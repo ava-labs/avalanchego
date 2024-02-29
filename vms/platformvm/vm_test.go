@@ -1376,10 +1376,8 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	// Passes messages from the consensus engine to the network
 	gossipConfig := subnets.GossipConfig{
-		AcceptedFrontierPeerSize:  1,
-		OnAcceptPeerSize:          1,
-		AppGossipValidatorSize:    1,
-		AppGossipNonValidatorSize: 1,
+		AcceptedFrontierPeerSize: 1,
+		OnAcceptPeerSize:         1,
 	}
 	sender, err := sender.New(
 		consensusCtx,
