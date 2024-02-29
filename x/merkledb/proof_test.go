@@ -31,24 +31,25 @@ func Test_Proof_Verify(t *testing.T) {
 	}
 
 	emptyValueKey := []byte{1, 2, 3}
-	nonEmptyValueKey := []byte{2, 3, 4}
+	nonEmptyValueKey := []byte{3, 4, 5}
+	nonExistentKey := []byte{5}
 
 	tests := []test{
-		// {
-		// 	name:        "happy path inclusion proof non-empty value",
-		// 	proofKey:    nonEmptyValueKey,
-		// 	malform:     func(*Proof) {},
-		// 	expectedErr: nil,
-		// },
-		// {
-		// 	name:        "happy path inclusion proof empty value",
-		// 	proofKey:    emptyValueKey,
-		// 	malform:     func(*Proof) {},
-		// 	expectedErr: nil,
-		// },
+		{
+			name:        "happy path inclusion proof non-empty value",
+			proofKey:    nonEmptyValueKey,
+			malform:     func(*Proof) {},
+			expectedErr: nil,
+		},
+		{
+			name:        "happy path inclusion proof empty value",
+			proofKey:    emptyValueKey,
+			malform:     func(*Proof) {},
+			expectedErr: nil,
+		},
 		{
 			name:        "happy path exclusion proof",
-			proofKey:    []byte{5},
+			proofKey:    nonExistentKey,
 			malform:     func(*Proof) {},
 			expectedErr: nil,
 		},
@@ -62,7 +63,7 @@ func Test_Proof_Verify(t *testing.T) {
 		},
 		{
 			name:     "empty exclusion proof path",
-			proofKey: []byte{5},
+			proofKey: nonExistentKey,
 			malform: func(proof *Proof) {
 				proof.Path = nil
 			},
@@ -78,7 +79,7 @@ func Test_Proof_Verify(t *testing.T) {
 		},
 		{
 			name:     "odd length key path with value; exclusion proof",
-			proofKey: []byte{5},
+			proofKey: nonExistentKey,
 			malform: func(proof *Proof) {
 				proof.Path[0].ValueOrHash = maybe.Some([]byte{1, 2})
 			},
@@ -107,6 +108,14 @@ func Test_Proof_Verify(t *testing.T) {
 				proof.Path[len(proof.Path)-1].ValueOrHash = maybe.Nothing[[]byte]()
 			},
 			expectedErr: ErrInclusionProofWrongValue,
+		},
+		{
+			name:     "exclusion proof has value",
+			proofKey: nonExistentKey,
+			malform: func(proof *Proof) {
+				proof.Value = maybe.Some([]byte{1, 2, 3})
+			},
+			expectedErr: ErrExclusionProofUnexpectedValue,
 		},
 	}
 
@@ -140,9 +149,21 @@ func Test_Proof_Verify(t *testing.T) {
 			require.ErrorIs(err, tt.expectedErr)
 		})
 	}
+
+	t.Run("proof key has partial byte", func(t *testing.T) {
+		require := require.New(t)
+
+		proof := &Proof{
+			Path: []ProofNode{{}},
+			Key:  ToKey([]byte{1}).Skip(1),
+		}
+
+		err := proof.Verify(context.Background(), ids.Empty, 4)
+		require.ErrorIs(err, ErrProofKeyPartialByte)
+	})
 }
 
-func Test_Proof_ValueOrHashMatches(t *testing.T) {
+func Test_ValueOrHashMatches(t *testing.T) {
 	require := require.New(t)
 
 	require.True(valueOrHashMatches(maybe.Some([]byte{0}), maybe.Some([]byte{0})))
