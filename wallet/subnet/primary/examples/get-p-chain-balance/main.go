@@ -16,8 +16,8 @@ import (
 )
 
 func main() {
-	uri := primary.LocalAPIURI
-	addrStr := "P-local18jma8ppw3nhx5r4ap8clazz0dps7rv5u00z96u"
+	uri := primary.FujiAPIURI
+	addrStr := "P-fuji18jma8ppw3nhx5r4ap8clazz0dps7rv5u00z96u"
 
 	addr, err := address.ParseToID(addrStr)
 	if err != nil {
