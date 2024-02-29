@@ -50,6 +50,9 @@ message SendAppErrorMsg {
 message SendAppGossipMsg {
   // The message body
   bytes msg = 1;
+  uint64 num_validators = 2;
+  uint64 num_non_validators = 3;
+  uint64 num_peers = 4;
 }
 
 message SendAppGossipSpecificMsg {

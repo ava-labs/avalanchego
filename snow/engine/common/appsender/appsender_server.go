@@ -87,7 +87,13 @@ func (s *Server) SendAppError(ctx context.Context, req *appsenderpb.SendAppError
 }
 
 func (s *Server) SendAppGossip(ctx context.Context, req *appsenderpb.SendAppGossipMsg) (*emptypb.Empty, error) {
-	err := s.appSender.SendAppGossip(ctx, req.Msg)
+	err := s.appSender.SendAppGossip(
+		ctx,
+		req.Msg,
+		int(req.NumValidators),
+		int(req.NumNonValidators),
+		int(req.NumPeers),
+	)
 	return &emptypb.Empty{}, err
 }
 

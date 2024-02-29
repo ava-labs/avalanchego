@@ -82,9 +82,6 @@ const (
 	DefaultConsensusGossipOnAcceptValidatorSize            = 0
 	DefaultConsensusGossipOnAcceptNonValidatorSize         = 0
 	DefaultConsensusGossipOnAcceptPeerSize                 = 10
-	DefaultAppGossipValidatorSize                          = 10
-	DefaultAppGossipNonValidatorSize                       = 0
-	DefaultAppGossipPeerSize                               = 0
 
 	// Inbound Throttling
 	DefaultInboundThrottlerAtLargeAllocSize         = 6 * units.MiB
