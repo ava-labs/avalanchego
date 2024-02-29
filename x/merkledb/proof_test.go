@@ -29,8 +29,8 @@ func Test_Proof_Verify(t *testing.T) {
 		expectedErr error
 	}
 
-	emptyValueKey := []byte{1}
-	nonEmptyValueKey := []byte{2}
+	emptyValueKey := []byte{1, 2, 3}
+	nonEmptyValueKey := []byte{2, 3, 4}
 
 	tests := []test{
 		{

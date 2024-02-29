@@ -41,6 +41,7 @@ var (
 	ErrProofNodeHasUnincludedValue = errors.New("the provided proof has a value for a key within the range that is not present in the provided key/values")
 	ErrExpectedUnmatchedToken      = errors.New("expected at least one unmatched token")
 	ErrUnexpectedEndOfProof        = errors.New("unexpected end of proof")
+	ErrProofKeyPartialByte         = errors.New("proof key has a partial byte")
 	ErrInvalidMaybe                = errors.New("maybe is nothing but has value")
 	ErrNilProofNode                = errors.New("proof node is nil")
 	ErrNilValueOrHash              = errors.New("proof node's valueOrHash field is nil")
@@ -129,6 +130,7 @@ type Proof struct {
 	Path []ProofNode
 
 	// This is a proof that [key] exists/doesn't exist.
+	// Must not have any partial bytes.
 	Key Key
 
 	// If this is an inclusion proof, this is the value associated with [key].
@@ -146,6 +148,10 @@ func (proof *Proof) Verify(ctx context.Context, expectedRootID ids.ID, tokenSize
 		return ErrEmptyProof
 	}
 
+	if proof.Key.hasPartialByte() {
+		return ErrProofKeyPartialByte
+	}
+
 	if err := verifyProofPath(proof.Path, maybe.Some(proof.Key)); err != nil {
 		return err
 	}
@@ -158,7 +164,7 @@ func (proof *Proof) Verify(ctx context.Context, expectedRootID ids.ID, tokenSize
 		return ErrInclusionProofWrongValue
 	}
 
-	// The last node in the proof should be either
+	// The last node in an exclusion proof must be either:
 	// 1. The node that would be the parent of [proof.Key] if [proof.Key] were in the trie, or
 	// 2. The node that is where [proof.Key] would be if [proof.Key] were in the trie
 	if !isInclusionProof && lastNode.Key.HasPrefix(proof.Key) {
