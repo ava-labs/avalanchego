@@ -147,11 +147,9 @@ func (proof *Proof) Verify(ctx context.Context, expectedRootID ids.ID, tokenSize
 	if len(proof.Path) == 0 {
 		return ErrEmptyProof
 	}
-
 	if proof.Key.hasPartialByte() {
 		return ErrProofKeyPartialByte
 	}
-
 	if err := verifyProofPath(proof.Path, maybe.Some(proof.Key)); err != nil {
 		return err
 	}
@@ -167,10 +165,10 @@ func (proof *Proof) Verify(ctx context.Context, expectedRootID ids.ID, tokenSize
 	// The last node in an exclusion proof must be either:
 	// 1. The node that would be the parent of [proof.Key] if [proof.Key] were in the trie, or
 	// 2. The node that is where [proof.Key] would be if [proof.Key] were in the trie
-	if !isInclusionProof && lastNode.Key.HasPrefix(proof.Key) {
+	if !isInclusionProof && proof.Key.HasPrefix(lastNode.Key) {
 		// Case 1
 		// Make sure there's no child which is a prefix of [proof.Key]
-		unmatchedKey := lastNode.Key.Skip(proof.Key.length)
+		unmatchedKey := proof.Key.Skip(lastNode.Key.length)
 		if unmatchedKey.Length() < tokenSize {
 			// The last node's key is a prefix of [proof.Key], but isn't equal to it,
 			// so there should be at least one unmatched token.
