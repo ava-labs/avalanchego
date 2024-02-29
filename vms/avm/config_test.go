@@ -34,12 +34,17 @@ func TestParseConfig(t *testing.T) {
 			},
 		},
 		{
-			name:        "manually specified checksums enabled",
+			name:        "manually specified network value",
 			configBytes: []byte(`{"network":{"max-validator-set-staleness":1}}`),
 			expectedConfig: Config{
 				Network: network.Config{
 					MaxValidatorSetStaleness:                    time.Nanosecond,
 					TargetGossipSize:                            network.DefaultConfig.TargetGossipSize,
+					PushGossipNumValidators:                     network.DefaultConfig.PushGossipNumValidators,
+					PushGossipNumPeers:                          network.DefaultConfig.PushGossipNumPeers,
+					PushGossipDiscardedCacheSize:                network.DefaultConfig.PushGossipDiscardedCacheSize,
+					PushGossipMaxRegossipFrequency:              network.DefaultConfig.PushGossipMaxRegossipFrequency,
+					PushGossipFrequency:                         network.DefaultConfig.PushGossipFrequency,
 					PullGossipPollSize:                          network.DefaultConfig.PullGossipPollSize,
 					PullGossipFrequency:                         network.DefaultConfig.PullGossipFrequency,
 					PullGossipThrottlingPeriod:                  network.DefaultConfig.PullGossipThrottlingPeriod,
@@ -47,7 +52,6 @@ func TestParseConfig(t *testing.T) {
 					ExpectedBloomFilterElements:                 network.DefaultConfig.ExpectedBloomFilterElements,
 					ExpectedBloomFilterFalsePositiveProbability: network.DefaultConfig.ExpectedBloomFilterFalsePositiveProbability,
 					MaxBloomFilterFalsePositiveProbability:      network.DefaultConfig.MaxBloomFilterFalsePositiveProbability,
-					LegacyPushGossipCacheSize:                   network.DefaultConfig.LegacyPushGossipCacheSize,
 				},
 				IndexTransactions:    DefaultConfig.IndexTransactions,
 				IndexAllowIncomplete: DefaultConfig.IndexAllowIncomplete,

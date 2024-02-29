@@ -282,7 +282,7 @@ func defaultVM(t *testing.T, f fork) (*VM, database.Database, *mutableSharedMemo
 	_, genesisBytes := defaultGenesis(t, ctx.AVAXAssetID)
 	appSender := &common.SenderTest{}
 	appSender.CantSendAppGossip = true
-	appSender.SendAppGossipF = func(context.Context, []byte) error {
+	appSender.SendAppGossipF = func(context.Context, []byte, int, int, int) error {
 		return nil
 	}
 
@@ -318,7 +318,7 @@ func defaultVM(t *testing.T, f fork) (*VM, database.Database, *mutableSharedMemo
 	)
 	require.NoError(err)
 	vm.ctx.Lock.Unlock()
-	require.NoError(vm.issueTx(context.Background(), testSubnet1))
+	require.NoError(vm.issueTxFromRPC(testSubnet1))
 	vm.ctx.Lock.Lock()
 	blk, err := vm.Builder.BuildBlock(context.Background())
 	require.NoError(err)
@@ -441,7 +441,7 @@ func TestAddValidatorCommit(t *testing.T) {
 
 	// trigger block creation
 	vm.ctx.Lock.Unlock()
-	require.NoError(vm.issueTx(context.Background(), tx))
+	require.NoError(vm.issueTxFromRPC(tx))
 	vm.ctx.Lock.Lock()
 
 	blk, err := vm.Builder.BuildBlock(context.Background())
@@ -540,7 +540,7 @@ func TestAddValidatorReject(t *testing.T) {
 
 	// trigger block creation
 	vm.ctx.Lock.Unlock()
-	require.NoError(vm.issueTx(context.Background(), tx))
+	require.NoError(vm.issueTxFromRPC(tx))
 	vm.ctx.Lock.Lock()
 
 	blk, err := vm.Builder.BuildBlock(context.Background())
@@ -589,7 +589,7 @@ func TestAddValidatorInvalidNotReissued(t *testing.T) {
 
 	// trigger block creation
 	vm.ctx.Lock.Unlock()
-	err = vm.issueTx(context.Background(), tx)
+	err = vm.issueTxFromRPC(tx)
 	vm.ctx.Lock.Lock()
 	require.ErrorIs(err, txexecutor.ErrDuplicateValidator)
 }
@@ -624,7 +624,7 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 
 	// trigger block creation
 	vm.ctx.Lock.Unlock()
-	require.NoError(vm.issueTx(context.Background(), tx))
+	require.NoError(vm.issueTxFromRPC(tx))
 	vm.ctx.Lock.Lock()
 
 	blk, err := vm.Builder.BuildBlock(context.Background())
@@ -672,7 +672,7 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 
 	// trigger block creation
 	vm.ctx.Lock.Unlock()
-	require.NoError(vm.issueTx(context.Background(), tx))
+	require.NoError(vm.issueTxFromRPC(tx))
 	vm.ctx.Lock.Lock()
 
 	blk, err := vm.Builder.BuildBlock(context.Background())
@@ -858,7 +858,7 @@ func TestCreateChain(t *testing.T) {
 	require.NoError(err)
 
 	vm.ctx.Lock.Unlock()
-	require.NoError(vm.issueTx(context.Background(), tx))
+	require.NoError(vm.issueTxFromRPC(tx))
 	vm.ctx.Lock.Lock()
 
 	blk, err := vm.Builder.BuildBlock(context.Background())
@@ -909,7 +909,7 @@ func TestCreateSubnet(t *testing.T) {
 	require.NoError(err)
 
 	vm.ctx.Lock.Unlock()
-	require.NoError(vm.issueTx(context.Background(), createSubnetTx))
+	require.NoError(vm.issueTxFromRPC(createSubnetTx))
 	vm.ctx.Lock.Lock()
 
 	// should contain the CreateSubnetTx
@@ -953,7 +953,7 @@ func TestCreateSubnet(t *testing.T) {
 	require.NoError(err)
 
 	vm.ctx.Lock.Unlock()
-	require.NoError(vm.issueTx(context.Background(), addValidatorTx))
+	require.NoError(vm.issueTxFromRPC(addValidatorTx))
 	vm.ctx.Lock.Lock()
 
 	blk, err = vm.Builder.BuildBlock(context.Background()) // should add validator to the new subnet
@@ -1057,7 +1057,7 @@ func TestAtomicImport(t *testing.T) {
 	require.NoError(err)
 
 	vm.ctx.Lock.Unlock()
-	require.NoError(vm.issueTx(context.Background(), tx))
+	require.NoError(vm.issueTxFromRPC(tx))
 	vm.ctx.Lock.Lock()
 
 	blk, err := vm.Builder.BuildBlock(context.Background())
@@ -1405,10 +1405,8 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	// Passes messages from the consensus engine to the network
 	gossipConfig := subnets.GossipConfig{
-		AcceptedFrontierPeerSize:  1,
-		OnAcceptPeerSize:          1,
-		AppGossipValidatorSize:    1,
-		AppGossipNonValidatorSize: 1,
+		AcceptedFrontierPeerSize: 1,
+		OnAcceptPeerSize:         1,
 	}
 	sender, err := sender.New(
 		consensusCtx,
@@ -2063,7 +2061,7 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 	require.NoError(err)
 
 	vm.ctx.Lock.Unlock()
-	require.NoError(vm.issueTx(context.Background(), addValidatorTx))
+	require.NoError(vm.issueTxFromRPC(addValidatorTx))
 	vm.ctx.Lock.Lock()
 
 	// trigger block creation for the validator tx
@@ -2083,7 +2081,7 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 	require.NoError(err)
 
 	vm.ctx.Lock.Unlock()
-	require.NoError(vm.issueTx(context.Background(), createSubnetTx))
+	require.NoError(vm.issueTxFromRPC(createSubnetTx))
 	vm.ctx.Lock.Lock()
 
 	// trigger block creation for the subnet tx
@@ -2154,7 +2152,7 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 	subnetID := createSubnetTx.ID()
 
 	vm.ctx.Lock.Unlock()
-	require.NoError(vm.issueTx(context.Background(), createSubnetTx))
+	require.NoError(vm.issueTxFromRPC(createSubnetTx))
 	vm.ctx.Lock.Lock()
 	createSubnetBlock, err := vm.Builder.BuildBlock(context.Background())
 	require.NoError(err)
@@ -2192,7 +2190,7 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 	require.NoError(err)
 
 	vm.ctx.Lock.Unlock()
-	require.NoError(vm.issueTx(context.Background(), transferSubnetOwnershipTx))
+	require.NoError(vm.issueTxFromRPC(transferSubnetOwnershipTx))
 	vm.ctx.Lock.Lock()
 	transferSubnetOwnershipBlock, err := vm.Builder.BuildBlock(context.Background())
 	require.NoError(err)
@@ -2294,7 +2292,7 @@ func TestBaseTx(t *testing.T) {
 	require.Equal(sendAmt, key1OutputAmt)
 
 	vm.ctx.Lock.Unlock()
-	require.NoError(vm.issueTx(context.Background(), baseTx))
+	require.NoError(vm.issueTxFromRPC(baseTx))
 	vm.ctx.Lock.Lock()
 	baseTxBlock, err := vm.Builder.BuildBlock(context.Background())
 	require.NoError(err)
@@ -2333,7 +2331,7 @@ func TestPruneMempool(t *testing.T) {
 	require.NoError(err)
 
 	vm.ctx.Lock.Unlock()
-	require.NoError(vm.issueTx(context.Background(), baseTx))
+	require.NoError(vm.issueTxFromRPC(baseTx))
 	vm.ctx.Lock.Lock()
 
 	// [baseTx] should be in the mempool.
@@ -2365,7 +2363,7 @@ func TestPruneMempool(t *testing.T) {
 	require.NoError(err)
 
 	vm.ctx.Lock.Unlock()
-	require.NoError(vm.issueTx(context.Background(), addValidatorTx))
+	require.NoError(vm.issueTxFromRPC(addValidatorTx))
 	vm.ctx.Lock.Lock()
 
 	// Advance clock to [endTime], making [addValidatorTx] invalid.

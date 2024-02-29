@@ -1567,7 +1567,13 @@ func (s *sender) SendAppGossipSpecific(_ context.Context, nodeIDs set.Set[ids.No
 	return nil
 }
 
-func (s *sender) SendAppGossip(_ context.Context, appGossipBytes []byte) error {
+func (s *sender) SendAppGossip(
+	_ context.Context,
+	appGossipBytes []byte,
+	numValidators int,
+	numNonValidators int,
+	numPeers int,
+) error {
 	// Create the outbound message.
 	outMsg, err := s.msgCreator.AppGossip(s.ctx.ChainID, appGossipBytes)
 	if err != nil {
@@ -1580,17 +1586,12 @@ func (s *sender) SendAppGossip(_ context.Context, appGossipBytes []byte) error {
 		return nil
 	}
 
-	gossipConfig := s.subnet.Config().GossipConfig
-	validatorSize := int(gossipConfig.AppGossipValidatorSize)
-	nonValidatorSize := int(gossipConfig.AppGossipNonValidatorSize)
-	peerSize := int(gossipConfig.AppGossipPeerSize)
-
 	sentTo := s.sender.Gossip(
 		outMsg,
 		s.ctx.SubnetID,
-		validatorSize,
-		nonValidatorSize,
-		peerSize,
+		numValidators,
+		numNonValidators,
+		numPeers,
 		s.subnet,
 	)
 	if sentTo.Len() == 0 {
