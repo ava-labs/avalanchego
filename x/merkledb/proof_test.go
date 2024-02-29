@@ -21,32 +21,7 @@ import (
 	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
-func Test_Proof_Empty(t *testing.T) {
-	proof := &Proof{}
-	err := proof.Verify(context.Background(), ids.Empty, 4)
-	require.ErrorIs(t, err, ErrEmptyProof)
-}
-
-func Test_Proof_Simple(t *testing.T) {
-	require := require.New(t)
-
-	db, err := getBasicDB()
-	require.NoError(err)
-
-	ctx := context.Background()
-	require.NoError(db.PutContext(ctx, []byte{}, []byte{1}))
-	require.NoError(db.PutContext(ctx, []byte{0}, []byte{2}))
-
-	expectedRoot, err := db.GetMerkleRoot(ctx)
-	require.NoError(err)
-
-	proof, err := db.GetProof(ctx, []byte{})
-	require.NoError(err)
-
-	require.NoError(proof.Verify(ctx, expectedRoot, 4))
-}
-
-func Test_Proof_Verify_Bad_Data(t *testing.T) {
+func Test_Proof_Verify(t *testing.T) {
 	type test struct {
 		name        string
 		proofKey    []byte

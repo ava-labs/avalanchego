@@ -39,6 +39,8 @@ var (
 	ErrInclusionProofWrongValue    = errors.New("the last proof node's value should match the proved value for an inclusion proof")
 	ErrProofValueDoesntMatch       = errors.New("the provided value does not match the proof node for the provided key's value")
 	ErrProofNodeHasUnincludedValue = errors.New("the provided proof has a value for a key within the range that is not present in the provided key/values")
+	ErrExpectedUnmatchedToken      = errors.New("expected at least one unmatched token")
+	ErrUnexpectedEndOfProof        = errors.New("unexpected end of proof")
 	ErrInvalidMaybe                = errors.New("maybe is nothing but has value")
 	ErrNilProofNode                = errors.New("proof node is nil")
 	ErrNilValueOrHash              = errors.New("proof node's valueOrHash field is nil")
@@ -156,6 +158,27 @@ func (proof *Proof) Verify(ctx context.Context, expectedRootID ids.ID, tokenSize
 		return ErrInclusionProofWrongValue
 	}
 
+	// The last node in the proof should be either
+	// 1. The node that would be the parent of [proof.Key] if [proof.Key] were in the trie, or
+	// 2. The node that is where [proof.Key] would be if [proof.Key] were in the trie
+	if !isInclusionProof && lastNode.Key.HasPrefix(proof.Key) {
+		// Case 1
+		// Make sure there's no child which is a prefix of [proof.Key]
+		unmatchedKey := lastNode.Key.Skip(proof.Key.length)
+		if unmatchedKey.Length() < tokenSize {
+			// The last node's key is a prefix of [proof.Key], but isn't equal to it,
+			// so there should be at least one unmatched token.
+			return ErrExpectedUnmatchedToken
+		}
+		nextUnmatchedToken := unmatchedKey.Token(0, tokenSize)
+		if _, ok := lastNode.Children[nextUnmatchedToken]; ok {
+			// The proof path should include all nodes which are prefixes of [proof.Key]
+			// but there's another child of the last node which is a prefix of [proof.Key].
+			// That child (or its descendant) should be the last node in the proof path.
+			return ErrUnexpectedEndOfProof
+		}
+	}
+
 	// Don't bother locking [view] -- nobody else has a reference to it.
 	view, err := getStandaloneView(ctx, nil, tokenSize)
 	if err != nil {
@@ -167,9 +190,17 @@ func (proof *Proof) Verify(ctx context.Context, expectedRootID ids.ID, tokenSize
 	provenKey := maybe.Some(lastNode.Key)
 
 	// Insert all proof nodes.
+	// TODO uncomment
 	if err = addPathInfo(view, proof.Path, provenKey, provenKey); err != nil {
 		return err
 	}
+	// END TODO uncomment
+
+	// TODO remove
+	// if err = addPathInfo(view, []ProofNode{proof.Path[0]}, provenKey, provenKey); err != nil {
+	// 	return err
+	// }
+	// END TODO remove
 
 	gotRootID, err := view.GetMerkleRoot(ctx)
 	if err != nil {
