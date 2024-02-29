@@ -69,6 +69,7 @@ The plugin version is updated to `34` all plugins must update to be compatible.
   - `push-regossip-num-peers`
   - `push-gossip-frequency`
   - `pull-gossip-frequency`
+  - `tx-pool-lifetime`
 - Removed C-chain configs:
   - `tx-pool-journal`
   - `tx-pool-rejournal`
