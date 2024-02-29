@@ -34,6 +34,8 @@ var (
 		TargetGossipSize:                            1,
 		PushGossipNumValidators:                     1,
 		PushGossipNumPeers:                          0,
+		PushRegossipNumValidators:                   1,
+		PushRegossipNumPeers:                        0,
 		PushGossipDiscardedCacheSize:                1,
 		PushGossipMaxRegossipFrequency:              time.Second,
 		PushGossipFrequency:                         time.Second,
