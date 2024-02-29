@@ -871,7 +871,7 @@ type testAppSender struct {
 	sendCrossChainAppResponseFn func(ids.ID, uint32, []byte) error
 	sendAppRequestFn            func(context.Context, set.Set[ids.NodeID], uint32, []byte) error
 	sendAppResponseFn           func(ids.NodeID, uint32, []byte) error
-	sendAppGossipFn             func([]byte) error
+	sendAppGossipFn             func([]byte, int, int, int) error
 }
 
 func (t testAppSender) SendCrossChainAppRequest(_ context.Context, chainID ids.ID, requestID uint32, appRequestBytes []byte) error {
@@ -894,8 +894,8 @@ func (t testAppSender) SendAppResponse(_ context.Context, nodeID ids.NodeID, req
 	return t.sendAppResponseFn(nodeID, requestID, message)
 }
 
-func (t testAppSender) SendAppGossip(_ context.Context, message []byte) error {
-	return t.sendAppGossipFn(message)
+func (t testAppSender) SendAppGossip(_ context.Context, message []byte, numValidators int, numNonValidators int, numPeers int) error {
+	return t.sendAppGossipFn(message, numValidators, numNonValidators, numPeers)
 }
 
 func (t testAppSender) SendAppError(ctx context.Context, nodeID ids.NodeID, requestID uint32, errorCode int32, errorMessage string) error {
