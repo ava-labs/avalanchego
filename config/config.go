@@ -271,9 +271,6 @@ func getGossipConfig(v *viper.Viper) subnets.GossipConfig {
 		OnAcceptValidatorSize:            uint(v.GetUint32(ConsensusGossipOnAcceptValidatorSizeKey)),
 		OnAcceptNonValidatorSize:         uint(v.GetUint32(ConsensusGossipOnAcceptNonValidatorSizeKey)),
 		OnAcceptPeerSize:                 uint(v.GetUint32(ConsensusGossipOnAcceptPeerSizeKey)),
-		AppGossipValidatorSize:           uint(v.GetUint32(AppGossipValidatorSizeKey)),
-		AppGossipNonValidatorSize:        uint(v.GetUint32(AppGossipNonValidatorSizeKey)),
-		AppGossipPeerSize:                uint(v.GetUint32(AppGossipPeerSizeKey)),
 	}
 }
 
