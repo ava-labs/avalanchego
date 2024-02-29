@@ -36,7 +36,7 @@ const (
 	defaultContinuousProfilerFrequency                = 15 * time.Minute
 	defaultContinuousProfilerMaxFiles                 = 5
 	defaultPushGossipFrequency                        = 100 * time.Millisecond
-	defaultPullGossipFrequency                        = 10 * time.Second
+	defaultPullGossipFrequency                        = 1 * time.Second
 	defaultTxRegossipFrequency                        = 10 * time.Second
 	defaultOfflinePruningBloomFilterSize       uint64 = 512 // Default size (MB) for the offline pruner to use
 	defaultLogLevel                                   = "info"
