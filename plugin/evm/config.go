@@ -133,12 +133,13 @@ type Config struct {
 	// API Settings
 	LocalTxsEnabled bool `json:"local-txs-enabled"`
 
-	TxPoolPriceLimit   uint64 `json:"tx-pool-price-limit"`
-	TxPoolPriceBump    uint64 `json:"tx-pool-price-bump"`
-	TxPoolAccountSlots uint64 `json:"tx-pool-account-slots"`
-	TxPoolGlobalSlots  uint64 `json:"tx-pool-global-slots"`
-	TxPoolAccountQueue uint64 `json:"tx-pool-account-queue"`
-	TxPoolGlobalQueue  uint64 `json:"tx-pool-global-queue"`
+	TxPoolPriceLimit   uint64   `json:"tx-pool-price-limit"`
+	TxPoolPriceBump    uint64   `json:"tx-pool-price-bump"`
+	TxPoolAccountSlots uint64   `json:"tx-pool-account-slots"`
+	TxPoolGlobalSlots  uint64   `json:"tx-pool-global-slots"`
+	TxPoolAccountQueue uint64   `json:"tx-pool-account-queue"`
+	TxPoolGlobalQueue  uint64   `json:"tx-pool-global-queue"`
+	TxPoolLifetime     Duration `json:"tx-pool-lifetime"`
 
 	APIMaxDuration           Duration      `json:"api-max-duration"`
 	WSCPURefillRate          Duration      `json:"ws-cpu-refill-rate"`
@@ -240,6 +241,7 @@ func (c *Config) SetDefaults() {
 	c.TxPoolGlobalSlots = txpool.DefaultConfig.GlobalSlots
 	c.TxPoolAccountQueue = txpool.DefaultConfig.AccountQueue
 	c.TxPoolGlobalQueue = txpool.DefaultConfig.GlobalQueue
+	c.TxPoolLifetime.Duration = txpool.DefaultConfig.Lifetime
 
 	c.APIMaxDuration.Duration = defaultApiMaxDuration
 	c.WSCPURefillRate.Duration = defaultWsCpuRefillRate
