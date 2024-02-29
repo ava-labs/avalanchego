@@ -21,7 +21,10 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/message"
 )
 
-const txGossipHandlerID = 0
+const (
+	txGossipHandlerID          = 0
+	pushGossipNumNonValidators = 0
+)
 
 var (
 	_ common.AppHandler    = (*Network)(nil)
@@ -95,7 +98,7 @@ func New(
 		txGossipClient,
 		txGossipMetrics,
 		config.PushGossipNumValidators,
-		config.PushGossipNumNonValidators,
+		pushGossipNumNonValidators,
 		config.PushGossipNumPeers,
 		config.PushGossipDiscardedCacheSize,
 		config.TargetGossipSize,

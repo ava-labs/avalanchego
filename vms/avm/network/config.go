@@ -13,7 +13,6 @@ var DefaultConfig = Config{
 	MaxValidatorSetStaleness:                    time.Minute,
 	TargetGossipSize:                            20 * units.KiB,
 	PushGossipNumValidators:                     10,
-	PushGossipNumNonValidators:                  0,
 	PushGossipNumPeers:                          0,
 	PushGossipDiscardedCacheSize:                1024,
 	PushGossipMaxRegossipFrequency:              10 * time.Second,
@@ -38,9 +37,6 @@ type Config struct {
 	// PushGossipNumValidators is the number of validators to push transactions
 	// to per round of gossip.
 	PushGossipNumValidators int `json:"push-gossip-num-validators"`
-	// PushGossipNumNonValidators is the number of non-validators to push
-	// transactions to per round of gossip.
-	PushGossipNumNonValidators int `json:"push-gossip-num-non-validators"`
 	// PushGossipNumPeers is the number of peers to push transactions to per
 	// round of gossip.
 	PushGossipNumPeers int `json:"push-gossip-num-peers"`
