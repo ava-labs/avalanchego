@@ -364,27 +364,25 @@ func (p *PushGossiper[T]) Gossip(ctx context.Context) error {
 		return nil
 	}
 
-	err := p.gossip(
+	if err := p.gossip(
 		ctx,
 		now,
 		p.gossipParams,
 		p.toGossip,
 		p.toRegossip,
 		&cache.Empty[ids.ID, struct{}]{}, // Don't mark dropped unsent transactions as discarded
-	)
-	if err != nil {
+	); err != nil {
 		return fmt.Errorf("unexpected error during gossip: %w", err)
 	}
 
-	err = p.gossip(
+	if err := p.gossip(
 		ctx,
 		now,
 		p.regossipParams,
 		p.toRegossip,
 		p.toRegossip,
 		p.discarded, // Mark dropped sent transactions as discarded
-	)
-	if err != nil {
+	); err != nil {
 		return fmt.Errorf("unexpected error during regossip: %w", err)
 	}
 	return nil
