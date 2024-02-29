@@ -253,7 +253,7 @@ func GenesisVM(t *testing.T,
 	ctx, dbManager, genesisBytes, issuer, m := setupGenesis(t, genesisJSON)
 	appSender := &commonEng.SenderTest{T: t}
 	appSender.CantSendAppGossip = true
-	appSender.SendAppGossipF = func(context.Context, []byte) error { return nil }
+	appSender.SendAppGossipF = func(context.Context, []byte, int, int, int) error { return nil }
 	err := vm.Initialize(
 		context.Background(),
 		ctx,
@@ -3409,7 +3409,7 @@ func TestConfigureLogLevel(t *testing.T) {
 			ctx, dbManager, genesisBytes, issuer, _ := setupGenesis(t, test.genesisJSON)
 			appSender := &commonEng.SenderTest{T: t}
 			appSender.CantSendAppGossip = true
-			appSender.SendAppGossipF = func(context.Context, []byte) error { return nil }
+			appSender.SendAppGossipF = func(context.Context, []byte, int, int, int) error { return nil }
 			err := vm.Initialize(
 				context.Background(),
 				ctx,

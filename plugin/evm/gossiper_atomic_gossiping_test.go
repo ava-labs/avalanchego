@@ -35,7 +35,7 @@ func TestMempoolAtmTxsAppGossipHandling(t *testing.T) {
 		txRequested    bool
 	)
 	sender.CantSendAppGossip = false
-	sender.SendAppGossipF = func(context.Context, []byte) error {
+	sender.SendAppGossipF = func(context.Context, []byte, int, int, int) error {
 		txGossipedLock.Lock()
 		defer txGossipedLock.Unlock()
 
@@ -122,7 +122,7 @@ func TestMempoolAtmTxsAppGossipHandlingDiscardedTx(t *testing.T) {
 		txRequested    bool
 	)
 	sender.CantSendAppGossip = false
-	sender.SendAppGossipF = func(context.Context, []byte) error {
+	sender.SendAppGossipF = func(context.Context, []byte, int, int, int) error {
 		txGossipedLock.Lock()
 		defer txGossipedLock.Unlock()
 

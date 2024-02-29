@@ -105,7 +105,7 @@ func TestMempoolEthTxsAppGossipHandling(t *testing.T) {
 		return nil
 	}
 	wg.Add(1)
-	sender.SendAppGossipF = func(context.Context, []byte) error {
+	sender.SendAppGossipF = func(context.Context, []byte, int, int, int) error {
 		wg.Done()
 		return nil
 	}
