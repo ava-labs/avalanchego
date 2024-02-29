@@ -47,10 +47,10 @@ func TestComputeNextEmptyWindows(t *testing.T) {
 	require.Equal(initialUnitFees[UTXORead], next.unitFees[UTXORead])
 
 	// UTXOWrite units are above target, next unit fees increased, proportionally to priceChangeDenominator
-	require.Equal(initialUnitFees[UTXOWrite]+priceChangeDenominator[UTXOWrite], next.unitFees[UTXOWrite])
+	require.Equal(initialUnitFees[UTXOWrite]+1, next.unitFees[UTXOWrite])
 
 	// Compute units are above target, next unit fees increased, proportionally to priceChangeDenominator
-	require.Equal(initialUnitFees[Compute]+9*priceChangeDenominator[Compute], next.unitFees[Compute])
+	require.Equal(initialUnitFees[Compute]+9, next.unitFees[Compute])
 
 	// next cumulated units are zeroed
 	require.Equal(Dimensions{}, next.cumulatedUnits)
@@ -97,10 +97,10 @@ func TestComputeNextNonEmptyWindows(t *testing.T) {
 	require.Equal(uint64(737869762948382064), next.unitFees[UTXORead])
 
 	// UTXOWrite units are above target, even if they are decreasing within the window. Next unit fees increased.
-	require.Equal(initialUnitFees[UTXOWrite]+4*priceChangeDenominator[UTXOWrite], next.unitFees[UTXOWrite])
+	require.Equal(initialUnitFees[UTXOWrite]+4, next.unitFees[UTXOWrite])
 
 	// Compute units are above target, next unit fees increased, proportionally to priceChangeDenominator
-	require.Equal(uint64(737869762948382061), next.unitFees[Compute])
+	require.Equal(uint64(73786976294838207), next.unitFees[Compute])
 
 	// next cumulated units are zeroed
 	require.Equal(Dimensions{}, next.cumulatedUnits)
