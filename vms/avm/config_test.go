@@ -40,8 +40,10 @@ func TestParseConfig(t *testing.T) {
 				Network: network.Config{
 					MaxValidatorSetStaleness:                    time.Nanosecond,
 					TargetGossipSize:                            network.DefaultConfig.TargetGossipSize,
-					PushGossipNumValidators:                     network.DefaultConfig.PushGossipNumValidators,
-					PushGossipNumPeers:                          network.DefaultConfig.PushGossipNumPeers,
+					PushGossipFirstNumValidators:                network.DefaultConfig.PushGossipFirstNumValidators,
+					PushGossipFirstNumPeers:                     network.DefaultConfig.PushGossipFirstNumPeers,
+					PushGossipFollowupNumValidators:             network.DefaultConfig.PushGossipFollowupNumValidators,
+					PushGossipFollowupNumPeers:                  network.DefaultConfig.PushGossipFollowupNumPeers,
 					PushGossipDiscardedCacheSize:                network.DefaultConfig.PushGossipDiscardedCacheSize,
 					PushGossipMaxRegossipFrequency:              network.DefaultConfig.PushGossipMaxRegossipFrequency,
 					PushGossipFrequency:                         network.DefaultConfig.PushGossipFrequency,

@@ -22,10 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 )
 
-const (
-	TxGossipHandlerID          = 0
-	pushGossipNumNonValidators = 0
-)
+const TxGossipHandlerID = 0
 
 var errMempoolDisabledWithPartialSync = errors.New("mempool is disabled partial syncing")
 
@@ -96,9 +93,14 @@ func New(
 		gossipMempool,
 		txGossipClient,
 		txGossipMetrics,
-		config.PushGossipNumValidators,
-		pushGossipNumNonValidators,
-		config.PushGossipNumPeers,
+		gossip.BranchingFactor{
+			Validators: config.PushGossipFirstNumValidators,
+			Peers:      config.PushGossipFirstNumPeers,
+		},
+		gossip.BranchingFactor{
+			Validators: config.PushGossipFollowupNumValidators,
+			Peers:      config.PushGossipFollowupNumPeers,
+		},
 		config.PushGossipDiscardedCacheSize,
 		config.TargetGossipSize,
 		config.PushGossipMaxRegossipFrequency,
