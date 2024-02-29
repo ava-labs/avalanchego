@@ -144,6 +144,18 @@ func verifyAddValidatorTx(
 	copy(outs, tx.Outs)
 	copy(outs[len(tx.Outs):], tx.StakeOuts)
 
+	feeCalculator := fees.Calculator{
+		IsEUpgradeActive: false,
+		TxID:             sTx.ID(),
+		Log:              backend.Ctx.Log,
+		Config:           backend.Config,
+		ChainTime:        currentTimestamp,
+		Credentials:      sTx.Creds,
+	}
+	if err := tx.Visit(&feeCalculator); err != nil {
+		return nil, err
+	}
+
 	if !backend.Bootstrapped.Get() {
 		return outs, nil
 	}
@@ -169,18 +181,6 @@ func verifyAddValidatorTx(
 	}
 
 	// Verify the flowcheck
-	feeCalculator := fees.Calculator{
-		IsEUpgradeActive: false,
-		TxID:             sTx.ID(),
-		Log:              backend.Ctx.Log,
-		Config:           backend.Config,
-		ChainTime:        currentTimestamp,
-		Credentials:      sTx.Creds,
-	}
-	if err := tx.Visit(&feeCalculator); err != nil {
-		return nil, err
-	}
-
 	if err := backend.FlowChecker.VerifySpend(
 		tx,
 		chainState,
@@ -238,6 +238,20 @@ func verifyAddSubnetValidatorTx(
 		return ErrStakeTooLong
 	}
 
+	feeCalculator := fees.Calculator{
+		IsEUpgradeActive: backend.Config.IsEUpgradeActivated(currentTimestamp),
+		TxID:             sTx.ID(),
+		Log:              backend.Ctx.Log,
+		Config:           backend.Config,
+		ChainTime:        currentTimestamp,
+		FeeManager:       feeManager,
+		ConsumedUnitsCap: unitCaps,
+		Credentials:      sTx.Creds,
+	}
+	if err := tx.Visit(&feeCalculator); err != nil {
+		return err
+	}
+
 	if !backend.Bootstrapped.Get() {
 		return nil
 	}
@@ -273,20 +287,6 @@ func verifyAddSubnetValidatorTx(
 	}
 
 	// Verify the flowcheck
-	feeCalculator := fees.Calculator{
-		IsEUpgradeActive: backend.Config.IsEUpgradeActivated(currentTimestamp),
-		TxID:             sTx.ID(),
-		Log:              backend.Ctx.Log,
-		Config:           backend.Config,
-		ChainTime:        currentTimestamp,
-		FeeManager:       feeManager,
-		ConsumedUnitsCap: unitCaps,
-		Credentials:      sTx.Creds,
-	}
-	if err := tx.Visit(&feeCalculator); err != nil {
-		return err
-	}
-
 	if err := backend.FlowChecker.VerifySpend(
 		tx,
 		chainState,
@@ -355,17 +355,6 @@ func verifyRemoveSubnetValidatorTx(
 		return nil, false, ErrRemovePermissionlessValidator
 	}
 
-	if !backend.Bootstrapped.Get() {
-		// Not bootstrapped yet -- don't need to do full verification.
-		return vdr, isCurrentValidator, nil
-	}
-
-	baseTxCreds, err := verifySubnetAuthorization(backend, chainState, sTx, tx.Subnet, tx.SubnetAuth)
-	if err != nil {
-		return nil, false, err
-	}
-
-	// Verify the flowcheck
 	feeCalculator := fees.Calculator{
 		IsEUpgradeActive: backend.Config.IsEUpgradeActivated(currentTimestamp),
 		TxID:             sTx.ID(),
@@ -380,6 +369,17 @@ func verifyRemoveSubnetValidatorTx(
 		return nil, false, err
 	}
 
+	if !backend.Bootstrapped.Get() {
+		// Not bootstrapped yet -- don't need to do full verification.
+		return vdr, isCurrentValidator, nil
+	}
+
+	baseTxCreds, err := verifySubnetAuthorization(backend, chainState, sTx, tx.Subnet, tx.SubnetAuth)
+	if err != nil {
+		return nil, false, err
+	}
+
+	// Verify the flowcheck
 	if err := backend.FlowChecker.VerifySpend(
 		tx,
 		chainState,
@@ -448,6 +448,18 @@ func verifyAddDelegatorTx(
 	copy(outs, tx.Outs)
 	copy(outs[len(tx.Outs):], tx.StakeOuts)
 
+	feeCalculator := fees.Calculator{
+		IsEUpgradeActive: false,
+		TxID:             sTx.ID(),
+		Log:              backend.Ctx.Log,
+		Config:           backend.Config,
+		ChainTime:        currentTimestamp,
+		Credentials:      sTx.Creds,
+	}
+	if err := tx.Visit(&feeCalculator); err != nil {
+		return nil, err
+	}
+
 	if !backend.Bootstrapped.Get() {
 		return outs, nil
 	}
@@ -498,18 +510,6 @@ func verifyAddDelegatorTx(
 	}
 
 	// Verify the flowcheck
-	feeCalculator := fees.Calculator{
-		IsEUpgradeActive: false,
-		TxID:             sTx.ID(),
-		Log:              backend.Ctx.Log,
-		Config:           backend.Config,
-		ChainTime:        currentTimestamp,
-		Credentials:      sTx.Creds,
-	}
-	if err := tx.Visit(&feeCalculator); err != nil {
-		return nil, err
-	}
-
 	if err := backend.FlowChecker.VerifySpend(
 		tx,
 		chainState,
@@ -548,6 +548,20 @@ func verifyAddPermissionlessValidatorTx(
 		isDurangoActive  = backend.Config.IsDurangoActivated(currentTimestamp)
 	)
 	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
+		return err
+	}
+
+	feeCalculator := fees.Calculator{
+		IsEUpgradeActive: backend.Config.IsEUpgradeActivated(currentTimestamp),
+		TxID:             sTx.ID(),
+		Log:              backend.Ctx.Log,
+		Config:           backend.Config,
+		ChainTime:        currentTimestamp,
+		FeeManager:       feeManager,
+		ConsumedUnitsCap: unitCaps,
+		Credentials:      sTx.Creds,
+	}
+	if err := tx.Visit(&feeCalculator); err != nil {
 		return err
 	}
 
@@ -631,20 +645,6 @@ func verifyAddPermissionlessValidatorTx(
 	copy(outs[len(tx.Outs):], tx.StakeOuts)
 
 	// Verify the flowcheck
-	feeCalculator := fees.Calculator{
-		IsEUpgradeActive: backend.Config.IsEUpgradeActivated(currentTimestamp),
-		TxID:             sTx.ID(),
-		Log:              backend.Ctx.Log,
-		Config:           backend.Config,
-		ChainTime:        currentTimestamp,
-		FeeManager:       feeManager,
-		ConsumedUnitsCap: unitCaps,
-		Credentials:      sTx.Creds,
-	}
-	if err := tx.Visit(&feeCalculator); err != nil {
-		return err
-	}
-
 	if err := backend.FlowChecker.VerifySpend(
 		tx,
 		chainState,
@@ -683,6 +683,20 @@ func verifyAddPermissionlessDelegatorTx(
 		isDurangoActive  = backend.Config.IsDurangoActivated(currentTimestamp)
 	)
 	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
+		return err
+	}
+
+	feeCalculator := fees.Calculator{
+		IsEUpgradeActive: backend.Config.IsEUpgradeActivated(currentTimestamp),
+		TxID:             sTx.ID(),
+		Log:              backend.Ctx.Log,
+		Config:           backend.Config,
+		ChainTime:        currentTimestamp,
+		FeeManager:       feeManager,
+		ConsumedUnitsCap: unitCaps,
+		Credentials:      sTx.Creds,
+	}
+	if err := tx.Visit(&feeCalculator); err != nil {
 		return err
 	}
 
@@ -791,21 +805,6 @@ func verifyAddPermissionlessDelegatorTx(
 	}
 
 	// Verify the flowcheck
-	feeCalculator := fees.Calculator{
-		IsEUpgradeActive: backend.Config.IsEUpgradeActivated(currentTimestamp),
-		TxID:             sTx.ID(),
-		Log:              backend.Ctx.Log,
-		Config:           backend.Config,
-		ChainTime:        currentTimestamp,
-		FeeManager:       feeManager,
-		ConsumedUnitsCap: unitCaps,
-		Credentials:      sTx.Creds,
-	}
-	if err := tx.Visit(&feeCalculator); err != nil {
-		return err
-	}
-
-	// Verify the flowcheck
 	if err := backend.FlowChecker.VerifySpend(
 		tx,
 		chainState,
@@ -850,17 +849,6 @@ func verifyTransferSubnetOwnershipTx(
 		return err
 	}
 
-	if !backend.Bootstrapped.Get() {
-		// Not bootstrapped yet -- don't need to do full verification.
-		return nil
-	}
-
-	baseTxCreds, err := verifySubnetAuthorization(backend, chainState, sTx, tx.Subnet, tx.SubnetAuth)
-	if err != nil {
-		return err
-	}
-
-	// Verify the flowcheck
 	currentTimestamp := chainState.GetTimestamp()
 	feeCalculator := fees.Calculator{
 		IsEUpgradeActive: backend.Config.IsEUpgradeActivated(currentTimestamp),
@@ -876,6 +864,17 @@ func verifyTransferSubnetOwnershipTx(
 		return err
 	}
 
+	if !backend.Bootstrapped.Get() {
+		// Not bootstrapped yet -- don't need to do full verification.
+		return nil
+	}
+
+	baseTxCreds, err := verifySubnetAuthorization(backend, chainState, sTx, tx.Subnet, tx.SubnetAuth)
+	if err != nil {
+		return err
+	}
+
+	// Verify the flowcheck
 	if err := backend.FlowChecker.VerifySpend(
 		tx,
 		chainState,

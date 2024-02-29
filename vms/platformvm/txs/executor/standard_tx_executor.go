@@ -193,6 +193,21 @@ func (e *StandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 		utxoIDs[i] = utxoID[:]
 	}
 
+	cfg := e.Backend.Config
+	feeCalculator := fees.Calculator{
+		IsEUpgradeActive: cfg.IsEUpgradeActivated(currentTimestamp),
+		TxID:             e.Tx.ID(),
+		Log:              e.Ctx.Log,
+		Config:           cfg,
+		ChainTime:        currentTimestamp,
+		FeeManager:       e.BlkFeeManager,
+		ConsumedUnitsCap: e.UnitCaps,
+		Credentials:      e.Tx.Creds,
+	}
+	if err := tx.Visit(&feeCalculator); err != nil {
+		return err
+	}
+
 	// Skip verification of the shared memory inputs if the other primary
 	// network chains are not guaranteed to be up-to-date.
 	if e.Bootstrapped.Get() && !e.Config.PartialSyncPrimaryNetwork {
@@ -226,24 +241,6 @@ func (e *StandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 		copy(ins[len(tx.Ins):], tx.ImportedInputs)
 
 		// Verify the flowcheck
-		var (
-			cfg              = e.Backend.Config
-			currentTimestamp = e.State.GetTimestamp()
-		)
-		feeCalculator := fees.Calculator{
-			IsEUpgradeActive: cfg.IsEUpgradeActivated(currentTimestamp),
-			TxID:             e.Tx.ID(),
-			Log:              e.Ctx.Log,
-			Config:           cfg,
-			ChainTime:        currentTimestamp,
-			FeeManager:       e.BlkFeeManager,
-			ConsumedUnitsCap: e.UnitCaps,
-			Credentials:      e.Tx.Creds,
-		}
-		if err := tx.Visit(&feeCalculator); err != nil {
-			return err
-		}
-
 		if err := e.FlowChecker.VerifySpendUTXOs(
 			tx,
 			utxos,
@@ -289,12 +286,6 @@ func (e *StandardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 		return err
 	}
 
-	if e.Bootstrapped.Get() {
-		if err := verify.SameSubnet(context.TODO(), e.Ctx, tx.DestinationChain); err != nil {
-			return err
-		}
-	}
-
 	// Verify the flowcheck
 	feeCalculator := fees.Calculator{
 		IsEUpgradeActive: e.Backend.Config.IsEUpgradeActivated(currentTimestamp),
@@ -308,6 +299,12 @@ func (e *StandardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 	}
 	if err := tx.Visit(&feeCalculator); err != nil {
 		return err
+	}
+
+	if e.Bootstrapped.Get() {
+		if err := verify.SameSubnet(context.TODO(), e.Ctx, tx.DestinationChain); err != nil {
+			return err
+		}
 	}
 
 	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.ExportedOutputs))
