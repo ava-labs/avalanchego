@@ -62,7 +62,7 @@ type SenderTest struct {
 	SendAppRequestF              func(context.Context, set.Set[ids.NodeID], uint32, []byte) error
 	SendAppResponseF             func(context.Context, ids.NodeID, uint32, []byte) error
 	SendAppErrorF                func(context.Context, ids.NodeID, uint32, int32, string) error
-	SendAppGossipF               func(context.Context, []byte) error
+	SendAppGossipF               func(context.Context, []byte, int, int, int) error
 	SendAppGossipSpecificF       func(context.Context, set.Set[ids.NodeID], []byte) error
 	SendCrossChainAppRequestF    func(context.Context, ids.ID, uint32, []byte)
 	SendCrossChainAppResponseF   func(context.Context, ids.ID, uint32, []byte)
@@ -366,10 +366,16 @@ func (s *SenderTest) SendAppError(ctx context.Context, nodeID ids.NodeID, reques
 // SendAppGossip calls SendAppGossipF if it was initialized. If it wasn't
 // initialized and this function shouldn't be called and testing was
 // initialized, then testing will fail.
-func (s *SenderTest) SendAppGossip(ctx context.Context, appGossipBytes []byte) error {
+func (s *SenderTest) SendAppGossip(
+	ctx context.Context,
+	appGossipBytes []byte,
+	numValidators int,
+	numNonValidators int,
+	numPeers int,
+) error {
 	switch {
 	case s.SendAppGossipF != nil:
-		return s.SendAppGossipF(ctx, appGossipBytes)
+		return s.SendAppGossipF(ctx, appGossipBytes, numValidators, numNonValidators, numPeers)
 	case s.CantSendAppGossip && s.T != nil:
 		require.FailNow(s.T, errSendAppGossip.Error())
 	}
@@ -428,7 +434,7 @@ func (f FakeSender) SendAppError(_ context.Context, _ ids.NodeID, _ uint32, erro
 	return nil
 }
 
-func (f FakeSender) SendAppGossip(_ context.Context, bytes []byte) error {
+func (f FakeSender) SendAppGossip(_ context.Context, bytes []byte, _ int, _ int, _ int) error {
 	if f.SentAppGossip == nil {
 		return nil
 	}
