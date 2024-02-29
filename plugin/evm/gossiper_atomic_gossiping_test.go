@@ -11,74 +11,11 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/ava-labs/coreth/plugin/evm/message"
 )
-
-// locally issued txs should be gossiped
-func TestMempoolAtmTxsIssueTxAndGossiping(t *testing.T) {
-	assert := assert.New(t)
-
-	_, vm, _, sharedMemory, sender := GenesisVM(t, false, "", "", "")
-	defer func() {
-		assert.NoError(vm.Shutdown(context.Background()))
-	}()
-	assert.NoError(vm.Connected(context.Background(), ids.GenerateTestNodeID(), nil))
-
-	// Create conflicting transactions
-	importTxs := createImportTxOptions(t, vm, sharedMemory)
-	tx, conflictingTx := importTxs[0], importTxs[1]
-
-	var gossiped int
-	var gossipedLock sync.Mutex // needed to prevent race
-	sender.CantSendAppGossip = false
-	sender.SendAppGossipF = func(_ context.Context, gossipedBytes []byte) error {
-		gossipedLock.Lock()
-		defer gossipedLock.Unlock()
-
-		notifyMsgIntf, err := message.ParseGossipMessage(vm.networkCodec, gossipedBytes)
-		assert.NoError(err)
-
-		requestMsg, ok := notifyMsgIntf.(message.AtomicTxGossip)
-		assert.NotEmpty(requestMsg.Tx)
-		assert.True(ok)
-
-		txg := Tx{}
-		_, err = Codec.Unmarshal(requestMsg.Tx, &txg)
-		assert.NoError(err)
-		unsignedBytes, err := Codec.Marshal(codecVersion, &txg.UnsignedAtomicTx)
-		assert.NoError(err)
-		txg.Initialize(unsignedBytes, requestMsg.Tx)
-		assert.Equal(tx.ID(), txg.ID())
-		gossiped++
-		return nil
-	}
-
-	assert.NoError(vm.SetState(context.Background(), snow.NormalOp))
-
-	// Optimistically gossip raw tx
-	assert.NoError(vm.mempool.AddLocalTx(tx))
-	time.Sleep(500 * time.Millisecond)
-	gossipedLock.Lock()
-	assert.Equal(1, gossiped)
-	gossipedLock.Unlock()
-	assert.True(vm.mempool.bloom.Has(&GossipAtomicTx{Tx: tx}))
-
-	// Test hash on retry
-	assert.NoError(vm.gossiper.GossipAtomicTxs([]*Tx{tx}))
-	gossipedLock.Lock()
-	assert.Equal(1, gossiped)
-	gossipedLock.Unlock()
-
-	// Attempt to gossip conflicting tx
-	assert.ErrorIs(vm.mempool.AddLocalTx(conflictingTx), errConflictingAtomicTx)
-	gossipedLock.Lock()
-	assert.Equal(1, gossiped)
-	gossipedLock.Unlock()
-}
 
 // show that a txID discovered from gossip is requested to the same node only if
 // the txID is unknown
@@ -131,7 +68,7 @@ func TestMempoolAtmTxsAppGossipHandling(t *testing.T) {
 
 	assert.False(txRequested, "tx should not have been requested")
 	txGossipedLock.Lock()
-	assert.Equal(1, txGossiped, "tx should have been gossiped")
+	assert.Equal(0, txGossiped, "tx should not have been gossiped")
 	txGossipedLock.Unlock()
 	assert.True(vm.mempool.has(tx.ID()))
 
@@ -143,7 +80,7 @@ func TestMempoolAtmTxsAppGossipHandling(t *testing.T) {
 	vm.ctx.Lock.Lock()
 
 	txGossipedLock.Lock()
-	assert.Equal(1, txGossiped, "tx should have only been gossiped once")
+	assert.Equal(0, txGossiped, "tx should not have been gossiped")
 	txGossipedLock.Unlock()
 
 	// show that conflicting tx is not added to mempool
@@ -161,7 +98,7 @@ func TestMempoolAtmTxsAppGossipHandling(t *testing.T) {
 
 	assert.False(txRequested, "tx should not have been requested")
 	txGossipedLock.Lock()
-	assert.Equal(1, txGossiped, "tx should not have been gossiped")
+	assert.Equal(0, txGossiped, "tx should not have been gossiped")
 	txGossipedLock.Unlock()
 	assert.False(vm.mempool.has(conflictingTx.ID()), "conflicting tx should not be in the atomic mempool")
 }
