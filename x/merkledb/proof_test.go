@@ -1874,7 +1874,7 @@ func FuzzProofVerification(f *testing.F) {
 		removeIndex := rand.Intn(len(proof.Path))
 		removedNode := proof.Path[removeIndex]
 		proof.Path = append(proof.Path[:removeIndex], proof.Path[removeIndex+1:]...)
-		require.Error(proof.Verify(context.Background(), rootID, db.tokenSize))
+		require.Error(proof.Verify(context.Background(), rootID, db.tokenSize)) //nolint:forbidigo
 
 		// Re-add the proof node
 		proof.Path = slices.Insert(proof.Path, removeIndex, removedNode)
@@ -1884,7 +1884,7 @@ func FuzzProofVerification(f *testing.F) {
 		changeIndex := rand.Intn(len(proof.Path))
 		originalKey := proof.Path[changeIndex].Key
 		proof.Path[changeIndex].Key = ToKey([]byte{1, 3, 3, 7})
-		require.Error(proof.Verify(context.Background(), rootID, db.tokenSize))
+		require.Error(proof.Verify(context.Background(), rootID, db.tokenSize)) //nolint:forbidigo
 
 		// Revert the change
 		proof.Path[changeIndex].Key = originalKey
@@ -1894,13 +1894,13 @@ func FuzzProofVerification(f *testing.F) {
 		changeIndex = rand.Intn(len(proof.Path))
 		originalValue := proof.Path[changeIndex].ValueOrHash
 		proof.Path[changeIndex].ValueOrHash = maybe.Some([]byte{1, 3, 3, 7})
-		require.Error(proof.Verify(context.Background(), rootID, db.tokenSize))
+		require.Error(proof.Verify(context.Background(), rootID, db.tokenSize)) //nolint:forbidigo
 
 		// Revert the change
 		proof.Path[changeIndex].ValueOrHash = originalValue
 
 		// Verifying the proof against a different root should fail
-		require.Error(proof.Verify(context.Background(), ids.GenerateTestID(), db.tokenSize))
+		require.Error(proof.Verify(context.Background(), ids.GenerateTestID(), db.tokenSize)) //nolint:forbidigo
 	})
 }
 
