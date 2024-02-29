@@ -47,6 +47,8 @@ const (
 	durango fork = iota
 	eUpgrade
 
+	latest = eUpgrade
+
 	testTxFee    uint64 = units.MilliAvax
 	startBalance uint64 = 1000 * units.MilliAvax
 
@@ -525,7 +527,7 @@ func issueAndAccept(
 	issuer <-chan common.Message,
 	tx *txs.Tx,
 ) {
-	txID, err := vm.issueTx(tx)
+	txID, err := vm.issueTxFromRPC(tx)
 	require.NoError(err)
 	require.Equal(tx.ID(), txID)
 

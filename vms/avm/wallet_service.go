@@ -4,7 +4,6 @@
 package avm
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -42,7 +41,7 @@ func (w *WalletService) decided(txID ids.ID) {
 			return
 		}
 
-		err := w.vm.network.IssueVerifiedTx(context.TODO(), tx)
+		err := w.vm.network.IssueTxFromRPCWithoutVerification(tx)
 		if err == nil {
 			w.vm.ctx.Log.Info("issued tx to mempool over wallet API",
 				zap.Stringer("txID", txID),
@@ -75,7 +74,7 @@ func (w *WalletService) issue(tx *txs.Tx) (ids.ID, error) {
 	}
 
 	if w.pendingTxs.Len() == 0 {
-		if err := w.vm.network.IssueVerifiedTx(context.TODO(), tx); err == nil {
+		if err := w.vm.network.IssueTxFromRPCWithoutVerification(tx); err == nil {
 			w.vm.ctx.Log.Info("issued tx to mempool over wallet API",
 				zap.Stringer("txID", txID),
 			)
