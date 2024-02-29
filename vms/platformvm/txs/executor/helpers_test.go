@@ -4,7 +4,6 @@
 package executor
 
 import (
-	"fmt"
 	"math"
 	"testing"
 	"time"
@@ -27,22 +26,20 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
-	"github.com/ava-labs/avalanchego/utils/formatting"
-	"github.com/ava-labs/avalanchego/utils/formatting/address"
-	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
+	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txheap"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -246,11 +243,11 @@ func defaultState(
 	db database.Database,
 	rewards reward.Calculator,
 ) state.State {
-	genesisBytes := buildGenesisTest(ctx)
+	genesis := buildGenesisTest(ctx)
 	execCfg, _ := config.GetExecutionConfig(nil)
 	state, err := state.New(
 		db,
-		genesisBytes,
+		genesis,
 		prometheus.NewRegistry(),
 		cfg,
 		execCfg,
@@ -358,65 +355,79 @@ func defaultFx(clk *mockable.Clock, log logging.Logger, isBootstrapped bool) fx.
 	return res
 }
 
-func buildGenesisTest(ctx *snow.Context) []byte {
-	genesisUTXOs := make([]api.UTXO, len(preFundedKeys))
+func buildGenesisTest(ctx *snow.Context) *genesis.Genesis {
+	genesisUTXOs := make([]*genesis.UTXO, len(preFundedKeys))
 	for i, key := range preFundedKeys {
-		id := key.PublicKey().Address()
-		addr, err := address.FormatBech32(constants.UnitTestHRP, id.Bytes())
-		if err != nil {
-			panic(err)
-		}
-		genesisUTXOs[i] = api.UTXO{
-			Amount:  json.Uint64(defaultBalance),
-			Address: addr,
+		addr := key.PublicKey().Address()
+		genesisUTXOs[i] = &genesis.UTXO{
+			UTXO: avax.UTXO{
+				UTXOID: avax.UTXOID{
+					TxID:        ids.Empty,
+					OutputIndex: uint32(i),
+				},
+				Asset: avax.Asset{ID: ctx.AVAXAssetID},
+				Out: &secp256k1fx.TransferOutput{
+					Amt: defaultBalance,
+					OutputOwners: secp256k1fx.OutputOwners{
+						Locktime:  0,
+						Threshold: 1,
+						Addrs:     []ids.ShortID{addr},
+					},
+				},
+			},
+			Message: nil,
 		}
 	}
 
-	genesisValidators := make([]api.GenesisPermissionlessValidator, len(genesisNodeIDs))
-	for i, nodeID := range genesisNodeIDs {
-		addr, err := address.FormatBech32(constants.UnitTestHRP, nodeID.Bytes())
-		if err != nil {
-			panic(err)
+	vdrs := txheap.NewByEndTime()
+	for idx, nodeID := range genesisNodeIDs {
+		addr := preFundedKeys[idx].PublicKey().Address()
+		utxo := &avax.TransferableOutput{
+			Asset: avax.Asset{ID: ctx.AVAXAssetID},
+			Out: &secp256k1fx.TransferOutput{
+				Amt: defaultWeight,
+				OutputOwners: secp256k1fx.OutputOwners{
+					Locktime:  0,
+					Threshold: 1,
+					Addrs:     []ids.ShortID{addr},
+				},
+			},
 		}
-		genesisValidators[i] = api.GenesisPermissionlessValidator{
-			GenesisValidator: api.GenesisValidator{
-				StartTime: json.Uint64(defaultValidateStartTime.Unix()),
-				EndTime:   json.Uint64(defaultValidateEndTime.Unix()),
-				NodeID:    nodeID,
-			},
-			RewardOwner: &api.Owner{
-				Threshold: 1,
-				Addresses: []string{addr},
-			},
-			Staked: []api.UTXO{{
-				Amount:  json.Uint64(defaultWeight),
-				Address: addr,
+
+		owner := &secp256k1fx.OutputOwners{
+			Locktime:  0,
+			Threshold: 1,
+			Addrs:     []ids.ShortID{addr},
+		}
+
+		tx := &txs.Tx{Unsigned: &txs.AddValidatorTx{
+			BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+				NetworkID:    ctx.NetworkID,
+				BlockchainID: constants.PlatformChainID,
 			}},
-			DelegationFee: reward.PercentDenominator,
+			Validator: txs.Validator{
+				NodeID: nodeID,
+				Start:  uint64(defaultValidateStartTime.Unix()),
+				End:    uint64(defaultValidateEndTime.Unix()),
+				Wght:   utxo.Output().Amount(),
+			},
+			StakeOuts:        []*avax.TransferableOutput{utxo},
+			RewardsOwner:     owner,
+			DelegationShares: reward.PercentDenominator,
+		}}
+
+		if err := tx.Initialize(txs.GenesisCodec); err != nil {
+			panic(err)
 		}
+		vdrs.Add(tx)
 	}
 
-	buildGenesisArgs := api.BuildGenesisArgs{
-		NetworkID:     json.Uint32(constants.UnitTestID),
-		AvaxAssetID:   ctx.AVAXAssetID,
+	return &genesis.Genesis{
+		GenesisBytes:  []byte{'g', 'e', 'n', 'e', 's', 'i', 's', 'B', 'y', 't', 'e', 's'},
 		UTXOs:         genesisUTXOs,
-		Validators:    genesisValidators,
+		Validators:    vdrs.List(),
 		Chains:        nil,
-		Time:          json.Uint64(defaultGenesisTime.Unix()),
-		InitialSupply: json.Uint64(360 * units.MegaAvax),
-		Encoding:      formatting.Hex,
+		Timestamp:     uint64(defaultGenesisTime.Unix()),
+		InitialSupply: 360 * units.MegaAvax,
 	}
-
-	buildGenesisResponse := api.BuildGenesisReply{}
-	platformvmSS := api.StaticService{}
-	if err := platformvmSS.BuildGenesis(nil, &buildGenesisArgs, &buildGenesisResponse); err != nil {
-		panic(fmt.Errorf("problem while building platform chain's genesis state: %w", err))
-	}
-
-	genesisBytes, err := formatting.Decode(buildGenesisResponse.Encoding, buildGenesisResponse.Bytes)
-	if err != nil {
-		panic(err)
-	}
-
-	return genesisBytes
 }
