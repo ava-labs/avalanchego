@@ -105,11 +105,20 @@ func (c *Client) SendAppError(ctx context.Context, nodeID ids.NodeID, requestID 
 	return err
 }
 
-func (c *Client) SendAppGossip(ctx context.Context, msg []byte) error {
+func (c *Client) SendAppGossip(
+	ctx context.Context,
+	msg []byte,
+	numValidators int,
+	numNonValidators int,
+	numPeers int,
+) error {
 	_, err := c.client.SendAppGossip(
 		ctx,
 		&appsenderpb.SendAppGossipMsg{
-			Msg: msg,
+			Msg:              msg,
+			NumValidators:    uint64(numValidators),
+			NumNonValidators: uint64(numNonValidators),
+			NumPeers:         uint64(numPeers),
 		},
 	)
 	return err
