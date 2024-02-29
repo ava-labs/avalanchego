@@ -463,13 +463,13 @@ func (v *view) getValue(key Key) ([]byte, error) {
 	}
 
 	if change, ok := v.changes.values[key]; ok {
-		v.db.metrics.ViewValueCacheHit()
+		v.db.metrics.ViewChangesValueHit()
 		if change.after.IsNothing() {
 			return nil, database.ErrNotFound
 		}
 		return change.after.Value(), nil
 	}
-	v.db.metrics.ViewValueCacheMiss()
+	v.db.metrics.ViewChangesValueMiss()
 
 	// if we don't have local copy of the key, then grab a copy from the parent trie
 	value, err := v.getParentTrie().getValue(key)
@@ -847,12 +847,13 @@ func (v *view) recordValueChange(key Key, value maybe.Maybe[[]byte]) error {
 func (v *view) getNode(key Key, hasValue bool) (*node, error) {
 	// check for the key within the changed nodes
 	if nodeChange, isChanged := v.changes.nodes[key]; isChanged {
-		v.db.metrics.ViewNodeCacheHit()
+		v.db.metrics.ViewChangesNodeHit()
 		if nodeChange.after == nil {
 			return nil, database.ErrNotFound
 		}
 		return nodeChange.after, nil
 	}
+	v.db.metrics.ViewChangesNodeMiss()
 
 	// get the node from the parent trie and store a local copy
 	return v.getParentTrie().getEditableNode(key, hasValue)
