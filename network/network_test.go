@@ -49,13 +49,9 @@ var (
 		SendFailRateHalflife:         time.Second,
 	}
 	defaultPeerListGossipConfig = PeerListGossipConfig{
-		PeerListNumValidatorIPs:        100,
-		PeerListValidatorGossipSize:    100,
-		PeerListNonValidatorGossipSize: 100,
-		PeerListPeersGossipSize:        100,
-		PeerListGossipFreq:             time.Second,
-		PeerListPullGossipFreq:         time.Second,
-		PeerListBloomResetFreq:         constants.DefaultNetworkPeerListBloomResetFreq,
+		PeerListNumValidatorIPs: 100,
+		PeerListPullGossipFreq:  time.Second,
+		PeerListBloomResetFreq:  constants.DefaultNetworkPeerListBloomResetFreq,
 	}
 	defaultTimeoutConfig = TimeoutConfig{
 		PingPongTimeout:      30 * time.Second,
