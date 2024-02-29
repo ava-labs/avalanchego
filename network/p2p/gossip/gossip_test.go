@@ -235,39 +235,69 @@ func TestValidatorGossiper(t *testing.T) {
 func TestPushGossiperNew(t *testing.T) {
 	tests := []struct {
 		name                 string
+		numValidators        int
+		numNonValidators     int
+		numPeers             int
 		discardedSize        int
 		targetGossipSize     int
 		maxRegossipFrequency time.Duration
 		expected             error
 	}{
 		{
+			name:          "invalid num validators",
+			numValidators: -1,
+			expected:      ErrInvalidNumValidators,
+		},
+		{
+			name:             "invalid num non-validators",
+			numNonValidators: -1,
+			expected:         ErrInvalidNumNonValidators,
+		},
+		{
+			name:     "invalid num peers",
+			numPeers: -1,
+			expected: ErrInvalidNumPeers,
+		},
+		{
+			name:     "invalid num to gossip",
+			expected: ErrInvalidNumToGossip,
+		},
+		{
 			name:          "invalid discarded size",
+			numValidators: 1,
 			discardedSize: -1,
 			expected:      ErrInvalidDiscardedSize,
 		},
 		{
 			name:             "invalid target gossip size",
+			numValidators:    1,
 			targetGossipSize: -1,
 			expected:         ErrInvalidTargetGossipSize,
 		},
 		{
 			name:                 "invalid max re-gossip frequency",
+			numValidators:        1,
 			maxRegossipFrequency: -1,
 			expected:             ErrInvalidRegossipFrequency,
 		},
 	}
 
 	for _, tt := range tests {
-		_, err := NewPushGossiper[*testTx](
-			nil,
-			nil,
-			nil,
-			Metrics{},
-			tt.discardedSize,
-			tt.targetGossipSize,
-			tt.maxRegossipFrequency,
-		)
-		require.ErrorIs(t, err, tt.expected)
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := NewPushGossiper[*testTx](
+				nil,
+				nil,
+				nil,
+				Metrics{},
+				tt.numValidators,
+				tt.numNonValidators,
+				tt.numPeers,
+				tt.discardedSize,
+				tt.targetGossipSize,
+				tt.maxRegossipFrequency,
+			)
+			require.ErrorIs(t, err, tt.expected)
+		})
 	}
 }
 
@@ -417,6 +447,9 @@ func TestPushGossiper(t *testing.T) {
 				FullSet[*testTx]{},
 				client,
 				metrics,
+				1,
+				0,
+				0,
 				0, // the discarded cache size doesn't matter for this test
 				units.MiB,
 				regossipTime,

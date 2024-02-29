@@ -109,6 +109,9 @@ func (c *Client) AppRequest(
 func (c *Client) AppGossip(
 	ctx context.Context,
 	appGossipBytes []byte,
+	numValidators int,
+	numNonValidators int,
+	numPeers int,
 ) error {
 	return c.sender.SendAppGossip(
 		ctx,
