@@ -66,21 +66,25 @@ type Staker struct {
 //  3. If the priorities are also the same, the one with the lesser txID is
 //     lesser.
 func (s *Staker) Less(than *Staker) bool {
+	return s.Compare(than) == -1
+}
+
+func (s *Staker) Compare(than *Staker) int {
 	if s.NextTime.Before(than.NextTime) {
-		return true
+		return -1
 	}
 	if than.NextTime.Before(s.NextTime) {
-		return false
+		return 1
 	}
 
 	if s.Priority < than.Priority {
-		return true
+		return -1
 	}
 	if than.Priority < s.Priority {
-		return false
+		return 1
 	}
 
-	return bytes.Compare(s.TxID[:], than.TxID[:]) == -1
+	return bytes.Compare(s.TxID[:], than.TxID[:])
 }
 
 func NewCurrentStaker(
