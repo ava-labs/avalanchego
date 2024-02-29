@@ -536,7 +536,7 @@ var bindTests = []struct {
 			require.NoError(t, err)
 			require.Equal(t, testBytes, unpacked.BytesTest)
 			gasCost := GetTestEventGasCost(testEventData)
-			require.Equal(t, contract.LogGas + 2 * contract.LogTopicGas + contract.LogDataGas, gasCost)
+			require.Equal(t, contract.LogGas + 3 * contract.LogTopicGas + contract.LogDataGas, gasCost)
 
 			topics, data, err = PackEmptyEvent()
 			require.NoError(t, err)
@@ -553,7 +553,7 @@ var bindTests = []struct {
 			require.Equal(t, eventID, topics[0])
 			require.Equal(t, testAddr.Hash(), topics[1])
 			require.Equal(t, 0, len(data))
-			require.Equal(t, contract.LogGas + 2 * contract.LogTopicGas, GetIndexedEventGasCost())
+			require.Equal(t, contract.LogGas + 3 * contract.LogTopicGas, GetIndexedEventGasCost())
 
 			testMixedData := MixedEventData{
 				Num: testInt,
@@ -567,7 +567,7 @@ var bindTests = []struct {
 			unpackedMixedData, err := UnpackMixedEventData(data)
 			require.NoError(t, err)
 			require.Equal(t, testMixedData, unpackedMixedData)
-			require.Equal(t, contract.LogGas + contract.LogTopicGas + contract.LogDataGas, GetMixedEventGasCost(testMixedData))
+			require.Equal(t, contract.LogGas + 2 * contract.LogTopicGas + contract.LogDataGas, GetMixedEventGasCost(testMixedData))
 
 			testDynamicData := DynamicEventData{
 				Str:    "test",
@@ -581,7 +581,7 @@ var bindTests = []struct {
 			unpackedDynamicData, err := UnpackDynamicEventData(data)
 			require.NoError(t, err)
 			require.Equal(t, testDynamicData, unpackedDynamicData)
-			require.Equal(t, contract.LogGas + 2 * contract.LogTopicGas + 2 * contract.LogDataGas, GetDynamicEventGasCost(testDynamicData))
+			require.Equal(t, contract.LogGas + 3 * contract.LogTopicGas + 2 * contract.LogDataGas, GetDynamicEventGasCost(testDynamicData))
 
 			topics, data, err = PackUnnamedEvent(testUint, testUint)
 			require.NoError(t, err)
@@ -589,7 +589,7 @@ var bindTests = []struct {
 			require.Len(t, topics, 3)
 			require.Equal(t, eventID, topics[0])
 			require.Equal(t, 0, len(data))
-			require.Equal(t, contract.LogGas + 2 * contract.LogTopicGas, GetUnnamedEventGasCost())
+			require.Equal(t, contract.LogGas + 3 * contract.LogTopicGas, GetUnnamedEventGasCost())
 	`,
 		"",
 		false,

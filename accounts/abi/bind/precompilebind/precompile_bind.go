@@ -155,6 +155,9 @@ func createPrecompileHook(abifilename string, template string) bind.BindHook {
 			for key := range allowlist.AllowListABI.Methods {
 				delete(funcs, key)
 			}
+			for events := range allowlist.AllowListABI.Events {
+				delete(contract.Events, events)
+			}
 		}
 
 		precompileContract := &tmplPrecompileContract{
