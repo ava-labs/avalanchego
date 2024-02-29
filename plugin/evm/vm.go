@@ -145,7 +145,6 @@ const (
 	atomicTxGossipProtocol = 0x1
 
 	// gossip constants
-	pushGossipNumNonValidators           = 0
 	pushGossipDiscardedElements          = 16_384
 	txGossipBloomMinTargetElements       = 8 * 1024
 	txGossipBloomTargetFalsePositiveRate = 0.01
@@ -1098,6 +1097,15 @@ func (vm *VM) initBlockBuilding() error {
 		return fmt.Errorf("failed to initialize atomic tx gossip metrics: %w", err)
 	}
 
+	pushGossipParams := gossip.BranchingFactor{
+		Validators: vm.config.PushGossipNumValidators,
+		Peers:      vm.config.PushGossipNumPeers,
+	}
+	pushRegossipParams := gossip.BranchingFactor{
+		Validators: vm.config.PushRegossipNumValidators,
+		Peers:      vm.config.PushRegossipNumPeers,
+	}
+
 	ethTxPushGossiper := vm.ethTxPushGossiper.Get()
 	if ethTxPushGossiper == nil {
 		ethTxPushGossiper, err = gossip.NewPushGossiper[*GossipEthTx](
@@ -1105,9 +1113,8 @@ func (vm *VM) initBlockBuilding() error {
 			ethTxPool,
 			ethTxGossipClient,
 			ethTxGossipMetrics,
-			vm.config.PushGossipNumValidators,
-			pushGossipNumNonValidators,
-			vm.config.PushGossipNumPeers,
+			pushGossipParams,
+			pushRegossipParams,
 			pushGossipDiscardedElements,
 			txGossipTargetMessageSize,
 			vm.config.RegossipFrequency.Duration,
@@ -1124,9 +1131,8 @@ func (vm *VM) initBlockBuilding() error {
 			vm.mempool,
 			atomicTxGossipClient,
 			atomicTxGossipMetrics,
-			vm.config.PushGossipNumValidators,
-			pushGossipNumNonValidators,
-			vm.config.PushGossipNumPeers,
+			pushGossipParams,
+			pushRegossipParams,
 			pushGossipDiscardedElements,
 			txGossipTargetMessageSize,
 			vm.config.RegossipFrequency.Duration,
