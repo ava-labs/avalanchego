@@ -17,7 +17,7 @@ var DefaultConfig = Config{
 	PushRegossipNumValidators:                   10,
 	PushRegossipNumPeers:                        0,
 	PushGossipDiscardedCacheSize:                1024,
-	PushGossipMaxRegossipFrequency:              10 * time.Second,
+	PushGossipMaxRegossipFrequency:              30 * time.Second,
 	PushGossipFrequency:                         500 * time.Millisecond,
 	PullGossipPollSize:                          1,
 	PullGossipFrequency:                         1500 * time.Millisecond,
