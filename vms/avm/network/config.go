@@ -12,6 +12,9 @@ import (
 var DefaultConfig = Config{
 	MaxValidatorSetStaleness:                    time.Minute,
 	TargetGossipSize:                            20 * units.KiB,
+	PushGossipDiscardedCacheSize:                1024,
+	PushGossipMaxRegossipFrequency:              10 * time.Second,
+	PushGossipFrequency:                         500 * time.Millisecond,
 	PullGossipPollSize:                          1,
 	PullGossipFrequency:                         1500 * time.Millisecond,
 	PullGossipThrottlingPeriod:                  10 * time.Second,
@@ -19,7 +22,6 @@ var DefaultConfig = Config{
 	ExpectedBloomFilterElements:                 8 * 1024,
 	ExpectedBloomFilterFalsePositiveProbability: .01,
 	MaxBloomFilterFalsePositiveProbability:      .05,
-	LegacyPushGossipCacheSize:                   512,
 }
 
 type Config struct {
@@ -30,6 +32,15 @@ type Config struct {
 	// sent when pushing transactions and when responded to transaction pull
 	// requests.
 	TargetGossipSize int `json:"target-gossip-size"`
+	// PushGossipDiscardedCacheSize is the number of txIDs to cache to avoid
+	// pushing transactions that were recently dropped from the mempool.
+	PushGossipDiscardedCacheSize int `json:"push-gossip-discarded-cache-size"`
+	// PushGossipMaxRegossipFrequency is the limit for how frequently a
+	// transaction will be push gossiped.
+	PushGossipMaxRegossipFrequency time.Duration `json:"push-gossip-max-regossip-frequency"`
+	// PushGossipFrequency is how frequently rounds of push gossip are
+	// performed.
+	PushGossipFrequency time.Duration `json:"push-gossip-frequency"`
 	// PullGossipPollSize is the number of validators to sample when performing
 	// a round of pull gossip.
 	PullGossipPollSize int `json:"pull-gossip-poll-size"`
@@ -57,10 +68,4 @@ type Config struct {
 	// The smaller this number is, the more frequently that the bloom filter
 	// will be regenerated.
 	MaxBloomFilterFalsePositiveProbability float64 `json:"max-bloom-filter-false-positive-probability"`
-	// LegacyPushGossipCacheSize tracks the most recently received transactions
-	// and ensures to only gossip them once.
-	//
-	// Deprecated: The legacy push gossip mechanism is deprecated in favor of
-	// the p2p SDK's push gossip mechanism.
-	LegacyPushGossipCacheSize int `json:"legacy-push-gossip-cache-size"`
 }

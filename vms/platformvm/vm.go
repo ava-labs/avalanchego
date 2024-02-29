@@ -62,7 +62,7 @@ var (
 type VM struct {
 	config.Config
 	blockbuilder.Builder
-	network.Network
+	*network.Network
 	validators.State
 
 	metrics            metrics.Metrics
@@ -219,7 +219,8 @@ func (vm *VM) Initialize(
 	vm.onShutdownCtx, vm.onShutdownCtxCancel = context.WithCancel(context.Background())
 	// TODO: Wait for this goroutine to exit during Shutdown once the platformvm
 	// has better control of the context lock.
-	go vm.Network.Gossip(vm.onShutdownCtx)
+	go vm.Network.PushGossip(vm.onShutdownCtx)
+	go vm.Network.PullGossip(vm.onShutdownCtx)
 
 	vm.Builder = blockbuilder.New(
 		mempool,
@@ -541,8 +542,8 @@ func (vm *VM) GetBlockIDAtHeight(_ context.Context, height uint64) (ids.ID, erro
 	return vm.state.GetBlockIDAtHeight(height)
 }
 
-func (vm *VM) issueTx(ctx context.Context, tx *txs.Tx) error {
-	err := vm.Network.IssueTx(ctx, tx)
+func (vm *VM) issueTxFromRPC(tx *txs.Tx) error {
+	err := vm.Network.IssueTxFromRPC(tx)
 	if err != nil && !errors.Is(err, mempool.ErrDuplicateTx) {
 		vm.ctx.Log.Debug("failed to add tx to mempool",
 			zap.Stringer("txID", tx.ID()),

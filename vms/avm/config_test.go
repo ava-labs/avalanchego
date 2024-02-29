@@ -40,6 +40,9 @@ func TestParseConfig(t *testing.T) {
 				Network: network.Config{
 					MaxValidatorSetStaleness:                    time.Nanosecond,
 					TargetGossipSize:                            network.DefaultConfig.TargetGossipSize,
+					PushGossipDiscardedCacheSize:                network.DefaultConfig.PushGossipDiscardedCacheSize,
+					PushGossipMaxRegossipFrequency:              network.DefaultConfig.PushGossipMaxRegossipFrequency,
+					PushGossipFrequency:                         network.DefaultConfig.PushGossipFrequency,
 					PullGossipPollSize:                          network.DefaultConfig.PullGossipPollSize,
 					PullGossipFrequency:                         network.DefaultConfig.PullGossipFrequency,
 					PullGossipThrottlingPeriod:                  network.DefaultConfig.PullGossipThrottlingPeriod,
@@ -47,7 +50,6 @@ func TestParseConfig(t *testing.T) {
 					ExpectedBloomFilterElements:                 network.DefaultConfig.ExpectedBloomFilterElements,
 					ExpectedBloomFilterFalsePositiveProbability: network.DefaultConfig.ExpectedBloomFilterFalsePositiveProbability,
 					MaxBloomFilterFalsePositiveProbability:      network.DefaultConfig.MaxBloomFilterFalsePositiveProbability,
-					LegacyPushGossipCacheSize:                   network.DefaultConfig.LegacyPushGossipCacheSize,
 				},
 				IndexTransactions:    DefaultConfig.IndexTransactions,
 				IndexAllowIncomplete: DefaultConfig.IndexAllowIncomplete,
