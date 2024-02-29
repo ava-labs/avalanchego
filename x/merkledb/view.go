@@ -471,7 +471,7 @@ func (v *view) getValue(key Key) ([]byte, error) {
 	}
 	v.db.metrics.ViewChangesValueMiss()
 
-	// if we don't have local copy of the key, then grab a copy from the parent trie
+	// if we don't have local copy of the value, then grab a copy from the parent trie
 	value, err := v.getParentTrie().getValue(key)
 	if err != nil {
 		return nil, err
@@ -542,15 +542,12 @@ func (v *view) remove(key Key) error {
 		return v.compressNodePath(grandParent, parent)
 	}
 
-	// merge this node and its descendants into a single node if possible
+	// merge this node and its parent into a single node if possible
 	return v.compressNodePath(parent, nodeToDelete)
 }
 
-// Merges together nodes in the inclusive descendants of [n] that
-// have no value and a single child into one node with a compressed
-// path until a node that doesn't meet those criteria is reached.
-// [parent] is [n]'s parent. If [parent] is nil, [n] is the root
-// node and [v.root] is updated to [n].
+// Merges [n] with its [parent] if [n] has only one child and no value.
+// If [parent] is nil, [n] is the root node and [v.root] is updated to [n].
 // Assumes at least one of the following is true:
 // * [n] has a value.
 // * [n] has children.
