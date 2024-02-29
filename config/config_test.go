@@ -422,7 +422,7 @@ func TestGetSubnetConfigsFromFile(t *testing.T) {
 		},
 		"gossip config": {
 			fileName:  "2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i.json",
-			givenJSON: `{"onAcceptValidatorSize": 100 }`,
+			givenJSON: `{"gossipOnAcceptValidatorSize": 100 }`,
 			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
 				id, _ := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
 				config, ok := given[id]

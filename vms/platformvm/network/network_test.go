@@ -29,6 +29,9 @@ var (
 	testConfig = Config{
 		MaxValidatorSetStaleness:                    time.Second,
 		TargetGossipSize:                            1,
+		PushGossipNumValidators:                     1,
+		PushGossipNumNonValidators:                  0,
+		PushGossipNumPeers:                          0,
 		PushGossipDiscardedCacheSize:                1,
 		PushGossipMaxRegossipFrequency:              time.Second,
 		PushGossipFrequency:                         time.Second,
