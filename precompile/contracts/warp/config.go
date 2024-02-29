@@ -116,7 +116,7 @@ func (c *Config) Accept(acceptCtx *precompileconfig.AcceptContext, blockHash com
 	if err != nil {
 		return fmt.Errorf("failed to parse warp log data into unsigned message (TxHash: %s, LogIndex: %d): %w", txHash, logIndex, err)
 	}
-	log.Info(
+	log.Debug(
 		"Accepted warp unsigned message",
 		"blockHash", blockHash,
 		"blockNumber", blockNumber,
