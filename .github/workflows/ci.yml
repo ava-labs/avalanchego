@@ -8,6 +8,9 @@ on:
       - 'v[0-9]+.[0-9]+.[0-9]+'
   pull_request:
 
+env:
+  tmpnet_data_path: ~/.tmpnet/networks/1000
+
 jobs:
   lint_test:
     name: Lint
@@ -88,7 +91,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: subnet-evm-e2e-logs-precompile
-          path: /tmp/network-runner-root-data*/
+          path: /tmp/e2e-test/precompile-data
           retention-days: 5
   e2e_warp:
     name: e2e warp tests
@@ -124,14 +127,14 @@ jobs:
         run: ./scripts/build.sh /tmp/e2e-test/avalanchego/plugins/srEXiWaHuhNyGwPUi444Tu47ZEDwxTWrbQiuD7FmgSAQ6X7Dy
       - name: Run Warp E2E Tests
         shell: bash
-        run: AVALANCHEGO_BUILD_PATH=/tmp/e2e-test/avalanchego DATA_DIR=/tmp/e2e-test/warp-data ./scripts/run_ginkgo_warp.sh
-      - name: Upload Artifact
+        run: AVALANCHEGO_BUILD_PATH=/tmp/e2e-test/avalanchego ./scripts/run_ginkgo_warp.sh
+      - name: Upload tmpnet network dir for warp testing
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: subnet-evm-e2e-logs-warp
-          path: /tmp/network-runner-root-data*/
-          retention-days: 5
+          name: warp-tmpnet-data
+          path: ${{ env.tmpnet_data_path }}
+          if-no-files-found: error
   e2e_load:
     name: e2e load tests
     runs-on: ubuntu-latest
@@ -153,14 +156,14 @@ jobs:
         run: ./scripts/build.sh /tmp/e2e-test/avalanchego/plugins/srEXiWaHuhNyGwPUi444Tu47ZEDwxTWrbQiuD7FmgSAQ6X7Dy
       - name: Run E2E Load Tests
         shell: bash
-        run: AVALANCHEGO_BUILD_PATH=/tmp/e2e-test/avalanchego DATA_DIR=/tmp/e2e-test/load-data ./scripts/run_ginkgo_load.sh
-      - name: Upload Artifact
+        run: AVALANCHEGO_BUILD_PATH=/tmp/e2e-test/avalanchego ./scripts/run_ginkgo_load.sh
+      - name: Upload tmpnet network dir for load testing
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: subnet-evm-e2e-logs-load
-          path: /tmp/network-runner-root-data*/
-          retention-days: 5
+          name: load-tmpnet-data
+          path: ${{ env.tmpnet_data_path }}
+          if-no-files-found: error
 
   build_image:
     name: Build Docker Image

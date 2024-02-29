@@ -14,7 +14,3 @@ const (
 
 	DefaultLocalNodeURI = "http://127.0.0.1:9650"
 )
-
-var (
-	NodeURIs = []string{DefaultLocalNodeURI, "http://127.0.0.1:9652", "http://127.0.0.1:9654", "http://127.0.0.1:9656", "http://127.0.0.1:9658"}
-)
