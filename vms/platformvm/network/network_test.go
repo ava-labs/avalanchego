@@ -29,6 +29,8 @@ var (
 	testConfig = Config{
 		MaxValidatorSetStaleness:                    time.Second,
 		TargetGossipSize:                            1,
+		PushGossipNumValidators:                     1,
+		PushGossipNumPeers:                          0,
 		PushGossipDiscardedCacheSize:                1,
 		PushGossipMaxRegossipFrequency:              time.Second,
 		PushGossipFrequency:                         time.Second,
@@ -275,7 +277,7 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 			},
 			appSenderFunc: func(ctrl *gomock.Controller) common.AppSender {
 				appSender := common.NewMockSender(ctrl)
-				appSender.EXPECT().SendAppGossip(gomock.Any(), gomock.Any()).Return(nil)
+				appSender.EXPECT().SendAppGossip(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 				return appSender
 			},
 			expectedErr: nil,

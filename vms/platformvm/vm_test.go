@@ -274,7 +274,7 @@ func defaultVM(t *testing.T, f fork) (*VM, database.Database, *mutableSharedMemo
 	_, genesisBytes := defaultGenesis(t, ctx.AVAXAssetID)
 	appSender := &common.SenderTest{}
 	appSender.CantSendAppGossip = true
-	appSender.SendAppGossipF = func(context.Context, []byte) error {
+	appSender.SendAppGossipF = func(context.Context, []byte, int, int, int) error {
 		return nil
 	}
 
@@ -1376,10 +1376,8 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	// Passes messages from the consensus engine to the network
 	gossipConfig := subnets.GossipConfig{
-		AcceptedFrontierPeerSize:  1,
-		OnAcceptPeerSize:          1,
-		AppGossipValidatorSize:    1,
-		AppGossipNonValidatorSize: 1,
+		AcceptedFrontierPeerSize: 1,
+		OnAcceptPeerSize:         1,
 	}
 	sender, err := sender.New(
 		consensusCtx,

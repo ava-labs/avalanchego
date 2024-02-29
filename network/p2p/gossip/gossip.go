@@ -54,6 +54,10 @@ var (
 		typeLabel: sentType,
 	}
 
+	ErrInvalidNumValidators     = errors.New("num validators cannot be negative")
+	ErrInvalidNumNonValidators  = errors.New("num non-validators cannot be negative")
+	ErrInvalidNumPeers          = errors.New("num peers cannot be negative")
+	ErrInvalidNumToGossip       = errors.New("must gossip to at least one peer")
 	ErrInvalidDiscardedSize     = errors.New("discarded size cannot be negative")
 	ErrInvalidTargetGossipSize  = errors.New("target gossip size cannot be negative")
 	ErrInvalidRegossipFrequency = errors.New("re-gossip frequency cannot be negative")
@@ -259,11 +263,22 @@ func NewPushGossiper[T Gossipable](
 	mempool Set[T],
 	client *p2p.Client,
 	metrics Metrics,
+	numValidators int,
+	numNonValidators int,
+	numPeers int,
 	discardedSize int,
 	targetGossipSize int,
 	maxRegossipFrequency time.Duration,
 ) (*PushGossiper[T], error) {
 	switch {
+	case numValidators < 0:
+		return nil, ErrInvalidNumValidators
+	case numNonValidators < 0:
+		return nil, ErrInvalidNumNonValidators
+	case numPeers < 0:
+		return nil, ErrInvalidNumPeers
+	case max(numValidators, numNonValidators, numPeers) == 0:
+		return nil, ErrInvalidNumToGossip
 	case discardedSize < 0:
 		return nil, ErrInvalidDiscardedSize
 	case targetGossipSize < 0:
@@ -277,6 +292,9 @@ func NewPushGossiper[T Gossipable](
 		set:                  mempool,
 		client:               client,
 		metrics:              metrics,
+		numValidators:        numValidators,
+		numNonValidators:     numNonValidators,
+		numPeers:             numPeers,
 		targetGossipSize:     targetGossipSize,
 		maxRegossipFrequency: maxRegossipFrequency,
 
@@ -294,6 +312,9 @@ type PushGossiper[T Gossipable] struct {
 	client     *p2p.Client
 	metrics    Metrics
 
+	numValidators        int
+	numNonValidators     int
+	numPeers             int
 	targetGossipSize     int
 	maxRegossipFrequency time.Duration
 
@@ -423,10 +444,14 @@ func (p *PushGossiper[T]) Gossip(ctx context.Context) error {
 	}
 	sentCountMetric.Add(float64(len(gossip)))
 	sentBytesMetric.Add(float64(sentBytes))
-	if err := p.client.AppGossip(ctx, msgBytes); err != nil {
-		return fmt.Errorf("failed to gossip: %w", err)
-	}
-	return nil
+
+	return p.client.AppGossip(
+		ctx,
+		msgBytes,
+		p.numValidators,
+		p.numNonValidators,
+		p.numPeers,
+	)
 }
 
 // Add enqueues new gossipables to be pushed. If a gossiable is already tracked,
