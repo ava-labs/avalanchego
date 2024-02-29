@@ -519,11 +519,12 @@ func (v *view) remove(key Key) error {
 		return err
 	}
 
+	hadValue := nodeToDelete.hasValue()
 	nodeToDelete.setValue(maybe.Nothing[[]byte]())
 
 	// if the removed node has no children, the node can be removed from the trie
 	if len(nodeToDelete.children) == 0 {
-		if err := v.recordNodeDeleted(nodeToDelete); err != nil {
+		if err := v.recordNodeDeleted(nodeToDelete, hadValue); err != nil {
 			return err
 		}
 
@@ -563,7 +564,8 @@ func (v *view) compressNodePath(parent, n *node) error {
 		return nil
 	}
 
-	if err := v.recordNodeDeleted(n); err != nil {
+	// We know from above that [n] has no value.
+	if err := v.recordNodeDeleted(n, false /* hasValue */); err != nil {
 		return err
 	}
 
@@ -768,8 +770,8 @@ func (v *view) recordNodeChange(after *node) error {
 
 // Records that the node associated with the given key has been deleted.
 // Must not be called after [calculateNodeIDs] has returned.
-func (v *view) recordNodeDeleted(after *node) error {
-	return v.recordKeyChange(after.key, nil, after.hasValue(), false /* newNode */)
+func (v *view) recordNodeDeleted(after *node, hadValue bool) error {
+	return v.recordKeyChange(after.key, nil, hadValue, false /* newNode */)
 }
 
 // Records that the node associated with the given key has been changed.
