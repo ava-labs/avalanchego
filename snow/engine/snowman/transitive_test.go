@@ -20,7 +20,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
 )
@@ -2426,13 +2425,15 @@ func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 		require.Equal(vdr, inVdr)
 		*asked = true
 	}
+	sender.CantSendChits = false
+
 	// This engine receives a Gossip message for [blk2] which was "unknown" in this engine.
 	// The engine thus learns about its ancestor [blk1] and should send a Get request for it.
 	// (see above for expected "Get" request)
-	require.NoError(te.Put(context.Background(), vdr, constants.GossipMsgRequestID, blk2.Bytes()))
+	require.NoError(te.PushQuery(context.Background(), vdr, 0, blk2.Bytes(), 0))
 	require.True(*asked)
 
-	// Prepare to PushQuery [blk1] after our Get request is fulfilled. We should not PushQuery
+	// Prepare to PullQuery [blk1] after our Get request is fulfilled. We should not PullQuery
 	// [blk2] since it currently fails verification.
 	queried := new(bool)
 	queryRequestID := new(uint32)
@@ -2448,8 +2449,8 @@ func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 	}
 	// This engine now handles the response to the "Get" request. This should cause [blk1] to be issued
 	// which will result in attempting to issue [blk2]. However, [blk2] should fail verification and be dropped.
-	// By issuing [blk1], this node should fire a "PushQuery" request for [blk1].
-	// (see above for expected "PushQuery" request)
+	// By issuing [blk1], this node should fire a "PullQuery" request for [blk1].
+	// (see above for expected "PullQuery" request)
 	require.NoError(te.Put(context.Background(), vdr, *reqID, blk1.Bytes()))
 	require.True(*asked)
 	require.True(*queried, "Didn't query the newly issued blk1")
@@ -2503,8 +2504,9 @@ func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 			return nil, errUnknownBlock
 		}
 	}
+
 	*queried = false
-	// Prepare to PushQuery [blk2] after receiving a Gossip message with [blk2].
+	// Prepare to PullQuery [blk2] after receiving a Gossip message with [blk2].
 	sender.SendPullQueryF = func(_ context.Context, inVdrs set.Set[ids.NodeID], requestID uint32, blkID ids.ID, requestedHeight uint64) {
 		require.False(*queried)
 		*queried = true
@@ -2513,8 +2515,8 @@ func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 		require.Equal(blk2.ID(), blkID)
 		require.Equal(uint64(2), requestedHeight)
 	}
-	// Expect that the Engine will send a PushQuery after receiving this Gossip message for [blk2].
-	require.NoError(te.Put(context.Background(), vdr, constants.GossipMsgRequestID, blk2.Bytes()))
+	// Expect that the Engine will send a PullQuery after receiving this Gossip message for [blk2].
+	require.NoError(te.PushQuery(context.Background(), vdr, 0, blk2.Bytes(), 0))
 	require.True(*queried)
 
 	// After a single vote for [blk2], it should be marked as accepted.
@@ -2611,14 +2613,16 @@ func TestEngineBubbleVotesThroughInvalidChain(t *testing.T) {
 		require.Equal(vdr, inVdr)
 		*asked = true
 	}
+	sender.CantSendChits = false
+
 	// Receive Gossip message for [blk3] first and expect the sender to issue a
 	// Get request for its ancestor: [blk2].
-	require.NoError(te.Put(context.Background(), vdr, constants.GossipMsgRequestID, blk3.Bytes()))
+	require.NoError(te.PushQuery(context.Background(), vdr, 0, blk3.Bytes(), 0))
 	require.True(*asked)
 
-	// Prepare to PushQuery [blk1] after our request for [blk2] is fulfilled.
-	// We should not PushQuery [blk2] since it currently fails verification.
-	// We should not PushQuery [blk3] because [blk2] wasn't issued.
+	// Prepare to PullQuery [blk1] after our request for [blk2] is fulfilled.
+	// We should not PullQuery [blk2] since it currently fails verification.
+	// We should not PullQuery [blk3] because [blk2] wasn't issued.
 	queried := new(bool)
 	queryRequestID := new(uint32)
 	sender.SendPullQueryF = func(_ context.Context, inVdrs set.Set[ids.NodeID], requestID uint32, blkID ids.ID, requestedHeight uint64) {

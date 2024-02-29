@@ -65,13 +65,6 @@ var (
 	deprecatedKeys                = map[string]string{
 		KeystoreAPIEnabledKey: keystoreDeprecationMsg,
 
-		ConsensusGossipAcceptedFrontierValidatorSizeKey:    acceptedFrontierGossipDeprecationMsg,
-		ConsensusGossipAcceptedFrontierNonValidatorSizeKey: acceptedFrontierGossipDeprecationMsg,
-		ConsensusGossipAcceptedFrontierPeerSizeKey:         acceptedFrontierGossipDeprecationMsg,
-		ConsensusGossipOnAcceptValidatorSizeKey:            acceptedFrontierGossipDeprecationMsg,
-		ConsensusGossipOnAcceptNonValidatorSizeKey:         acceptedFrontierGossipDeprecationMsg,
-		ConsensusGossipOnAcceptPeerSizeKey:                 acceptedFrontierGossipDeprecationMsg,
-
 		NetworkPeerListValidatorGossipSizeKey:    peerListPushGossipDeprecationMsg,
 		NetworkPeerListNonValidatorGossipSizeKey: peerListPushGossipDeprecationMsg,
 		NetworkPeerListPeersGossipSizeKey:        peerListPushGossipDeprecationMsg,
@@ -261,17 +254,6 @@ func getAdaptiveTimeoutConfig(v *viper.Viper) (timer.AdaptiveTimeoutConfig, erro
 	}
 
 	return config, nil
-}
-
-func getGossipConfig(v *viper.Viper) subnets.GossipConfig {
-	return subnets.GossipConfig{
-		AcceptedFrontierValidatorSize:    uint(v.GetUint32(ConsensusGossipAcceptedFrontierValidatorSizeKey)),
-		AcceptedFrontierNonValidatorSize: uint(v.GetUint32(ConsensusGossipAcceptedFrontierNonValidatorSizeKey)),
-		AcceptedFrontierPeerSize:         uint(v.GetUint32(ConsensusGossipAcceptedFrontierPeerSizeKey)),
-		OnAcceptValidatorSize:            uint(v.GetUint32(ConsensusGossipOnAcceptValidatorSizeKey)),
-		OnAcceptNonValidatorSize:         uint(v.GetUint32(ConsensusGossipOnAcceptNonValidatorSizeKey)),
-		OnAcceptPeerSize:                 uint(v.GetUint32(ConsensusGossipOnAcceptPeerSizeKey)),
-	}
 }
 
 func getNetworkConfig(
@@ -1124,7 +1106,6 @@ func getDefaultSubnetConfig(v *viper.Viper) subnets.Config {
 	return subnets.Config{
 		ConsensusParameters:         getConsensusConfig(v),
 		ValidatorOnly:               false,
-		GossipConfig:                getGossipConfig(v),
 		ProposerMinBlockDelay:       proposervm.DefaultMinBlockDelay,
 		ProposerNumHistoricalBlocks: proposervm.DefaultNumHistoricalBlocks,
 	}

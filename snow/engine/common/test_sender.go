@@ -37,7 +37,6 @@ type SenderTest struct {
 	CantSendGetAccepted, CantSendAccepted,
 	CantSendGet, CantSendGetAncestors, CantSendPut, CantSendAncestors,
 	CantSendPullQuery, CantSendPushQuery, CantSendChits,
-	CantSendGossip,
 	CantSendAppRequest, CantSendAppResponse, CantSendAppError,
 	CantSendAppGossip, CantSendAppGossipSpecific,
 	CantSendCrossChainAppRequest, CantSendCrossChainAppResponse, CantSendCrossChainAppError bool
@@ -58,7 +57,6 @@ type SenderTest struct {
 	SendPushQueryF               func(context.Context, set.Set[ids.NodeID], uint32, []byte, uint64)
 	SendPullQueryF               func(context.Context, set.Set[ids.NodeID], uint32, ids.ID, uint64)
 	SendChitsF                   func(context.Context, ids.NodeID, uint32, ids.ID, ids.ID, ids.ID)
-	SendGossipF                  func(context.Context, []byte)
 	SendAppRequestF              func(context.Context, set.Set[ids.NodeID], uint32, []byte) error
 	SendAppResponseF             func(context.Context, ids.NodeID, uint32, []byte) error
 	SendAppErrorF                func(context.Context, ids.NodeID, uint32, int32, string) error
@@ -87,7 +85,6 @@ func (s *SenderTest) Default(cant bool) {
 	s.CantSendPullQuery = cant
 	s.CantSendPushQuery = cant
 	s.CantSendChits = cant
-	s.CantSendGossip = cant
 	s.CantSendAppRequest = cant
 	s.CantSendAppResponse = cant
 	s.CantSendAppGossip = cant
@@ -274,17 +271,6 @@ func (s *SenderTest) SendChits(ctx context.Context, vdr ids.NodeID, requestID ui
 		s.SendChitsF(ctx, vdr, requestID, preferredID, preferredIDAtHeight, acceptedID)
 	} else if s.CantSendChits && s.T != nil {
 		require.FailNow(s.T, "Unexpectedly called SendChits")
-	}
-}
-
-// SendGossip calls SendGossipF if it was initialized. If it wasn't initialized
-// and this function shouldn't be called and testing was initialized, then
-// testing will fail.
-func (s *SenderTest) SendGossip(ctx context.Context, container []byte) {
-	if s.SendGossipF != nil {
-		s.SendGossipF(ctx, container)
-	} else if s.CantSendGossip && s.T != nil {
-		require.FailNow(s.T, "Unexpectedly called SendGossip")
 	}
 }
 

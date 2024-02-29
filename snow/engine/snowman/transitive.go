@@ -33,14 +33,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
-const (
-	nonVerifiedCacheSize = 64 * units.MiB
-
-	// putGossipPeriod specifies the number of times Gossip will be called per
-	// Put gossip. This is done to avoid splitting Gossip into multiple
-	// functions and to allow more frequent pull gossip than push gossip.
-	putGossipPeriod = 10
-)
+const nonVerifiedCacheSize = 64 * units.MiB
 
 var _ Engine = (*Transitive)(nil)
 
@@ -68,8 +61,6 @@ type Transitive struct {
 	validators.Connector
 
 	requestID uint32
-
-	gossipCounter int
 
 	// track outstanding preference requests
 	polls poll.Set
@@ -161,41 +152,7 @@ func newTransitive(config Config) (*Transitive, error) {
 
 func (t *Transitive) Gossip(ctx context.Context) error {
 	lastAcceptedID, lastAcceptedHeight := t.Consensus.LastAccepted()
-	if numProcessing := t.Consensus.NumProcessing(); numProcessing == 0 {
-		t.Ctx.Log.Verbo("sampling from validators",
-			zap.Stringer("validators", t.Validators),
-		)
-
-		// Uniform sampling is used here to reduce bandwidth requirements of
-		// nodes with a large amount of stake weight.
-		vdrID, ok := t.ConnectedValidators.SampleValidator()
-		if !ok {
-			t.Ctx.Log.Warn("skipping block gossip",
-				zap.String("reason", "no connected validators"),
-			)
-			return nil
-		}
-
-		nextHeightToAccept, err := math.Add64(lastAcceptedHeight, 1)
-		if err != nil {
-			t.Ctx.Log.Error("skipping block gossip",
-				zap.String("reason", "block height overflow"),
-				zap.Stringer("blkID", lastAcceptedID),
-				zap.Uint64("lastAcceptedHeight", lastAcceptedHeight),
-				zap.Error(err),
-			)
-			return nil
-		}
-
-		t.requestID++
-		t.Sender.SendPullQuery(
-			ctx,
-			set.Of(vdrID),
-			t.requestID,
-			t.Consensus.Preference(),
-			nextHeightToAccept,
-		)
-	} else {
+	if numProcessing := t.Consensus.NumProcessing(); numProcessing != 0 {
 		t.Ctx.Log.Debug("skipping block gossip",
 			zap.String("reason", "blocks currently processing"),
 			zap.Int("numProcessing", numProcessing),
@@ -205,28 +162,42 @@ func (t *Transitive) Gossip(ctx context.Context) error {
 		// when attempting to issue a query. This can happen if a subnet was
 		// temporarily misconfigured and there were no validators.
 		t.repoll(ctx)
-	}
-
-	// TODO: Remove periodic push gossip after v1.11.x is activated
-	t.gossipCounter++
-	t.gossipCounter %= putGossipPeriod
-	if t.gossipCounter > 0 {
 		return nil
 	}
 
-	lastAccepted, err := t.GetBlock(ctx, lastAcceptedID)
+	t.Ctx.Log.Verbo("sampling from validators",
+		zap.Stringer("validators", t.Validators),
+	)
+
+	// Uniform sampling is used here to reduce bandwidth requirements of
+	// nodes with a large amount of stake weight.
+	vdrID, ok := t.ConnectedValidators.SampleValidator()
+	if !ok {
+		t.Ctx.Log.Warn("skipping block gossip",
+			zap.String("reason", "no connected validators"),
+		)
+		return nil
+	}
+
+	nextHeightToAccept, err := math.Add64(lastAcceptedHeight, 1)
 	if err != nil {
-		t.Ctx.Log.Warn("dropping gossip request",
-			zap.String("reason", "block couldn't be loaded"),
+		t.Ctx.Log.Error("skipping block gossip",
+			zap.String("reason", "block height overflow"),
 			zap.Stringer("blkID", lastAcceptedID),
+			zap.Uint64("lastAcceptedHeight", lastAcceptedHeight),
 			zap.Error(err),
 		)
 		return nil
 	}
-	t.Ctx.Log.Verbo("gossiping accepted block to the network",
-		zap.Stringer("blkID", lastAcceptedID),
+
+	t.requestID++
+	t.Sender.SendPullQuery(
+		ctx,
+		set.Of(vdrID),
+		t.requestID,
+		t.Consensus.Preference(),
+		nextHeightToAccept,
 	)
-	t.Sender.SendGossip(ctx, lastAccepted.Bytes())
 	return nil
 }
 
@@ -276,8 +247,6 @@ func (t *Transitive) Put(ctx context.Context, nodeID ids.NodeID, requestID uint3
 		}
 
 		issuedMetric = t.blkReqSourceMetric[req]
-	case requestID == constants.GossipMsgRequestID:
-		issuedMetric = t.metrics.issued.WithLabelValues(putGossipSource)
 	default:
 		// This can happen if this block was provided to this engine while a Get
 		// request was outstanding. For example, the block may have been locally
@@ -562,7 +531,6 @@ func (t *Transitive) HealthCheck(ctx context.Context) (interface{}, error) {
 
 	t.Ctx.Log.Verbo("running health check",
 		zap.Uint32("requestID", t.requestID),
-		zap.Int("gossipCounter", t.gossipCounter),
 		zap.Stringer("polls", t.polls),
 		zap.Reflect("outstandingBlockRequests", t.blkReqs),
 		zap.Stringer("blockedJobs", &t.blocked),
