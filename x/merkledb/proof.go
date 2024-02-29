@@ -36,9 +36,7 @@ var (
 	ErrNoStartProof                = errors.New("no start proof")
 	ErrNoEndProof                  = errors.New("no end proof")
 	ErrProofNodeNotForKey          = errors.New("the provided node has a key that is not a prefix of the specified key")
-	ErrInclusionProofWrongKey      = errors.New("the last proof node's key should match the proved key for an inclusion proof")
 	ErrInclusionProofWrongValue    = errors.New("the last proof node's value should match the proved value for an inclusion proof")
-	ErrExclusionProofWrongKey      = errors.New("the last proof node's key should not match the proved key for an exclusion proof")
 	ErrProofValueDoesntMatch       = errors.New("the provided value does not match the proof node for the provided key's value")
 	ErrProofNodeHasUnincludedValue = errors.New("the provided proof has a value for a key within the range that is not present in the provided key/values")
 	ErrInvalidMaybe                = errors.New("maybe is nothing but has value")
@@ -123,13 +121,17 @@ func (node *ProofNode) UnmarshalProto(pbNode *pb.ProofNode) error {
 type Proof struct {
 	// Nodes in the proof path from root --> target key
 	// (or node that would be where key is if it doesn't exist).
+	// If the key of the last element is [Key], this is an inclusion proof.
+	// Otherwise, this is an exclusion proof.
 	// Always contains at least the root.
 	Path []ProofNode
+
 	// This is a proof that [key] exists/doesn't exist.
 	Key Key
 
-	// Nothing if [Key] isn't in the trie.
-	// Otherwise, the value corresponding to [Key].
+	// If this is an inclusion proof, this is the value associated with [key].
+	// Note this may be Nothing if the key doesn't have a value.
+	// If this is an exclusion proof, this is Nothing.
 	Value maybe.Maybe[[]byte]
 }
 
@@ -148,15 +150,10 @@ func (proof *Proof) Verify(ctx context.Context, expectedRootID ids.ID, tokenSize
 
 	// Confirm that the last proof node's value matches the claimed proof value
 	lastNode := proof.Path[len(proof.Path)-1]
-	isInclusionProof := proof.Value.HasValue()
+	isInclusionProof := lastNode.Key == proof.Key
 
-	switch {
-	case isInclusionProof && proof.Key != lastNode.Key:
-		return ErrInclusionProofWrongKey
-	case isInclusionProof && !valueOrHashMatches(proof.Value, lastNode.ValueOrHash):
+	if isInclusionProof && !valueOrHashMatches(proof.Value, lastNode.ValueOrHash) {
 		return ErrInclusionProofWrongValue
-	case !isInclusionProof && proof.Key == lastNode.Key:
-		return ErrExclusionProofWrongKey
 	}
 
 	// Don't bother locking [view] -- nobody else has a reference to it.
@@ -165,11 +162,11 @@ func (proof *Proof) Verify(ctx context.Context, expectedRootID ids.ID, tokenSize
 		return err
 	}
 
-	// Insert all proof nodes.
-	// [provenKey] is the key that we are proving exists, or the key
-	// that is the next key along the node path, proving that [proof.Key] doesn't exist in the trie.
-	provenKey := maybe.Some(proof.Path[len(proof.Path)-1].Key)
+	// [provenKey] is the key that we are proving exists, or the key that is the
+	// next key along the node path, proving that [proof.Key] doesn't exist in the trie.
+	provenKey := maybe.Some(lastNode.Key)
 
+	// Insert all proof nodes.
 	if err = addPathInfo(view, proof.Path, provenKey, provenKey); err != nil {
 		return err
 	}
