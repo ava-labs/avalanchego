@@ -268,13 +268,28 @@ func (s *tracedSender) SendAppGossipSpecific(ctx context.Context, nodeIDs set.Se
 	return s.sender.SendAppGossipSpecific(ctx, nodeIDs, appGossipBytes)
 }
 
-func (s *tracedSender) SendAppGossip(ctx context.Context, appGossipBytes []byte) error {
+func (s *tracedSender) SendAppGossip(
+	ctx context.Context,
+	appGossipBytes []byte,
+	numValidators int,
+	numNonValidators int,
+	numPeers int,
+) error {
 	_, span := s.tracer.Start(ctx, "tracedSender.SendAppGossip", oteltrace.WithAttributes(
 		attribute.Int("gossipLen", len(appGossipBytes)),
+		attribute.Int("numValidators", numValidators),
+		attribute.Int("numNonValidators", numNonValidators),
+		attribute.Int("numPeers", numPeers),
 	))
 	defer span.End()
 
-	return s.sender.SendAppGossip(ctx, appGossipBytes)
+	return s.sender.SendAppGossip(
+		ctx,
+		appGossipBytes,
+		numValidators,
+		numNonValidators,
+		numPeers,
+	)
 }
 
 func (s *tracedSender) SendGossip(ctx context.Context, container []byte) {

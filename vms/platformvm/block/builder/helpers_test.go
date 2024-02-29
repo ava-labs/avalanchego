@@ -103,7 +103,7 @@ type environment struct {
 	Builder
 	blkManager blockexecutor.Manager
 	mempool    mempool.Mempool
-	network    network.Network
+	network    *network.Network
 	sender     *common.SenderTest
 
 	isBootstrapped *utils.Atomic[bool]
@@ -177,7 +177,7 @@ func newEnvironment(t *testing.T, f fork) *environment { //nolint:unparam
 
 	registerer := prometheus.NewRegistry()
 	res.sender = &common.SenderTest{T: t}
-	res.sender.SendAppGossipF = func(context.Context, []byte) error {
+	res.sender.SendAppGossipF = func(context.Context, []byte, int, int, int) error {
 		return nil
 	}
 
