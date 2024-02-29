@@ -47,6 +47,8 @@ const (
 	durango fork = iota
 	eUpgrade
 
+	latest = durango
+
 	testTxFee    uint64 = 1000
 	startBalance uint64 = 50000
 
