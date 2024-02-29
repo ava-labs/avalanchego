@@ -36,6 +36,9 @@ var (
 	ErrNoStartProof                = errors.New("no start proof")
 	ErrNoEndProof                  = errors.New("no end proof")
 	ErrProofNodeNotForKey          = errors.New("the provided node has a key that is not a prefix of the specified key")
+	ErrInclusionProofWrongKey      = errors.New("the last proof node's key should match the proved key for an inclusion proof")
+	ErrInclusionProofWrongValue    = errors.New("the last proof node's value should match the proved value for an inclusion proof")
+	ErrExclusionProofWrongKey      = errors.New("the last proof node's key should not match the proved key for an exclusion proof")
 	ErrProofValueDoesntMatch       = errors.New("the provided value does not match the proof node for the provided key's value")
 	ErrProofNodeHasUnincludedValue = errors.New("the provided proof has a value for a key within the range that is not present in the provided key/values")
 	ErrInvalidMaybe                = errors.New("maybe is nothing but has value")
@@ -145,24 +148,15 @@ func (proof *Proof) Verify(ctx context.Context, expectedRootID ids.ID, tokenSize
 
 	// Confirm that the last proof node's value matches the claimed proof value
 	lastNode := proof.Path[len(proof.Path)-1]
+	isInclusionProof := proof.Value.HasValue()
 
-	// If the last proof node's key is [proof.Key] (i.e. this is an inclusion proof)
-	// then the value of the last proof node must match [proof.Value].
-	// Note partial byte length keys can never match the [proof.Key] since it's bytes,
-	// and thus has a whole number of bytes
-	if !lastNode.Key.hasPartialByte() &&
-		proof.Key == lastNode.Key &&
-		!valueOrHashMatches(proof.Value, lastNode.ValueOrHash) {
-		return ErrProofValueDoesntMatch
-	}
-
-	// If the last proof node has a length not evenly divisible into bytes or a different key than [proof.Key]
-	// then this is an exclusion proof and should prove that [proof.Key] isn't in the trie.
-	// Note length not evenly divisible into bytes can never match the [proof.Key] since it's bytes,
-	// and thus an exact number of bytes.
-	if (lastNode.Key.hasPartialByte() || proof.Key != lastNode.Key) &&
-		proof.Value.HasValue() {
-		return ErrProofValueDoesntMatch
+	switch {
+	case isInclusionProof && proof.Key != lastNode.Key:
+		return ErrInclusionProofWrongKey
+	case isInclusionProof && !valueOrHashMatches(proof.Value, lastNode.ValueOrHash):
+		return ErrInclusionProofWrongValue
+	case !isInclusionProof && proof.Key == lastNode.Key:
+		return ErrExclusionProofWrongKey
 	}
 
 	// Don't bother locking [view] -- nobody else has a reference to it.

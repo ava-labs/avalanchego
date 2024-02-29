@@ -49,58 +49,87 @@ func Test_Proof_Simple(t *testing.T) {
 func Test_Proof_Verify_Bad_Data(t *testing.T) {
 	type test struct {
 		name        string
+		proofKey    []byte
 		malform     func(proof *Proof)
 		expectedErr error
 	}
 
 	tests := []test{
 		{
-			name:        "happyPath",
+			name:        "happy path inclusion proof",
+			proofKey:    []byte{2},
 			malform:     func(*Proof) {},
 			expectedErr: nil,
 		},
 		{
-			name: "empty",
+			name:        "happy path exclusion proof",
+			proofKey:    []byte{5},
+			malform:     func(*Proof) {},
+			expectedErr: nil,
+		},
+		{
+			name:     "empty inclusion proof path",
+			proofKey: []byte{2},
 			malform: func(proof *Proof) {
 				proof.Path = nil
 			},
 			expectedErr: ErrEmptyProof,
 		},
 		{
-			name: "odd length key path with value",
+			name:     "empty exclusion proof path",
+			proofKey: []byte{5},
+			malform: func(proof *Proof) {
+				proof.Path = nil
+			},
+			expectedErr: ErrEmptyProof,
+		},
+		{
+			name:     "odd length key path with value; inclusion proof",
+			proofKey: []byte{2},
 			malform: func(proof *Proof) {
 				proof.Path[0].ValueOrHash = maybe.Some([]byte{1, 2})
 			},
 			expectedErr: ErrPartialByteLengthWithValue,
 		},
 		{
-			name: "last proof node has missing value",
+			name:     "odd length key path with value; exclusion proof",
+			proofKey: []byte{5},
+			malform: func(proof *Proof) {
+				proof.Path[0].ValueOrHash = maybe.Some([]byte{1, 2})
+			},
+			expectedErr: ErrPartialByteLengthWithValue,
+		},
+		{
+			name:     "last inclusion proof node has no value",
+			proofKey: []byte{2},
 			malform: func(proof *Proof) {
 				proof.Path[len(proof.Path)-1].ValueOrHash = maybe.Nothing[[]byte]()
 			},
-			expectedErr: ErrProofValueDoesntMatch,
+			expectedErr: ErrInclusionProofWrongValue,
 		},
 		{
-			name: "missing value on proof",
+			name:     "last inclusion proof node has wrong value",
+			proofKey: []byte{2},
 			malform: func(proof *Proof) {
-				proof.Value = maybe.Nothing[[]byte]()
+				proof.Path[len(proof.Path)-1].ValueOrHash = maybe.Some([]byte{1, 3, 3, 7})
 			},
-			expectedErr: ErrProofValueDoesntMatch,
+			expectedErr: ErrInclusionProofWrongValue,
 		},
 		{
-			name: "mismatched value on proof",
+			name:     "last inclusion proof node has wrong key",
+			proofKey: []byte{2},
 			malform: func(proof *Proof) {
-				proof.Value = maybe.Some([]byte{10})
+				proof.Path[len(proof.Path)-1].Key = ToKey([]byte{2, 1})
 			},
-			expectedErr: ErrProofValueDoesntMatch,
+			expectedErr: ErrInclusionProofWrongKey,
 		},
 		{
-			name: "value of exclusion proof",
+			name:     "last exclusion proof node has wrong key",
+			proofKey: []byte{5},
 			malform: func(proof *Proof) {
-				// remove the value node to make it look like it is an exclusion proof
-				proof.Path = proof.Path[:len(proof.Path)-1]
+				proof.Path[len(proof.Path)-1].Key = ToKey([]byte{5})
 			},
-			expectedErr: ErrProofValueDoesntMatch,
+			expectedErr: ErrExclusionProofWrongKey,
 		},
 	}
 
@@ -113,7 +142,7 @@ func Test_Proof_Verify_Bad_Data(t *testing.T) {
 
 			writeBasicBatch(t, db)
 
-			proof, err := db.GetProof(context.Background(), []byte{2})
+			proof, err := db.GetProof(context.Background(), tt.proofKey)
 			require.NoError(err)
 			require.NotNil(proof)
 
