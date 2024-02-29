@@ -1542,15 +1542,9 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				env.state.EXPECT().DeleteUTXO(gomock.Any()).Times(len(env.unsignedTx.Ins))
 				env.state.EXPECT().AddUTXO(gomock.Any()).Times(len(env.unsignedTx.Outs))
 
-				cfg := &config.Config{
-					BanffTime:    env.latestForkTime,
-					CortinaTime:  env.latestForkTime,
-					DurangoTime:  env.latestForkTime,
-					EUpgradeTime: mockable.MaxTime,
-				}
 				e := &StandardTxExecutor{
 					Backend: &Backend{
-						Config:       cfg,
+						Config:       defaultTestConfig(env.latestForkTime),
 						Bootstrapped: &utils.Atomic[bool]{},
 						Fx:           env.fx,
 						FlowChecker:  env.flowChecker,
@@ -1572,15 +1566,9 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				env.tx.Unsigned.(*txs.RemoveSubnetValidatorTx).Subnet = constants.PrimaryNetworkID
 				env.state = state.NewMockDiff(ctrl)
 
-				cfg := &config.Config{
-					BanffTime:    env.latestForkTime,
-					CortinaTime:  env.latestForkTime,
-					DurangoTime:  env.latestForkTime,
-					EUpgradeTime: mockable.MaxTime,
-				}
 				e := &StandardTxExecutor{
 					Backend: &Backend{
-						Config:       cfg,
+						Config:       defaultTestConfig(env.latestForkTime),
 						Bootstrapped: &utils.Atomic[bool]{},
 						Fx:           env.fx,
 						FlowChecker:  env.flowChecker,
@@ -1603,15 +1591,9 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(nil, database.ErrNotFound)
 				env.state.EXPECT().GetPendingValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(nil, database.ErrNotFound)
 
-				cfg := &config.Config{
-					BanffTime:    env.latestForkTime,
-					CortinaTime:  env.latestForkTime,
-					DurangoTime:  env.latestForkTime,
-					EUpgradeTime: mockable.MaxTime,
-				}
 				e := &StandardTxExecutor{
 					Backend: &Backend{
-						Config:       cfg,
+						Config:       defaultTestConfig(env.latestForkTime),
 						Bootstrapped: &utils.Atomic[bool]{},
 						Fx:           env.fx,
 						FlowChecker:  env.flowChecker,
@@ -1637,15 +1619,9 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime)
 				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(&staker, nil).Times(1)
 
-				cfg := &config.Config{
-					BanffTime:    env.latestForkTime,
-					CortinaTime:  env.latestForkTime,
-					DurangoTime:  env.latestForkTime,
-					EUpgradeTime: mockable.MaxTime,
-				}
 				e := &StandardTxExecutor{
 					Backend: &Backend{
-						Config:       cfg,
+						Config:       defaultTestConfig(env.latestForkTime),
 						Bootstrapped: &utils.Atomic[bool]{},
 						Fx:           env.fx,
 						FlowChecker:  env.flowChecker,
@@ -1669,15 +1645,9 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime)
 				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(env.staker, nil)
 
-				cfg := &config.Config{
-					BanffTime:    env.latestForkTime,
-					CortinaTime:  env.latestForkTime,
-					DurangoTime:  env.latestForkTime,
-					EUpgradeTime: mockable.MaxTime,
-				}
 				e := &StandardTxExecutor{
 					Backend: &Backend{
-						Config:       cfg,
+						Config:       defaultTestConfig(env.latestForkTime),
 						Bootstrapped: &utils.Atomic[bool]{},
 						Fx:           env.fx,
 						FlowChecker:  env.flowChecker,
@@ -1700,15 +1670,9 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(env.staker, nil)
 				env.state.EXPECT().GetSubnetOwner(env.unsignedTx.Subnet).Return(nil, database.ErrNotFound)
 
-				cfg := &config.Config{
-					BanffTime:    env.latestForkTime,
-					CortinaTime:  env.latestForkTime,
-					DurangoTime:  env.latestForkTime,
-					EUpgradeTime: mockable.MaxTime,
-				}
 				e := &StandardTxExecutor{
 					Backend: &Backend{
-						Config:       cfg,
+						Config:       defaultTestConfig(env.latestForkTime),
 						Bootstrapped: &utils.Atomic[bool]{},
 						Fx:           env.fx,
 						FlowChecker:  env.flowChecker,
@@ -1733,15 +1697,9 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				env.state.EXPECT().GetSubnetOwner(env.unsignedTx.Subnet).Return(subnetOwner, nil)
 				env.fx.EXPECT().VerifyPermission(gomock.Any(), env.unsignedTx.SubnetAuth, env.tx.Creds[len(env.tx.Creds)-1], subnetOwner).Return(errTest)
 
-				cfg := &config.Config{
-					BanffTime:    env.latestForkTime,
-					CortinaTime:  env.latestForkTime,
-					DurangoTime:  env.latestForkTime,
-					EUpgradeTime: mockable.MaxTime,
-				}
 				e := &StandardTxExecutor{
 					Backend: &Backend{
-						Config:       cfg,
+						Config:       defaultTestConfig(env.latestForkTime),
 						Bootstrapped: &utils.Atomic[bool]{},
 						Fx:           env.fx,
 						FlowChecker:  env.flowChecker,
@@ -1769,15 +1727,9 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 					gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(),
 				).Return(errTest)
 
-				cfg := &config.Config{
-					BanffTime:    env.latestForkTime,
-					CortinaTime:  env.latestForkTime,
-					DurangoTime:  env.latestForkTime,
-					EUpgradeTime: mockable.MaxTime,
-				}
 				e := &StandardTxExecutor{
 					Backend: &Backend{
-						Config:       cfg,
+						Config:       defaultTestConfig(env.latestForkTime),
 						Bootstrapped: &utils.Atomic[bool]{},
 						Fx:           env.fx,
 						FlowChecker:  env.flowChecker,
@@ -1929,15 +1881,9 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 				env.tx.Unsigned = (*txs.TransformSubnetTx)(nil)
 				env.state = state.NewMockDiff(ctrl)
 
-				cfg := &config.Config{
-					BanffTime:    env.latestForkTime,
-					CortinaTime:  env.latestForkTime,
-					DurangoTime:  env.latestForkTime,
-					EUpgradeTime: mockable.MaxTime,
-				}
 				e := &StandardTxExecutor{
 					Backend: &Backend{
-						Config:       cfg,
+						Config:       defaultTestConfig(env.latestForkTime),
 						Bootstrapped: &utils.Atomic[bool]{},
 						Fx:           env.fx,
 						FlowChecker:  env.flowChecker,
@@ -1958,16 +1904,10 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 				env.unsignedTx.MaxStakeDuration = math.MaxUint32
 				env.state = state.NewMockDiff(ctrl)
 
-				cfg := &config.Config{
-					BanffTime:    env.latestForkTime,
-					CortinaTime:  env.latestForkTime,
-					DurangoTime:  env.latestForkTime,
-					EUpgradeTime: mockable.MaxTime,
-				}
 				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime)
 				e := &StandardTxExecutor{
 					Backend: &Backend{
-						Config:       cfg,
+						Config:       defaultTestConfig(env.latestForkTime),
 						Bootstrapped: &utils.Atomic[bool]{},
 						Fx:           env.fx,
 						FlowChecker:  env.flowChecker,
@@ -1989,14 +1929,10 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 				env.tx.Creds = nil
 				env.state = state.NewMockDiff(ctrl)
 
-				cfg := &config.Config{
-					BanffTime:        env.latestForkTime,
-					CortinaTime:      env.latestForkTime,
-					DurangoTime:      env.latestForkTime,
-					EUpgradeTime:     mockable.MaxTime,
-					MaxStakeDuration: math.MaxInt64,
-				}
+				cfg := defaultTestConfig(env.latestForkTime)
+				cfg.MaxStakeDuration = math.MaxInt64
 				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime)
+
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config:       cfg,
@@ -2027,13 +1963,9 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 					gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(),
 				).Return(ErrFlowCheckFailed)
 
-				cfg := &config.Config{
-					BanffTime:        env.latestForkTime,
-					CortinaTime:      env.latestForkTime,
-					DurangoTime:      env.latestForkTime,
-					EUpgradeTime:     mockable.MaxTime,
-					MaxStakeDuration: math.MaxInt64,
-				}
+				cfg := defaultTestConfig(env.latestForkTime)
+				cfg.MaxStakeDuration = math.MaxInt64
+
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config:       cfg,
@@ -2069,13 +2001,9 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 				env.state.EXPECT().DeleteUTXO(gomock.Any()).Times(len(env.unsignedTx.Ins))
 				env.state.EXPECT().AddUTXO(gomock.Any()).Times(len(env.unsignedTx.Outs))
 
-				cfg := &config.Config{
-					BanffTime:        env.latestForkTime,
-					CortinaTime:      env.latestForkTime,
-					DurangoTime:      env.latestForkTime,
-					EUpgradeTime:     mockable.MaxTime,
-					MaxStakeDuration: math.MaxInt64,
-				}
+				cfg := defaultTestConfig(env.latestForkTime)
+				cfg.MaxStakeDuration = math.MaxInt64
+
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config:       cfg,
@@ -2102,5 +2030,14 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 			err := executor.TransformSubnetTx(unsignedTx)
 			require.ErrorIs(t, err, tt.err)
 		})
+	}
+}
+
+func defaultTestConfig(latestForkTime time.Time) *config.Config {
+	return &config.Config{
+		BanffTime:    latestForkTime,
+		CortinaTime:  latestForkTime,
+		DurangoTime:  latestForkTime,
+		EUpgradeTime: mockable.MaxTime,
 	}
 }
