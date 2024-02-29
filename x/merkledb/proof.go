@@ -829,16 +829,17 @@ func addPathInfo(
 
 		// Add [proofNode]'s children which are outside the range
 		// [insertChildrenLessThan, insertChildrenGreaterThan].
-		compressedKey := Key{}
 		for index, childID := range proofNode.Children {
+			var compressedKey Key
 			if existingChild, ok := n.children[index]; ok {
 				compressedKey = existingChild.compressedKey
 			}
 			childKey := key.Extend(ToToken(index, v.tokenSize), compressedKey)
 			if (shouldInsertLeftChildren && childKey.Less(insertChildrenLessThan.Value())) ||
 				(shouldInsertRightChildren && childKey.Greater(insertChildrenGreaterThan.Value())) {
-				// We didn't set the other values on the child entry, but it doesn't matter.
-				// We only need the IDs to be correct so that the calculated hash is correct.
+				// We don't set the [hasValue] field of the child but that's OK.
+				// We only need the compressed key and ID to be correct so that the
+				// calculated hash is correct.
 				n.setChildEntry(
 					index,
 					&child{
