@@ -174,7 +174,7 @@ func (proof *Proof) Verify(ctx context.Context, expectedRootID ids.ID, tokenSize
 	// Insert all proof nodes.
 	// [provenKey] is the key that we are proving exists, or the key
 	// that is the next key along the node path, proving that [proof.Key] doesn't exist in the trie.
-	provenKey := maybe.Some(proof.Path[len(proof.Path)-1].Key)
+	provenKey := maybe.Some(lastNode.Key)
 
 	if err = addPathInfo(view, proof.Path, provenKey, provenKey); err != nil {
 		return err
