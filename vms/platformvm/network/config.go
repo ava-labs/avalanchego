@@ -12,10 +12,10 @@ import (
 var DefaultConfig = Config{
 	MaxValidatorSetStaleness:                    time.Minute,
 	TargetGossipSize:                            20 * units.KiB,
-	PushGossipFirstNumValidators:                100,
-	PushGossipFirstNumPeers:                     0,
-	PushGossipFollowupNumValidators:             10,
-	PushGossipFollowupNumPeers:                  0,
+	PushGossipNumValidators:                     100,
+	PushGossipNumPeers:                          0,
+	PushRegossipNumValidators:                   10,
+	PushRegossipNumPeers:                        0,
 	PushGossipDiscardedCacheSize:                1024,
 	PushGossipMaxRegossipFrequency:              10 * time.Second,
 	PushGossipFrequency:                         500 * time.Millisecond,
@@ -36,18 +36,18 @@ type Config struct {
 	// sent when pushing transactions and when responded to transaction pull
 	// requests.
 	TargetGossipSize int `json:"target-gossip-size"`
-	// PushGossipFirstNumValidators is the number of validators to push
-	// transactions to in the first round of gossip.
-	PushGossipFirstNumValidators int `json:"push-gossip-first-num-validators"`
-	// PushGossipFirstNumPeers is the number of peers to push transactions to in
-	// the first round of gossip.
-	PushGossipFirstNumPeers int `json:"push-gossip-first-num-peers"`
-	// PushGossipFollowupNumValidators is the number of validators to push
+	// PushGossipNumValidators is the number of validators to push transactions
+	// to in the first round of gossip.
+	PushGossipNumValidators int `json:"push-gossip-num-validators"`
+	// PushGossipNumPeers is the number of peers to push transactions to in the
+	// first round of gossip.
+	PushGossipNumPeers int `json:"push-gossip-num-peers"`
+	// PushRegossipNumValidators is the number of validators to push
 	// transactions to after the first round of gossip.
-	PushGossipFollowupNumValidators int `json:"push-gossip-followup-num-validators"`
-	// PushGossipFollowupNumPeers is the number of peers to push transactions to
-	// after the first round of gossip.
-	PushGossipFollowupNumPeers int `json:"push-gossip-followup-num-peers"`
+	PushRegossipNumValidators int `json:"push-regossip-num-validators"`
+	// PushRegossipNumPeers is the number of peers to push transactions to after
+	// the first round of gossip.
+	PushRegossipNumPeers int `json:"push-regossip-num-peers"`
 	// PushGossipDiscardedCacheSize is the number of txIDs to cache to avoid
 	// pushing transactions that were recently dropped from the mempool.
 	PushGossipDiscardedCacheSize int `json:"push-gossip-discarded-cache-size"`

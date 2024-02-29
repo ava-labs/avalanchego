@@ -94,12 +94,12 @@ func New(
 		txGossipClient,
 		txGossipMetrics,
 		gossip.BranchingFactor{
-			Validators: config.PushGossipFirstNumValidators,
-			Peers:      config.PushGossipFirstNumPeers,
+			Validators: config.PushGossipNumValidators,
+			Peers:      config.PushGossipNumPeers,
 		},
 		gossip.BranchingFactor{
-			Validators: config.PushGossipFollowupNumValidators,
-			Peers:      config.PushGossipFollowupNumPeers,
+			Validators: config.PushRegossipNumValidators,
+			Peers:      config.PushRegossipNumPeers,
 		},
 		config.PushGossipDiscardedCacheSize,
 		config.TargetGossipSize,
