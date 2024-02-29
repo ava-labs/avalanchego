@@ -113,6 +113,9 @@ func (c *Client) AppGossip(
 	return c.sender.SendAppGossip(
 		ctx,
 		PrefixMessage(c.handlerPrefix, appGossipBytes),
+		10,
+		0,
+		0,
 	)
 }
 

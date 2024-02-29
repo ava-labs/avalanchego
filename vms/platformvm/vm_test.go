@@ -274,7 +274,7 @@ func defaultVM(t *testing.T, f fork) (*VM, database.Database, *mutableSharedMemo
 	_, genesisBytes := defaultGenesis(t, ctx.AVAXAssetID)
 	appSender := &common.SenderTest{}
 	appSender.CantSendAppGossip = true
-	appSender.SendAppGossipF = func(context.Context, []byte) error {
+	appSender.SendAppGossipF = func(context.Context, []byte, int, int, int) error {
 		return nil
 	}
 

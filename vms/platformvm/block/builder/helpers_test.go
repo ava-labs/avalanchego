@@ -177,7 +177,7 @@ func newEnvironment(t *testing.T, f fork) *environment { //nolint:unparam
 
 	registerer := prometheus.NewRegistry()
 	res.sender = &common.SenderTest{T: t}
-	res.sender.SendAppGossipF = func(context.Context, []byte) error {
+	res.sender.SendAppGossipF = func(context.Context, []byte, int, int, int) error {
 		return nil
 	}
 
