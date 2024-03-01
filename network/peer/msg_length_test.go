@@ -23,16 +23,6 @@ func TestWriteMsgLen(t *testing.T) {
 		{
 			msgLen:      math.MaxUint32,
 			msgLimit:    math.MaxUint32,
-			expectedErr: errInvalidMaxMessageLength,
-		},
-		{
-			msgLen:      bitmaskCodec,
-			msgLimit:    bitmaskCodec,
-			expectedErr: errInvalidMaxMessageLength,
-		},
-		{
-			msgLen:      bitmaskCodec - 1,
-			msgLimit:    bitmaskCodec - 1,
 			expectedErr: nil,
 		},
 		{
@@ -76,8 +66,8 @@ func TestReadMsgLen(t *testing.T) {
 		{
 			msgLenBytes:    []byte{0xFF, 0xFF, 0xFF, 0xFF},
 			msgLimit:       math.MaxUint32,
-			expectedErr:    errInvalidMaxMessageLength,
-			expectedMsgLen: 0,
+			expectedErr:    nil,
+			expectedMsgLen: math.MaxUint32,
 		},
 		{
 			msgLenBytes:    []byte{0b11111111, 0xFF},
@@ -86,13 +76,13 @@ func TestReadMsgLen(t *testing.T) {
 			expectedMsgLen: 0,
 		},
 		{
-			msgLenBytes:    []byte{0b11111111, 0xFF, 0xFF, 0xFF},
+			msgLenBytes:    []byte{0b01111111, 0xFF, 0xFF, 0xFF},
 			msgLimit:       constants.DefaultMaxMessageSize,
 			expectedErr:    errMaxMessageLengthExceeded,
 			expectedMsgLen: 0,
 		},
 		{
-			msgLenBytes:    []byte{0b11111111, 0xFF, 0xFF, 0xFF},
+			msgLenBytes:    []byte{0b01111111, 0xFF, 0xFF, 0xFF},
 			msgLimit:       math.MaxInt32,
 			expectedErr:    nil,
 			expectedMsgLen: math.MaxInt32,
@@ -100,14 +90,14 @@ func TestReadMsgLen(t *testing.T) {
 		{
 			msgLenBytes:    []byte{0b10000000, 0x00, 0x00, 0x01},
 			msgLimit:       math.MaxInt32,
-			expectedErr:    nil,
-			expectedMsgLen: 1,
+			expectedErr:    errMaxMessageLengthExceeded,
+			expectedMsgLen: 0,
 		},
 		{
 			msgLenBytes:    []byte{0b10000000, 0x00, 0x00, 0x01},
 			msgLimit:       1,
-			expectedErr:    nil,
-			expectedMsgLen: 1,
+			expectedErr:    errMaxMessageLengthExceeded,
+			expectedMsgLen: 0,
 		},
 	}
 	for _, tv := range tt {
