@@ -451,7 +451,7 @@ func TestPersistStakers(t *testing.T) {
 				blsDiffBytes, err := s.flatValidatorPublicKeyDiffsDB.Get(marshalDiffKey(staker.SubnetID, height, staker.NodeID))
 				if staker.SubnetID == constants.PrimaryNetworkID {
 					r.NoError(err)
-					r.Equal(bls.DeserializePublicKey(blsDiffBytes), staker.PublicKey)
+					r.Equal(bls.PublicKeyFromValidUncompressedBytes(blsDiffBytes), staker.PublicKey)
 				} else {
 					r.ErrorIs(err, database.ErrNotFound)
 				}
