@@ -67,6 +67,8 @@ jobs:
       - name: Build AvalancheGo Binary
         shell: bash
         run: ./scripts/build.sh -r
+      - name: Collect Workflow Telemetry
+        uses: catchpoint/workflow-telemetry-action@v2
       - name: Run e2e tests
         shell: bash
         run: E2E_SERIAL=1 ./scripts/tests.e2e.sh
