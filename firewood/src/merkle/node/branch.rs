@@ -100,7 +100,7 @@ impl BranchNode {
 
         let path = items.pop().ok_or(Error::custom("Invalid Branch Node"))?;
         let path = Nibbles::<0>::new(&path);
-        let (path, _term) = PartialPath::from_nibbles(path.into_iter());
+        let path = PartialPath::from_nibbles(path.into_iter());
 
         // we've already validated the size, that's why we can safely unwrap
         #[allow(clippy::unwrap_used)]
@@ -176,7 +176,7 @@ impl BranchNode {
         }
 
         #[allow(clippy::unwrap_used)]
-        let path = from_nibbles(&self.path.encode(false)).collect::<Vec<_>>();
+        let path = from_nibbles(&self.path.encode()).collect::<Vec<_>>();
 
         list[Self::MAX_CHILDREN + 1] = path;
 
@@ -202,7 +202,7 @@ impl Storable for BranchNode {
     fn serialize(&self, to: &mut [u8]) -> Result<(), crate::shale::ShaleError> {
         let mut cursor = Cursor::new(to);
 
-        let path: Vec<u8> = from_nibbles(&self.path.encode(false)).collect();
+        let path: Vec<u8> = from_nibbles(&self.path.encode()).collect();
         cursor.write_all(&[path.len() as PathLen])?;
         cursor.write_all(&path)?;
 
@@ -271,7 +271,7 @@ impl Storable for BranchNode {
         addr += path_len as usize;
 
         let path: Vec<u8> = path.into_iter().flat_map(to_nibble_array).collect();
-        let path = PartialPath::decode(&path).0;
+        let path = PartialPath::decode(&path);
 
         let node_raw =
             mem.get_view(addr, BRANCH_HEADER_SIZE)

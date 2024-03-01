@@ -159,7 +159,7 @@ where
                 children,
                 value,
             } => {
-                let path = PartialPath::decode(&path).0;
+                let path = PartialPath::decode(&path);
                 let value = value.map(|v| v.0);
                 let branch = NodeType::Branch(
                     BranchNode::new(path, [None; BranchNode::MAX_CHILDREN], value, *children)

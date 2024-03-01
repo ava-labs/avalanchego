@@ -40,12 +40,8 @@ impl PartialPath {
         self.0
     }
 
-    pub(crate) fn encode(&self, is_terminal: bool) -> Vec<u8> {
+    pub(crate) fn encode(&self) -> Vec<u8> {
         let mut flags = Flags::empty();
-
-        if is_terminal {
-            flags.insert(Flags::TERMINAL);
-        }
 
         let has_odd_len = self.0.len() & 1 == 1;
 
@@ -67,24 +63,24 @@ impl PartialPath {
     // I also think `PartialPath` could probably borrow instead of own data.
     //
     /// returns a tuple of the decoded partial path and whether the path is terminal
-    pub fn decode(raw: &[u8]) -> (Self, bool) {
+    pub fn decode(raw: &[u8]) -> Self {
         Self::from_iter(raw.iter().copied())
     }
 
     /// returns a tuple of the decoded partial path and whether the path is terminal
-    pub fn from_nibbles<const N: usize>(nibbles: NibblesIterator<'_, N>) -> (Self, bool) {
+    pub fn from_nibbles<const N: usize>(nibbles: NibblesIterator<'_, N>) -> Self {
         Self::from_iter(nibbles)
     }
 
     /// Assumes all bytes are nibbles, prefer to use `from_nibbles` instead.
-    fn from_iter<Iter: Iterator<Item = u8>>(mut iter: Iter) -> (Self, bool) {
+    fn from_iter<Iter: Iterator<Item = u8>>(mut iter: Iter) -> Self {
         let flags = Flags::from_bits_retain(iter.next().unwrap_or_default());
 
         if !flags.contains(Flags::ODD_LEN) {
             let _ = iter.next();
         }
 
-        (Self(iter.collect()), flags.contains(Flags::TERMINAL))
+        Self(iter.collect())
     }
 
     pub(super) fn serialized_len(&self) -> u64 {
@@ -107,20 +103,19 @@ mod tests {
     use super::*;
     use test_case::test_case;
 
-    #[test_case(&[1, 2, 3, 4], true)]
-    #[test_case(&[1, 2, 3], false)]
-    #[test_case(&[0, 1, 2], false)]
-    #[test_case(&[1, 2], true)]
-    #[test_case(&[1], true)]
-    fn test_encoding(steps: &[u8], term: bool) {
+    #[test_case(&[1, 2, 3, 4])]
+    #[test_case(&[1, 2, 3])]
+    #[test_case(&[0, 1, 2])]
+    #[test_case(&[1, 2])]
+    #[test_case(&[1])]
+    fn test_encoding(steps: &[u8]) {
         let path = PartialPath(steps.to_vec());
-        let encoded = path.encode(term);
+        let encoded = path.encode();
 
         assert_eq!(encoded.len(), path.serialized_len() as usize * 2);
 
-        let (decoded, decoded_term) = PartialPath::decode(&encoded);
+        let decoded = PartialPath::decode(&encoded);
 
         assert_eq!(&&*decoded, &steps);
-        assert_eq!(decoded_term, term);
     }
 }
