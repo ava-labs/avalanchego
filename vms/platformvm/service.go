@@ -1684,9 +1684,6 @@ type GetTotalStakeArgs struct {
 
 // GetTotalStakeReply is the response from calling GetTotalStake.
 type GetTotalStakeReply struct {
-	// Deprecated: Use Weight instead.
-	Stake avajson.Uint64 `json:"stake"`
-
 	Weight avajson.Uint64 `json:"weight"`
 }
 
@@ -1701,9 +1698,7 @@ func (s *Service) GetTotalStake(_ *http.Request, args *GetTotalStakeArgs, reply 
 	if err != nil {
 		return fmt.Errorf("couldn't get total weight: %w", err)
 	}
-	weight := avajson.Uint64(totalWeight)
-	reply.Weight = weight
-	reply.Stake = weight
+	reply.Weight = avajson.Uint64(totalWeight)
 	return nil
 }
 
