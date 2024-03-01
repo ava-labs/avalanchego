@@ -53,9 +53,8 @@ const (
 	chainUpgradeFileName = "upgrade"
 	subnetConfigFileExt  = ".json"
 
-	keystoreDeprecationMsg               = "keystore API is deprecated"
-	acceptedFrontierGossipDeprecationMsg = "push-based accepted frontier gossip is deprecated"
-	peerListPushGossipDeprecationMsg     = "push-based peer list gossip is deprecated"
+	keystoreDeprecationMsg           = "keystore API is deprecated"
+	peerListPushGossipDeprecationMsg = "push-based peer list gossip is deprecated"
 )
 
 var (
