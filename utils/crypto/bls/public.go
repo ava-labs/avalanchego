@@ -29,8 +29,8 @@ func PublicKeyToCompressedBytes(pk *PublicKey) []byte {
 	return pk.Compress()
 }
 
-// PublicKeyFromCompressedBytes returns the uncompressed big-endian format of
-// the public key.
+// PublicKeyFromCompressedBytes parses the compressed big-endian format of the
+// public key into a public key.
 func PublicKeyFromCompressedBytes(pkBytes []byte) (*PublicKey, error) {
 	pk := new(PublicKey).Uncompress(pkBytes)
 	if pk == nil {
@@ -42,9 +42,8 @@ func PublicKeyFromCompressedBytes(pkBytes []byte) (*PublicKey, error) {
 	return pk, nil
 }
 
-// PublicKeyToUncompressedBytes parses the uncompressed big-endian format
-// of the public key into a public key. It is assumed that the provided bytes
-// are valid.
+// PublicKeyToUncompressedBytes returns the uncompressed big-endian format of
+// the public key.
 func PublicKeyToUncompressedBytes(key *PublicKey) []byte {
 	return key.Serialize()
 }
