@@ -15,6 +15,7 @@ const SecretKeyLen = blst.BLST_SCALAR_BYTES
 
 var (
 	errFailedSecretKeyDeserialize = errors.New("couldn't deserialize secret key")
+	errInvalidSecretKey           = errors.New("invalid secret key")
 
 	// The ciphersuite is more commonly known as G2ProofOfPossession.
 	// There are two digests to ensure that message space for normal
@@ -50,6 +51,10 @@ func SecretKeyFromBytes(skBytes []byte) (*SecretKey, error) {
 	if sk == nil {
 		return nil, errFailedSecretKeyDeserialize
 	}
+	// if !sk.Valid() {
+	// 	sk.Zeroize()
+	// 	return nil, errInvalidSecretKey
+	// }
 	runtime.SetFinalizer(sk, func(sk *SecretKey) {
 		sk.Zeroize()
 	})

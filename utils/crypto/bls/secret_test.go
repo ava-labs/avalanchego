@@ -47,3 +47,15 @@ func TestSecretKeyBytes(t *testing.T) {
 	require.Equal(skBytes, sk2Bytes)
 	require.Equal(sig, sig2)
 }
+
+func FuzzSecretKeyFromBytes(f *testing.F) {
+	f.Fuzz(func(t *testing.T, skBytes []byte) {
+		sk, err := SecretKeyFromBytes(skBytes)
+		if err != nil {
+			return
+		}
+		if !sk.Valid() {
+			require.FailNow(t, "parsed invalid secret key")
+		}
+	})
+}
