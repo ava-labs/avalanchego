@@ -201,7 +201,9 @@ type Config struct {
 // DefaultConfig contains the default configurations for the transaction
 // pool.
 var DefaultConfig = Config{
-	Journal:   "transactions.rlp",
+	// If we re-enable txpool journaling, we should also add the saved local
+	// transactions to the p2p gossip on startup.
+	Journal:   "",
 	Rejournal: time.Hour,
 
 	PriceLimit: 1,
@@ -212,7 +214,7 @@ var DefaultConfig = Config{
 	AccountQueue: 64,
 	GlobalQueue:  1024,
 
-	Lifetime: 3 * time.Hour,
+	Lifetime: 10 * time.Minute,
 }
 
 // sanitize checks the provided user configurations and changes anything that's

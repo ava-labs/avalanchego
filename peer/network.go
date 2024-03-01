@@ -51,9 +51,6 @@ type Network interface {
 	// SendAppRequest sends message to given nodeID, notifying handler when there's a response or timeout
 	SendAppRequest(ctx context.Context, nodeID ids.NodeID, message []byte, handler message.ResponseHandler) error
 
-	// Gossip sends given gossip message to peers
-	Gossip(gossip []byte) error
-
 	// SendCrossChainRequest sends a message to given chainID notifying handler when there's a response or timeout
 	SendCrossChainRequest(ctx context.Context, chainID ids.ID, message []byte, handler message.ResponseHandler) error
 
@@ -435,15 +432,6 @@ func (n *network) markRequestFulfilled(requestID uint32) (message.ResponseHandle
 	delete(n.outstandingRequestHandlers, requestID)
 
 	return handler, true
-}
-
-// Gossip sends given gossip message to peers
-func (n *network) Gossip(gossip []byte) error {
-	if n.closed.Get() {
-		return nil
-	}
-
-	return n.appSender.SendAppGossip(context.TODO(), gossip)
 }
 
 // AppGossip is called by avalanchego -> VM when there is an incoming AppGossip

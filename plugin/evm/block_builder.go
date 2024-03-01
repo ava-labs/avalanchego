@@ -27,8 +27,7 @@ type blockBuilder struct {
 	ctx         *snow.Context
 	chainConfig *params.ChainConfig
 
-	txPool   *txpool.TxPool
-	gossiper Gossiper
+	txPool *txpool.TxPool
 
 	shutdownChan <-chan struct{}
 	shutdownWg   *sync.WaitGroup
@@ -56,7 +55,6 @@ func (vm *VM) NewBlockBuilder(notifyBuildBlockChan chan<- commonEng.Message) *bl
 		ctx:                  vm.ctx,
 		chainConfig:          vm.chainConfig,
 		txPool:               vm.txPool,
-		gossiper:             vm.gossiper,
 		shutdownChan:         vm.shutdownChan,
 		shutdownWg:           &vm.shutdownWg,
 		notifyBuildBlockChan: notifyBuildBlockChan,
@@ -152,20 +150,9 @@ func (b *blockBuilder) awaitSubmittedTxs() {
 
 		for {
 			select {
-			case ethTxsEvent := <-txSubmitChan:
+			case <-txSubmitChan:
 				log.Trace("New tx detected, trying to generate a block")
 				b.signalTxsReady()
-
-				if b.gossiper != nil && len(ethTxsEvent.Txs) > 0 {
-					// [GossipEthTxs] will block unless [gossiper.ethTxsToGossipChan] (an
-					// unbuffered channel) is listened on
-					if err := b.gossiper.GossipEthTxs(ethTxsEvent.Txs); err != nil {
-						log.Warn(
-							"failed to gossip new eth transactions",
-							"err", err,
-						)
-					}
-				}
 			case <-b.shutdownChan:
 				b.buildBlockTimer.Stop()
 				return

@@ -170,6 +170,10 @@ func TestEthTxPushGossipOutbound(t *testing.T) {
 	))
 	require.NoError(vm.SetState(ctx, snow.NormalOp))
 
+	defer func() {
+		require.NoError(vm.Shutdown(ctx))
+	}()
+
 	address := testEthAddrs[0]
 	key := testKeys[0]
 	tx := types.NewTransaction(0, address, big.NewInt(10), 21000, big.NewInt(testMinGasPrice), nil)
@@ -178,6 +182,7 @@ func TestEthTxPushGossipOutbound(t *testing.T) {
 
 	// issue a tx
 	require.NoError(vm.txPool.AddLocal(signedTx))
+	vm.ethTxPushGossiper.Get().Add(&GossipEthTx{signedTx})
 
 	sent := <-sender.SentAppGossip
 	got := &sdk.PushGossip{}
@@ -200,9 +205,7 @@ func TestEthTxPushGossipInbound(t *testing.T) {
 	ctx := context.Background()
 	snowCtx := utils.TestSnowContext()
 
-	sender := &common.FakeSender{
-		SentAppGossip: make(chan []byte, 1),
-	}
+	sender := &common.SenderTest{}
 	vm := &VM{
 		p2pSender:         sender,
 		ethTxPullGossiper: gossip.NoOpGossiper{},
@@ -220,6 +223,10 @@ func TestEthTxPushGossipInbound(t *testing.T) {
 		&common.FakeSender{},
 	))
 	require.NoError(vm.SetState(ctx, snow.NormalOp))
+
+	defer func() {
+		require.NoError(vm.Shutdown(ctx))
+	}()
 
 	address := testEthAddrs[0]
 	key := testKeys[0]
@@ -244,15 +251,5 @@ func TestEthTxPushGossipInbound(t *testing.T) {
 	inboundGossipMsg := append(binary.AppendUvarint(nil, ethTxGossipProtocol), inboundGossipBytes...)
 	require.NoError(vm.AppGossip(ctx, ids.EmptyNodeID, inboundGossipMsg))
 
-	forwardedMsg := &sdk.PushGossip{}
-	outboundGossipBytes := <-sender.SentAppGossip
-
-	require.Equal(byte(ethTxGossipProtocol), outboundGossipBytes[0])
-	require.NoError(proto.Unmarshal(outboundGossipBytes[1:], forwardedMsg))
-	require.Len(forwardedMsg.Gossip, 1)
-
-	forwardedTx, err := marshaller.UnmarshalGossip(forwardedMsg.Gossip[0])
-	require.NoError(err)
-	require.Equal(gossipedTx.GossipID(), forwardedTx.GossipID())
 	require.True(vm.txPool.Has(signedTx.Hash()))
 }
