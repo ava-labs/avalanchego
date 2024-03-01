@@ -88,10 +88,6 @@ type Staker struct {
 	EndTime   json.Uint64 `json:"endTime"`
 	Weight    json.Uint64 `json:"weight"`
 	NodeID    ids.NodeID  `json:"nodeID"`
-
-	// Deprecated: Use Weight instead
-	// TODO: remove [StakeAmount] after enough time for dependencies to update
-	StakeAmount *json.Uint64 `json:"stakeAmount,omitempty"`
 }
 
 // GenesisValidator should to be used for genesis validators only.
