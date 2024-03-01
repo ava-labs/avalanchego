@@ -795,11 +795,12 @@ func (s *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentValidato
 		nodeID := currentStaker.NodeID
 		weight := avajson.Uint64(currentStaker.Weight)
 		apiStaker := platformapi.Staker{
-			TxID:      currentStaker.TxID,
-			StartTime: avajson.Uint64(currentStaker.StartTime.Unix()),
-			EndTime:   avajson.Uint64(currentStaker.EndTime.Unix()),
-			Weight:    weight,
-			NodeID:    nodeID,
+			TxID:        currentStaker.TxID,
+			StartTime:   avajson.Uint64(currentStaker.StartTime.Unix()),
+			EndTime:     avajson.Uint64(currentStaker.EndTime.Unix()),
+			Weight:      weight,
+			StakeAmount: &weight,
+			NodeID:      nodeID,
 		}
 		potentialReward := avajson.Uint64(currentStaker.PotentialReward)
 
@@ -1009,11 +1010,12 @@ func (s *Service) GetPendingValidators(_ *http.Request, args *GetPendingValidato
 		nodeID := pendingStaker.NodeID
 		weight := avajson.Uint64(pendingStaker.Weight)
 		apiStaker := platformapi.Staker{
-			TxID:      pendingStaker.TxID,
-			NodeID:    nodeID,
-			StartTime: avajson.Uint64(pendingStaker.StartTime.Unix()),
-			EndTime:   avajson.Uint64(pendingStaker.EndTime.Unix()),
-			Weight:    weight,
+			TxID:        pendingStaker.TxID,
+			NodeID:      nodeID,
+			StartTime:   avajson.Uint64(pendingStaker.StartTime.Unix()),
+			EndTime:     avajson.Uint64(pendingStaker.EndTime.Unix()),
+			Weight:      weight,
+			StakeAmount: &weight,
 		}
 
 		switch pendingStaker.Priority {
@@ -1684,6 +1686,9 @@ type GetTotalStakeArgs struct {
 
 // GetTotalStakeReply is the response from calling GetTotalStake.
 type GetTotalStakeReply struct {
+	// Deprecated: Use Weight instead.
+	Stake avajson.Uint64 `json:"stake"`
+
 	Weight avajson.Uint64 `json:"weight"`
 }
 
@@ -1698,7 +1703,9 @@ func (s *Service) GetTotalStake(_ *http.Request, args *GetTotalStakeArgs, reply 
 	if err != nil {
 		return fmt.Errorf("couldn't get total weight: %w", err)
 	}
-	reply.Weight = avajson.Uint64(totalWeight)
+	weight := avajson.Uint64(totalWeight)
+	reply.Weight = weight
+	reply.Stake = weight
 	return nil
 }
 

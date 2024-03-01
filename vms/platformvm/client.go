@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
@@ -493,7 +494,13 @@ func (c *client) GetTotalStake(ctx context.Context, subnetID ids.ID, options ...
 	err := c.requester.SendRequest(ctx, "platform.getTotalStake", &GetTotalStakeArgs{
 		SubnetID: subnetID,
 	}, res, options...)
-	return uint64(res.Weight), err
+	var amount json.Uint64
+	if subnetID == constants.PrimaryNetworkID {
+		amount = res.Stake
+	} else {
+		amount = res.Weight
+	}
+	return uint64(amount), err
 }
 
 func (c *client) GetRewardUTXOs(ctx context.Context, args *api.GetTxArgs, options ...rpc.Option) ([][]byte, error) {
