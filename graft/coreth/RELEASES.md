@@ -1,5 +1,11 @@
 # Release Notes
 
+## [v0.13.1](https://github.com/ava-labs/coreth/releases/tag/v0.13.1)
+
+- Bump AvalancheGo to v1.11.2
+- Remove Legacy Gossipper
+- Tune default gossip parameters
+
 ## [v0.13.0](https://github.com/ava-labs/coreth/releases/tag/v0.13.0)
 
 - Bump AvalancheGo to v1.11.1
