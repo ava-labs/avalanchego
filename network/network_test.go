@@ -20,7 +20,6 @@ import (
 	"github.com/ava-labs/avalanchego/network/dialer"
 	"github.com/ava-labs/avalanchego/network/peer"
 	"github.com/ava-labs/avalanchego/network/throttling"
-	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/uptime"
@@ -327,7 +326,7 @@ func TestSend(t *testing.T) {
 	net0 := networks[0]
 
 	mc := newMessageCreator(t)
-	outboundGetMsg, err := mc.Get(ids.Empty, 1, time.Second, ids.Empty, p2p.EngineType_ENGINE_TYPE_SNOWMAN)
+	outboundGetMsg, err := mc.Get(ids.Empty, 1, time.Second, ids.Empty)
 	require.NoError(err)
 
 	toSend := set.Of(nodeIDs[1])
@@ -365,7 +364,7 @@ func TestSendAndGossipWithFilter(t *testing.T) {
 	net0 := networks[0]
 
 	mc := newMessageCreator(t)
-	outboundGetMsg, err := mc.Get(ids.Empty, 1, time.Second, ids.Empty, p2p.EngineType_ENGINE_TYPE_SNOWMAN)
+	outboundGetMsg, err := mc.Get(ids.Empty, 1, time.Second, ids.Empty)
 	require.NoError(err)
 
 	toSend := set.Of(nodeIDs...)

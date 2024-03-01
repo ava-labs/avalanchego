@@ -257,7 +257,7 @@ func TestSend(t *testing.T) {
 	peer0, peer1 := makeReadyTestPeers(t, set.Set[ids.ID]{})
 	mc := newMessageCreator(t)
 
-	outboundGetMsg, err := mc.Get(ids.Empty, 1, time.Second, ids.Empty, p2p.EngineType_ENGINE_TYPE_SNOWMAN)
+	outboundGetMsg, err := mc.Get(ids.Empty, 1, time.Second, ids.Empty)
 	require.NoError(err)
 
 	require.True(peer0.Send(context.Background(), outboundGetMsg))
@@ -834,7 +834,7 @@ func TestShouldDisconnect(t *testing.T) {
 func sendAndFlush(t *testing.T, sender *testPeer, receiver *testPeer) {
 	t.Helper()
 	mc := newMessageCreator(t)
-	outboundGetMsg, err := mc.Get(ids.Empty, 1, time.Second, ids.Empty, p2p.EngineType_ENGINE_TYPE_SNOWMAN)
+	outboundGetMsg, err := mc.Get(ids.Empty, 1, time.Second, ids.Empty)
 	require.NoError(t, err)
 	require.True(t, sender.Send(context.Background(), outboundGetMsg))
 	inboundGetMsg := <-receiver.inboundMsgChan
