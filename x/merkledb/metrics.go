@@ -24,10 +24,10 @@ type merkleMetrics interface {
 	ValueNodeCacheMiss()
 	IntermediateNodeCacheHit()
 	IntermediateNodeCacheMiss()
-	ViewNodeCacheHit()
-	ViewNodeCacheMiss()
-	ViewValueCacheHit()
-	ViewValueCacheMiss()
+	ViewChangesNodeHit()
+	ViewChangesNodeMiss()
+	ViewChangesValueHit()
+	ViewChangesValueMiss()
 }
 
 type mockMetrics struct {
@@ -40,9 +40,9 @@ type mockMetrics struct {
 	intermediateNodeCacheHit  int64
 	intermediateNodeCacheMiss int64
 	viewNodeCacheHit          int64
-	viewNodeCacheMiss         int64
-	viewValueCacheHit         int64
-	viewValueCacheMiss        int64
+	viewChangesNodeMiss       int64
+	viewChangesValueHit       int64
+	viewChangesValueMiss      int64
 }
 
 func (m *mockMetrics) HashCalculated() {
@@ -66,32 +66,32 @@ func (m *mockMetrics) DatabaseNodeWrite() {
 	m.keyWriteCount++
 }
 
-func (m *mockMetrics) ViewNodeCacheHit() {
+func (m *mockMetrics) ViewChangesNodeHit() {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
 	m.viewNodeCacheHit++
 }
 
-func (m *mockMetrics) ViewValueCacheHit() {
+func (m *mockMetrics) ViewChangesValueHit() {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	m.viewValueCacheHit++
+	m.viewChangesValueHit++
 }
 
-func (m *mockMetrics) ViewNodeCacheMiss() {
+func (m *mockMetrics) ViewChangesNodeMiss() {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	m.viewNodeCacheMiss++
+	m.viewChangesNodeMiss++
 }
 
-func (m *mockMetrics) ViewValueCacheMiss() {
+func (m *mockMetrics) ViewChangesValueMiss() {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	m.viewValueCacheMiss++
+	m.viewChangesValueMiss++
 }
 
 func (m *mockMetrics) ValueNodeCacheHit() {
@@ -130,7 +130,7 @@ type metrics struct {
 	intermediateNodeCacheMiss prometheus.Counter
 	valueNodeCacheHit         prometheus.Counter
 	valueNodeCacheMiss        prometheus.Counter
-	viewNodeCacheHit          prometheus.Counter
+	viewChangesNodeHit        prometheus.Counter
 	viewNodeCacheMiss         prometheus.Counter
 	viewValueCacheHit         prometheus.Counter
 	viewValueCacheMiss        prometheus.Counter
@@ -177,25 +177,25 @@ func newMetrics(namespace string, reg prometheus.Registerer) (merkleMetrics, err
 			Name:      "intermediate_node_cache_miss",
 			Help:      "cumulative amount of misses on the intermediate node db cache",
 		}),
-		viewNodeCacheHit: prometheus.NewCounter(prometheus.CounterOpts{
+		viewChangesNodeHit: prometheus.NewCounter(prometheus.CounterOpts{
 			Namespace: namespace,
-			Name:      "view_node_cache_hit",
-			Help:      "cumulative amount of hits on the view node cache",
+			Name:      "view_changes_node_hit",
+			Help:      "cumulative amount of hits looking up a node in a view's change set",
 		}),
 		viewNodeCacheMiss: prometheus.NewCounter(prometheus.CounterOpts{
 			Namespace: namespace,
-			Name:      "view_node_cache_miss",
-			Help:      "cumulative amount of misses on the view node cache",
+			Name:      "view_changes_node_miss",
+			Help:      "cumulative amount of misses looking up a node in a view's change set",
 		}),
 		viewValueCacheHit: prometheus.NewCounter(prometheus.CounterOpts{
 			Namespace: namespace,
-			Name:      "view_value_cache_hit",
-			Help:      "cumulative amount of hits on the view value cache",
+			Name:      "view_changes_value_hit",
+			Help:      "cumulative amount of hits looking up a value in a view's change set",
 		}),
 		viewValueCacheMiss: prometheus.NewCounter(prometheus.CounterOpts{
 			Namespace: namespace,
-			Name:      "view_value_cache_miss",
-			Help:      "cumulative amount of misses on the view value cache",
+			Name:      "view_changes_value_miss",
+			Help:      "cumulative amount of misses looking up a value in a view's change set",
 		}),
 	}
 	err := utils.Err(
@@ -206,7 +206,7 @@ func newMetrics(namespace string, reg prometheus.Registerer) (merkleMetrics, err
 		reg.Register(m.valueNodeCacheMiss),
 		reg.Register(m.intermediateNodeCacheHit),
 		reg.Register(m.intermediateNodeCacheMiss),
-		reg.Register(m.viewNodeCacheHit),
+		reg.Register(m.viewChangesNodeHit),
 		reg.Register(m.viewNodeCacheMiss),
 		reg.Register(m.viewValueCacheHit),
 		reg.Register(m.viewValueCacheMiss),
@@ -226,19 +226,19 @@ func (m *metrics) HashCalculated() {
 	m.hashCount.Inc()
 }
 
-func (m *metrics) ViewNodeCacheHit() {
-	m.viewNodeCacheHit.Inc()
+func (m *metrics) ViewChangesNodeHit() {
+	m.viewChangesNodeHit.Inc()
 }
 
-func (m *metrics) ViewNodeCacheMiss() {
+func (m *metrics) ViewChangesNodeMiss() {
 	m.viewNodeCacheMiss.Inc()
 }
 
-func (m *metrics) ViewValueCacheHit() {
+func (m *metrics) ViewChangesValueHit() {
 	m.viewValueCacheHit.Inc()
 }
 
-func (m *metrics) ViewValueCacheMiss() {
+func (m *metrics) ViewChangesValueMiss() {
 	m.viewValueCacheMiss.Inc()
 }
 

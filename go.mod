@@ -10,7 +10,7 @@ go 1.21
 require (
 	github.com/DataDog/zstd v1.5.2
 	github.com/NYTimes/gziphandler v1.1.1
-	github.com/ava-labs/coreth v0.13.0-rc.0
+	github.com/ava-labs/coreth v0.13.1-rc.5
 	github.com/ava-labs/ledger-avalanche/go v0.0.0-20231102202641-ae2ebdaeac34
 	github.com/btcsuite/btcd/btcutil v1.1.3
 	github.com/cockroachdb/pebble v0.0.0-20230209160836-829675f94811

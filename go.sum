@@ -63,8 +63,8 @@ github.com/alecthomas/units v0.0.0-20151022065526-2efee857e7cf/go.mod h1:ybxpYRF
 github.com/allegro/bigcache v1.2.1-0.20190218064605-e24eb225f156 h1:eMwmnE/GDgah4HI848JfFxHt+iPb26b4zyfspmqY0/8=
 github.com/allegro/bigcache v1.2.1-0.20190218064605-e24eb225f156/go.mod h1:Cb/ax3seSYIx7SuZdm2G2xzfwmv3TPSk2ucNfQESPXM=
 github.com/armon/consul-api v0.0.0-20180202201655-eb2c6b5be1b6/go.mod h1:grANhF5doyWs3UAsr3K4I6qtAmlQcZDesFNEHPZAzj8=
-github.com/ava-labs/coreth v0.13.0-rc.0 h1:V2l3qj2ek3geKDJAnF2M94mYJK8kg2kePixujfJ0bmk=
-github.com/ava-labs/coreth v0.13.0-rc.0/go.mod h1:eUMbBLDhlZASJjcbf0gIcD2GMn2rRRCUxC8MXLt5QQk=
+github.com/ava-labs/coreth v0.13.1-rc.5 h1:YcTs9nryZLkf4gPmMyFx1TREFpDTPdg/VCNGGHSF2TY=
+github.com/ava-labs/coreth v0.13.1-rc.5/go.mod h1:4y1igTe/sFOIrpAtXoY+AdmfftNHrmrhBBRVfGCAPcw=
 github.com/ava-labs/ledger-avalanche/go v0.0.0-20231102202641-ae2ebdaeac34 h1:mg9Uw6oZFJKytJxgxnl3uxZOs/SB8CVHg6Io4Tf99Zc=
 github.com/ava-labs/ledger-avalanche/go v0.0.0-20231102202641-ae2ebdaeac34/go.mod h1:pJxaT9bUgeRNVmNRgtCHb7sFDIRKy7CzTQVi8gGNT6g=
 github.com/aymerick/raymond v2.0.3-0.20180322193309-b565731e1464+incompatible/go.mod h1:osfaiScAUVup+UC9Nfq76eWqDhXlp+4UYaA8uhTBO6g=
