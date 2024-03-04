@@ -235,48 +235,119 @@ func TestValidatorGossiper(t *testing.T) {
 func TestPushGossiperNew(t *testing.T) {
 	tests := []struct {
 		name                 string
-		numValidators        int
-		numNonValidators     int
-		numPeers             int
+		gossipParams         BranchingFactor
+		regossipParams       BranchingFactor
 		discardedSize        int
 		targetGossipSize     int
 		maxRegossipFrequency time.Duration
 		expected             error
 	}{
 		{
-			name:          "invalid num validators",
-			numValidators: -1,
-			expected:      ErrInvalidNumValidators,
+			name: "invalid gossip num validators",
+			gossipParams: BranchingFactor{
+				Validators: -1,
+			},
+			regossipParams: BranchingFactor{
+				Peers: 1,
+			},
+			expected: ErrInvalidNumValidators,
 		},
 		{
-			name:             "invalid num non-validators",
-			numNonValidators: -1,
-			expected:         ErrInvalidNumNonValidators,
+			name: "invalid gossip num non-validators",
+			gossipParams: BranchingFactor{
+				NonValidators: -1,
+			},
+			regossipParams: BranchingFactor{
+				Peers: 1,
+			},
+			expected: ErrInvalidNumNonValidators,
 		},
 		{
-			name:     "invalid num peers",
-			numPeers: -1,
+			name: "invalid gossip num peers",
+			gossipParams: BranchingFactor{
+				Peers: -1,
+			},
+			regossipParams: BranchingFactor{
+				Peers: 1,
+			},
 			expected: ErrInvalidNumPeers,
 		},
 		{
-			name:     "invalid num to gossip",
+			name:         "invalid gossip num to gossip",
+			gossipParams: BranchingFactor{},
+			regossipParams: BranchingFactor{
+				Peers: 1,
+			},
 			expected: ErrInvalidNumToGossip,
 		},
 		{
-			name:          "invalid discarded size",
-			numValidators: 1,
+			name: "invalid regossip num validators",
+			gossipParams: BranchingFactor{
+				Validators: 1,
+			},
+			regossipParams: BranchingFactor{
+				Validators: -1,
+			},
+			expected: ErrInvalidNumValidators,
+		},
+		{
+			name: "invalid regossip num non-validators",
+			gossipParams: BranchingFactor{
+				Validators: 1,
+			},
+			regossipParams: BranchingFactor{
+				NonValidators: -1,
+			},
+			expected: ErrInvalidNumNonValidators,
+		},
+		{
+			name: "invalid regossip num peers",
+			gossipParams: BranchingFactor{
+				Validators: 1,
+			},
+			regossipParams: BranchingFactor{
+				Peers: -1,
+			},
+			expected: ErrInvalidNumPeers,
+		},
+		{
+			name: "invalid regossip num to gossip",
+			gossipParams: BranchingFactor{
+				Validators: 1,
+			},
+			regossipParams: BranchingFactor{},
+			expected:       ErrInvalidNumToGossip,
+		},
+		{
+			name: "invalid discarded size",
+			gossipParams: BranchingFactor{
+				Validators: 1,
+			},
+			regossipParams: BranchingFactor{
+				Validators: 1,
+			},
 			discardedSize: -1,
 			expected:      ErrInvalidDiscardedSize,
 		},
 		{
-			name:             "invalid target gossip size",
-			numValidators:    1,
+			name: "invalid target gossip size",
+			gossipParams: BranchingFactor{
+				Validators: 1,
+			},
+			regossipParams: BranchingFactor{
+				Validators: 1,
+			},
 			targetGossipSize: -1,
 			expected:         ErrInvalidTargetGossipSize,
 		},
 		{
-			name:                 "invalid max re-gossip frequency",
-			numValidators:        1,
+			name: "invalid max re-gossip frequency",
+			gossipParams: BranchingFactor{
+				Validators: 1,
+			},
+			regossipParams: BranchingFactor{
+				Validators: 1,
+			},
 			maxRegossipFrequency: -1,
 			expected:             ErrInvalidRegossipFrequency,
 		},
@@ -289,9 +360,8 @@ func TestPushGossiperNew(t *testing.T) {
 				nil,
 				nil,
 				Metrics{},
-				tt.numValidators,
-				tt.numNonValidators,
-				tt.numPeers,
+				tt.gossipParams,
+				tt.regossipParams,
 				tt.discardedSize,
 				tt.targetGossipSize,
 				tt.maxRegossipFrequency,
@@ -305,7 +375,7 @@ func TestPushGossiperNew(t *testing.T) {
 func TestPushGossiper(t *testing.T) {
 	type cycle struct {
 		toAdd    []*testTx
-		expected []*testTx
+		expected [][]*testTx
 	}
 	tests := []struct {
 		name           string
@@ -327,15 +397,17 @@ func TestPushGossiper(t *testing.T) {
 							id: ids.ID{2},
 						},
 					},
-					expected: []*testTx{
+					expected: [][]*testTx{
 						{
-							id: ids.ID{0},
-						},
-						{
-							id: ids.ID{1},
-						},
-						{
-							id: ids.ID{2},
+							{
+								id: ids.ID{0},
+							},
+							{
+								id: ids.ID{1},
+							},
+							{
+								id: ids.ID{2},
+							},
 						},
 					},
 				},
@@ -351,9 +423,11 @@ func TestPushGossiper(t *testing.T) {
 							id: ids.ID{0},
 						},
 					},
-					expected: []*testTx{
+					expected: [][]*testTx{
 						{
-							id: ids.ID{0},
+							{
+								id: ids.ID{0},
+							},
 						},
 					},
 				},
@@ -363,12 +437,16 @@ func TestPushGossiper(t *testing.T) {
 							id: ids.ID{1},
 						},
 					},
-					expected: []*testTx{
+					expected: [][]*testTx{
 						{
-							id: ids.ID{1},
+							{
+								id: ids.ID{1},
+							},
 						},
 						{
-							id: ids.ID{0},
+							{
+								id: ids.ID{0},
+							},
 						},
 					},
 				},
@@ -378,15 +456,19 @@ func TestPushGossiper(t *testing.T) {
 							id: ids.ID{2},
 						},
 					},
-					expected: []*testTx{
+					expected: [][]*testTx{
 						{
-							id: ids.ID{2},
+							{
+								id: ids.ID{2},
+							},
 						},
 						{
-							id: ids.ID{1},
-						},
-						{
-							id: ids.ID{0},
+							{
+								id: ids.ID{1},
+							},
+							{
+								id: ids.ID{0},
+							},
 						},
 					},
 				},
@@ -402,15 +484,17 @@ func TestPushGossiper(t *testing.T) {
 							id: ids.ID{0},
 						},
 					},
-					expected: []*testTx{
+					expected: [][]*testTx{
 						{
-							id: ids.ID{0},
+							{
+								id: ids.ID{0},
+							},
 						},
 					},
 				},
 				{
 					toAdd:    []*testTx{},
-					expected: []*testTx{},
+					expected: [][]*testTx{},
 				},
 			},
 			shouldRegossip: false,
@@ -423,7 +507,7 @@ func TestPushGossiper(t *testing.T) {
 			ctx := context.Background()
 
 			sender := &common.FakeSender{
-				SentAppGossip: make(chan []byte, 1),
+				SentAppGossip: make(chan []byte, 2),
 			}
 			network, err := p2p.NewNetwork(
 				logging.NoLog{},
@@ -447,9 +531,12 @@ func TestPushGossiper(t *testing.T) {
 				FullSet[*testTx]{},
 				client,
 				metrics,
-				1,
-				0,
-				0,
+				BranchingFactor{
+					Validators: 1,
+				},
+				BranchingFactor{
+					Validators: 1,
+				},
 				0, // the discarded cache size doesn't matter for this test
 				units.MiB,
 				regossipTime,
@@ -460,29 +547,31 @@ func TestPushGossiper(t *testing.T) {
 				gossiper.Add(cycle.toAdd...)
 				require.NoError(gossiper.Gossip(ctx))
 
-				want := &sdk.PushGossip{
-					Gossip: make([][]byte, 0, len(cycle.expected)),
-				}
+				for _, expected := range cycle.expected {
+					want := &sdk.PushGossip{
+						Gossip: make([][]byte, 0, len(expected)),
+					}
 
-				for _, gossipable := range cycle.expected {
-					bytes, err := marshaller.MarshalGossip(gossipable)
-					require.NoError(err)
+					for _, gossipable := range expected {
+						bytes, err := marshaller.MarshalGossip(gossipable)
+						require.NoError(err)
 
-					want.Gossip = append(want.Gossip, bytes)
-				}
+						want.Gossip = append(want.Gossip, bytes)
+					}
 
-				if len(want.Gossip) > 0 {
-					// remove the handler prefix
-					sentMsg := <-sender.SentAppGossip
-					got := &sdk.PushGossip{}
-					require.NoError(proto.Unmarshal(sentMsg[1:], got))
+					if len(want.Gossip) > 0 {
+						// remove the handler prefix
+						sentMsg := <-sender.SentAppGossip
+						got := &sdk.PushGossip{}
+						require.NoError(proto.Unmarshal(sentMsg[1:], got))
 
-					require.Equal(want.Gossip, got.Gossip)
-				} else {
-					select {
-					case <-sender.SentAppGossip:
-						require.FailNow("unexpectedly sent gossip message")
-					default:
+						require.Equal(want.Gossip, got.Gossip)
+					} else {
+						select {
+						case <-sender.SentAppGossip:
+							require.FailNow("unexpectedly sent gossip message")
+						default:
+						}
 					}
 				}
 

@@ -71,11 +71,3 @@ func Sign(sk *SecretKey, msg []byte) *Signature {
 func SignProofOfPossession(sk *SecretKey, msg []byte) *Signature {
 	return new(Signature).Sign(sk, msg, ciphersuiteProofOfPossession)
 }
-
-func DeserializeSecretKey(pkBytes []byte) *SecretKey {
-	return new(SecretKey).Deserialize(pkBytes)
-}
-
-func SerializeSecretKey(key *SecretKey) []byte {
-	return key.Serialize()
-}
