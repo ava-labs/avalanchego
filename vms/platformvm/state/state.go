@@ -1332,7 +1332,7 @@ func (s *state) ApplyValidatorPublicKeyDiffs(
 			continue
 		}
 
-		vdr.PublicKey = bls.DeserializePublicKey(pkBytes)
+		vdr.PublicKey = bls.PublicKeyFromValidUncompressedBytes(pkBytes)
 	}
 
 	// Note: this does not fallback to the linkeddb index because the linkeddb
@@ -2135,7 +2135,7 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64, codecV
 					// diffs.
 					err := s.flatValidatorPublicKeyDiffsDB.Put(
 						marshalDiffKey(constants.PrimaryNetworkID, height, nodeID),
-						bls.SerializePublicKey(staker.PublicKey),
+						bls.PublicKeyToUncompressedBytes(staker.PublicKey),
 					)
 					if err != nil {
 						return err
@@ -2145,7 +2145,7 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64, codecV
 					// rollbacks.
 					//
 					// Note: We store the compressed public key here.
-					pkBytes := bls.PublicKeyToBytes(staker.PublicKey)
+					pkBytes := bls.PublicKeyToCompressedBytes(staker.PublicKey)
 					if err := nestedPKDiffDB.Put(nodeID.Bytes(), pkBytes); err != nil {
 						return err
 					}
