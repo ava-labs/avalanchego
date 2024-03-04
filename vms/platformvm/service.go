@@ -1851,7 +1851,7 @@ func (v *GetValidatorsAtReply) MarshalJSON() ([]byte, error) {
 		}
 
 		if vdr.PublicKey != nil {
-			pk, err := formatting.Encode(formatting.HexNC, bls.PublicKeyToBytes(vdr.PublicKey))
+			pk, err := formatting.Encode(formatting.HexNC, bls.PublicKeyToCompressedBytes(vdr.PublicKey))
 			if err != nil {
 				return nil, err
 			}
@@ -1886,7 +1886,7 @@ func (v *GetValidatorsAtReply) UnmarshalJSON(b []byte) error {
 			if err != nil {
 				return err
 			}
-			vdr.PublicKey, err = bls.PublicKeyFromBytes(pkBytes)
+			vdr.PublicKey, err = bls.PublicKeyFromCompressedBytes(pkBytes)
 			if err != nil {
 				return err
 			}
