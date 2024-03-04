@@ -5,7 +5,7 @@ use firewood::{
     merkle::{Bincode, Proof, ProofError},
     merkle_util::{DataStoreError, InMemoryMerkle},
 };
-use rand::Rng;
+use rand::{rngs::StdRng, thread_rng, Rng, SeedableRng as _};
 use std::{collections::HashMap, fmt::Write};
 
 fn merkle_build_test<
@@ -224,7 +224,7 @@ fn test_root_hash_random_deletions() -> Result<(), DataStoreError> {
 #[test]
 #[allow(clippy::unwrap_used, clippy::indexing_slicing)]
 fn test_proof() -> Result<(), DataStoreError> {
-    let set = generate_random_data(500);
+    let set = fixed_and_pseudorandom_data(500);
     let mut items = Vec::from_iter(set.iter());
     items.sort();
     let merkle = merkle_build_test(items.clone(), 0x10000, 0x10000)?;
@@ -287,7 +287,7 @@ fn test_proof_end_with_branch() -> Result<(), DataStoreError> {
 
 #[test]
 fn test_bad_proof() -> Result<(), DataStoreError> {
-    let set = generate_random_data(800);
+    let set = fixed_and_pseudorandom_data(800);
     let mut items = Vec::from_iter(set.iter());
     items.sort();
     let merkle = merkle_build_test(items.clone(), 0x10000, 0x10000)?;
@@ -341,7 +341,7 @@ fn test_empty_tree_proof() -> Result<(), DataStoreError> {
 // The test cases are generated randomly.
 #[allow(clippy::indexing_slicing)]
 fn test_range_proof() -> Result<(), ProofError> {
-    let set = generate_random_data(4096);
+    let set = fixed_and_pseudorandom_data(4096);
     let mut items = Vec::from_iter(set.iter());
     items.sort();
     let merkle = merkle_build_test(items.clone(), 0x10000, 0x10000)?;
@@ -377,7 +377,7 @@ fn test_range_proof() -> Result<(), ProofError> {
 // The prover is expected to detect the error.
 #[allow(clippy::indexing_slicing)]
 fn test_bad_range_proof() -> Result<(), ProofError> {
-    let set = generate_random_data(4096);
+    let set = fixed_and_pseudorandom_data(4096);
     let mut items = Vec::from_iter(set.iter());
     items.sort();
     let merkle = merkle_build_test(items.clone(), 0x10000, 0x10000)?;
@@ -455,7 +455,7 @@ fn test_bad_range_proof() -> Result<(), ProofError> {
 // The test cases are generated randomly.
 #[allow(clippy::indexing_slicing)]
 fn test_range_proof_with_non_existent_proof() -> Result<(), ProofError> {
-    let set = generate_random_data(4096);
+    let set = fixed_and_pseudorandom_data(4096);
     let mut items = Vec::from_iter(set.iter());
     items.sort();
     let merkle = merkle_build_test(items.clone(), 0x10000, 0x10000)?;
@@ -524,7 +524,7 @@ fn test_range_proof_with_non_existent_proof() -> Result<(), ProofError> {
 // - There exists a gap between the last element and the right edge proof
 #[allow(clippy::indexing_slicing)]
 fn test_range_proof_with_invalid_non_existent_proof() -> Result<(), ProofError> {
-    let set = generate_random_data(4096);
+    let set = fixed_and_pseudorandom_data(4096);
     let mut items = Vec::from_iter(set.iter());
     items.sort();
     let merkle = merkle_build_test(items.clone(), 0x10000, 0x10000)?;
@@ -583,7 +583,7 @@ fn test_range_proof_with_invalid_non_existent_proof() -> Result<(), ProofError> 
 // non-existent one.
 #[allow(clippy::indexing_slicing)]
 fn test_one_element_range_proof() -> Result<(), ProofError> {
-    let set = generate_random_data(4096);
+    let set = fixed_and_pseudorandom_data(4096);
     let mut items = Vec::from_iter(set.iter());
     items.sort();
     let merkle = merkle_build_test(items.clone(), 0x10000, 0x10000)?;
@@ -671,7 +671,7 @@ fn test_one_element_range_proof() -> Result<(), ProofError> {
 // The edge proofs can be nil.
 #[allow(clippy::indexing_slicing)]
 fn test_all_elements_proof() -> Result<(), ProofError> {
-    let set = generate_random_data(4096);
+    let set = fixed_and_pseudorandom_data(4096);
     let mut items = Vec::from_iter(set.iter());
     items.sort();
     let merkle = merkle_build_test(items.clone(), 0x10000, 0x10000)?;
@@ -727,7 +727,7 @@ fn test_all_elements_proof() -> Result<(), ProofError> {
 // be a non-existent proof.
 #[allow(clippy::indexing_slicing)]
 fn test_empty_range_proof() -> Result<(), ProofError> {
-    let set = generate_random_data(4096);
+    let set = fixed_and_pseudorandom_data(4096);
     let mut items = Vec::from_iter(set.iter());
     items.sort();
     let merkle = merkle_build_test(items.clone(), 0x10000, 0x10000)?;
@@ -798,7 +798,7 @@ fn test_gapped_range_proof() -> Result<(), ProofError> {
 // Tests the element is not in the range covered by proofs.
 #[allow(clippy::indexing_slicing)]
 fn test_same_side_proof() -> Result<(), DataStoreError> {
-    let set = generate_random_data(4096);
+    let set = fixed_and_pseudorandom_data(4096);
     let mut items = Vec::from_iter(set.iter());
     items.sort();
     let merkle = merkle_build_test(items.clone(), 0x10000, 0x10000)?;
@@ -938,7 +938,7 @@ fn test_both_sides_range_proof() -> Result<(), ProofError> {
 // as the existent proof, but with an extra empty value included, which is a
 // noop technically, but practically should be rejected.
 fn test_empty_value_range_proof() -> Result<(), ProofError> {
-    let set = generate_random_data(512);
+    let set = fixed_and_pseudorandom_data(512);
     let mut items = Vec::from_iter(set.iter());
     items.sort();
     let merkle = merkle_build_test(items.clone(), 0x10000, 0x10000)?;
@@ -974,7 +974,7 @@ fn test_empty_value_range_proof() -> Result<(), ProofError> {
 // but with an extra empty value included, which is a noop technically, but
 // practically should be rejected.
 fn test_all_elements_empty_value_range_proof() -> Result<(), ProofError> {
-    let set = generate_random_data(512);
+    let set = fixed_and_pseudorandom_data(512);
     let mut items = Vec::from_iter(set.iter());
     items.sort();
     let merkle = merkle_build_test(items.clone(), 0x10000, 0x10000)?;
@@ -1078,8 +1078,10 @@ fn test_bloadted_range_proof() -> Result<(), ProofError> {
     Ok(())
 }
 
+// generate pseudorandom data, but prefix it with some known data
+// The number of fixed data points is 100; you specify how much random data you want
 #[allow(clippy::indexing_slicing)]
-fn generate_random_data(n: u32) -> HashMap<[u8; 32], [u8; 20]> {
+fn fixed_and_pseudorandom_data(random_count: u32) -> HashMap<[u8; 32], [u8; 20]> {
     let mut items: HashMap<[u8; 32], [u8; 20]> = HashMap::new();
     for i in 0..100_u32 {
         let mut key: [u8; 32] = [0; 32];
@@ -1097,9 +1099,23 @@ fn generate_random_data(n: u32) -> HashMap<[u8; 32], [u8; 20]> {
         items.insert(more_key, data);
     }
 
-    for _ in 0..n {
-        let key = rand::thread_rng().gen::<[u8; 32]>();
-        let val = rand::thread_rng().gen::<[u8; 20]>();
+    // read FIREWOOD_TEST_SEED from the environment. If it's there, parse it into a u64.
+    let seed = std::env::var("FIREWOOD_TEST_SEED")
+        .ok()
+        .map_or_else(
+            || None,
+            |s| Some(str::parse(&s).expect("couldn't parse FIREWOOD_TEST_SEED; must be a u64")),
+        )
+        .unwrap_or_else(|| thread_rng().gen());
+
+    // the test framework will only render this in verbose mode or if the test fails
+    // to re-run the test when it fails, just specify the seed instead of randomly
+    // selecting one
+    eprintln!("Seed {seed}: to rerun with this data, export FIREWOOD_TEST_SEED={seed}");
+    let mut r = StdRng::seed_from_u64(seed);
+    for _ in 0..random_count {
+        let key = r.gen::<[u8; 32]>();
+        let val = r.gen::<[u8; 20]>();
         items.insert(key, val);
     }
     items
