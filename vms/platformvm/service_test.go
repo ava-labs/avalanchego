@@ -184,7 +184,7 @@ func TestGetTxStatus(t *testing.T) {
 	require.Zero(resp.Reason)
 
 	// put the chain in existing chain list
-	require.NoError(service.vm.Network.IssueTx(context.Background(), tx))
+	require.NoError(service.vm.Network.IssueTxFromRPC(tx))
 	service.vm.ctx.Lock.Lock()
 
 	block, err := service.vm.BuildBlock(context.Background())
@@ -285,7 +285,7 @@ func TestGetTx(t *testing.T) {
 				err = service.GetTx(nil, arg, &response)
 				require.ErrorIs(err, database.ErrNotFound) // We haven't issued the tx yet
 
-				require.NoError(service.vm.Network.IssueTx(context.Background(), tx))
+				require.NoError(service.vm.Network.IssueTxFromRPC(tx))
 				service.vm.ctx.Lock.Lock()
 
 				blk, err := service.vm.BuildBlock(context.Background())

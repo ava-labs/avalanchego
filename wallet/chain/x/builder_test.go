@@ -461,7 +461,7 @@ func makeTestUTXOs(utxosKey *secp256k1.PrivateKey) []*avax.UTXO {
 	const utxosOffset uint64 = 2024
 
 	return []*avax.UTXO{ // currently, the wallet scans UTXOs in the order provided here
-		{ // a small UTXO first, which  should not be enough to pay fees
+		{ // a small UTXO first, which should not be enough to pay fees
 			UTXOID: avax.UTXOID{
 				TxID:        ids.Empty.Prefix(utxosOffset),
 				OutputIndex: uint32(utxosOffset),

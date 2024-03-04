@@ -459,12 +459,18 @@ func (vm *VM) Linearize(ctx context.Context, stopVertexID ids.ID, toEngine chan<
 	// handled asynchronously.
 	vm.Atomic.Set(vm.network)
 
-	vm.awaitShutdown.Add(1)
+	vm.awaitShutdown.Add(2)
 	go func() {
 		defer vm.awaitShutdown.Done()
 
-		// Invariant: Gossip must never grab the context lock.
-		vm.network.Gossip(vm.onShutdownCtx)
+		// Invariant: PushGossip must never grab the context lock.
+		vm.network.PushGossip(vm.onShutdownCtx)
+	}()
+	go func() {
+		defer vm.awaitShutdown.Done()
+
+		// Invariant: PullGossip must never grab the context lock.
+		vm.network.PullGossip(vm.onShutdownCtx)
 	}()
 
 	go func() {
@@ -507,13 +513,13 @@ func (vm *VM) ParseTx(_ context.Context, bytes []byte) (snowstorm.Tx, error) {
  ******************************************************************************
  */
 
-// issueTx attempts to send a transaction to consensus.
+// issueTxFromRPC attempts to send a transaction to consensus.
 //
 // Invariant: The context lock is not held
 // Invariant: This function is only called after Linearize has been called.
-func (vm *VM) issueTx(tx *txs.Tx) (ids.ID, error) {
+func (vm *VM) issueTxFromRPC(tx *txs.Tx) (ids.ID, error) {
 	txID := tx.ID()
-	err := vm.network.IssueTx(context.TODO(), tx)
+	err := vm.network.IssueTxFromRPC(tx)
 	if err != nil && !errors.Is(err, mempool.ErrDuplicateTx) {
 		vm.ctx.Log.Debug("failed to add tx to mempool",
 			zap.Stringer("txID", txID),
