@@ -1,5 +1,107 @@
 # Release Notes
 
+## [v1.11.2](https://github.com/ava-labs/avalanchego/releases/tag/v1.11.2)
+
+This version is backwards compatible to [v1.11.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.11.0). It is optional, but strongly encouraged.
+
+The plugin version is updated to `34` all plugins must update to be compatible.
+
+### APIs
+
+- Removed the `ipc` API
+- Removed the `auth` API
+- Removed most `keystore` related methods from the `platform` API
+  - `platform.importKey`
+  - `platform.createAddress`
+  - `platform.addValidator`
+  - `platform.addDelegator`
+  - `platform.addSubnetValidator`
+  - `platform.createSubnet`
+  - `platform.exportAVAX`
+  - `platform.importAVAX`
+  - `platform.createBlockchain`
+- Added push gossip metrics:
+  - `gossip_tracking{type="sent"}`
+  - `gossip_tracking{type="unsent"}`
+  - `gossip_tracking_lifetime_average`
+  to the following namespaces:
+  - `avalanche_P_vm_tx`
+  - `avalanche_X_vm_avalanche_tx`
+  - `avalanche_C_vm_sdk_atomic_tx_gossip`
+  - `avalanche_C_vm_sdk_eth_tx_gossip`
+- Removed metrics:
+  - `avalanche_C_vm_eth_gossip_atomic_sent`
+  - `avalanche_C_vm_eth_gossip_eth_txs_sent`
+  - `avalanche_C_vm_eth_regossip_eth_txs_queued_attempts`
+  - `avalanche_C_vm_eth_regossip_eth_txs_queued_local_tx_count`
+  - `avalanche_C_vm_eth_regossip_eth_txs_queued_remote_tx_count`
+
+### Configs
+
+- Removed:
+  - `api-ipcs-enabled`
+  - `ipcs-chain-ids`
+  - `ipcs-path`
+  - `api-auth-required`
+  - `api-auth-password`
+  - `api-auth-password-file`
+  - `consensus-app-gossip-validator-size`
+  - `consensus-app-gossip-non-validator-size`
+  - `consensus-app-gossip-peer-size`
+- Removed subnet configs:
+  - `appGossipValidatorSize`
+  - `appGossipNonValidatorSize`
+  - `appGossipPeerSize`
+- Added X-chain and P-chain networking configs:
+  - `push-gossip-num-validators`
+  - `push-gossip-num-peers`
+  - `push-regossip-num-validators`
+  - `push-regossip-num-peers`
+  - `push-gossip-discarded-cache-size`
+  - `push-gossip-max-regossip-frequency`
+  - `push-gossip-frequency`
+- Removed X-chain and P-chain networking configs:
+  - `legacy-push-gossip-cache-size`
+- Added C-chain configs:
+  - `push-gossip-num-validators`
+  - `push-gossip-num-peers`
+  - `push-regossip-num-validators`
+  - `push-regossip-num-peers`
+  - `push-gossip-frequency`
+  - `pull-gossip-frequency`
+  - `tx-pool-lifetime`
+- Removed C-chain configs:
+  - `tx-pool-journal`
+  - `tx-pool-rejournal`
+  - `remote-gossip-only-enabled`
+  - `regossip-max-txs`
+  - `remote-tx-gossip-only-enabled`
+  - `tx-regossip-max-size`
+
+### Fixes
+
+- Fixed mempool push gossip amplification
+
+### What's Changed
+
+- Remove deprecated IPC API by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2760
+- `vms/platformvm`: Remove all keystore APIs except `ExportKey` and `ListAddresses` by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/2761
+- Remove Deprecated Auth API by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2759
+- Remove `defaultAddress` helper from platformvm service tests by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/2767
+- [trace] upgrade opentelemetry to v1.22.0 by @bianyuanop in https://github.com/ava-labs/avalanchego/pull/2702
+- Reenable the upgrade tests by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2769
+- [network/p2p] Redesign Push Gossip by @patrick-ogrady in https://github.com/ava-labs/avalanchego/pull/2772
+- Move AppGossip configs from SubnetConfig into ChainConfig by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2785
+- `merkledb` -- move compressedKey declaration to avoid usage of stale values in loop by @danlaine in https://github.com/ava-labs/avalanchego/pull/2777
+- `merkledb` -- fix `hasValue` in `recordNodeDeleted` by @danlaine in https://github.com/ava-labs/avalanchego/pull/2779
+- `merkledb` -- rename metrics and add missing call by @danlaine in https://github.com/ava-labs/avalanchego/pull/2781
+- `merkledb` -- style nit, remove var name `newView` to reduce shadowing by @danlaine in https://github.com/ava-labs/avalanchego/pull/2784
+- `merkledb` style nits by @danlaine in https://github.com/ava-labs/avalanchego/pull/2783
+- `merkledb` comment accuracy fixes by @danlaine in https://github.com/ava-labs/avalanchego/pull/2780
+- Increase gossip size on first push by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2787
+
+**Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.11.0...v1.11.2
+
 ## [v1.11.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.11.0)
 
 This upgrade consists of the following Avalanche Community Proposals (ACPs):
