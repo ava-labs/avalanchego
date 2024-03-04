@@ -13,7 +13,7 @@ type testManager struct{}
 
 func (testManager) QueueChainCreation(ChainParameters) {}
 
-func (testManager) ForceCreateChain(ChainParameters) {}
+func (testManager) AddChain(*Chain) {}
 
 func (testManager) AddRegistrant(Registrant) {}
 
@@ -37,7 +37,7 @@ func (testManager) RemoveAliases(ids.ID) {}
 
 func (testManager) Shutdown() {}
 
-func (testManager) StartChainCreator(ChainParameters) error {
+func (testManager) StartChainCreator() error {
 	return nil
 }
 
