@@ -42,6 +42,8 @@ func TestParseConfig(t *testing.T) {
 					TargetGossipSize:                            network.DefaultConfig.TargetGossipSize,
 					PushGossipNumValidators:                     network.DefaultConfig.PushGossipNumValidators,
 					PushGossipNumPeers:                          network.DefaultConfig.PushGossipNumPeers,
+					PushRegossipNumValidators:                   network.DefaultConfig.PushRegossipNumValidators,
+					PushRegossipNumPeers:                        network.DefaultConfig.PushRegossipNumPeers,
 					PushGossipDiscardedCacheSize:                network.DefaultConfig.PushGossipDiscardedCacheSize,
 					PushGossipMaxRegossipFrequency:              network.DefaultConfig.PushGossipMaxRegossipFrequency,
 					PushGossipFrequency:                         network.DefaultConfig.PushGossipFrequency,

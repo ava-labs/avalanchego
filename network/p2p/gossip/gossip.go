@@ -263,22 +263,19 @@ func NewPushGossiper[T Gossipable](
 	mempool Set[T],
 	client *p2p.Client,
 	metrics Metrics,
-	numValidators int,
-	numNonValidators int,
-	numPeers int,
+	gossipParams BranchingFactor,
+	regossipParams BranchingFactor,
 	discardedSize int,
 	targetGossipSize int,
 	maxRegossipFrequency time.Duration,
 ) (*PushGossiper[T], error) {
+	if err := gossipParams.Verify(); err != nil {
+		return nil, fmt.Errorf("invalid gossip params: %w", err)
+	}
+	if err := regossipParams.Verify(); err != nil {
+		return nil, fmt.Errorf("invalid regossip params: %w", err)
+	}
 	switch {
-	case numValidators < 0:
-		return nil, ErrInvalidNumValidators
-	case numNonValidators < 0:
-		return nil, ErrInvalidNumNonValidators
-	case numPeers < 0:
-		return nil, ErrInvalidNumPeers
-	case max(numValidators, numNonValidators, numPeers) == 0:
-		return nil, ErrInvalidNumToGossip
 	case discardedSize < 0:
 		return nil, ErrInvalidDiscardedSize
 	case targetGossipSize < 0:
@@ -292,9 +289,8 @@ func NewPushGossiper[T Gossipable](
 		set:                  mempool,
 		client:               client,
 		metrics:              metrics,
-		numValidators:        numValidators,
-		numNonValidators:     numNonValidators,
-		numPeers:             numPeers,
+		gossipParams:         gossipParams,
+		regossipParams:       regossipParams,
 		targetGossipSize:     targetGossipSize,
 		maxRegossipFrequency: maxRegossipFrequency,
 
@@ -312,9 +308,8 @@ type PushGossiper[T Gossipable] struct {
 	client     *p2p.Client
 	metrics    Metrics
 
-	numValidators        int
-	numNonValidators     int
-	numPeers             int
+	gossipParams         BranchingFactor
+	regossipParams       BranchingFactor
 	targetGossipSize     int
 	maxRegossipFrequency time.Duration
 
@@ -324,6 +319,27 @@ type PushGossiper[T Gossipable] struct {
 	toGossip     buffer.Deque[T]
 	toRegossip   buffer.Deque[T]
 	discarded    *cache.LRU[ids.ID, struct{}] // discarded attempts to avoid overgossiping transactions that are frequently dropped
+}
+
+type BranchingFactor struct {
+	Validators    int
+	NonValidators int
+	Peers         int
+}
+
+func (b *BranchingFactor) Verify() error {
+	switch {
+	case b.Validators < 0:
+		return ErrInvalidNumValidators
+	case b.NonValidators < 0:
+		return ErrInvalidNumNonValidators
+	case b.Peers < 0:
+		return ErrInvalidNumPeers
+	case max(b.Validators, b.NonValidators, b.Peers) == 0:
+		return ErrInvalidNumToGossip
+	default:
+		return nil
+	}
 }
 
 type tracking struct {
@@ -348,46 +364,46 @@ func (p *PushGossiper[T]) Gossip(ctx context.Context) error {
 		return nil
 	}
 
-	var (
-		sentBytes = 0
-		gossip    = make([][]byte, 0, defaultGossipableCount)
-	)
-
-	// Iterate over all unsent gossipables.
-	for sentBytes < p.targetGossipSize {
-		gossipable, ok := p.toGossip.PopLeft()
-		if !ok {
-			break
-		}
-
-		// Ensure item is still in the set before we gossip.
-		gossipID := gossipable.GossipID()
-		tracking := p.tracking[gossipID]
-		if !p.set.Has(gossipID) {
-			delete(p.tracking, gossipID)
-			p.addedTimeSum -= tracking.addedTime
-			continue
-		}
-
-		bytes, err := p.marshaller.MarshalGossip(gossipable)
-		if err != nil {
-			delete(p.tracking, gossipID)
-			p.addedTimeSum -= tracking.addedTime
-			return err
-		}
-
-		gossip = append(gossip, bytes)
-		sentBytes += len(bytes)
-		p.toRegossip.PushRight(gossipable)
-		tracking.lastGossiped = now
+	if err := p.gossip(
+		ctx,
+		now,
+		p.gossipParams,
+		p.toGossip,
+		p.toRegossip,
+		&cache.Empty[ids.ID, struct{}]{}, // Don't mark dropped unsent transactions as discarded
+	); err != nil {
+		return fmt.Errorf("unexpected error during gossip: %w", err)
 	}
 
-	maxLastGossipTimeToRegossip := now.Add(-p.maxRegossipFrequency)
+	if err := p.gossip(
+		ctx,
+		now,
+		p.regossipParams,
+		p.toRegossip,
+		p.toRegossip,
+		p.discarded, // Mark dropped sent transactions as discarded
+	); err != nil {
+		return fmt.Errorf("unexpected error during regossip: %w", err)
+	}
+	return nil
+}
 
-	// Iterate over all previously sent gossipables to fill any remaining space
-	// in the gossip batch.
+func (p *PushGossiper[T]) gossip(
+	ctx context.Context,
+	now time.Time,
+	gossipParams BranchingFactor,
+	toGossip buffer.Deque[T],
+	toRegossip buffer.Deque[T],
+	discarded cache.Cacher[ids.ID, struct{}],
+) error {
+	var (
+		sentBytes                   = 0
+		gossip                      = make([][]byte, 0, defaultGossipableCount)
+		maxLastGossipTimeToRegossip = now.Add(-p.maxRegossipFrequency)
+	)
+
 	for sentBytes < p.targetGossipSize {
-		gossipable, ok := p.toRegossip.PopLeft()
+		gossipable, ok := toGossip.PopLeft()
 		if !ok {
 			break
 		}
@@ -398,7 +414,7 @@ func (p *PushGossiper[T]) Gossip(ctx context.Context) error {
 		if !p.set.Has(gossipID) {
 			delete(p.tracking, gossipID)
 			p.addedTimeSum -= tracking.addedTime
-			p.discarded.Put(gossipID, struct{}{}) // only add to discarded if previously sent
+			discarded.Put(gossipID, struct{}{}) // Cache that the item was dropped
 			continue
 		}
 
@@ -406,13 +422,12 @@ func (p *PushGossiper[T]) Gossip(ctx context.Context) error {
 		if maxLastGossipTimeToRegossip.Before(tracking.lastGossiped) {
 			// Put the gossipable on the front of the queue to keep items sorted
 			// by last issuance time.
-			p.toRegossip.PushLeft(gossipable)
+			toGossip.PushLeft(gossipable)
 			break
 		}
 
 		bytes, err := p.marshaller.MarshalGossip(gossipable)
 		if err != nil {
-			// Should never happen because we've already sent this once.
 			delete(p.tracking, gossipID)
 			p.addedTimeSum -= tracking.addedTime
 			return err
@@ -420,7 +435,7 @@ func (p *PushGossiper[T]) Gossip(ctx context.Context) error {
 
 		gossip = append(gossip, bytes)
 		sentBytes += len(bytes)
-		p.toRegossip.PushRight(gossipable)
+		toRegossip.PushRight(gossipable)
 		tracking.lastGossiped = now
 	}
 
@@ -448,9 +463,9 @@ func (p *PushGossiper[T]) Gossip(ctx context.Context) error {
 	return p.client.AppGossip(
 		ctx,
 		msgBytes,
-		p.numValidators,
-		p.numNonValidators,
-		p.numPeers,
+		gossipParams.Validators,
+		gossipParams.NonValidators,
+		gossipParams.Peers,
 	)
 }
 
