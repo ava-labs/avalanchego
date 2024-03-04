@@ -4,6 +4,7 @@
 package executor
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -14,12 +15,18 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fees"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/wallet/chain/p/backends"
+
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 // Ensure Execute fails when there are not enough control sigs
@@ -47,10 +54,13 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
+	feeCfg := env.config.GetDynamicFeesConfig(env.state.GetTimestamp())
 	executor := StandardTxExecutor{
-		Backend: &env.backend,
-		State:   stateDiff,
-		Tx:      tx,
+		Backend:       &env.backend,
+		BlkFeeManager: commonfees.NewManager(feeCfg.UnitFees),
+		UnitCaps:      feeCfg.BlockUnitsCap,
+		State:         stateDiff,
+		Tx:            tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
 	require.ErrorIs(err, errUnauthorizedSubnetModification)
@@ -87,10 +97,13 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
+	feeCfg := env.config.GetDynamicFeesConfig(stateDiff.GetTimestamp())
 	executor := StandardTxExecutor{
-		Backend: &env.backend,
-		State:   stateDiff,
-		Tx:      tx,
+		Backend:       &env.backend,
+		BlkFeeManager: commonfees.NewManager(feeCfg.UnitFees),
+		UnitCaps:      feeCfg.BlockUnitsCap,
+		State:         stateDiff,
+		Tx:            tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
 	require.ErrorIs(err, errUnauthorizedSubnetModification)
@@ -100,7 +113,7 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 // its validator set doesn't exist
 func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, banff)
+	env := newEnvironment(t, eUpgrade)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
@@ -121,10 +134,13 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
+	feeCfg := env.config.GetDynamicFeesConfig(stateDiff.GetTimestamp())
 	executor := StandardTxExecutor{
-		Backend: &env.backend,
-		State:   stateDiff,
-		Tx:      tx,
+		Backend:       &env.backend,
+		BlkFeeManager: commonfees.NewManager(feeCfg.UnitFees),
+		UnitCaps:      feeCfg.BlockUnitsCap,
+		State:         stateDiff,
+		Tx:            tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
 	require.ErrorIs(err, database.ErrNotFound)
@@ -133,7 +149,7 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 // Ensure valid tx passes semanticVerify
 func TestCreateChainTxValid(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, banff)
+	env := newEnvironment(t, eUpgrade)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
@@ -152,10 +168,13 @@ func TestCreateChainTxValid(t *testing.T) {
 	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
+	feeCfg := env.config.GetDynamicFeesConfig(stateDiff.GetTimestamp())
 	executor := StandardTxExecutor{
-		Backend: &env.backend,
-		State:   stateDiff,
-		Tx:      tx,
+		Backend:       &env.backend,
+		BlkFeeManager: commonfees.NewManager(feeCfg.UnitFees),
+		UnitCaps:      feeCfg.BlockUnitsCap,
+		State:         stateDiff,
+		Tx:            tx,
 	}
 	require.NoError(tx.Unsigned.Visit(&executor))
 }
@@ -194,39 +213,58 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 			env := newEnvironment(t, banff)
 			env.config.ApricotPhase3Time = ap3Time
 
-			ins, outs, _, signers, err := env.utxosHandler.Spend(env.state, preFundedKeys, 0, test.fee, ids.ShortEmpty)
-			require.NoError(err)
-
-			subnetAuth, subnetSigners, err := env.utxosHandler.Authorize(env.state, testSubnet1.ID(), preFundedKeys)
-			require.NoError(err)
-
-			signers = append(signers, subnetSigners)
-
-			// Create the tx
-
-			utx := &txs.CreateChainTx{
-				BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-					NetworkID:    env.ctx.NetworkID,
-					BlockchainID: env.ctx.ChainID,
-					Ins:          ins,
-					Outs:         outs,
-				}},
-				SubnetID:   testSubnet1.ID(),
-				VMID:       constants.AVMID,
-				SubnetAuth: subnetAuth,
+			addrs := set.NewSet[ids.ShortID](len(preFundedKeys))
+			for _, key := range preFundedKeys {
+				addrs.Add(key.Address())
 			}
-			tx := &txs.Tx{Unsigned: utx}
-			require.NoError(tx.Sign(txs.Codec, signers))
+
+			env.state.SetTimestamp(test.time) // to duly set fee
+
+			cfg := *env.config
+			cfg.CreateBlockchainTxFee = test.fee
+
+			var (
+				backend  = builder.NewBackend(env.ctx, &cfg, env.state, env.atomicUTXOs)
+				pBuilder = backends.NewBuilder(addrs, backend)
+				feeCfg   = cfg.GetDynamicFeesConfig(env.state.GetTimestamp())
+				feeCalc  = &fees.Calculator{
+					IsEUpgradeActive: false,
+					Log:              logging.NoLog{},
+					Config:           &cfg,
+					ChainTime:        test.time,
+					FeeManager:       commonfees.NewManager(feeCfg.UnitFees),
+					ConsumedUnitsCap: feeCfg.BlockUnitsCap,
+				}
+			)
+			backend.ResetAddresses(addrs)
+
+			utx, err := pBuilder.NewCreateChainTx(
+				testSubnet1.ID(),
+				nil,                  // genesisData
+				ids.GenerateTestID(), // vmID
+				nil,                  // fxIDs
+				"",                   // chainName
+				feeCalc,
+			)
+			require.NoError(err)
+
+			kc := secp256k1fx.NewKeychain(preFundedKeys...)
+			s := backends.NewSigner(kc, backend)
+			tx, err := backends.SignUnsigned(context.Background(), s, utx)
+			require.NoError(err)
 
 			stateDiff, err := state.NewDiff(lastAcceptedID, env)
 			require.NoError(err)
 
 			stateDiff.SetTimestamp(test.time)
 
+			feeCfg = env.config.GetDynamicFeesConfig(stateDiff.GetTimestamp())
 			executor := StandardTxExecutor{
-				Backend: &env.backend,
-				State:   stateDiff,
-				Tx:      tx,
+				Backend:       &env.backend,
+				BlkFeeManager: commonfees.NewManager(feeCfg.UnitFees),
+				UnitCaps:      feeCfg.BlockUnitsCap,
+				State:         stateDiff,
+				Tx:            tx,
 			}
 			err = tx.Unsigned.Visit(&executor)
 			require.ErrorIs(err, test.expectedError)

@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm/block"
 	"github.com/ava-labs/avalanchego/vms/avm/state"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/executor"
+	"github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 const SyncBound = 10 * time.Second
@@ -130,13 +131,18 @@ func (b *Block) Verify(context.Context) error {
 		atomicRequests: make(map[ids.ID]*atomic.Requests),
 	}
 
+	feeCfg := b.manager.backend.Config.GetDynamicFeesConfig(b.Timestamp())
+	feeManager := fees.NewManager(feeCfg.UnitFees)
+
 	for _, tx := range txs {
 		// Verify that the tx is valid according to the current state of the
 		// chain.
 		err := tx.Unsigned.Visit(&executor.SemanticVerifier{
-			Backend: b.manager.backend,
-			State:   stateDiff,
-			Tx:      tx,
+			Backend:       b.manager.backend,
+			BlkFeeManager: feeManager,
+			UnitCaps:      feeCfg.BlockUnitsCap,
+			State:         stateDiff,
+			Tx:            tx,
 		})
 		if err != nil {
 			txID := tx.ID()

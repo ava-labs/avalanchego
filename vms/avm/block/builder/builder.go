@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm/state"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/mempool"
+	"github.com/ava-labs/avalanchego/vms/components/fees"
 
 	blockexecutor "github.com/ava-labs/avalanchego/vms/avm/block/executor"
 	txexecutor "github.com/ava-labs/avalanchego/vms/avm/txs/executor"
@@ -91,6 +92,9 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 		blockTxs      []*txs.Tx
 		inputs        set.Set[ids.ID]
 		remainingSize = targetBlockSize
+
+		feeCfg     = b.backend.Config.GetDynamicFeesConfig(nextTimestamp)
+		feeManager = fees.NewManager(feeCfg.UnitFees)
 	)
 	for {
 		tx, exists := b.mempool.Peek()
@@ -111,9 +115,11 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 		}
 
 		err = tx.Unsigned.Visit(&txexecutor.SemanticVerifier{
-			Backend: b.backend,
-			State:   txDiff,
-			Tx:      tx,
+			Backend:       b.backend,
+			BlkFeeManager: feeManager,
+			UnitCaps:      feeCfg.BlockUnitsCap,
+			State:         txDiff,
+			Tx:            tx,
 		})
 		if err != nil {
 			txID := tx.ID()

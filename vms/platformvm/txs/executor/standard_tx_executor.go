@@ -19,6 +19,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fees"
+
+	commonFees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 var (
@@ -32,8 +35,11 @@ var (
 type StandardTxExecutor struct {
 	// inputs, to be filled before visitor methods are called
 	*Backend
-	State state.Diff // state is expected to be modified
-	Tx    *txs.Tx
+	BlkFeeManager *commonFees.Manager
+	UnitCaps      commonFees.Dimensions
+	State         state.Diff // state is expected to be modified
+	Tx            *txs.Tx
+	Height        uint64
 
 	// outputs of visitor execution
 	OnAccept       func() // may be nil
@@ -68,7 +74,21 @@ func (e *StandardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 	}
 
 	// Verify the flowcheck
-	createBlockchainTxFee := e.Config.GetCreateBlockchainTxFee(currentTimestamp)
+	feeCalculator := fees.Calculator{
+		IsEUpgradeActive: e.Backend.Config.IsEUpgradeActivated(currentTimestamp),
+		TxID:             e.Tx.ID(),
+		Log:              e.Ctx.Log,
+		Height:           e.Height,
+		Config:           e.Backend.Config,
+		ChainTime:        currentTimestamp,
+		FeeManager:       e.BlkFeeManager,
+		ConsumedUnitsCap: e.UnitCaps,
+		Credentials:      e.Tx.Creds,
+	}
+	if err := tx.Visit(&feeCalculator); err != nil {
+		return err
+	}
+
 	if err := e.FlowChecker.VerifySpend(
 		tx,
 		e.State,
@@ -76,7 +96,7 @@ func (e *StandardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 		tx.Outs,
 		baseTxCreds,
 		map[ids.ID]uint64{
-			e.Ctx.AVAXAssetID: createBlockchainTxFee,
+			e.Ctx.AVAXAssetID: feeCalculator.Fee,
 		},
 	); err != nil {
 		return err
@@ -114,7 +134,21 @@ func (e *StandardTxExecutor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 	}
 
 	// Verify the flowcheck
-	createSubnetTxFee := e.Config.GetCreateSubnetTxFee(currentTimestamp)
+	feeCalculator := fees.Calculator{
+		IsEUpgradeActive: e.Backend.Config.IsEUpgradeActivated(currentTimestamp),
+		TxID:             e.Tx.ID(),
+		Log:              e.Ctx.Log,
+		Height:           e.Height,
+		Config:           e.Backend.Config,
+		ChainTime:        currentTimestamp,
+		FeeManager:       e.BlkFeeManager,
+		ConsumedUnitsCap: e.UnitCaps,
+		Credentials:      e.Tx.Creds,
+	}
+	if err := tx.Visit(&feeCalculator); err != nil {
+		return err
+	}
+
 	if err := e.FlowChecker.VerifySpend(
 		tx,
 		e.State,
@@ -122,7 +156,7 @@ func (e *StandardTxExecutor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 		tx.Outs,
 		e.Tx.Creds,
 		map[ids.ID]uint64{
-			e.Ctx.AVAXAssetID: createSubnetTxFee,
+			e.Ctx.AVAXAssetID: feeCalculator.Fee,
 		},
 	); err != nil {
 		return err
@@ -162,6 +196,22 @@ func (e *StandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 		utxoIDs[i] = utxoID[:]
 	}
 
+	cfg := e.Backend.Config
+	feeCalculator := fees.Calculator{
+		IsEUpgradeActive: cfg.IsEUpgradeActivated(currentTimestamp),
+		TxID:             e.Tx.ID(),
+		Log:              e.Ctx.Log,
+		Height:           e.Height,
+		Config:           cfg,
+		ChainTime:        currentTimestamp,
+		FeeManager:       e.BlkFeeManager,
+		ConsumedUnitsCap: e.UnitCaps,
+		Credentials:      e.Tx.Creds,
+	}
+	if err := tx.Visit(&feeCalculator); err != nil {
+		return err
+	}
+
 	// Skip verification of the shared memory inputs if the other primary
 	// network chains are not guaranteed to be up-to-date.
 	if e.Bootstrapped.Get() && !e.Config.PartialSyncPrimaryNetwork {
@@ -194,6 +244,7 @@ func (e *StandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 		copy(ins, tx.Ins)
 		copy(ins[len(tx.Ins):], tx.ImportedInputs)
 
+		// Verify the flowcheck
 		if err := e.FlowChecker.VerifySpendUTXOs(
 			tx,
 			utxos,
@@ -201,7 +252,7 @@ func (e *StandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 			tx.Outs,
 			e.Tx.Creds,
 			map[ids.ID]uint64{
-				e.Ctx.AVAXAssetID: e.Config.TxFee,
+				e.Ctx.AVAXAssetID: feeCalculator.Fee,
 			},
 		); err != nil {
 			return err
@@ -239,9 +290,21 @@ func (e *StandardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 		return err
 	}
 
-	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.ExportedOutputs))
-	copy(outs, tx.Outs)
-	copy(outs[len(tx.Outs):], tx.ExportedOutputs)
+	// Verify the flowcheck
+	feeCalculator := fees.Calculator{
+		IsEUpgradeActive: e.Backend.Config.IsEUpgradeActivated(currentTimestamp),
+		TxID:             e.Tx.ID(),
+		Log:              e.Ctx.Log,
+		Height:           e.Height,
+		Config:           e.Backend.Config,
+		ChainTime:        currentTimestamp,
+		FeeManager:       e.BlkFeeManager,
+		ConsumedUnitsCap: e.UnitCaps,
+		Credentials:      e.Tx.Creds,
+	}
+	if err := tx.Visit(&feeCalculator); err != nil {
+		return err
+	}
 
 	if e.Bootstrapped.Get() {
 		if err := verify.SameSubnet(context.TODO(), e.Ctx, tx.DestinationChain); err != nil {
@@ -249,7 +312,9 @@ func (e *StandardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 		}
 	}
 
-	// Verify the flowcheck
+	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.ExportedOutputs))
+	copy(outs, tx.Outs)
+	copy(outs[len(tx.Outs):], tx.ExportedOutputs)
 	if err := e.FlowChecker.VerifySpend(
 		tx,
 		e.State,
@@ -257,7 +322,7 @@ func (e *StandardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 		outs,
 		e.Tx.Creds,
 		map[ids.ID]uint64{
-			e.Ctx.AVAXAssetID: e.Config.TxFee,
+			e.Ctx.AVAXAssetID: feeCalculator.Fee,
 		},
 	); err != nil {
 		return fmt.Errorf("failed verifySpend: %w", err)
@@ -317,6 +382,7 @@ func (e *StandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 		e.State,
 		e.Tx,
 		tx,
+		e.Height,
 	); err != nil {
 		return err
 	}
@@ -343,9 +409,12 @@ func (e *StandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 func (e *StandardTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
 	if err := verifyAddSubnetValidatorTx(
 		e.Backend,
+		e.BlkFeeManager,
+		e.UnitCaps,
 		e.State,
 		e.Tx,
 		tx,
+		e.Height,
 	); err != nil {
 		return err
 	}
@@ -366,6 +435,7 @@ func (e *StandardTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 		e.State,
 		e.Tx,
 		tx,
+		e.Height,
 	); err != nil {
 		return err
 	}
@@ -388,21 +458,23 @@ func (e *StandardTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 func (e *StandardTxExecutor) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx) error {
 	staker, isCurrentValidator, err := verifyRemoveSubnetValidatorTx(
 		e.Backend,
+		e.BlkFeeManager,
+		e.UnitCaps,
 		e.State,
 		e.Tx,
 		tx,
+		e.Height,
 	)
 	if err != nil {
 		return err
 	}
 
+	// Invariant: There are no permissioned subnet delegators to remove.
 	if isCurrentValidator {
 		e.State.DeleteCurrentValidator(staker)
 	} else {
 		e.State.DeletePendingValidator(staker)
 	}
-
-	// Invariant: There are no permissioned subnet delegators to remove.
 
 	txID := e.Tx.ID()
 	avax.Consume(e.State, tx.Ins)
@@ -435,6 +507,21 @@ func (e *StandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 		return err
 	}
 
+	feeCalculator := fees.Calculator{
+		IsEUpgradeActive: e.Backend.Config.IsEUpgradeActivated(currentTimestamp),
+		TxID:             e.Tx.ID(),
+		Log:              e.Ctx.Log,
+		Height:           e.Height,
+		Config:           e.Backend.Config,
+		ChainTime:        currentTimestamp,
+		FeeManager:       e.BlkFeeManager,
+		ConsumedUnitsCap: e.UnitCaps,
+		Credentials:      e.Tx.Creds,
+	}
+	if err := tx.Visit(&feeCalculator); err != nil {
+		return err
+	}
+
 	totalRewardAmount := tx.MaximumSupply - tx.InitialSupply
 	if err := e.Backend.FlowChecker.VerifySpend(
 		tx,
@@ -446,7 +533,7 @@ func (e *StandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 		//            entry in this map literal from being overwritten by the
 		//            second entry.
 		map[ids.ID]uint64{
-			e.Ctx.AVAXAssetID: e.Config.TransformSubnetTxFee,
+			e.Ctx.AVAXAssetID: feeCalculator.Fee,
 			tx.AssetID:        totalRewardAmount,
 		},
 	); err != nil {
@@ -468,9 +555,12 @@ func (e *StandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 func (e *StandardTxExecutor) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessValidatorTx) error {
 	if err := verifyAddPermissionlessValidatorTx(
 		e.Backend,
+		e.BlkFeeManager,
+		e.UnitCaps,
 		e.State,
 		e.Tx,
 		tx,
+		e.Height,
 	); err != nil {
 		return err
 	}
@@ -500,9 +590,12 @@ func (e *StandardTxExecutor) AddPermissionlessValidatorTx(tx *txs.AddPermissionl
 func (e *StandardTxExecutor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDelegatorTx) error {
 	if err := verifyAddPermissionlessDelegatorTx(
 		e.Backend,
+		e.BlkFeeManager,
+		e.UnitCaps,
 		e.State,
 		e.Tx,
 		tx,
+		e.Height,
 	); err != nil {
 		return err
 	}
@@ -524,9 +617,12 @@ func (e *StandardTxExecutor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionl
 func (e *StandardTxExecutor) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwnershipTx) error {
 	err := verifyTransferSubnetOwnershipTx(
 		e.Backend,
+		e.BlkFeeManager,
+		e.UnitCaps,
 		e.State,
 		e.Tx,
 		tx,
+		e.Height,
 	)
 	if err != nil {
 		return err
@@ -555,6 +651,25 @@ func (e *StandardTxExecutor) BaseTx(tx *txs.BaseTx) error {
 	}
 
 	// Verify the flowcheck
+	var (
+		cfg              = e.Backend.Config
+		currentTimestamp = e.State.GetTimestamp()
+	)
+	feeCalculator := fees.Calculator{
+		IsEUpgradeActive: cfg.IsEUpgradeActivated(currentTimestamp),
+		TxID:             e.Tx.ID(),
+		Log:              e.Ctx.Log,
+		Height:           e.Height,
+		Config:           cfg,
+		ChainTime:        currentTimestamp,
+		FeeManager:       e.BlkFeeManager,
+		ConsumedUnitsCap: e.UnitCaps,
+		Credentials:      e.Tx.Creds,
+	}
+	if err := tx.Visit(&feeCalculator); err != nil {
+		return err
+	}
+
 	if err := e.FlowChecker.VerifySpend(
 		tx,
 		e.State,
@@ -562,7 +677,7 @@ func (e *StandardTxExecutor) BaseTx(tx *txs.BaseTx) error {
 		tx.Outs,
 		e.Tx.Creds,
 		map[ids.ID]uint64{
-			e.Ctx.AVAXAssetID: e.Config.TxFee,
+			e.Ctx.AVAXAssetID: feeCalculator.Fee,
 		},
 	); err != nil {
 		return err

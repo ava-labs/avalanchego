@@ -6,6 +6,7 @@ package avm
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"math/rand"
 	"testing"
 	"time"
@@ -24,9 +25,10 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
-	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/sampler"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/avm/block/executor"
 	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
@@ -39,9 +41,14 @@ import (
 	keystoreutils "github.com/ava-labs/avalanchego/vms/components/keystore"
 )
 
+type fork uint8
+
 const (
-	testTxFee    uint64 = 1000
-	startBalance uint64 = 50000
+	durango fork = iota
+	eUpgrade
+
+	testTxFee    uint64 = units.MilliAvax
+	startBalance uint64 = 1000 * units.MilliAvax
 
 	username       = "bobby"
 	password       = "StrnasfqewiurPasswdn56d" //#nosec G101
@@ -85,6 +92,7 @@ type user struct {
 }
 
 type envConfig struct {
+	fork             fork
 	isCustomFeeAsset bool
 	keystoreUsers    []*user
 	vmStaticConfig   *config.Config
@@ -145,10 +153,7 @@ func setup(tb testing.TB, c *envConfig) *environment {
 		require.NoError(keystoreUser.Close())
 	}
 
-	vmStaticConfig := config.Config{
-		TxFee:            testTxFee,
-		CreateAssetTxFee: testTxFee,
-	}
+	vmStaticConfig := staticConfig(tb, c.fork)
 	if c.vmStaticConfig != nil {
 		vmStaticConfig = *c.vmStaticConfig
 	}
@@ -200,10 +205,17 @@ func setup(tb testing.TB, c *envConfig) *environment {
 		vm:           vm,
 		service: &Service{
 			vm: vm,
+			txBuilderBackend: newServiceBackend(
+				vm.feeAssetID,
+				vm.parser.Codec(),
+				vm.ctx,
+				&vm.Config,
+				vm.state,
+				vm.AtomicUTXOManager,
+			),
 		},
 		walletService: &WalletService{
-			vm:         vm,
-			pendingTxs: linkedhashmap.New[ids.ID, *txs.Tx](),
+			walletServiceBackend: NewWalletServiceBackend(vm),
 		},
 	}
 
@@ -219,6 +231,30 @@ func setup(tb testing.TB, c *envConfig) *environment {
 
 	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
 	return env
+}
+
+func staticConfig(tb testing.TB, f fork) config.Config {
+	var (
+		durangoTime  = mockable.MaxTime
+		eUpgradeTime = mockable.MaxTime
+	)
+
+	switch f {
+	case eUpgrade:
+		eUpgradeTime = time.Time{}
+		fallthrough
+	case durango:
+		durangoTime = time.Time{}
+	default:
+		require.FailNow(tb, fmt.Sprintf("unhandled fork %d", f))
+	}
+
+	return config.Config{
+		TxFee:            testTxFee,
+		CreateAssetTxFee: testTxFee,
+		DurangoTime:      durangoTime,
+		EUpgradeTime:     eUpgradeTime,
+	}
 }
 
 // Returns:

@@ -22,12 +22,20 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/avm/block"
+	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/metrics"
 	"github.com/ava-labs/avalanchego/vms/avm/state"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/mempool"
 )
+
+var noFeesTestConfig = &config.Config{
+	DurangoTime:      time.Time{},
+	EUpgradeTime:     mockable.MaxTime,
+	TxFee:            0,
+	CreateAssetTxFee: 0,
+}
 
 func TestBlockVerify(t *testing.T) {
 	type test struct {
@@ -45,6 +53,9 @@ func TestBlockVerify(t *testing.T) {
 				b := &Block{
 					Block: mockBlock,
 					manager: &manager{
+						backend: &executor.Backend{
+							Config: noFeesTestConfig,
+						},
 						blkIDToState: map[ids.ID]*blockState{},
 					},
 				}
@@ -62,8 +73,12 @@ func TestBlockVerify(t *testing.T) {
 				mockBlock.EXPECT().ID().Return(ids.Empty).AnyTimes()
 				mockBlock.EXPECT().MerkleRoot().Return(ids.GenerateTestID()).AnyTimes()
 				return &Block{
-					Block:   mockBlock,
-					manager: &manager{},
+					Block: mockBlock,
+					manager: &manager{
+						backend: &executor.Backend{
+							Config: noFeesTestConfig,
+						},
+					},
 				}
 			},
 			expectedErr: ErrUnexpectedMerkleRoot,
@@ -82,6 +97,9 @@ func TestBlockVerify(t *testing.T) {
 				return &Block{
 					Block: mockBlock,
 					manager: &manager{
+						backend: &executor.Backend{
+							Config: noFeesTestConfig,
+						},
 						clk: clk,
 					},
 				}
@@ -99,6 +117,9 @@ func TestBlockVerify(t *testing.T) {
 				return &Block{
 					Block: mockBlock,
 					manager: &manager{
+						backend: &executor.Backend{
+							Config: noFeesTestConfig,
+						},
 						blkIDToState: map[ids.ID]*blockState{},
 						clk:          &mockable.Clock{},
 					},
@@ -125,6 +146,9 @@ func TestBlockVerify(t *testing.T) {
 				return &Block{
 					Block: mockBlock,
 					manager: &manager{
+						backend: &executor.Backend{
+							Config: noFeesTestConfig,
+						},
 						mempool:      mempool,
 						metrics:      metrics.NewMockMetrics(ctrl),
 						blkIDToState: map[ids.ID]*blockState{},
@@ -157,6 +181,9 @@ func TestBlockVerify(t *testing.T) {
 				return &Block{
 					Block: mockBlock,
 					manager: &manager{
+						backend: &executor.Backend{
+							Config: noFeesTestConfig,
+						},
 						state:        mockState,
 						blkIDToState: map[ids.ID]*blockState{},
 						clk:          &mockable.Clock{},
@@ -193,6 +220,9 @@ func TestBlockVerify(t *testing.T) {
 				return &Block{
 					Block: mockBlock,
 					manager: &manager{
+						backend: &executor.Backend{
+							Config: noFeesTestConfig,
+						},
 						state:        mockState,
 						blkIDToState: map[ids.ID]*blockState{},
 						clk:          &mockable.Clock{},
@@ -232,6 +262,9 @@ func TestBlockVerify(t *testing.T) {
 				return &Block{
 					Block: mockBlock,
 					manager: &manager{
+						backend: &executor.Backend{
+							Config: noFeesTestConfig,
+						},
 						blkIDToState: map[ids.ID]*blockState{
 							parentID: {
 								onAcceptState:  mockParentState,
@@ -279,6 +312,9 @@ func TestBlockVerify(t *testing.T) {
 				return &Block{
 					Block: mockBlock,
 					manager: &manager{
+						backend: &executor.Backend{
+							Config: noFeesTestConfig,
+						},
 						mempool: mempool,
 						metrics: metrics.NewMockMetrics(ctrl),
 						blkIDToState: map[ids.ID]*blockState{
@@ -331,7 +367,9 @@ func TestBlockVerify(t *testing.T) {
 					manager: &manager{
 						mempool: mempool,
 						metrics: metrics.NewMockMetrics(ctrl),
-						backend: &executor.Backend{},
+						backend: &executor.Backend{
+							Config: noFeesTestConfig,
+						},
 						blkIDToState: map[ids.ID]*blockState{
 							parentID: {
 								onAcceptState:  mockParentState,
@@ -409,7 +447,9 @@ func TestBlockVerify(t *testing.T) {
 					manager: &manager{
 						mempool: mempool,
 						metrics: metrics.NewMockMetrics(ctrl),
-						backend: &executor.Backend{},
+						backend: &executor.Backend{
+							Config: noFeesTestConfig,
+						},
 						blkIDToState: map[ids.ID]*blockState{
 							parentID: {
 								onAcceptState:  mockParentState,
@@ -467,7 +507,9 @@ func TestBlockVerify(t *testing.T) {
 				return &Block{
 					Block: mockBlock,
 					manager: &manager{
-						backend: &executor.Backend{},
+						backend: &executor.Backend{
+							Config: noFeesTestConfig,
+						},
 						blkIDToState: map[ids.ID]*blockState{
 							parentID: {
 								onAcceptState:  mockParentState,
@@ -519,7 +561,9 @@ func TestBlockVerify(t *testing.T) {
 					manager: &manager{
 						mempool: mockMempool,
 						metrics: metrics.NewMockMetrics(ctrl),
-						backend: &executor.Backend{},
+						backend: &executor.Backend{
+							Config: noFeesTestConfig,
+						},
 						blkIDToState: map[ids.ID]*blockState{
 							parentID: {
 								onAcceptState:  mockParentState,
@@ -597,6 +641,7 @@ func TestBlockAccept(t *testing.T) {
 							Ctx: &snow.Context{
 								Log: logging.NoLog{},
 							},
+							Config: noFeesTestConfig,
 						},
 						blkIDToState: map[ids.ID]*blockState{},
 					},
@@ -631,6 +676,7 @@ func TestBlockAccept(t *testing.T) {
 							Ctx: &snow.Context{
 								Log: logging.NoLog{},
 							},
+							Config: noFeesTestConfig,
 						},
 						blkIDToState: map[ids.ID]*blockState{
 							blockID: {
@@ -675,6 +721,7 @@ func TestBlockAccept(t *testing.T) {
 								SharedMemory: mockSharedMemory,
 								Log:          logging.NoLog{},
 							},
+							Config: noFeesTestConfig,
 						},
 						blkIDToState: map[ids.ID]*blockState{
 							blockID: {
@@ -723,6 +770,7 @@ func TestBlockAccept(t *testing.T) {
 								SharedMemory: mockSharedMemory,
 								Log:          logging.NoLog{},
 							},
+							Config: noFeesTestConfig,
 						},
 						blkIDToState: map[ids.ID]*blockState{
 							blockID: {
@@ -774,6 +822,7 @@ func TestBlockAccept(t *testing.T) {
 								SharedMemory: mockSharedMemory,
 								Log:          logging.NoLog{},
 							},
+							Config: noFeesTestConfig,
 						},
 						blkIDToState: map[ids.ID]*blockState{
 							blockID: {
@@ -871,6 +920,7 @@ func TestBlockReject(t *testing.T) {
 						metrics:      metrics.NewMockMetrics(ctrl),
 						backend: &executor.Backend{
 							Bootstrapped: true,
+							Config:       noFeesTestConfig,
 							Ctx: &snow.Context{
 								Log: logging.NoLog{},
 							},
@@ -932,6 +982,7 @@ func TestBlockReject(t *testing.T) {
 							Ctx: &snow.Context{
 								Log: logging.NoLog{},
 							},
+							Config: noFeesTestConfig,
 						},
 						state: mockState,
 						blkIDToState: map[ids.ID]*blockState{
@@ -981,6 +1032,9 @@ func TestBlockStatus(t *testing.T) {
 				return &Block{
 					Block: mockBlock,
 					manager: &manager{
+						backend: &executor.Backend{
+							Config: noFeesTestConfig,
+						},
 						lastAccepted: blockID,
 					},
 				}
@@ -996,6 +1050,9 @@ func TestBlockStatus(t *testing.T) {
 				return &Block{
 					Block: mockBlock,
 					manager: &manager{
+						backend: &executor.Backend{
+							Config: noFeesTestConfig,
+						},
 						blkIDToState: map[ids.ID]*blockState{
 							blockID: {},
 						},
@@ -1017,6 +1074,9 @@ func TestBlockStatus(t *testing.T) {
 				return &Block{
 					Block: mockBlock,
 					manager: &manager{
+						backend: &executor.Backend{
+							Config: noFeesTestConfig,
+						},
 						blkIDToState: map[ids.ID]*blockState{},
 						state:        mockState,
 					},
@@ -1037,6 +1097,9 @@ func TestBlockStatus(t *testing.T) {
 				return &Block{
 					Block: mockBlock,
 					manager: &manager{
+						backend: &executor.Backend{
+							Config: noFeesTestConfig,
+						},
 						blkIDToState: map[ids.ID]*blockState{},
 						state:        mockState,
 					},

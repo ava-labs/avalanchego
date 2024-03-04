@@ -36,6 +36,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/fees"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
@@ -64,6 +65,7 @@ const (
 	banff
 	cortina
 	durango
+	eUpgrade
 
 	latestFork = durango
 )
@@ -116,7 +118,7 @@ type environment struct {
 	state          state.State
 	atomicUTXOs    avax.AtomicUTXOManager
 	uptimes        uptime.Manager
-	utxosHandler   utxo.Handler
+	utxosVerifier  utxo.Verifier
 	txBuilder      txbuilder.Builder
 	backend        txexecutor.Backend
 }
@@ -151,16 +153,13 @@ func newEnvironment(t *testing.T, f fork) *environment { //nolint:unparam
 
 	res.atomicUTXOs = avax.NewAtomicUTXOManager(res.ctx.SharedMemory, txs.Codec)
 	res.uptimes = uptime.NewManager(res.state, res.clk)
-	res.utxosHandler = utxo.NewHandler(res.ctx, res.clk, res.fx)
+	res.utxosVerifier = utxo.NewVerifier(res.ctx, res.clk, res.fx)
 
 	res.txBuilder = txbuilder.New(
 		res.ctx,
 		res.config,
-		res.clk,
-		res.fx,
 		res.state,
 		res.atomicUTXOs,
-		res.utxosHandler,
 	)
 
 	genesisID := res.state.GetLastAccepted()
@@ -170,7 +169,7 @@ func newEnvironment(t *testing.T, f fork) *environment { //nolint:unparam
 		Clk:          res.clk,
 		Bootstrapped: res.isBootstrapped,
 		Fx:           res.fx,
-		FlowChecker:  res.utxosHandler,
+		FlowChecker:  res.utxosVerifier,
 		Uptimes:      res.uptimes,
 		Rewards:      rewardsCalc,
 	}
@@ -264,15 +263,19 @@ func addSubnet(t *testing.T, env *environment) {
 	stateDiff, err := state.NewDiff(genesisID, env.blkManager)
 	require.NoError(err)
 
+	feeCfg := env.config.GetDynamicFeesConfig(env.state.GetTimestamp())
 	executor := txexecutor.StandardTxExecutor{
-		Backend: &env.backend,
-		State:   stateDiff,
-		Tx:      testSubnet1,
+		Backend:       &env.backend,
+		BlkFeeManager: fees.NewManager(feeCfg.UnitFees),
+		UnitCaps:      feeCfg.BlockUnitsCap,
+		State:         stateDiff,
+		Tx:            testSubnet1,
 	}
 	require.NoError(testSubnet1.Unsigned.Visit(&executor))
 
 	stateDiff.AddTx(testSubnet1, status.Committed)
 	require.NoError(stateDiff.Apply(env.state))
+	require.NoError(env.state.Commit())
 }
 
 func defaultState(
@@ -311,9 +314,13 @@ func defaultConfig(t *testing.T, f fork) *config.Config {
 		banffTime         = mockable.MaxTime
 		cortinaTime       = mockable.MaxTime
 		durangoTime       = mockable.MaxTime
+		eUpgradeTime      = mockable.MaxTime
 	)
 
 	switch f {
+	case eUpgrade:
+		eUpgradeTime = time.Time{} // neglecting fork ordering this for package tests
+		fallthrough
 	case durango:
 		durangoTime = time.Time{} // neglecting fork ordering for this package's tests
 		fallthrough
@@ -329,7 +336,7 @@ func defaultConfig(t *testing.T, f fork) *config.Config {
 	case apricotPhase3:
 		apricotPhase3Time = defaultValidateEndTime
 	default:
-		require.NoError(t, fmt.Errorf("unhandled fork %d", f))
+		require.FailNow(t, fmt.Sprintf("unhandled fork %d", f))
 	}
 
 	return &config.Config{
@@ -355,6 +362,7 @@ func defaultConfig(t *testing.T, f fork) *config.Config {
 		BanffTime:         banffTime,
 		CortinaTime:       cortinaTime,
 		DurangoTime:       durangoTime,
+		EUpgradeTime:      eUpgradeTime,
 	}
 }
 

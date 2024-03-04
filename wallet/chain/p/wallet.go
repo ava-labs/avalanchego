@@ -9,13 +9,20 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fees"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/wallet/chain/p/backends"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
+
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 var (
@@ -25,13 +32,13 @@ var (
 )
 
 type Wallet interface {
-	Context
+	backends.Context
 
 	// Builder returns the builder that will be used to create the transactions.
-	Builder() Builder
+	Builder() backends.Builder
 
 	// Signer returns the signer that will be used to sign the transactions.
-	Signer() Signer
+	Signer() backends.Signer
 
 	// IssueBaseTx creates, signs, and issues a new simple value transfer.
 	// Because the P-chain doesn't intend for balance transfers to occur, this
@@ -258,8 +265,8 @@ type Wallet interface {
 }
 
 func NewWallet(
-	builder Builder,
-	signer Signer,
+	builder backends.Builder,
+	signer backends.Signer,
 	client platformvm.Client,
 	backend Backend,
 ) Wallet {
@@ -273,16 +280,19 @@ func NewWallet(
 
 type wallet struct {
 	Backend
-	builder Builder
-	signer  Signer
-	client  platformvm.Client
+	client platformvm.Client
+
+	isEForkActive      bool
+	builder            backends.Builder
+	signer             backends.Signer
+	unitFees, unitCaps commonfees.Dimensions
 }
 
-func (w *wallet) Builder() Builder {
+func (w *wallet) Builder() backends.Builder {
 	return w.builder
 }
 
-func (w *wallet) Signer() Signer {
+func (w *wallet) Signer() backends.Signer {
 	return w.signer
 }
 
@@ -290,7 +300,30 @@ func (w *wallet) IssueBaseTx(
 	outputs []*avax.TransferableOutput,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	utx, err := w.builder.NewBaseTx(outputs, options...)
+	if err := w.refreshFork(options...); err != nil {
+		return nil, err
+	}
+
+	var (
+		utx txs.UnsignedTx
+		err error
+
+		feesMan = commonfees.NewManager(w.unitFees)
+		feeCalc = &fees.Calculator{
+			Log:              logging.NoLog{},
+			IsEUpgradeActive: w.isEForkActive,
+			Config: &config.Config{
+				CreateSubnetTxFee: w.CreateSubnetTxFee(),
+			},
+			FeeManager:       feesMan,
+			ConsumedUnitsCap: w.unitCaps,
+		}
+	)
+	if w.isEForkActive {
+		utx, err = w.builder.NewBaseTx(outputs, feeCalc, options...)
+	} else {
+		utx, err = w.builder.NewBaseTxPreEUpgrade(outputs, feeCalc, options...)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -303,7 +336,22 @@ func (w *wallet) IssueAddValidatorTx(
 	shares uint32,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	utx, err := w.builder.NewAddValidatorTx(vdr, rewardsOwner, shares, options...)
+	if err := w.refreshFork(options...); err != nil {
+		return nil, err
+	}
+
+	feesMan := commonfees.NewManager(w.unitFees)
+	feeCalc := &fees.Calculator{
+		Log:              logging.NoLog{},
+		IsEUpgradeActive: w.isEForkActive,
+		Config: &config.Config{
+			AddPrimaryNetworkValidatorFee: w.AddPrimaryNetworkValidatorFee(),
+		},
+		FeeManager:       feesMan,
+		ConsumedUnitsCap: w.unitCaps,
+	}
+
+	utx, err := w.builder.NewAddValidatorTx(vdr, rewardsOwner, shares, feeCalc, options...)
 	if err != nil {
 		return nil, err
 	}
@@ -314,7 +362,22 @@ func (w *wallet) IssueAddSubnetValidatorTx(
 	vdr *txs.SubnetValidator,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	utx, err := w.builder.NewAddSubnetValidatorTx(vdr, options...)
+	if err := w.refreshFork(options...); err != nil {
+		return nil, err
+	}
+
+	feesMan := commonfees.NewManager(w.unitFees)
+	feeCalc := &fees.Calculator{
+		Log:              logging.NoLog{},
+		IsEUpgradeActive: w.isEForkActive,
+		Config: &config.Config{
+			TxFee: w.BaseTxFee(),
+		},
+		FeeManager:       feesMan,
+		ConsumedUnitsCap: w.unitCaps,
+	}
+
+	utx, err := w.builder.NewAddSubnetValidatorTx(vdr, feeCalc, options...)
 	if err != nil {
 		return nil, err
 	}
@@ -326,7 +389,22 @@ func (w *wallet) IssueRemoveSubnetValidatorTx(
 	subnetID ids.ID,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	utx, err := w.builder.NewRemoveSubnetValidatorTx(nodeID, subnetID, options...)
+	if err := w.refreshFork(options...); err != nil {
+		return nil, err
+	}
+
+	feesMan := commonfees.NewManager(w.unitFees)
+	feeCalc := &fees.Calculator{
+		Log:              logging.NoLog{},
+		IsEUpgradeActive: w.isEForkActive,
+		Config: &config.Config{
+			TxFee: w.BaseTxFee(),
+		},
+		FeeManager:       feesMan,
+		ConsumedUnitsCap: w.unitCaps,
+	}
+
+	utx, err := w.builder.NewRemoveSubnetValidatorTx(nodeID, subnetID, feeCalc, options...)
 	if err != nil {
 		return nil, err
 	}
@@ -338,7 +416,22 @@ func (w *wallet) IssueAddDelegatorTx(
 	rewardsOwner *secp256k1fx.OutputOwners,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	utx, err := w.builder.NewAddDelegatorTx(vdr, rewardsOwner, options...)
+	if err := w.refreshFork(options...); err != nil {
+		return nil, err
+	}
+
+	feesMan := commonfees.NewManager(w.unitFees)
+	feeCalc := &fees.Calculator{
+		Log:              logging.NoLog{},
+		IsEUpgradeActive: w.isEForkActive,
+		Config: &config.Config{
+			AddPrimaryNetworkDelegatorFee: w.AddPrimaryNetworkDelegatorFee(),
+		},
+		FeeManager:       feesMan,
+		ConsumedUnitsCap: w.unitCaps,
+	}
+
+	utx, err := w.builder.NewAddDelegatorTx(vdr, rewardsOwner, feeCalc, options...)
 	if err != nil {
 		return nil, err
 	}
@@ -353,7 +446,22 @@ func (w *wallet) IssueCreateChainTx(
 	chainName string,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	utx, err := w.builder.NewCreateChainTx(subnetID, genesis, vmID, fxIDs, chainName, options...)
+	if err := w.refreshFork(options...); err != nil {
+		return nil, err
+	}
+
+	feesMan := commonfees.NewManager(w.unitFees)
+	feeCalc := &fees.Calculator{
+		Log:              logging.NoLog{},
+		IsEUpgradeActive: w.isEForkActive,
+		Config: &config.Config{
+			CreateBlockchainTxFee: w.CreateBlockchainTxFee(),
+		},
+		FeeManager:       feesMan,
+		ConsumedUnitsCap: w.unitCaps,
+	}
+
+	utx, err := w.builder.NewCreateChainTx(subnetID, genesis, vmID, fxIDs, chainName, feeCalc, options...)
 	if err != nil {
 		return nil, err
 	}
@@ -364,10 +472,25 @@ func (w *wallet) IssueCreateSubnetTx(
 	owner *secp256k1fx.OutputOwners,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	utx, err := w.builder.NewCreateSubnetTx(owner, options...)
+	if err := w.refreshFork(options...); err != nil {
+		return nil, err
+	}
+
+	feesMan := commonfees.NewManager(w.unitFees)
+	feeCalc := &fees.Calculator{
+		Log:              logging.NoLog{},
+		IsEUpgradeActive: w.isEForkActive,
+		Config: &config.Config{
+			CreateSubnetTxFee: w.CreateSubnetTxFee(),
+		},
+		FeeManager:       feesMan,
+		ConsumedUnitsCap: w.unitCaps,
+	}
+	utx, err := w.builder.NewCreateSubnetTx(owner, feeCalc, options...)
 	if err != nil {
 		return nil, err
 	}
+
 	return w.IssueUnsignedTx(utx, options...)
 }
 
@@ -376,7 +499,22 @@ func (w *wallet) IssueTransferSubnetOwnershipTx(
 	owner *secp256k1fx.OutputOwners,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	utx, err := w.builder.NewTransferSubnetOwnershipTx(subnetID, owner, options...)
+	if err := w.refreshFork(options...); err != nil {
+		return nil, err
+	}
+
+	feesMan := commonfees.NewManager(w.unitFees)
+	feeCalc := &fees.Calculator{
+		Log:              logging.NoLog{},
+		IsEUpgradeActive: w.isEForkActive,
+		Config: &config.Config{
+			TxFee: w.BaseTxFee(),
+		},
+		FeeManager:       feesMan,
+		ConsumedUnitsCap: w.unitCaps,
+	}
+
+	utx, err := w.builder.NewTransferSubnetOwnershipTx(subnetID, owner, feeCalc, options...)
 	if err != nil {
 		return nil, err
 	}
@@ -388,7 +526,22 @@ func (w *wallet) IssueImportTx(
 	to *secp256k1fx.OutputOwners,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	utx, err := w.builder.NewImportTx(sourceChainID, to, options...)
+	if err := w.refreshFork(options...); err != nil {
+		return nil, err
+	}
+
+	feesMan := commonfees.NewManager(w.unitFees)
+	feeCalc := &fees.Calculator{
+		Log:              logging.NoLog{},
+		IsEUpgradeActive: w.isEForkActive,
+		Config: &config.Config{
+			TxFee: w.BaseTxFee(),
+		},
+		FeeManager:       feesMan,
+		ConsumedUnitsCap: w.unitCaps,
+	}
+
+	utx, err := w.builder.NewImportTx(sourceChainID, to, feeCalc, options...)
 	if err != nil {
 		return nil, err
 	}
@@ -400,7 +553,22 @@ func (w *wallet) IssueExportTx(
 	outputs []*avax.TransferableOutput,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	utx, err := w.builder.NewExportTx(chainID, outputs, options...)
+	if err := w.refreshFork(options...); err != nil {
+		return nil, err
+	}
+
+	feesMan := commonfees.NewManager(w.unitFees)
+	feeCalc := &fees.Calculator{
+		Log:              logging.NoLog{},
+		IsEUpgradeActive: w.isEForkActive,
+		Config: &config.Config{
+			TxFee: w.BaseTxFee(),
+		},
+		FeeManager:       feesMan,
+		ConsumedUnitsCap: w.unitCaps,
+	}
+
+	utx, err := w.builder.NewExportTx(chainID, outputs, feeCalc, options...)
 	if err != nil {
 		return nil, err
 	}
@@ -424,6 +592,20 @@ func (w *wallet) IssueTransformSubnetTx(
 	uptimeRequirement uint32,
 	options ...common.Option,
 ) (*txs.Tx, error) {
+	if err := w.refreshFork(options...); err != nil {
+		return nil, err
+	}
+
+	feesMan := commonfees.NewManager(w.unitFees)
+	feeCalc := &fees.Calculator{
+		Log:              logging.NoLog{},
+		IsEUpgradeActive: w.isEForkActive,
+		Config: &config.Config{
+			TransformSubnetTxFee: w.TransformSubnetTxFee(),
+		},
+		FeeManager:       feesMan,
+		ConsumedUnitsCap: w.unitCaps,
+	}
 	utx, err := w.builder.NewTransformSubnetTx(
 		subnetID,
 		assetID,
@@ -439,6 +621,7 @@ func (w *wallet) IssueTransformSubnetTx(
 		minDelegatorStake,
 		maxValidatorWeightFactor,
 		uptimeRequirement,
+		feeCalc,
 		options...,
 	)
 	if err != nil {
@@ -456,6 +639,22 @@ func (w *wallet) IssueAddPermissionlessValidatorTx(
 	shares uint32,
 	options ...common.Option,
 ) (*txs.Tx, error) {
+	if err := w.refreshFork(options...); err != nil {
+		return nil, err
+	}
+
+	feesMan := commonfees.NewManager(w.unitFees)
+	feeCalc := &fees.Calculator{
+		Log:              logging.NoLog{},
+		IsEUpgradeActive: w.isEForkActive,
+		Config: &config.Config{
+			AddPrimaryNetworkValidatorFee: w.AddPrimaryNetworkValidatorFee(),
+			AddSubnetValidatorFee:         w.AddSubnetValidatorFee(),
+		},
+		FeeManager:       feesMan,
+		ConsumedUnitsCap: w.unitCaps,
+	}
+
 	utx, err := w.builder.NewAddPermissionlessValidatorTx(
 		vdr,
 		signer,
@@ -463,6 +662,7 @@ func (w *wallet) IssueAddPermissionlessValidatorTx(
 		validationRewardsOwner,
 		delegationRewardsOwner,
 		shares,
+		feeCalc,
 		options...,
 	)
 	if err != nil {
@@ -477,10 +677,27 @@ func (w *wallet) IssueAddPermissionlessDelegatorTx(
 	rewardsOwner *secp256k1fx.OutputOwners,
 	options ...common.Option,
 ) (*txs.Tx, error) {
+	if err := w.refreshFork(options...); err != nil {
+		return nil, err
+	}
+
+	feesMan := commonfees.NewManager(w.unitFees)
+	feeCalc := &fees.Calculator{
+		Log:              logging.NoLog{},
+		IsEUpgradeActive: w.isEForkActive,
+		Config: &config.Config{
+			AddPrimaryNetworkDelegatorFee: w.AddPrimaryNetworkDelegatorFee(),
+			AddSubnetDelegatorFee:         w.AddSubnetDelegatorFee(),
+		},
+		FeeManager:       feesMan,
+		ConsumedUnitsCap: w.unitCaps,
+	}
+
 	utx, err := w.builder.NewAddPermissionlessDelegatorTx(
 		vdr,
 		assetID,
 		rewardsOwner,
+		feeCalc,
 		options...,
 	)
 	if err != nil {
@@ -495,7 +712,7 @@ func (w *wallet) IssueUnsignedTx(
 ) (*txs.Tx, error) {
 	ops := common.NewOptions(options)
 	ctx := ops.Context()
-	tx, err := SignUnsigned(ctx, w.signer, utx)
+	tx, err := backends.SignUnsigned(ctx, w.signer, utx)
 	if err != nil {
 		return nil, err
 	}
@@ -534,5 +751,35 @@ func (w *wallet) IssueTx(
 	if txStatus.Status != status.Committed {
 		return fmt.Errorf("%w: %s", errNotCommitted, txStatus.Reason)
 	}
+	return nil
+}
+
+func (w *wallet) refreshFork(options ...common.Option) error {
+	if w.isEForkActive {
+		// E fork enables dinamic fees and it is active
+		// not need to recheck
+		return nil
+	}
+
+	var (
+		ops       = common.NewOptions(options)
+		ctx       = ops.Context()
+		eForkTime = version.GetEUpgradeTime(w.NetworkID())
+	)
+
+	chainTime, err := w.client.GetTimestamp(ctx)
+	if err != nil {
+		return err
+	}
+
+	w.isEForkActive = !chainTime.Before(eForkTime)
+	if w.isEForkActive {
+		w.unitFees = config.EUpgradeDynamicFeesConfig.UnitFees
+		w.unitCaps = config.EUpgradeDynamicFeesConfig.BlockUnitsCap
+	} else {
+		w.unitFees = config.PreEUpgradeDynamicFeesConfig.UnitFees
+		w.unitCaps = config.PreEUpgradeDynamicFeesConfig.BlockUnitsCap
+	}
+
 	return nil
 }

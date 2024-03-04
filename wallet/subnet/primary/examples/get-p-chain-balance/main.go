@@ -14,6 +14,8 @@ import (
 	"github.com/ava-labs/avalanchego/wallet/chain/p"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
+
+	pbackends "github.com/ava-labs/avalanchego/wallet/chain/p/backends"
 )
 
 func main() {
@@ -38,7 +40,7 @@ func main() {
 
 	pUTXOs := common.NewChainUTXOs(constants.PlatformChainID, state.UTXOs)
 	pBackend := p.NewBackend(state.PCTX, pUTXOs, nil)
-	pBuilder := p.NewBuilder(addresses, pBackend)
+	pBuilder := pbackends.NewBuilder(addresses, pBackend)
 
 	currentBalances, err := pBuilder.GetBalance()
 	if err != nil {

@@ -123,7 +123,9 @@ func TestManagerVerifyTx(t *testing.T) {
 			},
 			managerF: func(*gomock.Controller) *manager {
 				return &manager{
-					backend: &executor.Backend{},
+					backend: &executor.Backend{
+						Config: noFeesTestConfig,
+					},
 				}
 			},
 			expectedErr: ErrChainNotSynced,
@@ -141,6 +143,7 @@ func TestManagerVerifyTx(t *testing.T) {
 				return &manager{
 					backend: &executor.Backend{
 						Bootstrapped: true,
+						Config:       noFeesTestConfig,
 					},
 				}
 			},
@@ -164,11 +167,12 @@ func TestManagerVerifyTx(t *testing.T) {
 				// These values don't matter for this test
 				state := state.NewMockState(ctrl)
 				state.EXPECT().GetLastAccepted().Return(lastAcceptedID)
-				state.EXPECT().GetTimestamp().Return(time.Time{})
+				state.EXPECT().GetTimestamp().Return(time.Time{}).Times(2)
 
 				return &manager{
 					backend: &executor.Backend{
 						Bootstrapped: true,
+						Config:       noFeesTestConfig,
 					},
 					state:        state,
 					lastAccepted: lastAcceptedID,
@@ -196,11 +200,12 @@ func TestManagerVerifyTx(t *testing.T) {
 				// These values don't matter for this test
 				state := state.NewMockState(ctrl)
 				state.EXPECT().GetLastAccepted().Return(lastAcceptedID)
-				state.EXPECT().GetTimestamp().Return(time.Time{})
+				state.EXPECT().GetTimestamp().Return(time.Time{}).Times(2)
 
 				return &manager{
 					backend: &executor.Backend{
 						Bootstrapped: true,
+						Config:       noFeesTestConfig,
 					},
 					state:        state,
 					lastAccepted: lastAcceptedID,
@@ -228,11 +233,12 @@ func TestManagerVerifyTx(t *testing.T) {
 				// These values don't matter for this test
 				state := state.NewMockState(ctrl)
 				state.EXPECT().GetLastAccepted().Return(lastAcceptedID)
-				state.EXPECT().GetTimestamp().Return(time.Time{})
+				state.EXPECT().GetTimestamp().Return(time.Time{}).Times(2)
 
 				return &manager{
 					backend: &executor.Backend{
 						Bootstrapped: true,
+						Config:       noFeesTestConfig,
 					},
 					state:        state,
 					lastAccepted: lastAcceptedID,

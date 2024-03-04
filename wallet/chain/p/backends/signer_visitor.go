@@ -1,9 +1,10 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package p
+package backends
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -18,17 +19,16 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-
-	stdcontext "context"
 )
 
 var (
 	_ txs.Visitor = (*signerVisitor)(nil)
 
-	errUnsupportedTxType     = errors.New("unsupported tx type")
+	ErrUnknownOwnerType      = errors.New("unknown owner type")
+	ErrUnknownOutputType     = errors.New("unknown output type")
+	ErrUnsupportedTxType     = errors.New("unsupported tx type")
 	errUnknownInputType      = errors.New("unknown input type")
 	errUnknownCredentialType = errors.New("unknown credential type")
-	errUnknownOutputType     = errors.New("unknown output type")
 	errUnknownSubnetAuthType = errors.New("unknown subnet auth type")
 	errInvalidUTXOSigIndex   = errors.New("invalid UTXO signature index")
 
@@ -39,16 +39,16 @@ var (
 type signerVisitor struct {
 	kc      keychain.Keychain
 	backend SignerBackend
-	ctx     stdcontext.Context
+	ctx     context.Context
 	tx      *txs.Tx
 }
 
 func (*signerVisitor) AdvanceTimeTx(*txs.AdvanceTimeTx) error {
-	return errUnsupportedTxType
+	return ErrUnsupportedTxType
 }
 
 func (*signerVisitor) RewardValidatorTx(*txs.RewardValidatorTx) error {
-	return errUnsupportedTxType
+	return ErrUnsupportedTxType
 }
 
 func (s *signerVisitor) BaseTx(tx *txs.BaseTx) error {
@@ -219,7 +219,7 @@ func (s *signerVisitor) getSigners(sourceChainID ids.ID, ins []*avax.Transferabl
 
 		out, ok := outIntf.(*secp256k1fx.TransferOutput)
 		if !ok {
-			return nil, errUnknownOutputType
+			return nil, ErrUnknownOutputType
 		}
 
 		for sigIndex, addrIndex := range input.SigIndices {
@@ -256,7 +256,7 @@ func (s *signerVisitor) getSubnetSigners(subnetID ids.ID, subnetAuth verify.Veri
 	}
 	owner, ok := ownerIntf.(*secp256k1fx.OutputOwners)
 	if !ok {
-		return nil, errUnknownOwnerType
+		return nil, ErrUnknownOwnerType
 	}
 
 	authSigners := make([]keychain.Signer, len(subnetInput.SigIndices))

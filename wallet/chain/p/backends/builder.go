@@ -1,11 +1,12 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package p
+package backends
 
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -14,21 +15,19 @@ import (
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fees"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
-
-	stdcontext "context"
 )
 
 var (
 	errNoChangeAddress           = errors.New("no possible change address")
 	errUnknownOwnerType          = errors.New("unknown owner type")
 	errInsufficientAuthorization = errors.New("insufficient authorization")
-	errInsufficientFunds         = errors.New("insufficient funds")
+	ErrInsufficientFunds         = errors.New("insufficient funds")
 
 	_ Builder = (*builder)(nil)
 )
@@ -59,6 +58,14 @@ type Builder interface {
 	//   from this transaction.
 	NewBaseTx(
 		outputs []*avax.TransferableOutput,
+		feeCalc *fees.Calculator,
+		options ...common.Option,
+	) (*txs.BaseTx, error)
+
+	// TODO: Drop once E upgrade is activated
+	NewBaseTxPreEUpgrade(
+		outputs []*avax.TransferableOutput,
+		feeCalc *fees.Calculator,
 		options ...common.Option,
 	) (*txs.CreateSubnetTx, error)
 
@@ -75,6 +82,7 @@ type Builder interface {
 		vdr *txs.Validator,
 		rewardsOwner *secp256k1fx.OutputOwners,
 		shares uint32,
+		feeCalc *fees.Calculator,
 		options ...common.Option,
 	) (*txs.AddValidatorTx, error)
 
@@ -84,6 +92,7 @@ type Builder interface {
 	//   startTime, endTime, sampling weight, nodeID, and subnetID.
 	NewAddSubnetValidatorTx(
 		vdr *txs.SubnetValidator,
+		feeCalc *fees.Calculator,
 		options ...common.Option,
 	) (*txs.AddSubnetValidatorTx, error)
 
@@ -92,6 +101,7 @@ type Builder interface {
 	NewRemoveSubnetValidatorTx(
 		nodeID ids.NodeID,
 		subnetID ids.ID,
+		feeCalc *fees.Calculator,
 		options ...common.Option,
 	) (*txs.RemoveSubnetValidatorTx, error)
 
@@ -105,6 +115,7 @@ type Builder interface {
 	NewAddDelegatorTx(
 		vdr *txs.Validator,
 		rewardsOwner *secp256k1fx.OutputOwners,
+		feeCalc *fees.Calculator,
 		options ...common.Option,
 	) (*txs.AddDelegatorTx, error)
 
@@ -122,6 +133,7 @@ type Builder interface {
 		vmID ids.ID,
 		fxIDs []ids.ID,
 		chainName string,
+		feeCalc *fees.Calculator,
 		options ...common.Option,
 	) (*txs.CreateChainTx, error)
 
@@ -131,6 +143,7 @@ type Builder interface {
 	//   validators to the subnet.
 	NewCreateSubnetTx(
 		owner *secp256k1fx.OutputOwners,
+		feeCalc *fees.Calculator,
 		options ...common.Option,
 	) (*txs.CreateSubnetTx, error)
 
@@ -142,6 +155,7 @@ type Builder interface {
 	NewTransferSubnetOwnershipTx(
 		subnetID ids.ID,
 		owner *secp256k1fx.OutputOwners,
+		feeCalc *fees.Calculator,
 		options ...common.Option,
 	) (*txs.TransferSubnetOwnershipTx, error)
 
@@ -153,6 +167,7 @@ type Builder interface {
 	NewImportTx(
 		chainID ids.ID,
 		to *secp256k1fx.OutputOwners,
+		feeCalc *fees.Calculator,
 		options ...common.Option,
 	) (*txs.ImportTx, error)
 
@@ -164,6 +179,7 @@ type Builder interface {
 	NewExportTx(
 		chainID ids.ID,
 		outputs []*avax.TransferableOutput,
+		feeCalc *fees.Calculator,
 		options ...common.Option,
 	) (*txs.ExportTx, error)
 
@@ -212,6 +228,7 @@ type Builder interface {
 		minDelegatorStake uint64,
 		maxValidatorWeightFactor byte,
 		uptimeRequirement uint32,
+		feeCalc *fees.Calculator,
 		options ...common.Option,
 	) (*txs.TransformSubnetTx, error)
 
@@ -237,6 +254,7 @@ type Builder interface {
 		validationRewardsOwner *secp256k1fx.OutputOwners,
 		delegationRewardsOwner *secp256k1fx.OutputOwners,
 		shares uint32,
+		feeCalc *fees.Calculator,
 		options ...common.Option,
 	) (*txs.AddPermissionlessValidatorTx, error)
 
@@ -252,16 +270,9 @@ type Builder interface {
 		vdr *txs.SubnetValidator,
 		assetID ids.ID,
 		rewardsOwner *secp256k1fx.OutputOwners,
+		feeCalc *fees.Calculator,
 		options ...common.Option,
 	) (*txs.AddPermissionlessDelegatorTx, error)
-}
-
-// BuilderBackend specifies the required information needed to build unsigned
-// P-chain transactions.
-type BuilderBackend interface {
-	Context
-	UTXOs(ctx stdcontext.Context, sourceChainID ids.ID) ([]*avax.UTXO, error)
-	GetSubnetOwner(ctx stdcontext.Context, subnetID ids.ID) (fx.Owner, error)
 }
 
 type builder struct {
@@ -299,11 +310,71 @@ func (b *builder) GetImportableBalance(
 
 func (b *builder) NewBaseTx(
 	outputs []*avax.TransferableOutput,
+	feeCalc *fees.Calculator,
+	options ...common.Option,
+) (*txs.BaseTx, error) {
+	// 1. Build core transaction without utxos
+	ops := common.NewOptions(options)
+
+	utx := &txs.BaseTx{
+		BaseTx: avax.BaseTx{
+			NetworkID:    b.backend.NetworkID(),
+			BlockchainID: constants.PlatformChainID,
+			Memo:         ops.Memo(),
+			Outs:         outputs, // not sorted yet, we'll sort later on when we have all the outputs
+		},
+	}
+
+	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
+	toStake := map[ids.ID]uint64{}
+	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
+	for _, out := range outputs {
+		assetID := out.AssetID()
+		amountToBurn, err := math.Add64(toBurn[assetID], out.Out.Amount())
+		if err != nil {
+			return nil, err
+		}
+		toBurn[assetID] = amountToBurn
+	}
+
+	// feesMan cumulates consumed units. Let's init it with utx filled so far
+	if err := feeCalc.BaseTx(utx); err != nil {
+		return nil, err
+	}
+
+	inputs, changeOuts, _, err := b.financeTx(toBurn, toStake, feeCalc, ops)
+	if err != nil {
+		return nil, err
+	}
+
+	outputs = append(outputs, changeOuts...)
+	avax.SortTransferableOutputs(outputs, txs.Codec)
+	utx.Ins = inputs
+	utx.Outs = outputs
+
+	return utx, b.initCtx(utx)
+}
+
+func (b *builder) NewBaseTxPreEUpgrade(
+	outputs []*avax.TransferableOutput,
+	feeCalc *fees.Calculator,
 	options ...common.Option,
 ) (*txs.CreateSubnetTx, error) {
-	toBurn := map[ids.ID]uint64{
-		b.backend.AVAXAssetID(): b.backend.CreateSubnetTxFee(),
+	// 1. Build core transaction without utxos
+	ops := common.NewOptions(options)
+
+	utx := &txs.CreateSubnetTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    b.backend.NetworkID(),
+			BlockchainID: constants.PlatformChainID,
+			Outs:         outputs, // not sorted yet, we'll sort later on when we have all the outputs
+			Memo:         ops.Memo(),
+		}},
+		Owner: &secp256k1fx.OutputOwners{},
 	}
+
+	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
+	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
 	for _, out := range outputs {
 		assetID := out.AssetID()
 		amountToBurn, err := math.Add64(toBurn[assetID], out.Out.Amount())
@@ -314,163 +385,203 @@ func (b *builder) NewBaseTx(
 	}
 	toStake := map[ids.ID]uint64{}
 
-	ops := common.NewOptions(options)
-	inputs, changeOutputs, _, err := b.spend(toBurn, toStake, ops)
+	// feesMan cumulates consumed units. Let's init it with utx filled so far
+	if err := feeCalc.CreateSubnetTx(utx); err != nil {
+		return nil, err
+	}
+
+	inputs, changeOutputs, _, err := b.financeTx(toBurn, toStake, feeCalc, ops)
 	if err != nil {
 		return nil, err
 	}
 	outputs = append(outputs, changeOutputs...)
 	avax.SortTransferableOutputs(outputs, txs.Codec) // sort the outputs
 
-	tx := &txs.CreateSubnetTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    b.backend.NetworkID(),
-			BlockchainID: constants.PlatformChainID,
-			Ins:          inputs,
-			Outs:         outputs,
-			Memo:         ops.Memo(),
-		}},
-		Owner: &secp256k1fx.OutputOwners{},
-	}
-	return tx, b.initCtx(tx)
+	utx.Ins = inputs
+	utx.Outs = outputs
+
+	return utx, b.initCtx(utx)
 }
 
 func (b *builder) NewAddValidatorTx(
 	vdr *txs.Validator,
 	rewardsOwner *secp256k1fx.OutputOwners,
 	shares uint32,
+	feeCalc *fees.Calculator,
 	options ...common.Option,
 ) (*txs.AddValidatorTx, error) {
-	avaxAssetID := b.backend.AVAXAssetID()
-	toBurn := map[ids.ID]uint64{
-		avaxAssetID: b.backend.AddPrimaryNetworkValidatorFee(),
-	}
-	toStake := map[ids.ID]uint64{
-		avaxAssetID: vdr.Wght,
-	}
 	ops := common.NewOptions(options)
-	inputs, baseOutputs, stakeOutputs, err := b.spend(toBurn, toStake, ops)
+	utils.Sort(rewardsOwner.Addrs)
+
+	utx := &txs.AddValidatorTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    b.backend.NetworkID(),
+			BlockchainID: constants.PlatformChainID,
+			Memo:         ops.Memo(),
+		}},
+		Validator:        *vdr,
+		RewardsOwner:     rewardsOwner,
+		DelegationShares: shares,
+	}
+
+	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
+	toStake := map[ids.ID]uint64{
+		b.backend.AVAXAssetID(): vdr.Wght,
+	}
+	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
+
+	// feesMan cumulates consumed units. Let's init it with utx filled so far
+	if err := feeCalc.AddValidatorTx(utx); err != nil {
+		return nil, err
+	}
+
+	inputs, outputs, stakeOutputs, err := b.financeTx(toBurn, toStake, feeCalc, ops)
 	if err != nil {
 		return nil, err
 	}
 
-	utils.Sort(rewardsOwner.Addrs)
-	tx := &txs.AddValidatorTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    b.backend.NetworkID(),
-			BlockchainID: constants.PlatformChainID,
-			Ins:          inputs,
-			Outs:         baseOutputs,
-			Memo:         ops.Memo(),
-		}},
-		Validator:        *vdr,
-		StakeOuts:        stakeOutputs,
-		RewardsOwner:     rewardsOwner,
-		DelegationShares: shares,
-	}
-	return tx, b.initCtx(tx)
+	utx.Ins = inputs
+	utx.Outs = outputs
+	utx.StakeOuts = stakeOutputs
+
+	return utx, b.initCtx(utx)
 }
 
 func (b *builder) NewAddSubnetValidatorTx(
 	vdr *txs.SubnetValidator,
+	feeCalc *fees.Calculator,
 	options ...common.Option,
 ) (*txs.AddSubnetValidatorTx, error) {
-	toBurn := map[ids.ID]uint64{
-		b.backend.AVAXAssetID(): b.backend.AddSubnetValidatorFee(),
-	}
-	toStake := map[ids.ID]uint64{}
 	ops := common.NewOptions(options)
-	inputs, outputs, _, err := b.spend(toBurn, toStake, ops)
-	if err != nil {
-		return nil, err
-	}
 
 	subnetAuth, err := b.authorizeSubnet(vdr.Subnet, ops)
 	if err != nil {
 		return nil, err
 	}
 
-	tx := &txs.AddSubnetValidatorTx{
+	utx := &txs.AddSubnetValidatorTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.backend.NetworkID(),
 			BlockchainID: constants.PlatformChainID,
-			Ins:          inputs,
-			Outs:         outputs,
 			Memo:         ops.Memo(),
 		}},
 		SubnetValidator: *vdr,
 		SubnetAuth:      subnetAuth,
 	}
-	return tx, b.initCtx(tx)
+
+	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
+	toStake := map[ids.ID]uint64{}
+	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
+
+	// update fees to account for the auth credentials to be added upon tx signing
+	if _, err = fees.FinanceCredential(feeCalc, len(subnetAuth.SigIndices)); err != nil {
+		return nil, fmt.Errorf("account for credential fees: %w", err)
+	}
+
+	// feesMan cumulates consumed units. Let's init it with utx filled so far
+	if err := feeCalc.AddSubnetValidatorTx(utx); err != nil {
+		return nil, err
+	}
+
+	inputs, outputs, _, err := b.financeTx(toBurn, toStake, feeCalc, ops)
+	if err != nil {
+		return nil, err
+	}
+
+	utx.Ins = inputs
+	utx.Outs = outputs
+
+	return utx, b.initCtx(utx)
 }
 
 func (b *builder) NewRemoveSubnetValidatorTx(
 	nodeID ids.NodeID,
 	subnetID ids.ID,
+	feeCalc *fees.Calculator,
 	options ...common.Option,
 ) (*txs.RemoveSubnetValidatorTx, error) {
-	toBurn := map[ids.ID]uint64{
-		b.backend.AVAXAssetID(): b.backend.BaseTxFee(),
-	}
-	toStake := map[ids.ID]uint64{}
 	ops := common.NewOptions(options)
-	inputs, outputs, _, err := b.spend(toBurn, toStake, ops)
-	if err != nil {
-		return nil, err
-	}
 
 	subnetAuth, err := b.authorizeSubnet(subnetID, ops)
 	if err != nil {
 		return nil, err
 	}
 
-	tx := &txs.RemoveSubnetValidatorTx{
+	utx := &txs.RemoveSubnetValidatorTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.backend.NetworkID(),
 			BlockchainID: constants.PlatformChainID,
-			Ins:          inputs,
-			Outs:         outputs,
 			Memo:         ops.Memo(),
 		}},
 		Subnet:     subnetID,
 		NodeID:     nodeID,
 		SubnetAuth: subnetAuth,
 	}
-	return tx, b.initCtx(tx)
+	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
+	toStake := map[ids.ID]uint64{}
+	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
+
+	// update fees to account for the auth credentials to be added upon tx signing
+	if _, err = fees.FinanceCredential(feeCalc, len(subnetAuth.SigIndices)); err != nil {
+		return nil, fmt.Errorf("account for credential fees: %w", err)
+	}
+
+	// feesMan cumulates consumed units. Let's init it with utx filled so far
+	if err := feeCalc.RemoveSubnetValidatorTx(utx); err != nil {
+		return nil, err
+	}
+
+	inputs, outputs, _, err := b.financeTx(toBurn, toStake, feeCalc, ops)
+	if err != nil {
+		return nil, err
+	}
+
+	utx.Ins = inputs
+	utx.Outs = outputs
+
+	return utx, b.initCtx(utx)
 }
 
 func (b *builder) NewAddDelegatorTx(
 	vdr *txs.Validator,
 	rewardsOwner *secp256k1fx.OutputOwners,
+	feeCalc *fees.Calculator,
 	options ...common.Option,
 ) (*txs.AddDelegatorTx, error) {
-	avaxAssetID := b.backend.AVAXAssetID()
-	toBurn := map[ids.ID]uint64{
-		avaxAssetID: b.backend.AddPrimaryNetworkDelegatorFee(),
+	ops := common.NewOptions(options)
+	utils.Sort(rewardsOwner.Addrs)
+
+	utx := &txs.AddDelegatorTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    b.backend.NetworkID(),
+			BlockchainID: constants.PlatformChainID,
+			Memo:         ops.Memo(),
+		}},
+		Validator:              *vdr,
+		DelegationRewardsOwner: rewardsOwner,
 	}
+
+	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
 	toStake := map[ids.ID]uint64{
 		b.backend.AVAXAssetID(): vdr.Wght,
 	}
-	ops := common.NewOptions(options)
-	inputs, baseOutputs, stakeOutputs, err := b.spend(toBurn, toStake, ops)
+	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
+
+	// feesMan cumulates consumed units. Let's init it with utx filled so far
+	if err := feeCalc.AddDelegatorTx(utx); err != nil {
+		return nil, err
+	}
+
+	inputs, outputs, stakeOutputs, err := b.financeTx(toBurn, toStake, feeCalc, ops)
 	if err != nil {
 		return nil, err
 	}
 
-	utils.Sort(rewardsOwner.Addrs)
-	tx := &txs.AddDelegatorTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    b.backend.NetworkID(),
-			BlockchainID: constants.PlatformChainID,
-			Ins:          inputs,
-			Outs:         baseOutputs,
-			Memo:         ops.Memo(),
-		}},
-		Validator:              *vdr,
-		StakeOuts:              stakeOutputs,
-		DelegationRewardsOwner: rewardsOwner,
-	}
-	return tx, b.initCtx(tx)
+	utx.Ins = inputs
+	utx.Outs = outputs
+	utx.StakeOuts = stakeOutputs
+
+	return utx, b.initCtx(utx)
 }
 
 func (b *builder) NewCreateChainTx(
@@ -479,30 +590,22 @@ func (b *builder) NewCreateChainTx(
 	vmID ids.ID,
 	fxIDs []ids.ID,
 	chainName string,
+	feeCalc *fees.Calculator,
 	options ...common.Option,
 ) (*txs.CreateChainTx, error) {
-	toBurn := map[ids.ID]uint64{
-		b.backend.AVAXAssetID(): b.backend.CreateBlockchainTxFee(),
-	}
-	toStake := map[ids.ID]uint64{}
+	// 1. Build core transaction without utxos
 	ops := common.NewOptions(options)
-	inputs, outputs, _, err := b.spend(toBurn, toStake, ops)
-	if err != nil {
-		return nil, err
-	}
-
 	subnetAuth, err := b.authorizeSubnet(subnetID, ops)
 	if err != nil {
 		return nil, err
 	}
 
 	utils.Sort(fxIDs)
-	tx := &txs.CreateChainTx{
+
+	utx := &txs.CreateChainTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.backend.NetworkID(),
 			BlockchainID: constants.PlatformChainID,
-			Ins:          inputs,
-			Outs:         outputs,
 			Memo:         ops.Memo(),
 		}},
 		SubnetID:    subnetID,
@@ -512,80 +615,138 @@ func (b *builder) NewCreateChainTx(
 		GenesisData: genesis,
 		SubnetAuth:  subnetAuth,
 	}
-	return tx, b.initCtx(tx)
-}
 
-func (b *builder) NewCreateSubnetTx(
-	owner *secp256k1fx.OutputOwners,
-	options ...common.Option,
-) (*txs.CreateSubnetTx, error) {
-	toBurn := map[ids.ID]uint64{
-		b.backend.AVAXAssetID(): b.backend.CreateSubnetTxFee(),
-	}
+	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
 	toStake := map[ids.ID]uint64{}
-	ops := common.NewOptions(options)
-	inputs, outputs, _, err := b.spend(toBurn, toStake, ops)
+	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
+
+	// update fees to account for the auth credentials to be added upon tx signing
+	if _, err = fees.FinanceCredential(feeCalc, len(subnetAuth.SigIndices)); err != nil {
+		return nil, fmt.Errorf("account for credential fees: %w", err)
+	}
+
+	// feesMan cumulates consumed units. Let's init it with utx filled so far
+	if err = feeCalc.CreateChainTx(utx); err != nil {
+		return nil, err
+	}
+
+	inputs, outputs, _, err := b.financeTx(toBurn, toStake, feeCalc, ops)
 	if err != nil {
 		return nil, err
 	}
 
-	utils.Sort(owner.Addrs)
-	tx := &txs.CreateSubnetTx{
+	utx.Ins = inputs
+	utx.Outs = outputs
+
+	return utx, b.initCtx(utx)
+}
+
+func (b *builder) NewCreateSubnetTx(
+	owner *secp256k1fx.OutputOwners,
+	feeCalc *fees.Calculator,
+	options ...common.Option,
+) (*txs.CreateSubnetTx, error) {
+	// 1. Build core transaction without utxos
+	ops := common.NewOptions(options)
+
+	utx := &txs.CreateSubnetTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.backend.NetworkID(),
 			BlockchainID: constants.PlatformChainID,
-			Ins:          inputs,
-			Outs:         outputs,
 			Memo:         ops.Memo(),
 		}},
 		Owner: owner,
 	}
-	return tx, b.initCtx(tx)
+
+	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
+	toStake := map[ids.ID]uint64{}
+	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
+
+	// feesMan cumulates consumed units. Let's init it with utx filled so far
+	if err := feeCalc.CreateSubnetTx(utx); err != nil {
+		return nil, err
+	}
+
+	inputs, outputs, _, err := b.financeTx(toBurn, toStake, feeCalc, ops)
+	if err != nil {
+		return nil, err
+	}
+
+	utx.Ins = inputs
+	utx.Outs = outputs
+
+	return utx, b.initCtx(utx)
 }
 
 func (b *builder) NewTransferSubnetOwnershipTx(
 	subnetID ids.ID,
 	owner *secp256k1fx.OutputOwners,
+	feeCalc *fees.Calculator,
 	options ...common.Option,
 ) (*txs.TransferSubnetOwnershipTx, error) {
-	toBurn := map[ids.ID]uint64{
-		b.backend.AVAXAssetID(): b.backend.BaseTxFee(),
-	}
-	toStake := map[ids.ID]uint64{}
+	// 1. Build core transaction without utxos
 	ops := common.NewOptions(options)
-	inputs, outputs, _, err := b.spend(toBurn, toStake, ops)
-	if err != nil {
-		return nil, err
-	}
-
 	subnetAuth, err := b.authorizeSubnet(subnetID, ops)
 	if err != nil {
 		return nil, err
 	}
 
 	utils.Sort(owner.Addrs)
-	tx := &txs.TransferSubnetOwnershipTx{
+	utx := &txs.TransferSubnetOwnershipTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.backend.NetworkID(),
 			BlockchainID: constants.PlatformChainID,
-			Ins:          inputs,
-			Outs:         outputs,
 			Memo:         ops.Memo(),
 		}},
 		Subnet:     subnetID,
-		Owner:      owner,
 		SubnetAuth: subnetAuth,
+		Owner:      owner,
 	}
-	return tx, b.initCtx(tx)
+
+	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
+	toStake := map[ids.ID]uint64{}
+	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
+
+	// update fees to account for the auth credentials to be added upon tx signing
+	if _, err = fees.FinanceCredential(feeCalc, len(subnetAuth.SigIndices)); err != nil {
+		return nil, fmt.Errorf("account for credential fees: %w", err)
+	}
+
+	// feesMan cumulates consumed units. Let's init it with utx filled so far
+	if err := feeCalc.TransferSubnetOwnershipTx(utx); err != nil {
+		return nil, err
+	}
+
+	inputs, outputs, _, err := b.financeTx(toBurn, toStake, feeCalc, ops)
+	if err != nil {
+		return nil, err
+	}
+
+	utx.Ins = inputs
+	utx.Outs = outputs
+
+	return utx, b.initCtx(utx)
 }
 
 func (b *builder) NewImportTx(
 	sourceChainID ids.ID,
 	to *secp256k1fx.OutputOwners,
+	feeCalc *fees.Calculator,
 	options ...common.Option,
 ) (*txs.ImportTx, error) {
 	ops := common.NewOptions(options)
-	utxos, err := b.backend.UTXOs(ops.Context(), sourceChainID)
+	// 1. Build core transaction
+	utx := &txs.ImportTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    b.backend.NetworkID(),
+			BlockchainID: constants.PlatformChainID,
+			Memo:         ops.Memo(),
+		}},
+		SourceChain: sourceChainID,
+	}
+
+	// 2. Add imported inputs first
+	importedUtxos, err := b.backend.UTXOs(ops.Context(), sourceChainID)
 	if err != nil {
 		return nil, err
 	}
@@ -594,13 +755,13 @@ func (b *builder) NewImportTx(
 		addrs           = ops.Addresses(b.addrs)
 		minIssuanceTime = ops.MinIssuanceTime()
 		avaxAssetID     = b.backend.AVAXAssetID()
-		txFee           = b.backend.BaseTxFee()
 
-		importedInputs  = make([]*avax.TransferableInput, 0, len(utxos))
-		importedAmounts = make(map[ids.ID]uint64)
+		importedInputs     = make([]*avax.TransferableInput, 0, len(importedUtxos))
+		importedSigIndices = make([][]uint32, 0)
+		importedAmounts    = make(map[ids.ID]uint64)
 	)
-	// Iterate over the unlocked UTXOs
-	for _, utxo := range utxos {
+
+	for _, utxo := range importedUtxos {
 		out, ok := utxo.Out.(*secp256k1fx.TransferOutput)
 		if !ok {
 			continue
@@ -629,71 +790,131 @@ func (b *builder) NewImportTx(
 			return nil, err
 		}
 		importedAmounts[assetID] = newImportedAmount
+		importedSigIndices = append(importedSigIndices, inputSigIndices)
 	}
-	utils.Sort(importedInputs) // sort imported inputs
-
 	if len(importedInputs) == 0 {
 		return nil, fmt.Errorf(
 			"%w: no UTXOs available to import",
-			errInsufficientFunds,
+			ErrInsufficientFunds,
 		)
 	}
 
-	var (
-		inputs       []*avax.TransferableInput
-		outputs      = make([]*avax.TransferableOutput, 0, len(importedAmounts))
-		importedAVAX = importedAmounts[avaxAssetID]
-	)
-	if importedAVAX > txFee {
-		importedAmounts[avaxAssetID] -= txFee
-	} else {
-		if importedAVAX < txFee { // imported amount goes toward paying tx fee
-			toBurn := map[ids.ID]uint64{
-				avaxAssetID: txFee - importedAVAX,
-			}
-			toStake := map[ids.ID]uint64{}
-			var err error
-			inputs, outputs, _, err = b.spend(toBurn, toStake, ops)
-			if err != nil {
-				return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
-			}
-		}
-		delete(importedAmounts, avaxAssetID)
-	}
+	utils.Sort(importedInputs) // sort imported inputs
+	utx.ImportedInputs = importedInputs
 
+	// 3. Add an output for all non-avax denominated inputs.
 	for assetID, amount := range importedAmounts {
-		outputs = append(outputs, &avax.TransferableOutput{
+		if assetID == avaxAssetID {
+			// Avax-denominated inputs may be used to fully or partially pay fees,
+			// so we'll handle them later on.
+			continue
+		}
+
+		utx.Outs = append(utx.Outs, &avax.TransferableOutput{
 			Asset: avax.Asset{ID: assetID},
 			Out: &secp256k1fx.TransferOutput{
 				Amt:          amount,
 				OutputOwners: *to,
 			},
-		})
+		}) // we'll sort them later on
 	}
 
-	avax.SortTransferableOutputs(outputs, txs.Codec) // sort imported outputs
-	tx := &txs.ImportTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    b.backend.NetworkID(),
-			BlockchainID: constants.PlatformChainID,
-			Ins:          inputs,
-			Outs:         outputs,
-			Memo:         ops.Memo(),
-		}},
-		SourceChain:    sourceChainID,
-		ImportedInputs: importedInputs,
+	// 3. Finance fees as much as possible with imported, Avax-denominated UTXOs
+
+	// feesMan cumulates consumed units. Let's init it with utx filled so far
+	if err := feeCalc.ImportTx(utx); err != nil {
+		return nil, err
 	}
-	return tx, b.initCtx(tx)
+
+	for _, sigIndices := range importedSigIndices {
+		if _, err = fees.FinanceCredential(feeCalc, len(sigIndices)); err != nil {
+			return nil, fmt.Errorf("account for credential fees: %w", err)
+		}
+	}
+
+	switch importedAVAX := importedAmounts[avaxAssetID]; {
+	case importedAVAX == feeCalc.Fee:
+		// imported inputs match exactly the fees to be paid
+		avax.SortTransferableOutputs(utx.Outs, txs.Codec) // sort imported outputs
+		return utx, b.initCtx(utx)
+
+	case importedAVAX < feeCalc.Fee:
+		// imported inputs can partially pay fees
+		feeCalc.Fee -= importedAmounts[avaxAssetID]
+
+	default:
+		// imported inputs may be enough to pay taxes by themselves
+		changeOut := &avax.TransferableOutput{
+			Asset: avax.Asset{ID: avaxAssetID},
+			Out: &secp256k1fx.TransferOutput{
+				OutputOwners: *to, // we set amount after considering own fees
+			},
+		}
+
+		// update fees to target given the extra output added
+		_, outDimensions, err := fees.FinanceOutput(feeCalc, changeOut)
+		if err != nil {
+			return nil, fmt.Errorf("account for output fees: %w", err)
+		}
+
+		switch {
+		case feeCalc.Fee < importedAVAX:
+			changeOut.Out.(*secp256k1fx.TransferOutput).Amt = importedAVAX - feeCalc.Fee
+			utx.Outs = append(utx.Outs, changeOut)
+			avax.SortTransferableOutputs(utx.Outs, txs.Codec) // sort imported outputs
+			return utx, b.initCtx(utx)
+
+		case feeCalc.Fee == importedAVAX:
+			// imported fees pays exactly the tx cost. We don't include the outputs
+			avax.SortTransferableOutputs(utx.Outs, txs.Codec) // sort imported outputs
+			return utx, b.initCtx(utx)
+
+		default:
+			// imported avax are not enough to pay fees
+			// Drop the changeOut and finance the tx
+			if _, err := feeCalc.RemoveFeesFor(outDimensions); err != nil {
+				return nil, fmt.Errorf("failed reverting change output: %w", err)
+			}
+			feeCalc.Fee -= importedAVAX
+		}
+	}
+
+	toStake := map[ids.ID]uint64{}
+	toBurn := map[ids.ID]uint64{}
+	inputs, changeOuts, _, err := b.financeTx(toBurn, toStake, feeCalc, ops)
+	if err != nil {
+		return nil, err
+	}
+
+	utx.Ins = inputs
+	utx.Outs = append(utx.Outs, changeOuts...)
+	avax.SortTransferableOutputs(utx.Outs, txs.Codec) // sort imported outputs
+	return utx, b.initCtx(utx)
 }
 
 func (b *builder) NewExportTx(
 	chainID ids.ID,
 	outputs []*avax.TransferableOutput,
+	feeCalc *fees.Calculator,
 	options ...common.Option,
 ) (*txs.ExportTx, error) {
-	toBurn := map[ids.ID]uint64{
-		b.backend.AVAXAssetID(): b.backend.BaseTxFee(),
+	// 1. Build core transaction without utxos
+	ops := common.NewOptions(options)
+	avax.SortTransferableOutputs(outputs, txs.Codec) // sort exported outputs
+
+	utx := &txs.ExportTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    b.backend.NetworkID(),
+			BlockchainID: constants.PlatformChainID,
+			Memo:         ops.Memo(),
+		}},
+		DestinationChain: chainID,
+		ExportedOutputs:  outputs,
 	}
+
+	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
+	toStake := map[ids.ID]uint64{}
+	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
 	for _, out := range outputs {
 		assetID := out.AssetID()
 		amountToBurn, err := math.Add64(toBurn[assetID], out.Out.Amount())
@@ -703,26 +924,20 @@ func (b *builder) NewExportTx(
 		toBurn[assetID] = amountToBurn
 	}
 
-	toStake := map[ids.ID]uint64{}
-	ops := common.NewOptions(options)
-	inputs, changeOutputs, _, err := b.spend(toBurn, toStake, ops)
+	// feesMan cumulates consumed units. Let's init it with utx filled so far
+	if err := feeCalc.ExportTx(utx); err != nil {
+		return nil, err
+	}
+
+	inputs, changeOuts, _, err := b.financeTx(toBurn, toStake, feeCalc, ops)
 	if err != nil {
 		return nil, err
 	}
 
-	avax.SortTransferableOutputs(outputs, txs.Codec) // sort exported outputs
-	tx := &txs.ExportTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    b.backend.NetworkID(),
-			BlockchainID: constants.PlatformChainID,
-			Ins:          inputs,
-			Outs:         changeOutputs,
-			Memo:         ops.Memo(),
-		}},
-		DestinationChain: chainID,
-		ExportedOutputs:  outputs,
-	}
-	return tx, b.initCtx(tx)
+	utx.Ins = inputs
+	utx.Outs = changeOuts
+
+	return utx, b.initCtx(utx)
 }
 
 func (b *builder) NewTransformSubnetTx(
@@ -740,30 +955,21 @@ func (b *builder) NewTransformSubnetTx(
 	minDelegatorStake uint64,
 	maxValidatorWeightFactor byte,
 	uptimeRequirement uint32,
+	feeCalc *fees.Calculator,
 	options ...common.Option,
 ) (*txs.TransformSubnetTx, error) {
-	toBurn := map[ids.ID]uint64{
-		b.backend.AVAXAssetID(): b.backend.TransformSubnetTxFee(),
-		assetID:                 maxSupply - initialSupply,
-	}
-	toStake := map[ids.ID]uint64{}
+	// 1. Build core transaction without utxos
 	ops := common.NewOptions(options)
-	inputs, outputs, _, err := b.spend(toBurn, toStake, ops)
-	if err != nil {
-		return nil, err
-	}
 
 	subnetAuth, err := b.authorizeSubnet(subnetID, ops)
 	if err != nil {
 		return nil, err
 	}
 
-	tx := &txs.TransformSubnetTx{
+	utx := &txs.TransformSubnetTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.backend.NetworkID(),
 			BlockchainID: constants.PlatformChainID,
-			Ins:          inputs,
-			Outs:         outputs,
 			Memo:         ops.Memo(),
 		}},
 		Subnet:                   subnetID,
@@ -782,7 +988,32 @@ func (b *builder) NewTransformSubnetTx(
 		UptimeRequirement:        uptimeRequirement,
 		SubnetAuth:               subnetAuth,
 	}
-	return tx, b.initCtx(tx)
+
+	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
+	toStake := map[ids.ID]uint64{}
+	toBurn := map[ids.ID]uint64{
+		assetID: maxSupply - initialSupply,
+	} // fees are calculated in financeTx
+
+	// update fees to account for the auth credentials to be added upon tx signing
+	if _, err = fees.FinanceCredential(feeCalc, len(subnetAuth.SigIndices)); err != nil {
+		return nil, fmt.Errorf("account for credential fees: %w", err)
+	}
+
+	// feesMan cumulates consumed units. Let's init it with utx filled so far
+	if err := feeCalc.TransformSubnetTx(utx); err != nil {
+		return nil, err
+	}
+
+	inputs, outputs, _, err := b.financeTx(toBurn, toStake, feeCalc, ops)
+	if err != nil {
+		return nil, err
+	}
+
+	utx.Ins = inputs
+	utx.Outs = outputs
+
+	return utx, b.initCtx(utx)
 }
 
 func (b *builder) NewAddPermissionlessValidatorTx(
@@ -792,82 +1023,92 @@ func (b *builder) NewAddPermissionlessValidatorTx(
 	validationRewardsOwner *secp256k1fx.OutputOwners,
 	delegationRewardsOwner *secp256k1fx.OutputOwners,
 	shares uint32,
+	feeCalc *fees.Calculator,
 	options ...common.Option,
 ) (*txs.AddPermissionlessValidatorTx, error) {
-	avaxAssetID := b.backend.AVAXAssetID()
-	toBurn := map[ids.ID]uint64{}
-	if vdr.Subnet == constants.PrimaryNetworkID {
-		toBurn[avaxAssetID] = b.backend.AddPrimaryNetworkValidatorFee()
-	} else {
-		toBurn[avaxAssetID] = b.backend.AddSubnetValidatorFee()
-	}
-	toStake := map[ids.ID]uint64{
-		assetID: vdr.Wght,
-	}
 	ops := common.NewOptions(options)
-	inputs, baseOutputs, stakeOutputs, err := b.spend(toBurn, toStake, ops)
-	if err != nil {
-		return nil, err
-	}
-
 	utils.Sort(validationRewardsOwner.Addrs)
 	utils.Sort(delegationRewardsOwner.Addrs)
-	tx := &txs.AddPermissionlessValidatorTx{
+
+	utx := &txs.AddPermissionlessValidatorTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.backend.NetworkID(),
 			BlockchainID: constants.PlatformChainID,
-			Ins:          inputs,
-			Outs:         baseOutputs,
 			Memo:         ops.Memo(),
 		}},
 		Validator:             vdr.Validator,
 		Subnet:                vdr.Subnet,
 		Signer:                signer,
-		StakeOuts:             stakeOutputs,
 		ValidatorRewardsOwner: validationRewardsOwner,
 		DelegatorRewardsOwner: delegationRewardsOwner,
 		DelegationShares:      shares,
 	}
-	return tx, b.initCtx(tx)
+
+	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
+	toStake := map[ids.ID]uint64{
+		assetID: vdr.Wght,
+	}
+	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
+
+	// feesMan cumulates consumed units. Let's init it with utx filled so far
+	if err := feeCalc.AddPermissionlessValidatorTx(utx); err != nil {
+		return nil, err
+	}
+
+	inputs, outputs, stakeOutputs, err := b.financeTx(toBurn, toStake, feeCalc, ops)
+	if err != nil {
+		return nil, err
+	}
+
+	utx.Ins = inputs
+	utx.Outs = outputs
+	utx.StakeOuts = stakeOutputs
+
+	return utx, b.initCtx(utx)
 }
 
 func (b *builder) NewAddPermissionlessDelegatorTx(
 	vdr *txs.SubnetValidator,
 	assetID ids.ID,
 	rewardsOwner *secp256k1fx.OutputOwners,
+	feeCalc *fees.Calculator,
 	options ...common.Option,
 ) (*txs.AddPermissionlessDelegatorTx, error) {
-	avaxAssetID := b.backend.AVAXAssetID()
-	toBurn := map[ids.ID]uint64{}
-	if vdr.Subnet == constants.PrimaryNetworkID {
-		toBurn[avaxAssetID] = b.backend.AddPrimaryNetworkDelegatorFee()
-	} else {
-		toBurn[avaxAssetID] = b.backend.AddSubnetDelegatorFee()
-	}
-	toStake := map[ids.ID]uint64{
-		assetID: vdr.Wght,
-	}
 	ops := common.NewOptions(options)
-	inputs, baseOutputs, stakeOutputs, err := b.spend(toBurn, toStake, ops)
-	if err != nil {
-		return nil, err
-	}
-
 	utils.Sort(rewardsOwner.Addrs)
-	tx := &txs.AddPermissionlessDelegatorTx{
+
+	utx := &txs.AddPermissionlessDelegatorTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.backend.NetworkID(),
 			BlockchainID: constants.PlatformChainID,
-			Ins:          inputs,
-			Outs:         baseOutputs,
 			Memo:         ops.Memo(),
 		}},
 		Validator:              vdr.Validator,
 		Subnet:                 vdr.Subnet,
-		StakeOuts:              stakeOutputs,
 		DelegationRewardsOwner: rewardsOwner,
 	}
-	return tx, b.initCtx(tx)
+
+	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
+	toStake := map[ids.ID]uint64{
+		assetID: vdr.Wght,
+	}
+	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
+
+	// feesMan cumulates consumed units. Let's init it with utx filled so far
+	if err := feeCalc.AddPermissionlessDelegatorTx(utx); err != nil {
+		return nil, err
+	}
+
+	inputs, outputs, stakeOutputs, err := b.financeTx(toBurn, toStake, feeCalc, ops)
+	if err != nil {
+		return nil, err
+	}
+
+	utx.Ins = inputs
+	utx.Outs = outputs
+	utx.StakeOuts = stakeOutputs
+
+	return utx, b.initCtx(utx)
 }
 
 func (b *builder) getBalance(
@@ -900,7 +1141,7 @@ func (b *builder) getBalance(
 
 		out, ok := outIntf.(*secp256k1fx.TransferOutput)
 		if !ok {
-			return nil, errUnknownOutputType
+			return nil, ErrUnknownOutputType
 		}
 
 		_, ok = common.MatchOwners(&out.OutputOwners, addrs, minIssuanceTime)
@@ -929,9 +1170,10 @@ func (b *builder) getBalance(
 //     place into the staked outputs. First locked UTXOs are attempted to be
 //     used for these funds, and then unlocked UTXOs will be attempted to be
 //     used. There is no preferential ordering on the unlock times.
-func (b *builder) spend(
+func (b *builder) financeTx(
 	amountsToBurn map[ids.ID]uint64,
 	amountsToStake map[ids.ID]uint64,
+	feeCalc *fees.Calculator,
 	options *common.Options,
 ) (
 	inputs []*avax.TransferableInput,
@@ -939,10 +1181,24 @@ func (b *builder) spend(
 	stakeOutputs []*avax.TransferableOutput,
 	err error,
 ) {
+	avaxAssetID := b.backend.AVAXAssetID()
 	utxos, err := b.backend.UTXOs(options.Context(), constants.PlatformChainID)
 	if err != nil {
 		return nil, nil, nil, err
 	}
+
+	// we can only pay fees in avax, so we sort avax-denominated UTXOs last
+	// to maximize probability of being able to pay fees.
+	slices.SortFunc(utxos, func(lhs, rhs *avax.UTXO) int {
+		switch {
+		case lhs.Asset.AssetID() == avaxAssetID && rhs.Asset.AssetID() != avaxAssetID:
+			return 1
+		case lhs.Asset.AssetID() != avaxAssetID && rhs.Asset.AssetID() == avaxAssetID:
+			return -1
+		default:
+			return 0
+		}
+	})
 
 	addrs := options.Addresses(b.addrs)
 	minIssuanceTime := options.MinIssuanceTime()
@@ -956,14 +1212,15 @@ func (b *builder) spend(
 		Addrs:     []ids.ShortID{addr},
 	})
 
+	amountsToBurn[avaxAssetID] += feeCalc.Fee
+
 	// Iterate over the locked UTXOs
 	for _, utxo := range utxos {
 		assetID := utxo.AssetID()
-		remainingAmountToStake := amountsToStake[assetID]
 
 		// If we have staked enough of the asset, then we have no need burn
 		// more.
-		if remainingAmountToStake == 0 {
+		if amountsToStake[assetID] == 0 {
 			continue
 		}
 
@@ -982,7 +1239,7 @@ func (b *builder) spend(
 
 		out, ok := lockedOut.TransferableOut.(*secp256k1fx.TransferOutput)
 		if !ok {
-			return nil, nil, nil, errUnknownOutputType
+			return nil, nil, nil, ErrUnknownOutputType
 		}
 
 		inputSigIndices, ok := common.MatchOwners(&out.OutputOwners, addrs, minIssuanceTime)
@@ -991,7 +1248,7 @@ func (b *builder) spend(
 			continue
 		}
 
-		inputs = append(inputs, &avax.TransferableInput{
+		input := &avax.TransferableInput{
 			UTXOID: utxo.UTXOID,
 			Asset:  utxo.Asset,
 			In: &stakeable.LockIn{
@@ -1003,16 +1260,30 @@ func (b *builder) spend(
 					},
 				},
 			},
-		})
+		}
+
+		addedFees, err := fees.FinanceInput(feeCalc, input)
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("account for input fees: %w", err)
+		}
+		amountsToBurn[avaxAssetID] += addedFees
+
+		addedFees, err = fees.FinanceCredential(feeCalc, len(inputSigIndices))
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("account for input fees: %w", err)
+		}
+		amountsToBurn[avaxAssetID] += addedFees
+
+		inputs = append(inputs, input)
 
 		// Stake any value that should be staked
 		amountToStake := min(
-			remainingAmountToStake, // Amount we still need to stake
-			out.Amt,                // Amount available to stake
+			amountsToStake[assetID], // Amount we still need to stake
+			out.Amt,                 // Amount available to stake
 		)
 
 		// Add the output to the staked outputs
-		stakeOutputs = append(stakeOutputs, &avax.TransferableOutput{
+		stakeOut := &avax.TransferableOutput{
 			Asset: utxo.Asset,
 			Out: &stakeable.LockOut{
 				Locktime: lockedOut.Locktime,
@@ -1021,12 +1292,20 @@ func (b *builder) spend(
 					OutputOwners: out.OutputOwners,
 				},
 			},
-		})
+		}
+
+		addedFees, _, err = fees.FinanceOutput(feeCalc, stakeOut)
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("account for output fees: %w", err)
+		}
+		amountsToBurn[avaxAssetID] += addedFees
+
+		stakeOutputs = append(stakeOutputs, stakeOut)
 
 		amountsToStake[assetID] -= amountToStake
 		if remainingAmount := out.Amt - amountToStake; remainingAmount > 0 {
 			// This input had extra value, so some of it must be returned
-			changeOutputs = append(changeOutputs, &avax.TransferableOutput{
+			changeOut := &avax.TransferableOutput{
 				Asset: utxo.Asset,
 				Out: &stakeable.LockOut{
 					Locktime: lockedOut.Locktime,
@@ -1035,19 +1314,26 @@ func (b *builder) spend(
 						OutputOwners: out.OutputOwners,
 					},
 				},
-			})
+			}
+
+			// update fees to account for the change output
+			addedFees, _, err = fees.FinanceOutput(feeCalc, changeOut)
+			if err != nil {
+				return nil, nil, nil, fmt.Errorf("account for output fees: %w", err)
+			}
+			amountsToBurn[avaxAssetID] += addedFees
+
+			changeOutputs = append(changeOutputs, changeOut)
 		}
 	}
 
 	// Iterate over the unlocked UTXOs
 	for _, utxo := range utxos {
 		assetID := utxo.AssetID()
-		remainingAmountToStake := amountsToStake[assetID]
-		remainingAmountToBurn := amountsToBurn[assetID]
 
 		// If we have consumed enough of the asset, then we have no need burn
 		// more.
-		if remainingAmountToStake == 0 && remainingAmountToBurn == 0 {
+		if amountsToStake[assetID] == 0 && amountsToBurn[assetID] == 0 {
 			continue
 		}
 
@@ -1063,7 +1349,7 @@ func (b *builder) spend(
 
 		out, ok := outIntf.(*secp256k1fx.TransferOutput)
 		if !ok {
-			return nil, nil, nil, errUnknownOutputType
+			return nil, nil, nil, ErrUnknownOutputType
 		}
 
 		inputSigIndices, ok := common.MatchOwners(&out.OutputOwners, addrs, minIssuanceTime)
@@ -1072,7 +1358,7 @@ func (b *builder) spend(
 			continue
 		}
 
-		inputs = append(inputs, &avax.TransferableInput{
+		input := &avax.TransferableInput{
 			UTXOID: utxo.UTXOID,
 			Asset:  utxo.Asset,
 			In: &secp256k1fx.TransferInput{
@@ -1081,41 +1367,83 @@ func (b *builder) spend(
 					SigIndices: inputSigIndices,
 				},
 			},
-		})
+		}
 
-		// Burn any value that should be burned
-		amountToBurn := min(
-			remainingAmountToBurn, // Amount we still need to burn
-			out.Amt,               // Amount available to burn
-		)
-		amountsToBurn[assetID] -= amountToBurn
+		addedFees, err := fees.FinanceInput(feeCalc, input)
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("account for input fees: %w", err)
+		}
+		amountsToBurn[avaxAssetID] += addedFees
 
-		amountAvalibleToStake := out.Amt - amountToBurn
-		// Burn any value that should be burned
+		addedFees, err = fees.FinanceCredential(feeCalc, len(inputSigIndices))
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("account for credential fees: %w", err)
+		}
+		amountsToBurn[avaxAssetID] += addedFees
+
+		inputs = append(inputs, input)
+
+		// Stake any value that should be staked
 		amountToStake := min(
-			remainingAmountToStake, // Amount we still need to stake
-			amountAvalibleToStake,  // Amount available to stake
+			amountsToStake[assetID], // Amount we still need to stake
+			out.Amt,                 // Amount available to stake
 		)
 		amountsToStake[assetID] -= amountToStake
 		if amountToStake > 0 {
 			// Some of this input was put for staking
-			stakeOutputs = append(stakeOutputs, &avax.TransferableOutput{
+			stakeOut := &avax.TransferableOutput{
 				Asset: utxo.Asset,
 				Out: &secp256k1fx.TransferOutput{
 					Amt:          amountToStake,
 					OutputOwners: *changeOwner,
 				},
-			})
+			}
+
+			stakeOutputs = append(stakeOutputs, stakeOut)
+
+			addedFees, _, err = fees.FinanceOutput(feeCalc, stakeOut)
+			if err != nil {
+				return nil, nil, nil, fmt.Errorf("account for output fees: %w", err)
+			}
+			amountsToBurn[avaxAssetID] += addedFees
 		}
-		if remainingAmount := amountAvalibleToStake - amountToStake; remainingAmount > 0 {
-			// This input had extra value, so some of it must be returned
-			changeOutputs = append(changeOutputs, &avax.TransferableOutput{
+
+		// Burn any value that should be burned
+		amountAvalibleToBurn := out.Amt - amountToStake
+		amountToBurn := min(
+			amountsToBurn[assetID], // Amount we still need to burn
+			amountAvalibleToBurn,   // Amount available to burn
+		)
+		amountsToBurn[assetID] -= amountToBurn
+		if remainingAmount := amountAvalibleToBurn - amountToBurn; remainingAmount > 0 {
+			// This input had extra value, so some of it must be returned, once fees are removed
+			changeOut := &avax.TransferableOutput{
 				Asset: utxo.Asset,
 				Out: &secp256k1fx.TransferOutput{
-					Amt:          remainingAmount,
 					OutputOwners: *changeOwner,
 				},
-			})
+			}
+
+			// update fees to account for the change output
+			addedFees, _, err = fees.FinanceOutput(feeCalc, changeOut)
+			if err != nil {
+				return nil, nil, nil, fmt.Errorf("account for output fees: %w", err)
+			}
+
+			if assetID != avaxAssetID {
+				changeOut.Out.(*secp256k1fx.TransferOutput).Amt = remainingAmount
+				amountsToBurn[avaxAssetID] += addedFees
+				changeOutputs = append(changeOutputs, changeOut)
+			} else {
+				// here assetID == b.backend.AVAXAssetID()
+				switch {
+				case addedFees < remainingAmount:
+					changeOut.Out.(*secp256k1fx.TransferOutput).Amt = remainingAmount - addedFees
+					changeOutputs = append(changeOutputs, changeOut)
+				case addedFees >= remainingAmount:
+					amountsToBurn[assetID] += addedFees - remainingAmount
+				}
+			}
 		}
 	}
 
@@ -1123,7 +1451,7 @@ func (b *builder) spend(
 		if amount != 0 {
 			return nil, nil, nil, fmt.Errorf(
 				"%w: provided UTXOs need %d more units of asset %q to stake",
-				errInsufficientFunds,
+				ErrInsufficientFunds,
 				amount,
 				assetID,
 			)
@@ -1133,7 +1461,7 @@ func (b *builder) spend(
 		if amount != 0 {
 			return nil, nil, nil, fmt.Errorf(
 				"%w: provided UTXOs need %d more units of asset %q",
-				errInsufficientFunds,
+				ErrInsufficientFunds,
 				amount,
 				assetID,
 			)
@@ -1146,7 +1474,10 @@ func (b *builder) spend(
 	return inputs, changeOutputs, stakeOutputs, nil
 }
 
-func (b *builder) authorizeSubnet(subnetID ids.ID, options *common.Options) (*secp256k1fx.Input, error) {
+func (b *builder) authorizeSubnet(
+	subnetID ids.ID,
+	options *common.Options,
+) (*secp256k1fx.Input, error) {
 	ownerIntf, err := b.backend.GetSubnetOwner(options.Context(), subnetID)
 	if err != nil {
 		return nil, fmt.Errorf(
@@ -1173,7 +1504,7 @@ func (b *builder) authorizeSubnet(subnetID ids.ID, options *common.Options) (*se
 }
 
 func (b *builder) initCtx(tx txs.UnsignedTx) error {
-	ctx, err := newSnowContext(b.backend)
+	ctx, err := NewSnowContext(b.backend.NetworkID(), b.backend.AVAXAssetID())
 	if err != nil {
 		return err
 	}

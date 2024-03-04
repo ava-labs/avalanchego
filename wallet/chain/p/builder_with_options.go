@@ -10,14 +10,16 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fees"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/wallet/chain/p/backends"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
 
-var _ Builder = (*builderWithOptions)(nil)
+var _ backends.Builder = (*builderWithOptions)(nil)
 
 type builderWithOptions struct {
-	Builder
+	backends.Builder
 	options []common.Option
 }
 
@@ -28,7 +30,7 @@ type builderWithOptions struct {
 //     operations.
 //   - [options] will be provided to the builder in addition to the options
 //     provided in the method calls.
-func NewBuilderWithOptions(builder Builder, options ...common.Option) Builder {
+func NewBuilderWithOptions(builder backends.Builder, options ...common.Option) backends.Builder {
 	return &builderWithOptions{
 		Builder: builder,
 		options: options,
@@ -57,22 +59,26 @@ func (b *builderWithOptions) NewAddValidatorTx(
 	vdr *txs.Validator,
 	rewardsOwner *secp256k1fx.OutputOwners,
 	shares uint32,
+	feeCalc *fees.Calculator,
 	options ...common.Option,
 ) (*txs.AddValidatorTx, error) {
 	return b.Builder.NewAddValidatorTx(
 		vdr,
 		rewardsOwner,
 		shares,
+		feeCalc,
 		common.UnionOptions(b.options, options)...,
 	)
 }
 
 func (b *builderWithOptions) NewAddSubnetValidatorTx(
 	vdr *txs.SubnetValidator,
+	feeCalc *fees.Calculator,
 	options ...common.Option,
 ) (*txs.AddSubnetValidatorTx, error) {
 	return b.Builder.NewAddSubnetValidatorTx(
 		vdr,
+		feeCalc,
 		common.UnionOptions(b.options, options)...,
 	)
 }
@@ -80,11 +86,13 @@ func (b *builderWithOptions) NewAddSubnetValidatorTx(
 func (b *builderWithOptions) RemoveSubnetValidatorTx(
 	nodeID ids.NodeID,
 	subnetID ids.ID,
+	feeCalc *fees.Calculator,
 	options ...common.Option,
 ) (*txs.RemoveSubnetValidatorTx, error) {
 	return b.Builder.NewRemoveSubnetValidatorTx(
 		nodeID,
 		subnetID,
+		feeCalc,
 		common.UnionOptions(b.options, options)...,
 	)
 }
@@ -92,11 +100,13 @@ func (b *builderWithOptions) RemoveSubnetValidatorTx(
 func (b *builderWithOptions) NewAddDelegatorTx(
 	vdr *txs.Validator,
 	rewardsOwner *secp256k1fx.OutputOwners,
+	feeCalc *fees.Calculator,
 	options ...common.Option,
 ) (*txs.AddDelegatorTx, error) {
 	return b.Builder.NewAddDelegatorTx(
 		vdr,
 		rewardsOwner,
+		feeCalc,
 		common.UnionOptions(b.options, options)...,
 	)
 }
@@ -107,6 +117,7 @@ func (b *builderWithOptions) NewCreateChainTx(
 	vmID ids.ID,
 	fxIDs []ids.ID,
 	chainName string,
+	feeCalc *fees.Calculator,
 	options ...common.Option,
 ) (*txs.CreateChainTx, error) {
 	return b.Builder.NewCreateChainTx(
@@ -115,16 +126,19 @@ func (b *builderWithOptions) NewCreateChainTx(
 		vmID,
 		fxIDs,
 		chainName,
+		feeCalc,
 		common.UnionOptions(b.options, options)...,
 	)
 }
 
 func (b *builderWithOptions) NewCreateSubnetTx(
 	owner *secp256k1fx.OutputOwners,
+	feeCalc *fees.Calculator,
 	options ...common.Option,
 ) (*txs.CreateSubnetTx, error) {
 	return b.Builder.NewCreateSubnetTx(
 		owner,
+		feeCalc,
 		common.UnionOptions(b.options, options)...,
 	)
 }
@@ -132,11 +146,13 @@ func (b *builderWithOptions) NewCreateSubnetTx(
 func (b *builderWithOptions) NewTransferSubnetOwnershipTx(
 	subnetID ids.ID,
 	owner *secp256k1fx.OutputOwners,
+	feeCalc *fees.Calculator,
 	options ...common.Option,
 ) (*txs.TransferSubnetOwnershipTx, error) {
 	return b.Builder.NewTransferSubnetOwnershipTx(
 		subnetID,
 		owner,
+		feeCalc,
 		common.UnionOptions(b.options, options)...,
 	)
 }
@@ -144,11 +160,13 @@ func (b *builderWithOptions) NewTransferSubnetOwnershipTx(
 func (b *builderWithOptions) NewImportTx(
 	sourceChainID ids.ID,
 	to *secp256k1fx.OutputOwners,
+	feeCalc *fees.Calculator,
 	options ...common.Option,
 ) (*txs.ImportTx, error) {
 	return b.Builder.NewImportTx(
 		sourceChainID,
 		to,
+		feeCalc,
 		common.UnionOptions(b.options, options)...,
 	)
 }
@@ -156,11 +174,13 @@ func (b *builderWithOptions) NewImportTx(
 func (b *builderWithOptions) NewExportTx(
 	chainID ids.ID,
 	outputs []*avax.TransferableOutput,
+	feeCalc *fees.Calculator,
 	options ...common.Option,
 ) (*txs.ExportTx, error) {
 	return b.Builder.NewExportTx(
 		chainID,
 		outputs,
+		feeCalc,
 		common.UnionOptions(b.options, options)...,
 	)
 }
@@ -180,6 +200,7 @@ func (b *builderWithOptions) NewTransformSubnetTx(
 	minDelegatorStake uint64,
 	maxValidatorWeightFactor byte,
 	uptimeRequirement uint32,
+	feeCalc *fees.Calculator,
 	options ...common.Option,
 ) (*txs.TransformSubnetTx, error) {
 	return b.Builder.NewTransformSubnetTx(
@@ -197,6 +218,7 @@ func (b *builderWithOptions) NewTransformSubnetTx(
 		minDelegatorStake,
 		maxValidatorWeightFactor,
 		uptimeRequirement,
+		feeCalc,
 		common.UnionOptions(b.options, options)...,
 	)
 }
@@ -208,6 +230,7 @@ func (b *builderWithOptions) NewAddPermissionlessValidatorTx(
 	validationRewardsOwner *secp256k1fx.OutputOwners,
 	delegationRewardsOwner *secp256k1fx.OutputOwners,
 	shares uint32,
+	feeCalc *fees.Calculator,
 	options ...common.Option,
 ) (*txs.AddPermissionlessValidatorTx, error) {
 	return b.Builder.NewAddPermissionlessValidatorTx(
@@ -217,6 +240,7 @@ func (b *builderWithOptions) NewAddPermissionlessValidatorTx(
 		validationRewardsOwner,
 		delegationRewardsOwner,
 		shares,
+		feeCalc,
 		common.UnionOptions(b.options, options)...,
 	)
 }
@@ -225,12 +249,14 @@ func (b *builderWithOptions) NewAddPermissionlessDelegatorTx(
 	vdr *txs.SubnetValidator,
 	assetID ids.ID,
 	rewardsOwner *secp256k1fx.OutputOwners,
+	feeCalc *fees.Calculator,
 	options ...common.Option,
 ) (*txs.AddPermissionlessDelegatorTx, error) {
 	return b.Builder.NewAddPermissionlessDelegatorTx(
 		vdr,
 		assetID,
 		rewardsOwner,
+		feeCalc,
 		common.UnionOptions(b.options, options)...,
 	)
 }

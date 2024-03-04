@@ -59,15 +59,17 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fees"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/wallet/chain/p/backends"
 
 	smcon "github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	smeng "github.com/ava-labs/avalanchego/snow/engine/snowman"
 	snowgetter "github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
 	timetracker "github.com/ava-labs/avalanchego/snow/networking/tracker"
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 	blockbuilder "github.com/ava-labs/avalanchego/vms/platformvm/block/builder"
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
-	txbuilder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
@@ -77,8 +79,9 @@ const (
 	banff
 	cortina
 	durango
+	eUpgrade
 
-	latestFork = durango
+	latestFork fork = eUpgrade
 
 	defaultWeight uint64 = 10000
 )
@@ -209,12 +212,16 @@ func defaultVM(t *testing.T, f fork) (*VM, database.Database, *mutableSharedMemo
 		banffTime         = mockable.MaxTime
 		cortinaTime       = mockable.MaxTime
 		durangoTime       = mockable.MaxTime
+		eUpgradeTime      = mockable.MaxTime
 	)
 
 	// always reset latestForkTime (a package level variable)
 	// to ensure test independence
 	latestForkTime = defaultGenesisTime.Add(time.Second)
 	switch f {
+	case eUpgrade:
+		eUpgradeTime = latestForkTime
+		fallthrough
 	case durango:
 		durangoTime = latestForkTime
 		fallthrough
@@ -230,7 +237,7 @@ func defaultVM(t *testing.T, f fork) (*VM, database.Database, *mutableSharedMemo
 	case apricotPhase3:
 		apricotPhase3Time = latestForkTime
 	default:
-		require.NoError(fmt.Errorf("unhandled fork %d", f))
+		require.FailNow(fmt.Sprintf("unhandled fork %d", f))
 	}
 
 	vm := &VM{Config: config.Config{
@@ -253,6 +260,7 @@ func defaultVM(t *testing.T, f fork) (*VM, database.Database, *mutableSharedMemo
 		BanffTime:              banffTime,
 		CortinaTime:            cortinaTime,
 		DurangoTime:            durangoTime,
+		EUpgradeTime:           eUpgradeTime,
 	}}
 
 	db := memdb.New()
@@ -364,7 +372,26 @@ func TestGenesis(t *testing.T) {
 			require.NoError(err)
 
 			require.Equal(utxo.Address, addr)
-			require.Equal(uint64(utxo.Amount)-vm.CreateSubnetTxFee, out.Amount())
+
+			// we use the first key to fund a subnet creation in [defaultGenesis].
+			// As such we need to account for the subnet creation fee
+			var (
+				chainTime = vm.state.GetTimestamp()
+				feeCfg    = vm.Config.GetDynamicFeesConfig(chainTime)
+				feeMan    = commonfees.NewManager(feeCfg.UnitFees)
+				feeCalc   = &fees.Calculator{
+					Log:              logging.NoLog{},
+					IsEUpgradeActive: vm.IsEUpgradeActivated(chainTime),
+					Config:           &vm.Config,
+					ChainTime:        chainTime,
+					FeeManager:       feeMan,
+					ConsumedUnitsCap: feeCfg.BlockUnitsCap,
+					Credentials:      testSubnet1.Creds,
+				}
+			)
+
+			require.NoError(testSubnet1.Unsigned.Visit(feeCalc))
+			require.Equal(uint64(utxo.Amount)-feeCalc.Fee, out.Amount())
 		}
 	}
 
@@ -988,7 +1015,7 @@ func TestAtomicImport(t *testing.T) {
 		ids.ShortEmpty, // change addr
 		nil,
 	)
-	require.ErrorIs(err, txbuilder.ErrNoFunds)
+	require.ErrorIs(err, backends.ErrInsufficientFunds)
 
 	// Provide the avm UTXO
 
@@ -1123,6 +1150,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 		BanffTime:              latestForkTime,
 		CortinaTime:            latestForkTime,
 		DurangoTime:            latestForkTime,
+		EUpgradeTime:           mockable.MaxTime,
 	}}
 
 	firstCtx := snowtest.Context(t, snowtest.PChainID)
@@ -1210,6 +1238,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 		BanffTime:              latestForkTime,
 		CortinaTime:            latestForkTime,
 		DurangoTime:            latestForkTime,
+		EUpgradeTime:           mockable.MaxTime,
 	}}
 
 	secondCtx := snowtest.Context(t, snowtest.PChainID)
@@ -1260,6 +1289,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		BanffTime:              latestForkTime,
 		CortinaTime:            latestForkTime,
 		DurangoTime:            latestForkTime,
+		EUpgradeTime:           mockable.MaxTime,
 	}}
 
 	initialClkTime := latestForkTime.Add(time.Second)
@@ -1599,6 +1629,7 @@ func TestUnverifiedParent(t *testing.T) {
 		BanffTime:              latestForkTime,
 		CortinaTime:            latestForkTime,
 		DurangoTime:            latestForkTime,
+		EUpgradeTime:           mockable.MaxTime,
 	}}
 
 	initialClkTime := latestForkTime.Add(time.Second)
@@ -1759,6 +1790,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 		BanffTime:              latestForkTime,
 		CortinaTime:            latestForkTime,
 		DurangoTime:            latestForkTime,
+		EUpgradeTime:           mockable.MaxTime,
 	}}
 
 	firstCtx := snowtest.Context(t, snowtest.PChainID)
@@ -1807,6 +1839,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 		BanffTime:              latestForkTime,
 		CortinaTime:            latestForkTime,
 		DurangoTime:            latestForkTime,
+		EUpgradeTime:           mockable.MaxTime,
 	}}
 
 	secondCtx := snowtest.Context(t, snowtest.PChainID)
@@ -1906,6 +1939,7 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 		BanffTime:              latestForkTime,
 		CortinaTime:            latestForkTime,
 		DurangoTime:            latestForkTime,
+		EUpgradeTime:           mockable.MaxTime,
 	}}
 
 	ctx := snowtest.Context(t, snowtest.PChainID)
@@ -2141,6 +2175,9 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 			keys[0].PublicKey().Address(),
 		},
 	}
+	ctx, err := backends.NewSnowContext(vm.ctx.NetworkID, vm.ctx.AVAXAssetID)
+	require.NoError(err)
+	expectedOwner.InitCtx(ctx)
 	require.Equal(expectedOwner, subnetOwner)
 
 	transferSubnetOwnershipTx, err := vm.txBuilder.NewTransferSubnetOwnershipTx(
@@ -2176,6 +2213,7 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 			keys[1].PublicKey().Address(),
 		},
 	}
+	expectedOwner.InitCtx(ctx)
 	require.Equal(expectedOwner, subnetOwner)
 }
 
@@ -2236,7 +2274,23 @@ func TestBaseTx(t *testing.T) {
 	}
 	require.Equal(totalOutputAmt, key0OutputAmt+key1OutputAmt+changeAddrOutputAmt)
 
-	require.Equal(vm.TxFee, totalInputAmt-totalOutputAmt)
+	var (
+		chainTime = vm.state.GetTimestamp()
+		feeCfg    = vm.Config.GetDynamicFeesConfig(chainTime)
+		feeMan    = commonfees.NewManager(feeCfg.UnitFees)
+		feeCalc   = &fees.Calculator{
+			Log:              logging.NoLog{},
+			IsEUpgradeActive: vm.IsEUpgradeActivated(chainTime),
+			Config:           &vm.Config,
+			ChainTime:        chainTime,
+			FeeManager:       feeMan,
+			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
+			Credentials:      baseTx.Creds,
+		}
+	)
+
+	require.NoError(baseTx.Unsigned.Visit(feeCalc))
+	require.Equal(feeCalc.Fee, totalInputAmt-totalOutputAmt)
 	require.Equal(sendAmt, key1OutputAmt)
 
 	vm.ctx.Lock.Unlock()

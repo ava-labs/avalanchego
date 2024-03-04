@@ -15,4 +15,19 @@ type Config struct {
 
 	// Time of the Durango network upgrade
 	DurangoTime time.Time
+
+	// Time of the E network upgrade
+	EUpgradeTime time.Time
+}
+
+func (c *Config) IsEUpgradeActivated(timestamp time.Time) bool {
+	return !timestamp.Before(c.EUpgradeTime)
+}
+
+func (c *Config) GetDynamicFeesConfig(timestamp time.Time) DynamicFeesConfig {
+	if !c.IsEUpgradeActivated(timestamp) {
+		return PreEUpgradeDynamicFeesConfig
+	}
+
+	return EUpgradeDynamicFeesConfig
 }

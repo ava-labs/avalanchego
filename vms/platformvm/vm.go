@@ -158,18 +158,15 @@ func (vm *VM) Initialize(
 	validatorManager := pvalidators.NewManager(chainCtx.Log, vm.Config, vm.state, vm.metrics, &vm.clock)
 	vm.State = validatorManager
 	vm.atomicUtxosManager = avax.NewAtomicUTXOManager(chainCtx.SharedMemory, txs.Codec)
-	utxoHandler := utxo.NewHandler(vm.ctx, &vm.clock, vm.fx)
+	utxoVerifier := utxo.NewVerifier(vm.ctx, &vm.clock, vm.fx)
 	vm.uptimeManager = uptime.NewManager(vm.state, &vm.clock)
 	vm.UptimeLockedCalculator.SetCalculator(&vm.bootstrapped, &chainCtx.Lock, vm.uptimeManager)
 
 	vm.txBuilder = txbuilder.New(
 		vm.ctx,
 		&vm.Config,
-		&vm.clock,
-		vm.fx,
 		vm.state,
 		vm.atomicUtxosManager,
-		utxoHandler,
 	)
 
 	txExecutorBackend := &txexecutor.Backend{
@@ -177,7 +174,7 @@ func (vm *VM) Initialize(
 		Ctx:          vm.ctx,
 		Clk:          &vm.clock,
 		Fx:           vm.fx,
-		FlowChecker:  utxoHandler,
+		FlowChecker:  utxoVerifier,
 		Uptimes:      vm.uptimeManager,
 		Rewards:      rewards,
 		Bootstrapped: &vm.bootstrapped,
