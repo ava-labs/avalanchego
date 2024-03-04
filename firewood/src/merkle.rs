@@ -144,7 +144,7 @@ where
             }
         };
 
-        Bincode::serialize(&encoded).map_err(|e| MerkleError::BinarySerdeError(e.to_string()))
+        T::serialize(&encoded).map_err(|e| MerkleError::BinarySerdeError(e.to_string()))
     }
 
     #[allow(dead_code)]
