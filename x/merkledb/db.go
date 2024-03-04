@@ -779,7 +779,7 @@ func (db *merkleDB) NewView(
 		return nil, database.ErrClosed
 	}
 
-	newView, err := newView(db, db, changes)
+	view, err := newView(db, db, changes)
 	if err != nil {
 		return nil, err
 	}
@@ -788,8 +788,8 @@ func (db *merkleDB) NewView(
 	db.lock.Lock()
 	defer db.lock.Unlock()
 
-	db.childViews = append(db.childViews, newView)
-	return newView, nil
+	db.childViews = append(db.childViews, view)
+	return view, nil
 }
 
 func (db *merkleDB) Has(k []byte) (bool, error) {
