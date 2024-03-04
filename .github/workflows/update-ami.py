@@ -8,7 +8,7 @@ import subprocess
 
 # Globals
 amifile = '.github/workflows/amichange.json'
-packerfile = ".github/packer/ubuntu-jammy-x86_64-public-ami.hcl"
+packerfile = ".github/packer/ubuntu-jammy-x86_64-public-ami.pkr.hcl"
 
 # Environment Globals
 product_id = os.getenv('PRODUCT_ID')
