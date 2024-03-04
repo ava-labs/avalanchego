@@ -12,10 +12,12 @@ import (
 var DefaultConfig = Config{
 	MaxValidatorSetStaleness:                    time.Minute,
 	TargetGossipSize:                            20 * units.KiB,
-	PushGossipNumValidators:                     10,
+	PushGossipNumValidators:                     100,
 	PushGossipNumPeers:                          0,
-	PushGossipDiscardedCacheSize:                1024,
-	PushGossipMaxRegossipFrequency:              10 * time.Second,
+	PushRegossipNumValidators:                   10,
+	PushRegossipNumPeers:                        0,
+	PushGossipDiscardedCacheSize:                16384,
+	PushGossipMaxRegossipFrequency:              30 * time.Second,
 	PushGossipFrequency:                         500 * time.Millisecond,
 	PullGossipPollSize:                          1,
 	PullGossipFrequency:                         1500 * time.Millisecond,
@@ -35,11 +37,17 @@ type Config struct {
 	// requests.
 	TargetGossipSize int `json:"target-gossip-size"`
 	// PushGossipNumValidators is the number of validators to push transactions
-	// to per round of gossip.
+	// to in the first round of gossip.
 	PushGossipNumValidators int `json:"push-gossip-num-validators"`
-	// PushGossipNumPeers is the number of peers to push transactions to per
-	// round of gossip.
+	// PushGossipNumPeers is the number of peers to push transactions to in the
+	// first round of gossip.
 	PushGossipNumPeers int `json:"push-gossip-num-peers"`
+	// PushRegossipNumValidators is the number of validators to push
+	// transactions to after the first round of gossip.
+	PushRegossipNumValidators int `json:"push-regossip-num-validators"`
+	// PushRegossipNumPeers is the number of peers to push transactions to after
+	// the first round of gossip.
+	PushRegossipNumPeers int `json:"push-regossip-num-peers"`
 	// PushGossipDiscardedCacheSize is the number of txIDs to cache to avoid
 	// pushing transactions that were recently dropped from the mempool.
 	PushGossipDiscardedCacheSize int `json:"push-gossip-discarded-cache-size"`
