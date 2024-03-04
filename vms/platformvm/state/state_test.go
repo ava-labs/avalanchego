@@ -317,7 +317,7 @@ func TestPersistStakers(t *testing.T) {
 				r.ErrorIs(err, database.ErrNotFound)
 			},
 			checkDiffs: func(r *require.Assertions, s *state, staker *Staker, height uint64) {
-				// pending validators  weight diff and bls diffs are not stored
+				// pending validators weight diff and bls diffs are not stored
 				_, err := s.flatValidatorWeightDiffsDB.Get(marshalDiffKey(staker.SubnetID, height, staker.NodeID))
 				r.ErrorIs(err, database.ErrNotFound)
 
@@ -451,7 +451,7 @@ func TestPersistStakers(t *testing.T) {
 				blsDiffBytes, err := s.flatValidatorPublicKeyDiffsDB.Get(marshalDiffKey(staker.SubnetID, height, staker.NodeID))
 				if staker.SubnetID == constants.PrimaryNetworkID {
 					r.NoError(err)
-					r.Equal(bls.DeserializePublicKey(blsDiffBytes), staker.PublicKey)
+					r.Equal(bls.PublicKeyFromValidUncompressedBytes(blsDiffBytes), staker.PublicKey)
 				} else {
 					r.ErrorIs(err, database.ErrNotFound)
 				}
