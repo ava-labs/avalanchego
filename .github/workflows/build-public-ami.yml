@@ -26,6 +26,8 @@ jobs:
       - name: Install aws cli
         run: |
           sudo apt update
+          sudo apt-cache madison packer
+          sudo apt-cache madison python3-boto3
           sudo apt-get -y install packer python3-boto3
 
       - name: Get the tag

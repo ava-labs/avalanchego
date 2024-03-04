@@ -8,7 +8,7 @@ import subprocess
 
 # Globals
 amifile = '.github/workflows/amichange.json'
-packerfile = ".github/packer/ubuntu-jammy-x86_64-public-ami.json"
+packerfile = ".github/packer/ubuntu-jammy-x86_64-public-ami.hcl"
 
 # Environment Globals
 product_id = os.getenv('PRODUCT_ID')
@@ -19,10 +19,12 @@ skip_create_ami = os.getenv('SKIP_CREATE_AMI', "True")
 
 def packer_build(packerfile):
   print("Running the packer build")
+  subprocess.run('/usr/local/bin/packer init ' + packerfile, shell=True)
   subprocess.run('/usr/local/bin/packer build ' + packerfile, shell=True)
 
 def packer_build_update(packerfile):
   print("Creating packer AMI image for Marketplace")
+  subprocess.run('/usr/local/bin/packer init ' + packerfile, shell=True)
   output = subprocess.run('/usr/local/bin/packer build ' + packerfile, shell=True, stdout=subprocess.PIPE)
   found = re.findall('ami-[a-z0-9]*', str(output.stdout))
 
