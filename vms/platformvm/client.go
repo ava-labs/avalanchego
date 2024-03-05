@@ -116,19 +116,6 @@ type Client interface {
 	GetMinStake(ctx context.Context, subnetID ids.ID, options ...rpc.Option) (uint64, uint64, error)
 	// GetTotalStake returns the total amount (in nAVAX) staked on the network
 	GetTotalStake(ctx context.Context, subnetID ids.ID, options ...rpc.Option) (uint64, error)
-	// GetMaxStakeAmount returns the maximum amount of nAVAX staking to the named
-	// node during the time period.
-	//
-	// Deprecated: The MaxStakeAmount should be calculated using
-	// GetCurrentValidators, and GetPendingValidators.
-	GetMaxStakeAmount(
-		ctx context.Context,
-		subnetID ids.ID,
-		nodeID ids.NodeID,
-		startTime uint64,
-		endTime uint64,
-		options ...rpc.Option,
-	) (uint64, error)
 	// GetRewardUTXOs returns the reward UTXOs for a transaction
 	//
 	// Deprecated: GetRewardUTXOs should be fetched from a dedicated indexer.
@@ -514,17 +501,6 @@ func (c *client) GetTotalStake(ctx context.Context, subnetID ids.ID, options ...
 		amount = res.Weight
 	}
 	return uint64(amount), err
-}
-
-func (c *client) GetMaxStakeAmount(ctx context.Context, subnetID ids.ID, nodeID ids.NodeID, startTime, endTime uint64, options ...rpc.Option) (uint64, error) {
-	res := &GetMaxStakeAmountReply{}
-	err := c.requester.SendRequest(ctx, "platform.getMaxStakeAmount", &GetMaxStakeAmountArgs{
-		SubnetID:  subnetID,
-		NodeID:    nodeID,
-		StartTime: json.Uint64(startTime),
-		EndTime:   json.Uint64(endTime),
-	}, res, options...)
-	return uint64(res.Amount), err
 }
 
 func (c *client) GetRewardUTXOs(ctx context.Context, args *api.GetTxArgs, options ...rpc.Option) ([][]byte, error) {
