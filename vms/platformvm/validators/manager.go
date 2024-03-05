@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/cache"
-	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -247,7 +246,11 @@ func (m *manager) makePrimaryNetworkValidatorSet(
 		return nil, 0, err
 	}
 	if currentHeight < targetHeight {
-		return nil, 0, database.ErrNotFound
+		return nil, 0, fmt.Errorf("failed to fetch validator set (requested P-Chain Height: %d, SubnetID: %s, current P-chain Height: %d)",
+			targetHeight,
+			constants.PrimaryNetworkID,
+			currentHeight,
+		)
 	}
 
 	// Rebuild primary network validators at [targetHeight]
@@ -295,7 +298,11 @@ func (m *manager) makeSubnetValidatorSet(
 		return nil, 0, err
 	}
 	if currentHeight < targetHeight {
-		return nil, 0, database.ErrNotFound
+		return nil, 0, fmt.Errorf("failed to fetch validator set (requested P-Chain Height: %d, SubnetID: %s, current P-chain Height: %d)",
+			targetHeight,
+			subnetID,
+			currentHeight,
+		)
 	}
 
 	// Rebuild subnet validators at [targetHeight]
