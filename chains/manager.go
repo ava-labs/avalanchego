@@ -847,7 +847,7 @@ func (m *manager) createAvalancheChain(
 	}
 
 	if m.TracingEnabled {
-		snowmanEngine = smeng.TraceEngine(snowmanEngine, m.Tracer)
+		snowmanEngine = common.TraceEngine(snowmanEngine, m.Tracer)
 	}
 
 	// create bootstrap gear
@@ -1194,7 +1194,7 @@ func (m *manager) createSnowmanChain(
 	}
 
 	if m.TracingEnabled {
-		engine = smeng.TraceEngine(engine, m.Tracer)
+		engine = common.TraceEngine(engine, m.Tracer)
 	}
 
 	// create bootstrap gear
