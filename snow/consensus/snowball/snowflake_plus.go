@@ -15,38 +15,38 @@ var _ Consensus = (*snowflakePlus)(nil)
 // snowflakePlus implements Consensus using Snowflake with multiple
 // alpha thresholds and corresponding beta values.
 type snowflakePlus struct {
-	// alpha1 is the threshold of votes required to update the preference
+	// alphaPreference is the threshold of votes required to update the preference
 	// of the consensus instance.
-	alpha1 int
+	alphaPreference int
 
-	// alpha2Cutoff is the lowest alpha threshold that can be used to find
+	// minAlphaConfidence is the lowest alpha threshold that can be used to find
 	// the termination point.
-	alpha2Cutoff int
+	minAlphaConfidence int
 
 	// betas are the number of required successful polls corresponding to
 	// each alpha threshold required to finalize.
 	// The ith element of betas is the number of consecutive polls that
-	// received >= alpha2Cutoff + i votes required to finalize.
+	// received >= minAlphaConfidence + i votes required to finalize.
 	betas []int
 
 	// confidence tracks the number of successful polls in a row for each
 	// corresponding alpha threshold.
 	// The ith element of confidence is the number of consecutive polls
-	// that received >= alpha2Cutoff + i votes.
+	// that received >= minAlphaConfidence + i votes.
 	confidence []int
 
 	finalized bool
 
-	choice ids.ID
+	preference ids.ID
 }
 
-func newSnowflakePlus(alpha1 int, alpha2Cutoff int, betas []int, choice ids.ID) *snowflakePlus {
+func newSnowflakePlus(alphaPreference int, minAlphaConfidence int, betas []int, choice ids.ID) *snowflakePlus {
 	return &snowflakePlus{
-		alpha1:       alpha1,
-		alpha2Cutoff: alpha2Cutoff,
-		betas:        betas,
-		confidence:   make([]int, len(betas)),
-		choice:       choice,
+		alphaPreference:    alphaPreference,
+		minAlphaConfidence: minAlphaConfidence,
+		betas:              betas,
+		confidence:         make([]int, len(betas)),
+		preference:         choice,
 	}
 }
 
@@ -55,7 +55,7 @@ func (*snowflakePlus) Add(ids.ID) {}
 
 // Returns the currently preferred choice to be finalized
 func (s *snowflakePlus) Preference() ids.ID {
-	return s.choice
+	return s.preference
 }
 
 // RecordPoll records the results of a network poll. Assumes all choices
@@ -70,35 +70,30 @@ func (s *snowflakePlus) Preference() ids.ID {
 func (s *snowflakePlus) RecordPoll(votes bag.Bag[ids.ID]) bool {
 	choice, count := votes.Mode()
 
-	// If a new choice received an alpha1 threshold of votes,
+	// If a new choice received an alphaPreference threshold of votes,
 	// update my preference and zero out my confidence counters.
-	if choice != s.choice && count >= s.alpha1 {
-		s.choice = choice
-		s.RecordUnsuccessfulPoll()
+	if choice != s.preference && count >= s.alphaPreference {
+		s.preference = choice
+		clear(s.confidence)
 	}
 
-	// If my choice received an alpha2 threshold, increment the
-	// corresponding confidence counter. Otherwise, zero out
-	// the confidence counter.
-	for i := 0; i < len(s.confidence); i++ {
-		if count >= s.alpha2Cutoff+i {
-			s.confidence[i]++
-			if s.confidence[i] >= s.betas[i] {
-				s.finalized = true
-			}
-		} else {
-			s.confidence[i] = 0
-		}
+	// Increment the confidence counter for each alpha threshold in [minAlphaConfidence, count]
+	for i := 0; i <= count-s.minAlphaConfidence; i++ {
+		s.confidence[i]++
+		s.finalized = s.finalized || s.confidence[i] >= s.betas[i]
 	}
-	return s.finalized
+	// Reset the confidence counter for each alpha threshold in (count, len(confidence))
+	for i := count - s.minAlphaConfidence + 1; i < len(s.confidence); i++ {
+		s.confidence[i] = 0
+	}
+
+	return count >= s.minAlphaConfidence
 }
 
 // RecordUnsuccessfulPoll resets the snowflake counters of this consensus
 // instance
 func (s *snowflakePlus) RecordUnsuccessfulPoll() {
-	for i := 0; i < len(s.confidence); i++ {
-		s.confidence[i] = 0
-	}
+	clear(s.confidence)
 }
 
 // Return whether a choice has been finalized
@@ -109,7 +104,7 @@ func (s *snowflakePlus) Finalized() bool {
 func (s *snowflakePlus) String() string {
 	return fmt.Sprintf(
 		"SFP(Choice = %s, Confidence = %v, Finalized = %v)",
-		s.choice,
+		s.preference,
 		s.confidence,
 		s.finalized,
 	)
