@@ -51,7 +51,7 @@ func newSnowflakePlus(alpha1 int, alpha2Cutoff int, betas []int, choice ids.ID) 
 }
 
 // Add is a no-op for snowflakePlus because it has no notion of beta rogue.
-func (s *snowflakePlus) Add(ids.ID) {}
+func (*snowflakePlus) Add(ids.ID) {}
 
 // Returns the currently preferred choice to be finalized
 func (s *snowflakePlus) Preference() ids.ID {
