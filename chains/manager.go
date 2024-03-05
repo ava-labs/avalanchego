@@ -842,7 +842,7 @@ func (m *manager) createAvalancheChain(
 		Consensus:           snowmanConsensus,
 	}
 	var snowmanEngine common.Engine
-	snowmanEngine, err = smeng.NewTransitive(snowmanEngineConfig)
+	snowmanEngine, err = smeng.New(snowmanEngineConfig)
 	if err != nil {
 		return nil, fmt.Errorf("error initializing snowman engine: %w", err)
 	}
@@ -1190,7 +1190,7 @@ func (m *manager) createSnowmanChain(
 		PartialSync:         m.PartialSyncPrimaryNetwork && ctx.ChainID == constants.PlatformChainID,
 	}
 	var engine common.Engine
-	engine, err = smeng.NewTransitive(engineConfig)
+	engine, err = smeng.New(engineConfig)
 	if err != nil {
 		return nil, fmt.Errorf("error initializing snowman engine: %w", err)
 	}

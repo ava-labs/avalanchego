@@ -102,7 +102,7 @@ type Transitive struct {
 	errs wrappers.Errs
 }
 
-func NewTransitive(config Config) (*Transitive, error) {
+func New(config Config) (*Transitive, error) {
 	config.Ctx.Log.Info("initializing consensus engine")
 
 	nonVerifiedCache, err := metercacher.New[ids.ID, snowman.Block](
