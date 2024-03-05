@@ -663,7 +663,7 @@ func makeTestUTXOs(utxosKey *secp256k1.PrivateKey) []*avax.UTXO {
 
 	utxosAddr := utxosKey.Address()
 	return []*avax.UTXO{
-		{ // a small UTXO first, which  should not be enough to pay fees
+		{ // a small UTXO first, which should not be enough to pay fees
 			UTXOID: avax.UTXOID{
 				TxID:        ids.Empty.Prefix(utxosOffset),
 				OutputIndex: uint32(utxosOffset),
