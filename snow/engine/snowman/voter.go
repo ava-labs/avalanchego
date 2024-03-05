@@ -71,10 +71,10 @@ func (v *voter) Update(ctx context.Context) {
 
 	for _, result := range results {
 		result := result
-		v.t.Ctx.Log.Debug("finishing poll",
+		v.t.ctx.Log.Debug("finishing poll",
 			zap.Stringer("result", &result),
 		)
-		if err := v.t.Consensus.RecordPoll(ctx, result); err != nil {
+		if err := v.t.consensus.RecordPoll(ctx, result); err != nil {
 			v.t.errs.Add(err)
 		}
 	}
@@ -83,17 +83,17 @@ func (v *voter) Update(ctx context.Context) {
 		return
 	}
 
-	if err := v.t.VM.SetPreference(ctx, v.t.Consensus.Preference()); err != nil {
+	if err := v.t.vm.SetPreference(ctx, v.t.consensus.Preference()); err != nil {
 		v.t.errs.Add(err)
 		return
 	}
 
-	if v.t.Consensus.NumProcessing() == 0 {
-		v.t.Ctx.Log.Debug("Snowman engine can quiesce")
+	if v.t.consensus.NumProcessing() == 0 {
+		v.t.ctx.Log.Debug("Snowman engine can quiesce")
 		return
 	}
 
-	v.t.Ctx.Log.Debug("Snowman engine can't quiesce")
+	v.t.ctx.Log.Debug("Snowman engine can't quiesce")
 	v.t.repoll(ctx)
 }
 
@@ -110,7 +110,7 @@ func (v *voter) getProcessingAncestor(ctx context.Context, initialVote ids.ID) (
 		blk, err := v.t.GetBlock(ctx, bubbledVote)
 		// If we cannot retrieve the block, drop [vote]
 		if err != nil {
-			v.t.Ctx.Log.Debug("dropping vote",
+			v.t.ctx.Log.Debug("dropping vote",
 				zap.String("reason", "ancestor couldn't be fetched"),
 				zap.Stringer("initialVoteID", initialVote),
 				zap.Stringer("bubbledVoteID", bubbledVote),
@@ -120,8 +120,8 @@ func (v *voter) getProcessingAncestor(ctx context.Context, initialVote ids.ID) (
 			return ids.Empty, false
 		}
 
-		if v.t.Consensus.Decided(blk) {
-			v.t.Ctx.Log.Debug("dropping vote",
+		if v.t.consensus.Decided(blk) {
+			v.t.ctx.Log.Debug("dropping vote",
 				zap.String("reason", "bubbled vote already decided"),
 				zap.Stringer("initialVoteID", initialVote),
 				zap.Stringer("bubbledVoteID", bubbledVote),
@@ -132,8 +132,8 @@ func (v *voter) getProcessingAncestor(ctx context.Context, initialVote ids.ID) (
 			return ids.Empty, false
 		}
 
-		if v.t.Consensus.Processing(bubbledVote) {
-			v.t.Ctx.Log.Verbo("applying vote",
+		if v.t.consensus.Processing(bubbledVote) {
+			v.t.ctx.Log.Verbo("applying vote",
 				zap.Stringer("initialVoteID", initialVote),
 				zap.Stringer("bubbledVoteID", bubbledVote),
 				zap.Uint64("height", blk.Height()),
