@@ -37,7 +37,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	avajson "github.com/ava-labs/avalanchego/utils/json"
@@ -62,8 +61,6 @@ var (
 	errPrimaryNetworkIsNotASubnet = errors.New("the primary network isn't a subnet")
 	errNoAddresses                = errors.New("no addresses provided")
 	errMissingBlockchainID        = errors.New("argument 'blockchainID' not given")
-	errStartAfterEndTime          = errors.New("start time must be before end time")
-	errStartTimeInThePast         = errors.New("start time in the past")
 )
 
 // Service defines the API calls that can be made to the platform chain
@@ -1400,7 +1397,7 @@ func (s *Service) GetBlockchains(_ *http.Request, _ *struct{}, response *GetBloc
 	return nil
 }
 
-func (s *Service) IssueTx(req *http.Request, args *api.FormattedTx, response *api.JSONTxID) error {
+func (s *Service) IssueTx(_ *http.Request, args *api.FormattedTx, response *api.JSONTxID) error {
 	s.vm.ctx.Log.Debug("API called",
 		zap.String("service", "platform"),
 		zap.String("method", "issueTx"),
@@ -1415,7 +1412,7 @@ func (s *Service) IssueTx(req *http.Request, args *api.FormattedTx, response *ap
 		return fmt.Errorf("couldn't parse tx: %w", err)
 	}
 
-	if err := s.vm.issueTx(req.Context(), tx); err != nil {
+	if err := s.vm.issueTxFromRPC(tx); err != nil {
 		return fmt.Errorf("couldn't issue tx: %w", err)
 	}
 
@@ -1712,62 +1709,6 @@ func (s *Service) GetTotalStake(_ *http.Request, args *GetTotalStakeArgs, reply 
 	return nil
 }
 
-// GetMaxStakeAmountArgs is the request for calling GetMaxStakeAmount.
-type GetMaxStakeAmountArgs struct {
-	SubnetID  ids.ID         `json:"subnetID"`
-	NodeID    ids.NodeID     `json:"nodeID"`
-	StartTime avajson.Uint64 `json:"startTime"`
-	EndTime   avajson.Uint64 `json:"endTime"`
-}
-
-// GetMaxStakeAmountReply is the response from calling GetMaxStakeAmount.
-type GetMaxStakeAmountReply struct {
-	Amount avajson.Uint64 `json:"amount"`
-}
-
-// GetMaxStakeAmount returns the maximum amount of nAVAX staking to the named
-// node during the time period.
-func (s *Service) GetMaxStakeAmount(_ *http.Request, args *GetMaxStakeAmountArgs, reply *GetMaxStakeAmountReply) error {
-	s.vm.ctx.Log.Debug("deprecated API called",
-		zap.String("service", "platform"),
-		zap.String("method", "getMaxStakeAmount"),
-	)
-
-	startTime := time.Unix(int64(args.StartTime), 0)
-	endTime := time.Unix(int64(args.EndTime), 0)
-
-	if startTime.After(endTime) {
-		return errStartAfterEndTime
-	}
-
-	s.vm.ctx.Lock.Lock()
-	defer s.vm.ctx.Lock.Unlock()
-
-	now := s.vm.state.GetTimestamp()
-	if startTime.Before(now) {
-		return errStartTimeInThePast
-	}
-
-	staker, err := executor.GetValidator(s.vm.state, args.SubnetID, args.NodeID)
-	if err == database.ErrNotFound {
-		return nil
-	}
-	if err != nil {
-		return err
-	}
-
-	if startTime.After(staker.EndTime) {
-		return nil
-	}
-	if endTime.Before(staker.StartTime) {
-		return nil
-	}
-
-	maxStakeAmount, err := executor.GetMaxWeight(s.vm.state, staker, startTime, endTime)
-	reply.Amount = avajson.Uint64(maxStakeAmount)
-	return err
-}
-
 // GetRewardUTXOsReply defines the GetRewardUTXOs replies returned from the API
 type GetRewardUTXOsReply struct {
 	// Number of UTXOs returned
@@ -1851,7 +1792,7 @@ func (v *GetValidatorsAtReply) MarshalJSON() ([]byte, error) {
 		}
 
 		if vdr.PublicKey != nil {
-			pk, err := formatting.Encode(formatting.HexNC, bls.PublicKeyToBytes(vdr.PublicKey))
+			pk, err := formatting.Encode(formatting.HexNC, bls.PublicKeyToCompressedBytes(vdr.PublicKey))
 			if err != nil {
 				return nil, err
 			}
@@ -1886,7 +1827,7 @@ func (v *GetValidatorsAtReply) UnmarshalJSON(b []byte) error {
 			if err != nil {
 				return err
 			}
-			vdr.PublicKey, err = bls.PublicKeyFromBytes(pkBytes)
+			vdr.PublicKey, err = bls.PublicKeyFromCompressedBytes(pkBytes)
 			if err != nil {
 				return err
 			}
