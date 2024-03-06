@@ -34,7 +34,7 @@ var (
 		TestNilSliceSerialization,
 		TestEmptySliceSerialization,
 		TestSliceWithEmptySerialization,
-		TestSliceWithEmptySerializationOutOfMemory,
+		TestSliceWithEmptySerializationError,
 		TestSliceTooLarge,
 		TestNegativeNumbers,
 		TestTooLargeUnmarshal,
@@ -721,7 +721,7 @@ func TestEmptySliceSerialization(codec GeneralCodec, t testing.TB) {
 	require.Equal(val, valUnmarshaled)
 }
 
-// Test marshaling slice that is not nil and not empty
+// Test marshaling empty slice of zero length structs
 func TestSliceWithEmptySerialization(codec GeneralCodec, t testing.TB) {
 	require := require.New(t)
 
@@ -735,9 +735,9 @@ func TestSliceWithEmptySerialization(codec GeneralCodec, t testing.TB) {
 	require.NoError(manager.RegisterCodec(0, codec))
 
 	val := &nestedSliceStruct{
-		Arr: make([]emptyStruct, 1000),
+		Arr: make([]emptyStruct, 0),
 	}
-	expected := []byte{0x00, 0x00, 0x00, 0x00, 0x03, 0xE8} // codec version (0x00, 0x00) then 1000 for numElts
+	expected := []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00} // codec version (0x00, 0x00) then (0x00, 0x00, 0x00, 0x00) for numElts
 	result, err := manager.Marshal(0, val)
 	require.NoError(err)
 	require.Equal(expected, result)
@@ -750,10 +750,10 @@ func TestSliceWithEmptySerialization(codec GeneralCodec, t testing.TB) {
 	version, err := manager.Unmarshal(expected, &unmarshaled)
 	require.NoError(err)
 	require.Zero(version)
-	require.Len(unmarshaled.Arr, 1000)
+	require.Empty(unmarshaled.Arr)
 }
 
-func TestSliceWithEmptySerializationOutOfMemory(codec GeneralCodec, t testing.TB) {
+func TestSliceWithEmptySerializationError(codec GeneralCodec, t testing.TB) {
 	require := require.New(t)
 
 	type emptyStruct struct{}
@@ -766,14 +766,19 @@ func TestSliceWithEmptySerializationOutOfMemory(codec GeneralCodec, t testing.TB
 	require.NoError(manager.RegisterCodec(0, codec))
 
 	val := &nestedSliceStruct{
-		Arr: make([]emptyStruct, math.MaxInt32),
+		Arr: make([]emptyStruct, 1),
 	}
 	_, err := manager.Marshal(0, val)
-	require.ErrorIs(err, ErrMaxSliceLenExceeded)
+	require.ErrorIs(err, ErrMarshalZeroLength)
 
-	bytesLen, err := manager.Size(0, val)
-	require.NoError(err)
-	require.Equal(6, bytesLen) // 2 byte codec version + 4 byte length prefix
+	_, err = manager.Size(0, val)
+	require.ErrorIs(err, ErrMarshalZeroLength)
+
+	b := []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x01} // codec version (0x00, 0x00) then (0x00, 0x00, 0x00, 0x01) for numElts
+
+	unmarshaled := nestedSliceStruct{}
+	_, err = manager.Unmarshal(b, &unmarshaled)
+	require.ErrorIs(err, ErrUnmarshalZeroLength)
 }
 
 func TestSliceTooLarge(codec GeneralCodec, t testing.TB) {
