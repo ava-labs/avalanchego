@@ -87,7 +87,7 @@ func setup(t *testing.T, engCfg Config) (ids.NodeID, validators.Manager, *common
 		}
 	}
 
-	te, err := newTransitive(engCfg)
+	te, err := New(engCfg)
 	require.NoError(err)
 
 	require.NoError(te.Start(context.Background(), 0))
@@ -377,7 +377,7 @@ func TestEngineMultipleQuery(t *testing.T) {
 		return gBlk, nil
 	}
 
-	te, err := newTransitive(engCfg)
+	te, err := New(engCfg)
 	require.NoError(err)
 
 	require.NoError(te.Start(context.Background(), 0))
@@ -796,7 +796,7 @@ func TestVoteCanceling(t *testing.T) {
 		return gBlk, nil
 	}
 
-	te, err := newTransitive(engCfg)
+	te, err := New(engCfg)
 	require.NoError(err)
 
 	require.NoError(te.Start(context.Background(), 0))
@@ -877,7 +877,7 @@ func TestEngineNoQuery(t *testing.T) {
 
 	engCfg.VM = vm
 
-	te, err := newTransitive(engCfg)
+	te, err := New(engCfg)
 	require.NoError(err)
 
 	require.NoError(te.Start(context.Background(), 0))
@@ -930,7 +930,7 @@ func TestEngineNoRepollQuery(t *testing.T) {
 
 	engCfg.VM = vm
 
-	te, err := newTransitive(engCfg)
+	te, err := New(engCfg)
 	require.NoError(err)
 
 	require.NoError(te.Start(context.Background(), 0))
@@ -1630,7 +1630,7 @@ func TestEngineAggressivePolling(t *testing.T) {
 		return gBlk, nil
 	}
 
-	te, err := newTransitive(engCfg)
+	te, err := New(engCfg)
 	require.NoError(err)
 
 	require.NoError(te.Start(context.Background(), 0))
@@ -1732,7 +1732,7 @@ func TestEngineDoubleChit(t *testing.T) {
 		return gBlk, nil
 	}
 
-	te, err := newTransitive(engCfg)
+	te, err := New(engCfg)
 	require.NoError(err)
 
 	require.NoError(te.Start(context.Background(), 0))
@@ -1831,7 +1831,7 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 		return gBlk, nil
 	}
 
-	te, err := newTransitive(engCfg)
+	te, err := New(engCfg)
 	require.NoError(err)
 
 	require.NoError(te.Start(context.Background(), 0))
@@ -2861,7 +2861,7 @@ func TestEngineApplyAcceptedFrontierInQueryFailed(t *testing.T) {
 		return gBlk, nil
 	}
 
-	te, err := newTransitive(engCfg)
+	te, err := New(engCfg)
 	require.NoError(err)
 	require.NoError(te.Start(context.Background(), 0))
 
@@ -2969,7 +2969,7 @@ func TestEngineRepollsMisconfiguredSubnet(t *testing.T) {
 		return gBlk, nil
 	}
 
-	te, err := newTransitive(engCfg)
+	te, err := New(engCfg)
 	require.NoError(err)
 	require.NoError(te.Start(context.Background(), 0))
 
