@@ -53,8 +53,7 @@ const (
 	chainUpgradeFileName = "upgrade"
 	subnetConfigFileExt  = ".json"
 
-	keystoreDeprecationMsg           = "keystore API is deprecated"
-	peerListPushGossipDeprecationMsg = "push-based peer list gossip is deprecated"
+	keystoreDeprecationMsg = "keystore API is deprecated"
 )
 
 var (
@@ -63,11 +62,6 @@ var (
 	commitThresholdDeprecationMsg = fmt.Sprintf("use --%s instead", SnowCommitThresholdKey)
 	deprecatedKeys                = map[string]string{
 		KeystoreAPIEnabledKey: keystoreDeprecationMsg,
-
-		NetworkPeerListValidatorGossipSizeKey:    peerListPushGossipDeprecationMsg,
-		NetworkPeerListNonValidatorGossipSizeKey: peerListPushGossipDeprecationMsg,
-		NetworkPeerListPeersGossipSizeKey:        peerListPushGossipDeprecationMsg,
-		NetworkPeerListGossipFreqKey:             peerListPushGossipDeprecationMsg,
 
 		SnowRogueCommitThresholdKey:    commitThresholdDeprecationMsg,
 		SnowVirtuousCommitThresholdKey: commitThresholdDeprecationMsg,
@@ -367,13 +361,9 @@ func getNetworkConfig(
 		},
 
 		PeerListGossipConfig: network.PeerListGossipConfig{
-			PeerListNumValidatorIPs:        v.GetUint32(NetworkPeerListNumValidatorIPsKey),
-			PeerListValidatorGossipSize:    v.GetUint32(NetworkPeerListValidatorGossipSizeKey),
-			PeerListNonValidatorGossipSize: v.GetUint32(NetworkPeerListNonValidatorGossipSizeKey),
-			PeerListPeersGossipSize:        v.GetUint32(NetworkPeerListPeersGossipSizeKey),
-			PeerListGossipFreq:             v.GetDuration(NetworkPeerListGossipFreqKey),
-			PeerListPullGossipFreq:         v.GetDuration(NetworkPeerListPullGossipFreqKey),
-			PeerListBloomResetFreq:         v.GetDuration(NetworkPeerListBloomResetFreqKey),
+			PeerListNumValidatorIPs: v.GetUint32(NetworkPeerListNumValidatorIPsKey),
+			PeerListPullGossipFreq:  v.GetDuration(NetworkPeerListPullGossipFreqKey),
+			PeerListBloomResetFreq:  v.GetDuration(NetworkPeerListBloomResetFreqKey),
 		},
 
 		DelayConfig: network.DelayConfig{
@@ -407,8 +397,6 @@ func getNetworkConfig(
 		return network.Config{}, fmt.Errorf("%s must be in [0,1]", NetworkHealthMaxPortionSendQueueFillKey)
 	case config.DialerConfig.ConnectionTimeout < 0:
 		return network.Config{}, fmt.Errorf("%q must be >= 0", NetworkOutboundConnectionTimeoutKey)
-	case config.PeerListGossipFreq < 0:
-		return network.Config{}, fmt.Errorf("%s must be >= 0", NetworkPeerListGossipFreqKey)
 	case config.PeerListPullGossipFreq < 0:
 		return network.Config{}, fmt.Errorf("%s must be >= 0", NetworkPeerListPullGossipFreqKey)
 	case config.PeerListBloomResetFreq < 0:

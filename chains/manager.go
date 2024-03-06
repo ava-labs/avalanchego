@@ -821,13 +821,14 @@ func (m *manager) createAvalancheChain(
 		Params:              consensusParams,
 		Consensus:           snowmanConsensus,
 	}
-	snowmanEngine, err := smeng.New(snowmanEngineConfig)
+	var snowmanEngine common.Engine
+	snowmanEngine, err = smeng.New(snowmanEngineConfig)
 	if err != nil {
 		return nil, fmt.Errorf("error initializing snowman engine: %w", err)
 	}
 
 	if m.TracingEnabled {
-		snowmanEngine = smeng.TraceEngine(snowmanEngine, m.Tracer)
+		snowmanEngine = common.TraceEngine(snowmanEngine, m.Tracer)
 	}
 
 	// create bootstrap gear
@@ -1158,13 +1159,14 @@ func (m *manager) createSnowmanChain(
 		Consensus:           consensus,
 		PartialSync:         m.PartialSyncPrimaryNetwork && ctx.ChainID == constants.PlatformChainID,
 	}
-	engine, err := smeng.New(engineConfig)
+	var engine common.Engine
+	engine, err = smeng.New(engineConfig)
 	if err != nil {
 		return nil, fmt.Errorf("error initializing snowman engine: %w", err)
 	}
 
 	if m.TracingEnabled {
-		engine = smeng.TraceEngine(engine, m.Tracer)
+		engine = common.TraceEngine(engine, m.Tracer)
 	}
 
 	// create bootstrap gear
