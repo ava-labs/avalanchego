@@ -491,7 +491,8 @@ func (c *genericCodec) marshal(
 		allKeyBytes := slices.Clone(p.Bytes[startOffset:p.Offset])
 		p.Offset = startOffset
 		for _, key := range sortedKeys {
-			startOffset := p.Offset
+			keyStartOffset := p.Offset
+
 			// pack key
 			startIndex := key.startIndex - startOffset
 			endIndex := key.endIndex - startOffset
@@ -505,7 +506,7 @@ func (c *genericCodec) marshal(
 			if err := c.marshal(value.MapIndex(key.key), p, typeStack); err != nil {
 				return err
 			}
-			if startOffset == p.Offset {
+			if keyStartOffset == p.Offset {
 				return fmt.Errorf("couldn't marshal map with zero length entries: %w", codec.ErrMarshalZeroLength)
 			}
 		}
