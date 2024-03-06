@@ -1454,12 +1454,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	require.NoError(err)
 
 	engineConfig := smeng.Config{
-		Ctx:           bootstrapConfig.Ctx,
-		AllGetsServer: snowGetHandler,
-		VM:            bootstrapConfig.VM,
-		Sender:        bootstrapConfig.Sender,
-		Validators:    beacons,
-		Params: snowball.Parameters{
+		Parameters: snowball.Parameters{
 			K:                     1,
 			AlphaPreference:       1,
 			AlphaConfidence:       1,
@@ -1470,9 +1465,17 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 			MaxOutstandingItems:   1,
 			MaxItemProcessingTime: 1,
 		},
-		Consensus: &smcon.Topological{},
 	}
-	engine, err := smeng.New(engineConfig)
+	engine, err := smeng.New(
+		engineConfig,
+		bootstrapConfig.Ctx,
+		snowGetHandler,
+		bootstrapConfig.VM,
+		bootstrapConfig.Sender,
+		beacons,
+		nil,
+		&smcon.Topological{},
+	)
 	require.NoError(err)
 
 	bootstrapper, err := bootstrap.New(

@@ -832,17 +832,19 @@ func (m *manager) createAvalancheChain(
 	// Create engine, bootstrapper and state-syncer in this order,
 	// to make sure start callbacks are duly initialized
 	snowmanEngineConfig := smeng.Config{
-		Ctx:                 ctx,
-		AllGetsServer:       snowGetHandler,
-		VM:                  vmWrappingProposerVM,
-		Sender:              snowmanMessageSender,
-		Validators:          vdrs,
-		ConnectedValidators: connectedValidators,
-		Params:              consensusParams,
-		Consensus:           snowmanConsensus,
+		Parameters: consensusParams,
 	}
 	var snowmanEngine common.Engine
-	snowmanEngine, err = smeng.New(snowmanEngineConfig)
+	snowmanEngine, err = smeng.New(
+		snowmanEngineConfig,
+		ctx,
+		snowGetHandler,
+		vmWrappingProposerVM,
+		snowmanMessageSender,
+		vdrs,
+		connectedValidators,
+		snowmanConsensus,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("error initializing snowman engine: %w", err)
 	}
@@ -1179,18 +1181,20 @@ func (m *manager) createSnowmanChain(
 	// Create engine, bootstrapper and state-syncer in this order,
 	// to make sure start callbacks are duly initialized
 	engineConfig := smeng.Config{
-		Ctx:                 ctx,
-		AllGetsServer:       snowGetHandler,
-		VM:                  vm,
-		Sender:              messageSender,
-		Validators:          vdrs,
-		ConnectedValidators: connectedValidators,
-		Params:              consensusParams,
-		Consensus:           consensus,
-		PartialSync:         m.PartialSyncPrimaryNetwork && ctx.ChainID == constants.PlatformChainID,
+		Parameters:  consensusParams,
+		PartialSync: m.PartialSyncPrimaryNetwork && ctx.ChainID == constants.PlatformChainID,
 	}
 	var engine common.Engine
-	engine, err = smeng.New(engineConfig)
+	engine, err = smeng.New(
+		engineConfig,
+		ctx,
+		snowGetHandler,
+		vm,
+		messageSender,
+		vdrs,
+		connectedValidators,
+		consensus,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("error initializing snowman engine: %w", err)
 	}
