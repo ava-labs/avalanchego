@@ -128,10 +128,6 @@ func addNodeFlags(fs *pflag.FlagSet) {
 
 	// Peer List Gossip
 	fs.Uint(NetworkPeerListNumValidatorIPsKey, constants.DefaultNetworkPeerListNumValidatorIPs, "Number of validator IPs to gossip to other nodes")
-	fs.Uint(NetworkPeerListValidatorGossipSizeKey, constants.DefaultNetworkPeerListValidatorGossipSize, "Number of validators that the node will gossip peer list to")
-	fs.Uint(NetworkPeerListNonValidatorGossipSizeKey, constants.DefaultNetworkPeerListNonValidatorGossipSize, "Number of non-validators that the node will gossip peer list to")
-	fs.Uint(NetworkPeerListPeersGossipSizeKey, constants.DefaultNetworkPeerListPeersGossipSize, "Number of total peers (including non-validators and validators) that the node will gossip peer list to")
-	fs.Duration(NetworkPeerListGossipFreqKey, constants.DefaultNetworkPeerListGossipFreq, "Frequency to gossip peers to other nodes")
 	fs.Duration(NetworkPeerListPullGossipFreqKey, constants.DefaultNetworkPeerListPullGossipFreq, "Frequency to request peers from other nodes")
 	fs.Duration(NetworkPeerListBloomResetFreqKey, constants.DefaultNetworkPeerListBloomResetFreq, "Frequency to recalculate the bloom filter used to request new peers from other nodes")
 
