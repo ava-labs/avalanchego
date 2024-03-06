@@ -44,10 +44,6 @@ const (
 
 var _ common.Engine = (*Transitive)(nil)
 
-func New(config Config) (common.Engine, error) {
-	return newTransitive(config)
-}
-
 func cachedBlockSize(_ ids.ID, blk snowman.Block) int {
 	return ids.IDLen + len(blk.Bytes()) + constants.PointerOverhead
 }
@@ -106,7 +102,7 @@ type Transitive struct {
 	errs wrappers.Errs
 }
 
-func newTransitive(config Config) (*Transitive, error) {
+func New(config Config) (*Transitive, error) {
 	config.Ctx.Log.Info("initializing consensus engine")
 
 	nonVerifiedCache, err := metercacher.New[ids.ID, snowman.Block](
