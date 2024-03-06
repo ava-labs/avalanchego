@@ -850,24 +850,20 @@ func TestTooLargeUnmarshal(codec GeneralCodec, t testing.TB) {
 }
 
 type outerInterface interface {
-	ToInt() uint64
+	ToInt() int
 }
 
 type outer struct {
 	Interface outerInterface `serialize:"true"`
 }
 
-type innerInterface struct {
-	Val uint64 `serialize:"true"`
-}
+type innerInterface struct{}
 
-func (*innerInterface) ToInt() uint64 {
+func (*innerInterface) ToInt() int {
 	return 0
 }
 
-type innerNoInterface struct {
-	Val uint64 `serialize:"true"`
-}
+type innerNoInterface struct{}
 
 // Ensure deserializing structs into the wrong interface errors gracefully
 func TestUnmarshalInvalidInterface(codec GeneralCodec, t testing.TB) {
@@ -879,14 +875,14 @@ func TestUnmarshalInvalidInterface(codec GeneralCodec, t testing.TB) {
 	require.NoError(manager.RegisterCodec(0, codec))
 
 	{
-		bytes := []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
+		bytes := []byte{0, 0, 0, 0, 0, 0}
 		s := outer{}
 		version, err := manager.Unmarshal(bytes, &s)
 		require.NoError(err)
 		require.Zero(version)
 	}
 	{
-		bytes := []byte{0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0}
+		bytes := []byte{0, 0, 0, 0, 0, 1}
 		s := outer{}
 		_, err := manager.Unmarshal(bytes, &s)
 		require.ErrorIs(err, ErrDoesNotImplementInterface)

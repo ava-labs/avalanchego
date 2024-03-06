@@ -159,6 +159,10 @@ func (c *genericCodec) size(
 			return 0, false, err
 		}
 
+		if size == 0 {
+			return 0, false, fmt.Errorf("can't marshal slice of zero length values: %w", codec.ErrMarshalZeroLength)
+		}
+
 		// For fixed-size types we manually calculate lengths rather than
 		// processing each element separately to improve performance.
 		if constSize {
@@ -177,7 +181,7 @@ func (c *genericCodec) size(
 	case reflect.Array:
 		numElts := value.Len()
 		if numElts == 0 {
-			return 0, false, fmt.Errorf("can't marshal array: %w", codec.ErrMarshalZeroLength)
+			return 0, true, nil
 		}
 
 		size, constSize, err := c.size(value.Index(0), typeStack)
@@ -204,9 +208,6 @@ func (c *genericCodec) size(
 		serializedFields, err := c.fielder.GetSerializedFields(value.Type())
 		if err != nil {
 			return 0, false, err
-		}
-		if len(serializedFields) == 0 {
-			return 0, false, fmt.Errorf("can't marshal struct: %w", codec.ErrMarshalZeroLength)
 		}
 
 		var (
@@ -236,6 +237,10 @@ func (c *genericCodec) size(
 		valueSize, valueConstSize, err := c.size(iter.Value(), typeStack)
 		if err != nil {
 			return 0, false, err
+		}
+
+		if keySize == 0 && valueSize == 0 {
+			return 0, false, fmt.Errorf("can't marshal map with zero length entries: %w", codec.ErrMarshalZeroLength)
 		}
 
 		switch {
@@ -397,22 +402,22 @@ func (c *genericCodec) marshal(
 			return p.Err
 		}
 		for i := 0; i < numElts; i++ { // Process each element in the slice
+			startOffset := p.Offset
 			if err := c.marshal(value.Index(i), p, typeStack); err != nil {
 				return err
+			}
+			if startOffset == p.Offset {
+				return fmt.Errorf("couldn't marshal slice of zero length values: %w", codec.ErrMarshalZeroLength)
 			}
 		}
 		return nil
 	case reflect.Array:
-		numElts := value.Len()
-		if numElts == 0 {
-			return fmt.Errorf("couldn't marshal array: %w", codec.ErrMarshalZeroLength)
-		}
-
 		if elemKind := value.Type().Kind(); elemKind == reflect.Uint8 {
 			sliceVal := value.Convert(reflect.TypeOf([]byte{}))
 			p.PackFixedBytes(sliceVal.Bytes())
 			return p.Err
 		}
+		numElts := value.Len()
 		for i := 0; i < numElts; i++ { // Process each element in the array
 			if err := c.marshal(value.Index(i), p, typeStack); err != nil {
 				return err
@@ -424,10 +429,6 @@ func (c *genericCodec) marshal(
 		if err != nil {
 			return err
 		}
-		if len(serializedFields) == 0 {
-			return fmt.Errorf("couldn't marshal struct: %w", codec.ErrMarshalZeroLength)
-		}
-
 		for _, fieldIndex := range serializedFields { // Go through all fields of this struct that are serialized
 			if err := c.marshal(value.Field(fieldIndex), p, typeStack); err != nil { // Serialize the field and write to byte array
 				return err
@@ -490,6 +491,7 @@ func (c *genericCodec) marshal(
 		allKeyBytes := slices.Clone(p.Bytes[startOffset:p.Offset])
 		p.Offset = startOffset
 		for _, key := range sortedKeys {
+			startOffset := p.Offset
 			// pack key
 			startIndex := key.startIndex - startOffset
 			endIndex := key.endIndex - startOffset
@@ -502,6 +504,9 @@ func (c *genericCodec) marshal(
 			// serialize and pack value
 			if err := c.marshal(value.MapIndex(key.key), p, typeStack); err != nil {
 				return err
+			}
+			if startOffset == p.Offset {
+				return fmt.Errorf("couldn't marshal map with zero length entries: %w", codec.ErrMarshalZeroLength)
 			}
 		}
 
@@ -636,17 +641,18 @@ func (c *genericCodec) unmarshal(
 		zeroValue := reflect.Zero(innerType)
 		for i := 0; i < numElts; i++ {
 			value.Set(reflect.Append(value, zeroValue))
+
+			startOffset := p.Offset
 			if err := c.unmarshal(p, value.Index(i), typeStack); err != nil {
 				return err
+			}
+			if startOffset == p.Offset {
+				return fmt.Errorf("couldn't unmarshal slice of zero length values: %w", codec.ErrUnmarshalZeroLength)
 			}
 		}
 		return nil
 	case reflect.Array:
 		numElts := value.Len()
-		if numElts == 0 {
-			return fmt.Errorf("couldn't unmarshal array: %w", codec.ErrUnmarshalZeroLength)
-		}
-
 		if elemKind := value.Type().Elem().Kind(); elemKind == reflect.Uint8 {
 			unpackedBytes := p.UnpackFixedBytes(numElts)
 			if p.Errored() {
@@ -694,10 +700,6 @@ func (c *genericCodec) unmarshal(
 		if err != nil {
 			return fmt.Errorf("couldn't unmarshal struct: %w", err)
 		}
-		if len(serializedFieldIndices) == 0 {
-			return fmt.Errorf("couldn't unmarshal struct: %w", codec.ErrUnmarshalZeroLength)
-		}
-
 		// Go through the fields and umarshal into them
 		for _, fieldIndex := range serializedFieldIndices {
 			if err := c.unmarshal(p, value.Field(fieldIndex), typeStack); err != nil {
@@ -752,7 +754,6 @@ func (c *genericCodec) unmarshal(
 			mapKey := reflect.New(mapKeyType).Elem()
 
 			keyStartOffset := p.Offset
-
 			if err := c.unmarshal(p, mapKey, typeStack); err != nil {
 				return err
 			}
@@ -773,6 +774,9 @@ func (c *genericCodec) unmarshal(
 			mapValue := reflect.New(mapValueType).Elem()
 			if err := c.unmarshal(p, mapValue, typeStack); err != nil {
 				return err
+			}
+			if keyStartOffset == p.Offset {
+				return fmt.Errorf("couldn't unmarshal map with zero length entries: %w", codec.ErrUnmarshalZeroLength)
 			}
 
 			// Assign the key-value pair in the map
