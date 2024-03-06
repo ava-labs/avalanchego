@@ -39,6 +39,8 @@ pub enum ShaleError {
     InvalidCacheView { offset: usize, size: u64 },
     #[error("io error: {0}")]
     Io(#[from] std::io::Error),
+    #[error("Write on immutable cache")]
+    ImmutableWrite,
 }
 
 // TODO:
@@ -95,9 +97,12 @@ pub trait CachedStore: Debug + Send + Sync {
     fn get_shared(&self) -> Box<dyn SendSyncDerefMut<Target = dyn CachedStore>>;
     /// Write the `change` to the portion of the linear space starting at `offset`. The change
     /// should be immediately visible to all `CachedView` associated to this linear space.
-    fn write(&mut self, offset: usize, change: &[u8]);
+    fn write(&mut self, offset: usize, change: &[u8]) -> Result<(), ShaleError>;
     /// Returns the identifier of this storage space.
     fn id(&self) -> SpaceId;
+
+    /// Returns whether or not this store is writable
+    fn is_writeable(&self) -> bool;
 }
 
 /// A wrapper of `TypedView` to enable writes. The direct construction (by [Obj::from_typed_view]
@@ -127,6 +132,9 @@ impl<T: Storable> Obj<T> {
             None => return Err(ObjWriteSizeError),
         };
 
+        // catch writes that cannot be flushed early during debugging
+        debug_assert!(self.value.get_mem_store().is_writeable());
+
         Ok(())
     }
 
@@ -153,7 +161,7 @@ impl<T: Storable> Obj<T> {
             self.value.write_mem_image(&mut new_value).unwrap();
             let offset = self.value.get_offset();
             let bx: &mut dyn CachedStore = self.value.get_mut_mem_store();
-            bx.write(offset, &new_value);
+            bx.write(offset, &new_value).expect("write should succeed");
         }
     }
 }

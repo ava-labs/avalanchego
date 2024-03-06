@@ -68,7 +68,7 @@ impl Profiler for FlamegraphProfiler {
 fn bench_trie_hash(criterion: &mut Criterion) {
     let mut to = [1u8; TRIE_HASH_LEN];
     let mut store = DynamicMem::new(TRIE_HASH_LEN as u64, 0u8);
-    store.write(0, &*ZERO_HASH);
+    store.write(0, &*ZERO_HASH).expect("write should succeed");
 
     #[allow(clippy::unwrap_used)]
     criterion

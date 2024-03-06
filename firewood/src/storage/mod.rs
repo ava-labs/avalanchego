@@ -4,7 +4,7 @@
 // TODO: try to get rid of the use `RefCell` in this file
 use self::buffer::DiskBufferRequester;
 use crate::file::File;
-use crate::shale::{self, CachedStore, CachedView, SendSyncDerefMut, SpaceId};
+use crate::shale::{self, CachedStore, CachedView, SendSyncDerefMut, ShaleError, SpaceId};
 use nix::fcntl::{Flock, FlockArg};
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
@@ -349,13 +349,18 @@ impl CachedStore for StoreRevShared {
         Box::new(StoreShared(self.clone()))
     }
 
-    fn write(&mut self, _offset: usize, _change: &[u8]) {
+    fn write(&mut self, _offset: usize, _change: &[u8]) -> Result<(), ShaleError> {
         // StoreRevShared is a read-only view version of CachedStore
         // Writes could be induced by lazy hashing and we can just ignore those
+        Err(ShaleError::ImmutableWrite)
     }
 
     fn id(&self) -> SpaceId {
         <StoreRev as MemStoreR>::id(&self.0)
+    }
+
+    fn is_writeable(&self) -> bool {
+        false
     }
 }
 
@@ -429,6 +434,16 @@ pub struct StoreRevMut {
     base_space: Arc<dyn MemStoreR>,
     deltas: Arc<RwLock<StoreRevMutDelta>>,
     prev_deltas: Arc<RwLock<StoreRevMutDelta>>,
+}
+
+impl From<StoreRevShared> for StoreRevMut {
+    fn from(value: StoreRevShared) -> Self {
+        StoreRevMut {
+            base_space: value.0.base_space.read().clone(),
+            deltas: Arc::new(RwLock::new(StoreRevMutDelta::default())),
+            prev_deltas: Arc::new(RwLock::new(StoreRevMutDelta::default())),
+        }
+    }
 }
 
 impl StoreRevMut {
@@ -561,7 +576,7 @@ impl CachedStore for StoreRevMut {
         Box::new(StoreShared(self.clone()))
     }
 
-    fn write(&mut self, offset: usize, mut change: &[u8]) {
+    fn write(&mut self, offset: usize, mut change: &[u8]) -> Result<(), ShaleError> {
         let length = change.len() as u64;
         let end = offset + length as usize - 1;
         let s_pid = offset >> PAGE_SIZE_NBIT;
@@ -622,10 +637,16 @@ impl CachedStore for StoreRevMut {
             offset: offset as u64,
             data: redo,
         });
+
+        Ok(())
     }
 
     fn id(&self) -> SpaceId {
         self.base_space.id()
+    }
+
+    fn is_writeable(&self) -> bool {
+        true
     }
 }
 

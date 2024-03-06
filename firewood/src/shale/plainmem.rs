@@ -7,7 +7,7 @@ use std::{
     sync::{Arc, RwLock},
 };
 
-use super::{CachedStore, CachedView, SendSyncDerefMut, SpaceId};
+use super::{CachedStore, CachedView, SendSyncDerefMut, ShaleError, SpaceId};
 
 /// in-memory vector-based implementation for [CachedStore] for testing
 // built on [ShaleStore](super::ShaleStore) in memory, without having to write
@@ -54,16 +54,21 @@ impl CachedStore for PlainMem {
         }))
     }
 
-    fn write(&mut self, offset: usize, change: &[u8]) {
+    fn write(&mut self, offset: usize, change: &[u8]) -> Result<(), ShaleError> {
         let length = change.len();
         #[allow(clippy::unwrap_used)]
         let mut vect = self.space.deref().write().unwrap();
         #[allow(clippy::indexing_slicing)]
         vect.as_mut_slice()[offset..offset + length].copy_from_slice(change);
+        Ok(())
     }
 
     fn id(&self) -> SpaceId {
         self.id
+    }
+
+    fn is_writeable(&self) -> bool {
+        true
     }
 }
 

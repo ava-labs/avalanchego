@@ -63,7 +63,8 @@ where
                 NonZeroUsize::new(RESERVED).unwrap(),
             ))
             .unwrap(),
-        );
+        )
+        .expect("write should succeed");
         #[allow(clippy::unwrap_used)]
         let compact_header =
             StoredView::ptr_to_obj(&dm, compact_header, shale::compact::CompactHeader::MSIZE)

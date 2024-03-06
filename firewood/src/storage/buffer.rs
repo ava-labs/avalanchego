@@ -711,14 +711,14 @@ mod tests {
         let change = b"this is a test";
 
         // write to the in memory buffer not to disk
-        mut_store.write(0, change);
+        mut_store.write(0, change).unwrap();
         assert_eq!(mut_store.id(), STATE_SPACE);
 
         // mutate the in memory buffer.
         let change = b"this is another test";
 
         // write to the in memory buffer (ash) not yet to disk
-        mut_store.write(0, change);
+        mut_store.write(0, change).unwrap();
         assert_eq!(mut_store.id(), STATE_SPACE);
 
         // wal should have no records.
@@ -789,7 +789,7 @@ mod tests {
         let hash: [u8; HASH_SIZE] = sha3::Keccak256::digest(data).into();
 
         // write to the in memory buffer (ash) not yet to disk
-        mut_store.write(0, &hash);
+        mut_store.write(0, &hash).unwrap();
         assert_eq!(mut_store.id(), STATE_SPACE);
 
         // wal should have no records.
@@ -871,7 +871,7 @@ mod tests {
         // mutate the in memory buffer.
         let data = b"this is a test";
         let hash: [u8; HASH_SIZE] = sha3::Keccak256::digest(data).into();
-        block_in_place(|| store.write(0, &hash));
+        block_in_place(|| store.write(0, &hash)).unwrap();
         assert_eq!(store.id(), STATE_SPACE);
 
         let another_data = b"this is another test";
@@ -879,7 +879,7 @@ mod tests {
 
         // mutate the in memory buffer in another StoreRev new from the above.
         let mut another_store = StoreRevMut::new_from_other(&store);
-        block_in_place(|| another_store.write(32, &another_hash));
+        block_in_place(|| another_store.write(32, &another_hash)).unwrap();
         assert_eq!(another_store.id(), STATE_SPACE);
 
         // wal should have no records.
@@ -902,7 +902,7 @@ mod tests {
         assert_eq!(view.as_deref(), empty);
 
         // Overwrite the value from the beginning in the new store.  Only the new store should see the change.
-        another_store.write(0, &another_hash);
+        another_store.write(0, &another_hash).unwrap();
         let view = another_store.get_view(0, HASH_SIZE as u64).unwrap();
         assert_eq!(view.as_deref(), another_hash);
         let view = store.get_view(0, HASH_SIZE as u64).unwrap();

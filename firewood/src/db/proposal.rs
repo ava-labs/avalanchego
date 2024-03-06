@@ -225,7 +225,7 @@ impl Proposal {
                 .resize(max_revisions, TrieHash([0; TRIE_HASH_LEN]));
         }
 
-        rev_inner.root_hash_staging.write(0, &hash.0);
+        rev_inner.root_hash_staging.write(0, &hash.0)?;
         let (root_hash_redo, root_hash_wal) = rev_inner.root_hash_staging.delta();
 
         // schedule writes to the disk

@@ -67,7 +67,7 @@ fn get_view<C: CachedStore>(b: &mut Bencher, mut cached: C) {
 
         let offset = rng.gen_range(0..BENCH_MEM_SIZE - len);
 
-        cached.write(offset, rdata);
+        cached.write(offset, rdata).expect("write should succeed");
         #[allow(clippy::unwrap_used)]
         let view = cached
             .get_view(offset, rdata.len().try_into().unwrap())

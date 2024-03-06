@@ -406,7 +406,8 @@ impl DbRev<MutStore> {
 }
 
 impl From<DbRev<MutStore>> for DbRev<SharedStore> {
-    fn from(value: DbRev<MutStore>) -> Self {
+    fn from(mut value: DbRev<MutStore>) -> Self {
+        value.flush_dirty();
         DbRev {
             header: value.header,
             merkle: value.merkle.into(),
@@ -616,16 +617,20 @@ impl Db {
             merkle: get_sub_universe_from_empty_delta(&data_cache.merkle),
         };
 
-        let db_header_ref = Db::get_db_header_ref(&base.merkle.meta)?;
+        // convert the base merkle objects into writable ones
+        let meta: StoreRevMut = base.merkle.meta.clone().into();
+        let payload: StoreRevMut = base.merkle.payload.clone().into();
 
+        // get references to the DbHeader and the CompactSpaceHeader
+        // for free space management
+        let db_header_ref = Db::get_db_header_ref(&meta)?;
         let merkle_payload_header_ref =
-            Db::get_payload_header_ref(&base.merkle.meta, Db::PARAM_SIZE + DbHeader::MSIZE)?;
-
+            Db::get_payload_header_ref(&meta, Db::PARAM_SIZE + DbHeader::MSIZE)?;
         let header_refs = (db_header_ref, merkle_payload_header_ref);
 
-        let base_revision = Db::new_revision(
+        let base_revision = Db::new_revision::<StoreRevMut, _>(
             header_refs,
-            (base.merkle.meta.clone(), base.merkle.payload.clone()),
+            (meta, payload),
             params.payload_regn_nbit,
             cfg.payload_max_walk,
             &cfg.rev,
@@ -644,7 +649,7 @@ impl Db {
                 root_hashes: VecDeque::new(),
                 max_revisions: cfg.wal.max_revisions as usize,
                 base,
-                base_revision: Arc::new(base_revision),
+                base_revision: Arc::new(base_revision.into()),
             })),
             payload_regn_nbit: params.payload_regn_nbit,
             metrics: Arc::new(DbMetrics::default()),
@@ -718,11 +723,11 @@ impl Db {
                     #[allow(clippy::unwrap_used)]
                     NonZeroUsize::new(SPACE_RESERVED as usize).unwrap(),
                 ))?,
-            );
+            )?;
             merkle_meta_store.write(
                 db_header.into(),
                 &shale::to_dehydrated(&DbHeader::new_empty())?,
-            );
+            )?;
         }
 
         let store = Universe {

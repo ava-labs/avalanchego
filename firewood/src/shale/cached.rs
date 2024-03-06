@@ -11,6 +11,8 @@ use std::{
 #[cfg(test)]
 pub use crate::shale::plainmem::PlainMem;
 
+use super::ShaleError;
+
 // Purely volatile, dynamically allocated vector-based implementation for
 // [CachedStore]. This is similar to PlainMem (in testing). The only
 // difference is, when [write] dynamically allocate more space if original
@@ -61,7 +63,7 @@ impl CachedStore for DynamicMem {
         }))
     }
 
-    fn write(&mut self, offset: usize, change: &[u8]) {
+    fn write(&mut self, offset: usize, change: &[u8]) -> Result<(), ShaleError> {
         let length = change.len();
         let size = offset + length;
 
@@ -73,11 +75,17 @@ impl CachedStore for DynamicMem {
             space.resize(size, 0);
         }
         #[allow(clippy::indexing_slicing)]
-        space[offset..offset + length].copy_from_slice(change)
+        space[offset..offset + length].copy_from_slice(change);
+
+        Ok(())
     }
 
     fn id(&self) -> SpaceId {
         self.id
+    }
+
+    fn is_writeable(&self) -> bool {
+        true
     }
 }
 
@@ -122,14 +130,14 @@ mod tests {
     fn test_plain_mem() {
         let mut view = PlainMemShared(PlainMem::new(2, 0));
         let mem = &mut *view;
-        mem.write(0, &[1, 1]);
-        mem.write(0, &[1, 2]);
+        mem.write(0, &[1, 1]).unwrap();
+        mem.write(0, &[1, 2]).unwrap();
         #[allow(clippy::unwrap_used)]
         let r = mem.get_view(0, 2).unwrap().as_deref();
         assert_eq!(r, [1, 2]);
 
         // previous view not mutated by write
-        mem.write(0, &[1, 3]);
+        mem.write(0, &[1, 3]).unwrap();
         assert_eq!(r, [1, 2]);
         let r = mem.get_view(0, 2).unwrap().as_deref();
         assert_eq!(r, [1, 3]);
@@ -145,20 +153,20 @@ mod tests {
         let mem = &mut *view;
 
         // out of range
-        mem.write(1, &[7, 8]);
+        mem.write(1, &[7, 8]).unwrap();
     }
 
     #[test]
     fn test_dynamic_mem() {
         let mut view = DynamicMemShared(DynamicMem::new(2, 0));
         let mem = &mut *view;
-        mem.write(0, &[1, 2]);
-        mem.write(0, &[3, 4]);
+        mem.write(0, &[1, 2]).unwrap();
+        mem.write(0, &[3, 4]).unwrap();
         assert_eq!(mem.get_view(0, 2).unwrap().as_deref(), [3, 4]);
-        mem.get_shared().write(0, &[5, 6]);
+        mem.get_shared().write(0, &[5, 6]).unwrap();
 
         // capacity is increased
-        mem.write(5, &[0; 10]);
+        mem.write(5, &[0; 10]).unwrap();
 
         // get a view larger than recent growth
         assert_eq!(mem.get_view(3, 20).unwrap().as_deref(), [0; 20]);

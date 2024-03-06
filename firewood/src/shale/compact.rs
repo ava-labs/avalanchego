@@ -726,7 +726,8 @@ mod tests {
                 reserved.0.unwrap(),
             ))
             .unwrap(),
-        );
+        )
+        .unwrap();
         let compact_header =
             StoredView::ptr_to_obj(&dm, compact_header, CompactHeader::MSIZE).unwrap();
         let mem_meta = dm;
