@@ -3,28 +3,11 @@
 
 package snowman
 
-import (
-	"testing"
+import "github.com/ava-labs/avalanchego/snow/consensus/snowball"
 
-	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
-	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanchego/snow/snowtest"
-	"github.com/ava-labs/avalanchego/snow/validators"
-)
-
-func DefaultConfig(t testing.TB) Config {
-	ctx := snowtest.Context(t, snowtest.PChainID)
-
+func DefaultConfig() Config {
 	return Config{
-		Ctx:                 snowtest.ConsensusContext(ctx),
-		VM:                  &block.TestVM{},
-		Sender:              &common.SenderTest{},
-		Validators:          validators.NewManager(),
-		ConnectedValidators: tracker.NewPeers(),
-		Params: snowball.Parameters{
+		Parameters: snowball.Parameters{
 			K:                     1,
 			AlphaPreference:       1,
 			AlphaConfidence:       1,
@@ -35,6 +18,6 @@ func DefaultConfig(t testing.TB) Config {
 			MaxOutstandingItems:   1,
 			MaxItemProcessingTime: 1,
 		},
-		Consensus: &snowman.Topological{},
+		PartialSync: false,
 	}
 }
