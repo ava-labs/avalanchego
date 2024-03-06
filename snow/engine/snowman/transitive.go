@@ -161,7 +161,6 @@ func (t *Transitive) Gossip(ctx context.Context) error {
 		return nil
 	}
 
-<<<<<<< HEAD
 	t.Ctx.Log.Verbo("sampling from validators",
 		zap.Stringer("validators", t.Validators),
 	)
@@ -177,9 +176,6 @@ func (t *Transitive) Gossip(ctx context.Context) error {
 	}
 
 	nextHeightToAccept, err := math.Add64(lastAcceptedHeight, 1)
-=======
-	lastAccepted, err := t.getBlock(ctx, lastAcceptedID)
->>>>>>> master
 	if err != nil {
 		t.Ctx.Log.Error("skipping block gossip",
 			zap.String("reason", "block height overflow"),
