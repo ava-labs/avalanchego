@@ -177,7 +177,7 @@ func (c *genericCodec) size(
 	case reflect.Array:
 		numElts := value.Len()
 		if numElts == 0 {
-			return 0, true, nil
+			return 0, false, fmt.Errorf("can't marshal array: %w", codec.ErrMarshalZeroLength)
 		}
 
 		size, constSize, err := c.size(value.Index(0), typeStack)
@@ -204,6 +204,9 @@ func (c *genericCodec) size(
 		serializedFields, err := c.fielder.GetSerializedFields(value.Type())
 		if err != nil {
 			return 0, false, err
+		}
+		if len(serializedFields) == 0 {
+			return 0, false, fmt.Errorf("can't marshal struct: %w", codec.ErrMarshalZeroLength)
 		}
 
 		var (
@@ -400,12 +403,16 @@ func (c *genericCodec) marshal(
 		}
 		return nil
 	case reflect.Array:
+		numElts := value.Len()
+		if numElts == 0 {
+			return fmt.Errorf("couldn't marshal array: %w", codec.ErrMarshalZeroLength)
+		}
+
 		if elemKind := value.Type().Kind(); elemKind == reflect.Uint8 {
 			sliceVal := value.Convert(reflect.TypeOf([]byte{}))
 			p.PackFixedBytes(sliceVal.Bytes())
 			return p.Err
 		}
-		numElts := value.Len()
 		for i := 0; i < numElts; i++ { // Process each element in the array
 			if err := c.marshal(value.Index(i), p, typeStack); err != nil {
 				return err
@@ -417,6 +424,10 @@ func (c *genericCodec) marshal(
 		if err != nil {
 			return err
 		}
+		if len(serializedFields) == 0 {
+			return fmt.Errorf("couldn't marshal struct: %w", codec.ErrMarshalZeroLength)
+		}
+
 		for _, fieldIndex := range serializedFields { // Go through all fields of this struct that are serialized
 			if err := c.marshal(value.Field(fieldIndex), p, typeStack); err != nil { // Serialize the field and write to byte array
 				return err
@@ -632,6 +643,10 @@ func (c *genericCodec) unmarshal(
 		return nil
 	case reflect.Array:
 		numElts := value.Len()
+		if numElts == 0 {
+			return fmt.Errorf("couldn't unmarshal array: %w", codec.ErrUnmarshalZeroLength)
+		}
+
 		if elemKind := value.Type().Elem().Kind(); elemKind == reflect.Uint8 {
 			unpackedBytes := p.UnpackFixedBytes(numElts)
 			if p.Errored() {
@@ -679,6 +694,10 @@ func (c *genericCodec) unmarshal(
 		if err != nil {
 			return fmt.Errorf("couldn't unmarshal struct: %w", err)
 		}
+		if len(serializedFieldIndices) == 0 {
+			return fmt.Errorf("couldn't unmarshal struct: %w", codec.ErrUnmarshalZeroLength)
+		}
+
 		// Go through the fields and umarshal into them
 		for _, fieldIndex := range serializedFieldIndices {
 			if err := c.unmarshal(p, value.Field(fieldIndex), typeStack); err != nil {
