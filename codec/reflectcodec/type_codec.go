@@ -754,6 +754,7 @@ func (c *genericCodec) unmarshal(
 			mapKey := reflect.New(mapKeyType).Elem()
 
 			keyStartOffset := p.Offset
+
 			if err := c.unmarshal(p, mapKey, typeStack); err != nil {
 				return err
 			}
