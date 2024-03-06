@@ -119,10 +119,15 @@ func (g *gossipMempool) Add(tx *txs.Tx) error {
 		return err
 	}
 
-	return g.AddVerified(tx)
+	return g.AddWithoutVerification(tx)
 }
 
-func (g *gossipMempool) AddVerified(tx *txs.Tx) error {
+func (g *gossipMempool) Has(txID ids.ID) bool {
+	_, ok := g.Mempool.Get(txID)
+	return ok
+}
+
+func (g *gossipMempool) AddWithoutVerification(tx *txs.Tx) error {
 	if err := g.Mempool.Add(tx); err != nil {
 		g.Mempool.MarkDropped(tx.ID(), err)
 		return err

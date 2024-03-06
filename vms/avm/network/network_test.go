@@ -32,6 +32,13 @@ var (
 	testConfig = Config{
 		MaxValidatorSetStaleness:                    time.Second,
 		TargetGossipSize:                            1,
+		PushGossipNumValidators:                     1,
+		PushGossipNumPeers:                          0,
+		PushRegossipNumValidators:                   1,
+		PushRegossipNumPeers:                        0,
+		PushGossipDiscardedCacheSize:                1,
+		PushGossipMaxRegossipFrequency:              time.Second,
+		PushGossipFrequency:                         time.Second,
 		PullGossipPollSize:                          1,
 		PullGossipFrequency:                         time.Second,
 		PullGossipThrottlingPeriod:                  time.Second,
@@ -39,7 +46,6 @@ var (
 		ExpectedBloomFilterElements:                 10,
 		ExpectedBloomFilterFalsePositiveProbability: .1,
 		MaxBloomFilterFalsePositiveProbability:      .5,
-		LegacyPushGossipCacheSize:                   512,
 	}
 
 	errTest = errors.New("test error")
@@ -71,7 +77,6 @@ func TestNetworkAppGossip(t *testing.T) {
 		msgBytesFunc   func() []byte
 		mempoolFunc    func(*gomock.Controller) mempool.Mempool
 		txVerifierFunc func(*gomock.Controller) TxVerifier
-		appSenderFunc  func(*gomock.Controller) common.AppSender
 	}
 
 	tests := []test{
@@ -172,11 +177,6 @@ func TestNetworkAppGossip(t *testing.T) {
 				txVerifier.EXPECT().VerifyTx(gomock.Any()).Return(nil)
 				return txVerifier
 			},
-			appSenderFunc: func(ctrl *gomock.Controller) common.AppSender {
-				appSender := common.NewMockSender(ctrl)
-				appSender.EXPECT().SendAppGossip(gomock.Any(), gomock.Any()).Return(nil).Times(2)
-				return appSender
-			},
 		},
 	}
 
@@ -209,13 +209,6 @@ func TestNetworkAppGossip(t *testing.T) {
 				txVerifierFunc = tt.txVerifierFunc
 			}
 
-			appSenderFunc := func(ctrl *gomock.Controller) common.AppSender {
-				return common.NewMockSender(ctrl)
-			}
-			if tt.appSenderFunc != nil {
-				appSenderFunc = tt.appSenderFunc
-			}
-
 			n, err := New(
 				&snow.Context{
 					Log: logging.NoLog{},
@@ -223,7 +216,7 @@ func TestNetworkAppGossip(t *testing.T) {
 				parser,
 				txVerifierFunc(ctrl),
 				mempoolFunc(ctrl),
-				appSenderFunc(ctrl),
+				common.NewMockSender(ctrl),
 				prometheus.NewRegistry(),
 				testConfig,
 			)
@@ -233,7 +226,7 @@ func TestNetworkAppGossip(t *testing.T) {
 	}
 }
 
-func TestNetworkIssueTx(t *testing.T) {
+func TestNetworkIssueTxFromRPC(t *testing.T) {
 	type test struct {
 		name           string
 		mempoolFunc    func(*gomock.Controller) mempool.Mempool
@@ -304,6 +297,7 @@ func TestNetworkIssueTx(t *testing.T) {
 				mempool.EXPECT().Add(gomock.Any()).Return(nil)
 				mempool.EXPECT().Len().Return(0)
 				mempool.EXPECT().RequestBuildBlock()
+				mempool.EXPECT().Get(gomock.Any()).Return(nil, true).Times(2)
 				return mempool
 			},
 			txVerifierFunc: func(ctrl *gomock.Controller) TxVerifier {
@@ -313,7 +307,7 @@ func TestNetworkIssueTx(t *testing.T) {
 			},
 			appSenderFunc: func(ctrl *gomock.Controller) common.AppSender {
 				appSender := common.NewMockSender(ctrl)
-				appSender.EXPECT().SendAppGossip(gomock.Any(), gomock.Any()).Return(nil).Times(2)
+				appSender.EXPECT().SendAppGossip(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 				return appSender
 			},
 			expectedErr: nil,
@@ -368,13 +362,15 @@ func TestNetworkIssueTx(t *testing.T) {
 				testConfig,
 			)
 			require.NoError(err)
-			err = n.IssueTx(context.Background(), &txs.Tx{})
+			err = n.IssueTxFromRPC(&txs.Tx{})
 			require.ErrorIs(err, tt.expectedErr)
+
+			require.NoError(n.txPushGossiper.Gossip(context.Background()))
 		})
 	}
 }
 
-func TestNetworkIssueVerifiedTx(t *testing.T) {
+func TestNetworkIssueTxFromRPCWithoutVerification(t *testing.T) {
 	type test struct {
 		name          string
 		mempoolFunc   func(*gomock.Controller) mempool.Mempool
@@ -397,6 +393,7 @@ func TestNetworkIssueVerifiedTx(t *testing.T) {
 			name: "happy path",
 			mempoolFunc: func(ctrl *gomock.Controller) mempool.Mempool {
 				mempool := mempool.NewMockMempool(ctrl)
+				mempool.EXPECT().Get(gomock.Any()).Return(nil, true).Times(2)
 				mempool.EXPECT().Add(gomock.Any()).Return(nil)
 				mempool.EXPECT().Len().Return(0)
 				mempool.EXPECT().RequestBuildBlock()
@@ -404,7 +401,7 @@ func TestNetworkIssueVerifiedTx(t *testing.T) {
 			},
 			appSenderFunc: func(ctrl *gomock.Controller) common.AppSender {
 				appSender := common.NewMockSender(ctrl)
-				appSender.EXPECT().SendAppGossip(gomock.Any(), gomock.Any()).Return(nil).Times(2)
+				appSender.EXPECT().SendAppGossip(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 				return appSender
 			},
 			expectedErr: nil,
@@ -452,48 +449,10 @@ func TestNetworkIssueVerifiedTx(t *testing.T) {
 				testConfig,
 			)
 			require.NoError(err)
-			err = n.IssueVerifiedTx(context.Background(), &txs.Tx{})
+			err = n.IssueTxFromRPCWithoutVerification(&txs.Tx{})
 			require.ErrorIs(err, tt.expectedErr)
+
+			require.NoError(n.txPushGossiper.Gossip(context.Background()))
 		})
 	}
-}
-
-func TestNetworkGossipTx(t *testing.T) {
-	require := require.New(t)
-	ctrl := gomock.NewController(t)
-
-	parser, err := txs.NewParser(
-		time.Time{},
-		[]fxs.Fx{
-			&secp256k1fx.Fx{},
-		},
-	)
-	require.NoError(err)
-
-	appSender := common.NewMockSender(ctrl)
-
-	n, err := New(
-		&snow.Context{
-			Log: logging.NoLog{},
-		},
-		parser,
-		executor.NewMockManager(ctrl),
-		mempool.NewMockMempool(ctrl),
-		appSender,
-		prometheus.NewRegistry(),
-		testConfig,
-	)
-	require.NoError(err)
-
-	// Case: Tx was recently gossiped
-	txID := ids.GenerateTestID()
-	n.recentTxs.Put(txID, struct{}{})
-	n.gossipTxMessage(context.Background(), txID, []byte{})
-	// Didn't make a call to SendAppGossip
-
-	// Case: Tx was not recently gossiped
-	msgBytes := []byte{1, 2, 3}
-	appSender.EXPECT().SendAppGossip(gomock.Any(), msgBytes).Return(nil)
-	n.gossipTxMessage(context.Background(), ids.GenerateTestID(), msgBytes)
-	// Did make a call to SendAppGossip
 }

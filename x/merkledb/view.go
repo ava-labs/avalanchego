@@ -121,7 +121,7 @@ func (v *view) NewView(
 		return nil, err
 	}
 
-	newView, err := newView(v.db, v, changes)
+	childView, err := newView(v.db, v, changes)
 	if err != nil {
 		return nil, err
 	}
@@ -132,9 +132,9 @@ func (v *view) NewView(
 	if v.invalidated {
 		return nil, ErrInvalid
 	}
-	v.childViews = append(v.childViews, newView)
+	v.childViews = append(v.childViews, childView)
 
-	return newView, nil
+	return childView, nil
 }
 
 // Creates a new view with the given [parentTrie].
@@ -143,7 +143,7 @@ func newView(
 	parentTrie View,
 	changes ViewChanges,
 ) (*view, error) {
-	newView := &view{
+	v := &view{
 		root:       maybe.Bind(parentTrie.getRoot(), (*node).clone),
 		db:         db,
 		parentTrie: parentTrie,
@@ -164,7 +164,7 @@ func newView(
 				newVal = maybe.Some(slices.Clone(op.Value))
 			}
 		}
-		if err := newView.recordValueChange(toKey(key), newVal); err != nil {
+		if err := v.recordValueChange(toKey(key), newVal); err != nil {
 			return nil, err
 		}
 	}
@@ -172,11 +172,11 @@ func newView(
 		if !changes.ConsumeBytes {
 			val = maybe.Bind(val, slices.Clone[[]byte])
 		}
-		if err := newView.recordValueChange(toKey(stringToByteSlice(key)), val); err != nil {
+		if err := v.recordValueChange(toKey(stringToByteSlice(key)), val); err != nil {
 			return nil, err
 		}
 	}
-	return newView, nil
+	return v, nil
 }
 
 // Creates a view of the db at a historical root using the provided [changes].
@@ -189,7 +189,7 @@ func newViewWithChanges(
 		return nil, ErrNoChanges
 	}
 
-	newView := &view{
+	v := &view{
 		root:       changes.rootChange.after,
 		db:         db,
 		parentTrie: db,
@@ -198,9 +198,9 @@ func newViewWithChanges(
 	}
 	// since this is a set of historical changes, all nodes have already been calculated
 	// since no new changes have occurred, no new calculations need to be done
-	newView.calculateNodesOnce.Do(func() {})
-	newView.nodesAlreadyCalculated.Set(true)
-	return newView, nil
+	v.calculateNodesOnce.Do(func() {})
+	v.nodesAlreadyCalculated.Set(true)
+	return v, nil
 }
 
 func (v *view) getTokenSize() int {
@@ -271,8 +271,8 @@ func (v *view) calculateNodeIDsHelper(n *node) ids.ID {
 	// We use [wg] to wait until all descendants of [n] have been updated.
 	var wg sync.WaitGroup
 
-	for childIndex := range n.children {
-		childEntry := n.children[childIndex]
+	for childIndex, childEntry := range n.children {
+		childEntry := childEntry // New variable so goroutine doesn't capture loop variable.
 		childKey := n.key.Extend(ToToken(childIndex, v.tokenSize), childEntry.compressedKey)
 		childNodeChange, ok := v.changes.nodes[childKey]
 		if !ok {
@@ -463,15 +463,15 @@ func (v *view) getValue(key Key) ([]byte, error) {
 	}
 
 	if change, ok := v.changes.values[key]; ok {
-		v.db.metrics.ViewValueCacheHit()
+		v.db.metrics.ViewChangesValueHit()
 		if change.after.IsNothing() {
 			return nil, database.ErrNotFound
 		}
 		return change.after.Value(), nil
 	}
-	v.db.metrics.ViewValueCacheMiss()
+	v.db.metrics.ViewChangesValueMiss()
 
-	// if we don't have local copy of the key, then grab a copy from the parent trie
+	// if we don't have local copy of the value, then grab a copy from the parent trie
 	value, err := v.getParentTrie().getValue(key)
 	if err != nil {
 		return nil, err
@@ -519,11 +519,12 @@ func (v *view) remove(key Key) error {
 		return err
 	}
 
+	hadValue := nodeToDelete.hasValue()
 	nodeToDelete.setValue(maybe.Nothing[[]byte]())
 
 	// if the removed node has no children, the node can be removed from the trie
 	if len(nodeToDelete.children) == 0 {
-		if err := v.recordNodeDeleted(nodeToDelete); err != nil {
+		if err := v.recordNodeDeleted(nodeToDelete, hadValue); err != nil {
 			return err
 		}
 
@@ -541,15 +542,12 @@ func (v *view) remove(key Key) error {
 		return v.compressNodePath(grandParent, parent)
 	}
 
-	// merge this node and its descendants into a single node if possible
+	// merge this node and its parent into a single node if possible
 	return v.compressNodePath(parent, nodeToDelete)
 }
 
-// Merges together nodes in the inclusive descendants of [n] that
-// have no value and a single child into one node with a compressed
-// path until a node that doesn't meet those criteria is reached.
-// [parent] is [n]'s parent. If [parent] is nil, [n] is the root
-// node and [v.root] is updated to [n].
+// Merges [n] with its [parent] if [n] has only one child and no value.
+// If [parent] is nil, [n] is the root node and [v.root] is updated to [n].
 // Assumes at least one of the following is true:
 // * [n] has a value.
 // * [n] has children.
@@ -563,7 +561,8 @@ func (v *view) compressNodePath(parent, n *node) error {
 		return nil
 	}
 
-	if err := v.recordNodeDeleted(n); err != nil {
+	// We know from above that [n] has no value.
+	if err := v.recordNodeDeleted(n, false /* hasValue */); err != nil {
 		return err
 	}
 
@@ -768,8 +767,8 @@ func (v *view) recordNodeChange(after *node) error {
 
 // Records that the node associated with the given key has been deleted.
 // Must not be called after [calculateNodeIDs] has returned.
-func (v *view) recordNodeDeleted(after *node) error {
-	return v.recordKeyChange(after.key, nil, after.hasValue(), false /* newNode */)
+func (v *view) recordNodeDeleted(after *node, hadValue bool) error {
+	return v.recordKeyChange(after.key, nil, hadValue, false /* newNode */)
 }
 
 // Records that the node associated with the given key has been changed.
@@ -845,12 +844,13 @@ func (v *view) recordValueChange(key Key, value maybe.Maybe[[]byte]) error {
 func (v *view) getNode(key Key, hasValue bool) (*node, error) {
 	// check for the key within the changed nodes
 	if nodeChange, isChanged := v.changes.nodes[key]; isChanged {
-		v.db.metrics.ViewNodeCacheHit()
+		v.db.metrics.ViewChangesNodeHit()
 		if nodeChange.after == nil {
 			return nil, database.ErrNotFound
 		}
 		return nodeChange.after, nil
 	}
+	v.db.metrics.ViewChangesNodeMiss()
 
 	// get the node from the parent trie and store a local copy
 	return v.getParentTrie().getEditableNode(key, hasValue)

@@ -193,9 +193,6 @@ func addNodeFlags(fs *pflag.FlagSet) {
 	fs.Uint(ConsensusGossipOnAcceptValidatorSizeKey, constants.DefaultConsensusGossipOnAcceptValidatorSize, "Number of validators to gossip to each accepted container to")
 	fs.Uint(ConsensusGossipOnAcceptNonValidatorSizeKey, constants.DefaultConsensusGossipOnAcceptNonValidatorSize, "Number of non-validators to gossip to each accepted container to")
 	fs.Uint(ConsensusGossipOnAcceptPeerSizeKey, constants.DefaultConsensusGossipOnAcceptPeerSize, "Number of peers to gossip to each accepted container to")
-	fs.Uint(AppGossipValidatorSizeKey, constants.DefaultAppGossipValidatorSize, "Number of validators to gossip an AppGossip message to")
-	fs.Uint(AppGossipNonValidatorSizeKey, constants.DefaultAppGossipNonValidatorSize, "Number of non-validators to gossip an AppGossip message to")
-	fs.Uint(AppGossipPeerSizeKey, constants.DefaultAppGossipPeerSize, "Number of peers (which may be validators or non-validators) to gossip an AppGossip message to")
 
 	// Inbound Throttling
 	fs.Uint64(InboundThrottlerAtLargeAllocSizeKey, constants.DefaultInboundThrottlerAtLargeAllocSize, "Size, in bytes, of at-large byte allocation in inbound message throttler")
@@ -228,11 +225,6 @@ func addNodeFlags(fs *pflag.FlagSet) {
 	fs.Duration(HTTPReadHeaderTimeoutKey, 30*time.Second, fmt.Sprintf("Maximum duration to read request headers. The connection's read deadline is reset after reading the headers. If %s is zero, the value of %s is used. If both are zero, there is no timeout.", HTTPReadHeaderTimeoutKey, HTTPReadTimeoutKey))
 	fs.Duration(HTTPWriteTimeoutKey, 30*time.Second, "Maximum duration before timing out writes of the response. It is reset whenever a new request's header is read. A zero or negative value means there will be no timeout.")
 	fs.Duration(HTTPIdleTimeoutKey, 120*time.Second, fmt.Sprintf("Maximum duration to wait for the next request when keep-alives are enabled. If %s is zero, the value of %s is used. If both are zero, there is no timeout.", HTTPIdleTimeoutKey, HTTPReadTimeoutKey))
-	fs.Bool(APIAuthRequiredKey, false, "Require authorization token to call HTTP APIs")
-	fs.String(APIAuthPasswordFileKey, "",
-		fmt.Sprintf("Password file used to initially create/validate API authorization tokens. Ignored if %s is specified. Leading and trailing whitespace is removed from the password. Can be changed via API call",
-			APIAuthPasswordKey))
-	fs.String(APIAuthPasswordKey, "", "Specifies password for API authorization tokens")
 
 	// Enable/Disable APIs
 	fs.Bool(AdminAPIEnabledKey, false, "If true, this node exposes the Admin API")
@@ -240,7 +232,6 @@ func addNodeFlags(fs *pflag.FlagSet) {
 	fs.Bool(KeystoreAPIEnabledKey, false, "If true, this node exposes the Keystore API")
 	fs.Bool(MetricsAPIEnabledKey, true, "If true, this node exposes the Metrics API")
 	fs.Bool(HealthAPIEnabledKey, true, "If true, this node exposes the Health API")
-	fs.Bool(IpcAPIEnabledKey, false, "If true, IPCs can be opened")
 
 	// Health Checks
 	fs.Duration(HealthCheckFreqKey, 30*time.Second, "Time between health checks")
@@ -326,10 +317,6 @@ func addNodeFlags(fs *pflag.FlagSet) {
 	// Metrics
 	fs.Bool(MeterVMsEnabledKey, true, "Enable Meter VMs to track VM performance with more granularity")
 	fs.Duration(UptimeMetricFreqKey, 30*time.Second, "Frequency of renewing this node's average uptime metric")
-
-	// IPC
-	fs.String(IpcsChainIDsKey, "", "Comma separated list of chain ids to add to the IPC engine. Example: 11111111111111111111111111111111LpoYY,4R5p2RXDGLqaifZE4hHWH9owe34pfoBULn1DrQTWivjg8o4aH")
-	fs.String(IpcsPathKey, "", "The directory (Unix) or named pipe name prefix (Windows) for IPC sockets")
 
 	// Indexer
 	fs.Bool(IndexEnabledKey, false, "If true, index all accepted containers and transactions and expose them via an API")
