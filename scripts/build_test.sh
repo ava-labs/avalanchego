@@ -24,4 +24,4 @@ source "$SUBNET_EVM_PATH"/scripts/constants.sh
 # parallelism, and test coverage.
 # DO NOT RUN tests from the top level "tests" directory since they are run by ginkgo
 # shellcheck disable=SC2046
-go test -coverprofile=coverage.out -covermode=atomic -timeout="30m" "$@" $(go list ./... | grep -v github.com/ava-labs/subnet-evm/tests)
+go test -shuffle=on -race -coverprofile=coverage.out -covermode=atomic -timeout="30m" "$@" $(go list ./... | grep -v github.com/ava-labs/subnet-evm/tests)

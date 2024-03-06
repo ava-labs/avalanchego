@@ -151,7 +151,7 @@ func BindHelper(types []string, abis []string, bytecodes []string, fsigs []map[s
 			normalized := original
 			normalizedName := methodNormalizer[lang](alias(aliases, original.Name))
 			// Ensure there is no duplicated identifier
-			identifiers := callIdentifiers
+			var identifiers = callIdentifiers
 			if !original.IsConstant() {
 				identifiers = transactIdentifiers
 			}

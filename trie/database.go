@@ -18,15 +18,14 @@ package trie
 
 import (
 	"errors"
-	"runtime"
-	"time"
 
 	"github.com/ava-labs/subnet-evm/trie/triedb/hashdb"
+	"github.com/ava-labs/subnet-evm/trie/triedb/pathdb"
 	"github.com/ava-labs/subnet-evm/trie/trienode"
+	"github.com/ava-labs/subnet-evm/trie/triestate"
 	"github.com/ava-labs/subnet-evm/utils"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
-	"github.com/ethereum/go-ethereum/log"
 )
 
 const (
@@ -35,10 +34,13 @@ const (
 
 // Config defines all necessary options for database.
 type Config struct {
-	Cache       int    // Memory allowance (MB) to use for caching trie nodes in memory
-	Journal     string // Journal of clean cache to survive node restarts
-	Preimages   bool   // Flag whether the preimage of trie key is recorded
-	StatsPrefix string // Prefix for cache stats (disabled if empty)
+	Cache       int            // Memory allowance (MB) to use for caching trie nodes in memory
+	Preimages   bool           // Flag whether the preimage of trie key is recorded
+	StatsPrefix string         // Prefix for cache stats (disabled if empty)
+	PathDB      *pathdb.Config // Configs for experimental path-based scheme, not used yet.
+
+	// Testing hooks
+	OnCommit func(states *triestate.Set) // Hook invoked when commit is performed
 }
 
 // backend defines the methods needed to access/update trie nodes in different
@@ -58,8 +60,10 @@ type backend interface {
 	// Update performs a state transition by committing dirty nodes contained
 	// in the given set in order to update state from the specified parent to
 	// the specified root.
-	Update(root common.Hash, parent common.Hash, nodes *trienode.MergedNodeSet) error
-	UpdateAndReferenceRoot(root common.Hash, parent common.Hash, nodes *trienode.MergedNodeSet) error
+	//
+	// The passed in maps(nodes, states) will be retained to avoid copying
+	// everything. Therefore, these maps must not be changed afterwards.
+	Update(root common.Hash, parent common.Hash, block uint64, nodes *trienode.MergedNodeSet, states *triestate.Set) error
 
 	// Commit writes all relevant trie nodes belonging to the specified state
 	// to disk. Report specifies whether logs will be displayed in info level.
@@ -82,7 +86,6 @@ type cache interface {
 type Database struct {
 	config    *Config        // Configuration for trie database
 	diskdb    ethdb.Database // Persistent database to store the snapshot
-	cleans    cache          // Megabytes permitted using for read caches
 	preimages *preimageStore // The store for caching preimages
 	backend   backend        // The backend for managing trie nodes
 }
@@ -90,10 +93,6 @@ type Database struct {
 // prepare initializes the database with provided configs, but the
 // database backend is still left as nil.
 func prepare(diskdb ethdb.Database, config *Config) *Database {
-	var cleans cache
-	if config != nil && config.Cache > 0 {
-		cleans = utils.NewMeteredCache(config.Cache*1024*1024, config.Journal, config.StatsPrefix, cacheStatsUpdateFrequency)
-	}
 	var preimages *preimageStore
 	if config != nil && config.Preimages {
 		preimages = newPreimageStore(diskdb)
@@ -101,7 +100,6 @@ func prepare(diskdb ethdb.Database, config *Config) *Database {
 	return &Database{
 		config:    config,
 		diskdb:    diskdb,
-		cleans:    cleans,
 		preimages: preimages,
 	}
 }
@@ -116,33 +114,53 @@ func NewDatabase(diskdb ethdb.Database) *Database {
 // The path-based scheme is not activated yet, always initialized with legacy
 // hash-based scheme by default.
 func NewDatabaseWithConfig(diskdb ethdb.Database, config *Config) *Database {
+	var cleans cache
+	if config != nil && config.Cache != 0 {
+		cleans = utils.NewMeteredCache(config.Cache*1024*1024, config.StatsPrefix, cacheStatsUpdateFrequency)
+	}
 	db := prepare(diskdb, config)
-	db.backend = hashdb.New(diskdb, db.cleans, mptResolver{})
+	db.backend = hashdb.New(diskdb, cleans, mptResolver{})
 	return db
 }
 
 // Reader returns a reader for accessing all trie nodes with provided state root.
-// Nil is returned in case the state is not available.
-func (db *Database) Reader(blockRoot common.Hash) Reader {
-	return db.backend.(*hashdb.Database).Reader(blockRoot)
+// An error will be returned if the requested state is not available.
+func (db *Database) Reader(blockRoot common.Hash) (Reader, error) {
+	switch b := db.backend.(type) {
+	case *hashdb.Database:
+		return b.Reader(blockRoot)
+	case *pathdb.Database:
+		return b.Reader(blockRoot)
+	}
+	return nil, errors.New("unknown backend")
 }
 
 // Update performs a state transition by committing dirty nodes contained in the
 // given set in order to update state from the specified parent to the specified
 // root. The held pre-images accumulated up to this point will be flushed in case
 // the size exceeds the threshold.
-func (db *Database) Update(root common.Hash, parent common.Hash, nodes *trienode.MergedNodeSet) error {
+//
+// The passed in maps(nodes, states) will be retained to avoid copying everything.
+// Therefore, these maps must not be changed afterwards.
+func (db *Database) Update(root common.Hash, parent common.Hash, block uint64, nodes *trienode.MergedNodeSet, states *triestate.Set) error {
+	if db.config != nil && db.config.OnCommit != nil {
+		db.config.OnCommit(states)
+	}
 	if db.preimages != nil {
 		db.preimages.commit(false)
 	}
-	return db.backend.Update(root, parent, nodes)
+	return db.backend.Update(root, parent, block, nodes, states)
 }
 
-func (db *Database) UpdateAndReferenceRoot(root common.Hash, parent common.Hash, nodes *trienode.MergedNodeSet) error {
+func (db *Database) UpdateAndReferenceRoot(root common.Hash, parent common.Hash, block uint64, nodes *trienode.MergedNodeSet, states *triestate.Set) error {
 	if db.preimages != nil {
 		db.preimages.commit(false)
 	}
-	return db.backend.UpdateAndReferenceRoot(root, parent, nodes)
+	hdb, ok := db.backend.(*hashdb.Database)
+	if ok {
+		return hdb.UpdateAndReferenceRoot(root, parent, block, nodes, states)
+	}
+	return db.backend.Update(root, parent, block, nodes, states)
 }
 
 // Commit iterates over all the children of a particular node, writes them out
@@ -184,49 +202,14 @@ func (db *Database) Scheme() string {
 // It is meant to be called when closing the blockchain object, so that all
 // resources held can be released correctly.
 func (db *Database) Close() error {
-	if db.preimages != nil {
-		db.preimages.commit(true)
-	}
+	db.WritePreimages()
 	return db.backend.Close()
 }
 
-// saveCache saves clean state cache to given directory path
-// using specified CPU cores.
-func (db *Database) saveCache(dir string, threads int) error {
-	if db.cleans == nil {
-		return nil
-	}
-	log.Info("Writing clean trie cache to disk", "path", dir, "threads", threads)
-
-	start := time.Now()
-	err := db.cleans.SaveToFileConcurrent(dir, threads)
-	if err != nil {
-		log.Error("Failed to persist clean trie cache", "error", err)
-		return err
-	}
-	log.Info("Persisted the clean trie cache", "path", dir, "elapsed", common.PrettyDuration(time.Since(start)))
-	return nil
-}
-
-// SaveCache atomically saves fast cache data to the given dir using all
-// available CPU cores.
-func (db *Database) SaveCache(dir string) error {
-	return db.saveCache(dir, runtime.GOMAXPROCS(0))
-}
-
-// SaveCachePeriodically atomically saves fast cache data to the given dir with
-// the specified interval. All dump operation will only use a single CPU core.
-func (db *Database) SaveCachePeriodically(dir string, interval time.Duration, stopCh <-chan struct{}) {
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ticker.C:
-			db.saveCache(dir, 1)
-		case <-stopCh:
-			return
-		}
+// WritePreimages flushes all accumulated preimages to disk forcibly.
+func (db *Database) WritePreimages() {
+	if db.preimages != nil {
+		db.preimages.commit(true)
 	}
 }
 

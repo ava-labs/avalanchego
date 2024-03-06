@@ -64,6 +64,7 @@ var (
 	istanbulInstructionSet         = newIstanbulInstructionSet()
 	subnetEVMInstructionSet        = newSubnetEVMInstructionSet()
 	durangoInstructionSet          = newDurangoInstructionSet()
+	cancunInstructionSet           = newCancunInstructionSet()
 )
 
 // JumpTable contains the EVM opcodes supported at a given fork.
@@ -87,12 +88,22 @@ func validate(jt JumpTable) JumpTable {
 	return jt
 }
 
+func newCancunInstructionSet() JumpTable {
+	instructionSet := newDurangoInstructionSet()
+	enable4844(&instructionSet) // EIP-4844 (DATAHASH opcode)
+	enable1153(&instructionSet) // EIP-1153 "Transient Storage"
+	enable5656(&instructionSet) // EIP-5656 (MCOPY opcode)
+	enable6780(&instructionSet) // EIP-6780 SELFDESTRUCT only in same transaction
+	return validate(instructionSet)
+}
+
 // newDurangoInstructionSet returns the frontier, homestead, byzantium,
 // constantinople, istanbul, petersburg, subnet-evm, durango instructions.
 func newDurangoInstructionSet() JumpTable {
 	instructionSet := newSubnetEVMInstructionSet()
 	enable3855(&instructionSet) // PUSH0 instruction
 	enable3860(&instructionSet) // Limit and meter initcode
+
 	return validate(instructionSet)
 }
 

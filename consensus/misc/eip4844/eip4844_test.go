@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
-package misc
+package eip4844
 
 import (
 	"fmt"
@@ -24,9 +24,42 @@ import (
 	"github.com/ava-labs/subnet-evm/params"
 )
 
+func TestCalcExcessBlobGas(t *testing.T) {
+	var tests = []struct {
+		excess uint64
+		blobs  uint64
+		want   uint64
+	}{
+		// The excess blob gas should not increase from zero if the used blob
+		// slots are below - or equal - to the target.
+		{0, 0, 0},
+		{0, 1, 0},
+		{0, params.BlobTxTargetBlobGasPerBlock / params.BlobTxBlobGasPerBlob, 0},
+
+		// If the target blob gas is exceeded, the excessBlobGas should increase
+		// by however much it was overshot
+		{0, (params.BlobTxTargetBlobGasPerBlock / params.BlobTxBlobGasPerBlob) + 1, params.BlobTxBlobGasPerBlob},
+		{1, (params.BlobTxTargetBlobGasPerBlock / params.BlobTxBlobGasPerBlob) + 1, params.BlobTxBlobGasPerBlob + 1},
+		{1, (params.BlobTxTargetBlobGasPerBlock / params.BlobTxBlobGasPerBlob) + 2, 2*params.BlobTxBlobGasPerBlob + 1},
+
+		// The excess blob gas should decrease by however much the target was
+		// under-shot, capped at zero.
+		{params.BlobTxTargetBlobGasPerBlock, params.BlobTxTargetBlobGasPerBlock / params.BlobTxBlobGasPerBlob, params.BlobTxTargetBlobGasPerBlock},
+		{params.BlobTxTargetBlobGasPerBlock, (params.BlobTxTargetBlobGasPerBlock / params.BlobTxBlobGasPerBlob) - 1, params.BlobTxBlobGasPerBlob},
+		{params.BlobTxTargetBlobGasPerBlock, (params.BlobTxTargetBlobGasPerBlock / params.BlobTxBlobGasPerBlob) - 2, 0},
+		{params.BlobTxBlobGasPerBlob - 1, (params.BlobTxTargetBlobGasPerBlock / params.BlobTxBlobGasPerBlob) - 1, 0},
+	}
+	for _, tt := range tests {
+		result := CalcExcessBlobGas(tt.excess, tt.blobs*params.BlobTxBlobGasPerBlob)
+		if result != tt.want {
+			t.Errorf("excess blob gas mismatch: have %v, want %v", result, tt.want)
+		}
+	}
+}
+
 func TestCalcBlobFee(t *testing.T) {
 	tests := []struct {
-		excessDataGas int64
+		excessBlobGas uint64
 		blobfee       int64
 	}{
 		{0, 1},
@@ -34,12 +67,8 @@ func TestCalcBlobFee(t *testing.T) {
 		{1542707, 2},
 		{10 * 1024 * 1024, 111},
 	}
-	have := CalcBlobFee(nil)
-	if have.Int64() != params.BlobTxMinDataGasprice {
-		t.Errorf("nil test: blobfee mismatch: have %v, want %v", have, params.BlobTxMinDataGasprice)
-	}
 	for i, tt := range tests {
-		have := CalcBlobFee(big.NewInt(tt.excessDataGas))
+		have := CalcBlobFee(tt.excessBlobGas)
 		if have.Int64() != tt.blobfee {
 			t.Errorf("test %d: blobfee mismatch: have %v want %v", i, have, tt.blobfee)
 		}

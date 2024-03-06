@@ -289,9 +289,9 @@ func TestPrecompileActivationAfterHeaderBlock(t *testing.T) {
 
 func TestGenesisWriteUpgradesRegression(t *testing.T) {
 	require := require.New(t)
-	testConfig := *params.TestChainConfig
+	config := *params.TestChainConfig
 	genesis := &Genesis{
-		Config: &testConfig,
+		Config: &config,
 		Alloc: GenesisAlloc{
 			{1}: {Balance: big.NewInt(1), Storage: map[common.Hash]common.Hash{{1}: {1}}},
 		},

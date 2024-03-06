@@ -35,8 +35,9 @@ func GenerateTrie(t *testing.T, trieDB *trie.Database, numKeys int, keySize int)
 	keys, values := FillTrie(t, numKeys, keySize, testTrie)
 
 	// Commit the root to [trieDB]
-	root, nodes := testTrie.Commit(false)
-	err := trieDB.Update(root, types.EmptyRootHash, trienode.NewWithNodeSet(nodes))
+	root, nodes, err := testTrie.Commit(false)
+	assert.NoError(t, err)
+	err = trieDB.Update(root, types.EmptyRootHash, 0, trienode.NewWithNodeSet(nodes), nil)
 	assert.NoError(t, err)
 	err = trieDB.Commit(root, false)
 	assert.NoError(t, err)
@@ -82,8 +83,16 @@ func AssertTrieConsistency(t testing.TB, root common.Hash, a, b *trie.Database, 
 		t.Fatalf("error creating trieB, root=%s, err=%v", root, err)
 	}
 
-	itA := trie.NewIterator(trieA.NodeIterator(nil))
-	itB := trie.NewIterator(trieB.NodeIterator(nil))
+	nodeItA, err := trieA.NodeIterator(nil)
+	if err != nil {
+		t.Fatalf("error creating node iterator for trieA, root=%s, err=%v", root, err)
+	}
+	nodeItB, err := trieB.NodeIterator(nil)
+	if err != nil {
+		t.Fatalf("error creating node iterator for trieB, root=%s, err=%v", root, err)
+	}
+	itA := trie.NewIterator(nodeItA)
+	itB := trie.NewIterator(nodeItB)
 	count := 0
 	for itA.Next() && itB.Next() {
 		count++
@@ -107,7 +116,10 @@ func AssertTrieConsistency(t testing.TB, root common.Hash, a, b *trie.Database, 
 func CorruptTrie(t *testing.T, diskdb ethdb.Batcher, tr *trie.Trie, n int) {
 	// Delete some trie nodes
 	batch := diskdb.NewBatch()
-	nodeIt := tr.NodeIterator(nil)
+	nodeIt, err := tr.NodeIterator(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
 	count := 0
 	for nodeIt.Next(true) {
 		count++
@@ -169,8 +181,11 @@ func FillAccounts(
 		accounts[key] = &acc
 	}
 
-	newRoot, nodes := tr.Commit(false)
-	if err := trieDB.Update(newRoot, root, trienode.NewWithNodeSet(nodes)); err != nil {
+	newRoot, nodes, err := tr.Commit(false)
+	if err != nil {
+		t.Fatalf("error committing trie: %v", err)
+	}
+	if err := trieDB.Update(newRoot, root, 0, trienode.NewWithNodeSet(nodes), nil); err != nil {
 		t.Fatalf("error updating trieDB: %v", err)
 	}
 	if err := trieDB.Commit(newRoot, false); err != nil {

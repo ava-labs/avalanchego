@@ -3,6 +3,11 @@
 
 package params
 
+import (
+	"github.com/ava-labs/avalanchego/version"
+	"github.com/ava-labs/subnet-evm/utils"
+)
+
 // MandatoryNetworkUpgrades contains timestamps that enable mandatory network upgrades.
 // These upgrades are mandatory, meaning that if a node does not upgrade by the
 // specified timestamp, it will be unable to participate in consensus.
@@ -35,6 +40,14 @@ func (m *MandatoryNetworkUpgrades) mandatoryForkOrder() []fork {
 	return []fork{
 		{name: "subnetEVMTimestamp", timestamp: m.SubnetEVMTimestamp},
 		{name: "durangoTimestamp", timestamp: m.DurangoTimestamp},
+	}
+}
+
+// GetMandatoryNetworkUpgrades returns the mandatory network upgrades for the specified network ID.
+func GetMandatoryNetworkUpgrades(networkID uint32) MandatoryNetworkUpgrades {
+	return MandatoryNetworkUpgrades{
+		SubnetEVMTimestamp: utils.NewUint64(0),
+		DurangoTimestamp:   getUpgradeTime(networkID, version.DurangoTimes),
 	}
 }
 

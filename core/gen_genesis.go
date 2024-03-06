@@ -29,10 +29,13 @@ func (g Genesis) MarshalJSON() ([]byte, error) {
 		Alloc         map[common.UnprefixedAddress]GenesisAccount `json:"alloc"      gencodec:"required"`
 		AirdropHash   common.Hash                                 `json:"airdropHash"`
 		AirdropAmount *math.HexOrDecimal256                       `json:"airdropAmount"`
+		AirdropData   []byte                                      `json:"-"`
 		Number        math.HexOrDecimal64                         `json:"number"`
 		GasUsed       math.HexOrDecimal64                         `json:"gasUsed"`
 		ParentHash    common.Hash                                 `json:"parentHash"`
 		BaseFee       *math.HexOrDecimal256                       `json:"baseFeePerGas"`
+		ExcessBlobGas *math.HexOrDecimal64                        `json:"excessBlobGas"`
+		BlobGasUsed   *math.HexOrDecimal64                        `json:"blobGasUsed"`
 	}
 	var enc Genesis
 	enc.Config = g.Config
@@ -51,10 +54,13 @@ func (g Genesis) MarshalJSON() ([]byte, error) {
 	}
 	enc.AirdropHash = g.AirdropHash
 	enc.AirdropAmount = (*math.HexOrDecimal256)(g.AirdropAmount)
+	enc.AirdropData = g.AirdropData
 	enc.Number = math.HexOrDecimal64(g.Number)
 	enc.GasUsed = math.HexOrDecimal64(g.GasUsed)
 	enc.ParentHash = g.ParentHash
 	enc.BaseFee = (*math.HexOrDecimal256)(g.BaseFee)
+	enc.ExcessBlobGas = (*math.HexOrDecimal64)(g.ExcessBlobGas)
+	enc.BlobGasUsed = (*math.HexOrDecimal64)(g.BlobGasUsed)
 	return json.Marshal(&enc)
 }
 
@@ -72,10 +78,13 @@ func (g *Genesis) UnmarshalJSON(input []byte) error {
 		Alloc         map[common.UnprefixedAddress]GenesisAccount `json:"alloc"      gencodec:"required"`
 		AirdropHash   *common.Hash                                `json:"airdropHash"`
 		AirdropAmount *math.HexOrDecimal256                       `json:"airdropAmount"`
+		AirdropData   []byte                                      `json:"-"`
 		Number        *math.HexOrDecimal64                        `json:"number"`
 		GasUsed       *math.HexOrDecimal64                        `json:"gasUsed"`
 		ParentHash    *common.Hash                                `json:"parentHash"`
 		BaseFee       *math.HexOrDecimal256                       `json:"baseFeePerGas"`
+		ExcessBlobGas *math.HexOrDecimal64                        `json:"excessBlobGas"`
+		BlobGasUsed   *math.HexOrDecimal64                        `json:"blobGasUsed"`
 	}
 	var dec Genesis
 	if err := json.Unmarshal(input, &dec); err != nil {
@@ -120,6 +129,9 @@ func (g *Genesis) UnmarshalJSON(input []byte) error {
 	if dec.AirdropAmount != nil {
 		g.AirdropAmount = (*big.Int)(dec.AirdropAmount)
 	}
+	if dec.AirdropData != nil {
+		g.AirdropData = dec.AirdropData
+	}
 	if dec.Number != nil {
 		g.Number = uint64(*dec.Number)
 	}
@@ -131,6 +143,12 @@ func (g *Genesis) UnmarshalJSON(input []byte) error {
 	}
 	if dec.BaseFee != nil {
 		g.BaseFee = (*big.Int)(dec.BaseFee)
+	}
+	if dec.ExcessBlobGas != nil {
+		g.ExcessBlobGas = (*uint64)(dec.ExcessBlobGas)
+	}
+	if dec.BlobGasUsed != nil {
+		g.BlobGasUsed = (*uint64)(dec.BlobGasUsed)
 	}
 	return nil
 }

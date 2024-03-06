@@ -28,6 +28,7 @@ package hashdb
 
 import (
 	"errors"
+	"fmt"
 	"reflect"
 	"sync"
 	"time"
@@ -36,6 +37,7 @@ import (
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/metrics"
 	"github.com/ava-labs/subnet-evm/trie/trienode"
+	"github.com/ava-labs/subnet-evm/trie/triestate"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/log"
@@ -43,35 +45,35 @@ import (
 )
 
 var (
-	memcacheCleanHitMeter   = metrics.NewRegisteredMeter("trie/memcache/clean/hit", nil)
-	memcacheCleanMissMeter  = metrics.NewRegisteredMeter("trie/memcache/clean/miss", nil)
-	memcacheCleanReadMeter  = metrics.NewRegisteredMeter("trie/memcache/clean/read", nil)
-	memcacheCleanWriteMeter = metrics.NewRegisteredMeter("trie/memcache/clean/write", nil)
+	memcacheCleanHitMeter   = metrics.NewRegisteredMeter("hashdb/memcache/clean/hit", nil)
+	memcacheCleanMissMeter  = metrics.NewRegisteredMeter("hashdb/memcache/clean/miss", nil)
+	memcacheCleanReadMeter  = metrics.NewRegisteredMeter("hashdb/memcache/clean/read", nil)
+	memcacheCleanWriteMeter = metrics.NewRegisteredMeter("hashdb/memcache/clean/write", nil)
 
-	memcacheDirtyHitMeter   = metrics.NewRegisteredMeter("trie/memcache/dirty/hit", nil)
-	memcacheDirtyMissMeter  = metrics.NewRegisteredMeter("trie/memcache/dirty/miss", nil)
-	memcacheDirtyReadMeter  = metrics.NewRegisteredMeter("trie/memcache/dirty/read", nil)
-	memcacheDirtyWriteMeter = metrics.NewRegisteredMeter("trie/memcache/dirty/write", nil)
+	memcacheDirtyHitMeter   = metrics.NewRegisteredMeter("hashdb/memcache/dirty/hit", nil)
+	memcacheDirtyMissMeter  = metrics.NewRegisteredMeter("hashdb/memcache/dirty/miss", nil)
+	memcacheDirtyReadMeter  = metrics.NewRegisteredMeter("hashdb/memcache/dirty/read", nil)
+	memcacheDirtyWriteMeter = metrics.NewRegisteredMeter("hashdb/memcache/dirty/write", nil)
 
-	memcacheDirtySizeGauge      = metrics.NewRegisteredGaugeFloat64("trie/memcache/dirty/size", nil)
-	memcacheDirtyChildSizeGauge = metrics.NewRegisteredGaugeFloat64("trie/memcache/dirty/childsize", nil)
-	memcacheDirtyNodesGauge     = metrics.NewRegisteredGauge("trie/memcache/dirty/nodes", nil)
+	memcacheDirtySizeGauge      = metrics.NewRegisteredGaugeFloat64("hashdb/memcache/dirty/size", nil)
+	memcacheDirtyChildSizeGauge = metrics.NewRegisteredGaugeFloat64("hashdb/memcache/dirty/childsize", nil)
+	memcacheDirtyNodesGauge     = metrics.NewRegisteredGauge("hashdb/memcache/dirty/nodes", nil)
 
-	memcacheFlushMeter         = metrics.NewRegisteredMeter("trie/memcache/flush/count", nil)
-	memcacheFlushTimeTimer     = metrics.NewRegisteredResettingTimer("trie/memcache/flush/time", nil)
-	memcacheFlushLockTimeTimer = metrics.NewRegisteredResettingTimer("trie/memcache/flush/locktime", nil)
-	memcacheFlushNodesMeter    = metrics.NewRegisteredMeter("trie/memcache/flush/nodes", nil)
-	memcacheFlushSizeMeter     = metrics.NewRegisteredMeter("trie/memcache/flush/size", nil)
+	memcacheFlushMeter         = metrics.NewRegisteredMeter("hashdb/memcache/flush/count", nil)
+	memcacheFlushTimeTimer     = metrics.NewRegisteredResettingTimer("hashdb/memcache/flush/time", nil)
+	memcacheFlushLockTimeTimer = metrics.NewRegisteredResettingTimer("hashdb/memcache/flush/locktime", nil)
+	memcacheFlushNodesMeter    = metrics.NewRegisteredMeter("hashdb/memcache/flush/nodes", nil)
+	memcacheFlushBytesMeter    = metrics.NewRegisteredMeter("hashdb/memcache/flush/bytes", nil)
 
-	memcacheGCTimeTimer  = metrics.NewRegisteredResettingTimer("trie/memcache/gc/time", nil)
-	memcacheGCNodesMeter = metrics.NewRegisteredMeter("trie/memcache/gc/nodes", nil)
-	memcacheGCSizeMeter  = metrics.NewRegisteredMeter("trie/memcache/gc/size", nil)
+	memcacheGCTimeTimer  = metrics.NewRegisteredResettingTimer("hashdb/memcache/gc/time", nil)
+	memcacheGCNodesMeter = metrics.NewRegisteredMeter("hashdb/memcache/gc/nodes", nil)
+	memcacheGCBytesMeter = metrics.NewRegisteredMeter("hashdb/memcache/gc/bytes", nil)
 
-	memcacheCommitMeter         = metrics.NewRegisteredMeter("trie/memcache/commit/count", nil)
-	memcacheCommitTimeTimer     = metrics.NewRegisteredResettingTimer("trie/memcache/commit/time", nil)
-	memcacheCommitLockTimeTimer = metrics.NewRegisteredResettingTimer("trie/memcache/commit/locktime", nil)
-	memcacheCommitNodesMeter    = metrics.NewRegisteredMeter("trie/memcache/commit/nodes", nil)
-	memcacheCommitSizeMeter     = metrics.NewRegisteredMeter("trie/memcache/commit/size", nil)
+	memcacheCommitMeter         = metrics.NewRegisteredMeter("hashdb/memcache/commit/count", nil)
+	memcacheCommitTimeTimer     = metrics.NewRegisteredResettingTimer("hashdb/memcache/commit/time", nil)
+	memcacheCommitLockTimeTimer = metrics.NewRegisteredResettingTimer("hashdb/memcache/commit/locktime", nil)
+	memcacheCommitNodesMeter    = metrics.NewRegisteredMeter("hashdb/memcache/commit/nodes", nil)
+	memcacheCommitBytesMeter    = metrics.NewRegisteredMeter("hashdb/memcache/commit/bytes", nil)
 )
 
 // ChildResolver defines the required method to decode the provided
@@ -84,6 +86,7 @@ type cache interface {
 	HasGet([]byte, []byte) ([]byte, bool)
 	Del([]byte)
 	Set([]byte, []byte)
+	SaveToFileConcurrent(string, int) error
 }
 
 // Database is an intermediate write layer between the trie data structures and
@@ -257,6 +260,7 @@ func (db *Database) Reference(child common.Hash, parent common.Hash) {
 	db.reference(child, parent)
 }
 
+// reference is the private locked version of Reference.
 func (db *Database) reference(child common.Hash, parent common.Hash) {
 	// If the node does not exist, it's a node pulled from disk, skip
 	node, ok := db.dirties[child]
@@ -303,7 +307,7 @@ func (db *Database) Dereference(root common.Hash) {
 	memcacheDirtyNodesGauge.Update(int64(len(db.dirties)))
 
 	memcacheGCTimeTimer.Update(time.Since(start))
-	memcacheGCSizeMeter.Mark(int64(storage - db.dirtiesSize))
+	memcacheGCBytesMeter.Mark(int64(storage - db.dirtiesSize))
 	memcacheGCNodesMeter.Mark(int64(nodes - len(db.dirties)))
 
 	log.Debug("Dereferenced trie from memory database", "nodes", nodes-len(db.dirties), "size", storage-db.dirtiesSize, "time", time.Since(start),
@@ -460,7 +464,7 @@ func (db *Database) Cap(limit common.StorageSize) error {
 	memcacheFlushMeter.Mark(1)
 	memcacheFlushTimeTimer.Update(time.Since(start))
 	memcacheFlushLockTimeTimer.Update(lockTime + time.Since(lockStart))
-	memcacheFlushSizeMeter.Mark(int64(storage - db.dirtiesSize))
+	memcacheFlushBytesMeter.Mark(int64(storage - db.dirtiesSize))
 	memcacheFlushNodesMeter.Mark(int64(nodes - len(db.dirties)))
 
 	log.Debug("Persisted nodes from memory database", "nodes", nodes-len(db.dirties), "size", storage-db.dirtiesSize, "time", time.Since(start),
@@ -511,7 +515,7 @@ func (db *Database) Commit(node common.Hash, report bool) error {
 	memcacheCommitMeter.Mark(1)
 	memcacheCommitTimeTimer.Update(time.Since(start))
 	memcacheCommitLockTimeTimer.Update(lockTime + time.Since(lockStart))
-	memcacheCommitSizeMeter.Mark(int64(storage - db.dirtiesSize))
+	memcacheCommitBytesMeter.Mark(int64(storage - db.dirtiesSize))
 	memcacheCommitNodesMeter.Mark(int64(nodes - len(db.dirties)))
 
 	logger := log.Info
@@ -609,7 +613,7 @@ func (db *Database) Initialized(genesisRoot common.Hash) bool {
 
 // Update inserts the dirty nodes in provided nodeset into database and link the
 // account trie with multiple storage tries if necessary.
-func (db *Database) Update(root common.Hash, parent common.Hash, nodes *trienode.MergedNodeSet) error {
+func (db *Database) Update(root common.Hash, parent common.Hash, block uint64, nodes *trienode.MergedNodeSet, states *triestate.Set) error {
 	// Ensure the parent state is present and signal a warning if not.
 	if parent != types.EmptyRootHash {
 		if blob, _ := db.Node(parent); len(blob) == 0 {
@@ -625,7 +629,7 @@ func (db *Database) Update(root common.Hash, parent common.Hash, nodes *trienode
 // UpdateAndReferenceRoot inserts the dirty nodes in provided nodeset into
 // database and links the account trie with multiple storage tries if necessary,
 // then adds a reference [from] root to the metaroot while holding the db's lock.
-func (db *Database) UpdateAndReferenceRoot(root common.Hash, parent common.Hash, nodes *trienode.MergedNodeSet) error {
+func (db *Database) UpdateAndReferenceRoot(root common.Hash, parent common.Hash, block uint64, nodes *trienode.MergedNodeSet, states *triestate.Set) error {
 	// Ensure the parent state is present and signal a warning if not.
 	if parent != types.EmptyRootHash {
 		if blob, _ := db.Node(parent); len(blob) == 0 {
@@ -706,8 +710,12 @@ func (db *Database) Scheme() string {
 }
 
 // Reader retrieves a node reader belonging to the given state root.
-func (db *Database) Reader(root common.Hash) *reader {
-	return &reader{db: db}
+// An error will be returned if the requested state is not available.
+func (db *Database) Reader(root common.Hash) (*reader, error) {
+	if _, err := db.Node(root); err != nil {
+		return nil, fmt.Errorf("state %#x is not available, %v", root, err)
+	}
+	return &reader{db: db}, nil
 }
 
 // reader is a state reader of Database which implements the Reader interface.

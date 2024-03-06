@@ -297,7 +297,7 @@ func TestCheckPredicate(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			require := require.New(t)
 			// Create the rules from TestChainConfig and update the predicates based on the test params
-			rules := params.TestChainConfig.AvalancheRules(common.Big0, 0)
+			rules := params.TestChainConfig.Rules(common.Big0, 0)
 			if test.createPredicates != nil {
 				for address, predicater := range test.createPredicates(t) {
 					rules.Predicaters[address] = predicater
@@ -423,7 +423,7 @@ func TestCheckPredicatesOutput(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 			// Create the rules from TestChainConfig and update the predicates based on the test params
-			rules := params.TestChainConfig.AvalancheRules(common.Big0, 0)
+			rules := params.TestChainConfig.Rules(common.Big0, 0)
 			predicater := precompileconfig.NewMockPredicater(gomock.NewController(t))
 			predicater.EXPECT().PredicateGas(gomock.Any()).Return(uint64(0), nil).Times(len(test.testTuple))
 

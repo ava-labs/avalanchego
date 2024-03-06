@@ -441,7 +441,11 @@ func TestResyncNewRootAfterDeletes(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				it := trie.NewIterator(tr.NodeIterator(nil))
+				nodeIt, err := tr.NodeIterator(nil)
+				if err != nil {
+					t.Fatal(err)
+				}
+				it := trie.NewIterator(nodeIt)
 				accountsWithStorage := 0
 
 				// keep track of storage tries we delete trie nodes from

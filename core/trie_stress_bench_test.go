@@ -32,6 +32,7 @@ import (
 	"testing"
 
 	"github.com/ava-labs/subnet-evm/core/types"
+	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/precompile/contract"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -51,6 +52,10 @@ func BenchmarkTrie(t *testing.B) {
 
 func stressTestTrieDb(t *testing.B, numContracts int, callsPerBlock int, elements int64, gasTxLimit uint64) func(int, *BlockGen) {
 	require := require.New(t)
+	config := params.TestChainConfig
+	signer := types.LatestSigner(config)
+	testKey, _ := crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
+
 	contractAddr := make([]common.Address, numContracts)
 	contractTxs := make([]*types.Transaction, numContracts)
 

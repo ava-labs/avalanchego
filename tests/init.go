@@ -197,6 +197,22 @@ var Forks = map[string]*params.ChainConfig{
 			DurangoTimestamp:   utils.NewUint64(0),
 		},
 	},
+	"Cancun": {
+		ChainID:             big.NewInt(1),
+		HomesteadBlock:      big.NewInt(0),
+		EIP150Block:         big.NewInt(0),
+		EIP155Block:         big.NewInt(0),
+		EIP158Block:         big.NewInt(0),
+		ByzantiumBlock:      big.NewInt(0),
+		ConstantinopleBlock: big.NewInt(0),
+		PetersburgBlock:     big.NewInt(0),
+		IstanbulBlock:       big.NewInt(0),
+		MandatoryNetworkUpgrades: params.MandatoryNetworkUpgrades{
+			SubnetEVMTimestamp: utils.NewUint64(0),
+			DurangoTimestamp:   utils.NewUint64(0),
+			CancunTime:         utils.NewUint64(0),
+		},
+	},
 }
 
 // AvailableForks returns the set of defined fork names

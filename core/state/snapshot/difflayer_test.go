@@ -246,7 +246,7 @@ func TestInsertAndMerge(t *testing.T) {
 func emptyLayer() *diskLayer {
 	return &diskLayer{
 		diskdb: memorydb.New(),
-		cache:  utils.NewMeteredCache(500*1024, "", "", 0),
+		cache:  utils.NewMeteredCache(500*1024, "", 0),
 	}
 }
 
