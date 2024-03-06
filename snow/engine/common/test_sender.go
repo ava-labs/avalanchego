@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
@@ -18,7 +17,6 @@ var (
 	_ Sender    = (*SenderTest)(nil)
 	_ AppSender = (*FakeSender)(nil)
 
-	errAccept                = errors.New("unexpectedly called Accept")
 	errSendAppRequest        = errors.New("unexpectedly called SendAppRequest")
 	errSendAppResponse       = errors.New("unexpectedly called SendAppResponse")
 	errSendAppError          = errors.New("unexpectedly called SendAppError")
@@ -30,19 +28,16 @@ var (
 type SenderTest struct {
 	T require.TestingT
 
-	CantAccept,
 	CantSendGetStateSummaryFrontier, CantSendStateSummaryFrontier,
 	CantSendGetAcceptedStateSummary, CantSendAcceptedStateSummary,
 	CantSendGetAcceptedFrontier, CantSendAcceptedFrontier,
 	CantSendGetAccepted, CantSendAccepted,
 	CantSendGet, CantSendGetAncestors, CantSendPut, CantSendAncestors,
 	CantSendPullQuery, CantSendPushQuery, CantSendChits,
-	CantSendGossip,
 	CantSendAppRequest, CantSendAppResponse, CantSendAppError,
 	CantSendAppGossip, CantSendAppGossipSpecific,
 	CantSendCrossChainAppRequest, CantSendCrossChainAppResponse, CantSendCrossChainAppError bool
 
-	AcceptF                      func(*snow.ConsensusContext, ids.ID, []byte) error
 	SendGetStateSummaryFrontierF func(context.Context, set.Set[ids.NodeID], uint32)
 	SendStateSummaryFrontierF    func(context.Context, ids.NodeID, uint32, []byte)
 	SendGetAcceptedStateSummaryF func(context.Context, set.Set[ids.NodeID], uint32, []uint64)
@@ -58,7 +53,6 @@ type SenderTest struct {
 	SendPushQueryF               func(context.Context, set.Set[ids.NodeID], uint32, []byte, uint64)
 	SendPullQueryF               func(context.Context, set.Set[ids.NodeID], uint32, ids.ID, uint64)
 	SendChitsF                   func(context.Context, ids.NodeID, uint32, ids.ID, ids.ID, ids.ID)
-	SendGossipF                  func(context.Context, []byte)
 	SendAppRequestF              func(context.Context, set.Set[ids.NodeID], uint32, []byte) error
 	SendAppResponseF             func(context.Context, ids.NodeID, uint32, []byte) error
 	SendAppErrorF                func(context.Context, ids.NodeID, uint32, int32, string) error
@@ -71,7 +65,6 @@ type SenderTest struct {
 
 // Default set the default callable value to [cant]
 func (s *SenderTest) Default(cant bool) {
-	s.CantAccept = cant
 	s.CantSendGetStateSummaryFrontier = cant
 	s.CantSendStateSummaryFrontier = cant
 	s.CantSendGetAcceptedStateSummary = cant
@@ -87,29 +80,12 @@ func (s *SenderTest) Default(cant bool) {
 	s.CantSendPullQuery = cant
 	s.CantSendPushQuery = cant
 	s.CantSendChits = cant
-	s.CantSendGossip = cant
 	s.CantSendAppRequest = cant
 	s.CantSendAppResponse = cant
 	s.CantSendAppGossip = cant
 	s.CantSendAppGossipSpecific = cant
 	s.CantSendCrossChainAppRequest = cant
 	s.CantSendCrossChainAppResponse = cant
-}
-
-// Accept calls AcceptF if it was initialized. If it wasn't initialized and this
-// function shouldn't be called and testing was initialized, then testing will
-// fail.
-func (s *SenderTest) Accept(ctx *snow.ConsensusContext, containerID ids.ID, container []byte) error {
-	if s.AcceptF != nil {
-		return s.AcceptF(ctx, containerID, container)
-	}
-	if !s.CantAccept {
-		return nil
-	}
-	if s.T != nil {
-		require.FailNow(s.T, errAccept.Error())
-	}
-	return errAccept
 }
 
 // SendGetStateSummaryFrontier calls SendGetStateSummaryFrontierF if it was
@@ -274,17 +250,6 @@ func (s *SenderTest) SendChits(ctx context.Context, vdr ids.NodeID, requestID ui
 		s.SendChitsF(ctx, vdr, requestID, preferredID, preferredIDAtHeight, acceptedID)
 	} else if s.CantSendChits && s.T != nil {
 		require.FailNow(s.T, "Unexpectedly called SendChits")
-	}
-}
-
-// SendGossip calls SendGossipF if it was initialized. If it wasn't initialized
-// and this function shouldn't be called and testing was initialized, then
-// testing will fail.
-func (s *SenderTest) SendGossip(ctx context.Context, container []byte) {
-	if s.SendGossipF != nil {
-		s.SendGossipF(ctx, container)
-	} else if s.CantSendGossip && s.T != nil {
-		require.FailNow(s.T, "Unexpectedly called SendGossip")
 	}
 }
 
