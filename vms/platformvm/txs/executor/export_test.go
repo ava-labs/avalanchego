@@ -11,6 +11,8 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config/configtest"
+	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 )
 
@@ -26,14 +28,14 @@ func TestNewExportTx(t *testing.T) {
 		timestamp          time.Time
 	}
 
-	sourceKey := preFundedKeys[0]
+	sourceKey := genesistest.Keys[0]
 
 	tests := []test{
 		{
 			description:        "P->X export",
 			destinationChainID: env.ctx.XChainID,
 			sourceKeys:         []*secp256k1.PrivateKey{sourceKey},
-			timestamp:          defaultValidateStartTime,
+			timestamp:          genesistest.ValidateStartTime,
 		},
 		{
 			description:        "P->C export",
@@ -49,7 +51,7 @@ func TestNewExportTx(t *testing.T) {
 			require := require.New(t)
 
 			tx, err := env.txBuilder.NewExportTx(
-				defaultBalance-defaultTxFee, // Amount of tokens to export
+				configtest.Balance-defaultTxFee, // Amount of tokens to export
 				tt.destinationChainID,
 				to,
 				tt.sourceKeys,

@@ -17,6 +17,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config/configtest"
+	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -235,8 +237,8 @@ func TestRewardDelegatorTxExecuteOnCommitPreDelegateeDeferral(t *testing.T) {
 	vdrRewardAddress := ids.GenerateTestShortID()
 	delRewardAddress := ids.GenerateTestShortID()
 
-	vdrStartTime := uint64(defaultValidateStartTime.Unix()) + 1
-	vdrEndTime := uint64(defaultValidateStartTime.Add(2 * defaultMinStakingDuration).Unix())
+	vdrStartTime := uint64(genesistest.ValidateStartTime.Unix()) + 1
+	vdrEndTime := uint64(genesistest.ValidateStartTime.Add(2 * configtest.MinStakingDuration).Unix())
 	vdrNodeID := ids.GenerateTestNodeID()
 
 	vdrTx, err := env.txBuilder.NewAddValidatorTx(
@@ -246,7 +248,7 @@ func TestRewardDelegatorTxExecuteOnCommitPreDelegateeDeferral(t *testing.T) {
 		vdrNodeID,        // node ID
 		vdrRewardAddress, // reward address
 		reward.PercentDenominator/4,
-		[]*secp256k1.PrivateKey{preFundedKeys[0]},
+		[]*secp256k1.PrivateKey{genesistest.Keys[0]},
 		ids.ShortEmpty,
 		nil,
 	)
@@ -261,7 +263,7 @@ func TestRewardDelegatorTxExecuteOnCommitPreDelegateeDeferral(t *testing.T) {
 		delEndTime,
 		vdrNodeID,
 		delRewardAddress,
-		[]*secp256k1.PrivateKey{preFundedKeys[0]},
+		[]*secp256k1.PrivateKey{genesistest.Keys[0]},
 		ids.ShortEmpty, // Change address
 		nil,
 	)
@@ -358,8 +360,8 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 	vdrRewardAddress := ids.GenerateTestShortID()
 	delRewardAddress := ids.GenerateTestShortID()
 
-	vdrStartTime := uint64(defaultValidateStartTime.Unix()) + 1
-	vdrEndTime := uint64(defaultValidateStartTime.Add(2 * defaultMinStakingDuration).Unix())
+	vdrStartTime := uint64(genesistest.ValidateStartTime.Unix()) + 1
+	vdrEndTime := uint64(genesistest.ValidateStartTime.Add(2 * configtest.MinStakingDuration).Unix())
 	vdrNodeID := ids.GenerateTestNodeID()
 
 	vdrTx, err := env.txBuilder.NewAddValidatorTx(
@@ -369,7 +371,7 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 		vdrNodeID,
 		vdrRewardAddress,
 		reward.PercentDenominator/4,
-		[]*secp256k1.PrivateKey{preFundedKeys[0]},
+		[]*secp256k1.PrivateKey{genesistest.Keys[0]},
 		ids.ShortEmpty, /*=changeAddr*/
 		nil,
 	)
@@ -384,7 +386,7 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 		delEndTime,
 		vdrNodeID,
 		delRewardAddress,
-		[]*secp256k1.PrivateKey{preFundedKeys[0]},
+		[]*secp256k1.PrivateKey{genesistest.Keys[0]},
 		ids.ShortEmpty, /*=changeAddr*/
 		nil,
 	)
@@ -576,8 +578,8 @@ func TestRewardDelegatorTxAndValidatorTxExecuteOnCommitPostDelegateeDeferral(t *
 	vdrRewardAddress := ids.GenerateTestShortID()
 	delRewardAddress := ids.GenerateTestShortID()
 
-	vdrStartTime := uint64(defaultValidateStartTime.Unix()) + 1
-	vdrEndTime := uint64(defaultValidateStartTime.Add(2 * defaultMinStakingDuration).Unix())
+	vdrStartTime := uint64(genesistest.ValidateStartTime.Unix()) + 1
+	vdrEndTime := uint64(genesistest.ValidateStartTime.Add(2 * configtest.MinStakingDuration).Unix())
 	vdrNodeID := ids.GenerateTestNodeID()
 
 	vdrTx, err := env.txBuilder.NewAddValidatorTx(
@@ -587,7 +589,7 @@ func TestRewardDelegatorTxAndValidatorTxExecuteOnCommitPostDelegateeDeferral(t *
 		vdrNodeID,        // node ID
 		vdrRewardAddress, // reward address
 		reward.PercentDenominator/4,
-		[]*secp256k1.PrivateKey{preFundedKeys[0]},
+		[]*secp256k1.PrivateKey{genesistest.Keys[0]},
 		ids.ShortEmpty,
 		nil,
 	)
@@ -602,7 +604,7 @@ func TestRewardDelegatorTxAndValidatorTxExecuteOnCommitPostDelegateeDeferral(t *
 		delEndTime,
 		vdrNodeID,
 		delRewardAddress,
-		[]*secp256k1.PrivateKey{preFundedKeys[0]},
+		[]*secp256k1.PrivateKey{genesistest.Keys[0]},
 		ids.ShortEmpty, // Change address
 		nil,
 	)
@@ -740,8 +742,8 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	vdrRewardAddress := ids.GenerateTestShortID()
 	delRewardAddress := ids.GenerateTestShortID()
 
-	vdrStartTime := uint64(defaultValidateStartTime.Unix()) + 1
-	vdrEndTime := uint64(defaultValidateStartTime.Add(2 * defaultMinStakingDuration).Unix())
+	vdrStartTime := uint64(genesistest.ValidateStartTime.Unix()) + 1
+	vdrEndTime := uint64(genesistest.ValidateStartTime.Add(2 * configtest.MinStakingDuration).Unix())
 	vdrNodeID := ids.GenerateTestNodeID()
 
 	vdrTx, err := env.txBuilder.NewAddValidatorTx(
@@ -751,7 +753,7 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 		vdrNodeID,        // node ID
 		vdrRewardAddress, // reward address
 		reward.PercentDenominator/4,
-		[]*secp256k1.PrivateKey{preFundedKeys[0]},
+		[]*secp256k1.PrivateKey{genesistest.Keys[0]},
 		ids.ShortEmpty,
 		nil,
 	)
@@ -765,7 +767,7 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 		delEndTime,
 		vdrNodeID,
 		delRewardAddress,
-		[]*secp256k1.PrivateKey{preFundedKeys[0]},
+		[]*secp256k1.PrivateKey{genesistest.Keys[0]},
 		ids.ShortEmpty,
 		nil,
 	)

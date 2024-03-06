@@ -35,6 +35,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block/builder"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config/configtest"
+	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -100,7 +102,7 @@ func TestExportKey(t *testing.T) {
 	pk, err := secp256k1.ToPrivateKey(testPrivateKey)
 	require.NoError(err)
 
-	require.NoError(user.PutKeys(pk, keys[0]))
+	require.NoError(user.PutKeys(pk, genesistest.Keys[0]))
 
 	service.vm.ctx.Lock.Unlock()
 
@@ -220,8 +222,8 @@ func TestGetTx(t *testing.T) {
 					constants.AVMID,
 					[]ids.ID{},
 					"chain name",
-					[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
-					keys[0].PublicKey().Address(), // change addr
+					[]*secp256k1.PrivateKey{genesistest.SubnetControlKeys[0], genesistest.SubnetControlKeys[1]},
+					genesistest.Keys[0].PublicKey().Address(), // change addr
 					nil,
 				)
 			},
@@ -235,13 +237,13 @@ func TestGetTx(t *testing.T) {
 				return service.vm.txBuilder.NewAddPermissionlessValidatorTx( // Test GetTx works for proposal blocks
 					service.vm.MinValidatorStake,
 					uint64(service.vm.clock.Time().Add(txexecutor.SyncBound).Unix()),
-					uint64(service.vm.clock.Time().Add(txexecutor.SyncBound).Add(defaultMinStakingDuration).Unix()),
+					uint64(service.vm.clock.Time().Add(txexecutor.SyncBound).Add(configtest.MinStakingDuration).Unix()),
 					ids.GenerateTestNodeID(),
 					signer.NewProofOfPossession(sk),
 					ids.GenerateTestShortID(),
 					0,
-					[]*secp256k1.PrivateKey{keys[0]},
-					keys[0].PublicKey().Address(), // change addr
+					[]*secp256k1.PrivateKey{genesistest.Keys[0]},
+					genesistest.Keys[0].PublicKey().Address(), // change addr
 					nil,
 				)
 			},
@@ -253,8 +255,8 @@ func TestGetTx(t *testing.T) {
 					100,
 					service.vm.ctx.XChainID,
 					ids.GenerateTestShortID(),
-					[]*secp256k1.PrivateKey{keys[0]},
-					keys[0].PublicKey().Address(), // change addr
+					[]*secp256k1.PrivateKey{genesistest.Keys[0]},
+					genesistest.Keys[0].PublicKey().Address(), // change addr
 					nil,
 				)
 			},
@@ -336,7 +338,7 @@ func TestGetBalance(t *testing.T) {
 	service, _ := defaultService(t)
 
 	// Ensure GetStake is correct for each of the genesis validators
-	genesis, _ := defaultGenesis(t, service.vm.ctx.AVAXAssetID)
+	genesis, _ := genesistest.Genesis(t, service.vm.ctx)
 	for idx, utxo := range genesis.UTXOs {
 		request := GetBalanceRequest{
 			Addresses: []string{
@@ -346,11 +348,11 @@ func TestGetBalance(t *testing.T) {
 		reply := GetBalanceResponse{}
 
 		require.NoError(service.GetBalance(nil, &request, &reply))
-		balance := defaultBalance
+		balance := configtest.Balance
 		if idx == 0 {
 			// we use the first key to fund a subnet creation in [defaultGenesis].
 			// As such we need to account for the subnet creation fee
-			balance = defaultBalance - service.vm.Config.GetCreateSubnetTxFee(service.vm.clock.Time())
+			balance = configtest.Balance - service.vm.Config.GetCreateSubnetTxFee(service.vm.clock.Time())
 		}
 		require.Equal(avajson.Uint64(balance), reply.Balance)
 		require.Equal(avajson.Uint64(balance), reply.Unlocked)
@@ -364,9 +366,9 @@ func TestGetStake(t *testing.T) {
 	service, _ := defaultService(t)
 
 	// Ensure GetStake is correct for each of the genesis validators
-	genesis, _ := defaultGenesis(t, service.vm.ctx.AVAXAssetID)
+	g, _ := genesistest.Genesis(t, service.vm.ctx)
 	addrsStrs := []string{}
-	for i, validator := range genesis.Validators {
+	for i, validator := range g.Validators {
 		addr := "P-" + validator.RewardOwner.Addresses[0]
 		addrsStrs = append(addrsStrs, addr)
 
@@ -378,7 +380,7 @@ func TestGetStake(t *testing.T) {
 		}
 		response := GetStakeReply{}
 		require.NoError(service.GetStake(nil, &args, &response))
-		require.Equal(defaultWeight, uint64(response.Staked))
+		require.Equal(configtest.Weight, uint64(response.Staked))
 		require.Len(response.Outputs, 1)
 
 		// Unmarshal into an output
@@ -390,10 +392,10 @@ func TestGetStake(t *testing.T) {
 		require.NoError(err)
 
 		out := output.Out.(*secp256k1fx.TransferOutput)
-		require.Equal(defaultWeight, out.Amount())
+		require.Equal(configtest.Weight, out.Amount())
 		require.Equal(uint32(1), out.Threshold)
 		require.Len(out.Addrs, 1)
-		require.Equal(keys[i].PublicKey().Address(), out.Addrs[0])
+		require.Equal(genesistest.Keys[i].PublicKey().Address(), out.Addrs[0])
 		require.Zero(out.Locktime)
 	}
 
@@ -406,8 +408,8 @@ func TestGetStake(t *testing.T) {
 	}
 	response := GetStakeReply{}
 	require.NoError(service.GetStake(nil, &args, &response))
-	require.Equal(len(genesis.Validators)*int(defaultWeight), int(response.Staked))
-	require.Len(response.Outputs, len(genesis.Validators))
+	require.Equal(len(g.Validators)*int(configtest.Weight), int(response.Staked))
+	require.Len(response.Outputs, len(g.Validators))
 
 	for _, outputStr := range response.Outputs {
 		outputBytes, err := formatting.Decode(args.Encoding, outputStr)
@@ -418,29 +420,29 @@ func TestGetStake(t *testing.T) {
 		require.NoError(err)
 
 		out := output.Out.(*secp256k1fx.TransferOutput)
-		require.Equal(defaultWeight, out.Amount())
+		require.Equal(configtest.Weight, out.Amount())
 		require.Equal(uint32(1), out.Threshold)
 		require.Zero(out.Locktime)
 		require.Len(out.Addrs, 1)
 	}
 
-	oldStake := defaultWeight
+	oldStake := configtest.Weight
 
 	service.vm.ctx.Lock.Lock()
 
 	// Add a delegator
 	stakeAmount := service.vm.MinDelegatorStake + 12345
-	delegatorNodeID := genesisNodeIDs[0]
-	delegatorStartTime := defaultValidateStartTime
-	delegatorEndTime := defaultGenesisTime.Add(defaultMinStakingDuration)
+	delegatorNodeID := genesistest.GenesisNodeIDs[0]
+	delegatorStartTime := genesistest.ValidateStartTime
+	delegatorEndTime := delegatorStartTime.Add(configtest.MinStakingDuration)
 	tx, err := service.vm.txBuilder.NewAddDelegatorTx(
 		stakeAmount,
 		uint64(delegatorStartTime.Unix()),
 		uint64(delegatorEndTime.Unix()),
 		delegatorNodeID,
 		ids.GenerateTestShortID(),
-		[]*secp256k1.PrivateKey{keys[0]},
-		keys[0].PublicKey().Address(), // change addr
+		[]*secp256k1.PrivateKey{genesistest.Keys[0]},
+		genesistest.Keys[0].PublicKey().Address(), // change addr
 		nil,
 	)
 	require.NoError(err)
@@ -461,7 +463,7 @@ func TestGetStake(t *testing.T) {
 	service.vm.ctx.Lock.Unlock()
 
 	// Make sure the delegator addr has the right stake (old stake + stakeAmount)
-	addr, _ := service.addrManager.FormatLocalAddress(keys[0].PublicKey().Address())
+	addr, _ := service.addrManager.FormatLocalAddress(genesistest.Keys[0].PublicKey().Address())
 	args.Addresses = []string{addr}
 	require.NoError(service.GetStake(nil, &args, &response))
 	require.Equal(oldStake+stakeAmount, uint64(response.Staked))
@@ -487,16 +489,16 @@ func TestGetStake(t *testing.T) {
 	// Add a pending staker
 	stakeAmount = service.vm.MinValidatorStake + 54321
 	pendingStakerNodeID := ids.GenerateTestNodeID()
-	pendingStakerEndTime := uint64(defaultGenesisTime.Add(defaultMinStakingDuration).Unix())
+	pendingStakerEndTime := uint64(genesistest.GenesisTime.Add(configtest.MinStakingDuration).Unix())
 	tx, err = service.vm.txBuilder.NewAddValidatorTx(
 		stakeAmount,
-		uint64(defaultGenesisTime.Unix()),
+		uint64(genesistest.GenesisTime.Unix()),
 		pendingStakerEndTime,
 		pendingStakerNodeID,
 		ids.GenerateTestShortID(),
 		0,
-		[]*secp256k1.PrivateKey{keys[0]},
-		keys[0].PublicKey().Address(), // change addr
+		[]*secp256k1.PrivateKey{genesistest.Keys[0]},
+		genesistest.Keys[0].PublicKey().Address(), // change addr
 		nil,
 	)
 	require.NoError(err)
@@ -535,7 +537,7 @@ func TestGetCurrentValidators(t *testing.T) {
 	require := require.New(t)
 	service, _ := defaultService(t)
 
-	genesis, _ := defaultGenesis(t, service.vm.ctx.AVAXAssetID)
+	genesis, _ := genesistest.Genesis(t, service.vm.ctx)
 
 	// Call getValidators
 	args := GetCurrentValidatorsArgs{SubnetID: constants.PrimaryNetworkID}
@@ -561,9 +563,9 @@ func TestGetCurrentValidators(t *testing.T) {
 
 	// Add a delegator
 	stakeAmount := service.vm.MinDelegatorStake + 12345
-	validatorNodeID := genesisNodeIDs[1]
-	delegatorStartTime := defaultValidateStartTime
-	delegatorEndTime := delegatorStartTime.Add(defaultMinStakingDuration)
+	validatorNodeID := genesistest.GenesisNodeIDs[1]
+	delegatorStartTime := genesistest.ValidateStartTime
+	delegatorEndTime := genesistest.ValidateStartTime.Add(configtest.MinStakingDuration)
 
 	service.vm.ctx.Lock.Lock()
 
@@ -573,8 +575,8 @@ func TestGetCurrentValidators(t *testing.T) {
 		uint64(delegatorEndTime.Unix()),
 		validatorNodeID,
 		ids.GenerateTestShortID(),
-		[]*secp256k1.PrivateKey{keys[0]},
-		keys[0].PublicKey().Address(), // change addr
+		[]*secp256k1.PrivateKey{genesistest.Keys[0]},
+		genesistest.Keys[0].PublicKey().Address(), // change addr
 		nil,
 	)
 	require.NoError(err)
@@ -707,8 +709,8 @@ func TestGetBlock(t *testing.T) {
 				constants.AVMID,
 				[]ids.ID{},
 				"chain name",
-				[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
-				keys[0].PublicKey().Address(), // change addr
+				[]*secp256k1.PrivateKey{genesistest.SubnetControlKeys[0], genesistest.SubnetControlKeys[1]},
+				genesistest.Keys[0].PublicKey().Address(), // change addr
 				nil,
 			)
 			require.NoError(err)

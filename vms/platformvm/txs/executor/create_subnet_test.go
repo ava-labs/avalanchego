@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
@@ -19,7 +20,7 @@ import (
 )
 
 func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
-	ap3Time := defaultGenesisTime.Add(time.Hour)
+	ap3Time := genesistest.GenesisTime.Add(time.Hour)
 	tests := []struct {
 		name        string
 		time        time.Time
@@ -28,7 +29,7 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 	}{
 		{
 			name:        "pre-fork - correctly priced",
-			time:        defaultGenesisTime,
+			time:        genesistest.GenesisTime,
 			fee:         0,
 			expectedErr: nil,
 		},
@@ -54,7 +55,7 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 			env.ctx.Lock.Lock()
 			defer env.ctx.Lock.Unlock()
 
-			ins, outs, _, signers, err := env.utxosHandler.Spend(env.state, preFundedKeys, 0, test.fee, ids.ShortEmpty)
+			ins, outs, _, signers, err := env.utxosHandler.Spend(env.state, genesistest.Keys, 0, test.fee, ids.ShortEmpty)
 			require.NoError(err)
 
 			// Create the tx

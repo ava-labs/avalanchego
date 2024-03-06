@@ -21,6 +21,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config/configtest"
+	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
@@ -140,7 +142,7 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 	env := newEnvironment(t, ctrl, banff)
 
 	// create parentBlock. It's a standard one for simplicity
-	parentTime := defaultGenesisTime
+	parentTime := genesistest.GenesisTime
 	parentHeight := uint64(2022)
 
 	banffParentBlk, err := block.NewApricotStandardBlock(
@@ -385,23 +387,23 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 	// So in this test we avoid ids.GenerateTestNodeID, in favour of ids.BuildTestNodeID
 	// so that TxID does not depend on the order we run tests.
 	staker0 := staker{
-		nodeID:        ids.BuildTestNodeID([]byte{0xf0}),
+		nodeID:        ids.BuildTestNodeID([]byte{0xff}),
 		rewardAddress: ids.ShortID{0xf0},
-		startTime:     defaultGenesisTime,
+		startTime:     genesistest.GenesisTime,
 		endTime:       time.Time{}, // actual endTime depends on specific test
 	}
 
 	staker1 := staker{
 		nodeID:        ids.BuildTestNodeID([]byte{0xf1}),
 		rewardAddress: ids.ShortID{0xf1},
-		startTime:     defaultGenesisTime.Add(1 * time.Minute),
-		endTime:       defaultGenesisTime.Add(10 * defaultMinStakingDuration).Add(1 * time.Minute),
+		startTime:     genesistest.GenesisTime.Add(1 * time.Minute),
+		endTime:       genesistest.GenesisTime.Add(10 * configtest.MinStakingDuration).Add(1 * time.Minute),
 	}
 	staker2 := staker{
 		nodeID:        ids.BuildTestNodeID([]byte{0xf2}),
 		rewardAddress: ids.ShortID{0xf2},
 		startTime:     staker1.startTime.Add(1 * time.Minute),
-		endTime:       staker1.startTime.Add(1 * time.Minute).Add(defaultMinStakingDuration),
+		endTime:       staker1.startTime.Add(1 * time.Minute).Add(configtest.MinStakingDuration),
 	}
 	staker3 := staker{
 		nodeID:        ids.BuildTestNodeID([]byte{0xf3}),
@@ -425,7 +427,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 		nodeID:        ids.BuildTestNodeID([]byte{0xf5}),
 		rewardAddress: ids.ShortID{0xf5},
 		startTime:     staker2.endTime,
-		endTime:       staker2.endTime.Add(defaultMinStakingDuration),
+		endTime:       staker2.endTime.Add(configtest.MinStakingDuration),
 	}
 
 	tests := []test{
@@ -558,7 +560,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 					staker.nodeID,
 					staker.rewardAddress,
 					reward.PercentDenominator,
-					[]*secp256k1.PrivateKey{preFundedKeys[0]},
+					[]*secp256k1.PrivateKey{genesistest.Keys[0]},
 					ids.ShortEmpty,
 					nil,
 				)
@@ -582,7 +584,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 					uint64(subStaker.endTime.Unix()),
 					subStaker.nodeID, // validator ID
 					subnetID,         // Subnet ID
-					[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
+					[]*secp256k1.PrivateKey{genesistest.Keys[0], genesistest.Keys[1]},
 					ids.ShortEmpty,
 					nil,
 				)
@@ -612,7 +614,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 					staker0.nodeID,
 					staker0.rewardAddress,
 					reward.PercentDenominator,
-					[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
+					[]*secp256k1.PrivateKey{genesistest.Keys[0], genesistest.Keys[1]},
 					ids.ShortEmpty,
 					nil,
 				)
@@ -703,16 +705,16 @@ func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 	env.config.TrackedSubnets.Add(subnetID)
 
 	// Add a subnet validator to the staker set
-	subnetValidatorNodeID := genesisNodeIDs[0]
-	subnetVdr1StartTime := defaultValidateStartTime
-	subnetVdr1EndTime := defaultValidateStartTime.Add(defaultMinStakingDuration)
+	subnetValidatorNodeID := genesistest.GenesisNodeIDs[0]
+	subnetVdr1StartTime := genesistest.ValidateStartTime
+	subnetVdr1EndTime := genesistest.ValidateStartTime.Add(configtest.MinStakingDuration)
 	tx, err := env.txBuilder.NewAddSubnetValidatorTx(
 		1,                                  // Weight
 		uint64(subnetVdr1StartTime.Unix()), // Start time
 		uint64(subnetVdr1EndTime.Unix()),   // end time
 		subnetValidatorNodeID,              // Node ID
 		subnetID,                           // Subnet ID
-		[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
+		[]*secp256k1.PrivateKey{genesistest.Keys[0], genesistest.Keys[1]},
 		ids.ShortEmpty,
 		nil,
 	)
@@ -734,14 +736,14 @@ func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 	// The above validator is now part of the staking set
 
 	// Queue a staker that joins the staker set after the above validator leaves
-	subnetVdr2NodeID := genesisNodeIDs[1]
+	subnetVdr2NodeID := genesistest.GenesisNodeIDs[1]
 	tx, err = env.txBuilder.NewAddSubnetValidatorTx(
 		1, // Weight
-		uint64(subnetVdr1EndTime.Add(time.Second).Unix()),                                // Start time
-		uint64(subnetVdr1EndTime.Add(time.Second).Add(defaultMinStakingDuration).Unix()), // end time
+		uint64(subnetVdr1EndTime.Add(time.Second).Unix()),                                    // Start time
+		uint64(subnetVdr1EndTime.Add(time.Second).Add(configtest.MinStakingDuration).Unix()), // end time
 		subnetVdr2NodeID, // Node ID
 		subnetID,         // Subnet ID
-		[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
+		[]*secp256k1.PrivateKey{genesistest.Keys[0], genesistest.Keys[1]},
 		ids.ShortEmpty,
 		nil,
 	)
@@ -764,7 +766,7 @@ func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 
 	// add Staker0 (with the right end time) to state
 	// so to allow proposalBlk issuance
-	staker0StartTime := defaultValidateStartTime
+	staker0StartTime := genesistest.ValidateStartTime
 	staker0EndTime := subnetVdr1EndTime
 	addStaker0, err := env.txBuilder.NewAddValidatorTx(
 		10,
@@ -773,7 +775,7 @@ func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 		ids.GenerateTestNodeID(),
 		ids.GenerateTestShortID(),
 		reward.PercentDenominator,
-		[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
+		[]*secp256k1.PrivateKey{genesistest.Keys[0], genesistest.Keys[1]},
 		ids.ShortEmpty,
 		nil,
 	)
@@ -847,16 +849,16 @@ func TestBanffProposalBlockTrackedSubnet(t *testing.T) {
 			}
 
 			// Add a subnet validator to the staker set
-			subnetValidatorNodeID := genesisNodeIDs[0]
-			subnetVdr1StartTime := defaultGenesisTime.Add(1 * time.Minute)
-			subnetVdr1EndTime := defaultGenesisTime.Add(10 * defaultMinStakingDuration).Add(1 * time.Minute)
+			subnetValidatorNodeID := genesistest.GenesisNodeIDs[0]
+			subnetVdr1StartTime := genesistest.GenesisTime.Add(1 * time.Minute)
+			subnetVdr1EndTime := genesistest.GenesisTime.Add(10 * configtest.MinStakingDuration).Add(1 * time.Minute)
 			tx, err := env.txBuilder.NewAddSubnetValidatorTx(
 				1,                                  // Weight
 				uint64(subnetVdr1StartTime.Unix()), // Start time
 				uint64(subnetVdr1EndTime.Unix()),   // end time
 				subnetValidatorNodeID,              // Node ID
 				subnetID,                           // Subnet ID
-				[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
+				[]*secp256k1.PrivateKey{genesistest.Keys[0], genesistest.Keys[1]},
 				ids.ShortEmpty,
 				nil,
 			)
@@ -877,7 +879,7 @@ func TestBanffProposalBlockTrackedSubnet(t *testing.T) {
 
 			// add Staker0 (with the right end time) to state
 			// so to allow proposalBlk issuance
-			staker0StartTime := defaultGenesisTime
+			staker0StartTime := genesistest.GenesisTime
 			staker0EndTime := subnetVdr1StartTime
 			addStaker0, err := env.txBuilder.NewAddValidatorTx(
 				10,
@@ -886,7 +888,7 @@ func TestBanffProposalBlockTrackedSubnet(t *testing.T) {
 				ids.GenerateTestNodeID(),
 				ids.GenerateTestShortID(),
 				reward.PercentDenominator,
-				[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
+				[]*secp256k1.PrivateKey{genesistest.Keys[0], genesistest.Keys[1]},
 				ids.ShortEmpty,
 				nil,
 			)
@@ -947,8 +949,8 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 
 	// Case: Timestamp is after next validator start time
 	// Add a pending validator
-	pendingValidatorStartTime := defaultGenesisTime.Add(1 * time.Second)
-	pendingValidatorEndTime := pendingValidatorStartTime.Add(defaultMaxStakingDuration)
+	pendingValidatorStartTime := genesistest.GenesisTime.Add(1 * time.Second)
+	pendingValidatorEndTime := pendingValidatorStartTime.Add(configtest.MaxStakingDuration)
 	nodeID := ids.GenerateTestNodeID()
 	rewardAddress := ids.GenerateTestShortID()
 	_, err := addPendingValidator(
@@ -957,13 +959,13 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 		pendingValidatorEndTime,
 		nodeID,
 		rewardAddress,
-		[]*secp256k1.PrivateKey{preFundedKeys[0]},
+		[]*secp256k1.PrivateKey{genesistest.Keys[0]},
 	)
 	require.NoError(err)
 
 	// add Staker0 (with the right end time) to state
 	// just to allow proposalBlk issuance (with a reward Tx)
-	staker0StartTime := defaultGenesisTime
+	staker0StartTime := genesistest.GenesisTime
 	staker0EndTime := pendingValidatorStartTime
 	addStaker0, err := env.txBuilder.NewAddValidatorTx(
 		10,
@@ -972,7 +974,7 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 		ids.GenerateTestNodeID(),
 		ids.GenerateTestShortID(),
 		reward.PercentDenominator,
-		[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
+		[]*secp256k1.PrivateKey{genesistest.Keys[0], genesistest.Keys[1]},
 		ids.ShortEmpty,
 		nil,
 	)
@@ -1036,11 +1038,11 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 		uint64(pendingDelegatorStartTime.Unix()),
 		uint64(pendingDelegatorEndTime.Unix()),
 		nodeID,
-		preFundedKeys[0].PublicKey().Address(),
+		genesistest.Keys[0].PublicKey().Address(),
 		[]*secp256k1.PrivateKey{
-			preFundedKeys[0],
-			preFundedKeys[1],
-			preFundedKeys[4],
+			genesistest.Keys[0],
+			genesistest.Keys[1],
+			genesistest.Keys[4],
 		},
 		ids.ShortEmpty,
 		nil,
@@ -1068,7 +1070,7 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 		ids.GenerateTestNodeID(),
 		ids.GenerateTestShortID(),
 		reward.PercentDenominator,
-		[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
+		[]*secp256k1.PrivateKey{genesistest.Keys[0], genesistest.Keys[1]},
 		ids.ShortEmpty,
 		nil,
 	)
@@ -1131,8 +1133,8 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 
 	// Case: Timestamp is after next validator start time
 	// Add a pending validator
-	pendingValidatorStartTime := defaultGenesisTime.Add(1 * time.Second)
-	pendingValidatorEndTime := pendingValidatorStartTime.Add(defaultMinStakingDuration)
+	pendingValidatorStartTime := genesistest.GenesisTime.Add(1 * time.Second)
+	pendingValidatorEndTime := pendingValidatorStartTime.Add(configtest.MinStakingDuration)
 	nodeIDKey, _ := secp256k1.NewPrivateKey()
 	rewardAddress := nodeIDKey.PublicKey().Address()
 	nodeID := ids.BuildTestNodeID(rewardAddress[:])
@@ -1143,13 +1145,13 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 		pendingValidatorEndTime,
 		nodeID,
 		rewardAddress,
-		[]*secp256k1.PrivateKey{preFundedKeys[0]},
+		[]*secp256k1.PrivateKey{genesistest.Keys[0]},
 	)
 	require.NoError(err)
 
 	// add Staker0 (with the right end time) to state
 	// so to allow proposalBlk issuance
-	staker0StartTime := defaultGenesisTime
+	staker0StartTime := genesistest.GenesisTime
 	staker0EndTime := pendingValidatorStartTime
 	addStaker0, err := env.txBuilder.NewAddValidatorTx(
 		10,
@@ -1158,7 +1160,7 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 		ids.GenerateTestNodeID(),
 		ids.GenerateTestShortID(),
 		reward.PercentDenominator,
-		[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
+		[]*secp256k1.PrivateKey{genesistest.Keys[0], genesistest.Keys[1]},
 		ids.ShortEmpty,
 		nil,
 	)
@@ -1215,17 +1217,17 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 
 	// Add delegator
 	pendingDelegatorStartTime := pendingValidatorStartTime.Add(1 * time.Second)
-	pendingDelegatorEndTime := pendingDelegatorStartTime.Add(defaultMinStakingDuration)
+	pendingDelegatorEndTime := pendingDelegatorStartTime.Add(configtest.MinStakingDuration)
 	addDelegatorTx, err := env.txBuilder.NewAddDelegatorTx(
 		env.config.MinDelegatorStake,
 		uint64(pendingDelegatorStartTime.Unix()),
 		uint64(pendingDelegatorEndTime.Unix()),
 		nodeID,
-		preFundedKeys[0].PublicKey().Address(),
+		genesistest.Keys[0].PublicKey().Address(),
 		[]*secp256k1.PrivateKey{
-			preFundedKeys[0],
-			preFundedKeys[1],
-			preFundedKeys[4],
+			genesistest.Keys[0],
+			genesistest.Keys[1],
+			genesistest.Keys[4],
 		},
 		ids.ShortEmpty,
 		nil,
@@ -1253,7 +1255,7 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 		ids.GenerateTestNodeID(),
 		ids.GenerateTestShortID(),
 		reward.PercentDenominator,
-		[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
+		[]*secp256k1.PrivateKey{genesistest.Keys[0], genesistest.Keys[1]},
 		ids.ShortEmpty,
 		nil,
 	)
@@ -1331,12 +1333,12 @@ func TestAddValidatorProposalBlock(t *testing.T) {
 		uint64(validatorEndTime.Unix()),
 		nodeID,
 		signer.NewProofOfPossession(sk),
-		preFundedKeys[0].PublicKey().Address(),
+		genesistest.Keys[0].PublicKey().Address(),
 		10000,
 		[]*secp256k1.PrivateKey{
-			preFundedKeys[0],
-			preFundedKeys[1],
-			preFundedKeys[4],
+			genesistest.Keys[0],
+			genesistest.Keys[1],
+			genesistest.Keys[4],
 		},
 		ids.ShortEmpty,
 		nil,
@@ -1407,12 +1409,12 @@ func TestAddValidatorProposalBlock(t *testing.T) {
 		uint64(validatorEndTime.Unix()),
 		nodeID,
 		signer.NewProofOfPossession(sk),
-		preFundedKeys[0].PublicKey().Address(),
+		genesistest.Keys[0].PublicKey().Address(),
 		10000,
 		[]*secp256k1.PrivateKey{
-			preFundedKeys[0],
-			preFundedKeys[1],
-			preFundedKeys[4],
+			genesistest.Keys[0],
+			genesistest.Keys[1],
+			genesistest.Keys[4],
 		},
 		ids.ShortEmpty,
 		nil,

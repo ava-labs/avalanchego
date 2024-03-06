@@ -27,16 +27,14 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
-	"github.com/ava-labs/avalanchego/utils/formatting"
-	"github.com/ava-labs/avalanchego/utils/formatting/address"
-	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config/configtest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
+	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
@@ -48,9 +46,6 @@ import (
 )
 
 const (
-	defaultWeight = 5 * units.MilliAvax
-	trackChecksum = false
-
 	apricotPhase3 fork = iota
 	apricotPhase5
 	banff
@@ -59,30 +54,11 @@ const (
 )
 
 var (
-	defaultMinStakingDuration = 24 * time.Hour
-	defaultMaxStakingDuration = 365 * 24 * time.Hour
-	defaultGenesisTime        = time.Date(1997, 1, 1, 0, 0, 0, 0, time.UTC)
-	defaultValidateStartTime  = defaultGenesisTime
-	defaultValidateEndTime    = defaultValidateStartTime.Add(20 * defaultMinStakingDuration)
-	defaultMinValidatorStake  = 5 * units.MilliAvax
-	defaultBalance            = 100 * defaultMinValidatorStake
-	preFundedKeys             = secp256k1.TestKeys()
-	defaultTxFee              = uint64(100)
-	lastAcceptedID            = ids.GenerateTestID()
+	defaultTxFee   = uint64(100)
+	lastAcceptedID = ids.GenerateTestID()
 
-	testSubnet1            *txs.Tx
-	testSubnet1ControlKeys = preFundedKeys[0:3]
-
-	// Node IDs of genesis validators. Initialized in init function
-	genesisNodeIDs []ids.NodeID
+	testSubnet1 *txs.Tx
 )
-
-func init() {
-	genesisNodeIDs = make([]ids.NodeID, len(preFundedKeys))
-	for i := range preFundedKeys {
-		genesisNodeIDs[i] = ids.GenerateTestNodeID()
-	}
-}
 
 type fork uint8
 
@@ -137,7 +113,7 @@ func newEnvironment(t *testing.T, f fork) *environment {
 	fx := defaultFx(clk, ctx.Log, isBootstrapped.Get())
 
 	rewards := reward.NewCalculator(config.RewardConfig)
-	baseState := defaultState(config, ctx, baseDB, rewards)
+	baseState := defaultState(t, config, ctx, baseDB, rewards)
 
 	atomicUTXOs := avax.NewAtomicUTXOManager(ctx.SharedMemory, txs.Codec)
 	uptimes := uptime.NewManager(baseState, clk)
@@ -222,12 +198,12 @@ func addSubnet(
 	testSubnet1, err = txBuilder.NewCreateSubnetTx(
 		2, // threshold; 2 sigs from keys[0], keys[1], keys[2] needed to add validator to this subnet
 		[]ids.ShortID{ // control keys
-			preFundedKeys[0].PublicKey().Address(),
-			preFundedKeys[1].PublicKey().Address(),
-			preFundedKeys[2].PublicKey().Address(),
+			genesistest.SubnetControlKeys[0].PublicKey().Address(),
+			genesistest.SubnetControlKeys[1].PublicKey().Address(),
+			genesistest.SubnetControlKeys[2].PublicKey().Address(),
 		},
-		[]*secp256k1.PrivateKey{preFundedKeys[0]},
-		preFundedKeys[0].PublicKey().Address(),
+		[]*secp256k1.PrivateKey{genesistest.Keys[0]},
+		genesistest.Keys[0].PublicKey().Address(),
 		nil,
 	)
 	require.NoError(err)
@@ -249,12 +225,14 @@ func addSubnet(
 }
 
 func defaultState(
+	t *testing.T,
 	cfg *config.Config,
 	ctx *snow.Context,
 	db database.Database,
 	rewards reward.Calculator,
 ) state.State {
-	genesisBytes := buildGenesisTest(ctx)
+	_, genesisBytes := genesistest.Genesis(t, ctx)
+
 	execCfg, _ := config.GetExecutionConfig(nil)
 	state, err := state.New(
 		db,
@@ -290,19 +268,19 @@ func defaultConfig(t *testing.T, f fork) *config.Config {
 
 	switch f {
 	case durango:
-		durangoTime = defaultValidateStartTime.Add(-2 * time.Second)
+		durangoTime = genesistest.ValidateStartTime.Add(-2 * time.Second)
 		fallthrough
 	case cortina:
-		cortinaTime = defaultValidateStartTime.Add(-2 * time.Second)
+		cortinaTime = genesistest.ValidateStartTime.Add(-2 * time.Second)
 		fallthrough
 	case banff:
-		banffTime = defaultValidateStartTime.Add(-2 * time.Second)
+		banffTime = genesistest.ValidateStartTime.Add(-2 * time.Second)
 		fallthrough
 	case apricotPhase5:
-		apricotPhase5Time = defaultValidateEndTime
+		apricotPhase5Time = genesistest.ValidateEndTime
 		fallthrough
 	case apricotPhase3:
-		apricotPhase3Time = defaultValidateEndTime
+		apricotPhase3Time = genesistest.ValidateEndTime
 	default:
 		require.NoError(t, fmt.Errorf("unhandled fork %d", f))
 	}
@@ -317,8 +295,8 @@ func defaultConfig(t *testing.T, f fork) *config.Config {
 		MinValidatorStake:      5 * units.MilliAvax,
 		MaxValidatorStake:      500 * units.MilliAvax,
 		MinDelegatorStake:      1 * units.MilliAvax,
-		MinStakeDuration:       defaultMinStakingDuration,
-		MaxStakeDuration:       defaultMaxStakingDuration,
+		MinStakeDuration:       configtest.MinStakingDuration,
+		MaxStakeDuration:       configtest.MaxStakingDuration,
 		RewardConfig: reward.Config{
 			MaxConsumptionRate: .12 * reward.PercentDenominator,
 			MinConsumptionRate: .10 * reward.PercentDenominator,
@@ -334,10 +312,10 @@ func defaultConfig(t *testing.T, f fork) *config.Config {
 }
 
 func defaultClock(f fork) *mockable.Clock {
-	now := defaultGenesisTime
+	now := genesistest.GenesisTime
 	if f >= banff {
 		// 1 second after active fork
-		now = defaultValidateEndTime.Add(-2 * time.Second)
+		now = genesistest.ValidateEndTime.Add(-2 * time.Second)
 	}
 	clk := &mockable.Clock{}
 	clk.Set(now)
@@ -378,67 +356,4 @@ func defaultFx(clk *mockable.Clock, log logging.Logger, isBootstrapped bool) fx.
 		}
 	}
 	return res
-}
-
-func buildGenesisTest(ctx *snow.Context) []byte {
-	genesisUTXOs := make([]api.UTXO, len(preFundedKeys))
-	for i, key := range preFundedKeys {
-		id := key.PublicKey().Address()
-		addr, err := address.FormatBech32(constants.UnitTestHRP, id.Bytes())
-		if err != nil {
-			panic(err)
-		}
-		genesisUTXOs[i] = api.UTXO{
-			Amount:  json.Uint64(defaultBalance),
-			Address: addr,
-		}
-	}
-
-	genesisValidators := make([]api.GenesisPermissionlessValidator, len(genesisNodeIDs))
-	for i, nodeID := range genesisNodeIDs {
-		addr, err := address.FormatBech32(constants.UnitTestHRP, nodeID.Bytes())
-		if err != nil {
-			panic(err)
-		}
-		genesisValidators[i] = api.GenesisPermissionlessValidator{
-			GenesisValidator: api.GenesisValidator{
-				StartTime: json.Uint64(defaultValidateStartTime.Unix()),
-				EndTime:   json.Uint64(defaultValidateEndTime.Unix()),
-				NodeID:    nodeID,
-			},
-			RewardOwner: &api.Owner{
-				Threshold: 1,
-				Addresses: []string{addr},
-			},
-			Staked: []api.UTXO{{
-				Amount:  json.Uint64(defaultWeight),
-				Address: addr,
-			}},
-			DelegationFee: reward.PercentDenominator,
-		}
-	}
-
-	buildGenesisArgs := api.BuildGenesisArgs{
-		NetworkID:     json.Uint32(constants.UnitTestID),
-		AvaxAssetID:   ctx.AVAXAssetID,
-		UTXOs:         genesisUTXOs,
-		Validators:    genesisValidators,
-		Chains:        nil,
-		Time:          json.Uint64(defaultGenesisTime.Unix()),
-		InitialSupply: json.Uint64(360 * units.MegaAvax),
-		Encoding:      formatting.Hex,
-	}
-
-	buildGenesisResponse := api.BuildGenesisReply{}
-	platformvmSS := api.StaticService{}
-	if err := platformvmSS.BuildGenesis(nil, &buildGenesisArgs, &buildGenesisResponse); err != nil {
-		panic(fmt.Errorf("problem while building platform chain's genesis state: %w", err))
-	}
-
-	genesisBytes, err := formatting.Decode(buildGenesisResponse.Encoding, buildGenesisResponse.Bytes)
-	if err != nil {
-		panic(err)
-	}
-
-	return genesisBytes
 }
