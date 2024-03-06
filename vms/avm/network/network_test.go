@@ -64,7 +64,6 @@ func TestNetworkAppGossip(t *testing.T) {
 	}
 
 	parser, err := txs.NewParser(
-		time.Time{},
 		[]fxs.Fx{
 			&secp256k1fx.Fx{},
 		},
@@ -186,7 +185,6 @@ func TestNetworkAppGossip(t *testing.T) {
 			ctrl := gomock.NewController(t)
 
 			parser, err := txs.NewParser(
-				time.Time{},
 				[]fxs.Fx{
 					&secp256k1fx.Fx{},
 					&nftfx.Fx{},
@@ -320,7 +318,6 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 			ctrl := gomock.NewController(t)
 
 			parser, err := txs.NewParser(
-				time.Time{},
 				[]fxs.Fx{
 					&secp256k1fx.Fx{},
 					&nftfx.Fx{},
@@ -414,7 +411,6 @@ func TestNetworkIssueTxFromRPCWithoutVerification(t *testing.T) {
 			ctrl := gomock.NewController(t)
 
 			parser, err := txs.NewParser(
-				time.Time{},
 				[]fxs.Fx{
 					&secp256k1fx.Fx{},
 					&nftfx.Fx{},

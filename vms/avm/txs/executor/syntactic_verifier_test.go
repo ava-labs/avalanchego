@@ -7,7 +7,6 @@ import (
 	"math"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -38,7 +37,6 @@ func TestSyntacticVerifierBaseTx(t *testing.T) {
 
 	fx := &secp256k1fx.Fx{}
 	parser, err := txs.NewParser(
-		time.Time{},
 		[]fxs.Fx{
 			fx,
 		},
@@ -411,7 +409,6 @@ func TestSyntacticVerifierCreateAssetTx(t *testing.T) {
 
 	fx := &secp256k1fx.Fx{}
 	parser, err := txs.NewParser(
-		time.Time{},
 		[]fxs.Fx{
 			fx,
 		},
@@ -1021,7 +1018,6 @@ func TestSyntacticVerifierOperationTx(t *testing.T) {
 
 	fx := &secp256k1fx.Fx{}
 	parser, err := txs.NewParser(
-		time.Time{},
 		[]fxs.Fx{
 			fx,
 		},
@@ -1511,7 +1507,6 @@ func TestSyntacticVerifierImportTx(t *testing.T) {
 
 	fx := &secp256k1fx.Fx{}
 	parser, err := txs.NewParser(
-		time.Time{},
 		[]fxs.Fx{
 			fx,
 		},
@@ -1912,7 +1907,6 @@ func TestSyntacticVerifierExportTx(t *testing.T) {
 
 	fx := &secp256k1fx.Fx{}
 	parser, err := txs.NewParser(
-		time.Time{},
 		[]fxs.Fx{
 			fx,
 		},
