@@ -1855,7 +1855,7 @@ func (s *state) GetStatelessBlock(blockID ids.ID) (block.Block, error) {
 	}
 
 	blk, err := block.Parse(block.GenesisCodec, blkBytes)
-	if err == nil {
+	if err != nil {
 		return nil, err
 	}
 
