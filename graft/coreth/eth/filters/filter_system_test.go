@@ -95,13 +95,26 @@ func (b *testBackend) HeaderByNumber(ctx context.Context, blockNr rpc.BlockNumbe
 		num  uint64
 	)
 	switch blockNr {
-	case rpc.LatestBlockNumber, rpc.AcceptedBlockNumber:
+	case rpc.FinalizedBlockNumber:
+		var err error
+		hash, err = rawdb.ReadAcceptorTip(b.db)
+		if err != nil {
+			return nil, err
+		}
+		number := rawdb.ReadHeaderNumber(b.db, hash)
+		if number == nil {
+			return nil, nil
+		}
+		num = *number
+	case rpc.LatestBlockNumber, rpc.PendingBlockNumber:
 		hash = rawdb.ReadHeadBlockHash(b.db)
 		number := rawdb.ReadHeaderNumber(b.db, hash)
 		if number == nil {
 			return nil, nil
 		}
 		num = *number
+	case rpc.SafeBlockNumber:
+		return nil, errors.New("safe block not found")
 	default:
 		num = uint64(blockNr)
 		hash = rawdb.ReadCanonicalHash(b.db, num)
