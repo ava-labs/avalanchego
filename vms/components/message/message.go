@@ -12,10 +12,7 @@ import (
 	pb "github.com/ava-labs/avalanchego/proto/pb/message"
 )
 
-var (
-	ErrUnexpectedCodecVersion = errors.New("unexpected codec version")
-	errUnknownMessageType     = errors.New("unknown message type")
-)
+var errUnknownMessageType = errors.New("unknown message type")
 
 func ParseTx(bytes []byte) ([]byte, error) {
 	var protoMsg pb.Message
