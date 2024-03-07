@@ -13,7 +13,6 @@ import (
 const (
 	pullGossipSource = "pull_gossip"
 	pushGossipSource = "push_gossip"
-	putGossipSource  = "put_gossip"
 	builtSource      = "built"
 	unknownSource    = "unknown"
 )
@@ -141,7 +140,6 @@ func (m *metrics) Initialize(namespace string, reg prometheus.Registerer) error 
 	// Register the labels
 	m.issued.WithLabelValues(pullGossipSource)
 	m.issued.WithLabelValues(pushGossipSource)
-	m.issued.WithLabelValues(putGossipSource)
 	m.issued.WithLabelValues(builtSource)
 	m.issued.WithLabelValues(unknownSource)
 
