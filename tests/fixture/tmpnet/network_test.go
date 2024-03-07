@@ -17,7 +17,7 @@ func TestNetworkSerialization(t *testing.T) {
 
 	network := &Network{}
 	require.NoError(network.EnsureDefaultConfig(&bytes.Buffer{}, "/path/to/avalanche/go", "", 1))
-	require.NoError(network.Create(tmpDir))
+	require.NoError(network.Create(tmpDir, "network-serialization"))
 	// Ensure node runtime is initialized
 	require.NoError(network.readNodes())
 

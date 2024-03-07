@@ -35,7 +35,7 @@ func init() {
 
 var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	// Run only once in the first ginkgo process
-	return e2e.NewTestEnvironment(flagVars, &tmpnet.Network{}).Marshal()
+	return e2e.NewTestEnvironment(flagVars, "avalanchego-e2e", &tmpnet.Network{}).Marshal()
 }, func(envBytes []byte) {
 	// Run in every ginkgo process
 

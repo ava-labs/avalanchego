@@ -51,7 +51,7 @@ func (te *TestEnvironment) Marshal() []byte {
 }
 
 // Initialize a new test environment with a shared network (either pre-existing or newly created).
-func NewTestEnvironment(flagVars *FlagVars, desiredNetwork *tmpnet.Network) *TestEnvironment {
+func NewTestEnvironment(flagVars *FlagVars, networkDirSuffix string, desiredNetwork *tmpnet.Network) *TestEnvironment {
 	require := require.New(ginkgo.GinkgoT())
 
 	networkDir := flagVars.NetworkDir()
@@ -74,7 +74,7 @@ func NewTestEnvironment(flagVars *FlagVars, desiredNetwork *tmpnet.Network) *Tes
 		}
 	} else {
 		network = desiredNetwork
-		StartNetwork(network, flagVars.AvalancheGoExecPath(), flagVars.PluginDir())
+		StartNetwork(network, networkDirSuffix, flagVars.AvalancheGoExecPath(), flagVars.PluginDir())
 	}
 
 	// A new network will always need subnet creation and an existing
@@ -155,7 +155,7 @@ func (te *TestEnvironment) NewKeychain(count int) *secp256k1fx.Keychain {
 }
 
 // Create a new private network that is not shared with other tests.
-func (te *TestEnvironment) NewPrivateNetwork() *tmpnet.Network {
+func (te *TestEnvironment) NewPrivateNetwork(networkDirSuffix string) *tmpnet.Network {
 	// Use the same configuration as the shared network
 	sharedNetwork, err := tmpnet.ReadNetwork(te.NetworkDir)
 	te.require.NoError(err)
@@ -166,6 +166,7 @@ func (te *TestEnvironment) NewPrivateNetwork() *tmpnet.Network {
 	network := &tmpnet.Network{}
 	StartNetwork(
 		network,
+		networkDirSuffix,
 		sharedNetwork.DefaultRuntimeConfig.AvalancheGoPath,
 		pluginDir,
 	)
