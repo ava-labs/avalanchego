@@ -9,7 +9,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
-	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
 var (
@@ -106,14 +105,10 @@ func GetRequestID(m any) (uint32, bool) {
 		return requestID, true
 	}
 
-	// AppGossip is the only message currently not containing a requestID
-	// Here we assign the requestID already in use for gossiped containers
-	// to allow a uniform handling of all messages
-	if _, ok := m.(*p2p.AppGossip); ok {
-		return constants.GossipMsgRequestID, true
-	}
-
-	return 0, false
+	// AppGossip is the only inbound message not containing a requestID. For
+	// ease of handling, imagine that it does have a requestID.
+	_, ok := m.(*p2p.AppGossip)
+	return 0, ok
 }
 
 type engineTypeGetter interface {
