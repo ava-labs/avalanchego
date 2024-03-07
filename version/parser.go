@@ -11,9 +11,8 @@ import (
 )
 
 var (
-	errMissingVersionPrefix     = errors.New("missing required version prefix")
-	errMissingApplicationPrefix = errors.New("missing required application prefix")
-	errMissingVersions          = errors.New("missing version numbers")
+	errMissingVersionPrefix = errors.New("missing required version prefix")
+	errMissingVersions      = errors.New("missing version numbers")
 )
 
 func Parse(s string) (*Semantic, error) {
