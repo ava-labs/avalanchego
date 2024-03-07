@@ -11,10 +11,8 @@ import (
 	_ "embed"
 )
 
-var (
-	//go:embed large_rsa_key.cert
-	largeRSAKeyCert []byte
-)
+//go:embed large_rsa_key.cert
+var largeRSAKeyCert []byte
 
 func TestParseCheckLargeCert(t *testing.T) {
 	_, err := ParseCertificate(largeRSAKeyCert)
