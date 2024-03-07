@@ -6,7 +6,6 @@ package avm
 import (
 	"context"
 	"encoding/json"
-	"math/rand"
 	"testing"
 	"time"
 
@@ -24,9 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
-	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/sampler"
 	"github.com/ava-labs/avalanchego/vms/avm/block/executor"
 	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
@@ -50,21 +47,6 @@ const (
 )
 
 var (
-	testChangeAddr = ids.GenerateTestShortID()
-	testCases      = []struct {
-		name      string
-		avaxAsset bool
-	}{
-		{
-			name:      "genesis asset is AVAX",
-			avaxAsset: true,
-		},
-		{
-			name:      "genesis asset is TEST",
-			avaxAsset: false,
-		},
-	}
-
 	assetID = ids.ID{1, 2, 3}
 
 	keys  = secp256k1.TestKeys()[:3] // TODO: Remove [:3]
@@ -95,13 +77,12 @@ type envConfig struct {
 }
 
 type environment struct {
-	genesisBytes  []byte
-	genesisTx     *txs.Tx
-	sharedMemory  *atomic.Memory
-	issuer        chan common.Message
-	vm            *VM
-	service       *Service
-	walletService *WalletService
+	genesisBytes []byte
+	genesisTx    *txs.Tx
+	sharedMemory *atomic.Memory
+	issuer       chan common.Message
+	vm           *VM
+	service      *Service
 }
 
 // setup the testing environment
@@ -200,10 +181,6 @@ func setup(tb testing.TB, c *envConfig) *environment {
 		vm:           vm,
 		service: &Service{
 			vm: vm,
-		},
-		walletService: &WalletService{
-			vm:         vm,
-			pendingTxs: linkedhashmap.New[ids.ID, *txs.Tx](),
 		},
 	}
 
@@ -305,32 +282,6 @@ func newTx(tb testing.TB, genesisBytes []byte, chainID ids.ID, parser txs.Parser
 	}}
 	require.NoError(tx.SignSECP256K1Fx(parser.Codec(), [][]*secp256k1.PrivateKey{{keys[0]}}))
 	return tx
-}
-
-// Sample from a set of addresses and return them raw and formatted as strings.
-// The size of the sample is between 1 and len(addrs)
-// If len(addrs) == 0, returns nil
-func sampleAddrs(tb testing.TB, addressFormatter avax.AddressManager, addrs []ids.ShortID) ([]ids.ShortID, []string) {
-	require := require.New(tb)
-
-	sampledAddrs := []ids.ShortID{}
-	sampledAddrsStr := []string{}
-
-	sampler := sampler.NewUniform()
-	sampler.Initialize(uint64(len(addrs)))
-
-	numAddrs := 1 + rand.Intn(len(addrs)) // #nosec G404
-	indices, err := sampler.Sample(numAddrs)
-	require.NoError(err)
-	for _, index := range indices {
-		addr := addrs[index]
-		addrStr, err := addressFormatter.FormatLocalAddress(addr)
-		require.NoError(err)
-
-		sampledAddrs = append(sampledAddrs, addr)
-		sampledAddrsStr = append(sampledAddrsStr, addrStr)
-	}
-	return sampledAddrs, sampledAddrsStr
 }
 
 func makeDefaultGenesis(tb testing.TB) *BuildGenesisArgs {
