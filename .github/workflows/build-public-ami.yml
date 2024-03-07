@@ -18,7 +18,7 @@ on:
     tags:
       - "*"
 
-  jobs:
+jobs:
   build-public-ami-and-upload:
     runs-on: ubuntu-22.04
     timeout-minutes: 45
