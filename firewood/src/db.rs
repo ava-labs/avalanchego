@@ -811,7 +811,7 @@ impl Db {
             // create the sentinel node
             #[allow(clippy::unwrap_used)]
             db_header_ref
-                .write(|r| {
+                .modify(|r| {
                     err = (|| {
                         r.kv_root = merkle.init_root()?;
                         Ok(())

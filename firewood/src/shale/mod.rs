@@ -54,8 +54,7 @@ pub type SpaceId = u8;
 pub const INVALID_SPACE_ID: SpaceId = 0xff;
 
 pub struct DiskWrite {
-    pub space_id: SpaceId,
-    pub space_off: u64,
+    pub offset: u64,
     pub data: Box<[u8]>,
 }
 
@@ -63,9 +62,8 @@ impl std::fmt::Debug for DiskWrite {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         write!(
             f,
-            "[Disk space=0x{:02x} offset=0x{:04x} data=0x{}",
-            self.space_id,
-            self.space_off,
+            "[Disk offset=0x{:04x} data=0x{}",
+            self.offset,
             hex::encode(&self.data)
         )
     }
@@ -105,13 +103,14 @@ pub trait CachedStore: Debug + Send + Sync {
     fn is_writeable(&self) -> bool;
 }
 
-/// A wrapper of `TypedView` to enable writes. The direct construction (by [Obj::from_typed_view]
+/// A wrapper of `StoredView` to enable writes. The direct construction (by [Obj::from_stored_view]
 /// or [StoredView::ptr_to_obj]) could be useful for some unsafe access to a low-level item (e.g.
 /// headers/metadata at bootstrap or part of [ShaleStore] implementation) stored at a given [DiskAddress]
 /// . Users of [ShaleStore] implementation, however, will only use [ObjRef] for safeguarded access.
 #[derive(Debug)]
 pub struct Obj<T: Storable> {
     value: StoredView<T>,
+    /// None if the object isn't dirty, otherwise the length of the serialized object.
     dirty: Option<u64>,
 }
 
@@ -121,13 +120,13 @@ impl<T: Storable> Obj<T> {
         DiskAddress(NonZeroUsize::new(self.value.get_offset()))
     }
 
-    /// Write to the underlying object. Returns `Ok(())` on success.
+    /// Modifies the value of this object and marks it as dirty.
     #[inline]
-    pub fn write(&mut self, modify: impl FnOnce(&mut T)) -> Result<(), ObjWriteSizeError> {
-        modify(self.value.write());
+    pub fn modify(&mut self, modify_func: impl FnOnce(&mut T)) -> Result<(), ObjWriteSizeError> {
+        modify_func(self.value.mut_item_ref());
 
-        // if `estimate_mem_image` gives overflow, the object will not be written
-        self.dirty = match self.value.estimate_mem_image() {
+        // if `serialized_len` gives overflow, the object will not be written
+        self.dirty = match self.value.serialized_len() {
             Some(len) => Some(len),
             None => return Err(ObjWriteSizeError),
         };
@@ -139,12 +138,7 @@ impl<T: Storable> Obj<T> {
     }
 
     #[inline(always)]
-    pub fn get_space_id(&self) -> SpaceId {
-        self.value.get_mem_store().id()
-    }
-
-    #[inline(always)]
-    pub const fn from_typed_view(value: StoredView<T>) -> Self {
+    pub const fn from_stored_view(value: StoredView<T>) -> Self {
         Obj { value, dirty: None }
     }
 
@@ -158,7 +152,7 @@ impl<T: Storable> Obj<T> {
             let mut new_value = vec![0; new_value_len as usize];
             // TODO: log error
             #[allow(clippy::unwrap_used)]
-            self.value.write_mem_image(&mut new_value).unwrap();
+            self.value.serialize(&mut new_value).unwrap();
             let offset = self.value.get_offset();
             let bx: &mut dyn CachedStore = self.value.get_mut_mem_store();
             bx.write(offset, &new_value).expect("write should succeed");
@@ -173,7 +167,7 @@ impl Obj<Node> {
             data: Vec::new().into(),
         };
 
-        std::mem::replace(&mut self.value.decoded, Node::from_leaf(empty_node))
+        std::mem::replace(&mut self.value.item, Node::from_leaf(empty_node))
     }
 }
 
@@ -207,7 +201,7 @@ impl<'a, T: Storable + Debug> ObjRef<'a, T> {
 
     #[inline]
     pub fn write(&mut self, modify: impl FnOnce(&mut T)) -> Result<(), ObjWriteSizeError> {
-        self.inner.write(modify)?;
+        self.inner.modify(modify)?;
 
         self.cache.lock().dirty.insert(self.inner.as_ptr());
 
@@ -292,29 +286,32 @@ pub trait Storable {
 }
 
 pub fn to_dehydrated(item: &dyn Storable) -> Result<Vec<u8>, ShaleError> {
-    let mut buff = vec![0; item.serialized_len() as usize];
-    item.serialize(&mut buff)?;
-    Ok(buff)
+    let mut buf = vec![0; item.serialized_len() as usize];
+    item.serialize(&mut buf)?;
+    Ok(buf)
 }
 
 /// A stored view of any [Storable]
 pub struct StoredView<T> {
-    decoded: T,
+    /// The item this stores.
+    item: T,
     mem: Box<dyn SendSyncDerefMut<Target = dyn CachedStore>>,
     offset: usize,
+    /// If the serialized length of `item` is greater than this,
+    /// `serialized_len` will return `None`.
     len_limit: u64,
 }
 
 impl<T: Debug> Debug for StoredView<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let StoredView {
-            decoded,
+            item,
             offset,
             len_limit,
             mem: _,
         } = self;
         f.debug_struct("StoredView")
-            .field("decoded", decoded)
+            .field("item", item)
             .field("offset", offset)
             .field("len_limit", len_limit)
             .finish()
@@ -324,7 +321,7 @@ impl<T: Debug> Debug for StoredView<T> {
 impl<T: Storable> Deref for StoredView<T> {
     type Target = T;
     fn deref(&self) -> &T {
-        &self.decoded
+        &self.item
     }
 }
 
@@ -341,8 +338,9 @@ impl<T: Storable> StoredView<T> {
         &mut **self.mem
     }
 
-    fn estimate_mem_image(&self) -> Option<u64> {
-        let len = self.decoded.serialized_len();
+    /// Returns the serialized length of the item if it's less than the limit, otherwise `None`.
+    fn serialized_len(&self) -> Option<u64> {
+        let len = self.item.serialized_len();
         if len > self.len_limit {
             None
         } else {
@@ -350,23 +348,23 @@ impl<T: Storable> StoredView<T> {
         }
     }
 
-    fn write_mem_image(&self, mem_image: &mut [u8]) -> Result<(), ShaleError> {
-        self.decoded.serialize(mem_image)
+    fn serialize(&self, mem_image: &mut [u8]) -> Result<(), ShaleError> {
+        self.item.serialize(mem_image)
     }
 
-    fn write(&mut self) -> &mut T {
-        &mut self.decoded
+    fn mut_item_ref(&mut self) -> &mut T {
+        &mut self.item
     }
 }
 
 impl<T: Storable + 'static> StoredView<T> {
     #[inline(always)]
     fn new<U: CachedStore>(offset: usize, len_limit: u64, space: &U) -> Result<Self, ShaleError> {
-        let decoded = T::deserialize(offset, space)?;
+        let item = T::deserialize(offset, space)?;
 
         Ok(Self {
             offset,
-            decoded,
+            item,
             mem: space.get_shared(),
             len_limit,
         })
@@ -376,12 +374,12 @@ impl<T: Storable + 'static> StoredView<T> {
     fn from_hydrated(
         offset: usize,
         len_limit: u64,
-        decoded: T,
+        item: T,
         space: &dyn CachedStore,
     ) -> Result<Self, ShaleError> {
         Ok(Self {
             offset,
-            decoded,
+            item,
             mem: space.get_shared(),
             len_limit,
         })
@@ -393,7 +391,7 @@ impl<T: Storable + 'static> StoredView<T> {
         ptr: DiskAddress,
         len_limit: u64,
     ) -> Result<Obj<T>, ShaleError> {
-        Ok(Obj::from_typed_view(Self::new(
+        Ok(Obj::from_stored_view(Self::new(
             ptr.get(),
             len_limit,
             store,
@@ -405,10 +403,10 @@ impl<T: Storable + 'static> StoredView<T> {
         store: &dyn CachedStore,
         addr: usize,
         len_limit: u64,
-        decoded: T,
+        item: T,
     ) -> Result<Obj<T>, ShaleError> {
-        Ok(Obj::from_typed_view(Self::from_hydrated(
-            addr, len_limit, decoded, store,
+        Ok(Obj::from_stored_view(Self::from_hydrated(
+            addr, len_limit, item, store,
         )?))
     }
 }
@@ -417,12 +415,12 @@ impl<T: Storable> StoredView<T> {
     fn new_from_slice(
         offset: usize,
         len_limit: u64,
-        decoded: T,
+        item: T,
         space: &dyn CachedStore,
     ) -> Result<Self, ShaleError> {
         Ok(Self {
             offset,
-            decoded,
+            item,
             mem: space.get_shared(),
             len_limit,
         })
@@ -432,7 +430,7 @@ impl<T: Storable> StoredView<T> {
         s: &Obj<T>,
         offset: usize,
         length: u64,
-        decoded: U,
+        item: U,
     ) -> Result<Obj<U>, ShaleError> {
         let addr_ = s.value.get_offset() + offset;
         if s.dirty.is_some() {
@@ -442,7 +440,7 @@ impl<T: Storable> StoredView<T> {
                 error: "dirty write",
             });
         }
-        let r = StoredView::new_from_slice(addr_, length, decoded, s.value.get_mem_store())?;
+        let r = StoredView::new_from_slice(addr_, length, item, s.value.get_mem_store())?;
         Ok(Obj {
             value: r,
             dirty: None,
