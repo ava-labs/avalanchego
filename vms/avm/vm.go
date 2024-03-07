@@ -37,7 +37,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm/state"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/mempool"
-	"github.com/ava-labs/avalanchego/vms/avm/utxo"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/index"
 
@@ -67,7 +66,6 @@ type VM struct {
 	avax.AddressManager
 	avax.AtomicUTXOManager
 	ids.Aliaser
-	utxo.Spender
 
 	// Contains information of where this VM is executing
 	ctx *snow.Context
@@ -224,7 +222,6 @@ func (vm *VM) Initialize(
 
 	codec := vm.parser.Codec()
 	vm.AtomicUTXOManager = avax.NewAtomicUTXOManager(ctx.SharedMemory, codec)
-	vm.Spender = utxo.NewSpender(&vm.clock, codec)
 
 	state, err := state.New(
 		vm.db,
