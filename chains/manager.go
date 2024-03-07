@@ -607,16 +607,6 @@ func (m *manager) createAvalancheChain(
 		avalancheMessageSender = sender.Trace(avalancheMessageSender, m.Tracer)
 	}
 
-	err = m.VertexAcceptorGroup.RegisterAcceptor(
-		ctx.ChainID,
-		"gossip",
-		avalancheMessageSender,
-		false,
-	)
-	if err != nil { // Set up the event dispatcher
-		return nil, fmt.Errorf("problem initializing event dispatcher: %w", err)
-	}
-
 	// Passes messages from the snowman engines to the network
 	snowmanMessageSender, err := sender.New(
 		ctx,
@@ -633,16 +623,6 @@ func (m *manager) createAvalancheChain(
 
 	if m.TracingEnabled {
 		snowmanMessageSender = sender.Trace(snowmanMessageSender, m.Tracer)
-	}
-
-	err = m.BlockAcceptorGroup.RegisterAcceptor(
-		ctx.ChainID,
-		"gossip",
-		snowmanMessageSender,
-		false,
-	)
-	if err != nil { // Set up the event dispatcher
-		return nil, fmt.Errorf("problem initializing event dispatcher: %w", err)
 	}
 
 	chainConfig, err := m.getChainConfig(ctx.ChainID)
@@ -998,16 +978,6 @@ func (m *manager) createSnowmanChain(
 
 	if m.TracingEnabled {
 		messageSender = sender.Trace(messageSender, m.Tracer)
-	}
-
-	err = m.BlockAcceptorGroup.RegisterAcceptor(
-		ctx.ChainID,
-		"gossip",
-		messageSender,
-		false,
-	)
-	if err != nil { // Set up the event dispatcher
-		return nil, fmt.Errorf("problem initializing event dispatcher: %w", err)
 	}
 
 	var (
