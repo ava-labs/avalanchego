@@ -7,7 +7,6 @@ import (
 	"context"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
@@ -35,15 +34,12 @@ import (
 // time the requestID space has been exhausted, the beginning of the requestID
 // space is free of conflicts.
 type Sender interface {
-	snow.Acceptor
-
 	StateSummarySender
 	AcceptedStateSummarySender
 	FrontierSender
 	AcceptedSender
 	FetchSender
 	QuerySender
-	Gossiper
 	AppSender
 }
 
@@ -158,13 +154,6 @@ type QuerySender interface {
 		preferredIDAtHeight ids.ID,
 		acceptedID ids.ID,
 	)
-}
-
-// Gossiper defines how a consensus engine gossips a container on the accepted
-// frontier to other nodes
-type Gossiper interface {
-	// Gossip the provided container throughout the network
-	SendGossip(ctx context.Context, container []byte)
 }
 
 // NetworkAppSender sends VM-level messages to nodes in the network.

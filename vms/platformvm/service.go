@@ -37,7 +37,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	avajson "github.com/ava-labs/avalanchego/utils/json"
@@ -62,8 +61,6 @@ var (
 	errPrimaryNetworkIsNotASubnet = errors.New("the primary network isn't a subnet")
 	errNoAddresses                = errors.New("no addresses provided")
 	errMissingBlockchainID        = errors.New("argument 'blockchainID' not given")
-	errStartAfterEndTime          = errors.New("start time must be before end time")
-	errStartTimeInThePast         = errors.New("start time in the past")
 )
 
 // Service defines the API calls that can be made to the platform chain
@@ -935,128 +932,6 @@ func (s *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentValidato
 	return nil
 }
 
-// GetPendingValidatorsArgs are the arguments for calling GetPendingValidators
-type GetPendingValidatorsArgs struct {
-	// Subnet we're getting the pending validators of
-	// If omitted, defaults to primary network
-	SubnetID ids.ID `json:"subnetID"`
-	// NodeIDs of validators to request. If [NodeIDs]
-	// is empty, it fetches all pending validators. If
-	// some requested nodeIDs are not pending validators,
-	// they are omitted from the response.
-	NodeIDs []ids.NodeID `json:"nodeIDs"`
-}
-
-// GetPendingValidatorsReply are the results from calling GetPendingValidators.
-type GetPendingValidatorsReply struct {
-	Validators []interface{} `json:"validators"`
-	Delegators []interface{} `json:"delegators"`
-}
-
-// GetPendingValidators returns the lists of pending validators and delegators.
-func (s *Service) GetPendingValidators(_ *http.Request, args *GetPendingValidatorsArgs, reply *GetPendingValidatorsReply) error {
-	s.vm.ctx.Log.Debug("API called",
-		zap.String("service", "platform"),
-		zap.String("method", "getPendingValidators"),
-	)
-
-	reply.Validators = []interface{}{}
-	reply.Delegators = []interface{}{}
-
-	// Create set of nodeIDs
-	nodeIDs := set.Of(args.NodeIDs...)
-
-	s.vm.ctx.Lock.Lock()
-	defer s.vm.ctx.Lock.Unlock()
-
-	numNodeIDs := nodeIDs.Len()
-	targetStakers := make([]*state.Staker, 0, numNodeIDs)
-	if numNodeIDs == 0 { // Include all nodes
-		pendingStakerIterator, err := s.vm.state.GetPendingStakerIterator()
-		if err != nil {
-			return err
-		}
-		for pendingStakerIterator.Next() { // Iterates in order of increasing stop time
-			staker := pendingStakerIterator.Value()
-			if args.SubnetID != staker.SubnetID {
-				continue
-			}
-			targetStakers = append(targetStakers, staker)
-		}
-		pendingStakerIterator.Release()
-	} else {
-		for nodeID := range nodeIDs {
-			staker, err := s.vm.state.GetPendingValidator(args.SubnetID, nodeID)
-			switch err {
-			case nil:
-			case database.ErrNotFound:
-				// nothing to do, continue
-				continue
-			default:
-				return err
-			}
-			targetStakers = append(targetStakers, staker)
-
-			delegatorsIt, err := s.vm.state.GetPendingDelegatorIterator(args.SubnetID, nodeID)
-			if err != nil {
-				return err
-			}
-			for delegatorsIt.Next() {
-				staker := delegatorsIt.Value()
-				targetStakers = append(targetStakers, staker)
-			}
-			delegatorsIt.Release()
-		}
-	}
-
-	for _, pendingStaker := range targetStakers {
-		nodeID := pendingStaker.NodeID
-		weight := avajson.Uint64(pendingStaker.Weight)
-		apiStaker := platformapi.Staker{
-			TxID:        pendingStaker.TxID,
-			NodeID:      nodeID,
-			StartTime:   avajson.Uint64(pendingStaker.StartTime.Unix()),
-			EndTime:     avajson.Uint64(pendingStaker.EndTime.Unix()),
-			Weight:      weight,
-			StakeAmount: &weight,
-		}
-
-		switch pendingStaker.Priority {
-		case txs.PrimaryNetworkValidatorPendingPriority, txs.SubnetPermissionlessValidatorPendingPriority:
-			attr, err := s.loadStakerTxAttributes(pendingStaker.TxID)
-			if err != nil {
-				return err
-			}
-
-			shares := attr.shares
-			delegationFee := avajson.Float32(100 * float32(shares) / float32(reward.PercentDenominator))
-
-			connected := s.vm.uptimeManager.IsConnected(nodeID, args.SubnetID)
-			vdr := platformapi.PermissionlessValidator{
-				Staker:        apiStaker,
-				DelegationFee: delegationFee,
-				Connected:     connected,
-				Signer:        attr.proofOfPossession,
-			}
-			reply.Validators = append(reply.Validators, vdr)
-
-		case txs.PrimaryNetworkDelegatorApricotPendingPriority, txs.PrimaryNetworkDelegatorBanffPendingPriority, txs.SubnetPermissionlessDelegatorPendingPriority:
-			reply.Delegators = append(reply.Delegators, apiStaker)
-
-		case txs.SubnetPermissionedValidatorPendingPriority:
-			connected := s.vm.uptimeManager.IsConnected(nodeID, args.SubnetID)
-			reply.Validators = append(reply.Validators, platformapi.PermissionedValidator{
-				Staker:    apiStaker,
-				Connected: connected,
-			})
-
-		default:
-			return fmt.Errorf("unexpected staker priority %d", pendingStaker.Priority)
-		}
-	}
-	return nil
-}
-
 // GetCurrentSupplyArgs are the arguments for calling GetCurrentSupply
 type GetCurrentSupplyArgs struct {
 	SubnetID ids.ID `json:"subnetID"`
@@ -1710,62 +1585,6 @@ func (s *Service) GetTotalStake(_ *http.Request, args *GetTotalStakeArgs, reply 
 	reply.Weight = weight
 	reply.Stake = weight
 	return nil
-}
-
-// GetMaxStakeAmountArgs is the request for calling GetMaxStakeAmount.
-type GetMaxStakeAmountArgs struct {
-	SubnetID  ids.ID         `json:"subnetID"`
-	NodeID    ids.NodeID     `json:"nodeID"`
-	StartTime avajson.Uint64 `json:"startTime"`
-	EndTime   avajson.Uint64 `json:"endTime"`
-}
-
-// GetMaxStakeAmountReply is the response from calling GetMaxStakeAmount.
-type GetMaxStakeAmountReply struct {
-	Amount avajson.Uint64 `json:"amount"`
-}
-
-// GetMaxStakeAmount returns the maximum amount of nAVAX staking to the named
-// node during the time period.
-func (s *Service) GetMaxStakeAmount(_ *http.Request, args *GetMaxStakeAmountArgs, reply *GetMaxStakeAmountReply) error {
-	s.vm.ctx.Log.Debug("deprecated API called",
-		zap.String("service", "platform"),
-		zap.String("method", "getMaxStakeAmount"),
-	)
-
-	startTime := time.Unix(int64(args.StartTime), 0)
-	endTime := time.Unix(int64(args.EndTime), 0)
-
-	if startTime.After(endTime) {
-		return errStartAfterEndTime
-	}
-
-	s.vm.ctx.Lock.Lock()
-	defer s.vm.ctx.Lock.Unlock()
-
-	now := s.vm.state.GetTimestamp()
-	if startTime.Before(now) {
-		return errStartTimeInThePast
-	}
-
-	staker, err := executor.GetValidator(s.vm.state, args.SubnetID, args.NodeID)
-	if err == database.ErrNotFound {
-		return nil
-	}
-	if err != nil {
-		return err
-	}
-
-	if startTime.After(staker.EndTime) {
-		return nil
-	}
-	if endTime.Before(staker.StartTime) {
-		return nil
-	}
-
-	maxStakeAmount, err := executor.GetMaxWeight(s.vm.state, staker, startTime, endTime)
-	reply.Amount = avajson.Uint64(maxStakeAmount)
-	return err
 }
 
 // GetRewardUTXOsReply defines the GetRewardUTXOs replies returned from the API
