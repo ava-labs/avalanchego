@@ -9,8 +9,11 @@ on:
   push:
     tags:
       - "*"
+env:
+  PACKER_VERSION: "1.10.2"
+  PYTHON_BOTO3_VERSION: "1.20.34+dfsg-1"
 
-jobs:
+  jobs:
   build-public-ami-and-upload:
     runs-on: ubuntu-22.04
     timeout-minutes: 45
@@ -26,7 +29,7 @@ jobs:
       - name: Install aws cli
         run: |
           sudo apt update
-          sudo apt-get -y install packer python3-boto3
+          sudo apt-get -y install packer=${{ env.PACKER_VERSION }} python3-boto3=${{ env.PYTHON_BOTO3_VERSION }}
 
       - name: Get the tag
         id: get_tag
