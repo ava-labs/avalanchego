@@ -5,6 +5,7 @@ package getter
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -27,6 +28,7 @@ import (
 var _ common.AllGetsServer = (*getter)(nil)
 
 func New(
+	lock sync.Locker,
 	storage vertex.Storage,
 	sender common.Sender,
 	log logging.Logger,
@@ -35,6 +37,7 @@ func New(
 	reg prometheus.Registerer,
 ) (common.AllGetsServer, error) {
 	gh := &getter{
+		lock:                      lock,
 		storage:                   storage,
 		sender:                    sender,
 		log:                       log,
@@ -53,6 +56,7 @@ func New(
 }
 
 type getter struct {
+	lock                      sync.Locker
 	storage                   vertex.Storage
 	sender                    common.Sender
 	log                       logging.Logger
@@ -85,6 +89,9 @@ func (gh *getter) GetAcceptedStateSummary(_ context.Context, nodeID ids.NodeID, 
 // TODO: Remove support for GetAcceptedFrontier messages after v1.11.x is
 // activated.
 func (gh *getter) GetAcceptedFrontier(ctx context.Context, validatorID ids.NodeID, requestID uint32) error {
+	gh.lock.Lock()
+	defer gh.lock.Unlock()
+
 	acceptedFrontier := gh.storage.Edge(ctx)
 	// Since all the DAGs are linearized, we only need to return the stop
 	// vertex.
@@ -96,6 +103,9 @@ func (gh *getter) GetAcceptedFrontier(ctx context.Context, validatorID ids.NodeI
 
 // TODO: Remove support for GetAccepted messages after v1.11.x is activated.
 func (gh *getter) GetAccepted(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs set.Set[ids.ID]) error {
+	gh.lock.Lock()
+	defer gh.lock.Unlock()
+
 	acceptedVtxIDs := make([]ids.ID, 0, containerIDs.Len())
 	for vtxID := range containerIDs {
 		if vtx, err := gh.storage.GetVtx(ctx, vtxID); err == nil && vtx.Status() == choices.Accepted {
@@ -107,6 +117,9 @@ func (gh *getter) GetAccepted(ctx context.Context, nodeID ids.NodeID, requestID 
 }
 
 func (gh *getter) GetAncestors(ctx context.Context, nodeID ids.NodeID, requestID uint32, vtxID ids.ID) error {
+	gh.lock.Lock()
+	defer gh.lock.Unlock()
+
 	startTime := time.Now()
 	gh.log.Verbo("called GetAncestors",
 		zap.Stringer("nodeID", nodeID),
@@ -159,6 +172,9 @@ func (gh *getter) GetAncestors(ctx context.Context, nodeID ids.NodeID, requestID
 }
 
 func (gh *getter) Get(ctx context.Context, nodeID ids.NodeID, requestID uint32, vtxID ids.ID) error {
+	gh.lock.Lock()
+	defer gh.lock.Unlock()
+
 	// If this engine has access to the requested vertex, provide it
 	if vtx, err := gh.storage.GetVtx(ctx, vtxID); err == nil {
 		gh.sender.SendPut(ctx, nodeID, requestID, vtx.Bytes())

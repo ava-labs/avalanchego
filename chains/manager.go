@@ -793,6 +793,7 @@ func (m *manager) createAvalancheChain(
 	vdrs.RegisterCallbackListener(ctx.SubnetID, startupTracker)
 
 	snowGetHandler, err := snowgetter.New(
+		&ctx.Lock,
 		vmWrappingProposerVM,
 		snowmanMessageSender,
 		ctx.Log,
@@ -859,6 +860,7 @@ func (m *manager) createAvalancheChain(
 	}
 
 	avaGetHandler, err := avagetter.New(
+		&ctx.Lock,
 		vtxManager,
 		avalancheMessageSender,
 		ctx.Log,
@@ -1130,6 +1132,7 @@ func (m *manager) createSnowmanChain(
 	beacons.RegisterCallbackListener(ctx.SubnetID, startupTracker)
 
 	snowGetHandler, err := snowgetter.New(
+		&ctx.Lock,
 		vm,
 		messageSender,
 		ctx.Log,

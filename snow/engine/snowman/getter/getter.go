@@ -5,6 +5,7 @@ package getter
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -24,6 +25,7 @@ import (
 var _ common.AllGetsServer = (*getter)(nil)
 
 func New(
+	lock sync.Locker,
 	vm block.ChainVM,
 	sender common.Sender,
 	log logging.Logger,
@@ -33,6 +35,7 @@ func New(
 ) (common.AllGetsServer, error) {
 	ssVM, _ := vm.(block.StateSyncableVM)
 	gh := &getter{
+		lock:                      lock,
 		vm:                        vm,
 		ssVM:                      ssVM,
 		sender:                    sender,
@@ -52,6 +55,7 @@ func New(
 }
 
 type getter struct {
+	lock sync.Locker
 	vm   block.ChainVM
 	ssVM block.StateSyncableVM // can be nil
 
@@ -78,6 +82,9 @@ func (gh *getter) GetStateSummaryFrontier(ctx context.Context, nodeID ids.NodeID
 		)
 		return nil
 	}
+
+	gh.lock.Lock()
+	defer gh.lock.Unlock()
 
 	summary, err := gh.ssVM.GetLastStateSummary(ctx)
 	if err != nil {
@@ -114,6 +121,9 @@ func (gh *getter) GetAcceptedStateSummary(ctx context.Context, nodeID ids.NodeID
 		return nil
 	}
 
+	gh.lock.Lock()
+	defer gh.lock.Unlock()
+
 	summaryIDs := make([]ids.ID, 0, heights.Len())
 	for height := range heights {
 		summary, err := gh.ssVM.GetStateSummary(ctx, height)
@@ -140,6 +150,9 @@ func (gh *getter) GetAcceptedStateSummary(ctx context.Context, nodeID ids.NodeID
 }
 
 func (gh *getter) GetAcceptedFrontier(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
+	gh.lock.Lock()
+	defer gh.lock.Unlock()
+
 	lastAccepted, err := gh.vm.LastAccepted(ctx)
 	if err != nil {
 		return err
@@ -149,6 +162,9 @@ func (gh *getter) GetAcceptedFrontier(ctx context.Context, nodeID ids.NodeID, re
 }
 
 func (gh *getter) GetAccepted(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs set.Set[ids.ID]) error {
+	gh.lock.Lock()
+	defer gh.lock.Unlock()
+
 	acceptedIDs := make([]ids.ID, 0, containerIDs.Len())
 	for blkID := range containerIDs {
 		blk, err := gh.vm.GetBlock(ctx, blkID)
@@ -161,6 +177,9 @@ func (gh *getter) GetAccepted(ctx context.Context, nodeID ids.NodeID, requestID 
 }
 
 func (gh *getter) GetAncestors(ctx context.Context, nodeID ids.NodeID, requestID uint32, blkID ids.ID) error {
+	gh.lock.Lock()
+	defer gh.lock.Unlock()
+
 	ancestorsBytes, err := block.GetAncestors(
 		ctx,
 		gh.log,
@@ -187,6 +206,9 @@ func (gh *getter) GetAncestors(ctx context.Context, nodeID ids.NodeID, requestID
 }
 
 func (gh *getter) Get(ctx context.Context, nodeID ids.NodeID, requestID uint32, blkID ids.ID) error {
+	gh.lock.Lock()
+	defer gh.lock.Unlock()
+
 	blk, err := gh.vm.GetBlock(ctx, blkID)
 	if err != nil {
 		// If we failed to get the block, that means either an unexpected error
