@@ -15,7 +15,7 @@ import (
 )
 
 func TestNewExportTx(t *testing.T) {
-	env := newEnvironment(t, true /*=postBanff*/, false /*=postCortina*/, false /*=postDurango*/)
+	env := newEnvironment(t, banff)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
@@ -54,6 +54,7 @@ func TestNewExportTx(t *testing.T) {
 				to,
 				tt.sourceKeys,
 				ids.ShortEmpty, // Change address
+				nil,
 			)
 			require.NoError(err)
 

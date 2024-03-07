@@ -22,8 +22,6 @@ const (
 	LongLen = 8
 	// BoolLen is the number of bytes per bool
 	BoolLen = 1
-	// IPLen is the number of bytes per IP
-	IPLen = 16 + ShortLen
 )
 
 func StringLen(str string) int {

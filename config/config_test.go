@@ -14,7 +14,6 @@ import (
 
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
-
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/chains"
@@ -413,24 +412,10 @@ func TestGetSubnetConfigsFromFile(t *testing.T) {
 				config, ok := given[id]
 				require.True(ok)
 
-				require.Equal(true, config.ValidatorOnly)
+				require.True(config.ValidatorOnly)
 				require.Equal(16, config.ConsensusParameters.AlphaConfidence)
 				// must still respect defaults
 				require.Equal(20, config.ConsensusParameters.K)
-			},
-			expectedErr: nil,
-		},
-		"gossip config": {
-			fileName:  "2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i.json",
-			givenJSON: `{"appGossipNonValidatorSize": 100 }`,
-			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
-				id, _ := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
-				config, ok := given[id]
-				require.True(ok)
-				require.Equal(uint(100), config.GossipConfig.AppGossipNonValidatorSize)
-				// must still respect defaults
-				require.Equal(20, config.ConsensusParameters.K)
-				require.Equal(uint(10), config.GossipConfig.AppGossipValidatorSize)
 			},
 			expectedErr: nil,
 		},
@@ -523,12 +508,11 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 				id, _ := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
 				config, ok := given[id]
 				require.True(ok)
-				require.Equal(true, config.ValidatorOnly)
+				require.True(config.ValidatorOnly)
 				require.Equal(16, config.ConsensusParameters.AlphaPreference)
 				require.Equal(20, config.ConsensusParameters.AlphaConfidence)
 				require.Equal(30, config.ConsensusParameters.K)
 				// must still respect defaults
-				require.Equal(uint(10), config.GossipConfig.AppGossipValidatorSize)
 				require.Equal(256, config.ConsensusParameters.MaxOutstandingItems)
 			},
 			expectedErr: nil,

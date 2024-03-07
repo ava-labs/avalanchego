@@ -9,26 +9,23 @@ import (
 	"errors"
 	"fmt"
 	"runtime"
+	"slices"
 	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
-
-	"golang.org/x/exp/maps"
-	"golang.org/x/exp/slices"
-	"golang.org/x/sync/semaphore"
-
 	"go.opentelemetry.io/otel/attribute"
-
-	oteltrace "go.opentelemetry.io/otel/trace"
+	"golang.org/x/exp/maps"
+	"golang.org/x/sync/semaphore"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/maybe"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
+
+	oteltrace "go.opentelemetry.io/otel/trace"
 )
 
 const (
@@ -329,7 +326,7 @@ func (db *merkleDB) rebuild(ctx context.Context, cacheSize int) error {
 	}
 
 	// Add all key-value pairs back into the database.
-	opsSizeLimit := math.Max(
+	opsSizeLimit := max(
 		cacheSize/rebuildViewSizeFractionOfCacheSize,
 		minRebuildViewSizePerCommit,
 	)
@@ -782,7 +779,7 @@ func (db *merkleDB) NewView(
 		return nil, database.ErrClosed
 	}
 
-	newView, err := newView(db, db, changes)
+	view, err := newView(db, db, changes)
 	if err != nil {
 		return nil, err
 	}
@@ -791,8 +788,8 @@ func (db *merkleDB) NewView(
 	db.lock.Lock()
 	defer db.lock.Unlock()
 
-	db.childViews = append(db.childViews, newView)
-	return newView, nil
+	db.childViews = append(db.childViews, view)
+	return view, nil
 }
 
 func (db *merkleDB) Has(k []byte) (bool, error) {

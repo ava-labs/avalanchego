@@ -4,6 +4,8 @@
 package avm
 
 import (
+	"cmp"
+
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 )
@@ -20,5 +22,5 @@ type GenesisAsset struct {
 }
 
 func (g *GenesisAsset) Compare(other *GenesisAsset) int {
-	return utils.Compare(g.Alias, other.Alias)
+	return cmp.Compare(g.Alias, other.Alias)
 }

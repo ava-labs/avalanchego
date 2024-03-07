@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/api/health"
@@ -64,16 +63,14 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/vms/tracedvm"
 
-	timetracker "github.com/ava-labs/avalanchego/snow/networking/tracker"
-
+	smcon "github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	aveng "github.com/ava-labs/avalanchego/snow/engine/avalanche"
 	avbootstrap "github.com/ava-labs/avalanchego/snow/engine/avalanche/bootstrap"
 	avagetter "github.com/ava-labs/avalanchego/snow/engine/avalanche/getter"
-
-	smcon "github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	smeng "github.com/ava-labs/avalanchego/snow/engine/snowman"
 	smbootstrap "github.com/ava-labs/avalanchego/snow/engine/snowman/bootstrap"
 	snowgetter "github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
+	timetracker "github.com/ava-labs/avalanchego/snow/networking/tracker"
 )
 
 const (
@@ -83,21 +80,20 @@ const (
 
 var (
 	// Commonly shared VM DB prefix
-	vmDBPrefix = []byte("vm")
+	VMDBPrefix = []byte("vm")
 
 	// Bootstrapping prefixes for LinearizableVMs
-	vertexDBPrefix              = []byte("vertex")
-	vertexBootstrappingDBPrefix = []byte("vertex_bs")
-	txBootstrappingDBPrefix     = []byte("tx_bs")
-	blockBootstrappingDBPrefix  = []byte("block_bs")
+	VertexDBPrefix              = []byte("vertex")
+	VertexBootstrappingDBPrefix = []byte("vertex_bs")
+	TxBootstrappingDBPrefix     = []byte("tx_bs")
+	BlockBootstrappingDBPrefix  = []byte("block_bs")
 
 	// Bootstrapping prefixes for ChainVMs
-	bootstrappingDB = []byte("bs")
+	ChainBootstrappingDBPrefix = []byte("bs")
 
 	errUnknownVMType           = errors.New("the vm should have type avalanche.DAGVM or snowman.ChainVM")
 	errCreatePlatformVM        = errors.New("attempted to create a chain running the PlatformVM")
 	errNotBootstrapped         = errors.New("subnets not bootstrapped")
-	errNoPrimaryNetworkConfig  = errors.New("no subnet config for primary network found")
 	errPartialSyncAsAValidator = errors.New("partial sync should not be configured for a validator")
 
 	fxs = map[ids.ID]fx.Factory{
@@ -165,7 +161,6 @@ type chain struct {
 	Context *snow.ConsensusContext
 	VM      common.VM
 	Handler handler.Handler
-	Beacons validators.Manager
 }
 
 // ChainConfig is configuration settings for the current execution.
@@ -234,6 +229,8 @@ type ManagerConfig struct {
 	StateSyncBeacons []ids.NodeID
 
 	ChainDataDir string
+
+	Subnets *Subnets
 }
 
 type manager struct {
@@ -257,11 +254,6 @@ type manager struct {
 	chainCreatorShutdownCh chan struct{}
 	chainCreatorExited     sync.WaitGroup
 
-	subnetsLock sync.RWMutex
-	// Key: Subnet's ID
-	// Value: Subnet description
-	subnets map[ids.ID]subnets.Subnet
-
 	chainsLock sync.Mutex
 	// Key: Chain's ID
 	// Value: The chain
@@ -278,7 +270,6 @@ func New(config *ManagerConfig) Manager {
 		ManagerConfig:          *config,
 		stakingSigner:          config.StakingTLSCert.PrivateKey.(crypto.Signer),
 		stakingCert:            staking.CertificateFromX509(config.StakingTLSCert.Leaf),
-		subnets:                make(map[ids.ID]subnets.Subnet),
 		chains:                 make(map[ids.ID]handler.Handler),
 		chainsQueue:            buffer.NewUnboundedBlockingDeque[ChainParameters](initialQueueSize),
 		unblockChainCreatorCh:  make(chan struct{}),
@@ -289,25 +280,10 @@ func New(config *ManagerConfig) Manager {
 // QueueChainCreation queues a chain creation request
 // Invariant: Tracked Subnet must be checked before calling this function
 func (m *manager) QueueChainCreation(chainParams ChainParameters) {
-	m.subnetsLock.Lock()
-	subnetID := chainParams.SubnetID
-	sb, exists := m.subnets[subnetID]
-	if !exists {
-		sbConfig, ok := m.SubnetConfigs[subnetID]
-		if !ok {
-			// default to primary subnet config
-			sbConfig = m.SubnetConfigs[constants.PrimaryNetworkID]
-		}
-		sb = subnets.New(m.NodeID, sbConfig)
-		m.subnets[chainParams.SubnetID] = sb
-	}
-	addedChain := sb.AddChain(chainParams.ID)
-	m.subnetsLock.Unlock()
-
-	if !addedChain {
+	if sb, _ := m.Subnets.GetOrCreate(chainParams.SubnetID); !sb.AddChain(chainParams.ID) {
 		m.Log.Debug("skipping chain creation",
 			zap.String("reason", "chain already staged"),
-			zap.Stringer("subnetID", subnetID),
+			zap.Stringer("subnetID", chainParams.SubnetID),
 			zap.Stringer("chainID", chainParams.ID),
 			zap.Stringer("vmID", chainParams.VMID),
 		)
@@ -317,7 +293,7 @@ func (m *manager) QueueChainCreation(chainParams ChainParameters) {
 	if ok := m.chainsQueue.PushRight(chainParams); !ok {
 		m.Log.Warn("skipping chain creation",
 			zap.String("reason", "couldn't enqueue chain"),
-			zap.Stringer("subnetID", subnetID),
+			zap.Stringer("subnetID", chainParams.SubnetID),
 			zap.Stringer("chainID", chainParams.ID),
 			zap.Stringer("vmID", chainParams.VMID),
 		)
@@ -335,9 +311,7 @@ func (m *manager) createChain(chainParams ChainParameters) {
 		zap.Stringer("vmID", chainParams.VMID),
 	)
 
-	m.subnetsLock.RLock()
-	sb := m.subnets[chainParams.SubnetID]
-	m.subnetsLock.RUnlock()
+	sb, _ := m.Subnets.GetOrCreate(chainParams.SubnetID)
 
 	// Note: buildChain builds all chain's relevant objects (notably engine and handler)
 	// but does not start their operations. Starting of the handler (which could potentially
@@ -596,11 +570,11 @@ func (m *manager) createAvalancheChain(
 		return nil, err
 	}
 	prefixDB := prefixdb.New(ctx.ChainID[:], meterDB)
-	vmDB := prefixdb.New(vmDBPrefix, prefixDB)
-	vertexDB := prefixdb.New(vertexDBPrefix, prefixDB)
-	vertexBootstrappingDB := prefixdb.New(vertexBootstrappingDBPrefix, prefixDB)
-	txBootstrappingDB := prefixdb.New(txBootstrappingDBPrefix, prefixDB)
-	blockBootstrappingDB := prefixdb.New(blockBootstrappingDBPrefix, prefixDB)
+	vmDB := prefixdb.New(VMDBPrefix, prefixDB)
+	vertexDB := prefixdb.New(VertexDBPrefix, prefixDB)
+	vertexBootstrappingDB := prefixdb.New(VertexBootstrappingDBPrefix, prefixDB)
+	txBootstrappingDB := prefixdb.New(TxBootstrappingDBPrefix, prefixDB)
+	blockBootstrappingDB := prefixdb.New(BlockBootstrappingDBPrefix, prefixDB)
 
 	vtxBlocker, err := queue.NewWithMissing(vertexBootstrappingDB, "vtx", ctx.AvalancheRegisterer)
 	if err != nil {
@@ -633,16 +607,6 @@ func (m *manager) createAvalancheChain(
 		avalancheMessageSender = sender.Trace(avalancheMessageSender, m.Tracer)
 	}
 
-	err = m.VertexAcceptorGroup.RegisterAcceptor(
-		ctx.ChainID,
-		"gossip",
-		avalancheMessageSender,
-		false,
-	)
-	if err != nil { // Set up the event dispatcher
-		return nil, fmt.Errorf("problem initializing event dispatcher: %w", err)
-	}
-
 	// Passes messages from the snowman engines to the network
 	snowmanMessageSender, err := sender.New(
 		ctx,
@@ -659,16 +623,6 @@ func (m *manager) createAvalancheChain(
 
 	if m.TracingEnabled {
 		snowmanMessageSender = sender.Trace(snowmanMessageSender, m.Tracer)
-	}
-
-	err = m.BlockAcceptorGroup.RegisterAcceptor(
-		ctx.ChainID,
-		"gossip",
-		snowmanMessageSender,
-		false,
-	)
-	if err != nil { // Set up the event dispatcher
-		return nil, fmt.Errorf("problem initializing event dispatcher: %w", err)
 	}
 
 	chainConfig, err := m.getChainConfig(ctx.ChainID)
@@ -867,13 +821,14 @@ func (m *manager) createAvalancheChain(
 		Params:              consensusParams,
 		Consensus:           snowmanConsensus,
 	}
-	snowmanEngine, err := smeng.New(snowmanEngineConfig)
+	var snowmanEngine common.Engine
+	snowmanEngine, err = smeng.New(snowmanEngineConfig)
 	if err != nil {
 		return nil, fmt.Errorf("error initializing snowman engine: %w", err)
 	}
 
 	if m.TracingEnabled {
-		snowmanEngine = smeng.TraceEngine(snowmanEngine, m.Tracer)
+		snowmanEngine = common.TraceEngine(snowmanEngine, m.Tracer)
 	}
 
 	// create bootstrap gear
@@ -999,8 +954,8 @@ func (m *manager) createSnowmanChain(
 		return nil, err
 	}
 	prefixDB := prefixdb.New(ctx.ChainID[:], meterDB)
-	vmDB := prefixdb.New(vmDBPrefix, prefixDB)
-	bootstrappingDB := prefixdb.New(bootstrappingDB, prefixDB)
+	vmDB := prefixdb.New(VMDBPrefix, prefixDB)
+	bootstrappingDB := prefixdb.New(ChainBootstrappingDBPrefix, prefixDB)
 
 	blocked, err := queue.NewWithMissing(bootstrappingDB, "block", ctx.Registerer)
 	if err != nil {
@@ -1023,16 +978,6 @@ func (m *manager) createSnowmanChain(
 
 	if m.TracingEnabled {
 		messageSender = sender.Trace(messageSender, m.Tracer)
-	}
-
-	err = m.BlockAcceptorGroup.RegisterAcceptor(
-		ctx.ChainID,
-		"gossip",
-		messageSender,
-		false,
-	)
-	if err != nil { // Set up the event dispatcher
-		return nil, fmt.Errorf("problem initializing event dispatcher: %w", err)
 	}
 
 	var (
@@ -1214,13 +1159,14 @@ func (m *manager) createSnowmanChain(
 		Consensus:           consensus,
 		PartialSync:         m.PartialSyncPrimaryNetwork && ctx.ChainID == constants.PlatformChainID,
 	}
-	engine, err := smeng.New(engineConfig)
+	var engine common.Engine
+	engine, err = smeng.New(engineConfig)
 	if err != nil {
 		return nil, fmt.Errorf("error initializing snowman engine: %w", err)
 	}
 
 	if m.TracingEnabled {
-		engine = smeng.TraceEngine(engine, m.Tracer)
+		engine = common.TraceEngine(engine, m.Tracer)
 	}
 
 	// create bootstrap gear
@@ -1308,23 +1254,9 @@ func (m *manager) IsBootstrapped(id ids.ID) bool {
 	return chain.Context().State.Get().State == snow.NormalOp
 }
 
-func (m *manager) subnetsNotBootstrapped() []ids.ID {
-	m.subnetsLock.RLock()
-	defer m.subnetsLock.RUnlock()
-
-	subnetsBootstrapping := make([]ids.ID, 0, len(m.subnets))
-	for subnetID, subnet := range m.subnets {
-		if !subnet.IsBootstrapped() {
-			subnetsBootstrapping = append(subnetsBootstrapping, subnetID)
-		}
-	}
-	return subnetsBootstrapping
-}
-
 func (m *manager) registerBootstrappedHealthChecks() error {
 	bootstrappedCheck := health.CheckerFunc(func(context.Context) (interface{}, error) {
-		subnetIDs := m.subnetsNotBootstrapped()
-		if len(subnetIDs) != 0 {
+		if subnetIDs := m.Subnets.Bootstrapping(); len(subnetIDs) != 0 {
 			return subnetIDs, errNotBootstrapped
 		}
 		return []ids.ID{}, nil
@@ -1342,7 +1274,7 @@ func (m *manager) registerBootstrappedHealthChecks() error {
 		return nil
 	}
 
-	partialSyncCheck := health.CheckerFunc(func(ctx context.Context) (interface{}, error) {
+	partialSyncCheck := health.CheckerFunc(func(context.Context) (interface{}, error) {
 		// Note: The health check is skipped during bootstrapping to allow a
 		// node to sync the network even if it was previously a validator.
 		if !m.IsBootstrapped(constants.PlatformChainID) {
@@ -1366,18 +1298,9 @@ func (m *manager) registerBootstrappedHealthChecks() error {
 
 // Starts chain creation loop to process queued chains
 func (m *manager) StartChainCreator(platformParams ChainParameters) error {
-	// Get the Primary Network's subnet config. If it wasn't registered, then we
-	// throw a fatal error.
-	sbConfig, ok := m.SubnetConfigs[constants.PrimaryNetworkID]
-	if !ok {
-		return errNoPrimaryNetworkConfig
-	}
-
-	sb := subnets.New(m.NodeID, sbConfig)
-	m.subnetsLock.Lock()
-	m.subnets[platformParams.SubnetID] = sb
+	// Add the P-Chain to the Primary Network
+	sb, _ := m.Subnets.GetOrCreate(constants.PrimaryNetworkID)
 	sb.AddChain(platformParams.ID)
-	m.subnetsLock.Unlock()
 
 	// The P-chain is created synchronously to ensure that `VM.Initialize` has
 	// finished before returning from this function. This is required because

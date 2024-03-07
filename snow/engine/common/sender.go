@@ -7,7 +7,6 @@ import (
 	"context"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
@@ -35,15 +34,12 @@ import (
 // time the requestID space has been exhausted, the beginning of the requestID
 // space is free of conflicts.
 type Sender interface {
-	snow.Acceptor
-
 	StateSummarySender
 	AcceptedStateSummarySender
 	FrontierSender
 	AcceptedSender
 	FetchSender
 	QuerySender
-	Gossiper
 	AppSender
 }
 
@@ -160,13 +156,6 @@ type QuerySender interface {
 	)
 }
 
-// Gossiper defines how a consensus engine gossips a container on the accepted
-// frontier to other nodes
-type Gossiper interface {
-	// Gossip the provided container throughout the network
-	SendGossip(ctx context.Context, container []byte)
-}
-
 // NetworkAppSender sends VM-level messages to nodes in the network.
 type NetworkAppSender interface {
 	// Send an application-level request.
@@ -180,8 +169,16 @@ type NetworkAppSender interface {
 	// This response must be in response to an AppRequest that the VM corresponding
 	// to this AppSender received from [nodeID] with ID [requestID].
 	SendAppResponse(ctx context.Context, nodeID ids.NodeID, requestID uint32, appResponseBytes []byte) error
+	// SendAppError sends an application-level error to an AppRequest
+	SendAppError(ctx context.Context, nodeID ids.NodeID, requestID uint32, errorCode int32, errorMessage string) error
 	// Gossip an application-level message.
-	SendAppGossip(ctx context.Context, appGossipBytes []byte) error
+	SendAppGossip(
+		ctx context.Context,
+		appGossipBytes []byte,
+		numValidators int,
+		numNonValidators int,
+		numPeers int,
+	) error
 	SendAppGossipSpecific(ctx context.Context, nodeIDs set.Set[ids.NodeID], appGossipBytes []byte) error
 }
 
@@ -204,6 +201,8 @@ type CrossChainAppSender interface {
 	// corresponding to this CrossChainAppSender received from [chainID] with ID
 	// [requestID].
 	SendCrossChainAppResponse(ctx context.Context, chainID ids.ID, requestID uint32, appResponseBytes []byte) error
+	// SendCrossChainAppError sends an application-level error to a CrossChainAppRequest
+	SendCrossChainAppError(ctx context.Context, chainID ids.ID, requestID uint32, errorCode int32, errorMessage string) error
 }
 
 // AppSender sends application (VM) level messages.

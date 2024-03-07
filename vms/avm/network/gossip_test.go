@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -129,6 +128,6 @@ func TestGossipMempoolAddVerified(t *testing.T) {
 		TxID: ids.GenerateTestID(),
 	}
 
-	require.NoError(mempool.AddVerified(tx))
+	require.NoError(mempool.AddWithoutVerification(tx))
 	require.True(mempool.bloom.Has(tx))
 }

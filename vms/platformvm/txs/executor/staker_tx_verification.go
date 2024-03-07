@@ -26,7 +26,6 @@ var (
 	ErrStakeTooShort                   = errors.New("staking period is too short")
 	ErrStakeTooLong                    = errors.New("staking period is too long")
 	ErrFlowCheckFailed                 = errors.New("flow check failed")
-	ErrFutureStakeTime                 = fmt.Errorf("staker is attempting to start staking more than %s ahead of the current chain time", MaxFutureStartTime)
 	ErrNotValidator                    = errors.New("isn't a current or pending validator")
 	ErrRemovePermissionlessValidator   = errors.New("attempting to remove permissionless validator")
 	ErrStakeOverflow                   = errors.New("validator stake exceeds limit")
@@ -39,6 +38,8 @@ var (
 	ErrDelegateToPermissionedValidator = errors.New("delegation to permissioned validator")
 	ErrWrongStakedAssetID              = errors.New("incorrect staked assetID")
 	ErrDurangoUpgradeNotActive         = errors.New("attempting to use a Durango-upgrade feature prior to activation")
+	ErrAddValidatorTxPostDurango       = errors.New("AddValidatorTx is not permitted post-Durango")
+	ErrAddDelegatorTxPostDurango       = errors.New("AddDelegatorTx is not permitted post-Durango")
 )
 
 // verifySubnetValidatorPrimaryNetworkRequirements verifies the primary
@@ -95,24 +96,21 @@ func verifyAddValidatorTx(
 	[]*avax.TransferableOutput,
 	error,
 ) {
+	currentTimestamp := chainState.GetTimestamp()
+	if backend.Config.IsDurangoActivated(currentTimestamp) {
+		return nil, ErrAddValidatorTxPostDurango
+	}
+
 	// Verify the tx is well-formed
 	if err := sTx.SyntacticVerify(backend.Ctx); err != nil {
 		return nil, err
 	}
 
-	var (
-		currentTimestamp = chainState.GetTimestamp()
-		isDurangoActive  = backend.Config.IsDurangoActivated(currentTimestamp)
-	)
-	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
+	if err := avax.VerifyMemoFieldLength(tx.Memo, false /*=isDurangoActive*/); err != nil {
 		return nil, err
 	}
 
-	startTime := currentTimestamp
-	if !isDurangoActive {
-		startTime = tx.StartTime()
-	}
-
+	startTime := tx.StartTime()
 	duration := tx.EndTime().Sub(startTime)
 	switch {
 	case tx.Validator.Wght < backend.Config.MinValidatorStake:
@@ -144,7 +142,7 @@ func verifyAddValidatorTx(
 		return outs, nil
 	}
 
-	if err := verifyStakerStartTime(isDurangoActive, currentTimestamp, startTime); err != nil {
+	if err := verifyStakerStartTime(false /*=isDurangoActive*/, currentTimestamp, startTime); err != nil {
 		return nil, err
 	}
 
@@ -178,9 +176,7 @@ func verifyAddValidatorTx(
 		return nil, fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
 	}
 
-	// verifyStakerStartsSoon is checked last to allow
-	// the verifier visitor to explicitly check for this error.
-	return outs, verifyStakerStartsSoon(isDurangoActive, currentTimestamp, startTime)
+	return outs, nil
 }
 
 // verifyAddSubnetValidatorTx carries out the validation for an
@@ -268,9 +264,7 @@ func verifyAddSubnetValidatorTx(
 		return fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
 	}
 
-	// verifyStakerStartsSoon is checked last to allow
-	// the verifier visitor to explicitly check for this error.
-	return verifyStakerStartsSoon(isDurangoActive, currentTimestamp, startTime)
+	return nil
 }
 
 // Returns the representation of [tx.NodeID] validating [tx.Subnet].
@@ -360,28 +354,25 @@ func verifyAddDelegatorTx(
 	[]*avax.TransferableOutput,
 	error,
 ) {
+	currentTimestamp := chainState.GetTimestamp()
+	if backend.Config.IsDurangoActivated(currentTimestamp) {
+		return nil, ErrAddDelegatorTxPostDurango
+	}
+
 	// Verify the tx is well-formed
 	if err := sTx.SyntacticVerify(backend.Ctx); err != nil {
 		return nil, err
 	}
 
-	var (
-		currentTimestamp = chainState.GetTimestamp()
-		isDurangoActive  = backend.Config.IsDurangoActivated(currentTimestamp)
-	)
-	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
+	if err := avax.VerifyMemoFieldLength(tx.Memo, false /*=isDurangoActive*/); err != nil {
 		return nil, err
 	}
 
 	var (
 		endTime   = tx.EndTime()
-		startTime = currentTimestamp
-	)
-	if !isDurangoActive {
 		startTime = tx.StartTime()
-	}
-	duration := endTime.Sub(startTime)
-
+		duration  = endTime.Sub(startTime)
+	)
 	switch {
 	case duration < backend.Config.MinStakeDuration:
 		// Ensure staking length is not too short
@@ -404,7 +395,7 @@ func verifyAddDelegatorTx(
 		return outs, nil
 	}
 
-	if err := verifyStakerStartTime(isDurangoActive, currentTimestamp, startTime); err != nil {
+	if err := verifyStakerStartTime(false /*=isDurangoActive*/, currentTimestamp, startTime); err != nil {
 		return nil, err
 	}
 
@@ -423,7 +414,7 @@ func verifyAddDelegatorTx(
 	}
 
 	if backend.Config.IsApricotPhase3Activated(currentTimestamp) {
-		maximumWeight = safemath.Min(maximumWeight, backend.Config.MaxValidatorStake)
+		maximumWeight = min(maximumWeight, backend.Config.MaxValidatorStake)
 	}
 
 	if !txs.BoundedBy(
@@ -463,9 +454,7 @@ func verifyAddDelegatorTx(
 		return nil, fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
 	}
 
-	// verifyStakerStartsSoon is checked last to allow
-	// the verifier visitor to explicitly check for this error.
-	return outs, verifyStakerStartsSoon(isDurangoActive, currentTimestamp, startTime)
+	return outs, nil
 }
 
 // verifyAddPermissionlessValidatorTx carries out the validation for an
@@ -587,9 +576,7 @@ func verifyAddPermissionlessValidatorTx(
 		return fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
 	}
 
-	// verifyStakerStartsSoon is checked last to allow
-	// the verifier visitor to explicitly check for this error.
-	return verifyStakerStartsSoon(isDurangoActive, currentTimestamp, startTime)
+	return nil
 }
 
 // verifyAddPermissionlessDelegatorTx carries out the validation for an
@@ -676,7 +663,7 @@ func verifyAddPermissionlessDelegatorTx(
 	if err != nil {
 		maximumWeight = math.MaxUint64
 	}
-	maximumWeight = safemath.Min(maximumWeight, delegatorRules.maxValidatorStake)
+	maximumWeight = min(maximumWeight, delegatorRules.maxValidatorStake)
 
 	if !txs.BoundedBy(
 		startTime,
@@ -736,9 +723,7 @@ func verifyAddPermissionlessDelegatorTx(
 		return fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
 	}
 
-	// verifyStakerStartsSoon is checked last to allow
-	// the verifier visitor to explicitly check for this error.
-	return verifyStakerStartsSoon(isDurangoActive, currentTimestamp, startTime)
+	return nil
 }
 
 // Returns an error if the given tx is invalid.
@@ -807,20 +792,6 @@ func verifyStakerStartTime(isDurangoActive bool, chainTime, stakerTime time.Time
 			chainTime,
 			stakerTime,
 		)
-	}
-	return nil
-}
-
-func verifyStakerStartsSoon(isDurangoActive bool, chainTime, stakerStartTime time.Time) error {
-	if isDurangoActive {
-		return nil
-	}
-
-	// Make sure the tx doesn't start too far in the future. This is done last
-	// to allow the verifier visitor to explicitly check for this error.
-	maxStartTime := chainTime.Add(MaxFutureStartTime)
-	if stakerStartTime.After(maxStartTime) {
-		return ErrFutureStakeTime
 	}
 	return nil
 }

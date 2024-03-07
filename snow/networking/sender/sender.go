@@ -8,7 +8,6 @@ import (
 	"fmt"
 
 	"github.com/prometheus/client_golang/prometheus"
-
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -19,8 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
 	"github.com/ava-labs/avalanchego/subnets"
-	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
@@ -94,7 +91,7 @@ func New(
 }
 
 func (s *sender) SendGetStateSummaryFrontier(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32) {
-	ctx = utils.Detach(ctx)
+	ctx = context.WithoutCancel(ctx)
 
 	// Note that this timeout duration won't exactly match the one that gets
 	// registered. That's OK.
@@ -175,7 +172,7 @@ func (s *sender) SendGetStateSummaryFrontier(ctx context.Context, nodeIDs set.Se
 }
 
 func (s *sender) SendStateSummaryFrontier(ctx context.Context, nodeID ids.NodeID, requestID uint32, summary []byte) {
-	ctx = utils.Detach(ctx)
+	ctx = context.WithoutCancel(ctx)
 
 	// Sending this message to myself.
 	if nodeID == s.ctx.NodeID {
@@ -235,7 +232,7 @@ func (s *sender) SendStateSummaryFrontier(ctx context.Context, nodeID ids.NodeID
 }
 
 func (s *sender) SendGetAcceptedStateSummary(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, heights []uint64) {
-	ctx = utils.Detach(ctx)
+	ctx = context.WithoutCancel(ctx)
 
 	// Note that this timeout duration won't exactly match the one that gets
 	// registered. That's OK.
@@ -319,7 +316,7 @@ func (s *sender) SendGetAcceptedStateSummary(ctx context.Context, nodeIDs set.Se
 }
 
 func (s *sender) SendAcceptedStateSummary(ctx context.Context, nodeID ids.NodeID, requestID uint32, summaryIDs []ids.ID) {
-	ctx = utils.Detach(ctx)
+	ctx = context.WithoutCancel(ctx)
 
 	if nodeID == s.ctx.NodeID {
 		inMsg := message.InboundAcceptedStateSummary(
@@ -369,7 +366,7 @@ func (s *sender) SendAcceptedStateSummary(ctx context.Context, nodeID ids.NodeID
 }
 
 func (s *sender) SendGetAcceptedFrontier(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32) {
-	ctx = utils.Detach(ctx)
+	ctx = context.WithoutCancel(ctx)
 
 	// Note that this timeout duration won't exactly match the one that gets
 	// registered. That's OK.
@@ -453,7 +450,7 @@ func (s *sender) SendGetAcceptedFrontier(ctx context.Context, nodeIDs set.Set[id
 }
 
 func (s *sender) SendAcceptedFrontier(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID) {
-	ctx = utils.Detach(ctx)
+	ctx = context.WithoutCancel(ctx)
 
 	// Sending this message to myself.
 	if nodeID == s.ctx.NodeID {
@@ -504,7 +501,7 @@ func (s *sender) SendAcceptedFrontier(ctx context.Context, nodeID ids.NodeID, re
 }
 
 func (s *sender) SendGetAccepted(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, containerIDs []ids.ID) {
-	ctx = utils.Detach(ctx)
+	ctx = context.WithoutCancel(ctx)
 
 	// Note that this timeout duration won't exactly match the one that gets
 	// registered. That's OK.
@@ -591,7 +588,7 @@ func (s *sender) SendGetAccepted(ctx context.Context, nodeIDs set.Set[ids.NodeID
 }
 
 func (s *sender) SendAccepted(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) {
-	ctx = utils.Detach(ctx)
+	ctx = context.WithoutCancel(ctx)
 
 	if nodeID == s.ctx.NodeID {
 		inMsg := message.InboundAccepted(
@@ -637,7 +634,7 @@ func (s *sender) SendAccepted(ctx context.Context, nodeID ids.NodeID, requestID 
 }
 
 func (s *sender) SendGetAncestors(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID) {
-	ctx = utils.Detach(ctx)
+	ctx = context.WithoutCancel(ctx)
 
 	// Tell the router to expect a response message or a message notifying
 	// that we won't get a response from this node.
@@ -753,7 +750,7 @@ func (s *sender) SendAncestors(_ context.Context, nodeID ids.NodeID, requestID u
 }
 
 func (s *sender) SendGet(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID) {
-	ctx = utils.Detach(ctx)
+	ctx = context.WithoutCancel(ctx)
 
 	// Tell the router to expect a response message or a message notifying
 	// that we won't get a response from this node.
@@ -885,7 +882,7 @@ func (s *sender) SendPushQuery(
 	container []byte,
 	requestedHeight uint64,
 ) {
-	ctx = utils.Detach(ctx)
+	ctx = context.WithoutCancel(ctx)
 
 	// Tell the router to expect a response message or a message notifying
 	// that we won't get a response from each of these nodes.
@@ -1024,7 +1021,7 @@ func (s *sender) SendPullQuery(
 	containerID ids.ID,
 	requestedHeight uint64,
 ) {
-	ctx = utils.Detach(ctx)
+	ctx = context.WithoutCancel(ctx)
 
 	// Tell the router to expect a response message or a message notifying
 	// that we won't get a response from each of these nodes.
@@ -1153,7 +1150,7 @@ func (s *sender) SendChits(
 	preferredIDAtHeight ids.ID,
 	acceptedID ids.ID,
 ) {
-	ctx = utils.Detach(ctx)
+	ctx = context.WithoutCancel(ctx)
 
 	// If [nodeID] is myself, send this message directly
 	// to my own router rather than sending it over the network
@@ -1207,7 +1204,7 @@ func (s *sender) SendChits(
 }
 
 func (s *sender) SendCrossChainAppRequest(ctx context.Context, chainID ids.ID, requestID uint32, appRequestBytes []byte) error {
-	ctx = utils.Detach(ctx)
+	ctx = context.WithoutCancel(ctx)
 
 	// The failed message is treated as if it was sent by the requested chain
 	failedMsg := message.InternalCrossChainAppError(
@@ -1242,7 +1239,7 @@ func (s *sender) SendCrossChainAppRequest(ctx context.Context, chainID ids.ID, r
 }
 
 func (s *sender) SendCrossChainAppResponse(ctx context.Context, chainID ids.ID, requestID uint32, appResponseBytes []byte) error {
-	ctx = utils.Detach(ctx)
+	ctx = context.WithoutCancel(ctx)
 
 	inMsg := message.InternalCrossChainAppResponse(
 		s.ctx.NodeID,
@@ -1255,8 +1252,23 @@ func (s *sender) SendCrossChainAppResponse(ctx context.Context, chainID ids.ID, 
 	return nil
 }
 
+func (s *sender) SendCrossChainAppError(ctx context.Context, chainID ids.ID, requestID uint32, errorCode int32, errorMessage string) error {
+	ctx = context.WithoutCancel(ctx)
+
+	inMsg := message.InternalCrossChainAppError(
+		s.ctx.NodeID,
+		s.ctx.ChainID,
+		chainID,
+		requestID,
+		errorCode,
+		errorMessage,
+	)
+	go s.router.HandleInbound(ctx, inMsg)
+	return nil
+}
+
 func (s *sender) SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, appRequestBytes []byte) error {
-	ctx = utils.Detach(ctx)
+	ctx = context.WithoutCancel(ctx)
 
 	// Tell the router to expect a response message or a message notifying
 	// that we won't get a response from each of these nodes.
@@ -1386,7 +1398,7 @@ func (s *sender) SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.NodeID]
 }
 
 func (s *sender) SendAppResponse(ctx context.Context, nodeID ids.NodeID, requestID uint32, appResponseBytes []byte) error {
-	ctx = utils.Detach(ctx)
+	ctx = context.WithoutCancel(ctx)
 
 	if nodeID == s.ctx.NodeID {
 		inMsg := message.InboundAppResponse(
@@ -1445,6 +1457,72 @@ func (s *sender) SendAppResponse(ctx context.Context, nodeID ids.NodeID, request
 	return nil
 }
 
+func (s *sender) SendAppError(ctx context.Context, nodeID ids.NodeID, requestID uint32, errorCode int32, errorMessage string) error {
+	ctx = context.WithoutCancel(ctx)
+
+	if nodeID == s.ctx.NodeID {
+		inMsg := message.InboundAppError(
+			nodeID,
+			s.ctx.ChainID,
+			requestID,
+			errorCode,
+			errorMessage,
+		)
+		go s.router.HandleInbound(ctx, inMsg)
+		return nil
+	}
+
+	// Create the outbound message.
+	outMsg, err := s.msgCreator.AppError(
+		s.ctx.ChainID,
+		requestID,
+		errorCode,
+		errorMessage,
+	)
+	if err != nil {
+		s.ctx.Log.Error("failed to build message",
+			zap.Stringer("messageOp", message.AppErrorOp),
+			zap.Stringer("nodeID", nodeID),
+			zap.Stringer("chainID", s.ctx.ChainID),
+			zap.Uint32("requestID", requestID),
+			zap.Int32("errorCode", errorCode),
+			zap.String("errorMessage", errorMessage),
+			zap.Error(err),
+		)
+		return nil
+	}
+
+	// Send the message over the network.
+	sentTo := s.sender.Send(
+		outMsg,
+		set.Of(nodeID),
+		s.ctx.SubnetID,
+		s.subnet,
+	)
+	if sentTo.Len() == 0 {
+		if s.ctx.Log.Enabled(logging.Verbo) {
+			s.ctx.Log.Verbo("failed to send message",
+				zap.Stringer("messageOp", message.AppErrorOp),
+				zap.Stringer("nodeID", nodeID),
+				zap.Stringer("chainID", s.ctx.ChainID),
+				zap.Uint32("requestID", requestID),
+				zap.Int32("errorCode", errorCode),
+				zap.String("errorMessage", errorMessage),
+			)
+		} else {
+			s.ctx.Log.Debug("failed to send message",
+				zap.Stringer("messageOp", message.AppErrorOp),
+				zap.Stringer("nodeID", nodeID),
+				zap.Stringer("chainID", s.ctx.ChainID),
+				zap.Uint32("requestID", requestID),
+				zap.Int32("errorCode", errorCode),
+				zap.String("errorMessage", errorMessage),
+			)
+		}
+	}
+	return nil
+}
+
 func (s *sender) SendAppGossipSpecific(_ context.Context, nodeIDs set.Set[ids.NodeID], appGossipBytes []byte) error {
 	// Create the outbound message.
 	outMsg, err := s.msgCreator.AppGossip(s.ctx.ChainID, appGossipBytes)
@@ -1488,7 +1566,13 @@ func (s *sender) SendAppGossipSpecific(_ context.Context, nodeIDs set.Set[ids.No
 	return nil
 }
 
-func (s *sender) SendAppGossip(_ context.Context, appGossipBytes []byte) error {
+func (s *sender) SendAppGossip(
+	_ context.Context,
+	appGossipBytes []byte,
+	numValidators int,
+	numNonValidators int,
+	numPeers int,
+) error {
 	// Create the outbound message.
 	outMsg, err := s.msgCreator.AppGossip(s.ctx.ChainID, appGossipBytes)
 	if err != nil {
@@ -1501,17 +1585,12 @@ func (s *sender) SendAppGossip(_ context.Context, appGossipBytes []byte) error {
 		return nil
 	}
 
-	gossipConfig := s.subnet.Config().GossipConfig
-	validatorSize := int(gossipConfig.AppGossipValidatorSize)
-	nonValidatorSize := int(gossipConfig.AppGossipNonValidatorSize)
-	peerSize := int(gossipConfig.AppGossipPeerSize)
-
 	sentTo := s.sender.Gossip(
 		outMsg,
 		s.ctx.SubnetID,
-		validatorSize,
-		nonValidatorSize,
-		peerSize,
+		numValidators,
+		numNonValidators,
+		numPeers,
 		s.subnet,
 	)
 	if sentTo.Len() == 0 {
@@ -1524,99 +1603,6 @@ func (s *sender) SendAppGossip(_ context.Context, appGossipBytes []byte) error {
 		} else {
 			s.ctx.Log.Debug("failed to send message",
 				zap.Stringer("messageOp", message.AppGossipOp),
-				zap.Stringer("chainID", s.ctx.ChainID),
-			)
-		}
-	}
-	return nil
-}
-
-func (s *sender) SendGossip(_ context.Context, container []byte) {
-	// Create the outbound message.
-	outMsg, err := s.msgCreator.Put(
-		s.ctx.ChainID,
-		constants.GossipMsgRequestID,
-		container,
-		s.engineType,
-	)
-	if err != nil {
-		s.ctx.Log.Error("failed to build message",
-			zap.Stringer("messageOp", message.PutOp),
-			zap.Stringer("chainID", s.ctx.ChainID),
-			zap.Binary("container", container),
-			zap.Error(err),
-		)
-		return
-	}
-
-	gossipConfig := s.subnet.Config().GossipConfig
-	sentTo := s.sender.Gossip(
-		outMsg,
-		s.ctx.SubnetID,
-		int(gossipConfig.AcceptedFrontierValidatorSize),
-		int(gossipConfig.AcceptedFrontierNonValidatorSize),
-		int(gossipConfig.AcceptedFrontierPeerSize),
-		s.subnet,
-	)
-	if sentTo.Len() == 0 {
-		if s.ctx.Log.Enabled(logging.Verbo) {
-			s.ctx.Log.Verbo("failed to send message",
-				zap.Stringer("messageOp", message.PutOp),
-				zap.Stringer("chainID", s.ctx.ChainID),
-				zap.Binary("container", container),
-			)
-		} else {
-			s.ctx.Log.Debug("failed to send message",
-				zap.Stringer("messageOp", message.PutOp),
-				zap.Stringer("chainID", s.ctx.ChainID),
-			)
-		}
-	}
-}
-
-// Accept is called after every consensus decision
-func (s *sender) Accept(ctx *snow.ConsensusContext, _ ids.ID, container []byte) error {
-	if ctx.State.Get().State != snow.NormalOp {
-		// don't gossip during bootstrapping
-		return nil
-	}
-
-	// Create the outbound message.
-	outMsg, err := s.msgCreator.Put(
-		s.ctx.ChainID,
-		constants.GossipMsgRequestID,
-		container,
-		s.engineType,
-	)
-	if err != nil {
-		s.ctx.Log.Error("failed to build message",
-			zap.Stringer("messageOp", message.PutOp),
-			zap.Stringer("chainID", s.ctx.ChainID),
-			zap.Binary("container", container),
-			zap.Error(err),
-		)
-		return nil
-	}
-
-	gossipConfig := s.subnet.Config().GossipConfig
-	sentTo := s.sender.Gossip(
-		outMsg,
-		s.ctx.SubnetID,
-		int(gossipConfig.OnAcceptValidatorSize),
-		int(gossipConfig.OnAcceptNonValidatorSize),
-		int(gossipConfig.OnAcceptPeerSize),
-		s.subnet,
-	)
-	if sentTo.Len() == 0 {
-		if s.ctx.Log.Enabled(logging.Verbo) {
-			s.ctx.Log.Verbo("failed to send message",
-				zap.Stringer("messageOp", message.PutOp),
-				zap.Stringer("chainID", s.ctx.ChainID),
-				zap.Binary("container", container),
-			)
-		} else {
-			s.ctx.Log.Debug("failed to send message",
-				zap.Stringer("messageOp", message.PutOp),
 				zap.Stringer("chainID", s.ctx.ChainID),
 			)
 		}

@@ -25,17 +25,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer"
 )
 
-type IPCConfig struct {
-	IPCAPIEnabled      bool     `json:"ipcAPIEnabled"`
-	IPCPath            string   `json:"ipcPath"`
-	IPCDefaultChainIDs []string `json:"ipcDefaultChainIDs"`
-}
-
-type APIAuthConfig struct {
-	APIRequireAuthToken bool   `json:"apiRequireAuthToken"`
-	APIAuthPassword     string `json:"-"`
-}
-
 type APIIndexerConfig struct {
 	IndexAPIEnabled      bool `json:"indexAPIEnabled"`
 	IndexAllowIncomplete bool `json:"indexAllowIncomplete"`
@@ -59,9 +48,7 @@ type HTTPConfig struct {
 }
 
 type APIConfig struct {
-	APIAuthConfig    `json:"authConfig"`
 	APIIndexerConfig `json:"indexerConfig"`
-	IPCConfig        `json:"ipcConfig"`
 
 	// Enable/Disable APIs
 	AdminAPIEnabled    bool `json:"adminAPIEnabled"`
@@ -172,8 +159,6 @@ type Config struct {
 	// Metrics
 	MeterVMEnabled bool `json:"meterVMEnabled"`
 
-	// Router that is used to handle incoming consensus messages
-	ConsensusRouter          router.Router       `json:"-"`
 	RouterHealthConfig       router.HealthConfig `json:"routerHealthConfig"`
 	ConsensusShutdownTimeout time.Duration       `json:"consensusShutdownTimeout"`
 	// Poll for new frontiers every [FrontierPollFrequency]
@@ -189,7 +174,7 @@ type Config struct {
 	ChainConfigs map[string]chains.ChainConfig `json:"-"`
 	ChainAliases map[ids.ID][]string           `json:"chainAliases"`
 
-	VMAliaser ids.Aliaser `json:"-"`
+	VMAliases map[ids.ID][]string `json:"vmAliases"`
 
 	// Halflife to use for the processing requests tracker.
 	// Larger halflife --> usage metrics change more slowly.

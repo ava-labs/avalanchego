@@ -9,13 +9,10 @@ import (
 	"fmt"
 	"math"
 	"net/http"
-	"sync"
 	"time"
 
 	"github.com/gorilla/rpc/v2"
-
 	"github.com/prometheus/client_golang/prometheus"
-
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/cache"
@@ -65,7 +62,7 @@ var (
 type VM struct {
 	config.Config
 	blockbuilder.Builder
-	network.Network
+	*network.Network
 	validators.State
 
 	metrics            metrics.Metrics
@@ -95,7 +92,6 @@ type VM struct {
 	onShutdownCtx context.Context
 	// Call [onShutdownCtxCancel] to cancel [onShutdownCtx] during Shutdown()
 	onShutdownCtxCancel context.CancelFunc
-	awaitShutdown       sync.WaitGroup
 
 	// TODO: Remove after v1.11.x is activated
 	pruned utils.Atomic[bool]
@@ -205,7 +201,10 @@ func (vm *VM) Initialize(
 		chainCtx.Log,
 		chainCtx.NodeID,
 		chainCtx.SubnetID,
-		chainCtx.ValidatorState,
+		validators.NewLockedState(
+			&chainCtx.Lock,
+			validatorManager,
+		),
 		txVerifier,
 		mempool,
 		txExecutorBackend.Config.PartialSyncPrimaryNetwork,
@@ -218,17 +217,13 @@ func (vm *VM) Initialize(
 	}
 
 	vm.onShutdownCtx, vm.onShutdownCtxCancel = context.WithCancel(context.Background())
-	vm.awaitShutdown.Add(1)
-	go func() {
-		defer vm.awaitShutdown.Done()
-
-		// Invariant: Gossip must never grab the context lock.
-		vm.Network.Gossip(vm.onShutdownCtx)
-	}()
+	// TODO: Wait for this goroutine to exit during Shutdown once the platformvm
+	// has better control of the context lock.
+	go vm.Network.PushGossip(vm.onShutdownCtx)
+	go vm.Network.PullGossip(vm.onShutdownCtx)
 
 	vm.Builder = blockbuilder.New(
 		mempool,
-		vm.txBuilder,
 		txExecutorBackend,
 		vm.manager,
 	)
@@ -429,8 +424,6 @@ func (vm *VM) Shutdown(context.Context) error {
 	}
 
 	vm.onShutdownCtxCancel()
-	vm.awaitShutdown.Wait()
-
 	vm.Builder.ShutdownBlockTimer()
 
 	if vm.bootstrapped.Get() {
@@ -541,8 +534,8 @@ func (vm *VM) GetBlockIDAtHeight(_ context.Context, height uint64) (ids.ID, erro
 	return vm.state.GetBlockIDAtHeight(height)
 }
 
-func (vm *VM) issueTx(ctx context.Context, tx *txs.Tx) error {
-	err := vm.Network.IssueTx(ctx, tx)
+func (vm *VM) issueTxFromRPC(tx *txs.Tx) error {
+	err := vm.Network.IssueTxFromRPC(tx)
 	if err != nil && !errors.Is(err, mempool.ErrDuplicateTx) {
 		vm.ctx.Log.Debug("failed to add tx to mempool",
 			zap.Stringer("txID", tx.ID()),

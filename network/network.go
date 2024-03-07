@@ -15,9 +15,7 @@ import (
 	"time"
 
 	"github.com/pires/go-proxyproto"
-
 	"github.com/prometheus/client_golang/prometheus"
-
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/api/health"
@@ -262,6 +260,7 @@ func NewNetwork(
 		VersionCompatibility: version.GetCompatibility(config.NetworkID),
 		MySubnets:            config.TrackedSubnets,
 		Beacons:              config.Beacons,
+		Validators:           config.Validators,
 		NetworkID:            config.NetworkID,
 		PingFrequency:        config.PingFrequency,
 		PongTimeout:          config.PingPongTimeout,
@@ -270,7 +269,7 @@ func NewNetwork(
 		ObjectedACPs:         config.ObjectedACPs.List(),
 		ResourceTracker:      config.ResourceTracker,
 		UptimeCalculator:     config.UptimeCalculator,
-		IPSigner:             peer.NewIPSigner(config.MyIPPort, config.TLSKey),
+		IPSigner:             peer.NewIPSigner(config.MyIPPort, config.TLSKey, config.BLSKey),
 	}
 
 	// Invariant: We delay the activation of durango during the TLS handshake to
@@ -437,7 +436,7 @@ func (n *network) Connected(nodeID ids.NodeID) {
 		peer.Cert(),
 		peerIP.IPPort,
 		peerIP.Timestamp,
-		peerIP.Signature,
+		peerIP.TLSSignature,
 	)
 	n.ipTracker.Connected(newIP)
 
@@ -623,7 +622,7 @@ func (n *network) track(ip *ips.ClaimedIPPort) error {
 			IPPort:    ip.IPPort,
 			Timestamp: ip.Timestamp,
 		},
-		Signature: ip.Signature,
+		TLSSignature: ip.Signature,
 	}
 	maxTimestamp := n.peerConfig.Clock.Time().Add(n.peerConfig.MaxClockDifference)
 	if err := signedIP.Verify(ip.Cert, maxTimestamp); err != nil {
@@ -1158,12 +1157,10 @@ func (n *network) NodeUptime(subnetID ids.ID) (UptimeResult, error) {
 }
 
 func (n *network) runTimers() {
-	pushGossipPeerlists := time.NewTicker(n.config.PeerListGossipFreq)
 	pullGossipPeerlists := time.NewTicker(n.config.PeerListPullGossipFreq)
 	resetPeerListBloom := time.NewTicker(n.config.PeerListBloomResetFreq)
 	updateUptimes := time.NewTicker(n.config.UptimeMetricFreq)
 	defer func() {
-		pushGossipPeerlists.Stop()
 		resetPeerListBloom.Stop()
 		updateUptimes.Stop()
 	}()
@@ -1172,8 +1169,6 @@ func (n *network) runTimers() {
 		select {
 		case <-n.onCloseCtx.Done():
 			return
-		case <-pushGossipPeerlists.C:
-			n.pushGossipPeerLists()
 		case <-pullGossipPeerlists.C:
 			n.pullGossipPeerLists()
 		case <-resetPeerListBloom.C:
@@ -1207,21 +1202,6 @@ func (n *network) runTimers() {
 				n.metrics.nodeSubnetUptimeRewardingStake.WithLabelValues(subnetIDStr).Set(result.RewardingStakePercentage)
 			}
 		}
-	}
-}
-
-// pushGossipPeerLists gossips validators to peers in the network
-func (n *network) pushGossipPeerLists() {
-	peers := n.samplePeers(
-		constants.PrimaryNetworkID,
-		int(n.config.PeerListValidatorGossipSize),
-		int(n.config.PeerListNonValidatorGossipSize),
-		int(n.config.PeerListPeersGossipSize),
-		subnets.NoOpAllower,
-	)
-
-	for _, p := range peers {
-		p.StartSendPeerList()
 	}
 }
 

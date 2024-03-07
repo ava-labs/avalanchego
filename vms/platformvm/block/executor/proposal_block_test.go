@@ -10,18 +10,19 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-
 	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
-	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
+	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -33,7 +34,7 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 
-	env := newEnvironment(t, ctrl)
+	env := newEnvironment(t, ctrl, apricotPhase5)
 
 	// create apricotParentBlk. It's a standard one for simplicity
 	parentHeight := uint64(2022)
@@ -136,10 +137,7 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 
-	env := newEnvironment(t, ctrl)
-	env.clk.Set(defaultGenesisTime)
-	env.config.BanffTime = time.Time{}        // activate Banff
-	env.config.DurangoTime = mockable.MaxTime // deactivate Durango
+	env := newEnvironment(t, ctrl, banff)
 
 	// create parentBlock. It's a standard one for simplicity
 	parentTime := defaultGenesisTime
@@ -337,23 +335,6 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 	}
 
 	{
-		// include too many transactions
-		statelessProposalBlock, err := block.NewBanffProposalBlock(
-			nextStakerTime,
-			parentID,
-			banffParentBlk.Height()+1,
-			blkTx,
-			[]*txs.Tx{},
-		)
-		require.NoError(err)
-
-		statelessProposalBlock.Transactions = []*txs.Tx{blkTx}
-		block := env.blkManager.NewBlock(statelessProposalBlock)
-		err = block.Verify(context.Background())
-		require.ErrorIs(err, errBanffProposalBlockWithMultipleTransactions)
-	}
-
-	{
 		// valid
 		statelessProposalBlock, err := block.NewBanffProposalBlock(
 			nextStakerTime,
@@ -547,8 +528,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.description, func(t *testing.T) {
 			require := require.New(t)
-			env := newEnvironment(t, nil)
-			env.config.BanffTime = time.Time{} // activate Banff
+			env := newEnvironment(t, nil, banff)
 
 			subnetID := testSubnet1.ID()
 			env.config.TrackedSubnets.Add(subnetID)
@@ -563,6 +543,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 					reward.PercentDenominator,
 					[]*secp256k1.PrivateKey{preFundedKeys[0]},
 					ids.ShortEmpty,
+					nil,
 				)
 				require.NoError(err)
 
@@ -586,6 +567,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 					subnetID,         // Subnet ID
 					[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
 					ids.ShortEmpty,
+					nil,
 				)
 				require.NoError(err)
 
@@ -615,6 +597,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 					reward.PercentDenominator,
 					[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
 					ids.ShortEmpty,
+					nil,
 				)
 				require.NoError(err)
 
@@ -697,8 +680,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 
 func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, nil)
-	env.config.BanffTime = time.Time{} // activate Banff
+	env := newEnvironment(t, nil, banff)
 
 	subnetID := testSubnet1.ID()
 	env.config.TrackedSubnets.Add(subnetID)
@@ -715,6 +697,7 @@ func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 		subnetID,                           // Subnet ID
 		[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
 		ids.ShortEmpty,
+		nil,
 	)
 	require.NoError(err)
 
@@ -743,6 +726,7 @@ func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 		subnetID,         // Subnet ID
 		[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
 		ids.ShortEmpty,
+		nil,
 	)
 	require.NoError(err)
 
@@ -774,6 +758,7 @@ func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
 		ids.ShortEmpty,
+		nil,
 	)
 	require.NoError(err)
 
@@ -835,10 +820,9 @@ func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 
 func TestBanffProposalBlockTrackedSubnet(t *testing.T) {
 	for _, tracked := range []bool{true, false} {
-		t.Run(fmt.Sprintf("tracked %t", tracked), func(ts *testing.T) {
+		t.Run(fmt.Sprintf("tracked %t", tracked), func(t *testing.T) {
 			require := require.New(t)
-			env := newEnvironment(t, nil)
-			env.config.BanffTime = time.Time{} // activate Banff
+			env := newEnvironment(t, nil, banff)
 
 			subnetID := testSubnet1.ID()
 			if tracked {
@@ -857,6 +841,7 @@ func TestBanffProposalBlockTrackedSubnet(t *testing.T) {
 				subnetID,                           // Subnet ID
 				[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
 				ids.ShortEmpty,
+				nil,
 			)
 			require.NoError(err)
 
@@ -886,6 +871,7 @@ func TestBanffProposalBlockTrackedSubnet(t *testing.T) {
 				reward.PercentDenominator,
 				[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
 				ids.ShortEmpty,
+				nil,
 			)
 			require.NoError(err)
 
@@ -940,8 +926,7 @@ func TestBanffProposalBlockTrackedSubnet(t *testing.T) {
 
 func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, nil)
-	env.config.BanffTime = time.Time{} // activate Banff
+	env := newEnvironment(t, nil, banff)
 
 	// Case: Timestamp is after next validator start time
 	// Add a pending validator
@@ -972,6 +957,7 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
 		ids.ShortEmpty,
+		nil,
 	)
 	require.NoError(err)
 
@@ -1040,6 +1026,7 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 			preFundedKeys[4],
 		},
 		ids.ShortEmpty,
+		nil,
 	)
 	require.NoError(err)
 
@@ -1066,6 +1053,7 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
 		ids.ShortEmpty,
+		nil,
 	)
 	require.NoError(err)
 
@@ -1122,8 +1110,7 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 
 func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, nil)
-	env.config.BanffTime = time.Time{} // activate Banff
+	env := newEnvironment(t, nil, banff)
 
 	// Case: Timestamp is after next validator start time
 	// Add a pending validator
@@ -1156,6 +1143,7 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
 		ids.ShortEmpty,
+		nil,
 	)
 	require.NoError(err)
 
@@ -1223,6 +1211,7 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 			preFundedKeys[4],
 		},
 		ids.ShortEmpty,
+		nil,
 	)
 	require.NoError(err)
 
@@ -1249,6 +1238,7 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
 		ids.ShortEmpty,
+		nil,
 	)
 	require.NoError(err)
 
@@ -1304,9 +1294,7 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 
 func TestAddValidatorProposalBlock(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, nil)
-	env.config.BanffTime = time.Time{}   // activate Banff
-	env.config.DurangoTime = time.Time{} // activate Durango
+	env := newEnvironment(t, nil, durango)
 
 	now := env.clk.Time()
 
@@ -1317,11 +1305,15 @@ func TestAddValidatorProposalBlock(t *testing.T) {
 		nodeID             = ids.GenerateTestNodeID()
 	)
 
-	addValidatorTx, err := env.txBuilder.NewAddValidatorTx(
+	sk, err := bls.NewSecretKey()
+	require.NoError(err)
+
+	addValidatorTx, err := env.txBuilder.NewAddPermissionlessValidatorTx(
 		env.config.MinValidatorStake,
 		uint64(validatorStartTime.Unix()),
 		uint64(validatorEndTime.Unix()),
 		nodeID,
+		signer.NewProofOfPossession(sk),
 		preFundedKeys[0].PublicKey().Address(),
 		10000,
 		[]*secp256k1.PrivateKey{
@@ -1330,6 +1322,7 @@ func TestAddValidatorProposalBlock(t *testing.T) {
 			preFundedKeys[4],
 		},
 		ids.ShortEmpty,
+		nil,
 	)
 	require.NoError(err)
 
@@ -1388,11 +1381,15 @@ func TestAddValidatorProposalBlock(t *testing.T) {
 	validatorEndTime = validatorStartTime.Add(env.config.MinStakeDuration)
 	nodeID = ids.GenerateTestNodeID()
 
-	addValidatorTx2, err := env.txBuilder.NewAddValidatorTx(
+	sk, err = bls.NewSecretKey()
+	require.NoError(err)
+
+	addValidatorTx2, err := env.txBuilder.NewAddPermissionlessValidatorTx(
 		env.config.MinValidatorStake,
 		uint64(validatorStartTime.Unix()),
 		uint64(validatorEndTime.Unix()),
 		nodeID,
+		signer.NewProofOfPossession(sk),
 		preFundedKeys[0].PublicKey().Address(),
 		10000,
 		[]*secp256k1.PrivateKey{
@@ -1401,6 +1398,7 @@ func TestAddValidatorProposalBlock(t *testing.T) {
 			preFundedKeys[4],
 		},
 		ids.ShortEmpty,
+		nil,
 	)
 	require.NoError(err)
 
@@ -1409,7 +1407,7 @@ func TestAddValidatorProposalBlock(t *testing.T) {
 	preferred, err = env.blkManager.GetStatelessBlock(preferredID)
 	require.NoError(err)
 
-	rewardValidatorTx, err := env.txBuilder.NewRewardValidatorTx(addValidatorTx.ID())
+	rewardValidatorTx, err := newRewardValidatorTx(t, addValidatorTx.ID())
 	require.NoError(err)
 
 	statelessProposalBlk, err := block.NewBanffProposalBlock(
@@ -1439,4 +1437,13 @@ func TestAddValidatorProposalBlock(t *testing.T) {
 	rewardUTXOs, err := env.state.GetRewardUTXOs(addValidatorTx.ID())
 	require.NoError(err)
 	require.NotEmpty(rewardUTXOs)
+}
+
+func newRewardValidatorTx(t testing.TB, txID ids.ID) (*txs.Tx, error) {
+	utx := &txs.RewardValidatorTx{TxID: txID}
+	tx, err := txs.NewSigned(utx, txs.Codec, nil)
+	if err != nil {
+		return nil, err
+	}
+	return tx, tx.SyntacticVerify(snowtest.Context(t, snowtest.PChainID))
 }

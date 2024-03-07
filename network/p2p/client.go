@@ -75,7 +75,7 @@ func (c *Client) AppRequest(
 	c.router.lock.Lock()
 	defer c.router.lock.Unlock()
 
-	appRequestBytes = c.prefixMessage(appRequestBytes)
+	appRequestBytes = PrefixMessage(c.handlerPrefix, appRequestBytes)
 	for nodeID := range nodeIDs {
 		requestID := c.router.requestID
 		if _, ok := c.router.pendingAppRequests[requestID]; ok {
@@ -109,10 +109,16 @@ func (c *Client) AppRequest(
 func (c *Client) AppGossip(
 	ctx context.Context,
 	appGossipBytes []byte,
+	numValidators int,
+	numNonValidators int,
+	numPeers int,
 ) error {
 	return c.sender.SendAppGossip(
 		ctx,
-		c.prefixMessage(appGossipBytes),
+		PrefixMessage(c.handlerPrefix, appGossipBytes),
+		numValidators,
+		numNonValidators,
+		numPeers,
 	)
 }
 
@@ -125,7 +131,7 @@ func (c *Client) AppGossipSpecific(
 	return c.sender.SendAppGossipSpecific(
 		ctx,
 		nodeIDs,
-		c.prefixMessage(appGossipBytes),
+		PrefixMessage(c.handlerPrefix, appGossipBytes),
 	)
 }
 
@@ -153,7 +159,7 @@ func (c *Client) CrossChainAppRequest(
 		ctx,
 		chainID,
 		requestID,
-		c.prefixMessage(appRequestBytes),
+		PrefixMessage(c.handlerPrefix, appRequestBytes),
 	); err != nil {
 		return err
 	}
@@ -167,15 +173,14 @@ func (c *Client) CrossChainAppRequest(
 	return nil
 }
 
-// prefixMessage prefixes the original message with the handler identifier
-// corresponding to this client.
+// PrefixMessage prefixes the original message with the protocol identifier.
 //
 // Only gossip and request messages need to be prefixed.
 // Response messages don't need to be prefixed because request ids are tracked
 // which map to the expected response handler.
-func (c *Client) prefixMessage(src []byte) []byte {
-	messageBytes := make([]byte, len(c.handlerPrefix)+len(src))
-	copy(messageBytes, c.handlerPrefix)
-	copy(messageBytes[len(c.handlerPrefix):], src)
+func PrefixMessage(prefix, msg []byte) []byte {
+	messageBytes := make([]byte, len(prefix)+len(msg))
+	copy(messageBytes, prefix)
+	copy(messageBytes[len(prefix):], msg)
 	return messageBytes
 }

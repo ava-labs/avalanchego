@@ -258,7 +258,7 @@ func Test_Trie_ViewOnCommitedView(t *testing.T) {
 
 	require.NoError(committedTrie.CommitToDB(context.Background()))
 
-	newView, err := committedTrie.NewView(
+	view, err := committedTrie.NewView(
 		context.Background(),
 		ViewChanges{
 			BatchOps: []database.BatchOp{
@@ -267,7 +267,7 @@ func Test_Trie_ViewOnCommitedView(t *testing.T) {
 		},
 	)
 	require.NoError(err)
-	require.NoError(newView.CommitToDB(context.Background()))
+	require.NoError(view.CommitToDB(context.Background()))
 
 	val0, err := dbTrie.GetValue(context.Background(), []byte{0})
 	require.NoError(err)
@@ -1235,9 +1235,9 @@ func Test_Trie_ConcurrentNewViewAndCommit(t *testing.T) {
 		require.NoError(newTrie.CommitToDB(context.Background()))
 	}()
 
-	newView, err := newTrie.NewView(context.Background(), ViewChanges{})
+	view, err := newTrie.NewView(context.Background(), ViewChanges{})
 	require.NoError(err)
-	require.NotNil(newView)
+	require.NotNil(view)
 }
 
 // Returns the path of the only child of this node.

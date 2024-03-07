@@ -46,7 +46,7 @@ type Fx interface {
 	// VerifyOperation verifies that the specified transaction can spend the
 	// provided utxos conditioned on the result being restricted to the provided
 	// outputs. If the transaction can't spend the output based on the input and
-	// credential, a non-nil error  should be returned.
+	// credential, a non-nil error should be returned.
 	VerifyOperation(tx, op, cred interface{}, utxos []interface{}) error
 }
 

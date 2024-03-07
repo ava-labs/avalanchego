@@ -11,6 +11,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/math"
@@ -23,9 +24,18 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
+func newRewardValidatorTx(t testing.TB, txID ids.ID) (*txs.Tx, error) {
+	utx := &txs.RewardValidatorTx{TxID: txID}
+	tx, err := txs.NewSigned(utx, txs.Codec, nil)
+	if err != nil {
+		return nil, err
+	}
+	return tx, tx.SyntacticVerify(snowtest.Context(t, snowtest.PChainID))
+}
+
 func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, false /*=postBanff*/, false /*=postCortina*/, false /*=postDurango*/)
+	env := newEnvironment(t, apricotPhase5)
 	dummyHeight := uint64(1)
 
 	currentStakerIterator, err := env.state.GetCurrentStakerIterator()
@@ -40,7 +50,7 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	stakerToRemoveTx := stakerToRemoveTxIntf.Unsigned.(*txs.AddValidatorTx)
 
 	// Case 1: Chain timestamp is wrong
-	tx, err := env.txBuilder.NewRewardValidatorTx(stakerToRemove.TxID)
+	tx, err := newRewardValidatorTx(t, stakerToRemove.TxID)
 	require.NoError(err)
 
 	onCommitState, err := state.NewDiff(lastAcceptedID, env)
@@ -62,7 +72,7 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	env.state.SetTimestamp(stakerToRemove.EndTime)
 
 	// Case 2: Wrong validator
-	tx, err = env.txBuilder.NewRewardValidatorTx(ids.GenerateTestID())
+	tx, err = newRewardValidatorTx(t, ids.GenerateTestID())
 	require.NoError(err)
 
 	onCommitState, err = state.NewDiff(lastAcceptedID, env)
@@ -81,7 +91,7 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	require.ErrorIs(err, ErrRemoveWrongStaker)
 
 	// Case 3: Happy path
-	tx, err = env.txBuilder.NewRewardValidatorTx(stakerToRemove.TxID)
+	tx, err = newRewardValidatorTx(t, stakerToRemove.TxID)
 	require.NoError(err)
 
 	onCommitState, err = state.NewDiff(lastAcceptedID, env)
@@ -125,7 +135,7 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 
 func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, false /*=postBanff*/, false /*=postCortina*/, false /*=postDurango*/)
+	env := newEnvironment(t, apricotPhase5)
 	dummyHeight := uint64(1)
 
 	currentStakerIterator, err := env.state.GetCurrentStakerIterator()
@@ -140,7 +150,7 @@ func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	stakerToRemoveTx := stakerToRemoveTxIntf.Unsigned.(*txs.AddValidatorTx)
 
 	// Case 1: Chain timestamp is wrong
-	tx, err := env.txBuilder.NewRewardValidatorTx(stakerToRemove.TxID)
+	tx, err := newRewardValidatorTx(t, stakerToRemove.TxID)
 	require.NoError(err)
 
 	onCommitState, err := state.NewDiff(lastAcceptedID, env)
@@ -162,7 +172,7 @@ func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	env.state.SetTimestamp(stakerToRemove.EndTime)
 
 	// Case 2: Wrong validator
-	tx, err = env.txBuilder.NewRewardValidatorTx(ids.GenerateTestID())
+	tx, err = newRewardValidatorTx(t, ids.GenerateTestID())
 	require.NoError(err)
 
 	txExecutor = ProposalTxExecutor{
@@ -175,7 +185,7 @@ func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	require.ErrorIs(err, ErrRemoveWrongStaker)
 
 	// Case 3: Happy path
-	tx, err = env.txBuilder.NewRewardValidatorTx(stakerToRemove.TxID)
+	tx, err = newRewardValidatorTx(t, stakerToRemove.TxID)
 	require.NoError(err)
 
 	onCommitState, err = state.NewDiff(lastAcceptedID, env)
@@ -219,7 +229,7 @@ func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 
 func TestRewardDelegatorTxExecuteOnCommitPreDelegateeDeferral(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, false /*=postBanff*/, false /*=postCortina*/, false /*=postDurango*/)
+	env := newEnvironment(t, apricotPhase5)
 	dummyHeight := uint64(1)
 
 	vdrRewardAddress := ids.GenerateTestShortID()
@@ -238,6 +248,7 @@ func TestRewardDelegatorTxExecuteOnCommitPreDelegateeDeferral(t *testing.T) {
 		reward.PercentDenominator/4,
 		[]*secp256k1.PrivateKey{preFundedKeys[0]},
 		ids.ShortEmpty,
+		nil,
 	)
 	require.NoError(err)
 
@@ -252,6 +263,7 @@ func TestRewardDelegatorTxExecuteOnCommitPreDelegateeDeferral(t *testing.T) {
 		delRewardAddress,
 		[]*secp256k1.PrivateKey{preFundedKeys[0]},
 		ids.ShortEmpty, // Change address
+		nil,
 	)
 	require.NoError(err)
 
@@ -285,7 +297,7 @@ func TestRewardDelegatorTxExecuteOnCommitPreDelegateeDeferral(t *testing.T) {
 	stake := env.config.Validators.GetWeight(constants.PrimaryNetworkID, vdrNodeID)
 	require.Equal(env.config.MinValidatorStake+env.config.MinDelegatorStake, stake)
 
-	tx, err := env.txBuilder.NewRewardValidatorTx(delTx.ID())
+	tx, err := newRewardValidatorTx(t, delTx.ID())
 	require.NoError(err)
 
 	onCommitState, err := state.NewDiff(lastAcceptedID, env)
@@ -340,7 +352,7 @@ func TestRewardDelegatorTxExecuteOnCommitPreDelegateeDeferral(t *testing.T) {
 
 func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, true /*=postBanff*/, true /*=postCortina*/, false /*=postDurango*/)
+	env := newEnvironment(t, cortina)
 	dummyHeight := uint64(1)
 
 	vdrRewardAddress := ids.GenerateTestShortID()
@@ -359,6 +371,7 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 		reward.PercentDenominator/4,
 		[]*secp256k1.PrivateKey{preFundedKeys[0]},
 		ids.ShortEmpty, /*=changeAddr*/
+		nil,
 	)
 	require.NoError(err)
 
@@ -373,6 +386,7 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 		delRewardAddress,
 		[]*secp256k1.PrivateKey{preFundedKeys[0]},
 		ids.ShortEmpty, /*=changeAddr*/
+		nil,
 	)
 	require.NoError(err)
 
@@ -416,7 +430,7 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 	stake := env.config.Validators.GetWeight(constants.PrimaryNetworkID, vdrNodeID)
 	require.Equal(env.config.MinValidatorStake+env.config.MinDelegatorStake, stake)
 
-	tx, err := env.txBuilder.NewRewardValidatorTx(delTx.ID())
+	tx, err := newRewardValidatorTx(t, delTx.ID())
 	require.NoError(err)
 
 	// Create Delegator Diff
@@ -464,7 +478,7 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 	env.state.SetHeight(dummyHeight)
 	require.NoError(env.state.Commit())
 
-	tx, err = env.txBuilder.NewRewardValidatorTx(vdrStaker.TxID)
+	tx, err = newRewardValidatorTx(t, vdrStaker.TxID)
 	require.NoError(err)
 
 	// Create Validator Diff
@@ -556,7 +570,7 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 
 func TestRewardDelegatorTxAndValidatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, true /*=postBanff*/, true /*=postCortina*/, false /*=postDurango*/)
+	env := newEnvironment(t, cortina)
 	dummyHeight := uint64(1)
 
 	vdrRewardAddress := ids.GenerateTestShortID()
@@ -575,6 +589,7 @@ func TestRewardDelegatorTxAndValidatorTxExecuteOnCommitPostDelegateeDeferral(t *
 		reward.PercentDenominator/4,
 		[]*secp256k1.PrivateKey{preFundedKeys[0]},
 		ids.ShortEmpty,
+		nil,
 	)
 	require.NoError(err)
 
@@ -589,6 +604,7 @@ func TestRewardDelegatorTxAndValidatorTxExecuteOnCommitPostDelegateeDeferral(t *
 		delRewardAddress,
 		[]*secp256k1.PrivateKey{preFundedKeys[0]},
 		ids.ShortEmpty, // Change address
+		nil,
 	)
 	require.NoError(err)
 
@@ -628,7 +644,7 @@ func TestRewardDelegatorTxAndValidatorTxExecuteOnCommitPostDelegateeDeferral(t *
 	oldDelBalance, err := avax.GetBalance(env.state, delDestSet)
 	require.NoError(err)
 
-	tx, err := env.txBuilder.NewRewardValidatorTx(delTx.ID())
+	tx, err := newRewardValidatorTx(t, delTx.ID())
 	require.NoError(err)
 
 	// Create Delegator Diffs
@@ -656,7 +672,7 @@ func TestRewardDelegatorTxAndValidatorTxExecuteOnCommitPostDelegateeDeferral(t *
 	vdrOnAbortState, err := state.NewDiff(testID, env)
 	require.NoError(err)
 
-	tx, err = env.txBuilder.NewRewardValidatorTx(vdrTx.ID())
+	tx, err = newRewardValidatorTx(t, vdrTx.ID())
 	require.NoError(err)
 
 	txExecutor = ProposalTxExecutor{
@@ -715,7 +731,7 @@ func TestRewardDelegatorTxAndValidatorTxExecuteOnCommitPostDelegateeDeferral(t *
 
 func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, false /*=postBanff*/, false /*=postCortina*/, false /*=postDurango*/)
+	env := newEnvironment(t, apricotPhase5)
 	dummyHeight := uint64(1)
 
 	initialSupply, err := env.state.GetCurrentSupply(constants.PrimaryNetworkID)
@@ -737,6 +753,7 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 		reward.PercentDenominator/4,
 		[]*secp256k1.PrivateKey{preFundedKeys[0]},
 		ids.ShortEmpty,
+		nil,
 	)
 	require.NoError(err)
 
@@ -750,6 +767,7 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 		delRewardAddress,
 		[]*secp256k1.PrivateKey{preFundedKeys[0]},
 		ids.ShortEmpty,
+		nil,
 	)
 	require.NoError(err)
 
@@ -779,7 +797,7 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	env.state.SetHeight(dummyHeight)
 	require.NoError(env.state.Commit())
 
-	tx, err := env.txBuilder.NewRewardValidatorTx(delTx.ID())
+	tx, err := newRewardValidatorTx(t, delTx.ID())
 	require.NoError(err)
 
 	onCommitState, err := state.NewDiff(lastAcceptedID, env)

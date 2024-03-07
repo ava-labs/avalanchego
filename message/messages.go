@@ -9,9 +9,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-
 	"go.uber.org/zap"
-
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -19,7 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/compression"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -353,7 +350,7 @@ func (mb *msgBuilder) parseInbound(
 
 	expiration := mockable.MaxTime
 	if deadline, ok := GetDeadline(msg); ok {
-		deadline = math.Min(deadline, mb.maxMessageTimeout)
+		deadline = min(deadline, mb.maxMessageTimeout)
 		expiration = time.Now().Add(deadline)
 	}
 

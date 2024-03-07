@@ -4,7 +4,6 @@
 package executor
 
 import (
-	"fmt"
 	"math"
 	"testing"
 	"time"
@@ -43,6 +42,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 			reward.PercentDenominator,       // Shares
 			[]*secp256k1.PrivateKey{preFundedKeys[0]},
 			ids.ShortEmpty,
+			nil,
 		)
 		require.NoError(t, err)
 
@@ -73,6 +73,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 			reward.PercentDenominator,       // Shared
 			[]*secp256k1.PrivateKey{preFundedKeys[0]},
 			ids.ShortEmpty,
+			nil,
 		)
 		require.NoError(t, err)
 
@@ -91,7 +92,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 		require.NoError(t, target.state.Commit())
 	}
 
-	dummyH := newEnvironment(t, false /*=postBanff*/, false /*=postCortina*/, false /*=postDurango*/)
+	dummyH := newEnvironment(t, apricotPhase5)
 	currentTimestamp := dummyH.state.GetTimestamp()
 
 	type test struct {
@@ -119,18 +120,6 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 			setup:         nil,
 			AP3Time:       defaultGenesisTime,
 			expectedErr:   ErrPeriodMismatch,
-		},
-		{
-			description:   fmt.Sprintf("delegator should not be added more than (%s) in the future", MaxFutureStartTime),
-			stakeAmount:   dummyH.config.MinDelegatorStake,
-			startTime:     uint64(currentTimestamp.Add(MaxFutureStartTime + time.Second).Unix()),
-			endTime:       uint64(currentTimestamp.Add(MaxFutureStartTime + defaultMinStakingDuration + time.Second).Unix()),
-			nodeID:        nodeID,
-			rewardAddress: rewardAddress,
-			feeKeys:       []*secp256k1.PrivateKey{preFundedKeys[0]},
-			setup:         nil,
-			AP3Time:       defaultGenesisTime,
-			expectedErr:   ErrFutureStakeTime,
 		},
 		{
 			description:   "validator not in the current or pending validator sets",
@@ -245,7 +234,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.description, func(t *testing.T) {
 			require := require.New(t)
-			freshTH := newEnvironment(t, false /*=postBanff*/, false /*=postCortina*/, false /*=postDurango*/)
+			freshTH := newEnvironment(t, apricotPhase5)
 			freshTH.config.ApricotPhase3Time = tt.AP3Time
 
 			tx, err := freshTH.txBuilder.NewAddDelegatorTx(
@@ -256,6 +245,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 				tt.rewardAddress,
 				tt.feeKeys,
 				ids.ShortEmpty,
+				nil,
 			)
 			require.NoError(err)
 
@@ -283,7 +273,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 
 func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, false /*=postBanff*/, false /*=postCortina*/, false /*=postDurango*/)
+	env := newEnvironment(t, apricotPhase5)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
@@ -300,6 +290,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			testSubnet1.ID(),
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 			ids.ShortEmpty, // change addr
+			nil,
 		)
 		require.NoError(err)
 
@@ -332,6 +323,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			testSubnet1.ID(),
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 			ids.ShortEmpty, // change addr
+			nil,
 		)
 		require.NoError(err)
 
@@ -365,6 +357,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		reward.PercentDenominator,    // shares
 		[]*secp256k1.PrivateKey{preFundedKeys[0]},
 		ids.ShortEmpty,
+		nil,
 	)
 	require.NoError(err)
 
@@ -378,6 +371,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			testSubnet1.ID(),
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 			ids.ShortEmpty, // change addr
+			nil,
 		)
 		require.NoError(err)
 
@@ -425,6 +419,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			testSubnet1.ID(),
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 			ids.ShortEmpty, // change addr
+			nil,
 		)
 		require.NoError(err)
 
@@ -455,6 +450,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			testSubnet1.ID(),
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 			ids.ShortEmpty, // change addr
+			nil,
 		)
 		require.NoError(err)
 
@@ -485,6 +481,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			testSubnet1.ID(),
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 			ids.ShortEmpty, // change addr
+			nil,
 		)
 		require.NoError(err)
 
@@ -517,6 +514,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			testSubnet1.ID(), // subnet ID
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 			ids.ShortEmpty, // change addr
+			nil,
 		)
 		require.NoError(err)
 
@@ -549,6 +547,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		testSubnet1.ID(),                        // subnet ID
 		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 		ids.ShortEmpty,
+		nil,
 	)
 	require.NoError(err)
 
@@ -576,6 +575,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			testSubnet1.ID(),                          // subnet ID
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 			ids.ShortEmpty, // change addr
+			nil,
 		)
 		require.NoError(err)
 
@@ -609,6 +609,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			testSubnet1.ID(), // subnet ID
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[2]},
 			ids.ShortEmpty, // change addr
+			nil,
 		)
 		require.NoError(err)
 
@@ -645,6 +646,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			testSubnet1.ID(), // subnet ID
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], preFundedKeys[1]},
 			ids.ShortEmpty, // change addr
+			nil,
 		)
 		require.NoError(err)
 
@@ -680,6 +682,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			testSubnet1.ID(), // subnet ID
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 			ids.ShortEmpty, // change addr
+			nil,
 		)
 		require.NoError(err)
 
@@ -716,7 +719,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 
 func TestProposalTxExecuteAddValidator(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, false /*=postBanff*/, false /*=postCortina*/, false /*=postDurango*/)
+	env := newEnvironment(t, apricotPhase5)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
@@ -734,6 +737,7 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 			reward.PercentDenominator,
 			[]*secp256k1.PrivateKey{preFundedKeys[0]},
 			ids.ShortEmpty, // change addr
+			nil,
 		)
 		require.NoError(err)
 
@@ -754,36 +758,6 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 	}
 
 	{
-		// Case: Validator's start time too far in the future
-		tx, err := env.txBuilder.NewAddValidatorTx(
-			env.config.MinValidatorStake,
-			uint64(defaultValidateStartTime.Add(MaxFutureStartTime).Unix()+1),
-			uint64(defaultValidateStartTime.Add(MaxFutureStartTime).Add(defaultMinStakingDuration).Unix()+1),
-			nodeID,
-			ids.ShortEmpty,
-			reward.PercentDenominator,
-			[]*secp256k1.PrivateKey{preFundedKeys[0]},
-			ids.ShortEmpty, // change addr
-		)
-		require.NoError(err)
-
-		onCommitState, err := state.NewDiff(lastAcceptedID, env)
-		require.NoError(err)
-
-		onAbortState, err := state.NewDiff(lastAcceptedID, env)
-		require.NoError(err)
-
-		executor := ProposalTxExecutor{
-			OnCommitState: onCommitState,
-			OnAbortState:  onAbortState,
-			Backend:       &env.backend,
-			Tx:            tx,
-		}
-		err = tx.Unsigned.Visit(&executor)
-		require.ErrorIs(err, ErrFutureStakeTime)
-	}
-
-	{
 		nodeID := genesisNodeIDs[0]
 
 		// Case: Validator already validating primary network
@@ -796,6 +770,7 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 			reward.PercentDenominator,
 			[]*secp256k1.PrivateKey{preFundedKeys[0]},
 			ids.ShortEmpty, // change addr
+			nil,
 		)
 		require.NoError(err)
 
@@ -827,6 +802,7 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 			reward.PercentDenominator, // shares
 			[]*secp256k1.PrivateKey{preFundedKeys[0]},
 			ids.ShortEmpty, // change addr
+			nil,
 		)
 		require.NoError(err)
 
@@ -872,6 +848,7 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 			reward.PercentDenominator,
 			[]*secp256k1.PrivateKey{preFundedKeys[0]},
 			ids.ShortEmpty, // change addr
+			nil,
 		)
 		require.NoError(err)
 

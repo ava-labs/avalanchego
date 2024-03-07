@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/staking"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/ips"
 )
 
@@ -20,6 +21,9 @@ func TestSignedIpVerify(t *testing.T) {
 	require.NoError(t, err)
 	cert1 := staking.CertificateFromX509(tlsCert1.Leaf)
 	require.NoError(t, staking.ValidateCertificate(cert1))
+	tlsKey1 := tlsCert1.PrivateKey.(crypto.Signer)
+	blsKey1, err := bls.NewSecretKey()
+	require.NoError(t, err)
 
 	tlsCert2, err := staking.NewTLSCert()
 	require.NoError(t, err)
@@ -30,7 +34,8 @@ func TestSignedIpVerify(t *testing.T) {
 
 	type test struct {
 		name         string
-		signer       crypto.Signer
+		tlsSigner    crypto.Signer
+		blsSigner    *bls.SecretKey
 		expectedCert *staking.Certificate
 		ip           UnsignedIP
 		maxTimestamp time.Time
@@ -40,7 +45,8 @@ func TestSignedIpVerify(t *testing.T) {
 	tests := []test{
 		{
 			name:         "valid (before max time)",
-			signer:       tlsCert1.PrivateKey.(crypto.Signer),
+			tlsSigner:    tlsKey1,
+			blsSigner:    blsKey1,
 			expectedCert: cert1,
 			ip: UnsignedIP{
 				IPPort: ips.IPPort{
@@ -54,7 +60,8 @@ func TestSignedIpVerify(t *testing.T) {
 		},
 		{
 			name:         "valid (at max time)",
-			signer:       tlsCert1.PrivateKey.(crypto.Signer),
+			tlsSigner:    tlsKey1,
+			blsSigner:    blsKey1,
 			expectedCert: cert1,
 			ip: UnsignedIP{
 				IPPort: ips.IPPort{
@@ -68,7 +75,8 @@ func TestSignedIpVerify(t *testing.T) {
 		},
 		{
 			name:         "timestamp too far ahead",
-			signer:       tlsCert1.PrivateKey.(crypto.Signer),
+			tlsSigner:    tlsKey1,
+			blsSigner:    blsKey1,
 			expectedCert: cert1,
 			ip: UnsignedIP{
 				IPPort: ips.IPPort{
@@ -82,7 +90,8 @@ func TestSignedIpVerify(t *testing.T) {
 		},
 		{
 			name:         "sig from wrong cert",
-			signer:       tlsCert1.PrivateKey.(crypto.Signer),
+			tlsSigner:    tlsKey1,
+			blsSigner:    blsKey1,
 			expectedCert: cert2, // note this isn't cert1
 			ip: UnsignedIP{
 				IPPort: ips.IPPort{
@@ -92,13 +101,13 @@ func TestSignedIpVerify(t *testing.T) {
 				Timestamp: uint64(now.Unix()),
 			},
 			maxTimestamp: now,
-			expectedErr:  errInvalidSignature,
+			expectedErr:  errInvalidTLSSignature,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			signedIP, err := tt.ip.Sign(tt.signer)
+			signedIP, err := tt.ip.Sign(tt.tlsSigner, tt.blsSigner)
 			require.NoError(t, err)
 
 			err = signedIP.Verify(tt.expectedCert, tt.maxTimestamp)

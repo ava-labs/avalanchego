@@ -13,6 +13,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
@@ -24,7 +25,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
-	txbuilder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
@@ -73,7 +73,6 @@ type Builder interface {
 type builder struct {
 	mempool.Mempool
 
-	txBuilder         txbuilder.Builder
 	txExecutorBackend *txexecutor.Backend
 	blkManager        blockexecutor.Manager
 
@@ -86,13 +85,11 @@ type builder struct {
 
 func New(
 	mempool mempool.Mempool,
-	txBuilder txbuilder.Builder,
 	txExecutorBackend *txexecutor.Backend,
 	blkManager blockexecutor.Manager,
 ) Builder {
 	return &builder{
 		Mempool:           mempool,
-		txBuilder:         txBuilder,
 		txExecutorBackend: txExecutorBackend,
 		blkManager:        blkManager,
 		resetTimer:        make(chan struct{}, 1),
@@ -266,45 +263,6 @@ func buildBlock(
 	forceAdvanceTime bool,
 	parentState state.Chain,
 ) (block.Block, error) {
-	// Try rewarding stakers whose staking period ends at the new chain time.
-	// This is done first to prioritize advancing the timestamp as quickly as
-	// possible.
-	stakerTxID, shouldReward, err := getNextStakerToReward(timestamp, parentState)
-	if err != nil {
-		return nil, fmt.Errorf("could not find next staker to reward: %w", err)
-	}
-	if shouldReward {
-		rewardValidatorTx, err := builder.txBuilder.NewRewardValidatorTx(stakerTxID)
-		if err != nil {
-			return nil, fmt.Errorf("could not build tx to reward staker: %w", err)
-		}
-
-		var blockTxs []*txs.Tx
-		// TODO: Cleanup post-Durango
-		if builder.txExecutorBackend.Config.IsDurangoActivated(timestamp) {
-			blockTxs, err = packBlockTxs(
-				parentID,
-				parentState,
-				builder.Mempool,
-				builder.txExecutorBackend,
-				builder.blkManager,
-				timestamp,
-				targetBlockSize,
-			)
-			if err != nil {
-				return nil, fmt.Errorf("failed to pack block txs: %w", err)
-			}
-		}
-
-		return block.NewBanffProposalBlock(
-			timestamp,
-			parentID,
-			height,
-			rewardValidatorTx,
-			blockTxs,
-		)
-	}
-
 	blockTxs, err := packBlockTxs(
 		parentID,
 		parentState,
@@ -316,6 +274,28 @@ func buildBlock(
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to pack block txs: %w", err)
+	}
+
+	// Try rewarding stakers whose staking period ends at the new chain time.
+	// This is done first to prioritize advancing the timestamp as quickly as
+	// possible.
+	stakerTxID, shouldReward, err := getNextStakerToReward(timestamp, parentState)
+	if err != nil {
+		return nil, fmt.Errorf("could not find next staker to reward: %w", err)
+	}
+	if shouldReward {
+		rewardValidatorTx, err := NewRewardValidatorTx(builder.txExecutorBackend.Ctx, stakerTxID)
+		if err != nil {
+			return nil, fmt.Errorf("could not build tx to reward staker: %w", err)
+		}
+
+		return block.NewBanffProposalBlock(
+			timestamp,
+			parentID,
+			height,
+			rewardValidatorTx,
+			blockTxs,
+		)
 	}
 
 	// If there is no reason to build a block, don't.
@@ -446,4 +426,13 @@ func getNextStakerToReward(
 		}
 	}
 	return ids.Empty, false, nil
+}
+
+func NewRewardValidatorTx(ctx *snow.Context, txID ids.ID) (*txs.Tx, error) {
+	utx := &txs.RewardValidatorTx{TxID: txID}
+	tx, err := txs.NewSigned(utx, txs.Codec, nil)
+	if err != nil {
+		return nil, err
+	}
+	return tx, tx.SyntacticVerify(ctx)
 }

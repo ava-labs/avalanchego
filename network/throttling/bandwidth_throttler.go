@@ -9,9 +9,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-
 	"go.uber.org/zap"
-
 	"golang.org/x/time/rate"
 
 	"github.com/ava-labs/avalanchego/ids"
