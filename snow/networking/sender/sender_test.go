@@ -40,13 +40,6 @@ import (
 
 const testThreadPoolSize = 2
 
-var defaultSubnetConfig = subnets.Config{
-	GossipConfig: subnets.GossipConfig{
-		AcceptedFrontierPeerSize: 2,
-		OnAcceptPeerSize:         2,
-	},
-}
-
 func TestTimeout(t *testing.T) {
 	require := require.New(t)
 
@@ -106,7 +99,7 @@ func TestTimeout(t *testing.T) {
 		&chainRouter,
 		tm,
 		p2p.EngineType_ENGINE_TYPE_SNOWMAN,
-		subnets.New(ctx.NodeID, defaultSubnetConfig),
+		subnets.New(ctx.NodeID, subnets.Config{}),
 	)
 	require.NoError(err)
 
@@ -372,7 +365,7 @@ func TestReliableMessages(t *testing.T) {
 		&chainRouter,
 		tm,
 		p2p.EngineType_ENGINE_TYPE_SNOWMAN,
-		subnets.New(ctx.NodeID, defaultSubnetConfig),
+		subnets.New(ctx.NodeID, subnets.Config{}),
 	)
 	require.NoError(err)
 
@@ -518,7 +511,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 		&chainRouter,
 		tm,
 		p2p.EngineType_ENGINE_TYPE_SNOWMAN,
-		subnets.New(ctx.NodeID, defaultSubnetConfig),
+		subnets.New(ctx.NodeID, subnets.Config{}),
 	)
 	require.NoError(err)
 
@@ -820,7 +813,7 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 				router,
 				timeoutManager,
 				engineType,
-				subnets.New(ctx.NodeID, defaultSubnetConfig),
+				subnets.New(ctx.NodeID, subnets.Config{}),
 			)
 			require.NoError(err)
 
@@ -1032,7 +1025,7 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 				router,
 				timeoutManager,
 				engineType,
-				subnets.New(ctx.NodeID, defaultSubnetConfig),
+				subnets.New(ctx.NodeID, subnets.Config{}),
 			)
 			require.NoError(err)
 
@@ -1192,7 +1185,7 @@ func TestSender_Single_Request(t *testing.T) {
 				router,
 				timeoutManager,
 				engineType,
-				subnets.New(ctx.NodeID, defaultSubnetConfig),
+				subnets.New(ctx.NodeID, subnets.Config{}),
 			)
 			require.NoError(err)
 

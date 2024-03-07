@@ -53,9 +53,7 @@ const (
 	chainUpgradeFileName = "upgrade"
 	subnetConfigFileExt  = ".json"
 
-	keystoreDeprecationMsg               = "keystore API is deprecated"
-	acceptedFrontierGossipDeprecationMsg = "push-based accepted frontier gossip is deprecated"
-	peerListPushGossipDeprecationMsg     = "push-based peer list gossip is deprecated"
+	keystoreDeprecationMsg = "keystore API is deprecated"
 )
 
 var (
@@ -64,18 +62,6 @@ var (
 	commitThresholdDeprecationMsg = fmt.Sprintf("use --%s instead", SnowCommitThresholdKey)
 	deprecatedKeys                = map[string]string{
 		KeystoreAPIEnabledKey: keystoreDeprecationMsg,
-
-		ConsensusGossipAcceptedFrontierValidatorSizeKey:    acceptedFrontierGossipDeprecationMsg,
-		ConsensusGossipAcceptedFrontierNonValidatorSizeKey: acceptedFrontierGossipDeprecationMsg,
-		ConsensusGossipAcceptedFrontierPeerSizeKey:         acceptedFrontierGossipDeprecationMsg,
-		ConsensusGossipOnAcceptValidatorSizeKey:            acceptedFrontierGossipDeprecationMsg,
-		ConsensusGossipOnAcceptNonValidatorSizeKey:         acceptedFrontierGossipDeprecationMsg,
-		ConsensusGossipOnAcceptPeerSizeKey:                 acceptedFrontierGossipDeprecationMsg,
-
-		NetworkPeerListValidatorGossipSizeKey:    peerListPushGossipDeprecationMsg,
-		NetworkPeerListNonValidatorGossipSizeKey: peerListPushGossipDeprecationMsg,
-		NetworkPeerListPeersGossipSizeKey:        peerListPushGossipDeprecationMsg,
-		NetworkPeerListGossipFreqKey:             peerListPushGossipDeprecationMsg,
 
 		SnowRogueCommitThresholdKey:    commitThresholdDeprecationMsg,
 		SnowVirtuousCommitThresholdKey: commitThresholdDeprecationMsg,
@@ -263,17 +249,6 @@ func getAdaptiveTimeoutConfig(v *viper.Viper) (timer.AdaptiveTimeoutConfig, erro
 	return config, nil
 }
 
-func getGossipConfig(v *viper.Viper) subnets.GossipConfig {
-	return subnets.GossipConfig{
-		AcceptedFrontierValidatorSize:    uint(v.GetUint32(ConsensusGossipAcceptedFrontierValidatorSizeKey)),
-		AcceptedFrontierNonValidatorSize: uint(v.GetUint32(ConsensusGossipAcceptedFrontierNonValidatorSizeKey)),
-		AcceptedFrontierPeerSize:         uint(v.GetUint32(ConsensusGossipAcceptedFrontierPeerSizeKey)),
-		OnAcceptValidatorSize:            uint(v.GetUint32(ConsensusGossipOnAcceptValidatorSizeKey)),
-		OnAcceptNonValidatorSize:         uint(v.GetUint32(ConsensusGossipOnAcceptNonValidatorSizeKey)),
-		OnAcceptPeerSize:                 uint(v.GetUint32(ConsensusGossipOnAcceptPeerSizeKey)),
-	}
-}
-
 func getNetworkConfig(
 	v *viper.Viper,
 	networkID uint32,
@@ -386,13 +361,9 @@ func getNetworkConfig(
 		},
 
 		PeerListGossipConfig: network.PeerListGossipConfig{
-			PeerListNumValidatorIPs:        v.GetUint32(NetworkPeerListNumValidatorIPsKey),
-			PeerListValidatorGossipSize:    v.GetUint32(NetworkPeerListValidatorGossipSizeKey),
-			PeerListNonValidatorGossipSize: v.GetUint32(NetworkPeerListNonValidatorGossipSizeKey),
-			PeerListPeersGossipSize:        v.GetUint32(NetworkPeerListPeersGossipSizeKey),
-			PeerListGossipFreq:             v.GetDuration(NetworkPeerListGossipFreqKey),
-			PeerListPullGossipFreq:         v.GetDuration(NetworkPeerListPullGossipFreqKey),
-			PeerListBloomResetFreq:         v.GetDuration(NetworkPeerListBloomResetFreqKey),
+			PeerListNumValidatorIPs: v.GetUint32(NetworkPeerListNumValidatorIPsKey),
+			PeerListPullGossipFreq:  v.GetDuration(NetworkPeerListPullGossipFreqKey),
+			PeerListBloomResetFreq:  v.GetDuration(NetworkPeerListBloomResetFreqKey),
 		},
 
 		DelayConfig: network.DelayConfig{
@@ -426,8 +397,6 @@ func getNetworkConfig(
 		return network.Config{}, fmt.Errorf("%s must be in [0,1]", NetworkHealthMaxPortionSendQueueFillKey)
 	case config.DialerConfig.ConnectionTimeout < 0:
 		return network.Config{}, fmt.Errorf("%q must be >= 0", NetworkOutboundConnectionTimeoutKey)
-	case config.PeerListGossipFreq < 0:
-		return network.Config{}, fmt.Errorf("%s must be >= 0", NetworkPeerListGossipFreqKey)
 	case config.PeerListPullGossipFreq < 0:
 		return network.Config{}, fmt.Errorf("%s must be >= 0", NetworkPeerListPullGossipFreqKey)
 	case config.PeerListBloomResetFreq < 0:
@@ -1124,7 +1093,6 @@ func getDefaultSubnetConfig(v *viper.Viper) subnets.Config {
 	return subnets.Config{
 		ConsensusParameters:         getConsensusConfig(v),
 		ValidatorOnly:               false,
-		GossipConfig:                getGossipConfig(v),
 		ProposerMinBlockDelay:       proposervm.DefaultMinBlockDelay,
 		ProposerNumHistoricalBlocks: proposervm.DefaultNumHistoricalBlocks,
 	}
