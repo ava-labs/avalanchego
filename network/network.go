@@ -1157,12 +1157,10 @@ func (n *network) NodeUptime(subnetID ids.ID) (UptimeResult, error) {
 }
 
 func (n *network) runTimers() {
-	pushGossipPeerlists := time.NewTicker(n.config.PeerListGossipFreq)
 	pullGossipPeerlists := time.NewTicker(n.config.PeerListPullGossipFreq)
 	resetPeerListBloom := time.NewTicker(n.config.PeerListBloomResetFreq)
 	updateUptimes := time.NewTicker(n.config.UptimeMetricFreq)
 	defer func() {
-		pushGossipPeerlists.Stop()
 		resetPeerListBloom.Stop()
 		updateUptimes.Stop()
 	}()
@@ -1171,8 +1169,6 @@ func (n *network) runTimers() {
 		select {
 		case <-n.onCloseCtx.Done():
 			return
-		case <-pushGossipPeerlists.C:
-			n.pushGossipPeerLists()
 		case <-pullGossipPeerlists.C:
 			n.pullGossipPeerLists()
 		case <-resetPeerListBloom.C:
@@ -1206,21 +1202,6 @@ func (n *network) runTimers() {
 				n.metrics.nodeSubnetUptimeRewardingStake.WithLabelValues(subnetIDStr).Set(result.RewardingStakePercentage)
 			}
 		}
-	}
-}
-
-// pushGossipPeerLists gossips validators to peers in the network
-func (n *network) pushGossipPeerLists() {
-	peers := n.samplePeers(
-		constants.PrimaryNetworkID,
-		int(n.config.PeerListValidatorGossipSize),
-		int(n.config.PeerListNonValidatorGossipSize),
-		int(n.config.PeerListPeersGossipSize),
-		subnets.NoOpAllower,
-	)
-
-	for _, p := range peers {
-		p.StartSendPeerList()
 	}
 }
 

@@ -164,21 +164,13 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 		feesCfg.MinUnitFees,
 	)
 
-	err = tx.Unsigned.Visit(&executor.StandardTxExecutor{
+	return tx.Unsigned.Visit(&executor.StandardTxExecutor{
 		Backend:       m.txExecutorBackend,
 		BlkFeeManager: feeManager,
 		UnitCaps:      feesCfg.BlockUnitsCap,
 		State:         stateDiff,
 		Tx:            tx,
 	})
-	// We ignore [errFutureStakeTime] here because the time will be advanced
-	// when this transaction is issued.
-	//
-	// TODO: Remove this check post-Durango.
-	if errors.Is(err, executor.ErrFutureStakeTime) {
-		return nil
-	}
-	return err
 }
 
 func (m *manager) VerifyUniqueInputs(blkID ids.ID, inputs set.Set[ids.ID]) error {

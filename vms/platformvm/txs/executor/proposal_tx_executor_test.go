@@ -4,7 +4,6 @@
 package executor
 
 import (
-	"fmt"
 	"math"
 	"testing"
 	"time"
@@ -121,18 +120,6 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 			setup:         nil,
 			AP3Time:       defaultGenesisTime,
 			expectedErr:   ErrPeriodMismatch,
-		},
-		{
-			description:   fmt.Sprintf("delegator should not be added more than (%s) in the future", MaxFutureStartTime),
-			stakeAmount:   dummyH.config.MinDelegatorStake,
-			startTime:     uint64(currentTimestamp.Add(MaxFutureStartTime + time.Second).Unix()),
-			endTime:       uint64(currentTimestamp.Add(MaxFutureStartTime + defaultMinStakingDuration + time.Second).Unix()),
-			nodeID:        nodeID,
-			rewardAddress: rewardAddress,
-			feeKeys:       []*secp256k1.PrivateKey{preFundedKeys[0]},
-			setup:         nil,
-			AP3Time:       defaultGenesisTime,
-			expectedErr:   ErrFutureStakeTime,
 		},
 		{
 			description:   "validator not in the current or pending validator sets",
@@ -768,37 +755,6 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 		}
 		err = tx.Unsigned.Visit(&executor)
 		require.ErrorIs(err, ErrTimestampNotBeforeStartTime)
-	}
-
-	{
-		// Case: Validator's start time too far in the future
-		tx, err := env.txBuilder.NewAddValidatorTx(
-			env.config.MinValidatorStake,
-			uint64(defaultValidateStartTime.Add(MaxFutureStartTime).Unix()+1),
-			uint64(defaultValidateStartTime.Add(MaxFutureStartTime).Add(defaultMinStakingDuration).Unix()+1),
-			nodeID,
-			ids.ShortEmpty,
-			reward.PercentDenominator,
-			[]*secp256k1.PrivateKey{preFundedKeys[0]},
-			ids.ShortEmpty, // change addr
-			nil,
-		)
-		require.NoError(err)
-
-		onCommitState, err := state.NewDiff(lastAcceptedID, env)
-		require.NoError(err)
-
-		onAbortState, err := state.NewDiff(lastAcceptedID, env)
-		require.NoError(err)
-
-		executor := ProposalTxExecutor{
-			OnCommitState: onCommitState,
-			OnAbortState:  onAbortState,
-			Backend:       &env.backend,
-			Tx:            tx,
-		}
-		err = tx.Unsigned.Visit(&executor)
-		require.ErrorIs(err, ErrFutureStakeTime)
 	}
 
 	{

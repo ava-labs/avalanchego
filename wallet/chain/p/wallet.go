@@ -40,8 +40,6 @@ type Wallet interface {
 	Signer() backends.Signer
 
 	// IssueBaseTx creates, signs, and issues a new simple value transfer.
-	// Because the P-chain doesn't intend for balance transfers to occur, this
-	// method is expensive and abuses the creation of subnets.
 	//
 	// - [outputs] specifies all the recipients and amounts that should be sent
 	//   from this transaction.
@@ -317,11 +315,8 @@ func (w *wallet) IssueBaseTx(
 			ConsumedUnitsCap: w.unitCaps,
 		}
 	)
-	if w.isEForkActive {
-		utx, err = w.builder.NewBaseTx(outputs, feeCalc, options...)
-	} else {
-		utx, err = w.builder.NewBaseTxPreEUpgrade(outputs, feeCalc, options...)
-	}
+
+	utx, err = w.builder.NewBaseTx(outputs, feeCalc, options...)
 	if err != nil {
 		return nil, err
 	}
