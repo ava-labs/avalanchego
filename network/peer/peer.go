@@ -523,20 +523,12 @@ func (p *peer) writeMessages() {
 	}
 
 	myVersion := p.VersionCompatibility.Version()
-	legacyApplication := &version.Application{
-		Name:  version.LegacyAppName,
-		Major: myVersion.Major,
-		Minor: myVersion.Minor,
-		Patch: myVersion.Patch,
-	}
-
 	knownPeersFilter, knownPeersSalt := p.Network.KnownPeers()
 
 	msg, err := p.MessageCreator.Handshake(
 		p.NetworkID,
 		p.Clock.Unix(),
 		mySignedIP.IPPort,
-		legacyApplication.String(),
 		myVersion.Name,
 		uint32(myVersion.Major),
 		uint32(myVersion.Minor),

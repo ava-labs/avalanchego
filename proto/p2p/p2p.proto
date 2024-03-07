@@ -99,7 +99,7 @@ message Pong {
 //
 // Peers should drop connections to peers with incompatible versions.
 message Handshake {
-  reserved 5;
+  reserved 5; // Until E upgrade is activated.
   // Network the peer is running on (e.g local, testnet, mainnet)
   uint32 network_id = 1;
   // Unix timestamp when this Handshake message was created
@@ -249,7 +249,6 @@ message GetAcceptedFrontier {
 //
 // AcceptedFrontier is sent in response to GetAcceptedFrontier.
 message AcceptedFrontier {
-  reserved 4; // Until Cortina upgrade is activated
   // Chain being responded from
   bytes chain_id = 1;
   // Request id of the original GetAcceptedFrontier request
@@ -279,7 +278,6 @@ message GetAccepted {
 // a subset of container ids from the GetAccepted request that the sending peer
 // has accepted.
 message Accepted {
-  reserved 4; // Until Cortina upgrade is activated
   // Chain being responded from
   bytes chain_id = 1;
   // Request id of the original GetAccepted request
@@ -310,7 +308,6 @@ message GetAncestors {
 // Ancestors contains a contiguous ancestry of containers for the requested
 // container in order of increasing block height.
 message Ancestors {
-  reserved 4; // Until Cortina upgrade is activated
   // Chain being responded from
   bytes chain_id = 1;
   // Request id of the original GetAncestors request
