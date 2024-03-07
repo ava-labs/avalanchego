@@ -270,11 +270,7 @@ func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 	}
 
 	chainCtx := chain.Context()
-
-	// TODO: [requestID] can overflow, which means a timeout on the request
-	//       before the overflow may not be handled properly.
-	if notRequested := message.UnrequestedOps.Contains(op); notRequested ||
-		(op == message.PutOp && requestID == constants.GossipMsgRequestID) {
+	if message.UnrequestedOps.Contains(op) {
 		if chainCtx.Executing.Get() {
 			cr.log.Debug("dropping message and skipping queue",
 				zap.String("reason", "the chain is currently executing"),

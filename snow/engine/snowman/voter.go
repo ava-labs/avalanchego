@@ -107,7 +107,7 @@ func (v *voter) getProcessingAncestor(ctx context.Context, initialVote ids.ID) (
 	// have at our disposal as a best-effort mechanism to find a valid ancestor.
 	bubbledVote := v.t.nonVerifieds.GetAncestor(initialVote)
 	for {
-		blk, err := v.t.GetBlock(ctx, bubbledVote)
+		blk, err := v.t.getBlock(ctx, bubbledVote)
 		// If we cannot retrieve the block, drop [vote]
 		if err != nil {
 			v.t.Ctx.Log.Debug("dropping vote",
