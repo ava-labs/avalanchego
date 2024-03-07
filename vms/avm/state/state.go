@@ -281,69 +281,7 @@ func (s *state) DeleteUTXO(utxoID ids.ID) {
 	s.modifiedUTXOs[utxoID] = nil
 }
 
-// TODO: After v1.11.x has activated we can rename [getTx] to [GetTx] and delete
-// [getStatus].
 func (s *state) GetTx(txID ids.ID) (*txs.Tx, error) {
-	tx, err := s.getTx(txID)
-	if err != nil {
-		return nil, err
-	}
-
-	// Before the linearization, transactions were persisted before they were
-	// marked as Accepted. However, this function aims to only return accepted
-	// transactions.
-	status, err := s.getStatus(txID)
-	if err == database.ErrNotFound {
-		// If the status wasn't persisted, then the transaction was written
-		// after the linearization, and is accepted.
-		return tx, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	// If the status was persisted, then the transaction was written before the
-	// linearization. If it wasn't marked as accepted, then we treat it as if it
-	// doesn't exist.
-	if status != choices.Accepted {
-		return nil, database.ErrNotFound
-	}
-	return tx, nil
-}
-
-func (s *state) getStatus(id ids.ID) (choices.Status, error) {
-	if s.statusesPruned {
-		return choices.Unknown, database.ErrNotFound
-	}
-
-	if _, ok := s.addedTxs[id]; ok {
-		return choices.Unknown, database.ErrNotFound
-	}
-	if status, found := s.statusCache.Get(id); found {
-		if status == nil {
-			return choices.Unknown, database.ErrNotFound
-		}
-		return *status, nil
-	}
-
-	val, err := database.GetUInt32(s.statusDB, id[:])
-	if err == database.ErrNotFound {
-		s.statusCache.Put(id, nil)
-		return choices.Unknown, database.ErrNotFound
-	}
-	if err != nil {
-		return choices.Unknown, err
-	}
-
-	status := choices.Status(val)
-	if err := status.Valid(); err != nil {
-		return choices.Unknown, err
-	}
-	s.statusCache.Put(id, &status)
-	return status, nil
-}
-
-func (s *state) getTx(txID ids.ID) (*txs.Tx, error) {
 	if tx, exists := s.addedTxs[txID]; exists {
 		return tx, nil
 	}
