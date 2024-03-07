@@ -506,44 +506,45 @@ impl Db {
             file::Options::NoTruncate
         };
 
-        let (db_path, reset) = file::open_dir(db_path, open_options)?;
+        let (db_path, reset_store_headers) = file::open_dir(db_path, open_options)?;
 
         let merkle_path = file::touch_dir("merkle", &db_path)?;
         let merkle_meta_path = file::touch_dir("meta", &merkle_path)?;
         let merkle_payload_path = file::touch_dir("compact", &merkle_path)?;
-
         let root_hash_path = file::touch_dir("root_hash", &db_path)?;
 
-        let file0 = crate::file::File::new(0, SPACE_RESERVED, &merkle_meta_path)?;
-        let fd0 = file0.as_fd();
+        let meta_file = crate::file::File::new(0, SPACE_RESERVED, &merkle_meta_path)?;
+        let meta_fd = meta_file.as_fd();
 
-        if reset {
-            // initialize dbparams
+        if reset_store_headers {
+            // initialize DbParams
             if cfg.payload_file_nbit < cfg.payload_regn_nbit
                 || cfg.payload_regn_nbit < PAGE_SIZE_NBIT
             {
                 return Err(DbError::InvalidParams);
             }
-            Self::initialize_header_on_disk(&cfg, fd0)?;
+            Self::initialize_header_on_disk(&cfg, meta_fd)?;
         }
 
         // read DbParams
         let mut header_bytes = [0; size_of::<DbParams>()];
-        nix::sys::uio::pread(fd0, &mut header_bytes, 0).map_err(DbError::System)?;
-        drop(file0);
+        nix::sys::uio::pread(meta_fd, &mut header_bytes, 0).map_err(DbError::System)?;
+        drop(meta_file);
         #[allow(clippy::indexing_slicing)]
         let params: DbParams = cast_slice(&header_bytes)[0];
 
-        let wal = WalConfig::builder()
+        let (sender, inbound) = tokio::sync::mpsc::unbounded_channel();
+        let disk_requester = DiskBufferRequester::new(sender);
+
+        let wal_config = WalConfig::builder()
             .file_nbit(params.wal_file_nbit)
             .block_nbit(params.wal_block_nbit)
             .max_revisions(cfg.wal.max_revisions)
             .build();
-        let (sender, inbound) = tokio::sync::mpsc::unbounded_channel();
-        let disk_requester = DiskBufferRequester::new(sender);
-        let buffer = cfg.buffer.clone();
+
         #[allow(clippy::unwrap_used)]
-        let disk_buffer = DiskBuffer::new(inbound, &buffer, &wal).expect("DiskBuffer::new");
+        let disk_buffer =
+            DiskBuffer::new(inbound, &cfg.buffer, &wal_config).expect("DiskBuffer::new");
 
         let disk_thread = Some(
             std::thread::Builder::new()
@@ -552,6 +553,7 @@ impl Db {
                 .expect("thread spawn should succeed"),
         );
 
+        // set up caches
         #[allow(clippy::unwrap_used)]
         let root_hash_cache: Arc<CachedSpace> = CachedSpace::new(
             &StoreConfig::builder()
@@ -566,7 +568,6 @@ impl Db {
         .unwrap()
         .into();
 
-        // setup disk buffer
         #[allow(clippy::unwrap_used)]
         let data_cache = Universe {
             merkle: SubUniverse::<Arc<CachedSpace>>::new(
@@ -610,9 +611,6 @@ impl Db {
         // recover from Wal
         disk_requester.init_wal("wal", &db_path);
 
-        let root_hash_staging = StoreRevMut::new(root_hash_cache);
-        let reset_headers = reset;
-
         let base = Universe {
             merkle: get_sub_universe_from_empty_delta(&data_cache.merkle),
         };
@@ -641,8 +639,8 @@ impl Db {
                 disk_thread,
                 disk_requester,
                 cached_space: data_cache,
-                reset_store_headers: reset_headers,
-                root_hash_staging,
+                reset_store_headers,
+                root_hash_staging: StoreRevMut::new(root_hash_cache),
             })),
             revisions: Arc::new(Mutex::new(DbRevInner {
                 inner: VecDeque::new(),
