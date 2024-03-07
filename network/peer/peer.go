@@ -946,25 +946,19 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 		return
 	}
 
-	if msg.Client != nil {
-		p.version = &version.Application{
-			Name:  msg.Client.Name,
-			Major: int(msg.Client.Major),
-			Minor: int(msg.Client.Minor),
-			Patch: int(msg.Client.Patch),
-		}
-	} else {
-		// Handle legacy version field
-		peerVersion, err := version.ParseLegacyApplication(msg.MyVersion)
-		if err != nil {
-			p.Log.Debug("failed to parse peer version",
-				zap.Stringer("nodeID", p.id),
-				zap.Error(err),
-			)
-			p.StartClose()
-			return
-		}
-		p.version = peerVersion
+	if msg.Client == nil {
+		p.Log.Debug("missing version field",
+			zap.Stringer("nodeID", p.id),
+		)
+		p.StartClose()
+		return
+	}
+
+	p.version = &version.Application{
+		Name:  msg.Client.Name,
+		Major: int(msg.Client.Major),
+		Minor: int(msg.Client.Minor),
+		Patch: int(msg.Client.Patch),
 	}
 
 	if p.VersionCompatibility.Version().Before(p.version) {
