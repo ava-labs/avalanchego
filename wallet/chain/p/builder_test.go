@@ -140,12 +140,12 @@ func TestBaseTx(t *testing.T) {
 		feeCalc := &fees.Calculator{
 			IsEUpgradeActive: false,
 			Config: &config.Config{
-				CreateSubnetTxFee: testCtx.CreateSubnetTxFee(),
+				TxFee: testCtx.CreateSubnetTxFee(),
 			},
 			FeeManager:       commonfees.NewManager(commonfees.Empty),
 			ConsumedUnitsCap: commonfees.Max,
 		}
-		utx, err := builder.NewBaseTxPreEUpgrade(
+		utx, err := builder.NewBaseTx(
 			outputsToMove,
 			feeCalc,
 		)
@@ -157,7 +157,7 @@ func TestBaseTx(t *testing.T) {
 		fc := &fees.Calculator{
 			IsEUpgradeActive: false,
 			Config: &config.Config{
-				CreateSubnetTxFee: testCtx.CreateSubnetTxFee(),
+				TxFee: testCtx.CreateSubnetTxFee(),
 			},
 			FeeManager:       commonfees.NewManager(commonfees.Empty),
 			ConsumedUnitsCap: commonfees.Max,

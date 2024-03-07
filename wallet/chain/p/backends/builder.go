@@ -50,9 +50,7 @@ type Builder interface {
 		options ...common.Option,
 	) (map[ids.ID]uint64, error)
 
-	// NewBaseTx creates a new simple value transfer. Because the P-chain
-	// doesn't intend for balance transfers to occur, this method is expensive
-	// and abuses the creation of subnets.
+	// NewBaseTx creates a new simple value transfer.
 	//
 	// - [outputs] specifies all the recipients and amounts that should be sent
 	//   from this transaction.
@@ -61,13 +59,6 @@ type Builder interface {
 		feeCalc *fees.Calculator,
 		options ...common.Option,
 	) (*txs.BaseTx, error)
-
-	// TODO: Drop once E upgrade is activated
-	NewBaseTxPreEUpgrade(
-		outputs []*avax.TransferableOutput,
-		feeCalc *fees.Calculator,
-		options ...common.Option,
-	) (*txs.CreateSubnetTx, error)
 
 	// NewAddValidatorTx creates a new validator of the primary network.
 	//
@@ -349,54 +340,6 @@ func (b *builder) NewBaseTx(
 
 	outputs = append(outputs, changeOuts...)
 	avax.SortTransferableOutputs(outputs, txs.Codec)
-	utx.Ins = inputs
-	utx.Outs = outputs
-
-	return utx, b.initCtx(utx)
-}
-
-func (b *builder) NewBaseTxPreEUpgrade(
-	outputs []*avax.TransferableOutput,
-	feeCalc *fees.Calculator,
-	options ...common.Option,
-) (*txs.CreateSubnetTx, error) {
-	// 1. Build core transaction without utxos
-	ops := common.NewOptions(options)
-
-	utx := &txs.CreateSubnetTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    b.backend.NetworkID(),
-			BlockchainID: constants.PlatformChainID,
-			Outs:         outputs, // not sorted yet, we'll sort later on when we have all the outputs
-			Memo:         ops.Memo(),
-		}},
-		Owner: &secp256k1fx.OutputOwners{},
-	}
-
-	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
-	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
-	for _, out := range outputs {
-		assetID := out.AssetID()
-		amountToBurn, err := math.Add64(toBurn[assetID], out.Out.Amount())
-		if err != nil {
-			return nil, err
-		}
-		toBurn[assetID] = amountToBurn
-	}
-	toStake := map[ids.ID]uint64{}
-
-	// feesMan cumulates consumed units. Let's init it with utx filled so far
-	if err := feeCalc.CreateSubnetTx(utx); err != nil {
-		return nil, err
-	}
-
-	inputs, changeOutputs, _, err := b.financeTx(toBurn, toStake, feeCalc, ops)
-	if err != nil {
-		return nil, err
-	}
-	outputs = append(outputs, changeOutputs...)
-	avax.SortTransferableOutputs(outputs, txs.Codec) // sort the outputs
-
 	utx.Ins = inputs
 	utx.Outs = outputs
 
