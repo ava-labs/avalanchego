@@ -41,13 +41,6 @@ import (
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
-const (
-	pruneCommitLimit           = 1024
-	pruneCommitSleepMultiplier = 5
-	pruneCommitSleepCap        = 10 * time.Second
-	pruneUpdateFrequency       = 30 * time.Second
-)
-
 var (
 	_ State = (*state)(nil)
 
