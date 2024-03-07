@@ -92,11 +92,6 @@ type Peer interface {
 	// guaranteed not to be delivered to the peer.
 	Send(ctx context.Context, msg message.OutboundMessage) bool
 
-	// StartSendPeerList attempts to send a PeerList message to this peer on
-	// this peer's gossip routine. It is not guaranteed that a PeerList will be
-	// sent.
-	StartSendPeerList()
-
 	// StartSendGetPeerList attempts to send a GetPeerList message to this peer
 	// on this peer's gossip routine. It is not guaranteed that a GetPeerList
 	// will be sent.
@@ -186,10 +181,6 @@ type peer struct {
 	// Must only be accessed atomically
 	lastSent, lastReceived int64
 
-	// peerListChan signals that we should attempt to send a PeerList to this
-	// peer
-	peerListChan chan struct{}
-
 	// getPeerListChan signals that we should attempt to send a GetPeerList to
 	// this peer
 	getPeerListChan chan struct{}
@@ -219,7 +210,6 @@ func Start(
 		onClosingCtxCancel: onClosingCtxCancel,
 		onClosed:           make(chan struct{}),
 		observedUptimes:    make(map[ids.ID]uint32),
-		peerListChan:       make(chan struct{}, 1),
 		getPeerListChan:    make(chan struct{}, 1),
 	}
 
@@ -325,13 +315,6 @@ func (p *peer) ObservedUptime(subnetID ids.ID) (uint32, bool) {
 
 func (p *peer) Send(ctx context.Context, msg message.OutboundMessage) bool {
 	return p.messageQueue.Push(ctx, msg)
-}
-
-func (p *peer) StartSendPeerList() {
-	select {
-	case p.peerListChan <- struct{}{}:
-	default:
-	}
 }
 
 func (p *peer) StartSendGetPeerList() {
@@ -656,32 +639,6 @@ func (p *peer) sendNetworkMessages() {
 
 	for {
 		select {
-		case <-p.peerListChan:
-			peerIPs := p.Config.Network.Peers(p.id, bloom.EmptyFilter, nil)
-			if len(peerIPs) == 0 {
-				p.Log.Verbo(
-					"skipping peer gossip as there are no unknown peers",
-					zap.Stringer("nodeID", p.id),
-				)
-				continue
-			}
-
-			// Bypass throttling is disabled here to follow the non-handshake
-			// message sending pattern.
-			msg, err := p.Config.MessageCreator.PeerList(peerIPs, false /*=bypassThrottling*/)
-			if err != nil {
-				p.Log.Error("failed to create peer list message",
-					zap.Stringer("nodeID", p.id),
-					zap.Error(err),
-				)
-				continue
-			}
-
-			if !p.Send(p.onClosingCtx, msg) {
-				p.Log.Debug("failed to send peer list",
-					zap.Stringer("nodeID", p.id),
-				)
-			}
 		case <-p.getPeerListChan:
 			knownPeersFilter, knownPeersSalt := p.Config.Network.KnownPeers()
 			msg, err := p.Config.MessageCreator.GetPeerList(knownPeersFilter, knownPeersSalt)
