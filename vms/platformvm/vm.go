@@ -503,7 +503,7 @@ func (vm *VM) Logger() logging.Logger {
 	return vm.ctx.Log
 }
 
-func (vm *VM) VerifyHeightIndex(_ context.Context) error {
+func (*VM) VerifyHeightIndex(_ context.Context) error {
 	return nil
 }
 
