@@ -716,20 +716,12 @@ func (p *peer) shouldDisconnect() bool {
 		return false
 	}
 
-	postDurango := p.Clock.Time().After(version.GetDurangoTime(constants.MainnetID))
-	if postDurango && p.ip.BLSSignature == nil {
+	if p.ip.BLSSignature == nil {
 		p.Log.Debug("disconnecting from peer",
 			zap.String("reason", "missing BLS signature"),
 			zap.Stringer("nodeID", p.id),
 		)
 		return true
-	}
-
-	// If Durango hasn't activated on mainnet yet, we don't require BLS
-	// signatures to be provided. However, if they are provided, verify that
-	// they are correct.
-	if p.ip.BLSSignature == nil {
-		return false
 	}
 
 	validSignature := bls.VerifyProofOfPossession(

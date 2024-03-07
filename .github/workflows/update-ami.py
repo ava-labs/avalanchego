@@ -16,6 +16,9 @@ role_arn = os.getenv('ROLE_ARN')
 vtag = os.getenv('TAG')
 tag = vtag.replace('v', '')
 skip_create_ami = os.getenv('SKIP_CREATE_AMI', "True")
+os.environ["PKR_VAR_skip_create_ami"] = skip_create_ami
+os.environ["PKR_VAR_tag"] = tag
+
 
 def packer_build(packerfile):
   print("Running the packer build")
