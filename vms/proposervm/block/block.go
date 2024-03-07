@@ -91,13 +91,8 @@ func (b *statelessBlock) initialize(bytes []byte, durangoTime time.Time) error {
 		return nil
 	}
 
-	// TODO: Remove durangoTime after v1.11.x has activated.
 	var err error
-	if b.timestamp.Before(durangoTime) {
-		b.cert, err = staking.ParseCertificate(b.StatelessBlock.Certificate)
-	} else {
-		b.cert, err = staking.ParseCertificatePermissive(b.StatelessBlock.Certificate)
-	}
+	b.cert, err = staking.ParseCertificate(b.StatelessBlock.Certificate)
 	if err != nil {
 		return fmt.Errorf("%w: %w", errInvalidCertificate, err)
 	}

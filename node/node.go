@@ -110,8 +110,8 @@ func New(
 	logger logging.Logger,
 ) (*Node, error) {
 	tlsCert := config.StakingTLSCert.Leaf
-	stakingCert := staking.CertificateFromX509(tlsCert)
-	if err := staking.ValidateCertificate(stakingCert); err != nil {
+	stakingCert, err := staking.ParseCertificate(tlsCert.Raw)
+	if err != nil {
 		return nil, fmt.Errorf("invalid staking certificate: %w", err)
 	}
 
@@ -134,7 +134,6 @@ func New(
 		zap.Reflect("config", n.Config),
 	)
 
-	var err error
 	n.VMFactoryLog, err = logFactory.Make("vm-factory")
 	if err != nil {
 		return nil, fmt.Errorf("problem creating vm logger: %w", err)

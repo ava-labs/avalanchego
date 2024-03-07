@@ -11,8 +11,6 @@ import (
 type Certificate struct {
 	Raw       []byte
 	PublicKey crypto.PublicKey
-	// TODO: Remove after v1.11.x activates.
-	SignatureAlgorithm x509.SignatureAlgorithm
 }
 
 // CertificateFromX509 converts an x509 certificate into a staking certificate.
@@ -21,8 +19,7 @@ type Certificate struct {
 // certificate.
 func CertificateFromX509(cert *x509.Certificate) *Certificate {
 	return &Certificate{
-		Raw:                cert.Raw,
-		PublicKey:          cert.PublicKey,
-		SignatureAlgorithm: cert.SignatureAlgorithm,
+		Raw:       cert.Raw,
+		PublicKey: cert.PublicKey,
 	}
 }
