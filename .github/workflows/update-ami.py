@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import json
-import os 
+import os
 import boto3
 import uuid
 import re
@@ -8,7 +8,7 @@ import subprocess
 
 # Globals
 amifile = '.github/workflows/amichange.json'
-packerfile = ".github/packer/ubuntu-jammy-x86_64-public-ami.json"
+packerfile = ".github/packer/ubuntu-jammy-x86_64-public-ami.json.pkr.hcl"
 
 # Environment Globals
 product_id = os.getenv('PRODUCT_ID')
