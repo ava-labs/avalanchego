@@ -9,15 +9,16 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/ava-labs/avalanchego/codec"
+	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/units"
 
 	pb "github.com/ava-labs/avalanchego/proto/pb/message"
 )
 
 func TestParseGibberish(t *testing.T) {
 	randomBytes := []byte{0, 1, 2, 3, 4, 5}
-	_, err := Parse(randomBytes)
-	require.ErrorIs(t, err, codec.ErrUnknownVersion)
+	_, err := ParseTx(randomBytes)
+	require.ErrorIs(t, err, proto.Error)
 }
 
 func TestParseProto(t *testing.T) {
@@ -34,16 +35,24 @@ func TestParseProto(t *testing.T) {
 	msgBytes, err := proto.Marshal(&protoMsg)
 	require.NoError(err)
 
-	parsedMsgIntf, err := Parse(msgBytes)
+	parsedTx, err := ParseTx(msgBytes)
 	require.NoError(err)
 
-	require.IsType(&Tx{}, parsedMsgIntf)
-	parsedMsg := parsedMsgIntf.(*Tx)
+	require.Equal(txBytes, parsedTx)
 
-	require.Equal(txBytes, parsedMsg.Tx)
+	// Parse invalid bytes
+	_, err = ParseTx([]byte{1, 3, 3, 7})
+	require.ErrorIs(err, proto.Error)
+}
 
-	// Parse invalid message
-	_, err = Parse([]byte{1, 3, 3, 7})
-	// Can't parse as proto so it falls back to using avalanchego's codec
-	require.ErrorIs(err, codec.ErrUnknownVersion)
+func TestTx(t *testing.T) {
+	require := require.New(t)
+
+	tx := utils.RandomBytes(256 * units.KiB)
+	builtMsgBytes, err := BuildTx(tx)
+	require.NoError(err)
+
+	parsedTx, err := ParseTx(builtMsgBytes)
+	require.NoError(err)
+	require.Equal(tx, parsedTx)
 }

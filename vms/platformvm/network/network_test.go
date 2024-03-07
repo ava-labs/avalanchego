@@ -91,10 +91,7 @@ func TestNetworkAppGossip(t *testing.T) {
 			// Shouldn't attempt to issue or gossip the tx
 			name: "invalid tx bytes",
 			msgBytesFunc: func() []byte {
-				msg := message.Tx{
-					Tx: []byte{0x00},
-				}
-				msgBytes, err := message.Build(&msg)
+				msgBytes, err := message.BuildTx([]byte{0x00})
 				require.NoError(t, err)
 				return msgBytes
 			},
@@ -105,10 +102,7 @@ func TestNetworkAppGossip(t *testing.T) {
 		{
 			name: "issuance succeeds",
 			msgBytesFunc: func() []byte {
-				msg := message.Tx{
-					Tx: testTx.Bytes(),
-				}
-				msgBytes, err := message.Build(&msg)
+				msgBytes, err := message.BuildTx(testTx.Bytes())
 				require.NoError(t, err)
 				return msgBytes
 			},
@@ -126,10 +120,7 @@ func TestNetworkAppGossip(t *testing.T) {
 			// Issue returns error because tx was dropped. We shouldn't gossip the tx.
 			name: "issuance fails",
 			msgBytesFunc: func() []byte {
-				msg := message.Tx{
-					Tx: testTx.Bytes(),
-				}
-				msgBytes, err := message.Build(&msg)
+				msgBytes, err := message.BuildTx(testTx.Bytes())
 				require.NoError(t, err)
 				return msgBytes
 			},
@@ -143,10 +134,7 @@ func TestNetworkAppGossip(t *testing.T) {
 		{
 			name: "shouldn't AppGossip if primary network is not being fully synced",
 			msgBytesFunc: func() []byte {
-				msg := message.Tx{
-					Tx: testTx.Bytes(),
-				}
-				msgBytes, err := message.Build(&msg)
+				msgBytes, err := message.BuildTx(testTx.Bytes())
 				require.NoError(t, err)
 				return msgBytes
 			},

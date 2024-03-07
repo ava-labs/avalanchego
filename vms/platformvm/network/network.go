@@ -204,28 +204,19 @@ func (n *Network) AppGossip(ctx context.Context, nodeID ids.NodeID, msgBytes []b
 		return nil
 	}
 
-	msgIntf, err := message.Parse(msgBytes)
+	txBytes, err := message.ParseTx(msgBytes)
 	if err != nil {
-		n.log.Debug("forwarding AppGossip to p2p network",
-			zap.String("reason", "failed to parse message"),
-		)
-
-		return n.Network.AppGossip(ctx, nodeID, msgBytes)
-	}
-
-	msg, ok := msgIntf.(*message.Tx)
-	if !ok {
 		n.log.Debug("dropping unexpected message",
 			zap.Stringer("nodeID", nodeID),
 		)
 		return nil
 	}
 
-	tx, err := txs.Parse(txs.Codec, msg.Tx)
+	tx, err := txs.Parse(txs.Codec, txBytes)
 	if err != nil {
 		n.log.Verbo("received invalid tx",
 			zap.Stringer("nodeID", nodeID),
-			zap.Binary("tx", msg.Tx),
+			zap.Binary("tx", txBytes),
 			zap.Error(err),
 		)
 		return nil

@@ -179,34 +179,25 @@ func (n *Network) PullGossip(ctx context.Context) {
 	gossip.Every(ctx, n.ctx.Log, n.txPullGossiper, n.txPullGossipFrequency)
 }
 
-func (n *Network) AppGossip(ctx context.Context, nodeID ids.NodeID, msgBytes []byte) error {
+func (n *Network) AppGossip(_ context.Context, nodeID ids.NodeID, msgBytes []byte) error {
 	n.ctx.Log.Debug("called AppGossip message handler",
 		zap.Stringer("nodeID", nodeID),
 		zap.Int("messageLen", len(msgBytes)),
 	)
 
-	msgIntf, err := message.Parse(msgBytes)
+	txBytes, err := message.ParseTx(msgBytes)
 	if err != nil {
-		n.ctx.Log.Debug("forwarding AppGossip message to SDK network",
-			zap.String("reason", "failed to parse message"),
-		)
-
-		return n.Network.AppGossip(ctx, nodeID, msgBytes)
-	}
-
-	msg, ok := msgIntf.(*message.Tx)
-	if !ok {
 		n.ctx.Log.Debug("dropping unexpected message",
 			zap.Stringer("nodeID", nodeID),
 		)
 		return nil
 	}
 
-	tx, err := n.parser.ParseTx(msg.Tx)
+	tx, err := n.parser.ParseTx(txBytes)
 	if err != nil {
 		n.ctx.Log.Verbo("received invalid tx",
 			zap.Stringer("nodeID", nodeID),
-			zap.Binary("tx", msg.Tx),
+			zap.Binary("tx", txBytes),
 			zap.Error(err),
 		)
 		return nil

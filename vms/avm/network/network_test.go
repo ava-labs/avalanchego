@@ -89,10 +89,7 @@ func TestNetworkAppGossip(t *testing.T) {
 		{
 			name: "invalid tx bytes",
 			msgBytesFunc: func() []byte {
-				msg := message.Tx{
-					Tx: []byte{0x00},
-				}
-				msgBytes, err := message.Build(&msg)
+				msgBytes, err := message.BuildTx([]byte{0x00})
 				require.NoError(t, err)
 				return msgBytes
 			},
@@ -100,10 +97,7 @@ func TestNetworkAppGossip(t *testing.T) {
 		{
 			name: "tx already in mempool",
 			msgBytesFunc: func() []byte {
-				msg := message.Tx{
-					Tx: testTx.Bytes(),
-				}
-				msgBytes, err := message.Build(&msg)
+				msgBytes, err := message.BuildTx(testTx.Bytes())
 				require.NoError(t, err)
 				return msgBytes
 			},
@@ -116,10 +110,7 @@ func TestNetworkAppGossip(t *testing.T) {
 		{
 			name: "tx previously dropped",
 			msgBytesFunc: func() []byte {
-				msg := message.Tx{
-					Tx: testTx.Bytes(),
-				}
-				msgBytes, err := message.Build(&msg)
+				msgBytes, err := message.BuildTx(testTx.Bytes())
 				require.NoError(t, err)
 				return msgBytes
 			},
@@ -133,10 +124,7 @@ func TestNetworkAppGossip(t *testing.T) {
 		{
 			name: "transaction invalid",
 			msgBytesFunc: func() []byte {
-				msg := message.Tx{
-					Tx: testTx.Bytes(),
-				}
-				msgBytes, err := message.Build(&msg)
+				msgBytes, err := message.BuildTx(testTx.Bytes())
 				require.NoError(t, err)
 				return msgBytes
 			},
@@ -156,10 +144,7 @@ func TestNetworkAppGossip(t *testing.T) {
 		{
 			name: "happy path",
 			msgBytesFunc: func() []byte {
-				msg := message.Tx{
-					Tx: testTx.Bytes(),
-				}
-				msgBytes, err := message.Build(&msg)
+				msgBytes, err := message.BuildTx(testTx.Bytes())
 				require.NoError(t, err)
 				return msgBytes
 			},
