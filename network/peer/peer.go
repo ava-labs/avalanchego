@@ -1239,7 +1239,7 @@ func (p *peer) handlePeerList(msg *p2p.PeerList) {
 
 	discoveredIPs := make([]*ips.ClaimedIPPort, len(msg.ClaimedIpPorts)) // the peers this peer told us about
 	for i, claimedIPPort := range msg.ClaimedIpPorts {
-		tlsCert, err := staking.ParseCertificatePermissive(claimedIPPort.X509Certificate)
+		tlsCert, err := staking.ParseCertificate(claimedIPPort.X509Certificate)
 		if err != nil {
 			p.Log.Debug("message with invalid field",
 				zap.Stringer("nodeID", p.id),

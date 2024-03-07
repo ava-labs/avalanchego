@@ -15,7 +15,7 @@ import (
 var largeRSAKeyCert []byte
 
 func TestParseCheckLargeCert(t *testing.T) {
-	_, err := ParseCertificatePermissive(largeRSAKeyCert)
+	_, err := ParseCertificate(largeRSAKeyCert)
 	require.ErrorIs(t, err, ErrCertificateTooLarge)
 }
 
@@ -27,7 +27,7 @@ func BenchmarkParse(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, err = ParseCertificatePermissive(bytes)
+		_, err = ParseCertificate(bytes)
 		require.NoError(b, err)
 	}
 }

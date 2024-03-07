@@ -92,7 +92,7 @@ func (b *statelessBlock) initialize(bytes []byte) error {
 	}
 
 	var err error
-	b.cert, err = staking.ParseCertificatePermissive(b.StatelessBlock.Certificate)
+	b.cert, err = staking.ParseCertificate(b.StatelessBlock.Certificate)
 	if err != nil {
 		return fmt.Errorf("%w: %w", errInvalidCertificate, err)
 	}

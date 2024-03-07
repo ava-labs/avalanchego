@@ -58,8 +58,17 @@ func init() {
 		cert1, cert2, cert3,
 	}
 
+	stakingCert1, err := staking.ParseCertificate(cert1.Leaf.Raw)
+	if err != nil {
+		panic(err)
+	}
+	stakingCert2, err := staking.ParseCertificate(cert2.Leaf.Raw)
+	if err != nil {
+		panic(err)
+	}
+
 	ip = ips.NewClaimedIPPort(
-		staking.CertificateFromX509(cert1.Leaf),
+		stakingCert1,
 		ips.IPPort{
 			IP:   net.IPv4(127, 0, 0, 1),
 			Port: 9651,
@@ -68,7 +77,7 @@ func init() {
 		nil, // signature
 	)
 	otherIP = ips.NewClaimedIPPort(
-		staking.CertificateFromX509(cert2.Leaf),
+		stakingCert2,
 		ips.IPPort{
 			IP:   net.IPv4(127, 0, 0, 1),
 			Port: 9651,
@@ -94,7 +103,8 @@ func getTLS(t *testing.T, index int) (ids.NodeID, *tls.Certificate, *tls.Config)
 	}
 
 	tlsCert := tlsCerts[index]
-	cert := staking.CertificateFromX509(tlsCert.Leaf)
+	cert, err := staking.ParseCertificate(tlsCert.Leaf.Raw)
+	require.NoError(t, err)
 	nodeID := ids.NodeIDFromCert(cert)
 	return nodeID, tlsCert, tlsConfigs[index]
 }

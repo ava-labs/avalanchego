@@ -110,16 +110,18 @@ func New(
 	logger logging.Logger,
 ) (*Node, error) {
 	tlsCert := config.StakingTLSCert.Leaf
-	stakingCert := staking.CertificateFromX509(tlsCert)
-	if err := staking.ValidateCertificate(stakingCert); err != nil {
+	stakingCert, err := staking.ParseCertificate(tlsCert.Raw)
+	if err != nil {
 		return nil, fmt.Errorf("invalid staking certificate: %w", err)
 	}
 
 	n := &Node{
-		Log:        logger,
-		LogFactory: logFactory,
-		ID:         ids.NodeIDFromCert(stakingCert),
-		Config:     config,
+		Log:              logger,
+		LogFactory:       logFactory,
+		StakingTLSSigner: config.StakingTLSCert.PrivateKey.(crypto.Signer),
+		StakingTLSCert:   stakingCert,
+		ID:               ids.NodeIDFromCert(stakingCert),
+		Config:           config,
 	}
 
 	n.DoneShuttingDown.Add(1)
@@ -134,7 +136,6 @@ func New(
 		zap.Reflect("config", n.Config),
 	)
 
-	var err error
 	n.VMFactoryLog, err = logFactory.Make("vm-factory")
 	if err != nil {
 		return nil, fmt.Errorf("problem creating vm logger: %w", err)
@@ -262,6 +263,9 @@ type Node struct {
 	// This node's unique ID used when communicating with other nodes
 	// (in consensus, for example)
 	ID ids.NodeID
+
+	StakingTLSSigner crypto.Signer
+	StakingTLSCert   *staking.Certificate
 
 	// Storage for this node
 	DB database.Database
@@ -1054,7 +1058,8 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	n.chainManager = chains.New(
 		&chains.ManagerConfig{
 			SybilProtectionEnabled:                  n.Config.SybilProtectionEnabled,
-			StakingTLSCert:                          n.Config.StakingTLSCert,
+			StakingTLSSigner:                        n.StakingTLSSigner,
+			StakingTLSCert:                          n.StakingTLSCert,
 			StakingBLSKey:                           n.Config.StakingSigningKey,
 			Log:                                     n.Log,
 			LogFactory:                              n.LogFactory,
