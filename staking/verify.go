@@ -12,8 +12,6 @@ import (
 
 var (
 	ErrUnsupportedAlgorithm     = errors.New("staking: cannot verify signature: unsupported algorithm")
-	ErrPublicKeyAlgoMismatch    = errors.New("staking: signature algorithm specified different public key type")
-	ErrInvalidECDSAPublicKey    = errors.New("staking: invalid ECDSA public key")
 	ErrECDSAVerificationFailure = errors.New("staking: ECDSA verification failure")
 )
 

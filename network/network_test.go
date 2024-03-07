@@ -396,9 +396,12 @@ func TestTrackVerifiesSignatures(t *testing.T) {
 	nodeID, tlsCert, _ := getTLS(t, 1)
 	require.NoError(network.config.Validators.AddStaker(constants.PrimaryNetworkID, nodeID, nil, ids.Empty, 1))
 
-	err := network.Track([]*ips.ClaimedIPPort{
+	stakingCert, err := staking.ParseCertificate(tlsCert.Leaf.Raw)
+	require.NoError(err)
+
+	err = network.Track([]*ips.ClaimedIPPort{
 		ips.NewClaimedIPPort(
-			staking.CertificateFromX509(tlsCert.Leaf),
+			stakingCert,
 			ips.IPPort{
 				IP:   net.IPv4(123, 132, 123, 123),
 				Port: 10000,
@@ -551,15 +554,17 @@ func TestDialDeletesNonValidators(t *testing.T) {
 	wg.Add(len(networks))
 	for i, net := range networks {
 		if i != 0 {
-			err := net.Track([]*ips.ClaimedIPPort{
+			stakingCert, err := staking.ParseCertificate(config.TLSConfig.Certificates[0].Leaf.Raw)
+			require.NoError(err)
+
+			require.NoError(net.Track([]*ips.ClaimedIPPort{
 				ips.NewClaimedIPPort(
-					staking.CertificateFromX509(config.TLSConfig.Certificates[0].Leaf),
+					stakingCert,
 					ip.IPPort,
 					ip.Timestamp,
 					ip.TLSSignature,
 				),
-			})
-			require.NoError(err)
+			}))
 		}
 
 		go func(net Network) {

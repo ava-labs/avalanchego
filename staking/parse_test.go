@@ -24,6 +24,8 @@ func BenchmarkParse(b *testing.B) {
 	require.NoError(b, err)
 
 	bytes := tlsCert.Leaf.Raw
+
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_, err = ParseCertificate(bytes)
 		require.NoError(b, err)
