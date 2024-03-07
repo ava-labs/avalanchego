@@ -1375,10 +1375,6 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	externalSender.Default(true)
 
 	// Passes messages from the consensus engine to the network
-	gossipConfig := subnets.GossipConfig{
-		AcceptedFrontierPeerSize: 1,
-		OnAcceptPeerSize:         1,
-	}
 	sender, err := sender.New(
 		consensusCtx,
 		mc,
@@ -1386,7 +1382,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		chainRouter,
 		timeoutManager,
 		p2p.EngineType_ENGINE_TYPE_SNOWMAN,
-		subnets.New(consensusCtx.NodeID, subnets.Config{GossipConfig: gossipConfig}),
+		subnets.New(consensusCtx.NodeID, subnets.Config{}),
 	)
 	require.NoError(err)
 
