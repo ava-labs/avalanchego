@@ -53,18 +53,6 @@ var (
 	ErrUnknownPublicKeyAlgorithm             = errors.New("staking: unknown public key algorithm")
 )
 
-// ParseCertificate parses a single certificate from the given ASN.1 DER data.
-//
-// TODO: Remove after v1.11.x activates.
-func ParseCertificate(der []byte) (*Certificate, error) {
-	x509Cert, err := x509.ParseCertificate(der)
-	if err != nil {
-		return nil, err
-	}
-	stakingCert := CertificateFromX509(x509Cert)
-	return stakingCert, ValidateCertificate(stakingCert)
-}
-
 // ParseCertificatePermissive parses a single certificate from the given ASN.1.
 //
 // This function does not validate that the certificate is valid to be used
