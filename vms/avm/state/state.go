@@ -22,7 +22,6 @@ import (
 )
 
 const (
-	statusCacheSize  = 8192
 	txCacheSize      = 8192
 	blockIDCacheSize = 8192
 	blockCacheSize   = 2048
