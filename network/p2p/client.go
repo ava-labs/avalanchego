@@ -108,29 +108,12 @@ func (c *Client) AppRequest(
 // AppGossip sends a gossip message to a random set of peers.
 func (c *Client) AppGossip(
 	ctx context.Context,
+	config common.SendConfig,
 	appGossipBytes []byte,
-	numValidators int,
-	numNonValidators int,
-	numPeers int,
 ) error {
 	return c.sender.SendAppGossip(
 		ctx,
-		PrefixMessage(c.handlerPrefix, appGossipBytes),
-		numValidators,
-		numNonValidators,
-		numPeers,
-	)
-}
-
-// AppGossipSpecific sends a gossip message to a predetermined set of peers.
-func (c *Client) AppGossipSpecific(
-	ctx context.Context,
-	nodeIDs set.Set[ids.NodeID],
-	appGossipBytes []byte,
-) error {
-	return c.sender.SendAppGossipSpecific(
-		ctx,
-		nodeIDs,
+		config,
 		PrefixMessage(c.handlerPrefix, appGossipBytes),
 	)
 }
