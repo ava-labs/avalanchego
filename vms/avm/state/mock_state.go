@@ -11,12 +11,10 @@ package state
 
 import (
 	reflect "reflect"
-	sync "sync"
 	time "time"
 
 	database "github.com/ava-labs/avalanchego/database"
 	ids "github.com/ava-labs/avalanchego/ids"
-	logging "github.com/ava-labs/avalanchego/utils/logging"
 	block "github.com/ava-labs/avalanchego/vms/avm/block"
 	txs "github.com/ava-labs/avalanchego/vms/avm/txs"
 	avax "github.com/ava-labs/avalanchego/vms/components/avax"
@@ -462,20 +460,6 @@ func (m *MockState) IsInitialized() (bool, error) {
 func (mr *MockStateMockRecorder) IsInitialized() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsInitialized", reflect.TypeOf((*MockState)(nil).IsInitialized))
-}
-
-// Prune mocks base method.
-func (m *MockState) Prune(arg0 sync.Locker, arg1 logging.Logger) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Prune", arg0, arg1)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// Prune indicates an expected call of Prune.
-func (mr *MockStateMockRecorder) Prune(arg0, arg1 any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Prune", reflect.TypeOf((*MockState)(nil).Prune), arg0, arg1)
 }
 
 // SetInitialized mocks base method.
