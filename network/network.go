@@ -328,7 +328,9 @@ func (n *network) Send(
 		now          = n.peerConfig.Clock.Time()
 	)
 
-	// send to peer and update metrics
+	// send to peers and update metrics
+	//
+	// Note: It is guaranteed that namedPeers and sampledPeers are disjoint.
 	for _, peers := range [][]peer.Peer{namedPeers, sampledPeers} {
 		for _, peer := range peers {
 			if peer.Send(n.onCloseCtx, msg) {
@@ -710,13 +712,17 @@ func (n *network) getPeers(
 	return peers
 }
 
+// samplePeers samples connected peers attempting to align with the number of
+// requested validators, non-validators, and peers. This function will
+// explicitly ignore nodeIDs already included in the send config.
 func (n *network) samplePeers(
 	config common.SendConfig,
 	subnetID ids.ID,
 	allower subnets.Allower,
 ) []peer.Peer {
-	// If there are fewer validators than [numValidatorsToSample], then only
-	// sample [numValidatorsToSample] validators.
+	// As an optimization, if there are fewer validators than
+	// [numValidatorsToSample], only attempt to sample [numValidatorsToSample]
+	// validators to potentially avoid iterating over the entire peer set.
 	numValidatorsToSample := min(config.Validators, n.config.Validators.Count(subnetID))
 
 	n.peersLock.RLock()
