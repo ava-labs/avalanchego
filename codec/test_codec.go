@@ -37,6 +37,8 @@ var (
 		TestEmptySliceSerialization,
 		TestSliceWithEmptySerialization,
 		TestSliceWithEmptySerializationError,
+		TestMapWithEmptySerialization,
+		TestMapWithEmptySerializationError,
 		TestSliceTooLarge,
 		TestNegativeNumbers,
 		TestTooLargeUnmarshal,
@@ -787,6 +789,56 @@ func TestSliceWithEmptySerializationError(codec GeneralCodec, t testing.TB) {
 	b := []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x01} // codec version (0x00, 0x00) then (0x00, 0x00, 0x00, 0x01) for numElts
 
 	unmarshaled := nestedSliceStruct{}
+	_, err = manager.Unmarshal(b, &unmarshaled)
+	require.ErrorIs(err, ErrUnmarshalZeroLength)
+}
+
+// Test marshaling empty map of zero length structs
+func TestMapWithEmptySerialization(codec GeneralCodec, t testing.TB) {
+	require := require.New(t)
+
+	type emptyStruct struct{}
+
+	manager := NewDefaultManager()
+	require.NoError(manager.RegisterCodec(0, codec))
+
+	val := make(map[emptyStruct]emptyStruct)
+	expected := []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00} // codec version (0x00, 0x00) then (0x00, 0x00, 0x00, 0x00) for numElts
+	result, err := manager.Marshal(0, val)
+	require.NoError(err)
+	require.Equal(expected, result)
+
+	bytesLen, err := manager.Size(0, val)
+	require.NoError(err)
+	require.Len(result, bytesLen)
+
+	var unmarshaled map[emptyStruct]emptyStruct
+	version, err := manager.Unmarshal(expected, &unmarshaled)
+	require.NoError(err)
+	require.Zero(version)
+	require.Empty(unmarshaled)
+}
+
+func TestMapWithEmptySerializationError(codec GeneralCodec, t testing.TB) {
+	require := require.New(t)
+
+	type emptyStruct struct{}
+
+	manager := NewDefaultManager()
+	require.NoError(manager.RegisterCodec(0, codec))
+
+	val := map[emptyStruct]emptyStruct{
+		{}: {},
+	}
+	_, err := manager.Marshal(0, val)
+	require.ErrorIs(err, ErrMarshalZeroLength)
+
+	_, err = manager.Size(0, val)
+	require.ErrorIs(err, ErrMarshalZeroLength)
+
+	b := []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x01} // codec version (0x00, 0x00) then (0x00, 0x00, 0x00, 0x01) for numElts
+
+	var unmarshaled map[emptyStruct]emptyStruct
 	_, err = manager.Unmarshal(b, &unmarshaled)
 	require.ErrorIs(err, ErrUnmarshalZeroLength)
 }
