@@ -264,10 +264,10 @@ func (s *tracedSender) SendAppGossip(
 	appGossipBytes []byte,
 ) error {
 	_, span := s.tracer.Start(ctx, "tracedSender.SendAppGossip", oteltrace.WithAttributes(
-		attribute.Int("nodeIDs", config.NodeIDs.Len()),
-		attribute.Int("validators", config.Validators),
-		attribute.Int("nonValidators", config.NonValidators),
-		attribute.Int("peers", config.Peers),
+		attribute.Int("numNodeIDs", config.NodeIDs.Len()),
+		attribute.Int("numValidators", config.Validators),
+		attribute.Int("numNonValidators", config.NonValidators),
+		attribute.Int("numPeers", config.Peers),
 		attribute.Int("gossipLen", len(appGossipBytes)),
 	))
 	defer span.End()
