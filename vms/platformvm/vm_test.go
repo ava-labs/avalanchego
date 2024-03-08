@@ -1375,7 +1375,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	externalSender.Default(true)
 
 	// Passes messages from the consensus engine to the network
-	internalSender, err := sender.New(
+	sender, err := sender.New(
 		consensusCtx,
 		mc,
 		externalSender,
@@ -1406,7 +1406,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	// The engine handles consensus
 	snowGetHandler, err := snowgetter.New(
 		vm,
-		internalSender,
+		sender,
 		consensusCtx.Log,
 		time.Second,
 		2000,
@@ -1420,7 +1420,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		Beacons:                        beacons,
 		SampleK:                        beacons.Count(ctx.SubnetID),
 		StartupTracker:                 startup,
-		Sender:                         internalSender,
+		Sender:                         sender,
 		BootstrapTracker:               bootstrapTracker,
 		AncestorsMaxContainersReceived: 2000,
 		Blocked:                        blocked,
