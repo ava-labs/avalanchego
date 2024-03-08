@@ -327,10 +327,20 @@ type PushGossiper[T Gossipable] struct {
 }
 
 type BranchingFactor struct {
+	// StakePercentage determines the percentage of stake that should have
+	// gossip sent to based on the inverse CDF of stake weights. This value does
+	// not account for the connectivity of the nodes.
 	StakePercentage float64
-	Validators      int
-	NonValidators   int
-	Peers           int
+	// Validators specifies the number of connected validators, in addition to
+	// any validators sent from the StakePercentage parameter, to send gossip
+	// to.
+	Validators int
+	// NonValidators specifies the number of connected non-validators to send
+	// gossip to.
+	NonValidators int
+	// Peers specifies the number of connected validators or non-validators, in
+	// addition to the number sent due to other configs, to send gossip to.
+	Peers int
 }
 
 func (b *BranchingFactor) Verify() error {
