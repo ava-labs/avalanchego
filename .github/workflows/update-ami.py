@@ -15,7 +15,7 @@ product_id = os.getenv('PRODUCT_ID')
 role_arn = os.getenv('ROLE_ARN')
 vtag = os.getenv('TAG')
 PKR_VAR_tag = vtag.replace('v', '')
-PKR_VAR_skip_create_ami = os.getenv('SKIP_CREATE_AMI', "True")
+PKR_VAR_skip_create_ami = os.getenv('SKIP_CREATE_AMI', "true")
 
 def packer_build(packerfile):
   print("Running the packer build")
