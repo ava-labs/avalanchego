@@ -5,11 +5,9 @@ package network
 
 import (
 	"context"
-	"errors"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
@@ -19,7 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/mempool"
-	"github.com/ava-labs/avalanchego/vms/components/message"
 )
 
 const txGossipHandlerID = 0
@@ -184,44 +181,7 @@ func (n *Network) PullGossip(ctx context.Context) {
 }
 
 func (n *Network) AppGossip(ctx context.Context, nodeID ids.NodeID, msgBytes []byte) error {
-	n.log.Debug("called AppGossip message handler",
-		zap.Stringer("nodeID", nodeID),
-		zap.Int("messageLen", len(msgBytes)),
-	)
-
-	txBytes, err := message.ParseTx(msgBytes)
-	if err != nil {
-		if errors.Is(err, message.ErrUnknownMessageType) {
-			n.log.Debug("forwarding AppGossip message to SDK network",
-				zap.String("reason", "failed to parse message"),
-			)
-
-			return n.Network.AppGossip(ctx, nodeID, msgBytes)
-		}
-
-		n.log.Debug("dropping unexpected message",
-			zap.Stringer("nodeID", nodeID),
-		)
-		return nil
-	}
-
-	tx, err := n.parser.ParseTx(txBytes)
-	if err != nil {
-		n.log.Verbo("received invalid tx",
-			zap.Stringer("nodeID", nodeID),
-			zap.Binary("tx", txBytes),
-			zap.Error(err),
-		)
-		return nil
-	}
-
-	if err := n.mempool.Add(tx); err != nil {
-		n.log.Debug("tx failed to be added to the mempool",
-			zap.Stringer("txID", tx.ID()),
-			zap.Error(err),
-		)
-	}
-	return nil
+	return n.Network.AppGossip(ctx, nodeID, msgBytes)
 }
 
 // IssueTxFromRPC attempts to add a tx to the mempool, after verifying it. If
