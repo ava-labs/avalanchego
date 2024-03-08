@@ -4,8 +4,6 @@
 package state
 
 import (
-	"bytes"
-	"errors"
 	"fmt"
 	"time"
 
@@ -17,7 +15,6 @@ import (
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/avm/block"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
@@ -33,7 +30,6 @@ const (
 
 var (
 	utxoPrefix      = []byte("utxo")
-	statusPrefix    = []byte("status")
 	txPrefix        = []byte("tx")
 	blockIDPrefix   = []byte("blockID")
 	blockPrefix     = []byte("block")
@@ -42,8 +38,6 @@ var (
 	isInitializedKey = []byte{0x00}
 	timestampKey     = []byte{0x01}
 	lastAcceptedKey  = []byte{0x02}
-
-	errStatusWithoutTx = errors.New("unexpected status without transactions")
 
 	_ State = (*state)(nil)
 )
@@ -106,8 +100,6 @@ type State interface {
  * VMDB
  * |- utxos
  * | '-- utxoDB
- * |- statuses
- * | '-- statusDB
  * |-. txs
  * | '-- txID -> tx bytes
  * |-. blockIDs
@@ -126,9 +118,6 @@ type state struct {
 	modifiedUTXOs map[ids.ID]*avax.UTXO // map of modified UTXOID -> *UTXO if the UTXO is nil, it has been removed
 	utxoDB        database.Database
 	utxoState     avax.UTXOState
-
-	statusCache cache.Cacher[ids.ID, *choices.Status] // cache of id -> choices.Status. If the entry is nil, it is not in the database
-	statusDB    database.Database
 
 	addedTxs map[ids.ID]*txs.Tx            // map of txID -> *txs.Tx
 	txCache  cache.Cacher[ids.ID, *txs.Tx] // cache of txID -> *txs.Tx. If the entry is nil, it is not in the database
@@ -158,20 +147,10 @@ func New(
 	trackChecksums bool,
 ) (State, error) {
 	utxoDB := prefixdb.New(utxoPrefix, db)
-	statusDB := prefixdb.New(statusPrefix, db)
 	txDB := prefixdb.New(txPrefix, db)
 	blockIDDB := prefixdb.New(blockIDPrefix, db)
 	blockDB := prefixdb.New(blockPrefix, db)
 	singletonDB := prefixdb.New(singletonPrefix, db)
-
-	statusCache, err := metercacher.New[ids.ID, *choices.Status](
-		"status_cache",
-		metrics,
-		&cache.LRU[ids.ID, *choices.Status]{Size: statusCacheSize},
-	)
-	if err != nil {
-		return nil, err
-	}
 
 	txCache, err := metercacher.New[ids.ID, *txs.Tx](
 		"tx_cache",
@@ -212,9 +191,6 @@ func New(
 		modifiedUTXOs: make(map[ids.ID]*avax.UTXO),
 		utxoDB:        utxoDB,
 		utxoState:     utxoState,
-
-		statusCache: statusCache,
-		statusDB:    statusDB,
 
 		addedTxs: make(map[ids.ID]*txs.Tx),
 		txCache:  txCache,
@@ -435,7 +411,6 @@ func (s *state) CommitBatch() (database.Batch, error) {
 func (s *state) Close() error {
 	return utils.Err(
 		s.utxoDB.Close(),
-		s.statusDB.Close(),
 		s.txDB.Close(),
 		s.blockIDDB.Close(),
 		s.blockDB.Close(),
@@ -478,12 +453,8 @@ func (s *state) writeTxs() error {
 
 		delete(s.addedTxs, txID)
 		s.txCache.Put(txID, tx)
-		s.statusCache.Put(txID, nil)
 		if err := s.txDB.Put(txID[:], txBytes); err != nil {
 			return fmt.Errorf("failed to add tx: %w", err)
-		}
-		if err := s.statusDB.Delete(txID[:]); err != nil {
-			return fmt.Errorf("failed to delete status: %w", err)
 		}
 	}
 	return nil
@@ -543,27 +514,9 @@ func (s *state) initTxChecksum() error {
 
 	txIt := s.txDB.NewIterator()
 	defer txIt.Release()
-	statusIt := s.statusDB.NewIterator()
-	defer statusIt.Release()
 
-	statusHasNext := statusIt.Next()
 	for txIt.Next() {
 		txIDBytes := txIt.Key()
-		if statusHasNext { // if status was exhausted, everything is accepted
-			statusIDBytes := statusIt.Key()
-			if bytes.Equal(txIDBytes, statusIDBytes) { // if the status key doesn't match this was marked as accepted
-				statusInt, err := database.ParseUInt32(statusIt.Value())
-				if err != nil {
-					return err
-				}
-
-				statusHasNext = statusIt.Next() // we processed the txID, so move on to the next status
-
-				if choices.Status(statusInt) != choices.Accepted { // the status isn't accepted, so we skip the txID
-					continue
-				}
-			}
-		}
 
 		txID, err := ids.ToID(txIDBytes)
 		if err != nil {
@@ -573,14 +526,7 @@ func (s *state) initTxChecksum() error {
 		s.updateTxChecksum(txID)
 	}
 
-	if statusHasNext {
-		return errStatusWithoutTx
-	}
-
-	return utils.Err(
-		txIt.Error(),
-		statusIt.Error(),
-	)
+	return txIt.Error()
 }
 
 func (s *state) updateTxChecksum(modifiedID ids.ID) {
