@@ -938,19 +938,11 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 		return
 	}
 
-	if msg.Client == nil {
-		p.Log.Debug("missing version field",
-			zap.Stringer("nodeID", p.id),
-		)
-		p.StartClose()
-		return
-	}
-
 	p.version = &version.Application{
-		Name:  msg.Client.Name,
-		Major: int(msg.Client.Major),
-		Minor: int(msg.Client.Minor),
-		Patch: int(msg.Client.Patch),
+		Name:  msg.Client.GetName(),
+		Major: int(msg.Client.GetMajor()),
+		Minor: int(msg.Client.GetMinor()),
+		Patch: int(msg.Client.GetPatch()),
 	}
 
 	if p.VersionCompatibility.Version().Before(p.version) {
