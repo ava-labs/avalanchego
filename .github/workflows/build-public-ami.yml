@@ -30,7 +30,7 @@ jobs:
       - name: Install aws cli
         run: |
           sudo apt update
-          sudo apt-get -y install packer=${PACKER_VERSION} python3-boto3=${PYTHON3_BOTO3_VERSION}
+          sudo apt-get -y install packer=${PACKER_VERSION} python3-boto3=${PYTHON3_BOTO3_VERSION }}
 
       - name: Get the tag
         id: get_tag
@@ -59,7 +59,6 @@ jobs:
 
       - name: Create AMI and upload to marketplace
         run: |
-          packer hcl2_upgrade .github/packer/ubuntu-jammy-x86_64-public-ami.json
           packer init ./.github/packer/
           ./.github/workflows/update-ami.py
         env:

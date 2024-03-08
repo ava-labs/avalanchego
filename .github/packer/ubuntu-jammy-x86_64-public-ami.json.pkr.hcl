@@ -13,12 +13,10 @@ packer {
 
 variable "skip_create_ami" {
   type    = string
-  default = "${env("SKIP_CREATE_AMI")}"
 }
 
 variable "tag" {
   type    = string
-  default = "${env("TAG")}"
 }
 
 variable "version" {
