@@ -307,7 +307,7 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 			},
 			appSenderFunc: func(ctrl *gomock.Controller) common.AppSender {
 				appSender := common.NewMockSender(ctrl)
-				appSender.EXPECT().SendAppGossip(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+				appSender.EXPECT().SendAppGossip(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 				return appSender
 			},
 			expectedErr: nil,
@@ -401,7 +401,7 @@ func TestNetworkIssueTxFromRPCWithoutVerification(t *testing.T) {
 			},
 			appSenderFunc: func(ctrl *gomock.Controller) common.AppSender {
 				appSender := common.NewMockSender(ctrl)
-				appSender.EXPECT().SendAppGossip(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+				appSender.EXPECT().SendAppGossip(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 				return appSender
 			},
 			expectedErr: nil,
