@@ -333,7 +333,7 @@ type BranchingFactor struct {
 	StakePercentage float64
 	// Validators specifies the number of connected validators, in addition to
 	// any validators sent from the StakePercentage parameter, to send gossip
-	// to.
+	// to. These validators are sampled uniformly rather than by stake.
 	Validators int
 	// NonValidators specifies the number of connected non-validators to send
 	// gossip to.
