@@ -431,7 +431,10 @@ func (vm *VM) Linearize(ctx context.Context, stopVertexID ids.ID, toEngine chan<
 
 	// Invariant: The context lock is not held when calling network.IssueTx.
 	vm.network, err = network.New(
-		vm.ctx,
+		vm.ctx.Log,
+		vm.ctx.NodeID,
+		vm.ctx.SubnetID,
+		vm.ctx.ValidatorState,
 		vm.parser,
 		network.NewLockedTxVerifier(
 			&vm.ctx.Lock,
