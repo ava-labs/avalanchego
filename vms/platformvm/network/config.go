@@ -12,6 +12,7 @@ import (
 var DefaultConfig = Config{
 	MaxValidatorSetStaleness:                    time.Minute,
 	TargetGossipSize:                            20 * units.KiB,
+	PushGossipPercentStake:                      .9,
 	PushGossipNumValidators:                     100,
 	PushGossipNumPeers:                          0,
 	PushRegossipNumValidators:                   10,
@@ -36,6 +37,11 @@ type Config struct {
 	// sent when pushing transactions and when responded to transaction pull
 	// requests.
 	TargetGossipSize int `json:"target-gossip-size"`
+	// PushGossipPercentStake is the percentage of total stake to push
+	// transactions to in the first round of gossip. Nodes with higher stake are
+	// preferred over nodes with less stake to minimize the number of messages
+	// sent over the p2p network.
+	PushGossipPercentStake float64 `json:"push-gossip-percent-stake"`
 	// PushGossipNumValidators is the number of validators to push transactions
 	// to in the first round of gossip.
 	PushGossipNumValidators int `json:"push-gossip-num-validators"`

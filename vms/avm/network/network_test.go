@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/avm/block/executor"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
@@ -353,6 +354,14 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 			n, err := New(
 				&snow.Context{
 					Log: logging.NoLog{},
+					ValidatorState: &validators.TestState{
+						GetCurrentHeightF: func(context.Context) (uint64, error) {
+							return 0, nil
+						},
+						GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+							return nil, nil
+						},
+					},
 				},
 				parser,
 				txVerifierFunc(ctrl),
@@ -440,6 +449,14 @@ func TestNetworkIssueTxFromRPCWithoutVerification(t *testing.T) {
 			n, err := New(
 				&snow.Context{
 					Log: logging.NoLog{},
+					ValidatorState: &validators.TestState{
+						GetCurrentHeightF: func(context.Context) (uint64, error) {
+							return 0, nil
+						},
+						GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+							return nil, nil
+						},
+					},
 				},
 				parser,
 				executor.NewMockManager(ctrl), // Should never verify a tx

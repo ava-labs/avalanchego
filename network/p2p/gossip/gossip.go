@@ -21,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/bloom"
 	"github.com/ava-labs/avalanchego/utils/buffer"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 const (
@@ -262,6 +263,7 @@ func (p *PullGossiper[_]) handleResponse(
 func NewPushGossiper[T Gossipable](
 	marshaller Marshaller[T],
 	mempool Set[T],
+	validators p2p.ValidatorPortion,
 	client *p2p.Client,
 	metrics Metrics,
 	gossipParams BranchingFactor,
@@ -288,6 +290,7 @@ func NewPushGossiper[T Gossipable](
 	return &PushGossiper[T]{
 		marshaller:           marshaller,
 		set:                  mempool,
+		validators:           validators,
 		client:               client,
 		metrics:              metrics,
 		gossipParams:         gossipParams,
@@ -306,6 +309,7 @@ func NewPushGossiper[T Gossipable](
 type PushGossiper[T Gossipable] struct {
 	marshaller Marshaller[T]
 	set        Set[T]
+	validators p2p.ValidatorPortion
 	client     *p2p.Client
 	metrics    Metrics
 
@@ -323,9 +327,10 @@ type PushGossiper[T Gossipable] struct {
 }
 
 type BranchingFactor struct {
-	Validators    int
-	NonValidators int
-	Peers         int
+	StakePercentage float64
+	Validators      int
+	NonValidators   int
+	Peers           int
 }
 
 func (b *BranchingFactor) Verify() error {
@@ -461,9 +466,11 @@ func (p *PushGossiper[T]) gossip(
 	sentCountMetric.Add(float64(len(gossip)))
 	sentBytesMetric.Add(float64(sentBytes))
 
+	validatorsByStake := p.validators.Top(ctx, gossipParams.StakePercentage)
 	return p.client.AppGossip(
 		ctx,
 		common.SendConfig{
+			NodeIDs:       set.Of(validatorsByStake...),
 			Validators:    gossipParams.Validators,
 			NonValidators: gossipParams.NonValidators,
 			Peers:         gossipParams.Peers,
