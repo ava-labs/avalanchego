@@ -174,12 +174,16 @@ type NetworkAppSender interface {
 	// Gossip an application-level message.
 	SendAppGossip(
 		ctx context.Context,
+		config SendConfig,
 		appGossipBytes []byte,
-		numValidators int,
-		numNonValidators int,
-		numPeers int,
 	) error
-	SendAppGossipSpecific(ctx context.Context, nodeIDs set.Set[ids.NodeID], appGossipBytes []byte) error
+}
+
+type SendConfig struct {
+	NodeIDs       set.Set[ids.NodeID]
+	Validators    int
+	NonValidators int
+	Peers         int
 }
 
 // CrossChainAppSender sends local VM-level messages to another VM.

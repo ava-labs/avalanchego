@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/bloom"
 	"github.com/ava-labs/avalanchego/utils/buffer"
@@ -462,10 +463,12 @@ func (p *PushGossiper[T]) gossip(
 
 	return p.client.AppGossip(
 		ctx,
+		common.SendConfig{
+			Validators:    gossipParams.Validators,
+			NonValidators: gossipParams.NonValidators,
+			Peers:         gossipParams.Peers,
+		},
 		msgBytes,
-		gossipParams.Validators,
-		gossipParams.NonValidators,
-		gossipParams.Peers,
 	)
 }
 

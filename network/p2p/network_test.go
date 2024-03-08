@@ -68,7 +68,7 @@ func TestMessageRouting(t *testing.T) {
 	require.NoError(network.AddHandler(1, testHandler))
 	client := network.NewClient(1)
 
-	require.NoError(client.AppGossip(ctx, wantMsg, 0, 0, 1))
+	require.NoError(client.AppGossip(ctx, common.SendConfig{}, wantMsg))
 	require.NoError(network.AppGossip(ctx, wantNodeID, <-sender.SentAppGossip))
 	require.True(appGossipCalled)
 
@@ -89,7 +89,6 @@ func TestClientPrefixesMessages(t *testing.T) {
 	sender := common.FakeSender{
 		SentAppRequest:           make(chan []byte, 1),
 		SentAppGossip:            make(chan []byte, 1),
-		SentAppGossipSpecific:    make(chan []byte, 1),
 		SentCrossChainAppRequest: make(chan []byte, 1),
 	}
 
@@ -129,13 +128,8 @@ func TestClientPrefixesMessages(t *testing.T) {
 	require.Equal(handlerPrefix, gotCrossChainAppRequest[0])
 	require.Equal(want, gotCrossChainAppRequest[1:])
 
-	require.NoError(client.AppGossip(ctx, want, 0, 0, 1))
+	require.NoError(client.AppGossip(ctx, common.SendConfig{}, want))
 	gotAppGossip := <-sender.SentAppGossip
-	require.Equal(handlerPrefix, gotAppGossip[0])
-	require.Equal(want, gotAppGossip[1:])
-
-	require.NoError(client.AppGossipSpecific(ctx, set.Of(ids.EmptyNodeID), want))
-	gotAppGossip = <-sender.SentAppGossipSpecific
 	require.Equal(handlerPrefix, gotAppGossip[0])
 	require.Equal(want, gotAppGossip[1:])
 }

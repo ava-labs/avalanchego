@@ -87,17 +87,6 @@ func (s *Server) SendAppError(ctx context.Context, req *appsenderpb.SendAppError
 }
 
 func (s *Server) SendAppGossip(ctx context.Context, req *appsenderpb.SendAppGossipMsg) (*emptypb.Empty, error) {
-	err := s.appSender.SendAppGossip(
-		ctx,
-		req.Msg,
-		int(req.NumValidators),
-		int(req.NumNonValidators),
-		int(req.NumPeers),
-	)
-	return &emptypb.Empty{}, err
-}
-
-func (s *Server) SendAppGossipSpecific(ctx context.Context, req *appsenderpb.SendAppGossipSpecificMsg) (*emptypb.Empty, error) {
 	nodeIDs := set.NewSet[ids.NodeID](len(req.NodeIds))
 	for _, nodeIDBytes := range req.NodeIds {
 		nodeID, err := ids.ToNodeID(nodeIDBytes)
@@ -106,6 +95,15 @@ func (s *Server) SendAppGossipSpecific(ctx context.Context, req *appsenderpb.Sen
 		}
 		nodeIDs.Add(nodeID)
 	}
-	err := s.appSender.SendAppGossipSpecific(ctx, nodeIDs, req.Msg)
+	err := s.appSender.SendAppGossip(
+		ctx,
+		common.SendConfig{
+			NodeIDs:       nodeIDs,
+			Validators:    int(req.Validators),
+			NonValidators: int(req.NonValidators),
+			Peers:         int(req.Peers),
+		},
+		req.Msg,
+	)
 	return &emptypb.Empty{}, err
 }
