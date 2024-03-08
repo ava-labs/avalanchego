@@ -14,7 +14,6 @@ type Type byte
 
 const (
 	TypeNone Type = iota + 1
-	_
 	TypeZstd
 )
 
