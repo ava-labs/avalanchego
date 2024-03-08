@@ -114,7 +114,16 @@ func New(gasTip *big.Int, chain BlockChain, subpools []SubPool) (*TxPool, error)
 			return nil, err
 		}
 	}
-	go pool.loop(head, chain)
+
+	// Subscribe to chain head events to trigger subpool resets
+	var (
+		newHeadCh  = make(chan core.ChainHeadEvent)
+		newHeadSub = chain.SubscribeChainHeadEvent(newHeadCh)
+	)
+	go func() {
+		pool.loop(head, newHeadCh)
+		newHeadSub.Unsubscribe()
+	}()
 	return pool, nil
 }
 
@@ -192,14 +201,7 @@ func (p *TxPool) Close() error {
 // loop is the transaction pool's main event loop, waiting for and reacting to
 // outside blockchain events as well as for various reporting and transaction
 // eviction events.
-func (p *TxPool) loop(head *types.Header, chain BlockChain) {
-	// Subscribe to chain head events to trigger subpool resets
-	var (
-		newHeadCh  = make(chan core.ChainHeadEvent)
-		newHeadSub = chain.SubscribeChainHeadEvent(newHeadCh)
-	)
-	defer newHeadSub.Unsubscribe()
-
+func (p *TxPool) loop(head *types.Header, newHeadCh <-chan core.ChainHeadEvent) {
 	// Track the previous and current head to feed to an idle reset
 	var (
 		oldHead = head
@@ -224,8 +226,8 @@ func (p *TxPool) loop(head *types.Header, chain BlockChain) {
 					for _, subpool := range p.subpools {
 						subpool.Reset(oldHead, newHead)
 					}
-					resetDone <- newHead
 					p.reorgFeed.Send(core.NewTxPoolReorgEvent{Head: newHead})
+					resetDone <- newHead
 				}(oldHead, newHead)
 
 			default:
