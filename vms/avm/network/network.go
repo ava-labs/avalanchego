@@ -5,6 +5,7 @@ package network
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -187,7 +188,7 @@ func (n *Network) AppGossip(ctx context.Context, nodeID ids.NodeID, msgBytes []b
 
 	txBytes, err := message.ParseTx(msgBytes)
 	if err != nil {
-		if err == message.ErrUnknownMessageType {
+		if errors.Is(err, message.ErrUnknownMessageType) {
 			n.ctx.Log.Debug("forwarding AppGossip message to SDK network",
 				zap.String("reason", "failed to parse message"),
 			)
