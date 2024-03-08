@@ -191,7 +191,7 @@ func (n *Network) PullGossip(ctx context.Context) {
 	gossip.Every(ctx, n.log, n.txPullGossiper, n.txPullGossipFrequency)
 }
 
-func (n *Network) AppGossip(_ context.Context, nodeID ids.NodeID, msgBytes []byte) error {
+func (n *Network) AppGossip(ctx context.Context, nodeID ids.NodeID, msgBytes []byte) error {
 	n.log.Debug("called AppGossip message handler",
 		zap.Stringer("nodeID", nodeID),
 		zap.Int("messageLen", len(msgBytes)),
@@ -206,6 +206,14 @@ func (n *Network) AppGossip(_ context.Context, nodeID ids.NodeID, msgBytes []byt
 
 	txBytes, err := message.ParseTx(msgBytes)
 	if err != nil {
+		if err == message.ErrUnknownMessageType {
+			n.log.Debug("forwarding AppGossip message to SDK network",
+				zap.String("reason", "failed to parse message"),
+			)
+
+			return n.Network.AppGossip(ctx, nodeID, msgBytes)
+		}
+
 		n.log.Debug("dropping unexpected message",
 			zap.Stringer("nodeID", nodeID),
 		)

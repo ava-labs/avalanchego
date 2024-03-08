@@ -12,7 +12,7 @@ import (
 	pb "github.com/ava-labs/avalanchego/proto/pb/message"
 )
 
-var errUnknownMessageType = errors.New("unknown message type")
+var ErrUnknownMessageType = errors.New("unknown message type")
 
 func ParseTx(bytes []byte) ([]byte, error) {
 	var protoMsg pb.Message
@@ -24,7 +24,7 @@ func ParseTx(bytes []byte) ([]byte, error) {
 	case *pb.Message_Tx:
 		return m.Tx.Tx, nil
 	default:
-		return nil, fmt.Errorf("%w: %T", errUnknownMessageType, protoMsg.GetMessage())
+		return nil, fmt.Errorf("%w: %T", ErrUnknownMessageType, protoMsg.GetMessage())
 	}
 }
 
