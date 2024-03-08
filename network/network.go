@@ -322,10 +322,11 @@ func (n *network) Send(
 		config.NodeIDs.Len()-len(namedPeers),
 	)
 
-	sampledPeers := n.samplePeers(config, subnetID, allower)
-
-	sentTo := set.NewSet[ids.NodeID](len(namedPeers) + len(sampledPeers))
-	now := n.peerConfig.Clock.Time()
+	var (
+		sampledPeers = n.samplePeers(config, subnetID, allower)
+		sentTo       = set.NewSet[ids.NodeID](len(namedPeers) + len(sampledPeers))
+		now          = n.peerConfig.Clock.Time()
+	)
 
 	// send to peer and update metrics
 	for _, peers := range [][]peer.Peer{namedPeers, sampledPeers} {
