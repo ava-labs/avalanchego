@@ -661,7 +661,6 @@ impl Db {
         // DbHeader (just a pointer to the sentinel)
         // CompactSpaceHeader for future allocations
         let (params, hdr, csh);
-        #[allow(clippy::unwrap_used)]
         let header_bytes: Vec<u8> = {
             params = DbParams {
                 magic: *MAGIC_STR,
@@ -682,11 +681,9 @@ impl Db {
         })
         .chain({
             // write out the CompactSpaceHeader
-            csh = CompactSpaceHeader::new(
-                NonZeroUsize::new(SPACE_RESERVED as usize).unwrap(),
-                #[allow(clippy::unwrap_used)]
-                NonZeroUsize::new(SPACE_RESERVED as usize).unwrap(),
-            );
+            let space_reserved =
+                NonZeroUsize::new(SPACE_RESERVED as usize).expect("SPACE_RESERVED is non-zero");
+            csh = CompactSpaceHeader::new(space_reserved, space_reserved);
             bytemuck::bytes_of(&csh)
         })
         .copied()
