@@ -9,8 +9,6 @@ import (
 	"sync"
 )
 
-const LegacyAppName = "avalanche"
-
 var (
 	errDifferentMajor = errors.New("different major version")
 
