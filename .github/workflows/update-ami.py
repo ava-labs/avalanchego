@@ -13,9 +13,10 @@ packerfile = ".github/packer/ubuntu-jammy-x86_64-public-ami.json.pkr.hcl"
 # Environment Globals
 product_id = os.getenv('PRODUCT_ID')
 role_arn = os.getenv('ROLE_ARN')
-vtag = os.getenv('PKR_VAR_tag')
+vtag = os.getenv('TAG')
 tag = vtag.replace('v', '')
-skip_create_ami = os.getenv('PKR_VAR_skip_create_ami', "True")
+skip_create_ami = os.getenv('SKIP_CREATE_AMI', "True")
+os.environ["PKR_VAR_skip_create_ami"] = skip_create_ami
 
 def packer_build(packerfile):
   print("Running the packer build")

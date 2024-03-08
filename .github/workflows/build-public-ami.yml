@@ -62,6 +62,7 @@ jobs:
           packer init ./.github/packer/
           ./.github/workflows/update-ami.py
         env:
-          TAG: ${{ env.TAG }}
+          SKIP_CREATE_AMI: ${{ env.PKR_VAR_skip_create_ami }}
+          TAG: ${{ env.PKR_VAR_tag }}
           PRODUCT_ID: ${{ secrets.MARKETPLACE_PRODUCT }}
           ROLE_ARN: ${{ secrets.MARKETPLACE_ROLE }}
