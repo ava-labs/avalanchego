@@ -13,6 +13,7 @@ emulated-failure = []
 libc = "0.2.153"
 parking_lot = "0.12.1"
 crossbeam-channel = "0.5.11"
+thiserror = "1.0.57"
 
 [dev-dependencies]
 futures = "0.3.30"

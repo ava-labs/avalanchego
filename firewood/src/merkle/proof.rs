@@ -7,6 +7,7 @@ use std::collections::HashMap;
 use crate::shale::ObjWriteSizeError;
 use crate::shale::{disk_address::DiskAddress, ShaleError, ShaleStore};
 use crate::v2::api::HashKey;
+use aiofut::AioError;
 use nix::errno::Errno;
 use sha3::Digest;
 use thiserror::Error;
@@ -23,6 +24,8 @@ use super::{BinarySerde, EncodedNode, NodeObjRef};
 
 #[derive(Debug, Error)]
 pub enum ProofError {
+    #[error("aio error: {0:?}")]
+    AioError(AioError),
     #[error("decoding error")]
     DecodeError(#[from] bincode::Error),
     #[error("no such node")]
@@ -74,6 +77,7 @@ impl From<DataStoreError> for ProofError {
 impl From<DbError> for ProofError {
     fn from(d: DbError) -> ProofError {
         match d {
+            DbError::Aio(e) => ProofError::AioError(e),
             DbError::InvalidParams => ProofError::InvalidProof,
             DbError::Merkle(e) => ProofError::InvalidNode(e),
             DbError::System(e) => ProofError::SystemError(e),

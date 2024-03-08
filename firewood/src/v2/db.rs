@@ -17,6 +17,7 @@ use crate::{db::DbError, v2::api};
 impl From<DbError> for api::Error {
     fn from(value: DbError) -> Self {
         match value {
+            DbError::Aio(e) => api::Error::InternalError(Box::new(e)),
             DbError::InvalidParams => api::Error::InternalError(Box::new(value)),
             DbError::Merkle(e) => api::Error::InternalError(Box::new(e)),
             DbError::System(e) => api::Error::IO(e.into()),
