@@ -191,7 +191,7 @@ func (n *Network) PullGossip(ctx context.Context) {
 	gossip.Every(ctx, n.log, n.txPullGossiper, n.txPullGossipFrequency)
 }
 
-func (n *Network) AppGossip(ctx context.Context, nodeID ids.NodeID, msgBytes []byte) error {
+func (n *Network) AppGossip(_ context.Context, nodeID ids.NodeID, msgBytes []byte) error {
 	n.log.Debug("called AppGossip message handler",
 		zap.Stringer("nodeID", nodeID),
 		zap.Int("messageLen", len(msgBytes)),
