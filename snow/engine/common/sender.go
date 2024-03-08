@@ -10,6 +10,14 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
+// SendConfig is used to specify who to send messages to over the p2p network.
+type SendConfig struct {
+	NodeIDs       set.Set[ids.NodeID]
+	Validators    int
+	NonValidators int
+	Peers         int
+}
+
 // Sender defines how a consensus engine sends messages and requests to other
 // validators.
 //
@@ -177,13 +185,6 @@ type NetworkAppSender interface {
 		config SendConfig,
 		appGossipBytes []byte,
 	) error
-}
-
-type SendConfig struct {
-	NodeIDs       set.Set[ids.NodeID]
-	Validators    int
-	NonValidators int
-	Peers         int
 }
 
 // CrossChainAppSender sends local VM-level messages to another VM.
