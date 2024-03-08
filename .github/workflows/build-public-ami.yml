@@ -30,7 +30,7 @@ jobs:
       - name: Install aws cli
         run: |
           sudo apt update
-          sudo apt-get -y install packer=${PACKER_VERSION} python3-boto3=${PYTHON3_BOTO3_VERSION }}
+          sudo apt-get -y install packer=${PACKER_VERSION} python3-boto3=${PYTHON3_BOTO3_VERSION}
 
       - name: Get the tag
         id: get_tag
