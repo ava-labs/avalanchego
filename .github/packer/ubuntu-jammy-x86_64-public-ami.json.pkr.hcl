@@ -12,7 +12,7 @@ packer {
 }
 
 variable "skip_create_ami" {
-  type    = bool
+  type    = string
 }
 
 variable "tag" {

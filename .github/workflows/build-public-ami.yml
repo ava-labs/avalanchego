@@ -37,17 +37,17 @@ jobs:
         run: |
           if [[ ${{ github.event_name }} == 'push' ]];
           then
-            echo "TAG=${GITHUB_REF/refs\/tags\//}" >> $GITHUB_ENV
+            echo "PKR_VAR_tag=${GITHUB_REF/refs\/tags\//}" >> $GITHUB_ENV
           else
-            echo "TAG=${{ inputs.tag }}" >> $GITHUB_ENV
+            echo "PKR_VAR_tag=${{ inputs.tag }}" >> $GITHUB_ENV
           fi
         shell: bash
 
       - name: Set whether to skip ami creation in packer
         run: |
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            echo "Setting SKIP_CREATE_AMI to false"
-            echo "SKIP_CREATE_AMI=false" >> $GITHUB_ENV
+            echo "Setting PKR_VAR_skip_create_ami to False"
+            echo "PKR_VAR_skip_create_ami=False" >> $GITHUB_ENV
           fi
 
       - name: Configure AWS credentials
