@@ -473,17 +473,6 @@ func (vm *VM) Linearize(ctx context.Context, stopVertexID ids.ID, toEngine chan<
 		vm.network.PullGossip(vm.onShutdownCtx)
 	}()
 
-	go func() {
-		err := vm.state.Prune(&vm.ctx.Lock, vm.ctx.Log)
-		if err != nil {
-			vm.ctx.Log.Warn("state pruning failed",
-				zap.Error(err),
-			)
-			return
-		}
-		vm.ctx.Log.Info("state pruning finished")
-	}()
-
 	return nil
 }
 
