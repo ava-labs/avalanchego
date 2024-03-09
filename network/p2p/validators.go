@@ -21,16 +21,16 @@ import (
 )
 
 var (
-	_ ValidatorSet     = (*Validators)(nil)
-	_ ValidatorPortion = (*Validators)(nil)
-	_ NodeSampler      = (*Validators)(nil)
+	_ ValidatorSet    = (*Validators)(nil)
+	_ ValidatorSubset = (*Validators)(nil)
+	_ NodeSampler     = (*Validators)(nil)
 )
 
 type ValidatorSet interface {
 	Has(ctx context.Context, nodeID ids.NodeID) bool // TODO return error
 }
 
-type ValidatorPortion interface {
+type ValidatorSubset interface {
 	Top(ctx context.Context, percentage float64) []ids.NodeID // TODO return error
 }
 

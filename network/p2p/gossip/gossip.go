@@ -263,7 +263,7 @@ func (p *PullGossiper[_]) handleResponse(
 func NewPushGossiper[T Gossipable](
 	marshaller Marshaller[T],
 	mempool Set[T],
-	validators p2p.ValidatorPortion,
+	validators p2p.ValidatorSubset,
 	client *p2p.Client,
 	metrics Metrics,
 	gossipParams BranchingFactor,
@@ -309,7 +309,7 @@ func NewPushGossiper[T Gossipable](
 type PushGossiper[T Gossipable] struct {
 	marshaller Marshaller[T]
 	set        Set[T]
-	validators p2p.ValidatorPortion
+	validators p2p.ValidatorSubset
 	client     *p2p.Client
 	metrics    Metrics
 
