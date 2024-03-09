@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import json
-import os 
+import os
 import boto3
 import uuid
 import re
@@ -8,7 +8,7 @@ import subprocess
 
 # Globals
 amifile = '.github/workflows/amichange.json'
-packerfile = ".github/packer/ubuntu-jammy-x86_64-public-ami.json"
+packerfile = ".github/packer/ubuntu-jammy-x86_64-public-ami.json.pkr.hcl"
 
 # Environment Globals
 product_id = os.getenv('PRODUCT_ID')
@@ -16,6 +16,9 @@ role_arn = os.getenv('ROLE_ARN')
 vtag = os.getenv('TAG')
 tag = vtag.replace('v', '')
 skip_create_ami = os.getenv('SKIP_CREATE_AMI', "True")
+os.environ["PKR_VAR_skip_create_ami"] = skip_create_ami
+os.environ["PKR_VAR_tag"] = tag
+
 
 def packer_build(packerfile):
   print("Running the packer build")

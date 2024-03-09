@@ -10,6 +10,10 @@ on:
     tags:
       - "*"
 
+env:
+  PACKER_VERSION: "1.6.6+ds1-4ubuntu0.22.04.2"
+  PYTHON3_BOTO3_VERSION: "1.20.34+dfsg-1"
+
 jobs:
   build-public-ami-and-upload:
     runs-on: ubuntu-22.04
@@ -26,16 +30,16 @@ jobs:
       - name: Install aws cli
         run: |
           sudo apt update
-          sudo apt-get -y install packer python3-boto3
+          sudo apt-get -y install packer=${PACKER_VERSION} python3-boto3=${PYTHON3_BOTO3_VERSION}
 
       - name: Get the tag
         id: get_tag
         run: |
           if [[ ${{ github.event_name }} == 'push' ]];
           then
-            echo "TAG=${GITHUB_REF/refs\/tags\//}" >> $GITHUB_ENV
+            echo "PKR_VAR_tag=${GITHUB_REF/refs\/tags\//}" >> $GITHUB_ENV
           else
-            echo "TAG=${{ inputs.tag }}" >> $GITHUB_ENV
+            echo "PKR_VAR_tag=${{ inputs.tag }}" >> $GITHUB_ENV
           fi
         shell: bash
 
@@ -55,8 +59,10 @@ jobs:
 
       - name: Create AMI and upload to marketplace
         run: |
+          packer init ./.github/packer/
           ./.github/workflows/update-ami.py
         env:
-          TAG: ${{ env.TAG }}
+          SKIP_CREATE_AMI: ${{ env.SKIP_CREATE_AMI }}
+          TAG: ${{ env.PKR_VAR_tag }}
           PRODUCT_ID: ${{ secrets.MARKETPLACE_PRODUCT }}
           ROLE_ARN: ${{ secrets.MARKETPLACE_ROLE }}
