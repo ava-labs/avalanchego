@@ -82,6 +82,7 @@ func (v *Validators) refresh(ctx context.Context) {
 		return
 	}
 
+	// Even though validatorList may be nil, truncating will not panic.
 	v.validatorList = v.validatorList[:0]
 	v.validatorSet.Clear()
 	v.totalWeight = 0
