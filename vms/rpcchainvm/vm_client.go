@@ -185,7 +185,7 @@ func (vm *VMClient) Initialize(
 		SubnetId:     chainCtx.SubnetID[:],
 		ChainId:      chainCtx.ChainID[:],
 		NodeId:       chainCtx.NodeID.Bytes(),
-		PublicKey:    bls.PublicKeyToBytes(chainCtx.PublicKey),
+		PublicKey:    bls.PublicKeyToCompressedBytes(chainCtx.PublicKey),
 		XChainId:     chainCtx.XChainID[:],
 		CChainId:     chainCtx.CChainID[:],
 		AvaxAssetId:  chainCtx.AVAXAssetID[:],

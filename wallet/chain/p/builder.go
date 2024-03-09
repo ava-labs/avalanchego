@@ -51,16 +51,14 @@ type Builder interface {
 		options ...common.Option,
 	) (map[ids.ID]uint64, error)
 
-	// NewBaseTx creates a new simple value transfer. Because the P-chain
-	// doesn't intend for balance transfers to occur, this method is expensive
-	// and abuses the creation of subnets.
+	// NewBaseTx creates a new simple value transfer.
 	//
 	// - [outputs] specifies all the recipients and amounts that should be sent
 	//   from this transaction.
 	NewBaseTx(
 		outputs []*avax.TransferableOutput,
 		options ...common.Option,
-	) (*txs.CreateSubnetTx, error)
+	) (*txs.BaseTx, error)
 
 	// NewAddValidatorTx creates a new validator of the primary network.
 	//
@@ -300,9 +298,9 @@ func (b *builder) GetImportableBalance(
 func (b *builder) NewBaseTx(
 	outputs []*avax.TransferableOutput,
 	options ...common.Option,
-) (*txs.CreateSubnetTx, error) {
+) (*txs.BaseTx, error) {
 	toBurn := map[ids.ID]uint64{
-		b.backend.AVAXAssetID(): b.backend.CreateSubnetTxFee(),
+		b.backend.AVAXAssetID(): b.backend.BaseTxFee(),
 	}
 	for _, out := range outputs {
 		assetID := out.AssetID()
@@ -322,16 +320,13 @@ func (b *builder) NewBaseTx(
 	outputs = append(outputs, changeOutputs...)
 	avax.SortTransferableOutputs(outputs, txs.Codec) // sort the outputs
 
-	tx := &txs.CreateSubnetTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    b.backend.NetworkID(),
-			BlockchainID: constants.PlatformChainID,
-			Ins:          inputs,
-			Outs:         outputs,
-			Memo:         ops.Memo(),
-		}},
-		Owner: &secp256k1fx.OutputOwners{},
-	}
+	tx := &txs.BaseTx{BaseTx: avax.BaseTx{
+		NetworkID:    b.backend.NetworkID(),
+		BlockchainID: constants.PlatformChainID,
+		Ins:          inputs,
+		Outs:         outputs,
+		Memo:         ops.Memo(),
+	}}
 	return tx, b.initCtx(tx)
 }
 

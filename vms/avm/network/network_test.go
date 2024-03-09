@@ -14,8 +14,8 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/avm/block/executor"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
@@ -209,10 +209,12 @@ func TestNetworkAppGossip(t *testing.T) {
 				txVerifierFunc = tt.txVerifierFunc
 			}
 
+			snowCtx := snowtest.Context(t, ids.Empty)
 			n, err := New(
-				&snow.Context{
-					Log: logging.NoLog{},
-				},
+				logging.NoLog{},
+				ids.EmptyNodeID,
+				ids.Empty,
+				snowCtx.ValidatorState,
 				parser,
 				txVerifierFunc(ctrl),
 				mempoolFunc(ctrl),
@@ -307,7 +309,7 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 			},
 			appSenderFunc: func(ctrl *gomock.Controller) common.AppSender {
 				appSender := common.NewMockSender(ctrl)
-				appSender.EXPECT().SendAppGossip(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+				appSender.EXPECT().SendAppGossip(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 				return appSender
 			},
 			expectedErr: nil,
@@ -350,10 +352,12 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 				appSenderFunc = tt.appSenderFunc
 			}
 
+			snowCtx := snowtest.Context(t, ids.Empty)
 			n, err := New(
-				&snow.Context{
-					Log: logging.NoLog{},
-				},
+				logging.NoLog{},
+				ids.EmptyNodeID,
+				ids.Empty,
+				snowCtx.ValidatorState,
 				parser,
 				txVerifierFunc(ctrl),
 				mempoolFunc(ctrl),
@@ -401,7 +405,7 @@ func TestNetworkIssueTxFromRPCWithoutVerification(t *testing.T) {
 			},
 			appSenderFunc: func(ctrl *gomock.Controller) common.AppSender {
 				appSender := common.NewMockSender(ctrl)
-				appSender.EXPECT().SendAppGossip(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+				appSender.EXPECT().SendAppGossip(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 				return appSender
 			},
 			expectedErr: nil,
@@ -437,10 +441,12 @@ func TestNetworkIssueTxFromRPCWithoutVerification(t *testing.T) {
 				appSenderFunc = tt.appSenderFunc
 			}
 
+			snowCtx := snowtest.Context(t, ids.Empty)
 			n, err := New(
-				&snow.Context{
-					Log: logging.NoLog{},
-				},
+				logging.NoLog{},
+				ids.EmptyNodeID,
+				ids.Empty,
+				snowCtx.ValidatorState,
 				parser,
 				executor.NewMockManager(ctrl), // Should never verify a tx
 				mempoolFunc(ctrl),

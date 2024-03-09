@@ -40,13 +40,6 @@ import (
 
 const testThreadPoolSize = 2
 
-var defaultSubnetConfig = subnets.Config{
-	GossipConfig: subnets.GossipConfig{
-		AcceptedFrontierPeerSize: 2,
-		OnAcceptPeerSize:         2,
-	},
-}
-
 func TestTimeout(t *testing.T) {
 	require := require.New(t)
 
@@ -106,7 +99,7 @@ func TestTimeout(t *testing.T) {
 		&chainRouter,
 		tm,
 		p2p.EngineType_ENGINE_TYPE_SNOWMAN,
-		subnets.New(ctx.NodeID, defaultSubnetConfig),
+		subnets.New(ctx.NodeID, subnets.Config{}),
 	)
 	require.NoError(err)
 
@@ -295,14 +288,14 @@ func TestTimeout(t *testing.T) {
 	}
 
 	// Send messages to disconnected peers
-	externalSender.SendF = func(message.OutboundMessage, set.Set[ids.NodeID], ids.ID, subnets.Allower) set.Set[ids.NodeID] {
+	externalSender.SendF = func(message.OutboundMessage, common.SendConfig, ids.ID, subnets.Allower) set.Set[ids.NodeID] {
 		return nil
 	}
 	sendAll()
 
 	// Send messages to connected peers
-	externalSender.SendF = func(_ message.OutboundMessage, nodeIDs set.Set[ids.NodeID], _ ids.ID, _ subnets.Allower) set.Set[ids.NodeID] {
-		return nodeIDs
+	externalSender.SendF = func(_ message.OutboundMessage, config common.SendConfig, _ ids.ID, _ subnets.Allower) set.Set[ids.NodeID] {
+		return config.NodeIDs
 	}
 	sendAll()
 
@@ -372,7 +365,7 @@ func TestReliableMessages(t *testing.T) {
 		&chainRouter,
 		tm,
 		p2p.EngineType_ENGINE_TYPE_SNOWMAN,
-		subnets.New(ctx.NodeID, defaultSubnetConfig),
+		subnets.New(ctx.NodeID, subnets.Config{}),
 	)
 	require.NoError(err)
 
@@ -518,7 +511,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 		&chainRouter,
 		tm,
 		p2p.EngineType_ENGINE_TYPE_SNOWMAN,
-		subnets.New(ctx.NodeID, defaultSubnetConfig),
+		subnets.New(ctx.NodeID, subnets.Config{}),
 	)
 	require.NoError(err)
 
@@ -654,8 +647,10 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 			setExternalSenderExpect: func(externalSender *MockExternalSender) {
 				externalSender.EXPECT().Send(
 					gomock.Any(), // Outbound message
-					// Note [myNodeID] is not in this set
-					set.Of(successNodeID, failedNodeID),
+					common.SendConfig{
+						// Note [myNodeID] is not in this set
+						NodeIDs: set.Of(successNodeID, failedNodeID),
+					},
 					ctx.SubnetID, // Subnet ID
 					gomock.Any(),
 				).Return(set.Of(successNodeID))
@@ -697,8 +692,10 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 			setExternalSenderExpect: func(externalSender *MockExternalSender) {
 				externalSender.EXPECT().Send(
 					gomock.Any(), // Outbound message
-					// Note [myNodeID] is not in this set
-					set.Of(successNodeID, failedNodeID),
+					common.SendConfig{
+						// Note [myNodeID] is not in this set
+						NodeIDs: set.Of(successNodeID, failedNodeID),
+					},
 					ctx.SubnetID, // Subnet ID
 					gomock.Any(),
 				).Return(set.Of(successNodeID))
@@ -734,8 +731,10 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 			setExternalSenderExpect: func(externalSender *MockExternalSender) {
 				externalSender.EXPECT().Send(
 					gomock.Any(), // Outbound message
-					// Note [myNodeID] is not in this set
-					set.Of(successNodeID, failedNodeID),
+					common.SendConfig{
+						// Note [myNodeID] is not in this set
+						NodeIDs: set.Of(successNodeID, failedNodeID),
+					},
 					ctx.SubnetID, // Subnet ID
 					gomock.Any(),
 				).Return(set.Of(successNodeID))
@@ -772,8 +771,10 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 			setExternalSenderExpect: func(externalSender *MockExternalSender) {
 				externalSender.EXPECT().Send(
 					gomock.Any(), // Outbound message
-					// Note [myNodeID] is not in this set
-					set.Of(successNodeID, failedNodeID),
+					common.SendConfig{
+						// Note [myNodeID] is not in this set
+						NodeIDs: set.Of(successNodeID, failedNodeID),
+					},
 					ctx.SubnetID, // Subnet ID
 					gomock.Any(),
 				).Return(set.Of(successNodeID))
@@ -810,7 +811,7 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 				router,
 				timeoutManager,
 				p2p.EngineType_ENGINE_TYPE_SNOWMAN,
-				subnets.New(ctx.NodeID, defaultSubnetConfig),
+				subnets.New(ctx.NodeID, subnets.Config{}),
 			)
 			require.NoError(err)
 
@@ -897,9 +898,11 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 			},
 			setExternalSenderExpect: func(externalSender *MockExternalSender) {
 				externalSender.EXPECT().Send(
-					gomock.Any(),              // Outbound message
-					set.Of(destinationNodeID), // Node IDs
-					ctx.SubnetID,              // Subnet ID
+					gomock.Any(), // Outbound message
+					common.SendConfig{
+						NodeIDs: set.Of(destinationNodeID),
+					},
+					ctx.SubnetID, // Subnet ID
 					gomock.Any(),
 				).Return(nil)
 			},
@@ -927,9 +930,11 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 			},
 			setExternalSenderExpect: func(externalSender *MockExternalSender) {
 				externalSender.EXPECT().Send(
-					gomock.Any(),              // Outbound message
-					set.Of(destinationNodeID), // Node IDs
-					ctx.SubnetID,              // Subnet ID
+					gomock.Any(), // Outbound message
+					common.SendConfig{
+						NodeIDs: set.Of(destinationNodeID),
+					},
+					ctx.SubnetID, // Subnet ID
 					gomock.Any(),
 				).Return(nil)
 			},
@@ -955,9 +960,11 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 			},
 			setExternalSenderExpect: func(externalSender *MockExternalSender) {
 				externalSender.EXPECT().Send(
-					gomock.Any(),              // Outbound message
-					set.Of(destinationNodeID), // Node IDs
-					ctx.SubnetID,              // Subnet ID
+					gomock.Any(), // Outbound message
+					common.SendConfig{
+						NodeIDs: set.Of(destinationNodeID),
+					},
+					ctx.SubnetID, // Subnet ID
 					gomock.Any(),
 				).Return(nil)
 			},
@@ -985,9 +992,11 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 			},
 			setExternalSenderExpect: func(externalSender *MockExternalSender) {
 				externalSender.EXPECT().Send(
-					gomock.Any(),              // Outbound message
-					set.Of(destinationNodeID), // Node IDs
-					ctx.SubnetID,              // Subnet ID
+					gomock.Any(), // Outbound message
+					common.SendConfig{
+						NodeIDs: set.Of(destinationNodeID),
+					},
+					ctx.SubnetID, // Subnet ID
 					gomock.Any(),
 				).Return(nil)
 			},
@@ -1021,7 +1030,7 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 				router,
 				timeoutManager,
 				p2p.EngineType_ENGINE_TYPE_SNOWMAN,
-				subnets.New(ctx.NodeID, defaultSubnetConfig),
+				subnets.New(ctx.NodeID, subnets.Config{}),
 			)
 			require.NoError(err)
 
@@ -1108,8 +1117,10 @@ func TestSender_Single_Request(t *testing.T) {
 			},
 			setExternalSenderExpect: func(externalSender *MockExternalSender, sentTo set.Set[ids.NodeID]) {
 				externalSender.EXPECT().Send(
-					gomock.Any(),              // Outbound message
-					set.Of(destinationNodeID), // Node IDs
+					gomock.Any(), // Outbound message
+					common.SendConfig{
+						NodeIDs: set.Of(destinationNodeID),
+					},
 					ctx.SubnetID,
 					gomock.Any(),
 				).Return(sentTo)
@@ -1145,8 +1156,10 @@ func TestSender_Single_Request(t *testing.T) {
 			},
 			setExternalSenderExpect: func(externalSender *MockExternalSender, sentTo set.Set[ids.NodeID]) {
 				externalSender.EXPECT().Send(
-					gomock.Any(),              // Outbound message
-					set.Of(destinationNodeID), // Node IDs
+					gomock.Any(), // Outbound message
+					common.SendConfig{
+						NodeIDs: set.Of(destinationNodeID),
+					},
 					ctx.SubnetID,
 					gomock.Any(),
 				).Return(sentTo)
@@ -1180,7 +1193,7 @@ func TestSender_Single_Request(t *testing.T) {
 				router,
 				timeoutManager,
 				engineType,
-				subnets.New(ctx.NodeID, defaultSubnetConfig),
+				subnets.New(ctx.NodeID, subnets.Config{}),
 			)
 			require.NoError(err)
 

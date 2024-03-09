@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/network/dialer"
 	"github.com/ava-labs/avalanchego/network/peer"
 	"github.com/ava-labs/avalanchego/network/throttling"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/uptime"
@@ -48,13 +49,9 @@ var (
 		SendFailRateHalflife:         time.Second,
 	}
 	defaultPeerListGossipConfig = PeerListGossipConfig{
-		PeerListNumValidatorIPs:        100,
-		PeerListValidatorGossipSize:    100,
-		PeerListNonValidatorGossipSize: 100,
-		PeerListPeersGossipSize:        100,
-		PeerListGossipFreq:             time.Second,
-		PeerListPullGossipFreq:         time.Second,
-		PeerListBloomResetFreq:         constants.DefaultNetworkPeerListBloomResetFreq,
+		PeerListNumValidatorIPs: 100,
+		PeerListPullGossipFreq:  time.Second,
+		PeerListBloomResetFreq:  constants.DefaultNetworkPeerListBloomResetFreq,
 	}
 	defaultTimeoutConfig = TimeoutConfig{
 		PingPongTimeout:      30 * time.Second,
@@ -330,7 +327,14 @@ func TestSend(t *testing.T) {
 	require.NoError(err)
 
 	toSend := set.Of(nodeIDs[1])
-	sentTo := net0.Send(outboundGetMsg, toSend, constants.PrimaryNetworkID, subnets.NoOpAllower)
+	sentTo := net0.Send(
+		outboundGetMsg,
+		common.SendConfig{
+			NodeIDs: toSend,
+		},
+		constants.PrimaryNetworkID,
+		subnets.NoOpAllower,
+	)
 	require.Equal(toSend, sentTo)
 
 	inboundGetMsg := <-received
@@ -342,7 +346,7 @@ func TestSend(t *testing.T) {
 	wg.Wait()
 }
 
-func TestSendAndGossipWithFilter(t *testing.T) {
+func TestSendWithFilter(t *testing.T) {
 	require := require.New(t)
 
 	received := make(chan message.InboundMessage)
@@ -369,19 +373,18 @@ func TestSendAndGossipWithFilter(t *testing.T) {
 
 	toSend := set.Of(nodeIDs...)
 	validNodeID := nodeIDs[1]
-	sentTo := net0.Send(outboundGetMsg, toSend, constants.PrimaryNetworkID, newNodeIDConnector(validNodeID))
+	sentTo := net0.Send(
+		outboundGetMsg,
+		common.SendConfig{
+			NodeIDs: toSend,
+		},
+		constants.PrimaryNetworkID,
+		newNodeIDConnector(validNodeID),
+	)
 	require.Len(sentTo, 1)
 	require.Contains(sentTo, validNodeID)
 
 	inboundGetMsg := <-received
-	require.Equal(message.GetOp, inboundGetMsg.Op())
-
-	// Test Gossip now
-	sentTo = net0.Gossip(outboundGetMsg, constants.PrimaryNetworkID, 0, 0, len(nodeIDs), newNodeIDConnector(validNodeID))
-	require.Len(sentTo, 1)
-	require.Contains(sentTo, validNodeID)
-
-	inboundGetMsg = <-received
 	require.Equal(message.GetOp, inboundGetMsg.Op())
 
 	for _, net := range networks {
