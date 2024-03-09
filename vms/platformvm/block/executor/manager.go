@@ -160,7 +160,7 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 		stateDiff.GetTimestamp().Unix(),
 		nextBlkTime.Unix(),
 		feesCfg.BlockUnitsTarget,
-		feesCfg.FeesChangeDenominator,
+		feesCfg.UpdateCoefficient,
 		feesCfg.MinUnitFees,
 	)
 

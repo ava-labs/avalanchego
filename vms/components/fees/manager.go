@@ -104,7 +104,7 @@ func (m *Manager) ComputeNext(
 	lastTime,
 	currTime int64,
 	targetUnits,
-	priceChangeDenominator,
+	updateCoefficients,
 	minUnitPrice Dimensions,
 ) *Manager {
 	since := int(currTime - lastTime)
@@ -115,7 +115,7 @@ func (m *Manager) ComputeNext(
 			m.cumulatedUnits[i],
 			m.unitFees[i],
 			targetUnits[i],
-			priceChangeDenominator[i],
+			updateCoefficients[i],
 			minUnitPrice[i],
 			since,
 		)
@@ -132,7 +132,7 @@ func computeNextPriceWindow(
 	currentUnitsConsumed uint64,
 	currentUnitFee uint64,
 	target uint64, /* per window, must be non-zero */
-	changeDenom uint64,
+	updateCoefficient uint64,
 	minUnitFee uint64,
 	since int, /* seconds */
 ) (uint64, Window) {
@@ -147,47 +147,24 @@ func computeNextPriceWindow(
 
 	var (
 		totalUnitsConsumed = Sum(newRollupWindow)
-		nextUnitFee        = currentUnitFee
+		exponent           = float64(0)
 	)
 
 	switch {
 	case totalUnitsConsumed == target:
-		return nextUnitFee, newRollupWindow
+		return currentUnitFee, newRollupWindow
 	case totalUnitsConsumed > target:
-		// If the parent block used more units than its target, the baseFee should increase.
-		delta := currentUnitFee * (totalUnitsConsumed - target) / target / changeDenom
-
-		// make sure that delta is non zero. We want to move unit fees
-		// of at least a unit (they should not stay the same since totalUnitsConsumed > target)
-		delta = max(delta, 1)
-
-		var over error
-		nextUnitFee, over = safemath.Add64(nextUnitFee, delta)
-		if over != nil {
-			nextUnitFee = math.MaxUint64
-		}
-
+		exponent = float64(updateCoefficient) * float64(totalUnitsConsumed-target) / float64(target)
 	case totalUnitsConsumed < target:
-		// Otherwise if the parent block used less units than its target, the baseFee should decrease.
-		delta := currentUnitFee * (target - totalUnitsConsumed) / target / changeDenom
-
-		// make sure that delta is non zero. We want to move unit fees
-		// of at least a unit (they should not stay the same since totalUnitsConsumed < target)
-		delta = max(delta, 1)
-
-		// if we had no blocks for more than [WindowSize] seconds, we reduce fees even more,
-		// to try and account for all the low activity interval
-		if since > WindowSize {
-			delta *= uint64(since / WindowSize)
-		}
-
-		var under error
-		nextUnitFee, under = safemath.Sub(nextUnitFee, delta)
-		if under != nil {
-			nextUnitFee = 0
-		}
+		exponent = -float64(updateCoefficient) * float64(target-totalUnitsConsumed) / float64(target)
 	}
 
+	nextRawRate := math.Round(float64(currentUnitFee) * math.Exp(exponent))
+	if nextRawRate > math.MaxUint64 {
+		return math.MaxUint64, newRollupWindow
+	}
+
+	nextUnitFee := uint64(nextRawRate)
 	nextUnitFee = max(nextUnitFee, minUnitFee)
 	return nextUnitFee, newRollupWindow
 }

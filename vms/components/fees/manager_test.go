@@ -23,7 +23,7 @@ func TestComputeNextEmptyWindows(t *testing.T) {
 		lastBlkTime = time.Now().Truncate(time.Second)
 		currBlkTime = lastBlkTime.Add(time.Second)
 
-		priceChangeDenominator = Dimensions{1, 1, 2, 10}
+		priceChangeDenominator = Dimensions{0, 1, 2, 10}
 		minUnitFees            = Dimensions{0, 0, 0, 0}
 	)
 
@@ -41,16 +41,16 @@ func TestComputeNextEmptyWindows(t *testing.T) {
 	)
 
 	// Bandwidth units are below target, next unit fees are pushed to the minimum
-	require.Equal(minUnitFees[Bandwidth], next.unitFees[Bandwidth])
+	require.Equal(minUnitFees[Bandwidth]+1, next.unitFees[Bandwidth])
 
 	// UTXORead units are at target, next unit fees are kept equal
 	require.Equal(initialUnitFees[UTXORead], next.unitFees[UTXORead])
 
 	// UTXOWrite units are above target, next unit fees increased, proportionally to priceChangeDenominator
-	require.Equal(initialUnitFees[UTXOWrite]+1, next.unitFees[UTXOWrite])
+	require.Equal(uint64(1), next.unitFees[UTXOWrite])
 
 	// Compute units are above target, next unit fees increased, proportionally to priceChangeDenominator
-	require.Equal(initialUnitFees[Compute]+9, next.unitFees[Compute])
+	require.Equal(uint64(math.MaxUint64), next.unitFees[Compute])
 
 	// next cumulated units are zeroed
 	require.Equal(Dimensions{}, next.cumulatedUnits)
@@ -68,8 +68,8 @@ func TestComputeNextNonEmptyWindows(t *testing.T) {
 		lastBlkTime = time.Now().Truncate(time.Second)
 		currBlkTime = lastBlkTime.Add(time.Second)
 
-		priceChangeDenominator = Dimensions{1, 1, 2, 10}
-		minUnitFees            = Dimensions{0, 0, 0, 0}
+		updateCoefficient = Dimensions{0, 1, 2, 10}
+		minUnitFees       = Dimensions{0, 0, 0, 0}
 	)
 
 	m := &Manager{
@@ -86,21 +86,21 @@ func TestComputeNextNonEmptyWindows(t *testing.T) {
 		lastBlkTime.Unix(),
 		currBlkTime.Unix(),
 		targetComplexity,
-		priceChangeDenominator,
+		updateCoefficient,
 		minUnitFees,
 	)
 
 	// Bandwidth units are below target, next unit fees are pushed to the minimum
-	require.Equal(minUnitFees[Bandwidth], next.unitFees[Bandwidth])
+	require.Equal(uint64(1), next.unitFees[Bandwidth])
 
 	// UTXORead units are at above target, due to spike in window. Next unit fees are increased
-	require.Equal(uint64(737869762948382064), next.unitFees[UTXORead])
+	require.Equal(uint64(math.MaxUint64), next.unitFees[UTXORead])
 
 	// UTXOWrite units are above target, even if they are decreasing within the window. Next unit fees increased.
-	require.Equal(initialUnitFees[UTXOWrite]+4, next.unitFees[UTXOWrite])
+	require.Equal(uint64(19776403), next.unitFees[UTXOWrite])
 
 	// Compute units are above target, next unit fees increased, proportionally to priceChangeDenominator
-	require.Equal(uint64(73786976294838207), next.unitFees[Compute])
+	require.Equal(uint64(math.MaxUint64), next.unitFees[Compute])
 
 	// next cumulated units are zeroed
 	require.Equal(Dimensions{}, next.cumulatedUnits)
@@ -147,10 +147,10 @@ func TestComputeNextEdgeCases(t *testing.T) {
 	require.Equal(initialUnitFees[UTXORead], next.unitFees[UTXORead])
 
 	// UTXOWrite units are above target, even if they are decreasing within the window. Next unit fees increased.
-	require.Equal(minUnitFees[UTXOWrite], next.unitFees[UTXOWrite])
+	require.Equal(initialUnitFees[UTXOWrite]-1, next.unitFees[UTXOWrite])
 
 	// Compute units are above target, next unit fees increased, proportionally to priceChangeDenominator
-	require.Equal(minUnitFees[Compute], next.unitFees[Compute])
+	require.Equal(initialUnitFees[Compute]-1, next.unitFees[Compute])
 
 	// next cumulated units are zeroed
 	require.Equal(Dimensions{}, next.cumulatedUnits)
