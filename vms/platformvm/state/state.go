@@ -7,8 +7,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math"
-	"sync"
 	"time"
 
 	"github.com/google/btree"
@@ -23,15 +21,12 @@ import (
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/hashing"
-	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
@@ -44,13 +39,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
-)
-
-const (
-	pruneCommitLimit           = 1024
-	pruneCommitSleepMultiplier = 5
-	pruneCommitSleepCap        = 10 * time.Second
-	pruneUpdateFrequency       = 30 * time.Second
 )
 
 var (
@@ -87,7 +75,6 @@ var (
 	LastAcceptedKey   = []byte("last accepted")
 	HeightsIndexedKey = []byte("heights indexed")
 	InitializedKey    = []byte("initialized")
-	PrunedKey         = []byte("pruned")
 )
 
 // Chain collects all methods to manage the state of the chain for block
@@ -181,18 +168,6 @@ type State interface {
 	// Discard uncommitted changes to the database.
 	Abort()
 
-	// Returns if the state should be pruned and indexed to remove rejected
-	// blocks and generate the block height index.
-	//
-	// TODO: Remove after v1.11.x is activated
-	ShouldPrune() (bool, error)
-
-	// Removes rejected blocks from disk and indexes accepted blocks by height. This
-	// function supports being (and is recommended to be) called asynchronously.
-	//
-	// TODO: Remove after v1.11.x is activated
-	PruneAndIndex(sync.Locker, logging.Logger) error
-
 	// Commit changes to the base database.
 	Commit() error
 
@@ -203,13 +178,6 @@ type State interface {
 	Checksum() ids.ID
 
 	Close() error
-}
-
-// TODO: Remove after v1.11.x is activated
-type stateBlk struct {
-	Blk    block.Block
-	Bytes  []byte         `serialize:"true"`
-	Status choices.Status `serialize:"true"`
 }
 
 /*
@@ -276,7 +244,6 @@ type stateBlk struct {
  * |     '-- txID -> nil
  * '-. singletons
  *   |-- initializedKey -> nil
- *   |-- prunedKey -> nil
  *   |-- timestampKey -> timestamp
  *   |-- currentSupplyKey -> currentSupply
  *   |-- lastAcceptedKey -> lastAccepted
@@ -475,27 +442,6 @@ func New(
 		_ = s.Close()
 
 		return nil, err
-	}
-
-	// Before we start accepting new blocks, we check if the pruning process needs
-	// to be run.
-	//
-	// TODO: Cleanup after v1.11.x is activated
-	shouldPrune, err := s.ShouldPrune()
-	if err != nil {
-		return nil, err
-	}
-	if shouldPrune {
-		// If the pruned key is on disk, we must delete it to ensure our disk
-		// can't get into a partially pruned state if the node restarts mid-way
-		// through pruning.
-		if err := s.singletonDB.Delete(PrunedKey); err != nil {
-			return nil, fmt.Errorf("failed to remove prunedKey from singletonDB: %w", err)
-		}
-
-		if err := s.Commit(); err != nil {
-			return nil, fmt.Errorf("failed to commit to baseDB: %w", err)
-		}
 	}
 
 	return s, nil
@@ -768,37 +714,6 @@ func (s *state) shouldInit() (bool, error) {
 
 func (s *state) doneInit() error {
 	return s.singletonDB.Put(InitializedKey, nil)
-}
-
-func (s *state) ShouldPrune() (bool, error) {
-	has, err := s.singletonDB.Has(PrunedKey)
-	if err != nil {
-		return true, err
-	}
-
-	// If [prunedKey] is not in [singletonDB], [PruneAndIndex()] did not finish
-	// execution.
-	if !has {
-		return true, nil
-	}
-
-	// To ensure the db was not modified since we last ran [PruneAndIndex()], we
-	// must verify that [s.lastAccepted] is height indexed.
-	blk, err := s.GetStatelessBlock(s.lastAccepted)
-	if err != nil {
-		return true, err
-	}
-
-	_, err = s.GetBlockIDAtHeight(blk.Height())
-	if err == database.ErrNotFound {
-		return true, nil
-	}
-
-	return false, err
-}
-
-func (s *state) donePrune() error {
-	return s.singletonDB.Put(PrunedKey, nil)
 }
 
 func (s *state) GetSubnets() ([]*txs.Tx, error) {
@@ -1939,14 +1854,9 @@ func (s *state) GetStatelessBlock(blockID ids.ID) (block.Block, error) {
 		return nil, err
 	}
 
-	blk, status, _, err := parseStoredBlock(blkBytes)
+	blk, err := block.Parse(block.GenesisCodec, blkBytes)
 	if err != nil {
 		return nil, err
-	}
-
-	if status != choices.Accepted {
-		s.blockCache.Put(blockID, nil)
-		return nil, database.ErrNotFound
 	}
 
 	s.blockCache.Put(blockID, blk)
@@ -2449,188 +2359,4 @@ func (s *state) writeMetadata() error {
 	}
 
 	return nil
-}
-
-// Returns the block, status of the block, and whether it is a [stateBlk].
-// Invariant: blkBytes is safe to parse with blocks.GenesisCodec
-//
-// TODO: Remove after v1.11.x is activated
-func parseStoredBlock(blkBytes []byte) (block.Block, choices.Status, bool, error) {
-	// Attempt to parse as blocks.Block
-	blk, err := block.Parse(block.GenesisCodec, blkBytes)
-	if err == nil {
-		return blk, choices.Accepted, false, nil
-	}
-
-	// Fallback to [stateBlk]
-	blkState := stateBlk{}
-	if _, err := block.GenesisCodec.Unmarshal(blkBytes, &blkState); err != nil {
-		return nil, choices.Processing, false, err
-	}
-
-	blkState.Blk, err = block.Parse(block.GenesisCodec, blkState.Bytes)
-	if err != nil {
-		return nil, choices.Processing, false, err
-	}
-
-	return blkState.Blk, blkState.Status, true, nil
-}
-
-func (s *state) PruneAndIndex(lock sync.Locker, log logging.Logger) error {
-	lock.Lock()
-	// It is possible that new blocks are added after grabbing this iterator. New
-	// blocks are guaranteed to be accepted and height-indexed, so we don't need to
-	// check them.
-	blockIterator := s.blockDB.NewIterator()
-	// Releasing is done using a closure to ensure that updating blockIterator will
-	// result in having the most recent iterator released when executing the
-	// deferred function.
-	defer func() {
-		blockIterator.Release()
-	}()
-
-	// While we are pruning the disk, we disable caching of the data we are
-	// modifying. Caching is re-enabled when pruning finishes.
-	//
-	// Note: If an unexpected error occurs the caches are never re-enabled.
-	// That's fine as the node is going to be in an unhealthy state regardless.
-	oldBlockIDCache := s.blockIDCache
-	s.blockIDCache = &cache.Empty[uint64, ids.ID]{}
-	lock.Unlock()
-
-	log.Info("starting state pruning and indexing")
-
-	var (
-		startTime  = time.Now()
-		lastCommit = startTime
-		lastUpdate = startTime
-		numPruned  = 0
-		numIndexed = 0
-	)
-
-	for blockIterator.Next() {
-		blkBytes := blockIterator.Value()
-
-		blk, status, isStateBlk, err := parseStoredBlock(blkBytes)
-		if err != nil {
-			return err
-		}
-
-		if status != choices.Accepted {
-			// Remove non-accepted blocks from disk.
-			if err := s.blockDB.Delete(blockIterator.Key()); err != nil {
-				return fmt.Errorf("failed to delete block: %w", err)
-			}
-
-			numPruned++
-
-			// We don't index the height of non-accepted blocks.
-			continue
-		}
-
-		blkHeight := blk.Height()
-		blkID := blk.ID()
-
-		// Populate the map of height -> blockID.
-		heightKey := database.PackUInt64(blkHeight)
-		if err := database.PutID(s.blockIDDB, heightKey, blkID); err != nil {
-			return fmt.Errorf("failed to add blockID: %w", err)
-		}
-
-		// Since we only store accepted blocks on disk, we only need to store a map of
-		// ids.ID to Block.
-		if isStateBlk {
-			if err := s.blockDB.Put(blkID[:], blkBytes); err != nil {
-				return fmt.Errorf("failed to write block: %w", err)
-			}
-		}
-
-		numIndexed++
-
-		if numIndexed%pruneCommitLimit == 0 {
-			// We must hold the lock during committing to make sure we don't
-			// attempt to commit to disk while a block is concurrently being
-			// accepted.
-			lock.Lock()
-			err := utils.Err(
-				s.Commit(),
-				blockIterator.Error(),
-			)
-			lock.Unlock()
-			if err != nil {
-				return err
-			}
-
-			// We release the iterator here to allow the underlying database to
-			// clean up deleted state.
-			blockIterator.Release()
-
-			now := time.Now()
-			if now.Sub(lastUpdate) > pruneUpdateFrequency {
-				lastUpdate = now
-
-				progress := timer.ProgressFromHash(blkID[:])
-				eta := timer.EstimateETA(
-					startTime,
-					progress,
-					math.MaxUint64,
-				)
-
-				log.Info("committing state pruning and indexing",
-					zap.Int("numPruned", numPruned),
-					zap.Int("numIndexed", numIndexed),
-					zap.Duration("eta", eta),
-				)
-			}
-
-			// We take the minimum here because it's possible that the node is
-			// currently bootstrapping. This would mean that grabbing the lock
-			// could take an extremely long period of time; which we should not
-			// delay processing for.
-			pruneDuration := now.Sub(lastCommit)
-			sleepDuration := min(
-				pruneCommitSleepMultiplier*pruneDuration,
-				pruneCommitSleepCap,
-			)
-			time.Sleep(sleepDuration)
-
-			// Make sure not to include the sleep duration into the next prune
-			// duration.
-			lastCommit = time.Now()
-
-			blockIterator = s.blockDB.NewIteratorWithStart(blkID[:])
-		}
-	}
-
-	// Ensure we fully iterated over all blocks before writing that pruning has
-	// finished.
-	//
-	// Note: This is needed because a transient read error could cause the
-	// iterator to stop early.
-	if err := blockIterator.Error(); err != nil {
-		return err
-	}
-
-	if err := s.donePrune(); err != nil {
-		return err
-	}
-
-	// We must hold the lock during committing to make sure we don't
-	// attempt to commit to disk while a block is concurrently being
-	// accepted.
-	lock.Lock()
-	defer lock.Unlock()
-
-	// Make sure we flush the original cache before re-enabling it to prevent
-	// surfacing any stale data.
-	oldBlockIDCache.Flush()
-	s.blockIDCache = oldBlockIDCache
-
-	log.Info("finished state pruning and indexing",
-		zap.Int("numPruned", numPruned),
-		zap.Int("numIndexed", numIndexed),
-		zap.Duration("duration", time.Since(startTime)),
-	)
-
-	return s.Commit()
 }
