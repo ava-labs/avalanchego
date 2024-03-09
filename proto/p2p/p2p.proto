@@ -8,16 +8,12 @@ option go_package = "github.com/ava-labs/avalanchego/proto/pb/p2p";
 // Represents peer-to-peer messages.
 // Only one type can be non-null.
 message Message {
+  reserved 1; // Until E upgrade is activated.
   reserved 36; // Next unused field number.
   // NOTES
   // Use "oneof" for each message type and set rest to null if not used.
   // That is because when the compression is enabled, we don't want to include uncompressed fields.
   oneof message {
-    // Gzip-compressed bytes of a "p2p.Message" whose "oneof" "message" field is
-    // NOT compressed_* BUT one of the message types (e.g. ping, pong, etc.).
-    // This field is only set if the message type supports compression.
-    bytes compressed_gzip = 1;
-
     // zstd-compressed bytes of a "p2p.Message" whose "oneof" "message" field is
     // NOT compressed_* BUT one of the message types (e.g. ping, pong, etc.).
     // This field is only set if the message type supports compression.
