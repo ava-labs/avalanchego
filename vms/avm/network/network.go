@@ -180,10 +180,6 @@ func (n *Network) PullGossip(ctx context.Context) {
 	gossip.Every(ctx, n.log, n.txPullGossiper, n.txPullGossipFrequency)
 }
 
-func (n *Network) AppGossip(ctx context.Context, nodeID ids.NodeID, msgBytes []byte) error {
-	return n.Network.AppGossip(ctx, nodeID, msgBytes)
-}
-
 // IssueTxFromRPC attempts to add a tx to the mempool, after verifying it. If
 // the tx is added to the mempool, it will attempt to push gossip the tx to
 // random peers in the network.
