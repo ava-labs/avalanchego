@@ -14,8 +14,8 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/avm/block/executor"
@@ -210,10 +210,12 @@ func TestNetworkAppGossip(t *testing.T) {
 				txVerifierFunc = tt.txVerifierFunc
 			}
 
+			snowCtx := snowtest.Context(t, ids.Empty)
 			n, err := New(
-				&snow.Context{
-					Log: logging.NoLog{},
-				},
+				logging.NoLog{},
+				ids.EmptyNodeID,
+				ids.Empty,
+				snowCtx.ValidatorState,
 				parser,
 				txVerifierFunc(ctrl),
 				mempoolFunc(ctrl),
@@ -352,15 +354,15 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 			}
 
 			n, err := New(
-				&snow.Context{
-					Log: logging.NoLog{},
-					ValidatorState: &validators.TestState{
-						GetCurrentHeightF: func(context.Context) (uint64, error) {
-							return 0, nil
-						},
-						GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
-							return nil, nil
-						},
+				logging.NoLog{},
+				ids.EmptyNodeID,
+				ids.Empty,
+				&validators.TestState{
+					GetCurrentHeightF: func(context.Context) (uint64, error) {
+						return 0, nil
+					},
+					GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+						return nil, nil
 					},
 				},
 				parser,
@@ -447,15 +449,15 @@ func TestNetworkIssueTxFromRPCWithoutVerification(t *testing.T) {
 			}
 
 			n, err := New(
-				&snow.Context{
-					Log: logging.NoLog{},
-					ValidatorState: &validators.TestState{
-						GetCurrentHeightF: func(context.Context) (uint64, error) {
-							return 0, nil
-						},
-						GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
-							return nil, nil
-						},
+				logging.NoLog{},
+				ids.EmptyNodeID,
+				ids.Empty,
+				&validators.TestState{
+					GetCurrentHeightF: func(context.Context) (uint64, error) {
+						return 0, nil
+					},
+					GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+						return nil, nil
 					},
 				},
 				parser,
