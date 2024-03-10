@@ -62,7 +62,8 @@ type DynamicFeesConfig struct {
 	MinUnitFees commonfees.Dimensions
 
 	// UpdateCoefficient contains, per each fee dimension, the
-	// exponential update coefficient
+	// exponential update coefficient. Setting an entry to 0 makes
+	// the corresponding fee rate constant.
 	UpdateCoefficient commonfees.Dimensions
 
 	// BlockUnitsCap contains, per each fee dimension, the

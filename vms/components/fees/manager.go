@@ -160,7 +160,7 @@ func computeNextPriceWindow(
 	}
 
 	nextRawRate := math.Round(float64(currentUnitFee) * math.Exp(exponent))
-	if nextRawRate > math.MaxUint64 {
+	if nextRawRate >= math.MaxUint64 {
 		return math.MaxUint64, newRollupWindow
 	}
 
