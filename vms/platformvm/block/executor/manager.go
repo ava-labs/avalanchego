@@ -153,16 +153,21 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 	}
 
 	var (
-		feesCfg          = m.txExecutorBackend.Config.GetDynamicFeesConfig(stateDiff.GetTimestamp())
-		parentFeeManager = fees.NewManager(unitFees, unitWindows)
+		chainTime     = stateDiff.GetTimestamp()
+		isEForkActive = m.txExecutorBackend.Config.IsEUpgradeActivated(chainTime)
+		feesCfg       = m.txExecutorBackend.Config.GetDynamicFeesConfig(chainTime)
 	)
-	feeManager := parentFeeManager.ComputeNext(
-		stateDiff.GetTimestamp().Unix(),
-		nextBlkTime.Unix(),
-		feesCfg.BlockUnitsTarget,
-		feesCfg.UpdateCoefficient,
-		feesCfg.MinUnitFees,
-	)
+
+	feeManager := fees.NewManager(unitFees, unitWindows)
+	if isEForkActive {
+		feeManager = feeManager.ComputeNext(
+			chainTime.Unix(),
+			nextBlkTime.Unix(),
+			feesCfg.BlockUnitsTarget,
+			feesCfg.UpdateCoefficient,
+			feesCfg.MinUnitFees,
+		)
+	}
 
 	return tx.Unsigned.Visit(&executor.StandardTxExecutor{
 		Backend:       m.txExecutorBackend,

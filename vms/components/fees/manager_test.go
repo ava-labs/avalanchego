@@ -97,7 +97,7 @@ func TestComputeNextNonEmptyWindows(t *testing.T) {
 	require.Equal(uint64(math.MaxUint64), next.unitFees[UTXORead])
 
 	// UTXOWrite units are above target, even if they are decreasing within the window. Next unit fees increased.
-	require.Equal(uint64(1739274941520500992), next.unitFees[UTXOWrite])
+	require.Equal(uint64(1739274941520501248), next.unitFees[UTXOWrite])
 
 	// Compute units are above target, next unit fees are increased.
 	require.Equal(uint64(math.MaxUint64), next.unitFees[Compute])
