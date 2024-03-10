@@ -5,7 +5,6 @@ package config
 
 import (
 	"fmt"
-	"math"
 
 	"github.com/ava-labs/avalanchego/utils/units"
 
@@ -34,31 +33,18 @@ var (
 			3 * units.NanoAvax,
 			4 * units.NanoAvax,
 		},
-
 		MinUnitFees: commonfees.Dimensions{},
-
-		FeesChangeDenominator: commonfees.Dimensions{
-			1 * units.NanoAvax,
-			1 * units.NanoAvax,
-			1 * units.NanoAvax,
-			1 * units.NanoAvax,
-		},
-
-		BlockUnitsCap: commonfees.Dimensions{
-			math.MaxUint64,
-			math.MaxUint64,
-			math.MaxUint64,
-			math.MaxUint64,
-		},
-
-		BlockUnitsTarget: commonfees.Dimensions{
+		UpdateCoefficient: commonfees.Dimensions{
 			1,
 			1,
 			1,
 			1,
 		},
+		BlockUnitsCap:    commonfees.Max,
+		BlockUnitsTarget: commonfees.Dimensions{1, 1, 1, 1},
 	}
 
+	// TODO ABENEGIA: decide if and how to validate PreEUpgradeDynamicFeesConfig
 	PreEUpgradeDynamicFeesConfig = DynamicFeesConfig{
 		InitialUnitFees: commonfees.Empty,
 		BlockUnitsCap:   commonfees.Max,
@@ -75,9 +61,10 @@ type DynamicFeesConfig struct {
 	// minimal unit fees enforced by the dynamic fees algo.
 	MinUnitFees commonfees.Dimensions
 
-	// FeesChangeDenominator contains, per each fee dimension, the
-	// minimal unit fees change
-	FeesChangeDenominator commonfees.Dimensions
+	// UpdateCoefficient contains, per each fee dimension, the
+	// exponential update coefficient. Setting an entry to 0 makes
+	// the corresponding fee rate constant.
+	UpdateCoefficient commonfees.Dimensions
 
 	// BlockUnitsCap contains, per each fee dimension, the
 	// maximal complexity a valid P-chain block can host
@@ -97,10 +84,6 @@ func (c *DynamicFeesConfig) validate() error {
 				c.InitialUnitFees[i],
 				c.MinUnitFees[i],
 			)
-		}
-
-		if c.FeesChangeDenominator[i] == 0 {
-			return fmt.Errorf("dimension %d, fees change denominator set to zero", i)
 		}
 
 		if c.BlockUnitsTarget[i] > c.BlockUnitsCap[i] {

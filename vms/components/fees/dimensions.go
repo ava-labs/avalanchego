@@ -5,6 +5,7 @@ package fees
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"math"
 
@@ -17,12 +18,19 @@ const (
 	UTXOWrite Dimension = 2 // includes delete
 	Compute   Dimension = 3 // signatures checks, tx-specific
 
+	bandwidthString  string = "Bandwidth"
+	utxosReadString  string = "UTXOsRead"
+	utxosWriteString string = "UTXOsWrite"
+	computeString    string = "Compute"
+
 	FeeDimensions = 4
 
 	uint64Len = 8
 )
 
 var (
+	errUnknownDimension = errors.New("unknown dimension")
+
 	Empty = Dimensions{}
 	Max   = Dimensions{
 		math.MaxUint64,
@@ -30,12 +38,27 @@ var (
 		math.MaxUint64,
 		math.MaxUint64,
 	}
+
+	DimensionStrings = []string{
+		bandwidthString,
+		utxosReadString,
+		utxosWriteString,
+		computeString,
+	}
 )
 
 type (
 	Dimension  int
 	Dimensions [FeeDimensions]uint64
 )
+
+func (d Dimension) String() (string, error) {
+	if d < 0 || d >= FeeDimensions {
+		return "", errUnknownDimension
+	}
+
+	return DimensionStrings[d], nil
+}
 
 func Add(lhs, rhs Dimensions) (Dimensions, error) {
 	var res Dimensions
