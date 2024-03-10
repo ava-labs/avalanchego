@@ -137,13 +137,24 @@ func (b *Block) Verify(context.Context) error {
 	}
 	feeWindows, err := stateDiff.GetFeeWindows()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed retrieving fee windows: %w", err)
 	}
 
 	var (
-		feeCfg     = b.manager.backend.Config.GetDynamicFeesConfig(b.Timestamp())
-		feeManager = fees.NewManager(unitFees, feeWindows)
+		isEForkActive = b.manager.backend.Config.IsEUpgradeActivated(parentChainTime)
+		feesCfg       = b.manager.backend.Config.GetDynamicFeesConfig(parentChainTime)
 	)
+
+	feeManager := fees.NewManager(unitFees, feeWindows)
+	if isEForkActive {
+		feeManager = feeManager.ComputeNext(
+			parentChainTime.Unix(),
+			newChainTime.Unix(),
+			feesCfg.BlockUnitsTarget,
+			feesCfg.UpdateCoefficient,
+			feesCfg.MinUnitFees,
+		)
+	}
 
 	for _, tx := range txs {
 		// Verify that the tx is valid according to the current state of the
@@ -151,7 +162,7 @@ func (b *Block) Verify(context.Context) error {
 		err := tx.Unsigned.Visit(&executor.SemanticVerifier{
 			Backend:       b.manager.backend,
 			BlkFeeManager: feeManager,
-			UnitCaps:      feeCfg.BlockUnitsCap,
+			UnitCaps:      feesCfg.BlockUnitsCap,
 			State:         stateDiff,
 			Tx:            tx,
 		})

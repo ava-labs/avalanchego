@@ -5,6 +5,7 @@ package executor
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
@@ -156,6 +157,13 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 		return err
 	}
 
+	preferredID := m.Preferred()
+	preferred, err := m.GetStatelessBlock(preferredID)
+	if err != nil {
+		return err
+	}
+	nextBlkTime := NextBlockTime(preferred.Timestamp(), m.clk)
+
 	stateDiff, err := state.NewDiff(m.lastAccepted, m)
 	if err != nil {
 		return err
@@ -163,21 +171,34 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 
 	unitFees, err := stateDiff.GetUnitFees()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed retrieving unit fees: %w", err)
 	}
 	feeWindows, err := stateDiff.GetFeeWindows()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed retrieving fee windows: %w", err)
 	}
 
 	var (
-		feeCfg     = m.backend.Config.GetDynamicFeesConfig(m.state.GetTimestamp())
-		feeManager = fees.NewManager(unitFees, feeWindows)
+		chainTime     = stateDiff.GetTimestamp()
+		isEForkActive = m.backend.Config.IsEUpgradeActivated(chainTime)
+		feesCfg       = m.backend.Config.GetDynamicFeesConfig(chainTime)
 	)
+
+	feeManager := fees.NewManager(unitFees, feeWindows)
+	if isEForkActive {
+		feeManager = feeManager.ComputeNext(
+			chainTime.Unix(),
+			nextBlkTime.Unix(),
+			feesCfg.BlockUnitsTarget,
+			feesCfg.UpdateCoefficient,
+			feesCfg.MinUnitFees,
+		)
+	}
+
 	err = tx.Unsigned.Visit(&executor.SemanticVerifier{
 		Backend:       m.backend,
 		BlkFeeManager: feeManager,
-		UnitCaps:      feeCfg.BlockUnitsCap,
+		UnitCaps:      feesCfg.BlockUnitsCap,
 		State:         stateDiff,
 		Tx:            tx,
 	})

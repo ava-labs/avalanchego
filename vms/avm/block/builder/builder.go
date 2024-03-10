@@ -6,6 +6,7 @@ package builder
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -75,13 +76,10 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 	}
 
 	preferredHeight := preferred.Height()
-	preferredTimestamp := preferred.Timestamp()
-
 	nextHeight := preferredHeight + 1
-	nextTimestamp := b.clk.Time() // [timestamp] = max(now, parentTime)
-	if preferredTimestamp.After(nextTimestamp) {
-		nextTimestamp = preferredTimestamp
-	}
+
+	preferredTimestamp := preferred.Timestamp()
+	nextTimestamp := blockexecutor.NextBlockTime(preferredTimestamp, b.clk)
 
 	stateDiff, err := state.NewDiff(preferredID, b.manager)
 	if err != nil {
@@ -93,9 +91,31 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 		inputs        set.Set[ids.ID]
 		remainingSize = targetBlockSize
 
-		feeCfg     = b.backend.Config.GetDynamicFeesConfig(nextTimestamp)
-		feeManager = fees.NewManager(feeCfg.InitialUnitFees, fees.EmptyWindows)
+		chainTime     = stateDiff.GetTimestamp()
+		isEForkActive = b.backend.Config.IsEUpgradeActivated(chainTime)
+		feesCfg       = b.backend.Config.GetDynamicFeesConfig(chainTime)
 	)
+
+	unitFees, err := stateDiff.GetUnitFees()
+	if err != nil {
+		return nil, fmt.Errorf("failed retrieving unit fees: %w", err)
+	}
+	feeWindows, err := stateDiff.GetFeeWindows()
+	if err != nil {
+		return nil, fmt.Errorf("failed retrieving fee windows: %w", err)
+	}
+
+	feeManager := fees.NewManager(unitFees, feeWindows)
+	if isEForkActive {
+		feeManager = feeManager.ComputeNext(
+			chainTime.Unix(),
+			nextTimestamp.Unix(),
+			feesCfg.BlockUnitsTarget,
+			feesCfg.UpdateCoefficient,
+			feesCfg.MinUnitFees,
+		)
+	}
+
 	for {
 		tx, exists := b.mempool.Peek()
 		// Invariant: [mempool.MaxTxSize] < [targetBlockSize]. This guarantees
@@ -117,7 +137,7 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 		err = tx.Unsigned.Visit(&txexecutor.SemanticVerifier{
 			Backend:       b.backend,
 			BlkFeeManager: feeManager,
-			UnitCaps:      feeCfg.BlockUnitsCap,
+			UnitCaps:      feesCfg.BlockUnitsCap,
 			State:         txDiff,
 			Tx:            tx,
 		})

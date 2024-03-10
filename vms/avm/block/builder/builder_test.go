@@ -36,6 +36,7 @@ import (
 
 	blkexecutor "github.com/ava-labs/avalanchego/vms/avm/block/executor"
 	txexecutor "github.com/ava-labs/avalanchego/vms/avm/txs/executor"
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 const trackChecksums = false
@@ -122,11 +123,13 @@ func TestBuilderBuildBlock(t *testing.T) {
 				preferredState := state.NewMockChain(ctrl)
 				preferredState.EXPECT().GetLastAccepted().Return(preferredID)
 				preferredState.EXPECT().GetTimestamp().Return(preferredTimestamp)
+				preferredState.EXPECT().GetUnitFees().Return(commonfees.Empty, nil)
+				preferredState.EXPECT().GetFeeWindows().Return(commonfees.EmptyWindows, nil)
 
 				manager := blkexecutor.NewMockManager(ctrl)
 				manager.EXPECT().Preferred().Return(preferredID)
 				manager.EXPECT().GetStatelessBlock(preferredID).Return(preferredBlock, nil)
-				manager.EXPECT().GetState(preferredID).Return(preferredState, true)
+				manager.EXPECT().GetState(preferredID).Return(preferredState, true).AnyTimes()
 
 				unsignedTx := txs.NewMockUnsignedTx(ctrl)
 				unsignedTx.EXPECT().Visit(gomock.Any()).Return(errTest) // Fail semantic verification
@@ -169,11 +172,13 @@ func TestBuilderBuildBlock(t *testing.T) {
 				preferredState := state.NewMockChain(ctrl)
 				preferredState.EXPECT().GetLastAccepted().Return(preferredID)
 				preferredState.EXPECT().GetTimestamp().Return(preferredTimestamp)
+				preferredState.EXPECT().GetUnitFees().Return(commonfees.Empty, nil)
+				preferredState.EXPECT().GetFeeWindows().Return(commonfees.EmptyWindows, nil)
 
 				manager := blkexecutor.NewMockManager(ctrl)
 				manager.EXPECT().Preferred().Return(preferredID)
 				manager.EXPECT().GetStatelessBlock(preferredID).Return(preferredBlock, nil)
-				manager.EXPECT().GetState(preferredID).Return(preferredState, true)
+				manager.EXPECT().GetState(preferredID).Return(preferredState, true).AnyTimes()
 
 				unsignedTx := txs.NewMockUnsignedTx(ctrl)
 				unsignedTx.EXPECT().Visit(gomock.Any()).Return(nil)     // Pass semantic verification
@@ -217,11 +222,13 @@ func TestBuilderBuildBlock(t *testing.T) {
 				preferredState := state.NewMockChain(ctrl)
 				preferredState.EXPECT().GetLastAccepted().Return(preferredID)
 				preferredState.EXPECT().GetTimestamp().Return(preferredTimestamp)
+				preferredState.EXPECT().GetUnitFees().Return(commonfees.Empty, nil)
+				preferredState.EXPECT().GetFeeWindows().Return(commonfees.EmptyWindows, nil)
 
 				manager := blkexecutor.NewMockManager(ctrl)
 				manager.EXPECT().Preferred().Return(preferredID)
 				manager.EXPECT().GetStatelessBlock(preferredID).Return(preferredBlock, nil)
-				manager.EXPECT().GetState(preferredID).Return(preferredState, true)
+				manager.EXPECT().GetState(preferredID).Return(preferredState, true).AnyTimes()
 				manager.EXPECT().VerifyUniqueInputs(preferredID, gomock.Any()).Return(errTest)
 
 				unsignedTx := txs.NewMockUnsignedTx(ctrl)
@@ -266,6 +273,8 @@ func TestBuilderBuildBlock(t *testing.T) {
 				preferredState := state.NewMockChain(ctrl)
 				preferredState.EXPECT().GetLastAccepted().Return(preferredID)
 				preferredState.EXPECT().GetTimestamp().Return(preferredTimestamp)
+				preferredState.EXPECT().GetUnitFees().Return(commonfees.Empty, nil)
+				preferredState.EXPECT().GetFeeWindows().Return(commonfees.EmptyWindows, nil)
 
 				// tx1 and tx2 both consume [inputID].
 				// tx1 is added to the block first, so tx2 should be dropped.
@@ -302,7 +311,7 @@ func TestBuilderBuildBlock(t *testing.T) {
 				manager := blkexecutor.NewMockManager(ctrl)
 				manager.EXPECT().Preferred().Return(preferredID)
 				manager.EXPECT().GetStatelessBlock(preferredID).Return(preferredBlock, nil)
-				manager.EXPECT().GetState(preferredID).Return(preferredState, true)
+				manager.EXPECT().GetState(preferredID).Return(preferredState, true).AnyTimes()
 				manager.EXPECT().VerifyUniqueInputs(preferredID, gomock.Any()).Return(nil)
 				// Assert created block has one tx, tx1,
 				// and other fields are set correctly.
@@ -367,11 +376,13 @@ func TestBuilderBuildBlock(t *testing.T) {
 				preferredState := state.NewMockChain(ctrl)
 				preferredState.EXPECT().GetLastAccepted().Return(preferredID)
 				preferredState.EXPECT().GetTimestamp().Return(preferredTimestamp)
+				preferredState.EXPECT().GetUnitFees().Return(commonfees.Empty, nil)
+				preferredState.EXPECT().GetFeeWindows().Return(commonfees.EmptyWindows, nil)
 
 				manager := blkexecutor.NewMockManager(ctrl)
 				manager.EXPECT().Preferred().Return(preferredID)
 				manager.EXPECT().GetStatelessBlock(preferredID).Return(preferredBlock, nil)
-				manager.EXPECT().GetState(preferredID).Return(preferredState, true)
+				manager.EXPECT().GetState(preferredID).Return(preferredState, true).AnyTimes()
 				manager.EXPECT().VerifyUniqueInputs(preferredID, gomock.Any()).Return(nil)
 				// Assert that the created block has the right timestamp
 				manager.EXPECT().NewBlock(gomock.Any()).DoAndReturn(
@@ -444,11 +455,13 @@ func TestBuilderBuildBlock(t *testing.T) {
 				preferredState := state.NewMockChain(ctrl)
 				preferredState.EXPECT().GetLastAccepted().Return(preferredID)
 				preferredState.EXPECT().GetTimestamp().Return(preferredTimestamp)
+				preferredState.EXPECT().GetUnitFees().Return(commonfees.Empty, nil)
+				preferredState.EXPECT().GetFeeWindows().Return(commonfees.EmptyWindows, nil)
 
 				manager := blkexecutor.NewMockManager(ctrl)
 				manager.EXPECT().Preferred().Return(preferredID)
 				manager.EXPECT().GetStatelessBlock(preferredID).Return(preferredBlock, nil)
-				manager.EXPECT().GetState(preferredID).Return(preferredState, true)
+				manager.EXPECT().GetState(preferredID).Return(preferredState, true).AnyTimes()
 				manager.EXPECT().VerifyUniqueInputs(preferredID, gomock.Any()).Return(nil)
 				// Assert that the created block has the right timestamp
 				manager.EXPECT().NewBlock(gomock.Any()).DoAndReturn(

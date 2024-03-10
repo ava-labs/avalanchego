@@ -901,24 +901,33 @@ func TestBlockReject(t *testing.T) {
 				mempool.EXPECT().RequestBuildBlock()
 
 				lastAcceptedID := ids.GenerateTestID()
+				lastAcceptedMockBlock := block.NewMockBlock(ctrl)
+				lastAcceptedMockBlock.EXPECT().ID().Return(lastAcceptedID).AnyTimes()
+				lastAcceptedMockBlock.EXPECT().Timestamp().Return(time.Now().Truncate(time.Second)).AnyTimes()
+
 				mockState := state.NewMockState(ctrl)
 				mockState.EXPECT().GetLastAccepted().Return(lastAcceptedID).AnyTimes()
+				mockState.EXPECT().GetBlock(lastAcceptedID).Return(lastAcceptedMockBlock, nil).AnyTimes()
 				mockState.EXPECT().GetTimestamp().Return(time.Now()).AnyTimes()
 				mockState.EXPECT().GetUnitFees().Return(commonfees.Empty, nil).AnyTimes()
 				mockState.EXPECT().GetFeeWindows().Return(commonfees.EmptyWindows, nil).AnyTimes()
 
-				return &Block{
-					Block: mockBlock,
-					manager: &manager{
-						lastAccepted: lastAcceptedID,
-						mempool:      mempool,
-						metrics:      metrics.NewMockMetrics(ctrl),
-						backend:      defaultTestBackend(true, nil),
-						state:        mockState,
-						blkIDToState: map[ids.ID]*blockState{
-							blockID: {},
-						},
+				manager := &manager{
+					lastAccepted: lastAcceptedID,
+					mempool:      mempool,
+					clk:          &mockable.Clock{},
+					metrics:      metrics.NewMockMetrics(ctrl),
+					backend:      defaultTestBackend(true, nil),
+					state:        mockState,
+					blkIDToState: map[ids.ID]*blockState{
+						blockID: {},
 					},
+				}
+				manager.SetPreference(lastAcceptedID)
+
+				return &Block{
+					Block:   mockBlock,
+					manager: manager,
 				}
 			},
 		},
@@ -956,24 +965,33 @@ func TestBlockReject(t *testing.T) {
 				mempool.EXPECT().RequestBuildBlock()
 
 				lastAcceptedID := ids.GenerateTestID()
+				lastAcceptedMockBlock := block.NewMockBlock(ctrl)
+				lastAcceptedMockBlock.EXPECT().ID().Return(lastAcceptedID).AnyTimes()
+				lastAcceptedMockBlock.EXPECT().Timestamp().Return(time.Now().Truncate(time.Second)).AnyTimes()
+
 				mockState := state.NewMockState(ctrl)
 				mockState.EXPECT().GetLastAccepted().Return(lastAcceptedID).AnyTimes()
+				mockState.EXPECT().GetBlock(lastAcceptedID).Return(lastAcceptedMockBlock, nil).AnyTimes()
 				mockState.EXPECT().GetTimestamp().Return(time.Now()).AnyTimes()
 				mockState.EXPECT().GetUnitFees().Return(commonfees.Empty, nil).AnyTimes()
 				mockState.EXPECT().GetFeeWindows().Return(commonfees.EmptyWindows, nil).AnyTimes()
 
-				return &Block{
-					Block: mockBlock,
-					manager: &manager{
-						lastAccepted: lastAcceptedID,
-						mempool:      mempool,
-						metrics:      metrics.NewMockMetrics(ctrl),
-						backend:      defaultTestBackend(true, nil),
-						state:        mockState,
-						blkIDToState: map[ids.ID]*blockState{
-							blockID: {},
-						},
+				manager := &manager{
+					lastAccepted: lastAcceptedID,
+					mempool:      mempool,
+					clk:          &mockable.Clock{},
+					metrics:      metrics.NewMockMetrics(ctrl),
+					backend:      defaultTestBackend(true, nil),
+					state:        mockState,
+					blkIDToState: map[ids.ID]*blockState{
+						blockID: {},
 					},
+				}
+				manager.SetPreference(lastAcceptedID)
+
+				return &Block{
+					Block:   mockBlock,
+					manager: manager,
 				}
 			},
 		},
