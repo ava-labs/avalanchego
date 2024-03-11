@@ -364,7 +364,7 @@ func (fvi *fxVMInt) Logger() logging.Logger {
 
 func defaultFx(clk *mockable.Clock, log logging.Logger, isBootstrapped bool) fx.Fx {
 	fxVMInt := &fxVMInt{
-		registry: linearcodec.NewDefault(time.Time{}),
+		registry: linearcodec.NewDefault(),
 		clk:      clk,
 		log:      log,
 	}
