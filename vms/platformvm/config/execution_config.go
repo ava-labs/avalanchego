@@ -38,6 +38,8 @@ type ExecutionConfig struct {
 	FxOwnerCacheSize             int            `json:"fx-owner-cache-size"`
 	ChecksumsEnabled             bool           `json:"checksums-enabled"`
 	MempoolPruneFrequency        time.Duration  `json:"mempool-prune-frequency"`
+
+	DynamicFeesConfig *DynamicFeesConfig `json:"dynamic-fees-config"`
 }
 
 // GetExecutionConfig returns an ExecutionConfig

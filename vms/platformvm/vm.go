@@ -113,7 +113,11 @@ func (vm *VM) Initialize(
 	if err != nil {
 		return err
 	}
-	chainCtx.Log.Info("using VM execution config", zap.Reflect("config", execConfig))
+	chainCtx.Log.Info("retrieved VM execution config", zap.Reflect("config", execConfig))
+
+	if err := config.ResetDynamicFeesConfig(chainCtx, execConfig.DynamicFeesConfig); err != nil {
+		return fmt.Errorf("failed resetting dynamic fees config: %w", err)
+	}
 
 	registerer := prometheus.NewRegistry()
 	if err := chainCtx.Metrics.Register(registerer); err != nil {
