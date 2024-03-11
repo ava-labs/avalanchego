@@ -338,10 +338,9 @@ func TestMessage(t *testing.T) {
 			msg: &p2p.Message{
 				Message: &p2p.Message_GetAcceptedFrontier{
 					GetAcceptedFrontier: &p2p.GetAcceptedFrontier{
-						ChainId:    testID[:],
-						RequestId:  1,
-						Deadline:   1,
-						EngineType: p2p.EngineType_ENGINE_TYPE_AVALANCHE,
+						ChainId:   testID[:],
+						RequestId: 1,
+						Deadline:  1,
 					},
 				},
 			},
@@ -375,7 +374,6 @@ func TestMessage(t *testing.T) {
 						RequestId:    1,
 						Deadline:     1,
 						ContainerIds: [][]byte{testID[:], testID[:]},
-						EngineType:   p2p.EngineType_ENGINE_TYPE_AVALANCHE,
 					},
 				},
 			},
@@ -459,7 +457,6 @@ func TestMessage(t *testing.T) {
 						RequestId:   1,
 						Deadline:    1,
 						ContainerId: testID[:],
-						EngineType:  p2p.EngineType_ENGINE_TYPE_AVALANCHE,
 					},
 				},
 			},
@@ -473,10 +470,9 @@ func TestMessage(t *testing.T) {
 			msg: &p2p.Message{
 				Message: &p2p.Message_Put{
 					Put: &p2p.Put{
-						ChainId:    testID[:],
-						RequestId:  1,
-						Container:  []byte{0},
-						EngineType: p2p.EngineType_ENGINE_TYPE_AVALANCHE,
+						ChainId:   testID[:],
+						RequestId: 1,
+						Container: []byte{0},
 					},
 				},
 			},
@@ -490,10 +486,9 @@ func TestMessage(t *testing.T) {
 			msg: &p2p.Message{
 				Message: &p2p.Message_Put{
 					Put: &p2p.Put{
-						ChainId:    testID[:],
-						RequestId:  1,
-						Container:  compressibleContainers[0],
-						EngineType: p2p.EngineType_ENGINE_TYPE_AVALANCHE,
+						ChainId:   testID[:],
+						RequestId: 1,
+						Container: compressibleContainers[0],
 					},
 				},
 			},
@@ -507,11 +502,10 @@ func TestMessage(t *testing.T) {
 			msg: &p2p.Message{
 				Message: &p2p.Message_PushQuery{
 					PushQuery: &p2p.PushQuery{
-						ChainId:    testID[:],
-						RequestId:  1,
-						Deadline:   1,
-						Container:  []byte{0},
-						EngineType: p2p.EngineType_ENGINE_TYPE_AVALANCHE,
+						ChainId:   testID[:],
+						RequestId: 1,
+						Deadline:  1,
+						Container: []byte{0},
 					},
 				},
 			},
@@ -525,11 +519,10 @@ func TestMessage(t *testing.T) {
 			msg: &p2p.Message{
 				Message: &p2p.Message_PushQuery{
 					PushQuery: &p2p.PushQuery{
-						ChainId:    testID[:],
-						RequestId:  1,
-						Deadline:   1,
-						Container:  compressibleContainers[0],
-						EngineType: p2p.EngineType_ENGINE_TYPE_AVALANCHE,
+						ChainId:   testID[:],
+						RequestId: 1,
+						Deadline:  1,
+						Container: compressibleContainers[0],
 					},
 				},
 			},
@@ -547,7 +540,6 @@ func TestMessage(t *testing.T) {
 						RequestId:   1,
 						Deadline:    1,
 						ContainerId: testID[:],
-						EngineType:  p2p.EngineType_ENGINE_TYPE_AVALANCHE,
 					},
 				},
 			},
