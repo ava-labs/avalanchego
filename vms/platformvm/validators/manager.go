@@ -5,6 +5,7 @@ package validators
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -29,7 +30,11 @@ const (
 	recentlyAcceptedWindowTTL     = 2 * time.Minute
 )
 
-var _ validators.State = (*manager)(nil)
+var (
+	_ validators.State = (*manager)(nil)
+
+	errUnfinalizedHeight = errors.New("failed to fetch validator set at unfinalized height")
+)
 
 // Manager adds the ability to introduce newly accepted blocks IDs to the State
 // interface.
@@ -246,10 +251,11 @@ func (m *manager) makePrimaryNetworkValidatorSet(
 		return nil, 0, err
 	}
 	if currentHeight < targetHeight {
-		return nil, 0, fmt.Errorf("failed to fetch validator set (requested P-Chain Height: %d, SubnetID: %s, current P-chain Height: %d)",
-			targetHeight,
+		return nil, 0, fmt.Errorf("%w with SubnetID = %s: current P-chain height (%d) < requested P-Chain height (%d)",
+			errUnfinalizedHeight,
 			constants.PrimaryNetworkID,
 			currentHeight,
+			targetHeight,
 		)
 	}
 
@@ -298,10 +304,11 @@ func (m *manager) makeSubnetValidatorSet(
 		return nil, 0, err
 	}
 	if currentHeight < targetHeight {
-		return nil, 0, fmt.Errorf("failed to fetch validator set (requested P-Chain Height: %d, SubnetID: %s, current P-chain Height: %d)",
-			targetHeight,
+		return nil, 0, fmt.Errorf("%w with SubnetID = %s: current P-chain height (%d) < requested P-Chain height (%d)",
+			errUnfinalizedHeight,
 			subnetID,
 			currentHeight,
+			targetHeight,
 		)
 	}
 
