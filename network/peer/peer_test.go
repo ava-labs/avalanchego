@@ -29,7 +29,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/math/meter"
 	"github.com/ava-labs/avalanchego/utils/resource"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/version"
 )
 
@@ -69,11 +68,13 @@ func makeRawTestPeers(t *testing.T, trackedSubnets set.Set[ids.ID]) (*rawTestPee
 
 	tlsCert0, err := staking.NewTLSCert()
 	require.NoError(err)
-	cert0 := staking.CertificateFromX509(tlsCert0.Leaf)
+	cert0, err := staking.ParseCertificate(tlsCert0.Leaf.Raw)
+	require.NoError(err)
 
 	tlsCert1, err := staking.NewTLSCert()
 	require.NoError(err)
-	cert1 := staking.CertificateFromX509(tlsCert1.Leaf)
+	cert1, err := staking.ParseCertificate(tlsCert1.Leaf.Raw)
+	require.NoError(err)
 
 	nodeID0 := ids.NodeIDFromCert(cert0)
 	nodeID1 := ids.NodeIDFromCert(cert1)
@@ -257,7 +258,7 @@ func TestSend(t *testing.T) {
 	peer0, peer1 := makeReadyTestPeers(t, set.Set[ids.ID]{})
 	mc := newMessageCreator(t)
 
-	outboundGetMsg, err := mc.Get(ids.Empty, 1, time.Second, ids.Empty, p2p.EngineType_ENGINE_TYPE_SNOWMAN)
+	outboundGetMsg, err := mc.Get(ids.Empty, 1, time.Second, ids.Empty)
 	require.NoError(err)
 
 	require.True(peer0.Send(context.Background(), outboundGetMsg))
@@ -591,14 +592,9 @@ func TestShouldDisconnect(t *testing.T) {
 			expectedShouldDisconnect: false,
 		},
 		{
-			name: "past durango without a signature",
+			name: "peer without signature",
 			initialPeer: &peer{
 				Config: &Config{
-					Clock: func() mockable.Clock {
-						clk := mockable.Clock{}
-						clk.Set(mockable.MaxTime)
-						return clk
-					}(),
 					Log:                  logging.NoLog{},
 					VersionCompatibility: version.GetCompatibility(constants.UnitTestID),
 					Validators: func() validators.Manager {
@@ -619,11 +615,6 @@ func TestShouldDisconnect(t *testing.T) {
 			},
 			expectedPeer: &peer{
 				Config: &Config{
-					Clock: func() mockable.Clock {
-						clk := mockable.Clock{}
-						clk.Set(mockable.MaxTime)
-						return clk
-					}(),
 					Log:                  logging.NoLog{},
 					VersionCompatibility: version.GetCompatibility(constants.UnitTestID),
 					Validators: func() validators.Manager {
@@ -645,68 +636,9 @@ func TestShouldDisconnect(t *testing.T) {
 			expectedShouldDisconnect: true,
 		},
 		{
-			name: "pre durango without a signature",
+			name: "peer with invalid signature",
 			initialPeer: &peer{
 				Config: &Config{
-					Clock: func() mockable.Clock {
-						clk := mockable.Clock{}
-						clk.Set(time.Time{})
-						return clk
-					}(),
-					Log:                  logging.NoLog{},
-					VersionCompatibility: version.GetCompatibility(constants.UnitTestID),
-					Validators: func() validators.Manager {
-						vdrs := validators.NewManager()
-						require.NoError(t, vdrs.AddStaker(
-							constants.PrimaryNetworkID,
-							peerID,
-							bls.PublicFromSecretKey(blsKey),
-							txID,
-							1,
-						))
-						return vdrs
-					}(),
-				},
-				id:      peerID,
-				version: version.CurrentApp,
-				ip:      &SignedIP{},
-			},
-			expectedPeer: &peer{
-				Config: &Config{
-					Clock: func() mockable.Clock {
-						clk := mockable.Clock{}
-						clk.Set(time.Time{})
-						return clk
-					}(),
-					Log:                  logging.NoLog{},
-					VersionCompatibility: version.GetCompatibility(constants.UnitTestID),
-					Validators: func() validators.Manager {
-						vdrs := validators.NewManager()
-						require.NoError(t, vdrs.AddStaker(
-							constants.PrimaryNetworkID,
-							peerID,
-							bls.PublicFromSecretKey(blsKey),
-							txID,
-							1,
-						))
-						return vdrs
-					}(),
-				},
-				id:      peerID,
-				version: version.CurrentApp,
-				ip:      &SignedIP{},
-			},
-			expectedShouldDisconnect: false,
-		},
-		{
-			name: "pre durango with an invalid signature",
-			initialPeer: &peer{
-				Config: &Config{
-					Clock: func() mockable.Clock {
-						clk := mockable.Clock{}
-						clk.Set(time.Time{})
-						return clk
-					}(),
 					Log:                  logging.NoLog{},
 					VersionCompatibility: version.GetCompatibility(constants.UnitTestID),
 					Validators: func() validators.Manager {
@@ -729,11 +661,6 @@ func TestShouldDisconnect(t *testing.T) {
 			},
 			expectedPeer: &peer{
 				Config: &Config{
-					Clock: func() mockable.Clock {
-						clk := mockable.Clock{}
-						clk.Set(time.Time{})
-						return clk
-					}(),
 					Log:                  logging.NoLog{},
 					VersionCompatibility: version.GetCompatibility(constants.UnitTestID),
 					Validators: func() validators.Manager {
@@ -757,14 +684,9 @@ func TestShouldDisconnect(t *testing.T) {
 			expectedShouldDisconnect: true,
 		},
 		{
-			name: "pre durango with a valid signature",
+			name: "peer with valid signature",
 			initialPeer: &peer{
 				Config: &Config{
-					Clock: func() mockable.Clock {
-						clk := mockable.Clock{}
-						clk.Set(time.Time{})
-						return clk
-					}(),
 					Log:                  logging.NoLog{},
 					VersionCompatibility: version.GetCompatibility(constants.UnitTestID),
 					Validators: func() validators.Manager {
@@ -787,11 +709,6 @@ func TestShouldDisconnect(t *testing.T) {
 			},
 			expectedPeer: &peer{
 				Config: &Config{
-					Clock: func() mockable.Clock {
-						clk := mockable.Clock{}
-						clk.Set(time.Time{})
-						return clk
-					}(),
 					Log:                  logging.NoLog{},
 					VersionCompatibility: version.GetCompatibility(constants.UnitTestID),
 					Validators: func() validators.Manager {
@@ -834,7 +751,7 @@ func TestShouldDisconnect(t *testing.T) {
 func sendAndFlush(t *testing.T, sender *testPeer, receiver *testPeer) {
 	t.Helper()
 	mc := newMessageCreator(t)
-	outboundGetMsg, err := mc.Get(ids.Empty, 1, time.Second, ids.Empty, p2p.EngineType_ENGINE_TYPE_SNOWMAN)
+	outboundGetMsg, err := mc.Get(ids.Empty, 1, time.Second, ids.Empty)
 	require.NoError(t, err)
 	require.True(t, sender.Send(context.Background(), outboundGetMsg))
 	inboundGetMsg := <-receiver.inboundMsgChan

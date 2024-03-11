@@ -22,12 +22,11 @@ var (
 
 	ErrConflictingBlockTxs = errors.New("block contains conflicting transactions")
 
-	errApricotBlockIssuedAfterFork                = errors.New("apricot block issued after fork")
-	errBanffProposalBlockWithMultipleTransactions = errors.New("BanffProposalBlock contains multiple transactions")
-	errBanffStandardBlockWithoutChanges           = errors.New("BanffStandardBlock performs no state changes")
-	errIncorrectBlockHeight                       = errors.New("incorrect block height")
-	errChildBlockEarlierThanParent                = errors.New("proposed timestamp before current chain time")
-	errOptionBlockTimestampNotMatchingParent      = errors.New("option block proposed timestamp not matching parent block one")
+	errApricotBlockIssuedAfterFork           = errors.New("apricot block issued after fork")
+	errBanffStandardBlockWithoutChanges      = errors.New("BanffStandardBlock performs no state changes")
+	errIncorrectBlockHeight                  = errors.New("incorrect block height")
+	errChildBlockEarlierThanParent           = errors.New("proposed timestamp before current chain time")
+	errOptionBlockTimestampNotMatchingParent = errors.New("option block proposed timestamp not matching parent block one")
 )
 
 // verifier handles the logic for verifying a block.
@@ -51,11 +50,6 @@ func (v *verifier) BanffCommitBlock(b *block.BanffCommitBlock) error {
 }
 
 func (v *verifier) BanffProposalBlock(b *block.BanffProposalBlock) error {
-	nextChainTime := b.Timestamp()
-	if !v.txExecutorBackend.Config.IsDurangoActivated(nextChainTime) && len(b.Transactions) != 0 {
-		return errBanffProposalBlockWithMultipleTransactions
-	}
-
 	if err := v.banffNonOptionBlock(b); err != nil {
 		return err
 	}
@@ -67,6 +61,7 @@ func (v *verifier) BanffProposalBlock(b *block.BanffProposalBlock) error {
 	}
 
 	// Advance the time to [nextChainTime].
+	nextChainTime := b.Timestamp()
 	if _, err := executor.AdvanceTimeTo(v.txExecutorBackend, onDecisionState, nextChainTime); err != nil {
 		return err
 	}

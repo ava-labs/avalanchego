@@ -14,7 +14,6 @@ type Type byte
 
 const (
 	TypeNone Type = iota + 1
-	TypeGzip      // Remove once v1.11.x is out.
 	TypeZstd
 )
 
@@ -22,8 +21,6 @@ func (t Type) String() string {
 	switch t {
 	case TypeNone:
 		return "none"
-	case TypeGzip:
-		return "gzip"
 	case TypeZstd:
 		return "zstd"
 	default:
@@ -35,8 +32,6 @@ func TypeFromString(s string) (Type, error) {
 	switch s {
 	case TypeNone.String():
 		return TypeNone, nil
-	case TypeGzip.String():
-		return TypeGzip, nil
 	case TypeZstd.String():
 		return TypeZstd, nil
 	default:

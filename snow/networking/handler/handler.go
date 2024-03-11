@@ -716,9 +716,7 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 				zap.String("field", "PreferredIDAtHeight"),
 				zap.Error(err),
 			)
-			// TODO: Require this field to be populated correctly after v1.11.x
-			// is activated.
-			preferredIDAtHeight = preferredID
+			return engine.QueryFailed(ctx, nodeID, msg.RequestId)
 		}
 
 		acceptedID, err := ids.ToID(msg.AcceptedId)
