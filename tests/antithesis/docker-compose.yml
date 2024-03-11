@@ -5,7 +5,7 @@ networks:
       config:
       - { subnet: 10.0.20.0/24 }
 services:
-  #workload waits until cluster is up, issues 5 transactions, and the intializes the wallet. THEN we start fuzzing
+  # workload waits until cluster is up, issues 5 transactions, and the intializes the wallet. THEN we start fuzzing
   workload:
     container_name: workload
     entrypoint: [ "./antithesis-workload" ]
