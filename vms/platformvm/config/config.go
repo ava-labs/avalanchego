@@ -140,12 +140,12 @@ func (c *Config) IsDurangoActivated(timestamp time.Time) bool {
 	return !timestamp.Before(c.DurangoTime)
 }
 
-func (c *Config) IsEUpgradeActivated(timestamp time.Time) bool {
+func (c *Config) IsEActivated(timestamp time.Time) bool {
 	return !timestamp.Before(c.EUpgradeTime)
 }
 
 func (c *Config) GetDynamicFeesConfig(timestamp time.Time) DynamicFeesConfig {
-	if !c.IsEUpgradeActivated(timestamp) {
+	if !c.IsEActivated(timestamp) {
 		return PreEUpgradeDynamicFeesConfig
 	}
 

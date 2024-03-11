@@ -921,7 +921,7 @@ func TestTxFees(t *testing.T) {
 			uTx, sTx := tt.unsignedAndSignedTx(t)
 
 			fc := &Calculator{
-				IsEUpgradeActive: cfg.IsEUpgradeActivated(chainTime),
+				IsEUpgradeActive: cfg.IsEActivated(chainTime),
 				Config:           cfg,
 				ChainTime:        chainTime,
 				FeeManager:       fees.NewManager(testUnitFees),

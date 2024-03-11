@@ -269,7 +269,7 @@ func verifyAddSubnetValidatorTx(
 
 	// Verify the flowcheck
 	feeCalculator := fees.Calculator{
-		IsEUpgradeActive: backend.Config.IsEUpgradeActivated(currentTimestamp),
+		IsEUpgradeActive: backend.Config.IsEActivated(currentTimestamp),
 		Config:           backend.Config,
 		ChainTime:        currentTimestamp,
 		FeeManager:       feeManager,
@@ -358,7 +358,7 @@ func verifyRemoveSubnetValidatorTx(
 
 	// Verify the flowcheck
 	feeCalculator := fees.Calculator{
-		IsEUpgradeActive: backend.Config.IsEUpgradeActivated(currentTimestamp),
+		IsEUpgradeActive: backend.Config.IsEActivated(currentTimestamp),
 		Config:           backend.Config,
 		ChainTime:        currentTimestamp,
 		FeeManager:       feeManager,
@@ -617,7 +617,7 @@ func verifyAddPermissionlessValidatorTx(
 
 	// Verify the flowcheck
 	feeCalculator := fees.Calculator{
-		IsEUpgradeActive: backend.Config.IsEUpgradeActivated(currentTimestamp),
+		IsEUpgradeActive: backend.Config.IsEActivated(currentTimestamp),
 		Config:           backend.Config,
 		ChainTime:        currentTimestamp,
 		FeeManager:       feeManager,
@@ -773,7 +773,7 @@ func verifyAddPermissionlessDelegatorTx(
 
 	// Verify the flowcheck
 	feeCalculator := fees.Calculator{
-		IsEUpgradeActive: backend.Config.IsEUpgradeActivated(currentTimestamp),
+		IsEUpgradeActive: backend.Config.IsEActivated(currentTimestamp),
 		Config:           backend.Config,
 		ChainTime:        currentTimestamp,
 		FeeManager:       feeManager,
@@ -840,7 +840,7 @@ func verifyTransferSubnetOwnershipTx(
 	// Verify the flowcheck
 	currentTimestamp := chainState.GetTimestamp()
 	feeCalculator := fees.Calculator{
-		IsEUpgradeActive: backend.Config.IsEUpgradeActivated(currentTimestamp),
+		IsEUpgradeActive: backend.Config.IsEActivated(currentTimestamp),
 		Config:           backend.Config,
 		ChainTime:        currentTimestamp,
 		FeeManager:       feeManager,
