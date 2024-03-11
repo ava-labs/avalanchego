@@ -152,8 +152,8 @@ func computeNextPriceWindow(
 }
 
 func nextFeeRate(currentUnitFee, updateCoefficient, unitsConsumed, target uint64) uint64 {
-	// We approximate e^{k(u-t)/t} with 2^{k(u-t)/(t ln(2))}
-	// 1/ln(2) is approx. 1,442695
+	// We update the fee rate with the formula e^{k(u-t)/t} == 2^{1/ln(2) * k(u-t)/t}
+	// We approximate 1/ln(2) with 1,442695 and we round the exponent to a uint64
 
 	switch {
 	case unitsConsumed > target:

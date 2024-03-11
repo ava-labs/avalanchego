@@ -133,7 +133,9 @@ func TestBuilderBuildBlock(t *testing.T) {
 
 				unsignedTx := txs.NewMockUnsignedTx(ctrl)
 				unsignedTx.EXPECT().Visit(gomock.Any()).Return(errTest) // Fail semantic verification
+				unsignedTx.EXPECT().SetBytes(gomock.Any())              // needed for the SetBytes below
 				tx := &txs.Tx{Unsigned: unsignedTx}
+				tx.SetBytes([]byte{0x0, 0x1}, []byte{0xff, 0xff})
 
 				mempool := mempool.NewMockMempool(ctrl)
 				mempool.EXPECT().Peek().Return(tx, true)
@@ -182,8 +184,10 @@ func TestBuilderBuildBlock(t *testing.T) {
 
 				unsignedTx := txs.NewMockUnsignedTx(ctrl)
 				unsignedTx.EXPECT().Visit(gomock.Any()).Return(nil)     // Pass semantic verification
+				unsignedTx.EXPECT().SetBytes(gomock.Any())              // needed for the SetBytes below
 				unsignedTx.EXPECT().Visit(gomock.Any()).Return(errTest) // Fail execution
 				tx := &txs.Tx{Unsigned: unsignedTx}
+				tx.SetBytes([]byte{0x0, 0x1}, []byte{0xff, 0xff})
 
 				mempool := mempool.NewMockMempool(ctrl)
 				mempool.EXPECT().Peek().Return(tx, true)
@@ -234,7 +238,9 @@ func TestBuilderBuildBlock(t *testing.T) {
 				unsignedTx := txs.NewMockUnsignedTx(ctrl)
 				unsignedTx.EXPECT().Visit(gomock.Any()).Return(nil) // Pass semantic verification
 				unsignedTx.EXPECT().Visit(gomock.Any()).Return(nil) // Pass execution
+				unsignedTx.EXPECT().SetBytes(gomock.Any())          // needed for the SetBytes below
 				tx := &txs.Tx{Unsigned: unsignedTx}
+				tx.SetBytes([]byte{0x0, 0x1}, []byte{0xff, 0xff})
 
 				mempool := mempool.NewMockMempool(ctrl)
 				mempool.EXPECT().Peek().Return(tx, true)
@@ -394,6 +400,7 @@ func TestBuilderBuildBlock(t *testing.T) {
 
 				inputID := ids.GenerateTestID()
 				unsignedTx := txs.NewMockUnsignedTx(ctrl)
+				unsignedTx.EXPECT().SetBytes(gomock.Any())           // needed for the SetBytes below
 				unsignedTx.EXPECT().Visit(gomock.Any()).Return(nil)  // Pass semantic verification
 				unsignedTx.EXPECT().Visit(gomock.Any()).DoAndReturn( // Pass execution
 					func(visitor txs.Visitor) error {
@@ -405,6 +412,7 @@ func TestBuilderBuildBlock(t *testing.T) {
 				)
 				unsignedTx.EXPECT().SetBytes(gomock.Any()).AnyTimes()
 				tx := &txs.Tx{Unsigned: unsignedTx}
+				tx.SetBytes([]byte{0x0, 0x1}, []byte{0xff, 0xff})
 
 				mempool := mempool.NewMockMempool(ctrl)
 				mempool.EXPECT().Peek().Return(tx, true)
@@ -473,6 +481,7 @@ func TestBuilderBuildBlock(t *testing.T) {
 
 				inputID := ids.GenerateTestID()
 				unsignedTx := txs.NewMockUnsignedTx(ctrl)
+				unsignedTx.EXPECT().SetBytes(gomock.Any())           // needed for the SetBytes below
 				unsignedTx.EXPECT().Visit(gomock.Any()).Return(nil)  // Pass semantic verification
 				unsignedTx.EXPECT().Visit(gomock.Any()).DoAndReturn( // Pass execution
 					func(visitor txs.Visitor) error {
@@ -484,6 +493,7 @@ func TestBuilderBuildBlock(t *testing.T) {
 				)
 				unsignedTx.EXPECT().SetBytes(gomock.Any()).AnyTimes()
 				tx := &txs.Tx{Unsigned: unsignedTx}
+				tx.SetBytes([]byte{0x0, 0x1}, []byte{0xff, 0xff})
 
 				mempool := mempool.NewMockMempool(ctrl)
 				mempool.EXPECT().Peek().Return(tx, true)

@@ -118,11 +118,16 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 
 	for {
 		tx, exists := b.mempool.Peek()
-		// Invariant: [mempool.MaxTxSize] < [targetBlockSize]. This guarantees
-		// that we will only stop building a block once there are no
-		// transactions in the mempool or the block is at least
-		// [targetBlockSize - mempool.MaxTxSize] bytes full.
-		if !exists || len(tx.Bytes()) > remainingSize {
+		if !exists {
+			break
+		}
+		txSize := len(tx.Bytes())
+
+		// pre e upgrade is active, we fill blocks till a target size
+		// post e upgrade is active, we fill blocks till a target complexity
+		done := (!isEForkActive && txSize > remainingSize) ||
+			(isEForkActive && !fees.Compare(feeManager.GetCumulatedUnits(), feesCfg.BlockUnitsTarget))
+		if done {
 			break
 		}
 		b.mempool.Remove(tx)
@@ -177,7 +182,9 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 		txDiff.SetFeeWindows(feeManager.GetFeeWindows())
 		txDiff.Apply(stateDiff)
 
-		remainingSize -= len(tx.Bytes())
+		if isEForkActive {
+			remainingSize -= txSize
+		}
 		blockTxs = append(blockTxs, tx)
 	}
 
