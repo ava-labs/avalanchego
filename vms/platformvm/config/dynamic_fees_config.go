@@ -16,9 +16,9 @@ import (
 // I am setting them in a separate config object, but will access it via Config
 // so to have fork control over which dynamic fees is picked
 
-// EUpgradeDynamicFeesConfig to be tuned TODO ABENEGIA
+// eUpgradeDynamicFeesConfig to be tuned TODO ABENEGIA
 var (
-	EUpgradeDynamicFeesConfig = DynamicFeesConfig{
+	eUpgradeDynamicFeesConfig = DynamicFeesConfig{
 		UnitFees: commonfees.Dimensions{
 			1 * units.NanoAvax,
 			2 * units.NanoAvax,
@@ -29,11 +29,19 @@ var (
 		BlockUnitsCap: commonfees.Max,
 	}
 
-	PreEUpgradeDynamicFeesConfig = DynamicFeesConfig{
+	preEUpgradeDynamicFeesConfig = DynamicFeesConfig{
 		UnitFees:      commonfees.Empty,
 		BlockUnitsCap: commonfees.Max,
 	}
 )
+
+func GetDynamicFeesConfig(isEActive bool) DynamicFeesConfig {
+	if !isEActive {
+		return preEUpgradeDynamicFeesConfig
+	}
+
+	return eUpgradeDynamicFeesConfig
+}
 
 type DynamicFeesConfig struct {
 	// UnitFees contains, per each fee dimension, the

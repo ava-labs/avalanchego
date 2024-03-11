@@ -35,6 +35,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block/builder"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -354,7 +355,7 @@ func TestGetBalance(t *testing.T) {
 			// As such we need to account for the subnet creation fee
 			var (
 				chainTime = service.vm.state.GetTimestamp()
-				feeCfg    = service.vm.Config.GetDynamicFeesConfig(chainTime)
+				feeCfg    = config.GetDynamicFeesConfig(service.vm.Config.IsEActivated(chainTime))
 				feeMan    = commonfees.NewManager(feeCfg.UnitFees)
 				feeCalc   = &fees.Calculator{
 					IsEUpgradeActive: service.vm.IsEActivated(chainTime),

@@ -377,7 +377,7 @@ func TestGenesis(t *testing.T) {
 			// As such we need to account for the subnet creation fee
 			var (
 				chainTime = vm.state.GetTimestamp()
-				feeCfg    = vm.Config.GetDynamicFeesConfig(chainTime)
+				feeCfg    = config.GetDynamicFeesConfig(vm.Config.IsEActivated(chainTime))
 				feeMan    = commonfees.NewManager(feeCfg.UnitFees)
 				feeCalc   = &fees.Calculator{
 					IsEUpgradeActive: vm.IsEActivated(chainTime),
@@ -2271,7 +2271,7 @@ func TestBaseTx(t *testing.T) {
 
 	var (
 		chainTime = vm.state.GetTimestamp()
-		feeCfg    = vm.Config.GetDynamicFeesConfig(chainTime)
+		feeCfg    = config.GetDynamicFeesConfig(vm.Config.IsEActivated(chainTime))
 		feeMan    = commonfees.NewManager(feeCfg.UnitFees)
 		feeCalc   = &fees.Calculator{
 			IsEUpgradeActive: vm.IsEActivated(chainTime),

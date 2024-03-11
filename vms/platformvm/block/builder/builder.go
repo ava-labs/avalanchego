@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/fees"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -333,8 +334,9 @@ func packBlockTxs(
 	}
 
 	var (
-		feeCfg = backend.Config.GetDynamicFeesConfig(stateDiff.GetTimestamp())
-		feeMan = fees.NewManager(feeCfg.UnitFees)
+		isEActivated = backend.Config.IsEActivated(timestamp)
+		feeCfg       = config.GetDynamicFeesConfig(isEActivated)
+		feeMan       = fees.NewManager(feeCfg.UnitFees)
 
 		blockTxs []*txs.Tx
 		inputs   set.Set[ids.ID]

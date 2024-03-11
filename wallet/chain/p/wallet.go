@@ -754,13 +754,8 @@ func (w *wallet) refreshFork(options ...common.Option) error {
 	}
 
 	w.isEForkActive = !chainTime.Before(eForkTime)
-	if w.isEForkActive {
-		w.unitFees = config.EUpgradeDynamicFeesConfig.UnitFees
-		w.unitCaps = config.EUpgradeDynamicFeesConfig.BlockUnitsCap
-	} else {
-		w.unitFees = config.PreEUpgradeDynamicFeesConfig.UnitFees
-		w.unitCaps = config.PreEUpgradeDynamicFeesConfig.BlockUnitsCap
-	}
-
+	feeCfg := config.GetDynamicFeesConfig(w.isEForkActive)
+	w.unitFees = feeCfg.UnitFees
+	w.unitCaps = feeCfg.BlockUnitsCap
 	return nil
 }
