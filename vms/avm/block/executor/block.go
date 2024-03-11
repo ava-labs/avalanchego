@@ -141,7 +141,7 @@ func (b *Block) Verify(context.Context) error {
 	}
 
 	var (
-		isEForkActive = b.manager.backend.Config.IsEUpgradeActivated(parentChainTime)
+		isEForkActive = b.manager.backend.Config.IsEUActivated(parentChainTime)
 		feesCfg       = b.manager.backend.Config.GetDynamicFeesConfig(parentChainTime)
 	)
 

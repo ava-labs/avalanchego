@@ -92,7 +92,7 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 		remainingSize = targetBlockSize
 
 		chainTime     = stateDiff.GetTimestamp()
-		isEForkActive = b.backend.Config.IsEUpgradeActivated(chainTime)
+		isEForkActive = b.backend.Config.IsEUActivated(chainTime)
 		feesCfg       = b.backend.Config.GetDynamicFeesConfig(chainTime)
 	)
 
