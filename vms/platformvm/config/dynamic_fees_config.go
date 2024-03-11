@@ -19,14 +19,14 @@ import (
 // so to have fork control over which dynamic fees is picked
 
 func init() {
-	if err := EUpgradeDynamicFeesConfig.validate(); err != nil {
+	if err := eUpgradeDynamicFeesConfig.validate(); err != nil {
 		panic(err)
 	}
 }
 
-// EUpgradeDynamicFeesConfig to be tuned TODO ABENEGIA
+// eUpgradeDynamicFeesConfig to be tuned TODO ABENEGIA
 var (
-	EUpgradeDynamicFeesConfig = DynamicFeesConfig{
+	eUpgradeDynamicFeesConfig = DynamicFeesConfig{
 		InitialUnitFees: commonfees.Dimensions{
 			1 * units.NanoAvax,
 			2 * units.NanoAvax,
@@ -44,12 +44,20 @@ var (
 		BlockUnitsTarget: commonfees.Dimensions{1, 1, 1, 1},
 	}
 
-	// TODO ABENEGIA: decide if and how to validate PreEUpgradeDynamicFeesConfig
-	PreEUpgradeDynamicFeesConfig = DynamicFeesConfig{
+	// TODO ABENEGIA: decide if and how to validate preEUpgradeDynamicFeesConfig
+	preEUpgradeDynamicFeesConfig = DynamicFeesConfig{
 		InitialUnitFees: commonfees.Empty,
 		BlockUnitsCap:   commonfees.Max,
 	}
 )
+
+func GetDynamicFeesConfig(isEActive bool) DynamicFeesConfig {
+	if !isEActive {
+		return preEUpgradeDynamicFeesConfig
+	}
+
+	return eUpgradeDynamicFeesConfig
+}
 
 type DynamicFeesConfig struct {
 	// InitialUnitFees contains, per each fee dimension, the

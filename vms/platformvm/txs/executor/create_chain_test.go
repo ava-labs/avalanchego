@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
@@ -53,7 +54,8 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
-	feeCfg := env.config.GetDynamicFeesConfig(env.state.GetTimestamp())
+	chainTime := env.state.GetTimestamp()
+	feeCfg := config.GetDynamicFeesConfig(env.config.IsEActivated(chainTime))
 	executor := StandardTxExecutor{
 		Backend:       &env.backend,
 		BlkFeeManager: commonfees.NewManager(feeCfg.InitialUnitFees, commonfees.EmptyWindows),
@@ -96,7 +98,8 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
-	feeCfg := env.config.GetDynamicFeesConfig(stateDiff.GetTimestamp())
+	chainTime := stateDiff.GetTimestamp()
+	feeCfg := config.GetDynamicFeesConfig(env.config.IsEActivated(chainTime))
 	executor := StandardTxExecutor{
 		Backend:       &env.backend,
 		BlkFeeManager: commonfees.NewManager(feeCfg.InitialUnitFees, commonfees.EmptyWindows),
@@ -139,7 +142,8 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 	unitWindows, err := env.state.GetFeeWindows()
 	require.NoError(err)
 
-	feeCfg := env.config.GetDynamicFeesConfig(stateDiff.GetTimestamp())
+	currentTime := stateDiff.GetTimestamp()
+	feeCfg := config.GetDynamicFeesConfig(env.config.IsEActivated(currentTime))
 	executor := StandardTxExecutor{
 		Backend:       &env.backend,
 		BlkFeeManager: commonfees.NewManager(unitFees, unitWindows),
@@ -179,7 +183,8 @@ func TestCreateChainTxValid(t *testing.T) {
 	unitWindows, err := env.state.GetFeeWindows()
 	require.NoError(err)
 
-	feeCfg := env.config.GetDynamicFeesConfig(stateDiff.GetTimestamp())
+	currentTime := stateDiff.GetTimestamp()
+	feeCfg := config.GetDynamicFeesConfig(env.config.IsEActivated(currentTime))
 	executor := StandardTxExecutor{
 		Backend:       &env.backend,
 		BlkFeeManager: commonfees.NewManager(unitFees, unitWindows),
@@ -235,10 +240,11 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 			cfg.CreateBlockchainTxFee = test.fee
 
 			var (
-				backend  = builder.NewBackend(env.ctx, &cfg, env.state, env.atomicUTXOs)
-				pBuilder = backends.NewBuilder(addrs, backend)
-				feeCfg   = cfg.GetDynamicFeesConfig(env.state.GetTimestamp())
-				feeCalc  = &fees.Calculator{
+				backend   = builder.NewBackend(env.ctx, &cfg, env.state, env.atomicUTXOs)
+				pBuilder  = backends.NewBuilder(addrs, backend)
+				chainTime = env.state.GetTimestamp()
+				feeCfg    = config.GetDynamicFeesConfig(cfg.IsEActivated(chainTime))
+				feeCalc   = &fees.Calculator{
 					IsEUpgradeActive: false,
 					Config:           &cfg,
 					ChainTime:        test.time,
@@ -268,7 +274,8 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 
 			stateDiff.SetTimestamp(test.time)
 
-			feeCfg = env.config.GetDynamicFeesConfig(stateDiff.GetTimestamp())
+			currentTime := stateDiff.GetTimestamp()
+			feeCfg = config.GetDynamicFeesConfig(env.config.IsEActivated(currentTime))
 			executor := StandardTxExecutor{
 				Backend:       &env.backend,
 				BlkFeeManager: commonfees.NewManager(feeCfg.InitialUnitFees, commonfees.EmptyWindows),

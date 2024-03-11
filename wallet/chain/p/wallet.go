@@ -757,10 +757,7 @@ func (w *wallet) refreshFeesData(options ...common.Option) error {
 		return err
 	}
 
-	if w.isEForkActive {
-		w.unitCaps = config.EUpgradeDynamicFeesConfig.BlockUnitsCap
-	} else {
-		w.unitCaps = config.PreEUpgradeDynamicFeesConfig.BlockUnitsCap
-	}
+	feeCfg := config.GetDynamicFeesConfig(w.isEForkActive)
+	w.unitCaps = feeCfg.BlockUnitsCap
 	return nil
 }

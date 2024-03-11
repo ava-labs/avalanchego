@@ -137,7 +137,7 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 
 			pChainExportFee := uint64(0)
 			ginkgo.By("export avax from P to X chain", func() {
-				unitCaps := config.EUpgradeDynamicFeesConfig.BlockUnitsCap
+				unitCaps := config.GetDynamicFeesConfig(true /*isEActive*/).BlockUnitsCap
 
 				unitFees, err := pChainClient.GetUnitFees(e2e.DefaultContext())
 				require.NoError(err)

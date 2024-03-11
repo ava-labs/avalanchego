@@ -293,7 +293,7 @@ func (b *builder) NewImportTx(
 	var (
 		pBuilder, pSigner = b.builders(keys)
 		chainTime         = b.state.GetTimestamp()
-		feeCfg            = b.cfg.GetDynamicFeesConfig(chainTime)
+		feeCfg            = config.GetDynamicFeesConfig(b.cfg.IsEActivated(chainTime))
 		isEUpgradeActive  = b.cfg.IsEActivated(chainTime)
 
 		feeCalc = &fees.Calculator{
@@ -349,7 +349,7 @@ func (b *builder) NewExportTx(
 	var (
 		pBuilder, pSigner = b.builders(keys)
 		chainTime         = b.state.GetTimestamp()
-		feeCfg            = b.cfg.GetDynamicFeesConfig(chainTime)
+		feeCfg            = config.GetDynamicFeesConfig(b.cfg.IsEActivated(chainTime))
 		isEUpgradeActive  = b.cfg.IsEActivated(chainTime)
 
 		feeCalc = &fees.Calculator{
@@ -412,7 +412,7 @@ func (b *builder) NewCreateChainTx(
 	var (
 		pBuilder, pSigner = b.builders(keys)
 		chainTime         = b.state.GetTimestamp()
-		feeCfg            = b.cfg.GetDynamicFeesConfig(chainTime)
+		feeCfg            = config.GetDynamicFeesConfig(b.cfg.IsEActivated(chainTime))
 		isEUpgradeActive  = b.cfg.IsEActivated(chainTime)
 
 		feeCalc = &fees.Calculator{
@@ -463,7 +463,7 @@ func (b *builder) NewCreateSubnetTx(
 	var (
 		pBuilder, pSigner = b.builders(keys)
 		chainTime         = b.state.GetTimestamp()
-		feeCfg            = b.cfg.GetDynamicFeesConfig(chainTime)
+		feeCfg            = config.GetDynamicFeesConfig(b.cfg.IsEActivated(chainTime))
 		isEUpgradeActive  = b.cfg.IsEActivated(chainTime)
 
 		feeCalc = &fees.Calculator{
@@ -528,7 +528,7 @@ func (b *builder) NewTransformSubnetTx(
 	var (
 		pBuilder, pSigner = b.builders(keys)
 		chainTime         = b.state.GetTimestamp()
-		feeCfg            = b.cfg.GetDynamicFeesConfig(chainTime)
+		feeCfg            = config.GetDynamicFeesConfig(b.cfg.IsEActivated(chainTime))
 		isEUpgradeActive  = b.cfg.IsEActivated(chainTime)
 
 		feeCalc = &fees.Calculator{
@@ -592,7 +592,7 @@ func (b *builder) NewAddValidatorTx(
 	var (
 		pBuilder, pSigner = b.builders(keys)
 		chainTime         = b.state.GetTimestamp()
-		feeCfg            = b.cfg.GetDynamicFeesConfig(chainTime)
+		feeCfg            = config.GetDynamicFeesConfig(b.cfg.IsEActivated(chainTime))
 		isEUpgradeActive  = b.cfg.IsEActivated(chainTime)
 
 		feeCalc = &fees.Calculator{
@@ -658,7 +658,7 @@ func (b *builder) NewAddPermissionlessValidatorTx(
 	var (
 		pBuilder, pSigner = b.builders(keys)
 		chainTime         = b.state.GetTimestamp()
-		feeCfg            = b.cfg.GetDynamicFeesConfig(chainTime)
+		feeCfg            = config.GetDynamicFeesConfig(b.cfg.IsEActivated(chainTime))
 		isEUpgradeActive  = b.cfg.IsEActivated(chainTime)
 
 		feeCalc = &fees.Calculator{
@@ -728,7 +728,7 @@ func (b *builder) NewAddDelegatorTx(
 	var (
 		pBuilder, pSigner = b.builders(keys)
 		chainTime         = b.state.GetTimestamp()
-		feeCfg            = b.cfg.GetDynamicFeesConfig(chainTime)
+		feeCfg            = config.GetDynamicFeesConfig(b.cfg.IsEActivated(chainTime))
 		isEUpgradeActive  = b.cfg.IsEActivated(chainTime)
 
 		feeCalc = &fees.Calculator{
@@ -791,7 +791,7 @@ func (b *builder) NewAddPermissionlessDelegatorTx(
 	var (
 		pBuilder, pSigner = b.builders(keys)
 		chainTime         = b.state.GetTimestamp()
-		feeCfg            = b.cfg.GetDynamicFeesConfig(chainTime)
+		feeCfg            = config.GetDynamicFeesConfig(b.cfg.IsEActivated(chainTime))
 		isEUpgradeActive  = b.cfg.IsEActivated(chainTime)
 
 		feeCalc = &fees.Calculator{
@@ -858,7 +858,7 @@ func (b *builder) NewAddSubnetValidatorTx(
 	var (
 		pBuilder, pSigner = b.builders(keys)
 		chainTime         = b.state.GetTimestamp()
-		feeCfg            = b.cfg.GetDynamicFeesConfig(chainTime)
+		feeCfg            = config.GetDynamicFeesConfig(b.cfg.IsEActivated(chainTime))
 		isEUpgradeActive  = b.cfg.IsEActivated(chainTime)
 
 		feeCalc = &fees.Calculator{
@@ -915,7 +915,7 @@ func (b *builder) NewRemoveSubnetValidatorTx(
 	var (
 		pBuilder, pSigner = b.builders(keys)
 		chainTime         = b.state.GetTimestamp()
-		feeCfg            = b.cfg.GetDynamicFeesConfig(chainTime)
+		feeCfg            = config.GetDynamicFeesConfig(b.cfg.IsEActivated(chainTime))
 		isEUpgradeActive  = b.cfg.IsEActivated(chainTime)
 
 		feeCalc = &fees.Calculator{
@@ -964,7 +964,7 @@ func (b *builder) NewTransferSubnetOwnershipTx(
 	var (
 		pBuilder, pSigner = b.builders(keys)
 		chainTime         = b.state.GetTimestamp()
-		feeCfg            = b.cfg.GetDynamicFeesConfig(chainTime)
+		feeCfg            = config.GetDynamicFeesConfig(b.cfg.IsEActivated(chainTime))
 		isEUpgradeActive  = b.cfg.IsEActivated(chainTime)
 
 		feeCalc = &fees.Calculator{
@@ -1018,7 +1018,7 @@ func (b *builder) NewBaseTx(
 	var (
 		pBuilder, pSigner = b.builders(keys)
 		chainTime         = b.state.GetTimestamp()
-		feeCfg            = b.cfg.GetDynamicFeesConfig(chainTime)
+		feeCfg            = config.GetDynamicFeesConfig(b.cfg.IsEActivated(chainTime))
 		isEUpgradeActive  = b.cfg.IsEActivated(chainTime)
 
 		feeCalc = &fees.Calculator{

@@ -241,7 +241,8 @@ func addSubnet(
 	unitWindows, err := env.state.GetFeeWindows()
 	require.NoError(err)
 
-	feeCfg := env.config.GetDynamicFeesConfig(env.state.GetTimestamp())
+	chainTime := env.state.GetTimestamp()
+	feeCfg := config.GetDynamicFeesConfig(env.config.IsEActivated(chainTime))
 	executor := StandardTxExecutor{
 		Backend:       &env.backend,
 		BlkFeeManager: fees.NewManager(unitFees, unitWindows),

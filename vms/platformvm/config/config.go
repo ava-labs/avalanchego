@@ -144,14 +144,6 @@ func (c *Config) IsEActivated(timestamp time.Time) bool {
 	return !timestamp.Before(c.EUpgradeTime)
 }
 
-func (c *Config) GetDynamicFeesConfig(timestamp time.Time) DynamicFeesConfig {
-	if !c.IsEActivated(timestamp) {
-		return PreEUpgradeDynamicFeesConfig
-	}
-
-	return EUpgradeDynamicFeesConfig
-}
-
 func (c *Config) GetCreateBlockchainTxFee(timestamp time.Time) uint64 {
 	if c.IsApricotPhase3Activated(timestamp) {
 		return c.CreateBlockchainTxFee

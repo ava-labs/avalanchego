@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/fees"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -458,8 +459,8 @@ func (v *verifier) processStandardTxs(txs []*txs.Tx, state state.Diff, parentID 
 
 	var (
 		currentTimestamp = state.GetTimestamp()
-		isEForkActive    = v.txExecutorBackend.Config.IsEActivated(currentTimestamp)
-		feesCfg          = v.txExecutorBackend.Config.GetDynamicFeesConfig(currentTimestamp)
+		isEActivated     = v.txExecutorBackend.Config.IsEActivated(currentTimestamp)
+		feesCfg          = config.GetDynamicFeesConfig(isEActivated)
 
 		onAcceptFunc   func()
 		inputs         set.Set[ids.ID]
@@ -468,7 +469,7 @@ func (v *verifier) processStandardTxs(txs []*txs.Tx, state state.Diff, parentID 
 	)
 
 	feeManager := fees.NewManager(unitFees, unitWindows)
-	if isEForkActive {
+	if isEActivated {
 		feeManager = feeManager.ComputeNext(
 			currentTimestamp.Unix(),
 			blkTimestamp.Unix(),
@@ -520,7 +521,7 @@ func (v *verifier) processStandardTxs(txs []*txs.Tx, state state.Diff, parentID 
 		return nil, nil, nil, nil, err
 	}
 
-	if isEForkActive {
+	if isEActivated {
 		state.SetUnitFees(feeManager.GetUnitFees())
 		state.SetFeeWindows(feeManager.GetFeeWindows())
 	}

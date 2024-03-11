@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -342,18 +343,17 @@ func packBlockTxs(
 	}
 
 	var (
-		parentBlkTime = parentState.GetTimestamp()
-		feesCfg       = backend.Config.GetDynamicFeesConfig(timestamp)
-		isEForkActive = backend.Config.IsEActivated(timestamp)
+		isEActivated = backend.Config.IsEActivated(timestamp)
+		feesCfg      = config.GetDynamicFeesConfig(isEActivated)
 
 		blockTxs []*txs.Tx
 		inputs   set.Set[ids.ID]
 	)
 
 	feeMan := commonfees.NewManager(unitFees, unitWindows)
-	if isEForkActive {
+	if isEActivated {
 		feeMan = feeMan.ComputeNext(
-			parentBlkTime.Unix(),
+			parentState.GetTimestamp().Unix(),
 			timestamp.Unix(),
 			feesCfg.BlockUnitsTarget,
 			feesCfg.UpdateCoefficient,
@@ -371,8 +371,8 @@ func packBlockTxs(
 
 		// pre e upgrade is active, we fill blocks till a target size
 		// post e upgrade is active, we fill blocks till a target complexity
-		targetSizeReached := (!isEForkActive && txSize > remainingSize) ||
-			(isEForkActive && !commonfees.Compare(feeMan.GetCumulatedUnits(), feesCfg.BlockUnitsTarget))
+		targetSizeReached := (!isEActivated && txSize > remainingSize) ||
+			(isEActivated && !commonfees.Compare(feeMan.GetCumulatedUnits(), feesCfg.BlockUnitsTarget))
 		if targetSizeReached {
 			break
 		}
@@ -419,7 +419,7 @@ func packBlockTxs(
 			return nil, err
 		}
 
-		if !isEForkActive {
+		if !isEActivated {
 			remainingSize -= txSize
 		}
 		blockTxs = append(blockTxs, tx)
