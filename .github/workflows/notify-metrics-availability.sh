@@ -4,7 +4,7 @@ set -euo pipefail
 
 # Timestamps are in seconds
 from_timestamp="$(date '+%s')"
-monitoring_period=600 # 10 minutes
+monitoring_period=900 # 15 minutes
 to_timestamp="$((${from_timestamp} + ${monitoring_period}))"
 
 # Grafana expects microseconds, so pad timestamps with 3 zeros

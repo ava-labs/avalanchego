@@ -74,8 +74,8 @@ func RegisterFlags() *FlagVars {
 	flag.UintVar(
 		&vars.networkShutdownDelay,
 		"network-shutdown-delay",
-		0,
-		"[optional] the number of seconds to wait before shutting down the test network at the end of the test run. If collecting metrics, a value greater than the scrape interval is suggested.",
+		12, // Make sure this value takes into account the scrape_interval defined in scripts/run_prometheus.sh
+		"[optional] the number of seconds to wait before shutting down the test network at the end of the test run. A value greater than the scrape interval is suggested. 0 avoids waiting for shutdown.",
 	)
 
 	return &vars

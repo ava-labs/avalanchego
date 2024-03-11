@@ -94,6 +94,7 @@ echo "writing configuration..."
 cat >"${PROMETHEUS_WORKING_DIR}"/prometheus.yaml <<EOL
 # my global config
 global:
+  # Make sure this value takes into account the network-shutdown-delay in tests/fixture/e2e/env.go
   scrape_interval: 10s # Set the scrape interval to every 15 seconds. Default is every 1 minute.
   evaluation_interval: 10s # Evaluate rules every 15 seconds. The default is every 1 minute.
   scrape_timeout: 5s # The default is every 10s
