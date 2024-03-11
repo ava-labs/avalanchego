@@ -8,7 +8,7 @@ use firewood::{
     db::{BatchOp, DbConfig},
     merkle::{Bincode, Merkle, Node, TrieHash, TRIE_HASH_LEN},
     shale::{
-        cached::DynamicMem,
+        cached::InMemLinearStore,
         compact::{CompactHeader, CompactSpace},
         disk_address::DiskAddress,
         CachedStore, ObjCache, Storable, StoredView,
@@ -20,7 +20,7 @@ use pprof::ProfilerGuard;
 use rand::{distributions::Alphanumeric, rngs::StdRng, Rng, SeedableRng};
 use std::{fs::File, iter::repeat_with, os::raw::c_int, path::Path, sync::Arc};
 
-pub type MerkleWithEncoder = Merkle<CompactSpace<Node, DynamicMem>, Bincode>;
+pub type MerkleWithEncoder = Merkle<CompactSpace<Node, InMemLinearStore>, Bincode>;
 
 const ZERO_HASH: TrieHash = TrieHash([0u8; TRIE_HASH_LEN]);
 
@@ -67,7 +67,7 @@ impl Profiler for FlamegraphProfiler {
 
 fn bench_trie_hash(criterion: &mut Criterion) {
     let mut to = [1u8; TRIE_HASH_LEN];
-    let mut store = DynamicMem::new(TRIE_HASH_LEN as u64, 0u8);
+    let mut store = InMemLinearStore::new(TRIE_HASH_LEN as u64, 0u8);
     store.write(0, &*ZERO_HASH).expect("write should succeed");
 
     #[allow(clippy::unwrap_used)]
@@ -96,7 +96,7 @@ fn bench_merkle<const N: usize>(criterion: &mut Criterion) {
 
                     #[allow(clippy::unwrap_used)]
                     let merkle_payload_header_ref = StoredView::ptr_to_obj(
-                        &DynamicMem::new(2 * CompactHeader::MSIZE, 9),
+                        &InMemLinearStore::new(2 * CompactHeader::MSIZE, 9),
                         merkle_payload_header,
                         CompactHeader::MSIZE,
                     )
@@ -104,8 +104,8 @@ fn bench_merkle<const N: usize>(criterion: &mut Criterion) {
 
                     #[allow(clippy::unwrap_used)]
                     let store = CompactSpace::new(
-                        DynamicMem::new(TEST_MEM_SIZE, 0),
-                        DynamicMem::new(TEST_MEM_SIZE, 1),
+                        InMemLinearStore::new(TEST_MEM_SIZE, 0),
+                        InMemLinearStore::new(TEST_MEM_SIZE, 1),
                         merkle_payload_header_ref,
                         ObjCache::new(1 << 20),
                         4096,

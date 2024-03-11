@@ -5,7 +5,7 @@ use criterion::{
     black_box, criterion_group, criterion_main, profiler::Profiler, Bencher, Criterion,
 };
 use firewood::shale::{
-    cached::DynamicMem,
+    cached::InMemLinearStore,
     compact::{CompactHeader, CompactSpaceHeader},
     disk_address::DiskAddress,
     CachedStore, Obj, StoredView,
@@ -87,12 +87,8 @@ fn serialize<T: CachedStore>(m: &T) {
 
 fn bench_cursors(c: &mut Criterion) {
     let mut group = c.benchmark_group("shale-bench");
-    group.bench_function("PlainMem", |b| {
-        let mem = DynamicMem::new(BENCH_MEM_SIZE as u64, 0);
-        get_view(b, mem)
-    });
-    group.bench_function("DynamicMem", |b| {
-        let mem = DynamicMem::new(BENCH_MEM_SIZE as u64, 0);
+    group.bench_function("InMemLinearStore", |b| {
+        let mem = InMemLinearStore::new(BENCH_MEM_SIZE as u64, 0);
         get_view(b, mem)
     });
 }

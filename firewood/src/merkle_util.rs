@@ -7,8 +7,8 @@ use crate::{
         BinarySerde, EncodedNode, Merkle, Node, Ref, RefMut, TrieHash,
     },
     shale::{
-        self, cached::DynamicMem, compact::CompactSpace, disk_address::DiskAddress, CachedStore,
-        StoredView,
+        self, cached::InMemLinearStore, compact::CompactSpace, disk_address::DiskAddress,
+        CachedStore, StoredView,
     },
 };
 use std::num::NonZeroUsize;
@@ -36,7 +36,7 @@ pub enum DataStoreError {
     ProofEmptyKeyValuesError,
 }
 
-type InMemoryStore = CompactSpace<Node, DynamicMem>;
+type InMemoryStore = CompactSpace<Node, InMemLinearStore>;
 
 pub struct InMemoryMerkle<T> {
     root: DiskAddress,
@@ -52,7 +52,7 @@ where
         const RESERVED: usize = 0x1000;
         assert!(meta_size as usize > RESERVED);
         assert!(compact_size as usize > RESERVED);
-        let mut dm = DynamicMem::new(meta_size, 0);
+        let mut dm = InMemLinearStore::new(meta_size, 0);
         let compact_header = DiskAddress::null();
         #[allow(clippy::unwrap_used)]
         dm.write(
@@ -70,7 +70,7 @@ where
             StoredView::ptr_to_obj(&dm, compact_header, shale::compact::CompactHeader::MSIZE)
                 .unwrap();
         let mem_meta = dm;
-        let mem_payload = DynamicMem::new(compact_size, 0x1);
+        let mem_payload = InMemLinearStore::new(compact_size, 0x1);
 
         let cache = shale::ObjCache::new(1);
         let space =

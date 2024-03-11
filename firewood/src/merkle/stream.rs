@@ -584,7 +584,7 @@ use super::tests::create_test_merkle;
 mod tests {
     use crate::{
         merkle::Bincode,
-        shale::{cached::DynamicMem, compact::CompactSpace},
+        shale::{cached::InMemLinearStore, compact::CompactSpace},
     };
 
     use super::*;
@@ -772,8 +772,10 @@ mod tests {
     ///
     /// Note the 0000 branch has no value and the F0F0
     /// The number next to each branch is the position of the child in the branch's children array.
-    fn created_populated_merkle() -> (Merkle<CompactSpace<Node, DynamicMem>, Bincode>, DiskAddress)
-    {
+    fn created_populated_merkle() -> (
+        Merkle<CompactSpace<Node, InMemLinearStore>, Bincode>,
+        DiskAddress,
+    ) {
         let mut merkle = create_test_merkle();
         let root = merkle.init_root().unwrap();
 

@@ -809,7 +809,7 @@ impl BinarySerde for PlainCodec {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::shale::cached::PlainMem;
+    use crate::shale::cached::InMemLinearStore;
     use std::iter::repeat;
     use test_case::{test_case, test_matrix};
 
@@ -941,7 +941,7 @@ mod tests {
         let mut bytes = vec![0; serialized_len as usize];
         node.serialize(&mut bytes).expect("node should serialize");
 
-        let mut mem = PlainMem::new(serialized_len, 0);
+        let mut mem = InMemLinearStore::new(serialized_len, 0);
         mem.write(0, &bytes).expect("write should succed");
 
         let mut hydrated_node = Node::deserialize(0, &mem).expect("node should deserialize");

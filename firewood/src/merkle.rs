@@ -1393,7 +1393,7 @@ impl<'a, T: PartialEq> PrefixOverlap<'a, T> {
 mod tests {
     use super::*;
     use crate::merkle::node::PlainCodec;
-    use shale::{cached::DynamicMem, compact::CompactSpace, CachedStore};
+    use shale::{cached::InMemLinearStore, compact::CompactSpace, CachedStore};
     use test_case::test_case;
 
     fn leaf(path: Vec<u8>, data: Vec<u8>) -> Node {
@@ -1407,14 +1407,14 @@ mod tests {
         assert_eq!(n, nibbles);
     }
 
-    fn create_generic_test_merkle<'de, T>() -> Merkle<CompactSpace<Node, DynamicMem>, T>
+    fn create_generic_test_merkle<'de, T>() -> Merkle<CompactSpace<Node, InMemLinearStore>, T>
     where
         T: BinarySerde,
         EncodedNode<T>: serde::Serialize + serde::Deserialize<'de>,
     {
         const RESERVED: usize = 0x1000;
 
-        let mut dm = shale::cached::DynamicMem::new(0x10000, 0);
+        let mut dm = shale::cached::InMemLinearStore::new(0x10000, 0);
         let compact_header = DiskAddress::null();
         dm.write(
             compact_header.into(),
@@ -1432,7 +1432,7 @@ mod tests {
         )
         .unwrap();
         let mem_meta = dm;
-        let mem_payload = DynamicMem::new(0x10000, 0x1);
+        let mem_payload = InMemLinearStore::new(0x10000, 0x1);
 
         let cache = shale::ObjCache::new(1);
         let space =
@@ -1443,7 +1443,7 @@ mod tests {
         Merkle::new(store)
     }
 
-    pub(super) fn create_test_merkle() -> Merkle<CompactSpace<Node, DynamicMem>, Bincode> {
+    pub(super) fn create_test_merkle() -> Merkle<CompactSpace<Node, InMemLinearStore>, Bincode> {
         create_generic_test_merkle::<Bincode>()
     }
 

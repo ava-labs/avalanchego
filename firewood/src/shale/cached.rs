@@ -8,29 +8,24 @@ use std::{
     sync::{Arc, RwLock},
 };
 
-#[cfg(test)]
-pub use crate::shale::plainmem::PlainMem;
-
 use super::ShaleError;
 
 // Purely volatile, dynamically allocated vector-based implementation for
-// [CachedStore]. This is similar to PlainMem (in testing). The only
-// difference is, when [write] dynamically allocate more space if original
-// space is not enough.
+// [CachedStore]. Allocates more space on `write` if original size isn't enough.
 #[derive(Debug)]
-pub struct DynamicMem {
+pub struct InMemLinearStore {
     space: Arc<RwLock<Vec<u8>>>,
     id: SpaceId,
 }
 
-impl DynamicMem {
+impl InMemLinearStore {
     pub fn new(size: u64, id: SpaceId) -> Self {
         let space = Arc::new(RwLock::new(vec![0; size as usize]));
         Self { space, id }
     }
 }
 
-impl CachedStore for DynamicMem {
+impl CachedStore for InMemLinearStore {
     fn get_view(
         &self,
         offset: usize,
@@ -46,7 +41,7 @@ impl CachedStore for DynamicMem {
             space.resize(size, 0);
         }
 
-        Some(Box::new(DynamicMemView {
+        Some(Box::new(InMemLinearStoreView {
             offset,
             length,
             mem: Self {
@@ -57,7 +52,7 @@ impl CachedStore for DynamicMem {
     }
 
     fn get_shared(&self) -> Box<dyn SendSyncDerefMut<Target = dyn CachedStore>> {
-        Box::new(DynamicMemShared(Self {
+        Box::new(InMemLinearStoreShared(Self {
             space: self.space.clone(),
             id: self.id,
         }))
@@ -89,29 +84,33 @@ impl CachedStore for DynamicMem {
     }
 }
 
+/// A range within an in-memory linear byte store.
 #[derive(Debug)]
-struct DynamicMemView {
+struct InMemLinearStoreView {
+    /// The start of the range.
     offset: usize,
+    /// The length of the range.
     length: usize,
-    mem: DynamicMem,
+    /// The underlying store.
+    mem: InMemLinearStore,
 }
 
-struct DynamicMemShared(DynamicMem);
+struct InMemLinearStoreShared(InMemLinearStore);
 
-impl Deref for DynamicMemShared {
+impl Deref for InMemLinearStoreShared {
     type Target = dyn CachedStore;
     fn deref(&self) -> &(dyn CachedStore + 'static) {
         &self.0
     }
 }
 
-impl DerefMut for DynamicMemShared {
+impl DerefMut for InMemLinearStoreShared {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
 }
 
-impl CachedView for DynamicMemView {
+impl CachedView for InMemLinearStoreView {
     type DerefReturn = Vec<u8>;
 
     fn as_deref(&self) -> Self::DerefReturn {
@@ -124,41 +123,10 @@ impl CachedView for DynamicMemView {
 #[allow(clippy::indexing_slicing, clippy::unwrap_used)]
 mod tests {
     use super::*;
-    use crate::shale::plainmem::PlainMemShared;
-
-    #[test]
-    fn test_plain_mem() {
-        let mut view = PlainMemShared(PlainMem::new(2, 0));
-        let mem = &mut *view;
-        mem.write(0, &[1, 1]).unwrap();
-        mem.write(0, &[1, 2]).unwrap();
-        #[allow(clippy::unwrap_used)]
-        let r = mem.get_view(0, 2).unwrap().as_deref();
-        assert_eq!(r, [1, 2]);
-
-        // previous view not mutated by write
-        mem.write(0, &[1, 3]).unwrap();
-        assert_eq!(r, [1, 2]);
-        let r = mem.get_view(0, 2).unwrap().as_deref();
-        assert_eq!(r, [1, 3]);
-
-        // create a view larger than capacity
-        assert!(mem.get_view(0, 4).is_none())
-    }
-
-    #[test]
-    #[should_panic(expected = "index 3 out of range for slice of length 2")]
-    fn test_plain_mem_panic() {
-        let mut view = PlainMemShared(PlainMem::new(2, 0));
-        let mem = &mut *view;
-
-        // out of range
-        mem.write(1, &[7, 8]).unwrap();
-    }
 
     #[test]
     fn test_dynamic_mem() {
-        let mut view = DynamicMemShared(DynamicMem::new(2, 0));
+        let mut view = InMemLinearStoreShared(InMemLinearStore::new(2, 0));
         let mem = &mut *view;
         mem.write(0, &[1, 2]).unwrap();
         mem.write(0, &[3, 4]).unwrap();

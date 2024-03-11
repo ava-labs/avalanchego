@@ -662,7 +662,7 @@ impl<T: Storable + Debug + 'static + PartialEq, M: CachedStore + Send + Sync> Sh
 mod tests {
     use sha3::Digest;
 
-    use crate::shale::{self, cached::DynamicMem, ObjCache};
+    use crate::shale::{self, cached::InMemLinearStore, ObjCache};
 
     use super::*;
 
@@ -715,7 +715,7 @@ mod tests {
         let compact_size: NonZeroUsize = NonZeroUsize::new(0x10000).unwrap();
         let reserved: DiskAddress = 0x1000.into();
 
-        let mut dm = DynamicMem::new(meta_size.get() as u64, 0x0);
+        let mut dm = InMemLinearStore::new(meta_size.get() as u64, 0x0);
 
         // initialize compact space
         let compact_header = DiskAddress::from(0x1);
@@ -731,7 +731,7 @@ mod tests {
         let compact_header =
             StoredView::ptr_to_obj(&dm, compact_header, CompactHeader::MSIZE).unwrap();
         let mem_meta = dm;
-        let mem_payload = DynamicMem::new(compact_size.get() as u64, 0x1);
+        let mem_payload = InMemLinearStore::new(compact_size.get() as u64, 0x1);
 
         let cache: ObjCache<Hash> = ObjCache::new(1);
         let space =
