@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
@@ -18,7 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/mempool"
-	"github.com/ava-labs/avalanchego/vms/components/message"
 )
 
 const txGossipHandlerID = 0
@@ -180,48 +178,6 @@ func (n *Network) PushGossip(ctx context.Context) {
 
 func (n *Network) PullGossip(ctx context.Context) {
 	gossip.Every(ctx, n.log, n.txPullGossiper, n.txPullGossipFrequency)
-}
-
-func (n *Network) AppGossip(ctx context.Context, nodeID ids.NodeID, msgBytes []byte) error {
-	n.log.Debug("called AppGossip message handler",
-		zap.Stringer("nodeID", nodeID),
-		zap.Int("messageLen", len(msgBytes)),
-	)
-
-	msgIntf, err := message.Parse(msgBytes)
-	if err != nil {
-		n.log.Debug("forwarding AppGossip message to SDK network",
-			zap.String("reason", "failed to parse message"),
-		)
-
-		return n.Network.AppGossip(ctx, nodeID, msgBytes)
-	}
-
-	msg, ok := msgIntf.(*message.Tx)
-	if !ok {
-		n.log.Debug("dropping unexpected message",
-			zap.Stringer("nodeID", nodeID),
-		)
-		return nil
-	}
-
-	tx, err := n.parser.ParseTx(msg.Tx)
-	if err != nil {
-		n.log.Verbo("received invalid tx",
-			zap.Stringer("nodeID", nodeID),
-			zap.Binary("tx", msg.Tx),
-			zap.Error(err),
-		)
-		return nil
-	}
-
-	if err := n.mempool.Add(tx); err != nil {
-		n.log.Debug("tx failed to be added to the mempool",
-			zap.Stringer("txID", tx.ID()),
-			zap.Error(err),
-		)
-	}
-	return nil
 }
 
 // IssueTxFromRPC attempts to add a tx to the mempool, after verifying it. If
