@@ -17,11 +17,10 @@ var (
 	_ Sender    = (*SenderTest)(nil)
 	_ AppSender = (*FakeSender)(nil)
 
-	errSendAppRequest        = errors.New("unexpectedly called SendAppRequest")
-	errSendAppResponse       = errors.New("unexpectedly called SendAppResponse")
-	errSendAppError          = errors.New("unexpectedly called SendAppError")
-	errSendAppGossip         = errors.New("unexpectedly called SendAppGossip")
-	errSendAppGossipSpecific = errors.New("unexpectedly called SendAppGossipSpecific")
+	errSendAppRequest  = errors.New("unexpectedly called SendAppRequest")
+	errSendAppResponse = errors.New("unexpectedly called SendAppResponse")
+	errSendAppError    = errors.New("unexpectedly called SendAppError")
+	errSendAppGossip   = errors.New("unexpectedly called SendAppGossip")
 )
 
 // SenderTest is a test sender
@@ -35,7 +34,7 @@ type SenderTest struct {
 	CantSendGet, CantSendGetAncestors, CantSendPut, CantSendAncestors,
 	CantSendPullQuery, CantSendPushQuery, CantSendChits,
 	CantSendAppRequest, CantSendAppResponse, CantSendAppError,
-	CantSendAppGossip, CantSendAppGossipSpecific,
+	CantSendAppGossip,
 	CantSendCrossChainAppRequest, CantSendCrossChainAppResponse, CantSendCrossChainAppError bool
 
 	SendGetStateSummaryFrontierF func(context.Context, set.Set[ids.NodeID], uint32)
@@ -56,8 +55,7 @@ type SenderTest struct {
 	SendAppRequestF              func(context.Context, set.Set[ids.NodeID], uint32, []byte) error
 	SendAppResponseF             func(context.Context, ids.NodeID, uint32, []byte) error
 	SendAppErrorF                func(context.Context, ids.NodeID, uint32, int32, string) error
-	SendAppGossipF               func(context.Context, []byte, int, int, int) error
-	SendAppGossipSpecificF       func(context.Context, set.Set[ids.NodeID], []byte) error
+	SendAppGossipF               func(context.Context, SendConfig, []byte) error
 	SendCrossChainAppRequestF    func(context.Context, ids.ID, uint32, []byte)
 	SendCrossChainAppResponseF   func(context.Context, ids.ID, uint32, []byte)
 	SendCrossChainAppErrorF      func(context.Context, ids.ID, uint32, int32, string)
@@ -83,7 +81,6 @@ func (s *SenderTest) Default(cant bool) {
 	s.CantSendAppRequest = cant
 	s.CantSendAppResponse = cant
 	s.CantSendAppGossip = cant
-	s.CantSendAppGossipSpecific = cant
 	s.CantSendCrossChainAppRequest = cant
 	s.CantSendCrossChainAppResponse = cant
 }
@@ -333,37 +330,22 @@ func (s *SenderTest) SendAppError(ctx context.Context, nodeID ids.NodeID, reques
 // initialized, then testing will fail.
 func (s *SenderTest) SendAppGossip(
 	ctx context.Context,
+	config SendConfig,
 	appGossipBytes []byte,
-	numValidators int,
-	numNonValidators int,
-	numPeers int,
 ) error {
 	switch {
 	case s.SendAppGossipF != nil:
-		return s.SendAppGossipF(ctx, appGossipBytes, numValidators, numNonValidators, numPeers)
+		return s.SendAppGossipF(ctx, config, appGossipBytes)
 	case s.CantSendAppGossip && s.T != nil:
 		require.FailNow(s.T, errSendAppGossip.Error())
 	}
 	return errSendAppGossip
 }
 
-// SendAppGossipSpecific calls SendAppGossipSpecificF if it was initialized. If it wasn't
-// initialized and this function shouldn't be called and testing was
-// initialized, then testing will fail.
-func (s *SenderTest) SendAppGossipSpecific(ctx context.Context, nodeIDs set.Set[ids.NodeID], appGossipBytes []byte) error {
-	switch {
-	case s.SendAppGossipSpecificF != nil:
-		return s.SendAppGossipSpecificF(ctx, nodeIDs, appGossipBytes)
-	case s.CantSendAppGossipSpecific && s.T != nil:
-		require.FailNow(s.T, errSendAppGossipSpecific.Error())
-	}
-	return errSendAppGossipSpecific
-}
-
 // FakeSender is used for testing
 type FakeSender struct {
 	SentAppRequest, SentAppResponse,
-	SentAppGossip, SentAppGossipSpecific,
+	SentAppGossip,
 	SentCrossChainAppRequest, SentCrossChainAppResponse chan []byte
 
 	SentAppError, SentCrossChainAppError chan *AppError
@@ -399,21 +381,12 @@ func (f FakeSender) SendAppError(_ context.Context, _ ids.NodeID, _ uint32, erro
 	return nil
 }
 
-func (f FakeSender) SendAppGossip(_ context.Context, bytes []byte, _ int, _ int, _ int) error {
+func (f FakeSender) SendAppGossip(_ context.Context, _ SendConfig, bytes []byte) error {
 	if f.SentAppGossip == nil {
 		return nil
 	}
 
 	f.SentAppGossip <- bytes
-	return nil
-}
-
-func (f FakeSender) SendAppGossipSpecific(_ context.Context, _ set.Set[ids.NodeID], bytes []byte) error {
-	if f.SentAppGossipSpecific == nil {
-		return nil
-	}
-
-	f.SentAppGossipSpecific <- bytes
 	return nil
 }
 

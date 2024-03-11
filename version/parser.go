@@ -11,9 +11,8 @@ import (
 )
 
 var (
-	errMissingVersionPrefix     = errors.New("missing required version prefix")
-	errMissingApplicationPrefix = errors.New("missing required application prefix")
-	errMissingVersions          = errors.New("missing version numbers")
+	errMissingVersionPrefix = errors.New("missing required version prefix")
+	errMissingVersions      = errors.New("missing version numbers")
 )
 
 func Parse(s string) (*Semantic, error) {
@@ -28,27 +27,6 @@ func Parse(s string) (*Semantic, error) {
 	}
 
 	return &Semantic{
-		Major: major,
-		Minor: minor,
-		Patch: patch,
-	}, nil
-}
-
-// TODO: Remove after v1.11.x is activated
-func ParseLegacyApplication(s string) (*Application, error) {
-	prefix := LegacyAppName + "/"
-	if !strings.HasPrefix(s, prefix) {
-		return nil, fmt.Errorf("%w: %q", errMissingApplicationPrefix, s)
-	}
-
-	s = s[len(prefix):]
-	major, minor, patch, err := parseVersions(s)
-	if err != nil {
-		return nil, err
-	}
-
-	return &Application{
-		Name:  Client, // Convert the legacy name to the current client name
 		Major: major,
 		Minor: minor,
 		Patch: patch,
