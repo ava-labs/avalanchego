@@ -2316,7 +2316,7 @@ func TestBaseTx(t *testing.T) {
 
 func TestPruneMempool(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(t, latestFork)
+	vm, _, _ := defaultVM(t, durango)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 

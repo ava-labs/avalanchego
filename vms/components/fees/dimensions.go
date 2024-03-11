@@ -72,6 +72,15 @@ func Add(lhs, rhs Dimensions) (Dimensions, error) {
 	return res, nil
 }
 
+func Compare(lhs, rhs Dimensions) bool {
+	for i := 0; i < FeeDimensions; i++ {
+		if lhs[i] > rhs[i] {
+			return false
+		}
+	}
+	return true
+}
+
 func (d *Dimensions) Bytes() []byte {
 	res := make([]byte, FeeDimensions*uint64Len)
 	for i := Dimension(0); i < FeeDimensions; i++ {

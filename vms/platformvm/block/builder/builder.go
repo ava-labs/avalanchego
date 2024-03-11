@@ -18,13 +18,13 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/vms/components/fees"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
@@ -342,20 +342,38 @@ func packBlockTxs(
 	}
 
 	var (
-		feeCfg = backend.Config.GetDynamicFeesConfig(stateDiff.GetTimestamp())
-		feeMan = fees.NewManager(unitFees, unitWindows)
+		parentBlkTime = parentState.GetTimestamp()
+		feesCfg       = backend.Config.GetDynamicFeesConfig(timestamp)
+		isEForkActive = backend.Config.IsEUpgradeActivated(timestamp)
 
 		blockTxs []*txs.Tx
 		inputs   set.Set[ids.ID]
 	)
+
+	feeMan := commonfees.NewManager(unitFees, unitWindows)
+	if isEForkActive {
+		feeMan = feeMan.ComputeNext(
+			parentBlkTime.Unix(),
+			timestamp.Unix(),
+			feesCfg.BlockUnitsTarget,
+			feesCfg.UpdateCoefficient,
+			feesCfg.MinUnitFees,
+		)
+	}
 
 	for {
 		tx, exists := mempool.Peek()
 		if !exists {
 			break
 		}
+
 		txSize := len(tx.Bytes())
-		if txSize > remainingSize {
+
+		// pre e upgrade is active, we fill blocks till a target size
+		// post e upgrade is active, we fill blocks till a target complexity
+		targetSizeReached := (!isEForkActive && txSize > remainingSize) ||
+			(isEForkActive && !commonfees.Compare(feeMan.GetCumulatedUnits(), feesCfg.BlockUnitsTarget))
+		if targetSizeReached {
 			break
 		}
 		mempool.Remove(tx)
@@ -370,7 +388,7 @@ func packBlockTxs(
 		executor := &txexecutor.StandardTxExecutor{
 			Backend:       backend,
 			BlkFeeManager: feeMan,
-			UnitCaps:      feeCfg.BlockUnitsCap,
+			UnitCaps:      feesCfg.BlockUnitsCap,
 			State:         txDiff,
 			Tx:            tx,
 		}
@@ -401,7 +419,9 @@ func packBlockTxs(
 			return nil, err
 		}
 
-		remainingSize -= txSize
+		if !isEForkActive {
+			remainingSize -= txSize
+		}
 		blockTxs = append(blockTxs, tx)
 	}
 
