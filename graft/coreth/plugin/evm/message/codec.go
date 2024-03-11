@@ -4,8 +4,6 @@
 package message
 
 import (
-	"time"
-
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/utils/units"
@@ -24,7 +22,7 @@ var (
 
 func init() {
 	Codec = codec.NewManager(maxMessageSize)
-	c := linearcodec.NewDefault(time.Time{})
+	c := linearcodec.NewDefault()
 
 	errs := wrappers.Errs{}
 	errs.Add(
@@ -56,7 +54,7 @@ func init() {
 	}
 
 	CrossChainCodec = codec.NewManager(maxMessageSize)
-	ccc := linearcodec.NewDefault(time.Time{})
+	ccc := linearcodec.NewDefault()
 
 	errs = wrappers.Errs{}
 	errs.Add(
