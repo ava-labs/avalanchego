@@ -20,6 +20,6 @@ type Config struct {
 	EUpgradeTime time.Time
 }
 
-func (c *Config) IsEUpgradeActivated(timestamp time.Time) bool {
+func (c *Config) IsEUActivated(timestamp time.Time) bool {
 	return !timestamp.Before(c.EUpgradeTime)
 }
