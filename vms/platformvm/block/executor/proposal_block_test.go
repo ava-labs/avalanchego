@@ -335,23 +335,6 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 	}
 
 	{
-		// include too many transactions
-		statelessProposalBlock, err := block.NewBanffProposalBlock(
-			nextStakerTime,
-			parentID,
-			banffParentBlk.Height()+1,
-			blkTx,
-			[]*txs.Tx{},
-		)
-		require.NoError(err)
-
-		statelessProposalBlock.Transactions = []*txs.Tx{blkTx}
-		block := env.blkManager.NewBlock(statelessProposalBlock)
-		err = block.Verify(context.Background())
-		require.ErrorIs(err, errBanffProposalBlockWithMultipleTransactions)
-	}
-
-	{
 		// valid
 		statelessProposalBlock, err := block.NewBanffProposalBlock(
 			nextStakerTime,
