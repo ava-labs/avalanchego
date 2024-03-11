@@ -28,7 +28,7 @@ type Block interface {
 	Block() []byte
 	Bytes() []byte
 
-	initialize(bytes []byte, durangoTime time.Time) error
+	initialize(bytes []byte) error
 }
 
 type SignedBlock interface {
@@ -76,7 +76,7 @@ func (b *statelessBlock) Bytes() []byte {
 	return b.bytes
 }
 
-func (b *statelessBlock) initialize(bytes []byte, durangoTime time.Time) error {
+func (b *statelessBlock) initialize(bytes []byte) error {
 	b.bytes = bytes
 
 	// The serialized form of the block is the unsignedBytes followed by the
@@ -91,13 +91,8 @@ func (b *statelessBlock) initialize(bytes []byte, durangoTime time.Time) error {
 		return nil
 	}
 
-	// TODO: Remove durangoTime after v1.11.x has activated.
 	var err error
-	if b.timestamp.Before(durangoTime) {
-		b.cert, err = staking.ParseCertificate(b.StatelessBlock.Certificate)
-	} else {
-		b.cert, err = staking.ParseCertificatePermissive(b.StatelessBlock.Certificate)
-	}
+	b.cert, err = staking.ParseCertificate(b.StatelessBlock.Certificate)
 	if err != nil {
 		return fmt.Errorf("%w: %w", errInvalidCertificate, err)
 	}

@@ -6,7 +6,6 @@ package avax
 import (
 	"math"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -24,7 +23,7 @@ func TestUTXOIDVerifyNil(t *testing.T) {
 func TestUTXOID(t *testing.T) {
 	require := require.New(t)
 
-	c := linearcodec.NewDefault(time.Time{})
+	c := linearcodec.NewDefault()
 	manager := codec.NewDefaultManager()
 	require.NoError(manager.RegisterCodec(codecVersion, c))
 

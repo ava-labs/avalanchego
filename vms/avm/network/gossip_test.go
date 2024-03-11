@@ -5,7 +5,6 @@ package network
 
 import (
 	"testing"
-	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
@@ -34,7 +33,6 @@ func TestMarshaller(t *testing.T) {
 	require := require.New(t)
 
 	parser, err := txs.NewParser(
-		time.Time{},
 		[]fxs.Fx{
 			&secp256k1fx.Fx{},
 		},
@@ -65,7 +63,7 @@ func TestGossipMempoolAdd(t *testing.T) {
 	baseMempool, err := mempool.New("", metrics, toEngine)
 	require.NoError(err)
 
-	parser, err := txs.NewParser(time.Time{}, nil)
+	parser, err := txs.NewParser(nil)
 	require.NoError(err)
 
 	mempool, err := newGossipMempool(
@@ -102,7 +100,7 @@ func TestGossipMempoolAddVerified(t *testing.T) {
 	baseMempool, err := mempool.New("", metrics, toEngine)
 	require.NoError(err)
 
-	parser, err := txs.NewParser(time.Time{}, nil)
+	parser, err := txs.NewParser(nil)
 	require.NoError(err)
 
 	mempool, err := newGossipMempool(
