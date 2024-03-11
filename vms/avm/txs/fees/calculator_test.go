@@ -150,7 +150,7 @@ func TestBaseTxFees(t *testing.T) {
 			}
 
 			fc := &Calculator{
-				IsEUpgradeActive: cfg.IsEUpgradeActivated(chainTime),
+				IsEUpgradeActive: cfg.IsEUActivated(chainTime),
 				Config:           cfg,
 				Codec:            codec,
 				FeeManager:       fees.NewManager(testUnitFees, fees.EmptyWindows),
@@ -271,7 +271,7 @@ func TestCreateAssetTxFees(t *testing.T) {
 			}
 
 			fc := &Calculator{
-				IsEUpgradeActive: cfg.IsEUpgradeActivated(chainTime),
+				IsEUpgradeActive: cfg.IsEUActivated(chainTime),
 				Config:           cfg,
 				Codec:            codec,
 				FeeManager:       fees.NewManager(testUnitFees, fees.EmptyWindows),
@@ -392,7 +392,7 @@ func TestOperationTxFees(t *testing.T) {
 			}
 
 			fc := &Calculator{
-				IsEUpgradeActive: cfg.IsEUpgradeActivated(chainTime),
+				IsEUpgradeActive: cfg.IsEUActivated(chainTime),
 				Config:           cfg,
 				Codec:            codec,
 				FeeManager:       fees.NewManager(testUnitFees, fees.EmptyWindows),
@@ -509,7 +509,7 @@ func TestImportTxFees(t *testing.T) {
 			}
 
 			fc := &Calculator{
-				IsEUpgradeActive: cfg.IsEUpgradeActivated(chainTime),
+				IsEUpgradeActive: cfg.IsEUActivated(chainTime),
 				Config:           cfg,
 				Codec:            codec,
 				FeeManager:       fees.NewManager(testUnitFees, fees.EmptyWindows),
@@ -616,7 +616,7 @@ func TestExportTxFees(t *testing.T) {
 			}
 
 			fc := &Calculator{
-				IsEUpgradeActive: cfg.IsEUpgradeActivated(chainTime),
+				IsEUpgradeActive: cfg.IsEUActivated(chainTime),
 				Config:           cfg,
 				Codec:            codec,
 				FeeManager:       fees.NewManager(testUnitFees, fees.EmptyWindows),
@@ -637,7 +637,6 @@ func createTestFeesCodec(defaultCtx *snow.Context) (codec.Manager, error) {
 	}
 
 	parser, err := block.NewCustomParser(
-		durangoTime,
 		map[reflect.Type]int{},
 		&mockable.Clock{},
 		defaultCtx.Log,

@@ -138,7 +138,7 @@ func (v *SemanticVerifier) verifyBaseTx(
 	creds []*fxs.FxCredential,
 ) error {
 	feeCalculator := fees.Calculator{
-		IsEUpgradeActive: v.Config.IsEUpgradeActivated(v.State.GetTimestamp()),
+		IsEUpgradeActive: v.Config.IsEUActivated(v.State.GetTimestamp()),
 		Config:           v.Config,
 		FeeManager:       v.BlkFeeManager,
 		ConsumedUnitsCap: v.UnitCaps,
