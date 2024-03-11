@@ -145,26 +145,32 @@ func computeNextPriceWindow(
 		Update(&newRollupWindow, start, currentUnitsConsumed)
 	}
 
-	var (
-		totalUnitsConsumed = Sum(newRollupWindow)
-		exponent           = float64(0)
-	)
-
-	switch {
-	case totalUnitsConsumed == target:
-		return currentUnitFee, newRollupWindow
-	case totalUnitsConsumed > target:
-		exponent = float64(updateCoefficient) * float64(totalUnitsConsumed-target) / float64(target)
-	case totalUnitsConsumed < target:
-		exponent = -float64(updateCoefficient) * float64(target-totalUnitsConsumed) / float64(target)
-	}
-
-	nextRawRate := math.Round(float64(currentUnitFee) * math.Exp(exponent))
-	if nextRawRate >= math.MaxUint64 {
-		return math.MaxUint64, newRollupWindow
-	}
-
-	nextUnitFee := uint64(nextRawRate)
+	totalUnitsConsumed := Sum(newRollupWindow)
+	nextUnitFee := nextFeeRate(currentUnitFee, updateCoefficient, totalUnitsConsumed, target)
 	nextUnitFee = max(nextUnitFee, minUnitFee)
 	return nextUnitFee, newRollupWindow
+}
+
+func nextFeeRate(currentUnitFee, updateCoefficient, unitsConsumed, target uint64) uint64 {
+	// We approximate e^{k(u-t)/t} with 2^{k(u-t)/(t ln(2))}
+	// 1/ln(2) is approx. 1,442695
+
+	switch {
+	case unitsConsumed > target:
+		exp := float64(1.442695) * float64(updateCoefficient*(unitsConsumed-target)) / float64(target)
+		intExp := min(uint64(math.Ceil(exp)), 62) // we cap the exponent to avoid an overflow of uint64 type
+		res, over := safemath.Mul64(currentUnitFee, 1<<intExp)
+		if over != nil {
+			return math.MaxUint64
+		}
+		return res
+
+	case unitsConsumed < target:
+		exp := float64(1.442695) * float64(updateCoefficient*(target-unitsConsumed)) / float64(target)
+		intExp := min(uint64(math.Ceil(exp)), 62) // we cap the exponent to avoid an overflow of uint64 type
+		return currentUnitFee / (1 << intExp)
+
+	default:
+		return currentUnitFee // unitsConsumed == target
+	}
 }
