@@ -47,10 +47,10 @@ func TestComputeNextEmptyWindows(t *testing.T) {
 	require.Equal(initialUnitFees[UTXORead], next.unitFees[UTXORead])
 
 	// UTXOWrite units are above target, next unit fees increased
-	require.Equal(uint64(3), next.unitFees[UTXOWrite])
+	require.Equal(uint64(4), next.unitFees[UTXOWrite])
 
 	// Compute units are way above target, next unit fees are increased to the max
-	require.Equal(uint64(math.MaxUint64), next.unitFees[Compute])
+	require.Equal(uint64(4*1<<60), next.unitFees[Compute])
 
 	// next cumulated units are zeroed
 	require.Equal(Dimensions{}, next.cumulatedUnits)
@@ -91,16 +91,16 @@ func TestComputeNextNonEmptyWindows(t *testing.T) {
 	)
 
 	// Bandwidth units are below target, next unit fees are pushed to the minimum
-	require.Equal(initialUnitFees[Bandwidth], next.unitFees[Bandwidth])
+	require.Equal(minUnitFees[Bandwidth], next.unitFees[Bandwidth])
 
 	// UTXORead units are at above target, due to spike in window. Next unit fees are increased
-	require.Equal(uint64(math.MaxUint64), next.unitFees[UTXORead])
+	require.Equal(uint64(4*1<<60), next.unitFees[UTXORead])
 
 	// UTXOWrite units are above target, even if they are decreasing within the window. Next unit fees increased.
-	require.Equal(uint64(1739274941520500992), next.unitFees[UTXOWrite])
+	require.Equal(uint64(2*1<<60), next.unitFees[UTXOWrite])
 
 	// Compute units are above target, next unit fees are increased.
-	require.Equal(uint64(math.MaxUint64), next.unitFees[Compute])
+	require.Equal(uint64(4*1<<60), next.unitFees[Compute])
 
 	// next cumulated units are zeroed
 	require.Equal(Dimensions{}, next.cumulatedUnits)
@@ -147,10 +147,10 @@ func TestComputeNextEdgeCases(t *testing.T) {
 	require.Equal(initialUnitFees[UTXORead], next.unitFees[UTXORead])
 
 	// UTXOWrite units are below target. Unit fees are decreased.
-	require.Equal(initialUnitFees[UTXOWrite]/2, next.unitFees[UTXOWrite])
+	require.Equal(minUnitFees[UTXOWrite], next.unitFees[UTXOWrite])
 
 	// Compute units are below target. Unit fees are decreased.
-	require.Equal(initialUnitFees[Compute]/2, next.unitFees[Compute])
+	require.Equal(minUnitFees[Compute], next.unitFees[Compute])
 
 	// next cumulated units are zeroed
 	require.Equal(Dimensions{}, next.cumulatedUnits)
