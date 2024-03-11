@@ -264,6 +264,19 @@ func buildBlock(
 	forceAdvanceTime bool,
 	parentState state.Chain,
 ) (block.Block, error) {
+	blockTxs, err := packBlockTxs(
+		parentID,
+		parentState,
+		builder.Mempool,
+		builder.txExecutorBackend,
+		builder.blkManager,
+		timestamp,
+		targetBlockSize,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to pack block txs: %w", err)
+	}
+
 	// Try rewarding stakers whose staking period ends at the new chain time.
 	// This is done first to prioritize advancing the timestamp as quickly as
 	// possible.
@@ -277,23 +290,6 @@ func buildBlock(
 			return nil, fmt.Errorf("could not build tx to reward staker: %w", err)
 		}
 
-		var blockTxs []*txs.Tx
-		// TODO: Cleanup post-Durango
-		if builder.txExecutorBackend.Config.IsDurangoActivated(timestamp) {
-			blockTxs, err = packBlockTxs(
-				parentID,
-				parentState,
-				builder.Mempool,
-				builder.txExecutorBackend,
-				builder.blkManager,
-				timestamp,
-				targetBlockSize,
-			)
-			if err != nil {
-				return nil, fmt.Errorf("failed to pack block txs: %w", err)
-			}
-		}
-
 		return block.NewBanffProposalBlock(
 			timestamp,
 			parentID,
@@ -301,19 +297,6 @@ func buildBlock(
 			rewardValidatorTx,
 			blockTxs,
 		)
-	}
-
-	blockTxs, err := packBlockTxs(
-		parentID,
-		parentState,
-		builder.Mempool,
-		builder.txExecutorBackend,
-		builder.blkManager,
-		timestamp,
-		targetBlockSize,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to pack block txs: %w", err)
 	}
 
 	// If there is no reason to build a block, don't.
