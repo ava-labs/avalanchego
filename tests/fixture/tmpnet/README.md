@@ -231,3 +231,44 @@ The process details of a node are written by avalanchego to
 `[base-data-dir]/process.json`. The file contains the PID of the node
 process, the URI of the node's API, and the address other nodes can
 use to bootstrap themselves (aka staking address).
+
+## Metrics
+
+### Prometheus configuration
+
+When nodes are started, prometheus configuration for each node is
+written to `~/.tmpnet/prometheus/file_sd_configs/` with a filename of
+`[network uuid]-[node id].json`. Prometheus can be configured to
+scrape the nodes as per the following example:
+
+```yaml
+scrape_configs:
+  - job_name: "avalanchego"
+    metrics_path: "/ext/metrics"
+    file_sd_configs:
+      - files:
+        - '/home/me/.tmpnet/prometheus/file_sd_configs/*.yaml'
+```
+
+### Viewing metrics
+
+When  a network  is  started with  `tmpnet`, a  grafana  link for  the
+network's metrics will be emitted.
+
+The metrics emitted by temporary networks configured with tmpnet will
+have the following labels applied:
+
+ - `network_uuid`
+ - `node_id`
+ - `is_ephemeral_node`
+ - `network_owner`
+
+When a tmpnet network runs as part of github CI, the following
+additional labels will be applied:
+
+ - `gh_repo`
+ - `gh_workflow`
+ - `gh_run_id`
+ - `gh_run_number`
+ - `gh_run_attempt`
+ - `gh_job_id`
