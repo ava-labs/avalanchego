@@ -29,7 +29,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/math/meter"
 	"github.com/ava-labs/avalanchego/utils/resource"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/version"
 )
 
@@ -591,14 +590,9 @@ func TestShouldDisconnect(t *testing.T) {
 			expectedShouldDisconnect: false,
 		},
 		{
-			name: "past durango without a signature",
+			name: "peer without signature",
 			initialPeer: &peer{
 				Config: &Config{
-					Clock: func() mockable.Clock {
-						clk := mockable.Clock{}
-						clk.Set(mockable.MaxTime)
-						return clk
-					}(),
 					Log:                  logging.NoLog{},
 					VersionCompatibility: version.GetCompatibility(constants.UnitTestID),
 					Validators: func() validators.Manager {
@@ -619,11 +613,6 @@ func TestShouldDisconnect(t *testing.T) {
 			},
 			expectedPeer: &peer{
 				Config: &Config{
-					Clock: func() mockable.Clock {
-						clk := mockable.Clock{}
-						clk.Set(mockable.MaxTime)
-						return clk
-					}(),
 					Log:                  logging.NoLog{},
 					VersionCompatibility: version.GetCompatibility(constants.UnitTestID),
 					Validators: func() validators.Manager {
@@ -645,68 +634,9 @@ func TestShouldDisconnect(t *testing.T) {
 			expectedShouldDisconnect: true,
 		},
 		{
-			name: "pre durango without a signature",
+			name: "peer with invalid signature",
 			initialPeer: &peer{
 				Config: &Config{
-					Clock: func() mockable.Clock {
-						clk := mockable.Clock{}
-						clk.Set(time.Time{})
-						return clk
-					}(),
-					Log:                  logging.NoLog{},
-					VersionCompatibility: version.GetCompatibility(constants.UnitTestID),
-					Validators: func() validators.Manager {
-						vdrs := validators.NewManager()
-						require.NoError(t, vdrs.AddStaker(
-							constants.PrimaryNetworkID,
-							peerID,
-							bls.PublicFromSecretKey(blsKey),
-							txID,
-							1,
-						))
-						return vdrs
-					}(),
-				},
-				id:      peerID,
-				version: version.CurrentApp,
-				ip:      &SignedIP{},
-			},
-			expectedPeer: &peer{
-				Config: &Config{
-					Clock: func() mockable.Clock {
-						clk := mockable.Clock{}
-						clk.Set(time.Time{})
-						return clk
-					}(),
-					Log:                  logging.NoLog{},
-					VersionCompatibility: version.GetCompatibility(constants.UnitTestID),
-					Validators: func() validators.Manager {
-						vdrs := validators.NewManager()
-						require.NoError(t, vdrs.AddStaker(
-							constants.PrimaryNetworkID,
-							peerID,
-							bls.PublicFromSecretKey(blsKey),
-							txID,
-							1,
-						))
-						return vdrs
-					}(),
-				},
-				id:      peerID,
-				version: version.CurrentApp,
-				ip:      &SignedIP{},
-			},
-			expectedShouldDisconnect: false,
-		},
-		{
-			name: "pre durango with an invalid signature",
-			initialPeer: &peer{
-				Config: &Config{
-					Clock: func() mockable.Clock {
-						clk := mockable.Clock{}
-						clk.Set(time.Time{})
-						return clk
-					}(),
 					Log:                  logging.NoLog{},
 					VersionCompatibility: version.GetCompatibility(constants.UnitTestID),
 					Validators: func() validators.Manager {
@@ -729,11 +659,6 @@ func TestShouldDisconnect(t *testing.T) {
 			},
 			expectedPeer: &peer{
 				Config: &Config{
-					Clock: func() mockable.Clock {
-						clk := mockable.Clock{}
-						clk.Set(time.Time{})
-						return clk
-					}(),
 					Log:                  logging.NoLog{},
 					VersionCompatibility: version.GetCompatibility(constants.UnitTestID),
 					Validators: func() validators.Manager {
@@ -757,14 +682,9 @@ func TestShouldDisconnect(t *testing.T) {
 			expectedShouldDisconnect: true,
 		},
 		{
-			name: "pre durango with a valid signature",
+			name: "peer with valid signature",
 			initialPeer: &peer{
 				Config: &Config{
-					Clock: func() mockable.Clock {
-						clk := mockable.Clock{}
-						clk.Set(time.Time{})
-						return clk
-					}(),
 					Log:                  logging.NoLog{},
 					VersionCompatibility: version.GetCompatibility(constants.UnitTestID),
 					Validators: func() validators.Manager {
@@ -787,11 +707,6 @@ func TestShouldDisconnect(t *testing.T) {
 			},
 			expectedPeer: &peer{
 				Config: &Config{
-					Clock: func() mockable.Clock {
-						clk := mockable.Clock{}
-						clk.Set(time.Time{})
-						return clk
-					}(),
 					Log:                  logging.NoLog{},
 					VersionCompatibility: version.GetCompatibility(constants.UnitTestID),
 					Validators: func() validators.Manager {

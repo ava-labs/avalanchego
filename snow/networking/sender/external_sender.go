@@ -6,6 +6,7 @@ package sender
 import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
@@ -13,22 +14,10 @@ import (
 // ExternalSender sends consensus messages to other validators
 // Right now this is implemented in the networking package
 type ExternalSender interface {
-	// Send a message to a specific set of nodes
 	Send(
 		msg message.OutboundMessage,
-		nodeIDs set.Set[ids.NodeID],
+		config common.SendConfig,
 		subnetID ids.ID,
-		allower subnets.Allower,
-	) set.Set[ids.NodeID]
-
-	// Send a message to a random group of nodes in a subnet.
-	// Nodes are sampled based on their validator status.
-	Gossip(
-		msg message.OutboundMessage,
-		subnetID ids.ID,
-		numValidatorsToSend int,
-		numNonValidatorsToSend int,
-		numPeersToSend int,
 		allower subnets.Allower,
 	) set.Set[ids.NodeID]
 }
