@@ -272,12 +272,6 @@ func NewNetwork(
 		IPSigner:             peer.NewIPSigner(config.MyIPPort, config.TLSKey, config.BLSKey),
 	}
 
-	// Invariant: We delay the activation of durango during the TLS handshake to
-	// avoid gossiping any TLS certs that anyone else in the network may
-	// consider invalid. Recall that if a peer gossips an invalid cert, the
-	// connection is terminated.
-	durangoTime := version.GetDurangoTime(config.NetworkID)
-	durangoTimeWithClockSkew := durangoTime.Add(config.MaxClockDifference)
 	onCloseCtx, cancel := context.WithCancel(context.Background())
 	n := &network{
 		config:               config,
@@ -288,8 +282,8 @@ func NewNetwork(
 		inboundConnUpgradeThrottler: throttling.NewInboundConnUpgradeThrottler(log, config.ThrottlerConfig.InboundConnUpgradeThrottlerConfig),
 		listener:                    listener,
 		dialer:                      dialer,
-		serverUpgrader:              peer.NewTLSServerUpgrader(config.TLSConfig, metrics.tlsConnRejected, durangoTimeWithClockSkew),
-		clientUpgrader:              peer.NewTLSClientUpgrader(config.TLSConfig, metrics.tlsConnRejected, durangoTimeWithClockSkew),
+		serverUpgrader:              peer.NewTLSServerUpgrader(config.TLSConfig, metrics.tlsConnRejected),
+		clientUpgrader:              peer.NewTLSClientUpgrader(config.TLSConfig, metrics.tlsConnRejected),
 
 		onCloseCtx:       onCloseCtx,
 		onCloseCtxCancel: cancel,
