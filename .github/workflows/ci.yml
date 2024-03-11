@@ -80,6 +80,7 @@ jobs:
         env:
           PROMETHEUS_URL: ${{ env.prometheus_url }}
           GH_JOB_ID: ${{ github.job }}
+          FILTER_BY_OWNER: avalanchego-e2e
       - name: Run e2e tests
         shell: bash
         # TODO(maru) Ensure network stays up for final metrics scrape

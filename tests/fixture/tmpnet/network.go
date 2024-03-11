@@ -71,7 +71,9 @@ type Network struct {
 	// unique network ID values across all temporary networks.
 	UUID string
 
-	// A string identifying the entity that started or maintains this network.
+	// A string identifying the entity that started or maintains this
+	// network. Useful for differentiating between networks when a
+	// given CI job uses multiple networks.
 	Owner string
 
 	// Path where network configuration and data is stored
@@ -464,6 +466,9 @@ func (n *Network) EnsureNodeConfig(node *Node) error {
 
 	// Ensure nodes can write include the network uuid in their monitoring configuration
 	node.NetworkUUID = n.UUID
+
+	// Ensure nodes can label metrics with an indication of the shared/private nature of the network
+	node.NetworkOwner = n.Owner
 
 	// Set the network name if available
 	if n.Genesis != nil && n.Genesis.NetworkID > 0 {

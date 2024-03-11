@@ -304,6 +304,7 @@ func (p *NodeProcess) writePrometheusConfig() error {
 				"network_uuid":      p.node.NetworkUUID,
 				"node_id":           p.node.NodeID,
 				"is_ephemeral_node": strconv.FormatBool(p.node.IsEphemeral),
+				"network_owner":     p.node.NetworkOwner,
 				// Prometheus ignores empty values so running this outside
 				// of a github worker should have no ill-effect.
 				"gh_repo":        os.Getenv("GH_REPO"),
