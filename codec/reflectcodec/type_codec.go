@@ -10,7 +10,6 @@ import (
 	"math"
 	"reflect"
 	"slices"
-	"time"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -71,19 +70,15 @@ type TypeCodec interface {
 //  6. Serialized fields must be exported
 //  7. nil slices are marshaled as empty slices
 type genericCodec struct {
-	typer       TypeCodec
-	durangoTime time.Time // Time after which [maxSliceLen] will be ignored
-	maxSliceLen uint32
-	fielder     StructFielder
+	typer   TypeCodec
+	fielder StructFielder
 }
 
 // New returns a new, concurrency-safe codec
-func New(typer TypeCodec, tagNames []string, durangoTime time.Time, maxSliceLen uint32) codec.Codec {
+func New(typer TypeCodec, tagNames []string) codec.Codec {
 	return &genericCodec{
-		typer:       typer,
-		durangoTime: durangoTime,
-		maxSliceLen: maxSliceLen,
-		fielder:     NewStructFielder(tagNames),
+		typer:   typer,
+		fielder: NewStructFielder(tagNames),
 	}
 }
 
@@ -378,13 +373,6 @@ func (c *genericCodec) marshal(
 				math.MaxInt32,
 			)
 		}
-		if time.Now().Before(c.durangoTime) && uint32(numElts) > c.maxSliceLen {
-			return fmt.Errorf("%w; slice length, %d, exceeds maximum length, %d",
-				codec.ErrMaxSliceLenExceeded,
-				numElts,
-				c.maxSliceLen,
-			)
-		}
 		p.PackInt(uint32(numElts)) // pack # elements
 		if p.Err != nil {
 			return p.Err
@@ -443,13 +431,6 @@ func (c *genericCodec) marshal(
 				codec.ErrMaxSliceLenExceeded,
 				numElts,
 				math.MaxInt32,
-			)
-		}
-		if time.Now().Before(c.durangoTime) && uint32(numElts) > c.maxSliceLen {
-			return fmt.Errorf("%w; map length, %d, exceeds maximum length, %d",
-				codec.ErrMaxSliceLenExceeded,
-				numElts,
-				c.maxSliceLen,
 			)
 		}
 		p.PackInt(uint32(numElts)) // pack # elements
@@ -619,13 +600,6 @@ func (c *genericCodec) unmarshal(
 				math.MaxInt32,
 			)
 		}
-		if time.Now().Before(c.durangoTime) && numElts32 > c.maxSliceLen {
-			return fmt.Errorf("%w; array length, %d, exceeds maximum length, %d",
-				codec.ErrMaxSliceLenExceeded,
-				numElts32,
-				c.maxSliceLen,
-			)
-		}
 		numElts := int(numElts32)
 
 		sliceType := value.Type()
@@ -730,13 +704,6 @@ func (c *genericCodec) unmarshal(
 				codec.ErrMaxSliceLenExceeded,
 				numElts32,
 				math.MaxInt32,
-			)
-		}
-		if time.Now().Before(c.durangoTime) && numElts32 > c.maxSliceLen {
-			return fmt.Errorf("%w; map length, %d, exceeds maximum length, %d",
-				codec.ErrMaxSliceLenExceeded,
-				numElts32,
-				c.maxSliceLen,
 			)
 		}
 

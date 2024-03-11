@@ -513,7 +513,6 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 	require.True(ok)
 
 	parser, err := block.NewParser(
-		time.Time{},
 		[]fxs.Fx{
 			&secp256k1fx.Fx{},
 		},
