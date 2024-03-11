@@ -274,7 +274,7 @@ func defaultVM(t *testing.T, f fork) (*VM, database.Database, *mutableSharedMemo
 	_, genesisBytes := defaultGenesis(t, ctx.AVAXAssetID)
 	appSender := &common.SenderTest{}
 	appSender.CantSendAppGossip = true
-	appSender.SendAppGossipF = func(context.Context, []byte, int, int, int) error {
+	appSender.SendAppGossipF = func(context.Context, common.SendConfig, []byte) error {
 		return nil
 	}
 
@@ -1503,7 +1503,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	ctx.Lock.Lock()
 	var reqID uint32
-	externalSender.SendF = func(msg message.OutboundMessage, nodeIDs set.Set[ids.NodeID], _ ids.ID, _ subnets.Allower) set.Set[ids.NodeID] {
+	externalSender.SendF = func(msg message.OutboundMessage, config common.SendConfig, _ ids.ID, _ subnets.Allower) set.Set[ids.NodeID] {
 		inMsg, err := mc.Parse(msg.Bytes(), ctx.NodeID, func() {})
 		require.NoError(err)
 		require.Equal(message.GetAcceptedFrontierOp, inMsg.Op())
@@ -1512,24 +1512,24 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		require.True(ok)
 
 		reqID = requestID
-		return nodeIDs
+		return config.NodeIDs
 	}
 
 	require.NoError(bootstrapper.Connected(context.Background(), peerID, version.CurrentApp))
 
-	externalSender.SendF = func(msg message.OutboundMessage, nodeIDs set.Set[ids.NodeID], _ ids.ID, _ subnets.Allower) set.Set[ids.NodeID] {
+	externalSender.SendF = func(msg message.OutboundMessage, config common.SendConfig, _ ids.ID, _ subnets.Allower) set.Set[ids.NodeID] {
 		inMsgIntf, err := mc.Parse(msg.Bytes(), ctx.NodeID, func() {})
 		require.NoError(err)
 		require.Equal(message.GetAcceptedOp, inMsgIntf.Op())
 		inMsg := inMsgIntf.Message().(*p2p.GetAccepted)
 
 		reqID = inMsg.RequestId
-		return nodeIDs
+		return config.NodeIDs
 	}
 
 	require.NoError(bootstrapper.AcceptedFrontier(context.Background(), peerID, reqID, advanceTimeBlkID))
 
-	externalSender.SendF = func(msg message.OutboundMessage, nodeIDs set.Set[ids.NodeID], _ ids.ID, _ subnets.Allower) set.Set[ids.NodeID] {
+	externalSender.SendF = func(msg message.OutboundMessage, config common.SendConfig, _ ids.ID, _ subnets.Allower) set.Set[ids.NodeID] {
 		inMsgIntf, err := mc.Parse(msg.Bytes(), ctx.NodeID, func() {})
 		require.NoError(err)
 		require.Equal(message.GetAncestorsOp, inMsgIntf.Op())
@@ -1540,13 +1540,13 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		containerID, err := ids.ToID(inMsg.ContainerId)
 		require.NoError(err)
 		require.Equal(advanceTimeBlkID, containerID)
-		return nodeIDs
+		return config.NodeIDs
 	}
 
 	frontier := set.Of(advanceTimeBlkID)
 	require.NoError(bootstrapper.Accepted(context.Background(), peerID, reqID, frontier))
 
-	externalSender.SendF = func(msg message.OutboundMessage, nodeIDs set.Set[ids.NodeID], _ ids.ID, _ subnets.Allower) set.Set[ids.NodeID] {
+	externalSender.SendF = func(msg message.OutboundMessage, config common.SendConfig, _ ids.ID, _ subnets.Allower) set.Set[ids.NodeID] {
 		inMsg, err := mc.Parse(msg.Bytes(), ctx.NodeID, func() {})
 		require.NoError(err)
 		require.Equal(message.GetAcceptedFrontierOp, inMsg.Op())
@@ -1555,19 +1555,19 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		require.True(ok)
 
 		reqID = requestID
-		return nodeIDs
+		return config.NodeIDs
 	}
 
 	require.NoError(bootstrapper.Ancestors(context.Background(), peerID, reqID, [][]byte{advanceTimeBlkBytes}))
 
-	externalSender.SendF = func(msg message.OutboundMessage, nodeIDs set.Set[ids.NodeID], _ ids.ID, _ subnets.Allower) set.Set[ids.NodeID] {
+	externalSender.SendF = func(msg message.OutboundMessage, config common.SendConfig, _ ids.ID, _ subnets.Allower) set.Set[ids.NodeID] {
 		inMsgIntf, err := mc.Parse(msg.Bytes(), ctx.NodeID, func() {})
 		require.NoError(err)
 		require.Equal(message.GetAcceptedOp, inMsgIntf.Op())
 		inMsg := inMsgIntf.Message().(*p2p.GetAccepted)
 
 		reqID = inMsg.RequestId
-		return nodeIDs
+		return config.NodeIDs
 	}
 
 	require.NoError(bootstrapper.AcceptedFrontier(context.Background(), peerID, reqID, advanceTimeBlkID))
