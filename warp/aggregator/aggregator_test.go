@@ -23,7 +23,7 @@ func newValidator(t testing.TB, weight uint64) (*bls.SecretKey, *avalancheWarp.V
 	pk := bls.PublicFromSecretKey(sk)
 	return sk, &avalancheWarp.Validator{
 		PublicKey:      pk,
-		PublicKeyBytes: bls.PublicKeyToBytes(pk),
+		PublicKeyBytes: bls.PublicKeyToCompressedBytes(pk),
 		Weight:         weight,
 		NodeIDs:        []ids.NodeID{ids.GenerateTestNodeID()},
 	}

@@ -5,7 +5,6 @@ package evm
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
@@ -16,14 +15,12 @@ import (
 // Codec does serialization and deserialization
 var Codec codec.Manager
 
-// TODO: Remove after v1.11.x has activated
-//
-// Invariant: InitCodec and Codec must not be accessed concurrently
-func InitCodec(durangoTime time.Time) error {
+func init() {
+	Codec = codec.NewDefaultManager()
+
 	var (
-		lc       = linearcodec.NewDefault(durangoTime)
-		newCodec = codec.NewDefaultManager()
-		errs     = wrappers.Errs{}
+		lc   = linearcodec.NewDefault()
+		errs = wrappers.Errs{}
 	)
 	errs.Add(
 		lc.RegisterType(&UnsignedImportTx{}),
@@ -38,19 +35,10 @@ func InitCodec(durangoTime time.Time) error {
 		lc.RegisterType(&secp256k1fx.Credential{}),
 		lc.RegisterType(&secp256k1fx.Input{}),
 		lc.RegisterType(&secp256k1fx.OutputOwners{}),
-		newCodec.RegisterCodec(codecVersion, lc),
+		Codec.RegisterCodec(codecVersion, lc),
 	)
 	if errs.Errored() {
-		return errs.Err
-	}
-
-	Codec = newCodec
-	return nil
-}
-
-func init() {
-	if err := InitCodec(time.Time{}); err != nil {
-		panic(err)
+		panic(errs.Err)
 	}
 }
 
