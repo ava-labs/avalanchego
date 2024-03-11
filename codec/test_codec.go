@@ -8,8 +8,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 var (
@@ -46,19 +44,11 @@ var (
 		TestExtraSpace,
 		TestSliceLengthOverflow,
 		TestMap,
+		TestCanMarshalLargeSlices,
 	}
 
 	MultipleTagsTests = []func(c GeneralCodec, t testing.TB){
 		TestMultipleTags,
-	}
-
-	EnforceSliceLenTests = []func(c GeneralCodec, t testing.TB){
-		TestCanNotMarshalLargeSlices,
-		TestCanNotUnmarshalLargeSlices,
-	}
-
-	IgnoreSliceLenTests = []func(c GeneralCodec, t testing.TB){
-		TestCanMarshalLargeSlices,
 	}
 )
 
@@ -1086,35 +1076,6 @@ func TestMap(codec GeneralCodec, t testing.TB) {
 	outerArraySize, err := manager.Size(0, outerArray)
 	require.NoError(err)
 	require.Len(outerArrayBytes, outerArraySize)
-}
-
-func TestCanNotMarshalLargeSlices(codec GeneralCodec, t testing.TB) {
-	require := require.New(t)
-
-	data := make([]uint16, 1_000_000)
-
-	manager := NewManager(math.MaxInt)
-	require.NoError(manager.RegisterCodec(0, codec))
-
-	_, err := manager.Marshal(0, data)
-	require.ErrorIs(err, ErrMaxSliceLenExceeded)
-}
-
-func TestCanNotUnmarshalLargeSlices(codec GeneralCodec, t testing.TB) {
-	require := require.New(t)
-
-	writer := wrappers.Packer{
-		Bytes: make([]byte, 2+4+2_000_000),
-	}
-	writer.PackShort(0)
-	writer.PackInt(1_000_000)
-
-	manager := NewManager(math.MaxInt)
-	require.NoError(manager.RegisterCodec(0, codec))
-
-	var data []uint16
-	_, err := manager.Unmarshal(writer.Bytes, &data)
-	require.ErrorIs(err, ErrMaxSliceLenExceeded)
 }
 
 func TestCanMarshalLargeSlices(codec GeneralCodec, t testing.TB) {

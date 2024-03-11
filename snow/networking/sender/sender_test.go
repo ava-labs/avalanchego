@@ -605,7 +605,6 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 		requestID     = uint32(1337)
 		heights       = []uint64{1, 2, 3}
 		containerIDs  = []ids.ID{ids.GenerateTestID(), ids.GenerateTestID()}
-		engineType    = p2p.EngineType_ENGINE_TYPE_SNOWMAN
 	)
 	snowCtx := snowtest.Context(t, snowtest.PChainID)
 	ctx := snowtest.ConsensusContext(snowCtx)
@@ -618,7 +617,6 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 		setMsgCreatorExpect     func(msgCreator *message.MockOutboundMsgBuilder)
 		setExternalSenderExpect func(externalSender *MockExternalSender)
 		sendF                   func(require *require.Assertions, sender common.Sender, nodeIDs set.Set[ids.NodeID])
-		engineType              p2p.EngineType
 	}
 
 	tests := []test{
@@ -713,7 +711,6 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 					nodeID,
 					ctx.ChainID,
 					requestID,
-					engineType,
 				)
 			},
 			assertMsgToMyself: func(require *require.Assertions, msg message.InboundMessage) {
@@ -722,7 +719,6 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 				require.Equal(ctx.ChainID[:], innerMsg.ChainId)
 				require.Equal(requestID, innerMsg.RequestId)
 				require.Equal(uint64(deadline), innerMsg.Deadline)
-				require.Equal(engineType, innerMsg.EngineType)
 			},
 			expectedResponseOp: message.AcceptedFrontierOp,
 			setMsgCreatorExpect: func(msgCreator *message.MockOutboundMsgBuilder) {
@@ -730,7 +726,6 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 					ctx.ChainID,
 					requestID,
 					deadline,
-					engineType,
 				).Return(nil, nil)
 			},
 			setExternalSenderExpect: func(externalSender *MockExternalSender) {
@@ -747,7 +742,6 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 			sendF: func(_ *require.Assertions, sender common.Sender, nodeIDs set.Set[ids.NodeID]) {
 				sender.SendGetAcceptedFrontier(context.Background(), nodeIDs, requestID)
 			},
-			engineType: engineType,
 		},
 		{
 			name: "GetAccepted",
@@ -756,7 +750,6 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 					nodeID,
 					ctx.ChainID,
 					requestID,
-					engineType,
 				)
 			},
 			assertMsgToMyself: func(require *require.Assertions, msg message.InboundMessage) {
@@ -765,7 +758,6 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 				require.Equal(ctx.ChainID[:], innerMsg.ChainId)
 				require.Equal(requestID, innerMsg.RequestId)
 				require.Equal(uint64(deadline), innerMsg.Deadline)
-				require.Equal(engineType, innerMsg.EngineType)
 			},
 			expectedResponseOp: message.AcceptedOp,
 			setMsgCreatorExpect: func(msgCreator *message.MockOutboundMsgBuilder) {
@@ -774,7 +766,6 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 					requestID,
 					deadline,
 					containerIDs,
-					engineType,
 				).Return(nil, nil)
 			},
 			setExternalSenderExpect: func(externalSender *MockExternalSender) {
@@ -791,7 +782,6 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 			sendF: func(_ *require.Assertions, sender common.Sender, nodeIDs set.Set[ids.NodeID]) {
 				sender.SendGetAccepted(context.Background(), nodeIDs, requestID, containerIDs)
 			},
-			engineType: engineType,
 		},
 	}
 
@@ -820,7 +810,7 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 				externalSender,
 				router,
 				timeoutManager,
-				engineType,
+				p2p.EngineType_ENGINE_TYPE_SNOWMAN,
 				subnets.New(ctx.NodeID, subnets.Config{}),
 			)
 			require.NoError(err)
@@ -839,7 +829,7 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 					requestID,             // Request ID
 					tt.expectedResponseOp, // Operation
 					expectedFailedMsg,     // Failure Message
-					tt.engineType,
+					p2p.EngineType_ENGINE_TYPE_UNSPECIFIED,
 				)
 			}
 
@@ -877,7 +867,6 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 		requestID         = uint32(1337)
 		summaryIDs        = []ids.ID{ids.GenerateTestID(), ids.GenerateTestID()}
 		summary           = []byte{1, 2, 3}
-		engineType        = p2p.EngineType_ENGINE_TYPE_AVALANCHE
 	)
 	snowCtx := snowtest.Context(t, snowtest.PChainID)
 	ctx := snowtest.ConsensusContext(snowCtx)
@@ -1040,7 +1029,7 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 				externalSender,
 				router,
 				timeoutManager,
-				engineType,
+				p2p.EngineType_ENGINE_TYPE_SNOWMAN,
 				subnets.New(ctx.NodeID, subnets.Config{}),
 			)
 			require.NoError(err)
@@ -1095,6 +1084,7 @@ func TestSender_Single_Request(t *testing.T) {
 		setMsgCreatorExpect     func(msgCreator *message.MockOutboundMsgBuilder)
 		setExternalSenderExpect func(externalSender *MockExternalSender, sentTo set.Set[ids.NodeID])
 		sendF                   func(require *require.Assertions, sender common.Sender, nodeID ids.NodeID)
+		expectedEngineType      p2p.EngineType
 	}
 
 	tests := []test{
@@ -1138,6 +1128,7 @@ func TestSender_Single_Request(t *testing.T) {
 			sendF: func(_ *require.Assertions, sender common.Sender, nodeID ids.NodeID) {
 				sender.SendGetAncestors(context.Background(), nodeID, requestID, containerID)
 			},
+			expectedEngineType: engineType,
 		},
 		{
 			name: "Get",
@@ -1146,7 +1137,6 @@ func TestSender_Single_Request(t *testing.T) {
 					nodeID,
 					ctx.ChainID,
 					requestID,
-					engineType,
 				)
 			},
 			assertMsgToMyself: func(require *require.Assertions, msg message.InboundMessage) {
@@ -1154,7 +1144,6 @@ func TestSender_Single_Request(t *testing.T) {
 				innerMsg := msg.Message().(*message.GetFailed)
 				require.Equal(ctx.ChainID, innerMsg.ChainID)
 				require.Equal(requestID, innerMsg.RequestID)
-				require.Equal(engineType, innerMsg.EngineType)
 			},
 			expectedResponseOp: message.PutOp,
 			setMsgCreatorExpect: func(msgCreator *message.MockOutboundMsgBuilder) {
@@ -1163,7 +1152,6 @@ func TestSender_Single_Request(t *testing.T) {
 					requestID,
 					deadline,
 					containerID,
-					engineType,
 				).Return(nil, nil)
 			},
 			setExternalSenderExpect: func(externalSender *MockExternalSender, sentTo set.Set[ids.NodeID]) {
@@ -1224,7 +1212,7 @@ func TestSender_Single_Request(t *testing.T) {
 					requestID,             // Request ID
 					tt.expectedResponseOp, // Operation
 					expectedFailedMsg,     // Failure Message
-					engineType,            // Engine Type
+					tt.expectedEngineType, // Engine Type
 				)
 
 				// Note that HandleInbound is called in a separate goroutine
@@ -1260,7 +1248,7 @@ func TestSender_Single_Request(t *testing.T) {
 					requestID,             // Request ID
 					tt.expectedResponseOp, // Operation
 					expectedFailedMsg,     // Failure Message
-					engineType,            // Engine Type
+					tt.expectedEngineType, // Engine Type
 				)
 
 				// Note that HandleInbound is called in a separate goroutine
@@ -1296,7 +1284,7 @@ func TestSender_Single_Request(t *testing.T) {
 					requestID,             // Request ID
 					tt.expectedResponseOp, // Operation
 					expectedFailedMsg,     // Failure Message
-					engineType,            // Engine Type
+					tt.expectedEngineType, // Engine Type
 				)
 
 				// Note that HandleInbound is called in a separate goroutine
