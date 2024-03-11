@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -24,7 +23,7 @@ var errTest = errors.New("non-nil error")
 func TestInitialStateVerifySerialization(t *testing.T) {
 	require := require.New(t)
 
-	c := linearcodec.NewDefault(time.Time{})
+	c := linearcodec.NewDefault()
 	require.NoError(c.RegisterType(&secp256k1fx.TransferOutput{}))
 	m := codec.NewDefaultManager()
 	require.NoError(m.RegisterCodec(CodecVersion, c))
@@ -81,7 +80,7 @@ func TestInitialStateVerifySerialization(t *testing.T) {
 func TestInitialStateVerifyNil(t *testing.T) {
 	require := require.New(t)
 
-	c := linearcodec.NewDefault(time.Time{})
+	c := linearcodec.NewDefault()
 	m := codec.NewDefaultManager()
 	require.NoError(m.RegisterCodec(CodecVersion, c))
 	numFxs := 1
@@ -94,7 +93,7 @@ func TestInitialStateVerifyNil(t *testing.T) {
 func TestInitialStateVerifyUnknownFxID(t *testing.T) {
 	require := require.New(t)
 
-	c := linearcodec.NewDefault(time.Time{})
+	c := linearcodec.NewDefault()
 	m := codec.NewDefaultManager()
 	require.NoError(m.RegisterCodec(CodecVersion, c))
 	numFxs := 1
@@ -109,7 +108,7 @@ func TestInitialStateVerifyUnknownFxID(t *testing.T) {
 func TestInitialStateVerifyNilOutput(t *testing.T) {
 	require := require.New(t)
 
-	c := linearcodec.NewDefault(time.Time{})
+	c := linearcodec.NewDefault()
 	m := codec.NewDefaultManager()
 	require.NoError(m.RegisterCodec(CodecVersion, c))
 	numFxs := 1
@@ -125,7 +124,7 @@ func TestInitialStateVerifyNilOutput(t *testing.T) {
 func TestInitialStateVerifyInvalidOutput(t *testing.T) {
 	require := require.New(t)
 
-	c := linearcodec.NewDefault(time.Time{})
+	c := linearcodec.NewDefault()
 	require.NoError(c.RegisterType(&avax.TestState{}))
 	m := codec.NewDefaultManager()
 	require.NoError(m.RegisterCodec(CodecVersion, c))
@@ -142,7 +141,7 @@ func TestInitialStateVerifyInvalidOutput(t *testing.T) {
 func TestInitialStateVerifyUnsortedOutputs(t *testing.T) {
 	require := require.New(t)
 
-	c := linearcodec.NewDefault(time.Time{})
+	c := linearcodec.NewDefault()
 	require.NoError(c.RegisterType(&avax.TestTransferable{}))
 	m := codec.NewDefaultManager()
 	require.NoError(m.RegisterCodec(CodecVersion, c))

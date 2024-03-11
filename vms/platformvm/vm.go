@@ -130,7 +130,7 @@ func (vm *VM) Initialize(
 	vm.db = db
 
 	// Note: this codec is never used to serialize anything
-	vm.codecRegistry = linearcodec.NewDefault(time.Time{})
+	vm.codecRegistry = linearcodec.NewDefault()
 	vm.fx = &secp256k1fx.Fx{}
 	if err := vm.fx.Initialize(vm); err != nil {
 		return err

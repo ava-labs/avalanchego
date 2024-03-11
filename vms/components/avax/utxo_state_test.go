@@ -5,7 +5,6 @@ package avax
 
 import (
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -42,7 +41,7 @@ func TestUTXOState(t *testing.T) {
 	}
 	utxoID := utxo.InputID()
 
-	c := linearcodec.NewDefault(time.Time{})
+	c := linearcodec.NewDefault()
 	manager := codec.NewDefaultManager()
 
 	require.NoError(c.RegisterType(&secp256k1fx.MintOutput{}))
