@@ -523,20 +523,12 @@ func (p *peer) writeMessages() {
 	}
 
 	myVersion := p.VersionCompatibility.Version()
-	legacyApplication := &version.Application{
-		Name:  version.LegacyAppName,
-		Major: myVersion.Major,
-		Minor: myVersion.Minor,
-		Patch: myVersion.Patch,
-	}
-
 	knownPeersFilter, knownPeersSalt := p.Network.KnownPeers()
 
 	msg, err := p.MessageCreator.Handshake(
 		p.NetworkID,
 		p.Clock.Unix(),
 		mySignedIP.IPPort,
-		legacyApplication.String(),
 		myVersion.Name,
 		uint32(myVersion.Major),
 		uint32(myVersion.Minor),
@@ -716,20 +708,12 @@ func (p *peer) shouldDisconnect() bool {
 		return false
 	}
 
-	postDurango := p.Clock.Time().After(version.GetDurangoTime(constants.MainnetID))
-	if postDurango && p.ip.BLSSignature == nil {
+	if p.ip.BLSSignature == nil {
 		p.Log.Debug("disconnecting from peer",
 			zap.String("reason", "missing BLS signature"),
 			zap.Stringer("nodeID", p.id),
 		)
 		return true
-	}
-
-	// If Durango hasn't activated on mainnet yet, we don't require BLS
-	// signatures to be provided. However, if they are provided, verify that
-	// they are correct.
-	if p.ip.BLSSignature == nil {
-		return false
 	}
 
 	validSignature := bls.VerifyProofOfPossession(
@@ -954,25 +938,11 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 		return
 	}
 
-	if msg.Client != nil {
-		p.version = &version.Application{
-			Name:  msg.Client.Name,
-			Major: int(msg.Client.Major),
-			Minor: int(msg.Client.Minor),
-			Patch: int(msg.Client.Patch),
-		}
-	} else {
-		// Handle legacy version field
-		peerVersion, err := version.ParseLegacyApplication(msg.MyVersion)
-		if err != nil {
-			p.Log.Debug("failed to parse peer version",
-				zap.Stringer("nodeID", p.id),
-				zap.Error(err),
-			)
-			p.StartClose()
-			return
-		}
-		p.version = peerVersion
+	p.version = &version.Application{
+		Name:  msg.Client.GetName(),
+		Major: int(msg.Client.GetMajor()),
+		Minor: int(msg.Client.GetMinor()),
+		Patch: int(msg.Client.GetPatch()),
 	}
 
 	if p.VersionCompatibility.Version().Before(p.version) {

@@ -145,7 +145,9 @@ func (s *sender) SendGetStateSummaryFrontier(ctx context.Context, nodeIDs set.Se
 	if err == nil {
 		sentTo = s.sender.Send(
 			outMsg,
-			nodeIDs,
+			common.SendConfig{
+				NodeIDs: nodeIDs,
+			},
 			s.ctx.SubnetID,
 			s.subnet,
 		)
@@ -207,7 +209,9 @@ func (s *sender) SendStateSummaryFrontier(ctx context.Context, nodeID ids.NodeID
 	nodeIDs := set.Of(nodeID)
 	sentTo := s.sender.Send(
 		outMsg,
-		nodeIDs,
+		common.SendConfig{
+			NodeIDs: nodeIDs,
+		},
 		s.ctx.SubnetID,
 		s.subnet,
 	)
@@ -288,7 +292,9 @@ func (s *sender) SendGetAcceptedStateSummary(ctx context.Context, nodeIDs set.Se
 	if err == nil {
 		sentTo = s.sender.Send(
 			outMsg,
-			nodeIDs,
+			common.SendConfig{
+				NodeIDs: nodeIDs,
+			},
 			s.ctx.SubnetID,
 			s.subnet,
 		)
@@ -350,7 +356,9 @@ func (s *sender) SendAcceptedStateSummary(ctx context.Context, nodeID ids.NodeID
 	nodeIDs := set.Of(nodeID)
 	sentTo := s.sender.Send(
 		outMsg,
-		nodeIDs,
+		common.SendConfig{
+			NodeIDs: nodeIDs,
+		},
 		s.ctx.SubnetID,
 		s.subnet,
 	)
@@ -423,7 +431,9 @@ func (s *sender) SendGetAcceptedFrontier(ctx context.Context, nodeIDs set.Set[id
 	if err == nil {
 		sentTo = s.sender.Send(
 			outMsg,
-			nodeIDs,
+			common.SendConfig{
+				NodeIDs: nodeIDs,
+			},
 			s.ctx.SubnetID,
 			s.subnet,
 		)
@@ -485,7 +495,9 @@ func (s *sender) SendAcceptedFrontier(ctx context.Context, nodeID ids.NodeID, re
 	nodeIDs := set.Of(nodeID)
 	sentTo := s.sender.Send(
 		outMsg,
-		nodeIDs,
+		common.SendConfig{
+			NodeIDs: nodeIDs,
+		},
 		s.ctx.SubnetID,
 		s.subnet,
 	)
@@ -560,7 +572,9 @@ func (s *sender) SendGetAccepted(ctx context.Context, nodeIDs set.Set[ids.NodeID
 	if err == nil {
 		sentTo = s.sender.Send(
 			outMsg,
-			nodeIDs,
+			common.SendConfig{
+				NodeIDs: nodeIDs,
+			},
 			s.ctx.SubnetID,
 			s.subnet,
 		)
@@ -618,7 +632,9 @@ func (s *sender) SendAccepted(ctx context.Context, nodeID ids.NodeID, requestID 
 	nodeIDs := set.Of(nodeID)
 	sentTo := s.sender.Send(
 		outMsg,
-		nodeIDs,
+		common.SendConfig{
+			NodeIDs: nodeIDs,
+		},
 		s.ctx.SubnetID,
 		s.subnet,
 	)
@@ -698,7 +714,9 @@ func (s *sender) SendGetAncestors(ctx context.Context, nodeID ids.NodeID, reques
 	nodeIDs := set.Of(nodeID)
 	sentTo := s.sender.Send(
 		outMsg,
-		nodeIDs,
+		common.SendConfig{
+			NodeIDs: nodeIDs,
+		},
 		s.ctx.SubnetID,
 		s.subnet,
 	)
@@ -734,7 +752,9 @@ func (s *sender) SendAncestors(_ context.Context, nodeID ids.NodeID, requestID u
 	nodeIDs := set.Of(nodeID)
 	sentTo := s.sender.Send(
 		outMsg,
-		nodeIDs,
+		common.SendConfig{
+			NodeIDs: nodeIDs,
+		},
 		s.ctx.SubnetID,
 		s.subnet,
 	)
@@ -804,7 +824,9 @@ func (s *sender) SendGet(ctx context.Context, nodeID ids.NodeID, requestID uint3
 		nodeIDs := set.Of(nodeID)
 		sentTo = s.sender.Send(
 			outMsg,
-			nodeIDs,
+			common.SendConfig{
+				NodeIDs: nodeIDs,
+			},
 			s.ctx.SubnetID,
 			s.subnet,
 		)
@@ -851,7 +873,9 @@ func (s *sender) SendPut(_ context.Context, nodeID ids.NodeID, requestID uint32,
 	nodeIDs := set.Of(nodeID)
 	sentTo := s.sender.Send(
 		outMsg,
-		nodeIDs,
+		common.SendConfig{
+			NodeIDs: nodeIDs,
+		},
 		s.ctx.SubnetID,
 		s.subnet,
 	)
@@ -965,7 +989,9 @@ func (s *sender) SendPushQuery(
 	if err == nil {
 		sentTo = s.sender.Send(
 			outMsg,
-			nodeIDs,
+			common.SendConfig{
+				NodeIDs: nodeIDs,
+			},
 			s.ctx.SubnetID,
 			s.subnet,
 		)
@@ -1102,7 +1128,9 @@ func (s *sender) SendPullQuery(
 	if err == nil {
 		sentTo = s.sender.Send(
 			outMsg,
-			nodeIDs,
+			common.SendConfig{
+				NodeIDs: nodeIDs,
+			},
 			s.ctx.SubnetID,
 			s.subnet,
 		)
@@ -1186,7 +1214,9 @@ func (s *sender) SendChits(
 	nodeIDs := set.Of(nodeID)
 	sentTo := s.sender.Send(
 		outMsg,
-		nodeIDs,
+		common.SendConfig{
+			NodeIDs: nodeIDs,
+		},
 		s.ctx.SubnetID,
 		s.subnet,
 	)
@@ -1349,7 +1379,9 @@ func (s *sender) SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.NodeID]
 	if err == nil {
 		sentTo = s.sender.Send(
 			outMsg,
-			nodeIDs,
+			common.SendConfig{
+				NodeIDs: nodeIDs,
+			},
 			s.ctx.SubnetID,
 			s.subnet,
 		)
@@ -1432,7 +1464,9 @@ func (s *sender) SendAppResponse(ctx context.Context, nodeID ids.NodeID, request
 	nodeIDs := set.Of(nodeID)
 	sentTo := s.sender.Send(
 		outMsg,
-		nodeIDs,
+		common.SendConfig{
+			NodeIDs: nodeIDs,
+		},
 		s.ctx.SubnetID,
 		s.subnet,
 	)
@@ -1495,7 +1529,9 @@ func (s *sender) SendAppError(ctx context.Context, nodeID ids.NodeID, requestID 
 	// Send the message over the network.
 	sentTo := s.sender.Send(
 		outMsg,
-		set.Of(nodeID),
+		common.SendConfig{
+			NodeIDs: set.Of(nodeID),
+		},
 		s.ctx.SubnetID,
 		s.subnet,
 	)
@@ -1523,55 +1559,10 @@ func (s *sender) SendAppError(ctx context.Context, nodeID ids.NodeID, requestID 
 	return nil
 }
 
-func (s *sender) SendAppGossipSpecific(_ context.Context, nodeIDs set.Set[ids.NodeID], appGossipBytes []byte) error {
-	// Create the outbound message.
-	outMsg, err := s.msgCreator.AppGossip(s.ctx.ChainID, appGossipBytes)
-	if err != nil {
-		s.ctx.Log.Error("failed to build message",
-			zap.Stringer("messageOp", message.AppGossipOp),
-			zap.Stringer("chainID", s.ctx.ChainID),
-			zap.Binary("payload", appGossipBytes),
-			zap.Error(err),
-		)
-		return nil
-	}
-
-	// Send the message over the network.
-	sentTo := s.sender.Send(
-		outMsg,
-		nodeIDs,
-		s.ctx.SubnetID,
-		s.subnet,
-	)
-	if sentTo.Len() == 0 {
-		for nodeID := range nodeIDs {
-			if !sentTo.Contains(nodeID) {
-				if s.ctx.Log.Enabled(logging.Verbo) {
-					s.ctx.Log.Verbo("failed to send message",
-						zap.Stringer("messageOp", message.AppGossipOp),
-						zap.Stringer("nodeID", nodeID),
-						zap.Stringer("chainID", s.ctx.ChainID),
-						zap.Binary("payload", appGossipBytes),
-					)
-				} else {
-					s.ctx.Log.Debug("failed to send message",
-						zap.Stringer("messageOp", message.AppGossipOp),
-						zap.Stringer("nodeID", nodeID),
-						zap.Stringer("chainID", s.ctx.ChainID),
-					)
-				}
-			}
-		}
-	}
-	return nil
-}
-
 func (s *sender) SendAppGossip(
 	_ context.Context,
+	config common.SendConfig,
 	appGossipBytes []byte,
-	numValidators int,
-	numNonValidators int,
-	numPeers int,
 ) error {
 	// Create the outbound message.
 	outMsg, err := s.msgCreator.AppGossip(s.ctx.ChainID, appGossipBytes)
@@ -1585,12 +1576,10 @@ func (s *sender) SendAppGossip(
 		return nil
 	}
 
-	sentTo := s.sender.Gossip(
+	sentTo := s.sender.Send(
 		outMsg,
+		config,
 		s.ctx.SubnetID,
-		numValidators,
-		numNonValidators,
-		numPeers,
 		s.subnet,
 	)
 	if sentTo.Len() == 0 {
