@@ -51,22 +51,6 @@ pub struct ObjWriteSizeError;
 pub type SpaceId = u8;
 pub const INVALID_SPACE_ID: SpaceId = 0xff;
 
-pub struct DiskWrite {
-    pub offset: u64,
-    pub data: Box<[u8]>,
-}
-
-impl std::fmt::Debug for DiskWrite {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        write!(
-            f,
-            "[Disk offset=0x{:04x} data=0x{}",
-            self.offset,
-            hex::encode(&self.data)
-        )
-    }
-}
-
 /// A handle that pins and provides a readable access to a portion of the linear memory image.
 pub trait CachedView {
     type DerefReturn: Deref<Target = [u8]>;
