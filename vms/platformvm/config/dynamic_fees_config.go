@@ -4,6 +4,10 @@
 package config
 
 import (
+	"fmt"
+
+	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/units"
 
 	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
@@ -33,6 +37,8 @@ var (
 		UnitFees:      commonfees.Empty,
 		BlockUnitsCap: commonfees.Max,
 	}
+
+	customDynamicFeesConfig *DynamicFeesConfig
 )
 
 func GetDynamicFeesConfig(isEActive bool) DynamicFeesConfig {
@@ -40,7 +46,22 @@ func GetDynamicFeesConfig(isEActive bool) DynamicFeesConfig {
 		return preEUpgradeDynamicFeesConfig
 	}
 
+	if customDynamicFeesConfig != nil {
+		return *customDynamicFeesConfig
+	}
 	return eUpgradeDynamicFeesConfig
+}
+
+func ResetDynamicFeesConfig(ctx *snow.Context, customFeesConfig *DynamicFeesConfig) error {
+	if customFeesConfig == nil {
+		return nil // nothing to do
+	}
+	if ctx.NetworkID == constants.MainnetID || ctx.NetworkID == constants.FujiID {
+		return fmt.Errorf("forbidden resetting dynamic unit fees config for network %s", constants.NetworkName(ctx.NetworkID))
+	}
+
+	customDynamicFeesConfig = customFeesConfig
+	return nil
 }
 
 type DynamicFeesConfig struct {
