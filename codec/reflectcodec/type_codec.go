@@ -233,6 +233,10 @@ func (c *genericCodec) size(
 			return 0, false, err
 		}
 
+		if keySize == 0 && valueSize == 0 {
+			return 0, false, fmt.Errorf("can't marshal map with zero length entries: %w", codec.ErrMarshalZeroLength)
+		}
+
 		switch {
 		case keyConstSize && valueConstSize:
 			numElts := value.Len()
@@ -392,8 +396,12 @@ func (c *genericCodec) marshal(
 			return p.Err
 		}
 		for i := 0; i < numElts; i++ { // Process each element in the slice
+			startOffset := p.Offset
 			if err := c.marshal(value.Index(i), p, typeStack); err != nil {
 				return err
+			}
+			if startOffset == p.Offset {
+				return fmt.Errorf("couldn't marshal slice of zero length values: %w", codec.ErrMarshalZeroLength)
 			}
 		}
 		return nil
@@ -477,6 +485,8 @@ func (c *genericCodec) marshal(
 		allKeyBytes := slices.Clone(p.Bytes[startOffset:p.Offset])
 		p.Offset = startOffset
 		for _, key := range sortedKeys {
+			keyStartOffset := p.Offset
+
 			// pack key
 			startIndex := key.startIndex - startOffset
 			endIndex := key.endIndex - startOffset
@@ -489,6 +499,9 @@ func (c *genericCodec) marshal(
 			// serialize and pack value
 			if err := c.marshal(value.MapIndex(key.key), p, typeStack); err != nil {
 				return err
+			}
+			if keyStartOffset == p.Offset {
+				return fmt.Errorf("couldn't marshal map with zero length entries: %w", codec.ErrMarshalZeroLength)
 			}
 		}
 
@@ -623,8 +636,13 @@ func (c *genericCodec) unmarshal(
 		zeroValue := reflect.Zero(innerType)
 		for i := 0; i < numElts; i++ {
 			value.Set(reflect.Append(value, zeroValue))
+
+			startOffset := p.Offset
 			if err := c.unmarshal(p, value.Index(i), typeStack); err != nil {
 				return err
+			}
+			if startOffset == p.Offset {
+				return fmt.Errorf("couldn't unmarshal slice of zero length values: %w", codec.ErrUnmarshalZeroLength)
 			}
 		}
 		return nil
@@ -752,6 +770,9 @@ func (c *genericCodec) unmarshal(
 			mapValue := reflect.New(mapValueType).Elem()
 			if err := c.unmarshal(p, mapValue, typeStack); err != nil {
 				return err
+			}
+			if keyStartOffset == p.Offset {
+				return fmt.Errorf("couldn't unmarshal map with zero length entries: %w", codec.ErrUnmarshalZeroLength)
 			}
 
 			// Assign the key-value pair in the map
