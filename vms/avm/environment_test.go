@@ -267,7 +267,6 @@ func getCreateTxFromGenesisTest(tb testing.TB, genesisBytes []byte, assetName st
 	require := require.New(tb)
 
 	parser, err := txs.NewParser(
-		time.Time{},
 		[]fxs.Fx{
 			&secp256k1fx.Fx{},
 		},

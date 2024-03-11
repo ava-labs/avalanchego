@@ -216,7 +216,6 @@ func (vm *VM) Initialize(
 
 	vm.typeToFxIndex = map[reflect.Type]int{}
 	vm.parser, err = block.NewCustomParser(
-		vm.DurangoTime,
 		vm.typeToFxIndex,
 		&vm.clock,
 		ctx.Log,

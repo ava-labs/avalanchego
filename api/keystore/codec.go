@@ -4,8 +4,6 @@
 package keystore
 
 import (
-	"time"
-
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/utils/units"
@@ -20,7 +18,7 @@ const (
 var Codec codec.Manager
 
 func init() {
-	lc := linearcodec.NewDefault(time.Time{})
+	lc := linearcodec.NewDefault()
 	Codec = codec.NewManager(maxPackerSize)
 	if err := Codec.RegisterCodec(CodecVersion, lc); err != nil {
 		panic(err)

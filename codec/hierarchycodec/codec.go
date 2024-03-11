@@ -7,17 +7,11 @@ import (
 	"fmt"
 	"reflect"
 	"sync"
-	"time"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/reflectcodec"
 	"github.com/ava-labs/avalanchego/utils/bimap"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-)
-
-const (
-	// default max length of a slice being marshalled by Marshal(). Should be <= math.MaxUint32.
-	defaultMaxSliceLength = 256 * 1024
 )
 
 var (
@@ -51,19 +45,19 @@ type hierarchyCodec struct {
 }
 
 // New returns a new, concurrency-safe codec
-func New(durangoTime time.Time, tagNames []string, maxSliceLen uint32) Codec {
+func New(tagNames []string) Codec {
 	hCodec := &hierarchyCodec{
 		currentGroupID:  0,
 		nextTypeID:      0,
 		registeredTypes: bimap.New[typeID, reflect.Type](),
 	}
-	hCodec.Codec = reflectcodec.New(hCodec, tagNames, durangoTime, maxSliceLen)
+	hCodec.Codec = reflectcodec.New(hCodec, tagNames)
 	return hCodec
 }
 
 // NewDefault returns a new codec with reasonable default values
-func NewDefault(durangoTime time.Time) Codec {
-	return New(durangoTime, []string{reflectcodec.DefaultTagName}, defaultMaxSliceLength)
+func NewDefault() Codec {
+	return New([]string{reflectcodec.DefaultTagName})
 }
 
 // SkipRegistrations some number of type IDs
