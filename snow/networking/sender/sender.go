@@ -390,7 +390,6 @@ func (s *sender) SendGetAcceptedFrontier(ctx context.Context, nodeIDs set.Set[id
 			nodeID,
 			s.ctx.ChainID,
 			requestID,
-			s.engineType,
 		)
 		s.router.RegisterRequest(
 			ctx,
@@ -400,7 +399,7 @@ func (s *sender) SendGetAcceptedFrontier(ctx context.Context, nodeIDs set.Set[id
 			requestID,
 			message.AcceptedFrontierOp,
 			inMsg,
-			s.engineType,
+			p2p.EngineType_ENGINE_TYPE_UNSPECIFIED,
 		)
 	}
 
@@ -413,7 +412,6 @@ func (s *sender) SendGetAcceptedFrontier(ctx context.Context, nodeIDs set.Set[id
 			requestID,
 			deadline,
 			s.ctx.NodeID,
-			s.engineType,
 		)
 		go s.router.HandleInbound(ctx, inMsg)
 	}
@@ -423,7 +421,6 @@ func (s *sender) SendGetAcceptedFrontier(ctx context.Context, nodeIDs set.Set[id
 		s.ctx.ChainID,
 		requestID,
 		deadline,
-		s.engineType,
 	)
 
 	// Send the message over the network.
@@ -529,7 +526,6 @@ func (s *sender) SendGetAccepted(ctx context.Context, nodeIDs set.Set[ids.NodeID
 			nodeID,
 			s.ctx.ChainID,
 			requestID,
-			s.engineType,
 		)
 		s.router.RegisterRequest(
 			ctx,
@@ -539,7 +535,7 @@ func (s *sender) SendGetAccepted(ctx context.Context, nodeIDs set.Set[ids.NodeID
 			requestID,
 			message.AcceptedOp,
 			inMsg,
-			s.engineType,
+			p2p.EngineType_ENGINE_TYPE_UNSPECIFIED,
 		)
 	}
 
@@ -553,7 +549,6 @@ func (s *sender) SendGetAccepted(ctx context.Context, nodeIDs set.Set[ids.NodeID
 			deadline,
 			containerIDs,
 			s.ctx.NodeID,
-			s.engineType,
 		)
 		go s.router.HandleInbound(ctx, inMsg)
 	}
@@ -564,7 +559,6 @@ func (s *sender) SendGetAccepted(ctx context.Context, nodeIDs set.Set[ids.NodeID
 		requestID,
 		deadline,
 		containerIDs,
-		s.engineType,
 	)
 
 	// Send the message over the network.
@@ -778,7 +772,6 @@ func (s *sender) SendGet(ctx context.Context, nodeID ids.NodeID, requestID uint3
 		nodeID,
 		s.ctx.ChainID,
 		requestID,
-		s.engineType,
 	)
 	s.router.RegisterRequest(
 		ctx,
@@ -788,7 +781,7 @@ func (s *sender) SendGet(ctx context.Context, nodeID ids.NodeID, requestID uint3
 		requestID,
 		message.PutOp,
 		inMsg,
-		s.engineType,
+		p2p.EngineType_ENGINE_TYPE_UNSPECIFIED,
 	)
 
 	// Sending a Get to myself always fails.
@@ -815,7 +808,6 @@ func (s *sender) SendGet(ctx context.Context, nodeID ids.NodeID, requestID uint3
 		requestID,
 		deadline,
 		containerID,
-		s.engineType,
 	)
 
 	// Send the message over the network.
@@ -857,7 +849,7 @@ func (s *sender) SendGet(ctx context.Context, nodeID ids.NodeID, requestID uint3
 
 func (s *sender) SendPut(_ context.Context, nodeID ids.NodeID, requestID uint32, container []byte) {
 	// Create the outbound message.
-	outMsg, err := s.msgCreator.Put(s.ctx.ChainID, requestID, container, s.engineType)
+	outMsg, err := s.msgCreator.Put(s.ctx.ChainID, requestID, container)
 	if err != nil {
 		s.ctx.Log.Error("failed to build message",
 			zap.Stringer("messageOp", message.PutOp),
@@ -918,7 +910,6 @@ func (s *sender) SendPushQuery(
 			nodeID,
 			s.ctx.ChainID,
 			requestID,
-			s.engineType,
 		)
 		s.router.RegisterRequest(
 			ctx,
@@ -928,7 +919,7 @@ func (s *sender) SendPushQuery(
 			requestID,
 			message.ChitsOp,
 			inMsg,
-			s.engineType,
+			p2p.EngineType_ENGINE_TYPE_UNSPECIFIED,
 		)
 	}
 
@@ -947,7 +938,6 @@ func (s *sender) SendPushQuery(
 			container,
 			requestedHeight,
 			s.ctx.NodeID,
-			s.engineType,
 		)
 		go s.router.HandleInbound(ctx, inMsg)
 	}
@@ -967,7 +957,6 @@ func (s *sender) SendPushQuery(
 				nodeID,
 				s.ctx.ChainID,
 				requestID,
-				s.engineType,
 			)
 			go s.router.HandleInbound(ctx, inMsg)
 		}
@@ -980,7 +969,6 @@ func (s *sender) SendPushQuery(
 		deadline,
 		container,
 		requestedHeight,
-		s.engineType,
 	)
 
 	// Send the message over the network.
@@ -1033,7 +1021,6 @@ func (s *sender) SendPushQuery(
 				nodeID,
 				s.ctx.ChainID,
 				requestID,
-				s.engineType,
 			)
 			go s.router.HandleInbound(ctx, inMsg)
 		}
@@ -1059,7 +1046,6 @@ func (s *sender) SendPullQuery(
 			nodeID,
 			s.ctx.ChainID,
 			requestID,
-			s.engineType,
 		)
 		s.router.RegisterRequest(
 			ctx,
@@ -1069,7 +1055,7 @@ func (s *sender) SendPullQuery(
 			requestID,
 			message.ChitsOp,
 			inMsg,
-			s.engineType,
+			p2p.EngineType_ENGINE_TYPE_UNSPECIFIED,
 		)
 	}
 
@@ -1088,7 +1074,6 @@ func (s *sender) SendPullQuery(
 			containerID,
 			requestedHeight,
 			s.ctx.NodeID,
-			s.engineType,
 		)
 		go s.router.HandleInbound(ctx, inMsg)
 	}
@@ -1107,7 +1092,6 @@ func (s *sender) SendPullQuery(
 				nodeID,
 				s.ctx.ChainID,
 				requestID,
-				s.engineType,
 			)
 			go s.router.HandleInbound(ctx, inMsg)
 		}
@@ -1120,7 +1104,6 @@ func (s *sender) SendPullQuery(
 		deadline,
 		containerID,
 		requestedHeight,
-		s.engineType,
 	)
 
 	// Send the message over the network.
@@ -1163,7 +1146,6 @@ func (s *sender) SendPullQuery(
 				nodeID,
 				s.ctx.ChainID,
 				requestID,
-				s.engineType,
 			)
 			go s.router.HandleInbound(ctx, inMsg)
 		}

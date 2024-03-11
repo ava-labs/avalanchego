@@ -4,8 +4,6 @@
 package x
 
 import (
-	"time"
-
 	"github.com/ava-labs/avalanchego/vms/avm/block"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
@@ -25,7 +23,6 @@ var Parser block.Parser
 func init() {
 	var err error
 	Parser, err = block.NewParser(
-		time.Time{},
 		[]fxs.Fx{
 			&secp256k1fx.Fx{},
 			&nftfx.Fx{},
