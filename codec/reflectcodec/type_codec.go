@@ -157,10 +157,6 @@ func (c *genericCodec) size(
 			return 0, false, err
 		}
 
-		if size == 0 {
-			return 0, false, fmt.Errorf("can't marshal slice of zero length values: %w", codec.ErrMarshalZeroLength)
-		}
-
 		// For fixed-size types we manually calculate lengths rather than
 		// processing each element separately to improve performance.
 		if constSize {

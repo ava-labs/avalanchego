@@ -864,8 +864,9 @@ func TestSliceWithEmptySerializationError(codec GeneralCodec, t testing.TB) {
 	_, err := manager.Marshal(0, val)
 	require.ErrorIs(err, ErrMarshalZeroLength)
 
+	// we cannot marshal/unmarshal an empty slice, but we can ask its size
 	_, err = manager.Size(0, val)
-	require.ErrorIs(err, ErrMarshalZeroLength)
+	require.NoError(err)
 
 	b := []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x01} // codec version (0x00, 0x00) then (0x00, 0x00, 0x00, 0x01) for numElts
 
