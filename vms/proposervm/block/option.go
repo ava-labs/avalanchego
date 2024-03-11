@@ -4,8 +4,6 @@
 package block
 
 import (
-	"time"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
@@ -34,7 +32,7 @@ func (b *option) Bytes() []byte {
 	return b.bytes
 }
 
-func (b *option) initialize(bytes []byte, _ time.Time) error {
+func (b *option) initialize(bytes []byte) error {
 	b.id = hashing.ComputeHash256Array(bytes)
 	b.bytes = bytes
 	return nil
