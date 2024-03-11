@@ -321,7 +321,8 @@ func (n *Network) Start(ctx context.Context, w io.Writer) error {
 	if _, err := fmt.Fprintf(w, "\nStarted network %s (UUID: %s)\n", n.Dir, n.UUID); err != nil {
 		return err
 	}
-	if _, err := fmt.Fprintf(w, "\nMetrics: https://grafana-experimental.avax-dev.network/d/kBQpRdWnk/avalanche-main-dashboard?var-network_uuid=%s\n", n.UUID); err != nil {
+	// Provide a link the main dashboard filtered by the uuid and showing results for now till whenever the link is viewed
+	if _, err := fmt.Fprintf(w, "\nMetrics: https://grafana-experimental.avax-dev.network/d/kBQpRdWnk/avalanche-main-dashboard?&var-adhoc=network_uuid%%7C%%3D%%7C%s&from=%d&to=now\n", n.UUID, time.Now().UnixMilli()); err != nil {
 		return err
 	}
 

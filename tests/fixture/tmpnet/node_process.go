@@ -301,16 +301,17 @@ func (p *NodeProcess) writePrometheusConfig() error {
 		{
 			"targets": []string{strings.TrimPrefix(p.node.URI, "http://")},
 			"labels": FlagsMap{
-				"network_uuid": p.node.NetworkUUID,
-				"node_id":      p.node.NodeID,
-				"is_ephemeral": strconv.FormatBool(p.node.IsEphemeral),
+				"network_uuid":      p.node.NetworkUUID,
+				"node_id":           p.node.NodeID,
+				"is_ephemeral_node": strconv.FormatBool(p.node.IsEphemeral),
 				// Prometheus ignores empty values so running this outside
-				// of a github worker will have no ill-effect.
+				// of a github worker should have no ill-effect.
 				"gh_repo":        os.Getenv("GH_REPO"),
-				"gh_job_id":      os.Getenv("GH_JOB_ID"),
+				"gh_workflow":    os.Getenv("GH_WORKFLOW"),
 				"gh_run_id":      os.Getenv("GH_RUN_ID"),
 				"gh_run_number":  os.Getenv("GH_RUN_NUMBER"),
 				"gh_run_attempt": os.Getenv("GH_RUN_ATTEMPT"),
+				"gh_job_id":      os.Getenv("GH_JOB_ID"),
 			},
 		},
 	}
