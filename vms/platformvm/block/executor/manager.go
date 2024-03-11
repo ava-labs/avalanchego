@@ -154,7 +154,7 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 
 	var (
 		chainTime     = stateDiff.GetTimestamp()
-		isEForkActive = m.txExecutorBackend.Config.IsEUpgradeActivated(chainTime)
+		isEForkActive = m.txExecutorBackend.Config.IsEActivated(chainTime)
 		feesCfg       = m.txExecutorBackend.Config.GetDynamicFeesConfig(chainTime)
 	)
 

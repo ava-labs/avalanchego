@@ -344,7 +344,7 @@ func packBlockTxs(
 	var (
 		parentBlkTime = parentState.GetTimestamp()
 		feesCfg       = backend.Config.GetDynamicFeesConfig(timestamp)
-		isEForkActive = backend.Config.IsEUpgradeActivated(timestamp)
+		isEForkActive = backend.Config.IsEActivated(timestamp)
 
 		blockTxs []*txs.Tx
 		inputs   set.Set[ids.ID]

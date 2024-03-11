@@ -458,7 +458,7 @@ func (v *verifier) processStandardTxs(txs []*txs.Tx, state state.Diff, parentID 
 
 	var (
 		currentTimestamp = state.GetTimestamp()
-		isEForkActive    = v.txExecutorBackend.Config.IsEUpgradeActivated(currentTimestamp)
+		isEForkActive    = v.txExecutorBackend.Config.IsEActivated(currentTimestamp)
 		feesCfg          = v.txExecutorBackend.Config.GetDynamicFeesConfig(currentTimestamp)
 
 		onAcceptFunc   func()
