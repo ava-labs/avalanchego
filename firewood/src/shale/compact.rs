@@ -148,7 +148,7 @@ impl Storable for CompactDescriptor {
 #[derive(Copy, Clone, Debug, Pod, Zeroable)]
 pub struct CompactSpaceHeader {
     meta_space_tail: DiskAddress,
-    compact_space_tail: DiskAddress,
+    data_space_tail: DiskAddress,
     base_addr: DiskAddress,
     alloc_addr: DiskAddress,
 }
@@ -156,7 +156,7 @@ pub struct CompactSpaceHeader {
 #[derive(Debug)]
 struct CompactSpaceHeaderSliced {
     meta_space_tail: Obj<DiskAddress>,
-    compact_space_tail: Obj<DiskAddress>,
+    data_space_tail: Obj<DiskAddress>,
     base_addr: Obj<DiskAddress>,
     alloc_addr: Obj<DiskAddress>,
 }
@@ -164,7 +164,7 @@ struct CompactSpaceHeaderSliced {
 impl CompactSpaceHeaderSliced {
     fn flush_dirty(&mut self) {
         self.meta_space_tail.flush_dirty();
-        self.compact_space_tail.flush_dirty();
+        self.data_space_tail.flush_dirty();
         self.base_addr.flush_dirty();
         self.alloc_addr.flush_dirty();
     }
@@ -176,7 +176,7 @@ impl CompactSpaceHeader {
     pub const fn new(meta_base: NonZeroUsize, compact_base: NonZeroUsize) -> Self {
         Self {
             meta_space_tail: DiskAddress::new(meta_base),
-            compact_space_tail: DiskAddress::new(compact_base),
+            data_space_tail: DiskAddress::new(compact_base),
             base_addr: DiskAddress::new(meta_base),
             alloc_addr: DiskAddress::new(meta_base),
         }
@@ -185,7 +185,7 @@ impl CompactSpaceHeader {
     fn into_fields(r: Obj<Self>) -> Result<CompactSpaceHeaderSliced, ShaleError> {
         Ok(CompactSpaceHeaderSliced {
             meta_space_tail: StoredView::slice(&r, 0, 8, r.meta_space_tail)?,
-            compact_space_tail: StoredView::slice(&r, 8, 8, r.compact_space_tail)?,
+            data_space_tail: StoredView::slice(&r, 8, 8, r.data_space_tail)?,
             base_addr: StoredView::slice(&r, 16, 8, r.base_addr)?,
             alloc_addr: StoredView::slice(&r, 24, 8, r.alloc_addr)?,
         })
@@ -203,14 +203,14 @@ impl Storable for CompactSpaceHeader {
         #[allow(clippy::indexing_slicing)]
         let meta_space_tail = raw.as_deref()[..8].into();
         #[allow(clippy::indexing_slicing)]
-        let compact_space_tail = raw.as_deref()[8..16].into();
+        let data_space_tail = raw.as_deref()[8..16].into();
         #[allow(clippy::indexing_slicing)]
         let base_addr = raw.as_deref()[16..24].into();
         #[allow(clippy::indexing_slicing)]
         let alloc_addr = raw.as_deref()[24..].into();
         Ok(Self {
             meta_space_tail,
-            compact_space_tail,
+            data_space_tail,
             base_addr,
             alloc_addr,
         })
@@ -223,7 +223,7 @@ impl Storable for CompactSpaceHeader {
     fn serialize(&self, to: &mut [u8]) -> Result<(), ShaleError> {
         let mut cur = Cursor::new(to);
         cur.write_all(&self.meta_space_tail.to_le_bytes())?;
-        cur.write_all(&self.compact_space_tail.to_le_bytes())?;
+        cur.write_all(&self.data_space_tail.to_le_bytes())?;
         cur.write_all(&self.base_addr.to_le_bytes())?;
         cur.write_all(&self.alloc_addr.to_le_bytes())?;
         Ok(())
@@ -233,7 +233,7 @@ impl Storable for CompactSpaceHeader {
 #[derive(Debug)]
 struct CompactSpaceInner<M> {
     meta_space: M,
-    compact_space: M,
+    data_space: M,
     header: CompactSpaceHeaderSliced,
     alloc_max_walk: u64,
     regn_nbit: u64,
@@ -243,7 +243,7 @@ impl From<CompactSpaceInner<StoreRevMut>> for CompactSpaceInner<StoreRevShared> 
     fn from(value: CompactSpaceInner<StoreRevMut>) -> CompactSpaceInner<StoreRevShared> {
         CompactSpaceInner {
             meta_space: value.meta_space.into(),
-            compact_space: value.compact_space.into(),
+            data_space: value.data_space.into(),
             header: value.header,
             alloc_max_walk: value.alloc_max_walk,
             regn_nbit: value.regn_nbit,
@@ -261,7 +261,7 @@ impl<M: CachedStore> CompactSpaceInner<M> {
         ptr: DiskAddress,
         len_limit: u64,
     ) -> Result<Obj<U>, ShaleError> {
-        StoredView::ptr_to_obj(&self.compact_space, ptr, len_limit)
+        StoredView::ptr_to_obj(&self.data_space, ptr, len_limit)
     }
 
     fn get_header(&self, ptr: DiskAddress) -> Result<Obj<CompactHeader>, ShaleError> {
@@ -340,7 +340,7 @@ impl<M: CachedStore> CompactSpaceInner<M> {
         let mut f = offset;
 
         #[allow(clippy::unwrap_used)]
-        if offset + fsize < self.header.compact_space_tail.unwrap().get() as u64
+        if offset + fsize < self.header.data_space_tail.unwrap().get() as u64
             && (regn_size - (offset & (regn_size - 1))) >= fsize + hsize
         {
             // merge with higher data segment
@@ -500,10 +500,10 @@ impl<M: CachedStore> CompactSpaceInner<M> {
     fn alloc_new(&mut self, length: u64) -> Result<u64, ShaleError> {
         let regn_size = 1 << self.regn_nbit;
         let total_length = CompactHeader::MSIZE + length + CompactFooter::MSIZE;
-        let mut offset = *self.header.compact_space_tail;
+        let mut offset = *self.header.data_space_tail;
         #[allow(clippy::unwrap_used)]
         self.header
-            .compact_space_tail
+            .data_space_tail
             .modify(|r| {
                 // an item is always fully in one region
                 let rem = regn_size - (offset & (regn_size - 1)).get();
@@ -549,7 +549,7 @@ pub struct CompactSpace<T: Storable, M> {
 impl<T: Storable, M: CachedStore> CompactSpace<T, M> {
     pub fn new(
         meta_space: M,
-        compact_space: M,
+        data_space: M,
         header: Obj<CompactSpaceHeader>,
         obj_cache: super::ObjCache<T>,
         alloc_max_walk: u64,
@@ -558,7 +558,7 @@ impl<T: Storable, M: CachedStore> CompactSpace<T, M> {
         let cs = CompactSpace {
             inner: RwLock::new(CompactSpaceInner {
                 meta_space,
-                compact_space,
+                data_space,
                 header: CompactSpaceHeader::into_fields(header)?,
                 alloc_max_walk,
                 regn_nbit,
@@ -593,10 +593,9 @@ impl<T: Storable + Debug + 'static + PartialEq, M: CachedStore + Send + Sync> Sh
         #[allow(clippy::unwrap_used)]
         let obj = {
             let inner = self.inner.read().unwrap();
-            let compact_space = &inner.compact_space;
+            let data_space = &inner.data_space;
             #[allow(clippy::unwrap_used)]
-            let view =
-                StoredView::item_to_obj(compact_space, addr.try_into().unwrap(), size, item)?;
+            let view = StoredView::item_to_obj(data_space, addr.try_into().unwrap(), size, item)?;
 
             self.obj_cache.put(view)
         };
