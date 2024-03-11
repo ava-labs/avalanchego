@@ -40,7 +40,7 @@ const (
 	// increase the time for a network's nodes to be seen as healthy.
 	networkHealthCheckInterval = 200 * time.Millisecond
 
-	// All temporary network will use this arbitrary default network ID by default.
+	// All temporary networks will use this arbitrary network ID by default.
 	defaultNetworkID = 88888
 
 	// eth address: 0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC
@@ -64,12 +64,15 @@ func init() {
 
 // Collects the configuration for running a temporary avalanchego network
 type Network struct {
-	// Uniquely identifies the temporary network for storage on disk and
-	// metrics collection. Distinct from avalanchego's concept of network ID
-	// since the utility of special network ID values (e.g. to trigger specific
-	// fork behavior in a given network) precludes requiring unique network ID
-	// values across all temporary networks.
+	// Uniquely identifies the temporary network for metrics
+	// collection. Distinct from avalanchego's concept of network ID
+	// since the utility of special network ID values (e.g. to trigger
+	// specific fork behavior in a given network) precludes requiring
+	// unique network ID values across all temporary networks.
 	UUID string
+
+	// A string identifying the entity that started or maintains this network.
+	Owner string
 
 	// Path where network configuration and data is stored
 	Dir string
@@ -160,6 +163,11 @@ func (n *Network) EnsureDefaultConfig(w io.Writer, avalancheGoPath string, plugi
 		return err
 	}
 
+	// A UUID supports centralized metrics collection
+	if len(n.UUID) == 0 {
+		n.UUID = uuid.NewString()
+	}
+
 	// Ensure default flags
 	if n.DefaultFlags == nil {
 		n.DefaultFlags = FlagsMap{}
@@ -216,7 +224,7 @@ func (n *Network) EnsureDefaultConfig(w io.Writer, avalancheGoPath string, plugi
 	return nil
 }
 
-// Creates the network on disk, choosing its network id and generating its genesis in the process.
+// Creates the network on disk, generating its genesis and configuring its nodes in the process.
 func (n *Network) Create(rootDir string) error {
 	// Ensure creation of the root dir
 	if len(rootDir) == 0 {
@@ -231,11 +239,15 @@ func (n *Network) Create(rootDir string) error {
 		return fmt.Errorf("failed to create root network dir: %w", err)
 	}
 
-	// Ensure creation of the network dir
-	if len(n.UUID) == 0 {
-		n.UUID = uuid.NewString()
+	// A time-based name ensures consistent directory ordering
+	dirName := time.Now().Format("20060102-150405.999999")
+	if len(n.Owner) > 0 {
+		// Include the owner to differentiate networks created at similar times
+		dirName = fmt.Sprintf("%s-%s", dirName, n.Owner)
 	}
-	networkDir := filepath.Join(rootDir, n.UUID)
+
+	// Ensure creation of the network dir
+	networkDir := filepath.Join(rootDir, dirName)
 	if err := os.MkdirAll(networkDir, perms.ReadWriteExecute); err != nil {
 		return fmt.Errorf("failed to create network dir: %w", err)
 	}
@@ -289,7 +301,7 @@ func (n *Network) Create(rootDir string) error {
 
 // Starts all nodes in the network
 func (n *Network) Start(ctx context.Context, w io.Writer) error {
-	if _, err := fmt.Fprintf(w, "Starting network %s\n", n.Dir); err != nil {
+	if _, err := fmt.Fprintf(w, "Starting network %s (UUID: %s)\n", n.Dir, n.UUID); err != nil {
 		return err
 	}
 
@@ -306,7 +318,7 @@ func (n *Network) Start(ctx context.Context, w io.Writer) error {
 	if err := n.WaitForHealthy(ctx, w); err != nil {
 		return err
 	}
-	if _, err := fmt.Fprintf(w, "\nStarted network %s\n", n.Dir); err != nil {
+	if _, err := fmt.Fprintf(w, "\nStarted network %s (UUID: %s)\n", n.Dir, n.UUID); err != nil {
 		return err
 	}
 

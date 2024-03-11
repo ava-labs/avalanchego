@@ -77,12 +77,12 @@ $ ./scripts/build_tmpnetctl.sh
 # Start a new network
 $ ./build/tmpnetctl start-network --avalanchego-path=/path/to/avalanchego
 ...
-Started network /home/me/.tmpnet/networks/c975a433-503d-4d66-957d-643b79f0a7dd
+Started network /home/me/.tmpnet/networks/20240306-152305.924531 (UUID: abaab590-b375-44f6-9ca5-f8a6dc061725)
 
 Configure tmpnetctl and the test suite to target this network by default
 with one of the following statements:
- - source /home/me/.tmpnet/networks/c975a433-503d-4d66-957d-643b79f0a7dd/network.env
- - export TMPNET_NETWORK_DIR=/home/me/.tmpnet/networks/c975a433-503d-4d66-957d-643b79f0a7dd
+ - source /home/me/.tmpnet/networks/20240306-152305.924531/network.env
+ - export TMPNET_NETWORK_DIR=/home/me/.tmpnet/networks/20240306-152305.924531
  - export TMPNET_NETWORK_DIR=/home/me/.tmpnet/networks/latest
 
 # Start a new test run using the existing network

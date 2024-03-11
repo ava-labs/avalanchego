@@ -155,7 +155,7 @@ func (te *TestEnvironment) NewKeychain(count int) *secp256k1fx.Keychain {
 }
 
 // Create a new private network that is not shared with other tests.
-func (te *TestEnvironment) NewPrivateNetwork() *tmpnet.Network {
+func (te *TestEnvironment) NewPrivateNetwork(networkOwner string) *tmpnet.Network {
 	// Use the same configuration as the shared network
 	sharedNetwork, err := tmpnet.ReadNetwork(te.NetworkDir)
 	te.require.NoError(err)
@@ -163,7 +163,9 @@ func (te *TestEnvironment) NewPrivateNetwork() *tmpnet.Network {
 	pluginDir, err := sharedNetwork.DefaultFlags.GetStringVal(config.PluginDirKey)
 	te.require.NoError(err)
 
-	network := &tmpnet.Network{}
+	network := &tmpnet.Network{
+		Owner: networkOwner,
+	}
 	StartNetwork(
 		network,
 		sharedNetwork.DefaultRuntimeConfig.AvalancheGoPath,
