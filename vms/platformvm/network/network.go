@@ -17,7 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/vms/components/message"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 )
@@ -192,11 +191,6 @@ func (n *Network) PullGossip(ctx context.Context) {
 }
 
 func (n *Network) AppGossip(ctx context.Context, nodeID ids.NodeID, msgBytes []byte) error {
-	n.log.Debug("called AppGossip message handler",
-		zap.Stringer("nodeID", nodeID),
-		zap.Int("messageLen", len(msgBytes)),
-	)
-
 	if n.partialSyncPrimaryNetwork {
 		n.log.Debug("dropping AppGossip message",
 			zap.String("reason", "primary network is not being fully synced"),
@@ -204,63 +198,22 @@ func (n *Network) AppGossip(ctx context.Context, nodeID ids.NodeID, msgBytes []b
 		return nil
 	}
 
-	msgIntf, err := message.Parse(msgBytes)
-	if err != nil {
-		n.log.Debug("forwarding AppGossip to p2p network",
-			zap.String("reason", "failed to parse message"),
-		)
-
-		return n.Network.AppGossip(ctx, nodeID, msgBytes)
-	}
-
-	msg, ok := msgIntf.(*message.Tx)
-	if !ok {
-		n.log.Debug("dropping unexpected message",
-			zap.Stringer("nodeID", nodeID),
-		)
-		return nil
-	}
-
-	tx, err := txs.Parse(txs.Codec, msg.Tx)
-	if err != nil {
-		n.log.Verbo("received invalid tx",
-			zap.Stringer("nodeID", nodeID),
-			zap.Binary("tx", msg.Tx),
-			zap.Error(err),
-		)
-		return nil
-	}
-
-	// Returning an error here would result in shutting down the chain. Logging
-	// is already included inside addTxToMempool, so there's nothing to do with
-	// the returned error here.
-	_ = n.addTxToMempool(tx)
-	return nil
+	return n.Network.AppGossip(ctx, nodeID, msgBytes)
 }
 
 func (n *Network) IssueTxFromRPC(tx *txs.Tx) error {
-	// TODO: We should still push the transaction to some peers when partial
-	// syncing.
-	if err := n.addTxToMempool(tx); err != nil {
-		return err
-	}
-	n.txPushGossiper.Add(tx)
-	return nil
-}
-
-func (n *Network) addTxToMempool(tx *txs.Tx) error {
 	// If we are partially syncing the Primary Network, we should not be
 	// maintaining the transaction mempool locally.
+	//
+	// TODO: We should still push the transaction to some peers when partial
+	// syncing.
 	if n.partialSyncPrimaryNetwork {
 		return errMempoolDisabledWithPartialSync
 	}
 
-	err := n.mempool.Add(tx)
-	if err != nil {
-		n.log.Debug("tx failed to be added to the mempool",
-			zap.Stringer("txID", tx.ID()),
-			zap.Error(err),
-		)
+	if err := n.mempool.Add(tx); err != nil {
+		return err
 	}
-	return err
+	n.txPushGossiper.Add(tx)
+	return nil
 }
