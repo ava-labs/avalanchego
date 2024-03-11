@@ -92,11 +92,6 @@ type Peer interface {
 	// guaranteed not to be delivered to the peer.
 	Send(ctx context.Context, msg message.OutboundMessage) bool
 
-	// StartSendPeerList attempts to send a PeerList message to this peer on
-	// this peer's gossip routine. It is not guaranteed that a PeerList will be
-	// sent.
-	StartSendPeerList()
-
 	// StartSendGetPeerList attempts to send a GetPeerList message to this peer
 	// on this peer's gossip routine. It is not guaranteed that a GetPeerList
 	// will be sent.
@@ -186,10 +181,6 @@ type peer struct {
 	// Must only be accessed atomically
 	lastSent, lastReceived int64
 
-	// peerListChan signals that we should attempt to send a PeerList to this
-	// peer
-	peerListChan chan struct{}
-
 	// getPeerListChan signals that we should attempt to send a GetPeerList to
 	// this peer
 	getPeerListChan chan struct{}
@@ -219,7 +210,6 @@ func Start(
 		onClosingCtxCancel: onClosingCtxCancel,
 		onClosed:           make(chan struct{}),
 		observedUptimes:    make(map[ids.ID]uint32),
-		peerListChan:       make(chan struct{}, 1),
 		getPeerListChan:    make(chan struct{}, 1),
 	}
 
@@ -325,13 +315,6 @@ func (p *peer) ObservedUptime(subnetID ids.ID) (uint32, bool) {
 
 func (p *peer) Send(ctx context.Context, msg message.OutboundMessage) bool {
 	return p.messageQueue.Push(ctx, msg)
-}
-
-func (p *peer) StartSendPeerList() {
-	select {
-	case p.peerListChan <- struct{}{}:
-	default:
-	}
 }
 
 func (p *peer) StartSendGetPeerList() {
@@ -540,20 +523,12 @@ func (p *peer) writeMessages() {
 	}
 
 	myVersion := p.VersionCompatibility.Version()
-	legacyApplication := &version.Application{
-		Name:  version.LegacyAppName,
-		Major: myVersion.Major,
-		Minor: myVersion.Minor,
-		Patch: myVersion.Patch,
-	}
-
 	knownPeersFilter, knownPeersSalt := p.Network.KnownPeers()
 
 	msg, err := p.MessageCreator.Handshake(
 		p.NetworkID,
 		p.Clock.Unix(),
 		mySignedIP.IPPort,
-		legacyApplication.String(),
 		myVersion.Name,
 		uint32(myVersion.Major),
 		uint32(myVersion.Minor),
@@ -656,32 +631,6 @@ func (p *peer) sendNetworkMessages() {
 
 	for {
 		select {
-		case <-p.peerListChan:
-			peerIPs := p.Config.Network.Peers(p.id, bloom.EmptyFilter, nil)
-			if len(peerIPs) == 0 {
-				p.Log.Verbo(
-					"skipping peer gossip as there are no unknown peers",
-					zap.Stringer("nodeID", p.id),
-				)
-				continue
-			}
-
-			// Bypass throttling is disabled here to follow the non-handshake
-			// message sending pattern.
-			msg, err := p.Config.MessageCreator.PeerList(peerIPs, false /*=bypassThrottling*/)
-			if err != nil {
-				p.Log.Error("failed to create peer list message",
-					zap.Stringer("nodeID", p.id),
-					zap.Error(err),
-				)
-				continue
-			}
-
-			if !p.Send(p.onClosingCtx, msg) {
-				p.Log.Debug("failed to send peer list",
-					zap.Stringer("nodeID", p.id),
-				)
-			}
 		case <-p.getPeerListChan:
 			knownPeersFilter, knownPeersSalt := p.Config.Network.KnownPeers()
 			msg, err := p.Config.MessageCreator.GetPeerList(knownPeersFilter, knownPeersSalt)
@@ -759,20 +708,12 @@ func (p *peer) shouldDisconnect() bool {
 		return false
 	}
 
-	postDurango := p.Clock.Time().After(version.GetDurangoTime(constants.MainnetID))
-	if postDurango && p.ip.BLSSignature == nil {
+	if p.ip.BLSSignature == nil {
 		p.Log.Debug("disconnecting from peer",
 			zap.String("reason", "missing BLS signature"),
 			zap.Stringer("nodeID", p.id),
 		)
 		return true
-	}
-
-	// If Durango hasn't activated on mainnet yet, we don't require BLS
-	// signatures to be provided. However, if they are provided, verify that
-	// they are correct.
-	if p.ip.BLSSignature == nil {
-		return false
 	}
 
 	validSignature := bls.VerifyProofOfPossession(
@@ -997,25 +938,11 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 		return
 	}
 
-	if msg.Client != nil {
-		p.version = &version.Application{
-			Name:  msg.Client.Name,
-			Major: int(msg.Client.Major),
-			Minor: int(msg.Client.Minor),
-			Patch: int(msg.Client.Patch),
-		}
-	} else {
-		// Handle legacy version field
-		peerVersion, err := version.ParseLegacyApplication(msg.MyVersion)
-		if err != nil {
-			p.Log.Debug("failed to parse peer version",
-				zap.Stringer("nodeID", p.id),
-				zap.Error(err),
-			)
-			p.StartClose()
-			return
-		}
-		p.version = peerVersion
+	p.version = &version.Application{
+		Name:  msg.Client.GetName(),
+		Major: int(msg.Client.GetMajor()),
+		Minor: int(msg.Client.GetMinor()),
+		Patch: int(msg.Client.GetPatch()),
 	}
 
 	if p.VersionCompatibility.Version().Before(p.version) {
@@ -1280,22 +1207,9 @@ func (p *peer) handlePeerList(msg *p2p.PeerList) {
 		close(p.onFinishHandshake)
 	}
 
-	// Invariant: We do not account for clock skew here, as the sender of the
-	// certificate is expected to account for clock skew during the activation
-	// of Durango.
-	durangoTime := version.GetDurangoTime(p.NetworkID)
-	beforeDurango := time.Now().Before(durangoTime)
 	discoveredIPs := make([]*ips.ClaimedIPPort, len(msg.ClaimedIpPorts)) // the peers this peer told us about
 	for i, claimedIPPort := range msg.ClaimedIpPorts {
-		var (
-			tlsCert *staking.Certificate
-			err     error
-		)
-		if beforeDurango {
-			tlsCert, err = staking.ParseCertificate(claimedIPPort.X509Certificate)
-		} else {
-			tlsCert, err = staking.ParseCertificatePermissive(claimedIPPort.X509Certificate)
-		}
+		tlsCert, err := staking.ParseCertificate(claimedIPPort.X509Certificate)
 		if err != nil {
 			p.Log.Debug("message with invalid field",
 				zap.Stringer("nodeID", p.id),

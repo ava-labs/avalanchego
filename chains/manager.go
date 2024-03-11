@@ -6,7 +6,6 @@ package chains
 import (
 	"context"
 	"crypto"
-	"crypto/tls"
 	"errors"
 	"fmt"
 	"os"
@@ -173,7 +172,8 @@ type ChainConfig struct {
 
 type ManagerConfig struct {
 	SybilProtectionEnabled bool
-	StakingTLSCert         tls.Certificate // needed to sign snowman++ blocks
+	StakingTLSSigner       crypto.Signer
+	StakingTLSCert         *staking.Certificate
 	StakingBLSKey          *bls.SecretKey
 	TracingEnabled         bool
 	// Must not be used unless [TracingEnabled] is true as this may be nil.
@@ -239,9 +239,6 @@ type manager struct {
 	ids.Aliaser
 	ManagerConfig
 
-	stakingSigner crypto.Signer
-	stakingCert   *staking.Certificate
-
 	// Those notified when a chain is created
 	registrants []Registrant
 
@@ -268,8 +265,6 @@ func New(config *ManagerConfig) Manager {
 	return &manager{
 		Aliaser:                ids.NewAliaser(),
 		ManagerConfig:          *config,
-		stakingSigner:          config.StakingTLSCert.PrivateKey.(crypto.Signer),
-		stakingCert:            staking.CertificateFromX509(config.StakingTLSCert.Leaf),
 		chains:                 make(map[ids.ID]handler.Handler),
 		chainsQueue:            buffer.NewUnboundedBlockingDeque[ChainParameters](initialQueueSize),
 		unblockChainCreatorCh:  make(chan struct{}),
@@ -607,16 +602,6 @@ func (m *manager) createAvalancheChain(
 		avalancheMessageSender = sender.Trace(avalancheMessageSender, m.Tracer)
 	}
 
-	err = m.VertexAcceptorGroup.RegisterAcceptor(
-		ctx.ChainID,
-		"gossip",
-		avalancheMessageSender,
-		false,
-	)
-	if err != nil { // Set up the event dispatcher
-		return nil, fmt.Errorf("problem initializing event dispatcher: %w", err)
-	}
-
 	// Passes messages from the snowman engines to the network
 	snowmanMessageSender, err := sender.New(
 		ctx,
@@ -633,16 +618,6 @@ func (m *manager) createAvalancheChain(
 
 	if m.TracingEnabled {
 		snowmanMessageSender = sender.Trace(snowmanMessageSender, m.Tracer)
-	}
-
-	err = m.BlockAcceptorGroup.RegisterAcceptor(
-		ctx.ChainID,
-		"gossip",
-		snowmanMessageSender,
-		false,
-	)
-	if err != nil { // Set up the event dispatcher
-		return nil, fmt.Errorf("problem initializing event dispatcher: %w", err)
 	}
 
 	chainConfig, err := m.getChainConfig(ctx.ChainID)
@@ -745,8 +720,8 @@ func (m *manager) createAvalancheChain(
 			MinimumPChainHeight: m.ApricotPhase4MinPChainHeight,
 			MinBlkDelay:         minBlockDelay,
 			NumHistoricalBlocks: numHistoricalBlocks,
-			StakingLeafSigner:   m.stakingSigner,
-			StakingCertLeaf:     m.stakingCert,
+			StakingLeafSigner:   m.StakingTLSSigner,
+			StakingCertLeaf:     m.StakingTLSCert,
 		},
 	)
 
@@ -841,13 +816,14 @@ func (m *manager) createAvalancheChain(
 		Params:              consensusParams,
 		Consensus:           snowmanConsensus,
 	}
-	snowmanEngine, err := smeng.New(snowmanEngineConfig)
+	var snowmanEngine common.Engine
+	snowmanEngine, err = smeng.New(snowmanEngineConfig)
 	if err != nil {
 		return nil, fmt.Errorf("error initializing snowman engine: %w", err)
 	}
 
 	if m.TracingEnabled {
-		snowmanEngine = smeng.TraceEngine(snowmanEngine, m.Tracer)
+		snowmanEngine = common.TraceEngine(snowmanEngine, m.Tracer)
 	}
 
 	// create bootstrap gear
@@ -999,16 +975,6 @@ func (m *manager) createSnowmanChain(
 		messageSender = sender.Trace(messageSender, m.Tracer)
 	}
 
-	err = m.BlockAcceptorGroup.RegisterAcceptor(
-		ctx.ChainID,
-		"gossip",
-		messageSender,
-		false,
-	)
-	if err != nil { // Set up the event dispatcher
-		return nil, fmt.Errorf("problem initializing event dispatcher: %w", err)
-	}
-
 	var (
 		bootstrapFunc   func()
 		subnetConnector = validators.UnhandledSubnetConnector
@@ -1091,8 +1057,8 @@ func (m *manager) createSnowmanChain(
 			MinimumPChainHeight: m.ApricotPhase4MinPChainHeight,
 			MinBlkDelay:         minBlockDelay,
 			NumHistoricalBlocks: numHistoricalBlocks,
-			StakingLeafSigner:   m.stakingSigner,
-			StakingCertLeaf:     m.stakingCert,
+			StakingLeafSigner:   m.StakingTLSSigner,
+			StakingCertLeaf:     m.StakingTLSCert,
 		},
 	)
 
@@ -1188,13 +1154,14 @@ func (m *manager) createSnowmanChain(
 		Consensus:           consensus,
 		PartialSync:         m.PartialSyncPrimaryNetwork && ctx.ChainID == constants.PlatformChainID,
 	}
-	engine, err := smeng.New(engineConfig)
+	var engine common.Engine
+	engine, err = smeng.New(engineConfig)
 	if err != nil {
 		return nil, fmt.Errorf("error initializing snowman engine: %w", err)
 	}
 
 	if m.TracingEnabled {
-		engine = smeng.TraceEngine(engine, m.Tracer)
+		engine = common.TraceEngine(engine, m.Tracer)
 	}
 
 	// create bootstrap gear

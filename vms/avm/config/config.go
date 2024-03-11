@@ -3,8 +3,6 @@
 
 package config
 
-import "time"
-
 // Struct collecting all the foundational parameters of the AVM
 type Config struct {
 	// Fee that is burned by every non-asset creating transaction
@@ -12,7 +10,4 @@ type Config struct {
 
 	// Fee that must be burned by every asset creating transaction
 	CreateAssetTxFee uint64
-
-	// Time of the Durango network upgrade
-	DurangoTime time.Time
 }
