@@ -27,7 +27,7 @@ def packer_build(packerfile):
   if found:
     amiid = found[-1]
     print("Found amiId=" + amiid)
-  else
+  else:
     print("Did not find amiId")
 
 def packer_build_update(packerfile):
