@@ -433,12 +433,16 @@ func (n *Network) Restart(ctx context.Context, w io.Writer) error {
 		if err := n.StartNode(ctx, w, node); err != nil {
 			return fmt.Errorf("failed to start node %s: %w", node.NodeID, err)
 		}
-		if _, err := fmt.Fprintf(w, " waiting for node %s to report healthy\n", node.NodeID); err != nil {
-			return err
-		}
-		if err := WaitForHealthy(ctx, node); err != nil {
-			return err
-		}
+	}
+
+	if _, err := fmt.Fprintf(w, "Waiting for all nodes to report healthy...\n\n"); err != nil {
+		return err
+	}
+	if err := n.WaitForHealthy(ctx, w); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintf(w, "\nRestarted network %d @ %s\n", n.Genesis.NetworkID, n.Dir); err != nil {
+		return err
 	}
 	return nil
 }
