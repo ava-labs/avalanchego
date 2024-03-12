@@ -7,17 +7,11 @@ import (
 	"fmt"
 	"reflect"
 	"sync"
-	"time"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/reflectcodec"
 	"github.com/ava-labs/avalanchego/utils/bimap"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-)
-
-const (
-	// default max length of a slice being marshalled by Marshal(). Should be <= math.MaxUint32.
-	DefaultMaxSliceLength = 256 * 1024
 )
 
 var (
@@ -43,25 +37,20 @@ type linearCodec struct {
 	registeredTypes *bimap.BiMap[uint32, reflect.Type]
 }
 
-// New returns a new, concurrency-safe codec; it allow to specify
-// both tagNames and maxSlicelenght
-func New(durangoTime time.Time, tagNames []string, maxSliceLen uint32) Codec {
+// New returns a new, concurrency-safe codec; it allow to specify tagNames.
+func New(tagNames []string) Codec {
 	hCodec := &linearCodec{
 		nextTypeID:      0,
 		registeredTypes: bimap.New[uint32, reflect.Type](),
 	}
-	hCodec.Codec = reflectcodec.New(hCodec, tagNames, durangoTime, maxSliceLen)
+	hCodec.Codec = reflectcodec.New(hCodec, tagNames)
 	return hCodec
 }
 
-// NewDefault is a convenience constructor; it returns a new codec with reasonable default values
-func NewDefault(durangoTime time.Time) Codec {
-	return New(durangoTime, []string{reflectcodec.DefaultTagName}, DefaultMaxSliceLength)
-}
-
-// NewCustomMaxLength is a convenience constructor; it returns a new codec with custom max length and default tags
-func NewCustomMaxLength(durangoTime time.Time, maxSliceLen uint32) Codec {
-	return New(durangoTime, []string{reflectcodec.DefaultTagName}, maxSliceLen)
+// NewDefault is a convenience constructor; it returns a new codec with default
+// tagNames.
+func NewDefault() Codec {
+	return New([]string{reflectcodec.DefaultTagName})
 }
 
 // Skip some number of type IDs

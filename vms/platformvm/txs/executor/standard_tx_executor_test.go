@@ -5,7 +5,6 @@ package executor
 
 import (
 	"errors"
-	"fmt"
 	"math"
 	"testing"
 	"time"
@@ -196,18 +195,6 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 			setup:                nil,
 			AP3Time:              defaultGenesisTime,
 			expectedExecutionErr: ErrPeriodMismatch,
-		},
-		{
-			description:          fmt.Sprintf("delegator should not be added more than (%s) in the future", MaxFutureStartTime),
-			stakeAmount:          dummyH.config.MinDelegatorStake,
-			startTime:            currentTimestamp.Add(MaxFutureStartTime + time.Second),
-			endTime:              currentTimestamp.Add(MaxFutureStartTime + defaultMinStakingDuration + time.Second),
-			nodeID:               nodeID,
-			rewardAddress:        rewardAddress,
-			feeKeys:              []*secp256k1.PrivateKey{preFundedKeys[0]},
-			setup:                nil,
-			AP3Time:              defaultGenesisTime,
-			expectedExecutionErr: ErrFutureStakeTime,
 		},
 		{
 			description:          "validator not in the current or pending validator sets",
@@ -831,33 +818,6 @@ func TestBanffStandardTxExecutorAddValidator(t *testing.T) {
 		}
 		err = tx.Unsigned.Visit(&executor)
 		require.ErrorIs(err, ErrTimestampNotBeforeStartTime)
-	}
-
-	{
-		// Case: Validator's start time too far in the future
-		tx, err := env.txBuilder.NewAddValidatorTx(
-			env.config.MinValidatorStake,
-			uint64(defaultValidateStartTime.Add(MaxFutureStartTime).Unix()+1),
-			uint64(defaultValidateStartTime.Add(MaxFutureStartTime).Add(defaultMinStakingDuration).Unix()+1),
-			nodeID,
-			ids.ShortEmpty,
-			reward.PercentDenominator,
-			[]*secp256k1.PrivateKey{preFundedKeys[0]},
-			ids.ShortEmpty, // change addr
-			nil,
-		)
-		require.NoError(err)
-
-		onAcceptState, err := state.NewDiff(lastAcceptedID, env)
-		require.NoError(err)
-
-		executor := StandardTxExecutor{
-			Backend: &env.backend,
-			State:   onAcceptState,
-			Tx:      tx,
-		}
-		err = tx.Unsigned.Visit(&executor)
-		require.ErrorIs(err, ErrFutureStakeTime)
 	}
 
 	{

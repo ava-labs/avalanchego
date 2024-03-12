@@ -128,10 +128,6 @@ func addNodeFlags(fs *pflag.FlagSet) {
 
 	// Peer List Gossip
 	fs.Uint(NetworkPeerListNumValidatorIPsKey, constants.DefaultNetworkPeerListNumValidatorIPs, "Number of validator IPs to gossip to other nodes")
-	fs.Uint(NetworkPeerListValidatorGossipSizeKey, constants.DefaultNetworkPeerListValidatorGossipSize, "Number of validators that the node will gossip peer list to")
-	fs.Uint(NetworkPeerListNonValidatorGossipSizeKey, constants.DefaultNetworkPeerListNonValidatorGossipSize, "Number of non-validators that the node will gossip peer list to")
-	fs.Uint(NetworkPeerListPeersGossipSizeKey, constants.DefaultNetworkPeerListPeersGossipSize, "Number of total peers (including non-validators and validators) that the node will gossip peer list to")
-	fs.Duration(NetworkPeerListGossipFreqKey, constants.DefaultNetworkPeerListGossipFreq, "Frequency to gossip peers to other nodes")
 	fs.Duration(NetworkPeerListPullGossipFreqKey, constants.DefaultNetworkPeerListPullGossipFreq, "Frequency to request peers from other nodes")
 	fs.Duration(NetworkPeerListBloomResetFreqKey, constants.DefaultNetworkPeerListBloomResetFreq, "Frequency to recalculate the bloom filter used to request new peers from other nodes")
 
@@ -187,12 +183,6 @@ func addNodeFlags(fs *pflag.FlagSet) {
 	fs.Uint(ConsensusAppConcurrencyKey, constants.DefaultConsensusAppConcurrency, "Maximum number of goroutines to use when handling App messages on a chain")
 	fs.Duration(ConsensusShutdownTimeoutKey, constants.DefaultConsensusShutdownTimeout, "Timeout before killing an unresponsive chain")
 	fs.Duration(ConsensusFrontierPollFrequencyKey, constants.DefaultFrontierPollFrequency, "Frequency of polling for new consensus frontiers")
-	fs.Uint(ConsensusGossipAcceptedFrontierValidatorSizeKey, constants.DefaultConsensusGossipAcceptedFrontierValidatorSize, "Number of validators to gossip to when gossiping accepted frontier")
-	fs.Uint(ConsensusGossipAcceptedFrontierNonValidatorSizeKey, constants.DefaultConsensusGossipAcceptedFrontierNonValidatorSize, "Number of non-validators to gossip to when gossiping accepted frontier")
-	fs.Uint(ConsensusGossipAcceptedFrontierPeerSizeKey, constants.DefaultConsensusGossipAcceptedFrontierPeerSize, "Number of peers to gossip to when gossiping accepted frontier")
-	fs.Uint(ConsensusGossipOnAcceptValidatorSizeKey, constants.DefaultConsensusGossipOnAcceptValidatorSize, "Number of validators to gossip to each accepted container to")
-	fs.Uint(ConsensusGossipOnAcceptNonValidatorSizeKey, constants.DefaultConsensusGossipOnAcceptNonValidatorSize, "Number of non-validators to gossip to each accepted container to")
-	fs.Uint(ConsensusGossipOnAcceptPeerSizeKey, constants.DefaultConsensusGossipOnAcceptPeerSize, "Number of peers to gossip to each accepted container to")
 
 	// Inbound Throttling
 	fs.Uint64(InboundThrottlerAtLargeAllocSizeKey, constants.DefaultInboundThrottlerAtLargeAllocSize, "Size, in bytes, of at-large byte allocation in inbound message throttler")

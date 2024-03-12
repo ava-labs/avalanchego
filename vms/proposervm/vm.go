@@ -693,7 +693,7 @@ func (vm *VM) setLastAcceptedMetadata(ctx context.Context) error {
 }
 
 func (vm *VM) parsePostForkBlock(ctx context.Context, b []byte) (PostForkBlock, error) {
-	statelessBlock, err := statelessblock.Parse(b, vm.DurangoTime)
+	statelessBlock, err := statelessblock.Parse(b)
 	if err != nil {
 		return nil, err
 	}

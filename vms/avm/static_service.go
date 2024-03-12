@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
@@ -79,7 +78,6 @@ type BuildGenesisReply struct {
 // referenced in the UTXO.
 func (*StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, reply *BuildGenesisReply) error {
 	parser, err := txs.NewParser(
-		time.Time{},
 		[]fxs.Fx{
 			&secp256k1fx.Fx{},
 			&nftfx.Fx{},
