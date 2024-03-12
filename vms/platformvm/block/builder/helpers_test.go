@@ -177,7 +177,7 @@ func newEnvironment(t *testing.T, f fork) *environment { //nolint:unparam
 
 	registerer := prometheus.NewRegistry()
 	res.sender = &common.SenderTest{T: t}
-	res.sender.SendAppGossipF = func(context.Context, []byte, int, int, int) error {
+	res.sender.SendAppGossipF = func(context.Context, common.SendConfig, []byte) error {
 		return nil
 	}
 
@@ -387,7 +387,7 @@ func defaultFx(t *testing.T, clk *mockable.Clock, log logging.Logger, isBootstra
 	require := require.New(t)
 
 	fxVMInt := &fxVMInt{
-		registry: linearcodec.NewDefault(time.Time{}),
+		registry: linearcodec.NewDefault(),
 		clk:      clk,
 		log:      log,
 	}

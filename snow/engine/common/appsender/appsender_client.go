@@ -107,35 +107,23 @@ func (c *Client) SendAppError(ctx context.Context, nodeID ids.NodeID, requestID 
 
 func (c *Client) SendAppGossip(
 	ctx context.Context,
+	config common.SendConfig,
 	msg []byte,
-	numValidators int,
-	numNonValidators int,
-	numPeers int,
 ) error {
+	nodeIDs := make([][]byte, config.NodeIDs.Len())
+	i := 0
+	for nodeID := range config.NodeIDs {
+		nodeIDs[i] = nodeID.Bytes()
+		i++
+	}
 	_, err := c.client.SendAppGossip(
 		ctx,
 		&appsenderpb.SendAppGossipMsg{
-			Msg:              msg,
-			NumValidators:    uint64(numValidators),
-			NumNonValidators: uint64(numNonValidators),
-			NumPeers:         uint64(numPeers),
-		},
-	)
-	return err
-}
-
-func (c *Client) SendAppGossipSpecific(ctx context.Context, nodeIDs set.Set[ids.NodeID], msg []byte) error {
-	nodeIDsBytes := make([][]byte, nodeIDs.Len())
-	i := 0
-	for nodeID := range nodeIDs {
-		nodeIDsBytes[i] = nodeID.Bytes()
-		i++
-	}
-	_, err := c.client.SendAppGossipSpecific(
-		ctx,
-		&appsenderpb.SendAppGossipSpecificMsg{
-			NodeIds: nodeIDsBytes,
-			Msg:     msg,
+			NodeIds:       nodeIDs,
+			Validators:    uint64(config.Validators),
+			NonValidators: uint64(config.NonValidators),
+			Peers:         uint64(config.Peers),
+			Msg:           msg,
 		},
 	)
 	return err

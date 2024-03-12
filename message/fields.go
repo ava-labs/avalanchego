@@ -51,13 +51,7 @@ var (
 	_ requestIDGetter = (*p2p.AppRequest)(nil)
 	_ requestIDGetter = (*p2p.AppResponse)(nil)
 
-	_ engineTypeGetter = (*p2p.GetAcceptedFrontier)(nil)
-	_ engineTypeGetter = (*p2p.GetAccepted)(nil)
 	_ engineTypeGetter = (*p2p.GetAncestors)(nil)
-	_ engineTypeGetter = (*p2p.Get)(nil)
-	_ engineTypeGetter = (*p2p.Put)(nil)
-	_ engineTypeGetter = (*p2p.PushQuery)(nil)
-	_ engineTypeGetter = (*p2p.PullQuery)(nil)
 
 	_ deadlineGetter = (*p2p.GetStateSummaryFrontier)(nil)
 	_ deadlineGetter = (*p2p.GetAcceptedStateSummary)(nil)

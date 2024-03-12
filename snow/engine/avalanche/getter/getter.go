@@ -82,27 +82,23 @@ func (gh *getter) GetAcceptedStateSummary(_ context.Context, nodeID ids.NodeID, 
 	return nil
 }
 
-// TODO: Remove support for GetAcceptedFrontier messages after v1.11.x is
-// activated.
-func (gh *getter) GetAcceptedFrontier(ctx context.Context, validatorID ids.NodeID, requestID uint32) error {
-	acceptedFrontier := gh.storage.Edge(ctx)
-	// Since all the DAGs are linearized, we only need to return the stop
-	// vertex.
-	if len(acceptedFrontier) > 0 {
-		gh.sender.SendAcceptedFrontier(ctx, validatorID, requestID, acceptedFrontier[0])
-	}
+func (gh *getter) GetAcceptedFrontier(_ context.Context, nodeID ids.NodeID, requestID uint32) error {
+	gh.log.Debug("dropping request",
+		zap.String("reason", "unhandled by this gear"),
+		zap.Stringer("messageOp", message.GetAcceptedFrontierOp),
+		zap.Stringer("nodeID", nodeID),
+		zap.Uint32("requestID", requestID),
+	)
 	return nil
 }
 
-// TODO: Remove support for GetAccepted messages after v1.11.x is activated.
-func (gh *getter) GetAccepted(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs set.Set[ids.ID]) error {
-	acceptedVtxIDs := make([]ids.ID, 0, containerIDs.Len())
-	for vtxID := range containerIDs {
-		if vtx, err := gh.storage.GetVtx(ctx, vtxID); err == nil && vtx.Status() == choices.Accepted {
-			acceptedVtxIDs = append(acceptedVtxIDs, vtxID)
-		}
-	}
-	gh.sender.SendAccepted(ctx, nodeID, requestID, acceptedVtxIDs)
+func (gh *getter) GetAccepted(_ context.Context, nodeID ids.NodeID, requestID uint32, _ set.Set[ids.ID]) error {
+	gh.log.Debug("dropping request",
+		zap.String("reason", "unhandled by this gear"),
+		zap.Stringer("messageOp", message.GetAcceptedOp),
+		zap.Stringer("nodeID", nodeID),
+		zap.Uint32("requestID", requestID),
+	)
 	return nil
 }
 
@@ -158,10 +154,12 @@ func (gh *getter) GetAncestors(ctx context.Context, nodeID ids.NodeID, requestID
 	return nil
 }
 
-func (gh *getter) Get(ctx context.Context, nodeID ids.NodeID, requestID uint32, vtxID ids.ID) error {
-	// If this engine has access to the requested vertex, provide it
-	if vtx, err := gh.storage.GetVtx(ctx, vtxID); err == nil {
-		gh.sender.SendPut(ctx, nodeID, requestID, vtx.Bytes())
-	}
+func (gh *getter) Get(_ context.Context, nodeID ids.NodeID, requestID uint32, _ ids.ID) error {
+	gh.log.Debug("dropping request",
+		zap.String("reason", "unhandled by this gear"),
+		zap.Stringer("messageOp", message.GetOp),
+		zap.Stringer("nodeID", nodeID),
+		zap.Uint32("requestID", requestID),
+	)
 	return nil
 }
