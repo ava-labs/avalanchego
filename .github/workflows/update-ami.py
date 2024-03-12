@@ -20,7 +20,15 @@ skip_create_ami = os.getenv('SKIP_CREATE_AMI', "True")
 def packer_build(packerfile):
   print("Running the packer build")
   subprocess.run('/usr/local/bin/packer init ' + packerfile, shell=True)
-  subprocess.run('/usr/local/bin/packer build ' + packerfile, shell=True)
+  output = subprocess.run('/usr/local/bin/packer build ' + packerfile, shell=True, stdout=subprocess.PIPE)
+  print(output.stdout)
+  found = re.findall('ami-[a-z0-9]*', str(output.stdout))
+
+  if found:
+    amiid = found[-1]
+    print("Found amiId=" + amiid)
+  else
+    print("Did not find amiId")
 
 def packer_build_update(packerfile):
   print("Creating packer AMI image for Marketplace")

@@ -10,6 +10,10 @@ on:
     tags:
       - "*"
 
+env:
+  PACKER_VERSION: "1.6.6+ds1-4ubuntu0.22.04.2"
+  PYTHON3_BOTO3_VERSION: "1.20.34+dfsg-1"
+
 jobs:
   build-public-ami-and-upload:
     runs-on: ubuntu-22.04
@@ -26,9 +30,7 @@ jobs:
       - name: Install aws cli
         run: |
           sudo apt update
-          sudo apt-cache madison packer
-          sudo apt-cache madison python3-boto3
-          sudo apt-get -y install packer python3-boto3
+          sudo apt-get -y install packer=${PACKER_VERSION} python3-boto3=${PYTHON3_BOTO3_VERSION}
 
       - name: Get the tag
         id: get_tag
