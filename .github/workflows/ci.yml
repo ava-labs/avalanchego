@@ -21,7 +21,6 @@ concurrency:
 
 env:
   go_version: '~1.21.8'
-  tmpnet_data_path: ~/.tmpnet
   prometheus_url: https://grafana-experimental.avax-dev.network/d/kBQpRdWnk/avalanche-main-dashboard?orgId=1&refresh=10s&var-filter=is_ephemeral_node%7C%3D%7Cfalse&var-filter=gh_repo%7C%3D%7Cava-labs%2Favalanchego&var-filter=gh_run_id%7C%3D%7C${{ github.run_id }}&var-filter=gh_run_attempt%7C%3D%7C${{ github.run_attempt }}
 
 jobs:
@@ -83,7 +82,6 @@ jobs:
           FILTER_BY_OWNER: avalanchego-e2e
       - name: Run e2e tests
         shell: bash
-        # TODO(maru) Ensure network stays up for final metrics scrape
         run: E2E_SERIAL=1 ./scripts/tests.e2e.sh
         env:
           GH_REPO: ${{ github.repository }}
@@ -97,7 +95,9 @@ jobs:
         if: always()
         with:
           name: e2e-tmpnet-data
-          path: ${{ env.tmpnet_data_path }}
+          path: |
+            ~/.tmpnet/networks
+            ~/.tmpnet/prometheus/prometheus.log
           if-no-files-found: error
   e2e_existing_network:
     runs-on: ubuntu-latest
@@ -137,7 +137,9 @@ jobs:
         if: always()
         with:
           name: e2e-existing-network-tmpnet-data
-          path: ${{ env.tmpnet_data_path }}
+          path: |
+            ~/.tmpnet/networks
+            ~/.tmpnet/prometheus/prometheus.log
           if-no-files-found: error
   Upgrade:
     runs-on: ubuntu-latest
@@ -177,7 +179,9 @@ jobs:
         if: always()
         with:
           name: upgrade-tmpnet-data
-          path: ${{ env.tmpnet_data_path }}
+          path: |
+            ~/.tmpnet/networks
+            ~/.tmpnet/prometheus/prometheus.log
           if-no-files-found: error
   Lint:
     runs-on: ubuntu-latest
