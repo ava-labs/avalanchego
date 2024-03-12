@@ -131,10 +131,6 @@ func (m *outboundMessage) BytesSavedCompression() int {
 type msgBuilder struct {
 	log logging.Logger
 
-	// TODO: Remove gzip once v1.11.x is out.
-	gzipCompressor            compression.Compressor
-	gzipDecompressTimeMetrics map[Op]metric.Averager
-
 	zstdCompressor            compression.Compressor
 	zstdCompressTimeMetrics   map[Op]metric.Averager
 	zstdDecompressTimeMetrics map[Op]metric.Averager
@@ -148,10 +144,6 @@ func newMsgBuilder(
 	metrics prometheus.Registerer,
 	maxMessageTimeout time.Duration,
 ) (*msgBuilder, error) {
-	gzipCompressor, err := compression.NewGzipCompressor(constants.DefaultMaxMessageSize)
-	if err != nil {
-		return nil, err
-	}
 	zstdCompressor, err := compression.NewZstdCompressor(constants.DefaultMaxMessageSize)
 	if err != nil {
 		return nil, err
@@ -159,9 +151,6 @@ func newMsgBuilder(
 
 	mb := &msgBuilder{
 		log: log,
-
-		gzipCompressor:            gzipCompressor,
-		gzipDecompressTimeMetrics: make(map[Op]metric.Averager, len(ExternalOps)),
 
 		zstdCompressor:            zstdCompressor,
 		zstdCompressTimeMetrics:   make(map[Op]metric.Averager, len(ExternalOps)),
@@ -172,13 +161,6 @@ func newMsgBuilder(
 
 	errs := wrappers.Errs{}
 	for _, op := range ExternalOps {
-		mb.gzipDecompressTimeMetrics[op] = metric.NewAveragerWithErrs(
-			namespace,
-			fmt.Sprintf("gzip_%s_decompress_time", op),
-			fmt.Sprintf("time (in ns) to decompress %s messages with gzip", op),
-			metrics,
-			&errs,
-		)
 		mb.zstdCompressTimeMetrics[op] = metric.NewAveragerWithErrs(
 			namespace,
 			fmt.Sprintf("zstd_%s_compress_time", op),
@@ -271,14 +253,9 @@ func (mb *msgBuilder) unmarshal(b []byte) (*p2p.Message, int, Op, error) {
 		opToDecompressTimeMetrics map[Op]metric.Averager
 		compressor                compression.Compressor
 		compressedBytes           []byte
-		gzipCompressed            = m.GetCompressedGzip()
 		zstdCompressed            = m.GetCompressedZstd()
 	)
 	switch {
-	case len(gzipCompressed) > 0:
-		opToDecompressTimeMetrics = mb.gzipDecompressTimeMetrics
-		compressor = mb.gzipCompressor
-		compressedBytes = gzipCompressed
 	case len(zstdCompressed) > 0:
 		opToDecompressTimeMetrics = mb.zstdDecompressTimeMetrics
 		compressor = mb.zstdCompressor

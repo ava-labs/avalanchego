@@ -68,8 +68,6 @@ type Client interface {
 	GetStakingAssetID(ctx context.Context, subnetID ids.ID, options ...rpc.Option) (ids.ID, error)
 	// GetCurrentValidators returns the list of current validators for subnet with ID [subnetID]
 	GetCurrentValidators(ctx context.Context, subnetID ids.ID, nodeIDs []ids.NodeID, options ...rpc.Option) ([]ClientPermissionlessValidator, error)
-	// GetPendingValidators returns the list of pending validators for subnet with ID [subnetID]
-	GetPendingValidators(ctx context.Context, subnetID ids.ID, nodeIDs []ids.NodeID, options ...rpc.Option) ([]interface{}, []interface{}, error)
 	// GetCurrentSupply returns an upper bound on the supply of AVAX in the system along with the P-chain height
 	GetCurrentSupply(ctx context.Context, subnetID ids.ID, options ...rpc.Option) (uint64, uint64, error)
 	// SampleValidators returns the nodeIDs of a sample of [sampleSize] validators from the current validator set for subnet with ID [subnetID]
@@ -103,8 +101,7 @@ type Client interface {
 	// GetStake returns the amount of nAVAX that [addrs] have cumulatively
 	// staked on the Primary Network.
 	//
-	// Deprecated: Stake should be calculated using GetTx, GetCurrentValidators,
-	// and GetPendingValidators.
+	// Deprecated: Stake should be calculated using GetTx and GetCurrentValidators.
 	GetStake(
 		ctx context.Context,
 		addrs []ids.ShortID,
@@ -323,20 +320,6 @@ func (c *client) GetCurrentValidators(
 		return nil, err
 	}
 	return getClientPermissionlessValidators(res.Validators)
-}
-
-func (c *client) GetPendingValidators(
-	ctx context.Context,
-	subnetID ids.ID,
-	nodeIDs []ids.NodeID,
-	options ...rpc.Option,
-) ([]interface{}, []interface{}, error) {
-	res := &GetPendingValidatorsReply{}
-	err := c.requester.SendRequest(ctx, "platform.getPendingValidators", &GetPendingValidatorsArgs{
-		SubnetID: subnetID,
-		NodeIDs:  nodeIDs,
-	}, res, options...)
-	return res.Validators, res.Delegators, err
 }
 
 func (c *client) GetCurrentSupply(ctx context.Context, subnetID ids.ID, options ...rpc.Option) (uint64, uint64, error) {

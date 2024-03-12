@@ -87,7 +87,7 @@ func TestBaseTx(t *testing.T) {
 	require.Len(ins, 2)
 	require.Len(outs, 2)
 
-	expectedConsumed := testCtx.CreateSubnetTxFee() + outputsToMove[0].Out.Amount()
+	expectedConsumed := testCtx.BaseTxFee() + outputsToMove[0].Out.Amount()
 	consumed := ins[0].In.Amount() + ins[1].In.Amount() - outs[0].Out.Amount()
 	require.Equal(expectedConsumed, consumed)
 	require.Equal(outputsToMove[0], outs[1])
