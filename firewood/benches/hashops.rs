@@ -6,7 +6,7 @@
 use criterion::{criterion_group, criterion_main, profiler::Profiler, BatchSize, Criterion};
 use firewood::{
     db::{BatchOp, DbConfig},
-    merkle::{Bincode, Merkle, Node, TrieHash, TRIE_HASH_LEN},
+    merkle::{Bincode, Merkle, TrieHash, TRIE_HASH_LEN},
     shale::{
         cached::InMemLinearStore,
         compact::{CompactHeader, CompactSpace},
@@ -20,7 +20,7 @@ use pprof::ProfilerGuard;
 use rand::{distributions::Alphanumeric, rngs::StdRng, Rng, SeedableRng};
 use std::{fs::File, iter::repeat_with, os::raw::c_int, path::Path, sync::Arc};
 
-pub type MerkleWithEncoder = Merkle<CompactSpace<Node, InMemLinearStore>, Bincode>;
+pub type MerkleWithEncoder = Merkle<InMemLinearStore, Bincode>;
 
 const ZERO_HASH: TrieHash = TrieHash([0u8; TRIE_HASH_LEN]);
 
@@ -113,7 +113,7 @@ fn bench_merkle<const N: usize>(criterion: &mut Criterion) {
                     )
                     .unwrap();
 
-                    let merkle = MerkleWithEncoder::new(Box::new(store));
+                    let merkle = MerkleWithEncoder::new(store);
                     #[allow(clippy::unwrap_used)]
                     let root = merkle.init_root().unwrap();
 

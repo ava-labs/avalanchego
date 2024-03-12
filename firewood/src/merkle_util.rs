@@ -4,12 +4,9 @@
 use crate::{
     merkle::{
         proof::{Proof, ProofError},
-        BinarySerde, EncodedNode, Merkle, Node, Ref, RefMut, TrieHash,
+        BinarySerde, EncodedNode, Merkle, Ref, RefMut, TrieHash,
     },
-    shale::{
-        self, cached::InMemLinearStore, compact::CompactSpace, disk_address::DiskAddress,
-        CachedStore, StoredView,
-    },
+    shale::{self, cached::InMemLinearStore, disk_address::DiskAddress, CachedStore, StoredView},
 };
 use std::num::NonZeroUsize;
 use thiserror::Error;
@@ -36,11 +33,9 @@ pub enum DataStoreError {
     ProofEmptyKeyValuesError,
 }
 
-type InMemoryStore = CompactSpace<Node, InMemLinearStore>;
-
 pub struct InMemoryMerkle<T> {
     root: DiskAddress,
-    merkle: Merkle<InMemoryStore, T>,
+    merkle: Merkle<InMemLinearStore, T>,
 }
 
 impl<T> InMemoryMerkle<T>
@@ -77,7 +72,7 @@ where
             shale::compact::CompactSpace::new(mem_meta, mem_payload, compact_header, cache, 10, 16)
                 .expect("CompactSpace init fail");
 
-        let merkle = Merkle::new(Box::new(space));
+        let merkle = Merkle::new(space);
         #[allow(clippy::unwrap_used)]
         let root = merkle.init_root().unwrap();
 
@@ -105,7 +100,7 @@ where
     pub fn get_mut<K: AsRef<[u8]>>(
         &mut self,
         key: K,
-    ) -> Result<Option<RefMut<InMemoryStore, T>>, DataStoreError> {
+    ) -> Result<Option<RefMut<InMemLinearStore, T>>, DataStoreError> {
         self.merkle
             .get_mut(key, self.root)
             .map_err(|_err| DataStoreError::GetError)
@@ -115,7 +110,7 @@ where
         self.root
     }
 
-    pub fn get_merkle_mut(&mut self) -> &mut Merkle<InMemoryStore, T> {
+    pub fn get_merkle_mut(&mut self) -> &mut Merkle<InMemLinearStore, T> {
         &mut self.merkle
     }
 

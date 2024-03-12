@@ -5,7 +5,7 @@ use super::{Data, Node};
 use crate::{
     merkle::{from_nibbles, to_nibble_array, PartialPath},
     nibbles::Nibbles,
-    shale::{DiskAddress, ShaleError, ShaleStore, Storable},
+    shale::{compact::CompactSpace, CachedStore, DiskAddress, ShaleError, Storable},
 };
 use bincode::{Error, Options};
 use serde::de::Error as DeError;
@@ -125,7 +125,7 @@ impl BranchNode {
         ))
     }
 
-    pub(super) fn encode<S: ShaleStore<Node>>(&self, store: &S) -> Vec<u8> {
+    pub(super) fn encode<S: CachedStore>(&self, store: &CompactSpace<Node, S>) -> Vec<u8> {
         // path + children + value
         let mut list = <[Vec<u8>; Self::MSIZE]>::default();
 
@@ -136,9 +136,9 @@ impl BranchNode {
                     let mut c_ref = store.get_item(*c).unwrap();
 
                     #[allow(clippy::unwrap_used)]
-                    if c_ref.is_encoded_longer_than_hash_len::<S>(store) {
+                    if c_ref.is_encoded_longer_than_hash_len(store) {
                         #[allow(clippy::indexing_slicing)]
-                        (list[i] = c_ref.get_root_hash::<S>(store).to_vec());
+                        (list[i] = c_ref.get_root_hash(store).to_vec());
 
                         // See struct docs for ordering requirements
                         if c_ref.is_dirty() {
@@ -146,7 +146,7 @@ impl BranchNode {
                             c_ref.set_dirty(false);
                         }
                     } else {
-                        let child_encoded = c_ref.get_encoded::<S>(store);
+                        let child_encoded = c_ref.get_encoded(store);
                         #[allow(clippy::indexing_slicing)]
                         (list[i] = child_encoded.to_vec());
                     }

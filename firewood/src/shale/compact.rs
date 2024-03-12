@@ -7,7 +7,7 @@ use crate::shale::ObjCache;
 use crate::storage::{StoreRevMut, StoreRevShared};
 
 use super::disk_address::DiskAddress;
-use super::{CachedStore, Obj, ObjRef, ShaleError, ShaleStore, Storable, StoredView};
+use super::{CachedStore, Obj, ObjRef, ShaleError, Storable, StoredView};
 use bytemuck::{Pod, Zeroable};
 use std::fmt::Debug;
 use std::io::{Cursor, Write};
@@ -569,9 +569,9 @@ impl<T: Storable, M: CachedStore> CompactSpace<T, M> {
     }
 }
 
-impl From<Box<CompactSpace<Node, StoreRevMut>>> for CompactSpace<Node, StoreRevShared> {
+impl From<CompactSpace<Node, StoreRevMut>> for CompactSpace<Node, StoreRevShared> {
     #[allow(clippy::unwrap_used)]
-    fn from(value: Box<CompactSpace<Node, StoreRevMut>>) -> Self {
+    fn from(value: CompactSpace<Node, StoreRevMut>) -> Self {
         let inner = value.inner.into_inner().unwrap();
         CompactSpace {
             inner: RwLock::new(inner.into()),
@@ -580,10 +580,8 @@ impl From<Box<CompactSpace<Node, StoreRevMut>>> for CompactSpace<Node, StoreRevS
     }
 }
 
-impl<T: Storable + Debug + 'static + PartialEq, M: CachedStore + Send + Sync> ShaleStore<T>
-    for CompactSpace<T, M>
-{
-    fn put_item(&self, item: T, extra: u64) -> Result<ObjRef<'_, T>, ShaleError> {
+impl<T: Storable + Debug + 'static, M: CachedStore> CompactSpace<T, M> {
+    pub(crate) fn put_item(&self, item: T, extra: u64) -> Result<ObjRef<'_, T>, ShaleError> {
         let size = item.serialized_len() + extra;
         #[allow(clippy::unwrap_used)]
         let addr = self.inner.write().unwrap().alloc(size)?;
@@ -612,14 +610,14 @@ impl<T: Storable + Debug + 'static + PartialEq, M: CachedStore + Send + Sync> Sh
     }
 
     #[allow(clippy::unwrap_used)]
-    fn free_item(&mut self, ptr: DiskAddress) -> Result<(), ShaleError> {
+    pub(crate) fn free_item(&mut self, ptr: DiskAddress) -> Result<(), ShaleError> {
         let mut inner = self.inner.write().unwrap();
         self.obj_cache.pop(ptr);
         #[allow(clippy::unwrap_used)]
         inner.free(ptr.unwrap().get() as u64)
     }
 
-    fn get_item(&self, ptr: DiskAddress) -> Result<ObjRef<'_, T>, ShaleError> {
+    pub(crate) fn get_item(&self, ptr: DiskAddress) -> Result<ObjRef<'_, T>, ShaleError> {
         let obj = self.obj_cache.get(ptr)?;
 
         #[allow(clippy::unwrap_used)]
@@ -648,7 +646,7 @@ impl<T: Storable + Debug + 'static + PartialEq, M: CachedStore + Send + Sync> Sh
     }
 
     #[allow(clippy::unwrap_used)]
-    fn flush_dirty(&self) -> Option<()> {
+    pub(crate) fn flush_dirty(&self) -> Option<()> {
         let mut inner = self.inner.write().unwrap();
         inner.header.flush_dirty();
         // hold the write lock to ensure that both cache and header are flushed in-sync

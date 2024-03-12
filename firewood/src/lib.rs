@@ -77,19 +77,17 @@
 //!   that is mirrored to the disk. In reality, the linear space will be chunked into files under a
 //!   directory, but the user does not have to even know about this.
 //!
-//! - Persistent item storage stash: `ShaleStore` trait from `shale` defines a pool of typed
-//!   objects that are persisted on disk but also made accessible in memory transparently. It is
-//!   built on top of `CachedStore` by defining how "items" of the given type are laid out, allocated
-//!   and recycled throughout their life cycles (there is a disk-friendly, malloc-style kind of
-//!   basic implementation in `shale` crate, but one can always define their own `ShaleStore`).
+//! - Persistent item storage stash: `CompactStore` in `shale` defines a pool of typed objects that are
+//!   persisted on disk but also made accessible in memory transparently. It is built on top of `CachedStore`
+//!   and defines how "items" of a given type are laid out, allocated and recycled throughout their lifecycles.
 //!
-//! - Data structure: in Firewood, one trie is maintained by invoking `ShaleStore` (see `src/merkle.rs`).
+//! - Data structure: in Firewood, one trie is maintained by invoking `CompactStore` (see `src/merkle.rs`).
 //!   The data structure code is totally unaware of how its objects (i.e., nodes) are organized or
 //!   persisted on disk. It is as if they're just in memory, which makes it much easier to write
 //!   and maintain the code.
 //!
 //! Given the abstraction, one can easily realize the fact that the actual data that affect the
-//! state of the data structure (trie) is what the linear space (`CachedStore`) keeps track of, that is,
+//! state of the data structure (trie) is what the linear space (`CachedStore`) keeps track of. That is,
 //! a flat but conceptually large byte vector. In other words, given a valid byte vector as the
 //! content of the linear space, the higher level data structure can be *uniquely* determined, there
 //! is nothing more (except for some auxiliary data that are kept for performance reasons, such as caching)
@@ -97,8 +95,7 @@
 //! separate the logical data from its physical representation, greatly simplifies the storage
 //! management, and allows reusing the code. It is still a very versatile abstraction, as in theory
 //! any persistent data could be stored this way -- sometimes you need to swap in a different
-//! `ShaleStore` or `CachedStore` implementation, but without having to touch the code for the persisted
-//! data structure.
+//! `CachedStore` implementation, but without having to touch the code for the persisted data structure.
 //!
 //! ## Page-based Shadowing and Revisions
 //!
