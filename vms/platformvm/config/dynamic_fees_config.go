@@ -81,25 +81,25 @@ type DynamicFeesConfig struct {
 	// InitialUnitFees contains, per each fee dimension, the
 	// unit fees valid as soon as fork introducing dynamic fees
 	// activates. Unit fees will be then updated by the dynamic fees algo.
-	InitialUnitFees commonfees.Dimensions
+	InitialUnitFees commonfees.Dimensions `json:"initial-unit-fees"`
 
 	// MinUnitFees contains, per each fee dimension, the
 	// minimal unit fees enforced by the dynamic fees algo.
-	MinUnitFees commonfees.Dimensions
+	MinUnitFees commonfees.Dimensions `json:"min-unit-fees"`
 
 	// UpdateCoefficient contains, per each fee dimension, the
 	// exponential update coefficient. Setting an entry to 0 makes
 	// the corresponding fee rate constant.
-	UpdateCoefficient commonfees.Dimensions
+	UpdateCoefficient commonfees.Dimensions `json:"update-coefficient"`
 
 	// BlockUnitsCap contains, per each fee dimension, the
 	// maximal complexity a valid P-chain block can host
-	BlockUnitsCap commonfees.Dimensions
+	BlockUnitsCap commonfees.Dimensions `json:"block-unit-caps"`
 
 	// BlockUnitsTarget contains, per each fee dimension, the
 	// preferred block complexity that the dynamic fee algo
 	// strive to converge to
-	BlockUnitsTarget commonfees.Dimensions
+	BlockUnitsTarget commonfees.Dimensions `json:"block-target-caps"`
 }
 
 func (c *DynamicFeesConfig) validate() error {
