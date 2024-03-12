@@ -101,8 +101,8 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	reqID := uint32(1)
 	chainID := ids.ID{}
 	msg := Message{
-		InboundMessage: message.InboundGetAcceptedFrontier(chainID, reqID, 0*time.Second, nodeID, p2p.EngineType_ENGINE_TYPE_SNOWMAN),
-		EngineType:     p2p.EngineType_ENGINE_TYPE_SNOWMAN,
+		InboundMessage: message.InboundGetAcceptedFrontier(chainID, reqID, 0*time.Second, nodeID),
+		EngineType:     p2p.EngineType_ENGINE_TYPE_UNSPECIFIED,
 	}
 	handler.Push(context.Background(), msg)
 
@@ -111,8 +111,8 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 
 	reqID++
 	msg = Message{
-		InboundMessage: message.InboundGetAccepted(chainID, reqID, 1*time.Second, nil, nodeID, p2p.EngineType_ENGINE_TYPE_SNOWMAN),
-		EngineType:     p2p.EngineType_ENGINE_TYPE_SNOWMAN,
+		InboundMessage: message.InboundGetAccepted(chainID, reqID, 1*time.Second, nil, nodeID),
+		EngineType:     p2p.EngineType_ENGINE_TYPE_UNSPECIFIED,
 	}
 	handler.Push(context.Background(), msg)
 
@@ -210,7 +210,7 @@ func TestHandlerClosesOnError(t *testing.T) {
 	reqID := uint32(1)
 	deadline := time.Nanosecond
 	msg := Message{
-		InboundMessage: message.InboundGetAcceptedFrontier(ids.ID{}, reqID, deadline, nodeID, 0),
+		InboundMessage: message.InboundGetAcceptedFrontier(ids.ID{}, reqID, deadline, nodeID),
 		EngineType:     p2p.EngineType_ENGINE_TYPE_UNSPECIFIED,
 	}
 	handler.Push(context.Background(), msg)
@@ -288,8 +288,8 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 	chainID := ids.Empty
 	reqID := uint32(1)
 	inInboundMessage := Message{
-		InboundMessage: message.InternalGetFailed(nodeID, chainID, reqID, p2p.EngineType_ENGINE_TYPE_SNOWMAN),
-		EngineType:     p2p.EngineType_ENGINE_TYPE_SNOWMAN,
+		InboundMessage: message.InternalGetFailed(nodeID, chainID, reqID),
+		EngineType:     p2p.EngineType_ENGINE_TYPE_UNSPECIFIED,
 	}
 	handler.Push(context.Background(), inInboundMessage)
 

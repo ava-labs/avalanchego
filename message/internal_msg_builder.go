@@ -27,30 +27,26 @@ var (
 	_ chainIDGetter   = (*GetAcceptedStateSummaryFailed)(nil)
 	_ requestIDGetter = (*GetAcceptedStateSummaryFailed)(nil)
 
-	_ fmt.Stringer     = (*GetAcceptedFrontierFailed)(nil)
-	_ chainIDGetter    = (*GetAcceptedFrontierFailed)(nil)
-	_ requestIDGetter  = (*GetAcceptedFrontierFailed)(nil)
-	_ engineTypeGetter = (*GetAcceptedFrontierFailed)(nil)
+	_ fmt.Stringer    = (*GetAcceptedFrontierFailed)(nil)
+	_ chainIDGetter   = (*GetAcceptedFrontierFailed)(nil)
+	_ requestIDGetter = (*GetAcceptedFrontierFailed)(nil)
 
-	_ fmt.Stringer     = (*GetAcceptedFailed)(nil)
-	_ chainIDGetter    = (*GetAcceptedFailed)(nil)
-	_ requestIDGetter  = (*GetAcceptedFailed)(nil)
-	_ engineTypeGetter = (*GetAcceptedFailed)(nil)
+	_ fmt.Stringer    = (*GetAcceptedFailed)(nil)
+	_ chainIDGetter   = (*GetAcceptedFailed)(nil)
+	_ requestIDGetter = (*GetAcceptedFailed)(nil)
 
 	_ fmt.Stringer     = (*GetAncestorsFailed)(nil)
 	_ chainIDGetter    = (*GetAncestorsFailed)(nil)
 	_ requestIDGetter  = (*GetAncestorsFailed)(nil)
 	_ engineTypeGetter = (*GetAncestorsFailed)(nil)
 
-	_ fmt.Stringer     = (*GetFailed)(nil)
-	_ chainIDGetter    = (*GetFailed)(nil)
-	_ requestIDGetter  = (*GetFailed)(nil)
-	_ engineTypeGetter = (*GetFailed)(nil)
+	_ fmt.Stringer    = (*GetFailed)(nil)
+	_ chainIDGetter   = (*GetFailed)(nil)
+	_ requestIDGetter = (*GetFailed)(nil)
 
-	_ fmt.Stringer     = (*QueryFailed)(nil)
-	_ chainIDGetter    = (*QueryFailed)(nil)
-	_ requestIDGetter  = (*QueryFailed)(nil)
-	_ engineTypeGetter = (*QueryFailed)(nil)
+	_ fmt.Stringer    = (*QueryFailed)(nil)
+	_ chainIDGetter   = (*QueryFailed)(nil)
+	_ requestIDGetter = (*QueryFailed)(nil)
 
 	_ fmt.Stringer        = (*CrossChainAppRequest)(nil)
 	_ sourceChainIDGetter = (*CrossChainAppRequest)(nil)
@@ -147,15 +143,14 @@ func InternalGetAcceptedStateSummaryFailed(
 }
 
 type GetAcceptedFrontierFailed struct {
-	ChainID    ids.ID         `json:"chain_id,omitempty"`
-	RequestID  uint32         `json:"request_id,omitempty"`
-	EngineType p2p.EngineType `json:"engine_type,omitempty"`
+	ChainID   ids.ID `json:"chain_id,omitempty"`
+	RequestID uint32 `json:"request_id,omitempty"`
 }
 
 func (m *GetAcceptedFrontierFailed) String() string {
 	return fmt.Sprintf(
-		"ChainID: %s RequestID: %d EngineType: %s",
-		m.ChainID, m.RequestID, m.EngineType,
+		"ChainID: %s RequestID: %d",
+		m.ChainID, m.RequestID,
 	)
 }
 
@@ -167,38 +162,31 @@ func (m *GetAcceptedFrontierFailed) GetRequestId() uint32 {
 	return m.RequestID
 }
 
-func (m *GetAcceptedFrontierFailed) GetEngineType() p2p.EngineType {
-	return m.EngineType
-}
-
 func InternalGetAcceptedFrontierFailed(
 	nodeID ids.NodeID,
 	chainID ids.ID,
 	requestID uint32,
-	engineType p2p.EngineType,
 ) InboundMessage {
 	return &inboundMessage{
 		nodeID: nodeID,
 		op:     GetAcceptedFrontierFailedOp,
 		message: &GetAcceptedFrontierFailed{
-			ChainID:    chainID,
-			RequestID:  requestID,
-			EngineType: engineType,
+			ChainID:   chainID,
+			RequestID: requestID,
 		},
 		expiration: mockable.MaxTime,
 	}
 }
 
 type GetAcceptedFailed struct {
-	ChainID    ids.ID         `json:"chain_id,omitempty"`
-	RequestID  uint32         `json:"request_id,omitempty"`
-	EngineType p2p.EngineType `json:"engine_type,omitempty"`
+	ChainID   ids.ID `json:"chain_id,omitempty"`
+	RequestID uint32 `json:"request_id,omitempty"`
 }
 
 func (m *GetAcceptedFailed) String() string {
 	return fmt.Sprintf(
-		"ChainID: %s RequestID: %d EngineType: %s",
-		m.ChainID, m.RequestID, m.EngineType,
+		"ChainID: %s RequestID: %d",
+		m.ChainID, m.RequestID,
 	)
 }
 
@@ -210,23 +198,17 @@ func (m *GetAcceptedFailed) GetRequestId() uint32 {
 	return m.RequestID
 }
 
-func (m *GetAcceptedFailed) GetEngineType() p2p.EngineType {
-	return m.EngineType
-}
-
 func InternalGetAcceptedFailed(
 	nodeID ids.NodeID,
 	chainID ids.ID,
 	requestID uint32,
-	engineType p2p.EngineType,
 ) InboundMessage {
 	return &inboundMessage{
 		nodeID: nodeID,
 		op:     GetAcceptedFailedOp,
 		message: &GetAcceptedFailed{
-			ChainID:    chainID,
-			RequestID:  requestID,
-			EngineType: engineType,
+			ChainID:   chainID,
+			RequestID: requestID,
 		},
 		expiration: mockable.MaxTime,
 	}
@@ -276,15 +258,14 @@ func InternalGetAncestorsFailed(
 }
 
 type GetFailed struct {
-	ChainID    ids.ID         `json:"chain_id,omitempty"`
-	RequestID  uint32         `json:"request_id,omitempty"`
-	EngineType p2p.EngineType `json:"engine_type,omitempty"`
+	ChainID   ids.ID `json:"chain_id,omitempty"`
+	RequestID uint32 `json:"request_id,omitempty"`
 }
 
 func (m *GetFailed) String() string {
 	return fmt.Sprintf(
-		"ChainID: %s RequestID: %d EngineType: %s",
-		m.ChainID, m.RequestID, m.EngineType,
+		"ChainID: %s RequestID: %d",
+		m.ChainID, m.RequestID,
 	)
 }
 
@@ -296,38 +277,31 @@ func (m *GetFailed) GetRequestId() uint32 {
 	return m.RequestID
 }
 
-func (m *GetFailed) GetEngineType() p2p.EngineType {
-	return m.EngineType
-}
-
 func InternalGetFailed(
 	nodeID ids.NodeID,
 	chainID ids.ID,
 	requestID uint32,
-	engineType p2p.EngineType,
 ) InboundMessage {
 	return &inboundMessage{
 		nodeID: nodeID,
 		op:     GetFailedOp,
 		message: &GetFailed{
-			ChainID:    chainID,
-			RequestID:  requestID,
-			EngineType: engineType,
+			ChainID:   chainID,
+			RequestID: requestID,
 		},
 		expiration: mockable.MaxTime,
 	}
 }
 
 type QueryFailed struct {
-	ChainID    ids.ID         `json:"chain_id,omitempty"`
-	RequestID  uint32         `json:"request_id,omitempty"`
-	EngineType p2p.EngineType `json:"engine_type,omitempty"`
+	ChainID   ids.ID `json:"chain_id,omitempty"`
+	RequestID uint32 `json:"request_id,omitempty"`
 }
 
 func (m *QueryFailed) String() string {
 	return fmt.Sprintf(
-		"ChainID: %s RequestID: %d EngineType: %s",
-		m.ChainID, m.RequestID, m.EngineType,
+		"ChainID: %s RequestID: %d",
+		m.ChainID, m.RequestID,
 	)
 }
 
@@ -339,23 +313,17 @@ func (m *QueryFailed) GetRequestId() uint32 {
 	return m.RequestID
 }
 
-func (m *QueryFailed) GetEngineType() p2p.EngineType {
-	return m.EngineType
-}
-
 func InternalQueryFailed(
 	nodeID ids.NodeID,
 	chainID ids.ID,
 	requestID uint32,
-	engineType p2p.EngineType,
 ) InboundMessage {
 	return &inboundMessage{
 		nodeID: nodeID,
 		op:     QueryFailedOp,
 		message: &QueryFailed{
-			ChainID:    chainID,
-			RequestID:  requestID,
-			EngineType: engineType,
+			ChainID:   chainID,
+			RequestID: requestID,
 		},
 		expiration: mockable.MaxTime,
 	}

@@ -45,7 +45,6 @@ func TestInboundMsgBuilder(t *testing.T) {
 		acceptedContainerID        = ids.GenerateTestID()
 		summaryIDs                 = []ids.ID{ids.GenerateTestID(), ids.GenerateTestID()}
 		heights                    = []uint64{1000, 2000}
-		engineType                 = p2p.EngineType_ENGINE_TYPE_SNOWMAN
 	)
 
 	t.Run(
@@ -162,7 +161,6 @@ func TestInboundMsgBuilder(t *testing.T) {
 				requestID,
 				deadline,
 				nodeID,
-				engineType,
 			)
 			end := time.Now()
 
@@ -174,7 +172,6 @@ func TestInboundMsgBuilder(t *testing.T) {
 			innerMsg := msg.Message().(*p2p.GetAcceptedFrontier)
 			require.Equal(chainID[:], innerMsg.ChainId)
 			require.Equal(requestID, innerMsg.RequestId)
-			require.Equal(engineType, innerMsg.EngineType)
 		},
 	)
 
@@ -213,7 +210,6 @@ func TestInboundMsgBuilder(t *testing.T) {
 				deadline,
 				containerIDs,
 				nodeID,
-				engineType,
 			)
 			end := time.Now()
 
@@ -225,7 +221,6 @@ func TestInboundMsgBuilder(t *testing.T) {
 			innerMsg := msg.Message().(*p2p.GetAccepted)
 			require.Equal(chainID[:], innerMsg.ChainId)
 			require.Equal(requestID, innerMsg.RequestId)
-			require.Equal(engineType, innerMsg.EngineType)
 		},
 	)
 
@@ -270,7 +265,6 @@ func TestInboundMsgBuilder(t *testing.T) {
 				container,
 				requestedHeight,
 				nodeID,
-				engineType,
 			)
 			end := time.Now()
 
@@ -284,7 +278,6 @@ func TestInboundMsgBuilder(t *testing.T) {
 			require.Equal(requestID, innerMsg.RequestId)
 			require.Equal(container, innerMsg.Container)
 			require.Equal(requestedHeight, innerMsg.RequestedHeight)
-			require.Equal(engineType, innerMsg.EngineType)
 		},
 	)
 
@@ -301,7 +294,6 @@ func TestInboundMsgBuilder(t *testing.T) {
 				containerIDs[0],
 				requestedHeight,
 				nodeID,
-				engineType,
 			)
 			end := time.Now()
 
@@ -315,7 +307,6 @@ func TestInboundMsgBuilder(t *testing.T) {
 			require.Equal(requestID, innerMsg.RequestId)
 			require.Equal(containerIDs[0][:], innerMsg.ContainerId)
 			require.Equal(requestedHeight, innerMsg.RequestedHeight)
-			require.Equal(engineType, innerMsg.EngineType)
 		},
 	)
 
