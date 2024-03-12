@@ -146,8 +146,8 @@ impl<'a, S: CachedStore, T> Stream for MerkleNodeStream<'a, S, T> {
                             let child = merkle.get_node(child_addr)?;
 
                             let partial_path = match child.inner() {
-                                NodeType::Branch(branch) => branch.path.iter().copied(),
-                                NodeType::Leaf(leaf) => leaf.path.iter().copied(),
+                                NodeType::Branch(branch) => branch.partial_path.iter().copied(),
+                                NodeType::Leaf(leaf) => leaf.partial_path.iter().copied(),
                             };
 
                             // The child's key is its parent's key, followed by the child's index,
@@ -240,8 +240,8 @@ fn get_iterator_intial_state<'a, S: CachedStore, T>(
                 let child = merkle.get_node(child_addr)?;
 
                 let partial_key = match child.inner() {
-                    NodeType::Branch(branch) => &branch.path,
-                    NodeType::Leaf(leaf) => &leaf.path,
+                    NodeType::Branch(branch) => &branch.partial_path,
+                    NodeType::Leaf(leaf) => &leaf.partial_path,
                 };
 
                 let (comparison, new_unmatched_key_nibbles) =
@@ -272,13 +272,13 @@ fn get_iterator_intial_state<'a, S: CachedStore, T>(
                 }
             }
             NodeType::Leaf(leaf) => {
-                if compare_partial_path(leaf.path.iter(), unmatched_key_nibbles).0
+                if compare_partial_path(leaf.partial_path.iter(), unmatched_key_nibbles).0
                     == Ordering::Greater
                 {
                     // `child` is after `key`.
                     let key = matched_key_nibbles
                         .iter()
-                        .chain(leaf.path.iter())
+                        .chain(leaf.partial_path.iter())
                         .copied()
                         .collect();
                     iter_stack.push(IterationNode::Unvisited { key, node });
@@ -477,8 +477,8 @@ impl<'a, 'b, S: CachedStore, T> Iterator for PathIterator<'a, 'b, S, T> {
                 };
 
                 let partial_path = match node.inner() {
-                    NodeType::Branch(branch) => &branch.path,
-                    NodeType::Leaf(leaf) => &leaf.path,
+                    NodeType::Branch(branch) => &branch.partial_path,
+                    NodeType::Leaf(leaf) => &leaf.partial_path,
                 };
 
                 let (comparison, unmatched_key) =
@@ -810,40 +810,40 @@ mod tests {
         assert_eq!(key, vec![0x00].into_boxed_slice());
         let node = node.inner().as_branch().unwrap();
         assert!(node.value.is_none());
-        assert_eq!(node.path.to_vec(), vec![0x00, 0x00]);
+        assert_eq!(node.partial_path.to_vec(), vec![0x00, 0x00]);
 
         // Covers case of branch with value
         let (key, node) = stream.next().await.unwrap().unwrap();
         assert_eq!(key, vec![0x00, 0x00, 0x00].into_boxed_slice());
         let node = node.inner().as_branch().unwrap();
         assert_eq!(node.value.clone().unwrap().to_vec(), vec![0x00, 0x00, 0x00]);
-        assert_eq!(node.path.to_vec(), vec![0x00, 0x00, 0x00]);
+        assert_eq!(node.partial_path.to_vec(), vec![0x00, 0x00, 0x00]);
 
         // Covers case of leaf with partial path
         let (key, node) = stream.next().await.unwrap().unwrap();
         assert_eq!(key, vec![0x00, 0x00, 0x00, 0x01].into_boxed_slice());
         let node = node.inner().as_leaf().unwrap();
         assert_eq!(node.clone().data.to_vec(), vec![0x00, 0x00, 0x00, 0x01]);
-        assert_eq!(node.path.to_vec(), vec![0x01]);
+        assert_eq!(node.partial_path.to_vec(), vec![0x01]);
 
         let (key, node) = stream.next().await.unwrap().unwrap();
         assert_eq!(key, vec![0x00, 0x00, 0x00, 0xFF].into_boxed_slice());
         let node = node.inner().as_leaf().unwrap();
         assert_eq!(node.clone().data.to_vec(), vec![0x00, 0x00, 0x00, 0xFF]);
-        assert_eq!(node.path.to_vec(), vec![0x0F]);
+        assert_eq!(node.partial_path.to_vec(), vec![0x0F]);
 
         let (key, node) = stream.next().await.unwrap().unwrap();
         assert_eq!(key, vec![0x00, 0xD0, 0xD0].into_boxed_slice());
         let node = node.inner().as_leaf().unwrap();
         assert_eq!(node.clone().data.to_vec(), vec![0x00, 0xD0, 0xD0]);
-        assert_eq!(node.path.to_vec(), vec![0x00, 0x0D, 0x00]); // 0x0D00 becomes 0xDO
+        assert_eq!(node.partial_path.to_vec(), vec![0x00, 0x0D, 0x00]); // 0x0D00 becomes 0xDO
 
         // Covers case of leaf with no partial path
         let (key, node) = stream.next().await.unwrap().unwrap();
         assert_eq!(key, vec![0x00, 0xFF].into_boxed_slice());
         let node = node.inner().as_leaf().unwrap();
         assert_eq!(node.clone().data.to_vec(), vec![0x00, 0xFF]);
-        assert_eq!(node.path.to_vec(), vec![0x0F]);
+        assert_eq!(node.partial_path.to_vec(), vec![0x0F]);
 
         check_stream_is_done(stream).await;
     }

@@ -22,26 +22,31 @@ type DataLen = u32;
 
 #[derive(PartialEq, Eq, Clone)]
 pub struct LeafNode {
-    pub(crate) path: PartialPath,
+    pub(crate) partial_path: PartialPath,
     pub(crate) data: Data,
 }
 
 impl Debug for LeafNode {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), FmtError> {
-        write!(f, "[Leaf {:?} {}]", self.path, hex::encode(&*self.data))
+        write!(
+            f,
+            "[Leaf {:?} {}]",
+            self.partial_path,
+            hex::encode(&*self.data)
+        )
     }
 }
 
 impl LeafNode {
-    pub fn new<P: Into<PartialPath>, D: Into<Data>>(path: P, data: D) -> Self {
+    pub fn new<P: Into<PartialPath>, D: Into<Data>>(partial_path: P, data: D) -> Self {
         Self {
-            path: path.into(),
+            partial_path: partial_path.into(),
             data: data.into(),
         }
     }
 
     pub const fn path(&self) -> &PartialPath {
-        &self.path
+        &self.partial_path
     }
 
     pub const fn data(&self) -> &Data {
@@ -53,7 +58,7 @@ impl LeafNode {
         bincode::DefaultOptions::new()
             .serialize(
                 [
-                    from_nibbles(&self.path.encode()).collect(),
+                    from_nibbles(&self.partial_path.encode()).collect(),
                     self.data.to_vec(),
                 ]
                 .as_slice(),
@@ -76,7 +81,7 @@ impl Meta {
 impl Storable for LeafNode {
     fn serialized_len(&self) -> u64 {
         let meta_len = size_of::<Meta>() as u64;
-        let path_len = self.path.serialized_len();
+        let path_len = self.partial_path.serialized_len();
         let data_len = self.data.len() as u64;
 
         meta_len + path_len + data_len
@@ -85,11 +90,11 @@ impl Storable for LeafNode {
     fn serialize(&self, to: &mut [u8]) -> Result<(), crate::shale::ShaleError> {
         let mut cursor = Cursor::new(to);
 
-        let path = &self.path.encode();
+        let path = &self.partial_path.encode();
         let path = from_nibbles(path);
         let data = &self.data;
 
-        let path_len = self.path.serialized_len() as PathLen;
+        let path_len = self.partial_path.serialized_len() as PathLen;
         let data_len = data.len() as DataLen;
 
         let meta = Meta { path_len, data_len };

@@ -144,7 +144,7 @@ impl<T: Storable> Obj<T> {
 impl Obj<Node> {
     pub fn into_inner(mut self) -> Node {
         let empty_node = LeafNode {
-            path: PartialPath(Vec::new()),
+            partial_path: PartialPath(Vec::new()),
             data: Vec::new().into(),
         };
 

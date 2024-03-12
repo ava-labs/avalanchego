@@ -112,15 +112,15 @@ impl NodeType {
 
     pub fn path_mut(&mut self) -> &mut PartialPath {
         match self {
-            NodeType::Branch(u) => &mut u.path,
-            NodeType::Leaf(node) => &mut node.path,
+            NodeType::Branch(u) => &mut u.partial_path,
+            NodeType::Leaf(node) => &mut node.partial_path,
         }
     }
 
     pub fn set_path(&mut self, path: PartialPath) {
         match self {
-            NodeType::Branch(u) => u.path = path,
-            NodeType::Leaf(node) => node.path = path,
+            NodeType::Branch(u) => u.partial_path = path,
+            NodeType::Leaf(node) => node.partial_path = path,
         }
     }
 
@@ -210,7 +210,7 @@ impl Node {
                 is_encoded_longer_than_hash_len: OnceLock::new(),
                 inner: NodeType::Branch(
                     BranchNode {
-                        path: vec![].into(),
+                        partial_path: vec![].into(),
                         children: [Some(DiskAddress::null()); BranchNode::MAX_CHILDREN],
                         value: Some(Data(Vec::new())),
                         children_encoded: Default::default(),
@@ -524,7 +524,7 @@ impl Serialize for EncodedNode<PlainCodec> {
             EncodedNodeType::Leaf(n) => {
                 let data = Some(&*n.data);
                 let chd: Vec<(u64, Vec<u8>)> = Default::default();
-                let path: Vec<_> = from_nibbles(&n.path.encode()).collect();
+                let path: Vec<_> = from_nibbles(&n.partial_path.encode()).collect();
                 (chd, data, path)
             }
 
@@ -580,7 +580,10 @@ impl<'de> Deserialize<'de> for EncodedNode<PlainCodec> {
                 Data(Vec::new())
             };
 
-            let node = EncodedNodeType::Leaf(LeafNode { path, data });
+            let node = EncodedNodeType::Leaf(LeafNode {
+                partial_path: path,
+                data,
+            });
 
             Ok(Self::new(node))
         } else {
@@ -608,7 +611,10 @@ impl Serialize for EncodedNode<Bincode> {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         match &self.node {
             EncodedNodeType::Leaf(n) => {
-                let list = [from_nibbles(&n.path.encode()).collect(), n.data.to_vec()];
+                let list = [
+                    from_nibbles(&n.partial_path.encode()).collect(),
+                    n.data.to_vec(),
+                ];
                 let mut seq = serializer.serialize_seq(Some(list.len()))?;
                 for e in list {
                     seq.serialize_element(&e)?;
@@ -681,7 +687,7 @@ impl<'de> Deserialize<'de> for EncodedNode<Bincode> {
                 };
                 let path = PartialPath::from_nibbles(Nibbles::<0>::new(&path).into_iter());
                 let node = EncodedNodeType::Leaf(LeafNode {
-                    path,
+                    partial_path: path,
                     data: Data(data),
                 });
                 Ok(Self::new(node))
@@ -828,7 +834,7 @@ mod tests {
     ) {
         let leaf = NodeType::Leaf(LeafNode::new(PartialPath(vec![1, 2, 3]), Data(vec![4, 5])));
         let branch = NodeType::Branch(Box::new(BranchNode {
-            path: vec![].into(),
+            partial_path: vec![].into(),
             children: [Some(DiskAddress::from(1)); BranchNode::MAX_CHILDREN],
             value: Some(Data(vec![1, 2, 3])),
             children_encoded: std::array::from_fn(|_| Some(vec![1])),
@@ -912,7 +918,7 @@ mod tests {
         value: impl Into<Option<u8>>,
         children_encoded: [Option<Vec<u8>>; BranchNode::MAX_CHILDREN],
     ) {
-        let path = PartialPath(path.iter().copied().map(|x| x & 0xf).collect());
+        let partial_path = PartialPath(path.iter().copied().map(|x| x & 0xf).collect());
 
         let mut children = children.into_iter().map(|x| {
             if x == 0 {
@@ -929,7 +935,7 @@ mod tests {
             .map(|x| Data(std::iter::repeat(x).take(x as usize).collect()));
 
         let node = Node::from_branch(BranchNode {
-            path,
+            partial_path,
             children,
             value,
             children_encoded,

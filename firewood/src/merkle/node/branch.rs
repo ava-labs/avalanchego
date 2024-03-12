@@ -23,7 +23,7 @@ const MAX_CHILDREN: usize = 16;
 
 #[derive(PartialEq, Eq, Clone)]
 pub struct BranchNode {
-    pub(crate) path: PartialPath,
+    pub(crate) partial_path: PartialPath,
     pub(crate) children: [Option<DiskAddress>; MAX_CHILDREN],
     pub(crate) value: Option<Data>,
     pub(crate) children_encoded: [Option<Vec<u8>>; MAX_CHILDREN],
@@ -32,7 +32,7 @@ pub struct BranchNode {
 impl Debug for BranchNode {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), FmtError> {
         write!(f, "[Branch")?;
-        write!(f, r#" path="{:?}""#, self.path)?;
+        write!(f, r#" path="{:?}""#, self.partial_path)?;
 
         for (i, c) in self.children.iter().enumerate() {
             if let Some(c) = c {
@@ -62,13 +62,13 @@ impl BranchNode {
     pub const MSIZE: usize = Self::MAX_CHILDREN + 2;
 
     pub fn new(
-        path: PartialPath,
+        partial_path: PartialPath,
         chd: [Option<DiskAddress>; Self::MAX_CHILDREN],
         value: Option<Vec<u8>>,
         chd_encoded: [Option<Vec<u8>>; Self::MAX_CHILDREN],
     ) -> Self {
         BranchNode {
-            path,
+            partial_path,
             children: chd,
             value: value.map(Data),
             children_encoded: chd_encoded,
@@ -176,7 +176,7 @@ impl BranchNode {
         }
 
         #[allow(clippy::unwrap_used)]
-        let path = from_nibbles(&self.path.encode()).collect::<Vec<_>>();
+        let path = from_nibbles(&self.partial_path.encode()).collect::<Vec<_>>();
 
         list[Self::MAX_CHILDREN + 1] = path;
 
@@ -194,7 +194,7 @@ impl Storable for BranchNode {
             len + optional_data_len::<EncodedChildLen, _>(child.as_ref())
         });
         let path_len_size = size_of::<PathLen>() as u64;
-        let path_len = self.path.serialized_len();
+        let path_len = self.partial_path.serialized_len();
 
         children_len + data_len + children_encoded_len + path_len_size + path_len
     }
@@ -202,7 +202,7 @@ impl Storable for BranchNode {
     fn serialize(&self, to: &mut [u8]) -> Result<(), crate::shale::ShaleError> {
         let mut cursor = Cursor::new(to);
 
-        let path: Vec<u8> = from_nibbles(&self.path.encode()).collect();
+        let path: Vec<u8> = from_nibbles(&self.partial_path.encode()).collect();
         cursor.write_all(&[path.len() as PathLen])?;
         cursor.write_all(&path)?;
 
@@ -358,7 +358,7 @@ impl Storable for BranchNode {
         }
 
         let node = BranchNode {
-            path,
+            partial_path: path,
             children,
             value,
             children_encoded,

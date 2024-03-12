@@ -333,7 +333,7 @@ impl<N: AsRef<[u8]> + Send> Proof<N> {
             let encoded_sub_proof = match child_node.inner() {
                 NodeType::Leaf(n) => {
                     break n
-                        .path
+                        .partial_path
                         .iter()
                         .copied()
                         .eq(key_nibbles) // all nibbles have to match
@@ -342,7 +342,7 @@ impl<N: AsRef<[u8]> + Send> Proof<N> {
 
                 NodeType::Branch(n) => {
                     let paths_match = n
-                        .path
+                        .partial_path
                         .iter()
                         .copied()
                         .all(|nibble| Some(nibble) == key_nibbles.next());
@@ -420,7 +420,7 @@ fn locate_subproof(
             Ok((sub_proof.into(), key_nibbles))
         }
         NodeType::Branch(n) => {
-            let partial_path = &n.path.0;
+            let partial_path = &n.partial_path.0;
 
             let does_not_match = key_nibbles.size_hint().0 < partial_path.len()
                 || !partial_path
@@ -518,7 +518,7 @@ where
             NodeType::Branch(n) => {
                 // If either the key of left proof or right proof doesn't match with
                 // stop here, this is the forkpoint.
-                let path = &*n.path;
+                let path = &*n.partial_path;
 
                 if !path.is_empty() {
                     [fork_left, fork_right] = [&left_chunks[index..], &right_chunks[index..]]
@@ -552,7 +552,7 @@ where
 
             #[allow(clippy::indexing_slicing)]
             NodeType::Leaf(n) => {
-                let path = &*n.path;
+                let path = &*n.partial_path;
 
                 [fork_left, fork_right] = [&left_chunks[index..], &right_chunks[index..]]
                     .map(|chunks| chunks.chunks(path.len()).next().unwrap_or_default())
@@ -597,7 +597,7 @@ where
             }
 
             let p = u_ref.as_ptr();
-            index += n.path.len();
+            index += n.partial_path.len();
 
             // Only one proof points to non-existent key.
             if fork_right.is_ne() {
@@ -741,8 +741,8 @@ fn unset_node_ref<K: AsRef<[u8]>, S: CachedStore, T: BinarySerde>(
 
     #[allow(clippy::indexing_slicing)]
     match &u_ref.inner() {
-        NodeType::Branch(n) if chunks[index..].starts_with(&n.path) => {
-            let index = index + n.path.len();
+        NodeType::Branch(n) if chunks[index..].starts_with(&n.partial_path) => {
+            let index = index + n.partial_path.len();
             let child_index = chunks[index] as usize;
 
             let node = n.chd()[child_index];
@@ -772,7 +772,7 @@ fn unset_node_ref<K: AsRef<[u8]>, S: CachedStore, T: BinarySerde>(
         }
 
         NodeType::Branch(n) => {
-            let cur_key = &n.path;
+            let cur_key = &n.partial_path;
 
             // Find the fork point, it's a non-existent branch.
             //
