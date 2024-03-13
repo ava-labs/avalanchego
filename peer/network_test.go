@@ -871,7 +871,7 @@ type testAppSender struct {
 	sendCrossChainAppResponseFn func(ids.ID, uint32, []byte) error
 	sendAppRequestFn            func(context.Context, set.Set[ids.NodeID], uint32, []byte) error
 	sendAppResponseFn           func(ids.NodeID, uint32, []byte) error
-	sendAppGossipFn             func([]byte, int, int, int) error
+	sendAppGossipFn             func(common.SendConfig, []byte) error
 }
 
 func (t testAppSender) SendCrossChainAppRequest(_ context.Context, chainID ids.ID, requestID uint32, appRequestBytes []byte) error {
@@ -882,10 +882,6 @@ func (t testAppSender) SendCrossChainAppResponse(_ context.Context, chainID ids.
 	return t.sendCrossChainAppResponseFn(chainID, requestID, appResponseBytes)
 }
 
-func (t testAppSender) SendAppGossipSpecific(context.Context, set.Set[ids.NodeID], []byte) error {
-	panic("not implemented")
-}
-
 func (t testAppSender) SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, message []byte) error {
 	return t.sendAppRequestFn(ctx, nodeIDs, requestID, message)
 }
@@ -894,8 +890,8 @@ func (t testAppSender) SendAppResponse(_ context.Context, nodeID ids.NodeID, req
 	return t.sendAppResponseFn(nodeID, requestID, message)
 }
 
-func (t testAppSender) SendAppGossip(_ context.Context, message []byte, numValidators int, numNonValidators int, numPeers int) error {
-	return t.sendAppGossipFn(message, numValidators, numNonValidators, numPeers)
+func (t testAppSender) SendAppGossip(_ context.Context, config common.SendConfig, message []byte) error {
+	return t.sendAppGossipFn(config, message)
 }
 
 func (t testAppSender) SendAppError(ctx context.Context, nodeID ids.NodeID, requestID uint32, errorCode int32, errorMessage string) error {
