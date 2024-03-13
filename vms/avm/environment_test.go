@@ -80,7 +80,6 @@ var (
 	addrs []ids.ShortID              // addrs[i] corresponds to keys[i]
 
 	noFeesTestConfig = &config.Config{
-		DurangoTime:      time.Time{},
 		EUpgradeTime:     mockable.MaxTime,
 		TxFee:            0,
 		CreateAssetTxFee: 0,
@@ -236,17 +235,13 @@ func setup(tb testing.TB, c *envConfig) *environment {
 }
 
 func staticConfig(tb testing.TB, f fork) config.Config {
-	var (
-		durangoTime  = mockable.MaxTime
-		eUpgradeTime = mockable.MaxTime
-	)
+	var eUpgradeTime time.Time
 
 	switch f {
 	case eUpgrade:
 		eUpgradeTime = time.Time{}
-		fallthrough
 	case durango:
-		durangoTime = time.Time{}
+		eUpgradeTime = mockable.MaxTime
 	default:
 		require.FailNow(tb, fmt.Sprintf("unhandled fork %d", f))
 	}
@@ -254,7 +249,6 @@ func staticConfig(tb testing.TB, f fork) config.Config {
 	return config.Config{
 		TxFee:            testTxFee,
 		CreateAssetTxFee: testTxFee,
-		DurangoTime:      durangoTime,
 		EUpgradeTime:     eUpgradeTime,
 	}
 }
