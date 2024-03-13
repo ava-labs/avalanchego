@@ -1984,7 +1984,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 	}
 }
 
-func defaultTestConfig(t *testing.T, f fork, tm time.Time) *config.Config { //nolint: unparam
+func defaultTestConfig(t *testing.T, f fork, tm time.Time) *config.Config {
 	var (
 		apricotPhase3Time = mockable.MaxTime
 		apricotPhase5Time = mockable.MaxTime
@@ -2017,11 +2017,11 @@ func defaultTestConfig(t *testing.T, f fork, tm time.Time) *config.Config { //no
 	}
 
 	return &config.Config{
-		EUpgradeTime:      eUpgradeTime,
-		DurangoTime:       durangoTime,
-		CortinaTime:       cortinaTime,
-		BanffTime:         banffTime,
-		ApricotPhase5Time: apricotPhase5Time,
 		ApricotPhase3Time: apricotPhase3Time,
+		ApricotPhase5Time: apricotPhase5Time,
+		BanffTime:         banffTime,
+		CortinaTime:       cortinaTime,
+		DurangoTime:       durangoTime,
+		EUpgradeTime:      eUpgradeTime,
 	}
 }
