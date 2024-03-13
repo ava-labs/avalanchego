@@ -1984,7 +1984,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 	}
 }
 
-func defaultTestConfig(t *testing.T, f fork, tm time.Time) *config.Config { //nolint: unparam
+func defaultTestConfig(t *testing.T, f fork, tm time.Time) *config.Config {
 	var (
 		apricotPhase3Time = mockable.MaxTime
 		apricotPhase5Time = mockable.MaxTime
