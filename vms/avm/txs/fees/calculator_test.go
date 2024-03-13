@@ -49,8 +49,6 @@ var (
 
 	feeTestKeys    = secp256k1.TestKeys()
 	feeTestSigners = [][]*secp256k1.PrivateKey{}
-
-	durangoTime = time.Time{} // assume durango is active in these tests
 )
 
 type feeTests struct {
