@@ -7,7 +7,6 @@ import (
 	"math"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -31,7 +30,6 @@ var (
 	feeConfig = config.Config{
 		TxFee:            2,
 		CreateAssetTxFee: 3,
-		DurangoTime:      time.Time{},
 		EUpgradeTime:     mockable.MaxTime,
 	}
 )

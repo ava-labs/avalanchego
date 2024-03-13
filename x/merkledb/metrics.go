@@ -39,7 +39,7 @@ type mockMetrics struct {
 	valueNodeCacheMiss        int64
 	intermediateNodeCacheHit  int64
 	intermediateNodeCacheMiss int64
-	viewNodeCacheHit          int64
+	viewChangesNodeHit        int64
 	viewChangesNodeMiss       int64
 	viewChangesValueHit       int64
 	viewChangesValueMiss      int64
@@ -70,7 +70,7 @@ func (m *mockMetrics) ViewChangesNodeHit() {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	m.viewNodeCacheHit++
+	m.viewChangesNodeHit++
 }
 
 func (m *mockMetrics) ViewChangesValueHit() {
@@ -131,9 +131,9 @@ type metrics struct {
 	valueNodeCacheHit         prometheus.Counter
 	valueNodeCacheMiss        prometheus.Counter
 	viewChangesNodeHit        prometheus.Counter
-	viewNodeCacheMiss         prometheus.Counter
-	viewValueCacheHit         prometheus.Counter
-	viewValueCacheMiss        prometheus.Counter
+	viewChangesNodeMiss       prometheus.Counter
+	viewChangesValueHit       prometheus.Counter
+	viewChangesValueMiss      prometheus.Counter
 }
 
 func newMetrics(namespace string, reg prometheus.Registerer) (merkleMetrics, error) {
@@ -182,17 +182,17 @@ func newMetrics(namespace string, reg prometheus.Registerer) (merkleMetrics, err
 			Name:      "view_changes_node_hit",
 			Help:      "cumulative amount of hits looking up a node in a view's change set",
 		}),
-		viewNodeCacheMiss: prometheus.NewCounter(prometheus.CounterOpts{
+		viewChangesNodeMiss: prometheus.NewCounter(prometheus.CounterOpts{
 			Namespace: namespace,
 			Name:      "view_changes_node_miss",
 			Help:      "cumulative amount of misses looking up a node in a view's change set",
 		}),
-		viewValueCacheHit: prometheus.NewCounter(prometheus.CounterOpts{
+		viewChangesValueHit: prometheus.NewCounter(prometheus.CounterOpts{
 			Namespace: namespace,
 			Name:      "view_changes_value_hit",
 			Help:      "cumulative amount of hits looking up a value in a view's change set",
 		}),
-		viewValueCacheMiss: prometheus.NewCounter(prometheus.CounterOpts{
+		viewChangesValueMiss: prometheus.NewCounter(prometheus.CounterOpts{
 			Namespace: namespace,
 			Name:      "view_changes_value_miss",
 			Help:      "cumulative amount of misses looking up a value in a view's change set",
@@ -207,9 +207,9 @@ func newMetrics(namespace string, reg prometheus.Registerer) (merkleMetrics, err
 		reg.Register(m.intermediateNodeCacheHit),
 		reg.Register(m.intermediateNodeCacheMiss),
 		reg.Register(m.viewChangesNodeHit),
-		reg.Register(m.viewNodeCacheMiss),
-		reg.Register(m.viewValueCacheHit),
-		reg.Register(m.viewValueCacheMiss),
+		reg.Register(m.viewChangesNodeMiss),
+		reg.Register(m.viewChangesValueHit),
+		reg.Register(m.viewChangesValueMiss),
 	)
 	return &m, err
 }
@@ -231,15 +231,15 @@ func (m *metrics) ViewChangesNodeHit() {
 }
 
 func (m *metrics) ViewChangesNodeMiss() {
-	m.viewNodeCacheMiss.Inc()
+	m.viewChangesNodeMiss.Inc()
 }
 
 func (m *metrics) ViewChangesValueHit() {
-	m.viewValueCacheHit.Inc()
+	m.viewChangesValueHit.Inc()
 }
 
 func (m *metrics) ViewChangesValueMiss() {
-	m.viewValueCacheMiss.Inc()
+	m.viewChangesValueMiss.Inc()
 }
 
 func (m *metrics) IntermediateNodeCacheHit() {
