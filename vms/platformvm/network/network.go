@@ -90,11 +90,13 @@ func New(
 	txPushGossiper, err := gossip.NewPushGossiper[*txs.Tx](
 		marshaller,
 		gossipMempool,
+		validators,
 		txGossipClient,
 		txGossipMetrics,
 		gossip.BranchingFactor{
-			Validators: config.PushGossipNumValidators,
-			Peers:      config.PushGossipNumPeers,
+			StakePercentage: config.PushGossipPercentStake,
+			Validators:      config.PushGossipNumValidators,
+			Peers:           config.PushGossipNumPeers,
 		},
 		gossip.BranchingFactor{
 			Validators: config.PushRegossipNumValidators,
