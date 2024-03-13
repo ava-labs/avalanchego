@@ -27,12 +27,12 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/propertyfx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-	"github.com/ava-labs/avalanchego/wallet/chain/x"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
 	xtxs "github.com/ava-labs/avalanchego/vms/avm/txs"
 	ptxs "github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	xbackends "github.com/ava-labs/avalanchego/wallet/chain/x/backends"
 )
 
 const NumKeys = 5
@@ -579,7 +579,7 @@ func (w *workload) verifyXChainTxConsumedUTXOs(ctx context.Context, tx *xtxs.Tx)
 			ctx,
 			utxos,
 			client,
-			x.Parser.Codec(),
+			xbackends.Parser.Codec(),
 			chainID,
 			chainID,
 			w.addrs.List(),
