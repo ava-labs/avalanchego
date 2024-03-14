@@ -9,11 +9,12 @@ use std::{
 };
 
 // TODO: use smallvec
-/// PartialPath keeps a list of nibbles to represent a path on the Trie.
+/// Path is part or all of a node's path in the trie.
+/// Each element is a nibble.
 #[derive(PartialEq, Eq, Clone)]
-pub struct PartialPath(pub Vec<u8>);
+pub struct Path(pub Vec<u8>);
 
-impl Debug for PartialPath {
+impl Debug for Path {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         for nib in self.0.iter() {
             write!(f, "{:x}", *nib & 0xf)?;
@@ -22,20 +23,20 @@ impl Debug for PartialPath {
     }
 }
 
-impl std::ops::Deref for PartialPath {
+impl std::ops::Deref for Path {
     type Target = [u8];
     fn deref(&self) -> &[u8] {
         &self.0
     }
 }
 
-impl From<Vec<u8>> for PartialPath {
+impl From<Vec<u8>> for Path {
     fn from(value: Vec<u8>) -> Self {
         Self(value)
     }
 }
 
-impl PartialPath {
+impl Path {
     pub fn into_inner(self) -> Vec<u8> {
         self.0
     }
@@ -60,14 +61,14 @@ impl PartialPath {
     }
 
     // TODO: remove all non `Nibbles` usages and delete this function.
-    // I also think `PartialPath` could probably borrow instead of own data.
+    // I also think `Path` could probably borrow instead of own data.
     //
-    /// returns a tuple of the decoded partial path and whether the path is terminal
+    /// Returns the decoded path.
     pub fn decode(raw: &[u8]) -> Self {
         Self::from_iter(raw.iter().copied())
     }
 
-    /// returns a tuple of the decoded partial path and whether the path is terminal
+    /// Returns the decoded path.
     pub fn from_nibbles<const N: usize>(nibbles: NibblesIterator<'_, N>) -> Self {
         Self::from_iter(nibbles)
     }
@@ -109,12 +110,12 @@ mod tests {
     #[test_case(&[1, 2])]
     #[test_case(&[1])]
     fn test_encoding(steps: &[u8]) {
-        let path = PartialPath(steps.to_vec());
+        let path = Path(steps.to_vec());
         let encoded = path.encode();
 
         assert_eq!(encoded.len(), path.serialized_len() as usize * 2);
 
-        let decoded = PartialPath::decode(&encoded);
+        let decoded = Path::decode(&encoded);
 
         assert_eq!(&&*decoded, &steps);
     }

@@ -3,7 +3,7 @@
 
 use crate::{
     logger::trace,
-    merkle::from_nibbles,
+    merkle::nibbles_to_bytes_iter,
     shale::{compact::CompactSpace, disk_address::DiskAddress, CachedStore, ShaleError, Storable},
 };
 use bincode::{Error, Options};
@@ -29,11 +29,11 @@ use std::{
 
 mod branch;
 mod leaf;
-mod partial_path;
+mod path;
 
 pub use branch::BranchNode;
 pub use leaf::{LeafNode, SIZE as LEAF_NODE_SIZE};
-pub use partial_path::PartialPath;
+pub use path::Path;
 
 use crate::nibbles::Nibbles;
 
@@ -87,7 +87,7 @@ impl NodeType {
 
                 let decoded_key_nibbles = Nibbles::<0>::new(&decoded_key);
 
-                let cur_key_path = PartialPath::from_nibbles(decoded_key_nibbles.into_iter());
+                let cur_key_path = Path::from_nibbles(decoded_key_nibbles.into_iter());
 
                 let cur_key = cur_key_path.into_inner();
                 #[allow(clippy::unwrap_used)]
@@ -110,14 +110,14 @@ impl NodeType {
         }
     }
 
-    pub fn path_mut(&mut self) -> &mut PartialPath {
+    pub fn path_mut(&mut self) -> &mut Path {
         match self {
             NodeType::Branch(u) => &mut u.partial_path,
             NodeType::Leaf(node) => &mut node.partial_path,
         }
     }
 
-    pub fn set_path(&mut self, path: PartialPath) {
+    pub fn set_path(&mut self, path: Path) {
         match self {
             NodeType::Branch(u) => u.partial_path = path,
             NodeType::Leaf(node) => node.partial_path = path,
@@ -500,7 +500,7 @@ impl<T> EncodedNode<T> {
 pub enum EncodedNodeType {
     Leaf(LeafNode),
     Branch {
-        path: PartialPath,
+        path: Path,
         children: Box<[Option<Vec<u8>>; BranchNode::MAX_CHILDREN]>,
         value: Option<Data>,
     },
@@ -524,7 +524,7 @@ impl Serialize for EncodedNode<PlainCodec> {
             EncodedNodeType::Leaf(n) => {
                 let data = Some(&*n.data);
                 let chd: Vec<(u64, Vec<u8>)> = Default::default();
-                let path: Vec<_> = from_nibbles(&n.partial_path.encode()).collect();
+                let path: Vec<_> = nibbles_to_bytes_iter(&n.partial_path.encode()).collect();
                 (chd, data, path)
             }
 
@@ -548,7 +548,7 @@ impl Serialize for EncodedNode<PlainCodec> {
 
                 let data = value.as_deref();
 
-                let path = from_nibbles(&path.encode()).collect();
+                let path = nibbles_to_bytes_iter(&path.encode()).collect();
 
                 (chd, data, path)
             }
@@ -571,7 +571,7 @@ impl<'de> Deserialize<'de> for EncodedNode<PlainCodec> {
     {
         let EncodedBranchNode { chd, data, path } = Deserialize::deserialize(deserializer)?;
 
-        let path = PartialPath::from_nibbles(Nibbles::<0>::new(&path).into_iter());
+        let path = Path::from_nibbles(Nibbles::<0>::new(&path).into_iter());
 
         if chd.is_empty() {
             let data = if let Some(d) = data {
@@ -612,7 +612,7 @@ impl Serialize for EncodedNode<Bincode> {
         match &self.node {
             EncodedNodeType::Leaf(n) => {
                 let list = [
-                    from_nibbles(&n.partial_path.encode()).collect(),
+                    nibbles_to_bytes_iter(&n.partial_path.encode()).collect(),
                     n.data.to_vec(),
                 ];
                 let mut seq = serializer.serialize_seq(Some(list.len()))?;
@@ -647,7 +647,7 @@ impl Serialize for EncodedNode<Bincode> {
                     list[BranchNode::MAX_CHILDREN] = val.clone();
                 }
 
-                let serialized_path = from_nibbles(&path.encode()).collect();
+                let serialized_path = nibbles_to_bytes_iter(&path.encode()).collect();
                 list[BranchNode::MAX_CHILDREN + 1] = serialized_path;
 
                 let mut seq = serializer.serialize_seq(Some(list.len()))?;
@@ -685,7 +685,7 @@ impl<'de> Deserialize<'de> for EncodedNode<Bincode> {
                         "incorrect encoded type for leaf node data",
                     ));
                 };
-                let path = PartialPath::from_nibbles(Nibbles::<0>::new(&path).into_iter());
+                let path = Path::from_nibbles(Nibbles::<0>::new(&path).into_iter());
                 let node = EncodedNodeType::Leaf(LeafNode {
                     partial_path: path,
                     data: Data(data),
@@ -695,7 +695,7 @@ impl<'de> Deserialize<'de> for EncodedNode<Bincode> {
 
             BranchNode::MSIZE => {
                 let path = items.pop().expect("length was checked above");
-                let path = PartialPath::from_nibbles(Nibbles::<0>::new(&path).into_iter());
+                let path = Path::from_nibbles(Nibbles::<0>::new(&path).into_iter());
 
                 let value = items.pop().expect("length was checked above");
                 let value = if value.is_empty() {
@@ -832,7 +832,7 @@ mod tests {
         encoded: impl Into<Option<Vec<u8>>>,
         is_encoded_longer_than_hash_len: impl Into<Option<bool>>,
     ) {
-        let leaf = NodeType::Leaf(LeafNode::new(PartialPath(vec![1, 2, 3]), Data(vec![4, 5])));
+        let leaf = NodeType::Leaf(LeafNode::new(Path(vec![1, 2, 3]), Data(vec![4, 5])));
         let branch = NodeType::Branch(Box::new(BranchNode {
             partial_path: vec![].into(),
             children: [Some(DiskAddress::from(1)); BranchNode::MAX_CHILDREN],
@@ -869,7 +869,7 @@ mod tests {
     )]
     fn leaf_node<Iter: Iterator<Item = u8>>(path: Iter, data: Iter) {
         let node = Node::from_leaf(LeafNode::new(
-            PartialPath(path.map(|x| x & 0xf).collect()),
+            Path(path.map(|x| x & 0xf).collect()),
             Data(data.collect()),
         ));
 
@@ -886,7 +886,7 @@ mod tests {
     #[test_case(&[0x0F,0x01,0x0F])]
     fn encoded_branch_node_bincode_serialize(path_nibbles: &[u8]) -> Result<(), Error> {
         let node = EncodedNode::<Bincode>::new(EncodedNodeType::Branch {
-            path: PartialPath(path_nibbles.to_vec()),
+            path: Path(path_nibbles.to_vec()),
             children: Default::default(),
             value: Some(Data(vec![1, 2, 3, 4])),
         });
@@ -918,7 +918,7 @@ mod tests {
         value: impl Into<Option<u8>>,
         children_encoded: [Option<Vec<u8>>; BranchNode::MAX_CHILDREN],
     ) {
-        let partial_path = PartialPath(path.iter().copied().map(|x| x & 0xf).collect());
+        let partial_path = Path(path.iter().copied().map(|x| x & 0xf).collect());
 
         let mut children = children.into_iter().map(|x| {
             if x == 0 {

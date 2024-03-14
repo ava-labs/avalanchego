@@ -3,7 +3,7 @@
 
 use super::{Data, Node};
 use crate::{
-    merkle::{from_nibbles, to_nibble_array, PartialPath},
+    merkle::{nibbles_to_bytes_iter, to_nibble_array, Path},
     nibbles::Nibbles,
     shale::{compact::CompactSpace, CachedStore, DiskAddress, ShaleError, Storable},
 };
@@ -23,7 +23,7 @@ const MAX_CHILDREN: usize = 16;
 
 #[derive(PartialEq, Eq, Clone)]
 pub struct BranchNode {
-    pub(crate) partial_path: PartialPath,
+    pub(crate) partial_path: Path,
     pub(crate) children: [Option<DiskAddress>; MAX_CHILDREN],
     pub(crate) value: Option<Data>,
     pub(crate) children_encoded: [Option<Vec<u8>>; MAX_CHILDREN],
@@ -62,7 +62,7 @@ impl BranchNode {
     pub const MSIZE: usize = Self::MAX_CHILDREN + 2;
 
     pub fn new(
-        partial_path: PartialPath,
+        partial_path: Path,
         chd: [Option<DiskAddress>; Self::MAX_CHILDREN],
         value: Option<Vec<u8>>,
         chd_encoded: [Option<Vec<u8>>; Self::MAX_CHILDREN],
@@ -100,7 +100,7 @@ impl BranchNode {
 
         let path = items.pop().ok_or(Error::custom("Invalid Branch Node"))?;
         let path = Nibbles::<0>::new(&path);
-        let path = PartialPath::from_nibbles(path.into_iter());
+        let path = Path::from_nibbles(path.into_iter());
 
         // we've already validated the size, that's why we can safely unwrap
         #[allow(clippy::unwrap_used)]
@@ -176,7 +176,7 @@ impl BranchNode {
         }
 
         #[allow(clippy::unwrap_used)]
-        let path = from_nibbles(&self.partial_path.encode()).collect::<Vec<_>>();
+        let path = nibbles_to_bytes_iter(&self.partial_path.encode()).collect::<Vec<_>>();
 
         list[Self::MAX_CHILDREN + 1] = path;
 
@@ -202,7 +202,7 @@ impl Storable for BranchNode {
     fn serialize(&self, to: &mut [u8]) -> Result<(), crate::shale::ShaleError> {
         let mut cursor = Cursor::new(to);
 
-        let path: Vec<u8> = from_nibbles(&self.partial_path.encode()).collect();
+        let path: Vec<u8> = nibbles_to_bytes_iter(&self.partial_path.encode()).collect();
         cursor.write_all(&[path.len() as PathLen])?;
         cursor.write_all(&path)?;
 
@@ -271,7 +271,7 @@ impl Storable for BranchNode {
         addr += path_len as usize;
 
         let path: Vec<u8> = path.into_iter().flat_map(to_nibble_array).collect();
-        let path = PartialPath::decode(&path);
+        let path = Path::decode(&path);
 
         let node_raw =
             mem.get_view(addr, BRANCH_HEADER_SIZE)

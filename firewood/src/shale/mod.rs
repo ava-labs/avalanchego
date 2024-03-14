@@ -12,7 +12,7 @@ use std::sync::{Arc, RwLock, RwLockWriteGuard};
 
 use thiserror::Error;
 
-use crate::merkle::{LeafNode, Node, PartialPath};
+use crate::merkle::{LeafNode, Node, Path};
 
 pub mod cached;
 pub mod compact;
@@ -144,7 +144,7 @@ impl<T: Storable> Obj<T> {
 impl Obj<Node> {
     pub fn into_inner(mut self) -> Node {
         let empty_node = LeafNode {
-            partial_path: PartialPath(Vec::new()),
+            partial_path: Path(Vec::new()),
             data: Vec::new().into(),
         };
 
