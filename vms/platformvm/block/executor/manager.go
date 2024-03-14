@@ -134,6 +134,9 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 		return err
 	}
 
+	// retrieve parent block time before moving time forward
+	parentBlkTime := stateDiff.GetTimestamp()
+
 	nextBlkTime, _, err := executor.NextBlockTime(stateDiff, m.txExecutorBackend.Clk)
 	if err != nil {
 		return err
@@ -154,8 +157,7 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 	}
 
 	var (
-		chainTime    = stateDiff.GetTimestamp()
-		isEActivated = m.txExecutorBackend.Config.IsEActivated(chainTime)
+		isEActivated = m.txExecutorBackend.Config.IsEActivated(nextBlkTime)
 		feesCfg      = config.GetDynamicFeesConfig(isEActivated)
 	)
 
@@ -164,7 +166,7 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 		feeManager.UpdateUnitFees(
 			feesCfg,
 			feeWindows,
-			chainTime.Unix(),
+			parentBlkTime.Unix(),
 			nextBlkTime.Unix(),
 		)
 	}

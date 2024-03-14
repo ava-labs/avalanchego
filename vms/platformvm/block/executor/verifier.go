@@ -63,13 +63,22 @@ func (v *verifier) BanffProposalBlock(b *block.BanffProposalBlock) error {
 		return err
 	}
 
+	// retrieve parent block time before moving time forward
+	parentBlkTime := onDecisionState.GetTimestamp()
+
 	// Advance the time to [nextChainTime].
 	nextChainTime := b.Timestamp()
 	if _, err := executor.AdvanceTimeTo(v.txExecutorBackend, onDecisionState, nextChainTime); err != nil {
 		return err
 	}
 
-	inputs, feesMan, atomicRequests, onAcceptFunc, err := v.processStandardTxs(b.Transactions, onDecisionState, b.Parent(), b.Timestamp())
+	inputs, feesMan, atomicRequests, onAcceptFunc, err := v.processStandardTxs(
+		b.Transactions,
+		onDecisionState,
+		b.Parent(),
+		parentBlkTime,
+		b.Timestamp(),
+	)
 	if err != nil {
 		return err
 	}
@@ -107,6 +116,9 @@ func (v *verifier) BanffStandardBlock(b *block.BanffStandardBlock) error {
 		return err
 	}
 
+	// retrieve parent block time before moving time forward
+	parentBlkTime := onAcceptState.GetTimestamp()
+
 	// Advance the time to [b.Timestamp()].
 	changed, err := executor.AdvanceTimeTo(
 		v.txExecutorBackend,
@@ -123,7 +135,7 @@ func (v *verifier) BanffStandardBlock(b *block.BanffStandardBlock) error {
 		return errBanffStandardBlockWithoutChanges
 	}
 
-	return v.standardBlock(&b.ApricotStandardBlock, b.Timestamp(), onAcceptState)
+	return v.standardBlock(&b.ApricotStandardBlock, parentBlkTime, b.Timestamp(), onAcceptState)
 }
 
 func (v *verifier) ApricotAbortBlock(b *block.ApricotAbortBlock) error {
@@ -169,7 +181,7 @@ func (v *verifier) ApricotStandardBlock(b *block.ApricotStandardBlock) error {
 		return err
 	}
 
-	return v.standardBlock(b, time.Time{}, onAcceptState)
+	return v.standardBlock(b, time.Time{}, time.Time{}, onAcceptState)
 }
 
 func (v *verifier) ApricotAtomicBlock(b *block.ApricotAtomicBlock) error {
@@ -416,10 +428,17 @@ func (v *verifier) proposalBlock(
 // standardBlock populates the state of this block if [nil] is returned
 func (v *verifier) standardBlock(
 	b *block.ApricotStandardBlock,
+	parentBlkTime time.Time,
 	blkTimestamp time.Time,
 	onAcceptState state.Diff,
 ) error {
-	inputs, feeMan, atomicRequests, onAcceptFunc, err := v.processStandardTxs(b.Transactions, onAcceptState, b.Parent(), blkTimestamp)
+	inputs, feeMan, atomicRequests, onAcceptFunc, err := v.processStandardTxs(
+		b.Transactions,
+		onAcceptState,
+		b.Parent(),
+		parentBlkTime,
+		blkTimestamp,
+	)
 	if err != nil {
 		return err
 	}
@@ -441,7 +460,12 @@ func (v *verifier) standardBlock(
 	return nil
 }
 
-func (v *verifier) processStandardTxs(txs []*txs.Tx, state state.Diff, parentID ids.ID, blkTimestamp time.Time) (
+func (v *verifier) processStandardTxs(
+	txs []*txs.Tx,
+	state state.Diff,
+	parentID ids.ID,
+	parentBlkTime, blkTimestamp time.Time,
+) (
 	set.Set[ids.ID],
 	*fees.Manager,
 	map[ids.ID]*atomic.Requests,
@@ -458,9 +482,8 @@ func (v *verifier) processStandardTxs(txs []*txs.Tx, state state.Diff, parentID 
 	}
 
 	var (
-		currentTimestamp = state.GetTimestamp()
-		isEActivated     = v.txExecutorBackend.Config.IsEActivated(currentTimestamp)
-		feesCfg          = config.GetDynamicFeesConfig(isEActivated)
+		isEActivated = v.txExecutorBackend.Config.IsEActivated(parentBlkTime)
+		feesCfg      = config.GetDynamicFeesConfig(isEActivated)
 
 		onAcceptFunc   func()
 		inputs         set.Set[ids.ID]
@@ -473,7 +496,7 @@ func (v *verifier) processStandardTxs(txs []*txs.Tx, state state.Diff, parentID 
 		feeManager.UpdateUnitFees(
 			feesCfg,
 			feeWindows,
-			currentTimestamp.Unix(),
+			parentBlkTime.Unix(),
 			blkTimestamp.Unix(),
 		)
 	}
@@ -521,7 +544,7 @@ func (v *verifier) processStandardTxs(txs []*txs.Tx, state state.Diff, parentID 
 	}
 
 	if isEActivated {
-		feeManager.UpdateWindows(&feeWindows, currentTimestamp.Unix(), blkTimestamp.Unix())
+		feeManager.UpdateWindows(&feeWindows, parentBlkTime.Unix(), blkTimestamp.Unix())
 		state.SetUnitFees(feeManager.GetUnitFees())
 		state.SetFeeWindows(feeWindows)
 	}

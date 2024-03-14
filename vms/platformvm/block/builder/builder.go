@@ -324,6 +324,9 @@ func packBlockTxs(
 	timestamp time.Time,
 	remainingSize int,
 ) ([]*txs.Tx, error) {
+	// retrieve parent block time before moving time forward
+	parentBlkTime := parentState.GetTimestamp()
+
 	stateDiff, err := state.NewDiffOn(parentState)
 	if err != nil {
 		return nil, err
@@ -355,7 +358,7 @@ func packBlockTxs(
 		feeMan.UpdateUnitFees(
 			feesCfg,
 			feeWindows,
-			parentState.GetTimestamp().Unix(),
+			parentBlkTime.Unix(),
 			timestamp.Unix(),
 		)
 	}

@@ -94,14 +94,15 @@ func (m *Manager) RemoveUnits(unitsToRm Dimensions) error {
 
 // [UpdateWindows] stores in the fee windows the units cumulated in current block
 func (m *Manager) UpdateWindows(windows *Windows, lastTime, currTime int64) {
-	var (
-		since     = int(currTime - lastTime)
-		latestIdx = WindowSize - 1
-	)
+	since := int(currTime - lastTime)
+	idx := 0
+	if since < WindowSize {
+		idx = WindowSize - 1 - since
+	}
 
 	for i := Dimension(0); i < FeeDimensions; i++ {
 		windows[i] = Roll(windows[i], since)
-		Update(&windows[i], latestIdx, m.cumulatedUnits[i])
+		Update(&windows[i], idx, m.cumulatedUnits[i])
 	}
 }
 
