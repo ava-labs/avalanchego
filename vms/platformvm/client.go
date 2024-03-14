@@ -134,8 +134,8 @@ type Client interface {
 	// GetBlockByHeight returns the block at the given [height].
 	GetBlockByHeight(ctx context.Context, height uint64, options ...rpc.Option) ([]byte, error)
 
-	// GetUnitFees returns the current unit fees that a transaction must pay to be accepted
-	GetUnitFees(ctx context.Context, options ...rpc.Option) (commonfees.Dimensions, error)
+	// GetUnitFees returns the current unit fees and the next unit fees that a transaction must pay to be accepted
+	GetUnitFees(ctx context.Context, options ...rpc.Option) (commonfees.Dimensions, commonfees.Dimensions, error)
 
 	// GetFeeWindows returns the fee window needed to calculate next block unit fees
 	GetFeeWindows(ctx context.Context, options ...rpc.Option) (commonfees.Windows, error)
@@ -554,10 +554,10 @@ func (c *client) GetBlockByHeight(ctx context.Context, height uint64, options ..
 	return formatting.Decode(res.Encoding, res.Block)
 }
 
-func (c *client) GetUnitFees(ctx context.Context, options ...rpc.Option) (commonfees.Dimensions, error) {
+func (c *client) GetUnitFees(ctx context.Context, options ...rpc.Option) (commonfees.Dimensions, commonfees.Dimensions, error) {
 	res := &GetUnitFeesReply{}
 	err := c.requester.SendRequest(ctx, "platform.getUnitFees", struct{}{}, res, options...)
-	return res.UnitFees, err
+	return res.CurrentUnitFees, res.NextUnitFees, err
 }
 
 func (c *client) GetFeeWindows(ctx context.Context, options ...rpc.Option) (commonfees.Windows, error) {

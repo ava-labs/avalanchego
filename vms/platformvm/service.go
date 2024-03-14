@@ -29,6 +29,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/keystore"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
@@ -37,6 +38,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	avajson "github.com/ava-labs/avalanchego/utils/json"
@@ -1821,8 +1823,8 @@ func (s *Service) GetBlockByHeight(_ *http.Request, args *api.GetBlockByHeightAr
 
 // GetUnitFeesReply is the response from GetUnitFees
 type GetUnitFeesReply struct {
-	// Current timestamp
-	UnitFees commonfees.Dimensions `json:"unitfees"`
+	CurrentUnitFees commonfees.Dimensions `json:"currentUnitFees"`
+	NextUnitFees    commonfees.Dimensions `json:"nextUnitFees"`
 }
 
 // GetTimestamp returns the current timestamp on chain.
@@ -1835,9 +1837,52 @@ func (s *Service) GetUnitFees(_ *http.Request, _ *struct{}, reply *GetUnitFeesRe
 	s.vm.ctx.Lock.Lock()
 	defer s.vm.ctx.Lock.Unlock()
 
-	var err error
-	reply.UnitFees, err = s.vm.state.GetUnitFees()
-	return err
+	preferredID := s.vm.manager.Preferred()
+	onAccept, ok := s.vm.manager.GetState(preferredID)
+	if !ok {
+		return fmt.Errorf("could not retrieve state for block %s", preferredID)
+	}
+
+	currentUnitFees, err := onAccept.GetUnitFees()
+	if err != nil {
+		return err
+	}
+	reply.CurrentUnitFees = currentUnitFees
+
+	nextTimestamp, _, err := executor.NextBlockTime(onAccept, &s.vm.clock)
+	if err != nil {
+		return fmt.Errorf("could not calculate next staker change time: %w", err)
+	}
+	isEActivated := s.vm.Config.IsEActivated(nextTimestamp)
+
+	if !isEActivated {
+		reply.NextUnitFees = reply.CurrentUnitFees
+		return nil
+	}
+
+	var (
+		currentTimestamp = onAccept.GetTimestamp()
+		feesCfg          = config.GetDynamicFeesConfig(isEActivated)
+	)
+
+	feeWindows, err := onAccept.GetFeeWindows()
+	if err != nil {
+		return err
+	}
+
+	feeManager := commonfees.NewManager(currentUnitFees, feeWindows)
+	if isEActivated {
+		feeManager.UpdateUnitFees(
+			currentTimestamp.Unix(),
+			nextTimestamp.Unix(),
+			feesCfg.BlockUnitsTarget,
+			feesCfg.UpdateCoefficient,
+			feesCfg.MinUnitFees,
+		)
+	}
+	reply.NextUnitFees = feeManager.GetUnitFees()
+
+	return nil
 }
 
 // GetBlockUnitsCapReply is the response from GetBlockUnitsCap

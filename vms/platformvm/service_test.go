@@ -1018,7 +1018,7 @@ func TestGetUnitFees(t *testing.T) {
 
 	unitFees, err := service.vm.state.GetUnitFees()
 	require.NoError(err)
-	require.Equal(unitFees, reply.UnitFees)
+	require.Equal(unitFees, reply.CurrentUnitFees)
 
 	updatedUnitFees := commonfees.Dimensions{
 		123,
@@ -1031,7 +1031,7 @@ func TestGetUnitFees(t *testing.T) {
 	service.vm.ctx.Lock.Unlock()
 
 	require.NoError(service.GetUnitFees(nil, nil, &reply))
-	require.Equal(updatedUnitFees, reply.UnitFees)
+	require.Equal(updatedUnitFees, reply.CurrentUnitFees)
 }
 
 func TestGetFeeWindows(t *testing.T) {

@@ -747,7 +747,7 @@ func (w *wallet) refreshFeesData(options ...common.Option) error {
 	eUpgradeTime := version.GetEUpgradeTime(w.NetworkID())
 	w.isEForkActive = !chainTime.Before(eUpgradeTime)
 
-	w.unitFees, err = w.client.GetUnitFees(ctx)
+	_, w.unitFees, err = w.client.GetUnitFees(ctx)
 	if err != nil {
 		return err
 	}

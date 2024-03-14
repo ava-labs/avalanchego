@@ -139,7 +139,7 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 			ginkgo.By("export avax from P to X chain", func() {
 				unitCaps := config.GetDynamicFeesConfig(true /*isEActive*/).BlockUnitsCap
 
-				unitFees, err := pChainClient.GetUnitFees(e2e.DefaultContext())
+				_, nextUnitFees, err := pChainClient.GetUnitFees(e2e.DefaultContext())
 				require.NoError(err)
 
 				feeWindows, err := pChainClient.GetFeeWindows(e2e.DefaultContext())
@@ -162,7 +162,7 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 				// retrieve fees paid for the tx
 				feeCalc := fees.Calculator{
 					IsEUpgradeActive: true,
-					FeeManager:       commonfees.NewManager(unitFees, feeWindows),
+					FeeManager:       commonfees.NewManager(nextUnitFees, feeWindows),
 					ConsumedUnitsCap: unitCaps,
 					Credentials:      tx.Creds,
 				}
