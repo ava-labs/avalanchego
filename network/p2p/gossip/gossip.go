@@ -21,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/bloom"
 	"github.com/ava-labs/avalanchego/utils/buffer"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 const (
@@ -89,6 +90,7 @@ type Metrics struct {
 	receivedBytes           *prometheus.CounterVec
 	tracking                *prometheus.GaugeVec
 	trackingLifetimeAverage prometheus.Gauge
+	topValidators           *prometheus.GaugeVec
 }
 
 // NewMetrics returns a common set of metrics
@@ -127,6 +129,11 @@ func NewMetrics(
 			Name:      "gossip_tracking_lifetime_average",
 			Help:      "average duration a gossipable has been tracked (ns)",
 		}),
+		topValidators: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "top_validators",
+			Help:      "number of validators gossipables are sent to due to stake",
+		}, metricLabels),
 	}
 	err := utils.Err(
 		metrics.Register(m.sentCount),
@@ -135,6 +142,7 @@ func NewMetrics(
 		metrics.Register(m.receivedBytes),
 		metrics.Register(m.tracking),
 		metrics.Register(m.trackingLifetimeAverage),
+		metrics.Register(m.topValidators),
 	)
 	return m, err
 }
@@ -262,6 +270,7 @@ func (p *PullGossiper[_]) handleResponse(
 func NewPushGossiper[T Gossipable](
 	marshaller Marshaller[T],
 	mempool Set[T],
+	validators p2p.ValidatorSubset,
 	client *p2p.Client,
 	metrics Metrics,
 	gossipParams BranchingFactor,
@@ -288,6 +297,7 @@ func NewPushGossiper[T Gossipable](
 	return &PushGossiper[T]{
 		marshaller:           marshaller,
 		set:                  mempool,
+		validators:           validators,
 		client:               client,
 		metrics:              metrics,
 		gossipParams:         gossipParams,
@@ -306,6 +316,7 @@ func NewPushGossiper[T Gossipable](
 type PushGossiper[T Gossipable] struct {
 	marshaller Marshaller[T]
 	set        Set[T]
+	validators p2p.ValidatorSubset
 	client     *p2p.Client
 	metrics    Metrics
 
@@ -323,9 +334,20 @@ type PushGossiper[T Gossipable] struct {
 }
 
 type BranchingFactor struct {
-	Validators    int
+	// StakePercentage determines the percentage of stake that should have
+	// gossip sent to based on the inverse CDF of stake weights. This value does
+	// not account for the connectivity of the nodes.
+	StakePercentage float64
+	// Validators specifies the number of connected validators, in addition to
+	// any validators sent from the StakePercentage parameter, to send gossip
+	// to. These validators are sampled uniformly rather than by stake.
+	Validators int
+	// NonValidators specifies the number of connected non-validators to send
+	// gossip to.
 	NonValidators int
-	Peers         int
+	// Peers specifies the number of connected validators or non-validators, in
+	// addition to the number sent due to other configs, to send gossip to.
+	Peers int
 }
 
 func (b *BranchingFactor) Verify() error {
@@ -372,6 +394,7 @@ func (p *PushGossiper[T]) Gossip(ctx context.Context) error {
 		p.toGossip,
 		p.toRegossip,
 		&cache.Empty[ids.ID, struct{}]{}, // Don't mark dropped unsent transactions as discarded
+		unsentLabels,
 	); err != nil {
 		return fmt.Errorf("unexpected error during gossip: %w", err)
 	}
@@ -383,6 +406,7 @@ func (p *PushGossiper[T]) Gossip(ctx context.Context) error {
 		p.toRegossip,
 		p.toRegossip,
 		p.discarded, // Mark dropped sent transactions as discarded
+		sentLabels,
 	); err != nil {
 		return fmt.Errorf("unexpected error during regossip: %w", err)
 	}
@@ -396,6 +420,7 @@ func (p *PushGossiper[T]) gossip(
 	toGossip buffer.Deque[T],
 	toRegossip buffer.Deque[T],
 	discarded cache.Cacher[ids.ID, struct{}],
+	metricsLabels prometheus.Labels,
 ) error {
 	var (
 		sentBytes                   = 0
@@ -450,6 +475,9 @@ func (p *PushGossiper[T]) gossip(
 	if err != nil {
 		return err
 	}
+
+	validatorsByStake := p.validators.Top(ctx, gossipParams.StakePercentage)
+
 	sentCountMetric, err := p.metrics.sentCount.GetMetricWith(pushLabels)
 	if err != nil {
 		return fmt.Errorf("failed to get sent count metric: %w", err)
@@ -458,12 +486,18 @@ func (p *PushGossiper[T]) gossip(
 	if err != nil {
 		return fmt.Errorf("failed to get sent bytes metric: %w", err)
 	}
+	topValidatorsMetric, err := p.metrics.topValidators.GetMetricWith(metricsLabels)
+	if err != nil {
+		return fmt.Errorf("failed to get top validators metric: %w", err)
+	}
 	sentCountMetric.Add(float64(len(gossip)))
 	sentBytesMetric.Add(float64(sentBytes))
+	topValidatorsMetric.Set(float64(len(validatorsByStake)))
 
 	return p.client.AppGossip(
 		ctx,
 		common.SendConfig{
+			NodeIDs:       set.Of(validatorsByStake...),
 			Validators:    gossipParams.Validators,
 			NonValidators: gossipParams.NonValidators,
 			Peers:         gossipParams.Peers,
