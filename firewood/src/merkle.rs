@@ -19,8 +19,7 @@ mod stream;
 mod trie_hash;
 
 pub use node::{
-    BinarySerde, Bincode, BranchNode, Data, EncodedNode, EncodedNodeType, LeafNode, Node, NodeType,
-    Path,
+    BinarySerde, Bincode, BranchNode, Data, EncodedNode, LeafNode, Node, NodeType, Path,
 };
 pub use proof::{Proof, ProofError};
 pub use stream::MerkleKeyValueStream;
@@ -115,11 +114,17 @@ where
     #[allow(dead_code)]
     fn encode(&self, node: &NodeType) -> Result<Vec<u8>, MerkleError> {
         let encoded = match node {
-            NodeType::Leaf(n) => EncodedNode::new(EncodedNodeType::Leaf(n.clone())),
+            NodeType::Leaf(n) => {
+                let children: [Option<Vec<u8>>; BranchNode::MAX_CHILDREN] = Default::default();
+                EncodedNode {
+                    partial_path: n.partial_path.clone(),
+                    children: Box::new(children),
+                    value: n.data.clone().into(),
+                    phantom: PhantomData,
+                }
+            }
 
             NodeType::Branch(n) => {
-                let path = n.partial_path.clone();
-
                 // pair up DiskAddresses with encoded children and pick the right one
                 let encoded_children = n.chd().iter().zip(n.children_encoded.iter());
                 let children = encoded_children
@@ -138,11 +143,13 @@ where
                     .try_into()
                     .expect("MAX_CHILDREN will always be yielded");
 
-                EncodedNode::new(EncodedNodeType::Branch {
-                    path,
+                let value = n.value.as_ref().map(|v| v.0.clone());
+                EncodedNode {
+                    partial_path: n.partial_path.clone(),
                     children,
-                    value: n.value.clone(),
-                })
+                    value,
+                    phantom: PhantomData,
+                }
             }
         };
 
@@ -154,23 +161,23 @@ where
         let encoded: EncodedNode<T> =
             T::deserialize(buf).map_err(|e| MerkleError::BinarySerdeError(e.to_string()))?;
 
-        match encoded.node {
-            EncodedNodeType::Leaf(leaf) => Ok(NodeType::Leaf(leaf)),
-            EncodedNodeType::Branch {
-                path,
-                children,
-                value,
-            } => {
-                let path = Path::decode(&path);
-                let value = value.map(|v| v.0);
-                let branch = NodeType::Branch(
-                    BranchNode::new(path, [None; BranchNode::MAX_CHILDREN], value, *children)
-                        .into(),
-                );
-
-                Ok(branch)
-            }
+        if encoded.children.iter().all(|b| b.is_none()) {
+            // This is a leaf node
+            return Ok(NodeType::Leaf(LeafNode::new(
+                encoded.partial_path,
+                Data(encoded.value.expect("leaf nodes must always have a value")),
+            )));
         }
+
+        Ok(NodeType::Branch(
+            BranchNode::new(
+                encoded.partial_path,
+                [None; BranchNode::MAX_CHILDREN],
+                encoded.value,
+                *encoded.children,
+            )
+            .into(),
+        ))
     }
 }
 
@@ -1451,8 +1458,11 @@ mod tests {
         let path = Path(path.into_iter().collect());
 
         let children = Default::default();
-        // TODO: Properly test empty data as a value
-        let value = Some(Data(value));
+        let value = if value.is_empty() {
+            None
+        } else {
+            Some(Data(value))
+        };
         let mut children_encoded = <[Option<Vec<u8>>; BranchNode::MAX_CHILDREN]>::default();
 
         if let Some(child) = encoded_child {
@@ -1513,16 +1523,16 @@ mod tests {
         assert_eq!(encoded, new_node_encoded);
     }
 
-    #[test_case(Bincode::new(), leaf(Vec::new(), Vec::new()) ; "empty leaf encoding with Bincode")]
-    #[test_case(Bincode::new(), leaf(vec![1, 2, 3], vec![4, 5]) ; "leaf encoding with Bincode")]
-    #[test_case(Bincode::new(), branch(b"", b"value", vec![1, 2, 3].into()) ; "branch with chd with Bincode")]
-    #[test_case(Bincode::new(), branch(b"", b"value", None); "branch without chd with Bincode")]
-    #[test_case(Bincode::new(), branch_without_data(b"", None); "branch without value and chd with Bincode")]
-    #[test_case(PlainCodec::new(), leaf(Vec::new(), Vec::new()) ; "empty leaf encoding with PlainCodec")]
-    #[test_case(PlainCodec::new(), leaf(vec![1, 2, 3], vec![4, 5]) ; "leaf encoding with PlainCodec")]
-    #[test_case(PlainCodec::new(), branch(b"", b"value", vec![1, 2, 3].into()) ; "branch with chd with PlainCodec")]
-    #[test_case(PlainCodec::new(), branch(b"", b"value", Some(Vec::new())); "branch with empty chd with PlainCodec")]
-    #[test_case(PlainCodec::new(), branch(b"", b"", vec![1, 2, 3].into()); "branch with empty value with PlainCodec")]
+    #[test_case(Bincode::new(), leaf(vec![], vec![4, 5]) ; "leaf without partial path encoding with Bincode")]
+    #[test_case(Bincode::new(), leaf(vec![1, 2, 3], vec![4, 5]) ; "leaf with partial path encoding with Bincode")]
+    #[test_case(Bincode::new(), branch(b"abcd", b"value", vec![1, 2, 3].into()) ; "branch with partial path and value with Bincode")]
+    #[test_case(Bincode::new(), branch(b"abcd", &[], vec![1, 2, 3].into()) ; "branch with partial path and no value with Bincode")]
+    #[test_case(Bincode::new(), branch(b"", &[1,3,3,7], vec![1, 2, 3].into()) ; "branch with no partial path and value with Bincode")]
+    #[test_case(PlainCodec::new(), leaf(Vec::new(), vec![4, 5]) ; "leaf without partial path encoding with PlainCodec")]
+    #[test_case(PlainCodec::new(), leaf(vec![1, 2, 3], vec![4, 5]) ; "leaf with partial path encoding with PlainCodec")]
+    #[test_case(PlainCodec::new(), branch(b"abcd", b"value", vec![1, 2, 3].into()) ; "branch with partial path and value with PlainCodec")]
+    #[test_case(PlainCodec::new(), branch(b"abcd", &[], vec![1, 2, 3].into()) ; "branch with partial path and no value with PlainCodec")]
+    #[test_case(PlainCodec::new(), branch(b"", &[1,3,3,7], vec![1, 2, 3].into()) ; "branch with no partial path and value with PlainCodec")]
     fn node_encode_decode<T>(_codec: T, node: Node)
     where
         T: BinarySerde,

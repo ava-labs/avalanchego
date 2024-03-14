@@ -56,6 +56,12 @@ impl std::ops::Deref for Data {
     }
 }
 
+impl From<Data> for Option<Vec<u8>> {
+    fn from(val: Data) -> Self {
+        Some(val.0)
+    }
+}
+
 impl From<Vec<u8>> for Data {
     fn from(v: Vec<u8>) -> Self {
         Self(v)
@@ -482,36 +488,25 @@ impl Storable for Node {
     }
 }
 
+/// Contains the fields that we include in a node's hash.
+/// If this is a leaf node, `children` is empty and `value` is Some.
+/// If this is a branch node, `children` is non-empty.
+#[derive(Debug)]
 pub struct EncodedNode<T> {
-    pub(crate) node: EncodedNodeType,
+    pub(crate) partial_path: Path,
+    /// If a child is None, it doesn't exist.
+    /// If it's Some, it's the value or value hash of the child.
+    pub(crate) children: Box<[Option<Vec<u8>>; BranchNode::MAX_CHILDREN]>,
+    pub(crate) value: Option<Vec<u8>>,
     pub(crate) phantom: PhantomData<T>,
 }
 
-impl<T> EncodedNode<T> {
-    pub const fn new(node: EncodedNodeType) -> Self {
-        Self {
-            node,
-            phantom: PhantomData,
-        }
+impl<T> PartialEq for EncodedNode<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.partial_path == other.partial_path
+            && self.children == other.children
+            && self.value == other.value
     }
-}
-
-#[derive(Debug, PartialEq)]
-pub enum EncodedNodeType {
-    Leaf(LeafNode),
-    Branch {
-        path: Path,
-        children: Box<[Option<Vec<u8>>; BranchNode::MAX_CHILDREN]>,
-        value: Option<Data>,
-    },
-}
-
-// TODO: probably can merge with `EncodedNodeType`.
-#[derive(Debug, Deserialize)]
-struct EncodedBranchNode {
-    chd: Vec<(u64, Vec<u8>)>,
-    data: Option<Vec<u8>>,
-    path: Vec<u8>,
 }
 
 // Note that the serializer passed in should always be the same type as T in EncodedNode<T>.
@@ -520,44 +515,28 @@ impl Serialize for EncodedNode<PlainCodec> {
     where
         S: serde::Serializer,
     {
-        let (chd, data, path) = match &self.node {
-            EncodedNodeType::Leaf(n) => {
-                let data = Some(&*n.data);
-                let chd: Vec<(u64, Vec<u8>)> = Default::default();
-                let path: Vec<_> = nibbles_to_bytes_iter(&n.partial_path.encode()).collect();
-                (chd, data, path)
-            }
+        let chd: Vec<(u64, Vec<u8>)> = self
+            .children
+            .iter()
+            .enumerate()
+            .filter_map(|(i, c)| c.as_ref().map(|c| (i as u64, c)))
+            .map(|(i, c)| {
+                if c.len() >= TRIE_HASH_LEN {
+                    (i, Keccak256::digest(c).to_vec())
+                } else {
+                    (i, c.to_vec())
+                }
+            })
+            .collect();
 
-            EncodedNodeType::Branch {
-                path,
-                children,
-                value,
-            } => {
-                let chd: Vec<(u64, Vec<u8>)> = children
-                    .iter()
-                    .enumerate()
-                    .filter_map(|(i, c)| c.as_ref().map(|c| (i as u64, c)))
-                    .map(|(i, c)| {
-                        if c.len() >= TRIE_HASH_LEN {
-                            (i, Keccak256::digest(c).to_vec())
-                        } else {
-                            (i, c.to_vec())
-                        }
-                    })
-                    .collect();
+        let value = self.value.as_deref();
 
-                let data = value.as_deref();
-
-                let path = nibbles_to_bytes_iter(&path.encode()).collect();
-
-                (chd, data, path)
-            }
-        };
+        let path: Vec<u8> = nibbles_to_bytes_iter(&self.partial_path.encode()).collect();
 
         let mut s = serializer.serialize_tuple(3)?;
 
         s.serialize_element(&chd)?;
-        s.serialize_element(&data)?;
+        s.serialize_element(&value)?;
         s.serialize_element(&path)?;
 
         s.end()
@@ -569,96 +548,63 @@ impl<'de> Deserialize<'de> for EncodedNode<PlainCodec> {
     where
         D: serde::Deserializer<'de>,
     {
-        let EncodedBranchNode { chd, data, path } = Deserialize::deserialize(deserializer)?;
+        let chd: Vec<(u64, Vec<u8>)>;
+        let value: Option<Vec<u8>>;
+        let path: Vec<u8>;
+
+        (chd, value, path) = Deserialize::deserialize(deserializer)?;
 
         let path = Path::from_nibbles(Nibbles::<0>::new(&path).into_iter());
 
-        if chd.is_empty() {
-            let data = if let Some(d) = data {
-                Data(d)
-            } else {
-                Data(Vec::new())
-            };
-
-            let node = EncodedNodeType::Leaf(LeafNode {
-                partial_path: path,
-                data,
-            });
-
-            Ok(Self::new(node))
-        } else {
-            let mut children: [Option<Vec<u8>>; BranchNode::MAX_CHILDREN] = Default::default();
-            let value = data.map(Data);
-
-            #[allow(clippy::indexing_slicing)]
-            for (i, chd) in chd {
-                children[i as usize] = Some(chd);
-            }
-
-            let node = EncodedNodeType::Branch {
-                path,
-                children: children.into(),
-                value,
-            };
-
-            Ok(Self::new(node))
+        let mut children: [Option<Vec<u8>>; BranchNode::MAX_CHILDREN] = Default::default();
+        #[allow(clippy::indexing_slicing)]
+        for (i, chd) in chd {
+            children[i as usize] = Some(chd);
         }
+
+        Ok(Self {
+            partial_path: path,
+            children: children.into(),
+            value,
+            phantom: PhantomData,
+        })
     }
 }
 
 // Note that the serializer passed in should always be the same type as T in EncodedNode<T>.
 impl Serialize for EncodedNode<Bincode> {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match &self.node {
-            EncodedNodeType::Leaf(n) => {
-                let list = [
-                    nibbles_to_bytes_iter(&n.partial_path.encode()).collect(),
-                    n.data.to_vec(),
-                ];
-                let mut seq = serializer.serialize_seq(Some(list.len()))?;
-                for e in list {
-                    seq.serialize_element(&e)?;
-                }
-                seq.end()
-            }
+        let mut list = <[Vec<u8>; BranchNode::MAX_CHILDREN + 2]>::default();
+        let children = self
+            .children
+            .iter()
+            .enumerate()
+            .filter_map(|(i, c)| c.as_ref().map(|c| (i, c)));
 
-            EncodedNodeType::Branch {
-                path,
-                children,
-                value,
-            } => {
-                let mut list = <[Vec<u8>; BranchNode::MAX_CHILDREN + 2]>::default();
-                let children = children
-                    .iter()
-                    .enumerate()
-                    .filter_map(|(i, c)| c.as_ref().map(|c| (i, c)));
-
-                #[allow(clippy::indexing_slicing)]
-                for (i, child) in children {
-                    if child.len() >= TRIE_HASH_LEN {
-                        let serialized_hash = Keccak256::digest(child).to_vec();
-                        list[i] = serialized_hash;
-                    } else {
-                        list[i] = child.to_vec();
-                    }
-                }
-
-                if let Some(Data(val)) = &value {
-                    list[BranchNode::MAX_CHILDREN] = val.clone();
-                }
-
-                let serialized_path = nibbles_to_bytes_iter(&path.encode()).collect();
-                list[BranchNode::MAX_CHILDREN + 1] = serialized_path;
-
-                let mut seq = serializer.serialize_seq(Some(list.len()))?;
-
-                for e in list {
-                    seq.serialize_element(&e)?;
-                }
-
-                seq.end()
+        #[allow(clippy::indexing_slicing)]
+        for (i, child) in children {
+            if child.len() >= TRIE_HASH_LEN {
+                let serialized_hash = Keccak256::digest(child).to_vec();
+                list[i] = serialized_hash;
+            } else {
+                list[i] = child.to_vec();
             }
         }
+
+        if let Some(val) = &self.value {
+            list[BranchNode::MAX_CHILDREN] = val.clone();
+        }
+
+        let serialized_path = nibbles_to_bytes_iter(&self.partial_path.encode()).collect();
+        list[BranchNode::MAX_CHILDREN + 1] = serialized_path;
+
+        let mut seq = serializer.serialize_seq(Some(list.len()))?;
+
+        for e in list {
+            seq.serialize_element(&e)?;
+        }
+
+        seq.end()
     }
 }
 
@@ -686,11 +632,13 @@ impl<'de> Deserialize<'de> for EncodedNode<Bincode> {
                     ));
                 };
                 let path = Path::from_nibbles(Nibbles::<0>::new(&path).into_iter());
-                let node = EncodedNodeType::Leaf(LeafNode {
+                let children: [Option<Vec<u8>>; BranchNode::MAX_CHILDREN] = Default::default();
+                Ok(Self {
                     partial_path: path,
-                    data: Data(data),
-                });
-                Ok(Self::new(node))
+                    children: children.into(),
+                    value: Some(data),
+                    phantom: PhantomData,
+                })
             }
 
             BranchNode::MSIZE => {
@@ -698,11 +646,7 @@ impl<'de> Deserialize<'de> for EncodedNode<Bincode> {
                 let path = Path::from_nibbles(Nibbles::<0>::new(&path).into_iter());
 
                 let value = items.pop().expect("length was checked above");
-                let value = if value.is_empty() {
-                    None
-                } else {
-                    Some(Data(value))
-                };
+                let value = if value.is_empty() { None } else { Some(value) };
 
                 let mut children: [Option<Vec<u8>>; BranchNode::MAX_CHILDREN] = Default::default();
 
@@ -711,14 +655,10 @@ impl<'de> Deserialize<'de> for EncodedNode<Bincode> {
                     (children[i] = Some(chd).filter(|chd| !chd.is_empty()));
                 }
 
-                let node = EncodedNodeType::Branch {
-                    path,
+                Ok(Self {
+                    partial_path: path,
                     children: children.into(),
                     value,
-                };
-
-                Ok(Self {
-                    node,
                     phantom: PhantomData,
                 })
             }
@@ -885,17 +825,18 @@ mod tests {
     #[test_case(&[0x0F,0x0F])]
     #[test_case(&[0x0F,0x01,0x0F])]
     fn encoded_branch_node_bincode_serialize(path_nibbles: &[u8]) -> Result<(), Error> {
-        let node = EncodedNode::<Bincode>::new(EncodedNodeType::Branch {
-            path: Path(path_nibbles.to_vec()),
+        let node = EncodedNode::<Bincode> {
+            partial_path: Path(path_nibbles.to_vec()),
             children: Default::default(),
-            value: Some(Data(vec![1, 2, 3, 4])),
-        });
+            value: Some(vec![1, 2, 3, 4]),
+            phantom: PhantomData,
+        };
 
         let node_bytes = Bincode::serialize(&node)?;
 
         let deserialized_node: EncodedNode<Bincode> = Bincode::deserialize(&node_bytes)?;
 
-        assert_eq!(&node.node, &deserialized_node.node);
+        assert_eq!(&node, &deserialized_node);
 
         Ok(())
     }
