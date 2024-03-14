@@ -1576,7 +1576,9 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	externalSender.CantSend = false
 
 	require.NoError(bootstrapper.Accepted(context.Background(), peerID, reqID, frontier))
-	require.Equal(advanceTimeBlk.ID(), vm.manager.Preferred())
+	gotLastAccepted, err := vm.LastAccepted(context.Background())
+	require.NoError(err)
+	require.Equal(advanceTimeBlk.ID(), gotLastAccepted)
 
 	ctx.Lock.Unlock()
 	chainRouter.Shutdown(context.Background())
