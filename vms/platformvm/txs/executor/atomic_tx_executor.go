@@ -104,7 +104,7 @@ func (e *AtomicTxExecutor) atomicTx(tx txs.UnsignedTx) error {
 	feesCfg := config.GetDynamicFeesConfig(false /*isEActive*/)
 	executor := StandardTxExecutor{
 		Backend:       e.Backend,
-		BlkFeeManager: commonfees.NewManager(commonfees.Empty, commonfees.EmptyWindows),
+		BlkFeeManager: commonfees.NewManager(commonfees.Empty),
 		UnitCaps:      feesCfg.BlockUnitsCap,
 		State:         e.OnAccept,
 		Tx:            e.Tx,

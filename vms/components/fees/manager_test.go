@@ -22,6 +22,7 @@ func TestComputeNextEmptyWindows(t *testing.T) {
 		}
 		currentUnitFees = Dimensions{1, 1, 1, 1}
 		consumedUnits   = Dimensions{50, 100, 150, 2500}
+		feeWindows      = Windows{}
 
 		// last block happened within Window
 		lastBlkTime = time.Now().Truncate(time.Second)
@@ -30,13 +31,13 @@ func TestComputeNextEmptyWindows(t *testing.T) {
 
 	m := &Manager{
 		unitFees:       currentUnitFees,
-		windows:        [FeeDimensions]Window{},
 		cumulatedUnits: consumedUnits,
 	}
 	m.UpdateUnitFees(
+		feesCfg,
+		feeWindows,
 		lastBlkTime.Unix(),
 		currBlkTime.Unix(),
-		feesCfg,
 	)
 
 	// Bandwidth units are below target, next unit fees are pushed to the minimum
@@ -51,11 +52,12 @@ func TestComputeNextEmptyWindows(t *testing.T) {
 	// Compute units are way above target, next unit fees are increased to the max
 	require.Equal(feesCfg.MinUnitFees[Compute], m.unitFees[Compute])
 
-	m.UpdateWindows(lastBlkTime.Unix(), currBlkTime.Unix())
+	m.UpdateWindows(&feeWindows, lastBlkTime.Unix(), currBlkTime.Unix())
 	m.UpdateUnitFees(
+		feesCfg,
+		feeWindows,
 		lastBlkTime.Unix(),
 		currBlkTime.Unix(),
-		feesCfg,
 	)
 
 	// Bandwidth units are below target, next unit fees are pushed to the minimum
@@ -82,6 +84,12 @@ func TestComputeNextNonEmptyWindows(t *testing.T) {
 		}
 		currentUnitFees = Dimensions{1, 1, 1, 1}
 		consumedUnits   = Dimensions{0, 0, 0, 0}
+		feeWindows      = Windows{
+			{1, 1, 1, 2, 2, 3, 3, 4, 5, 0},                                   // increasing but overall below target
+			{0, 0, math.MaxUint64, 0, 0, 0, 0, 0, 0, 0},                      // spike within window
+			{10, 20, 30, 40, 50, 35, 25, 15, 10, 10},                         // decreasing but overall above target
+			{0, 0, 0, 0, 0, math.MaxUint64 / 2, math.MaxUint64 / 2, 0, 0, 0}, // again pretty spiky
+		}
 
 		// last block happened within Window
 		lastBlkTime = time.Now().Truncate(time.Second)
@@ -89,19 +97,14 @@ func TestComputeNextNonEmptyWindows(t *testing.T) {
 	)
 
 	m := &Manager{
-		unitFees: currentUnitFees,
-		windows: [FeeDimensions]Window{
-			{1, 1, 1, 2, 2, 3, 3, 4, 5, 0},                                   // increasing but overall below target
-			{0, 0, math.MaxUint64, 0, 0, 0, 0, 0, 0, 0},                      // spike within window
-			{10, 20, 30, 40, 50, 35, 25, 15, 10, 10},                         // decreasing but overall above target
-			{0, 0, 0, 0, 0, math.MaxUint64 / 2, math.MaxUint64 / 2, 0, 0, 0}, // again pretty spiky
-		},
+		unitFees:       currentUnitFees,
 		cumulatedUnits: consumedUnits,
 	}
 	m.UpdateUnitFees(
+		feesCfg,
+		feeWindows,
 		lastBlkTime.Unix(),
 		currBlkTime.Unix(),
-		feesCfg,
 	)
 
 	// Bandwidth units are below target, next unit fees are pushed to the minimum
@@ -128,6 +131,12 @@ func TestComputeNextEdgeCases(t *testing.T) {
 		}
 		currentUnitFees = Dimensions{1, 2, 2, 2}
 		consumedUnits   = Dimensions{0, 0, 0, 0}
+		feeWindows      = Windows{
+			{0, 0, 0, math.MaxUint64, 0, 0, 0, 0, 0, 0}, // a huge spike in the past, on the non-constrained dimension
+			{0, 1, 0, 0, 0, 0, 0, 0, 0, 0},              // a small spike, but it hits the small constrain set for this dimension
+			{},
+			{},
+		}
 
 		// last block happened within Window
 		lastBlkTime = time.Now().Truncate(time.Second)
@@ -135,20 +144,15 @@ func TestComputeNextEdgeCases(t *testing.T) {
 	)
 
 	m := &Manager{
-		unitFees: currentUnitFees,
-		windows: [FeeDimensions]Window{
-			{0, 0, 0, math.MaxUint64, 0, 0, 0, 0, 0, 0}, // a huge spike in the past, on the non-constrained dimension
-			{0, 1, 0, 0, 0, 0, 0, 0, 0, 0},              // a small spike, but it hits the small constrain set for this dimension
-			{},
-			{},
-		},
+		unitFees:       currentUnitFees,
 		cumulatedUnits: consumedUnits,
 	}
 
 	m.UpdateUnitFees(
+		feesCfg,
+		feeWindows,
 		lastBlkTime.Unix(),
 		currBlkTime.Unix(),
-		feesCfg,
 	)
 
 	// Bandwidth units are below target, next unit fees are pushed to the minimum
@@ -179,7 +183,9 @@ func TestComputeNextStability(t *testing.T) {
 			UpdateCoefficient: Dimensions{1, 2, 5, 10},
 			BlockUnitsTarget:  Dimensions{25, 50, 100, 1000},
 		}
-		currentUnitFees = Dimensions{10, 100, 1_000, 1_000_000_000}
+		initialUnitFees = Dimensions{10, 100, 1_000, 1_000_000_000}
+		feeWindows1     = Windows{}
+		feeWindows2     = Windows{}
 		consumedUnits1  = Dimensions{24, 45, 70, 500}
 		consumedUnits2  = Dimensions{26, 55, 130, 1500}
 
@@ -190,38 +196,38 @@ func TestComputeNextStability(t *testing.T) {
 
 	// step1: cumulated units are below target. Unit fees must decrease
 	m1 := &Manager{
-		unitFees:       currentUnitFees,
-		windows:        [FeeDimensions]Window{},
+		unitFees:       initialUnitFees,
 		cumulatedUnits: consumedUnits1,
 	}
-	m1.UpdateWindows(lastBlkTime.Unix(), currBlkTime.Unix())
+	m1.UpdateWindows(&feeWindows1, lastBlkTime.Unix(), currBlkTime.Unix())
 	m1.UpdateUnitFees(
+		feesCfg,
+		feeWindows1,
 		lastBlkTime.Unix(),
 		currBlkTime.Unix(),
-		feesCfg,
 	)
 
-	require.Less(m1.unitFees[Bandwidth], currentUnitFees[Bandwidth])
-	require.Less(m1.unitFees[UTXORead], currentUnitFees[UTXORead])
-	require.Less(m1.unitFees[UTXOWrite], currentUnitFees[UTXOWrite])
-	require.Less(m1.unitFees[Compute], currentUnitFees[Compute])
+	require.Less(m1.unitFees[Bandwidth], initialUnitFees[Bandwidth])
+	require.Less(m1.unitFees[UTXORead], initialUnitFees[UTXORead])
+	require.Less(m1.unitFees[UTXOWrite], initialUnitFees[UTXOWrite])
+	require.Less(m1.unitFees[Compute], initialUnitFees[Compute])
 
 	// step2: cumulated units go slight above target, so that average consumed units are at target.
 	// Unit fees go back to the original value
 	m2 := &Manager{
 		unitFees:       m1.unitFees,
-		windows:        [FeeDimensions]Window{},
 		cumulatedUnits: consumedUnits2,
 	}
-	m2.UpdateWindows(lastBlkTime.Unix(), currBlkTime.Unix())
+	m2.UpdateWindows(&feeWindows2, lastBlkTime.Unix(), currBlkTime.Unix())
 	m2.UpdateUnitFees(
+		feesCfg,
+		feeWindows2,
 		lastBlkTime.Unix(),
 		currBlkTime.Unix(),
-		feesCfg,
 	)
 
-	require.Equal(currentUnitFees[Bandwidth], m2.unitFees[Bandwidth])
-	require.Equal(currentUnitFees[UTXORead], m2.unitFees[UTXORead])
-	require.Equal(currentUnitFees[UTXOWrite], m2.unitFees[UTXOWrite])
-	require.Equal(currentUnitFees[Compute], m2.unitFees[Compute])
+	require.Equal(initialUnitFees[Bandwidth], m2.unitFees[Bandwidth])
+	require.Equal(initialUnitFees[UTXORead], m2.unitFees[UTXORead])
+	require.Equal(initialUnitFees[UTXOWrite], m2.unitFees[UTXOWrite])
+	require.Equal(initialUnitFees[Compute], m2.unitFees[Compute])
 }

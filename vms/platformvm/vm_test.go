@@ -376,15 +376,12 @@ func TestGenesis(t *testing.T) {
 			unitFees, err := vm.state.GetUnitFees()
 			require.NoError(err)
 
-			feeWindows, err := vm.state.GetFeeWindows()
-			require.NoError(err)
-
 			// we use the first key to fund a subnet creation in [defaultGenesis].
 			// As such we need to account for the subnet creation fee
 			var (
 				chainTime = vm.state.GetTimestamp()
 				feeCfg    = config.GetDynamicFeesConfig(vm.Config.IsEActivated(chainTime))
-				feeMan    = commonfees.NewManager(unitFees, feeWindows)
+				feeMan    = commonfees.NewManager(unitFees)
 				feeCalc   = &fees.Calculator{
 					IsEUpgradeActive: vm.IsEActivated(chainTime),
 					Config:           &vm.Config,
@@ -2278,13 +2275,10 @@ func TestBaseTx(t *testing.T) {
 	unitFees, err := vm.state.GetUnitFees()
 	require.NoError(err)
 
-	feeWindows, err := vm.state.GetFeeWindows()
-	require.NoError(err)
-
 	var (
 		chainTime = vm.state.GetTimestamp()
 		feeCfg    = config.GetDynamicFeesConfig(vm.Config.IsEActivated(chainTime))
-		feeMan    = commonfees.NewManager(unitFees, feeWindows)
+		feeMan    = commonfees.NewManager(unitFees)
 		feeCalc   = &fees.Calculator{
 			IsEUpgradeActive: vm.IsEActivated(chainTime),
 			Config:           &vm.Config,

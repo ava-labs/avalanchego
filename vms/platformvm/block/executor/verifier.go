@@ -452,7 +452,7 @@ func (v *verifier) processStandardTxs(txs []*txs.Tx, state state.Diff, parentID 
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
-	unitWindows, err := state.GetFeeWindows()
+	feeWindows, err := state.GetFeeWindows()
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
@@ -468,12 +468,13 @@ func (v *verifier) processStandardTxs(txs []*txs.Tx, state state.Diff, parentID 
 		atomicRequests = make(map[ids.ID]*atomic.Requests)
 	)
 
-	feeManager := fees.NewManager(unitFees, unitWindows)
+	feeManager := fees.NewManager(unitFees)
 	if isEActivated {
 		feeManager.UpdateUnitFees(
+			feesCfg,
+			feeWindows,
 			currentTimestamp.Unix(),
 			blkTimestamp.Unix(),
-			feesCfg,
 		)
 	}
 
@@ -520,9 +521,9 @@ func (v *verifier) processStandardTxs(txs []*txs.Tx, state state.Diff, parentID 
 	}
 
 	if isEActivated {
-		feeManager.UpdateWindows(currentTimestamp.Unix(), blkTimestamp.Unix())
+		feeManager.UpdateWindows(&feeWindows, currentTimestamp.Unix(), blkTimestamp.Unix())
 		state.SetUnitFees(feeManager.GetUnitFees())
-		state.SetFeeWindows(feeManager.GetFeeWindows())
+		state.SetFeeWindows(feeWindows)
 	}
 
 	if numFuncs := len(funcs); numFuncs == 1 {

@@ -71,7 +71,7 @@ func TestAddAndRemoveFees(t *testing.T) {
 
 	fc := &Calculator{
 		IsEUpgradeActive: true,
-		FeeManager:       fees.NewManager(testUnitFees, fees.EmptyWindows),
+		FeeManager:       fees.NewManager(testUnitFees),
 		ConsumedUnitsCap: testBlockMaxConsumedUnits,
 	}
 
@@ -924,7 +924,7 @@ func TestTxFees(t *testing.T) {
 				IsEUpgradeActive: cfg.IsEActivated(chainTime),
 				Config:           cfg,
 				ChainTime:        chainTime,
-				FeeManager:       fees.NewManager(testUnitFees, fees.EmptyWindows),
+				FeeManager:       fees.NewManager(testUnitFees),
 				ConsumedUnitsCap: consumedUnitCaps,
 				Credentials:      sTx.Creds,
 			}

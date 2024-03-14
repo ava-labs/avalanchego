@@ -285,10 +285,6 @@ func (b *builder) NewImportTx(
 	if err != nil {
 		return nil, err
 	}
-	unitWindows, err := b.state.GetFeeWindows()
-	if err != nil {
-		return nil, err
-	}
 
 	var (
 		pBuilder, pSigner = b.builders(keys)
@@ -300,7 +296,7 @@ func (b *builder) NewImportTx(
 			IsEUpgradeActive: isEUpgradeActive,
 			Config:           b.cfg,
 			ChainTime:        chainTime,
-			FeeManager:       commonfees.NewManager(unitFees, unitWindows),
+			FeeManager:       commonfees.NewManager(unitFees),
 			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
 		}
 	)
@@ -341,10 +337,6 @@ func (b *builder) NewExportTx(
 	if err != nil {
 		return nil, err
 	}
-	unitWindows, err := b.state.GetFeeWindows()
-	if err != nil {
-		return nil, err
-	}
 
 	var (
 		pBuilder, pSigner = b.builders(keys)
@@ -356,7 +348,7 @@ func (b *builder) NewExportTx(
 			IsEUpgradeActive: isEUpgradeActive,
 			Config:           b.cfg,
 			ChainTime:        chainTime,
-			FeeManager:       commonfees.NewManager(unitFees, unitWindows),
+			FeeManager:       commonfees.NewManager(unitFees),
 			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
 		}
 	)
@@ -404,10 +396,6 @@ func (b *builder) NewCreateChainTx(
 	if err != nil {
 		return nil, err
 	}
-	unitWindows, err := b.state.GetFeeWindows()
-	if err != nil {
-		return nil, err
-	}
 
 	var (
 		pBuilder, pSigner = b.builders(keys)
@@ -419,7 +407,7 @@ func (b *builder) NewCreateChainTx(
 			IsEUpgradeActive: isEUpgradeActive,
 			Config:           b.cfg,
 			ChainTime:        chainTime,
-			FeeManager:       commonfees.NewManager(unitFees, unitWindows),
+			FeeManager:       commonfees.NewManager(unitFees),
 			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
 		}
 	)
@@ -455,10 +443,6 @@ func (b *builder) NewCreateSubnetTx(
 	if err != nil {
 		return nil, err
 	}
-	unitWindows, err := b.state.GetFeeWindows()
-	if err != nil {
-		return nil, err
-	}
 
 	var (
 		pBuilder, pSigner = b.builders(keys)
@@ -470,7 +454,7 @@ func (b *builder) NewCreateSubnetTx(
 			IsEUpgradeActive: isEUpgradeActive,
 			Config:           b.cfg,
 			ChainTime:        chainTime,
-			FeeManager:       commonfees.NewManager(unitFees, unitWindows),
+			FeeManager:       commonfees.NewManager(unitFees),
 			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
 		}
 	)
@@ -520,10 +504,6 @@ func (b *builder) NewTransformSubnetTx(
 	if err != nil {
 		return nil, err
 	}
-	unitWindows, err := b.state.GetFeeWindows()
-	if err != nil {
-		return nil, err
-	}
 
 	var (
 		pBuilder, pSigner = b.builders(keys)
@@ -535,7 +515,7 @@ func (b *builder) NewTransformSubnetTx(
 			IsEUpgradeActive: isEUpgradeActive,
 			Config:           b.cfg,
 			ChainTime:        chainTime,
-			FeeManager:       commonfees.NewManager(unitFees, unitWindows),
+			FeeManager:       commonfees.NewManager(unitFees),
 			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
 		}
 	)
@@ -584,10 +564,6 @@ func (b *builder) NewAddValidatorTx(
 	if err != nil {
 		return nil, err
 	}
-	unitWindows, err := b.state.GetFeeWindows()
-	if err != nil {
-		return nil, err
-	}
 
 	var (
 		pBuilder, pSigner = b.builders(keys)
@@ -599,7 +575,7 @@ func (b *builder) NewAddValidatorTx(
 			IsEUpgradeActive: isEUpgradeActive,
 			Config:           b.cfg,
 			ChainTime:        chainTime,
-			FeeManager:       commonfees.NewManager(unitFees, unitWindows),
+			FeeManager:       commonfees.NewManager(unitFees),
 			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
 		}
 	)
@@ -650,10 +626,6 @@ func (b *builder) NewAddPermissionlessValidatorTx(
 	if err != nil {
 		return nil, err
 	}
-	unitWindows, err := b.state.GetFeeWindows()
-	if err != nil {
-		return nil, err
-	}
 
 	var (
 		pBuilder, pSigner = b.builders(keys)
@@ -665,7 +637,7 @@ func (b *builder) NewAddPermissionlessValidatorTx(
 			IsEUpgradeActive: isEUpgradeActive,
 			Config:           b.cfg,
 			ChainTime:        chainTime,
-			FeeManager:       commonfees.NewManager(unitFees, unitWindows),
+			FeeManager:       commonfees.NewManager(unitFees),
 			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
 		}
 	)
@@ -720,10 +692,6 @@ func (b *builder) NewAddDelegatorTx(
 	if err != nil {
 		return nil, err
 	}
-	unitWindows, err := b.state.GetFeeWindows()
-	if err != nil {
-		return nil, err
-	}
 
 	var (
 		pBuilder, pSigner = b.builders(keys)
@@ -735,7 +703,7 @@ func (b *builder) NewAddDelegatorTx(
 			IsEUpgradeActive: isEUpgradeActive,
 			Config:           b.cfg,
 			ChainTime:        chainTime,
-			FeeManager:       commonfees.NewManager(unitFees, unitWindows),
+			FeeManager:       commonfees.NewManager(unitFees),
 			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
 		}
 	)
@@ -783,10 +751,6 @@ func (b *builder) NewAddPermissionlessDelegatorTx(
 	if err != nil {
 		return nil, err
 	}
-	unitWindows, err := b.state.GetFeeWindows()
-	if err != nil {
-		return nil, err
-	}
 
 	var (
 		pBuilder, pSigner = b.builders(keys)
@@ -798,7 +762,7 @@ func (b *builder) NewAddPermissionlessDelegatorTx(
 			IsEUpgradeActive: isEUpgradeActive,
 			Config:           b.cfg,
 			ChainTime:        chainTime,
-			FeeManager:       commonfees.NewManager(unitFees, unitWindows),
+			FeeManager:       commonfees.NewManager(unitFees),
 			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
 		}
 	)
@@ -850,10 +814,6 @@ func (b *builder) NewAddSubnetValidatorTx(
 	if err != nil {
 		return nil, err
 	}
-	unitWindows, err := b.state.GetFeeWindows()
-	if err != nil {
-		return nil, err
-	}
 
 	var (
 		pBuilder, pSigner = b.builders(keys)
@@ -865,7 +825,7 @@ func (b *builder) NewAddSubnetValidatorTx(
 			IsEUpgradeActive: isEUpgradeActive,
 			Config:           b.cfg,
 			ChainTime:        chainTime,
-			FeeManager:       commonfees.NewManager(unitFees, unitWindows),
+			FeeManager:       commonfees.NewManager(unitFees),
 			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
 		}
 	)
@@ -907,10 +867,6 @@ func (b *builder) NewRemoveSubnetValidatorTx(
 	if err != nil {
 		return nil, err
 	}
-	unitWindows, err := b.state.GetFeeWindows()
-	if err != nil {
-		return nil, err
-	}
 
 	var (
 		pBuilder, pSigner = b.builders(keys)
@@ -922,7 +878,7 @@ func (b *builder) NewRemoveSubnetValidatorTx(
 			IsEUpgradeActive: isEUpgradeActive,
 			Config:           b.cfg,
 			ChainTime:        chainTime,
-			FeeManager:       commonfees.NewManager(unitFees, unitWindows),
+			FeeManager:       commonfees.NewManager(unitFees),
 			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
 		}
 	)
@@ -956,10 +912,6 @@ func (b *builder) NewTransferSubnetOwnershipTx(
 	if err != nil {
 		return nil, err
 	}
-	unitWindows, err := b.state.GetFeeWindows()
-	if err != nil {
-		return nil, err
-	}
 
 	var (
 		pBuilder, pSigner = b.builders(keys)
@@ -971,7 +923,7 @@ func (b *builder) NewTransferSubnetOwnershipTx(
 			IsEUpgradeActive: isEUpgradeActive,
 			Config:           b.cfg,
 			ChainTime:        chainTime,
-			FeeManager:       commonfees.NewManager(unitFees, unitWindows),
+			FeeManager:       commonfees.NewManager(unitFees),
 			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
 		}
 	)
@@ -1010,10 +962,6 @@ func (b *builder) NewBaseTx(
 	if err != nil {
 		return nil, err
 	}
-	unitWindows, err := b.state.GetFeeWindows()
-	if err != nil {
-		return nil, err
-	}
 
 	var (
 		pBuilder, pSigner = b.builders(keys)
@@ -1025,7 +973,7 @@ func (b *builder) NewBaseTx(
 			IsEUpgradeActive: isEUpgradeActive,
 			Config:           b.cfg,
 			ChainTime:        chainTime,
-			FeeManager:       commonfees.NewManager(unitFees, unitWindows),
+			FeeManager:       commonfees.NewManager(unitFees),
 			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
 		}
 	)

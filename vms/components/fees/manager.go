@@ -14,27 +14,19 @@ type Manager struct {
 	// Avax denominated unit fees for all fee dimensions
 	unitFees Dimensions
 
-	// consumed units window per each fee dimension.
-	windows Windows
-
 	// cumulatedUnits helps aggregating the units consumed by a block
 	// so that we can verify it's not too big/build it properly.
 	cumulatedUnits Dimensions
 }
 
-func NewManager(unitFees Dimensions, windows Windows) *Manager {
+func NewManager(unitFees Dimensions) *Manager {
 	return &Manager{
 		unitFees: unitFees,
-		windows:  windows,
 	}
 }
 
 func (m *Manager) GetUnitFees() Dimensions {
 	return m.unitFees
-}
-
-func (m *Manager) GetFeeWindows() Windows {
-	return m.windows
 }
 
 func (m *Manager) GetCumulatedUnits() Dimensions {
@@ -101,26 +93,26 @@ func (m *Manager) RemoveUnits(unitsToRm Dimensions) error {
 }
 
 // [UpdateWindows] stores in the fee windows the units cumulated in current block
-func (m *Manager) UpdateWindows(lastTime, currTime int64) {
+func (m *Manager) UpdateWindows(windows *Windows, lastTime, currTime int64) {
 	var (
 		since     = int(currTime - lastTime)
 		latestIdx = WindowSize - 1
 	)
 
 	for i := Dimension(0); i < FeeDimensions; i++ {
-		m.windows[i] = Roll(m.windows[i], since)
-		Update(&m.windows[i], latestIdx, m.cumulatedUnits[i])
+		windows[i] = Roll(windows[i], since)
+		Update(&windows[i], latestIdx, m.cumulatedUnits[i])
 	}
 }
 
 func (m *Manager) UpdateUnitFees(
-	lastTime,
-	currTime int64,
 	feesConfig DynamicFeesConfig,
+	windows Windows,
+	lastTime, currTime int64,
 ) {
 	since := int(currTime - lastTime)
 	for i := Dimension(0); i < FeeDimensions; i++ {
-		nextUnitWindow := Roll(m.windows[i], since)
+		nextUnitWindow := Roll(windows[i], since)
 		totalUnitsConsumed := Sum(nextUnitWindow)
 		nextUnitFee := nextFeeRate(m.unitFees[i], feesConfig.UpdateCoefficient[i], totalUnitsConsumed, feesConfig.BlockUnitsTarget[i])
 		nextUnitFee = max(nextUnitFee, feesConfig.MinUnitFees[i])

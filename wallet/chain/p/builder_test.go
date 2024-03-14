@@ -103,7 +103,7 @@ func TestBaseTx(t *testing.T) {
 	{ // Post E-Upgrade
 		feeCalc := &fees.Calculator{
 			IsEUpgradeActive: true,
-			FeeManager:       commonfees.NewManager(testUnitFees, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(testUnitFees),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
 		}
 		utx, err := builder.NewBaseTx(
@@ -117,7 +117,7 @@ func TestBaseTx(t *testing.T) {
 
 		fc := &fees.Calculator{
 			IsEUpgradeActive: true,
-			FeeManager:       commonfees.NewManager(testUnitFees, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(testUnitFees),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
 			Credentials:      tx.Creds,
 		}
@@ -142,7 +142,7 @@ func TestBaseTx(t *testing.T) {
 			Config: &config.Config{
 				TxFee: testCtx.CreateSubnetTxFee(),
 			},
-			FeeManager:       commonfees.NewManager(commonfees.Empty, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(commonfees.Empty),
 			ConsumedUnitsCap: commonfees.Max,
 		}
 		utx, err := builder.NewBaseTx(
@@ -159,7 +159,7 @@ func TestBaseTx(t *testing.T) {
 			Config: &config.Config{
 				TxFee: testCtx.CreateSubnetTxFee(),
 			},
-			FeeManager:       commonfees.NewManager(commonfees.Empty, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(commonfees.Empty),
 			ConsumedUnitsCap: commonfees.Max,
 			Credentials:      tx.Creds,
 		}
@@ -232,7 +232,7 @@ func TestAddSubnetValidatorTx(t *testing.T) {
 	{ // Post E-Upgrade
 		feeCalc := &fees.Calculator{
 			IsEUpgradeActive: true,
-			FeeManager:       commonfees.NewManager(testUnitFees, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(testUnitFees),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
 		}
 		utx, err := builder.NewAddSubnetValidatorTx(subnetValidator, feeCalc)
@@ -246,7 +246,7 @@ func TestAddSubnetValidatorTx(t *testing.T) {
 			Config: &config.Config{
 				AddSubnetValidatorFee: units.MilliAvax,
 			},
-			FeeManager:       commonfees.NewManager(testUnitFees, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(testUnitFees),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
 			Credentials:      tx.Creds,
 		}
@@ -270,7 +270,7 @@ func TestAddSubnetValidatorTx(t *testing.T) {
 			Config: &config.Config{
 				AddSubnetValidatorFee: testCtx.AddSubnetValidatorFee(),
 			},
-			FeeManager:       commonfees.NewManager(commonfees.Empty, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(commonfees.Empty),
 			ConsumedUnitsCap: commonfees.Max,
 		}
 		utx, err := builder.NewAddSubnetValidatorTx(subnetValidator, feeCalc)
@@ -284,7 +284,7 @@ func TestAddSubnetValidatorTx(t *testing.T) {
 			Config: &config.Config{
 				AddSubnetValidatorFee: testCtx.AddSubnetValidatorFee(),
 			},
-			FeeManager:       commonfees.NewManager(commonfees.Empty, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(commonfees.Empty),
 			ConsumedUnitsCap: commonfees.Max,
 			Credentials:      tx.Creds,
 		}
@@ -348,7 +348,7 @@ func TestRemoveSubnetValidatorTx(t *testing.T) {
 	{ // Post E-Upgrade
 		feeCalc := &fees.Calculator{
 			IsEUpgradeActive: true,
-			FeeManager:       commonfees.NewManager(testUnitFees, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(testUnitFees),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
 		}
 		utx, err := builder.NewRemoveSubnetValidatorTx(
@@ -363,7 +363,7 @@ func TestRemoveSubnetValidatorTx(t *testing.T) {
 
 		fc := &fees.Calculator{
 			IsEUpgradeActive: true,
-			FeeManager:       commonfees.NewManager(testUnitFees, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(testUnitFees),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
 			Credentials:      tx.Creds,
 		}
@@ -388,7 +388,7 @@ func TestRemoveSubnetValidatorTx(t *testing.T) {
 			Config: &config.Config{
 				TxFee: testCtx.BaseTxFee(),
 			},
-			FeeManager:       commonfees.NewManager(commonfees.Empty, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(commonfees.Empty),
 			ConsumedUnitsCap: commonfees.Max,
 		}
 		utx, err := builder.NewRemoveSubnetValidatorTx(
@@ -406,7 +406,7 @@ func TestRemoveSubnetValidatorTx(t *testing.T) {
 			Config: &config.Config{
 				TxFee: testCtx.BaseTxFee(),
 			},
-			FeeManager:       commonfees.NewManager(commonfees.Empty, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(commonfees.Empty),
 			ConsumedUnitsCap: commonfees.Max,
 			Credentials:      tx.Creds,
 		}
@@ -476,7 +476,7 @@ func TestCreateChainTx(t *testing.T) {
 	{ // Post E-Upgrade
 		feeCalc := &fees.Calculator{
 			IsEUpgradeActive: true,
-			FeeManager:       commonfees.NewManager(testUnitFees, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(testUnitFees),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
 		}
 		utx, err := builder.NewCreateChainTx(
@@ -494,7 +494,7 @@ func TestCreateChainTx(t *testing.T) {
 
 		fc := &fees.Calculator{
 			IsEUpgradeActive: true,
-			FeeManager:       commonfees.NewManager(testUnitFees, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(testUnitFees),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
 			Credentials:      tx.Creds,
 		}
@@ -518,7 +518,7 @@ func TestCreateChainTx(t *testing.T) {
 			Config: &config.Config{
 				CreateBlockchainTxFee: testCtx.CreateBlockchainTxFee(),
 			},
-			FeeManager:       commonfees.NewManager(commonfees.Empty, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(commonfees.Empty),
 			ConsumedUnitsCap: commonfees.Max,
 		}
 		utx, err := builder.NewCreateChainTx(
@@ -602,7 +602,7 @@ func TestCreateSubnetTx(t *testing.T) {
 	{ // Post E-Upgrade
 		feeCalc := &fees.Calculator{
 			IsEUpgradeActive: true,
-			FeeManager:       commonfees.NewManager(testUnitFees, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(testUnitFees),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
 		}
 		utx, err := builder.NewCreateSubnetTx(
@@ -616,7 +616,7 @@ func TestCreateSubnetTx(t *testing.T) {
 
 		fc := &fees.Calculator{
 			IsEUpgradeActive: true,
-			FeeManager:       commonfees.NewManager(testUnitFees, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(testUnitFees),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
 			Credentials:      tx.Creds,
 		}
@@ -640,7 +640,7 @@ func TestCreateSubnetTx(t *testing.T) {
 			Config: &config.Config{
 				CreateSubnetTxFee: testCtx.CreateSubnetTxFee(),
 			},
-			FeeManager:       commonfees.NewManager(commonfees.Empty, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(commonfees.Empty),
 			ConsumedUnitsCap: commonfees.Max,
 		}
 		utx, err := builder.NewCreateSubnetTx(
@@ -657,7 +657,7 @@ func TestCreateSubnetTx(t *testing.T) {
 			Config: &config.Config{
 				CreateSubnetTxFee: testCtx.CreateSubnetTxFee(),
 			},
-			FeeManager:       commonfees.NewManager(commonfees.Empty, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(commonfees.Empty),
 			ConsumedUnitsCap: commonfees.Max,
 			Credentials:      tx.Creds,
 		}
@@ -721,7 +721,7 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 	{ // Post E-Upgrade
 		feeCalc := &fees.Calculator{
 			IsEUpgradeActive: true,
-			FeeManager:       commonfees.NewManager(testUnitFees, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(testUnitFees),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
 		}
 		utx, err := builder.NewTransferSubnetOwnershipTx(
@@ -736,7 +736,7 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 
 		fc := &fees.Calculator{
 			IsEUpgradeActive: true,
-			FeeManager:       commonfees.NewManager(testUnitFees, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(testUnitFees),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
 			Credentials:      tx.Creds,
 		}
@@ -760,7 +760,7 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 			Config: &config.Config{
 				TxFee: testCtx.BaseTxFee(),
 			},
-			FeeManager:       commonfees.NewManager(commonfees.Empty, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(commonfees.Empty),
 			ConsumedUnitsCap: commonfees.Max,
 		}
 		utx, err := builder.NewTransferSubnetOwnershipTx(
@@ -778,7 +778,7 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 			Config: &config.Config{
 				TxFee: testCtx.BaseTxFee(),
 			},
-			FeeManager:       commonfees.NewManager(commonfees.Empty, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(commonfees.Empty),
 			ConsumedUnitsCap: commonfees.Max,
 			Credentials:      tx.Creds,
 		}
@@ -836,7 +836,7 @@ func TestImportTx(t *testing.T) {
 	{ // Post E-Upgrade
 		feeCalc := &fees.Calculator{
 			IsEUpgradeActive: true,
-			FeeManager:       commonfees.NewManager(testUnitFees, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(testUnitFees),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
 		}
 		utx, err := builder.NewImportTx(
@@ -851,7 +851,7 @@ func TestImportTx(t *testing.T) {
 
 		fc := &fees.Calculator{
 			IsEUpgradeActive: true,
-			FeeManager:       commonfees.NewManager(testUnitFees, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(testUnitFees),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
 			Credentials:      tx.Creds,
 		}
@@ -877,7 +877,7 @@ func TestImportTx(t *testing.T) {
 			Config: &config.Config{
 				TxFee: testCtx.BaseTxFee(),
 			},
-			FeeManager:       commonfees.NewManager(commonfees.Empty, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(commonfees.Empty),
 			ConsumedUnitsCap: commonfees.Max,
 		}
 		utx, err := builder.NewImportTx(
@@ -895,7 +895,7 @@ func TestImportTx(t *testing.T) {
 			Config: &config.Config{
 				TxFee: testCtx.BaseTxFee(),
 			},
-			FeeManager:       commonfees.NewManager(commonfees.Empty, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(commonfees.Empty),
 			ConsumedUnitsCap: commonfees.Max,
 			Credentials:      tx.Creds,
 		}
@@ -955,7 +955,7 @@ func TestExportTx(t *testing.T) {
 	{ // Post E-Upgrade
 		feeCalc := &fees.Calculator{
 			IsEUpgradeActive: true,
-			FeeManager:       commonfees.NewManager(testUnitFees, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(testUnitFees),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
 		}
 		utx, err := builder.NewExportTx(
@@ -970,7 +970,7 @@ func TestExportTx(t *testing.T) {
 
 		fc := &fees.Calculator{
 			IsEUpgradeActive: true,
-			FeeManager:       commonfees.NewManager(testUnitFees, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(testUnitFees),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
 			Credentials:      tx.Creds,
 		}
@@ -995,7 +995,7 @@ func TestExportTx(t *testing.T) {
 			Config: &config.Config{
 				TxFee: testCtx.BaseTxFee(),
 			},
-			FeeManager:       commonfees.NewManager(commonfees.Empty, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(commonfees.Empty),
 			ConsumedUnitsCap: commonfees.Max,
 		}
 		utx, err := builder.NewExportTx(
@@ -1013,7 +1013,7 @@ func TestExportTx(t *testing.T) {
 			Config: &config.Config{
 				TxFee: testCtx.BaseTxFee(),
 			},
-			FeeManager:       commonfees.NewManager(commonfees.Empty, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(commonfees.Empty),
 			ConsumedUnitsCap: commonfees.Max,
 			Credentials:      tx.Creds,
 		}
@@ -1082,7 +1082,7 @@ func TestTransformSubnetTx(t *testing.T) {
 	{ // Post E-Upgrade
 		feeCalc := &fees.Calculator{
 			IsEUpgradeActive: true,
-			FeeManager:       commonfees.NewManager(testUnitFees, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(testUnitFees),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
 		}
 		utx, err := builder.NewTransformSubnetTx(
@@ -1109,7 +1109,7 @@ func TestTransformSubnetTx(t *testing.T) {
 
 		fc := &fees.Calculator{
 			IsEUpgradeActive: true,
-			FeeManager:       commonfees.NewManager(testUnitFees, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(testUnitFees),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
 			Credentials:      tx.Creds,
 		}
@@ -1136,7 +1136,7 @@ func TestTransformSubnetTx(t *testing.T) {
 			Config: &config.Config{
 				TransformSubnetTxFee: testCtx.TransformSubnetTxFee(),
 			},
-			FeeManager:       commonfees.NewManager(commonfees.Empty, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(commonfees.Empty),
 			ConsumedUnitsCap: commonfees.Max,
 		}
 		utx, err := builder.NewTransformSubnetTx(
@@ -1166,7 +1166,7 @@ func TestTransformSubnetTx(t *testing.T) {
 			Config: &config.Config{
 				TransformSubnetTxFee: testCtx.TransformSubnetTxFee(),
 			},
-			FeeManager:       commonfees.NewManager(commonfees.Empty, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(commonfees.Empty),
 			ConsumedUnitsCap: commonfees.Max,
 			Credentials:      tx.Creds,
 		}
@@ -1233,7 +1233,7 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 	{ // Post E-Upgrade
 		feeCalc := &fees.Calculator{
 			IsEUpgradeActive: true,
-			FeeManager:       commonfees.NewManager(testUnitFees, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(testUnitFees),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
 		}
 		utx, err := builder.NewAddPermissionlessValidatorTx(
@@ -1259,7 +1259,7 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 
 		fc := &fees.Calculator{
 			IsEUpgradeActive: true,
-			FeeManager:       commonfees.NewManager(testUnitFees, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(testUnitFees),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
 			Credentials:      tx.Creds,
 		}
@@ -1288,7 +1288,7 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 			Config: &config.Config{
 				AddPrimaryNetworkValidatorFee: testCtx.AddPrimaryNetworkValidatorFee(),
 			},
-			FeeManager:       commonfees.NewManager(commonfees.Empty, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(commonfees.Empty),
 			ConsumedUnitsCap: commonfees.Max,
 		}
 		utx, err := builder.NewAddPermissionlessValidatorTx(
@@ -1317,7 +1317,7 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 			Config: &config.Config{
 				AddPrimaryNetworkValidatorFee: testCtx.AddPrimaryNetworkValidatorFee(),
 			},
-			FeeManager:       commonfees.NewManager(commonfees.Empty, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(commonfees.Empty),
 			ConsumedUnitsCap: commonfees.Max,
 			Credentials:      tx.Creds,
 		}
@@ -1377,7 +1377,7 @@ func TestAddPermissionlessDelegatorTx(t *testing.T) {
 	{ // Post E-Upgrade
 		feeCalc := &fees.Calculator{
 			IsEUpgradeActive: true,
-			FeeManager:       commonfees.NewManager(testUnitFees, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(testUnitFees),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
 		}
 		utx, err := builder.NewAddPermissionlessDelegatorTx(
@@ -1400,7 +1400,7 @@ func TestAddPermissionlessDelegatorTx(t *testing.T) {
 
 		fc := &fees.Calculator{
 			IsEUpgradeActive: true,
-			FeeManager:       commonfees.NewManager(testUnitFees, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(testUnitFees),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
 			Credentials:      tx.Creds,
 		}
@@ -1429,7 +1429,7 @@ func TestAddPermissionlessDelegatorTx(t *testing.T) {
 			Config: &config.Config{
 				AddPrimaryNetworkDelegatorFee: testCtx.AddPrimaryNetworkDelegatorFee(),
 			},
-			FeeManager:       commonfees.NewManager(commonfees.Empty, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(commonfees.Empty),
 			ConsumedUnitsCap: commonfees.Max,
 		}
 		utx, err := builder.NewAddPermissionlessDelegatorTx(
@@ -1455,7 +1455,7 @@ func TestAddPermissionlessDelegatorTx(t *testing.T) {
 			Config: &config.Config{
 				AddPrimaryNetworkDelegatorFee: testCtx.AddPrimaryNetworkDelegatorFee(),
 			},
-			FeeManager:       commonfees.NewManager(commonfees.Empty, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(commonfees.Empty),
 			ConsumedUnitsCap: commonfees.Max,
 			Credentials:      tx.Creds,
 		}

@@ -283,7 +283,6 @@ type wallet struct {
 	builder            backends.Builder
 	signer             backends.Signer
 	unitFees, unitCaps commonfees.Dimensions
-	feeWindows         commonfees.Windows
 }
 
 func (w *wallet) Builder() backends.Builder {
@@ -311,7 +310,7 @@ func (w *wallet) IssueBaseTx(
 			Config: &config.Config{
 				CreateSubnetTxFee: w.CreateSubnetTxFee(),
 			},
-			FeeManager:       commonfees.NewManager(w.unitFees, w.feeWindows),
+			FeeManager:       commonfees.NewManager(w.unitFees),
 			ConsumedUnitsCap: w.unitCaps,
 		}
 	)
@@ -339,7 +338,7 @@ func (w *wallet) IssueAddValidatorTx(
 		Config: &config.Config{
 			AddPrimaryNetworkValidatorFee: w.AddPrimaryNetworkValidatorFee(),
 		},
-		FeeManager:       commonfees.NewManager(w.unitFees, w.feeWindows),
+		FeeManager:       commonfees.NewManager(w.unitFees),
 		ConsumedUnitsCap: w.unitCaps,
 	}
 
@@ -363,7 +362,7 @@ func (w *wallet) IssueAddSubnetValidatorTx(
 		Config: &config.Config{
 			TxFee: w.BaseTxFee(),
 		},
-		FeeManager:       commonfees.NewManager(w.unitFees, w.feeWindows),
+		FeeManager:       commonfees.NewManager(w.unitFees),
 		ConsumedUnitsCap: w.unitCaps,
 	}
 
@@ -389,7 +388,7 @@ func (w *wallet) IssueRemoveSubnetValidatorTx(
 		Config: &config.Config{
 			TxFee: w.BaseTxFee(),
 		},
-		FeeManager:       commonfees.NewManager(w.unitFees, w.feeWindows),
+		FeeManager:       commonfees.NewManager(w.unitFees),
 		ConsumedUnitsCap: w.unitCaps,
 	}
 
@@ -415,7 +414,7 @@ func (w *wallet) IssueAddDelegatorTx(
 		Config: &config.Config{
 			AddPrimaryNetworkDelegatorFee: w.AddPrimaryNetworkDelegatorFee(),
 		},
-		FeeManager:       commonfees.NewManager(w.unitFees, w.feeWindows),
+		FeeManager:       commonfees.NewManager(w.unitFees),
 		ConsumedUnitsCap: w.unitCaps,
 	}
 
@@ -443,7 +442,7 @@ func (w *wallet) IssueCreateChainTx(
 		Config: &config.Config{
 			CreateBlockchainTxFee: w.CreateBlockchainTxFee(),
 		},
-		FeeManager:       commonfees.NewManager(w.unitFees, w.feeWindows),
+		FeeManager:       commonfees.NewManager(w.unitFees),
 		ConsumedUnitsCap: w.unitCaps,
 	}
 
@@ -468,7 +467,7 @@ func (w *wallet) IssueCreateSubnetTx(
 		Config: &config.Config{
 			CreateSubnetTxFee: w.CreateSubnetTxFee(),
 		},
-		FeeManager:       commonfees.NewManager(w.unitFees, w.feeWindows),
+		FeeManager:       commonfees.NewManager(w.unitFees),
 		ConsumedUnitsCap: w.unitCaps,
 	}
 	utx, err := w.builder.NewCreateSubnetTx(owner, feeCalc, options...)
@@ -493,7 +492,7 @@ func (w *wallet) IssueTransferSubnetOwnershipTx(
 		Config: &config.Config{
 			TxFee: w.BaseTxFee(),
 		},
-		FeeManager:       commonfees.NewManager(w.unitFees, w.feeWindows),
+		FeeManager:       commonfees.NewManager(w.unitFees),
 		ConsumedUnitsCap: w.unitCaps,
 	}
 
@@ -518,7 +517,7 @@ func (w *wallet) IssueImportTx(
 		Config: &config.Config{
 			TxFee: w.BaseTxFee(),
 		},
-		FeeManager:       commonfees.NewManager(w.unitFees, w.feeWindows),
+		FeeManager:       commonfees.NewManager(w.unitFees),
 		ConsumedUnitsCap: w.unitCaps,
 	}
 
@@ -544,7 +543,7 @@ func (w *wallet) IssueExportTx(
 		Config: &config.Config{
 			TxFee: w.BaseTxFee(),
 		},
-		FeeManager:       commonfees.NewManager(w.unitFees, w.feeWindows),
+		FeeManager:       commonfees.NewManager(w.unitFees),
 		ConsumedUnitsCap: w.unitCaps,
 	}
 
@@ -582,7 +581,7 @@ func (w *wallet) IssueTransformSubnetTx(
 		Config: &config.Config{
 			TransformSubnetTxFee: w.TransformSubnetTxFee(),
 		},
-		FeeManager:       commonfees.NewManager(w.unitFees, w.feeWindows),
+		FeeManager:       commonfees.NewManager(w.unitFees),
 		ConsumedUnitsCap: w.unitCaps,
 	}
 	utx, err := w.builder.NewTransformSubnetTx(
@@ -629,7 +628,7 @@ func (w *wallet) IssueAddPermissionlessValidatorTx(
 			AddPrimaryNetworkValidatorFee: w.AddPrimaryNetworkValidatorFee(),
 			AddSubnetValidatorFee:         w.AddSubnetValidatorFee(),
 		},
-		FeeManager:       commonfees.NewManager(w.unitFees, w.feeWindows),
+		FeeManager:       commonfees.NewManager(w.unitFees),
 		ConsumedUnitsCap: w.unitCaps,
 	}
 
@@ -666,7 +665,7 @@ func (w *wallet) IssueAddPermissionlessDelegatorTx(
 			AddPrimaryNetworkDelegatorFee: w.AddPrimaryNetworkDelegatorFee(),
 			AddSubnetDelegatorFee:         w.AddSubnetDelegatorFee(),
 		},
-		FeeManager:       commonfees.NewManager(w.unitFees, w.feeWindows),
+		FeeManager:       commonfees.NewManager(w.unitFees),
 		ConsumedUnitsCap: w.unitCaps,
 	}
 
@@ -748,11 +747,6 @@ func (w *wallet) refreshFeesData(options ...common.Option) error {
 	w.isEForkActive = !chainTime.Before(eUpgradeTime)
 
 	_, w.unitFees, err = w.client.GetUnitFees(ctx)
-	if err != nil {
-		return err
-	}
-
-	w.feeWindows, err = w.client.GetFeeWindows(ctx)
 	if err != nil {
 		return err
 	}

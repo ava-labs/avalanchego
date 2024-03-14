@@ -337,7 +337,7 @@ func packBlockTxs(
 	if err != nil {
 		return nil, err
 	}
-	unitWindows, err := stateDiff.GetFeeWindows()
+	feeWindows, err := stateDiff.GetFeeWindows()
 	if err != nil {
 		return nil, err
 	}
@@ -350,12 +350,13 @@ func packBlockTxs(
 		inputs   set.Set[ids.ID]
 	)
 
-	feeMan := commonfees.NewManager(unitFees, unitWindows)
+	feeMan := commonfees.NewManager(unitFees)
 	if isEActivated {
 		feeMan.UpdateUnitFees(
+			feesCfg,
+			feeWindows,
 			parentState.GetTimestamp().Unix(),
 			timestamp.Unix(),
-			feesCfg,
 		)
 	}
 

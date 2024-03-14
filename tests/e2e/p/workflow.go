@@ -142,9 +142,6 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 				_, nextUnitFees, err := pChainClient.GetUnitFees(e2e.DefaultContext())
 				require.NoError(err)
 
-				feeWindows, err := pChainClient.GetFeeWindows(e2e.DefaultContext())
-				require.NoError(err)
-
 				tx, err := pWallet.IssueExportTx(
 					xWallet.BlockchainID(),
 					[]*avax.TransferableOutput{
@@ -162,7 +159,7 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 				// retrieve fees paid for the tx
 				feeCalc := fees.Calculator{
 					IsEUpgradeActive: true,
-					FeeManager:       commonfees.NewManager(nextUnitFees, feeWindows),
+					FeeManager:       commonfees.NewManager(nextUnitFees),
 					ConsumedUnitsCap: unitCaps,
 					Credentials:      tx.Creds,
 				}

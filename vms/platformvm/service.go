@@ -1870,38 +1870,18 @@ func (s *Service) GetUnitFees(_ *http.Request, _ *struct{}, reply *GetUnitFeesRe
 		return err
 	}
 
-	feeManager := commonfees.NewManager(currentUnitFees, feeWindows)
+	feeManager := commonfees.NewManager(currentUnitFees)
 	if isEActivated {
 		feeManager.UpdateUnitFees(
+			feesCfg,
+			feeWindows,
 			currentTimestamp.Unix(),
 			nextTimestamp.Unix(),
-			feesCfg,
 		)
 	}
 	reply.NextUnitFees = feeManager.GetUnitFees()
 
 	return nil
-}
-
-// GetBlockUnitsCapReply is the response from GetBlockUnitsCap
-type GetFeeWindowsReply struct {
-	// Current timestamp
-	FeeWindows commonfees.Windows `json:"feeWindows"`
-}
-
-// GetTimestamp returns the current timestamp on chain.
-func (s *Service) GetFeeWindows(_ *http.Request, _ *struct{}, reply *GetFeeWindowsReply) error {
-	s.vm.ctx.Log.Debug("API called",
-		zap.String("service", "platform"),
-		zap.String("method", "getBlockUnitsCap"),
-	)
-
-	s.vm.ctx.Lock.Lock()
-	defer s.vm.ctx.Lock.Unlock()
-
-	var err error
-	reply.FeeWindows, err = s.vm.state.GetFeeWindows()
-	return err
 }
 
 func (s *Service) getAPIUptime(staker *state.Staker) (*avajson.Float32, error) {

@@ -148,7 +148,7 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 	if err != nil {
 		return err
 	}
-	unitWindows, err := stateDiff.GetFeeWindows()
+	feeWindows, err := stateDiff.GetFeeWindows()
 	if err != nil {
 		return err
 	}
@@ -159,12 +159,13 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 		feesCfg      = config.GetDynamicFeesConfig(isEActivated)
 	)
 
-	feeManager := fees.NewManager(unitFees, unitWindows)
+	feeManager := fees.NewManager(unitFees)
 	if isEActivated {
 		feeManager.UpdateUnitFees(
+			feesCfg,
+			feeWindows,
 			chainTime.Unix(),
 			nextBlkTime.Unix(),
-			feesCfg,
 		)
 	}
 

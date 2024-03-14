@@ -136,9 +136,6 @@ type Client interface {
 
 	// GetUnitFees returns the current unit fees and the next unit fees that a transaction must pay to be accepted
 	GetUnitFees(ctx context.Context, options ...rpc.Option) (commonfees.Dimensions, commonfees.Dimensions, error)
-
-	// GetFeeWindows returns the fee window needed to calculate next block unit fees
-	GetFeeWindows(ctx context.Context, options ...rpc.Option) (commonfees.Windows, error)
 }
 
 // Client implementation for interacting with the P Chain endpoint
@@ -558,10 +555,4 @@ func (c *client) GetUnitFees(ctx context.Context, options ...rpc.Option) (common
 	res := &GetUnitFeesReply{}
 	err := c.requester.SendRequest(ctx, "platform.getUnitFees", struct{}{}, res, options...)
 	return res.CurrentUnitFees, res.NextUnitFees, err
-}
-
-func (c *client) GetFeeWindows(ctx context.Context, options ...rpc.Option) (commonfees.Windows, error) {
-	res := &GetFeeWindowsReply{}
-	err := c.requester.SendRequest(ctx, "platform.getFeeWindows", struct{}{}, res, options...)
-	return res.FeeWindows, err
 }

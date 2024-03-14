@@ -356,13 +356,10 @@ func TestGetBalance(t *testing.T) {
 			unitFees, err := service.vm.state.GetUnitFees()
 			require.NoError(err)
 
-			feeWindows, err := service.vm.state.GetFeeWindows()
-			require.NoError(err)
-
 			var (
 				chainTime = service.vm.state.GetTimestamp()
 				feeCfg    = config.GetDynamicFeesConfig(service.vm.Config.IsEActivated(chainTime))
-				feeMan    = commonfees.NewManager(unitFees, feeWindows)
+				feeMan    = commonfees.NewManager(unitFees)
 				feeCalc   = &fees.Calculator{
 					IsEUpgradeActive: service.vm.IsEActivated(chainTime),
 					Config:           &service.vm.Config,
@@ -1032,31 +1029,4 @@ func TestGetUnitFees(t *testing.T) {
 
 	require.NoError(service.GetUnitFees(nil, nil, &reply))
 	require.Equal(updatedUnitFees, reply.CurrentUnitFees)
-}
-
-func TestGetFeeWindows(t *testing.T) {
-	require := require.New(t)
-	service, _ := defaultService(t)
-
-	reply := GetFeeWindowsReply{}
-	require.NoError(service.GetFeeWindows(nil, nil, &reply))
-
-	service.vm.ctx.Lock.Lock()
-
-	feeWindows, err := service.vm.state.GetFeeWindows()
-	require.NoError(err)
-	require.Equal(feeWindows, reply.FeeWindows)
-
-	updatedFeeWindows := commonfees.Windows{
-		commonfees.Window{1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
-		commonfees.Window{11, 12, 13, 14, 15, 16, 17, 18, 19, 20},
-		commonfees.Window{math.MaxUint64, 0, math.MaxUint64, 0, math.MaxUint64, 0, math.MaxUint64, 0, math.MaxUint64, 0},
-		commonfees.Window{10, 9, 8, 7, 6, 5, 4, 3, 2, 1},
-	}
-	service.vm.state.SetFeeWindows(updatedFeeWindows)
-
-	service.vm.ctx.Lock.Unlock()
-
-	require.NoError(service.GetFeeWindows(nil, nil, &reply))
-	require.Equal(updatedFeeWindows, reply.FeeWindows)
 }

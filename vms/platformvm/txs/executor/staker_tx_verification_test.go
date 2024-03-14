@@ -515,7 +515,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 			var (
 				backend = tt.backendF(ctrl)
 
-				feeManager = fees.NewManager(fees.Empty, fees.EmptyWindows)
+				feeManager = fees.NewManager(fees.Empty)
 				state      = tt.stateF(ctrl)
 				sTx        = tt.sTxF()
 				tx         = tt.txF()
