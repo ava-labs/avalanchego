@@ -352,7 +352,7 @@ func packBlockTxs(
 
 	feeMan := commonfees.NewManager(unitFees, unitWindows)
 	if isEActivated {
-		feeMan = feeMan.ComputeNext(
+		feeMan.UpdateUnitFees(
 			parentState.GetTimestamp().Unix(),
 			timestamp.Unix(),
 			feesCfg.BlockUnitsTarget,

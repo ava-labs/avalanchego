@@ -100,55 +100,34 @@ func (m *Manager) RemoveUnits(unitsToRm Dimensions) error {
 	return nil
 }
 
-func (m *Manager) ComputeNext(
+// [UpdateWindows] stores in the fee windows the units cumulated in current block
+func (m *Manager) UpdateWindows(lastTime, currTime int64) {
+	var (
+		since     = int(currTime - lastTime)
+		latestIdx = WindowSize - 1
+	)
+
+	for i := Dimension(0); i < FeeDimensions; i++ {
+		m.windows[i] = Roll(m.windows[i], since)
+		Update(&m.windows[i], latestIdx, m.cumulatedUnits[i])
+	}
+}
+
+func (m *Manager) UpdateUnitFees(
 	lastTime,
 	currTime int64,
 	targetUnits,
 	updateCoefficients,
 	minUnitPrice Dimensions,
-) *Manager {
+) {
 	since := int(currTime - lastTime)
-	nextManager := &Manager{}
 	for i := Dimension(0); i < FeeDimensions; i++ {
-		nextUnitPrice, nextUnitWindow := computeNextPriceWindow(
-			m.windows[i],
-			m.cumulatedUnits[i],
-			m.unitFees[i],
-			targetUnits[i],
-			updateCoefficients[i],
-			minUnitPrice[i],
-			since,
-		)
-
-		nextManager.unitFees[i] = nextUnitPrice
-		nextManager.windows[i] = nextUnitWindow
-		// unit consumed are zeroed in nextManager
+		nextUnitWindow := Roll(m.windows[i], since)
+		totalUnitsConsumed := Sum(nextUnitWindow)
+		nextUnitFee := nextFeeRate(m.unitFees[i], updateCoefficients[i], totalUnitsConsumed, targetUnits[i])
+		nextUnitFee = max(nextUnitFee, minUnitPrice[i])
+		m.unitFees[i] = nextUnitFee
 	}
-	return nextManager
-}
-
-func computeNextPriceWindow(
-	current Window,
-	currentUnitsConsumed uint64,
-	currentUnitFee uint64,
-	target uint64, /* per window, must be non-zero */
-	updateCoefficient uint64,
-	minUnitFee uint64,
-	since int, /* seconds */
-) (uint64, Window) {
-	newRollupWindow := Roll(current, since)
-	if since < WindowSize {
-		// add in the units used by the parent block in the correct place
-		// If the parent consumed units within the rollup window, add the consumed
-		// units in.
-		start := WindowSize - 1 - since
-		Update(&newRollupWindow, start, currentUnitsConsumed)
-	}
-
-	totalUnitsConsumed := Sum(newRollupWindow)
-	nextUnitFee := nextFeeRate(currentUnitFee, updateCoefficient, totalUnitsConsumed, target)
-	nextUnitFee = max(nextUnitFee, minUnitFee)
-	return nextUnitFee, newRollupWindow
 }
 
 func nextFeeRate(currentUnitFee, updateCoefficient, unitsConsumed, target uint64) uint64 {

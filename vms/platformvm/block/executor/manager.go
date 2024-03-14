@@ -161,7 +161,7 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 
 	feeManager := fees.NewManager(unitFees, unitWindows)
 	if isEActivated {
-		feeManager = feeManager.ComputeNext(
+		feeManager.UpdateUnitFees(
 			chainTime.Unix(),
 			nextBlkTime.Unix(),
 			feesCfg.BlockUnitsTarget,

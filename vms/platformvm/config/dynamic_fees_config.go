@@ -104,6 +104,9 @@ type DynamicFeesConfig struct {
 
 func (c *DynamicFeesConfig) validate() error {
 	for i := commonfees.Dimension(0); i < commonfees.FeeDimensions; i++ {
+		// MinUnitFees can be zero, but that is a bit dangerous. if a fee ever becomes
+		// zero, the update mechanism will keep them to zero.
+
 		if c.InitialUnitFees[i] < c.MinUnitFees[i] {
 			return fmt.Errorf("dimension %d, initial unit fee %d smaller than minimal unit fee %d",
 				i,

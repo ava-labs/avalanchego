@@ -470,7 +470,7 @@ func (v *verifier) processStandardTxs(txs []*txs.Tx, state state.Diff, parentID 
 
 	feeManager := fees.NewManager(unitFees, unitWindows)
 	if isEActivated {
-		feeManager = feeManager.ComputeNext(
+		feeManager.UpdateUnitFees(
 			currentTimestamp.Unix(),
 			blkTimestamp.Unix(),
 			feesCfg.BlockUnitsTarget,
@@ -522,6 +522,7 @@ func (v *verifier) processStandardTxs(txs []*txs.Tx, state state.Diff, parentID 
 	}
 
 	if isEActivated {
+		feeManager.UpdateWindows(currentTimestamp.Unix(), blkTimestamp.Unix())
 		state.SetUnitFees(feeManager.GetUnitFees())
 		state.SetFeeWindows(feeManager.GetFeeWindows())
 	}
