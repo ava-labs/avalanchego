@@ -164,9 +164,7 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 		feeManager.UpdateUnitFees(
 			chainTime.Unix(),
 			nextBlkTime.Unix(),
-			feesCfg.BlockUnitsTarget,
-			feesCfg.UpdateCoefficient,
-			feesCfg.MinUnitFees,
+			feesCfg,
 		)
 	}
 

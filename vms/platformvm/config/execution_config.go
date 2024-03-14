@@ -9,6 +9,8 @@ import (
 
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm/network"
+
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 var DefaultExecutionConfig = ExecutionConfig{
@@ -39,7 +41,7 @@ type ExecutionConfig struct {
 	ChecksumsEnabled             bool           `json:"checksums-enabled"`
 	MempoolPruneFrequency        time.Duration  `json:"mempool-prune-frequency"`
 
-	DynamicFeesConfig *DynamicFeesConfig `json:"dynamic-fees-config"`
+	DynamicFeesConfig *commonfees.DynamicFeesConfig `json:"dynamic-fees-config"`
 }
 
 // GetExecutionConfig returns an ExecutionConfig

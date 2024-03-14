@@ -355,9 +355,7 @@ func packBlockTxs(
 		feeMan.UpdateUnitFees(
 			parentState.GetTimestamp().Unix(),
 			timestamp.Unix(),
-			feesCfg.BlockUnitsTarget,
-			feesCfg.UpdateCoefficient,
-			feesCfg.MinUnitFees,
+			feesCfg,
 		)
 	}
 

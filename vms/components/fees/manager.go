@@ -116,16 +116,14 @@ func (m *Manager) UpdateWindows(lastTime, currTime int64) {
 func (m *Manager) UpdateUnitFees(
 	lastTime,
 	currTime int64,
-	targetUnits,
-	updateCoefficients,
-	minUnitPrice Dimensions,
+	feesConfig DynamicFeesConfig,
 ) {
 	since := int(currTime - lastTime)
 	for i := Dimension(0); i < FeeDimensions; i++ {
 		nextUnitWindow := Roll(m.windows[i], since)
 		totalUnitsConsumed := Sum(nextUnitWindow)
-		nextUnitFee := nextFeeRate(m.unitFees[i], updateCoefficients[i], totalUnitsConsumed, targetUnits[i])
-		nextUnitFee = max(nextUnitFee, minUnitPrice[i])
+		nextUnitFee := nextFeeRate(m.unitFees[i], feesConfig.UpdateCoefficient[i], totalUnitsConsumed, feesConfig.BlockUnitsTarget[i])
+		nextUnitFee = max(nextUnitFee, feesConfig.MinUnitFees[i])
 		m.unitFees[i] = nextUnitFee
 	}
 }

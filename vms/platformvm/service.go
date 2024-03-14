@@ -1875,9 +1875,7 @@ func (s *Service) GetUnitFees(_ *http.Request, _ *struct{}, reply *GetUnitFeesRe
 		feeManager.UpdateUnitFees(
 			currentTimestamp.Unix(),
 			nextTimestamp.Unix(),
-			feesCfg.BlockUnitsTarget,
-			feesCfg.UpdateCoefficient,
-			feesCfg.MinUnitFees,
+			feesCfg,
 		)
 	}
 	reply.NextUnitFees = feeManager.GetUnitFees()

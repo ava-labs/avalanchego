@@ -473,9 +473,7 @@ func (v *verifier) processStandardTxs(txs []*txs.Tx, state state.Diff, parentID 
 		feeManager.UpdateUnitFees(
 			currentTimestamp.Unix(),
 			blkTimestamp.Unix(),
-			feesCfg.BlockUnitsTarget,
-			feesCfg.UpdateCoefficient,
-			feesCfg.MinUnitFees,
+			feesCfg,
 		)
 	}
 
