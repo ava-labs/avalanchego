@@ -326,7 +326,7 @@ func (n *Network) Start(ctx context.Context, w io.Writer) error {
 	if _, err := fmt.Fprintf(w, "\nStarted network %s (UUID: %s)\n", n.Dir, n.UUID); err != nil {
 		return err
 	}
-	// Provide a link the main dashboard filtered by the uuid and showing results for now till whenever the link is viewed
+	// Provide a link to the main dashboard filtered by the uuid and showing results from now till whenever the link is viewed
 	if _, err := fmt.Fprintf(w, "\nMetrics: https://grafana-experimental.avax-dev.network/d/kBQpRdWnk/avalanche-main-dashboard?&var-filter=network_uuid%%7C%%3D%%7C%s&var-filter=is_ephemeral_node%%7C%%3D%%7Cfalse&from=%d&to=now\n", n.UUID, startTime.UnixMilli()); err != nil {
 		return err
 	}
@@ -464,7 +464,7 @@ func (n *Network) Restart(ctx context.Context, w io.Writer) error {
 func (n *Network) EnsureNodeConfig(node *Node) error {
 	flags := node.Flags
 
-	// Ensure nodes can write include the network uuid in their monitoring configuration
+	// Ensure nodes can label their metrics with the network uuid
 	node.NetworkUUID = n.UUID
 
 	// Ensure nodes can label metrics with an indication of the shared/private nature of the network
@@ -687,7 +687,7 @@ func (n *Network) getBootstrapIPsAndIDs(skippedNode *Node) ([]string, []string, 
 	return bootstrapIPs, bootstrapIDs, nil
 }
 
-// Retrieves the default path of the given network child dir.
+// Retrieves the root dir for tmpnet data.
 func getTmpnetPath() (string, error) {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {

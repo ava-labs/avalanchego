@@ -6,7 +6,7 @@ set -euo pipefail
 # running locally and in CI.
 #
 # The promtail instance will remain running in the background and will forward
-# metrics to the central instance for all tmpnet networks.
+# logs to the central instance for all tmpnet networks.
 #
 # To stop it:
 #
@@ -36,15 +36,15 @@ if [[ -z "${LOKI_URL}" ]]; then
   exit 1
 fi
 
-PROMTAIL_ID="${PROMTAIL_ID:-}"
-if [[ -z "${PROMTAIL_ID}" ]]; then
-  echo "Please provide a value for PROMTAIL_ID"
+LOKI_ID="${LOKI_ID:-}"
+if [[ -z "${LOKI_ID}" ]]; then
+  echo "Please provide a value for LOKI_ID"
   exit 1
 fi
 
-PROMTAIL_PASSWORD="${PROMTAIL_PASSWORD:-}"
-if [[ -z "${PROMTAIL_PASSWORD}" ]]; then
-  echo "Plase provide a value for PROMTAIL_PASSWORD"
+LOKI_PASSWORD="${LOKI_PASSWORD:-}"
+if [[ -z "${LOKI_PASSWORD}" ]]; then
+  echo "Plase provide a value for LOKI_PASSWORD"
   exit 1
 fi
 
@@ -73,7 +73,7 @@ if ! command -v "${CMD}" &> /dev/null; then
     PROMTAIL_FILE="promtail-${DIST}"
     ZIP_PATH="/tmp/${PROMTAIL_FILE}.zip"
     BIN_DIR="$(dirname "${CMD}")"
-    URL="https://github.com/grafana/loki/releases/download/VERSION/promtail-${DIST}.zip"
+    URL="https://github.com/grafana/loki/releases/download/${VERSION}/promtail-${DIST}.zip"
     curl -L -o "${ZIP_PATH}" "${URL}"
     unzip "${ZIP_PATH}" -d "${BIN_DIR}"
     mv "${BIN_DIR}/${PROMTAIL_FILE}" "${CMD}"
@@ -91,16 +91,16 @@ server:
   grpc_listen_port: 0
 
 positions:
-  filename: "${PROMTAIL_WORKING_DIR}/positions.yaml
+  filename: "${PROMTAIL_WORKING_DIR}/positions.yaml"
 
 client:
-  - url: "${LOKI_URL}/api/prom/push"
-    basic_auth:
-      username: "${LOKI_ID}"
-      password: "${LOKI_PASSWORD}"
+  url: "${LOKI_URL}/api/prom/push"
+  basic_auth:
+    username: "${LOKI_ID}"
+    password: "${LOKI_PASSWORD}"
 
 scrape_configs:
-  - job_name: avalanchego
+  - job_name: "avalanchego"
     file_sd_configs:
       - files:
           - '${FILE_SD_PATH}/*.json'

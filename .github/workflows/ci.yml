@@ -77,8 +77,8 @@ jobs:
         shell: bash
         run: bash -x ./scripts/run_promtail.sh
         env:
-          PROMTAIL_ID: ${{ secrets.PROMTAIL_ID }}
-          PROMTAIL_PASSWORD: ${{ secrets.PROMTAIL_PASSWORD }}
+          LOKI_ID: ${{ secrets.LOKI_ID }}
+          LOKI_PASSWORD: ${{ secrets.LOKI_PASSWORD }}
       - name: Notify of metrics availability
         shell: bash
         run: .github/workflows/notify-metrics-availability.sh
@@ -123,6 +123,12 @@ jobs:
         env:
           PROMETHEUS_ID: ${{ secrets.PROMETHEUS_ID }}
           PROMETHEUS_PASSWORD: ${{ secrets.PROMETHEUS_PASSWORD }}
+      - name: Start promtail
+        shell: bash
+        run: bash -x ./scripts/run_promtail.sh
+        env:
+          LOKI_ID: ${{ secrets.LOKI_ID }}
+          LOKI_PASSWORD: ${{ secrets.LOKI_PASSWORD }}
       - name: Notify of metrics availability
         shell: bash
         run: .github/workflows/notify-metrics-availability.sh
@@ -147,6 +153,7 @@ jobs:
           path: |
             ~/.tmpnet/networks
             ~/.tmpnet/prometheus/prometheus.log
+            ~/.tmpnet/promtail/promtail.log
           if-no-files-found: error
   Upgrade:
     runs-on: ubuntu-latest
@@ -165,6 +172,12 @@ jobs:
         env:
           PROMETHEUS_ID: ${{ secrets.PROMETHEUS_ID }}
           PROMETHEUS_PASSWORD: ${{ secrets.PROMETHEUS_PASSWORD }}
+      - name: Start promtail
+        shell: bash
+        run: bash -x ./scripts/run_promtail.sh
+        env:
+          LOKI_ID: ${{ secrets.LOKI_ID }}
+          LOKI_PASSWORD: ${{ secrets.LOKI_PASSWORD }}
       - name: Notify of metrics availability
         shell: bash
         run: .github/workflows/notify-metrics-availability.sh
@@ -189,6 +202,7 @@ jobs:
           path: |
             ~/.tmpnet/networks
             ~/.tmpnet/prometheus/prometheus.log
+            ~/.tmpnet/promtail/promtail.log
           if-no-files-found: error
   Lint:
     runs-on: ubuntu-latest
