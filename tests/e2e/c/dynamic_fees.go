@@ -40,7 +40,7 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 		privateNetwork := &tmpnet.Network{
 			Owner: "avalanchego-e2e-dynamic-fees",
 		}
-		e2e.Env.NewPrivateNetwork(privateNetwork)
+		e2e.Env.StartPrivateNetwork(privateNetwork)
 
 		ginkgo.By("allocating a pre-funded key")
 		key := privateNetwork.PreFundedKeys[0]

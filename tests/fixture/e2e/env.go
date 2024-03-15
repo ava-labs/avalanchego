@@ -155,7 +155,7 @@ func (te *TestEnvironment) NewKeychain(count int) *secp256k1fx.Keychain {
 }
 
 // Create a new private network that is not shared with other tests.
-func (te *TestEnvironment) NewPrivateNetwork(network *tmpnet.Network) {
+func (te *TestEnvironment) StartPrivateNetwork(network *tmpnet.Network) {
 	// Use the same configuration as the shared network
 	sharedNetwork, err := tmpnet.ReadNetwork(te.NetworkDir)
 	te.require.NoError(err)
