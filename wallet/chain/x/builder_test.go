@@ -94,7 +94,7 @@ func TestBaseTx(t *testing.T) {
 	{ // Post E-Upgrade
 		feeCalc := &fees.Calculator{
 			IsEUpgradeActive: true,
-			FeeManager:       commonfees.NewManager(testUnitFees, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(testUnitFees),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
 			Codec:            backends.Parser.Codec(),
 		}
@@ -109,7 +109,7 @@ func TestBaseTx(t *testing.T) {
 
 		fc := &fees.Calculator{
 			IsEUpgradeActive: true,
-			FeeManager:       commonfees.NewManager(testUnitFees, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(testUnitFees),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
 			Credentials:      tx.Creds,
 			Codec:            backends.Parser.Codec(),
@@ -135,7 +135,7 @@ func TestBaseTx(t *testing.T) {
 			Config: &config.Config{
 				TxFee: testCtx.BaseTxFee(),
 			},
-			FeeManager:       commonfees.NewManager(commonfees.Empty, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(commonfees.Empty),
 			ConsumedUnitsCap: commonfees.Max,
 			Codec:            backends.Parser.Codec(),
 		}
@@ -153,7 +153,7 @@ func TestBaseTx(t *testing.T) {
 			Config: &config.Config{
 				TxFee: testCtx.BaseTxFee(),
 			},
-			FeeManager:       commonfees.NewManager(commonfees.Empty, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(commonfees.Empty),
 			ConsumedUnitsCap: commonfees.Max,
 			Codec:            backends.Parser.Codec(),
 			Credentials:      tx.Creds,
@@ -250,7 +250,7 @@ func TestCreateAssetTx(t *testing.T) {
 		// Post E-Upgrade
 		feeCalc := &fees.Calculator{
 			IsEUpgradeActive: true,
-			FeeManager:       commonfees.NewManager(testUnitFees, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(testUnitFees),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
 			Codec:            backends.Parser.Codec(),
 		}
@@ -269,7 +269,7 @@ func TestCreateAssetTx(t *testing.T) {
 
 		fc := &fees.Calculator{
 			IsEUpgradeActive: true,
-			FeeManager:       commonfees.NewManager(testUnitFees, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(testUnitFees),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
 			Codec:            backends.Parser.Codec(),
 			Credentials:      tx.Creds,
@@ -295,7 +295,7 @@ func TestCreateAssetTx(t *testing.T) {
 			Config: &config.Config{
 				CreateAssetTxFee: testCtx.CreateAssetTxFee(),
 			},
-			FeeManager:       commonfees.NewManager(commonfees.Empty, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(commonfees.Empty),
 			ConsumedUnitsCap: commonfees.Max,
 			Codec:            backends.Parser.Codec(),
 		}
@@ -317,7 +317,7 @@ func TestCreateAssetTx(t *testing.T) {
 			Config: &config.Config{
 				CreateAssetTxFee: testCtx.CreateAssetTxFee(),
 			},
-			FeeManager:       commonfees.NewManager(commonfees.Empty, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(commonfees.Empty),
 			ConsumedUnitsCap: commonfees.Max,
 			Codec:            backends.Parser.Codec(),
 			Credentials:      tx.Creds,
@@ -368,7 +368,7 @@ func TestMintNFTOperation(t *testing.T) {
 		// Post E-Upgrade
 		feeCalc := &fees.Calculator{
 			IsEUpgradeActive: true,
-			FeeManager:       commonfees.NewManager(testUnitFees, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(testUnitFees),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
 			Codec:            backends.Parser.Codec(),
 		}
@@ -386,7 +386,7 @@ func TestMintNFTOperation(t *testing.T) {
 
 		fc := &fees.Calculator{
 			IsEUpgradeActive: true,
-			FeeManager:       commonfees.NewManager(testUnitFees, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(testUnitFees),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
 			Codec:            backends.Parser.Codec(),
 			Credentials:      tx.Creds,
@@ -412,7 +412,7 @@ func TestMintNFTOperation(t *testing.T) {
 			Config: &config.Config{
 				TxFee: testCtx.BaseTxFee(),
 			},
-			FeeManager:       commonfees.NewManager(commonfees.Empty, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(commonfees.Empty),
 			ConsumedUnitsCap: commonfees.Max,
 			Codec:            backends.Parser.Codec(),
 		}
@@ -433,7 +433,7 @@ func TestMintNFTOperation(t *testing.T) {
 			Config: &config.Config{
 				TxFee: testCtx.BaseTxFee(),
 			},
-			FeeManager:       commonfees.NewManager(commonfees.Empty, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(commonfees.Empty),
 			ConsumedUnitsCap: commonfees.Max,
 			Codec:            backends.Parser.Codec(),
 			Credentials:      tx.Creds,
@@ -490,7 +490,7 @@ func TestMintFTOperation(t *testing.T) {
 		// Post E-Upgrade
 		feeCalc := &fees.Calculator{
 			IsEUpgradeActive: true,
-			FeeManager:       commonfees.NewManager(testUnitFees, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(testUnitFees),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
 			Codec:            backends.Parser.Codec(),
 		}
@@ -506,7 +506,7 @@ func TestMintFTOperation(t *testing.T) {
 
 		fc := &fees.Calculator{
 			IsEUpgradeActive: true,
-			FeeManager:       commonfees.NewManager(testUnitFees, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(testUnitFees),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
 			Codec:            backends.Parser.Codec(),
 			Credentials:      tx.Creds,
@@ -532,7 +532,7 @@ func TestMintFTOperation(t *testing.T) {
 			Config: &config.Config{
 				TxFee: testCtx.BaseTxFee(),
 			},
-			FeeManager:       commonfees.NewManager(commonfees.Empty, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(commonfees.Empty),
 			ConsumedUnitsCap: commonfees.Max,
 			Codec:            backends.Parser.Codec(),
 		}
@@ -551,7 +551,7 @@ func TestMintFTOperation(t *testing.T) {
 			Config: &config.Config{
 				TxFee: testCtx.BaseTxFee(),
 			},
-			FeeManager:       commonfees.NewManager(commonfees.Empty, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(commonfees.Empty),
 			ConsumedUnitsCap: commonfees.Max,
 			Codec:            backends.Parser.Codec(),
 			Credentials:      tx.Creds,
@@ -603,7 +603,7 @@ func TestMintPropertyOperation(t *testing.T) {
 		// Post E-Upgrade
 		feeCalc := &fees.Calculator{
 			IsEUpgradeActive: true,
-			FeeManager:       commonfees.NewManager(testUnitFees, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(testUnitFees),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
 			Codec:            backends.Parser.Codec(),
 		}
@@ -620,7 +620,7 @@ func TestMintPropertyOperation(t *testing.T) {
 
 		fc := &fees.Calculator{
 			IsEUpgradeActive: true,
-			FeeManager:       commonfees.NewManager(testUnitFees, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(testUnitFees),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
 			Codec:            backends.Parser.Codec(),
 			Credentials:      tx.Creds,
@@ -646,7 +646,7 @@ func TestMintPropertyOperation(t *testing.T) {
 			Config: &config.Config{
 				TxFee: testCtx.BaseTxFee(),
 			},
-			FeeManager:       commonfees.NewManager(commonfees.Empty, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(commonfees.Empty),
 			ConsumedUnitsCap: commonfees.Max,
 			Codec:            backends.Parser.Codec(),
 		}
@@ -666,7 +666,7 @@ func TestMintPropertyOperation(t *testing.T) {
 			Config: &config.Config{
 				TxFee: testCtx.BaseTxFee(),
 			},
-			FeeManager:       commonfees.NewManager(commonfees.Empty, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(commonfees.Empty),
 			ConsumedUnitsCap: commonfees.Max,
 			Codec:            backends.Parser.Codec(),
 			Credentials:      tx.Creds,
@@ -712,7 +712,7 @@ func TestBurnPropertyOperation(t *testing.T) {
 		// Post E-Upgrade
 		feeCalc := &fees.Calculator{
 			IsEUpgradeActive: true,
-			FeeManager:       commonfees.NewManager(testUnitFees, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(testUnitFees),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
 			Codec:            backends.Parser.Codec(),
 		}
@@ -728,7 +728,7 @@ func TestBurnPropertyOperation(t *testing.T) {
 
 		fc := &fees.Calculator{
 			IsEUpgradeActive: true,
-			FeeManager:       commonfees.NewManager(testUnitFees, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(testUnitFees),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
 			Codec:            backends.Parser.Codec(),
 			Credentials:      tx.Creds,
@@ -754,7 +754,7 @@ func TestBurnPropertyOperation(t *testing.T) {
 			Config: &config.Config{
 				TxFee: testCtx.BaseTxFee(),
 			},
-			FeeManager:       commonfees.NewManager(commonfees.Empty, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(commonfees.Empty),
 			ConsumedUnitsCap: commonfees.Max,
 			Codec:            backends.Parser.Codec(),
 		}
@@ -773,7 +773,7 @@ func TestBurnPropertyOperation(t *testing.T) {
 			Config: &config.Config{
 				TxFee: testCtx.BaseTxFee(),
 			},
-			FeeManager:       commonfees.NewManager(commonfees.Empty, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(commonfees.Empty),
 			ConsumedUnitsCap: commonfees.Max,
 			Codec:            backends.Parser.Codec(),
 			Credentials:      tx.Creds,
@@ -831,7 +831,7 @@ func TestImportTx(t *testing.T) {
 	{ // Post E-Upgrade
 		feeCalc := &fees.Calculator{
 			IsEUpgradeActive: true,
-			FeeManager:       commonfees.NewManager(testUnitFees, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(testUnitFees),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
 			Codec:            backends.Parser.Codec(),
 		}
@@ -847,7 +847,7 @@ func TestImportTx(t *testing.T) {
 
 		fc := &fees.Calculator{
 			IsEUpgradeActive: true,
-			FeeManager:       commonfees.NewManager(testUnitFees, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(testUnitFees),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
 			Credentials:      tx.Creds,
 			Codec:            backends.Parser.Codec(),
@@ -874,7 +874,7 @@ func TestImportTx(t *testing.T) {
 			Config: &config.Config{
 				TxFee: testCtx.BaseTxFee(),
 			},
-			FeeManager:       commonfees.NewManager(commonfees.Empty, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(commonfees.Empty),
 			ConsumedUnitsCap: commonfees.Max,
 			Codec:            backends.Parser.Codec(),
 		}
@@ -893,7 +893,7 @@ func TestImportTx(t *testing.T) {
 			Config: &config.Config{
 				TxFee: testCtx.BaseTxFee(),
 			},
-			FeeManager:       commonfees.NewManager(commonfees.Empty, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(commonfees.Empty),
 			ConsumedUnitsCap: commonfees.Max,
 			Codec:            backends.Parser.Codec(),
 			Credentials:      tx.Creds,
@@ -953,7 +953,7 @@ func TestExportTx(t *testing.T) {
 	{ // Post E-Upgrade
 		feeCalc := &fees.Calculator{
 			IsEUpgradeActive: true,
-			FeeManager:       commonfees.NewManager(testUnitFees, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(testUnitFees),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
 			Codec:            backends.Parser.Codec(),
 		}
@@ -969,7 +969,7 @@ func TestExportTx(t *testing.T) {
 
 		fc := &fees.Calculator{
 			IsEUpgradeActive: true,
-			FeeManager:       commonfees.NewManager(testUnitFees, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(testUnitFees),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
 			Credentials:      tx.Creds,
 			Codec:            backends.Parser.Codec(),
@@ -995,7 +995,7 @@ func TestExportTx(t *testing.T) {
 			Config: &config.Config{
 				TxFee: testCtx.BaseTxFee(),
 			},
-			FeeManager:       commonfees.NewManager(commonfees.Empty, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(commonfees.Empty),
 			ConsumedUnitsCap: commonfees.Max,
 			Codec:            backends.Parser.Codec(),
 		}
@@ -1014,7 +1014,7 @@ func TestExportTx(t *testing.T) {
 			Config: &config.Config{
 				TxFee: testCtx.BaseTxFee(),
 			},
-			FeeManager:       commonfees.NewManager(commonfees.Empty, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(commonfees.Empty),
 			ConsumedUnitsCap: commonfees.Max,
 			Codec:            backends.Parser.Codec(),
 			Credentials:      tx.Creds,

@@ -131,14 +131,10 @@ func (tx *Tx) Verify(context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed retrieving unit fees: %w", err)
 	}
-	feeWindows, err := tx.vm.state.GetFeeWindows()
-	if err != nil {
-		return fmt.Errorf("failed retrieving fee windows: %w", err)
-	}
 
 	var (
 		feeCfg     = tx.vm.txExecutorBackend.Config.GetDynamicFeesConfig(tx.vm.state.GetTimestamp())
-		feeManager = fees.NewManager(unitFees, feeWindows)
+		feeManager = fees.NewManager(unitFees)
 	)
 	return tx.tx.Unsigned.Visit(&executor.SemanticVerifier{
 		Backend:       tx.vm.txExecutorBackend,

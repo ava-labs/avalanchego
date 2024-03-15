@@ -105,14 +105,13 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 		return nil, fmt.Errorf("failed retrieving fee windows: %w", err)
 	}
 
-	feeManager := fees.NewManager(unitFees, feeWindows)
+	feeManager := fees.NewManager(unitFees)
 	if isEForkActive {
-		feeManager = feeManager.ComputeNext(
+		feeManager.UpdateUnitFees(
+			feesCfg,
+			feeWindows,
 			chainTime.Unix(),
 			nextTimestamp.Unix(),
-			feesCfg.BlockUnitsTarget,
-			feesCfg.UpdateCoefficient,
-			feesCfg.MinUnitFees,
 		)
 	}
 
@@ -179,7 +178,7 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 
 		txDiff.AddTx(tx)
 		txDiff.SetUnitFees(feeManager.GetUnitFees())
-		txDiff.SetFeeWindows(feeManager.GetFeeWindows())
+		txDiff.SetFeeWindows(feeWindows)
 		txDiff.Apply(stateDiff)
 
 		if isEForkActive {

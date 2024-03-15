@@ -153,7 +153,7 @@ func TestBaseTxFees(t *testing.T) {
 				IsEUpgradeActive: cfg.IsEUActivated(chainTime),
 				Config:           cfg,
 				Codec:            codec,
-				FeeManager:       fees.NewManager(testUnitFees, fees.EmptyWindows),
+				FeeManager:       fees.NewManager(testUnitFees),
 				ConsumedUnitsCap: consumedUnitCaps,
 				Credentials:      sTx.Creds,
 			}
@@ -274,7 +274,7 @@ func TestCreateAssetTxFees(t *testing.T) {
 				IsEUpgradeActive: cfg.IsEUActivated(chainTime),
 				Config:           cfg,
 				Codec:            codec,
-				FeeManager:       fees.NewManager(testUnitFees, fees.EmptyWindows),
+				FeeManager:       fees.NewManager(testUnitFees),
 				ConsumedUnitsCap: consumedUnitCaps,
 				Credentials:      sTx.Creds,
 			}
@@ -395,7 +395,7 @@ func TestOperationTxFees(t *testing.T) {
 				IsEUpgradeActive: cfg.IsEUActivated(chainTime),
 				Config:           cfg,
 				Codec:            codec,
-				FeeManager:       fees.NewManager(testUnitFees, fees.EmptyWindows),
+				FeeManager:       fees.NewManager(testUnitFees),
 				ConsumedUnitsCap: consumedUnitCaps,
 				Credentials:      sTx.Creds,
 			}
@@ -512,7 +512,7 @@ func TestImportTxFees(t *testing.T) {
 				IsEUpgradeActive: cfg.IsEUActivated(chainTime),
 				Config:           cfg,
 				Codec:            codec,
-				FeeManager:       fees.NewManager(testUnitFees, fees.EmptyWindows),
+				FeeManager:       fees.NewManager(testUnitFees),
 				ConsumedUnitsCap: consumedUnitCaps,
 				Credentials:      sTx.Creds,
 			}
@@ -619,7 +619,7 @@ func TestExportTxFees(t *testing.T) {
 				IsEUpgradeActive: cfg.IsEUActivated(chainTime),
 				Config:           cfg,
 				Codec:            codec,
-				FeeManager:       fees.NewManager(testUnitFees, fees.EmptyWindows),
+				FeeManager:       fees.NewManager(testUnitFees),
 				ConsumedUnitsCap: consumedUnitCaps,
 				Credentials:      sTx.Creds,
 			}

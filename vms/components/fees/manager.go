@@ -14,27 +14,19 @@ type Manager struct {
 	// Avax denominated unit fees for all fee dimensions
 	unitFees Dimensions
 
-	// consumed units window per each fee dimension.
-	windows Windows
-
 	// cumulatedUnits helps aggregating the units consumed by a block
 	// so that we can verify it's not too big/build it properly.
 	cumulatedUnits Dimensions
 }
 
-func NewManager(unitFees Dimensions, windows Windows) *Manager {
+func NewManager(unitFees Dimensions) *Manager {
 	return &Manager{
 		unitFees: unitFees,
-		windows:  windows,
 	}
 }
 
 func (m *Manager) GetUnitFees() Dimensions {
 	return m.unitFees
-}
-
-func (m *Manager) GetFeeWindows() Windows {
-	return m.windows
 }
 
 func (m *Manager) GetCumulatedUnits() Dimensions {
@@ -100,55 +92,33 @@ func (m *Manager) RemoveUnits(unitsToRm Dimensions) error {
 	return nil
 }
 
-func (m *Manager) ComputeNext(
-	lastTime,
-	currTime int64,
-	targetUnits,
-	updateCoefficients,
-	minUnitPrice Dimensions,
-) *Manager {
+// [UpdateWindows] stores in the fee windows the units cumulated in current block
+func (m *Manager) UpdateWindows(windows *Windows, lastTime, currTime int64) {
 	since := int(currTime - lastTime)
-	nextManager := &Manager{}
-	for i := Dimension(0); i < FeeDimensions; i++ {
-		nextUnitPrice, nextUnitWindow := computeNextPriceWindow(
-			m.windows[i],
-			m.cumulatedUnits[i],
-			m.unitFees[i],
-			targetUnits[i],
-			updateCoefficients[i],
-			minUnitPrice[i],
-			since,
-		)
-
-		nextManager.unitFees[i] = nextUnitPrice
-		nextManager.windows[i] = nextUnitWindow
-		// unit consumed are zeroed in nextManager
+	idx := 0
+	if since < WindowSize {
+		idx = WindowSize - 1 - since
 	}
-	return nextManager
+
+	for i := Dimension(0); i < FeeDimensions; i++ {
+		windows[i] = Roll(windows[i], since)
+		Update(&windows[i], idx, m.cumulatedUnits[i])
+	}
 }
 
-func computeNextPriceWindow(
-	current Window,
-	currentUnitsConsumed uint64,
-	currentUnitFee uint64,
-	target uint64, /* per window, must be non-zero */
-	updateCoefficient uint64,
-	minUnitFee uint64,
-	since int, /* seconds */
-) (uint64, Window) {
-	newRollupWindow := Roll(current, since)
-	if since < WindowSize {
-		// add in the units used by the parent block in the correct place
-		// If the parent consumed units within the rollup window, add the consumed
-		// units in.
-		start := WindowSize - 1 - since
-		Update(&newRollupWindow, start, currentUnitsConsumed)
+func (m *Manager) UpdateUnitFees(
+	feesConfig DynamicFeesConfig,
+	windows Windows,
+	lastTime, currTime int64,
+) {
+	since := int(currTime - lastTime)
+	for i := Dimension(0); i < FeeDimensions; i++ {
+		nextUnitWindow := Roll(windows[i], since)
+		totalUnitsConsumed := Sum(nextUnitWindow)
+		nextUnitFee := nextFeeRate(m.unitFees[i], feesConfig.UpdateCoefficient[i], totalUnitsConsumed, feesConfig.BlockUnitsTarget[i])
+		nextUnitFee = max(nextUnitFee, feesConfig.MinUnitFees[i])
+		m.unitFees[i] = nextUnitFee
 	}
-
-	totalUnitsConsumed := Sum(newRollupWindow)
-	nextUnitFee := nextFeeRate(currentUnitFee, updateCoefficient, totalUnitsConsumed, target)
-	nextUnitFee = max(nextUnitFee, minUnitFee)
-	return nextUnitFee, newRollupWindow
 }
 
 func nextFeeRate(currentUnitFee, updateCoefficient, unitsConsumed, target uint64) uint64 {

@@ -2673,7 +2673,7 @@ func TestNFTWorkflow(t *testing.T) {
 			feeCalc := &fees.Calculator{
 				IsEUpgradeActive: true,
 				Config:           &env.vm.Config,
-				FeeManager:       commonfees.NewManager(feesCfg.InitialUnitFees, commonfees.EmptyWindows),
+				FeeManager:       commonfees.NewManager(feesCfg.InitialUnitFees),
 				ConsumedUnitsCap: feesCfg.BlockUnitsCap,
 				Codec:            env.service.txBuilderBackend.codec,
 				Credentials:      createAssetTx.Creds,

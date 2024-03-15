@@ -45,17 +45,13 @@ func buildCreateAssetTx(
 	if err != nil {
 		return nil, ids.ShortEmpty, fmt.Errorf("failed retrieving unit fees: %w", err)
 	}
-	feeWindows, err := backend.State().GetFeeWindows()
-	if err != nil {
-		return nil, ids.ShortEmpty, fmt.Errorf("failed retrieving fee windows: %w", err)
-	}
 
 	var (
 		pBuilder, pSigner = builders(backend, kc)
 		chainTime         = backend.State().GetTimestamp()
 		cfg               = backend.Config()
 		feeCfg            = cfg.GetDynamicFeesConfig(chainTime)
-		feeMan            = commonfees.NewManager(unitFees, feeWindows)
+		feeMan            = commonfees.NewManager(unitFees)
 		feeCalc           = &fees.Calculator{
 			IsEUpgradeActive: cfg.IsEUActivated(chainTime),
 			Config:           cfg,
@@ -96,17 +92,13 @@ func buildBaseTx(
 	if err != nil {
 		return nil, ids.ShortEmpty, fmt.Errorf("failed retrieving unit fees: %w", err)
 	}
-	feeWindows, err := backend.State().GetFeeWindows()
-	if err != nil {
-		return nil, ids.ShortEmpty, fmt.Errorf("failed retrieving fee windows: %w", err)
-	}
 
 	var (
 		pBuilder, pSigner = builders(backend, kc)
 		chainTime         = backend.State().GetTimestamp()
 		cfg               = backend.Config()
 		feeCfg            = cfg.GetDynamicFeesConfig(chainTime)
-		feeMan            = commonfees.NewManager(unitFees, feeWindows)
+		feeMan            = commonfees.NewManager(unitFees)
 		feeCalc           = &fees.Calculator{
 			IsEUpgradeActive: cfg.IsEUActivated(chainTime),
 			Config:           cfg,
@@ -145,17 +137,13 @@ func mintNFT(
 	if err != nil {
 		return nil, fmt.Errorf("failed retrieving unit fees: %w", err)
 	}
-	feeWindows, err := backend.State().GetFeeWindows()
-	if err != nil {
-		return nil, fmt.Errorf("failed retrieving fee windows: %w", err)
-	}
 
 	var (
 		pBuilder, pSigner = builders(backend, kc)
 		chainTime         = backend.State().GetTimestamp()
 		cfg               = backend.Config()
 		feeCfg            = cfg.GetDynamicFeesConfig(chainTime)
-		feeMan            = commonfees.NewManager(unitFees, feeWindows)
+		feeMan            = commonfees.NewManager(unitFees)
 		feeCalc           = &fees.Calculator{
 			IsEUpgradeActive: cfg.IsEUActivated(chainTime),
 			Config:           cfg,
@@ -189,17 +177,13 @@ func mintFTs(
 	if err != nil {
 		return nil, fmt.Errorf("failed retrieving unit fees: %w", err)
 	}
-	feeWindows, err := backend.State().GetFeeWindows()
-	if err != nil {
-		return nil, fmt.Errorf("failed retrieving fee windows: %w", err)
-	}
 
 	var (
 		pBuilder, pSigner = builders(backend, kc)
 		chainTime         = backend.State().GetTimestamp()
 		cfg               = backend.Config()
 		feeCfg            = cfg.GetDynamicFeesConfig(chainTime)
-		feeMan            = commonfees.NewManager(unitFees, feeWindows)
+		feeMan            = commonfees.NewManager(unitFees)
 		feeCalc           = &fees.Calculator{
 			IsEUpgradeActive: cfg.IsEUActivated(chainTime),
 			Config:           cfg,
@@ -230,17 +214,13 @@ func buildOperation(
 	if err != nil {
 		return nil, fmt.Errorf("failed retrieving unit fees: %w", err)
 	}
-	feeWindows, err := backend.State().GetFeeWindows()
-	if err != nil {
-		return nil, fmt.Errorf("failed retrieving fee windows: %w", err)
-	}
 
 	var (
 		pBuilder, pSigner = builders(backend, kc)
 		chainTime         = backend.State().GetTimestamp()
 		cfg               = backend.Config()
 		feeCfg            = cfg.GetDynamicFeesConfig(chainTime)
-		feeMan            = commonfees.NewManager(unitFees, feeWindows)
+		feeMan            = commonfees.NewManager(unitFees)
 		feeCalc           = &fees.Calculator{
 			IsEUpgradeActive: cfg.IsEUActivated(chainTime),
 			Config:           cfg,
@@ -272,17 +252,13 @@ func buildImportTx(
 	if err != nil {
 		return nil, fmt.Errorf("failed retrieving unit fees: %w", err)
 	}
-	feeWindows, err := backend.State().GetFeeWindows()
-	if err != nil {
-		return nil, fmt.Errorf("failed retrieving fee windows: %w", err)
-	}
 
 	var (
 		pBuilder, pSigner = builders(backend, kc)
 		chainTime         = backend.State().GetTimestamp()
 		cfg               = backend.Config()
 		feeCfg            = cfg.GetDynamicFeesConfig(chainTime)
-		feeMan            = commonfees.NewManager(unitFees, feeWindows)
+		feeMan            = commonfees.NewManager(unitFees)
 		feeCalc           = &fees.Calculator{
 			IsEUpgradeActive: cfg.IsEUActivated(chainTime),
 			Config:           cfg,
@@ -323,17 +299,13 @@ func buildExportTx(
 	if err != nil {
 		return nil, ids.ShortEmpty, fmt.Errorf("failed retrieving unit fees: %w", err)
 	}
-	feeWindows, err := backend.State().GetFeeWindows()
-	if err != nil {
-		return nil, ids.ShortEmpty, fmt.Errorf("failed retrieving fee windows: %w", err)
-	}
 
 	var (
 		pBuilder, pSigner = builders(backend, kc)
 		chainTime         = backend.State().GetTimestamp()
 		cfg               = backend.Config()
 		feeCfg            = cfg.GetDynamicFeesConfig(chainTime)
-		feeMan            = commonfees.NewManager(unitFees, feeWindows)
+		feeMan            = commonfees.NewManager(unitFees)
 		feeCalc           = &fees.Calculator{
 			IsEUpgradeActive: cfg.IsEUActivated(chainTime),
 			Config:           cfg,

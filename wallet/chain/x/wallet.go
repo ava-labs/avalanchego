@@ -174,7 +174,6 @@ type wallet struct {
 
 	isEForkActive      bool
 	unitFees, unitCaps commonfees.Dimensions
-	feeWindows         commonfees.Windows
 }
 
 func (w *wallet) Builder() backends.Builder {
@@ -194,7 +193,7 @@ func (w *wallet) IssueBaseTx(
 	}
 
 	var (
-		feesMan = commonfees.NewManager(w.unitFees, w.feeWindows)
+		feesMan = commonfees.NewManager(w.unitFees)
 		feeCalc = &fees.Calculator{
 			IsEUpgradeActive: w.isEForkActive,
 			Config: &config.Config{
@@ -225,7 +224,7 @@ func (w *wallet) IssueCreateAssetTx(
 	}
 
 	var (
-		feesMan = commonfees.NewManager(w.unitFees, w.feeWindows)
+		feesMan = commonfees.NewManager(w.unitFees)
 		feeCalc = &fees.Calculator{
 			IsEUpgradeActive: w.isEForkActive,
 			Config: &config.Config{
@@ -253,7 +252,7 @@ func (w *wallet) IssueOperationTx(
 	}
 
 	var (
-		feesMan = commonfees.NewManager(w.unitFees, w.feeWindows)
+		feesMan = commonfees.NewManager(w.unitFees)
 		feeCalc = &fees.Calculator{
 			IsEUpgradeActive: w.isEForkActive,
 			Config: &config.Config{
@@ -281,7 +280,7 @@ func (w *wallet) IssueOperationTxMintFT(
 	}
 
 	var (
-		feesMan = commonfees.NewManager(w.unitFees, w.feeWindows)
+		feesMan = commonfees.NewManager(w.unitFees)
 		feeCalc = &fees.Calculator{
 			IsEUpgradeActive: w.isEForkActive,
 			Config: &config.Config{
@@ -311,7 +310,7 @@ func (w *wallet) IssueOperationTxMintNFT(
 	}
 
 	var (
-		feesMan = commonfees.NewManager(w.unitFees, w.feeWindows)
+		feesMan = commonfees.NewManager(w.unitFees)
 		feeCalc = &fees.Calculator{
 			IsEUpgradeActive: w.isEForkActive,
 			Config: &config.Config{
@@ -340,7 +339,7 @@ func (w *wallet) IssueOperationTxMintProperty(
 	}
 
 	var (
-		feesMan = commonfees.NewManager(w.unitFees, w.feeWindows)
+		feesMan = commonfees.NewManager(w.unitFees)
 		feeCalc = &fees.Calculator{
 			IsEUpgradeActive: w.isEForkActive,
 			Config: &config.Config{
@@ -368,7 +367,7 @@ func (w *wallet) IssueOperationTxBurnProperty(
 	}
 
 	var (
-		feesMan = commonfees.NewManager(w.unitFees, w.feeWindows)
+		feesMan = commonfees.NewManager(w.unitFees)
 		feeCalc = &fees.Calculator{
 			IsEUpgradeActive: w.isEForkActive,
 			Config: &config.Config{
@@ -397,7 +396,7 @@ func (w *wallet) IssueImportTx(
 	}
 
 	var (
-		feesMan = commonfees.NewManager(w.unitFees, w.feeWindows)
+		feesMan = commonfees.NewManager(w.unitFees)
 		feeCalc = &fees.Calculator{
 			IsEUpgradeActive: w.isEForkActive,
 			Config: &config.Config{
@@ -426,7 +425,7 @@ func (w *wallet) IssueExportTx(
 	}
 
 	var (
-		feesMan = commonfees.NewManager(w.unitFees, w.feeWindows)
+		feesMan = commonfees.NewManager(w.unitFees)
 		feeCalc = &fees.Calculator{
 			IsEUpgradeActive: w.isEForkActive,
 			Config: &config.Config{
@@ -507,11 +506,6 @@ func (w *wallet) refreshFork(options ...common.Option) error {
 	)
 
 	w.unitFees, err = w.client.GetUnitFees(ctx)
-	if err != nil {
-		return err
-	}
-
-	w.feeWindows, err = w.client.GetFeeWindows(ctx)
 	if err != nil {
 		return err
 	}

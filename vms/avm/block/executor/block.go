@@ -145,14 +145,13 @@ func (b *Block) Verify(context.Context) error {
 		feesCfg       = b.manager.backend.Config.GetDynamicFeesConfig(parentChainTime)
 	)
 
-	feeManager := fees.NewManager(unitFees, feeWindows)
+	feeManager := fees.NewManager(unitFees)
 	if isEForkActive {
-		feeManager = feeManager.ComputeNext(
+		feeManager.UpdateUnitFees(
+			feesCfg,
+			feeWindows,
 			parentChainTime.Unix(),
 			newChainTime.Unix(),
-			feesCfg.BlockUnitsTarget,
-			feesCfg.UpdateCoefficient,
-			feesCfg.MinUnitFees,
 		)
 	}
 

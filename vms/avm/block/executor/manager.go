@@ -184,14 +184,13 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 		feesCfg       = m.backend.Config.GetDynamicFeesConfig(chainTime)
 	)
 
-	feeManager := fees.NewManager(unitFees, feeWindows)
+	feeManager := fees.NewManager(unitFees)
 	if isEForkActive {
-		feeManager = feeManager.ComputeNext(
+		feeManager.UpdateUnitFees(
+			feesCfg,
+			feeWindows,
 			chainTime.Unix(),
 			nextBlkTime.Unix(),
-			feesCfg.BlockUnitsTarget,
-			feesCfg.UpdateCoefficient,
-			feesCfg.MinUnitFees,
 		)
 	}
 

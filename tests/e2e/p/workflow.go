@@ -188,12 +188,10 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 				feeCfg := config.EUpgradeDynamicFeesConfig
 				unitFees, err := xChainClient.GetUnitFees(e2e.DefaultContext())
 				require.NoError(err)
-				feeWindows, err := xChainClient.GetFeeWindows(e2e.DefaultContext())
-				require.NoError(err)
 
 				feeCalc := fees.Calculator{
 					IsEUpgradeActive: true,
-					FeeManager:       commonfees.NewManager(unitFees, feeWindows),
+					FeeManager:       commonfees.NewManager(unitFees),
 					ConsumedUnitsCap: feeCfg.BlockUnitsCap,
 					Codec:            xbackends.Parser.Codec(),
 					Credentials:      tx.Creds,
