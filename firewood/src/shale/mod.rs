@@ -145,7 +145,7 @@ impl Obj<Node> {
     pub fn into_inner(mut self) -> Node {
         let empty_node = LeafNode {
             partial_path: Path(Vec::new()),
-            data: Vec::new().into(),
+            data: Vec::new(),
         };
 
         std::mem::replace(&mut self.value.item, Node::from_leaf(empty_node))

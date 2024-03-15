@@ -18,9 +18,7 @@ pub mod proof;
 mod stream;
 mod trie_hash;
 
-pub use node::{
-    BinarySerde, Bincode, BranchNode, Data, EncodedNode, LeafNode, Node, NodeType, Path,
-};
+pub use node::{BinarySerde, Bincode, BranchNode, EncodedNode, LeafNode, Node, NodeType, Path};
 pub use proof::{Proof, ProofError};
 pub use stream::MerkleKeyValueStream;
 pub use trie_hash::{TrieHash, TRIE_HASH_LEN};
@@ -143,11 +141,10 @@ where
                     .try_into()
                     .expect("MAX_CHILDREN will always be yielded");
 
-                let value = n.value.as_ref().map(|v| v.0.clone());
                 EncodedNode {
                     partial_path: n.partial_path.clone(),
                     children,
-                    value,
+                    value: n.value.clone(),
                     phantom: PhantomData,
                 }
             }
@@ -165,17 +162,17 @@ where
             // This is a leaf node
             return Ok(NodeType::Leaf(LeafNode::new(
                 encoded.partial_path,
-                Data(encoded.value.expect("leaf nodes must always have a value")),
+                encoded.value.expect("leaf nodes must always have a value"),
             )));
         }
 
         Ok(NodeType::Branch(
-            BranchNode::new(
-                encoded.partial_path,
-                [None; BranchNode::MAX_CHILDREN],
-                encoded.value,
-                *encoded.children,
-            )
+            BranchNode {
+                partial_path: encoded.partial_path,
+                children: [None; BranchNode::MAX_CHILDREN],
+                value: encoded.value,
+                children_encoded: *encoded.children,
+            }
             .into(),
         ))
     }
@@ -326,7 +323,7 @@ impl<S: CachedStore, T> Merkle<S, T> {
                             self.update_data_and_move_node_if_larger(
                                 (&mut parents, &mut deleted),
                                 node,
-                                Data(val),
+                                val,
                             )?;
                         }
 
@@ -337,8 +334,7 @@ impl<S: CachedStore, T> Merkle<S, T> {
                                 (index[0], path.to_vec())
                             };
 
-                            let new_leaf =
-                                Node::from_leaf(LeafNode::new(Path(new_leaf_path), Data(val)));
+                            let new_leaf = Node::from_leaf(LeafNode::new(Path(new_leaf_path), val));
 
                             let new_leaf = self.put_node(new_leaf)?.as_ptr();
 
@@ -381,7 +377,7 @@ impl<S: CachedStore, T> Merkle<S, T> {
                             let mut new_branch = BranchNode {
                                 partial_path: Path(new_branch_path),
                                 children: [None; BranchNode::MAX_CHILDREN],
-                                value: Some(val.into()),
+                                value: Some(val),
                                 children_encoded: Default::default(),
                             };
 
@@ -415,8 +411,7 @@ impl<S: CachedStore, T> Merkle<S, T> {
                                 )?
                                 .as_ptr();
 
-                            let new_leaf =
-                                Node::from_leaf(LeafNode::new(Path(new_leaf_path), Data(val)));
+                            let new_leaf = Node::from_leaf(LeafNode::new(Path(new_leaf_path), val));
 
                             let new_leaf = self.put_node(new_leaf)?.as_ptr();
 
@@ -450,7 +445,7 @@ impl<S: CachedStore, T> Merkle<S, T> {
                             let leaf_ptr = self
                                 .put_node(Node::from_leaf(LeafNode::new(
                                     Path(key_nibbles.collect()),
-                                    Data(val),
+                                    val,
                                 )))?
                                 .as_ptr();
 
@@ -482,7 +477,7 @@ impl<S: CachedStore, T> Merkle<S, T> {
                             self.update_data_and_move_node_if_larger(
                                 (&mut parents, &mut deleted),
                                 node,
-                                Data(val),
+                                val,
                             )?;
                             break None;
                         }
@@ -505,7 +500,7 @@ impl<S: CachedStore, T> Merkle<S, T> {
                                 None => {
                                     let new_leaf = Node::from_leaf(LeafNode::new(
                                         Path(new_leaf_path.to_vec()),
-                                        Data(val),
+                                        val,
                                     ));
 
                                     let new_leaf = self.put_node(new_leaf)?.as_ptr();
@@ -542,7 +537,7 @@ impl<S: CachedStore, T> Merkle<S, T> {
                             let mut new_branch = BranchNode {
                                 partial_path: Path(new_branch_path),
                                 children: [None; BranchNode::MAX_CHILDREN],
-                                value: Some(val.into()),
+                                value: Some(val),
                                 children_encoded: Default::default(),
                             };
 
@@ -578,8 +573,7 @@ impl<S: CachedStore, T> Merkle<S, T> {
                                 )?
                                 .as_ptr();
 
-                            let new_leaf =
-                                Node::from_leaf(LeafNode::new(Path(new_leaf_path), Data(val)));
+                            let new_leaf = Node::from_leaf(LeafNode::new(Path(new_leaf_path), val));
 
                             let new_leaf = self.put_node(new_leaf)?.as_ptr();
 
@@ -620,12 +614,12 @@ impl<S: CachedStore, T> Merkle<S, T> {
                     |u| {
                         info = match &mut u.inner {
                             NodeType::Branch(n) => {
-                                n.value = Some(Data(val));
+                                n.value = Some(val);
                                 None
                             }
                             NodeType::Leaf(n) => {
                                 if n.partial_path.len() == 0 {
-                                    n.data = Data(val);
+                                    n.data = val;
 
                                     None
                                 } else {
@@ -667,7 +661,7 @@ impl<S: CachedStore, T> Merkle<S, T> {
                     .put_node(Node::from_branch(BranchNode {
                         partial_path: vec![].into(),
                         children: chd,
-                        value: Some(Data(val)),
+                        value: Some(val),
                         children_encoded: Default::default(),
                     }))?
                     .as_ptr();
@@ -850,7 +844,7 @@ impl<S: CachedStore, T> Merkle<S, T> {
             self.free_node(ptr)?;
         }
 
-        Ok(data.map(|data| data.0))
+        Ok(data)
     }
 
     fn remove_tree_(
@@ -1232,7 +1226,7 @@ impl<S: CachedStore, T> Merkle<S, T> {
         &'a self,
         (parents, to_delete): (&mut [(NodeObjRef, u8)], &mut Vec<DiskAddress>),
         mut node: NodeObjRef<'a>,
-        data: Data,
+        data: Vec<u8>,
     ) -> Result<NodeObjRef, MerkleError> {
         let write_result = node.write(|node| {
             node.inner_mut().set_data(data);
@@ -1329,8 +1323,8 @@ impl<'a, S: CachedStore, T> RefMut<'a, S, T> {
                 |u| {
                     #[allow(clippy::unwrap_used)]
                     modify(match &mut u.inner {
-                        NodeType::Branch(n) => &mut n.value.as_mut().unwrap().0,
-                        NodeType::Leaf(n) => &mut n.data.0,
+                        NodeType::Branch(n) => n.value.as_mut().unwrap(),
+                        NodeType::Leaf(n) => &mut n.data,
                     });
                     u.rehash()
                 },
@@ -1403,7 +1397,7 @@ mod tests {
     use test_case::test_case;
 
     fn leaf(path: Vec<u8>, data: Vec<u8>) -> Node {
-        Node::from_leaf(LeafNode::new(Path(path), Data(data)))
+        Node::from_leaf(LeafNode::new(Path(path), data))
     }
 
     #[test_case(vec![0x12, 0x34, 0x56], &[0x1, 0x2, 0x3, 0x4, 0x5, 0x6])]
@@ -1458,11 +1452,7 @@ mod tests {
         let path = Path(path.into_iter().collect());
 
         let children = Default::default();
-        let value = if value.is_empty() {
-            None
-        } else {
-            Some(Data(value))
-        };
+        let value = if value.is_empty() { None } else { Some(value) };
         let mut children_encoded = <[Option<Vec<u8>>; BranchNode::MAX_CHILDREN]>::default();
 
         if let Some(child) = encoded_child {
@@ -2094,7 +2084,7 @@ mod tests {
 
         let node = Node::from_leaf(LeafNode {
             partial_path: Path::from(path),
-            data: Data(data.clone()),
+            data: data.clone(),
         });
 
         check_node_update(node, double_path, data)
@@ -2113,7 +2103,7 @@ mod tests {
 
         let node = Node::from_leaf(LeafNode {
             partial_path: Path::from(path.clone()),
-            data: Data(data),
+            data,
         });
 
         check_node_update(node, path, double_data)
@@ -2133,7 +2123,7 @@ mod tests {
         let node = Node::from_branch(BranchNode {
             partial_path: Path::from(path.clone()),
             children: Default::default(),
-            value: Some(Data(data.clone())),
+            value: Some(data.clone()),
             children_encoded: Default::default(),
         });
 
@@ -2154,7 +2144,7 @@ mod tests {
         let node = Node::from_branch(BranchNode {
             partial_path: Path::from(path.clone()),
             children: Default::default(),
-            value: Some(Data(data)),
+            value: Some(data),
             children_encoded: Default::default(),
         });
 
@@ -2176,7 +2166,7 @@ mod tests {
         // make sure that doubling the path length will fail on a normal write
         let write_result = node_ref.write(|node| {
             node.inner_mut().set_path(Path(new_path.clone()));
-            node.inner_mut().set_data(Data(new_data.clone()));
+            node.inner_mut().set_data(new_data.clone());
             node.rehash();
         });
 
@@ -2201,7 +2191,7 @@ mod tests {
         };
 
         assert_eq!(path, &Path(new_path));
-        assert_eq!(data, Some(&Data(new_data)));
+        assert_eq!(data, Some(&new_data));
 
         Ok(())
     }

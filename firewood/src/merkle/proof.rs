@@ -434,7 +434,7 @@ fn locate_subproof(
             let Some(index) = key_nibbles.next().map(|nib| nib as usize) else {
                 let encoded = n.value;
 
-                let sub_proof = encoded.map(|encoded| SubProof::Data(encoded.into_inner()));
+                let sub_proof = encoded.map(SubProof::Data);
 
                 return Ok((sub_proof, key_nibbles));
             };

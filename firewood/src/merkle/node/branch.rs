@@ -1,7 +1,7 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-use super::{Data, Node};
+use super::Node;
 use crate::{
     merkle::{nibbles_to_bytes_iter, to_nibble_array, Path},
     nibbles::Nibbles,
@@ -25,7 +25,7 @@ const MAX_CHILDREN: usize = 16;
 pub struct BranchNode {
     pub(crate) partial_path: Path,
     pub(crate) children: [Option<DiskAddress>; MAX_CHILDREN],
-    pub(crate) value: Option<Data>,
+    pub(crate) value: Option<Vec<u8>>,
     pub(crate) children_encoded: [Option<Vec<u8>>; MAX_CHILDREN],
 }
 
@@ -61,21 +61,7 @@ impl BranchNode {
     pub const MAX_CHILDREN: usize = MAX_CHILDREN;
     pub const MSIZE: usize = Self::MAX_CHILDREN + 2;
 
-    pub fn new(
-        partial_path: Path,
-        chd: [Option<DiskAddress>; Self::MAX_CHILDREN],
-        value: Option<Vec<u8>>,
-        chd_encoded: [Option<Vec<u8>>; Self::MAX_CHILDREN],
-    ) -> Self {
-        BranchNode {
-            partial_path,
-            children: chd,
-            value: value.map(Data),
-            children_encoded: chd_encoded,
-        }
-    }
-
-    pub const fn value(&self) -> &Option<Data> {
+    pub const fn value(&self) -> &Option<Vec<u8>> {
         &self.value
     }
 
@@ -117,12 +103,12 @@ impl BranchNode {
             (chd_encoded[i] = Some(chd).filter(|data| !data.is_empty()));
         }
 
-        Ok(BranchNode::new(
-            path,
-            [None; Self::MAX_CHILDREN],
+        Ok(BranchNode {
+            partial_path: path,
+            children: [None; Self::MAX_CHILDREN],
             value,
-            chd_encoded,
-        ))
+            children_encoded: chd_encoded,
+        })
     }
 
     pub(super) fn encode<S: CachedStore>(&self, store: &CompactSpace<Node, S>) -> Vec<u8> {
@@ -171,7 +157,7 @@ impl BranchNode {
         }
 
         #[allow(clippy::unwrap_used)]
-        if let Some(Data(val)) = &self.value {
+        if let Some(val) = &self.value {
             list[Self::MAX_CHILDREN] = val.clone();
         }
 
@@ -312,7 +298,7 @@ impl Storable for BranchNode {
 
                 addr += len as usize;
 
-                Some(Data(data.as_deref()))
+                Some(data.as_deref())
             }
             None => None,
         };

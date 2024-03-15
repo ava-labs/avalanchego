@@ -1,7 +1,6 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-use super::Data;
 use crate::{
     merkle::{nibbles_to_bytes_iter, Path},
     nibbles::Nibbles,
@@ -23,7 +22,7 @@ type DataLen = u32;
 #[derive(PartialEq, Eq, Clone)]
 pub struct LeafNode {
     pub(crate) partial_path: Path,
-    pub(crate) data: Data,
+    pub(crate) data: Vec<u8>,
 }
 
 impl Debug for LeafNode {
@@ -38,7 +37,7 @@ impl Debug for LeafNode {
 }
 
 impl LeafNode {
-    pub fn new<P: Into<Path>, D: Into<Data>>(partial_path: P, data: D) -> Self {
+    pub fn new<P: Into<Path>, D: Into<Vec<u8>>>(partial_path: P, data: D) -> Self {
         Self {
             partial_path: partial_path.into(),
             data: data.into(),
@@ -49,7 +48,7 @@ impl LeafNode {
         &self.partial_path
     }
 
-    pub const fn data(&self) -> &Data {
+    pub const fn data(&self) -> &Vec<u8> {
         &self.data
     }
 
@@ -141,7 +140,7 @@ impl Storable for LeafNode {
             Path::from_nibbles(nibbles).0
         };
 
-        let data = Data(data.to_vec());
+        let data = data.to_vec();
 
         Ok(Self::new(path, data))
     }
