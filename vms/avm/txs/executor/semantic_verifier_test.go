@@ -740,7 +740,7 @@ func TestSemanticVerifierBaseTx(t *testing.T) {
 			state := test.stateFunc(ctrl)
 			tx := test.txFunc(require)
 
-			feeCfg := config.EUpgradeDynamicFeesConfig
+			feeCfg := config.GetDynamicFeesConfig(true /*isEActive*/)
 
 			err = tx.Unsigned.Visit(&SemanticVerifier{
 				Backend:       backend,
@@ -1494,7 +1494,7 @@ func TestSemanticVerifierExportTx(t *testing.T) {
 			state := test.stateFunc(ctrl)
 			tx := test.txFunc(require)
 
-			feeCfg := config.EUpgradeDynamicFeesConfig
+			feeCfg := config.GetDynamicFeesConfig(true /*isEActive*/)
 
 			err = tx.Unsigned.Visit(&SemanticVerifier{
 				Backend:       backend,
@@ -1639,7 +1639,7 @@ func TestSemanticVerifierExportTxDifferentSubnet(t *testing.T) {
 		},
 	))
 
-	feeCfg := config.EUpgradeDynamicFeesConfig
+	feeCfg := config.GetDynamicFeesConfig(true /*isEActive*/)
 
 	err = tx.Unsigned.Visit(&SemanticVerifier{
 		Backend:       backend,
@@ -2177,7 +2177,7 @@ func TestSemanticVerifierImportTx(t *testing.T) {
 			state := test.stateFunc(ctrl)
 			tx := test.txFunc(require)
 
-			feeCfg := config.EUpgradeDynamicFeesConfig
+			feeCfg := config.GetDynamicFeesConfig(true /*isEActive*/)
 
 			err = tx.Unsigned.Visit(&SemanticVerifier{
 				Backend:       backend,

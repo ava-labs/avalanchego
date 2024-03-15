@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/vms/avm/block"
+	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/state"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/components/fees"
@@ -141,8 +142,8 @@ func (b *Block) Verify(context.Context) error {
 	}
 
 	var (
-		isEForkActive = b.manager.backend.Config.IsEUActivated(parentChainTime)
-		feesCfg       = b.manager.backend.Config.GetDynamicFeesConfig(parentChainTime)
+		isEForkActive = b.manager.backend.Config.IsEActivated(parentChainTime)
+		feesCfg       = config.GetDynamicFeesConfig(isEForkActive)
 	)
 
 	feeManager := fees.NewManager(unitFees)

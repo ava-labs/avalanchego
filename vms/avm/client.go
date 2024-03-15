@@ -76,10 +76,8 @@ type Client interface {
 	//
 	// Deprecated: GetUTXOs should be used instead.
 	GetAllBalances(ctx context.Context, addr ids.ShortID, includePartial bool, options ...rpc.Option) ([]Balance, error)
-	// GetUnitFees returns the current unit fees that a transaction must pay to be accepted
-	GetUnitFees(ctx context.Context, options ...rpc.Option) (commonfees.Dimensions, error)
-	// GetFeeWindows returns the fee window needed to calculate next block unit fees
-	GetFeeWindows(ctx context.Context, options ...rpc.Option) (commonfees.Windows, error)
+	// GetUnitFees returns the current unit fees and the next unit fees that a transaction must pay to be accepted
+	GetUnitFees(ctx context.Context, options ...rpc.Option) (commonfees.Dimensions, commonfees.Dimensions, error)
 	// CreateAsset creates a new asset and returns its assetID
 	//
 	// Deprecated: Transactions should be issued using the
@@ -412,16 +410,10 @@ func (c *client) GetAllBalances(
 	return res.Balances, err
 }
 
-func (c *client) GetUnitFees(ctx context.Context, options ...rpc.Option) (commonfees.Dimensions, error) {
+func (c *client) GetUnitFees(ctx context.Context, options ...rpc.Option) (commonfees.Dimensions, commonfees.Dimensions, error) {
 	res := &GetUnitFeesReply{}
 	err := c.requester.SendRequest(ctx, "avm.getUnitFees", struct{}{}, res, options...)
-	return res.UnitFees, err
-}
-
-func (c *client) GetFeeWindows(ctx context.Context, options ...rpc.Option) (commonfees.Windows, error) {
-	res := &GetFeeWindowsReply{}
-	err := c.requester.SendRequest(ctx, "avm.getFeeWindows", struct{}{}, res, options...)
-	return res.FeeWindows, err
+	return res.CurrentUnitFees, res.NextUnitFees, err
 }
 
 // ClientHolder describes how much an address owns of an asset

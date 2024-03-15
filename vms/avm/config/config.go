@@ -3,11 +3,7 @@
 
 package config
 
-import (
-	"time"
-
-	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
-)
+import "time"
 
 // Struct collecting all the foundational parameters of the AVM
 type Config struct {
@@ -24,14 +20,6 @@ type Config struct {
 	EUpgradeTime time.Time
 }
 
-func (c *Config) IsEUActivated(timestamp time.Time) bool {
+func (c *Config) IsEActivated(timestamp time.Time) bool {
 	return !timestamp.Before(c.EUpgradeTime)
-}
-
-func (c *Config) GetDynamicFeesConfig(timestamp time.Time) commonfees.DynamicFeesConfig {
-	if !c.IsEUActivated(timestamp) {
-		return PreEUpgradeDynamicFeesConfig
-	}
-
-	return EUpgradeDynamicFeesConfig
 }

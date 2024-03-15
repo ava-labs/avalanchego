@@ -21,6 +21,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/vms/avm/block/executor"
+	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/keystore"
@@ -676,23 +678,62 @@ func (s *Service) GetAllBalances(_ *http.Request, args *GetAllBalancesArgs, repl
 
 // GetUnitFeesReply is the response from GetUnitFees
 type GetUnitFeesReply struct {
-	// Current timestamp
-	UnitFees commonfees.Dimensions `json:"unitfees"`
+	CurrentUnitFees commonfees.Dimensions `json:"currentUnitFees"`
+	NextUnitFees    commonfees.Dimensions `json:"nextUnitFees"`
 }
 
 // GetTimestamp returns the current timestamp on chain.
 func (s *Service) GetUnitFees(_ *http.Request, _ *struct{}, reply *GetUnitFeesReply) error {
 	s.vm.ctx.Log.Debug("API called",
-		zap.String("service", "avm"),
+		zap.String("service", "platform"),
 		zap.String("method", "getUnitFees"),
 	)
 
 	s.vm.ctx.Lock.Lock()
 	defer s.vm.ctx.Lock.Unlock()
 
-	var err error
-	reply.UnitFees, err = s.vm.state.GetUnitFees()
-	return err
+	preferredID := s.vm.chainManager.Preferred()
+	onAccept, ok := s.vm.chainManager.GetState(preferredID)
+	if !ok {
+		return fmt.Errorf("could not retrieve state for block %s", preferredID)
+	}
+
+	currentUnitFees, err := onAccept.GetUnitFees()
+	if err != nil {
+		return err
+	}
+	reply.CurrentUnitFees = currentUnitFees
+
+	nextTimestamp := executor.NextBlockTime(onAccept.GetTimestamp(), &s.vm.clock)
+	isEActivated := s.vm.Config.IsEActivated(nextTimestamp)
+
+	if !isEActivated {
+		reply.NextUnitFees = reply.CurrentUnitFees
+		return nil
+	}
+
+	var (
+		currentTimestamp = onAccept.GetTimestamp()
+		feesCfg          = config.GetDynamicFeesConfig(isEActivated)
+	)
+
+	feeWindows, err := onAccept.GetFeeWindows()
+	if err != nil {
+		return err
+	}
+
+	feeManager := commonfees.NewManager(currentUnitFees)
+	if isEActivated {
+		feeManager.UpdateUnitFees(
+			feesCfg,
+			feeWindows,
+			currentTimestamp.Unix(),
+			nextTimestamp.Unix(),
+		)
+	}
+	reply.NextUnitFees = feeManager.GetUnitFees()
+
+	return nil
 }
 
 // GetBlockUnitsCapReply is the response from GetBlockUnitsCap

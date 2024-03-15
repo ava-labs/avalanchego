@@ -150,7 +150,7 @@ func TestBaseTxFees(t *testing.T) {
 			}
 
 			fc := &Calculator{
-				IsEUpgradeActive: cfg.IsEUActivated(chainTime),
+				IsEUpgradeActive: cfg.IsEActivated(chainTime),
 				Config:           cfg,
 				Codec:            codec,
 				FeeManager:       fees.NewManager(testUnitFees),
@@ -271,7 +271,7 @@ func TestCreateAssetTxFees(t *testing.T) {
 			}
 
 			fc := &Calculator{
-				IsEUpgradeActive: cfg.IsEUActivated(chainTime),
+				IsEUpgradeActive: cfg.IsEActivated(chainTime),
 				Config:           cfg,
 				Codec:            codec,
 				FeeManager:       fees.NewManager(testUnitFees),
@@ -392,7 +392,7 @@ func TestOperationTxFees(t *testing.T) {
 			}
 
 			fc := &Calculator{
-				IsEUpgradeActive: cfg.IsEUActivated(chainTime),
+				IsEUpgradeActive: cfg.IsEActivated(chainTime),
 				Config:           cfg,
 				Codec:            codec,
 				FeeManager:       fees.NewManager(testUnitFees),
@@ -509,7 +509,7 @@ func TestImportTxFees(t *testing.T) {
 			}
 
 			fc := &Calculator{
-				IsEUpgradeActive: cfg.IsEUActivated(chainTime),
+				IsEUpgradeActive: cfg.IsEActivated(chainTime),
 				Config:           cfg,
 				Codec:            codec,
 				FeeManager:       fees.NewManager(testUnitFees),
@@ -616,7 +616,7 @@ func TestExportTxFees(t *testing.T) {
 			}
 
 			fc := &Calculator{
-				IsEUpgradeActive: cfg.IsEUActivated(chainTime),
+				IsEUpgradeActive: cfg.IsEActivated(chainTime),
 				Config:           cfg,
 				Codec:            codec,
 				FeeManager:       fees.NewManager(testUnitFees),

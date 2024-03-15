@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/avm/block"
+	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/metrics"
 	"github.com/ava-labs/avalanchego/vms/avm/state"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
@@ -180,8 +181,8 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 
 	var (
 		chainTime     = stateDiff.GetTimestamp()
-		isEForkActive = m.backend.Config.IsEUActivated(chainTime)
-		feesCfg       = m.backend.Config.GetDynamicFeesConfig(chainTime)
+		isEForkActive = m.backend.Config.IsEActivated(chainTime)
+		feesCfg       = config.GetDynamicFeesConfig(isEForkActive)
 	)
 
 	feeManager := fees.NewManager(unitFees)

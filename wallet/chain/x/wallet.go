@@ -505,7 +505,7 @@ func (w *wallet) refreshFork(options ...common.Option) error {
 		err error
 	)
 
-	w.unitFees, err = w.client.GetUnitFees(ctx)
+	_, w.unitFees, err = w.client.GetUnitFees(ctx)
 	if err != nil {
 		return err
 	}
@@ -519,12 +519,6 @@ func (w *wallet) refreshFork(options ...common.Option) error {
 	// }
 	chainTime := mockable.MaxTime // assume fork is already active
 	w.isEForkActive = !chainTime.Before(eUpgradeTime)
-
-	if w.isEForkActive {
-		w.unitCaps = config.EUpgradeDynamicFeesConfig.BlockUnitsCap
-	} else {
-		w.unitCaps = config.PreEUpgradeDynamicFeesConfig.BlockUnitsCap
-	}
-
+	w.unitCaps = config.GetDynamicFeesConfig(w.isEForkActive).BlockUnitsCap
 	return nil
 }

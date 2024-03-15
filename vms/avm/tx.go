@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/components/fees"
@@ -133,8 +134,9 @@ func (tx *Tx) Verify(context.Context) error {
 	}
 
 	var (
-		feeCfg     = tx.vm.txExecutorBackend.Config.GetDynamicFeesConfig(tx.vm.state.GetTimestamp())
-		feeManager = fees.NewManager(unitFees)
+		isEActivated = tx.vm.txExecutorBackend.Config.IsEActivated(tx.vm.state.GetTimestamp())
+		feeCfg       = config.GetDynamicFeesConfig(isEActivated)
+		feeManager   = fees.NewManager(unitFees)
 	)
 	return tx.tx.Unsigned.Visit(&executor.SemanticVerifier{
 		Backend:       tx.vm.txExecutorBackend,
