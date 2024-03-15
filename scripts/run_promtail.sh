@@ -65,6 +65,8 @@ if ! command -v "${CMD}" &> /dev/null; then
       ARCH="$(uname -i)"
       if [[ "${ARCH}" == "aarch64" ]]; then
         ARCH="arm64"
+      elif [[ "${ARCH}" == "x86_64" ]]; then
+        ARCH="amd64"
       fi
       DIST="linux-${ARCH}"
     fi
