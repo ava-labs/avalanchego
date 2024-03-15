@@ -20,7 +20,7 @@ use crate::{
     merkle_util::{DataStoreError, InMemoryMerkle},
 };
 
-use super::{BinarySerde, EncodedNode, NodeObjRef};
+use super::{BinarySerde, EncodedNode};
 
 #[derive(Debug, Error)]
 pub enum ProofError {
@@ -285,19 +285,19 @@ impl<N: AsRef<[u8]> + Send> Proof<N> {
         // Start with the sentinel root
         let sentinel = in_mem_merkle.get_sentinel_address();
         let merkle = in_mem_merkle.get_merkle_mut();
-        let mut parent_node_ref = merkle
+        let mut parent_node = merkle
             .get_node(sentinel)
             .map_err(|_| ProofError::NoSuchNode)?;
 
         let mut key_nibbles = Nibbles::<1>::new(key.as_ref()).into_iter().peekable();
 
         let mut child_hash = root_hash;
-        let proofs_map = &self.0;
+        let proof_nodes_map = &self.0;
 
         let sub_proof = loop {
             // Link the child to the parent based on the node type.
             // if a child is already linked, use it instead
-            let child_node = match &parent_node_ref.inner() {
+            let child_node = match &parent_node.inner() {
                 #[allow(clippy::indexing_slicing)]
                 NodeType::Branch(n) => {
                     let Some(child_index) = key_nibbles.next().map(usize::from) else {
@@ -308,10 +308,17 @@ impl<N: AsRef<[u8]> + Send> Proof<N> {
                         // If the child already resolved, then use the existing node.
                         Some(node) => merkle.get_node(node)?,
                         None => {
-                            let child_node = decode_subproof(merkle, proofs_map, &child_hash)?;
+                            // Look up the child's encoded bytes and decode to get the child.
+                            let child_node_bytes = proof_nodes_map
+                                .get(&child_hash)
+                                .ok_or(ProofError::ProofNodeMissing)?;
 
-                            // insert the leaf to the empty slot
-                            parent_node_ref.write(|node| {
+                            let child_node = NodeType::decode(child_node_bytes.as_ref())?;
+
+                            let child_node = merkle.put_node(Node::from(child_node))?;
+
+                            // insert `child_node` to the appropriate index in the `parent_node`
+                            parent_node.write(|node| {
                                 #[allow(clippy::indexing_slicing)]
                                 let node = node
                                     .inner_mut()
@@ -329,7 +336,7 @@ impl<N: AsRef<[u8]> + Send> Proof<N> {
                 _ => return Err(ProofError::InvalidNode(MerkleError::ParentLeafBranch)),
             };
 
-            // find the encoded subproof of the child if the partial-path and nibbles match
+            // find the encoded subproof of the child if the partial path and nibbles match
             let encoded_sub_proof = match child_node.inner() {
                 NodeType::Leaf(n) => {
                     break n
@@ -373,7 +380,7 @@ impl<N: AsRef<[u8]> + Send> Proof<N> {
                 }
             }
 
-            parent_node_ref = child_node;
+            parent_node = child_node;
         };
 
         match sub_proof {
@@ -382,19 +389,6 @@ impl<N: AsRef<[u8]> + Send> Proof<N> {
             None => Err(ProofError::NodeNotInTrie),
         }
     }
-}
-
-fn decode_subproof<'a, S: CachedStore, T, N: AsRef<[u8]>>(
-    merkle: &'a Merkle<S, T>,
-    proofs_map: &HashMap<HashKey, N>,
-    child_hash: &HashKey,
-) -> Result<NodeObjRef<'a>, ProofError> {
-    let child_proof = proofs_map
-        .get(child_hash)
-        .ok_or(ProofError::ProofNodeMissing)?;
-    let child_node = NodeType::decode(child_proof.as_ref())?;
-    let node = merkle.put_node(Node::from(child_node))?;
-    Ok(node)
 }
 
 fn locate_subproof(
