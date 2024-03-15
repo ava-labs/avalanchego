@@ -17,12 +17,12 @@ use std::{
 pub const SIZE: usize = 2;
 
 type PathLen = u8;
-type DataLen = u32;
+type ValueLen = u32;
 
 #[derive(PartialEq, Eq, Clone)]
 pub struct LeafNode {
     pub(crate) partial_path: Path,
-    pub(crate) data: Vec<u8>,
+    pub(crate) value: Vec<u8>,
 }
 
 impl Debug for LeafNode {
@@ -31,16 +31,16 @@ impl Debug for LeafNode {
             f,
             "[Leaf {:?} {}]",
             self.partial_path,
-            hex::encode(&*self.data)
+            hex::encode(&*self.value)
         )
     }
 }
 
 impl LeafNode {
-    pub fn new<P: Into<Path>, D: Into<Vec<u8>>>(partial_path: P, data: D) -> Self {
+    pub fn new<P: Into<Path>, V: Into<Vec<u8>>>(partial_path: P, value: V) -> Self {
         Self {
             partial_path: partial_path.into(),
-            data: data.into(),
+            value: value.into(),
         }
     }
 
@@ -48,8 +48,8 @@ impl LeafNode {
         &self.partial_path
     }
 
-    pub const fn data(&self) -> &Vec<u8> {
-        &self.data
+    pub const fn value(&self) -> &Vec<u8> {
+        &self.value
     }
 
     pub(super) fn encode(&self) -> Vec<u8> {
@@ -58,7 +58,7 @@ impl LeafNode {
             .serialize(
                 [
                     nibbles_to_bytes_iter(&self.partial_path.encode()).collect(),
-                    self.data.to_vec(),
+                    self.value.to_vec(),
                 ]
                 .as_slice(),
             )
@@ -70,7 +70,7 @@ impl LeafNode {
 #[repr(C, packed)]
 struct Meta {
     path_len: PathLen,
-    data_len: DataLen,
+    value_len: ValueLen,
 }
 
 impl Meta {
@@ -81,9 +81,9 @@ impl Storable for LeafNode {
     fn serialized_len(&self) -> u64 {
         let meta_len = size_of::<Meta>() as u64;
         let path_len = self.partial_path.serialized_len();
-        let data_len = self.data.len() as u64;
+        let value_len = self.value.len() as u64;
 
-        meta_len + path_len + data_len
+        meta_len + path_len + value_len
     }
 
     fn serialize(&self, to: &mut [u8]) -> Result<(), crate::shale::ShaleError> {
@@ -91,12 +91,15 @@ impl Storable for LeafNode {
 
         let path = &self.partial_path.encode();
         let path = nibbles_to_bytes_iter(path);
-        let data = &self.data;
+        let value = &self.value;
 
         let path_len = self.partial_path.serialized_len() as PathLen;
-        let data_len = data.len() as DataLen;
+        let value_len = value.len() as ValueLen;
 
-        let meta = Meta { path_len, data_len };
+        let meta = Meta {
+            path_len,
+            value_len,
+        };
 
         cursor.write_all(bytemuck::bytes_of(&meta))?;
 
@@ -104,7 +107,7 @@ impl Storable for LeafNode {
             cursor.write_all(&[nibble])?;
         }
 
-        cursor.write_all(data)?;
+        cursor.write_all(value)?;
 
         Ok(())
     }
@@ -125,24 +128,27 @@ impl Storable for LeafNode {
             .as_deref();
 
         let offset = offset + Meta::SIZE;
-        let Meta { path_len, data_len } = *bytemuck::from_bytes(&node_header_raw);
-        let size = path_len as u64 + data_len as u64;
+        let Meta {
+            path_len,
+            value_len,
+        } = *bytemuck::from_bytes(&node_header_raw);
+        let size = path_len as u64 + value_len as u64;
 
         let remainder = mem
             .get_view(offset, size)
             .ok_or(InvalidCacheView { offset, size })?
             .as_deref();
 
-        let (path, data) = remainder.split_at(path_len as usize);
+        let (path, value) = remainder.split_at(path_len as usize);
 
         let path = {
             let nibbles = Nibbles::<0>::new(path).into_iter();
             Path::from_nibbles(nibbles).0
         };
 
-        let data = data.to_vec();
+        let value = value.to_vec();
 
-        Ok(Self::new(path, data))
+        Ok(Self::new(path, value))
     }
 }
 
@@ -160,15 +166,15 @@ mod tests {
     // This is combined with the first nibble of the path (0b0000_0010) to become 0b0001_0010
     #[test_case(0b0001_0010, vec![0x34], vec![2, 3, 4]; "odd length")]
     fn encode_regression_test(prefix: u8, path: Vec<u8>, nibbles: Vec<u8>) {
-        let data = vec![5, 6, 7, 8];
+        let value = vec![5, 6, 7, 8];
 
         let serialized_path = [vec![prefix], path.clone()].concat();
         let serialized_path = [vec![serialized_path.len() as u8], serialized_path].concat();
-        let serialized_data = [vec![data.len() as u8], data.clone()].concat();
+        let serialized_value = [vec![value.len() as u8], value.clone()].concat();
 
-        let serialized = [vec![2], serialized_path, serialized_data].concat();
+        let serialized = [vec![2], serialized_path, serialized_value].concat();
 
-        let node = LeafNode::new(nibbles, data.clone());
+        let node = LeafNode::new(nibbles, value.clone());
 
         assert_eq!(node.encode(), serialized);
     }

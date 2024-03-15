@@ -69,9 +69,9 @@ impl NodeType {
 
                 let cur_key = cur_key_path.into_inner();
                 #[allow(clippy::unwrap_used)]
-                let data: Vec<u8> = items.next().unwrap();
+                let value: Vec<u8> = items.next().unwrap();
 
-                Ok(NodeType::Leaf(LeafNode::new(cur_key, data)))
+                Ok(NodeType::Leaf(LeafNode::new(cur_key, value)))
             }
             // TODO: add path
             BranchNode::MSIZE => Ok(NodeType::Branch(BranchNode::decode(buf)?.into())),
@@ -102,10 +102,10 @@ impl NodeType {
         }
     }
 
-    pub fn set_data(&mut self, data: Vec<u8>) {
+    pub fn set_value(&mut self, value: Vec<u8>) {
         match self {
-            NodeType::Branch(u) => u.value = Some(data),
-            NodeType::Leaf(node) => node.data = data,
+            NodeType::Branch(u) => u.value = Some(value),
+            NodeType::Leaf(node) => node.value = value,
         }
     }
 }
@@ -598,9 +598,9 @@ impl<'de> Deserialize<'de> for EncodedNode<Bincode> {
                         "incorrect encoded type for leaf node path",
                     ));
                 };
-                let Some(data) = items.next() else {
+                let Some(value) = items.next() else {
                     return Err(D::Error::custom(
-                        "incorrect encoded type for leaf node data",
+                        "incorrect encoded type for leaf node value",
                     ));
                 };
                 let path = Path::from_nibbles(Nibbles::<0>::new(&path).into_iter());
@@ -608,7 +608,7 @@ impl<'de> Deserialize<'de> for EncodedNode<Bincode> {
                 Ok(Self {
                     partial_path: path,
                     children: children.into(),
-                    value: Some(data),
+                    value: Some(value),
                     phantom: PhantomData,
                 })
             }
@@ -779,10 +779,10 @@ mod tests {
         (0..0, 0..15, 0..16, 0..31, 0..32),
         [0..0, 0..16, 0..32]
     )]
-    fn leaf_node<Iter: Iterator<Item = u8>>(path: Iter, data: Iter) {
+    fn leaf_node<Iter: Iterator<Item = u8>>(path: Iter, value: Iter) {
         let node = Node::from_leaf(LeafNode::new(
             Path(path.map(|x| x & 0xf).collect()),
-            data.collect::<Vec<u8>>(),
+            value.collect::<Vec<u8>>(),
         ));
 
         check_node_encoding(node);

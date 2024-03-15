@@ -946,8 +946,8 @@ fn test_empty_value_range_proof() -> Result<(), ProofError> {
     // Create a new entry with a slightly modified key
     let mid_index = items.len() / 2;
     let key = increase_key(items[mid_index - 1].0);
-    let empty_data: [u8; 20] = [0; 20];
-    items.splice(mid_index..mid_index, [(&key, &empty_data)].iter().cloned());
+    let empty_value: [u8; 20] = [0; 20];
+    items.splice(mid_index..mid_index, [(&key, &empty_value)].iter().cloned());
 
     let start = 1;
     let end = items.len() - 1;
@@ -982,8 +982,8 @@ fn test_all_elements_empty_value_range_proof() -> Result<(), ProofError> {
     // Create a new entry with a slightly modified key
     let mid_index = items.len() / 2;
     let key = increase_key(items[mid_index - 1].0);
-    let empty_data: [u8; 20] = [0; 20];
-    items.splice(mid_index..mid_index, [(&key, &empty_data)].iter().cloned());
+    let empty_value: [u8; 20] = [0; 20];
+    items.splice(mid_index..mid_index, [(&key, &empty_value)].iter().cloned());
 
     let start = 0;
     let end = items.len() - 1;
@@ -1049,12 +1049,12 @@ fn test_bloadted_range_proof() -> Result<(), ProofError> {
     let mut items = Vec::new();
     for i in 0..100_u32 {
         let mut key: [u8; 32] = [0; 32];
-        let mut data: [u8; 20] = [0; 20];
+        let mut value: [u8; 20] = [0; 20];
         for (index, d) in i.to_be_bytes().iter().enumerate() {
             key[index] = *d;
-            data[index] = *d;
+            value[index] = *d;
         }
-        items.push((key, data));
+        items.push((key, value));
     }
     let merkle = merkle_build_test(items.clone(), 0x10000, 0x10000)?;
 
@@ -1085,18 +1085,18 @@ fn fixed_and_pseudorandom_data(random_count: u32) -> HashMap<[u8; 32], [u8; 20]>
     let mut items: HashMap<[u8; 32], [u8; 20]> = HashMap::new();
     for i in 0..100_u32 {
         let mut key: [u8; 32] = [0; 32];
-        let mut data: [u8; 20] = [0; 20];
+        let mut value: [u8; 20] = [0; 20];
         for (index, d) in i.to_be_bytes().iter().enumerate() {
             key[index] = *d;
-            data[index] = *d;
+            value[index] = *d;
         }
-        items.insert(key, data);
+        items.insert(key, value);
 
         let mut more_key: [u8; 32] = [0; 32];
         for (index, d) in (i + 10).to_be_bytes().iter().enumerate() {
             more_key[index] = *d;
         }
-        items.insert(more_key, data);
+        items.insert(more_key, value);
     }
 
     // read FIREWOOD_TEST_SEED from the environment. If it's there, parse it into a u64.

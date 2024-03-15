@@ -16,7 +16,7 @@ use std::{
 };
 
 type PathLen = u8;
-pub type DataLen = u32;
+pub type ValueLen = u32;
 pub type EncodedChildLen = u8;
 
 const MAX_CHILDREN: usize = 16;
@@ -90,9 +90,9 @@ impl BranchNode {
 
         // we've already validated the size, that's why we can safely unwrap
         #[allow(clippy::unwrap_used)]
-        let data = items.pop().unwrap();
+        let value = items.pop().unwrap();
         // Extract the value of the branch node and set to None if it's an empty Vec
-        let value = Some(data).filter(|data| !data.is_empty());
+        let value = Some(value).filter(|value| !value.is_empty());
 
         // encode all children.
         let mut chd_encoded: [Option<Vec<u8>>; Self::MAX_CHILDREN] = Default::default();
@@ -100,7 +100,7 @@ impl BranchNode {
         // we popped the last element, so their should only be NBRANCH items left
         for (i, chd) in items.into_iter().enumerate() {
             #[allow(clippy::indexing_slicing)]
-            (chd_encoded[i] = Some(chd).filter(|data| !data.is_empty()));
+            (chd_encoded[i] = Some(chd).filter(|value| !value.is_empty()));
         }
 
         Ok(BranchNode {
@@ -175,14 +175,14 @@ impl BranchNode {
 impl Storable for BranchNode {
     fn serialized_len(&self) -> u64 {
         let children_len = Self::MAX_CHILDREN as u64 * DiskAddress::MSIZE;
-        let data_len = optional_data_len::<DataLen, _>(self.value.as_deref());
+        let value_len = optional_value_len::<ValueLen, _>(self.value.as_deref());
         let children_encoded_len = self.children_encoded.iter().fold(0, |len, child| {
-            len + optional_data_len::<EncodedChildLen, _>(child.as_ref())
+            len + optional_value_len::<EncodedChildLen, _>(child.as_ref())
         });
         let path_len_size = size_of::<PathLen>() as u64;
         let path_len = self.partial_path.serialized_len();
 
-        children_len + data_len + children_encoded_len + path_len_size + path_len
+        children_len + value_len + children_encoded_len + path_len_size + path_len
     }
 
     fn serialize(&self, to: &mut [u8]) -> Result<(), crate::shale::ShaleError> {
@@ -200,8 +200,8 @@ impl Storable for BranchNode {
         let (value_len, value) = self
             .value
             .as_ref()
-            .map(|val| (val.len() as DataLen, &**val))
-            .unwrap_or((DataLen::MAX, &[]));
+            .map(|val| (val.len() as ValueLen, &**val))
+            .unwrap_or((ValueLen::MAX, &[]));
 
         cursor.write_all(&value_len.to_le_bytes())?;
         cursor.write_all(value)?;
@@ -224,9 +224,9 @@ impl Storable for BranchNode {
         mem: &T,
     ) -> Result<Self, crate::shale::ShaleError> {
         const PATH_LEN_SIZE: u64 = size_of::<PathLen>() as u64;
-        const DATA_LEN_SIZE: usize = size_of::<DataLen>();
+        const VALUE_LEN_SIZE: usize = size_of::<ValueLen>();
         const BRANCH_HEADER_SIZE: u64 =
-            BranchNode::MAX_CHILDREN as u64 * DiskAddress::MSIZE + DATA_LEN_SIZE as u64;
+            BranchNode::MAX_CHILDREN as u64 * DiskAddress::MSIZE + VALUE_LEN_SIZE as u64;
 
         let path_len = mem
             .get_view(addr, PATH_LEN_SIZE)
@@ -280,16 +280,16 @@ impl Storable for BranchNode {
         }
 
         let raw_len = {
-            let mut buf = [0; DATA_LEN_SIZE];
+            let mut buf = [0; VALUE_LEN_SIZE];
             cursor.read_exact(&mut buf)?;
-            Some(DataLen::from_le_bytes(buf))
-                .filter(|len| *len != DataLen::MAX)
+            Some(ValueLen::from_le_bytes(buf))
+                .filter(|len| *len != ValueLen::MAX)
                 .map(|len| len as u64)
         };
 
         let value = match raw_len {
             Some(len) => {
-                let data = mem
+                let value = mem
                     .get_view(addr, len)
                     .ok_or(ShaleError::InvalidCacheView {
                         offset: addr,
@@ -298,7 +298,7 @@ impl Storable for BranchNode {
 
                 addr += len as usize;
 
-                Some(data.as_deref())
+                Some(value.as_deref())
             }
             None => None,
         };
@@ -354,6 +354,9 @@ impl Storable for BranchNode {
     }
 }
 
-fn optional_data_len<Len, T: AsRef<[u8]>>(data: Option<T>) -> u64 {
-    size_of::<Len>() as u64 + data.as_ref().map_or(0, |data| data.as_ref().len() as u64)
+fn optional_value_len<Len, T: AsRef<[u8]>>(value: Option<T>) -> u64 {
+    size_of::<Len>() as u64
+        + value
+            .as_ref()
+            .map_or(0, |value| value.as_ref().len() as u64)
 }

@@ -21,7 +21,7 @@ struct Args {
     #[arg(short, long, default_value = "1-64", value_parser = string_to_range)]
     keylen: RangeInclusive<usize>,
     #[arg(short, long, default_value = "32", value_parser = string_to_range)]
-    datalen: RangeInclusive<usize>,
+    valuelen: RangeInclusive<usize>,
     #[arg(short, long, default_value_t = 1)]
     batch_size: usize,
     #[arg(short, long, default_value_t = 100)]
@@ -65,7 +65,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     for _ in 0..args.number_of_batches {
         let keylen = rng.gen_range(args.keylen.clone());
-        let datalen = rng.gen_range(args.datalen.clone());
+        let valuelen = rng.gen_range(args.valuelen.clone());
         let batch: Batch<Vec<u8>, Vec<u8>> = (0..keys)
             .map(|_| {
                 (
@@ -75,7 +75,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                         .collect::<Vec<u8>>(),
                     rng.borrow_mut()
                         .sample_iter(&Alphanumeric)
-                        .take(datalen)
+                        .take(valuelen)
                         .collect::<Vec<u8>>(),
                 )
             })

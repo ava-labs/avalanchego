@@ -381,7 +381,7 @@ impl<'a, S: CachedStore, T> Stream for MerkleKeyValueStream<'a, S, T> {
                                 Poll::Ready(Some(Ok((key, value))))
                             }
                             NodeType::Leaf(leaf) => {
-                                let value = leaf.data.to_vec();
+                                let value = leaf.value.to_vec();
                                 Poll::Ready(Some(Ok((key, value))))
                             }
                         },
@@ -635,7 +635,7 @@ mod tests {
         };
 
         assert_eq!(key, vec![0x01, 0x03, 0x03, 0x07].into_boxed_slice());
-        assert_eq!(node.inner().as_leaf().unwrap().data, vec![0x42]);
+        assert_eq!(node.inner().as_leaf().unwrap().value, vec![0x42]);
 
         assert!(stream.next().is_none());
     }
@@ -683,7 +683,7 @@ mod tests {
             vec![0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0F, 0x0F].into_boxed_slice()
         );
         assert_eq!(
-            node.inner().as_leaf().unwrap().data,
+            node.inner().as_leaf().unwrap().value,
             vec![0x00, 0x00, 0x00, 0x0FF],
         );
 
@@ -753,7 +753,7 @@ mod tests {
         let (key, node) = stream.next().await.unwrap().unwrap();
 
         assert_eq!(key, vec![0x00].into_boxed_slice());
-        assert_eq!(node.inner().as_leaf().unwrap().data.to_vec(), vec![0x00]);
+        assert_eq!(node.inner().as_leaf().unwrap().value.to_vec(), vec![0x00]);
 
         check_stream_is_done(stream).await;
     }
@@ -823,26 +823,26 @@ mod tests {
         let (key, node) = stream.next().await.unwrap().unwrap();
         assert_eq!(key, vec![0x00, 0x00, 0x00, 0x01].into_boxed_slice());
         let node = node.inner().as_leaf().unwrap();
-        assert_eq!(node.clone().data.to_vec(), vec![0x00, 0x00, 0x00, 0x01]);
+        assert_eq!(node.clone().value.to_vec(), vec![0x00, 0x00, 0x00, 0x01]);
         assert_eq!(node.partial_path.to_vec(), vec![0x01]);
 
         let (key, node) = stream.next().await.unwrap().unwrap();
         assert_eq!(key, vec![0x00, 0x00, 0x00, 0xFF].into_boxed_slice());
         let node = node.inner().as_leaf().unwrap();
-        assert_eq!(node.clone().data.to_vec(), vec![0x00, 0x00, 0x00, 0xFF]);
+        assert_eq!(node.clone().value.to_vec(), vec![0x00, 0x00, 0x00, 0xFF]);
         assert_eq!(node.partial_path.to_vec(), vec![0x0F]);
 
         let (key, node) = stream.next().await.unwrap().unwrap();
         assert_eq!(key, vec![0x00, 0xD0, 0xD0].into_boxed_slice());
         let node = node.inner().as_leaf().unwrap();
-        assert_eq!(node.clone().data.to_vec(), vec![0x00, 0xD0, 0xD0]);
+        assert_eq!(node.clone().value.to_vec(), vec![0x00, 0xD0, 0xD0]);
         assert_eq!(node.partial_path.to_vec(), vec![0x00, 0x0D, 0x00]); // 0x0D00 becomes 0xDO
 
         // Covers case of leaf with no partial path
         let (key, node) = stream.next().await.unwrap().unwrap();
         assert_eq!(key, vec![0x00, 0xFF].into_boxed_slice());
         let node = node.inner().as_leaf().unwrap();
-        assert_eq!(node.clone().data.to_vec(), vec![0x00, 0xFF]);
+        assert_eq!(node.clone().value.to_vec(), vec![0x00, 0xFF]);
         assert_eq!(node.partial_path.to_vec(), vec![0x0F]);
 
         check_stream_is_done(stream).await;
@@ -857,7 +857,7 @@ mod tests {
         let (key, node) = stream.next().await.unwrap().unwrap();
         assert_eq!(key, vec![0x00, 0xD0, 0xD0].into_boxed_slice());
         assert_eq!(
-            node.inner().as_leaf().unwrap().clone().data.to_vec(),
+            node.inner().as_leaf().unwrap().clone().value.to_vec(),
             vec![0x00, 0xD0, 0xD0]
         );
 
@@ -865,7 +865,7 @@ mod tests {
         let (key, node) = stream.next().await.unwrap().unwrap();
         assert_eq!(key, vec![0x00, 0xFF].into_boxed_slice());
         assert_eq!(
-            node.inner().as_leaf().unwrap().clone().data.to_vec(),
+            node.inner().as_leaf().unwrap().clone().value.to_vec(),
             vec![0x00, 0xFF]
         );
 
@@ -881,7 +881,7 @@ mod tests {
         let (key, node) = stream.next().await.unwrap().unwrap();
         assert_eq!(key, vec![0x00, 0xD0, 0xD0].into_boxed_slice());
         assert_eq!(
-            node.inner().as_leaf().unwrap().clone().data.to_vec(),
+            node.inner().as_leaf().unwrap().clone().value.to_vec(),
             vec![0x00, 0xD0, 0xD0]
         );
 
@@ -889,7 +889,7 @@ mod tests {
         let (key, node) = stream.next().await.unwrap().unwrap();
         assert_eq!(key, vec![0x00, 0xFF].into_boxed_slice());
         assert_eq!(
-            node.inner().as_leaf().unwrap().clone().data.to_vec(),
+            node.inner().as_leaf().unwrap().clone().value.to_vec(),
             vec![0x00, 0xFF]
         );
 
@@ -1039,7 +1039,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn key_value_root_with_empty_data() {
+    async fn key_value_root_with_empty_value() {
         let mut merkle = create_test_merkle();
         let root = merkle.init_root().unwrap();
 
