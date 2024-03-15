@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/avm/block"
+	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/metrics"
 	"github.com/ava-labs/avalanchego/vms/avm/state"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
@@ -161,13 +162,18 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 		return err
 	}
 
-	feeCfg := m.backend.Config.GetDynamicFeesConfig(m.state.GetTimestamp())
-	feeManager := fees.NewManager(feeCfg.UnitFees)
+	var (
+		chainTime     = m.state.GetTimestamp()
+		isEForkActive = m.backend.Config.IsEActivated(chainTime)
+		feesCfg       = config.GetDynamicFeesConfig(isEForkActive)
+	)
+
+	feeManager := fees.NewManager(feesCfg.UnitFees)
 
 	err = tx.Unsigned.Visit(&executor.SemanticVerifier{
 		Backend:       m.backend,
 		BlkFeeManager: feeManager,
-		UnitCaps:      feeCfg.BlockUnitsCap,
+		UnitCaps:      feesCfg.BlockUnitsCap,
 		State:         stateDiff,
 		Tx:            tx,
 	})

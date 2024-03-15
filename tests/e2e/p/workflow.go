@@ -183,7 +183,7 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 				require.NoError(err)
 
 				// retrieve fees paid for the tx
-				feeCfg := config.EUpgradeDynamicFeesConfig
+				feeCfg := config.GetDynamicFeesConfig(true /*isEActive*/)
 				feeCalc := fees.Calculator{
 					IsEUpgradeActive: true,
 					FeeManager:       commonfees.NewManager(feeCfg.UnitFees),

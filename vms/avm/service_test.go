@@ -2669,7 +2669,8 @@ func TestNFTWorkflow(t *testing.T) {
 			require.Len(txs, 1)
 			createAssetTx := txs[0]
 
-			feesCfg := env.vm.Config.GetDynamicFeesConfig(env.vm.state.GetTimestamp())
+			isEActivated := env.vm.Config.IsEActivated(env.vm.state.GetTimestamp())
+			feesCfg := config.GetDynamicFeesConfig(isEActivated)
 			feeCalc := &fees.Calculator{
 				IsEUpgradeActive: true,
 				Config:           &env.vm.Config,

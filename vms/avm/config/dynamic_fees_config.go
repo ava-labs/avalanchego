@@ -11,7 +11,7 @@ import (
 
 // EUpgradeDynamicFeesConfig to be tuned TODO ABENEGIA
 var (
-	EUpgradeDynamicFeesConfig = commonfees.DynamicFeesConfig{
+	eUpgradeDynamicFeesConfig = commonfees.DynamicFeesConfig{
 		UnitFees: commonfees.Dimensions{
 			1 * units.NanoAvax,
 			2 * units.NanoAvax,
@@ -22,8 +22,15 @@ var (
 		BlockUnitsCap: commonfees.Max,
 	}
 
-	PreEUpgradeDynamicFeesConfig = commonfees.DynamicFeesConfig{
+	preEUpgradeDynamicFeesConfig = commonfees.DynamicFeesConfig{
 		UnitFees:      commonfees.Empty,
 		BlockUnitsCap: commonfees.Max,
 	}
 )
+
+func GetDynamicFeesConfig(isEActive bool) commonfees.DynamicFeesConfig {
+	if !isEActive {
+		return preEUpgradeDynamicFeesConfig
+	}
+	return eUpgradeDynamicFeesConfig
+}

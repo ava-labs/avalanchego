@@ -45,7 +45,8 @@ func buildCreateAssetTx(
 		pBuilder, pSigner = builders(backend, kc)
 		chainTime         = backend.State().GetTimestamp()
 		cfg               = backend.Config()
-		feeCfg            = cfg.GetDynamicFeesConfig(chainTime)
+		isEUpgradeActive  = cfg.IsEActivated(chainTime)
+		feeCfg            = config.GetDynamicFeesConfig(isEUpgradeActive)
 		feeMan            = commonfees.NewManager(feeCfg.UnitFees)
 		feeCalc           = &fees.Calculator{
 			IsEUpgradeActive: cfg.IsEActivated(chainTime),
@@ -87,7 +88,8 @@ func buildBaseTx(
 		pBuilder, pSigner = builders(backend, kc)
 		chainTime         = backend.State().GetTimestamp()
 		cfg               = backend.Config()
-		feeCfg            = cfg.GetDynamicFeesConfig(chainTime)
+		isEUpgradeActive  = cfg.IsEActivated(chainTime)
+		feeCfg            = config.GetDynamicFeesConfig(isEUpgradeActive)
 		feeMan            = commonfees.NewManager(feeCfg.UnitFees)
 		feeCalc           = &fees.Calculator{
 			IsEUpgradeActive: cfg.IsEActivated(chainTime),
@@ -127,7 +129,8 @@ func mintNFT(
 		pBuilder, pSigner = builders(backend, kc)
 		chainTime         = backend.State().GetTimestamp()
 		cfg               = backend.Config()
-		feeCfg            = cfg.GetDynamicFeesConfig(chainTime)
+		isEUpgradeActive  = cfg.IsEActivated(chainTime)
+		feeCfg            = config.GetDynamicFeesConfig(isEUpgradeActive)
 		feeMan            = commonfees.NewManager(feeCfg.UnitFees)
 		feeCalc           = &fees.Calculator{
 			IsEUpgradeActive: cfg.IsEActivated(chainTime),
@@ -162,7 +165,8 @@ func mintFTs(
 		pBuilder, pSigner = builders(backend, kc)
 		chainTime         = backend.State().GetTimestamp()
 		cfg               = backend.Config()
-		feeCfg            = cfg.GetDynamicFeesConfig(chainTime)
+		isEUpgradeActive  = cfg.IsEActivated(chainTime)
+		feeCfg            = config.GetDynamicFeesConfig(isEUpgradeActive)
 		feeMan            = commonfees.NewManager(feeCfg.UnitFees)
 		feeCalc           = &fees.Calculator{
 			IsEUpgradeActive: cfg.IsEActivated(chainTime),
@@ -194,7 +198,8 @@ func buildOperation(
 		pBuilder, pSigner = builders(backend, kc)
 		chainTime         = backend.State().GetTimestamp()
 		cfg               = backend.Config()
-		feeCfg            = cfg.GetDynamicFeesConfig(chainTime)
+		isEUpgradeActive  = cfg.IsEActivated(chainTime)
+		feeCfg            = config.GetDynamicFeesConfig(isEUpgradeActive)
 		feeMan            = commonfees.NewManager(feeCfg.UnitFees)
 		feeCalc           = &fees.Calculator{
 			IsEUpgradeActive: cfg.IsEActivated(chainTime),
@@ -227,7 +232,8 @@ func buildImportTx(
 		pBuilder, pSigner = builders(backend, kc)
 		chainTime         = backend.State().GetTimestamp()
 		cfg               = backend.Config()
-		feeCfg            = cfg.GetDynamicFeesConfig(chainTime)
+		isEUpgradeActive  = cfg.IsEActivated(chainTime)
+		feeCfg            = config.GetDynamicFeesConfig(isEUpgradeActive)
 		feeMan            = commonfees.NewManager(feeCfg.UnitFees)
 		feeCalc           = &fees.Calculator{
 			IsEUpgradeActive: cfg.IsEActivated(chainTime),
@@ -269,7 +275,8 @@ func buildExportTx(
 		pBuilder, pSigner = builders(backend, kc)
 		chainTime         = backend.State().GetTimestamp()
 		cfg               = backend.Config()
-		feeCfg            = cfg.GetDynamicFeesConfig(chainTime)
+		isEUpgradeActive  = cfg.IsEActivated(chainTime)
+		feeCfg            = config.GetDynamicFeesConfig(isEUpgradeActive)
 		feeMan            = commonfees.NewManager(feeCfg.UnitFees)
 		feeCalc           = &fees.Calculator{
 			IsEUpgradeActive: cfg.IsEActivated(chainTime),

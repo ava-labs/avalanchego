@@ -187,7 +187,7 @@ var _ = e2e.DescribeXChainSerial("[Virtuous Transfer Tx AVAX]", func() {
 				require.NoError(err)
 
 				// retrieve fees paid for the BaseTx
-				feeCfg := config.EUpgradeDynamicFeesConfig
+				feeCfg := config.GetDynamicFeesConfig(true /*isEActive*/)
 				feeCalc := fees.Calculator{
 					IsEUpgradeActive: true,
 					FeeManager:       commonfees.NewManager(feeCfg.UnitFees),

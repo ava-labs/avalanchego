@@ -481,9 +481,7 @@ func (w *wallet) refreshFork(_ ...common.Option) {
 		return
 	}
 
-	// ops       = common.NewOptions(options)
-	// ctx       = ops.Context()
-	eForkTime := version.GetEUpgradeTime(w.NetworkID())
+	eUpgradeTime := version.GetEUpgradeTime(w.NetworkID())
 
 	// TODO ABENEGIA: consider introducing this method in X-chain as well
 	// chainTime, err := w.client.GetTimestamp(ctx)
@@ -491,13 +489,8 @@ func (w *wallet) refreshFork(_ ...common.Option) {
 	// 	return err
 	// }
 	chainTime := mockable.MaxTime // assume fork is already active
-
-	w.isEForkActive = !chainTime.Before(eForkTime)
-	if w.isEForkActive {
-		w.unitFees = config.EUpgradeDynamicFeesConfig.UnitFees
-		w.unitCaps = config.EUpgradeDynamicFeesConfig.BlockUnitsCap
-	} else {
-		w.unitFees = config.PreEUpgradeDynamicFeesConfig.UnitFees
-		w.unitCaps = config.PreEUpgradeDynamicFeesConfig.BlockUnitsCap
-	}
+	w.isEForkActive = !chainTime.Before(eUpgradeTime)
+	feeCfg := config.GetDynamicFeesConfig(w.isEForkActive)
+	w.unitFees = feeCfg.UnitFees
+	w.unitCaps = feeCfg.BlockUnitsCap
 }
