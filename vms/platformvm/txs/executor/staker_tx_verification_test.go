@@ -156,12 +156,8 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				bootstrapped := &utils.Atomic[bool]{}
 				bootstrapped.Set(true)
 				return &Backend{
-					Ctx: ctx,
-					Config: &config.Config{
-						CortinaTime:  activeForkTime,
-						DurangoTime:  mockable.MaxTime,
-						EUpgradeTime: mockable.MaxTime,
-					},
+					Ctx:          ctx,
+					Config:       defaultTestConfig(t, cortina, activeForkTime),
 					Bootstrapped: bootstrapped,
 				}
 			},
