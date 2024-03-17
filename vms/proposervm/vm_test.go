@@ -67,7 +67,10 @@ func init() {
 		panic(err)
 	}
 	pTestSigner = tlsCert.PrivateKey.(crypto.Signer)
-	pTestCert = staking.CertificateFromX509(tlsCert.Leaf)
+	pTestCert, err = staking.ParseCertificate(tlsCert.Leaf.Raw)
+	if err != nil {
+		panic(err)
+	}
 }
 
 func initTestProposerVM(

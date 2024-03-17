@@ -185,6 +185,8 @@ func (n *Network) readConfig() error {
 
 // The subset of network fields to store in the network config file.
 type serializedNetworkConfig struct {
+	UUID                 string
+	Owner                string
 	DefaultFlags         FlagsMap
 	DefaultRuntimeConfig NodeRuntimeConfig
 	PreFundedKeys        []*secp256k1.PrivateKey
@@ -192,6 +194,8 @@ type serializedNetworkConfig struct {
 
 func (n *Network) writeNetworkConfig() error {
 	config := &serializedNetworkConfig{
+		UUID:                 n.UUID,
+		Owner:                n.Owner,
 		DefaultFlags:         n.DefaultFlags,
 		DefaultRuntimeConfig: n.DefaultRuntimeConfig,
 		PreFundedKeys:        n.PreFundedKeys,

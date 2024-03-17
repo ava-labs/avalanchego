@@ -646,7 +646,7 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 	defer ctx.Lock.Unlock()
 	appSender := &common.SenderTest{}
 	appSender.CantSendAppGossip = true
-	appSender.SendAppGossipF = func(context.Context, []byte, int, int, int) error {
+	appSender.SendAppGossipF = func(context.Context, common.SendConfig, []byte) error {
 		return nil
 	}
 

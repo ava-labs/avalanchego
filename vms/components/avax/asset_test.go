@@ -5,7 +5,6 @@ package avax
 
 import (
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -29,7 +28,7 @@ func TestAssetVerifyEmpty(t *testing.T) {
 func TestAssetID(t *testing.T) {
 	require := require.New(t)
 
-	c := linearcodec.NewDefault(time.Time{})
+	c := linearcodec.NewDefault()
 	manager := codec.NewDefaultManager()
 	require.NoError(manager.RegisterCodec(codecVersion, c))
 

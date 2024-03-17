@@ -304,8 +304,8 @@ func TestShutdownTimesOut(t *testing.T) {
 	go func() {
 		chainID := ids.ID{}
 		msg := handler.Message{
-			InboundMessage: message.InboundPullQuery(chainID, 1, time.Hour, ids.GenerateTestID(), 0, nodeID, engineType),
-			EngineType:     engineType,
+			InboundMessage: message.InboundPullQuery(chainID, 1, time.Hour, ids.GenerateTestID(), 0, nodeID),
+			EngineType:     p2p.EngineType_ENGINE_TYPE_UNSPECIFIED,
 		}
 		h.Push(context.Background(), msg)
 
@@ -541,7 +541,6 @@ func TestRouterTimeout(t *testing.T) {
 				nodeID,
 				ctx.ChainID,
 				requestID,
-				p2p.EngineType_ENGINE_TYPE_SNOWMAN,
 			),
 			p2p.EngineType_ENGINE_TYPE_SNOWMAN,
 		)
@@ -561,7 +560,6 @@ func TestRouterTimeout(t *testing.T) {
 				nodeID,
 				ctx.ChainID,
 				requestID,
-				p2p.EngineType_ENGINE_TYPE_SNOWMAN,
 			),
 			p2p.EngineType_ENGINE_TYPE_SNOWMAN,
 		)
@@ -601,7 +599,6 @@ func TestRouterTimeout(t *testing.T) {
 				nodeID,
 				ctx.ChainID,
 				requestID,
-				p2p.EngineType_ENGINE_TYPE_SNOWMAN,
 			),
 			p2p.EngineType_ENGINE_TYPE_SNOWMAN,
 		)
@@ -621,7 +618,6 @@ func TestRouterTimeout(t *testing.T) {
 				nodeID,
 				ctx.ChainID,
 				requestID,
-				p2p.EngineType_ENGINE_TYPE_SNOWMAN,
 			),
 			p2p.EngineType_ENGINE_TYPE_SNOWMAN,
 		)
@@ -799,8 +795,6 @@ func TestRouterHonorsRequestedEngine(t *testing.T) {
 	}
 
 	{
-		engineType := p2p.EngineType(100)
-
 		requestID++
 		msg := message.InboundPushQuery(
 			ctx.ChainID,
@@ -809,11 +803,10 @@ func TestRouterHonorsRequestedEngine(t *testing.T) {
 			nil,
 			0,
 			nodeID,
-			engineType,
 		)
 
 		h.EXPECT().Push(gomock.Any(), gomock.Any()).Do(func(_ context.Context, msg handler.Message) {
-			require.Equal(engineType, msg.EngineType)
+			require.Equal(p2p.EngineType_ENGINE_TYPE_UNSPECIFIED, msg.EngineType)
 		})
 		chainRouter.HandleInbound(context.Background(), msg)
 	}
@@ -846,19 +839,19 @@ func TestRouterClearTimeouts(t *testing.T) {
 			name:        "AcceptedFrontierOp",
 			responseOp:  message.AcceptedFrontierOp,
 			responseMsg: message.InboundAcceptedFrontier(ids.Empty, requestID, ids.GenerateTestID(), ids.EmptyNodeID),
-			timeoutMsg:  message.InternalGetAcceptedFrontierFailed(ids.EmptyNodeID, ids.Empty, requestID, engineType),
+			timeoutMsg:  message.InternalGetAcceptedFrontierFailed(ids.EmptyNodeID, ids.Empty, requestID),
 		},
 		{
 			name:        "Accepted",
 			responseOp:  message.AcceptedOp,
 			responseMsg: message.InboundAccepted(ids.Empty, requestID, []ids.ID{ids.GenerateTestID()}, ids.EmptyNodeID),
-			timeoutMsg:  message.InternalGetAcceptedFailed(ids.EmptyNodeID, ids.Empty, requestID, engineType),
+			timeoutMsg:  message.InternalGetAcceptedFailed(ids.EmptyNodeID, ids.Empty, requestID),
 		},
 		{
 			name:        "Chits",
 			responseOp:  message.ChitsOp,
 			responseMsg: message.InboundChits(ids.Empty, requestID, ids.GenerateTestID(), ids.GenerateTestID(), ids.GenerateTestID(), ids.EmptyNodeID),
-			timeoutMsg:  message.InternalQueryFailed(ids.EmptyNodeID, ids.Empty, requestID, engineType),
+			timeoutMsg:  message.InternalQueryFailed(ids.EmptyNodeID, ids.Empty, requestID),
 		},
 		{
 			name:        "AppResponse",
@@ -1037,7 +1030,6 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 		dummyContainerID,
 		0,
 		nID,
-		p2p.EngineType_ENGINE_TYPE_SNOWMAN,
 	)
 	chainRouter.HandleInbound(context.Background(), inMsg)
 
@@ -1053,7 +1045,6 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 		dummyContainerID,
 		0,
 		vID,
-		p2p.EngineType_ENGINE_TYPE_SNOWMAN,
 	)
 	wg.Add(1)
 	chainRouter.HandleInbound(context.Background(), inMsg)
@@ -1305,7 +1296,6 @@ func TestValidatorOnlyAllowedNodeMessageDrops(t *testing.T) {
 		dummyContainerID,
 		0,
 		nID,
-		engineType,
 	)
 	chainRouter.HandleInbound(context.Background(), inMsg)
 
@@ -1321,7 +1311,6 @@ func TestValidatorOnlyAllowedNodeMessageDrops(t *testing.T) {
 		dummyContainerID,
 		0,
 		allowedID,
-		engineType,
 	)
 	wg.Add(1)
 	chainRouter.HandleInbound(context.Background(), inMsg)
@@ -1339,7 +1328,6 @@ func TestValidatorOnlyAllowedNodeMessageDrops(t *testing.T) {
 		dummyContainerID,
 		0,
 		vID,
-		engineType,
 	)
 	wg.Add(1)
 	chainRouter.HandleInbound(context.Background(), inMsg)

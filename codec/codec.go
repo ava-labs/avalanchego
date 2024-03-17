@@ -15,6 +15,8 @@ var (
 	ErrDoesNotImplementInterface = errors.New("does not implement interface")
 	ErrUnexportedField           = errors.New("unexported field")
 	ErrExtraSpace                = errors.New("trailing buffer space")
+	ErrMarshalZeroLength         = errors.New("can't marshal zero length value")
+	ErrUnmarshalZeroLength       = errors.New("can't unmarshal zero length value")
 )
 
 // Codec marshals and unmarshals
