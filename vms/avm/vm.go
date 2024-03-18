@@ -390,10 +390,6 @@ func (vm *VM) GetBlockIDAtHeight(_ context.Context, height uint64) (ids.ID, erro
 	return vm.state.GetBlockIDAtHeight(height)
 }
 
-func (*VM) VerifyHeightIndex(context.Context) error {
-	return nil
-}
-
 /*
  ******************************************************************************
  *********************************** DAG VM ***********************************
