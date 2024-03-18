@@ -5,10 +5,11 @@ import boto3
 import uuid
 import re
 import subprocess
+import sys
 
 # Globals
 amifile = '.github/workflows/amichange.json'
-packerfile = ".github/packer/ubuntu-jammy-x86_64-public-ami.json"
+packerfile = ".github/packer/ubuntu-jammy-x86_64-public-ami.pkr.hcl"
 
 # Environment Globals
 product_id = os.getenv('PRODUCT_ID')
@@ -19,11 +20,16 @@ skip_create_ami = os.getenv('SKIP_CREATE_AMI', "True")
 
 def packer_build(packerfile):
   print("Running the packer build")
-  subprocess.run('/usr/local/bin/packer build ' + packerfile, shell=True)
+  output = subprocess.run('/usr/local/bin/packer build ' + packerfile, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+  if output.returncode != 0:
+    raise RuntimeError(f"Command returned with code: {output.returncode}")
 
 def packer_build_update(packerfile):
   print("Creating packer AMI image for Marketplace")
-  output = subprocess.run('/usr/local/bin/packer build ' + packerfile, shell=True, stdout=subprocess.PIPE)
+  output = subprocess.run('/usr/local/bin/packer build ' + packerfile, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+  if output.returncode != 0:
+    raise RuntimeError(f"Command returned with code: {output.returncode}")
+
   found = re.findall('ami-[a-z0-9]*', str(output.stdout))
 
   if found:
@@ -76,10 +82,16 @@ def update_ami(amifile, amiid):
     print(f"An error occurred while updating AMI delivery options: {e}")
 
 def main():
-  if skip_create_ami == "True":
-    packer_build(packerfile)
-  else:
-    update_ami(amifile, packer_build_update(packerfile))
+  try:
+    if skip_create_ami == "True":
+      packer_build(packerfile)
+    else:
+      update_ami(amifile, packer_build_update(packerfile))
+    
+    print("Ran packer build and update ami successfully")
+  except Exception as e:
+    print(f"An error occurred while running packer")
+    sys.exit(5)
 
 if __name__ == '__main__':
   main()
