@@ -40,10 +40,10 @@ type TestEnvironment struct {
 	URIs []tmpnet.NodeURI
 	// The URI used to access the http server that allocates test data
 	TestDataServerURI string
-	// The number of seconds to wait before shutting down private
-	// networks. A non-zero value may be useful to ensure all metrics
-	// can be scraped before shutdown.
-	PrivateNetworkShutdownDelay uint
+	// The duration to wait before shutting down private networks. A
+	// non-zero value may be useful to ensure all metrics can be
+	// scraped before shutdown.
+	PrivateNetworkShutdownDelay time.Duration
 
 	require *require.Assertions
 }

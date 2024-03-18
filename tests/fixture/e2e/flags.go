@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 )
@@ -16,7 +17,7 @@ type FlagVars struct {
 	pluginDir            string
 	networkDir           string
 	useExistingNetwork   bool
-	networkShutdownDelay uint
+	networkShutdownDelay time.Duration
 }
 
 func (v *FlagVars) AvalancheGoExecPath() string {
@@ -41,7 +42,7 @@ func (v *FlagVars) UseExistingNetwork() bool {
 	return v.useExistingNetwork
 }
 
-func (v *FlagVars) NetworkShutdownDelay() uint {
+func (v *FlagVars) NetworkShutdownDelay() time.Duration {
 	return v.networkShutdownDelay
 }
 
@@ -71,11 +72,11 @@ func RegisterFlags() *FlagVars {
 		false,
 		"[optional] whether to target the existing network identified by --network-dir.",
 	)
-	flag.UintVar(
+	flag.DurationVar(
 		&vars.networkShutdownDelay,
 		"network-shutdown-delay",
-		12, // Make sure this value takes into account the scrape_interval defined in scripts/run_prometheus.sh
-		"[optional] the number of seconds to wait before shutting down the test network at the end of the test run. A value greater than the scrape interval is suggested. 0 avoids waiting for shutdown.",
+		12*time.Second, // Make sure this value takes into account the scrape_interval defined in scripts/run_prometheus.sh
+		"[optional] the duration to wait before shutting down the test network at the end of the test run. A value greater than the scrape interval is suggested. 0 avoids waiting for shutdown.",
 	)
 
 	return &vars
