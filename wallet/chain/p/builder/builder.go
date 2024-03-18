@@ -24,10 +24,10 @@ import (
 )
 
 var (
-	errNoChangeAddress           = errors.New("no possible change address")
+	ErrNoChangeAddress           = errors.New("no possible change address")
 	ErrUnknownOutputType         = errors.New("unknown output type")
-	errUnknownOwnerType          = errors.New("unknown owner type")
-	errInsufficientAuthorization = errors.New("insufficient authorization")
+	ErrUnknownOwnerType          = errors.New("unknown owner type")
+	ErrInsufficientAuthorization = errors.New("insufficient authorization")
 	ErrInsufficientFunds         = errors.New("insufficient funds")
 
 	_ Builder = (*builder)(nil)
@@ -955,7 +955,7 @@ func (b *builder) spend(
 
 	addr, ok := addrs.Peek()
 	if !ok {
-		return nil, nil, nil, errNoChangeAddress
+		return nil, nil, nil, ErrNoChangeAddress
 	}
 	changeOwner := options.ChangeOwner(&secp256k1fx.OutputOwners{
 		Threshold: 1,
@@ -1163,7 +1163,7 @@ func (b *builder) authorizeSubnet(subnetID ids.ID, options *common.Options) (*se
 	}
 	owner, ok := ownerIntf.(*secp256k1fx.OutputOwners)
 	if !ok {
-		return nil, errUnknownOwnerType
+		return nil, ErrUnknownOwnerType
 	}
 
 	addrs := options.Addresses(b.addrs)
@@ -1171,7 +1171,7 @@ func (b *builder) authorizeSubnet(subnetID ids.ID, options *common.Options) (*se
 	inputSigIndices, ok := common.MatchOwners(owner, addrs, minIssuanceTime)
 	if !ok {
 		// We can't authorize the subnet
-		return nil, errInsufficientAuthorization
+		return nil, ErrInsufficientAuthorization
 	}
 	return &secp256k1fx.Input{
 		SigIndices: inputSigIndices,
