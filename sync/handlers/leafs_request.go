@@ -101,8 +101,8 @@ func (lrh *LeafsRequestHandler) OnLeafsRequest(ctx context.Context, nodeID ids.N
 	// TODO: We should know the state root that accounts correspond to,
 	// as this information will be necessary to access storage tries when
 	// the trie is path based.
-	stateRoot := common.Hash{}
-	t, err := trie.New(trie.StorageTrieID(stateRoot, leafsRequest.Account, leafsRequest.Root), lrh.trieDB)
+	// stateRoot := common.Hash{}
+	t, err := trie.New(trie.TrieID(leafsRequest.Root), lrh.trieDB)
 	if err != nil {
 		log.Debug("error opening trie when processing request, dropping request", "nodeID", nodeID, "requestID", requestID, "root", leafsRequest.Root, "err", err)
 		lrh.stats.IncMissingRoot()
@@ -341,14 +341,14 @@ func (rb *responseBuilder) generateRangeProof(start []byte, keys [][]byte) (*mem
 		start = bytes.Repeat([]byte{0x00}, rb.keyLength)
 	}
 
-	if err := rb.t.Prove(start, 0, proof); err != nil {
+	if err := rb.t.Prove(start, proof); err != nil {
 		_ = proof.Close() // closing memdb does not error
 		return nil, err
 	}
 	if len(keys) > 0 {
 		// If there is a non-zero number of keys, set [end] for the range proof to the last key.
 		end := keys[len(keys)-1]
-		if err := rb.t.Prove(end, 0, proof); err != nil {
+		if err := rb.t.Prove(end, proof); err != nil {
 			_ = proof.Close() // closing memdb does not error
 			return nil, err
 		}
@@ -431,7 +431,11 @@ func (rb *responseBuilder) fillFromTrie(ctx context.Context, end []byte) (bool, 
 	defer func() { rb.trieReadTime += time.Since(startTime) }()
 
 	// create iterator to iterate the trie
-	it := trie.NewIterator(rb.t.NodeIterator(rb.nextKey()))
+	nodeIt, err := rb.t.NodeIterator(rb.nextKey())
+	if err != nil {
+		return false, err
+	}
+	it := trie.NewIterator(nodeIt)
 	more := false
 	for it.Next() {
 		// if we're at the end, break this loop

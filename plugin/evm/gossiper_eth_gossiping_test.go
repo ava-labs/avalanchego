@@ -67,7 +67,7 @@ func getValidEthTxs(key *ecdsa.PrivateKey, count int, gasPrice *big.Int) []*type
 				gasPrice,
 				[]byte(strings.Repeat("aaaaaaaaaa", 100))),
 			types.HomesteadSigner{}, key)
-		tx.SetFirstSeen(time.Now().Add(-1 * time.Minute))
+		tx.SetTime(time.Now().Add(-1 * time.Minute))
 		res[i] = tx
 	}
 	return res
@@ -94,7 +94,7 @@ func TestMempoolEthTxsAppGossipHandling(t *testing.T) {
 		err := vm.Shutdown(context.Background())
 		assert.NoError(err)
 	}()
-	vm.txPool.SetGasPrice(common.Big1)
+	vm.txPool.SetGasTip(common.Big1)
 	vm.txPool.SetMinFee(common.Big0)
 
 	var (
@@ -131,4 +131,22 @@ func TestMempoolEthTxsAppGossipHandling(t *testing.T) {
 
 	// wait for transaction to be re-gossiped
 	attemptAwait(t, &wg, 5*time.Second)
+}
+
+func attemptAwait(t *testing.T, wg *sync.WaitGroup, delay time.Duration) {
+	ticker := make(chan struct{})
+
+	// Wait for [wg] and then close [ticket] to indicate that
+	// the wait group has finished.
+	go func() {
+		wg.Wait()
+		close(ticker)
+	}()
+
+	select {
+	case <-time.After(delay):
+		t.Fatal("Timed out waiting for wait group to complete")
+	case <-ticker:
+		// The wait group completed without issue
+	}
 }

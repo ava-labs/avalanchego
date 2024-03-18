@@ -35,62 +35,52 @@ import (
 	"github.com/ethereum/go-ethereum/common/math"
 )
 
-// gasSStoreEIP2929 implements gas cost for SSTORE according to EIP-2929
-//
-// When calling SSTORE, check if the (address, storage_key) pair is in accessed_storage_keys.
-// If it is not, charge an additional COLD_SLOAD_COST gas, and add the pair to accessed_storage_keys.
-// Additionally, modify the parameters defined in EIP 2200 as follows:
-//
-// Parameter 	Old value 	New value
-// SLOAD_GAS 	800 	= WARM_STORAGE_READ_COST
-// SSTORE_RESET_GAS 	5000 	5000 - COLD_SLOAD_COST
-//
-// The other parameters defined in EIP 2200 are unchanged.
-// see gasSStoreEIP2200(...) in core/vm/gas_table.go for more info about how EIP 2200 is specified
-func gasSStoreEIP2929(evm *EVM, contract *Contract, stack *Stack, mem *Memory, memorySize uint64) (uint64, error) {
-	// If we fail the minimum gas availability invariant, fail (0)
-	if contract.Gas <= params.SstoreSentryGasEIP2200 {
-		return 0, errors.New("not enough gas for reentrancy sentry")
-	}
-	// Gas sentry honoured, do the actual gas calculation based on the stored value
-	var (
-		y, x    = stack.Back(1), stack.peek()
-		slot    = common.Hash(x.Bytes32())
-		current = evm.StateDB.GetState(contract.Address(), slot)
-		cost    = uint64(0)
-	)
-	// Check slot presence in the access list
-	if addrPresent, slotPresent := evm.StateDB.SlotInAccessList(contract.Address(), slot); !slotPresent {
-		cost = params.ColdSloadCostEIP2929
-		// If the caller cannot afford the cost, this change will be rolled back
-		evm.StateDB.AddSlotToAccessList(contract.Address(), slot)
-		if !addrPresent {
-			// Once we're done with YOLOv2 and schedule this for mainnet, might
-			// be good to remove this panic here, which is just really a
-			// canary to have during testing
-			panic("impossible case: address was not present in access list during sstore op")
+func makeGasSStoreFunc() gasFunc {
+	return func(evm *EVM, contract *Contract, stack *Stack, mem *Memory, memorySize uint64) (uint64, error) {
+		// If we fail the minimum gas availability invariant, fail (0)
+		if contract.Gas <= params.SstoreSentryGasEIP2200 {
+			return 0, errors.New("not enough gas for reentrancy sentry")
 		}
-	}
-	value := common.Hash(y.Bytes32())
+		// Gas sentry honoured, do the actual gas calculation based on the stored value
+		var (
+			y, x    = stack.Back(1), stack.peek()
+			slot    = common.Hash(x.Bytes32())
+			current = evm.StateDB.GetState(contract.Address(), slot)
+			cost    = uint64(0)
+		)
+		// Check slot presence in the access list
+		if addrPresent, slotPresent := evm.StateDB.SlotInAccessList(contract.Address(), slot); !slotPresent {
+			cost = params.ColdSloadCostEIP2929
+			// If the caller cannot afford the cost, this change will be rolled back
+			evm.StateDB.AddSlotToAccessList(contract.Address(), slot)
+			if !addrPresent {
+				// Once we're done with YOLOv2 and schedule this for mainnet, might
+				// be good to remove this panic here, which is just really a
+				// canary to have during testing
+				panic("impossible case: address was not present in access list during sstore op")
+			}
+		}
+		value := common.Hash(y.Bytes32())
 
-	if current == value { // noop (1)
-		// EIP 2200 original clause:
-		//		return params.SloadGasEIP2200, nil
-		return cost + params.WarmStorageReadCostEIP2929, nil // SLOAD_GAS
-	}
-	original := evm.StateDB.GetCommittedStateAP1(contract.Address(), x.Bytes32())
-	if original == current {
-		if original == (common.Hash{}) { // create slot (2.1.1)
-			return cost + params.SstoreSetGasEIP2200, nil
+		if current == value { // noop (1)
+			// EIP 2200 original clause:
+			//		return params.SloadGasEIP2200, nil
+			return cost + params.WarmStorageReadCostEIP2929, nil // SLOAD_GAS
 		}
+		original := evm.StateDB.GetCommittedStateAP1(contract.Address(), x.Bytes32())
+		if original == current {
+			if original == (common.Hash{}) { // create slot (2.1.1)
+				return cost + params.SstoreSetGasEIP2200, nil
+			}
+			// EIP-2200 original clause:
+			//		return params.SstoreResetGasEIP2200, nil // write existing slot (2.1.2)
+			return cost + (params.SstoreResetGasEIP2200 - params.ColdSloadCostEIP2929), nil // write existing slot (2.1.2)
+		}
+
 		// EIP-2200 original clause:
-		//		return params.SstoreResetGasEIP2200, nil // write existing slot (2.1.2)
-		return cost + (params.SstoreResetGasEIP2200 - params.ColdSloadCostEIP2929), nil // write existing slot (2.1.2)
+		//return params.SloadGasEIP2200, nil // dirty update (2.2)
+		return cost + params.WarmStorageReadCostEIP2929, nil // dirty update (2.2)
 	}
-
-	// EIP-2200 original clause:
-	//return params.SloadGasEIP2200, nil // dirty update (2.2)
-	return cost + params.WarmStorageReadCostEIP2929, nil // dirty update (2.2)
 }
 
 // gasSLoadEIP2929 calculates dynamic gas for SLOAD according to EIP-2929
@@ -194,22 +184,44 @@ var (
 	gasDelegateCallEIP2929 = makeCallVariantGasCallEIP2929(gasDelegateCall)
 	gasStaticCallEIP2929   = makeCallVariantGasCallEIP2929(gasStaticCall)
 	gasCallCodeEIP2929     = makeCallVariantGasCallEIP2929(gasCallCode)
+	gasSelfdestructEIP2929 = makeSelfdestructGasFn(false) // Note: refunds were never enabled on Avalanche
+	// gasSelfdestructEIP3529 implements the changes in EIP-2539 (no refunds)
+	gasSelfdestructEIP3529 = makeSelfdestructGasFn(false)
+	// gasSStoreEIP2929 implements gas cost for SSTORE according to EIP-2929
+	//
+	// When calling SSTORE, check if the (address, storage_key) pair is in accessed_storage_keys.
+	// If it is not, charge an additional COLD_SLOAD_COST gas, and add the pair to accessed_storage_keys.
+	// Additionally, modify the parameters defined in EIP 2200 as follows:
+	//
+	// Parameter 	Old value 	New value
+	// SLOAD_GAS 	800 	= WARM_STORAGE_READ_COST
+	// SSTORE_RESET_GAS 	5000 	5000 - COLD_SLOAD_COST
+	//
+	//The other parameters defined in EIP 2200 are unchanged.
+	// see gasSStoreEIP2200(...) in core/vm/gas_table.go for more info about how EIP 2200 is specified
+	gasSStoreEIP2929 = makeGasSStoreFunc()
 )
 
-func gasSelfdestructEIP2929(evm *EVM, contract *Contract, stack *Stack, mem *Memory, memorySize uint64) (uint64, error) {
-	var (
-		gas     uint64
-		address = common.Address(stack.peek().Bytes20())
-	)
-	if !evm.StateDB.AddressInAccessList(address) {
-		// If the caller cannot afford the cost, this change will be rolled back
-		evm.StateDB.AddAddressToAccessList(address)
-		gas = params.ColdAccountAccessCostEIP2929
+// makeSelfdestructGasFn can create the selfdestruct dynamic gas function for EIP-2929 and EIP-2539
+func makeSelfdestructGasFn(refundsEnabled bool) gasFunc {
+	gasFunc := func(evm *EVM, contract *Contract, stack *Stack, mem *Memory, memorySize uint64) (uint64, error) {
+		var (
+			gas     uint64
+			address = common.Address(stack.peek().Bytes20())
+		)
+		if !evm.StateDB.AddressInAccessList(address) {
+			// If the caller cannot afford the cost, this change will be rolled back
+			evm.StateDB.AddAddressToAccessList(address)
+			gas = params.ColdAccountAccessCostEIP2929
+		}
+		// if empty and transfers value
+		if evm.StateDB.Empty(address) && evm.StateDB.GetBalance(contract.Address()).Sign() != 0 {
+			gas += params.CreateBySelfdestructGas
+		}
+		if refundsEnabled && !evm.StateDB.HasSelfDestructed(contract.Address()) {
+			evm.StateDB.AddRefund(params.SelfdestructRefundGas)
+		}
+		return gas, nil
 	}
-	// if empty and transfers value
-	if evm.StateDB.Empty(address) && evm.StateDB.GetBalance(contract.Address()).Sign() != 0 {
-		gas += params.CreateBySelfdestructGas
-	}
-
-	return gas, nil
+	return gasFunc
 }

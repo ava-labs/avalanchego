@@ -424,7 +424,7 @@ func newTrieOrchestrator(sf *subfetcher) *trieOrchestrator {
 			return nil
 		}
 	} else {
-		base, err = sf.db.OpenStorageTrie(sf.state, sf.owner, sf.root)
+		base, err = sf.db.OpenStorageTrie(sf.state, sf.addr, sf.root)
 		if err != nil {
 			log.Warn("Trie prefetcher failed opening trie", "root", sf.root, "err", err)
 			return nil

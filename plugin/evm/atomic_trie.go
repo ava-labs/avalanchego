@@ -276,7 +276,11 @@ func (a *atomicTrie) Iterator(root common.Hash, cursor []byte) (AtomicTrieIterat
 		return nil, err
 	}
 
-	iter := trie.NewIterator(t.NodeIterator(cursor))
+	nodeIt, err := t.NodeIterator(cursor)
+	if err != nil {
+		return nil, err
+	}
+	iter := trie.NewIterator(nodeIt)
 	return NewAtomicTrieIterator(iter, a.codec), iter.Err
 }
 
@@ -318,7 +322,7 @@ func (a *atomicTrie) LastAcceptedRoot() common.Hash {
 
 func (a *atomicTrie) InsertTrie(nodes *trienode.NodeSet, root common.Hash) error {
 	if nodes != nil {
-		if err := a.trieDB.Update(root, types.EmptyRootHash, trienode.NewWithNodeSet(nodes)); err != nil {
+		if err := a.trieDB.Update(root, types.EmptyRootHash, 0, trienode.NewWithNodeSet(nodes), nil); err != nil {
 			return err
 		}
 	}

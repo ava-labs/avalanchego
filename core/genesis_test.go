@@ -34,8 +34,10 @@ import (
 
 	"github.com/ava-labs/coreth/consensus/dummy"
 	"github.com/ava-labs/coreth/core/rawdb"
+	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/core/vm"
 	"github.com/ava-labs/coreth/params"
+	"github.com/ava-labs/coreth/precompile/contracts/warp"
 	"github.com/ava-labs/coreth/trie"
 	"github.com/ava-labs/coreth/utils"
 	"github.com/davecgh/go-spew/spew"
@@ -219,4 +221,45 @@ func TestNetworkUpgradeBetweenHeadAndAcceptedBlock(t *testing.T) {
 	if !reflect.DeepEqual(config, activatedGenesis.Config) {
 		t.Errorf("returned %v\nwant     %v", config, activatedGenesis.Config)
 	}
+}
+
+func TestGenesisWriteUpgradesRegression(t *testing.T) {
+	require := require.New(t)
+	config := *params.TestChainConfig
+	genesis := &Genesis{
+		Config: &config,
+		Alloc: GenesisAlloc{
+			{1}: {Balance: big.NewInt(1), Storage: map[common.Hash]common.Hash{{1}: {1}}},
+		},
+	}
+
+	db := rawdb.NewMemoryDatabase()
+	genesisBlock := genesis.ToBlock()
+	trieDB := trie.NewDatabase(db)
+
+	_, _, err := SetupGenesisBlock(db, trieDB, genesis, genesisBlock.Hash(), false)
+	require.NoError(err)
+
+	genesis.Config.UpgradeConfig.PrecompileUpgrades = []params.PrecompileUpgrade{
+		{
+			Config: warp.NewConfig(utils.NewUint64(51), 0),
+		},
+	}
+	_, _, err = SetupGenesisBlock(db, trieDB, genesis, genesisBlock.Hash(), false)
+	require.NoError(err)
+
+	timestamp := uint64(100)
+	lastAcceptedBlock := types.NewBlock(&types.Header{
+		ParentHash: common.Hash{1, 2, 3},
+		Number:     big.NewInt(100),
+		GasLimit:   8_000_000,
+		Extra:      nil,
+		Time:       timestamp,
+	}, nil, nil, nil, trie.NewStackTrie(nil))
+	rawdb.WriteBlock(db, lastAcceptedBlock)
+
+	// Attempt restart after the chain has advanced past the activation of the precompile upgrade.
+	// This tests a regression where the UpgradeConfig would not be written to disk correctly.
+	_, _, err = SetupGenesisBlock(db, trieDB, genesis, lastAcceptedBlock.Hash(), false)
+	require.NoError(err)
 }

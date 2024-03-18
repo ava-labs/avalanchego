@@ -118,7 +118,11 @@ func (h *GossipHandler) HandleEthTxs(nodeID ids.NodeID, msg message.EthTxsGossip
 		return nil
 	}
 	h.stats.IncEthTxsGossipReceived()
-	errs := h.txPool.AddRemotes(txs)
+	wrapped := make([]*txpool.Transaction, len(txs))
+	for i, tx := range txs {
+		wrapped[i] = &txpool.Transaction{Tx: tx}
+	}
+	errs := h.txPool.Add(wrapped, false, false)
 	for i, err := range errs {
 		if err != nil {
 			log.Trace(

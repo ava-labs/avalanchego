@@ -44,8 +44,9 @@ func (obj *Header) EncodeRLP(_w io.Writer) error {
 	_tmp1 := obj.BaseFee != nil
 	_tmp2 := obj.ExtDataGasUsed != nil
 	_tmp3 := obj.BlockGasCost != nil
-	_tmp4 := obj.ExcessDataGas != nil
-	if _tmp1 || _tmp2 || _tmp3 || _tmp4 {
+	_tmp4 := obj.BlobGasUsed != nil
+	_tmp5 := obj.ExcessBlobGas != nil
+	if _tmp1 || _tmp2 || _tmp3 || _tmp4 || _tmp5 {
 		if obj.BaseFee == nil {
 			w.Write(rlp.EmptyString)
 		} else {
@@ -55,7 +56,7 @@ func (obj *Header) EncodeRLP(_w io.Writer) error {
 			w.WriteBigInt(obj.BaseFee)
 		}
 	}
-	if _tmp2 || _tmp3 || _tmp4 {
+	if _tmp2 || _tmp3 || _tmp4 || _tmp5 {
 		if obj.ExtDataGasUsed == nil {
 			w.Write(rlp.EmptyString)
 		} else {
@@ -65,7 +66,7 @@ func (obj *Header) EncodeRLP(_w io.Writer) error {
 			w.WriteBigInt(obj.ExtDataGasUsed)
 		}
 	}
-	if _tmp3 || _tmp4 {
+	if _tmp3 || _tmp4 || _tmp5 {
 		if obj.BlockGasCost == nil {
 			w.Write(rlp.EmptyString)
 		} else {
@@ -75,14 +76,18 @@ func (obj *Header) EncodeRLP(_w io.Writer) error {
 			w.WriteBigInt(obj.BlockGasCost)
 		}
 	}
-	if _tmp4 {
-		if obj.ExcessDataGas == nil {
-			w.Write(rlp.EmptyString)
+	if _tmp4 || _tmp5 {
+		if obj.BlobGasUsed == nil {
+			w.Write([]byte{0x80})
 		} else {
-			if obj.ExcessDataGas.Sign() == -1 {
-				return rlp.ErrNegativeBigInt
-			}
-			w.WriteBigInt(obj.ExcessDataGas)
+			w.WriteUint64((*obj.BlobGasUsed))
+		}
+	}
+	if _tmp5 {
+		if obj.ExcessBlobGas == nil {
+			w.Write([]byte{0x80})
+		} else {
+			w.WriteUint64((*obj.ExcessBlobGas))
 		}
 	}
 	w.ListEnd(_tmp0)

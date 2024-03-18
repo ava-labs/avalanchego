@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ava-labs/coreth/core/txpool"
+	"github.com/ava-labs/coreth/core/txpool/legacypool"
 	"github.com/ava-labs/coreth/eth"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -106,13 +106,11 @@ type Config struct {
 	RPCTxFeeCap float64 `json:"rpc-tx-fee-cap"`
 
 	// Cache settings
-	TrieCleanCache            int      `json:"trie-clean-cache"`            // Size of the trie clean cache (MB)
-	TrieCleanJournal          string   `json:"trie-clean-journal"`          // Directory to use to save the trie clean cache (must be populated to enable journaling the trie clean cache)
-	TrieCleanRejournal        Duration `json:"trie-clean-rejournal"`        // Frequency to re-journal the trie clean cache to disk (minimum 1 minute, must be populated to enable journaling the trie clean cache)
-	TrieDirtyCache            int      `json:"trie-dirty-cache"`            // Size of the trie dirty cache (MB)
-	TrieDirtyCommitTarget     int      `json:"trie-dirty-commit-target"`    // Memory limit to target in the dirty cache before performing a commit (MB)
-	TriePrefetcherParallelism int      `json:"trie-prefetcher-parallelism"` // Max concurrent disk reads trie prefetcher should perform at once
-	SnapshotCache             int      `json:"snapshot-cache"`              // Size of the snapshot disk layer clean cache (MB)
+	TrieCleanCache            int `json:"trie-clean-cache"`            // Size of the trie clean cache (MB)
+	TrieDirtyCache            int `json:"trie-dirty-cache"`            // Size of the trie dirty cache (MB)
+	TrieDirtyCommitTarget     int `json:"trie-dirty-commit-target"`    // Memory limit to target in the dirty cache before performing a commit (MB)
+	TriePrefetcherParallelism int `json:"trie-prefetcher-parallelism"` // Max concurrent disk reads trie prefetcher should perform at once
+	SnapshotCache             int `json:"snapshot-cache"`              // Size of the snapshot disk layer clean cache (MB)
 
 	// Eth Settings
 	Preimages      bool `json:"preimages-enabled"`
@@ -237,13 +235,13 @@ func (c *Config) SetDefaults() {
 	c.RPCTxFeeCap = defaultRpcTxFeeCap
 	c.MetricsExpensiveEnabled = defaultMetricsExpensiveEnabled
 
-	c.TxPoolPriceLimit = txpool.DefaultConfig.PriceLimit
-	c.TxPoolPriceBump = txpool.DefaultConfig.PriceBump
-	c.TxPoolAccountSlots = txpool.DefaultConfig.AccountSlots
-	c.TxPoolGlobalSlots = txpool.DefaultConfig.GlobalSlots
-	c.TxPoolAccountQueue = txpool.DefaultConfig.AccountQueue
-	c.TxPoolGlobalQueue = txpool.DefaultConfig.GlobalQueue
-	c.TxPoolLifetime.Duration = txpool.DefaultConfig.Lifetime
+	c.TxPoolPriceLimit = legacypool.DefaultConfig.PriceLimit
+	c.TxPoolPriceBump = legacypool.DefaultConfig.PriceBump
+	c.TxPoolAccountSlots = legacypool.DefaultConfig.AccountSlots
+	c.TxPoolGlobalSlots = legacypool.DefaultConfig.GlobalSlots
+	c.TxPoolAccountQueue = legacypool.DefaultConfig.AccountQueue
+	c.TxPoolGlobalQueue = legacypool.DefaultConfig.GlobalQueue
+	c.TxPoolLifetime.Duration = legacypool.DefaultConfig.Lifetime
 
 	c.APIMaxDuration.Duration = defaultApiMaxDuration
 	c.WSCPURefillRate.Duration = defaultWsCpuRefillRate

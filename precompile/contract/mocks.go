@@ -413,17 +413,3 @@ func (mr *MockStateDBMockRecorder) Snapshot() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Snapshot", reflect.TypeOf((*MockStateDB)(nil).Snapshot))
 }
-
-// Suicide mocks base method.
-func (m *MockStateDB) Suicide(arg0 common.Address) bool {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Suicide", arg0)
-	ret0, _ := ret[0].(bool)
-	return ret0
-}
-
-// Suicide indicates an expected call of Suicide.
-func (mr *MockStateDBMockRecorder) Suicide(arg0 any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Suicide", reflect.TypeOf((*MockStateDB)(nil).Suicide), arg0)
-}

@@ -21,8 +21,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
-	"github.com/fsnotify/fsnotify"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -81,100 +79,6 @@ func TestArchiveBlockChain(t *testing.T) {
 			tt.testFunc(t, createArchiveBlockChain)
 		})
 	}
-}
-
-// awaitWatcherEventsSubside waits for at least one event on [watcher] and then waits
-// for at least [subsideTimeout] before returning
-func awaitWatcherEventsSubside(watcher *fsnotify.Watcher, subsideTimeout time.Duration) {
-	done := make(chan struct{})
-
-	go func() {
-		defer func() {
-			close(done)
-		}()
-
-		select {
-		case <-watcher.Events:
-		case <-watcher.Errors:
-			return
-		}
-
-		for {
-			select {
-			case <-watcher.Events:
-			case <-watcher.Errors:
-				return
-			case <-time.After(subsideTimeout):
-				return
-			}
-		}
-	}()
-	<-done
-}
-
-func TestTrieCleanJournal(t *testing.T) {
-	if os.Getenv("RUN_FLAKY_TESTS") != "true" {
-		t.Skip("FLAKY")
-	}
-	require := require.New(t)
-	assert := assert.New(t)
-
-	trieCleanJournal := t.TempDir()
-	trieCleanJournalWatcher, err := fsnotify.NewWatcher()
-	require.NoError(err)
-	defer func() {
-		assert.NoError(trieCleanJournalWatcher.Close())
-	}()
-	require.NoError(trieCleanJournalWatcher.Add(trieCleanJournal))
-
-	create := func(db ethdb.Database, gspec *Genesis, lastAcceptedHash common.Hash) (*BlockChain, error) {
-		config := *archiveConfig
-		config.TrieCleanJournal = trieCleanJournal
-		config.TrieCleanRejournal = 100 * time.Millisecond
-		return createBlockChain(db, &config, gspec, lastAcceptedHash)
-	}
-
-	var (
-		key1, _ = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
-		key2, _ = crypto.HexToECDSA("8a1f9a8f95be41cd7ccb6168179afb4504aefe388d1e14474d32c45c72ce7b7a")
-		addr1   = crypto.PubkeyToAddress(key1.PublicKey)
-		addr2   = crypto.PubkeyToAddress(key2.PublicKey)
-		chainDB = rawdb.NewMemoryDatabase()
-	)
-
-	// Ensure that key1 has some funds in the genesis block.
-	genesisBalance := big.NewInt(1000000)
-	gspec := &Genesis{
-		Config: &params.ChainConfig{HomesteadBlock: new(big.Int)},
-		Alloc:  GenesisAlloc{addr1: {Balance: genesisBalance}},
-	}
-
-	blockchain, err := create(chainDB, gspec, common.Hash{})
-	require.NoError(err)
-	defer blockchain.Stop()
-
-	// This call generates a chain of 3 blocks.
-	signer := types.HomesteadSigner{}
-	_, chain, _, err := GenerateChainWithGenesis(gspec, blockchain.engine, 3, 10, func(i int, gen *BlockGen) {
-		tx, _ := types.SignTx(types.NewTransaction(gen.TxNonce(addr1), addr2, big.NewInt(10000), params.TxGas, nil, nil), signer, key1)
-		gen.AddTx(tx)
-	})
-	require.NoError(err)
-
-	// Insert and accept the generated chain
-	_, err = blockchain.InsertChain(chain)
-	require.NoError(err)
-
-	for _, block := range chain {
-		require.NoError(blockchain.Accept(block))
-	}
-	blockchain.DrainAcceptorQueue()
-
-	awaitWatcherEventsSubside(trieCleanJournalWatcher, time.Second)
-	// Assert that a new file is created in the trie clean journal
-	dirEntries, err := os.ReadDir(trieCleanJournal)
-	require.NoError(err)
-	require.NotEmpty(dirEntries)
 }
 
 func TestArchiveBlockChainSnapsDisabled(t *testing.T) {
@@ -372,7 +276,6 @@ func TestBlockChainOfflinePruningUngracefulShutdown(t *testing.T) {
 		prunerConfig := pruner.Config{
 			Datadir:   tempDir,
 			BloomSize: 256,
-			Cachedir:  pruningConfig.TrieCleanJournal,
 		}
 
 		pruner, err := pruner.NewPruner(db, prunerConfig)

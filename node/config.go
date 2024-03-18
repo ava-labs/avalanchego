@@ -60,6 +60,12 @@ type Config struct {
 	// InsecureUnlockAllowed allows user to unlock accounts in unsafe http environment.
 	InsecureUnlockAllowed bool `toml:",omitempty"`
 
+	// BatchRequestLimit is the maximum number of requests in a batch.
+	BatchRequestLimit int `toml:",omitempty"`
+
+	// BatchResponseMaxSize is the maximum number of bytes returned from a batched rpc call.
+	BatchResponseMaxSize int `toml:",omitempty"`
+
 	CorethVersion string
 }
 
