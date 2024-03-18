@@ -326,8 +326,9 @@ type state struct {
 	currentSupply, persistedCurrentSupply uint64
 	// [lastAccepted] is the most recently accepted block.
 	lastAccepted, persistedLastAccepted ids.ID
-	indexedHeights                      *heightRange
-	singletonDB                         database.Database
+	// TODO: Remove indexedHeights once v1.11.3 has been released.
+	indexedHeights *heightRange
+	singletonDB    database.Database
 }
 
 // heightRange is used to track which heights are safe to use the native DB
