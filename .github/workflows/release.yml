@@ -8,7 +8,7 @@ on:
         required: true
   push:
     tags:
-      - "*"
+     - 'v[0-9]+.[0-9]+.[0-9]+'
 
 jobs:
   release:
