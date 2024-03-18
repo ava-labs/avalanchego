@@ -8,7 +8,6 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rsa"
-	"crypto/x509"
 	"encoding/asn1"
 	"errors"
 	"fmt"
@@ -53,25 +52,13 @@ var (
 	ErrUnknownPublicKeyAlgorithm             = errors.New("staking: unknown public key algorithm")
 )
 
-// ParseCertificate parses a single certificate from the given ASN.1 DER data.
-//
-// TODO: Remove after v1.11.x activates.
-func ParseCertificate(der []byte) (*Certificate, error) {
-	x509Cert, err := x509.ParseCertificate(der)
-	if err != nil {
-		return nil, err
-	}
-	stakingCert := CertificateFromX509(x509Cert)
-	return stakingCert, ValidateCertificate(stakingCert)
-}
-
-// ParseCertificatePermissive parses a single certificate from the given ASN.1.
+// ParseCertificate parses a single certificate from the given ASN.1.
 //
 // This function does not validate that the certificate is valid to be used
 // against normal TLS implementations.
 //
 // Ref: https://github.com/golang/go/blob/go1.19.12/src/crypto/x509/parser.go#L789-L968
-func ParseCertificatePermissive(bytes []byte) (*Certificate, error) {
+func ParseCertificate(bytes []byte) (*Certificate, error) {
 	if len(bytes) > MaxCertificateLen {
 		return nil, ErrCertificateTooLarge
 	}
@@ -126,56 +113,55 @@ func ParseCertificatePermissive(bytes []byte) (*Certificate, error) {
 	if !input.ReadASN1BitString(&spk) {
 		return nil, ErrMalformedSubjectPublicKey
 	}
-	publicKey, signatureAlgorithm, err := parsePublicKey(pkAI, spk)
+	publicKey, err := parsePublicKey(pkAI, spk)
 	return &Certificate{
-		Raw:                bytes,
-		SignatureAlgorithm: signatureAlgorithm,
-		PublicKey:          publicKey,
+		Raw:       bytes,
+		PublicKey: publicKey,
 	}, err
 }
 
 // Ref: https://github.com/golang/go/blob/go1.19.12/src/crypto/x509/parser.go#L215-L306
-func parsePublicKey(oid asn1.ObjectIdentifier, publicKey asn1.BitString) (crypto.PublicKey, x509.SignatureAlgorithm, error) {
+func parsePublicKey(oid asn1.ObjectIdentifier, publicKey asn1.BitString) (crypto.PublicKey, error) {
 	der := cryptobyte.String(publicKey.RightAlign())
 	switch {
 	case oid.Equal(oidPublicKeyRSA):
 		pub := &rsa.PublicKey{N: new(big.Int)}
 		if !der.ReadASN1(&der, cryptobyte_asn1.SEQUENCE) {
-			return nil, 0, ErrInvalidRSAPublicKey
+			return nil, ErrInvalidRSAPublicKey
 		}
 		if !der.ReadASN1Integer(pub.N) {
-			return nil, 0, ErrInvalidRSAModulus
+			return nil, ErrInvalidRSAModulus
 		}
 		if !der.ReadASN1Integer(&pub.E) {
-			return nil, 0, ErrInvalidRSAPublicExponent
+			return nil, ErrInvalidRSAPublicExponent
 		}
 
 		if pub.N.Sign() <= 0 {
-			return nil, 0, ErrRSAModulusNotPositive
+			return nil, ErrRSAModulusNotPositive
 		}
 
 		if bitLen := pub.N.BitLen(); bitLen != allowedRSALargeModulusLen && bitLen != allowedRSASmallModulusLen {
-			return nil, 0, fmt.Errorf("%w: %d", ErrUnsupportedRSAModulusBitLen, bitLen)
+			return nil, fmt.Errorf("%w: %d", ErrUnsupportedRSAModulusBitLen, bitLen)
 		}
 		if pub.N.Bit(0) == 0 {
-			return nil, 0, ErrRSAModulusIsEven
+			return nil, ErrRSAModulusIsEven
 		}
 		if pub.E != allowedRSAPublicExponentValue {
-			return nil, 0, fmt.Errorf("%w: %d", ErrUnsupportedRSAPublicExponent, pub.E)
+			return nil, fmt.Errorf("%w: %d", ErrUnsupportedRSAPublicExponent, pub.E)
 		}
-		return pub, x509.SHA256WithRSA, nil
+		return pub, nil
 	case oid.Equal(oidPublicKeyECDSA):
 		namedCurve := elliptic.P256()
 		x, y := elliptic.Unmarshal(namedCurve, der)
 		if x == nil {
-			return nil, 0, ErrFailedUnmarshallingEllipticCurvePoint
+			return nil, ErrFailedUnmarshallingEllipticCurvePoint
 		}
 		return &ecdsa.PublicKey{
 			Curve: namedCurve,
 			X:     x,
 			Y:     y,
-		}, x509.ECDSAWithSHA256, nil
+		}, nil
 	default:
-		return nil, 0, ErrUnknownPublicKeyAlgorithm
+		return nil, ErrUnknownPublicKeyAlgorithm
 	}
 }

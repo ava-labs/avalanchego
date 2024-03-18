@@ -5,7 +5,6 @@ package tx
 
 import (
 	"math"
-	"time"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
@@ -17,7 +16,7 @@ const CodecVersion = 0
 var Codec codec.Manager
 
 func init() {
-	c := linearcodec.NewDefault(time.Time{})
+	c := linearcodec.NewDefault()
 	Codec = codec.NewManager(math.MaxInt32)
 
 	err := utils.Err(

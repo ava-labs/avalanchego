@@ -5,6 +5,7 @@ package compression
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -12,7 +13,13 @@ import (
 	"github.com/DataDog/zstd"
 )
 
-var _ Compressor = (*zstdCompressor)(nil)
+var (
+	_ Compressor = (*zstdCompressor)(nil)
+
+	ErrInvalidMaxSizeCompressor = errors.New("invalid compressor max size")
+	ErrDecompressedMsgTooLarge  = errors.New("decompressed msg too large")
+	ErrMsgTooLarge              = errors.New("msg too large to be compressed")
+)
 
 func NewZstdCompressor(maxSize int64) (Compressor, error) {
 	if maxSize == math.MaxInt64 {

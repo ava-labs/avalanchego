@@ -130,7 +130,7 @@ func (vm *VM) Initialize(
 	vm.db = db
 
 	// Note: this codec is never used to serialize anything
-	vm.codecRegistry = linearcodec.NewDefault(time.Time{})
+	vm.codecRegistry = linearcodec.NewDefault()
 	vm.fx = &secp256k1fx.Fx{}
 	if err := vm.fx.Initialize(vm); err != nil {
 		return err
@@ -501,10 +501,6 @@ func (vm *VM) Clock() *mockable.Clock {
 
 func (vm *VM) Logger() logging.Logger {
 	return vm.ctx.Log
-}
-
-func (*VM) VerifyHeightIndex(_ context.Context) error {
-	return nil
 }
 
 func (vm *VM) GetBlockIDAtHeight(_ context.Context, height uint64) (ids.ID, error) {
