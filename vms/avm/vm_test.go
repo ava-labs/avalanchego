@@ -213,7 +213,7 @@ func TestIssueProperty(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		fork: durango,
+		fork: eUpgrade,
 		additionalFxs: []*common.Fx{{
 			ID: propertyfx.ID,
 			Fx: &propertyfx.Fx{},
@@ -622,7 +622,7 @@ func TestForceAcceptImportTx(t *testing.T) {
 				UTXOID: utxoID,
 				Asset:  txAssetID,
 				In: &secp256k1fx.TransferInput{
-					Amt: 1455,
+					Amt: 10_000 * units.NanoAvax,
 					Input: secp256k1fx.Input{
 						SigIndices: []uint32{0},
 					},
@@ -744,7 +744,7 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 
 	env.service.txBuilderBackend.ResetAddresses(kc.Addresses())
 
-	expectedFee := uint64(5355)
+	expectedFee := uint64(7975)
 	tx, _, err := buildExportTx(
 		env.service.txBuilderBackend,
 		constants.PlatformChainID,

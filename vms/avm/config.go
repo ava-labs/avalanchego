@@ -7,6 +7,8 @@ import (
 	"encoding/json"
 
 	"github.com/ava-labs/avalanchego/vms/avm/network"
+
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 var DefaultConfig = Config{
@@ -21,6 +23,8 @@ type Config struct {
 	IndexTransactions    bool           `json:"index-transactions"`
 	IndexAllowIncomplete bool           `json:"index-allow-incomplete"`
 	ChecksumsEnabled     bool           `json:"checksums-enabled"`
+
+	DynamicFeesConfig *commonfees.DynamicFeesConfig `json:"dynamic-fees-config"`
 }
 
 func ParseConfig(configBytes []byte) (Config, error) {
