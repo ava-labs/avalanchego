@@ -39,7 +39,6 @@ import (
 var feeConfig = config.Config{
 	TxFee:            2 * units.MilliAvax,
 	CreateAssetTxFee: 3 * units.MilliAvax,
-	DurangoTime:      time.Time{},
 	EUpgradeTime:     time.Time{},
 }
 

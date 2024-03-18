@@ -13,9 +13,6 @@ type Config struct {
 	// Fee that must be burned by every asset creating transaction
 	CreateAssetTxFee uint64
 
-	// Time of the Durango network upgrade
-	DurangoTime time.Time
-
 	// Time of the E network upgrade
 	EUpgradeTime time.Time
 }

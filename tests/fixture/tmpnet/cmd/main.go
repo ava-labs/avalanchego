@@ -49,6 +49,7 @@ func main() {
 
 	var (
 		rootDir         string
+		networkOwner    string
 		avalancheGoPath string
 		pluginDir       string
 		nodeCount       uint8
@@ -63,7 +64,9 @@ func main() {
 
 			// Root dir will be defaulted on start if not provided
 
-			network := &tmpnet.Network{}
+			network := &tmpnet.Network{
+				Owner: networkOwner,
+			}
 
 			// Extreme upper bound, should never take this long
 			networkStartTimeout := 2 * time.Minute
@@ -106,6 +109,7 @@ func main() {
 	startNetworkCmd.PersistentFlags().StringVar(&avalancheGoPath, "avalanchego-path", os.Getenv(tmpnet.AvalancheGoPathEnvName), "The path to an avalanchego binary")
 	startNetworkCmd.PersistentFlags().StringVar(&pluginDir, "plugin-dir", os.ExpandEnv("$HOME/.avalanchego/plugins"), "[optional] the dir containing VM plugins")
 	startNetworkCmd.PersistentFlags().Uint8Var(&nodeCount, "node-count", tmpnet.DefaultNodeCount, "Number of nodes the network should initially consist of")
+	startNetworkCmd.PersistentFlags().StringVar(&networkOwner, "network-owner", "", "The string identifying the intended owner of the network")
 	rootCmd.AddCommand(startNetworkCmd)
 
 	stopNetworkCmd := &cobra.Command{

@@ -5,18 +5,11 @@ package block
 
 import (
 	"context"
-	"errors"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 )
-
-// ErrIndexIncomplete is used to indicate that the VM is currently repairing its
-// index.
-//
-// TODO: Remove after v1.11.x activates.
-var ErrIndexIncomplete = errors.New("query failed because height index is incomplete")
 
 // ChainVM defines the required functionality of a Snowman VM.
 //
@@ -55,15 +48,6 @@ type ChainVM interface {
 	// a definitionally accepted block, the Genesis block, that will be
 	// returned.
 	LastAccepted(context.Context) (ids.ID, error)
-
-	// VerifyHeightIndex should return:
-	// - nil if the height index is available.
-	// - ErrIndexIncomplete if the height index is not currently available.
-	// - Any other non-standard error that may have occurred when verifying the
-	//   index.
-	//
-	// TODO: Remove after v1.11.x activates.
-	VerifyHeightIndex(context.Context) error
 
 	// GetBlockIDAtHeight returns:
 	// - The ID of the block that was accepted with [height].

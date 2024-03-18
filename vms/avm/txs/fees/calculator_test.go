@@ -49,8 +49,6 @@ var (
 
 	feeTestKeys    = secp256k1.TestKeys()
 	feeTestSigners = [][]*secp256k1.PrivateKey{}
-
-	durangoTime = time.Time{} // assume durango is active in these tests
 )
 
 type feeTests struct {
@@ -83,7 +81,6 @@ func TestBaseTxFees(t *testing.T) {
 				chainTime := eForkTime.Add(-1 * time.Second)
 
 				cfg := feeTestsDefaultCfg
-				cfg.DurangoTime = durangoTime
 				cfg.EUpgradeTime = eForkTime
 
 				return &cfg, chainTime
@@ -100,7 +97,6 @@ func TestBaseTxFees(t *testing.T) {
 				chainTime := eForkTime.Add(time.Second)
 
 				cfg := feeTestsDefaultCfg
-				cfg.DurangoTime = durangoTime
 				cfg.EUpgradeTime = eForkTime
 
 				return &cfg, chainTime
@@ -126,7 +122,6 @@ func TestBaseTxFees(t *testing.T) {
 				chainTime := eForkTime.Add(time.Second)
 
 				cfg := feeTestsDefaultCfg
-				cfg.DurangoTime = durangoTime
 				cfg.EUpgradeTime = eForkTime
 				return &cfg, chainTime
 			},
@@ -204,7 +199,6 @@ func TestCreateAssetTxFees(t *testing.T) {
 				chainTime := eForkTime.Add(-1 * time.Second)
 
 				cfg := feeTestsDefaultCfg
-				cfg.DurangoTime = durangoTime
 				cfg.EUpgradeTime = eForkTime
 
 				return &cfg, chainTime
@@ -221,7 +215,6 @@ func TestCreateAssetTxFees(t *testing.T) {
 				chainTime := eForkTime.Add(time.Second)
 
 				cfg := feeTestsDefaultCfg
-				cfg.DurangoTime = durangoTime
 				cfg.EUpgradeTime = eForkTime
 
 				return &cfg, chainTime
@@ -247,7 +240,6 @@ func TestCreateAssetTxFees(t *testing.T) {
 				chainTime := eForkTime.Add(time.Second)
 
 				cfg := feeTestsDefaultCfg
-				cfg.DurangoTime = durangoTime
 				cfg.EUpgradeTime = eForkTime
 				return &cfg, chainTime
 			},
@@ -325,7 +317,6 @@ func TestOperationTxFees(t *testing.T) {
 				chainTime := eForkTime.Add(-1 * time.Second)
 
 				cfg := feeTestsDefaultCfg
-				cfg.DurangoTime = durangoTime
 				cfg.EUpgradeTime = eForkTime
 
 				return &cfg, chainTime
@@ -342,7 +333,6 @@ func TestOperationTxFees(t *testing.T) {
 				chainTime := eForkTime.Add(time.Second)
 
 				cfg := feeTestsDefaultCfg
-				cfg.DurangoTime = durangoTime
 				cfg.EUpgradeTime = eForkTime
 
 				return &cfg, chainTime
@@ -368,7 +358,6 @@ func TestOperationTxFees(t *testing.T) {
 				chainTime := eForkTime.Add(time.Second)
 
 				cfg := feeTestsDefaultCfg
-				cfg.DurangoTime = durangoTime
 				cfg.EUpgradeTime = eForkTime
 				return &cfg, chainTime
 			},
@@ -442,7 +431,6 @@ func TestImportTxFees(t *testing.T) {
 				chainTime := eForkTime.Add(-1 * time.Second)
 
 				cfg := feeTestsDefaultCfg
-				cfg.DurangoTime = durangoTime
 				cfg.EUpgradeTime = eForkTime
 
 				return &cfg, chainTime
@@ -459,7 +447,6 @@ func TestImportTxFees(t *testing.T) {
 				chainTime := eForkTime.Add(time.Second)
 
 				cfg := feeTestsDefaultCfg
-				cfg.DurangoTime = durangoTime
 				cfg.EUpgradeTime = eForkTime
 
 				return &cfg, chainTime
@@ -485,7 +472,6 @@ func TestImportTxFees(t *testing.T) {
 				chainTime := eForkTime.Add(time.Second)
 
 				cfg := feeTestsDefaultCfg
-				cfg.DurangoTime = durangoTime
 				cfg.EUpgradeTime = eForkTime
 				return &cfg, chainTime
 			},
@@ -549,7 +535,6 @@ func TestExportTxFees(t *testing.T) {
 				chainTime := eForkTime.Add(-1 * time.Second)
 
 				cfg := feeTestsDefaultCfg
-				cfg.DurangoTime = durangoTime
 				cfg.EUpgradeTime = eForkTime
 
 				return &cfg, chainTime
@@ -566,7 +551,6 @@ func TestExportTxFees(t *testing.T) {
 				chainTime := eForkTime.Add(time.Second)
 
 				cfg := feeTestsDefaultCfg
-				cfg.DurangoTime = durangoTime
 				cfg.EUpgradeTime = eForkTime
 
 				return &cfg, chainTime
@@ -592,7 +576,6 @@ func TestExportTxFees(t *testing.T) {
 				chainTime := eForkTime.Add(time.Second)
 
 				cfg := feeTestsDefaultCfg
-				cfg.DurangoTime = durangoTime
 				cfg.EUpgradeTime = eForkTime
 				return &cfg, chainTime
 			},

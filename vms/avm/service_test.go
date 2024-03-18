@@ -2887,7 +2887,6 @@ func TestSendMultiple(t *testing.T) {
 					initialKeys: keys,
 				}},
 				vmStaticConfig: &config.Config{
-					DurangoTime:  time.Time{},
 					EUpgradeTime: time.Time{},
 				},
 			})
