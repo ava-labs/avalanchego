@@ -19,8 +19,7 @@ var (
 	heightPrefix   = []byte("height")
 	metadataPrefix = []byte("metadata")
 
-	forkKey       = []byte("fork")
-	checkpointKey = []byte("checkpoint")
+	forkKey = []byte("fork")
 )
 
 type HeightIndexGetter interface {
@@ -40,23 +39,11 @@ type HeightIndexWriter interface {
 	DeleteBlockIDAtHeight(height uint64) error
 }
 
-// A checkpoint is the blockID of the next block to be considered
-// for height indexing. We store checkpoints to be able to duly resume
-// long-running re-indexing ops.
-type HeightIndexBatchSupport interface {
-	versiondb.Commitable
-
-	GetCheckpoint() (ids.ID, error)
-	SetCheckpoint(blkID ids.ID) error
-	DeleteCheckpoint() error
-}
-
 // HeightIndex contains mapping of blockHeights to accepted proposer block IDs
 // along with some metadata (fork height and checkpoint).
 type HeightIndex interface {
 	HeightIndexWriter
 	HeightIndexGetter
-	HeightIndexBatchSupport
 }
 
 type heightIndex struct {
@@ -126,16 +113,4 @@ func (hi *heightIndex) GetForkHeight() (uint64, error) {
 
 func (hi *heightIndex) SetForkHeight(height uint64) error {
 	return database.PutUInt64(hi.metadataDB, forkKey, height)
-}
-
-func (hi *heightIndex) GetCheckpoint() (ids.ID, error) {
-	return database.GetID(hi.metadataDB, checkpointKey)
-}
-
-func (hi *heightIndex) SetCheckpoint(blkID ids.ID) error {
-	return database.PutID(hi.metadataDB, checkpointKey, blkID)
-}
-
-func (hi *heightIndex) DeleteCheckpoint() error {
-	return hi.metadataDB.Delete(checkpointKey)
 }
