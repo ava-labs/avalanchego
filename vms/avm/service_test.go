@@ -978,34 +978,8 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 	"unsignedTx": {
 		"networkID": 10,
 		"blockchainID": "PLACEHOLDER_BLOCKCHAIN_ID",
-		"outputs": [
-			{
-				"assetID": "tvLKci3hNoCX4NijS6TfiT6XJJY3gGKd2git6SSVTG5J8Nfby",
-				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
-				"output": {
-					"addresses": [
-						"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
-					],
-					"amount": 999989755,
-					"locktime": 0,
-					"threshold": 1
-				}
-			}
-		],
-		"inputs": [
-			{
-				"txID": "fmwdbeEvaoZxqQ1CffQbABeKwLhKjHJyY2k7cFhDjmuAX6yCn",
-				"outputIndex": 0,
-				"assetID": "tvLKci3hNoCX4NijS6TfiT6XJJY3gGKd2git6SSVTG5J8Nfby",
-				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
-				"input": {
-					"amount": 999994889,
-					"signatureIndices": [
-						0
-					]
-				}
-			}
-		],
+		"outputs": null,
+		"inputs": null,
 		"memo": "0x",
 		"operations": [
 			{
@@ -1040,18 +1014,10 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 	},
 	"credentials": [
 		{
-			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
-			"credential": {
-				"signatures": [
-					"0xda85a73a3981e5a53c097a1c41ca9900f623b150af4dc745175cecf80ee007a3232f107a76c1b68996c6c9a319036495ec7763fc17dca030d34a43e6e465ccf701"
-				]
-			}
-		},
-		{
 			"fxID": "qd2U4HDWUvMrVUeTcCHp6xH3Qpnn1XbU5MDdnBoiifFqvgXwT",
 			"credential": {
 				"signatures": [
-					"0xda85a73a3981e5a53c097a1c41ca9900f623b150af4dc745175cecf80ee007a3232f107a76c1b68996c6c9a319036495ec7763fc17dca030d34a43e6e465ccf701"
+					"0x4c862cf04a2df68cfd1451568d7c08e8015c72c968bbd31f9764397ddef2046e6d1fab7593cc001900807a15a9f481cfcfd116adbf612a9b194332fec361f23e01"
 				]
 			}
 		}
@@ -1063,7 +1029,7 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_TX_ID", mintNFTTx.ID().String(), 1)
 	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_BLOCKCHAIN_ID", mintNFTTx.Unsigned.(*txs.OperationTx).BlockchainID.String(), 1)
 
-	sigStr, err := formatting.Encode(formatting.HexNC, mintNFTTx.Creds[1].Credential.(*nftfx.Credential).Sigs[0][:])
+	sigStr, err := formatting.Encode(formatting.HexNC, mintNFTTx.Creds[0].Credential.(*nftfx.Credential).Sigs[0][:])
 	require.NoError(err)
 
 	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_SIGNATURE", sigStr, 1)
@@ -1132,34 +1098,8 @@ func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
 	"unsignedTx": {
 		"networkID": 10,
 		"blockchainID": "PLACEHOLDER_BLOCKCHAIN_ID",
-		"outputs": [
-			{
-				"assetID": "tvLKci3hNoCX4NijS6TfiT6XJJY3gGKd2git6SSVTG5J8Nfby",
-				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
-				"output": {
-					"addresses": [
-						"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
-					],
-					"amount": 999989610,
-					"locktime": 0,
-					"threshold": 1
-				}
-			}
-		],
-		"inputs": [
-			{
-				"txID": "242j2DppY6ivQ9VRpK7K34pFTwvLdDJ8qoR3dKNDuL1299A1tD",
-				"outputIndex": 0,
-				"assetID": "tvLKci3hNoCX4NijS6TfiT6XJJY3gGKd2git6SSVTG5J8Nfby",
-				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
-				"input": {
-					"amount": 999994881,
-					"signatureIndices": [
-						0
-					]
-				}
-			}
-		],
+		"outputs": null,
+		"inputs": null,
 		"memo": "0x",
 		"operations": [
 			{
@@ -1222,18 +1162,10 @@ func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
 	},
 	"credentials": [
 		{
-			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
-			"credential": {
-				"signatures": [
-					"PLACEHOLDER_SIGNATURE"
-				]
-			}
-		},
-		{
 			"fxID": "qd2U4HDWUvMrVUeTcCHp6xH3Qpnn1XbU5MDdnBoiifFqvgXwT",
 			"credential": {
 				"signatures": [
-					"0x7ffa7f3e7e7fd567ca888932fc5f7d3946a168f5b7fe0f03fcc1cece66ef046c15e7e3524b51d38fd6c8aecc7800bd01e8ca122228e513728047ced3f5a18cba00"
+					"0xb8fe75ee309edda8d03cb6d890774b98a7171ec18da22894c7d760fc66a0d9392aac513bbc2fbddea9702001dbceaf1cd505a0b3b2b25770471ec0590f5fd24701"
 				]
 			}
 		},
@@ -1316,34 +1248,8 @@ func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 	"unsignedTx": {
 		"networkID": 10,
 		"blockchainID": "PLACEHOLDER_BLOCKCHAIN_ID",
-		"outputs": [
-			{
-				"assetID": "tvLKci3hNoCX4NijS6TfiT6XJJY3gGKd2git6SSVTG5J8Nfby",
-				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
-				"output": {
-					"addresses": [
-						"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
-					],
-					"amount": 999989732,
-					"locktime": 0,
-					"threshold": 1
-				}
-			}
-		],
-		"inputs": [
-			{
-				"txID": "2V6JT8iKGj8e8kquziCiJnhq4EbfZpSoy64WTpSPwVoTJN1Nzy",
-				"outputIndex": 0,
-				"assetID": "tvLKci3hNoCX4NijS6TfiT6XJJY3gGKd2git6SSVTG5J8Nfby",
-				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
-				"input": {
-					"amount": 999994893,
-					"signatureIndices": [
-						0
-					]
-				}
-			}
-		],
+		"outputs": null,
+		"inputs": null,
 		"memo": "0x",
 		"operations": [
 			{
@@ -1385,15 +1291,7 @@ func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 			"credential": {
 				"signatures": [
-					"PLACEHOLDER_SIGNATURE"
-				]
-			}
-		},
-		{
-			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
-			"credential": {
-				"signatures": [
-					"0x06f4963b62555034c66f5ebd8a654effc9a0a1fce3b13b227e2d71c99fa3630c554ce94754c25cd2e2a16e2c1c09fc9234c902dbf3a7816bfebcf7fb8181baf801"
+					"0x0be6194c911b5836960ac3c79ed0e1243a1df47913dde4d473ee228daf224b8a310a9b12fb42ecac2406699d75ee86d7046525be79c9f747a4d8ac4b0591300700"
 				]
 			}
 		}
@@ -1472,34 +1370,8 @@ func TestServiceGetTxJSON_OperationTxWithMultipleSecpMintOp(t *testing.T) {
 	"unsignedTx": {
 		"networkID": 10,
 		"blockchainID": "PLACEHOLDER_BLOCKCHAIN_ID",
-		"outputs": [
-			{
-				"assetID": "tvLKci3hNoCX4NijS6TfiT6XJJY3gGKd2git6SSVTG5J8Nfby",
-				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
-				"output": {
-					"addresses": [
-						"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
-					],
-					"amount": 999989564,
-					"locktime": 0,
-					"threshold": 1
-				}
-			}
-		],
-		"inputs": [
-			{
-				"txID": "27K46oMaq92J3EbkLxzhqqNAvYyMbHQE5AmbjHa5GGZ6uQ9oqW",
-				"outputIndex": 0,
-				"assetID": "tvLKci3hNoCX4NijS6TfiT6XJJY3gGKd2git6SSVTG5J8Nfby",
-				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
-				"input": {
-					"amount": 999994889,
-					"signatureIndices": [
-						0
-					]
-				}
-			}
-		],
+		"outputs": null,
+		"inputs": null,
 		"memo": "0x",
 		"operations": [
 			{
@@ -1581,15 +1453,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleSecpMintOp(t *testing.T) {
 			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 			"credential": {
 				"signatures": [
-					"PLACEHOLDER_SIGNATURE"
-				]
-			}
-		},
-		{
-			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
-			"credential": {
-				"signatures": [
-					"0x31826158f0f5db02d7ebde9ae2726cfbc5b59693065bce80448f089a31e83d2477cc193ed74e870c643668024a177acf862ba537c46e22c4ef8ed8332f05618401"
+					"0x4e6eb93c7a744c1c550140b115edf7490a9d94a122c9b7cfaed1dfa75b5da3142637d113d85e6a1cbfd0b383f1b604e74b72422207c4631bb2b78f929632df0c00"
 				]
 			}
 		}
@@ -1659,34 +1523,8 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
 	"unsignedTx": {
 		"networkID": 10,
 		"blockchainID": "PLACEHOLDER_BLOCKCHAIN_ID",
-		"outputs": [
-			{
-				"assetID": "tvLKci3hNoCX4NijS6TfiT6XJJY3gGKd2git6SSVTG5J8Nfby",
-				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
-				"output": {
-					"addresses": [
-						"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
-					],
-					"amount": 999989804,
-					"locktime": 0,
-					"threshold": 1
-				}
-			}
-		],
-		"inputs": [
-			{
-				"txID": "2AkCR4agFVbDqhBsmEtdNMW3P4v18v6UqKAJqEounv5ayyKec3",
-				"outputIndex": 0,
-				"assetID": "tvLKci3hNoCX4NijS6TfiT6XJJY3gGKd2git6SSVTG5J8Nfby",
-				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
-				"input": {
-					"amount": 999994937,
-					"signatureIndices": [
-						0
-					]
-				}
-			}
-		],
+		"outputs": null,
+		"inputs": null,
 		"memo": "0x",
 		"operations": [
 			{
@@ -1722,14 +1560,6 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
 	},
 	"credentials": [
 		{
-			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
-			"credential": {
-				"signatures": [
-					"0x772626548a885e46e556288f8dfb70b7ba0d160fa43c1b4995649a000deb73a063da7f5162f2379a7aedf192c55069782b0f712523cdaf0bfef6509b71c46f5b00"
-				]
-			}
-		},
-		{
 			"fxID": "rXJsCSEYXg2TehWxCEEGj6JU2PWKTkd6cBdNLjoe2SpsKD9cy",
 			"credential": {
 				"signatures": [
@@ -1745,7 +1575,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
 	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_TX_ID", mintPropertyFxOpTx.ID().String(), 1)
 	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_BLOCKCHAIN_ID", mintPropertyFxOpTx.Unsigned.(*txs.OperationTx).BlockchainID.String(), 1)
 
-	sigStr, err := formatting.Encode(formatting.HexNC, mintPropertyFxOpTx.Creds[1].Credential.(*propertyfx.Credential).Sigs[0][:])
+	sigStr, err := formatting.Encode(formatting.HexNC, mintPropertyFxOpTx.Creds[0].Credential.(*propertyfx.Credential).Sigs[0][:])
 	require.NoError(err)
 
 	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_SIGNATURE", sigStr, 1)
@@ -1810,34 +1640,8 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) 
 	"unsignedTx": {
 		"networkID": 10,
 		"blockchainID": "PLACEHOLDER_BLOCKCHAIN_ID",
-		"outputs": [
-			{
-				"assetID": "tvLKci3hNoCX4NijS6TfiT6XJJY3gGKd2git6SSVTG5J8Nfby",
-				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
-				"output": {
-					"addresses": [
-						"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
-					],
-					"amount": 999989628,
-					"locktime": 0,
-					"threshold": 1
-				}
-			}
-		],
-		"inputs": [
-			{
-				"txID": "uxCyRqRgK1MtyxLVw2m4Axti2fZAub8m9d5BJzySpEKX3t39b",
-				"outputIndex": 0,
-				"assetID": "tvLKci3hNoCX4NijS6TfiT6XJJY3gGKd2git6SSVTG5J8Nfby",
-				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
-				"input": {
-					"amount": 999994897,
-					"signatureIndices": [
-						0
-					]
-				}
-			}
-		],
+		"outputs": null,
+		"inputs": null,
 		"memo": "0x",
 		"operations": [
 			{
@@ -1901,14 +1705,6 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) 
 		]
 	},
 	"credentials": [
-		{
-			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
-			"credential": {
-				"signatures": [
-					"0x7631837d04fabb247fe13d492bc950890ea5b1617a60d4700c07f199fd66899d05aed813f02bbab55ac50ec0d24a1de8fcafa224b91d8049e9f77d15114ad9e501"
-				]
-			}
-		},
 		{
 			"fxID": "rXJsCSEYXg2TehWxCEEGj6JU2PWKTkd6cBdNLjoe2SpsKD9cy",
 			"credential": {

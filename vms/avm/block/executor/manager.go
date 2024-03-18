@@ -163,6 +163,7 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 	if err != nil {
 		return err
 	}
+	parentBlkTime := preferred.Timestamp()
 	nextBlkTime := NextBlockTime(preferred.Timestamp(), m.clk)
 
 	stateDiff, err := state.NewDiff(m.lastAccepted, m)
@@ -180,8 +181,7 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 	}
 
 	var (
-		chainTime     = stateDiff.GetTimestamp()
-		isEForkActive = m.backend.Config.IsEActivated(chainTime)
+		isEForkActive = m.backend.Config.IsEActivated(nextBlkTime)
 		feesCfg       = config.GetDynamicFeesConfig(isEForkActive)
 	)
 
@@ -190,7 +190,7 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 		feeManager.UpdateUnitFees(
 			feesCfg,
 			feeWindows,
-			chainTime.Unix(),
+			parentBlkTime.Unix(),
 			nextBlkTime.Unix(),
 		)
 	}

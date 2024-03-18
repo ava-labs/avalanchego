@@ -79,8 +79,8 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 	preferredHeight := preferred.Height()
 	nextHeight := preferredHeight + 1
 
-	preferredTimestamp := preferred.Timestamp()
-	nextTimestamp := blockexecutor.NextBlockTime(preferredTimestamp, b.clk)
+	parentBlkTime := preferred.Timestamp()
+	nextBlkTime := blockexecutor.NextBlockTime(parentBlkTime, b.clk)
 
 	stateDiff, err := state.NewDiff(preferredID, b.manager)
 	if err != nil {
@@ -92,8 +92,7 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 		inputs        set.Set[ids.ID]
 		remainingSize = targetBlockSize
 
-		chainTime     = stateDiff.GetTimestamp()
-		isEForkActive = b.backend.Config.IsEActivated(chainTime)
+		isEForkActive = b.backend.Config.IsEActivated(nextBlkTime)
 		feesCfg       = config.GetDynamicFeesConfig(isEForkActive)
 	)
 
@@ -111,8 +110,8 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 		feeManager.UpdateUnitFees(
 			feesCfg,
 			feeWindows,
-			chainTime.Unix(),
-			nextTimestamp.Unix(),
+			parentBlkTime.Unix(),
+			nextBlkTime.Unix(),
 		)
 	}
 
@@ -195,7 +194,7 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 	statelessBlk, err := block.NewStandardBlock(
 		preferredID,
 		nextHeight,
-		nextTimestamp,
+		nextBlkTime,
 		blockTxs,
 		b.backend.Codec,
 	)

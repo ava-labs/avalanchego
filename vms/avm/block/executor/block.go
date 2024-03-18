@@ -224,6 +224,12 @@ func (b *Block) Verify(context.Context) error {
 
 	// Now that the block has been executed, we can add the block data to the
 	// state diff.
+	if isEForkActive {
+		feeManager.UpdateWindows(&feeWindows, parentChainTime.Unix(), newChainTime.Unix())
+		stateDiff.SetUnitFees(feeManager.GetUnitFees())
+		stateDiff.SetFeeWindows(feeWindows)
+	}
+
 	stateDiff.SetLastAccepted(blkID)
 	stateDiff.AddBlock(b.Block)
 
