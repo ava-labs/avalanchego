@@ -408,7 +408,9 @@ func (w *workload) issueXToPTransfer(ctx context.Context) {
 		avaxAssetID   = xWallet.AVAXAssetID()
 		avaxBalance   = balances[avaxAssetID]
 		xBaseTxFee    = xWallet.BaseTxFee()
-		pBaseTxFee    = pWallet.BaseTxFee()
+		pBuilder      = pWallet.Builder()
+		pContext      = pBuilder.Context()
+		pBaseTxFee    = pContext.BaseTxFee
 		txFees        = xBaseTxFee + pBaseTxFee
 		neededBalance = txFees + units.Avax
 	)
@@ -471,9 +473,10 @@ func (w *workload) issuePToXTransfer(ctx context.Context) {
 	}
 
 	var (
-		avaxAssetID   = pWallet.AVAXAssetID()
+		pContext      = pBuilder.Context()
+		avaxAssetID   = pContext.AVAXAssetID
 		avaxBalance   = balances[avaxAssetID]
-		pBaseTxFee    = pWallet.BaseTxFee()
+		pBaseTxFee    = pContext.BaseTxFee
 		xBaseTxFee    = xWallet.BaseTxFee()
 		txFees        = pBaseTxFee + xBaseTxFee
 		neededBalance = txFees + units.Schmeckle

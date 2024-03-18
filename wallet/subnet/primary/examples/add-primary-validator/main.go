@@ -54,7 +54,7 @@ func main() {
 
 	// Get the P-chain wallet
 	pWallet := wallet.P()
-	avaxAssetID := pWallet.AVAXAssetID()
+	avaxAssetID := pWallet.Builder().Context().AVAXAssetID
 
 	addValidatorStartTime := time.Now()
 	addValidatorTx, err := pWallet.IssueAddPermissionlessValidatorTx(
