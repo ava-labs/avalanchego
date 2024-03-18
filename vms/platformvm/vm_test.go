@@ -6,7 +6,6 @@ package platformvm
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"testing"
 	"time"
 
@@ -235,7 +234,7 @@ func defaultVM(t *testing.T, f fork) (*VM, database.Database, *mutableSharedMemo
 	case apricotPhase3:
 		apricotPhase3Time = latestForkTime
 	default:
-		require.FailNow(fmt.Sprintf("unhandled fork %d", f))
+		require.FailNow("unhandled fork", f)
 	}
 
 	vm := &VM{Config: config.Config{

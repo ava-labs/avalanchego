@@ -309,7 +309,7 @@ func defaultConfig(t *testing.T, f fork) *config.Config {
 	case apricotPhase3:
 		apricotPhase3Time = defaultValidateEndTime
 	default:
-		require.FailNow(t, fmt.Sprintf("unhandled fork %d", f))
+		require.FailNow(t, "unhandled fork", f)
 	}
 
 	return &config.Config{

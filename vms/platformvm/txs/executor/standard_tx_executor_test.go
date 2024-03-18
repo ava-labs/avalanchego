@@ -5,7 +5,6 @@ package executor
 
 import (
 	"errors"
-	"fmt"
 	"math"
 	"testing"
 	"time"
@@ -2013,7 +2012,7 @@ func defaultTestConfig(t *testing.T, f fork, tm time.Time) *config.Config {
 	case apricotPhase3:
 		apricotPhase3Time = tm
 	default:
-		require.FailNow(t, fmt.Sprintf("unhandled fork %d", f))
+		require.FailNow(t, "unhandled fork", f)
 	}
 
 	return &config.Config{
