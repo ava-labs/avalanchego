@@ -234,8 +234,7 @@ func setup(tb testing.TB, c *envConfig) *environment {
 }
 
 func staticConfig(tb testing.TB, f fork) config.Config {
-	var eUpgradeTime = mockable.MaxTime
-
+	eUpgradeTime := mockable.MaxTime
 	switch f {
 	case eUpgrade:
 		eUpgradeTime = time.Time{}
