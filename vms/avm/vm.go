@@ -171,6 +171,9 @@ func (vm *VM) Initialize(
 	ctx.Log.Info("VM config initialized",
 		zap.Reflect("config", avmConfig),
 	)
+	if err := config.ResetDynamicFeesConfig(ctx, avmConfig.DynamicFeesConfig); err != nil {
+		return fmt.Errorf("failed resetting dynamic fees config: %w", err)
+	}
 
 	registerer := prometheus.NewRegistry()
 	if err := ctx.Metrics.Register(registerer); err != nil {

@@ -38,6 +38,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	avajson "github.com/ava-labs/avalanchego/utils/json"
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 	keystoreutils "github.com/ava-labs/avalanchego/vms/components/keystore"
 )
 
@@ -78,6 +79,29 @@ var (
 
 	keys  = secp256k1.TestKeys()[:3] // TODO: Remove [:3]
 	addrs []ids.ShortID              // addrs[i] corresponds to keys[i]
+
+	testFeesCfg = commonfees.DynamicFeesConfig{
+		InitialUnitFees: commonfees.Dimensions{
+			5 * units.NanoAvax,
+			5 * units.NanoAvax,
+			5 * units.NanoAvax,
+			5 * units.NanoAvax,
+		},
+		MinUnitFees: commonfees.Dimensions{
+			1 * units.NanoAvax,
+			1 * units.NanoAvax,
+			1 * units.NanoAvax,
+			1 * units.NanoAvax,
+		},
+		UpdateCoefficient: commonfees.Dimensions{
+			1,
+			1,
+			1,
+			1,
+		},
+		BlockUnitsCap:    commonfees.Max,
+		BlockUnitsTarget: commonfees.Dimensions{1000, 1000, 1000, 10000},
+	}
 )
 
 func init() {
@@ -165,6 +189,7 @@ func setup(tb testing.TB, c *envConfig) *environment {
 	}
 
 	vmDynamicConfig := DefaultConfig
+	vmDynamicConfig.DynamicFeesConfig = &testFeesCfg
 	vmDynamicConfig.IndexTransactions = true
 	if c.vmDynamicConfig != nil {
 		vmDynamicConfig = *c.vmDynamicConfig
