@@ -41,6 +41,7 @@ type ExecutionConfig struct {
 	ChecksumsEnabled             bool           `json:"checksums-enabled"`
 	MempoolPruneFrequency        time.Duration  `json:"mempool-prune-frequency"`
 
+	// test nets are allow to configure ad-hoc dynamic fees configuration
 	DynamicFeesConfig *commonfees.DynamicFeesConfig `json:"dynamic-fees-config"`
 }
 
