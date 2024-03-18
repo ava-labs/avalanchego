@@ -123,22 +123,22 @@ func (m *Manager) UpdateUnitFees(
 
 func nextFeeRate(currentUnitFee, updateCoefficient, unitsConsumed, target uint64) uint64 {
 	// We update the fee rate with the formula e^{k(u-t)/t} == 2^{1/ln(2) * k(u-t)/t}
-	// We approximate 1/ln(2) with 1,442695 and we round the exponent to a uint64
+	// We approximate 1/ln(2) with 1_442/1_000 and we round the exponent to a uint64
 
 	switch {
 	case unitsConsumed > target:
-		exp := float64(1.442695) * float64(updateCoefficient*(unitsConsumed-target)) / float64(target)
-		intExp := min(uint64(math.Ceil(exp)), 62) // we cap the exponent to avoid an overflow of uint64 type
-		res, over := safemath.Mul64(currentUnitFee, 1<<intExp)
+		exp := 1442 * updateCoefficient * (unitsConsumed - target) / target / 1000
+		exp = min(exp, 62) // we cap the exponent to avoid an overflow of uint64 type
+		res, over := safemath.Mul64(currentUnitFee, 1<<exp)
 		if over != nil {
 			return math.MaxUint64
 		}
 		return res
 
 	case unitsConsumed < target:
-		exp := float64(1.442695) * float64(updateCoefficient*(target-unitsConsumed)) / float64(target)
-		intExp := min(uint64(math.Ceil(exp)), 62) // we cap the exponent to avoid an overflow of uint64 type
-		return currentUnitFee / (1 << intExp)
+		exp := 1442 * updateCoefficient * (target - unitsConsumed) / target / 1000
+		exp = min(exp, 62) // we cap the exponent to avoid an overflow of uint64 type
+		return currentUnitFee / (1 << exp)
 
 	default:
 		return currentUnitFee // unitsConsumed == target

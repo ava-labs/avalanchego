@@ -986,7 +986,7 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 					"addresses": [
 						"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
 					],
-					"amount": 999989915,
+					"amount": 999988215,
 					"locktime": 0,
 					"threshold": 1
 				}
@@ -1043,7 +1043,7 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 			"credential": {
 				"signatures": [
-					"0x9afa3e41f7b55bea294c30d9b1e79148ed32c5526e5c4449a24745664b4eb1382bc7be71a1ddc77acdcab06c3f020fd53ff9d963dfd2c70c036aa4c1de46571800"
+					"0xf692f8fb45d54064f6453936f5bf636219e2ddf64b5b86ece204aa1527c6e60f10ecbfad2c4cf07b982ef611e791220ac9064035062ab5bf00ec983355437ef400"
 				]
 			}
 		},
@@ -1051,7 +1051,7 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 			"fxID": "qd2U4HDWUvMrVUeTcCHp6xH3Qpnn1XbU5MDdnBoiifFqvgXwT",
 			"credential": {
 				"signatures": [
-					"0x9afa3e41f7b55bea294c30d9b1e79148ed32c5526e5c4449a24745664b4eb1382bc7be71a1ddc77acdcab06c3f020fd53ff9d963dfd2c70c036aa4c1de46571800"
+					"0xf692f8fb45d54064f6453936f5bf636219e2ddf64b5b86ece204aa1527c6e60f10ecbfad2c4cf07b982ef611e791220ac9064035062ab5bf00ec983355437ef400"
 				]
 			}
 		}
@@ -1140,7 +1140,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
 					"addresses": [
 						"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
 					],
-					"amount": 999989738,
+					"amount": 999987901,
 					"locktime": 0,
 					"threshold": 1
 				}
@@ -1225,7 +1225,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
 			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 			"credential": {
 				"signatures": [
-					"0xdbc76c0ed5064da5c7f391a05800de4a917adb92c98be22d3d995d358e973f877eafd8b32ba9dd4381ab61e20a315b6152171e4bceaedee1b87c009806a584d800"
+					"0x71861edb51241d98280409243382697667ec850852360ab6b72c7864d926ca6d08a0ef2d7a3a3c17e4c38693973ee6b22aeebccd46ae9aab2a038f3777bee18200"
 				]
 			}
 		},
@@ -1233,7 +1233,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
 			"fxID": "qd2U4HDWUvMrVUeTcCHp6xH3Qpnn1XbU5MDdnBoiifFqvgXwT",
 			"credential": {
 				"signatures": [
-					"0xdbc76c0ed5064da5c7f391a05800de4a917adb92c98be22d3d995d358e973f877eafd8b32ba9dd4381ab61e20a315b6152171e4bceaedee1b87c009806a584d800"
+					"0x71861edb51241d98280409243382697667ec850852360ab6b72c7864d926ca6d08a0ef2d7a3a3c17e4c38693973ee6b22aeebccd46ae9aab2a038f3777bee18200"
 				]
 			}
 		},
@@ -1324,7 +1324,7 @@ func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 					"addresses": [
 						"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
 					],
-					"amount": 999989908,
+					"amount": 999988181,
 					"locktime": 0,
 					"threshold": 1
 				}
@@ -1385,7 +1385,7 @@ func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 			"credential": {
 				"signatures": [
-					"0x3bebf1a4bee4e309a3a93c39886caacc0fe246c0fcad01715cc30152157db4ee3bad1bf8e6466a36255675f7b33defdcc11b2539571dd12cbef2c373e8963cef01"
+					"0xc7c6ee0541a7f9535aea63485698565004ba1904df15ae11a1f9320258b8a0910a7e67b3adecfb583b3c1aa169ce334b6599332a2edb0213438008ee6b8d6e9200"
 				]
 			}
 		},
@@ -1393,7 +1393,7 @@ func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 			"credential": {
 				"signatures": [
-					"0x3bebf1a4bee4e309a3a93c39886caacc0fe246c0fcad01715cc30152157db4ee3bad1bf8e6466a36255675f7b33defdcc11b2539571dd12cbef2c373e8963cef01"
+					"0xc7c6ee0541a7f9535aea63485698565004ba1904df15ae11a1f9320258b8a0910a7e67b3adecfb583b3c1aa169ce334b6599332a2edb0213438008ee6b8d6e9200"
 				]
 			}
 		}
@@ -1480,7 +1480,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleSecpMintOp(t *testing.T) {
 					"addresses": [
 						"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
 					],
-					"amount": 999989724,
+					"amount": 999987833,
 					"locktime": 0,
 					"threshold": 1
 				}
@@ -1581,7 +1581,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleSecpMintOp(t *testing.T) {
 			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 			"credential": {
 				"signatures": [
-					"0xc8b9f92346b7cfd553ff0ce07ad3404a2a6f5d3772fad505394ecc569854942c43a7acad47b8da7a0483404213695103732a508db9b7ff31c3cb594ef21416b300"
+					"0x475c5887edeade739aa756b41705b74cccd265044d62a5ddb927cb36b5325fca24b9e60c45b86c75983a2e0b088ca43423f61580526d27e079d4e0699696f16f00"
 				]
 			}
 		},
@@ -1589,7 +1589,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleSecpMintOp(t *testing.T) {
 			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 			"credential": {
 				"signatures": [
-					"0xc8b9f92346b7cfd553ff0ce07ad3404a2a6f5d3772fad505394ecc569854942c43a7acad47b8da7a0483404213695103732a508db9b7ff31c3cb594ef21416b300"
+					"0x475c5887edeade739aa756b41705b74cccd265044d62a5ddb927cb36b5325fca24b9e60c45b86c75983a2e0b088ca43423f61580526d27e079d4e0699696f16f00"
 				]
 			}
 		}
@@ -1667,7 +1667,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
 					"addresses": [
 						"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
 					],
-					"amount": 999990156,
+					"amount": 999988457,
 					"locktime": 0,
 					"threshold": 1
 				}
@@ -1725,7 +1725,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
 			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 			"credential": {
 				"signatures": [
-					"0x5d5c832a43c268fbfaeac448d70abcdf421ddb43330569fb226e13fe6612e52c75f1cedf5a9273bdd27382e7823d6cb57491f655bfce86101d95874c291f601101"
+					"0xb57f28c21f47bdcba299086d6f45c94b97f24d45a9c1c68d6c8b42be41ff3e130521dd297c9c9b4af66defde7a3e15538aefaee70211a0191d00e8f280afa5bb00"
 				]
 			}
 		},
@@ -1818,7 +1818,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) 
 					"addresses": [
 						"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
 					],
-					"amount": 999989820,
+					"amount": 999987985,
 					"locktime": 0,
 					"threshold": 1
 				}
@@ -1905,7 +1905,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) 
 			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 			"credential": {
 				"signatures": [
-					"0x21e481d413077b99d8baec68669ba96e98a41b99961c0dda5ae8d6e4289f7fa67ad63896989e51f80b3ceba21fd92f8b61e4e6d32f7d4817eaf6980f62fd863601"
+					"0xcd0efc04d93b862a2fd95c75ccb4b0a393632a2e57c7b68c8fa1821a93e16c83381940dcb52fb5349aa954d9323486ea1022b75d5d9feabd6bf8c9263488234d01"
 				]
 			}
 		},

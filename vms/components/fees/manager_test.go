@@ -21,7 +21,7 @@ func TestComputeNextEmptyWindows(t *testing.T) {
 			BlockUnitsTarget:  Dimensions{25, 25, 25, 25},
 		}
 		currentUnitFees = Dimensions{1, 1, 1, 1}
-		consumedUnits   = Dimensions{50, 100, 150, 2500}
+		consumedUnits   = Dimensions{2500, 25, 20, 50}
 		feeWindows      = Windows{}
 
 		// last block happened within Window
@@ -40,16 +40,16 @@ func TestComputeNextEmptyWindows(t *testing.T) {
 		currBlkTime.Unix(),
 	)
 
-	// Bandwidth units are below target, next unit fees are pushed to the minimum
+	// Bandwidth units are way above target, next unit fees are pushed up
 	require.Equal(feesCfg.MinUnitFees[Bandwidth], m.unitFees[Bandwidth])
 
-	// UTXORead units are at target, next unit fees are kept equal
+	// UTXORead units are below target, next unit fees are pushed to the minimum
 	require.Equal(feesCfg.MinUnitFees[UTXORead], m.unitFees[UTXORead])
 
-	// UTXOWrite units are above target, next unit fees increased
+	// UTXOWriteunits are below target, next unit fees are pushed to the minimum
 	require.Equal(feesCfg.MinUnitFees[UTXOWrite], m.unitFees[UTXOWrite])
 
-	// Compute units are way above target, next unit fees are increased to the max
+	// Compute units are below target, next unit fees are pushed to the minimum
 	require.Equal(feesCfg.MinUnitFees[Compute], m.unitFees[Compute])
 
 	m.UpdateWindows(&feeWindows, lastBlkTime.Unix(), currBlkTime.Unix())
@@ -60,17 +60,17 @@ func TestComputeNextEmptyWindows(t *testing.T) {
 		currBlkTime.Unix(),
 	)
 
-	// Bandwidth units are below target, next unit fees are pushed to the minimum
-	require.Equal(uint64(4), m.unitFees[Bandwidth])
+	// Bandwidth units are above target, next unit fees are pushed up
+	require.Equal(uint64(0x4000000000000000), m.unitFees[Bandwidth])
 
-	// UTXORead units are at target, next unit fees are kept equal
-	require.Equal(uint64(512), m.unitFees[UTXORead])
+	// UTXORead units are at target, unit fees are not changed
+	require.Equal(feesCfg.MinUnitFees[UTXORead], m.unitFees[UTXORead])
 
-	// UTXOWrite units are above target, next unit fees increased
-	require.Equal(uint64(0x2000000000), m.unitFees[UTXOWrite])
+	// UTXOWrite units are below target, next unit fees are pushed down if there is space
+	require.Equal(feesCfg.MinUnitFees[UTXOWrite], m.unitFees[UTXOWrite])
 
-	// Compute units are way above target, next unit fees are increased to the max
-	require.Equal(uint64(0x4000000000000000), m.unitFees[Compute])
+	// Compute units are above target, next unit fees are pushed up
+	require.Equal(uint64(0x4000), m.unitFees[Compute])
 }
 
 func TestComputeNextNonEmptyWindows(t *testing.T) {
@@ -107,17 +107,17 @@ func TestComputeNextNonEmptyWindows(t *testing.T) {
 		currBlkTime.Unix(),
 	)
 
-	// Bandwidth units are below target, next unit fees are pushed to the minimum
-	require.Equal(feesCfg.MinUnitFees[Bandwidth], m.unitFees[Bandwidth])
+	// Bandwidth units are below target, next unit fees are pushed down
+	require.Equal(uint64(0x1), m.unitFees[Bandwidth])
 
 	// UTXORead units are at above target, due to spike in window. Next unit fees are increased
-	require.Equal(uint64(4*1<<60), m.unitFees[UTXORead])
+	require.Equal(uint64(0x4000000000000000), m.unitFees[UTXORead])
 
-	// UTXOWrite units are above target, even if they are decreasing within the window. Next unit fees increased.
-	require.Equal(uint64(2*1<<60), m.unitFees[UTXOWrite])
+	// UTXOWrite units are above target, even if they are decreasing within the window. Next unit fees are increased.
+	require.Equal(uint64(0x1000000000000000), m.unitFees[UTXOWrite])
 
 	// Compute units are above target, next unit fees are increased.
-	require.Equal(uint64(4*1<<60), m.unitFees[Compute])
+	require.Equal(uint64(0x4000000000000000), m.unitFees[Compute])
 }
 
 func TestComputeNextEdgeCases(t *testing.T) {
@@ -162,10 +162,10 @@ func TestComputeNextEdgeCases(t *testing.T) {
 	require.Equal(currentUnitFees[UTXORead], m.unitFees[UTXORead])
 
 	// UTXOWrite units are below target. Unit fees are decreased.
-	require.Equal(feesCfg.MinUnitFees[UTXOWrite], m.unitFees[UTXOWrite])
+	require.Equal(uint64(0x1), m.unitFees[UTXOWrite])
 
 	// Compute units are below target. Unit fees are decreased.
-	require.Equal(feesCfg.MinUnitFees[Compute], m.unitFees[Compute])
+	require.Equal(uint64(0x1), m.unitFees[Compute])
 }
 
 func TestComputeNextStability(t *testing.T) {
@@ -180,7 +180,7 @@ func TestComputeNextStability(t *testing.T) {
 	var (
 		feesCfg = DynamicFeesConfig{
 			MinUnitFees:       Dimensions{0, 0, 0, 0},
-			UpdateCoefficient: Dimensions{1, 2, 5, 10},
+			UpdateCoefficient: Dimensions{2, 4, 5, 10},
 			BlockUnitsTarget:  Dimensions{25, 50, 100, 1000},
 		}
 		initialUnitFees = Dimensions{10, 100, 1_000, 1_000_000_000}
@@ -207,8 +207,8 @@ func TestComputeNextStability(t *testing.T) {
 		currBlkTime.Unix(),
 	)
 
-	require.Less(m1.unitFees[Bandwidth], initialUnitFees[Bandwidth])
-	require.Less(m1.unitFees[UTXORead], initialUnitFees[UTXORead])
+	require.LessOrEqual(m1.unitFees[Bandwidth], initialUnitFees[Bandwidth])
+	require.LessOrEqual(m1.unitFees[UTXORead], initialUnitFees[UTXORead])
 	require.Less(m1.unitFees[UTXOWrite], initialUnitFees[UTXOWrite])
 	require.Less(m1.unitFees[Compute], initialUnitFees[Compute])
 
