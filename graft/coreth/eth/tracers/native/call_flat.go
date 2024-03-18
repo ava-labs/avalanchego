@@ -158,7 +158,7 @@ func newFlatCallTracer(ctx *tracers.Context, cfg json.RawMessage) (tracers.Trace
 func (t *flatCallTracer) CaptureStart(env *vm.EVM, from common.Address, to common.Address, create bool, input []byte, gas uint64, value *big.Int) {
 	t.tracer.CaptureStart(env, from, to, create, input, gas, value)
 	// Update list of precompiles based on current block
-	rules := env.ChainConfig().AvalancheRules(env.Context.BlockNumber, env.Context.Timestamp())
+	rules := env.ChainConfig().Rules(env.Context.BlockNumber, env.Context.Time)
 	t.activePrecompiles = vm.ActivePrecompiles(rules)
 }
 
@@ -259,7 +259,7 @@ func flatFromNested(input *callFrame, traceAddress []int, convertErrs bool, ctx 
 	case vm.CREATE, vm.CREATE2:
 		frame = newFlatCreate(input)
 	case vm.SELFDESTRUCT:
-		frame = newFlatSuicide(input)
+		frame = newFlatSelfdestruct(input)
 	case vm.CALL, vm.STATICCALL, vm.CALLCODE, vm.DELEGATECALL:
 		frame = newFlatCall(input)
 	default:
@@ -341,7 +341,7 @@ func newFlatCall(input *callFrame) *flatCallFrame {
 	}
 }
 
-func newFlatSuicide(input *callFrame) *flatCallFrame {
+func newFlatSelfdestruct(input *callFrame) *flatCallFrame {
 	return &flatCallFrame{
 		Type: "suicide",
 		Action: flatCallAction{

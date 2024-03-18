@@ -122,7 +122,11 @@ func testAtomicSyncer(t *testing.T, serverTrieDB *trie.Database, targetHeight ui
 	serverTrie, err := trie.New(trie.TrieID(targetRoot), serverTrieDB)
 	assert.NoError(t, err)
 	addAllKeysWithPrefix := func(prefix []byte) error {
-		it := trie.NewIterator(serverTrie.NodeIterator(prefix))
+		nodeIt, err := serverTrie.NodeIterator(prefix)
+		if err != nil {
+			return err
+		}
+		it := trie.NewIterator(nodeIt)
 		for it.Next() {
 			if !bytes.HasPrefix(it.Key, prefix) {
 				return it.Err

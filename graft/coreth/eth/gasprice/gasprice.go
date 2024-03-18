@@ -29,7 +29,6 @@ package gasprice
 import (
 	"context"
 	"math/big"
-	"sort"
 	"sync"
 
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
@@ -43,6 +42,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
+	"golang.org/x/exp/slices"
 )
 
 const (
@@ -356,12 +356,12 @@ func (oracle *Oracle) suggestDynamicFees(ctx context.Context) (*big.Int, *big.In
 	price := lastPrice
 	baseFee := lastBaseFee
 	if len(tipResults) > 0 {
-		sort.Sort(bigIntArray(tipResults))
+		slices.SortFunc(tipResults, func(a, b *big.Int) int { return a.Cmp(b) })
 		price = tipResults[(len(tipResults)-1)*oracle.percentile/100]
 	}
 
 	if len(baseFeeResults) > 0 {
-		sort.Sort(bigIntArray(baseFeeResults))
+		slices.SortFunc(baseFeeResults, func(a, b *big.Int) int { return a.Cmp(b) })
 		baseFee = baseFeeResults[(len(baseFeeResults)-1)*oracle.percentile/100]
 	}
 	if price.Cmp(oracle.maxPrice) > 0 {
@@ -394,9 +394,3 @@ func (oracle *Oracle) getFeeInfo(ctx context.Context, number uint64) (*feeInfo, 
 	}
 	return oracle.feeInfoProvider.addHeader(ctx, header)
 }
-
-type bigIntArray []*big.Int
-
-func (s bigIntArray) Len() int           { return len(s) }
-func (s bigIntArray) Less(i, j int) bool { return s[i].Cmp(s[j]) < 0 }
-func (s bigIntArray) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }

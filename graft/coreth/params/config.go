@@ -27,12 +27,12 @@
 package params
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
 	"time"
 
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/coreth/precompile/modules"
@@ -40,6 +40,8 @@ import (
 	"github.com/ava-labs/coreth/utils"
 	"github.com/ethereum/go-ethereum/common"
 )
+
+const maxJSONLen = 64 * 1024 * 1024 // 64MB
 
 // Avalanche ChainIDs
 var (
@@ -413,7 +415,7 @@ var (
 		CortinaBlockTimestamp:           utils.NewUint64(0),
 	}
 
-	TestRules = TestChainConfig.AvalancheRules(new(big.Int), 0)
+	TestRules = TestChainConfig.Rules(new(big.Int), 0)
 )
 
 func getChainConfig(networkID uint32, chainID *big.Int) *ChainConfig {
@@ -451,19 +453,6 @@ func getUpgradeTime(networkID uint32, upgradeTimes map[uint32]time.Time) *uint64
 	// If the upgrade time isn't specified, default being enabled in the
 	// genesis.
 	return utils.NewUint64(0)
-}
-
-// UpgradeConfig includes the following configs that may be specified in upgradeBytes:
-// - Timestamps that enable avalanche network upgrades,
-// - Enabling or disabling precompiles as network upgrades.
-type UpgradeConfig struct {
-	// Config for enabling and disabling precompiles as network upgrades.
-	PrecompileUpgrades []PrecompileUpgrade `json:"precompileUpgrades,omitempty"`
-}
-
-// AvalancheContext provides Avalanche specific context directly into the EVM.
-type AvalancheContext struct {
-	SnowCtx *snow.Context
 }
 
 // ChainConfig is the core config which determines the blockchain settings.
@@ -533,7 +522,7 @@ func (c *ChainConfig) Description() string {
 	// Create a list of forks with a short description of them. Forks that only
 	// makes sense for mainnet should be optional at printing to avoid bloating
 	// the output for testnets and private networks.
-	banner += "Hard Forks:\n"
+	banner += "Hard Forks (block based):\n"
 	banner += fmt.Sprintf(" - Homestead:                   #%-8v (https://github.com/ethereum/execution-specs/blob/master/network-upgrades/mainnet-upgrades/homestead.md)\n", c.HomesteadBlock)
 	if c.DAOForkBlock != nil {
 		banner += fmt.Sprintf(" - DAO Fork:                    #%-8v (https://github.com/ethereum/execution-specs/blob/master/network-upgrades/mainnet-upgrades/dao-fork.md)\n", c.DAOForkBlock)
@@ -548,6 +537,12 @@ func (c *ChainConfig) Description() string {
 	if c.MuirGlacierBlock != nil {
 		banner += fmt.Sprintf(" - Muir Glacier:                #%-8v (https://github.com/ethereum/execution-specs/blob/master/network-upgrades/mainnet-upgrades/muir-glacier.md)\n", c.MuirGlacierBlock)
 	}
+
+	banner += "Hard forks (timestamp based):\n"
+	banner += fmt.Sprintf(" - Cancun Timestamp:                 @%-10v (https://github.com/ava-labs/avalanchego/releases/tag/v1.12.0)\n", ptrToString(c.CancunTime))
+	banner += "\n"
+
+	banner += "Mandatory Avalanche Upgrades (timestamp based):\n"
 	banner += fmt.Sprintf(" - Apricot Phase 1 Timestamp:        @%-10v (https://github.com/ava-labs/avalanchego/releases/tag/v1.3.0)\n", ptrToString(c.ApricotPhase1BlockTimestamp))
 	banner += fmt.Sprintf(" - Apricot Phase 2 Timestamp:        @%-10v (https://github.com/ava-labs/avalanchego/releases/tag/v1.4.0)\n", ptrToString(c.ApricotPhase2BlockTimestamp))
 	banner += fmt.Sprintf(" - Apricot Phase 3 Timestamp:        @%-10v (https://github.com/ava-labs/avalanchego/releases/tag/v1.5.0)\n", ptrToString(c.ApricotPhase3BlockTimestamp))
@@ -559,7 +554,13 @@ func (c *ChainConfig) Description() string {
 	banner += fmt.Sprintf(" - Banff Timestamp:                  @%-10v (https://github.com/ava-labs/avalanchego/releases/tag/v1.9.0)\n", ptrToString(c.BanffBlockTimestamp))
 	banner += fmt.Sprintf(" - Cortina Timestamp:                @%-10v (https://github.com/ava-labs/avalanchego/releases/tag/v1.10.0)\n", ptrToString(c.CortinaBlockTimestamp))
 	banner += fmt.Sprintf(" - Durango Timestamp:               @%-10v (https://github.com/ava-labs/avalanchego/releases/tag/v1.11.0)\n", ptrToString(c.DurangoBlockTimestamp))
-	banner += fmt.Sprintf(" - Cancun Timestamp:                 @%-10v (https://github.com/ava-labs/avalanchego/releases/tag/v1.12.0)\n", ptrToString(c.CancunTime))
+	banner += "\n"
+
+	upgradeConfigBytes, err := json.Marshal(c.UpgradeConfig)
+	if err != nil {
+		upgradeConfigBytes = []byte("cannot marshal UpgradeConfig")
+	}
+	banner += fmt.Sprintf("Upgrade Config: %s", string(upgradeConfigBytes))
 	banner += "\n"
 	return banner
 }
@@ -686,7 +687,7 @@ func (c *ChainConfig) IsDurango(time uint64) bool {
 
 // IsCancun returns whether [time] represents a block
 // with a timestamp after the Cancun upgrade time.
-func (c *ChainConfig) IsCancun(time uint64) bool {
+func (c *ChainConfig) IsCancun(num *big.Int, time uint64) bool {
 	return utils.IsTimestampForked(c.CancunTime, time)
 }
 
@@ -1072,13 +1073,13 @@ func (c *ChainConfig) rules(num *big.Int, timestamp uint64) Rules {
 		IsConstantinople: c.IsConstantinople(num),
 		IsPetersburg:     c.IsPetersburg(num),
 		IsIstanbul:       c.IsIstanbul(num),
-		IsCancun:         c.IsCancun(timestamp),
+		IsCancun:         c.IsCancun(num, timestamp),
 	}
 }
 
-// AvalancheRules returns the Avalanche modified rules to support Avalanche
+// Rules returns the Avalanche modified rules to support Avalanche
 // network upgrades
-func (c *ChainConfig) AvalancheRules(blockNum *big.Int, timestamp uint64) Rules {
+func (c *ChainConfig) Rules(blockNum *big.Int, timestamp uint64) Rules {
 	rules := c.rules(blockNum, timestamp)
 
 	rules.IsApricotPhase1 = c.IsApricotPhase1(timestamp)

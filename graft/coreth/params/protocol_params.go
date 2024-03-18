@@ -163,10 +163,23 @@ const (
 	Bls12381MapG1Gas          uint64 = 5500   // Gas price for BLS12-381 mapping field element to G1 operation
 	Bls12381MapG2Gas          uint64 = 110000 // Gas price for BLS12-381 mapping field element to G2 operation
 
-	BlobTxDataGasPerBlob             = 1 << 17 // Gas consumption of a single data blob (== blob byte size)
-	BlobTxMinDataGasprice            = 1       // Minimum gas price for data blobs
-	BlobTxDataGaspriceUpdateFraction = 2225652 // Controls the maximum rate of change for data gas price
+	// The Refund Quotient is the cap on how much of the used gas can be refunded. Before EIP-3529,
+	// up to half the consumed gas could be refunded. Redefined as 1/5th in EIP-3529
+	RefundQuotient        uint64 = 2
+	RefundQuotientEIP3529 uint64 = 5
 
+	BlobTxBytesPerFieldElement         = 32      // Size in bytes of a field element
+	BlobTxFieldElementsPerBlob         = 4096    // Number of field elements stored in a single data blob
+	BlobTxHashVersion                  = 0x01    // Version byte of the commitment hash
+	BlobTxMaxBlobGasPerBlock           = 1 << 19 // Maximum consumable blob gas for data blobs per block
+	BlobTxTargetBlobGasPerBlock        = 1 << 18 // Target consumable blob gas for data blobs per block (for 1559-like pricing)
+	BlobTxBlobGasPerBlob               = 1 << 17 // Gas consumption of a single data blob (== blob byte size)
+	BlobTxMinBlobGasprice              = 1       // Minimum gas price for data blobs
+	BlobTxBlobGaspriceUpdateFraction   = 2225652 // Controls the maximum rate of change for blob gas price
+	BlobTxPointEvaluationPrecompileGas = 50000   // Gas price for the point evaluation precompile.
+)
+
+const (
 	// Avalanche Stateful Precompile Params
 	// Gas price for native asset balance lookup. Based on the cost of an SLOAD operation since native
 	// asset balances are kept in state storage.

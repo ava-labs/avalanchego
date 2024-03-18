@@ -518,15 +518,6 @@ func (es *EventSystem) handlePendingLogs(filters filterIndex, ev []*types.Log) {
 	}
 }
 
-func (es *EventSystem) handleRemovedLogs(filters filterIndex, ev core.RemovedLogsEvent) {
-	for _, f := range filters[LogsSubscription] {
-		matchedLogs := filterLogs(ev.Logs, f.logsCrit.FromBlock, f.logsCrit.ToBlock, f.logsCrit.Addresses, f.logsCrit.Topics)
-		if len(matchedLogs) > 0 {
-			f.logs <- matchedLogs
-		}
-	}
-}
-
 func (es *EventSystem) handleTxsEvent(filters filterIndex, ev core.NewTxsEvent, accepted bool) {
 	for _, f := range filters[PendingTransactionsSubscription] {
 		f.txs <- ev.Txs
@@ -578,7 +569,7 @@ func (es *EventSystem) eventLoop() {
 		case ev := <-es.logsAcceptedCh:
 			es.handleAcceptedLogs(index, ev)
 		case ev := <-es.rmLogsCh:
-			es.handleRemovedLogs(index, ev)
+			es.handleLogs(index, ev.Logs)
 		case ev := <-es.pendingLogsCh:
 			es.handlePendingLogs(index, ev)
 		case ev := <-es.chainCh:

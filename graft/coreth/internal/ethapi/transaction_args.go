@@ -90,7 +90,6 @@ func (args *TransactionArgs) setDefaults(ctx context.Context, b Backend) error {
 	if err := args.setFeeDefaults(ctx, b); err != nil {
 		return err
 	}
-
 	if args.Value == nil {
 		args.Value = new(hexutil.Big)
 	}
@@ -123,7 +122,7 @@ func (args *TransactionArgs) setDefaults(ctx context.Context, b Backend) error {
 			AccessList:           args.AccessList,
 		}
 		pendingBlockNr := rpc.BlockNumberOrHashWithNumber(rpc.PendingBlockNumber)
-		estimated, err := DoEstimateGas(ctx, b, callArgs, pendingBlockNr, b.RPCGasCap())
+		estimated, err := DoEstimateGas(ctx, b, callArgs, pendingBlockNr, nil, b.RPCGasCap())
 		if err != nil {
 			return err
 		}
@@ -258,7 +257,7 @@ func (args *TransactionArgs) ToMessage(globalGasCap uint64, baseFee *big.Int) (*
 			gasPrice = args.GasPrice.ToInt()
 			gasFeeCap, gasTipCap = gasPrice, gasPrice
 		} else {
-			// User specified 1559 gas feilds (or none), use those
+			// User specified 1559 gas fields (or none), use those
 			gasFeeCap = new(big.Int)
 			if args.MaxFeePerGas != nil {
 				gasFeeCap = args.MaxFeePerGas.ToInt()

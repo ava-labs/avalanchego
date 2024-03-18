@@ -48,6 +48,9 @@ var (
 	// headBlockKey tracks the latest known full block's hash.
 	headBlockKey = []byte("LastBlock")
 
+	// persistentStateIDKey tracks the id of latest stored state(for path-based only).
+	persistentStateIDKey = []byte("LastStateID")
+
 	// snapshotRootKey tracks the hash of the last snapshot.
 	snapshotRootKey = []byte("SnapshotRoot")
 
@@ -56,6 +59,9 @@ var (
 
 	// snapshotGeneratorKey tracks the snapshot generation marker across restarts.
 	snapshotGeneratorKey = []byte("SnapshotGenerator")
+
+	// trieJournalKey tracks the in-memory trie node layers across restarts.
+	trieJournalKey = []byte("TrieJournal")
 
 	// txIndexTailKey tracks the oldest block whose transactions have been indexed.
 	txIndexTailKey = []byte("TransactionIndexTail")
@@ -93,6 +99,7 @@ var (
 	// Path-based storage scheme of merkle patricia trie.
 	trieNodeAccountPrefix = []byte("A") // trieNodeAccountPrefix + hexPath -> trie node
 	trieNodeStoragePrefix = []byte("O") // trieNodeStoragePrefix + accountHash + hexPath -> trie node
+	stateIDPrefix         = []byte("L") // stateIDPrefix + state root -> state id
 
 	PreimagePrefix = []byte("secure-key-")      // PreimagePrefix + hash -> preimage
 	configPrefix   = []byte("ethereum-config-") // config prefix for the db
@@ -216,6 +223,11 @@ func IsCodeKey(key []byte) (bool, []byte) {
 // configKey = configPrefix + hash
 func configKey(hash common.Hash) []byte {
 	return append(configPrefix, hash.Bytes()...)
+}
+
+// stateIDKey = stateIDPrefix + root (32 bytes)
+func stateIDKey(root common.Hash) []byte {
+	return append(stateIDPrefix, root.Bytes()...)
 }
 
 // accountTrieNodeKey = trieNodeAccountPrefix + nodePath.

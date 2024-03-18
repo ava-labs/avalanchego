@@ -30,7 +30,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"math/big"
 	"time"
 
 	"github.com/ava-labs/coreth/core/rawdb"
@@ -287,7 +286,15 @@ func (dl *diskLayer) generate(stats *generatorStats) {
 	if len(dl.genMarker) > 0 { // []byte{} is the start, use nil for that
 		accMarker = dl.genMarker[:common.HashLength]
 	}
-	accIt := trie.NewIterator(accTrie.NodeIterator(accMarker))
+	nodeIt, err := accTrie.NodeIterator(accMarker)
+	if err != nil {
+		log.Error("Generator failed to create account iterator", "root", dl)
+		abort := <-dl.genAbort
+		dl.genStats = stats
+		close(abort)
+		return
+	}
+	accIt := trie.NewIterator(nodeIt)
 	batch := dl.diskdb.NewBatch()
 
 	// Iterate from the previous marker and continue generating the state snapshot
@@ -296,17 +303,11 @@ func (dl *diskLayer) generate(stats *generatorStats) {
 		// Retrieve the current account and flatten it into the internal format
 		accountHash := common.BytesToHash(accIt.Key)
 
-		var acc struct {
-			Nonce       uint64
-			Balance     *big.Int
-			Root        common.Hash
-			CodeHash    []byte
-			IsMultiCoin bool
-		}
+		var acc types.StateAccount
 		if err := rlp.DecodeBytes(accIt.Value, &acc); err != nil {
 			log.Crit("Invalid account encountered during snapshot creation", "err", err)
 		}
-		data := SlimAccountRLP(acc.Nonce, acc.Balance, acc.Root, acc.CodeHash, acc.IsMultiCoin)
+		data := types.SlimAccountRLP(acc)
 
 		// If the account is not yet in-progress, write it out
 		if accMarker == nil || !bytes.Equal(accountHash[:], accMarker) {
@@ -340,7 +341,15 @@ func (dl *diskLayer) generate(stats *generatorStats) {
 			if accMarker != nil && bytes.Equal(accountHash[:], accMarker) && len(dl.genMarker) > common.HashLength {
 				storeMarker = dl.genMarker[common.HashLength:]
 			}
-			storeIt := trie.NewIterator(storeTrie.NodeIterator(storeMarker))
+			nodeIt, err := storeTrie.NodeIterator(storeMarker)
+			if err != nil {
+				log.Error("Generator failed to create storage iterator", "root", dl.root, "account", accountHash, "stroot", acc.Root, "err", err)
+				abort := <-dl.genAbort
+				dl.genStats = stats
+				close(abort)
+				return
+			}
+			storeIt := trie.NewIterator(nodeIt)
 			for storeIt.Next() {
 				rawdb.WriteStorageSnapshot(batch, accountHash, common.BytesToHash(storeIt.Key), storeIt.Value)
 				stats.storage += common.StorageSize(1 + 2*common.HashLength + len(storeIt.Value))
@@ -400,5 +409,5 @@ func (dl *diskLayer) generate(stats *generatorStats) {
 }
 
 func newMeteredSnapshotCache(size int) *utils.MeteredCache {
-	return utils.NewMeteredCache(size, "", snapshotCacheNamespace, snapshotCacheStatsUpdateFrequency)
+	return utils.NewMeteredCache(size, snapshotCacheNamespace, snapshotCacheStatsUpdateFrequency)
 }

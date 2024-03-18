@@ -57,9 +57,10 @@ type Backend interface {
 	ChainDb() ethdb.Database
 	AccountManager() *accounts.Manager
 	ExtRPCEnabled() bool
-	RPCGasCap() uint64                             // global gas cap for eth_call over rpc: DoS protection
-	RPCEVMTimeout() time.Duration                  // global timeout for eth_call over rpc: DoS protection
-	RPCTxFeeCap() float64                          // global tx fee cap for all transaction related APIs
+	RPCGasCap() uint64            // global gas cap for eth_call over rpc: DoS protection
+	RPCEVMTimeout() time.Duration // global timeout for eth_call over rpc: DoS protection
+	RPCTxFeeCap() float64         // global tx fee cap for all transaction related APIs
+
 	UnprotectedAllowed(tx *types.Transaction) bool // allows only for EIP155 transactions.
 
 	// Blockchain API
@@ -87,8 +88,8 @@ type Backend interface {
 	GetPoolTransaction(txHash common.Hash) *types.Transaction
 	GetPoolNonce(ctx context.Context, addr common.Address) (uint64, error)
 	Stats() (pending int, queued int)
-	TxPoolContent() (map[common.Address]types.Transactions, map[common.Address]types.Transactions)
-	TxPoolContentFrom(addr common.Address) (types.Transactions, types.Transactions)
+	TxPoolContent() (map[common.Address][]*types.Transaction, map[common.Address][]*types.Transaction)
+	TxPoolContentFrom(addr common.Address) ([]*types.Transaction, []*types.Transaction)
 	SubscribeNewTxsEvent(chan<- core.NewTxsEvent) event.Subscription
 
 	ChainConfig() *params.ChainConfig

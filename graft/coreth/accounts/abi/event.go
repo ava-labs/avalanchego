@@ -59,6 +59,7 @@ type Event struct {
 	// e.g.	 event foo(uint32 a, int b) = "foo(uint32,int256)"
 	// Please note that "int" is substitute for its canonical representation "int256"
 	Sig string
+
 	// ID returns the canonical representation of the event's signature used by the
 	// abi definition to identify event names and types.
 	ID common.Hash

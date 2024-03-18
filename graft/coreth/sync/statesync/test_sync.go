@@ -10,7 +10,6 @@ import (
 
 	"github.com/ava-labs/coreth/accounts/keystore"
 	"github.com/ava-labs/coreth/core/rawdb"
-	"github.com/ava-labs/coreth/core/state/snapshot"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/sync/syncutils"
 	"github.com/ava-labs/coreth/trie"
@@ -48,7 +47,7 @@ func assertDBConsistency(t testing.TB, root common.Hash, clientDB ethdb.Database
 		}
 		// check snapshot consistency
 		snapshotVal := rawdb.ReadAccountSnapshot(clientDB, accHash)
-		expectedSnapshotVal := snapshot.SlimAccountRLP(acc.Nonce, acc.Balance, acc.Root, acc.CodeHash, acc.IsMultiCoin)
+		expectedSnapshotVal := types.SlimAccountRLP(acc)
 		assert.Equal(t, expectedSnapshotVal, snapshotVal)
 
 		// check code consistency

@@ -40,21 +40,22 @@ import (
 	"github.com/ethereum/go-ethereum/ethdb"
 )
 
-type stateTest struct {
+type stateEnv struct {
 	db    ethdb.Database
 	state *StateDB
 }
 
-func newStateTest() *stateTest {
+func newStateEnv() *stateEnv {
 	db := rawdb.NewMemoryDatabase()
 	sdb, _ := New(types.EmptyRootHash, NewDatabase(db), nil)
-	return &stateTest{db: db, state: sdb}
+	return &stateEnv{db: db, state: sdb}
 }
 
 func TestIterativeDump(t *testing.T) {
 	db := rawdb.NewMemoryDatabase()
-	sdb, _ := New(types.EmptyRootHash, NewDatabaseWithConfig(db, &trie.Config{Preimages: true}), nil)
-	s := &stateTest{db: db, state: sdb}
+	tdb := NewDatabaseWithConfig(db, &trie.Config{Preimages: true})
+	sdb, _ := New(types.EmptyRootHash, tdb, nil)
+	s := &stateEnv{db: db, state: sdb}
 
 	// generate a few entries
 	obj1 := s.state.GetOrNewStateObject(common.BytesToAddress([]byte{0x01}))
@@ -69,7 +70,8 @@ func TestIterativeDump(t *testing.T) {
 	// write some of them to the trie
 	s.state.updateStateObject(obj1)
 	s.state.updateStateObject(obj2)
-	s.state.Commit(false, false)
+	root, _ := s.state.Commit(0, false, false)
+	s.state, _ = New(root, tdb, nil)
 
 	b := &bytes.Buffer{}
 	s.state.IterativeDump(nil, json.NewEncoder(b))

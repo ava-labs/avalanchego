@@ -29,6 +29,7 @@ package types
 import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/log"
 )
 
 var (
@@ -50,3 +51,13 @@ var (
 	// EmptyExtDataHash is the known hash of empty extdata bytes.
 	EmptyExtDataHash = rlpHash([]byte(nil))
 )
+
+// TrieRootHash returns the hash itself if it's non-empty or the predefined
+// emptyHash one instead.
+func TrieRootHash(hash common.Hash) common.Hash {
+	if hash == (common.Hash{}) {
+		log.Error("Zero trie root hash!")
+		return EmptyRootHash
+	}
+	return hash
+}

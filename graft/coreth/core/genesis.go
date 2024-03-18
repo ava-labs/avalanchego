@@ -66,10 +66,12 @@ type Genesis struct {
 
 	// These fields are used for consensus tests. Please don't use them
 	// in actual genesis blocks.
-	Number     uint64      `json:"number"`
-	GasUsed    uint64      `json:"gasUsed"`
-	ParentHash common.Hash `json:"parentHash"`
-	BaseFee    *big.Int    `json:"baseFeePerGas"`
+	Number        uint64      `json:"number"`
+	GasUsed       uint64      `json:"gasUsed"`
+	ParentHash    common.Hash `json:"parentHash"`
+	BaseFee       *big.Int    `json:"baseFeePerGas"` // EIP-1559
+	ExcessBlobGas *uint64     `json:"excessBlobGas"` // EIP-4844
+	BlobGasUsed   *uint64     `json:"blobGasUsed"`   // EIP-4844
 }
 
 // GenesisAlloc specifies the initial state that is part of the genesis block.
@@ -101,15 +103,17 @@ type GenesisAccount struct {
 
 // field type overrides for gencodec
 type genesisSpecMarshaling struct {
-	Nonce      math.HexOrDecimal64
-	Timestamp  math.HexOrDecimal64
-	ExtraData  hexutil.Bytes
-	GasLimit   math.HexOrDecimal64
-	GasUsed    math.HexOrDecimal64
-	Number     math.HexOrDecimal64
-	Difficulty *math.HexOrDecimal256
-	BaseFee    *math.HexOrDecimal256
-	Alloc      map[common.UnprefixedAddress]GenesisAccount
+	Nonce         math.HexOrDecimal64
+	Timestamp     math.HexOrDecimal64
+	ExtraData     hexutil.Bytes
+	GasLimit      math.HexOrDecimal64
+	GasUsed       math.HexOrDecimal64
+	Number        math.HexOrDecimal64
+	Difficulty    *math.HexOrDecimal256
+	BaseFee       *math.HexOrDecimal256
+	Alloc         map[common.UnprefixedAddress]GenesisAccount
+	ExcessBlobGas *math.HexOrDecimal64
+	BlobGasUsed   *math.HexOrDecimal64
 }
 
 type genesisAccountMarshaling struct {
@@ -222,7 +226,7 @@ func SetupGenesisBlock(
 	// when we start syncing from scratch, the last accepted block
 	// will be genesis block
 	if lastBlock == nil {
-		return newcfg, common.Hash{}, fmt.Errorf("missing last accepted block")
+		return newcfg, common.Hash{}, errors.New("missing last accepted block")
 	}
 	height := lastBlock.NumberU64()
 	timestamp := lastBlock.Time()
@@ -297,14 +301,28 @@ func (g *Genesis) toBlock(db ethdb.Database, triedb *trie.Database) *types.Block
 	if g.Difficulty == nil {
 		head.Difficulty = params.GenesisDifficulty
 	}
-	if g.Config != nil && g.Config.IsApricotPhase3(0) {
-		if g.BaseFee != nil {
-			head.BaseFee = g.BaseFee
-		} else {
-			head.BaseFee = big.NewInt(params.ApricotPhase3InitialBaseFee)
+	if conf := g.Config; conf != nil {
+		num := new(big.Int).SetUint64(g.Number)
+		if conf.IsApricotPhase3(g.Timestamp) {
+			if g.BaseFee != nil {
+				head.BaseFee = g.BaseFee
+			} else {
+				head.BaseFee = new(big.Int).SetInt64(params.ApricotPhase3InitialBaseFee)
+			}
+		}
+		if conf.IsCancun(num, g.Timestamp) {
+			head.ExcessBlobGas = g.ExcessBlobGas
+			head.BlobGasUsed = g.BlobGasUsed
+			if head.ExcessBlobGas == nil {
+				head.ExcessBlobGas = new(uint64)
+			}
+			if head.BlobGasUsed == nil {
+				head.BlobGasUsed = new(uint64)
+			}
 		}
 	}
-	statedb.Commit(false, false)
+
+	statedb.Commit(0, false, false)
 	// Commit newly generated states into disk if it's not empty.
 	if root != types.EmptyRootHash {
 		if err := triedb.Commit(root, true); err != nil {

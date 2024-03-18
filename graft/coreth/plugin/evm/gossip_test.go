@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/core/rawdb"
 	"github.com/ava-labs/coreth/core/txpool"
+	"github.com/ava-labs/coreth/core/txpool/legacypool"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/core/vm"
 	"github.com/ava-labs/coreth/params"
@@ -154,8 +155,8 @@ func TestGossipSubscribe(t *testing.T) {
 
 	require.NoError(err)
 	txPool := setupPoolWithConfig(t, params.TestChainConfig, addr)
-	defer txPool.Stop()
-	txPool.SetGasPrice(common.Big1)
+	defer txPool.Close()
+	txPool.SetGasTip(common.Big1)
 	txPool.SetMinFee(common.Big0)
 
 	gossipTxPool, err := NewGossipEthTxPool(txPool, prometheus.NewRegistry())
@@ -174,7 +175,7 @@ func TestGossipSubscribe(t *testing.T) {
 	// Notify mempool about txs
 	errs := txPool.AddRemotesSync(ethTxs)
 	for _, err := range errs {
-		require.NoError(err, "failed adding subnet-evm tx to remote mempool")
+		require.NoError(err, "failed adding tx to remote mempool")
 	}
 
 	require.Eventually(
@@ -205,8 +206,11 @@ func setupPoolWithConfig(t *testing.T, config *params.ChainConfig, fundedAddress
 	}
 	chain, err := core.NewBlockChain(diskdb, core.DefaultCacheConfig, gspec, engine, vm.Config{}, common.Hash{}, false)
 	require.NoError(t, err)
-	testTxPoolConfig := txpool.DefaultConfig
-	pool := txpool.NewTxPool(testTxPoolConfig, config, chain)
+	testTxPoolConfig := legacypool.DefaultConfig
+	legacyPool := legacypool.New(testTxPoolConfig, chain)
 
-	return pool
+	txPool, err := txpool.New(new(big.Int).SetUint64(testTxPoolConfig.PriceLimit), chain, []txpool.SubPool{legacyPool})
+	require.NoError(t, err)
+
+	return txPool
 }
