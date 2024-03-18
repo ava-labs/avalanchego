@@ -234,13 +234,12 @@ func setup(tb testing.TB, c *envConfig) *environment {
 }
 
 func staticConfig(tb testing.TB, f fork) config.Config {
-	var eUpgradeTime time.Time
+	var eUpgradeTime = mockable.MaxTime
 
 	switch f {
 	case eUpgrade:
 		eUpgradeTime = time.Time{}
 	case durango:
-		eUpgradeTime = mockable.MaxTime
 	default:
 		require.FailNow(tb, "unhandled fork", f)
 	}
