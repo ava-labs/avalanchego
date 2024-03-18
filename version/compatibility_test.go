@@ -18,14 +18,14 @@ func TestCompatibility(t *testing.T) {
 		Minor: 4,
 		Patch: 3,
 	}
-	minCompatable := &Application{
+	minCompatible := &Application{
 		Name:  Client,
 		Major: 1,
 		Minor: 4,
 		Patch: 0,
 	}
-	minCompatableTime := time.Unix(9000, 0)
-	prevMinCompatable := &Application{
+	minCompatibleTime := time.Unix(9000, 0)
+	prevMinCompatible := &Application{
 		Name:  Client,
 		Major: 1,
 		Minor: 3,
@@ -34,9 +34,9 @@ func TestCompatibility(t *testing.T) {
 
 	compatibility := NewCompatibility(
 		v,
-		minCompatable,
-		minCompatableTime,
-		prevMinCompatable,
+		minCompatible,
+		minCompatibleTime,
+		prevMinCompatible,
 	).(*compatibility)
 	require.Equal(t, v, compatibility.Version())
 
@@ -47,21 +47,12 @@ func TestCompatibility(t *testing.T) {
 	}{
 		{
 			peer: &Application{
-				Name:  LegacyAppName,
-				Major: 1,
-				Minor: 5,
-				Patch: 0,
-			},
-			time: minCompatableTime,
-		},
-		{
-			peer: &Application{
 				Name:  Client,
 				Major: 1,
 				Minor: 5,
 				Patch: 0,
 			},
-			time: minCompatableTime,
+			time: minCompatibleTime,
 		},
 		{
 			peer: &Application{
@@ -79,7 +70,7 @@ func TestCompatibility(t *testing.T) {
 				Minor: 1,
 				Patch: 0,
 			},
-			time:        minCompatableTime,
+			time:        minCompatibleTime,
 			expectedErr: errDifferentMajor,
 		},
 		{
@@ -89,7 +80,7 @@ func TestCompatibility(t *testing.T) {
 				Minor: 3,
 				Patch: 5,
 			},
-			time:        minCompatableTime,
+			time:        minCompatibleTime,
 			expectedErr: errIncompatible,
 		},
 		{
