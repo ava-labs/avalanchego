@@ -190,11 +190,6 @@ func initTestProposerVM(
 
 	db := prefixdb.New([]byte{0}, memdb.New())
 
-	// signal height index is complete
-	coreVM.VerifyHeightIndexF = func(context.Context) error {
-		return nil
-	}
-
 	require.NoError(proVM.Initialize(
 		context.Background(),
 		ctx,
@@ -1000,9 +995,6 @@ func TestExpiredBuildBlock(t *testing.T) {
 		toScheduler = toEngineChan
 		return nil
 	}
-	coreVM.VerifyHeightIndexF = func(context.Context) error {
-		return nil
-	}
 
 	// make sure that DBs are compressed correctly
 	require.NoError(proVM.Initialize(
@@ -1290,9 +1282,6 @@ func TestInnerVMRollback(t *testing.T) {
 	) error {
 		return nil
 	}
-	coreVM.VerifyHeightIndexF = func(context.Context) error {
-		return nil
-	}
 
 	db := memdb.New()
 
@@ -1382,9 +1371,6 @@ func TestInnerVMRollback(t *testing.T) {
 	// Restart the node and have the inner VM rollback state.
 	require.NoError(proVM.Shutdown(context.Background()))
 	coreBlk.StatusV = choices.Processing
-	coreVM.VerifyHeightIndexF = func(context.Context) error {
-		return nil
-	}
 
 	proVM = New(
 		coreVM,
@@ -1856,9 +1842,6 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 		TestVM: common.TestVM{
 			T: t,
 		},
-		VerifyHeightIndexF: func(context.Context) error {
-			return nil
-		},
 		GetBlockIDAtHeightF: func(_ context.Context, height uint64) (ids.ID, error) {
 			if height >= uint64(len(coreHeights)) {
 				return ids.ID{}, errTooHigh
@@ -1967,14 +1950,6 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 	require.NoError(proVM.SetState(context.Background(), snow.NormalOp))
 
 	require.NoError(proVM.SetPreference(context.Background(), coreGenBlk.IDV))
-
-	ctx.Lock.Lock()
-	for proVM.VerifyHeightIndex(context.Background()) != nil {
-		ctx.Lock.Unlock()
-		time.Sleep(time.Millisecond)
-		ctx.Lock.Lock()
-	}
-	ctx.Lock.Unlock()
 
 	// create inner block X and outer block A
 	xBlock := &snowman.TestBlock{
@@ -2066,9 +2041,6 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 		TestVM: common.TestVM{
 			T: t,
 		},
-		VerifyHeightIndexF: func(context.Context) error {
-			return nil
-		},
 		GetBlockIDAtHeightF: func(_ context.Context, height uint64) (ids.ID, error) {
 			if height >= uint64(len(coreHeights)) {
 				return ids.ID{}, errTooHigh
@@ -2177,14 +2149,6 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 	require.NoError(proVM.SetState(context.Background(), snow.NormalOp))
 
 	require.NoError(proVM.SetPreference(context.Background(), coreGenBlk.IDV))
-
-	ctx.Lock.Lock()
-	for proVM.VerifyHeightIndex(context.Background()) != nil {
-		ctx.Lock.Unlock()
-		time.Sleep(time.Millisecond)
-		ctx.Lock.Lock()
-	}
-	ctx.Lock.Unlock()
 
 	xBlockID := ids.GenerateTestID()
 	xBlock := &TestOptionsBlock{
@@ -2293,7 +2257,6 @@ func TestVMInnerBlkCache(t *testing.T) {
 		gomock.Any(),
 		gomock.Any(),
 	).Return(nil)
-	innerVM.EXPECT().VerifyHeightIndex(gomock.Any()).Return(nil)
 	innerVM.EXPECT().Shutdown(gomock.Any()).Return(nil)
 
 	{
@@ -2534,7 +2497,6 @@ func TestVM_VerifyBlockWithContext(t *testing.T) {
 		gomock.Any(),
 		gomock.Any(),
 	).Return(nil)
-	innerVM.EXPECT().VerifyHeightIndex(gomock.Any()).Return(nil)
 	innerVM.EXPECT().Shutdown(gomock.Any()).Return(nil)
 
 	{
@@ -2692,9 +2654,6 @@ func TestHistoricalBlockDeletion(t *testing.T) {
 			}
 			return nil, errUnknownBlock
 		},
-		VerifyHeightIndexF: func(context.Context) error {
-			return nil
-		},
 		GetBlockIDAtHeightF: func(_ context.Context, height uint64) (ids.ID, error) {
 			if height >= uint64(len(acceptedBlocks)) {
 				return ids.ID{}, errTooHigh
@@ -2751,7 +2710,6 @@ func TestHistoricalBlockDeletion(t *testing.T) {
 
 	require.NoError(proVM.SetState(context.Background(), snow.NormalOp))
 	require.NoError(proVM.SetPreference(context.Background(), lastAcceptedID))
-	require.NoError(proVM.VerifyHeightIndex(context.Background()))
 
 	issueBlock := func() {
 		lastAcceptedBlock := acceptedBlocks[currentHeight]
@@ -2852,7 +2810,6 @@ func TestHistoricalBlockDeletion(t *testing.T) {
 
 	require.NoError(proVM.SetState(context.Background(), snow.NormalOp))
 	require.NoError(proVM.SetPreference(context.Background(), lastAcceptedID))
-	require.NoError(proVM.VerifyHeightIndex(context.Background()))
 
 	// Verify that old blocks were pruned during startup
 	requireNumHeights(numHistoricalBlocks)
@@ -2900,7 +2857,6 @@ func TestHistoricalBlockDeletion(t *testing.T) {
 
 	require.NoError(proVM.SetState(context.Background(), snow.NormalOp))
 	require.NoError(proVM.SetPreference(context.Background(), lastAcceptedID))
-	require.NoError(proVM.VerifyHeightIndex(context.Background()))
 
 	// The height index shouldn't be modified at this point
 	requireNumHeights(numHistoricalBlocks)

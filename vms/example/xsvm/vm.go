@@ -168,10 +168,6 @@ func (vm *VM) BuildBlockWithContext(ctx context.Context, blockContext *smblock.C
 	return vm.builder.BuildBlock(ctx, blockContext)
 }
 
-func (*VM) VerifyHeightIndex(context.Context) error {
-	return nil
-}
-
 func (vm *VM) GetBlockIDAtHeight(_ context.Context, height uint64) (ids.ID, error) {
 	return state.GetBlockIDByHeight(vm.db, height)
 }
