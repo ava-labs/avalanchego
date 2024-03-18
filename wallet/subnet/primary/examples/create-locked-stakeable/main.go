@@ -48,7 +48,7 @@ func main() {
 
 	// Get the P-chain wallet
 	pWallet := wallet.P()
-	avaxAssetID := pWallet.AVAXAssetID()
+	avaxAssetID := pWallet.Builder().Context().AVAXAssetID
 
 	issueTxStartTime := time.Now()
 	tx, err := pWallet.IssueBaseTx([]*avax.TransferableOutput{

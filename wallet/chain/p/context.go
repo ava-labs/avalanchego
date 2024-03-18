@@ -4,24 +4,24 @@
 package p
 
 import (
+	"context"
+
 	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/vms/avm"
-	"github.com/ava-labs/avalanchego/wallet/chain/p/backends"
-
-	stdcontext "context"
+	"github.com/ava-labs/avalanchego/wallet/chain/p/builder"
 )
 
-func NewContextFromURI(ctx stdcontext.Context, uri string) (backends.Context, error) {
+func NewContextFromURI(ctx context.Context, uri string) (*builder.Context, error) {
 	infoClient := info.NewClient(uri)
 	xChainClient := avm.NewClient(uri, "X")
 	return NewContextFromClients(ctx, infoClient, xChainClient)
 }
 
 func NewContextFromClients(
-	ctx stdcontext.Context,
+	ctx context.Context,
 	infoClient info.Client,
 	xChainClient avm.Client,
-) (backends.Context, error) {
+) (*builder.Context, error) {
 	networkID, err := infoClient.GetNetworkID(ctx)
 	if err != nil {
 		return nil, err
@@ -37,16 +37,16 @@ func NewContextFromClients(
 		return nil, err
 	}
 
-	return backends.NewContext(
-		networkID,
-		asset.AssetID,
-		uint64(txFees.TxFee),
-		uint64(txFees.CreateSubnetTxFee),
-		uint64(txFees.TransformSubnetTxFee),
-		uint64(txFees.CreateBlockchainTxFee),
-		uint64(txFees.AddPrimaryNetworkValidatorFee),
-		uint64(txFees.AddPrimaryNetworkDelegatorFee),
-		uint64(txFees.AddSubnetValidatorFee),
-		uint64(txFees.AddSubnetDelegatorFee),
-	), nil
+	return &builder.Context{
+		NetworkID:                     networkID,
+		AVAXAssetID:                   asset.AssetID,
+		BaseTxFee:                     uint64(txFees.TxFee),
+		CreateSubnetTxFee:             uint64(txFees.CreateSubnetTxFee),
+		TransformSubnetTxFee:          uint64(txFees.TransformSubnetTxFee),
+		CreateBlockchainTxFee:         uint64(txFees.CreateBlockchainTxFee),
+		AddPrimaryNetworkValidatorFee: uint64(txFees.AddPrimaryNetworkValidatorFee),
+		AddPrimaryNetworkDelegatorFee: uint64(txFees.AddPrimaryNetworkDelegatorFee),
+		AddSubnetValidatorFee:         uint64(txFees.AddSubnetValidatorFee),
+		AddSubnetDelegatorFee:         uint64(txFees.AddSubnetDelegatorFee),
+	}, nil
 }
