@@ -14,10 +14,12 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-	"github.com/ava-labs/avalanchego/wallet/chain/p/backends"
+	"github.com/ava-labs/avalanchego/wallet/chain/p/signer"
+
+	vmbuilder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
+	walletbuilder "github.com/ava-labs/avalanchego/wallet/chain/p/builder"
 )
 
 func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
@@ -65,9 +67,10 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 
 			cfg := *env.config
 			cfg.CreateSubnetTxFee = test.fee
-			backend := builder.NewBackend(env.ctx, &cfg, env.state, env.atomicUTXOs)
+			builderContext := vmbuilder.NewContext(env.ctx, &cfg, env.state.GetTimestamp())
+			backend := vmbuilder.NewBackend(&cfg, env.state, env.atomicUTXOs)
 			backend.ResetAddresses(addrs)
-			pBuilder := backends.NewBuilder(addrs, backend)
+			pBuilder := walletbuilder.New(addrs, builderContext, backend)
 
 			utx, err := pBuilder.NewCreateSubnetTx(
 				&secp256k1fx.OutputOwners{}, // owner
@@ -75,8 +78,8 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 			require.NoError(err)
 
 			kc := secp256k1fx.NewKeychain(preFundedKeys...)
-			s := backends.NewSigner(kc, backend)
-			tx, err := backends.SignUnsigned(context.Background(), s, utx)
+			s := signer.New(kc, backend)
+			tx, err := signer.SignUnsigned(context.Background(), s, utx)
 			require.NoError(err)
 
 			stateDiff, err := state.NewDiff(lastAcceptedID, env)
