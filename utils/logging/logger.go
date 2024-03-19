@@ -9,6 +9,8 @@ import (
 	"go.uber.org/zap"
 )
 
+type Func func(msg string, fields ...zap.Field)
+
 // Logger defines the interface that is used to keep a record of all events that
 // happen to the program
 type Logger interface {

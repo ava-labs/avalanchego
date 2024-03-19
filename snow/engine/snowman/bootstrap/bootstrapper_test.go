@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -21,14 +20,13 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
 	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/bootstrap/interval"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
 )
@@ -79,7 +77,6 @@ func newConfig(t *testing.T) (Config, ids.NodeID, *common.SenderTest, *block.Tes
 	snowGetHandler, err := getter.New(vm, sender, ctx.Log, time.Second, 2000, ctx.Registerer)
 	require.NoError(err)
 
-	blocker, _ := queue.NewWithMissing(memdb.New(), "", prometheus.NewRegistry())
 	return Config{
 		AllGetsServer:                  snowGetHandler,
 		Ctx:                            ctx,
@@ -90,7 +87,7 @@ func newConfig(t *testing.T) (Config, ids.NodeID, *common.SenderTest, *block.Tes
 		BootstrapTracker:               bootstrapTracker,
 		Timer:                          &common.TimerTest{},
 		AncestorsMaxContainersReceived: 2000,
-		Blocked:                        blocker,
+		DB:                             memdb.New(),
 		VM:                             vm,
 	}, peer, sender, vm
 }
@@ -117,7 +114,6 @@ func TestBootstrapperStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 	startupTracker := tracker.NewStartup(peerTracker, startupAlpha)
 	peers.RegisterCallbackListener(ctx.SubnetID, startupTracker)
 
-	blocker, _ := queue.NewWithMissing(memdb.New(), "", prometheus.NewRegistry())
 	snowGetHandler, err := getter.New(vm, sender, ctx.Log, time.Second, 2000, ctx.Registerer)
 	require.NoError(err)
 	cfg := Config{
@@ -130,7 +126,7 @@ func TestBootstrapperStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 		BootstrapTracker:               &common.BootstrapTrackerTest{},
 		Timer:                          &common.TimerTest{},
 		AncestorsMaxContainersReceived: 2000,
-		Blocked:                        blocker,
+		DB:                             memdb.New(),
 		VM:                             vm,
 	}
 
@@ -1310,7 +1306,7 @@ func TestBootstrapContinueAfterHalt(t *testing.T) {
 
 	require.NoError(bs.startSyncing(context.Background(), []ids.ID{blk2.ID()}))
 
-	require.Equal(1, bs.Blocked.NumMissingIDs())
+	require.Equal(1, bs.missingBlockIDs.Len())
 }
 
 func TestBootstrapNoParseOnNew(t *testing.T) {
@@ -1355,10 +1351,6 @@ func TestBootstrapNoParseOnNew(t *testing.T) {
 	snowGetHandler, err := getter.New(vm, sender, ctx.Log, time.Second, 2000, ctx.Registerer)
 	require.NoError(err)
 
-	queueDB := memdb.New()
-	blocker, err := queue.NewWithMissing(queueDB, "", prometheus.NewRegistry())
-	require.NoError(err)
-
 	blk0 := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
@@ -1383,22 +1375,13 @@ func TestBootstrapNoParseOnNew(t *testing.T) {
 		return blk0, nil
 	}
 
-	pushed, err := blocker.Push(context.Background(), &blockJob{
-		log:         logging.NoLog{},
-		numAccepted: prometheus.NewCounter(prometheus.CounterOpts{}),
-		numDropped:  prometheus.NewCounter(prometheus.CounterOpts{}),
-		blk:         blk1,
-		vm:          vm,
-	})
+	intervalDB := memdb.New()
+	tree, err := interval.NewTree(intervalDB)
 	require.NoError(err)
-	require.True(pushed)
-
-	require.NoError(blocker.Commit())
+	_, err = interval.Add(intervalDB, tree, 0, blk1)
+	require.NoError(err)
 
 	vm.GetBlockF = nil
-
-	blocker, err = queue.NewWithMissing(queueDB, "", prometheus.NewRegistry())
-	require.NoError(err)
 
 	config := Config{
 		AllGetsServer:                  snowGetHandler,
@@ -1410,7 +1393,7 @@ func TestBootstrapNoParseOnNew(t *testing.T) {
 		BootstrapTracker:               bootstrapTracker,
 		Timer:                          &common.TimerTest{},
 		AncestorsMaxContainersReceived: 2000,
-		Blocked:                        blocker,
+		DB:                             intervalDB,
 		VM:                             vm,
 	}
 

@@ -82,10 +82,11 @@ var (
 	VMDBPrefix = []byte("vm")
 
 	// Bootstrapping prefixes for LinearizableVMs
-	VertexDBPrefix              = []byte("vertex")
-	VertexBootstrappingDBPrefix = []byte("vertex_bs")
-	TxBootstrappingDBPrefix     = []byte("tx_bs")
-	BlockBootstrappingDBPrefix  = []byte("block_bs")
+	VertexDBPrefix                = []byte("vertex")
+	VertexBootstrappingDBPrefix   = []byte("vertex_bs")
+	TxBootstrappingDBPrefix       = []byte("tx_bs")
+	BlockBootstrappingDBPrefix    = []byte("block_bs")
+	NewBlockBootstrappingDBPrefix = []byte("new_block_bs")
 
 	// Bootstrapping prefixes for ChainVMs
 	ChainBootstrappingDBPrefix = []byte("bs")
@@ -569,17 +570,13 @@ func (m *manager) createAvalancheChain(
 	vertexDB := prefixdb.New(VertexDBPrefix, prefixDB)
 	vertexBootstrappingDB := prefixdb.New(VertexBootstrappingDBPrefix, prefixDB)
 	txBootstrappingDB := prefixdb.New(TxBootstrappingDBPrefix, prefixDB)
-	blockBootstrappingDB := prefixdb.New(BlockBootstrappingDBPrefix, prefixDB)
+	newBlockBootstrappingDB := prefixdb.New(NewBlockBootstrappingDBPrefix, prefixDB)
 
 	vtxBlocker, err := queue.NewWithMissing(vertexBootstrappingDB, "vtx", ctx.AvalancheRegisterer)
 	if err != nil {
 		return nil, err
 	}
 	txBlocker, err := queue.New(txBootstrappingDB, "tx", ctx.AvalancheRegisterer)
-	if err != nil {
-		return nil, err
-	}
-	blockBlocker, err := queue.NewWithMissing(blockBootstrappingDB, "block", ctx.Registerer)
 	if err != nil {
 		return nil, err
 	}
@@ -837,7 +834,7 @@ func (m *manager) createAvalancheChain(
 		BootstrapTracker:               sb,
 		Timer:                          h,
 		AncestorsMaxContainersReceived: m.BootstrapAncestorsMaxContainersReceived,
-		Blocked:                        blockBlocker,
+		DB:                             newBlockBootstrappingDB,
 		VM:                             vmWrappingProposerVM,
 	}
 	var snowmanBootstrapper common.BootstrapableEngine
@@ -950,12 +947,7 @@ func (m *manager) createSnowmanChain(
 	}
 	prefixDB := prefixdb.New(ctx.ChainID[:], meterDB)
 	vmDB := prefixdb.New(VMDBPrefix, prefixDB)
-	bootstrappingDB := prefixdb.New(ChainBootstrappingDBPrefix, prefixDB)
-
-	blocked, err := queue.NewWithMissing(bootstrappingDB, "block", ctx.Registerer)
-	if err != nil {
-		return nil, err
-	}
+	newBootstrappingDB := prefixdb.New(NewBlockBootstrappingDBPrefix, prefixDB)
 
 	// Passes messages from the consensus engine to the network
 	messageSender, err := sender.New(
@@ -1175,7 +1167,7 @@ func (m *manager) createSnowmanChain(
 		BootstrapTracker:               sb,
 		Timer:                          h,
 		AncestorsMaxContainersReceived: m.BootstrapAncestorsMaxContainersReceived,
-		Blocked:                        blocked,
+		DB:                             newBootstrappingDB,
 		VM:                             vm,
 		Bootstrapped:                   bootstrapFunc,
 	}

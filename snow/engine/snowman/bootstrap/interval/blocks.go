@@ -91,7 +91,7 @@ func Add(
 // Invariant: Execute assumes that GetMissingBlockIDs would return an empty set.
 func Execute(
 	ctx context.Context,
-	log logging.Logger,
+	log logging.Func,
 	db database.Database,
 	parser Parser,
 	tree *Tree,
@@ -124,7 +124,7 @@ func Execute(
 		iterator.Release()
 	}()
 
-	log.Info("executing blocks",
+	log("executing blocks",
 		zap.Uint64("numToExecute", totalNumberToProcess),
 	)
 
@@ -177,7 +177,7 @@ func Execute(
 				eta          = timer.EstimateETA(startTime, numProcessed, totalNumberToProcess)
 			)
 
-			log.Info("executing blocks",
+			log("executing blocks",
 				zap.Duration("eta", eta),
 				zap.Uint64("numExecuted", numProcessed),
 				zap.Uint64("numToExecute", totalNumberToProcess),
@@ -207,7 +207,7 @@ func Execute(
 		numProcessed = totalNumberToProcess - tree.Len()
 		err          = ctx.Err()
 	)
-	log.Info("executed blocks",
+	log("executed blocks",
 		zap.Uint64("numExecuted", numProcessed),
 		zap.Uint64("numToExecute", totalNumberToProcess),
 		zap.Duration("duration", time.Since(startTime)),
