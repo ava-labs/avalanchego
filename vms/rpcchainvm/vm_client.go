@@ -667,14 +667,6 @@ func (vm *VMClient) batchedParseBlock(ctx context.Context, blksBytes [][]byte) (
 	return res, nil
 }
 
-func (vm *VMClient) VerifyHeightIndex(ctx context.Context) error {
-	resp, err := vm.client.VerifyHeightIndex(ctx, &emptypb.Empty{})
-	if err != nil {
-		return err
-	}
-	return errEnumToError[resp.Err]
-}
-
 func (vm *VMClient) GetBlockIDAtHeight(ctx context.Context, height uint64) (ids.ID, error) {
 	resp, err := vm.client.GetBlockIDAtHeight(
 		ctx,

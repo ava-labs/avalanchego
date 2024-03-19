@@ -379,7 +379,7 @@ Specifically, we encode these values in the following way:
 +----------------------------------------------------+
 | Value (variable length bytes) (optional)           |
 +----------------------------------------------------+
-| Key length (varint)                                |
+| Key bit length (varint)                            |
 +----------------------------------------------------+
 | Key (variable length bytes)                        |
 +----------------------------------------------------+
@@ -392,7 +392,7 @@ Where:
 * `Value existence flag` is `1` if this node has a value, otherwise `0`.
 * `Value length` is the length of the value, if it exists (i.e. if `Value existence flag` is `1`.) Otherwise not serialized.
 * `Value` is the value, if it exists (i.e. if `Value existence flag` is `1`.) Otherwise not serialized.
-* `Key length` is the number of nibbles in this node's key.
+* `Key length` is the number of bits in this node's key.
 * `Key` is the node's key.
 
 Note that, as with the node serialization format, the `Child index` values aren't necessarily sequential, but they are unique and strictly increasing.

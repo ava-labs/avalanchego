@@ -104,6 +104,9 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 		baseWallet := e2e.NewWallet(keychain, nodeURI)
 		pWallet := baseWallet.P()
 
+		pBuilder := pWallet.Builder()
+		pContext := pBuilder.Context()
+
 		const (
 			delegationPercent = 0.10 // 10%
 			delegationShare   = reward.PercentDenominator * delegationPercent
@@ -130,7 +133,7 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 					Subnet: constants.PrimaryNetworkID,
 				},
 				alphaPOP,
-				pWallet.AVAXAssetID(),
+				pContext.AVAXAssetID,
 				&secp256k1fx.OutputOwners{
 					Threshold: 1,
 					Addrs:     []ids.ShortID{alphaValidationRewardKey.Address()},
@@ -159,7 +162,7 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 					Subnet: constants.PrimaryNetworkID,
 				},
 				betaPOP,
-				pWallet.AVAXAssetID(),
+				pContext.AVAXAssetID,
 				&secp256k1fx.OutputOwners{
 					Threshold: 1,
 					Addrs:     []ids.ShortID{betaValidationRewardKey.Address()},
@@ -191,7 +194,7 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 					},
 					Subnet: constants.PrimaryNetworkID,
 				},
-				pWallet.AVAXAssetID(),
+				pContext.AVAXAssetID,
 				&secp256k1fx.OutputOwners{
 					Threshold: 1,
 					Addrs:     []ids.ShortID{gammaDelegationRewardKey.Address()},
@@ -214,7 +217,7 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 					},
 					Subnet: constants.PrimaryNetworkID,
 				},
-				pWallet.AVAXAssetID(),
+				pContext.AVAXAssetID,
 				&secp256k1fx.OutputOwners{
 					Threshold: 1,
 					Addrs:     []ids.ShortID{deltaDelegationRewardKey.Address()},
@@ -276,7 +279,7 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 			pWallet := baseWallet.P()
 			balances, err := pWallet.Builder().GetBalance()
 			require.NoError(err)
-			rewardBalances[rewardKey.Address()] = balances[pWallet.AVAXAssetID()]
+			rewardBalances[rewardKey.Address()] = balances[pContext.AVAXAssetID]
 		}
 		require.Len(rewardBalances, len(rewardKeys))
 

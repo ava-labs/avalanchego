@@ -15,7 +15,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/snow/snowtest"
+	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/avm/block/executor"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
@@ -143,7 +143,6 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 			ctrl := gomock.NewController(t)
 
 			parser, err := txs.NewParser(
-				time.Time{},
 				[]fxs.Fx{
 					&secp256k1fx.Fx{},
 					&nftfx.Fx{},
@@ -173,12 +172,18 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 				appSenderFunc = tt.appSenderFunc
 			}
 
-			snowCtx := snowtest.Context(t, ids.Empty)
 			n, err := New(
 				logging.NoLog{},
 				ids.EmptyNodeID,
 				ids.Empty,
-				snowCtx.ValidatorState,
+				&validators.TestState{
+					GetCurrentHeightF: func(context.Context) (uint64, error) {
+						return 0, nil
+					},
+					GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+						return nil, nil
+					},
+				},
 				parser,
 				txVerifierFunc(ctrl),
 				mempoolFunc(ctrl),
@@ -239,7 +244,6 @@ func TestNetworkIssueTxFromRPCWithoutVerification(t *testing.T) {
 			ctrl := gomock.NewController(t)
 
 			parser, err := txs.NewParser(
-				time.Time{},
 				[]fxs.Fx{
 					&secp256k1fx.Fx{},
 					&nftfx.Fx{},
@@ -262,12 +266,18 @@ func TestNetworkIssueTxFromRPCWithoutVerification(t *testing.T) {
 				appSenderFunc = tt.appSenderFunc
 			}
 
-			snowCtx := snowtest.Context(t, ids.Empty)
 			n, err := New(
 				logging.NoLog{},
 				ids.EmptyNodeID,
 				ids.Empty,
-				snowCtx.ValidatorState,
+				&validators.TestState{
+					GetCurrentHeightF: func(context.Context) (uint64, error) {
+						return 0, nil
+					},
+					GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+						return nil, nil
+					},
+				},
 				parser,
 				executor.NewMockManager(ctrl), // Should never verify a tx
 				mempoolFunc(ctrl),
