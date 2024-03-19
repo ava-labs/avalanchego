@@ -53,6 +53,16 @@ type NodeRuntimeConfig struct {
 
 // Node supports configuring and running a node participating in a temporary network.
 type Node struct {
+	// Uniquely identifies the network the node is part of to enable monitoring.
+	NetworkUUID string
+
+	// Identify the entity associated with this network. This is
+	// intended to be used to label metrics to enable filtering
+	// results for a test run between the primary/shared network used
+	// by the majority of tests and private networks used by
+	// individual tests.
+	NetworkOwner string
+
 	// Set by EnsureNodeID which is also called when the node is read.
 	NodeID ids.NodeID
 
