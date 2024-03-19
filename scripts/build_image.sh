@@ -16,7 +16,7 @@ source "$SUBNET_EVM_PATH"/scripts/versions.sh
 # Load the constants
 source "$SUBNET_EVM_PATH"/scripts/constants.sh
 
-BUILD_IMAGE_ID=${BUILD_IMAGE_ID:-"${AVALANCHE_VERSION}-Subnet-EVM-${CURRENT_BRANCH}"}
+BUILD_IMAGE_ID=${BUILD_IMAGE_ID:-"avalanchego-${AVALANCHE_VERSION}-subnet-evm-${CURRENT_BRANCH}"}
 
 echo "Building Docker Image: $DOCKERHUB_REPO:$BUILD_IMAGE_ID based of $AVALANCHE_VERSION"
 docker build -t "$DOCKERHUB_REPO:$BUILD_IMAGE_ID" "$SUBNET_EVM_PATH" -f "$SUBNET_EVM_PATH/Dockerfile" \
@@ -25,5 +25,9 @@ docker build -t "$DOCKERHUB_REPO:$BUILD_IMAGE_ID" "$SUBNET_EVM_PATH" -f "$SUBNET
   --build-arg CURRENT_BRANCH="$CURRENT_BRANCH"
 
 if [[ ${PUSH_DOCKER_IMAGE:-""} == "true" ]]; then
+  if [[ $CURRENT_BRANCH == "master" ]]; then
+    echo "Tagging current image as $DOCKERHUB_REPO:latest"
+    docker tag "$DOCKERHUB_REPO:$BUILD_IMAGE_ID" "$DOCKERHUB_REPO:latest"
+  fi
   docker push "$DOCKERHUB_REPO:$BUILD_IMAGE_ID"
 fi

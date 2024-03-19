@@ -1,15 +1,16 @@
-name: Build + Test + Lint
+name: Tests
 
 on:
   push:
     branches:
       - master
     tags:
-      - 'v[0-9]+.[0-9]+.[0-9]+'
+      - '*'
   pull_request:
 
 env:
   tmpnet_data_path: ~/.tmpnet/networks/1000
+  min_go_version: '~1.21.7'
 
 jobs:
   lint_test:
@@ -21,7 +22,7 @@ jobs:
         shell: bash
       - uses: actions/setup-go@v5
         with:
-          go-version: '~1.21.7'
+          go-version: ${{ env.min_go_version }}
           check-latest: true
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v3
@@ -40,7 +41,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: '~1.21.7'
+          go-version: ${{ env.min_go_version }}
           check-latest: true
       - run: go mod download
         shell: bash
@@ -62,7 +63,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '~1.21.7'
+          go-version: ${{ env.min_go_version }}
           check-latest: true
       - name: Use Node.js
         uses: actions/setup-node@v4
@@ -104,7 +105,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '~1.21.7'
+          go-version: ${{ env.min_go_version }}
           check-latest: true
       - name: Use Node.js
         uses: actions/setup-node@v4
@@ -146,7 +147,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '~1.21.7'
+          go-version: ${{ env.min_go_version }}
           check-latest: true
       - name: Install AvalancheGo Release
         shell: bash
@@ -164,13 +165,16 @@ jobs:
           name: load-tmpnet-data
           path: ${{ env.tmpnet_data_path }}
           if-no-files-found: error
-
-  build_image:
-    name: Build Docker Image
-    runs-on: ubuntu-20.04
+  mock_gen:
+    name: MockGen Check
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: echo ${{ secrets.docker_pass }} | docker login --username ${{ secrets.docker_username }} --password-stdin
-        shell: bash
-      - run: CURRENT_BRANCH=${{ github.head_ref || github.ref_name }} PUSH_DOCKER_IMAGE=true ./scripts/build_image.sh
-        shell: bash
+      - uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.min_go_version }}
+          check-latest: true
+      - shell: bash
+        run: scripts/mock.gen.sh
+      - shell: bash
+        run: .github/workflows/check-clean-branch.sh
