@@ -151,7 +151,7 @@ func TestCheckCompatible(t *testing.T) {
 
 func TestConfigRules(t *testing.T) {
 	c := &ChainConfig{
-		MandatoryNetworkUpgrades: MandatoryNetworkUpgrades{
+		NetworkUpgrades: NetworkUpgrades{
 			SubnetEVMTimestamp: utils.NewUint64(500),
 		},
 	}
@@ -272,7 +272,7 @@ func TestChainConfigMarshalWithUpgrades(t *testing.T) {
 			PetersburgBlock:     big.NewInt(0),
 			IstanbulBlock:       big.NewInt(0),
 			MuirGlacierBlock:    big.NewInt(0),
-			MandatoryNetworkUpgrades: MandatoryNetworkUpgrades{
+			NetworkUpgrades: NetworkUpgrades{
 				SubnetEVMTimestamp: utils.NewUint64(0),
 				DurangoTimestamp:   utils.NewUint64(0),
 			},

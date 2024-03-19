@@ -78,17 +78,17 @@ var (
 		FeeConfig:          DefaultFeeConfig,
 		AllowFeeRecipients: false,
 
-		HomesteadBlock:           big.NewInt(0),
-		EIP150Block:              big.NewInt(0),
-		EIP155Block:              big.NewInt(0),
-		EIP158Block:              big.NewInt(0),
-		ByzantiumBlock:           big.NewInt(0),
-		ConstantinopleBlock:      big.NewInt(0),
-		PetersburgBlock:          big.NewInt(0),
-		IstanbulBlock:            big.NewInt(0),
-		MuirGlacierBlock:         big.NewInt(0),
-		MandatoryNetworkUpgrades: GetMandatoryNetworkUpgrades(constants.MainnetID), // This can be changed to correct network (local, test) via VM.
-		GenesisPrecompiles:       Precompiles{},
+		HomesteadBlock:      big.NewInt(0),
+		EIP150Block:         big.NewInt(0),
+		EIP155Block:         big.NewInt(0),
+		EIP158Block:         big.NewInt(0),
+		ByzantiumBlock:      big.NewInt(0),
+		ConstantinopleBlock: big.NewInt(0),
+		PetersburgBlock:     big.NewInt(0),
+		IstanbulBlock:       big.NewInt(0),
+		MuirGlacierBlock:    big.NewInt(0),
+		NetworkUpgrades:     getDefaultNetworkUpgrades(constants.MainnetID), // This can be changed to correct network (local, test) via VM.
+		GenesisPrecompiles:  Precompiles{},
 	}
 
 	TestChainConfig = &ChainConfig{
@@ -105,7 +105,7 @@ var (
 		PetersburgBlock:     big.NewInt(0),
 		IstanbulBlock:       big.NewInt(0),
 		MuirGlacierBlock:    big.NewInt(0),
-		MandatoryNetworkUpgrades: MandatoryNetworkUpgrades{
+		NetworkUpgrades: NetworkUpgrades{
 			SubnetEVMTimestamp: utils.NewUint64(0),
 			DurangoTimestamp:   utils.NewUint64(0),
 		},
@@ -127,7 +127,7 @@ var (
 		PetersburgBlock:     big.NewInt(0),
 		IstanbulBlock:       big.NewInt(0),
 		MuirGlacierBlock:    big.NewInt(0),
-		MandatoryNetworkUpgrades: MandatoryNetworkUpgrades{
+		NetworkUpgrades: NetworkUpgrades{
 			SubnetEVMTimestamp: utils.NewUint64(0),
 		},
 		GenesisPrecompiles: Precompiles{},
@@ -135,22 +135,22 @@ var (
 	}
 
 	TestPreSubnetEVMConfig = &ChainConfig{
-		AvalancheContext:         AvalancheContext{utils.TestSnowContext()},
-		ChainID:                  big.NewInt(1),
-		FeeConfig:                DefaultFeeConfig,
-		AllowFeeRecipients:       false,
-		HomesteadBlock:           big.NewInt(0),
-		EIP150Block:              big.NewInt(0),
-		EIP155Block:              big.NewInt(0),
-		EIP158Block:              big.NewInt(0),
-		ByzantiumBlock:           big.NewInt(0),
-		ConstantinopleBlock:      big.NewInt(0),
-		PetersburgBlock:          big.NewInt(0),
-		IstanbulBlock:            big.NewInt(0),
-		MuirGlacierBlock:         big.NewInt(0),
-		MandatoryNetworkUpgrades: MandatoryNetworkUpgrades{},
-		GenesisPrecompiles:       Precompiles{},
-		UpgradeConfig:            UpgradeConfig{},
+		AvalancheContext:    AvalancheContext{utils.TestSnowContext()},
+		ChainID:             big.NewInt(1),
+		FeeConfig:           DefaultFeeConfig,
+		AllowFeeRecipients:  false,
+		HomesteadBlock:      big.NewInt(0),
+		EIP150Block:         big.NewInt(0),
+		EIP155Block:         big.NewInt(0),
+		EIP158Block:         big.NewInt(0),
+		ByzantiumBlock:      big.NewInt(0),
+		ConstantinopleBlock: big.NewInt(0),
+		PetersburgBlock:     big.NewInt(0),
+		IstanbulBlock:       big.NewInt(0),
+		MuirGlacierBlock:    big.NewInt(0),
+		NetworkUpgrades:     NetworkUpgrades{},
+		GenesisPrecompiles:  Precompiles{},
+		UpgradeConfig:       UpgradeConfig{},
 	}
 
 	TestRules = TestChainConfig.Rules(new(big.Int), 0)
@@ -186,8 +186,10 @@ type ChainConfig struct {
 	IstanbulBlock       *big.Int `json:"istanbulBlock,omitempty"`       // Istanbul switch block (nil = no fork, 0 = already on istanbul)
 	MuirGlacierBlock    *big.Int `json:"muirGlacierBlock,omitempty"`    // Eip-2384 (bomb delay) switch block (nil = no fork, 0 = already activated)
 
-	MandatoryNetworkUpgrades // Config for timestamps that enable mandatory network upgrades. Skip encoding/decoding directly into ChainConfig.
-	OptionalNetworkUpgrades  // Config for optional timestamps that enable network upgrades
+	// Cancun activates the Cancun upgrade from Ethereum. (nil = no fork, 0 = already activated)
+	CancunTime *uint64 `json:"cancunTime,omitempty"`
+
+	NetworkUpgrades // Config for timestamps that enable network upgrades. Skip encoding/decoding directly into ChainConfig.
 
 	AvalancheContext `json:"-"` // Avalanche specific context set during VM initialization. Not serialized.
 
@@ -224,17 +226,9 @@ func (c *ChainConfig) Description() string {
 	banner += "Hard forks (timestamp based):\n"
 	banner += fmt.Sprintf(" - Cancun Timestamp:              @%-10v (https://github.com/ava-labs/avalanchego/releases/tag/v1.12.0)\n", ptrToString(c.CancunTime))
 
-	banner += "Mandatory Avalanche Upgrades (timestamp based):\n"
+	banner += "Avalanche Upgrades (timestamp based):\n"
 	banner += fmt.Sprintf(" - SubnetEVM Timestamp:           @%-10v (https://github.com/ava-labs/avalanchego/releases/tag/v1.10.0)\n", ptrToString(c.SubnetEVMTimestamp))
 	banner += fmt.Sprintf(" - Durango Timestamp:            @%-10v (https://github.com/ava-labs/avalanchego/releases/tag/v1.11.0)\n", ptrToString(c.DurangoTimestamp))
-	banner += "\n"
-
-	// Add Subnet-EVM custom fields
-	optionalNetworkUpgradeBytes, err := json.Marshal(c.OptionalNetworkUpgrades)
-	if err != nil {
-		optionalNetworkUpgradeBytes = []byte("cannot marshal OptionalNetworkUpgrades")
-	}
-	banner += fmt.Sprintf("Optional Network Upgrades: %s", string(optionalNetworkUpgradeBytes))
 	banner += "\n"
 
 	precompileUpgradeBytes, err := json.Marshal(c.GenesisPrecompiles)
@@ -261,6 +255,42 @@ func (c *ChainConfig) Description() string {
 	banner += fmt.Sprintf("Allow Fee Recipients: %v", c.AllowFeeRecipients)
 	banner += "\n"
 	return banner
+}
+
+func (c *ChainConfig) SetNetworkUpgradeDefaults() {
+	if c.HomesteadBlock == nil {
+		c.HomesteadBlock = big.NewInt(0)
+	}
+	if c.EIP150Block == nil {
+		c.EIP150Block = big.NewInt(0)
+	}
+	if c.EIP155Block == nil {
+		c.EIP155Block = big.NewInt(0)
+	}
+	if c.EIP158Block == nil {
+		c.EIP158Block = big.NewInt(0)
+	}
+	if c.ByzantiumBlock == nil {
+		c.ByzantiumBlock = big.NewInt(0)
+	}
+	if c.ConstantinopleBlock == nil {
+		c.ConstantinopleBlock = big.NewInt(0)
+	}
+	if c.PetersburgBlock == nil {
+		c.PetersburgBlock = big.NewInt(0)
+	}
+	if c.IstanbulBlock == nil {
+		c.IstanbulBlock = big.NewInt(0)
+	}
+	if c.MuirGlacierBlock == nil {
+		c.MuirGlacierBlock = big.NewInt(0)
+	}
+
+	c.NetworkUpgrades.setDefaults(c.SnowCtx.NetworkID)
+
+	// if c.CancunTime == nil {
+	// 	c.CancunTime = c.EUpgrade
+	// }
 }
 
 // IsHomestead returns whether num is either equal to the homestead block or greater.
@@ -316,6 +346,7 @@ func (c *ChainConfig) IsSubnetEVM(time uint64) bool {
 	return utils.IsTimestampForked(c.SubnetEVMTimestamp, time)
 }
 
+// TODO: move avalanche hardforks to network_upgrades.go
 // IsDurango returns whether [time] represents a block
 // with a timestamp after the Durango upgrade time.
 func (c *ChainConfig) IsDurango(time uint64) bool {
@@ -384,6 +415,11 @@ func (c *ChainConfig) Verify() error {
 		return fmt.Errorf("invalid state upgrades: %w", err)
 	}
 
+	// Verify the network upgrades are internally consistent given the existing chainConfig.
+	if err := c.VerifyNetworkUpgrades(c.SnowCtx.NetworkID); err != nil {
+		return fmt.Errorf("invalid network upgrades: %w", err)
+	}
+
 	return nil
 }
 
@@ -422,12 +458,7 @@ func (c *ChainConfig) CheckConfigForkOrder() error {
 	// Note: we do not add the optional stateful precompile configs in here because they are optional
 	// and independent, such that the ordering they are enabled does not impact the correctness of the
 	// chain config.
-	if err := checkForks(c.mandatoryForkOrder(), false); err != nil {
-		return err
-	}
-
-	// Check optional forks are enabled in order
-	if err := checkForks(c.optionalForkOrder(), false); err != nil {
+	if err := checkForks(c.forkOrder(), false); err != nil {
 		return err
 	}
 
@@ -446,12 +477,12 @@ func checkForks(forks []fork, blockFork bool) error {
 			// Next one must be higher number
 			if lastFork.timestamp == nil && cur.timestamp != nil {
 				return fmt.Errorf("unsupported fork ordering: %v not enabled, but %v enabled at %v",
-					lastFork.name, cur.name, cur.timestamp)
+					lastFork.name, cur.name, *cur.timestamp)
 			}
 			if lastFork.timestamp != nil && cur.timestamp != nil {
 				if *lastFork.timestamp > *cur.timestamp {
 					return fmt.Errorf("unsupported fork ordering: %v enabled at %v, but %v enabled at %v",
-						lastFork.name, lastFork.timestamp, cur.name, cur.timestamp)
+						lastFork.name, *lastFork.timestamp, cur.name, *cur.timestamp)
 				}
 			}
 		}
@@ -502,20 +533,12 @@ func (c *ChainConfig) checkCompatible(newcfg *ChainConfig, height *big.Int, time
 		return newBlockCompatError("Muir Glacier fork block", c.MuirGlacierBlock, newcfg.MuirGlacierBlock)
 	}
 
-	// Check avalanhe network upgrades
-	if err := c.CheckMandatoryCompatible(&newcfg.MandatoryNetworkUpgrades, time); err != nil {
-		return err
+	if isForkTimestampIncompatible(c.CancunTime, newcfg.CancunTime, time) {
+		return newTimestampCompatError("Cancun fork block timestamp", c.CancunTime, c.CancunTime)
 	}
 
-	// Check subnet-evm specific activations
-	newOptionalNetworkUpgrades := newcfg.getOptionalNetworkUpgrades()
-	if c.UpgradeConfig.OptionalNetworkUpgrades != nil && newcfg.UpgradeConfig.OptionalNetworkUpgrades == nil {
-		// Note: if the current OptionalNetworkUpgrades are set via UpgradeConfig, then a new config
-		// without OptionalNetworkUpgrades will be treated as having specified an empty set of network
-		// upgrades (ie., treated as the user intends to cancel scheduled forks)
-		newOptionalNetworkUpgrades = &OptionalNetworkUpgrades{}
-	}
-	if err := c.getOptionalNetworkUpgrades().CheckOptionalCompatible(newOptionalNetworkUpgrades, time); err != nil {
+	// Check avalanche network upgrades
+	if err := c.CheckNetworkUpgradesCompatible(&newcfg.NetworkUpgrades, time); err != nil {
 		return err
 	}
 
@@ -732,13 +755,4 @@ func (c *ChainConfig) GetFeeConfig() commontype.FeeConfig {
 // Implements precompile.ChainConfig interface.
 func (c *ChainConfig) AllowedFeeRecipients() bool {
 	return c.AllowFeeRecipients
-}
-
-// getOptionalNetworkUpgrades returns OptionalNetworkUpgrades from upgrade config if set there,
-// otherwise it falls back to the genesis chain config.
-func (c *ChainConfig) getOptionalNetworkUpgrades() *OptionalNetworkUpgrades {
-	if upgradeConfigOverride := c.UpgradeConfig.OptionalNetworkUpgrades; upgradeConfigOverride != nil {
-		return upgradeConfigOverride
-	}
-	return &c.OptionalNetworkUpgrades
 }

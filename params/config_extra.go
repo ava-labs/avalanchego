@@ -14,10 +14,8 @@ import (
 // - Timestamps that enable avalanche network upgrades,
 // - Enabling or disabling precompiles as network upgrades.
 type UpgradeConfig struct {
-	// Config for optional timestamps that enable network upgrades.
-	// Note: if OptionalUpgrades is specified in the JSON all previously activated
-	// forks must be present or upgradeBytes will be rejected.
-	OptionalNetworkUpgrades *OptionalNetworkUpgrades `json:"networkUpgrades,omitempty"`
+	// Config for timestamps that enable network upgrades.
+	NetworkUpgradeOverrides *NetworkUpgrades `json:"networkUpgradeOverrides,omitempty"`
 
 	// Config for modifying state as a network upgrade.
 	StateUpgrades []StateUpgrade `json:"stateUpgrades,omitempty"`

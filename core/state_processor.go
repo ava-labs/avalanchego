@@ -27,6 +27,7 @@
 package core
 
 import (
+	"encoding/json"
 	"fmt"
 	"math/big"
 
@@ -197,7 +198,15 @@ func ApplyPrecompileActivations(c *params.ChainConfig, parentTimestamp *uint64, 
 				// since Suicide will be committed after the reconfiguration.
 				statedb.Finalise(true)
 			} else {
-				log.Info("Activating new precompile", "name", module.ConfigKey, "config", activatingConfig)
+				var printIntf interface{}
+				marshalled, err := json.Marshal(activatingConfig)
+				if err == nil {
+					printIntf = string(marshalled)
+				} else {
+					printIntf = activatingConfig
+				}
+
+				log.Info("Activating new precompile", "name", module.ConfigKey, "config", printIntf)
 				// Set the nonce of the precompile's address (as is done when a contract is created) to ensure
 				// that it is marked as non-empty and will not be cleaned up when the statedb is finalized.
 				statedb.SetNonce(module.Address, 1)
