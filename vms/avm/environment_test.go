@@ -6,7 +6,6 @@ package avm
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"math/rand"
 	"testing"
 	"time"
@@ -235,22 +234,21 @@ func setup(tb testing.TB, c *envConfig) *environment {
 }
 
 func staticConfig(tb testing.TB, f fork) config.Config {
-	var eUpgradeTime time.Time
+	c := config.Config{
+		TxFee:            testTxFee,
+		CreateAssetTxFee: testTxFee,
+		EUpgradeTime:     mockable.MaxTime,
+	}
 
 	switch f {
 	case eUpgrade:
-		eUpgradeTime = time.Time{}
+		c.EUpgradeTime = time.Time{}
 	case durango:
-		eUpgradeTime = mockable.MaxTime
 	default:
-		require.FailNow(tb, fmt.Sprintf("unhandled fork %d", f))
+		require.FailNow(tb, "unhandled fork", f)
 	}
 
-	return config.Config{
-		TxFee:            testTxFee,
-		CreateAssetTxFee: testTxFee,
-		EUpgradeTime:     eUpgradeTime,
-	}
+	return c
 }
 
 // Returns:
