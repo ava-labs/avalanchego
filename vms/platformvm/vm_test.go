@@ -60,7 +60,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-	"github.com/ava-labs/avalanchego/wallet/chain/p/backends"
 
 	smcon "github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	smeng "github.com/ava-labs/avalanchego/snow/engine/snowman"
@@ -69,6 +68,7 @@ import (
 	blockbuilder "github.com/ava-labs/avalanchego/vms/platformvm/block/builder"
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
+	walletbuilder "github.com/ava-labs/avalanchego/wallet/chain/p/builder"
 )
 
 const (
@@ -988,7 +988,7 @@ func TestAtomicImport(t *testing.T) {
 		ids.ShortEmpty, // change addr
 		nil,
 	)
-	require.ErrorIs(err, backends.ErrInsufficientFunds)
+	require.ErrorIs(err, walletbuilder.ErrInsufficientFunds)
 
 	// Provide the avm UTXO
 
@@ -2137,7 +2137,7 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 			keys[0].PublicKey().Address(),
 		},
 	}
-	ctx, err := backends.NewSnowContext(vm.ctx.NetworkID, vm.ctx.AVAXAssetID)
+	ctx, err := builder.NewSnowContext(vm.ctx.NetworkID, vm.ctx.AVAXAssetID)
 	require.NoError(err)
 	expectedOwner.InitCtx(ctx)
 	require.Equal(expectedOwner, subnetOwner)
