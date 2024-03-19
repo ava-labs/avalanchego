@@ -88,6 +88,7 @@ func Add(
 	return height != lastHeightToFetch && !tree.Contains(height-1), nil
 }
 
+// Invariant: Execute assumes that GetMissingBlockIDs would return an empty set.
 func Execute(
 	ctx context.Context,
 	log logging.Logger,
