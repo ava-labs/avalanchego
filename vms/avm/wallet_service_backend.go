@@ -14,21 +14,22 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/wallet/chain/x/backends"
+	"github.com/ava-labs/avalanchego/wallet/chain/x/builder"
 )
 
 var _ txBuilderBackend = (*walletServiceBackend)(nil)
 
 func NewWalletServiceBackend(vm *VM) *walletServiceBackend {
-	backendCtx := backends.NewContext(
-		vm.ctx.NetworkID,
-		vm.ctx.XChainID,
-		vm.feeAssetID,
-		vm.Config.TxFee,
-		vm.Config.CreateAssetTxFee,
-	)
+	backendCtx := &builder.Context{
+		NetworkID:        vm.ctx.NetworkID,
+		BlockchainID:     vm.ctx.XChainID,
+		AVAXAssetID:      vm.feeAssetID,
+		BaseTxFee:        vm.Config.TxFee,
+		CreateAssetTxFee: vm.Config.CreateAssetTxFee,
+	}
+
 	return &walletServiceBackend{
-		Context:    backendCtx,
+		ctx:        backendCtx,
 		vm:         vm,
 		pendingTxs: linkedhashmap.New[ids.ID, *txs.Tx](),
 		utxos:      make([]*avax.UTXO, 0),
@@ -36,13 +37,16 @@ func NewWalletServiceBackend(vm *VM) *walletServiceBackend {
 }
 
 type walletServiceBackend struct {
-	backends.Context
-
+	ctx        *builder.Context
 	vm         *VM
 	pendingTxs linkedhashmap.LinkedHashmap[ids.ID, *txs.Tx]
 	utxos      []*avax.UTXO
 
 	addrs set.Set[ids.ShortID]
+}
+
+func (b *walletServiceBackend) Context() *builder.Context {
+	return b.ctx
 }
 
 func (b *walletServiceBackend) ResetAddresses(addrs set.Set[ids.ShortID]) {
