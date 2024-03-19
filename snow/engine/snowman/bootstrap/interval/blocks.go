@@ -60,7 +60,8 @@ func GetMissingBlockIDs(
 	return missingBlocks, nil
 }
 
-// Add the block to the tree and return if the parent block should be fetched.
+// Add the block to the tree and return if the parent block should be fetched,
+// but wasn't desired before.
 func Add(
 	db database.KeyValueWriterDeleter,
 	tree *Tree,
@@ -126,7 +127,7 @@ func Execute(
 		zap.Uint64("numToExecute", totalNumberToProcess),
 	)
 
-	for iterator.Next() {
+	for ctx.Err() == nil && iterator.Next() {
 		blkBytes := iterator.Value()
 		blk, err := parser.ParseBlock(ctx, blkBytes)
 		if err != nil {
@@ -170,8 +171,10 @@ func Execute(
 
 		now := time.Now()
 		if now.After(timeOfNextLog) {
-			numProcessed := totalNumberToProcess - tree.Len()
-			eta := timer.EstimateETA(startTime, numProcessed, totalNumberToProcess)
+			var (
+				numProcessed = totalNumberToProcess - tree.Len()
+				eta          = timer.EstimateETA(startTime, numProcessed, totalNumberToProcess)
+			)
 
 			log.Info("executing blocks",
 				zap.Duration("eta", eta),
@@ -199,9 +202,15 @@ func Execute(
 		return err
 	}
 
-	log.Info("executed blocks",
-		zap.Uint64("numExecuted", totalNumberToProcess),
-		zap.Duration("duration", time.Since(startTime)),
+	var (
+		numProcessed = totalNumberToProcess - tree.Len()
+		err          = ctx.Err()
 	)
-	return nil
+	log.Info("executed blocks",
+		zap.Uint64("numExecuted", numProcessed),
+		zap.Uint64("numToExecute", totalNumberToProcess),
+		zap.Duration("duration", time.Since(startTime)),
+		zap.Error(err),
+	)
+	return err
 }
