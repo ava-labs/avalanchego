@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package p
+package builder
 
 import (
 	"time"
@@ -12,35 +12,38 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fees"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-	"github.com/ava-labs/avalanchego/wallet/chain/p/backends"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
 
-var _ backends.Builder = (*builderWithOptions)(nil)
+var _ Builder = (*builderWithOptions)(nil)
 
 type builderWithOptions struct {
-	backends.Builder
+	builder Builder
 	options []common.Option
 }
 
-// NewBuilderWithOptions returns a new transaction builder that will use the
-// given options by default.
+// NewWithOptions returns a new builder that will use the given options by
+// default.
 //
 //   - [builder] is the builder that will be called to perform the underlying
 //     operations.
 //   - [options] will be provided to the builder in addition to the options
 //     provided in the method calls.
-func NewBuilderWithOptions(builder backends.Builder, options ...common.Option) backends.Builder {
+func NewWithOptions(builder Builder, options ...common.Option) Builder {
 	return &builderWithOptions{
-		Builder: builder,
+		builder: builder,
 		options: options,
 	}
+}
+
+func (b *builderWithOptions) Context() *Context {
+	return b.builder.Context()
 }
 
 func (b *builderWithOptions) GetBalance(
 	options ...common.Option,
 ) (map[ids.ID]uint64, error) {
-	return b.Builder.GetBalance(
+	return b.builder.GetBalance(
 		common.UnionOptions(b.options, options)...,
 	)
 }
@@ -49,8 +52,20 @@ func (b *builderWithOptions) GetImportableBalance(
 	chainID ids.ID,
 	options ...common.Option,
 ) (map[ids.ID]uint64, error) {
-	return b.Builder.GetImportableBalance(
+	return b.builder.GetImportableBalance(
 		chainID,
+		common.UnionOptions(b.options, options)...,
+	)
+}
+
+func (b *builderWithOptions) NewBaseTx(
+	outputs []*avax.TransferableOutput,
+	feeCalc *fees.Calculator,
+	options ...common.Option,
+) (*txs.BaseTx, error) {
+	return b.builder.NewBaseTx(
+		outputs,
+		feeCalc,
 		common.UnionOptions(b.options, options)...,
 	)
 }
@@ -62,7 +77,7 @@ func (b *builderWithOptions) NewAddValidatorTx(
 	feeCalc *fees.Calculator,
 	options ...common.Option,
 ) (*txs.AddValidatorTx, error) {
-	return b.Builder.NewAddValidatorTx(
+	return b.builder.NewAddValidatorTx(
 		vdr,
 		rewardsOwner,
 		shares,
@@ -76,20 +91,20 @@ func (b *builderWithOptions) NewAddSubnetValidatorTx(
 	feeCalc *fees.Calculator,
 	options ...common.Option,
 ) (*txs.AddSubnetValidatorTx, error) {
-	return b.Builder.NewAddSubnetValidatorTx(
+	return b.builder.NewAddSubnetValidatorTx(
 		vdr,
 		feeCalc,
 		common.UnionOptions(b.options, options)...,
 	)
 }
 
-func (b *builderWithOptions) RemoveSubnetValidatorTx(
+func (b *builderWithOptions) NewRemoveSubnetValidatorTx(
 	nodeID ids.NodeID,
 	subnetID ids.ID,
 	feeCalc *fees.Calculator,
 	options ...common.Option,
 ) (*txs.RemoveSubnetValidatorTx, error) {
-	return b.Builder.NewRemoveSubnetValidatorTx(
+	return b.builder.NewRemoveSubnetValidatorTx(
 		nodeID,
 		subnetID,
 		feeCalc,
@@ -103,7 +118,7 @@ func (b *builderWithOptions) NewAddDelegatorTx(
 	feeCalc *fees.Calculator,
 	options ...common.Option,
 ) (*txs.AddDelegatorTx, error) {
-	return b.Builder.NewAddDelegatorTx(
+	return b.builder.NewAddDelegatorTx(
 		vdr,
 		rewardsOwner,
 		feeCalc,
@@ -120,7 +135,7 @@ func (b *builderWithOptions) NewCreateChainTx(
 	feeCalc *fees.Calculator,
 	options ...common.Option,
 ) (*txs.CreateChainTx, error) {
-	return b.Builder.NewCreateChainTx(
+	return b.builder.NewCreateChainTx(
 		subnetID,
 		genesis,
 		vmID,
@@ -136,7 +151,7 @@ func (b *builderWithOptions) NewCreateSubnetTx(
 	feeCalc *fees.Calculator,
 	options ...common.Option,
 ) (*txs.CreateSubnetTx, error) {
-	return b.Builder.NewCreateSubnetTx(
+	return b.builder.NewCreateSubnetTx(
 		owner,
 		feeCalc,
 		common.UnionOptions(b.options, options)...,
@@ -149,7 +164,7 @@ func (b *builderWithOptions) NewTransferSubnetOwnershipTx(
 	feeCalc *fees.Calculator,
 	options ...common.Option,
 ) (*txs.TransferSubnetOwnershipTx, error) {
-	return b.Builder.NewTransferSubnetOwnershipTx(
+	return b.builder.NewTransferSubnetOwnershipTx(
 		subnetID,
 		owner,
 		feeCalc,
@@ -163,7 +178,7 @@ func (b *builderWithOptions) NewImportTx(
 	feeCalc *fees.Calculator,
 	options ...common.Option,
 ) (*txs.ImportTx, error) {
-	return b.Builder.NewImportTx(
+	return b.builder.NewImportTx(
 		sourceChainID,
 		to,
 		feeCalc,
@@ -177,7 +192,7 @@ func (b *builderWithOptions) NewExportTx(
 	feeCalc *fees.Calculator,
 	options ...common.Option,
 ) (*txs.ExportTx, error) {
-	return b.Builder.NewExportTx(
+	return b.builder.NewExportTx(
 		chainID,
 		outputs,
 		feeCalc,
@@ -203,7 +218,7 @@ func (b *builderWithOptions) NewTransformSubnetTx(
 	feeCalc *fees.Calculator,
 	options ...common.Option,
 ) (*txs.TransformSubnetTx, error) {
-	return b.Builder.NewTransformSubnetTx(
+	return b.builder.NewTransformSubnetTx(
 		subnetID,
 		assetID,
 		initialSupply,
@@ -233,7 +248,7 @@ func (b *builderWithOptions) NewAddPermissionlessValidatorTx(
 	feeCalc *fees.Calculator,
 	options ...common.Option,
 ) (*txs.AddPermissionlessValidatorTx, error) {
-	return b.Builder.NewAddPermissionlessValidatorTx(
+	return b.builder.NewAddPermissionlessValidatorTx(
 		vdr,
 		signer,
 		assetID,
@@ -252,7 +267,7 @@ func (b *builderWithOptions) NewAddPermissionlessDelegatorTx(
 	feeCalc *fees.Calculator,
 	options ...common.Option,
 ) (*txs.AddPermissionlessDelegatorTx, error) {
-	return b.Builder.NewAddPermissionlessDelegatorTx(
+	return b.builder.NewAddPermissionlessDelegatorTx(
 		vdr,
 		assetID,
 		rewardsOwner,

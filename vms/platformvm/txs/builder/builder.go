@@ -20,10 +20,11 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fees"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-	"github.com/ava-labs/avalanchego/wallet/chain/p/backends"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
 	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
+	walletbuilder "github.com/ava-labs/avalanchego/wallet/chain/p/builder"
+	walletsigner "github.com/ava-labs/avalanchego/wallet/chain/p/signer"
 )
 
 // Max number of items allowed in a page
@@ -263,7 +264,7 @@ func New(
 		ctx:     ctx,
 		cfg:     cfg,
 		state:   state,
-		backend: NewBackend(ctx, cfg, state, atomicUTXOManager),
+		backend: NewBackend(cfg, state, atomicUTXOManager),
 	}
 }
 
@@ -312,7 +313,7 @@ func (b *builder) NewImportTx(
 		return nil, fmt.Errorf("failed building import tx: %w", err)
 	}
 
-	tx, err := backends.SignUnsigned(context.Background(), pSigner, utx)
+	tx, err := walletsigner.SignUnsigned(context.Background(), pSigner, utx)
 	if err != nil {
 		return nil, err
 	}
@@ -365,7 +366,7 @@ func (b *builder) NewExportTx(
 		return nil, fmt.Errorf("failed building export tx: %w", err)
 	}
 
-	tx, err := backends.SignUnsigned(context.Background(), pSigner, utx)
+	tx, err := walletsigner.SignUnsigned(context.Background(), pSigner, utx)
 	if err != nil {
 		return nil, err
 	}
@@ -410,7 +411,7 @@ func (b *builder) NewCreateChainTx(
 		return nil, fmt.Errorf("failed building create chain tx: %w", err)
 	}
 
-	tx, err := backends.SignUnsigned(context.Background(), pSigner, utx)
+	tx, err := walletsigner.SignUnsigned(context.Background(), pSigner, utx)
 	if err != nil {
 		return nil, err
 	}
@@ -454,7 +455,7 @@ func (b *builder) NewCreateSubnetTx(
 		return nil, fmt.Errorf("failed building create subnet tx: %w", err)
 	}
 
-	tx, err := backends.SignUnsigned(context.Background(), pSigner, utx)
+	tx, err := walletsigner.SignUnsigned(context.Background(), pSigner, utx)
 	if err != nil {
 		return nil, err
 	}
@@ -517,7 +518,7 @@ func (b *builder) NewTransformSubnetTx(
 		return nil, fmt.Errorf("failed building transform subnet tx: %w", err)
 	}
 
-	tx, err := backends.SignUnsigned(context.Background(), pSigner, utx)
+	tx, err := walletsigner.SignUnsigned(context.Background(), pSigner, utx)
 	if err != nil {
 		return nil, err
 	}
@@ -573,7 +574,7 @@ func (b *builder) NewAddValidatorTx(
 		return nil, fmt.Errorf("failed building add validator tx: %w", err)
 	}
 
-	tx, err := backends.SignUnsigned(context.Background(), pSigner, utx)
+	tx, err := walletsigner.SignUnsigned(context.Background(), pSigner, utx)
 	if err != nil {
 		return nil, err
 	}
@@ -636,7 +637,7 @@ func (b *builder) NewAddPermissionlessValidatorTx(
 		return nil, fmt.Errorf("failed building add permissionless validator tx: %w", err)
 	}
 
-	tx, err := backends.SignUnsigned(context.Background(), pSigner, utx)
+	tx, err := walletsigner.SignUnsigned(context.Background(), pSigner, utx)
 	if err != nil {
 		return nil, err
 	}
@@ -690,7 +691,7 @@ func (b *builder) NewAddDelegatorTx(
 		return nil, fmt.Errorf("failed building add delegator tx: %w", err)
 	}
 
-	tx, err := backends.SignUnsigned(context.Background(), pSigner, utx)
+	tx, err := walletsigner.SignUnsigned(context.Background(), pSigner, utx)
 	if err != nil {
 		return nil, err
 	}
@@ -748,7 +749,7 @@ func (b *builder) NewAddPermissionlessDelegatorTx(
 		return nil, fmt.Errorf("failed building add permissionless delegator tx: %w", err)
 	}
 
-	tx, err := backends.SignUnsigned(context.Background(), pSigner, utx)
+	tx, err := walletsigner.SignUnsigned(context.Background(), pSigner, utx)
 	if err != nil {
 		return nil, err
 	}
@@ -799,7 +800,7 @@ func (b *builder) NewAddSubnetValidatorTx(
 		return nil, fmt.Errorf("failed building add subnet validator tx: %w", err)
 	}
 
-	tx, err := backends.SignUnsigned(context.Background(), pSigner, utx)
+	tx, err := walletsigner.SignUnsigned(context.Background(), pSigner, utx)
 	if err != nil {
 		return nil, err
 	}
@@ -838,7 +839,7 @@ func (b *builder) NewRemoveSubnetValidatorTx(
 		return nil, fmt.Errorf("failed building remove subnet validator tx: %w", err)
 	}
 
-	tx, err := backends.SignUnsigned(context.Background(), pSigner, utx)
+	tx, err := walletsigner.SignUnsigned(context.Background(), pSigner, utx)
 	if err != nil {
 		return nil, err
 	}
@@ -884,7 +885,7 @@ func (b *builder) NewTransferSubnetOwnershipTx(
 		return nil, fmt.Errorf("failed building transfer subnet ownership tx: %w", err)
 	}
 
-	tx, err := backends.SignUnsigned(context.Background(), pSigner, utx)
+	tx, err := walletsigner.SignUnsigned(context.Background(), pSigner, utx)
 	if err != nil {
 		return nil, err
 	}
@@ -930,19 +931,20 @@ func (b *builder) NewBaseTx(
 		return nil, fmt.Errorf("failed building base tx: %w", err)
 	}
 
-	tx, err := backends.SignUnsigned(context.Background(), pSigner, utx)
+	tx, err := walletsigner.SignUnsigned(context.Background(), pSigner, utx)
 	if err != nil {
 		return nil, err
 	}
 	return tx, tx.SyntacticVerify(b.ctx)
 }
 
-func (b *builder) builders(keys []*secp256k1.PrivateKey) (backends.Builder, backends.Signer) {
+func (b *builder) builders(keys []*secp256k1.PrivateKey) (walletbuilder.Builder, walletsigner.Signer) {
 	var (
 		kc      = secp256k1fx.NewKeychain(keys...)
 		addrs   = kc.Addresses()
-		builder = backends.NewBuilder(addrs, b.backend)
-		signer  = backends.NewSigner(kc, b.backend)
+		context = NewContext(b.ctx, b.backend.cfg, b.backend.state.GetTimestamp())
+		builder = walletbuilder.New(addrs, context, b.backend)
+		signer  = walletsigner.New(kc, b.backend)
 	)
 	b.backend.ResetAddresses(addrs)
 

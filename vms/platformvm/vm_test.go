@@ -6,7 +6,6 @@ package platformvm
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"testing"
 	"time"
 
@@ -61,7 +60,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fees"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-	"github.com/ava-labs/avalanchego/wallet/chain/p/backends"
+	"github.com/ava-labs/avalanchego/wallet/chain/p/builder"
 
 	smcon "github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	smeng "github.com/ava-labs/avalanchego/snow/engine/snowman"
@@ -237,7 +236,7 @@ func defaultVM(t *testing.T, f fork) (*VM, database.Database, *mutableSharedMemo
 	case apricotPhase3:
 		apricotPhase3Time = latestForkTime
 	default:
-		require.FailNow(fmt.Sprintf("unhandled fork %d", f))
+		require.FailNow("unhandled fork", f)
 	}
 
 	vm := &VM{Config: config.Config{
@@ -1014,7 +1013,7 @@ func TestAtomicImport(t *testing.T) {
 		ids.ShortEmpty, // change addr
 		nil,
 	)
-	require.ErrorIs(err, backends.ErrInsufficientFunds)
+	require.ErrorIs(err, builder.ErrInsufficientFunds)
 
 	// Provide the avm UTXO
 
@@ -2170,7 +2169,7 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 			keys[0].PublicKey().Address(),
 		},
 	}
-	ctx, err := backends.NewSnowContext(vm.ctx.NetworkID, vm.ctx.AVAXAssetID)
+	ctx, err := builder.NewSnowContext(vm.ctx.NetworkID, vm.ctx.AVAXAssetID)
 	require.NoError(err)
 	expectedOwner.InitCtx(ctx)
 	require.Equal(expectedOwner, subnetOwner)

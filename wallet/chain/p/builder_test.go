@@ -21,16 +21,17 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
-	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fees"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-	"github.com/ava-labs/avalanchego/wallet/chain/p/backends"
+	"github.com/ava-labs/avalanchego/wallet/chain/p/builder"
+	"github.com/ava-labs/avalanchego/wallet/chain/p/signer"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
 	stdcontext "context"
 	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
+	blssigner "github.com/ava-labs/avalanchego/vms/platformvm/signer"
 )
 
 var (
@@ -41,18 +42,18 @@ var (
 	avaxAssetID   = ids.Empty.Prefix(1789)
 	subnetAssetID = ids.Empty.Prefix(2024)
 
-	testCtx = backends.NewContext(
-		constants.UnitTestID,
-		avaxAssetID,
-		units.MicroAvax,      // BaseTxFee
-		19*units.MicroAvax,   // CreateSubnetTxFee
-		789*units.MicroAvax,  // TransformSubnetTxFee
-		1234*units.MicroAvax, // CreateBlockchainTxFee
-		19*units.MilliAvax,   // AddPrimaryNetworkValidatorFee
-		765*units.MilliAvax,  // AddPrimaryNetworkDelegatorFee
-		1010*units.MilliAvax, // AddSubnetValidatorFee
-		9*units.Avax,         // AddSubnetDelegatorFee
-	)
+	testContext = &builder.Context{
+		NetworkID:                     constants.UnitTestID,
+		AVAXAssetID:                   avaxAssetID,
+		BaseTxFee:                     units.MicroAvax,
+		CreateSubnetTxFee:             19 * units.MicroAvax,
+		TransformSubnetTxFee:          789 * units.MicroAvax,
+		CreateBlockchainTxFee:         1234 * units.MicroAvax,
+		AddPrimaryNetworkValidatorFee: 19 * units.MilliAvax,
+		AddPrimaryNetworkDelegatorFee: 765 * units.MilliAvax,
+		AddSubnetValidatorFee:         1010 * units.MilliAvax,
+		AddSubnetDelegatorFee:         9 * units.Avax,
+	}
 
 	testUnitFees = commonfees.Dimensions{
 		1 * units.MicroAvax,
@@ -63,29 +64,26 @@ var (
 	testBlockMaxConsumedUnits = commonfees.Max
 )
 
-// These tests create and sign a tx, then verify that utxos included
-// in the tx are exactly necessary to pay fees for it
+// These tests create a tx, then verify that utxos included in the tx are
+// exactly necessary to pay fees for it.
 
 func TestBaseTx(t *testing.T) {
 	var (
 		require = require.New(t)
 
 		// backend
-		utxosKey       = testKeys[1]
-		utxos          = makeTestUTXOs(utxosKey)
-		genericBackend = newDeterministicGenericBackend(
-			require,
-			map[ids.ID][]*avax.UTXO{
-				constants.PlatformChainID: utxos,
-			}, nil,
-		)
-		backend = NewBackend(testCtx, genericBackend, nil)
+		utxosKey   = testKeys[1]
+		utxos      = makeTestUTXOs(utxosKey)
+		chainUTXOs = common.NewDeterministicChainUTXOs(require, map[ids.ID][]*avax.UTXO{
+			constants.PlatformChainID: utxos,
+		})
+		backend = NewBackend(testContext, chainUTXOs, nil)
 
 		// builder and signer
 		utxoAddr = utxosKey.Address()
-		builder  = backends.NewBuilder(set.Of(utxoAddr), backend)
+		builder  = builder.New(set.Of(utxoAddr), testContext, backend)
 		kc       = secp256k1fx.NewKeychain(utxosKey)
-		s        = backends.NewSigner(kc, genericBackend)
+		s        = signer.New(kc, backend)
 
 		// data to build the transaction
 		outputsToMove = []*avax.TransferableOutput{{
@@ -112,7 +110,7 @@ func TestBaseTx(t *testing.T) {
 		)
 		require.NoError(err)
 
-		tx, err := backends.SignUnsigned(stdcontext.Background(), s, utx)
+		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
 
 		fc := &fees.Calculator{
@@ -140,7 +138,7 @@ func TestBaseTx(t *testing.T) {
 		feeCalc := &fees.Calculator{
 			IsEUpgradeActive: false,
 			Config: &config.Config{
-				TxFee: testCtx.CreateSubnetTxFee(),
+				TxFee: testContext.CreateSubnetTxFee,
 			},
 			FeeManager:       commonfees.NewManager(commonfees.Empty),
 			ConsumedUnitsCap: commonfees.Max,
@@ -151,20 +149,20 @@ func TestBaseTx(t *testing.T) {
 		)
 		require.NoError(err)
 
-		tx, err := backends.SignUnsigned(stdcontext.Background(), s, utx)
+		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
 
 		fc := &fees.Calculator{
 			IsEUpgradeActive: false,
 			Config: &config.Config{
-				TxFee: testCtx.CreateSubnetTxFee(),
+				TxFee: testContext.CreateSubnetTxFee,
 			},
 			FeeManager:       commonfees.NewManager(commonfees.Empty),
 			ConsumedUnitsCap: commonfees.Max,
 			Credentials:      tx.Creds,
 		}
 		require.NoError(utx.Visit(fc))
-		require.Equal(testCtx.CreateSubnetTxFee(), fc.Fee)
+		require.Equal(testContext.CreateSubnetTxFee, fc.Fee)
 
 		// check UTXOs selection and fee financing
 		ins := utx.Ins
@@ -194,7 +192,7 @@ func TestAddSubnetValidatorTx(t *testing.T) {
 			Addrs:     []ids.ShortID{subnetAuthAddr},
 		}
 
-		genericBackend = newDeterministicGenericBackend(
+		chainUTXOs = newDeterministicGenericBackend(
 			require,
 			map[ids.ID][]*avax.UTXO{
 				constants.PlatformChainID: utxos,
@@ -211,13 +209,13 @@ func TestAddSubnetValidatorTx(t *testing.T) {
 				},
 			},
 		}
-		backend = NewBackend(testCtx, genericBackend, subnets)
+		backend = NewBackend(testContext, chainUTXOs, subnets)
 
 		// builder and signer
 		utxoAddr = utxosKey.Address()
-		builder  = backends.NewBuilder(set.Of(utxoAddr, subnetAuthAddr), backend)
+		builder  = builder.New(set.Of(utxoAddr, subnetAuthAddr), testContext, backend)
 		kc       = secp256k1fx.NewKeychain(utxosKey)
-		s        = backends.NewSigner(kc, genericBackend)
+		s        = signer.New(kc, chainUTXOs)
 
 		// data to build the transaction
 		subnetValidator = &txs.SubnetValidator{
@@ -238,7 +236,7 @@ func TestAddSubnetValidatorTx(t *testing.T) {
 		utx, err := builder.NewAddSubnetValidatorTx(subnetValidator, feeCalc)
 		require.NoError(err)
 
-		tx, err := backends.SignUnsigned(stdcontext.Background(), s, utx)
+		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
 
 		fc := &fees.Calculator{
@@ -268,7 +266,7 @@ func TestAddSubnetValidatorTx(t *testing.T) {
 		feeCalc := &fees.Calculator{
 			IsEUpgradeActive: false,
 			Config: &config.Config{
-				AddSubnetValidatorFee: testCtx.AddSubnetValidatorFee(),
+				AddSubnetValidatorFee: testContext.AddSubnetValidatorFee,
 			},
 			FeeManager:       commonfees.NewManager(commonfees.Empty),
 			ConsumedUnitsCap: commonfees.Max,
@@ -276,20 +274,20 @@ func TestAddSubnetValidatorTx(t *testing.T) {
 		utx, err := builder.NewAddSubnetValidatorTx(subnetValidator, feeCalc)
 		require.NoError(err)
 
-		tx, err := backends.SignUnsigned(stdcontext.Background(), s, utx)
+		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
 
 		fc := &fees.Calculator{
 			IsEUpgradeActive: false,
 			Config: &config.Config{
-				AddSubnetValidatorFee: testCtx.AddSubnetValidatorFee(),
+				AddSubnetValidatorFee: testContext.AddSubnetValidatorFee,
 			},
 			FeeManager:       commonfees.NewManager(commonfees.Empty),
 			ConsumedUnitsCap: commonfees.Max,
 			Credentials:      tx.Creds,
 		}
 		require.NoError(utx.Visit(fc))
-		require.Equal(testCtx.AddSubnetValidatorFee(), fc.Fee)
+		require.Equal(testContext.AddSubnetValidatorFee, fc.Fee)
 
 		// check UTXOs selection and fee financing
 		ins := utx.Ins
@@ -318,7 +316,7 @@ func TestRemoveSubnetValidatorTx(t *testing.T) {
 			Addrs:     []ids.ShortID{subnetAuthAddr},
 		}
 
-		genericBackend = newDeterministicGenericBackend(
+		chainUTXOs = newDeterministicGenericBackend(
 			require,
 			map[ids.ID][]*avax.UTXO{
 				constants.PlatformChainID: utxos,
@@ -336,13 +334,13 @@ func TestRemoveSubnetValidatorTx(t *testing.T) {
 			},
 		}
 
-		backend = NewBackend(testCtx, genericBackend, subnets)
+		backend = NewBackend(testContext, chainUTXOs, subnets)
 
 		// builder and signer
 		utxoAddr = utxosKey.Address()
-		builder  = backends.NewBuilder(set.Of(utxoAddr, subnetAuthAddr), backend)
+		builder  = builder.New(set.Of(utxoAddr, subnetAuthAddr), testContext, backend)
 		kc       = secp256k1fx.NewKeychain(utxosKey)
-		s        = backends.NewSigner(kc, genericBackend)
+		s        = signer.New(kc, chainUTXOs)
 	)
 
 	{ // Post E-Upgrade
@@ -358,7 +356,7 @@ func TestRemoveSubnetValidatorTx(t *testing.T) {
 		)
 		require.NoError(err)
 
-		tx, err := backends.SignUnsigned(stdcontext.Background(), s, utx)
+		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
 
 		fc := &fees.Calculator{
@@ -386,7 +384,7 @@ func TestRemoveSubnetValidatorTx(t *testing.T) {
 		feeCalc := &fees.Calculator{
 			IsEUpgradeActive: false,
 			Config: &config.Config{
-				TxFee: testCtx.BaseTxFee(),
+				TxFee: testContext.BaseTxFee,
 			},
 			FeeManager:       commonfees.NewManager(commonfees.Empty),
 			ConsumedUnitsCap: commonfees.Max,
@@ -398,20 +396,20 @@ func TestRemoveSubnetValidatorTx(t *testing.T) {
 		)
 		require.NoError(err)
 
-		tx, err := backends.SignUnsigned(stdcontext.Background(), s, utx)
+		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
 
 		fc := &fees.Calculator{
 			IsEUpgradeActive: false,
 			Config: &config.Config{
-				TxFee: testCtx.BaseTxFee(),
+				TxFee: testContext.BaseTxFee,
 			},
 			FeeManager:       commonfees.NewManager(commonfees.Empty),
 			ConsumedUnitsCap: commonfees.Max,
 			Credentials:      tx.Creds,
 		}
 		require.NoError(utx.Visit(fc))
-		require.Equal(testCtx.BaseTxFee(), fc.Fee)
+		require.Equal(testContext.BaseTxFee, fc.Fee)
 
 		// check UTXOs selection and fee financing
 		ins := utx.Ins
@@ -440,7 +438,7 @@ func TestCreateChainTx(t *testing.T) {
 			Addrs:     []ids.ShortID{subnetAuthAddr},
 		}
 
-		genericBackend = newDeterministicGenericBackend(
+		chainUTXOs = newDeterministicGenericBackend(
 			require,
 			map[ids.ID][]*avax.UTXO{
 				constants.PlatformChainID: utxos,
@@ -458,13 +456,13 @@ func TestCreateChainTx(t *testing.T) {
 			},
 		}
 
-		backend = NewBackend(testCtx, genericBackend, subnets)
+		backend = NewBackend(testContext, chainUTXOs, subnets)
 
 		// builder and signer
 		utxoAddr = utxosKey.Address()
-		builder  = backends.NewBuilder(set.Of(utxoAddr, subnetAuthAddr), backend)
+		builder  = builder.New(set.Of(utxoAddr, subnetAuthAddr), testContext, backend)
 		kc       = secp256k1fx.NewKeychain(utxosKey)
-		s        = backends.NewSigner(kc, genericBackend)
+		s        = signer.New(kc, chainUTXOs)
 
 		// data to build the transaction
 		genesisBytes = []byte{'a', 'b', 'c'}
@@ -489,7 +487,7 @@ func TestCreateChainTx(t *testing.T) {
 		)
 		require.NoError(err)
 
-		tx, err := backends.SignUnsigned(stdcontext.Background(), s, utx)
+		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
 
 		fc := &fees.Calculator{
@@ -516,7 +514,7 @@ func TestCreateChainTx(t *testing.T) {
 		feeCalc := &fees.Calculator{
 			IsEUpgradeActive: false,
 			Config: &config.Config{
-				CreateBlockchainTxFee: testCtx.CreateBlockchainTxFee(),
+				CreateBlockchainTxFee: testContext.CreateBlockchainTxFee,
 			},
 			FeeManager:       commonfees.NewManager(commonfees.Empty),
 			ConsumedUnitsCap: commonfees.Max,
@@ -531,19 +529,19 @@ func TestCreateChainTx(t *testing.T) {
 		)
 		require.NoError(err)
 
-		tx, err := backends.SignUnsigned(stdcontext.Background(), s, utx)
+		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
 
 		fc := &fees.Calculator{
 			IsEUpgradeActive: false,
 			Config: &config.Config{
-				CreateBlockchainTxFee: testCtx.CreateBlockchainTxFee(),
+				CreateBlockchainTxFee: testContext.CreateBlockchainTxFee,
 			},
 			ConsumedUnitsCap: commonfees.Max,
 			Credentials:      tx.Creds,
 		}
 		require.NoError(utx.Visit(fc))
-		require.Equal(testCtx.CreateBlockchainTxFee(), fc.Fee)
+		require.Equal(testContext.CreateBlockchainTxFee, fc.Fee)
 
 		// check UTXOs selection and fee financing
 		ins := utx.Ins
@@ -572,7 +570,7 @@ func TestCreateSubnetTx(t *testing.T) {
 			Addrs:     []ids.ShortID{subnetAuthAddr},
 		}
 
-		genericBackend = newDeterministicGenericBackend(
+		chainUTXOs = newDeterministicGenericBackend(
 			require,
 			map[ids.ID][]*avax.UTXO{
 				constants.PlatformChainID: utxos,
@@ -590,13 +588,13 @@ func TestCreateSubnetTx(t *testing.T) {
 			},
 		}
 
-		backend = NewBackend(testCtx, genericBackend, subnets)
+		backend = NewBackend(testContext, chainUTXOs, subnets)
 
 		// builder and signer
 		utxoAddr = utxosKey.Address()
-		builder  = backends.NewBuilder(set.Of(utxoAddr, subnetAuthAddr), backend)
+		builder  = builder.New(set.Of(utxoAddr, subnetAuthAddr), testContext, backend)
 		kc       = secp256k1fx.NewKeychain(utxosKey)
-		s        = backends.NewSigner(kc, genericBackend)
+		s        = signer.New(kc, chainUTXOs)
 	)
 
 	{ // Post E-Upgrade
@@ -611,7 +609,7 @@ func TestCreateSubnetTx(t *testing.T) {
 		)
 		require.NoError(err)
 
-		tx, err := backends.SignUnsigned(stdcontext.Background(), s, utx)
+		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
 
 		fc := &fees.Calculator{
@@ -638,7 +636,7 @@ func TestCreateSubnetTx(t *testing.T) {
 		feeCalc := &fees.Calculator{
 			IsEUpgradeActive: false,
 			Config: &config.Config{
-				CreateSubnetTxFee: testCtx.CreateSubnetTxFee(),
+				CreateSubnetTxFee: testContext.CreateSubnetTxFee,
 			},
 			FeeManager:       commonfees.NewManager(commonfees.Empty),
 			ConsumedUnitsCap: commonfees.Max,
@@ -649,20 +647,20 @@ func TestCreateSubnetTx(t *testing.T) {
 		)
 		require.NoError(err)
 
-		tx, err := backends.SignUnsigned(stdcontext.Background(), s, utx)
+		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
 
 		fc := &fees.Calculator{
 			IsEUpgradeActive: false,
 			Config: &config.Config{
-				CreateSubnetTxFee: testCtx.CreateSubnetTxFee(),
+				CreateSubnetTxFee: testContext.CreateSubnetTxFee,
 			},
 			FeeManager:       commonfees.NewManager(commonfees.Empty),
 			ConsumedUnitsCap: commonfees.Max,
 			Credentials:      tx.Creds,
 		}
 		require.NoError(utx.Visit(fc))
-		require.Equal(testCtx.CreateSubnetTxFee(), fc.Fee)
+		require.Equal(testContext.CreateSubnetTxFee, fc.Fee)
 
 		// check UTXOs selection and fee financing
 		ins := utx.Ins
@@ -691,7 +689,7 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 			Addrs:     []ids.ShortID{subnetAuthAddr},
 		}
 
-		genericBackend = newDeterministicGenericBackend(
+		chainUTXOs = newDeterministicGenericBackend(
 			require,
 			map[ids.ID][]*avax.UTXO{
 				constants.PlatformChainID: utxos,
@@ -709,13 +707,13 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 			},
 		}
 
-		backend = NewBackend(testCtx, genericBackend, subnets)
+		backend = NewBackend(testContext, chainUTXOs, subnets)
 
 		// builder
 		utxoAddr = utxosKey.Address()
-		builder  = backends.NewBuilder(set.Of(utxoAddr, subnetAuthAddr), backend)
+		builder  = builder.New(set.Of(utxoAddr, subnetAuthAddr), testContext, backend)
 		kc       = secp256k1fx.NewKeychain(utxosKey)
-		s        = backends.NewSigner(kc, genericBackend)
+		s        = signer.New(kc, chainUTXOs)
 	)
 
 	{ // Post E-Upgrade
@@ -731,7 +729,7 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 		)
 		require.NoError(err)
 
-		tx, err := backends.SignUnsigned(stdcontext.Background(), s, utx)
+		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
 
 		fc := &fees.Calculator{
@@ -758,7 +756,7 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 		feeCalc := &fees.Calculator{
 			IsEUpgradeActive: false,
 			Config: &config.Config{
-				TxFee: testCtx.BaseTxFee(),
+				TxFee: testContext.BaseTxFee,
 			},
 			FeeManager:       commonfees.NewManager(commonfees.Empty),
 			ConsumedUnitsCap: commonfees.Max,
@@ -770,20 +768,20 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 		)
 		require.NoError(err)
 
-		tx, err := backends.SignUnsigned(stdcontext.Background(), s, utx)
+		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
 
 		fc := &fees.Calculator{
 			IsEUpgradeActive: false,
 			Config: &config.Config{
-				TxFee: testCtx.BaseTxFee(),
+				TxFee: testContext.BaseTxFee,
 			},
 			FeeManager:       commonfees.NewManager(commonfees.Empty),
 			ConsumedUnitsCap: commonfees.Max,
 			Credentials:      tx.Creds,
 		}
 		require.NoError(utx.Visit(fc))
-		require.Equal(testCtx.BaseTxFee(), fc.Fee)
+		require.Equal(testContext.BaseTxFee, fc.Fee)
 
 		// check UTXOs selection and fee financing
 		ins := utx.Ins
@@ -802,11 +800,11 @@ func TestImportTx(t *testing.T) {
 		require = require.New(t)
 
 		// backend
-		utxosKey       = testKeys[1]
-		utxos          = makeTestUTXOs(utxosKey)
-		sourceChainID  = ids.GenerateTestID()
-		importedUTXOs  = utxos[:1]
-		genericBackend = newDeterministicGenericBackend(
+		utxosKey      = testKeys[1]
+		utxos         = makeTestUTXOs(utxosKey)
+		sourceChainID = ids.GenerateTestID()
+		importedUTXOs = utxos[:1]
+		chainUTXOs    = newDeterministicGenericBackend(
 			require,
 			map[ids.ID][]*avax.UTXO{
 				constants.PlatformChainID: utxos,
@@ -815,13 +813,13 @@ func TestImportTx(t *testing.T) {
 			nil,
 		)
 
-		backend = NewBackend(testCtx, genericBackend, nil)
+		backend = NewBackend(testContext, chainUTXOs, nil)
 
 		// builder and signer
 		utxoAddr = utxosKey.Address()
-		builder  = backends.NewBuilder(set.Of(utxoAddr), backend)
+		builder  = builder.New(set.Of(utxoAddr), testContext, backend)
 		kc       = secp256k1fx.NewKeychain(utxosKey)
-		s        = backends.NewSigner(kc, genericBackend)
+		s        = signer.New(kc, chainUTXOs)
 
 		// data to build the transaction
 		importKey = testKeys[0]
@@ -846,7 +844,7 @@ func TestImportTx(t *testing.T) {
 		)
 		require.NoError(err)
 
-		tx, err := backends.SignUnsigned(stdcontext.Background(), s, utx)
+		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
 
 		fc := &fees.Calculator{
@@ -875,7 +873,7 @@ func TestImportTx(t *testing.T) {
 		feeCalc := &fees.Calculator{
 			IsEUpgradeActive: false,
 			Config: &config.Config{
-				TxFee: testCtx.BaseTxFee(),
+				TxFee: testContext.BaseTxFee,
 			},
 			FeeManager:       commonfees.NewManager(commonfees.Empty),
 			ConsumedUnitsCap: commonfees.Max,
@@ -887,20 +885,20 @@ func TestImportTx(t *testing.T) {
 		)
 		require.NoError(err)
 
-		tx, err := backends.SignUnsigned(stdcontext.Background(), s, utx)
+		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
 
 		fc := &fees.Calculator{
 			IsEUpgradeActive: false,
 			Config: &config.Config{
-				TxFee: testCtx.BaseTxFee(),
+				TxFee: testContext.BaseTxFee,
 			},
 			FeeManager:       commonfees.NewManager(commonfees.Empty),
 			ConsumedUnitsCap: commonfees.Max,
 			Credentials:      tx.Creds,
 		}
 		require.NoError(utx.Visit(fc))
-		require.Equal(testCtx.BaseTxFee(), fc.Fee)
+		require.Equal(testContext.BaseTxFee, fc.Fee)
 
 		// check UTXOs selection and fee financing
 		ins := utx.Ins
@@ -921,22 +919,18 @@ func TestExportTx(t *testing.T) {
 		require = require.New(t)
 
 		// backend
-		utxosKey       = testKeys[1]
-		utxos          = makeTestUTXOs(utxosKey)
-		genericBackend = newDeterministicGenericBackend(
-			require,
-			map[ids.ID][]*avax.UTXO{
-				constants.PlatformChainID: utxos,
-			},
-			nil,
-		)
-		backend = NewBackend(testCtx, genericBackend, nil)
+		utxosKey   = testKeys[1]
+		utxos      = makeTestUTXOs(utxosKey)
+		chainUTXOs = common.NewDeterministicChainUTXOs(require, map[ids.ID][]*avax.UTXO{
+			constants.PlatformChainID: utxos,
+		})
+		backend = NewBackend(testContext, chainUTXOs, nil)
 
 		// builder and signer
 		utxoAddr = utxosKey.Address()
-		builder  = backends.NewBuilder(set.Of(utxoAddr), backend)
+		builder  = builder.New(set.Of(utxoAddr), testContext, backend)
 		kc       = secp256k1fx.NewKeychain(utxosKey)
-		s        = backends.NewSigner(kc, genericBackend)
+		s        = signer.New(kc, backend)
 
 		// data to build the transaction
 		subnetID        = ids.GenerateTestID()
@@ -965,7 +959,7 @@ func TestExportTx(t *testing.T) {
 		)
 		require.NoError(err)
 
-		tx, err := backends.SignUnsigned(stdcontext.Background(), s, utx)
+		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
 
 		fc := &fees.Calculator{
@@ -993,7 +987,7 @@ func TestExportTx(t *testing.T) {
 		feeCalc := &fees.Calculator{
 			IsEUpgradeActive: false,
 			Config: &config.Config{
-				TxFee: testCtx.BaseTxFee(),
+				TxFee: testContext.BaseTxFee,
 			},
 			FeeManager:       commonfees.NewManager(commonfees.Empty),
 			ConsumedUnitsCap: commonfees.Max,
@@ -1005,20 +999,20 @@ func TestExportTx(t *testing.T) {
 		)
 		require.NoError(err)
 
-		tx, err := backends.SignUnsigned(stdcontext.Background(), s, utx)
+		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
 
 		fc := &fees.Calculator{
 			IsEUpgradeActive: false,
 			Config: &config.Config{
-				TxFee: testCtx.BaseTxFee(),
+				TxFee: testContext.BaseTxFee,
 			},
 			FeeManager:       commonfees.NewManager(commonfees.Empty),
 			ConsumedUnitsCap: commonfees.Max,
 			Credentials:      tx.Creds,
 		}
 		require.NoError(utx.Visit(fc))
-		require.Equal(testCtx.BaseTxFee(), fc.Fee)
+		require.Equal(testContext.BaseTxFee, fc.Fee)
 
 		// check UTXOs selection and fee financing
 		ins := utx.Ins
@@ -1048,7 +1042,7 @@ func TestTransformSubnetTx(t *testing.T) {
 			Addrs:     []ids.ShortID{subnetAuthAddr},
 		}
 
-		genericBackend = newDeterministicGenericBackend(
+		chainUTXOs = newDeterministicGenericBackend(
 			require,
 			map[ids.ID][]*avax.UTXO{
 				constants.PlatformChainID: utxos,
@@ -1066,13 +1060,13 @@ func TestTransformSubnetTx(t *testing.T) {
 			},
 		}
 
-		backend = NewBackend(testCtx, genericBackend, subnets)
+		backend = NewBackend(testContext, chainUTXOs, subnets)
 
 		// builder and signer
 		utxoAddr = utxosKey.Address()
-		builder  = backends.NewBuilder(set.Of(utxoAddr, subnetAuthAddr), backend)
+		builder  = builder.New(set.Of(utxoAddr, subnetAuthAddr), testContext, backend)
 		kc       = secp256k1fx.NewKeychain(utxosKey)
-		s        = backends.NewSigner(kc, genericBackend)
+		s        = signer.New(kc, chainUTXOs)
 
 		// data to build the transaction
 		initialSupply = 40 * units.MegaAvax
@@ -1104,7 +1098,7 @@ func TestTransformSubnetTx(t *testing.T) {
 		)
 		require.NoError(err)
 
-		tx, err := backends.SignUnsigned(stdcontext.Background(), s, utx)
+		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
 
 		fc := &fees.Calculator{
@@ -1134,7 +1128,7 @@ func TestTransformSubnetTx(t *testing.T) {
 		feeCalc := &fees.Calculator{
 			IsEUpgradeActive: false,
 			Config: &config.Config{
-				TransformSubnetTxFee: testCtx.TransformSubnetTxFee(),
+				TransformSubnetTxFee: testContext.TransformSubnetTxFee,
 			},
 			FeeManager:       commonfees.NewManager(commonfees.Empty),
 			ConsumedUnitsCap: commonfees.Max,
@@ -1158,20 +1152,20 @@ func TestTransformSubnetTx(t *testing.T) {
 		)
 		require.NoError(err)
 
-		tx, err := backends.SignUnsigned(stdcontext.Background(), s, utx)
+		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
 
 		fc := &fees.Calculator{
 			IsEUpgradeActive: false,
 			Config: &config.Config{
-				TransformSubnetTxFee: testCtx.TransformSubnetTxFee(),
+				TransformSubnetTxFee: testContext.TransformSubnetTxFee,
 			},
 			FeeManager:       commonfees.NewManager(commonfees.Empty),
 			ConsumedUnitsCap: commonfees.Max,
 			Credentials:      tx.Creds,
 		}
 		require.NoError(utx.Visit(fc))
-		require.Equal(testCtx.TransformSubnetTxFee(), fc.Fee)
+		require.Equal(testContext.TransformSubnetTxFee, fc.Fee)
 
 		// check UTXOs selection and fee financing
 		ins := utx.Ins
@@ -1193,24 +1187,20 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 		require = require.New(t)
 
 		// backend
-		utxosKey       = testKeys[1]
-		utxos          = makeTestUTXOs(utxosKey)
-		genericBackend = newDeterministicGenericBackend(
-			require,
-			map[ids.ID][]*avax.UTXO{
-				constants.PlatformChainID: utxos,
-			},
-			nil,
-		)
-		backend = NewBackend(testCtx, genericBackend, nil)
+		utxosKey   = testKeys[1]
+		utxos      = makeTestUTXOs(utxosKey)
+		chainUTXOs = common.NewDeterministicChainUTXOs(require, map[ids.ID][]*avax.UTXO{
+			constants.PlatformChainID: utxos,
+		})
+		backend = NewBackend(testContext, chainUTXOs, nil)
 
 		// builder
 		utxoAddr   = utxosKey.Address()
 		rewardKey  = testKeys[0]
 		rewardAddr = rewardKey.Address()
-		builder    = backends.NewBuilder(set.Of(utxoAddr, rewardAddr), backend)
+		builder    = builder.New(set.Of(utxoAddr, rewardAddr), testContext, backend)
 		kc         = secp256k1fx.NewKeychain(utxosKey)
-		s          = backends.NewSigner(kc, genericBackend)
+		s          = signer.New(kc, backend)
 
 		// data to build the transaction
 		validationRewardsOwner = &secp256k1fx.OutputOwners{
@@ -1245,7 +1235,7 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 				},
 				Subnet: constants.PrimaryNetworkID,
 			},
-			signer.NewProofOfPossession(sk),
+			blssigner.NewProofOfPossession(sk),
 			avaxAssetID,
 			validationRewardsOwner,
 			delegationRewardsOwner,
@@ -1254,7 +1244,7 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 		)
 		require.NoError(err)
 
-		tx, err := backends.SignUnsigned(stdcontext.Background(), s, utx)
+		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
 
 		fc := &fees.Calculator{
@@ -1286,7 +1276,7 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 		feeCalc := &fees.Calculator{
 			IsEUpgradeActive: false,
 			Config: &config.Config{
-				AddPrimaryNetworkValidatorFee: testCtx.AddPrimaryNetworkValidatorFee(),
+				AddPrimaryNetworkValidatorFee: testContext.AddPrimaryNetworkValidatorFee,
 			},
 			FeeManager:       commonfees.NewManager(commonfees.Empty),
 			ConsumedUnitsCap: commonfees.Max,
@@ -1300,7 +1290,7 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 				},
 				Subnet: constants.PrimaryNetworkID,
 			},
-			signer.NewProofOfPossession(sk),
+			blssigner.NewProofOfPossession(sk),
 			avaxAssetID,
 			validationRewardsOwner,
 			delegationRewardsOwner,
@@ -1309,20 +1299,20 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 		)
 		require.NoError(err)
 
-		tx, err := backends.SignUnsigned(stdcontext.Background(), s, utx)
+		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
 
 		fc := &fees.Calculator{
 			IsEUpgradeActive: false,
 			Config: &config.Config{
-				AddPrimaryNetworkValidatorFee: testCtx.AddPrimaryNetworkValidatorFee(),
+				AddPrimaryNetworkValidatorFee: testContext.AddPrimaryNetworkValidatorFee,
 			},
 			FeeManager:       commonfees.NewManager(commonfees.Empty),
 			ConsumedUnitsCap: commonfees.Max,
 			Credentials:      tx.Creds,
 		}
 		require.NoError(utx.Visit(fc))
-		require.Equal(testCtx.AddPrimaryNetworkValidatorFee(), fc.Fee)
+		require.Equal(testContext.AddPrimaryNetworkValidatorFee, fc.Fee)
 
 		// check UTXOs selection and fee financing
 		ins := utx.Ins
@@ -1346,24 +1336,20 @@ func TestAddPermissionlessDelegatorTx(t *testing.T) {
 		require = require.New(t)
 
 		// backend
-		utxosKey       = testKeys[1]
-		utxos          = makeTestUTXOs(utxosKey)
-		genericBackend = newDeterministicGenericBackend(
-			require,
-			map[ids.ID][]*avax.UTXO{
-				constants.PlatformChainID: utxos,
-			},
-			nil,
-		)
-		backend = NewBackend(testCtx, genericBackend, nil)
+		utxosKey   = testKeys[1]
+		utxos      = makeTestUTXOs(utxosKey)
+		chainUTXOs = common.NewDeterministicChainUTXOs(require, map[ids.ID][]*avax.UTXO{
+			constants.PlatformChainID: utxos,
+		})
+		backend = NewBackend(testContext, chainUTXOs, nil)
 
 		// builder and signer
 		utxoAddr   = utxosKey.Address()
 		rewardKey  = testKeys[0]
 		rewardAddr = rewardKey.Address()
-		builder    = backends.NewBuilder(set.Of(utxoAddr, rewardAddr), backend)
+		builder    = builder.New(set.Of(utxoAddr, rewardAddr), testContext, backend)
 		kc         = secp256k1fx.NewKeychain(utxosKey)
-		s          = backends.NewSigner(kc, genericBackend)
+		s          = signer.New(kc, backend)
 
 		// data to build the transaction
 		rewardsOwner = &secp256k1fx.OutputOwners{
@@ -1395,7 +1381,7 @@ func TestAddPermissionlessDelegatorTx(t *testing.T) {
 		)
 		require.NoError(err)
 
-		tx, err := backends.SignUnsigned(stdcontext.Background(), s, utx)
+		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
 
 		fc := &fees.Calculator{
@@ -1427,7 +1413,7 @@ func TestAddPermissionlessDelegatorTx(t *testing.T) {
 		feeCalc := &fees.Calculator{
 			IsEUpgradeActive: false,
 			Config: &config.Config{
-				AddPrimaryNetworkDelegatorFee: testCtx.AddPrimaryNetworkDelegatorFee(),
+				AddPrimaryNetworkDelegatorFee: testContext.AddPrimaryNetworkDelegatorFee,
 			},
 			FeeManager:       commonfees.NewManager(commonfees.Empty),
 			ConsumedUnitsCap: commonfees.Max,
@@ -1447,20 +1433,20 @@ func TestAddPermissionlessDelegatorTx(t *testing.T) {
 		)
 		require.NoError(err)
 
-		tx, err := backends.SignUnsigned(stdcontext.Background(), s, utx)
+		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
 
 		fc := &fees.Calculator{
 			IsEUpgradeActive: false,
 			Config: &config.Config{
-				AddPrimaryNetworkDelegatorFee: testCtx.AddPrimaryNetworkDelegatorFee(),
+				AddPrimaryNetworkDelegatorFee: testContext.AddPrimaryNetworkDelegatorFee,
 			},
 			FeeManager:       commonfees.NewManager(commonfees.Empty),
 			ConsumedUnitsCap: commonfees.Max,
 			Credentials:      tx.Creds,
 		}
 		require.NoError(utx.Visit(fc))
-		require.Equal(testCtx.AddPrimaryNetworkDelegatorFee(), fc.Fee)
+		require.Equal(testContext.AddPrimaryNetworkDelegatorFee, fc.Fee)
 
 		// check UTXOs selection and fee financing
 		ins := utx.Ins

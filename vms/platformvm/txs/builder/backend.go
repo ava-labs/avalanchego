@@ -9,38 +9,28 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
-	"github.com/ava-labs/avalanchego/wallet/chain/p/backends"
+	"github.com/ava-labs/avalanchego/wallet/chain/p/signer"
+
+	walletbuilder "github.com/ava-labs/avalanchego/wallet/chain/p/builder"
 )
 
-var _ backends.Backend = (*Backend)(nil)
+var (
+	_ walletbuilder.Backend = (*Backend)(nil)
+	_ signer.Backend        = (*Backend)(nil)
+)
 
 func NewBackend(
-	ctx *snow.Context,
 	cfg *config.Config,
 	state state.State,
 	atomicUTXOsMan avax.AtomicUTXOManager,
 ) *Backend {
-	backendCtx := backends.NewContext(
-		ctx.NetworkID,
-		ctx.AVAXAssetID,
-		cfg.TxFee,
-		cfg.GetCreateSubnetTxFee(state.GetTimestamp()),
-		cfg.TransformSubnetTxFee,
-		cfg.GetCreateBlockchainTxFee(state.GetTimestamp()),
-		cfg.AddPrimaryNetworkValidatorFee,
-		cfg.AddPrimaryNetworkDelegatorFee,
-		cfg.AddSubnetValidatorFee,
-		cfg.AddSubnetDelegatorFee,
-	)
 	return &Backend{
-		Context:        backendCtx,
 		cfg:            cfg,
 		state:          state,
 		atomicUTXOsMan: atomicUTXOsMan,
@@ -48,24 +38,10 @@ func NewBackend(
 }
 
 type Backend struct {
-	backends.Context
-
 	cfg            *config.Config
 	addrs          set.Set[ids.ShortID]
 	state          state.State
 	atomicUTXOsMan avax.AtomicUTXOManager
-}
-
-// Override [backend.Context.CreateSubnetTxFee] to refresh fee
-// relevant in unit tests only
-func (b *Backend) CreateSubnetTxFee() uint64 {
-	return b.cfg.GetCreateSubnetTxFee(b.state.GetTimestamp())
-}
-
-// Override [backend.Context.CreateBlockchainTxFee] to refresh fee
-// relevant in unit tests only
-func (b *Backend) CreateBlockchainTxFee() uint64 {
-	return b.cfg.GetCreateBlockchainTxFee(b.state.GetTimestamp())
 }
 
 func (b *Backend) ResetAddresses(addrs set.Set[ids.ShortID]) {

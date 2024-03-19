@@ -40,6 +40,10 @@ type TestEnvironment struct {
 	URIs []tmpnet.NodeURI
 	// The URI used to access the http server that allocates test data
 	TestDataServerURI string
+	// The duration to wait before shutting down private networks. A
+	// non-zero value may be useful to ensure all metrics can be
+	// scraped before shutdown.
+	PrivateNetworkShutdownDelay time.Duration
 
 	require *require.Assertions
 }
@@ -74,7 +78,7 @@ func NewTestEnvironment(flagVars *FlagVars, desiredNetwork *tmpnet.Network) *Tes
 		}
 	} else {
 		network = desiredNetwork
-		StartNetwork(network, flagVars.AvalancheGoExecPath(), flagVars.PluginDir())
+		StartNetwork(network, flagVars.AvalancheGoExecPath(), flagVars.PluginDir(), flagVars.NetworkShutdownDelay())
 	}
 
 	// A new network will always need subnet creation and an existing
@@ -112,10 +116,11 @@ func NewTestEnvironment(flagVars *FlagVars, desiredNetwork *tmpnet.Network) *Tes
 	require.NoError(err)
 
 	return &TestEnvironment{
-		NetworkDir:        network.Dir,
-		URIs:              uris,
-		TestDataServerURI: testDataServerURI,
-		require:           require,
+		NetworkDir:                  network.Dir,
+		URIs:                        uris,
+		TestDataServerURI:           testDataServerURI,
+		PrivateNetworkShutdownDelay: flagVars.NetworkShutdownDelay(),
+		require:                     require,
 	}
 }
 
@@ -167,5 +172,6 @@ func (te *TestEnvironment) StartPrivateNetwork(network *tmpnet.Network) {
 		network,
 		sharedNetwork.DefaultRuntimeConfig.AvalancheGoPath,
 		pluginDir,
+		te.PrivateNetworkShutdownDelay,
 	)
 }
