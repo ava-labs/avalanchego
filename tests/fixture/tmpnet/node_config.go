@@ -61,12 +61,16 @@ func (n *Node) readConfig() error {
 }
 
 type serializedNodeConfig struct {
+	NetworkUUID   string
+	NetworkOwner  string
 	IsEphemeral   bool
 	RuntimeConfig *NodeRuntimeConfig
 }
 
 func (n *Node) writeConfig() error {
 	config := serializedNodeConfig{
+		NetworkUUID:   n.NetworkUUID,
+		NetworkOwner:  n.NetworkOwner,
 		IsEphemeral:   n.IsEphemeral,
 		RuntimeConfig: n.RuntimeConfig,
 	}
