@@ -114,7 +114,9 @@ func TestFxInitializationFailure(t *testing.T) {
 func TestIssueTx(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{fork: latest})
+	env := setup(t, &envConfig{
+		fork: latest,
+	})
 	env.vm.ctx.Lock.Unlock()
 	defer func() {
 		env.vm.ctx.Lock.Lock()
@@ -130,7 +132,9 @@ func TestIssueTx(t *testing.T) {
 func TestIssueNFT(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{fork: eUpgrade})
+	env := setup(t, &envConfig{
+		fork: eUpgrade,
+	})
 	env.vm.ctx.Lock.Unlock()
 	defer func() {
 		env.vm.ctx.Lock.Lock()
@@ -386,7 +390,9 @@ func TestIssueTxWithAnotherAsset(t *testing.T) {
 }
 
 func TestVMFormat(t *testing.T) {
-	env := setup(t, &envConfig{fork: latest})
+	env := setup(t, &envConfig{
+		fork: latest,
+	})
 	defer func() {
 		require.NoError(t, env.vm.Shutdown(context.Background()))
 		env.vm.ctx.Lock.Unlock()
@@ -495,7 +501,9 @@ func TestTxAcceptAfterParseTx(t *testing.T) {
 func TestIssueImportTx(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{fork: eUpgrade})
+	env := setup(t, &envConfig{
+		fork: eUpgrade,
+	})
 	defer func() {
 		require.NoError(env.vm.Shutdown(context.Background()))
 		env.vm.ctx.Lock.Unlock()
@@ -658,7 +666,9 @@ func TestImportTxNotState(t *testing.T) {
 func TestIssueExportTx(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{fork: latest})
+	env := setup(t, &envConfig{
+		fork: latest,
+	})
 	defer func() {
 		require.NoError(env.vm.Shutdown(context.Background()))
 		env.vm.ctx.Lock.Unlock()
@@ -723,7 +733,9 @@ func TestIssueExportTx(t *testing.T) {
 func TestClearForceAcceptedExportTx(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{fork: latest})
+	env := setup(t, &envConfig{
+		fork: latest,
+	})
 	defer func() {
 		require.NoError(env.vm.Shutdown(context.Background()))
 		env.vm.ctx.Lock.Unlock()
