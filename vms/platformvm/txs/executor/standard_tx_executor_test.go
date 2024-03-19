@@ -5,7 +5,6 @@ package executor
 
 import (
 	"errors"
-	"fmt"
 	"math"
 	"testing"
 	"time"
@@ -1995,43 +1994,36 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 }
 
 func defaultTestConfig(t *testing.T, f fork, tm time.Time) *config.Config {
-	var (
-		apricotPhase3Time = mockable.MaxTime
-		apricotPhase5Time = mockable.MaxTime
-		banffTime         = mockable.MaxTime
-		cortinaTime       = mockable.MaxTime
-		durangoTime       = mockable.MaxTime
-		eUpgradeTime      = mockable.MaxTime
-	)
+	c := &config.Config{
+		ApricotPhase3Time: mockable.MaxTime,
+		ApricotPhase5Time: mockable.MaxTime,
+		BanffTime:         mockable.MaxTime,
+		CortinaTime:       mockable.MaxTime,
+		DurangoTime:       mockable.MaxTime,
+		EUpgradeTime:      mockable.MaxTime,
+	}
 
 	switch f {
 	case eUpgrade:
-		eUpgradeTime = tm
+		c.EUpgradeTime = tm
 		fallthrough
 	case durango:
-		durangoTime = tm
+		c.DurangoTime = tm
 		fallthrough
 	case cortina:
-		cortinaTime = tm
+		c.CortinaTime = tm
 		fallthrough
 	case banff:
-		banffTime = tm
+		c.BanffTime = tm
 		fallthrough
 	case apricotPhase5:
-		apricotPhase5Time = tm
+		c.ApricotPhase5Time = tm
 		fallthrough
 	case apricotPhase3:
-		apricotPhase3Time = tm
+		c.ApricotPhase3Time = tm
 	default:
-		require.FailNow(t, fmt.Sprintf("unhandled fork %d", f))
+		require.FailNow(t, "unhandled fork", f)
 	}
 
-	return &config.Config{
-		ApricotPhase3Time: apricotPhase3Time,
-		ApricotPhase5Time: apricotPhase5Time,
-		BanffTime:         banffTime,
-		CortinaTime:       cortinaTime,
-		DurangoTime:       durangoTime,
-		EUpgradeTime:      eUpgradeTime,
-	}
+	return c
 }

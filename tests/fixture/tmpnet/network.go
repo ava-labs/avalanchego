@@ -71,7 +71,9 @@ type Network struct {
 	// unique network ID values across all temporary networks.
 	UUID string
 
-	// A string identifying the entity that started or maintains this network.
+	// A string identifying the entity that started or maintains this
+	// network. Useful for differentiating between networks when a
+	// given CI job uses multiple networks.
 	Owner string
 
 	// Path where network configuration and data is stored
@@ -230,7 +232,7 @@ func (n *Network) Create(rootDir string) error {
 	if len(rootDir) == 0 {
 		// Use the default root dir
 		var err error
-		rootDir, err = getDefaultRootDir()
+		rootDir, err = getDefaultRootNetworkDir()
 		if err != nil {
 			return err
 		}
@@ -305,6 +307,9 @@ func (n *Network) Start(ctx context.Context, w io.Writer) error {
 		return err
 	}
 
+	// Record the time before nodes are started to ensure visibility of subsequently collected metrics via the emitted link
+	startTime := time.Now()
+
 	// Configure the networking for each node and start
 	for _, node := range n.Nodes {
 		if err := n.StartNode(ctx, w, node); err != nil {
@@ -319,6 +324,10 @@ func (n *Network) Start(ctx context.Context, w io.Writer) error {
 		return err
 	}
 	if _, err := fmt.Fprintf(w, "\nStarted network %s (UUID: %s)\n", n.Dir, n.UUID); err != nil {
+		return err
+	}
+	// Provide a link to the main dashboard filtered by the uuid and showing results from now till whenever the link is viewed
+	if _, err := fmt.Fprintf(w, "\nMetrics: https://grafana-experimental.avax-dev.network/d/kBQpRdWnk/avalanche-main-dashboard?&var-filter=network_uuid%%7C%%3D%%7C%s&var-filter=is_ephemeral_node%%7C%%3D%%7Cfalse&from=%d&to=now\n", n.UUID, startTime.UnixMilli()); err != nil {
 		return err
 	}
 
@@ -454,6 +463,12 @@ func (n *Network) Restart(ctx context.Context, w io.Writer) error {
 // TODO(marun) Reword or refactor to account for the differing behavior pre- vs post-start
 func (n *Network) EnsureNodeConfig(node *Node) error {
 	flags := node.Flags
+
+	// Ensure nodes can label their metrics with the network uuid
+	node.NetworkUUID = n.UUID
+
+	// Ensure nodes can label metrics with an indication of the shared/private nature of the network
+	node.NetworkOwner = n.Owner
 
 	// Set the network name if available
 	if n.Genesis != nil && n.Genesis.NetworkID > 0 {
@@ -672,12 +687,21 @@ func (n *Network) getBootstrapIPsAndIDs(skippedNode *Node) ([]string, []string, 
 	return bootstrapIPs, bootstrapIDs, nil
 }
 
-// Retrieves the default root dir for storing networks and their
-// configuration.
-func getDefaultRootDir() (string, error) {
+// Retrieves the root dir for tmpnet data.
+func getTmpnetPath() (string, error) {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(homeDir, ".tmpnet", "networks"), nil
+	return filepath.Join(homeDir, ".tmpnet"), nil
+}
+
+// Retrieves the default root dir for storing networks and their
+// configuration.
+func getDefaultRootNetworkDir() (string, error) {
+	tmpnetPath, err := getTmpnetPath()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(tmpnetPath, "networks"), nil
 }
