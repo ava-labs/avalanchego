@@ -41,7 +41,9 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 			baseWallet := e2e.NewWallet(keychain, nodeURI)
 
 			pWallet := baseWallet.P()
-			avaxAssetID := baseWallet.P().AVAXAssetID()
+			pBuilder := pWallet.Builder()
+			pContext := pBuilder.Context()
+			avaxAssetID := pContext.AVAXAssetID
 			xWallet := baseWallet.X()
 			pChainClient := platformvm.NewClient(nodeURI.URI)
 

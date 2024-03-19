@@ -22,7 +22,9 @@ import (
 func TestVerifyFxUsage(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{vmStaticConfig: noFeesTestConfig})
+	env := setup(t, &envConfig{
+		vmStaticConfig: noFeesTestConfig,
+	})
 	env.vm.ctx.Lock.Unlock()
 	defer func() {
 		env.vm.ctx.Lock.Lock()
