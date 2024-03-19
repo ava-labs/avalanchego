@@ -2137,7 +2137,7 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 			keys[0].PublicKey().Address(),
 		},
 	}
-	ctx, err := builder.NewSnowContext(vm.ctx.NetworkID, vm.ctx.AVAXAssetID)
+	ctx, err := walletbuilder.NewSnowContext(vm.ctx.NetworkID, vm.ctx.AVAXAssetID)
 	require.NoError(err)
 	expectedOwner.InitCtx(ctx)
 	require.Equal(expectedOwner, subnetOwner)
