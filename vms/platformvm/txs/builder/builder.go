@@ -739,18 +739,7 @@ func (b *builder) builders(keys []*secp256k1.PrivateKey) (walletbuilder.Builder,
 	var (
 		kc      = secp256k1fx.NewKeychain(keys...)
 		addrs   = kc.Addresses()
-		context = &walletbuilder.Context{
-			NetworkID:                     b.ctx.NetworkID,
-			AVAXAssetID:                   b.ctx.AVAXAssetID,
-			BaseTxFee:                     b.backend.cfg.TxFee,
-			CreateSubnetTxFee:             b.backend.cfg.GetCreateSubnetTxFee(b.backend.state.GetTimestamp()),
-			TransformSubnetTxFee:          b.backend.cfg.TransformSubnetTxFee,
-			CreateBlockchainTxFee:         b.backend.cfg.GetCreateBlockchainTxFee(b.backend.state.GetTimestamp()),
-			AddPrimaryNetworkValidatorFee: b.backend.cfg.AddPrimaryNetworkValidatorFee,
-			AddPrimaryNetworkDelegatorFee: b.backend.cfg.AddPrimaryNetworkDelegatorFee,
-			AddSubnetValidatorFee:         b.backend.cfg.AddSubnetValidatorFee,
-			AddSubnetDelegatorFee:         b.backend.cfg.AddSubnetDelegatorFee,
-		}
+		context = NewContext(b.ctx, b.backend.cfg, b.backend.state.GetTimestamp())
 		builder = walletbuilder.New(addrs, context, b.backend)
 		signer  = walletsigner.New(kc, b.backend)
 	)
