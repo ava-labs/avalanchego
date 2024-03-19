@@ -6,7 +6,6 @@ package avm
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"math/rand"
 	"testing"
 	"time"
@@ -45,6 +44,8 @@ type fork uint8
 const (
 	durango fork = iota
 	eUpgrade
+
+	latest = durango
 
 	testTxFee    uint64 = 1000
 	startBalance uint64 = 50000
@@ -226,27 +227,21 @@ func setup(tb testing.TB, c *envConfig) *environment {
 }
 
 func staticConfig(tb testing.TB, f fork) config.Config {
-	var (
-		durangoTime  = mockable.MaxTime
-		eUpgradeTime = mockable.MaxTime
-	)
+	c := config.Config{
+		TxFee:            testTxFee,
+		CreateAssetTxFee: testTxFee,
+		EUpgradeTime:     mockable.MaxTime,
+	}
 
 	switch f {
 	case eUpgrade:
-		eUpgradeTime = time.Time{}
-		fallthrough
+		c.EUpgradeTime = time.Time{}
 	case durango:
-		durangoTime = time.Time{}
 	default:
-		require.FailNow(tb, fmt.Sprintf("unhandled fork %d", f))
+		require.FailNow(tb, "unhandled fork", f)
 	}
 
-	return config.Config{
-		TxFee:            testTxFee,
-		CreateAssetTxFee: testTxFee,
-		DurangoTime:      durangoTime,
-		EUpgradeTime:     eUpgradeTime,
-	}
+	return c
 }
 
 // Returns:

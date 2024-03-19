@@ -140,7 +140,7 @@ func (c *Config) IsDurangoActivated(timestamp time.Time) bool {
 	return !timestamp.Before(c.DurangoTime)
 }
 
-func (c *Config) IsEForkActivated(timestamp time.Time) bool {
+func (c *Config) IsEActivated(timestamp time.Time) bool {
 	return !timestamp.Before(c.EUpgradeTime)
 }
 

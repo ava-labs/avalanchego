@@ -28,6 +28,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/avm/block"
 	"github.com/ava-labs/avalanchego/vms/avm/block/executor"
@@ -47,7 +48,9 @@ import (
 func TestServiceIssueTx(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{fork: durango})
+	env := setup(t, &envConfig{
+		fork: latest,
+	})
 	env.vm.ctx.Lock.Unlock()
 
 	defer func() {
@@ -73,7 +76,9 @@ func TestServiceIssueTx(t *testing.T) {
 func TestServiceGetTxStatus(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{fork: durango})
+	env := setup(t, &envConfig{
+		fork: latest,
+	})
 	env.vm.ctx.Lock.Unlock()
 
 	defer func() {
@@ -108,7 +113,9 @@ func TestServiceGetTxStatus(t *testing.T) {
 func TestServiceGetBalanceStrict(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{fork: durango})
+	env := setup(t, &envConfig{
+		fork: latest,
+	})
 	defer func() {
 		env.vm.ctx.Lock.Lock()
 		require.NoError(env.vm.Shutdown(context.Background()))
@@ -264,7 +271,9 @@ func TestServiceGetBalanceStrict(t *testing.T) {
 
 func TestServiceGetTxs(t *testing.T) {
 	require := require.New(t)
-	env := setup(t, &envConfig{fork: eUpgrade})
+	env := setup(t, &envConfig{
+		fork: latest,
+	})
 	var err error
 	env.vm.addressTxsIndexer, err = index.NewIndexer(env.vm.db, env.vm.ctx.Log, "", prometheus.NewRegistry(), false)
 	require.NoError(err)
@@ -306,7 +315,9 @@ func TestServiceGetTxs(t *testing.T) {
 func TestServiceGetAllBalances(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{fork: eUpgrade})
+	env := setup(t, &envConfig{
+		fork: latest,
+	})
 	defer func() {
 		env.vm.ctx.Lock.Lock()
 		require.NoError(env.vm.Shutdown(context.Background()))
@@ -504,7 +515,9 @@ func TestServiceGetAllBalances(t *testing.T) {
 func TestServiceGetTx(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{fork: eUpgrade})
+	env := setup(t, &envConfig{
+		fork: latest,
+	})
 	env.vm.ctx.Lock.Unlock()
 
 	defer func() {
@@ -532,7 +545,9 @@ func TestServiceGetTx(t *testing.T) {
 func TestServiceGetTxJSON_BaseTx(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{fork: eUpgrade})
+	env := setup(t, &envConfig{
+		fork: latest,
+	})
 	env.vm.ctx.Lock.Unlock()
 	defer func() {
 		env.vm.ctx.Lock.Lock()
@@ -627,7 +642,9 @@ func TestServiceGetTxJSON_BaseTx(t *testing.T) {
 func TestServiceGetTxJSON_ExportTx(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{fork: eUpgrade})
+	env := setup(t, &envConfig{
+		fork: latest,
+	})
 	env.vm.ctx.Lock.Unlock()
 	defer func() {
 		env.vm.ctx.Lock.Lock()
@@ -725,7 +742,7 @@ func TestServiceGetTxJSON_CreateAssetTx(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		fork: durango,
+		fork: latest,
 		additionalFxs: []*common.Fx{{
 			ID: propertyfx.ID,
 			Fx: &propertyfx.Fx{},
@@ -922,7 +939,7 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		fork: durango,
+		fork: latest,
 		additionalFxs: []*common.Fx{{
 			ID: propertyfx.ID,
 			Fx: &propertyfx.Fx{},
@@ -1073,7 +1090,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		fork: durango,
+		fork: latest,
 		additionalFxs: []*common.Fx{{
 			ID: propertyfx.ID,
 			Fx: &propertyfx.Fx{},
@@ -1263,7 +1280,7 @@ func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		fork: durango,
+		fork: latest,
 		additionalFxs: []*common.Fx{{
 			ID: propertyfx.ID,
 			Fx: &propertyfx.Fx{},
@@ -1611,7 +1628,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		fork: durango,
+		fork: latest,
 		additionalFxs: []*common.Fx{{
 			ID: propertyfx.ID,
 			Fx: &propertyfx.Fx{},
@@ -1755,7 +1772,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) 
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		fork: durango,
+		fork: latest,
 		additionalFxs: []*common.Fx{{
 			ID: propertyfx.ID,
 			Fx: &propertyfx.Fx{},
@@ -2105,7 +2122,9 @@ func buildOperationTxWithOp(t *testing.T, env *environment, ops []*txs.Operation
 func TestServiceGetNilTx(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{fork: eUpgrade})
+	env := setup(t, &envConfig{
+		fork: latest,
+	})
 	env.vm.ctx.Lock.Unlock()
 
 	defer func() {
@@ -2122,7 +2141,9 @@ func TestServiceGetNilTx(t *testing.T) {
 func TestServiceGetUnknownTx(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{fork: durango})
+	env := setup(t, &envConfig{
+		fork: latest,
+	})
 	env.vm.ctx.Lock.Unlock()
 
 	defer func() {
@@ -2137,7 +2158,9 @@ func TestServiceGetUnknownTx(t *testing.T) {
 }
 
 func TestServiceGetUTXOs(t *testing.T) {
-	env := setup(t, &envConfig{fork: durango})
+	env := setup(t, &envConfig{
+		fork: latest,
+	})
 	defer func() {
 		env.vm.ctx.Lock.Lock()
 		require.NoError(t, env.vm.Shutdown(context.Background()))
@@ -2392,7 +2415,9 @@ func TestServiceGetUTXOs(t *testing.T) {
 func TestGetAssetDescription(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{fork: eUpgrade})
+	env := setup(t, &envConfig{
+		fork: latest,
+	})
 	env.vm.ctx.Lock.Unlock()
 
 	defer func() {
@@ -2415,7 +2440,9 @@ func TestGetAssetDescription(t *testing.T) {
 func TestGetBalance(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{fork: durango})
+	env := setup(t, &envConfig{
+		fork: latest,
+	})
 	env.vm.ctx.Lock.Unlock()
 
 	defer func() {
@@ -2862,7 +2889,7 @@ func TestSendMultiple(t *testing.T) {
 					initialKeys: keys,
 				}},
 				vmStaticConfig: &config.Config{
-					DurangoTime: time.Time{},
+					EUpgradeTime: mockable.MaxTime,
 				},
 			})
 			env.vm.ctx.Lock.Unlock()
