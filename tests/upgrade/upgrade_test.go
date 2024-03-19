@@ -48,7 +48,7 @@ var _ = ginkgo.Describe("[Upgrade]", func() {
 		network := &tmpnet.Network{
 			Owner: "avalanchego-upgrade",
 		}
-		e2e.StartNetwork(network, avalancheGoExecPath, "" /* pluginDir */)
+		e2e.StartNetwork(network, avalancheGoExecPath, "" /* pluginDir */, 0 /* shutdownDelay */)
 
 		ginkgo.By(fmt.Sprintf("restarting all nodes with %q binary", avalancheGoExecPathToUpgradeTo))
 		for _, node := range network.Nodes {

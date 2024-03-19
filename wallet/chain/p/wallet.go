@@ -22,7 +22,7 @@ import (
 )
 
 var (
-	errNotCommitted = errors.New("not committed")
+	ErrNotCommitted = errors.New("not committed")
 
 	_ Wallet = (*wallet)(nil)
 )
@@ -531,7 +531,7 @@ func (w *wallet) IssueTx(
 	}
 
 	if txStatus.Status != status.Committed {
-		return fmt.Errorf("%w: %s", errNotCommitted, txStatus.Reason)
+		return fmt.Errorf("%w: %s", ErrNotCommitted, txStatus.Reason)
 	}
 	return nil
 }
