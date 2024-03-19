@@ -102,7 +102,7 @@ func Execute(
 			if processedSinceBatchWrite == 0 {
 				return nil
 			}
-			processedSinceBatchWrite %= batchWritePeriod
+			processedSinceBatchWrite = 0
 
 			if err := batch.Write(); err != nil {
 				return err
@@ -163,6 +163,7 @@ func Execute(
 				return err
 			}
 
+			processedSinceIteratorRelease = 0
 			iterator.Release()
 			iterator = db.NewIteratorWithPrefix(blockPrefix)
 		}
