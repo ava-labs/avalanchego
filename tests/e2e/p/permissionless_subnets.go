@@ -36,7 +36,9 @@ var _ = e2e.DescribePChain("[Permissionless Subnets]", func() {
 
 			pWallet := baseWallet.P()
 			xWallet := baseWallet.X()
-			xChainID := xWallet.BlockchainID()
+			xBuilder := xWallet.Builder()
+			xContext := xBuilder.Context()
+			xChainID := xContext.BlockchainID
 
 			var validatorID ids.NodeID
 			ginkgo.By("retrieving the node ID of a primary network validator", func() {
