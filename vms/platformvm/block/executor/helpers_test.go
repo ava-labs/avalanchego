@@ -171,7 +171,7 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller, f fork) *environment 
 		res.uptimes = uptime.NewManager(res.mockedState, res.clk)
 		res.utxosVerifier = utxo.NewVerifier(res.ctx, res.clk, res.fx)
 
-		res.mockedState.EXPECT().GetTimestamp().Return(time.Time{}).Times(2) // to initialize createSubnet/BlockchainTx fee
+		res.mockedState.EXPECT().GetTimestamp().Return(time.Time{}).AnyTimes() // to initialize createSubnet/BlockchainTx fee
 		res.txBuilder = p_tx_builder.New(
 			res.ctx,
 			res.config,
@@ -336,38 +336,7 @@ func defaultState(
 }
 
 func defaultConfig(t *testing.T, f fork) *config.Config {
-	var (
-		apricotPhase3Time = mockable.MaxTime
-		apricotPhase5Time = mockable.MaxTime
-		banffTime         = mockable.MaxTime
-		cortinaTime       = mockable.MaxTime
-		durangoTime       = mockable.MaxTime
-		eUpgradeTime      = mockable.MaxTime
-	)
-
-	switch f {
-	case eUpgrade:
-		eUpgradeTime = time.Time{} // neglecting fork ordering this for package tests
-		fallthrough
-	case durango:
-		durangoTime = time.Time{} // neglecting fork ordering for this package's tests
-		fallthrough
-	case cortina:
-		cortinaTime = time.Time{} // neglecting fork ordering for this package's tests
-		fallthrough
-	case banff:
-		banffTime = time.Time{} // neglecting fork ordering for this package's tests
-		fallthrough
-	case apricotPhase5:
-		apricotPhase5Time = defaultValidateEndTime
-		fallthrough
-	case apricotPhase3:
-		apricotPhase3Time = defaultValidateEndTime
-	default:
-		require.FailNow(t, fmt.Sprintf("unhandled fork %d", f))
-	}
-
-	return &config.Config{
+	c := &config.Config{
 		Chains:                 chains.TestManager,
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		Validators:             validators.NewManager(),
@@ -385,13 +354,37 @@ func defaultConfig(t *testing.T, f fork) *config.Config {
 			MintingPeriod:      365 * 24 * time.Hour,
 			SupplyCap:          720 * units.MegaAvax,
 		},
-		ApricotPhase3Time: apricotPhase3Time,
-		ApricotPhase5Time: apricotPhase5Time,
-		BanffTime:         banffTime,
-		CortinaTime:       cortinaTime,
-		DurangoTime:       durangoTime,
-		EUpgradeTime:      eUpgradeTime,
+		ApricotPhase3Time: mockable.MaxTime,
+		ApricotPhase5Time: mockable.MaxTime,
+		BanffTime:         mockable.MaxTime,
+		CortinaTime:       mockable.MaxTime,
+		DurangoTime:       mockable.MaxTime,
+		EUpgradeTime:      mockable.MaxTime,
 	}
+
+	switch f {
+	case eUpgrade:
+		c.EUpgradeTime = time.Time{} // neglecting fork ordering this for package tests
+		fallthrough
+	case durango:
+		c.DurangoTime = time.Time{} // neglecting fork ordering for this package's tests
+		fallthrough
+	case cortina:
+		c.CortinaTime = time.Time{} // neglecting fork ordering for this package's tests
+		fallthrough
+	case banff:
+		c.BanffTime = time.Time{} // neglecting fork ordering for this package's tests
+		fallthrough
+	case apricotPhase5:
+		c.ApricotPhase5Time = defaultValidateEndTime
+		fallthrough
+	case apricotPhase3:
+		c.ApricotPhase3Time = defaultValidateEndTime
+	default:
+		require.FailNow(t, "unhandled fork", f)
+	}
+
+	return c
 }
 
 func defaultClock() *mockable.Clock {

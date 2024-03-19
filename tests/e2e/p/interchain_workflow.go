@@ -56,6 +56,9 @@ var _ = e2e.DescribePChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 		cWallet := baseWallet.C()
 		pWallet := baseWallet.P()
 
+		pBuilder := pWallet.Builder()
+		pContext := pBuilder.Context()
+
 		ginkgo.By("defining common configuration")
 		recipientEthAddress := evm.GetEthAddress(recipientKey)
 		avaxAssetID := xWallet.AVAXAssetID()
@@ -114,7 +117,7 @@ var _ = e2e.DescribePChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 					Subnet: constants.PrimaryNetworkID,
 				},
 				nodePOP,
-				pWallet.AVAXAssetID(),
+				pContext.AVAXAssetID,
 				&secp256k1fx.OutputOwners{
 					Threshold: 1,
 					Addrs:     []ids.ShortID{rewardKey.Address()},
@@ -143,7 +146,7 @@ var _ = e2e.DescribePChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 					},
 					Subnet: constants.PrimaryNetworkID,
 				},
-				pWallet.AVAXAssetID(),
+				pContext.AVAXAssetID,
 				&secp256k1fx.OutputOwners{
 					Threshold: 1,
 					Addrs:     []ids.ShortID{rewardKey.Address()},

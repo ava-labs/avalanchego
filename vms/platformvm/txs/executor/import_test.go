@@ -18,7 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-	"github.com/ava-labs/avalanchego/wallet/chain/p/backends"
+	"github.com/ava-labs/avalanchego/wallet/chain/p/builder"
 )
 
 var fundedSharedMemoryCalls byte
@@ -54,7 +54,7 @@ func TestNewImportTx(t *testing.T) {
 				},
 			),
 			sourceKeys:  []*secp256k1.PrivateKey{sourceKey},
-			expectedErr: backends.ErrInsufficientFunds,
+			expectedErr: builder.ErrInsufficientFunds,
 		},
 		{
 			description:   "can barely pay fee",

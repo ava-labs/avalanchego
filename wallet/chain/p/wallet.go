@@ -13,31 +13,30 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
-	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fees"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-	"github.com/ava-labs/avalanchego/wallet/chain/p/backends"
+	"github.com/ava-labs/avalanchego/wallet/chain/p/builder"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
 	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
+	vmsigner "github.com/ava-labs/avalanchego/vms/platformvm/signer"
+	walletsigner "github.com/ava-labs/avalanchego/wallet/chain/p/signer"
 )
 
 var (
-	errNotCommitted = errors.New("not committed")
+	ErrNotCommitted = errors.New("not committed")
 
 	_ Wallet = (*wallet)(nil)
 )
 
 type Wallet interface {
-	backends.Context
-
 	// Builder returns the builder that will be used to create the transactions.
-	Builder() backends.Builder
+	Builder() builder.Builder
 
 	// Signer returns the signer that will be used to sign the transactions.
-	Signer() backends.Signer
+	Signer() walletsigner.Signer
 
 	// IssueBaseTx creates, signs, and issues a new simple value transfer.
 	//
@@ -225,7 +224,7 @@ type Wallet interface {
 	//   the delegation reward will be sent to the validator's [rewardsOwner].
 	IssueAddPermissionlessValidatorTx(
 		vdr *txs.SubnetValidator,
-		signer signer.Signer,
+		signer vmsigner.Signer,
 		assetID ids.ID,
 		validationRewardsOwner *secp256k1fx.OutputOwners,
 		delegationRewardsOwner *secp256k1fx.OutputOwners,
@@ -262,8 +261,8 @@ type Wallet interface {
 }
 
 func NewWallet(
-	builder backends.Builder,
-	signer backends.Signer,
+	builder builder.Builder,
+	signer walletsigner.Signer,
 	client platformvm.Client,
 	backend Backend,
 ) Wallet {
@@ -277,19 +276,19 @@ func NewWallet(
 
 type wallet struct {
 	Backend
-	client platformvm.Client
+	builder builder.Builder
+	signer  walletsigner.Signer
+	client  platformvm.Client
 
 	isEForkActive      bool
-	builder            backends.Builder
-	signer             backends.Signer
 	unitFees, unitCaps commonfees.Dimensions
 }
 
-func (w *wallet) Builder() backends.Builder {
+func (w *wallet) Builder() builder.Builder {
 	return w.builder
 }
 
-func (w *wallet) Signer() backends.Signer {
+func (w *wallet) Signer() walletsigner.Signer {
 	return w.signer
 }
 
@@ -308,7 +307,7 @@ func (w *wallet) IssueBaseTx(
 		feeCalc = &fees.Calculator{
 			IsEUpgradeActive: w.isEForkActive,
 			Config: &config.Config{
-				CreateSubnetTxFee: w.CreateSubnetTxFee(),
+				CreateSubnetTxFee: w.builder.Context().CreateSubnetTxFee,
 			},
 			FeeManager:       commonfees.NewManager(w.unitFees),
 			ConsumedUnitsCap: w.unitCaps,
@@ -336,7 +335,7 @@ func (w *wallet) IssueAddValidatorTx(
 	feeCalc := &fees.Calculator{
 		IsEUpgradeActive: w.isEForkActive,
 		Config: &config.Config{
-			AddPrimaryNetworkValidatorFee: w.AddPrimaryNetworkValidatorFee(),
+			AddPrimaryNetworkValidatorFee: w.builder.Context().AddPrimaryNetworkValidatorFee,
 		},
 		FeeManager:       commonfees.NewManager(w.unitFees),
 		ConsumedUnitsCap: w.unitCaps,
@@ -360,7 +359,7 @@ func (w *wallet) IssueAddSubnetValidatorTx(
 	feeCalc := &fees.Calculator{
 		IsEUpgradeActive: w.isEForkActive,
 		Config: &config.Config{
-			TxFee: w.BaseTxFee(),
+			TxFee: w.builder.Context().BaseTxFee,
 		},
 		FeeManager:       commonfees.NewManager(w.unitFees),
 		ConsumedUnitsCap: w.unitCaps,
@@ -386,7 +385,7 @@ func (w *wallet) IssueRemoveSubnetValidatorTx(
 	feeCalc := &fees.Calculator{
 		IsEUpgradeActive: w.isEForkActive,
 		Config: &config.Config{
-			TxFee: w.BaseTxFee(),
+			TxFee: w.builder.Context().BaseTxFee,
 		},
 		FeeManager:       commonfees.NewManager(w.unitFees),
 		ConsumedUnitsCap: w.unitCaps,
@@ -412,7 +411,7 @@ func (w *wallet) IssueAddDelegatorTx(
 	feeCalc := &fees.Calculator{
 		IsEUpgradeActive: w.isEForkActive,
 		Config: &config.Config{
-			AddPrimaryNetworkDelegatorFee: w.AddPrimaryNetworkDelegatorFee(),
+			AddPrimaryNetworkDelegatorFee: w.builder.Context().AddPrimaryNetworkDelegatorFee,
 		},
 		FeeManager:       commonfees.NewManager(w.unitFees),
 		ConsumedUnitsCap: w.unitCaps,
@@ -440,7 +439,7 @@ func (w *wallet) IssueCreateChainTx(
 	feeCalc := &fees.Calculator{
 		IsEUpgradeActive: w.isEForkActive,
 		Config: &config.Config{
-			CreateBlockchainTxFee: w.CreateBlockchainTxFee(),
+			CreateBlockchainTxFee: w.builder.Context().CreateBlockchainTxFee,
 		},
 		FeeManager:       commonfees.NewManager(w.unitFees),
 		ConsumedUnitsCap: w.unitCaps,
@@ -465,7 +464,7 @@ func (w *wallet) IssueCreateSubnetTx(
 	feeCalc := &fees.Calculator{
 		IsEUpgradeActive: w.isEForkActive,
 		Config: &config.Config{
-			CreateSubnetTxFee: w.CreateSubnetTxFee(),
+			CreateSubnetTxFee: w.builder.Context().CreateSubnetTxFee,
 		},
 		FeeManager:       commonfees.NewManager(w.unitFees),
 		ConsumedUnitsCap: w.unitCaps,
@@ -474,7 +473,6 @@ func (w *wallet) IssueCreateSubnetTx(
 	if err != nil {
 		return nil, err
 	}
-
 	return w.IssueUnsignedTx(utx, options...)
 }
 
@@ -490,7 +488,7 @@ func (w *wallet) IssueTransferSubnetOwnershipTx(
 	feeCalc := &fees.Calculator{
 		IsEUpgradeActive: w.isEForkActive,
 		Config: &config.Config{
-			TxFee: w.BaseTxFee(),
+			TxFee: w.builder.Context().BaseTxFee,
 		},
 		FeeManager:       commonfees.NewManager(w.unitFees),
 		ConsumedUnitsCap: w.unitCaps,
@@ -515,7 +513,7 @@ func (w *wallet) IssueImportTx(
 	feeCalc := &fees.Calculator{
 		IsEUpgradeActive: w.isEForkActive,
 		Config: &config.Config{
-			TxFee: w.BaseTxFee(),
+			TxFee: w.builder.Context().BaseTxFee,
 		},
 		FeeManager:       commonfees.NewManager(w.unitFees),
 		ConsumedUnitsCap: w.unitCaps,
@@ -541,7 +539,7 @@ func (w *wallet) IssueExportTx(
 	feeCalc := &fees.Calculator{
 		IsEUpgradeActive: w.isEForkActive,
 		Config: &config.Config{
-			TxFee: w.BaseTxFee(),
+			TxFee: w.builder.Context().BaseTxFee,
 		},
 		FeeManager:       commonfees.NewManager(w.unitFees),
 		ConsumedUnitsCap: w.unitCaps,
@@ -579,7 +577,7 @@ func (w *wallet) IssueTransformSubnetTx(
 	feeCalc := &fees.Calculator{
 		IsEUpgradeActive: w.isEForkActive,
 		Config: &config.Config{
-			TransformSubnetTxFee: w.TransformSubnetTxFee(),
+			TransformSubnetTxFee: w.builder.Context().TransformSubnetTxFee,
 		},
 		FeeManager:       commonfees.NewManager(w.unitFees),
 		ConsumedUnitsCap: w.unitCaps,
@@ -611,7 +609,7 @@ func (w *wallet) IssueTransformSubnetTx(
 
 func (w *wallet) IssueAddPermissionlessValidatorTx(
 	vdr *txs.SubnetValidator,
-	signer signer.Signer,
+	signer vmsigner.Signer,
 	assetID ids.ID,
 	validationRewardsOwner *secp256k1fx.OutputOwners,
 	delegationRewardsOwner *secp256k1fx.OutputOwners,
@@ -625,8 +623,8 @@ func (w *wallet) IssueAddPermissionlessValidatorTx(
 	feeCalc := &fees.Calculator{
 		IsEUpgradeActive: w.isEForkActive,
 		Config: &config.Config{
-			AddPrimaryNetworkValidatorFee: w.AddPrimaryNetworkValidatorFee(),
-			AddSubnetValidatorFee:         w.AddSubnetValidatorFee(),
+			AddPrimaryNetworkValidatorFee: w.builder.Context().AddPrimaryNetworkValidatorFee,
+			AddSubnetValidatorFee:         w.builder.Context().AddSubnetValidatorFee,
 		},
 		FeeManager:       commonfees.NewManager(w.unitFees),
 		ConsumedUnitsCap: w.unitCaps,
@@ -662,8 +660,8 @@ func (w *wallet) IssueAddPermissionlessDelegatorTx(
 	feeCalc := &fees.Calculator{
 		IsEUpgradeActive: w.isEForkActive,
 		Config: &config.Config{
-			AddPrimaryNetworkDelegatorFee: w.AddPrimaryNetworkDelegatorFee(),
-			AddSubnetDelegatorFee:         w.AddSubnetDelegatorFee(),
+			AddPrimaryNetworkDelegatorFee: w.builder.Context().AddPrimaryNetworkDelegatorFee,
+			AddSubnetDelegatorFee:         w.builder.Context().AddSubnetDelegatorFee,
 		},
 		FeeManager:       commonfees.NewManager(w.unitFees),
 		ConsumedUnitsCap: w.unitCaps,
@@ -689,7 +687,7 @@ func (w *wallet) IssueUnsignedTx(
 ) (*txs.Tx, error) {
 	ops := common.NewOptions(options)
 	ctx := ops.Context()
-	tx, err := backends.SignUnsigned(ctx, w.signer, utx)
+	tx, err := walletsigner.SignUnsigned(ctx, w.signer, utx)
 	if err != nil {
 		return nil, err
 	}
@@ -726,7 +724,7 @@ func (w *wallet) IssueTx(
 	}
 
 	if txStatus.Status != status.Committed {
-		return fmt.Errorf("%w: %s", errNotCommitted, txStatus.Reason)
+		return fmt.Errorf("%w: %s", ErrNotCommitted, txStatus.Reason)
 	}
 	return nil
 }
@@ -743,7 +741,7 @@ func (w *wallet) refreshFeesData(options ...common.Option) error {
 		return err
 	}
 
-	eUpgradeTime := version.GetEUpgradeTime(w.NetworkID())
+	eUpgradeTime := version.GetEUpgradeTime(w.builder.Context().NetworkID)
 	w.isEForkActive = !chainTime.Before(eUpgradeTime)
 
 	_, w.unitFees, err = w.client.GetUnitFees(ctx)
