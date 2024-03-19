@@ -18,11 +18,11 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fees"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/wallet/chain/p/signer"
 
 	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 	vmbuilder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 	walletbuilder "github.com/ava-labs/avalanchego/wallet/chain/p/builder"
-	walletsigner "github.com/ava-labs/avalanchego/wallet/chain/p/signer"
 )
 
 func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
@@ -98,8 +98,8 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 			require.NoError(err)
 
 			kc := secp256k1fx.NewKeychain(preFundedKeys...)
-			s := walletsigner.New(kc, backend)
-			tx, err := walletsigner.SignUnsigned(context.Background(), s, utx)
+			s := signer.New(kc, backend)
+			tx, err := signer.SignUnsigned(context.Background(), s, utx)
 			require.NoError(err)
 
 			stateDiff, err := state.NewDiff(lastAcceptedID, env)

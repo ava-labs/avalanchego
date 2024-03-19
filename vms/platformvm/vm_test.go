@@ -1014,9 +1014,6 @@ func TestAtomicImport(t *testing.T) {
 		nil,
 	)
 	require.ErrorIs(err, builder.ErrInsufficientFunds)
-
-	// Provide the avm UTXO
-
 	utxo := &avax.UTXO{
 		UTXOID: utxoID,
 		Asset:  avax.Asset{ID: vm.ctx.AVAXAssetID},
