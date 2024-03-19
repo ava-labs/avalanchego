@@ -49,7 +49,9 @@ import (
 func TestServiceIssueTx(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{fork: latest})
+	env := setup(t, &envConfig{
+		fork: latest,
+	})
 	env.vm.ctx.Lock.Unlock()
 
 	defer func() {
@@ -75,7 +77,9 @@ func TestServiceIssueTx(t *testing.T) {
 func TestServiceGetTxStatus(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{fork: latest})
+	env := setup(t, &envConfig{
+		fork: latest,
+	})
 	env.vm.ctx.Lock.Unlock()
 
 	defer func() {
@@ -110,7 +114,9 @@ func TestServiceGetTxStatus(t *testing.T) {
 func TestServiceGetBalanceStrict(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{fork: latest})
+	env := setup(t, &envConfig{
+		fork: latest,
+	})
 	defer func() {
 		env.vm.ctx.Lock.Lock()
 		require.NoError(env.vm.Shutdown(context.Background()))
@@ -266,7 +272,9 @@ func TestServiceGetBalanceStrict(t *testing.T) {
 
 func TestServiceGetTxs(t *testing.T) {
 	require := require.New(t)
-	env := setup(t, &envConfig{fork: latest})
+	env := setup(t, &envConfig{
+		fork: latest,
+	})
 	var err error
 	env.vm.addressTxsIndexer, err = index.NewIndexer(env.vm.db, env.vm.ctx.Log, "", prometheus.NewRegistry(), false)
 	require.NoError(err)
@@ -308,7 +316,9 @@ func TestServiceGetTxs(t *testing.T) {
 func TestServiceGetAllBalances(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{fork: latest})
+	env := setup(t, &envConfig{
+		fork: latest,
+	})
 	defer func() {
 		env.vm.ctx.Lock.Lock()
 		require.NoError(env.vm.Shutdown(context.Background()))
@@ -506,7 +516,9 @@ func TestServiceGetAllBalances(t *testing.T) {
 func TestServiceGetTx(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{fork: latest})
+	env := setup(t, &envConfig{
+		fork: latest,
+	})
 	env.vm.ctx.Lock.Unlock()
 
 	defer func() {
@@ -534,7 +546,9 @@ func TestServiceGetTx(t *testing.T) {
 func TestServiceGetTxJSON_BaseTx(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{fork: latest})
+	env := setup(t, &envConfig{
+		fork: latest,
+	})
 	env.vm.ctx.Lock.Unlock()
 	defer func() {
 		env.vm.ctx.Lock.Lock()
@@ -629,7 +643,9 @@ func TestServiceGetTxJSON_BaseTx(t *testing.T) {
 func TestServiceGetTxJSON_ExportTx(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{fork: latest})
+	env := setup(t, &envConfig{
+		fork: latest,
+	})
 	env.vm.ctx.Lock.Unlock()
 	defer func() {
 		env.vm.ctx.Lock.Lock()
@@ -2107,7 +2123,9 @@ func buildOperationTxWithOp(t *testing.T, env *environment, ops []*txs.Operation
 func TestServiceGetNilTx(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{fork: latest})
+	env := setup(t, &envConfig{
+		fork: latest,
+	})
 	env.vm.ctx.Lock.Unlock()
 
 	defer func() {
@@ -2124,7 +2142,9 @@ func TestServiceGetNilTx(t *testing.T) {
 func TestServiceGetUnknownTx(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{fork: latest})
+	env := setup(t, &envConfig{
+		fork: latest,
+	})
 	env.vm.ctx.Lock.Unlock()
 
 	defer func() {
@@ -2139,7 +2159,9 @@ func TestServiceGetUnknownTx(t *testing.T) {
 }
 
 func TestServiceGetUTXOs(t *testing.T) {
-	env := setup(t, &envConfig{fork: latest})
+	env := setup(t, &envConfig{
+		fork: latest,
+	})
 	defer func() {
 		env.vm.ctx.Lock.Lock()
 		require.NoError(t, env.vm.Shutdown(context.Background()))
@@ -2394,7 +2416,9 @@ func TestServiceGetUTXOs(t *testing.T) {
 func TestGetAssetDescription(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{fork: latest})
+	env := setup(t, &envConfig{
+		fork: latest,
+	})
 	env.vm.ctx.Lock.Unlock()
 
 	defer func() {
@@ -2417,7 +2441,9 @@ func TestGetAssetDescription(t *testing.T) {
 func TestGetBalance(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{fork: latest})
+	env := setup(t, &envConfig{
+		fork: latest,
+	})
 	env.vm.ctx.Lock.Unlock()
 
 	defer func() {
