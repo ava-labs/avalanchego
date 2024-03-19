@@ -25,7 +25,7 @@ type Context struct {
 	AddSubnetDelegatorFee         uint64
 }
 
-func newSnowContext(networkID uint32, avaxAssetID ids.ID) (*snow.Context, error) {
+func NewSnowContext(networkID uint32, avaxAssetID ids.ID) (*snow.Context, error) {
 	lookup := ids.NewAliaser()
 	return &snow.Context{
 		NetworkID:   networkID,
