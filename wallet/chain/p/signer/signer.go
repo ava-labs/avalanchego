@@ -1,16 +1,19 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package backends
+package signer
 
 import (
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/keychain"
-	"github.com/ava-labs/avalanchego/vms/avm/txs"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 
 	stdcontext "context"
 )
 
-var _ Signer = (*signer)(nil)
+var _ Signer = (*txSigner)(nil)
 
 type Signer interface {
 	// Sign adds as many missing signatures as possible to the provided
@@ -24,20 +27,25 @@ type Signer interface {
 	Sign(ctx stdcontext.Context, tx *txs.Tx) error
 }
 
-type signer struct {
-	kc      keychain.Keychain
-	backend SignerBackend
+type Backend interface {
+	GetUTXO(ctx stdcontext.Context, chainID, utxoID ids.ID) (*avax.UTXO, error)
+	GetSubnetOwner(ctx stdcontext.Context, subnetID ids.ID) (fx.Owner, error)
 }
 
-func NewSigner(kc keychain.Keychain, backend SignerBackend) Signer {
-	return &signer{
+type txSigner struct {
+	kc      keychain.Keychain
+	backend Backend
+}
+
+func New(kc keychain.Keychain, backend Backend) Signer {
+	return &txSigner{
 		kc:      kc,
 		backend: backend,
 	}
 }
 
-func (s *signer) Sign(ctx stdcontext.Context, tx *txs.Tx) error {
-	return tx.Unsigned.Visit(&signerVisitor{
+func (s *txSigner) Sign(ctx stdcontext.Context, tx *txs.Tx) error {
+	return tx.Unsigned.Visit(&visitor{
 		kc:      s.kc,
 		backend: s.backend,
 		ctx:     ctx,

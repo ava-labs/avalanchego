@@ -380,6 +380,7 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 		BanffTime:              latestForkTime,
 		CortinaTime:            mockable.MaxTime,
 		DurangoTime:            mockable.MaxTime,
+		EUpgradeTime:           mockable.MaxTime,
 	}}
 
 	ctx := snowtest.Context(t, snowtest.PChainID)

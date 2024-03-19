@@ -69,8 +69,10 @@ func main() {
 	workloads[0] = genesisWorkload
 
 	var (
-		genesisXWallet = wallet.X()
-		avaxAssetID    = genesisXWallet.AVAXAssetID()
+		genesisXWallet  = wallet.X()
+		genesisXBuilder = genesisXWallet.Builder()
+		genesisXContext = genesisXBuilder.Context()
+		avaxAssetID     = genesisXContext.AVAXAssetID
 	)
 	for i := 1; i < NumKeys; i++ {
 		key, err := secp256k1.NewPrivateKey()
@@ -192,7 +194,8 @@ func (w *workload) run(ctx context.Context) {
 		log.Fatalf("failed to fetch P-chain balances: %s", err)
 	}
 	var (
-		avaxAssetID = xWallet.AVAXAssetID()
+		xContext    = xBuilder.Context()
+		avaxAssetID = xContext.AVAXAssetID
 		xAVAX       = xBalances[avaxAssetID]
 		pAVAX       = pBalances[avaxAssetID]
 	)
@@ -245,9 +248,10 @@ func (w *workload) issueXChainBaseTx(ctx context.Context) {
 	}
 
 	var (
-		avaxAssetID   = xWallet.AVAXAssetID()
+		xContext      = xBuilder.Context()
+		avaxAssetID   = xContext.AVAXAssetID
 		avaxBalance   = balances[avaxAssetID]
-		baseTxFee     = xWallet.BaseTxFee()
+		baseTxFee     = xContext.BaseTxFee
 		neededBalance = baseTxFee + units.Schmeckle
 	)
 	if avaxBalance < neededBalance {
@@ -294,9 +298,10 @@ func (w *workload) issueXChainCreateAssetTx(ctx context.Context) {
 	}
 
 	var (
-		avaxAssetID   = xWallet.AVAXAssetID()
+		xContext      = xBuilder.Context()
+		avaxAssetID   = xContext.AVAXAssetID
 		avaxBalance   = balances[avaxAssetID]
-		neededBalance = xWallet.CreateAssetTxFee()
+		neededBalance = xContext.CreateAssetTxFee
 	)
 	if avaxBalance < neededBalance {
 		log.Printf("skipping X-chain tx issuance due to insufficient balance: %d < %d", avaxBalance, neededBalance)
@@ -342,10 +347,11 @@ func (w *workload) issueXChainOperationTx(ctx context.Context) {
 	}
 
 	var (
-		avaxAssetID      = xWallet.AVAXAssetID()
+		xContext         = xBuilder.Context()
+		avaxAssetID      = xContext.AVAXAssetID
 		avaxBalance      = balances[avaxAssetID]
-		createAssetTxFee = xWallet.CreateAssetTxFee()
-		baseTxFee        = xWallet.BaseTxFee()
+		createAssetTxFee = xContext.CreateAssetTxFee
+		baseTxFee        = xContext.BaseTxFee
 		neededBalance    = createAssetTxFee + baseTxFee
 	)
 	if avaxBalance < neededBalance {
@@ -405,10 +411,13 @@ func (w *workload) issueXToPTransfer(ctx context.Context) {
 	}
 
 	var (
-		avaxAssetID   = xWallet.AVAXAssetID()
+		xContext      = xBuilder.Context()
+		avaxAssetID   = xContext.AVAXAssetID
 		avaxBalance   = balances[avaxAssetID]
-		xBaseTxFee    = xWallet.BaseTxFee()
-		pBaseTxFee    = pWallet.BaseTxFee()
+		xBaseTxFee    = xContext.BaseTxFee
+		pBuilder      = pWallet.Builder()
+		pContext      = pBuilder.Context()
+		pBaseTxFee    = pContext.BaseTxFee
 		txFees        = xBaseTxFee + pBaseTxFee
 		neededBalance = txFees + units.Avax
 	)
@@ -439,7 +448,7 @@ func (w *workload) issueXToPTransfer(ctx context.Context) {
 	log.Printf("created X-chain export transaction %s in %s", exportTx.ID(), time.Since(exportStartTime))
 
 	var (
-		xChainID        = xWallet.BlockchainID()
+		xChainID        = xContext.BlockchainID
 		importStartTime = time.Now()
 	)
 	importTx, err := pWallet.IssueImportTx(
@@ -462,6 +471,7 @@ func (w *workload) issuePToXTransfer(ctx context.Context) {
 	var (
 		xWallet  = w.wallet.X()
 		pWallet  = w.wallet.P()
+		xBuilder = xWallet.Builder()
 		pBuilder = pWallet.Builder()
 	)
 	balances, err := pBuilder.GetBalance()
@@ -471,10 +481,12 @@ func (w *workload) issuePToXTransfer(ctx context.Context) {
 	}
 
 	var (
-		avaxAssetID   = pWallet.AVAXAssetID()
+		xContext      = xBuilder.Context()
+		pContext      = pBuilder.Context()
+		avaxAssetID   = pContext.AVAXAssetID
 		avaxBalance   = balances[avaxAssetID]
-		pBaseTxFee    = pWallet.BaseTxFee()
-		xBaseTxFee    = xWallet.BaseTxFee()
+		pBaseTxFee    = pContext.BaseTxFee
+		xBaseTxFee    = xContext.BaseTxFee
 		txFees        = pBaseTxFee + xBaseTxFee
 		neededBalance = txFees + units.Schmeckle
 	)
@@ -484,7 +496,7 @@ func (w *workload) issuePToXTransfer(ctx context.Context) {
 	}
 
 	var (
-		xChainID        = xWallet.BlockchainID()
+		xChainID        = xContext.BlockchainID
 		owner           = w.makeOwner()
 		exportStartTime = time.Now()
 	)
@@ -570,7 +582,7 @@ func (w *workload) confirmPChainTx(ctx context.Context, tx *ptxs.Tx) {
 
 func (w *workload) verifyXChainTxConsumedUTXOs(ctx context.Context, tx *xtxs.Tx) {
 	txID := tx.ID()
-	chainID := w.wallet.X().BlockchainID()
+	chainID := w.wallet.X().Builder().Context().BlockchainID
 	for _, uri := range w.uris {
 		client := avm.NewClient(uri, "X")
 

@@ -1122,6 +1122,7 @@ func (n *Node) initVMs() error {
 	}
 
 	// Register the VMs that Avalanche supports
+	eUpgradeTime := version.GetEUpgradeTime(n.Config.NetworkID)
 	err := utils.Err(
 		n.VMManager.RegisterFactory(context.TODO(), constants.PlatformVMID, &platformvm.Factory{
 			Config: platformconfig.Config{
@@ -1153,6 +1154,7 @@ func (n *Node) initVMs() error {
 				BanffTime:                     version.GetBanffTime(n.Config.NetworkID),
 				CortinaTime:                   version.GetCortinaTime(n.Config.NetworkID),
 				DurangoTime:                   version.GetDurangoTime(n.Config.NetworkID),
+				EUpgradeTime:                  eUpgradeTime,
 				UseCurrentHeight:              n.Config.UseCurrentHeight,
 			},
 		}),
@@ -1160,6 +1162,7 @@ func (n *Node) initVMs() error {
 			Config: avmconfig.Config{
 				TxFee:            n.Config.TxFee,
 				CreateAssetTxFee: n.Config.CreateAssetTxFee,
+				EUpgradeTime:     eUpgradeTime,
 			},
 		}),
 		n.VMManager.RegisterFactory(context.TODO(), constants.EVMID, &coreth.Factory{}),
