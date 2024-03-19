@@ -4,10 +4,14 @@
 package builder
 
 import (
+	"context"
+
+	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/vms/avm"
 )
 
 const Alias = "P"
@@ -23,6 +27,46 @@ type Context struct {
 	AddPrimaryNetworkDelegatorFee uint64
 	AddSubnetValidatorFee         uint64
 	AddSubnetDelegatorFee         uint64
+}
+
+func NewContextFromURI(ctx context.Context, uri string) (*Context, error) {
+	infoClient := info.NewClient(uri)
+	xChainClient := avm.NewClient(uri, "X")
+	return NewContextFromClients(ctx, infoClient, xChainClient)
+}
+
+func NewContextFromClients(
+	ctx context.Context,
+	infoClient info.Client,
+	xChainClient avm.Client,
+) (*Context, error) {
+	networkID, err := infoClient.GetNetworkID(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	asset, err := xChainClient.GetAssetDescription(ctx, "AVAX")
+	if err != nil {
+		return nil, err
+	}
+
+	txFees, err := infoClient.GetTxFee(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Context{
+		NetworkID:                     networkID,
+		AVAXAssetID:                   asset.AssetID,
+		BaseTxFee:                     uint64(txFees.TxFee),
+		CreateSubnetTxFee:             uint64(txFees.CreateSubnetTxFee),
+		TransformSubnetTxFee:          uint64(txFees.TransformSubnetTxFee),
+		CreateBlockchainTxFee:         uint64(txFees.CreateBlockchainTxFee),
+		AddPrimaryNetworkValidatorFee: uint64(txFees.AddPrimaryNetworkValidatorFee),
+		AddPrimaryNetworkDelegatorFee: uint64(txFees.AddPrimaryNetworkDelegatorFee),
+		AddSubnetValidatorFee:         uint64(txFees.AddSubnetValidatorFee),
+		AddSubnetDelegatorFee:         uint64(txFees.AddSubnetDelegatorFee),
+	}, nil
 }
 
 func NewSnowContext(networkID uint32, avaxAssetID ids.ID) (*snow.Context, error) {

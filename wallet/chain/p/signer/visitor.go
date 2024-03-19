@@ -24,13 +24,13 @@ import (
 var (
 	_ txs.Visitor = (*visitor)(nil)
 
-	ErrUnknownOwnerType      = errors.New("unknown owner type")
-	ErrUnknownOutputType     = errors.New("unknown output type")
 	ErrUnsupportedTxType     = errors.New("unsupported tx type")
-	errUnknownInputType      = errors.New("unknown input type")
-	errUnknownCredentialType = errors.New("unknown credential type")
-	errUnknownSubnetAuthType = errors.New("unknown subnet auth type")
-	errInvalidUTXOSigIndex   = errors.New("invalid UTXO signature index")
+	ErrUnknownInputType      = errors.New("unknown input type")
+	ErrUnknownOutputType     = errors.New("unknown output type")
+	ErrInvalidUTXOSigIndex   = errors.New("invalid UTXO signature index")
+	ErrUnknownSubnetAuthType = errors.New("unknown subnet auth type")
+	ErrUnknownOwnerType      = errors.New("unknown owner type")
+	ErrUnknownCredentialType = errors.New("unknown credential type")
 
 	emptySig [secp256k1.SignatureLen]byte
 )
@@ -195,7 +195,7 @@ func (s *visitor) getSigners(sourceChainID ids.ID, ins []*avax.TransferableInput
 
 		input, ok := inIntf.(*secp256k1fx.TransferInput)
 		if !ok {
-			return nil, errUnknownInputType
+			return nil, ErrUnknownInputType
 		}
 
 		inputSigners := make([]keychain.Signer, len(input.SigIndices))
@@ -224,7 +224,7 @@ func (s *visitor) getSigners(sourceChainID ids.ID, ins []*avax.TransferableInput
 
 		for sigIndex, addrIndex := range input.SigIndices {
 			if addrIndex >= uint32(len(out.Addrs)) {
-				return nil, errInvalidUTXOSigIndex
+				return nil, ErrInvalidUTXOSigIndex
 			}
 
 			addr := out.Addrs[addrIndex]
@@ -243,7 +243,7 @@ func (s *visitor) getSigners(sourceChainID ids.ID, ins []*avax.TransferableInput
 func (s *visitor) getSubnetSigners(subnetID ids.ID, subnetAuth verify.Verifiable) ([]keychain.Signer, error) {
 	subnetInput, ok := subnetAuth.(*secp256k1fx.Input)
 	if !ok {
-		return nil, errUnknownSubnetAuthType
+		return nil, ErrUnknownSubnetAuthType
 	}
 
 	ownerIntf, err := s.backend.GetSubnetOwner(s.ctx, subnetID)
@@ -262,7 +262,7 @@ func (s *visitor) getSubnetSigners(subnetID ids.ID, subnetAuth verify.Verifiable
 	authSigners := make([]keychain.Signer, len(subnetInput.SigIndices))
 	for sigIndex, addrIndex := range subnetInput.SigIndices {
 		if addrIndex >= uint32(len(owner.Addrs)) {
-			return nil, errInvalidUTXOSigIndex
+			return nil, ErrInvalidUTXOSigIndex
 		}
 
 		addr := owner.Addrs[addrIndex]
@@ -299,7 +299,7 @@ func sign(tx *txs.Tx, signHash bool, txSigners [][]keychain.Signer) error {
 
 		cred, ok := credIntf.(*secp256k1fx.Credential)
 		if !ok {
-			return errUnknownCredentialType
+			return ErrUnknownCredentialType
 		}
 		if expectedLen := len(inputSigners); expectedLen != len(cred.Sigs) {
 			cred.Sigs = make([][secp256k1.SignatureLen]byte, expectedLen)
