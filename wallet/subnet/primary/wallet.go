@@ -18,12 +18,8 @@ import (
 
 	pbuilder "github.com/ava-labs/avalanchego/wallet/chain/p/builder"
 	psigner "github.com/ava-labs/avalanchego/wallet/chain/p/signer"
-<<<<<<< HEAD
 	xbuilder "github.com/ava-labs/avalanchego/wallet/chain/x/builder"
 	xsigner "github.com/ava-labs/avalanchego/wallet/chain/x/signer"
-=======
-	xbackends "github.com/ava-labs/avalanchego/wallet/chain/x/backends"
->>>>>>> 0cd1353ea7017aa0a30c3cef9811963a46eff29a
 )
 
 var _ Wallet = (*wallet)(nil)
