@@ -21,7 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/wallet/chain/c"
-	"github.com/ava-labs/avalanchego/wallet/chain/p"
+	"github.com/ava-labs/avalanchego/wallet/chain/p/builder"
 	"github.com/ava-labs/avalanchego/wallet/chain/x"
 
 	walletcommon "github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
@@ -57,7 +57,7 @@ type UTXOClient interface {
 
 type AVAXState struct {
 	PClient platformvm.Client
-	PCTX    p.Context
+	PCTX    *builder.Context
 	XClient avm.Client
 	XCTX    x.Context
 	CClient evm.Client
@@ -78,7 +78,7 @@ func FetchState(
 	xClient := avm.NewClient(uri, "X")
 	cClient := evm.NewCChainClient(uri)
 
-	pCTX, err := p.NewContextFromClients(ctx, infoClient, xClient)
+	pCTX, err := builder.NewContextFromClients(ctx, infoClient, xClient)
 	if err != nil {
 		return nil, err
 	}
