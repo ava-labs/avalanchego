@@ -705,7 +705,10 @@ func (b *Bootstrapper) tryStartExecuting(ctx context.Context) error {
 		},
 		log,
 		b.DB,
-		b.VM,
+		&parseAcceptor{
+			parser: b.VM,
+			ctx:    b.Ctx,
+		},
 		b.tree,
 		lastAcceptedHeight,
 	)
