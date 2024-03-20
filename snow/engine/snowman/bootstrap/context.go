@@ -23,7 +23,7 @@ type haltableContext struct {
 
 func (c *haltableContext) Err() error {
 	if c.Halted() {
-		return context.Canceled
+		return errHalted
 	}
 	return c.Context.Err()
 }
