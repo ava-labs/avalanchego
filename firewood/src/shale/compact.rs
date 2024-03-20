@@ -171,7 +171,11 @@ impl CompactSpaceHeaderSliced {
 }
 
 impl CompactSpaceHeader {
-    pub const MSIZE: u64 = 32;
+    pub const MSIZE: u64 = 4 * DiskAddress::MSIZE;
+    const META_SPACE_TAIL_OFFSET: usize = 0;
+    const DATA_SPACE_TAIL_OFFSET: usize = DiskAddress::MSIZE as usize;
+    const BASE_ADDR_OFFSET: usize = 2 * DiskAddress::MSIZE as usize;
+    const ALLOC_ADDR_OFFSET: usize = 3 * DiskAddress::MSIZE as usize;
 
     pub const fn new(meta_base: NonZeroUsize, compact_base: NonZeroUsize) -> Self {
         Self {
@@ -184,10 +188,30 @@ impl CompactSpaceHeader {
 
     fn into_fields(r: Obj<Self>) -> Result<CompactSpaceHeaderSliced, ShaleError> {
         Ok(CompactSpaceHeaderSliced {
-            meta_space_tail: StoredView::slice(&r, 0, 8, r.meta_space_tail)?,
-            data_space_tail: StoredView::slice(&r, 8, 8, r.data_space_tail)?,
-            base_addr: StoredView::slice(&r, 16, 8, r.base_addr)?,
-            alloc_addr: StoredView::slice(&r, 24, 8, r.alloc_addr)?,
+            meta_space_tail: StoredView::slice(
+                &r,
+                Self::META_SPACE_TAIL_OFFSET,
+                DiskAddress::MSIZE,
+                r.meta_space_tail,
+            )?,
+            data_space_tail: StoredView::slice(
+                &r,
+                Self::DATA_SPACE_TAIL_OFFSET,
+                DiskAddress::MSIZE,
+                r.data_space_tail,
+            )?,
+            base_addr: StoredView::slice(
+                &r,
+                Self::BASE_ADDR_OFFSET,
+                DiskAddress::MSIZE,
+                r.base_addr,
+            )?,
+            alloc_addr: StoredView::slice(
+                &r,
+                Self::ALLOC_ADDR_OFFSET,
+                DiskAddress::MSIZE,
+                r.alloc_addr,
+            )?,
         })
     }
 }
@@ -201,13 +225,14 @@ impl Storable for CompactSpaceHeader {
                 size: Self::MSIZE,
             })?;
         #[allow(clippy::indexing_slicing)]
-        let meta_space_tail = raw.as_deref()[..8].into();
+        let meta_space_tail = raw.as_deref()[..Self::DATA_SPACE_TAIL_OFFSET].into();
         #[allow(clippy::indexing_slicing)]
-        let data_space_tail = raw.as_deref()[8..16].into();
+        let data_space_tail =
+            raw.as_deref()[Self::DATA_SPACE_TAIL_OFFSET..Self::BASE_ADDR_OFFSET].into();
         #[allow(clippy::indexing_slicing)]
-        let base_addr = raw.as_deref()[16..24].into();
+        let base_addr = raw.as_deref()[Self::BASE_ADDR_OFFSET..Self::ALLOC_ADDR_OFFSET].into();
         #[allow(clippy::indexing_slicing)]
-        let alloc_addr = raw.as_deref()[24..].into();
+        let alloc_addr = raw.as_deref()[Self::ALLOC_ADDR_OFFSET..].into();
         Ok(Self {
             meta_space_tail,
             data_space_tail,

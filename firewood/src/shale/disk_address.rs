@@ -48,7 +48,7 @@ impl DiskAddress {
     }
 
     /// Get the little endian bytes for a DiskAddress for storage
-    pub fn to_le_bytes(&self) -> [u8; 8] {
+    pub fn to_le_bytes(&self) -> [u8; Self::MSIZE as usize] {
         self.0.map(|v| v.get()).unwrap_or_default().to_le_bytes()
     }
 
@@ -67,7 +67,7 @@ impl From<usize> for DiskAddress {
 
 /// Convert from a serialized le_bytes to a DiskAddress
 impl From<[u8; 8]> for DiskAddress {
-    fn from(value: [u8; 8]) -> Self {
+    fn from(value: [u8; Self::MSIZE as usize]) -> Self {
         Self::from(usize::from_le_bytes(value))
     }
 }
@@ -78,7 +78,7 @@ impl From<[u8; 8]> for DiskAddress {
 impl From<&[u8]> for DiskAddress {
     fn from(value: &[u8]) -> Self {
         #[allow(clippy::unwrap_used)]
-        let bytes: [u8; 8] = value.try_into().unwrap();
+        let bytes: [u8; Self::MSIZE as usize] = value.try_into().unwrap();
         bytes.into()
     }
 }
