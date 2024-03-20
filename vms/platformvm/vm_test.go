@@ -1252,7 +1252,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	baseDB := memdb.New()
 	vmDB := prefixdb.New(chains.VMDBPrefix, baseDB)
-	bootstrappingDB := prefixdb.New(chains.NewChainBootstrappingDBPrefix, baseDB)
+	bootstrappingDB := prefixdb.New(chains.ChainBootstrappingDBPrefix, baseDB)
 
 	vm := &VM{Config: config.Config{
 		Chains:                 chains.TestManager,

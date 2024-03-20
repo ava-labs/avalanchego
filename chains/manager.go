@@ -82,15 +82,13 @@ var (
 	VMDBPrefix = []byte("vm")
 
 	// Bootstrapping prefixes for LinearizableVMs
-	VertexDBPrefix                = []byte("vertex")
-	VertexBootstrappingDBPrefix   = []byte("vertex_bs")
-	TxBootstrappingDBPrefix       = []byte("tx_bs")
-	OldBlockBootstrappingDBPrefix = []byte("block_bs")
-	NewBlockBootstrappingDBPrefix = []byte("new_block_bs")
+	VertexDBPrefix              = []byte("vertex")
+	VertexBootstrappingDBPrefix = []byte("vertex_bs")
+	TxBootstrappingDBPrefix     = []byte("tx_bs")
+	BlockBootstrappingDBPrefix  = []byte("interval_block_bs")
 
 	// Bootstrapping prefixes for ChainVMs
-	OldChainBootstrappingDBPrefix = []byte("bs")
-	NewChainBootstrappingDBPrefix = []byte("new_bs")
+	ChainBootstrappingDBPrefix = []byte("interval_bs")
 
 	errUnknownVMType           = errors.New("the vm should have type avalanche.DAGVM or snowman.ChainVM")
 	errCreatePlatformVM        = errors.New("attempted to create a chain running the PlatformVM")
@@ -571,12 +569,7 @@ func (m *manager) createAvalancheChain(
 	vertexDB := prefixdb.New(VertexDBPrefix, prefixDB)
 	vertexBootstrappingDB := prefixdb.New(VertexBootstrappingDBPrefix, prefixDB)
 	txBootstrappingDB := prefixdb.New(TxBootstrappingDBPrefix, prefixDB)
-
-	oldBlockBootstrappingDB := prefixdb.New(OldBlockBootstrappingDBPrefix, prefixDB)
-	if err := database.AtomicClear(oldBlockBootstrappingDB, oldBlockBootstrappingDB); err != nil {
-		return nil, fmt.Errorf("failed to clear legacy bootstrapping database: %w", err)
-	}
-	newBlockBootstrappingDB := prefixdb.New(NewBlockBootstrappingDBPrefix, prefixDB)
+	blockBootstrappingDB := prefixdb.New(BlockBootstrappingDBPrefix, prefixDB)
 
 	vtxBlocker, err := queue.NewWithMissing(vertexBootstrappingDB, "vtx", ctx.AvalancheRegisterer)
 	if err != nil {
@@ -840,7 +833,7 @@ func (m *manager) createAvalancheChain(
 		BootstrapTracker:               sb,
 		Timer:                          h,
 		AncestorsMaxContainersReceived: m.BootstrapAncestorsMaxContainersReceived,
-		DB:                             newBlockBootstrappingDB,
+		DB:                             blockBootstrappingDB,
 		VM:                             vmWrappingProposerVM,
 	}
 	var snowmanBootstrapper common.BootstrapableEngine
@@ -953,12 +946,7 @@ func (m *manager) createSnowmanChain(
 	}
 	prefixDB := prefixdb.New(ctx.ChainID[:], meterDB)
 	vmDB := prefixdb.New(VMDBPrefix, prefixDB)
-
-	oldBootstrappingDB := prefixdb.New(OldChainBootstrappingDBPrefix, prefixDB)
-	if err := database.AtomicClear(oldBootstrappingDB, oldBootstrappingDB); err != nil {
-		return nil, fmt.Errorf("failed to clear legacy bootstrapping database: %w", err)
-	}
-	newBootstrappingDB := prefixdb.New(NewChainBootstrappingDBPrefix, prefixDB)
+	bootstrappingDB := prefixdb.New(ChainBootstrappingDBPrefix, prefixDB)
 
 	// Passes messages from the consensus engine to the network
 	messageSender, err := sender.New(
@@ -1178,7 +1166,7 @@ func (m *manager) createSnowmanChain(
 		BootstrapTracker:               sb,
 		Timer:                          h,
 		AncestorsMaxContainersReceived: m.BootstrapAncestorsMaxContainersReceived,
-		DB:                             newBootstrappingDB,
+		DB:                             bootstrappingDB,
 		VM:                             vm,
 		Bootstrapped:                   bootstrapFunc,
 	}
