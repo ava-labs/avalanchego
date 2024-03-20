@@ -291,7 +291,7 @@ func TestExecute(t *testing.T) {
 
 	require.NoError(Execute(
 		context.Background(),
-		logging.NoLog{},
+		logging.NoLog{}.Info,
 		db,
 		parser,
 		tree,
@@ -337,7 +337,7 @@ func TestExecuteExitsWhenCancelled(t *testing.T) {
 	cancel()
 	err = Execute(
 		ctx,
-		logging.NoLog{},
+		logging.NoLog{}.Info,
 		db,
 		parser,
 		tree,
@@ -382,7 +382,7 @@ func TestExecuteSkipsAcceptedBlocks(t *testing.T) {
 
 	require.NoError(Execute(
 		context.Background(),
-		logging.NoLog{},
+		logging.NoLog{}.Info,
 		db,
 		parser,
 		tree,
