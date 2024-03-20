@@ -30,7 +30,7 @@ impl DerefMut for DiskAddress {
 }
 
 impl DiskAddress {
-    pub(crate) const MSIZE: u64 = size_of::<Self>() as u64;
+    pub(crate) const SERIALIZED_LEN: u64 = size_of::<Self>() as u64;
 
     /// Return a None DiskAddress
     pub const fn null() -> Self {
@@ -48,7 +48,7 @@ impl DiskAddress {
     }
 
     /// Get the little endian bytes for a DiskAddress for storage
-    pub fn to_le_bytes(&self) -> [u8; Self::MSIZE as usize] {
+    pub fn to_le_bytes(&self) -> [u8; Self::SERIALIZED_LEN as usize] {
         self.0.map(|v| v.get()).unwrap_or_default().to_le_bytes()
     }
 
@@ -67,7 +67,7 @@ impl From<usize> for DiskAddress {
 
 /// Convert from a serialized le_bytes to a DiskAddress
 impl From<[u8; 8]> for DiskAddress {
-    fn from(value: [u8; Self::MSIZE as usize]) -> Self {
+    fn from(value: [u8; Self::SERIALIZED_LEN as usize]) -> Self {
         Self::from(usize::from_le_bytes(value))
     }
 }
@@ -79,7 +79,7 @@ impl TryFrom<&[u8]> for DiskAddress {
     type Error = std::array::TryFromSliceError;
 
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
-        let bytes: [u8; Self::MSIZE as usize] = value.try_into()?;
+        let bytes: [u8; Self::SERIALIZED_LEN as usize] = value.try_into()?;
         Ok(bytes.into())
     }
 }
@@ -166,7 +166,7 @@ impl std::ops::BitAnd<usize> for DiskAddress {
 
 impl Storable for DiskAddress {
     fn serialized_len(&self) -> u64 {
-        Self::MSIZE
+        Self::SERIALIZED_LEN
     }
 
     fn serialize(&self, to: &mut [u8]) -> Result<(), ShaleError> {
@@ -178,10 +178,10 @@ impl Storable for DiskAddress {
 
     fn deserialize<U: CachedStore>(addr: usize, mem: &U) -> Result<Self, ShaleError> {
         let raw = mem
-            .get_view(addr, Self::MSIZE)
+            .get_view(addr, Self::SERIALIZED_LEN)
             .ok_or(ShaleError::InvalidCacheView {
                 offset: addr,
-                size: Self::MSIZE,
+                size: Self::SERIALIZED_LEN,
             })?;
         let addrdyn = &*raw;
         let addrvec = addrdyn.as_deref();

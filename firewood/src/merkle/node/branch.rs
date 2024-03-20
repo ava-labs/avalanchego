@@ -174,7 +174,7 @@ impl BranchNode {
 
 impl Storable for BranchNode {
     fn serialized_len(&self) -> u64 {
-        let children_len = Self::MAX_CHILDREN as u64 * DiskAddress::MSIZE;
+        let children_len = Self::MAX_CHILDREN as u64 * DiskAddress::SERIALIZED_LEN;
         let value_len = optional_value_len::<ValueLen, _>(self.value.as_deref());
         let children_encoded_len = self.children_encoded.iter().fold(0, |len, child| {
             len + optional_value_len::<EncodedChildLen, _>(child.as_ref())
@@ -226,7 +226,7 @@ impl Storable for BranchNode {
         const PATH_LEN_SIZE: u64 = size_of::<PathLen>() as u64;
         const VALUE_LEN_SIZE: usize = size_of::<ValueLen>();
         const BRANCH_HEADER_SIZE: u64 =
-            BranchNode::MAX_CHILDREN as u64 * DiskAddress::MSIZE + VALUE_LEN_SIZE as u64;
+            BranchNode::MAX_CHILDREN as u64 * DiskAddress::SERIALIZED_LEN + VALUE_LEN_SIZE as u64;
 
         let path_len = mem
             .get_view(addr, PATH_LEN_SIZE)
@@ -270,7 +270,7 @@ impl Storable for BranchNode {
 
         let mut cursor = Cursor::new(node_raw.as_deref());
         let mut children = [None; BranchNode::MAX_CHILDREN];
-        let mut buf = [0u8; DiskAddress::MSIZE as usize];
+        let mut buf = [0u8; DiskAddress::SERIALIZED_LEN as usize];
 
         for child in &mut children {
             cursor.read_exact(&mut buf)?;

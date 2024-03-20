@@ -24,7 +24,7 @@ pub struct CompactHeader {
 }
 
 impl CompactHeader {
-    pub const MSIZE: u64 = 17;
+    pub const SERIALIZED_LEN: u64 = 17;
 
     pub const fn is_freed(&self) -> bool {
         self.is_freed
@@ -38,10 +38,10 @@ impl CompactHeader {
 impl Storable for CompactHeader {
     fn deserialize<T: CachedStore>(addr: usize, mem: &T) -> Result<Self, ShaleError> {
         let raw = mem
-            .get_view(addr, Self::MSIZE)
+            .get_view(addr, Self::SERIALIZED_LEN)
             .ok_or(ShaleError::InvalidCacheView {
                 offset: addr,
-                size: Self::MSIZE,
+                size: Self::SERIALIZED_LEN,
             })?;
         #[allow(clippy::indexing_slicing)]
         let payload_size =
@@ -59,7 +59,7 @@ impl Storable for CompactHeader {
     }
 
     fn serialized_len(&self) -> u64 {
-        Self::MSIZE
+        Self::SERIALIZED_LEN
     }
 
     fn serialize(&self, to: &mut [u8]) -> Result<(), ShaleError> {
@@ -77,16 +77,16 @@ struct CompactFooter {
 }
 
 impl CompactFooter {
-    const MSIZE: u64 = std::mem::size_of::<PayLoadSize>() as u64;
+    const SERIALIZED_LEN: u64 = std::mem::size_of::<PayLoadSize>() as u64;
 }
 
 impl Storable for CompactFooter {
     fn deserialize<T: CachedStore>(addr: usize, mem: &T) -> Result<Self, ShaleError> {
         let raw = mem
-            .get_view(addr, Self::MSIZE)
+            .get_view(addr, Self::SERIALIZED_LEN)
             .ok_or(ShaleError::InvalidCacheView {
                 offset: addr,
-                size: Self::MSIZE,
+                size: Self::SERIALIZED_LEN,
             })?;
         #[allow(clippy::unwrap_used)]
         let payload_size = u64::from_le_bytes(raw.as_deref().try_into().unwrap());
@@ -94,7 +94,7 @@ impl Storable for CompactFooter {
     }
 
     fn serialized_len(&self) -> u64 {
-        Self::MSIZE
+        Self::SERIALIZED_LEN
     }
 
     fn serialize(&self, to: &mut [u8]) -> Result<(), ShaleError> {
@@ -110,16 +110,16 @@ struct CompactDescriptor {
 }
 
 impl CompactDescriptor {
-    const MSIZE: u64 = 16;
+    const SERIALIZED_LEN: u64 = 16;
 }
 
 impl Storable for CompactDescriptor {
     fn deserialize<T: CachedStore>(addr: usize, mem: &T) -> Result<Self, ShaleError> {
         let raw = mem
-            .get_view(addr, Self::MSIZE)
+            .get_view(addr, Self::SERIALIZED_LEN)
             .ok_or(ShaleError::InvalidCacheView {
                 offset: addr,
-                size: Self::MSIZE,
+                size: Self::SERIALIZED_LEN,
             })?;
         #[allow(clippy::indexing_slicing)]
         let payload_size =
@@ -133,7 +133,7 @@ impl Storable for CompactDescriptor {
     }
 
     fn serialized_len(&self) -> u64 {
-        Self::MSIZE
+        Self::SERIALIZED_LEN
     }
 
     fn serialize(&self, to: &mut [u8]) -> Result<(), ShaleError> {
@@ -171,11 +171,11 @@ impl CompactSpaceHeaderSliced {
 }
 
 impl CompactSpaceHeader {
-    pub const MSIZE: u64 = 4 * DiskAddress::MSIZE;
+    pub const SERIALIZED_LEN: u64 = 4 * DiskAddress::SERIALIZED_LEN;
     const META_SPACE_TAIL_OFFSET: usize = 0;
-    const DATA_SPACE_TAIL_OFFSET: usize = DiskAddress::MSIZE as usize;
-    const BASE_ADDR_OFFSET: usize = 2 * DiskAddress::MSIZE as usize;
-    const ALLOC_ADDR_OFFSET: usize = 3 * DiskAddress::MSIZE as usize;
+    const DATA_SPACE_TAIL_OFFSET: usize = DiskAddress::SERIALIZED_LEN as usize;
+    const BASE_ADDR_OFFSET: usize = 2 * DiskAddress::SERIALIZED_LEN as usize;
+    const ALLOC_ADDR_OFFSET: usize = 3 * DiskAddress::SERIALIZED_LEN as usize;
 
     pub const fn new(meta_base: NonZeroUsize, compact_base: NonZeroUsize) -> Self {
         Self {
@@ -191,25 +191,25 @@ impl CompactSpaceHeader {
             meta_space_tail: StoredView::slice(
                 &r,
                 Self::META_SPACE_TAIL_OFFSET,
-                DiskAddress::MSIZE,
+                DiskAddress::SERIALIZED_LEN,
                 r.meta_space_tail,
             )?,
             data_space_tail: StoredView::slice(
                 &r,
                 Self::DATA_SPACE_TAIL_OFFSET,
-                DiskAddress::MSIZE,
+                DiskAddress::SERIALIZED_LEN,
                 r.data_space_tail,
             )?,
             base_addr: StoredView::slice(
                 &r,
                 Self::BASE_ADDR_OFFSET,
-                DiskAddress::MSIZE,
+                DiskAddress::SERIALIZED_LEN,
                 r.base_addr,
             )?,
             alloc_addr: StoredView::slice(
                 &r,
                 Self::ALLOC_ADDR_OFFSET,
-                DiskAddress::MSIZE,
+                DiskAddress::SERIALIZED_LEN,
                 r.alloc_addr,
             )?,
         })
@@ -219,10 +219,10 @@ impl CompactSpaceHeader {
 impl Storable for CompactSpaceHeader {
     fn deserialize<T: CachedStore + Debug>(addr: usize, mem: &T) -> Result<Self, ShaleError> {
         let raw = mem
-            .get_view(addr, Self::MSIZE)
+            .get_view(addr, Self::SERIALIZED_LEN)
             .ok_or(ShaleError::InvalidCacheView {
                 offset: addr,
-                size: Self::MSIZE,
+                size: Self::SERIALIZED_LEN,
             })?;
         #[allow(clippy::indexing_slicing)]
         let meta_space_tail = raw.as_deref()[..Self::DATA_SPACE_TAIL_OFFSET]
@@ -249,7 +249,7 @@ impl Storable for CompactSpaceHeader {
     }
 
     fn serialized_len(&self) -> u64 {
-        Self::MSIZE
+        Self::SERIALIZED_LEN
     }
 
     fn serialize(&self, to: &mut [u8]) -> Result<(), ShaleError> {
@@ -285,7 +285,7 @@ impl From<CompactSpaceInner<StoreRevMut>> for CompactSpaceInner<StoreRevShared> 
 
 impl<M: CachedStore> CompactSpaceInner<M> {
     fn get_descriptor(&self, ptr: DiskAddress) -> Result<Obj<CompactDescriptor>, ShaleError> {
-        StoredView::ptr_to_obj(&self.meta_space, ptr, CompactDescriptor::MSIZE)
+        StoredView::ptr_to_obj(&self.meta_space, ptr, CompactDescriptor::SERIALIZED_LEN)
     }
 
     fn get_data_ref<U: Storable + 'static>(
@@ -297,15 +297,15 @@ impl<M: CachedStore> CompactSpaceInner<M> {
     }
 
     fn get_header(&self, ptr: DiskAddress) -> Result<Obj<CompactHeader>, ShaleError> {
-        self.get_data_ref::<CompactHeader>(ptr, CompactHeader::MSIZE)
+        self.get_data_ref::<CompactHeader>(ptr, CompactHeader::SERIALIZED_LEN)
     }
 
     fn get_footer(&self, ptr: DiskAddress) -> Result<Obj<CompactFooter>, ShaleError> {
-        self.get_data_ref::<CompactFooter>(ptr, CompactFooter::MSIZE)
+        self.get_data_ref::<CompactFooter>(ptr, CompactFooter::SERIALIZED_LEN)
     }
 
     fn del_desc(&mut self, desc_addr: DiskAddress) -> Result<(), ShaleError> {
-        let desc_size = CompactDescriptor::MSIZE;
+        let desc_size = CompactDescriptor::SERIALIZED_LEN;
         // TODO: subtracting two disk addresses is only used here, probably can rewrite this
         // debug_assert!((desc_addr.0 - self.header.base_addr.value.into()) % desc_size == 0);
         #[allow(clippy::unwrap_used)]
@@ -332,15 +332,15 @@ impl<M: CachedStore> CompactSpaceInner<M> {
         #[allow(clippy::unwrap_used)]
         self.header
             .meta_space_tail
-            .modify(|r| *r += CompactDescriptor::MSIZE as usize)
+            .modify(|r| *r += CompactDescriptor::SERIALIZED_LEN as usize)
             .unwrap();
 
         Ok(DiskAddress(addr))
     }
 
     fn free(&mut self, addr: u64) -> Result<(), ShaleError> {
-        let hsize = CompactHeader::MSIZE;
-        let fsize = CompactFooter::MSIZE;
+        let hsize = CompactHeader::SERIALIZED_LEN;
+        let fsize = CompactFooter::SERIALIZED_LEN;
         let regn_size = 1 << self.regn_nbit;
 
         let mut offset = addr - hsize;
@@ -424,9 +424,9 @@ impl<M: CachedStore> CompactSpaceInner<M> {
             return Ok(None);
         }
 
-        let hsize = CompactHeader::MSIZE as usize;
-        let fsize = CompactFooter::MSIZE as usize;
-        let dsize = CompactDescriptor::MSIZE as usize;
+        let hsize = CompactHeader::SERIALIZED_LEN as usize;
+        let fsize = CompactFooter::SERIALIZED_LEN as usize;
+        let dsize = CompactDescriptor::SERIALIZED_LEN as usize;
 
         let mut old_alloc_addr = *self.header.alloc_addr;
 
@@ -531,7 +531,7 @@ impl<M: CachedStore> CompactSpaceInner<M> {
 
     fn alloc_new(&mut self, length: u64) -> Result<u64, ShaleError> {
         let regn_size = 1 << self.regn_nbit;
-        let total_length = CompactHeader::MSIZE + length + CompactFooter::MSIZE;
+        let total_length = CompactHeader::SERIALIZED_LEN + length + CompactFooter::SERIALIZED_LEN;
         let mut offset = *self.header.data_space_tail;
         #[allow(clippy::unwrap_used)]
         self.header
@@ -547,7 +547,8 @@ impl<M: CachedStore> CompactSpaceInner<M> {
             })
             .unwrap();
         let mut h = self.get_header(offset)?;
-        let mut f = self.get_footer(offset + CompactHeader::MSIZE as usize + length as usize)?;
+        let mut f =
+            self.get_footer(offset + CompactHeader::SERIALIZED_LEN as usize + length as usize)?;
         #[allow(clippy::unwrap_used)]
         h.modify(|h| {
             h.payload_size = length;
@@ -558,7 +559,10 @@ impl<M: CachedStore> CompactSpaceInner<M> {
         #[allow(clippy::unwrap_used)]
         f.modify(|f| f.payload_size = length).unwrap();
         #[allow(clippy::unwrap_used)]
-        Ok((offset + CompactHeader::MSIZE as usize).0.unwrap().get() as u64)
+        Ok((offset + CompactHeader::SERIALIZED_LEN as usize)
+            .0
+            .unwrap()
+            .get() as u64)
     }
 
     fn alloc(&mut self, length: u64) -> Result<u64, ShaleError> {
@@ -661,15 +665,15 @@ impl<T: Storable + Debug + 'static, M: CachedStore> CompactSpace<T, M> {
         }
 
         #[allow(clippy::unwrap_used)]
-        if ptr < DiskAddress::from(CompactSpaceHeader::MSIZE as usize) {
+        if ptr < DiskAddress::from(CompactSpaceHeader::SERIALIZED_LEN as usize) {
             return Err(ShaleError::InvalidAddressLength {
-                expected: CompactSpaceHeader::MSIZE,
+                expected: CompactSpaceHeader::SERIALIZED_LEN,
                 found: ptr.0.map(|inner| inner.get()).unwrap_or_default() as u64,
             });
         }
 
         let payload_size = inner
-            .get_header(ptr - CompactHeader::MSIZE as usize)?
+            .get_header(ptr - CompactHeader::SERIALIZED_LEN as usize)?
             .payload_size;
         let obj = self.obj_cache.put(inner.get_data_ref(ptr, payload_size)?);
         let cache = &self.obj_cache;
@@ -702,7 +706,7 @@ mod tests {
     pub struct Hash(pub [u8; HASH_SIZE]);
 
     impl Hash {
-        const MSIZE: u64 = 32;
+        const SERIALIZED_LEN: u64 = 32;
     }
 
     impl std::ops::Deref for Hash {
@@ -714,21 +718,21 @@ mod tests {
 
     impl Storable for Hash {
         fn deserialize<T: CachedStore>(addr: usize, mem: &T) -> Result<Self, ShaleError> {
-            let raw = mem
-                .get_view(addr, Self::MSIZE)
-                .ok_or(ShaleError::InvalidCacheView {
-                    offset: addr,
-                    size: Self::MSIZE,
-                })?;
+            let raw =
+                mem.get_view(addr, Self::SERIALIZED_LEN)
+                    .ok_or(ShaleError::InvalidCacheView {
+                        offset: addr,
+                        size: Self::SERIALIZED_LEN,
+                    })?;
             Ok(Self(
-                raw.as_deref()[..Self::MSIZE as usize]
+                raw.as_deref()[..Self::SERIALIZED_LEN as usize]
                     .try_into()
                     .expect("invalid slice"),
             ))
         }
 
         fn serialized_len(&self) -> u64 {
-            Self::MSIZE
+            Self::SERIALIZED_LEN
         }
 
         fn serialize(&self, to: &mut [u8]) -> Result<(), ShaleError> {
@@ -758,7 +762,7 @@ mod tests {
         )
         .unwrap();
         let compact_header =
-            StoredView::ptr_to_obj(&dm, compact_header, CompactHeader::MSIZE).unwrap();
+            StoredView::ptr_to_obj(&dm, compact_header, CompactHeader::SERIALIZED_LEN).unwrap();
         let mem_meta = dm;
         let mem_payload = InMemLinearStore::new(compact_size.get() as u64, 0x1);
 

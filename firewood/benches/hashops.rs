@@ -96,9 +96,9 @@ fn bench_merkle<const N: usize>(criterion: &mut Criterion) {
 
                     #[allow(clippy::unwrap_used)]
                     let merkle_payload_header_ref = StoredView::ptr_to_obj(
-                        &InMemLinearStore::new(2 * CompactHeader::MSIZE, 9),
+                        &InMemLinearStore::new(2 * CompactHeader::SERIALIZED_LEN, 9),
                         merkle_payload_header,
-                        CompactHeader::MSIZE,
+                        CompactHeader::SERIALIZED_LEN,
                     )
                     .unwrap();
 

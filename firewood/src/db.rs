@@ -700,7 +700,7 @@ impl Db {
         let db_header: DiskAddress = DiskAddress::from(offset);
         offset += DbHeader::MSIZE as usize;
         let merkle_payload_header: DiskAddress = DiskAddress::from(offset);
-        offset += CompactSpaceHeader::MSIZE as usize;
+        offset += CompactSpaceHeader::SERIALIZED_LEN as usize;
         assert!(offset <= SPACE_RESERVED as usize);
 
         let mut merkle_meta_store = StoreRevMut::new(cached_space.merkle.meta.clone());
@@ -757,7 +757,7 @@ impl Db {
         StoredView::ptr_to_obj(
             meta_ref,
             payload_header,
-            shale::compact::CompactHeader::MSIZE,
+            shale::compact::CompactHeader::SERIALIZED_LEN,
         )
         .map_err(Into::into)
     }
@@ -777,7 +777,7 @@ impl Db {
         // TODO: This should be a compile time check
         const DB_OFFSET: u64 = Db::PARAM_SIZE;
         let merkle_offset = DB_OFFSET + DbHeader::MSIZE;
-        assert!(merkle_offset + CompactSpaceHeader::MSIZE <= SPACE_RESERVED);
+        assert!(merkle_offset + CompactSpaceHeader::SERIALIZED_LEN <= SPACE_RESERVED);
 
         let mut db_header_ref = header_refs.0;
         let merkle_payload_header_ref = header_refs.1;

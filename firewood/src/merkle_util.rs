@@ -61,9 +61,12 @@ where
         )
         .expect("write should succeed");
         #[allow(clippy::unwrap_used)]
-        let compact_header =
-            StoredView::ptr_to_obj(&dm, compact_header, shale::compact::CompactHeader::MSIZE)
-                .unwrap();
+        let compact_header = StoredView::ptr_to_obj(
+            &dm,
+            compact_header,
+            shale::compact::CompactHeader::SERIALIZED_LEN,
+        )
+        .unwrap();
         let mem_meta = dm;
         let mem_payload = InMemLinearStore::new(compact_size, 0x1);
 

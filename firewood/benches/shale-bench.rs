@@ -82,7 +82,7 @@ fn serialize<T: CachedStore>(m: &T) {
     let compact_header_obj: DiskAddress = DiskAddress::from(0x0);
     #[allow(clippy::unwrap_used)]
     let _: Obj<CompactSpaceHeader> =
-        StoredView::ptr_to_obj(m, compact_header_obj, CompactHeader::MSIZE).unwrap();
+        StoredView::ptr_to_obj(m, compact_header_obj, CompactHeader::SERIALIZED_LEN).unwrap();
 }
 
 fn bench_cursors(c: &mut Criterion) {
