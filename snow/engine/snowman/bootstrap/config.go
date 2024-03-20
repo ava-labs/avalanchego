@@ -28,6 +28,8 @@ type Config struct {
 	// containers in an ancestors message it receives.
 	AncestorsMaxContainersReceived int
 
+	// Database used to track the fetched, but not yet executed, blocks during
+	// bootstrapping.
 	DB database.Database
 
 	VM block.ChainVM

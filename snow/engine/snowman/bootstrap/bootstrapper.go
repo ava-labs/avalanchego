@@ -151,10 +151,6 @@ func (b *Bootstrapper) Clear(context.Context) error {
 	defer b.Ctx.Lock.Unlock()
 
 	return database.AtomicClear(b.DB, b.DB)
-	// if err := b.Config.Blocked.Clear(); err != nil {
-	// 	return err
-	// }
-	// return b.Config.Blocked.Commit()
 }
 
 func (b *Bootstrapper) Start(ctx context.Context, startReqID uint32) error {
