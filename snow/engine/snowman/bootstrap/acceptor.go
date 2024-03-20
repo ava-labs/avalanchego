@@ -6,10 +6,11 @@ package bootstrap
 import (
 	"context"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/bootstrap/interval"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 var (
