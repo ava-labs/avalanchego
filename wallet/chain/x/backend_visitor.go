@@ -4,11 +4,11 @@
 package x
 
 import (
+	"context"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-
-	stdcontext "context"
 )
 
 var _ txs.Visitor = (*backendVisitor)(nil)
@@ -16,7 +16,7 @@ var _ txs.Visitor = (*backendVisitor)(nil)
 // backendVisitor handles accepting of transactions for the backend
 type backendVisitor struct {
 	b    *backend
-	ctx  stdcontext.Context
+	ctx  context.Context
 	txID ids.ID
 }
 
