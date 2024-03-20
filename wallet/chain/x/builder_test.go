@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/nftfx"
 	"github.com/ava-labs/avalanchego/vms/propertyfx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/wallet/chain/x/builder"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
 
@@ -31,13 +32,13 @@ var (
 	nftAssetID      = ids.Empty.Prefix(2022)
 	propertyAssetID = ids.Empty.Prefix(2023)
 
-	testCtx = NewContext(
-		constants.UnitTestID,
-		xChainID,
-		avaxAssetID,
-		units.MicroAvax,    // BaseTxFee
-		99*units.MilliAvax, // CreateAssetTxFee
-	)
+	testContext = &builder.Context{
+		NetworkID:        constants.UnitTestID,
+		BlockchainID:     xChainID,
+		AVAXAssetID:      avaxAssetID,
+		BaseTxFee:        units.MicroAvax,
+		CreateAssetTxFee: 99 * units.MilliAvax,
+	}
 )
 
 // These tests create and sign a tx, then verify that utxos included
@@ -56,11 +57,11 @@ func TestBaseTx(t *testing.T) {
 				xChainID: utxos,
 			},
 		)
-		backend = NewBackend(testCtx, genericBackend)
+		backend = NewBackend(testContext, genericBackend)
 
 		// builder
 		utxoAddr = utxosKey.Address()
-		builder  = NewBuilder(set.Of(utxoAddr), backend)
+		builder  = builder.New(set.Of(utxoAddr), testContext, backend)
 
 		// data to build the transaction
 		outputsToMove = []*avax.TransferableOutput{{
@@ -86,7 +87,7 @@ func TestBaseTx(t *testing.T) {
 	require.Len(ins, 2)
 	require.Len(outs, 2)
 
-	expectedConsumed := testCtx.BaseTxFee()
+	expectedConsumed := testContext.BaseTxFee
 	consumed := ins[0].In.Amount() + ins[1].In.Amount() - outs[0].Out.Amount() - outs[1].Out.Amount()
 	require.Equal(expectedConsumed, consumed)
 	require.Equal(outputsToMove[0], outs[1])
@@ -105,11 +106,11 @@ func TestCreateAssetTx(t *testing.T) {
 				xChainID: utxos,
 			},
 		)
-		backend = NewBackend(testCtx, genericBackend)
+		backend = NewBackend(testContext, genericBackend)
 
 		// builder
 		utxoAddr = utxosKey.Address()
-		builder  = NewBuilder(set.Of(utxoAddr), backend)
+		builder  = builder.New(set.Of(utxoAddr), testContext, backend)
 
 		// data to build the transaction
 		assetName          = "Team Rocket"
@@ -176,7 +177,7 @@ func TestCreateAssetTx(t *testing.T) {
 	require.Len(ins, 2)
 	require.Len(outs, 1)
 
-	expectedConsumed := testCtx.CreateAssetTxFee()
+	expectedConsumed := testContext.CreateAssetTxFee
 	consumed := ins[0].In.Amount() + ins[1].In.Amount() - outs[0].Out.Amount()
 	require.Equal(expectedConsumed, consumed)
 }
@@ -194,11 +195,11 @@ func TestMintNFTOperation(t *testing.T) {
 				xChainID: utxos,
 			},
 		)
-		backend = NewBackend(testCtx, genericBackend)
+		backend = NewBackend(testContext, genericBackend)
 
 		// builder
 		utxoAddr = utxosKey.Address()
-		builder  = NewBuilder(set.Of(utxoAddr), backend)
+		builder  = builder.New(set.Of(utxoAddr), testContext, backend)
 
 		// data to build the transaction
 		payload  = []byte{'h', 'e', 'l', 'l', 'o'}
@@ -221,7 +222,7 @@ func TestMintNFTOperation(t *testing.T) {
 	require.Len(ins, 1)
 	require.Len(outs, 1)
 
-	expectedConsumed := testCtx.BaseTxFee()
+	expectedConsumed := testContext.BaseTxFee
 	consumed := ins[0].In.Amount() - outs[0].Out.Amount()
 	require.Equal(expectedConsumed, consumed)
 }
@@ -239,11 +240,11 @@ func TestMintFTOperation(t *testing.T) {
 				xChainID: utxos,
 			},
 		)
-		backend = NewBackend(testCtx, genericBackend)
+		backend = NewBackend(testContext, genericBackend)
 
 		// builder
 		utxoAddr = utxosKey.Address()
-		builder  = NewBuilder(set.Of(utxoAddr), backend)
+		builder  = builder.New(set.Of(utxoAddr), testContext, backend)
 
 		// data to build the transaction
 		outputs = map[ids.ID]*secp256k1fx.TransferOutput{
@@ -268,7 +269,7 @@ func TestMintFTOperation(t *testing.T) {
 	require.Len(ins, 1)
 	require.Len(outs, 1)
 
-	expectedConsumed := testCtx.BaseTxFee()
+	expectedConsumed := testContext.BaseTxFee
 	consumed := ins[0].In.Amount() - outs[0].Out.Amount()
 	require.Equal(expectedConsumed, consumed)
 }
@@ -286,11 +287,11 @@ func TestMintPropertyOperation(t *testing.T) {
 				xChainID: utxos,
 			},
 		)
-		backend = NewBackend(testCtx, genericBackend)
+		backend = NewBackend(testContext, genericBackend)
 
 		// builder
 		utxoAddr = utxosKey.Address()
-		builder  = NewBuilder(set.Of(utxoAddr), backend)
+		builder  = builder.New(set.Of(utxoAddr), testContext, backend)
 
 		// data to build the transaction
 		propertyOwner = &secp256k1fx.OutputOwners{
@@ -311,7 +312,7 @@ func TestMintPropertyOperation(t *testing.T) {
 	require.Len(ins, 1)
 	require.Len(outs, 1)
 
-	expectedConsumed := testCtx.BaseTxFee()
+	expectedConsumed := testContext.BaseTxFee
 	consumed := ins[0].In.Amount() - outs[0].Out.Amount()
 	require.Equal(expectedConsumed, consumed)
 }
@@ -329,11 +330,11 @@ func TestBurnPropertyOperation(t *testing.T) {
 				xChainID: utxos,
 			},
 		)
-		backend = NewBackend(testCtx, genericBackend)
+		backend = NewBackend(testContext, genericBackend)
 
 		// builder
 		utxoAddr = utxosKey.Address()
-		builder  = NewBuilder(set.Of(utxoAddr), backend)
+		builder  = builder.New(set.Of(utxoAddr), testContext, backend)
 	)
 
 	utx, err := builder.NewOperationTxBurnProperty(
@@ -347,7 +348,7 @@ func TestBurnPropertyOperation(t *testing.T) {
 	require.Len(ins, 1)
 	require.Len(outs, 1)
 
-	expectedConsumed := testCtx.BaseTxFee()
+	expectedConsumed := testContext.BaseTxFee
 	consumed := ins[0].In.Amount() - outs[0].Out.Amount()
 	require.Equal(expectedConsumed, consumed)
 }
@@ -369,11 +370,11 @@ func TestImportTx(t *testing.T) {
 			},
 		)
 
-		backend = NewBackend(testCtx, genericBackend)
+		backend = NewBackend(testContext, genericBackend)
 
 		// builder
 		utxoAddr = utxosKey.Address()
-		builder  = NewBuilder(set.Of(utxoAddr), backend)
+		builder  = builder.New(set.Of(utxoAddr), testContext, backend)
 
 		// data to build the transaction
 		importKey = testKeys[0]
@@ -399,7 +400,7 @@ func TestImportTx(t *testing.T) {
 	require.Len(importedIns, 1)
 	require.Len(outs, 1)
 
-	expectedConsumed := testCtx.BaseTxFee()
+	expectedConsumed := testContext.BaseTxFee
 	consumed := importedIns[0].In.Amount() - outs[0].Out.Amount()
 	require.Equal(expectedConsumed, consumed)
 }
@@ -417,11 +418,11 @@ func TestExportTx(t *testing.T) {
 				xChainID: utxos,
 			},
 		)
-		backend = NewBackend(testCtx, genericBackend)
+		backend = NewBackend(testContext, genericBackend)
 
 		// builder
 		utxoAddr = utxosKey.Address()
-		builder  = NewBuilder(set.Of(utxoAddr), backend)
+		builder  = builder.New(set.Of(utxoAddr), testContext, backend)
 
 		// data to build the transaction
 		subnetID        = ids.GenerateTestID()
@@ -449,7 +450,7 @@ func TestExportTx(t *testing.T) {
 	require.Len(ins, 2)
 	require.Len(outs, 1)
 
-	expectedConsumed := testCtx.BaseTxFee() + exportedOutputs[0].Out.Amount()
+	expectedConsumed := testContext.BaseTxFee + exportedOutputs[0].Out.Amount()
 	consumed := ins[0].In.Amount() + ins[1].In.Amount() - outs[0].Out.Amount()
 	require.Equal(expectedConsumed, consumed)
 	require.Equal(utx.ExportedOuts, exportedOutputs)
