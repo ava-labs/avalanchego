@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/wallet/chain/x"
+	"github.com/ava-labs/avalanchego/wallet/chain/x/builder"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
@@ -35,18 +36,18 @@ func main() {
 	}
 	log.Printf("fetched state of %s in %s\n", addrStr, time.Since(fetchStartTime))
 
-	xChainID := state.XCTX.BlockchainID()
+	xChainID := state.XCTX.BlockchainID
 
 	xUTXOs := common.NewChainUTXOs(xChainID, state.UTXOs)
 	xBackend := x.NewBackend(state.XCTX, xUTXOs)
-	xBuilder := x.NewBuilder(addresses, xBackend)
+	xBuilder := builder.New(addresses, state.XCTX, xBackend)
 
 	currentBalances, err := xBuilder.GetFTBalance()
 	if err != nil {
 		log.Fatalf("failed to get the balance: %s\n", err)
 	}
 
-	avaxID := state.XCTX.AVAXAssetID()
+	avaxID := state.XCTX.AVAXAssetID
 	avaxBalance := currentBalances[avaxID]
 	log.Printf("current AVAX balance of %s is %d nAVAX\n", addrStr, avaxBalance)
 }
