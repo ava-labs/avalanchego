@@ -383,19 +383,15 @@ func (b *Bootstrapper) startSyncing(ctx context.Context, acceptedContainerIDs []
 	// Initialize the fetch from set to the currently preferred peers
 	b.fetchFrom = b.StartupTracker.PreferredPeers()
 
-	pendingContainerIDs := b.missingBlockIDs.List()
-	// Append the list of accepted container IDs to pendingContainerIDs to ensure
-	// we iterate over every container that must be traversed.
-	pendingContainerIDs = append(pendingContainerIDs, acceptedContainerIDs...)
+	b.missingBlockIDs.Add(acceptedContainerIDs...)
+	numMissingBlockIDs := b.missingBlockIDs.Len()
 	b.Ctx.Log.Debug("starting bootstrapping",
-		zap.Int("numPendingBlocks", len(pendingContainerIDs)),
+		zap.Int("numMissingBlocks", numMissingBlockIDs),
 		zap.Int("numAcceptedBlocks", len(acceptedContainerIDs)),
 	)
 
-	toProcess := make([]snowman.Block, 0, len(pendingContainerIDs))
-	for _, blkID := range pendingContainerIDs {
-		b.missingBlockIDs.Add(blkID)
-
+	toProcess := make([]snowman.Block, 0, numMissingBlockIDs)
+	for blkID := range b.missingBlockIDs {
 		// TODO: if `GetBlock` returns an error other than
 		// `database.ErrNotFound`, then the error should be propagated.
 		blk, err := b.VM.GetBlock(ctx, blkID)
