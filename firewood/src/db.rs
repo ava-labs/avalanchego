@@ -206,14 +206,19 @@ impl DbHeader {
 
 impl Storable for DbHeader {
     fn deserialize<T: CachedStore>(addr: usize, mem: &T) -> Result<Self, shale::ShaleError> {
-        let raw = mem
+        let root_bytes = mem
             .get_view(addr, Self::MSIZE)
             .ok_or(ShaleError::InvalidCacheView {
                 offset: addr,
                 size: Self::MSIZE,
             })?;
+        let root_bytes = root_bytes.as_deref();
+        let root_bytes = root_bytes.as_slice();
+
         Ok(Self {
-            kv_root: raw.as_deref().as_slice().into(),
+            kv_root: root_bytes
+                .try_into()
+                .expect("Self::MSIZE == DiskAddress:MSIZE"),
         })
     }
 

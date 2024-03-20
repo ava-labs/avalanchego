@@ -225,14 +225,21 @@ impl Storable for CompactSpaceHeader {
                 size: Self::MSIZE,
             })?;
         #[allow(clippy::indexing_slicing)]
-        let meta_space_tail = raw.as_deref()[..Self::DATA_SPACE_TAIL_OFFSET].into();
+        let meta_space_tail = raw.as_deref()[..Self::DATA_SPACE_TAIL_OFFSET]
+            .try_into()
+            .expect("Self::MSIZE = 4 * DiskAddress::MSIZE");
         #[allow(clippy::indexing_slicing)]
-        let data_space_tail =
-            raw.as_deref()[Self::DATA_SPACE_TAIL_OFFSET..Self::BASE_ADDR_OFFSET].into();
+        let data_space_tail = raw.as_deref()[Self::DATA_SPACE_TAIL_OFFSET..Self::BASE_ADDR_OFFSET]
+            .try_into()
+            .expect("Self::MSIZE = 4 * DiskAddress::MSIZE");
         #[allow(clippy::indexing_slicing)]
-        let base_addr = raw.as_deref()[Self::BASE_ADDR_OFFSET..Self::ALLOC_ADDR_OFFSET].into();
+        let base_addr = raw.as_deref()[Self::BASE_ADDR_OFFSET..Self::ALLOC_ADDR_OFFSET]
+            .try_into()
+            .expect("Self::MSIZE = 4 * DiskAddress::MSIZE");
         #[allow(clippy::indexing_slicing)]
-        let alloc_addr = raw.as_deref()[Self::ALLOC_ADDR_OFFSET..].into();
+        let alloc_addr = raw.as_deref()[Self::ALLOC_ADDR_OFFSET..]
+            .try_into()
+            .expect("Self::MSIZE = 4 * DiskAddress::MSIZE");
         Ok(Self {
             meta_space_tail,
             data_space_tail,
@@ -656,7 +663,7 @@ impl<T: Storable + Debug + 'static, M: CachedStore> CompactSpace<T, M> {
         #[allow(clippy::unwrap_used)]
         if ptr < DiskAddress::from(CompactSpaceHeader::MSIZE as usize) {
             return Err(ShaleError::InvalidAddressLength {
-                expected: DiskAddress::from(CompactSpaceHeader::MSIZE as usize),
+                expected: CompactSpaceHeader::MSIZE,
                 found: ptr.0.map(|inner| inner.get()).unwrap_or_default() as u64,
             });
         }

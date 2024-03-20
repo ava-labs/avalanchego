@@ -28,7 +28,7 @@ pub enum ShaleError {
         error: &'static str,
     },
     #[error("invalid address length expected: {expected:?} found: {found:?})")]
-    InvalidAddressLength { expected: DiskAddress, found: u64 },
+    InvalidAddressLength { expected: u64, found: u64 },
     #[error("invalid node type")]
     InvalidNodeType,
     #[error("invalid node metadata")]
