@@ -6,8 +6,6 @@ package e2e
 import (
 	"encoding/json"
 	"math/rand"
-	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/stretchr/testify/require"
@@ -18,7 +16,6 @@ import (
 	"github.com/ava-labs/avalanchego/tests/fixture"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
-	"github.com/ava-labs/avalanchego/utils/perms"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	ginkgo "github.com/onsi/ginkgo/v2"
@@ -43,6 +40,10 @@ type TestEnvironment struct {
 	URIs []tmpnet.NodeURI
 	// The URI used to access the http server that allocates test data
 	TestDataServerURI string
+	// The duration to wait before shutting down private networks. A
+	// non-zero value may be useful to ensure all metrics can be
+	// scraped before shutdown.
+	PrivateNetworkShutdownDelay time.Duration
 
 	require *require.Assertions
 }
@@ -77,7 +78,7 @@ func NewTestEnvironment(flagVars *FlagVars, desiredNetwork *tmpnet.Network) *Tes
 		}
 	} else {
 		network = desiredNetwork
-		StartNetwork(network, DefaultNetworkDir, flagVars.AvalancheGoExecPath(), flagVars.PluginDir())
+		StartNetwork(network, flagVars.AvalancheGoExecPath(), flagVars.PluginDir(), flagVars.NetworkShutdownDelay())
 	}
 
 	// A new network will always need subnet creation and an existing
@@ -115,10 +116,11 @@ func NewTestEnvironment(flagVars *FlagVars, desiredNetwork *tmpnet.Network) *Tes
 	require.NoError(err)
 
 	return &TestEnvironment{
-		NetworkDir:        network.Dir,
-		URIs:              uris,
-		TestDataServerURI: testDataServerURI,
-		require:           require,
+		NetworkDir:                  network.Dir,
+		URIs:                        uris,
+		TestDataServerURI:           testDataServerURI,
+		PrivateNetworkShutdownDelay: flagVars.NetworkShutdownDelay(),
+		require:                     require,
 	}
 }
 
@@ -158,27 +160,18 @@ func (te *TestEnvironment) NewKeychain(count int) *secp256k1fx.Keychain {
 }
 
 // Create a new private network that is not shared with other tests.
-func (te *TestEnvironment) NewPrivateNetwork() *tmpnet.Network {
-	// Load the shared network to retrieve its path and exec path
+func (te *TestEnvironment) StartPrivateNetwork(network *tmpnet.Network) {
+	// Use the same configuration as the shared network
 	sharedNetwork, err := tmpnet.ReadNetwork(te.NetworkDir)
 	te.require.NoError(err)
-
-	network := &tmpnet.Network{}
-
-	// The private networks dir is under the shared network dir to ensure it
-	// will be included in the artifact uploaded in CI.
-	privateNetworksDir := filepath.Join(sharedNetwork.Dir, PrivateNetworksDirName)
-	te.require.NoError(os.MkdirAll(privateNetworksDir, perms.ReadWriteExecute))
 
 	pluginDir, err := sharedNetwork.DefaultFlags.GetStringVal(config.PluginDirKey)
 	te.require.NoError(err)
 
 	StartNetwork(
 		network,
-		privateNetworksDir,
 		sharedNetwork.DefaultRuntimeConfig.AvalancheGoPath,
 		pluginDir,
+		te.PrivateNetworkShutdownDelay,
 	)
-
-	return network
 }

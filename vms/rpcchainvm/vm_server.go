@@ -108,7 +108,7 @@ func (vm *VMServer) Initialize(ctx context.Context, req *vmpb.InitializeRequest)
 	if err != nil {
 		return nil, err
 	}
-	publicKey, err := bls.PublicKeyFromBytes(req.PublicKey)
+	publicKey, err := bls.PublicKeyFromCompressedBytes(req.PublicKey)
 	if err != nil {
 		return nil, err
 	}
@@ -625,13 +625,6 @@ func (vm *VMServer) BatchedParseBlock(
 	return &vmpb.BatchedParseBlockResponse{
 		Response: blocks,
 	}, nil
-}
-
-func (vm *VMServer) VerifyHeightIndex(ctx context.Context, _ *emptypb.Empty) (*vmpb.VerifyHeightIndexResponse, error) {
-	err := vm.vm.VerifyHeightIndex(ctx)
-	return &vmpb.VerifyHeightIndexResponse{
-		Err: errorToErrEnum[err],
-	}, errorToRPCError(err)
 }
 
 func (vm *VMServer) GetBlockIDAtHeight(

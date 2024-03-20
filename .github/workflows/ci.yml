@@ -20,8 +20,8 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  go_version: '~1.21.7'
-  tmpnet_data_path: ~/.tmpnet/networks/1000
+  go_version: '~1.21.8'
+  grafana_url: https://grafana-experimental.avax-dev.network/d/kBQpRdWnk/avalanche-main-dashboard?orgId=1&refresh=10s&var-filter=is_ephemeral_node%7C%3D%7Cfalse&var-filter=gh_repo%7C%3D%7Cava-labs%2Favalanchego&var-filter=gh_run_id%7C%3D%7C${{ github.run_id }}&var-filter=gh_run_attempt%7C%3D%7C${{ github.run_attempt }}
 
 jobs:
   Unit:
@@ -67,15 +67,44 @@ jobs:
       - name: Build AvalancheGo Binary
         shell: bash
         run: ./scripts/build.sh -r
+      - name: Start prometheus
+        shell: bash
+        run: bash -x ./scripts/run_prometheus.sh
+        env:
+          PROMETHEUS_ID: ${{ secrets.PROMETHEUS_ID }}
+          PROMETHEUS_PASSWORD: ${{ secrets.PROMETHEUS_PASSWORD }}
+      - name: Start promtail
+        shell: bash
+        run: bash -x ./scripts/run_promtail.sh
+        env:
+          LOKI_ID: ${{ secrets.LOKI_ID }}
+          LOKI_PASSWORD: ${{ secrets.LOKI_PASSWORD }}
+      - name: Notify of metrics availability
+        shell: bash
+        run: .github/workflows/notify-metrics-availability.sh
+        env:
+          GRAFANA_URL: ${{ env.grafana_url }}
+          GH_JOB_ID: ${{ github.job }}
+          FILTER_BY_OWNER: avalanchego-e2e
       - name: Run e2e tests
         shell: bash
         run: E2E_SERIAL=1 ./scripts/tests.e2e.sh
+        env:
+          GH_REPO: ${{ github.repository }}
+          GH_WORKFLOW: ${{ github.workflow }}
+          GH_RUN_ID: ${{ github.run_id }}
+          GH_RUN_NUMBER: ${{ github.run_number }}
+          GH_RUN_ATTEMPT: ${{ github.run_attempt }}
+          GH_JOB_ID: ${{ github.job }}
       - name: Upload tmpnet network dir
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: e2e-tmpnet-data
-          path: ${{ env.tmpnet_data_path }}
+          path: |
+            ~/.tmpnet/networks
+            ~/.tmpnet/prometheus/prometheus.log
+            ~/.tmpnet/promtail/promtail.log
           if-no-files-found: error
   e2e_existing_network:
     runs-on: ubuntu-latest
@@ -88,15 +117,43 @@ jobs:
       - name: Build AvalancheGo Binary
         shell: bash
         run: ./scripts/build.sh -r
+      - name: Start prometheus
+        shell: bash
+        run: bash -x ./scripts/run_prometheus.sh
+        env:
+          PROMETHEUS_ID: ${{ secrets.PROMETHEUS_ID }}
+          PROMETHEUS_PASSWORD: ${{ secrets.PROMETHEUS_PASSWORD }}
+      - name: Start promtail
+        shell: bash
+        run: bash -x ./scripts/run_promtail.sh
+        env:
+          LOKI_ID: ${{ secrets.LOKI_ID }}
+          LOKI_PASSWORD: ${{ secrets.LOKI_PASSWORD }}
+      - name: Notify of metrics availability
+        shell: bash
+        run: .github/workflows/notify-metrics-availability.sh
+        env:
+          GRAFANA_URL: ${{ env.grafana_url }}
+          GH_JOB_ID: ${{ github.job }}
       - name: Run e2e tests with existing network
         shell: bash
         run: E2E_SERIAL=1 ./scripts/tests.e2e.existing.sh
+        env:
+          GH_REPO: ${{ github.repository }}
+          GH_WORKFLOW: ${{ github.workflow }}
+          GH_RUN_ID: ${{ github.run_id }}
+          GH_RUN_NUMBER: ${{ github.run_number }}
+          GH_RUN_ATTEMPT: ${{ github.run_attempt }}
+          GH_JOB_ID: ${{ github.job }}
       - name: Upload tmpnet network dir
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: e2e-existing-network-tmpnet-data
-          path: ${{ env.tmpnet_data_path }}
+          path: |
+            ~/.tmpnet/networks
+            ~/.tmpnet/prometheus/prometheus.log
+            ~/.tmpnet/promtail/promtail.log
           if-no-files-found: error
   Upgrade:
     runs-on: ubuntu-latest
@@ -109,15 +166,43 @@ jobs:
       - name: Build AvalancheGo Binary
         shell: bash
         run: ./scripts/build.sh
+      - name: Start prometheus
+        shell: bash
+        run: bash -x ./scripts/run_prometheus.sh
+        env:
+          PROMETHEUS_ID: ${{ secrets.PROMETHEUS_ID }}
+          PROMETHEUS_PASSWORD: ${{ secrets.PROMETHEUS_PASSWORD }}
+      - name: Start promtail
+        shell: bash
+        run: bash -x ./scripts/run_promtail.sh
+        env:
+          LOKI_ID: ${{ secrets.LOKI_ID }}
+          LOKI_PASSWORD: ${{ secrets.LOKI_PASSWORD }}
+      - name: Notify of metrics availability
+        shell: bash
+        run: .github/workflows/notify-metrics-availability.sh
+        env:
+          GRAFANA_URL: ${{ env.grafana_url }}
+          GH_JOB_ID: ${{ github.job }}
       - name: Run e2e tests
         shell: bash
         run: ./scripts/tests.upgrade.sh
+        env:
+          GH_REPO: ${{ github.repository }}
+          GH_WORKFLOW: ${{ github.workflow }}
+          GH_RUN_ID: ${{ github.run_id }}
+          GH_RUN_NUMBER: ${{ github.run_number }}
+          GH_RUN_ATTEMPT: ${{ github.run_attempt }}
+          GH_JOB_ID: ${{ github.job }}
       - name: Upload tmpnet network dir
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: upgrade-tmpnet-data
-          path: ${{ env.tmpnet_data_path }}
+          path: |
+            ~/.tmpnet/networks
+            ~/.tmpnet/prometheus/prometheus.log
+            ~/.tmpnet/promtail/promtail.log
           if-no-files-found: error
   Lint:
     runs-on: ubuntu-latest
@@ -138,7 +223,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: bufbuild/buf-setup-action@v1.29.0
+      - uses: bufbuild/buf-setup-action@v1.30.0
         with:
           github_token: ${{ github.token }}
       - uses: bufbuild/buf-lint-action@v1
@@ -153,7 +238,7 @@ jobs:
         with:
           go-version: ${{ env.go_version }}
           check-latest: true
-      - uses: bufbuild/buf-setup-action@v1.29.0
+      - uses: bufbuild/buf-setup-action@v1.30.0
       - shell: bash
         run: scripts/protobuf_codegen.sh
       - shell: bash

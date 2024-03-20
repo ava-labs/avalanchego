@@ -45,7 +45,7 @@ jobs:
       - name: Setup Golang
         uses: actions/setup-go@v5
         with:
-          go-version: '~1.21.7'
+          go-version: '~1.21.8'
           check-latest: true
 
       # Initializes the CodeQL tools for scanning.

@@ -13,23 +13,23 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/wallet/chain/x/builder"
+	"github.com/ava-labs/avalanchego/wallet/chain/x/signer"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
 
 var (
-	errNotAccepted = errors.New("not accepted")
+	ErrNotAccepted = errors.New("not accepted")
 
 	_ Wallet = (*wallet)(nil)
 )
 
 type Wallet interface {
-	Context
-
 	// Builder returns the builder that will be used to create the transactions.
-	Builder() Builder
+	Builder() builder.Builder
 
 	// Signer returns the signer that will be used to sign the transactions.
-	Signer() Signer
+	Signer() signer.Signer
 
 	// IssueBaseTx creates, signs, and issues a new simple value transfer.
 	//
@@ -145,13 +145,13 @@ type Wallet interface {
 }
 
 func NewWallet(
-	builder Builder,
-	signer Signer,
+	builder builder.Builder,
+	signer signer.Signer,
 	client avm.Client,
 	backend Backend,
 ) Wallet {
 	return &wallet{
-		Backend: backend,
+		backend: backend,
 		builder: builder,
 		signer:  signer,
 		client:  client,
@@ -159,17 +159,17 @@ func NewWallet(
 }
 
 type wallet struct {
-	Backend
-	builder Builder
-	signer  Signer
+	backend Backend
+	builder builder.Builder
+	signer  signer.Signer
 	client  avm.Client
 }
 
-func (w *wallet) Builder() Builder {
+func (w *wallet) Builder() builder.Builder {
 	return w.builder
 }
 
-func (w *wallet) Signer() Signer {
+func (w *wallet) Signer() signer.Signer {
 	return w.signer
 }
 
@@ -286,7 +286,7 @@ func (w *wallet) IssueUnsignedTx(
 ) (*txs.Tx, error) {
 	ops := common.NewOptions(options)
 	ctx := ops.Context()
-	tx, err := SignUnsigned(ctx, w.signer, utx)
+	tx, err := signer.SignUnsigned(ctx, w.signer, utx)
 	if err != nil {
 		return nil, err
 	}
@@ -310,7 +310,7 @@ func (w *wallet) IssueTx(
 	}
 
 	if ops.AssumeDecided() {
-		return w.Backend.AcceptTx(ctx, tx)
+		return w.backend.AcceptTx(ctx, tx)
 	}
 
 	txStatus, err := w.client.ConfirmTx(ctx, txID, ops.PollFrequency())
@@ -318,12 +318,12 @@ func (w *wallet) IssueTx(
 		return err
 	}
 
-	if err := w.Backend.AcceptTx(ctx, tx); err != nil {
+	if err := w.backend.AcceptTx(ctx, tx); err != nil {
 		return err
 	}
 
 	if txStatus != choices.Accepted {
-		return errNotAccepted
+		return ErrNotAccepted
 	}
 	return nil
 }

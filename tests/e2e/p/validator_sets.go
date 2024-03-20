@@ -36,11 +36,14 @@ var _ = e2e.DescribePChain("[Validator Sets]", func() {
 		baseWallet := e2e.NewWallet(keychain, nodeURI)
 		pWallet := baseWallet.P()
 
+		pBuilder := pWallet.Builder()
+		pContext := pBuilder.Context()
+
 		const delegatorCount = 15
 		ginkgo.By(fmt.Sprintf("adding %d delegators", delegatorCount), func() {
 			rewardKey, err := secp256k1.NewPrivateKey()
 			require.NoError(err)
-			avaxAssetID := pWallet.AVAXAssetID()
+			avaxAssetID := pContext.AVAXAssetID
 			startTime := time.Now().Add(tmpnet.DefaultValidatorStartTimeDiff)
 			endTime := startTime.Add(time.Second * 360)
 			// This is the default flag value for MinDelegatorStake.

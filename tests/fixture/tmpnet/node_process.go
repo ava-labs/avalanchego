@@ -14,12 +14,15 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/node"
+	"github.com/ava-labs/avalanchego/utils/perms"
 )
 
 const (
@@ -142,8 +145,12 @@ func (p *NodeProcess) Start(w io.Writer) error {
 		return fmt.Errorf("failed to start local node: %w", err)
 	}
 
-	_, err = fmt.Fprintf(w, "Started %s\n", nodeDescription)
-	return err
+	if _, err = fmt.Fprintf(w, "Started %s\n", nodeDescription); err != nil {
+		return err
+	}
+
+	// Configure collection of metrics and logs
+	return p.writeMonitoringConfig()
 }
 
 // Signals the node process to stop.
@@ -154,7 +161,7 @@ func (p *NodeProcess) InitiateStop() error {
 	}
 	if proc == nil {
 		// Already stopped
-		return nil
+		return p.removeMonitoringConfig()
 	}
 	if err := proc.Signal(syscall.SIGTERM); err != nil {
 		return fmt.Errorf("failed to send SIGTERM to pid %d: %w", p.pid, err)
@@ -172,7 +179,7 @@ func (p *NodeProcess) WaitForStopped(ctx context.Context) error {
 			return fmt.Errorf("failed to retrieve process: %w", err)
 		}
 		if proc == nil {
-			return nil
+			return p.removeMonitoringConfig()
 		}
 
 		select {
@@ -255,4 +262,96 @@ func (p *NodeProcess) getProcess() (*os.Process, error) {
 		return nil, nil
 	}
 	return nil, fmt.Errorf("failed to determine process status: %w", err)
+}
+
+// Write monitoring configuration enabling collection of metrics and logs from the node.
+func (p *NodeProcess) writeMonitoringConfig() error {
+	// Ensure labeling that uniquely identifies the node and its network
+	commonLabels := FlagsMap{
+		"network_uuid":      p.node.NetworkUUID,
+		"node_id":           p.node.NodeID,
+		"is_ephemeral_node": strconv.FormatBool(p.node.IsEphemeral),
+		"network_owner":     p.node.NetworkOwner,
+		// prometheus/promtail ignore empty values so including these
+		// labels with empty values outside of a github worker (where
+		// the env vars will not be set) should not be a problem.
+		"gh_repo":        os.Getenv("GH_REPO"),
+		"gh_workflow":    os.Getenv("GH_WORKFLOW"),
+		"gh_run_id":      os.Getenv("GH_RUN_ID"),
+		"gh_run_number":  os.Getenv("GH_RUN_NUMBER"),
+		"gh_run_attempt": os.Getenv("GH_RUN_ATTEMPT"),
+		"gh_job_id":      os.Getenv("GH_JOB_ID"),
+	}
+
+	tmpnetDir, err := getTmpnetPath()
+	if err != nil {
+		return err
+	}
+
+	prometheusConfig := []FlagsMap{
+		{
+			"targets": []string{strings.TrimPrefix(p.node.URI, "http://")},
+			"labels":  commonLabels,
+		},
+	}
+	if err := p.writeMonitoringConfigFile(tmpnetDir, "prometheus", prometheusConfig); err != nil {
+		return err
+	}
+
+	promtailLabels := FlagsMap{
+		"__path__": filepath.Join(p.node.getDataDir(), "logs", "*.log"),
+	}
+	promtailLabels.SetDefaults(commonLabels)
+	promtailConfig := []FlagsMap{
+		{
+			"targets": []string{"localhost"},
+			"labels":  promtailLabels,
+		},
+	}
+	return p.writeMonitoringConfigFile(tmpnetDir, "promtail", promtailConfig)
+}
+
+// Return the path for this node's prometheus configuration.
+func (p *NodeProcess) getMonitoringConfigPath(tmpnetDir string, name string) string {
+	// Ensure a unique filename to allow config files to be added and removed
+	// by multiple nodes without conflict.
+	return filepath.Join(tmpnetDir, name, "file_sd_configs", fmt.Sprintf("%s_%s.json", p.node.NetworkUUID, p.node.NodeID))
+}
+
+// Ensure the removal of the prometheus configuration file for this node.
+func (p *NodeProcess) removeMonitoringConfig() error {
+	tmpnetDir, err := getTmpnetPath()
+	if err != nil {
+		return err
+	}
+
+	for _, name := range []string{"promtail", "prometheus"} {
+		configPath := p.getMonitoringConfigPath(tmpnetDir, name)
+		if err := os.Remove(configPath); err != nil && !errors.Is(err, fs.ErrNotExist) {
+			return fmt.Errorf("failed to remove %s config: %w", name, err)
+		}
+	}
+
+	return nil
+}
+
+// Write the configuration for a type of monitoring (e.g. prometheus, promtail).
+func (p *NodeProcess) writeMonitoringConfigFile(tmpnetDir string, name string, config []FlagsMap) error {
+	configPath := p.getMonitoringConfigPath(tmpnetDir, name)
+
+	dir := filepath.Dir(configPath)
+	if err := os.MkdirAll(dir, perms.ReadWriteExecute); err != nil {
+		return fmt.Errorf("failed to create %s service discovery dir: %w", name, err)
+	}
+
+	bytes, err := DefaultJSONMarshal(config)
+	if err != nil {
+		return fmt.Errorf("failed to marshal %s config: %w", name, err)
+	}
+
+	if err := os.WriteFile(configPath, bytes, perms.ReadWrite); err != nil {
+		return fmt.Errorf("failed to write %s config: %w", name, err)
+	}
+
+	return nil
 }

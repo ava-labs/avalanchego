@@ -45,7 +45,7 @@ func (l *logger) OnValidatorAdded(
 	if l.nodeIDs.Contains(nodeID) {
 		var pkBytes []byte
 		if pk != nil {
-			pkBytes = bls.PublicKeyToBytes(pk)
+			pkBytes = bls.PublicKeyToCompressedBytes(pk)
 		}
 		l.log.Info("node added to validator set",
 			zap.Stringer("subnetID", l.subnetID),

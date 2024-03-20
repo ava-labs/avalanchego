@@ -23,6 +23,7 @@ func BenchmarkLoadUser(b *testing.B) {
 		require := require.New(b)
 
 		env := setup(b, &envConfig{
+			fork: latest,
 			keystoreUsers: []*user{{
 				username: username,
 				password: password,
@@ -67,7 +68,7 @@ func BenchmarkLoadUser(b *testing.B) {
 func GetAllUTXOsBenchmark(b *testing.B, utxoCount int) {
 	require := require.New(b)
 
-	env := setup(b, &envConfig{})
+	env := setup(b, &envConfig{fork: latest})
 	defer func() {
 		require.NoError(env.vm.Shutdown(context.Background()))
 		env.vm.ctx.Lock.Unlock()

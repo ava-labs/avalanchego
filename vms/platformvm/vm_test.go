@@ -6,7 +6,6 @@ package platformvm
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"testing"
 	"time"
 
@@ -77,6 +76,7 @@ const (
 	banff
 	cortina
 	durango
+	eUpgrade
 
 	latestFork = durango
 
@@ -209,12 +209,16 @@ func defaultVM(t *testing.T, f fork) (*VM, database.Database, *mutableSharedMemo
 		banffTime         = mockable.MaxTime
 		cortinaTime       = mockable.MaxTime
 		durangoTime       = mockable.MaxTime
+		eUpgradeTime      = mockable.MaxTime
 	)
 
 	// always reset latestForkTime (a package level variable)
 	// to ensure test independence
 	latestForkTime = defaultGenesisTime.Add(time.Second)
 	switch f {
+	case eUpgrade:
+		eUpgradeTime = latestForkTime
+		fallthrough
 	case durango:
 		durangoTime = latestForkTime
 		fallthrough
@@ -230,7 +234,7 @@ func defaultVM(t *testing.T, f fork) (*VM, database.Database, *mutableSharedMemo
 	case apricotPhase3:
 		apricotPhase3Time = latestForkTime
 	default:
-		require.NoError(fmt.Errorf("unhandled fork %d", f))
+		require.FailNow("unhandled fork", f)
 	}
 
 	vm := &VM{Config: config.Config{
@@ -253,6 +257,7 @@ func defaultVM(t *testing.T, f fork) (*VM, database.Database, *mutableSharedMemo
 		BanffTime:              banffTime,
 		CortinaTime:            cortinaTime,
 		DurangoTime:            durangoTime,
+		EUpgradeTime:           eUpgradeTime,
 	}}
 
 	db := memdb.New()
@@ -274,7 +279,7 @@ func defaultVM(t *testing.T, f fork) (*VM, database.Database, *mutableSharedMemo
 	_, genesisBytes := defaultGenesis(t, ctx.AVAXAssetID)
 	appSender := &common.SenderTest{}
 	appSender.CantSendAppGossip = true
-	appSender.SendAppGossipF = func(context.Context, []byte) error {
+	appSender.SendAppGossipF = func(context.Context, common.SendConfig, []byte) error {
 		return nil
 	}
 
@@ -310,7 +315,7 @@ func defaultVM(t *testing.T, f fork) (*VM, database.Database, *mutableSharedMemo
 	)
 	require.NoError(err)
 	vm.ctx.Lock.Unlock()
-	require.NoError(vm.issueTx(context.Background(), testSubnet1))
+	require.NoError(vm.issueTxFromRPC(testSubnet1))
 	vm.ctx.Lock.Lock()
 	blk, err := vm.Builder.BuildBlock(context.Background())
 	require.NoError(err)
@@ -415,7 +420,7 @@ func TestAddValidatorCommit(t *testing.T) {
 
 	// trigger block creation
 	vm.ctx.Lock.Unlock()
-	require.NoError(vm.issueTx(context.Background(), tx))
+	require.NoError(vm.issueTxFromRPC(tx))
 	vm.ctx.Lock.Lock()
 
 	blk, err := vm.Builder.BuildBlock(context.Background())
@@ -514,7 +519,7 @@ func TestAddValidatorReject(t *testing.T) {
 
 	// trigger block creation
 	vm.ctx.Lock.Unlock()
-	require.NoError(vm.issueTx(context.Background(), tx))
+	require.NoError(vm.issueTxFromRPC(tx))
 	vm.ctx.Lock.Lock()
 
 	blk, err := vm.Builder.BuildBlock(context.Background())
@@ -563,7 +568,7 @@ func TestAddValidatorInvalidNotReissued(t *testing.T) {
 
 	// trigger block creation
 	vm.ctx.Lock.Unlock()
-	err = vm.issueTx(context.Background(), tx)
+	err = vm.issueTxFromRPC(tx)
 	vm.ctx.Lock.Lock()
 	require.ErrorIs(err, txexecutor.ErrDuplicateValidator)
 }
@@ -598,7 +603,7 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 
 	// trigger block creation
 	vm.ctx.Lock.Unlock()
-	require.NoError(vm.issueTx(context.Background(), tx))
+	require.NoError(vm.issueTxFromRPC(tx))
 	vm.ctx.Lock.Lock()
 
 	blk, err := vm.Builder.BuildBlock(context.Background())
@@ -646,7 +651,7 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 
 	// trigger block creation
 	vm.ctx.Lock.Unlock()
-	require.NoError(vm.issueTx(context.Background(), tx))
+	require.NoError(vm.issueTxFromRPC(tx))
 	vm.ctx.Lock.Lock()
 
 	blk, err := vm.Builder.BuildBlock(context.Background())
@@ -832,7 +837,7 @@ func TestCreateChain(t *testing.T) {
 	require.NoError(err)
 
 	vm.ctx.Lock.Unlock()
-	require.NoError(vm.issueTx(context.Background(), tx))
+	require.NoError(vm.issueTxFromRPC(tx))
 	vm.ctx.Lock.Lock()
 
 	blk, err := vm.Builder.BuildBlock(context.Background())
@@ -883,7 +888,7 @@ func TestCreateSubnet(t *testing.T) {
 	require.NoError(err)
 
 	vm.ctx.Lock.Unlock()
-	require.NoError(vm.issueTx(context.Background(), createSubnetTx))
+	require.NoError(vm.issueTxFromRPC(createSubnetTx))
 	vm.ctx.Lock.Lock()
 
 	// should contain the CreateSubnetTx
@@ -927,7 +932,7 @@ func TestCreateSubnet(t *testing.T) {
 	require.NoError(err)
 
 	vm.ctx.Lock.Unlock()
-	require.NoError(vm.issueTx(context.Background(), addValidatorTx))
+	require.NoError(vm.issueTxFromRPC(addValidatorTx))
 	vm.ctx.Lock.Lock()
 
 	blk, err = vm.Builder.BuildBlock(context.Background()) // should add validator to the new subnet
@@ -1031,7 +1036,7 @@ func TestAtomicImport(t *testing.T) {
 	require.NoError(err)
 
 	vm.ctx.Lock.Unlock()
-	require.NoError(vm.issueTx(context.Background(), tx))
+	require.NoError(vm.issueTxFromRPC(tx))
 	vm.ctx.Lock.Lock()
 
 	blk, err := vm.Builder.BuildBlock(context.Background())
@@ -1123,6 +1128,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 		BanffTime:              latestForkTime,
 		CortinaTime:            latestForkTime,
 		DurangoTime:            latestForkTime,
+		EUpgradeTime:           mockable.MaxTime,
 	}}
 
 	firstCtx := snowtest.Context(t, snowtest.PChainID)
@@ -1210,6 +1216,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 		BanffTime:              latestForkTime,
 		CortinaTime:            latestForkTime,
 		DurangoTime:            latestForkTime,
+		EUpgradeTime:           mockable.MaxTime,
 	}}
 
 	secondCtx := snowtest.Context(t, snowtest.PChainID)
@@ -1260,6 +1267,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		BanffTime:              latestForkTime,
 		CortinaTime:            latestForkTime,
 		DurangoTime:            latestForkTime,
+		EUpgradeTime:           mockable.MaxTime,
 	}}
 
 	initialClkTime := latestForkTime.Add(time.Second)
@@ -1375,12 +1383,6 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	externalSender.Default(true)
 
 	// Passes messages from the consensus engine to the network
-	gossipConfig := subnets.GossipConfig{
-		AcceptedFrontierPeerSize:  1,
-		OnAcceptPeerSize:          1,
-		AppGossipValidatorSize:    1,
-		AppGossipNonValidatorSize: 1,
-	}
 	sender, err := sender.New(
 		consensusCtx,
 		mc,
@@ -1388,7 +1390,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		chainRouter,
 		timeoutManager,
 		p2p.EngineType_ENGINE_TYPE_SNOWMAN,
-		subnets.New(consensusCtx.NodeID, subnets.Config{GossipConfig: gossipConfig}),
+		subnets.New(consensusCtx.NodeID, subnets.Config{}),
 	)
 	require.NoError(err)
 
@@ -1509,7 +1511,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	ctx.Lock.Lock()
 	var reqID uint32
-	externalSender.SendF = func(msg message.OutboundMessage, nodeIDs set.Set[ids.NodeID], _ ids.ID, _ subnets.Allower) set.Set[ids.NodeID] {
+	externalSender.SendF = func(msg message.OutboundMessage, config common.SendConfig, _ ids.ID, _ subnets.Allower) set.Set[ids.NodeID] {
 		inMsg, err := mc.Parse(msg.Bytes(), ctx.NodeID, func() {})
 		require.NoError(err)
 		require.Equal(message.GetAcceptedFrontierOp, inMsg.Op())
@@ -1518,24 +1520,24 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		require.True(ok)
 
 		reqID = requestID
-		return nodeIDs
+		return config.NodeIDs
 	}
 
 	require.NoError(bootstrapper.Connected(context.Background(), peerID, version.CurrentApp))
 
-	externalSender.SendF = func(msg message.OutboundMessage, nodeIDs set.Set[ids.NodeID], _ ids.ID, _ subnets.Allower) set.Set[ids.NodeID] {
+	externalSender.SendF = func(msg message.OutboundMessage, config common.SendConfig, _ ids.ID, _ subnets.Allower) set.Set[ids.NodeID] {
 		inMsgIntf, err := mc.Parse(msg.Bytes(), ctx.NodeID, func() {})
 		require.NoError(err)
 		require.Equal(message.GetAcceptedOp, inMsgIntf.Op())
 		inMsg := inMsgIntf.Message().(*p2p.GetAccepted)
 
 		reqID = inMsg.RequestId
-		return nodeIDs
+		return config.NodeIDs
 	}
 
 	require.NoError(bootstrapper.AcceptedFrontier(context.Background(), peerID, reqID, advanceTimeBlkID))
 
-	externalSender.SendF = func(msg message.OutboundMessage, nodeIDs set.Set[ids.NodeID], _ ids.ID, _ subnets.Allower) set.Set[ids.NodeID] {
+	externalSender.SendF = func(msg message.OutboundMessage, config common.SendConfig, _ ids.ID, _ subnets.Allower) set.Set[ids.NodeID] {
 		inMsgIntf, err := mc.Parse(msg.Bytes(), ctx.NodeID, func() {})
 		require.NoError(err)
 		require.Equal(message.GetAncestorsOp, inMsgIntf.Op())
@@ -1546,13 +1548,13 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		containerID, err := ids.ToID(inMsg.ContainerId)
 		require.NoError(err)
 		require.Equal(advanceTimeBlkID, containerID)
-		return nodeIDs
+		return config.NodeIDs
 	}
 
 	frontier := set.Of(advanceTimeBlkID)
 	require.NoError(bootstrapper.Accepted(context.Background(), peerID, reqID, frontier))
 
-	externalSender.SendF = func(msg message.OutboundMessage, nodeIDs set.Set[ids.NodeID], _ ids.ID, _ subnets.Allower) set.Set[ids.NodeID] {
+	externalSender.SendF = func(msg message.OutboundMessage, config common.SendConfig, _ ids.ID, _ subnets.Allower) set.Set[ids.NodeID] {
 		inMsg, err := mc.Parse(msg.Bytes(), ctx.NodeID, func() {})
 		require.NoError(err)
 		require.Equal(message.GetAcceptedFrontierOp, inMsg.Op())
@@ -1561,19 +1563,19 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		require.True(ok)
 
 		reqID = requestID
-		return nodeIDs
+		return config.NodeIDs
 	}
 
 	require.NoError(bootstrapper.Ancestors(context.Background(), peerID, reqID, [][]byte{advanceTimeBlkBytes}))
 
-	externalSender.SendF = func(msg message.OutboundMessage, nodeIDs set.Set[ids.NodeID], _ ids.ID, _ subnets.Allower) set.Set[ids.NodeID] {
+	externalSender.SendF = func(msg message.OutboundMessage, config common.SendConfig, _ ids.ID, _ subnets.Allower) set.Set[ids.NodeID] {
 		inMsgIntf, err := mc.Parse(msg.Bytes(), ctx.NodeID, func() {})
 		require.NoError(err)
 		require.Equal(message.GetAcceptedOp, inMsgIntf.Op())
 		inMsg := inMsgIntf.Message().(*p2p.GetAccepted)
 
 		reqID = inMsg.RequestId
-		return nodeIDs
+		return config.NodeIDs
 	}
 
 	require.NoError(bootstrapper.AcceptedFrontier(context.Background(), peerID, reqID, advanceTimeBlkID))
@@ -1601,6 +1603,7 @@ func TestUnverifiedParent(t *testing.T) {
 		BanffTime:              latestForkTime,
 		CortinaTime:            latestForkTime,
 		DurangoTime:            latestForkTime,
+		EUpgradeTime:           mockable.MaxTime,
 	}}
 
 	initialClkTime := latestForkTime.Add(time.Second)
@@ -1761,6 +1764,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 		BanffTime:              latestForkTime,
 		CortinaTime:            latestForkTime,
 		DurangoTime:            latestForkTime,
+		EUpgradeTime:           mockable.MaxTime,
 	}}
 
 	firstCtx := snowtest.Context(t, snowtest.PChainID)
@@ -1809,6 +1813,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 		BanffTime:              latestForkTime,
 		CortinaTime:            latestForkTime,
 		DurangoTime:            latestForkTime,
+		EUpgradeTime:           mockable.MaxTime,
 	}}
 
 	secondCtx := snowtest.Context(t, snowtest.PChainID)
@@ -1908,6 +1913,7 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 		BanffTime:              latestForkTime,
 		CortinaTime:            latestForkTime,
 		DurangoTime:            latestForkTime,
+		EUpgradeTime:           mockable.MaxTime,
 	}}
 
 	ctx := snowtest.Context(t, snowtest.PChainID)
@@ -2030,7 +2036,7 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 	require.NoError(err)
 
 	vm.ctx.Lock.Unlock()
-	require.NoError(vm.issueTx(context.Background(), addValidatorTx))
+	require.NoError(vm.issueTxFromRPC(addValidatorTx))
 	vm.ctx.Lock.Lock()
 
 	// trigger block creation for the validator tx
@@ -2050,7 +2056,7 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 	require.NoError(err)
 
 	vm.ctx.Lock.Unlock()
-	require.NoError(vm.issueTx(context.Background(), createSubnetTx))
+	require.NoError(vm.issueTxFromRPC(createSubnetTx))
 	vm.ctx.Lock.Lock()
 
 	// trigger block creation for the subnet tx
@@ -2121,7 +2127,7 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 	subnetID := createSubnetTx.ID()
 
 	vm.ctx.Lock.Unlock()
-	require.NoError(vm.issueTx(context.Background(), createSubnetTx))
+	require.NoError(vm.issueTxFromRPC(createSubnetTx))
 	vm.ctx.Lock.Lock()
 	createSubnetBlock, err := vm.Builder.BuildBlock(context.Background())
 	require.NoError(err)
@@ -2156,7 +2162,7 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 	require.NoError(err)
 
 	vm.ctx.Lock.Unlock()
-	require.NoError(vm.issueTx(context.Background(), transferSubnetOwnershipTx))
+	require.NoError(vm.issueTxFromRPC(transferSubnetOwnershipTx))
 	vm.ctx.Lock.Lock()
 	transferSubnetOwnershipBlock, err := vm.Builder.BuildBlock(context.Background())
 	require.NoError(err)
@@ -2242,7 +2248,7 @@ func TestBaseTx(t *testing.T) {
 	require.Equal(sendAmt, key1OutputAmt)
 
 	vm.ctx.Lock.Unlock()
-	require.NoError(vm.issueTx(context.Background(), baseTx))
+	require.NoError(vm.issueTxFromRPC(baseTx))
 	vm.ctx.Lock.Lock()
 	baseTxBlock, err := vm.Builder.BuildBlock(context.Background())
 	require.NoError(err)
@@ -2281,7 +2287,7 @@ func TestPruneMempool(t *testing.T) {
 	require.NoError(err)
 
 	vm.ctx.Lock.Unlock()
-	require.NoError(vm.issueTx(context.Background(), baseTx))
+	require.NoError(vm.issueTxFromRPC(baseTx))
 	vm.ctx.Lock.Lock()
 
 	// [baseTx] should be in the mempool.
@@ -2313,7 +2319,7 @@ func TestPruneMempool(t *testing.T) {
 	require.NoError(err)
 
 	vm.ctx.Lock.Unlock()
-	require.NoError(vm.issueTx(context.Background(), addValidatorTx))
+	require.NoError(vm.issueTxFromRPC(addValidatorTx))
 	vm.ctx.Lock.Lock()
 
 	// Advance clock to [endTime], making [addValidatorTx] invalid.

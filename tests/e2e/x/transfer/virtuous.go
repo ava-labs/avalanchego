@@ -84,7 +84,10 @@ var _ = e2e.DescribeXChainSerial("[Virtuous Transfer Tx AVAX]", func() {
 
 				keychain := secp256k1fx.NewKeychain(testKeys...)
 				baseWallet := e2e.NewWallet(keychain, e2e.Env.GetRandomNodeURI())
-				avaxAssetID := baseWallet.X().AVAXAssetID()
+				xWallet := baseWallet.X()
+				xBuilder := xWallet.Builder()
+				xContext := xBuilder.Context()
+				avaxAssetID := xContext.AVAXAssetID
 
 				wallets := make([]primary.Wallet, len(testKeys))
 				shortAddrs := make([]ids.ShortID, len(testKeys))
@@ -146,7 +149,7 @@ var _ = e2e.DescribeXChainSerial("[Virtuous Transfer Tx AVAX]", func() {
 
 				amountToTransfer := senderOrigBal / 10
 
-				senderNewBal := senderOrigBal - amountToTransfer - baseWallet.X().BaseTxFee()
+				senderNewBal := senderOrigBal - amountToTransfer - xContext.BaseTxFee
 				receiverNewBal := receiverOrigBal + amountToTransfer
 
 				ginkgo.By("X-Chain transfer with wrong amount must fail", func() {

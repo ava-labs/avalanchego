@@ -217,7 +217,6 @@ func (vm *VM) Initialize(
 
 	vm.typeToFxIndex = map[reflect.Type]int{}
 	vm.parser, err = block.NewCustomParser(
-		vm.DurangoTime,
 		vm.typeToFxIndex,
 		&vm.clock,
 		ctx.Log,
@@ -391,10 +390,6 @@ func (vm *VM) GetBlockIDAtHeight(_ context.Context, height uint64) (ids.ID, erro
 	return vm.state.GetBlockIDAtHeight(height)
 }
 
-func (*VM) VerifyHeightIndex(context.Context) error {
-	return nil
-}
-
 /*
  ******************************************************************************
  *********************************** DAG VM ***********************************
@@ -431,7 +426,10 @@ func (vm *VM) Linearize(ctx context.Context, stopVertexID ids.ID, toEngine chan<
 
 	// Invariant: The context lock is not held when calling network.IssueTx.
 	vm.network, err = network.New(
-		vm.ctx,
+		vm.ctx.Log,
+		vm.ctx.NodeID,
+		vm.ctx.SubnetID,
+		vm.ctx.ValidatorState,
 		vm.parser,
 		network.NewLockedTxVerifier(
 			&vm.ctx.Lock,
@@ -459,23 +457,18 @@ func (vm *VM) Linearize(ctx context.Context, stopVertexID ids.ID, toEngine chan<
 	// handled asynchronously.
 	vm.Atomic.Set(vm.network)
 
-	vm.awaitShutdown.Add(1)
+	vm.awaitShutdown.Add(2)
 	go func() {
 		defer vm.awaitShutdown.Done()
 
-		// Invariant: Gossip must never grab the context lock.
-		vm.network.Gossip(vm.onShutdownCtx)
+		// Invariant: PushGossip must never grab the context lock.
+		vm.network.PushGossip(vm.onShutdownCtx)
 	}()
-
 	go func() {
-		err := vm.state.Prune(&vm.ctx.Lock, vm.ctx.Log)
-		if err != nil {
-			vm.ctx.Log.Warn("state pruning failed",
-				zap.Error(err),
-			)
-			return
-		}
-		vm.ctx.Log.Info("state pruning finished")
+		defer vm.awaitShutdown.Done()
+
+		// Invariant: PullGossip must never grab the context lock.
+		vm.network.PullGossip(vm.onShutdownCtx)
 	}()
 
 	return nil
@@ -507,13 +500,13 @@ func (vm *VM) ParseTx(_ context.Context, bytes []byte) (snowstorm.Tx, error) {
  ******************************************************************************
  */
 
-// issueTx attempts to send a transaction to consensus.
+// issueTxFromRPC attempts to send a transaction to consensus.
 //
 // Invariant: The context lock is not held
 // Invariant: This function is only called after Linearize has been called.
-func (vm *VM) issueTx(tx *txs.Tx) (ids.ID, error) {
+func (vm *VM) issueTxFromRPC(tx *txs.Tx) (ids.ID, error) {
 	txID := tx.ID()
-	err := vm.network.IssueTx(context.TODO(), tx)
+	err := vm.network.IssueTxFromRPC(tx)
 	if err != nil && !errors.Is(err, mempool.ErrDuplicateTx) {
 		vm.ctx.Log.Debug("failed to add tx to mempool",
 			zap.Stringer("txID", txID),

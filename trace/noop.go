@@ -3,25 +3,13 @@
 
 package trace
 
-import (
-	"context"
+import "go.opentelemetry.io/otel/trace/noop"
 
-	"go.opentelemetry.io/otel/trace"
-
-	"github.com/ava-labs/avalanchego/utils/constants"
-)
-
-var Noop Tracer = noOpTracer{
-	t: trace.NewNoopTracerProvider().Tracer(constants.AppName),
-}
+var Noop Tracer = noOpTracer{}
 
 // noOpTracer is an implementation of trace.Tracer that does nothing.
 type noOpTracer struct {
-	t trace.Tracer
-}
-
-func (n noOpTracer) Start(ctx context.Context, spanName string, opts ...trace.SpanStartOption) (context.Context, trace.Span) {
-	return n.t.Start(ctx, spanName, opts...) //nolint:spancheck
+	noop.Tracer
 }
 
 func (noOpTracer) Close() error {

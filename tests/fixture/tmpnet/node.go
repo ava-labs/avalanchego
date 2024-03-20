@@ -53,6 +53,16 @@ type NodeRuntimeConfig struct {
 
 // Node supports configuring and running a node participating in a temporary network.
 type Node struct {
+	// Uniquely identifies the network the node is part of to enable monitoring.
+	NetworkUUID string
+
+	// Identify the entity associated with this network. This is
+	// intended to be used to label metrics to enable filtering
+	// results for a test run between the primary/shared network used
+	// by the majority of tests and private networks used by
+	// individual tests.
+	NetworkOwner string
+
 	// Set by EnsureNodeID which is also called when the node is read.
 	NodeID ids.NodeID
 
@@ -244,7 +254,7 @@ func (n *Node) EnsureBLSSigningKey() error {
 	if err != nil {
 		return fmt.Errorf("failed to generate staking signer key: %w", err)
 	}
-	n.Flags[config.StakingSignerKeyContentKey] = base64.StdEncoding.EncodeToString(bls.SerializeSecretKey(newKey))
+	n.Flags[config.StakingSignerKeyContentKey] = base64.StdEncoding.EncodeToString(bls.SecretKeyToBytes(newKey))
 	return nil
 }
 
@@ -330,7 +340,10 @@ func (n *Node) EnsureNodeID() error {
 	if err != nil {
 		return fmt.Errorf("failed to ensure node ID: failed to load tls cert: %w", err)
 	}
-	stakingCert := staking.CertificateFromX509(tlsCert.Leaf)
+	stakingCert, err := staking.ParseCertificate(tlsCert.Leaf.Raw)
+	if err != nil {
+		return fmt.Errorf("failed to ensure node ID: failed to parse staking cert: %w", err)
+	}
 	n.NodeID = ids.NodeIDFromCert(stakingCert)
 
 	return nil
