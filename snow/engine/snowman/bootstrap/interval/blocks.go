@@ -5,6 +5,7 @@ package interval
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"go.uber.org/zap"
@@ -190,10 +191,18 @@ func Execute(
 		}
 
 		if err := blk.Verify(ctx); err != nil {
-			return err
+			return fmt.Errorf("failed to verify block %s (%d) in bootstrapping: %w",
+				blk.ID(),
+				height,
+				err,
+			)
 		}
 		if err := blk.Accept(ctx); err != nil {
-			return err
+			return fmt.Errorf("failed to accept block %s (%d) in bootstrapping: %w",
+				blk.ID(),
+				height,
+				err,
+			)
 		}
 	}
 	if err := writeBatch(); err != nil {
