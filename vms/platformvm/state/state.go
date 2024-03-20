@@ -344,7 +344,7 @@ type state struct {
 
 	// The persisted fields represent the current database value
 	timestamp, persistedTimestamp         time.Time
-	unitFees                              commonfees.Dimensions
+	unitFees                              *commonfees.Dimensions // pointer, to allow customization for test networks
 	feesWindows                           commonfees.Windows
 	currentSupply, persistedCurrentSupply uint64
 	lastAccepted, persistedLastAccepted   ids.ID
@@ -1002,11 +1002,12 @@ func (s *state) GetStartTime(nodeID ids.NodeID, subnetID ids.ID) (time.Time, err
 }
 
 func (s *state) GetUnitFees() (commonfees.Dimensions, error) {
-	return s.unitFees, nil
+	return *s.unitFees, nil
 }
 
 func (s *state) SetUnitFees(uf commonfees.Dimensions) {
-	s.unitFees = uf
+	unitFees := uf
+	s.unitFees = &unitFees
 }
 
 func (s *state) GetFeeWindows() (commonfees.Windows, error) {
@@ -1352,6 +1353,7 @@ func (s *state) loadMetadata() error {
 	s.persistedTimestamp = timestamp
 	s.SetTimestamp(timestamp)
 
+	s.unitFees = new(commonfees.Dimensions)
 	switch unitFeesBytes, err := s.singletonDB.Get(UnitFeesKey); err {
 	case nil:
 		if err := s.unitFees.FromBytes(unitFeesBytes); err != nil {
@@ -1363,7 +1365,7 @@ func (s *state) loadMetadata() error {
 		// hence we may have never stored unit fees. Load from config
 		// TODO: remove once fork is active
 		isEActive := s.cfg.IsEActivated(timestamp)
-		s.unitFees = config.GetDynamicFeesConfig(isEActive).InitialUnitFees
+		*s.unitFees = config.GetDynamicFeesConfig(isEActive).InitialUnitFees
 
 	default:
 		return err
@@ -2394,8 +2396,11 @@ func (s *state) writeMetadata() error {
 		}
 		s.persistedTimestamp = s.timestamp
 	}
-	if err := s.singletonDB.Put(UnitFeesKey, s.unitFees.Bytes()); err != nil {
-		return fmt.Errorf("failed to write unit fees: %w", err)
+
+	if s.unitFees != nil {
+		if err := s.singletonDB.Put(UnitFeesKey, s.unitFees.Bytes()); err != nil {
+			return fmt.Errorf("failed to write unit fees: %w", err)
+		}
 	}
 	if err := s.singletonDB.Put(FeesWindowsKey, s.feesWindows.Bytes()); err != nil {
 		return fmt.Errorf("failed to write unit fees: %w", err)
