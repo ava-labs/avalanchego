@@ -165,15 +165,11 @@ func (b *Bootstrapper) Start(ctx context.Context, startReqID uint32) error {
 	}
 
 	// Set the starting height
-	lastAcceptedID, err := b.VM.LastAccepted(ctx)
+	lastAcceptedHeight, err := b.getLastAcceptedHeight(ctx)
 	if err != nil {
-		return fmt.Errorf("couldn't get last accepted ID: %w", err)
+		return err
 	}
-	lastAccepted, err := b.VM.GetBlock(ctx, lastAcceptedID)
-	if err != nil {
-		return fmt.Errorf("couldn't get last accepted block: %w", err)
-	}
-	b.startingHeight = lastAccepted.Height()
+	b.startingHeight = lastAcceptedHeight
 	b.requestID = startReqID
 
 	tree, err := interval.NewTree(b.DB)
@@ -576,15 +572,10 @@ func (b *Bootstrapper) markUnavailable(nodeID ids.NodeID) {
 // If [blk]'s height is <= the last accepted height, then it will be removed
 // from the missingIDs set.
 func (b *Bootstrapper) process(ctx context.Context, blk snowman.Block, processingBlocks map[ids.ID]snowman.Block) error {
-	lastAcceptedID, err := b.VM.LastAccepted(ctx)
+	lastAcceptedHeight, err := b.getLastAcceptedHeight(ctx)
 	if err != nil {
-		return fmt.Errorf("couldn't get last accepted ID: %w", err)
+		return err
 	}
-	lastAccepted, err := b.VM.GetBlock(ctx, lastAcceptedID)
-	if err != nil {
-		return fmt.Errorf("couldn't get last accepted block: %w", err)
-	}
-	lastAcceptedHeight := lastAccepted.Height()
 
 	batch := b.DB.NewBatch()
 	for {
@@ -678,15 +669,10 @@ func (b *Bootstrapper) tryStartExecuting(ctx context.Context) error {
 		return nil
 	}
 
-	lastAcceptedID, err := b.VM.LastAccepted(ctx)
+	lastAcceptedHeight, err := b.getLastAcceptedHeight(ctx)
 	if err != nil {
-		return fmt.Errorf("couldn't get last accepted ID: %w", err)
+		return err
 	}
-	lastAccepted, err := b.VM.GetBlock(ctx, lastAcceptedID)
-	if err != nil {
-		return fmt.Errorf("couldn't get last accepted block: %w", err)
-	}
-	lastAcceptedHeight := lastAccepted.Height()
 
 	log := b.Ctx.Log.Info
 	if b.restarted {
@@ -747,6 +733,18 @@ func (b *Bootstrapper) tryStartExecuting(ctx context.Context) error {
 	}
 	b.fetchETA.Set(0)
 	return b.onFinished(ctx, b.requestID)
+}
+
+func (b *Bootstrapper) getLastAcceptedHeight(ctx context.Context) (uint64, error) {
+	lastAcceptedID, err := b.VM.LastAccepted(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("couldn't get last accepted ID: %w", err)
+	}
+	lastAccepted, err := b.VM.GetBlock(ctx, lastAcceptedID)
+	if err != nil {
+		return 0, fmt.Errorf("couldn't get last accepted block: %w", err)
+	}
+	return lastAccepted.Height(), nil
 }
 
 func (b *Bootstrapper) Timeout(ctx context.Context) error {
