@@ -380,17 +380,17 @@ func (b *Bootstrapper) GetAcceptedFailed(ctx context.Context, nodeID ids.NodeID,
 	return b.sendBootstrappingMessagesOrFinish(ctx)
 }
 
-func (b *Bootstrapper) startSyncing(ctx context.Context, acceptedContainerIDs []ids.ID) error {
+func (b *Bootstrapper) startSyncing(ctx context.Context, acceptedBlockIDs []ids.ID) error {
 	// Initialize the fetch from set to the currently preferred peers
 	b.fetchFrom = b.StartupTracker.PreferredPeers()
 
-	knownContainerIDs := genesis.GetCheckpoints(b.Ctx.NetworkID, b.Ctx.ChainID)
-	b.missingBlockIDs.Union(knownContainerIDs)
-	b.missingBlockIDs.Add(acceptedContainerIDs...)
+	knownBlockIDs := genesis.GetCheckpoints(b.Ctx.NetworkID, b.Ctx.ChainID)
+	b.missingBlockIDs.Union(knownBlockIDs)
+	b.missingBlockIDs.Add(acceptedBlockIDs...)
 	numMissingBlockIDs := b.missingBlockIDs.Len()
 	b.Ctx.Log.Debug("starting bootstrapping",
-		zap.Int("numKnownBlocks", knownContainerIDs.Len()),
-		zap.Int("numAcceptedBlocks", len(acceptedContainerIDs)),
+		zap.Int("numKnownBlocks", knownBlockIDs.Len()),
+		zap.Int("numAcceptedBlocks", len(acceptedBlockIDs)),
 		zap.Int("numMissingBlocks", numMissingBlockIDs),
 	)
 
