@@ -54,6 +54,7 @@ impl File {
         filepath.push(fname);
         Ok(std::fs::File::options()
             .create(true)
+            .truncate(true)
             .read(true)
             .write(true)
             .mode(0o600)

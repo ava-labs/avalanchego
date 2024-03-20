@@ -8,7 +8,6 @@ use firewood::{
     v2::api::{self, Db as _},
 };
 use futures_util::StreamExt;
-use log;
 use std::borrow::Cow;
 
 #[derive(Debug, Args)]

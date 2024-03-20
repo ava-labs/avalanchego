@@ -150,7 +150,7 @@ impl BranchNode {
                     #[allow(clippy::indexing_slicing)]
                     if let Some(v) = &self.children_encoded[i] {
                         #[allow(clippy::indexing_slicing)]
-                        (list[i] = v.clone());
+                        list[i].clone_from(v);
                     }
                 }
             };
@@ -158,7 +158,7 @@ impl BranchNode {
 
         #[allow(clippy::unwrap_used)]
         if let Some(val) = &self.value {
-            list[Self::MAX_CHILDREN] = val.clone();
+            list[Self::MAX_CHILDREN].clone_from(val);
         }
 
         #[allow(clippy::unwrap_used)]

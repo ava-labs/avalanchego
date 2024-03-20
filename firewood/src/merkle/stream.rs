@@ -585,7 +585,6 @@ mod tests {
     use crate::{merkle::Bincode, shale::cached::InMemLinearStore};
 
     use super::*;
-    use futures::StreamExt;
     use test_case::test_case;
 
     impl<S: CachedStore, T> Merkle<S, T> {
@@ -1102,7 +1101,7 @@ mod tests {
 
         assert!(first_key < intermediate);
 
-        let key_values = vec![
+        let key_values = [
             vec![first_key],
             vec![intermediate, intermediate],
             vec![intermediate, intermediate, intermediate],

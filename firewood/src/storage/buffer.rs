@@ -638,15 +638,13 @@ impl DiskBufferRequester {
 #[allow(clippy::unwrap_used, clippy::indexing_slicing)]
 mod tests {
     use sha3::Digest;
-    use std::path::{Path, PathBuf};
-    use tokio::task::block_in_place;
 
     use super::*;
     use crate::shale::CachedStore;
     use crate::{
         file,
         storage::{
-            Ash, CachedSpace, DeltaPage, MemStoreR, StoreConfig, StoreRevMut, StoreRevMutDelta,
+            Ash, CachedSpace, MemStoreR, StoreConfig, StoreRevMut, StoreRevMutDelta,
             StoreRevShared, ZeroStore,
         },
     };

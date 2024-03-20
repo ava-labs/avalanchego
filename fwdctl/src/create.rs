@@ -6,7 +6,6 @@ use firewood::{
     db::{Db, DbConfig, DbRevConfig, DiskBufferConfig, WalConfig},
     v2::api,
 };
-use log;
 
 #[derive(Args)]
 pub struct Options {

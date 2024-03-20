@@ -8,7 +8,6 @@ use firewood::{
     db::{BatchOp, Db, DbConfig, WalConfig},
     v2::api::{self, Db as _, Proposal},
 };
-use log;
 
 #[derive(Debug, Args)]
 pub struct Options {

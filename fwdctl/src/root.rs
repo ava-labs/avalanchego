@@ -7,7 +7,6 @@ use firewood::{
     db::{Db, DbConfig, WalConfig},
     v2::api,
 };
-use log;
 use std::str;
 
 #[derive(Debug, Args)]

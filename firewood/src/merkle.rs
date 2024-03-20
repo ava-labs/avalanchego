@@ -1392,7 +1392,7 @@ impl<'a, T: PartialEq> PrefixOverlap<'a, T> {
 mod tests {
     use super::*;
     use crate::merkle::node::PlainCodec;
-    use shale::{cached::InMemLinearStore, CachedStore};
+    use shale::cached::InMemLinearStore;
     use test_case::test_case;
 
     fn leaf(path: Vec<u8>, value: Vec<u8>) -> Node {
