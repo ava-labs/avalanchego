@@ -709,8 +709,21 @@ func (b *Bootstrapper) tryStartExecuting(ctx context.Context) error {
 	}
 
 	numToExecute := b.tree.Len()
-	err = interval.Execute(ctx, log, b.DB, b.VM, b.tree, lastAcceptedHeight)
-	if err != nil || b.Halted() {
+	err = interval.Execute(
+		&haltableContext{
+			Context:  ctx,
+			Haltable: b,
+		},
+		log,
+		b.DB,
+		b.VM,
+		b.tree,
+		lastAcceptedHeight,
+	)
+	if errors.Is(err, errHalted) {
+		return nil
+	}
+	if err != nil {
 		return err
 	}
 
