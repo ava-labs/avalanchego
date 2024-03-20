@@ -1,9 +1,10 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package x
+package signer
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -18,32 +19,31 @@ import (
 	"github.com/ava-labs/avalanchego/vms/nftfx"
 	"github.com/ava-labs/avalanchego/vms/propertyfx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-
-	stdcontext "context"
+	"github.com/ava-labs/avalanchego/wallet/chain/x/builder"
 )
 
 var (
-	_ txs.Visitor = (*signerVisitor)(nil)
+	_ txs.Visitor = (*visitor)(nil)
 
-	errUnknownInputType      = errors.New("unknown input type")
-	errUnknownOpType         = errors.New("unknown operation type")
-	errInvalidNumUTXOsInOp   = errors.New("invalid number of UTXOs in operation")
-	errUnknownCredentialType = errors.New("unknown credential type")
-	errUnknownOutputType     = errors.New("unknown output type")
-	errInvalidUTXOSigIndex   = errors.New("invalid UTXO signature index")
+	ErrUnknownInputType      = errors.New("unknown input type")
+	ErrUnknownOpType         = errors.New("unknown operation type")
+	ErrInvalidNumUTXOsInOp   = errors.New("invalid number of UTXOs in operation")
+	ErrUnknownCredentialType = errors.New("unknown credential type")
+	ErrUnknownOutputType     = errors.New("unknown output type")
+	ErrInvalidUTXOSigIndex   = errors.New("invalid UTXO signature index")
 
 	emptySig [secp256k1.SignatureLen]byte
 )
 
-// signerVisitor handles signing transactions for the signer
-type signerVisitor struct {
+// visitor handles signing transactions for the signer
+type visitor struct {
 	kc      keychain.Keychain
-	backend SignerBackend
-	ctx     stdcontext.Context
+	backend Backend
+	ctx     context.Context
 	tx      *txs.Tx
 }
 
-func (s *signerVisitor) BaseTx(tx *txs.BaseTx) error {
+func (s *visitor) BaseTx(tx *txs.BaseTx) error {
 	txCreds, txSigners, err := s.getSigners(s.ctx, tx.BlockchainID, tx.Ins)
 	if err != nil {
 		return err
@@ -51,7 +51,7 @@ func (s *signerVisitor) BaseTx(tx *txs.BaseTx) error {
 	return sign(s.tx, txCreds, txSigners)
 }
 
-func (s *signerVisitor) CreateAssetTx(tx *txs.CreateAssetTx) error {
+func (s *visitor) CreateAssetTx(tx *txs.CreateAssetTx) error {
 	txCreds, txSigners, err := s.getSigners(s.ctx, tx.BlockchainID, tx.Ins)
 	if err != nil {
 		return err
@@ -59,7 +59,7 @@ func (s *signerVisitor) CreateAssetTx(tx *txs.CreateAssetTx) error {
 	return sign(s.tx, txCreds, txSigners)
 }
 
-func (s *signerVisitor) OperationTx(tx *txs.OperationTx) error {
+func (s *visitor) OperationTx(tx *txs.OperationTx) error {
 	txCreds, txSigners, err := s.getSigners(s.ctx, tx.BlockchainID, tx.Ins)
 	if err != nil {
 		return err
@@ -73,7 +73,7 @@ func (s *signerVisitor) OperationTx(tx *txs.OperationTx) error {
 	return sign(s.tx, txCreds, txSigners)
 }
 
-func (s *signerVisitor) ImportTx(tx *txs.ImportTx) error {
+func (s *visitor) ImportTx(tx *txs.ImportTx) error {
 	txCreds, txSigners, err := s.getSigners(s.ctx, tx.BlockchainID, tx.Ins)
 	if err != nil {
 		return err
@@ -87,7 +87,7 @@ func (s *signerVisitor) ImportTx(tx *txs.ImportTx) error {
 	return sign(s.tx, txCreds, txSigners)
 }
 
-func (s *signerVisitor) ExportTx(tx *txs.ExportTx) error {
+func (s *visitor) ExportTx(tx *txs.ExportTx) error {
 	txCreds, txSigners, err := s.getSigners(s.ctx, tx.BlockchainID, tx.Ins)
 	if err != nil {
 		return err
@@ -95,14 +95,14 @@ func (s *signerVisitor) ExportTx(tx *txs.ExportTx) error {
 	return sign(s.tx, txCreds, txSigners)
 }
 
-func (s *signerVisitor) getSigners(ctx stdcontext.Context, sourceChainID ids.ID, ins []*avax.TransferableInput) ([]verify.Verifiable, [][]keychain.Signer, error) {
+func (s *visitor) getSigners(ctx context.Context, sourceChainID ids.ID, ins []*avax.TransferableInput) ([]verify.Verifiable, [][]keychain.Signer, error) {
 	txCreds := make([]verify.Verifiable, len(ins))
 	txSigners := make([][]keychain.Signer, len(ins))
 	for credIndex, transferInput := range ins {
 		txCreds[credIndex] = &secp256k1fx.Credential{}
 		input, ok := transferInput.In.(*secp256k1fx.TransferInput)
 		if !ok {
-			return nil, nil, errUnknownInputType
+			return nil, nil, ErrUnknownInputType
 		}
 
 		inputSigners := make([]keychain.Signer, len(input.SigIndices))
@@ -121,12 +121,12 @@ func (s *signerVisitor) getSigners(ctx stdcontext.Context, sourceChainID ids.ID,
 
 		out, ok := utxo.Out.(*secp256k1fx.TransferOutput)
 		if !ok {
-			return nil, nil, errUnknownOutputType
+			return nil, nil, ErrUnknownOutputType
 		}
 
 		for sigIndex, addrIndex := range input.SigIndices {
 			if addrIndex >= uint32(len(out.Addrs)) {
-				return nil, nil, errInvalidUTXOSigIndex
+				return nil, nil, ErrInvalidUTXOSigIndex
 			}
 
 			addr := out.Addrs[addrIndex]
@@ -142,7 +142,7 @@ func (s *signerVisitor) getSigners(ctx stdcontext.Context, sourceChainID ids.ID,
 	return txCreds, txSigners, nil
 }
 
-func (s *signerVisitor) getOpsSigners(ctx stdcontext.Context, sourceChainID ids.ID, ops []*txs.Operation) ([]verify.Verifiable, [][]keychain.Signer, error) {
+func (s *visitor) getOpsSigners(ctx context.Context, sourceChainID ids.ID, ops []*txs.Operation) ([]verify.Verifiable, [][]keychain.Signer, error) {
 	txCreds := make([]verify.Verifiable, len(ops))
 	txSigners := make([][]keychain.Signer, len(ops))
 	for credIndex, op := range ops {
@@ -164,14 +164,14 @@ func (s *signerVisitor) getOpsSigners(ctx stdcontext.Context, sourceChainID ids.
 			txCreds[credIndex] = &propertyfx.Credential{}
 			input = &op.Input
 		default:
-			return nil, nil, errUnknownOpType
+			return nil, nil, ErrUnknownOpType
 		}
 
 		inputSigners := make([]keychain.Signer, len(input.SigIndices))
 		txSigners[credIndex] = inputSigners
 
 		if len(op.UTXOIDs) != 1 {
-			return nil, nil, errInvalidNumUTXOsInOp
+			return nil, nil, ErrInvalidNumUTXOsInOp
 		}
 		utxoID := op.UTXOIDs[0].InputID()
 		utxo, err := s.backend.GetUTXO(ctx, sourceChainID, utxoID)
@@ -197,12 +197,12 @@ func (s *signerVisitor) getOpsSigners(ctx stdcontext.Context, sourceChainID ids.
 		case *propertyfx.OwnedOutput:
 			addrs = out.Addrs
 		default:
-			return nil, nil, errUnknownOutputType
+			return nil, nil, ErrUnknownOutputType
 		}
 
 		for sigIndex, addrIndex := range input.SigIndices {
 			if addrIndex >= uint32(len(addrs)) {
-				return nil, nil, errInvalidUTXOSigIndex
+				return nil, nil, ErrInvalidUTXOSigIndex
 			}
 
 			addr := addrs[addrIndex]
@@ -219,7 +219,7 @@ func (s *signerVisitor) getOpsSigners(ctx stdcontext.Context, sourceChainID ids.
 }
 
 func sign(tx *txs.Tx, creds []verify.Verifiable, txSigners [][]keychain.Signer) error {
-	codec := Parser.Codec()
+	codec := builder.Parser.Codec()
 	unsignedBytes, err := codec.Marshal(txs.CodecVersion, &tx.Unsigned)
 	if err != nil {
 		return fmt.Errorf("couldn't marshal unsigned tx: %w", err)
@@ -254,7 +254,7 @@ func sign(tx *txs.Tx, creds []verify.Verifiable, txSigners [][]keychain.Signer) 
 			fxCred.FxID = propertyfx.ID
 			cred = &credImpl.Credential
 		default:
-			return errUnknownCredentialType
+			return ErrUnknownCredentialType
 		}
 
 		if expectedLen := len(inputSigners); expectedLen != len(cred.Sigs) {
