@@ -657,7 +657,7 @@ func (b *Bootstrapper) process(ctx context.Context, blk snowman.Block, processin
 // being fetched. After executing all pending blocks it will either restart
 // bootstrapping, or transition into normal operations.
 func (b *Bootstrapper) tryStartExecuting(ctx context.Context) error {
-	if numPending := b.missingBlockIDs.Len(); numPending != 0 {
+	if numMissingBlockIDs := b.missingBlockIDs.Len(); numMissingBlockIDs != 0 {
 		return nil
 	}
 
