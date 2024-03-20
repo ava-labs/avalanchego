@@ -85,11 +85,12 @@ var (
 	VertexDBPrefix                = []byte("vertex")
 	VertexBootstrappingDBPrefix   = []byte("vertex_bs")
 	TxBootstrappingDBPrefix       = []byte("tx_bs")
-	BlockBootstrappingDBPrefix    = []byte("block_bs")
+	OldBlockBootstrappingDBPrefix = []byte("block_bs")
 	NewBlockBootstrappingDBPrefix = []byte("new_block_bs")
 
 	// Bootstrapping prefixes for ChainVMs
-	ChainBootstrappingDBPrefix = []byte("bs")
+	OldChainBootstrappingDBPrefix = []byte("bs")
+	NewChainBootstrappingDBPrefix = []byte("new_bs")
 
 	errUnknownVMType           = errors.New("the vm should have type avalanche.DAGVM or snowman.ChainVM")
 	errCreatePlatformVM        = errors.New("attempted to create a chain running the PlatformVM")
@@ -570,6 +571,11 @@ func (m *manager) createAvalancheChain(
 	vertexDB := prefixdb.New(VertexDBPrefix, prefixDB)
 	vertexBootstrappingDB := prefixdb.New(VertexBootstrappingDBPrefix, prefixDB)
 	txBootstrappingDB := prefixdb.New(TxBootstrappingDBPrefix, prefixDB)
+
+	oldBlockBootstrappingDB := prefixdb.New(OldBlockBootstrappingDBPrefix, prefixDB)
+	if err := database.AtomicClear(oldBlockBootstrappingDB, oldBlockBootstrappingDB); err != nil {
+		return nil, fmt.Errorf("failed to clear legacy bootstrapping database: %w", err)
+	}
 	newBlockBootstrappingDB := prefixdb.New(NewBlockBootstrappingDBPrefix, prefixDB)
 
 	vtxBlocker, err := queue.NewWithMissing(vertexBootstrappingDB, "vtx", ctx.AvalancheRegisterer)
@@ -947,7 +953,12 @@ func (m *manager) createSnowmanChain(
 	}
 	prefixDB := prefixdb.New(ctx.ChainID[:], meterDB)
 	vmDB := prefixdb.New(VMDBPrefix, prefixDB)
-	newBootstrappingDB := prefixdb.New(NewBlockBootstrappingDBPrefix, prefixDB)
+
+	oldBootstrappingDB := prefixdb.New(OldChainBootstrappingDBPrefix, prefixDB)
+	if err := database.AtomicClear(oldBootstrappingDB, oldBootstrappingDB); err != nil {
+		return nil, fmt.Errorf("failed to clear legacy bootstrapping database: %w", err)
+	}
+	newBootstrappingDB := prefixdb.New(NewChainBootstrappingDBPrefix, prefixDB)
 
 	// Passes messages from the consensus engine to the network
 	messageSender, err := sender.New(

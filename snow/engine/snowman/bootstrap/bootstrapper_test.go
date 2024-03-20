@@ -270,7 +270,7 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 	}
 
 	require.NoError(bs.startSyncing(context.Background(), acceptedIDs))
-	require.Equal(snow.NormalOp, config.Ctx.State.Get().State)
+	require.Equal(snow.Bootstrapping, config.Ctx.State.Get().State)
 	require.Equal(choices.Accepted, blk1.Status())
 }
 
