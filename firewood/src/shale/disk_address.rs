@@ -30,7 +30,7 @@ impl DerefMut for DiskAddress {
 }
 
 impl DiskAddress {
-    pub(crate) const SERIALIZED_LEN: u64 = size_of::<Self>() as u64;
+    pub(crate) const SERIALIZED_LEN: u64 = size_of::<usize>() as u64;
 
     /// Return a None DiskAddress
     pub const fn null() -> Self {
