@@ -692,17 +692,6 @@ func (b *Bootstrapper) tryStartExecuting(ctx context.Context) error {
 	}
 	lastAcceptedHeight := lastAccepted.Height()
 
-	// TODO: Remove after testing
-	{
-		expectedMissingIDs, err := interval.GetMissingBlockIDs(ctx, b.DB, b.VM, b.tree, lastAcceptedHeight)
-		if err != nil {
-			return err
-		}
-		if expectedMissingIDs.Len() > 0 {
-			return fmt.Errorf("unexpectedly had missing IDs: %d", expectedMissingIDs.Len())
-		}
-	}
-
 	log := b.Ctx.Log.Info
 	if b.restarted {
 		log = b.Ctx.Log.Debug
