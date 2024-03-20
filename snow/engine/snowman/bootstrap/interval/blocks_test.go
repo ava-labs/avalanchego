@@ -289,15 +289,14 @@ func TestExecute(t *testing.T) {
 		require.Equal(uint64(i+1), tree.Len())
 	}
 
-	err = Execute(
+	require.NoError(Execute(
 		context.Background(),
 		logging.NoLog{}.Info,
 		db,
 		parser,
 		tree,
 		lastAcceptedHeight,
-	)
-	require.NoError(err)
+	))
 
 	for _, block := range blocks[lastAcceptedHeight+1:] {
 		require.Equal(choices.Accepted, block.Status())
@@ -381,15 +380,14 @@ func TestExecuteSkipsAcceptedBlocks(t *testing.T) {
 		require.Equal(uint64(i+1), tree.Len())
 	}
 
-	err = Execute(
+	require.NoError(Execute(
 		context.Background(),
 		logging.NoLog{}.Info,
 		db,
 		parser,
 		tree,
 		lastAcceptedHeightWhenExecuting,
-	)
-	require.NoError(err)
+	))
 
 	for _, block := range blocks[lastAcceptedHeightWhenAdding+1 : lastAcceptedHeightWhenExecuting] {
 		require.Equal(choices.Processing, block.Status())
