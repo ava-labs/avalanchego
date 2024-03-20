@@ -92,11 +92,10 @@ type View interface {
 	CommitToDB(ctx context.Context) error
 }
 
-// Returns the nodes along the path to [key].
+// Calls [visitNode] on the nodes along the path to [key].
 // The first node is the root, and the last node is either the node with the
 // given [key], if it's in the trie, or the node with the largest prefix of
 // the [key] if it isn't in the trie.
-// Always returns at least the root node.
 // Assumes [t] doesn't change while this function is running.
 func visitPathToKey(t Trie, key Key, visitNode func(*node) error) error {
 	maybeRoot := t.getRoot()
@@ -137,7 +136,7 @@ func visitPathToKey(t Trie, key Key, visitNode func(*node) error) error {
 	return nil
 }
 
-// Returns a proof that [bytesPath] is in or not in trie [t].
+// Returns a proof that [key] is in or not in trie [t].
 // Assumes [t] doesn't change while this function is running.
 func getProof(t Trie, key []byte) (*Proof, error) {
 	root := t.getRoot()

@@ -41,11 +41,6 @@ func (i *issuer) Abandon(ctx context.Context, _ ids.ID) {
 		i.t.removeFromPending(i.blk)
 		i.t.addToNonVerifieds(i.blk)
 		i.t.blocked.Abandon(ctx, blkID)
-
-		// Tracks performance statistics
-		i.t.metrics.numRequests.Set(float64(i.t.blkReqs.Len()))
-		i.t.metrics.numBlocked.Set(float64(len(i.t.pending)))
-		i.t.metrics.numBlockers.Set(float64(i.t.blocked.Len()))
 	}
 	i.abandoned = true
 }

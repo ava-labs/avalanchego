@@ -8,17 +8,12 @@ option go_package = "github.com/ava-labs/avalanchego/proto/pb/p2p";
 // Represents peer-to-peer messages.
 // Only one type can be non-null.
 message Message {
-  reserved 33; // Until after durango activation.
+  reserved 1; // Until E upgrade is activated.
   reserved 36; // Next unused field number.
   // NOTES
   // Use "oneof" for each message type and set rest to null if not used.
   // That is because when the compression is enabled, we don't want to include uncompressed fields.
   oneof message {
-    // Gzip-compressed bytes of a "p2p.Message" whose "oneof" "message" field is
-    // NOT compressed_* BUT one of the message types (e.g. ping, pong, etc.).
-    // This field is only set if the message type supports compression.
-    bytes compressed_gzip = 1;
-
     // zstd-compressed bytes of a "p2p.Message" whose "oneof" "message" field is
     // NOT compressed_* BUT one of the message types (e.g. ping, pong, etc.).
     // This field is only set if the message type supports compression.
@@ -100,6 +95,7 @@ message Pong {
 //
 // Peers should drop connections to peers with incompatible versions.
 message Handshake {
+  reserved 5; // Until E upgrade is activated.
   // Network the peer is running on (e.g local, testnet, mainnet)
   uint32 network_id = 1;
   // Unix timestamp when this Handshake message was created
@@ -108,8 +104,6 @@ message Handshake {
   bytes ip_addr = 3;
   // IP port of the peer
   uint32 ip_port = 4;
-  // Avalanche client version
-  string my_version = 5;
   // Timestamp of the IP
   uint64 ip_signing_time = 6;
   // Signature of the peer IP port pair at a provided timestamp with the TLS
@@ -237,21 +231,19 @@ enum EngineType {
 //
 // Peers should respond to GetAcceptedFrontier with AcceptedFrontier.
 message GetAcceptedFrontier {
+  reserved 4;
   // Chain being requested from
   bytes chain_id = 1;
   // Unique identifier for this request
   uint32 request_id = 2;
   // Timeout (ns) for this request
   uint64 deadline = 3;
-  // Consensus type the remote peer should use to handle this message
-  EngineType engine_type = 4;
 }
 
 // AcceptedFrontier contains the remote peer's last accepted frontier.
 //
 // AcceptedFrontier is sent in response to GetAcceptedFrontier.
 message AcceptedFrontier {
-  reserved 4; // Until Cortina upgrade is activated
   // Chain being responded from
   bytes chain_id = 1;
   // Request id of the original GetAcceptedFrontier request
@@ -265,6 +257,7 @@ message AcceptedFrontier {
 //
 // Peers should respond to GetAccepted with an Accepted message.
 message GetAccepted {
+  reserved 5;
   // Chain being requested from
   bytes chain_id = 1;
   // Unique identifier for this message
@@ -273,15 +266,12 @@ message GetAccepted {
   uint64 deadline = 3;
   // The sender's accepted frontier
   repeated bytes container_ids = 4;
-  // Consensus type to handle this message
-  EngineType engine_type = 5;
 }
 
 // Accepted is sent in response to GetAccepted. The sending peer responds with
 // a subset of container ids from the GetAccepted request that the sending peer
 // has accepted.
 message Accepted {
-  reserved 4; // Until Cortina upgrade is activated
   // Chain being responded from
   bytes chain_id = 1;
   // Request id of the original GetAccepted request
@@ -312,7 +302,6 @@ message GetAncestors {
 // Ancestors contains a contiguous ancestry of containers for the requested
 // container in order of increasing block height.
 message Ancestors {
-  reserved 4; // Until Cortina upgrade is activated
   // Chain being responded from
   bytes chain_id = 1;
   // Request id of the original GetAncestors request
@@ -325,6 +314,7 @@ message Ancestors {
 //
 // Remote peers should respond with a Put message if they have the container.
 message Get {
+  reserved 5;
   // Chain being requested from
   bytes chain_id = 1;
   // Unique identifier for this request
@@ -333,8 +323,6 @@ message Get {
   uint64 deadline = 3;
   // Container being requested
   bytes container_id = 4;
-  // Consensus type to handle this message
-  EngineType engine_type = 5;
 }
 
 // Put is sent in response to Get with the requested block.
@@ -345,14 +333,13 @@ message Put {
   uint32 request_id = 2;
   // Requested container
   bytes container = 3;
-  // Consensus type to handle this message
-  EngineType engine_type = 4;
 }
 
 // PushQuery requests the preferences of a remote peer given a container.
 //
 // Remote peers should respond to a PushQuery with a Chits message
 message PushQuery {
+  reserved 5;
   // Chain being requested from
   bytes chain_id = 1;
   // Unique identifier for this request
@@ -361,8 +348,6 @@ message PushQuery {
   uint64 deadline = 3;
   // Container being gossiped
   bytes container = 4;
-  // Consensus type to handle this message
-  EngineType engine_type = 5;
   // Requesting peer's last accepted height
   uint64 requested_height = 6;
 }
@@ -371,6 +356,7 @@ message PushQuery {
 //
 // Remote peers should respond to a PullQuery with a Chits message
 message PullQuery {
+  reserved 5;
   // Chain being requested from
   bytes chain_id = 1;
   // Unique identifier for this request
@@ -379,8 +365,6 @@ message PullQuery {
   uint64 deadline = 3;
   // Container id being gossiped
   bytes container_id = 4;
-  // Consensus type to handle this message
-  EngineType engine_type = 5;
   // Requesting peer's last accepted height
   uint64 requested_height = 6;
 }

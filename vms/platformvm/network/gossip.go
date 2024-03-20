@@ -135,6 +135,11 @@ func (g *gossipMempool) Add(tx *txs.Tx) error {
 	return nil
 }
 
+func (g *gossipMempool) Has(txID ids.ID) bool {
+	_, ok := g.Mempool.Get(txID)
+	return ok
+}
+
 func (g *gossipMempool) GetFilter() (bloom []byte, salt []byte) {
 	g.lock.RLock()
 	defer g.lock.RUnlock()

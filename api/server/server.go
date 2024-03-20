@@ -112,7 +112,6 @@ func New(
 	registerer prometheus.Registerer,
 	httpConfig HTTPConfig,
 	allowedHosts []string,
-	wrappers ...Wrapper,
 ) (Server, error) {
 	m, err := newMetrics(namespace, registerer)
 	if err != nil {
@@ -133,10 +132,6 @@ func New(
 			gzipHandler.ServeHTTP(w, r)
 		},
 	)
-
-	for _, wrapper := range wrappers {
-		handler = wrapper.WrapHandler(handler)
-	}
 
 	httpServer := &http.Server{
 		Handler:           handler,

@@ -48,27 +48,47 @@
 		{
 			"nodeID": "NodeID-7Xhw2mDxuDS44j42TCB6U5579esbSt3Lg",
 			"rewardAddress": "X-local18jma8ppw3nhx5r4ap8clazz0dps7rv5u00z96u",
-			"delegationFee": 1000000
+			"delegationFee": 1000000,
+			"signer": {
+				"publicKey": "0x900c9b119b5c82d781d4b49be78c3fc7ae65f2b435b7ed9e3a8b9a03e475edff86d8a64827fec8db23a6f236afbf127d",
+				"proofOfPossession": "0x8bfd6d4d2086b2b8115d8f72f94095fefe5a6c07876b2accf51a811adf520f389e74a3d2152a6d90b521e2be58ffe468043dc5ea68b4c44410eb67f8dc24f13ed4f194000764c0e922cd254a3588a4962b1cb4db7de4bb9cda9d9d4d6b03f3d2"
+			}
 		},
 		{
 			"nodeID": "NodeID-MFrZFVCXPv5iCn6M9K6XduxGTYp891xXZ",
 			"rewardAddress": "X-local18jma8ppw3nhx5r4ap8clazz0dps7rv5u00z96u",
-			"delegationFee": 500000
+			"delegationFee": 500000,
+			"signer": {
+				"publicKey": "0xa058ff27a4c570664bfa28e34939368539a1340867951943d0f56fa8aac13bc09ff64f341acf8cc0cef74202c2d6f9c0",
+				"proofOfPossession": "0xac52195616344127df74d924e11701ca5e0867647ae36171d168fcf95d536e94061659b3edb924fffdb69dd5aa5cb2d703f8920c825c8f7b74dd0112c9c27814790bfcfa3a08e1d9358da1c54e1f6c0b4d9772432f79d7dceaa3a95c3a7e6adc"
+			}
 		},
 		{
 			"nodeID": "NodeID-NFBbbJ4qCmNaCzeW7sxErhvWqvEQMnYcN",
 			"rewardAddress": "X-local18jma8ppw3nhx5r4ap8clazz0dps7rv5u00z96u",
-			"delegationFee": 250000
+			"delegationFee": 250000,
+			"signer": {
+				"publicKey": "0xa10b6955a85684a0f5c94b8381f04506f1bee60625927d372323f78b3d30196cc56c8618c77eaf429298e74673d832c3",
+				"proofOfPossession": "0x8d505f7b53960813f1e007f04702ae1bd524cce036b4695fbf8a16eb50b35cdbdd4eedec2b0ce281f35ae36e3ac29fb40867c94cabe2ba0b462f177dd8c3d293b0586b92d392e8278711fb434fe2601ae1b2e0867cfd128180c936a8010c5552"
+			}
 		},
 		{
 			"nodeID": "NodeID-GWPcbFJZFfZreETSoWjPimr846mXEKCtu",
 			"rewardAddress": "X-local18jma8ppw3nhx5r4ap8clazz0dps7rv5u00z96u",
-			"delegationFee": 125000
+			"delegationFee": 125000,
+			"signer": {
+				"publicKey": "0xaccd61ceb90c61628aa0fa34acab27ecb08f6897e9ccad283578c278c52109f9e10e4f8bc31aa6d7905c4e1623de367e",
+				"proofOfPossession": "0x910082e2b61fe4895b4a8f754c9e3a93c346156363acf67546a87e4bc1db7bbfa3239daa5292ad9bc30a11f60e59bbd30b375785b71fe45abd154d717b6471c2406df2534297305ae93d6abeb38fc461170fc0b74b8aa4550f30257a264c75b0"
+			}
 		},
 		{
 			"nodeID": "NodeID-P7oB2McjBGgW2NXXWVYjV8JEDFoW9xDE5",
 			"rewardAddress": "X-local18jma8ppw3nhx5r4ap8clazz0dps7rv5u00z96u",
-			"delegationFee": 62500
+			"delegationFee": 62500,
+			"signer": {
+				"publicKey": "0x8048109c3da13de0700f9f3590c3270bfc42277417f6d0cc84282947e1a1f8b4980fd3e3fe223acf0f56a5838890814a",
+				"proofOfPossession": "0xb034e0d0ec808b7ec456a6d88bdad7b32854794605a11139d70430d81fb93834a3f81d8969042952daff335fec51018016a7ecb19d38597c5743a4eb3fb945ebe28a4250dd7bcb7a192c98d2fcaf15320a9bee239c66ddf61bb24f87c6e91971"
+			}
 		}
 	],
 	"cChainGenesis": "{\"config\":{\"chainId\":43112,\"homesteadBlock\":0,\"daoForkBlock\":0,\"daoForkSupport\":true,\"eip150Block\":0,\"eip150Hash\":\"0x2086799aeebeae135c246c65021c82b4e15a2c451340993aacfd2751886514f0\",\"eip155Block\":0,\"eip158Block\":0,\"byzantiumBlock\":0,\"constantinopleBlock\":0,\"petersburgBlock\":0,\"istanbulBlock\":0,\"muirGlacierBlock\":0,\"apricotPhase1BlockTimestamp\":0,\"apricotPhase2BlockTimestamp\":0},\"nonce\":\"0x0\",\"timestamp\":\"0x0\",\"extraData\":\"0x00\",\"gasLimit\":\"0x5f5e100\",\"difficulty\":\"0x0\",\"mixHash\":\"0x0000000000000000000000000000000000000000000000000000000000000000\",\"coinbase\":\"0x0000000000000000000000000000000000000000\",\"alloc\":{\"8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC\":{\"balance\":\"0x295BE96E64066972000000\"}},\"number\":\"0x0\",\"gasUsed\":\"0x0\",\"parentHash\":\"0x0000000000000000000000000000000000000000000000000000000000000000\"}",

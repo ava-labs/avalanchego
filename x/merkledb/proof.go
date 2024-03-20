@@ -174,7 +174,7 @@ func (proof *Proof) Verify(ctx context.Context, expectedRootID ids.ID, tokenSize
 	// Insert all proof nodes.
 	// [provenKey] is the key that we are proving exists, or the key
 	// that is the next key along the node path, proving that [proof.Key] doesn't exist in the trie.
-	provenKey := maybe.Some(proof.Path[len(proof.Path)-1].Key)
+	provenKey := maybe.Some(lastNode.Key)
 
 	if err = addPathInfo(view, proof.Path, provenKey, provenKey); err != nil {
 		return err
@@ -734,8 +734,8 @@ func verifyProofPath(proof []ProofNode, key maybe.Maybe[Key]) error {
 		currentProofNode := proof[i]
 		nodeKey := currentProofNode.Key
 
-		// Because the interface only support []byte keys,
-		// a key with a partial byte should store a value
+		// Because the interface only supports []byte keys,
+		// a key with a partial byte may not store a value
 		if nodeKey.hasPartialByte() && proof[i].ValueOrHash.HasValue() {
 			return ErrPartialByteLengthWithValue
 		}
@@ -829,16 +829,17 @@ func addPathInfo(
 
 		// Add [proofNode]'s children which are outside the range
 		// [insertChildrenLessThan, insertChildrenGreaterThan].
-		compressedKey := Key{}
 		for index, childID := range proofNode.Children {
+			var compressedKey Key
 			if existingChild, ok := n.children[index]; ok {
 				compressedKey = existingChild.compressedKey
 			}
 			childKey := key.Extend(ToToken(index, v.tokenSize), compressedKey)
 			if (shouldInsertLeftChildren && childKey.Less(insertChildrenLessThan.Value())) ||
 				(shouldInsertRightChildren && childKey.Greater(insertChildrenGreaterThan.Value())) {
-				// We didn't set the other values on the child entry, but it doesn't matter.
-				// We only need the IDs to be correct so that the calculated hash is correct.
+				// We don't set the [hasValue] field of the child but that's OK.
+				// We only need the compressed key and ID to be correct so that the
+				// calculated hash is correct.
 				n.setChildEntry(
 					index,
 					&child{

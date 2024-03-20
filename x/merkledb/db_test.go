@@ -1061,11 +1061,11 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest, token
 				})
 			}
 
-			newView, err := newDB.NewView(context.Background(), ViewChanges{BatchOps: ops})
+			view, err := newDB.NewView(context.Background(), ViewChanges{BatchOps: ops})
 			require.NoError(err)
 
 			// Check that the root of the view is the same as the root of [db]
-			newRoot, err := newView.GetMerkleRoot(context.Background())
+			newRoot, err := view.GetMerkleRoot(context.Background())
 			require.NoError(err)
 
 			dbRoot, err := db.GetMerkleRoot(context.Background())

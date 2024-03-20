@@ -1,4 +1,4 @@
-FROM bufbuild/buf:1.29.0 AS builder
+FROM bufbuild/buf:1.30.0 AS builder
 
 FROM ubuntu:20.04
 
@@ -6,7 +6,7 @@ RUN apt-get update && apt -y install bash curl unzip git
 WORKDIR /opt
 
 RUN \
-  curl -L https://go.dev/dl/go1.21.7.linux-amd64.tar.gz > golang.tar.gz && \
+  curl -L https://go.dev/dl/go1.21.8.linux-amd64.tar.gz > golang.tar.gz && \
   mkdir golang && \
   tar -zxvf golang.tar.gz -C golang/
 
@@ -16,7 +16,7 @@ COPY --from=builder /usr/local/bin/buf /usr/local/bin/
 
 # any version changes here should also be bumped in scripts/protobuf_codegen.sh
 RUN \
-  go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.30.0 && \
+  go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.33.0 && \
   go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.3.0
 
 ENV PATH="${PATH}:/root/go/bin/"

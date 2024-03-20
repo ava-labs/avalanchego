@@ -52,11 +52,11 @@ $ ./scripts/build_tmpnetctl.sh
 # Start a new network
 $ ./build/tmpnetctl start-network --avalanchego-path=/path/to/avalanchego
 ...
-Started network 1000 @ /home/me/.tmpnet/networks/1000
+Started network /home/me/.tmpnet/networks/20240306-152305.924531 (UUID: abaab590-b375-44f6-9ca5-f8a6dc061725)
 
 Configure tmpnetctl to target this network by default with one of the following statements:
- - source /home/me/.tmpnet/networks/1000/network.env
- - export TMPNET_NETWORK_DIR=/home/me/.tmpnet/networks/1000
+ - source /home/me/.tmpnet/networks/20240306-152305.924531/network.env
+ - export TMPNET_NETWORK_DIR=/home/me/.tmpnet/networks/20240306-152305.924531
  - export TMPNET_NETWORK_DIR=/home/me/.tmpnet/networks/latest
 
 # Stop the network
@@ -128,8 +128,12 @@ A temporary network relies on configuration written to disk in the following str
 ```
 HOME
 └── .tmpnet                                              // Root path for the temporary network fixture
+    ├── prometheus                                       // Working directory for a metrics-scraping prometheus instance
+    │   └── file_sd_configs                              // Directory containing file-based service discovery config for prometheus
+    ├── promtail                                         // Working directory for a log-collecting promtail instance
+    │   └── file_sd_configs                              // Directory containing file-based service discovery config for promtail
     └── networks                                         // Default parent directory for temporary networks
-        └── 1000                                         // The networkID is used to name the network dir and starts at 1000
+        └── 20240306-152305.924531                       // The timestamp of creation is the name of a network's directory
             ├── NodeID-37E8UK3x2YFsHE3RdALmfWcppcZ1eTuj9 // The ID of a node is the name of its data dir
             │   ├── chainData
             │   │   └── ...
@@ -229,3 +233,44 @@ The process details of a node are written by avalanchego to
 `[base-data-dir]/process.json`. The file contains the PID of the node
 process, the URI of the node's API, and the address other nodes can
 use to bootstrap themselves (aka staking address).
+
+## Metrics
+
+### Prometheus configuration
+
+When nodes are started, prometheus configuration for each node is
+written to `~/.tmpnet/prometheus/file_sd_configs/` with a filename of
+`[network uuid]-[node id].json`. Prometheus can be configured to
+scrape the nodes as per the following example:
+
+```yaml
+scrape_configs:
+  - job_name: "avalanchego"
+    metrics_path: "/ext/metrics"
+    file_sd_configs:
+      - files:
+        - '/home/me/.tmpnet/prometheus/file_sd_configs/*.yaml'
+```
+
+### Viewing metrics
+
+When  a network  is  started with  `tmpnet`, a  grafana  link for  the
+network's metrics will be emitted.
+
+The metrics emitted by temporary networks configured with tmpnet will
+have the following labels applied:
+
+ - `network_uuid`
+ - `node_id`
+ - `is_ephemeral_node`
+ - `network_owner`
+
+When a tmpnet network runs as part of github CI, the following
+additional labels will be applied:
+
+ - `gh_repo`
+ - `gh_workflow`
+ - `gh_run_id`
+ - `gh_run_number`
+ - `gh_run_attempt`
+ - `gh_job_id`

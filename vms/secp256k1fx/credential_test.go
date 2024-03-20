@@ -5,7 +5,6 @@ package secp256k1fx
 
 import (
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -28,7 +27,7 @@ func TestCredentialVerifyNil(t *testing.T) {
 
 func TestCredentialSerialize(t *testing.T) {
 	require := require.New(t)
-	c := linearcodec.NewDefault(time.Time{})
+	c := linearcodec.NewDefault()
 	m := codec.NewDefaultManager()
 	require.NoError(m.RegisterCodec(0, c))
 

@@ -3,9 +3,9 @@
 set -euo pipefail
 
 # e.g.,
-# ./scripts/tests.upgrade.sh                                                # Use default version
-# ./scripts/tests.upgrade.sh 1.10.18                                        # Specify a version
-# AVALANCHEGO_PATH=./path/to/avalanchego ./scripts/tests.upgrade.sh 1.10.18 # Customization of avalanchego path
+# ./scripts/tests.upgrade.sh                                               # Use default version
+# ./scripts/tests.upgrade.sh 1.11.0                                        # Specify a version
+# AVALANCHEGO_PATH=./path/to/avalanchego ./scripts/tests.upgrade.sh 1.11.0 # Customization of avalanchego path
 if ! [[ "$0" =~ scripts/tests.upgrade.sh ]]; then
   echo "must be run from repository root"
   exit 255
@@ -16,9 +16,8 @@ fi
 # local network, this flag must be updated to the last compatible
 # version with the latest code.
 #
-# v1.10.18 includes restrictions on ports sent over the p2p network along with
-# proposervm and P-chain rule changes on the local network.
-DEFAULT_VERSION="1.10.18"
+# v1.11.0 activates Durango.
+DEFAULT_VERSION="1.11.0"
 
 VERSION="${1:-${DEFAULT_VERSION}}"
 if [[ -z "${VERSION}" ]]; then

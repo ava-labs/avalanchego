@@ -298,7 +298,7 @@ func addPrimaryValidatorWithBLSKey(vm *VM, data *validatorInputData) (*state.Sta
 
 func internalAddValidator(vm *VM, signedTx *txs.Tx) (*state.Staker, error) {
 	vm.ctx.Lock.Unlock()
-	err := vm.issueTx(context.Background(), signedTx)
+	err := vm.issueTxFromRPC(signedTx)
 	vm.ctx.Lock.Lock()
 
 	if err != nil {
@@ -629,6 +629,7 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 		ApricotPhase5Time:      forkTime,
 		BanffTime:              forkTime,
 		CortinaTime:            forkTime,
+		EUpgradeTime:           mockable.MaxTime,
 	}}
 	vm.clock.Set(forkTime.Add(time.Second))
 
@@ -646,7 +647,7 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 	defer ctx.Lock.Unlock()
 	appSender := &common.SenderTest{}
 	appSender.CantSendAppGossip = true
-	appSender.SendAppGossipF = func(context.Context, []byte) error {
+	appSender.SendAppGossipF = func(context.Context, common.SendConfig, []byte) error {
 		return nil
 	}
 
@@ -689,7 +690,7 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 		return nil, ids.Empty, err
 	}
 	vm.ctx.Lock.Unlock()
-	err = vm.issueTx(context.Background(), testSubnet1)
+	err = vm.issueTxFromRPC(testSubnet1)
 	vm.ctx.Lock.Lock()
 	if err != nil {
 		return nil, ids.Empty, err

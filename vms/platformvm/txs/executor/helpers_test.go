@@ -56,6 +56,7 @@ const (
 	banff
 	cortina
 	durango
+	eUpgrade
 )
 
 var (
@@ -280,34 +281,7 @@ func defaultState(
 }
 
 func defaultConfig(t *testing.T, f fork) *config.Config {
-	var (
-		apricotPhase3Time = mockable.MaxTime
-		apricotPhase5Time = mockable.MaxTime
-		banffTime         = mockable.MaxTime
-		cortinaTime       = mockable.MaxTime
-		durangoTime       = mockable.MaxTime
-	)
-
-	switch f {
-	case durango:
-		durangoTime = defaultValidateStartTime.Add(-2 * time.Second)
-		fallthrough
-	case cortina:
-		cortinaTime = defaultValidateStartTime.Add(-2 * time.Second)
-		fallthrough
-	case banff:
-		banffTime = defaultValidateStartTime.Add(-2 * time.Second)
-		fallthrough
-	case apricotPhase5:
-		apricotPhase5Time = defaultValidateEndTime
-		fallthrough
-	case apricotPhase3:
-		apricotPhase3Time = defaultValidateEndTime
-	default:
-		require.NoError(t, fmt.Errorf("unhandled fork %d", f))
-	}
-
-	return &config.Config{
+	c := &config.Config{
 		Chains:                 chains.TestManager,
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		Validators:             validators.NewManager(),
@@ -325,12 +299,37 @@ func defaultConfig(t *testing.T, f fork) *config.Config {
 			MintingPeriod:      365 * 24 * time.Hour,
 			SupplyCap:          720 * units.MegaAvax,
 		},
-		ApricotPhase3Time: apricotPhase3Time,
-		ApricotPhase5Time: apricotPhase5Time,
-		BanffTime:         banffTime,
-		CortinaTime:       cortinaTime,
-		DurangoTime:       durangoTime,
+		ApricotPhase3Time: mockable.MaxTime,
+		ApricotPhase5Time: mockable.MaxTime,
+		BanffTime:         mockable.MaxTime,
+		CortinaTime:       mockable.MaxTime,
+		DurangoTime:       mockable.MaxTime,
+		EUpgradeTime:      mockable.MaxTime,
 	}
+
+	switch f {
+	case eUpgrade:
+		c.EUpgradeTime = defaultValidateStartTime.Add(-2 * time.Second)
+		fallthrough
+	case durango:
+		c.DurangoTime = defaultValidateStartTime.Add(-2 * time.Second)
+		fallthrough
+	case cortina:
+		c.CortinaTime = defaultValidateStartTime.Add(-2 * time.Second)
+		fallthrough
+	case banff:
+		c.BanffTime = defaultValidateStartTime.Add(-2 * time.Second)
+		fallthrough
+	case apricotPhase5:
+		c.ApricotPhase5Time = defaultValidateEndTime
+		fallthrough
+	case apricotPhase3:
+		c.ApricotPhase3Time = defaultValidateEndTime
+	default:
+		require.FailNow(t, "unhandled fork", f)
+	}
+
+	return c
 }
 
 func defaultClock(f fork) *mockable.Clock {
@@ -364,7 +363,7 @@ func (fvi *fxVMInt) Logger() logging.Logger {
 
 func defaultFx(clk *mockable.Clock, log logging.Logger, isBootstrapped bool) fx.Fx {
 	fxVMInt := &fxVMInt{
-		registry: linearcodec.NewDefault(time.Time{}),
+		registry: linearcodec.NewDefault(),
 		clk:      clk,
 		log:      log,
 	}

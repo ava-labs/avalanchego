@@ -152,13 +152,9 @@ func NewTestNetwork(
 		},
 
 		PeerListGossipConfig: PeerListGossipConfig{
-			PeerListNumValidatorIPs:        constants.DefaultNetworkPeerListNumValidatorIPs,
-			PeerListValidatorGossipSize:    constants.DefaultNetworkPeerListValidatorGossipSize,
-			PeerListNonValidatorGossipSize: constants.DefaultNetworkPeerListNonValidatorGossipSize,
-			PeerListPeersGossipSize:        constants.DefaultNetworkPeerListPeersGossipSize,
-			PeerListGossipFreq:             constants.DefaultNetworkPeerListGossipFreq,
-			PeerListPullGossipFreq:         constants.DefaultNetworkPeerListPullGossipFreq,
-			PeerListBloomResetFreq:         constants.DefaultNetworkPeerListBloomResetFreq,
+			PeerListNumValidatorIPs: constants.DefaultNetworkPeerListNumValidatorIPs,
+			PeerListPullGossipFreq:  constants.DefaultNetworkPeerListPullGossipFreq,
+			PeerListBloomResetFreq:  constants.DefaultNetworkPeerListBloomResetFreq,
 		},
 
 		DelayConfig: DelayConfig{

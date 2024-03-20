@@ -9,6 +9,10 @@ import (
 	"go.uber.org/zap"
 )
 
+// Func defines the method signature used for all logging methods on the Logger
+// interface.
+type Func func(msg string, fields ...zap.Field)
+
 // Logger defines the interface that is used to keep a record of all events that
 // happen to the program
 type Logger interface {

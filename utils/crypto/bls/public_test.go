@@ -11,11 +11,11 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 )
 
-func TestPublicKeyFromBytesWrongSize(t *testing.T) {
+func TestPublicKeyFromCompressedBytesWrongSize(t *testing.T) {
 	require := require.New(t)
 
 	pkBytes := utils.RandomBytes(PublicKeyLen + 1)
-	_, err := PublicKeyFromBytes(pkBytes)
+	_, err := PublicKeyFromCompressedBytes(pkBytes)
 	require.ErrorIs(err, ErrFailedPublicKeyDecompress)
 }
 
@@ -26,11 +26,11 @@ func TestPublicKeyBytes(t *testing.T) {
 	require.NoError(err)
 
 	pk := PublicFromSecretKey(sk)
-	pkBytes := PublicKeyToBytes(pk)
+	pkBytes := PublicKeyToCompressedBytes(pk)
 
-	pk2, err := PublicKeyFromBytes(pkBytes)
+	pk2, err := PublicKeyFromCompressedBytes(pkBytes)
 	require.NoError(err)
-	pk2Bytes := PublicKeyToBytes(pk2)
+	pk2Bytes := PublicKeyToCompressedBytes(pk2)
 
 	require.Equal(pk, pk2)
 	require.Equal(pkBytes, pk2Bytes)
@@ -43,12 +43,12 @@ func TestAggregatePublicKeysNoop(t *testing.T) {
 	require.NoError(err)
 
 	pk := PublicFromSecretKey(sk)
-	pkBytes := PublicKeyToBytes(pk)
+	pkBytes := PublicKeyToCompressedBytes(pk)
 
 	aggPK, err := AggregatePublicKeys([]*PublicKey{pk})
 	require.NoError(err)
 
-	aggPKBytes := PublicKeyToBytes(aggPK)
+	aggPKBytes := PublicKeyToCompressedBytes(aggPK)
 	require.NoError(err)
 
 	require.Equal(pk, aggPK)

@@ -30,9 +30,9 @@ type Compatibility interface {
 type compatibility struct {
 	version *Application
 
-	minCompatable     *Application
-	minCompatableTime time.Time
-	prevMinCompatable *Application
+	minCompatible     *Application
+	minCompatibleTime time.Time
+	prevMinCompatible *Application
 
 	clock mockable.Clock
 }
@@ -40,15 +40,15 @@ type compatibility struct {
 // NewCompatibility returns a compatibility checker with the provided options
 func NewCompatibility(
 	version *Application,
-	minCompatable *Application,
-	minCompatableTime time.Time,
-	prevMinCompatable *Application,
+	minCompatible *Application,
+	minCompatibleTime time.Time,
+	prevMinCompatible *Application,
 ) Compatibility {
 	return &compatibility{
 		version:           version,
-		minCompatable:     minCompatable,
-		minCompatableTime: minCompatableTime,
-		prevMinCompatable: prevMinCompatable,
+		minCompatible:     minCompatible,
+		minCompatibleTime: minCompatibleTime,
+		prevMinCompatible: prevMinCompatible,
 	}
 }
 
@@ -61,19 +61,19 @@ func (c *compatibility) Compatible(peer *Application) error {
 		return err
 	}
 
-	if !peer.Before(c.minCompatable) {
+	if !peer.Before(c.minCompatible) {
 		// The peer is at least the minimum compatible version.
 		return nil
 	}
 
-	// The peer is going to be marked as incompatible at [c.minCompatableTime].
+	// The peer is going to be marked as incompatible at [c.minCompatibleTime].
 	now := c.clock.Time()
-	if !now.Before(c.minCompatableTime) {
+	if !now.Before(c.minCompatibleTime) {
 		return errIncompatible
 	}
 
-	// The minCompatable check isn't being enforced yet.
-	if !peer.Before(c.prevMinCompatable) {
+	// The minCompatible check isn't being enforced yet.
+	if !peer.Before(c.prevMinCompatible) {
 		// The peer is at least the previous minimum compatible version.
 		return nil
 	}
