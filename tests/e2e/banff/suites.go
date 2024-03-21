@@ -30,9 +30,11 @@ var _ = ginkgo.Describe("[Banff]", func() {
 			// Get the P-chain and the X-chain wallets
 			pWallet := wallet.P()
 			xWallet := wallet.X()
+			xBuilder := xWallet.Builder()
+			xContext := xBuilder.Context()
 
 			// Pull out useful constants to use when issuing transactions.
-			xChainID := xWallet.BlockchainID()
+			xChainID := xContext.BlockchainID
 			owner := &secp256k1fx.OutputOwners{
 				Threshold: 1,
 				Addrs: []ids.ShortID{

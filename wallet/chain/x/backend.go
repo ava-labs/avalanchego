@@ -4,11 +4,12 @@
 package x
 
 import (
-	"github.com/ava-labs/avalanchego/vms/avm/txs"
-	"github.com/ava-labs/avalanchego/wallet/chain/x/backends"
-	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
+	"context"
 
-	stdcontext "context"
+	"github.com/ava-labs/avalanchego/vms/avm/txs"
+	"github.com/ava-labs/avalanchego/wallet/chain/x/builder"
+	"github.com/ava-labs/avalanchego/wallet/chain/x/signer"
+	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
 
 var _ Backend = (*backend)(nil)
@@ -16,25 +17,26 @@ var _ Backend = (*backend)(nil)
 // Backend defines the full interface required to support an X-chain wallet.
 type Backend interface {
 	common.ChainUTXOs
-	backends.BuilderBackend
-	backends.SignerBackend
+	builder.Backend
+	signer.Backend
 
-	AcceptTx(ctx stdcontext.Context, tx *txs.Tx) error
+	AcceptTx(ctx context.Context, tx *txs.Tx) error
 }
 
 type backend struct {
-	backends.Context
 	common.ChainUTXOs
+
+	context *builder.Context
 }
 
-func NewBackend(ctx backends.Context, utxos common.ChainUTXOs) Backend {
+func NewBackend(context *builder.Context, utxos common.ChainUTXOs) Backend {
 	return &backend{
-		Context:    ctx,
 		ChainUTXOs: utxos,
+		context:    context,
 	}
 }
 
-func (b *backend) AcceptTx(ctx stdcontext.Context, tx *txs.Tx) error {
+func (b *backend) AcceptTx(ctx context.Context, tx *txs.Tx) error {
 	err := tx.Unsigned.Visit(&backendVisitor{
 		b:    b,
 		ctx:  ctx,
@@ -44,7 +46,7 @@ func (b *backend) AcceptTx(ctx stdcontext.Context, tx *txs.Tx) error {
 		return err
 	}
 
-	chainID := b.Context.BlockchainID()
+	chainID := b.context.BlockchainID
 	inputUTXOs := tx.Unsigned.InputUTXOs()
 	for _, utxoID := range inputUTXOs {
 		if utxoID.Symbol {

@@ -133,7 +133,7 @@ func TestIssueNFT(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		fork: eUpgrade,
+		fork: latest,
 	})
 	env.vm.ctx.Lock.Unlock()
 	defer func() {
@@ -217,7 +217,7 @@ func TestIssueProperty(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		fork: eUpgrade,
+		fork: latest,
 		additionalFxs: []*common.Fx{{
 			ID: propertyfx.ID,
 			Fx: &propertyfx.Fx{},
@@ -421,7 +421,7 @@ func TestTxAcceptAfterParseTx(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		fork:          durango,
+		fork:          latest,
 		notLinearized: true,
 	})
 	defer func() {
@@ -466,7 +466,7 @@ func TestTxAcceptAfterParseTx(t *testing.T) {
 				},
 				Asset: avax.Asset{ID: env.genesisTx.ID()},
 				In: &secp256k1fx.TransferInput{
-					Amt: startBalance/2 - testTxFee,
+					Amt: 499991395,
 					Input: secp256k1fx.Input{
 						SigIndices: []uint32{
 							0,
@@ -502,7 +502,7 @@ func TestIssueImportTx(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		fork: eUpgrade,
+		fork: latest,
 	})
 	defer func() {
 		require.NoError(env.vm.Shutdown(context.Background()))
@@ -587,7 +587,7 @@ func TestForceAcceptImportTx(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		fork:          eUpgrade,
+		fork:          latest,
 		notLinearized: true,
 	})
 	defer func() {

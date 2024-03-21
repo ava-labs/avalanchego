@@ -4,30 +4,30 @@
 package x
 
 import (
+	"context"
+
 	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/vms/avm"
-	"github.com/ava-labs/avalanchego/wallet/chain/x/backends"
-
-	stdcontext "context"
+	"github.com/ava-labs/avalanchego/wallet/chain/x/builder"
 )
 
-func NewContextFromURI(ctx stdcontext.Context, uri string) (backends.Context, error) {
+func NewContextFromURI(ctx context.Context, uri string) (*builder.Context, error) {
 	infoClient := info.NewClient(uri)
-	xChainClient := avm.NewClient(uri, backends.Alias)
+	xChainClient := avm.NewClient(uri, builder.Alias)
 	return NewContextFromClients(ctx, infoClient, xChainClient)
 }
 
 func NewContextFromClients(
-	ctx stdcontext.Context,
+	ctx context.Context,
 	infoClient info.Client,
 	xChainClient avm.Client,
-) (backends.Context, error) {
+) (*builder.Context, error) {
 	networkID, err := infoClient.GetNetworkID(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	chainID, err := infoClient.GetBlockchainID(ctx, backends.Alias)
+	chainID, err := infoClient.GetBlockchainID(ctx, builder.Alias)
 	if err != nil {
 		return nil, err
 	}
@@ -42,11 +42,11 @@ func NewContextFromClients(
 		return nil, err
 	}
 
-	return backends.NewContext(
-		networkID,
-		chainID,
-		asset.AssetID,
-		uint64(txFees.TxFee),
-		uint64(txFees.CreateAssetTxFee),
-	), nil
+	return &builder.Context{
+		NetworkID:        networkID,
+		BlockchainID:     chainID,
+		AVAXAssetID:      asset.AssetID,
+		BaseTxFee:        uint64(txFees.TxFee),
+		CreateAssetTxFee: uint64(txFees.CreateAssetTxFee),
+	}, nil
 }

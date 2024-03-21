@@ -743,7 +743,7 @@ func TestServiceGetTxJSON_CreateAssetTx(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		fork: eUpgrade,
+		fork: latest,
 		additionalFxs: []*common.Fx{{
 			ID: propertyfx.ID,
 			Fx: &propertyfx.Fx{},
@@ -940,7 +940,7 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		fork: eUpgrade,
+		fork: latest,
 		additionalFxs: []*common.Fx{{
 			ID: propertyfx.ID,
 			Fx: &propertyfx.Fx{},
@@ -1091,7 +1091,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		fork: eUpgrade,
+		fork: latest,
 		additionalFxs: []*common.Fx{{
 			ID: propertyfx.ID,
 			Fx: &propertyfx.Fx{},
@@ -1281,7 +1281,7 @@ func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		fork: eUpgrade,
+		fork: latest,
 		additionalFxs: []*common.Fx{{
 			ID: propertyfx.ID,
 			Fx: &propertyfx.Fx{},
@@ -1629,7 +1629,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		fork: eUpgrade,
+		fork: latest,
 		additionalFxs: []*common.Fx{{
 			ID: propertyfx.ID,
 			Fx: &propertyfx.Fx{},
@@ -1773,7 +1773,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) 
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		fork: eUpgrade,
+		fork: latest,
 		additionalFxs: []*common.Fx{{
 			ID: propertyfx.ID,
 			Fx: &propertyfx.Fx{},

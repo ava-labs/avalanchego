@@ -25,7 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
 	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
-	xbackends "github.com/ava-labs/avalanchego/wallet/chain/x/backends"
+	xbuilder "github.com/ava-labs/avalanchego/wallet/chain/x/builder"
 	ginkgo "github.com/onsi/ginkgo/v2"
 )
 
@@ -88,7 +88,10 @@ var _ = e2e.DescribeXChainSerial("[Virtuous Transfer Tx AVAX]", func() {
 
 				keychain := secp256k1fx.NewKeychain(testKeys...)
 				baseWallet := e2e.NewWallet(keychain, e2e.Env.GetRandomNodeURI())
-				avaxAssetID := baseWallet.X().AVAXAssetID()
+				xWallet := baseWallet.X()
+				xBuilder := xWallet.Builder()
+				xContext := xBuilder.Context()
+				avaxAssetID := xContext.AVAXAssetID
 
 				wallets := make([]primary.Wallet, len(testKeys))
 				shortAddrs := make([]ids.ShortID, len(testKeys))
@@ -192,7 +195,7 @@ var _ = e2e.DescribeXChainSerial("[Virtuous Transfer Tx AVAX]", func() {
 					IsEUpgradeActive: true,
 					FeeManager:       commonfees.NewManager(feeCfg.UnitFees),
 					ConsumedUnitsCap: feeCfg.BlockUnitsCap,
-					Codec:            xbackends.Parser.Codec(),
+					Codec:            xbuilder.Parser.Codec(),
 					Credentials:      tx.Creds,
 				}
 
