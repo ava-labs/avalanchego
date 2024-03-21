@@ -110,11 +110,11 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 			chainTime = stateDiff.GetTimestamp()
 			feeCfg = config.GetDynamicFeesConfig(env.config.IsEActivated(chainTime))
 			executor := StandardTxExecutor{
-				Backend:       &env.backend,
-				BlkFeeManager: commonfees.NewManager(feeCfg.FeeRate),
-				UnitCaps:      feeCfg.BlockMaxComplexity,
-				State:         stateDiff,
-				Tx:            tx,
+				Backend:            &env.backend,
+				BlkFeeManager:      commonfees.NewManager(feeCfg.FeeRate),
+				BlockMaxComplexity: feeCfg.BlockMaxComplexity,
+				State:              stateDiff,
+				Tx:                 tx,
 			}
 			err = tx.Unsigned.Visit(&executor)
 			require.ErrorIs(err, test.expectedErr)

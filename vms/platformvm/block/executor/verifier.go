@@ -88,7 +88,7 @@ func (v *verifier) BanffProposalBlock(b *block.BanffProposalBlock) error {
 		onDecisionState,
 		onCommitState,
 		onAbortState,
-		feesMan.GetCumulatedUnits(),
+		feesMan.GetCumulatedComplexity(),
 		inputs,
 		atomicRequests,
 		onAcceptFunc,
@@ -432,7 +432,7 @@ func (v *verifier) standardBlock(
 		onAcceptFunc:  onAcceptFunc,
 
 		timestamp:       onAcceptState.GetTimestamp(),
-		blockComplexity: feeMan.GetCumulatedUnits(),
+		blockComplexity: feeMan.GetCumulatedComplexity(),
 		inputs:          inputs,
 		atomicRequests:  atomicRequests,
 	}
@@ -458,11 +458,11 @@ func (v *verifier) processStandardTxs(txs []*txs.Tx, state state.Diff, parentID 
 	)
 	for _, tx := range txs {
 		txExecutor := executor.StandardTxExecutor{
-			Backend:       v.txExecutorBackend,
-			BlkFeeManager: feesMan,
-			UnitCaps:      feesCfg.BlockMaxComplexity,
-			State:         state,
-			Tx:            tx,
+			Backend:            v.txExecutorBackend,
+			BlkFeeManager:      feesMan,
+			BlockMaxComplexity: feesCfg.BlockMaxComplexity,
+			State:              state,
+			Tx:                 tx,
 		}
 		if err := tx.Unsigned.Visit(&txExecutor); err != nil {
 			txID := tx.ID()

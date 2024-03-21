@@ -282,11 +282,11 @@ func addSubnet(env *environment) {
 	chainTime := env.state.GetTimestamp()
 	feeCfg := config.GetDynamicFeesConfig(env.config.IsEActivated(chainTime))
 	executor := executor.StandardTxExecutor{
-		Backend:       env.backend,
-		BlkFeeManager: fees.NewManager(feeCfg.FeeRate),
-		UnitCaps:      feeCfg.BlockMaxComplexity,
-		State:         stateDiff,
-		Tx:            testSubnet1,
+		Backend:            env.backend,
+		BlkFeeManager:      fees.NewManager(feeCfg.FeeRate),
+		BlockMaxComplexity: feeCfg.BlockMaxComplexity,
+		State:              stateDiff,
+		Tx:                 testSubnet1,
 	}
 	err = testSubnet1.Unsigned.Visit(&executor)
 	if err != nil {

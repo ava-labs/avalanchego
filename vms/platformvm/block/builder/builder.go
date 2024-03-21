@@ -361,11 +361,11 @@ func packBlockTxs(
 		}
 
 		executor := &txexecutor.StandardTxExecutor{
-			Backend:       backend,
-			BlkFeeManager: feeMan,
-			UnitCaps:      feeCfg.BlockMaxComplexity,
-			State:         txDiff,
-			Tx:            tx,
+			Backend:            backend,
+			BlkFeeManager:      feeMan,
+			BlockMaxComplexity: feeCfg.BlockMaxComplexity,
+			State:              txDiff,
+			Tx:                 tx,
 		}
 
 		err = tx.Unsigned.Visit(executor)

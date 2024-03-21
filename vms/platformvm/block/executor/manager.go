@@ -147,11 +147,11 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 	isEActivated := m.txExecutorBackend.Config.IsEActivated(stateDiff.GetTimestamp())
 	feesCfg := config.GetDynamicFeesConfig(isEActivated)
 	return tx.Unsigned.Visit(&executor.StandardTxExecutor{
-		Backend:       m.txExecutorBackend,
-		BlkFeeManager: fees.NewManager(feesCfg.FeeRate),
-		UnitCaps:      feesCfg.BlockMaxComplexity,
-		State:         stateDiff,
-		Tx:            tx,
+		Backend:            m.txExecutorBackend,
+		BlkFeeManager:      fees.NewManager(feesCfg.FeeRate),
+		BlockMaxComplexity: feesCfg.BlockMaxComplexity,
+		State:              stateDiff,
+		Tx:                 tx,
 	})
 }
 

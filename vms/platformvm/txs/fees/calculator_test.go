@@ -26,7 +26,7 @@ import (
 )
 
 var (
-	testUnitFees = fees.Dimensions{
+	testFeeRates = fees.Dimensions{
 		1 * units.MicroAvax,
 		2 * units.MicroAvax,
 		3 * units.MicroAvax,
@@ -61,7 +61,7 @@ type feeTests struct {
 	description         string
 	cfgAndChainTimeF    func() (*config.Config, time.Time)
 	unsignedAndSignedTx func(t *testing.T) (txs.UnsignedTx, *txs.Tx)
-	consumedUnitCapsF   func() fees.Dimensions
+	maxComplexityF      func() fees.Dimensions
 	expectedError       error
 	checksF             func(*testing.T, *Calculator)
 }
@@ -71,7 +71,7 @@ func TestAddAndRemoveFees(t *testing.T) {
 
 	fc := &Calculator{
 		IsEUpgradeActive:   true,
-		FeeManager:         fees.NewManager(testUnitFees),
+		FeeManager:         fees.NewManager(testFeeRates),
 		BlockMaxComplexity: testBlockMaxConsumedUnits,
 	}
 
@@ -82,25 +82,25 @@ func TestAddAndRemoveFees(t *testing.T) {
 
 	feeDelta, err := fc.AddFeesFor(units)
 	r.NoError(err)
-	r.Equal(units, fc.FeeManager.GetCumulatedUnits())
+	r.Equal(units, fc.FeeManager.GetCumulatedComplexity())
 	r.NotZero(feeDelta)
 	r.Equal(feeDelta, fc.Fee)
 
 	feeDelta2, err := fc.AddFeesFor(units)
 	r.NoError(err)
-	r.Equal(doubleUnits, fc.FeeManager.GetCumulatedUnits())
+	r.Equal(doubleUnits, fc.FeeManager.GetCumulatedComplexity())
 	r.Equal(feeDelta, feeDelta2)
 	r.Equal(feeDelta+feeDelta2, fc.Fee)
 
 	feeDelta3, err := fc.RemoveFeesFor(units)
 	r.NoError(err)
-	r.Equal(units, fc.FeeManager.GetCumulatedUnits())
+	r.Equal(units, fc.FeeManager.GetCumulatedComplexity())
 	r.Equal(feeDelta, feeDelta3)
 	r.Equal(feeDelta, fc.Fee)
 
 	feeDelta4, err := fc.RemoveFeesFor(units)
 	r.NoError(err)
-	r.Zero(fc.FeeManager.GetCumulatedUnits())
+	r.Zero(fc.FeeManager.GetCumulatedComplexity())
 	r.Equal(feeDelta, feeDelta4)
 	r.Zero(fc.Fee)
 }
@@ -186,7 +186,7 @@ func TestTxFees(t *testing.T) {
 						172,
 						1000,
 					},
-					fc.FeeManager.GetCumulatedUnits(),
+					fc.FeeManager.GetCumulatedComplexity(),
 				)
 			},
 		},
@@ -202,7 +202,7 @@ func TestTxFees(t *testing.T) {
 
 				return &cfg, chainTime
 			},
-			consumedUnitCapsF: func() fees.Dimensions {
+			maxComplexityF: func() fees.Dimensions {
 				caps := testBlockMaxConsumedUnits
 				caps[fees.UTXORead] = 90 - 1
 				return caps
@@ -288,7 +288,7 @@ func TestTxFees(t *testing.T) {
 						172,
 						1000,
 					},
-					fc.FeeManager.GetCumulatedUnits(),
+					fc.FeeManager.GetCumulatedComplexity(),
 				)
 			},
 		},
@@ -305,7 +305,7 @@ func TestTxFees(t *testing.T) {
 				return &cfg, chainTime
 			},
 			unsignedAndSignedTx: createChainTx,
-			consumedUnitCapsF: func() fees.Dimensions {
+			maxComplexityF: func() fees.Dimensions {
 				caps := testBlockMaxConsumedUnits
 				caps[fees.UTXORead] = 90 - 1
 				return caps
@@ -354,7 +354,7 @@ func TestTxFees(t *testing.T) {
 						172,
 						1000,
 					},
-					fc.FeeManager.GetCumulatedUnits(),
+					fc.FeeManager.GetCumulatedComplexity(),
 				)
 			},
 		},
@@ -370,7 +370,7 @@ func TestTxFees(t *testing.T) {
 
 				return &cfg, chainTime
 			},
-			consumedUnitCapsF: func() fees.Dimensions {
+			maxComplexityF: func() fees.Dimensions {
 				caps := testBlockMaxConsumedUnits
 				caps[fees.UTXORead] = 90 - 1
 				return caps
@@ -420,7 +420,7 @@ func TestTxFees(t *testing.T) {
 						172,
 						1000,
 					},
-					fc.FeeManager.GetCumulatedUnits(),
+					fc.FeeManager.GetCumulatedComplexity(),
 				)
 			},
 		},
@@ -436,7 +436,7 @@ func TestTxFees(t *testing.T) {
 
 				return &cfg, chainTime
 			},
-			consumedUnitCapsF: func() fees.Dimensions {
+			maxComplexityF: func() fees.Dimensions {
 				caps := testBlockMaxConsumedUnits
 				caps[fees.UTXORead] = 90 - 1
 				return caps
@@ -486,7 +486,7 @@ func TestTxFees(t *testing.T) {
 						172,
 						1000,
 					},
-					fc.FeeManager.GetCumulatedUnits(),
+					fc.FeeManager.GetCumulatedComplexity(),
 				)
 			},
 		},
@@ -502,7 +502,7 @@ func TestTxFees(t *testing.T) {
 
 				return &cfg, chainTime
 			},
-			consumedUnitCapsF: func() fees.Dimensions {
+			maxComplexityF: func() fees.Dimensions {
 				caps := testBlockMaxConsumedUnits
 				caps[fees.UTXORead] = 90 - 1
 				return caps
@@ -552,7 +552,7 @@ func TestTxFees(t *testing.T) {
 						172,
 						1000,
 					},
-					fc.FeeManager.GetCumulatedUnits(),
+					fc.FeeManager.GetCumulatedComplexity(),
 				)
 			},
 		},
@@ -568,7 +568,7 @@ func TestTxFees(t *testing.T) {
 
 				return &cfg, chainTime
 			},
-			consumedUnitCapsF: func() fees.Dimensions {
+			maxComplexityF: func() fees.Dimensions {
 				caps := testBlockMaxConsumedUnits
 				caps[fees.UTXORead] = 90 - 1
 				return caps
@@ -618,7 +618,7 @@ func TestTxFees(t *testing.T) {
 						266,
 						1000,
 					},
-					fc.FeeManager.GetCumulatedUnits(),
+					fc.FeeManager.GetCumulatedComplexity(),
 				)
 			},
 		},
@@ -634,7 +634,7 @@ func TestTxFees(t *testing.T) {
 
 				return &cfg, chainTime
 			},
-			consumedUnitCapsF: func() fees.Dimensions {
+			maxComplexityF: func() fees.Dimensions {
 				caps := testBlockMaxConsumedUnits
 				caps[fees.UTXORead] = 90 - 1
 				return caps
@@ -684,7 +684,7 @@ func TestTxFees(t *testing.T) {
 						266,
 						1000,
 					},
-					fc.FeeManager.GetCumulatedUnits(),
+					fc.FeeManager.GetCumulatedComplexity(),
 				)
 			},
 		},
@@ -700,7 +700,7 @@ func TestTxFees(t *testing.T) {
 
 				return &cfg, chainTime
 			},
-			consumedUnitCapsF: func() fees.Dimensions {
+			maxComplexityF: func() fees.Dimensions {
 				caps := testBlockMaxConsumedUnits
 				caps[fees.UTXORead] = 90 - 1
 				return caps
@@ -750,7 +750,7 @@ func TestTxFees(t *testing.T) {
 						172,
 						1000,
 					},
-					fc.FeeManager.GetCumulatedUnits(),
+					fc.FeeManager.GetCumulatedComplexity(),
 				)
 			},
 		},
@@ -766,7 +766,7 @@ func TestTxFees(t *testing.T) {
 
 				return &cfg, chainTime
 			},
-			consumedUnitCapsF: func() fees.Dimensions {
+			maxComplexityF: func() fees.Dimensions {
 				caps := testBlockMaxConsumedUnits
 				caps[fees.UTXORead] = 90 - 1
 				return caps
@@ -816,7 +816,7 @@ func TestTxFees(t *testing.T) {
 						262,
 						2000,
 					},
-					fc.FeeManager.GetCumulatedUnits(),
+					fc.FeeManager.GetCumulatedComplexity(),
 				)
 			},
 		},
@@ -832,7 +832,7 @@ func TestTxFees(t *testing.T) {
 
 				return &cfg, chainTime
 			},
-			consumedUnitCapsF: func() fees.Dimensions {
+			maxComplexityF: func() fees.Dimensions {
 				caps := testBlockMaxConsumedUnits
 				caps[fees.UTXORead] = 180 - 1
 				return caps
@@ -882,7 +882,7 @@ func TestTxFees(t *testing.T) {
 						266,
 						1000,
 					},
-					fc.FeeManager.GetCumulatedUnits(),
+					fc.FeeManager.GetCumulatedComplexity(),
 				)
 			},
 		},
@@ -898,7 +898,7 @@ func TestTxFees(t *testing.T) {
 
 				return &cfg, chainTime
 			},
-			consumedUnitCapsF: func() fees.Dimensions {
+			maxComplexityF: func() fees.Dimensions {
 				caps := testBlockMaxConsumedUnits
 				caps[fees.UTXORead] = 90 - 1
 				return caps
@@ -913,9 +913,9 @@ func TestTxFees(t *testing.T) {
 		t.Run(tt.description, func(t *testing.T) {
 			cfg, chainTime := tt.cfgAndChainTimeF()
 
-			consumedUnitCaps := testBlockMaxConsumedUnits
-			if tt.consumedUnitCapsF != nil {
-				consumedUnitCaps = tt.consumedUnitCapsF()
+			maxComplexity := testBlockMaxConsumedUnits
+			if tt.maxComplexityF != nil {
+				maxComplexity = tt.maxComplexityF()
 			}
 
 			uTx, sTx := tt.unsignedAndSignedTx(t)
@@ -924,8 +924,8 @@ func TestTxFees(t *testing.T) {
 				IsEUpgradeActive:   cfg.IsEActivated(chainTime),
 				Config:             cfg,
 				ChainTime:          chainTime,
-				FeeManager:         fees.NewManager(testUnitFees),
-				BlockMaxComplexity: consumedUnitCaps,
+				FeeManager:         fees.NewManager(testFeeRates),
+				BlockMaxComplexity: maxComplexity,
 				Credentials:        sTx.Creds,
 			}
 			err := uTx.Visit(fc)

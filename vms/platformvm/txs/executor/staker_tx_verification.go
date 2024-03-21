@@ -199,7 +199,7 @@ func verifyAddValidatorTx(
 func verifyAddSubnetValidatorTx(
 	backend *Backend,
 	feeManager *commonFees.Manager,
-	unitCaps commonFees.Dimensions,
+	maxComplexity commonFees.Dimensions,
 	chainState state.Chain,
 	sTx *txs.Tx,
 	tx *txs.AddSubnetValidatorTx,
@@ -273,7 +273,7 @@ func verifyAddSubnetValidatorTx(
 		Config:             backend.Config,
 		ChainTime:          currentTimestamp,
 		FeeManager:         feeManager,
-		BlockMaxComplexity: unitCaps,
+		BlockMaxComplexity: maxComplexity,
 		Credentials:        sTx.Creds,
 	}
 	if err := tx.Visit(&feeCalculator); err != nil {
@@ -307,7 +307,7 @@ func verifyAddSubnetValidatorTx(
 func verifyRemoveSubnetValidatorTx(
 	backend *Backend,
 	feeManager *commonFees.Manager,
-	unitCaps commonFees.Dimensions,
+	maxComplexity commonFees.Dimensions,
 	chainState state.Chain,
 	sTx *txs.Tx,
 	tx *txs.RemoveSubnetValidatorTx,
@@ -362,7 +362,7 @@ func verifyRemoveSubnetValidatorTx(
 		Config:             backend.Config,
 		ChainTime:          currentTimestamp,
 		FeeManager:         feeManager,
-		BlockMaxComplexity: unitCaps,
+		BlockMaxComplexity: maxComplexity,
 		Credentials:        sTx.Creds,
 	}
 	if err := tx.Visit(&feeCalculator); err != nil {
@@ -518,7 +518,7 @@ func verifyAddDelegatorTx(
 func verifyAddPermissionlessValidatorTx(
 	backend *Backend,
 	feeManager *commonFees.Manager,
-	unitCaps commonFees.Dimensions,
+	maxComplexity commonFees.Dimensions,
 	chainState state.Chain,
 	sTx *txs.Tx,
 	tx *txs.AddPermissionlessValidatorTx,
@@ -621,7 +621,7 @@ func verifyAddPermissionlessValidatorTx(
 		Config:             backend.Config,
 		ChainTime:          currentTimestamp,
 		FeeManager:         feeManager,
-		BlockMaxComplexity: unitCaps,
+		BlockMaxComplexity: maxComplexity,
 		Credentials:        sTx.Creds,
 	}
 	if err := tx.Visit(&feeCalculator); err != nil {
@@ -649,7 +649,7 @@ func verifyAddPermissionlessValidatorTx(
 func verifyAddPermissionlessDelegatorTx(
 	backend *Backend,
 	feeManager *commonFees.Manager,
-	unitCaps commonFees.Dimensions,
+	maxComplexity commonFees.Dimensions,
 	chainState state.Chain,
 	sTx *txs.Tx,
 	tx *txs.AddPermissionlessDelegatorTx,
@@ -777,7 +777,7 @@ func verifyAddPermissionlessDelegatorTx(
 		Config:             backend.Config,
 		ChainTime:          currentTimestamp,
 		FeeManager:         feeManager,
-		BlockMaxComplexity: unitCaps,
+		BlockMaxComplexity: maxComplexity,
 		Credentials:        sTx.Creds,
 	}
 	if err := tx.Visit(&feeCalculator); err != nil {
@@ -809,7 +809,7 @@ func verifyAddPermissionlessDelegatorTx(
 func verifyTransferSubnetOwnershipTx(
 	backend *Backend,
 	feeManager *commonFees.Manager,
-	unitCaps commonFees.Dimensions,
+	maxComplexity commonFees.Dimensions,
 	chainState state.Chain,
 	sTx *txs.Tx,
 	tx *txs.TransferSubnetOwnershipTx,
@@ -844,7 +844,7 @@ func verifyTransferSubnetOwnershipTx(
 		Config:             backend.Config,
 		ChainTime:          currentTimestamp,
 		FeeManager:         feeManager,
-		BlockMaxComplexity: unitCaps,
+		BlockMaxComplexity: maxComplexity,
 		Credentials:        sTx.Creds,
 	}
 	if err := tx.Visit(&feeCalculator); err != nil {
