@@ -172,13 +172,12 @@ func (b *Bootstrapper) Start(ctx context.Context, startReqID uint32) error {
 	b.startingHeight = lastAcceptedHeight
 	b.requestID = startReqID
 
-	tree, err := interval.NewTree(b.DB)
+	b.tree, err = interval.NewTree(b.DB)
 	if err != nil {
 		return fmt.Errorf("failed to initialize interval tree: %w", err)
 	}
-	b.tree = tree
 
-	b.missingBlockIDs, err = interval.GetMissingBlockIDs(ctx, b.DB, b.VM, tree, b.startingHeight)
+	b.missingBlockIDs, err = interval.GetMissingBlockIDs(ctx, b.DB, b.VM, b.tree, b.startingHeight)
 	if err != nil {
 		return fmt.Errorf("failed to initialize missing block IDs: %w", err)
 	}
