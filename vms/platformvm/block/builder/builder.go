@@ -336,7 +336,7 @@ func packBlockTxs(
 	var (
 		isEActivated = backend.Config.IsEActivated(timestamp)
 		feeCfg       = config.GetDynamicFeesConfig(isEActivated)
-		feeMan       = fees.NewManager(feeCfg.UnitFees)
+		feeMan       = fees.NewManager(feeCfg.FeeRate)
 
 		blockTxs []*txs.Tx
 		inputs   set.Set[ids.ID]
@@ -363,7 +363,7 @@ func packBlockTxs(
 		executor := &txexecutor.StandardTxExecutor{
 			Backend:       backend,
 			BlkFeeManager: feeMan,
-			UnitCaps:      feeCfg.BlockUnitsCap,
+			UnitCaps:      feeCfg.BlockMaxComplexity,
 			State:         txDiff,
 			Tx:            tx,
 		}

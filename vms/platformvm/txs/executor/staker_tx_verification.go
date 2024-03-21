@@ -269,12 +269,12 @@ func verifyAddSubnetValidatorTx(
 
 	// Verify the flowcheck
 	feeCalculator := fees.Calculator{
-		IsEUpgradeActive: backend.Config.IsEActivated(currentTimestamp),
-		Config:           backend.Config,
-		ChainTime:        currentTimestamp,
-		FeeManager:       feeManager,
-		ConsumedUnitsCap: unitCaps,
-		Credentials:      sTx.Creds,
+		IsEUpgradeActive:   backend.Config.IsEActivated(currentTimestamp),
+		Config:             backend.Config,
+		ChainTime:          currentTimestamp,
+		FeeManager:         feeManager,
+		BlockMaxComplexity: unitCaps,
+		Credentials:        sTx.Creds,
 	}
 	if err := tx.Visit(&feeCalculator); err != nil {
 		return err
@@ -358,12 +358,12 @@ func verifyRemoveSubnetValidatorTx(
 
 	// Verify the flowcheck
 	feeCalculator := fees.Calculator{
-		IsEUpgradeActive: backend.Config.IsEActivated(currentTimestamp),
-		Config:           backend.Config,
-		ChainTime:        currentTimestamp,
-		FeeManager:       feeManager,
-		ConsumedUnitsCap: unitCaps,
-		Credentials:      sTx.Creds,
+		IsEUpgradeActive:   backend.Config.IsEActivated(currentTimestamp),
+		Config:             backend.Config,
+		ChainTime:          currentTimestamp,
+		FeeManager:         feeManager,
+		BlockMaxComplexity: unitCaps,
+		Credentials:        sTx.Creds,
 	}
 	if err := tx.Visit(&feeCalculator); err != nil {
 		return nil, false, err
@@ -617,12 +617,12 @@ func verifyAddPermissionlessValidatorTx(
 
 	// Verify the flowcheck
 	feeCalculator := fees.Calculator{
-		IsEUpgradeActive: backend.Config.IsEActivated(currentTimestamp),
-		Config:           backend.Config,
-		ChainTime:        currentTimestamp,
-		FeeManager:       feeManager,
-		ConsumedUnitsCap: unitCaps,
-		Credentials:      sTx.Creds,
+		IsEUpgradeActive:   backend.Config.IsEActivated(currentTimestamp),
+		Config:             backend.Config,
+		ChainTime:          currentTimestamp,
+		FeeManager:         feeManager,
+		BlockMaxComplexity: unitCaps,
+		Credentials:        sTx.Creds,
 	}
 	if err := tx.Visit(&feeCalculator); err != nil {
 		return err
@@ -773,12 +773,12 @@ func verifyAddPermissionlessDelegatorTx(
 
 	// Verify the flowcheck
 	feeCalculator := fees.Calculator{
-		IsEUpgradeActive: backend.Config.IsEActivated(currentTimestamp),
-		Config:           backend.Config,
-		ChainTime:        currentTimestamp,
-		FeeManager:       feeManager,
-		ConsumedUnitsCap: unitCaps,
-		Credentials:      sTx.Creds,
+		IsEUpgradeActive:   backend.Config.IsEActivated(currentTimestamp),
+		Config:             backend.Config,
+		ChainTime:          currentTimestamp,
+		FeeManager:         feeManager,
+		BlockMaxComplexity: unitCaps,
+		Credentials:        sTx.Creds,
 	}
 	if err := tx.Visit(&feeCalculator); err != nil {
 		return err
@@ -840,12 +840,12 @@ func verifyTransferSubnetOwnershipTx(
 	// Verify the flowcheck
 	currentTimestamp := chainState.GetTimestamp()
 	feeCalculator := fees.Calculator{
-		IsEUpgradeActive: backend.Config.IsEActivated(currentTimestamp),
-		Config:           backend.Config,
-		ChainTime:        currentTimestamp,
-		FeeManager:       feeManager,
-		ConsumedUnitsCap: unitCaps,
-		Credentials:      sTx.Creds,
+		IsEUpgradeActive:   backend.Config.IsEActivated(currentTimestamp),
+		Config:             backend.Config,
+		ChainTime:          currentTimestamp,
+		FeeManager:         feeManager,
+		BlockMaxComplexity: unitCaps,
+		Credentials:        sTx.Creds,
 	}
 	if err := tx.Visit(&feeCalculator); err != nil {
 		return err

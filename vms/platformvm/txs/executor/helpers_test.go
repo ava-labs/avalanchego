@@ -240,8 +240,8 @@ func addSubnet(
 	feeCfg := config.GetDynamicFeesConfig(env.config.IsEActivated(chainTime))
 	executor := StandardTxExecutor{
 		Backend:       &env.backend,
-		BlkFeeManager: commonfees.NewManager(feeCfg.UnitFees),
-		UnitCaps:      feeCfg.BlockUnitsCap,
+		BlkFeeManager: commonfees.NewManager(feeCfg.FeeRate),
+		UnitCaps:      feeCfg.BlockMaxComplexity,
 		State:         stateDiff,
 		Tx:            testSubnet1,
 	}

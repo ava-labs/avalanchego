@@ -449,7 +449,7 @@ func (v *verifier) processStandardTxs(txs []*txs.Tx, state state.Diff, parentID 
 	var (
 		isEActivated = v.txExecutorBackend.Config.IsEActivated(state.GetTimestamp())
 		feesCfg      = config.GetDynamicFeesConfig(isEActivated)
-		feesMan      = fees.NewManager(feesCfg.UnitFees)
+		feesMan      = fees.NewManager(feesCfg.FeeRate)
 
 		onAcceptFunc   func()
 		inputs         set.Set[ids.ID]
@@ -460,7 +460,7 @@ func (v *verifier) processStandardTxs(txs []*txs.Tx, state state.Diff, parentID 
 		txExecutor := executor.StandardTxExecutor{
 			Backend:       v.txExecutorBackend,
 			BlkFeeManager: feesMan,
-			UnitCaps:      feesCfg.BlockUnitsCap,
+			UnitCaps:      feesCfg.BlockMaxComplexity,
 			State:         state,
 			Tx:            tx,
 		}

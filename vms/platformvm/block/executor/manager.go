@@ -148,8 +148,8 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 	feesCfg := config.GetDynamicFeesConfig(isEActivated)
 	return tx.Unsigned.Visit(&executor.StandardTxExecutor{
 		Backend:       m.txExecutorBackend,
-		BlkFeeManager: fees.NewManager(feesCfg.UnitFees),
-		UnitCaps:      feesCfg.BlockUnitsCap,
+		BlkFeeManager: fees.NewManager(feesCfg.FeeRate),
+		UnitCaps:      feesCfg.BlockMaxComplexity,
 		State:         stateDiff,
 		Tx:            tx,
 	})

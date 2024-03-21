@@ -16,19 +16,19 @@ import (
 // eUpgradeDynamicFeesConfig to be tuned TODO ABENEGIA
 var (
 	eUpgradeDynamicFeesConfig = commonfees.DynamicFeesConfig{
-		UnitFees: commonfees.Dimensions{
+		FeeRate: commonfees.Dimensions{
 			1 * units.NanoAvax,
 			2 * units.NanoAvax,
 			3 * units.NanoAvax,
 			4 * units.NanoAvax,
 		},
 
-		BlockUnitsCap: commonfees.Max,
+		BlockMaxComplexity: commonfees.Max,
 	}
 
 	preEUpgradeDynamicFeesConfig = commonfees.DynamicFeesConfig{
-		UnitFees:      commonfees.Empty,
-		BlockUnitsCap: commonfees.Max,
+		FeeRate:            commonfees.Empty,
+		BlockMaxComplexity: commonfees.Max,
 	}
 
 	customDynamicFeesConfig *commonfees.DynamicFeesConfig

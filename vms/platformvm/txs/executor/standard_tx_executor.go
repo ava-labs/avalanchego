@@ -74,12 +74,12 @@ func (e *StandardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 
 	// Verify the flowcheck
 	feeCalculator := fees.Calculator{
-		IsEUpgradeActive: e.Backend.Config.IsEActivated(currentTimestamp),
-		Config:           e.Backend.Config,
-		ChainTime:        currentTimestamp,
-		FeeManager:       e.BlkFeeManager,
-		ConsumedUnitsCap: e.UnitCaps,
-		Credentials:      e.Tx.Creds,
+		IsEUpgradeActive:   e.Backend.Config.IsEActivated(currentTimestamp),
+		Config:             e.Backend.Config,
+		ChainTime:          currentTimestamp,
+		FeeManager:         e.BlkFeeManager,
+		BlockMaxComplexity: e.UnitCaps,
+		Credentials:        e.Tx.Creds,
 	}
 	if err := tx.Visit(&feeCalculator); err != nil {
 		return err
@@ -131,12 +131,12 @@ func (e *StandardTxExecutor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 
 	// Verify the flowcheck
 	feeCalculator := fees.Calculator{
-		IsEUpgradeActive: e.Backend.Config.IsEActivated(currentTimestamp),
-		Config:           e.Backend.Config,
-		ChainTime:        currentTimestamp,
-		FeeManager:       e.BlkFeeManager,
-		ConsumedUnitsCap: e.UnitCaps,
-		Credentials:      e.Tx.Creds,
+		IsEUpgradeActive:   e.Backend.Config.IsEActivated(currentTimestamp),
+		Config:             e.Backend.Config,
+		ChainTime:          currentTimestamp,
+		FeeManager:         e.BlkFeeManager,
+		BlockMaxComplexity: e.UnitCaps,
+		Credentials:        e.Tx.Creds,
 	}
 	if err := tx.Visit(&feeCalculator); err != nil {
 		return err
@@ -227,12 +227,12 @@ func (e *StandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 			currentTimestamp = e.State.GetTimestamp()
 		)
 		feeCalculator := fees.Calculator{
-			IsEUpgradeActive: cfg.IsEActivated(currentTimestamp),
-			Config:           cfg,
-			ChainTime:        currentTimestamp,
-			FeeManager:       e.BlkFeeManager,
-			ConsumedUnitsCap: e.UnitCaps,
-			Credentials:      e.Tx.Creds,
+			IsEUpgradeActive:   cfg.IsEActivated(currentTimestamp),
+			Config:             cfg,
+			ChainTime:          currentTimestamp,
+			FeeManager:         e.BlkFeeManager,
+			BlockMaxComplexity: e.UnitCaps,
+			Credentials:        e.Tx.Creds,
 		}
 		if err := tx.Visit(&feeCalculator); err != nil {
 			return err
@@ -291,12 +291,12 @@ func (e *StandardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 
 	// Verify the flowcheck
 	feeCalculator := fees.Calculator{
-		IsEUpgradeActive: e.Backend.Config.IsEActivated(currentTimestamp),
-		Config:           e.Backend.Config,
-		ChainTime:        currentTimestamp,
-		FeeManager:       e.BlkFeeManager,
-		ConsumedUnitsCap: e.UnitCaps,
-		Credentials:      e.Tx.Creds,
+		IsEUpgradeActive:   e.Backend.Config.IsEActivated(currentTimestamp),
+		Config:             e.Backend.Config,
+		ChainTime:          currentTimestamp,
+		FeeManager:         e.BlkFeeManager,
+		BlockMaxComplexity: e.UnitCaps,
+		Credentials:        e.Tx.Creds,
 	}
 	if err := tx.Visit(&feeCalculator); err != nil {
 		return err
@@ -494,12 +494,12 @@ func (e *StandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 	}
 
 	feeCalculator := fees.Calculator{
-		IsEUpgradeActive: e.Backend.Config.IsEActivated(currentTimestamp),
-		Config:           e.Backend.Config,
-		ChainTime:        currentTimestamp,
-		FeeManager:       e.BlkFeeManager,
-		ConsumedUnitsCap: e.UnitCaps,
-		Credentials:      e.Tx.Creds,
+		IsEUpgradeActive:   e.Backend.Config.IsEActivated(currentTimestamp),
+		Config:             e.Backend.Config,
+		ChainTime:          currentTimestamp,
+		FeeManager:         e.BlkFeeManager,
+		BlockMaxComplexity: e.UnitCaps,
+		Credentials:        e.Tx.Creds,
 	}
 	if err := tx.Visit(&feeCalculator); err != nil {
 		return err
@@ -636,12 +636,12 @@ func (e *StandardTxExecutor) BaseTx(tx *txs.BaseTx) error {
 		currentTimestamp = e.State.GetTimestamp()
 	)
 	feeCalculator := fees.Calculator{
-		IsEUpgradeActive: cfg.IsEActivated(currentTimestamp),
-		Config:           cfg,
-		ChainTime:        currentTimestamp,
-		FeeManager:       e.BlkFeeManager,
-		ConsumedUnitsCap: e.UnitCaps,
-		Credentials:      e.Tx.Creds,
+		IsEUpgradeActive:   cfg.IsEActivated(currentTimestamp),
+		Config:             cfg,
+		ChainTime:          currentTimestamp,
+		FeeManager:         e.BlkFeeManager,
+		BlockMaxComplexity: e.UnitCaps,
+		Credentials:        e.Tx.Creds,
 	}
 	if err := tx.Visit(&feeCalculator); err != nil {
 		return err

@@ -80,11 +80,11 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 				chainTime = env.state.GetTimestamp()
 				feeCfg    = config.GetDynamicFeesConfig(env.config.IsEActivated(chainTime))
 				feeCalc   = &fees.Calculator{
-					IsEUpgradeActive: false,
-					Config:           &cfg,
-					ChainTime:        test.time,
-					FeeManager:       commonfees.NewManager(feeCfg.UnitFees),
-					ConsumedUnitsCap: feeCfg.BlockUnitsCap,
+					IsEUpgradeActive:   false,
+					Config:             &cfg,
+					ChainTime:          test.time,
+					FeeManager:         commonfees.NewManager(feeCfg.FeeRate),
+					BlockMaxComplexity: feeCfg.BlockMaxComplexity,
 
 					Fee: test.fee,
 				}
@@ -111,8 +111,8 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 			feeCfg = config.GetDynamicFeesConfig(env.config.IsEActivated(chainTime))
 			executor := StandardTxExecutor{
 				Backend:       &env.backend,
-				BlkFeeManager: commonfees.NewManager(feeCfg.UnitFees),
-				UnitCaps:      feeCfg.BlockUnitsCap,
+				BlkFeeManager: commonfees.NewManager(feeCfg.FeeRate),
+				UnitCaps:      feeCfg.BlockMaxComplexity,
 				State:         stateDiff,
 				Tx:            tx,
 			}

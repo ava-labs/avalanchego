@@ -70,9 +70,9 @@ func TestAddAndRemoveFees(t *testing.T) {
 	r := require.New(t)
 
 	fc := &Calculator{
-		IsEUpgradeActive: true,
-		FeeManager:       fees.NewManager(testUnitFees),
-		ConsumedUnitsCap: testBlockMaxConsumedUnits,
+		IsEUpgradeActive:   true,
+		FeeManager:         fees.NewManager(testUnitFees),
+		BlockMaxComplexity: testBlockMaxConsumedUnits,
 	}
 
 	var (
@@ -921,12 +921,12 @@ func TestTxFees(t *testing.T) {
 			uTx, sTx := tt.unsignedAndSignedTx(t)
 
 			fc := &Calculator{
-				IsEUpgradeActive: cfg.IsEActivated(chainTime),
-				Config:           cfg,
-				ChainTime:        chainTime,
-				FeeManager:       fees.NewManager(testUnitFees),
-				ConsumedUnitsCap: consumedUnitCaps,
-				Credentials:      sTx.Creds,
+				IsEUpgradeActive:   cfg.IsEActivated(chainTime),
+				Config:             cfg,
+				ChainTime:          chainTime,
+				FeeManager:         fees.NewManager(testUnitFees),
+				BlockMaxComplexity: consumedUnitCaps,
+				Credentials:        sTx.Creds,
 			}
 			err := uTx.Visit(fc)
 			r.ErrorIs(err, tt.expectedError)

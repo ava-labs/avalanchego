@@ -280,8 +280,8 @@ type wallet struct {
 	signer  walletsigner.Signer
 	client  platformvm.Client
 
-	isEForkActive      bool
-	unitFees, unitCaps commonfees.Dimensions
+	isEForkActive                bool
+	feeRates, blockMaxComplexity commonfees.Dimensions
 }
 
 func (w *wallet) Builder() builder.Builder {
@@ -304,14 +304,14 @@ func (w *wallet) IssueBaseTx(
 		utx txs.UnsignedTx
 		err error
 
-		feesMan = commonfees.NewManager(w.unitFees)
+		feesMan = commonfees.NewManager(w.feeRates)
 		feeCalc = &fees.Calculator{
 			IsEUpgradeActive: w.isEForkActive,
 			Config: &config.Config{
 				CreateSubnetTxFee: w.builder.Context().CreateSubnetTxFee,
 			},
-			FeeManager:       feesMan,
-			ConsumedUnitsCap: w.unitCaps,
+			FeeManager:         feesMan,
+			BlockMaxComplexity: w.blockMaxComplexity,
 		}
 	)
 
@@ -332,14 +332,14 @@ func (w *wallet) IssueAddValidatorTx(
 		return nil, err
 	}
 
-	feesMan := commonfees.NewManager(w.unitFees)
+	feesMan := commonfees.NewManager(w.feeRates)
 	feeCalc := &fees.Calculator{
 		IsEUpgradeActive: w.isEForkActive,
 		Config: &config.Config{
 			AddPrimaryNetworkValidatorFee: w.builder.Context().AddPrimaryNetworkValidatorFee,
 		},
-		FeeManager:       feesMan,
-		ConsumedUnitsCap: w.unitCaps,
+		FeeManager:         feesMan,
+		BlockMaxComplexity: w.blockMaxComplexity,
 	}
 
 	utx, err := w.builder.NewAddValidatorTx(vdr, rewardsOwner, shares, feeCalc, options...)
@@ -357,14 +357,14 @@ func (w *wallet) IssueAddSubnetValidatorTx(
 		return nil, err
 	}
 
-	feesMan := commonfees.NewManager(w.unitFees)
+	feesMan := commonfees.NewManager(w.feeRates)
 	feeCalc := &fees.Calculator{
 		IsEUpgradeActive: w.isEForkActive,
 		Config: &config.Config{
 			TxFee: w.builder.Context().BaseTxFee,
 		},
-		FeeManager:       feesMan,
-		ConsumedUnitsCap: w.unitCaps,
+		FeeManager:         feesMan,
+		BlockMaxComplexity: w.blockMaxComplexity,
 	}
 
 	utx, err := w.builder.NewAddSubnetValidatorTx(vdr, feeCalc, options...)
@@ -383,14 +383,14 @@ func (w *wallet) IssueRemoveSubnetValidatorTx(
 		return nil, err
 	}
 
-	feesMan := commonfees.NewManager(w.unitFees)
+	feesMan := commonfees.NewManager(w.feeRates)
 	feeCalc := &fees.Calculator{
 		IsEUpgradeActive: w.isEForkActive,
 		Config: &config.Config{
 			TxFee: w.builder.Context().BaseTxFee,
 		},
-		FeeManager:       feesMan,
-		ConsumedUnitsCap: w.unitCaps,
+		FeeManager:         feesMan,
+		BlockMaxComplexity: w.blockMaxComplexity,
 	}
 
 	utx, err := w.builder.NewRemoveSubnetValidatorTx(nodeID, subnetID, feeCalc, options...)
@@ -409,14 +409,14 @@ func (w *wallet) IssueAddDelegatorTx(
 		return nil, err
 	}
 
-	feesMan := commonfees.NewManager(w.unitFees)
+	feesMan := commonfees.NewManager(w.feeRates)
 	feeCalc := &fees.Calculator{
 		IsEUpgradeActive: w.isEForkActive,
 		Config: &config.Config{
 			AddPrimaryNetworkDelegatorFee: w.builder.Context().AddPrimaryNetworkDelegatorFee,
 		},
-		FeeManager:       feesMan,
-		ConsumedUnitsCap: w.unitCaps,
+		FeeManager:         feesMan,
+		BlockMaxComplexity: w.blockMaxComplexity,
 	}
 
 	utx, err := w.builder.NewAddDelegatorTx(vdr, rewardsOwner, feeCalc, options...)
@@ -438,14 +438,14 @@ func (w *wallet) IssueCreateChainTx(
 		return nil, err
 	}
 
-	feesMan := commonfees.NewManager(w.unitFees)
+	feesMan := commonfees.NewManager(w.feeRates)
 	feeCalc := &fees.Calculator{
 		IsEUpgradeActive: w.isEForkActive,
 		Config: &config.Config{
 			CreateBlockchainTxFee: w.builder.Context().CreateBlockchainTxFee,
 		},
-		FeeManager:       feesMan,
-		ConsumedUnitsCap: w.unitCaps,
+		FeeManager:         feesMan,
+		BlockMaxComplexity: w.blockMaxComplexity,
 	}
 
 	utx, err := w.builder.NewCreateChainTx(subnetID, genesis, vmID, fxIDs, chainName, feeCalc, options...)
@@ -463,14 +463,14 @@ func (w *wallet) IssueCreateSubnetTx(
 		return nil, err
 	}
 
-	feesMan := commonfees.NewManager(w.unitFees)
+	feesMan := commonfees.NewManager(w.feeRates)
 	feeCalc := &fees.Calculator{
 		IsEUpgradeActive: w.isEForkActive,
 		Config: &config.Config{
 			CreateSubnetTxFee: w.builder.Context().CreateSubnetTxFee,
 		},
-		FeeManager:       feesMan,
-		ConsumedUnitsCap: w.unitCaps,
+		FeeManager:         feesMan,
+		BlockMaxComplexity: w.blockMaxComplexity,
 	}
 	utx, err := w.builder.NewCreateSubnetTx(owner, feeCalc, options...)
 	if err != nil {
@@ -488,14 +488,14 @@ func (w *wallet) IssueTransferSubnetOwnershipTx(
 		return nil, err
 	}
 
-	feesMan := commonfees.NewManager(w.unitFees)
+	feesMan := commonfees.NewManager(w.feeRates)
 	feeCalc := &fees.Calculator{
 		IsEUpgradeActive: w.isEForkActive,
 		Config: &config.Config{
 			TxFee: w.builder.Context().BaseTxFee,
 		},
-		FeeManager:       feesMan,
-		ConsumedUnitsCap: w.unitCaps,
+		FeeManager:         feesMan,
+		BlockMaxComplexity: w.blockMaxComplexity,
 	}
 
 	utx, err := w.builder.NewTransferSubnetOwnershipTx(subnetID, owner, feeCalc, options...)
@@ -514,14 +514,14 @@ func (w *wallet) IssueImportTx(
 		return nil, err
 	}
 
-	feesMan := commonfees.NewManager(w.unitFees)
+	feesMan := commonfees.NewManager(w.feeRates)
 	feeCalc := &fees.Calculator{
 		IsEUpgradeActive: w.isEForkActive,
 		Config: &config.Config{
 			TxFee: w.builder.Context().BaseTxFee,
 		},
-		FeeManager:       feesMan,
-		ConsumedUnitsCap: w.unitCaps,
+		FeeManager:         feesMan,
+		BlockMaxComplexity: w.blockMaxComplexity,
 	}
 
 	utx, err := w.builder.NewImportTx(sourceChainID, to, feeCalc, options...)
@@ -540,14 +540,14 @@ func (w *wallet) IssueExportTx(
 		return nil, err
 	}
 
-	feesMan := commonfees.NewManager(w.unitFees)
+	feesMan := commonfees.NewManager(w.feeRates)
 	feeCalc := &fees.Calculator{
 		IsEUpgradeActive: w.isEForkActive,
 		Config: &config.Config{
 			TxFee: w.builder.Context().BaseTxFee,
 		},
-		FeeManager:       feesMan,
-		ConsumedUnitsCap: w.unitCaps,
+		FeeManager:         feesMan,
+		BlockMaxComplexity: w.blockMaxComplexity,
 	}
 
 	utx, err := w.builder.NewExportTx(chainID, outputs, feeCalc, options...)
@@ -578,14 +578,14 @@ func (w *wallet) IssueTransformSubnetTx(
 		return nil, err
 	}
 
-	feesMan := commonfees.NewManager(w.unitFees)
+	feesMan := commonfees.NewManager(w.feeRates)
 	feeCalc := &fees.Calculator{
 		IsEUpgradeActive: w.isEForkActive,
 		Config: &config.Config{
 			TransformSubnetTxFee: w.builder.Context().TransformSubnetTxFee,
 		},
-		FeeManager:       feesMan,
-		ConsumedUnitsCap: w.unitCaps,
+		FeeManager:         feesMan,
+		BlockMaxComplexity: w.blockMaxComplexity,
 	}
 	utx, err := w.builder.NewTransformSubnetTx(
 		subnetID,
@@ -624,15 +624,15 @@ func (w *wallet) IssueAddPermissionlessValidatorTx(
 		return nil, err
 	}
 
-	feesMan := commonfees.NewManager(w.unitFees)
+	feesMan := commonfees.NewManager(w.feeRates)
 	feeCalc := &fees.Calculator{
 		IsEUpgradeActive: w.isEForkActive,
 		Config: &config.Config{
 			AddPrimaryNetworkValidatorFee: w.builder.Context().AddPrimaryNetworkValidatorFee,
 			AddSubnetValidatorFee:         w.builder.Context().AddSubnetValidatorFee,
 		},
-		FeeManager:       feesMan,
-		ConsumedUnitsCap: w.unitCaps,
+		FeeManager:         feesMan,
+		BlockMaxComplexity: w.blockMaxComplexity,
 	}
 
 	utx, err := w.builder.NewAddPermissionlessValidatorTx(
@@ -661,15 +661,15 @@ func (w *wallet) IssueAddPermissionlessDelegatorTx(
 		return nil, err
 	}
 
-	feesMan := commonfees.NewManager(w.unitFees)
+	feesMan := commonfees.NewManager(w.feeRates)
 	feeCalc := &fees.Calculator{
 		IsEUpgradeActive: w.isEForkActive,
 		Config: &config.Config{
 			AddPrimaryNetworkDelegatorFee: w.builder.Context().AddPrimaryNetworkDelegatorFee,
 			AddSubnetDelegatorFee:         w.builder.Context().AddSubnetDelegatorFee,
 		},
-		FeeManager:       feesMan,
-		ConsumedUnitsCap: w.unitCaps,
+		FeeManager:         feesMan,
+		BlockMaxComplexity: w.blockMaxComplexity,
 	}
 
 	utx, err := w.builder.NewAddPermissionlessDelegatorTx(
@@ -753,7 +753,7 @@ func (w *wallet) refreshFork(options ...common.Option) error {
 
 	w.isEForkActive = !chainTime.Before(eForkTime)
 	feeCfg := config.GetDynamicFeesConfig(w.isEForkActive)
-	w.unitFees = feeCfg.UnitFees
-	w.unitCaps = feeCfg.BlockUnitsCap
+	w.feeRates = feeCfg.FeeRate
+	w.blockMaxComplexity = feeCfg.BlockMaxComplexity
 	return nil
 }

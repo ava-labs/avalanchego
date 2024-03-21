@@ -92,8 +92,8 @@ func TestStandardTxExecutorAddValidatorTxEmptyID(t *testing.T) {
 		feeCfg := config.GetDynamicFeesConfig(env.config.IsEActivated(chainTime))
 		executor := StandardTxExecutor{
 			Backend:       &env.backend,
-			BlkFeeManager: fees.NewManager(feeCfg.UnitFees),
-			UnitCaps:      feeCfg.BlockUnitsCap,
+			BlkFeeManager: fees.NewManager(feeCfg.FeeRate),
+			UnitCaps:      feeCfg.BlockMaxComplexity,
 			State:         stateDiff,
 			Tx:            tx,
 		}
@@ -343,8 +343,8 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 			feeCfg := config.GetDynamicFeesConfig(freshTH.config.IsEActivated(chainTime))
 			executor := StandardTxExecutor{
 				Backend:       &freshTH.backend,
-				BlkFeeManager: fees.NewManager(feeCfg.UnitFees),
-				UnitCaps:      feeCfg.BlockUnitsCap,
+				BlkFeeManager: fees.NewManager(feeCfg.FeeRate),
+				UnitCaps:      feeCfg.BlockMaxComplexity,
 				State:         onAcceptState,
 				Tx:            tx,
 			}
@@ -386,8 +386,8 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		feeCfg := config.GetDynamicFeesConfig(env.config.IsEActivated(chainTime))
 		executor := StandardTxExecutor{
 			Backend:       &env.backend,
-			BlkFeeManager: fees.NewManager(feeCfg.UnitFees),
-			UnitCaps:      feeCfg.BlockUnitsCap,
+			BlkFeeManager: fees.NewManager(feeCfg.FeeRate),
+			UnitCaps:      feeCfg.BlockMaxComplexity,
 			State:         onAcceptState,
 			Tx:            tx,
 		}
@@ -419,8 +419,8 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		feeCfg := config.GetDynamicFeesConfig(env.config.IsEActivated(chainTime))
 		executor := StandardTxExecutor{
 			Backend:       &env.backend,
-			BlkFeeManager: fees.NewManager(feeCfg.UnitFees),
-			UnitCaps:      feeCfg.BlockUnitsCap,
+			BlkFeeManager: fees.NewManager(feeCfg.FeeRate),
+			UnitCaps:      feeCfg.BlockMaxComplexity,
 			State:         onAcceptState,
 			Tx:            tx,
 		}
@@ -467,8 +467,8 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		feeCfg := config.GetDynamicFeesConfig(env.config.IsEActivated(chainTime))
 		executor := StandardTxExecutor{
 			Backend:       &env.backend,
-			BlkFeeManager: fees.NewManager(feeCfg.UnitFees),
-			UnitCaps:      feeCfg.BlockUnitsCap,
+			BlkFeeManager: fees.NewManager(feeCfg.FeeRate),
+			UnitCaps:      feeCfg.BlockMaxComplexity,
 			State:         onAcceptState,
 			Tx:            tx,
 		}
@@ -515,8 +515,8 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		feeCfg := config.GetDynamicFeesConfig(env.config.IsEActivated(chainTime))
 		executor := StandardTxExecutor{
 			Backend:       &env.backend,
-			BlkFeeManager: fees.NewManager(feeCfg.UnitFees),
-			UnitCaps:      feeCfg.BlockUnitsCap,
+			BlkFeeManager: fees.NewManager(feeCfg.FeeRate),
+			UnitCaps:      feeCfg.BlockMaxComplexity,
 			State:         onAcceptState,
 			Tx:            tx,
 		}
@@ -546,8 +546,8 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		feeCfg := config.GetDynamicFeesConfig(env.config.IsEActivated(chainTime))
 		executor := StandardTxExecutor{
 			Backend:       &env.backend,
-			BlkFeeManager: fees.NewManager(feeCfg.UnitFees),
-			UnitCaps:      feeCfg.BlockUnitsCap,
+			BlkFeeManager: fees.NewManager(feeCfg.FeeRate),
+			UnitCaps:      feeCfg.BlockMaxComplexity,
 			State:         onAcceptState,
 			Tx:            tx,
 		}
@@ -577,8 +577,8 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		feeCfg := config.GetDynamicFeesConfig(env.config.IsEActivated(chainTime))
 		executor := StandardTxExecutor{
 			Backend:       &env.backend,
-			BlkFeeManager: fees.NewManager(feeCfg.UnitFees),
-			UnitCaps:      feeCfg.BlockUnitsCap,
+			BlkFeeManager: fees.NewManager(feeCfg.FeeRate),
+			UnitCaps:      feeCfg.BlockMaxComplexity,
 			State:         onAcceptState,
 			Tx:            tx,
 		}
@@ -610,8 +610,8 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		feeCfg := config.GetDynamicFeesConfig(env.config.IsEActivated(chainTime))
 		executor := StandardTxExecutor{
 			Backend:       &env.backend,
-			BlkFeeManager: fees.NewManager(feeCfg.UnitFees),
-			UnitCaps:      feeCfg.BlockUnitsCap,
+			BlkFeeManager: fees.NewManager(feeCfg.FeeRate),
+			UnitCaps:      feeCfg.BlockMaxComplexity,
 			State:         onAcceptState,
 			Tx:            tx,
 		}
@@ -672,8 +672,8 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		feeCfg := config.GetDynamicFeesConfig(env.config.IsEActivated(chainTime))
 		executor := StandardTxExecutor{
 			Backend:       &env.backend,
-			BlkFeeManager: fees.NewManager(feeCfg.UnitFees),
-			UnitCaps:      feeCfg.BlockUnitsCap,
+			BlkFeeManager: fees.NewManager(feeCfg.FeeRate),
+			UnitCaps:      feeCfg.BlockMaxComplexity,
 			State:         onAcceptState,
 			Tx:            duplicateSubnetTx,
 		}
@@ -714,8 +714,8 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		feeCfg := config.GetDynamicFeesConfig(env.config.IsEActivated(chainTime))
 		executor := StandardTxExecutor{
 			Backend:       &env.backend,
-			BlkFeeManager: fees.NewManager(feeCfg.UnitFees),
-			UnitCaps:      feeCfg.BlockUnitsCap,
+			BlkFeeManager: fees.NewManager(feeCfg.FeeRate),
+			UnitCaps:      feeCfg.BlockMaxComplexity,
 			State:         onAcceptState,
 			Tx:            tx,
 		}
@@ -752,8 +752,8 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		feeCfg := config.GetDynamicFeesConfig(env.config.IsEActivated(chainTime))
 		executor := StandardTxExecutor{
 			Backend:       &env.backend,
-			BlkFeeManager: fees.NewManager(feeCfg.UnitFees),
-			UnitCaps:      feeCfg.BlockUnitsCap,
+			BlkFeeManager: fees.NewManager(feeCfg.FeeRate),
+			UnitCaps:      feeCfg.BlockMaxComplexity,
 			State:         onAcceptState,
 			Tx:            tx,
 		}
@@ -788,8 +788,8 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		feeCfg := config.GetDynamicFeesConfig(env.config.IsEActivated(chainTime))
 		executor := StandardTxExecutor{
 			Backend:       &env.backend,
-			BlkFeeManager: fees.NewManager(feeCfg.UnitFees),
-			UnitCaps:      feeCfg.BlockUnitsCap,
+			BlkFeeManager: fees.NewManager(feeCfg.FeeRate),
+			UnitCaps:      feeCfg.BlockMaxComplexity,
 			State:         onAcceptState,
 			Tx:            tx,
 		}
@@ -834,8 +834,8 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		feeCfg := config.GetDynamicFeesConfig(env.config.IsEActivated(chainTime))
 		executor := StandardTxExecutor{
 			Backend:       &env.backend,
-			BlkFeeManager: fees.NewManager(feeCfg.UnitFees),
-			UnitCaps:      feeCfg.BlockUnitsCap,
+			BlkFeeManager: fees.NewManager(feeCfg.FeeRate),
+			UnitCaps:      feeCfg.BlockMaxComplexity,
 			State:         onAcceptState,
 			Tx:            tx,
 		}
@@ -874,8 +874,8 @@ func TestBanffStandardTxExecutorAddValidator(t *testing.T) {
 		feeCfg := config.GetDynamicFeesConfig(env.config.IsEActivated(chainTime))
 		executor := StandardTxExecutor{
 			Backend:       &env.backend,
-			BlkFeeManager: fees.NewManager(feeCfg.UnitFees),
-			UnitCaps:      feeCfg.BlockUnitsCap,
+			BlkFeeManager: fees.NewManager(feeCfg.FeeRate),
+			UnitCaps:      feeCfg.BlockMaxComplexity,
 			State:         onAcceptState,
 			Tx:            tx,
 		}
@@ -918,8 +918,8 @@ func TestBanffStandardTxExecutorAddValidator(t *testing.T) {
 		feeCfg := config.GetDynamicFeesConfig(env.config.IsEActivated(chainTime))
 		executor := StandardTxExecutor{
 			Backend:       &env.backend,
-			BlkFeeManager: fees.NewManager(feeCfg.UnitFees),
-			UnitCaps:      feeCfg.BlockUnitsCap,
+			BlkFeeManager: fees.NewManager(feeCfg.FeeRate),
+			UnitCaps:      feeCfg.BlockMaxComplexity,
 			State:         onAcceptState,
 			Tx:            tx,
 		}
@@ -959,8 +959,8 @@ func TestBanffStandardTxExecutorAddValidator(t *testing.T) {
 		feeCfg := config.GetDynamicFeesConfig(env.config.IsEActivated(chainTime))
 		executor := StandardTxExecutor{
 			Backend:       &env.backend,
-			BlkFeeManager: fees.NewManager(feeCfg.UnitFees),
-			UnitCaps:      feeCfg.BlockUnitsCap,
+			BlkFeeManager: fees.NewManager(feeCfg.FeeRate),
+			UnitCaps:      feeCfg.BlockMaxComplexity,
 			State:         onAcceptState,
 			Tx:            tx,
 		}
@@ -999,8 +999,8 @@ func TestBanffStandardTxExecutorAddValidator(t *testing.T) {
 		feeCfg := config.GetDynamicFeesConfig(env.config.IsEActivated(chainTime))
 		executor := StandardTxExecutor{
 			Backend:       &env.backend,
-			BlkFeeManager: fees.NewManager(feeCfg.UnitFees),
-			UnitCaps:      feeCfg.BlockUnitsCap,
+			BlkFeeManager: fees.NewManager(feeCfg.FeeRate),
+			UnitCaps:      feeCfg.BlockMaxComplexity,
 			State:         onAcceptState,
 			Tx:            tx,
 		}
@@ -1586,8 +1586,8 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 						FlowChecker:  env.flowChecker,
 						Ctx:          &snow.Context{},
 					},
-					BlkFeeManager: fees.NewManager(feeCfg.UnitFees),
-					UnitCaps:      feeCfg.BlockUnitsCap,
+					BlkFeeManager: fees.NewManager(feeCfg.FeeRate),
+					UnitCaps:      feeCfg.BlockMaxComplexity,
 					Tx:            env.tx,
 					State:         env.state,
 				}
@@ -1613,8 +1613,8 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 						FlowChecker:  env.flowChecker,
 						Ctx:          &snow.Context{},
 					},
-					BlkFeeManager: fees.NewManager(feeCfg.UnitFees),
-					UnitCaps:      feeCfg.BlockUnitsCap,
+					BlkFeeManager: fees.NewManager(feeCfg.FeeRate),
+					UnitCaps:      feeCfg.BlockMaxComplexity,
 					Tx:            env.tx,
 					State:         env.state,
 				}
@@ -1643,8 +1643,8 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 						FlowChecker:  env.flowChecker,
 						Ctx:          &snow.Context{},
 					},
-					BlkFeeManager: fees.NewManager(feeCfg.UnitFees),
-					UnitCaps:      feeCfg.BlockUnitsCap,
+					BlkFeeManager: fees.NewManager(feeCfg.FeeRate),
+					UnitCaps:      feeCfg.BlockMaxComplexity,
 					Tx:            env.tx,
 					State:         env.state,
 				}
@@ -1676,8 +1676,8 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 						FlowChecker:  env.flowChecker,
 						Ctx:          &snow.Context{},
 					},
-					BlkFeeManager: fees.NewManager(feeCfg.UnitFees),
-					UnitCaps:      feeCfg.BlockUnitsCap,
+					BlkFeeManager: fees.NewManager(feeCfg.FeeRate),
+					UnitCaps:      feeCfg.BlockMaxComplexity,
 					Tx:            env.tx,
 					State:         env.state,
 				}
@@ -1707,8 +1707,8 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 						FlowChecker:  env.flowChecker,
 						Ctx:          &snow.Context{},
 					},
-					BlkFeeManager: fees.NewManager(feeCfg.UnitFees),
-					UnitCaps:      feeCfg.BlockUnitsCap,
+					BlkFeeManager: fees.NewManager(feeCfg.FeeRate),
+					UnitCaps:      feeCfg.BlockMaxComplexity,
 					Tx:            env.tx,
 					State:         env.state,
 				}
@@ -1737,8 +1737,8 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 						FlowChecker:  env.flowChecker,
 						Ctx:          &snow.Context{},
 					},
-					BlkFeeManager: fees.NewManager(feeCfg.UnitFees),
-					UnitCaps:      feeCfg.BlockUnitsCap,
+					BlkFeeManager: fees.NewManager(feeCfg.FeeRate),
+					UnitCaps:      feeCfg.BlockMaxComplexity,
 					Tx:            env.tx,
 					State:         env.state,
 				}
@@ -1769,8 +1769,8 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 						FlowChecker:  env.flowChecker,
 						Ctx:          &snow.Context{},
 					},
-					BlkFeeManager: fees.NewManager(feeCfg.UnitFees),
-					UnitCaps:      feeCfg.BlockUnitsCap,
+					BlkFeeManager: fees.NewManager(feeCfg.FeeRate),
+					UnitCaps:      feeCfg.BlockMaxComplexity,
 					Tx:            env.tx,
 					State:         env.state,
 				}
@@ -1804,8 +1804,8 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 						FlowChecker:  env.flowChecker,
 						Ctx:          &snow.Context{},
 					},
-					BlkFeeManager: fees.NewManager(feeCfg.UnitFees),
-					UnitCaps:      feeCfg.BlockUnitsCap,
+					BlkFeeManager: fees.NewManager(feeCfg.FeeRate),
+					UnitCaps:      feeCfg.BlockMaxComplexity,
 					Tx:            env.tx,
 					State:         env.state,
 				}
@@ -1961,8 +1961,8 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 						FlowChecker:  env.flowChecker,
 						Ctx:          &snow.Context{},
 					},
-					BlkFeeManager: fees.NewManager(feeCfg.UnitFees),
-					UnitCaps:      feeCfg.BlockUnitsCap,
+					BlkFeeManager: fees.NewManager(feeCfg.FeeRate),
+					UnitCaps:      feeCfg.BlockMaxComplexity,
 					Tx:            env.tx,
 					State:         env.state,
 				}
@@ -1990,8 +1990,8 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 						FlowChecker:  env.flowChecker,
 						Ctx:          &snow.Context{},
 					},
-					BlkFeeManager: fees.NewManager(feeCfg.UnitFees),
-					UnitCaps:      feeCfg.BlockUnitsCap,
+					BlkFeeManager: fees.NewManager(feeCfg.FeeRate),
+					UnitCaps:      feeCfg.BlockMaxComplexity,
 					Tx:            env.tx,
 					State:         env.state,
 				}
@@ -2021,8 +2021,8 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 						FlowChecker:  env.flowChecker,
 						Ctx:          &snow.Context{},
 					},
-					BlkFeeManager: fees.NewManager(feeCfg.UnitFees),
-					UnitCaps:      feeCfg.BlockUnitsCap,
+					BlkFeeManager: fees.NewManager(feeCfg.FeeRate),
+					UnitCaps:      feeCfg.BlockMaxComplexity,
 					Tx:            env.tx,
 					State:         env.state,
 				}
@@ -2057,8 +2057,8 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 						FlowChecker:  env.flowChecker,
 						Ctx:          &snow.Context{},
 					},
-					BlkFeeManager: fees.NewManager(feeCfg.UnitFees),
-					UnitCaps:      feeCfg.BlockUnitsCap,
+					BlkFeeManager: fees.NewManager(feeCfg.FeeRate),
+					UnitCaps:      feeCfg.BlockMaxComplexity,
 					Tx:            env.tx,
 					State:         env.state,
 				}
@@ -2098,8 +2098,8 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 						FlowChecker:  env.flowChecker,
 						Ctx:          &snow.Context{},
 					},
-					BlkFeeManager: fees.NewManager(feeCfg.UnitFees),
-					UnitCaps:      feeCfg.BlockUnitsCap,
+					BlkFeeManager: fees.NewManager(feeCfg.FeeRate),
+					UnitCaps:      feeCfg.BlockMaxComplexity,
 					Tx:            env.tx,
 					State:         env.state,
 				}

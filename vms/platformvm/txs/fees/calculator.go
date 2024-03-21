@@ -35,8 +35,8 @@ type Calculator struct {
 	ChainTime time.Time
 
 	// Post E-fork inputs
-	FeeManager       *fees.Manager
-	ConsumedUnitsCap fees.Dimensions
+	FeeManager         *fees.Manager
+	BlockMaxComplexity fees.Dimensions
 
 	// common inputs
 	Credentials []verify.Verifiable
@@ -316,7 +316,7 @@ func (fc *Calculator) meterTx(
 }
 
 func (fc *Calculator) AddFeesFor(consumedUnits fees.Dimensions) (uint64, error) {
-	boundBreached, dimension := fc.FeeManager.CumulateUnits(consumedUnits, fc.ConsumedUnitsCap)
+	boundBreached, dimension := fc.FeeManager.CumulateUnits(consumedUnits, fc.BlockMaxComplexity)
 	if boundBreached {
 		return 0, fmt.Errorf("%w: breached dimension %d", errFailedConsumedUnitsCumulation, dimension)
 	}
