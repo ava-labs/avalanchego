@@ -4,7 +4,6 @@
 package p
 
 import (
-	"fmt"
 	"math"
 
 	"github.com/stretchr/testify/require"
@@ -29,7 +28,9 @@ var _ = ginkgo.Describe("[Dynamic Fees]", func() {
 			MinUnitFees:       commonfees.Dimensions{1, 1, 1, 1},
 			UpdateCoefficient: commonfees.Dimensions{1, 1, 1, 1},
 			BlockUnitsCap:     commonfees.Dimensions{math.MaxUint64, math.MaxUint64, math.MaxUint64, math.MaxUint64},
-			BlockUnitsTarget:  commonfees.Dimensions{1_000, 1_000, 1_000, 3_000},
+
+			// BlockUnitsTarget are set to cause an increase of fees while simple transactions are issued
+			BlockUnitsTarget: commonfees.Dimensions{1_000, 1_000, 1_000, 3_000},
 		}
 
 		ginkgo.By("creating a new private network to ensure isolation from other tests")
@@ -91,9 +92,9 @@ var _ = ginkgo.Describe("[Dynamic Fees]", func() {
 
 				currUnitFees, _, err := pChainClient.GetUnitFees(e2e.DefaultContext())
 				require.NoError(err)
-				ginkgo.By(fmt.Sprintf("current unit fees: %v", currUnitFees))
+				tests.Outf("{{blue}} current unit fees: %v {{/}}\n", currUnitFees)
 
-				ginkgo.By("repeatedly change the permissioned subnet owner", func() {
+				ginkgo.By("repeatedly change the permissioned subnet owner to increase unit fees", func() {
 					txsCount := 10
 					for i := 0; i < txsCount; i++ {
 						nextOwner := &secp256k1fx.OutputOwners{
@@ -112,9 +113,24 @@ var _ = ginkgo.Describe("[Dynamic Fees]", func() {
 
 						updatedUnitFees, _, err := pChainClient.GetUnitFees(e2e.DefaultContext())
 						require.NoError(err)
-						ginkgo.By(fmt.Sprintf("current unit fees: %v", updatedUnitFees))
+						tests.Outf("{{blue}} current unit fees: %v {{/}}\n", updatedUnitFees)
+
+						ginkgo.By("check that unit fees components have increased")
+						require.True(commonfees.Compare(currUnitFees, updatedUnitFees))
 						currUnitFees = updatedUnitFees
 					}
+				})
+
+				ginkgo.By("wait for the unit fees to decrease", func() {
+					initialUnitFees := currUnitFees
+					e2e.Eventually(func() bool {
+						var err error
+						_, currUnitFees, err = pChainClient.GetUnitFees(e2e.DefaultContext())
+						require.NoError(err)
+						tests.Outf("{{blue}} next unit fees: %v {{/}}\n", currUnitFees)
+						return commonfees.Compare(initialUnitFees, currUnitFees)
+					}, e2e.DefaultTimeout, e2e.DefaultPollingInterval, "failed to see gas price decrease before timeout")
+					tests.Outf("\n{{blue}}unit fees have decreased to %v{{/}}\n", currUnitFees)
 				})
 			},
 		)
