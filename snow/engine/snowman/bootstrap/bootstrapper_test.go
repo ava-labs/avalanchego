@@ -1386,7 +1386,6 @@ func TestBootstrapNoParseOnNew(t *testing.T) {
 	pushed, err := blocker.Push(context.Background(), &blockJob{
 		log:         logging.NoLog{},
 		numAccepted: prometheus.NewCounter(prometheus.CounterOpts{}),
-		numDropped:  prometheus.NewCounter(prometheus.CounterOpts{}),
 		blk:         blk1,
 		vm:          vm,
 	})
