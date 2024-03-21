@@ -47,7 +47,6 @@ import (
 	snowmanblock "github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	blockbuilder "github.com/ava-labs/avalanchego/vms/platformvm/block/builder"
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
-	txbuilder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	pvalidators "github.com/ava-labs/avalanchego/vms/platformvm/validators"
 )
@@ -85,8 +84,7 @@ type VM struct {
 	// Bootstrapped remembers if this chain has finished bootstrapping or not
 	bootstrapped utils.Atomic[bool]
 
-	txBuilder txbuilder.Builder
-	manager   blockexecutor.Manager
+	manager blockexecutor.Manager
 
 	// Cancelled on shutdown
 	onShutdownCtx context.Context
@@ -158,13 +156,6 @@ func (vm *VM) Initialize(
 	utxoVerifier := utxo.NewVerifier(vm.ctx, &vm.clock, vm.fx)
 	vm.uptimeManager = uptime.NewManager(vm.state, &vm.clock)
 	vm.UptimeLockedCalculator.SetCalculator(&vm.bootstrapped, &chainCtx.Lock, vm.uptimeManager)
-
-	vm.txBuilder = txbuilder.New(
-		vm.ctx,
-		&vm.Config,
-		vm.state,
-		vm.atomicUtxosManager,
-	)
 
 	txExecutorBackend := &txexecutor.Backend{
 		Config:       &vm.Config,

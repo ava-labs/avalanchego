@@ -45,6 +45,7 @@ import (
 	vmkeystore "github.com/ava-labs/avalanchego/vms/components/keystore"
 	pchainapi "github.com/ava-labs/avalanchego/vms/platformvm/api"
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
+	txbuilder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
@@ -72,8 +73,17 @@ var (
 	}
 )
 
-func defaultService(t *testing.T) (*Service, *mutableSharedMemory) {
-	vm, _, mutableSharedMemory := defaultVM(t, latestFork)
+func createTxBuilder(vm *VM) txbuilder.Builder {
+	return txbuilder.New(
+		vm.ctx,
+		&vm.Config,
+		vm.state,
+		vm.atomicUtxosManager,
+	)
+}
+
+func defaultService(t *testing.T) (*Service, *mutableSharedMemory, txbuilder.Builder) {
+	vm, txBuilder, _, mutableSharedMemory := defaultVM(t, latestFork)
 
 	return &Service{
 		vm:          vm,
@@ -81,13 +91,13 @@ func defaultService(t *testing.T) (*Service, *mutableSharedMemory) {
 		stakerAttributesCache: &cache.LRU[ids.ID, *stakerAttributes]{
 			Size: stakerAttributesCacheSize,
 		},
-	}, mutableSharedMemory
+	}, mutableSharedMemory, txBuilder
 }
 
 func TestExportKey(t *testing.T) {
 	require := require.New(t)
 
-	service, _ := defaultService(t)
+	service, _, _ := defaultService(t)
 	service.vm.ctx.Lock.Lock()
 
 	ks := keystore.New(logging.NoLog{}, memdb.New())
@@ -117,7 +127,7 @@ func TestExportKey(t *testing.T) {
 // Test issuing a tx and accepted
 func TestGetTxStatus(t *testing.T) {
 	require := require.New(t)
-	service, mutableSharedMemory := defaultService(t)
+	service, mutableSharedMemory, txBuilder := defaultService(t)
 	service.vm.ctx.Lock.Lock()
 
 	recipientKey, err := secp256k1.NewPrivateKey()
@@ -164,7 +174,7 @@ func TestGetTxStatus(t *testing.T) {
 
 	mutableSharedMemory.SharedMemory = sm
 
-	tx, err := service.vm.txBuilder.NewImportTx(
+	tx, err := txBuilder.NewImportTx(
 		service.vm.ctx.XChainID,
 		ids.ShortEmpty,
 		[]*secp256k1.PrivateKey{recipientKey},
@@ -207,14 +217,14 @@ func TestGetTxStatus(t *testing.T) {
 func TestGetTx(t *testing.T) {
 	type test struct {
 		description string
-		createTx    func(service *Service) (*txs.Tx, error)
+		createTx    func(service *Service, builder txbuilder.Builder) (*txs.Tx, error)
 	}
 
 	tests := []test{
 		{
 			"standard block",
-			func(service *Service) (*txs.Tx, error) {
-				return service.vm.txBuilder.NewCreateChainTx( // Test GetTx works for standard blocks
+			func(_ *Service, builder txbuilder.Builder) (*txs.Tx, error) {
+				return builder.NewCreateChainTx( // Test GetTx works for standard blocks
 					testSubnet1.ID(),
 					[]byte{},
 					constants.AVMID,
@@ -228,11 +238,11 @@ func TestGetTx(t *testing.T) {
 		},
 		{
 			"proposal block",
-			func(service *Service) (*txs.Tx, error) {
+			func(service *Service, builder txbuilder.Builder) (*txs.Tx, error) {
 				sk, err := bls.NewSecretKey()
 				require.NoError(t, err)
 
-				return service.vm.txBuilder.NewAddPermissionlessValidatorTx( // Test GetTx works for proposal blocks
+				return builder.NewAddPermissionlessValidatorTx( // Test GetTx works for proposal blocks
 					service.vm.MinValidatorStake,
 					uint64(service.vm.clock.Time().Add(txexecutor.SyncBound).Unix()),
 					uint64(service.vm.clock.Time().Add(txexecutor.SyncBound).Add(defaultMinStakingDuration).Unix()),
@@ -248,8 +258,8 @@ func TestGetTx(t *testing.T) {
 		},
 		{
 			"atomic block",
-			func(service *Service) (*txs.Tx, error) {
-				return service.vm.txBuilder.NewExportTx( // Test GetTx works for proposal blocks
+			func(service *Service, builder txbuilder.Builder) (*txs.Tx, error) {
+				return builder.NewExportTx( // Test GetTx works for proposal blocks
 					100,
 					service.vm.ctx.XChainID,
 					ids.GenerateTestShortID(),
@@ -269,10 +279,10 @@ func TestGetTx(t *testing.T) {
 			)
 			t.Run(testName, func(t *testing.T) {
 				require := require.New(t)
-				service, _ := defaultService(t)
+				service, _, txBuilder := defaultService(t)
 				service.vm.ctx.Lock.Lock()
 
-				tx, err := test.createTx(service)
+				tx, err := test.createTx(service, txBuilder)
 				require.NoError(err)
 
 				service.vm.ctx.Lock.Unlock()
@@ -333,7 +343,7 @@ func TestGetTx(t *testing.T) {
 
 func TestGetBalance(t *testing.T) {
 	require := require.New(t)
-	service, _ := defaultService(t)
+	service, _, _ := defaultService(t)
 
 	// Ensure GetStake is correct for each of the genesis validators
 	genesis, _ := defaultGenesis(t, service.vm.ctx.AVAXAssetID)
@@ -361,7 +371,7 @@ func TestGetBalance(t *testing.T) {
 
 func TestGetStake(t *testing.T) {
 	require := require.New(t)
-	service, _ := defaultService(t)
+	service, _, txBuilder := defaultService(t)
 
 	// Ensure GetStake is correct for each of the genesis validators
 	genesis, _ := defaultGenesis(t, service.vm.ctx.AVAXAssetID)
@@ -433,7 +443,7 @@ func TestGetStake(t *testing.T) {
 	delegatorNodeID := genesisNodeIDs[0]
 	delegatorStartTime := defaultValidateStartTime
 	delegatorEndTime := defaultGenesisTime.Add(defaultMinStakingDuration)
-	tx, err := service.vm.txBuilder.NewAddDelegatorTx(
+	tx, err := txBuilder.NewAddDelegatorTx(
 		stakeAmount,
 		uint64(delegatorStartTime.Unix()),
 		uint64(delegatorEndTime.Unix()),
@@ -488,7 +498,7 @@ func TestGetStake(t *testing.T) {
 	stakeAmount = service.vm.MinValidatorStake + 54321
 	pendingStakerNodeID := ids.GenerateTestNodeID()
 	pendingStakerEndTime := uint64(defaultGenesisTime.Add(defaultMinStakingDuration).Unix())
-	tx, err = service.vm.txBuilder.NewAddValidatorTx(
+	tx, err = txBuilder.NewAddValidatorTx(
 		stakeAmount,
 		uint64(defaultGenesisTime.Unix()),
 		pendingStakerEndTime,
@@ -533,7 +543,7 @@ func TestGetStake(t *testing.T) {
 
 func TestGetCurrentValidators(t *testing.T) {
 	require := require.New(t)
-	service, _ := defaultService(t)
+	service, _, txBuilder := defaultService(t)
 
 	genesis, _ := defaultGenesis(t, service.vm.ctx.AVAXAssetID)
 
@@ -567,7 +577,7 @@ func TestGetCurrentValidators(t *testing.T) {
 
 	service.vm.ctx.Lock.Lock()
 
-	delTx, err := service.vm.txBuilder.NewAddDelegatorTx(
+	delTx, err := txBuilder.NewAddDelegatorTx(
 		stakeAmount,
 		uint64(delegatorStartTime.Unix()),
 		uint64(delegatorEndTime.Unix()),
@@ -659,7 +669,7 @@ func TestGetCurrentValidators(t *testing.T) {
 
 func TestGetTimestamp(t *testing.T) {
 	require := require.New(t)
-	service, _ := defaultService(t)
+	service, _, _ := defaultService(t)
 
 	reply := GetTimestampReply{}
 	require.NoError(service.GetTimestamp(nil, nil, &reply))
@@ -695,13 +705,13 @@ func TestGetBlock(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
-			service, _ := defaultService(t)
+			service, _, txBuilder := defaultService(t)
 			service.vm.ctx.Lock.Lock()
 
 			service.vm.Config.CreateAssetTxFee = 100 * defaultTxFee
 
 			// Make a block an accept it, then check we can get it.
-			tx, err := service.vm.txBuilder.NewCreateChainTx( // Test GetTx works for standard blocks
+			tx, err := txBuilder.NewCreateChainTx( // Test GetTx works for standard blocks
 				testSubnet1.ID(),
 				[]byte{},
 				constants.AVMID,

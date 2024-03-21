@@ -45,6 +45,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
+	txbuilder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
@@ -253,8 +254,15 @@ func takeValidatorsSnapshotAtCurrentHeight(vm *VM, validatorsSetByHeightAndSubne
 }
 
 func addSubnetValidator(vm *VM, data *validatorInputData, subnetID ids.ID) (*state.Staker, error) {
+	txBuilder := txbuilder.New(
+		vm.ctx,
+		&vm.Config,
+		vm.state,
+		vm.atomicUtxosManager,
+	)
+
 	addr := keys[0].PublicKey().Address()
-	signedTx, err := vm.txBuilder.NewAddSubnetValidatorTx(
+	signedTx, err := txBuilder.NewAddSubnetValidatorTx(
 		vm.Config.MinValidatorStake,
 		uint64(data.startTime.Unix()),
 		uint64(data.endTime.Unix()),
@@ -278,7 +286,14 @@ func addPrimaryValidatorWithBLSKey(vm *VM, data *validatorInputData) (*state.Sta
 		return nil, fmt.Errorf("failed to generate BLS key: %w", err)
 	}
 
-	signedTx, err := vm.txBuilder.NewAddPermissionlessValidatorTx(
+	txBuilder := txbuilder.New(
+		vm.ctx,
+		&vm.Config,
+		vm.state,
+		vm.atomicUtxosManager,
+	)
+
+	signedTx, err := txBuilder.NewAddPermissionlessValidatorTx(
 		vm.Config.MinValidatorStake,
 		uint64(data.startTime.Unix()),
 		uint64(data.endTime.Unix()),
@@ -676,10 +691,17 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 		return nil, ids.Empty, err
 	}
 
+	txBuilder := txbuilder.New(
+		vm.ctx,
+		&vm.Config,
+		vm.state,
+		vm.atomicUtxosManager,
+	)
+
 	// Create a subnet and store it in testSubnet1
 	// Note: following Banff activation, block acceptance will move
 	// chain time ahead
-	testSubnet1, err = vm.txBuilder.NewCreateSubnetTx(
+	testSubnet1, err = txBuilder.NewCreateSubnetTx(
 		1, // threshold
 		[]ids.ShortID{keys[0].PublicKey().Address()},
 		[]*secp256k1.PrivateKey{keys[len(keys)-1]}, // pays tx fee
