@@ -382,12 +382,12 @@ func TestGenesis(t *testing.T) {
 				feeCfg    = config.GetDynamicFeesConfig(vm.Config.IsEActivated(chainTime))
 				feeMan    = commonfees.NewManager(feeRates)
 				feeCalc   = &fees.Calculator{
-					IsEUpgradeActive: vm.IsEActivated(chainTime),
-					Config:           &vm.Config,
-					ChainTime:        chainTime,
-					FeeManager:       feeMan,
-					ConsumedUnitsCap: feeCfg.BlockMaxComplexity,
-					Credentials:      testSubnet1.Creds,
+					IsEUpgradeActive:   vm.IsEActivated(chainTime),
+					Config:             &vm.Config,
+					ChainTime:          chainTime,
+					FeeManager:         feeMan,
+					BlockMaxComplexity: feeCfg.BlockMaxComplexity,
+					Credentials:        testSubnet1.Creds,
 				}
 			)
 
@@ -2276,12 +2276,12 @@ func TestBaseTx(t *testing.T) {
 		feeCfg    = config.GetDynamicFeesConfig(vm.Config.IsEActivated(chainTime))
 		feeMan    = commonfees.NewManager(feeRates)
 		feeCalc   = &fees.Calculator{
-			IsEUpgradeActive: vm.IsEActivated(chainTime),
-			Config:           &vm.Config,
-			ChainTime:        chainTime,
-			FeeManager:       feeMan,
-			ConsumedUnitsCap: feeCfg.BlockMaxComplexity,
-			Credentials:      baseTx.Creds,
+			IsEUpgradeActive:   vm.IsEActivated(chainTime),
+			Config:             &vm.Config,
+			ChainTime:          chainTime,
+			FeeManager:         feeMan,
+			BlockMaxComplexity: feeCfg.BlockMaxComplexity,
+			Credentials:        baseTx.Creds,
 		}
 	)
 

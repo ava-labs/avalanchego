@@ -294,11 +294,11 @@ func (b *builder) NewImportTx(
 		isEUpgradeActive  = b.cfg.IsEActivated(chainTime)
 
 		feeCalc = &fees.Calculator{
-			IsEUpgradeActive: isEUpgradeActive,
-			Config:           b.cfg,
-			ChainTime:        chainTime,
-			FeeManager:       commonfees.NewManager(feeRates),
-			ConsumedUnitsCap: feeCfg.BlockMaxComplexity,
+			IsEUpgradeActive:   isEUpgradeActive,
+			Config:             b.cfg,
+			ChainTime:          chainTime,
+			FeeManager:         commonfees.NewManager(feeRates),
+			BlockMaxComplexity: feeCfg.BlockMaxComplexity,
 		}
 	)
 
@@ -346,11 +346,11 @@ func (b *builder) NewExportTx(
 		isEUpgradeActive  = b.cfg.IsEActivated(chainTime)
 
 		feeCalc = &fees.Calculator{
-			IsEUpgradeActive: isEUpgradeActive,
-			Config:           b.cfg,
-			ChainTime:        chainTime,
-			FeeManager:       commonfees.NewManager(feeRates),
-			ConsumedUnitsCap: feeCfg.BlockMaxComplexity,
+			IsEUpgradeActive:   isEUpgradeActive,
+			Config:             b.cfg,
+			ChainTime:          chainTime,
+			FeeManager:         commonfees.NewManager(feeRates),
+			BlockMaxComplexity: feeCfg.BlockMaxComplexity,
 		}
 	)
 
@@ -405,11 +405,11 @@ func (b *builder) NewCreateChainTx(
 		isEUpgradeActive  = b.cfg.IsEActivated(chainTime)
 
 		feeCalc = &fees.Calculator{
-			IsEUpgradeActive: isEUpgradeActive,
-			Config:           b.cfg,
-			ChainTime:        chainTime,
-			FeeManager:       commonfees.NewManager(feeRates),
-			ConsumedUnitsCap: feeCfg.BlockMaxComplexity,
+			IsEUpgradeActive:   isEUpgradeActive,
+			Config:             b.cfg,
+			ChainTime:          chainTime,
+			FeeManager:         commonfees.NewManager(feeRates),
+			BlockMaxComplexity: feeCfg.BlockMaxComplexity,
 		}
 	)
 
@@ -452,11 +452,11 @@ func (b *builder) NewCreateSubnetTx(
 		isEUpgradeActive  = b.cfg.IsEActivated(chainTime)
 
 		feeCalc = &fees.Calculator{
-			IsEUpgradeActive: isEUpgradeActive,
-			Config:           b.cfg,
-			ChainTime:        chainTime,
-			FeeManager:       commonfees.NewManager(feeRates),
-			ConsumedUnitsCap: feeCfg.BlockMaxComplexity,
+			IsEUpgradeActive:   isEUpgradeActive,
+			Config:             b.cfg,
+			ChainTime:          chainTime,
+			FeeManager:         commonfees.NewManager(feeRates),
+			BlockMaxComplexity: feeCfg.BlockMaxComplexity,
 		}
 	)
 
@@ -513,11 +513,11 @@ func (b *builder) NewTransformSubnetTx(
 		isEUpgradeActive  = b.cfg.IsEActivated(chainTime)
 
 		feeCalc = &fees.Calculator{
-			IsEUpgradeActive: isEUpgradeActive,
-			Config:           b.cfg,
-			ChainTime:        chainTime,
-			FeeManager:       commonfees.NewManager(feeRates),
-			ConsumedUnitsCap: feeCfg.BlockMaxComplexity,
+			IsEUpgradeActive:   isEUpgradeActive,
+			Config:             b.cfg,
+			ChainTime:          chainTime,
+			FeeManager:         commonfees.NewManager(feeRates),
+			BlockMaxComplexity: feeCfg.BlockMaxComplexity,
 		}
 	)
 
@@ -573,11 +573,11 @@ func (b *builder) NewAddValidatorTx(
 		isEUpgradeActive  = b.cfg.IsEActivated(chainTime)
 
 		feeCalc = &fees.Calculator{
-			IsEUpgradeActive: isEUpgradeActive,
-			Config:           b.cfg,
-			ChainTime:        chainTime,
-			FeeManager:       commonfees.NewManager(feeRates),
-			ConsumedUnitsCap: feeCfg.BlockMaxComplexity,
+			IsEUpgradeActive:   isEUpgradeActive,
+			Config:             b.cfg,
+			ChainTime:          chainTime,
+			FeeManager:         commonfees.NewManager(feeRates),
+			BlockMaxComplexity: feeCfg.BlockMaxComplexity,
 		}
 	)
 
@@ -635,11 +635,11 @@ func (b *builder) NewAddPermissionlessValidatorTx(
 		isEUpgradeActive  = b.cfg.IsEActivated(chainTime)
 
 		feeCalc = &fees.Calculator{
-			IsEUpgradeActive: isEUpgradeActive,
-			Config:           b.cfg,
-			ChainTime:        chainTime,
-			FeeManager:       commonfees.NewManager(feeRates),
-			ConsumedUnitsCap: feeCfg.BlockMaxComplexity,
+			IsEUpgradeActive:   isEUpgradeActive,
+			Config:             b.cfg,
+			ChainTime:          chainTime,
+			FeeManager:         commonfees.NewManager(feeRates),
+			BlockMaxComplexity: feeCfg.BlockMaxComplexity,
 		}
 	)
 
@@ -701,11 +701,11 @@ func (b *builder) NewAddDelegatorTx(
 		isEUpgradeActive  = b.cfg.IsEActivated(chainTime)
 
 		feeCalc = &fees.Calculator{
-			IsEUpgradeActive: isEUpgradeActive,
-			Config:           b.cfg,
-			ChainTime:        chainTime,
-			FeeManager:       commonfees.NewManager(feeRates),
-			ConsumedUnitsCap: feeCfg.BlockMaxComplexity,
+			IsEUpgradeActive:   isEUpgradeActive,
+			Config:             b.cfg,
+			ChainTime:          chainTime,
+			FeeManager:         commonfees.NewManager(feeRates),
+			BlockMaxComplexity: feeCfg.BlockMaxComplexity,
 		}
 	)
 
@@ -760,11 +760,11 @@ func (b *builder) NewAddPermissionlessDelegatorTx(
 		isEUpgradeActive  = b.cfg.IsEActivated(chainTime)
 
 		feeCalc = &fees.Calculator{
-			IsEUpgradeActive: isEUpgradeActive,
-			Config:           b.cfg,
-			ChainTime:        chainTime,
-			FeeManager:       commonfees.NewManager(feeRates),
-			ConsumedUnitsCap: feeCfg.BlockMaxComplexity,
+			IsEUpgradeActive:   isEUpgradeActive,
+			Config:             b.cfg,
+			ChainTime:          chainTime,
+			FeeManager:         commonfees.NewManager(feeRates),
+			BlockMaxComplexity: feeCfg.BlockMaxComplexity,
 		}
 	)
 
@@ -823,11 +823,11 @@ func (b *builder) NewAddSubnetValidatorTx(
 		isEUpgradeActive  = b.cfg.IsEActivated(chainTime)
 
 		feeCalc = &fees.Calculator{
-			IsEUpgradeActive: isEUpgradeActive,
-			Config:           b.cfg,
-			ChainTime:        chainTime,
-			FeeManager:       commonfees.NewManager(feeRates),
-			ConsumedUnitsCap: feeCfg.BlockMaxComplexity,
+			IsEUpgradeActive:   isEUpgradeActive,
+			Config:             b.cfg,
+			ChainTime:          chainTime,
+			FeeManager:         commonfees.NewManager(feeRates),
+			BlockMaxComplexity: feeCfg.BlockMaxComplexity,
 		}
 	)
 
@@ -876,11 +876,11 @@ func (b *builder) NewRemoveSubnetValidatorTx(
 		isEUpgradeActive  = b.cfg.IsEActivated(chainTime)
 
 		feeCalc = &fees.Calculator{
-			IsEUpgradeActive: isEUpgradeActive,
-			Config:           b.cfg,
-			ChainTime:        chainTime,
-			FeeManager:       commonfees.NewManager(feeRates),
-			ConsumedUnitsCap: feeCfg.BlockMaxComplexity,
+			IsEUpgradeActive:   isEUpgradeActive,
+			Config:             b.cfg,
+			ChainTime:          chainTime,
+			FeeManager:         commonfees.NewManager(feeRates),
+			BlockMaxComplexity: feeCfg.BlockMaxComplexity,
 		}
 	)
 
@@ -921,11 +921,11 @@ func (b *builder) NewTransferSubnetOwnershipTx(
 		isEUpgradeActive  = b.cfg.IsEActivated(chainTime)
 
 		feeCalc = &fees.Calculator{
-			IsEUpgradeActive: isEUpgradeActive,
-			Config:           b.cfg,
-			ChainTime:        chainTime,
-			FeeManager:       commonfees.NewManager(feeRates),
-			ConsumedUnitsCap: feeCfg.BlockMaxComplexity,
+			IsEUpgradeActive:   isEUpgradeActive,
+			Config:             b.cfg,
+			ChainTime:          chainTime,
+			FeeManager:         commonfees.NewManager(feeRates),
+			BlockMaxComplexity: feeCfg.BlockMaxComplexity,
 		}
 	)
 
@@ -971,11 +971,11 @@ func (b *builder) NewBaseTx(
 		isEUpgradeActive  = b.cfg.IsEActivated(chainTime)
 
 		feeCalc = &fees.Calculator{
-			IsEUpgradeActive: isEUpgradeActive,
-			Config:           b.cfg,
-			ChainTime:        chainTime,
-			FeeManager:       commonfees.NewManager(feeRates),
-			ConsumedUnitsCap: feeCfg.BlockMaxComplexity,
+			IsEUpgradeActive:   isEUpgradeActive,
+			Config:             b.cfg,
+			ChainTime:          chainTime,
+			FeeManager:         commonfees.NewManager(feeRates),
+			BlockMaxComplexity: feeCfg.BlockMaxComplexity,
 		}
 	)
 
