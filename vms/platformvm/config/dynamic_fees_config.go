@@ -43,10 +43,10 @@ var (
 		},
 		BlockUnitsCap: commonfees.Max,
 		BlockUnitsTarget: commonfees.Dimensions{
-			1000,
-			1000,
-			1000,
-			1000,
+			2000,
+			2000,
+			2000,
+			4000,
 		},
 	}
 
