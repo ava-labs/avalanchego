@@ -347,7 +347,7 @@ func packBlockTxs(
 
 	var (
 		isEActivated = backend.Config.IsEActivated(timestamp)
-		feesCfg      = config.GetDynamicFeesConfig(isEActivated)
+		feeCfg       = config.GetDynamicFeesConfig(isEActivated)
 
 		blockTxs []*txs.Tx
 		inputs   set.Set[ids.ID]
@@ -356,7 +356,7 @@ func packBlockTxs(
 	feeMan := commonfees.NewManager(feeRates)
 	if isEActivated {
 		if err := feeMan.UpdateFeeRates(
-			feesCfg,
+			feeCfg,
 			parentBlkComplexity,
 			parentBlkTime.Unix(),
 			timestamp.Unix(),
@@ -376,7 +376,7 @@ func packBlockTxs(
 		// pre e upgrade is active, we fill blocks till a target size
 		// post e upgrade is active, we fill blocks till a target complexity
 		targetSizeReached := (!isEActivated && txSize > remainingSize) ||
-			(isEActivated && !commonfees.Compare(feeMan.GetCumulatedComplexity(), feesCfg.BlockTargetComplexityRate))
+			(isEActivated && !commonfees.Compare(feeMan.GetCumulatedComplexity(), feeCfg.BlockTargetComplexityRate))
 		if targetSizeReached {
 			break
 		}
@@ -392,7 +392,7 @@ func packBlockTxs(
 		executor := &txexecutor.StandardTxExecutor{
 			Backend:            backend,
 			BlkFeeManager:      feeMan,
-			BlockMaxComplexity: feesCfg.BlockMaxComplexity,
+			BlockMaxComplexity: feeCfg.BlockMaxComplexity,
 			State:              txDiff,
 			Tx:                 tx,
 		}

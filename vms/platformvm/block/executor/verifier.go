@@ -491,9 +491,9 @@ func (v *verifier) processStandardTxs(
 		atomicRequests = make(map[ids.ID]*atomic.Requests)
 	)
 
-	feeManager := fees.NewManager(feeRates)
+	feeMan := fees.NewManager(feeRates)
 	if isEActivated {
-		if err := feeManager.UpdateFeeRates(
+		if err := feeMan.UpdateFeeRates(
 			feesCfg,
 			parentBlkComplexity,
 			parentBlkTime.Unix(),
@@ -506,7 +506,7 @@ func (v *verifier) processStandardTxs(
 	for _, tx := range txs {
 		txExecutor := executor.StandardTxExecutor{
 			Backend:            v.txExecutorBackend,
-			BlkFeeManager:      feeManager,
+			BlkFeeManager:      feeMan,
 			BlockMaxComplexity: feesCfg.BlockMaxComplexity,
 			State:              state,
 			Tx:                 tx,
@@ -546,8 +546,8 @@ func (v *verifier) processStandardTxs(
 	}
 
 	if isEActivated {
-		state.SetFeeRates(feeManager.GetFeeRates())
-		state.SetLastBlockComplexity(feeManager.GetCumulatedComplexity())
+		state.SetFeeRates(feeMan.GetFeeRates())
+		state.SetLastBlockComplexity(feeMan.GetCumulatedComplexity())
 	}
 
 	if numFuncs := len(funcs); numFuncs == 1 {
@@ -560,5 +560,5 @@ func (v *verifier) processStandardTxs(
 		}
 	}
 
-	return inputs, feeManager, atomicRequests, onAcceptFunc, nil
+	return inputs, feeMan, atomicRequests, onAcceptFunc, nil
 }
