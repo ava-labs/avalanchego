@@ -152,6 +152,7 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller, f fork) *environment 
 	res.fx = defaultFx(res.clk, res.ctx.Log, res.isBootstrapped.Get())
 
 	rewardsCalc := reward.NewCalculator(res.config.RewardConfig)
+	res.atomicUTXOs = avax.NewAtomicUTXOManager(res.ctx.SharedMemory, txs.Codec)
 
 	if ctrl == nil {
 		res.state = defaultState(res.config, res.ctx, res.baseDB, rewardsCalc)
