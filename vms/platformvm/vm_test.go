@@ -306,7 +306,7 @@ func defaultVM(t *testing.T, f fork) (*VM, txbuilder.Builder, database.Database,
 		ctx,
 		&vm.Config,
 		vm.state,
-		vm.atomicUtxosManager,
+		avax.NewAtomicUTXOManager(vm.ctx.SharedMemory, txs.Codec),
 	)
 
 	// Create a subnet and store it in testSubnet1

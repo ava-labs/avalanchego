@@ -64,8 +64,7 @@ type VM struct {
 	*network.Network
 	validators.State
 
-	metrics            metrics.Metrics
-	atomicUtxosManager avax.AtomicUTXOManager
+	metrics metrics.Metrics
 
 	// Used to get time. Useful for faking time during tests.
 	clock mockable.Clock
@@ -152,7 +151,6 @@ func (vm *VM) Initialize(
 
 	validatorManager := pvalidators.NewManager(chainCtx.Log, vm.Config, vm.state, vm.metrics, &vm.clock)
 	vm.State = validatorManager
-	vm.atomicUtxosManager = avax.NewAtomicUTXOManager(chainCtx.SharedMemory, txs.Codec)
 	utxoVerifier := utxo.NewVerifier(vm.ctx, &vm.clock, vm.fx)
 	vm.uptimeManager = uptime.NewManager(vm.state, &vm.clock)
 	vm.UptimeLockedCalculator.SetCalculator(&vm.bootstrapped, &chainCtx.Lock, vm.uptimeManager)

@@ -381,7 +381,8 @@ func (s *Service) GetUTXOs(_ *http.Request, args *api.GetUTXOsArgs, response *ap
 			limit,
 		)
 	} else {
-		utxos, endAddr, endUTXOID, err = s.vm.atomicUtxosManager.GetAtomicUTXOs(
+		atomicUtxosManager := avax.NewAtomicUTXOManager(s.vm.ctx.SharedMemory, txs.Codec)
+		utxos, endAddr, endUTXOID, err = atomicUtxosManager.GetAtomicUTXOs(
 			sourceChain,
 			addrSet,
 			startAddr,
