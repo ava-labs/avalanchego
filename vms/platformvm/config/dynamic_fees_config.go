@@ -34,15 +34,20 @@ var (
 			3 * units.NanoAvax,
 			4 * units.NanoAvax,
 		},
-		MinUnitFees: commonfees.Dimensions{},
+		MinUnitFees: commonfees.Empty,
 		UpdateCoefficient: commonfees.Dimensions{
 			1,
 			1,
 			1,
 			1,
 		},
-		BlockUnitsCap:    commonfees.Max,
-		BlockUnitsTarget: commonfees.Dimensions{1, 1, 1, 1},
+		BlockUnitsCap: commonfees.Max,
+		BlockUnitsTarget: commonfees.Dimensions{
+			1000,
+			1000,
+			1000,
+			1000,
+		},
 	}
 
 	// TODO ABENEGIA: decide if and how to validate preEUpgradeDynamicFeesConfig
