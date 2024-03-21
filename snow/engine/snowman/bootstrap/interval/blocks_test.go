@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -436,7 +437,7 @@ func (f testParser) ParseBlock(ctx context.Context, bytes []byte) (snowman.Block
 	return f(ctx, bytes)
 }
 
-func makeParser(blocks []snowman.Block) Parser {
+func makeParser(blocks []snowman.Block) block.Parser {
 	return testParser(func(_ context.Context, b []byte) (snowman.Block, error) {
 		for _, block := range blocks {
 			if bytes.Equal(b, block.Bytes()) {
