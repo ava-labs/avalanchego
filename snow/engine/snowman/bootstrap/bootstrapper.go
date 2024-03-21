@@ -302,16 +302,6 @@ func (b *Bootstrapper) sendBootstrappingMessagesOrFinish(ctx context.Context) er
 		return b.startBootstrapping(ctx)
 	}
 
-	if !b.restarted {
-		b.Ctx.Log.Info("bootstrapping started syncing",
-			zap.Int("numAccepted", numAccepted),
-		)
-	} else {
-		b.Ctx.Log.Debug("bootstrapping started syncing",
-			zap.Int("numAccepted", numAccepted),
-		)
-	}
-
 	return b.startSyncing(ctx, accepted)
 }
 
@@ -385,9 +375,14 @@ func (b *Bootstrapper) startSyncing(ctx context.Context, acceptedContainerIDs []
 
 	b.missingBlockIDs.Add(acceptedContainerIDs...)
 	numMissingBlockIDs := b.missingBlockIDs.Len()
-	b.Ctx.Log.Debug("starting bootstrapping",
-		zap.Int("numMissingBlocks", numMissingBlockIDs),
+
+	log := b.Ctx.Log.Info
+	if b.restarted {
+		log = b.Ctx.Log.Debug
+	}
+	log("starting to fetch blocks",
 		zap.Int("numAcceptedBlocks", len(acceptedContainerIDs)),
+		zap.Int("numMissingBlocks", numMissingBlockIDs),
 	)
 
 	toProcess := make([]snowman.Block, 0, numMissingBlockIDs)
