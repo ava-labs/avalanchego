@@ -296,7 +296,7 @@ func (w *wallet) IssueBaseTx(
 	outputs []*avax.TransferableOutput,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	if err := w.refreshFork(options...); err != nil {
+	if err := w.refreshFeesData(options...); err != nil {
 		return nil, err
 	}
 
@@ -328,7 +328,7 @@ func (w *wallet) IssueAddValidatorTx(
 	shares uint32,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	if err := w.refreshFork(options...); err != nil {
+	if err := w.refreshFeesData(options...); err != nil {
 		return nil, err
 	}
 
@@ -353,7 +353,7 @@ func (w *wallet) IssueAddSubnetValidatorTx(
 	vdr *txs.SubnetValidator,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	if err := w.refreshFork(options...); err != nil {
+	if err := w.refreshFeesData(options...); err != nil {
 		return nil, err
 	}
 
@@ -379,7 +379,7 @@ func (w *wallet) IssueRemoveSubnetValidatorTx(
 	subnetID ids.ID,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	if err := w.refreshFork(options...); err != nil {
+	if err := w.refreshFeesData(options...); err != nil {
 		return nil, err
 	}
 
@@ -405,7 +405,7 @@ func (w *wallet) IssueAddDelegatorTx(
 	rewardsOwner *secp256k1fx.OutputOwners,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	if err := w.refreshFork(options...); err != nil {
+	if err := w.refreshFeesData(options...); err != nil {
 		return nil, err
 	}
 
@@ -434,7 +434,7 @@ func (w *wallet) IssueCreateChainTx(
 	chainName string,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	if err := w.refreshFork(options...); err != nil {
+	if err := w.refreshFeesData(options...); err != nil {
 		return nil, err
 	}
 
@@ -459,7 +459,7 @@ func (w *wallet) IssueCreateSubnetTx(
 	owner *secp256k1fx.OutputOwners,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	if err := w.refreshFork(options...); err != nil {
+	if err := w.refreshFeesData(options...); err != nil {
 		return nil, err
 	}
 
@@ -484,7 +484,7 @@ func (w *wallet) IssueTransferSubnetOwnershipTx(
 	owner *secp256k1fx.OutputOwners,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	if err := w.refreshFork(options...); err != nil {
+	if err := w.refreshFeesData(options...); err != nil {
 		return nil, err
 	}
 
@@ -510,7 +510,7 @@ func (w *wallet) IssueImportTx(
 	to *secp256k1fx.OutputOwners,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	if err := w.refreshFork(options...); err != nil {
+	if err := w.refreshFeesData(options...); err != nil {
 		return nil, err
 	}
 
@@ -536,7 +536,7 @@ func (w *wallet) IssueExportTx(
 	outputs []*avax.TransferableOutput,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	if err := w.refreshFork(options...); err != nil {
+	if err := w.refreshFeesData(options...); err != nil {
 		return nil, err
 	}
 
@@ -574,7 +574,7 @@ func (w *wallet) IssueTransformSubnetTx(
 	uptimeRequirement uint32,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	if err := w.refreshFork(options...); err != nil {
+	if err := w.refreshFeesData(options...); err != nil {
 		return nil, err
 	}
 
@@ -620,7 +620,7 @@ func (w *wallet) IssueAddPermissionlessValidatorTx(
 	shares uint32,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	if err := w.refreshFork(options...); err != nil {
+	if err := w.refreshFeesData(options...); err != nil {
 		return nil, err
 	}
 
@@ -657,7 +657,7 @@ func (w *wallet) IssueAddPermissionlessDelegatorTx(
 	rewardsOwner *secp256k1fx.OutputOwners,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	if err := w.refreshFork(options...); err != nil {
+	if err := w.refreshFeesData(options...); err != nil {
 		return nil, err
 	}
 
@@ -733,7 +733,7 @@ func (w *wallet) IssueTx(
 	return nil
 }
 
-func (w *wallet) refreshFork(options ...common.Option) error {
+func (w *wallet) refreshFeesData(options ...common.Option) error {
 	if w.isEForkActive {
 		// E fork enables dinamic fees and it is active
 		// not need to recheck
