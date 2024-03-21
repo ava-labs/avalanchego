@@ -73,15 +73,6 @@ var (
 	}
 )
 
-func createTxBuilder(vm *VM) txbuilder.Builder {
-	return txbuilder.New(
-		vm.ctx,
-		&vm.Config,
-		vm.state,
-		vm.atomicUtxosManager,
-	)
-}
-
 func defaultService(t *testing.T) (*Service, *mutableSharedMemory, txbuilder.Builder) {
 	vm, txBuilder, _, mutableSharedMemory := defaultVM(t, latestFork)
 
