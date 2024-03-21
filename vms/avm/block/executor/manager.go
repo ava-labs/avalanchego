@@ -168,12 +168,12 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 		feesCfg       = config.GetDynamicFeesConfig(isEForkActive)
 	)
 
-	feeManager := fees.NewManager(feesCfg.UnitFees)
+	feeManager := fees.NewManager(feesCfg.FeeRate)
 
 	err = tx.Unsigned.Visit(&executor.SemanticVerifier{
 		Backend:       m.backend,
 		BlkFeeManager: feeManager,
-		UnitCaps:      feesCfg.BlockUnitsCap,
+		UnitCaps:      feesCfg.BlockMaxComplexity,
 		State:         stateDiff,
 		Tx:            tx,
 	})

@@ -137,7 +137,7 @@ func (b *Block) Verify(context.Context) error {
 		feesCfg       = config.GetDynamicFeesConfig(isEForkActive)
 	)
 
-	feeManager := fees.NewManager(feesCfg.UnitFees)
+	feeManager := fees.NewManager(feesCfg.FeeRate)
 
 	for _, tx := range txs {
 		// Verify that the tx is valid according to the current state of the
@@ -145,7 +145,7 @@ func (b *Block) Verify(context.Context) error {
 		err := tx.Unsigned.Visit(&executor.SemanticVerifier{
 			Backend:       b.manager.backend,
 			BlkFeeManager: feeManager,
-			UnitCaps:      feesCfg.BlockUnitsCap,
+			UnitCaps:      feesCfg.BlockMaxComplexity,
 			State:         stateDiff,
 			Tx:            tx,
 		})

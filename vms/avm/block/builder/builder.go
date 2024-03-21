@@ -97,7 +97,7 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 		chainTime     = stateDiff.GetTimestamp()
 		isEForkActive = b.backend.Config.IsEActivated(chainTime)
 		feesCfg       = config.GetDynamicFeesConfig(isEForkActive)
-		feeManager    = fees.NewManager(feesCfg.UnitFees)
+		feeManager    = fees.NewManager(feesCfg.FeeRate)
 	)
 	for {
 		tx, exists := b.mempool.Peek()
@@ -120,7 +120,7 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 		err = tx.Unsigned.Visit(&txexecutor.SemanticVerifier{
 			Backend:       b.backend,
 			BlkFeeManager: feeManager,
-			UnitCaps:      feesCfg.BlockUnitsCap,
+			UnitCaps:      feesCfg.BlockMaxComplexity,
 			State:         txDiff,
 			Tx:            tx,
 		})

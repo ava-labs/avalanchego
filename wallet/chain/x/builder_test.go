@@ -25,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
 	stdcontext "context"
+
 	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
@@ -46,7 +47,7 @@ var (
 		CreateAssetTxFee: 99 * units.MilliAvax,
 	}
 
-	testUnitFees = commonfees.Dimensions{
+	testFeeRates = commonfees.Dimensions{
 		1 * units.MicroAvax,
 		2 * units.MicroAvax,
 		3 * units.MicroAvax,
@@ -95,7 +96,7 @@ func TestBaseTx(t *testing.T) {
 	{ // Post E-Upgrade
 		feeCalc := &fees.Calculator{
 			IsEUpgradeActive: true,
-			FeeManager:       commonfees.NewManager(testUnitFees),
+			FeeManager:       commonfees.NewManager(testFeeRates),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
 			Codec:            builder.Parser.Codec(),
 		}
@@ -110,7 +111,7 @@ func TestBaseTx(t *testing.T) {
 
 		fc := &fees.Calculator{
 			IsEUpgradeActive: true,
-			FeeManager:       commonfees.NewManager(testUnitFees),
+			FeeManager:       commonfees.NewManager(testFeeRates),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
 			Credentials:      tx.Creds,
 			Codec:            builder.Parser.Codec(),
@@ -250,7 +251,7 @@ func TestCreateAssetTx(t *testing.T) {
 		// Post E-Upgrade
 		feeCalc := &fees.Calculator{
 			IsEUpgradeActive: true,
-			FeeManager:       commonfees.NewManager(testUnitFees),
+			FeeManager:       commonfees.NewManager(testFeeRates),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
 			Codec:            builder.Parser.Codec(),
 		}
@@ -269,7 +270,7 @@ func TestCreateAssetTx(t *testing.T) {
 
 		fc := &fees.Calculator{
 			IsEUpgradeActive: true,
-			FeeManager:       commonfees.NewManager(testUnitFees),
+			FeeManager:       commonfees.NewManager(testFeeRates),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
 			Codec:            builder.Parser.Codec(),
 			Credentials:      tx.Creds,
@@ -365,7 +366,7 @@ func TestMintNFTOperation(t *testing.T) {
 		// Post E-Upgrade
 		feeCalc := &fees.Calculator{
 			IsEUpgradeActive: true,
-			FeeManager:       commonfees.NewManager(testUnitFees),
+			FeeManager:       commonfees.NewManager(testFeeRates),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
 			Codec:            builder.Parser.Codec(),
 		}
@@ -383,7 +384,7 @@ func TestMintNFTOperation(t *testing.T) {
 
 		fc := &fees.Calculator{
 			IsEUpgradeActive: true,
-			FeeManager:       commonfees.NewManager(testUnitFees),
+			FeeManager:       commonfees.NewManager(testFeeRates),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
 			Codec:            builder.Parser.Codec(),
 			Credentials:      tx.Creds,
@@ -484,7 +485,7 @@ func TestMintFTOperation(t *testing.T) {
 		// Post E-Upgrade
 		feeCalc := &fees.Calculator{
 			IsEUpgradeActive: true,
-			FeeManager:       commonfees.NewManager(testUnitFees),
+			FeeManager:       commonfees.NewManager(testFeeRates),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
 			Codec:            builder.Parser.Codec(),
 		}
@@ -500,7 +501,7 @@ func TestMintFTOperation(t *testing.T) {
 
 		fc := &fees.Calculator{
 			IsEUpgradeActive: true,
-			FeeManager:       commonfees.NewManager(testUnitFees),
+			FeeManager:       commonfees.NewManager(testFeeRates),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
 			Codec:            builder.Parser.Codec(),
 			Credentials:      tx.Creds,
@@ -594,7 +595,7 @@ func TestMintPropertyOperation(t *testing.T) {
 		// Post E-Upgrade
 		feeCalc := &fees.Calculator{
 			IsEUpgradeActive: true,
-			FeeManager:       commonfees.NewManager(testUnitFees),
+			FeeManager:       commonfees.NewManager(testFeeRates),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
 			Codec:            builder.Parser.Codec(),
 		}
@@ -611,7 +612,7 @@ func TestMintPropertyOperation(t *testing.T) {
 
 		fc := &fees.Calculator{
 			IsEUpgradeActive: true,
-			FeeManager:       commonfees.NewManager(testUnitFees),
+			FeeManager:       commonfees.NewManager(testFeeRates),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
 			Codec:            builder.Parser.Codec(),
 			Credentials:      tx.Creds,
@@ -700,7 +701,7 @@ func TestBurnPropertyOperation(t *testing.T) {
 		// Post E-Upgrade
 		feeCalc := &fees.Calculator{
 			IsEUpgradeActive: true,
-			FeeManager:       commonfees.NewManager(testUnitFees),
+			FeeManager:       commonfees.NewManager(testFeeRates),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
 			Codec:            builder.Parser.Codec(),
 		}
@@ -716,7 +717,7 @@ func TestBurnPropertyOperation(t *testing.T) {
 
 		fc := &fees.Calculator{
 			IsEUpgradeActive: true,
-			FeeManager:       commonfees.NewManager(testUnitFees),
+			FeeManager:       commonfees.NewManager(testFeeRates),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
 			Codec:            builder.Parser.Codec(),
 			Credentials:      tx.Creds,
@@ -816,7 +817,7 @@ func TestImportTx(t *testing.T) {
 	{ // Post E-Upgrade
 		feeCalc := &fees.Calculator{
 			IsEUpgradeActive: true,
-			FeeManager:       commonfees.NewManager(testUnitFees),
+			FeeManager:       commonfees.NewManager(testFeeRates),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
 			Codec:            builder.Parser.Codec(),
 		}
@@ -832,7 +833,7 @@ func TestImportTx(t *testing.T) {
 
 		fc := &fees.Calculator{
 			IsEUpgradeActive: true,
-			FeeManager:       commonfees.NewManager(testUnitFees),
+			FeeManager:       commonfees.NewManager(testFeeRates),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
 			Credentials:      tx.Creds,
 			Codec:            builder.Parser.Codec(),
@@ -938,7 +939,7 @@ func TestExportTx(t *testing.T) {
 	{ // Post E-Upgrade
 		feeCalc := &fees.Calculator{
 			IsEUpgradeActive: true,
-			FeeManager:       commonfees.NewManager(testUnitFees),
+			FeeManager:       commonfees.NewManager(testFeeRates),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
 			Codec:            builder.Parser.Codec(),
 		}
@@ -954,7 +955,7 @@ func TestExportTx(t *testing.T) {
 
 		fc := &fees.Calculator{
 			IsEUpgradeActive: true,
-			FeeManager:       commonfees.NewManager(testUnitFees),
+			FeeManager:       commonfees.NewManager(testFeeRates),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
 			Credentials:      tx.Creds,
 			Codec:            builder.Parser.Codec(),

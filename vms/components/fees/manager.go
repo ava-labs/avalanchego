@@ -10,26 +10,26 @@ import (
 )
 
 type Manager struct {
-	// Avax denominated unit fees for all fee dimensions
-	unitFees Dimensions
+	// Avax denominated fee rates, i.e. fees per unit of complexity.
+	feeRates Dimensions
 
-	// cumulatedUnits helps aggregating the units consumed by a block
-	// so that we can verify it's not too big/build it properly.
-	cumulatedUnits Dimensions
+	// cumulatedComplexity helps aggregating the units of complexity consumed
+	// by a block so that we can verify it's not too big/build it properly.
+	cumulatedComplexity Dimensions
 }
 
-func NewManager(unitFees Dimensions) *Manager {
+func NewManager(feeRate Dimensions) *Manager {
 	return &Manager{
-		unitFees: unitFees,
+		feeRates: feeRate,
 	}
 }
 
-func (m *Manager) GetUnitFees() Dimensions {
-	return m.unitFees
+func (m *Manager) GetFeeRates() Dimensions {
+	return m.feeRates
 }
 
-func (m *Manager) GetCumulatedUnits() Dimensions {
-	return m.cumulatedUnits
+func (m *Manager) GetCumulatedComplexity() Dimensions {
+	return m.cumulatedComplexity
 }
 
 // CalculateFee must be a stateless method
@@ -37,7 +37,7 @@ func (m *Manager) CalculateFee(units Dimensions) (uint64, error) {
 	fee := uint64(0)
 
 	for i := Dimension(0); i < FeeDimensions; i++ {
-		contribution, err := safemath.Mul64(m.unitFees[i], units[i])
+		contribution, err := safemath.Mul64(m.feeRates[i], units[i])
 		if err != nil {
 			return 0, err
 		}
@@ -49,13 +49,13 @@ func (m *Manager) CalculateFee(units Dimensions) (uint64, error) {
 	return fee, nil
 }
 
-// CumulateUnits tries to cumulate the consumed units [units]. Before
+// CumulateComplexity tries to cumulate the consumed complexity [units]. Before
 // actually cumulating them, it checks whether the result would breach [bounds].
 // If so, it returns the first dimension to breach bounds.
-func (m *Manager) CumulateUnits(units, bounds Dimensions) (bool, Dimension) {
+func (m *Manager) CumulateComplexity(units, bounds Dimensions) (bool, Dimension) {
 	// Ensure we can consume (don't want partial update of values)
 	for i := Dimension(0); i < FeeDimensions; i++ {
-		consumed, err := safemath.Add64(m.cumulatedUnits[i], units[i])
+		consumed, err := safemath.Add64(m.cumulatedComplexity[i], units[i])
 		if err != nil {
 			return true, i
 		}
@@ -66,27 +66,27 @@ func (m *Manager) CumulateUnits(units, bounds Dimensions) (bool, Dimension) {
 
 	// Commit to consumption
 	for i := Dimension(0); i < FeeDimensions; i++ {
-		consumed, err := safemath.Add64(m.cumulatedUnits[i], units[i])
+		consumed, err := safemath.Add64(m.cumulatedComplexity[i], units[i])
 		if err != nil {
 			return true, i
 		}
-		m.cumulatedUnits[i] = consumed
+		m.cumulatedComplexity[i] = consumed
 	}
 	return false, 0
 }
 
-// Sometimes, e.g. while building a tx, we'd like freedom to speculatively add units
-// and to remove them later on. [RemoveUnits] grants this freedom
-func (m *Manager) RemoveUnits(unitsToRm Dimensions) error {
+// Sometimes, e.g. while building a tx, we'd like freedom to speculatively add complexity
+// and to remove it later on. [RemoveComplexity] grants this freedom
+func (m *Manager) RemoveComplexity(unitsToRm Dimensions) error {
 	var revertedUnits Dimensions
 	for i := Dimension(0); i < FeeDimensions; i++ {
-		prev, err := safemath.Sub(m.cumulatedUnits[i], unitsToRm[i])
+		prev, err := safemath.Sub(m.cumulatedComplexity[i], unitsToRm[i])
 		if err != nil {
 			return fmt.Errorf("%w: dimension %d", err, i)
 		}
 		revertedUnits[i] = prev
 	}
 
-	m.cumulatedUnits = revertedUnits
+	m.cumulatedComplexity = revertedUnits
 	return nil
 }

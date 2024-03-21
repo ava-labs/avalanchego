@@ -29,7 +29,7 @@ import (
 )
 
 var (
-	testUnitFees = fees.Dimensions{
+	testFeeRates = fees.Dimensions{
 		1 * units.MicroAvax,
 		2 * units.MicroAvax,
 		3 * units.MicroAvax,
@@ -111,7 +111,7 @@ func TestBaseTxFees(t *testing.T) {
 						172,
 						1000,
 					},
-					fc.FeeManager.GetCumulatedUnits(),
+					fc.FeeManager.GetCumulatedComplexity(),
 				)
 			},
 		},
@@ -148,7 +148,7 @@ func TestBaseTxFees(t *testing.T) {
 				IsEUpgradeActive: cfg.IsEActivated(chainTime),
 				Config:           cfg,
 				Codec:            codec,
-				FeeManager:       fees.NewManager(testUnitFees),
+				FeeManager:       fees.NewManager(testFeeRates),
 				ConsumedUnitsCap: consumedUnitCaps,
 				Credentials:      sTx.Creds,
 			}
@@ -229,7 +229,7 @@ func TestCreateAssetTxFees(t *testing.T) {
 						172,
 						1000,
 					},
-					fc.FeeManager.GetCumulatedUnits(),
+					fc.FeeManager.GetCumulatedComplexity(),
 				)
 			},
 		},
@@ -266,7 +266,7 @@ func TestCreateAssetTxFees(t *testing.T) {
 				IsEUpgradeActive: cfg.IsEActivated(chainTime),
 				Config:           cfg,
 				Codec:            codec,
-				FeeManager:       fees.NewManager(testUnitFees),
+				FeeManager:       fees.NewManager(testFeeRates),
 				ConsumedUnitsCap: consumedUnitCaps,
 				Credentials:      sTx.Creds,
 			}
@@ -347,7 +347,7 @@ func TestOperationTxFees(t *testing.T) {
 						172,
 						1000,
 					},
-					fc.FeeManager.GetCumulatedUnits(),
+					fc.FeeManager.GetCumulatedComplexity(),
 				)
 			},
 		},
@@ -384,7 +384,7 @@ func TestOperationTxFees(t *testing.T) {
 				IsEUpgradeActive: cfg.IsEActivated(chainTime),
 				Config:           cfg,
 				Codec:            codec,
-				FeeManager:       fees.NewManager(testUnitFees),
+				FeeManager:       fees.NewManager(testFeeRates),
 				ConsumedUnitsCap: consumedUnitCaps,
 				Credentials:      sTx.Creds,
 			}
@@ -461,7 +461,7 @@ func TestImportTxFees(t *testing.T) {
 						262,
 						2000,
 					},
-					fc.FeeManager.GetCumulatedUnits(),
+					fc.FeeManager.GetCumulatedComplexity(),
 				)
 			},
 		},
@@ -498,7 +498,7 @@ func TestImportTxFees(t *testing.T) {
 				IsEUpgradeActive: cfg.IsEActivated(chainTime),
 				Config:           cfg,
 				Codec:            codec,
-				FeeManager:       fees.NewManager(testUnitFees),
+				FeeManager:       fees.NewManager(testFeeRates),
 				ConsumedUnitsCap: consumedUnitCaps,
 				Credentials:      sTx.Creds,
 			}
@@ -565,7 +565,7 @@ func TestExportTxFees(t *testing.T) {
 						254,
 						1000,
 					},
-					fc.FeeManager.GetCumulatedUnits(),
+					fc.FeeManager.GetCumulatedComplexity(),
 				)
 			},
 		},
@@ -602,7 +602,7 @@ func TestExportTxFees(t *testing.T) {
 				IsEUpgradeActive: cfg.IsEActivated(chainTime),
 				Config:           cfg,
 				Codec:            codec,
-				FeeManager:       fees.NewManager(testUnitFees),
+				FeeManager:       fees.NewManager(testFeeRates),
 				ConsumedUnitsCap: consumedUnitCaps,
 				Credentials:      sTx.Creds,
 			}

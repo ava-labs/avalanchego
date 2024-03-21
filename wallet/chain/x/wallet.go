@@ -170,8 +170,8 @@ type wallet struct {
 	signer  signer.Signer
 	client  avm.Client
 
-	isEForkActive      bool
-	unitFees, unitCaps commonfees.Dimensions
+	isEForkActive                bool
+	feeRates, blockMaxComplexity commonfees.Dimensions
 }
 
 func (w *wallet) Builder() builder.Builder {
@@ -189,14 +189,14 @@ func (w *wallet) IssueBaseTx(
 	w.refreshFork(options...)
 
 	var (
-		feesMan = commonfees.NewManager(w.unitFees)
+		feesMan = commonfees.NewManager(w.feeRates)
 		feeCalc = &fees.Calculator{
 			IsEUpgradeActive: w.isEForkActive,
 			Config: &config.Config{
 				TxFee: w.builder.Context().BaseTxFee,
 			},
 			FeeManager:       feesMan,
-			ConsumedUnitsCap: w.unitCaps,
+			ConsumedUnitsCap: w.blockMaxComplexity,
 			Codec:            builder.Parser.Codec(),
 		}
 	)
@@ -218,14 +218,14 @@ func (w *wallet) IssueCreateAssetTx(
 	w.refreshFork(options...)
 
 	var (
-		feesMan = commonfees.NewManager(w.unitFees)
+		feesMan = commonfees.NewManager(w.feeRates)
 		feeCalc = &fees.Calculator{
 			IsEUpgradeActive: w.isEForkActive,
 			Config: &config.Config{
 				TxFee: w.builder.Context().BaseTxFee,
 			},
 			FeeManager:       feesMan,
-			ConsumedUnitsCap: w.unitCaps,
+			ConsumedUnitsCap: w.blockMaxComplexity,
 			Codec:            builder.Parser.Codec(),
 		}
 	)
@@ -244,14 +244,14 @@ func (w *wallet) IssueOperationTx(
 	w.refreshFork(options...)
 
 	var (
-		feesMan = commonfees.NewManager(w.unitFees)
+		feesMan = commonfees.NewManager(w.feeRates)
 		feeCalc = &fees.Calculator{
 			IsEUpgradeActive: w.isEForkActive,
 			Config: &config.Config{
 				TxFee: w.builder.Context().BaseTxFee,
 			},
 			FeeManager:       feesMan,
-			ConsumedUnitsCap: w.unitCaps,
+			ConsumedUnitsCap: w.blockMaxComplexity,
 			Codec:            builder.Parser.Codec(),
 		}
 	)
@@ -270,14 +270,14 @@ func (w *wallet) IssueOperationTxMintFT(
 	w.refreshFork(options...)
 
 	var (
-		feesMan = commonfees.NewManager(w.unitFees)
+		feesMan = commonfees.NewManager(w.feeRates)
 		feeCalc = &fees.Calculator{
 			IsEUpgradeActive: w.isEForkActive,
 			Config: &config.Config{
 				TxFee: w.builder.Context().BaseTxFee,
 			},
 			FeeManager:       feesMan,
-			ConsumedUnitsCap: w.unitCaps,
+			ConsumedUnitsCap: w.blockMaxComplexity,
 			Codec:            builder.Parser.Codec(),
 		}
 	)
@@ -298,14 +298,14 @@ func (w *wallet) IssueOperationTxMintNFT(
 	w.refreshFork(options...)
 
 	var (
-		feesMan = commonfees.NewManager(w.unitFees)
+		feesMan = commonfees.NewManager(w.feeRates)
 		feeCalc = &fees.Calculator{
 			IsEUpgradeActive: w.isEForkActive,
 			Config: &config.Config{
 				TxFee: w.builder.Context().BaseTxFee,
 			},
 			FeeManager:       feesMan,
-			ConsumedUnitsCap: w.unitCaps,
+			ConsumedUnitsCap: w.blockMaxComplexity,
 			Codec:            builder.Parser.Codec(),
 		}
 	)
@@ -325,14 +325,14 @@ func (w *wallet) IssueOperationTxMintProperty(
 	w.refreshFork(options...)
 
 	var (
-		feesMan = commonfees.NewManager(w.unitFees)
+		feesMan = commonfees.NewManager(w.feeRates)
 		feeCalc = &fees.Calculator{
 			IsEUpgradeActive: w.isEForkActive,
 			Config: &config.Config{
 				TxFee: w.builder.Context().BaseTxFee,
 			},
 			FeeManager:       feesMan,
-			ConsumedUnitsCap: w.unitCaps,
+			ConsumedUnitsCap: w.blockMaxComplexity,
 			Codec:            builder.Parser.Codec(),
 		}
 	)
@@ -351,14 +351,14 @@ func (w *wallet) IssueOperationTxBurnProperty(
 	w.refreshFork(options...)
 
 	var (
-		feesMan = commonfees.NewManager(w.unitFees)
+		feesMan = commonfees.NewManager(w.feeRates)
 		feeCalc = &fees.Calculator{
 			IsEUpgradeActive: w.isEForkActive,
 			Config: &config.Config{
 				TxFee: w.builder.Context().BaseTxFee,
 			},
 			FeeManager:       feesMan,
-			ConsumedUnitsCap: w.unitCaps,
+			ConsumedUnitsCap: w.blockMaxComplexity,
 			Codec:            builder.Parser.Codec(),
 		}
 	)
@@ -378,14 +378,14 @@ func (w *wallet) IssueImportTx(
 	w.refreshFork(options...)
 
 	var (
-		feesMan = commonfees.NewManager(w.unitFees)
+		feesMan = commonfees.NewManager(w.feeRates)
 		feeCalc = &fees.Calculator{
 			IsEUpgradeActive: w.isEForkActive,
 			Config: &config.Config{
 				TxFee: w.builder.Context().BaseTxFee,
 			},
 			FeeManager:       feesMan,
-			ConsumedUnitsCap: w.unitCaps,
+			ConsumedUnitsCap: w.blockMaxComplexity,
 			Codec:            builder.Parser.Codec(),
 		}
 	)
@@ -405,14 +405,14 @@ func (w *wallet) IssueExportTx(
 	w.refreshFork(options...)
 
 	var (
-		feesMan = commonfees.NewManager(w.unitFees)
+		feesMan = commonfees.NewManager(w.feeRates)
 		feeCalc = &fees.Calculator{
 			IsEUpgradeActive: w.isEForkActive,
 			Config: &config.Config{
 				TxFee: w.builder.Context().BaseTxFee,
 			},
 			FeeManager:       feesMan,
-			ConsumedUnitsCap: w.unitCaps,
+			ConsumedUnitsCap: w.blockMaxComplexity,
 			Codec:            builder.Parser.Codec(),
 		}
 	)
@@ -489,6 +489,6 @@ func (w *wallet) refreshFork(_ ...common.Option) {
 	chainTime := mockable.MaxTime // assume fork is already active
 	w.isEForkActive = !chainTime.Before(eUpgradeTime)
 	feeCfg := config.GetDynamicFeesConfig(w.isEForkActive)
-	w.unitFees = feeCfg.UnitFees
-	w.unitCaps = feeCfg.BlockUnitsCap
+	w.feeRates = feeCfg.FeeRate
+	w.blockMaxComplexity = feeCfg.BlockMaxComplexity
 }

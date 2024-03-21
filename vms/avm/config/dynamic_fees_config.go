@@ -16,19 +16,19 @@ import (
 // EUpgradeDynamicFeesConfig to be tuned TODO ABENEGIA
 var (
 	eUpgradeDynamicFeesConfig = commonfees.DynamicFeesConfig{
-		UnitFees: commonfees.Dimensions{
+		FeeRate: commonfees.Dimensions{
 			1 * units.NanoAvax,
 			2 * units.NanoAvax,
 			3 * units.NanoAvax,
 			4 * units.NanoAvax,
 		},
 
-		BlockUnitsCap: commonfees.Max,
+		BlockMaxComplexity: commonfees.Max,
 	}
 
 	preEUpgradeDynamicFeesConfig = commonfees.DynamicFeesConfig{
-		UnitFees:      commonfees.Empty,
-		BlockUnitsCap: commonfees.Max,
+		FeeRate:            commonfees.Empty,
+		BlockMaxComplexity: commonfees.Max,
 	}
 
 	customDynamicFeesConfig *commonfees.DynamicFeesConfig
@@ -49,7 +49,7 @@ func ResetDynamicFeesConfig(ctx *snow.Context, customFeesConfig *commonfees.Dyna
 		return nil // nothing to do
 	}
 	if ctx.NetworkID == constants.MainnetID || ctx.NetworkID == constants.FujiID {
-		return fmt.Errorf("forbidden resetting dynamic unit fees config for network %s", constants.NetworkName(ctx.NetworkID))
+		return fmt.Errorf("forbidden resetting dynamic fee rates config for network %s", constants.NetworkName(ctx.NetworkID))
 	}
 	customDynamicFeesConfig = customFeesConfig
 	return nil

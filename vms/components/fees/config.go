@@ -4,12 +4,12 @@
 package fees
 
 type DynamicFeesConfig struct {
-	// UnitFees contains, per each fee dimension, the
-	// unit fees valid as soon as fork introducing dynamic fees
-	// activates. Unit fees are not currently updated by any dynamic fees algo.
-	UnitFees Dimensions `json:"initial-unit-fees"`
+	// FeeRate contains, per each fee dimension, the fee rate,
+	// i.e. the fee per unit of complexity. Fee rates are
+	// valid as soon as fork introducing dynamic fees activates.
+	FeeRate Dimensions `json:"fee-rate"`
 
-	// BlockUnitsCap contains, per each fee dimension, the
-	// maximal complexity a valid block can host
-	BlockUnitsCap Dimensions `json:"block-unit-caps"`
+	// BlockMaxComplexity contains, per each fee dimension, the
+	// maximal complexity a valid block can host.
+	BlockMaxComplexity Dimensions `json:"block-max-complexity"`
 }
