@@ -112,7 +112,22 @@ func (p *NodeProcess) Start(w io.Writer) error {
 		return fmt.Errorf("failed to remove stale process context file: %w", err)
 	}
 
+	// All argument are provided in the flags file
 	cmd := exec.Command(p.node.RuntimeConfig.AvalancheGoPath, "--config-file", p.node.getFlagsPath()) // #nosec G204
+
+	// Ensure process is detached from the parent process so that an error in the parent will not affect the child
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		Setsid: true,
+	}
+
+	// Redirect stdout and stderr error to a file since it will detach from the parent process
+	outfile, err := os.OpenFile("nohup.out", os.O_RDWR|os.O_CREATE|os.O_TRUNC, perms.ReadWrite)
+	if err != nil {
+		return fmt.Errorf("failed to create stderr/stdout output file: %w", err)
+	}
+	cmd.Stdout = outfile
+	cmd.Stderr = outfile
+
 	if err := cmd.Start(); err != nil {
 		return err
 	}
@@ -128,15 +143,6 @@ func (p *NodeProcess) Start(w io.Writer) error {
 		// Only include the data dir if its base is not the default (the node ID)
 		nodeDescription = fmt.Sprintf("%s with path: %s", nodeDescription, dataDir)
 	}
-
-	go func() {
-		if err := cmd.Wait(); err != nil {
-			if err.Error() != "signal: killed" {
-				_, _ = fmt.Fprintf(w, "%s finished with error: %v\n", nodeDescription, err)
-			}
-		}
-		_, _ = fmt.Fprintf(w, "%s exited\n", nodeDescription)
-	}()
 
 	// A node writes a process context file on start. If the file is not
 	// found in a reasonable amount of time, the node is unlikely to have

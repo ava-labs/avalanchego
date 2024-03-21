@@ -46,7 +46,7 @@ func DefaultFlags() FlagsMap {
 		config.HealthCheckFreqKey:               "2s",
 		config.AdminAPIEnabledKey:               true,
 		config.IndexEnabledKey:                  true,
-		config.LogDisplayLevelKey:               "INFO",
+		config.LogDisplayLevelKey:               "off", // Display logging not needed since nodes run headless
 		config.LogLevelKey:                      "DEBUG",
 		config.MinStakeDurationKey:              DefaultMinStakeDuration.String(),
 	}
