@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer"
@@ -24,10 +25,6 @@ const (
 	logPeriod             = 5 * time.Second
 )
 
-type Parser interface {
-	ParseBlock(context.Context, []byte) (snowman.Block, error)
-}
-
 // GetMissingBlockIDs returns the ID of the blocks that should be fetched to
 // attempt to make a single continuous range from
 // (lastAcceptedHeight, highestTrackedHeight].
@@ -38,7 +35,7 @@ type Parser interface {
 func GetMissingBlockIDs(
 	ctx context.Context,
 	db database.KeyValueReader,
-	parser Parser,
+	parser block.Parser,
 	tree *Tree,
 	lastAcceptedHeight uint64,
 ) (set.Set[ids.ID], error) {
@@ -105,7 +102,7 @@ func Execute(
 	ctx context.Context,
 	log logging.Func,
 	db database.Database,
-	parser Parser,
+	parser block.Parser,
 	tree *Tree,
 	lastAcceptedHeight uint64,
 ) error {
