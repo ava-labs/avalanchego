@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package x
+package builder
 
 import (
 	"github.com/ava-labs/avalanchego/ids"
@@ -15,28 +15,32 @@ import (
 var _ Builder = (*builderWithOptions)(nil)
 
 type builderWithOptions struct {
-	Builder
+	builder Builder
 	options []common.Option
 }
 
-// NewBuilderWithOptions returns a new transaction builder that will use the
-// given options by default.
+// NewWithOptions returns a new transaction builder that will use the given
+// options by default.
 //
 //   - [builder] is the builder that will be called to perform the underlying
 //     operations.
 //   - [options] will be provided to the builder in addition to the options
 //     provided in the method calls.
-func NewBuilderWithOptions(builder Builder, options ...common.Option) Builder {
+func NewWithOptions(builder Builder, options ...common.Option) Builder {
 	return &builderWithOptions{
-		Builder: builder,
+		builder: builder,
 		options: options,
 	}
+}
+
+func (b *builderWithOptions) Context() *Context {
+	return b.builder.Context()
 }
 
 func (b *builderWithOptions) GetFTBalance(
 	options ...common.Option,
 ) (map[ids.ID]uint64, error) {
-	return b.Builder.GetFTBalance(
+	return b.builder.GetFTBalance(
 		common.UnionOptions(b.options, options)...,
 	)
 }
@@ -45,7 +49,7 @@ func (b *builderWithOptions) GetImportableBalance(
 	chainID ids.ID,
 	options ...common.Option,
 ) (map[ids.ID]uint64, error) {
-	return b.Builder.GetImportableBalance(
+	return b.builder.GetImportableBalance(
 		chainID,
 		common.UnionOptions(b.options, options)...,
 	)
@@ -55,7 +59,7 @@ func (b *builderWithOptions) NewBaseTx(
 	outputs []*avax.TransferableOutput,
 	options ...common.Option,
 ) (*txs.BaseTx, error) {
-	return b.Builder.NewBaseTx(
+	return b.builder.NewBaseTx(
 		outputs,
 		common.UnionOptions(b.options, options)...,
 	)
@@ -68,7 +72,7 @@ func (b *builderWithOptions) NewCreateAssetTx(
 	initialState map[uint32][]verify.State,
 	options ...common.Option,
 ) (*txs.CreateAssetTx, error) {
-	return b.Builder.NewCreateAssetTx(
+	return b.builder.NewCreateAssetTx(
 		name,
 		symbol,
 		denomination,
@@ -81,7 +85,7 @@ func (b *builderWithOptions) NewOperationTx(
 	operations []*txs.Operation,
 	options ...common.Option,
 ) (*txs.OperationTx, error) {
-	return b.Builder.NewOperationTx(
+	return b.builder.NewOperationTx(
 		operations,
 		common.UnionOptions(b.options, options)...,
 	)
@@ -91,7 +95,7 @@ func (b *builderWithOptions) NewOperationTxMintFT(
 	outputs map[ids.ID]*secp256k1fx.TransferOutput,
 	options ...common.Option,
 ) (*txs.OperationTx, error) {
-	return b.Builder.NewOperationTxMintFT(
+	return b.builder.NewOperationTxMintFT(
 		outputs,
 		common.UnionOptions(b.options, options)...,
 	)
@@ -103,7 +107,7 @@ func (b *builderWithOptions) NewOperationTxMintNFT(
 	owners []*secp256k1fx.OutputOwners,
 	options ...common.Option,
 ) (*txs.OperationTx, error) {
-	return b.Builder.NewOperationTxMintNFT(
+	return b.builder.NewOperationTxMintNFT(
 		assetID,
 		payload,
 		owners,
@@ -116,7 +120,7 @@ func (b *builderWithOptions) NewOperationTxMintProperty(
 	owner *secp256k1fx.OutputOwners,
 	options ...common.Option,
 ) (*txs.OperationTx, error) {
-	return b.Builder.NewOperationTxMintProperty(
+	return b.builder.NewOperationTxMintProperty(
 		assetID,
 		owner,
 		common.UnionOptions(b.options, options)...,
@@ -127,7 +131,7 @@ func (b *builderWithOptions) NewOperationTxBurnProperty(
 	assetID ids.ID,
 	options ...common.Option,
 ) (*txs.OperationTx, error) {
-	return b.Builder.NewOperationTxBurnProperty(
+	return b.builder.NewOperationTxBurnProperty(
 		assetID,
 		common.UnionOptions(b.options, options)...,
 	)
@@ -138,7 +142,7 @@ func (b *builderWithOptions) NewImportTx(
 	to *secp256k1fx.OutputOwners,
 	options ...common.Option,
 ) (*txs.ImportTx, error) {
-	return b.Builder.NewImportTx(
+	return b.builder.NewImportTx(
 		chainID,
 		to,
 		common.UnionOptions(b.options, options)...,
@@ -150,7 +154,7 @@ func (b *builderWithOptions) NewExportTx(
 	outputs []*avax.TransferableOutput,
 	options ...common.Option,
 ) (*txs.ExportTx, error) {
-	return b.Builder.NewExportTx(
+	return b.builder.NewExportTx(
 		chainID,
 		outputs,
 		common.UnionOptions(b.options, options)...,

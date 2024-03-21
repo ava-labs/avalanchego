@@ -10,7 +10,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/indexer"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
-	"github.com/ava-labs/avalanchego/wallet/chain/x"
+	"github.com/ava-labs/avalanchego/wallet/chain/x/builder"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
 )
 
@@ -37,7 +37,7 @@ func main() {
 		}
 
 		avmBlockBytes := proposerVMBlock.Block()
-		avmBlock, err := x.Parser.ParseBlock(avmBlockBytes)
+		avmBlock, err := builder.Parser.ParseBlock(avmBlockBytes)
 		if err != nil {
 			log.Fatalf("failed to parse avm block: %s\n", err)
 		}
