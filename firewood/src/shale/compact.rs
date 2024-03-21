@@ -14,11 +14,9 @@ use std::io::{Cursor, Write};
 use std::num::NonZeroUsize;
 use std::sync::RwLock;
 
-type PayLoadSize = u64;
-
 #[derive(Debug)]
 pub struct CompactHeader {
-    payload_size: PayLoadSize,
+    payload_size: u64,
     is_freed: bool,
     desc_addr: DiskAddress,
 }
@@ -81,11 +79,11 @@ impl Storable for CompactHeader {
 
 #[derive(Debug)]
 struct CompactFooter {
-    payload_size: PayLoadSize,
+    payload_size: u64,
 }
 
 impl CompactFooter {
-    const SERIALIZED_LEN: u64 = std::mem::size_of::<PayLoadSize>() as u64;
+    const SERIALIZED_LEN: u64 = std::mem::size_of::<u64>() as u64;
 }
 
 impl Storable for CompactFooter {
@@ -113,7 +111,7 @@ impl Storable for CompactFooter {
 
 #[derive(Clone, Copy, Debug)]
 struct CompactDescriptor {
-    payload_size: PayLoadSize,
+    payload_size: u64,
     haddr: usize, // disk address of the free space
 }
 
