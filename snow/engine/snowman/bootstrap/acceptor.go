@@ -44,9 +44,10 @@ type blockAcceptor struct {
 }
 
 func (b *blockAcceptor) Accept(ctx context.Context) error {
-	b.numAccepted.Inc()
 	if err := b.ctx.BlockAcceptor.Accept(b.ctx, b.ID(), b.Bytes()); err != nil {
 		return err
 	}
-	return b.Block.Accept(ctx)
+	err := b.Block.Accept(ctx)
+	b.numAccepted.Inc()
+	return err
 }
