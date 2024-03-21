@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package x
+package builder
 
 import (
 	"github.com/ava-labs/avalanchego/ids"
@@ -10,35 +10,38 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-	"github.com/ava-labs/avalanchego/wallet/chain/x/backends"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
 
-var _ backends.Builder = (*builderWithOptions)(nil)
+var _ Builder = (*builderWithOptions)(nil)
 
 type builderWithOptions struct {
-	backends.Builder
+	builder Builder
 	options []common.Option
 }
 
-// NewBuilderWithOptions returns a new transaction builder that will use the
-// given options by default.
+// NewWithOptions returns a new transaction builder that will use the given
+// options by default.
 //
 //   - [builder] is the builder that will be called to perform the underlying
 //     operations.
 //   - [options] will be provided to the builder in addition to the options
 //     provided in the method calls.
-func NewBuilderWithOptions(builder backends.Builder, options ...common.Option) backends.Builder {
+func NewWithOptions(builder Builder, options ...common.Option) Builder {
 	return &builderWithOptions{
-		Builder: builder,
+		builder: builder,
 		options: options,
 	}
+}
+
+func (b *builderWithOptions) Context() *Context {
+	return b.builder.Context()
 }
 
 func (b *builderWithOptions) GetFTBalance(
 	options ...common.Option,
 ) (map[ids.ID]uint64, error) {
-	return b.Builder.GetFTBalance(
+	return b.builder.GetFTBalance(
 		common.UnionOptions(b.options, options)...,
 	)
 }
@@ -47,7 +50,7 @@ func (b *builderWithOptions) GetImportableBalance(
 	chainID ids.ID,
 	options ...common.Option,
 ) (map[ids.ID]uint64, error) {
-	return b.Builder.GetImportableBalance(
+	return b.builder.GetImportableBalance(
 		chainID,
 		common.UnionOptions(b.options, options)...,
 	)
@@ -58,7 +61,7 @@ func (b *builderWithOptions) NewBaseTx(
 	feeCalc *fees.Calculator,
 	options ...common.Option,
 ) (*txs.BaseTx, error) {
-	return b.Builder.NewBaseTx(
+	return b.builder.NewBaseTx(
 		outputs,
 		feeCalc,
 		common.UnionOptions(b.options, options)...,
@@ -73,7 +76,7 @@ func (b *builderWithOptions) NewCreateAssetTx(
 	feeCalc *fees.Calculator,
 	options ...common.Option,
 ) (*txs.CreateAssetTx, error) {
-	return b.Builder.NewCreateAssetTx(
+	return b.builder.NewCreateAssetTx(
 		name,
 		symbol,
 		denomination,
@@ -88,7 +91,7 @@ func (b *builderWithOptions) NewOperationTx(
 	feeCalc *fees.Calculator,
 	options ...common.Option,
 ) (*txs.OperationTx, error) {
-	return b.Builder.NewOperationTx(
+	return b.builder.NewOperationTx(
 		operations,
 		feeCalc,
 		common.UnionOptions(b.options, options)...,
@@ -100,7 +103,7 @@ func (b *builderWithOptions) NewOperationTxMintFT(
 	feeCalc *fees.Calculator,
 	options ...common.Option,
 ) (*txs.OperationTx, error) {
-	return b.Builder.NewOperationTxMintFT(
+	return b.builder.NewOperationTxMintFT(
 		outputs,
 		feeCalc,
 		common.UnionOptions(b.options, options)...,
@@ -114,7 +117,7 @@ func (b *builderWithOptions) NewOperationTxMintNFT(
 	feeCalc *fees.Calculator,
 	options ...common.Option,
 ) (*txs.OperationTx, error) {
-	return b.Builder.NewOperationTxMintNFT(
+	return b.builder.NewOperationTxMintNFT(
 		assetID,
 		payload,
 		owners,
@@ -129,7 +132,7 @@ func (b *builderWithOptions) NewOperationTxMintProperty(
 	feeCalc *fees.Calculator,
 	options ...common.Option,
 ) (*txs.OperationTx, error) {
-	return b.Builder.NewOperationTxMintProperty(
+	return b.builder.NewOperationTxMintProperty(
 		assetID,
 		owner,
 		feeCalc,
@@ -142,7 +145,7 @@ func (b *builderWithOptions) NewOperationTxBurnProperty(
 	feeCalc *fees.Calculator,
 	options ...common.Option,
 ) (*txs.OperationTx, error) {
-	return b.Builder.NewOperationTxBurnProperty(
+	return b.builder.NewOperationTxBurnProperty(
 		assetID,
 		feeCalc,
 		common.UnionOptions(b.options, options)...,
@@ -155,7 +158,7 @@ func (b *builderWithOptions) NewImportTx(
 	feeCalc *fees.Calculator,
 	options ...common.Option,
 ) (*txs.ImportTx, error) {
-	return b.Builder.NewImportTx(
+	return b.builder.NewImportTx(
 		chainID,
 		to,
 		feeCalc,
@@ -169,7 +172,7 @@ func (b *builderWithOptions) NewExportTx(
 	feeCalc *fees.Calculator,
 	options ...common.Option,
 ) (*txs.ExportTx, error) {
-	return b.Builder.NewExportTx(
+	return b.builder.NewExportTx(
 		chainID,
 		outputs,
 		feeCalc,

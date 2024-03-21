@@ -17,19 +17,22 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-	"github.com/ava-labs/avalanchego/wallet/chain/x/backends"
+	"github.com/ava-labs/avalanchego/wallet/chain/x/signer"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
 	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
+	walletbuilder "github.com/ava-labs/avalanchego/wallet/chain/x/builder"
 )
 
 type txBuilderBackend interface {
-	backends.Backend
+	walletbuilder.Backend
+	signer.Backend
 
 	State() state.State
 	Config() *config.Config
 	Codec() codec.Manager
 
+	Context() *walletbuilder.Context
 	ResetAddresses(addrs set.Set[ids.ShortID])
 }
 
@@ -74,7 +77,7 @@ func buildCreateAssetTx(
 		return nil, ids.ShortEmpty, fmt.Errorf("failed building base tx: %w", err)
 	}
 
-	tx, err := backends.SignUnsigned(context.Background(), pSigner, utx)
+	tx, err := signer.SignUnsigned(context.Background(), pSigner, utx)
 	if err != nil {
 		return nil, ids.ShortEmpty, err
 	}
@@ -119,7 +122,7 @@ func buildBaseTx(
 		return nil, ids.ShortEmpty, fmt.Errorf("failed building base tx: %w", err)
 	}
 
-	tx, err := backends.SignUnsigned(context.Background(), pSigner, utx)
+	tx, err := signer.SignUnsigned(context.Background(), pSigner, utx)
 	if err != nil {
 		return nil, ids.ShortEmpty, err
 	}
@@ -167,7 +170,7 @@ func mintNFT(
 		return nil, fmt.Errorf("failed minting NFTs: %w", err)
 	}
 
-	return backends.SignUnsigned(context.Background(), pSigner, utx)
+	return signer.SignUnsigned(context.Background(), pSigner, utx)
 }
 
 func mintFTs(
@@ -205,7 +208,7 @@ func mintFTs(
 		return nil, fmt.Errorf("failed minting FTs: %w", err)
 	}
 
-	return backends.SignUnsigned(context.Background(), pSigner, utx)
+	return signer.SignUnsigned(context.Background(), pSigner, utx)
 }
 
 func buildOperation(
@@ -244,7 +247,7 @@ func buildOperation(
 		return nil, fmt.Errorf("failed building operation tx: %w", err)
 	}
 
-	return backends.SignUnsigned(context.Background(), pSigner, utx)
+	return signer.SignUnsigned(context.Background(), pSigner, utx)
 }
 
 func buildImportTx(
@@ -289,7 +292,7 @@ func buildImportTx(
 		return nil, fmt.Errorf("failed building import tx: %w", err)
 	}
 
-	return backends.SignUnsigned(context.Background(), pSigner, utx)
+	return signer.SignUnsigned(context.Background(), pSigner, utx)
 }
 
 func buildExportTx(
@@ -344,19 +347,20 @@ func buildExportTx(
 		return nil, ids.ShortEmpty, fmt.Errorf("failed building export tx: %w", err)
 	}
 
-	tx, err := backends.SignUnsigned(context.Background(), pSigner, utx)
+	tx, err := signer.SignUnsigned(context.Background(), pSigner, utx)
 	if err != nil {
 		return nil, ids.ShortEmpty, err
 	}
 	return tx, changeAddr, nil
 }
 
-func builders(backend txBuilderBackend, kc *secp256k1fx.Keychain) (backends.Builder, backends.Signer) {
+func builders(backend txBuilderBackend, kc *secp256k1fx.Keychain) (walletbuilder.Builder, signer.Signer) {
 	var (
 		addrs   = kc.Addresses()
-		builder = backends.NewBuilder(addrs, backend)
-		signer  = backends.NewSigner(kc, backend)
+		builder = walletbuilder.New(addrs, backend.Context(), backend)
+		signer  = signer.New(kc, backend)
 	)
+
 	backend.ResetAddresses(addrs)
 
 	return builder, signer

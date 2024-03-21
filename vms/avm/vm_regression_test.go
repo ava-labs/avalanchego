@@ -19,9 +19,7 @@ import (
 func TestVerifyFxUsage(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{
-		fork: eUpgrade,
-	})
+	env := setup(t, &envConfig{fork: latest})
 	env.vm.ctx.Lock.Unlock()
 	defer func() {
 		env.vm.ctx.Lock.Lock()

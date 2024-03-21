@@ -17,26 +17,25 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-	"github.com/ava-labs/avalanchego/wallet/chain/x/backends"
+	"github.com/ava-labs/avalanchego/wallet/chain/x/builder"
+	"github.com/ava-labs/avalanchego/wallet/chain/x/signer"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
 	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 var (
-	errNotAccepted = errors.New("not accepted")
+	ErrNotAccepted = errors.New("not accepted")
 
 	_ Wallet = (*wallet)(nil)
 )
 
 type Wallet interface {
-	backends.Context
-
 	// Builder returns the builder that will be used to create the transactions.
-	Builder() backends.Builder
+	Builder() builder.Builder
 
 	// Signer returns the signer that will be used to sign the transactions.
-	Signer() backends.Signer
+	Signer() signer.Signer
 
 	// IssueBaseTx creates, signs, and issues a new simple value transfer.
 	//
@@ -152,13 +151,13 @@ type Wallet interface {
 }
 
 func NewWallet(
-	builder backends.Builder,
-	signer backends.Signer,
+	builder builder.Builder,
+	signer signer.Signer,
 	client avm.Client,
 	backend Backend,
 ) Wallet {
 	return &wallet{
-		Backend: backend,
+		backend: backend,
 		builder: builder,
 		signer:  signer,
 		client:  client,
@@ -166,21 +165,20 @@ func NewWallet(
 }
 
 type wallet struct {
-	Backend
-
-	builder backends.Builder
-	signer  backends.Signer
+	backend Backend
+	builder builder.Builder
+	signer  signer.Signer
 	client  avm.Client
 
 	isEForkActive      bool
 	unitFees, unitCaps commonfees.Dimensions
 }
 
-func (w *wallet) Builder() backends.Builder {
+func (w *wallet) Builder() builder.Builder {
 	return w.builder
 }
 
-func (w *wallet) Signer() backends.Signer {
+func (w *wallet) Signer() signer.Signer {
 	return w.signer
 }
 
@@ -197,11 +195,11 @@ func (w *wallet) IssueBaseTx(
 		feeCalc = &fees.Calculator{
 			IsEUpgradeActive: w.isEForkActive,
 			Config: &config.Config{
-				TxFee: w.BaseTxFee(),
+				TxFee: w.builder.Context().BaseTxFee,
 			},
 			FeeManager:       feesMan,
 			ConsumedUnitsCap: w.unitCaps,
-			Codec:            backends.Parser.Codec(),
+			Codec:            builder.Parser.Codec(),
 		}
 	)
 
@@ -228,11 +226,11 @@ func (w *wallet) IssueCreateAssetTx(
 		feeCalc = &fees.Calculator{
 			IsEUpgradeActive: w.isEForkActive,
 			Config: &config.Config{
-				TxFee: w.BaseTxFee(),
+				TxFee: w.builder.Context().BaseTxFee,
 			},
 			FeeManager:       feesMan,
 			ConsumedUnitsCap: w.unitCaps,
-			Codec:            backends.Parser.Codec(),
+			Codec:            builder.Parser.Codec(),
 		}
 	)
 
@@ -256,11 +254,11 @@ func (w *wallet) IssueOperationTx(
 		feeCalc = &fees.Calculator{
 			IsEUpgradeActive: w.isEForkActive,
 			Config: &config.Config{
-				TxFee: w.BaseTxFee(),
+				TxFee: w.builder.Context().BaseTxFee,
 			},
 			FeeManager:       feesMan,
 			ConsumedUnitsCap: w.unitCaps,
-			Codec:            backends.Parser.Codec(),
+			Codec:            builder.Parser.Codec(),
 		}
 	)
 
@@ -284,11 +282,11 @@ func (w *wallet) IssueOperationTxMintFT(
 		feeCalc = &fees.Calculator{
 			IsEUpgradeActive: w.isEForkActive,
 			Config: &config.Config{
-				TxFee: w.BaseTxFee(),
+				TxFee: w.builder.Context().BaseTxFee,
 			},
 			FeeManager:       feesMan,
 			ConsumedUnitsCap: w.unitCaps,
-			Codec:            backends.Parser.Codec(),
+			Codec:            builder.Parser.Codec(),
 		}
 	)
 
@@ -314,11 +312,11 @@ func (w *wallet) IssueOperationTxMintNFT(
 		feeCalc = &fees.Calculator{
 			IsEUpgradeActive: w.isEForkActive,
 			Config: &config.Config{
-				TxFee: w.BaseTxFee(),
+				TxFee: w.builder.Context().BaseTxFee,
 			},
 			FeeManager:       feesMan,
 			ConsumedUnitsCap: w.unitCaps,
-			Codec:            backends.Parser.Codec(),
+			Codec:            builder.Parser.Codec(),
 		}
 	)
 
@@ -343,11 +341,11 @@ func (w *wallet) IssueOperationTxMintProperty(
 		feeCalc = &fees.Calculator{
 			IsEUpgradeActive: w.isEForkActive,
 			Config: &config.Config{
-				TxFee: w.BaseTxFee(),
+				TxFee: w.builder.Context().BaseTxFee,
 			},
 			FeeManager:       feesMan,
 			ConsumedUnitsCap: w.unitCaps,
-			Codec:            backends.Parser.Codec(),
+			Codec:            builder.Parser.Codec(),
 		}
 	)
 
@@ -371,11 +369,11 @@ func (w *wallet) IssueOperationTxBurnProperty(
 		feeCalc = &fees.Calculator{
 			IsEUpgradeActive: w.isEForkActive,
 			Config: &config.Config{
-				TxFee: w.BaseTxFee(),
+				TxFee: w.builder.Context().BaseTxFee,
 			},
 			FeeManager:       feesMan,
 			ConsumedUnitsCap: w.unitCaps,
-			Codec:            backends.Parser.Codec(),
+			Codec:            builder.Parser.Codec(),
 		}
 	)
 
@@ -400,11 +398,11 @@ func (w *wallet) IssueImportTx(
 		feeCalc = &fees.Calculator{
 			IsEUpgradeActive: w.isEForkActive,
 			Config: &config.Config{
-				TxFee: w.BaseTxFee(),
+				TxFee: w.builder.Context().BaseTxFee,
 			},
 			FeeManager:       feesMan,
 			ConsumedUnitsCap: w.unitCaps,
-			Codec:            backends.Parser.Codec(),
+			Codec:            builder.Parser.Codec(),
 		}
 	)
 
@@ -429,11 +427,11 @@ func (w *wallet) IssueExportTx(
 		feeCalc = &fees.Calculator{
 			IsEUpgradeActive: w.isEForkActive,
 			Config: &config.Config{
-				TxFee: w.BaseTxFee(),
+				TxFee: w.builder.Context().BaseTxFee,
 			},
 			FeeManager:       feesMan,
 			ConsumedUnitsCap: w.unitCaps,
-			Codec:            backends.Parser.Codec(),
+			Codec:            builder.Parser.Codec(),
 		}
 	)
 
@@ -450,7 +448,7 @@ func (w *wallet) IssueUnsignedTx(
 ) (*txs.Tx, error) {
 	ops := common.NewOptions(options)
 	ctx := ops.Context()
-	tx, err := backends.SignUnsigned(ctx, w.signer, utx)
+	tx, err := signer.SignUnsigned(ctx, w.signer, utx)
 	if err != nil {
 		return nil, err
 	}
@@ -474,7 +472,7 @@ func (w *wallet) IssueTx(
 	}
 
 	if ops.AssumeDecided() {
-		return w.Backend.AcceptTx(ctx, tx)
+		return w.backend.AcceptTx(ctx, tx)
 	}
 
 	txStatus, err := w.client.ConfirmTx(ctx, txID, ops.PollFrequency())
@@ -482,12 +480,12 @@ func (w *wallet) IssueTx(
 		return err
 	}
 
-	if err := w.Backend.AcceptTx(ctx, tx); err != nil {
+	if err := w.backend.AcceptTx(ctx, tx); err != nil {
 		return err
 	}
 
 	if txStatus != choices.Accepted {
-		return errNotAccepted
+		return ErrNotAccepted
 	}
 	return nil
 }
@@ -510,7 +508,7 @@ func (w *wallet) refreshFork(options ...common.Option) error {
 		return err
 	}
 
-	eUpgradeTime := version.GetEUpgradeTime(w.NetworkID())
+	eUpgradeTime := version.GetEUpgradeTime(w.builder.Context().NetworkID)
 
 	// TODO ABENEGIA: consider introducing this method in X-chain as well
 	// chainTime, err := w.client.GetTimestamp(ctx)

@@ -20,7 +20,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/nftfx"
 	"github.com/ava-labs/avalanchego/vms/propertyfx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-	"github.com/ava-labs/avalanchego/wallet/chain/x/backends"
+	"github.com/ava-labs/avalanchego/wallet/chain/x/builder"
+	"github.com/ava-labs/avalanchego/wallet/chain/x/signer"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
 	stdcontext "context"
@@ -37,13 +38,13 @@ var (
 	nftAssetID      = ids.Empty.Prefix(2022)
 	propertyAssetID = ids.Empty.Prefix(2023)
 
-	testCtx = backends.NewContext(
-		constants.UnitTestID,
-		xChainID,
-		avaxAssetID,
-		units.MicroAvax,    // BaseTxFee
-		99*units.MilliAvax, // CreateAssetTxFee
-	)
+	testContext = &builder.Context{
+		NetworkID:        constants.UnitTestID,
+		BlockchainID:     xChainID,
+		AVAXAssetID:      avaxAssetID,
+		BaseTxFee:        units.MicroAvax,
+		CreateAssetTxFee: 99 * units.MilliAvax,
+	}
 
 	testUnitFees = commonfees.Dimensions{
 		1 * units.MicroAvax,
@@ -70,13 +71,13 @@ func TestBaseTx(t *testing.T) {
 				xChainID: utxos,
 			},
 		)
-		backend = NewBackend(testCtx, genericBackend)
+		backend = NewBackend(testContext, genericBackend)
 
 		// builder and signer
 		utxoAddr = utxosKey.Address()
-		builder  = backends.NewBuilder(set.Of(utxoAddr), backend)
+		b        = builder.New(set.Of(utxoAddr), testContext, backend)
 		kc       = secp256k1fx.NewKeychain(utxosKey)
-		s        = backends.NewSigner(kc, genericBackend)
+		s        = signer.New(kc, genericBackend)
 
 		// data to build the transaction
 		outputsToMove = []*avax.TransferableOutput{{
@@ -96,15 +97,15 @@ func TestBaseTx(t *testing.T) {
 			IsEUpgradeActive: true,
 			FeeManager:       commonfees.NewManager(testUnitFees),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
-			Codec:            backends.Parser.Codec(),
+			Codec:            builder.Parser.Codec(),
 		}
-		utx, err := builder.NewBaseTx(
+		utx, err := b.NewBaseTx(
 			outputsToMove,
 			feeCalc,
 		)
 		require.NoError(err)
 
-		tx, err := backends.SignUnsigned(stdcontext.Background(), s, utx)
+		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
 
 		fc := &fees.Calculator{
@@ -112,7 +113,7 @@ func TestBaseTx(t *testing.T) {
 			FeeManager:       commonfees.NewManager(testUnitFees),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
 			Credentials:      tx.Creds,
-			Codec:            backends.Parser.Codec(),
+			Codec:            builder.Parser.Codec(),
 		}
 		require.NoError(utx.Visit(fc))
 		require.Equal(9930*units.MicroAvax, fc.Fee)
@@ -133,33 +134,33 @@ func TestBaseTx(t *testing.T) {
 		feeCalc := &fees.Calculator{
 			IsEUpgradeActive: false,
 			Config: &config.Config{
-				TxFee: testCtx.BaseTxFee(),
+				TxFee: testContext.BaseTxFee,
 			},
 			FeeManager:       commonfees.NewManager(commonfees.Empty),
 			ConsumedUnitsCap: commonfees.Max,
-			Codec:            backends.Parser.Codec(),
+			Codec:            builder.Parser.Codec(),
 		}
-		utx, err := builder.NewBaseTx(
+		utx, err := b.NewBaseTx(
 			outputsToMove,
 			feeCalc,
 		)
 		require.NoError(err)
 
-		tx, err := backends.SignUnsigned(stdcontext.Background(), s, utx)
+		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
 
 		fc := &fees.Calculator{
 			IsEUpgradeActive: false,
 			Config: &config.Config{
-				TxFee: testCtx.BaseTxFee(),
+				TxFee: testContext.BaseTxFee,
 			},
 			FeeManager:       commonfees.NewManager(commonfees.Empty),
 			ConsumedUnitsCap: commonfees.Max,
-			Codec:            backends.Parser.Codec(),
+			Codec:            builder.Parser.Codec(),
 			Credentials:      tx.Creds,
 		}
 		require.NoError(utx.Visit(fc))
-		require.Equal(testCtx.BaseTxFee(), fc.Fee)
+		require.Equal(testContext.BaseTxFee, fc.Fee)
 
 		// check UTXOs selection and fee financing
 		ins := utx.Ins
@@ -187,13 +188,13 @@ func TestCreateAssetTx(t *testing.T) {
 				xChainID: utxos,
 			},
 		)
-		backend = NewBackend(testCtx, genericBackend)
+		backend = NewBackend(testContext, genericBackend)
 
 		// builder and signer
 		utxoAddr = utxosKey.Address()
-		builder  = backends.NewBuilder(set.Of(utxoAddr), backend)
+		b        = builder.New(set.Of(utxoAddr), testContext, backend)
 		kc       = secp256k1fx.NewKeychain(utxosKey)
-		s        = backends.NewSigner(kc, genericBackend)
+		s        = signer.New(kc, genericBackend)
 
 		// data to build the transaction
 		assetName          = "Team Rocket"
@@ -252,10 +253,10 @@ func TestCreateAssetTx(t *testing.T) {
 			IsEUpgradeActive: true,
 			FeeManager:       commonfees.NewManager(testUnitFees),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
-			Codec:            backends.Parser.Codec(),
+			Codec:            builder.Parser.Codec(),
 		}
 
-		utx, err := builder.NewCreateAssetTx(
+		utx, err := b.NewCreateAssetTx(
 			assetName,
 			symbol,
 			denomination,
@@ -264,14 +265,14 @@ func TestCreateAssetTx(t *testing.T) {
 		)
 		require.NoError(err)
 
-		tx, err := backends.SignUnsigned(stdcontext.Background(), s, utx)
+		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
 
 		fc := &fees.Calculator{
 			IsEUpgradeActive: true,
 			FeeManager:       commonfees.NewManager(testUnitFees),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
-			Codec:            backends.Parser.Codec(),
+			Codec:            builder.Parser.Codec(),
 			Credentials:      tx.Creds,
 		}
 		require.NoError(utx.Visit(fc))
@@ -293,14 +294,14 @@ func TestCreateAssetTx(t *testing.T) {
 		feeCalc := &fees.Calculator{
 			IsEUpgradeActive: false,
 			Config: &config.Config{
-				CreateAssetTxFee: testCtx.CreateAssetTxFee(),
+				CreateAssetTxFee: testContext.CreateAssetTxFee,
 			},
 			FeeManager:       commonfees.NewManager(commonfees.Empty),
 			ConsumedUnitsCap: commonfees.Max,
-			Codec:            backends.Parser.Codec(),
+			Codec:            builder.Parser.Codec(),
 		}
 
-		utx, err := builder.NewCreateAssetTx(
+		utx, err := b.NewCreateAssetTx(
 			assetName,
 			symbol,
 			denomination,
@@ -309,17 +310,17 @@ func TestCreateAssetTx(t *testing.T) {
 		)
 		require.NoError(err)
 
-		tx, err := backends.SignUnsigned(stdcontext.Background(), s, utx)
+		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
 
 		fc := &fees.Calculator{
 			IsEUpgradeActive: false,
 			Config: &config.Config{
-				CreateAssetTxFee: testCtx.CreateAssetTxFee(),
+				CreateAssetTxFee: testContext.CreateAssetTxFee,
 			},
 			FeeManager:       commonfees.NewManager(commonfees.Empty),
 			ConsumedUnitsCap: commonfees.Max,
-			Codec:            backends.Parser.Codec(),
+			Codec:            builder.Parser.Codec(),
 			Credentials:      tx.Creds,
 		}
 		require.NoError(utx.Visit(fc))
@@ -348,13 +349,13 @@ func TestMintNFTOperation(t *testing.T) {
 				xChainID: utxos,
 			},
 		)
-		backend = NewBackend(testCtx, genericBackend)
+		backend = NewBackend(testContext, genericBackend)
 
 		// builder and signer
 		utxoAddr = utxosKey.Address()
-		builder  = backends.NewBuilder(set.Of(utxoAddr), backend)
+		b        = builder.New(set.Of(utxoAddr), testContext, backend)
 		kc       = secp256k1fx.NewKeychain(utxosKey)
-		s        = backends.NewSigner(kc, genericBackend)
+		s        = signer.New(kc, genericBackend)
 
 		// data to build the transaction
 		payload  = []byte{'h', 'e', 'l', 'l', 'o'}
@@ -370,10 +371,10 @@ func TestMintNFTOperation(t *testing.T) {
 			IsEUpgradeActive: true,
 			FeeManager:       commonfees.NewManager(testUnitFees),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
-			Codec:            backends.Parser.Codec(),
+			Codec:            builder.Parser.Codec(),
 		}
 
-		utx, err := builder.NewOperationTxMintNFT(
+		utx, err := b.NewOperationTxMintNFT(
 			nftAssetID,
 			payload,
 			[]*secp256k1fx.OutputOwners{NFTOwner},
@@ -381,14 +382,14 @@ func TestMintNFTOperation(t *testing.T) {
 		)
 		require.NoError(err)
 
-		tx, err := backends.SignUnsigned(stdcontext.Background(), s, utx)
+		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
 
 		fc := &fees.Calculator{
 			IsEUpgradeActive: true,
 			FeeManager:       commonfees.NewManager(testUnitFees),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
-			Codec:            backends.Parser.Codec(),
+			Codec:            builder.Parser.Codec(),
 			Credentials:      tx.Creds,
 		}
 		require.NoError(utx.Visit(fc))
@@ -410,14 +411,14 @@ func TestMintNFTOperation(t *testing.T) {
 		feeCalc := &fees.Calculator{
 			IsEUpgradeActive: false,
 			Config: &config.Config{
-				TxFee: testCtx.BaseTxFee(),
+				TxFee: testContext.BaseTxFee,
 			},
 			FeeManager:       commonfees.NewManager(commonfees.Empty),
 			ConsumedUnitsCap: commonfees.Max,
-			Codec:            backends.Parser.Codec(),
+			Codec:            builder.Parser.Codec(),
 		}
 
-		utx, err := builder.NewOperationTxMintNFT(
+		utx, err := b.NewOperationTxMintNFT(
 			nftAssetID,
 			payload,
 			[]*secp256k1fx.OutputOwners{NFTOwner},
@@ -425,21 +426,21 @@ func TestMintNFTOperation(t *testing.T) {
 		)
 		require.NoError(err)
 
-		tx, err := backends.SignUnsigned(stdcontext.Background(), s, utx)
+		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
 
 		fc := &fees.Calculator{
 			IsEUpgradeActive: false,
 			Config: &config.Config{
-				TxFee: testCtx.BaseTxFee(),
+				TxFee: testContext.BaseTxFee,
 			},
 			FeeManager:       commonfees.NewManager(commonfees.Empty),
 			ConsumedUnitsCap: commonfees.Max,
-			Codec:            backends.Parser.Codec(),
+			Codec:            builder.Parser.Codec(),
 			Credentials:      tx.Creds,
 		}
 		require.NoError(utx.Visit(fc))
-		require.Equal(testCtx.BaseTxFee(), fc.Fee)
+		require.Equal(testContext.BaseTxFee, fc.Fee)
 
 		// check UTXOs selection and fee financing
 		ins := utx.Ins
@@ -466,13 +467,13 @@ func TestMintFTOperation(t *testing.T) {
 				xChainID: utxos,
 			},
 		)
-		backend = NewBackend(testCtx, genericBackend)
+		backend = NewBackend(testContext, genericBackend)
 
 		// builder and signer
 		utxoAddr = utxosKey.Address()
-		builder  = backends.NewBuilder(set.Of(utxoAddr), backend)
+		b        = builder.New(set.Of(utxoAddr), testContext, backend)
 		kc       = secp256k1fx.NewKeychain(utxosKey)
-		s        = backends.NewSigner(kc, genericBackend)
+		s        = signer.New(kc, genericBackend)
 
 		// data to build the transaction
 		outputs = map[ids.ID]*secp256k1fx.TransferOutput{
@@ -492,23 +493,23 @@ func TestMintFTOperation(t *testing.T) {
 			IsEUpgradeActive: true,
 			FeeManager:       commonfees.NewManager(testUnitFees),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
-			Codec:            backends.Parser.Codec(),
+			Codec:            builder.Parser.Codec(),
 		}
 
-		utx, err := builder.NewOperationTxMintFT(
+		utx, err := b.NewOperationTxMintFT(
 			outputs,
 			feeCalc,
 		)
 		require.NoError(err)
 
-		tx, err := backends.SignUnsigned(stdcontext.Background(), s, utx)
+		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
 
 		fc := &fees.Calculator{
 			IsEUpgradeActive: true,
 			FeeManager:       commonfees.NewManager(testUnitFees),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
-			Codec:            backends.Parser.Codec(),
+			Codec:            builder.Parser.Codec(),
 			Credentials:      tx.Creds,
 		}
 		require.NoError(utx.Visit(fc))
@@ -530,34 +531,34 @@ func TestMintFTOperation(t *testing.T) {
 		feeCalc := &fees.Calculator{
 			IsEUpgradeActive: false,
 			Config: &config.Config{
-				TxFee: testCtx.BaseTxFee(),
+				TxFee: testContext.BaseTxFee,
 			},
 			FeeManager:       commonfees.NewManager(commonfees.Empty),
 			ConsumedUnitsCap: commonfees.Max,
-			Codec:            backends.Parser.Codec(),
+			Codec:            builder.Parser.Codec(),
 		}
 
-		utx, err := builder.NewOperationTxMintFT(
+		utx, err := b.NewOperationTxMintFT(
 			outputs,
 			feeCalc,
 		)
 		require.NoError(err)
 
-		tx, err := backends.SignUnsigned(stdcontext.Background(), s, utx)
+		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
 
 		fc := &fees.Calculator{
 			IsEUpgradeActive: false,
 			Config: &config.Config{
-				TxFee: testCtx.BaseTxFee(),
+				TxFee: testContext.BaseTxFee,
 			},
 			FeeManager:       commonfees.NewManager(commonfees.Empty),
 			ConsumedUnitsCap: commonfees.Max,
-			Codec:            backends.Parser.Codec(),
+			Codec:            builder.Parser.Codec(),
 			Credentials:      tx.Creds,
 		}
 		require.NoError(utx.Visit(fc))
-		require.Equal(testCtx.BaseTxFee(), fc.Fee)
+		require.Equal(testContext.BaseTxFee, fc.Fee)
 
 		// check UTXOs selection and fee financing
 		ins := utx.Ins
@@ -565,7 +566,7 @@ func TestMintFTOperation(t *testing.T) {
 		require.Len(ins, 1)
 		require.Len(outs, 1)
 
-		expectedConsumed := testCtx.BaseTxFee()
+		expectedConsumed := testContext.BaseTxFee
 		consumed := ins[0].In.Amount() - outs[0].Out.Amount()
 		require.Equal(expectedConsumed, consumed)
 	}
@@ -584,13 +585,13 @@ func TestMintPropertyOperation(t *testing.T) {
 				xChainID: utxos,
 			},
 		)
-		backend = NewBackend(testCtx, genericBackend)
+		backend = NewBackend(testContext, genericBackend)
 
 		// builder and signer
 		utxoAddr = utxosKey.Address()
-		builder  = backends.NewBuilder(set.Of(utxoAddr), backend)
+		b        = builder.New(set.Of(utxoAddr), testContext, backend)
 		kc       = secp256k1fx.NewKeychain(utxosKey)
-		s        = backends.NewSigner(kc, genericBackend)
+		s        = signer.New(kc, genericBackend)
 
 		// data to build the transaction
 		propertyOwner = &secp256k1fx.OutputOwners{
@@ -605,24 +606,24 @@ func TestMintPropertyOperation(t *testing.T) {
 			IsEUpgradeActive: true,
 			FeeManager:       commonfees.NewManager(testUnitFees),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
-			Codec:            backends.Parser.Codec(),
+			Codec:            builder.Parser.Codec(),
 		}
 
-		utx, err := builder.NewOperationTxMintProperty(
+		utx, err := b.NewOperationTxMintProperty(
 			propertyAssetID,
 			propertyOwner,
 			feeCalc,
 		)
 		require.NoError(err)
 
-		tx, err := backends.SignUnsigned(stdcontext.Background(), s, utx)
+		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
 
 		fc := &fees.Calculator{
 			IsEUpgradeActive: true,
 			FeeManager:       commonfees.NewManager(testUnitFees),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
-			Codec:            backends.Parser.Codec(),
+			Codec:            builder.Parser.Codec(),
 			Credentials:      tx.Creds,
 		}
 		require.NoError(utx.Visit(fc))
@@ -644,35 +645,35 @@ func TestMintPropertyOperation(t *testing.T) {
 		feeCalc := &fees.Calculator{
 			IsEUpgradeActive: false,
 			Config: &config.Config{
-				TxFee: testCtx.BaseTxFee(),
+				TxFee: testContext.BaseTxFee,
 			},
 			FeeManager:       commonfees.NewManager(commonfees.Empty),
 			ConsumedUnitsCap: commonfees.Max,
-			Codec:            backends.Parser.Codec(),
+			Codec:            builder.Parser.Codec(),
 		}
 
-		utx, err := builder.NewOperationTxMintProperty(
+		utx, err := b.NewOperationTxMintProperty(
 			propertyAssetID,
 			propertyOwner,
 			feeCalc,
 		)
 		require.NoError(err)
 
-		tx, err := backends.SignUnsigned(stdcontext.Background(), s, utx)
+		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
 
 		fc := &fees.Calculator{
 			IsEUpgradeActive: false,
 			Config: &config.Config{
-				TxFee: testCtx.BaseTxFee(),
+				TxFee: testContext.BaseTxFee,
 			},
 			FeeManager:       commonfees.NewManager(commonfees.Empty),
 			ConsumedUnitsCap: commonfees.Max,
-			Codec:            backends.Parser.Codec(),
+			Codec:            builder.Parser.Codec(),
 			Credentials:      tx.Creds,
 		}
 		require.NoError(utx.Visit(fc))
-		require.Equal(testCtx.BaseTxFee(), fc.Fee)
+		require.Equal(testContext.BaseTxFee, fc.Fee)
 
 		// check UTXOs selection and fee financing
 		ins := utx.Ins
@@ -699,13 +700,13 @@ func TestBurnPropertyOperation(t *testing.T) {
 				xChainID: utxos,
 			},
 		)
-		backend = NewBackend(testCtx, genericBackend)
+		backend = NewBackend(testContext, genericBackend)
 
 		// builder and signer
 		utxoAddr = utxosKey.Address()
-		builder  = backends.NewBuilder(set.Of(utxoAddr), backend)
+		b        = builder.New(set.Of(utxoAddr), testContext, backend)
 		kc       = secp256k1fx.NewKeychain(utxosKey)
-		s        = backends.NewSigner(kc, genericBackend)
+		s        = signer.New(kc, genericBackend)
 	)
 
 	{
@@ -714,23 +715,23 @@ func TestBurnPropertyOperation(t *testing.T) {
 			IsEUpgradeActive: true,
 			FeeManager:       commonfees.NewManager(testUnitFees),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
-			Codec:            backends.Parser.Codec(),
+			Codec:            builder.Parser.Codec(),
 		}
 
-		utx, err := builder.NewOperationTxBurnProperty(
+		utx, err := b.NewOperationTxBurnProperty(
 			propertyAssetID,
 			feeCalc,
 		)
 		require.NoError(err)
 
-		tx, err := backends.SignUnsigned(stdcontext.Background(), s, utx)
+		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
 
 		fc := &fees.Calculator{
 			IsEUpgradeActive: true,
 			FeeManager:       commonfees.NewManager(testUnitFees),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
-			Codec:            backends.Parser.Codec(),
+			Codec:            builder.Parser.Codec(),
 			Credentials:      tx.Creds,
 		}
 		require.NoError(utx.Visit(fc))
@@ -752,34 +753,34 @@ func TestBurnPropertyOperation(t *testing.T) {
 		feeCalc := &fees.Calculator{
 			IsEUpgradeActive: false,
 			Config: &config.Config{
-				TxFee: testCtx.BaseTxFee(),
+				TxFee: testContext.BaseTxFee,
 			},
 			FeeManager:       commonfees.NewManager(commonfees.Empty),
 			ConsumedUnitsCap: commonfees.Max,
-			Codec:            backends.Parser.Codec(),
+			Codec:            builder.Parser.Codec(),
 		}
 
-		utx, err := builder.NewOperationTxBurnProperty(
+		utx, err := b.NewOperationTxBurnProperty(
 			propertyAssetID,
 			feeCalc,
 		)
 		require.NoError(err)
 
-		tx, err := backends.SignUnsigned(stdcontext.Background(), s, utx)
+		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
 
 		fc := &fees.Calculator{
 			IsEUpgradeActive: false,
 			Config: &config.Config{
-				TxFee: testCtx.BaseTxFee(),
+				TxFee: testContext.BaseTxFee,
 			},
 			FeeManager:       commonfees.NewManager(commonfees.Empty),
 			ConsumedUnitsCap: commonfees.Max,
-			Codec:            backends.Parser.Codec(),
+			Codec:            builder.Parser.Codec(),
 			Credentials:      tx.Creds,
 		}
 		require.NoError(utx.Visit(fc))
-		require.Equal(testCtx.BaseTxFee(), fc.Fee)
+		require.Equal(testContext.BaseTxFee, fc.Fee)
 
 		// check UTXOs selection and fee financing
 		ins := utx.Ins
@@ -810,13 +811,13 @@ func TestImportTx(t *testing.T) {
 			},
 		)
 
-		backend = NewBackend(testCtx, genericBackend)
+		backend = NewBackend(testContext, genericBackend)
 
 		// builder and signer
 		utxoAddr = utxosKey.Address()
-		builder  = backends.NewBuilder(set.Of(utxoAddr), backend)
+		b        = builder.New(set.Of(utxoAddr), testContext, backend)
 		kc       = secp256k1fx.NewKeychain(utxosKey)
-		s        = backends.NewSigner(kc, genericBackend)
+		s        = signer.New(kc, genericBackend)
 
 		// data to build the transaction
 		importKey = testKeys[0]
@@ -833,16 +834,16 @@ func TestImportTx(t *testing.T) {
 			IsEUpgradeActive: true,
 			FeeManager:       commonfees.NewManager(testUnitFees),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
-			Codec:            backends.Parser.Codec(),
+			Codec:            builder.Parser.Codec(),
 		}
-		utx, err := builder.NewImportTx(
+		utx, err := b.NewImportTx(
 			sourceChainID,
 			importTo,
 			feeCalc,
 		)
 		require.NoError(err)
 
-		tx, err := backends.SignUnsigned(stdcontext.Background(), s, utx)
+		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
 
 		fc := &fees.Calculator{
@@ -850,7 +851,7 @@ func TestImportTx(t *testing.T) {
 			FeeManager:       commonfees.NewManager(testUnitFees),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
 			Credentials:      tx.Creds,
-			Codec:            backends.Parser.Codec(),
+			Codec:            builder.Parser.Codec(),
 		}
 		require.NoError(utx.Visit(fc))
 		require.Equal(14251*units.MicroAvax, fc.Fee)
@@ -872,34 +873,34 @@ func TestImportTx(t *testing.T) {
 		feeCalc := &fees.Calculator{
 			IsEUpgradeActive: false,
 			Config: &config.Config{
-				TxFee: testCtx.BaseTxFee(),
+				TxFee: testContext.BaseTxFee,
 			},
 			FeeManager:       commonfees.NewManager(commonfees.Empty),
 			ConsumedUnitsCap: commonfees.Max,
-			Codec:            backends.Parser.Codec(),
+			Codec:            builder.Parser.Codec(),
 		}
-		utx, err := builder.NewImportTx(
+		utx, err := b.NewImportTx(
 			sourceChainID,
 			importTo,
 			feeCalc,
 		)
 		require.NoError(err)
 
-		tx, err := backends.SignUnsigned(stdcontext.Background(), s, utx)
+		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
 
 		fc := &fees.Calculator{
 			IsEUpgradeActive: false,
 			Config: &config.Config{
-				TxFee: testCtx.BaseTxFee(),
+				TxFee: testContext.BaseTxFee,
 			},
 			FeeManager:       commonfees.NewManager(commonfees.Empty),
 			ConsumedUnitsCap: commonfees.Max,
-			Codec:            backends.Parser.Codec(),
 			Credentials:      tx.Creds,
+			Codec:            builder.Parser.Codec(),
 		}
 		require.NoError(utx.Visit(fc))
-		require.Equal(testCtx.BaseTxFee(), fc.Fee)
+		require.Equal(testContext.BaseTxFee, fc.Fee)
 
 		// check UTXOs selection and fee financing
 		ins := utx.Ins
@@ -928,13 +929,13 @@ func TestExportTx(t *testing.T) {
 				xChainID: utxos,
 			},
 		)
-		backend = NewBackend(testCtx, genericBackend)
+		backend = NewBackend(testContext, genericBackend)
 
 		// builder and signer
 		utxoAddr = utxosKey.Address()
-		builder  = backends.NewBuilder(set.Of(utxoAddr), backend)
+		b        = builder.New(set.Of(utxoAddr), testContext, backend)
 		kc       = secp256k1fx.NewKeychain(utxosKey)
-		s        = backends.NewSigner(kc, genericBackend)
+		s        = signer.New(kc, genericBackend)
 
 		// data to build the transaction
 		subnetID        = ids.GenerateTestID()
@@ -955,16 +956,16 @@ func TestExportTx(t *testing.T) {
 			IsEUpgradeActive: true,
 			FeeManager:       commonfees.NewManager(testUnitFees),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
-			Codec:            backends.Parser.Codec(),
+			Codec:            builder.Parser.Codec(),
 		}
-		utx, err := builder.NewExportTx(
+		utx, err := b.NewExportTx(
 			subnetID,
 			exportedOutputs,
 			feeCalc,
 		)
 		require.NoError(err)
 
-		tx, err := backends.SignUnsigned(stdcontext.Background(), s, utx)
+		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
 
 		fc := &fees.Calculator{
@@ -972,7 +973,7 @@ func TestExportTx(t *testing.T) {
 			FeeManager:       commonfees.NewManager(testUnitFees),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
 			Credentials:      tx.Creds,
-			Codec:            backends.Parser.Codec(),
+			Codec:            builder.Parser.Codec(),
 		}
 		require.NoError(utx.Visit(fc))
 		require.Equal(9966*units.MicroAvax, fc.Fee)
@@ -993,34 +994,34 @@ func TestExportTx(t *testing.T) {
 		feeCalc := &fees.Calculator{
 			IsEUpgradeActive: false,
 			Config: &config.Config{
-				TxFee: testCtx.BaseTxFee(),
+				TxFee: testContext.BaseTxFee,
 			},
 			FeeManager:       commonfees.NewManager(commonfees.Empty),
 			ConsumedUnitsCap: commonfees.Max,
-			Codec:            backends.Parser.Codec(),
+			Codec:            builder.Parser.Codec(),
 		}
-		utx, err := builder.NewExportTx(
+		utx, err := b.NewExportTx(
 			subnetID,
 			exportedOutputs,
 			feeCalc,
 		)
 		require.NoError(err)
 
-		tx, err := backends.SignUnsigned(stdcontext.Background(), s, utx)
+		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
 
 		fc := &fees.Calculator{
 			IsEUpgradeActive: false,
 			Config: &config.Config{
-				TxFee: testCtx.BaseTxFee(),
+				TxFee: testContext.BaseTxFee,
 			},
 			FeeManager:       commonfees.NewManager(commonfees.Empty),
 			ConsumedUnitsCap: commonfees.Max,
-			Codec:            backends.Parser.Codec(),
 			Credentials:      tx.Creds,
+			Codec:            builder.Parser.Codec(),
 		}
 		require.NoError(utx.Visit(fc))
-		require.Equal(testCtx.BaseTxFee(), fc.Fee)
+		require.Equal(testContext.BaseTxFee, fc.Fee)
 
 		// check UTXOs selection and fee financing
 		ins := utx.Ins

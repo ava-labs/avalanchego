@@ -26,7 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
-	xbackends "github.com/ava-labs/avalanchego/wallet/chain/x/backends"
+	xbuilder "github.com/ava-labs/avalanchego/wallet/chain/x/builder"
 	ginkgo "github.com/onsi/ginkgo/v2"
 )
 
@@ -50,6 +50,8 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 			pContext := pBuilder.Context()
 			avaxAssetID := pContext.AVAXAssetID
 			xWallet := baseWallet.X()
+			xBuilder := xWallet.Builder()
+			xContext := xBuilder.Context()
 			pChainClient := platformvm.NewClient(nodeURI.URI)
 			xChainClient := avm.NewClient(nodeURI.URI, "X")
 
@@ -149,7 +151,7 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 
 			ginkgo.By("export avax from P to X chain", func() {
 				_, err := pWallet.IssueExportTx(
-					xWallet.BlockchainID(),
+					xContext.BlockchainID,
 					[]*avax.TransferableOutput{
 						{
 							Asset: avax.Asset{
@@ -195,7 +197,7 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 					IsEUpgradeActive: true,
 					FeeManager:       commonfees.NewManager(unitFees),
 					ConsumedUnitsCap: feeCfg.BlockUnitsCap,
-					Codec:            xbackends.Parser.Codec(),
+					Codec:            xbuilder.Parser.Codec(),
 					Credentials:      tx.Creds,
 				}
 

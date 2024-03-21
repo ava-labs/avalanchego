@@ -15,7 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/state"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/wallet/chain/x/backends"
+	"github.com/ava-labs/avalanchego/wallet/chain/x/builder"
 )
 
 var _ txBuilderBackend = (*serviceBackend)(nil)
@@ -28,16 +28,17 @@ func newServiceBackend(
 	state state.State,
 	atomicUTXOsMan avax.AtomicUTXOManager,
 ) *serviceBackend {
-	backendCtx := backends.NewContext(
-		ctx.NetworkID,
-		ctx.XChainID,
-		feeAssetID,
-		cfg.TxFee,
-		cfg.CreateAssetTxFee,
-	)
+	backendCtx := &builder.Context{
+		NetworkID:        ctx.NetworkID,
+		BlockchainID:     ctx.XChainID,
+		AVAXAssetID:      feeAssetID,
+		BaseTxFee:        cfg.TxFee,
+		CreateAssetTxFee: cfg.CreateAssetTxFee,
+	}
+
 	return &serviceBackend{
-		Context:        backendCtx,
 		codec:          codec,
+		ctx:            backendCtx,
 		xchainID:       ctx.XChainID,
 		cfg:            cfg,
 		state:          state,
@@ -46,9 +47,8 @@ func newServiceBackend(
 }
 
 type serviceBackend struct {
-	backends.Context
-
 	codec          codec.Manager
+	ctx            *builder.Context
 	xchainID       ids.ID
 	cfg            *config.Config
 	addrs          set.Set[ids.ShortID]
@@ -66,6 +66,10 @@ func (b *serviceBackend) Config() *config.Config {
 
 func (b *serviceBackend) Codec() codec.Manager {
 	return b.codec
+}
+
+func (b *serviceBackend) Context() *builder.Context {
+	return b.ctx
 }
 
 func (b *serviceBackend) ResetAddresses(addrs set.Set[ids.ShortID]) {

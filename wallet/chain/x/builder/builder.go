@@ -1,9 +1,10 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package backends
+package builder
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -30,9 +31,9 @@ var (
 	errInsufficientFunds = errors.New("insufficient funds")
 
 	fxIndexToID = map[uint32]ids.ID{
-		0: secp256k1fx.ID,
-		1: nftfx.ID,
-		2: propertyfx.ID,
+		SECP256K1FxIndex: secp256k1fx.ID,
+		NFTFxIndex:       nftfx.ID,
+		PropertyFxIndex:  propertyfx.ID,
 	}
 
 	_ Builder = (*builder)(nil)
@@ -41,6 +42,10 @@ var (
 // Builder provides a convenient interface for building unsigned X-chain
 // transactions.
 type Builder interface {
+	// Context returns the configuration of the chain that this builder uses to
+	// create transactions.
+	Context() *Context
+
 	// GetFTBalance calculates the amount of each fungible asset that this
 	// builder has control over.
 	GetFTBalance(
@@ -166,29 +171,43 @@ type Builder interface {
 	) (*txs.ExportTx, error)
 }
 
-type builder struct {
-	addrs   set.Set[ids.ShortID]
-	backend BuilderBackend
+type Backend interface {
+	UTXOs(ctx context.Context, sourceChainID ids.ID) ([]*avax.UTXO, error)
 }
 
-// NewBuilder returns a new transaction builder.
+type builder struct {
+	addrs   set.Set[ids.ShortID]
+	context *Context
+	backend Backend
+}
+
+// New returns a new transaction builder.
 //
 //   - [addrs] is the set of addresses that the builder assumes can be used when
 //     signing the transactions in the future.
-//   - [backend] provides the required access to the chain's context and state
-//     to build out the transactions.
-func NewBuilder(addrs set.Set[ids.ShortID], backend BuilderBackend) Builder {
+//   - [context] provides the chain's configuration.
+//   - [backend] provides the chain's state.
+func New(
+	addrs set.Set[ids.ShortID],
+	context *Context,
+	backend Backend,
+) Builder {
 	return &builder{
 		addrs:   addrs,
+		context: context,
 		backend: backend,
 	}
+}
+
+func (b *builder) Context() *Context {
+	return b.context
 }
 
 func (b *builder) GetFTBalance(
 	options ...common.Option,
 ) (map[ids.ID]uint64, error) {
 	ops := common.NewOptions(options)
-	return b.getBalance(b.backend.BlockchainID(), ops)
+	return b.getBalance(b.context.BlockchainID, ops)
 }
 
 func (b *builder) GetImportableBalance(
@@ -209,8 +228,8 @@ func (b *builder) NewBaseTx(
 
 	utx := &txs.BaseTx{
 		BaseTx: avax.BaseTx{
-			NetworkID:    b.backend.NetworkID(),
-			BlockchainID: b.backend.BlockchainID(),
+			NetworkID:    b.context.NetworkID,
+			BlockchainID: b.context.BlockchainID,
 			Memo:         ops.Memo(),
 			Outs:         outputs, // not sorted yet, we'll sort later on when we have all the outputs
 		},
@@ -271,8 +290,8 @@ func (b *builder) NewCreateAssetTx(
 
 	utx := &txs.CreateAssetTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    b.backend.NetworkID(),
-			BlockchainID: b.backend.BlockchainID(),
+			NetworkID:    b.context.NetworkID,
+			BlockchainID: b.context.BlockchainID,
 			Memo:         ops.Memo(),
 		}},
 		Name:         name,
@@ -312,8 +331,8 @@ func (b *builder) NewOperationTx(
 
 	utx := &txs.OperationTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    b.backend.NetworkID(),
-			BlockchainID: b.backend.BlockchainID(),
+			NetworkID:    b.context.NetworkID,
+			BlockchainID: b.context.BlockchainID,
 			Memo:         ops.Memo(),
 		}},
 		Ops: operations,
@@ -344,7 +363,7 @@ func (b *builder) NewOperationTxMintFT(
 	options ...common.Option,
 ) (*txs.OperationTx, error) {
 	ops := common.NewOptions(options)
-	operations, err := mintFTs(b.addrs, b.backend, outputs, feeCalc, ops)
+	operations, err := mintFTs(b.addrs, b.backend, b.context, outputs, feeCalc, ops)
 	if err != nil {
 		return nil, err
 	}
@@ -359,7 +378,7 @@ func (b *builder) NewOperationTxMintNFT(
 	options ...common.Option,
 ) (*txs.OperationTx, error) {
 	ops := common.NewOptions(options)
-	operations, err := mintNFTs(b.addrs, b.backend, assetID, payload, owners, feeCalc, ops)
+	operations, err := mintNFTs(b.addrs, b.backend, b.context, assetID, payload, owners, feeCalc, ops)
 	if err != nil {
 		return nil, err
 	}
@@ -373,7 +392,7 @@ func (b *builder) NewOperationTxMintProperty(
 	options ...common.Option,
 ) (*txs.OperationTx, error) {
 	ops := common.NewOptions(options)
-	operations, err := mintProperty(b.addrs, b.backend, assetID, owner, feeCalc, ops)
+	operations, err := mintProperty(b.addrs, b.backend, b.context, assetID, owner, feeCalc, ops)
 	if err != nil {
 		return nil, err
 	}
@@ -386,7 +405,7 @@ func (b *builder) NewOperationTxBurnProperty(
 	options ...common.Option,
 ) (*txs.OperationTx, error) {
 	ops := common.NewOptions(options)
-	operations, err := burnProperty(b.addrs, b.backend, assetID, feeCalc, ops)
+	operations, err := burnProperty(b.addrs, b.backend, b.context, assetID, feeCalc, ops)
 	if err != nil {
 		return nil, err
 	}
@@ -403,8 +422,8 @@ func (b *builder) NewImportTx(
 	// 1. Build core transaction
 	utx := &txs.ImportTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    b.backend.NetworkID(),
-			BlockchainID: b.backend.BlockchainID(),
+			NetworkID:    b.context.NetworkID,
+			BlockchainID: b.context.BlockchainID,
 			Memo:         ops.Memo(),
 		}},
 		SourceChain: chainID,
@@ -419,7 +438,7 @@ func (b *builder) NewImportTx(
 	var (
 		addrs           = ops.Addresses(b.addrs)
 		minIssuanceTime = ops.MinIssuanceTime()
-		avaxAssetID     = b.backend.AVAXAssetID()
+		avaxAssetID     = b.context.AVAXAssetID
 
 		importedInputs     = make([]*avax.TransferableInput, 0, len(utxos))
 		importedSigIndices = make([][]uint32, 0)
@@ -574,8 +593,8 @@ func (b *builder) NewExportTx(
 
 	utx := &txs.ExportTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    b.backend.NetworkID(),
-			BlockchainID: b.backend.BlockchainID(),
+			NetworkID:    b.context.NetworkID,
+			BlockchainID: b.context.BlockchainID,
 			Memo:         ops.Memo(),
 		}},
 		DestinationChain: chainID,
@@ -658,8 +677,8 @@ func (b *builder) financeTx(
 	changeOutputs []*avax.TransferableOutput,
 	err error,
 ) {
-	avaxAssetID := b.backend.AVAXAssetID()
-	utxos, err := b.backend.UTXOs(options.Context(), b.backend.BlockchainID())
+	avaxAssetID := b.context.AVAXAssetID
+	utxos, err := b.backend.UTXOs(options.Context(), b.context.BlockchainID)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -798,7 +817,8 @@ func (b *builder) financeTx(
 
 func mintFTs(
 	addresses set.Set[ids.ShortID],
-	backend BuilderBackend,
+	backend Backend,
+	context *Context,
 	outputs map[ids.ID]*secp256k1fx.TransferOutput,
 	feeCalc *fees.Calculator,
 	options *common.Options,
@@ -806,7 +826,7 @@ func mintFTs(
 	operations []*txs.Operation,
 	err error,
 ) {
-	utxos, err := backend.UTXOs(options.Context(), backend.BlockchainID())
+	utxos, err := backend.UTXOs(options.Context(), context.BlockchainID)
 	if err != nil {
 		return nil, err
 	}
@@ -866,7 +886,8 @@ func mintFTs(
 // TODO: make this able to generate multiple NFT groups
 func mintNFTs(
 	addresses set.Set[ids.ShortID],
-	backend BuilderBackend,
+	backend Backend,
+	context *Context,
 	assetID ids.ID,
 	payload []byte,
 	owners []*secp256k1fx.OutputOwners,
@@ -876,7 +897,7 @@ func mintNFTs(
 	operations []*txs.Operation,
 	err error,
 ) {
-	utxos, err := backend.UTXOs(options.Context(), backend.BlockchainID())
+	utxos, err := backend.UTXOs(options.Context(), context.BlockchainID)
 	if err != nil {
 		return nil, err
 	}
@@ -932,7 +953,8 @@ func mintNFTs(
 
 func mintProperty(
 	addresses set.Set[ids.ShortID],
-	backend BuilderBackend,
+	backend Backend,
+	context *Context,
 	assetID ids.ID,
 	owner *secp256k1fx.OutputOwners,
 	feeCalc *fees.Calculator,
@@ -941,7 +963,7 @@ func mintProperty(
 	operations []*txs.Operation,
 	err error,
 ) {
-	utxos, err := backend.UTXOs(options.Context(), backend.BlockchainID())
+	utxos, err := backend.UTXOs(options.Context(), context.BlockchainID)
 	if err != nil {
 		return nil, err
 	}
@@ -998,7 +1020,8 @@ func mintProperty(
 
 func burnProperty(
 	addresses set.Set[ids.ShortID],
-	backend BuilderBackend,
+	backend Backend,
+	context *Context,
 	assetID ids.ID,
 	feeCalc *fees.Calculator,
 	options *common.Options,
@@ -1006,7 +1029,7 @@ func burnProperty(
 	operations []*txs.Operation,
 	err error,
 ) {
-	utxos, err := backend.UTXOs(options.Context(), backend.BlockchainID())
+	utxos, err := backend.UTXOs(options.Context(), context.BlockchainID)
 	if err != nil {
 		return nil, err
 	}
@@ -1059,7 +1082,11 @@ func burnProperty(
 }
 
 func (b *builder) initCtx(tx txs.UnsignedTx) error {
-	ctx, err := NewSnowContext(b.backend)
+	ctx, err := NewSnowContext(
+		b.context.NetworkID,
+		b.context.BlockchainID,
+		b.context.AVAXAssetID,
+	)
 	if err != nil {
 		return err
 	}
