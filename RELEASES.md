@@ -21,10 +21,10 @@ The plugin version is updated to `35` all plugins must update to be compatible.
   - `network-peer-list-gossip-frequency`
   - `consensus-accepted-frontier-gossip-validator-size`
   - `consensus-accepted-frontier-gossip-non-validator-size`
-	- `consensus-accepted-frontier-gossip-peer-size`
-	- `consensus-on-accept-gossip-validator-size`
-	- `consensus-on-accept-gossip-non-validator-size`
-	- `consensus-on-accept-gossip-peer-size`
+  - `consensus-accepted-frontier-gossip-peer-size`
+  - `consensus-on-accept-gossip-validator-size`
+  - `consensus-on-accept-gossip-non-validator-size`
+  - `consensus-on-accept-gossip-peer-size`
 - Added P-chain, X-chain, and C-chain configs:
   - `push-gossip-percent-stake`
 
