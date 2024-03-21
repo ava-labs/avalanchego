@@ -284,17 +284,7 @@ func (b *builder) NewImportTx(
 ) (*txs.Tx, error) {
 	var (
 		pBuilder, pSigner = b.builders(keys)
-		chainTime         = b.state.GetTimestamp()
-		feeCfg            = config.GetDynamicFeesConfig(b.cfg.IsEActivated(chainTime))
-		isEUpgradeActive  = b.cfg.IsEActivated(chainTime)
-
-		feeCalc = &fees.Calculator{
-			IsEUpgradeActive:   isEUpgradeActive,
-			Config:             b.cfg,
-			ChainTime:          chainTime,
-			FeeManager:         commonfees.NewManager(feeCfg.FeeRate),
-			BlockMaxComplexity: feeCfg.BlockMaxComplexity,
-		}
+		feeCalc           = b.feeCalculator()
 	)
 
 	outOwner := &secp256k1fx.OutputOwners{
@@ -331,17 +321,7 @@ func (b *builder) NewExportTx(
 ) (*txs.Tx, error) {
 	var (
 		pBuilder, pSigner = b.builders(keys)
-		chainTime         = b.state.GetTimestamp()
-		feeCfg            = config.GetDynamicFeesConfig(b.cfg.IsEActivated(chainTime))
-		isEUpgradeActive  = b.cfg.IsEActivated(chainTime)
-
-		feeCalc = &fees.Calculator{
-			IsEUpgradeActive:   isEUpgradeActive,
-			Config:             b.cfg,
-			ChainTime:          chainTime,
-			FeeManager:         commonfees.NewManager(feeCfg.FeeRate),
-			BlockMaxComplexity: feeCfg.BlockMaxComplexity,
-		}
+		feeCalc           = b.feeCalculator()
 	)
 
 	outputs := []*avax.TransferableOutput{{
@@ -385,17 +365,7 @@ func (b *builder) NewCreateChainTx(
 ) (*txs.Tx, error) {
 	var (
 		pBuilder, pSigner = b.builders(keys)
-		chainTime         = b.state.GetTimestamp()
-		feeCfg            = config.GetDynamicFeesConfig(b.cfg.IsEActivated(chainTime))
-		isEUpgradeActive  = b.cfg.IsEActivated(chainTime)
-
-		feeCalc = &fees.Calculator{
-			IsEUpgradeActive:   isEUpgradeActive,
-			Config:             b.cfg,
-			ChainTime:          chainTime,
-			FeeManager:         commonfees.NewManager(feeCfg.FeeRate),
-			BlockMaxComplexity: feeCfg.BlockMaxComplexity,
-		}
+		feeCalc           = b.feeCalculator()
 	)
 
 	utx, err := pBuilder.NewCreateChainTx(
@@ -427,17 +397,7 @@ func (b *builder) NewCreateSubnetTx(
 ) (*txs.Tx, error) {
 	var (
 		pBuilder, pSigner = b.builders(keys)
-		chainTime         = b.state.GetTimestamp()
-		feeCfg            = config.GetDynamicFeesConfig(b.cfg.IsEActivated(chainTime))
-		isEUpgradeActive  = b.cfg.IsEActivated(chainTime)
-
-		feeCalc = &fees.Calculator{
-			IsEUpgradeActive:   isEUpgradeActive,
-			Config:             b.cfg,
-			ChainTime:          chainTime,
-			FeeManager:         commonfees.NewManager(feeCfg.FeeRate),
-			BlockMaxComplexity: feeCfg.BlockMaxComplexity,
-		}
+		feeCalc           = b.feeCalculator()
 	)
 
 	utils.Sort(ownerAddrs) // sort control addresses
@@ -483,17 +443,7 @@ func (b *builder) NewTransformSubnetTx(
 ) (*txs.Tx, error) {
 	var (
 		pBuilder, pSigner = b.builders(keys)
-		chainTime         = b.state.GetTimestamp()
-		feeCfg            = config.GetDynamicFeesConfig(b.cfg.IsEActivated(chainTime))
-		isEUpgradeActive  = b.cfg.IsEActivated(chainTime)
-
-		feeCalc = &fees.Calculator{
-			IsEUpgradeActive:   isEUpgradeActive,
-			Config:             b.cfg,
-			ChainTime:          chainTime,
-			FeeManager:         commonfees.NewManager(feeCfg.FeeRate),
-			BlockMaxComplexity: feeCfg.BlockMaxComplexity,
-		}
+		feeCalc           = b.feeCalculator()
 	)
 
 	utx, err := pBuilder.NewTransformSubnetTx(
@@ -538,17 +488,7 @@ func (b *builder) NewAddValidatorTx(
 ) (*txs.Tx, error) {
 	var (
 		pBuilder, pSigner = b.builders(keys)
-		chainTime         = b.state.GetTimestamp()
-		feeCfg            = config.GetDynamicFeesConfig(b.cfg.IsEActivated(chainTime))
-		isEUpgradeActive  = b.cfg.IsEActivated(chainTime)
-
-		feeCalc = &fees.Calculator{
-			IsEUpgradeActive:   isEUpgradeActive,
-			Config:             b.cfg,
-			ChainTime:          chainTime,
-			FeeManager:         commonfees.NewManager(feeCfg.FeeRate),
-			BlockMaxComplexity: feeCfg.BlockMaxComplexity,
-		}
+		feeCalc           = b.feeCalculator()
 	)
 
 	vdr := &txs.Validator{
@@ -595,17 +535,7 @@ func (b *builder) NewAddPermissionlessValidatorTx(
 ) (*txs.Tx, error) {
 	var (
 		pBuilder, pSigner = b.builders(keys)
-		chainTime         = b.state.GetTimestamp()
-		feeCfg            = config.GetDynamicFeesConfig(b.cfg.IsEActivated(chainTime))
-		isEUpgradeActive  = b.cfg.IsEActivated(chainTime)
-
-		feeCalc = &fees.Calculator{
-			IsEUpgradeActive:   isEUpgradeActive,
-			Config:             b.cfg,
-			ChainTime:          chainTime,
-			FeeManager:         commonfees.NewManager(feeCfg.FeeRate),
-			BlockMaxComplexity: feeCfg.BlockMaxComplexity,
-		}
+		feeCalc           = b.feeCalculator()
 	)
 
 	vdr := &txs.SubnetValidator{
@@ -656,17 +586,7 @@ func (b *builder) NewAddDelegatorTx(
 ) (*txs.Tx, error) {
 	var (
 		pBuilder, pSigner = b.builders(keys)
-		chainTime         = b.state.GetTimestamp()
-		feeCfg            = config.GetDynamicFeesConfig(b.cfg.IsEActivated(chainTime))
-		isEUpgradeActive  = b.cfg.IsEActivated(chainTime)
-
-		feeCalc = &fees.Calculator{
-			IsEUpgradeActive:   isEUpgradeActive,
-			Config:             b.cfg,
-			ChainTime:          chainTime,
-			FeeManager:         commonfees.NewManager(feeCfg.FeeRate),
-			BlockMaxComplexity: feeCfg.BlockMaxComplexity,
-		}
+		feeCalc           = b.feeCalculator()
 	)
 
 	vdr := &txs.Validator{
@@ -710,17 +630,7 @@ func (b *builder) NewAddPermissionlessDelegatorTx(
 ) (*txs.Tx, error) {
 	var (
 		pBuilder, pSigner = b.builders(keys)
-		chainTime         = b.state.GetTimestamp()
-		feeCfg            = config.GetDynamicFeesConfig(b.cfg.IsEActivated(chainTime))
-		isEUpgradeActive  = b.cfg.IsEActivated(chainTime)
-
-		feeCalc = &fees.Calculator{
-			IsEUpgradeActive:   isEUpgradeActive,
-			Config:             b.cfg,
-			ChainTime:          chainTime,
-			FeeManager:         commonfees.NewManager(feeCfg.FeeRate),
-			BlockMaxComplexity: feeCfg.BlockMaxComplexity,
-		}
+		feeCalc           = b.feeCalculator()
 	)
 
 	vdr := &txs.SubnetValidator{
@@ -768,17 +678,7 @@ func (b *builder) NewAddSubnetValidatorTx(
 ) (*txs.Tx, error) {
 	var (
 		pBuilder, pSigner = b.builders(keys)
-		chainTime         = b.state.GetTimestamp()
-		feeCfg            = config.GetDynamicFeesConfig(b.cfg.IsEActivated(chainTime))
-		isEUpgradeActive  = b.cfg.IsEActivated(chainTime)
-
-		feeCalc = &fees.Calculator{
-			IsEUpgradeActive:   isEUpgradeActive,
-			Config:             b.cfg,
-			ChainTime:          chainTime,
-			FeeManager:         commonfees.NewManager(feeCfg.FeeRate),
-			BlockMaxComplexity: feeCfg.BlockMaxComplexity,
-		}
+		feeCalc           = b.feeCalculator()
 	)
 
 	vdr := &txs.SubnetValidator{
@@ -816,17 +716,7 @@ func (b *builder) NewRemoveSubnetValidatorTx(
 ) (*txs.Tx, error) {
 	var (
 		pBuilder, pSigner = b.builders(keys)
-		chainTime         = b.state.GetTimestamp()
-		feeCfg            = config.GetDynamicFeesConfig(b.cfg.IsEActivated(chainTime))
-		isEUpgradeActive  = b.cfg.IsEActivated(chainTime)
-
-		feeCalc = &fees.Calculator{
-			IsEUpgradeActive:   isEUpgradeActive,
-			Config:             b.cfg,
-			ChainTime:          chainTime,
-			FeeManager:         commonfees.NewManager(feeCfg.FeeRate),
-			BlockMaxComplexity: feeCfg.BlockMaxComplexity,
-		}
+		feeCalc           = b.feeCalculator()
 	)
 
 	utx, err := pBuilder.NewRemoveSubnetValidatorTx(
@@ -856,17 +746,7 @@ func (b *builder) NewTransferSubnetOwnershipTx(
 ) (*txs.Tx, error) {
 	var (
 		pBuilder, pSigner = b.builders(keys)
-		chainTime         = b.state.GetTimestamp()
-		feeCfg            = config.GetDynamicFeesConfig(b.cfg.IsEActivated(chainTime))
-		isEUpgradeActive  = b.cfg.IsEActivated(chainTime)
-
-		feeCalc = &fees.Calculator{
-			IsEUpgradeActive:   isEUpgradeActive,
-			Config:             b.cfg,
-			ChainTime:          chainTime,
-			FeeManager:         commonfees.NewManager(feeCfg.FeeRate),
-			BlockMaxComplexity: feeCfg.BlockMaxComplexity,
-		}
+		feeCalc           = b.feeCalculator()
 	)
 
 	utils.Sort(ownerAddrs) // sort control addresses
@@ -901,17 +781,7 @@ func (b *builder) NewBaseTx(
 ) (*txs.Tx, error) {
 	var (
 		pBuilder, pSigner = b.builders(keys)
-		chainTime         = b.state.GetTimestamp()
-		feeCfg            = config.GetDynamicFeesConfig(b.cfg.IsEActivated(chainTime))
-		isEUpgradeActive  = b.cfg.IsEActivated(chainTime)
-
-		feeCalc = &fees.Calculator{
-			IsEUpgradeActive:   isEUpgradeActive,
-			Config:             b.cfg,
-			ChainTime:          chainTime,
-			FeeManager:         commonfees.NewManager(feeCfg.FeeRate),
-			BlockMaxComplexity: feeCfg.BlockMaxComplexity,
-		}
+		feeCalc           = b.feeCalculator()
 	)
 
 	out := &avax.TransferableOutput{
@@ -949,6 +819,22 @@ func (b *builder) builders(keys []*secp256k1.PrivateKey) (walletbuilder.Builder,
 	b.backend.ResetAddresses(addrs)
 
 	return builder, signer
+}
+
+func (b *builder) feeCalculator() *fees.Calculator {
+	var (
+		chainTime        = b.state.GetTimestamp()
+		feeCfg           = config.GetDynamicFeesConfig(b.cfg.IsEActivated(chainTime))
+		isEUpgradeActive = b.cfg.IsEActivated(chainTime)
+	)
+
+	return &fees.Calculator{
+		IsEUpgradeActive:   isEUpgradeActive,
+		Config:             b.cfg,
+		ChainTime:          chainTime,
+		FeeManager:         commonfees.NewManager(feeCfg.FeeRate),
+		BlockMaxComplexity: feeCfg.BlockMaxComplexity,
+	}
 }
 
 func options(changeAddr ids.ShortID, memo []byte) []common.Option {
