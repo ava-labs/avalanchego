@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -214,13 +215,14 @@ func (n *Node) Stop(ctx context.Context) error {
 // Sets networking configuration for the node.
 // Convenience method for setting networking flags.
 func (n *Node) SetNetworkingConfig(bootstrapIDs []string, bootstrapIPs []string) {
-	var (
-		// Use dynamic port allocation.
-		httpPort    uint16 = 0
-		stakingPort uint16 = 0
-	)
-	n.Flags[config.HTTPPortKey] = httpPort
-	n.Flags[config.StakingPortKey] = stakingPort
+	if _, ok := n.Flags[config.HTTPPortKey]; !ok {
+		// Default to dynamic port allocation
+		n.Flags[config.HTTPPortKey] = 0
+	}
+	if _, ok := n.Flags[config.StakingPortKey]; !ok {
+		// Default to dynamic port allocation
+		n.Flags[config.StakingPortKey] = 0
+	}
 	n.Flags[config.BootstrapIDsKey] = strings.Join(bootstrapIDs, ",")
 	n.Flags[config.BootstrapIPsKey] = strings.Join(bootstrapIPs, ",")
 }
@@ -346,5 +348,18 @@ func (n *Node) EnsureNodeID() error {
 	}
 	n.NodeID = ids.NodeIDFromCert(stakingCert)
 
+	return nil
+}
+
+// Saves the currently allocated API port to the node's configuration
+// for use across restarts. Reusing the port ensures consistent
+// labeling of metrics.
+func (n *Node) SaveAPIPort() error {
+	hostPort := strings.TrimPrefix(n.URI, "http://")
+	_, port, err := net.SplitHostPort(hostPort)
+	if err != nil {
+		return err
+	}
+	n.Flags[config.HTTPPortKey] = port
 	return nil
 }
