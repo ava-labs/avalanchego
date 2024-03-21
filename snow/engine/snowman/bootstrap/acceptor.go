@@ -10,16 +10,16 @@ import (
 
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/bootstrap/interval"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
 var (
-	_ interval.Parser = (*parseAcceptor)(nil)
-	_ snowman.Block   = (*blockAcceptor)(nil)
+	_ block.Parser  = (*parseAcceptor)(nil)
+	_ snowman.Block = (*blockAcceptor)(nil)
 )
 
 type parseAcceptor struct {
-	parser      interval.Parser
+	parser      block.Parser
 	ctx         *snow.ConsensusContext
 	numAccepted prometheus.Counter
 }
