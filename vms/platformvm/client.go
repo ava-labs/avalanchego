@@ -552,7 +552,7 @@ func (c *client) GetBlockByHeight(ctx context.Context, height uint64, options ..
 }
 
 func (c *client) GetFeeRates(ctx context.Context, options ...rpc.Option) (commonfees.Dimensions, commonfees.Dimensions, error) {
-	res := &GetUnitFeesReply{}
+	res := &GetFeeRatesReply{}
 	err := c.requester.SendRequest(ctx, "platform.getFeeRates", struct{}{}, res, options...)
-	return res.CurrentUnitFees, res.NextUnitFees, err
+	return res.CurrentFeeRates, res.NextFeeRates, err
 }

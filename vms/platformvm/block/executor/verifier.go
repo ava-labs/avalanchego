@@ -546,7 +546,7 @@ func (v *verifier) processStandardTxs(
 	}
 
 	if isEActivated {
-		state.SetUnitFees(feeManager.GetFeeRates())
+		state.SetFeeRates(feeManager.GetFeeRates())
 		state.SetLastBlockComplexity(feeManager.GetCumulatedComplexity())
 	}
 

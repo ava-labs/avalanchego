@@ -372,7 +372,7 @@ func TestGenesis(t *testing.T) {
 
 			require.Equal(utxo.Address, addr)
 
-			unitFees, err := vm.state.GetFeeRates()
+			feeRates, err := vm.state.GetFeeRates()
 			require.NoError(err)
 
 			// we use the first key to fund a subnet creation in [defaultGenesis].
@@ -380,7 +380,7 @@ func TestGenesis(t *testing.T) {
 			var (
 				chainTime = vm.state.GetTimestamp()
 				feeCfg    = config.GetDynamicFeesConfig(vm.Config.IsEActivated(chainTime))
-				feeMan    = commonfees.NewManager(unitFees)
+				feeMan    = commonfees.NewManager(feeRates)
 				feeCalc   = &fees.Calculator{
 					IsEUpgradeActive: vm.IsEActivated(chainTime),
 					Config:           &vm.Config,

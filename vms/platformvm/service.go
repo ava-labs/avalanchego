@@ -1821,17 +1821,17 @@ func (s *Service) GetBlockByHeight(_ *http.Request, args *api.GetBlockByHeightAr
 	return err
 }
 
-// GetUnitFeesReply is the response from GetFeeRates
-type GetUnitFeesReply struct {
-	CurrentUnitFees commonfees.Dimensions `json:"currentUnitFees"`
-	NextUnitFees    commonfees.Dimensions `json:"nextUnitFees"`
+// GetFeeRatesReply is the response from GetFeeRates
+type GetFeeRatesReply struct {
+	CurrentFeeRates commonfees.Dimensions `json:"currentFeeRates"`
+	NextFeeRates    commonfees.Dimensions `json:"nextFeeRates"`
 }
 
 // GetTimestamp returns the current timestamp on chain.
-func (s *Service) GetFeeRates(_ *http.Request, _ *struct{}, reply *GetUnitFeesReply) error {
+func (s *Service) GetFeeRates(_ *http.Request, _ *struct{}, reply *GetFeeRatesReply) error {
 	s.vm.ctx.Log.Debug("API called",
 		zap.String("service", "platform"),
-		zap.String("method", "getUnitFees"),
+		zap.String("method", "getFeeRates"),
 	)
 
 	s.vm.ctx.Lock.Lock()
@@ -1847,7 +1847,7 @@ func (s *Service) GetFeeRates(_ *http.Request, _ *struct{}, reply *GetUnitFeesRe
 	if err != nil {
 		return err
 	}
-	reply.CurrentUnitFees = currentFeeRate
+	reply.CurrentFeeRates = currentFeeRate
 
 	nextTimestamp, _, err := executor.NextBlockTime(onAccept, &s.vm.clock)
 	if err != nil {
@@ -1856,7 +1856,7 @@ func (s *Service) GetFeeRates(_ *http.Request, _ *struct{}, reply *GetUnitFeesRe
 	isEActivated := s.vm.Config.IsEActivated(nextTimestamp)
 
 	if !isEActivated {
-		reply.NextUnitFees = reply.CurrentUnitFees
+		reply.NextFeeRates = reply.CurrentFeeRates
 		return nil
 	}
 
@@ -1881,7 +1881,7 @@ func (s *Service) GetFeeRates(_ *http.Request, _ *struct{}, reply *GetUnitFeesRe
 			return fmt.Errorf("failed updating fee rates, %w", err)
 		}
 	}
-	reply.NextUnitFees = feeManager.GetFeeRates()
+	reply.NextFeeRates = feeManager.GetFeeRates()
 
 	return nil
 }

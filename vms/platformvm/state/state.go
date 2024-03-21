@@ -73,7 +73,7 @@ var (
 	CurrentSupplyKey     = []byte("current supply")
 	LastAcceptedKey      = []byte("last accepted")
 	HeightsIndexedKey    = []byte("heights indexed")
-	UnitFeesKey          = []byte("unit fees")
+	FeeRatesKey          = []byte("fee rates")
 	LastBlkComplexityKey = []byte("last complexity")
 	InitializedKey       = []byte("initialized")
 )
@@ -87,7 +87,7 @@ type Chain interface {
 	avax.UTXODeleter
 
 	GetFeeRates() (commonfees.Dimensions, error)
-	SetUnitFees(uf commonfees.Dimensions)
+	SetFeeRates(uf commonfees.Dimensions)
 
 	GetLastBlockComplexity() (commonfees.Dimensions, error)
 	SetLastBlockComplexity(windows commonfees.Dimensions)
@@ -986,9 +986,9 @@ func (s *state) GetFeeRates() (commonfees.Dimensions, error) {
 	return *s.feeRate, nil
 }
 
-func (s *state) SetUnitFees(uf commonfees.Dimensions) {
-	unitFees := uf
-	s.feeRate = &unitFees
+func (s *state) SetFeeRates(uf commonfees.Dimensions) {
+	feeRates := uf
+	s.feeRate = &feeRates
 }
 
 func (s *state) GetLastBlockComplexity() (commonfees.Dimensions, error) {
@@ -1290,15 +1290,15 @@ func (s *state) loadMetadata() error {
 	s.SetTimestamp(timestamp)
 
 	s.feeRate = new(commonfees.Dimensions)
-	switch unitFeesBytes, err := s.singletonDB.Get(UnitFeesKey); err {
+	switch feeRatesBytes, err := s.singletonDB.Get(FeeRatesKey); err {
 	case nil:
-		if err := s.feeRate.FromBytes(unitFeesBytes); err != nil {
+		if err := s.feeRate.FromBytes(feeRatesBytes); err != nil {
 			return err
 		}
 
 	case database.ErrNotFound:
 		// fork introducing dynamic fees may not be active yet,
-		// hence we may have never stored unit fees. Load from config
+		// hence we may have never stored fee rates. Load from config
 		// TODO: remove once fork is active
 		isEActive := s.cfg.IsEActivated(timestamp)
 		*s.feeRate = config.GetDynamicFeesConfig(isEActive).InitialFeeRate
@@ -2301,12 +2301,12 @@ func (s *state) writeMetadata() error {
 	}
 
 	if s.feeRate != nil {
-		if err := s.singletonDB.Put(UnitFeesKey, s.feeRate.Bytes()); err != nil {
-			return fmt.Errorf("failed to write unit fees: %w", err)
+		if err := s.singletonDB.Put(FeeRatesKey, s.feeRate.Bytes()); err != nil {
+			return fmt.Errorf("failed to write fee rates: %w", err)
 		}
 	}
 	if err := s.singletonDB.Put(LastBlkComplexityKey, s.lastBlkComplexity.Bytes()); err != nil {
-		return fmt.Errorf("failed to write unit fees: %w", err)
+		return fmt.Errorf("failed to write fee rates: %w", err)
 	}
 	if s.persistedCurrentSupply != s.currentSupply {
 		if err := database.PutUInt64(s.singletonDB, CurrentSupplyKey, s.currentSupply); err != nil {

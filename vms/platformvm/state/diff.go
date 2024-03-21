@@ -100,19 +100,19 @@ func (d *diff) GetFeeRates() (commonfees.Dimensions, error) {
 		if !ok {
 			return commonfees.Empty, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
 		}
-		parentUnitFees, err := parentState.GetFeeRates()
+		parentFeeRates, err := parentState.GetFeeRates()
 		if err != nil {
 			return commonfees.Empty, err
 		}
 
 		d.feeRates = new(commonfees.Dimensions)
-		*d.feeRates = parentUnitFees
+		*d.feeRates = parentFeeRates
 	}
 
 	return *d.feeRates, nil
 }
 
-func (d *diff) SetUnitFees(uf commonfees.Dimensions) {
+func (d *diff) SetFeeRates(uf commonfees.Dimensions) {
 	if d.feeRates == nil {
 		d.feeRates = new(commonfees.Dimensions)
 	}
@@ -457,7 +457,7 @@ func (d *diff) DeleteUTXO(utxoID ids.ID) {
 func (d *diff) Apply(baseState Chain) error {
 	baseState.SetTimestamp(d.timestamp)
 	if d.feeRates != nil {
-		baseState.SetUnitFees(*d.feeRates)
+		baseState.SetFeeRates(*d.feeRates)
 	}
 	if d.lastBlkComplexity != nil {
 		baseState.SetLastBlockComplexity(*d.lastBlkComplexity)

@@ -103,15 +103,15 @@ func (m *Manager) UpdateFeeRates(
 
 	elapsedTime := uint64(childBlkTime - parentBlkTime)
 	for i := Dimension(0); i < FeeDimensions; i++ {
-		nextUnitFee := nextFeeRate(
+		nextFeeRates := nextFeeRate(
 			m.feeRates[i],
 			feesConfig.UpdateCoefficient[i],
 			parentBlkComplexity[i],
 			feesConfig.BlockTargetComplexityRate[i],
 			elapsedTime,
 		)
-		nextUnitFee = max(nextUnitFee, feesConfig.MinFeeRate[i])
-		m.feeRates[i] = nextUnitFee
+		nextFeeRates = max(nextFeeRates, feesConfig.MinFeeRate[i])
+		m.feeRates[i] = nextFeeRates
 	}
 	return nil
 }

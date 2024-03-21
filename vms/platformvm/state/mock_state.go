@@ -480,6 +480,18 @@ func (mr *MockChainMockRecorder) SetDelegateeReward(arg0, arg1, arg2 any) *gomoc
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetDelegateeReward", reflect.TypeOf((*MockChain)(nil).SetDelegateeReward), arg0, arg1, arg2)
 }
 
+// SetFeeRates mocks base method.
+func (m *MockChain) SetFeeRates(arg0 fees.Dimensions) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "SetFeeRates", arg0)
+}
+
+// SetFeeRates indicates an expected call of SetFeeRates.
+func (mr *MockChainMockRecorder) SetFeeRates(arg0 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetFeeRates", reflect.TypeOf((*MockChain)(nil).SetFeeRates), arg0)
+}
+
 // SetLastBlockComplexity mocks base method.
 func (m *MockChain) SetLastBlockComplexity(arg0 fees.Dimensions) {
 	m.ctrl.T.Helper()
@@ -514,18 +526,6 @@ func (m *MockChain) SetTimestamp(arg0 time.Time) {
 func (mr *MockChainMockRecorder) SetTimestamp(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetTimestamp", reflect.TypeOf((*MockChain)(nil).SetTimestamp), arg0)
-}
-
-// SetUnitFees mocks base method.
-func (m *MockChain) SetUnitFees(arg0 fees.Dimensions) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SetUnitFees", arg0)
-}
-
-// SetUnitFees indicates an expected call of SetUnitFees.
-func (mr *MockChainMockRecorder) SetUnitFees(arg0 any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetUnitFees", reflect.TypeOf((*MockChain)(nil).SetUnitFees), arg0)
 }
 
 // MockDiff is a mock of Diff interface.
@@ -996,6 +996,18 @@ func (mr *MockDiffMockRecorder) SetDelegateeReward(arg0, arg1, arg2 any) *gomock
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetDelegateeReward", reflect.TypeOf((*MockDiff)(nil).SetDelegateeReward), arg0, arg1, arg2)
 }
 
+// SetFeeRates mocks base method.
+func (m *MockDiff) SetFeeRates(arg0 fees.Dimensions) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "SetFeeRates", arg0)
+}
+
+// SetFeeRates indicates an expected call of SetFeeRates.
+func (mr *MockDiffMockRecorder) SetFeeRates(arg0 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetFeeRates", reflect.TypeOf((*MockDiff)(nil).SetFeeRates), arg0)
+}
+
 // SetLastBlockComplexity mocks base method.
 func (m *MockDiff) SetLastBlockComplexity(arg0 fees.Dimensions) {
 	m.ctrl.T.Helper()
@@ -1030,18 +1042,6 @@ func (m *MockDiff) SetTimestamp(arg0 time.Time) {
 func (mr *MockDiffMockRecorder) SetTimestamp(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetTimestamp", reflect.TypeOf((*MockDiff)(nil).SetTimestamp), arg0)
-}
-
-// SetUnitFees mocks base method.
-func (m *MockDiff) SetUnitFees(arg0 fees.Dimensions) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SetUnitFees", arg0)
-}
-
-// SetUnitFees indicates an expected call of SetUnitFees.
-func (mr *MockDiffMockRecorder) SetUnitFees(arg0 any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetUnitFees", reflect.TypeOf((*MockDiff)(nil).SetUnitFees), arg0)
 }
 
 // MockState is a mock of State interface.
@@ -1727,6 +1727,18 @@ func (mr *MockStateMockRecorder) SetDelegateeReward(arg0, arg1, arg2 any) *gomoc
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetDelegateeReward", reflect.TypeOf((*MockState)(nil).SetDelegateeReward), arg0, arg1, arg2)
 }
 
+// SetFeeRates mocks base method.
+func (m *MockState) SetFeeRates(arg0 fees.Dimensions) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "SetFeeRates", arg0)
+}
+
+// SetFeeRates indicates an expected call of SetFeeRates.
+func (mr *MockStateMockRecorder) SetFeeRates(arg0 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetFeeRates", reflect.TypeOf((*MockState)(nil).SetFeeRates), arg0)
+}
+
 // SetHeight mocks base method.
 func (m *MockState) SetHeight(arg0 uint64) {
 	m.ctrl.T.Helper()
@@ -1785,18 +1797,6 @@ func (m *MockState) SetTimestamp(arg0 time.Time) {
 func (mr *MockStateMockRecorder) SetTimestamp(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetTimestamp", reflect.TypeOf((*MockState)(nil).SetTimestamp), arg0)
-}
-
-// SetUnitFees mocks base method.
-func (m *MockState) SetUnitFees(arg0 fees.Dimensions) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SetUnitFees", arg0)
-}
-
-// SetUnitFees indicates an expected call of SetUnitFees.
-func (mr *MockStateMockRecorder) SetUnitFees(arg0 any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetUnitFees", reflect.TypeOf((*MockState)(nil).SetUnitFees), arg0)
 }
 
 // SetUptime mocks base method.

@@ -122,13 +122,13 @@ var _ = ginkgo.Describe("[Dynamic Fees]", func() {
 				})
 
 				ginkgo.By("wait for the fee rates to decrease", func() {
-					initialUnitFees := currFeeRates
+					initialFeeRates := currFeeRates
 					e2e.Eventually(func() bool {
 						var err error
 						_, currFeeRates, err = pChainClient.GetFeeRates(e2e.DefaultContext())
 						require.NoError(err)
 						tests.Outf("{{blue}} next fee rates: %v {{/}}\n", currFeeRates)
-						return commonfees.Compare(initialUnitFees, currFeeRates)
+						return commonfees.Compare(initialFeeRates, currFeeRates)
 					}, e2e.DefaultTimeout, e2e.DefaultPollingInterval, "failed to see gas price decrease before timeout")
 					tests.Outf("\n{{blue}}fee rates have decreased to %v{{/}}\n", currFeeRates)
 				})

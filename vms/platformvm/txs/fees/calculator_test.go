@@ -26,7 +26,7 @@ import (
 )
 
 var (
-	testUnitFees = fees.Dimensions{
+	testFeeRates = fees.Dimensions{
 		1 * units.MicroAvax,
 		2 * units.MicroAvax,
 		3 * units.MicroAvax,
@@ -71,7 +71,7 @@ func TestAddAndRemoveFees(t *testing.T) {
 
 	fc := &Calculator{
 		IsEUpgradeActive: true,
-		FeeManager:       fees.NewManager(testUnitFees),
+		FeeManager:       fees.NewManager(testFeeRates),
 		ConsumedUnitsCap: testBlockMaxConsumedUnits,
 	}
 
@@ -924,7 +924,7 @@ func TestTxFees(t *testing.T) {
 				IsEUpgradeActive: cfg.IsEActivated(chainTime),
 				Config:           cfg,
 				ChainTime:        chainTime,
-				FeeManager:       fees.NewManager(testUnitFees),
+				FeeManager:       fees.NewManager(testFeeRates),
 				ConsumedUnitsCap: consumedUnitCaps,
 				Credentials:      sTx.Creds,
 			}
