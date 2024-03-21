@@ -1821,14 +1821,14 @@ func (s *Service) GetBlockByHeight(_ *http.Request, args *api.GetBlockByHeightAr
 	return err
 }
 
-// GetUnitFeesReply is the response from GetUnitFees
+// GetUnitFeesReply is the response from GetFeeRates
 type GetUnitFeesReply struct {
 	CurrentUnitFees commonfees.Dimensions `json:"currentUnitFees"`
 	NextUnitFees    commonfees.Dimensions `json:"nextUnitFees"`
 }
 
 // GetTimestamp returns the current timestamp on chain.
-func (s *Service) GetUnitFees(_ *http.Request, _ *struct{}, reply *GetUnitFeesReply) error {
+func (s *Service) GetFeeRates(_ *http.Request, _ *struct{}, reply *GetUnitFeesReply) error {
 	s.vm.ctx.Log.Debug("API called",
 		zap.String("service", "platform"),
 		zap.String("method", "getUnitFees"),
@@ -1843,11 +1843,11 @@ func (s *Service) GetUnitFees(_ *http.Request, _ *struct{}, reply *GetUnitFeesRe
 		return fmt.Errorf("could not retrieve state for block %s", preferredID)
 	}
 
-	currentUnitFees, err := onAccept.GetUnitFees()
+	currentFeeRate, err := onAccept.GetFeeRates()
 	if err != nil {
 		return err
 	}
-	reply.CurrentUnitFees = currentUnitFees
+	reply.CurrentUnitFees = currentFeeRate
 
 	nextTimestamp, _, err := executor.NextBlockTime(onAccept, &s.vm.clock)
 	if err != nil {
@@ -1865,21 +1865,23 @@ func (s *Service) GetUnitFees(_ *http.Request, _ *struct{}, reply *GetUnitFeesRe
 		feesCfg          = config.GetDynamicFeesConfig(isEActivated)
 	)
 
-	feeWindows, err := onAccept.GetFeeWindows()
+	parentBlkComplexity, err := onAccept.GetLastBlockComplexity()
 	if err != nil {
 		return err
 	}
 
-	feeManager := commonfees.NewManager(currentUnitFees)
+	feeManager := commonfees.NewManager(currentFeeRate)
 	if isEActivated {
-		feeManager.UpdateUnitFees(
+		if err := feeManager.UpdateFeeRates(
 			feesCfg,
-			feeWindows,
+			parentBlkComplexity,
 			currentTimestamp.Unix(),
 			nextTimestamp.Unix(),
-		)
+		); err != nil {
+			return fmt.Errorf("failed updating fee rates, %w", err)
+		}
 	}
-	reply.NextUnitFees = feeManager.GetUnitFees()
+	reply.NextUnitFees = feeManager.GetFeeRates()
 
 	return nil
 }

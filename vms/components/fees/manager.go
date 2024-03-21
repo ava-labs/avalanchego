@@ -11,26 +11,26 @@ import (
 )
 
 type Manager struct {
-	// Avax denominated unit fees for all fee dimensions
-	unitFees Dimensions
+	// Avax denominated fee rates, i.e. fees per unit of complexity.
+	feeRates Dimensions
 
-	// cumulatedUnits helps aggregating the units consumed by a block
-	// so that we can verify it's not too big/build it properly.
-	cumulatedUnits Dimensions
+	// cumulatedComplexity helps aggregating the units of complexity consumed
+	// by a block so that we can verify it's not too big/build it properly.
+	cumulatedComplexity Dimensions
 }
 
-func NewManager(unitFees Dimensions) *Manager {
+func NewManager(feeRate Dimensions) *Manager {
 	return &Manager{
-		unitFees: unitFees,
+		feeRates: feeRate,
 	}
 }
 
-func (m *Manager) GetUnitFees() Dimensions {
-	return m.unitFees
+func (m *Manager) GetFeeRates() Dimensions {
+	return m.feeRates
 }
 
-func (m *Manager) GetCumulatedUnits() Dimensions {
-	return m.cumulatedUnits
+func (m *Manager) GetCumulatedComplexity() Dimensions {
+	return m.cumulatedComplexity
 }
 
 // CalculateFee must be a stateless method
@@ -38,7 +38,7 @@ func (m *Manager) CalculateFee(units Dimensions) (uint64, error) {
 	fee := uint64(0)
 
 	for i := Dimension(0); i < FeeDimensions; i++ {
-		contribution, err := safemath.Mul64(m.unitFees[i], units[i])
+		contribution, err := safemath.Mul64(m.feeRates[i], units[i])
 		if err != nil {
 			return 0, err
 		}
@@ -50,13 +50,13 @@ func (m *Manager) CalculateFee(units Dimensions) (uint64, error) {
 	return fee, nil
 }
 
-// CumulateUnits tries to cumulate the consumed units [units]. Before
+// CumulateComplexity tries to cumulate the consumed complexity [units]. Before
 // actually cumulating them, it checks whether the result would breach [bounds].
 // If so, it returns the first dimension to breach bounds.
-func (m *Manager) CumulateUnits(units, bounds Dimensions) (bool, Dimension) {
+func (m *Manager) CumulateComplexity(units, bounds Dimensions) (bool, Dimension) {
 	// Ensure we can consume (don't want partial update of values)
 	for i := Dimension(0); i < FeeDimensions; i++ {
-		consumed, err := safemath.Add64(m.cumulatedUnits[i], units[i])
+		consumed, err := safemath.Add64(m.cumulatedComplexity[i], units[i])
 		if err != nil {
 			return true, i
 		}
@@ -67,80 +67,87 @@ func (m *Manager) CumulateUnits(units, bounds Dimensions) (bool, Dimension) {
 
 	// Commit to consumption
 	for i := Dimension(0); i < FeeDimensions; i++ {
-		consumed, err := safemath.Add64(m.cumulatedUnits[i], units[i])
+		consumed, err := safemath.Add64(m.cumulatedComplexity[i], units[i])
 		if err != nil {
 			return true, i
 		}
-		m.cumulatedUnits[i] = consumed
+		m.cumulatedComplexity[i] = consumed
 	}
 	return false, 0
 }
 
-// Sometimes, e.g. while building a tx, we'd like freedom to speculatively add units
-// and to remove them later on. [RemoveUnits] grants this freedom
-func (m *Manager) RemoveUnits(unitsToRm Dimensions) error {
+// Sometimes, e.g. while building a tx, we'd like freedom to speculatively add complexity
+// and to remove it later on. [RemoveComplexity] grants this freedom
+func (m *Manager) RemoveComplexity(unitsToRm Dimensions) error {
 	var revertedUnits Dimensions
 	for i := Dimension(0); i < FeeDimensions; i++ {
-		prev, err := safemath.Sub(m.cumulatedUnits[i], unitsToRm[i])
+		prev, err := safemath.Sub(m.cumulatedComplexity[i], unitsToRm[i])
 		if err != nil {
 			return fmt.Errorf("%w: dimension %d", err, i)
 		}
 		revertedUnits[i] = prev
 	}
 
-	m.cumulatedUnits = revertedUnits
+	m.cumulatedComplexity = revertedUnits
 	return nil
 }
 
-// [UpdateWindows] stores in the fee windows the units cumulated in current block
-func (m *Manager) UpdateWindows(windows *Windows, lastTime, currTime int64) {
-	since := int(currTime - lastTime)
-	idx := 0
-	if since < WindowSize {
-		idx = WindowSize - 1 - since
-	}
-
-	for i := Dimension(0); i < FeeDimensions; i++ {
-		windows[i] = Roll(windows[i], since)
-		Update(&windows[i], idx, m.cumulatedUnits[i])
-	}
-}
-
-func (m *Manager) UpdateUnitFees(
+func (m *Manager) UpdateFeeRates(
 	feesConfig DynamicFeesConfig,
-	windows Windows,
-	lastTime, currTime int64,
-) {
-	since := int(currTime - lastTime)
-	for i := Dimension(0); i < FeeDimensions; i++ {
-		nextUnitWindow := Roll(windows[i], since)
-		totalUnitsConsumed := Sum(nextUnitWindow)
-		nextUnitFee := nextFeeRate(m.unitFees[i], feesConfig.UpdateCoefficient[i], totalUnitsConsumed, feesConfig.BlockUnitsTarget[i])
-		nextUnitFee = max(nextUnitFee, feesConfig.MinUnitFees[i])
-		m.unitFees[i] = nextUnitFee
+	parentBlkComplexity Dimensions,
+	parentBlkTime, childBlkTime int64,
+) error {
+	if childBlkTime < parentBlkTime {
+		return fmt.Errorf("unexpected block times, parentBlkTim %v, childBlkTime %v", parentBlkTime, childBlkTime)
 	}
+
+	elapsedTime := uint64(childBlkTime - parentBlkTime)
+	for i := Dimension(0); i < FeeDimensions; i++ {
+		nextUnitFee := nextFeeRate(
+			m.feeRates[i],
+			feesConfig.UpdateCoefficient[i],
+			parentBlkComplexity[i],
+			feesConfig.BlockTargetComplexityRate[i],
+			elapsedTime,
+		)
+		nextUnitFee = max(nextUnitFee, feesConfig.MinFeeRate[i])
+		m.feeRates[i] = nextUnitFee
+	}
+	return nil
 }
 
-func nextFeeRate(currentUnitFee, updateCoefficient, unitsConsumed, target uint64) uint64 {
-	// We update the fee rate with the formula e^{k(u-t)/t} == 2^{1/ln(2) * k(u-t)/t}
-	// We approximate 1/ln(2) with 1_442/1_000 and we round the exponent to a uint64
+func nextFeeRate(currentFeeRate, coeff, parentBlkComplexity, targetComplexityRate, elapsedTime uint64) uint64 {
+	// We update the fee rate with the formula:
+	// feeRate_{t+1} = feeRate_t * exp{coeff * (parentComplexity - targetComplexity)/(targetComplexity) }
+	// where [targetComplexity] is the complexity expected in the elapsed time.
+	//
+	// We simplify the exponential for integer math. Specifically we approximate 1/ln(2) with 1_442/1_000
+	// so that exp { x } == 2^{ 1/ln(2) * x } ≈≈ 2^{1_442/1_000 * x}
+	// Finally we round the exponent to a uint64
+
+	// parent and child block may have the same timestamp. In this case targetComplexity will match targetComplexityRate
+	elapsedTime = max(1, elapsedTime)
+	targetComplexity, over := safemath.Mul64(targetComplexityRate, elapsedTime)
+	if over != nil {
+		targetComplexity = math.MaxUint64
+	}
 
 	switch {
-	case unitsConsumed > target:
-		exp := 1442 * updateCoefficient * (unitsConsumed - target) / target / 1000
+	case parentBlkComplexity > targetComplexity:
+		exp := 1442 * coeff * (parentBlkComplexity - targetComplexity) / targetComplexity / 1000
 		exp = min(exp, 62) // we cap the exponent to avoid an overflow of uint64 type
-		res, over := safemath.Mul64(currentUnitFee, 1<<exp)
+		res, over := safemath.Mul64(currentFeeRate, 1<<exp)
 		if over != nil {
 			return math.MaxUint64
 		}
 		return res
 
-	case unitsConsumed < target:
-		exp := 1442 * updateCoefficient * (target - unitsConsumed) / target / 1000
+	case parentBlkComplexity < targetComplexity:
+		exp := 1442 * coeff * (targetComplexity - parentBlkComplexity) / targetComplexity / 1000
 		exp = min(exp, 62) // we cap the exponent to avoid an overflow of uint64 type
-		return currentUnitFee / (1 << exp)
+		return currentFeeRate / (1 << exp)
 
 	default:
-		return currentUnitFee // unitsConsumed == target
+		return currentFeeRate // unitsConsumed == target
 	}
 }

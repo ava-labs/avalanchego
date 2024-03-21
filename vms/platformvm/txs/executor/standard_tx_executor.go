@@ -35,10 +35,10 @@ var (
 type StandardTxExecutor struct {
 	// inputs, to be filled before visitor methods are called
 	*Backend
-	BlkFeeManager *commonFees.Manager
-	UnitCaps      commonFees.Dimensions
-	State         state.Diff // state is expected to be modified
-	Tx            *txs.Tx
+	BlkFeeManager      *commonFees.Manager
+	BlockMaxComplexity commonFees.Dimensions
+	State              state.Diff // state is expected to be modified
+	Tx                 *txs.Tx
 
 	// outputs of visitor execution
 	OnAccept       func() // may be nil
@@ -78,7 +78,7 @@ func (e *StandardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 		Config:           e.Backend.Config,
 		ChainTime:        currentTimestamp,
 		FeeManager:       e.BlkFeeManager,
-		ConsumedUnitsCap: e.UnitCaps,
+		ConsumedUnitsCap: e.BlockMaxComplexity,
 		Credentials:      e.Tx.Creds,
 	}
 	if err := tx.Visit(&feeCalculator); err != nil {
@@ -135,7 +135,7 @@ func (e *StandardTxExecutor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 		Config:           e.Backend.Config,
 		ChainTime:        currentTimestamp,
 		FeeManager:       e.BlkFeeManager,
-		ConsumedUnitsCap: e.UnitCaps,
+		ConsumedUnitsCap: e.BlockMaxComplexity,
 		Credentials:      e.Tx.Creds,
 	}
 	if err := tx.Visit(&feeCalculator); err != nil {
@@ -231,7 +231,7 @@ func (e *StandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 			Config:           cfg,
 			ChainTime:        currentTimestamp,
 			FeeManager:       e.BlkFeeManager,
-			ConsumedUnitsCap: e.UnitCaps,
+			ConsumedUnitsCap: e.BlockMaxComplexity,
 			Credentials:      e.Tx.Creds,
 		}
 		if err := tx.Visit(&feeCalculator); err != nil {
@@ -295,7 +295,7 @@ func (e *StandardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 		Config:           e.Backend.Config,
 		ChainTime:        currentTimestamp,
 		FeeManager:       e.BlkFeeManager,
-		ConsumedUnitsCap: e.UnitCaps,
+		ConsumedUnitsCap: e.BlockMaxComplexity,
 		Credentials:      e.Tx.Creds,
 	}
 	if err := tx.Visit(&feeCalculator); err != nil {
@@ -399,7 +399,7 @@ func (e *StandardTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 	if err := verifyAddSubnetValidatorTx(
 		e.Backend,
 		e.BlkFeeManager,
-		e.UnitCaps,
+		e.BlockMaxComplexity,
 		e.State,
 		e.Tx,
 		tx,
@@ -446,7 +446,7 @@ func (e *StandardTxExecutor) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidat
 	staker, isCurrentValidator, err := verifyRemoveSubnetValidatorTx(
 		e.Backend,
 		e.BlkFeeManager,
-		e.UnitCaps,
+		e.BlockMaxComplexity,
 		e.State,
 		e.Tx,
 		tx,
@@ -498,7 +498,7 @@ func (e *StandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 		Config:           e.Backend.Config,
 		ChainTime:        currentTimestamp,
 		FeeManager:       e.BlkFeeManager,
-		ConsumedUnitsCap: e.UnitCaps,
+		ConsumedUnitsCap: e.BlockMaxComplexity,
 		Credentials:      e.Tx.Creds,
 	}
 	if err := tx.Visit(&feeCalculator); err != nil {
@@ -539,7 +539,7 @@ func (e *StandardTxExecutor) AddPermissionlessValidatorTx(tx *txs.AddPermissionl
 	if err := verifyAddPermissionlessValidatorTx(
 		e.Backend,
 		e.BlkFeeManager,
-		e.UnitCaps,
+		e.BlockMaxComplexity,
 		e.State,
 		e.Tx,
 		tx,
@@ -573,7 +573,7 @@ func (e *StandardTxExecutor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionl
 	if err := verifyAddPermissionlessDelegatorTx(
 		e.Backend,
 		e.BlkFeeManager,
-		e.UnitCaps,
+		e.BlockMaxComplexity,
 		e.State,
 		e.Tx,
 		tx,
@@ -599,7 +599,7 @@ func (e *StandardTxExecutor) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwn
 	err := verifyTransferSubnetOwnershipTx(
 		e.Backend,
 		e.BlkFeeManager,
-		e.UnitCaps,
+		e.BlockMaxComplexity,
 		e.State,
 		e.Tx,
 		tx,
@@ -640,7 +640,7 @@ func (e *StandardTxExecutor) BaseTx(tx *txs.BaseTx) error {
 		Config:           cfg,
 		ChainTime:        currentTimestamp,
 		FeeManager:       e.BlkFeeManager,
-		ConsumedUnitsCap: e.UnitCaps,
+		ConsumedUnitsCap: e.BlockMaxComplexity,
 		Credentials:      e.Tx.Creds,
 	}
 	if err := tx.Visit(&feeCalculator); err != nil {

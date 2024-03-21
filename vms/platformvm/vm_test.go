@@ -372,7 +372,7 @@ func TestGenesis(t *testing.T) {
 
 			require.Equal(utxo.Address, addr)
 
-			unitFees, err := vm.state.GetUnitFees()
+			unitFees, err := vm.state.GetFeeRates()
 			require.NoError(err)
 
 			// we use the first key to fund a subnet creation in [defaultGenesis].
@@ -386,7 +386,7 @@ func TestGenesis(t *testing.T) {
 					Config:           &vm.Config,
 					ChainTime:        chainTime,
 					FeeManager:       feeMan,
-					ConsumedUnitsCap: feeCfg.BlockUnitsCap,
+					ConsumedUnitsCap: feeCfg.BlockMaxComplexity,
 					Credentials:      testSubnet1.Creds,
 				}
 			)
@@ -2268,19 +2268,19 @@ func TestBaseTx(t *testing.T) {
 	}
 	require.Equal(totalOutputAmt, key0OutputAmt+key1OutputAmt+changeAddrOutputAmt)
 
-	unitFees, err := vm.state.GetUnitFees()
+	feeRates, err := vm.state.GetFeeRates()
 	require.NoError(err)
 
 	var (
 		chainTime = vm.state.GetTimestamp()
 		feeCfg    = config.GetDynamicFeesConfig(vm.Config.IsEActivated(chainTime))
-		feeMan    = commonfees.NewManager(unitFees)
+		feeMan    = commonfees.NewManager(feeRates)
 		feeCalc   = &fees.Calculator{
 			IsEUpgradeActive: vm.IsEActivated(chainTime),
 			Config:           &vm.Config,
 			ChainTime:        chainTime,
 			FeeManager:       feeMan,
-			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
+			ConsumedUnitsCap: feeCfg.BlockMaxComplexity,
 			Credentials:      baseTx.Creds,
 		}
 	)

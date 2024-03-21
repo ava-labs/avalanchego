@@ -134,8 +134,8 @@ type Client interface {
 	// GetBlockByHeight returns the block at the given [height].
 	GetBlockByHeight(ctx context.Context, height uint64, options ...rpc.Option) ([]byte, error)
 
-	// GetUnitFees returns the current unit fees and the next unit fees that a transaction must pay to be accepted
-	GetUnitFees(ctx context.Context, options ...rpc.Option) (commonfees.Dimensions, commonfees.Dimensions, error)
+	// GetFeeRates returns the current unit fees and the next unit fees that a transaction must pay to be accepted
+	GetFeeRates(ctx context.Context, options ...rpc.Option) (commonfees.Dimensions, commonfees.Dimensions, error)
 }
 
 // Client implementation for interacting with the P Chain endpoint
@@ -551,8 +551,8 @@ func (c *client) GetBlockByHeight(ctx context.Context, height uint64, options ..
 	return formatting.Decode(res.Encoding, res.Block)
 }
 
-func (c *client) GetUnitFees(ctx context.Context, options ...rpc.Option) (commonfees.Dimensions, commonfees.Dimensions, error) {
+func (c *client) GetFeeRates(ctx context.Context, options ...rpc.Option) (commonfees.Dimensions, commonfees.Dimensions, error) {
 	res := &GetUnitFeesReply{}
-	err := c.requester.SendRequest(ctx, "platform.getUnitFees", struct{}{}, res, options...)
+	err := c.requester.SendRequest(ctx, "platform.getFeeRates", struct{}{}, res, options...)
 	return res.CurrentUnitFees, res.NextUnitFees, err
 }

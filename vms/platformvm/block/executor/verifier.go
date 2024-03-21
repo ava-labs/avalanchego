@@ -98,7 +98,7 @@ func (v *verifier) BanffProposalBlock(b *block.BanffProposalBlock) error {
 		onDecisionState,
 		onCommitState,
 		onAbortState,
-		feesMan.GetCumulatedUnits(),
+		feesMan.GetCumulatedComplexity(),
 		inputs,
 		atomicRequests,
 		onAcceptFunc,
@@ -453,7 +453,7 @@ func (v *verifier) standardBlock(
 		onAcceptFunc:  onAcceptFunc,
 
 		timestamp:       onAcceptState.GetTimestamp(),
-		blockComplexity: feeMan.GetCumulatedUnits(),
+		blockComplexity: feeMan.GetCumulatedComplexity(),
 		inputs:          inputs,
 		atomicRequests:  atomicRequests,
 	}
@@ -472,11 +472,11 @@ func (v *verifier) processStandardTxs(
 	func(),
 	error,
 ) {
-	unitFees, err := state.GetUnitFees()
+	feeRates, err := state.GetFeeRates()
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
-	feeWindows, err := state.GetFeeWindows()
+	parentBlkComplexity, err := state.GetLastBlockComplexity()
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
@@ -491,23 +491,25 @@ func (v *verifier) processStandardTxs(
 		atomicRequests = make(map[ids.ID]*atomic.Requests)
 	)
 
-	feeManager := fees.NewManager(unitFees)
+	feeManager := fees.NewManager(feeRates)
 	if isEActivated {
-		feeManager.UpdateUnitFees(
+		if err := feeManager.UpdateFeeRates(
 			feesCfg,
-			feeWindows,
+			parentBlkComplexity,
 			parentBlkTime.Unix(),
 			blkTimestamp.Unix(),
-		)
+		); err != nil {
+			return nil, nil, nil, nil, fmt.Errorf("failed updating fee rates, %w", err)
+		}
 	}
 
 	for _, tx := range txs {
 		txExecutor := executor.StandardTxExecutor{
-			Backend:       v.txExecutorBackend,
-			BlkFeeManager: feeManager,
-			UnitCaps:      feesCfg.BlockUnitsCap,
-			State:         state,
-			Tx:            tx,
+			Backend:            v.txExecutorBackend,
+			BlkFeeManager:      feeManager,
+			BlockMaxComplexity: feesCfg.BlockMaxComplexity,
+			State:              state,
+			Tx:                 tx,
 		}
 		if err := tx.Unsigned.Visit(&txExecutor); err != nil {
 			txID := tx.ID()
@@ -544,9 +546,8 @@ func (v *verifier) processStandardTxs(
 	}
 
 	if isEActivated {
-		feeManager.UpdateWindows(&feeWindows, parentBlkTime.Unix(), blkTimestamp.Unix())
-		state.SetUnitFees(feeManager.GetUnitFees())
-		state.SetFeeWindows(feeWindows)
+		state.SetUnitFees(feeManager.GetFeeRates())
+		state.SetLastBlockComplexity(feeManager.GetCumulatedComplexity())
 	}
 
 	if numFuncs := len(funcs); numFuncs == 1 {

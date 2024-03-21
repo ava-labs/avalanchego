@@ -316,7 +316,7 @@ func (fc *Calculator) meterTx(
 }
 
 func (fc *Calculator) AddFeesFor(consumedUnits fees.Dimensions) (uint64, error) {
-	boundBreached, dimension := fc.FeeManager.CumulateUnits(consumedUnits, fc.ConsumedUnitsCap)
+	boundBreached, dimension := fc.FeeManager.CumulateComplexity(consumedUnits, fc.ConsumedUnitsCap)
 	if boundBreached {
 		return 0, fmt.Errorf("%w: breached dimension %d", errFailedConsumedUnitsCumulation, dimension)
 	}
@@ -331,7 +331,7 @@ func (fc *Calculator) AddFeesFor(consumedUnits fees.Dimensions) (uint64, error) 
 }
 
 func (fc *Calculator) RemoveFeesFor(unitsToRm fees.Dimensions) (uint64, error) {
-	if err := fc.FeeManager.RemoveUnits(unitsToRm); err != nil {
+	if err := fc.FeeManager.RemoveComplexity(unitsToRm); err != nil {
 		return 0, fmt.Errorf("failed removing units: %w", err)
 	}
 

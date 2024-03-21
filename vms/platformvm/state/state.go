@@ -69,13 +69,13 @@ var (
 	ChainPrefix                   = []byte("chain")
 	SingletonPrefix               = []byte("singleton")
 
-	TimestampKey      = []byte("timestamp")
-	CurrentSupplyKey  = []byte("current supply")
-	LastAcceptedKey   = []byte("last accepted")
-	HeightsIndexedKey = []byte("heights indexed")
-	UnitFeesKey       = []byte("unit fees")
-	FeesWindowsKey    = []byte("fees windows")
-	InitializedKey    = []byte("initialized")
+	TimestampKey         = []byte("timestamp")
+	CurrentSupplyKey     = []byte("current supply")
+	LastAcceptedKey      = []byte("last accepted")
+	HeightsIndexedKey    = []byte("heights indexed")
+	UnitFeesKey          = []byte("unit fees")
+	LastBlkComplexityKey = []byte("last complexity")
+	InitializedKey       = []byte("initialized")
 )
 
 // Chain collects all methods to manage the state of the chain for block
@@ -86,11 +86,11 @@ type Chain interface {
 	avax.UTXOGetter
 	avax.UTXODeleter
 
-	GetUnitFees() (commonfees.Dimensions, error)
+	GetFeeRates() (commonfees.Dimensions, error)
 	SetUnitFees(uf commonfees.Dimensions)
 
-	GetFeeWindows() (commonfees.Windows, error)
-	SetFeeWindows(windows commonfees.Windows)
+	GetLastBlockComplexity() (commonfees.Dimensions, error)
+	SetLastBlockComplexity(windows commonfees.Dimensions)
 
 	GetTimestamp() time.Time
 	SetTimestamp(tm time.Time)
@@ -332,8 +332,8 @@ type state struct {
 
 	// The persisted fields represent the current database value
 	timestamp, persistedTimestamp         time.Time
-	unitFees                              *commonfees.Dimensions // pointer, to allow customization for test networks
-	feesWindows                           commonfees.Windows
+	feeRate                               *commonfees.Dimensions // pointer, to allow customization for test networks
+	lastBlkComplexity                     commonfees.Dimensions
 	currentSupply, persistedCurrentSupply uint64
 	// [lastAccepted] is the most recently accepted block.
 	lastAccepted, persistedLastAccepted ids.ID
@@ -982,21 +982,21 @@ func (s *state) GetStartTime(nodeID ids.NodeID, subnetID ids.ID) (time.Time, err
 	return staker.StartTime, nil
 }
 
-func (s *state) GetUnitFees() (commonfees.Dimensions, error) {
-	return *s.unitFees, nil
+func (s *state) GetFeeRates() (commonfees.Dimensions, error) {
+	return *s.feeRate, nil
 }
 
 func (s *state) SetUnitFees(uf commonfees.Dimensions) {
 	unitFees := uf
-	s.unitFees = &unitFees
+	s.feeRate = &unitFees
 }
 
-func (s *state) GetFeeWindows() (commonfees.Windows, error) {
-	return s.feesWindows, nil
+func (s *state) GetLastBlockComplexity() (commonfees.Dimensions, error) {
+	return s.lastBlkComplexity, nil
 }
 
-func (s *state) SetFeeWindows(windows commonfees.Windows) {
-	s.feesWindows = windows
+func (s *state) SetLastBlockComplexity(complexity commonfees.Dimensions) {
+	s.lastBlkComplexity = complexity
 }
 
 func (s *state) GetTimestamp() time.Time {
@@ -1289,10 +1289,10 @@ func (s *state) loadMetadata() error {
 	s.persistedTimestamp = timestamp
 	s.SetTimestamp(timestamp)
 
-	s.unitFees = new(commonfees.Dimensions)
+	s.feeRate = new(commonfees.Dimensions)
 	switch unitFeesBytes, err := s.singletonDB.Get(UnitFeesKey); err {
 	case nil:
-		if err := s.unitFees.FromBytes(unitFeesBytes); err != nil {
+		if err := s.feeRate.FromBytes(unitFeesBytes); err != nil {
 			return err
 		}
 
@@ -1301,15 +1301,15 @@ func (s *state) loadMetadata() error {
 		// hence we may have never stored unit fees. Load from config
 		// TODO: remove once fork is active
 		isEActive := s.cfg.IsEActivated(timestamp)
-		*s.unitFees = config.GetDynamicFeesConfig(isEActive).InitialUnitFees
+		*s.feeRate = config.GetDynamicFeesConfig(isEActive).InitialFeeRate
 
 	default:
 		return err
 	}
 
-	switch feesWindowsBytes, err := s.singletonDB.Get(FeesWindowsKey); err {
+	switch lastBlkComplexityBytes, err := s.singletonDB.Get(LastBlkComplexityKey); err {
 	case nil:
-		if err := s.feesWindows.FromBytes(feesWindowsBytes); err != nil {
+		if err := s.lastBlkComplexity.FromBytes(lastBlkComplexityBytes); err != nil {
 			return err
 		}
 
@@ -1317,7 +1317,7 @@ func (s *state) loadMetadata() error {
 		// fork introducing dynamic fees may not be active yet,
 		// hence we may have never stored fees windows. Set to nil
 		// TODO: remove once fork is active
-		s.feesWindows = commonfees.EmptyWindows
+		s.lastBlkComplexity = commonfees.Empty
 
 	default:
 		return err
@@ -2300,12 +2300,12 @@ func (s *state) writeMetadata() error {
 		s.persistedTimestamp = s.timestamp
 	}
 
-	if s.unitFees != nil {
-		if err := s.singletonDB.Put(UnitFeesKey, s.unitFees.Bytes()); err != nil {
+	if s.feeRate != nil {
+		if err := s.singletonDB.Put(UnitFeesKey, s.feeRate.Bytes()); err != nil {
 			return fmt.Errorf("failed to write unit fees: %w", err)
 		}
 	}
-	if err := s.singletonDB.Put(FeesWindowsKey, s.feesWindows.Bytes()); err != nil {
+	if err := s.singletonDB.Put(LastBlkComplexityKey, s.lastBlkComplexity.Bytes()); err != nil {
 		return fmt.Errorf("failed to write unit fees: %w", err)
 	}
 	if s.persistedCurrentSupply != s.currentSupply {

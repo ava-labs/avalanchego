@@ -282,7 +282,7 @@ func (b *builder) NewImportTx(
 	changeAddr ids.ShortID,
 	memo []byte,
 ) (*txs.Tx, error) {
-	unitFees, err := b.state.GetUnitFees()
+	feeRates, err := b.state.GetFeeRates()
 	if err != nil {
 		return nil, err
 	}
@@ -297,8 +297,8 @@ func (b *builder) NewImportTx(
 			IsEUpgradeActive: isEUpgradeActive,
 			Config:           b.cfg,
 			ChainTime:        chainTime,
-			FeeManager:       commonfees.NewManager(unitFees),
-			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
+			FeeManager:       commonfees.NewManager(feeRates),
+			ConsumedUnitsCap: feeCfg.BlockMaxComplexity,
 		}
 	)
 
@@ -334,7 +334,7 @@ func (b *builder) NewExportTx(
 	changeAddr ids.ShortID,
 	memo []byte,
 ) (*txs.Tx, error) {
-	unitFees, err := b.state.GetUnitFees()
+	feeRates, err := b.state.GetFeeRates()
 	if err != nil {
 		return nil, err
 	}
@@ -349,8 +349,8 @@ func (b *builder) NewExportTx(
 			IsEUpgradeActive: isEUpgradeActive,
 			Config:           b.cfg,
 			ChainTime:        chainTime,
-			FeeManager:       commonfees.NewManager(unitFees),
-			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
+			FeeManager:       commonfees.NewManager(feeRates),
+			ConsumedUnitsCap: feeCfg.BlockMaxComplexity,
 		}
 	)
 
@@ -393,7 +393,7 @@ func (b *builder) NewCreateChainTx(
 	changeAddr ids.ShortID,
 	memo []byte,
 ) (*txs.Tx, error) {
-	unitFees, err := b.state.GetUnitFees()
+	feeRates, err := b.state.GetFeeRates()
 	if err != nil {
 		return nil, err
 	}
@@ -408,8 +408,8 @@ func (b *builder) NewCreateChainTx(
 			IsEUpgradeActive: isEUpgradeActive,
 			Config:           b.cfg,
 			ChainTime:        chainTime,
-			FeeManager:       commonfees.NewManager(unitFees),
-			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
+			FeeManager:       commonfees.NewManager(feeRates),
+			ConsumedUnitsCap: feeCfg.BlockMaxComplexity,
 		}
 	)
 
@@ -440,7 +440,7 @@ func (b *builder) NewCreateSubnetTx(
 	changeAddr ids.ShortID,
 	memo []byte,
 ) (*txs.Tx, error) {
-	unitFees, err := b.state.GetUnitFees()
+	feeRates, err := b.state.GetFeeRates()
 	if err != nil {
 		return nil, err
 	}
@@ -455,8 +455,8 @@ func (b *builder) NewCreateSubnetTx(
 			IsEUpgradeActive: isEUpgradeActive,
 			Config:           b.cfg,
 			ChainTime:        chainTime,
-			FeeManager:       commonfees.NewManager(unitFees),
-			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
+			FeeManager:       commonfees.NewManager(feeRates),
+			ConsumedUnitsCap: feeCfg.BlockMaxComplexity,
 		}
 	)
 
@@ -501,7 +501,7 @@ func (b *builder) NewTransformSubnetTx(
 	changeAddr ids.ShortID,
 	memo []byte,
 ) (*txs.Tx, error) {
-	unitFees, err := b.state.GetUnitFees()
+	feeRates, err := b.state.GetFeeRates()
 	if err != nil {
 		return nil, err
 	}
@@ -516,8 +516,8 @@ func (b *builder) NewTransformSubnetTx(
 			IsEUpgradeActive: isEUpgradeActive,
 			Config:           b.cfg,
 			ChainTime:        chainTime,
-			FeeManager:       commonfees.NewManager(unitFees),
-			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
+			FeeManager:       commonfees.NewManager(feeRates),
+			ConsumedUnitsCap: feeCfg.BlockMaxComplexity,
 		}
 	)
 
@@ -561,7 +561,7 @@ func (b *builder) NewAddValidatorTx(
 	changeAddr ids.ShortID,
 	memo []byte,
 ) (*txs.Tx, error) {
-	unitFees, err := b.state.GetUnitFees()
+	feeRates, err := b.state.GetFeeRates()
 	if err != nil {
 		return nil, err
 	}
@@ -576,8 +576,8 @@ func (b *builder) NewAddValidatorTx(
 			IsEUpgradeActive: isEUpgradeActive,
 			Config:           b.cfg,
 			ChainTime:        chainTime,
-			FeeManager:       commonfees.NewManager(unitFees),
-			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
+			FeeManager:       commonfees.NewManager(feeRates),
+			ConsumedUnitsCap: feeCfg.BlockMaxComplexity,
 		}
 	)
 
@@ -623,7 +623,7 @@ func (b *builder) NewAddPermissionlessValidatorTx(
 	changeAddr ids.ShortID,
 	memo []byte,
 ) (*txs.Tx, error) {
-	unitFees, err := b.state.GetUnitFees()
+	feeRates, err := b.state.GetFeeRates()
 	if err != nil {
 		return nil, err
 	}
@@ -638,8 +638,8 @@ func (b *builder) NewAddPermissionlessValidatorTx(
 			IsEUpgradeActive: isEUpgradeActive,
 			Config:           b.cfg,
 			ChainTime:        chainTime,
-			FeeManager:       commonfees.NewManager(unitFees),
-			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
+			FeeManager:       commonfees.NewManager(feeRates),
+			ConsumedUnitsCap: feeCfg.BlockMaxComplexity,
 		}
 	)
 
@@ -689,7 +689,7 @@ func (b *builder) NewAddDelegatorTx(
 	changeAddr ids.ShortID,
 	memo []byte,
 ) (*txs.Tx, error) {
-	unitFees, err := b.state.GetUnitFees()
+	feeRates, err := b.state.GetFeeRates()
 	if err != nil {
 		return nil, err
 	}
@@ -704,8 +704,8 @@ func (b *builder) NewAddDelegatorTx(
 			IsEUpgradeActive: isEUpgradeActive,
 			Config:           b.cfg,
 			ChainTime:        chainTime,
-			FeeManager:       commonfees.NewManager(unitFees),
-			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
+			FeeManager:       commonfees.NewManager(feeRates),
+			ConsumedUnitsCap: feeCfg.BlockMaxComplexity,
 		}
 	)
 
@@ -748,7 +748,7 @@ func (b *builder) NewAddPermissionlessDelegatorTx(
 	changeAddr ids.ShortID,
 	memo []byte,
 ) (*txs.Tx, error) {
-	unitFees, err := b.state.GetUnitFees()
+	feeRates, err := b.state.GetFeeRates()
 	if err != nil {
 		return nil, err
 	}
@@ -763,8 +763,8 @@ func (b *builder) NewAddPermissionlessDelegatorTx(
 			IsEUpgradeActive: isEUpgradeActive,
 			Config:           b.cfg,
 			ChainTime:        chainTime,
-			FeeManager:       commonfees.NewManager(unitFees),
-			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
+			FeeManager:       commonfees.NewManager(feeRates),
+			ConsumedUnitsCap: feeCfg.BlockMaxComplexity,
 		}
 	)
 
@@ -811,7 +811,7 @@ func (b *builder) NewAddSubnetValidatorTx(
 	changeAddr ids.ShortID,
 	memo []byte,
 ) (*txs.Tx, error) {
-	unitFees, err := b.state.GetUnitFees()
+	feeRates, err := b.state.GetFeeRates()
 	if err != nil {
 		return nil, err
 	}
@@ -826,8 +826,8 @@ func (b *builder) NewAddSubnetValidatorTx(
 			IsEUpgradeActive: isEUpgradeActive,
 			Config:           b.cfg,
 			ChainTime:        chainTime,
-			FeeManager:       commonfees.NewManager(unitFees),
-			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
+			FeeManager:       commonfees.NewManager(feeRates),
+			ConsumedUnitsCap: feeCfg.BlockMaxComplexity,
 		}
 	)
 
@@ -864,7 +864,7 @@ func (b *builder) NewRemoveSubnetValidatorTx(
 	changeAddr ids.ShortID,
 	memo []byte,
 ) (*txs.Tx, error) {
-	unitFees, err := b.state.GetUnitFees()
+	feeRates, err := b.state.GetFeeRates()
 	if err != nil {
 		return nil, err
 	}
@@ -879,8 +879,8 @@ func (b *builder) NewRemoveSubnetValidatorTx(
 			IsEUpgradeActive: isEUpgradeActive,
 			Config:           b.cfg,
 			ChainTime:        chainTime,
-			FeeManager:       commonfees.NewManager(unitFees),
-			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
+			FeeManager:       commonfees.NewManager(feeRates),
+			ConsumedUnitsCap: feeCfg.BlockMaxComplexity,
 		}
 	)
 
@@ -909,7 +909,7 @@ func (b *builder) NewTransferSubnetOwnershipTx(
 	changeAddr ids.ShortID,
 	memo []byte,
 ) (*txs.Tx, error) {
-	unitFees, err := b.state.GetUnitFees()
+	feeRates, err := b.state.GetFeeRates()
 	if err != nil {
 		return nil, err
 	}
@@ -924,8 +924,8 @@ func (b *builder) NewTransferSubnetOwnershipTx(
 			IsEUpgradeActive: isEUpgradeActive,
 			Config:           b.cfg,
 			ChainTime:        chainTime,
-			FeeManager:       commonfees.NewManager(unitFees),
-			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
+			FeeManager:       commonfees.NewManager(feeRates),
+			ConsumedUnitsCap: feeCfg.BlockMaxComplexity,
 		}
 	)
 
@@ -959,7 +959,7 @@ func (b *builder) NewBaseTx(
 	changeAddr ids.ShortID,
 	memo []byte,
 ) (*txs.Tx, error) {
-	unitFees, err := b.state.GetUnitFees()
+	feeRates, err := b.state.GetFeeRates()
 	if err != nil {
 		return nil, err
 	}
@@ -974,8 +974,8 @@ func (b *builder) NewBaseTx(
 			IsEUpgradeActive: isEUpgradeActive,
 			Config:           b.cfg,
 			ChainTime:        chainTime,
-			FeeManager:       commonfees.NewManager(unitFees),
-			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
+			FeeManager:       commonfees.NewManager(feeRates),
+			ConsumedUnitsCap: feeCfg.BlockMaxComplexity,
 		}
 	)
 

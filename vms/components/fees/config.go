@@ -6,53 +6,56 @@ package fees
 import "fmt"
 
 type DynamicFeesConfig struct {
-	// InitialUnitFees contains, per each fee dimension, the
-	// unit fees valid as soon as fork introducing dynamic fees
-	// activates. Unit fees will be then updated by the dynamic fees algo.
-	InitialUnitFees Dimensions `json:"initial-unit-fees"`
+	// InitialFeeRate contains, per each fee dimension, the
+	// fee rate, i.e. the fee per unit of complexity. Fee rates are
+	// valid as soon as fork introducing dynamic fees activates.
+	// Fee rates will be then updated by the dynamic fees algo.
+	InitialFeeRate Dimensions `json:"initial-fee-rate"`
 
-	// MinUnitFees contains, per each fee dimension, the
-	// minimal unit fees enforced by the dynamic fees algo.
-	MinUnitFees Dimensions `json:"min-unit-fees"`
+	// MinFeeRate contains, per each fee dimension, the
+	// minimal fee rate, i.e. the fee per unit of complexity,
+	// enforced by the dynamic fees algo.
+	MinFeeRate Dimensions `json:"minimal-fee-rate"`
 
 	// UpdateCoefficient contains, per each fee dimension, the
 	// exponential update coefficient. Setting an entry to 0 makes
 	// the corresponding fee rate constant.
 	UpdateCoefficient Dimensions `json:"update-coefficient"`
 
-	// BlockUnitsCap contains, per each fee dimension, the
-	// maximal complexity a valid P-chain block can host
-	BlockUnitsCap Dimensions `json:"block-unit-caps"`
-
-	// BlockUnitsTarget contains, per each fee dimension, the
+	// BlockTargetComplexityRate contains, per each fee dimension, the
 	// preferred block complexity that the dynamic fee algo
-	// strive to converge to
-	BlockUnitsTarget Dimensions `json:"block-target-caps"`
+	// strive to converge to, per second.
+	BlockTargetComplexityRate Dimensions `json:"block-target-complexity-rate"`
+
+	// BlockMaxComplexity contains, per each fee dimension, the
+	// maximal complexity a valid P-chain block can host.
+	BlockMaxComplexity Dimensions `json:"block-max-complexity-rate"`
 }
 
 func (c *DynamicFeesConfig) Validate() error {
 	for i := Dimension(0); i < FeeDimensions; i++ {
-		// MinUnitFees can be zero, but that is a bit dangerous. if a fee ever becomes
+		// MinFeeRate can be zero, but that is a bit dangerous. If a fee rate ever becomes
 		// zero, the update mechanism will keep them to zero.
-
-		if c.InitialUnitFees[i] < c.MinUnitFees[i] {
-			return fmt.Errorf("dimension %d, initial unit fee %d smaller than minimal unit fee %d",
+		if c.InitialFeeRate[i] < c.MinFeeRate[i] {
+			return fmt.Errorf("dimension %d, initial fee rate %d smaller than minimal fee rate %d",
 				i,
-				c.InitialUnitFees[i],
-				c.MinUnitFees[i],
+				c.InitialFeeRate[i],
+				c.MinFeeRate[i],
 			)
 		}
 
-		if c.BlockUnitsTarget[i] > c.BlockUnitsCap[i] {
-			return fmt.Errorf("dimension %d, block target units %d larger than block units cap %d",
+		if c.BlockTargetComplexityRate[i] > c.BlockMaxComplexity[i] {
+			return fmt.Errorf("dimension %d, block target complexity rate %d larger than block max complexity rate %d",
 				i,
-				c.BlockUnitsTarget[i],
-				c.BlockUnitsCap[i],
+				c.BlockTargetComplexityRate[i],
+				c.BlockMaxComplexity[i],
 			)
 		}
 
-		if c.BlockUnitsTarget[i] == 0 {
-			return fmt.Errorf("dimension %d, block target units set to zero", i)
+		// The update algorithm normalizes complexity delta by [BlockTargetComplexityRate].
+		// So we enforce [BlockTargetComplexityRate] to be non-zero.
+		if c.BlockTargetComplexityRate[i] == 0 {
+			return fmt.Errorf("dimension %d, block target complexity rate set to zero", i)
 		}
 	}
 

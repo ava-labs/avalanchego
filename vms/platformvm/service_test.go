@@ -353,7 +353,7 @@ func TestGetBalance(t *testing.T) {
 		if idx == 0 {
 			// we use the first key to fund a subnet creation in [defaultGenesis].
 			// As such we need to account for the subnet creation fee
-			unitFees, err := service.vm.state.GetUnitFees()
+			unitFees, err := service.vm.state.GetFeeRates()
 			require.NoError(err)
 
 			var (
@@ -365,7 +365,7 @@ func TestGetBalance(t *testing.T) {
 					Config:           &service.vm.Config,
 					ChainTime:        chainTime,
 					FeeManager:       feeMan,
-					ConsumedUnitsCap: feeCfg.BlockUnitsCap,
+					ConsumedUnitsCap: feeCfg.BlockMaxComplexity,
 					Credentials:      testSubnet1.Creds,
 				}
 			)
@@ -1009,24 +1009,24 @@ func TestGetUnitFees(t *testing.T) {
 	service, _ := defaultService(t)
 
 	reply := GetUnitFeesReply{}
-	require.NoError(service.GetUnitFees(nil, nil, &reply))
+	require.NoError(service.GetFeeRates(nil, nil, &reply))
 
 	service.vm.ctx.Lock.Lock()
 
-	unitFees, err := service.vm.state.GetUnitFees()
+	feeRates, err := service.vm.state.GetFeeRates()
 	require.NoError(err)
-	require.Equal(unitFees, reply.CurrentUnitFees)
+	require.Equal(feeRates, reply.CurrentUnitFees)
 
-	updatedUnitFees := commonfees.Dimensions{
+	updatedFeeRates := commonfees.Dimensions{
 		123,
 		456,
 		789,
 		1011,
 	}
-	service.vm.state.SetUnitFees(updatedUnitFees)
+	service.vm.state.SetUnitFees(updatedFeeRates)
 
 	service.vm.ctx.Lock.Unlock()
 
-	require.NoError(service.GetUnitFees(nil, nil, &reply))
-	require.Equal(updatedUnitFees, reply.CurrentUnitFees)
+	require.NoError(service.GetFeeRates(nil, nil, &reply))
+	require.Equal(updatedFeeRates, reply.CurrentUnitFees)
 }

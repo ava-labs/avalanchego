@@ -37,8 +37,8 @@ type diff struct {
 
 	timestamp time.Time
 
-	unitFees    *commonfees.Dimensions
-	feesWindows *commonfees.Windows
+	feeRates          *commonfees.Dimensions
+	lastBlkComplexity *commonfees.Dimensions
 
 	// Subnet ID --> supply of native asset of the subnet
 	currentSupply map[ids.ID]uint64
@@ -94,54 +94,54 @@ func NewDiffOn(parentState Chain) (Diff, error) {
 	})
 }
 
-func (d *diff) GetUnitFees() (commonfees.Dimensions, error) {
-	if d.unitFees == nil {
+func (d *diff) GetFeeRates() (commonfees.Dimensions, error) {
+	if d.feeRates == nil {
 		parentState, ok := d.stateVersions.GetState(d.parentID)
 		if !ok {
 			return commonfees.Empty, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
 		}
-		parentUnitFees, err := parentState.GetUnitFees()
+		parentUnitFees, err := parentState.GetFeeRates()
 		if err != nil {
 			return commonfees.Empty, err
 		}
 
-		d.unitFees = new(commonfees.Dimensions)
-		*d.unitFees = parentUnitFees
+		d.feeRates = new(commonfees.Dimensions)
+		*d.feeRates = parentUnitFees
 	}
 
-	return *d.unitFees, nil
+	return *d.feeRates, nil
 }
 
 func (d *diff) SetUnitFees(uf commonfees.Dimensions) {
-	if d.unitFees == nil {
-		d.unitFees = new(commonfees.Dimensions)
+	if d.feeRates == nil {
+		d.feeRates = new(commonfees.Dimensions)
 	}
-	*d.unitFees = uf
+	*d.feeRates = uf
 }
 
-func (d *diff) GetFeeWindows() (commonfees.Windows, error) {
-	if d.feesWindows == nil {
+func (d *diff) GetLastBlockComplexity() (commonfees.Dimensions, error) {
+	if d.lastBlkComplexity == nil {
 		parentState, ok := d.stateVersions.GetState(d.parentID)
 		if !ok {
-			return commonfees.EmptyWindows, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
+			return commonfees.Empty, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
 		}
-		parentFeeWindows, err := parentState.GetFeeWindows()
+		parentLastComplexity, err := parentState.GetLastBlockComplexity()
 		if err != nil {
-			return commonfees.EmptyWindows, err
+			return commonfees.Empty, err
 		}
 
-		d.feesWindows = new(commonfees.Windows)
-		*d.feesWindows = parentFeeWindows
+		d.lastBlkComplexity = new(commonfees.Dimensions)
+		*d.lastBlkComplexity = parentLastComplexity
 	}
 
-	return *d.feesWindows, nil
+	return *d.lastBlkComplexity, nil
 }
 
-func (d *diff) SetFeeWindows(windows commonfees.Windows) {
-	if d.feesWindows == nil {
-		d.feesWindows = new(commonfees.Windows)
+func (d *diff) SetLastBlockComplexity(complexity commonfees.Dimensions) {
+	if d.lastBlkComplexity == nil {
+		d.lastBlkComplexity = new(commonfees.Dimensions)
 	}
-	*d.feesWindows = windows
+	*d.lastBlkComplexity = complexity
 }
 
 func (d *diff) GetTimestamp() time.Time {
@@ -456,11 +456,11 @@ func (d *diff) DeleteUTXO(utxoID ids.ID) {
 
 func (d *diff) Apply(baseState Chain) error {
 	baseState.SetTimestamp(d.timestamp)
-	if d.unitFees != nil {
-		baseState.SetUnitFees(*d.unitFees)
+	if d.feeRates != nil {
+		baseState.SetUnitFees(*d.feeRates)
 	}
-	if d.feesWindows != nil {
-		baseState.SetFeeWindows(*d.feesWindows)
+	if d.lastBlkComplexity != nil {
+		baseState.SetLastBlockComplexity(*d.lastBlkComplexity)
 	}
 	for subnetID, supply := range d.currentSupply {
 		baseState.SetCurrentSupply(subnetID, supply)

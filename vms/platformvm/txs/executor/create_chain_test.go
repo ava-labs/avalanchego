@@ -58,11 +58,11 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 	chainTime := env.state.GetTimestamp()
 	feeCfg := config.GetDynamicFeesConfig(env.config.IsEActivated(chainTime))
 	executor := StandardTxExecutor{
-		Backend:       &env.backend,
-		BlkFeeManager: commonfees.NewManager(feeCfg.InitialUnitFees),
-		UnitCaps:      feeCfg.BlockUnitsCap,
-		State:         stateDiff,
-		Tx:            tx,
+		Backend:            &env.backend,
+		BlkFeeManager:      commonfees.NewManager(feeCfg.InitialFeeRate),
+		BlockMaxComplexity: feeCfg.BlockMaxComplexity,
+		State:              stateDiff,
+		Tx:                 tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
 	require.ErrorIs(err, errUnauthorizedSubnetModification)
@@ -102,11 +102,11 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 	chainTime := stateDiff.GetTimestamp()
 	feeCfg := config.GetDynamicFeesConfig(env.config.IsEActivated(chainTime))
 	executor := StandardTxExecutor{
-		Backend:       &env.backend,
-		BlkFeeManager: commonfees.NewManager(feeCfg.InitialUnitFees),
-		UnitCaps:      feeCfg.BlockUnitsCap,
-		State:         stateDiff,
-		Tx:            tx,
+		Backend:            &env.backend,
+		BlkFeeManager:      commonfees.NewManager(feeCfg.InitialFeeRate),
+		BlockMaxComplexity: feeCfg.BlockMaxComplexity,
+		State:              stateDiff,
+		Tx:                 tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
 	require.ErrorIs(err, errUnauthorizedSubnetModification)
@@ -137,17 +137,17 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
-	unitFees, err := env.state.GetUnitFees()
+	feeRates, err := env.state.GetFeeRates()
 	require.NoError(err)
 
 	currentTime := stateDiff.GetTimestamp()
 	feeCfg := config.GetDynamicFeesConfig(env.config.IsEActivated(currentTime))
 	executor := StandardTxExecutor{
-		Backend:       &env.backend,
-		BlkFeeManager: commonfees.NewManager(unitFees),
-		UnitCaps:      feeCfg.BlockUnitsCap,
-		State:         stateDiff,
-		Tx:            tx,
+		Backend:            &env.backend,
+		BlkFeeManager:      commonfees.NewManager(feeRates),
+		BlockMaxComplexity: feeCfg.BlockMaxComplexity,
+		State:              stateDiff,
+		Tx:                 tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
 	require.ErrorIs(err, database.ErrNotFound)
@@ -175,17 +175,17 @@ func TestCreateChainTxValid(t *testing.T) {
 	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
-	unitFees, err := env.state.GetUnitFees()
+	feeRates, err := env.state.GetFeeRates()
 	require.NoError(err)
 
 	currentTime := stateDiff.GetTimestamp()
 	feeCfg := config.GetDynamicFeesConfig(env.config.IsEActivated(currentTime))
 	executor := StandardTxExecutor{
-		Backend:       &env.backend,
-		BlkFeeManager: commonfees.NewManager(unitFees),
-		UnitCaps:      feeCfg.BlockUnitsCap,
-		State:         stateDiff,
-		Tx:            tx,
+		Backend:            &env.backend,
+		BlkFeeManager:      commonfees.NewManager(feeRates),
+		BlockMaxComplexity: feeCfg.BlockMaxComplexity,
+		State:              stateDiff,
+		Tx:                 tx,
 	}
 	require.NoError(tx.Unsigned.Visit(&executor))
 }
@@ -246,8 +246,8 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 					IsEUpgradeActive: false,
 					Config:           &cfg,
 					ChainTime:        test.time,
-					FeeManager:       commonfees.NewManager(feeCfg.InitialUnitFees),
-					ConsumedUnitsCap: feeCfg.BlockUnitsCap,
+					FeeManager:       commonfees.NewManager(feeCfg.InitialFeeRate),
+					ConsumedUnitsCap: feeCfg.BlockMaxComplexity,
 				}
 			)
 			backend.ResetAddresses(addrs)
@@ -275,11 +275,11 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 			currentTime := stateDiff.GetTimestamp()
 			feeCfg = config.GetDynamicFeesConfig(env.config.IsEActivated(currentTime))
 			executor := StandardTxExecutor{
-				Backend:       &env.backend,
-				BlkFeeManager: commonfees.NewManager(feeCfg.InitialUnitFees),
-				UnitCaps:      feeCfg.BlockUnitsCap,
-				State:         stateDiff,
-				Tx:            tx,
+				Backend:            &env.backend,
+				BlkFeeManager:      commonfees.NewManager(feeCfg.InitialFeeRate),
+				BlockMaxComplexity: feeCfg.BlockMaxComplexity,
+				State:              stateDiff,
+				Tx:                 tx,
 			}
 			err = tx.Unsigned.Visit(&executor)
 			require.ErrorIs(err, test.expectedError)

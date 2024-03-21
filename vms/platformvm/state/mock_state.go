@@ -256,19 +256,34 @@ func (mr *MockChainMockRecorder) GetDelegateeReward(arg0, arg1 any) *gomock.Call
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDelegateeReward", reflect.TypeOf((*MockChain)(nil).GetDelegateeReward), arg0, arg1)
 }
 
-// GetFeeWindows mocks base method.
-func (m *MockChain) GetFeeWindows() (fees.Windows, error) {
+// GetFeeRates mocks base method.
+func (m *MockChain) GetFeeRates() (fees.Dimensions, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetFeeWindows")
-	ret0, _ := ret[0].(fees.Windows)
+	ret := m.ctrl.Call(m, "GetFeeRates")
+	ret0, _ := ret[0].(fees.Dimensions)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// GetFeeWindows indicates an expected call of GetFeeWindows.
-func (mr *MockChainMockRecorder) GetFeeWindows() *gomock.Call {
+// GetFeeRates indicates an expected call of GetFeeRates.
+func (mr *MockChainMockRecorder) GetFeeRates() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetFeeWindows", reflect.TypeOf((*MockChain)(nil).GetFeeWindows))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetFeeRates", reflect.TypeOf((*MockChain)(nil).GetFeeRates))
+}
+
+// GetLastBlockComplexity mocks base method.
+func (m *MockChain) GetLastBlockComplexity() (fees.Dimensions, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetLastBlockComplexity")
+	ret0, _ := ret[0].(fees.Dimensions)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetLastBlockComplexity indicates an expected call of GetLastBlockComplexity.
+func (mr *MockChainMockRecorder) GetLastBlockComplexity() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLastBlockComplexity", reflect.TypeOf((*MockChain)(nil).GetLastBlockComplexity))
 }
 
 // GetPendingDelegatorIterator mocks base method.
@@ -391,21 +406,6 @@ func (mr *MockChainMockRecorder) GetUTXO(arg0 any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUTXO", reflect.TypeOf((*MockChain)(nil).GetUTXO), arg0)
 }
 
-// GetUnitFees mocks base method.
-func (m *MockChain) GetUnitFees() (fees.Dimensions, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetUnitFees")
-	ret0, _ := ret[0].(fees.Dimensions)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetUnitFees indicates an expected call of GetUnitFees.
-func (mr *MockChainMockRecorder) GetUnitFees() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUnitFees", reflect.TypeOf((*MockChain)(nil).GetUnitFees))
-}
-
 // PutCurrentDelegator mocks base method.
 func (m *MockChain) PutCurrentDelegator(arg0 *Staker) {
 	m.ctrl.T.Helper()
@@ -480,16 +480,16 @@ func (mr *MockChainMockRecorder) SetDelegateeReward(arg0, arg1, arg2 any) *gomoc
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetDelegateeReward", reflect.TypeOf((*MockChain)(nil).SetDelegateeReward), arg0, arg1, arg2)
 }
 
-// SetFeeWindows mocks base method.
-func (m *MockChain) SetFeeWindows(arg0 fees.Windows) {
+// SetLastBlockComplexity mocks base method.
+func (m *MockChain) SetLastBlockComplexity(arg0 fees.Dimensions) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SetFeeWindows", arg0)
+	m.ctrl.Call(m, "SetLastBlockComplexity", arg0)
 }
 
-// SetFeeWindows indicates an expected call of SetFeeWindows.
-func (mr *MockChainMockRecorder) SetFeeWindows(arg0 any) *gomock.Call {
+// SetLastBlockComplexity indicates an expected call of SetLastBlockComplexity.
+func (mr *MockChainMockRecorder) SetLastBlockComplexity(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetFeeWindows", reflect.TypeOf((*MockChain)(nil).SetFeeWindows), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetLastBlockComplexity", reflect.TypeOf((*MockChain)(nil).SetLastBlockComplexity), arg0)
 }
 
 // SetSubnetOwner mocks base method.
@@ -772,19 +772,34 @@ func (mr *MockDiffMockRecorder) GetDelegateeReward(arg0, arg1 any) *gomock.Call 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDelegateeReward", reflect.TypeOf((*MockDiff)(nil).GetDelegateeReward), arg0, arg1)
 }
 
-// GetFeeWindows mocks base method.
-func (m *MockDiff) GetFeeWindows() (fees.Windows, error) {
+// GetFeeRates mocks base method.
+func (m *MockDiff) GetFeeRates() (fees.Dimensions, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetFeeWindows")
-	ret0, _ := ret[0].(fees.Windows)
+	ret := m.ctrl.Call(m, "GetFeeRates")
+	ret0, _ := ret[0].(fees.Dimensions)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// GetFeeWindows indicates an expected call of GetFeeWindows.
-func (mr *MockDiffMockRecorder) GetFeeWindows() *gomock.Call {
+// GetFeeRates indicates an expected call of GetFeeRates.
+func (mr *MockDiffMockRecorder) GetFeeRates() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetFeeWindows", reflect.TypeOf((*MockDiff)(nil).GetFeeWindows))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetFeeRates", reflect.TypeOf((*MockDiff)(nil).GetFeeRates))
+}
+
+// GetLastBlockComplexity mocks base method.
+func (m *MockDiff) GetLastBlockComplexity() (fees.Dimensions, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetLastBlockComplexity")
+	ret0, _ := ret[0].(fees.Dimensions)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetLastBlockComplexity indicates an expected call of GetLastBlockComplexity.
+func (mr *MockDiffMockRecorder) GetLastBlockComplexity() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLastBlockComplexity", reflect.TypeOf((*MockDiff)(nil).GetLastBlockComplexity))
 }
 
 // GetPendingDelegatorIterator mocks base method.
@@ -907,21 +922,6 @@ func (mr *MockDiffMockRecorder) GetUTXO(arg0 any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUTXO", reflect.TypeOf((*MockDiff)(nil).GetUTXO), arg0)
 }
 
-// GetUnitFees mocks base method.
-func (m *MockDiff) GetUnitFees() (fees.Dimensions, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetUnitFees")
-	ret0, _ := ret[0].(fees.Dimensions)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetUnitFees indicates an expected call of GetUnitFees.
-func (mr *MockDiffMockRecorder) GetUnitFees() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUnitFees", reflect.TypeOf((*MockDiff)(nil).GetUnitFees))
-}
-
 // PutCurrentDelegator mocks base method.
 func (m *MockDiff) PutCurrentDelegator(arg0 *Staker) {
 	m.ctrl.T.Helper()
@@ -996,16 +996,16 @@ func (mr *MockDiffMockRecorder) SetDelegateeReward(arg0, arg1, arg2 any) *gomock
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetDelegateeReward", reflect.TypeOf((*MockDiff)(nil).SetDelegateeReward), arg0, arg1, arg2)
 }
 
-// SetFeeWindows mocks base method.
-func (m *MockDiff) SetFeeWindows(arg0 fees.Windows) {
+// SetLastBlockComplexity mocks base method.
+func (m *MockDiff) SetLastBlockComplexity(arg0 fees.Dimensions) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SetFeeWindows", arg0)
+	m.ctrl.Call(m, "SetLastBlockComplexity", arg0)
 }
 
-// SetFeeWindows indicates an expected call of SetFeeWindows.
-func (mr *MockDiffMockRecorder) SetFeeWindows(arg0 any) *gomock.Call {
+// SetLastBlockComplexity indicates an expected call of SetLastBlockComplexity.
+func (mr *MockDiffMockRecorder) SetLastBlockComplexity(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetFeeWindows", reflect.TypeOf((*MockDiff)(nil).SetFeeWindows), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetLastBlockComplexity", reflect.TypeOf((*MockDiff)(nil).SetLastBlockComplexity), arg0)
 }
 
 // SetSubnetOwner mocks base method.
@@ -1413,19 +1413,19 @@ func (mr *MockStateMockRecorder) GetDelegateeReward(arg0, arg1 any) *gomock.Call
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDelegateeReward", reflect.TypeOf((*MockState)(nil).GetDelegateeReward), arg0, arg1)
 }
 
-// GetFeeWindows mocks base method.
-func (m *MockState) GetFeeWindows() (fees.Windows, error) {
+// GetFeeRates mocks base method.
+func (m *MockState) GetFeeRates() (fees.Dimensions, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetFeeWindows")
-	ret0, _ := ret[0].(fees.Windows)
+	ret := m.ctrl.Call(m, "GetFeeRates")
+	ret0, _ := ret[0].(fees.Dimensions)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// GetFeeWindows indicates an expected call of GetFeeWindows.
-func (mr *MockStateMockRecorder) GetFeeWindows() *gomock.Call {
+// GetFeeRates indicates an expected call of GetFeeRates.
+func (mr *MockStateMockRecorder) GetFeeRates() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetFeeWindows", reflect.TypeOf((*MockState)(nil).GetFeeWindows))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetFeeRates", reflect.TypeOf((*MockState)(nil).GetFeeRates))
 }
 
 // GetLastAccepted mocks base method.
@@ -1440,6 +1440,21 @@ func (m *MockState) GetLastAccepted() ids.ID {
 func (mr *MockStateMockRecorder) GetLastAccepted() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLastAccepted", reflect.TypeOf((*MockState)(nil).GetLastAccepted))
+}
+
+// GetLastBlockComplexity mocks base method.
+func (m *MockState) GetLastBlockComplexity() (fees.Dimensions, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetLastBlockComplexity")
+	ret0, _ := ret[0].(fees.Dimensions)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetLastBlockComplexity indicates an expected call of GetLastBlockComplexity.
+func (mr *MockStateMockRecorder) GetLastBlockComplexity() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLastBlockComplexity", reflect.TypeOf((*MockState)(nil).GetLastBlockComplexity))
 }
 
 // GetPendingDelegatorIterator mocks base method.
@@ -1622,21 +1637,6 @@ func (mr *MockStateMockRecorder) GetUTXO(arg0 any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUTXO", reflect.TypeOf((*MockState)(nil).GetUTXO), arg0)
 }
 
-// GetUnitFees mocks base method.
-func (m *MockState) GetUnitFees() (fees.Dimensions, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetUnitFees")
-	ret0, _ := ret[0].(fees.Dimensions)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetUnitFees indicates an expected call of GetUnitFees.
-func (mr *MockStateMockRecorder) GetUnitFees() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUnitFees", reflect.TypeOf((*MockState)(nil).GetUnitFees))
-}
-
 // GetUptime mocks base method.
 func (m *MockState) GetUptime(arg0 ids.NodeID, arg1 ids.ID) (time.Duration, time.Time, error) {
 	m.ctrl.T.Helper()
@@ -1727,18 +1727,6 @@ func (mr *MockStateMockRecorder) SetDelegateeReward(arg0, arg1, arg2 any) *gomoc
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetDelegateeReward", reflect.TypeOf((*MockState)(nil).SetDelegateeReward), arg0, arg1, arg2)
 }
 
-// SetFeeWindows mocks base method.
-func (m *MockState) SetFeeWindows(arg0 fees.Windows) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SetFeeWindows", arg0)
-}
-
-// SetFeeWindows indicates an expected call of SetFeeWindows.
-func (mr *MockStateMockRecorder) SetFeeWindows(arg0 any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetFeeWindows", reflect.TypeOf((*MockState)(nil).SetFeeWindows), arg0)
-}
-
 // SetHeight mocks base method.
 func (m *MockState) SetHeight(arg0 uint64) {
 	m.ctrl.T.Helper()
@@ -1761,6 +1749,18 @@ func (m *MockState) SetLastAccepted(arg0 ids.ID) {
 func (mr *MockStateMockRecorder) SetLastAccepted(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetLastAccepted", reflect.TypeOf((*MockState)(nil).SetLastAccepted), arg0)
+}
+
+// SetLastBlockComplexity mocks base method.
+func (m *MockState) SetLastBlockComplexity(arg0 fees.Dimensions) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "SetLastBlockComplexity", arg0)
+}
+
+// SetLastBlockComplexity indicates an expected call of SetLastBlockComplexity.
+func (mr *MockStateMockRecorder) SetLastBlockComplexity(arg0 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetLastBlockComplexity", reflect.TypeOf((*MockState)(nil).SetLastBlockComplexity), arg0)
 }
 
 // SetSubnetOwner mocks base method.

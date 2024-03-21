@@ -5,6 +5,7 @@ package executor
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -147,11 +148,11 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 		return err
 	}
 
-	unitFees, err := stateDiff.GetUnitFees()
+	feeRates, err := stateDiff.GetFeeRates()
 	if err != nil {
 		return err
 	}
-	feeWindows, err := stateDiff.GetFeeWindows()
+	parentBlkComplexitty, err := stateDiff.GetLastBlockComplexity()
 	if err != nil {
 		return err
 	}
@@ -161,22 +162,24 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 		feesCfg      = config.GetDynamicFeesConfig(isEActivated)
 	)
 
-	feeManager := fees.NewManager(unitFees)
+	feeManager := fees.NewManager(feeRates)
 	if isEActivated {
-		feeManager.UpdateUnitFees(
+		if err := feeManager.UpdateFeeRates(
 			feesCfg,
-			feeWindows,
+			parentBlkComplexitty,
 			parentBlkTime.Unix(),
 			nextBlkTime.Unix(),
-		)
+		); err != nil {
+			return fmt.Errorf("failed updating fee rates, %w", err)
+		}
 	}
 
 	return tx.Unsigned.Visit(&executor.StandardTxExecutor{
-		Backend:       m.txExecutorBackend,
-		BlkFeeManager: feeManager,
-		UnitCaps:      feesCfg.BlockUnitsCap,
-		State:         stateDiff,
-		Tx:            tx,
+		Backend:            m.txExecutorBackend,
+		BlkFeeManager:      feeManager,
+		BlockMaxComplexity: feesCfg.BlockMaxComplexity,
+		State:              stateDiff,
+		Tx:                 tx,
 	})
 }
 
