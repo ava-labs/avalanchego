@@ -10,21 +10,21 @@ import (
 )
 
 const (
-	rangePrefixByte byte = iota
+	intervalPrefixByte byte = iota
 	blockPrefixByte
 
 	prefixLen = 1
 )
 
 var (
-	rangePrefix = []byte{rangePrefixByte}
-	blockPrefix = []byte{blockPrefixByte}
+	intervalPrefix = []byte{intervalPrefixByte}
+	blockPrefix    = []byte{blockPrefixByte}
 
 	errInvalidKeyLength = errors.New("invalid key length")
 )
 
 func GetIntervals(db database.Iteratee) ([]*Interval, error) {
-	it := db.NewIteratorWithPrefix(rangePrefix)
+	it := db.NewIteratorWithPrefix(intervalPrefix)
 	defer it.Release()
 
 	var intervals []*Interval
@@ -34,8 +34,8 @@ func GetIntervals(db database.Iteratee) ([]*Interval, error) {
 			return nil, errInvalidKeyLength
 		}
 
-		rangeKey := dbKey[prefixLen:]
-		upperBound, err := database.ParseUInt64(rangeKey)
+		intervalKey := dbKey[prefixLen:]
+		upperBound, err := database.ParseUInt64(intervalKey)
 		if err != nil {
 			return nil, err
 		}
@@ -55,39 +55,39 @@ func GetIntervals(db database.Iteratee) ([]*Interval, error) {
 }
 
 func PutInterval(db database.KeyValueWriter, upperBound uint64, lowerBound uint64) error {
-	rangeKey := database.PackUInt64(upperBound)
-	return database.PutUInt64(
-		db,
-		append(rangePrefix, rangeKey...),
-		lowerBound,
-	)
+	return database.PutUInt64(db, makeIntervalKey(upperBound), lowerBound)
 }
 
 func DeleteInterval(db database.KeyValueDeleter, upperBound uint64) error {
-	rangeKey := database.PackUInt64(upperBound)
-	return db.Delete(
-		append(rangePrefix, rangeKey...),
-	)
+	return db.Delete(makeIntervalKey(upperBound))
+}
+
+// makeIntervalKey uses the upperBound rather than the lowerBound because blocks
+// are fetched from tip towards genesis. This means that it is more common for
+// the lowerBound to change than the upperBound. Modifying the lowerBound only
+// requires a single write rather than a write and a delete when modifying the
+// upperBound.
+func makeIntervalKey(upperBound uint64) []byte {
+	intervalKey := database.PackUInt64(upperBound)
+	return append(intervalPrefix, intervalKey...)
 }
 
 func GetBlock(db database.KeyValueReader, height uint64) ([]byte, error) {
-	blockKey := database.PackUInt64(height)
-	return db.Get(
-		append(blockPrefix, blockKey...),
-	)
+	return db.Get(makeBlockKey(height))
 }
 
 func PutBlock(db database.KeyValueWriter, height uint64, bytes []byte) error {
-	blockKey := database.PackUInt64(height)
-	return db.Put(
-		append(blockPrefix, blockKey...),
-		bytes,
-	)
+	return db.Put(makeBlockKey(height), bytes)
 }
 
 func DeleteBlock(db database.KeyValueDeleter, height uint64) error {
+	return db.Delete(makeBlockKey(height))
+}
+
+// makeBlockKey ensures that the returned key maintains the same sorted order as
+// the height. This ensures that database iteration of block keys will iterate
+// from lower height to higher height.
+func makeBlockKey(height uint64) []byte {
 	blockKey := database.PackUInt64(height)
-	return db.Delete(
-		append(blockPrefix, blockKey...),
-	)
+	return append(blockPrefix, blockKey...)
 }

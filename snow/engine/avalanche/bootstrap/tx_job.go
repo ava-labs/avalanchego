@@ -23,9 +23,9 @@ import (
 var errMissingTxDependenciesOnAccept = errors.New("attempting to accept a transaction with missing dependencies")
 
 type txParser struct {
-	log                     logging.Logger
-	numAccepted, numDropped prometheus.Counter
-	vm                      vertex.LinearizableVM
+	log         logging.Logger
+	numAccepted prometheus.Counter
+	vm          vertex.LinearizableVM
 }
 
 func (p *txParser) Parse(ctx context.Context, txBytes []byte) (queue.Job, error) {
@@ -36,15 +36,14 @@ func (p *txParser) Parse(ctx context.Context, txBytes []byte) (queue.Job, error)
 	return &txJob{
 		log:         p.log,
 		numAccepted: p.numAccepted,
-		numDropped:  p.numDropped,
 		tx:          tx,
 	}, nil
 }
 
 type txJob struct {
-	log                     logging.Logger
-	numAccepted, numDropped prometheus.Counter
-	tx                      snowstorm.Tx
+	log         logging.Logger
+	numAccepted prometheus.Counter
+	tx          snowstorm.Tx
 }
 
 func (t *txJob) ID() ids.ID {
@@ -67,14 +66,12 @@ func (t *txJob) Execute(ctx context.Context) error {
 		return err
 	}
 	if hasMissingDeps {
-		t.numDropped.Inc()
 		return errMissingTxDependenciesOnAccept
 	}
 
 	status := t.tx.Status()
 	switch status {
 	case choices.Unknown, choices.Rejected:
-		t.numDropped.Inc()
 		return fmt.Errorf("attempting to execute transaction with status %s", status)
 	case choices.Processing:
 		txID := t.tx.ID()

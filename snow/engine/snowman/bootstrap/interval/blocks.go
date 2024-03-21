@@ -19,7 +19,7 @@ import (
 )
 
 const (
-	batchWritePeriod      = 1
+	batchWritePeriod      = 64
 	iteratorReleasePeriod = 1024
 	logPeriod             = 5 * time.Second
 )
@@ -28,6 +28,13 @@ type Parser interface {
 	ParseBlock(context.Context, []byte) (snowman.Block, error)
 }
 
+// GetMissingBlockIDs returns the ID of the blocks that should be fetched to
+// attempt to make a single continuous range from
+// (lastAcceptedHeight, highestTrackedHeight].
+//
+// For example, if the tree currently contains heights [1, 4, 6, 7] and the
+// lastAcceptedHeight is 2, this function will return the IDs corresponding to
+// blocks [3, 5].
 func GetMissingBlockIDs(
 	ctx context.Context,
 	db database.KeyValueReader,
@@ -89,7 +96,11 @@ func Add(
 	return height != lastHeightToFetch && !tree.Contains(height-1), nil
 }
 
-// Invariant: Execute assumes that GetMissingBlockIDs would return an empty set.
+// Execute all the blocks tracked by the tree. If a block is in the tree but is
+// already accepted based on the lastAcceptedHeight, it will be removed from the
+// tree but not executed.
+//
+// Execute assumes that GetMissingBlockIDs would return an empty set.
 func Execute(
 	ctx context.Context,
 	log logging.Func,
