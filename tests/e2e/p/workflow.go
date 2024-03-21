@@ -48,6 +48,8 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 			pContext := pBuilder.Context()
 			avaxAssetID := pContext.AVAXAssetID
 			xWallet := baseWallet.X()
+			xBuilder := xWallet.Builder()
+			xContext := xBuilder.Context()
 			pChainClient := platformvm.NewClient(nodeURI.URI)
 
 			tests.Outf("{{blue}} fetching minimal stake amounts {{/}}\n")
@@ -145,7 +147,7 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 				require.NoError(err)
 
 				tx, err := pWallet.IssueExportTx(
-					xWallet.BlockchainID(),
+					xContext.BlockchainID,
 					[]*avax.TransferableOutput{
 						{
 							Asset: avax.Asset{
