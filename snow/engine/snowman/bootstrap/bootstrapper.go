@@ -170,7 +170,6 @@ func (b *Bootstrapper) Start(ctx context.Context, startReqID uint32) error {
 	b.parser = &parser{
 		log:         b.Ctx.Log,
 		numAccepted: b.numAccepted,
-		numDropped:  b.numDropped,
 		vm:          b.VM,
 	}
 	if err := b.Blocked.SetParser(ctx, b.parser); err != nil {
@@ -616,7 +615,6 @@ func (b *Bootstrapper) process(ctx context.Context, blk snowman.Block, processin
 		pushed, err := b.Blocked.Push(ctx, &blockJob{
 			log:         b.Ctx.Log,
 			numAccepted: b.numAccepted,
-			numDropped:  b.numDropped,
 			blk:         blk,
 			vm:          b.VM,
 		})
