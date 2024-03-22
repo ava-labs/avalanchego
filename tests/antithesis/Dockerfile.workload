@@ -8,7 +8,6 @@
 # ============= Compilation Stage ================
 FROM golang:1.21.8-bullseye AS builder
 
-WORKDIR /build
 # Copy and download avalanche dependencies using go mod
 COPY go.mod .
 COPY go.sum .
@@ -23,11 +22,7 @@ RUN ./scripts/build_antithesis_workload.sh
 # ============= Cleanup Stage ================
 FROM debian:11-slim AS execution
 
-# Maintain compatibility with previous images
-RUN mkdir -p /workload/build
-WORKDIR /workload/build
-
 # Copy the executables into the container
-COPY --from=builder /build/build/ .
+COPY --from=builder /build/ .
 
 CMD [ "./workload" ]
