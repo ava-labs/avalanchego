@@ -678,8 +678,8 @@ func (s *Service) GetAllBalances(_ *http.Request, args *GetAllBalancesArgs, repl
 
 // GetFeeRatesReply is the response from GetFeeRates
 type GetFeeRatesReply struct {
-	CurrentUnitFees commonfees.Dimensions `json:"currentUnitFees"`
-	NextUnitFees    commonfees.Dimensions `json:"nextUnitFees"`
+	CurrentFeeRates commonfees.Dimensions `json:"currentFeeRates"`
+	NextFeeRates    commonfees.Dimensions `json:"nextFeesRates"`
 }
 
 // GetTimestamp returns the current timestamp on chain.
@@ -698,17 +698,17 @@ func (s *Service) GetFeeRates(_ *http.Request, _ *struct{}, reply *GetFeeRatesRe
 		return fmt.Errorf("could not retrieve state for block %s", preferredID)
 	}
 
-	currentUnitFees, err := onAccept.GetFeeRates()
+	currentFeeRates, err := onAccept.GetFeeRates()
 	if err != nil {
 		return err
 	}
-	reply.CurrentUnitFees = currentUnitFees
+	reply.CurrentFeeRates = currentFeeRates
 
 	nextTimestamp := executor.NextBlockTime(onAccept.GetTimestamp(), &s.vm.clock)
 	isEActivated := s.vm.Config.IsEActivated(nextTimestamp)
 
 	if !isEActivated {
-		reply.NextUnitFees = reply.CurrentUnitFees
+		reply.NextFeeRates = reply.CurrentFeeRates
 		return nil
 	}
 
@@ -717,23 +717,23 @@ func (s *Service) GetFeeRates(_ *http.Request, _ *struct{}, reply *GetFeeRatesRe
 		feesCfg          = config.GetDynamicFeesConfig(isEActivated)
 	)
 
-	feeWindows, err := onAccept.GetLastBlockComplexity()
+	parentBlkComplexity, err := onAccept.GetLastBlockComplexity()
 	if err != nil {
 		return err
 	}
 
-	feeManager := commonfees.NewManager(currentUnitFees)
+	feeManager := commonfees.NewManager(currentFeeRates)
 	if isEActivated {
 		if err := feeManager.UpdateFeeRates(
 			feesCfg,
-			feeWindows,
+			parentBlkComplexity,
 			currentTimestamp.Unix(),
 			nextTimestamp.Unix(),
 		); err != nil {
 			return fmt.Errorf("failed updating fee rates, %w", err)
 		}
 	}
-	reply.NextUnitFees = feeManager.GetFeeRates()
+	reply.NextFeeRates = feeManager.GetFeeRates()
 
 	return nil
 }

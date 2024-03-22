@@ -175,9 +175,9 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 	if err != nil {
 		return fmt.Errorf("failed retrieving unit fees: %w", err)
 	}
-	feeWindows, err := stateDiff.GetLastBlockComplexity()
+	parentBlkComplexity, err := stateDiff.GetLastBlockComplexity()
 	if err != nil {
-		return fmt.Errorf("failed retrieving fee windows: %w", err)
+		return fmt.Errorf("failed retrieving last block complexity: %w", err)
 	}
 
 	var (
@@ -189,7 +189,7 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 	if isEForkActive {
 		if err := feeManager.UpdateFeeRates(
 			feesCfg,
-			feeWindows,
+			parentBlkComplexity,
 			parentBlkTime.Unix(),
 			nextBlkTime.Unix(),
 		); err != nil {

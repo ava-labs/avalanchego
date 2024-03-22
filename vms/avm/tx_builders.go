@@ -44,7 +44,7 @@ func buildCreateAssetTx(
 	kc *secp256k1fx.Keychain,
 	changeAddr ids.ShortID,
 ) (*txs.Tx, ids.ShortID, error) {
-	unitFees, err := backend.State().GetFeeRates()
+	feeRates, err := backend.State().GetFeeRates()
 	if err != nil {
 		return nil, ids.ShortEmpty, fmt.Errorf("failed retrieving unit fees: %w", err)
 	}
@@ -55,7 +55,7 @@ func buildCreateAssetTx(
 		cfg               = backend.Config()
 		isEUpgradeActive  = cfg.IsEActivated(chainTime)
 		feeCfg            = config.GetDynamicFeesConfig(isEUpgradeActive)
-		feeMan            = commonfees.NewManager(unitFees)
+		feeMan            = commonfees.NewManager(feeRates)
 		feeCalc           = &fees.Calculator{
 			IsEUpgradeActive: isEUpgradeActive,
 			Config:           cfg,
@@ -92,7 +92,7 @@ func buildBaseTx(
 	kc *secp256k1fx.Keychain,
 	changeAddr ids.ShortID,
 ) (*txs.Tx, ids.ShortID, error) {
-	unitFees, err := backend.State().GetFeeRates()
+	feeRates, err := backend.State().GetFeeRates()
 	if err != nil {
 		return nil, ids.ShortEmpty, fmt.Errorf("failed retrieving unit fees: %w", err)
 	}
@@ -103,7 +103,7 @@ func buildBaseTx(
 		cfg               = backend.Config()
 		isEUpgradeActive  = cfg.IsEActivated(chainTime)
 		feeCfg            = config.GetDynamicFeesConfig(isEUpgradeActive)
-		feeMan            = commonfees.NewManager(unitFees)
+		feeMan            = commonfees.NewManager(feeRates)
 		feeCalc           = &fees.Calculator{
 			IsEUpgradeActive: isEUpgradeActive,
 			Config:           cfg,
@@ -138,7 +138,7 @@ func mintNFT(
 	kc *secp256k1fx.Keychain,
 	changeAddr ids.ShortID,
 ) (*txs.Tx, error) {
-	unitFees, err := backend.State().GetFeeRates()
+	feeRates, err := backend.State().GetFeeRates()
 	if err != nil {
 		return nil, fmt.Errorf("failed retrieving unit fees: %w", err)
 	}
@@ -149,7 +149,7 @@ func mintNFT(
 		cfg               = backend.Config()
 		isEUpgradeActive  = cfg.IsEActivated(chainTime)
 		feeCfg            = config.GetDynamicFeesConfig(isEUpgradeActive)
-		feeMan            = commonfees.NewManager(unitFees)
+		feeMan            = commonfees.NewManager(feeRates)
 		feeCalc           = &fees.Calculator{
 			IsEUpgradeActive: isEUpgradeActive,
 			Config:           cfg,
@@ -179,7 +179,7 @@ func mintFTs(
 	kc *secp256k1fx.Keychain,
 	changeAddr ids.ShortID,
 ) (*txs.Tx, error) {
-	unitFees, err := backend.State().GetFeeRates()
+	feeRates, err := backend.State().GetFeeRates()
 	if err != nil {
 		return nil, fmt.Errorf("failed retrieving unit fees: %w", err)
 	}
@@ -190,7 +190,7 @@ func mintFTs(
 		cfg               = backend.Config()
 		isEUpgradeActive  = cfg.IsEActivated(chainTime)
 		feeCfg            = config.GetDynamicFeesConfig(isEUpgradeActive)
-		feeMan            = commonfees.NewManager(unitFees)
+		feeMan            = commonfees.NewManager(feeRates)
 		feeCalc           = &fees.Calculator{
 			IsEUpgradeActive: isEUpgradeActive,
 			Config:           cfg,
@@ -217,7 +217,7 @@ func buildOperation(
 	kc *secp256k1fx.Keychain,
 	changeAddr ids.ShortID,
 ) (*txs.Tx, error) {
-	unitFees, err := backend.State().GetFeeRates()
+	feeRates, err := backend.State().GetFeeRates()
 	if err != nil {
 		return nil, fmt.Errorf("failed retrieving unit fees: %w", err)
 	}
@@ -228,7 +228,7 @@ func buildOperation(
 		cfg               = backend.Config()
 		isEUpgradeActive  = cfg.IsEActivated(chainTime)
 		feeCfg            = config.GetDynamicFeesConfig(isEUpgradeActive)
-		feeMan            = commonfees.NewManager(unitFees)
+		feeMan            = commonfees.NewManager(feeRates)
 		feeCalc           = &fees.Calculator{
 			IsEUpgradeActive: isEUpgradeActive,
 			Config:           cfg,
@@ -256,7 +256,7 @@ func buildImportTx(
 	to ids.ShortID,
 	kc *secp256k1fx.Keychain,
 ) (*txs.Tx, error) {
-	unitFees, err := backend.State().GetFeeRates()
+	feeRates, err := backend.State().GetFeeRates()
 	if err != nil {
 		return nil, fmt.Errorf("failed retrieving unit fees: %w", err)
 	}
@@ -267,7 +267,7 @@ func buildImportTx(
 		cfg               = backend.Config()
 		isEUpgradeActive  = cfg.IsEActivated(chainTime)
 		feeCfg            = config.GetDynamicFeesConfig(isEUpgradeActive)
-		feeMan            = commonfees.NewManager(unitFees)
+		feeMan            = commonfees.NewManager(feeRates)
 		feeCalc           = &fees.Calculator{
 			IsEUpgradeActive: isEUpgradeActive,
 			Config:           cfg,
@@ -304,7 +304,7 @@ func buildExportTx(
 	kc *secp256k1fx.Keychain,
 	changeAddr ids.ShortID,
 ) (*txs.Tx, ids.ShortID, error) {
-	unitFees, err := backend.State().GetFeeRates()
+	feeRates, err := backend.State().GetFeeRates()
 	if err != nil {
 		return nil, ids.ShortEmpty, fmt.Errorf("failed retrieving unit fees: %w", err)
 	}
@@ -315,7 +315,7 @@ func buildExportTx(
 		cfg               = backend.Config()
 		isEUpgradeActive  = cfg.IsEActivated(chainTime)
 		feeCfg            = config.GetDynamicFeesConfig(isEUpgradeActive)
-		feeMan            = commonfees.NewManager(unitFees)
+		feeMan            = commonfees.NewManager(feeRates)
 		feeCalc           = &fees.Calculator{
 			IsEUpgradeActive: isEUpgradeActive,
 			Config:           cfg,

@@ -413,7 +413,7 @@ func (c *client) GetAllBalances(
 func (c *client) GetFeeRates(ctx context.Context, options ...rpc.Option) (commonfees.Dimensions, commonfees.Dimensions, error) {
 	res := &GetFeeRatesReply{}
 	err := c.requester.SendRequest(ctx, "avm.getFeeRates", struct{}{}, res, options...)
-	return res.CurrentUnitFees, res.NextUnitFees, err
+	return res.CurrentFeeRates, res.NextFeeRates, err
 }
 
 // ClientHolder describes how much an address owns of an asset

@@ -29,7 +29,7 @@ import (
 )
 
 var (
-	testUnitFees = fees.Dimensions{
+	testFeeRates = fees.Dimensions{
 		1 * units.MicroAvax,
 		2 * units.MicroAvax,
 		3 * units.MicroAvax,
@@ -148,7 +148,7 @@ func TestBaseTxFees(t *testing.T) {
 				IsEUpgradeActive: cfg.IsEActivated(chainTime),
 				Config:           cfg,
 				Codec:            codec,
-				FeeManager:       fees.NewManager(testUnitFees),
+				FeeManager:       fees.NewManager(testFeeRates),
 				ConsumedUnitsCap: consumedUnitCaps,
 				Credentials:      sTx.Creds,
 			}
@@ -266,7 +266,7 @@ func TestCreateAssetTxFees(t *testing.T) {
 				IsEUpgradeActive: cfg.IsEActivated(chainTime),
 				Config:           cfg,
 				Codec:            codec,
-				FeeManager:       fees.NewManager(testUnitFees),
+				FeeManager:       fees.NewManager(testFeeRates),
 				ConsumedUnitsCap: consumedUnitCaps,
 				Credentials:      sTx.Creds,
 			}
@@ -384,7 +384,7 @@ func TestOperationTxFees(t *testing.T) {
 				IsEUpgradeActive: cfg.IsEActivated(chainTime),
 				Config:           cfg,
 				Codec:            codec,
-				FeeManager:       fees.NewManager(testUnitFees),
+				FeeManager:       fees.NewManager(testFeeRates),
 				ConsumedUnitsCap: consumedUnitCaps,
 				Credentials:      sTx.Creds,
 			}
@@ -498,7 +498,7 @@ func TestImportTxFees(t *testing.T) {
 				IsEUpgradeActive: cfg.IsEActivated(chainTime),
 				Config:           cfg,
 				Codec:            codec,
-				FeeManager:       fees.NewManager(testUnitFees),
+				FeeManager:       fees.NewManager(testFeeRates),
 				ConsumedUnitsCap: consumedUnitCaps,
 				Credentials:      sTx.Creds,
 			}
@@ -602,7 +602,7 @@ func TestExportTxFees(t *testing.T) {
 				IsEUpgradeActive: cfg.IsEActivated(chainTime),
 				Config:           cfg,
 				Codec:            codec,
-				FeeManager:       fees.NewManager(testUnitFees),
+				FeeManager:       fees.NewManager(testFeeRates),
 				ConsumedUnitsCap: consumedUnitCaps,
 				Credentials:      sTx.Creds,
 			}

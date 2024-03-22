@@ -37,11 +37,11 @@ var (
 	blockPrefix     = []byte("block")
 	singletonPrefix = []byte("singleton")
 
-	isInitializedKey = []byte{0x00}
-	timestampKey     = []byte{0x01}
-	lastAcceptedKey  = []byte{0x02}
-	unitFeesKey      = []byte{0x03}
-	feesWindowsKey   = []byte{0x04}
+	isInitializedKey     = []byte{0x00}
+	timestampKey         = []byte{0x01}
+	lastAcceptedKey      = []byte{0x02}
+	feeRatesKey          = []byte{0x03}
+	lastBlkComplexityKey = []byte{0x04}
 
 	_ State = (*state)(nil)
 )
@@ -69,8 +69,8 @@ type Chain interface {
 	SetLastAccepted(blkID ids.ID)
 	SetTimestamp(t time.Time)
 
-	SetFeeRates(uf commonfees.Dimensions)
-	SetLastBlockComplexity(windows commonfees.Dimensions)
+	SetFeeRates(commonfees.Dimensions)
+	SetLastBlockComplexity(commonfees.Dimensions)
 }
 
 // State persistently maintains a set of UTXOs, transaction, statuses, and
@@ -364,9 +364,9 @@ func (s *state) InitializeChainState(stopVertexID ids.ID, genesisTimestamp time.
 }
 
 func (s *state) InitFees() error {
-	switch unitFeesBytes, err := s.singletonDB.Get(unitFeesKey); err {
+	switch feeRatesBytes, err := s.singletonDB.Get(feeRatesKey); err {
 	case nil:
-		if err := s.feeRates.FromBytes(unitFeesBytes); err != nil {
+		if err := s.feeRates.FromBytes(feeRatesBytes); err != nil {
 			return err
 		}
 
@@ -382,15 +382,15 @@ func (s *state) InitFees() error {
 		return err
 	}
 
-	switch feesWindowsBytes, err := s.singletonDB.Get(feesWindowsKey); err {
+	switch lastBlkComplexityBytes, err := s.singletonDB.Get(lastBlkComplexityKey); err {
 	case nil:
-		if err := s.lastBlkComplexity.FromBytes(feesWindowsBytes); err != nil {
+		if err := s.lastBlkComplexity.FromBytes(lastBlkComplexityBytes); err != nil {
 			return err
 		}
 
 	case database.ErrNotFound:
 		// fork introducing dynamic fees may not be active yet,
-		// hence we may have never stored fees windows. Set to nil
+		// hence we may have never stored block complexities. Set to nil
 		// TODO: remove once fork is active
 		s.lastBlkComplexity = commonfees.Empty
 
@@ -565,10 +565,10 @@ func (s *state) writeMetadata() error {
 		}
 		s.persistedTimestamp = s.timestamp
 	}
-	if err := s.singletonDB.Put(unitFeesKey, s.feeRates.Bytes()); err != nil {
+	if err := s.singletonDB.Put(feeRatesKey, s.feeRates.Bytes()); err != nil {
 		return fmt.Errorf("failed to write unit fees: %w", err)
 	}
-	if err := s.singletonDB.Put(feesWindowsKey, s.lastBlkComplexity.Bytes()); err != nil {
+	if err := s.singletonDB.Put(lastBlkComplexityKey, s.lastBlkComplexity.Bytes()); err != nil {
 		return fmt.Errorf("failed to write unit fees: %w", err)
 	}
 	if s.persistedLastAccepted != s.lastAccepted {

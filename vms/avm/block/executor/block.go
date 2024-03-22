@@ -138,7 +138,7 @@ func (b *Block) Verify(context.Context) error {
 	}
 	parentBlkComplexitty, err := stateDiff.GetLastBlockComplexity()
 	if err != nil {
-		return fmt.Errorf("failed retrieving fee windows: %w", err)
+		return fmt.Errorf("failed retrieving last block complexity: %w", err)
 	}
 
 	var (

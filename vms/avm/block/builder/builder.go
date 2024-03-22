@@ -102,7 +102,7 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 	}
 	parentBlkComplexity, err := stateDiff.GetLastBlockComplexity()
 	if err != nil {
-		return nil, fmt.Errorf("failed retrieving fee windows: %w", err)
+		return nil, fmt.Errorf("failed retrieving last block complexity: %w", err)
 	}
 
 	feeManager := fees.NewManager(feeRates)
