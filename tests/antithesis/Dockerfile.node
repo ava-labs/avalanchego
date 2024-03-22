@@ -54,8 +54,8 @@ FROM debian:11-slim AS execution
 COPY --from=builder /build/commit_hash.txt ./commit_hash.txt
 
 # Copy the antithesis dependencies into the container
-RUN mkdir -p /avalanchego/symbols
-COPY --from=builder /avalanchego_instrumented/symbols /avalanchego/symbols
+# RUN mkdir -p /avalanchego/symbols
+# COPY --from=builder /avalanchego_instrumented/symbols /avalanchego/symbols
 COPY --from=builder /opt/antithesis/lib/libvoidstar.so /usr/lib/libvoidstar.so
 
 # Copy the executable into the container
