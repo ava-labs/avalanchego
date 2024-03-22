@@ -58,7 +58,7 @@ RUN mkdir -p /avalanchego/symbols
 COPY --from=builder /avalanchego_instrumented/symbols /avalanchego/symbols
 COPY --from=builder /opt/antithesis/lib/libvoidstar.so /usr/lib/libvoidstar.so
 
-# Copy the executables into the container
-COPY --from=builder /avalanchego_instrumented/customer/build/ .
+# Copy the executable into the container
+COPY --from=builder /avalanchego_instrumented/customer/build/avalanchego ./avalanchego
 
 CMD [ "./avalanchego" ]
