@@ -1,3 +1,6 @@
+# Antithesis: Getting the Antithesis golang instrumentation library
+FROM docker.io/antithesishq/go-instrumentor AS instrumentor
+
 # Changes to the minimum golang version must also be replicated in
 # scripts/build_avalanche.sh
 # tests/antithesis/Dockerfile.node (here)
@@ -6,9 +9,6 @@
 # go.mod
 # ============= Compilation Stage ================
 FROM golang:1.21.8-bullseye AS builder
-
-# Antithesis: Getting the Antithesis golang instrumentation library
-FROM docker.io/antithesishq/go-instrumentor AS instrumentor
 
 # RUN mkdir -p /build
 WORKDIR /build
