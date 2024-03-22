@@ -10,7 +10,6 @@ FROM docker.io/antithesishq/go-instrumentor AS instrumentor
 # ============= Compilation Stage ================
 FROM golang:1.21.8-bullseye AS builder
 
-# RUN mkdir -p /build
 WORKDIR /build
 # Copy and download avalanche dependencies using go mod
 COPY go.mod .
@@ -50,11 +49,6 @@ RUN ./scripts/build.sh -r
 
 # ============= Cleanup Stage ================
 FROM debian:11-slim AS execution
-
-# Maintain compatibility with previous images
-RUN mkdir -p /avalanchego/build
-RUN mkdir -p /avalanchego/symbols
-WORKDIR /avalanchego/build
 
 # Copy the executables into the container
 COPY --from=builder /avalanchego_instrumented/customer/build/ .
