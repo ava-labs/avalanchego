@@ -18,7 +18,7 @@ RUN go mod download
 COPY . .
 
 # Build the workload
-RUN ./build_antithesis_workload.sh
+RUN ./scripts/build_antithesis_workload.sh
 
 # ============= Cleanup Stage ================
 FROM debian:11-slim AS execution
