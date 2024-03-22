@@ -128,7 +128,7 @@ func (tx *Tx) Verify(context.Context) error {
 		return fmt.Errorf("%w: %s", errTxNotProcessing, s)
 	}
 
-	unitFees, err := tx.vm.state.GetUnitFees()
+	unitFees, err := tx.vm.state.GetFeeRates()
 	if err != nil {
 		return fmt.Errorf("failed retrieving unit fees: %w", err)
 	}
@@ -141,7 +141,7 @@ func (tx *Tx) Verify(context.Context) error {
 	return tx.tx.Unsigned.Visit(&executor.SemanticVerifier{
 		Backend:       tx.vm.txExecutorBackend,
 		BlkFeeManager: feeManager,
-		UnitCaps:      feeCfg.BlockUnitsCap,
+		UnitCaps:      feeCfg.BlockMaxComplexity,
 		State:         tx.vm.state,
 		Tx:            tx.tx,
 	})

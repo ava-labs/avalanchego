@@ -132,11 +132,11 @@ func (b *Block) Verify(context.Context) error {
 		atomicRequests: make(map[ids.ID]*atomic.Requests),
 	}
 
-	unitFees, err := stateDiff.GetUnitFees()
+	feeRates, err := stateDiff.GetFeeRates()
 	if err != nil {
 		return fmt.Errorf("failed retrieving unit fees: %w", err)
 	}
-	feeWindows, err := stateDiff.GetFeeWindows()
+	parentBlkComplexitty, err := stateDiff.GetLastBlockComplexity()
 	if err != nil {
 		return fmt.Errorf("failed retrieving fee windows: %w", err)
 	}
@@ -146,14 +146,16 @@ func (b *Block) Verify(context.Context) error {
 		feesCfg       = config.GetDynamicFeesConfig(isEForkActive)
 	)
 
-	feeManager := fees.NewManager(unitFees)
+	feeManager := fees.NewManager(feeRates)
 	if isEForkActive {
-		feeManager.UpdateUnitFees(
+		if err := feeManager.UpdateFeeRates(
 			feesCfg,
-			feeWindows,
+			parentBlkComplexitty,
 			parentChainTime.Unix(),
 			newChainTime.Unix(),
-		)
+		); err != nil {
+			return fmt.Errorf("failed updating fee rates, %w", err)
+		}
 	}
 
 	for _, tx := range txs {
@@ -162,7 +164,7 @@ func (b *Block) Verify(context.Context) error {
 		err := tx.Unsigned.Visit(&executor.SemanticVerifier{
 			Backend:       b.manager.backend,
 			BlkFeeManager: feeManager,
-			UnitCaps:      feesCfg.BlockUnitsCap,
+			UnitCaps:      feesCfg.BlockMaxComplexity,
 			State:         stateDiff,
 			Tx:            tx,
 		})
@@ -225,9 +227,8 @@ func (b *Block) Verify(context.Context) error {
 	// Now that the block has been executed, we can add the block data to the
 	// state diff.
 	if isEForkActive {
-		feeManager.UpdateWindows(&feeWindows, parentChainTime.Unix(), newChainTime.Unix())
-		stateDiff.SetUnitFees(feeManager.GetUnitFees())
-		stateDiff.SetFeeWindows(feeWindows)
+		stateDiff.SetFeeRates(feeManager.GetFeeRates())
+		stateDiff.SetLastBlockComplexity(parentBlkComplexitty)
 	}
 
 	stateDiff.SetLastAccepted(blkID)

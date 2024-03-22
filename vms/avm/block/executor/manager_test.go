@@ -142,8 +142,8 @@ func TestManagerVerifyTx(t *testing.T) {
 			managerF: func(ctrl *gomock.Controller) *manager {
 				state := state.NewMockState(ctrl)
 				// state.EXPECT().GetTimestamp().Return(time.Time{})
-				state.EXPECT().GetUnitFees().Return(commonfees.Empty, nil).AnyTimes()
-				state.EXPECT().GetFeeWindows().Return(commonfees.EmptyWindows, nil).AnyTimes()
+				state.EXPECT().GetFeeRates().Return(commonfees.Empty, nil).AnyTimes()
+				state.EXPECT().GetLastBlockComplexity().Return(commonfees.Empty, nil).AnyTimes()
 
 				return &manager{
 					backend: defaultTestBackend(true, nil),
@@ -175,8 +175,8 @@ func TestManagerVerifyTx(t *testing.T) {
 				state.EXPECT().GetLastAccepted().Return(lastAcceptedID).AnyTimes()
 				state.EXPECT().GetBlock(lastAcceptedID).Return(lastAcceptedMockBlock, nil).AnyTimes()
 				state.EXPECT().GetTimestamp().Return(time.Time{}).AnyTimes()
-				state.EXPECT().GetUnitFees().Return(commonfees.Empty, nil).AnyTimes()
-				state.EXPECT().GetFeeWindows().Return(commonfees.EmptyWindows, nil).AnyTimes()
+				state.EXPECT().GetFeeRates().Return(commonfees.Empty, nil).AnyTimes()
+				state.EXPECT().GetLastBlockComplexity().Return(commonfees.Empty, nil).AnyTimes()
 
 				m := &manager{
 					backend:      defaultTestBackend(true, nil),
@@ -215,8 +215,8 @@ func TestManagerVerifyTx(t *testing.T) {
 				state.EXPECT().GetLastAccepted().Return(lastAcceptedID).AnyTimes()
 				state.EXPECT().GetBlock(lastAcceptedID).Return(lastAcceptedMockBlock, nil).AnyTimes()
 				state.EXPECT().GetTimestamp().Return(time.Time{}).AnyTimes()
-				state.EXPECT().GetUnitFees().Return(commonfees.Empty, nil).AnyTimes()
-				state.EXPECT().GetFeeWindows().Return(commonfees.EmptyWindows, nil).AnyTimes()
+				state.EXPECT().GetFeeRates().Return(commonfees.Empty, nil).AnyTimes()
+				state.EXPECT().GetLastBlockComplexity().Return(commonfees.Empty, nil).AnyTimes()
 
 				m := &manager{
 					backend:      defaultTestBackend(true, nil),
@@ -254,8 +254,8 @@ func TestManagerVerifyTx(t *testing.T) {
 				state.EXPECT().GetLastAccepted().Return(lastAcceptedID).AnyTimes()
 				state.EXPECT().GetBlock(lastAcceptedID).Return(lastAcceptedMockBlock, nil).AnyTimes()
 				state.EXPECT().GetTimestamp().Return(time.Time{}).AnyTimes()
-				state.EXPECT().GetUnitFees().Return(commonfees.Empty, nil).AnyTimes()
-				state.EXPECT().GetFeeWindows().Return(commonfees.EmptyWindows, nil).AnyTimes()
+				state.EXPECT().GetFeeRates().Return(commonfees.Empty, nil).AnyTimes()
+				state.EXPECT().GetLastBlockComplexity().Return(commonfees.Empty, nil).AnyTimes()
 
 				m := &manager{
 					backend:      defaultTestBackend(true, nil),

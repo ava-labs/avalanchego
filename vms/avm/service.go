@@ -676,17 +676,17 @@ func (s *Service) GetAllBalances(_ *http.Request, args *GetAllBalancesArgs, repl
 	return nil
 }
 
-// GetUnitFeesReply is the response from GetUnitFees
-type GetUnitFeesReply struct {
+// GetFeeRatesReply is the response from GetFeeRates
+type GetFeeRatesReply struct {
 	CurrentUnitFees commonfees.Dimensions `json:"currentUnitFees"`
 	NextUnitFees    commonfees.Dimensions `json:"nextUnitFees"`
 }
 
 // GetTimestamp returns the current timestamp on chain.
-func (s *Service) GetUnitFees(_ *http.Request, _ *struct{}, reply *GetUnitFeesReply) error {
+func (s *Service) GetFeeRates(_ *http.Request, _ *struct{}, reply *GetFeeRatesReply) error {
 	s.vm.ctx.Log.Debug("API called",
 		zap.String("service", "platform"),
-		zap.String("method", "getUnitFees"),
+		zap.String("method", "getFeeRates"),
 	)
 
 	s.vm.ctx.Lock.Lock()
@@ -698,7 +698,7 @@ func (s *Service) GetUnitFees(_ *http.Request, _ *struct{}, reply *GetUnitFeesRe
 		return fmt.Errorf("could not retrieve state for block %s", preferredID)
 	}
 
-	currentUnitFees, err := onAccept.GetUnitFees()
+	currentUnitFees, err := onAccept.GetFeeRates()
 	if err != nil {
 		return err
 	}
@@ -717,44 +717,25 @@ func (s *Service) GetUnitFees(_ *http.Request, _ *struct{}, reply *GetUnitFeesRe
 		feesCfg          = config.GetDynamicFeesConfig(isEActivated)
 	)
 
-	feeWindows, err := onAccept.GetFeeWindows()
+	feeWindows, err := onAccept.GetLastBlockComplexity()
 	if err != nil {
 		return err
 	}
 
 	feeManager := commonfees.NewManager(currentUnitFees)
 	if isEActivated {
-		feeManager.UpdateUnitFees(
+		if err := feeManager.UpdateFeeRates(
 			feesCfg,
 			feeWindows,
 			currentTimestamp.Unix(),
 			nextTimestamp.Unix(),
-		)
+		); err != nil {
+			return fmt.Errorf("failed updating fee rates, %w", err)
+		}
 	}
-	reply.NextUnitFees = feeManager.GetUnitFees()
+	reply.NextUnitFees = feeManager.GetFeeRates()
 
 	return nil
-}
-
-// GetBlockUnitsCapReply is the response from GetBlockUnitsCap
-type GetFeeWindowsReply struct {
-	// Current timestamp
-	FeeWindows commonfees.Windows `json:"feeWindows"`
-}
-
-// GetTimestamp returns the current timestamp on chain.
-func (s *Service) GetFeeWindows(_ *http.Request, _ *struct{}, reply *GetFeeWindowsReply) error {
-	s.vm.ctx.Log.Debug("API called",
-		zap.String("service", "avm"),
-		zap.String("method", "getBlockUnitsCap"),
-	)
-
-	s.vm.ctx.Lock.Lock()
-	defer s.vm.ctx.Lock.Unlock()
-
-	var err error
-	reply.FeeWindows, err = s.vm.state.GetFeeWindows()
-	return err
 }
 
 // Holder describes how much an address owns of an asset

@@ -55,8 +55,8 @@ type ReadOnlyChain interface {
 	GetLastAccepted() ids.ID
 	GetTimestamp() time.Time
 
-	GetUnitFees() (commonfees.Dimensions, error)
-	GetFeeWindows() (commonfees.Windows, error)
+	GetFeeRates() (commonfees.Dimensions, error)
+	GetLastBlockComplexity() (commonfees.Dimensions, error)
 }
 
 type Chain interface {
@@ -69,8 +69,8 @@ type Chain interface {
 	SetLastAccepted(blkID ids.ID)
 	SetTimestamp(t time.Time)
 
-	SetUnitFees(uf commonfees.Dimensions)
-	SetFeeWindows(windows commonfees.Windows)
+	SetFeeRates(uf commonfees.Dimensions)
+	SetLastBlockComplexity(windows commonfees.Dimensions)
 }
 
 // State persistently maintains a set of UTXOs, transaction, statuses, and
@@ -149,8 +149,8 @@ type state struct {
 	timestamp, persistedTimestamp       time.Time
 	singletonDB                         database.Database
 
-	unitFees    commonfees.Dimensions
-	feesWindows commonfees.Windows
+	feeRates          commonfees.Dimensions
+	lastBlkComplexity commonfees.Dimensions
 
 	trackChecksum bool
 	txChecksum    ids.ID
@@ -366,7 +366,7 @@ func (s *state) InitializeChainState(stopVertexID ids.ID, genesisTimestamp time.
 func (s *state) InitFees() error {
 	switch unitFeesBytes, err := s.singletonDB.Get(unitFeesKey); err {
 	case nil:
-		if err := s.unitFees.FromBytes(unitFeesBytes); err != nil {
+		if err := s.feeRates.FromBytes(unitFeesBytes); err != nil {
 			return err
 		}
 
@@ -376,7 +376,7 @@ func (s *state) InitFees() error {
 		// TODO: remove once fork is active
 		isEActivated := s.cfg.IsEActivated(s.GetTimestamp())
 		feeCfg := config.GetDynamicFeesConfig(isEActivated)
-		s.unitFees = feeCfg.InitialUnitFees
+		s.feeRates = feeCfg.InitialFeeRate
 
 	default:
 		return err
@@ -384,7 +384,7 @@ func (s *state) InitFees() error {
 
 	switch feesWindowsBytes, err := s.singletonDB.Get(feesWindowsKey); err {
 	case nil:
-		if err := s.feesWindows.FromBytes(feesWindowsBytes); err != nil {
+		if err := s.lastBlkComplexity.FromBytes(feesWindowsBytes); err != nil {
 			return err
 		}
 
@@ -392,7 +392,7 @@ func (s *state) InitFees() error {
 		// fork introducing dynamic fees may not be active yet,
 		// hence we may have never stored fees windows. Set to nil
 		// TODO: remove once fork is active
-		s.feesWindows = commonfees.EmptyWindows
+		s.lastBlkComplexity = commonfees.Empty
 
 	default:
 		return err
@@ -443,20 +443,20 @@ func (s *state) SetTimestamp(t time.Time) {
 	s.timestamp = t
 }
 
-func (s *state) GetUnitFees() (commonfees.Dimensions, error) {
-	return s.unitFees, nil
+func (s *state) GetFeeRates() (commonfees.Dimensions, error) {
+	return s.feeRates, nil
 }
 
-func (s *state) SetUnitFees(uf commonfees.Dimensions) {
-	s.unitFees = uf
+func (s *state) SetFeeRates(feeRates commonfees.Dimensions) {
+	s.feeRates = feeRates
 }
 
-func (s *state) GetFeeWindows() (commonfees.Windows, error) {
-	return s.feesWindows, nil
+func (s *state) GetLastBlockComplexity() (commonfees.Dimensions, error) {
+	return s.lastBlkComplexity, nil
 }
 
-func (s *state) SetFeeWindows(windows commonfees.Windows) {
-	s.feesWindows = windows
+func (s *state) SetLastBlockComplexity(complexity commonfees.Dimensions) {
+	s.lastBlkComplexity = complexity
 }
 
 func (s *state) Commit() error {
@@ -565,10 +565,10 @@ func (s *state) writeMetadata() error {
 		}
 		s.persistedTimestamp = s.timestamp
 	}
-	if err := s.singletonDB.Put(unitFeesKey, s.unitFees.Bytes()); err != nil {
+	if err := s.singletonDB.Put(unitFeesKey, s.feeRates.Bytes()); err != nil {
 		return fmt.Errorf("failed to write unit fees: %w", err)
 	}
-	if err := s.singletonDB.Put(feesWindowsKey, s.feesWindows.Bytes()); err != nil {
+	if err := s.singletonDB.Put(feesWindowsKey, s.lastBlkComplexity.Bytes()); err != nil {
 		return fmt.Errorf("failed to write unit fees: %w", err)
 	}
 	if s.persistedLastAccepted != s.lastAccepted {

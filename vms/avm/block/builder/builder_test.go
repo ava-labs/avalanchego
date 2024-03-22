@@ -123,8 +123,8 @@ func TestBuilderBuildBlock(t *testing.T) {
 				preferredState := state.NewMockChain(ctrl)
 				preferredState.EXPECT().GetLastAccepted().Return(preferredID)
 				preferredState.EXPECT().GetTimestamp().Return(preferredTimestamp)
-				preferredState.EXPECT().GetUnitFees().Return(commonfees.Empty, nil)
-				preferredState.EXPECT().GetFeeWindows().Return(commonfees.EmptyWindows, nil)
+				preferredState.EXPECT().GetFeeRates().Return(commonfees.Empty, nil)
+				preferredState.EXPECT().GetLastBlockComplexity().Return(commonfees.Empty, nil)
 
 				manager := blkexecutor.NewMockManager(ctrl)
 				manager.EXPECT().Preferred().Return(preferredID)
@@ -174,8 +174,8 @@ func TestBuilderBuildBlock(t *testing.T) {
 				preferredState := state.NewMockChain(ctrl)
 				preferredState.EXPECT().GetLastAccepted().Return(preferredID)
 				preferredState.EXPECT().GetTimestamp().Return(preferredTimestamp)
-				preferredState.EXPECT().GetUnitFees().Return(commonfees.Empty, nil)
-				preferredState.EXPECT().GetFeeWindows().Return(commonfees.EmptyWindows, nil)
+				preferredState.EXPECT().GetFeeRates().Return(commonfees.Empty, nil)
+				preferredState.EXPECT().GetLastBlockComplexity().Return(commonfees.Empty, nil)
 
 				manager := blkexecutor.NewMockManager(ctrl)
 				manager.EXPECT().Preferred().Return(preferredID)
@@ -226,8 +226,8 @@ func TestBuilderBuildBlock(t *testing.T) {
 				preferredState := state.NewMockChain(ctrl)
 				preferredState.EXPECT().GetLastAccepted().Return(preferredID)
 				preferredState.EXPECT().GetTimestamp().Return(preferredTimestamp)
-				preferredState.EXPECT().GetUnitFees().Return(commonfees.Empty, nil)
-				preferredState.EXPECT().GetFeeWindows().Return(commonfees.EmptyWindows, nil)
+				preferredState.EXPECT().GetFeeRates().Return(commonfees.Empty, nil)
+				preferredState.EXPECT().GetLastBlockComplexity().Return(commonfees.Empty, nil)
 
 				manager := blkexecutor.NewMockManager(ctrl)
 				manager.EXPECT().Preferred().Return(preferredID)
@@ -279,8 +279,8 @@ func TestBuilderBuildBlock(t *testing.T) {
 				preferredState := state.NewMockChain(ctrl)
 				preferredState.EXPECT().GetLastAccepted().Return(preferredID)
 				preferredState.EXPECT().GetTimestamp().Return(preferredTimestamp)
-				preferredState.EXPECT().GetUnitFees().Return(commonfees.Empty, nil)
-				preferredState.EXPECT().GetFeeWindows().Return(commonfees.EmptyWindows, nil)
+				preferredState.EXPECT().GetFeeRates().Return(commonfees.Empty, nil)
+				preferredState.EXPECT().GetLastBlockComplexity().Return(commonfees.Empty, nil)
 
 				// tx1 and tx2 both consume [inputID].
 				// tx1 is added to the block first, so tx2 should be dropped.
@@ -382,8 +382,8 @@ func TestBuilderBuildBlock(t *testing.T) {
 				preferredState := state.NewMockChain(ctrl)
 				preferredState.EXPECT().GetLastAccepted().Return(preferredID)
 				preferredState.EXPECT().GetTimestamp().Return(preferredTimestamp)
-				preferredState.EXPECT().GetUnitFees().Return(commonfees.Empty, nil)
-				preferredState.EXPECT().GetFeeWindows().Return(commonfees.EmptyWindows, nil)
+				preferredState.EXPECT().GetFeeRates().Return(commonfees.Empty, nil)
+				preferredState.EXPECT().GetLastBlockComplexity().Return(commonfees.Empty, nil)
 
 				manager := blkexecutor.NewMockManager(ctrl)
 				manager.EXPECT().Preferred().Return(preferredID)
@@ -463,8 +463,8 @@ func TestBuilderBuildBlock(t *testing.T) {
 				preferredState := state.NewMockChain(ctrl)
 				preferredState.EXPECT().GetLastAccepted().Return(preferredID)
 				preferredState.EXPECT().GetTimestamp().Return(preferredTimestamp)
-				preferredState.EXPECT().GetUnitFees().Return(commonfees.Empty, nil)
-				preferredState.EXPECT().GetFeeWindows().Return(commonfees.EmptyWindows, nil)
+				preferredState.EXPECT().GetFeeRates().Return(commonfees.Empty, nil)
+				preferredState.EXPECT().GetLastBlockComplexity().Return(commonfees.Empty, nil)
 
 				manager := blkexecutor.NewMockManager(ctrl)
 				manager.EXPECT().Preferred().Return(preferredID)

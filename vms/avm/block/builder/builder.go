@@ -96,23 +96,25 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 		feesCfg       = config.GetDynamicFeesConfig(isEForkActive)
 	)
 
-	unitFees, err := stateDiff.GetUnitFees()
+	feeRates, err := stateDiff.GetFeeRates()
 	if err != nil {
 		return nil, fmt.Errorf("failed retrieving unit fees: %w", err)
 	}
-	feeWindows, err := stateDiff.GetFeeWindows()
+	parentBlkComplexity, err := stateDiff.GetLastBlockComplexity()
 	if err != nil {
 		return nil, fmt.Errorf("failed retrieving fee windows: %w", err)
 	}
 
-	feeManager := fees.NewManager(unitFees)
+	feeManager := fees.NewManager(feeRates)
 	if isEForkActive {
-		feeManager.UpdateUnitFees(
+		if err := feeManager.UpdateFeeRates(
 			feesCfg,
-			feeWindows,
+			parentBlkComplexity,
 			parentBlkTime.Unix(),
 			nextBlkTime.Unix(),
-		)
+		); err != nil {
+			return nil, fmt.Errorf("failed updating fee rates, %w", err)
+		}
 	}
 
 	for {
@@ -125,7 +127,7 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 		// pre e upgrade is active, we fill blocks till a target size
 		// post e upgrade is active, we fill blocks till a target complexity
 		done := (!isEForkActive && txSize > remainingSize) ||
-			(isEForkActive && !fees.Compare(feeManager.GetCumulatedUnits(), feesCfg.BlockUnitsTarget))
+			(isEForkActive && !fees.Compare(feeManager.GetCumulatedComplexity(), feesCfg.BlockTargetComplexityRate))
 		if done {
 			break
 		}
@@ -141,7 +143,7 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 		err = tx.Unsigned.Visit(&txexecutor.SemanticVerifier{
 			Backend:       b.backend,
 			BlkFeeManager: feeManager,
-			UnitCaps:      feesCfg.BlockUnitsCap,
+			UnitCaps:      feesCfg.BlockMaxComplexity,
 			State:         txDiff,
 			Tx:            tx,
 		})
@@ -177,8 +179,8 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 		inputs.Union(executor.Inputs)
 
 		txDiff.AddTx(tx)
-		txDiff.SetUnitFees(feeManager.GetUnitFees())
-		txDiff.SetFeeWindows(feeWindows)
+		txDiff.SetFeeRates(feeManager.GetFeeRates())
+		txDiff.SetLastBlockComplexity(feeManager.GetCumulatedComplexity())
 		txDiff.Apply(stateDiff)
 
 		if isEForkActive {

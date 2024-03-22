@@ -80,13 +80,13 @@ var (
 	addrs []ids.ShortID              // addrs[i] corresponds to keys[i]
 
 	testFeesCfg = commonfees.DynamicFeesConfig{
-		InitialUnitFees: commonfees.Dimensions{
+		InitialFeeRate: commonfees.Dimensions{
 			5 * units.NanoAvax,
 			5 * units.NanoAvax,
 			5 * units.NanoAvax,
 			5 * units.NanoAvax,
 		},
-		MinUnitFees: commonfees.Dimensions{
+		MinFeeRate: commonfees.Dimensions{
 			1 * units.NanoAvax,
 			1 * units.NanoAvax,
 			1 * units.NanoAvax,
@@ -98,8 +98,8 @@ var (
 			1,
 			1,
 		},
-		BlockUnitsCap:    commonfees.Max,
-		BlockUnitsTarget: commonfees.Dimensions{1000, 1000, 1000, 10000},
+		BlockMaxComplexity:        commonfees.Max,
+		BlockTargetComplexityRate: commonfees.Dimensions{1000, 1000, 1000, 10000},
 	}
 )
 

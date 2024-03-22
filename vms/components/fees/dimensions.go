@@ -72,6 +72,9 @@ func Add(lhs, rhs Dimensions) (Dimensions, error) {
 	return res, nil
 }
 
+// [Compare] returns true only if rhs[i] >= lhs[i] for each dimensions
+// Arrays ordering is not total, so we avoided naming [Compare] as [Less]
+// to discourage improper use
 func Compare(lhs, rhs Dimensions) bool {
 	for i := 0; i < FeeDimensions; i++ {
 		if lhs[i] > rhs[i] {

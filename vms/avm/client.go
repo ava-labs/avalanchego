@@ -76,8 +76,8 @@ type Client interface {
 	//
 	// Deprecated: GetUTXOs should be used instead.
 	GetAllBalances(ctx context.Context, addr ids.ShortID, includePartial bool, options ...rpc.Option) ([]Balance, error)
-	// GetUnitFees returns the current unit fees and the next unit fees that a transaction must pay to be accepted
-	GetUnitFees(ctx context.Context, options ...rpc.Option) (commonfees.Dimensions, commonfees.Dimensions, error)
+	// GetFeeRates returns the current unit fees and the next unit fees that a transaction must pay to be accepted
+	GetFeeRates(ctx context.Context, options ...rpc.Option) (commonfees.Dimensions, commonfees.Dimensions, error)
 	// CreateAsset creates a new asset and returns its assetID
 	//
 	// Deprecated: Transactions should be issued using the
@@ -410,9 +410,9 @@ func (c *client) GetAllBalances(
 	return res.Balances, err
 }
 
-func (c *client) GetUnitFees(ctx context.Context, options ...rpc.Option) (commonfees.Dimensions, commonfees.Dimensions, error) {
-	res := &GetUnitFeesReply{}
-	err := c.requester.SendRequest(ctx, "avm.getUnitFees", struct{}{}, res, options...)
+func (c *client) GetFeeRates(ctx context.Context, options ...rpc.Option) (commonfees.Dimensions, commonfees.Dimensions, error) {
+	res := &GetFeeRatesReply{}
+	err := c.requester.SendRequest(ctx, "avm.getFeeRates", struct{}{}, res, options...)
 	return res.CurrentUnitFees, res.NextUnitFees, err
 }
 

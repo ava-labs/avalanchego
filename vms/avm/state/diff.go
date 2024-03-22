@@ -40,10 +40,10 @@ type diff struct {
 	addedBlockIDs map[uint64]ids.ID      // map of height -> blockID
 	addedBlocks   map[ids.ID]block.Block // map of blockID -> block
 
-	lastAccepted ids.ID
-	timestamp    time.Time
-	unitFees     *commonfees.Dimensions
-	feesWindows  *commonfees.Windows
+	lastAccepted      ids.ID
+	timestamp         time.Time
+	unitFees          *commonfees.Dimensions
+	lastBlkComplexity *commonfees.Dimensions
 }
 
 func NewDiff(
@@ -165,13 +165,13 @@ func (d *diff) SetTimestamp(t time.Time) {
 	d.timestamp = t
 }
 
-func (d *diff) GetUnitFees() (commonfees.Dimensions, error) {
+func (d *diff) GetFeeRates() (commonfees.Dimensions, error) {
 	if d.unitFees == nil {
 		parentState, ok := d.stateVersions.GetState(d.parentID)
 		if !ok {
 			return commonfees.Empty, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
 		}
-		parentUnitFees, err := parentState.GetUnitFees()
+		parentUnitFees, err := parentState.GetFeeRates()
 		if err != nil {
 			return commonfees.Empty, err
 		}
@@ -183,36 +183,36 @@ func (d *diff) GetUnitFees() (commonfees.Dimensions, error) {
 	return *d.unitFees, nil
 }
 
-func (d *diff) SetUnitFees(uf commonfees.Dimensions) {
+func (d *diff) SetFeeRates(uf commonfees.Dimensions) {
 	if d.unitFees == nil {
 		d.unitFees = new(commonfees.Dimensions)
 	}
 	*d.unitFees = uf
 }
 
-func (d *diff) GetFeeWindows() (commonfees.Windows, error) {
-	if d.feesWindows == nil {
+func (d *diff) GetLastBlockComplexity() (commonfees.Dimensions, error) {
+	if d.lastBlkComplexity == nil {
 		parentState, ok := d.stateVersions.GetState(d.parentID)
 		if !ok {
-			return commonfees.EmptyWindows, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
+			return commonfees.Empty, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
 		}
-		parentFeeWindows, err := parentState.GetFeeWindows()
+		parentFeeWindows, err := parentState.GetLastBlockComplexity()
 		if err != nil {
-			return commonfees.EmptyWindows, err
+			return commonfees.Empty, err
 		}
 
-		d.feesWindows = new(commonfees.Windows)
-		*d.feesWindows = parentFeeWindows
+		d.lastBlkComplexity = new(commonfees.Dimensions)
+		*d.lastBlkComplexity = parentFeeWindows
 	}
 
-	return *d.feesWindows, nil
+	return *d.lastBlkComplexity, nil
 }
 
-func (d *diff) SetFeeWindows(windows commonfees.Windows) {
-	if d.feesWindows == nil {
-		d.feesWindows = new(commonfees.Windows)
+func (d *diff) SetLastBlockComplexity(windows commonfees.Dimensions) {
+	if d.lastBlkComplexity == nil {
+		d.lastBlkComplexity = new(commonfees.Dimensions)
 	}
-	*d.feesWindows = windows
+	*d.lastBlkComplexity = windows
 }
 
 func (d *diff) Apply(state Chain) {
@@ -235,9 +235,9 @@ func (d *diff) Apply(state Chain) {
 	state.SetLastAccepted(d.lastAccepted)
 	state.SetTimestamp(d.timestamp)
 	if d.unitFees != nil {
-		state.SetUnitFees(*d.unitFees)
+		state.SetFeeRates(*d.unitFees)
 	}
-	if d.feesWindows != nil {
-		state.SetFeeWindows(*d.feesWindows)
+	if d.lastBlkComplexity != nil {
+		state.SetLastBlockComplexity(*d.lastBlkComplexity)
 	}
 }

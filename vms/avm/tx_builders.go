@@ -44,7 +44,7 @@ func buildCreateAssetTx(
 	kc *secp256k1fx.Keychain,
 	changeAddr ids.ShortID,
 ) (*txs.Tx, ids.ShortID, error) {
-	unitFees, err := backend.State().GetUnitFees()
+	unitFees, err := backend.State().GetFeeRates()
 	if err != nil {
 		return nil, ids.ShortEmpty, fmt.Errorf("failed retrieving unit fees: %w", err)
 	}
@@ -60,7 +60,7 @@ func buildCreateAssetTx(
 			IsEUpgradeActive: isEUpgradeActive,
 			Config:           cfg,
 			FeeManager:       feeMan,
-			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
+			ConsumedUnitsCap: feeCfg.BlockMaxComplexity,
 			Codec:            backend.Codec(),
 		}
 	)
@@ -92,7 +92,7 @@ func buildBaseTx(
 	kc *secp256k1fx.Keychain,
 	changeAddr ids.ShortID,
 ) (*txs.Tx, ids.ShortID, error) {
-	unitFees, err := backend.State().GetUnitFees()
+	unitFees, err := backend.State().GetFeeRates()
 	if err != nil {
 		return nil, ids.ShortEmpty, fmt.Errorf("failed retrieving unit fees: %w", err)
 	}
@@ -108,7 +108,7 @@ func buildBaseTx(
 			IsEUpgradeActive: isEUpgradeActive,
 			Config:           cfg,
 			FeeManager:       feeMan,
-			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
+			ConsumedUnitsCap: feeCfg.BlockMaxComplexity,
 			Codec:            backend.Codec(),
 		}
 	)
@@ -138,7 +138,7 @@ func mintNFT(
 	kc *secp256k1fx.Keychain,
 	changeAddr ids.ShortID,
 ) (*txs.Tx, error) {
-	unitFees, err := backend.State().GetUnitFees()
+	unitFees, err := backend.State().GetFeeRates()
 	if err != nil {
 		return nil, fmt.Errorf("failed retrieving unit fees: %w", err)
 	}
@@ -154,7 +154,7 @@ func mintNFT(
 			IsEUpgradeActive: isEUpgradeActive,
 			Config:           cfg,
 			FeeManager:       feeMan,
-			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
+			ConsumedUnitsCap: feeCfg.BlockMaxComplexity,
 			Codec:            backend.Codec(),
 		}
 	)
@@ -179,7 +179,7 @@ func mintFTs(
 	kc *secp256k1fx.Keychain,
 	changeAddr ids.ShortID,
 ) (*txs.Tx, error) {
-	unitFees, err := backend.State().GetUnitFees()
+	unitFees, err := backend.State().GetFeeRates()
 	if err != nil {
 		return nil, fmt.Errorf("failed retrieving unit fees: %w", err)
 	}
@@ -195,7 +195,7 @@ func mintFTs(
 			IsEUpgradeActive: isEUpgradeActive,
 			Config:           cfg,
 			FeeManager:       feeMan,
-			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
+			ConsumedUnitsCap: feeCfg.BlockMaxComplexity,
 			Codec:            backend.Codec(),
 		}
 	)
@@ -217,7 +217,7 @@ func buildOperation(
 	kc *secp256k1fx.Keychain,
 	changeAddr ids.ShortID,
 ) (*txs.Tx, error) {
-	unitFees, err := backend.State().GetUnitFees()
+	unitFees, err := backend.State().GetFeeRates()
 	if err != nil {
 		return nil, fmt.Errorf("failed retrieving unit fees: %w", err)
 	}
@@ -233,7 +233,7 @@ func buildOperation(
 			IsEUpgradeActive: isEUpgradeActive,
 			Config:           cfg,
 			FeeManager:       feeMan,
-			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
+			ConsumedUnitsCap: feeCfg.BlockMaxComplexity,
 			Codec:            backend.Codec(),
 		}
 	)
@@ -256,7 +256,7 @@ func buildImportTx(
 	to ids.ShortID,
 	kc *secp256k1fx.Keychain,
 ) (*txs.Tx, error) {
-	unitFees, err := backend.State().GetUnitFees()
+	unitFees, err := backend.State().GetFeeRates()
 	if err != nil {
 		return nil, fmt.Errorf("failed retrieving unit fees: %w", err)
 	}
@@ -272,7 +272,7 @@ func buildImportTx(
 			IsEUpgradeActive: isEUpgradeActive,
 			Config:           cfg,
 			FeeManager:       feeMan,
-			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
+			ConsumedUnitsCap: feeCfg.BlockMaxComplexity,
 			Codec:            backend.Codec(),
 		}
 	)
@@ -304,7 +304,7 @@ func buildExportTx(
 	kc *secp256k1fx.Keychain,
 	changeAddr ids.ShortID,
 ) (*txs.Tx, ids.ShortID, error) {
-	unitFees, err := backend.State().GetUnitFees()
+	unitFees, err := backend.State().GetFeeRates()
 	if err != nil {
 		return nil, ids.ShortEmpty, fmt.Errorf("failed retrieving unit fees: %w", err)
 	}
@@ -320,7 +320,7 @@ func buildExportTx(
 			IsEUpgradeActive: isEUpgradeActive,
 			Config:           cfg,
 			FeeManager:       feeMan,
-			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
+			ConsumedUnitsCap: feeCfg.BlockMaxComplexity,
 			Codec:            backend.Codec(),
 		}
 	)

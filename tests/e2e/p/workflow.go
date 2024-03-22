@@ -190,13 +190,13 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 
 				// retrieve fees paid for the tx
 				feeCfg := config.GetDynamicFeesConfig(true /*isEActive*/)
-				_, unitFees, err := xChainClient.GetUnitFees(e2e.DefaultContext())
+				_, feeRates, err := xChainClient.GetFeeRates(e2e.DefaultContext())
 				require.NoError(err)
 
 				feeCalc := fees.Calculator{
 					IsEUpgradeActive: true,
-					FeeManager:       commonfees.NewManager(unitFees),
-					ConsumedUnitsCap: feeCfg.BlockUnitsCap,
+					FeeManager:       commonfees.NewManager(feeRates),
+					ConsumedUnitsCap: feeCfg.BlockMaxComplexity,
 					Codec:            xbuilder.Parser.Codec(),
 					Credentials:      tx.Creds,
 				}

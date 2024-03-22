@@ -171,11 +171,11 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 		return err
 	}
 
-	unitFees, err := stateDiff.GetUnitFees()
+	feeRates, err := stateDiff.GetFeeRates()
 	if err != nil {
 		return fmt.Errorf("failed retrieving unit fees: %w", err)
 	}
-	feeWindows, err := stateDiff.GetFeeWindows()
+	feeWindows, err := stateDiff.GetLastBlockComplexity()
 	if err != nil {
 		return fmt.Errorf("failed retrieving fee windows: %w", err)
 	}
@@ -185,20 +185,22 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 		feesCfg       = config.GetDynamicFeesConfig(isEForkActive)
 	)
 
-	feeManager := fees.NewManager(unitFees)
+	feeManager := fees.NewManager(feeRates)
 	if isEForkActive {
-		feeManager.UpdateUnitFees(
+		if err := feeManager.UpdateFeeRates(
 			feesCfg,
 			feeWindows,
 			parentBlkTime.Unix(),
 			nextBlkTime.Unix(),
-		)
+		); err != nil {
+			return fmt.Errorf("failed updating fee rates, %w", err)
+		}
 	}
 
 	err = tx.Unsigned.Visit(&executor.SemanticVerifier{
 		Backend:       m.backend,
 		BlkFeeManager: feeManager,
-		UnitCaps:      feesCfg.BlockUnitsCap,
+		UnitCaps:      feesCfg.BlockMaxComplexity,
 		State:         stateDiff,
 		Tx:            tx,
 	})

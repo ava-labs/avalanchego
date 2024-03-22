@@ -111,7 +111,7 @@ func TestBaseTxFees(t *testing.T) {
 						172,
 						1000,
 					},
-					fc.FeeManager.GetCumulatedUnits(),
+					fc.FeeManager.GetCumulatedComplexity(),
 				)
 			},
 		},
@@ -229,7 +229,7 @@ func TestCreateAssetTxFees(t *testing.T) {
 						172,
 						1000,
 					},
-					fc.FeeManager.GetCumulatedUnits(),
+					fc.FeeManager.GetCumulatedComplexity(),
 				)
 			},
 		},
@@ -347,7 +347,7 @@ func TestOperationTxFees(t *testing.T) {
 						172,
 						1000,
 					},
-					fc.FeeManager.GetCumulatedUnits(),
+					fc.FeeManager.GetCumulatedComplexity(),
 				)
 			},
 		},
@@ -461,7 +461,7 @@ func TestImportTxFees(t *testing.T) {
 						262,
 						2000,
 					},
-					fc.FeeManager.GetCumulatedUnits(),
+					fc.FeeManager.GetCumulatedComplexity(),
 				)
 			},
 		},
@@ -565,7 +565,7 @@ func TestExportTxFees(t *testing.T) {
 						254,
 						1000,
 					},
-					fc.FeeManager.GetCumulatedUnits(),
+					fc.FeeManager.GetCumulatedComplexity(),
 				)
 			},
 		},

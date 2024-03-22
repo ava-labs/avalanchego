@@ -22,27 +22,27 @@ func init() {
 // eUpgradeDynamicFeesConfig to be tuned TODO ABENEGIA
 var (
 	eUpgradeDynamicFeesConfig = commonfees.DynamicFeesConfig{
-		InitialUnitFees: commonfees.Dimensions{
+		InitialFeeRate: commonfees.Dimensions{
 			1 * units.NanoAvax,
 			2 * units.NanoAvax,
 			3 * units.NanoAvax,
 			4 * units.NanoAvax,
 		},
-		MinUnitFees: commonfees.Dimensions{},
+		MinFeeRate: commonfees.Dimensions{},
 		UpdateCoefficient: commonfees.Dimensions{
 			1,
 			1,
 			1,
 			1,
 		},
-		BlockUnitsCap:    commonfees.Max,
-		BlockUnitsTarget: commonfees.Dimensions{1, 1, 1, 1},
+		BlockMaxComplexity:        commonfees.Max,
+		BlockTargetComplexityRate: commonfees.Dimensions{1, 1, 1, 1},
 	}
 
 	// TODO ABENEGIA: decide if and how to validate preEUpgradeDynamicFeesConfig
 	preEUpgradeDynamicFeesConfig = commonfees.DynamicFeesConfig{
-		InitialUnitFees: commonfees.Empty,
-		BlockUnitsCap:   commonfees.Max,
+		InitialFeeRate:     commonfees.Empty,
+		BlockMaxComplexity: commonfees.Max,
 	}
 
 	customDynamicFeesConfig *commonfees.DynamicFeesConfig
