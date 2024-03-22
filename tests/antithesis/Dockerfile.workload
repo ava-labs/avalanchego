@@ -18,7 +18,7 @@ RUN go mod download
 COPY . .
 
 # Build the workload
-RUN ./build.sh
+RUN ./build_antithesis_workload.sh
 
 # ============= Cleanup Stage ================
 FROM debian:11-slim AS execution
@@ -28,4 +28,6 @@ RUN mkdir -p /workload/build
 WORKDIR /workload/build
 
 # Copy the executables into the container
-COPY --from=builder /build/antithesis-workload antithesis-workload
+COPY --from=builder /build/workload workload
+
+CMD [ "./workload" ]

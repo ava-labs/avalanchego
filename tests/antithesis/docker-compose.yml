@@ -8,7 +8,6 @@ services:
   # workload waits until cluster is up, issues 5 transactions, and the intializes the wallet. THEN we start fuzzing
   workload:
     container_name: workload
-    entrypoint: [ "./antithesis-workload" ]
     image: workload:latest
     environment: {
       AVAWL_URIS: "http://10.0.20.3:9650 http://10.0.20.4:9650 http://10.0.20.5:9650 http://10.0.20.6:9650 http://10.0.20.7:9650"
