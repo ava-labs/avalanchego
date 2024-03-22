@@ -372,7 +372,7 @@ func (s *state) InitFees() error {
 
 	case database.ErrNotFound:
 		// fork introducing dynamic fees may not be active yet,
-		// hence we may have never stored unit fees. Load from config
+		// hence we may have never stored fee rates. Load from config
 		// TODO: remove once fork is active
 		isEActivated := s.cfg.IsEActivated(s.GetTimestamp())
 		feeCfg := config.GetDynamicFeesConfig(isEActivated)
@@ -566,10 +566,10 @@ func (s *state) writeMetadata() error {
 		s.persistedTimestamp = s.timestamp
 	}
 	if err := s.singletonDB.Put(feeRatesKey, s.feeRates.Bytes()); err != nil {
-		return fmt.Errorf("failed to write unit fees: %w", err)
+		return fmt.Errorf("failed to write fee rates: %w", err)
 	}
 	if err := s.singletonDB.Put(lastBlkComplexityKey, s.lastBlkComplexity.Bytes()); err != nil {
-		return fmt.Errorf("failed to write unit fees: %w", err)
+		return fmt.Errorf("failed to write fee rates: %w", err)
 	}
 	if s.persistedLastAccepted != s.lastAccepted {
 		if err := database.PutID(s.singletonDB, lastAcceptedKey, s.lastAccepted); err != nil {

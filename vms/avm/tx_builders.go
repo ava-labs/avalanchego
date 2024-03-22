@@ -46,7 +46,7 @@ func buildCreateAssetTx(
 ) (*txs.Tx, ids.ShortID, error) {
 	feeRates, err := backend.State().GetFeeRates()
 	if err != nil {
-		return nil, ids.ShortEmpty, fmt.Errorf("failed retrieving unit fees: %w", err)
+		return nil, ids.ShortEmpty, fmt.Errorf("failed retrieving fee rates: %w", err)
 	}
 
 	var (
@@ -94,7 +94,7 @@ func buildBaseTx(
 ) (*txs.Tx, ids.ShortID, error) {
 	feeRates, err := backend.State().GetFeeRates()
 	if err != nil {
-		return nil, ids.ShortEmpty, fmt.Errorf("failed retrieving unit fees: %w", err)
+		return nil, ids.ShortEmpty, fmt.Errorf("failed retrieving fee rates: %w", err)
 	}
 
 	var (
@@ -140,7 +140,7 @@ func mintNFT(
 ) (*txs.Tx, error) {
 	feeRates, err := backend.State().GetFeeRates()
 	if err != nil {
-		return nil, fmt.Errorf("failed retrieving unit fees: %w", err)
+		return nil, fmt.Errorf("failed retrieving fee rates: %w", err)
 	}
 
 	var (
@@ -181,7 +181,7 @@ func mintFTs(
 ) (*txs.Tx, error) {
 	feeRates, err := backend.State().GetFeeRates()
 	if err != nil {
-		return nil, fmt.Errorf("failed retrieving unit fees: %w", err)
+		return nil, fmt.Errorf("failed retrieving fee rates: %w", err)
 	}
 
 	var (
@@ -219,7 +219,7 @@ func buildOperation(
 ) (*txs.Tx, error) {
 	feeRates, err := backend.State().GetFeeRates()
 	if err != nil {
-		return nil, fmt.Errorf("failed retrieving unit fees: %w", err)
+		return nil, fmt.Errorf("failed retrieving fee rates: %w", err)
 	}
 
 	var (
@@ -258,7 +258,7 @@ func buildImportTx(
 ) (*txs.Tx, error) {
 	feeRates, err := backend.State().GetFeeRates()
 	if err != nil {
-		return nil, fmt.Errorf("failed retrieving unit fees: %w", err)
+		return nil, fmt.Errorf("failed retrieving fee rates: %w", err)
 	}
 
 	var (
@@ -306,7 +306,7 @@ func buildExportTx(
 ) (*txs.Tx, ids.ShortID, error) {
 	feeRates, err := backend.State().GetFeeRates()
 	if err != nil {
-		return nil, ids.ShortEmpty, fmt.Errorf("failed retrieving unit fees: %w", err)
+		return nil, ids.ShortEmpty, fmt.Errorf("failed retrieving fee rates: %w", err)
 	}
 
 	var (

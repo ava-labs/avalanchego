@@ -139,10 +139,10 @@ func (tx *Tx) Verify(context.Context) error {
 		feeManager   = fees.NewManager(feeRates)
 	)
 	return tx.tx.Unsigned.Visit(&executor.SemanticVerifier{
-		Backend:       tx.vm.txExecutorBackend,
-		BlkFeeManager: feeManager,
-		UnitCaps:      feeCfg.BlockMaxComplexity,
-		State:         tx.vm.state,
-		Tx:            tx.tx,
+		Backend:            tx.vm.txExecutorBackend,
+		BlkFeeManager:      feeManager,
+		BlockMaxComplexity: feeCfg.BlockMaxComplexity,
+		State:              tx.vm.state,
+		Tx:                 tx.tx,
 	})
 }

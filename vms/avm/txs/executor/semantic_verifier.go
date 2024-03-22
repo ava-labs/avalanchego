@@ -30,10 +30,10 @@ var (
 
 type SemanticVerifier struct {
 	*Backend
-	BlkFeeManager *commonfees.Manager
-	UnitCaps      commonfees.Dimensions
-	State         state.ReadOnlyChain
-	Tx            *txs.Tx
+	BlkFeeManager      *commonfees.Manager
+	BlockMaxComplexity commonfees.Dimensions
+	State              state.ReadOnlyChain
+	Tx                 *txs.Tx
 }
 
 func (v *SemanticVerifier) BaseTx(tx *txs.BaseTx) error {
@@ -141,7 +141,7 @@ func (v *SemanticVerifier) verifyBaseTx(
 		IsEUpgradeActive:   v.Config.IsEActivated(v.State.GetTimestamp()),
 		Config:             v.Config,
 		FeeManager:         v.BlkFeeManager,
-		BlockMaxComplexity: v.UnitCaps,
+		BlockMaxComplexity: v.BlockMaxComplexity,
 		Codec:              v.Codec,
 		Credentials:        creds,
 	}

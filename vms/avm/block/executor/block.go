@@ -134,7 +134,7 @@ func (b *Block) Verify(context.Context) error {
 
 	feeRates, err := stateDiff.GetFeeRates()
 	if err != nil {
-		return fmt.Errorf("failed retrieving unit fees: %w", err)
+		return fmt.Errorf("failed retrieving fee rates: %w", err)
 	}
 	parentBlkComplexitty, err := stateDiff.GetLastBlockComplexity()
 	if err != nil {
@@ -162,11 +162,11 @@ func (b *Block) Verify(context.Context) error {
 		// Verify that the tx is valid according to the current state of the
 		// chain.
 		err := tx.Unsigned.Visit(&executor.SemanticVerifier{
-			Backend:       b.manager.backend,
-			BlkFeeManager: feeManager,
-			UnitCaps:      feesCfg.BlockMaxComplexity,
-			State:         stateDiff,
-			Tx:            tx,
+			Backend:            b.manager.backend,
+			BlkFeeManager:      feeManager,
+			BlockMaxComplexity: feesCfg.BlockMaxComplexity,
+			State:              stateDiff,
+			Tx:                 tx,
 		})
 		if err != nil {
 			txID := tx.ID()

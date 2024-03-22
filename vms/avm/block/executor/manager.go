@@ -173,7 +173,7 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 
 	feeRates, err := stateDiff.GetFeeRates()
 	if err != nil {
-		return fmt.Errorf("failed retrieving unit fees: %w", err)
+		return fmt.Errorf("failed retrieving fee rates: %w", err)
 	}
 	parentBlkComplexity, err := stateDiff.GetLastBlockComplexity()
 	if err != nil {
@@ -198,11 +198,11 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 	}
 
 	err = tx.Unsigned.Visit(&executor.SemanticVerifier{
-		Backend:       m.backend,
-		BlkFeeManager: feeManager,
-		UnitCaps:      feesCfg.BlockMaxComplexity,
-		State:         stateDiff,
-		Tx:            tx,
+		Backend:            m.backend,
+		BlkFeeManager:      feeManager,
+		BlockMaxComplexity: feesCfg.BlockMaxComplexity,
+		State:              stateDiff,
+		Tx:                 tx,
 	})
 	if err != nil {
 		return err

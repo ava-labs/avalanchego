@@ -76,7 +76,7 @@ type Client interface {
 	//
 	// Deprecated: GetUTXOs should be used instead.
 	GetAllBalances(ctx context.Context, addr ids.ShortID, includePartial bool, options ...rpc.Option) ([]Balance, error)
-	// GetFeeRates returns the current unit fees and the next unit fees that a transaction must pay to be accepted
+	// GetFeeRates returns the current fee rates and the next fee rates that a transaction must pay to be accepted
 	GetFeeRates(ctx context.Context, options ...rpc.Option) (commonfees.Dimensions, commonfees.Dimensions, error)
 	// CreateAsset creates a new asset and returns its assetID
 	//

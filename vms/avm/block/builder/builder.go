@@ -98,7 +98,7 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 
 	feeRates, err := stateDiff.GetFeeRates()
 	if err != nil {
-		return nil, fmt.Errorf("failed retrieving unit fees: %w", err)
+		return nil, fmt.Errorf("failed retrieving fee rates: %w", err)
 	}
 	parentBlkComplexity, err := stateDiff.GetLastBlockComplexity()
 	if err != nil {
@@ -141,11 +141,11 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 		}
 
 		err = tx.Unsigned.Visit(&txexecutor.SemanticVerifier{
-			Backend:       b.backend,
-			BlkFeeManager: feeManager,
-			UnitCaps:      feesCfg.BlockMaxComplexity,
-			State:         txDiff,
-			Tx:            tx,
+			Backend:            b.backend,
+			BlkFeeManager:      feeManager,
+			BlockMaxComplexity: feesCfg.BlockMaxComplexity,
+			State:              txDiff,
+			Tx:                 tx,
 		})
 		if err != nil {
 			txID := tx.ID()
