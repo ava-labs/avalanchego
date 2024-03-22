@@ -1,11 +1,5 @@
 #!/usr/bin/env bash
 
-# First argument is the time, in seconds, to run each fuzz test for.
-# If not provided, defaults to 1 second.
-#
-# Second argument is the directory to run fuzz tests in.
-# If not provided, defaults to the current directory.
-
 set -euo pipefail
 
 # Directory above this script
