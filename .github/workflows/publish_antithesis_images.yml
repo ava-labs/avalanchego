@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - master
+      - push-antithesis-images
 
 env: 
   REGISTRY: us-central1-docker.pkg.dev
@@ -47,8 +48,8 @@ jobs:
         docker build -t $REGISTRY/$REPOSITORY/$CONFIG_NAME:$TAG -f ./tests/antithesis/Dockerfile.config .
         echo "name=image::$REGISTRY/$REPOSITORY/$CONFIG_NAME:$TAG" >> $GITHUB_OUTPUT
 
-    - name: Publish images
-      run: |
-        docker push ${REGISTRY}/${REPOSITORY}/${NODE_NAME}:${TAG}
-        docker push ${REGISTRY}/${REPOSITORY}/${WORKLOAD_NAME}:${TAG}
-        docker push ${REGISTRY}/${REPOSITORY}/${CONFIG_NAME}:${TAG}
+    # - name: Publish images
+    #   run: |
+    #     docker push ${REGISTRY}/${REPOSITORY}/${NODE_NAME}:${TAG}
+    #     docker push ${REGISTRY}/${REPOSITORY}/${WORKLOAD_NAME}:${TAG}
+    #     docker push ${REGISTRY}/${REPOSITORY}/${CONFIG_NAME}:${TAG}
