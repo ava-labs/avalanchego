@@ -23,7 +23,7 @@ RUN ./scripts/build_antithesis_workload.sh
 # ============= Cleanup Stage ================
 FROM debian:11-slim AS execution
 
-# Copy the executables into the container
-COPY --from=builder /build/build/ .
+# Copy the executable into the container
+COPY --from=builder /build/build/workload ./workload
 
 CMD [ "./workload" ]
