@@ -10,8 +10,8 @@ import (
 )
 
 type metrics struct {
-	numFetched, numDropped, numAccepted prometheus.Counter
-	fetchETA                            prometheus.Gauge
+	numFetched, numAccepted prometheus.Counter
+	fetchETA                prometheus.Gauge
 }
 
 func newMetrics(namespace string, registerer prometheus.Registerer) (*metrics, error) {
@@ -20,11 +20,6 @@ func newMetrics(namespace string, registerer prometheus.Registerer) (*metrics, e
 			Namespace: namespace,
 			Name:      "fetched",
 			Help:      "Number of blocks fetched during bootstrapping",
-		}),
-		numDropped: prometheus.NewCounter(prometheus.CounterOpts{
-			Namespace: namespace,
-			Name:      "dropped",
-			Help:      "Number of blocks dropped during bootstrapping",
 		}),
 		numAccepted: prometheus.NewCounter(prometheus.CounterOpts{
 			Namespace: namespace,
@@ -40,7 +35,6 @@ func newMetrics(namespace string, registerer prometheus.Registerer) (*metrics, e
 
 	err := utils.Err(
 		registerer.Register(m.numFetched),
-		registerer.Register(m.numDropped),
 		registerer.Register(m.numAccepted),
 		registerer.Register(m.fetchETA),
 	)

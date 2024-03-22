@@ -441,6 +441,23 @@ func (n *Network) Restart(ctx context.Context, w io.Writer) error {
 		return err
 	}
 	for _, node := range n.Nodes {
+		// Ensure the node reuses the same API port across restarts to ensure
+		// consistent labeling of metrics. Otherwise prometheus's automatic
+		// addition of the `instance` label (host:port) results in
+		// segmentation of results for a given node every time the port
+		// changes on restart. This segmentation causes graphs on the grafana
+		// dashboards to display multiple series per graph for a given node,
+		// one for each port that the node used.
+		//
+		// There is a non-zero chance of the port being allocatted to a
+		// different process and the node subsequently being unable to start,
+		// but the alternative is having to update the grafana dashboards
+		// query-by-query to ensure that node metrics ignore the instance
+		// label.
+		if err := node.SaveAPIPort(); err != nil {
+			return err
+		}
+
 		if err := node.Stop(ctx); err != nil {
 			return fmt.Errorf("failed to stop node %s: %w", node.NodeID, err)
 		}
