@@ -50,10 +50,15 @@ RUN ./scripts/build.sh -r
 # ============= Cleanup Stage ================
 FROM debian:11-slim AS execution
 
-# Copy the executables into the container
-COPY --from=builder /avalanchego_instrumented/customer/build/ .
+# Copy identifying information into the container
+COPY --from=builder /build/commit_hash.txt ./commit_hash.txt
+
+# Copy the antithesis dependencies into the container
+RUN mkdir -p /avalanchego/symbols
 COPY --from=builder /avalanchego_instrumented/symbols /avalanchego/symbols
 COPY --from=builder /opt/antithesis/lib/libvoidstar.so /usr/lib/libvoidstar.so
-COPY --from=builder /build/commit_hash.txt ./commit_hash.txt
+
+# Copy the executables into the container
+COPY --from=builder /avalanchego_instrumented/customer/build/ .
 
 CMD [ "./avalanchego" ]
