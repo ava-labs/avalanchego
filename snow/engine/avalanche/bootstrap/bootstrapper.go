@@ -325,7 +325,6 @@ func (b *bootstrapper) Start(ctx context.Context, startReqID uint32) error {
 	if err := b.VtxBlocked.SetParser(ctx, &vtxParser{
 		log:         b.Ctx.Log,
 		numAccepted: b.numAcceptedVts,
-		numDropped:  b.numDroppedVts,
 		manager:     b.Manager,
 	}); err != nil {
 		return err
@@ -334,7 +333,6 @@ func (b *bootstrapper) Start(ctx context.Context, startReqID uint32) error {
 	if err := b.TxBlocked.SetParser(&txParser{
 		log:         b.Ctx.Log,
 		numAccepted: b.numAcceptedTxs,
-		numDropped:  b.numDroppedTxs,
 		vm:          b.VM,
 	}); err != nil {
 		return err
@@ -475,7 +473,6 @@ func (b *bootstrapper) process(ctx context.Context, vtxs ...avalanche.Vertex) er
 			pushed, err := b.VtxBlocked.Push(ctx, &vertexJob{
 				log:         b.Ctx.Log,
 				numAccepted: b.numAcceptedVts,
-				numDropped:  b.numDroppedVts,
 				vtx:         vtx,
 			})
 			if err != nil {
@@ -497,7 +494,6 @@ func (b *bootstrapper) process(ctx context.Context, vtxs ...avalanche.Vertex) er
 				pushed, err := b.TxBlocked.Push(ctx, &txJob{
 					log:         b.Ctx.Log,
 					numAccepted: b.numAcceptedTxs,
-					numDropped:  b.numDroppedTxs,
 					tx:          tx,
 				})
 				if err != nil {

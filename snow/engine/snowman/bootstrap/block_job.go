@@ -23,9 +23,9 @@ import (
 var errMissingDependenciesOnAccept = errors.New("attempting to accept a block with missing dependencies")
 
 type parser struct {
-	log                     logging.Logger
-	numAccepted, numDropped prometheus.Counter
-	vm                      block.ChainVM
+	log         logging.Logger
+	numAccepted prometheus.Counter
+	vm          block.ChainVM
 }
 
 func (p *parser) Parse(ctx context.Context, blkBytes []byte) (queue.Job, error) {
@@ -36,17 +36,16 @@ func (p *parser) Parse(ctx context.Context, blkBytes []byte) (queue.Job, error) 
 	return &blockJob{
 		log:         p.log,
 		numAccepted: p.numAccepted,
-		numDropped:  p.numDropped,
 		blk:         blk,
 		vm:          p.vm,
 	}, nil
 }
 
 type blockJob struct {
-	log                     logging.Logger
-	numAccepted, numDropped prometheus.Counter
-	blk                     snowman.Block
-	vm                      block.Getter
+	log         logging.Logger
+	numAccepted prometheus.Counter
+	blk         snowman.Block
+	vm          block.Getter
 }
 
 func (b *blockJob) ID() ids.ID {
@@ -76,13 +75,11 @@ func (b *blockJob) Execute(ctx context.Context) error {
 		return err
 	}
 	if hasMissingDeps {
-		b.numDropped.Inc()
 		return errMissingDependenciesOnAccept
 	}
 	status := b.blk.Status()
 	switch status {
 	case choices.Unknown, choices.Rejected:
-		b.numDropped.Inc()
 		return fmt.Errorf("attempting to execute block with status %s", status)
 	case choices.Processing:
 		blkID := b.blk.ID()
