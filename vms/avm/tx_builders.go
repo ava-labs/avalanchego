@@ -57,11 +57,11 @@ func buildCreateAssetTx(
 		feeCfg            = config.GetDynamicFeesConfig(isEUpgradeActive)
 		feeMan            = commonfees.NewManager(feeRates)
 		feeCalc           = &fees.Calculator{
-			IsEUpgradeActive: isEUpgradeActive,
-			Config:           cfg,
-			FeeManager:       feeMan,
-			ConsumedUnitsCap: feeCfg.BlockMaxComplexity,
-			Codec:            backend.Codec(),
+			IsEUpgradeActive:   isEUpgradeActive,
+			Config:             cfg,
+			FeeManager:         feeMan,
+			BlockMaxComplexity: feeCfg.BlockMaxComplexity,
+			Codec:              backend.Codec(),
 		}
 	)
 
@@ -105,11 +105,11 @@ func buildBaseTx(
 		feeCfg            = config.GetDynamicFeesConfig(isEUpgradeActive)
 		feeMan            = commonfees.NewManager(feeRates)
 		feeCalc           = &fees.Calculator{
-			IsEUpgradeActive: isEUpgradeActive,
-			Config:           cfg,
-			FeeManager:       feeMan,
-			ConsumedUnitsCap: feeCfg.BlockMaxComplexity,
-			Codec:            backend.Codec(),
+			IsEUpgradeActive:   isEUpgradeActive,
+			Config:             cfg,
+			FeeManager:         feeMan,
+			BlockMaxComplexity: feeCfg.BlockMaxComplexity,
+			Codec:              backend.Codec(),
 		}
 	)
 
@@ -151,11 +151,11 @@ func mintNFT(
 		feeCfg            = config.GetDynamicFeesConfig(isEUpgradeActive)
 		feeMan            = commonfees.NewManager(feeRates)
 		feeCalc           = &fees.Calculator{
-			IsEUpgradeActive: isEUpgradeActive,
-			Config:           cfg,
-			FeeManager:       feeMan,
-			ConsumedUnitsCap: feeCfg.BlockMaxComplexity,
-			Codec:            backend.Codec(),
+			IsEUpgradeActive:   isEUpgradeActive,
+			Config:             cfg,
+			FeeManager:         feeMan,
+			BlockMaxComplexity: feeCfg.BlockMaxComplexity,
+			Codec:              backend.Codec(),
 		}
 	)
 
@@ -192,11 +192,11 @@ func mintFTs(
 		feeCfg            = config.GetDynamicFeesConfig(isEUpgradeActive)
 		feeMan            = commonfees.NewManager(feeRates)
 		feeCalc           = &fees.Calculator{
-			IsEUpgradeActive: isEUpgradeActive,
-			Config:           cfg,
-			FeeManager:       feeMan,
-			ConsumedUnitsCap: feeCfg.BlockMaxComplexity,
-			Codec:            backend.Codec(),
+			IsEUpgradeActive:   isEUpgradeActive,
+			Config:             cfg,
+			FeeManager:         feeMan,
+			BlockMaxComplexity: feeCfg.BlockMaxComplexity,
+			Codec:              backend.Codec(),
 		}
 	)
 	utx, err := pBuilder.NewOperationTxMintFT(
@@ -230,11 +230,11 @@ func buildOperation(
 		feeCfg            = config.GetDynamicFeesConfig(isEUpgradeActive)
 		feeMan            = commonfees.NewManager(feeRates)
 		feeCalc           = &fees.Calculator{
-			IsEUpgradeActive: isEUpgradeActive,
-			Config:           cfg,
-			FeeManager:       feeMan,
-			ConsumedUnitsCap: feeCfg.BlockMaxComplexity,
-			Codec:            backend.Codec(),
+			IsEUpgradeActive:   isEUpgradeActive,
+			Config:             cfg,
+			FeeManager:         feeMan,
+			BlockMaxComplexity: feeCfg.BlockMaxComplexity,
+			Codec:              backend.Codec(),
 		}
 	)
 
@@ -269,11 +269,11 @@ func buildImportTx(
 		feeCfg            = config.GetDynamicFeesConfig(isEUpgradeActive)
 		feeMan            = commonfees.NewManager(feeRates)
 		feeCalc           = &fees.Calculator{
-			IsEUpgradeActive: isEUpgradeActive,
-			Config:           cfg,
-			FeeManager:       feeMan,
-			ConsumedUnitsCap: feeCfg.BlockMaxComplexity,
-			Codec:            backend.Codec(),
+			IsEUpgradeActive:   isEUpgradeActive,
+			Config:             cfg,
+			FeeManager:         feeMan,
+			BlockMaxComplexity: feeCfg.BlockMaxComplexity,
+			Codec:              backend.Codec(),
 		}
 	)
 
@@ -317,11 +317,11 @@ func buildExportTx(
 		feeCfg            = config.GetDynamicFeesConfig(isEUpgradeActive)
 		feeMan            = commonfees.NewManager(feeRates)
 		feeCalc           = &fees.Calculator{
-			IsEUpgradeActive: isEUpgradeActive,
-			Config:           cfg,
-			FeeManager:       feeMan,
-			ConsumedUnitsCap: feeCfg.BlockMaxComplexity,
-			Codec:            backend.Codec(),
+			IsEUpgradeActive:   isEUpgradeActive,
+			Config:             cfg,
+			FeeManager:         feeMan,
+			BlockMaxComplexity: feeCfg.BlockMaxComplexity,
+			Codec:              backend.Codec(),
 		}
 	)
 

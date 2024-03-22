@@ -145,12 +145,12 @@ func TestBaseTxFees(t *testing.T) {
 			}
 
 			fc := &Calculator{
-				IsEUpgradeActive: cfg.IsEActivated(chainTime),
-				Config:           cfg,
-				Codec:            codec,
-				FeeManager:       fees.NewManager(testFeeRates),
-				ConsumedUnitsCap: consumedUnitCaps,
-				Credentials:      sTx.Creds,
+				IsEUpgradeActive:   cfg.IsEActivated(chainTime),
+				Config:             cfg,
+				Codec:              codec,
+				FeeManager:         fees.NewManager(testFeeRates),
+				BlockMaxComplexity: consumedUnitCaps,
+				Credentials:        sTx.Creds,
 			}
 			err := uTx.Visit(fc)
 			r.ErrorIs(err, tt.expectedError)
@@ -263,12 +263,12 @@ func TestCreateAssetTxFees(t *testing.T) {
 			}
 
 			fc := &Calculator{
-				IsEUpgradeActive: cfg.IsEActivated(chainTime),
-				Config:           cfg,
-				Codec:            codec,
-				FeeManager:       fees.NewManager(testFeeRates),
-				ConsumedUnitsCap: consumedUnitCaps,
-				Credentials:      sTx.Creds,
+				IsEUpgradeActive:   cfg.IsEActivated(chainTime),
+				Config:             cfg,
+				Codec:              codec,
+				FeeManager:         fees.NewManager(testFeeRates),
+				BlockMaxComplexity: consumedUnitCaps,
+				Credentials:        sTx.Creds,
 			}
 			err := uTx.Visit(fc)
 			r.ErrorIs(err, tt.expectedError)
@@ -381,12 +381,12 @@ func TestOperationTxFees(t *testing.T) {
 			}
 
 			fc := &Calculator{
-				IsEUpgradeActive: cfg.IsEActivated(chainTime),
-				Config:           cfg,
-				Codec:            codec,
-				FeeManager:       fees.NewManager(testFeeRates),
-				ConsumedUnitsCap: consumedUnitCaps,
-				Credentials:      sTx.Creds,
+				IsEUpgradeActive:   cfg.IsEActivated(chainTime),
+				Config:             cfg,
+				Codec:              codec,
+				FeeManager:         fees.NewManager(testFeeRates),
+				BlockMaxComplexity: consumedUnitCaps,
+				Credentials:        sTx.Creds,
 			}
 			err := uTx.Visit(fc)
 			r.ErrorIs(err, tt.expectedError)
@@ -495,12 +495,12 @@ func TestImportTxFees(t *testing.T) {
 			}
 
 			fc := &Calculator{
-				IsEUpgradeActive: cfg.IsEActivated(chainTime),
-				Config:           cfg,
-				Codec:            codec,
-				FeeManager:       fees.NewManager(testFeeRates),
-				ConsumedUnitsCap: consumedUnitCaps,
-				Credentials:      sTx.Creds,
+				IsEUpgradeActive:   cfg.IsEActivated(chainTime),
+				Config:             cfg,
+				Codec:              codec,
+				FeeManager:         fees.NewManager(testFeeRates),
+				BlockMaxComplexity: consumedUnitCaps,
+				Credentials:        sTx.Creds,
 			}
 			err := uTx.Visit(fc)
 			r.ErrorIs(err, tt.expectedError)
@@ -599,12 +599,12 @@ func TestExportTxFees(t *testing.T) {
 			}
 
 			fc := &Calculator{
-				IsEUpgradeActive: cfg.IsEActivated(chainTime),
-				Config:           cfg,
-				Codec:            codec,
-				FeeManager:       fees.NewManager(testFeeRates),
-				ConsumedUnitsCap: consumedUnitCaps,
-				Credentials:      sTx.Creds,
+				IsEUpgradeActive:   cfg.IsEActivated(chainTime),
+				Config:             cfg,
+				Codec:              codec,
+				FeeManager:         fees.NewManager(testFeeRates),
+				BlockMaxComplexity: consumedUnitCaps,
+				Credentials:        sTx.Creds,
 			}
 			err := uTx.Visit(fc)
 			r.ErrorIs(err, tt.expectedError)

@@ -34,9 +34,9 @@ type Calculator struct {
 	Config *config.Config
 
 	// Post E-Upgrade inputs
-	FeeManager       *fees.Manager
-	ConsumedUnitsCap fees.Dimensions
-	Codec            codec.Manager
+	FeeManager         *fees.Manager
+	BlockMaxComplexity fees.Dimensions
+	Codec              codec.Manager
 
 	// common inputs
 	Credentials []*fxs.FxCredential
@@ -195,7 +195,7 @@ func (fc *Calculator) meterTx(
 }
 
 func (fc *Calculator) AddFeesFor(consumedUnits fees.Dimensions) (uint64, error) {
-	boundBreached, dimension := fc.FeeManager.CumulateComplexity(consumedUnits, fc.ConsumedUnitsCap)
+	boundBreached, dimension := fc.FeeManager.CumulateComplexity(consumedUnits, fc.BlockMaxComplexity)
 	if boundBreached {
 		return 0, fmt.Errorf("%w: breached dimension %d", errFailedConsumedUnitsCumulation, dimension)
 	}

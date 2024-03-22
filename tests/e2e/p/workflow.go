@@ -194,11 +194,11 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 				require.NoError(err)
 
 				feeCalc := fees.Calculator{
-					IsEUpgradeActive: true,
-					FeeManager:       commonfees.NewManager(feeRates),
-					ConsumedUnitsCap: feeCfg.BlockMaxComplexity,
-					Codec:            xbuilder.Parser.Codec(),
-					Credentials:      tx.Creds,
+					IsEUpgradeActive:   true,
+					FeeManager:         commonfees.NewManager(feeRates),
+					BlockMaxComplexity: feeCfg.BlockMaxComplexity,
+					Codec:              xbuilder.Parser.Codec(),
+					Credentials:        tx.Creds,
 				}
 
 				require.NoError(tx.Unsigned.Visit(&feeCalc))

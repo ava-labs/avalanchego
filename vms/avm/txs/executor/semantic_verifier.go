@@ -138,12 +138,12 @@ func (v *SemanticVerifier) verifyBaseTx(
 	creds []*fxs.FxCredential,
 ) error {
 	feeCalculator := fees.Calculator{
-		IsEUpgradeActive: v.Config.IsEActivated(v.State.GetTimestamp()),
-		Config:           v.Config,
-		FeeManager:       v.BlkFeeManager,
-		ConsumedUnitsCap: v.UnitCaps,
-		Codec:            v.Codec,
-		Credentials:      creds,
+		IsEUpgradeActive:   v.Config.IsEActivated(v.State.GetTimestamp()),
+		Config:             v.Config,
+		FeeManager:         v.BlkFeeManager,
+		BlockMaxComplexity: v.UnitCaps,
+		Codec:              v.Codec,
+		Credentials:        creds,
 	}
 	if err := tx.Visit(&feeCalculator); err != nil {
 		return err

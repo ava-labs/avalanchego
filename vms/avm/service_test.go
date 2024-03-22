@@ -2698,12 +2698,12 @@ func TestNFTWorkflow(t *testing.T) {
 			isEActivated := env.vm.Config.IsEActivated(env.vm.state.GetTimestamp())
 			feesCfg := config.GetDynamicFeesConfig(isEActivated)
 			feeCalc := &fees.Calculator{
-				IsEUpgradeActive: true,
-				Config:           &env.vm.Config,
-				FeeManager:       commonfees.NewManager(feesCfg.InitialFeeRate),
-				ConsumedUnitsCap: feesCfg.BlockMaxComplexity,
-				Codec:            env.service.txBuilderBackend.codec,
-				Credentials:      createAssetTx.Creds,
+				IsEUpgradeActive:   true,
+				Config:             &env.vm.Config,
+				FeeManager:         commonfees.NewManager(feesCfg.InitialFeeRate),
+				BlockMaxComplexity: feesCfg.BlockMaxComplexity,
+				Codec:              env.service.txBuilderBackend.codec,
+				Credentials:        createAssetTx.Creds,
 			}
 
 			require.NoError(createAssetTx.Unsigned.Visit(feeCalc))

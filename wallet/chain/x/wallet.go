@@ -170,8 +170,8 @@ type wallet struct {
 	signer  signer.Signer
 	client  avm.Client
 
-	isEForkActive      bool
-	feeRates, unitCaps commonfees.Dimensions
+	isEForkActive                bool
+	feeRates, blockMaxComplexity commonfees.Dimensions
 }
 
 func (w *wallet) Builder() builder.Builder {
@@ -197,9 +197,9 @@ func (w *wallet) IssueBaseTx(
 			Config: &config.Config{
 				TxFee: w.builder.Context().BaseTxFee,
 			},
-			FeeManager:       feesMan,
-			ConsumedUnitsCap: w.unitCaps,
-			Codec:            builder.Parser.Codec(),
+			FeeManager:         feesMan,
+			BlockMaxComplexity: w.blockMaxComplexity,
+			Codec:              builder.Parser.Codec(),
 		}
 	)
 
@@ -228,9 +228,9 @@ func (w *wallet) IssueCreateAssetTx(
 			Config: &config.Config{
 				TxFee: w.builder.Context().BaseTxFee,
 			},
-			FeeManager:       feesMan,
-			ConsumedUnitsCap: w.unitCaps,
-			Codec:            builder.Parser.Codec(),
+			FeeManager:         feesMan,
+			BlockMaxComplexity: w.blockMaxComplexity,
+			Codec:              builder.Parser.Codec(),
 		}
 	)
 
@@ -256,9 +256,9 @@ func (w *wallet) IssueOperationTx(
 			Config: &config.Config{
 				TxFee: w.builder.Context().BaseTxFee,
 			},
-			FeeManager:       feesMan,
-			ConsumedUnitsCap: w.unitCaps,
-			Codec:            builder.Parser.Codec(),
+			FeeManager:         feesMan,
+			BlockMaxComplexity: w.blockMaxComplexity,
+			Codec:              builder.Parser.Codec(),
 		}
 	)
 
@@ -284,9 +284,9 @@ func (w *wallet) IssueOperationTxMintFT(
 			Config: &config.Config{
 				TxFee: w.builder.Context().BaseTxFee,
 			},
-			FeeManager:       feesMan,
-			ConsumedUnitsCap: w.unitCaps,
-			Codec:            builder.Parser.Codec(),
+			FeeManager:         feesMan,
+			BlockMaxComplexity: w.blockMaxComplexity,
+			Codec:              builder.Parser.Codec(),
 		}
 	)
 
@@ -314,9 +314,9 @@ func (w *wallet) IssueOperationTxMintNFT(
 			Config: &config.Config{
 				TxFee: w.builder.Context().BaseTxFee,
 			},
-			FeeManager:       feesMan,
-			ConsumedUnitsCap: w.unitCaps,
-			Codec:            builder.Parser.Codec(),
+			FeeManager:         feesMan,
+			BlockMaxComplexity: w.blockMaxComplexity,
+			Codec:              builder.Parser.Codec(),
 		}
 	)
 
@@ -343,9 +343,9 @@ func (w *wallet) IssueOperationTxMintProperty(
 			Config: &config.Config{
 				TxFee: w.builder.Context().BaseTxFee,
 			},
-			FeeManager:       feesMan,
-			ConsumedUnitsCap: w.unitCaps,
-			Codec:            builder.Parser.Codec(),
+			FeeManager:         feesMan,
+			BlockMaxComplexity: w.blockMaxComplexity,
+			Codec:              builder.Parser.Codec(),
 		}
 	)
 
@@ -371,9 +371,9 @@ func (w *wallet) IssueOperationTxBurnProperty(
 			Config: &config.Config{
 				TxFee: w.builder.Context().BaseTxFee,
 			},
-			FeeManager:       feesMan,
-			ConsumedUnitsCap: w.unitCaps,
-			Codec:            builder.Parser.Codec(),
+			FeeManager:         feesMan,
+			BlockMaxComplexity: w.blockMaxComplexity,
+			Codec:              builder.Parser.Codec(),
 		}
 	)
 
@@ -400,9 +400,9 @@ func (w *wallet) IssueImportTx(
 			Config: &config.Config{
 				TxFee: w.builder.Context().BaseTxFee,
 			},
-			FeeManager:       feesMan,
-			ConsumedUnitsCap: w.unitCaps,
-			Codec:            builder.Parser.Codec(),
+			FeeManager:         feesMan,
+			BlockMaxComplexity: w.blockMaxComplexity,
+			Codec:              builder.Parser.Codec(),
 		}
 	)
 
@@ -429,9 +429,9 @@ func (w *wallet) IssueExportTx(
 			Config: &config.Config{
 				TxFee: w.builder.Context().BaseTxFee,
 			},
-			FeeManager:       feesMan,
-			ConsumedUnitsCap: w.unitCaps,
-			Codec:            builder.Parser.Codec(),
+			FeeManager:         feesMan,
+			BlockMaxComplexity: w.blockMaxComplexity,
+			Codec:              builder.Parser.Codec(),
 		}
 	)
 
@@ -517,6 +517,6 @@ func (w *wallet) refreshFork(options ...common.Option) error {
 	// }
 	chainTime := mockable.MaxTime // assume fork is already active
 	w.isEForkActive = !chainTime.Before(eUpgradeTime)
-	w.unitCaps = config.GetDynamicFeesConfig(w.isEForkActive).BlockMaxComplexity
+	w.blockMaxComplexity = config.GetDynamicFeesConfig(w.isEForkActive).BlockMaxComplexity
 	return nil
 }
