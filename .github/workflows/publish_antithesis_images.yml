@@ -32,7 +32,7 @@ jobs:
     - name: Build node
       id: build-node-image
       run: |
-        docker build --build-arg="RACE_FLAG=-r" -t $REGISTRY/$REPOSITORY/$NODE_NAME:$TAG -f ./tests/antithesis/Dockerfile.node .
+        docker build -t $REGISTRY/$REPOSITORY/$NODE_NAME:$TAG -f ./tests/antithesis/Dockerfile.node .
         echo "name=image::$REGISTRY/$REPOSITORY/$NODE_NAME:$TAG" >> $GITHUB_OUTPUT
 
     - name: Build workload
