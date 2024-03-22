@@ -28,6 +28,6 @@ RUN mkdir -p /workload/build
 WORKDIR /workload/build
 
 # Copy the executables into the container
-COPY --from=builder /build/workload workload
+COPY --from=builder /build/build/ .
 
 CMD [ "./workload" ]
