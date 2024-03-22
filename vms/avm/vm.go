@@ -415,6 +415,10 @@ func (vm *VM) Linearize(ctx context.Context, stopVertexID ids.ID, toEngine chan<
 		return err
 	}
 
+	if err := vm.state.InitFees(); err != nil {
+		return err
+	}
+
 	mempool, err := mempool.New("mempool", vm.registerer, toEngine)
 	if err != nil {
 		return fmt.Errorf("failed to create mempool: %w", err)
@@ -577,10 +581,6 @@ func (vm *VM) initGenesis(genesisBytes []byte) error {
 			)
 			vm.feeAssetID = txID
 		}
-	}
-
-	if err := vm.state.InitFees(); err != nil {
-		return err
 	}
 
 	if !stateInitialized {

@@ -466,7 +466,7 @@ func TestTxAcceptAfterParseTx(t *testing.T) {
 				},
 				Asset: avax.Asset{ID: env.genesisTx.ID()},
 				In: &secp256k1fx.TransferInput{
-					Amt: 499991395,
+					Amt: 500000000,
 					Input: secp256k1fx.Input{
 						SigIndices: []uint32{
 							0,

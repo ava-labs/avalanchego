@@ -149,7 +149,7 @@ type state struct {
 	timestamp, persistedTimestamp       time.Time
 	singletonDB                         database.Database
 
-	feeRates          commonfees.Dimensions
+	feeRates          *commonfees.Dimensions // pointer, to allow customization for test networks
 	lastBlkComplexity commonfees.Dimensions
 
 	trackChecksum bool
@@ -364,6 +364,7 @@ func (s *state) InitializeChainState(stopVertexID ids.ID, genesisTimestamp time.
 }
 
 func (s *state) InitFees() error {
+	s.feeRates = new(commonfees.Dimensions)
 	switch feeRatesBytes, err := s.singletonDB.Get(feeRatesKey); err {
 	case nil:
 		if err := s.feeRates.FromBytes(feeRatesBytes); err != nil {
@@ -376,7 +377,7 @@ func (s *state) InitFees() error {
 		// TODO: remove once fork is active
 		isEActivated := s.cfg.IsEActivated(s.GetTimestamp())
 		feeCfg := config.GetDynamicFeesConfig(isEActivated)
-		s.feeRates = feeCfg.InitialFeeRate
+		*s.feeRates = feeCfg.InitialFeeRate
 
 	default:
 		return err
@@ -444,11 +445,15 @@ func (s *state) SetTimestamp(t time.Time) {
 }
 
 func (s *state) GetFeeRates() (commonfees.Dimensions, error) {
-	return s.feeRates, nil
+	if s.feeRates == nil {
+		return commonfees.Empty, nil
+	}
+	return *s.feeRates, nil
 }
 
-func (s *state) SetFeeRates(feeRates commonfees.Dimensions) {
-	s.feeRates = feeRates
+func (s *state) SetFeeRates(fr commonfees.Dimensions) {
+	feeRates := fr
+	s.feeRates = &feeRates
 }
 
 func (s *state) GetLastBlockComplexity() (commonfees.Dimensions, error) {
@@ -565,8 +570,11 @@ func (s *state) writeMetadata() error {
 		}
 		s.persistedTimestamp = s.timestamp
 	}
-	if err := s.singletonDB.Put(feeRatesKey, s.feeRates.Bytes()); err != nil {
-		return fmt.Errorf("failed to write fee rates: %w", err)
+
+	if s.feeRates != nil {
+		if err := s.singletonDB.Put(feeRatesKey, s.feeRates.Bytes()); err != nil {
+			return fmt.Errorf("failed to write fee rates: %w", err)
+		}
 	}
 	if err := s.singletonDB.Put(lastBlkComplexityKey, s.lastBlkComplexity.Bytes()); err != nil {
 		return fmt.Errorf("failed to write fee rates: %w", err)
