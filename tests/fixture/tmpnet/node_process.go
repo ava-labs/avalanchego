@@ -120,18 +120,6 @@ func (p *NodeProcess) Start(w io.Writer) error {
 		Setsid: true,
 	}
 
-	// Redirect stdout and stderr to ensure the subprocess is not writing to
-	// the parent's stdout and stderr. Since a node is intended to run
-	// headless and should be logging everything to disk internally, its
-	// direct output can be ignored by sending to /dev/null.
-	devNull, err := os.OpenFile(os.DevNull, os.O_WRONLY, 0)
-	if err != nil {
-		return fmt.Errorf("failed to open /dev/null: %w", err)
-	}
-	defer devNull.Close()
-	cmd.Stdout = devNull
-	cmd.Stderr = devNull
-
 	if err := cmd.Start(); err != nil {
 		return err
 	}
