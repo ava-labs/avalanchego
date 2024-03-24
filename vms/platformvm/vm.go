@@ -92,9 +92,6 @@ type VM struct {
 	onShutdownCtx context.Context
 	// Call [onShutdownCtxCancel] to cancel [onShutdownCtx] during Shutdown()
 	onShutdownCtxCancel context.CancelFunc
-
-	// TODO: Remove after v1.11.x is activated
-	pruned utils.Atomic[bool]
 }
 
 // Initialize this blockchain.
@@ -257,7 +254,6 @@ func (vm *VM) Initialize(
 	}
 	if !shouldPrune {
 		chainCtx.Log.Info("state already pruned and indexed")
-		vm.pruned.Set(true)
 		return nil
 	}
 
@@ -268,8 +264,6 @@ func (vm *VM) Initialize(
 				zap.Error(err),
 			)
 		}
-
-		vm.pruned.Set(true)
 	}()
 
 	return nil
