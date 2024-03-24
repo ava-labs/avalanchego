@@ -179,6 +179,10 @@ type State interface {
 	Close() error
 }
 
+// Prior to https://github.com/ava-labs/avalanchego/pull/1719, blocks were
+// stored as a map from blkID to stateBlk. Nodes have been synced since prior to
+// this PR may still have blocks partially stored using this legacy format.
+//
 // TODO: Remove after v1.12.x is activated
 type stateBlk struct {
 	Bytes  []byte         `serialize:"true"`
