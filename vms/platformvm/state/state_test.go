@@ -1393,12 +1393,12 @@ func TestParsedStateBlock(t *testing.T) {
 		stBlkBytes, err := block.GenesisCodec.Marshal(block.CodecVersion, &stBlk)
 		require.NoError(err)
 
-		gotBlk, _, isStateBlk, err := parseStoredBlock(stBlkBytes)
+		gotBlk, isStateBlk, err := parseStoredBlock(stBlkBytes)
 		require.NoError(err)
 		require.True(isStateBlk)
 		require.Equal(blk.ID(), gotBlk.ID())
 
-		gotBlk, _, isStateBlk, err = parseStoredBlock(blk.Bytes())
+		gotBlk, isStateBlk, err = parseStoredBlock(blk.Bytes())
 		require.NoError(err)
 		require.False(isStateBlk)
 		require.Equal(blk.ID(), gotBlk.ID())

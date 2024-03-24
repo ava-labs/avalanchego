@@ -245,27 +245,6 @@ func (vm *VM) Initialize(
 	// [periodicallyPruneMempool] grabs the context lock.
 	go vm.periodicallyPruneMempool(execConfig.MempoolPruneFrequency)
 
-	shouldPrune, err := vm.state.ShouldPrune()
-	if err != nil {
-		return fmt.Errorf(
-			"failed to check if the database should be pruned: %w",
-			err,
-		)
-	}
-	if !shouldPrune {
-		chainCtx.Log.Info("state already pruned and indexed")
-		return nil
-	}
-
-	go func() {
-		err := vm.state.PruneAndIndex(&vm.ctx.Lock, vm.ctx.Log)
-		if err != nil {
-			vm.ctx.Log.Error("state pruning and height indexing failed",
-				zap.Error(err),
-			)
-		}
-	}()
-
 	return nil
 }
 
