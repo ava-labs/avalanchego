@@ -181,7 +181,6 @@ type State interface {
 
 // TODO: Remove after v1.12.x is activated
 type stateBlk struct {
-	Blk    block.Block
 	Bytes  []byte         `serialize:"true"`
 	Status choices.Status `serialize:"true"`
 }
@@ -2286,10 +2285,6 @@ func parseStoredBlock(blkBytes []byte) (block.Block, bool, error) {
 		return nil, false, err
 	}
 
-	blkState.Blk, err = block.Parse(block.GenesisCodec, blkState.Bytes)
-	if err != nil {
-		return nil, false, err
-	}
-
-	return blkState.Blk, true, nil
+	blk, err = block.Parse(block.GenesisCodec, blkState.Bytes)
+	return blk, true, err
 }

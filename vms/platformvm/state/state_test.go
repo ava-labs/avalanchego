@@ -1385,7 +1385,6 @@ func TestParsedStateBlock(t *testing.T) {
 
 	for _, blk := range blks {
 		stBlk := stateBlk{
-			Blk:    blk,
 			Bytes:  blk.Bytes(),
 			Status: choices.Accepted,
 		}
