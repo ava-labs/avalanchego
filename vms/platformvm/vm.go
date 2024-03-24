@@ -92,6 +92,9 @@ type VM struct {
 	onShutdownCtx context.Context
 	// Call [onShutdownCtxCancel] to cancel [onShutdownCtx] during Shutdown()
 	onShutdownCtxCancel context.CancelFunc
+
+	// TODO: Remove after v1.11.x is activated
+	pruned utils.Atomic[bool]
 }
 
 // Initialize this blockchain.
@@ -244,6 +247,30 @@ func (vm *VM) Initialize(
 	// Incrementing [awaitShutdown] would cause a deadlock since
 	// [periodicallyPruneMempool] grabs the context lock.
 	go vm.periodicallyPruneMempool(execConfig.MempoolPruneFrequency)
+
+	shouldPrune, err := vm.state.ShouldPrune()
+	if err != nil {
+		return fmt.Errorf(
+			"failed to check if the database should be pruned: %w",
+			err,
+		)
+	}
+	if !shouldPrune {
+		chainCtx.Log.Info("state already pruned and indexed")
+		vm.pruned.Set(true)
+		return nil
+	}
+
+	go func() {
+		err := vm.state.PruneAndIndex(&vm.ctx.Lock, vm.ctx.Log)
+		if err != nil {
+			vm.ctx.Log.Error("state pruning and height indexing failed",
+				zap.Error(err),
+			)
+		}
+
+		vm.pruned.Set(true)
+	}()
 
 	return nil
 }
