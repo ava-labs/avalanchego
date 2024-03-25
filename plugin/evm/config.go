@@ -35,6 +35,7 @@ const (
 	defaultMaxBlocksPerRequest                        = 0 // Default to no maximum on the number of blocks per getLogs request
 	defaultContinuousProfilerFrequency                = 15 * time.Minute
 	defaultContinuousProfilerMaxFiles                 = 5
+	defaultPushGossipPercentStake                     = .9
 	defaultPushGossipNumValidators                    = 100
 	defaultPushGossipNumPeers                         = 0
 	defaultPushRegossipNumValidators                  = 10
@@ -154,6 +155,7 @@ type Config struct {
 	KeystoreInsecureUnlockAllowed bool   `json:"keystore-insecure-unlock-allowed"`
 
 	// Gossip Settings
+	PushGossipPercentStake    float64          `json:"push-gossip-percent-stake"`
 	PushGossipNumValidators   int              `json:"push-gossip-num-validators"`
 	PushGossipNumPeers        int              `json:"push-gossip-num-peers"`
 	PushRegossipNumValidators int              `json:"push-regossip-num-validators"`
@@ -260,6 +262,7 @@ func (c *Config) SetDefaults() {
 	c.AcceptorQueueLimit = defaultAcceptorQueueLimit
 	c.CommitInterval = defaultCommitInterval
 	c.SnapshotWait = defaultSnapshotWait
+	c.PushGossipPercentStake = defaultPushGossipPercentStake
 	c.PushGossipNumValidators = defaultPushGossipNumValidators
 	c.PushGossipNumPeers = defaultPushGossipNumPeers
 	c.PushRegossipNumValidators = defaultPushRegossipNumValidators
@@ -317,5 +320,8 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("cannot use commit interval of 0 with pruning enabled")
 	}
 
+	if c.PushGossipPercentStake < 0 || c.PushGossipPercentStake > 1 {
+		return fmt.Errorf("push-gossip-percent-stake is %f but must be in the range [0, 1]", c.PushGossipPercentStake)
+	}
 	return nil
 }
