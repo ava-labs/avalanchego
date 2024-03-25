@@ -4,7 +4,7 @@ go 1.21
 
 require (
 	github.com/VictoriaMetrics/fastcache v1.10.0
-	github.com/ava-labs/avalanchego v1.11.3-stake-weighted-gossip.2
+	github.com/ava-labs/avalanchego v1.11.3
 	github.com/cespare/cp v0.1.0
 	github.com/davecgh/go-spew v1.1.1
 	github.com/deckarep/golang-set/v2 v2.1.0
@@ -43,7 +43,7 @@ require (
 	golang.org/x/sys v0.16.0
 	golang.org/x/text v0.14.0
 	golang.org/x/time v0.3.0
-	google.golang.org/protobuf v1.32.0
+	google.golang.org/protobuf v1.33.0
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 )
 
