@@ -93,6 +93,18 @@ func Add(
 	return height != lastHeightToFetch && !tree.Contains(height-1), nil
 }
 
+// Remove the block from the tree.
+func Remove(
+	db database.KeyValueWriterDeleter,
+	tree *Tree,
+	height uint64,
+) error {
+	if err := DeleteBlock(db, height); err != nil {
+		return err
+	}
+	return tree.Remove(db, height)
+}
+
 // Execute all the blocks tracked by the tree. If a block is in the tree but is
 // already accepted based on the lastAcceptedHeight, it will be removed from the
 // tree but not executed.
@@ -145,11 +157,7 @@ func Execute(
 		}
 
 		height := blk.Height()
-		if err := DeleteBlock(batch, height); err != nil {
-			return err
-		}
-
-		if err := tree.Remove(batch, height); err != nil {
+		if err := Remove(batch, tree, height); err != nil {
 			return err
 		}
 
