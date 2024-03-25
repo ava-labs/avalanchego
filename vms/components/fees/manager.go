@@ -34,20 +34,42 @@ func (m *Manager) GetCumulatedComplexity() Dimensions {
 }
 
 // CalculateFee must be a stateless method
-func (m *Manager) CalculateFee(units Dimensions) (uint64, error) {
-	fee := uint64(0)
+// tipPercentage is assumed to have been validated
+func (m *Manager) CalculateFee(complexity Dimensions, tipPercentage TipPercentage) (uint64, error) {
+	var (
+		baseFee = uint64(0)
+		tip     = uint64(0)
+	)
 
 	for i := Dimension(0); i < FeeDimensions; i++ {
-		contribution, err := safemath.Mul64(m.feeRates[i], units[i])
+		baseAddend, err := safemath.Mul64(m.feeRates[i], complexity[i])
 		if err != nil {
 			return 0, err
 		}
-		fee, err = safemath.Add64(contribution, fee)
+		baseFee, err = safemath.Add64(baseAddend, baseFee)
 		if err != nil {
 			return 0, err
+		}
+
+		tipAddend, err := safemath.Mul64(baseFee, uint64(tipPercentage))
+		if err != nil {
+			tipAddend, err = safemath.Mul64(baseFee/uint64(maxTipPercentage), uint64(tipPercentage))
+			if err != nil {
+				return 0, err
+			}
+			tip, err = safemath.Add64(tip, tipAddend)
+			if err != nil {
+				return 0, err
+			}
+		} else {
+			tip, err = safemath.Add64(tip, tipAddend/maxTipPercentage)
+			if err != nil {
+				return 0, err
+			}
 		}
 	}
-	return fee, nil
+
+	return safemath.Add64(baseFee, tip)
 }
 
 // CumulateComplexity tries to cumulate the consumed complexity [units]. Before

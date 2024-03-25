@@ -37,6 +37,7 @@ type Calculator struct {
 	// Post E-fork inputs
 	FeeManager         *fees.Manager
 	BlockMaxComplexity fees.Dimensions
+	TipPercentage      fees.TipPercentage
 
 	// common inputs
 	Credentials []verify.Verifiable
@@ -78,7 +79,7 @@ func (fc *Calculator) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
 		return err
 	}
 
-	_, err = fc.AddFeesFor(consumedUnits)
+	_, err = fc.AddFeesFor(consumedUnits, fc.TipPercentage)
 	return err
 }
 
@@ -93,7 +94,7 @@ func (fc *Calculator) CreateChainTx(tx *txs.CreateChainTx) error {
 		return err
 	}
 
-	_, err = fc.AddFeesFor(consumedUnits)
+	_, err = fc.AddFeesFor(consumedUnits, fc.TipPercentage)
 	return err
 }
 
@@ -108,7 +109,7 @@ func (fc *Calculator) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 		return err
 	}
 
-	_, err = fc.AddFeesFor(consumedUnits)
+	_, err = fc.AddFeesFor(consumedUnits, fc.TipPercentage)
 	return err
 }
 
@@ -123,7 +124,7 @@ func (fc *Calculator) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx) e
 		return err
 	}
 
-	_, err = fc.AddFeesFor(consumedUnits)
+	_, err = fc.AddFeesFor(consumedUnits, fc.TipPercentage)
 	return err
 }
 
@@ -138,7 +139,7 @@ func (fc *Calculator) TransformSubnetTx(tx *txs.TransformSubnetTx) error {
 		return err
 	}
 
-	_, err = fc.AddFeesFor(consumedUnits)
+	_, err = fc.AddFeesFor(consumedUnits, fc.TipPercentage)
 	return err
 }
 
@@ -153,7 +154,7 @@ func (fc *Calculator) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwnershipT
 		return err
 	}
 
-	_, err = fc.AddFeesFor(consumedUnits)
+	_, err = fc.AddFeesFor(consumedUnits, fc.TipPercentage)
 	return err
 }
 
@@ -176,7 +177,7 @@ func (fc *Calculator) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessVali
 		return err
 	}
 
-	_, err = fc.AddFeesFor(consumedUnits)
+	_, err = fc.AddFeesFor(consumedUnits, fc.TipPercentage)
 	return err
 }
 
@@ -199,7 +200,7 @@ func (fc *Calculator) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDele
 		return err
 	}
 
-	_, err = fc.AddFeesFor(consumedUnits)
+	_, err = fc.AddFeesFor(consumedUnits, fc.TipPercentage)
 	return err
 }
 
@@ -214,7 +215,7 @@ func (fc *Calculator) BaseTx(tx *txs.BaseTx) error {
 		return err
 	}
 
-	_, err = fc.AddFeesFor(consumedUnits)
+	_, err = fc.AddFeesFor(consumedUnits, fc.TipPercentage)
 	return err
 }
 
@@ -233,7 +234,7 @@ func (fc *Calculator) ImportTx(tx *txs.ImportTx) error {
 		return err
 	}
 
-	_, err = fc.AddFeesFor(consumedUnits)
+	_, err = fc.AddFeesFor(consumedUnits, fc.TipPercentage)
 	return err
 }
 
@@ -252,7 +253,7 @@ func (fc *Calculator) ExportTx(tx *txs.ExportTx) error {
 		return err
 	}
 
-	_, err = fc.AddFeesFor(consumedUnits)
+	_, err = fc.AddFeesFor(consumedUnits, fc.TipPercentage)
 	return err
 }
 
@@ -315,13 +316,13 @@ func (fc *Calculator) meterTx(
 	return consumedUnits, nil
 }
 
-func (fc *Calculator) AddFeesFor(consumedUnits fees.Dimensions) (uint64, error) {
+func (fc *Calculator) AddFeesFor(consumedUnits fees.Dimensions, tipPercentage fees.TipPercentage) (uint64, error) {
 	boundBreached, dimension := fc.FeeManager.CumulateComplexity(consumedUnits, fc.BlockMaxComplexity)
 	if boundBreached {
 		return 0, fmt.Errorf("%w: breached dimension %d", errFailedConsumedUnitsCumulation, dimension)
 	}
 
-	fee, err := fc.FeeManager.CalculateFee(consumedUnits)
+	fee, err := fc.FeeManager.CalculateFee(consumedUnits, tipPercentage)
 	if err != nil {
 		return 0, fmt.Errorf("%w: %w", errFailedFeeCalculation, err)
 	}
@@ -330,12 +331,12 @@ func (fc *Calculator) AddFeesFor(consumedUnits fees.Dimensions) (uint64, error) 
 	return fee, nil
 }
 
-func (fc *Calculator) RemoveFeesFor(unitsToRm fees.Dimensions) (uint64, error) {
+func (fc *Calculator) RemoveFeesFor(unitsToRm fees.Dimensions, tipPercentage fees.TipPercentage) (uint64, error) {
 	if err := fc.FeeManager.RemoveComplexity(unitsToRm); err != nil {
 		return 0, fmt.Errorf("failed removing units: %w", err)
 	}
 
-	fee, err := fc.FeeManager.CalculateFee(unitsToRm)
+	fee, err := fc.FeeManager.CalculateFee(unitsToRm, tipPercentage)
 	if err != nil {
 		return 0, fmt.Errorf("%w: %w", errFailedFeeCalculation, err)
 	}

@@ -837,7 +837,7 @@ func (b *builder) NewImportTx(
 		default:
 			// imported avax are not enough to pay fees
 			// Drop the changeOut and finance the tx
-			if _, err := feeCalc.RemoveFeesFor(outDimensions); err != nil {
+			if _, err := feeCalc.RemoveFeesFor(outDimensions, feeCalc.TipPercentage); err != nil {
 				return nil, fmt.Errorf("failed reverting change output: %w", err)
 			}
 			feeCalc.Fee -= importedAVAX
