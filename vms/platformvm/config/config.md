@@ -58,7 +58,7 @@ The node's chain manager
 
 ### `Validators`
 
-Node's validator set maps subnetID to validators of the subnet
+Node's validator set maps SubnetID to validators of the Subnet
 
 - The primary network's validator set should have been added to the manager before calling VM.Initialize.
 - The primary network's validator set should be empty before calling VM.Initialize.
@@ -81,9 +81,7 @@ If true, only the P-chain will be instantiated on the primary network.
 
 ### `TrackedSubnets`
 
-_Set[ids.ID]_
-
-Set of subnets that this node is validating
+Set of Subnets that this node is validating
 
 ### `TxFee`
 
@@ -101,13 +99,13 @@ Fee that must be burned by every state creating transaction before AP3
 
 _Uint64_
 
-Fee that must be burned by every subnet creating transaction after AP3
+Fee that must be burned by every Subnet creating transaction after AP3
 
 ### `TransformSubnetTxFee`
 
 _Uint64_
 
-Fee that must be burned by every transform subnet transaction
+Fee that must be burned by every transform Subnet transaction
 
 ### `CreateBlockchainTxFee`
 
@@ -131,13 +129,13 @@ Transaction fee for adding a primary network delegator
 
 _Uint64_
 
-Transaction fee for adding a subnet validator
+Transaction fee for adding a Subnet validator
 
 ### `AddSubnetDelegatorFee`
 
 _Uint64_
 
-Transaction fee for adding a subnet delegator
+Transaction fee for adding a Subnet delegator
 
 ### `MinValidatorStake`
 
@@ -225,4 +223,4 @@ Time of the E network upgrade
 
 _Boolean_
 
-UseCurrentHeight forces [GetMinimumHeight] to return the current height of the P-Chain instead of the oldest block in the [recentlyAccepted] window. This config is particularly useful for triggering proposervm activation on recently created subnets (without this, users need to wait for [recentlyAcceptedWindowTTL] to pass for activation to occur).
+UseCurrentHeight forces `GetMinimumHeight` to return the current height of the P-Chain instead of the oldest block in the `recentlyAccepted` window. This config is particularly useful for triggering proposervm activation on recently created Subnets (without this, users need to wait for `recentlyAcceptedWindowTTL` to pass for activation to occur).
