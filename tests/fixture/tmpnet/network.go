@@ -9,17 +9,17 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/perms"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -39,6 +39,9 @@ const (
 	// startup, as smaller intervals (e.g. 50ms) seemed to noticeably
 	// increase the time for a network's nodes to be seen as healthy.
 	networkHealthCheckInterval = 200 * time.Millisecond
+
+	// All temporary networks will use this arbitrary network ID by default.
+	defaultNetworkID = 88888
 
 	// eth address: 0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC
 	HardHatKeyStr = "56289e99c94b6912bfc12adc093c9b51124f0dc54ac7a766b2bc5ccf558d8027"
@@ -61,6 +64,18 @@ func init() {
 
 // Collects the configuration for running a temporary avalanchego network
 type Network struct {
+	// Uniquely identifies the temporary network for metrics
+	// collection. Distinct from avalanchego's concept of network ID
+	// since the utility of special network ID values (e.g. to trigger
+	// specific fork behavior in a given network) precludes requiring
+	// unique network ID values across all temporary networks.
+	UUID string
+
+	// A string identifying the entity that started or maintains this
+	// network. Useful for differentiating between networks when a
+	// given CI job uses multiple networks.
+	Owner string
+
 	// Path where network configuration and data is stored
 	Dir string
 
@@ -150,6 +165,11 @@ func (n *Network) EnsureDefaultConfig(w io.Writer, avalancheGoPath string, plugi
 		return err
 	}
 
+	// A UUID supports centralized metrics collection
+	if len(n.UUID) == 0 {
+		n.UUID = uuid.NewString()
+	}
+
 	// Ensure default flags
 	if n.DefaultFlags == nil {
 		n.DefaultFlags = FlagsMap{}
@@ -206,45 +226,32 @@ func (n *Network) EnsureDefaultConfig(w io.Writer, avalancheGoPath string, plugi
 	return nil
 }
 
-// Creates the network on disk, choosing its network id and generating its genesis in the process.
+// Creates the network on disk, generating its genesis and configuring its nodes in the process.
 func (n *Network) Create(rootDir string) error {
+	// Ensure creation of the root dir
 	if len(rootDir) == 0 {
 		// Use the default root dir
 		var err error
-		rootDir, err = getDefaultRootDir()
+		rootDir, err = getDefaultRootNetworkDir()
 		if err != nil {
 			return err
 		}
 	}
-
-	// Ensure creation of the root dir
 	if err := os.MkdirAll(rootDir, perms.ReadWriteExecute); err != nil {
 		return fmt.Errorf("failed to create root network dir: %w", err)
 	}
 
-	// Determine the network path and ID
-	var (
-		networkDir string
-		networkID  uint32
-	)
-	if n.Genesis != nil && n.Genesis.NetworkID > 0 {
-		// Use the network ID defined in the provided genesis
-		networkID = n.Genesis.NetworkID
+	// A time-based name ensures consistent directory ordering
+	dirName := time.Now().Format("20060102-150405.999999")
+	if len(n.Owner) > 0 {
+		// Include the owner to differentiate networks created at similar times
+		dirName = fmt.Sprintf("%s-%s", dirName, n.Owner)
 	}
-	if networkID > 0 {
-		// Use a directory with a random suffix
-		var err error
-		networkDir, err = os.MkdirTemp(rootDir, fmt.Sprintf("%d.", n.Genesis.NetworkID))
-		if err != nil {
-			return fmt.Errorf("failed to create network dir: %w", err)
-		}
-	} else {
-		// Find the next available network ID based on the contents of the root dir
-		var err error
-		networkID, networkDir, err = findNextNetworkID(rootDir)
-		if err != nil {
-			return err
-		}
+
+	// Ensure creation of the network dir
+	networkDir := filepath.Join(rootDir, dirName)
+	if err := os.MkdirAll(networkDir, perms.ReadWriteExecute); err != nil {
+		return fmt.Errorf("failed to create network dir: %w", err)
 	}
 	canonicalDir, err := toCanonicalDir(networkDir)
 	if err != nil {
@@ -252,12 +259,12 @@ func (n *Network) Create(rootDir string) error {
 	}
 	n.Dir = canonicalDir
 
+	// Ensure the existence of the plugin directory or nodes won't be able to start.
 	pluginDir, err := n.DefaultFlags.GetStringVal(config.PluginDirKey)
 	if err != nil {
 		return err
 	}
 	if len(pluginDir) > 0 {
-		// Ensure the existence of the plugin directory or nodes won't be able to start.
 		if err := os.MkdirAll(pluginDir, perms.ReadWriteExecute); err != nil {
 			return fmt.Errorf("failed to create plugin dir: %w", err)
 		}
@@ -275,7 +282,7 @@ func (n *Network) Create(rootDir string) error {
 		}
 		keysToFund = append(keysToFund, n.PreFundedKeys...)
 
-		genesis, err := NewTestGenesis(networkID, n.Nodes, keysToFund)
+		genesis, err := NewTestGenesis(defaultNetworkID, n.Nodes, keysToFund)
 		if err != nil {
 			return err
 		}
@@ -296,9 +303,12 @@ func (n *Network) Create(rootDir string) error {
 
 // Starts all nodes in the network
 func (n *Network) Start(ctx context.Context, w io.Writer) error {
-	if _, err := fmt.Fprintf(w, "Starting network %d @ %s\n", n.Genesis.NetworkID, n.Dir); err != nil {
+	if _, err := fmt.Fprintf(w, "Starting network %s (UUID: %s)\n", n.Dir, n.UUID); err != nil {
 		return err
 	}
+
+	// Record the time before nodes are started to ensure visibility of subsequently collected metrics via the emitted link
+	startTime := time.Now()
 
 	// Configure the networking for each node and start
 	for _, node := range n.Nodes {
@@ -313,7 +323,11 @@ func (n *Network) Start(ctx context.Context, w io.Writer) error {
 	if err := n.WaitForHealthy(ctx, w); err != nil {
 		return err
 	}
-	if _, err := fmt.Fprintf(w, "\nStarted network %d @ %s\n", n.Genesis.NetworkID, n.Dir); err != nil {
+	if _, err := fmt.Fprintf(w, "\nStarted network %s (UUID: %s)\n", n.Dir, n.UUID); err != nil {
+		return err
+	}
+	// Provide a link to the main dashboard filtered by the uuid and showing results from now till whenever the link is viewed
+	if _, err := fmt.Fprintf(w, "\nMetrics: https://grafana-experimental.avax-dev.network/d/kBQpRdWnk/avalanche-main-dashboard?&var-filter=network_uuid%%7C%%3D%%7C%s&var-filter=is_ephemeral_node%%7C%%3D%%7Cfalse&from=%d&to=now\n", n.UUID, startTime.UnixMilli()); err != nil {
 		return err
 	}
 
@@ -427,6 +441,23 @@ func (n *Network) Restart(ctx context.Context, w io.Writer) error {
 		return err
 	}
 	for _, node := range n.Nodes {
+		// Ensure the node reuses the same API port across restarts to ensure
+		// consistent labeling of metrics. Otherwise prometheus's automatic
+		// addition of the `instance` label (host:port) results in
+		// segmentation of results for a given node every time the port
+		// changes on restart. This segmentation causes graphs on the grafana
+		// dashboards to display multiple series per graph for a given node,
+		// one for each port that the node used.
+		//
+		// There is a non-zero chance of the port being allocatted to a
+		// different process and the node subsequently being unable to start,
+		// but the alternative is having to update the grafana dashboards
+		// query-by-query to ensure that node metrics ignore the instance
+		// label.
+		if err := node.SaveAPIPort(); err != nil {
+			return err
+		}
+
 		if err := node.Stop(ctx); err != nil {
 			return fmt.Errorf("failed to stop node %s: %w", node.NodeID, err)
 		}
@@ -449,6 +480,12 @@ func (n *Network) Restart(ctx context.Context, w io.Writer) error {
 // TODO(marun) Reword or refactor to account for the differing behavior pre- vs post-start
 func (n *Network) EnsureNodeConfig(node *Node) error {
 	flags := node.Flags
+
+	// Ensure nodes can label their metrics with the network uuid
+	node.NetworkUUID = n.UUID
+
+	// Ensure nodes can label metrics with an indication of the shared/private nature of the network
+	node.NetworkOwner = n.Owner
 
 	// Set the network name if available
 	if n.Genesis != nil && n.Genesis.NetworkID > 0 {
@@ -667,42 +704,21 @@ func (n *Network) getBootstrapIPsAndIDs(skippedNode *Node) ([]string, []string, 
 	return bootstrapIPs, bootstrapIDs, nil
 }
 
-// Retrieves the default root dir for storing networks and their
-// configuration.
-func getDefaultRootDir() (string, error) {
+// Retrieves the root dir for tmpnet data.
+func getTmpnetPath() (string, error) {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(homeDir, ".tmpnet", "networks"), nil
+	return filepath.Join(homeDir, ".tmpnet"), nil
 }
 
-// Finds the next available network ID by attempting to create a
-// directory numbered from 1000 until creation succeeds. Returns the
-// network id and the full path of the created directory.
-func findNextNetworkID(rootDir string) (uint32, string, error) {
-	var (
-		networkID uint32 = 1000
-		dirPath   string
-	)
-	for {
-		_, reserved := constants.NetworkIDToNetworkName[networkID]
-		if reserved {
-			networkID++
-			continue
-		}
-
-		dirPath = filepath.Join(rootDir, strconv.FormatUint(uint64(networkID), 10))
-		err := os.Mkdir(dirPath, perms.ReadWriteExecute)
-		if err == nil {
-			return networkID, dirPath, nil
-		}
-
-		if !errors.Is(err, fs.ErrExist) {
-			return 0, "", fmt.Errorf("failed to create network directory: %w", err)
-		}
-
-		// Directory already exists, keep iterating
-		networkID++
+// Retrieves the default root dir for storing networks and their
+// configuration.
+func getDefaultRootNetworkDir() (string, error) {
+	tmpnetPath, err := getTmpnetPath()
+	if err != nil {
+		return "", err
 	}
+	return filepath.Join(tmpnetPath, "networks"), nil
 }

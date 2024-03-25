@@ -24,6 +24,7 @@ func TestSetsAndGets(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
+		fork: latest,
 		additionalFxs: []*common.Fx{{
 			ID: ids.GenerateTestID(),
 			Fx: &FxTest{
@@ -86,6 +87,7 @@ func TestSetsAndGets(t *testing.T) {
 
 func TestFundingNoAddresses(t *testing.T) {
 	env := setup(t, &envConfig{
+		fork: latest,
 		additionalFxs: []*common.Fx{{
 			ID: ids.GenerateTestID(),
 			Fx: &FxTest{
@@ -118,6 +120,7 @@ func TestFundingAddresses(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
+		fork: latest,
 		additionalFxs: []*common.Fx{{
 			ID: ids.GenerateTestID(),
 			Fx: &FxTest{

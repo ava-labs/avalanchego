@@ -561,7 +561,10 @@ func TestNodeSamplerClientOption(t *testing.T) {
 					},
 					GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
 						return map[ids.NodeID]*validators.GetValidatorOutput{
-							nodeID1: nil,
+							nodeID1: {
+								NodeID: nodeID1,
+								Weight: 1,
+							},
 						}, nil
 					},
 				}
@@ -581,7 +584,10 @@ func TestNodeSamplerClientOption(t *testing.T) {
 					},
 					GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
 						return map[ids.NodeID]*validators.GetValidatorOutput{
-							nodeID1: nil,
+							nodeID1: {
+								NodeID: nodeID1,
+								Weight: 1,
+							},
 						}, nil
 					},
 				}

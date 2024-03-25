@@ -12,7 +12,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
-	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -24,7 +23,7 @@ func TestVerifyFxUsage(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		vmStaticConfig: &config.Config{},
+		vmStaticConfig: noFeesTestConfig,
 	})
 	env.vm.ctx.Lock.Unlock()
 	defer func() {

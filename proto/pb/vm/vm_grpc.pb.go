@@ -42,7 +42,6 @@ const (
 	VM_CrossChainAppResponse_FullMethodName      = "/vm.VM/CrossChainAppResponse"
 	VM_GetAncestors_FullMethodName               = "/vm.VM/GetAncestors"
 	VM_BatchedParseBlock_FullMethodName          = "/vm.VM/BatchedParseBlock"
-	VM_VerifyHeightIndex_FullMethodName          = "/vm.VM/VerifyHeightIndex"
 	VM_GetBlockIDAtHeight_FullMethodName         = "/vm.VM/GetBlockIDAtHeight"
 	VM_StateSyncEnabled_FullMethodName           = "/vm.VM/StateSyncEnabled"
 	VM_GetOngoingSyncStateSummary_FullMethodName = "/vm.VM/GetOngoingSyncStateSummary"
@@ -102,7 +101,6 @@ type VMClient interface {
 	GetAncestors(ctx context.Context, in *GetAncestorsRequest, opts ...grpc.CallOption) (*GetAncestorsResponse, error)
 	BatchedParseBlock(ctx context.Context, in *BatchedParseBlockRequest, opts ...grpc.CallOption) (*BatchedParseBlockResponse, error)
 	// HeightIndexedChainVM
-	VerifyHeightIndex(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*VerifyHeightIndexResponse, error)
 	GetBlockIDAtHeight(ctx context.Context, in *GetBlockIDAtHeightRequest, opts ...grpc.CallOption) (*GetBlockIDAtHeightResponse, error)
 	// StateSyncableVM
 	//
@@ -331,15 +329,6 @@ func (c *vMClient) BatchedParseBlock(ctx context.Context, in *BatchedParseBlockR
 	return out, nil
 }
 
-func (c *vMClient) VerifyHeightIndex(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*VerifyHeightIndexResponse, error) {
-	out := new(VerifyHeightIndexResponse)
-	err := c.cc.Invoke(ctx, VM_VerifyHeightIndex_FullMethodName, in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 func (c *vMClient) GetBlockIDAtHeight(ctx context.Context, in *GetBlockIDAtHeightRequest, opts ...grpc.CallOption) (*GetBlockIDAtHeightResponse, error) {
 	out := new(GetBlockIDAtHeightResponse)
 	err := c.cc.Invoke(ctx, VM_GetBlockIDAtHeight_FullMethodName, in, out, opts...)
@@ -477,7 +466,6 @@ type VMServer interface {
 	GetAncestors(context.Context, *GetAncestorsRequest) (*GetAncestorsResponse, error)
 	BatchedParseBlock(context.Context, *BatchedParseBlockRequest) (*BatchedParseBlockResponse, error)
 	// HeightIndexedChainVM
-	VerifyHeightIndex(context.Context, *emptypb.Empty) (*VerifyHeightIndexResponse, error)
 	GetBlockIDAtHeight(context.Context, *GetBlockIDAtHeightRequest) (*GetBlockIDAtHeightResponse, error)
 	// StateSyncableVM
 	//
@@ -570,9 +558,6 @@ func (UnimplementedVMServer) GetAncestors(context.Context, *GetAncestorsRequest)
 }
 func (UnimplementedVMServer) BatchedParseBlock(context.Context, *BatchedParseBlockRequest) (*BatchedParseBlockResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method BatchedParseBlock not implemented")
-}
-func (UnimplementedVMServer) VerifyHeightIndex(context.Context, *emptypb.Empty) (*VerifyHeightIndexResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method VerifyHeightIndex not implemented")
 }
 func (UnimplementedVMServer) GetBlockIDAtHeight(context.Context, *GetBlockIDAtHeightRequest) (*GetBlockIDAtHeightResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetBlockIDAtHeight not implemented")
@@ -1013,24 +998,6 @@ func _VM_BatchedParseBlock_Handler(srv interface{}, ctx context.Context, dec fun
 	return interceptor(ctx, in, info, handler)
 }
 
-func _VM_VerifyHeightIndex_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(emptypb.Empty)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(VMServer).VerifyHeightIndex(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: VM_VerifyHeightIndex_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(VMServer).VerifyHeightIndex(ctx, req.(*emptypb.Empty))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _VM_GetBlockIDAtHeight_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetBlockIDAtHeightRequest)
 	if err := dec(in); err != nil {
@@ -1305,10 +1272,6 @@ var VM_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "BatchedParseBlock",
 			Handler:    _VM_BatchedParseBlock_Handler,
-		},
-		{
-			MethodName: "VerifyHeightIndex",
-			Handler:    _VM_VerifyHeightIndex_Handler,
 		},
 		{
 			MethodName: "GetBlockIDAtHeight",
