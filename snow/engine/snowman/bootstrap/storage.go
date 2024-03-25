@@ -12,6 +12,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/bootstrap/interval"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -63,6 +64,52 @@ func getMissingBlockIDs(
 		missingBlocks.Add(parentID)
 	}
 	return missingBlocks, nil
+}
+
+// process a series of consecutive blocks starting at [blk].
+//
+//   - blk is a block that is assumed to have been marked as acceptable by the
+//     bootstrapping engine.
+//   - ancestors is a set of blocks that can be used to lookup blocks.
+//
+// If [blk]'s height is <= the last accepted height, then it will be removed
+// from the missingIDs set.
+//
+// Returns a newly discovered blockID that should be fetched.
+func process(
+	db database.KeyValueWriterDeleter,
+	tree *interval.Tree,
+	blk snowman.Block,
+	ancestors map[ids.ID]snowman.Block,
+	missingBlockIDs set.Set[ids.ID],
+	lastAcceptedHeight uint64,
+) (ids.ID, bool, error) {
+	for {
+		// It's possible that missingBlockIDs contain values contained inside of
+		// ancestors. So, it's important to remove IDs from the set for each
+		// iteration, not just the first block's ID.
+		blkID := blk.ID()
+		missingBlockIDs.Remove(blkID)
+
+		wantsParent, err := interval.Add(db, tree, lastAcceptedHeight, blk)
+		if err != nil {
+			return ids.Empty, false, err
+		}
+
+		if !wantsParent {
+			return ids.Empty, false, nil
+		}
+
+		// If the parent was provided in the ancestors set, we can immediately
+		// process it.
+		parentID := blk.Parent()
+		parent, ok := ancestors[parentID]
+		if !ok {
+			return parentID, true, nil
+		}
+
+		blk = parent
+	}
 }
 
 // execute all the blocks tracked by the tree. If a block is in the tree but is
