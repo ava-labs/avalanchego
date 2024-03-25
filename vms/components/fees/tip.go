@@ -14,7 +14,7 @@ import (
 
 const (
 	NoTip            = 0
-	maxTipPercentage = 1_000
+	MaxTipPercentage = 1_000
 )
 
 var (
@@ -29,7 +29,7 @@ func (t TipPercentage) Validate() error {
 		return fmt.Errorf("%w, tip percentage %d", errTipPercentageNegative, t)
 	}
 
-	if t > maxTipPercentage {
+	if t > MaxTipPercentage {
 		return fmt.Errorf("%w, tip percentage %d", errTipPercentageTooLarge, t)
 	}
 

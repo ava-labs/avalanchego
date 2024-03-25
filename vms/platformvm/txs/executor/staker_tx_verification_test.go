@@ -424,7 +424,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 					gomock.Any(),
 					gomock.Any(),
 					gomock.Any(),
-				).Return(ErrFlowCheckFailed)
+				).Return(uint64(0), ErrFlowCheckFailed)
 
 				cfg := defaultTestConfig(t, durango, activeForkTime)
 				cfg.AddSubnetValidatorFee = 1
@@ -470,7 +470,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 					gomock.Any(),
 					gomock.Any(),
 					gomock.Any(),
-				).Return(nil)
+				).Return(uint64(0), nil)
 
 				cfg := defaultTestConfig(t, durango, activeForkTime)
 				cfg.AddSubnetValidatorFee = 1
@@ -517,7 +517,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				tx         = tt.txF()
 			)
 
-			err := verifyAddPermissionlessValidatorTx(backend, feeManager, fees.Empty, state, sTx, tx)
+			_, err := verifyAddPermissionlessValidatorTx(backend, feeManager, fees.Empty, state, sTx, tx)
 			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}

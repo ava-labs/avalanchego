@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
+	"github.com/ava-labs/avalanchego/vms/components/fees"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 )
@@ -49,8 +50,8 @@ type testTxVerifier struct {
 	err error
 }
 
-func (t testTxVerifier) VerifyTx(*txs.Tx) error {
-	return t.err
+func (t testTxVerifier) VerifyTx(*txs.Tx) (fees.TipPercentage, error) {
+	return fees.NoTip, t.err
 }
 
 func TestNetworkIssueTxFromRPC(t *testing.T) {

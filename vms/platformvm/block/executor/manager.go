@@ -42,7 +42,7 @@ type Manager interface {
 
 	// VerifyTx verifies that the transaction can be issued based on the currently
 	// preferred state. This should *not* be used to verify transactions in a block.
-	VerifyTx(tx *txs.Tx) error
+	VerifyTx(tx *txs.Tx) (fees.TipPercentage, error)
 
 	// VerifyUniqueInputs verifies that the inputs are not duplicated in the
 	// provided blk or any of its ancestors pinned in memory.
@@ -125,14 +125,14 @@ func (m *manager) Preferred() ids.ID {
 	return m.preferred
 }
 
-func (m *manager) VerifyTx(tx *txs.Tx) error {
+func (m *manager) VerifyTx(tx *txs.Tx) (fees.TipPercentage, error) {
 	if !m.txExecutorBackend.Bootstrapped.Get() {
-		return ErrChainNotSynced
+		return fees.NoTip, ErrChainNotSynced
 	}
 
 	stateDiff, err := state.NewDiff(m.preferred, m)
 	if err != nil {
-		return err
+		return fees.NoTip, err
 	}
 
 	// retrieve parent block time before moving time forward
@@ -140,21 +140,21 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 
 	nextBlkTime, _, err := executor.NextBlockTime(stateDiff, m.txExecutorBackend.Clk)
 	if err != nil {
-		return err
+		return fees.NoTip, err
 	}
 
 	_, err = executor.AdvanceTimeTo(m.txExecutorBackend, stateDiff, nextBlkTime)
 	if err != nil {
-		return err
+		return fees.NoTip, err
 	}
 
 	feeRates, err := stateDiff.GetFeeRates()
 	if err != nil {
-		return err
+		return fees.NoTip, err
 	}
-	parentBlkComplexitty, err := stateDiff.GetLastBlockComplexity()
+	parentBlkComplexity, err := stateDiff.GetLastBlockComplexity()
 	if err != nil {
-		return err
+		return fees.NoTip, err
 	}
 
 	var (
@@ -166,21 +166,23 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 	if isEActivated {
 		if err := feeManager.UpdateFeeRates(
 			feesCfg,
-			parentBlkComplexitty,
+			parentBlkComplexity,
 			parentBlkTime.Unix(),
 			nextBlkTime.Unix(),
 		); err != nil {
-			return fmt.Errorf("failed updating fee rates, %w", err)
+			return fees.NoTip, fmt.Errorf("failed updating fee rates, %w", err)
 		}
 	}
 
-	return tx.Unsigned.Visit(&executor.StandardTxExecutor{
+	standardExecutor := &executor.StandardTxExecutor{
 		Backend:            m.txExecutorBackend,
 		BlkFeeManager:      feeManager,
 		BlockMaxComplexity: feesCfg.BlockMaxComplexity,
 		State:              stateDiff,
 		Tx:                 tx,
-	})
+	}
+	err = tx.Unsigned.Visit(standardExecutor)
+	return standardExecutor.TipPercentage, err
 }
 
 func (m *manager) VerifyUniqueInputs(blkID ids.ID, inputs set.Set[ids.ID]) error {

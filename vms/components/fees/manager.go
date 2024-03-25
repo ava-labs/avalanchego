@@ -53,7 +53,7 @@ func (m *Manager) CalculateFee(complexity Dimensions, tipPercentage TipPercentag
 
 		tipAddend, err := safemath.Mul64(baseFee, uint64(tipPercentage))
 		if err != nil {
-			tipAddend, err = safemath.Mul64(baseFee/uint64(maxTipPercentage), uint64(tipPercentage))
+			tipAddend, err = safemath.Mul64(baseFee/uint64(MaxTipPercentage), uint64(tipPercentage))
 			if err != nil {
 				return 0, err
 			}
@@ -62,7 +62,7 @@ func (m *Manager) CalculateFee(complexity Dimensions, tipPercentage TipPercentag
 				return 0, err
 			}
 		} else {
-			tip, err = safemath.Add64(tip, tipAddend/maxTipPercentage)
+			tip, err = safemath.Add64(tip, tipAddend/MaxTipPercentage)
 			if err != nil {
 				return 0, err
 			}

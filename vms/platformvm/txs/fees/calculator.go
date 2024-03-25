@@ -37,7 +37,10 @@ type Calculator struct {
 	// Post E-fork inputs
 	FeeManager         *fees.Manager
 	BlockMaxComplexity fees.Dimensions
-	TipPercentage      fees.TipPercentage
+
+	// TipPercentage can either be an input (e.g. when building a transaction)
+	// or an output (once a transaction is verified)
+	TipPercentage fees.TipPercentage
 
 	// common inputs
 	Credentials []verify.Verifiable
@@ -343,4 +346,24 @@ func (fc *Calculator) RemoveFeesFor(unitsToRm fees.Dimensions, tipPercentage fee
 
 	fc.Fee -= fee
 	return fee, nil
+}
+
+// CalculateTipPercentage calculates and sets the tip percentage, given the fees actually paid
+// and the fees required to accept the target transaction.
+// [CalculateTipPercentage] requires that fc.Visit has been called for the target transaction.
+func (fc *Calculator) CalculateTipPercentage(feesPaid uint64) error {
+	if feesPaid < fc.Fee {
+		return fmt.Errorf("fees paid are less the required fees: fees paid %v, fees required %v",
+			feesPaid,
+			fc.Fee,
+		)
+	}
+
+	if fc.Fee == 0 {
+		return nil
+	}
+
+	tip := feesPaid - fc.Fee
+	fc.TipPercentage = fees.TipPercentage(tip * fees.MaxTipPercentage / fc.Fee)
+	return fc.TipPercentage.Validate()
 }

@@ -15,6 +15,7 @@ import (
 	ids "github.com/ava-labs/avalanchego/ids"
 	snowman "github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	set "github.com/ava-labs/avalanchego/utils/set"
+	fees "github.com/ava-labs/avalanchego/vms/components/fees"
 	block "github.com/ava-labs/avalanchego/vms/platformvm/block"
 	state "github.com/ava-labs/avalanchego/vms/platformvm/state"
 	txs "github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -146,11 +147,12 @@ func (mr *MockManagerMockRecorder) SetPreference(blkID any) *gomock.Call {
 }
 
 // VerifyTx mocks base method.
-func (m *MockManager) VerifyTx(tx *txs.Tx) error {
+func (m *MockManager) VerifyTx(tx *txs.Tx) (fees.TipPercentage, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "VerifyTx", tx)
-	ret0, _ := ret[0].(error)
-	return ret0
+	ret0, _ := ret[0].(fees.TipPercentage)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // VerifyTx indicates an expected call of VerifyTx.
