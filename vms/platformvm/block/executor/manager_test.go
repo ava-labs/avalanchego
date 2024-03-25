@@ -77,7 +77,9 @@ func TestManagerSetPreference(t *testing.T) {
 
 	initialPreference := ids.GenerateTestID()
 	manager := &manager{
-		preferred: initialPreference,
+		backend: &backend{
+			preferred: initialPreference,
+		},
 	}
 	require.False(manager.SetPreference(initialPreference))
 

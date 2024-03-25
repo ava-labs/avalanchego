@@ -60,6 +60,7 @@ func NewManager(
 	backend := &backend{
 		Mempool:      mempool,
 		lastAccepted: lastAccepted,
+		preferred:    lastAccepted,
 		state:        s,
 		ctx:          txExecutorBackend.Ctx,
 		blkIDToState: map[ids.ID]*blockState{},
@@ -81,7 +82,6 @@ func NewManager(
 			backend:         backend,
 			addTxsToMempool: !txExecutorBackend.Config.PartialSyncPrimaryNetwork,
 		},
-		preferred:         lastAccepted,
 		txExecutorBackend: txExecutorBackend,
 	}
 }
@@ -92,7 +92,6 @@ type manager struct {
 	acceptor block.Visitor
 	rejector block.Visitor
 
-	preferred         ids.ID
 	txExecutorBackend *executor.Backend
 }
 
@@ -115,22 +114,12 @@ func (m *manager) NewBlock(blk block.Block) snowman.Block {
 	}
 }
 
-func (m *manager) SetPreference(blkID ids.ID) bool {
-	updated := m.preferred != blkID
-	m.preferred = blkID
-	return updated
-}
-
-func (m *manager) Preferred() ids.ID {
-	return m.preferred
-}
-
 func (m *manager) VerifyTx(tx *txs.Tx) (fees.TipPercentage, error) {
 	if !m.txExecutorBackend.Bootstrapped.Get() {
 		return fees.NoTip, ErrChainNotSynced
 	}
 
-	stateDiff, err := state.NewDiff(m.preferred, m)
+	stateDiff, err := state.NewDiff(m.Preferred(), m)
 	if err != nil {
 		return fees.NoTip, err
 	}

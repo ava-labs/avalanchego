@@ -43,6 +43,11 @@ var (
 	errCalculatingNextStakerTime = errors.New("failed calculating next staker time")
 )
 
+type TxAndTipPercentage struct {
+	Tx            *txs.Tx
+	TipPercentage commonfees.TipPercentage
+}
+
 type Builder interface {
 	mempool.Mempool
 
@@ -68,7 +73,7 @@ type Builder interface {
 	// preferred state.
 	//
 	// Note: This function does not call the consensus engine.
-	PackBlockTxs(targetBlockSize int) ([]*txs.Tx, error)
+	PackBlockTxs(targetBlockSize int) ([]TxAndTipPercentage, error)
 }
 
 // builder implements a simple builder to convert txs into valid blocks
@@ -238,7 +243,7 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 	return b.blkManager.NewBlock(statelessBlk), nil
 }
 
-func (b *builder) PackBlockTxs(targetBlockSize int) ([]*txs.Tx, error) {
+func (b *builder) PackBlockTxs(targetBlockSize int) ([]TxAndTipPercentage, error) {
 	preferredID := b.blkManager.Preferred()
 	preferredState, ok := b.blkManager.GetState(preferredID)
 	if !ok {
@@ -278,6 +283,11 @@ func buildBlock(
 		return nil, fmt.Errorf("failed to pack block txs: %w", err)
 	}
 
+	txs := make([]*txs.Tx, 0, len(blockTxs))
+	for _, v := range blockTxs {
+		txs = append(txs, v.Tx)
+	}
+
 	// Try rewarding stakers whose staking period ends at the new chain time.
 	// This is done first to prioritize advancing the timestamp as quickly as
 	// possible.
@@ -296,12 +306,12 @@ func buildBlock(
 			parentID,
 			height,
 			rewardValidatorTx,
-			blockTxs,
+			txs,
 		)
 	}
 
 	// If there is no reason to build a block, don't.
-	if len(blockTxs) == 0 && !forceAdvanceTime {
+	if len(txs) == 0 && !forceAdvanceTime {
 		builder.txExecutorBackend.Ctx.Log.Debug("no pending txs to issue into a block")
 		return nil, ErrNoPendingBlocks
 	}
@@ -311,7 +321,7 @@ func buildBlock(
 		timestamp,
 		parentID,
 		height,
-		blockTxs,
+		txs,
 	)
 }
 
@@ -323,7 +333,7 @@ func packBlockTxs(
 	manager blockexecutor.Manager,
 	timestamp time.Time,
 	remainingSize int,
-) ([]*txs.Tx, error) {
+) ([]TxAndTipPercentage, error) {
 	// retrieve parent block time before moving time forward
 	parentBlkTime := parentState.GetTimestamp()
 
@@ -349,7 +359,7 @@ func packBlockTxs(
 		isEActivated = backend.Config.IsEActivated(timestamp)
 		feeCfg       = config.GetDynamicFeesConfig(isEActivated)
 
-		blockTxs []*txs.Tx
+		blockTxs []TxAndTipPercentage
 		inputs   set.Set[ids.ID]
 	)
 
@@ -426,7 +436,10 @@ func packBlockTxs(
 		if !isEActivated {
 			remainingSize -= txSize
 		}
-		blockTxs = append(blockTxs, tx)
+		blockTxs = append(blockTxs, TxAndTipPercentage{
+			Tx:            tx,
+			TipPercentage: executor.TipPercentage,
+		})
 	}
 
 	return blockTxs, nil

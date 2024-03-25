@@ -279,11 +279,12 @@ func (vm *VM) pruneMempool() error {
 		return err
 	}
 
-	for _, tx := range blockTxs {
-		if err := vm.Builder.Add(tx); err != nil {
+	for _, v := range blockTxs {
+		// TODO ABENEGIA: make PackBlockTxs return tipPercentage too!
+		if err := vm.Builder.Add(v.Tx, v.TipPercentage); err != nil {
 			vm.ctx.Log.Debug(
 				"failed to reissue tx",
-				zap.Stringer("txID", tx.ID()),
+				zap.Stringer("txID", v.Tx.ID()),
 				zap.Error(err),
 			)
 		}

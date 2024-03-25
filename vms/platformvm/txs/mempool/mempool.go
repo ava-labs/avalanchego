@@ -18,6 +18,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/setmap"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 const (
@@ -44,7 +46,7 @@ var (
 )
 
 type Mempool interface {
-	Add(tx *txs.Tx) error
+	Add(tx *txs.Tx, tipPercentage commonfees.TipPercentage) error
 	Get(txID ids.ID) (*txs.Tx, bool)
 	// Remove [txs] and any conflicts of [txs] from the mempool.
 	Remove(txs ...*txs.Tx)
@@ -118,7 +120,7 @@ func New(
 	return m, err
 }
 
-func (m *mempool) Add(tx *txs.Tx) error {
+func (m *mempool) Add(tx *txs.Tx, tipPercentage commonfees.TipPercentage) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 

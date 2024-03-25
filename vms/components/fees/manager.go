@@ -114,6 +114,10 @@ func (m *Manager) RemoveComplexity(unitsToRm Dimensions) error {
 	return nil
 }
 
+func (m *Manager) ResetComplexity() {
+	m.cumulatedComplexity = Empty
+}
+
 func (m *Manager) UpdateFeeRates(
 	feesConfig DynamicFeesConfig,
 	parentBlkComplexity Dimensions,

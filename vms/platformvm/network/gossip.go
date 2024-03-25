@@ -104,14 +104,13 @@ func (g *gossipMempool) Add(tx *txs.Tx) error {
 		return reason
 	}
 
-	/*tipPercentage*/
-	_, err := g.txVerifier.VerifyTx(tx)
+	tipPercentage, err := g.txVerifier.VerifyTx(tx)
 	if err != nil {
 		g.Mempool.MarkDropped(txID, err)
 		return err
 	}
 
-	if err := g.Mempool.Add(tx); err != nil {
+	if err := g.Mempool.Add(tx, tipPercentage); err != nil {
 		g.Mempool.MarkDropped(txID, err)
 		return err
 	}
