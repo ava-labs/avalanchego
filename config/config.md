@@ -189,7 +189,7 @@ them into the VM on initialization.
 #### `--chain-config-dir` (string)
 
 Specifies the directory that contains chain configs, as described
-[here](chain-config-flags.md). Defaults to `$HOME/.avalanchego/configs/chains`.
+[here](/nodes/configure/chain-configs/chain-config-flags.md). Defaults to `$HOME/.avalanchego/configs/chains`.
 If this flag is not provided and the default directory does not exist,
 AvalancheGo will not exit since custom configs are optional. However, if the
 flag is set, the specified folder must exist, or AvalancheGo will exit with an
