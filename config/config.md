@@ -217,7 +217,7 @@ The chain configuration is intended to provide optional configuration parameters
 and the VM will use default values if nothing is passed in.
 
 Full reference for all configuration options for some standard chains can be
-found in a separate [chain config flags](chain-config-flags.md) document.
+found in a separate [chain config flags](/nodes/configure/chain-configs/chain-config-flags.md) document.
 
 Full reference for `subnet-evm` upgrade configuration can be found in a separate
 [Customize a Subnet](/build/subnet/upgrade/customize-a-subnet.md) document.
