@@ -46,6 +46,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
 )
 
@@ -422,6 +423,7 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 		[]ids.ShortID{addr0},
 		[]*secp256k1.PrivateKey{key0},
 		addr0,
+		commonfees.NoTip,
 		nil,
 	)
 	require.NoError(err)
@@ -431,6 +433,7 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 		[]ids.ShortID{addr1},
 		[]*secp256k1.PrivateKey{key1},
 		addr1,
+		commonfees.NoTip,
 		nil,
 	)
 	require.NoError(err)
@@ -440,6 +443,7 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 		[]ids.ShortID{addr1},
 		[]*secp256k1.PrivateKey{key1},
 		addr0,
+		commonfees.NoTip,
 		nil,
 	)
 	require.NoError(err)
@@ -1282,6 +1286,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionNotTracked(t
 		[]ids.ShortID{changeAddr},
 		[]*secp256k1.PrivateKey{keys[0], keys[1]},
 		changeAddr,
+		commonfees.NoTip,
 		nil,
 	)
 	require.NoError(err)
@@ -1305,6 +1310,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionNotTracked(t
 		createSubnetTx.ID(),
 		[]*secp256k1.PrivateKey{keys[0], keys[1]},
 		changeAddr,
+		commonfees.NoTip,
 		nil,
 	)
 	require.NoError(err)
@@ -1333,6 +1339,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionNotTracked(t
 		createSubnetTx.ID(),
 		[]*secp256k1.PrivateKey{keys[0], keys[1]},
 		changeAddr,
+		commonfees.NoTip,
 		nil,
 	)
 	require.NoError(err)
@@ -1407,6 +1414,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 		[]ids.ShortID{changeAddr},
 		[]*secp256k1.PrivateKey{keys[0], keys[1]},
 		changeAddr,
+		commonfees.NoTip,
 		nil,
 	)
 	require.NoError(err)
@@ -1430,6 +1438,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 		createSubnetTx.ID(),
 		[]*secp256k1.PrivateKey{keys[0], keys[1]},
 		changeAddr,
+		commonfees.NoTip,
 		nil,
 	)
 	require.NoError(err)
@@ -1450,6 +1459,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 		createSubnetTx.ID(),
 		[]*secp256k1.PrivateKey{keys[0], keys[1]},
 		changeAddr,
+		commonfees.NoTip,
 		nil,
 	)
 	require.NoError(err)
@@ -1515,6 +1525,7 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 		reward.PercentDenominator,
 		keys,
 		addr, // change address
+		commonfees.NoTip,
 		nil,
 	)
 	require.NoError(err)
@@ -1546,6 +1557,7 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 		subnetID,
 		[]*secp256k1.PrivateKey{keys[0], keys[1]},
 		addr,
+		commonfees.NoTip,
 		nil,
 	)
 	require.NoError(err)
@@ -1621,6 +1633,7 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 		reward.PercentDenominator,
 		keys,
 		addr, // change address
+		commonfees.NoTip,
 		nil,
 	)
 	require.NoError(err)
@@ -1791,6 +1804,7 @@ func TestPrimaryNetworkValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 		reward.PercentDenominator,
 		keys,
 		addr, // change address
+		commonfees.NoTip,
 		nil,
 	)
 	require.NoError(err)
@@ -1892,6 +1906,7 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 		subnetID,
 		[]*secp256k1.PrivateKey{keys[0], keys[1]},
 		addr,
+		commonfees.NoTip,
 		nil,
 	)
 	require.NoError(err)
@@ -1966,6 +1981,7 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 		reward.PercentDenominator,
 		keys,
 		addr, // change address
+		commonfees.NoTip,
 		nil,
 	)
 	require.NoError(err)
@@ -2071,6 +2087,7 @@ func TestSubnetValidatorSetAfterPrimaryNetworkValidatorRemoval(t *testing.T) {
 		subnetID,
 		[]*secp256k1.PrivateKey{keys[0], keys[1]},
 		addr,
+		commonfees.NoTip,
 		nil,
 	)
 	require.NoError(err)

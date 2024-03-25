@@ -12,6 +12,8 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
+
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 func TestNewExportTx(t *testing.T) {
@@ -54,6 +56,7 @@ func TestNewExportTx(t *testing.T) {
 				to,
 				tt.sourceKeys,
 				ids.ShortEmpty, // Change address
+				commonfees.NoTip,
 				nil,
 			)
 			require.NoError(err)

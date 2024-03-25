@@ -19,6 +19,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/chain/p/builder"
+
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 var fundedSharedMemoryCalls byte
@@ -117,6 +119,7 @@ func TestNewImportTx(t *testing.T) {
 				to,
 				tt.sourceKeys,
 				ids.ShortEmpty,
+				commonfees.NoTip,
 				nil,
 			)
 			require.ErrorIs(err, tt.expectedErr)

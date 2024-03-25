@@ -48,6 +48,7 @@ type AtomicTxBuilder interface {
 		to ids.ShortID,
 		keys []*secp256k1.PrivateKey,
 		changeAddr ids.ShortID,
+		tipPercentage commonfees.TipPercentage,
 		memo []byte,
 	) (*txs.Tx, error)
 
@@ -62,6 +63,7 @@ type AtomicTxBuilder interface {
 		to ids.ShortID,
 		keys []*secp256k1.PrivateKey,
 		changeAddr ids.ShortID,
+		tipPercentage commonfees.TipPercentage,
 		memo []byte,
 	) (*txs.Tx, error)
 }
@@ -82,6 +84,7 @@ type DecisionTxBuilder interface {
 		chainName string,
 		keys []*secp256k1.PrivateKey,
 		changeAddr ids.ShortID,
+		tipPercentage commonfees.TipPercentage,
 		memo []byte,
 	) (*txs.Tx, error)
 
@@ -94,6 +97,7 @@ type DecisionTxBuilder interface {
 		ownerAddrs []ids.ShortID,
 		keys []*secp256k1.PrivateKey,
 		changeAddr ids.ShortID,
+		tipPercentage commonfees.TipPercentage,
 		memo []byte,
 	) (*txs.Tx, error)
 
@@ -114,6 +118,7 @@ type DecisionTxBuilder interface {
 		uptimeRequirement uint32,
 		keys []*secp256k1.PrivateKey,
 		changeAddr ids.ShortID,
+		tipPercentage commonfees.TipPercentage,
 		memo []byte,
 	) (*txs.Tx, error)
 
@@ -126,6 +131,7 @@ type DecisionTxBuilder interface {
 		owner secp256k1fx.OutputOwners,
 		keys []*secp256k1.PrivateKey,
 		changeAddr ids.ShortID,
+		tipPercentage commonfees.TipPercentage,
 		memo []byte,
 	) (*txs.Tx, error)
 }
@@ -170,6 +176,7 @@ type ProposalTxBuilder interface {
 		shares uint32,
 		keys []*secp256k1.PrivateKey,
 		changeAddr ids.ShortID,
+		tipPercentage commonfees.TipPercentage,
 		memo []byte,
 	) (*txs.Tx, error)
 
@@ -206,6 +213,7 @@ type ProposalTxBuilder interface {
 		rewardAddress ids.ShortID,
 		keys []*secp256k1.PrivateKey,
 		changeAddr ids.ShortID,
+		tipPercentage commonfees.TipPercentage,
 		memo []byte,
 	) (*txs.Tx, error)
 
@@ -224,6 +232,7 @@ type ProposalTxBuilder interface {
 		subnetID ids.ID,
 		keys []*secp256k1.PrivateKey,
 		changeAddr ids.ShortID,
+		tipPercentage commonfees.TipPercentage,
 		memo []byte,
 	) (*txs.Tx, error)
 
@@ -236,6 +245,7 @@ type ProposalTxBuilder interface {
 		subnetID ids.ID,
 		keys []*secp256k1.PrivateKey,
 		changeAddr ids.ShortID,
+		tipPercentage commonfees.TipPercentage,
 		memo []byte,
 	) (*txs.Tx, error)
 
@@ -250,6 +260,7 @@ type ProposalTxBuilder interface {
 		ownerAddrs []ids.ShortID,
 		keys []*secp256k1.PrivateKey,
 		changeAddr ids.ShortID,
+		tipPercentage commonfees.TipPercentage,
 		memo []byte,
 	) (*txs.Tx, error)
 }
@@ -280,10 +291,11 @@ func (b *builder) NewImportTx(
 	to ids.ShortID,
 	keys []*secp256k1.PrivateKey,
 	changeAddr ids.ShortID,
+	tipPercentage commonfees.TipPercentage,
 	memo []byte,
 ) (*txs.Tx, error) {
 	pBuilder, pSigner := b.builders(keys)
-	feeCalc, err := b.feeCalculator()
+	feeCalc, err := b.feeCalculator(tipPercentage)
 	if err != nil {
 		return nil, err
 	}
@@ -318,10 +330,11 @@ func (b *builder) NewExportTx(
 	to ids.ShortID,
 	keys []*secp256k1.PrivateKey,
 	changeAddr ids.ShortID,
+	tipPercentage commonfees.TipPercentage,
 	memo []byte,
 ) (*txs.Tx, error) {
 	pBuilder, pSigner := b.builders(keys)
-	feeCalc, err := b.feeCalculator()
+	feeCalc, err := b.feeCalculator(tipPercentage)
 	if err != nil {
 		return nil, err
 	}
@@ -363,10 +376,11 @@ func (b *builder) NewCreateChainTx(
 	chainName string,
 	keys []*secp256k1.PrivateKey,
 	changeAddr ids.ShortID,
+	tipPercentage commonfees.TipPercentage,
 	memo []byte,
 ) (*txs.Tx, error) {
 	pBuilder, pSigner := b.builders(keys)
-	feeCalc, err := b.feeCalculator()
+	feeCalc, err := b.feeCalculator(tipPercentage)
 	if err != nil {
 		return nil, err
 	}
@@ -396,10 +410,11 @@ func (b *builder) NewCreateSubnetTx(
 	ownerAddrs []ids.ShortID,
 	keys []*secp256k1.PrivateKey,
 	changeAddr ids.ShortID,
+	tipPercentage commonfees.TipPercentage,
 	memo []byte,
 ) (*txs.Tx, error) {
 	pBuilder, pSigner := b.builders(keys)
-	feeCalc, err := b.feeCalculator()
+	feeCalc, err := b.feeCalculator(tipPercentage)
 	if err != nil {
 		return nil, err
 	}
@@ -443,10 +458,11 @@ func (b *builder) NewTransformSubnetTx(
 	uptimeRequirement uint32,
 	keys []*secp256k1.PrivateKey,
 	changeAddr ids.ShortID,
+	tipPercentage commonfees.TipPercentage,
 	memo []byte,
 ) (*txs.Tx, error) {
 	pBuilder, pSigner := b.builders(keys)
-	feeCalc, err := b.feeCalculator()
+	feeCalc, err := b.feeCalculator(tipPercentage)
 	if err != nil {
 		return nil, err
 	}
@@ -492,7 +508,7 @@ func (b *builder) NewAddValidatorTx(
 	memo []byte,
 ) (*txs.Tx, error) {
 	pBuilder, pSigner := b.builders(keys)
-	feeCalc, err := b.feeCalculator()
+	feeCalc, err := b.feeCalculator(commonfees.NoTip)
 	if err != nil {
 		return nil, err
 	}
@@ -537,10 +553,11 @@ func (b *builder) NewAddPermissionlessValidatorTx(
 	shares uint32,
 	keys []*secp256k1.PrivateKey,
 	changeAddr ids.ShortID,
+	tipPercentage commonfees.TipPercentage,
 	memo []byte,
 ) (*txs.Tx, error) {
 	pBuilder, pSigner := b.builders(keys)
-	feeCalc, err := b.feeCalculator()
+	feeCalc, err := b.feeCalculator(tipPercentage)
 	if err != nil {
 		return nil, err
 	}
@@ -592,7 +609,7 @@ func (b *builder) NewAddDelegatorTx(
 	memo []byte,
 ) (*txs.Tx, error) {
 	pBuilder, pSigner := b.builders(keys)
-	feeCalc, err := b.feeCalculator()
+	feeCalc, err := b.feeCalculator(commonfees.NoTip)
 	if err != nil {
 		return nil, err
 	}
@@ -634,10 +651,11 @@ func (b *builder) NewAddPermissionlessDelegatorTx(
 	rewardAddress ids.ShortID,
 	keys []*secp256k1.PrivateKey,
 	changeAddr ids.ShortID,
+	tipPercentage commonfees.TipPercentage,
 	memo []byte,
 ) (*txs.Tx, error) {
 	pBuilder, pSigner := b.builders(keys)
-	feeCalc, err := b.feeCalculator()
+	feeCalc, err := b.feeCalculator(tipPercentage)
 	if err != nil {
 		return nil, err
 	}
@@ -683,10 +701,11 @@ func (b *builder) NewAddSubnetValidatorTx(
 	subnetID ids.ID,
 	keys []*secp256k1.PrivateKey,
 	changeAddr ids.ShortID,
+	tipPercentage commonfees.TipPercentage,
 	memo []byte,
 ) (*txs.Tx, error) {
 	pBuilder, pSigner := b.builders(keys)
-	feeCalc, err := b.feeCalculator()
+	feeCalc, err := b.feeCalculator(tipPercentage)
 	if err != nil {
 		return nil, err
 	}
@@ -722,10 +741,11 @@ func (b *builder) NewRemoveSubnetValidatorTx(
 	subnetID ids.ID,
 	keys []*secp256k1.PrivateKey,
 	changeAddr ids.ShortID,
+	tipPercentage commonfees.TipPercentage,
 	memo []byte,
 ) (*txs.Tx, error) {
 	pBuilder, pSigner := b.builders(keys)
-	feeCalc, err := b.feeCalculator()
+	feeCalc, err := b.feeCalculator(tipPercentage)
 	if err != nil {
 		return nil, err
 	}
@@ -753,10 +773,11 @@ func (b *builder) NewTransferSubnetOwnershipTx(
 	ownerAddrs []ids.ShortID,
 	keys []*secp256k1.PrivateKey,
 	changeAddr ids.ShortID,
+	tipPercentage commonfees.TipPercentage,
 	memo []byte,
 ) (*txs.Tx, error) {
 	pBuilder, pSigner := b.builders(keys)
-	feeCalc, err := b.feeCalculator()
+	feeCalc, err := b.feeCalculator(tipPercentage)
 	if err != nil {
 		return nil, err
 	}
@@ -789,10 +810,11 @@ func (b *builder) NewBaseTx(
 	owner secp256k1fx.OutputOwners,
 	keys []*secp256k1.PrivateKey,
 	changeAddr ids.ShortID,
+	tipPercentage commonfees.TipPercentage,
 	memo []byte,
 ) (*txs.Tx, error) {
 	pBuilder, pSigner := b.builders(keys)
-	feeCalc, err := b.feeCalculator()
+	feeCalc, err := b.feeCalculator(tipPercentage)
 	if err != nil {
 		return nil, err
 	}
@@ -834,7 +856,7 @@ func (b *builder) builders(keys []*secp256k1.PrivateKey) (walletbuilder.Builder,
 	return builder, signer
 }
 
-func (b *builder) feeCalculator() (*fees.Calculator, error) {
+func (b *builder) feeCalculator(tipPercentage commonfees.TipPercentage) (*fees.Calculator, error) {
 	feeRates, err := b.state.GetFeeRates()
 	if err != nil {
 		return nil, err
@@ -851,6 +873,7 @@ func (b *builder) feeCalculator() (*fees.Calculator, error) {
 		Config:             b.cfg,
 		ChainTime:          chainTime,
 		FeeManager:         commonfees.NewManager(feeRates),
+		TipPercentage:      tipPercentage,
 		BlockMaxComplexity: feeCfg.BlockMaxComplexity,
 	}, nil
 }
