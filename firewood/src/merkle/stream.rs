@@ -582,7 +582,7 @@ use super::tests::create_test_merkle;
 #[cfg(test)]
 #[allow(clippy::indexing_slicing, clippy::unwrap_used)]
 mod tests {
-    use crate::{merkle::Bincode, shale::cached::InMemLinearStore};
+    use crate::{merkle::Bincode, shale::in_mem::InMemLinearStore};
 
     use super::*;
     use test_case::test_case;

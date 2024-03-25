@@ -5,9 +5,9 @@ use criterion::{
     black_box, criterion_group, criterion_main, profiler::Profiler, Bencher, Criterion,
 };
 use firewood::shale::{
-    cached::InMemLinearStore,
     compact::{CompactHeader, CompactSpaceHeader},
     disk_address::DiskAddress,
+    in_mem::InMemLinearStore,
     LinearStore, Obj, StoredView,
 };
 use pprof::ProfilerGuard;

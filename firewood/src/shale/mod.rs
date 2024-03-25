@@ -14,9 +14,9 @@ use thiserror::Error;
 
 use crate::merkle::{LeafNode, Node, Path};
 
-pub mod cached;
 pub mod compact;
 pub mod disk_address;
+pub mod in_mem;
 
 #[derive(Debug, Error)]
 #[non_exhaustive]

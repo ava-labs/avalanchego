@@ -710,7 +710,7 @@ impl<T: Storable + Debug + 'static, M: LinearStore> CompactSpace<T, M> {
 mod tests {
     use sha3::Digest;
 
-    use crate::shale::{self, cached::InMemLinearStore};
+    use crate::shale::{self, in_mem::InMemLinearStore};
 
     use super::*;
 

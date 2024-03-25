@@ -6,7 +6,7 @@ use crate::{
         proof::{Proof, ProofError},
         BinarySerde, EncodedNode, Merkle, Ref, RefMut, TrieHash,
     },
-    shale::{self, cached::InMemLinearStore, disk_address::DiskAddress, LinearStore, StoredView},
+    shale::{self, disk_address::DiskAddress, in_mem::InMemLinearStore, LinearStore, StoredView},
 };
 use std::num::NonZeroUsize;
 use thiserror::Error;

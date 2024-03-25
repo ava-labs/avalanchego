@@ -1392,7 +1392,7 @@ impl<'a, T: PartialEq> PrefixOverlap<'a, T> {
 mod tests {
     use super::*;
     use crate::merkle::node::PlainCodec;
-    use shale::cached::InMemLinearStore;
+    use shale::in_mem::InMemLinearStore;
     use test_case::test_case;
 
     fn leaf(path: Vec<u8>, value: Vec<u8>) -> Node {
@@ -1413,7 +1413,7 @@ mod tests {
     {
         const RESERVED: usize = 0x1000;
 
-        let mut dm = shale::cached::InMemLinearStore::new(0x10000, 0);
+        let mut dm = shale::in_mem::InMemLinearStore::new(0x10000, 0);
         let compact_header = DiskAddress::null();
         dm.write(
             compact_header.into(),

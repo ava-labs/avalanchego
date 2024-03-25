@@ -8,9 +8,9 @@ use firewood::{
     db::{BatchOp, DbConfig},
     merkle::{Bincode, Merkle, TrieHash, TRIE_HASH_LEN},
     shale::{
-        cached::InMemLinearStore,
         compact::{CompactHeader, CompactSpace},
         disk_address::DiskAddress,
+        in_mem::InMemLinearStore,
         LinearStore, ObjCache, Storable, StoredView,
     },
     storage::WalConfig,

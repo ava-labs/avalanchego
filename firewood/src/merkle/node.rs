@@ -736,7 +736,7 @@ impl BinarySerde for PlainCodec {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::shale::cached::InMemLinearStore;
+    use crate::shale::in_mem::InMemLinearStore;
     use std::iter::repeat;
     use test_case::{test_case, test_matrix};
 
