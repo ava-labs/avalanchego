@@ -2,6 +2,8 @@ module github.com/ava-labs/avalanchego
 
 // Changes to the minimum golang version must also be replicated in
 // scripts/build_avalanche.sh
+// tests/antithesis/Dockerfile.node
+// tests/antithesis/Dockerfile.workload
 // Dockerfile
 // README.md
 // go.mod (here, only major.minor can be specified)
@@ -81,7 +83,7 @@ require (
 	github.com/cockroachdb/logtags v0.0.0-20230118201751-21c54148d20b // indirect
 	github.com/cockroachdb/redact v1.1.3 // indirect
 	github.com/consensys/bavard v0.1.13 // indirect
-	github.com/consensys/gnark-crypto v0.10.0 // indirect
+	github.com/consensys/gnark-crypto v0.12.1 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.2 // indirect
 	github.com/crate-crypto/go-kzg-4844 v0.3.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
