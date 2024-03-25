@@ -8,7 +8,7 @@ use firewood::shale::{
     cached::InMemLinearStore,
     compact::{CompactHeader, CompactSpaceHeader},
     disk_address::DiskAddress,
-    CachedStore, Obj, StoredView,
+    LinearStore, Obj, StoredView,
 };
 use pprof::ProfilerGuard;
 use rand::Rng;
@@ -57,7 +57,7 @@ impl Profiler for FlamegraphProfiler {
     }
 }
 
-fn get_view<C: CachedStore>(b: &mut Bencher, mut cached: C) {
+fn get_view<C: LinearStore>(b: &mut Bencher, mut cached: C) {
     let mut rng = rand::thread_rng();
 
     b.iter(|| {
@@ -78,7 +78,7 @@ fn get_view<C: CachedStore>(b: &mut Bencher, mut cached: C) {
     });
 }
 
-fn serialize<T: CachedStore>(m: &T) {
+fn serialize<T: LinearStore>(m: &T) {
     let compact_header_obj: DiskAddress = DiskAddress::from(0x0);
     #[allow(clippy::unwrap_used)]
     let _: Obj<CompactSpaceHeader> =

@@ -112,7 +112,7 @@ impl Storable for LeafNode {
         Ok(())
     }
 
-    fn deserialize<T: crate::shale::CachedStore>(
+    fn deserialize<T: crate::shale::LinearStore>(
         offset: usize,
         mem: &T,
     ) -> Result<Self, crate::shale::ShaleError>

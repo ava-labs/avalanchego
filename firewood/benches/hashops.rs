@@ -11,7 +11,7 @@ use firewood::{
         cached::InMemLinearStore,
         compact::{CompactHeader, CompactSpace},
         disk_address::DiskAddress,
-        CachedStore, ObjCache, Storable, StoredView,
+        LinearStore, ObjCache, Storable, StoredView,
     },
     storage::WalConfig,
     v2::api::{Db, Proposal},

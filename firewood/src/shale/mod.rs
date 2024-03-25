@@ -51,8 +51,8 @@ pub struct ObjWriteSizeError;
 pub type SpaceId = u8;
 pub const INVALID_SPACE_ID: SpaceId = 0xff;
 
-/// A handle that pins and provides a readable access to a portion of the linear memory image.
-pub trait CachedView {
+/// A handle that pins and provides a readable access to a portion of a [LinearStore].
+pub trait LinearStoreView {
     type DerefReturn: Deref<Target = [u8]>;
     fn as_deref(&self) -> Self::DerefReturn;
 }
@@ -63,21 +63,24 @@ impl<T: Send + Sync + DerefMut> SendSyncDerefMut for T {}
 
 /// In-memory store that offers access to intervals from a linear byte space, which is usually
 /// backed by a cached/memory-mapped pool of the accessed intervals from the underlying linear
-/// persistent store. Reads could trigger disk reads to bring data into memory, but writes will
-/// *only* be visible in memory (it does not write back to the disk).
-pub trait CachedStore: Debug + Send + Sync {
-    /// Returns a handle that pins the `length` of bytes starting from `offset` and makes them
-    /// directly accessible.
+/// persistent store. Reads may trigger disk reads to bring data into memory, but writes will
+/// *only* be visible in memory -- they do not write to disk.
+pub trait LinearStore: Debug + Send + Sync {
+    /// Returns a view containing `length` bytes starting from `offset` from this
+    /// store. The returned view is pinned.
     fn get_view(
         &self,
         offset: usize,
         length: u64,
-    ) -> Option<Box<dyn CachedView<DerefReturn = Vec<u8>>>>;
-    /// Returns a handle that allows shared access to the store.
-    fn get_shared(&self) -> Box<dyn SendSyncDerefMut<Target = dyn CachedStore>>;
-    /// Write the `change` to the portion of the linear space starting at `offset`. The change
-    /// should be immediately visible to all `CachedView` associated to this linear space.
+    ) -> Option<Box<dyn LinearStoreView<DerefReturn = Vec<u8>>>>;
+
+    /// Returns a handle that allows shared access to this store.
+    fn get_shared(&self) -> Box<dyn SendSyncDerefMut<Target = dyn LinearStore>>;
+
+    /// Write the `change` to the linear space starting at `offset`. The change should
+    /// be immediately visible to all `LinearStoreView` associated with this linear space.
     fn write(&mut self, offset: usize, change: &[u8]) -> Result<(), ShaleError>;
+
     /// Returns the identifier of this storage space.
     fn id(&self) -> SpaceId;
 
@@ -135,7 +138,7 @@ impl<T: Storable> Obj<T> {
             #[allow(clippy::unwrap_used)]
             self.value.serialize(&mut new_value).unwrap();
             let offset = self.value.get_offset();
-            let bx: &mut dyn CachedStore = self.value.get_mut_mem_store();
+            let bx: &mut dyn LinearStore = self.value.get_mut_mem_store();
             bx.write(offset, &new_value).expect("write should succeed");
         }
     }
@@ -248,7 +251,7 @@ impl<'a, T: Storable> Drop for ObjRef<'a, T> {
 pub trait Storable {
     fn serialized_len(&self) -> u64;
     fn serialize(&self, to: &mut [u8]) -> Result<(), ShaleError>;
-    fn deserialize<T: CachedStore>(addr: usize, mem: &T) -> Result<Self, ShaleError>
+    fn deserialize<T: LinearStore>(addr: usize, mem: &T) -> Result<Self, ShaleError>
     where
         Self: Sized;
 }
@@ -263,7 +266,7 @@ pub fn to_dehydrated(item: &dyn Storable) -> Result<Vec<u8>, ShaleError> {
 pub struct StoredView<T> {
     /// The item this stores.
     item: T,
-    mem: Box<dyn SendSyncDerefMut<Target = dyn CachedStore>>,
+    mem: Box<dyn SendSyncDerefMut<Target = dyn LinearStore>>,
     offset: usize,
     /// If the serialized length of `item` is greater than this,
     /// `serialized_len` will return `None`.
@@ -298,11 +301,11 @@ impl<T: Storable> StoredView<T> {
         self.offset
     }
 
-    fn get_mem_store(&self) -> &dyn CachedStore {
+    fn get_mem_store(&self) -> &dyn LinearStore {
         &**self.mem
     }
 
-    fn get_mut_mem_store(&mut self) -> &mut dyn CachedStore {
+    fn get_mut_mem_store(&mut self) -> &mut dyn LinearStore {
         &mut **self.mem
     }
 
@@ -327,7 +330,7 @@ impl<T: Storable> StoredView<T> {
 
 impl<T: Storable + 'static> StoredView<T> {
     #[inline(always)]
-    fn new<U: CachedStore>(offset: usize, len_limit: u64, space: &U) -> Result<Self, ShaleError> {
+    fn new<U: LinearStore>(offset: usize, len_limit: u64, space: &U) -> Result<Self, ShaleError> {
         let item = T::deserialize(offset, space)?;
 
         Ok(Self {
@@ -343,7 +346,7 @@ impl<T: Storable + 'static> StoredView<T> {
         offset: usize,
         len_limit: u64,
         item: T,
-        space: &dyn CachedStore,
+        space: &dyn LinearStore,
     ) -> Result<Self, ShaleError> {
         Ok(Self {
             offset,
@@ -354,7 +357,7 @@ impl<T: Storable + 'static> StoredView<T> {
     }
 
     #[inline(always)]
-    pub fn ptr_to_obj<U: CachedStore>(
+    pub fn ptr_to_obj<U: LinearStore>(
         store: &U,
         ptr: DiskAddress,
         len_limit: u64,
@@ -368,7 +371,7 @@ impl<T: Storable + 'static> StoredView<T> {
 
     #[inline(always)]
     pub fn item_to_obj(
-        store: &dyn CachedStore,
+        store: &dyn LinearStore,
         addr: usize,
         len_limit: u64,
         item: T,
@@ -384,7 +387,7 @@ impl<T: Storable> StoredView<T> {
         offset: usize,
         len_limit: u64,
         item: T,
-        space: &dyn CachedStore,
+        space: &dyn LinearStore,
     ) -> Result<Self, ShaleError> {
         Ok(Self {
             offset,

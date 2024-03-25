@@ -4,7 +4,7 @@
 // TODO: try to get rid of the use `RefCell` in this file
 use self::buffer::DiskBufferRequester;
 use crate::file::File;
-use crate::shale::{self, CachedStore, CachedView, SendSyncDerefMut, ShaleError, SpaceId};
+use crate::shale::{self, LinearStore, LinearStoreView, SendSyncDerefMut, ShaleError, SpaceId};
 use nix::fcntl::{Flock, FlockArg};
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
@@ -335,17 +335,17 @@ impl StoreRevShared {
     }
 }
 
-impl CachedStore for StoreRevShared {
+impl LinearStore for StoreRevShared {
     fn get_view(
         &self,
         offset: usize,
         length: u64,
-    ) -> Option<Box<dyn CachedView<DerefReturn = Vec<u8>>>> {
+    ) -> Option<Box<dyn LinearStoreView<DerefReturn = Vec<u8>>>> {
         let data = self.0.get_slice(offset as u64, length)?;
         Some(Box::new(StoreRef { data }))
     }
 
-    fn get_shared(&self) -> Box<dyn SendSyncDerefMut<Target = dyn CachedStore>> {
+    fn get_shared(&self) -> Box<dyn SendSyncDerefMut<Target = dyn LinearStore>> {
         Box::new(StoreShared(self.clone()))
     }
 
@@ -394,7 +394,7 @@ impl Deref for StoreRef {
     }
 }
 
-impl CachedView for StoreRef {
+impl LinearStoreView for StoreRef {
     type DerefReturn = Vec<u8>;
 
     fn as_deref(&self) -> Self::DerefReturn {
@@ -402,16 +402,16 @@ impl CachedView for StoreRef {
     }
 }
 
-struct StoreShared<S: Clone + CachedStore>(S);
+struct StoreShared<S: Clone + LinearStore>(S);
 
-impl<S: Clone + CachedStore + 'static> Deref for StoreShared<S> {
-    type Target = dyn CachedStore;
-    fn deref(&self) -> &(dyn CachedStore + 'static) {
+impl<S: Clone + LinearStore + 'static> Deref for StoreShared<S> {
+    type Target = dyn LinearStore;
+    fn deref(&self) -> &(dyn LinearStore + 'static) {
         &self.0
     }
 }
 
-impl<S: Clone + CachedStore + 'static> DerefMut for StoreShared<S> {
+impl<S: Clone + LinearStore + 'static> DerefMut for StoreShared<S> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
@@ -505,12 +505,12 @@ impl StoreRevMut {
     }
 }
 
-impl CachedStore for StoreRevMut {
+impl LinearStore for StoreRevMut {
     fn get_view(
         &self,
         offset: usize,
         length: u64,
-    ) -> Option<Box<dyn CachedView<DerefReturn = Vec<u8>>>> {
+    ) -> Option<Box<dyn LinearStoreView<DerefReturn = Vec<u8>>>> {
         let data = if length == 0 {
             Vec::new()
         } else {
@@ -572,7 +572,7 @@ impl CachedStore for StoreRevMut {
         Some(Box::new(StoreRef { data }))
     }
 
-    fn get_shared(&self) -> Box<dyn SendSyncDerefMut<Target = dyn CachedStore>> {
+    fn get_shared(&self) -> Box<dyn SendSyncDerefMut<Target = dyn LinearStore>> {
         Box::new(StoreShared(self.clone()))
     }
 

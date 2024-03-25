@@ -1,7 +1,7 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-use crate::shale::{CachedStore, ShaleError, Storable};
+use crate::shale::{LinearStore, ShaleError, Storable};
 use std::{
     fmt::{self, Debug},
     io::Write,
@@ -21,7 +21,7 @@ impl std::ops::Deref for TrieHash {
 }
 
 impl Storable for TrieHash {
-    fn deserialize<T: CachedStore>(addr: usize, mem: &T) -> Result<Self, ShaleError> {
+    fn deserialize<T: LinearStore>(addr: usize, mem: &T) -> Result<Self, ShaleError> {
         let raw = mem
             .get_view(addr, U64_TRIE_HASH_LEN)
             .ok_or(ShaleError::InvalidCacheView {

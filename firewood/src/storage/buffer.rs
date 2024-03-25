@@ -640,7 +640,7 @@ mod tests {
     use sha3::Digest;
 
     use super::*;
-    use crate::shale::CachedStore;
+    use crate::shale::LinearStore;
     use crate::{
         file,
         storage::{

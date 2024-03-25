@@ -4,7 +4,7 @@
 use super::{BranchNode, Key, Merkle, MerkleError, NodeObjRef, NodeType, Value};
 use crate::{
     nibbles::{Nibbles, NibblesIterator},
-    shale::{CachedStore, DiskAddress},
+    shale::{DiskAddress, LinearStore},
     v2::api,
 };
 use futures::{stream::FusedStream, Stream, StreamExt};
@@ -73,7 +73,7 @@ pub struct MerkleNodeStream<'a, S, T> {
     merkle: &'a Merkle<S, T>,
 }
 
-impl<'a, S: CachedStore, T> FusedStream for MerkleNodeStream<'a, S, T> {
+impl<'a, S: LinearStore, T> FusedStream for MerkleNodeStream<'a, S, T> {
     fn is_terminated(&self) -> bool {
         // The top of `iter_stack` is the next node to return.
         // If `iter_stack` is empty, there are no more nodes to visit.
@@ -93,7 +93,7 @@ impl<'a, S, T> MerkleNodeStream<'a, S, T> {
     }
 }
 
-impl<'a, S: CachedStore, T> Stream for MerkleNodeStream<'a, S, T> {
+impl<'a, S: LinearStore, T> Stream for MerkleNodeStream<'a, S, T> {
     type Item = Result<(Key, NodeObjRef<'a>), api::Error>;
 
     fn poll_next(
@@ -178,7 +178,7 @@ impl<'a, S: CachedStore, T> Stream for MerkleNodeStream<'a, S, T> {
 
 /// Returns the initial state for an iterator over the given `merkle` with root `root_node`
 /// which starts at `key`.
-fn get_iterator_intial_state<'a, S: CachedStore, T>(
+fn get_iterator_intial_state<'a, S: LinearStore, T>(
     merkle: &'a Merkle<S, T>,
     root_node: DiskAddress,
     key: &[u8],
@@ -321,7 +321,7 @@ pub struct MerkleKeyValueStream<'a, S, T> {
     merkle: &'a Merkle<S, T>,
 }
 
-impl<'a, S: CachedStore, T> FusedStream for MerkleKeyValueStream<'a, S, T> {
+impl<'a, S: LinearStore, T> FusedStream for MerkleKeyValueStream<'a, S, T> {
     fn is_terminated(&self) -> bool {
         matches!(&self.state, MerkleKeyValueStreamState::Initialized { node_iter } if node_iter.is_terminated())
     }
@@ -345,7 +345,7 @@ impl<'a, S, T> MerkleKeyValueStream<'a, S, T> {
     }
 }
 
-impl<'a, S: CachedStore, T> Stream for MerkleKeyValueStream<'a, S, T> {
+impl<'a, S: LinearStore, T> Stream for MerkleKeyValueStream<'a, S, T> {
     type Item = Result<(Key, Value), api::Error>;
 
     fn poll_next(
@@ -426,7 +426,7 @@ pub struct PathIterator<'a, 'b, S, T> {
     merkle: &'a Merkle<S, T>,
 }
 
-impl<'a, 'b, S: CachedStore, T> PathIterator<'a, 'b, S, T> {
+impl<'a, 'b, S: LinearStore, T> PathIterator<'a, 'b, S, T> {
     pub(super) fn new(
         merkle: &'a Merkle<S, T>,
         sentinel_node: NodeObjRef<'a>,
@@ -456,7 +456,7 @@ impl<'a, 'b, S: CachedStore, T> PathIterator<'a, 'b, S, T> {
     }
 }
 
-impl<'a, 'b, S: CachedStore, T> Iterator for PathIterator<'a, 'b, S, T> {
+impl<'a, 'b, S: LinearStore, T> Iterator for PathIterator<'a, 'b, S, T> {
     type Item = Result<(Key, NodeObjRef<'a>), MerkleError>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -587,7 +587,7 @@ mod tests {
     use super::*;
     use test_case::test_case;
 
-    impl<S: CachedStore, T> Merkle<S, T> {
+    impl<S: LinearStore, T> Merkle<S, T> {
         pub(crate) fn node_iter(&self, root: DiskAddress) -> MerkleNodeStream<'_, S, T> {
             MerkleNodeStream::new(self, root, Box::new([]))
         }

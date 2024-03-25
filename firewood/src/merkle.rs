@@ -2,7 +2,7 @@
 // See the file LICENSE.md for licensing terms.
 use crate::nibbles::Nibbles;
 use crate::shale::compact::CompactSpace;
-use crate::shale::CachedStore;
+use crate::shale::LinearStore;
 use crate::shale::{self, disk_address::DiskAddress, ObjWriteSizeError, ShaleError};
 use crate::storage::{StoreRevMut, StoreRevShared};
 use crate::v2::api;
@@ -81,7 +81,7 @@ impl<T> From<Merkle<StoreRevMut, T>> for Merkle<StoreRevShared, T> {
     }
 }
 
-impl<S: CachedStore, T> Merkle<S, T> {
+impl<S: LinearStore, T> Merkle<S, T> {
     pub fn get_node(&self, ptr: DiskAddress) -> Result<NodeObjRef, MerkleError> {
         self.store.get_item(ptr).map_err(Into::into)
     }
@@ -97,7 +97,7 @@ impl<S: CachedStore, T> Merkle<S, T> {
 
 impl<'de, S, T> Merkle<S, T>
 where
-    S: CachedStore,
+    S: LinearStore,
     T: BinarySerde,
     EncodedNode<T>: serde::Serialize + serde::Deserialize<'de>,
 {
@@ -178,7 +178,7 @@ where
     }
 }
 
-impl<S: CachedStore, T> Merkle<S, T> {
+impl<S: LinearStore, T> Merkle<S, T> {
     pub fn init_root(&self) -> Result<DiskAddress, MerkleError> {
         self.store
             .put_item(
@@ -1299,7 +1299,7 @@ impl<'a, S, T> RefMut<'a, S, T> {
     }
 }
 
-impl<'a, S: CachedStore, T> RefMut<'a, S, T> {
+impl<'a, S: LinearStore, T> RefMut<'a, S, T> {
     #[allow(clippy::unwrap_used)]
     pub fn get(&self) -> Ref {
         Ref(self.merkle.get_node(self.ptr).unwrap())

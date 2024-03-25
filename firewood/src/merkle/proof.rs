@@ -5,7 +5,7 @@ use std::cmp::Ordering;
 use std::collections::HashMap;
 
 use crate::shale::{disk_address::DiskAddress, ShaleError};
-use crate::shale::{CachedStore, ObjWriteSizeError};
+use crate::shale::{LinearStore, ObjWriteSizeError};
 use crate::v2::api::HashKey;
 use aiofut::AioError;
 use nix::errno::Errno;
@@ -708,7 +708,7 @@ where
 //     keep the entire branch and return.
 //   - the fork point is a shortnode, the shortnode is excluded in the range,
 //     unset the entire branch.
-fn unset_node_ref<K: AsRef<[u8]>, S: CachedStore, T: BinarySerde>(
+fn unset_node_ref<K: AsRef<[u8]>, S: LinearStore, T: BinarySerde>(
     merkle: &Merkle<S, T>,
     parent: DiskAddress,
     node: Option<DiskAddress>,

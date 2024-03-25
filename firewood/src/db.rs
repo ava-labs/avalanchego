@@ -22,7 +22,7 @@ use crate::{
 use crate::{
     merkle,
     shale::{
-        self, compact::CompactSpaceHeader, disk_address::DiskAddress, CachedStore, Obj, ShaleError,
+        self, compact::CompactSpaceHeader, disk_address::DiskAddress, LinearStore, Obj, ShaleError,
         SpaceId, Storable, StoredView,
     },
 };
@@ -205,7 +205,7 @@ impl DbHeader {
 }
 
 impl Storable for DbHeader {
-    fn deserialize<T: CachedStore>(addr: usize, mem: &T) -> Result<Self, shale::ShaleError> {
+    fn deserialize<T: LinearStore>(addr: usize, mem: &T) -> Result<Self, shale::ShaleError> {
         let root_bytes = mem
             .get_view(addr, Self::MSIZE)
             .ok_or(ShaleError::InvalidCacheView {
@@ -285,7 +285,7 @@ pub struct DbRev<T> {
 }
 
 #[async_trait]
-impl<T: CachedStore> api::DbView for DbRev<T> {
+impl<T: LinearStore> api::DbView for DbRev<T> {
     type Stream<'a> = MerkleKeyValueStream<'a, T, Bincode> where Self: 'a;
 
     async fn root_hash(&self) -> Result<api::HashKey, api::Error> {
@@ -338,7 +338,7 @@ impl<T: CachedStore> api::DbView for DbRev<T> {
     }
 }
 
-impl<T: CachedStore> DbRev<T> {
+impl<T: LinearStore> DbRev<T> {
     pub fn stream(&self) -> merkle::MerkleKeyValueStream<'_, T, Bincode> {
         self.merkle.key_value_iter(self.header.kv_root)
     }
@@ -749,7 +749,7 @@ impl Db {
         Ok((store, rev))
     }
 
-    fn get_payload_header_ref<K: CachedStore>(
+    fn get_payload_header_ref<K: LinearStore>(
         meta_ref: &K,
         header_offset: u64,
     ) -> Result<Obj<CompactSpaceHeader>, DbError> {
@@ -762,12 +762,12 @@ impl Db {
         .map_err(Into::into)
     }
 
-    fn get_db_header_ref<K: CachedStore>(meta_ref: &K) -> Result<Obj<DbHeader>, DbError> {
+    fn get_db_header_ref<K: LinearStore>(meta_ref: &K) -> Result<Obj<DbHeader>, DbError> {
         let db_header = DiskAddress::from(Db::PARAM_SIZE as usize);
         StoredView::ptr_to_obj(meta_ref, db_header, DbHeader::MSIZE).map_err(Into::into)
     }
 
-    fn new_revision<K: CachedStore, T: Into<K>>(
+    fn new_revision<K: LinearStore, T: Into<K>>(
         header_refs: (Obj<DbHeader>, Obj<CompactSpaceHeader>),
         merkle: (T, T),
         payload_regn_nbit: u64,

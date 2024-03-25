@@ -5,7 +5,7 @@ use super::Node;
 use crate::{
     merkle::{nibbles_to_bytes_iter, to_nibble_array, Path},
     nibbles::Nibbles,
-    shale::{compact::CompactSpace, CachedStore, DiskAddress, ShaleError, Storable},
+    shale::{compact::CompactSpace, DiskAddress, LinearStore, ShaleError, Storable},
 };
 use bincode::{Error, Options};
 use serde::de::Error as DeError;
@@ -111,7 +111,7 @@ impl BranchNode {
         })
     }
 
-    pub(super) fn encode<S: CachedStore>(&self, store: &CompactSpace<Node, S>) -> Vec<u8> {
+    pub(super) fn encode<S: LinearStore>(&self, store: &CompactSpace<Node, S>) -> Vec<u8> {
         // path + children + value
         let mut list = <[Vec<u8>; Self::MSIZE]>::default();
 
@@ -219,7 +219,7 @@ impl Storable for BranchNode {
         Ok(())
     }
 
-    fn deserialize<T: crate::shale::CachedStore>(
+    fn deserialize<T: crate::shale::LinearStore>(
         mut addr: usize,
         mem: &T,
     ) -> Result<Self, crate::shale::ShaleError> {

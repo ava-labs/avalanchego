@@ -8,7 +8,7 @@ use std::ops::{Deref, DerefMut};
 
 use bytemuck::{Pod, Zeroable};
 
-use crate::shale::{CachedStore, ShaleError, Storable};
+use crate::shale::{LinearStore, ShaleError, Storable};
 
 /// The virtual disk address of an object
 #[repr(transparent)]
@@ -176,7 +176,7 @@ impl Storable for DiskAddress {
         Ok(())
     }
 
-    fn deserialize<U: CachedStore>(addr: usize, mem: &U) -> Result<Self, ShaleError> {
+    fn deserialize<U: LinearStore>(addr: usize, mem: &U) -> Result<Self, ShaleError> {
         let raw = mem
             .get_view(addr, Self::SERIALIZED_LEN)
             .ok_or(ShaleError::InvalidCacheView {

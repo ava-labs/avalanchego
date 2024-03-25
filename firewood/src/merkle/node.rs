@@ -4,7 +4,7 @@
 use crate::{
     logger::trace,
     merkle::nibbles_to_bytes_iter,
-    shale::{compact::CompactSpace, disk_address::DiskAddress, CachedStore, ShaleError, Storable},
+    shale::{compact::CompactSpace, disk_address::DiskAddress, LinearStore, ShaleError, Storable},
 };
 use bincode::{Error, Options};
 use bitflags::bitflags;
@@ -81,7 +81,7 @@ impl NodeType {
         }
     }
 
-    pub fn encode<S: CachedStore>(&self, store: &CompactSpace<Node, S>) -> Vec<u8> {
+    pub fn encode<S: LinearStore>(&self, store: &CompactSpace<Node, S>) -> Vec<u8> {
         match &self {
             NodeType::Leaf(n) => n.encode(),
             NodeType::Branch(n) => n.encode(store),
@@ -201,18 +201,18 @@ impl Node {
         })
     }
 
-    pub(super) fn get_encoded<S: CachedStore>(&self, store: &CompactSpace<Node, S>) -> &[u8] {
+    pub(super) fn get_encoded<S: LinearStore>(&self, store: &CompactSpace<Node, S>) -> &[u8] {
         self.encoded.get_or_init(|| self.inner.encode(store))
     }
 
-    pub(super) fn get_root_hash<S: CachedStore>(&self, store: &CompactSpace<Node, S>) -> &TrieHash {
+    pub(super) fn get_root_hash<S: LinearStore>(&self, store: &CompactSpace<Node, S>) -> &TrieHash {
         self.root_hash.get_or_init(|| {
             self.set_dirty(true);
             TrieHash(Keccak256::digest(self.get_encoded(store)).into())
         })
     }
 
-    fn is_encoded_longer_than_hash_len<S: CachedStore>(
+    fn is_encoded_longer_than_hash_len<S: LinearStore>(
         &self,
         store: &CompactSpace<Node, S>,
     ) -> bool {
@@ -328,7 +328,7 @@ mod type_id {
 use type_id::NodeTypeId;
 
 impl Storable for Node {
-    fn deserialize<T: CachedStore>(offset: usize, mem: &T) -> Result<Self, ShaleError> {
+    fn deserialize<T: LinearStore>(offset: usize, mem: &T) -> Result<Self, ShaleError> {
         let meta_raw =
             mem.get_view(offset, Meta::SIZE as u64)
                 .ok_or(ShaleError::InvalidCacheView {

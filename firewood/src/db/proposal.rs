@@ -6,7 +6,7 @@ use super::{
     Universe, MERKLE_META_SPACE, MERKLE_PAYLOAD_SPACE, ROOT_HASH_SPACE,
 };
 use crate::merkle::{Bincode, MerkleKeyValueStream, Proof};
-use crate::shale::CachedStore;
+use crate::shale::LinearStore;
 use crate::storage::StoreRevShared;
 use crate::{
     merkle::{TrieHash, TRIE_HASH_LEN},
