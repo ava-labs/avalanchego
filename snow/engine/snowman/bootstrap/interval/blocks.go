@@ -122,7 +122,7 @@ func Execute(
 			return nil
 		}
 
-		iterator                      = db.NewIteratorWithPrefix(blockPrefix)
+		iterator                      = GetBlockIterator(db)
 		processedSinceIteratorRelease uint
 
 		startTime            = time.Now()
@@ -176,7 +176,7 @@ func Execute(
 
 			processedSinceIteratorRelease = 0
 			iterator.Release()
-			iterator = db.NewIteratorWithPrefix(blockPrefix)
+			iterator = GetBlockIterator(db)
 		}
 
 		now := time.Now()
