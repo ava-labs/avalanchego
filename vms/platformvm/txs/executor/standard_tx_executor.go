@@ -21,7 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fees"
 
-	commonFees "github.com/ava-labs/avalanchego/vms/components/fees"
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 var (
@@ -35,8 +35,8 @@ var (
 type StandardTxExecutor struct {
 	// inputs, to be filled before visitor methods are called
 	*Backend
-	BlkFeeManager      *commonFees.Manager
-	BlockMaxComplexity commonFees.Dimensions
+	BlkFeeManager      *commonfees.Manager
+	BlockMaxComplexity commonfees.Dimensions
 	State              state.Diff // state is expected to be modified
 	Tx                 *txs.Tx
 

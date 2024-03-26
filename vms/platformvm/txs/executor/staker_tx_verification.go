@@ -18,7 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fees"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
-	commonFees "github.com/ava-labs/avalanchego/vms/components/fees"
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 var (
@@ -198,8 +198,8 @@ func verifyAddValidatorTx(
 // AddSubnetValidatorTx.
 func verifyAddSubnetValidatorTx(
 	backend *Backend,
-	feeManager *commonFees.Manager,
-	maxComplexity commonFees.Dimensions,
+	feeManager *commonfees.Manager,
+	maxComplexity commonfees.Dimensions,
 	chainState state.Chain,
 	sTx *txs.Tx,
 	tx *txs.AddSubnetValidatorTx,
@@ -306,8 +306,8 @@ func verifyAddSubnetValidatorTx(
 // * The flow checker passes.
 func verifyRemoveSubnetValidatorTx(
 	backend *Backend,
-	feeManager *commonFees.Manager,
-	maxComplexity commonFees.Dimensions,
+	feeManager *commonfees.Manager,
+	maxComplexity commonfees.Dimensions,
 	chainState state.Chain,
 	sTx *txs.Tx,
 	tx *txs.RemoveSubnetValidatorTx,
@@ -517,8 +517,8 @@ func verifyAddDelegatorTx(
 // AddPermissionlessValidatorTx.
 func verifyAddPermissionlessValidatorTx(
 	backend *Backend,
-	feeManager *commonFees.Manager,
-	maxComplexity commonFees.Dimensions,
+	feeManager *commonfees.Manager,
+	maxComplexity commonfees.Dimensions,
 	chainState state.Chain,
 	sTx *txs.Tx,
 	tx *txs.AddPermissionlessValidatorTx,
@@ -648,8 +648,8 @@ func verifyAddPermissionlessValidatorTx(
 // AddPermissionlessDelegatorTx.
 func verifyAddPermissionlessDelegatorTx(
 	backend *Backend,
-	feeManager *commonFees.Manager,
-	maxComplexity commonFees.Dimensions,
+	feeManager *commonfees.Manager,
+	maxComplexity commonfees.Dimensions,
 	chainState state.Chain,
 	sTx *txs.Tx,
 	tx *txs.AddPermissionlessDelegatorTx,
@@ -808,8 +808,8 @@ func verifyAddPermissionlessDelegatorTx(
 // * The flow checker passes.
 func verifyTransferSubnetOwnershipTx(
 	backend *Backend,
-	feeManager *commonFees.Manager,
-	maxComplexity commonFees.Dimensions,
+	feeManager *commonfees.Manager,
+	maxComplexity commonfees.Dimensions,
 	chainState state.Chain,
 	sTx *txs.Tx,
 	tx *txs.TransferSubnetOwnershipTx,

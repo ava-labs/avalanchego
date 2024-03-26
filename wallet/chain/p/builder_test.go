@@ -61,7 +61,7 @@ var (
 		3 * units.MicroAvax,
 		4 * units.MicroAvax,
 	}
-	testBlockMaxConsumedUnits = commonfees.Max
+	testBlockMaxComplexity = commonfees.Max
 )
 
 // These tests create a tx, then verify that utxos included in the tx are
@@ -102,7 +102,7 @@ func TestBaseTx(t *testing.T) {
 		feeCalc := &fees.Calculator{
 			IsEUpgradeActive:   true,
 			FeeManager:         commonfees.NewManager(testFeeRates),
-			BlockMaxComplexity: testBlockMaxConsumedUnits,
+			BlockMaxComplexity: testBlockMaxComplexity,
 		}
 		utx, err := builder.NewBaseTx(
 			outputsToMove,
@@ -116,7 +116,7 @@ func TestBaseTx(t *testing.T) {
 		fc := &fees.Calculator{
 			IsEUpgradeActive:   true,
 			FeeManager:         commonfees.NewManager(testFeeRates),
-			BlockMaxComplexity: testBlockMaxConsumedUnits,
+			BlockMaxComplexity: testBlockMaxComplexity,
 			Credentials:        tx.Creds,
 		}
 		require.NoError(utx.Visit(fc))
@@ -231,7 +231,7 @@ func TestAddSubnetValidatorTx(t *testing.T) {
 		feeCalc := &fees.Calculator{
 			IsEUpgradeActive:   true,
 			FeeManager:         commonfees.NewManager(testFeeRates),
-			BlockMaxComplexity: testBlockMaxConsumedUnits,
+			BlockMaxComplexity: testBlockMaxComplexity,
 		}
 		utx, err := builder.NewAddSubnetValidatorTx(subnetValidator, feeCalc)
 		require.NoError(err)
@@ -245,7 +245,7 @@ func TestAddSubnetValidatorTx(t *testing.T) {
 				AddSubnetValidatorFee: units.MilliAvax,
 			},
 			FeeManager:         commonfees.NewManager(testFeeRates),
-			BlockMaxComplexity: testBlockMaxConsumedUnits,
+			BlockMaxComplexity: testBlockMaxComplexity,
 			Credentials:        tx.Creds,
 		}
 		require.NoError(utx.Visit(fc))
@@ -347,7 +347,7 @@ func TestRemoveSubnetValidatorTx(t *testing.T) {
 		feeCalc := &fees.Calculator{
 			IsEUpgradeActive:   true,
 			FeeManager:         commonfees.NewManager(testFeeRates),
-			BlockMaxComplexity: testBlockMaxConsumedUnits,
+			BlockMaxComplexity: testBlockMaxComplexity,
 		}
 		utx, err := builder.NewRemoveSubnetValidatorTx(
 			ids.GenerateTestNodeID(),
@@ -362,7 +362,7 @@ func TestRemoveSubnetValidatorTx(t *testing.T) {
 		fc := &fees.Calculator{
 			IsEUpgradeActive:   true,
 			FeeManager:         commonfees.NewManager(testFeeRates),
-			BlockMaxComplexity: testBlockMaxConsumedUnits,
+			BlockMaxComplexity: testBlockMaxComplexity,
 			Credentials:        tx.Creds,
 		}
 		require.NoError(utx.Visit(fc))
@@ -475,7 +475,7 @@ func TestCreateChainTx(t *testing.T) {
 		feeCalc := &fees.Calculator{
 			IsEUpgradeActive:   true,
 			FeeManager:         commonfees.NewManager(testFeeRates),
-			BlockMaxComplexity: testBlockMaxConsumedUnits,
+			BlockMaxComplexity: testBlockMaxComplexity,
 		}
 		utx, err := builder.NewCreateChainTx(
 			subnetID,
@@ -493,7 +493,7 @@ func TestCreateChainTx(t *testing.T) {
 		fc := &fees.Calculator{
 			IsEUpgradeActive:   true,
 			FeeManager:         commonfees.NewManager(testFeeRates),
-			BlockMaxComplexity: testBlockMaxConsumedUnits,
+			BlockMaxComplexity: testBlockMaxComplexity,
 			Credentials:        tx.Creds,
 		}
 		require.NoError(utx.Visit(fc))
@@ -601,7 +601,7 @@ func TestCreateSubnetTx(t *testing.T) {
 		feeCalc := &fees.Calculator{
 			IsEUpgradeActive:   true,
 			FeeManager:         commonfees.NewManager(testFeeRates),
-			BlockMaxComplexity: testBlockMaxConsumedUnits,
+			BlockMaxComplexity: testBlockMaxComplexity,
 		}
 		utx, err := builder.NewCreateSubnetTx(
 			subnetOwner,
@@ -615,7 +615,7 @@ func TestCreateSubnetTx(t *testing.T) {
 		fc := &fees.Calculator{
 			IsEUpgradeActive:   true,
 			FeeManager:         commonfees.NewManager(testFeeRates),
-			BlockMaxComplexity: testBlockMaxConsumedUnits,
+			BlockMaxComplexity: testBlockMaxComplexity,
 			Credentials:        tx.Creds,
 		}
 		require.NoError(utx.Visit(fc))
@@ -720,7 +720,7 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 		feeCalc := &fees.Calculator{
 			IsEUpgradeActive:   true,
 			FeeManager:         commonfees.NewManager(testFeeRates),
-			BlockMaxComplexity: testBlockMaxConsumedUnits,
+			BlockMaxComplexity: testBlockMaxComplexity,
 		}
 		utx, err := builder.NewTransferSubnetOwnershipTx(
 			subnetID,
@@ -735,7 +735,7 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 		fc := &fees.Calculator{
 			IsEUpgradeActive:   true,
 			FeeManager:         commonfees.NewManager(testFeeRates),
-			BlockMaxComplexity: testBlockMaxConsumedUnits,
+			BlockMaxComplexity: testBlockMaxComplexity,
 			Credentials:        tx.Creds,
 		}
 		require.NoError(utx.Visit(fc))
@@ -835,7 +835,7 @@ func TestImportTx(t *testing.T) {
 		feeCalc := &fees.Calculator{
 			IsEUpgradeActive:   true,
 			FeeManager:         commonfees.NewManager(testFeeRates),
-			BlockMaxComplexity: testBlockMaxConsumedUnits,
+			BlockMaxComplexity: testBlockMaxComplexity,
 		}
 		utx, err := builder.NewImportTx(
 			sourceChainID,
@@ -850,7 +850,7 @@ func TestImportTx(t *testing.T) {
 		fc := &fees.Calculator{
 			IsEUpgradeActive:   true,
 			FeeManager:         commonfees.NewManager(testFeeRates),
-			BlockMaxComplexity: testBlockMaxConsumedUnits,
+			BlockMaxComplexity: testBlockMaxComplexity,
 			Credentials:        tx.Creds,
 		}
 		require.NoError(utx.Visit(fc))
@@ -950,7 +950,7 @@ func TestExportTx(t *testing.T) {
 		feeCalc := &fees.Calculator{
 			IsEUpgradeActive:   true,
 			FeeManager:         commonfees.NewManager(testFeeRates),
-			BlockMaxComplexity: testBlockMaxConsumedUnits,
+			BlockMaxComplexity: testBlockMaxComplexity,
 		}
 		utx, err := builder.NewExportTx(
 			subnetID,
@@ -965,7 +965,7 @@ func TestExportTx(t *testing.T) {
 		fc := &fees.Calculator{
 			IsEUpgradeActive:   true,
 			FeeManager:         commonfees.NewManager(testFeeRates),
-			BlockMaxComplexity: testBlockMaxConsumedUnits,
+			BlockMaxComplexity: testBlockMaxComplexity,
 			Credentials:        tx.Creds,
 		}
 		require.NoError(utx.Visit(fc))
@@ -1077,7 +1077,7 @@ func TestTransformSubnetTx(t *testing.T) {
 		feeCalc := &fees.Calculator{
 			IsEUpgradeActive:   true,
 			FeeManager:         commonfees.NewManager(testFeeRates),
-			BlockMaxComplexity: testBlockMaxConsumedUnits,
+			BlockMaxComplexity: testBlockMaxComplexity,
 		}
 		utx, err := builder.NewTransformSubnetTx(
 			subnetID,
@@ -1104,7 +1104,7 @@ func TestTransformSubnetTx(t *testing.T) {
 		fc := &fees.Calculator{
 			IsEUpgradeActive:   true,
 			FeeManager:         commonfees.NewManager(testFeeRates),
-			BlockMaxComplexity: testBlockMaxConsumedUnits,
+			BlockMaxComplexity: testBlockMaxComplexity,
 			Credentials:        tx.Creds,
 		}
 		require.NoError(utx.Visit(fc))
@@ -1224,7 +1224,7 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 		feeCalc := &fees.Calculator{
 			IsEUpgradeActive:   true,
 			FeeManager:         commonfees.NewManager(testFeeRates),
-			BlockMaxComplexity: testBlockMaxConsumedUnits,
+			BlockMaxComplexity: testBlockMaxComplexity,
 		}
 		utx, err := builder.NewAddPermissionlessValidatorTx(
 			&txs.SubnetValidator{
@@ -1250,7 +1250,7 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 		fc := &fees.Calculator{
 			IsEUpgradeActive:   true,
 			FeeManager:         commonfees.NewManager(testFeeRates),
-			BlockMaxComplexity: testBlockMaxConsumedUnits,
+			BlockMaxComplexity: testBlockMaxComplexity,
 			Credentials:        tx.Creds,
 		}
 		require.NoError(utx.Visit(fc))
@@ -1364,7 +1364,7 @@ func TestAddPermissionlessDelegatorTx(t *testing.T) {
 		feeCalc := &fees.Calculator{
 			IsEUpgradeActive:   true,
 			FeeManager:         commonfees.NewManager(testFeeRates),
-			BlockMaxComplexity: testBlockMaxConsumedUnits,
+			BlockMaxComplexity: testBlockMaxComplexity,
 		}
 		utx, err := builder.NewAddPermissionlessDelegatorTx(
 			&txs.SubnetValidator{
@@ -1387,7 +1387,7 @@ func TestAddPermissionlessDelegatorTx(t *testing.T) {
 		fc := &fees.Calculator{
 			IsEUpgradeActive:   true,
 			FeeManager:         commonfees.NewManager(testFeeRates),
-			BlockMaxComplexity: testBlockMaxConsumedUnits,
+			BlockMaxComplexity: testBlockMaxComplexity,
 			Credentials:        tx.Creds,
 		}
 		require.NoError(utx.Visit(fc))
