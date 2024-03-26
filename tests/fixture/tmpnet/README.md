@@ -237,7 +237,7 @@ use to bootstrap themselves (aka staking address).
 ## Monitoring
 
 Monitoring is an essential part of understanding the workings of a
-distributed system such as avalanchego.  The tmpnet fixture enables
+distributed system such as avalanchego. The tmpnet fixture enables
 collection of logs and metrics from temporary networks to a monitoring
 stack (prometheus+loki+grafana) to enable results to be analyzed and
 shared.
