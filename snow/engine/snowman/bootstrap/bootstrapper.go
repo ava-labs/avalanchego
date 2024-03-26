@@ -591,7 +591,7 @@ func (b *Bootstrapper) process(
 		height := blk.Height()
 		b.tipHeight = max(b.tipHeight, height)
 
-		if numFetched%statusUpdateFrequency == 0 {
+		if numPreviouslyFetched/statusUpdateFrequency != numFetched/statusUpdateFrequency {
 			totalBlocksToFetch := b.tipHeight - b.startingHeight
 			eta := timer.EstimateETA(
 				b.startTime,
