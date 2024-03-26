@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/heap"
 	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
 	"github.com/ava-labs/avalanchego/utils/setmap"
 	"github.com/ava-labs/avalanchego/utils/units"
@@ -46,6 +47,8 @@ var (
 )
 
 type Mempool interface {
+	SetEUpgradeActive()
+
 	Add(tx *txs.Tx, tipPercentage commonfees.TipPercentage) error
 	Get(txID ids.ID) (*txs.Tx, bool)
 	// Remove [txs] and any conflicts of [txs] from the mempool.
@@ -74,11 +77,37 @@ type Mempool interface {
 	Len() int
 }
 
+type TxAndTipPercent struct {
+	Tx            *txs.Tx
+	TipPercentage commonfees.TipPercentage
+}
+
+func lessTxAndTipPercent(a TxAndTipPercent, b TxAndTipPercent) bool {
+	switch {
+	case a.TipPercentage < b.TipPercentage:
+		return true
+	case a.TipPercentage > b.TipPercentage:
+		return false
+	default:
+		return a.Tx.ID().Compare(b.Tx.ID()) == -1
+	}
+}
+
 // Transactions from clients that have not yet been put into blocks and added to
 // consensus
 type mempool struct {
-	lock           sync.RWMutex
-	unissuedTxs    linkedhashmap.LinkedHashmap[ids.ID, *txs.Tx]
+	lock sync.RWMutex
+
+	// TODO: drop [[isEUpgradeActive] once E upgrade is activated
+	isEUpgradeActive utils.Atomic[bool]
+
+	// unissued txs sorted by time they entered the mempool
+	// TODO: drop [unissuedTxs] once E upgrade is activated
+	unissuedTxs linkedhashmap.LinkedHashmap[ids.ID, *txs.Tx]
+
+	// Following E upgrade activation, mempool transactions are sorted by tip percentage
+	unissuedTxsByTipPercentage heap.Map[ids.ID, TxAndTipPercent]
+
 	consumedUTXOs  *setmap.SetMap[ids.ID, ids.ID] // TxID -> Consumed UTXOs
 	bytesAvailable int
 	droppedTxIDs   *cache.LRU[ids.ID, error] // TxID -> verification error
@@ -95,11 +124,12 @@ func New(
 	toEngine chan<- common.Message,
 ) (Mempool, error) {
 	m := &mempool{
-		unissuedTxs:    linkedhashmap.New[ids.ID, *txs.Tx](),
-		consumedUTXOs:  setmap.New[ids.ID, ids.ID](),
-		bytesAvailable: maxMempoolSize,
-		droppedTxIDs:   &cache.LRU[ids.ID, error]{Size: droppedTxIDsCacheSize},
-		toEngine:       toEngine,
+		unissuedTxs:                linkedhashmap.New[ids.ID, *txs.Tx](),
+		unissuedTxsByTipPercentage: heap.NewMap[ids.ID, TxAndTipPercent](lessTxAndTipPercent),
+		consumedUTXOs:              setmap.New[ids.ID, ids.ID](),
+		bytesAvailable:             maxMempoolSize,
+		droppedTxIDs:               &cache.LRU[ids.ID, error]{Size: droppedTxIDsCacheSize},
+		toEngine:                   toEngine,
 		numTxs: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespace,
 			Name:      "txs",
@@ -111,6 +141,7 @@ func New(
 			Help:      "Number of bytes of space currently available in the mempool",
 		}),
 	}
+	m.isEUpgradeActive.Set(false)
 	m.bytesAvailableMetric.Set(maxMempoolSize)
 
 	err := utils.Err(
@@ -120,7 +151,11 @@ func New(
 	return m, err
 }
 
-func (m *mempool) Add(tx *txs.Tx, _ commonfees.TipPercentage) error {
+func (m *mempool) SetEUpgradeActive() {
+	m.isEUpgradeActive.Set(true)
+}
+
+func (m *mempool) Add(tx *txs.Tx, tipPercentage commonfees.TipPercentage) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
@@ -134,7 +169,7 @@ func (m *mempool) Add(tx *txs.Tx, _ commonfees.TipPercentage) error {
 
 	// Note: a previously dropped tx can be re-added
 	txID := tx.ID()
-	if _, ok := m.unissuedTxs.Get(txID); ok {
+	if _, ok := m.Get(txID); ok {
 		return fmt.Errorf("%w: %s", ErrDuplicateTx, txID)
 	}
 
@@ -162,6 +197,10 @@ func (m *mempool) Add(tx *txs.Tx, _ commonfees.TipPercentage) error {
 	}
 
 	m.unissuedTxs.Put(txID, tx)
+	m.unissuedTxsByTipPercentage.Push(txID, TxAndTipPercent{
+		Tx:            tx,
+		TipPercentage: tipPercentage,
+	})
 	m.numTxs.Inc()
 	m.bytesAvailable -= txSize
 	m.bytesAvailableMetric.Set(float64(m.bytesAvailable))
@@ -176,7 +215,11 @@ func (m *mempool) Add(tx *txs.Tx, _ commonfees.TipPercentage) error {
 }
 
 func (m *mempool) Get(txID ids.ID) (*txs.Tx, bool) {
-	return m.unissuedTxs.Get(txID)
+	if !m.isEUpgradeActive.Get() {
+		return m.unissuedTxs.Get(txID)
+	}
+	v, found := m.unissuedTxsByTipPercentage.Get(txID)
+	return v.Tx, found
 }
 
 func (m *mempool) Remove(txs ...*txs.Tx) {
@@ -188,6 +231,7 @@ func (m *mempool) Remove(txs ...*txs.Tx) {
 		// If the transaction is in the mempool, remove it.
 		if _, ok := m.consumedUTXOs.DeleteKey(txID); ok {
 			m.unissuedTxs.Delete(txID)
+			m.unissuedTxsByTipPercentage.Remove(txID)
 			m.bytesAvailable += len(tx.Bytes())
 			continue
 		}
@@ -197,6 +241,7 @@ func (m *mempool) Remove(txs ...*txs.Tx) {
 		for _, removed := range m.consumedUTXOs.DeleteOverlapping(inputs) {
 			tx, _ := m.unissuedTxs.Get(removed.Key)
 			m.unissuedTxs.Delete(removed.Key)
+			m.unissuedTxsByTipPercentage.Remove(removed.Key)
 			m.bytesAvailable += len(tx.Bytes())
 		}
 	}
@@ -205,7 +250,19 @@ func (m *mempool) Remove(txs ...*txs.Tx) {
 }
 
 func (m *mempool) Peek() (*txs.Tx, bool) {
-	_, tx, exists := m.unissuedTxs.Oldest()
+	var (
+		tx     *txs.Tx
+		exists bool
+	)
+
+	if !m.isEUpgradeActive.Get() {
+		_, tx, exists = m.unissuedTxs.Oldest()
+	} else {
+		var v TxAndTipPercent
+		_, v, exists = m.unissuedTxsByTipPercentage.Peek()
+		tx = v.Tx
+	}
+
 	return tx, exists
 }
 
@@ -213,6 +270,9 @@ func (m *mempool) Iterate(f func(tx *txs.Tx) bool) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 
+	// TODO: once E upgrade gets activated, replace unissuedTxs
+	// with an array containing txs. We cannot iterate [unissuedTxsByTipPercentage]
+	// but order does not seems relevant for the functions [f] currently used
 	itr := m.unissuedTxs.NewIterator()
 	for itr.Next() {
 		if !f(itr.Value()) {
@@ -229,8 +289,14 @@ func (m *mempool) MarkDropped(txID ids.ID, reason error) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 
-	if _, ok := m.unissuedTxs.Get(txID); ok {
-		return
+	if !m.isEUpgradeActive.Get() {
+		if _, ok := m.unissuedTxs.Get(txID); ok {
+			return
+		}
+	} else {
+		if _, ok := m.unissuedTxsByTipPercentage.Get(txID); ok {
+			return
+		}
 	}
 
 	m.droppedTxIDs.Put(txID, reason)
@@ -242,7 +308,7 @@ func (m *mempool) GetDropReason(txID ids.ID) error {
 }
 
 func (m *mempool) RequestBuildBlock(emptyBlockPermitted bool) {
-	if !emptyBlockPermitted && m.unissuedTxs.Len() == 0 {
+	if !emptyBlockPermitted && (m.unissuedTxs.Len() == 0 || m.unissuedTxsByTipPercentage.Len() == 0) {
 		return
 	}
 
@@ -256,5 +322,8 @@ func (m *mempool) Len() int {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 
-	return m.unissuedTxs.Len()
+	if !m.isEUpgradeActive.Get() {
+		return m.unissuedTxs.Len()
+	}
+	return m.unissuedTxsByTipPercentage.Len()
 }

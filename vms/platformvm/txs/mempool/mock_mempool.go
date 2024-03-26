@@ -164,3 +164,15 @@ func (mr *MockMempoolMockRecorder) RequestBuildBlock(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RequestBuildBlock", reflect.TypeOf((*MockMempool)(nil).RequestBuildBlock), arg0)
 }
+
+// SetEUpgradeActive mocks base method.
+func (m *MockMempool) SetEUpgradeActive() {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "SetEUpgradeActive")
+}
+
+// SetEUpgradeActive indicates an expected call of SetEUpgradeActive.
+func (mr *MockMempoolMockRecorder) SetEUpgradeActive() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetEUpgradeActive", reflect.TypeOf((*MockMempool)(nil).SetEUpgradeActive))
+}
