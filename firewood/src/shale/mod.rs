@@ -426,7 +426,7 @@ pub struct ObjCacheInner<T: Storable> {
     dirty: HashSet<DiskAddress>,
 }
 
-/// [ObjRef] pool that is used by [compact::CompactSpace] to construct [ObjRef]s.
+/// [ObjRef] pool that is used by [compact::Store] to construct [ObjRef]s.
 #[derive(Debug)]
 pub struct ObjCache<T: Storable>(Arc<RwLock<ObjCacheInner<T>>>);
 

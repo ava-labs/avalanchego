@@ -52,7 +52,7 @@ where
         #[allow(clippy::unwrap_used)]
         dm.write(
             compact_header.into(),
-            &shale::to_dehydrated(&shale::compact::CompactSpaceHeader::new(
+            &shale::to_dehydrated(&shale::compact::StoreHeader::new(
                 NonZeroUsize::new(RESERVED).unwrap(),
                 #[allow(clippy::unwrap_used)]
                 NonZeroUsize::new(RESERVED).unwrap(),
@@ -64,7 +64,7 @@ where
         let compact_header = StoredView::ptr_to_obj(
             &dm,
             compact_header,
-            shale::compact::CompactHeader::SERIALIZED_LEN,
+            shale::compact::ChunkHeader::SERIALIZED_LEN,
         )
         .unwrap();
         let mem_meta = dm;
@@ -72,8 +72,8 @@ where
 
         let cache = shale::ObjCache::new(1);
         let space =
-            shale::compact::CompactSpace::new(mem_meta, mem_payload, compact_header, cache, 10, 16)
-                .expect("CompactSpace init fail");
+            shale::compact::Store::new(mem_meta, mem_payload, compact_header, cache, 10, 16)
+                .expect("Store init fail");
 
         let merkle = Merkle::new(space);
         #[allow(clippy::unwrap_used)]

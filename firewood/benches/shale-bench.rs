@@ -5,7 +5,7 @@ use criterion::{
     black_box, criterion_group, criterion_main, profiler::Profiler, Bencher, Criterion,
 };
 use firewood::shale::{
-    compact::{CompactHeader, CompactSpaceHeader},
+    compact::{ChunkHeader, StoreHeader},
     disk_address::DiskAddress,
     in_mem::InMemLinearStore,
     LinearStore, Obj, StoredView,
@@ -81,8 +81,8 @@ fn get_view<C: LinearStore>(b: &mut Bencher, mut cached: C) {
 fn serialize<T: LinearStore>(m: &T) {
     let compact_header_obj: DiskAddress = DiskAddress::from(0x0);
     #[allow(clippy::unwrap_used)]
-    let _: Obj<CompactSpaceHeader> =
-        StoredView::ptr_to_obj(m, compact_header_obj, CompactHeader::SERIALIZED_LEN).unwrap();
+    let _: Obj<StoreHeader> =
+        StoredView::ptr_to_obj(m, compact_header_obj, ChunkHeader::SERIALIZED_LEN).unwrap();
 }
 
 fn bench_cursors(c: &mut Criterion) {

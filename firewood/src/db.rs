@@ -22,7 +22,7 @@ use crate::{
 use crate::{
     merkle,
     shale::{
-        self, compact::CompactSpaceHeader, disk_address::DiskAddress, LinearStore, Obj, ShaleError,
+        self, compact::StoreHeader, disk_address::DiskAddress, LinearStore, Obj, ShaleError,
         SpaceId, Storable, StoredView,
     },
 };
@@ -118,7 +118,7 @@ struct DbParams {
 }
 
 #[derive(Clone, Debug)]
-/// Necessary linear space instances bundled for a `CompactSpace`.
+/// Necessary linear space instances bundled for a `Store`.
 struct SubUniverse<T> {
     meta: T,
     payload: T,
@@ -616,7 +616,7 @@ impl Db {
         let meta: StoreRevMut = base.merkle.meta.clone().into();
         let payload: StoreRevMut = base.merkle.payload.clone().into();
 
-        // get references to the DbHeader and the CompactSpaceHeader
+        // get references to the DbHeader and the StoreHeader
         // for free space management
         let db_header_ref = Db::get_db_header_ref(&meta)?;
         let merkle_payload_header_ref =
@@ -656,7 +656,7 @@ impl Db {
         // The header consists of three parts:
         // DbParams
         // DbHeader (just a pointer to the sentinel)
-        // CompactSpaceHeader for future allocations
+        // StoreHeader for future allocations
         let (params, hdr, csh);
         let header_bytes: Vec<u8> = {
             params = DbParams {
@@ -677,10 +677,10 @@ impl Db {
             bytemuck::bytes_of(&hdr)
         })
         .chain({
-            // write out the CompactSpaceHeader
+            // write out the StoreHeader
             let space_reserved =
                 NonZeroUsize::new(SPACE_RESERVED as usize).expect("SPACE_RESERVED is non-zero");
-            csh = CompactSpaceHeader::new(space_reserved, space_reserved);
+            csh = StoreHeader::new(space_reserved, space_reserved);
             bytemuck::bytes_of(&csh)
         })
         .copied()
@@ -700,7 +700,7 @@ impl Db {
         let db_header: DiskAddress = DiskAddress::from(offset);
         offset += DbHeader::MSIZE as usize;
         let merkle_payload_header: DiskAddress = DiskAddress::from(offset);
-        offset += CompactSpaceHeader::SERIALIZED_LEN as usize;
+        offset += StoreHeader::SERIALIZED_LEN as usize;
         assert!(offset <= SPACE_RESERVED as usize);
 
         let mut merkle_meta_store = StoreRevMut::new(cached_space.merkle.meta.clone());
@@ -710,7 +710,7 @@ impl Db {
             #[allow(clippy::unwrap_used)]
             merkle_meta_store.write(
                 merkle_payload_header.into(),
-                &shale::to_dehydrated(&shale::compact::CompactSpaceHeader::new(
+                &shale::to_dehydrated(&shale::compact::StoreHeader::new(
                     NonZeroUsize::new(SPACE_RESERVED as usize).unwrap(),
                     #[allow(clippy::unwrap_used)]
                     NonZeroUsize::new(SPACE_RESERVED as usize).unwrap(),
@@ -752,12 +752,12 @@ impl Db {
     fn get_payload_header_ref<K: LinearStore>(
         meta_ref: &K,
         header_offset: u64,
-    ) -> Result<Obj<CompactSpaceHeader>, DbError> {
+    ) -> Result<Obj<StoreHeader>, DbError> {
         let payload_header = DiskAddress::from(header_offset as usize);
         StoredView::ptr_to_obj(
             meta_ref,
             payload_header,
-            shale::compact::CompactHeader::SERIALIZED_LEN,
+            shale::compact::ChunkHeader::SERIALIZED_LEN,
         )
         .map_err(Into::into)
     }
@@ -768,7 +768,7 @@ impl Db {
     }
 
     fn new_revision<K: LinearStore, T: Into<K>>(
-        header_refs: (Obj<DbHeader>, Obj<CompactSpaceHeader>),
+        header_refs: (Obj<DbHeader>, Obj<StoreHeader>),
         merkle: (T, T),
         payload_regn_nbit: u64,
         payload_max_walk: u64,
@@ -777,7 +777,7 @@ impl Db {
         // TODO: This should be a compile time check
         const DB_OFFSET: u64 = Db::PARAM_SIZE;
         let merkle_offset = DB_OFFSET + DbHeader::MSIZE;
-        assert!(merkle_offset + CompactSpaceHeader::SERIALIZED_LEN <= SPACE_RESERVED);
+        assert!(merkle_offset + StoreHeader::SERIALIZED_LEN <= SPACE_RESERVED);
 
         let mut db_header_ref = header_refs.0;
         let merkle_payload_header_ref = header_refs.1;
@@ -786,7 +786,7 @@ impl Db {
         let merkle_payload = merkle.1.into();
 
         #[allow(clippy::unwrap_used)]
-        let merkle_space = shale::compact::CompactSpace::new(
+        let merkle_space = shale::compact::Store::new(
             merkle_meta,
             merkle_payload,
             merkle_payload_header_ref,

@@ -1,7 +1,7 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 use crate::nibbles::Nibbles;
-use crate::shale::compact::CompactSpace;
+use crate::shale::compact::Store;
 use crate::shale::LinearStore;
 use crate::shale::{self, disk_address::DiskAddress, ObjWriteSizeError, ShaleError};
 use crate::storage::{StoreRevMut, StoreRevShared};
@@ -67,7 +67,7 @@ macro_rules! write_node {
 
 #[derive(Debug)]
 pub struct Merkle<S, T> {
-    store: CompactSpace<Node, S>,
+    store: Store<Node, S>,
     phantom: PhantomData<T>,
 }
 
@@ -101,7 +101,7 @@ where
     T: BinarySerde,
     EncodedNode<T>: serde::Serialize + serde::Deserialize<'de>,
 {
-    pub const fn new(store: CompactSpace<Node, S>) -> Self {
+    pub const fn new(store: Store<Node, S>) -> Self {
         Self {
             store,
             phantom: PhantomData,
@@ -1417,7 +1417,7 @@ mod tests {
         let compact_header = DiskAddress::null();
         dm.write(
             compact_header.into(),
-            &shale::to_dehydrated(&shale::compact::CompactSpaceHeader::new(
+            &shale::to_dehydrated(&shale::compact::StoreHeader::new(
                 std::num::NonZeroUsize::new(RESERVED).unwrap(),
                 std::num::NonZeroUsize::new(RESERVED).unwrap(),
             ))
@@ -1427,7 +1427,7 @@ mod tests {
         let compact_header = shale::StoredView::ptr_to_obj(
             &dm,
             compact_header,
-            shale::compact::CompactHeader::SERIALIZED_LEN,
+            shale::compact::ChunkHeader::SERIALIZED_LEN,
         )
         .unwrap();
         let mem_meta = dm;
@@ -1435,8 +1435,8 @@ mod tests {
 
         let cache = shale::ObjCache::new(1);
         let space =
-            shale::compact::CompactSpace::new(mem_meta, mem_payload, compact_header, cache, 10, 16)
-                .expect("CompactSpace init fail");
+            shale::compact::Store::new(mem_meta, mem_payload, compact_header, cache, 10, 16)
+                .expect("Store init fail");
 
         Merkle::new(space)
     }
