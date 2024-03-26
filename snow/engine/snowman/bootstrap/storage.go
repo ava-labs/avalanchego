@@ -91,13 +91,17 @@ func process(
 		blkID := blk.ID()
 		missingBlockIDs.Remove(blkID)
 
-		wantsParent, err := interval.Add(db, tree, lastAcceptedHeight, blk)
-		if err != nil {
+		height := blk.Height()
+		blkBytes := blk.Bytes()
+		wantsParent, err := interval.Add(
+			db,
+			tree,
+			lastAcceptedHeight,
+			height,
+			blkBytes,
+		)
+		if err != nil || !wantsParent {
 			return ids.Empty, false, err
-		}
-
-		if !wantsParent {
-			return ids.Empty, false, nil
 		}
 
 		// If the parent was provided in the ancestors set, we can immediately
