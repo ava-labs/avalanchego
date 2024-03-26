@@ -1,0 +1,54 @@
+name: Publish Antithesis Images
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+
+env: 
+  REGISTRY: us-central1-docker.pkg.dev
+  REPOSITORY: molten-verve-216720/avalanche-repository
+  NODE_NAME: avalanche-node
+  WORKLOAD_NAME: workload
+  CONFIG_NAME: config
+  TAG: latest
+
+jobs:
+  antithesis:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+
+    - name: Login to GAR
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: _json_key
+        password: ${{ secrets.ANTITHESIS_GAR_JSON_KEY }}
+    
+    - name: Build node
+      id: build-node-image
+      run: |
+        docker build -t $REGISTRY/$REPOSITORY/$NODE_NAME:$TAG -f ./tests/antithesis/Dockerfile.node .
+        echo "name=image::$REGISTRY/$REPOSITORY/$NODE_NAME:$TAG" >> $GITHUB_OUTPUT
+
+    - name: Build workload
+      id: build-workload-image
+      run: |
+        docker build -t $REGISTRY/$REPOSITORY/$WORKLOAD_NAME:$TAG -f ./tests/antithesis/Dockerfile.workload .
+        echo "name=image::$REGISTRY/$REPOSITORY/$WORKLOAD_NAME:$TAG" >> $GITHUB_OUTPUT
+
+    - name: Build config
+      id: build-config-image
+      run: |
+        docker build -t $REGISTRY/$REPOSITORY/$CONFIG_NAME:$TAG -f ./tests/antithesis/Dockerfile.config .
+        echo "name=image::$REGISTRY/$REPOSITORY/$CONFIG_NAME:$TAG" >> $GITHUB_OUTPUT
+
+    - name: Publish images
+      run: |
+        docker push ${REGISTRY}/${REPOSITORY}/${NODE_NAME}:${TAG}
+        docker push ${REGISTRY}/${REPOSITORY}/${WORKLOAD_NAME}:${TAG}
+        docker push ${REGISTRY}/${REPOSITORY}/${CONFIG_NAME}:${TAG}
