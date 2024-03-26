@@ -172,13 +172,12 @@ func (b *Bootstrapper) Start(ctx context.Context, startReqID uint32) error {
 	b.startingHeight = lastAcceptedHeight
 	b.requestID = startReqID
 
-	tree, err := interval.NewTree(b.DB)
+	b.tree, err = interval.NewTree(b.DB)
 	if err != nil {
 		return fmt.Errorf("failed to initialize interval tree: %w", err)
 	}
-	b.tree = tree
 
-	b.missingBlockIDs, err = interval.GetMissingBlockIDs(ctx, b.DB, b.VM, tree, b.startingHeight)
+	b.missingBlockIDs, err = getMissingBlockIDs(ctx, b.DB, b.VM, b.tree, b.startingHeight)
 	if err != nil {
 		return fmt.Errorf("failed to initialize missing block IDs: %w", err)
 	}
@@ -302,16 +301,6 @@ func (b *Bootstrapper) sendBootstrappingMessagesOrFinish(ctx context.Context) er
 		return b.startBootstrapping(ctx)
 	}
 
-	if !b.restarted {
-		b.Ctx.Log.Info("bootstrapping started syncing",
-			zap.Int("numAccepted", numAccepted),
-		)
-	} else {
-		b.Ctx.Log.Debug("bootstrapping started syncing",
-			zap.Int("numAccepted", numAccepted),
-		)
-	}
-
 	return b.startSyncing(ctx, accepted)
 }
 
@@ -385,9 +374,14 @@ func (b *Bootstrapper) startSyncing(ctx context.Context, acceptedContainerIDs []
 
 	b.missingBlockIDs.Add(acceptedContainerIDs...)
 	numMissingBlockIDs := b.missingBlockIDs.Len()
-	b.Ctx.Log.Debug("starting bootstrapping",
-		zap.Int("numMissingBlocks", numMissingBlockIDs),
+
+	log := b.Ctx.Log.Info
+	if b.restarted {
+		log = b.Ctx.Log.Debug
+	}
+	log("starting to fetch blocks",
 		zap.Int("numAcceptedBlocks", len(acceptedContainerIDs)),
+		zap.Int("numMissingBlocks", numMissingBlockIDs),
 	)
 
 	toProcess := make([]snowman.Block, 0, numMissingBlockIDs)
@@ -561,96 +555,74 @@ func (b *Bootstrapper) markUnavailable(nodeID ids.NodeID) {
 //
 //   - blk is a block that is assumed to have been marked as acceptable by the
 //     bootstrapping engine.
-//   - processingBlocks is a set of blocks that can be used to lookup blocks.
-//     This enables the engine to process multiple blocks without relying on the
-//     VM to have stored blocks during `ParseBlock`.
-//
-// If [blk]'s height is <= the last accepted height, then it will be removed
-// from the missingIDs set.
-func (b *Bootstrapper) process(ctx context.Context, blk snowman.Block, processingBlocks map[ids.ID]snowman.Block) error {
+//   - ancestors is a set of blocks that can be used to optimisically lookup
+//     parent blocks. This enables the engine to process multiple blocks without
+//     relying on the VM to have stored blocks during `ParseBlock`.
+func (b *Bootstrapper) process(
+	ctx context.Context,
+	blk snowman.Block,
+	ancestors map[ids.ID]snowman.Block,
+) error {
 	lastAcceptedHeight, err := b.getLastAcceptedHeight(ctx)
 	if err != nil {
 		return err
 	}
 
-	batch := b.DB.NewBatch()
-	for {
-		if b.Halted() {
-			return batch.Write()
-		}
+	numPreviouslyFetched := b.tree.Len()
 
-		blkID := blk.ID()
-		b.missingBlockIDs.Remove(blkID)
+	batch := b.DB.NewBatch()
+	missingBlockID, foundNewMissingID, err := process(
+		batch,
+		b.tree,
+		b.missingBlockIDs,
+		lastAcceptedHeight,
+		blk,
+		ancestors,
+	)
+	if err != nil {
+		return err
+	}
+
+	// Update metrics and log statuses
+	{
+		numFetched := b.tree.Len()
+		b.numFetched.Add(float64(b.tree.Len() - numPreviouslyFetched))
 
 		height := blk.Height()
 		b.tipHeight = max(b.tipHeight, height)
 
-		wantsParent, err := interval.Add(batch, b.tree, lastAcceptedHeight, blk)
-		if err != nil {
-			return err
-		}
-
-		// We added a new block to the queue, so track that it was fetched
-		b.numFetched.Inc()
-
-		// Periodically log progress
-		blocksFetchedSoFar := b.tree.Len()
-		if blocksFetchedSoFar%statusUpdateFrequency == 0 {
+		if numFetched%statusUpdateFrequency == 0 {
 			totalBlocksToFetch := b.tipHeight - b.startingHeight
 			eta := timer.EstimateETA(
 				b.startTime,
-				blocksFetchedSoFar-b.initiallyFetched, // Number of blocks we have fetched during this run
+				numFetched-b.initiallyFetched,         // Number of blocks we have fetched during this run
 				totalBlocksToFetch-b.initiallyFetched, // Number of blocks we expect to fetch during this run
 			)
 			b.fetchETA.Set(float64(eta))
 
 			if !b.restarted {
 				b.Ctx.Log.Info("fetching blocks",
-					zap.Uint64("numFetchedBlocks", blocksFetchedSoFar),
+					zap.Uint64("numFetchedBlocks", numFetched),
 					zap.Uint64("numTotalBlocks", totalBlocksToFetch),
 					zap.Duration("eta", eta),
 				)
 			} else {
 				b.Ctx.Log.Debug("fetching blocks",
-					zap.Uint64("numFetchedBlocks", blocksFetchedSoFar),
+					zap.Uint64("numFetchedBlocks", numFetched),
 					zap.Uint64("numTotalBlocks", totalBlocksToFetch),
 					zap.Duration("eta", eta),
 				)
 			}
 		}
-
-		if !wantsParent {
-			return batch.Write()
-		}
-
-		// Attempt to traverse to the next block
-		parentID := blk.Parent()
-		b.missingBlockIDs.Add(parentID)
-
-		// First check if the parent is in the processing blocks set
-		parent, ok := processingBlocks[parentID]
-		if ok {
-			blk = parent
-			continue
-		}
-
-		// If the parent is not available in processing blocks, attempt to get
-		// the block from the vm
-		parent, err = b.VM.GetBlock(ctx, parentID)
-		if err == nil {
-			blk = parent
-			continue
-		}
-		// TODO: report errors that aren't `database.ErrNotFound`
-
-		// If the block wasn't able to be acquired immediately, attempt to fetch
-		// it
-		if err := b.fetch(ctx, parentID); err != nil {
-			return err
-		}
-
-		return batch.Write()
 	}
+
+	if err := batch.Write(); err != nil || !foundNewMissingID {
+		return err
+	}
+
+	b.missingBlockIDs.Add(missingBlockID)
+	// Attempt to fetch the newly discovered block
+	return b.fetch(ctx, missingBlockID)
 }
 
 // tryStartExecuting executes all pending blocks if there are no more blocks
@@ -676,7 +648,7 @@ func (b *Bootstrapper) tryStartExecuting(ctx context.Context) error {
 	}
 
 	numToExecute := b.tree.Len()
-	err = interval.Execute(
+	err = execute(
 		&haltableContext{
 			Context:  ctx,
 			Haltable: b,

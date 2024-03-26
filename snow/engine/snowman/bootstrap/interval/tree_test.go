@@ -4,6 +4,7 @@
 package interval
 
 import (
+	"math"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -365,4 +366,24 @@ func TestTreeContains(t *testing.T) {
 			require.Equal(test.expected, tree.Contains(test.height))
 		})
 	}
+}
+
+func TestTreeLenOverflow(t *testing.T) {
+	require := require.New(t)
+
+	db := memdb.New()
+	require.NoError(PutInterval(db, math.MaxUint64, 0))
+
+	tree, err := NewTree(db)
+	require.NoError(err)
+	require.Zero(tree.Len())
+	require.True(tree.Contains(0))
+	require.True(tree.Contains(math.MaxUint64 / 2))
+	require.True(tree.Contains(math.MaxUint64))
+
+	require.NoError(tree.Remove(db, 5))
+	require.Equal(uint64(math.MaxUint64), tree.Len())
+
+	require.NoError(tree.Add(db, 5))
+	require.Zero(tree.Len())
 }
