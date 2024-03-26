@@ -70,7 +70,7 @@ func TestAddAndRemoveFees(t *testing.T) {
 	r := require.New(t)
 
 	fc := &Calculator{
-		IsEUpgradeActive:   true,
+		IsEActive:          true,
 		FeeManager:         fees.NewManager(testFeeRates),
 		BlockMaxComplexity: testBlockMaxComplexity,
 	}
@@ -921,7 +921,7 @@ func TestTxFees(t *testing.T) {
 			uTx, sTx := tt.unsignedAndSignedTx(t)
 
 			fc := &Calculator{
-				IsEUpgradeActive:   cfg.IsEActivated(chainTime),
+				IsEActive:          cfg.IsEActivated(chainTime),
 				Config:             cfg,
 				ChainTime:          chainTime,
 				FeeManager:         fees.NewManager(testFeeRates),

@@ -482,8 +482,8 @@ func (v *verifier) processStandardTxs(
 	}
 
 	var (
-		isEActivated = v.txExecutorBackend.Config.IsEActivated(parentBlkTime)
-		feesCfg      = config.GetDynamicFeesConfig(isEActivated)
+		isEActive = v.txExecutorBackend.Config.IsEActivated(parentBlkTime)
+		feesCfg   = config.GetDynamicFeesConfig(isEActive)
 
 		onAcceptFunc   func()
 		inputs         set.Set[ids.ID]
@@ -492,7 +492,7 @@ func (v *verifier) processStandardTxs(
 	)
 
 	feeMan := fees.NewManager(feeRates)
-	if isEActivated {
+	if isEActive {
 		if err := feeMan.UpdateFeeRates(
 			feesCfg,
 			parentBlkComplexity,
@@ -545,7 +545,7 @@ func (v *verifier) processStandardTxs(
 		return nil, nil, nil, nil, err
 	}
 
-	if isEActivated {
+	if isEActive {
 		state.SetFeeRates(feeMan.GetFeeRates())
 		state.SetLastBlockComplexity(feeMan.GetCumulatedComplexity())
 	}

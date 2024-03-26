@@ -162,7 +162,7 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 
 				// retrieve fees paid for the tx
 				feeCalc := fees.Calculator{
-					IsEUpgradeActive:   true,
+					IsEActive:          true,
 					FeeManager:         commonfees.NewManager(nextFeeRates),
 					BlockMaxComplexity: maxComplexity,
 					Credentials:        tx.Creds,
