@@ -79,10 +79,10 @@ func getMissingBlockIDs(
 func process(
 	db database.KeyValueWriterDeleter,
 	tree *interval.Tree,
-	blk snowman.Block,
-	ancestors map[ids.ID]snowman.Block,
 	missingBlockIDs set.Set[ids.ID],
 	lastAcceptedHeight uint64,
+	blk snowman.Block,
+	ancestors map[ids.ID]snowman.Block,
 ) (ids.ID, bool, error) {
 	for {
 		// It's possible that missingBlockIDs contain values contained inside of
