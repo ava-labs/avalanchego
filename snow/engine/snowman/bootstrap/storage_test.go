@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/bootstrap/interval"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -255,6 +256,7 @@ func TestExecute(t *testing.T) {
 
 	require.NoError(execute(
 		context.Background(),
+		&common.Halter{},
 		logging.NoLog{}.Info,
 		db,
 		parser,
@@ -271,7 +273,7 @@ func TestExecute(t *testing.T) {
 	require.Zero(size)
 }
 
-func TestExecuteExitsWhenCancelled(t *testing.T) {
+func TestExecuteExitsWhenHalted(t *testing.T) {
 	require := require.New(t)
 
 	blocks := generateBlockchain(7)
@@ -298,17 +300,18 @@ func TestExecuteExitsWhenCancelled(t *testing.T) {
 	startSize, err := database.Count(db)
 	require.NoError(err)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
+	halter := common.Halter{}
+	halter.Halt(context.Background())
 	err = execute(
-		ctx,
+		context.Background(),
+		&halter,
 		logging.NoLog{}.Info,
 		db,
 		parser,
 		tree,
 		lastAcceptedHeight,
 	)
-	require.ErrorIs(err, context.Canceled)
+	require.NoError(err)
 
 	for _, block := range blocks[lastAcceptedHeight+1:] {
 		require.Equal(choices.Processing, block.Status())
@@ -348,6 +351,7 @@ func TestExecuteSkipsAcceptedBlocks(t *testing.T) {
 
 	require.NoError(execute(
 		context.Background(),
+		&common.Halter{},
 		logging.NoLog{}.Info,
 		db,
 		parser,
