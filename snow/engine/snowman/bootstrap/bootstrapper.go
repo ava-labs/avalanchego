@@ -574,10 +574,10 @@ func (b *Bootstrapper) process(
 	missingBlockID, foundNewMissingID, err := process(
 		batch,
 		b.tree,
-		blk,
-		ancestors,
 		b.missingBlockIDs,
 		lastAcceptedHeight,
+		blk,
+		ancestors,
 	)
 	if err != nil {
 		return err

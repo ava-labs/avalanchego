@@ -174,12 +174,12 @@ func TestProcess(t *testing.T) {
 		parentID, shouldFetchParentID, err := process(
 			db,
 			tree,
+			missingIDs,
+			lastAcceptedHeight,
 			blocks[6],
 			map[ids.ID]snowman.Block{
 				blocks[2].ID(): blocks[2],
 			},
-			missingIDs,
-			lastAcceptedHeight,
 		)
 		require.NoError(err)
 		require.True(shouldFetchParentID)
@@ -195,13 +195,13 @@ func TestProcess(t *testing.T) {
 		parentID, shouldFetchParentID, err := process(
 			db,
 			tree,
+			missingIDs,
+			lastAcceptedHeight,
 			blocks[5],
 			map[ids.ID]snowman.Block{
 				blocks[4].ID(): blocks[4],
 				blocks[3].ID(): blocks[3],
 			},
-			missingIDs,
-			lastAcceptedHeight,
 		)
 		require.NoError(err)
 		require.True(shouldFetchParentID)
@@ -217,10 +217,10 @@ func TestProcess(t *testing.T) {
 		_, shouldFetchParentID, err := process(
 			db,
 			tree,
-			blocks[2],
-			nil,
 			missingIDs,
 			lastAcceptedHeight,
+			blocks[2],
+			nil,
 		)
 		require.NoError(err)
 		require.False(shouldFetchParentID)
