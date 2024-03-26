@@ -26,9 +26,10 @@ func Add(
 		return false, err
 	}
 
-	// We know that height is greater than lastAcceptedHeight here, so
-	// lastAcceptedHeight+1 is guaranteed not to overflow.
-	return height != lastAcceptedHeight+1 && !tree.Contains(height-1), nil
+	// We know that height is greater than lastAcceptedHeight here, so height-1
+	// is guaranteed not to underflow.
+	nextHeight := height - 1
+	return nextHeight != lastAcceptedHeight && !tree.Contains(nextHeight), nil
 }
 
 // Remove the block from the tree.
