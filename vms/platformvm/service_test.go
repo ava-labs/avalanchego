@@ -358,7 +358,7 @@ func TestGetBalance(t *testing.T) {
 				feeCfg    = config.GetDynamicFeesConfig(service.vm.Config.IsEActivated(chainTime))
 				feeMan    = commonfees.NewManager(feeCfg.FeeRate)
 				feeCalc   = &fees.Calculator{
-					IsEUpgradeActive:   service.vm.IsEActivated(chainTime),
+					IsEActive:          service.vm.IsEActivated(chainTime),
 					Config:             &service.vm.Config,
 					ChainTime:          chainTime,
 					FeeManager:         feeMan,

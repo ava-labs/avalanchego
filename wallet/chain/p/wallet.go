@@ -306,7 +306,7 @@ func (w *wallet) IssueBaseTx(
 
 		feesMan = commonfees.NewManager(w.feeRates)
 		feeCalc = &fees.Calculator{
-			IsEUpgradeActive: w.isEForkActive,
+			IsEActive: w.isEForkActive,
 			Config: &config.Config{
 				CreateSubnetTxFee: w.builder.Context().CreateSubnetTxFee,
 			},
@@ -334,7 +334,7 @@ func (w *wallet) IssueAddValidatorTx(
 
 	feesMan := commonfees.NewManager(w.feeRates)
 	feeCalc := &fees.Calculator{
-		IsEUpgradeActive: w.isEForkActive,
+		IsEActive: w.isEForkActive,
 		Config: &config.Config{
 			AddPrimaryNetworkValidatorFee: w.builder.Context().AddPrimaryNetworkValidatorFee,
 		},
@@ -359,7 +359,7 @@ func (w *wallet) IssueAddSubnetValidatorTx(
 
 	feesMan := commonfees.NewManager(w.feeRates)
 	feeCalc := &fees.Calculator{
-		IsEUpgradeActive: w.isEForkActive,
+		IsEActive: w.isEForkActive,
 		Config: &config.Config{
 			TxFee: w.builder.Context().BaseTxFee,
 		},
@@ -385,7 +385,7 @@ func (w *wallet) IssueRemoveSubnetValidatorTx(
 
 	feesMan := commonfees.NewManager(w.feeRates)
 	feeCalc := &fees.Calculator{
-		IsEUpgradeActive: w.isEForkActive,
+		IsEActive: w.isEForkActive,
 		Config: &config.Config{
 			TxFee: w.builder.Context().BaseTxFee,
 		},
@@ -411,7 +411,7 @@ func (w *wallet) IssueAddDelegatorTx(
 
 	feesMan := commonfees.NewManager(w.feeRates)
 	feeCalc := &fees.Calculator{
-		IsEUpgradeActive: w.isEForkActive,
+		IsEActive: w.isEForkActive,
 		Config: &config.Config{
 			AddPrimaryNetworkDelegatorFee: w.builder.Context().AddPrimaryNetworkDelegatorFee,
 		},
@@ -440,7 +440,7 @@ func (w *wallet) IssueCreateChainTx(
 
 	feesMan := commonfees.NewManager(w.feeRates)
 	feeCalc := &fees.Calculator{
-		IsEUpgradeActive: w.isEForkActive,
+		IsEActive: w.isEForkActive,
 		Config: &config.Config{
 			CreateBlockchainTxFee: w.builder.Context().CreateBlockchainTxFee,
 		},
@@ -465,7 +465,7 @@ func (w *wallet) IssueCreateSubnetTx(
 
 	feesMan := commonfees.NewManager(w.feeRates)
 	feeCalc := &fees.Calculator{
-		IsEUpgradeActive: w.isEForkActive,
+		IsEActive: w.isEForkActive,
 		Config: &config.Config{
 			CreateSubnetTxFee: w.builder.Context().CreateSubnetTxFee,
 		},
@@ -490,7 +490,7 @@ func (w *wallet) IssueTransferSubnetOwnershipTx(
 
 	feesMan := commonfees.NewManager(w.feeRates)
 	feeCalc := &fees.Calculator{
-		IsEUpgradeActive: w.isEForkActive,
+		IsEActive: w.isEForkActive,
 		Config: &config.Config{
 			TxFee: w.builder.Context().BaseTxFee,
 		},
@@ -516,7 +516,7 @@ func (w *wallet) IssueImportTx(
 
 	feesMan := commonfees.NewManager(w.feeRates)
 	feeCalc := &fees.Calculator{
-		IsEUpgradeActive: w.isEForkActive,
+		IsEActive: w.isEForkActive,
 		Config: &config.Config{
 			TxFee: w.builder.Context().BaseTxFee,
 		},
@@ -542,7 +542,7 @@ func (w *wallet) IssueExportTx(
 
 	feesMan := commonfees.NewManager(w.feeRates)
 	feeCalc := &fees.Calculator{
-		IsEUpgradeActive: w.isEForkActive,
+		IsEActive: w.isEForkActive,
 		Config: &config.Config{
 			TxFee: w.builder.Context().BaseTxFee,
 		},
@@ -580,7 +580,7 @@ func (w *wallet) IssueTransformSubnetTx(
 
 	feesMan := commonfees.NewManager(w.feeRates)
 	feeCalc := &fees.Calculator{
-		IsEUpgradeActive: w.isEForkActive,
+		IsEActive: w.isEForkActive,
 		Config: &config.Config{
 			TransformSubnetTxFee: w.builder.Context().TransformSubnetTxFee,
 		},
@@ -626,7 +626,7 @@ func (w *wallet) IssueAddPermissionlessValidatorTx(
 
 	feesMan := commonfees.NewManager(w.feeRates)
 	feeCalc := &fees.Calculator{
-		IsEUpgradeActive: w.isEForkActive,
+		IsEActive: w.isEForkActive,
 		Config: &config.Config{
 			AddPrimaryNetworkValidatorFee: w.builder.Context().AddPrimaryNetworkValidatorFee,
 			AddSubnetValidatorFee:         w.builder.Context().AddSubnetValidatorFee,
@@ -663,7 +663,7 @@ func (w *wallet) IssueAddPermissionlessDelegatorTx(
 
 	feesMan := commonfees.NewManager(w.feeRates)
 	feeCalc := &fees.Calculator{
-		IsEUpgradeActive: w.isEForkActive,
+		IsEActive: w.isEForkActive,
 		Config: &config.Config{
 			AddPrimaryNetworkDelegatorFee: w.builder.Context().AddPrimaryNetworkDelegatorFee,
 			AddSubnetDelegatorFee:         w.builder.Context().AddSubnetDelegatorFee,

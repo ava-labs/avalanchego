@@ -237,7 +237,7 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 				chainTime = env.state.GetTimestamp()
 				feeCfg    = config.GetDynamicFeesConfig(cfg.IsEActivated(chainTime))
 				feeCalc   = &fees.Calculator{
-					IsEUpgradeActive:   false,
+					IsEActive:          false,
 					Config:             &cfg,
 					ChainTime:          test.time,
 					FeeManager:         commonfees.NewManager(feeCfg.FeeRate),

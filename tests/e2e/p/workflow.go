@@ -158,7 +158,7 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 				// retrieve fees paid for the tx
 				feeCfg := config.GetDynamicFeesConfig(true /*isEActive*/)
 				feeCalc := fees.Calculator{
-					IsEUpgradeActive:   true,
+					IsEActive:          true,
 					FeeManager:         commonfees.NewManager(feeCfg.FeeRate),
 					BlockMaxComplexity: feeCfg.BlockMaxComplexity,
 					Credentials:        tx.Creds,

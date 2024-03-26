@@ -823,13 +823,13 @@ func (b *builder) builders(keys []*secp256k1.PrivateKey) (walletbuilder.Builder,
 
 func (b *builder) feeCalculator() *fees.Calculator {
 	var (
-		chainTime        = b.state.GetTimestamp()
-		feeCfg           = config.GetDynamicFeesConfig(b.cfg.IsEActivated(chainTime))
-		isEUpgradeActive = b.cfg.IsEActivated(chainTime)
+		chainTime = b.state.GetTimestamp()
+		feeCfg    = config.GetDynamicFeesConfig(b.cfg.IsEActivated(chainTime))
+		isEActive = b.cfg.IsEActivated(chainTime)
 	)
 
 	return &fees.Calculator{
-		IsEUpgradeActive:   isEUpgradeActive,
+		IsEActive:          isEActive,
 		Config:             b.cfg,
 		ChainTime:          chainTime,
 		FeeManager:         commonfees.NewManager(feeCfg.FeeRate),

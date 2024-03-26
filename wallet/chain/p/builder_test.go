@@ -100,7 +100,7 @@ func TestBaseTx(t *testing.T) {
 
 	{ // Post E-Upgrade
 		feeCalc := &fees.Calculator{
-			IsEUpgradeActive:   true,
+			IsEActive:          true,
 			FeeManager:         commonfees.NewManager(testFeeRates),
 			BlockMaxComplexity: testBlockMaxComplexity,
 		}
@@ -114,7 +114,7 @@ func TestBaseTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := &fees.Calculator{
-			IsEUpgradeActive:   true,
+			IsEActive:          true,
 			FeeManager:         commonfees.NewManager(testFeeRates),
 			BlockMaxComplexity: testBlockMaxComplexity,
 			Credentials:        tx.Creds,
@@ -136,7 +136,7 @@ func TestBaseTx(t *testing.T) {
 
 	{ // Pre E-Upgrade
 		feeCalc := &fees.Calculator{
-			IsEUpgradeActive: false,
+			IsEActive: false,
 			Config: &config.Config{
 				TxFee: testContext.CreateSubnetTxFee,
 			},
@@ -153,7 +153,7 @@ func TestBaseTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := &fees.Calculator{
-			IsEUpgradeActive: false,
+			IsEActive: false,
 			Config: &config.Config{
 				TxFee: testContext.CreateSubnetTxFee,
 			},
@@ -229,7 +229,7 @@ func TestAddSubnetValidatorTx(t *testing.T) {
 
 	{ // Post E-Upgrade
 		feeCalc := &fees.Calculator{
-			IsEUpgradeActive:   true,
+			IsEActive:          true,
 			FeeManager:         commonfees.NewManager(testFeeRates),
 			BlockMaxComplexity: testBlockMaxComplexity,
 		}
@@ -240,7 +240,7 @@ func TestAddSubnetValidatorTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := &fees.Calculator{
-			IsEUpgradeActive: true,
+			IsEActive: true,
 			Config: &config.Config{
 				AddSubnetValidatorFee: units.MilliAvax,
 			},
@@ -264,7 +264,7 @@ func TestAddSubnetValidatorTx(t *testing.T) {
 
 	{ // Pre E-Upgrade
 		feeCalc := &fees.Calculator{
-			IsEUpgradeActive: false,
+			IsEActive: false,
 			Config: &config.Config{
 				AddSubnetValidatorFee: testContext.AddSubnetValidatorFee,
 			},
@@ -278,7 +278,7 @@ func TestAddSubnetValidatorTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := &fees.Calculator{
-			IsEUpgradeActive: false,
+			IsEActive: false,
 			Config: &config.Config{
 				AddSubnetValidatorFee: testContext.AddSubnetValidatorFee,
 			},
@@ -345,7 +345,7 @@ func TestRemoveSubnetValidatorTx(t *testing.T) {
 
 	{ // Post E-Upgrade
 		feeCalc := &fees.Calculator{
-			IsEUpgradeActive:   true,
+			IsEActive:          true,
 			FeeManager:         commonfees.NewManager(testFeeRates),
 			BlockMaxComplexity: testBlockMaxComplexity,
 		}
@@ -360,7 +360,7 @@ func TestRemoveSubnetValidatorTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := &fees.Calculator{
-			IsEUpgradeActive:   true,
+			IsEActive:          true,
 			FeeManager:         commonfees.NewManager(testFeeRates),
 			BlockMaxComplexity: testBlockMaxComplexity,
 			Credentials:        tx.Creds,
@@ -382,7 +382,7 @@ func TestRemoveSubnetValidatorTx(t *testing.T) {
 
 	{ // Pre E-Upgrade
 		feeCalc := &fees.Calculator{
-			IsEUpgradeActive: false,
+			IsEActive: false,
 			Config: &config.Config{
 				TxFee: testContext.BaseTxFee,
 			},
@@ -400,7 +400,7 @@ func TestRemoveSubnetValidatorTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := &fees.Calculator{
-			IsEUpgradeActive: false,
+			IsEActive: false,
 			Config: &config.Config{
 				TxFee: testContext.BaseTxFee,
 			},
@@ -473,7 +473,7 @@ func TestCreateChainTx(t *testing.T) {
 
 	{ // Post E-Upgrade
 		feeCalc := &fees.Calculator{
-			IsEUpgradeActive:   true,
+			IsEActive:          true,
 			FeeManager:         commonfees.NewManager(testFeeRates),
 			BlockMaxComplexity: testBlockMaxComplexity,
 		}
@@ -491,7 +491,7 @@ func TestCreateChainTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := &fees.Calculator{
-			IsEUpgradeActive:   true,
+			IsEActive:          true,
 			FeeManager:         commonfees.NewManager(testFeeRates),
 			BlockMaxComplexity: testBlockMaxComplexity,
 			Credentials:        tx.Creds,
@@ -512,7 +512,7 @@ func TestCreateChainTx(t *testing.T) {
 
 	{ // Pre E-Upgrade
 		feeCalc := &fees.Calculator{
-			IsEUpgradeActive: false,
+			IsEActive: false,
 			Config: &config.Config{
 				CreateBlockchainTxFee: testContext.CreateBlockchainTxFee,
 			},
@@ -533,7 +533,7 @@ func TestCreateChainTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := &fees.Calculator{
-			IsEUpgradeActive: false,
+			IsEActive: false,
 			Config: &config.Config{
 				CreateBlockchainTxFee: testContext.CreateBlockchainTxFee,
 			},
@@ -599,7 +599,7 @@ func TestCreateSubnetTx(t *testing.T) {
 
 	{ // Post E-Upgrade
 		feeCalc := &fees.Calculator{
-			IsEUpgradeActive:   true,
+			IsEActive:          true,
 			FeeManager:         commonfees.NewManager(testFeeRates),
 			BlockMaxComplexity: testBlockMaxComplexity,
 		}
@@ -613,7 +613,7 @@ func TestCreateSubnetTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := &fees.Calculator{
-			IsEUpgradeActive:   true,
+			IsEActive:          true,
 			FeeManager:         commonfees.NewManager(testFeeRates),
 			BlockMaxComplexity: testBlockMaxComplexity,
 			Credentials:        tx.Creds,
@@ -634,7 +634,7 @@ func TestCreateSubnetTx(t *testing.T) {
 
 	{ // Pre E-Upgrade
 		feeCalc := &fees.Calculator{
-			IsEUpgradeActive: false,
+			IsEActive: false,
 			Config: &config.Config{
 				CreateSubnetTxFee: testContext.CreateSubnetTxFee,
 			},
@@ -651,7 +651,7 @@ func TestCreateSubnetTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := &fees.Calculator{
-			IsEUpgradeActive: false,
+			IsEActive: false,
 			Config: &config.Config{
 				CreateSubnetTxFee: testContext.CreateSubnetTxFee,
 			},
@@ -718,7 +718,7 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 
 	{ // Post E-Upgrade
 		feeCalc := &fees.Calculator{
-			IsEUpgradeActive:   true,
+			IsEActive:          true,
 			FeeManager:         commonfees.NewManager(testFeeRates),
 			BlockMaxComplexity: testBlockMaxComplexity,
 		}
@@ -733,7 +733,7 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := &fees.Calculator{
-			IsEUpgradeActive:   true,
+			IsEActive:          true,
 			FeeManager:         commonfees.NewManager(testFeeRates),
 			BlockMaxComplexity: testBlockMaxComplexity,
 			Credentials:        tx.Creds,
@@ -754,7 +754,7 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 
 	{ // Pre E-Upgrade
 		feeCalc := &fees.Calculator{
-			IsEUpgradeActive: false,
+			IsEActive: false,
 			Config: &config.Config{
 				TxFee: testContext.BaseTxFee,
 			},
@@ -772,7 +772,7 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := &fees.Calculator{
-			IsEUpgradeActive: false,
+			IsEActive: false,
 			Config: &config.Config{
 				TxFee: testContext.BaseTxFee,
 			},
@@ -833,7 +833,7 @@ func TestImportTx(t *testing.T) {
 
 	{ // Post E-Upgrade
 		feeCalc := &fees.Calculator{
-			IsEUpgradeActive:   true,
+			IsEActive:          true,
 			FeeManager:         commonfees.NewManager(testFeeRates),
 			BlockMaxComplexity: testBlockMaxComplexity,
 		}
@@ -848,7 +848,7 @@ func TestImportTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := &fees.Calculator{
-			IsEUpgradeActive:   true,
+			IsEActive:          true,
 			FeeManager:         commonfees.NewManager(testFeeRates),
 			BlockMaxComplexity: testBlockMaxComplexity,
 			Credentials:        tx.Creds,
@@ -871,7 +871,7 @@ func TestImportTx(t *testing.T) {
 
 	{ // Pre E-Upgrade
 		feeCalc := &fees.Calculator{
-			IsEUpgradeActive: false,
+			IsEActive: false,
 			Config: &config.Config{
 				TxFee: testContext.BaseTxFee,
 			},
@@ -889,7 +889,7 @@ func TestImportTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := &fees.Calculator{
-			IsEUpgradeActive: false,
+			IsEActive: false,
 			Config: &config.Config{
 				TxFee: testContext.BaseTxFee,
 			},
@@ -948,7 +948,7 @@ func TestExportTx(t *testing.T) {
 
 	{ // Post E-Upgrade
 		feeCalc := &fees.Calculator{
-			IsEUpgradeActive:   true,
+			IsEActive:          true,
 			FeeManager:         commonfees.NewManager(testFeeRates),
 			BlockMaxComplexity: testBlockMaxComplexity,
 		}
@@ -963,7 +963,7 @@ func TestExportTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := &fees.Calculator{
-			IsEUpgradeActive:   true,
+			IsEActive:          true,
 			FeeManager:         commonfees.NewManager(testFeeRates),
 			BlockMaxComplexity: testBlockMaxComplexity,
 			Credentials:        tx.Creds,
@@ -985,7 +985,7 @@ func TestExportTx(t *testing.T) {
 
 	{ // Pre E-Upgrade
 		feeCalc := &fees.Calculator{
-			IsEUpgradeActive: false,
+			IsEActive: false,
 			Config: &config.Config{
 				TxFee: testContext.BaseTxFee,
 			},
@@ -1003,7 +1003,7 @@ func TestExportTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := &fees.Calculator{
-			IsEUpgradeActive: false,
+			IsEActive: false,
 			Config: &config.Config{
 				TxFee: testContext.BaseTxFee,
 			},
@@ -1075,7 +1075,7 @@ func TestTransformSubnetTx(t *testing.T) {
 
 	{ // Post E-Upgrade
 		feeCalc := &fees.Calculator{
-			IsEUpgradeActive:   true,
+			IsEActive:          true,
 			FeeManager:         commonfees.NewManager(testFeeRates),
 			BlockMaxComplexity: testBlockMaxComplexity,
 		}
@@ -1102,7 +1102,7 @@ func TestTransformSubnetTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := &fees.Calculator{
-			IsEUpgradeActive:   true,
+			IsEActive:          true,
 			FeeManager:         commonfees.NewManager(testFeeRates),
 			BlockMaxComplexity: testBlockMaxComplexity,
 			Credentials:        tx.Creds,
@@ -1126,7 +1126,7 @@ func TestTransformSubnetTx(t *testing.T) {
 
 	{ // Pre E-Upgrade
 		feeCalc := &fees.Calculator{
-			IsEUpgradeActive: false,
+			IsEActive: false,
 			Config: &config.Config{
 				TransformSubnetTxFee: testContext.TransformSubnetTxFee,
 			},
@@ -1156,7 +1156,7 @@ func TestTransformSubnetTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := &fees.Calculator{
-			IsEUpgradeActive: false,
+			IsEActive: false,
 			Config: &config.Config{
 				TransformSubnetTxFee: testContext.TransformSubnetTxFee,
 			},
@@ -1222,7 +1222,7 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 
 	{ // Post E-Upgrade
 		feeCalc := &fees.Calculator{
-			IsEUpgradeActive:   true,
+			IsEActive:          true,
 			FeeManager:         commonfees.NewManager(testFeeRates),
 			BlockMaxComplexity: testBlockMaxComplexity,
 		}
@@ -1248,7 +1248,7 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := &fees.Calculator{
-			IsEUpgradeActive:   true,
+			IsEActive:          true,
 			FeeManager:         commonfees.NewManager(testFeeRates),
 			BlockMaxComplexity: testBlockMaxComplexity,
 			Credentials:        tx.Creds,
@@ -1274,7 +1274,7 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 
 	{ // Pre E-Upgrade
 		feeCalc := &fees.Calculator{
-			IsEUpgradeActive: false,
+			IsEActive: false,
 			Config: &config.Config{
 				AddPrimaryNetworkValidatorFee: testContext.AddPrimaryNetworkValidatorFee,
 			},
@@ -1303,7 +1303,7 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := &fees.Calculator{
-			IsEUpgradeActive: false,
+			IsEActive: false,
 			Config: &config.Config{
 				AddPrimaryNetworkValidatorFee: testContext.AddPrimaryNetworkValidatorFee,
 			},
@@ -1362,7 +1362,7 @@ func TestAddPermissionlessDelegatorTx(t *testing.T) {
 
 	{ // Post E-Upgrade
 		feeCalc := &fees.Calculator{
-			IsEUpgradeActive:   true,
+			IsEActive:          true,
 			FeeManager:         commonfees.NewManager(testFeeRates),
 			BlockMaxComplexity: testBlockMaxComplexity,
 		}
@@ -1385,7 +1385,7 @@ func TestAddPermissionlessDelegatorTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := &fees.Calculator{
-			IsEUpgradeActive:   true,
+			IsEActive:          true,
 			FeeManager:         commonfees.NewManager(testFeeRates),
 			BlockMaxComplexity: testBlockMaxComplexity,
 			Credentials:        tx.Creds,
@@ -1411,7 +1411,7 @@ func TestAddPermissionlessDelegatorTx(t *testing.T) {
 
 	{ // Pre E-Upgrade
 		feeCalc := &fees.Calculator{
-			IsEUpgradeActive: false,
+			IsEActive: false,
 			Config: &config.Config{
 				AddPrimaryNetworkDelegatorFee: testContext.AddPrimaryNetworkDelegatorFee,
 			},
@@ -1437,7 +1437,7 @@ func TestAddPermissionlessDelegatorTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := &fees.Calculator{
-			IsEUpgradeActive: false,
+			IsEActive: false,
 			Config: &config.Config{
 				AddPrimaryNetworkDelegatorFee: testContext.AddPrimaryNetworkDelegatorFee,
 			},

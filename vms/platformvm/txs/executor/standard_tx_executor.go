@@ -62,6 +62,7 @@ func (e *StandardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 	var (
 		currentTimestamp = e.State.GetTimestamp()
 		isDurangoActive  = e.Config.IsDurangoActivated(currentTimestamp)
+		isEActive        = e.Config.IsEActivated(currentTimestamp)
 	)
 	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
 		return err
@@ -74,7 +75,7 @@ func (e *StandardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 
 	// Verify the flowcheck
 	feeCalculator := fees.Calculator{
-		IsEUpgradeActive:   e.Backend.Config.IsEActivated(currentTimestamp),
+		IsEActive:          isEActive,
 		Config:             e.Backend.Config,
 		ChainTime:          currentTimestamp,
 		FeeManager:         e.BlkFeeManager,
@@ -124,6 +125,7 @@ func (e *StandardTxExecutor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 	var (
 		currentTimestamp = e.State.GetTimestamp()
 		isDurangoActive  = e.Config.IsDurangoActivated(currentTimestamp)
+		isEActive        = e.Config.IsEActivated(currentTimestamp)
 	)
 	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
 		return err
@@ -131,7 +133,7 @@ func (e *StandardTxExecutor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 
 	// Verify the flowcheck
 	feeCalculator := fees.Calculator{
-		IsEUpgradeActive:   e.Backend.Config.IsEActivated(currentTimestamp),
+		IsEActive:          isEActive,
 		Config:             e.Backend.Config,
 		ChainTime:          currentTimestamp,
 		FeeManager:         e.BlkFeeManager,
@@ -175,6 +177,7 @@ func (e *StandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 	var (
 		currentTimestamp = e.State.GetTimestamp()
 		isDurangoActive  = e.Config.IsDurangoActivated(currentTimestamp)
+		isEActive        = e.Config.IsEActivated(currentTimestamp)
 	)
 	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
 		return err
@@ -227,7 +230,7 @@ func (e *StandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 			currentTimestamp = e.State.GetTimestamp()
 		)
 		feeCalculator := fees.Calculator{
-			IsEUpgradeActive:   cfg.IsEActivated(currentTimestamp),
+			IsEActive:          isEActive,
 			Config:             cfg,
 			ChainTime:          currentTimestamp,
 			FeeManager:         e.BlkFeeManager,
@@ -278,6 +281,7 @@ func (e *StandardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 	var (
 		currentTimestamp = e.State.GetTimestamp()
 		isDurangoActive  = e.Config.IsDurangoActivated(currentTimestamp)
+		isEActive        = e.Config.IsEActivated(currentTimestamp)
 	)
 	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
 		return err
@@ -291,7 +295,7 @@ func (e *StandardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 
 	// Verify the flowcheck
 	feeCalculator := fees.Calculator{
-		IsEUpgradeActive:   e.Backend.Config.IsEActivated(currentTimestamp),
+		IsEActive:          isEActive,
 		Config:             e.Backend.Config,
 		ChainTime:          currentTimestamp,
 		FeeManager:         e.BlkFeeManager,
@@ -477,6 +481,7 @@ func (e *StandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 	var (
 		currentTimestamp = e.State.GetTimestamp()
 		isDurangoActive  = e.Config.IsDurangoActivated(currentTimestamp)
+		isEActive        = e.Config.IsEActivated(currentTimestamp)
 	)
 	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
 		return err
@@ -494,7 +499,7 @@ func (e *StandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 	}
 
 	feeCalculator := fees.Calculator{
-		IsEUpgradeActive:   e.Backend.Config.IsEActivated(currentTimestamp),
+		IsEActive:          isEActive,
 		Config:             e.Backend.Config,
 		ChainTime:          currentTimestamp,
 		FeeManager:         e.BlkFeeManager,
@@ -617,7 +622,14 @@ func (e *StandardTxExecutor) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwn
 }
 
 func (e *StandardTxExecutor) BaseTx(tx *txs.BaseTx) error {
-	if !e.Backend.Config.IsDurangoActivated(e.State.GetTimestamp()) {
+	var (
+		cfg              = e.Backend.Config
+		currentTimestamp = e.State.GetTimestamp()
+		IsDurangoActive  = cfg.IsDurangoActivated(currentTimestamp)
+		isEActive        = cfg.IsEActivated(currentTimestamp)
+	)
+
+	if !IsDurangoActive {
 		return ErrDurangoUpgradeNotActive
 	}
 
@@ -631,12 +643,8 @@ func (e *StandardTxExecutor) BaseTx(tx *txs.BaseTx) error {
 	}
 
 	// Verify the flowcheck
-	var (
-		cfg              = e.Backend.Config
-		currentTimestamp = e.State.GetTimestamp()
-	)
 	feeCalculator := fees.Calculator{
-		IsEUpgradeActive:   cfg.IsEActivated(currentTimestamp),
+		IsEActive:          isEActive,
 		Config:             cfg,
 		ChainTime:          currentTimestamp,
 		FeeManager:         e.BlkFeeManager,

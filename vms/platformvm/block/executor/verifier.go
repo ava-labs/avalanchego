@@ -447,9 +447,9 @@ func (v *verifier) processStandardTxs(txs []*txs.Tx, state state.Diff, parentID 
 	error,
 ) {
 	var (
-		isEActivated = v.txExecutorBackend.Config.IsEActivated(state.GetTimestamp())
-		feesCfg      = config.GetDynamicFeesConfig(isEActivated)
-		feesMan      = fees.NewManager(feesCfg.FeeRate)
+		isEActive = v.txExecutorBackend.Config.IsEActivated(state.GetTimestamp())
+		feesCfg   = config.GetDynamicFeesConfig(isEActive)
+		feesMan   = fees.NewManager(feesCfg.FeeRate)
 
 		onAcceptFunc   func()
 		inputs         set.Set[ids.ID]
