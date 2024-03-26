@@ -42,6 +42,7 @@ func buildCreateAssetTx(
 	denomination byte,
 	initialStates map[uint32][]verify.State,
 	kc *secp256k1fx.Keychain,
+	tipPercentage commonfees.TipPercentage, //nolint:unparam
 	changeAddr ids.ShortID,
 ) (*txs.Tx, ids.ShortID, error) {
 	feeRates, err := backend.State().GetFeeRates()
@@ -60,7 +61,7 @@ func buildCreateAssetTx(
 		denomination,
 		initialStates,
 		feeCalc,
-		options(changeAddr, nil /*memo*/)...,
+		options(changeAddr, tipPercentage, nil /*memo*/)...,
 	)
 	if err != nil {
 		return nil, ids.ShortEmpty, fmt.Errorf("failed building base tx: %w", err)
@@ -79,6 +80,7 @@ func buildBaseTx(
 	outs []*avax.TransferableOutput,
 	memo []byte,
 	kc *secp256k1fx.Keychain,
+	tipPercentage commonfees.TipPercentage, //nolint:unparam
 	changeAddr ids.ShortID,
 ) (*txs.Tx, ids.ShortID, error) {
 	feeRates, err := backend.State().GetFeeRates()
@@ -94,7 +96,7 @@ func buildBaseTx(
 	utx, err := pBuilder.NewBaseTx(
 		outs,
 		feeCalc,
-		options(changeAddr, memo)...,
+		options(changeAddr, tipPercentage, memo)...,
 	)
 	if err != nil {
 		return nil, ids.ShortEmpty, fmt.Errorf("failed building base tx: %w", err)
@@ -114,6 +116,7 @@ func mintNFT(
 	payload []byte,
 	owners []*secp256k1fx.OutputOwners,
 	kc *secp256k1fx.Keychain,
+	tipPercentage commonfees.TipPercentage,
 	changeAddr ids.ShortID,
 ) (*txs.Tx, error) {
 	feeRates, err := backend.State().GetFeeRates()
@@ -131,7 +134,7 @@ func mintNFT(
 		payload,
 		owners,
 		feeCalc,
-		options(changeAddr, nil /*memo*/)...,
+		options(changeAddr, tipPercentage, nil /*memo*/)...,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed minting NFTs: %w", err)
@@ -144,6 +147,7 @@ func mintFTs(
 	backend txBuilderBackend,
 	outputs map[ids.ID]*secp256k1fx.TransferOutput,
 	kc *secp256k1fx.Keychain,
+	tipPercentage commonfees.TipPercentage,
 	changeAddr ids.ShortID,
 ) (*txs.Tx, error) {
 	feeRates, err := backend.State().GetFeeRates()
@@ -158,7 +162,7 @@ func mintFTs(
 	utx, err := pBuilder.NewOperationTxMintFT(
 		outputs,
 		feeCalc,
-		options(changeAddr, nil /*memo*/)...,
+		options(changeAddr, tipPercentage, nil /*memo*/)...,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed minting FTs: %w", err)
@@ -171,6 +175,7 @@ func buildOperation(
 	backend txBuilderBackend,
 	ops []*txs.Operation,
 	kc *secp256k1fx.Keychain,
+	tipPercentage commonfees.TipPercentage, //nolint:unparam
 	changeAddr ids.ShortID,
 ) (*txs.Tx, error) {
 	feeRates, err := backend.State().GetFeeRates()
@@ -186,7 +191,7 @@ func buildOperation(
 	utx, err := pBuilder.NewOperationTx(
 		ops,
 		feeCalc,
-		options(changeAddr, nil /*memo*/)...,
+		options(changeAddr, tipPercentage, nil /*memo*/)...,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed building operation tx: %w", err)
@@ -200,6 +205,7 @@ func buildImportTx(
 	sourceChain ids.ID,
 	to ids.ShortID,
 	kc *secp256k1fx.Keychain,
+	tipPercentage commonfees.TipPercentage,
 ) (*txs.Tx, error) {
 	feeRates, err := backend.State().GetFeeRates()
 	if err != nil {
@@ -221,6 +227,7 @@ func buildImportTx(
 		sourceChain,
 		outOwner,
 		feeCalc,
+		options(ids.ShortEmpty, tipPercentage, nil /*memo*/)...,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed building import tx: %w", err)
@@ -236,6 +243,7 @@ func buildExportTx(
 	exportedAssetID ids.ID,
 	exportedAmt uint64,
 	kc *secp256k1fx.Keychain,
+	tipPercentage commonfees.TipPercentage, //nolint:unparam
 	changeAddr ids.ShortID,
 ) (*txs.Tx, ids.ShortID, error) {
 	feeRates, err := backend.State().GetFeeRates()
@@ -264,7 +272,7 @@ func buildExportTx(
 		destinationChain,
 		outputs,
 		feeCalc,
-		options(changeAddr, nil /*memo*/)...,
+		options(changeAddr, tipPercentage, nil /*memo*/)...,
 	)
 	if err != nil {
 		return nil, ids.ShortEmpty, fmt.Errorf("failed building export tx: %w", err)
@@ -307,12 +315,17 @@ func feeCalculator(backend txBuilderBackend, feeRates commonfees.Dimensions) *fe
 	}
 }
 
-func options(changeAddr ids.ShortID, memo []byte) []common.Option {
-	return common.UnionOptions(
+func options(changeAddr ids.ShortID, tipPercentage commonfees.TipPercentage, memo []byte) []common.Option {
+	ops := common.UnionOptions(
 		[]common.Option{common.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{changeAddr},
 		})},
+		[]common.Option{common.WithTipPercentage(tipPercentage)},
+	)
+
+	return common.UnionOptions(
+		ops,
 		[]common.Option{common.WithMemo(memo)},
 	)
 }

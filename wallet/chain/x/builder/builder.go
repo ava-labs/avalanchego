@@ -247,6 +247,7 @@ func (b *builder) NewBaseTx(
 	}
 
 	// feesMan cumulates complexity. Let's init it with utx filled so far
+	feeCalc.TipPercentage = ops.TipPercentage()
 	if err := feeCalc.BaseTx(utx); err != nil {
 		return nil, err
 	}
@@ -304,6 +305,7 @@ func (b *builder) NewCreateAssetTx(
 	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
 
 	// feesMan cumulates complexity. Let's init it with utx filled so far
+	feeCalc.TipPercentage = ops.TipPercentage()
 	if err := feeCalc.CreateAssetTx(utx); err != nil {
 		return nil, err
 	}
@@ -342,6 +344,7 @@ func (b *builder) NewOperationTx(
 	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
 
 	// feesMan cumulates complexity. Let's init it with utx filled so far
+	feeCalc.TipPercentage = ops.TipPercentage()
 	if err := feeCalc.OperationTx(utx); err != nil {
 		return nil, err
 	}
@@ -509,6 +512,7 @@ func (b *builder) NewImportTx(
 	// 3. Finance fees as much as possible with imported, Avax-denominated UTXOs
 
 	// feesMan cumulates complexity. Let's init it with utx filled so far
+	feeCalc.TipPercentage = ops.TipPercentage()
 	if err := feeCalc.ImportTx(utx); err != nil {
 		return nil, err
 	}
@@ -613,6 +617,7 @@ func (b *builder) NewExportTx(
 	}
 
 	// feesMan cumulates complexity. Let's init it with utx filled so far
+	feeCalc.TipPercentage = ops.TipPercentage()
 	if err := feeCalc.ExportTx(utx); err != nil {
 		return nil, err
 	}
