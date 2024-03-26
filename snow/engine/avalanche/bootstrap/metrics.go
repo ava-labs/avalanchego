@@ -10,8 +10,8 @@ import (
 )
 
 type metrics struct {
-	numFetchedVts, numDroppedVts, numAcceptedVts,
-	numFetchedTxs, numDroppedTxs, numAcceptedTxs prometheus.Counter
+	numFetchedVts, numAcceptedVts,
+	numFetchedTxs, numAcceptedTxs prometheus.Counter
 }
 
 func (m *metrics) Initialize(
@@ -22,11 +22,6 @@ func (m *metrics) Initialize(
 		Namespace: namespace,
 		Name:      "fetched_vts",
 		Help:      "Number of vertices fetched during bootstrapping",
-	})
-	m.numDroppedVts = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: namespace,
-		Name:      "dropped_vts",
-		Help:      "Number of vertices dropped during bootstrapping",
 	})
 	m.numAcceptedVts = prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: namespace,
@@ -39,11 +34,6 @@ func (m *metrics) Initialize(
 		Name:      "fetched_txs",
 		Help:      "Number of transactions fetched during bootstrapping",
 	})
-	m.numDroppedTxs = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: namespace,
-		Name:      "dropped_txs",
-		Help:      "Number of transactions dropped during bootstrapping",
-	})
 	m.numAcceptedTxs = prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: namespace,
 		Name:      "accepted_txs",
@@ -52,10 +42,8 @@ func (m *metrics) Initialize(
 
 	return utils.Err(
 		registerer.Register(m.numFetchedVts),
-		registerer.Register(m.numDroppedVts),
 		registerer.Register(m.numAcceptedVts),
 		registerer.Register(m.numFetchedTxs),
-		registerer.Register(m.numDroppedTxs),
 		registerer.Register(m.numAcceptedTxs),
 	)
 }

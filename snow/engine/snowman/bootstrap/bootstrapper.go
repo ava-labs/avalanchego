@@ -170,7 +170,6 @@ func (b *Bootstrapper) Start(ctx context.Context, startReqID uint32) error {
 	b.parser = &parser{
 		log:         b.Ctx.Log,
 		numAccepted: b.numAccepted,
-		numDropped:  b.numDropped,
 		vm:          b.VM,
 	}
 	if err := b.Blocked.SetParser(ctx, b.parser); err != nil {
@@ -308,16 +307,6 @@ func (b *Bootstrapper) sendBootstrappingMessagesOrFinish(ctx context.Context) er
 		return b.startBootstrapping(ctx)
 	}
 
-	if !b.restarted {
-		b.Ctx.Log.Info("bootstrapping started syncing",
-			zap.Int("numAccepted", numAccepted),
-		)
-	} else {
-		b.Ctx.Log.Debug("bootstrapping started syncing",
-			zap.Int("numAccepted", numAccepted),
-		)
-	}
-
 	return b.startSyncing(ctx, accepted)
 }
 
@@ -393,9 +382,14 @@ func (b *Bootstrapper) startSyncing(ctx context.Context, acceptedContainerIDs []
 	// Append the list of accepted container IDs to pendingContainerIDs to ensure
 	// we iterate over every container that must be traversed.
 	pendingContainerIDs = append(pendingContainerIDs, acceptedContainerIDs...)
-	b.Ctx.Log.Debug("starting bootstrapping",
-		zap.Int("numPendingBlocks", len(pendingContainerIDs)),
+
+	log := b.Ctx.Log.Info
+	if b.restarted {
+		log = b.Ctx.Log.Debug
+	}
+	log("starting to fetch blocks",
 		zap.Int("numAcceptedBlocks", len(acceptedContainerIDs)),
+		zap.Int("numMissingBlocks", len(pendingContainerIDs)),
 	)
 
 	toProcess := make([]snowman.Block, 0, len(pendingContainerIDs))
@@ -616,7 +610,6 @@ func (b *Bootstrapper) process(ctx context.Context, blk snowman.Block, processin
 		pushed, err := b.Blocked.Push(ctx, &blockJob{
 			log:         b.Ctx.Log,
 			numAccepted: b.numAccepted,
-			numDropped:  b.numDropped,
 			blk:         blk,
 			vm:          b.VM,
 		})

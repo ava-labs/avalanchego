@@ -1,8 +1,8 @@
 # Changes to the minimum golang version must also be replicated in
 # scripts/build_avalanche.sh
 # tests/antithesis/Dockerfile.node
-# tests/antithesis/Dockerfile.workload
-# Dockerfile (here)
+# tests/antithesis/Dockerfile.workload (here)
+# Dockerfile
 # README.md
 # go.mod
 # ============= Compilation Stage ================
@@ -17,18 +17,13 @@ RUN go mod download
 # Copy the code into the container
 COPY . .
 
-# Build avalanchego
-ARG RACE_FLAG=""
-RUN ./scripts/build.sh ${RACE_FLAG}
+# Build the workload
+RUN ./scripts/build_antithesis_workload.sh
 
 # ============= Cleanup Stage ================
 FROM debian:11-slim AS execution
 
-# Maintain compatibility with previous images
-RUN mkdir -p /avalanchego/build
-WORKDIR /avalanchego/build
+# Copy the executable into the container
+COPY --from=builder /build/build/workload ./workload
 
-# Copy the executables into the container
-COPY --from=builder /build/build/ .
-
-CMD [ "./avalanchego" ]
+CMD [ "./workload" ]
