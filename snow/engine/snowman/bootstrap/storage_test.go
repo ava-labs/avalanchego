@@ -17,7 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/bootstrap/interval"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
@@ -366,35 +365,6 @@ func TestExecuteSkipsAcceptedBlocks(t *testing.T) {
 	size, err := database.Count(db)
 	require.NoError(err)
 	require.Zero(size)
-}
-
-func generateBlockchain(length uint64) []snowman.Block {
-	if length == 0 {
-		return nil
-	}
-
-	blocks := make([]snowman.Block, length)
-	blocks[0] = &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		ParentV: ids.Empty,
-		HeightV: 0,
-		BytesV:  utils.RandomBytes(1024),
-	}
-	for height := uint64(1); height < length; height++ {
-		blocks[height] = &snowman.TestBlock{
-			TestDecidable: choices.TestDecidable{
-				IDV:     ids.GenerateTestID(),
-				StatusV: choices.Processing,
-			},
-			ParentV: blocks[height-1].ID(),
-			HeightV: height,
-			BytesV:  utils.RandomBytes(1024),
-		}
-	}
-	return blocks
 }
 
 type testParser func(context.Context, []byte) (snowman.Block, error)

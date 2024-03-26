@@ -197,64 +197,8 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 
 	config, _, _, vm := newConfig(t)
 
-	blkID0 := ids.Empty.Prefix(0)
-	blkID1 := ids.Empty.Prefix(1)
-
-	blkBytes0 := []byte{0}
-	blkBytes1 := []byte{1}
-
-	blk0 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     blkID0,
-			StatusV: choices.Accepted,
-		},
-		HeightV: 0,
-		BytesV:  blkBytes0,
-	}
-	blk1 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     blkID1,
-			StatusV: choices.Processing,
-		},
-		ParentV: blk0.IDV,
-		HeightV: 1,
-		BytesV:  blkBytes1,
-	}
-	blks := map[ids.ID]snowman.Block{
-		blkID0: blk0,
-		blkID1: blk1,
-	}
-
-	vm.CantSetState = false
-	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
-		var (
-			lastAcceptedID     = blk0.ID()
-			lastAcceptedHeight = blk0.Height()
-		)
-		for blkID, blk := range blks {
-			height := blk.Height()
-			if blk.Status() == choices.Accepted && height > lastAcceptedHeight {
-				lastAcceptedID = blkID
-				lastAcceptedHeight = height
-			}
-		}
-		return lastAcceptedID, nil
-	}
-	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
-		if blk, ok := blks[blkID]; ok {
-			return blk, nil
-		}
-		return nil, database.ErrNotFound
-	}
-	vm.ParseBlockF = func(_ context.Context, blkBytes []byte) (snowman.Block, error) {
-		for _, blk := range blks {
-			if bytes.Equal(blk.Bytes(), blkBytes) {
-				return blk, nil
-			}
-		}
-		require.FailNow(errUnknownBlock.Error())
-		return nil, errUnknownBlock
-	}
+	blks := generateBlockchain(1)
+	initializeVMWithBlockchain(vm, blks)
 
 	bs, err := New(
 		config,
@@ -270,10 +214,8 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 
 	require.NoError(bs.Start(context.Background(), 0))
 
-	acceptedIDs := []ids.ID{blkID1}
-	require.NoError(bs.startSyncing(context.Background(), acceptedIDs))
-	require.Equal(snow.Bootstrapping, config.Ctx.State.Get().State)
-	require.Equal(choices.Accepted, blk1.Status())
+	require.NoError(bs.startSyncing(context.Background(), blocksToIDs(blks[0:1])))
+	require.Equal(snow.NormalOp, config.Ctx.State.Get().State)
 }
 
 // Requests the unknown block and gets back a Ancestors with unexpected block.
@@ -283,64 +225,8 @@ func TestBootstrapperUnknownByzantineResponse(t *testing.T) {
 
 	config, peerID, sender, vm := newConfig(t)
 
-	blkID0 := ids.Empty.Prefix(0)
-	blkID1 := ids.Empty.Prefix(1)
-
-	blkBytes0 := []byte{0}
-	blkBytes1 := []byte{1}
-
-	blk0 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     blkID0,
-			StatusV: choices.Accepted,
-		},
-		HeightV: 0,
-		BytesV:  blkBytes0,
-	}
-	blk1 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     blkID1,
-			StatusV: choices.Processing,
-		},
-		ParentV: blk0.IDV,
-		HeightV: 1,
-		BytesV:  blkBytes1,
-	}
-	blks := map[ids.ID]snowman.Block{
-		blkID0: blk0,
-		blkID1: blk1,
-	}
-
-	vm.CantSetState = false
-	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
-		var (
-			lastAcceptedID     = blk0.ID()
-			lastAcceptedHeight = blk0.Height()
-		)
-		for blkID, blk := range blks {
-			height := blk.Height()
-			if blk.Status() == choices.Accepted && height > lastAcceptedHeight {
-				lastAcceptedID = blkID
-				lastAcceptedHeight = height
-			}
-		}
-		return lastAcceptedID, nil
-	}
-	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
-		if blk, ok := blks[blkID]; ok && blk.Status() == choices.Accepted {
-			return blk, nil
-		}
-		return nil, database.ErrNotFound
-	}
-	vm.ParseBlockF = func(_ context.Context, blkBytes []byte) (snowman.Block, error) {
-		for _, blk := range blks {
-			if bytes.Equal(blk.Bytes(), blkBytes) {
-				return blk, nil
-			}
-		}
-		require.FailNow(errUnknownBlock.Error())
-		return nil, errUnknownBlock
-	}
+	blks := generateBlockchain(2)
+	initializeVMWithBlockchain(vm, blks)
 
 	bs, err := New(
 		config,
@@ -357,116 +243,35 @@ func TestBootstrapperUnknownByzantineResponse(t *testing.T) {
 	require.NoError(bs.Start(context.Background(), 0))
 
 	var requestID uint32
-	sender.SendGetAncestorsF = func(_ context.Context, vdr ids.NodeID, reqID uint32, blkID ids.ID) {
-		require.Equal(peerID, vdr)
-		require.Equal(blkID1, blkID)
+	sender.SendGetAncestorsF = func(_ context.Context, nodeID ids.NodeID, reqID uint32, blkID ids.ID) {
+		require.Equal(peerID, nodeID)
+		require.Equal(blks[1].ID(), blkID)
 		requestID = reqID
 	}
 
-	require.NoError(bs.startSyncing(context.Background(), []ids.ID{blkID1})) // should request blk1
+	require.NoError(bs.startSyncing(context.Background(), blocksToIDs(blks[1:2]))) // should request blk1
 
 	oldReqID := requestID
-	require.NoError(bs.Ancestors(context.Background(), peerID, requestID, [][]byte{blkBytes0})) // respond with wrong block
+	require.NoError(bs.Ancestors(context.Background(), peerID, requestID, blocksToBytes(blks[0:1]))) // respond with wrong block
 	require.NotEqual(oldReqID, requestID)
 
-	require.NoError(bs.Ancestors(context.Background(), peerID, requestID, [][]byte{blkBytes1}))
+	require.NoError(bs.Ancestors(context.Background(), peerID, requestID, blocksToBytes(blks[1:2])))
 
 	require.Equal(snow.Bootstrapping, config.Ctx.State.Get().State)
-	require.Equal(choices.Accepted, blk0.Status())
-	require.Equal(choices.Accepted, blk1.Status())
+	requireStatusIs(require, blks, choices.Accepted)
 
-	require.NoError(bs.startSyncing(context.Background(), []ids.ID{blkID1}))
+	require.NoError(bs.startSyncing(context.Background(), blocksToIDs(blks[1:2])))
 	require.Equal(snow.NormalOp, config.Ctx.State.Get().State)
 }
 
-// There are multiple needed blocks and Ancestors returns one at a time
+// There are multiple needed blocks and multiple Ancestors are required
 func TestBootstrapperPartialFetch(t *testing.T) {
 	require := require.New(t)
 
 	config, peerID, sender, vm := newConfig(t)
 
-	blkID0 := ids.Empty.Prefix(0)
-	blkID1 := ids.Empty.Prefix(1)
-	blkID2 := ids.Empty.Prefix(2)
-	blkID3 := ids.Empty.Prefix(3)
-
-	blkBytes0 := []byte{0}
-	blkBytes1 := []byte{1}
-	blkBytes2 := []byte{2}
-	blkBytes3 := []byte{3}
-
-	blk0 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     blkID0,
-			StatusV: choices.Accepted,
-		},
-		HeightV: 0,
-		BytesV:  blkBytes0,
-	}
-	blk1 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     blkID1,
-			StatusV: choices.Processing,
-		},
-		ParentV: blk0.IDV,
-		HeightV: 1,
-		BytesV:  blkBytes1,
-	}
-	blk2 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     blkID2,
-			StatusV: choices.Processing,
-		},
-		ParentV: blk1.IDV,
-		HeightV: 2,
-		BytesV:  blkBytes2,
-	}
-	blk3 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     blkID3,
-			StatusV: choices.Processing,
-		},
-		ParentV: blk2.IDV,
-		HeightV: 3,
-		BytesV:  blkBytes3,
-	}
-	blks := map[ids.ID]snowman.Block{
-		blkID0: blk0,
-		blkID1: blk1,
-		blkID2: blk2,
-		blkID3: blk3,
-	}
-
-	vm.CantSetState = false
-	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
-		var (
-			lastAcceptedID     = blk0.ID()
-			lastAcceptedHeight = blk0.Height()
-		)
-		for blkID, blk := range blks {
-			height := blk.Height()
-			if blk.Status() == choices.Accepted && height > lastAcceptedHeight {
-				lastAcceptedID = blkID
-				lastAcceptedHeight = height
-			}
-		}
-		return lastAcceptedID, nil
-	}
-	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
-		if blk, ok := blks[blkID]; ok && blk.Status() == choices.Accepted {
-			return blk, nil
-		}
-		return nil, database.ErrNotFound
-	}
-	vm.ParseBlockF = func(_ context.Context, blkBytes []byte) (snowman.Block, error) {
-		for _, blk := range blks {
-			if bytes.Equal(blk.Bytes(), blkBytes) {
-				return blk, nil
-			}
-		}
-		require.FailNow(errUnknownBlock.Error())
-		return nil, errUnknownBlock
-	}
+	blks := generateBlockchain(4)
+	initializeVMWithBlockchain(vm, blks)
 
 	bs, err := New(
 		config,
@@ -488,26 +293,23 @@ func TestBootstrapperPartialFetch(t *testing.T) {
 	)
 	sender.SendGetAncestorsF = func(_ context.Context, nodeID ids.NodeID, reqID uint32, blkID ids.ID) {
 		require.Equal(peerID, nodeID)
-		require.Contains([]ids.ID{blkID1, blkID2, blkID3}, blkID)
+		require.Contains([]ids.ID{blks[1].ID(), blks[3].ID()}, blkID)
 		requestID = reqID
 		requested = blkID
 	}
 
-	acceptedIDs := []ids.ID{blkID3}
-	require.NoError(bs.startSyncing(context.Background(), acceptedIDs)) // should request blk3
-	require.Equal(blkID3, requested)
+	require.NoError(bs.startSyncing(context.Background(), blocksToIDs(blks[3:4]))) // should request blk3
+	require.Equal(blks[3].ID(), requested)
 
-	require.NoError(bs.Ancestors(context.Background(), peerID, requestID, [][]byte{blkBytes3, blkBytes2})) // respond with blk3 and blk2
-	require.Equal(blkID1, requested)
+	require.NoError(bs.Ancestors(context.Background(), peerID, requestID, blocksToBytes(blks[2:4]))) // respond with blk3 and blk2
+	require.Equal(blks[1].ID(), requested)
 
-	require.NoError(bs.Ancestors(context.Background(), peerID, requestID, [][]byte{blkBytes1})) // respond with blk1
+	require.NoError(bs.Ancestors(context.Background(), peerID, requestID, blocksToBytes(blks[1:2]))) // respond with blk1
 
 	require.Equal(snow.Bootstrapping, config.Ctx.State.Get().State)
-	require.Equal(choices.Accepted, blk0.Status())
-	require.Equal(choices.Accepted, blk1.Status())
-	require.Equal(choices.Accepted, blk2.Status())
+	requireStatusIs(require, blks, choices.Accepted)
 
-	require.NoError(bs.startSyncing(context.Background(), acceptedIDs))
+	require.NoError(bs.startSyncing(context.Background(), blocksToIDs(blks[3:4])))
 	require.Equal(snow.NormalOp, config.Ctx.State.Get().State)
 }
 
@@ -518,64 +320,8 @@ func TestBootstrapperEmptyResponse(t *testing.T) {
 
 	config, peerID, sender, vm := newConfig(t)
 
-	blkID0 := ids.Empty.Prefix(0)
-	blkID1 := ids.Empty.Prefix(1)
-
-	blkBytes0 := []byte{0}
-	blkBytes1 := []byte{1}
-
-	blk0 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     blkID0,
-			StatusV: choices.Accepted,
-		},
-		HeightV: 0,
-		BytesV:  blkBytes0,
-	}
-	blk1 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     blkID1,
-			StatusV: choices.Processing,
-		},
-		ParentV: blk0.IDV,
-		HeightV: 1,
-		BytesV:  blkBytes1,
-	}
-	blks := map[ids.ID]snowman.Block{
-		blkID0: blk0,
-		blkID1: blk1,
-	}
-
-	vm.CantSetState = false
-	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
-		var (
-			lastAcceptedID     = blk0.ID()
-			lastAcceptedHeight = blk0.Height()
-		)
-		for blkID, blk := range blks {
-			height := blk.Height()
-			if blk.Status() == choices.Accepted && height > lastAcceptedHeight {
-				lastAcceptedID = blkID
-				lastAcceptedHeight = height
-			}
-		}
-		return lastAcceptedID, nil
-	}
-	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
-		if blk, ok := blks[blkID]; ok && blk.Status() == choices.Accepted {
-			return blk, nil
-		}
-		return nil, database.ErrNotFound
-	}
-	vm.ParseBlockF = func(_ context.Context, blkBytes []byte) (snowman.Block, error) {
-		for _, blk := range blks {
-			if bytes.Equal(blk.Bytes(), blkBytes) {
-				return blk, nil
-			}
-		}
-		require.FailNow(errUnknownBlock.Error())
-		return nil, errUnknownBlock
-	}
+	blks := generateBlockchain(2)
+	initializeVMWithBlockchain(vm, blks)
 
 	bs, err := New(
 		config,
@@ -592,21 +338,17 @@ func TestBootstrapperEmptyResponse(t *testing.T) {
 	require.NoError(bs.Start(context.Background(), 0))
 
 	var (
-		requestedNodeID  ids.NodeID
-		requestID        uint32
-		requestedBlockID ids.ID
+		requestedNodeID ids.NodeID
+		requestID       uint32
 	)
 	sender.SendGetAncestorsF = func(_ context.Context, nodeID ids.NodeID, reqID uint32, blkID ids.ID) {
-		require.Equal(blkID1, blkID)
+		require.Equal(blks[1].ID(), blkID)
 		requestedNodeID = nodeID
 		requestID = reqID
-		requestedBlockID = blkID
 	}
 
-	acceptedIDs := []ids.ID{blkID1}
-	require.NoError(bs.startSyncing(context.Background(), acceptedIDs)) // should request blk3
+	require.NoError(bs.startSyncing(context.Background(), blocksToIDs(blks[1:2])))
 	require.Equal(requestedNodeID, peerID)
-	require.Equal(blkID1, requestedBlockID)
 
 	// add another 2 validators to the fetch set to test behavior on empty
 	// response
@@ -614,12 +356,10 @@ func TestBootstrapperEmptyResponse(t *testing.T) {
 
 	require.NoError(bs.Ancestors(context.Background(), requestedNodeID, requestID, nil)) // respond with empty
 	require.NotEqual(requestedNodeID, peerID)
-	require.Equal(blkID1, requestedBlockID)
 
-	require.NoError(bs.Ancestors(context.Background(), requestedNodeID, requestID, [][]byte{blkBytes1}))
+	require.NoError(bs.Ancestors(context.Background(), requestedNodeID, requestID, blocksToBytes(blks[1:2])))
 	require.Equal(snow.Bootstrapping, config.Ctx.State.Get().State)
-	require.Equal(choices.Accepted, blk0.Status())
-	require.Equal(choices.Accepted, blk1.Status())
+	requireStatusIs(require, blks, choices.Accepted)
 
 	// check that peerID was removed from the fetch set
 	require.NotContains(bs.fetchFrom, peerID)
@@ -631,88 +371,8 @@ func TestBootstrapperAncestors(t *testing.T) {
 
 	config, peerID, sender, vm := newConfig(t)
 
-	blkID0 := ids.Empty.Prefix(0)
-	blkID1 := ids.Empty.Prefix(1)
-	blkID2 := ids.Empty.Prefix(2)
-	blkID3 := ids.Empty.Prefix(3)
-
-	blkBytes0 := []byte{0}
-	blkBytes1 := []byte{1}
-	blkBytes2 := []byte{2}
-	blkBytes3 := []byte{3}
-
-	blk0 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     blkID0,
-			StatusV: choices.Accepted,
-		},
-		HeightV: 0,
-		BytesV:  blkBytes0,
-	}
-	blk1 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     blkID1,
-			StatusV: choices.Processing,
-		},
-		ParentV: blk0.IDV,
-		HeightV: 1,
-		BytesV:  blkBytes1,
-	}
-	blk2 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     blkID2,
-			StatusV: choices.Processing,
-		},
-		ParentV: blk1.IDV,
-		HeightV: 2,
-		BytesV:  blkBytes2,
-	}
-	blk3 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     blkID3,
-			StatusV: choices.Processing,
-		},
-		ParentV: blk2.IDV,
-		HeightV: 3,
-		BytesV:  blkBytes3,
-	}
-	blks := map[ids.ID]snowman.Block{
-		blkID0: blk0,
-		blkID1: blk1,
-		blkID2: blk2,
-		blkID3: blk3,
-	}
-
-	vm.CantSetState = false
-	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
-		var (
-			lastAcceptedID     = blk0.ID()
-			lastAcceptedHeight = blk0.Height()
-		)
-		for blkID, blk := range blks {
-			height := blk.Height()
-			if blk.Status() == choices.Accepted && height > lastAcceptedHeight {
-				lastAcceptedID = blkID
-				lastAcceptedHeight = height
-			}
-		}
-		return lastAcceptedID, nil
-	}
-	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
-		if blk, ok := blks[blkID]; ok && blk.Status() == choices.Accepted {
-			return blk, nil
-		}
-		return nil, database.ErrNotFound
-	}
-	vm.ParseBlockF = func(_ context.Context, blkBytes []byte) (snowman.Block, error) {
-		for _, blk := range blks {
-			if bytes.Equal(blk.Bytes(), blkBytes) {
-				return blk, nil
-			}
-		}
-		require.FailNow(errUnknownBlock.Error())
-		return nil, errUnknownBlock
-	}
+	blks := generateBlockchain(4)
+	initializeVMWithBlockchain(vm, blks)
 
 	bs, err := New(
 		config,
@@ -734,24 +394,20 @@ func TestBootstrapperAncestors(t *testing.T) {
 	)
 	sender.SendGetAncestorsF = func(_ context.Context, vdr ids.NodeID, reqID uint32, blkID ids.ID) {
 		require.Equal(peerID, vdr)
-		require.Equal(blkID3, blkID)
+		require.Equal(blks[3].ID(), blkID)
 		requestID = reqID
 		requested = blkID
 	}
 
-	acceptedIDs := []ids.ID{blkID3}
-	require.NoError(bs.startSyncing(context.Background(), acceptedIDs)) // should request blk3
-	require.Equal(blkID3, requested)
+	require.NoError(bs.startSyncing(context.Background(), blocksToIDs(blks[3:4]))) // should request blk3
+	require.Equal(blks[3].ID(), requested)
 
-	require.NoError(bs.Ancestors(context.Background(), peerID, requestID, [][]byte{blkBytes3, blkBytes2, blkBytes1, blkBytes0})) // respond with all the blocks
+	require.NoError(bs.Ancestors(context.Background(), peerID, requestID, blocksToBytes(blks))) // respond with all the blocks
 
 	require.Equal(snow.Bootstrapping, config.Ctx.State.Get().State)
-	require.Equal(choices.Accepted, blk0.Status())
-	require.Equal(choices.Accepted, blk1.Status())
-	require.Equal(choices.Accepted, blk2.Status())
-	require.Equal(choices.Accepted, blk3.Status())
+	requireStatusIs(require, blks, choices.Accepted)
 
-	require.NoError(bs.startSyncing(context.Background(), acceptedIDs))
+	require.NoError(bs.startSyncing(context.Background(), blocksToIDs(blks[3:4])))
 	require.Equal(snow.NormalOp, config.Ctx.State.Get().State)
 }
 
@@ -760,76 +416,8 @@ func TestBootstrapperFinalized(t *testing.T) {
 
 	config, peerID, sender, vm := newConfig(t)
 
-	blkID0 := ids.Empty.Prefix(0)
-	blkID1 := ids.Empty.Prefix(1)
-	blkID2 := ids.Empty.Prefix(2)
-
-	blkBytes0 := []byte{0}
-	blkBytes1 := []byte{1}
-	blkBytes2 := []byte{2}
-
-	blk0 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     blkID0,
-			StatusV: choices.Accepted,
-		},
-		HeightV: 0,
-		BytesV:  blkBytes0,
-	}
-	blk1 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     blkID1,
-			StatusV: choices.Processing,
-		},
-		ParentV: blk0.IDV,
-		HeightV: 1,
-		BytesV:  blkBytes1,
-	}
-	blk2 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     blkID2,
-			StatusV: choices.Processing,
-		},
-		ParentV: blk1.IDV,
-		HeightV: 2,
-		BytesV:  blkBytes2,
-	}
-	blks := map[ids.ID]snowman.Block{
-		blkID0: blk0,
-		blkID1: blk1,
-		blkID2: blk2,
-	}
-
-	vm.CantSetState = false
-	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
-		var (
-			lastAcceptedID     = blk0.ID()
-			lastAcceptedHeight = blk0.Height()
-		)
-		for blkID, blk := range blks {
-			height := blk.Height()
-			if blk.Status() == choices.Accepted && height > lastAcceptedHeight {
-				lastAcceptedID = blkID
-				lastAcceptedHeight = height
-			}
-		}
-		return lastAcceptedID, nil
-	}
-	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
-		if blk, ok := blks[blkID]; ok && blk.Status() == choices.Accepted {
-			return blk, nil
-		}
-		return nil, database.ErrNotFound
-	}
-	vm.ParseBlockF = func(_ context.Context, blkBytes []byte) (snowman.Block, error) {
-		for _, blk := range blks {
-			if bytes.Equal(blk.Bytes(), blkBytes) {
-				return blk, nil
-			}
-		}
-		require.FailNow(errUnknownBlock.Error())
-		return nil, errUnknownBlock
-	}
+	blks := generateBlockchain(3)
+	initializeVMWithBlockchain(vm, blks)
 
 	bs, err := New(
 		config,
@@ -851,19 +439,17 @@ func TestBootstrapperFinalized(t *testing.T) {
 		requestIDs[blkID] = reqID
 	}
 
-	require.NoError(bs.startSyncing(context.Background(), []ids.ID{blkID1, blkID2})) // should request blk1 and blk2
+	require.NoError(bs.startSyncing(context.Background(), blocksToIDs(blks[1:3]))) // should request blk1 and blk2
 
-	reqIDBlk2, ok := requestIDs[blkID2]
+	reqIDBlk2, ok := requestIDs[blks[2].ID()]
 	require.True(ok)
 
-	require.NoError(bs.Ancestors(context.Background(), peerID, reqIDBlk2, [][]byte{blkBytes2, blkBytes1}))
+	require.NoError(bs.Ancestors(context.Background(), peerID, reqIDBlk2, blocksToBytes(blks[1:3])))
 
 	require.Equal(snow.Bootstrapping, config.Ctx.State.Get().State)
-	require.Equal(choices.Accepted, blk0.Status())
-	require.Equal(choices.Accepted, blk1.Status())
-	require.Equal(choices.Accepted, blk2.Status())
+	requireStatusIs(require, blks, choices.Accepted)
 
-	require.NoError(bs.startSyncing(context.Background(), []ids.ID{blkID2}))
+	require.NoError(bs.startSyncing(context.Background(), blocksToIDs(blks[2:3])))
 	require.Equal(snow.NormalOp, config.Ctx.State.Get().State)
 }
 
@@ -872,100 +458,8 @@ func TestRestartBootstrapping(t *testing.T) {
 
 	config, peerID, sender, vm := newConfig(t)
 
-	blkID0 := ids.Empty.Prefix(0)
-	blkID1 := ids.Empty.Prefix(1)
-	blkID2 := ids.Empty.Prefix(2)
-	blkID3 := ids.Empty.Prefix(3)
-	blkID4 := ids.Empty.Prefix(4)
-
-	blkBytes0 := []byte{0}
-	blkBytes1 := []byte{1}
-	blkBytes2 := []byte{2}
-	blkBytes3 := []byte{3}
-	blkBytes4 := []byte{4}
-
-	blk0 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     blkID0,
-			StatusV: choices.Accepted,
-		},
-		HeightV: 0,
-		BytesV:  blkBytes0,
-	}
-	blk1 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     blkID1,
-			StatusV: choices.Processing,
-		},
-		ParentV: blk0.IDV,
-		HeightV: 1,
-		BytesV:  blkBytes1,
-	}
-	blk2 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     blkID2,
-			StatusV: choices.Processing,
-		},
-		ParentV: blk1.IDV,
-		HeightV: 2,
-		BytesV:  blkBytes2,
-	}
-	blk3 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     blkID3,
-			StatusV: choices.Processing,
-		},
-		ParentV: blk2.IDV,
-		HeightV: 3,
-		BytesV:  blkBytes3,
-	}
-	blk4 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     blkID4,
-			StatusV: choices.Processing,
-		},
-		ParentV: blk3.IDV,
-		HeightV: 4,
-		BytesV:  blkBytes4,
-	}
-	blks := map[ids.ID]snowman.Block{
-		blkID0: blk0,
-		blkID1: blk1,
-		blkID2: blk2,
-		blkID3: blk3,
-		blkID4: blk4,
-	}
-
-	vm.CantSetState = false
-	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
-		var (
-			lastAcceptedID     = blk0.ID()
-			lastAcceptedHeight = blk0.Height()
-		)
-		for blkID, blk := range blks {
-			height := blk.Height()
-			if blk.Status() == choices.Accepted && height > lastAcceptedHeight {
-				lastAcceptedID = blkID
-				lastAcceptedHeight = height
-			}
-		}
-		return lastAcceptedID, nil
-	}
-	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
-		if blk, ok := blks[blkID]; ok && blk.Status() == choices.Accepted {
-			return blk, nil
-		}
-		return nil, database.ErrNotFound
-	}
-	vm.ParseBlockF = func(_ context.Context, blkBytes []byte) (snowman.Block, error) {
-		for _, blk := range blks {
-			if bytes.Equal(blk.Bytes(), blkBytes) {
-				return blk, nil
-			}
-		}
-		require.FailNow(errUnknownBlock.Error())
-		return nil, errUnknownBlock
-	}
+	blks := generateBlockchain(5)
+	initializeVMWithBlockchain(vm, blks)
 
 	bs, err := New(
 		config,
@@ -987,43 +481,36 @@ func TestRestartBootstrapping(t *testing.T) {
 		requestIDs[blkID] = reqID
 	}
 
-	require.NoError(bs.startSyncing(context.Background(), []ids.ID{blkID3})) // should request blk3
+	require.NoError(bs.startSyncing(context.Background(), blocksToIDs(blks[3:4]))) // should request blk3
 
-	reqID, ok := requestIDs[blkID3]
+	reqID, ok := requestIDs[blks[3].ID()]
 	require.True(ok)
 
-	require.NoError(bs.Ancestors(context.Background(), peerID, reqID, [][]byte{blkBytes3, blkBytes2}))
-	require.Contains(requestIDs, blkID1)
+	require.NoError(bs.Ancestors(context.Background(), peerID, reqID, blocksToBytes(blks[2:4])))
+	require.Contains(requestIDs, blks[1].ID())
 
 	// Remove request, so we can restart bootstrapping via startSyncing
-	_, removed := bs.outstandingRequests.DeleteValue(blkID1)
+	_, removed := bs.outstandingRequests.DeleteValue(blks[1].ID())
 	require.True(removed)
 	clear(requestIDs)
 
-	require.NoError(bs.startSyncing(context.Background(), []ids.ID{blkID4}))
+	require.NoError(bs.startSyncing(context.Background(), blocksToIDs(blks[4:5])))
 
-	blk1RequestID, ok := requestIDs[blkID1]
+	blk1RequestID, ok := requestIDs[blks[1].ID()]
 	require.True(ok)
-	blk4RequestID, ok := requestIDs[blkID4]
+	blk4RequestID, ok := requestIDs[blks[4].ID()]
 	require.True(ok)
 
-	require.NoError(bs.Ancestors(context.Background(), peerID, blk1RequestID, [][]byte{blkBytes1}))
+	require.NoError(bs.Ancestors(context.Background(), peerID, blk1RequestID, blocksToBytes(blks[1:2])))
 	require.Equal(snow.Bootstrapping, config.Ctx.State.Get().State)
-	require.Equal(choices.Accepted, blk0.Status())
-	require.Equal(choices.Processing, blk1.Status())
-	require.Equal(choices.Processing, blk2.Status())
-	require.Equal(choices.Processing, blk3.Status())
-	require.Equal(choices.Processing, blk4.Status())
+	require.Equal(choices.Accepted, blks[0].Status())
+	requireStatusIs(require, blks[1:], choices.Processing)
 
-	require.NoError(bs.Ancestors(context.Background(), peerID, blk4RequestID, [][]byte{blkBytes4}))
+	require.NoError(bs.Ancestors(context.Background(), peerID, blk4RequestID, blocksToBytes(blks[4:5])))
 	require.Equal(snow.Bootstrapping, config.Ctx.State.Get().State)
-	require.Equal(choices.Accepted, blk0.Status())
-	require.Equal(choices.Accepted, blk1.Status())
-	require.Equal(choices.Accepted, blk2.Status())
-	require.Equal(choices.Accepted, blk3.Status())
-	require.Equal(choices.Accepted, blk4.Status())
+	requireStatusIs(require, blks, choices.Accepted)
 
-	require.NoError(bs.startSyncing(context.Background(), []ids.ID{blkID4}))
+	require.NoError(bs.startSyncing(context.Background(), blocksToIDs(blks[4:5])))
 	require.Equal(snow.NormalOp, config.Ctx.State.Get().State)
 }
 
@@ -1032,48 +519,11 @@ func TestBootstrapOldBlockAfterStateSync(t *testing.T) {
 
 	config, peerID, sender, vm := newConfig(t)
 
-	blk0 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		HeightV: 0,
-		BytesV:  utils.RandomBytes(32),
-	}
-	blk1 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Accepted,
-		},
-		ParentV: blk0.IDV,
-		HeightV: 1,
-		BytesV:  utils.RandomBytes(32),
-	}
+	blks := generateBlockchain(2)
+	initializeVMWithBlockchain(vm, blks)
 
-	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
-		return blk1.ID(), nil
-	}
-	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
-		switch blkID {
-		case blk0.ID():
-			return nil, database.ErrNotFound
-		case blk1.ID():
-			return blk1, nil
-		default:
-			require.FailNow(database.ErrNotFound.Error())
-			return nil, database.ErrNotFound
-		}
-	}
-	vm.ParseBlockF = func(_ context.Context, blkBytes []byte) (snowman.Block, error) {
-		switch {
-		case bytes.Equal(blkBytes, blk0.Bytes()):
-			return blk0, nil
-		case bytes.Equal(blkBytes, blk1.Bytes()):
-			return blk1, nil
-		}
-		require.FailNow(errUnknownBlock.Error())
-		return nil, errUnknownBlock
-	}
+	blks[0].(*snowman.TestBlock).StatusV = choices.Processing
+	require.NoError(blks[1].Accept(context.Background()))
 
 	bs, err := New(
 		config,
@@ -1087,25 +537,24 @@ func TestBootstrapOldBlockAfterStateSync(t *testing.T) {
 	)
 	require.NoError(err)
 
-	vm.CantSetState = false
 	require.NoError(bs.Start(context.Background(), 0))
 
 	requestIDs := map[ids.ID]uint32{}
-	sender.SendGetAncestorsF = func(_ context.Context, vdr ids.NodeID, reqID uint32, blkID ids.ID) {
-		require.Equal(peerID, vdr)
+	sender.SendGetAncestorsF = func(_ context.Context, nodeID ids.NodeID, reqID uint32, blkID ids.ID) {
+		require.Equal(peerID, nodeID)
 		requestIDs[blkID] = reqID
 	}
 
 	// Force Accept, the already transitively accepted, blk0
-	require.NoError(bs.startSyncing(context.Background(), []ids.ID{blk0.ID()})) // should request blk0
+	require.NoError(bs.startSyncing(context.Background(), blocksToIDs(blks[0:1]))) // should request blk0
 
-	reqID, ok := requestIDs[blk0.ID()]
+	reqID, ok := requestIDs[blks[0].ID()]
 	require.True(ok)
-	require.NoError(bs.Ancestors(context.Background(), peerID, reqID, [][]byte{blk0.Bytes()}))
 
+	require.NoError(bs.Ancestors(context.Background(), peerID, reqID, blocksToBytes(blks[0:1])))
 	require.Equal(snow.NormalOp, config.Ctx.State.Get().State)
-	require.Equal(choices.Processing, blk0.Status())
-	require.Equal(choices.Accepted, blk1.Status())
+	require.Equal(choices.Processing, blks[0].Status())
+	require.Equal(choices.Accepted, blks[1].Status())
 }
 
 func TestBootstrapContinueAfterHalt(t *testing.T) {
@@ -1113,36 +562,8 @@ func TestBootstrapContinueAfterHalt(t *testing.T) {
 
 	config, _, _, vm := newConfig(t)
 
-	blk0 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Accepted,
-		},
-		HeightV: 0,
-		BytesV:  utils.RandomBytes(32),
-	}
-	blk1 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		ParentV: blk0.IDV,
-		HeightV: 1,
-		BytesV:  utils.RandomBytes(32),
-	}
-	blk2 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		ParentV: blk1.IDV,
-		HeightV: 2,
-		BytesV:  utils.RandomBytes(32),
-	}
-
-	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
-		return blk0.ID(), nil
-	}
+	blks := generateBlockchain(2)
+	initializeVMWithBlockchain(vm, blks)
 
 	bs, err := New(
 		config,
@@ -1156,26 +577,15 @@ func TestBootstrapContinueAfterHalt(t *testing.T) {
 	)
 	require.NoError(err)
 
-	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
-		switch blkID {
-		case blk0.ID():
-			return blk0, nil
-		case blk1.ID():
-			bs.Halt(context.Background())
-			return blk1, nil
-		case blk2.ID():
-			return blk2, nil
-		default:
-			require.FailNow(database.ErrNotFound.Error())
-			return nil, database.ErrNotFound
-		}
+	getBlockF := vm.GetBlockF
+	vm.GetBlockF = func(ctx context.Context, blkID ids.ID) (snowman.Block, error) {
+		bs.Halt(ctx)
+		return getBlockF(ctx, blkID)
 	}
 
-	vm.CantSetState = false
 	require.NoError(bs.Start(context.Background(), 0))
 
-	require.NoError(bs.startSyncing(context.Background(), []ids.ID{blk2.ID()}))
-
+	require.NoError(bs.startSyncing(context.Background(), blocksToIDs(blks[1:2])))
 	require.Equal(1, bs.missingBlockIDs.Len())
 }
 
@@ -1285,50 +695,9 @@ func TestBootstrapperReceiveStaleAncestorsMessage(t *testing.T) {
 
 	config, peerID, sender, vm := newConfig(t)
 
-	var (
-		blkID0    = ids.GenerateTestID()
-		blkBytes0 = utils.RandomBytes(1024)
-		blk0      = &snowman.TestBlock{
-			TestDecidable: choices.TestDecidable{
-				IDV:     blkID0,
-				StatusV: choices.Accepted,
-			},
-			HeightV: 0,
-			BytesV:  blkBytes0,
-		}
+	blks := generateBlockchain(3)
+	initializeVMWithBlockchain(vm, blks)
 
-		blkID1    = ids.GenerateTestID()
-		blkBytes1 = utils.RandomBytes(1024)
-		blk1      = &snowman.TestBlock{
-			TestDecidable: choices.TestDecidable{
-				IDV:     blkID1,
-				StatusV: choices.Processing,
-			},
-			ParentV: blk0.IDV,
-			HeightV: blk0.HeightV + 1,
-			BytesV:  blkBytes1,
-		}
-
-		blkID2    = ids.GenerateTestID()
-		blkBytes2 = utils.RandomBytes(1024)
-		blk2      = &snowman.TestBlock{
-			TestDecidable: choices.TestDecidable{
-				IDV:     blkID2,
-				StatusV: choices.Processing,
-			},
-			ParentV: blk1.IDV,
-			HeightV: blk1.HeightV + 1,
-			BytesV:  blkBytes2,
-		}
-	)
-
-	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
-		return blk0.ID(), nil
-	}
-	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
-		require.Equal(blkID0, blkID)
-		return blk0, nil
-	}
 	bs, err := New(
 		config,
 		func(context.Context, uint32) error {
@@ -1341,62 +710,111 @@ func TestBootstrapperReceiveStaleAncestorsMessage(t *testing.T) {
 	)
 	require.NoError(err)
 
-	vm.CantSetState = false
 	require.NoError(bs.Start(context.Background(), 0))
 
-	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
-		switch blkID {
-		case blkID0:
-			return blk0, nil
-		case blkID1:
-			if blk1.StatusV == choices.Accepted {
-				return blk1, nil
-			}
-			return nil, database.ErrNotFound
-		case blkID2:
-			if blk2.StatusV == choices.Accepted {
-				return blk2, nil
-			}
-			return nil, database.ErrNotFound
-		default:
-			require.FailNow(database.ErrNotFound.Error())
-			return nil, database.ErrNotFound
-		}
-	}
-	vm.ParseBlockF = func(_ context.Context, blkBytes []byte) (snowman.Block, error) {
-		switch {
-		case bytes.Equal(blkBytes, blkBytes0):
-			return blk0, nil
-		case bytes.Equal(blkBytes, blkBytes1):
-			return blk1, nil
-		case bytes.Equal(blkBytes, blkBytes2):
-			return blk2, nil
-		default:
-			require.FailNow(errUnknownBlock.Error())
-			return nil, errUnknownBlock
-		}
-	}
-
 	requestIDs := map[ids.ID]uint32{}
-	sender.SendGetAncestorsF = func(_ context.Context, vdr ids.NodeID, reqID uint32, blkID ids.ID) {
-		require.Equal(peerID, vdr)
+	sender.SendGetAncestorsF = func(_ context.Context, nodeID ids.NodeID, reqID uint32, blkID ids.ID) {
+		require.Equal(peerID, nodeID)
 		requestIDs[blkID] = reqID
 	}
 
-	require.NoError(bs.startSyncing(context.Background(), []ids.ID{blkID1, blkID2})) // should request blk2 and blk1
+	require.NoError(bs.startSyncing(context.Background(), blocksToIDs(blks[1:3]))) // should request blk1 and blk2
 
-	reqIDBlk1, ok := requestIDs[blkID1]
+	reqIDBlk1, ok := requestIDs[blks[1].ID()]
 	require.True(ok)
-	reqIDBlk2, ok := requestIDs[blkID2]
+	reqIDBlk2, ok := requestIDs[blks[2].ID()]
 	require.True(ok)
 
-	require.NoError(bs.Ancestors(context.Background(), peerID, reqIDBlk2, [][]byte{blkBytes2, blkBytes1}))
-
+	require.NoError(bs.Ancestors(context.Background(), peerID, reqIDBlk2, blocksToBytes(blks[1:3])))
 	require.Equal(snow.Bootstrapping, config.Ctx.State.Get().State)
-	require.Equal(choices.Accepted, blk0.Status())
-	require.Equal(choices.Accepted, blk1.Status())
-	require.Equal(choices.Accepted, blk2.Status())
+	requireStatusIs(require, blks, choices.Accepted)
 
-	require.NoError(bs.Ancestors(context.Background(), peerID, reqIDBlk1, [][]byte{blkBytes1}))
+	require.NoError(bs.Ancestors(context.Background(), peerID, reqIDBlk1, blocksToBytes(blks[1:2])))
 	require.Equal(snow.Bootstrapping, config.Ctx.State.Get().State)
+}
+
+func generateBlockchain(length uint64) []snowman.Block {
+	if length == 0 {
+		return nil
+	}
+
+	blocks := make([]snowman.Block, length)
+	blocks[0] = &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Accepted,
+		},
+		ParentV: ids.Empty,
+		HeightV: 0,
+		BytesV:  utils.RandomBytes(1024),
+	}
+	for height := uint64(1); height < length; height++ {
+		blocks[height] = &snowman.TestBlock{
+			TestDecidable: choices.TestDecidable{
+				IDV:     ids.GenerateTestID(),
+				StatusV: choices.Processing,
+			},
+			ParentV: blocks[height-1].ID(),
+			HeightV: height,
+			BytesV:  utils.RandomBytes(1024),
+		}
+	}
+	return blocks
+}
+
+func initializeVMWithBlockchain(vm *block.TestVM, blocks []snowman.Block) {
+	vm.CantSetState = false
+	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
+		var (
+			lastAcceptedID     ids.ID
+			lastAcceptedHeight uint64
+		)
+		for _, blk := range blocks {
+			height := blk.Height()
+			if blk.Status() == choices.Accepted && height >= lastAcceptedHeight {
+				lastAcceptedID = blk.ID()
+				lastAcceptedHeight = height
+			}
+		}
+		return lastAcceptedID, nil
+	}
+	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
+		for _, blk := range blocks {
+			if blk.Status() == choices.Accepted && blk.ID() == blkID {
+				return blk, nil
+			}
+		}
+		return nil, database.ErrNotFound
+	}
+	vm.ParseBlockF = func(_ context.Context, blkBytes []byte) (snowman.Block, error) {
+		for _, blk := range blocks {
+			if bytes.Equal(blk.Bytes(), blkBytes) {
+				return blk, nil
+			}
+		}
+		return nil, errUnknownBlock
+	}
+}
+
+func requireStatusIs(require *require.Assertions, blocks []snowman.Block, status choices.Status) {
+	for i, blk := range blocks {
+		require.Equal(status, blk.Status(), i)
+	}
+}
+
+func blocksToIDs(blocks []snowman.Block) []ids.ID {
+	blkIDs := make([]ids.ID, len(blocks))
+	for i, blk := range blocks {
+		blkIDs[i] = blk.ID()
+	}
+	return blkIDs
+}
+
+func blocksToBytes(blocks []snowman.Block) [][]byte {
+	numBlocks := len(blocks)
+	blkBytes := make([][]byte, numBlocks)
+	for i, blk := range blocks {
+		blkBytes[numBlocks-i-1] = blk.Bytes()
+	}
+	return blkBytes
 }
