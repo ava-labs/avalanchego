@@ -162,41 +162,41 @@ impl Storable for ChunkDescriptor {
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Pod, Zeroable)]
 pub struct StoreHeader {
-    meta_space_tail: DiskAddress,
-    data_space_tail: DiskAddress,
+    meta_store_tail: DiskAddress,
+    data_store_tail: DiskAddress,
     base_addr: DiskAddress,
     alloc_addr: DiskAddress,
 }
 
 #[derive(Debug)]
 struct StoreHeaderSliced {
-    meta_space_tail: Obj<DiskAddress>,
-    data_space_tail: Obj<DiskAddress>,
+    meta_store_tail: Obj<DiskAddress>,
+    data_store_tail: Obj<DiskAddress>,
     base_addr: Obj<DiskAddress>,
     alloc_addr: Obj<DiskAddress>,
 }
 
 impl StoreHeaderSliced {
     fn flush_dirty(&mut self) {
-        self.meta_space_tail.flush_dirty();
-        self.data_space_tail.flush_dirty();
+        self.meta_store_tail.flush_dirty();
+        self.data_store_tail.flush_dirty();
         self.base_addr.flush_dirty();
         self.alloc_addr.flush_dirty();
     }
 }
 
 impl StoreHeader {
-    const META_SPACE_TAIL_OFFSET: usize = 0;
-    const DATA_SPACE_TAIL_OFFSET: usize = DiskAddress::SERIALIZED_LEN as usize;
+    const META_STORE_TAIL_OFFSET: usize = 0;
+    const DATA_STORE_TAIL_OFFSET: usize = DiskAddress::SERIALIZED_LEN as usize;
     const BASE_ADDR_OFFSET: usize =
-        Self::DATA_SPACE_TAIL_OFFSET + DiskAddress::SERIALIZED_LEN as usize;
+        Self::DATA_STORE_TAIL_OFFSET + DiskAddress::SERIALIZED_LEN as usize;
     const ALLOC_ADDR_OFFSET: usize = Self::BASE_ADDR_OFFSET + DiskAddress::SERIALIZED_LEN as usize;
     pub const SERIALIZED_LEN: u64 = Self::ALLOC_ADDR_OFFSET as u64 + DiskAddress::SERIALIZED_LEN;
 
     pub const fn new(meta_base: NonZeroUsize, compact_base: NonZeroUsize) -> Self {
         Self {
-            meta_space_tail: DiskAddress::new(meta_base),
-            data_space_tail: DiskAddress::new(compact_base),
+            meta_store_tail: DiskAddress::new(meta_base),
+            data_store_tail: DiskAddress::new(compact_base),
             base_addr: DiskAddress::new(meta_base),
             alloc_addr: DiskAddress::new(meta_base),
         }
@@ -204,17 +204,17 @@ impl StoreHeader {
 
     fn into_fields(r: Obj<Self>) -> Result<StoreHeaderSliced, ShaleError> {
         Ok(StoreHeaderSliced {
-            meta_space_tail: StoredView::slice(
+            meta_store_tail: StoredView::slice(
                 &r,
-                Self::META_SPACE_TAIL_OFFSET,
+                Self::META_STORE_TAIL_OFFSET,
                 DiskAddress::SERIALIZED_LEN,
-                r.meta_space_tail,
+                r.meta_store_tail,
             )?,
-            data_space_tail: StoredView::slice(
+            data_store_tail: StoredView::slice(
                 &r,
-                Self::DATA_SPACE_TAIL_OFFSET,
+                Self::DATA_STORE_TAIL_OFFSET,
                 DiskAddress::SERIALIZED_LEN,
-                r.data_space_tail,
+                r.data_store_tail,
             )?,
             base_addr: StoredView::slice(
                 &r,
@@ -241,11 +241,11 @@ impl Storable for StoreHeader {
                 size: Self::SERIALIZED_LEN,
             })?;
         #[allow(clippy::indexing_slicing)]
-        let meta_space_tail = raw.as_deref()[..Self::DATA_SPACE_TAIL_OFFSET]
+        let meta_store_tail = raw.as_deref()[..Self::DATA_STORE_TAIL_OFFSET]
             .try_into()
             .expect("Self::MSIZE = 4 * DiskAddress::MSIZE");
         #[allow(clippy::indexing_slicing)]
-        let data_space_tail = raw.as_deref()[Self::DATA_SPACE_TAIL_OFFSET..Self::BASE_ADDR_OFFSET]
+        let data_store_tail = raw.as_deref()[Self::DATA_STORE_TAIL_OFFSET..Self::BASE_ADDR_OFFSET]
             .try_into()
             .expect("Self::MSIZE = 4 * DiskAddress::MSIZE");
         #[allow(clippy::indexing_slicing)]
@@ -257,8 +257,8 @@ impl Storable for StoreHeader {
             .try_into()
             .expect("Self::MSIZE = 4 * DiskAddress::MSIZE");
         Ok(Self {
-            meta_space_tail,
-            data_space_tail,
+            meta_store_tail,
+            data_store_tail,
             base_addr,
             alloc_addr,
         })
@@ -270,8 +270,8 @@ impl Storable for StoreHeader {
 
     fn serialize(&self, to: &mut [u8]) -> Result<(), ShaleError> {
         let mut cur = Cursor::new(to);
-        cur.write_all(&self.meta_space_tail.to_le_bytes())?;
-        cur.write_all(&self.data_space_tail.to_le_bytes())?;
+        cur.write_all(&self.meta_store_tail.to_le_bytes())?;
+        cur.write_all(&self.data_store_tail.to_le_bytes())?;
         cur.write_all(&self.base_addr.to_le_bytes())?;
         cur.write_all(&self.alloc_addr.to_le_bytes())?;
         Ok(())
@@ -280,8 +280,8 @@ impl Storable for StoreHeader {
 
 #[derive(Debug)]
 struct StoreInner<M> {
-    meta_space: M,
-    data_space: M,
+    meta_store: M,
+    data_store: M,
     header: StoreHeaderSliced,
     alloc_max_walk: u64,
     regn_nbit: u64,
@@ -290,8 +290,8 @@ struct StoreInner<M> {
 impl From<StoreInner<StoreRevMut>> for StoreInner<StoreRevShared> {
     fn from(value: StoreInner<StoreRevMut>) -> StoreInner<StoreRevShared> {
         StoreInner {
-            meta_space: value.meta_space.into(),
-            data_space: value.data_space.into(),
+            meta_store: value.meta_store.into(),
+            data_store: value.data_store.into(),
             header: value.header,
             alloc_max_walk: value.alloc_max_walk,
             regn_nbit: value.regn_nbit,
@@ -301,7 +301,7 @@ impl From<StoreInner<StoreRevMut>> for StoreInner<StoreRevShared> {
 
 impl<M: LinearStore> StoreInner<M> {
     fn get_descriptor(&self, ptr: DiskAddress) -> Result<Obj<ChunkDescriptor>, ShaleError> {
-        StoredView::ptr_to_obj(&self.meta_space, ptr, ChunkDescriptor::SERIALIZED_LEN)
+        StoredView::ptr_to_obj(&self.meta_store, ptr, ChunkDescriptor::SERIALIZED_LEN)
     }
 
     fn get_data_ref<U: Storable + 'static>(
@@ -309,7 +309,7 @@ impl<M: LinearStore> StoreInner<M> {
         ptr: DiskAddress,
         len_limit: u64,
     ) -> Result<Obj<U>, ShaleError> {
-        StoredView::ptr_to_obj(&self.data_space, ptr, len_limit)
+        StoredView::ptr_to_obj(&self.data_store, ptr, len_limit)
     }
 
     fn get_header(&self, ptr: DiskAddress) -> Result<Obj<ChunkHeader>, ShaleError> {
@@ -326,12 +326,12 @@ impl<M: LinearStore> StoreInner<M> {
         // debug_assert!((desc_addr.0 - self.header.base_addr.value.into()) % desc_size == 0);
         #[allow(clippy::unwrap_used)]
         self.header
-            .meta_space_tail
+            .meta_store_tail
             .modify(|r| *r -= desc_size as usize)
             .unwrap();
 
-        if desc_addr != DiskAddress(**self.header.meta_space_tail) {
-            let desc_last = self.get_descriptor(*self.header.meta_space_tail.value)?;
+        if desc_addr != DiskAddress(**self.header.meta_store_tail) {
+            let desc_last = self.get_descriptor(*self.header.meta_store_tail.value)?;
             let mut desc = self.get_descriptor(desc_addr)?;
             #[allow(clippy::unwrap_used)]
             desc.modify(|r| *r = *desc_last).unwrap();
@@ -344,10 +344,10 @@ impl<M: LinearStore> StoreInner<M> {
     }
 
     fn new_desc(&mut self) -> Result<DiskAddress, ShaleError> {
-        let addr = **self.header.meta_space_tail;
+        let addr = **self.header.meta_store_tail;
         #[allow(clippy::unwrap_used)]
         self.header
-            .meta_space_tail
+            .meta_store_tail
             .modify(|r| *r += ChunkDescriptor::SERIALIZED_LEN as usize)
             .unwrap();
 
@@ -387,7 +387,7 @@ impl<M: LinearStore> StoreInner<M> {
         let mut f = offset;
 
         #[allow(clippy::unwrap_used)]
-        if offset + ChunkFooter::SERIALIZED_LEN < self.header.data_space_tail.unwrap().get() as u64
+        if offset + ChunkFooter::SERIALIZED_LEN < self.header.data_store_tail.unwrap().get() as u64
             && (regn_size - (offset & (regn_size - 1)))
                 >= ChunkFooter::SERIALIZED_LEN + ChunkHeader::SERIALIZED_LEN
         {
@@ -440,7 +440,7 @@ impl<M: LinearStore> StoreInner<M> {
         const FOOTER_SIZE: usize = ChunkFooter::SERIALIZED_LEN as usize;
         const DESCRIPTOR_SIZE: usize = ChunkDescriptor::SERIALIZED_LEN as usize;
 
-        let tail = *self.header.meta_space_tail;
+        let tail = *self.header.meta_store_tail;
         if tail == *self.header.base_addr {
             return Ok(None);
         }
@@ -550,10 +550,10 @@ impl<M: LinearStore> StoreInner<M> {
     fn alloc_new(&mut self, length: u64) -> Result<u64, ShaleError> {
         let regn_size = 1 << self.regn_nbit;
         let total_length = ChunkHeader::SERIALIZED_LEN + length + ChunkFooter::SERIALIZED_LEN;
-        let mut offset = *self.header.data_space_tail;
+        let mut offset = *self.header.data_store_tail;
         #[allow(clippy::unwrap_used)]
         self.header
-            .data_space_tail
+            .data_store_tail
             .modify(|r| {
                 // an item is always fully in one region
                 let rem = regn_size - (offset & (regn_size - 1)).get();
@@ -602,8 +602,8 @@ pub struct Store<T: Storable, M> {
 
 impl<T: Storable, M: LinearStore> Store<T, M> {
     pub fn new(
-        meta_space: M,
-        data_space: M,
+        meta_store: M,
+        data_store: M,
         header: Obj<StoreHeader>,
         obj_cache: super::ObjCache<T>,
         alloc_max_walk: u64,
@@ -611,8 +611,8 @@ impl<T: Storable, M: LinearStore> Store<T, M> {
     ) -> Result<Self, ShaleError> {
         let cs = Store {
             inner: RwLock::new(StoreInner {
-                meta_space,
-                data_space,
+                meta_store,
+                data_store,
                 header: StoreHeader::into_fields(header)?,
                 alloc_max_walk,
                 regn_nbit,
@@ -645,9 +645,9 @@ impl<T: Storable + Debug + 'static, M: LinearStore> Store<T, M> {
         #[allow(clippy::unwrap_used)]
         let obj = {
             let inner = self.inner.read().unwrap();
-            let data_space = &inner.data_space;
+            let data_store = &inner.data_store;
             #[allow(clippy::unwrap_used)]
-            let view = StoredView::item_to_obj(data_space, addr.try_into().unwrap(), size, item)?;
+            let view = StoredView::item_to_obj(data_store, addr.try_into().unwrap(), size, item)?;
 
             self.obj_cache.put(view)
         };
@@ -761,14 +761,14 @@ mod tests {
     }
 
     #[test]
-    fn test_space_item() {
+    fn test_store_item() {
         let meta_size: NonZeroUsize = NonZeroUsize::new(0x10000).unwrap();
         let compact_size: NonZeroUsize = NonZeroUsize::new(0x10000).unwrap();
         let reserved: DiskAddress = 0x1000.into();
 
         let mut dm = InMemLinearStore::new(meta_size.get() as u64, 0x0);
 
-        // initialize compact space
+        // initialize compact store
         let compact_header = DiskAddress::from(0x1);
         dm.write(
             compact_header.unwrap().get(),
@@ -782,15 +782,15 @@ mod tests {
         let mem_payload = InMemLinearStore::new(compact_size.get() as u64, 0x1);
 
         let cache: ObjCache<Hash> = ObjCache::new(1);
-        let space = Store::new(mem_meta, mem_payload, compact_header, cache, 10, 16).unwrap();
+        let store = Store::new(mem_meta, mem_payload, compact_header, cache, 10, 16).unwrap();
 
         // initial write
         let data = b"hello world";
         let hash: [u8; HASH_SIZE] = sha3::Keccak256::digest(data).into();
-        let obj_ref = space.put_item(Hash(hash), 0).unwrap();
+        let obj_ref = store.put_item(Hash(hash), 0).unwrap();
         assert_eq!(obj_ref.as_ptr(), DiskAddress::from(4113));
         // create hash ptr from address and attempt to read dirty write.
-        let hash_ref = space.get_item(DiskAddress::from(4113)).unwrap();
+        let hash_ref = store.get_item(DiskAddress::from(4113)).unwrap();
         // read before flush results in zeroed hash
         assert_eq!(hash_ref.as_ref(), ZERO_HASH.as_ref());
         // not cached
@@ -815,7 +815,7 @@ mod tests {
         drop(obj_ref);
         // write is visible
         assert_eq!(
-            space.get_item(DiskAddress::from(4113)).unwrap().as_ref(),
+            store.get_item(DiskAddress::from(4113)).unwrap().as_ref(),
             hash
         );
     }

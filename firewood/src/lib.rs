@@ -69,12 +69,12 @@
 //! Firewood is built by three layers of abstractions that totally decouple the
 //! layout/representation of the data on disk from the actual logical data structure it retains:
 //!
-//! - Linear, memory-like space: the `shale` crate offers a `CachedStore` abstraction for a
-//!   (64-bit) byte-addressable space that abstracts away the intricate method that actually persists
+//! - Linear, memory-like store: the `shale` crate offers a `CachedStore` abstraction for a
+//!   (64-bit) byte-addressable store that abstracts away the intricate method that actually persists
 //!   the in-memory data on the secondary storage medium (e.g., hard drive). The implementor of `CachedStore`
 //!   provides the functions to give the user of `CachedStore` an illusion that the user is operating upon a
-//!   byte-addressable memory space. It is just a "magical" array of bytes one can view and change
-//!   that is mirrored to the disk. In reality, the linear space will be chunked into files under a
+//!   byte-addressable memory store. It is just a "magical" array of bytes one can view and change
+//!   that is mirrored to the disk. In reality, the linear store will be chunked into files under a
 //!   directory, but the user does not have to even know about this.
 //!
 //! - Persistent item storage stash: `CompactStore` in `shale` defines a pool of typed objects that are
@@ -87,9 +87,9 @@
 //!   and maintain the code.
 //!
 //! Given the abstraction, one can easily realize the fact that the actual data that affect the
-//! state of the data structure (trie) is what the linear space (`CachedStore`) keeps track of. That is,
+//! state of the data structure (trie) is what the linear store (`CachedStore`) keeps track of. That is,
 //! a flat but conceptually large byte vector. In other words, given a valid byte vector as the
-//! content of the linear space, the higher level data structure can be *uniquely* determined, there
+//! content of the linear store, the higher level data structure can be *uniquely* determined, there
 //! is nothing more (except for some auxiliary data that are kept for performance reasons, such as caching)
 //! or less than that, like a way to interpret the bytes. This nice property allows us to completely
 //! separate the logical data from its physical representation, greatly simplifies the storage
@@ -99,18 +99,18 @@
 //!
 //! ## Page-based Shadowing and Revisions
 //!
-//! Following the idea that the tries are just a view of a linear byte space, all writes made to the
+//! Following the idea that the tries are just a view of a linear byte store, all writes made to the
 //! tries inside Firewood will eventually be consolidated into some interval writes to the linear
-//! space. The writes may overlap and some frequent writes are even done to the same spot in the
-//! space. To reduce the overhead and be friendly to the disk, we partition the entire 64-bit
-//! virtual space into pages (yeah it appears to be more and more like an OS) and keep track of the
+//! store. The writes may overlap and some frequent writes are even done to the same spot in the
+//! store. To reduce the overhead and be friendly to the disk, we partition the entire 64-bit
+//! virtual store into pages (yeah it appears to be more and more like an OS) and keep track of the
 //! dirty pages in some `CachedStore` instantiation (see `storage::StoreRevMut`). When a
 //! [`db::Proposal`] commits, both the recorded interval writes and the aggregated in-memory
-//! dirty pages induced by this write batch are taken out from the linear space. Although they are
+//! dirty pages induced by this write batch are taken out from the linear store. Although they are
 //! mathematically equivalent, interval writes are more compact than pages (which are 4K in size,
 //! become dirty even if a single byte is touched upon) . So interval writes are fed into the WAL
 //! subsystem (supported by growthring). After the WAL record is written (one record per write batch),
-//! the dirty pages are then pushed to the on-disk linear space to mirror the change by some
+//! the dirty pages are then pushed to the on-disk linear store to mirror the change by some
 //! asynchronous, out-of-order file writes. See the `BufferCmd::WriteBatch` part of `DiskBuffer::process`
 //! for the detailed logic.
 //!
@@ -120,15 +120,15 @@
 //!   memory, then:
 //!
 //! - Bring the necessary pages that contain the accessed nodes into the memory and cache them
-//!   (`storage::CachedSpace`).
+//!   (`storage::CachedStore`).
 //!
 //! - Make changes to the trie, and that induces the writes to some nodes. The nodes are either
 //!   already cached in memory (its pages are cached, or its handle `ObjRef<Node>` is still in
 //!   `shale::ObjCache`) or need to be brought into the memory (if that's the case, go back to the
 //!   second step for it).
 //!
-//! - Writes to nodes are converted into interval writes to the stagging `StoreRevMut` space that
-//!   overlays atop `CachedSpace`, so all dirty pages during the current write batch will be
+//! - Writes to nodes are converted into interval writes to the stagging `StoreRevMut` store that
+//!   overlays atop `CachedStore`, so all dirty pages during the current write batch will be
 //!   exactly captured in `StoreRevMut` (see `StoreRevMut::delta`).
 //!
 //! - Finally:
@@ -139,18 +139,18 @@
 //!
 //!   - Commit: otherwise, the write batch is committed, the interval writes (`storage::Ash`) will be bundled
 //!     into a single WAL record (`storage::AshRecord`) and sent to WAL subsystem, before dirty pages
-//!     are scheduled to be written to the space files. Also the dirty pages are applied to the
-//!     underlying `CachedSpace`. `StoreRevMut` becomes empty again for further write batches.
+//!     are scheduled to be written to the store files. Also the dirty pages are applied to the
+//!     underlying `CachedStore`. `StoreRevMut` becomes empty again for further write batches.
 //!
-//! Parts of the following diagram show this normal flow, the "staging" space (implemented by
+//! Parts of the following diagram show this normal flow, the "staging" store (implemented by
 //! `StoreRevMut`) concept is a bit similar to the staging area in Git, which enables the handling
 //! of (resuming from) write errors, clean abortion of an on-going write batch so the entire store
 //! state remains intact, and also reduces unnecessary premature disk writes. Essentially, we
-//! copy-on-write pages in the space that are touched upon, without directly mutating the
-//! underlying "master" space. The staging space is just a collection of these "shadowing" pages
+//! copy-on-write pages in the store that are touched upon, without directly mutating the
+//! underlying "master" store. The staging store is just a collection of these "shadowing" pages
 //! and a reference to the its base (master) so any reads could partially hit those dirty pages
 //! and/or fall through to the base, whereas all writes are captured. Finally, when things go well,
-//! we "push down" these changes to the base and clear up the staging space.
+//! we "push down" these changes to the base and clear up the staging store.
 //!
 //! <p align="center">
 //!     <img src="https://ava-labs.github.io/firewood/assets/architecture.svg" width="100%">
@@ -161,25 +161,25 @@
 //! shows previously logged write batch records could be kept even though they are no longer needed
 //! for the purpose of crash recovery. The interval writes from a record can be aggregated into
 //! pages (see `storage::StoreDelta::new`) and used to reconstruct a "ghost" image of past
-//! revision of the linear space (just like how staging space works, except that the ghost space is
+//! revision of the linear store (just like how staging store works, except that the ghost store is
 //! essentially read-only once constructed). The shadow pages there will function as some
-//! "rewinding" changes to patch the necessary locations in the linear space, while the rest of the
-//! linear space is very likely untouched by that historical write batch.
+//! "rewinding" changes to patch the necessary locations in the linear store, while the rest of the
+//! linear store is very likely untouched by that historical write batch.
 //!
 //! Then, with the three-layer abstraction we previously talked about, a historical trie could be
 //! derived. In fact, because there is no mandatory traversal or scanning in the process, the
 //! only cost to revive a historical state from the log is to just playback the records and create
-//! those shadow pages. There is very little additional cost because the ghost space is summoned on an
+//! those shadow pages. There is very little additional cost because the ghost store is summoned on an
 //! on-demand manner while one accesses the historical trie.
 //!
 //! In the other direction, when new write batches are committed, the system moves forward, we can
 //! therefore maintain a rolling window of past revisions in memory with *zero* cost. The
-//! mid-bottom of the diagram shows when a write batch is committed, the persisted (master) space goes one
-//! step forward, the staging space is cleared, and an extra ghost space (colored in purple) can be
+//! mid-bottom of the diagram shows when a write batch is committed, the persisted (master) store goes one
+//! step forward, the staging store is cleared, and an extra ghost store (colored in purple) can be
 //! created to hold the version of the store before the commit. The backward delta is applied to
 //! counteract the change that has been made to the persisted store, which is also a set of shadow pages.
-//! No change is required for other historical ghost space instances. Finally, we can phase out
-//! some very old ghost space to keep the size of the rolling window invariant.
+//! No change is required for other historical ghost store instances. Finally, we can phase out
+//! some very old ghost store to keep the size of the rolling window invariant.
 //!
 pub mod db;
 pub(crate) mod file;

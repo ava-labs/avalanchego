@@ -190,7 +190,7 @@ struct WalState {
 
 #[async_trait(?Send)]
 pub trait WalFile {
-    /// Initialize the file space in [offset, offset + length) to zero.
+    /// Initialize the file store in [offset, offset + length) to zero.
     async fn allocate(&self, offset: WalPos, length: usize) -> Result<(), WalError>;
     /// Write data with offset. We assume all previous `allocate`/`truncate` invocations are visible
     /// if ordered earlier (should be guaranteed by most OS).  Additionally, the write caused
@@ -380,7 +380,7 @@ impl<F: WalFile + 'static, S: WalStore<F>> WalFilePool<F, S> {
             std::mem::replace(&mut *self.last_write.get(), std::mem::MaybeUninit::uninit())
                 .assume_init()
         };
-        // pre-allocate the file space
+        // pre-allocate the file store
         let alloc = async move {
             last_write.await?;
             let mut last_h: Option<

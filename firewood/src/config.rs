@@ -18,7 +18,7 @@ pub struct DbConfig {
     #[builder(default = 22)] // 4MB file by default
     pub meta_file_nbit: u64,
     /// Maximum cached pages for the item stash. This is the low-level cache used by the linear
-    /// space that holds Trie nodes and account objects.
+    /// store that holds Trie nodes and account objects.
     #[builder(default = 262144)] // 1G total size by default
     pub payload_ncached_pages: usize,
     /// Maximum cached file descriptors for the item stash.

@@ -4,7 +4,7 @@
 // TODO: try to get rid of the use `RefCell` in this file
 use self::buffer::DiskBufferRequester;
 use crate::file::File;
-use crate::shale::{self, LinearStore, LinearStoreView, SendSyncDerefMut, ShaleError, SpaceId};
+use crate::shale::{self, LinearStore, LinearStoreView, SendSyncDerefMut, ShaleError, StoreId};
 use nix::fcntl::{Flock, FlockArg};
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
@@ -52,14 +52,14 @@ impl<T> From<std::io::Error> for StoreError<T> {
 pub trait MemStoreR: Debug + Send + Sync {
     /// Returns a slice of bytes from memory.
     fn get_slice(&self, offset: u64, length: u64) -> Option<Vec<u8>>;
-    fn id(&self) -> SpaceId;
+    fn id(&self) -> StoreId;
 }
 
 // Page should be boxed as to not take up so much stack-space
 type Page = Box<[u8; PAGE_SIZE as usize]>;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct SpaceWrite {
+pub struct StoreWrite {
     offset: u64,
     data: Box<[u8]>,
 }
@@ -68,19 +68,19 @@ pub struct SpaceWrite {
 /// In memory representation of Write-ahead log with `undo` and `redo`.
 pub struct Ash {
     /// Deltas to undo the changes.
-    pub undo: Vec<SpaceWrite>,
+    pub undo: Vec<StoreWrite>,
     /// Deltas to replay the changes.
-    pub redo: Vec<SpaceWrite>,
+    pub redo: Vec<StoreWrite>,
 }
 
 impl Ash {
-    fn iter(&self) -> impl Iterator<Item = (&SpaceWrite, &SpaceWrite)> {
+    fn iter(&self) -> impl Iterator<Item = (&StoreWrite, &StoreWrite)> {
         self.undo.iter().zip(self.redo.iter())
     }
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
-pub struct AshRecord(pub HashMap<SpaceId, Ash>);
+pub struct AshRecord(pub HashMap<StoreId, Ash>);
 
 impl growthring::wal::Record for AshRecord {
     fn serialize(&self) -> growthring::wal::WalBytes {
@@ -97,7 +97,7 @@ impl AshRecord {
     }
 }
 
-/// Basic copy-on-write item in the linear storage space for multi-versioning.
+/// Basic copy-on-write item in the linear storage store for multi-versioning.
 pub struct DeltaPage(u64, Page);
 
 impl DeltaPage {
@@ -134,7 +134,7 @@ impl Deref for StoreDelta {
 }
 
 impl StoreDelta {
-    pub fn new(src: &dyn MemStoreR, writes: &[SpaceWrite]) -> Self {
+    pub fn new(src: &dyn MemStoreR, writes: &[StoreWrite]) -> Self {
         let mut deltas = Vec::new();
         #[allow(clippy::indexing_slicing)]
         let mut widx: Vec<_> = (0..writes.len())
@@ -220,7 +220,7 @@ impl StoreDelta {
 }
 
 pub struct StoreRev {
-    base_space: RwLock<Arc<dyn MemStoreR>>,
+    base_store: RwLock<Arc<dyn MemStoreR>>,
     delta: StoreDelta,
 }
 
@@ -236,7 +236,7 @@ impl fmt::Debug for StoreRev {
 
 impl MemStoreR for StoreRev {
     fn get_slice(&self, offset: u64, length: u64) -> Option<Vec<u8>> {
-        let base_space = self.base_space.read();
+        let base_store = self.base_store.read();
         let mut start = offset;
         let end = start + length;
         let delta = &self.delta;
@@ -244,7 +244,7 @@ impl MemStoreR for StoreRev {
         let mut r = delta.len();
         // no dirty page, before or after all dirty pages
         if r == 0 {
-            return base_space.get_slice(start, end - start);
+            return base_store.get_slice(start, end - start);
         }
         // otherwise, some dirty pages are covered by the range
         while r - l > 1 {
@@ -262,7 +262,7 @@ impl MemStoreR for StoreRev {
         }
         #[allow(clippy::indexing_slicing)]
         if l >= delta.len() || end < delta[l].offset() {
-            return base_space.get_slice(start, end - start);
+            return base_store.get_slice(start, end - start);
         }
         let mut data = Vec::new();
         #[allow(clippy::indexing_slicing)]
@@ -270,7 +270,7 @@ impl MemStoreR for StoreRev {
         #[allow(clippy::indexing_slicing)]
         if start < delta[l].offset() {
             #[allow(clippy::indexing_slicing)]
-            data.extend(base_space.get_slice(start, delta[l].offset() - start)?);
+            data.extend(base_store.get_slice(start, delta[l].offset() - start)?);
             #[allow(clippy::indexing_slicing)]
             data.extend(&delta[l].data()[..p_off as usize]);
         } else {
@@ -283,13 +283,13 @@ impl MemStoreR for StoreRev {
             l += 1;
             #[allow(clippy::indexing_slicing)]
             if l >= delta.len() || end < delta[l].offset() {
-                data.extend(base_space.get_slice(start, end - start)?);
+                data.extend(base_store.get_slice(start, end - start)?);
                 break;
             }
             #[allow(clippy::indexing_slicing)]
             if delta[l].offset() > start {
                 #[allow(clippy::indexing_slicing)]
-                data.extend(base_space.get_slice(start, delta[l].offset() - start)?);
+                data.extend(base_store.get_slice(start, delta[l].offset() - start)?);
             }
             #[allow(clippy::indexing_slicing)]
             if end < delta[l].offset() + PAGE_SIZE {
@@ -306,8 +306,8 @@ impl MemStoreR for StoreRev {
         Some(data)
     }
 
-    fn id(&self) -> SpaceId {
-        self.base_space.read().id()
+    fn id(&self) -> StoreId {
+        self.base_store.read().id()
     }
 }
 
@@ -315,19 +315,19 @@ impl MemStoreR for StoreRev {
 pub struct StoreRevShared(Arc<StoreRev>);
 
 impl StoreRevShared {
-    pub fn from_ash(base_space: Arc<dyn MemStoreR>, writes: &[SpaceWrite]) -> Self {
-        let delta = StoreDelta::new(base_space.as_ref(), writes);
-        let base_space = RwLock::new(base_space);
-        Self(Arc::new(StoreRev { base_space, delta }))
+    pub fn from_ash(base_store: Arc<dyn MemStoreR>, writes: &[StoreWrite]) -> Self {
+        let delta = StoreDelta::new(base_store.as_ref(), writes);
+        let base_store = RwLock::new(base_store);
+        Self(Arc::new(StoreRev { base_store, delta }))
     }
 
-    pub fn from_delta(base_space: Arc<dyn MemStoreR>, delta: StoreDelta) -> Self {
-        let base_space = RwLock::new(base_space);
-        Self(Arc::new(StoreRev { base_space, delta }))
+    pub fn from_delta(base_store: Arc<dyn MemStoreR>, delta: StoreDelta) -> Self {
+        let base_store = RwLock::new(base_store);
+        Self(Arc::new(StoreRev { base_store, delta }))
     }
 
-    pub fn set_base_space(&mut self, base_space: Arc<dyn MemStoreR>) {
-        *self.0.base_space.write() = base_space
+    pub fn set_base_store(&mut self, base_store: Arc<dyn MemStoreR>) {
+        *self.0.base_store.write() = base_store
     }
 
     pub const fn inner(&self) -> &Arc<StoreRev> {
@@ -355,7 +355,7 @@ impl LinearStore for StoreRevShared {
         Err(ShaleError::ImmutableWrite)
     }
 
-    fn id(&self) -> SpaceId {
+    fn id(&self) -> StoreId {
         <StoreRev as MemStoreR>::id(&self.0)
     }
 
@@ -375,7 +375,7 @@ impl From<StoreRevMut> for StoreRevShared {
         let delta = StoreDelta(pages);
 
         let rev = Arc::new(StoreRev {
-            base_space: RwLock::new(value.base_space),
+            base_store: RwLock::new(value.base_store),
             delta,
         });
         StoreRevShared(rev)
@@ -425,13 +425,13 @@ struct StoreRevMutDelta {
 
 #[derive(Clone, Debug)]
 /// A mutable revision of the store. The view is constructed by applying the `deltas` to the
-/// `base space`. The `deltas` tracks both `undo` and `redo` to be able to rewind or reapply
+/// `base_store`. The `deltas` tracks both `undo` and `redo` to be able to rewind or reapply
 /// the changes. `StoreRevMut` supports basing on top of another `StoreRevMut`, by chaining
 /// `prev_deltas` (from based `StoreRevMut`) with current `deltas` from itself . In this way,
 /// callers can create a new `StoreRevMut` from an existing one without actually committing
-/// the mutations to the base space.
+/// the mutations to the base store.
 pub struct StoreRevMut {
-    base_space: Arc<dyn MemStoreR>,
+    base_store: Arc<dyn MemStoreR>,
     deltas: Arc<RwLock<StoreRevMutDelta>>,
     prev_deltas: Arc<RwLock<StoreRevMutDelta>>,
 }
@@ -439,7 +439,7 @@ pub struct StoreRevMut {
 impl From<StoreRevShared> for StoreRevMut {
     fn from(value: StoreRevShared) -> Self {
         StoreRevMut {
-            base_space: value.0.base_space.read().clone(),
+            base_store: value.0.base_store.read().clone(),
             deltas: Arc::new(RwLock::new(StoreRevMutDelta::default())),
             prev_deltas: Arc::new(RwLock::new(StoreRevMutDelta::default())),
         }
@@ -447,9 +447,9 @@ impl From<StoreRevShared> for StoreRevMut {
 }
 
 impl StoreRevMut {
-    pub fn new(base_space: Arc<dyn MemStoreR>) -> Self {
+    pub fn new(base_store: Arc<dyn MemStoreR>) -> Self {
         Self {
-            base_space,
+            base_store,
             deltas: Default::default(),
             prev_deltas: Default::default(),
         }
@@ -457,7 +457,7 @@ impl StoreRevMut {
 
     pub fn new_from_other(other: &StoreRevMut) -> Self {
         Self {
-            base_space: other.base_space.clone(),
+            base_store: other.base_store.clone(),
             deltas: Default::default(),
             prev_deltas: other.deltas.clone(),
         }
@@ -476,7 +476,7 @@ impl StoreRevMut {
             .or_insert_with(|| match prev_deltas.pages.get(&pid) {
                 Some(p) => Box::new(*p.as_ref()),
                 None => Box::new(
-                    self.base_space
+                    self.base_store
                         .get_slice(pid << PAGE_SIZE_NBIT, PAGE_SIZE)
                         .unwrap()
                         .try_into()
@@ -528,7 +528,7 @@ impl LinearStore for StoreRevMut {
                     None => match prev_deltas.get(&s_pid) {
                         #[allow(clippy::indexing_slicing)]
                         Some(p) => p[s_off..e_off + 1].to_vec(),
-                        None => self.base_space.get_slice(offset as u64, length)?,
+                        None => self.base_store.get_slice(offset as u64, length)?,
                     },
                 }
             } else {
@@ -539,7 +539,7 @@ impl LinearStore for StoreRevMut {
                         #[allow(clippy::indexing_slicing)]
                         Some(p) => p[s_off..].to_vec(),
                         None => self
-                            .base_space
+                            .base_store
                             .get_slice(offset as u64, PAGE_SIZE - s_off as u64)?,
                     },
                 };
@@ -549,7 +549,7 @@ impl LinearStore for StoreRevMut {
                         None => match prev_deltas.get(&p) {
                             Some(p) => data.extend(**p),
                             None => data.extend(
-                                &self.base_space.get_slice(p << PAGE_SIZE_NBIT, PAGE_SIZE)?,
+                                &self.base_store.get_slice(p << PAGE_SIZE_NBIT, PAGE_SIZE)?,
                             ),
                         },
                     };
@@ -561,7 +561,7 @@ impl LinearStore for StoreRevMut {
                         #[allow(clippy::indexing_slicing)]
                         Some(p) => data.extend(&p[..e_off + 1]),
                         None => data.extend(
-                            self.base_space
+                            self.base_store
                                 .get_slice(e_pid << PAGE_SIZE_NBIT, e_off as u64 + 1)?,
                         ),
                     },
@@ -629,11 +629,11 @@ impl LinearStore for StoreRevMut {
 
         let plain = &mut self.deltas.write().plain;
         assert!(undo.len() == redo.len());
-        plain.undo.push(SpaceWrite {
+        plain.undo.push(StoreWrite {
             offset: offset as u64,
             data: undo.into(),
         });
-        plain.redo.push(SpaceWrite {
+        plain.redo.push(StoreWrite {
             offset: offset as u64,
             data: redo,
         });
@@ -641,8 +641,8 @@ impl LinearStore for StoreRevMut {
         Ok(())
     }
 
-    fn id(&self) -> SpaceId {
-        self.base_space.id()
+    fn id(&self) -> StoreId {
+        self.base_store.id()
     }
 
     fn is_writeable(&self) -> bool {
@@ -659,8 +659,8 @@ impl MemStoreR for ZeroStore {
         Some(vec![0; length as usize])
     }
 
-    fn id(&self) -> SpaceId {
-        shale::INVALID_SPACE_ID
+    fn id(&self) -> StoreId {
+        shale::INVALID_STORE_ID
     }
 }
 
@@ -686,7 +686,7 @@ mod test {
                     canvas[(idx - min) as usize] = *byte;
                 }
                 println!("[0x{l:x}, 0x{r:x})");
-                writes.push(SpaceWrite { offset: l, data });
+                writes.push(StoreWrite { offset: l, data });
             }
             let z = Arc::new(ZeroStore::default());
             let rev = StoreRevShared::from_ash(z, &writes);
@@ -719,12 +719,12 @@ pub struct StoreConfig {
     ncached_files: usize,
     #[builder(default = 22)] // 4MB file by default
     file_nbit: u64,
-    space_id: SpaceId,
+    store_id: StoreId,
     rootdir: PathBuf,
 }
 
 #[derive(Debug)]
-struct CachedSpaceInner {
+struct CachedStoreInner {
     cached_pages: lru::LruCache<u64, Page>,
     pinned_pages: HashMap<u64, (usize, Page)>,
     files: Arc<FilePool>,
@@ -732,20 +732,20 @@ struct CachedSpaceInner {
 }
 
 #[derive(Clone, Debug)]
-pub struct CachedSpace {
-    inner: Arc<RwLock<CachedSpaceInner>>,
-    space_id: SpaceId,
+pub struct CachedStore {
+    inner: Arc<RwLock<CachedStoreInner>>,
+    store_id: StoreId,
 }
 
-impl CachedSpace {
+impl CachedStore {
     pub fn new(
         cfg: &StoreConfig,
         disk_requester: DiskBufferRequester,
     ) -> Result<Self, StoreError<std::io::Error>> {
-        let space_id = cfg.space_id;
+        let store_id = cfg.store_id;
         let files = Arc::new(FilePool::new(cfg)?);
         Ok(Self {
-            inner: Arc::new(RwLock::new(CachedSpaceInner {
+            inner: Arc::new(RwLock::new(CachedStoreInner {
                 cached_pages: lru::LruCache::new(
                     NonZeroUsize::new(cfg.ncached_pages).expect("non-zero cache size"),
                 ),
@@ -753,7 +753,7 @@ impl CachedSpace {
                 files,
                 disk_requester,
             })),
-            space_id,
+            store_id,
         })
     }
 
@@ -765,7 +765,7 @@ impl CachedSpace {
     pub fn update(&self, delta: &StoreDelta) -> Option<StoreDelta> {
         let mut pages = Vec::new();
         for DeltaPage(pid, page) in &delta.0 {
-            let data = self.inner.write().pin_page(self.space_id, *pid).ok()?;
+            let data = self.inner.write().pin_page(self.store_id, *pid).ok()?;
             // save the original data
             #[allow(clippy::unwrap_used)]
             pages.push(DeltaPage(*pid, Box::new(data.try_into().unwrap())));
@@ -776,10 +776,10 @@ impl CachedSpace {
     }
 }
 
-impl CachedSpaceInner {
+impl CachedStoreInner {
     fn pin_page(
         &mut self,
-        space_id: SpaceId,
+        store_id: StoreId,
         pid: u64,
     ) -> Result<&'static mut [u8], StoreError<std::io::Error>> {
         let base = match self.pinned_pages.get_mut(&pid) {
@@ -791,7 +791,7 @@ impl CachedSpaceInner {
                 let page = self
                     .cached_pages
                     .pop(&pid)
-                    .or_else(|| self.disk_requester.get_page(space_id, pid));
+                    .or_else(|| self.disk_requester.get_page(store_id, pid));
                 let mut page = match page {
                     Some(page) => page,
                     None => {
@@ -844,7 +844,7 @@ impl CachedSpaceInner {
 struct PageRef {
     pid: u64,
     data: &'static mut [u8],
-    store: CachedSpace,
+    store: CachedStore,
 }
 
 impl std::ops::Deref for PageRef {
@@ -861,10 +861,10 @@ impl std::ops::DerefMut for PageRef {
 }
 
 impl PageRef {
-    fn new(pid: u64, store: &CachedSpace) -> Option<Self> {
+    fn new(pid: u64, store: &CachedStore) -> Option<Self> {
         Some(Self {
             pid,
-            data: store.inner.write().pin_page(store.space_id, pid).ok()?,
+            data: store.inner.write().pin_page(store.store_id, pid).ok()?,
             store: store.clone(),
         })
     }
@@ -876,7 +876,7 @@ impl Drop for PageRef {
     }
 }
 
-impl MemStoreR for CachedSpace {
+impl MemStoreR for CachedStore {
     fn get_slice(&self, offset: u64, length: u64) -> Option<Vec<u8>> {
         if length == 0 {
             return Some(Default::default());
@@ -903,8 +903,8 @@ impl MemStoreR for CachedSpace {
         Some(data)
     }
 
-    fn id(&self) -> SpaceId {
-        self.space_id
+    fn id(&self) -> StoreId {
+        self.store_id
     }
 }
 

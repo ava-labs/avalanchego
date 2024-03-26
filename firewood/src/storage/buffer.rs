@@ -11,7 +11,7 @@ use std::sync::Arc;
 use std::{cell::RefCell, collections::HashMap};
 
 use super::{AshRecord, FilePool, Page, StoreDelta, StoreError, WalConfig, PAGE_SIZE_NBIT};
-use crate::shale::SpaceId;
+use crate::shale::StoreId;
 use crate::storage::DeltaPage;
 use aiofut::{AioBuilder, AioError, AioManager};
 use futures::future::join_all;
@@ -40,10 +40,10 @@ pub enum BufferCmd {
     /// Process a write batch against the underlying store.
     WriteBatch(BufferWrites, AshRecord),
     /// Get a page from the disk buffer.
-    GetPage((SpaceId, u64), oneshot::Sender<Option<Page>>),
+    GetPage((StoreId, u64), oneshot::Sender<Option<Page>>),
     CollectAsh(usize, oneshot::Sender<Vec<AshRecord>>),
-    /// Register a new space and add the files to a memory mapped pool.
-    RegCachedSpace(SpaceId, Arc<FilePool>),
+    /// Register a new store and add the files to a memory mapped pool.
+    RegCachedStore(StoreId, Arc<FilePool>),
     /// Returns false if the
     Shutdown,
 }
@@ -77,7 +77,7 @@ pub struct DiskBufferConfig {
 /// List of pages to write to disk.
 #[derive(Debug)]
 pub struct BufferWrite {
-    pub space_id: SpaceId,
+    pub store_id: StoreId,
     pub delta: StoreDelta,
 }
 
@@ -212,12 +212,12 @@ struct WalQueueMax {
 
 /// Add an pending pages to aio manager for processing by the local pool.
 fn schedule_write(
-    pending: Rc<RefCell<HashMap<(SpaceId, u64), PendingPage>>>,
+    pending: Rc<RefCell<HashMap<(StoreId, u64), PendingPage>>>,
     fc_notifier: Rc<Notify>,
     file_pools: Rc<RefCell<[Option<Arc<FilePool>>; 255]>>,
     aiomgr: Rc<AioManager>,
     max: WalQueueMax,
-    page_key: (SpaceId, u64),
+    page_key: (StoreId, u64),
 ) {
     use std::collections::hash_map::Entry::*;
 
@@ -299,12 +299,12 @@ async fn init_wal(
             |raw, _| {
                 let batch = AshRecord::deserialize(raw);
 
-                for (space_id, ash) in batch.0 {
+                for (store_id, ash) in batch.0 {
                     for (undo, redo) in ash.iter() {
                         let offset = undo.offset;
                         let file_pools = file_pools.borrow();
                         #[allow(clippy::unwrap_used, clippy::indexing_slicing)]
-                        let file_pool = file_pools[space_id as usize].as_ref().unwrap();
+                        let file_pool = file_pools[store_id as usize].as_ref().unwrap();
                         let file_nbit = file_pool.get_file_nbit();
                         let file_mask = (1 << file_nbit) - 1;
                         let fid = offset >> file_nbit;
@@ -343,7 +343,7 @@ async fn init_wal(
 async fn run_wal_queue(
     max: WalQueueMax,
     wal: Rc<Mutex<WalWriter<WalFileImpl, WalStoreImpl>>>,
-    pending: Rc<RefCell<HashMap<(SpaceId, u64), PendingPage>>>,
+    pending: Rc<RefCell<HashMap<(StoreId, u64), PendingPage>>>,
     file_pools: Rc<RefCell<[Option<Arc<FilePool>>; 255]>>,
     mut writes: mpsc::Receiver<(BufferWrites, AshRecord)>,
     fc_notifier: Rc<Notify>,
@@ -382,9 +382,9 @@ async fn run_wal_queue(
         let sem = Rc::new(tokio::sync::Semaphore::new(0));
         let mut npermit = 0;
 
-        for BufferWrite { space_id, delta } in bwrites {
+        for BufferWrite { store_id, delta } in bwrites {
             for DeltaPage(page_id, page) in delta.0 {
-                let page_key = (space_id, page_id);
+                let page_key = (store_id, page_id);
 
                 let should_write = match pending.borrow_mut().entry(page_key) {
                     Occupied(mut e) => {
@@ -461,7 +461,7 @@ fn panic_on_intialization_failure_with<'a, T>(
 
 #[allow(clippy::too_many_arguments)]
 async fn process(
-    pending: Rc<RefCell<HashMap<(SpaceId, u64), PendingPage>>>,
+    pending: Rc<RefCell<HashMap<(StoreId, u64), PendingPage>>>,
     fc_notifier: Rc<Notify>,
     file_pools: Rc<RefCell<[Option<Arc<FilePool>>; 255]>>,
     aiomgr: Rc<AioManager>,
@@ -544,11 +544,11 @@ async fn process(
             #[allow(clippy::unwrap_used)]
             tx.send(ash).unwrap();
         }
-        BufferCmd::RegCachedSpace(space_id, files) => {
+        BufferCmd::RegCachedStore(store_id, files) => {
             file_pools
                 .borrow_mut()
                 .as_mut_slice()
-                .index_mut(space_id as usize)
+                .index_mut(store_id as usize)
                 .replace(files);
         }
     }
@@ -581,10 +581,10 @@ impl DiskBufferRequester {
     }
 
     /// Get a page from the buffer.
-    pub fn get_page(&self, space_id: SpaceId, page_id: u64) -> Option<Page> {
+    pub fn get_page(&self, store_id: StoreId, page_id: u64) -> Option<Page> {
         let (resp_tx, resp_rx) = oneshot::channel();
         self.sender
-            .send(BufferCmd::GetPage((space_id, page_id), resp_tx))
+            .send(BufferCmd::GetPage((store_id, page_id), resp_tx))
             .map_err(StoreError::Send)
             .ok();
         #[allow(clippy::unwrap_used)]
@@ -625,10 +625,10 @@ impl DiskBufferRequester {
         block_in_place(|| resp_rx.blocking_recv().map_err(StoreError::Receive))
     }
 
-    /// Register a cached space to the buffer.
-    pub fn reg_cached_space(&self, space_id: SpaceId, files: Arc<FilePool>) {
+    /// Register a cached store to the buffer.
+    pub fn reg_cached_store(&self, store_id: StoreId, files: Arc<FilePool>) {
         self.sender
-            .send(BufferCmd::RegCachedSpace(space_id, files))
+            .send(BufferCmd::RegCachedStore(store_id, files))
             .map_err(StoreError::Send)
             .ok();
     }
@@ -644,12 +644,12 @@ mod tests {
     use crate::{
         file,
         storage::{
-            Ash, CachedSpace, MemStoreR, StoreConfig, StoreRevMut, StoreRevMutDelta,
+            Ash, CachedStore, MemStoreR, StoreConfig, StoreRevMut, StoreRevMutDelta,
             StoreRevShared, ZeroStore,
         },
     };
 
-    const STATE_SPACE: SpaceId = 0x0;
+    const STATE_STORE_ID: StoreId = 0x0;
     const HASH_SIZE: usize = 32;
 
     fn get_tmp_dir() -> PathBuf {
@@ -659,15 +659,15 @@ mod tests {
             .join("firewood")
     }
 
-    fn new_cached_space_for_test(
+    fn new_cached_store_for_test(
         state_path: PathBuf,
         disk_requester: DiskBufferRequester,
-    ) -> Arc<CachedSpace> {
-        CachedSpace::new(
+    ) -> Arc<CachedStore> {
+        CachedStore::new(
             &StoreConfig::builder()
                 .ncached_pages(1)
                 .ncached_files(1)
-                .space_id(STATE_SPACE)
+                .store_id(STATE_STORE_ID)
                 .file_nbit(1)
                 .rootdir(state_path)
                 .build(),
@@ -697,11 +697,11 @@ mod tests {
         disk_requester.init_wal("wal", &root_db_path);
 
         // create a new state cache which tracks on disk state.
-        let state_cache = new_cached_space_for_test(state_path, disk_requester.clone());
+        let state_cache = new_cached_store_for_test(state_path, disk_requester.clone());
 
-        // add an in memory cached space. this will allow us to write to the
+        // add an in memory cached store. this will allow us to write to the
         // disk buffer then later persist the change to disk.
-        disk_requester.reg_cached_space(state_cache.id(), state_cache.inner.read().files.clone());
+        disk_requester.reg_cached_store(state_cache.id(), state_cache.inner.read().files.clone());
 
         // memory mapped store
         let mut mut_store = StoreRevMut::new(state_cache);
@@ -710,14 +710,14 @@ mod tests {
 
         // write to the in memory buffer not to disk
         mut_store.write(0, change).unwrap();
-        assert_eq!(mut_store.id(), STATE_SPACE);
+        assert_eq!(mut_store.id(), STATE_STORE_ID);
 
         // mutate the in memory buffer.
         let change = b"this is another test";
 
         // write to the in memory buffer (ash) not yet to disk
         mut_store.write(0, change).unwrap();
-        assert_eq!(mut_store.id(), STATE_SPACE);
+        assert_eq!(mut_store.id(), STATE_STORE_ID);
 
         // wal should have no records.
         assert!(disk_requester.collect_ash(1).unwrap().is_empty());
@@ -734,7 +734,7 @@ mod tests {
             // wal is empty
             assert!(d1.collect_ash(1).unwrap().is_empty());
             // page is not yet persisted to disk.
-            assert!(d1.get_page(STATE_SPACE, 0).is_none());
+            assert!(d1.get_page(STATE_STORE_ID, 0).is_none());
             d1.write(page_batch, write_batch);
         });
         // wait for the write to complete.
@@ -773,11 +773,11 @@ mod tests {
         disk_requester.init_wal("wal", &root_db_path);
 
         // create a new state cache which tracks on disk state.
-        let state_cache = new_cached_space_for_test(state_path, disk_requester.clone());
+        let state_cache = new_cached_store_for_test(state_path, disk_requester.clone());
 
-        // add an in memory cached space. this will allow us to write to the
+        // add an in memory cached store. this will allow us to write to the
         // disk buffer then later persist the change to disk.
-        disk_requester.reg_cached_space(state_cache.id(), state_cache.clone_files());
+        disk_requester.reg_cached_store(state_cache.id(), state_cache.clone_files());
 
         // memory mapped store
         let mut mut_store = StoreRevMut::new(state_cache.clone());
@@ -788,7 +788,7 @@ mod tests {
 
         // write to the in memory buffer (ash) not yet to disk
         mut_store.write(0, &hash).unwrap();
-        assert_eq!(mut_store.id(), STATE_SPACE);
+        assert_eq!(mut_store.id(), STATE_STORE_ID);
 
         // wal should have no records.
         assert!(disk_requester.collect_ash(1).unwrap().is_empty());
@@ -798,7 +798,7 @@ mod tests {
         assert_eq!(view.as_deref(), hash);
 
         // Commit the change. Take the delta from cached store,
-        // then apply changes to the CachedSpace.
+        // then apply changes to the CachedStore.
         let (redo_delta, wal) = mut_store.delta();
         state_cache.update(&redo_delta).unwrap();
 
@@ -806,13 +806,13 @@ mod tests {
         // wal is empty
         assert!(disk_requester.collect_ash(1).unwrap().is_empty());
         // page is not yet persisted to disk.
-        assert!(disk_requester.get_page(STATE_SPACE, 0).is_none());
+        assert!(disk_requester.get_page(STATE_STORE_ID, 0).is_none());
         disk_requester.write(
             Box::new([BufferWrite {
-                space_id: STATE_SPACE,
+                store_id: STATE_STORE_ID,
                 delta: redo_delta,
             }]),
-            AshRecord([(STATE_SPACE, wal)].into()),
+            AshRecord([(STATE_STORE_ID, wal)].into()),
         );
 
         // verify
@@ -822,7 +822,7 @@ mod tests {
         // replay the redo from the wal
         let shared_store = StoreRevShared::from_ash(
             Arc::new(ZeroStore::default()),
-            &ashes[0].0[&STATE_SPACE].redo,
+            &ashes[0].0[&STATE_STORE_ID].redo,
         );
         let view = shared_store.get_view(0, hash.len() as u64).unwrap();
         assert_eq!(view.as_deref(), hash);
@@ -846,11 +846,11 @@ mod tests {
         disk_requester.init_wal("wal", &root_db_path);
 
         // create a new state cache which tracks on disk state.
-        let state_cache: Arc<CachedSpace> = CachedSpace::new(
+        let state_cache: Arc<CachedStore> = CachedStore::new(
             &StoreConfig::builder()
                 .ncached_pages(1)
                 .ncached_files(1)
-                .space_id(STATE_SPACE)
+                .store_id(STATE_STORE_ID)
                 .file_nbit(1)
                 .rootdir(state_path)
                 .build(),
@@ -859,9 +859,9 @@ mod tests {
         .unwrap()
         .into();
 
-        // add an in memory cached space. this will allow us to write to the
+        // add an in memory cached store. this will allow us to write to the
         // disk buffer then later persist the change to disk.
-        disk_requester.reg_cached_space(state_cache.id(), state_cache.clone_files());
+        disk_requester.reg_cached_store(state_cache.id(), state_cache.clone_files());
 
         // memory mapped store
         let mut store = StoreRevMut::new(state_cache.clone());
@@ -870,7 +870,7 @@ mod tests {
         let data = b"this is a test";
         let hash: [u8; HASH_SIZE] = sha3::Keccak256::digest(data).into();
         block_in_place(|| store.write(0, &hash)).unwrap();
-        assert_eq!(store.id(), STATE_SPACE);
+        assert_eq!(store.id(), STATE_STORE_ID);
 
         let another_data = b"this is another test";
         let another_hash: [u8; HASH_SIZE] = sha3::Keccak256::digest(another_data).into();
@@ -878,7 +878,7 @@ mod tests {
         // mutate the in memory buffer in another StoreRev new from the above.
         let mut another_store = StoreRevMut::new_from_other(&store);
         block_in_place(|| another_store.write(32, &another_hash)).unwrap();
-        assert_eq!(another_store.id(), STATE_SPACE);
+        assert_eq!(another_store.id(), STATE_STORE_ID);
 
         // wal should have no records.
         assert!(block_in_place(|| disk_requester.collect_ash(1))
@@ -915,7 +915,7 @@ mod tests {
         assert_eq!(1, another_redo_delta.0.len());
         assert_eq!(2, another_wal.undo.len());
 
-        // Verify after the changes been applied to underlying CachedSpace,
+        // Verify after the changes been applied to underlying CachedStore,
         // the newly created stores should see the previous changes.
         state_cache.update(&redo_delta).unwrap();
         let store = StoreRevMut::new(state_cache.clone());
@@ -960,11 +960,11 @@ mod tests {
         pages.sort_by_key(|p| p.0);
 
         let page_batch = Box::new([BufferWrite {
-            space_id: STATE_SPACE,
+            store_id: STATE_STORE_ID,
             delta: StoreDelta(pages),
         }]);
 
-        let write_batch = AshRecord([(STATE_SPACE, deltas.plain)].into());
+        let write_batch = AshRecord([(STATE_STORE_ID, deltas.plain)].into());
         (page_batch, write_batch)
     }
 }

@@ -14,7 +14,7 @@ use crate::{
     },
     storage::{
         buffer::{DiskBuffer, DiskBufferRequester},
-        CachedSpace, MemStoreR, SpaceWrite, StoreConfig, StoreDelta, StoreRevMut, StoreRevShared,
+        CachedStore, MemStoreR, StoreConfig, StoreDelta, StoreRevMut, StoreRevShared, StoreWrite,
         ZeroStore, PAGE_SIZE_NBIT,
     },
     v2::api::{self, HashKey, KeyType, ValueType},
@@ -23,7 +23,7 @@ use crate::{
     merkle,
     shale::{
         self, compact::StoreHeader, disk_address::DiskAddress, LinearStore, Obj, ShaleError,
-        SpaceId, Storable, StoredView,
+        Storable, StoreId, StoredView,
     },
 };
 use aiofut::AioError;
@@ -51,10 +51,10 @@ mod proposal;
 
 use self::proposal::ProposalBase;
 
-const MERKLE_META_SPACE: SpaceId = 0x0;
-const MERKLE_PAYLOAD_SPACE: SpaceId = 0x1;
-const ROOT_HASH_SPACE: SpaceId = 0x2;
-const SPACE_RESERVED: u64 = 0x1000;
+const MERKLE_META_STORE_ID: StoreId = 0x0;
+const MERKLE_PAYLOAD_STORE_ID: StoreId = 0x1;
+const ROOT_HASH_STORE_ID: StoreId = 0x2;
+const RESERVED_STORE_ID: u64 = 0x1000;
 
 const MAGIC_STR: &[u8; 16] = b"firewood v0.1\0\0\0";
 
@@ -118,7 +118,7 @@ struct DbParams {
 }
 
 #[derive(Clone, Debug)]
-/// Necessary linear space instances bundled for a `Store`.
+/// Necessary linear store instances bundled for a `Store`.
 struct SubUniverse<T> {
     meta: T,
     payload: T,
@@ -151,8 +151,8 @@ impl SubUniverse<StoreRevMut> {
 impl<T: MemStoreR + 'static> SubUniverse<Arc<T>> {
     fn rewind(
         &self,
-        meta_writes: &[SpaceWrite],
-        payload_writes: &[SpaceWrite],
+        meta_writes: &[StoreWrite],
+        payload_writes: &[StoreWrite],
     ) -> SubUniverse<StoreRevShared> {
         SubUniverse::new(
             StoreRevShared::from_ash(self.meta.clone(), meta_writes),
@@ -161,7 +161,7 @@ impl<T: MemStoreR + 'static> SubUniverse<Arc<T>> {
     }
 }
 
-impl SubUniverse<Arc<CachedSpace>> {
+impl SubUniverse<Arc<CachedStore>> {
     fn to_mem_store_r(&self) -> SubUniverse<Arc<impl MemStoreR>> {
         SubUniverse {
             meta: self.meta.clone(),
@@ -171,7 +171,7 @@ impl SubUniverse<Arc<CachedSpace>> {
 }
 
 fn get_sub_universe_from_deltas(
-    sub_universe: &SubUniverse<Arc<CachedSpace>>,
+    sub_universe: &SubUniverse<Arc<CachedStore>>,
     meta_delta: StoreDelta,
     payload_delta: StoreDelta,
 ) -> SubUniverse<StoreRevShared> {
@@ -182,7 +182,7 @@ fn get_sub_universe_from_deltas(
 }
 
 fn get_sub_universe_from_empty_delta(
-    sub_universe: &SubUniverse<Arc<CachedSpace>>,
+    sub_universe: &SubUniverse<Arc<CachedStore>>,
 ) -> SubUniverse<StoreRevShared> {
     get_sub_universe_from_deltas(sub_universe, StoreDelta::default(), StoreDelta::default())
 }
@@ -234,7 +234,7 @@ impl Storable for DbHeader {
 }
 
 #[derive(Clone, Debug)]
-/// Necessary linear space instances bundled for the state of the entire DB.
+/// Necessary linear store instances bundled for the state of the entire DB.
 struct Universe<T> {
     merkle: SubUniverse<T>,
 }
@@ -255,7 +255,7 @@ impl Universe<StoreRevMut> {
     }
 }
 
-impl Universe<Arc<CachedSpace>> {
+impl Universe<Arc<CachedStore>> {
     fn to_mem_store_r(&self) -> Universe<Arc<impl MemStoreR>> {
         Universe {
             merkle: self.merkle.to_mem_store_r(),
@@ -266,8 +266,8 @@ impl Universe<Arc<CachedSpace>> {
 impl<T: MemStoreR + 'static> Universe<Arc<T>> {
     fn rewind(
         &self,
-        merkle_meta_writes: &[SpaceWrite],
-        merkle_payload_writes: &[SpaceWrite],
+        merkle_meta_writes: &[StoreWrite],
+        merkle_payload_writes: &[StoreWrite],
     ) -> Universe<StoreRevShared> {
         Universe {
             merkle: self
@@ -417,8 +417,8 @@ impl From<DbRev<StoreRevMut>> for DbRev<StoreRevShared> {
 struct DbInner {
     disk_requester: DiskBufferRequester,
     disk_thread: Option<JoinHandle<()>>,
-    cached_space: Universe<Arc<CachedSpace>>,
-    // Whether to reset the store headers when creating a new store on top of the cached space.
+    cached_store: Universe<Arc<CachedStore>>,
+    // Whether to reset the store headers when creating a new store on top of the cached store.
     reset_store_headers: bool,
     root_hash_staging: StoreRevMut,
 }
@@ -511,7 +511,7 @@ impl Db {
         let merkle_payload_path = file::touch_dir("compact", &merkle_path)?;
         let root_hash_path = file::touch_dir("root_hash", &db_path)?;
 
-        let meta_file = crate::file::File::new(0, SPACE_RESERVED, &merkle_meta_path)?;
+        let meta_file = crate::file::File::new(0, RESERVED_STORE_ID, &merkle_meta_path)?;
         let meta_fd = meta_file.as_fd();
 
         if reset_store_headers {
@@ -552,11 +552,11 @@ impl Db {
 
         // set up caches
         #[allow(clippy::unwrap_used)]
-        let root_hash_cache: Arc<CachedSpace> = CachedSpace::new(
+        let root_hash_cache: Arc<CachedStore> = CachedStore::new(
             &StoreConfig::builder()
                 .ncached_pages(cfg.root_hash_ncached_pages)
                 .ncached_files(cfg.root_hash_ncached_files)
-                .space_id(ROOT_HASH_SPACE)
+                .store_id(ROOT_HASH_STORE_ID)
                 .file_nbit(params.root_hash_file_nbit)
                 .rootdir(root_hash_path)
                 .build(),
@@ -567,12 +567,12 @@ impl Db {
 
         #[allow(clippy::unwrap_used)]
         let data_cache = Universe {
-            merkle: SubUniverse::<Arc<CachedSpace>>::new(
-                CachedSpace::new(
+            merkle: SubUniverse::<Arc<CachedStore>>::new(
+                CachedStore::new(
                     &StoreConfig::builder()
                         .ncached_pages(cfg.meta_ncached_pages)
                         .ncached_files(cfg.meta_ncached_files)
-                        .space_id(MERKLE_META_SPACE)
+                        .store_id(MERKLE_META_STORE_ID)
                         .file_nbit(params.meta_file_nbit)
                         .rootdir(merkle_meta_path)
                         .build(),
@@ -580,11 +580,11 @@ impl Db {
                 )
                 .unwrap()
                 .into(),
-                CachedSpace::new(
+                CachedStore::new(
                     &StoreConfig::builder()
                         .ncached_pages(cfg.payload_ncached_pages)
                         .ncached_files(cfg.payload_ncached_files)
-                        .space_id(MERKLE_PAYLOAD_SPACE)
+                        .store_id(MERKLE_PAYLOAD_STORE_ID)
                         .file_nbit(params.payload_file_nbit)
                         .rootdir(merkle_payload_path)
                         .build(),
@@ -601,8 +601,8 @@ impl Db {
             root_hash_cache.as_ref(),
         ]
         .into_iter()
-        .for_each(|cached_space| {
-            disk_requester.reg_cached_space(cached_space.id(), cached_space.clone_files());
+        .for_each(|cached_store| {
+            disk_requester.reg_cached_store(cached_store.id(), cached_store.clone_files());
         });
 
         // recover from Wal
@@ -635,7 +635,7 @@ impl Db {
             inner: Arc::new(RwLock::new(DbInner {
                 disk_thread,
                 disk_requester,
-                cached_space: data_cache,
+                cached_store: data_cache,
                 reset_store_headers,
                 root_hash_staging: StoreRevMut::new(root_hash_cache),
             })),
@@ -678,9 +678,9 @@ impl Db {
         })
         .chain({
             // write out the StoreHeader
-            let space_reserved =
-                NonZeroUsize::new(SPACE_RESERVED as usize).expect("SPACE_RESERVED is non-zero");
-            csh = StoreHeader::new(space_reserved, space_reserved);
+            let store_reserved = NonZeroUsize::new(RESERVED_STORE_ID as usize)
+                .expect("RESERVED_STORE_ID is non-zero");
+            csh = StoreHeader::new(store_reserved, store_reserved);
             bytemuck::bytes_of(&csh)
         })
         .copied()
@@ -693,7 +693,7 @@ impl Db {
     /// Create a new mutable store and an alterable revision of the DB on top.
     fn new_store(
         &self,
-        cached_space: &Universe<Arc<CachedSpace>>,
+        cached_store: &Universe<Arc<CachedStore>>,
         reset_store_headers: bool,
     ) -> Result<(Universe<StoreRevMut>, DbRev<StoreRevMut>), DbError> {
         let mut offset = Db::PARAM_SIZE as usize;
@@ -701,9 +701,9 @@ impl Db {
         offset += DbHeader::MSIZE as usize;
         let merkle_payload_header: DiskAddress = DiskAddress::from(offset);
         offset += StoreHeader::SERIALIZED_LEN as usize;
-        assert!(offset <= SPACE_RESERVED as usize);
+        assert!(offset <= RESERVED_STORE_ID as usize);
 
-        let mut merkle_meta_store = StoreRevMut::new(cached_space.merkle.meta.clone());
+        let mut merkle_meta_store = StoreRevMut::new(cached_store.merkle.meta.clone());
 
         if reset_store_headers {
             // initialize store headers
@@ -711,9 +711,9 @@ impl Db {
             merkle_meta_store.write(
                 merkle_payload_header.into(),
                 &shale::to_dehydrated(&shale::compact::StoreHeader::new(
-                    NonZeroUsize::new(SPACE_RESERVED as usize).unwrap(),
+                    NonZeroUsize::new(RESERVED_STORE_ID as usize).unwrap(),
                     #[allow(clippy::unwrap_used)]
-                    NonZeroUsize::new(SPACE_RESERVED as usize).unwrap(),
+                    NonZeroUsize::new(RESERVED_STORE_ID as usize).unwrap(),
                 ))?,
             )?;
             merkle_meta_store.write(
@@ -725,7 +725,7 @@ impl Db {
         let store = Universe {
             merkle: SubUniverse::new(
                 merkle_meta_store,
-                StoreRevMut::new(cached_space.merkle.payload.clone()),
+                StoreRevMut::new(cached_store.merkle.payload.clone()),
             ),
         };
 
@@ -777,7 +777,7 @@ impl Db {
         // TODO: This should be a compile time check
         const DB_OFFSET: u64 = Db::PARAM_SIZE;
         let merkle_offset = DB_OFFSET + DbHeader::MSIZE;
-        assert!(merkle_offset + StoreHeader::SERIALIZED_LEN <= SPACE_RESERVED);
+        assert!(merkle_offset + StoreHeader::SERIALIZED_LEN <= RESERVED_STORE_ID);
 
         let mut db_header_ref = header_refs.0;
         let merkle_payload_header_ref = header_refs.1;
@@ -786,7 +786,7 @@ impl Db {
         let merkle_payload = merkle.1.into();
 
         #[allow(clippy::unwrap_used)]
-        let merkle_space = shale::compact::Store::new(
+        let merkle_store = shale::compact::Store::new(
             merkle_meta,
             merkle_payload,
             merkle_payload_header_ref,
@@ -796,7 +796,7 @@ impl Db {
         )
         .unwrap();
 
-        let merkle = Merkle::new(merkle_space);
+        let merkle = Merkle::new(merkle_store);
 
         if db_header_ref.kv_root.is_null() {
             let mut err = Ok(());
@@ -826,7 +826,7 @@ impl Db {
     ) -> Result<proposal::Proposal, DbError> {
         let mut inner = self.inner.write();
         let reset_store_headers = inner.reset_store_headers;
-        let (store, mut rev) = self.new_store(&inner.cached_space, reset_store_headers)?;
+        let (store, mut rev) = self.new_store(&inner.cached_store, reset_store_headers)?;
 
         // Flip the reset flag after resetting the store headers.
         if reset_store_headers {
@@ -900,7 +900,7 @@ impl Db {
                     StoreRevShared::from_ash(
                         Arc::new(ZeroStore::default()),
                         #[allow(clippy::indexing_slicing)]
-                        &ash.0[&ROOT_HASH_SPACE].redo,
+                        &ash.0[&ROOT_HASH_STORE_ID].redo,
                     )
                 })
                 .map(|root_hash_store| {
@@ -928,22 +928,22 @@ impl Db {
                 let u = match revisions.inner.back() {
                     Some(u) => u.to_mem_store_r().rewind(
                         #[allow(clippy::indexing_slicing)]
-                        &ash.0[&MERKLE_META_SPACE].undo,
+                        &ash.0[&MERKLE_META_STORE_ID].undo,
                         #[allow(clippy::indexing_slicing)]
-                        &ash.0[&MERKLE_PAYLOAD_SPACE].undo,
+                        &ash.0[&MERKLE_PAYLOAD_STORE_ID].undo,
                     ),
-                    None => inner_lock.cached_space.to_mem_store_r().rewind(
+                    None => inner_lock.cached_store.to_mem_store_r().rewind(
                         #[allow(clippy::indexing_slicing)]
-                        &ash.0[&MERKLE_META_SPACE].undo,
+                        &ash.0[&MERKLE_META_STORE_ID].undo,
                         #[allow(clippy::indexing_slicing)]
-                        &ash.0[&MERKLE_PAYLOAD_SPACE].undo,
+                        &ash.0[&MERKLE_PAYLOAD_STORE_ID].undo,
                     ),
                 };
                 revisions.inner.push_back(u);
             }
         }
 
-        let space = if nback == 0 {
+        let store = if nback == 0 {
             &revisions.base
         } else {
             #[allow(clippy::indexing_slicing)]
@@ -953,11 +953,11 @@ impl Db {
         drop(inner_lock);
 
         #[allow(clippy::unwrap_used)]
-        let db_header_ref = Db::get_db_header_ref(&space.merkle.meta).unwrap();
+        let db_header_ref = Db::get_db_header_ref(&store.merkle.meta).unwrap();
 
         #[allow(clippy::unwrap_used)]
         let merkle_payload_header_ref =
-            Db::get_payload_header_ref(&space.merkle.meta, Db::PARAM_SIZE + DbHeader::MSIZE)
+            Db::get_payload_header_ref(&store.merkle.meta, Db::PARAM_SIZE + DbHeader::MSIZE)
                 .unwrap();
 
         let header_refs = (db_header_ref, merkle_payload_header_ref);
@@ -965,7 +965,7 @@ impl Db {
         #[allow(clippy::unwrap_used)]
         Db::new_revision(
             header_refs,
-            (space.merkle.meta.clone(), space.merkle.payload.clone()),
+            (store.merkle.meta.clone(), store.merkle.payload.clone()),
             self.payload_regn_nbit,
             0,
             &self.cfg.rev,

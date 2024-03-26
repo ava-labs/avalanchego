@@ -51,7 +51,7 @@ pub struct Options {
         default_value_t = 262144,
         value_name = "PAYLOAD_NCACHED_PAGES",
         help = "Maximum cached pages for the item stash. This is the low-level cache used by the linear
-    space that holds trie nodes and account objects."
+        store that holds trie nodes and account objects."
     )]
     pub payload_ncached_pages: usize,
 

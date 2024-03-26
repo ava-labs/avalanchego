@@ -71,11 +71,11 @@ where
         let mem_payload = InMemLinearStore::new(compact_size, 0x1);
 
         let cache = shale::ObjCache::new(1);
-        let space =
+        let store =
             shale::compact::Store::new(mem_meta, mem_payload, compact_header, cache, 10, 16)
                 .expect("Store init fail");
 
-        let merkle = Merkle::new(space);
+        let merkle = Merkle::new(store);
         #[allow(clippy::unwrap_used)]
         let root = merkle.init_root().unwrap();
 

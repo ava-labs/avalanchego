@@ -45,11 +45,11 @@ pub enum ShaleError {
 // this could probably included with ShaleError,
 // but keeping it separate for now as Obj/ObjRef might change in the near future
 #[derive(Debug, Error)]
-#[error("object cannot be written in the space provided")]
+#[error("object cannot be written in the store provided")]
 pub struct ObjWriteSizeError;
 
-pub type SpaceId = u8;
-pub const INVALID_SPACE_ID: SpaceId = 0xff;
+pub type StoreId = u8;
+pub const INVALID_STORE_ID: StoreId = 0xff;
 
 /// A handle that pins and provides a readable access to a portion of a [LinearStore].
 pub trait LinearStoreView {
@@ -61,7 +61,7 @@ pub trait SendSyncDerefMut: DerefMut + Send + Sync {}
 
 impl<T: Send + Sync + DerefMut> SendSyncDerefMut for T {}
 
-/// In-memory store that offers access to intervals from a linear byte space, which is usually
+/// In-memory store that offers access to intervals from a linear byte store, which is usually
 /// backed by a cached/memory-mapped pool of the accessed intervals from the underlying linear
 /// persistent store. Reads may trigger disk reads to bring data into memory, but writes will
 /// *only* be visible in memory -- they do not write to disk.
@@ -77,12 +77,12 @@ pub trait LinearStore: Debug + Send + Sync {
     /// Returns a handle that allows shared access to this store.
     fn get_shared(&self) -> Box<dyn SendSyncDerefMut<Target = dyn LinearStore>>;
 
-    /// Write the `change` to the linear space starting at `offset`. The change should
-    /// be immediately visible to all `LinearStoreView` associated with this linear space.
+    /// Write the `change` to the linear store starting at `offset`. The change should
+    /// be immediately visible to all `LinearStoreView` associated with this linear store.
     fn write(&mut self, offset: usize, change: &[u8]) -> Result<(), ShaleError>;
 
-    /// Returns the identifier of this storage space.
-    fn id(&self) -> SpaceId;
+    /// Returns the identifier of this store.
+    fn id(&self) -> StoreId;
 
     /// Returns whether or not this store is writable
     fn is_writeable(&self) -> bool;
@@ -330,13 +330,13 @@ impl<T: Storable> StoredView<T> {
 
 impl<T: Storable + 'static> StoredView<T> {
     #[inline(always)]
-    fn new<U: LinearStore>(offset: usize, len_limit: u64, space: &U) -> Result<Self, ShaleError> {
-        let item = T::deserialize(offset, space)?;
+    fn new<U: LinearStore>(offset: usize, len_limit: u64, store: &U) -> Result<Self, ShaleError> {
+        let item = T::deserialize(offset, store)?;
 
         Ok(Self {
             offset,
             item,
-            mem: space.get_shared(),
+            mem: store.get_shared(),
             len_limit,
         })
     }
@@ -346,12 +346,12 @@ impl<T: Storable + 'static> StoredView<T> {
         offset: usize,
         len_limit: u64,
         item: T,
-        space: &dyn LinearStore,
+        store: &dyn LinearStore,
     ) -> Result<Self, ShaleError> {
         Ok(Self {
             offset,
             item,
-            mem: space.get_shared(),
+            mem: store.get_shared(),
             len_limit,
         })
     }
@@ -387,12 +387,12 @@ impl<T: Storable> StoredView<T> {
         offset: usize,
         len_limit: u64,
         item: T,
-        space: &dyn LinearStore,
+        store: &dyn LinearStore,
     ) -> Result<Self, ShaleError> {
         Ok(Self {
             offset,
             item,
-            mem: space.get_shared(),
+            mem: store.get_shared(),
             len_limit,
         })
     }

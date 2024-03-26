@@ -1434,11 +1434,11 @@ mod tests {
         let mem_payload = InMemLinearStore::new(0x10000, 0x1);
 
         let cache = shale::ObjCache::new(1);
-        let space =
+        let store =
             shale::compact::Store::new(mem_meta, mem_payload, compact_header, cache, 10, 16)
                 .expect("Store init fail");
 
-        Merkle::new(space)
+        Merkle::new(store)
     }
 
     pub(super) fn create_test_merkle() -> Merkle<InMemLinearStore, Bincode> {

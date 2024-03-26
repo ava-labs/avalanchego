@@ -3,7 +3,7 @@
 
 use super::{
     get_sub_universe_from_deltas, Db, DbConfig, DbError, DbHeader, DbInner, DbRev, DbRevInner,
-    Universe, MERKLE_META_SPACE, MERKLE_PAYLOAD_SPACE, ROOT_HASH_SPACE,
+    Universe, MERKLE_META_STORE_ID, MERKLE_PAYLOAD_STORE_ID, ROOT_HASH_STORE_ID,
 };
 use crate::merkle::{Bincode, MerkleKeyValueStream, Proof};
 use crate::shale::LinearStore;
@@ -171,21 +171,21 @@ impl Proposal {
             }
         };
 
-        // clear the staging layer and apply changes to the CachedSpace
+        // clear the staging layer and apply changes to the CachedStore
         let (merkle_payload_redo, merkle_payload_wal) = store.merkle.payload.delta();
         let (merkle_meta_redo, merkle_meta_wal) = store.merkle.meta.delta();
 
         let mut rev_inner = m.write();
         #[allow(clippy::unwrap_used)]
         let merkle_meta_undo = rev_inner
-            .cached_space
+            .cached_store
             .merkle
             .meta
             .update(&merkle_meta_redo)
             .unwrap();
         #[allow(clippy::unwrap_used)]
         let merkle_payload_undo = rev_inner
-            .cached_space
+            .cached_store
             .merkle
             .payload
             .update(&merkle_payload_redo)
@@ -194,7 +194,7 @@ impl Proposal {
         // update the rolling window of past revisions
         let latest_past = Universe {
             merkle: get_sub_universe_from_deltas(
-                &rev_inner.cached_space.merkle,
+                &rev_inner.cached_store.merkle,
                 merkle_meta_undo,
                 merkle_payload_undo,
             ),
@@ -204,10 +204,10 @@ impl Proposal {
         if let Some(rev) = revisions.inner.front_mut() {
             rev.merkle
                 .meta
-                .set_base_space(latest_past.merkle.meta.inner().clone());
+                .set_base_store(latest_past.merkle.meta.inner().clone());
             rev.merkle
                 .payload
-                .set_base_space(latest_past.merkle.payload.inner().clone());
+                .set_base_store(latest_past.merkle.payload.inner().clone());
         }
         revisions.inner.push_front(latest_past);
         while revisions.inner.len() > max_revisions {
@@ -231,23 +231,23 @@ impl Proposal {
         rev_inner.disk_requester.write(
             Box::new([
                 BufferWrite {
-                    space_id: store.merkle.payload.id(),
+                    store_id: store.merkle.payload.id(),
                     delta: merkle_payload_redo,
                 },
                 BufferWrite {
-                    space_id: store.merkle.meta.id(),
+                    store_id: store.merkle.meta.id(),
                     delta: merkle_meta_redo,
                 },
                 BufferWrite {
-                    space_id: rev_inner.root_hash_staging.id(),
+                    store_id: rev_inner.root_hash_staging.id(),
                     delta: root_hash_redo,
                 },
             ]),
             AshRecord(
                 [
-                    (MERKLE_META_SPACE, merkle_meta_wal),
-                    (MERKLE_PAYLOAD_SPACE, merkle_payload_wal),
-                    (ROOT_HASH_SPACE, root_hash_wal),
+                    (MERKLE_META_STORE_ID, merkle_meta_wal),
+                    (MERKLE_PAYLOAD_STORE_ID, merkle_payload_wal),
+                    (ROOT_HASH_STORE_ID, root_hash_wal),
                 ]
                 .into(),
             ),
