@@ -64,11 +64,16 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 
 	// create valid tx
 	addValidatorTx, err := txBuilder.NewAddValidatorTx(
-		vm.MinValidatorStake,
-		uint64(validatorStartTime.Unix()),
-		uint64(validatorEndTime.Unix()),
-		nodeID,
-		changeAddr,
+		&txs.Validator{
+			NodeID: nodeID,
+			Start:  uint64(validatorStartTime.Unix()),
+			End:    uint64(validatorEndTime.Unix()),
+			Wght:   vm.MinValidatorStake,
+		},
+		&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{changeAddr},
+		},
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[0]},
 		changeAddr,
@@ -100,11 +105,16 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 
 	// create valid tx
 	addFirstDelegatorTx, err := txBuilder.NewAddDelegatorTx(
-		4*vm.MinValidatorStake, // maximum amount of stake this delegator can provide
-		uint64(firstDelegatorStartTime.Unix()),
-		uint64(firstDelegatorEndTime.Unix()),
-		nodeID,
-		changeAddr,
+		&txs.Validator{
+			NodeID: nodeID,
+			Start:  uint64(firstDelegatorStartTime.Unix()),
+			End:    uint64(firstDelegatorEndTime.Unix()),
+			Wght:   4 * vm.MinValidatorStake, // maximum amount of stake this delegator can provide
+		},
+		&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{changeAddr},
+		},
 		[]*secp256k1.PrivateKey{keys[0], keys[1]},
 		changeAddr,
 		nil,
@@ -137,11 +147,16 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 
 	// create valid tx
 	addSecondDelegatorTx, err := txBuilder.NewAddDelegatorTx(
-		vm.MinDelegatorStake,
-		uint64(secondDelegatorStartTime.Unix()),
-		uint64(secondDelegatorEndTime.Unix()),
-		nodeID,
-		changeAddr,
+		&txs.Validator{
+			NodeID: nodeID,
+			Start:  uint64(secondDelegatorStartTime.Unix()),
+			End:    uint64(secondDelegatorEndTime.Unix()),
+			Wght:   vm.MinDelegatorStake,
+		},
+		&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{changeAddr},
+		},
 		[]*secp256k1.PrivateKey{keys[0], keys[1], keys[3]},
 		changeAddr,
 		nil,
@@ -164,11 +179,16 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 
 	// create valid tx
 	addThirdDelegatorTx, err := txBuilder.NewAddDelegatorTx(
-		vm.MinDelegatorStake,
-		uint64(thirdDelegatorStartTime.Unix()),
-		uint64(thirdDelegatorEndTime.Unix()),
-		nodeID,
-		changeAddr,
+		&txs.Validator{
+			NodeID: nodeID,
+			Start:  uint64(thirdDelegatorStartTime.Unix()),
+			End:    uint64(thirdDelegatorEndTime.Unix()),
+			Wght:   vm.MinDelegatorStake,
+		},
+		&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{changeAddr},
+		},
 		[]*secp256k1.PrivateKey{keys[0], keys[1], keys[4]},
 		changeAddr,
 		nil,
@@ -236,11 +256,16 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 
 			// create valid tx
 			addValidatorTx, err := txBuilder.NewAddValidatorTx(
-				validatorStake,
-				uint64(validatorStartTime.Unix()),
-				uint64(validatorEndTime.Unix()),
-				nodeID,
-				id,
+				&txs.Validator{
+					NodeID: nodeID,
+					Start:  uint64(validatorStartTime.Unix()),
+					End:    uint64(validatorEndTime.Unix()),
+					Wght:   validatorStake,
+				},
+				&secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{id},
+				},
 				reward.PercentDenominator,
 				[]*secp256k1.PrivateKey{keys[0], keys[1]},
 				changeAddr,
@@ -262,11 +287,16 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 
 			// create valid tx
 			addFirstDelegatorTx, err := txBuilder.NewAddDelegatorTx(
-				delegator1Stake,
-				uint64(delegator1StartTime.Unix()),
-				uint64(delegator1EndTime.Unix()),
-				nodeID,
-				keys[0].PublicKey().Address(),
+				&txs.Validator{
+					NodeID: nodeID,
+					Start:  uint64(delegator1StartTime.Unix()),
+					End:    uint64(delegator1EndTime.Unix()),
+					Wght:   delegator1Stake,
+				},
+				&secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+				},
 				[]*secp256k1.PrivateKey{keys[0], keys[1]},
 				changeAddr,
 				nil,
@@ -287,11 +317,16 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 
 			// create valid tx
 			addSecondDelegatorTx, err := txBuilder.NewAddDelegatorTx(
-				delegator2Stake,
-				uint64(delegator2StartTime.Unix()),
-				uint64(delegator2EndTime.Unix()),
-				nodeID,
-				keys[0].PublicKey().Address(),
+				&txs.Validator{
+					NodeID: nodeID,
+					Start:  uint64(delegator2StartTime.Unix()),
+					End:    uint64(delegator2EndTime.Unix()),
+					Wght:   delegator2Stake,
+				},
+				&secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+				},
 				[]*secp256k1.PrivateKey{keys[0], keys[1]},
 				changeAddr,
 				nil,
@@ -312,11 +347,16 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 
 			// create valid tx
 			addThirdDelegatorTx, err := txBuilder.NewAddDelegatorTx(
-				delegator3Stake,
-				uint64(delegator3StartTime.Unix()),
-				uint64(delegator3EndTime.Unix()),
-				nodeID,
-				keys[0].PublicKey().Address(),
+				&txs.Validator{
+					NodeID: nodeID,
+					Start:  uint64(delegator3StartTime.Unix()),
+					End:    uint64(delegator3EndTime.Unix()),
+					Wght:   delegator3Stake,
+				},
+				&secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+				},
 				[]*secp256k1.PrivateKey{keys[0], keys[1]},
 				changeAddr,
 				nil,
@@ -337,11 +377,16 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 
 			// create valid tx
 			addFourthDelegatorTx, err := txBuilder.NewAddDelegatorTx(
-				delegator4Stake,
-				uint64(delegator4StartTime.Unix()),
-				uint64(delegator4EndTime.Unix()),
-				nodeID,
-				keys[0].PublicKey().Address(),
+				&txs.Validator{
+					NodeID: nodeID,
+					Start:  uint64(delegator4StartTime.Unix()),
+					End:    uint64(delegator4EndTime.Unix()),
+					Wght:   delegator4Stake,
+				},
+				&secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+				},
 				[]*secp256k1.PrivateKey{keys[0], keys[1]},
 				changeAddr,
 				nil,
@@ -426,8 +471,10 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 	)
 
 	addSubnetTx0, err := txBuilder.NewCreateSubnetTx(
-		1,
-		[]ids.ShortID{addr0},
+		&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{addr0},
+		},
 		[]*secp256k1.PrivateKey{key0},
 		addr0,
 		nil,
@@ -435,8 +482,10 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 	require.NoError(err)
 
 	addSubnetTx1, err := txBuilder.NewCreateSubnetTx(
-		1,
-		[]ids.ShortID{addr1},
+		&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{addr1},
+		},
 		[]*secp256k1.PrivateKey{key1},
 		addr1,
 		nil,
@@ -444,8 +493,10 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 	require.NoError(err)
 
 	addSubnetTx2, err := txBuilder.NewCreateSubnetTx(
-		1,
-		[]ids.ShortID{addr1},
+		&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{addr1},
+		},
 		[]*secp256k1.PrivateKey{key1},
 		addr0,
 		nil,
@@ -514,11 +565,16 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 
 	// Create the tx to add a new validator
 	addValidatorTx, err := txBuilder.NewAddValidatorTx(
-		vm.MinValidatorStake,
-		uint64(newValidatorStartTime.Unix()),
-		uint64(newValidatorEndTime.Unix()),
-		nodeID,
-		ids.GenerateTestShortID(),
+		&txs.Validator{
+			NodeID: nodeID,
+			Start:  uint64(newValidatorStartTime.Unix()),
+			End:    uint64(newValidatorEndTime.Unix()),
+			Wght:   vm.MinValidatorStake,
+		},
+		&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+		},
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[0]},
 		ids.ShortEmpty,
@@ -723,11 +779,16 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 
 	// Create the tx to add the first new validator
 	addValidatorTx0, err := txBuilder.NewAddValidatorTx(
-		vm.MaxValidatorStake,
-		uint64(newValidatorStartTime0.Unix()),
-		uint64(newValidatorEndTime0.Unix()),
-		nodeID0,
-		ids.GenerateTestShortID(),
+		&txs.Validator{
+			NodeID: nodeID0,
+			Start:  uint64(newValidatorStartTime0.Unix()),
+			End:    uint64(newValidatorEndTime0.Unix()),
+			Wght:   vm.MaxValidatorStake,
+		},
+		&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+		},
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[0]},
 		ids.ShortEmpty,
@@ -896,11 +957,16 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 
 	// Create the tx to add the second new validator
 	addValidatorTx1, err := txBuilder.NewAddValidatorTx(
-		vm.MaxValidatorStake,
-		uint64(newValidatorStartTime1.Unix()),
-		uint64(newValidatorEndTime1.Unix()),
-		nodeID1,
-		ids.GenerateTestShortID(),
+		&txs.Validator{
+			NodeID: nodeID1,
+			Start:  uint64(newValidatorStartTime1.Unix()),
+			End:    uint64(newValidatorEndTime1.Unix()),
+			Wght:   vm.MaxValidatorStake,
+		},
+		&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+		},
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[1]},
 		ids.ShortEmpty,
@@ -1052,11 +1118,16 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 
 	// Create the tx to add the first new validator
 	addValidatorTx0, err := txBuilder.NewAddValidatorTx(
-		vm.MaxValidatorStake,
-		uint64(newValidatorStartTime0.Unix()),
-		uint64(newValidatorEndTime0.Unix()),
-		extraNodeID,
-		ids.GenerateTestShortID(),
+		&txs.Validator{
+			NodeID: extraNodeID,
+			Start:  uint64(newValidatorStartTime0.Unix()),
+			End:    uint64(newValidatorEndTime0.Unix()),
+			Wght:   vm.MaxValidatorStake,
+		},
+		&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+		},
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[0]},
 		ids.GenerateTestShortID(),
@@ -1174,11 +1245,16 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 
 	// create valid tx
 	addValidatorTx, err := txBuilder.NewAddValidatorTx(
-		validatorStake,
-		uint64(validatorStartTime.Unix()),
-		uint64(validatorEndTime.Unix()),
-		nodeID,
-		id,
+		&txs.Validator{
+			NodeID: nodeID,
+			Start:  uint64(validatorStartTime.Unix()),
+			End:    uint64(validatorEndTime.Unix()),
+			Wght:   validatorStake,
+		},
+		&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{id},
+		},
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[0], keys[1]},
 		changeAddr,
@@ -1200,11 +1276,16 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 
 	// create valid tx
 	addFirstDelegatorTx, err := txBuilder.NewAddDelegatorTx(
-		delegator1Stake,
-		uint64(delegator1StartTime.Unix()),
-		uint64(delegator1EndTime.Unix()),
-		nodeID,
-		keys[0].PublicKey().Address(),
+		&txs.Validator{
+			NodeID: nodeID,
+			Start:  uint64(delegator1StartTime.Unix()),
+			End:    uint64(delegator1EndTime.Unix()),
+			Wght:   delegator1Stake,
+		},
+		&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+		},
 		[]*secp256k1.PrivateKey{keys[0], keys[1]},
 		changeAddr,
 		nil,
@@ -1225,11 +1306,16 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 
 	// create valid tx
 	addSecondDelegatorTx, err := txBuilder.NewAddDelegatorTx(
-		delegator2Stake,
-		uint64(delegator2StartTime.Unix()),
-		uint64(delegator2EndTime.Unix()),
-		nodeID,
-		keys[0].PublicKey().Address(),
+		&txs.Validator{
+			NodeID: nodeID,
+			Start:  uint64(delegator2StartTime.Unix()),
+			End:    uint64(delegator2EndTime.Unix()),
+			Wght:   delegator2Stake,
+		},
+		&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+		},
 		[]*secp256k1.PrivateKey{keys[0], keys[1]},
 		changeAddr,
 		nil,
@@ -1262,11 +1348,16 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionNotTracked(t
 	changeAddr := keys[0].PublicKey().Address()
 
 	addValidatorTx, err := txBuilder.NewAddValidatorTx(
-		defaultMaxValidatorStake,
-		uint64(validatorStartTime.Unix()),
-		uint64(validatorEndTime.Unix()),
-		nodeID,
-		id,
+		&txs.Validator{
+			NodeID: nodeID,
+			Start:  uint64(validatorStartTime.Unix()),
+			End:    uint64(validatorEndTime.Unix()),
+			Wght:   defaultMaxValidatorStake,
+		},
+		&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{id},
+		},
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[0], keys[1]},
 		changeAddr,
@@ -1286,8 +1377,10 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionNotTracked(t
 	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
 	createSubnetTx, err := txBuilder.NewCreateSubnetTx(
-		1,
-		[]ids.ShortID{changeAddr},
+		&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{changeAddr},
+		},
 		[]*secp256k1.PrivateKey{keys[0], keys[1]},
 		changeAddr,
 		nil,
@@ -1306,11 +1399,15 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionNotTracked(t
 	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
 	addSubnetValidatorTx, err := txBuilder.NewAddSubnetValidatorTx(
-		defaultMaxValidatorStake,
-		uint64(validatorStartTime.Unix()),
-		uint64(validatorEndTime.Unix()),
-		nodeID,
-		createSubnetTx.ID(),
+		&txs.SubnetValidator{
+			Validator: txs.Validator{
+				NodeID: nodeID,
+				Start:  uint64(validatorStartTime.Unix()),
+				End:    uint64(validatorEndTime.Unix()),
+				Wght:   defaultMaxValidatorStake,
+			},
+			Subnet: createSubnetTx.ID(),
+		},
 		[]*secp256k1.PrivateKey{keys[0], keys[1]},
 		changeAddr,
 		nil,
@@ -1387,11 +1484,16 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 	changeAddr := keys[0].PublicKey().Address()
 
 	addValidatorTx, err := txBuilder.NewAddValidatorTx(
-		defaultMaxValidatorStake,
-		uint64(validatorStartTime.Unix()),
-		uint64(validatorEndTime.Unix()),
-		nodeID,
-		id,
+		&txs.Validator{
+			NodeID: nodeID,
+			Start:  uint64(validatorStartTime.Unix()),
+			End:    uint64(validatorEndTime.Unix()),
+			Wght:   defaultMaxValidatorStake,
+		},
+		&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{id},
+		},
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[0], keys[1]},
 		changeAddr,
@@ -1411,8 +1513,10 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
 	createSubnetTx, err := txBuilder.NewCreateSubnetTx(
-		1,
-		[]ids.ShortID{changeAddr},
+		&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{changeAddr},
+		},
 		[]*secp256k1.PrivateKey{keys[0], keys[1]},
 		changeAddr,
 		nil,
@@ -1431,11 +1535,15 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
 	addSubnetValidatorTx, err := txBuilder.NewAddSubnetValidatorTx(
-		defaultMaxValidatorStake,
-		uint64(validatorStartTime.Unix()),
-		uint64(validatorEndTime.Unix()),
-		nodeID,
-		createSubnetTx.ID(),
+		&txs.SubnetValidator{
+			Validator: txs.Validator{
+				NodeID: nodeID,
+				Start:  uint64(validatorStartTime.Unix()),
+				End:    uint64(validatorEndTime.Unix()),
+				Wght:   defaultMaxValidatorStake,
+			},
+			Subnet: createSubnetTx.ID(),
+		},
 		[]*secp256k1.PrivateKey{keys[0], keys[1]},
 		changeAddr,
 		nil,
@@ -1514,12 +1622,25 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 
 	// build primary network validator with BLS key
 	primaryTx, err := txBuilder.NewAddPermissionlessValidatorTx(
-		vm.MinValidatorStake,
-		uint64(primaryStartTime.Unix()),
-		uint64(primaryEndTime.Unix()),
-		nodeID,
+		&txs.SubnetValidator{
+			Validator: txs.Validator{
+				NodeID: nodeID,
+				Start:  uint64(primaryStartTime.Unix()),
+				End:    uint64(primaryEndTime.Unix()),
+				Wght:   vm.MinValidatorStake,
+			},
+			Subnet: constants.PrimaryNetworkID,
+		},
 		signer.NewProofOfPossession(sk1),
-		addr, // reward address
+		vm.ctx.AVAXAssetID,
+		&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{addr},
+		},
+		&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{addr},
+		},
 		reward.PercentDenominator,
 		keys,
 		addr, // change address
@@ -1547,11 +1668,15 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 
 	// insert the subnet validator
 	subnetTx, err := txBuilder.NewAddSubnetValidatorTx(
-		1,                              // Weight
-		uint64(subnetStartTime.Unix()), // Start time
-		uint64(subnetEndTime.Unix()),   // end time
-		nodeID,                         // Node ID
-		subnetID,
+		&txs.SubnetValidator{
+			Validator: txs.Validator{
+				NodeID: nodeID,
+				Start:  uint64(subnetStartTime.Unix()),
+				End:    uint64(subnetEndTime.Unix()),
+				Wght:   1,
+			},
+			Subnet: subnetID,
+		},
 		[]*secp256k1.PrivateKey{keys[0], keys[1]},
 		addr,
 		nil,
@@ -1620,12 +1745,25 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 	require.NotEqual(sk1, sk2)
 
 	primaryRestartTx, err := txBuilder.NewAddPermissionlessValidatorTx(
-		vm.MinValidatorStake,
-		uint64(primaryReStartTime.Unix()),
-		uint64(primaryReEndTime.Unix()),
-		nodeID,
+		&txs.SubnetValidator{
+			Validator: txs.Validator{
+				NodeID: nodeID,
+				Start:  uint64(primaryReStartTime.Unix()),
+				End:    uint64(primaryReEndTime.Unix()),
+				Wght:   vm.MinValidatorStake,
+			},
+			Subnet: constants.PrimaryNetworkID,
+		},
 		signer.NewProofOfPossession(sk2),
-		addr, // reward address
+		vm.ctx.AVAXAssetID,
+		&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{addr},
+		},
+		&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{addr},
+		},
 		reward.PercentDenominator,
 		keys,
 		addr, // change address
@@ -1729,11 +1867,16 @@ func TestPrimaryNetworkValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	nodeID := ids.GenerateTestNodeID()
 	addr := keys[0].PublicKey().Address()
 	primaryTx1, err := txBuilder.NewAddValidatorTx(
-		vm.MinValidatorStake,
-		uint64(primaryStartTime1.Unix()),
-		uint64(primaryEndTime1.Unix()),
-		nodeID,
-		addr,
+		&txs.Validator{
+			NodeID: nodeID,
+			Start:  uint64(primaryStartTime1.Unix()),
+			End:    uint64(primaryEndTime1.Unix()),
+			Wght:   vm.MinValidatorStake,
+		},
+		&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{addr},
+		},
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[0]},
 		addr,
@@ -1790,12 +1933,25 @@ func TestPrimaryNetworkValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	require.NoError(err)
 
 	primaryRestartTx, err := txBuilder.NewAddPermissionlessValidatorTx(
-		vm.MinValidatorStake,
-		uint64(primaryStartTime2.Unix()),
-		uint64(primaryEndTime2.Unix()),
-		nodeID,
+		&txs.SubnetValidator{
+			Validator: txs.Validator{
+				NodeID: nodeID,
+				Start:  uint64(primaryStartTime2.Unix()),
+				End:    uint64(primaryEndTime2.Unix()),
+				Wght:   vm.MinValidatorStake,
+			},
+			Subnet: constants.PrimaryNetworkID,
+		},
 		signer.NewProofOfPossession(sk2),
-		addr, // reward address
+		vm.ctx.AVAXAssetID,
+		&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{addr},
+		},
+		&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{addr},
+		},
 		reward.PercentDenominator,
 		keys,
 		addr, // change address
@@ -1862,11 +2018,16 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	nodeID := ids.GenerateTestNodeID()
 	addr := keys[0].PublicKey().Address()
 	primaryTx1, err := txBuilder.NewAddValidatorTx(
-		vm.MinValidatorStake,
-		uint64(primaryStartTime1.Unix()),
-		uint64(primaryEndTime1.Unix()),
-		nodeID,
-		addr,
+		&txs.Validator{
+			NodeID: nodeID,
+			Start:  uint64(primaryStartTime1.Unix()),
+			End:    uint64(primaryEndTime1.Unix()),
+			Wght:   vm.MinValidatorStake,
+		},
+		&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{addr},
+		},
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[0]},
 		addr,
@@ -1893,11 +2054,15 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 
 	// insert the subnet validator
 	subnetTx, err := txBuilder.NewAddSubnetValidatorTx(
-		1,                              // Weight
-		uint64(subnetStartTime.Unix()), // Start time
-		uint64(subnetEndTime.Unix()),   // end time
-		nodeID,                         // Node ID
-		subnetID,
+		&txs.SubnetValidator{
+			Validator: txs.Validator{
+				NodeID: nodeID,
+				Start:  uint64(subnetStartTime.Unix()),
+				End:    uint64(subnetEndTime.Unix()),
+				Wght:   1,
+			},
+			Subnet: subnetID,
+		},
 		[]*secp256k1.PrivateKey{keys[0], keys[1]},
 		addr,
 		nil,
@@ -1965,12 +2130,25 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	require.NoError(err)
 
 	primaryRestartTx, err := txBuilder.NewAddPermissionlessValidatorTx(
-		vm.MinValidatorStake,
-		uint64(primaryStartTime2.Unix()),
-		uint64(primaryEndTime2.Unix()),
-		nodeID,
+		&txs.SubnetValidator{
+			Validator: txs.Validator{
+				NodeID: nodeID,
+				Start:  uint64(primaryStartTime2.Unix()),
+				End:    uint64(primaryEndTime2.Unix()),
+				Wght:   vm.MinValidatorStake,
+			},
+			Subnet: constants.PrimaryNetworkID,
+		},
 		signer.NewProofOfPossession(sk2),
-		addr, // reward address
+		vm.ctx.AVAXAssetID,
+		&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{addr},
+		},
+		&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{addr},
+		},
 		reward.PercentDenominator,
 		keys,
 		addr, // change address
@@ -2044,11 +2222,16 @@ func TestSubnetValidatorSetAfterPrimaryNetworkValidatorRemoval(t *testing.T) {
 	nodeID := ids.GenerateTestNodeID()
 	addr := keys[0].PublicKey().Address()
 	primaryTx1, err := txBuilder.NewAddValidatorTx(
-		vm.MinValidatorStake,
-		uint64(primaryStartTime1.Unix()),
-		uint64(primaryEndTime1.Unix()),
-		nodeID,
-		addr,
+		&txs.Validator{
+			NodeID: nodeID,
+			Start:  uint64(primaryStartTime1.Unix()),
+			End:    uint64(primaryEndTime1.Unix()),
+			Wght:   vm.MinValidatorStake,
+		},
+		&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{addr},
+		},
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[0]},
 		addr,
@@ -2072,11 +2255,15 @@ func TestSubnetValidatorSetAfterPrimaryNetworkValidatorRemoval(t *testing.T) {
 
 	// insert the subnet validator
 	subnetTx, err := txBuilder.NewAddSubnetValidatorTx(
-		1,                              // Weight
-		uint64(subnetStartTime.Unix()), // Start time
-		uint64(subnetEndTime.Unix()),   // end time
-		nodeID,                         // Node ID
-		subnetID,
+		&txs.SubnetValidator{
+			Validator: txs.Validator{
+				NodeID: nodeID,
+				Start:  uint64(subnetStartTime.Unix()),
+				End:    uint64(subnetEndTime.Unix()),
+				Wght:   1,
+			},
+			Subnet: subnetID,
+		},
 		[]*secp256k1.PrivateKey{keys[0], keys[1]},
 		addr,
 		nil,

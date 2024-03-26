@@ -10,8 +10,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
@@ -46,23 +44,17 @@ type Builder struct {
 }
 
 func (b *Builder) NewImportTx(
-	from ids.ID,
-	to ids.ShortID,
+	chainID ids.ID,
+	to *secp256k1fx.OutputOwners,
 	keys []*secp256k1.PrivateKey,
 	changeAddr ids.ShortID,
 	memo []byte,
 ) (*txs.Tx, error) {
 	pBuilder, pSigner := b.builders(keys)
 
-	outOwner := &secp256k1fx.OutputOwners{
-		Locktime:  0,
-		Threshold: 1,
-		Addrs:     []ids.ShortID{to},
-	}
-
 	utx, err := pBuilder.NewImportTx(
-		from,
-		outOwner,
+		chainID,
+		to,
 		common.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{changeAddr},
@@ -76,28 +68,14 @@ func (b *Builder) NewImportTx(
 	return walletsigner.SignUnsigned(context.Background(), pSigner, utx)
 }
 
-// TODO: should support other assets than AVAX
 func (b *Builder) NewExportTx(
-	amount uint64,
 	chainID ids.ID,
-	to ids.ShortID,
+	outputs []*avax.TransferableOutput,
 	keys []*secp256k1.PrivateKey,
 	changeAddr ids.ShortID,
 	memo []byte,
 ) (*txs.Tx, error) {
 	pBuilder, pSigner := b.builders(keys)
-
-	outputs := []*avax.TransferableOutput{{
-		Asset: avax.Asset{ID: b.ctx.AVAXAssetID},
-		Out: &secp256k1fx.TransferOutput{
-			Amt: amount,
-			OutputOwners: secp256k1fx.OutputOwners{
-				Locktime:  0,
-				Threshold: 1,
-				Addrs:     []ids.ShortID{to},
-			},
-		},
-	}}
 
 	utx, err := pBuilder.NewExportTx(
 		chainID,
@@ -117,7 +95,7 @@ func (b *Builder) NewExportTx(
 
 func (b *Builder) NewCreateChainTx(
 	subnetID ids.ID,
-	genesisData []byte,
+	genesis []byte,
 	vmID ids.ID,
 	fxIDs []ids.ID,
 	chainName string,
@@ -129,7 +107,7 @@ func (b *Builder) NewCreateChainTx(
 
 	utx, err := pBuilder.NewCreateChainTx(
 		subnetID,
-		genesisData,
+		genesis,
 		vmID,
 		fxIDs,
 		chainName,
@@ -147,22 +125,15 @@ func (b *Builder) NewCreateChainTx(
 }
 
 func (b *Builder) NewCreateSubnetTx(
-	threshold uint32,
-	ownerAddrs []ids.ShortID,
+	owner *secp256k1fx.OutputOwners,
 	keys []*secp256k1.PrivateKey,
 	changeAddr ids.ShortID,
 	memo []byte,
 ) (*txs.Tx, error) {
 	pBuilder, pSigner := b.builders(keys)
 
-	utils.Sort(ownerAddrs) // sort control addresses
-	subnetOwner := &secp256k1fx.OutputOwners{
-		Threshold: threshold,
-		Addrs:     ownerAddrs,
-	}
-
 	utx, err := pBuilder.NewCreateSubnetTx(
-		subnetOwner,
+		owner,
 		common.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{changeAddr},
@@ -226,11 +197,8 @@ func (b *Builder) NewTransformSubnetTx(
 }
 
 func (b *Builder) NewAddValidatorTx(
-	stakeAmount,
-	startTime,
-	endTime uint64,
-	nodeID ids.NodeID,
-	rewardAddress ids.ShortID,
+	vdr *txs.Validator,
+	rewardsOwner *secp256k1fx.OutputOwners,
 	shares uint32,
 	keys []*secp256k1.PrivateKey,
 	changeAddr ids.ShortID,
@@ -238,21 +206,9 @@ func (b *Builder) NewAddValidatorTx(
 ) (*txs.Tx, error) {
 	pBuilder, pSigner := b.builders(keys)
 
-	vdr := &txs.Validator{
-		NodeID: nodeID,
-		Start:  startTime,
-		End:    endTime,
-		Wght:   stakeAmount,
-	}
-
-	rewardOwner := &secp256k1fx.OutputOwners{
-		Threshold: 1,
-		Addrs:     []ids.ShortID{rewardAddress},
-	}
-
 	utx, err := pBuilder.NewAddValidatorTx(
 		vdr,
-		rewardOwner,
+		rewardsOwner,
 		shares,
 		common.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
@@ -268,12 +224,11 @@ func (b *Builder) NewAddValidatorTx(
 }
 
 func (b *Builder) NewAddPermissionlessValidatorTx(
-	stakeAmount,
-	startTime,
-	endTime uint64,
-	nodeID ids.NodeID,
-	pop *vmsigner.ProofOfPossession,
-	rewardAddress ids.ShortID,
+	vdr *txs.SubnetValidator,
+	signer vmsigner.Signer,
+	assetID ids.ID,
+	validationRewardsOwner *secp256k1fx.OutputOwners,
+	delegationRewardsOwner *secp256k1fx.OutputOwners,
 	shares uint32,
 	keys []*secp256k1.PrivateKey,
 	changeAddr ids.ShortID,
@@ -281,27 +236,12 @@ func (b *Builder) NewAddPermissionlessValidatorTx(
 ) (*txs.Tx, error) {
 	pBuilder, pSigner := b.builders(keys)
 
-	vdr := &txs.SubnetValidator{
-		Validator: txs.Validator{
-			NodeID: nodeID,
-			Start:  startTime,
-			End:    endTime,
-			Wght:   stakeAmount,
-		},
-		Subnet: constants.PrimaryNetworkID,
-	}
-
-	rewardOwner := &secp256k1fx.OutputOwners{
-		Threshold: 1,
-		Addrs:     []ids.ShortID{rewardAddress},
-	}
-
 	utx, err := pBuilder.NewAddPermissionlessValidatorTx(
 		vdr,
-		pop,
-		b.ctx.AVAXAssetID,
-		rewardOwner, // validationRewardsOwner
-		rewardOwner, // delegationRewardsOwner
+		signer,
+		assetID,
+		validationRewardsOwner,
+		delegationRewardsOwner,
 		shares,
 		common.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
@@ -317,32 +257,17 @@ func (b *Builder) NewAddPermissionlessValidatorTx(
 }
 
 func (b *Builder) NewAddDelegatorTx(
-	stakeAmount,
-	startTime,
-	endTime uint64,
-	nodeID ids.NodeID,
-	rewardAddress ids.ShortID,
+	vdr *txs.Validator,
+	rewardsOwner *secp256k1fx.OutputOwners,
 	keys []*secp256k1.PrivateKey,
 	changeAddr ids.ShortID,
 	memo []byte,
 ) (*txs.Tx, error) {
 	pBuilder, pSigner := b.builders(keys)
 
-	vdr := &txs.Validator{
-		NodeID: nodeID,
-		Start:  startTime,
-		End:    endTime,
-		Wght:   stakeAmount,
-	}
-
-	rewardOwner := &secp256k1fx.OutputOwners{
-		Threshold: 1,
-		Addrs:     []ids.ShortID{rewardAddress},
-	}
-
 	utx, err := pBuilder.NewAddDelegatorTx(
 		vdr,
-		rewardOwner,
+		rewardsOwner,
 		common.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{changeAddr},
@@ -357,36 +282,19 @@ func (b *Builder) NewAddDelegatorTx(
 }
 
 func (b *Builder) NewAddPermissionlessDelegatorTx(
-	stakeAmount,
-	startTime,
-	endTime uint64,
-	nodeID ids.NodeID,
-	rewardAddress ids.ShortID,
+	vdr *txs.SubnetValidator,
+	assetID ids.ID,
+	rewardsOwner *secp256k1fx.OutputOwners,
 	keys []*secp256k1.PrivateKey,
 	changeAddr ids.ShortID,
 	memo []byte,
 ) (*txs.Tx, error) {
 	pBuilder, pSigner := b.builders(keys)
 
-	vdr := &txs.SubnetValidator{
-		Validator: txs.Validator{
-			NodeID: nodeID,
-			Start:  startTime,
-			End:    endTime,
-			Wght:   stakeAmount,
-		},
-		Subnet: constants.PrimaryNetworkID,
-	}
-
-	rewardOwner := &secp256k1fx.OutputOwners{
-		Threshold: 1,
-		Addrs:     []ids.ShortID{rewardAddress},
-	}
-
 	utx, err := pBuilder.NewAddPermissionlessDelegatorTx(
 		vdr,
-		b.ctx.AVAXAssetID,
-		rewardOwner,
+		assetID,
+		rewardsOwner,
 		common.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{changeAddr},
@@ -401,26 +309,12 @@ func (b *Builder) NewAddPermissionlessDelegatorTx(
 }
 
 func (b *Builder) NewAddSubnetValidatorTx(
-	weight,
-	startTime,
-	endTime uint64,
-	nodeID ids.NodeID,
-	subnetID ids.ID,
+	vdr *txs.SubnetValidator,
 	keys []*secp256k1.PrivateKey,
 	changeAddr ids.ShortID,
 	memo []byte,
 ) (*txs.Tx, error) {
 	pBuilder, pSigner := b.builders(keys)
-
-	vdr := &txs.SubnetValidator{
-		Validator: txs.Validator{
-			NodeID: nodeID,
-			Start:  startTime,
-			End:    endTime,
-			Wght:   weight,
-		},
-		Subnet: subnetID,
-	}
 
 	utx, err := pBuilder.NewAddSubnetValidatorTx(
 		vdr,
@@ -464,23 +358,16 @@ func (b *Builder) NewRemoveSubnetValidatorTx(
 
 func (b *Builder) NewTransferSubnetOwnershipTx(
 	subnetID ids.ID,
-	threshold uint32,
-	ownerAddrs []ids.ShortID,
+	owner *secp256k1fx.OutputOwners,
 	keys []*secp256k1.PrivateKey,
 	changeAddr ids.ShortID,
 	memo []byte,
 ) (*txs.Tx, error) {
 	pBuilder, pSigner := b.builders(keys)
 
-	utils.Sort(ownerAddrs) // sort control addresses
-	newOwner := &secp256k1fx.OutputOwners{
-		Threshold: threshold,
-		Addrs:     ownerAddrs,
-	}
-
 	utx, err := pBuilder.NewTransferSubnetOwnershipTx(
 		subnetID,
-		newOwner,
+		owner,
 		common.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{changeAddr},
@@ -495,24 +382,15 @@ func (b *Builder) NewTransferSubnetOwnershipTx(
 }
 
 func (b *Builder) NewBaseTx(
-	amount uint64,
-	owner secp256k1fx.OutputOwners,
+	outputs []*avax.TransferableOutput,
 	keys []*secp256k1.PrivateKey,
 	changeAddr ids.ShortID,
 	memo []byte,
 ) (*txs.Tx, error) {
 	pBuilder, pSigner := b.builders(keys)
 
-	out := &avax.TransferableOutput{
-		Asset: avax.Asset{ID: b.ctx.AVAXAssetID},
-		Out: &secp256k1fx.TransferOutput{
-			Amt:          amount,
-			OutputOwners: owner,
-		},
-	}
-
 	utx, err := pBuilder.NewBaseTx(
-		[]*avax.TransferableOutput{out},
+		outputs,
 		common.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{changeAddr},

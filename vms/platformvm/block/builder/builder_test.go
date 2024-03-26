@@ -24,6 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
@@ -110,12 +111,25 @@ func TestBuildBlockShouldReward(t *testing.T) {
 
 	// Create a valid [AddPermissionlessValidatorTx]
 	tx, err := env.txBuilder.NewAddPermissionlessValidatorTx(
-		defaultValidatorStake,
-		uint64(validatorStartTime.Unix()),
-		uint64(validatorEndTime.Unix()),
-		nodeID,
+		&txs.SubnetValidator{
+			Validator: txs.Validator{
+				NodeID: nodeID,
+				Start:  uint64(validatorStartTime.Unix()),
+				End:    uint64(validatorEndTime.Unix()),
+				Wght:   defaultValidatorStake,
+			},
+			Subnet: constants.PrimaryNetworkID,
+		},
 		signer.NewProofOfPossession(sk),
-		preFundedKeys[0].PublicKey().Address(),
+		env.ctx.AVAXAssetID,
+		&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
+		},
+		&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
+		},
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{preFundedKeys[0]},
 		preFundedKeys[0].PublicKey().Address(),
@@ -302,12 +316,25 @@ func TestBuildBlockInvalidStakingDurations(t *testing.T) {
 	require.NoError(err)
 
 	tx1, err := env.txBuilder.NewAddPermissionlessValidatorTx(
-		defaultValidatorStake,
-		uint64(now.Unix()),
-		uint64(validatorEndTime.Unix()),
-		ids.GenerateTestNodeID(),
+		&txs.SubnetValidator{
+			Validator: txs.Validator{
+				NodeID: ids.GenerateTestNodeID(),
+				Start:  uint64(now.Unix()),
+				End:    uint64(validatorEndTime.Unix()),
+				Wght:   defaultValidatorStake,
+			},
+			Subnet: constants.PrimaryNetworkID,
+		},
 		signer.NewProofOfPossession(sk),
-		preFundedKeys[0].PublicKey().Address(),
+		env.ctx.AVAXAssetID,
+		&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
+		},
+		&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
+		},
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{preFundedKeys[0]},
 		preFundedKeys[0].PublicKey().Address(),
@@ -326,12 +353,25 @@ func TestBuildBlockInvalidStakingDurations(t *testing.T) {
 	require.NoError(err)
 
 	tx2, err := env.txBuilder.NewAddPermissionlessValidatorTx(
-		defaultValidatorStake,
-		uint64(now.Unix()),
-		uint64(validator2EndTime.Unix()),
-		ids.GenerateTestNodeID(),
+		&txs.SubnetValidator{
+			Validator: txs.Validator{
+				NodeID: ids.GenerateTestNodeID(),
+				Start:  uint64(now.Unix()),
+				End:    uint64(validator2EndTime.Unix()),
+				Wght:   defaultValidatorStake,
+			},
+			Subnet: constants.PrimaryNetworkID,
+		},
 		signer.NewProofOfPossession(sk),
-		preFundedKeys[2].PublicKey().Address(),
+		env.ctx.AVAXAssetID,
+		&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{preFundedKeys[2].PublicKey().Address()},
+		},
+		&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{preFundedKeys[2].PublicKey().Address()},
+		},
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{preFundedKeys[2]},
 		preFundedKeys[2].PublicKey().Address(),

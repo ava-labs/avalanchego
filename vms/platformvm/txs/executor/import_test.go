@@ -106,7 +106,11 @@ func TestNewImportTx(t *testing.T) {
 		},
 	}
 
-	to := ids.GenerateTestShortID()
+	to := &secp256k1fx.OutputOwners{
+		Locktime:  0,
+		Threshold: 1,
+		Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+	}
 	for _, tt := range tests {
 		t.Run(tt.description, func(t *testing.T) {
 			require := require.New(t)
