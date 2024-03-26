@@ -14,163 +14,150 @@ import (
 )
 
 func TestAdd(t *testing.T) {
-	blocks := generateBlockchain(7)
+	tests := []struct {
+		name                 string
+		tree                 *Tree
+		lastAcceptedHeight   uint64
+		height               uint64
+		blkBytes             []byte
+		expectedToPersist    bool
+		expectedToWantParent bool
+	}{
+		{
+			name: "height already accepted",
+			tree: func() *Tree {
+				tree, err := NewTree(memdb.New())
+				require.NoError(t, err)
+				return tree
+			}(),
+			lastAcceptedHeight:   1,
+			height:               1,
+			blkBytes:             []byte{1},
+			expectedToPersist:    false,
+			expectedToWantParent: false,
+		},
+		{
+			name: "height already added",
+			tree: func() *Tree {
+				db := memdb.New()
+				tree, err := NewTree(db)
+				require.NoError(t, err)
 
-	db := memdb.New()
-	tree, err := NewTree(db)
-	require.NoError(t, err)
-	lastAcceptedHeight := uint64(1)
+				require.NoError(t, tree.Add(db, 1))
+				return tree
+			}(),
+			lastAcceptedHeight:   0,
+			height:               1,
+			blkBytes:             []byte{1},
+			expectedToPersist:    false,
+			expectedToWantParent: false,
+		},
+		{
+			name: "next block is desired",
+			tree: func() *Tree {
+				tree, err := NewTree(memdb.New())
+				require.NoError(t, err)
+				return tree
+			}(),
+			lastAcceptedHeight:   0,
+			height:               2,
+			blkBytes:             []byte{2},
+			expectedToPersist:    true,
+			expectedToWantParent: true,
+		},
+		{
+			name: "next block is accepted",
+			tree: func() *Tree {
+				tree, err := NewTree(memdb.New())
+				require.NoError(t, err)
+				return tree
+			}(),
+			lastAcceptedHeight:   0,
+			height:               1,
+			blkBytes:             []byte{1},
+			expectedToPersist:    true,
+			expectedToWantParent: false,
+		},
+		{
+			name: "next block already added",
+			tree: func() *Tree {
+				db := memdb.New()
+				tree, err := NewTree(db)
+				require.NoError(t, err)
 
-	t.Run("adding first block", func(t *testing.T) {
-		require := require.New(t)
+				require.NoError(t, tree.Add(db, 1))
+				return tree
+			}(),
+			lastAcceptedHeight:   0,
+			height:               2,
+			blkBytes:             []byte{2},
+			expectedToPersist:    true,
+			expectedToWantParent: false,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
 
-		newlyWantsParent, err := Add(
-			db,
-			tree,
-			lastAcceptedHeight,
-			5,
-			blocks[5],
-		)
-		require.NoError(err)
-		require.True(newlyWantsParent)
-		require.Equal(uint64(1), tree.Len())
+			db := memdb.New()
+			wantsParent, err := Add(
+				db,
+				test.tree,
+				test.lastAcceptedHeight,
+				test.height,
+				test.blkBytes,
+			)
+			require.NoError(err)
+			require.Equal(test.expectedToWantParent, wantsParent)
 
-		bytes, err := GetBlock(db, 5)
-		require.NoError(err)
-		require.Equal(blocks[5], bytes)
-	})
-
-	t.Run("adding duplicate block", func(t *testing.T) {
-		require := require.New(t)
-
-		newlyWantsParent, err := Add(
-			db,
-			tree,
-			lastAcceptedHeight,
-			5,
-			blocks[5],
-		)
-		require.NoError(err)
-		require.False(newlyWantsParent)
-		require.Equal(uint64(1), tree.Len())
-	})
-
-	t.Run("adding second block", func(t *testing.T) {
-		require := require.New(t)
-
-		newlyWantsParent, err := Add(
-			db,
-			tree,
-			lastAcceptedHeight,
-			3,
-			blocks[3],
-		)
-		require.NoError(err)
-		require.True(newlyWantsParent)
-		require.Equal(uint64(2), tree.Len())
-
-		bytes, err := GetBlock(db, 3)
-		require.NoError(err)
-		require.Equal(blocks[3], bytes)
-	})
-
-	t.Run("adding last desired block", func(t *testing.T) {
-		require := require.New(t)
-
-		newlyWantsParent, err := Add(
-			db,
-			tree,
-			lastAcceptedHeight,
-			2,
-			blocks[2],
-		)
-		require.NoError(err)
-		require.False(newlyWantsParent)
-		require.Equal(uint64(3), tree.Len())
-
-		bytes, err := GetBlock(db, 2)
-		require.NoError(err)
-		require.Equal(blocks[2], bytes)
-	})
-
-	t.Run("adding undesired block", func(t *testing.T) {
-		require := require.New(t)
-
-		newlyWantsParent, err := Add(
-			db,
-			tree,
-			lastAcceptedHeight,
-			1,
-			blocks[1],
-		)
-		require.NoError(err)
-		require.False(newlyWantsParent)
-		require.Equal(uint64(3), tree.Len())
-
-		_, err = GetBlock(db, 1)
-		require.ErrorIs(err, database.ErrNotFound)
-	})
-
-	t.Run("adding block with known parent", func(t *testing.T) {
-		require := require.New(t)
-
-		newlyWantsParent, err := Add(
-			db,
-			tree,
-			lastAcceptedHeight,
-			6,
-			blocks[6],
-		)
-		require.NoError(err)
-		require.False(newlyWantsParent)
-		require.Equal(uint64(4), tree.Len())
-
-		bytes, err := GetBlock(db, 6)
-		require.NoError(err)
-		require.Equal(blocks[6], bytes)
-	})
+			blkBytes, err := GetBlock(db, test.height)
+			if test.expectedToPersist {
+				require.NoError(err)
+				require.Equal(test.blkBytes, blkBytes)
+				require.True(test.tree.Contains(test.height))
+			} else {
+				require.ErrorIs(err, database.ErrNotFound)
+			}
+		})
+	}
 }
 
 func TestRemove(t *testing.T) {
-	blocks := generateBlockchain(7)
+	require := require.New(t)
 
 	db := memdb.New()
 	tree, err := NewTree(db)
-	require.NoError(t, err)
+	require.NoError(err)
 	lastAcceptedHeight := uint64(1)
+	height := uint64(5)
+	blkBytes := []byte{5}
 
-	t.Run("adding a block", func(t *testing.T) {
-		require := require.New(t)
+	_, err = Add(
+		db,
+		tree,
+		lastAcceptedHeight,
+		height,
+		blkBytes,
+	)
+	require.NoError(err)
 
-		newlyWantsParent, err := Add(
-			db,
-			tree,
-			lastAcceptedHeight,
-			5,
-			blocks[5],
-		)
-		require.NoError(err)
-		require.True(newlyWantsParent)
-		require.Equal(uint64(1), tree.Len())
+	// Verify that the database has the block.
+	storedBlkBytes, err := GetBlock(db, height)
+	require.NoError(err)
+	require.Equal(blkBytes, storedBlkBytes)
+	require.Equal(uint64(1), tree.Len())
 
-		bytes, err := GetBlock(db, 5)
-		require.NoError(err)
-		require.Equal(blocks[5], bytes)
-	})
+	require.NoError(Remove(
+		db,
+		tree,
+		height,
+	))
+	require.Zero(tree.Len())
 
-	t.Run("removing a block", func(t *testing.T) {
-		require := require.New(t)
-
-		require.NoError(Remove(
-			db,
-			tree,
-			5,
-		))
-		require.Zero(tree.Len())
-
-		_, err = GetBlock(db, 5)
-		require.ErrorIs(err, database.ErrNotFound)
-	})
+	// Verify that the database no longer contains the block.
+	_, err = GetBlock(db, height)
+	require.ErrorIs(err, database.ErrNotFound)
+	require.Zero(tree.Len())
 }
 
 func generateBlockchain(length uint64) [][]byte {
