@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/state"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -26,6 +27,7 @@ func newServiceBackend(
 	ctx *snow.Context,
 	cfg *config.Config,
 	state state.State,
+	clk *mockable.Clock,
 	atomicUTXOsMan avax.AtomicUTXOManager,
 ) *serviceBackend {
 	backendCtx := &builder.Context{
@@ -41,6 +43,7 @@ func newServiceBackend(
 		ctx:            backendCtx,
 		xchainID:       ctx.XChainID,
 		cfg:            cfg,
+		clk:            clk,
 		state:          state,
 		atomicUTXOsMan: atomicUTXOsMan,
 	}
@@ -51,6 +54,7 @@ type serviceBackend struct {
 	ctx            *builder.Context
 	xchainID       ids.ID
 	cfg            *config.Config
+	clk            *mockable.Clock
 	addrs          set.Set[ids.ShortID]
 	state          state.State
 	atomicUTXOsMan avax.AtomicUTXOManager
@@ -66,6 +70,10 @@ func (b *serviceBackend) Config() *config.Config {
 
 func (b *serviceBackend) Codec() codec.Manager {
 	return b.codec
+}
+
+func (b *serviceBackend) Clock() *mockable.Clock {
+	return b.clk
 }
 
 func (b *serviceBackend) Context() *builder.Context {

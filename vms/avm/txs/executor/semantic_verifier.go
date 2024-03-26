@@ -6,6 +6,7 @@ package executor
 import (
 	"context"
 	"errors"
+	"fmt"
 	"reflect"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -29,11 +30,15 @@ var (
 )
 
 type SemanticVerifier struct {
+	// inputs
 	*Backend
 	BlkFeeManager      *commonfees.Manager
 	BlockMaxComplexity commonfees.Dimensions
 	State              state.ReadOnlyChain
 	Tx                 *txs.Tx
+
+	// outputs
+	TipPercentage commonfees.TipPercentage
 }
 
 func (v *SemanticVerifier) BaseTx(tx *txs.BaseTx) error {
@@ -137,8 +142,9 @@ func (v *SemanticVerifier) verifyBaseTx(
 	exportedOuts []*avax.TransferableOutput,
 	creds []*fxs.FxCredential,
 ) error {
+	isEActive := v.Config.IsEActivated(v.State.GetTimestamp())
 	feeCalculator := fees.Calculator{
-		IsEActive:          v.Config.IsEActivated(v.State.GetTimestamp()),
+		IsEActive:          isEActive,
 		Config:             v.Config,
 		FeeManager:         v.BlkFeeManager,
 		BlockMaxComplexity: v.BlockMaxComplexity,
@@ -149,7 +155,7 @@ func (v *SemanticVerifier) verifyBaseTx(
 		return err
 	}
 
-	err := avax.VerifyTx(
+	feesPaid, err := avax.VerifyTx(
 		feeCalculator.Fee,
 		v.FeeAssetID,
 		[][]*avax.TransferableInput{tx.Ins, importedIns},
@@ -158,6 +164,13 @@ func (v *SemanticVerifier) verifyBaseTx(
 	)
 	if err != nil {
 		return err
+	}
+
+	if isEActive {
+		if err := feeCalculator.CalculateTipPercentage(feesPaid); err != nil {
+			return fmt.Errorf("failed estimating fee tip percentage: %w", err)
+		}
+		v.TipPercentage = feeCalculator.TipPercentage
 	}
 
 	for i, in := range tx.Ins {

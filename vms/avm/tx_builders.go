@@ -10,6 +10,9 @@ import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
+	"github.com/ava-labs/avalanchego/vms/avm/block/builder"
+	"github.com/ava-labs/avalanchego/vms/avm/block/executor"
 	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/state"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
@@ -31,6 +34,7 @@ type txBuilderBackend interface {
 	State() state.State
 	Config() *config.Config
 	Codec() codec.Manager
+	Clock() *mockable.Clock
 
 	Context() *walletbuilder.Context
 	ResetAddresses(addrs set.Set[ids.ShortID])
@@ -45,15 +49,11 @@ func buildCreateAssetTx(
 	tipPercentage commonfees.TipPercentage, //nolint:unparam
 	changeAddr ids.ShortID,
 ) (*txs.Tx, ids.ShortID, error) {
-	feeRates, err := backend.State().GetFeeRates()
+	pBuilder, pSigner := builders(backend, kc)
+	feeCalc, err := feeCalculator(backend)
 	if err != nil {
-		return nil, ids.ShortEmpty, fmt.Errorf("failed retrieving fee rates: %w", err)
+		return nil, ids.ShortEmpty, fmt.Errorf("failed creating fee calculator: %w", err)
 	}
-
-	var (
-		pBuilder, pSigner = builders(backend, kc)
-		feeCalc           = feeCalculator(backend, feeRates)
-	)
 
 	utx, err := pBuilder.NewCreateAssetTx(
 		name,
@@ -83,15 +83,11 @@ func buildBaseTx(
 	tipPercentage commonfees.TipPercentage, //nolint:unparam
 	changeAddr ids.ShortID,
 ) (*txs.Tx, ids.ShortID, error) {
-	feeRates, err := backend.State().GetFeeRates()
+	pBuilder, pSigner := builders(backend, kc)
+	feeCalc, err := feeCalculator(backend)
 	if err != nil {
-		return nil, ids.ShortEmpty, fmt.Errorf("failed retrieving fee rates: %w", err)
+		return nil, ids.ShortEmpty, fmt.Errorf("failed creating fee calculator: %w", err)
 	}
-
-	var (
-		pBuilder, pSigner = builders(backend, kc)
-		feeCalc           = feeCalculator(backend, feeRates)
-	)
 
 	utx, err := pBuilder.NewBaseTx(
 		outs,
@@ -119,15 +115,11 @@ func mintNFT(
 	tipPercentage commonfees.TipPercentage,
 	changeAddr ids.ShortID,
 ) (*txs.Tx, error) {
-	feeRates, err := backend.State().GetFeeRates()
+	pBuilder, pSigner := builders(backend, kc)
+	feeCalc, err := feeCalculator(backend)
 	if err != nil {
-		return nil, fmt.Errorf("failed retrieving fee rates: %w", err)
+		return nil, fmt.Errorf("failed creating fee calculator: %w", err)
 	}
-
-	var (
-		pBuilder, pSigner = builders(backend, kc)
-		feeCalc           = feeCalculator(backend, feeRates)
-	)
 
 	utx, err := pBuilder.NewOperationTxMintNFT(
 		assetID,
@@ -150,15 +142,12 @@ func mintFTs(
 	tipPercentage commonfees.TipPercentage,
 	changeAddr ids.ShortID,
 ) (*txs.Tx, error) {
-	feeRates, err := backend.State().GetFeeRates()
+	pBuilder, pSigner := builders(backend, kc)
+	feeCalc, err := feeCalculator(backend)
 	if err != nil {
-		return nil, fmt.Errorf("failed retrieving fee rates: %w", err)
+		return nil, fmt.Errorf("failed creating fee calculator: %w", err)
 	}
 
-	var (
-		pBuilder, pSigner = builders(backend, kc)
-		feeCalc           = feeCalculator(backend, feeRates)
-	)
 	utx, err := pBuilder.NewOperationTxMintFT(
 		outputs,
 		feeCalc,
@@ -178,15 +167,11 @@ func buildOperation(
 	tipPercentage commonfees.TipPercentage, //nolint:unparam
 	changeAddr ids.ShortID,
 ) (*txs.Tx, error) {
-	feeRates, err := backend.State().GetFeeRates()
+	pBuilder, pSigner := builders(backend, kc)
+	feeCalc, err := feeCalculator(backend)
 	if err != nil {
-		return nil, fmt.Errorf("failed retrieving fee rates: %w", err)
+		return nil, fmt.Errorf("failed creating fee calculator: %w", err)
 	}
-
-	var (
-		pBuilder, pSigner = builders(backend, kc)
-		feeCalc           = feeCalculator(backend, feeRates)
-	)
 
 	utx, err := pBuilder.NewOperationTx(
 		ops,
@@ -207,15 +192,11 @@ func buildImportTx(
 	kc *secp256k1fx.Keychain,
 	tipPercentage commonfees.TipPercentage,
 ) (*txs.Tx, error) {
-	feeRates, err := backend.State().GetFeeRates()
+	pBuilder, pSigner := builders(backend, kc)
+	feeCalc, err := feeCalculator(backend)
 	if err != nil {
-		return nil, fmt.Errorf("failed retrieving fee rates: %w", err)
+		return nil, fmt.Errorf("failed creating fee calculator: %w", err)
 	}
-
-	var (
-		pBuilder, pSigner = builders(backend, kc)
-		feeCalc           = feeCalculator(backend, feeRates)
-	)
 
 	outOwner := &secp256k1fx.OutputOwners{
 		Locktime:  0,
@@ -246,15 +227,11 @@ func buildExportTx(
 	tipPercentage commonfees.TipPercentage, //nolint:unparam
 	changeAddr ids.ShortID,
 ) (*txs.Tx, ids.ShortID, error) {
-	feeRates, err := backend.State().GetFeeRates()
+	pBuilder, pSigner := builders(backend, kc)
+	feeCalc, err := feeCalculator(backend)
 	if err != nil {
-		return nil, ids.ShortEmpty, fmt.Errorf("failed retrieving fee rates: %w", err)
+		return nil, ids.ShortEmpty, fmt.Errorf("failed creating fee calculator: %w", err)
 	}
-
-	var (
-		pBuilder, pSigner = builders(backend, kc)
-		feeCalc           = feeCalculator(backend, feeRates)
-	)
 
 	outputs := []*avax.TransferableOutput{{
 		Asset: avax.Asset{ID: exportedAssetID},
@@ -297,22 +274,27 @@ func builders(backend txBuilderBackend, kc *secp256k1fx.Keychain) (walletbuilder
 	return builder, signer
 }
 
-func feeCalculator(backend txBuilderBackend, feeRates commonfees.Dimensions) *fees.Calculator {
+func feeCalculator(backend txBuilderBackend) (*fees.Calculator, error) {
 	var (
-		chainTime = backend.State().GetTimestamp()
-		cfg       = backend.Config()
-		isEActive = cfg.IsEActivated(chainTime)
-		feeCfg    = config.GetDynamicFeesConfig(isEActive)
-		feeMan    = commonfees.NewManager(feeRates)
+		chainTime   = backend.State().GetTimestamp()
+		nextBlkTime = executor.NextBlockTime(chainTime, backend.Clock())
+		cfg         = backend.Config()
+		isEActive   = cfg.IsEActivated(chainTime)
+		feeCfg      = config.GetDynamicFeesConfig(isEActive)
 	)
+
+	feeManager, err := builder.UpdatedFeeManager(backend.State(), backend.Config(), chainTime, nextBlkTime)
+	if err != nil {
+		return nil, err
+	}
 
 	return &fees.Calculator{
 		IsEActive:          cfg.IsEActivated(chainTime),
 		Config:             cfg,
-		FeeManager:         feeMan,
+		FeeManager:         feeManager,
 		BlockMaxComplexity: feeCfg.BlockMaxComplexity,
 		Codec:              backend.Codec(),
-	}
+	}, nil
 }
 
 func options(changeAddr ids.ShortID, tipPercentage commonfees.TipPercentage, memo []byte) []common.Option {

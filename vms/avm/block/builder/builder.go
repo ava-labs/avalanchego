@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -97,25 +98,9 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 		feesCfg   = config.GetDynamicFeesConfig(isEActive)
 	)
 
-	feeRates, err := stateDiff.GetFeeRates()
+	feeManager, err := UpdatedFeeManager(stateDiff, b.backend.Config, chainTime, nextBlkTime)
 	if err != nil {
-		return nil, fmt.Errorf("failed retrieving fee rates: %w", err)
-	}
-	parentBlkComplexity, err := stateDiff.GetLastBlockComplexity()
-	if err != nil {
-		return nil, fmt.Errorf("failed retrieving last block complexity: %w", err)
-	}
-
-	feeManager := fees.NewManager(feeRates)
-	if isEActive {
-		if err := feeManager.UpdateFeeRates(
-			feesCfg,
-			parentBlkComplexity,
-			parentBlkTime.Unix(),
-			nextBlkTime.Unix(),
-		); err != nil {
-			return nil, fmt.Errorf("failed updating fee rates, %w", err)
-		}
+		return nil, err
 	}
 
 	for {
@@ -206,4 +191,37 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 	}
 
 	return b.manager.NewBlock(statelessBlk), nil
+}
+
+func UpdatedFeeManager(state state.Chain, cfg *config.Config, parentBlkTime, nextBlkTime time.Time) (*fees.Manager, error) {
+	var (
+		chainTime = state.GetTimestamp()
+		isEActive = cfg.IsEActivated(chainTime)
+		feeCfg    = config.GetDynamicFeesConfig(isEActive)
+	)
+
+	// nextBlkTime := executor.NextBlockTime(chainTime, clk)
+
+	feeRates, err := state.GetFeeRates()
+	if err != nil {
+		return nil, fmt.Errorf("failed retrieving fee rates: %w", err)
+	}
+	parentBlkComplexity, err := state.GetLastBlockComplexity()
+	if err != nil {
+		return nil, fmt.Errorf("failed retrieving last block complexity: %w", err)
+	}
+
+	feeManager := fees.NewManager(feeRates)
+	if isEActive {
+		if err := feeManager.UpdateFeeRates(
+			feeCfg,
+			parentBlkComplexity,
+			parentBlkTime.Unix(),
+			nextBlkTime.Unix(),
+		); err != nil {
+			return nil, fmt.Errorf("failed updating fee rates, %w", err)
+		}
+	}
+
+	return feeManager, nil
 }

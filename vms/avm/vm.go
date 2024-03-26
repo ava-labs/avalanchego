@@ -350,6 +350,7 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 			vm.ctx,
 			&vm.Config,
 			vm.state,
+			&vm.clock,
 			vm.AtomicUTXOManager,
 		),
 	}, "avm"); err != nil {

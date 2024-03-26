@@ -242,6 +242,6 @@ func (fc *Calculator) CalculateTipPercentage(feesPaid uint64) error {
 	}
 
 	tip := feesPaid - fc.Fee
-	fc.TipPercentage = fees.TipPercentage(tip * fees.MaxTipPercentage / fc.Fee)
+	fc.TipPercentage = fees.TipPercentage(tip * fees.TipDenonimator / fc.Fee)
 	return fc.TipPercentage.Validate()
 }

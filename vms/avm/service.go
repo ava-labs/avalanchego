@@ -21,8 +21,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/vms/avm/block/builder"
 	"github.com/ava-labs/avalanchego/vms/avm/block/executor"
-	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/keystore"
@@ -704,34 +704,20 @@ func (s *Service) GetFeeRates(_ *http.Request, _ *struct{}, reply *GetFeeRatesRe
 	}
 	reply.CurrentFeeRates = currentFeeRates
 
-	nextTimestamp := executor.NextBlockTime(onAccept.GetTimestamp(), &s.vm.clock)
-	isEActivated := s.vm.Config.IsEActivated(nextTimestamp)
+	var (
+		currentTimestamp = onAccept.GetTimestamp()
+		nextTimestamp    = executor.NextBlockTime(onAccept.GetTimestamp(), &s.vm.clock)
+		isEActivated     = s.vm.Config.IsEActivated(nextTimestamp)
+	)
 
 	if !isEActivated {
 		reply.NextFeeRates = reply.CurrentFeeRates
 		return nil
 	}
 
-	var (
-		currentTimestamp = onAccept.GetTimestamp()
-		feesCfg          = config.GetDynamicFeesConfig(isEActivated)
-	)
-
-	parentBlkComplexity, err := onAccept.GetLastBlockComplexity()
+	feeManager, err := builder.UpdatedFeeManager(onAccept, &s.vm.Config, currentTimestamp, nextTimestamp)
 	if err != nil {
 		return err
-	}
-
-	feeManager := commonfees.NewManager(currentFeeRates)
-	if isEActivated {
-		if err := feeManager.UpdateFeeRates(
-			feesCfg,
-			parentBlkComplexity,
-			currentTimestamp.Unix(),
-			nextTimestamp.Unix(),
-		); err != nil {
-			return fmt.Errorf("failed updating fee rates, %w", err)
-		}
 	}
 	reply.NextFeeRates = feeManager.GetFeeRates()
 
