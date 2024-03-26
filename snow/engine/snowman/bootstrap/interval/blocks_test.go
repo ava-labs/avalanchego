@@ -15,7 +15,7 @@ import (
 func TestAdd(t *testing.T) {
 	tests := []struct {
 		name                 string
-		tree                 *Tree
+		existing             []uint64
 		lastAcceptedHeight   uint64
 		height               uint64
 		blkBytes             []byte
@@ -23,12 +23,7 @@ func TestAdd(t *testing.T) {
 		expectedToWantParent bool
 	}{
 		{
-			name: "height already accepted",
-			tree: func() *Tree {
-				tree, err := NewTree(memdb.New())
-				require.NoError(t, err)
-				return tree
-			}(),
+			name:                 "height already accepted",
 			lastAcceptedHeight:   1,
 			height:               1,
 			blkBytes:             []byte{1},
@@ -36,15 +31,8 @@ func TestAdd(t *testing.T) {
 			expectedToWantParent: false,
 		},
 		{
-			name: "height already added",
-			tree: func() *Tree {
-				db := memdb.New()
-				tree, err := NewTree(db)
-				require.NoError(t, err)
-
-				require.NoError(t, tree.Add(db, 1))
-				return tree
-			}(),
+			name:                 "height already added",
+			existing:             []uint64{1},
 			lastAcceptedHeight:   0,
 			height:               1,
 			blkBytes:             []byte{1},
@@ -52,12 +40,7 @@ func TestAdd(t *testing.T) {
 			expectedToWantParent: false,
 		},
 		{
-			name: "next block is desired",
-			tree: func() *Tree {
-				tree, err := NewTree(memdb.New())
-				require.NoError(t, err)
-				return tree
-			}(),
+			name:                 "next block is desired",
 			lastAcceptedHeight:   0,
 			height:               2,
 			blkBytes:             []byte{2},
@@ -65,12 +48,7 @@ func TestAdd(t *testing.T) {
 			expectedToWantParent: true,
 		},
 		{
-			name: "next block is accepted",
-			tree: func() *Tree {
-				tree, err := NewTree(memdb.New())
-				require.NoError(t, err)
-				return tree
-			}(),
+			name:                 "next block is accepted",
 			lastAcceptedHeight:   0,
 			height:               1,
 			blkBytes:             []byte{1},
@@ -78,15 +56,8 @@ func TestAdd(t *testing.T) {
 			expectedToWantParent: false,
 		},
 		{
-			name: "next block already added",
-			tree: func() *Tree {
-				db := memdb.New()
-				tree, err := NewTree(db)
-				require.NoError(t, err)
-
-				require.NoError(t, tree.Add(db, 1))
-				return tree
-			}(),
+			name:                 "next block already added",
+			existing:             []uint64{1},
 			lastAcceptedHeight:   0,
 			height:               2,
 			blkBytes:             []byte{2},
@@ -99,9 +70,15 @@ func TestAdd(t *testing.T) {
 			require := require.New(t)
 
 			db := memdb.New()
+			tree, err := NewTree(db)
+			require.NoError(err)
+			for _, add := range test.existing {
+				require.NoError(tree.Add(db, add))
+			}
+
 			wantsParent, err := Add(
 				db,
-				test.tree,
+				tree,
 				test.lastAcceptedHeight,
 				test.height,
 				test.blkBytes,
@@ -113,7 +90,7 @@ func TestAdd(t *testing.T) {
 			if test.expectedToPersist {
 				require.NoError(err)
 				require.Equal(test.blkBytes, blkBytes)
-				require.True(test.tree.Contains(test.height))
+				require.True(tree.Contains(test.height))
 			} else {
 				require.ErrorIs(err, database.ErrNotFound)
 			}
