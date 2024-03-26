@@ -142,12 +142,12 @@ func (b *Block) Verify(context.Context) error {
 	}
 
 	var (
-		isEForkActive = b.manager.backend.Config.IsEActivated(parentChainTime)
-		feesCfg       = config.GetDynamicFeesConfig(isEForkActive)
+		isEActive = b.manager.backend.Config.IsEActivated(parentChainTime)
+		feesCfg   = config.GetDynamicFeesConfig(isEActive)
 	)
 
 	feeManager := fees.NewManager(feeRates)
-	if isEForkActive {
+	if isEActive {
 		if err := feeManager.UpdateFeeRates(
 			feesCfg,
 			parentBlkComplexitty,
@@ -226,7 +226,7 @@ func (b *Block) Verify(context.Context) error {
 
 	// Now that the block has been executed, we can add the block data to the
 	// state diff.
-	if isEForkActive {
+	if isEActive {
 		stateDiff.SetFeeRates(feeManager.GetFeeRates())
 		stateDiff.SetLastBlockComplexity(parentBlkComplexitty)
 	}

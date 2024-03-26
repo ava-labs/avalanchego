@@ -94,7 +94,7 @@ func TestBaseTx(t *testing.T) {
 
 	{ // Post E-Upgrade
 		feeCalc := &fees.Calculator{
-			IsEUpgradeActive:   true,
+			IsEActive:          true,
 			FeeManager:         commonfees.NewManager(testFeeRates),
 			BlockMaxComplexity: testBlockMaxConsumedUnits,
 			Codec:              builder.Parser.Codec(),
@@ -109,7 +109,7 @@ func TestBaseTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := &fees.Calculator{
-			IsEUpgradeActive:   true,
+			IsEActive:          true,
 			FeeManager:         commonfees.NewManager(testFeeRates),
 			BlockMaxComplexity: testBlockMaxConsumedUnits,
 			Credentials:        tx.Creds,
@@ -132,7 +132,7 @@ func TestBaseTx(t *testing.T) {
 
 	{ // Pre E-Upgrade
 		feeCalc := &fees.Calculator{
-			IsEUpgradeActive: false,
+			IsEActive: false,
 			Config: &config.Config{
 				TxFee: testContext.BaseTxFee,
 			},
@@ -150,7 +150,7 @@ func TestBaseTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := &fees.Calculator{
-			IsEUpgradeActive: false,
+			IsEActive: false,
 			Config: &config.Config{
 				TxFee: testContext.BaseTxFee,
 			},
@@ -250,7 +250,7 @@ func TestCreateAssetTx(t *testing.T) {
 	{
 		// Post E-Upgrade
 		feeCalc := &fees.Calculator{
-			IsEUpgradeActive:   true,
+			IsEActive:          true,
 			FeeManager:         commonfees.NewManager(testFeeRates),
 			BlockMaxComplexity: testBlockMaxConsumedUnits,
 			Codec:              builder.Parser.Codec(),
@@ -269,7 +269,7 @@ func TestCreateAssetTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := &fees.Calculator{
-			IsEUpgradeActive:   true,
+			IsEActive:          true,
 			FeeManager:         commonfees.NewManager(testFeeRates),
 			BlockMaxComplexity: testBlockMaxConsumedUnits,
 			Codec:              builder.Parser.Codec(),
@@ -292,7 +292,7 @@ func TestCreateAssetTx(t *testing.T) {
 	{
 		// Pre E-Upgrade
 		feeCalc := &fees.Calculator{
-			IsEUpgradeActive: false,
+			IsEActive: false,
 			Config: &config.Config{
 				CreateAssetTxFee: testContext.CreateAssetTxFee,
 			},
@@ -314,7 +314,7 @@ func TestCreateAssetTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := &fees.Calculator{
-			IsEUpgradeActive: false,
+			IsEActive: false,
 			Config: &config.Config{
 				CreateAssetTxFee: testContext.CreateAssetTxFee,
 			},
@@ -368,7 +368,7 @@ func TestMintNFTOperation(t *testing.T) {
 	{
 		// Post E-Upgrade
 		feeCalc := &fees.Calculator{
-			IsEUpgradeActive:   true,
+			IsEActive:          true,
 			FeeManager:         commonfees.NewManager(testFeeRates),
 			BlockMaxComplexity: testBlockMaxConsumedUnits,
 			Codec:              builder.Parser.Codec(),
@@ -386,7 +386,7 @@ func TestMintNFTOperation(t *testing.T) {
 		require.NoError(err)
 
 		fc := &fees.Calculator{
-			IsEUpgradeActive:   true,
+			IsEActive:          true,
 			FeeManager:         commonfees.NewManager(testFeeRates),
 			BlockMaxComplexity: testBlockMaxConsumedUnits,
 			Codec:              builder.Parser.Codec(),
@@ -409,7 +409,7 @@ func TestMintNFTOperation(t *testing.T) {
 	{
 		// Pre E-Upgrade
 		feeCalc := &fees.Calculator{
-			IsEUpgradeActive: false,
+			IsEActive: false,
 			Config: &config.Config{
 				TxFee: testContext.BaseTxFee,
 			},
@@ -430,7 +430,7 @@ func TestMintNFTOperation(t *testing.T) {
 		require.NoError(err)
 
 		fc := &fees.Calculator{
-			IsEUpgradeActive: false,
+			IsEActive: false,
 			Config: &config.Config{
 				TxFee: testContext.BaseTxFee,
 			},
@@ -490,7 +490,7 @@ func TestMintFTOperation(t *testing.T) {
 	{
 		// Post E-Upgrade
 		feeCalc := &fees.Calculator{
-			IsEUpgradeActive:   true,
+			IsEActive:          true,
 			FeeManager:         commonfees.NewManager(testFeeRates),
 			BlockMaxComplexity: testBlockMaxConsumedUnits,
 			Codec:              builder.Parser.Codec(),
@@ -506,7 +506,7 @@ func TestMintFTOperation(t *testing.T) {
 		require.NoError(err)
 
 		fc := &fees.Calculator{
-			IsEUpgradeActive:   true,
+			IsEActive:          true,
 			FeeManager:         commonfees.NewManager(testFeeRates),
 			BlockMaxComplexity: testBlockMaxConsumedUnits,
 			Codec:              builder.Parser.Codec(),
@@ -529,7 +529,7 @@ func TestMintFTOperation(t *testing.T) {
 	{
 		// Pre E-Upgrade
 		feeCalc := &fees.Calculator{
-			IsEUpgradeActive: false,
+			IsEActive: false,
 			Config: &config.Config{
 				TxFee: testContext.BaseTxFee,
 			},
@@ -548,7 +548,7 @@ func TestMintFTOperation(t *testing.T) {
 		require.NoError(err)
 
 		fc := &fees.Calculator{
-			IsEUpgradeActive: false,
+			IsEActive: false,
 			Config: &config.Config{
 				TxFee: testContext.BaseTxFee,
 			},
@@ -603,7 +603,7 @@ func TestMintPropertyOperation(t *testing.T) {
 	{
 		// Post E-Upgrade
 		feeCalc := &fees.Calculator{
-			IsEUpgradeActive:   true,
+			IsEActive:          true,
 			FeeManager:         commonfees.NewManager(testFeeRates),
 			BlockMaxComplexity: testBlockMaxConsumedUnits,
 			Codec:              builder.Parser.Codec(),
@@ -620,7 +620,7 @@ func TestMintPropertyOperation(t *testing.T) {
 		require.NoError(err)
 
 		fc := &fees.Calculator{
-			IsEUpgradeActive:   true,
+			IsEActive:          true,
 			FeeManager:         commonfees.NewManager(testFeeRates),
 			BlockMaxComplexity: testBlockMaxConsumedUnits,
 			Codec:              builder.Parser.Codec(),
@@ -643,7 +643,7 @@ func TestMintPropertyOperation(t *testing.T) {
 	{
 		// Pre E-Upgrade
 		feeCalc := &fees.Calculator{
-			IsEUpgradeActive: false,
+			IsEActive: false,
 			Config: &config.Config{
 				TxFee: testContext.BaseTxFee,
 			},
@@ -663,7 +663,7 @@ func TestMintPropertyOperation(t *testing.T) {
 		require.NoError(err)
 
 		fc := &fees.Calculator{
-			IsEUpgradeActive: false,
+			IsEActive: false,
 			Config: &config.Config{
 				TxFee: testContext.BaseTxFee,
 			},
@@ -712,7 +712,7 @@ func TestBurnPropertyOperation(t *testing.T) {
 	{
 		// Post E-Upgrade
 		feeCalc := &fees.Calculator{
-			IsEUpgradeActive:   true,
+			IsEActive:          true,
 			FeeManager:         commonfees.NewManager(testFeeRates),
 			BlockMaxComplexity: testBlockMaxConsumedUnits,
 			Codec:              builder.Parser.Codec(),
@@ -728,7 +728,7 @@ func TestBurnPropertyOperation(t *testing.T) {
 		require.NoError(err)
 
 		fc := &fees.Calculator{
-			IsEUpgradeActive:   true,
+			IsEActive:          true,
 			FeeManager:         commonfees.NewManager(testFeeRates),
 			BlockMaxComplexity: testBlockMaxConsumedUnits,
 			Codec:              builder.Parser.Codec(),
@@ -751,7 +751,7 @@ func TestBurnPropertyOperation(t *testing.T) {
 	{
 		// Pre E-Upgrade
 		feeCalc := &fees.Calculator{
-			IsEUpgradeActive: false,
+			IsEActive: false,
 			Config: &config.Config{
 				TxFee: testContext.BaseTxFee,
 			},
@@ -770,7 +770,7 @@ func TestBurnPropertyOperation(t *testing.T) {
 		require.NoError(err)
 
 		fc := &fees.Calculator{
-			IsEUpgradeActive: false,
+			IsEActive: false,
 			Config: &config.Config{
 				TxFee: testContext.BaseTxFee,
 			},
@@ -831,7 +831,7 @@ func TestImportTx(t *testing.T) {
 
 	{ // Post E-Upgrade
 		feeCalc := &fees.Calculator{
-			IsEUpgradeActive:   true,
+			IsEActive:          true,
 			FeeManager:         commonfees.NewManager(testFeeRates),
 			BlockMaxComplexity: testBlockMaxConsumedUnits,
 			Codec:              builder.Parser.Codec(),
@@ -847,7 +847,7 @@ func TestImportTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := &fees.Calculator{
-			IsEUpgradeActive:   true,
+			IsEActive:          true,
 			FeeManager:         commonfees.NewManager(testFeeRates),
 			BlockMaxComplexity: testBlockMaxConsumedUnits,
 			Credentials:        tx.Creds,
@@ -871,7 +871,7 @@ func TestImportTx(t *testing.T) {
 
 	{ // Pre E-Upgrade
 		feeCalc := &fees.Calculator{
-			IsEUpgradeActive: false,
+			IsEActive: false,
 			Config: &config.Config{
 				TxFee: testContext.BaseTxFee,
 			},
@@ -890,7 +890,7 @@ func TestImportTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := &fees.Calculator{
-			IsEUpgradeActive: false,
+			IsEActive: false,
 			Config: &config.Config{
 				TxFee: testContext.BaseTxFee,
 			},
@@ -953,7 +953,7 @@ func TestExportTx(t *testing.T) {
 
 	{ // Post E-Upgrade
 		feeCalc := &fees.Calculator{
-			IsEUpgradeActive:   true,
+			IsEActive:          true,
 			FeeManager:         commonfees.NewManager(testFeeRates),
 			BlockMaxComplexity: testBlockMaxConsumedUnits,
 			Codec:              builder.Parser.Codec(),
@@ -969,7 +969,7 @@ func TestExportTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := &fees.Calculator{
-			IsEUpgradeActive:   true,
+			IsEActive:          true,
 			FeeManager:         commonfees.NewManager(testFeeRates),
 			BlockMaxComplexity: testBlockMaxConsumedUnits,
 			Credentials:        tx.Creds,
@@ -992,7 +992,7 @@ func TestExportTx(t *testing.T) {
 
 	{ // Pre E-Upgrade
 		feeCalc := &fees.Calculator{
-			IsEUpgradeActive: false,
+			IsEActive: false,
 			Config: &config.Config{
 				TxFee: testContext.BaseTxFee,
 			},
@@ -1011,7 +1011,7 @@ func TestExportTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := &fees.Calculator{
-			IsEUpgradeActive: false,
+			IsEActive: false,
 			Config: &config.Config{
 				TxFee: testContext.BaseTxFee,
 			},

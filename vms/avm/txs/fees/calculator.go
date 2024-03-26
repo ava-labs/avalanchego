@@ -28,7 +28,7 @@ var (
 
 type Calculator struct {
 	// setup, to be filled before visitor methods are called
-	IsEUpgradeActive bool
+	IsEActive bool
 
 	// Pre E-Upgrade inputs
 	Config *config.Config
@@ -46,52 +46,52 @@ type Calculator struct {
 }
 
 func (fc *Calculator) BaseTx(tx *txs.BaseTx) error {
-	if !fc.IsEUpgradeActive {
+	if !fc.IsEActive {
 		fc.Fee = fc.Config.TxFee
 		return nil
 	}
 
-	consumedUnits, err := fc.meterTx(tx, tx.Outs, tx.Ins)
+	complexity, err := fc.meterTx(tx, tx.Outs, tx.Ins)
 	if err != nil {
 		return err
 	}
 
-	_, err = fc.AddFeesFor(consumedUnits)
+	_, err = fc.AddFeesFor(complexity)
 	return err
 }
 
 func (fc *Calculator) CreateAssetTx(tx *txs.CreateAssetTx) error {
-	if !fc.IsEUpgradeActive {
+	if !fc.IsEActive {
 		fc.Fee = fc.Config.CreateAssetTxFee
 		return nil
 	}
 
-	consumedUnits, err := fc.meterTx(tx, tx.Outs, tx.Ins)
+	complexity, err := fc.meterTx(tx, tx.Outs, tx.Ins)
 	if err != nil {
 		return err
 	}
 
-	_, err = fc.AddFeesFor(consumedUnits)
+	_, err = fc.AddFeesFor(complexity)
 	return err
 }
 
 func (fc *Calculator) OperationTx(tx *txs.OperationTx) error {
-	if !fc.IsEUpgradeActive {
+	if !fc.IsEActive {
 		fc.Fee = fc.Config.TxFee
 		return nil
 	}
 
-	consumedUnits, err := fc.meterTx(tx, tx.Outs, tx.Ins)
+	complexity, err := fc.meterTx(tx, tx.Outs, tx.Ins)
 	if err != nil {
 		return err
 	}
 
-	_, err = fc.AddFeesFor(consumedUnits)
+	_, err = fc.AddFeesFor(complexity)
 	return err
 }
 
 func (fc *Calculator) ImportTx(tx *txs.ImportTx) error {
-	if !fc.IsEUpgradeActive {
+	if !fc.IsEActive {
 		fc.Fee = fc.Config.TxFee
 		return nil
 	}
@@ -100,17 +100,17 @@ func (fc *Calculator) ImportTx(tx *txs.ImportTx) error {
 	copy(ins, tx.Ins)
 	copy(ins[len(tx.Ins):], tx.ImportedIns)
 
-	consumedUnits, err := fc.meterTx(tx, tx.Outs, ins)
+	complexity, err := fc.meterTx(tx, tx.Outs, ins)
 	if err != nil {
 		return err
 	}
 
-	_, err = fc.AddFeesFor(consumedUnits)
+	_, err = fc.AddFeesFor(complexity)
 	return err
 }
 
 func (fc *Calculator) ExportTx(tx *txs.ExportTx) error {
-	if !fc.IsEUpgradeActive {
+	if !fc.IsEActive {
 		fc.Fee = fc.Config.TxFee
 		return nil
 	}
@@ -119,12 +119,12 @@ func (fc *Calculator) ExportTx(tx *txs.ExportTx) error {
 	copy(outs, tx.Outs)
 	copy(outs[len(tx.Outs):], tx.ExportedOuts)
 
-	consumedUnits, err := fc.meterTx(tx, outs, tx.Ins)
+	complexity, err := fc.meterTx(tx, outs, tx.Ins)
 	if err != nil {
 		return err
 	}
 
-	_, err = fc.AddFeesFor(consumedUnits)
+	_, err = fc.AddFeesFor(complexity)
 	return err
 }
 
@@ -133,13 +133,13 @@ func (fc *Calculator) meterTx(
 	allOuts []*avax.TransferableOutput,
 	allIns []*avax.TransferableInput,
 ) (fees.Dimensions, error) {
-	var consumedUnits fees.Dimensions
+	var complexity fees.Dimensions
 
 	uTxSize, err := fc.Codec.Size(txs.CodecVersion, uTx)
 	if err != nil {
-		return consumedUnits, fmt.Errorf("couldn't calculate UnsignedTx marshal length: %w", err)
+		return complexity, fmt.Errorf("couldn't calculate UnsignedTx marshal length: %w", err)
 	}
-	consumedUnits[fees.Bandwidth] = uint64(uTxSize)
+	complexity[fees.Bandwidth] = uint64(uTxSize)
 
 	// meter credentials, one by one. Then account for the extra bytes needed to
 	// serialize a slice of credentials (codec version bytes + slice size bytes)
@@ -153,54 +153,54 @@ func (fc *Calculator) meterTx(
 		case *nftfx.Credential:
 			keysCount = len(c.Sigs)
 		default:
-			return consumedUnits, fmt.Errorf("don't know how to calculate complexity of %T", cred)
+			return complexity, fmt.Errorf("don't know how to calculate complexity of %T", cred)
 		}
 		credDimensions, err := fees.MeterCredential(fc.Codec, txs.CodecVersion, keysCount)
 		if err != nil {
-			return consumedUnits, fmt.Errorf("failed adding credential %d: %w", i, err)
+			return complexity, fmt.Errorf("failed adding credential %d: %w", i, err)
 		}
-		consumedUnits, err = fees.Add(consumedUnits, credDimensions)
+		complexity, err = fees.Add(complexity, credDimensions)
 		if err != nil {
-			return consumedUnits, fmt.Errorf("failed adding credentials: %w", err)
+			return complexity, fmt.Errorf("failed adding credentials: %w", err)
 		}
 	}
-	consumedUnits[fees.Bandwidth] += wrappers.IntLen // length of the credentials slice
-	consumedUnits[fees.Bandwidth] += codec.CodecVersionSize
+	complexity[fees.Bandwidth] += wrappers.IntLen // length of the credentials slice
+	complexity[fees.Bandwidth] += codec.CodecVersionSize
 
 	for _, in := range allIns {
 		inputDimensions, err := fees.MeterInput(fc.Codec, txs.CodecVersion, in)
 		if err != nil {
-			return consumedUnits, fmt.Errorf("failed retrieving size of inputs: %w", err)
+			return complexity, fmt.Errorf("failed retrieving size of inputs: %w", err)
 		}
 		inputDimensions[fees.Bandwidth] = 0 // inputs bandwidth is already accounted for above, so we zero it
-		consumedUnits, err = fees.Add(consumedUnits, inputDimensions)
+		complexity, err = fees.Add(complexity, inputDimensions)
 		if err != nil {
-			return consumedUnits, fmt.Errorf("failed adding inputs: %w", err)
+			return complexity, fmt.Errorf("failed adding inputs: %w", err)
 		}
 	}
 
 	for _, out := range allOuts {
 		outputDimensions, err := fees.MeterOutput(fc.Codec, txs.CodecVersion, out)
 		if err != nil {
-			return consumedUnits, fmt.Errorf("failed retrieving size of outputs: %w", err)
+			return complexity, fmt.Errorf("failed retrieving size of outputs: %w", err)
 		}
 		outputDimensions[fees.Bandwidth] = 0 // outputs bandwidth is already accounted for above, so we zero it
-		consumedUnits, err = fees.Add(consumedUnits, outputDimensions)
+		complexity, err = fees.Add(complexity, outputDimensions)
 		if err != nil {
-			return consumedUnits, fmt.Errorf("failed adding outputs: %w", err)
+			return complexity, fmt.Errorf("failed adding outputs: %w", err)
 		}
 	}
 
-	return consumedUnits, nil
+	return complexity, nil
 }
 
-func (fc *Calculator) AddFeesFor(consumedUnits fees.Dimensions) (uint64, error) {
-	boundBreached, dimension := fc.FeeManager.CumulateComplexity(consumedUnits, fc.BlockMaxComplexity)
+func (fc *Calculator) AddFeesFor(complexity fees.Dimensions) (uint64, error) {
+	boundBreached, dimension := fc.FeeManager.CumulateComplexity(complexity, fc.BlockMaxComplexity)
 	if boundBreached {
 		return 0, fmt.Errorf("%w: breached dimension %d", errFailedConsumedUnitsCumulation, dimension)
 	}
 
-	fee, err := fc.FeeManager.CalculateFee(consumedUnits)
+	fee, err := fc.FeeManager.CalculateFee(complexity)
 	if err != nil {
 		return 0, fmt.Errorf("%w: %w", errFailedFeeCalculation, err)
 	}

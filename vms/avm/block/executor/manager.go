@@ -181,12 +181,13 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 	}
 
 	var (
-		isEForkActive = m.backend.Config.IsEActivated(nextBlkTime)
-		feesCfg       = config.GetDynamicFeesConfig(isEForkActive)
+		chainTime = m.state.GetTimestamp()
+		isEActive = m.backend.Config.IsEActivated(chainTime)
+		feesCfg   = config.GetDynamicFeesConfig(isEActive)
 	)
 
 	feeManager := fees.NewManager(feeRates)
-	if isEForkActive {
+	if isEActive {
 		if err := feeManager.UpdateFeeRates(
 			feesCfg,
 			parentBlkComplexity,

@@ -193,7 +193,7 @@ func (w *wallet) IssueBaseTx(
 	var (
 		feesMan = commonfees.NewManager(w.feeRates)
 		feeCalc = &fees.Calculator{
-			IsEUpgradeActive: w.isEForkActive,
+			IsEActive: w.isEForkActive,
 			Config: &config.Config{
 				TxFee: w.builder.Context().BaseTxFee,
 			},
@@ -224,7 +224,7 @@ func (w *wallet) IssueCreateAssetTx(
 	var (
 		feesMan = commonfees.NewManager(w.feeRates)
 		feeCalc = &fees.Calculator{
-			IsEUpgradeActive: w.isEForkActive,
+			IsEActive: w.isEForkActive,
 			Config: &config.Config{
 				TxFee: w.builder.Context().BaseTxFee,
 			},
@@ -252,7 +252,7 @@ func (w *wallet) IssueOperationTx(
 	var (
 		feesMan = commonfees.NewManager(w.feeRates)
 		feeCalc = &fees.Calculator{
-			IsEUpgradeActive: w.isEForkActive,
+			IsEActive: w.isEForkActive,
 			Config: &config.Config{
 				TxFee: w.builder.Context().BaseTxFee,
 			},
@@ -280,7 +280,7 @@ func (w *wallet) IssueOperationTxMintFT(
 	var (
 		feesMan = commonfees.NewManager(w.feeRates)
 		feeCalc = &fees.Calculator{
-			IsEUpgradeActive: w.isEForkActive,
+			IsEActive: w.isEForkActive,
 			Config: &config.Config{
 				TxFee: w.builder.Context().BaseTxFee,
 			},
@@ -310,7 +310,7 @@ func (w *wallet) IssueOperationTxMintNFT(
 	var (
 		feesMan = commonfees.NewManager(w.feeRates)
 		feeCalc = &fees.Calculator{
-			IsEUpgradeActive: w.isEForkActive,
+			IsEActive: w.isEForkActive,
 			Config: &config.Config{
 				TxFee: w.builder.Context().BaseTxFee,
 			},
@@ -339,7 +339,7 @@ func (w *wallet) IssueOperationTxMintProperty(
 	var (
 		feesMan = commonfees.NewManager(w.feeRates)
 		feeCalc = &fees.Calculator{
-			IsEUpgradeActive: w.isEForkActive,
+			IsEActive: w.isEForkActive,
 			Config: &config.Config{
 				TxFee: w.builder.Context().BaseTxFee,
 			},
@@ -367,7 +367,7 @@ func (w *wallet) IssueOperationTxBurnProperty(
 	var (
 		feesMan = commonfees.NewManager(w.feeRates)
 		feeCalc = &fees.Calculator{
-			IsEUpgradeActive: w.isEForkActive,
+			IsEActive: w.isEForkActive,
 			Config: &config.Config{
 				TxFee: w.builder.Context().BaseTxFee,
 			},
@@ -396,7 +396,7 @@ func (w *wallet) IssueImportTx(
 	var (
 		feesMan = commonfees.NewManager(w.feeRates)
 		feeCalc = &fees.Calculator{
-			IsEUpgradeActive: w.isEForkActive,
+			IsEActive: w.isEForkActive,
 			Config: &config.Config{
 				TxFee: w.builder.Context().BaseTxFee,
 			},
@@ -425,7 +425,7 @@ func (w *wallet) IssueExportTx(
 	var (
 		feesMan = commonfees.NewManager(w.feeRates)
 		feeCalc = &fees.Calculator{
-			IsEUpgradeActive: w.isEForkActive,
+			IsEActive: w.isEForkActive,
 			Config: &config.Config{
 				TxFee: w.builder.Context().BaseTxFee,
 			},

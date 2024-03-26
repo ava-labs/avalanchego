@@ -92,8 +92,9 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 		inputs        set.Set[ids.ID]
 		remainingSize = targetBlockSize
 
-		isEForkActive = b.backend.Config.IsEActivated(nextBlkTime)
-		feesCfg       = config.GetDynamicFeesConfig(isEForkActive)
+		chainTime = stateDiff.GetTimestamp()
+		isEActive = b.backend.Config.IsEActivated(chainTime)
+		feesCfg   = config.GetDynamicFeesConfig(isEActive)
 	)
 
 	feeRates, err := stateDiff.GetFeeRates()
@@ -106,7 +107,7 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 	}
 
 	feeManager := fees.NewManager(feeRates)
-	if isEForkActive {
+	if isEActive {
 		if err := feeManager.UpdateFeeRates(
 			feesCfg,
 			parentBlkComplexity,
@@ -126,8 +127,8 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 
 		// pre e upgrade is active, we fill blocks till a target size
 		// post e upgrade is active, we fill blocks till a target complexity
-		done := (!isEForkActive && txSize > remainingSize) ||
-			(isEForkActive && !fees.Compare(feeManager.GetCumulatedComplexity(), feesCfg.BlockTargetComplexityRate))
+		done := (!isEActive && txSize > remainingSize) ||
+			(isEActive && !fees.Compare(feeManager.GetCumulatedComplexity(), feesCfg.BlockTargetComplexityRate))
 		if done {
 			break
 		}
@@ -183,7 +184,7 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 		txDiff.SetLastBlockComplexity(feeManager.GetCumulatedComplexity())
 		txDiff.Apply(stateDiff)
 
-		if isEForkActive {
+		if isEActive {
 			remainingSize -= txSize
 		}
 		blockTxs = append(blockTxs, tx)

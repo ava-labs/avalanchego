@@ -196,7 +196,7 @@ var _ = e2e.DescribeXChainSerial("[Virtuous Transfer Tx AVAX]", func() {
 				_, feeRates, err := xChainClient.GetFeeRates(e2e.DefaultContext())
 				require.NoError(err)
 				feeCalc := fees.Calculator{
-					IsEUpgradeActive:   true,
+					IsEActive:          true,
 					FeeManager:         commonfees.NewManager(feeRates),
 					BlockMaxComplexity: feeCfg.BlockMaxComplexity,
 					Codec:              xbuilder.Parser.Codec(),
