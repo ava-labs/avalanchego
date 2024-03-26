@@ -159,6 +159,76 @@ func TestGetMissingBlockIDs(t *testing.T) {
 	})
 }
 
+func TestProcess(t *testing.T) {
+	blocks := generateBlockchain(7)
+
+	db := memdb.New()
+	tree, err := interval.NewTree(db)
+	require.NoError(t, err)
+	lastAcceptedHeight := uint64(1)
+
+	t.Run("adding first block", func(t *testing.T) {
+		require := require.New(t)
+
+		missingIDs := set.Of(blocks[6].ID())
+		parentID, shouldFetchParentID, err := process(
+			db,
+			tree,
+			blocks[6],
+			map[ids.ID]snowman.Block{
+				blocks[2].ID(): blocks[2],
+			},
+			missingIDs,
+			lastAcceptedHeight,
+		)
+		require.NoError(err)
+		require.True(shouldFetchParentID)
+		require.Equal(blocks[5].ID(), parentID)
+		require.Equal(uint64(1), tree.Len())
+		require.Empty(missingIDs)
+	})
+
+	t.Run("adding multiple blocks", func(t *testing.T) {
+		require := require.New(t)
+
+		missingIDs := set.Of(blocks[5].ID())
+		parentID, shouldFetchParentID, err := process(
+			db,
+			tree,
+			blocks[5],
+			map[ids.ID]snowman.Block{
+				blocks[4].ID(): blocks[4],
+				blocks[3].ID(): blocks[3],
+			},
+			missingIDs,
+			lastAcceptedHeight,
+		)
+		require.NoError(err)
+		require.True(shouldFetchParentID)
+		require.Equal(blocks[2].ID(), parentID)
+		require.Equal(uint64(4), tree.Len())
+		require.Empty(missingIDs)
+	})
+
+	t.Run("do not request last accepted block", func(t *testing.T) {
+		require := require.New(t)
+
+		missingIDs := set.Of(blocks[2].ID())
+		_, shouldFetchParentID, err := process(
+			db,
+			tree,
+			blocks[2],
+			nil,
+			missingIDs,
+			lastAcceptedHeight,
+		)
+		require.NoError(err)
+		require.False(shouldFetchParentID)
+		require.Equal(uint64(5), tree.Len())
+		require.Empty(missingIDs)
+	})
+}
+
 func TestExecute(t *testing.T) {
 	require := require.New(t)
 
