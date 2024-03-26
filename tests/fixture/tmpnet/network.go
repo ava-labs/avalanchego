@@ -648,7 +648,7 @@ func (n *Network) CreateSubnets(ctx context.Context, w io.Writer) error {
 		// If one or more of the subnets chains have explicit configuration, the
 		// subnet's validator nodes will need to be restarted for those nodes to read
 		// the newly written chain configuration and apply it to the chain(s).
-		if subnet.HasChainConfig() {
+		if subnet.HasChainConfig() || subnet.HasUpgradeConfig() {
 			restartRequired = true
 		}
 	}

@@ -31,6 +31,7 @@ type Chain struct {
 	// Set statically
 	VMID    ids.ID
 	Config  string
+	Upgrade string
 	Genesis []byte
 
 	// Set at runtime
@@ -52,6 +53,24 @@ func (c *Chain) WriteConfig(chainDir string) error {
 	path := filepath.Join(chainConfigDir, defaultConfigFilename)
 	if err := os.WriteFile(path, []byte(c.Config), perms.ReadWrite); err != nil {
 		return fmt.Errorf("failed to write chain config: %w", err)
+	}
+
+	return nil
+}
+
+func (c *Chain) WriteUpgrade(chainDir string) error {
+	if len(c.Upgrade) == 0 {
+		return nil
+	}
+
+	upgradeConfigDir := filepath.Join(chainDir, c.ChainID.String())
+	if err := os.MkdirAll(upgradeConfigDir, perms.ReadWriteExecute); err != nil {
+		return fmt.Errorf("failed to create upgrade config dir: %w", err)
+	}
+
+	path := filepath.Join(upgradeConfigDir, defaultUpgradeFilename)
+	if err := os.WriteFile(path, []byte(c.Upgrade), perms.ReadWrite); err != nil {
+		return fmt.Errorf("failed to write upgrade upgrade: %w", err)
 	}
 
 	return nil
@@ -238,6 +257,9 @@ func (s *Subnet) Write(subnetDir string, chainDir string) error {
 		if err := chain.WriteConfig(chainDir); err != nil {
 			return err
 		}
+		if err := chain.WriteUpgrade(chainDir); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -250,6 +272,19 @@ func (s *Subnet) Write(subnetDir string, chainDir string) error {
 func (s *Subnet) HasChainConfig() bool {
 	for _, chain := range s.Chains {
 		if len(chain.Config) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+// HasUpgradeConfig indicates whether at least one of the subnet's
+// chains have explicit upgrade configuration. This can be used to
+// determine whether validator restart is required after chain
+// creation to ensure that chains are configured correctly.
+func (s *Subnet) HasUpgradeConfig() bool {
+	for _, chain := range s.Chains {
+		if len(chain.Upgrade) > 0 {
 			return true
 		}
 	}
