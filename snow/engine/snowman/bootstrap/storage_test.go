@@ -302,7 +302,7 @@ func TestExecuteExitsWhenHalted(t *testing.T) {
 
 	halter := common.Halter{}
 	halter.Halt(context.Background())
-	err = execute(
+	require.NoError(execute(
 		context.Background(),
 		&halter,
 		logging.NoLog{}.Info,
@@ -310,8 +310,7 @@ func TestExecuteExitsWhenHalted(t *testing.T) {
 		parser,
 		tree,
 		lastAcceptedHeight,
-	)
-	require.NoError(err)
+	))
 
 	for _, block := range blocks[lastAcceptedHeight+1:] {
 		require.Equal(choices.Processing, block.Status())
