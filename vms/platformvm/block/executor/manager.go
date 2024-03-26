@@ -147,12 +147,12 @@ func (m *manager) VerifyTx(tx *txs.Tx) (fees.TipPercentage, error) {
 	}
 
 	var (
-		isEActivated = m.txExecutorBackend.Config.IsEActivated(nextBlkTime)
-		feesCfg      = config.GetDynamicFeesConfig(isEActivated)
+		isEActive = m.txExecutorBackend.Config.IsEActivated(nextBlkTime)
+		feesCfg   = config.GetDynamicFeesConfig(isEActive)
 	)
 
 	feeManager := fees.NewManager(feeRates)
-	if isEActivated {
+	if isEActive {
 		if err := feeManager.UpdateFeeRates(
 			feesCfg,
 			parentBlkComplexity,

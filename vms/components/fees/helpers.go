@@ -15,40 +15,40 @@ import (
 )
 
 func MeterInput(c codec.Manager, v uint16, in *avax.TransferableInput) (Dimensions, error) {
-	var consumedUnits Dimensions
+	var complexity Dimensions
 	cost, err := in.In.Cost()
 	if err != nil {
-		return consumedUnits, fmt.Errorf("failed retrieving cost of input %s: %w", in.ID, err)
+		return complexity, fmt.Errorf("failed retrieving cost of input %s: %w", in.ID, err)
 	}
 
 	inSize, err := c.Size(v, in)
 	if err != nil {
-		return consumedUnits, fmt.Errorf("failed retrieving size of input %s: %w", in.ID, err)
+		return complexity, fmt.Errorf("failed retrieving size of input %s: %w", in.ID, err)
 	}
 	uInSize := uint64(inSize)
 
-	consumedUnits[Bandwidth] += uInSize - codec.CodecVersionSize
-	consumedUnits[UTXORead] += uInSize  // inputs are read
-	consumedUnits[UTXOWrite] += uInSize // inputs are deleted
-	consumedUnits[Compute] += cost
-	return consumedUnits, nil
+	complexity[Bandwidth] += uInSize - codec.CodecVersionSize
+	complexity[UTXORead] += uInSize  // inputs are read
+	complexity[UTXOWrite] += uInSize // inputs are deleted
+	complexity[Compute] += cost
+	return complexity, nil
 }
 
 func MeterOutput(c codec.Manager, v uint16, out *avax.TransferableOutput) (Dimensions, error) {
-	var consumedUnits Dimensions
+	var complexity Dimensions
 	outSize, err := c.Size(v, out)
 	if err != nil {
-		return consumedUnits, fmt.Errorf("failed retrieving size of output %s: %w", out.ID, err)
+		return complexity, fmt.Errorf("failed retrieving size of output %s: %w", out.ID, err)
 	}
 	uOutSize := uint64(outSize)
 
-	consumedUnits[Bandwidth] += uOutSize - codec.CodecVersionSize
-	consumedUnits[UTXOWrite] += uOutSize
-	return consumedUnits, nil
+	complexity[Bandwidth] += uOutSize - codec.CodecVersionSize
+	complexity[UTXOWrite] += uOutSize
+	return complexity, nil
 }
 
 func MeterCredential(c codec.Manager, v uint16, keysCount int) (Dimensions, error) {
-	var consumedUnits Dimensions
+	var complexity Dimensions
 
 	// Ensure that codec picks interface instead of the pointer to evaluate size.
 	creds := make([]verify.Verifiable, 0, 1)
@@ -58,10 +58,10 @@ func MeterCredential(c codec.Manager, v uint16, keysCount int) (Dimensions, erro
 
 	credSize, err := c.Size(v, creds)
 	if err != nil {
-		return consumedUnits, fmt.Errorf("failed retrieving size of credentials: %w", err)
+		return complexity, fmt.Errorf("failed retrieving size of credentials: %w", err)
 	}
 	credSize -= wrappers.IntLen // length of the slice, we want the single credential
 
-	consumedUnits[Bandwidth] += uint64(credSize) - codec.CodecVersionSize
-	return consumedUnits, nil
+	complexity[Bandwidth] += uint64(credSize) - codec.CodecVersionSize
+	return complexity, nil
 }

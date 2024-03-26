@@ -305,7 +305,7 @@ func (w *wallet) IssueBaseTx(
 		err error
 
 		feeCalc = &fees.Calculator{
-			IsEUpgradeActive: w.isEForkActive,
+			IsEActive: w.isEForkActive,
 			Config: &config.Config{
 				CreateSubnetTxFee: w.builder.Context().CreateSubnetTxFee,
 			},
@@ -333,7 +333,7 @@ func (w *wallet) IssueAddValidatorTx(
 	}
 
 	feeCalc := &fees.Calculator{
-		IsEUpgradeActive: w.isEForkActive,
+		IsEActive: w.isEForkActive,
 		Config: &config.Config{
 			AddPrimaryNetworkValidatorFee: w.builder.Context().AddPrimaryNetworkValidatorFee,
 		},
@@ -357,7 +357,7 @@ func (w *wallet) IssueAddSubnetValidatorTx(
 	}
 
 	feeCalc := &fees.Calculator{
-		IsEUpgradeActive: w.isEForkActive,
+		IsEActive: w.isEForkActive,
 		Config: &config.Config{
 			TxFee: w.builder.Context().BaseTxFee,
 		},
@@ -383,7 +383,7 @@ func (w *wallet) IssueRemoveSubnetValidatorTx(
 	}
 
 	feeCalc := &fees.Calculator{
-		IsEUpgradeActive: w.isEForkActive,
+		IsEActive: w.isEForkActive,
 		Config: &config.Config{
 			TxFee: w.builder.Context().BaseTxFee,
 		},
@@ -409,7 +409,7 @@ func (w *wallet) IssueAddDelegatorTx(
 	}
 
 	feeCalc := &fees.Calculator{
-		IsEUpgradeActive: w.isEForkActive,
+		IsEActive: w.isEForkActive,
 		Config: &config.Config{
 			AddPrimaryNetworkDelegatorFee: w.builder.Context().AddPrimaryNetworkDelegatorFee,
 		},
@@ -437,7 +437,7 @@ func (w *wallet) IssueCreateChainTx(
 	}
 
 	feeCalc := &fees.Calculator{
-		IsEUpgradeActive: w.isEForkActive,
+		IsEActive: w.isEForkActive,
 		Config: &config.Config{
 			CreateBlockchainTxFee: w.builder.Context().CreateBlockchainTxFee,
 		},
@@ -462,7 +462,7 @@ func (w *wallet) IssueCreateSubnetTx(
 	}
 
 	feeCalc := &fees.Calculator{
-		IsEUpgradeActive: w.isEForkActive,
+		IsEActive: w.isEForkActive,
 		Config: &config.Config{
 			CreateSubnetTxFee: w.builder.Context().CreateSubnetTxFee,
 		},
@@ -486,7 +486,7 @@ func (w *wallet) IssueTransferSubnetOwnershipTx(
 	}
 
 	feeCalc := &fees.Calculator{
-		IsEUpgradeActive: w.isEForkActive,
+		IsEActive: w.isEForkActive,
 		Config: &config.Config{
 			TxFee: w.builder.Context().BaseTxFee,
 		},
@@ -511,7 +511,7 @@ func (w *wallet) IssueImportTx(
 	}
 
 	feeCalc := &fees.Calculator{
-		IsEUpgradeActive: w.isEForkActive,
+		IsEActive: w.isEForkActive,
 		Config: &config.Config{
 			TxFee: w.builder.Context().BaseTxFee,
 		},
@@ -537,7 +537,7 @@ func (w *wallet) IssueExportTx(
 	}
 
 	feeCalc := &fees.Calculator{
-		IsEUpgradeActive: w.isEForkActive,
+		IsEActive: w.isEForkActive,
 		Config: &config.Config{
 			TxFee: w.builder.Context().BaseTxFee,
 		},
@@ -575,7 +575,7 @@ func (w *wallet) IssueTransformSubnetTx(
 	}
 
 	feeCalc := &fees.Calculator{
-		IsEUpgradeActive: w.isEForkActive,
+		IsEActive: w.isEForkActive,
 		Config: &config.Config{
 			TransformSubnetTxFee: w.builder.Context().TransformSubnetTxFee,
 		},
@@ -621,7 +621,7 @@ func (w *wallet) IssueAddPermissionlessValidatorTx(
 	}
 
 	feeCalc := &fees.Calculator{
-		IsEUpgradeActive: w.isEForkActive,
+		IsEActive: w.isEForkActive,
 		Config: &config.Config{
 			AddPrimaryNetworkValidatorFee: w.builder.Context().AddPrimaryNetworkValidatorFee,
 			AddSubnetValidatorFee:         w.builder.Context().AddSubnetValidatorFee,
@@ -658,7 +658,7 @@ func (w *wallet) IssueAddPermissionlessDelegatorTx(
 	}
 
 	feeCalc := &fees.Calculator{
-		IsEUpgradeActive: w.isEForkActive,
+		IsEActive: w.isEForkActive,
 		Config: &config.Config{
 			AddPrimaryNetworkDelegatorFee: w.builder.Context().AddPrimaryNetworkDelegatorFee,
 			AddSubnetDelegatorFee:         w.builder.Context().AddSubnetDelegatorFee,

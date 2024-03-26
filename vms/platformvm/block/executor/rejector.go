@@ -124,7 +124,7 @@ func (r *rejector) rejectBlock(b block.Block, blockType string) error {
 		feeManager.ResetComplexity()
 
 		feeCalculator := fees.Calculator{
-			IsEUpgradeActive:   isEActive,
+			IsEActive:          isEActive,
 			Config:             cfg,
 			ChainTime:          currentTimestamp,
 			FeeManager:         feeManager,

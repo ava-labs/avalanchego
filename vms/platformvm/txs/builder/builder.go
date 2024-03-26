@@ -863,16 +863,16 @@ func (b *builder) feeCalculator() (*fees.Calculator, error) {
 	}
 
 	var (
-		chainTime        = b.state.GetTimestamp()
-		feeCfg           = config.GetDynamicFeesConfig(b.cfg.IsEActivated(chainTime))
-		isEUpgradeActive = b.cfg.IsEActivated(chainTime)
+		chainTime = b.state.GetTimestamp()
+		feeCfg    = config.GetDynamicFeesConfig(b.cfg.IsEActivated(chainTime))
+		isEActive = b.cfg.IsEActivated(chainTime)
 	)
 
 	return &fees.Calculator{
-		IsEUpgradeActive: isEUpgradeActive,
-		Config:           b.cfg,
-		ChainTime:        chainTime,
-		FeeManager:       commonfees.NewManager(feeRates),
+		IsEActive:  isEActive,
+		Config:     b.cfg,
+		ChainTime:  chainTime,
+		FeeManager: commonfees.NewManager(feeRates),
 		// TipPercentage is added via options
 		BlockMaxComplexity: feeCfg.BlockMaxComplexity,
 	}, nil

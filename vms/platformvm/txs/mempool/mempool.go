@@ -120,7 +120,7 @@ func New(
 	return m, err
 }
 
-func (m *mempool) Add(tx *txs.Tx, tipPercentage commonfees.TipPercentage) error {
+func (m *mempool) Add(tx *txs.Tx, _ commonfees.TipPercentage) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 

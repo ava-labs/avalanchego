@@ -76,7 +76,7 @@ func (e *StandardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 
 	// Verify the flowcheck
 	feeCalculator := fees.Calculator{
-		IsEUpgradeActive:   isEActive,
+		IsEActive:          isEActive,
 		Config:             e.Backend.Config,
 		ChainTime:          currentTimestamp,
 		FeeManager:         e.BlkFeeManager,
@@ -142,7 +142,7 @@ func (e *StandardTxExecutor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 
 	// Verify the flowcheck
 	feeCalculator := fees.Calculator{
-		IsEUpgradeActive:   isEActive,
+		IsEActive:          isEActive,
 		Config:             e.Backend.Config,
 		ChainTime:          currentTimestamp,
 		FeeManager:         e.BlkFeeManager,
@@ -247,7 +247,7 @@ func (e *StandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 			currentTimestamp = e.State.GetTimestamp()
 		)
 		feeCalculator := fees.Calculator{
-			IsEUpgradeActive:   isEActive,
+			IsEActive:          isEActive,
 			Config:             cfg,
 			ChainTime:          currentTimestamp,
 			FeeManager:         e.BlkFeeManager,
@@ -320,7 +320,7 @@ func (e *StandardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 
 	// Verify the flowcheck
 	feeCalculator := fees.Calculator{
-		IsEUpgradeActive:   isEActive,
+		IsEActive:          isEActive,
 		Config:             e.Backend.Config,
 		ChainTime:          currentTimestamp,
 		FeeManager:         e.BlkFeeManager,
@@ -535,7 +535,7 @@ func (e *StandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 	}
 
 	feeCalculator := fees.Calculator{
-		IsEUpgradeActive:   isEActive,
+		IsEActive:          isEActive,
 		Config:             e.Backend.Config,
 		ChainTime:          currentTimestamp,
 		FeeManager:         e.BlkFeeManager,
@@ -693,7 +693,7 @@ func (e *StandardTxExecutor) BaseTx(tx *txs.BaseTx) error {
 
 	// Verify the flowcheck
 	feeCalculator := fees.Calculator{
-		IsEUpgradeActive:   isEActive,
+		IsEActive:          isEActive,
 		Config:             cfg,
 		ChainTime:          currentTimestamp,
 		FeeManager:         e.BlkFeeManager,
