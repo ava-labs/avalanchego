@@ -4,7 +4,6 @@
 package interval
 
 import (
-	"encoding/binary"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -158,12 +157,4 @@ func TestRemove(t *testing.T) {
 	_, err = GetBlock(db, height)
 	require.ErrorIs(err, database.ErrNotFound)
 	require.Zero(tree.Len())
-}
-
-func generateBlockchain(length uint64) [][]byte {
-	blocks := make([][]byte, length)
-	for i := range blocks {
-		blocks[i] = binary.AppendUvarint(nil, uint64(i))
-	}
-	return blocks
 }
