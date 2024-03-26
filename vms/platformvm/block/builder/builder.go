@@ -43,11 +43,6 @@ var (
 	errCalculatingNextStakerTime = errors.New("failed calculating next staker time")
 )
 
-type TxAndTipPercentage struct {
-	Tx            *txs.Tx
-	TipPercentage commonfees.TipPercentage
-}
-
 type Builder interface {
 	mempool.Mempool
 
@@ -73,7 +68,7 @@ type Builder interface {
 	// preferred state.
 	//
 	// Note: This function does not call the consensus engine.
-	PackBlockTxs(targetBlockSize int) ([]TxAndTipPercentage, error)
+	PackBlockTxs(targetBlockSize int) ([]mempool.TxAndTipPercentage, error)
 }
 
 // builder implements a simple builder to convert txs into valid blocks
@@ -243,7 +238,7 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 	return b.blkManager.NewBlock(statelessBlk), nil
 }
 
-func (b *builder) PackBlockTxs(targetBlockSize int) ([]TxAndTipPercentage, error) {
+func (b *builder) PackBlockTxs(targetBlockSize int) ([]mempool.TxAndTipPercentage, error) {
 	preferredID := b.blkManager.Preferred()
 	preferredState, ok := b.blkManager.GetState(preferredID)
 	if !ok {
@@ -328,12 +323,12 @@ func buildBlock(
 func packBlockTxs(
 	parentID ids.ID,
 	parentState state.Chain,
-	mempool mempool.Mempool,
+	mpool mempool.Mempool,
 	backend *txexecutor.Backend,
 	manager blockexecutor.Manager,
 	timestamp time.Time,
 	remainingSize int,
-) ([]TxAndTipPercentage, error) {
+) ([]mempool.TxAndTipPercentage, error) {
 	// retrieve parent block time before moving time forward
 	parentBlkTime := parentState.GetTimestamp()
 
@@ -359,7 +354,7 @@ func packBlockTxs(
 		isEActivated = backend.Config.IsEActivated(timestamp)
 		feeCfg       = config.GetDynamicFeesConfig(isEActivated)
 
-		blockTxs []TxAndTipPercentage
+		blockTxs []mempool.TxAndTipPercentage
 		inputs   set.Set[ids.ID]
 	)
 
@@ -376,7 +371,7 @@ func packBlockTxs(
 	}
 
 	for {
-		tx, exists := mempool.Peek()
+		tx, exists := mpool.Peek()
 		if !exists {
 			break
 		}
@@ -390,7 +385,7 @@ func packBlockTxs(
 		if targetSizeReached {
 			break
 		}
-		mempool.Remove(tx)
+		mpool.Remove(tx)
 
 		// Invariant: [tx] has already been syntactically verified.
 
@@ -410,19 +405,19 @@ func packBlockTxs(
 		err = tx.Unsigned.Visit(executor)
 		if err != nil {
 			txID := tx.ID()
-			mempool.MarkDropped(txID, err)
+			mpool.MarkDropped(txID, err)
 			continue
 		}
 
 		if inputs.Overlaps(executor.Inputs) {
 			txID := tx.ID()
-			mempool.MarkDropped(txID, blockexecutor.ErrConflictingBlockTxs)
+			mpool.MarkDropped(txID, blockexecutor.ErrConflictingBlockTxs)
 			continue
 		}
 		err = manager.VerifyUniqueInputs(parentID, executor.Inputs)
 		if err != nil {
 			txID := tx.ID()
-			mempool.MarkDropped(txID, err)
+			mpool.MarkDropped(txID, err)
 			continue
 		}
 		inputs.Union(executor.Inputs)
@@ -436,7 +431,7 @@ func packBlockTxs(
 		if !isEActivated {
 			remainingSize -= txSize
 		}
-		blockTxs = append(blockTxs, TxAndTipPercentage{
+		blockTxs = append(blockTxs, mempool.TxAndTipPercentage{
 			Tx:            tx,
 			TipPercentage: executor.TipPercentage,
 		})

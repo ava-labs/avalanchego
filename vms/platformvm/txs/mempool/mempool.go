@@ -77,12 +77,12 @@ type Mempool interface {
 	Len() int
 }
 
-type TxAndTipPercent struct {
+type TxAndTipPercentage struct {
 	Tx            *txs.Tx
 	TipPercentage commonfees.TipPercentage
 }
 
-func lessTxAndTipPercent(a TxAndTipPercent, b TxAndTipPercent) bool {
+func lessTxAndTipPercent(a TxAndTipPercentage, b TxAndTipPercentage) bool {
 	switch {
 	case a.TipPercentage < b.TipPercentage:
 		return true
@@ -106,7 +106,7 @@ type mempool struct {
 	unissuedTxs linkedhashmap.LinkedHashmap[ids.ID, *txs.Tx]
 
 	// Following E upgrade activation, mempool transactions are sorted by tip percentage
-	unissuedTxsByTipPercentage heap.Map[ids.ID, TxAndTipPercent]
+	unissuedTxsByTipPercentage heap.Map[ids.ID, TxAndTipPercentage]
 
 	consumedUTXOs  *setmap.SetMap[ids.ID, ids.ID] // TxID -> Consumed UTXOs
 	bytesAvailable int
@@ -125,7 +125,7 @@ func New(
 ) (Mempool, error) {
 	m := &mempool{
 		unissuedTxs:                linkedhashmap.New[ids.ID, *txs.Tx](),
-		unissuedTxsByTipPercentage: heap.NewMap[ids.ID, TxAndTipPercent](lessTxAndTipPercent),
+		unissuedTxsByTipPercentage: heap.NewMap[ids.ID, TxAndTipPercentage](lessTxAndTipPercent),
 		consumedUTXOs:              setmap.New[ids.ID, ids.ID](),
 		bytesAvailable:             maxMempoolSize,
 		droppedTxIDs:               &cache.LRU[ids.ID, error]{Size: droppedTxIDsCacheSize},
@@ -197,7 +197,7 @@ func (m *mempool) Add(tx *txs.Tx, tipPercentage commonfees.TipPercentage) error 
 	}
 
 	m.unissuedTxs.Put(txID, tx)
-	m.unissuedTxsByTipPercentage.Push(txID, TxAndTipPercent{
+	m.unissuedTxsByTipPercentage.Push(txID, TxAndTipPercentage{
 		Tx:            tx,
 		TipPercentage: tipPercentage,
 	})
@@ -258,7 +258,7 @@ func (m *mempool) Peek() (*txs.Tx, bool) {
 	if !m.isEUpgradeActive.Get() {
 		_, tx, exists = m.unissuedTxs.Oldest()
 	} else {
-		var v TxAndTipPercent
+		var v TxAndTipPercentage
 		_, v, exists = m.unissuedTxsByTipPercentage.Peek()
 		tx = v.Tx
 	}
