@@ -154,9 +154,11 @@ HOME
             ├── config.json                              // Common configuration (including defaults and pre-funded keys)
             ├── genesis.json                             // Genesis for all nodes
             ├── network.env                              // Sets network dir env var to simplify network usage
-            └── subnets                                  // Parent directory for subnet definitions
-                ├─ subnet-a.json                         // Configuration for subnet-a and its chain(s)
-                └─ subnet-b.json                         // Configuration for subnet-b and its chain(s)
+            └── subnets                                  // Directory containing subnet config for both avalanchego and tmpnet
+                ├── subnet-a.json                        // tmpnet configuration for subnet-a and its chain(s)
+                ├── subnet-b.json                        // tmpnet configuration for subnet-b and its chain(s)
+                └── 2jRbWtaonb2RP8DEM5DBsd7o2o8d...RqNs9 // The ID of a subnet is the name of its configuration dir
+                    └── config.json                      // avalanchego configuration for subnet
 ```
 
 ### Common networking configuration

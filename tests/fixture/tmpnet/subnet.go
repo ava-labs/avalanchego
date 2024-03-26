@@ -30,8 +30,8 @@ const defaultSubnetDirName = "subnets"
 type Chain struct {
 	// Set statically
 	VMID    ids.ID
-	Config  string
-	Genesis []byte
+	Config  FlagsMap
+	Genesis FlagsMap
 
 	// Set at runtime
 	ChainID      ids.ID
@@ -40,6 +40,7 @@ type Chain struct {
 
 // Write the chain configuration to the specified directory.
 func (c *Chain) WriteConfig(chainDir string) error {
+	// TODO(marun) Ensure removal of an existing file if no configuration should be provided
 	if len(c.Config) == 0 {
 		return nil
 	}
@@ -49,8 +50,12 @@ func (c *Chain) WriteConfig(chainDir string) error {
 		return fmt.Errorf("failed to create chain config dir: %w", err)
 	}
 
+	bytes, err := DefaultJSONMarshal(c.Config)
+	if err != nil {
+		return fmt.Errorf("failed to marshal config for chain %s: %w", c.ChainID, err)
+	}
 	path := filepath.Join(chainConfigDir, defaultConfigFilename)
-	if err := os.WriteFile(path, []byte(c.Config), perms.ReadWrite); err != nil {
+	if err := os.WriteFile(path, bytes, perms.ReadWrite); err != nil {
 		return fmt.Errorf("failed to write chain config: %w", err)
 	}
 
@@ -61,6 +66,8 @@ type Subnet struct {
 	// A unique string that can be used to refer to the subnet across different temporary
 	// networks (since the SubnetID will be different every time the subnet is created)
 	Name string
+
+	Config FlagsMap
 
 	// The ID of the transaction that created the subnet
 	SubnetID ids.ID
@@ -131,9 +138,13 @@ func (s *Subnet) CreateChains(ctx context.Context, w io.Writer, uri string) erro
 	}
 
 	for _, chain := range s.Chains {
+		genesisBytes, err := DefaultJSONMarshal(chain.Genesis)
+		if err != nil {
+			return fmt.Errorf("failed to marshal genesis for chain %s: %w", chain.VMID, err)
+		}
 		createChainTx, err := pWallet.IssueCreateChainTx(
 			s.SubnetID,
-			chain.Genesis,
+			genesisBytes,
 			chain.VMID,
 			nil,
 			"",
@@ -152,7 +163,7 @@ func (s *Subnet) CreateChains(ctx context.Context, w io.Writer, uri string) erro
 }
 
 // Add validators to the subnet
-func (s *Subnet) AddValidators(ctx context.Context, w io.Writer, nodes []*Node) error {
+func (s *Subnet) AddValidators(ctx context.Context, w io.Writer, nodes ...*Node) error {
 	apiURI := nodes[0].URI
 
 	wallet, err := s.GetWallet(ctx, apiURI)
@@ -198,8 +209,6 @@ func (s *Subnet) AddValidators(ctx context.Context, w io.Writer, nodes []*Node) 
 		if _, err := fmt.Fprintf(w, " added %s as validator for subnet `%s`\n", node.NodeID, s.Name); err != nil {
 			return err
 		}
-
-		s.ValidatorIDs = append(s.ValidatorIDs, node.NodeID)
 	}
 
 	return nil
@@ -210,14 +219,14 @@ func (s *Subnet) Write(subnetDir string, chainDir string) error {
 	if err := os.MkdirAll(subnetDir, perms.ReadWriteExecute); err != nil {
 		return fmt.Errorf("failed to create subnet dir: %w", err)
 	}
-	path := filepath.Join(subnetDir, s.Name+".json")
+	tmpnetConfigPath := filepath.Join(subnetDir, s.Name+".json")
 
 	// Since subnets are expected to be serialized for the first time
 	// without their chains having been created (i.e. chains will have
 	// empty IDs), use the absence of chain IDs as a prompt for a
-	// subnet name uniquness check.
+	// subnet name uniqueness check.
 	if len(s.Chains) > 0 && s.Chains[0].ChainID == ids.Empty {
-		_, err := os.Stat(path)
+		_, err := os.Stat(tmpnetConfigPath)
 		if err != nil && !os.IsNotExist(err) {
 			return err
 		}
@@ -226,12 +235,39 @@ func (s *Subnet) Write(subnetDir string, chainDir string) error {
 		}
 	}
 
+	// Write subnet configuration for tmpnet
 	bytes, err := DefaultJSONMarshal(s)
 	if err != nil {
-		return fmt.Errorf("failed to marshal subnet %s: %w", s.Name, err)
+		return fmt.Errorf("failed to marshal tmpnet subnet %s: %w", s.Name, err)
 	}
-	if err := os.WriteFile(path, bytes, perms.ReadWrite); err != nil {
-		return fmt.Errorf("failed to write subnet %s: %w", s.Name, err)
+	if err := os.WriteFile(tmpnetConfigPath, bytes, perms.ReadWrite); err != nil {
+		return fmt.Errorf("failed to write tmpnet subnet config %s: %w", s.Name, err)
+	}
+
+	// The subnet and chain configurations for avalanchego can only be written once
+	// they have been created since the id of the creating transaction must be
+	// included in the path.
+	if s.SubnetID == ids.Empty {
+		return nil
+	}
+
+	// TODO(marun) Ensure removal of an existing file if no configuration should be provided
+	if len(s.Config) > 0 {
+		// Write subnet configuration for avalanchego
+		bytes, err = DefaultJSONMarshal(s.Config)
+		if err != nil {
+			return fmt.Errorf("failed to marshal avalanchego subnet config %s: %w", s.Name, err)
+		}
+
+		avgoConfigDir := filepath.Join(subnetDir, s.SubnetID.String())
+		if err := os.MkdirAll(avgoConfigDir, perms.ReadWriteExecute); err != nil {
+			return fmt.Errorf("failed to create avalanchego subnet config dir: %w", err)
+		}
+
+		avgoConfigPath := filepath.Join(avgoConfigDir, defaultConfigFilename)
+		if err := os.WriteFile(avgoConfigPath, bytes, perms.ReadWrite); err != nil {
+			return fmt.Errorf("failed to write avalanchego subnet config %s: %w", s.Name, err)
+		}
 	}
 
 	for _, chain := range s.Chains {
