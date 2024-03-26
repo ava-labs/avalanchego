@@ -649,10 +649,8 @@ func (b *Bootstrapper) tryStartExecuting(ctx context.Context) error {
 
 	numToExecute := b.tree.Len()
 	err = execute(
-		&haltableContext{
-			Context:  ctx,
-			Haltable: b,
-		},
+		ctx,
+		b,
 		log,
 		b.DB,
 		&parseAcceptor{
@@ -663,10 +661,7 @@ func (b *Bootstrapper) tryStartExecuting(ctx context.Context) error {
 		b.tree,
 		lastAcceptedHeight,
 	)
-	if errors.Is(err, errHalted) {
-		return nil
-	}
-	if err != nil {
+	if err != nil || b.Halted() {
 		return err
 	}
 
