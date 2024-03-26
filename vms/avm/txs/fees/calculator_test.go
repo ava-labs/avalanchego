@@ -130,7 +130,7 @@ func TestBaseTxFees(t *testing.T) {
 				caps[fees.UTXORead] = 90 - 1
 				return caps
 			},
-			expectedError: errFailedConsumedUnitsCumulation,
+			expectedError: errFailedComplexityCumulation,
 			checksF:       func(*testing.T, *Calculator) {},
 		},
 	}
@@ -248,7 +248,7 @@ func TestCreateAssetTxFees(t *testing.T) {
 				caps[fees.Bandwidth] = 289 - 1
 				return caps
 			},
-			expectedError: errFailedConsumedUnitsCumulation,
+			expectedError: errFailedComplexityCumulation,
 			checksF:       func(*testing.T, *Calculator) {},
 		},
 	}
@@ -366,7 +366,7 @@ func TestOperationTxFees(t *testing.T) {
 				caps[fees.UTXORead] = 90 - 1
 				return caps
 			},
-			expectedError: errFailedConsumedUnitsCumulation,
+			expectedError: errFailedComplexityCumulation,
 			checksF:       func(*testing.T, *Calculator) {},
 		},
 	}
@@ -480,7 +480,7 @@ func TestImportTxFees(t *testing.T) {
 				caps[fees.UTXORead] = 180 - 1
 				return caps
 			},
-			expectedError: errFailedConsumedUnitsCumulation,
+			expectedError: errFailedComplexityCumulation,
 			checksF:       func(*testing.T, *Calculator) {},
 		},
 	}
@@ -584,7 +584,7 @@ func TestExportTxFees(t *testing.T) {
 				caps[fees.UTXORead] = 90 - 1
 				return caps
 			},
-			expectedError: errFailedConsumedUnitsCumulation,
+			expectedError: errFailedComplexityCumulation,
 			checksF:       func(*testing.T, *Calculator) {},
 		},
 	}

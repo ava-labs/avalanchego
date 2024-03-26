@@ -22,8 +22,8 @@ import (
 var (
 	_ txs.Visitor = (*Calculator)(nil)
 
-	errFailedFeeCalculation          = errors.New("failed fee calculation")
-	errFailedConsumedUnitsCumulation = errors.New("failed cumulating consumed units")
+	errFailedFeeCalculation       = errors.New("failed fee calculation")
+	errFailedComplexityCumulation = errors.New("failed cumulating complexity")
 )
 
 type Calculator struct {
@@ -37,6 +37,10 @@ type Calculator struct {
 	FeeManager         *fees.Manager
 	BlockMaxComplexity fees.Dimensions
 	Codec              codec.Manager
+
+	// TipPercentage can either be an input (e.g. when building a transaction)
+	// or an output (once a transaction is verified)
+	TipPercentage fees.TipPercentage
 
 	// common inputs
 	Credentials []*fxs.FxCredential
@@ -56,7 +60,7 @@ func (fc *Calculator) BaseTx(tx *txs.BaseTx) error {
 		return err
 	}
 
-	_, err = fc.AddFeesFor(complexity)
+	_, err = fc.AddFeesFor(complexity, fc.TipPercentage)
 	return err
 }
 
@@ -71,7 +75,7 @@ func (fc *Calculator) CreateAssetTx(tx *txs.CreateAssetTx) error {
 		return err
 	}
 
-	_, err = fc.AddFeesFor(complexity)
+	_, err = fc.AddFeesFor(complexity, fc.TipPercentage)
 	return err
 }
 
@@ -86,7 +90,7 @@ func (fc *Calculator) OperationTx(tx *txs.OperationTx) error {
 		return err
 	}
 
-	_, err = fc.AddFeesFor(complexity)
+	_, err = fc.AddFeesFor(complexity, fc.TipPercentage)
 	return err
 }
 
@@ -105,7 +109,7 @@ func (fc *Calculator) ImportTx(tx *txs.ImportTx) error {
 		return err
 	}
 
-	_, err = fc.AddFeesFor(complexity)
+	_, err = fc.AddFeesFor(complexity, fc.TipPercentage)
 	return err
 }
 
@@ -124,7 +128,7 @@ func (fc *Calculator) ExportTx(tx *txs.ExportTx) error {
 		return err
 	}
 
-	_, err = fc.AddFeesFor(complexity)
+	_, err = fc.AddFeesFor(complexity, fc.TipPercentage)
 	return err
 }
 
@@ -194,31 +198,50 @@ func (fc *Calculator) meterTx(
 	return complexity, nil
 }
 
-func (fc *Calculator) AddFeesFor(complexity fees.Dimensions) (uint64, error) {
+func (fc *Calculator) AddFeesFor(complexity fees.Dimensions, tipPercentage fees.TipPercentage) (uint64, error) {
 	boundBreached, dimension := fc.FeeManager.CumulateComplexity(complexity, fc.BlockMaxComplexity)
 	if boundBreached {
-		return 0, fmt.Errorf("%w: breached dimension %d", errFailedConsumedUnitsCumulation, dimension)
+		return 0, fmt.Errorf("%w: breached dimension %d", errFailedComplexityCumulation, dimension)
 	}
 
-	fee, err := fc.FeeManager.CalculateFee(complexity)
+	fee, err := fc.FeeManager.CalculateFee(complexity, tipPercentage)
 	if err != nil {
 		return 0, fmt.Errorf("%w: %w", errFailedFeeCalculation, err)
 	}
-
 	fc.Fee += fee
 	return fee, nil
 }
 
-func (fc *Calculator) RemoveFeesFor(unitsToRm fees.Dimensions) (uint64, error) {
+func (fc *Calculator) RemoveFeesFor(unitsToRm fees.Dimensions, tipPercentage fees.TipPercentage) (uint64, error) {
 	if err := fc.FeeManager.RemoveComplexity(unitsToRm); err != nil {
 		return 0, fmt.Errorf("failed removing units: %w", err)
 	}
 
-	fee, err := fc.FeeManager.CalculateFee(unitsToRm)
+	fee, err := fc.FeeManager.CalculateFee(unitsToRm, tipPercentage)
 	if err != nil {
 		return 0, fmt.Errorf("%w: %w", errFailedFeeCalculation, err)
 	}
 
 	fc.Fee -= fee
 	return fee, nil
+}
+
+// CalculateTipPercentage calculates and sets the tip percentage, given the fees actually paid
+// and the fees required to accept the target transaction.
+// [CalculateTipPercentage] requires that fc.Visit has been called for the target transaction.
+func (fc *Calculator) CalculateTipPercentage(feesPaid uint64) error {
+	if feesPaid < fc.Fee {
+		return fmt.Errorf("fees paid are less the required fees: fees paid %v, fees required %v",
+			feesPaid,
+			fc.Fee,
+		)
+	}
+
+	if fc.Fee == 0 {
+		return nil
+	}
+
+	tip := feesPaid - fc.Fee
+	fc.TipPercentage = fees.TipPercentage(tip * fees.MaxTipPercentage / fc.Fee)
+	return fc.TipPercentage.Validate()
 }

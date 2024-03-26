@@ -246,7 +246,7 @@ func (b *builder) NewBaseTx(
 		toBurn[assetID] = amountToBurn
 	}
 
-	// feesMan cumulates consumed units. Let's init it with utx filled so far
+	// feesMan cumulates complexity. Let's init it with utx filled so far
 	if err := feeCalc.BaseTx(utx); err != nil {
 		return nil, err
 	}
@@ -303,7 +303,7 @@ func (b *builder) NewCreateAssetTx(
 	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
 	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
 
-	// feesMan cumulates consumed units. Let's init it with utx filled so far
+	// feesMan cumulates complexity. Let's init it with utx filled so far
 	if err := feeCalc.CreateAssetTx(utx); err != nil {
 		return nil, err
 	}
@@ -341,7 +341,7 @@ func (b *builder) NewOperationTx(
 	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
 	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
 
-	// feesMan cumulates consumed units. Let's init it with utx filled so far
+	// feesMan cumulates complexity. Let's init it with utx filled so far
 	if err := feeCalc.OperationTx(utx); err != nil {
 		return nil, err
 	}
@@ -508,7 +508,7 @@ func (b *builder) NewImportTx(
 
 	// 3. Finance fees as much as possible with imported, Avax-denominated UTXOs
 
-	// feesMan cumulates consumed units. Let's init it with utx filled so far
+	// feesMan cumulates complexity. Let's init it with utx filled so far
 	if err := feeCalc.ImportTx(utx); err != nil {
 		return nil, err
 	}
@@ -543,7 +543,7 @@ func (b *builder) NewImportTx(
 		if err != nil {
 			return nil, fmt.Errorf("failed calculating output size: %w", err)
 		}
-		if _, err := feeCalc.AddFeesFor(outDimensions); err != nil {
+		if _, err := feeCalc.AddFeesFor(outDimensions, feeCalc.TipPercentage); err != nil {
 			return nil, fmt.Errorf("account for output fees: %w", err)
 		}
 
@@ -562,7 +562,7 @@ func (b *builder) NewImportTx(
 		default:
 			// imported avax are not enough to pay fees
 			// Drop the changeOut and finance the tx
-			if _, err := feeCalc.RemoveFeesFor(outDimensions); err != nil {
+			if _, err := feeCalc.RemoveFeesFor(outDimensions, feeCalc.TipPercentage); err != nil {
 				return nil, fmt.Errorf("failed reverting change output: %w", err)
 			}
 			feeCalc.Fee -= importedAVAX
@@ -612,7 +612,7 @@ func (b *builder) NewExportTx(
 		toBurn[assetID] = amountToBurn
 	}
 
-	// feesMan cumulates consumed units. Let's init it with utx filled so far
+	// feesMan cumulates complexity. Let's init it with utx filled so far
 	if err := feeCalc.ExportTx(utx); err != nil {
 		return nil, err
 	}
