@@ -1437,7 +1437,6 @@ func TestDurangoMemoField(t *testing.T) {
 				tx, err := env.txBuilder.NewAddPermissionlessDelegatorTx(
 					&txs.SubnetValidator{
 						Validator: txs.Validator{
-
 							NodeID: primaryValidator.NodeID,
 							Start:  0,
 							End:    uint64(primaryValidator.EndTime.Unix()),
