@@ -10,9 +10,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
-	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
-	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils"
 )
 
@@ -31,15 +28,16 @@ func TestAdd(t *testing.T) {
 			db,
 			tree,
 			lastAcceptedHeight,
+			5,
 			blocks[5],
 		)
 		require.NoError(err)
 		require.True(newlyWantsParent)
 		require.Equal(uint64(1), tree.Len())
 
-		bytes, err := GetBlock(db, blocks[5].Height())
+		bytes, err := GetBlock(db, 5)
 		require.NoError(err)
-		require.Equal(blocks[5].Bytes(), bytes)
+		require.Equal(blocks[5], bytes)
 	})
 
 	t.Run("adding duplicate block", func(t *testing.T) {
@@ -49,6 +47,7 @@ func TestAdd(t *testing.T) {
 			db,
 			tree,
 			lastAcceptedHeight,
+			5,
 			blocks[5],
 		)
 		require.NoError(err)
@@ -63,15 +62,16 @@ func TestAdd(t *testing.T) {
 			db,
 			tree,
 			lastAcceptedHeight,
+			3,
 			blocks[3],
 		)
 		require.NoError(err)
 		require.True(newlyWantsParent)
 		require.Equal(uint64(2), tree.Len())
 
-		bytes, err := GetBlock(db, blocks[3].Height())
+		bytes, err := GetBlock(db, 3)
 		require.NoError(err)
-		require.Equal(blocks[3].Bytes(), bytes)
+		require.Equal(blocks[3], bytes)
 	})
 
 	t.Run("adding last desired block", func(t *testing.T) {
@@ -81,15 +81,16 @@ func TestAdd(t *testing.T) {
 			db,
 			tree,
 			lastAcceptedHeight,
+			2,
 			blocks[2],
 		)
 		require.NoError(err)
 		require.False(newlyWantsParent)
 		require.Equal(uint64(3), tree.Len())
 
-		bytes, err := GetBlock(db, blocks[2].Height())
+		bytes, err := GetBlock(db, 2)
 		require.NoError(err)
-		require.Equal(blocks[2].Bytes(), bytes)
+		require.Equal(blocks[2], bytes)
 	})
 
 	t.Run("adding undesired block", func(t *testing.T) {
@@ -99,13 +100,14 @@ func TestAdd(t *testing.T) {
 			db,
 			tree,
 			lastAcceptedHeight,
+			1,
 			blocks[1],
 		)
 		require.NoError(err)
 		require.False(newlyWantsParent)
 		require.Equal(uint64(3), tree.Len())
 
-		_, err = GetBlock(db, blocks[1].Height())
+		_, err = GetBlock(db, 1)
 		require.ErrorIs(err, database.ErrNotFound)
 	})
 
@@ -116,15 +118,16 @@ func TestAdd(t *testing.T) {
 			db,
 			tree,
 			lastAcceptedHeight,
+			6,
 			blocks[6],
 		)
 		require.NoError(err)
 		require.False(newlyWantsParent)
 		require.Equal(uint64(4), tree.Len())
 
-		bytes, err := GetBlock(db, blocks[6].Height())
+		bytes, err := GetBlock(db, 6)
 		require.NoError(err)
-		require.Equal(blocks[6].Bytes(), bytes)
+		require.Equal(blocks[6], bytes)
 	})
 }
 
@@ -143,15 +146,16 @@ func TestRemove(t *testing.T) {
 			db,
 			tree,
 			lastAcceptedHeight,
+			5,
 			blocks[5],
 		)
 		require.NoError(err)
 		require.True(newlyWantsParent)
 		require.Equal(uint64(1), tree.Len())
 
-		bytes, err := GetBlock(db, blocks[5].Height())
+		bytes, err := GetBlock(db, 5)
 		require.NoError(err)
-		require.Equal(blocks[5].Bytes(), bytes)
+		require.Equal(blocks[5], bytes)
 	})
 
 	t.Run("removing a block", func(t *testing.T) {
@@ -160,40 +164,19 @@ func TestRemove(t *testing.T) {
 		require.NoError(Remove(
 			db,
 			tree,
-			blocks[5].Height(),
+			5,
 		))
 		require.Zero(tree.Len())
 
-		_, err = GetBlock(db, blocks[5].Height())
+		_, err = GetBlock(db, 5)
 		require.ErrorIs(err, database.ErrNotFound)
 	})
 }
 
-func generateBlockchain(length uint64) []snowman.Block {
-	if length == 0 {
-		return nil
-	}
-
-	blocks := make([]snowman.Block, length)
-	blocks[0] = &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		ParentV: ids.Empty,
-		HeightV: 0,
-		BytesV:  utils.RandomBytes(1024),
-	}
-	for height := uint64(1); height < length; height++ {
-		blocks[height] = &snowman.TestBlock{
-			TestDecidable: choices.TestDecidable{
-				IDV:     ids.GenerateTestID(),
-				StatusV: choices.Processing,
-			},
-			ParentV: blocks[height-1].ID(),
-			HeightV: height,
-			BytesV:  utils.RandomBytes(1024),
-		}
+func generateBlockchain(length uint64) [][]byte {
+	blocks := make([][]byte, length)
+	for i := range blocks {
+		blocks[i] = utils.RandomBytes(1024)
 	}
 	return blocks
 }
