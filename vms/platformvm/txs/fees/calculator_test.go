@@ -32,7 +32,7 @@ var (
 		3 * units.MicroAvax,
 		4 * units.MicroAvax,
 	}
-	testBlockMaxConsumedUnits = fees.Dimensions{
+	testBlockMaxComplexity = fees.Dimensions{
 		3000,
 		3500,
 		1000,
@@ -72,7 +72,7 @@ func TestAddAndRemoveFees(t *testing.T) {
 	fc := &Calculator{
 		IsEUpgradeActive:   true,
 		FeeManager:         fees.NewManager(testFeeRates),
-		BlockMaxComplexity: testBlockMaxConsumedUnits,
+		BlockMaxComplexity: testBlockMaxComplexity,
 	}
 
 	var (
@@ -203,12 +203,12 @@ func TestTxFees(t *testing.T) {
 				return &cfg, chainTime
 			},
 			maxComplexityF: func() fees.Dimensions {
-				caps := testBlockMaxConsumedUnits
+				caps := testBlockMaxComplexity
 				caps[fees.UTXORead] = 90 - 1
 				return caps
 			},
 			unsignedAndSignedTx: addSubnetValidatorTx,
-			expectedError:       errFailedConsumedUnitsCumulation,
+			expectedError:       errFailedComplexityCumulation,
 			checksF:             func(*testing.T, *Calculator) {},
 		},
 		{
@@ -306,11 +306,11 @@ func TestTxFees(t *testing.T) {
 			},
 			unsignedAndSignedTx: createChainTx,
 			maxComplexityF: func() fees.Dimensions {
-				caps := testBlockMaxConsumedUnits
+				caps := testBlockMaxComplexity
 				caps[fees.UTXORead] = 90 - 1
 				return caps
 			},
-			expectedError: errFailedConsumedUnitsCumulation,
+			expectedError: errFailedComplexityCumulation,
 			checksF:       func(*testing.T, *Calculator) {},
 		},
 		{
@@ -371,12 +371,12 @@ func TestTxFees(t *testing.T) {
 				return &cfg, chainTime
 			},
 			maxComplexityF: func() fees.Dimensions {
-				caps := testBlockMaxConsumedUnits
+				caps := testBlockMaxComplexity
 				caps[fees.UTXORead] = 90 - 1
 				return caps
 			},
 			unsignedAndSignedTx: createSubnetTx,
-			expectedError:       errFailedConsumedUnitsCumulation,
+			expectedError:       errFailedComplexityCumulation,
 			checksF:             func(*testing.T, *Calculator) {},
 		},
 		{
@@ -437,12 +437,12 @@ func TestTxFees(t *testing.T) {
 				return &cfg, chainTime
 			},
 			maxComplexityF: func() fees.Dimensions {
-				caps := testBlockMaxConsumedUnits
+				caps := testBlockMaxComplexity
 				caps[fees.UTXORead] = 90 - 1
 				return caps
 			},
 			unsignedAndSignedTx: removeSubnetValidatorTx,
-			expectedError:       errFailedConsumedUnitsCumulation,
+			expectedError:       errFailedComplexityCumulation,
 			checksF:             func(*testing.T, *Calculator) {},
 		},
 		{
@@ -503,12 +503,12 @@ func TestTxFees(t *testing.T) {
 				return &cfg, chainTime
 			},
 			maxComplexityF: func() fees.Dimensions {
-				caps := testBlockMaxConsumedUnits
+				caps := testBlockMaxComplexity
 				caps[fees.UTXORead] = 90 - 1
 				return caps
 			},
 			unsignedAndSignedTx: transformSubnetTx,
-			expectedError:       errFailedConsumedUnitsCumulation,
+			expectedError:       errFailedComplexityCumulation,
 			checksF:             func(*testing.T, *Calculator) {},
 		},
 		{
@@ -569,12 +569,12 @@ func TestTxFees(t *testing.T) {
 				return &cfg, chainTime
 			},
 			maxComplexityF: func() fees.Dimensions {
-				caps := testBlockMaxConsumedUnits
+				caps := testBlockMaxComplexity
 				caps[fees.UTXORead] = 90 - 1
 				return caps
 			},
 			unsignedAndSignedTx: transferSubnetOwnershipTx,
-			expectedError:       errFailedConsumedUnitsCumulation,
+			expectedError:       errFailedComplexityCumulation,
 			checksF:             func(*testing.T, *Calculator) {},
 		},
 		{
@@ -635,12 +635,12 @@ func TestTxFees(t *testing.T) {
 				return &cfg, chainTime
 			},
 			maxComplexityF: func() fees.Dimensions {
-				caps := testBlockMaxConsumedUnits
+				caps := testBlockMaxComplexity
 				caps[fees.UTXORead] = 90 - 1
 				return caps
 			},
 			unsignedAndSignedTx: addPermissionlessValidatorTx,
-			expectedError:       errFailedConsumedUnitsCumulation,
+			expectedError:       errFailedComplexityCumulation,
 			checksF:             func(*testing.T, *Calculator) {},
 		},
 		{
@@ -701,12 +701,12 @@ func TestTxFees(t *testing.T) {
 				return &cfg, chainTime
 			},
 			maxComplexityF: func() fees.Dimensions {
-				caps := testBlockMaxConsumedUnits
+				caps := testBlockMaxComplexity
 				caps[fees.UTXORead] = 90 - 1
 				return caps
 			},
 			unsignedAndSignedTx: addPermissionlessDelegatorTx,
-			expectedError:       errFailedConsumedUnitsCumulation,
+			expectedError:       errFailedComplexityCumulation,
 			checksF:             func(*testing.T, *Calculator) {},
 		},
 		{
@@ -767,12 +767,12 @@ func TestTxFees(t *testing.T) {
 				return &cfg, chainTime
 			},
 			maxComplexityF: func() fees.Dimensions {
-				caps := testBlockMaxConsumedUnits
+				caps := testBlockMaxComplexity
 				caps[fees.UTXORead] = 90 - 1
 				return caps
 			},
 			unsignedAndSignedTx: baseTx,
-			expectedError:       errFailedConsumedUnitsCumulation,
+			expectedError:       errFailedComplexityCumulation,
 			checksF:             func(*testing.T, *Calculator) {},
 		},
 		{
@@ -833,12 +833,12 @@ func TestTxFees(t *testing.T) {
 				return &cfg, chainTime
 			},
 			maxComplexityF: func() fees.Dimensions {
-				caps := testBlockMaxConsumedUnits
+				caps := testBlockMaxComplexity
 				caps[fees.UTXORead] = 180 - 1
 				return caps
 			},
 			unsignedAndSignedTx: importTx,
-			expectedError:       errFailedConsumedUnitsCumulation,
+			expectedError:       errFailedComplexityCumulation,
 			checksF:             func(*testing.T, *Calculator) {},
 		},
 		{
@@ -899,12 +899,12 @@ func TestTxFees(t *testing.T) {
 				return &cfg, chainTime
 			},
 			maxComplexityF: func() fees.Dimensions {
-				caps := testBlockMaxConsumedUnits
+				caps := testBlockMaxComplexity
 				caps[fees.UTXORead] = 90 - 1
 				return caps
 			},
 			unsignedAndSignedTx: exportTx,
-			expectedError:       errFailedConsumedUnitsCumulation,
+			expectedError:       errFailedComplexityCumulation,
 			checksF:             func(*testing.T, *Calculator) {},
 		},
 	}
@@ -913,7 +913,7 @@ func TestTxFees(t *testing.T) {
 		t.Run(tt.description, func(t *testing.T) {
 			cfg, chainTime := tt.cfgAndChainTimeF()
 
-			maxComplexity := testBlockMaxConsumedUnits
+			maxComplexity := testBlockMaxComplexity
 			if tt.maxComplexityF != nil {
 				maxComplexity = tt.maxComplexityF()
 			}
