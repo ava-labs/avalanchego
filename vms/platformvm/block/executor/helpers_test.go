@@ -206,6 +206,10 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller, f fork) *environment 
 	}
 
 	if ctrl == nil {
+		if res.config.IsEActivated(res.state.GetTimestamp()) {
+			res.mempool.SetEUpgradeActive()
+		}
+
 		res.blkManager = NewManager(
 			res.mempool,
 			metrics,
@@ -215,6 +219,10 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller, f fork) *environment 
 		)
 		addSubnet(res)
 	} else {
+		if res.config.IsEActivated(res.mockedState.GetTimestamp()) {
+			res.mempool.SetEUpgradeActive()
+		}
+
 		res.blkManager = NewManager(
 			res.mempool,
 			metrics,

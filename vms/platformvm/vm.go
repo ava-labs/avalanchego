@@ -185,6 +185,9 @@ func (vm *VM) Initialize(
 	if err != nil {
 		return fmt.Errorf("failed to create mempool: %w", err)
 	}
+	if vm.IsEActivated(vm.state.GetTimestamp()) {
+		mempool.SetEUpgradeActive()
+	}
 
 	vm.manager = blockexecutor.NewManager(
 		mempool,

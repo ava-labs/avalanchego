@@ -184,6 +184,9 @@ func newEnvironment(t *testing.T, f fork) *environment { //nolint:unparam
 
 	res.mempool, err = mempool.New("mempool", registerer, nil)
 	require.NoError(err)
+	if res.config.IsEActivated(res.state.GetTimestamp()) {
+		res.mempool.SetEUpgradeActive()
+	}
 
 	res.blkManager = blockexecutor.NewManager(
 		res.mempool,

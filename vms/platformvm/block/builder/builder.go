@@ -358,6 +358,14 @@ func packBlockTxs(
 		inputs   set.Set[ids.ID]
 	)
 
+	if isEActivated {
+		// we lazily inform the mempool that the E upgrade has been activated.
+		// Lazily since we don't inform the mempool as soon as the first block
+		// post E upgrade has been accepted; instead we wait for the next block
+		// build.
+		mpool.SetEUpgradeActive()
+	}
+
 	feeMan := commonfees.NewManager(feeRates)
 	if isEActivated {
 		if err := feeMan.UpdateFeeRates(
