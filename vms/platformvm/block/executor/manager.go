@@ -79,8 +79,9 @@ func NewManager(
 			bootstrapped: txExecutorBackend.Bootstrapped,
 		},
 		rejector: &rejector{
-			backend:         backend,
-			addTxsToMempool: !txExecutorBackend.Config.PartialSyncPrimaryNetwork,
+			backend:           backend,
+			txExecutorBackend: txExecutorBackend,
+			addTxsToMempool:   !txExecutorBackend.Config.PartialSyncPrimaryNetwork,
 		},
 		txExecutorBackend: txExecutorBackend,
 	}

@@ -13,10 +13,13 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
+	"github.com/ava-labs/avalanchego/vms/components/fees"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -120,7 +123,7 @@ func TestRejectBlock(t *testing.T) {
 			require.NoError(err)
 
 			mempool := mempool.NewMockMempool(ctrl)
-			state := state.NewMockState(ctrl)
+			mockedState := state.NewMockState(ctrl)
 			blkIDToState := map[ids.ID]*blockState{
 				blk.Parent(): nil,
 				blk.ID():     nil,
@@ -132,7 +135,11 @@ func TestRejectBlock(t *testing.T) {
 					},
 					blkIDToState: blkIDToState,
 					Mempool:      mempool,
-					state:        state,
+					state:        mockedState,
+				},
+				txExecutorBackend: &executor.Backend{
+					Config: defaultConfig(t, eUpgrade),
+					Clk:    &mockable.Clock{},
 				},
 				addTxsToMempool: true,
 			}
@@ -141,8 +148,25 @@ func TestRejectBlock(t *testing.T) {
 			for _, tx := range blk.Txs() {
 				mempool.EXPECT().Add(tx, gomock.Any()).Return(nil).Times(1)
 			}
-
 			mempool.EXPECT().RequestBuildBlock(false).Times(1)
+			mockedState.EXPECT().GetLastAccepted().Return(ids.Empty).AnyTimes()
+			mockedState.EXPECT().GetTimestamp().Return(time.Now().Truncate(time.Second))
+			mockedState.EXPECT().GetFeeRates().Return(fees.Empty, nil)
+			mockedState.EXPECT().GetLastBlockComplexity().Return(fees.Empty, nil)
+
+			currentStakersIt := state.NewMockStakerIterator(ctrl)
+			currentStakersIt.EXPECT().Next().Return(true)
+			currentStakersIt.EXPECT().Value().Return(&state.Staker{
+				NextTime: mockable.MaxTime,
+				EndTime:  mockable.MaxTime,
+			}).Times(2)
+			currentStakersIt.EXPECT().Release()
+			mockedState.EXPECT().GetCurrentStakerIterator().Return(currentStakersIt, nil)
+
+			pendingStakersIt := state.NewMockStakerIterator(ctrl)
+			pendingStakersIt.EXPECT().Next().Return(false)
+			pendingStakersIt.EXPECT().Release()
+			mockedState.EXPECT().GetPendingStakerIterator().Return(pendingStakersIt, nil)
 
 			require.NoError(tt.rejectFunc(rejector, blk))
 			// Make sure block and its parent are removed from the state map.
