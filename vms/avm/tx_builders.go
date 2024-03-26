@@ -46,18 +46,7 @@ func buildCreateAssetTx(
 ) (*txs.Tx, ids.ShortID, error) {
 	var (
 		pBuilder, pSigner = builders(backend, kc)
-		chainTime         = backend.State().GetTimestamp()
-		cfg               = backend.Config()
-		isEUpgradeActive  = cfg.IsEActivated(chainTime)
-		feeCfg            = config.GetDynamicFeesConfig(isEUpgradeActive)
-		feeMan            = commonfees.NewManager(feeCfg.FeeRate)
-		feeCalc           = &fees.Calculator{
-			IsEUpgradeActive: cfg.IsEActivated(chainTime),
-			Config:           cfg,
-			FeeManager:       feeMan,
-			ConsumedUnitsCap: feeCfg.BlockMaxComplexity,
-			Codec:            backend.Codec(),
-		}
+		feeCalc           = feeCalculator(backend)
 	)
 
 	utx, err := pBuilder.NewCreateAssetTx(
@@ -89,18 +78,7 @@ func buildBaseTx(
 ) (*txs.Tx, ids.ShortID, error) {
 	var (
 		pBuilder, pSigner = builders(backend, kc)
-		chainTime         = backend.State().GetTimestamp()
-		cfg               = backend.Config()
-		isEUpgradeActive  = cfg.IsEActivated(chainTime)
-		feeCfg            = config.GetDynamicFeesConfig(isEUpgradeActive)
-		feeMan            = commonfees.NewManager(feeCfg.FeeRate)
-		feeCalc           = &fees.Calculator{
-			IsEUpgradeActive: cfg.IsEActivated(chainTime),
-			Config:           cfg,
-			FeeManager:       feeMan,
-			ConsumedUnitsCap: feeCfg.BlockMaxComplexity,
-			Codec:            backend.Codec(),
-		}
+		feeCalc           = feeCalculator(backend)
 	)
 
 	utx, err := pBuilder.NewBaseTx(
@@ -130,18 +108,7 @@ func mintNFT(
 ) (*txs.Tx, error) {
 	var (
 		pBuilder, pSigner = builders(backend, kc)
-		chainTime         = backend.State().GetTimestamp()
-		cfg               = backend.Config()
-		isEUpgradeActive  = cfg.IsEActivated(chainTime)
-		feeCfg            = config.GetDynamicFeesConfig(isEUpgradeActive)
-		feeMan            = commonfees.NewManager(feeCfg.FeeRate)
-		feeCalc           = &fees.Calculator{
-			IsEUpgradeActive: cfg.IsEActivated(chainTime),
-			Config:           cfg,
-			FeeManager:       feeMan,
-			ConsumedUnitsCap: feeCfg.BlockMaxComplexity,
-			Codec:            backend.Codec(),
-		}
+		feeCalc           = feeCalculator(backend)
 	)
 
 	utx, err := pBuilder.NewOperationTxMintNFT(
@@ -166,18 +133,7 @@ func mintFTs(
 ) (*txs.Tx, error) {
 	var (
 		pBuilder, pSigner = builders(backend, kc)
-		chainTime         = backend.State().GetTimestamp()
-		cfg               = backend.Config()
-		isEUpgradeActive  = cfg.IsEActivated(chainTime)
-		feeCfg            = config.GetDynamicFeesConfig(isEUpgradeActive)
-		feeMan            = commonfees.NewManager(feeCfg.FeeRate)
-		feeCalc           = &fees.Calculator{
-			IsEUpgradeActive: cfg.IsEActivated(chainTime),
-			Config:           cfg,
-			FeeManager:       feeMan,
-			ConsumedUnitsCap: feeCfg.BlockMaxComplexity,
-			Codec:            backend.Codec(),
-		}
+		feeCalc           = feeCalculator(backend)
 	)
 	utx, err := pBuilder.NewOperationTxMintFT(
 		outputs,
@@ -199,18 +155,7 @@ func buildOperation(
 ) (*txs.Tx, error) {
 	var (
 		pBuilder, pSigner = builders(backend, kc)
-		chainTime         = backend.State().GetTimestamp()
-		cfg               = backend.Config()
-		isEUpgradeActive  = cfg.IsEActivated(chainTime)
-		feeCfg            = config.GetDynamicFeesConfig(isEUpgradeActive)
-		feeMan            = commonfees.NewManager(feeCfg.FeeRate)
-		feeCalc           = &fees.Calculator{
-			IsEUpgradeActive: cfg.IsEActivated(chainTime),
-			Config:           cfg,
-			FeeManager:       feeMan,
-			ConsumedUnitsCap: feeCfg.BlockMaxComplexity,
-			Codec:            backend.Codec(),
-		}
+		feeCalc           = feeCalculator(backend)
 	)
 
 	utx, err := pBuilder.NewOperationTx(
@@ -233,18 +178,7 @@ func buildImportTx(
 ) (*txs.Tx, error) {
 	var (
 		pBuilder, pSigner = builders(backend, kc)
-		chainTime         = backend.State().GetTimestamp()
-		cfg               = backend.Config()
-		isEUpgradeActive  = cfg.IsEActivated(chainTime)
-		feeCfg            = config.GetDynamicFeesConfig(isEUpgradeActive)
-		feeMan            = commonfees.NewManager(feeCfg.FeeRate)
-		feeCalc           = &fees.Calculator{
-			IsEUpgradeActive: cfg.IsEActivated(chainTime),
-			Config:           cfg,
-			FeeManager:       feeMan,
-			ConsumedUnitsCap: feeCfg.BlockMaxComplexity,
-			Codec:            backend.Codec(),
-		}
+		feeCalc           = feeCalculator(backend)
 	)
 
 	outOwner := &secp256k1fx.OutputOwners{
@@ -276,18 +210,7 @@ func buildExportTx(
 ) (*txs.Tx, ids.ShortID, error) {
 	var (
 		pBuilder, pSigner = builders(backend, kc)
-		chainTime         = backend.State().GetTimestamp()
-		cfg               = backend.Config()
-		isEUpgradeActive  = cfg.IsEActivated(chainTime)
-		feeCfg            = config.GetDynamicFeesConfig(isEUpgradeActive)
-		feeMan            = commonfees.NewManager(feeCfg.FeeRate)
-		feeCalc           = &fees.Calculator{
-			IsEUpgradeActive: cfg.IsEActivated(chainTime),
-			Config:           cfg,
-			FeeManager:       feeMan,
-			ConsumedUnitsCap: feeCfg.BlockMaxComplexity,
-			Codec:            backend.Codec(),
-		}
+		feeCalc           = feeCalculator(backend)
 	)
 
 	outputs := []*avax.TransferableOutput{{
@@ -329,6 +252,24 @@ func builders(backend txBuilderBackend, kc *secp256k1fx.Keychain) (walletbuilder
 	backend.ResetAddresses(addrs)
 
 	return builder, signer
+}
+
+func feeCalculator(backend txBuilderBackend) *fees.Calculator {
+	var (
+		chainTime = backend.State().GetTimestamp()
+		cfg       = backend.Config()
+		isEActive = cfg.IsEActivated(chainTime)
+		feeCfg    = config.GetDynamicFeesConfig(isEActive)
+		feeMan    = commonfees.NewManager(feeCfg.FeeRate)
+	)
+
+	return &fees.Calculator{
+		IsEActive:          cfg.IsEActivated(chainTime),
+		Config:             cfg,
+		FeeManager:         feeMan,
+		BlockMaxComplexity: feeCfg.BlockMaxComplexity,
+		Codec:              backend.Codec(),
+	}
 }
 
 func options(changeAddr ids.ShortID, memo []byte) []common.Option {

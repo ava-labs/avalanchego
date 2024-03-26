@@ -133,8 +133,8 @@ func (b *Block) Verify(context.Context) error {
 	}
 
 	var (
-		isEForkActive = b.manager.backend.Config.IsEActivated(parentChainTime)
-		feesCfg       = config.GetDynamicFeesConfig(isEForkActive)
+		isEActive = b.manager.backend.Config.IsEActivated(parentChainTime)
+		feesCfg   = config.GetDynamicFeesConfig(isEActive)
 	)
 
 	feeManager := fees.NewManager(feesCfg.FeeRate)
@@ -143,11 +143,11 @@ func (b *Block) Verify(context.Context) error {
 		// Verify that the tx is valid according to the current state of the
 		// chain.
 		err := tx.Unsigned.Visit(&executor.SemanticVerifier{
-			Backend:       b.manager.backend,
-			BlkFeeManager: feeManager,
-			UnitCaps:      feesCfg.BlockMaxComplexity,
-			State:         stateDiff,
-			Tx:            tx,
+			Backend:            b.manager.backend,
+			BlkFeeManager:      feeManager,
+			BlockMaxComplexity: feesCfg.BlockMaxComplexity,
+			State:              stateDiff,
+			Tx:                 tx,
 		})
 		if err != nil {
 			txID := tx.ID()

@@ -163,19 +163,19 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 	}
 
 	var (
-		chainTime     = m.state.GetTimestamp()
-		isEForkActive = m.backend.Config.IsEActivated(chainTime)
-		feesCfg       = config.GetDynamicFeesConfig(isEForkActive)
+		chainTime = m.state.GetTimestamp()
+		isEActive = m.backend.Config.IsEActivated(chainTime)
+		feesCfg   = config.GetDynamicFeesConfig(isEActive)
 	)
 
 	feeManager := fees.NewManager(feesCfg.FeeRate)
 
 	err = tx.Unsigned.Visit(&executor.SemanticVerifier{
-		Backend:       m.backend,
-		BlkFeeManager: feeManager,
-		UnitCaps:      feesCfg.BlockMaxComplexity,
-		State:         stateDiff,
-		Tx:            tx,
+		Backend:            m.backend,
+		BlkFeeManager:      feeManager,
+		BlockMaxComplexity: feesCfg.BlockMaxComplexity,
+		State:              stateDiff,
+		Tx:                 tx,
 	})
 	if err != nil {
 		return err

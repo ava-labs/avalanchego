@@ -129,16 +129,16 @@ func (tx *Tx) Verify(context.Context) error {
 	}
 
 	var (
-		isEActivated = tx.vm.txExecutorBackend.Config.IsEActivated(tx.vm.state.GetTimestamp())
-		feeCfg       = config.GetDynamicFeesConfig(isEActivated)
-		feeManager   = fees.NewManager(feeCfg.FeeRate)
+		isEActive  = tx.vm.txExecutorBackend.Config.IsEActivated(tx.vm.state.GetTimestamp())
+		feeCfg     = config.GetDynamicFeesConfig(isEActive)
+		feeManager = fees.NewManager(feeCfg.FeeRate)
 	)
 
 	return tx.tx.Unsigned.Visit(&executor.SemanticVerifier{
-		Backend:       tx.vm.txExecutorBackend,
-		BlkFeeManager: feeManager,
-		UnitCaps:      feeCfg.BlockMaxComplexity,
-		State:         tx.vm.state,
-		Tx:            tx.tx,
+		Backend:            tx.vm.txExecutorBackend,
+		BlkFeeManager:      feeManager,
+		BlockMaxComplexity: feeCfg.BlockMaxComplexity,
+		State:              tx.vm.state,
+		Tx:                 tx.tx,
 	})
 }

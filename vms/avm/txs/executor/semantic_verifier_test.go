@@ -742,11 +742,11 @@ func TestSemanticVerifierBaseTx(t *testing.T) {
 			feeCfg := config.GetDynamicFeesConfig(true /*isEActive*/)
 
 			err = tx.Unsigned.Visit(&SemanticVerifier{
-				Backend:       backend,
-				BlkFeeManager: fees.NewManager(feeCfg.FeeRate),
-				UnitCaps:      feeCfg.BlockMaxComplexity,
-				State:         state,
-				Tx:            tx,
+				Backend:            backend,
+				BlkFeeManager:      fees.NewManager(feeCfg.FeeRate),
+				BlockMaxComplexity: feeCfg.BlockMaxComplexity,
+				State:              state,
+				Tx:                 tx,
 			})
 			require.ErrorIs(err, test.err)
 		})
@@ -1496,11 +1496,11 @@ func TestSemanticVerifierExportTx(t *testing.T) {
 			feeCfg := config.GetDynamicFeesConfig(true /*isEActive*/)
 
 			err = tx.Unsigned.Visit(&SemanticVerifier{
-				Backend:       backend,
-				BlkFeeManager: fees.NewManager(feeCfg.FeeRate),
-				UnitCaps:      feeCfg.BlockMaxComplexity,
-				State:         state,
-				Tx:            tx,
+				Backend:            backend,
+				BlkFeeManager:      fees.NewManager(feeCfg.FeeRate),
+				BlockMaxComplexity: feeCfg.BlockMaxComplexity,
+				State:              state,
+				Tx:                 tx,
 			})
 			require.ErrorIs(err, test.err)
 		})
@@ -1641,11 +1641,11 @@ func TestSemanticVerifierExportTxDifferentSubnet(t *testing.T) {
 	feeCfg := config.GetDynamicFeesConfig(true /*isEActive*/)
 
 	err = tx.Unsigned.Visit(&SemanticVerifier{
-		Backend:       backend,
-		BlkFeeManager: fees.NewManager(feeCfg.FeeRate),
-		UnitCaps:      feeCfg.BlockMaxComplexity,
-		State:         state,
-		Tx:            tx,
+		Backend:            backend,
+		BlkFeeManager:      fees.NewManager(feeCfg.FeeRate),
+		BlockMaxComplexity: feeCfg.BlockMaxComplexity,
+		State:              state,
+		Tx:                 tx,
 	})
 	require.ErrorIs(err, verify.ErrMismatchedSubnetIDs)
 }
@@ -2179,11 +2179,11 @@ func TestSemanticVerifierImportTx(t *testing.T) {
 			feeCfg := config.GetDynamicFeesConfig(true /*isEActive*/)
 
 			err = tx.Unsigned.Visit(&SemanticVerifier{
-				Backend:       backend,
-				BlkFeeManager: fees.NewManager(feeCfg.FeeRate),
-				UnitCaps:      feeCfg.BlockMaxComplexity,
-				State:         state,
-				Tx:            tx,
+				Backend:            backend,
+				BlkFeeManager:      fees.NewManager(feeCfg.FeeRate),
+				BlockMaxComplexity: feeCfg.BlockMaxComplexity,
+				State:              state,
+				Tx:                 tx,
 			})
 			require.ErrorIs(err, test.expectedErr)
 		})

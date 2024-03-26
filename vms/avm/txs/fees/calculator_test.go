@@ -35,7 +35,7 @@ var (
 		3 * units.MicroAvax,
 		4 * units.MicroAvax,
 	}
-	testBlockMaxConsumedUnits = fees.Dimensions{
+	testBlockMaxComplexity = fees.Dimensions{
 		3000,
 		3500,
 		1000,
@@ -126,7 +126,7 @@ func TestBaseTxFees(t *testing.T) {
 				return &cfg, chainTime
 			},
 			consumedUnitCapsF: func() fees.Dimensions {
-				caps := testBlockMaxConsumedUnits
+				caps := testBlockMaxComplexity
 				caps[fees.UTXORead] = 90 - 1
 				return caps
 			},
@@ -139,18 +139,18 @@ func TestBaseTxFees(t *testing.T) {
 		t.Run(tt.description, func(t *testing.T) {
 			cfg, chainTime := tt.cfgAndChainTimeF()
 
-			consumedUnitCaps := testBlockMaxConsumedUnits
+			blockMaxComplexity := testBlockMaxComplexity
 			if tt.consumedUnitCapsF != nil {
-				consumedUnitCaps = tt.consumedUnitCapsF()
+				blockMaxComplexity = tt.consumedUnitCapsF()
 			}
 
 			fc := &Calculator{
-				IsEUpgradeActive: cfg.IsEActivated(chainTime),
-				Config:           cfg,
-				Codec:            codec,
-				FeeManager:       fees.NewManager(testFeeRates),
-				ConsumedUnitsCap: consumedUnitCaps,
-				Credentials:      sTx.Creds,
+				IsEActive:          cfg.IsEActivated(chainTime),
+				Config:             cfg,
+				Codec:              codec,
+				FeeManager:         fees.NewManager(testFeeRates),
+				BlockMaxComplexity: blockMaxComplexity,
+				Credentials:        sTx.Creds,
 			}
 			err := uTx.Visit(fc)
 			r.ErrorIs(err, tt.expectedError)
@@ -244,7 +244,7 @@ func TestCreateAssetTxFees(t *testing.T) {
 				return &cfg, chainTime
 			},
 			consumedUnitCapsF: func() fees.Dimensions {
-				caps := testBlockMaxConsumedUnits
+				caps := testBlockMaxComplexity
 				caps[fees.Bandwidth] = 289 - 1
 				return caps
 			},
@@ -257,18 +257,18 @@ func TestCreateAssetTxFees(t *testing.T) {
 		t.Run(tt.description, func(t *testing.T) {
 			cfg, chainTime := tt.cfgAndChainTimeF()
 
-			consumedUnitCaps := testBlockMaxConsumedUnits
+			blockMaxComplexity := testBlockMaxComplexity
 			if tt.consumedUnitCapsF != nil {
-				consumedUnitCaps = tt.consumedUnitCapsF()
+				blockMaxComplexity = tt.consumedUnitCapsF()
 			}
 
 			fc := &Calculator{
-				IsEUpgradeActive: cfg.IsEActivated(chainTime),
-				Config:           cfg,
-				Codec:            codec,
-				FeeManager:       fees.NewManager(testFeeRates),
-				ConsumedUnitsCap: consumedUnitCaps,
-				Credentials:      sTx.Creds,
+				IsEActive:          cfg.IsEActivated(chainTime),
+				Config:             cfg,
+				Codec:              codec,
+				FeeManager:         fees.NewManager(testFeeRates),
+				BlockMaxComplexity: blockMaxComplexity,
+				Credentials:        sTx.Creds,
 			}
 			err := uTx.Visit(fc)
 			r.ErrorIs(err, tt.expectedError)
@@ -362,7 +362,7 @@ func TestOperationTxFees(t *testing.T) {
 				return &cfg, chainTime
 			},
 			consumedUnitCapsF: func() fees.Dimensions {
-				caps := testBlockMaxConsumedUnits
+				caps := testBlockMaxComplexity
 				caps[fees.UTXORead] = 90 - 1
 				return caps
 			},
@@ -375,18 +375,18 @@ func TestOperationTxFees(t *testing.T) {
 		t.Run(tt.description, func(t *testing.T) {
 			cfg, chainTime := tt.cfgAndChainTimeF()
 
-			consumedUnitCaps := testBlockMaxConsumedUnits
+			blockMaxComplexity := testBlockMaxComplexity
 			if tt.consumedUnitCapsF != nil {
-				consumedUnitCaps = tt.consumedUnitCapsF()
+				blockMaxComplexity = tt.consumedUnitCapsF()
 			}
 
 			fc := &Calculator{
-				IsEUpgradeActive: cfg.IsEActivated(chainTime),
-				Config:           cfg,
-				Codec:            codec,
-				FeeManager:       fees.NewManager(testFeeRates),
-				ConsumedUnitsCap: consumedUnitCaps,
-				Credentials:      sTx.Creds,
+				IsEActive:          cfg.IsEActivated(chainTime),
+				Config:             cfg,
+				Codec:              codec,
+				FeeManager:         fees.NewManager(testFeeRates),
+				BlockMaxComplexity: blockMaxComplexity,
+				Credentials:        sTx.Creds,
 			}
 			err := uTx.Visit(fc)
 			r.ErrorIs(err, tt.expectedError)
@@ -476,7 +476,7 @@ func TestImportTxFees(t *testing.T) {
 				return &cfg, chainTime
 			},
 			consumedUnitCapsF: func() fees.Dimensions {
-				caps := testBlockMaxConsumedUnits
+				caps := testBlockMaxComplexity
 				caps[fees.UTXORead] = 180 - 1
 				return caps
 			},
@@ -489,18 +489,18 @@ func TestImportTxFees(t *testing.T) {
 		t.Run(tt.description, func(t *testing.T) {
 			cfg, chainTime := tt.cfgAndChainTimeF()
 
-			consumedUnitCaps := testBlockMaxConsumedUnits
+			blockMaxComplexity := testBlockMaxComplexity
 			if tt.consumedUnitCapsF != nil {
-				consumedUnitCaps = tt.consumedUnitCapsF()
+				blockMaxComplexity = tt.consumedUnitCapsF()
 			}
 
 			fc := &Calculator{
-				IsEUpgradeActive: cfg.IsEActivated(chainTime),
-				Config:           cfg,
-				Codec:            codec,
-				FeeManager:       fees.NewManager(testFeeRates),
-				ConsumedUnitsCap: consumedUnitCaps,
-				Credentials:      sTx.Creds,
+				IsEActive:          cfg.IsEActivated(chainTime),
+				Config:             cfg,
+				Codec:              codec,
+				FeeManager:         fees.NewManager(testFeeRates),
+				BlockMaxComplexity: blockMaxComplexity,
+				Credentials:        sTx.Creds,
 			}
 			err := uTx.Visit(fc)
 			r.ErrorIs(err, tt.expectedError)
@@ -580,7 +580,7 @@ func TestExportTxFees(t *testing.T) {
 				return &cfg, chainTime
 			},
 			consumedUnitCapsF: func() fees.Dimensions {
-				caps := testBlockMaxConsumedUnits
+				caps := testBlockMaxComplexity
 				caps[fees.UTXORead] = 90 - 1
 				return caps
 			},
@@ -593,18 +593,18 @@ func TestExportTxFees(t *testing.T) {
 		t.Run(tt.description, func(t *testing.T) {
 			cfg, chainTime := tt.cfgAndChainTimeF()
 
-			consumedUnitCaps := testBlockMaxConsumedUnits
+			blockMaxComplexity := testBlockMaxComplexity
 			if tt.consumedUnitCapsF != nil {
-				consumedUnitCaps = tt.consumedUnitCapsF()
+				blockMaxComplexity = tt.consumedUnitCapsF()
 			}
 
 			fc := &Calculator{
-				IsEUpgradeActive: cfg.IsEActivated(chainTime),
-				Config:           cfg,
-				Codec:            codec,
-				FeeManager:       fees.NewManager(testFeeRates),
-				ConsumedUnitsCap: consumedUnitCaps,
-				Credentials:      sTx.Creds,
+				IsEActive:          cfg.IsEActivated(chainTime),
+				Config:             cfg,
+				Codec:              codec,
+				FeeManager:         fees.NewManager(testFeeRates),
+				BlockMaxComplexity: blockMaxComplexity,
+				Credentials:        sTx.Creds,
 			}
 			err := uTx.Visit(fc)
 			r.ErrorIs(err, tt.expectedError)
