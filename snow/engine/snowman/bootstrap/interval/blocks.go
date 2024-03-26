@@ -21,7 +21,6 @@ func Add(
 	if err := PutBlock(db, height, blkBytes); err != nil {
 		return false, err
 	}
-
 	if err := tree.Add(db, height); err != nil {
 		return false, err
 	}
