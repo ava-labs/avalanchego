@@ -179,8 +179,8 @@ type State interface {
 	// Discard uncommitted changes to the database.
 	Abort()
 
-	// ReindexBlocks converts any block indicies using the legacy storage format
-	// to the new format. If this database has already updated the indicies,
+	// ReindexBlocks converts any block indices using the legacy storage format
+	// to the new format. If this database has already updated the indices,
 	// this function will return immediately, without iterating over the
 	// database.
 	//
@@ -2338,11 +2338,11 @@ func (s *state) ReindexBlocks(lock sync.Locker, log logging.Logger) error {
 	log.Info("starting block reindexing")
 
 	var (
-		startTime          = time.Now()
-		lastCommit         = startTime
-		nextUpdate         = startTime.Add(indexLogFrequency)
-		numIndiciesChecked = 0
-		numIndicesUpdated  = 0
+		startTime         = time.Now()
+		lastCommit        = startTime
+		nextUpdate        = startTime.Add(indexLogFrequency)
+		numIndicesChecked = 0
+		numIndicesUpdated = 0
 	)
 
 	for blockIterator.Next() {
@@ -2365,7 +2365,7 @@ func (s *state) ReindexBlocks(lock sync.Locker, log logging.Logger) error {
 			numIndicesUpdated++
 		}
 
-		numIndiciesChecked++
+		numIndicesChecked++
 
 		now := time.Now()
 		if now.After(nextUpdate) {
@@ -2380,12 +2380,12 @@ func (s *state) ReindexBlocks(lock sync.Locker, log logging.Logger) error {
 
 			log.Info("reindexing blocks",
 				zap.Int("numIndicesUpdated", numIndicesUpdated),
-				zap.Int("numIndiciesChecked", numIndiciesChecked),
+				zap.Int("numIndicesChecked", numIndicesChecked),
 				zap.Duration("eta", eta),
 			)
 		}
 
-		if numIndiciesChecked%indexIterationLimit == 0 {
+		if numIndicesChecked%indexIterationLimit == 0 {
 			// We must hold the lock during committing to make sure we don't
 			// attempt to commit to disk while a block is concurrently being
 			// accepted.
@@ -2442,7 +2442,7 @@ func (s *state) ReindexBlocks(lock sync.Locker, log logging.Logger) error {
 
 	log.Info("finished block reindexing",
 		zap.Int("numIndicesUpdated", numIndicesUpdated),
-		zap.Int("numIndiciesChecked", numIndiciesChecked),
+		zap.Int("numIndicesChecked", numIndicesChecked),
 		zap.Duration("duration", time.Since(startTime)),
 	)
 
