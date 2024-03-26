@@ -72,6 +72,12 @@ func makeIntervalKey(upperBound uint64) []byte {
 	return append(intervalPrefix, intervalKey...)
 }
 
+// GetBlockIterator returns a block iterator that will produce values
+// corresponding to persisted blocks in order of increasing height.
+func GetBlockIterator(db database.Iteratee) database.Iterator {
+	return db.NewIteratorWithPrefix(blockPrefix)
+}
+
 func GetBlock(db database.KeyValueReader, height uint64) ([]byte, error) {
 	return db.Get(makeBlockKey(height))
 }
