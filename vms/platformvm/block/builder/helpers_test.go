@@ -117,7 +117,7 @@ type environment struct {
 	atomicUTXOs    avax.AtomicUTXOManager
 	uptimes        uptime.Manager
 	utxosVerifier  utxo.Verifier
-	txBuilder      txbuilder.Builder
+	txBuilder      *txbuilder.Builder
 	backend        txexecutor.Backend
 }
 

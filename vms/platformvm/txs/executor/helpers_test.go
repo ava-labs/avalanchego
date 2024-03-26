@@ -104,7 +104,7 @@ type environment struct {
 	atomicUTXOs    avax.AtomicUTXOManager
 	uptimes        uptime.Manager
 	utxosHandler   utxo.Verifier
-	txBuilder      builder.Builder
+	txBuilder      *builder.Builder
 	backend        Backend
 }
 
@@ -211,7 +211,7 @@ func newEnvironment(t *testing.T, f fork) *environment {
 func addSubnet(
 	t *testing.T,
 	env *environment,
-	txBuilder builder.Builder,
+	txBuilder *builder.Builder,
 ) {
 	require := require.New(t)
 

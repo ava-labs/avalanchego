@@ -28,248 +28,24 @@ import (
 // Max number of items allowed in a page
 const MaxPageSize = 1024
 
-var _ Builder = (*builder)(nil)
-
-type Builder interface {
-	AtomicTxBuilder
-	DecisionTxBuilder
-	ProposalTxBuilder
-}
-
-type AtomicTxBuilder interface {
-	// chainID: chain to import UTXOs from
-	// to: address of recipient
-	// keys: keys to import the funds
-	// changeAddr: address to send change to, if there is any
-	NewImportTx(
-		chainID ids.ID,
-		to ids.ShortID,
-		keys []*secp256k1.PrivateKey,
-		changeAddr ids.ShortID,
-		memo []byte,
-	) (*txs.Tx, error)
-
-	// amount: amount of tokens to export
-	// chainID: chain to send the UTXOs to
-	// to: address of recipient
-	// keys: keys to pay the fee and provide the tokens
-	// changeAddr: address to send change to, if there is any
-	NewExportTx(
-		amount uint64,
-		chainID ids.ID,
-		to ids.ShortID,
-		keys []*secp256k1.PrivateKey,
-		changeAddr ids.ShortID,
-		memo []byte,
-	) (*txs.Tx, error)
-}
-
-type DecisionTxBuilder interface {
-	// subnetID: ID of the subnet that validates the new chain
-	// genesisData: byte repr. of genesis state of the new chain
-	// vmID: ID of VM this chain runs
-	// fxIDs: ids of features extensions this chain supports
-	// chainName: name of the chain
-	// keys: keys to sign the tx
-	// changeAddr: address to send change to, if there is any
-	NewCreateChainTx(
-		subnetID ids.ID,
-		genesisData []byte,
-		vmID ids.ID,
-		fxIDs []ids.ID,
-		chainName string,
-		keys []*secp256k1.PrivateKey,
-		changeAddr ids.ShortID,
-		memo []byte,
-	) (*txs.Tx, error)
-
-	// threshold: [threshold] of [ownerAddrs] needed to manage this subnet
-	// ownerAddrs: control addresses for the new subnet
-	// keys: keys to pay the fee
-	// changeAddr: address to send change to, if there is any
-	NewCreateSubnetTx(
-		threshold uint32,
-		ownerAddrs []ids.ShortID,
-		keys []*secp256k1.PrivateKey,
-		changeAddr ids.ShortID,
-		memo []byte,
-	) (*txs.Tx, error)
-
-	NewTransformSubnetTx(
-		subnetID ids.ID,
-		assetID ids.ID,
-		initialSupply uint64,
-		maxSupply uint64,
-		minConsumptionRate uint64,
-		maxConsumptionRate uint64,
-		minValidatorStake uint64,
-		maxValidatorStake uint64,
-		minStakeDuration time.Duration,
-		maxStakeDuration time.Duration,
-		minDelegationFee uint32,
-		minDelegatorStake uint64,
-		maxValidatorWeightFactor byte,
-		uptimeRequirement uint32,
-		keys []*secp256k1.PrivateKey,
-		changeAddr ids.ShortID,
-		memo []byte,
-	) (*txs.Tx, error)
-
-	// amount: amount the sender is sending
-	// owner: recipient of the funds
-	// keys: keys to sign the tx and pay the amount
-	// changeAddr: address to send change to, if there is any
-	NewBaseTx(
-		amount uint64,
-		owner secp256k1fx.OutputOwners,
-		keys []*secp256k1.PrivateKey,
-		changeAddr ids.ShortID,
-		memo []byte,
-	) (*txs.Tx, error)
-}
-
-type ProposalTxBuilder interface {
-	// stakeAmount: amount the validator stakes
-	// startTime: unix time they start validating
-	// endTime: unix time they stop validating
-	// nodeID: ID of the node we want to validate with
-	// rewardAddress: address to send reward to, if applicable
-	// shares: 10,000 times percentage of reward taken from delegators
-	// keys: Keys providing the staked tokens
-	// changeAddr: Address to send change to, if there is any
-	NewAddValidatorTx(
-		stakeAmount,
-		startTime,
-		endTime uint64,
-		nodeID ids.NodeID,
-		rewardAddress ids.ShortID,
-		shares uint32,
-		keys []*secp256k1.PrivateKey,
-		changeAddr ids.ShortID,
-		memo []byte,
-	) (*txs.Tx, error)
-
-	// stakeAmount: amount the validator stakes
-	// startTime: unix time they start validating
-	// endTime: unix time they stop validating
-	// nodeID: ID of the node we want to validate with
-	// pop: the node proof of possession
-	// rewardAddress: address to send reward to, if applicable
-	// shares: 10,000 times percentage of reward taken from delegators
-	// keys: Keys providing the staked tokens
-	// changeAddr: Address to send change to, if there is any
-	NewAddPermissionlessValidatorTx(
-		stakeAmount,
-		startTime,
-		endTime uint64,
-		nodeID ids.NodeID,
-		pop *vmsigner.ProofOfPossession,
-		rewardAddress ids.ShortID,
-		shares uint32,
-		keys []*secp256k1.PrivateKey,
-		changeAddr ids.ShortID,
-		memo []byte,
-	) (*txs.Tx, error)
-
-	// stakeAmount: amount the delegator stakes
-	// startTime: unix time they start delegating
-	// endTime: unix time they stop delegating
-	// nodeID: ID of the node we are delegating to
-	// rewardAddress: address to send reward to, if applicable
-	// keys: keys providing the staked tokens
-	// changeAddr: address to send change to, if there is any
-	NewAddDelegatorTx(
-		stakeAmount,
-		startTime,
-		endTime uint64,
-		nodeID ids.NodeID,
-		rewardAddress ids.ShortID,
-		keys []*secp256k1.PrivateKey,
-		changeAddr ids.ShortID,
-		memo []byte,
-	) (*txs.Tx, error)
-
-	// stakeAmount: amount the delegator stakes
-	// startTime: unix time they start delegating
-	// endTime: unix time they stop delegating
-	// nodeID: ID of the node we are delegating to
-	// rewardAddress: address to send reward to, if applicable
-	// keys: keys providing the staked tokens
-	// changeAddr: address to send change to, if there is any
-	NewAddPermissionlessDelegatorTx(
-		stakeAmount,
-		startTime,
-		endTime uint64,
-		nodeID ids.NodeID,
-		rewardAddress ids.ShortID,
-		keys []*secp256k1.PrivateKey,
-		changeAddr ids.ShortID,
-		memo []byte,
-	) (*txs.Tx, error)
-
-	// weight: sampling weight of the new validator
-	// startTime: unix time they start delegating
-	// endTime:  unix time they top delegating
-	// nodeID: ID of the node validating
-	// subnetID: ID of the subnet the validator will validate
-	// keys: keys to use for adding the validator
-	// changeAddr: address to send change to, if there is any
-	NewAddSubnetValidatorTx(
-		weight,
-		startTime,
-		endTime uint64,
-		nodeID ids.NodeID,
-		subnetID ids.ID,
-		keys []*secp256k1.PrivateKey,
-		changeAddr ids.ShortID,
-		memo []byte,
-	) (*txs.Tx, error)
-
-	// Creates a transaction that removes [nodeID]
-	// as a validator from [subnetID]
-	// keys: keys to use for removing the validator
-	// changeAddr: address to send change to, if there is any
-	NewRemoveSubnetValidatorTx(
-		nodeID ids.NodeID,
-		subnetID ids.ID,
-		keys []*secp256k1.PrivateKey,
-		changeAddr ids.ShortID,
-		memo []byte,
-	) (*txs.Tx, error)
-
-	// Creates a transaction that transfers ownership of [subnetID]
-	// threshold: [threshold] of [ownerAddrs] needed to manage this subnet
-	// ownerAddrs: control addresses for the new subnet
-	// keys: keys to use for modifying the subnet
-	// changeAddr: address to send change to, if there is any
-	NewTransferSubnetOwnershipTx(
-		subnetID ids.ID,
-		threshold uint32,
-		ownerAddrs []ids.ShortID,
-		keys []*secp256k1.PrivateKey,
-		changeAddr ids.ShortID,
-		memo []byte,
-	) (*txs.Tx, error)
-}
-
 func New(
 	ctx *snow.Context,
 	cfg *config.Config,
 	state state.State,
 	atomicUTXOManager avax.AtomicUTXOManager,
-) Builder {
-	return &builder{
+) *Builder {
+	return &Builder{
 		ctx:     ctx,
 		backend: NewBackend(cfg, state, atomicUTXOManager),
 	}
 }
 
-type builder struct {
+type Builder struct {
 	ctx     *snow.Context
 	backend *Backend
 }
 
-func (b *builder) NewImportTx(
+func (b *Builder) NewImportTx(
 	from ids.ID,
 	to ids.ShortID,
 	keys []*secp256k1.PrivateKey,
@@ -301,7 +77,7 @@ func (b *builder) NewImportTx(
 }
 
 // TODO: should support other assets than AVAX
-func (b *builder) NewExportTx(
+func (b *Builder) NewExportTx(
 	amount uint64,
 	chainID ids.ID,
 	to ids.ShortID,
@@ -339,7 +115,7 @@ func (b *builder) NewExportTx(
 	return tx, tx.SyntacticVerify(b.ctx)
 }
 
-func (b *builder) NewCreateChainTx(
+func (b *Builder) NewCreateChainTx(
 	subnetID ids.ID,
 	genesisData []byte,
 	vmID ids.ID,
@@ -363,7 +139,7 @@ func (b *builder) NewCreateChainTx(
 	return tx, tx.SyntacticVerify(b.ctx)
 }
 
-func (b *builder) NewCreateSubnetTx(
+func (b *Builder) NewCreateSubnetTx(
 	threshold uint32,
 	ownerAddrs []ids.ShortID,
 	keys []*secp256k1.PrivateKey,
@@ -390,7 +166,7 @@ func (b *builder) NewCreateSubnetTx(
 	return tx, tx.SyntacticVerify(b.ctx)
 }
 
-func (b *builder) NewTransformSubnetTx(
+func (b *Builder) NewTransformSubnetTx(
 	subnetID ids.ID,
 	assetID ids.ID,
 	initialSupply uint64,
@@ -439,7 +215,7 @@ func (b *builder) NewTransformSubnetTx(
 	return tx, tx.SyntacticVerify(b.ctx)
 }
 
-func (b *builder) NewAddValidatorTx(
+func (b *Builder) NewAddValidatorTx(
 	stakeAmount,
 	startTime,
 	endTime uint64,
@@ -476,7 +252,7 @@ func (b *builder) NewAddValidatorTx(
 	return tx, tx.SyntacticVerify(b.ctx)
 }
 
-func (b *builder) NewAddPermissionlessValidatorTx(
+func (b *Builder) NewAddPermissionlessValidatorTx(
 	stakeAmount,
 	startTime,
 	endTime uint64,
@@ -525,7 +301,7 @@ func (b *builder) NewAddPermissionlessValidatorTx(
 	return tx, tx.SyntacticVerify(b.ctx)
 }
 
-func (b *builder) NewAddDelegatorTx(
+func (b *Builder) NewAddDelegatorTx(
 	stakeAmount,
 	startTime,
 	endTime uint64,
@@ -565,7 +341,7 @@ func (b *builder) NewAddDelegatorTx(
 	return tx, tx.SyntacticVerify(b.ctx)
 }
 
-func (b *builder) NewAddPermissionlessDelegatorTx(
+func (b *Builder) NewAddPermissionlessDelegatorTx(
 	stakeAmount,
 	startTime,
 	endTime uint64,
@@ -609,7 +385,7 @@ func (b *builder) NewAddPermissionlessDelegatorTx(
 	return tx, tx.SyntacticVerify(b.ctx)
 }
 
-func (b *builder) NewAddSubnetValidatorTx(
+func (b *Builder) NewAddSubnetValidatorTx(
 	weight,
 	startTime,
 	endTime uint64,
@@ -646,7 +422,7 @@ func (b *builder) NewAddSubnetValidatorTx(
 	return tx, tx.SyntacticVerify(b.ctx)
 }
 
-func (b *builder) NewRemoveSubnetValidatorTx(
+func (b *Builder) NewRemoveSubnetValidatorTx(
 	nodeID ids.NodeID,
 	subnetID ids.ID,
 	keys []*secp256k1.PrivateKey,
@@ -671,7 +447,7 @@ func (b *builder) NewRemoveSubnetValidatorTx(
 	return tx, tx.SyntacticVerify(b.ctx)
 }
 
-func (b *builder) NewTransferSubnetOwnershipTx(
+func (b *Builder) NewTransferSubnetOwnershipTx(
 	subnetID ids.ID,
 	threshold uint32,
 	ownerAddrs []ids.ShortID,
@@ -703,7 +479,7 @@ func (b *builder) NewTransferSubnetOwnershipTx(
 	return tx, tx.SyntacticVerify(b.ctx)
 }
 
-func (b *builder) NewBaseTx(
+func (b *Builder) NewBaseTx(
 	amount uint64,
 	owner secp256k1fx.OutputOwners,
 	keys []*secp256k1.PrivateKey,
@@ -735,7 +511,7 @@ func (b *builder) NewBaseTx(
 	return tx, tx.SyntacticVerify(b.ctx)
 }
 
-func (b *builder) builders(keys []*secp256k1.PrivateKey) (walletbuilder.Builder, walletsigner.Signer) {
+func (b *Builder) builders(keys []*secp256k1.PrivateKey) (walletbuilder.Builder, walletsigner.Signer) {
 	var (
 		kc      = secp256k1fx.NewKeychain(keys...)
 		addrs   = kc.Addresses()

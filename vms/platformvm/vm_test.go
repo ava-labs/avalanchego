@@ -202,7 +202,7 @@ func defaultGenesis(t *testing.T, avaxAssetID ids.ID) (*api.BuildGenesisArgs, []
 	return &buildGenesisArgs, genesisBytes
 }
 
-func defaultVM(t *testing.T, f fork) (*VM, txbuilder.Builder, database.Database, *mutableSharedMemory) {
+func defaultVM(t *testing.T, f fork) (*VM, *txbuilder.Builder, database.Database, *mutableSharedMemory) {
 	require := require.New(t)
 	var (
 		apricotPhase3Time = mockable.MaxTime
