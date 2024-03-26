@@ -69,6 +69,7 @@ import (
 	txbuilder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	walletbuilder "github.com/ava-labs/avalanchego/wallet/chain/p/builder"
+	walletcommon "github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
 
 const (
@@ -323,8 +324,10 @@ func defaultVM(t *testing.T, f fork) (*VM, *txbuilder.Builder, database.Database
 			},
 		},
 		[]*secp256k1.PrivateKey{keys[0]}, // pays tx fee
-		keys[0].PublicKey().Address(),    // change addr
-		nil,
+		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+		}),
 	)
 	require.NoError(err)
 	vm.ctx.Lock.Unlock()
@@ -439,8 +442,6 @@ func TestAddValidatorCommit(t *testing.T) {
 		},
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[0]},
-		ids.ShortEmpty, // change addr
-		nil,
 	)
 	require.NoError(err)
 
@@ -489,8 +490,6 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 		},
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[0]},
-		ids.ShortEmpty, // change addr
-		nil,
 	)
 	require.NoError(err)
 
@@ -548,8 +547,6 @@ func TestAddValidatorReject(t *testing.T) {
 		},
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[0]},
-		ids.ShortEmpty, // change addr
-		nil,
 	)
 	require.NoError(err)
 
@@ -610,8 +607,6 @@ func TestAddValidatorInvalidNotReissued(t *testing.T) {
 		},
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[0]},
-		ids.ShortEmpty, // change addr
-		nil,
 	)
 	require.NoError(err)
 
@@ -649,8 +644,6 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 			Subnet: testSubnet1.ID(),
 		},
 		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
-		ids.ShortEmpty, // change addr
-		nil,
 	)
 	require.NoError(err)
 
@@ -701,8 +694,6 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 			Subnet: testSubnet1.ID(),
 		},
 		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[1], testSubnet1ControlKeys[2]},
-		ids.ShortEmpty, // change addr
-		nil,
 	)
 	require.NoError(err)
 
@@ -888,8 +879,6 @@ func TestCreateChain(t *testing.T) {
 		nil,
 		"name",
 		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
-		ids.ShortEmpty, // change addr
-		nil,
 	)
 	require.NoError(err)
 
@@ -941,8 +930,10 @@ func TestCreateSubnet(t *testing.T) {
 			},
 		},
 		[]*secp256k1.PrivateKey{keys[0]}, // payer
-		keys[0].PublicKey().Address(),    // change addr
-		nil,
+		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+		}),
 	)
 	require.NoError(err)
 
@@ -989,8 +980,6 @@ func TestCreateSubnet(t *testing.T) {
 			Subnet: createSubnetTx.ID(),
 		},
 		[]*secp256k1.PrivateKey{keys[0]},
-		ids.ShortEmpty, // change addr
-		nil,
 	)
 	require.NoError(err)
 
@@ -1057,8 +1046,6 @@ func TestAtomicImport(t *testing.T) {
 			Addrs:     []ids.ShortID{recipientKey.PublicKey().Address()},
 		},
 		[]*secp256k1.PrivateKey{keys[0]},
-		ids.ShortEmpty, // change addr
-		nil,
 	)
 	require.ErrorIs(err, walletbuilder.ErrInsufficientFunds)
 
@@ -1101,8 +1088,6 @@ func TestAtomicImport(t *testing.T) {
 			Addrs:     []ids.ShortID{recipientKey.PublicKey().Address()},
 		},
 		[]*secp256k1.PrivateKey{recipientKey},
-		ids.ShortEmpty, // change addr
-		nil,
 	)
 	require.NoError(err)
 
@@ -2114,8 +2099,10 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 		},
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[0]},
-		keys[0].Address(),
-		nil,
+		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+		}),
 	)
 	require.NoError(err)
 
@@ -2136,8 +2123,10 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 			Addrs:     []ids.ShortID{id},
 		},
 		[]*secp256k1.PrivateKey{keys[0]},
-		keys[0].Address(),
-		nil,
+		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+		}),
 	)
 	require.NoError(err)
 
@@ -2163,8 +2152,10 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 			Subnet: createSubnetTx.ID(),
 		},
 		[]*secp256k1.PrivateKey{key, keys[1]},
-		keys[1].Address(),
-		nil,
+		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{keys[1].PublicKey().Address()},
+		}),
 	)
 	require.NoError(err)
 
@@ -2172,8 +2163,10 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 		nodeID,
 		createSubnetTx.ID(),
 		[]*secp256k1.PrivateKey{key, keys[2]},
-		keys[2].Address(),
-		nil,
+		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{keys[2].PublicKey().Address()},
+		}),
 	)
 	require.NoError(err)
 
@@ -2212,8 +2205,10 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 			Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
 		},
 		[]*secp256k1.PrivateKey{keys[0]},
-		keys[0].Address(),
-		nil,
+		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+		}),
 	)
 	require.NoError(err)
 	subnetID := createSubnetTx.ID()
@@ -2253,8 +2248,6 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 			Addrs:     []ids.ShortID{keys[1].PublicKey().Address()},
 		},
 		[]*secp256k1.PrivateKey{keys[0]},
-		ids.ShortEmpty, // change addr
-		nil,
 	)
 	require.NoError(err)
 
@@ -2310,8 +2303,10 @@ func TestBaseTx(t *testing.T) {
 			},
 		},
 		[]*secp256k1.PrivateKey{keys[0]},
-		changeAddr,
-		nil,
+		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{changeAddr},
+		}),
 	)
 	require.NoError(err)
 
@@ -2393,8 +2388,10 @@ func TestPruneMempool(t *testing.T) {
 			},
 		},
 		[]*secp256k1.PrivateKey{keys[0]},
-		changeAddr,
-		nil,
+		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{changeAddr},
+		}),
 	)
 	require.NoError(err)
 
@@ -2438,8 +2435,6 @@ func TestPruneMempool(t *testing.T) {
 		},
 		20000,
 		[]*secp256k1.PrivateKey{keys[1]},
-		ids.ShortEmpty,
-		nil,
 	)
 	require.NoError(err)
 

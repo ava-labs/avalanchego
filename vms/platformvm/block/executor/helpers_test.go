@@ -51,6 +51,7 @@ import (
 
 	p_tx_builder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 	pvalidators "github.com/ava-labs/avalanchego/vms/platformvm/validators"
+	walletcommon "github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
 
 const (
@@ -265,8 +266,10 @@ func addSubnet(env *environment) {
 			},
 		},
 		[]*secp256k1.PrivateKey{preFundedKeys[0]},
-		preFundedKeys[0].PublicKey().Address(),
-		nil,
+		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
+		}),
 	)
 	if err != nil {
 		panic(err)
@@ -504,8 +507,6 @@ func addPendingValidator(
 		},
 		reward.PercentDenominator,
 		keys,
-		ids.ShortEmpty,
-		nil,
 	)
 	if err != nil {
 		return nil, err

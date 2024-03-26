@@ -47,19 +47,14 @@ func (b *Builder) NewImportTx(
 	chainID ids.ID,
 	to *secp256k1fx.OutputOwners,
 	keys []*secp256k1.PrivateKey,
-	changeAddr ids.ShortID,
-	memo []byte,
+	options ...common.Option,
 ) (*txs.Tx, error) {
 	pBuilder, pSigner := b.builders(keys)
 
 	utx, err := pBuilder.NewImportTx(
 		chainID,
 		to,
-		common.WithChangeOwner(&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{changeAddr},
-		}),
-		common.WithMemo(memo),
+		options...,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed building import tx: %w", err)
@@ -72,19 +67,14 @@ func (b *Builder) NewExportTx(
 	chainID ids.ID,
 	outputs []*avax.TransferableOutput,
 	keys []*secp256k1.PrivateKey,
-	changeAddr ids.ShortID,
-	memo []byte,
+	options ...common.Option,
 ) (*txs.Tx, error) {
 	pBuilder, pSigner := b.builders(keys)
 
 	utx, err := pBuilder.NewExportTx(
 		chainID,
 		outputs,
-		common.WithChangeOwner(&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{changeAddr},
-		}),
-		common.WithMemo(memo),
+		options...,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed building export tx: %w", err)
@@ -100,8 +90,7 @@ func (b *Builder) NewCreateChainTx(
 	fxIDs []ids.ID,
 	chainName string,
 	keys []*secp256k1.PrivateKey,
-	changeAddr ids.ShortID,
-	memo []byte,
+	options ...common.Option,
 ) (*txs.Tx, error) {
 	pBuilder, pSigner := b.builders(keys)
 
@@ -111,11 +100,7 @@ func (b *Builder) NewCreateChainTx(
 		vmID,
 		fxIDs,
 		chainName,
-		common.WithChangeOwner(&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{changeAddr},
-		}),
-		common.WithMemo(memo),
+		options...,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed building create chain tx: %w", err)
@@ -127,18 +112,13 @@ func (b *Builder) NewCreateChainTx(
 func (b *Builder) NewCreateSubnetTx(
 	owner *secp256k1fx.OutputOwners,
 	keys []*secp256k1.PrivateKey,
-	changeAddr ids.ShortID,
-	memo []byte,
+	options ...common.Option,
 ) (*txs.Tx, error) {
 	pBuilder, pSigner := b.builders(keys)
 
 	utx, err := pBuilder.NewCreateSubnetTx(
 		owner,
-		common.WithChangeOwner(&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{changeAddr},
-		}),
-		common.WithMemo(memo),
+		options...,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed building create subnet tx: %w", err)
@@ -163,8 +143,7 @@ func (b *Builder) NewTransformSubnetTx(
 	maxValidatorWeightFactor byte,
 	uptimeRequirement uint32,
 	keys []*secp256k1.PrivateKey,
-	changeAddr ids.ShortID,
-	memo []byte,
+	options ...common.Option,
 ) (*txs.Tx, error) {
 	pBuilder, pSigner := b.builders(keys)
 
@@ -183,11 +162,7 @@ func (b *Builder) NewTransformSubnetTx(
 		minDelegatorStake,
 		maxValidatorWeightFactor,
 		uptimeRequirement,
-		common.WithChangeOwner(&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{changeAddr},
-		}),
-		common.WithMemo(memo),
+		options...,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed building transform subnet tx: %w", err)
@@ -201,8 +176,7 @@ func (b *Builder) NewAddValidatorTx(
 	rewardsOwner *secp256k1fx.OutputOwners,
 	shares uint32,
 	keys []*secp256k1.PrivateKey,
-	changeAddr ids.ShortID,
-	memo []byte,
+	options ...common.Option,
 ) (*txs.Tx, error) {
 	pBuilder, pSigner := b.builders(keys)
 
@@ -210,11 +184,7 @@ func (b *Builder) NewAddValidatorTx(
 		vdr,
 		rewardsOwner,
 		shares,
-		common.WithChangeOwner(&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{changeAddr},
-		}),
-		common.WithMemo(memo),
+		options...,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed building add validator tx: %w", err)
@@ -231,8 +201,7 @@ func (b *Builder) NewAddPermissionlessValidatorTx(
 	delegationRewardsOwner *secp256k1fx.OutputOwners,
 	shares uint32,
 	keys []*secp256k1.PrivateKey,
-	changeAddr ids.ShortID,
-	memo []byte,
+	options ...common.Option,
 ) (*txs.Tx, error) {
 	pBuilder, pSigner := b.builders(keys)
 
@@ -243,11 +212,7 @@ func (b *Builder) NewAddPermissionlessValidatorTx(
 		validationRewardsOwner,
 		delegationRewardsOwner,
 		shares,
-		common.WithChangeOwner(&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{changeAddr},
-		}),
-		common.WithMemo(memo),
+		options...,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed building add permissionless validator tx: %w", err)
@@ -260,19 +225,14 @@ func (b *Builder) NewAddDelegatorTx(
 	vdr *txs.Validator,
 	rewardsOwner *secp256k1fx.OutputOwners,
 	keys []*secp256k1.PrivateKey,
-	changeAddr ids.ShortID,
-	memo []byte,
+	options ...common.Option,
 ) (*txs.Tx, error) {
 	pBuilder, pSigner := b.builders(keys)
 
 	utx, err := pBuilder.NewAddDelegatorTx(
 		vdr,
 		rewardsOwner,
-		common.WithChangeOwner(&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{changeAddr},
-		}),
-		common.WithMemo(memo),
+		options...,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed building add delegator tx: %w", err)
@@ -286,8 +246,7 @@ func (b *Builder) NewAddPermissionlessDelegatorTx(
 	assetID ids.ID,
 	rewardsOwner *secp256k1fx.OutputOwners,
 	keys []*secp256k1.PrivateKey,
-	changeAddr ids.ShortID,
-	memo []byte,
+	options ...common.Option,
 ) (*txs.Tx, error) {
 	pBuilder, pSigner := b.builders(keys)
 
@@ -295,11 +254,7 @@ func (b *Builder) NewAddPermissionlessDelegatorTx(
 		vdr,
 		assetID,
 		rewardsOwner,
-		common.WithChangeOwner(&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{changeAddr},
-		}),
-		common.WithMemo(memo),
+		options...,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed building add permissionless delegator tx: %w", err)
@@ -311,18 +266,13 @@ func (b *Builder) NewAddPermissionlessDelegatorTx(
 func (b *Builder) NewAddSubnetValidatorTx(
 	vdr *txs.SubnetValidator,
 	keys []*secp256k1.PrivateKey,
-	changeAddr ids.ShortID,
-	memo []byte,
+	options ...common.Option,
 ) (*txs.Tx, error) {
 	pBuilder, pSigner := b.builders(keys)
 
 	utx, err := pBuilder.NewAddSubnetValidatorTx(
 		vdr,
-		common.WithChangeOwner(&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{changeAddr},
-		}),
-		common.WithMemo(memo),
+		options...,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed building add subnet validator tx: %w", err)
@@ -335,19 +285,14 @@ func (b *Builder) NewRemoveSubnetValidatorTx(
 	nodeID ids.NodeID,
 	subnetID ids.ID,
 	keys []*secp256k1.PrivateKey,
-	changeAddr ids.ShortID,
-	memo []byte,
+	options ...common.Option,
 ) (*txs.Tx, error) {
 	pBuilder, pSigner := b.builders(keys)
 
 	utx, err := pBuilder.NewRemoveSubnetValidatorTx(
 		nodeID,
 		subnetID,
-		common.WithChangeOwner(&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{changeAddr},
-		}),
-		common.WithMemo(memo),
+		options...,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed building remove subnet validator tx: %w", err)
@@ -360,19 +305,14 @@ func (b *Builder) NewTransferSubnetOwnershipTx(
 	subnetID ids.ID,
 	owner *secp256k1fx.OutputOwners,
 	keys []*secp256k1.PrivateKey,
-	changeAddr ids.ShortID,
-	memo []byte,
+	options ...common.Option,
 ) (*txs.Tx, error) {
 	pBuilder, pSigner := b.builders(keys)
 
 	utx, err := pBuilder.NewTransferSubnetOwnershipTx(
 		subnetID,
 		owner,
-		common.WithChangeOwner(&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{changeAddr},
-		}),
-		common.WithMemo(memo),
+		options...,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed building transfer subnet ownership tx: %w", err)
@@ -384,18 +324,13 @@ func (b *Builder) NewTransferSubnetOwnershipTx(
 func (b *Builder) NewBaseTx(
 	outputs []*avax.TransferableOutput,
 	keys []*secp256k1.PrivateKey,
-	changeAddr ids.ShortID,
-	memo []byte,
+	options ...common.Option,
 ) (*txs.Tx, error) {
 	pBuilder, pSigner := b.builders(keys)
 
 	utx, err := pBuilder.NewBaseTx(
 		outputs,
-		common.WithChangeOwner(&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{changeAddr},
-		}),
-		common.WithMemo(memo),
+		options...,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed building base tx: %w", err)

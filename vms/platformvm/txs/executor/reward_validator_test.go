@@ -252,8 +252,6 @@ func TestRewardDelegatorTxExecuteOnCommitPreDelegateeDeferral(t *testing.T) {
 		},
 		reward.PercentDenominator/4,
 		[]*secp256k1.PrivateKey{preFundedKeys[0]},
-		ids.ShortEmpty,
-		nil,
 	)
 	require.NoError(err)
 
@@ -272,8 +270,6 @@ func TestRewardDelegatorTxExecuteOnCommitPreDelegateeDeferral(t *testing.T) {
 			Addrs:     []ids.ShortID{delRewardAddress},
 		},
 		[]*secp256k1.PrivateKey{preFundedKeys[0]},
-		ids.ShortEmpty, // Change address
-		nil,
 	)
 	require.NoError(err)
 
@@ -385,8 +381,6 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 		},
 		reward.PercentDenominator/4,
 		[]*secp256k1.PrivateKey{preFundedKeys[0]},
-		ids.ShortEmpty, /*=changeAddr*/
-		nil,
 	)
 	require.NoError(err)
 
@@ -405,8 +399,6 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 			Addrs:     []ids.ShortID{delRewardAddress},
 		},
 		[]*secp256k1.PrivateKey{preFundedKeys[0]},
-		ids.ShortEmpty, /*=changeAddr*/
-		nil,
 	)
 	require.NoError(err)
 
@@ -613,8 +605,6 @@ func TestRewardDelegatorTxAndValidatorTxExecuteOnCommitPostDelegateeDeferral(t *
 		},
 		reward.PercentDenominator/4,
 		[]*secp256k1.PrivateKey{preFundedKeys[0]},
-		ids.ShortEmpty,
-		nil,
 	)
 	require.NoError(err)
 
@@ -633,8 +623,6 @@ func TestRewardDelegatorTxAndValidatorTxExecuteOnCommitPostDelegateeDeferral(t *
 			Addrs:     []ids.ShortID{delRewardAddress},
 		},
 		[]*secp256k1.PrivateKey{preFundedKeys[0]},
-		ids.ShortEmpty, // Change address
-		nil,
 	)
 	require.NoError(err)
 
@@ -787,8 +775,6 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 		},
 		reward.PercentDenominator/4,
 		[]*secp256k1.PrivateKey{preFundedKeys[0]},
-		ids.ShortEmpty,
-		nil,
 	)
 	require.NoError(err)
 
@@ -806,8 +792,6 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 			Addrs:     []ids.ShortID{delRewardAddress},
 		},
 		[]*secp256k1.PrivateKey{preFundedKeys[0]},
-		ids.ShortEmpty,
-		nil,
 	)
 	require.NoError(err)
 

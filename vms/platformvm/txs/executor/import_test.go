@@ -120,8 +120,6 @@ func TestNewImportTx(t *testing.T) {
 				tt.sourceChainID,
 				to,
 				tt.sourceKeys,
-				ids.ShortEmpty,
-				nil,
 			)
 			require.ErrorIs(err, tt.expectedErr)
 			if tt.expectedErr != nil {
