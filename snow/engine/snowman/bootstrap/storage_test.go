@@ -52,7 +52,8 @@ func TestGetMissingBlockIDs(t *testing.T) {
 			db,
 			tree,
 			lastAcceptedHeight,
-			blocks[5],
+			5,
+			blocks[5].Bytes(),
 		)
 		require.NoError(err)
 
@@ -79,7 +80,8 @@ func TestGetMissingBlockIDs(t *testing.T) {
 			db,
 			tree,
 			lastAcceptedHeight,
-			blocks[3],
+			3,
+			blocks[3].Bytes(),
 		)
 		require.NoError(err)
 
@@ -107,7 +109,8 @@ func TestGetMissingBlockIDs(t *testing.T) {
 			db,
 			tree,
 			lastAcceptedHeight,
-			blocks[2],
+			2,
+			blocks[2].Bytes(),
 		)
 		require.NoError(err)
 
@@ -134,7 +137,8 @@ func TestGetMissingBlockIDs(t *testing.T) {
 			db,
 			tree,
 			lastAcceptedHeight,
-			blocks[6],
+			6,
+			blocks[6].Bytes(),
 		)
 		require.NoError(err)
 
@@ -172,7 +176,8 @@ func TestExecute(t *testing.T) {
 			db,
 			tree,
 			lastAcceptedHeight,
-			block,
+			block.Height(),
+			block.Bytes(),
 		)
 		require.NoError(err)
 		require.False(newlyWantsParent)
@@ -213,7 +218,8 @@ func TestExecuteExitsWhenCancelled(t *testing.T) {
 			db,
 			tree,
 			lastAcceptedHeight,
-			block,
+			block.Height(),
+			block.Bytes(),
 		)
 		require.NoError(err)
 		require.False(newlyWantsParent)
@@ -263,7 +269,8 @@ func TestExecuteSkipsAcceptedBlocks(t *testing.T) {
 			db,
 			tree,
 			lastAcceptedHeightWhenAdding,
-			block,
+			block.Height(),
+			block.Bytes(),
 		)
 		require.NoError(err)
 		require.False(newlyWantsParent)

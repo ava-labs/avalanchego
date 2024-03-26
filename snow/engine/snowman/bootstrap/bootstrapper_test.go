@@ -1378,7 +1378,7 @@ func TestBootstrapNoParseOnNew(t *testing.T) {
 	intervalDB := memdb.New()
 	tree, err := interval.NewTree(intervalDB)
 	require.NoError(err)
-	_, err = interval.Add(intervalDB, tree, 0, blk1)
+	_, err = interval.Add(intervalDB, tree, 0, blk1.Height(), blk1.Bytes())
 	require.NoError(err)
 
 	vm.GetBlockF = nil
