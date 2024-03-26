@@ -5,7 +5,6 @@ package interval
 
 import (
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 )
 
 // Add the block to the tree and return if the parent block should be fetched,
@@ -14,17 +13,13 @@ func Add(
 	db database.KeyValueWriterDeleter,
 	tree *Tree,
 	lastAcceptedHeight uint64,
-	blk snowman.Block,
+	height uint64,
+	blkBytes []byte,
 ) (bool, error) {
-	var (
-		height            = blk.Height()
-		lastHeightToFetch = lastAcceptedHeight + 1
-	)
-	if height < lastHeightToFetch || tree.Contains(height) {
+	if height <= lastAcceptedHeight || tree.Contains(height) {
 		return false, nil
 	}
 
-	blkBytes := blk.Bytes()
 	if err := PutBlock(db, height, blkBytes); err != nil {
 		return false, err
 	}
@@ -33,7 +28,9 @@ func Add(
 		return false, err
 	}
 
-	return height != lastHeightToFetch && !tree.Contains(height-1), nil
+	// We know that height is greater than lastAcceptedHeight here, so
+	// lastAcceptedHeight+1 is guaranteed not to overflow.
+	return height != lastAcceptedHeight+1 && !tree.Contains(height-1), nil
 }
 
 // Remove the block from the tree.
