@@ -157,12 +157,11 @@ func TestRemove(t *testing.T) {
 	t.Run("removing a block", func(t *testing.T) {
 		require := require.New(t)
 
-		err := Remove(
+		require.NoError(Remove(
 			db,
 			tree,
 			blocks[5].Height(),
-		)
-		require.NoError(err)
+		))
 		require.Zero(tree.Len())
 
 		_, err = GetBlock(db, blocks[5].Height())
