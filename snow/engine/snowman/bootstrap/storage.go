@@ -206,9 +206,9 @@ func execute(
 			)
 
 			log("executing blocks",
-				zap.Duration("eta", eta),
 				zap.Uint64("numExecuted", numProcessed),
 				zap.Uint64("numToExecute", totalNumberToProcess),
+				zap.Duration("eta", eta),
 			)
 			timeOfNextLog = now.Add(logPeriod)
 		}
