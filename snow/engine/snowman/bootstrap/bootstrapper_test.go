@@ -392,8 +392,8 @@ func TestBootstrapperAncestors(t *testing.T) {
 		requestID uint32
 		requested ids.ID
 	)
-	sender.SendGetAncestorsF = func(_ context.Context, vdr ids.NodeID, reqID uint32, blkID ids.ID) {
-		require.Equal(peerID, vdr)
+	sender.SendGetAncestorsF = func(_ context.Context, nodeID ids.NodeID, reqID uint32, blkID ids.ID) {
+		require.Equal(peerID, nodeID)
 		require.Equal(blks[3].ID(), blkID)
 		requestID = reqID
 		requested = blkID
@@ -434,8 +434,8 @@ func TestBootstrapperFinalized(t *testing.T) {
 	require.NoError(bs.Start(context.Background(), 0))
 
 	requestIDs := map[ids.ID]uint32{}
-	sender.SendGetAncestorsF = func(_ context.Context, vdr ids.NodeID, reqID uint32, blkID ids.ID) {
-		require.Equal(peerID, vdr)
+	sender.SendGetAncestorsF = func(_ context.Context, nodeID ids.NodeID, reqID uint32, blkID ids.ID) {
+		require.Equal(peerID, nodeID)
 		requestIDs[blkID] = reqID
 	}
 
