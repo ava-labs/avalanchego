@@ -107,7 +107,6 @@ func TestNewImportTx(t *testing.T) {
 	}
 
 	to := &secp256k1fx.OutputOwners{
-		Locktime:  0,
 		Threshold: 1,
 		Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
 	}
