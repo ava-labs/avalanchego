@@ -11,7 +11,7 @@ This API can be used for measuring node health.
 
 :::info
 
-This API set is for a specific node, it is unavailable on the [public server](/tooling/rpc-providers.md).
+This API set is for a specific node; it is unavailable on the [public server](/tooling/rpc-providers.md).
 
 :::
 
@@ -28,9 +28,8 @@ you want to see by using `tags` filters. Returned results will only include heal
 match the specified tags and global health checks like `network`, `database` etc.
 When filtered, the returned results will not show the full node health,
 but only a subset of filtered health checks.
-This means the node can be still unhealthy in unfiltered checks, even if the returned results show that
-the node is healthy.
-AvalancheGo supports filtering tags by subnetIDs.
+This means the node can still be unhealthy in unfiltered checks, even if the returned results show that the node is healthy.
+AvalancheGo supports using subnetIDs as tags.
 
 ## GET Request
 
@@ -63,7 +62,7 @@ For example, to filter health results by subnetID `29uVeLPJB1eQJkzRemU8g8wZDw5uJ
 curl 'http://localhost:9650/ext/health?tag=29uVeLPJB1eQJkzRemU8g8wZDw5uJRqpab5U2mX9euieVwiEbL&tag=28nrH5T2BMvNrWecFcV3mfccjs6axM1TVyqe79MCv2Mhs8kxiY'
 ```
 
-Returned results will contain checks for both subnetIDs and global health checks.
+The returned results will include health checks for both subnetIDs as well as global health checks.
 
 ### Endpoints
 
