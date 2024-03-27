@@ -5,7 +5,6 @@ package executor
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
@@ -18,8 +17,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm/state"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/executor"
+	"github.com/ava-labs/avalanchego/vms/avm/txs/fees"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/mempool"
-	"github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 var (
@@ -171,31 +170,14 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 		return err
 	}
 
-	feeRates, err := stateDiff.GetFeeRates()
-	if err != nil {
-		return fmt.Errorf("failed retrieving fee rates: %w", err)
-	}
-	parentBlkComplexity, err := stateDiff.GetLastBlockComplexity()
-	if err != nil {
-		return fmt.Errorf("failed retrieving last block complexity: %w", err)
-	}
-
 	var (
-		chainTime = m.state.GetTimestamp()
-		isEActive = m.backend.Config.IsEActivated(chainTime)
+		isEActive = m.backend.Config.IsEActivated(parentBlkTime)
 		feesCfg   = config.GetDynamicFeesConfig(isEActive)
 	)
 
-	feeManager := fees.NewManager(feeRates)
-	if isEActive {
-		if err := feeManager.UpdateFeeRates(
-			feesCfg,
-			parentBlkComplexity,
-			parentBlkTime.Unix(),
-			nextBlkTime.Unix(),
-		); err != nil {
-			return fmt.Errorf("failed updating fee rates, %w", err)
-		}
+	feeManager, err := fees.UpdatedFeeManager(m.state, m.backend.Config, parentBlkTime, nextBlkTime)
+	if err != nil {
+		return err
 	}
 
 	err = tx.Unsigned.Visit(&executor.SemanticVerifier{

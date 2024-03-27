@@ -22,8 +22,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/avm/block/executor"
-	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
+	"github.com/ava-labs/avalanchego/vms/avm/txs/fees"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/keystore"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -712,29 +712,12 @@ func (s *Service) GetFeeRates(_ *http.Request, _ *struct{}, reply *GetFeeRatesRe
 		return nil
 	}
 
-	var (
-		currentTimestamp = onAccept.GetTimestamp()
-		feesCfg          = config.GetDynamicFeesConfig(isEActivated)
-	)
-
-	parentBlkComplexity, err := onAccept.GetLastBlockComplexity()
+	feeManager, err := fees.UpdatedFeeManager(onAccept, &s.vm.Config, onAccept.GetTimestamp(), nextTimestamp)
 	if err != nil {
 		return err
 	}
 
-	feeManager := commonfees.NewManager(currentFeeRates)
-	if isEActivated {
-		if err := feeManager.UpdateFeeRates(
-			feesCfg,
-			parentBlkComplexity,
-			currentTimestamp.Unix(),
-			nextTimestamp.Unix(),
-		); err != nil {
-			return fmt.Errorf("failed updating fee rates, %w", err)
-		}
-	}
 	reply.NextFeeRates = feeManager.GetFeeRates()
-
 	return nil
 }
 
