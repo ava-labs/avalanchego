@@ -704,7 +704,7 @@ func (n *Network) CreateSubnets(ctx context.Context, w io.Writer) error {
 		return nil
 	}
 
-	if _, err := fmt.Fprintf(w, "Restarting node(s) to pick up chain configuration\n"); err != nil {
+	if _, err := fmt.Fprintln(w, "Restarting node(s) to pick up chain configuration"); err != nil {
 		return err
 	}
 
