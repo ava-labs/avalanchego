@@ -103,71 +103,103 @@ func TestGetMissingBlockIDs(t *testing.T) {
 func TestProcess(t *testing.T) {
 	blocks := generateBlockchain(7)
 
-	db := memdb.New()
-	tree, err := interval.NewTree(db)
-	require.NoError(t, err)
-	lastAcceptedHeight := uint64(1)
-
-	t.Run("adding first block", func(t *testing.T) {
-		require := require.New(t)
-
-		missingIDs := set.Of(blocks[6].ID())
-		parentID, shouldFetchParentID, err := process(
-			db,
-			tree,
-			missingIDs,
-			lastAcceptedHeight,
-			blocks[6],
-			map[ids.ID]snowman.Block{
-				blocks[2].ID(): blocks[2],
-			},
-		)
-		require.NoError(err)
-		require.True(shouldFetchParentID)
-		require.Equal(blocks[5].ID(), parentID)
-		require.Equal(uint64(1), tree.Len())
-		require.Empty(missingIDs)
-	})
-
-	t.Run("adding multiple blocks", func(t *testing.T) {
-		require := require.New(t)
-
-		missingIDs := set.Of(blocks[5].ID())
-		parentID, shouldFetchParentID, err := process(
-			db,
-			tree,
-			missingIDs,
-			lastAcceptedHeight,
-			blocks[5],
-			map[ids.ID]snowman.Block{
+	tests := []struct {
+		name                        string
+		initialBlocks               []snowman.Block
+		lastAcceptedHeight          uint64
+		missingBlockIDs             set.Set[ids.ID]
+		blk                         snowman.Block
+		ancestors                   map[ids.ID]snowman.Block
+		expectedParentID            ids.ID
+		expectedShouldFetchParentID bool
+		expectedMissingBlockIDs     set.Set[ids.ID]
+	}{
+		{
+			name:                        "add single block",
+			initialBlocks:               nil,
+			lastAcceptedHeight:          0,
+			missingBlockIDs:             set.Of(blocks[5].ID()),
+			blk:                         blocks[5],
+			ancestors:                   nil,
+			expectedParentID:            blocks[4].ID(),
+			expectedShouldFetchParentID: true,
+			expectedMissingBlockIDs:     set.Set[ids.ID]{},
+		},
+		{
+			name:               "add multiple blocks",
+			initialBlocks:      nil,
+			lastAcceptedHeight: 0,
+			missingBlockIDs:    set.Of(blocks[5].ID()),
+			blk:                blocks[5],
+			ancestors: map[ids.ID]snowman.Block{
 				blocks[4].ID(): blocks[4],
+			},
+			expectedParentID:            blocks[3].ID(),
+			expectedShouldFetchParentID: true,
+			expectedMissingBlockIDs:     set.Set[ids.ID]{},
+		},
+		{
+			name:               "ignore non-consecutive blocks",
+			initialBlocks:      nil,
+			lastAcceptedHeight: 0,
+			missingBlockIDs:    set.Of(blocks[3].ID(), blocks[5].ID()),
+			blk:                blocks[5],
+			ancestors: map[ids.ID]snowman.Block{
 				blocks[3].ID(): blocks[3],
 			},
-		)
-		require.NoError(err)
-		require.True(shouldFetchParentID)
-		require.Equal(blocks[2].ID(), parentID)
-		require.Equal(uint64(4), tree.Len())
-		require.Empty(missingIDs)
-	})
+			expectedParentID:            blocks[4].ID(),
+			expectedShouldFetchParentID: true,
+			expectedMissingBlockIDs:     set.Of(blocks[3].ID()),
+		},
+		{
+			name:                        "do not request the last accepted block",
+			initialBlocks:               nil,
+			lastAcceptedHeight:          2,
+			missingBlockIDs:             set.Of(blocks[3].ID()),
+			blk:                         blocks[3],
+			ancestors:                   nil,
+			expectedParentID:            ids.Empty,
+			expectedShouldFetchParentID: false,
+			expectedMissingBlockIDs:     set.Set[ids.ID]{},
+		},
+		{
+			name:                        "do not request already known block",
+			initialBlocks:               []snowman.Block{blocks[2]},
+			lastAcceptedHeight:          0,
+			missingBlockIDs:             set.Of(blocks[1].ID(), blocks[3].ID()),
+			blk:                         blocks[3],
+			ancestors:                   nil,
+			expectedParentID:            ids.Empty,
+			expectedShouldFetchParentID: false,
+			expectedMissingBlockIDs:     set.Of(blocks[1].ID()),
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
 
-	t.Run("do not request last accepted block", func(t *testing.T) {
-		require := require.New(t)
+			db := memdb.New()
+			tree, err := interval.NewTree(db)
+			require.NoError(err)
+			for _, blk := range test.initialBlocks {
+				_, err := interval.Add(db, tree, 0, blk.Height(), blk.Bytes())
+				require.NoError(err)
+			}
 
-		missingIDs := set.Of(blocks[2].ID())
-		_, shouldFetchParentID, err := process(
-			db,
-			tree,
-			missingIDs,
-			lastAcceptedHeight,
-			blocks[2],
-			nil,
-		)
-		require.NoError(err)
-		require.False(shouldFetchParentID)
-		require.Equal(uint64(5), tree.Len())
-		require.Empty(missingIDs)
-	})
+			parentID, shouldFetchParentID, err := process(
+				db,
+				tree,
+				test.missingBlockIDs,
+				test.lastAcceptedHeight,
+				test.blk,
+				test.ancestors,
+			)
+			require.NoError(err)
+			require.Equal(test.expectedShouldFetchParentID, shouldFetchParentID)
+			require.Equal(test.expectedParentID, parentID)
+			require.Equal(test.expectedMissingBlockIDs, test.missingBlockIDs)
+		})
+	}
 }
 
 func TestExecute(t *testing.T) {
