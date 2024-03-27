@@ -317,7 +317,7 @@ func (n *Network) Start(ctx context.Context, w io.Writer) error {
 		}
 	}
 
-	if _, err := fmt.Fprintf(w, "Waiting for all nodes to report healthy...\n\n"); err != nil {
+	if _, err := fmt.Fprint(w, "Waiting for all nodes to report healthy...\n\n"); err != nil {
 		return err
 	}
 	if err := n.WaitForHealthy(ctx, w); err != nil {
@@ -437,7 +437,7 @@ func (n *Network) Stop(ctx context.Context) error {
 
 // Restarts all non-ephemeral nodes in the network.
 func (n *Network) Restart(ctx context.Context, w io.Writer) error {
-	if _, err := fmt.Fprintf(w, " restarting network\n"); err != nil {
+	if _, err := fmt.Fprintln(w, " restarting network"); err != nil {
 		return err
 	}
 	for _, node := range n.Nodes {
@@ -600,7 +600,7 @@ func (n *Network) CreateSubnets(ctx context.Context, w io.Writer) error {
 	}
 
 	// Reconfigure nodes for the new subnets
-	if _, err := fmt.Fprintf(w, "Configured nodes to track new subnet(s). Restart is required.\n"); err != nil {
+	if _, err := fmt.Fprintln(w, "Configured nodes to track new subnet(s). Restart is required."); err != nil {
 		return err
 	}
 	for _, node := range n.Nodes {

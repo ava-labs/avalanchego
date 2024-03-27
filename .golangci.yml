@@ -166,6 +166,7 @@ linters-settings:
         arguments:
           - "fmt\\.Fprint"
           - "fmt\\.Fprintf"
+          - "fmt\\.Fprintln"
           - "fmt\\.Print"
           - "fmt\\.Printf"
           - "fmt\\.Println"
