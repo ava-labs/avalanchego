@@ -515,7 +515,7 @@ func (n *Network) EnsureNodeConfig(node *Node) error {
 		subnetDir := n.getSubnetDir()
 		if _, err := os.Stat(subnetDir); err == nil {
 			defaultFlags[config.SubnetConfigDirKey] = subnetDir
-		} else if err != nil && !errors.Is(err, os.ErrNotExist) {
+		} else if !errors.Is(err, os.ErrNotExist) {
 			return err
 		}
 
