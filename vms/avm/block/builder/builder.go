@@ -6,8 +6,6 @@ package builder
 import (
 	"context"
 	"errors"
-	"fmt"
-	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -18,11 +16,12 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/state"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
+	"github.com/ava-labs/avalanchego/vms/avm/txs/fees"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/mempool"
-	"github.com/ava-labs/avalanchego/vms/components/fees"
 
 	blockexecutor "github.com/ava-labs/avalanchego/vms/avm/block/executor"
 	txexecutor "github.com/ava-labs/avalanchego/vms/avm/txs/executor"
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 // targetBlockSize is the max block size we aim to produce
@@ -98,7 +97,7 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 		feesCfg   = config.GetDynamicFeesConfig(isEActive)
 	)
 
-	feeManager, err := UpdatedFeeManager(stateDiff, b.backend.Config, chainTime, nextBlkTime)
+	feeManager, err := fees.UpdatedFeeManager(stateDiff, b.backend.Config, parentBlkTime, nextBlkTime)
 	if err != nil {
 		return nil, err
 	}
@@ -113,7 +112,7 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 		// pre e upgrade is active, we fill blocks till a target size
 		// post e upgrade is active, we fill blocks till a target complexity
 		done := (!isEActive && txSize > remainingSize) ||
-			(isEActive && !fees.Compare(feeManager.GetCumulatedComplexity(), feesCfg.BlockTargetComplexityRate))
+			(isEActive && !commonfees.Compare(feeManager.GetCumulatedComplexity(), feesCfg.BlockTargetComplexityRate))
 		if done {
 			break
 		}
@@ -191,37 +190,4 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 	}
 
 	return b.manager.NewBlock(statelessBlk), nil
-}
-
-func UpdatedFeeManager(state state.Chain, cfg *config.Config, parentBlkTime, nextBlkTime time.Time) (*fees.Manager, error) {
-	var (
-		chainTime = state.GetTimestamp()
-		isEActive = cfg.IsEActivated(chainTime)
-		feeCfg    = config.GetDynamicFeesConfig(isEActive)
-	)
-
-	// nextBlkTime := executor.NextBlockTime(chainTime, clk)
-
-	feeRates, err := state.GetFeeRates()
-	if err != nil {
-		return nil, fmt.Errorf("failed retrieving fee rates: %w", err)
-	}
-	parentBlkComplexity, err := state.GetLastBlockComplexity()
-	if err != nil {
-		return nil, fmt.Errorf("failed retrieving last block complexity: %w", err)
-	}
-
-	feeManager := fees.NewManager(feeRates)
-	if isEActive {
-		if err := feeManager.UpdateFeeRates(
-			feeCfg,
-			parentBlkComplexity,
-			parentBlkTime.Unix(),
-			nextBlkTime.Unix(),
-		); err != nil {
-			return nil, fmt.Errorf("failed updating fee rates, %w", err)
-		}
-	}
-
-	return feeManager, nil
 }

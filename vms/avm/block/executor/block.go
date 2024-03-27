@@ -20,7 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/state"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/executor"
-	"github.com/ava-labs/avalanchego/vms/components/fees"
+	"github.com/ava-labs/avalanchego/vms/avm/txs/fees"
 )
 
 const SyncBound = 10 * time.Second
@@ -132,30 +132,14 @@ func (b *Block) Verify(context.Context) error {
 		atomicRequests: make(map[ids.ID]*atomic.Requests),
 	}
 
-	feeRates, err := stateDiff.GetFeeRates()
-	if err != nil {
-		return fmt.Errorf("failed retrieving fee rates: %w", err)
-	}
-	parentBlkComplexitty, err := stateDiff.GetLastBlockComplexity()
-	if err != nil {
-		return fmt.Errorf("failed retrieving last block complexity: %w", err)
-	}
-
 	var (
 		isEActive = b.manager.backend.Config.IsEActivated(parentChainTime)
 		feesCfg   = config.GetDynamicFeesConfig(isEActive)
 	)
 
-	feeManager := fees.NewManager(feeRates)
-	if isEActive {
-		if err := feeManager.UpdateFeeRates(
-			feesCfg,
-			parentBlkComplexitty,
-			parentChainTime.Unix(),
-			newChainTime.Unix(),
-		); err != nil {
-			return fmt.Errorf("failed updating fee rates, %w", err)
-		}
+	feeManager, err := fees.UpdatedFeeManager(stateDiff, b.manager.backend.Config, parentChainTime, newChainTime)
+	if err != nil {
+		return err
 	}
 
 	for _, tx := range txs {
@@ -228,7 +212,7 @@ func (b *Block) Verify(context.Context) error {
 	// state diff.
 	if isEActive {
 		stateDiff.SetFeeRates(feeManager.GetFeeRates())
-		stateDiff.SetLastBlockComplexity(parentBlkComplexitty)
+		stateDiff.SetLastBlockComplexity(feeManager.GetCumulatedComplexity())
 	}
 
 	stateDiff.SetLastAccepted(blkID)

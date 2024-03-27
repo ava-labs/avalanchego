@@ -21,9 +21,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/vms/avm/block/builder"
 	"github.com/ava-labs/avalanchego/vms/avm/block/executor"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
+	"github.com/ava-labs/avalanchego/vms/avm/txs/fees"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/keystore"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -715,12 +715,12 @@ func (s *Service) GetFeeRates(_ *http.Request, _ *struct{}, reply *GetFeeRatesRe
 		return nil
 	}
 
-	feeManager, err := builder.UpdatedFeeManager(onAccept, &s.vm.Config, currentTimestamp, nextTimestamp)
+	feeManager, err := fees.UpdatedFeeManager(onAccept, &s.vm.Config, currentTimestamp, nextTimestamp)
 	if err != nil {
 		return err
 	}
-	reply.NextFeeRates = feeManager.GetFeeRates()
 
+	reply.NextFeeRates = feeManager.GetFeeRates()
 	return nil
 }
 
