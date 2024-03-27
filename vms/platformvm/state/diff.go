@@ -209,6 +209,10 @@ func (d *diff) GetCurrentStakerIterator() (StakerIterator, error) {
 	return d.currentStakerDiffs.GetStakerIterator(parentIterator), nil
 }
 
+func (d *diff) GetStakerRewardAttributes(stakerID ids.ID) (*StakerRewardAttributes, error) {
+	return getStakerRewardAttributes(d, stakerID)
+}
+
 func (d *diff) GetPendingValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, error) {
 	// If the validator was modified in this diff, return the modified
 	// validator.
@@ -328,6 +332,10 @@ func (d *diff) AddChain(createChainTx *txs.Tx) {
 	} else {
 		d.addedChains[tx.SubnetID] = append(d.addedChains[tx.SubnetID], createChainTx)
 	}
+}
+
+func (d *diff) GetChainSubnet(chainID ids.ID) (ids.ID, error) {
+	return getChainSubnet(d, chainID)
 }
 
 func (d *diff) GetTx(txID ids.ID) (*txs.Tx, status.Status, error) {
