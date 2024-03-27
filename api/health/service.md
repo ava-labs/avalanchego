@@ -74,7 +74,6 @@ The available endpoints for GET requests are:
 - `/ext/health/health` is the same as `/ext/health`.
 - `/ext/health/readiness` returns healthy once the node has finished initializing.
 - `/ext/health/liveness` returns healthy once the endpoint is avialable.
-  It is useful to ensure that requests are being handled by the node.
 
 ## JSON RPC Request
 
