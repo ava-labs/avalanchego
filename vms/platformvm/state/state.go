@@ -88,7 +88,7 @@ var (
 	FeeRatesKey          = []byte("fee rates")
 	LastBlkComplexityKey = []byte("last complexity")
 	InitializedKey       = []byte("initialized")
-  BlocksReindexedKey = []byte("blocks reindexed")
+	BlocksReindexedKey   = []byte("blocks reindexed")
 )
 
 // Chain collects all methods to manage the state of the chain for block
