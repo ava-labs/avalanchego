@@ -241,10 +241,10 @@ func TestRewardDelegatorTxExecuteOnCommitPreDelegateeDeferral(t *testing.T) {
 
 	vdrTx, err := env.txBuilder.NewAddValidatorTx(
 		&txs.Validator{
-			NodeID: vdrNodeID, // node ID
+			NodeID: vdrNodeID,
 			Start:  vdrStartTime,
 			End:    vdrEndTime,
-			Wght:   env.config.MinValidatorStake, // stakeAmt
+			Wght:   env.config.MinValidatorStake,
 		},
 		&secp256k1fx.OutputOwners{
 			Threshold: 1,
