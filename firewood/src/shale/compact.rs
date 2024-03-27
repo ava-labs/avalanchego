@@ -324,6 +324,8 @@ impl<M: LinearStore> StoreInner<M> {
         let desc_size = ChunkDescriptor::SERIALIZED_LEN;
         // TODO: subtracting two disk addresses is only used here, probably can rewrite this
         // debug_assert!((desc_addr.0 - self.header.base_addr.value.into()) % desc_size == 0);
+
+        // Move the last descriptor to the position of the deleted descriptor
         #[allow(clippy::unwrap_used)]
         self.header
             .meta_store_tail
@@ -331,13 +333,16 @@ impl<M: LinearStore> StoreInner<M> {
             .unwrap();
 
         if desc_addr != DiskAddress(**self.header.meta_store_tail) {
-            let desc_last = self.get_descriptor(*self.header.meta_store_tail.value)?;
+            let last_desc = self.get_descriptor(*self.header.meta_store_tail.value)?;
+
             let mut desc = self.get_descriptor(desc_addr)?;
             #[allow(clippy::unwrap_used)]
-            desc.modify(|r| *r = *desc_last).unwrap();
-            let mut header = self.get_header(desc.haddr.into())?;
+            desc.modify(|r| *r = *last_desc).unwrap();
+
+            // `chunk_header` is associated with the deleted descriptor
+            let mut chunk_header = self.get_header(desc.haddr.into())?;
             #[allow(clippy::unwrap_used)]
-            header.modify(|h| h.desc_addr = desc_addr).unwrap();
+            chunk_header.modify(|h| h.desc_addr = desc_addr).unwrap();
         }
 
         Ok(())
@@ -355,58 +360,62 @@ impl<M: LinearStore> StoreInner<M> {
     }
 
     fn free(&mut self, addr: u64) -> Result<(), ShaleError> {
-        let regn_size = 1 << self.regn_nbit;
+        let region_size = 1 << self.regn_nbit;
 
-        let mut offset = addr - ChunkHeader::SERIALIZED_LEN;
+        let header_offset = addr - ChunkHeader::SERIALIZED_LEN;
         let header_chunk_size = {
-            let header = self.get_header(DiskAddress::from(offset as usize))?;
+            let header = self.get_header(DiskAddress::from(header_offset as usize))?;
             assert!(!header.is_freed);
             header.chunk_size
         };
-        let mut h = offset;
-        let mut chunk_size = header_chunk_size;
+        let mut free_header_offset = header_offset;
+        let mut free_chunk_size = header_chunk_size;
 
-        if offset & (regn_size - 1) > 0 {
-            // merge with lower data segment
-            offset -= ChunkFooter::SERIALIZED_LEN;
-            let (pheader_is_freed, pheader_chunk_size, pheader_desc_addr) = {
-                let pfooter = self.get_footer(DiskAddress::from(offset as usize))?;
-                offset -= pfooter.chunk_size + ChunkHeader::SERIALIZED_LEN;
-                let pheader = self.get_header(DiskAddress::from(offset as usize))?;
-                (pheader.is_freed, pheader.chunk_size, pheader.desc_addr)
-            };
-            if pheader_is_freed {
-                h = offset;
-                chunk_size +=
-                    ChunkHeader::SERIALIZED_LEN + ChunkFooter::SERIALIZED_LEN + pheader_chunk_size;
-                self.delete_descriptor(pheader_desc_addr)?;
+        if header_offset & (region_size - 1) > 0 {
+            // TODO danlaine: document what this condition means.
+            // merge with previous chunk if it's freed.
+            let prev_footer_offset = header_offset - ChunkFooter::SERIALIZED_LEN;
+            let prev_footer = self.get_footer(DiskAddress::from(prev_footer_offset as usize))?;
+
+            let prev_header_offset =
+                prev_footer_offset - prev_footer.chunk_size - ChunkHeader::SERIALIZED_LEN;
+            let prev_header = self.get_header(DiskAddress::from(prev_header_offset as usize))?;
+
+            if prev_header.is_freed {
+                free_header_offset = prev_header_offset;
+                free_chunk_size += ChunkHeader::SERIALIZED_LEN
+                    + ChunkFooter::SERIALIZED_LEN
+                    + prev_header.chunk_size;
+                self.delete_descriptor(prev_header.desc_addr)?;
             }
         }
 
-        offset = addr + header_chunk_size;
-        let mut f = offset;
+        let footer_offset = addr + header_chunk_size;
+        let mut free_footer_offset = footer_offset;
 
         #[allow(clippy::unwrap_used)]
-        if offset + ChunkFooter::SERIALIZED_LEN < self.header.data_store_tail.unwrap().get() as u64
-            && (regn_size - (offset & (regn_size - 1)))
+        if footer_offset + ChunkFooter::SERIALIZED_LEN
+            < self.header.data_store_tail.unwrap().get() as u64
+            && (region_size - (footer_offset & (region_size - 1)))
                 >= ChunkFooter::SERIALIZED_LEN + ChunkHeader::SERIALIZED_LEN
         {
-            // merge with higher data segment
-            offset += ChunkFooter::SERIALIZED_LEN;
-            let (nheader_is_freed, nheader_chunk_size, nheader_desc_addr) = {
-                let nheader = self.get_header(DiskAddress::from(offset as usize))?;
-                (nheader.is_freed, nheader.chunk_size, nheader.desc_addr)
-            };
-            if nheader_is_freed {
-                offset += ChunkHeader::SERIALIZED_LEN + nheader_chunk_size;
-                f = offset;
+            // TODO danlaine: document what this condition means.
+            // merge with next chunk if it's freed.
+            let next_header_offset = footer_offset + ChunkFooter::SERIALIZED_LEN;
+            let next_header = self.get_header(DiskAddress::from(next_header_offset as usize))?;
+            if next_header.is_freed {
+                let next_footer_offset =
+                    next_header_offset + ChunkHeader::SERIALIZED_LEN + next_header.chunk_size;
+                free_footer_offset = next_footer_offset;
                 {
-                    let nfooter = self.get_footer(DiskAddress::from(offset as usize))?;
-                    assert!(nheader_chunk_size == nfooter.chunk_size);
+                    let next_footer =
+                        self.get_footer(DiskAddress::from(next_footer_offset as usize))?;
+                    assert!(next_header.chunk_size == next_footer.chunk_size);
                 }
-                chunk_size +=
-                    ChunkHeader::SERIALIZED_LEN + ChunkFooter::SERIALIZED_LEN + nheader_chunk_size;
-                self.delete_descriptor(nheader_desc_addr)?;
+                free_chunk_size += ChunkHeader::SERIALIZED_LEN
+                    + ChunkFooter::SERIALIZED_LEN
+                    + next_header.chunk_size;
+                self.delete_descriptor(next_header.desc_addr)?;
             }
         }
 
@@ -415,22 +424,26 @@ impl<M: LinearStore> StoreInner<M> {
             let mut desc = self.get_descriptor(desc_addr)?;
             #[allow(clippy::unwrap_used)]
             desc.modify(|d| {
-                d.chunk_size = chunk_size;
-                d.haddr = h as usize;
+                d.chunk_size = free_chunk_size;
+                d.haddr = free_header_offset as usize;
             })
             .unwrap();
         }
-        let mut h = self.get_header(DiskAddress::from(h as usize))?;
-        let mut f = self.get_footer(DiskAddress::from(f as usize))?;
+        let mut free_header = self.get_header(DiskAddress::from(free_header_offset as usize))?;
         #[allow(clippy::unwrap_used)]
-        h.modify(|h| {
-            h.chunk_size = chunk_size;
-            h.is_freed = true;
-            h.desc_addr = desc_addr;
-        })
-        .unwrap();
+        free_header
+            .modify(|h| {
+                h.chunk_size = free_chunk_size;
+                h.is_freed = true;
+                h.desc_addr = desc_addr;
+            })
+            .unwrap();
+
+        let mut free_footer = self.get_footer(DiskAddress::from(free_footer_offset as usize))?;
         #[allow(clippy::unwrap_used)]
-        f.modify(|f| f.chunk_size = chunk_size).unwrap();
+        free_footer
+            .modify(|f| f.chunk_size = free_chunk_size)
+            .unwrap();
 
         Ok(())
     }
@@ -548,7 +561,7 @@ impl<M: LinearStore> StoreInner<M> {
     }
 
     fn alloc_new(&mut self, length: u64) -> Result<u64, ShaleError> {
-        let regn_size = 1 << self.regn_nbit;
+        let region_size = 1 << self.regn_nbit;
         let total_length = ChunkHeader::SERIALIZED_LEN + length + ChunkFooter::SERIALIZED_LEN;
         let mut offset = *self.header.data_store_tail;
         #[allow(clippy::unwrap_used)]
@@ -556,7 +569,7 @@ impl<M: LinearStore> StoreInner<M> {
             .data_store_tail
             .modify(|r| {
                 // an item is always fully in one region
-                let rem = regn_size - (offset & (regn_size - 1)).get();
+                let rem = region_size - (offset & (region_size - 1)).get();
                 if rem < total_length as usize {
                     offset += rem;
                     *r += rem;
