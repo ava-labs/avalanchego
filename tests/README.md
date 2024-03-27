@@ -29,3 +29,11 @@ The network started by `tmpnetctl` won't come with subnets configured,
 so the test suite will add them to the network the first time it
 runs. Subsequent test runs will be able to reuse those subnets without
 having to set them up.
+
+## Collection of logs and metrics
+
+Logs and metrics can be optionally collected for tmpnet networks and
+viewed in grafana. The details of configuration and usage for
+subnet-evm mirror those of avalanchego and the same
+[documentation](https://github.com/ava-labs/avalanchego/blob/master/tests/fixture/tmpnet/README.md#Monitoring)
+applies.

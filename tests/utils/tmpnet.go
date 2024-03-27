@@ -14,6 +14,11 @@ import (
 	"github.com/ava-labs/subnet-evm/plugin/evm"
 )
 
+var DefaultChainConfig = tmpnet.FlagsMap{
+	"log-level":        "debug",
+	"warp-api-enabled": true,
+}
+
 func NewTmpnetNodes(count int) []*tmpnet.Node {
 	nodes := make([]*tmpnet.Node, count)
 	for i := range nodes {
@@ -24,15 +29,14 @@ func NewTmpnetNodes(count int) []*tmpnet.Node {
 	return nodes
 }
 
-func NewTmpnetNetwork(nodes []*tmpnet.Node, flags tmpnet.FlagsMap, subnets ...*tmpnet.Subnet) *tmpnet.Network {
+func NewTmpnetNetwork(owner string, nodes []*tmpnet.Node, flags tmpnet.FlagsMap, subnets ...*tmpnet.Subnet) *tmpnet.Network {
 	defaultFlags := tmpnet.FlagsMap{}
 	defaultFlags.SetDefaults(flags)
 	defaultFlags.SetDefaults(tmpnet.FlagsMap{
-		// Remove when vendored tmpnet default is `off`. tmpnet nodes are run headless so stdout logging is unnecessary.
-		config.LogDisplayLevelKey:            "off",
 		config.ProposerVMUseCurrentHeightKey: true,
 	})
 	return &tmpnet.Network{
+		Owner:        owner,
 		DefaultFlags: defaultFlags,
 		Nodes:        nodes,
 		Subnets:      subnets,

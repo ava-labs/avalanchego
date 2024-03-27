@@ -19,7 +19,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/log"
 
-	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
@@ -59,21 +58,15 @@ var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 	ginkgo.BeforeAll(func() {
 		genesisPath := filepath.Join(repoRootPath, "tests/load/genesis/genesis.json")
 
-		// The load tests are flaky at high levels of evm logging, so leave it at
-		// the default level instead of raising it to debug (as the warp testing does).
-		chainConfig := tmpnet.FlagsMap{}
-
 		nodes := utils.NewTmpnetNodes(nodeCount)
 
 		env = e2e.NewTestEnvironment(
 			flagVars,
 			utils.NewTmpnetNetwork(
+				"subnet-evm-small-load",
 				nodes,
-				tmpnet.FlagsMap{
-					// The default tmpnet log level (debug) induces too much overhead for load testing.
-					config.LogLevelKey: "info",
-				},
-				utils.NewTmpnetSubnet(subnetAName, genesisPath, chainConfig, nodes...),
+				tmpnet.FlagsMap{},
+				utils.NewTmpnetSubnet(subnetAName, genesisPath, utils.DefaultChainConfig, nodes...),
 			),
 		)
 	})
