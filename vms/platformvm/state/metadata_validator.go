@@ -18,7 +18,7 @@ import (
 // [preDelegateeRewardMetadata].
 //
 // CodecVersionLen + UpDurationLen + LastUpdatedLen + PotentialRewardLen
-const preDelegateeRewardSize = codec.CodecVersionSize + 3*wrappers.LongLen
+const preDelegateeRewardSize = codec.VersionSize + 3*wrappers.LongLen
 
 var _ validatorState = (*metadata)(nil)
 

@@ -82,7 +82,7 @@ func New(typer TypeCodec, tagNames []string) codec.Codec {
 
 func (c *genericCodec) Size(value interface{}) (int, error) {
 	if value == nil {
-		return 0, nil // can't marshal nil, we return zero size
+		return 0, codec.ErrMarshalNil // can't marshal nil, we return zero size
 	}
 
 	size, _, err := c.size(reflect.ValueOf(value), nil /*=typeStack*/)
@@ -118,14 +118,14 @@ func (c *genericCodec) size(
 		return wrappers.StringLen(value.String()), false, nil
 	case reflect.Ptr:
 		if value.IsNil() {
-			return 0, false, nil // can't marshal nil, we return zero size
+			return 0, false, codec.ErrMarshalNil // can't marshal nil, we return zero size
 		}
 
 		return c.size(value.Elem(), typeStack)
 
 	case reflect.Interface:
 		if value.IsNil() {
-			return 0, false, nil // can't marshal nil, we return zero size
+			return 0, false, codec.ErrMarshalNil // can't marshal nil, we return zero size
 		}
 
 		underlyingValue := value.Interface()
@@ -150,6 +150,10 @@ func (c *genericCodec) size(
 		size, constSize, err := c.size(value.Index(0), typeStack)
 		if err != nil {
 			return 0, false, err
+		}
+
+		if size == 0 {
+			return 0, false, fmt.Errorf("can't marshal slice of zero length values: %w", codec.ErrMarshalZeroLength)
 		}
 
 		// For fixed-size types we manually calculate lengths rather than
