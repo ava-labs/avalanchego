@@ -27,7 +27,7 @@ func MeterInput(c codec.Manager, v uint16, in *avax.TransferableInput) (Dimensio
 	}
 	uInSize := uint64(inSize)
 
-	complexity[Bandwidth] += uInSize - codec.CodecVersionSize
+	complexity[Bandwidth] += uInSize - codec.VersionSize
 	complexity[UTXORead] += uInSize  // inputs are read
 	complexity[UTXOWrite] += uInSize // inputs are deleted
 	complexity[Compute] += cost
@@ -42,7 +42,7 @@ func MeterOutput(c codec.Manager, v uint16, out *avax.TransferableOutput) (Dimen
 	}
 	uOutSize := uint64(outSize)
 
-	complexity[Bandwidth] += uOutSize - codec.CodecVersionSize
+	complexity[Bandwidth] += uOutSize - codec.VersionSize
 	complexity[UTXOWrite] += uOutSize
 	return complexity, nil
 }
@@ -62,6 +62,6 @@ func MeterCredential(c codec.Manager, v uint16, keysCount int) (Dimensions, erro
 	}
 	credSize -= wrappers.IntLen // length of the slice, we want the single credential
 
-	complexity[Bandwidth] += uint64(credSize) - codec.CodecVersionSize
+	complexity[Bandwidth] += uint64(credSize) - codec.VersionSize
 	return complexity, nil
 }

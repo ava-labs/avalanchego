@@ -2612,154 +2612,104 @@ func TestCreateVariableCapAsset(t *testing.T) {
 	}
 }
 
-// TODO ABENEGIA: to be unlocked
-// func TestNFTWorkflow(t *testing.T) {
-// 	for _, tc := range testCases {
-// 		t.Run(tc.name, func(t *testing.T) {
-// 			require := require.New(t)
+func TestNFTWorkflow(t *testing.T) {
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			require := require.New(t)
 
-// 			env := setup(t, &envConfig{
-// 				fork:             eUpgrade,
-// 				isCustomFeeAsset: !tc.avaxAsset,
-// 				keystoreUsers: []*user{{
-// 					username:    username,
-// 					password:    password,
-// 					initialKeys: keys,
-// 				}},
-// 			})
-// 			env.vm.ctx.Lock.Unlock()
+			env := setup(t, &envConfig{
+				fork:             eUpgrade,
+				isCustomFeeAsset: !tc.avaxAsset,
+				keystoreUsers: []*user{{
+					username:    username,
+					password:    password,
+					initialKeys: keys,
+				}},
+			})
+			env.vm.ctx.Lock.Unlock()
 
-// 			defer func() {
-// 				env.vm.ctx.Lock.Lock()
-// 				require.NoError(env.vm.Shutdown(context.Background()))
-// 				env.vm.ctx.Lock.Unlock()
-// 			}()
+			defer func() {
+				env.vm.ctx.Lock.Lock()
+				require.NoError(env.vm.Shutdown(context.Background()))
+				env.vm.ctx.Lock.Unlock()
+			}()
 
-// 			fromAddrs, fromAddrsStr := sampleAddrs(t, env.vm.AddressManager, addrs)
+			_, fromAddrsStr := sampleAddrs(t, env.vm.AddressManager, addrs)
 
-// 			// Test minting of the created variable cap asset
-// 			addrStr, err := env.vm.FormatLocalAddress(keys[0].PublicKey().Address())
-// 			require.NoError(err)
+			// Test minting of the created variable cap asset
+			addrStr, err := env.vm.FormatLocalAddress(keys[0].PublicKey().Address())
+			require.NoError(err)
 
-// 			createArgs := &CreateNFTAssetArgs{
-// 				JSONSpendHeader: api.JSONSpendHeader{
-// 					UserPass: api.UserPass{
-// 						Username: username,
-// 						Password: password,
-// 					},
-// 					JSONFromAddrs:  api.JSONFromAddrs{From: fromAddrsStr},
-// 					JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: fromAddrsStr[0]},
-// 				},
-// 				Name:   "BIG COIN",
-// 				Symbol: "COIN",
-// 				MinterSets: []Owners{
-// 					{
-// 						Threshold: 1,
-// 						Minters: []string{
-// 							addrStr,
-// 						},
-// 					},
-// 				},
-// 			}
-// 			createReply := &AssetIDChangeAddr{}
-// 			require.NoError(env.service.CreateNFTAsset(nil, createArgs, createReply))
-// 			require.Equal(fromAddrsStr[0], createReply.ChangeAddr)
+			createArgs := &CreateNFTAssetArgs{
+				JSONSpendHeader: api.JSONSpendHeader{
+					UserPass: api.UserPass{
+						Username: username,
+						Password: password,
+					},
+					JSONFromAddrs:  api.JSONFromAddrs{From: fromAddrsStr},
+					JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: fromAddrsStr[0]},
+				},
+				Name:   "BIG COIN",
+				Symbol: "COIN",
+				MinterSets: []Owners{
+					{
+						Threshold: 1,
+						Minters: []string{
+							addrStr,
+						},
+					},
+				},
+			}
+			createReply := &AssetIDChangeAddr{}
+			require.NoError(env.service.CreateNFTAsset(nil, createArgs, createReply))
+			require.Equal(fromAddrsStr[0], createReply.ChangeAddr)
 
-// 			buildAndAccept(require, env.vm, env.issuer, createReply.AssetID)
+			buildAndAccept(require, env.vm, env.issuer, createReply.AssetID)
 
-// 			// Key: Address
-// 			// Value: AVAX balance
-// 			balances := map[ids.ShortID]uint64{}
-// 			for _, addr := range addrs { // get balances for all addresses
-// 				addrStr, err := env.vm.FormatLocalAddress(addr)
-// 				require.NoError(err)
+			assetID := createReply.AssetID
+			payload, err := formatting.Encode(formatting.Hex, []byte{1, 2, 3, 4, 5})
+			require.NoError(err)
+			mintArgs := &MintNFTArgs{
+				JSONSpendHeader: api.JSONSpendHeader{
+					UserPass: api.UserPass{
+						Username: username,
+						Password: password,
+					},
+					JSONFromAddrs:  api.JSONFromAddrs{},
+					JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: fromAddrsStr[0]},
+				},
+				AssetID:  assetID.String(),
+				Payload:  payload,
+				To:       addrStr,
+				Encoding: formatting.Hex,
+			}
+			mintReply := &api.JSONTxIDChangeAddr{}
 
-// 				reply := &GetBalanceReply{}
-// 				require.NoError(env.service.GetBalance(nil,
-// 					&GetBalanceArgs{
-// 						Address: addrStr,
-// 						AssetID: env.vm.feeAssetID.String(),
-// 					},
-// 					reply,
-// 				))
+			require.NoError(env.service.MintNFT(nil, mintArgs, mintReply))
+			require.Equal(fromAddrsStr[0], createReply.ChangeAddr)
 
-// 				balances[addr] = uint64(reply.Balance)
-// 			}
+			// Accept the transaction so that we can send the newly minted NFT
+			buildAndAccept(require, env.vm, env.issuer, mintReply.TxID)
 
-// 			fromAddrsTotalBalance := uint64(0)
-// 			for _, addr := range fromAddrs {
-// 				fromAddrsTotalBalance += balances[addr]
-// 			}
-
-// 			// retrieve tx fee
-// 			lastAcceptedBlkID := env.vm.chainManager.LastAccepted()
-// 			lastAcceptedBlk, err := env.vm.chainManager.GetStatelessBlock(lastAcceptedBlkID)
-// 			require.NoError(err)
-// 			txs := lastAcceptedBlk.Txs()
-// 			require.Len(txs, 1)
-// 			createAssetTx := txs[0]
-
-// 			isEActivated := env.vm.Config.IsEActivated(env.vm.state.GetTimestamp())
-// 			feesCfg := config.GetDynamicFeesConfig(isEActivated)
-// 			feeCalc := &fees.Calculator{
-// 				IsEActive:          true,
-// 				Config:             &env.vm.Config,
-// 				FeeManager:         commonfees.NewManager(feesCfg.InitialFeeRate),
-// 				BlockMaxComplexity: feesCfg.BlockMaxComplexity,
-// 				Codec:              env.service.txBuilderBackend.codec,
-// 				Credentials:        createAssetTx.Creds,
-// 			}
-
-// 			require.NoError(createAssetTx.Unsigned.Visit(feeCalc))
-// 			expectedFee := feeCalc.Fee
-
-// 			fromAddrsStartBalance := startBalance * uint64(len(fromAddrs))
-// 			require.Equal(fromAddrsStartBalance-expectedFee, fromAddrsTotalBalance)
-
-// 			assetID := createReply.AssetID
-// 			payload, err := formatting.Encode(formatting.Hex, []byte{1, 2, 3, 4, 5})
-// 			require.NoError(err)
-// 			mintArgs := &MintNFTArgs{
-// 				JSONSpendHeader: api.JSONSpendHeader{
-// 					UserPass: api.UserPass{
-// 						Username: username,
-// 						Password: password,
-// 					},
-// 					JSONFromAddrs:  api.JSONFromAddrs{},
-// 					JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: fromAddrsStr[0]},
-// 				},
-// 				AssetID:  assetID.String(),
-// 				Payload:  payload,
-// 				To:       addrStr,
-// 				Encoding: formatting.Hex,
-// 			}
-// 			mintReply := &api.JSONTxIDChangeAddr{}
-
-// 			require.NoError(env.service.MintNFT(nil, mintArgs, mintReply))
-// 			require.Equal(fromAddrsStr[0], createReply.ChangeAddr)
-
-// 			// Accept the transaction so that we can send the newly minted NFT
-// 			buildAndAccept(require, env.vm, env.issuer, mintReply.TxID)
-
-// 			sendArgs := &SendNFTArgs{
-// 				JSONSpendHeader: api.JSONSpendHeader{
-// 					UserPass: api.UserPass{
-// 						Username: username,
-// 						Password: password,
-// 					},
-// 					JSONFromAddrs:  api.JSONFromAddrs{},
-// 					JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: fromAddrsStr[0]},
-// 				},
-// 				AssetID: assetID.String(),
-// 				GroupID: 0,
-// 				To:      addrStr,
-// 			}
-// 			sendReply := &api.JSONTxIDChangeAddr{}
-// 			require.NoError(env.service.SendNFT(nil, sendArgs, sendReply))
-// 			require.Equal(fromAddrsStr[0], sendReply.ChangeAddr)
-// 		})
-// 	}
-// }
+			sendArgs := &SendNFTArgs{
+				JSONSpendHeader: api.JSONSpendHeader{
+					UserPass: api.UserPass{
+						Username: username,
+						Password: password,
+					},
+					JSONFromAddrs:  api.JSONFromAddrs{},
+					JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: fromAddrsStr[0]},
+				},
+				AssetID: assetID.String(),
+				GroupID: 0,
+				To:      addrStr,
+			}
+			sendReply := &api.JSONTxIDChangeAddr{}
+			require.NoError(env.service.SendNFT(nil, sendArgs, sendReply))
+			require.Equal(fromAddrsStr[0], sendReply.ChangeAddr)
+		})
+	}
+}
 
 func TestImportExportKey(t *testing.T) {
 	require := require.New(t)

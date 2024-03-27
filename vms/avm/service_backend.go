@@ -26,8 +26,8 @@ func newServiceBackend(
 	codec codec.Manager,
 	ctx *snow.Context,
 	cfg *config.Config,
-	state state.State,
 	clk *mockable.Clock,
+	state state.State,
 	atomicUTXOsMan avax.AtomicUTXOManager,
 ) *serviceBackend {
 	backendCtx := &builder.Context{

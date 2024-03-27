@@ -349,8 +349,8 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 			vm.parser.Codec(),
 			vm.ctx,
 			&vm.Config,
-			vm.state,
 			&vm.clock,
+			vm.state,
 			vm.AtomicUTXOManager,
 		),
 	}, "avm"); err != nil {

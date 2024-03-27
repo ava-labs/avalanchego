@@ -11,7 +11,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
-	"github.com/ava-labs/avalanchego/vms/avm/block/builder"
 	"github.com/ava-labs/avalanchego/vms/avm/block/executor"
 	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/state"
@@ -276,20 +275,20 @@ func builders(backend txBuilderBackend, kc *secp256k1fx.Keychain) (walletbuilder
 
 func feeCalculator(backend txBuilderBackend) (*fees.Calculator, error) {
 	var (
-		chainTime   = backend.State().GetTimestamp()
-		nextBlkTime = executor.NextBlockTime(chainTime, backend.Clock())
-		cfg         = backend.Config()
-		isEActive   = cfg.IsEActivated(chainTime)
-		feeCfg      = config.GetDynamicFeesConfig(isEActive)
+		currentChainTime = backend.State().GetTimestamp()
+		nextChainTime    = executor.NextBlockTime(currentChainTime, backend.Clock())
+		cfg              = backend.Config()
+		isEActive        = cfg.IsEActivated(currentChainTime)
+		feeCfg           = config.GetDynamicFeesConfig(isEActive)
 	)
 
-	feeManager, err := builder.UpdatedFeeManager(backend.State(), backend.Config(), chainTime, nextBlkTime)
+	feeManager, err := fees.UpdatedFeeManager(backend.State(), backend.Config(), currentChainTime, nextChainTime)
 	if err != nil {
 		return nil, err
 	}
 
 	return &fees.Calculator{
-		IsEActive:          cfg.IsEActivated(chainTime),
+		IsEActive:          isEActive,
 		Config:             cfg,
 		FeeManager:         feeManager,
 		BlockMaxComplexity: feeCfg.BlockMaxComplexity,
