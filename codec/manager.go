@@ -104,7 +104,7 @@ func (m *manager) Size(version uint16, value interface{}) (int, error) {
 
 	res, err := c.Size(value)
 
-	// Add [CodecVersionSize] for the codec version
+	// Add [VersionSize] for the codec version
 	return VersionSize + res, err
 }
 
