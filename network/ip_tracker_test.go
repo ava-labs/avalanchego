@@ -37,7 +37,7 @@ func requireEqual(t *testing.T, expected, actual *ipTracker) {
 	require.Equal(expected.connected, actual.connected)
 	require.Equal(expected.mostRecentValidatorIPs, actual.mostRecentValidatorIPs)
 	require.Equal(expected.validators, actual.validators)
-	require.Equal(expected.gossipableIndicies, actual.gossipableIndicies)
+	require.Equal(expected.gossipableIndices, actual.gossipableIndices)
 	require.Equal(expected.gossipableIPs, actual.gossipableIPs)
 	require.Equal(expected.bloomAdditions, actual.bloomAdditions)
 	require.Equal(expected.maxBloomCount, actual.maxBloomCount)
@@ -82,7 +82,7 @@ func TestIPTracker_ManuallyTrack(t *testing.T) {
 				tracker.Connected(ip)
 				tracker.mostRecentValidatorIPs[ip.NodeID] = ip
 				tracker.bloomAdditions[ip.NodeID] = 1
-				tracker.gossipableIndicies[ip.NodeID] = 0
+				tracker.gossipableIndices[ip.NodeID] = 0
 				tracker.gossipableIPs = []*ips.ClaimedIPPort{
 					ip,
 				}
@@ -235,7 +235,7 @@ func TestIPTracker_AddIP(t *testing.T) {
 				tracker.Connected(ip)
 				tracker.mostRecentValidatorIPs[newerIP.NodeID] = newerIP
 				tracker.bloomAdditions[newerIP.NodeID] = 2
-				delete(tracker.gossipableIndicies, newerIP.NodeID)
+				delete(tracker.gossipableIndices, newerIP.NodeID)
 				tracker.gossipableIPs = tracker.gossipableIPs[:0]
 				return tracker
 			}(),
@@ -283,7 +283,7 @@ func TestIPTracker_Connected(t *testing.T) {
 				tracker.connected[ip.NodeID] = ip
 				tracker.mostRecentValidatorIPs[ip.NodeID] = ip
 				tracker.bloomAdditions[ip.NodeID] = 1
-				tracker.gossipableIndicies[ip.NodeID] = 0
+				tracker.gossipableIndices[ip.NodeID] = 0
 				tracker.gossipableIPs = []*ips.ClaimedIPPort{
 					ip,
 				}
@@ -323,7 +323,7 @@ func TestIPTracker_Connected(t *testing.T) {
 				tracker.connected[newerIP.NodeID] = newerIP
 				tracker.mostRecentValidatorIPs[newerIP.NodeID] = newerIP
 				tracker.bloomAdditions[newerIP.NodeID] = 2
-				tracker.gossipableIndicies[newerIP.NodeID] = 0
+				tracker.gossipableIndices[newerIP.NodeID] = 0
 				tracker.gossipableIPs = []*ips.ClaimedIPPort{
 					newerIP,
 				}
@@ -344,7 +344,7 @@ func TestIPTracker_Connected(t *testing.T) {
 				tracker.onValidatorAdded(ip.NodeID)
 				require.True(t, tracker.AddIP(ip))
 				tracker.connected[ip.NodeID] = ip
-				tracker.gossipableIndicies[ip.NodeID] = 0
+				tracker.gossipableIndices[ip.NodeID] = 0
 				tracker.gossipableIPs = []*ips.ClaimedIPPort{
 					ip,
 				}
@@ -392,7 +392,7 @@ func TestIPTracker_Disconnected(t *testing.T) {
 				tracker.onValidatorAdded(ip.NodeID)
 				tracker.Connected(ip)
 				delete(tracker.connected, ip.NodeID)
-				delete(tracker.gossipableIndicies, ip.NodeID)
+				delete(tracker.gossipableIndices, ip.NodeID)
 				tracker.gossipableIPs = tracker.gossipableIPs[:0]
 				return tracker
 			}(),
@@ -415,7 +415,7 @@ func TestIPTracker_Disconnected(t *testing.T) {
 				tracker.onValidatorAdded(otherIP.NodeID)
 				tracker.Connected(otherIP)
 				delete(tracker.connected, ip.NodeID)
-				tracker.gossipableIndicies = map[ids.NodeID]int{
+				tracker.gossipableIndices = map[ids.NodeID]int{
 					otherIP.NodeID: 0,
 				}
 				tracker.gossipableIPs = []*ips.ClaimedIPPort{
@@ -479,7 +479,7 @@ func TestIPTracker_OnValidatorAdded(t *testing.T) {
 				tracker.validators.Add(ip.NodeID)
 				tracker.mostRecentValidatorIPs[ip.NodeID] = ip
 				tracker.bloomAdditions[ip.NodeID] = 1
-				tracker.gossipableIndicies[ip.NodeID] = 0
+				tracker.gossipableIndices[ip.NodeID] = 0
 				tracker.gossipableIPs = []*ips.ClaimedIPPort{
 					ip,
 				}
@@ -554,7 +554,7 @@ func TestIPTracker_OnValidatorRemoved(t *testing.T) {
 				tracker.Connected(ip)
 				delete(tracker.mostRecentValidatorIPs, ip.NodeID)
 				tracker.validators.Remove(ip.NodeID)
-				delete(tracker.gossipableIndicies, ip.NodeID)
+				delete(tracker.gossipableIndices, ip.NodeID)
 				tracker.gossipableIPs = tracker.gossipableIPs[:0]
 				return tracker
 			}(),
@@ -578,7 +578,7 @@ func TestIPTracker_OnValidatorRemoved(t *testing.T) {
 				tracker.Connected(otherIP)
 				delete(tracker.mostRecentValidatorIPs, ip.NodeID)
 				tracker.validators.Remove(ip.NodeID)
-				tracker.gossipableIndicies = map[ids.NodeID]int{
+				tracker.gossipableIndices = map[ids.NodeID]int{
 					otherIP.NodeID: 0,
 				}
 				tracker.gossipableIPs = []*ips.ClaimedIPPort{
