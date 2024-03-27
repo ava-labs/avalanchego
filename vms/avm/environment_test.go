@@ -236,6 +236,7 @@ func setup(tb testing.TB, c *envConfig) *environment {
 				vm.parser.Codec(),
 				vm.ctx,
 				&vm.Config,
+				&vm.clock,
 				vm.state,
 				vm.AtomicUTXOManager,
 			),
@@ -365,7 +366,7 @@ func newTx(tb testing.TB, genesisBytes []byte, chainID ids.ID, parser txs.Parser
 // Sample from a set of addresses and return them raw and formatted as strings.
 // The size of the sample is between 1 and len(addrs)
 // If len(addrs) == 0, returns nil
-func sampleAddrs(tb testing.TB, addressFormatter avax.AddressManager, addrs []ids.ShortID) ([]ids.ShortID, []string) {
+func sampleAddrs(tb testing.TB, addressFormatter avax.AddressManager, addrs []ids.ShortID) ([]ids.ShortID, []string) { //nolint:unparam
 	require := require.New(tb)
 
 	sampledAddrs := []ids.ShortID{}
