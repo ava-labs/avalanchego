@@ -759,6 +759,9 @@ func (b *Bootstrapper) tryStartExecuting(ctx context.Context) error {
 }
 
 func (b *Bootstrapper) Timeout(ctx context.Context) error {
+	b.Ctx.Lock.Lock()
+	defer b.Ctx.Lock.Unlock()
+
 	if !b.awaitingTimeout {
 		return errUnexpectedTimeout
 	}
