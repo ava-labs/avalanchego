@@ -223,13 +223,16 @@ func TestExecute(t *testing.T) {
 	db := memdb.New()
 	tree, err := interval.NewTree(db)
 	require.NoError(err)
-	const lastAcceptedHeight = 1
 
-	for i, block := range blocks[lastAcceptedHeight+1:] {
+	const lastAcceptedHeight = numBlocks / 2
+	blocksNotToExecute := blocks[1 : lastAcceptedHeight+1]
+	blocksToExecute := blocks[lastAcceptedHeight+1:]
+
+	for i, block := range blocks[1:] {
 		newlyWantsParent, err := interval.Add(
 			db,
 			tree,
-			lastAcceptedHeight,
+			0,
 			block.Height(),
 			block.Bytes(),
 		)
@@ -247,10 +250,8 @@ func TestExecute(t *testing.T) {
 		tree,
 		lastAcceptedHeight,
 	))
-
-	for _, block := range blocks[lastAcceptedHeight+1:] {
-		require.Equal(choices.Accepted, block.Status())
-	}
+	requireStatusIs(require, blocksNotToExecute, choices.Processing)
+	requireStatusIs(require, blocksToExecute, choices.Accepted)
 
 	size, err := database.Count(db)
 	require.NoError(err)
@@ -266,9 +267,9 @@ func TestExecuteExitsWhenHalted(t *testing.T) {
 	db := memdb.New()
 	tree, err := interval.NewTree(db)
 	require.NoError(err)
-	const lastAcceptedHeight = 1
 
-	for i, block := range blocks[lastAcceptedHeight+1:] {
+	const lastAcceptedHeight = 1
+	for i, block := range blocks[1:] {
 		newlyWantsParent, err := interval.Add(
 			db,
 			tree,
@@ -295,63 +296,11 @@ func TestExecuteExitsWhenHalted(t *testing.T) {
 		tree,
 		lastAcceptedHeight,
 	))
-
-	for _, block := range blocks[lastAcceptedHeight+1:] {
-		require.Equal(choices.Processing, block.Status())
-	}
+	requireStatusIs(require, blocks[1:], choices.Processing)
 
 	endSize, err := database.Count(db)
 	require.NoError(err)
 	require.Equal(startSize, endSize)
-}
-
-func TestExecuteSkipsAcceptedBlocks(t *testing.T) {
-	require := require.New(t)
-
-	blocks := generateBlockchain(7)
-	parser := makeParser(blocks)
-
-	db := memdb.New()
-	tree, err := interval.NewTree(db)
-	require.NoError(err)
-	const (
-		lastAcceptedHeightWhenAdding    = 1
-		lastAcceptedHeightWhenExecuting = 3
-	)
-
-	for i, block := range blocks[lastAcceptedHeightWhenAdding+1:] {
-		newlyWantsParent, err := interval.Add(
-			db,
-			tree,
-			lastAcceptedHeightWhenAdding,
-			block.Height(),
-			block.Bytes(),
-		)
-		require.NoError(err)
-		require.False(newlyWantsParent)
-		require.Equal(uint64(i+1), tree.Len())
-	}
-
-	require.NoError(execute(
-		context.Background(),
-		&common.Halter{},
-		logging.NoLog{}.Info,
-		db,
-		parser,
-		tree,
-		lastAcceptedHeightWhenExecuting,
-	))
-
-	for _, block := range blocks[lastAcceptedHeightWhenAdding+1 : lastAcceptedHeightWhenExecuting] {
-		require.Equal(choices.Processing, block.Status())
-	}
-	for _, block := range blocks[lastAcceptedHeightWhenExecuting+1:] {
-		require.Equal(choices.Accepted, block.Status())
-	}
-
-	size, err := database.Count(db)
-	require.NoError(err)
-	require.Zero(size)
 }
 
 type testParser func(context.Context, []byte) (snowman.Block, error)
