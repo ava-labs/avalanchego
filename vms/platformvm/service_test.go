@@ -170,7 +170,6 @@ func TestGetTxStatus(t *testing.T) {
 	tx, err := txBuilder.NewImportTx(
 		service.vm.ctx.XChainID,
 		&secp256k1fx.OutputOwners{
-			Locktime:  0,
 			Threshold: 1,
 			Addrs:     []ids.ShortID{ids.ShortEmpty},
 		},

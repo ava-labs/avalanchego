@@ -1041,7 +1041,6 @@ func TestAtomicImport(t *testing.T) {
 	_, err := txBuilder.NewImportTx(
 		vm.ctx.XChainID,
 		&secp256k1fx.OutputOwners{
-			Locktime:  0,
 			Threshold: 1,
 			Addrs:     []ids.ShortID{recipientKey.PublicKey().Address()},
 		},
@@ -1083,7 +1082,6 @@ func TestAtomicImport(t *testing.T) {
 	tx, err := txBuilder.NewImportTx(
 		vm.ctx.XChainID,
 		&secp256k1fx.OutputOwners{
-			Locktime:  0,
 			Threshold: 1,
 			Addrs:     []ids.ShortID{recipientKey.PublicKey().Address()},
 		},

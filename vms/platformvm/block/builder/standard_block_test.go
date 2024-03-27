@@ -65,7 +65,6 @@ func TestAtomicTxImports(t *testing.T) {
 	tx, err := env.txBuilder.NewImportTx(
 		env.ctx.XChainID,
 		&secp256k1fx.OutputOwners{
-			Locktime:  0,
 			Threshold: 1,
 			Addrs:     []ids.ShortID{recipientKey.PublicKey().Address()},
 		},
