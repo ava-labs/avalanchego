@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"sync"
 	"testing"
 	"time"
 
@@ -22,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -1295,10 +1297,112 @@ func requireEqualPublicKeysValidatorSet(
 }
 
 func TestParsedStateBlock(t *testing.T) {
+	var (
+		require = require.New(t)
+		blks    = makeBlocks(require)
+	)
+
+	for _, blk := range blks {
+		stBlk := stateBlk{
+			Bytes:  blk.Bytes(),
+			Status: choices.Accepted,
+		}
+
+		stBlkBytes, err := block.GenesisCodec.Marshal(block.CodecVersion, &stBlk)
+		require.NoError(err)
+
+		gotBlk, isStateBlk, err := parseStoredBlock(stBlkBytes)
+		require.NoError(err)
+		require.True(isStateBlk)
+		require.Equal(blk.ID(), gotBlk.ID())
+
+		gotBlk, isStateBlk, err = parseStoredBlock(blk.Bytes())
+		require.NoError(err)
+		require.False(isStateBlk)
+		require.Equal(blk.ID(), gotBlk.ID())
+	}
+}
+
+func TestReindexBlocks(t *testing.T) {
+	var (
+		require = require.New(t)
+		s       = newInitializedState(require).(*state)
+		blks    = makeBlocks(require)
+	)
+
+	// Populate the blocks using the legacy format.
+	for _, blk := range blks {
+		stBlk := stateBlk{
+			Bytes:  blk.Bytes(),
+			Status: choices.Accepted,
+		}
+		stBlkBytes, err := block.GenesisCodec.Marshal(block.CodecVersion, &stBlk)
+		require.NoError(err)
+
+		blkID := blk.ID()
+		require.NoError(s.blockDB.Put(blkID[:], stBlkBytes))
+	}
+
+	// Convert the indices to the new format.
+	require.NoError(s.ReindexBlocks(&sync.Mutex{}, logging.NoLog{}))
+
+	// Verify that the blocks are stored in the new format.
+	for _, blk := range blks {
+		blkID := blk.ID()
+		blkBytes, err := s.blockDB.Get(blkID[:])
+		require.NoError(err)
+
+		parsedBlk, err := block.Parse(block.GenesisCodec, blkBytes)
+		require.NoError(err)
+		require.Equal(blkID, parsedBlk.ID())
+	}
+
+	// Verify that the flag has been written to disk to allow skipping future
+	// reindexings.
+	reindexed, err := s.singletonDB.Has(BlocksReindexedKey)
+	require.NoError(err)
+	require.True(reindexed)
+}
+
+func TestStateSubnetOwner(t *testing.T) {
 	require := require.New(t)
 
-	var blks []block.Block
+	state := newInitializedState(require)
+	ctrl := gomock.NewController(t)
 
+	var (
+		owner1 = fx.NewMockOwner(ctrl)
+		owner2 = fx.NewMockOwner(ctrl)
+
+		createSubnetTx = &txs.Tx{
+			Unsigned: &txs.CreateSubnetTx{
+				BaseTx: txs.BaseTx{},
+				Owner:  owner1,
+			},
+		}
+
+		subnetID = createSubnetTx.ID()
+	)
+
+	owner, err := state.GetSubnetOwner(subnetID)
+	require.ErrorIs(err, database.ErrNotFound)
+	require.Nil(owner)
+
+	state.AddSubnet(createSubnetTx)
+	state.SetSubnetOwner(subnetID, owner1)
+
+	owner, err = state.GetSubnetOwner(subnetID)
+	require.NoError(err)
+	require.Equal(owner1, owner)
+
+	state.SetSubnetOwner(subnetID, owner2)
+	owner, err = state.GetSubnetOwner(subnetID)
+	require.NoError(err)
+	require.Equal(owner2, owner)
+}
+
+func makeBlocks(require *require.Assertions) []block.Block {
+	var blks []block.Block
 	{
 		blk, err := block.NewApricotAbortBlock(ids.GenerateTestID(), 1000)
 		require.NoError(err)
@@ -1382,61 +1486,5 @@ func TestParsedStateBlock(t *testing.T) {
 		require.NoError(err)
 		blks = append(blks, blk)
 	}
-
-	for _, blk := range blks {
-		stBlk := stateBlk{
-			Bytes:  blk.Bytes(),
-			Status: choices.Accepted,
-		}
-
-		stBlkBytes, err := block.GenesisCodec.Marshal(block.CodecVersion, &stBlk)
-		require.NoError(err)
-
-		gotBlk, isStateBlk, err := parseStoredBlock(stBlkBytes)
-		require.NoError(err)
-		require.True(isStateBlk)
-		require.Equal(blk.ID(), gotBlk.ID())
-
-		gotBlk, isStateBlk, err = parseStoredBlock(blk.Bytes())
-		require.NoError(err)
-		require.False(isStateBlk)
-		require.Equal(blk.ID(), gotBlk.ID())
-	}
-}
-
-func TestStateSubnetOwner(t *testing.T) {
-	require := require.New(t)
-
-	state := newInitializedState(require)
-	ctrl := gomock.NewController(t)
-
-	var (
-		owner1 = fx.NewMockOwner(ctrl)
-		owner2 = fx.NewMockOwner(ctrl)
-
-		createSubnetTx = &txs.Tx{
-			Unsigned: &txs.CreateSubnetTx{
-				BaseTx: txs.BaseTx{},
-				Owner:  owner1,
-			},
-		}
-
-		subnetID = createSubnetTx.ID()
-	)
-
-	owner, err := state.GetSubnetOwner(subnetID)
-	require.ErrorIs(err, database.ErrNotFound)
-	require.Nil(owner)
-
-	state.AddSubnet(createSubnetTx)
-	state.SetSubnetOwner(subnetID, owner1)
-
-	owner, err = state.GetSubnetOwner(subnetID)
-	require.NoError(err)
-	require.Equal(owner1, owner)
-
-	state.SetSubnetOwner(subnetID, owner2)
-	owner, err = state.GetSubnetOwner(subnetID)
-	require.NoError(err)
-	require.Equal(owner2, owner)
+	return blks
 }
