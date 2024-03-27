@@ -34,12 +34,14 @@ func New(
 ) *Builder {
 	return &Builder{
 		ctx:     ctx,
-		backend: NewBackend(cfg, state, atomicUTXOManager),
+		cfg:     cfg,
+		backend: NewBackend(state, atomicUTXOManager),
 	}
 }
 
 type Builder struct {
 	ctx     *snow.Context
+	cfg     *config.Config
 	backend *Backend
 }
 
@@ -343,7 +345,7 @@ func (b *Builder) builders(keys []*secp256k1.PrivateKey) (walletbuilder.Builder,
 	var (
 		kc      = secp256k1fx.NewKeychain(keys...)
 		addrs   = kc.Addresses()
-		context = NewContext(b.ctx, b.backend.cfg, b.backend.state.GetTimestamp())
+		context = NewContext(b.ctx, b.cfg, b.backend.state.GetTimestamp())
 		builder = walletbuilder.New(addrs, context, b.backend)
 		signer  = walletsigner.New(kc, b.backend)
 	)

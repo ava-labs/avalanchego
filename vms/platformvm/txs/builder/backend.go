@@ -12,7 +12,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/wallet/chain/p/signer"
@@ -26,19 +25,16 @@ var (
 )
 
 func NewBackend(
-	cfg *config.Config,
 	state state.State,
 	atomicUTXOsMan avax.AtomicUTXOManager,
 ) *Backend {
 	return &Backend{
-		cfg:            cfg,
 		state:          state,
 		atomicUTXOsMan: atomicUTXOsMan,
 	}
 }
 
 type Backend struct {
-	cfg            *config.Config
 	addrs          set.Set[ids.ShortID]
 	state          state.State
 	atomicUTXOsMan avax.AtomicUTXOManager
