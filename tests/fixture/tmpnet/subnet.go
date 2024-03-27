@@ -305,12 +305,12 @@ func waitForActiveValidators(
 		return err
 	}
 
-	if _, err := fmt.Fprintf(w, " "); err != nil {
+	if _, err := fmt.Fprint(w, " "); err != nil {
 		return err
 	}
 
 	for {
-		if _, err := fmt.Fprintf(w, "."); err != nil {
+		if _, err := fmt.Fprint(w, "."); err != nil {
 			return err
 		}
 		validators, err := pChainClient.GetCurrentValidators(ctx, subnet.SubnetID, nil)
