@@ -19,7 +19,7 @@ This API set is for a specific node, it is unavailable on the [public server](/t
 
 The node periodically runs all health checks, including health checks for each chain.
 
-The frequency that health checks are run can be specified by [--health-check-frequency](/nodes/configure/avalanchego-config-flags).
+The frequency at which health checks are run can be specified with the [--health-check-frequency](/nodes/configure/avalanchego-config-flags.md) flag.
 
 ## Filterable Health Checks
 
@@ -69,11 +69,11 @@ Returned results will contain checks for both subnetIDs and global health checks
 
 The available endpoints for GET requests are:
 
-- `/ext/health` returns a wholeistic report of the status of the node.
+- `/ext/health` returns a holistic report of the status of the node.
   **Most operators should monitor this status.**
 - `/ext/health/health` is the same as `/ext/health`.
 - `/ext/health/readiness` returns healthy once the node has finished initializing.
-- `/ext/health/liveness` returns healthy once the endpoint is avialable.
+- `/ext/health/liveness` returns healthy once the endpoint is available.
 
 ## JSON RPC Request
 
