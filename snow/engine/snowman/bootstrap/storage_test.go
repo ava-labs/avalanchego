@@ -26,137 +26,78 @@ func TestGetMissingBlockIDs(t *testing.T) {
 	blocks := generateBlockchain(7)
 	parser := makeParser(blocks)
 
-	db := memdb.New()
-	tree, err := interval.NewTree(db)
-	require.NoError(t, err)
-	lastAcceptedHeight := uint64(1)
+	tests := []struct {
+		name               string
+		blocks             []snowman.Block
+		lastAcceptedHeight uint64
+		expected           set.Set[ids.ID]
+	}{
+		{
+			name:               "initially empty",
+			blocks:             nil,
+			lastAcceptedHeight: 0,
+			expected:           nil,
+		},
+		{
+			name:               "wants one block",
+			blocks:             []snowman.Block{blocks[4]},
+			lastAcceptedHeight: 0,
+			expected:           set.Of(blocks[3].ID()),
+		},
+		{
+			name:               "wants multiple blocks",
+			blocks:             []snowman.Block{blocks[2], blocks[4]},
+			lastAcceptedHeight: 0,
+			expected:           set.Of(blocks[1].ID(), blocks[3].ID()),
+		},
+		{
+			name:               "doesn't want last accepted block",
+			blocks:             []snowman.Block{blocks[1]},
+			lastAcceptedHeight: 0,
+			expected:           nil,
+		},
+		{
+			name:               "doesn't want known block",
+			blocks:             []snowman.Block{blocks[2], blocks[3]},
+			lastAcceptedHeight: 0,
+			expected:           set.Of(blocks[1].ID()),
+		},
+		{
+			name:               "doesn't want already accepted block",
+			blocks:             []snowman.Block{blocks[1]},
+			lastAcceptedHeight: 4,
+			expected:           nil,
+		},
+		{
+			name:               "doesn't underflow",
+			blocks:             []snowman.Block{blocks[0]},
+			lastAcceptedHeight: 0,
+			expected:           nil,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
 
-	t.Run("initially empty", func(t *testing.T) {
-		require := require.New(t)
+			db := memdb.New()
+			tree, err := interval.NewTree(db)
+			require.NoError(err)
+			for _, blk := range test.blocks {
+				_, err := interval.Add(db, tree, 0, blk.Height(), blk.Bytes())
+				require.NoError(err)
+			}
 
-		missing, err := getMissingBlockIDs(
-			context.Background(),
-			db,
-			parser,
-			tree,
-			lastAcceptedHeight,
-		)
-		require.NoError(err)
-		require.Empty(missing)
-	})
-
-	t.Run("adding first block", func(t *testing.T) {
-		require := require.New(t)
-
-		_, err := interval.Add(
-			db,
-			tree,
-			lastAcceptedHeight,
-			5,
-			blocks[5].Bytes(),
-		)
-		require.NoError(err)
-
-		missing, err := getMissingBlockIDs(
-			context.Background(),
-			db,
-			parser,
-			tree,
-			lastAcceptedHeight,
-		)
-		require.NoError(err)
-		require.Equal(
-			set.Of(
-				blocks[4].ID(),
-			),
-			missing,
-		)
-	})
-
-	t.Run("adding second block", func(t *testing.T) {
-		require := require.New(t)
-
-		_, err := interval.Add(
-			db,
-			tree,
-			lastAcceptedHeight,
-			3,
-			blocks[3].Bytes(),
-		)
-		require.NoError(err)
-
-		missing, err := getMissingBlockIDs(
-			context.Background(),
-			db,
-			parser,
-			tree,
-			lastAcceptedHeight,
-		)
-		require.NoError(err)
-		require.Equal(
-			set.Of(
-				blocks[2].ID(),
-				blocks[4].ID(),
-			),
-			missing,
-		)
-	})
-
-	t.Run("adding last desired block", func(t *testing.T) {
-		require := require.New(t)
-
-		_, err := interval.Add(
-			db,
-			tree,
-			lastAcceptedHeight,
-			2,
-			blocks[2].Bytes(),
-		)
-		require.NoError(err)
-
-		missing, err := getMissingBlockIDs(
-			context.Background(),
-			db,
-			parser,
-			tree,
-			lastAcceptedHeight,
-		)
-		require.NoError(err)
-		require.Equal(
-			set.Of(
-				blocks[4].ID(),
-			),
-			missing,
-		)
-	})
-
-	t.Run("adding block with known parent", func(t *testing.T) {
-		require := require.New(t)
-
-		_, err := interval.Add(
-			db,
-			tree,
-			lastAcceptedHeight,
-			6,
-			blocks[6].Bytes(),
-		)
-		require.NoError(err)
-
-		missing, err := getMissingBlockIDs(
-			context.Background(),
-			db,
-			parser,
-			tree,
-			lastAcceptedHeight,
-		)
-		require.NoError(err)
-		require.Equal(
-			set.Of(
-				blocks[4].ID(),
-			),
-			missing,
-		)
-	})
+			missingBlockIDs, err := getMissingBlockIDs(
+				context.Background(),
+				db,
+				parser,
+				tree,
+				test.lastAcceptedHeight,
+			)
+			require.NoError(err)
+			require.Equal(test.expected, missingBlockIDs)
+		})
+	}
 }
 
 func TestProcess(t *testing.T) {
