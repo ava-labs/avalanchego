@@ -6,6 +6,7 @@ package state
 import (
 	"time"
 
+	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -17,7 +18,7 @@ import (
 // [preDelegateeRewardMetadata].
 //
 // CodecVersionLen + UpDurationLen + LastUpdatedLen + PotentialRewardLen
-const preDelegateeRewardSize = wrappers.ShortLen + 3*wrappers.LongLen
+const preDelegateeRewardSize = codec.VersionSize + 3*wrappers.LongLen
 
 var _ validatorState = (*metadata)(nil)
 

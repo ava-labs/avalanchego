@@ -13,6 +13,8 @@ import (
 )
 
 const (
+	VersionSize = wrappers.ShortLen
+
 	// default max size, in bytes, of something being marshalled by Marshal()
 	defaultMaxSize = 256 * units.KiB
 
@@ -102,8 +104,8 @@ func (m *manager) Size(version uint16, value interface{}) (int, error) {
 
 	res, err := c.Size(value)
 
-	// Add [wrappers.ShortLen] for the codec version
-	return wrappers.ShortLen + res, err
+	// Add [VersionSize] for the codec version
+	return VersionSize + res, err
 }
 
 // To marshal an interface, [value] must be a pointer to the interface.
