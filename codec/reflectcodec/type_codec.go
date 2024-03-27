@@ -82,7 +82,7 @@ func New(typer TypeCodec, tagNames []string) codec.Codec {
 
 func (c *genericCodec) Size(value interface{}) (int, error) {
 	if value == nil {
-		return 0, codec.ErrMarshalNil // can't marshal nil, we return zero size
+		return 0, codec.ErrMarshalNil
 	}
 
 	size, _, err := c.size(reflect.ValueOf(value), nil /*=typeStack*/)
@@ -118,14 +118,14 @@ func (c *genericCodec) size(
 		return wrappers.StringLen(value.String()), false, nil
 	case reflect.Ptr:
 		if value.IsNil() {
-			return 0, false, codec.ErrMarshalNil // can't marshal nil, we return zero size
+			return 0, false, codec.ErrMarshalNil
 		}
 
 		return c.size(value.Elem(), typeStack)
 
 	case reflect.Interface:
 		if value.IsNil() {
-			return 0, false, codec.ErrMarshalNil // can't marshal nil, we return zero size
+			return 0, false, codec.ErrMarshalNil
 		}
 
 		underlyingValue := value.Interface()
@@ -292,7 +292,7 @@ func (c *genericCodec) size(
 // To marshal an interface, [value] must be a pointer to the interface
 func (c *genericCodec) MarshalInto(value interface{}, p *wrappers.Packer) error {
 	if value == nil {
-		return codec.ErrMarshalNil // can't marshal nil
+		return codec.ErrMarshalNil
 	}
 
 	return c.marshal(reflect.ValueOf(value), p, nil /*=typeStack*/)
