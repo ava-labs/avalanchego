@@ -619,6 +619,7 @@ func (b *builder) NewCreateSubnetTx(
 	// 1. Build core transaction without utxos
 	ops := common.NewOptions(options)
 
+	utils.Sort(owner.Addrs)
 	utx := &txs.CreateSubnetTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.context.NetworkID,
