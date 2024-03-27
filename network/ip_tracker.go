@@ -59,7 +59,7 @@ func newIPTracker(
 		bloomMetrics:           bloomMetrics,
 		connected:              make(map[ids.NodeID]*ips.ClaimedIPPort),
 		mostRecentValidatorIPs: make(map[ids.NodeID]*ips.ClaimedIPPort),
-		gossipableIndicies:     make(map[ids.NodeID]int),
+		gossipableIndices:      make(map[ids.NodeID]int),
 		bloomAdditions:         make(map[ids.NodeID]int),
 	}
 	err = utils.Err(
@@ -92,8 +92,8 @@ type ipTracker struct {
 	// - The node is a validator
 	// - The node is connected
 	// - The IP the node connected with is its latest IP
-	gossipableIndicies map[ids.NodeID]int
-	gossipableIPs      []*ips.ClaimedIPPort
+	gossipableIndices map[ids.NodeID]int
+	gossipableIPs     []*ips.ClaimedIPPort
 
 	// The bloom filter contains the most recent validator IPs to avoid
 	// unnecessary IP gossip.
@@ -288,13 +288,13 @@ func (i *ipTracker) updateMostRecentValidatorIP(ip *ips.ClaimedIPPort) {
 }
 
 func (i *ipTracker) addGossipableIP(ip *ips.ClaimedIPPort) {
-	i.gossipableIndicies[ip.NodeID] = len(i.gossipableIPs)
+	i.gossipableIndices[ip.NodeID] = len(i.gossipableIPs)
 	i.gossipableIPs = append(i.gossipableIPs, ip)
 	i.numGossipable.Inc()
 }
 
 func (i *ipTracker) removeGossipableIP(nodeID ids.NodeID) {
-	indexToRemove, wasGossipable := i.gossipableIndicies[nodeID]
+	indexToRemove, wasGossipable := i.gossipableIndices[nodeID]
 	if !wasGossipable {
 		return
 	}
@@ -302,11 +302,11 @@ func (i *ipTracker) removeGossipableIP(nodeID ids.NodeID) {
 	newNumGossipable := len(i.gossipableIPs) - 1
 	if newNumGossipable != indexToRemove {
 		replacementIP := i.gossipableIPs[newNumGossipable]
-		i.gossipableIndicies[replacementIP.NodeID] = indexToRemove
+		i.gossipableIndices[replacementIP.NodeID] = indexToRemove
 		i.gossipableIPs[indexToRemove] = replacementIP
 	}
 
-	delete(i.gossipableIndicies, nodeID)
+	delete(i.gossipableIndices, nodeID)
 	i.gossipableIPs[newNumGossipable] = nil
 	i.gossipableIPs = i.gossipableIPs[:newNumGossipable]
 	i.numGossipable.Dec()
