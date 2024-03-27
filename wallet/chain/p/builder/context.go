@@ -5,7 +5,6 @@ package builder
 
 import (
 	"context"
-	"time"
 
 	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/ids"
@@ -13,7 +12,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/avm"
-	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 )
 
 const Alias = "P"
@@ -69,25 +67,6 @@ func NewContextFromClients(
 		AddSubnetValidatorFee:         uint64(txFees.AddSubnetValidatorFee),
 		AddSubnetDelegatorFee:         uint64(txFees.AddSubnetDelegatorFee),
 	}, nil
-}
-
-func NewContextFromConfig(
-	ctx *snow.Context,
-	cfg *config.Config,
-	timestamp time.Time,
-) *Context {
-	return &Context{
-		NetworkID:                     ctx.NetworkID,
-		AVAXAssetID:                   ctx.AVAXAssetID,
-		BaseTxFee:                     cfg.TxFee,
-		CreateSubnetTxFee:             cfg.GetCreateSubnetTxFee(timestamp),
-		TransformSubnetTxFee:          cfg.TransformSubnetTxFee,
-		CreateBlockchainTxFee:         cfg.GetCreateBlockchainTxFee(timestamp),
-		AddPrimaryNetworkValidatorFee: cfg.AddPrimaryNetworkValidatorFee,
-		AddPrimaryNetworkDelegatorFee: cfg.AddPrimaryNetworkDelegatorFee,
-		AddSubnetValidatorFee:         cfg.AddSubnetValidatorFee,
-		AddSubnetDelegatorFee:         cfg.AddSubnetDelegatorFee,
-	}
 }
 
 func NewSnowContext(networkID uint32, avaxAssetID ids.ID) (*snow.Context, error) {
