@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
+	"github.com/ava-labs/avalanchego/vms/components/fees"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 )
@@ -49,8 +50,8 @@ type testTxVerifier struct {
 	err error
 }
 
-func (t testTxVerifier) VerifyTx(*txs.Tx) error {
-	return t.err
+func (t testTxVerifier) VerifyTx(*txs.Tx) (fees.TipPercentage, error) {
+	return fees.NoTip, t.err
 }
 
 func TestNetworkIssueTxFromRPC(t *testing.T) {
@@ -114,7 +115,7 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 				mempool := mempool.NewMockMempool(ctrl)
 				mempool.EXPECT().Get(gomock.Any()).Return(nil, false)
 				mempool.EXPECT().GetDropReason(gomock.Any()).Return(nil)
-				mempool.EXPECT().Add(gomock.Any()).Return(errTest)
+				mempool.EXPECT().Add(gomock.Any(), gomock.Any()).Return(errTest)
 				mempool.EXPECT().MarkDropped(gomock.Any(), gomock.Any())
 				return mempool
 			},
@@ -141,7 +142,7 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 				mempool := mempool.NewMockMempool(ctrl)
 				mempool.EXPECT().Get(gomock.Any()).Return(nil, false)
 				mempool.EXPECT().GetDropReason(gomock.Any()).Return(nil)
-				mempool.EXPECT().Add(gomock.Any()).Return(nil)
+				mempool.EXPECT().Add(gomock.Any(), gomock.Any()).Return(nil)
 				mempool.EXPECT().Len().Return(0)
 				mempool.EXPECT().RequestBuildBlock(false)
 				mempool.EXPECT().Get(gomock.Any()).Return(nil, true).Times(2)

@@ -17,6 +17,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 func TestAtomicTxImports(t *testing.T) {
@@ -67,11 +69,12 @@ func TestAtomicTxImports(t *testing.T) {
 		recipientKey.PublicKey().Address(),
 		[]*secp256k1.PrivateKey{recipientKey},
 		ids.ShortEmpty, // change addr
+		commonfees.NoTip,
 		nil,
 	)
 	require.NoError(err)
 
-	require.NoError(env.Builder.Add(tx))
+	require.NoError(env.Builder.Add(tx, commonfees.NoTip))
 	b, err := env.Builder.BuildBlock(context.Background())
 	require.NoError(err)
 	// Test multiple verify calls work

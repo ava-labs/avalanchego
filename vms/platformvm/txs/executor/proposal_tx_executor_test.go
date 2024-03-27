@@ -19,6 +19,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 func TestProposalTxExecuteAddDelegator(t *testing.T) {
@@ -290,6 +292,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			testSubnet1.ID(),
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 			ids.ShortEmpty, // change addr
+			commonfees.NoTip,
 			nil,
 		)
 		require.NoError(err)
@@ -323,6 +326,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			testSubnet1.ID(),
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 			ids.ShortEmpty, // change addr
+			commonfees.NoTip,
 			nil,
 		)
 		require.NoError(err)
@@ -371,6 +375,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			testSubnet1.ID(),
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 			ids.ShortEmpty, // change addr
+			commonfees.NoTip,
 			nil,
 		)
 		require.NoError(err)
@@ -419,6 +424,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			testSubnet1.ID(),
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 			ids.ShortEmpty, // change addr
+			commonfees.NoTip,
 			nil,
 		)
 		require.NoError(err)
@@ -450,6 +456,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			testSubnet1.ID(),
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 			ids.ShortEmpty, // change addr
+			commonfees.NoTip,
 			nil,
 		)
 		require.NoError(err)
@@ -481,6 +488,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			testSubnet1.ID(),
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 			ids.ShortEmpty, // change addr
+			commonfees.NoTip,
 			nil,
 		)
 		require.NoError(err)
@@ -514,6 +522,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			testSubnet1.ID(), // subnet ID
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 			ids.ShortEmpty, // change addr
+			commonfees.NoTip,
 			nil,
 		)
 		require.NoError(err)
@@ -547,6 +556,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		testSubnet1.ID(),                        // subnet ID
 		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 		ids.ShortEmpty,
+		commonfees.NoTip,
 		nil,
 	)
 	require.NoError(err)
@@ -575,6 +585,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			testSubnet1.ID(),                          // subnet ID
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 			ids.ShortEmpty, // change addr
+			commonfees.NoTip,
 			nil,
 		)
 		require.NoError(err)
@@ -609,6 +620,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			testSubnet1.ID(), // subnet ID
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[2]},
 			ids.ShortEmpty, // change addr
+			commonfees.NoTip,
 			nil,
 		)
 		require.NoError(err)
@@ -646,6 +658,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			testSubnet1.ID(), // subnet ID
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], preFundedKeys[1]},
 			ids.ShortEmpty, // change addr
+			commonfees.NoTip,
 			nil,
 		)
 		require.NoError(err)
@@ -682,6 +695,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			testSubnet1.ID(), // subnet ID
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 			ids.ShortEmpty, // change addr
+			commonfees.NoTip,
 			nil,
 		)
 		require.NoError(err)

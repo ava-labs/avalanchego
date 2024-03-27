@@ -184,6 +184,9 @@ func newEnvironment(t *testing.T, f fork) *environment { //nolint:unparam
 
 	res.mempool, err = mempool.New("mempool", registerer, nil)
 	require.NoError(err)
+	if res.config.IsEActivated(res.state.GetTimestamp()) {
+		res.mempool.SetEUpgradeActive()
+	}
 
 	res.blkManager = blockexecutor.NewManager(
 		res.mempool,
@@ -253,6 +256,7 @@ func addSubnet(t *testing.T, env *environment) {
 		},
 		[]*secp256k1.PrivateKey{preFundedKeys[0]},
 		preFundedKeys[0].PublicKey().Address(),
+		fees.NoTip,
 		nil,
 	)
 	require.NoError(err)

@@ -67,7 +67,7 @@ func TestGossipMempoolAddError(t *testing.T) {
 
 	mempool.EXPECT().Get(txID).Return(nil, false)
 	mempool.EXPECT().GetDropReason(txID).Return(nil)
-	mempool.EXPECT().Add(tx).Return(errFoo)
+	mempool.EXPECT().Add(tx, gomock.Any()).Return(errFoo)
 	mempool.EXPECT().MarkDropped(txID, errFoo).AnyTimes()
 
 	gossipMempool, err := newGossipMempool(
@@ -132,7 +132,7 @@ func TestGossipAddBloomFilter(t *testing.T) {
 
 	mempool.EXPECT().Get(txID).Return(nil, false)
 	mempool.EXPECT().GetDropReason(txID).Return(nil)
-	mempool.EXPECT().Add(tx).Return(nil)
+	mempool.EXPECT().Add(tx, gomock.Any()).Return(nil)
 	mempool.EXPECT().Len().Return(0)
 	mempool.EXPECT().RequestBuildBlock(false)
 

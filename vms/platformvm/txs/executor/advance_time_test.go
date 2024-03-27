@@ -19,6 +19,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 func newAdvanceTimeTx(t testing.TB, timestamp time.Time) (*txs.Tx, error) {
@@ -383,6 +385,7 @@ func TestAdvanceTimeTxUpdateStakers(t *testing.T) {
 					subnetID,      // Subnet ID
 					[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
 					ids.ShortEmpty,
+					commonfees.NoTip,
 					nil,
 				)
 				require.NoError(err)
@@ -478,6 +481,7 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 		subnetID,                           // Subnet ID
 		[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
 		ids.ShortEmpty,
+		commonfees.NoTip,
 		nil,
 	)
 	require.NoError(err)
@@ -508,6 +512,7 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 		subnetID,         // Subnet ID
 		[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]}, // Keys
 		ids.ShortEmpty, // reward address
+		commonfees.NoTip,
 		nil,
 	)
 	require.NoError(err)
@@ -585,6 +590,7 @@ func TestTrackedSubnet(t *testing.T) {
 				subnetID,                           // Subnet ID
 				[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
 				ids.ShortEmpty,
+				commonfees.NoTip,
 				nil,
 			)
 			require.NoError(err)

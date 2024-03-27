@@ -375,6 +375,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 			testSubnet1.ID(),
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 			ids.ShortEmpty, // change addr
+			fees.NoTip,
 			nil,
 		)
 		require.NoError(err)
@@ -408,6 +409,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 			testSubnet1.ID(),
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 			ids.ShortEmpty, // change addr
+			fees.NoTip,
 			nil,
 		)
 		require.NoError(err)
@@ -456,6 +458,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 			testSubnet1.ID(),
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 			ids.ShortEmpty, // change addr
+			fees.NoTip,
 			nil,
 		)
 		require.NoError(err)
@@ -504,6 +507,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 			testSubnet1.ID(),
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 			ids.ShortEmpty, // change addr
+			fees.NoTip,
 			nil,
 		)
 		require.NoError(err)
@@ -535,6 +539,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 			testSubnet1.ID(),
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 			ids.ShortEmpty, // change addr
+			fees.NoTip,
 			nil,
 		)
 		require.NoError(err)
@@ -566,6 +571,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 			testSubnet1.ID(),
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 			ids.ShortEmpty, // change addr
+			fees.NoTip,
 			nil,
 		)
 		require.NoError(err)
@@ -599,6 +605,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 			testSubnet1.ID(), // subnet ID
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 			ids.ShortEmpty, // change addr
+			fees.NoTip,
 			nil,
 		)
 		require.NoError(err)
@@ -632,6 +639,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		testSubnet1.ID(),                        // subnet ID
 		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 		ids.ShortEmpty,
+		fees.NoTip,
 		nil,
 	)
 	require.NoError(err)
@@ -661,6 +669,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 			testSubnet1.ID(),                      // subnet ID
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 			ids.ShortEmpty, // change addr
+			fees.NoTip,
 			nil,
 		)
 		require.NoError(err)
@@ -696,6 +705,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 			testSubnet1.ID(), // subnet ID
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1], testSubnet1ControlKeys[2]},
 			ids.ShortEmpty, // change addr
+			fees.NoTip,
 			nil,
 		)
 		require.NoError(err)
@@ -734,6 +744,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 			testSubnet1.ID(), // subnet ID
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[2]},
 			ids.ShortEmpty, // change addr
+			fees.NoTip,
 			nil,
 		)
 		require.NoError(err)
@@ -772,6 +783,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 			testSubnet1.ID(), // subnet ID
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], preFundedKeys[1]},
 			ids.ShortEmpty, // change addr
+			fees.NoTip,
 			nil,
 		)
 		require.NoError(err)
@@ -809,6 +821,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 			testSubnet1.ID(), // subnet ID
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 			ids.ShortEmpty, // change addr
+			fees.NoTip,
 			nil,
 		)
 		require.NoError(err)
@@ -1133,6 +1146,7 @@ func TestDurangoMemoField(t *testing.T) {
 					testSubnet1.TxID,
 					preFundedKeys,
 					ids.ShortEmpty,
+					fees.NoTip,
 					memoField,
 				)
 				require.NoError(t, err)
@@ -1153,6 +1167,7 @@ func TestDurangoMemoField(t *testing.T) {
 					"aaa",                // chain name
 					preFundedKeys,
 					ids.ShortEmpty,
+					fees.NoTip,
 					memoField,
 				)
 				require.NoError(t, err)
@@ -1171,6 +1186,7 @@ func TestDurangoMemoField(t *testing.T) {
 					[]ids.ShortID{ids.GenerateTestShortID()},
 					preFundedKeys,
 					ids.ShortEmpty,
+					fees.NoTip,
 					memoField,
 				)
 				require.NoError(t, err)
@@ -1209,6 +1225,7 @@ func TestDurangoMemoField(t *testing.T) {
 					sourceKey.PublicKey().Address(),
 					preFundedKeys,
 					ids.ShortEmpty, // change address
+					fees.NoTip,
 					memoField,
 				)
 				require.NoError(t, err)
@@ -1228,6 +1245,7 @@ func TestDurangoMemoField(t *testing.T) {
 					ids.GenerateTestShortID(), // destination address
 					preFundedKeys,
 					ids.ShortEmpty, // change address
+					fees.NoTip,
 					memoField,
 				)
 				require.NoError(t, err)
@@ -1263,6 +1281,7 @@ func TestDurangoMemoField(t *testing.T) {
 					testSubnet1.ID(),
 					[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 					ids.ShortEmpty,
+					fees.NoTip,
 					nil,
 				)
 				require.NoError(t, err)
@@ -1281,6 +1300,7 @@ func TestDurangoMemoField(t *testing.T) {
 					testSubnet1.ID(),
 					preFundedKeys,
 					ids.ShortEmpty,
+					fees.NoTip,
 					memoField,
 				)
 				require.NoError(t, err)
@@ -1307,6 +1327,7 @@ func TestDurangoMemoField(t *testing.T) {
 					80,                        // uptime requirement
 					preFundedKeys,
 					ids.ShortEmpty, // change address
+					fees.NoTip,
 					memoField,
 				)
 				require.NoError(t, err)
@@ -1338,6 +1359,7 @@ func TestDurangoMemoField(t *testing.T) {
 					reward.PercentDenominator, // shares
 					preFundedKeys,
 					ids.ShortEmpty, // change address
+					fees.NoTip,
 					memoField,
 				)
 				require.NoError(t, err)
@@ -1372,6 +1394,7 @@ func TestDurangoMemoField(t *testing.T) {
 					ids.ShortEmpty, // reward address
 					preFundedKeys,
 					ids.ShortEmpty, // change address
+					fees.NoTip,
 					memoField,
 				)
 				require.NoError(t, err)
@@ -1391,6 +1414,7 @@ func TestDurangoMemoField(t *testing.T) {
 					[]ids.ShortID{ids.ShortEmpty},
 					preFundedKeys,
 					ids.ShortEmpty, // change address
+					fees.NoTip,
 					memoField,
 				)
 				require.NoError(t, err)
@@ -1412,6 +1436,7 @@ func TestDurangoMemoField(t *testing.T) {
 					},
 					preFundedKeys,
 					ids.ShortEmpty,
+					fees.NoTip,
 					memoField,
 				)
 				require.NoError(t, err)
@@ -1570,7 +1595,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				env.fx.EXPECT().VerifyPermission(env.unsignedTx, env.unsignedTx.SubnetAuth, env.tx.Creds[len(env.tx.Creds)-1], subnetOwner).Return(nil).Times(1)
 				env.flowChecker.EXPECT().VerifySpend(
 					env.unsignedTx, env.state, env.unsignedTx.Ins, env.unsignedTx.Outs, env.tx.Creds[:len(env.tx.Creds)-1], gomock.Any(),
-				).Return(nil).Times(1)
+				).Return(uint64(0), nil).Times(1)
 				env.state.EXPECT().DeleteCurrentValidator(env.staker)
 				env.state.EXPECT().DeleteUTXO(gomock.Any()).Times(len(env.unsignedTx.Ins))
 				env.state.EXPECT().AddUTXO(gomock.Any()).Times(len(env.unsignedTx.Outs))
@@ -1791,7 +1816,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				env.fx.EXPECT().VerifyPermission(gomock.Any(), env.unsignedTx.SubnetAuth, env.tx.Creds[len(env.tx.Creds)-1], subnetOwner).Return(nil)
 				env.flowChecker.EXPECT().VerifySpend(
 					gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(),
-				).Return(errTest)
+				).Return(uint64(0), errTest)
 
 				cfg := defaultTestConfig(t, durango, env.latestForkTime)
 				chainTime := env.state.GetTimestamp()
@@ -2043,7 +2068,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 				env.fx.EXPECT().VerifyPermission(gomock.Any(), env.unsignedTx.SubnetAuth, env.tx.Creds[len(env.tx.Creds)-1], subnetOwner).Return(nil)
 				env.flowChecker.EXPECT().VerifySpend(
 					gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(),
-				).Return(ErrFlowCheckFailed)
+				).Return(uint64(0), ErrFlowCheckFailed)
 
 				cfg := defaultTestConfig(t, durango, env.latestForkTime)
 				cfg.MaxStakeDuration = math.MaxInt64
@@ -2080,7 +2105,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 				env.fx.EXPECT().VerifyPermission(env.unsignedTx, env.unsignedTx.SubnetAuth, env.tx.Creds[len(env.tx.Creds)-1], subnetOwner).Return(nil).Times(1)
 				env.flowChecker.EXPECT().VerifySpend(
 					env.unsignedTx, env.state, env.unsignedTx.Ins, env.unsignedTx.Outs, env.tx.Creds[:len(env.tx.Creds)-1], gomock.Any(),
-				).Return(nil).Times(1)
+				).Return(uint64(0), nil).Times(1)
 				env.state.EXPECT().AddSubnetTransformation(env.tx)
 				env.state.EXPECT().SetCurrentSupply(env.unsignedTx.Subnet, env.unsignedTx.InitialSupply)
 				env.state.EXPECT().DeleteUTXO(gomock.Any()).Times(len(env.unsignedTx.Ins))

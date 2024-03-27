@@ -44,6 +44,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
@@ -262,6 +263,7 @@ func addSubnetValidator(vm *VM, data *validatorInputData, subnetID ids.ID) (*sta
 		subnetID,
 		[]*secp256k1.PrivateKey{keys[0], keys[1]},
 		addr,
+		commonfees.NoTip,
 		nil,
 	)
 	if err != nil {
@@ -288,6 +290,7 @@ func addPrimaryValidatorWithBLSKey(vm *VM, data *validatorInputData) (*state.Sta
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[0], keys[1]},
 		addr,
+		commonfees.NoTip,
 		nil,
 	)
 	if err != nil {
@@ -685,6 +688,7 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 		[]ids.ShortID{keys[0].PublicKey().Address()},
 		[]*secp256k1.PrivateKey{keys[len(keys)-1]}, // pays tx fee
 		keys[0].PublicKey().Address(),              // change addr
+		commonfees.NoTip,
 		nil,
 	)
 	if err != nil {

@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 )
 
@@ -41,7 +42,8 @@ type Options struct {
 
 	changeOwner *secp256k1fx.OutputOwners
 
-	memo []byte
+	tipPercentage commonfees.TipPercentage
+	memo          []byte
 
 	assumeDecided bool
 
@@ -117,6 +119,10 @@ func (o *Options) ChangeOwner(defaultOwner *secp256k1fx.OutputOwners) *secp256k1
 	return defaultOwner
 }
 
+func (o *Options) TipPercentage() commonfees.TipPercentage {
+	return o.tipPercentage
+}
+
 func (o *Options) Memo() []byte {
 	return o.memo
 }
@@ -178,6 +184,12 @@ func WithStakeableLocked() Option {
 func WithChangeOwner(changeOwner *secp256k1fx.OutputOwners) Option {
 	return func(o *Options) {
 		o.changeOwner = changeOwner
+	}
+}
+
+func WithTipPercentage(tp commonfees.TipPercentage) Option {
+	return func(o *Options) {
+		o.tipPercentage = tp
 	}
 }
 

@@ -25,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
@@ -45,6 +46,7 @@ func TestBuildBlockBasic(t *testing.T) {
 		"chain name",
 		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 		ids.ShortEmpty,
+		commonfees.NoTip,
 		nil,
 	)
 	require.NoError(err)
@@ -119,6 +121,7 @@ func TestBuildBlockShouldReward(t *testing.T) {
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{preFundedKeys[0]},
 		preFundedKeys[0].PublicKey().Address(),
+		commonfees.NoTip,
 		nil,
 	)
 	require.NoError(err)
@@ -240,6 +243,7 @@ func TestBuildBlockForceAdvanceTime(t *testing.T) {
 		"chain name",
 		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 		ids.ShortEmpty,
+		commonfees.NoTip,
 		nil,
 	)
 	require.NoError(err)
@@ -311,10 +315,11 @@ func TestBuildBlockInvalidStakingDurations(t *testing.T) {
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{preFundedKeys[0]},
 		preFundedKeys[0].PublicKey().Address(),
+		commonfees.NoTip,
 		nil,
 	)
 	require.NoError(err)
-	require.NoError(env.mempool.Add(tx1))
+	require.NoError(env.mempool.Add(tx1, commonfees.NoTip))
 	tx1ID := tx1.ID()
 	_, ok := env.mempool.Get(tx1ID)
 	require.True(ok)
@@ -335,10 +340,11 @@ func TestBuildBlockInvalidStakingDurations(t *testing.T) {
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{preFundedKeys[2]},
 		preFundedKeys[2].PublicKey().Address(),
+		commonfees.NoTip,
 		nil,
 	)
 	require.NoError(err)
-	require.NoError(env.mempool.Add(tx2))
+	require.NoError(env.mempool.Add(tx2, commonfees.NoTip))
 	tx2ID := tx2.ID()
 	_, ok = env.mempool.Get(tx2ID)
 	require.True(ok)
@@ -381,6 +387,7 @@ func TestPreviouslyDroppedTxsCannotBeReAddedToMempool(t *testing.T) {
 		"chain name",
 		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 		ids.ShortEmpty,
+		commonfees.NoTip,
 		nil,
 	)
 	require.NoError(err)

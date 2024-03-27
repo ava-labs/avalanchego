@@ -351,6 +351,7 @@ func (b *builder) NewBaseTx(
 	}
 
 	// feesMan cumulates complexity. Let's init it with utx filled so far
+	feeCalc.TipPercentage = ops.TipPercentage()
 	if err := feeCalc.BaseTx(utx); err != nil {
 		return nil, err
 	}
@@ -396,6 +397,7 @@ func (b *builder) NewAddValidatorTx(
 	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
 
 	// feesMan cumulates complexity. Let's init it with utx filled so far
+	feeCalc.TipPercentage = ops.TipPercentage()
 	if err := feeCalc.AddValidatorTx(utx); err != nil {
 		return nil, err
 	}
@@ -444,6 +446,7 @@ func (b *builder) NewAddSubnetValidatorTx(
 	}
 
 	// feesMan cumulates complexity. Let's init it with utx filled so far
+	feeCalc.TipPercentage = ops.TipPercentage()
 	if err := feeCalc.AddSubnetValidatorTx(utx); err != nil {
 		return nil, err
 	}
@@ -492,6 +495,7 @@ func (b *builder) NewRemoveSubnetValidatorTx(
 	}
 
 	// feesMan cumulates complexity. Let's init it with utx filled so far
+	feeCalc.TipPercentage = ops.TipPercentage()
 	if err := feeCalc.RemoveSubnetValidatorTx(utx); err != nil {
 		return nil, err
 	}
@@ -533,6 +537,7 @@ func (b *builder) NewAddDelegatorTx(
 	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
 
 	// feesMan cumulates complexity. Let's init it with utx filled so far
+	feeCalc.TipPercentage = ops.TipPercentage()
 	if err := feeCalc.AddDelegatorTx(utx); err != nil {
 		return nil, err
 	}
@@ -629,6 +634,7 @@ func (b *builder) NewCreateSubnetTx(
 	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
 
 	// feesMan cumulates complexity. Let's init it with utx filled so far
+	feeCalc.TipPercentage = ops.TipPercentage()
 	if err := feeCalc.CreateSubnetTx(utx); err != nil {
 		return nil, err
 	}
@@ -679,6 +685,7 @@ func (b *builder) NewTransferSubnetOwnershipTx(
 	}
 
 	// feesMan cumulates complexity. Let's init it with utx filled so far
+	feeCalc.TipPercentage = ops.TipPercentage()
 	if err := feeCalc.TransferSubnetOwnershipTx(utx); err != nil {
 		return nil, err
 	}
@@ -788,6 +795,7 @@ func (b *builder) NewImportTx(
 	// 3. Finance fees as much as possible with imported, Avax-denominated UTXOs
 
 	// feesMan cumulates complexity. Let's init it with utx filled so far
+	feeCalc.TipPercentage = ops.TipPercentage()
 	if err := feeCalc.ImportTx(utx); err != nil {
 		return nil, err
 	}
@@ -838,7 +846,7 @@ func (b *builder) NewImportTx(
 		default:
 			// imported avax are not enough to pay fees
 			// Drop the changeOut and finance the tx
-			if _, err := feeCalc.RemoveFeesFor(outDimensions); err != nil {
+			if _, err := feeCalc.RemoveFeesFor(outDimensions, feeCalc.TipPercentage); err != nil {
 				return nil, fmt.Errorf("failed reverting change output: %w", err)
 			}
 			feeCalc.Fee -= importedAVAX
@@ -891,6 +899,7 @@ func (b *builder) NewExportTx(
 	}
 
 	// feesMan cumulates complexity. Let's init it with utx filled so far
+	feeCalc.TipPercentage = ops.TipPercentage()
 	if err := feeCalc.ExportTx(utx); err != nil {
 		return nil, err
 	}
@@ -967,6 +976,7 @@ func (b *builder) NewTransformSubnetTx(
 	}
 
 	// feesMan cumulates complexity. Let's init it with utx filled so far
+	feeCalc.TipPercentage = ops.TipPercentage()
 	if err := feeCalc.TransformSubnetTx(utx); err != nil {
 		return nil, err
 	}
@@ -1017,6 +1027,7 @@ func (b *builder) NewAddPermissionlessValidatorTx(
 	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
 
 	// feesMan cumulates complexity. Let's init it with utx filled so far
+	feeCalc.TipPercentage = ops.TipPercentage()
 	if err := feeCalc.AddPermissionlessValidatorTx(utx); err != nil {
 		return nil, err
 	}
@@ -1061,6 +1072,7 @@ func (b *builder) NewAddPermissionlessDelegatorTx(
 	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
 
 	// feesMan cumulates complexity. Let's init it with utx filled so far
+	feeCalc.TipPercentage = ops.TipPercentage()
 	if err := feeCalc.AddPermissionlessDelegatorTx(utx); err != nil {
 		return nil, err
 	}

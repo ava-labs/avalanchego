@@ -16,7 +16,7 @@ func FinanceInput(feeCalc *Calculator, input *avax.TransferableInput) (uint64, e
 	if err != nil {
 		return 0, fmt.Errorf("failed calculating input size: %w", err)
 	}
-	addedFees, err := feeCalc.AddFeesFor(inDimensions)
+	addedFees, err := feeCalc.AddFeesFor(inDimensions, feeCalc.TipPercentage)
 	if err != nil {
 		return 0, fmt.Errorf("account for input fees: %w", err)
 	}
@@ -28,7 +28,7 @@ func FinanceOutput(feeCalc *Calculator, output *avax.TransferableOutput) (uint64
 	if err != nil {
 		return 0, fees.Empty, fmt.Errorf("failed calculating changeOut size: %w", err)
 	}
-	addedFees, err := feeCalc.AddFeesFor(outDimensions)
+	addedFees, err := feeCalc.AddFeesFor(outDimensions, feeCalc.TipPercentage)
 	if err != nil {
 		return 0, fees.Empty, fmt.Errorf("account for stakedOut fees: %w", err)
 	}
@@ -40,7 +40,7 @@ func FinanceCredential(feeCalc *Calculator, keysCount int) (uint64, error) {
 	if err != nil {
 		return 0, fmt.Errorf("failed calculating input size: %w", err)
 	}
-	addedFees, err := feeCalc.AddFeesFor(credDimensions)
+	addedFees, err := feeCalc.AddFeesFor(credDimensions, feeCalc.TipPercentage)
 	if err != nil {
 		return 0, fmt.Errorf("account for input fees: %w", err)
 	}

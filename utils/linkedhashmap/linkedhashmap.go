@@ -21,7 +21,7 @@ type Hashmap[K, V any] interface {
 	Len() int
 }
 
-// LinkedHashmap is a hashmap that keeps track of the oldest pairing an the
+// LinkedHashmap is a hashmap that keeps track of the oldest pairing and the
 // newest pairing.
 type LinkedHashmap[K, V any] interface {
 	Hashmap[K, V]

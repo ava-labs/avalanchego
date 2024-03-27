@@ -76,29 +76,30 @@ func TestAddAndRemoveFees(t *testing.T) {
 	}
 
 	var (
-		units       = fees.Dimensions{1, 2, 3, 4}
-		doubleUnits = fees.Dimensions{2, 4, 6, 8}
+		units         = fees.Dimensions{1, 2, 3, 4}
+		doubleUnits   = fees.Dimensions{2, 4, 6, 8}
+		tipPercentage = fees.TipPercentage(100)
 	)
 
-	feeDelta, err := fc.AddFeesFor(units)
+	feeDelta, err := fc.AddFeesFor(units, tipPercentage)
 	r.NoError(err)
 	r.Equal(units, fc.FeeManager.GetCumulatedComplexity())
 	r.NotZero(feeDelta)
 	r.Equal(feeDelta, fc.Fee)
 
-	feeDelta2, err := fc.AddFeesFor(units)
+	feeDelta2, err := fc.AddFeesFor(units, tipPercentage)
 	r.NoError(err)
 	r.Equal(doubleUnits, fc.FeeManager.GetCumulatedComplexity())
 	r.Equal(feeDelta, feeDelta2)
 	r.Equal(feeDelta+feeDelta2, fc.Fee)
 
-	feeDelta3, err := fc.RemoveFeesFor(units)
+	feeDelta3, err := fc.RemoveFeesFor(units, tipPercentage)
 	r.NoError(err)
 	r.Equal(units, fc.FeeManager.GetCumulatedComplexity())
 	r.Equal(feeDelta, feeDelta3)
 	r.Equal(feeDelta, fc.Fee)
 
-	feeDelta4, err := fc.RemoveFeesFor(units)
+	feeDelta4, err := fc.RemoveFeesFor(units, tipPercentage)
 	r.NoError(err)
 	r.Zero(fc.FeeManager.GetCumulatedComplexity())
 	r.Equal(feeDelta, feeDelta4)

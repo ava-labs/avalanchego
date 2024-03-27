@@ -1091,7 +1091,7 @@ func TestVerifySpendUTXOs(t *testing.T) {
 		h.clk.Set(now)
 
 		t.Run(test.description, func(t *testing.T) {
-			err := h.VerifySpendUTXOs(
+			_, err := h.VerifySpendUTXOs(
 				&unsignedTx,
 				test.utxos,
 				test.ins,

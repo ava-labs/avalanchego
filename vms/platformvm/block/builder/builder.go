@@ -68,7 +68,7 @@ type Builder interface {
 	// preferred state.
 	//
 	// Note: This function does not call the consensus engine.
-	PackBlockTxs(targetBlockSize int) ([]*txs.Tx, error)
+	PackBlockTxs(targetBlockSize int) ([]mempool.TxAndTipPercentage, error)
 }
 
 // builder implements a simple builder to convert txs into valid blocks
@@ -238,7 +238,7 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 	return b.blkManager.NewBlock(statelessBlk), nil
 }
 
-func (b *builder) PackBlockTxs(targetBlockSize int) ([]*txs.Tx, error) {
+func (b *builder) PackBlockTxs(targetBlockSize int) ([]mempool.TxAndTipPercentage, error) {
 	preferredID := b.blkManager.Preferred()
 	preferredState, ok := b.blkManager.GetState(preferredID)
 	if !ok {
@@ -278,6 +278,11 @@ func buildBlock(
 		return nil, fmt.Errorf("failed to pack block txs: %w", err)
 	}
 
+	txs := make([]*txs.Tx, 0, len(blockTxs))
+	for _, v := range blockTxs {
+		txs = append(txs, v.Tx)
+	}
+
 	// Try rewarding stakers whose staking period ends at the new chain time.
 	// This is done first to prioritize advancing the timestamp as quickly as
 	// possible.
@@ -296,12 +301,12 @@ func buildBlock(
 			parentID,
 			height,
 			rewardValidatorTx,
-			blockTxs,
+			txs,
 		)
 	}
 
 	// If there is no reason to build a block, don't.
-	if len(blockTxs) == 0 && !forceAdvanceTime {
+	if len(txs) == 0 && !forceAdvanceTime {
 		builder.txExecutorBackend.Ctx.Log.Debug("no pending txs to issue into a block")
 		return nil, ErrNoPendingBlocks
 	}
@@ -311,19 +316,19 @@ func buildBlock(
 		timestamp,
 		parentID,
 		height,
-		blockTxs,
+		txs,
 	)
 }
 
 func packBlockTxs(
 	parentID ids.ID,
 	parentState state.Chain,
-	mempool mempool.Mempool,
+	mpool mempool.Mempool,
 	backend *txexecutor.Backend,
 	manager blockexecutor.Manager,
 	timestamp time.Time,
 	remainingSize int,
-) ([]*txs.Tx, error) {
+) ([]mempool.TxAndTipPercentage, error) {
 	// retrieve parent block time before moving time forward
 	parentBlkTime := parentState.GetTimestamp()
 
@@ -349,9 +354,17 @@ func packBlockTxs(
 		isEActivated = backend.Config.IsEActivated(timestamp)
 		feeCfg       = config.GetDynamicFeesConfig(isEActivated)
 
-		blockTxs []*txs.Tx
+		blockTxs []mempool.TxAndTipPercentage
 		inputs   set.Set[ids.ID]
 	)
+
+	if isEActivated {
+		// we lazily inform the mempool that the E upgrade has been activated.
+		// Lazily since we don't inform the mempool as soon as the first block
+		// post E upgrade has been accepted; instead we wait for the next block
+		// build.
+		mpool.SetEUpgradeActive()
+	}
 
 	feeMan := commonfees.NewManager(feeRates)
 	if isEActivated {
@@ -366,7 +379,7 @@ func packBlockTxs(
 	}
 
 	for {
-		tx, exists := mempool.Peek()
+		tx, exists := mpool.Peek()
 		if !exists {
 			break
 		}
@@ -380,7 +393,7 @@ func packBlockTxs(
 		if targetSizeReached {
 			break
 		}
-		mempool.Remove(tx)
+		mpool.Remove(tx)
 
 		// Invariant: [tx] has already been syntactically verified.
 
@@ -400,19 +413,19 @@ func packBlockTxs(
 		err = tx.Unsigned.Visit(executor)
 		if err != nil {
 			txID := tx.ID()
-			mempool.MarkDropped(txID, err)
+			mpool.MarkDropped(txID, err)
 			continue
 		}
 
 		if inputs.Overlaps(executor.Inputs) {
 			txID := tx.ID()
-			mempool.MarkDropped(txID, blockexecutor.ErrConflictingBlockTxs)
+			mpool.MarkDropped(txID, blockexecutor.ErrConflictingBlockTxs)
 			continue
 		}
 		err = manager.VerifyUniqueInputs(parentID, executor.Inputs)
 		if err != nil {
 			txID := tx.ID()
-			mempool.MarkDropped(txID, err)
+			mpool.MarkDropped(txID, err)
 			continue
 		}
 		inputs.Union(executor.Inputs)
@@ -426,7 +439,10 @@ func packBlockTxs(
 		if !isEActivated {
 			remainingSize -= txSize
 		}
-		blockTxs = append(blockTxs, tx)
+		blockTxs = append(blockTxs, mempool.TxAndTipPercentage{
+			Tx:            tx,
+			TipPercentage: executor.TipPercentage,
+		})
 	}
 
 	return blockTxs, nil

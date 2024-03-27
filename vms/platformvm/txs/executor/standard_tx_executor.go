@@ -44,6 +44,7 @@ type StandardTxExecutor struct {
 	OnAccept       func() // may be nil
 	Inputs         set.Set[ids.ID]
 	AtomicRequests map[ids.ID]*atomic.Requests // may be nil
+	TipPercentage  commonfees.TipPercentage
 }
 
 func (*StandardTxExecutor) AdvanceTimeTx(*txs.AdvanceTimeTx) error {
@@ -86,7 +87,7 @@ func (e *StandardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 		return err
 	}
 
-	if err := e.FlowChecker.VerifySpend(
+	feesPaid, err := e.FlowChecker.VerifySpend(
 		tx,
 		e.State,
 		tx.Ins,
@@ -95,8 +96,16 @@ func (e *StandardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 		map[ids.ID]uint64{
 			e.Ctx.AVAXAssetID: feeCalculator.Fee,
 		},
-	); err != nil {
+	)
+	if err != nil {
 		return err
+	}
+
+	if isEActive {
+		if err := feeCalculator.CalculateTipPercentage(feesPaid); err != nil {
+			return fmt.Errorf("failed estimating fee tip percentage: %w", err)
+		}
+		e.TipPercentage = feeCalculator.TipPercentage
 	}
 
 	txID := e.Tx.ID()
@@ -144,7 +153,7 @@ func (e *StandardTxExecutor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 		return err
 	}
 
-	if err := e.FlowChecker.VerifySpend(
+	feesPaid, err := e.FlowChecker.VerifySpend(
 		tx,
 		e.State,
 		tx.Ins,
@@ -153,8 +162,16 @@ func (e *StandardTxExecutor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 		map[ids.ID]uint64{
 			e.Ctx.AVAXAssetID: feeCalculator.Fee,
 		},
-	); err != nil {
+	)
+	if err != nil {
 		return err
+	}
+
+	if isEActive {
+		if err := feeCalculator.CalculateTipPercentage(feesPaid); err != nil {
+			return fmt.Errorf("failed estimating fee tip percentage: %w", err)
+		}
+		e.TipPercentage = feeCalculator.TipPercentage
 	}
 
 	txID := e.Tx.ID()
@@ -241,7 +258,7 @@ func (e *StandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 			return err
 		}
 
-		if err := e.FlowChecker.VerifySpendUTXOs(
+		feesPaid, err := e.FlowChecker.VerifySpendUTXOs(
 			tx,
 			utxos,
 			ins,
@@ -250,8 +267,16 @@ func (e *StandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 			map[ids.ID]uint64{
 				e.Ctx.AVAXAssetID: feeCalculator.Fee,
 			},
-		); err != nil {
+		)
+		if err != nil {
 			return err
+		}
+
+		if isEActive {
+			if err := feeCalculator.CalculateTipPercentage(feesPaid); err != nil {
+				return fmt.Errorf("failed estimating fee tip percentage: %w", err)
+			}
+			e.TipPercentage = feeCalculator.TipPercentage
 		}
 	}
 
@@ -309,7 +334,7 @@ func (e *StandardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.ExportedOutputs))
 	copy(outs, tx.Outs)
 	copy(outs[len(tx.Outs):], tx.ExportedOutputs)
-	if err := e.FlowChecker.VerifySpend(
+	feesPaid, err := e.FlowChecker.VerifySpend(
 		tx,
 		e.State,
 		tx.Ins,
@@ -318,8 +343,16 @@ func (e *StandardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 		map[ids.ID]uint64{
 			e.Ctx.AVAXAssetID: feeCalculator.Fee,
 		},
-	); err != nil {
+	)
+	if err != nil {
 		return fmt.Errorf("failed verifySpend: %w", err)
+	}
+
+	if isEActive {
+		if err := feeCalculator.CalculateTipPercentage(feesPaid); err != nil {
+			return fmt.Errorf("failed estimating fee tip percentage: %w", err)
+		}
+		e.TipPercentage = feeCalculator.TipPercentage
 	}
 
 	txID := e.Tx.ID()
@@ -400,16 +433,18 @@ func (e *StandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 }
 
 func (e *StandardTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
-	if err := verifyAddSubnetValidatorTx(
+	tipPercentage, err := verifyAddSubnetValidatorTx(
 		e.Backend,
 		e.BlkFeeManager,
 		e.BlockMaxComplexity,
 		e.State,
 		e.Tx,
 		tx,
-	); err != nil {
+	)
+	if err != nil {
 		return err
 	}
+	e.TipPercentage = tipPercentage
 
 	if err := e.putStaker(tx); err != nil {
 		return err
@@ -447,7 +482,7 @@ func (e *StandardTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 // [tx.SubnetID].
 // Note: [tx.NodeID] may be either a current or pending validator.
 func (e *StandardTxExecutor) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx) error {
-	staker, isCurrentValidator, err := verifyRemoveSubnetValidatorTx(
+	staker, isCurrentValidator, tipPercentage, err := verifyRemoveSubnetValidatorTx(
 		e.Backend,
 		e.BlkFeeManager,
 		e.BlockMaxComplexity,
@@ -458,6 +493,7 @@ func (e *StandardTxExecutor) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidat
 	if err != nil {
 		return err
 	}
+	e.TipPercentage = tipPercentage
 
 	// Invariant: There are no permissioned subnet delegators to remove.
 	if isCurrentValidator {
@@ -511,7 +547,7 @@ func (e *StandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 	}
 
 	totalRewardAmount := tx.MaximumSupply - tx.InitialSupply
-	if err := e.Backend.FlowChecker.VerifySpend(
+	feesPaid, err := e.Backend.FlowChecker.VerifySpend(
 		tx,
 		e.State,
 		tx.Ins,
@@ -524,8 +560,16 @@ func (e *StandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 			e.Ctx.AVAXAssetID: feeCalculator.Fee,
 			tx.AssetID:        totalRewardAmount,
 		},
-	); err != nil {
+	)
+	if err != nil {
 		return err
+	}
+
+	if isEActive {
+		if err := feeCalculator.CalculateTipPercentage(feesPaid); err != nil {
+			return fmt.Errorf("failed estimating fee tip percentage: %w", err)
+		}
+		e.TipPercentage = feeCalculator.TipPercentage
 	}
 
 	txID := e.Tx.ID()
@@ -541,16 +585,18 @@ func (e *StandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 }
 
 func (e *StandardTxExecutor) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessValidatorTx) error {
-	if err := verifyAddPermissionlessValidatorTx(
+	tipPercentage, err := verifyAddPermissionlessValidatorTx(
 		e.Backend,
 		e.BlkFeeManager,
 		e.BlockMaxComplexity,
 		e.State,
 		e.Tx,
 		tx,
-	); err != nil {
+	)
+	if err != nil {
 		return err
 	}
+	e.TipPercentage = tipPercentage
 
 	if err := e.putStaker(tx); err != nil {
 		return err
@@ -575,16 +621,18 @@ func (e *StandardTxExecutor) AddPermissionlessValidatorTx(tx *txs.AddPermissionl
 }
 
 func (e *StandardTxExecutor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDelegatorTx) error {
-	if err := verifyAddPermissionlessDelegatorTx(
+	tipPercentage, err := verifyAddPermissionlessDelegatorTx(
 		e.Backend,
 		e.BlkFeeManager,
 		e.BlockMaxComplexity,
 		e.State,
 		e.Tx,
 		tx,
-	); err != nil {
+	)
+	if err != nil {
 		return err
 	}
+	e.TipPercentage = tipPercentage
 
 	if err := e.putStaker(tx); err != nil {
 		return err
@@ -601,7 +649,7 @@ func (e *StandardTxExecutor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionl
 // This transaction will result in the ownership of [tx.Subnet] being transferred
 // to [tx.Owner].
 func (e *StandardTxExecutor) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwnershipTx) error {
-	err := verifyTransferSubnetOwnershipTx(
+	tipPercentage, err := verifyTransferSubnetOwnershipTx(
 		e.Backend,
 		e.BlkFeeManager,
 		e.BlockMaxComplexity,
@@ -612,6 +660,7 @@ func (e *StandardTxExecutor) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwn
 	if err != nil {
 		return err
 	}
+	e.TipPercentage = tipPercentage
 
 	e.State.SetSubnetOwner(tx.Subnet, tx.Owner)
 
@@ -655,7 +704,7 @@ func (e *StandardTxExecutor) BaseTx(tx *txs.BaseTx) error {
 		return err
 	}
 
-	if err := e.FlowChecker.VerifySpend(
+	feesPaid, err := e.FlowChecker.VerifySpend(
 		tx,
 		e.State,
 		tx.Ins,
@@ -664,8 +713,16 @@ func (e *StandardTxExecutor) BaseTx(tx *txs.BaseTx) error {
 		map[ids.ID]uint64{
 			e.Ctx.AVAXAssetID: feeCalculator.Fee,
 		},
-	); err != nil {
+	)
+	if err != nil {
 		return err
+	}
+
+	if isEActive {
+		if err := feeCalculator.CalculateTipPercentage(feesPaid); err != nil {
+			return fmt.Errorf("failed estimating fee tip percentage: %w", err)
+		}
+		e.TipPercentage = feeCalculator.TipPercentage
 	}
 
 	txID := e.Tx.ID()
@@ -673,6 +730,7 @@ func (e *StandardTxExecutor) BaseTx(tx *txs.BaseTx) error {
 	avax.Consume(e.State, tx.Ins)
 	// Produce the UTXOS
 	avax.Produce(e.State, txID, tx.Outs)
+	e.TipPercentage = feeCalculator.TipPercentage
 	return nil
 }
 
