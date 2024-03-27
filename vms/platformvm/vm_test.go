@@ -69,6 +69,7 @@ import (
 	txbuilder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	walletbuilder "github.com/ava-labs/avalanchego/wallet/chain/p/builder"
+	walletcommon "github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
 
 const (
@@ -202,7 +203,7 @@ func defaultGenesis(t *testing.T, avaxAssetID ids.ID) (*api.BuildGenesisArgs, []
 	return &buildGenesisArgs, genesisBytes
 }
 
-func defaultVM(t *testing.T, f fork) (*VM, txbuilder.Builder, database.Database, *mutableSharedMemory) {
+func defaultVM(t *testing.T, f fork) (*VM, *txbuilder.Builder, database.Database, *mutableSharedMemory) {
 	require := require.New(t)
 	var (
 		apricotPhase3Time = mockable.MaxTime
@@ -314,12 +315,19 @@ func defaultVM(t *testing.T, f fork) (*VM, txbuilder.Builder, database.Database,
 	// chain time ahead
 	var err error
 	testSubnet1, err = builder.NewCreateSubnetTx(
-		2, // threshold; 2 sigs from keys[0], keys[1], keys[2] needed to add validator to this subnet
-		// control keys are keys[0], keys[1], keys[2]
-		[]ids.ShortID{keys[0].PublicKey().Address(), keys[1].PublicKey().Address(), keys[2].PublicKey().Address()},
+		&secp256k1fx.OutputOwners{
+			Threshold: 2,
+			Addrs: []ids.ShortID{
+				keys[0].PublicKey().Address(),
+				keys[1].PublicKey().Address(),
+				keys[2].PublicKey().Address(),
+			},
+		},
 		[]*secp256k1.PrivateKey{keys[0]}, // pays tx fee
-		keys[0].PublicKey().Address(),    // change addr
-		nil,
+		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+		}),
 	)
 	require.NoError(err)
 	vm.ctx.Lock.Unlock()
@@ -413,16 +421,27 @@ func TestAddValidatorCommit(t *testing.T) {
 
 	// create valid tx
 	tx, err := txBuilder.NewAddPermissionlessValidatorTx(
-		vm.MinValidatorStake,
-		uint64(startTime.Unix()),
-		uint64(endTime.Unix()),
-		nodeID,
+		&txs.SubnetValidator{
+			Validator: txs.Validator{
+				NodeID: nodeID,
+				Start:  uint64(startTime.Unix()),
+				End:    uint64(endTime.Unix()),
+				Wght:   vm.MinValidatorStake,
+			},
+			Subnet: constants.PrimaryNetworkID,
+		},
 		signer.NewProofOfPossession(sk),
-		rewardAddress,
+		vm.ctx.AVAXAssetID,
+		&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{rewardAddress},
+		},
+		&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{rewardAddress},
+		},
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[0]},
-		ids.ShortEmpty, // change addr
-		nil,
 	)
 	require.NoError(err)
 
@@ -459,15 +478,18 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 
 	// create invalid tx
 	tx, err := txBuilder.NewAddValidatorTx(
-		vm.MinValidatorStake,
-		uint64(startTime.Unix()),
-		uint64(endTime.Unix()),
-		nodeID,
-		ids.GenerateTestShortID(),
+		&txs.Validator{
+			NodeID: nodeID,
+			Start:  uint64(startTime.Unix()),
+			End:    uint64(endTime.Unix()),
+			Wght:   vm.MinValidatorStake,
+		},
+		&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+		},
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[0]},
-		ids.ShortEmpty, // change addr
-		nil,
 	)
 	require.NoError(err)
 
@@ -513,15 +535,18 @@ func TestAddValidatorReject(t *testing.T) {
 
 	// create valid tx
 	tx, err := txBuilder.NewAddValidatorTx(
-		vm.MinValidatorStake,
-		uint64(startTime.Unix()),
-		uint64(endTime.Unix()),
-		nodeID,
-		rewardAddress,
+		&txs.Validator{
+			NodeID: nodeID,
+			Start:  uint64(startTime.Unix()),
+			End:    uint64(endTime.Unix()),
+			Wght:   vm.MinValidatorStake,
+		},
+		&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{rewardAddress},
+		},
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[0]},
-		ids.ShortEmpty, // change addr
-		nil,
 	)
 	require.NoError(err)
 
@@ -561,16 +586,27 @@ func TestAddValidatorInvalidNotReissued(t *testing.T) {
 
 	// create valid tx
 	tx, err := txBuilder.NewAddPermissionlessValidatorTx(
-		vm.MinValidatorStake,
-		uint64(startTime.Unix()),
-		uint64(endTime.Unix()),
-		repeatNodeID,
+		&txs.SubnetValidator{
+			Validator: txs.Validator{
+				NodeID: repeatNodeID,
+				Start:  uint64(startTime.Unix()),
+				End:    uint64(endTime.Unix()),
+				Wght:   vm.MinValidatorStake,
+			},
+			Subnet: constants.PrimaryNetworkID,
+		},
 		signer.NewProofOfPossession(sk),
-		ids.GenerateTestShortID(),
+		vm.ctx.AVAXAssetID,
+		&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+		},
+		&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+		},
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[0]},
-		ids.ShortEmpty, // change addr
-		nil,
 	)
 	require.NoError(err)
 
@@ -598,14 +634,16 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 	// note that [startTime, endTime] is a subset of time that keys[0]
 	// validates primary network ([defaultValidateStartTime, defaultValidateEndTime])
 	tx, err := txBuilder.NewAddSubnetValidatorTx(
-		defaultWeight,
-		uint64(startTime.Unix()),
-		uint64(endTime.Unix()),
-		nodeID,
-		testSubnet1.ID(),
+		&txs.SubnetValidator{
+			Validator: txs.Validator{
+				NodeID: nodeID,
+				Start:  uint64(startTime.Unix()),
+				End:    uint64(endTime.Unix()),
+				Wght:   defaultWeight,
+			},
+			Subnet: testSubnet1.ID(),
+		},
 		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
-		ids.ShortEmpty, // change addr
-		nil,
 	)
 	require.NoError(err)
 
@@ -646,14 +684,16 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 	// note that [startTime, endTime] is a subset of time that keys[0]
 	// validates primary network ([defaultValidateStartTime, defaultValidateEndTime])
 	tx, err := txBuilder.NewAddSubnetValidatorTx(
-		defaultWeight,
-		uint64(startTime.Unix()),
-		uint64(endTime.Unix()),
-		nodeID,
-		testSubnet1.ID(),
+		&txs.SubnetValidator{
+			Validator: txs.Validator{
+				NodeID: nodeID,
+				Start:  uint64(startTime.Unix()),
+				End:    uint64(endTime.Unix()),
+				Wght:   defaultWeight,
+			},
+			Subnet: testSubnet1.ID(),
+		},
 		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[1], testSubnet1ControlKeys[2]},
-		ids.ShortEmpty, // change addr
-		nil,
 	)
 	require.NoError(err)
 
@@ -839,8 +879,6 @@ func TestCreateChain(t *testing.T) {
 		nil,
 		"name",
 		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
-		ids.ShortEmpty, // change addr
-		nil,
 	)
 	require.NoError(err)
 
@@ -884,14 +922,18 @@ func TestCreateSubnet(t *testing.T) {
 
 	nodeID := genesisNodeIDs[0]
 	createSubnetTx, err := txBuilder.NewCreateSubnetTx(
-		1, // threshold
-		[]ids.ShortID{ // control keys
-			keys[0].PublicKey().Address(),
-			keys[1].PublicKey().Address(),
+		&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs: []ids.ShortID{
+				keys[0].PublicKey().Address(),
+				keys[1].PublicKey().Address(),
+			},
 		},
 		[]*secp256k1.PrivateKey{keys[0]}, // payer
-		keys[0].PublicKey().Address(),    // change addr
-		nil,
+		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+		}),
 	)
 	require.NoError(err)
 
@@ -928,14 +970,16 @@ func TestCreateSubnet(t *testing.T) {
 	endTime := startTime.Add(defaultMinStakingDuration)
 	// [startTime, endTime] is subset of time keys[0] validates default subnet so tx is valid
 	addValidatorTx, err := txBuilder.NewAddSubnetValidatorTx(
-		defaultWeight,
-		uint64(startTime.Unix()),
-		uint64(endTime.Unix()),
-		nodeID,
-		createSubnetTx.ID(),
+		&txs.SubnetValidator{
+			Validator: txs.Validator{
+				NodeID: nodeID,
+				Start:  uint64(startTime.Unix()),
+				End:    uint64(endTime.Unix()),
+				Wght:   defaultWeight,
+			},
+			Subnet: createSubnetTx.ID(),
+		},
 		[]*secp256k1.PrivateKey{keys[0]},
-		ids.ShortEmpty, // change addr
-		nil,
 	)
 	require.NoError(err)
 
@@ -996,10 +1040,12 @@ func TestAtomicImport(t *testing.T) {
 
 	_, err := txBuilder.NewImportTx(
 		vm.ctx.XChainID,
-		recipientKey.PublicKey().Address(),
+		&secp256k1fx.OutputOwners{
+			Locktime:  0,
+			Threshold: 1,
+			Addrs:     []ids.ShortID{recipientKey.PublicKey().Address()},
+		},
 		[]*secp256k1.PrivateKey{keys[0]},
-		ids.ShortEmpty, // change addr
-		nil,
 	)
 	require.ErrorIs(err, walletbuilder.ErrInsufficientFunds)
 
@@ -1036,10 +1082,12 @@ func TestAtomicImport(t *testing.T) {
 
 	tx, err := txBuilder.NewImportTx(
 		vm.ctx.XChainID,
-		recipientKey.PublicKey().Address(),
+		&secp256k1fx.OutputOwners{
+			Locktime:  0,
+			Threshold: 1,
+			Addrs:     []ids.ShortID{recipientKey.PublicKey().Address()},
+		},
 		[]*secp256k1.PrivateKey{recipientKey},
-		ids.ShortEmpty, // change addr
-		nil,
 	)
 	require.NoError(err)
 
@@ -2030,16 +2078,31 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 	require.NoError(err)
 
 	addValidatorTx, err := txBuilder.NewAddPermissionlessValidatorTx(
-		defaultMaxValidatorStake,
-		uint64(validatorStartTime.Unix()),
-		uint64(validatorEndTime.Unix()),
-		nodeID,
+		&txs.SubnetValidator{
+			Validator: txs.Validator{
+				NodeID: nodeID,
+				Start:  uint64(validatorStartTime.Unix()),
+				End:    uint64(validatorEndTime.Unix()),
+				Wght:   defaultMaxValidatorStake,
+			},
+			Subnet: constants.PrimaryNetworkID,
+		},
 		signer.NewProofOfPossession(sk),
-		id,
+		vm.ctx.AVAXAssetID,
+		&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{id},
+		},
+		&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{id},
+		},
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[0]},
-		keys[0].Address(),
-		nil,
+		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+		}),
 	)
 	require.NoError(err)
 
@@ -2055,11 +2118,15 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
 	createSubnetTx, err := txBuilder.NewCreateSubnetTx(
-		1,
-		[]ids.ShortID{id},
+		&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{id},
+		},
 		[]*secp256k1.PrivateKey{keys[0]},
-		keys[0].Address(),
-		nil,
+		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+		}),
 	)
 	require.NoError(err)
 
@@ -2075,14 +2142,20 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
 	addSubnetValidatorTx, err := txBuilder.NewAddSubnetValidatorTx(
-		defaultMaxValidatorStake,
-		uint64(validatorStartTime.Unix()),
-		uint64(validatorEndTime.Unix()),
-		nodeID,
-		createSubnetTx.ID(),
+		&txs.SubnetValidator{
+			Validator: txs.Validator{
+				NodeID: nodeID,
+				Start:  uint64(validatorStartTime.Unix()),
+				End:    uint64(validatorEndTime.Unix()),
+				Wght:   defaultMaxValidatorStake,
+			},
+			Subnet: createSubnetTx.ID(),
+		},
 		[]*secp256k1.PrivateKey{key, keys[1]},
-		keys[1].Address(),
-		nil,
+		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{keys[1].PublicKey().Address()},
+		}),
 	)
 	require.NoError(err)
 
@@ -2090,8 +2163,10 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 		nodeID,
 		createSubnetTx.ID(),
 		[]*secp256k1.PrivateKey{key, keys[2]},
-		keys[2].Address(),
-		nil,
+		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{keys[2].PublicKey().Address()},
+		}),
 	)
 	require.NoError(err)
 
@@ -2125,11 +2200,15 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 
 	// Create a subnet
 	createSubnetTx, err := txBuilder.NewCreateSubnetTx(
-		1,
-		[]ids.ShortID{keys[0].PublicKey().Address()},
+		&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+		},
 		[]*secp256k1.PrivateKey{keys[0]},
-		keys[0].Address(),
-		nil,
+		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+		}),
 	)
 	require.NoError(err)
 	subnetID := createSubnetTx.ID()
@@ -2164,11 +2243,11 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 
 	transferSubnetOwnershipTx, err := txBuilder.NewTransferSubnetOwnershipTx(
 		subnetID,
-		1,
-		[]ids.ShortID{keys[1].PublicKey().Address()},
+		&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{keys[1].PublicKey().Address()},
+		},
 		[]*secp256k1.PrivateKey{keys[0]},
-		ids.ShortEmpty, // change addr
-		nil,
 	)
 	require.NoError(err)
 
@@ -2209,16 +2288,25 @@ func TestBaseTx(t *testing.T) {
 	changeAddr := ids.ShortEmpty
 
 	baseTx, err := txBuilder.NewBaseTx(
-		sendAmt,
-		secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs: []ids.ShortID{
-				keys[1].Address(),
+		[]*avax.TransferableOutput{
+			{
+				Asset: avax.Asset{ID: vm.ctx.AVAXAssetID},
+				Out: &secp256k1fx.TransferOutput{
+					Amt: sendAmt,
+					OutputOwners: secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs: []ids.ShortID{
+							keys[1].Address(),
+						},
+					},
+				},
 			},
 		},
 		[]*secp256k1.PrivateKey{keys[0]},
-		changeAddr,
-		nil,
+		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{changeAddr},
+		}),
 	)
 	require.NoError(err)
 
@@ -2285,16 +2373,25 @@ func TestPruneMempool(t *testing.T) {
 	changeAddr := ids.ShortEmpty
 
 	baseTx, err := txBuilder.NewBaseTx(
-		sendAmt,
-		secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs: []ids.ShortID{
-				keys[1].Address(),
+		[]*avax.TransferableOutput{
+			{
+				Asset: avax.Asset{ID: vm.ctx.AVAXAssetID},
+				Out: &secp256k1fx.TransferOutput{
+					Amt: sendAmt,
+					OutputOwners: secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs: []ids.ShortID{
+							keys[1].Address(),
+						},
+					},
+				},
 			},
 		},
 		[]*secp256k1.PrivateKey{keys[0]},
-		changeAddr,
-		nil,
+		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{changeAddr},
+		}),
 	)
 	require.NoError(err)
 
@@ -2317,16 +2414,27 @@ func TestPruneMempool(t *testing.T) {
 	require.NoError(err)
 
 	addValidatorTx, err := txBuilder.NewAddPermissionlessValidatorTx(
-		defaultMinValidatorStake,
-		uint64(startTime.Unix()),
-		uint64(endTime.Unix()),
-		ids.GenerateTestNodeID(),
+		&txs.SubnetValidator{
+			Validator: txs.Validator{
+				NodeID: ids.GenerateTestNodeID(),
+				Start:  uint64(startTime.Unix()),
+				End:    uint64(endTime.Unix()),
+				Wght:   defaultMinValidatorStake,
+			},
+			Subnet: constants.PrimaryNetworkID,
+		},
 		signer.NewProofOfPossession(sk),
-		keys[2].Address(),
+		vm.ctx.AVAXAssetID,
+		&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{keys[2].Address()},
+		},
+		&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{keys[2].Address()},
+		},
 		20000,
 		[]*secp256k1.PrivateKey{keys[1]},
-		ids.ShortEmpty,
-		nil,
 	)
 	require.NoError(err)
 

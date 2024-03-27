@@ -40,6 +40,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
 	avajson "github.com/ava-labs/avalanchego/utils/json"
 	vmkeystore "github.com/ava-labs/avalanchego/vms/components/keystore"
@@ -73,7 +74,7 @@ var (
 	}
 )
 
-func defaultService(t *testing.T) (*Service, *mutableSharedMemory, txbuilder.Builder) {
+func defaultService(t *testing.T) (*Service, *mutableSharedMemory, *txbuilder.Builder) {
 	vm, txBuilder, _, mutableSharedMemory := defaultVM(t, latestFork)
 
 	return &Service{
@@ -168,10 +169,12 @@ func TestGetTxStatus(t *testing.T) {
 
 	tx, err := txBuilder.NewImportTx(
 		service.vm.ctx.XChainID,
-		ids.ShortEmpty,
+		&secp256k1fx.OutputOwners{
+			Locktime:  0,
+			Threshold: 1,
+			Addrs:     []ids.ShortID{ids.ShortEmpty},
+		},
 		[]*secp256k1.PrivateKey{recipientKey},
-		ids.ShortEmpty,
-		nil,
 	)
 	require.NoError(err)
 
@@ -209,13 +212,13 @@ func TestGetTxStatus(t *testing.T) {
 func TestGetTx(t *testing.T) {
 	type test struct {
 		description string
-		createTx    func(service *Service, builder txbuilder.Builder) (*txs.Tx, error)
+		createTx    func(service *Service, builder *txbuilder.Builder) (*txs.Tx, error)
 	}
 
 	tests := []test{
 		{
 			"standard block",
-			func(_ *Service, builder txbuilder.Builder) (*txs.Tx, error) {
+			func(_ *Service, builder *txbuilder.Builder) (*txs.Tx, error) {
 				return builder.NewCreateChainTx( // Test GetTx works for standard blocks
 					testSubnet1.ID(),
 					[]byte{},
@@ -223,41 +226,68 @@ func TestGetTx(t *testing.T) {
 					[]ids.ID{},
 					"chain name",
 					[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
-					keys[0].PublicKey().Address(), // change addr
-					nil,
+					common.WithChangeOwner(&secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+					}),
 				)
 			},
 		},
 		{
 			"proposal block",
-			func(service *Service, builder txbuilder.Builder) (*txs.Tx, error) {
+			func(service *Service, builder *txbuilder.Builder) (*txs.Tx, error) {
 				sk, err := bls.NewSecretKey()
 				require.NoError(t, err)
 
+				rewardsOwner := &secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+				}
+
 				return builder.NewAddPermissionlessValidatorTx( // Test GetTx works for proposal blocks
-					service.vm.MinValidatorStake,
-					uint64(service.vm.clock.Time().Add(txexecutor.SyncBound).Unix()),
-					uint64(service.vm.clock.Time().Add(txexecutor.SyncBound).Add(defaultMinStakingDuration).Unix()),
-					ids.GenerateTestNodeID(),
+					&txs.SubnetValidator{
+						Validator: txs.Validator{
+							NodeID: ids.GenerateTestNodeID(),
+							Start:  uint64(service.vm.clock.Time().Add(txexecutor.SyncBound).Unix()),
+							End:    uint64(service.vm.clock.Time().Add(txexecutor.SyncBound).Add(defaultMinStakingDuration).Unix()),
+							Wght:   service.vm.MinValidatorStake,
+						},
+						Subnet: constants.PrimaryNetworkID,
+					},
 					signer.NewProofOfPossession(sk),
-					ids.GenerateTestShortID(),
+					service.vm.ctx.AVAXAssetID,
+					rewardsOwner,
+					rewardsOwner,
 					0,
 					[]*secp256k1.PrivateKey{keys[0]},
-					keys[0].PublicKey().Address(), // change addr
-					nil,
+					common.WithChangeOwner(&secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+					}),
 				)
 			},
 		},
 		{
 			"atomic block",
-			func(service *Service, builder txbuilder.Builder) (*txs.Tx, error) {
+			func(service *Service, builder *txbuilder.Builder) (*txs.Tx, error) {
 				return builder.NewExportTx( // Test GetTx works for proposal blocks
-					100,
 					service.vm.ctx.XChainID,
-					ids.GenerateTestShortID(),
+					[]*avax.TransferableOutput{{
+						Asset: avax.Asset{ID: service.vm.ctx.AVAXAssetID},
+						Out: &secp256k1fx.TransferOutput{
+							Amt: 100,
+							OutputOwners: secp256k1fx.OutputOwners{
+								Locktime:  0,
+								Threshold: 1,
+								Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+							},
+						},
+					}},
 					[]*secp256k1.PrivateKey{keys[0]},
-					keys[0].PublicKey().Address(), // change addr
-					nil,
+					common.WithChangeOwner(&secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+					}),
 				)
 			},
 		},
@@ -436,14 +466,21 @@ func TestGetStake(t *testing.T) {
 	delegatorStartTime := defaultValidateStartTime
 	delegatorEndTime := defaultGenesisTime.Add(defaultMinStakingDuration)
 	tx, err := txBuilder.NewAddDelegatorTx(
-		stakeAmount,
-		uint64(delegatorStartTime.Unix()),
-		uint64(delegatorEndTime.Unix()),
-		delegatorNodeID,
-		ids.GenerateTestShortID(),
+		&txs.Validator{
+			NodeID: delegatorNodeID,
+			Start:  uint64(delegatorStartTime.Unix()),
+			End:    uint64(delegatorEndTime.Unix()),
+			Wght:   stakeAmount,
+		},
+		&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+		},
 		[]*secp256k1.PrivateKey{keys[0]},
-		keys[0].PublicKey().Address(), // change addr
-		nil,
+		common.WithChangeOwner(&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+		}),
 	)
 	require.NoError(err)
 
@@ -491,15 +528,22 @@ func TestGetStake(t *testing.T) {
 	pendingStakerNodeID := ids.GenerateTestNodeID()
 	pendingStakerEndTime := uint64(defaultGenesisTime.Add(defaultMinStakingDuration).Unix())
 	tx, err = txBuilder.NewAddValidatorTx(
-		stakeAmount,
-		uint64(defaultGenesisTime.Unix()),
-		pendingStakerEndTime,
-		pendingStakerNodeID,
-		ids.GenerateTestShortID(),
+		&txs.Validator{
+			NodeID: pendingStakerNodeID,
+			Start:  uint64(defaultGenesisTime.Unix()),
+			End:    pendingStakerEndTime,
+			Wght:   stakeAmount,
+		},
+		&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+		},
 		0,
 		[]*secp256k1.PrivateKey{keys[0]},
-		keys[0].PublicKey().Address(), // change addr
-		nil,
+		common.WithChangeOwner(&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+		}),
 	)
 	require.NoError(err)
 
@@ -570,14 +614,21 @@ func TestGetCurrentValidators(t *testing.T) {
 	service.vm.ctx.Lock.Lock()
 
 	delTx, err := txBuilder.NewAddDelegatorTx(
-		stakeAmount,
-		uint64(delegatorStartTime.Unix()),
-		uint64(delegatorEndTime.Unix()),
-		validatorNodeID,
-		ids.GenerateTestShortID(),
+		&txs.Validator{
+			NodeID: validatorNodeID,
+			Start:  uint64(delegatorStartTime.Unix()),
+			End:    uint64(delegatorEndTime.Unix()),
+			Wght:   stakeAmount,
+		},
+		&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+		},
 		[]*secp256k1.PrivateKey{keys[0]},
-		keys[0].PublicKey().Address(), // change addr
-		nil,
+		common.WithChangeOwner(&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+		}),
 	)
 	require.NoError(err)
 
@@ -710,8 +761,10 @@ func TestGetBlock(t *testing.T) {
 				[]ids.ID{},
 				"chain name",
 				[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
-				keys[0].PublicKey().Address(), // change addr
-				nil,
+				common.WithChangeOwner(&secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+				}),
 			)
 			require.NoError(err)
 
