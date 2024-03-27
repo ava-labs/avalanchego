@@ -165,7 +165,7 @@ func (fc *Calculator) meterTx(
 		}
 	}
 	complexity[fees.Bandwidth] += wrappers.IntLen // length of the credentials slice
-	complexity[fees.Bandwidth] += codec.CodecVersionSize
+	complexity[fees.Bandwidth] += codec.VersionSize
 
 	for _, in := range allIns {
 		inputDimensions, err := fees.MeterInput(fc.Codec, txs.CodecVersion, in)

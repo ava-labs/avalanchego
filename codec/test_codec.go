@@ -8,15 +8,11 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 var (
 	Tests = []func(c GeneralCodec, t testing.TB){
 		TestStruct,
-		TestPartiallyFilledStruct,
-		TestSliceWithEmptyElements,
 		TestRegisterStructTwice,
 		TestUInt32,
 		TestUIntPtr,
@@ -243,85 +239,6 @@ func TestStruct(codec GeneralCodec, t testing.TB) {
 
 	require.Zero(version)
 	require.Equal(myStructInstance, *myStructUnmarshaled)
-}
-
-func TestPartiallyFilledStruct(codec GeneralCodec, t testing.TB) {
-	require := require.New(t)
-
-	manager := NewDefaultManager()
-	require.NoError(manager.RegisterCodec(0, codec))
-
-	// a nil pointer cannot be marshalled but we can get its size
-	var nilStruct *myStruct
-	_, err := manager.Marshal(0, nilStruct)
-	require.ErrorIs(err, ErrMarshalNil)
-
-	bytesLen, err := manager.Size(0, nilStruct)
-	require.NoError(err)
-	require.Equal(CodecVersionSize, bytesLen)
-
-	// an empty struct cannot be marshalled but we can get its size
-	emptyStruct := &myStruct{}
-	_, err = manager.Marshal(0, nilStruct)
-	require.ErrorIs(err, ErrMarshalNil)
-
-	emptyStructLen := CodecVersionSize + 117
-	bytesLen, err = manager.Size(0, emptyStruct)
-	require.NoError(err)
-	require.Equal(emptyStructLen, bytesLen)
-
-	// an partially filled struct cannot be marshalled but we can get its size
-	elem := &MyInnerStruct{
-		Str: "a",
-	}
-	elemLen := CodecVersionSize + wrappers.StringLen(elem.Str)
-
-	partialStruct := &myStruct{
-		InnerStruct2: elem,
-	}
-	partialStructLen := emptyStructLen + elemLen - CodecVersionSize
-	bytesLen, err = manager.Size(0, partialStruct)
-	require.NoError(err)
-	require.Equal(partialStructLen, bytesLen)
-}
-
-func TestSliceWithEmptyElements(codec GeneralCodec, t testing.TB) {
-	require := require.New(t)
-
-	manager := NewDefaultManager()
-	require.NoError(manager.RegisterCodec(0, codec))
-
-	// a non-empty slice with nil pointers cannot be marshalled but we can get its size
-	slice := make([]*MyInnerStruct, 10)
-
-	_, err := manager.Marshal(0, slice)
-	require.ErrorIs(err, ErrMarshalNil)
-
-	emptySliceLen := CodecVersionSize + wrappers.IntLen // Codec version + slice size. Slice elements have zero size
-	bytesLen, err := manager.Size(0, slice)
-	require.NoError(err)
-	require.Equal(emptySliceLen, bytesLen)
-
-	elem := &MyInnerStruct{
-		Str: "aaa",
-	}
-	elemLen := CodecVersionSize + wrappers.StringLen(elem.Str)
-	bytesLen, err = manager.Size(0, elem)
-	require.NoError(err)
-	require.Equal(elemLen, bytesLen)
-
-	// we can fill some elements and leave other empty. Size will be sub-additive
-	slice[1] = elem
-	sliceLen := emptySliceLen + elemLen - CodecVersionSize // codec version is marshelled only once
-	bytesLen, err = manager.Size(0, slice)
-	require.NoError(err)
-	require.Equal(sliceLen, bytesLen)
-
-	slice[5] = elem
-	sliceLen += elemLen - CodecVersionSize // codec version is marshelled only once
-	bytesLen, err = manager.Size(0, slice)
-	require.NoError(err)
-	require.Equal(sliceLen, bytesLen)
 }
 
 func TestRegisterStructTwice(codec GeneralCodec, t testing.TB) {
@@ -856,9 +773,8 @@ func TestSliceWithEmptySerializationError(codec GeneralCodec, t testing.TB) {
 	_, err := manager.Marshal(0, val)
 	require.ErrorIs(err, ErrMarshalZeroLength)
 
-	// we cannot marshal/unmarshal an empty slice, but we can ask its size
 	_, err = manager.Size(0, val)
-	require.NoError(err)
+	require.ErrorIs(err, ErrMarshalZeroLength)
 
 	b := []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x01} // codec version (0x00, 0x00) then (0x00, 0x00, 0x00, 0x01) for numElts
 
