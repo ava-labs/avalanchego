@@ -113,6 +113,7 @@ func TestProcess(t *testing.T) {
 		expectedParentID            ids.ID
 		expectedShouldFetchParentID bool
 		expectedMissingBlockIDs     set.Set[ids.ID]
+		expectedTrackedHeights      []uint64
 	}{
 		{
 			name:                        "add single block",
@@ -124,6 +125,7 @@ func TestProcess(t *testing.T) {
 			expectedParentID:            blocks[4].ID(),
 			expectedShouldFetchParentID: true,
 			expectedMissingBlockIDs:     set.Set[ids.ID]{},
+			expectedTrackedHeights:      []uint64{5},
 		},
 		{
 			name:               "add multiple blocks",
@@ -137,6 +139,7 @@ func TestProcess(t *testing.T) {
 			expectedParentID:            blocks[3].ID(),
 			expectedShouldFetchParentID: true,
 			expectedMissingBlockIDs:     set.Set[ids.ID]{},
+			expectedTrackedHeights:      []uint64{4, 5},
 		},
 		{
 			name:               "ignore non-consecutive blocks",
@@ -150,6 +153,7 @@ func TestProcess(t *testing.T) {
 			expectedParentID:            blocks[4].ID(),
 			expectedShouldFetchParentID: true,
 			expectedMissingBlockIDs:     set.Of(blocks[3].ID()),
+			expectedTrackedHeights:      []uint64{5},
 		},
 		{
 			name:                        "do not request the last accepted block",
@@ -161,6 +165,7 @@ func TestProcess(t *testing.T) {
 			expectedParentID:            ids.Empty,
 			expectedShouldFetchParentID: false,
 			expectedMissingBlockIDs:     set.Set[ids.ID]{},
+			expectedTrackedHeights:      []uint64{3},
 		},
 		{
 			name:                        "do not request already known block",
@@ -172,6 +177,7 @@ func TestProcess(t *testing.T) {
 			expectedParentID:            ids.Empty,
 			expectedShouldFetchParentID: false,
 			expectedMissingBlockIDs:     set.Of(blocks[1].ID()),
+			expectedTrackedHeights:      []uint64{2, 3},
 		},
 	}
 	for _, test := range tests {
@@ -198,6 +204,11 @@ func TestProcess(t *testing.T) {
 			require.Equal(test.expectedShouldFetchParentID, shouldFetchParentID)
 			require.Equal(test.expectedParentID, parentID)
 			require.Equal(test.expectedMissingBlockIDs, test.missingBlockIDs)
+
+			require.Equal(uint64(len(test.expectedTrackedHeights)), tree.Len())
+			for _, height := range test.expectedTrackedHeights {
+				require.True(tree.Contains(height))
+			}
 		})
 	}
 }
