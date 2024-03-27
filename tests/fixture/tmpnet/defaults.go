@@ -32,7 +32,8 @@ const (
 	// A short minimum stake duration enables testing of staking logic.
 	DefaultMinStakeDuration = time.Second
 
-	defaultConfigFilename = "config.json"
+	defaultConfigFilename  = "config.json"
+	defaultUpgradeFilename = "upgrade.json"
 )
 
 // A set of flags appropriate for testing.
