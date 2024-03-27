@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
@@ -35,7 +36,7 @@ func New(
 	return &Builder{
 		ctx:     ctx,
 		cfg:     cfg,
-		backend: NewBackend(state, atomicUTXOManager),
+		backend: NewBackend(set.Set[ids.ShortID]{}, state, atomicUTXOManager),
 	}
 }
 
@@ -349,7 +350,7 @@ func (b *Builder) builders(keys []*secp256k1.PrivateKey) (walletbuilder.Builder,
 		builder = walletbuilder.New(addrs, context, b.backend)
 		signer  = walletsigner.New(kc, b.backend)
 	)
-	b.backend.ResetAddresses(addrs)
+	b.backend.addrs = addrs
 
 	return builder, signer
 }

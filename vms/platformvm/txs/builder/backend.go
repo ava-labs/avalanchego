@@ -25,10 +25,12 @@ var (
 )
 
 func NewBackend(
+	addrs set.Set[ids.ShortID],
 	state state.State,
 	atomicUTXOsMan avax.AtomicUTXOManager,
 ) *Backend {
 	return &Backend{
+		addrs:          addrs,
 		state:          state,
 		atomicUTXOsMan: atomicUTXOsMan,
 	}
@@ -38,10 +40,6 @@ type Backend struct {
 	addrs          set.Set[ids.ShortID]
 	state          state.State
 	atomicUTXOsMan avax.AtomicUTXOManager
-}
-
-func (b *Backend) ResetAddresses(addrs set.Set[ids.ShortID]) {
-	b.addrs = addrs
 }
 
 func (b *Backend) UTXOs(_ context.Context, sourceChainID ids.ID) ([]*avax.UTXO, error) {
