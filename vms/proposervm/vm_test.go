@@ -2872,3 +2872,200 @@ func TestHistoricalBlockDeletion(t *testing.T) {
 	issueBlock()
 	requireNumHeights(newNumHistoricalBlocks)
 }
+
+func TestBootstrappingAheadOfPChainBuildBlockRegression(t *testing.T) {
+	require := require.New(t)
+
+	genesisBlock := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Accepted,
+		},
+		HeightV:    0,
+		TimestampV: time.Unix(0, 0),
+		BytesV:     []byte{0},
+	}
+	innerVMBlks := []*snowman.TestBlock{
+		genesisBlock,
+	}
+
+	var innerToEngine chan<- common.Message
+	coreVM := &block.TestVM{
+		TestVM: common.TestVM{
+			T: t,
+			InitializeF: func(_ context.Context, _ *snow.Context, _ database.Database, _ []byte, _ []byte, _ []byte, toEngine chan<- common.Message, _ []*common.Fx, _ common.AppSender) error {
+				innerToEngine = toEngine
+				return nil
+			},
+		},
+		ParseBlockF: func(_ context.Context, blkBytes []byte) (snowman.Block, error) {
+			for _, blk := range innerVMBlks {
+				if bytes.Equal(blk.Bytes(), blkBytes) {
+					return blk, nil
+				}
+			}
+			return nil, errUnknownBlock
+		},
+		GetBlockF: func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
+			for _, blk := range innerVMBlks {
+				if blk.Status() == choices.Accepted && blk.ID() == blkID {
+					return blk, nil
+				}
+			}
+			return nil, database.ErrNotFound
+		},
+		LastAcceptedF: func(context.Context) (ids.ID, error) {
+			var (
+				lastAcceptedID     ids.ID
+				lastAcceptedHeight uint64
+			)
+			for _, blk := range innerVMBlks {
+				if blk.Status() == choices.Accepted && blk.Height() >= lastAcceptedHeight {
+					lastAcceptedID = blk.ID()
+					lastAcceptedHeight = blk.Height()
+				}
+			}
+			return lastAcceptedID, nil
+		},
+	}
+
+	proVM := New(
+		coreVM,
+		Config{
+			ActivationTime:      genesisBlock.Timestamp(),
+			DurangoTime:         genesisBlock.Timestamp(),
+			MinimumPChainHeight: 0,
+			MinBlkDelay:         DefaultMinBlockDelay,
+			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
+			StakingLeafSigner:   pTestSigner,
+			StakingCertLeaf:     pTestCert,
+		},
+	)
+	proVM.Set(genesisBlock.Timestamp())
+
+	currentPChainHeight := uint64(1)
+	valState := &validators.TestState{
+		T: t,
+		GetMinimumHeightF: func(context.Context) (uint64, error) {
+			return currentPChainHeight, nil
+		},
+		GetCurrentHeightF: func(context.Context) (uint64, error) {
+			return currentPChainHeight, nil
+		},
+		GetValidatorSetF: func(_ context.Context, height uint64, _ ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+			if height > currentPChainHeight {
+				return nil, fmt.Errorf("requested height (%d) > current P-chain height (%d)", height, currentPChainHeight)
+			}
+			return map[ids.NodeID]*validators.GetValidatorOutput{
+				proVM.ctx.NodeID: {
+					NodeID: proVM.ctx.NodeID,
+					Weight: 10,
+				},
+			}, nil
+		},
+	}
+
+	ctx := snowtest.Context(t, ids.ID{1})
+	ctx.NodeID = ids.NodeIDFromCert(pTestCert)
+	ctx.ValidatorState = valState
+
+	db := prefixdb.New([]byte{0}, memdb.New())
+
+	toEngine := make(chan common.Message, 1)
+	require.NoError(proVM.Initialize(
+		context.Background(),
+		ctx,
+		db,
+		nil,
+		nil,
+		nil,
+		toEngine,
+		nil,
+		nil,
+	))
+	defer func() {
+		require.NoError(proVM.Shutdown(context.Background()))
+	}()
+
+	require.NoError(proVM.SetState(context.Background(), snow.Bootstrapping))
+
+	innerBlock1 := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		BytesV:     []byte{1},
+		ParentV:    genesisBlock.ID(),
+		HeightV:    genesisBlock.Height() + 1,
+		TimestampV: genesisBlock.Timestamp(),
+	}
+	innerVMBlks = append(innerVMBlks, innerBlock1)
+
+	statelessBlock1, err := statelessblock.BuildUnsigned(
+		genesisBlock.ID(),
+		genesisBlock.Timestamp(),
+		currentPChainHeight,
+		innerBlock1.Bytes(),
+	)
+	require.NoError(err)
+
+	block1, err := proVM.ParseBlock(context.Background(), statelessBlock1.Bytes())
+	require.NoError(err)
+
+	require.NoError(block1.Verify(context.Background()))
+	require.NoError(block1.Accept(context.Background()))
+
+	innerBlock2 := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		BytesV:     []byte{2},
+		ParentV:    innerBlock1.ID(),
+		HeightV:    innerBlock1.Height() + 1,
+		TimestampV: innerBlock1.Timestamp(),
+	}
+	innerVMBlks = append(innerVMBlks, innerBlock2)
+
+	statelessBlock2, err := statelessblock.Build(
+		statelessBlock1.ID(),
+		statelessBlock1.Timestamp(),
+		currentPChainHeight+1,
+		pTestCert,
+		innerBlock2.Bytes(),
+		ctx.ChainID,
+		pTestSigner,
+	)
+	require.NoError(err)
+
+	block2, err := proVM.ParseBlock(context.Background(), statelessBlock2.Bytes())
+	require.NoError(err)
+
+	require.NoError(block2.Verify(context.Background()))
+	require.NoError(block2.Accept(context.Background()))
+
+	require.NoError(proVM.SetPreference(context.Background(), statelessBlock2.ID()))
+
+	require.NoError(proVM.SetState(context.Background(), snow.NormalOp))
+
+	innerToEngine <- common.PendingTxs
+	require.Equal(common.PendingTxs, <-toEngine)
+
+	innerBlock3 := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		BytesV:     []byte{3},
+		ParentV:    innerBlock2.ID(),
+		HeightV:    innerBlock2.Height() + 1,
+		TimestampV: innerBlock2.Timestamp(),
+	}
+	innerVMBlks = append(innerVMBlks, innerBlock3)
+
+	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
+		return innerBlock3, nil
+	}
+	_, err = proVM.BuildBlock(context.Background())
+	require.NoError(err)
+}
