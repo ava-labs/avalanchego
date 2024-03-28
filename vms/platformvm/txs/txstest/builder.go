@@ -16,10 +16,10 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/wallet/chain/p/builder"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
 	vmsigner "github.com/ava-labs/avalanchego/vms/platformvm/signer"
-	walletbuilder "github.com/ava-labs/avalanchego/wallet/chain/p/builder"
 	walletsigner "github.com/ava-labs/avalanchego/wallet/chain/p/signer"
 )
 
@@ -337,13 +337,13 @@ func (b *Builder) NewBaseTx(
 	return walletsigner.SignUnsigned(context.Background(), pSigner, utx)
 }
 
-func (b *Builder) builders(keys []*secp256k1.PrivateKey) (walletbuilder.Builder, walletsigner.Signer) {
+func (b *Builder) builders(keys []*secp256k1.PrivateKey) (builder.Builder, walletsigner.Signer) {
 	var (
 		kc      = secp256k1fx.NewKeychain(keys...)
 		addrs   = kc.Addresses()
 		backend = NewBackend(addrs, b.state, b.ctx.SharedMemory)
 		context = NewContext(b.ctx, b.cfg, backend.state.GetTimestamp())
-		builder = walletbuilder.New(addrs, context, backend)
+		builder = builder.New(addrs, context, backend)
 		signer  = walletsigner.New(kc, backend)
 	)
 
