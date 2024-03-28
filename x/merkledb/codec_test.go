@@ -9,6 +9,7 @@ import (
 	"io"
 	"math"
 	"math/rand"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -264,5 +265,21 @@ func TestUintSize(t *testing.T) {
 		expectedSize := c.uintSize(n)
 		actualSize := binary.PutUvarint(make([]byte, binary.MaxVarintLen64), n)
 		require.Equal(t, expectedSize, actualSize, power)
+	}
+}
+
+func Benchmark_EncodeUint(b *testing.B) {
+	c := codec.(*codecImpl)
+
+	var dst bytes.Buffer
+	dst.Grow(binary.MaxVarintLen64)
+
+	for _, v := range []uint64{0, 1, 2, 32, 1024, 32768} {
+		b.Run(strconv.FormatUint(v, 10), func(b *testing.B) {
+			for i := 0; i < b.N; i++ {
+				c.encodeUint(&dst, v)
+				dst.Reset()
+			}
+		})
 	}
 }

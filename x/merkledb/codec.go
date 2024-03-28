@@ -11,7 +11,6 @@ import (
 	"math"
 	"math/bits"
 	"slices"
-	"sync"
 
 	"golang.org/x/exp/maps"
 
@@ -75,22 +74,12 @@ type decoder interface {
 }
 
 func newCodec() encoderDecoder {
-	return &codecImpl{
-		varIntPool: sync.Pool{
-			New: func() interface{} {
-				return make([]byte, binary.MaxVarintLen64)
-			},
-		},
-	}
+	return &codecImpl{}
 }
 
 // Note that bytes.Buffer.Write always returns nil, so we
 // can ignore its return values in [codecImpl] methods.
-type codecImpl struct {
-	// Invariant: Every byte slice returned by [varIntPool] has
-	// length [binary.MaxVarintLen64].
-	varIntPool sync.Pool
-}
+type codecImpl struct{}
 
 func (c *codecImpl) childSize(index byte, childEntry *child) int {
 	// * index
@@ -285,11 +274,10 @@ func (*codecImpl) decodeUint(src *bytes.Reader) (uint64, error) {
 	return val64, nil
 }
 
-func (c *codecImpl) encodeUint(dst *bytes.Buffer, value uint64) {
-	buf := c.varIntPool.Get().([]byte)
-	size := binary.PutUvarint(buf, value)
+func (*codecImpl) encodeUint(dst *bytes.Buffer, value uint64) {
+	var buf [binary.MaxVarintLen64]byte
+	size := binary.PutUvarint(buf[:], value)
 	_, _ = dst.Write(buf[:size])
-	c.varIntPool.Put(buf)
 }
 
 func (c *codecImpl) encodeMaybeByteSlice(dst *bytes.Buffer, maybeValue maybe.Maybe[[]byte]) {
