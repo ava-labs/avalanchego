@@ -171,8 +171,8 @@ type wallet struct {
 	signer  signer.Signer
 	client  avm.Client
 
-	isEForkActive                bool
-	feeRates, blockMaxComplexity commonfees.Dimensions
+	isEForkActive                    bool
+	nextFeeRates, blockMaxComplexity commonfees.Dimensions
 }
 
 func (w *wallet) Builder() builder.Builder {
@@ -396,7 +396,7 @@ func (w *wallet) refreshFork(options ...common.Option) error {
 		err error
 	)
 
-	_, w.feeRates, err = w.client.GetFeeRates(ctx)
+	_, w.nextFeeRates, err = w.client.GetFeeRates(ctx)
 	if err != nil {
 		return err
 	}
@@ -419,7 +419,7 @@ func (w *wallet) feeCalculator(options ...common.Option) (*fees.Calculator, erro
 		return nil, fmt.Errorf("failed refreshing dynamic fees data: %w", err)
 	}
 
-	feesMan := commonfees.NewManager(w.feeRates)
+	feesMan := commonfees.NewManager(w.nextFeeRates)
 	return &fees.Calculator{
 		IsEActive: w.isEForkActive,
 		Config: &config.Config{

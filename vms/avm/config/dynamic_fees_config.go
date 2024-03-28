@@ -36,7 +36,7 @@ var (
 			1,
 		},
 		BlockMaxComplexity:        commonfees.Max,
-		BlockTargetComplexityRate: commonfees.Dimensions{1, 1, 1, 1},
+		BlockTargetComplexityRate: commonfees.Dimensions{1000, 1000, 1000, 2000},
 	}
 
 	// TODO ABENEGIA: decide if and how to validate preEUpgradeDynamicFeesConfig
