@@ -47,7 +47,6 @@ import (
 	snowmanblock "github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	blockbuilder "github.com/ava-labs/avalanchego/vms/platformvm/block/builder"
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
-	txbuilder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	pvalidators "github.com/ava-labs/avalanchego/vms/platformvm/validators"
 )
@@ -65,8 +64,7 @@ type VM struct {
 	*network.Network
 	validators.State
 
-	metrics            metrics.Metrics
-	atomicUtxosManager avax.AtomicUTXOManager
+	metrics metrics.Metrics
 
 	// Used to get time. Useful for faking time during tests.
 	clock mockable.Clock
@@ -85,8 +83,7 @@ type VM struct {
 	// Bootstrapped remembers if this chain has finished bootstrapping or not
 	bootstrapped utils.Atomic[bool]
 
-	txBuilder txbuilder.Builder
-	manager   blockexecutor.Manager
+	manager blockexecutor.Manager
 
 	// Cancelled on shutdown
 	onShutdownCtx context.Context
@@ -154,27 +151,16 @@ func (vm *VM) Initialize(
 
 	validatorManager := pvalidators.NewManager(chainCtx.Log, vm.Config, vm.state, vm.metrics, &vm.clock)
 	vm.State = validatorManager
-	vm.atomicUtxosManager = avax.NewAtomicUTXOManager(chainCtx.SharedMemory, txs.Codec)
-	utxoHandler := utxo.NewHandler(vm.ctx, &vm.clock, vm.fx)
+	utxoVerifier := utxo.NewVerifier(vm.ctx, &vm.clock, vm.fx)
 	vm.uptimeManager = uptime.NewManager(vm.state, &vm.clock)
 	vm.UptimeLockedCalculator.SetCalculator(&vm.bootstrapped, &chainCtx.Lock, vm.uptimeManager)
-
-	vm.txBuilder = txbuilder.New(
-		vm.ctx,
-		&vm.Config,
-		&vm.clock,
-		vm.fx,
-		vm.state,
-		vm.atomicUtxosManager,
-		utxoHandler,
-	)
 
 	txExecutorBackend := &txexecutor.Backend{
 		Config:       &vm.Config,
 		Ctx:          vm.ctx,
 		Clk:          &vm.clock,
 		Fx:           vm.fx,
-		FlowChecker:  utxoHandler,
+		FlowChecker:  utxoVerifier,
 		Uptimes:      vm.uptimeManager,
 		Rewards:      rewards,
 		Bootstrapped: &vm.bootstrapped,
@@ -478,6 +464,7 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 		stakerAttributesCache: &cache.LRU[ids.ID, *stakerAttributes]{
 			Size: stakerAttributesCacheSize,
 		},
+		atomicUtxosManager: avax.NewAtomicUTXOManager(vm.ctx.SharedMemory, txs.Codec),
 	}
 	err := server.RegisterService(service, "platform")
 	return map[string]http.Handler{
