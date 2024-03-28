@@ -8,16 +8,15 @@ import (
 
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
-
-	walletbuilder "github.com/ava-labs/avalanchego/wallet/chain/p/builder"
+	"github.com/ava-labs/avalanchego/wallet/chain/p/builder"
 )
 
 func NewContext(
 	ctx *snow.Context,
 	cfg *config.Config,
 	timestamp time.Time,
-) *walletbuilder.Context {
-	return &walletbuilder.Context{
+) *builder.Context {
+	return &builder.Context{
 		NetworkID:                     ctx.NetworkID,
 		AVAXAssetID:                   ctx.AVAXAssetID,
 		BaseTxFee:                     cfg.TxFee,

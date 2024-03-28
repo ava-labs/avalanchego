@@ -22,9 +22,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/wallet/chain/p/builder"
 	"github.com/ava-labs/avalanchego/wallet/chain/p/signer"
-
-	walletbuilder "github.com/ava-labs/avalanchego/wallet/chain/p/builder"
 )
 
 // Ensure Execute fails when there are not enough control sigs
@@ -202,7 +201,7 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 			cfg.CreateBlockchainTxFee = test.fee
 			builderContext := txstest.NewContext(env.ctx, &cfg, env.state.GetTimestamp())
 			backend := txstest.NewBackend(addrs, env.state, env.msm)
-			pBuilder := walletbuilder.New(addrs, builderContext, backend)
+			pBuilder := builder.New(addrs, builderContext, backend)
 
 			utx, err := pBuilder.NewCreateChainTx(
 				testSubnet1.ID(),

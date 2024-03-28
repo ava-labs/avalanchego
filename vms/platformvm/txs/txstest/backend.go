@@ -15,14 +15,13 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/wallet/chain/p/builder"
 	"github.com/ava-labs/avalanchego/wallet/chain/p/signer"
-
-	walletbuilder "github.com/ava-labs/avalanchego/wallet/chain/p/builder"
 )
 
 var (
-	_ walletbuilder.Backend = (*Backend)(nil)
-	_ signer.Backend        = (*Backend)(nil)
+	_ builder.Backend = (*Backend)(nil)
+	_ signer.Backend  = (*Backend)(nil)
 )
 
 func NewBackend(
