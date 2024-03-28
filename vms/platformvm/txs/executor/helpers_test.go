@@ -42,7 +42,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
@@ -105,7 +105,7 @@ type environment struct {
 	atomicUTXOs    avax.AtomicUTXOManager
 	uptimes        uptime.Manager
 	utxosHandler   utxo.Verifier
-	txBuilder      *builder.Builder
+	txBuilder      *txstest.Builder
 	backend        Backend
 }
 
@@ -145,7 +145,7 @@ func newEnvironment(t *testing.T, f fork) *environment {
 	uptimes := uptime.NewManager(baseState, clk)
 	utxosVerifier := utxo.NewVerifier(ctx, clk, fx)
 
-	txBuilder := builder.New(
+	txBuilder := txstest.NewBuilder(
 		ctx,
 		config,
 		baseState,
@@ -211,7 +211,7 @@ func newEnvironment(t *testing.T, f fork) *environment {
 func addSubnet(
 	t *testing.T,
 	env *environment,
-	txBuilder *builder.Builder,
+	txBuilder *txstest.Builder,
 ) {
 	require := require.New(t)
 

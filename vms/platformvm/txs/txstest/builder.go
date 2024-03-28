@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package builder
+package txstest
 
 import (
 	"context"
@@ -23,7 +23,7 @@ import (
 	walletsigner "github.com/ava-labs/avalanchego/wallet/chain/p/signer"
 )
 
-func New(
+func NewBuilder(
 	ctx *snow.Context,
 	cfg *config.Config,
 	state state.State,

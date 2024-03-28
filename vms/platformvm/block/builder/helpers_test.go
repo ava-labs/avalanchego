@@ -45,11 +45,11 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
-	txbuilder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	pvalidators "github.com/ava-labs/avalanchego/vms/platformvm/validators"
 	walletcommon "github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
@@ -118,7 +118,7 @@ type environment struct {
 	atomicUTXOs    avax.AtomicUTXOManager
 	uptimes        uptime.Manager
 	utxosVerifier  utxo.Verifier
-	txBuilder      *txbuilder.Builder
+	txBuilder      *txstest.Builder
 	backend        txexecutor.Backend
 }
 
@@ -154,7 +154,7 @@ func newEnvironment(t *testing.T, f fork) *environment { //nolint:unparam
 	res.uptimes = uptime.NewManager(res.state, res.clk)
 	res.utxosVerifier = utxo.NewVerifier(res.ctx, res.clk, res.fx)
 
-	res.txBuilder = txbuilder.New(
+	res.txBuilder = txstest.NewBuilder(
 		res.ctx,
 		res.config,
 		res.state,

@@ -46,10 +46,10 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
-	p_tx_builder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 	pvalidators "github.com/ava-labs/avalanchego/vms/platformvm/validators"
 	walletcommon "github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
@@ -130,7 +130,7 @@ type environment struct {
 	atomicUTXOs    avax.AtomicUTXOManager
 	uptimes        uptime.Manager
 	utxosVerifier  utxo.Verifier
-	txBuilder      *p_tx_builder.Builder
+	txBuilder      *txstest.Builder
 	backend        *executor.Backend
 }
 
@@ -159,7 +159,7 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller, f fork) *environment 
 		res.state = defaultState(res.config, res.ctx, res.baseDB, rewardsCalc)
 		res.uptimes = uptime.NewManager(res.state, res.clk)
 		res.utxosVerifier = utxo.NewVerifier(res.ctx, res.clk, res.fx)
-		res.txBuilder = p_tx_builder.New(
+		res.txBuilder = txstest.NewBuilder(
 			res.ctx,
 			res.config,
 			res.state,
@@ -170,7 +170,7 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller, f fork) *environment 
 		res.uptimes = uptime.NewManager(res.mockedState, res.clk)
 		res.utxosVerifier = utxo.NewVerifier(res.ctx, res.clk, res.fx)
 
-		res.txBuilder = p_tx_builder.New(
+		res.txBuilder = txstest.NewBuilder(
 			res.ctx,
 			res.config,
 			res.mockedState,

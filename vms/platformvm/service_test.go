@@ -46,8 +46,8 @@ import (
 	vmkeystore "github.com/ava-labs/avalanchego/vms/components/keystore"
 	pchainapi "github.com/ava-labs/avalanchego/vms/platformvm/api"
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
-	txbuilder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
 )
 
 var (
@@ -74,7 +74,7 @@ var (
 	}
 )
 
-func defaultService(t *testing.T) (*Service, *mutableSharedMemory, *txbuilder.Builder) {
+func defaultService(t *testing.T) (*Service, *mutableSharedMemory, *txstest.Builder) {
 	vm, txBuilder, _, mutableSharedMemory := defaultVM(t, latestFork)
 
 	return &Service{
@@ -211,13 +211,13 @@ func TestGetTxStatus(t *testing.T) {
 func TestGetTx(t *testing.T) {
 	type test struct {
 		description string
-		createTx    func(service *Service, builder *txbuilder.Builder) (*txs.Tx, error)
+		createTx    func(service *Service, builder *txstest.Builder) (*txs.Tx, error)
 	}
 
 	tests := []test{
 		{
 			"standard block",
-			func(_ *Service, builder *txbuilder.Builder) (*txs.Tx, error) {
+			func(_ *Service, builder *txstest.Builder) (*txs.Tx, error) {
 				return builder.NewCreateChainTx( // Test GetTx works for standard blocks
 					testSubnet1.ID(),
 					[]byte{},
@@ -234,7 +234,7 @@ func TestGetTx(t *testing.T) {
 		},
 		{
 			"proposal block",
-			func(service *Service, builder *txbuilder.Builder) (*txs.Tx, error) {
+			func(service *Service, builder *txstest.Builder) (*txs.Tx, error) {
 				sk, err := bls.NewSecretKey()
 				require.NoError(t, err)
 
@@ -268,7 +268,7 @@ func TestGetTx(t *testing.T) {
 		},
 		{
 			"atomic block",
-			func(service *Service, builder *txbuilder.Builder) (*txs.Tx, error) {
+			func(service *Service, builder *txstest.Builder) (*txs.Tx, error) {
 				return builder.NewExportTx( // Test GetTx works for proposal blocks
 					service.vm.ctx.XChainID,
 					[]*avax.TransferableOutput{{

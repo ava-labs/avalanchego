@@ -19,11 +19,11 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/chain/p/signer"
 
-	vmbuilder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 	walletbuilder "github.com/ava-labs/avalanchego/wallet/chain/p/builder"
 )
 
@@ -200,8 +200,8 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 
 			cfg := *env.config
 			cfg.CreateBlockchainTxFee = test.fee
-			builderContext := vmbuilder.NewContext(env.ctx, &cfg, env.state.GetTimestamp())
-			backend := vmbuilder.NewBackend(addrs, env.state, env.msm)
+			builderContext := txstest.NewContext(env.ctx, &cfg, env.state.GetTimestamp())
+			backend := txstest.NewBackend(addrs, env.state, env.msm)
 			pBuilder := walletbuilder.New(addrs, builderContext, backend)
 
 			utx, err := pBuilder.NewCreateChainTx(

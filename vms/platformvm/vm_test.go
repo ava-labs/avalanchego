@@ -58,6 +58,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	smcon "github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -66,7 +67,6 @@ import (
 	timetracker "github.com/ava-labs/avalanchego/snow/networking/tracker"
 	blockbuilder "github.com/ava-labs/avalanchego/vms/platformvm/block/builder"
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
-	txbuilder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	walletbuilder "github.com/ava-labs/avalanchego/wallet/chain/p/builder"
 	walletcommon "github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
@@ -203,7 +203,7 @@ func defaultGenesis(t *testing.T, avaxAssetID ids.ID) (*api.BuildGenesisArgs, []
 	return &buildGenesisArgs, genesisBytes
 }
 
-func defaultVM(t *testing.T, f fork) (*VM, *txbuilder.Builder, database.Database, *mutableSharedMemory) {
+func defaultVM(t *testing.T, f fork) (*VM, *txstest.Builder, database.Database, *mutableSharedMemory) {
 	require := require.New(t)
 	var (
 		apricotPhase3Time = mockable.MaxTime
@@ -303,7 +303,7 @@ func defaultVM(t *testing.T, f fork) (*VM, *txbuilder.Builder, database.Database
 
 	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
 
-	builder := txbuilder.New(
+	builder := txstest.NewBuilder(
 		ctx,
 		&vm.Config,
 		vm.state,

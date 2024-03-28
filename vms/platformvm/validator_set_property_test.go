@@ -43,10 +43,10 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
-	txbuilder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	walletcommon "github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
@@ -256,7 +256,7 @@ func takeValidatorsSnapshotAtCurrentHeight(vm *VM, validatorsSetByHeightAndSubne
 }
 
 func addSubnetValidator(vm *VM, data *validatorInputData, subnetID ids.ID) (*state.Staker, error) {
-	txBuilder := txbuilder.New(
+	txBuilder := txstest.NewBuilder(
 		vm.ctx,
 		&vm.Config,
 		vm.state,
@@ -293,7 +293,7 @@ func addPrimaryValidatorWithBLSKey(vm *VM, data *validatorInputData) (*state.Sta
 		return nil, fmt.Errorf("failed to generate BLS key: %w", err)
 	}
 
-	txBuilder := txbuilder.New(
+	txBuilder := txstest.NewBuilder(
 		vm.ctx,
 		&vm.Config,
 		vm.state,
@@ -712,7 +712,7 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 		return nil, ids.Empty, err
 	}
 
-	txBuilder := txbuilder.New(
+	txBuilder := txstest.NewBuilder(
 		vm.ctx,
 		&vm.Config,
 		vm.state,
