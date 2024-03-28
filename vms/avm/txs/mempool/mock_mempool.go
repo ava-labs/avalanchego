@@ -14,6 +14,7 @@ import (
 
 	ids "github.com/ava-labs/avalanchego/ids"
 	txs "github.com/ava-labs/avalanchego/vms/avm/txs"
+	fees "github.com/ava-labs/avalanchego/vms/components/fees"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -41,17 +42,17 @@ func (m *MockMempool) EXPECT() *MockMempoolMockRecorder {
 }
 
 // Add mocks base method.
-func (m *MockMempool) Add(arg0 *txs.Tx) error {
+func (m *MockMempool) Add(arg0 *txs.Tx, arg1 fees.TipPercentage) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Add", arg0)
+	ret := m.ctrl.Call(m, "Add", arg0, arg1)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Add indicates an expected call of Add.
-func (mr *MockMempoolMockRecorder) Add(arg0 any) *gomock.Call {
+func (mr *MockMempoolMockRecorder) Add(arg0, arg1 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Add", reflect.TypeOf((*MockMempool)(nil).Add), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Add", reflect.TypeOf((*MockMempool)(nil).Add), arg0, arg1)
 }
 
 // Get mocks base method.
@@ -162,4 +163,16 @@ func (m *MockMempool) RequestBuildBlock() {
 func (mr *MockMempoolMockRecorder) RequestBuildBlock() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RequestBuildBlock", reflect.TypeOf((*MockMempool)(nil).RequestBuildBlock))
+}
+
+// SetEUpgradeActive mocks base method.
+func (m *MockMempool) SetEUpgradeActive() {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "SetEUpgradeActive")
+}
+
+// SetEUpgradeActive indicates an expected call of SetEUpgradeActive.
+func (mr *MockMempoolMockRecorder) SetEUpgradeActive() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetEUpgradeActive", reflect.TypeOf((*MockMempool)(nil).SetEUpgradeActive))
 }

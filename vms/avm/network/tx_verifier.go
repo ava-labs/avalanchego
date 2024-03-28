@@ -7,13 +7,15 @@ import (
 	"sync"
 
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
+
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 var _ TxVerifier = (*LockedTxVerifier)(nil)
 
 type TxVerifier interface {
 	// VerifyTx verifies that the transaction should be issued into the mempool.
-	VerifyTx(tx *txs.Tx) error
+	VerifyTx(tx *txs.Tx) (commonfees.TipPercentage, error)
 }
 
 type LockedTxVerifier struct {
@@ -21,7 +23,7 @@ type LockedTxVerifier struct {
 	txVerifier TxVerifier
 }
 
-func (l *LockedTxVerifier) VerifyTx(tx *txs.Tx) error {
+func (l *LockedTxVerifier) VerifyTx(tx *txs.Tx) (commonfees.TipPercentage, error) {
 	l.lock.Lock()
 	defer l.lock.Unlock()
 

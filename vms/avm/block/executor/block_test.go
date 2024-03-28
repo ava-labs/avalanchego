@@ -897,7 +897,7 @@ func TestBlockReject(t *testing.T) {
 				})
 
 				mempool := mempool.NewMockMempool(ctrl)
-				mempool.EXPECT().Add(validTx).Return(nil) // Only add the one that passes verification
+				mempool.EXPECT().Add(validTx, gomock.Any()).Return(nil) // Only add the one that passes verification
 				mempool.EXPECT().RequestBuildBlock()
 
 				lastAcceptedID := ids.GenerateTestID()
@@ -960,8 +960,8 @@ func TestBlockReject(t *testing.T) {
 				})
 
 				mempool := mempool.NewMockMempool(ctrl)
-				mempool.EXPECT().Add(tx1).Return(nil)
-				mempool.EXPECT().Add(tx2).Return(nil)
+				mempool.EXPECT().Add(tx1, gomock.Any()).Return(nil)
+				mempool.EXPECT().Add(tx2, gomock.Any()).Return(nil)
 				mempool.EXPECT().RequestBuildBlock()
 
 				lastAcceptedID := ids.GenerateTestID()

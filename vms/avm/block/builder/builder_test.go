@@ -549,7 +549,7 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 	// add a tx to the mempool
 	tx := transactions[0]
 	txID := tx.ID()
-	require.NoError(mempool.Add(tx))
+	require.NoError(mempool.Add(tx, commonfees.NoTip))
 
 	_, ok := mempool.Get(txID)
 	require.True(ok)

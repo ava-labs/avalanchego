@@ -13,7 +13,7 @@ import (
 // Tip is expressed as a percentage of the base fee and it is burned as the required fee.
 
 const (
-	NoTip          = 0
+	NoTip          = TipPercentage(0)
 	TipDenonimator = 1_000
 )
 
