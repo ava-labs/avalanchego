@@ -14,18 +14,18 @@ import (
 	"github.com/ava-labs/avalanchego/utils/maybe"
 )
 
-type StagedParent interface {
+type RollingParent interface {
 	trieInternals
 
-	NewStagedView(context.Context) (*StagedView, error)
+	NewRollingView(context.Context) (*RollingView, error)
 }
 
-type StagedView struct {
+type RollingView struct {
 	// the uncommitted parent trie of this view
 	// [validityTrackingLock] must be held when reading/writing this field.
 	ancestry   sync.Mutex
-	parentTrie StagedParent
-	child      *StagedView
+	parentTrie RollingParent
+	child      *RollingView
 
 	// Changes made to this view.
 	// May include nodes that haven't been updated
@@ -40,8 +40,8 @@ type StagedView struct {
 	tokenSize int
 }
 
-func (v *StagedView) NewStagedView(context.Context) (*StagedView, error) {
-	nv := &StagedView{
+func (v *RollingView) NewRollingView(context.Context) (*RollingView, error) {
+	nv := &RollingView{
 		root:       maybe.Bind(v.getRoot(), (*node).clone),
 		db:         v.db,
 		parentTrie: v,
@@ -51,7 +51,7 @@ func (v *StagedView) NewStagedView(context.Context) (*StagedView, error) {
 	return nv, nil
 }
 
-func (v *StagedView) Process(ctx context.Context, key string, val maybe.Maybe[[]byte]) error {
+func (v *RollingView) Process(ctx context.Context, key string, val maybe.Maybe[[]byte]) error {
 	kkey := toKey(stringToByteSlice(key))
 	change, err := v.recordValueChange(kkey, maybe.Bind(val, slices.Clone[[]byte]))
 	if err != nil {
@@ -69,17 +69,17 @@ func (v *StagedView) Process(ctx context.Context, key string, val maybe.Maybe[[]
 	return nil
 }
 
-func (v *StagedView) getTokenSize() int {
+func (v *RollingView) getTokenSize() int {
 	return v.tokenSize
 }
 
-func (v *StagedView) getRoot() maybe.Maybe[*node] {
+func (v *RollingView) getRoot() maybe.Maybe[*node] {
 	return v.root
 }
 
 // Recalculates the node IDs for all changed nodes in the trie.
 // Cancelling [ctx] doesn't cancel calculation. It's used only for tracing.
-func (v *StagedView) calculateNodeIDs(ctx context.Context) error {
+func (v *RollingView) calculateNodeIDs(ctx context.Context) error {
 	oldRoot := maybe.Bind(v.root, (*node).clone)
 
 	// We wait to create the span until after checking that we need to actually
@@ -105,7 +105,7 @@ func (v *StagedView) calculateNodeIDs(ctx context.Context) error {
 
 // Calculates the ID of all descendants of [n] which need to be recalculated,
 // and then calculates the ID of [n] itself.
-func (v *StagedView) calculateNodeIDsHelper(n *node) ids.ID {
+func (v *RollingView) calculateNodeIDsHelper(n *node) ids.ID {
 	// We use [wg] to wait until all descendants of [n] have been updated.
 	var wg sync.WaitGroup
 
@@ -141,7 +141,7 @@ func (v *StagedView) calculateNodeIDsHelper(n *node) ids.ID {
 }
 
 // CommitToDB commits changes from this view to the underlying DB.
-func (v *StagedView) CommitToDB(ctx context.Context) error {
+func (v *RollingView) CommitToDB(ctx context.Context) error {
 	ctx, span := v.db.infoTracer.Start(ctx, "MerkleDB.view.CommitToDB")
 	defer span.End()
 
@@ -151,7 +151,7 @@ func (v *StagedView) CommitToDB(ctx context.Context) error {
 	if err := v.calculateNodeIDs(ctx); err != nil {
 		return err
 	}
-	if err := v.db.commitStagedChanges(ctx, v); err != nil {
+	if err := v.db.commitRollingChanges(ctx, v); err != nil {
 		return err
 	}
 
@@ -164,7 +164,7 @@ func (v *StagedView) CommitToDB(ctx context.Context) error {
 	return nil
 }
 
-func (v *StagedView) getValue(key Key) ([]byte, error) {
+func (v *RollingView) getValue(key Key) ([]byte, error) {
 	if change, ok := v.changes.values[key]; ok {
 		v.db.metrics.ViewChangesValueHit()
 		if change.after.IsNothing() {
@@ -183,7 +183,7 @@ func (v *StagedView) getValue(key Key) ([]byte, error) {
 }
 
 // Must not be called after [calculateNodeIDs] has returned.
-func (v *StagedView) remove(key Key) error {
+func (v *RollingView) remove(key Key) error {
 	// confirm a node exists with a value
 	keyNode, err := v.getNode(key, true)
 	if err != nil {
@@ -245,7 +245,7 @@ func (v *StagedView) remove(key Key) error {
 // * [n] has a value.
 // * [n] has children.
 // Must not be called after [calculateNodeIDs] has returned.
-func (v *StagedView) compressNodePath(parent, n *node) error {
+func (v *RollingView) compressNodePath(parent, n *node) error {
 	if len(n.children) != 1 || n.hasValue() {
 		return nil
 	}
@@ -287,7 +287,7 @@ func (v *StagedView) compressNodePath(parent, n *node) error {
 
 // Get a copy of the node matching the passed key from the view.
 // Used by views to get nodes from their ancestors.
-func (v *StagedView) getEditableNode(key Key, hadValue bool) (*node, error) {
+func (v *RollingView) getEditableNode(key Key, hadValue bool) (*node, error) {
 	// grab the node in question
 	n, err := v.getNode(key, hadValue)
 	if err != nil {
@@ -300,7 +300,7 @@ func (v *StagedView) getEditableNode(key Key, hadValue bool) (*node, error) {
 
 // insert a key/value pair into the correct node of the trie.
 // Must not be called after [calculateNodeIDs] has returned.
-func (v *StagedView) insert(
+func (v *RollingView) insert(
 	key Key,
 	value maybe.Maybe[[]byte],
 ) (*node, error) {
@@ -422,26 +422,26 @@ func (v *StagedView) insert(
 
 // Records that a node has been created.
 // Must not be called after [calculateNodeIDs] has returned.
-func (v *StagedView) recordNewNode(after *node) error {
+func (v *RollingView) recordNewNode(after *node) error {
 	return v.recordKeyChange(after.key, after, after.hasValue(), true /* newNode */)
 }
 
 // Records that an existing node has been changed.
 // Must not be called after [calculateNodeIDs] has returned.
-func (v *StagedView) recordNodeChange(after *node) error {
+func (v *RollingView) recordNodeChange(after *node) error {
 	return v.recordKeyChange(after.key, after, after.hasValue(), false /* newNode */)
 }
 
 // Records that the node associated with the given key has been deleted.
 // Must not be called after [calculateNodeIDs] has returned.
-func (v *StagedView) recordNodeDeleted(after *node, hadValue bool) error {
+func (v *RollingView) recordNodeDeleted(after *node, hadValue bool) error {
 	return v.recordKeyChange(after.key, nil, hadValue, false /* newNode */)
 }
 
 // Records that the node associated with the given key has been changed.
 // If it is an existing node, record what its value was before it was changed.
 // Must not be called after [calculateNodeIDs] has returned.
-func (v *StagedView) recordKeyChange(key Key, after *node, hadValue bool, newNode bool) error {
+func (v *RollingView) recordKeyChange(key Key, after *node, hadValue bool, newNode bool) error {
 	if existing, ok := v.changes.nodes[key]; ok {
 		existing.after = after
 		return nil
@@ -469,7 +469,7 @@ func (v *StagedView) recordKeyChange(key Key, after *node, hadValue bool, newNod
 // Doesn't actually change the trie data structure.
 // That's deferred until we call [calculateNodeIDs].
 // Must not be called after [calculateNodeIDs] has returned.
-func (v *StagedView) recordValueChange(key Key, value maybe.Maybe[[]byte]) (*change[maybe.Maybe[[]byte]], error) {
+func (v *RollingView) recordValueChange(key Key, value maybe.Maybe[[]byte]) (*change[maybe.Maybe[[]byte]], error) {
 	// update the existing change if it exists
 	if existing, ok := v.changes.values[key]; ok {
 		existing.after = value
@@ -501,7 +501,7 @@ func (v *StagedView) recordValueChange(key Key, value maybe.Maybe[[]byte]) (*cha
 // sets the node's ID to [id].
 // If the node is loaded from the baseDB, [hasValue] determines which database the node is stored in.
 // Returns database.ErrNotFound if the node doesn't exist.
-func (v *StagedView) getNode(key Key, hasValue bool) (*node, error) {
+func (v *RollingView) getNode(key Key, hasValue bool) (*node, error) {
 	// check for the key within the changed nodes
 	if nodeChange, isChanged := v.changes.nodes[key]; isChanged {
 		v.db.metrics.ViewChangesNodeHit()
@@ -517,7 +517,7 @@ func (v *StagedView) getNode(key Key, hasValue bool) (*node, error) {
 }
 
 // Get the parent trie of the view
-func (v *StagedView) getParentTrie() StagedParent {
+func (v *RollingView) getParentTrie() RollingParent {
 	v.ancestry.Lock()
 	defer v.ancestry.Unlock()
 

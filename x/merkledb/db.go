@@ -790,7 +790,7 @@ func (db *merkleDB) NewView(
 	return view, nil
 }
 
-func (db *merkleDB) NewStagedView(context.Context) (*StagedView, error) {
+func (db *merkleDB) NewRollingView(context.Context) (*RollingView, error) {
 	db.commitLock.Lock()
 	defer db.commitLock.Unlock()
 
@@ -798,7 +798,7 @@ func (db *merkleDB) NewStagedView(context.Context) (*StagedView, error) {
 		return nil, database.ErrClosed
 	}
 
-	return &StagedView{
+	return &RollingView{
 		root:       maybe.Bind(db.root, (*node).clone),
 		db:         db,
 		parentTrie: db,
@@ -1003,10 +1003,10 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *view) error
 	return db.baseDB.Put(rootDBKey, rootKey)
 }
 
-// commitStagedChanges commits the changes in [trieToCommit] to [db].
+// commitRollingChanges commits the changes in [trieToCommit] to [db].
 // Assumes [trieToCommit]'s node IDs have been calculated.
 // Assumes [db.commitLock] is held.
-func (db *merkleDB) commitStagedChanges(ctx context.Context, trieToCommit *StagedView) error {
+func (db *merkleDB) commitRollingChanges(ctx context.Context, trieToCommit *RollingView) error {
 	db.lock.Lock()
 	defer db.lock.Unlock()
 
