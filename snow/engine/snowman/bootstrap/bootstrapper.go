@@ -598,7 +598,6 @@ func (b *Bootstrapper) process(
 				numFetched-b.initiallyFetched,         // Number of blocks we have fetched during this run
 				totalBlocksToFetch-b.initiallyFetched, // Number of blocks we expect to fetch during this run
 			)
-			b.fetchETA.Set(float64(eta))
 
 			if !b.restarted {
 				b.Ctx.Log.Info("fetching blocks",
@@ -694,7 +693,6 @@ func (b *Bootstrapper) tryStartExecuting(ctx context.Context) error {
 		b.awaitingTimeout = true
 		return nil
 	}
-	b.fetchETA.Set(0)
 	return b.onFinished(ctx, b.requestID)
 }
 
@@ -719,7 +717,6 @@ func (b *Bootstrapper) Timeout(ctx context.Context) error {
 	if !b.Config.BootstrapTracker.IsBootstrapped() {
 		return b.restartBootstrapping(ctx)
 	}
-	b.fetchETA.Set(0)
 	return b.onFinished(ctx, b.requestID)
 }
 
