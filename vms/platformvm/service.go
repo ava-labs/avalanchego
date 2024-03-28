@@ -29,6 +29,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/keystore"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
@@ -37,10 +38,12 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	avajson "github.com/ava-labs/avalanchego/utils/json"
 	safemath "github.com/ava-labs/avalanchego/utils/math"
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 	platformapi "github.com/ava-labs/avalanchego/vms/platformvm/api"
 )
 
@@ -1816,6 +1819,71 @@ func (s *Service) GetBlockByHeight(_ *http.Request, args *api.GetBlockByHeightAr
 
 	response.Block, err = json.Marshal(result)
 	return err
+}
+
+// GetFeeRatesReply is the response from GetFeeRates
+type GetFeeRatesReply struct {
+	CurrentFeeRates commonfees.Dimensions `json:"currentFeeRates"`
+	NextFeeRates    commonfees.Dimensions `json:"nextFeeRates"`
+}
+
+// GetTimestamp returns the current timestamp on chain.
+func (s *Service) GetFeeRates(_ *http.Request, _ *struct{}, reply *GetFeeRatesReply) error {
+	s.vm.ctx.Log.Debug("API called",
+		zap.String("service", "platform"),
+		zap.String("method", "getFeeRates"),
+	)
+
+	s.vm.ctx.Lock.Lock()
+	defer s.vm.ctx.Lock.Unlock()
+
+	preferredID := s.vm.manager.Preferred()
+	onAccept, ok := s.vm.manager.GetState(preferredID)
+	if !ok {
+		return fmt.Errorf("could not retrieve state for block %s", preferredID)
+	}
+
+	currentFeeRate, err := onAccept.GetFeeRates()
+	if err != nil {
+		return err
+	}
+	reply.CurrentFeeRates = currentFeeRate
+
+	nextTimestamp, _, err := executor.NextBlockTime(onAccept, &s.vm.clock)
+	if err != nil {
+		return fmt.Errorf("could not calculate next staker change time: %w", err)
+	}
+	isEActivated := s.vm.Config.IsEActivated(nextTimestamp)
+
+	if !isEActivated {
+		reply.NextFeeRates = reply.CurrentFeeRates
+		return nil
+	}
+
+	var (
+		currentTimestamp = onAccept.GetTimestamp()
+		feesCfg          = config.GetDynamicFeesConfig(isEActivated)
+	)
+
+	parentBlkComplexity, err := onAccept.GetLastBlockComplexity()
+	if err != nil {
+		return err
+	}
+
+	feeManager := commonfees.NewManager(currentFeeRate)
+	if isEActivated {
+		if err := feeManager.UpdateFeeRates(
+			feesCfg,
+			parentBlkComplexity,
+			currentTimestamp.Unix(),
+			nextTimestamp.Unix(),
+		); err != nil {
+			return fmt.Errorf("failed updating fee rates, %w", err)
+		}
+	}
+	reply.NextFeeRates = feeManager.GetFeeRates()
+
+	return nil
 }
 
 func (s *Service) getAPIUptime(staker *state.Staker) (*avajson.Float32, error) {

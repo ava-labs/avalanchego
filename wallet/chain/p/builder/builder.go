@@ -1180,6 +1180,13 @@ func (b *builder) financeTx(
 
 	amountsToBurn[avaxAssetID] += feeCalc.Fee
 
+	// we initialize the return values with empty slices
+	// to preserv backward compatibility of json representation
+	// for transactions no inputs/outputs
+	inputs = make([]*avax.TransferableInput, 0)
+	changeOutputs = make([]*avax.TransferableOutput, 0)
+	stakeOutputs = make([]*avax.TransferableOutput, 0)
+
 	// Iterate over the locked UTXOs
 	for _, utxo := range utxos {
 		assetID := utxo.AssetID()

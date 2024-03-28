@@ -5,6 +5,7 @@ package executor
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -134,6 +135,9 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 		return err
 	}
 
+	// retrieve parent block time before moving time forward
+	parentBlkTime := stateDiff.GetTimestamp()
+
 	nextBlkTime, _, err := executor.NextBlockTime(stateDiff, m.txExecutorBackend.Clk)
 	if err != nil {
 		return err
@@ -144,11 +148,35 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 		return err
 	}
 
-	isEActive := m.txExecutorBackend.Config.IsEActivated(stateDiff.GetTimestamp())
-	feesCfg := config.GetDynamicFeesConfig(isEActive)
+	feeRates, err := stateDiff.GetFeeRates()
+	if err != nil {
+		return err
+	}
+	parentBlkComplexitty, err := stateDiff.GetLastBlockComplexity()
+	if err != nil {
+		return err
+	}
+
+	var (
+		isEActive = m.txExecutorBackend.Config.IsEActivated(nextBlkTime)
+		feesCfg   = config.GetDynamicFeesConfig(isEActive)
+	)
+
+	feeManager := fees.NewManager(feeRates)
+	if isEActive {
+		if err := feeManager.UpdateFeeRates(
+			feesCfg,
+			parentBlkComplexitty,
+			parentBlkTime.Unix(),
+			nextBlkTime.Unix(),
+		); err != nil {
+			return fmt.Errorf("failed updating fee rates, %w", err)
+		}
+	}
+
 	return tx.Unsigned.Visit(&executor.StandardTxExecutor{
 		Backend:            m.txExecutorBackend,
-		BlkFeeManager:      fees.NewManager(feesCfg.FeeRate),
+		BlkFeeManager:      feeManager,
 		BlockMaxComplexity: feesCfg.BlockMaxComplexity,
 		State:              stateDiff,
 		Tx:                 tx,

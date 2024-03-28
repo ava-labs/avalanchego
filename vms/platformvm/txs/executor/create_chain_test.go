@@ -59,7 +59,7 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 	feeCfg := config.GetDynamicFeesConfig(env.config.IsEActivated(chainTime))
 	executor := StandardTxExecutor{
 		Backend:            &env.backend,
-		BlkFeeManager:      commonfees.NewManager(feeCfg.FeeRate),
+		BlkFeeManager:      commonfees.NewManager(feeCfg.InitialFeeRate),
 		BlockMaxComplexity: feeCfg.BlockMaxComplexity,
 		State:              stateDiff,
 		Tx:                 tx,
@@ -103,7 +103,7 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 	feeCfg := config.GetDynamicFeesConfig(env.config.IsEActivated(chainTime))
 	executor := StandardTxExecutor{
 		Backend:            &env.backend,
-		BlkFeeManager:      commonfees.NewManager(feeCfg.FeeRate),
+		BlkFeeManager:      commonfees.NewManager(feeCfg.InitialFeeRate),
 		BlockMaxComplexity: feeCfg.BlockMaxComplexity,
 		State:              stateDiff,
 		Tx:                 tx,
@@ -137,11 +137,14 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
+	feeRates, err := env.state.GetFeeRates()
+	require.NoError(err)
+
 	currentTime := stateDiff.GetTimestamp()
 	feeCfg := config.GetDynamicFeesConfig(env.config.IsEActivated(currentTime))
 	executor := StandardTxExecutor{
 		Backend:            &env.backend,
-		BlkFeeManager:      commonfees.NewManager(feeCfg.FeeRate),
+		BlkFeeManager:      commonfees.NewManager(feeRates),
 		BlockMaxComplexity: feeCfg.BlockMaxComplexity,
 		State:              stateDiff,
 		Tx:                 tx,
@@ -172,11 +175,14 @@ func TestCreateChainTxValid(t *testing.T) {
 	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
+	feeRates, err := env.state.GetFeeRates()
+	require.NoError(err)
+
 	currentTime := stateDiff.GetTimestamp()
 	feeCfg := config.GetDynamicFeesConfig(env.config.IsEActivated(currentTime))
 	executor := StandardTxExecutor{
 		Backend:            &env.backend,
-		BlkFeeManager:      commonfees.NewManager(feeCfg.FeeRate),
+		BlkFeeManager:      commonfees.NewManager(feeRates),
 		BlockMaxComplexity: feeCfg.BlockMaxComplexity,
 		State:              stateDiff,
 		Tx:                 tx,
@@ -240,7 +246,7 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 					IsEActive:          false,
 					Config:             &cfg,
 					ChainTime:          test.time,
-					FeeManager:         commonfees.NewManager(feeCfg.FeeRate),
+					FeeManager:         commonfees.NewManager(feeCfg.InitialFeeRate),
 					BlockMaxComplexity: feeCfg.BlockMaxComplexity,
 				}
 			)
@@ -270,7 +276,7 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 			feeCfg = config.GetDynamicFeesConfig(env.config.IsEActivated(currentTime))
 			executor := StandardTxExecutor{
 				Backend:            &env.backend,
-				BlkFeeManager:      commonfees.NewManager(feeCfg.FeeRate),
+				BlkFeeManager:      commonfees.NewManager(feeCfg.InitialFeeRate),
 				BlockMaxComplexity: feeCfg.BlockMaxComplexity,
 				State:              stateDiff,
 				Tx:                 tx,

@@ -103,7 +103,10 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 			Creds:    []verify.Verifiable{},
 		}
 	)
-	verifiedSignedTx.SetBytes([]byte{1}, []byte{2})
+
+	unsignedBytes := []byte{1}
+	signedBytes := []byte{2}
+	verifiedSignedTx.SetBytes(unsignedBytes, signedBytes)
 
 	tests := []test{
 		{

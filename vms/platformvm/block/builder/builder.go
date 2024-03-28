@@ -18,7 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/vms/components/fees"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
@@ -26,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
@@ -324,6 +324,9 @@ func packBlockTxs(
 	timestamp time.Time,
 	remainingSize int,
 ) ([]*txs.Tx, error) {
+	// retrieve parent block time before moving time forward
+	parentBlkTime := parentState.GetTimestamp()
+
 	stateDiff, err := state.NewDiffOn(parentState)
 	if err != nil {
 		return nil, err
@@ -333,22 +336,48 @@ func packBlockTxs(
 		return nil, err
 	}
 
+	feeRates, err := stateDiff.GetFeeRates()
+	if err != nil {
+		return nil, err
+	}
+	parentBlkComplexity, err := stateDiff.GetLastBlockComplexity()
+	if err != nil {
+		return nil, err
+	}
+
 	var (
 		isEActivated = backend.Config.IsEActivated(timestamp)
 		feeCfg       = config.GetDynamicFeesConfig(isEActivated)
-		feeMan       = fees.NewManager(feeCfg.FeeRate)
 
 		blockTxs []*txs.Tx
 		inputs   set.Set[ids.ID]
 	)
+
+	feeMan := commonfees.NewManager(feeRates)
+	if isEActivated {
+		if err := feeMan.UpdateFeeRates(
+			feeCfg,
+			parentBlkComplexity,
+			parentBlkTime.Unix(),
+			timestamp.Unix(),
+		); err != nil {
+			return nil, fmt.Errorf("failed updating fee rates, %w", err)
+		}
+	}
 
 	for {
 		tx, exists := mempool.Peek()
 		if !exists {
 			break
 		}
+
 		txSize := len(tx.Bytes())
-		if txSize > remainingSize {
+
+		// pre e upgrade is active, we fill blocks till a target size
+		// post e upgrade is active, we fill blocks till a target complexity
+		targetSizeReached := (!isEActivated && txSize > remainingSize) ||
+			(isEActivated && !commonfees.Compare(feeMan.GetCumulatedComplexity(), feeCfg.BlockTargetComplexityRate))
+		if targetSizeReached {
 			break
 		}
 		mempool.Remove(tx)
@@ -394,7 +423,9 @@ func packBlockTxs(
 			return nil, err
 		}
 
-		remainingSize -= txSize
+		if !isEActivated {
+			remainingSize -= txSize
+		}
 		blockTxs = append(blockTxs, tx)
 	}
 

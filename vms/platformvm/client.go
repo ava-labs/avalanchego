@@ -17,6 +17,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/rpc"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
+
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 var _ Client = (*client)(nil)
@@ -131,6 +133,9 @@ type Client interface {
 	GetBlock(ctx context.Context, blockID ids.ID, options ...rpc.Option) ([]byte, error)
 	// GetBlockByHeight returns the block at the given [height].
 	GetBlockByHeight(ctx context.Context, height uint64, options ...rpc.Option) ([]byte, error)
+
+	// GetFeeRates returns the current unit fees and the next unit fees that a transaction must pay to be accepted
+	GetFeeRates(ctx context.Context, options ...rpc.Option) (commonfees.Dimensions, commonfees.Dimensions, error)
 }
 
 // Client implementation for interacting with the P Chain endpoint
@@ -544,4 +549,10 @@ func (c *client) GetBlockByHeight(ctx context.Context, height uint64, options ..
 		return nil, err
 	}
 	return formatting.Decode(res.Encoding, res.Block)
+}
+
+func (c *client) GetFeeRates(ctx context.Context, options ...rpc.Option) (commonfees.Dimensions, commonfees.Dimensions, error) {
+	res := &GetFeeRatesReply{}
+	err := c.requester.SendRequest(ctx, "platform.getFeeRates", struct{}{}, res, options...)
+	return res.CurrentFeeRates, res.NextFeeRates, err
 }

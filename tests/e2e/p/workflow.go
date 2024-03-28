@@ -141,6 +141,11 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 
 			pChainExportFee := uint64(0)
 			ginkgo.By("export avax from P to X chain", func() {
+				maxComplexity := config.GetDynamicFeesConfig(true /*isEActive*/).BlockMaxComplexity
+
+				_, nextFeeRates, err := pChainClient.GetFeeRates(e2e.DefaultContext())
+				require.NoError(err)
+
 				tx, err := pWallet.IssueExportTx(
 					xContext.BlockchainID,
 					[]*avax.TransferableOutput{
@@ -156,11 +161,10 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 				require.NoError(err)
 
 				// retrieve fees paid for the tx
-				feeCfg := config.GetDynamicFeesConfig(true /*isEActive*/)
 				feeCalc := fees.Calculator{
 					IsEActive:          true,
-					FeeManager:         commonfees.NewManager(feeCfg.FeeRate),
-					BlockMaxComplexity: feeCfg.BlockMaxComplexity,
+					FeeManager:         commonfees.NewManager(nextFeeRates),
+					BlockMaxComplexity: maxComplexity,
 					Credentials:        tx.Creds,
 				}
 

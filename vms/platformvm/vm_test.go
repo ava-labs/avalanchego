@@ -372,12 +372,15 @@ func TestGenesis(t *testing.T) {
 
 			require.Equal(utxo.Address, addr)
 
+			feeRates, err := vm.state.GetFeeRates()
+			require.NoError(err)
+
 			// we use the first key to fund a subnet creation in [defaultGenesis].
 			// As such we need to account for the subnet creation fee
 			var (
 				chainTime = vm.state.GetTimestamp()
 				feeCfg    = config.GetDynamicFeesConfig(vm.Config.IsEActivated(chainTime))
-				feeMan    = commonfees.NewManager(feeCfg.FeeRate)
+				feeMan    = commonfees.NewManager(feeRates)
 				feeCalc   = &fees.Calculator{
 					IsEActive:          vm.IsEActivated(chainTime),
 					Config:             &vm.Config,
@@ -2265,10 +2268,13 @@ func TestBaseTx(t *testing.T) {
 	}
 	require.Equal(totalOutputAmt, key0OutputAmt+key1OutputAmt+changeAddrOutputAmt)
 
+	feeRates, err := vm.state.GetFeeRates()
+	require.NoError(err)
+
 	var (
 		chainTime = vm.state.GetTimestamp()
 		feeCfg    = config.GetDynamicFeesConfig(vm.Config.IsEActivated(chainTime))
-		feeMan    = commonfees.NewManager(feeCfg.FeeRate)
+		feeMan    = commonfees.NewManager(feeRates)
 		feeCalc   = &fees.Calculator{
 			IsEActive:          vm.IsEActivated(chainTime),
 			Config:             &vm.Config,
@@ -2300,7 +2306,7 @@ func TestBaseTx(t *testing.T) {
 
 func TestPruneMempool(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(t, latestFork)
+	vm, _, _ := defaultVM(t, durango)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 

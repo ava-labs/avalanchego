@@ -262,11 +262,14 @@ func addSubnet(t *testing.T, env *environment) {
 	stateDiff, err := state.NewDiff(genesisID, env.blkManager)
 	require.NoError(err)
 
+	feeRates, err := env.state.GetFeeRates()
+	require.NoError(err)
+
 	chainTime := env.state.GetTimestamp()
 	feeCfg := config.GetDynamicFeesConfig(env.config.IsEActivated(chainTime))
 	executor := txexecutor.StandardTxExecutor{
 		Backend:            &env.backend,
-		BlkFeeManager:      fees.NewManager(feeCfg.FeeRate),
+		BlkFeeManager:      fees.NewManager(feeRates),
 		BlockMaxComplexity: feeCfg.BlockMaxComplexity,
 		State:              stateDiff,
 		Tx:                 testSubnet1,

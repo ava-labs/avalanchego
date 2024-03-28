@@ -353,10 +353,13 @@ func TestGetBalance(t *testing.T) {
 		if idx == 0 {
 			// we use the first key to fund a subnet creation in [defaultGenesis].
 			// As such we need to account for the subnet creation fee
+			feeRates, err := service.vm.state.GetFeeRates()
+			require.NoError(err)
+
 			var (
 				chainTime = service.vm.state.GetTimestamp()
 				feeCfg    = config.GetDynamicFeesConfig(service.vm.Config.IsEActivated(chainTime))
-				feeMan    = commonfees.NewManager(feeCfg.FeeRate)
+				feeMan    = commonfees.NewManager(feeRates)
 				feeCalc   = &fees.Calculator{
 					IsEActive:          service.vm.IsEActivated(chainTime),
 					Config:             &service.vm.Config,
@@ -999,4 +1002,31 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 			require.Equal(json.RawMessage(expectedJSON), reply.Block)
 		})
 	}
+}
+
+func TestGetFeeRates(t *testing.T) {
+	require := require.New(t)
+	service, _ := defaultService(t)
+
+	reply := GetFeeRatesReply{}
+	require.NoError(service.GetFeeRates(nil, nil, &reply))
+
+	service.vm.ctx.Lock.Lock()
+
+	feeRates, err := service.vm.state.GetFeeRates()
+	require.NoError(err)
+	require.Equal(feeRates, reply.CurrentFeeRates)
+
+	updatedFeeRates := commonfees.Dimensions{
+		123,
+		456,
+		789,
+		1011,
+	}
+	service.vm.state.SetFeeRates(updatedFeeRates)
+
+	service.vm.ctx.Lock.Unlock()
+
+	require.NoError(service.GetFeeRates(nil, nil, &reply))
+	require.Equal(updatedFeeRates, reply.CurrentFeeRates)
 }
