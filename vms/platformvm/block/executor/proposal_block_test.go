@@ -28,6 +28,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	walletcommon "github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
 
 func TestApricotProposalBlockTimeVerification(t *testing.T) {
@@ -547,6 +549,10 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 					},
 					reward.PercentDenominator,
 					[]*secp256k1.PrivateKey{preFundedKeys[0]},
+					walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{ids.ShortEmpty},
+					}),
 				)
 				require.NoError(err)
 
@@ -573,6 +579,10 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 						Subnet: subnetID,
 					},
 					[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
+					walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{ids.ShortEmpty},
+					}),
 				)
 				require.NoError(err)
 
@@ -606,6 +616,10 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 					},
 					reward.PercentDenominator,
 					[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
+					walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{ids.ShortEmpty},
+					}),
 				)
 				require.NoError(err)
 
@@ -774,6 +788,10 @@ func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 		},
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
+		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{ids.ShortEmpty},
+		}),
 	)
 	require.NoError(err)
 
