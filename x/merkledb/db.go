@@ -146,7 +146,7 @@ type MerkleDB interface {
 	RangeProofer
 	Prefetcher
 
-	NewRollingView(context.Context) (*RollingView, error)
+	NewRollingView(context.Context, int) (*RollingView, error)
 }
 
 type Config struct {
@@ -792,7 +792,7 @@ func (db *merkleDB) NewView(
 	return view, nil
 }
 
-func (db *merkleDB) NewRollingView(context.Context) (*RollingView, error) {
+func (db *merkleDB) NewRollingView(_ context.Context, changes int) (*RollingView, error) {
 	db.commitLock.Lock()
 	defer db.commitLock.Unlock()
 
@@ -800,12 +800,7 @@ func (db *merkleDB) NewRollingView(context.Context) (*RollingView, error) {
 		return nil, database.ErrClosed
 	}
 
-	return &RollingView{
-		root:       maybe.Bind(db.root, (*node).clone),
-		db:         db,
-		parentTrie: db,
-		tokenSize:  db.tokenSize,
-	}, nil
+	return newRollingView(db, db, changes), nil
 }
 
 func (db *merkleDB) Has(k []byte) (bool, error) {

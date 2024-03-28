@@ -17,7 +17,7 @@ import (
 type RollingParent interface {
 	trieInternals
 
-	NewRollingView(context.Context) (*RollingView, error)
+	NewRollingView(context.Context, int) (*RollingView, error)
 }
 
 type RollingView struct {
@@ -40,15 +40,20 @@ type RollingView struct {
 	tokenSize int
 }
 
-func (v *RollingView) NewRollingView(context.Context) (*RollingView, error) {
-	nv := &RollingView{
-		root:       maybe.Bind(v.getRoot(), (*node).clone),
-		db:         v.db,
-		parentTrie: v,
-		tokenSize:  v.db.tokenSize,
-	}
+func (v *RollingView) NewRollingView(_ context.Context, changes int) (*RollingView, error) {
+	nv := newRollingView(v.db, v, changes)
 	v.child = nv
 	return nv, nil
+}
+
+func newRollingView(db *merkleDB, parentTrie RollingParent, changes int) *RollingView {
+	return &RollingView{
+		root:       maybe.Bind(parentTrie.getRoot(), (*node).clone),
+		db:         db,
+		parentTrie: parentTrie,
+		changes:    newChangeSummary(changes),
+		tokenSize:  db.tokenSize,
+	}
 }
 
 func (v *RollingView) Process(ctx context.Context, key string, val maybe.Maybe[[]byte]) error {
