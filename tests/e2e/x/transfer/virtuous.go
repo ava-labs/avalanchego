@@ -17,11 +17,15 @@ import (
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/avm"
+	"github.com/ava-labs/avalanchego/vms/avm/config"
+	"github.com/ava-labs/avalanchego/vms/avm/txs/fees"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
+	xbuilder "github.com/ava-labs/avalanchego/wallet/chain/x/builder"
 	ginkgo "github.com/onsi/ginkgo/v2"
 )
 
@@ -149,9 +153,6 @@ var _ = e2e.DescribeXChainSerial("[Virtuous Transfer Tx AVAX]", func() {
 
 				amountToTransfer := senderOrigBal / 10
 
-				senderNewBal := senderOrigBal - amountToTransfer - xContext.BaseTxFee
-				receiverNewBal := receiverOrigBal + amountToTransfer
-
 				ginkgo.By("X-Chain transfer with wrong amount must fail", func() {
 					_, err := wallets[fromIdx].X().IssueBaseTx(
 						[]*avax.TransferableOutput{{
@@ -171,29 +172,6 @@ var _ = e2e.DescribeXChainSerial("[Virtuous Transfer Tx AVAX]", func() {
 					require.Contains(err.Error(), "insufficient funds")
 				})
 
-				fmt.Printf(`===
-TRANSFERRING
-
-FROM [%q]
-SENDER    CURRENT BALANCE     : %21d AVAX
-SENDER    NEW BALANCE (AFTER) : %21d AVAX
-
-TRANSFER AMOUNT FROM SENDER   : %21d AVAX
-
-TO [%q]
-RECEIVER  CURRENT BALANCE     : %21d AVAX
-RECEIVER  NEW BALANCE (AFTER) : %21d AVAX
-===
-`,
-					shortAddrs[fromIdx],
-					senderOrigBal,
-					senderNewBal,
-					amountToTransfer,
-					shortAddrs[toIdx],
-					receiverOrigBal,
-					receiverNewBal,
-				)
-
 				tx, err := wallets[fromIdx].X().IssueBaseTx(
 					[]*avax.TransferableOutput{{
 						Asset: avax.Asset{
@@ -210,6 +188,43 @@ RECEIVER  NEW BALANCE (AFTER) : %21d AVAX
 					e2e.WithDefaultContext(),
 				)
 				require.NoError(err)
+
+				// retrieve fees paid for the BaseTx
+				feeCfg := config.GetDynamicFeesConfig(true /*isEActive*/)
+				feeCalc := fees.Calculator{
+					IsEActive:          true,
+					FeeManager:         commonfees.NewManager(feeCfg.FeeRate),
+					BlockMaxComplexity: feeCfg.BlockMaxComplexity,
+					Codec:              xbuilder.Parser.Codec(),
+					Credentials:        tx.Creds,
+				}
+
+				require.NoError(tx.Unsigned.Visit(&feeCalc))
+				senderNewBal := senderOrigBal - amountToTransfer - feeCalc.Fee
+				receiverNewBal := receiverOrigBal + amountToTransfer
+
+				fmt.Printf(`===
+				TRANSFERRING
+				
+				FROM [%q]
+				SENDER    CURRENT BALANCE     : %21d AVAX
+				SENDER    NEW BALANCE (AFTER) : %21d AVAX
+				
+				TRANSFER AMOUNT FROM SENDER   : %21d AVAX
+				
+				TO [%q]
+				RECEIVER  CURRENT BALANCE     : %21d AVAX
+				RECEIVER  NEW BALANCE (AFTER) : %21d AVAX
+				===
+				`,
+					shortAddrs[fromIdx],
+					senderOrigBal,
+					senderNewBal,
+					amountToTransfer,
+					shortAddrs[toIdx],
+					receiverOrigBal,
+					receiverNewBal,
+				)
 
 				balances, err := wallets[fromIdx].X().Builder().GetFTBalance()
 				require.NoError(err)
