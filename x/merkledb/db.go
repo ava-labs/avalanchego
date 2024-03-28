@@ -790,6 +790,22 @@ func (db *merkleDB) NewView(
 	return view, nil
 }
 
+func (db *merkleDB) NewStagedView(context.Context) (*StagedView, error) {
+	db.commitLock.Lock()
+	defer db.commitLock.Unlock()
+
+	if db.closed {
+		return nil, database.ErrClosed
+	}
+
+	return &StagedView{
+		root:       maybe.Bind(db.root, (*node).clone),
+		db:         db,
+		parentTrie: db,
+		tokenSize:  db.tokenSize,
+	}, nil
+}
+
 func (db *merkleDB) Has(k []byte) (bool, error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()

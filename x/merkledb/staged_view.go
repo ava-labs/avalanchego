@@ -9,20 +9,21 @@ import (
 	"slices"
 	"sync"
 
-	"go.opentelemetry.io/otel/attribute"
-
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/maybe"
-
-	oteltrace "go.opentelemetry.io/otel/trace"
 )
+
+type StagedParent interface {
+	trieInternals
+
+	NewStagedView(context.Context) (*StagedView, error)
+}
 
 type StagedView struct {
 	// the uncommitted parent trie of this view
 	// [validityTrackingLock] must be held when reading/writing this field.
-	parentLock sync.Mutex
-	parentTrie *StagedView
+	parentTrie StagedParent
 
 	// Changes made to this view.
 	// May include nodes that haven't been updated
@@ -37,38 +38,30 @@ type StagedView struct {
 	tokenSize int
 }
 
-func (v *StagedView) NewStagedView(ctx context.Context) *StagedView {
+func (v *StagedView) NewStagedView(context.Context) (*StagedView, error) {
 	return &StagedView{
 		root:       maybe.Bind(v.getRoot(), (*node).clone),
 		db:         v.db,
 		parentTrie: v,
 		tokenSize:  v.db.tokenSize,
-	}
+	}, nil
 }
 
-func (v *StagedView) Add(ctx context.Context, changes ViewChanges) error {
-	for _, op := range changes.BatchOps {
-		key := op.Key
-		if !changes.ConsumeBytes {
-			key = slices.Clone(op.Key)
-		}
-
-		newVal := maybe.Nothing[[]byte]()
-		if !op.Delete {
-			newVal = maybe.Some(op.Value)
-			if !changes.ConsumeBytes {
-				newVal = maybe.Some(slices.Clone(op.Value))
-			}
-		}
-		if err := v.recordValueChange(toKey(key), newVal); err != nil {
+func (v *StagedView) Add(ctx context.Context, changes map[string]maybe.Maybe[[]byte]) error {
+	// TODO: turn this into an async queue
+	for skey, val := range changes {
+		key := toKey(stringToByteSlice(skey))
+		change, err := v.recordValueChange(key, maybe.Bind(val, slices.Clone[[]byte]))
+		if err != nil {
 			return err
 		}
-	}
-	for key, val := range changes.MapOps {
-		if !changes.ConsumeBytes {
-			val = maybe.Bind(val, slices.Clone[[]byte])
-		}
-		if err := v.recordValueChange(toKey(stringToByteSlice(key)), val); err != nil {
+		if change.after.IsNothing() {
+			// Note we're setting [err] defined outside this function.
+			if err := v.remove(key); err != nil {
+				return err
+			}
+			// Note we're setting [err] defined outside this function.
+		} else if _, err := v.insert(key, change.after); err != nil {
 			return err
 		}
 	}
@@ -93,19 +86,6 @@ func (v *StagedView) calculateNodeIDs(ctx context.Context) error {
 	// per key modified even though IDs are not re-calculated).
 	_, span := v.db.infoTracer.Start(ctx, "MerkleDB.view.calculateNodeIDs")
 	defer span.End()
-
-	// add all the changed key/values to the nodes of the trie
-	for key, change := range v.changes.values {
-		if change.after.IsNothing() {
-			// Note we're setting [err] defined outside this function.
-			if err := v.remove(key); err != nil {
-				return err
-			}
-			// Note we're setting [err] defined outside this function.
-		} else if _, err := v.insert(key, change.after); err != nil {
-			return err
-		}
-	}
 
 	if !v.root.IsNothing() {
 		_ = v.db.calculateNodeIDsSema.Acquire(context.Background(), 1)
@@ -166,18 +146,6 @@ func (v *StagedView) CommitToDB(ctx context.Context) error {
 
 	v.db.commitLock.Lock()
 	defer v.db.commitLock.Unlock()
-
-	return v.commitToDB(ctx)
-}
-
-// Commits the changes from [trieToCommit] to this view,
-// this view to its parent, and so on until committing to the db.
-// Assumes [v.db.commitLock] is held.
-func (v *StagedView) commitToDB(ctx context.Context) error {
-	ctx, span := v.db.infoTracer.Start(ctx, "MerkleDB.view.commitToDB", oteltrace.WithAttributes(
-		attribute.Int("changeCount", len(v.changes.values)),
-	))
-	defer span.End()
 
 	// Call this here instead of in [v.db.commitChanges]
 	// because doing so there would be a deadlock.
@@ -496,11 +464,11 @@ func (v *StagedView) recordKeyChange(key Key, after *node, hadValue bool, newNod
 // Doesn't actually change the trie data structure.
 // That's deferred until we call [calculateNodeIDs].
 // Must not be called after [calculateNodeIDs] has returned.
-func (v *StagedView) recordValueChange(key Key, value maybe.Maybe[[]byte]) error {
+func (v *StagedView) recordValueChange(key Key, value maybe.Maybe[[]byte]) (*change[maybe.Maybe[[]byte]], error) {
 	// update the existing change if it exists
 	if existing, ok := v.changes.values[key]; ok {
 		existing.after = value
-		return nil
+		return existing, nil
 	}
 
 	// grab the before value
@@ -512,14 +480,15 @@ func (v *StagedView) recordValueChange(key Key, value maybe.Maybe[[]byte]) error
 	case database.ErrNotFound:
 		beforeMaybe = maybe.Nothing[[]byte]()
 	default:
-		return err
+		return nil, err
 	}
 
-	v.changes.values[key] = &change[maybe.Maybe[[]byte]]{
+	c := &change[maybe.Maybe[[]byte]]{
 		before: beforeMaybe,
 		after:  value,
 	}
-	return nil
+	v.changes.values[key] = c
+	return c, nil
 }
 
 // Retrieves a node with the given [key].
@@ -543,7 +512,7 @@ func (v *StagedView) getNode(key Key, hasValue bool) (*node, error) {
 }
 
 // Get the parent trie of the view
-func (v *StagedView) getParentTrie() *StagedView {
+func (v *StagedView) getParentTrie() StagedParent {
 	return v.parentTrie
 }
 
