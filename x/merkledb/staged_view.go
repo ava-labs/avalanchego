@@ -198,7 +198,7 @@ func (v *StagedView) remove(key Key) error {
 	// mark all ancestor for change
 	// grab parent and grandparent nodes for path compression
 	var grandParent, parent, nodeToDelete *node
-	if err := visitPathToKeyStaged(v, key, func(n *node) error {
+	if err := visitPathToKey(v, key, func(n *node) error {
 		grandParent = parent
 		parent = nodeToDelete
 		nodeToDelete = n
@@ -309,7 +309,7 @@ func (v *StagedView) insert(
 
 	// Find the node that most closely matches [key].
 	var closestNode *node
-	if err := visitPathToKeyStaged(v, key, func(n *node) error {
+	if err := visitPathToKey(v, key, func(n *node) error {
 		closestNode = n
 		// Need to recalculate ID for all nodes on path to [key].
 		return v.recordNodeChange(n)
@@ -514,43 +514,4 @@ func (v *StagedView) getNode(key Key, hasValue bool) (*node, error) {
 // Get the parent trie of the view
 func (v *StagedView) getParentTrie() StagedParent {
 	return v.parentTrie
-}
-
-func visitPathToKeyStaged(t *StagedView, key Key, visitNode func(*node) error) error {
-	maybeRoot := t.getRoot()
-	if maybeRoot.IsNothing() {
-		return nil
-	}
-	root := maybeRoot.Value()
-	if !key.HasPrefix(root.key) {
-		return nil
-	}
-	var (
-		// all node paths start at the root
-		currentNode = root
-		tokenSize   = t.getTokenSize()
-		err         error
-	)
-	if err := visitNode(currentNode); err != nil {
-		return err
-	}
-	// while the entire path hasn't been matched
-	for currentNode.key.length < key.length {
-		// confirm that a child exists and grab its ID before attempting to load it
-		nextChildEntry, hasChild := currentNode.children[key.Token(currentNode.key.length, tokenSize)]
-
-		if !hasChild || !key.iteratedHasPrefix(nextChildEntry.compressedKey, currentNode.key.length+tokenSize, tokenSize) {
-			// there was no child along the path or the child that was there doesn't match the remaining path
-			return nil
-		}
-		// grab the next node along the path
-		currentNode, err = t.getNode(key.Take(currentNode.key.length+tokenSize+nextChildEntry.compressedKey.length), nextChildEntry.hasValue)
-		if err != nil {
-			return err
-		}
-		if err := visitNode(currentNode); err != nil {
-			return err
-		}
-	}
-	return nil
 }

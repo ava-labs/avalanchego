@@ -97,7 +97,7 @@ type View interface {
 // given [key], if it's in the trie, or the node with the largest prefix of
 // the [key] if it isn't in the trie.
 // Assumes [t] doesn't change while this function is running.
-func visitPathToKey(t Trie, key Key, visitNode func(*node) error) error {
+func visitPathToKey(t trieInternals, key Key, visitNode func(*node) error) error {
 	maybeRoot := t.getRoot()
 	if maybeRoot.IsNothing() {
 		return nil
