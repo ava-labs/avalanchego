@@ -145,6 +145,8 @@ type MerkleDB interface {
 	ChangeProofer
 	RangeProofer
 	Prefetcher
+
+	NewRollingView(context.Context) (*RollingView, error)
 }
 
 type Config struct {
