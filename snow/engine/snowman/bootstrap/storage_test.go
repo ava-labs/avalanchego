@@ -214,93 +214,81 @@ func TestProcess(t *testing.T) {
 }
 
 func TestExecute(t *testing.T) {
-	require := require.New(t)
+	const numBlocks = 7
 
-	const numBlocks = 2*max(batchWritePeriod, iteratorReleasePeriod) + 1
-	blocks := generateBlockchain(numBlocks)
-	parser := makeParser(blocks)
+	unhalted := &common.Halter{}
+	halted := &common.Halter{}
+	halted.Halt(context.Background())
 
-	db := memdb.New()
-	tree, err := interval.NewTree(db)
-	require.NoError(err)
-
-	const lastAcceptedHeight = numBlocks / 2
-	blocksNotToExecute := blocks[1 : lastAcceptedHeight+1]
-	blocksToExecute := blocks[lastAcceptedHeight+1:]
-
-	for i, block := range blocks[1:] {
-		newlyWantsParent, err := interval.Add(
-			db,
-			tree,
-			0,
-			block.Height(),
-			block.Bytes(),
-		)
-		require.NoError(err)
-		require.False(newlyWantsParent)
-		require.Equal(uint64(i+1), tree.Len())
+	tests := []struct {
+		name                      string
+		haltable                  common.Haltable
+		lastAcceptedHeight        uint64
+		expectedProcessingHeights []uint64
+		expectedAcceptedHeights   []uint64
+	}{
+		{
+			name:                      "execute everything",
+			haltable:                  unhalted,
+			lastAcceptedHeight:        0,
+			expectedProcessingHeights: nil,
+			expectedAcceptedHeights:   []uint64{0, 1, 2, 3, 4, 5, 6},
+		},
+		{
+			name:                      "do not execute blocks accepted by height",
+			haltable:                  unhalted,
+			lastAcceptedHeight:        3,
+			expectedProcessingHeights: []uint64{1, 2, 3},
+			expectedAcceptedHeights:   []uint64{0, 4, 5, 6},
+		},
+		{
+			name:                      "do not execute blocks when halted",
+			haltable:                  halted,
+			lastAcceptedHeight:        0,
+			expectedProcessingHeights: []uint64{1, 2, 3, 4, 5, 6},
+			expectedAcceptedHeights:   []uint64{0},
+		},
 	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
 
-	require.NoError(execute(
-		context.Background(),
-		&common.Halter{},
-		logging.NoLog{}.Info,
-		db,
-		parser,
-		tree,
-		lastAcceptedHeight,
-	))
-	requireStatusIs(require, blocksNotToExecute, choices.Processing)
-	requireStatusIs(require, blocksToExecute, choices.Accepted)
+			db := memdb.New()
+			tree, err := interval.NewTree(db)
+			require.NoError(err)
 
-	size, err := database.Count(db)
-	require.NoError(err)
-	require.Zero(size)
-}
+			blocks := generateBlockchain(numBlocks)
+			parser := makeParser(blocks)
+			for _, blk := range blocks {
+				_, err := interval.Add(db, tree, 0, blk.Height(), blk.Bytes())
+				require.NoError(err)
+			}
 
-func TestExecuteExitsWhenHalted(t *testing.T) {
-	require := require.New(t)
+			require.NoError(execute(
+				context.Background(),
+				test.haltable,
+				logging.NoLog{}.Info,
+				db,
+				parser,
+				tree,
+				test.lastAcceptedHeight,
+			))
+			for _, height := range test.expectedProcessingHeights {
+				require.Equal(choices.Processing, blocks[height].Status())
+			}
+			for _, height := range test.expectedAcceptedHeights {
+				require.Equal(choices.Accepted, blocks[height].Status())
+			}
 
-	blocks := generateBlockchain(7)
-	parser := makeParser(blocks)
+			if test.haltable.Halted() {
+				return
+			}
 
-	db := memdb.New()
-	tree, err := interval.NewTree(db)
-	require.NoError(err)
-
-	const lastAcceptedHeight = 1
-	for i, block := range blocks[1:] {
-		newlyWantsParent, err := interval.Add(
-			db,
-			tree,
-			0,
-			block.Height(),
-			block.Bytes(),
-		)
-		require.NoError(err)
-		require.False(newlyWantsParent)
-		require.Equal(uint64(i+1), tree.Len())
+			size, err := database.Count(db)
+			require.NoError(err)
+			require.Zero(size)
+		})
 	}
-
-	startSize, err := database.Count(db)
-	require.NoError(err)
-
-	halter := common.Halter{}
-	halter.Halt(context.Background())
-	require.NoError(execute(
-		context.Background(),
-		&halter,
-		logging.NoLog{}.Info,
-		db,
-		parser,
-		tree,
-		lastAcceptedHeight,
-	))
-	requireStatusIs(require, blocks[1:], choices.Processing)
-
-	endSize, err := database.Count(db)
-	require.NoError(err)
-	require.Equal(startSize, endSize)
 }
 
 type testParser func(context.Context, []byte) (snowman.Block, error)
