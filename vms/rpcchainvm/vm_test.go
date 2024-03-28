@@ -79,7 +79,7 @@ func TestHelperProcess(t *testing.T) {
 	}
 
 	if len(args) == 0 {
-		fmt.Fprintf(os.Stderr, "failed to receive testKey\n")
+		fmt.Fprintln(os.Stderr, "failed to receive testKey")
 		os.Exit(2)
 	}
 
