@@ -23,7 +23,9 @@ type StagedParent interface {
 type StagedView struct {
 	// the uncommitted parent trie of this view
 	// [validityTrackingLock] must be held when reading/writing this field.
+	ancestry   sync.Mutex
 	parentTrie StagedParent
+	child      *StagedView
 
 	// Changes made to this view.
 	// May include nodes that haven't been updated
@@ -66,6 +68,10 @@ func (v *StagedView) Add(ctx context.Context, changes map[string]maybe.Maybe[[]b
 		}
 	}
 	return nil
+}
+
+// Done waits for queue to finish processing changes to trie
+func (v *StagedView) Done() {
 }
 
 func (v *StagedView) getTokenSize() int {
@@ -147,14 +153,18 @@ func (v *StagedView) CommitToDB(ctx context.Context) error {
 	v.db.commitLock.Lock()
 	defer v.db.commitLock.Unlock()
 
-	// Call this here instead of in [v.db.commitChanges]
-	// because doing so there would be a deadlock.
 	if err := v.calculateNodeIDs(ctx); err != nil {
 		return err
 	}
-
 	if err := v.db.commitStagedChanges(ctx, v); err != nil {
 		return err
+	}
+
+	// Update child with correct parent trie
+	if v.child != nil {
+		v.child.ancestry.Lock()
+		v.parentTrie = v.db
+		v.child.ancestry.Unlock()
 	}
 	return nil
 }
@@ -513,5 +523,8 @@ func (v *StagedView) getNode(key Key, hasValue bool) (*node, error) {
 
 // Get the parent trie of the view
 func (v *StagedView) getParentTrie() StagedParent {
+	v.ancestry.Lock()
+	defer v.ancestry.Unlock()
+
 	return v.parentTrie
 }
