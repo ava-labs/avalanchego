@@ -17,6 +17,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm/txs/mempool"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 var _ TxVerifier = (*testVerifier)(nil)
@@ -25,8 +27,8 @@ type testVerifier struct {
 	err error
 }
 
-func (v testVerifier) VerifyTx(*txs.Tx) error {
-	return v.err
+func (v testVerifier) VerifyTx(*txs.Tx) (commonfees.TipPercentage, error) {
+	return commonfees.NoTip, v.err
 }
 
 func TestMarshaller(t *testing.T) {
@@ -126,6 +128,6 @@ func TestGossipMempoolAddVerified(t *testing.T) {
 		TxID: ids.GenerateTestID(),
 	}
 
-	require.NoError(mempool.AddWithoutVerification(tx))
+	require.NoError(mempool.AddWithoutVerification(tx, commonfees.NoTip))
 	require.True(mempool.bloom.Has(tx))
 }

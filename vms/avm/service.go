@@ -704,15 +704,18 @@ func (s *Service) GetFeeRates(_ *http.Request, _ *struct{}, reply *GetFeeRatesRe
 	}
 	reply.CurrentFeeRates = currentFeeRates
 
-	nextTimestamp := executor.NextBlockTime(onAccept.GetTimestamp(), &s.vm.clock)
-	isEActivated := s.vm.Config.IsEActivated(nextTimestamp)
+	var (
+		currentTimestamp = onAccept.GetTimestamp()
+		nextTimestamp    = executor.NextBlockTime(onAccept.GetTimestamp(), &s.vm.clock)
+		isEActivated     = s.vm.Config.IsEActivated(nextTimestamp)
+	)
 
 	if !isEActivated {
 		reply.NextFeeRates = reply.CurrentFeeRates
 		return nil
 	}
 
-	feeManager, err := fees.UpdatedFeeManager(onAccept, &s.vm.Config, onAccept.GetTimestamp(), nextTimestamp)
+	feeManager, err := fees.UpdatedFeeManager(onAccept, &s.vm.Config, currentTimestamp, nextTimestamp)
 	if err != nil {
 		return err
 	}
@@ -846,6 +849,7 @@ func (s *Service) buildCreateAssetTx(args *CreateAssetArgs) (*txs.Tx, ids.ShortI
 		args.Denomination,
 		map[uint32][]verify.State{fxIndex: initialStateOuts},
 		kc,
+		commonfees.NoTip,
 		changeAddr,
 	)
 }
@@ -967,6 +971,7 @@ func (s *Service) buildCreateNFTAsset(args *CreateNFTAssetArgs) (*txs.Tx, ids.Sh
 		0, // NFTs are non-fungible
 		map[uint32][]verify.State{fxIndex: initialStateOuts},
 		kc,
+		commonfees.NoTip,
 		changeAddr,
 	)
 }
@@ -1283,6 +1288,7 @@ func (s *Service) buildSendMultiple(args *SendMultipleArgs) (*txs.Tx, ids.ShortI
 		outs,
 		memoBytes,
 		kc,
+		commonfees.NoTip,
 		changeAddr,
 	)
 }
@@ -1384,6 +1390,7 @@ func (s *Service) buildMint(args *MintArgs) (*txs.Tx, ids.ShortID, error) {
 		s.txBuilderBackend,
 		outputs,
 		feeKc,
+		commonfees.NoTip,
 		changeAddr,
 	)
 	if err != nil {
@@ -1476,6 +1483,7 @@ func (s *Service) buildSendNFT(args *SendNFTArgs) (*txs.Tx, ids.ShortID, error) 
 		s.txBuilderBackend,
 		ops,
 		kc,
+		commonfees.NoTip,
 		changeAddr,
 	)
 	if err != nil {
@@ -1573,6 +1581,7 @@ func (s *Service) buildMintNFT(args *MintNFTArgs) (*txs.Tx, ids.ShortID, error) 
 			Addrs:     []ids.ShortID{to},
 		}},
 		kc,
+		commonfees.NoTip,
 		changeAddr,
 	)
 	if err != nil {
@@ -1642,6 +1651,7 @@ func (s *Service) buildImport(args *ImportArgs) (*txs.Tx, error) {
 		chainID,
 		to,
 		kc,
+		commonfees.NoTip,
 	)
 }
 
@@ -1743,6 +1753,7 @@ func (s *Service) buildExport(args *ExportArgs) (*txs.Tx, ids.ShortID, error) {
 		assetID,
 		uint64(args.Amount),
 		kc,
+		commonfees.NoTip,
 		changeAddr,
 	)
 }

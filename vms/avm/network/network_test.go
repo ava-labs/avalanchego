@@ -24,6 +24,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/nftfx"
 	"github.com/ava-labs/avalanchego/vms/propertyfx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 var (
@@ -89,7 +91,7 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 			},
 			txVerifierFunc: func(ctrl *gomock.Controller) TxVerifier {
 				txVerifier := executor.NewMockManager(ctrl)
-				txVerifier.EXPECT().VerifyTx(gomock.Any()).Return(errTest)
+				txVerifier.EXPECT().VerifyTx(gomock.Any()).Return(commonfees.NoTip, errTest)
 				return txVerifier
 			},
 			expectedErr: errTest,
@@ -100,13 +102,13 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 				mempool := mempool.NewMockMempool(ctrl)
 				mempool.EXPECT().Get(gomock.Any()).Return(nil, false)
 				mempool.EXPECT().GetDropReason(gomock.Any()).Return(nil)
-				mempool.EXPECT().Add(gomock.Any()).Return(errTest)
+				mempool.EXPECT().Add(gomock.Any(), gomock.Any()).Return(errTest)
 				mempool.EXPECT().MarkDropped(gomock.Any(), gomock.Any())
 				return mempool
 			},
 			txVerifierFunc: func(ctrl *gomock.Controller) TxVerifier {
 				txVerifier := executor.NewMockManager(ctrl)
-				txVerifier.EXPECT().VerifyTx(gomock.Any()).Return(nil)
+				txVerifier.EXPECT().VerifyTx(gomock.Any()).Return(commonfees.NoTip, nil)
 				return txVerifier
 			},
 			expectedErr: errTest,
@@ -117,7 +119,7 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 				mempool := mempool.NewMockMempool(ctrl)
 				mempool.EXPECT().Get(gomock.Any()).Return(nil, false)
 				mempool.EXPECT().GetDropReason(gomock.Any()).Return(nil)
-				mempool.EXPECT().Add(gomock.Any()).Return(nil)
+				mempool.EXPECT().Add(gomock.Any(), gomock.Any()).Return(nil)
 				mempool.EXPECT().Len().Return(0)
 				mempool.EXPECT().RequestBuildBlock()
 				mempool.EXPECT().Get(gomock.Any()).Return(nil, true).Times(2)
@@ -125,7 +127,7 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 			},
 			txVerifierFunc: func(ctrl *gomock.Controller) TxVerifier {
 				txVerifier := executor.NewMockManager(ctrl)
-				txVerifier.EXPECT().VerifyTx(gomock.Any()).Return(nil)
+				txVerifier.EXPECT().VerifyTx(gomock.Any()).Return(commonfees.NoTip, nil)
 				return txVerifier
 			},
 			appSenderFunc: func(ctrl *gomock.Controller) common.AppSender {
@@ -213,7 +215,7 @@ func TestNetworkIssueTxFromRPCWithoutVerification(t *testing.T) {
 			name: "can't add transaction to mempool",
 			mempoolFunc: func(ctrl *gomock.Controller) mempool.Mempool {
 				mempool := mempool.NewMockMempool(ctrl)
-				mempool.EXPECT().Add(gomock.Any()).Return(errTest)
+				mempool.EXPECT().Add(gomock.Any(), gomock.Any()).Return(errTest)
 				mempool.EXPECT().MarkDropped(gomock.Any(), gomock.Any())
 				return mempool
 			},
@@ -224,7 +226,7 @@ func TestNetworkIssueTxFromRPCWithoutVerification(t *testing.T) {
 			mempoolFunc: func(ctrl *gomock.Controller) mempool.Mempool {
 				mempool := mempool.NewMockMempool(ctrl)
 				mempool.EXPECT().Get(gomock.Any()).Return(nil, true).Times(2)
-				mempool.EXPECT().Add(gomock.Any()).Return(nil)
+				mempool.EXPECT().Add(gomock.Any(), gomock.Any()).Return(nil)
 				mempool.EXPECT().Len().Return(0)
 				mempool.EXPECT().RequestBuildBlock()
 				return mempool

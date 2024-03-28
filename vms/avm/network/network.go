@@ -17,6 +17,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/mempool"
+
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 const txGossipHandlerID = 0
@@ -205,7 +207,8 @@ func (n *Network) IssueTxFromRPC(tx *txs.Tx) error {
 // returned.
 // If the tx is not added to the mempool, an error will be returned.
 func (n *Network) IssueTxFromRPCWithoutVerification(tx *txs.Tx) error {
-	if err := n.mempool.AddWithoutVerification(tx); err != nil {
+	// TODO ABENEGIA: FIX FEE PERCENTAGE
+	if err := n.mempool.AddWithoutVerification(tx, commonfees.NoTip); err != nil {
 		return err
 	}
 	n.txPushGossiper.Add(tx)

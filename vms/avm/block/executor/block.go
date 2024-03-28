@@ -292,7 +292,8 @@ func (b *Block) Reject(context.Context) error {
 	)
 
 	for _, tx := range b.Txs() {
-		if err := b.manager.VerifyTx(tx); err != nil {
+		tipPercentage, err := b.manager.VerifyTx(tx)
+		if err != nil {
 			b.manager.backend.Ctx.Log.Debug("dropping invalidated tx",
 				zap.Stringer("txID", tx.ID()),
 				zap.Stringer("blkID", blkID),
@@ -300,7 +301,7 @@ func (b *Block) Reject(context.Context) error {
 			)
 			continue
 		}
-		if err := b.manager.mempool.Add(tx); err != nil {
+		if err := b.manager.mempool.Add(tx, tipPercentage); err != nil {
 			b.manager.backend.Ctx.Log.Debug("dropping valid tx",
 				zap.Stringer("txID", tx.ID()),
 				zap.Stringer("blkID", blkID),

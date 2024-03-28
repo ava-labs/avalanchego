@@ -51,3 +51,8 @@ func (fc *FlowChecker) Verify() error {
 	}
 	return fc.errs.Err
 }
+
+// Fees must be invoked only if [Verify] has been successfully called
+func (fc *FlowChecker) Fees(assetID ids.ID, feeAmount uint64) uint64 {
+	return fc.consumed[assetID] - fc.produced[assetID] + feeAmount
+}

@@ -42,6 +42,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	avajson "github.com/ava-labs/avalanchego/utils/json"
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 func TestServiceIssueTx(t *testing.T) {
@@ -1979,6 +1980,7 @@ func newAvaxBaseTxWithOutputs(t *testing.T, env *environment) *txs.Tx {
 		}},
 		memo,
 		kc,
+		commonfees.NoTip,
 		changeKey.PublicKey().Address(),
 	)
 	require.NoError(t, err)
@@ -1999,6 +2001,7 @@ func newAvaxCreateAssetTxWithOutputs(t *testing.T, env *environment, initialStat
 		0,             // denomination
 		initialStates,
 		kc,
+		commonfees.NoTip,
 		key.Address(),
 	)
 	require.NoError(t, err)
@@ -2021,6 +2024,7 @@ func buildTestExportTx(t *testing.T, env *environment, chainID ids.ID) *txs.Tx {
 		env.vm.feeAssetID,
 		units.MicroAvax,
 		kc,
+		commonfees.NoTip,
 		key.Address(),
 	)
 	require.NoError(t, err)
@@ -2112,6 +2116,7 @@ func buildOperationTxWithOp(t *testing.T, env *environment, ops []*txs.Operation
 		env.service.txBuilderBackend,
 		ops,
 		kc,
+		commonfees.NoTip,
 		key.Address(),
 	)
 	require.NoError(t, err)

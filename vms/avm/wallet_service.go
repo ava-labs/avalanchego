@@ -19,6 +19,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm/txs/mempool"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 var errMissingUTXO = errors.New("missing utxo")
@@ -228,6 +230,7 @@ func (w *WalletService) SendMultiple(_ *http.Request, args *SendMultipleArgs, re
 		outs,
 		memoBytes,
 		kc,
+		commonfees.NoTip,
 		changeAddr,
 	)
 	if err != nil {

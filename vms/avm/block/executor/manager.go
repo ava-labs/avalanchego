@@ -19,6 +19,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/fees"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/mempool"
+
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 var (
@@ -43,7 +45,7 @@ type Manager interface {
 
 	// VerifyTx verifies that the transaction can be issued based on the currently
 	// preferred state. This should *not* be used to verify transactions in a block.
-	VerifyTx(tx *txs.Tx) error
+	VerifyTx(tx *txs.Tx) (commonfees.TipPercentage, error)
 
 	// VerifyUniqueInputs returns nil iff no blocks in the inclusive
 	// ancestry of [blkID] consume an input in [inputs].
@@ -144,9 +146,9 @@ func (m *manager) NewBlock(blk block.Block) snowman.Block {
 	}
 }
 
-func (m *manager) VerifyTx(tx *txs.Tx) error {
+func (m *manager) VerifyTx(tx *txs.Tx) (commonfees.TipPercentage, error) {
 	if !m.backend.Bootstrapped {
-		return ErrChainNotSynced
+		return commonfees.NoTip, ErrChainNotSynced
 	}
 
 	err := tx.Unsigned.Visit(&executor.SyntacticVerifier{
@@ -154,20 +156,20 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 		Tx:      tx,
 	})
 	if err != nil {
-		return err
+		return commonfees.NoTip, err
 	}
 
 	preferredID := m.Preferred()
 	preferred, err := m.GetStatelessBlock(preferredID)
 	if err != nil {
-		return err
+		return commonfees.NoTip, err
 	}
 	parentBlkTime := preferred.Timestamp()
 	nextBlkTime := NextBlockTime(preferred.Timestamp(), m.clk)
 
 	stateDiff, err := state.NewDiff(m.lastAccepted, m)
 	if err != nil {
-		return err
+		return commonfees.NoTip, err
 	}
 
 	var (
@@ -177,18 +179,18 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 
 	feeManager, err := fees.UpdatedFeeManager(m.state, m.backend.Config, parentBlkTime, nextBlkTime)
 	if err != nil {
-		return err
+		return commonfees.NoTip, err
 	}
 
-	err = tx.Unsigned.Visit(&executor.SemanticVerifier{
+	semanticVerifier := &executor.SemanticVerifier{
 		Backend:            m.backend,
 		BlkFeeManager:      feeManager,
 		BlockMaxComplexity: feesCfg.BlockMaxComplexity,
 		State:              stateDiff,
 		Tx:                 tx,
-	})
-	if err != nil {
-		return err
+	}
+	if err := tx.Unsigned.Visit(semanticVerifier); err != nil {
+		return commonfees.NoTip, err
 	}
 
 	executor := &executor.Executor{
@@ -196,7 +198,7 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 		State: stateDiff,
 		Tx:    tx,
 	}
-	return tx.Unsigned.Visit(executor)
+	return semanticVerifier.TipPercentage, tx.Unsigned.Visit(executor)
 }
 
 func (m *manager) VerifyUniqueInputs(blkID ids.ID, inputs set.Set[ids.ID]) error {
