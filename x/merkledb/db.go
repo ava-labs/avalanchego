@@ -987,6 +987,83 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *view) error
 	return db.baseDB.Put(rootDBKey, rootKey)
 }
 
+// commitStagedChanges commits the changes in [trieToCommit] to [db].
+// Assumes [trieToCommit]'s node IDs have been calculated.
+// Assumes [db.commitLock] is held.
+func (db *merkleDB) commitStagedChanges(ctx context.Context, trieToCommit *StagedView) error {
+	db.lock.Lock()
+	defer db.lock.Unlock()
+
+	switch {
+	case db.closed:
+		return database.ErrClosed
+	case trieToCommit == nil:
+		return nil
+	case trieToCommit.db != trieToCommit.getParentTrie():
+		return ErrParentNotDatabase
+	}
+
+	changes := trieToCommit.changes
+	_, span := db.infoTracer.Start(ctx, "MerkleDB.commitChanges", oteltrace.WithAttributes(
+		attribute.Int("nodesChanged", len(changes.nodes)),
+		attribute.Int("valuesChanged", len(changes.values)),
+	))
+	defer span.End()
+
+	if len(changes.nodes) == 0 {
+		return nil
+	}
+
+	currentValueNodeBatch := db.valueNodeDB.NewBatch()
+	_, nodesSpan := db.infoTracer.Start(ctx, "MerkleDB.commitChanges.writeNodes")
+	for key, nodeChange := range changes.nodes {
+		shouldAddIntermediate := nodeChange.after != nil && !nodeChange.after.hasValue()
+		shouldDeleteIntermediate := !shouldAddIntermediate && nodeChange.before != nil && !nodeChange.before.hasValue()
+
+		shouldAddValue := nodeChange.after != nil && nodeChange.after.hasValue()
+		shouldDeleteValue := !shouldAddValue && nodeChange.before != nil && nodeChange.before.hasValue()
+
+		if shouldAddIntermediate {
+			if err := db.intermediateNodeDB.Put(key, nodeChange.after); err != nil {
+				nodesSpan.End()
+				return err
+			}
+		} else if shouldDeleteIntermediate {
+			if err := db.intermediateNodeDB.Delete(key); err != nil {
+				nodesSpan.End()
+				return err
+			}
+		}
+
+		if shouldAddValue {
+			currentValueNodeBatch.Put(key, nodeChange.after)
+		} else if shouldDeleteValue {
+			currentValueNodeBatch.Delete(key)
+		}
+	}
+	nodesSpan.End()
+
+	_, commitSpan := db.infoTracer.Start(ctx, "MerkleDB.commitChanges.valueNodeDBCommit")
+	err := currentValueNodeBatch.Write()
+	commitSpan.End()
+	if err != nil {
+		return err
+	}
+
+	db.history.record(changes)
+
+	// Update root in database.
+	db.root = changes.rootChange.after
+	db.rootID = changes.rootID
+
+	if db.root.IsNothing() {
+		return db.baseDB.Delete(rootDBKey)
+	}
+
+	rootKey := codec.encodeKey(db.root.Value().key)
+	return db.baseDB.Put(rootDBKey, rootKey)
+}
+
 // moveChildViewsToDB removes any child views from the trieToCommit and moves them to the db
 // assumes [db.lock] is held
 func (db *merkleDB) moveChildViewsToDB(trieToCommit *view) {
