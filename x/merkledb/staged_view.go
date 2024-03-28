@@ -51,29 +51,22 @@ func (v *StagedView) NewStagedView(context.Context) (*StagedView, error) {
 	return nv, nil
 }
 
-func (v *StagedView) Add(ctx context.Context, changes map[string]maybe.Maybe[[]byte]) error {
-	// TODO: turn this into an async queue
-	for skey, val := range changes {
-		key := toKey(stringToByteSlice(skey))
-		change, err := v.recordValueChange(key, maybe.Bind(val, slices.Clone[[]byte]))
-		if err != nil {
+func (v *StagedView) Process(ctx context.Context, key string, val maybe.Maybe[[]byte]) error {
+	kkey := toKey(stringToByteSlice(key))
+	change, err := v.recordValueChange(kkey, maybe.Bind(val, slices.Clone[[]byte]))
+	if err != nil {
+		return err
+	}
+	if change.after.IsNothing() {
+		// Note we're setting [err] defined outside this function.
+		if err := v.remove(kkey); err != nil {
 			return err
 		}
-		if change.after.IsNothing() {
-			// Note we're setting [err] defined outside this function.
-			if err := v.remove(key); err != nil {
-				return err
-			}
-			// Note we're setting [err] defined outside this function.
-		} else if _, err := v.insert(key, change.after); err != nil {
-			return err
-		}
+		// Note we're setting [err] defined outside this function.
+	} else if _, err := v.insert(kkey, change.after); err != nil {
+		return err
 	}
 	return nil
-}
-
-// Done waits for queue to finish processing changes to trie
-func (v *StagedView) Done() {
 }
 
 func (v *StagedView) getTokenSize() int {
