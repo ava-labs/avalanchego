@@ -41,7 +41,7 @@ func TestVerifySpendUTXOs(t *testing.T) {
 
 	ctx := snowtest.Context(t, snowtest.PChainID)
 
-	h := &handler{
+	h := &verifier{
 		ctx: ctx,
 		clk: &mockable.Clock{},
 		fx:  fx,

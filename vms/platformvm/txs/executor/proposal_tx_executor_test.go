@@ -34,15 +34,18 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 	// pending validator set with the minimum staking amount
 	addMinStakeValidator := func(target *environment) {
 		tx, err := target.txBuilder.NewAddValidatorTx(
-			target.config.MinValidatorStake, // stake amount
-			newValidatorStartTime,           // start time
-			newValidatorEndTime,             // end time
-			newValidatorID,                  // node ID
-			rewardAddress,                   // Reward Address
-			reward.PercentDenominator,       // Shares
+			&txs.Validator{
+				NodeID: newValidatorID,
+				Start:  newValidatorStartTime,
+				End:    newValidatorEndTime,
+				Wght:   target.config.MinValidatorStake,
+			},
+			&secp256k1fx.OutputOwners{
+				Threshold: 1,
+				Addrs:     []ids.ShortID{rewardAddress},
+			},
+			reward.PercentDenominator, // Shares
 			[]*secp256k1.PrivateKey{preFundedKeys[0]},
-			ids.ShortEmpty,
-			nil,
 		)
 		require.NoError(t, err)
 
@@ -65,15 +68,18 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 	// pending validator set with the maximum staking amount
 	addMaxStakeValidator := func(target *environment) {
 		tx, err := target.txBuilder.NewAddValidatorTx(
-			target.config.MaxValidatorStake, // stake amount
-			newValidatorStartTime,           // start time
-			newValidatorEndTime,             // end time
-			newValidatorID,                  // node ID
-			rewardAddress,                   // Reward Address
-			reward.PercentDenominator,       // Shared
+			&txs.Validator{
+				NodeID: newValidatorID,
+				Start:  newValidatorStartTime,
+				End:    newValidatorEndTime,
+				Wght:   target.config.MaxValidatorStake,
+			},
+			&secp256k1fx.OutputOwners{
+				Threshold: 1,
+				Addrs:     []ids.ShortID{rewardAddress},
+			},
+			reward.PercentDenominator, // Shared
 			[]*secp256k1.PrivateKey{preFundedKeys[0]},
-			ids.ShortEmpty,
-			nil,
 		)
 		require.NoError(t, err)
 
@@ -238,14 +244,17 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 			freshTH.config.ApricotPhase3Time = tt.AP3Time
 
 			tx, err := freshTH.txBuilder.NewAddDelegatorTx(
-				tt.stakeAmount,
-				tt.startTime,
-				tt.endTime,
-				tt.nodeID,
-				tt.rewardAddress,
+				&txs.Validator{
+					NodeID: tt.nodeID,
+					Start:  tt.startTime,
+					End:    tt.endTime,
+					Wght:   tt.stakeAmount,
+				},
+				&secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{tt.rewardAddress},
+				},
 				tt.feeKeys,
-				ids.ShortEmpty,
-				nil,
 			)
 			require.NoError(err)
 
@@ -283,14 +292,16 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		// but stops validating subnet after stops validating primary network
 		// (note that keys[0] is a genesis validator)
 		tx, err := env.txBuilder.NewAddSubnetValidatorTx(
-			defaultWeight,
-			uint64(defaultValidateStartTime.Unix())+1,
-			uint64(defaultValidateEndTime.Unix())+1,
-			nodeID,
-			testSubnet1.ID(),
+			&txs.SubnetValidator{
+				Validator: txs.Validator{
+					NodeID: nodeID,
+					Start:  uint64(defaultValidateStartTime.Unix()) + 1,
+					End:    uint64(defaultValidateEndTime.Unix()) + 1,
+					Wght:   defaultWeight,
+				},
+				Subnet: testSubnet1.ID(),
+			},
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
-			ids.ShortEmpty, // change addr
-			nil,
 		)
 		require.NoError(err)
 
@@ -316,14 +327,16 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		// primary network validation period
 		// (note that keys[0] is a genesis validator)
 		tx, err := env.txBuilder.NewAddSubnetValidatorTx(
-			defaultWeight,
-			uint64(defaultValidateStartTime.Unix())+1,
-			uint64(defaultValidateEndTime.Unix()),
-			nodeID,
-			testSubnet1.ID(),
+			&txs.SubnetValidator{
+				Validator: txs.Validator{
+					NodeID: nodeID,
+					Start:  uint64(defaultValidateStartTime.Unix()) + 1,
+					End:    uint64(defaultValidateEndTime.Unix()),
+					Wght:   defaultWeight,
+				},
+				Subnet: testSubnet1.ID(),
+			},
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
-			ids.ShortEmpty, // change addr
-			nil,
 		)
 		require.NoError(err)
 
@@ -349,29 +362,34 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 	dsEndTime := dsStartTime.Add(5 * defaultMinStakingDuration)
 
 	addDSTx, err := env.txBuilder.NewAddValidatorTx(
-		env.config.MinValidatorStake, // stake amount
-		uint64(dsStartTime.Unix()),   // start time
-		uint64(dsEndTime.Unix()),     // end time
-		pendingDSValidatorID,         // node ID
-		ids.GenerateTestShortID(),    // reward address
-		reward.PercentDenominator,    // shares
+		&txs.Validator{
+			NodeID: pendingDSValidatorID,
+			Start:  uint64(dsStartTime.Unix()),
+			End:    uint64(dsEndTime.Unix()),
+			Wght:   env.config.MinValidatorStake,
+		},
+		&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+		},
+		reward.PercentDenominator, // shares
 		[]*secp256k1.PrivateKey{preFundedKeys[0]},
-		ids.ShortEmpty,
-		nil,
 	)
 	require.NoError(err)
 
 	{
 		// Case: Proposed validator isn't in pending or current validator sets
 		tx, err := env.txBuilder.NewAddSubnetValidatorTx(
-			defaultWeight,
-			uint64(dsStartTime.Unix()), // start validating subnet before primary network
-			uint64(dsEndTime.Unix()),
-			pendingDSValidatorID,
-			testSubnet1.ID(),
+			&txs.SubnetValidator{
+				Validator: txs.Validator{
+					NodeID: pendingDSValidatorID,
+					Start:  uint64(dsStartTime.Unix()), // start validating subnet before primary network
+					End:    uint64(dsEndTime.Unix()),
+					Wght:   defaultWeight,
+				},
+				Subnet: testSubnet1.ID(),
+			},
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
-			ids.ShortEmpty, // change addr
-			nil,
 		)
 		require.NoError(err)
 
@@ -412,14 +430,16 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		// Case: Proposed validator is pending validator of primary network
 		// but starts validating subnet before primary network
 		tx, err := env.txBuilder.NewAddSubnetValidatorTx(
-			defaultWeight,
-			uint64(dsStartTime.Unix())-1, // start validating subnet before primary network
-			uint64(dsEndTime.Unix()),
-			pendingDSValidatorID,
-			testSubnet1.ID(),
+			&txs.SubnetValidator{
+				Validator: txs.Validator{
+					NodeID: pendingDSValidatorID,
+					Start:  uint64(dsStartTime.Unix()) - 1, // start validating subnet before primary network
+					End:    uint64(dsEndTime.Unix()),
+					Wght:   defaultWeight,
+				},
+				Subnet: testSubnet1.ID(),
+			},
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
-			ids.ShortEmpty, // change addr
-			nil,
 		)
 		require.NoError(err)
 
@@ -443,14 +463,16 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		// Case: Proposed validator is pending validator of primary network
 		// but stops validating subnet after primary network
 		tx, err := env.txBuilder.NewAddSubnetValidatorTx(
-			defaultWeight,
-			uint64(dsStartTime.Unix()),
-			uint64(dsEndTime.Unix())+1, // stop validating subnet after stopping validating primary network
-			pendingDSValidatorID,
-			testSubnet1.ID(),
+			&txs.SubnetValidator{
+				Validator: txs.Validator{
+					NodeID: pendingDSValidatorID,
+					Start:  uint64(dsStartTime.Unix()),
+					End:    uint64(dsEndTime.Unix()) + 1, // stop validating subnet after stopping validating primary network
+					Wght:   defaultWeight,
+				},
+				Subnet: testSubnet1.ID(),
+			},
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
-			ids.ShortEmpty, // change addr
-			nil,
 		)
 		require.NoError(err)
 
@@ -474,14 +496,16 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		// Case: Proposed validator is pending validator of primary network and
 		// period validating subnet is subset of time validating primary network
 		tx, err := env.txBuilder.NewAddSubnetValidatorTx(
-			defaultWeight,
-			uint64(dsStartTime.Unix()), // same start time as for primary network
-			uint64(dsEndTime.Unix()),   // same end time as for primary network
-			pendingDSValidatorID,
-			testSubnet1.ID(),
+			&txs.SubnetValidator{
+				Validator: txs.Validator{
+					NodeID: pendingDSValidatorID,
+					Start:  uint64(dsStartTime.Unix()), // same start time as for primary network
+					End:    uint64(dsEndTime.Unix()),   // same end time as for primary network
+					Wght:   defaultWeight,
+				},
+				Subnet: testSubnet1.ID(),
+			},
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
-			ids.ShortEmpty, // change addr
-			nil,
 		)
 		require.NoError(err)
 
@@ -507,14 +531,16 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 
 	{
 		tx, err := env.txBuilder.NewAddSubnetValidatorTx(
-			defaultWeight,               // weight
-			uint64(newTimestamp.Unix()), // start time
-			uint64(newTimestamp.Add(defaultMinStakingDuration).Unix()), // end time
-			nodeID,           // node ID
-			testSubnet1.ID(), // subnet ID
+			&txs.SubnetValidator{
+				Validator: txs.Validator{
+					NodeID: nodeID,
+					Start:  uint64(newTimestamp.Unix()),
+					End:    uint64(newTimestamp.Add(defaultMinStakingDuration).Unix()),
+					Wght:   defaultWeight,
+				},
+				Subnet: testSubnet1.ID(),
+			},
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
-			ids.ShortEmpty, // change addr
-			nil,
 		)
 		require.NoError(err)
 
@@ -540,14 +566,16 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 	// Case: Proposed validator already validating the subnet
 	// First, add validator as validator of subnet
 	subnetTx, err := env.txBuilder.NewAddSubnetValidatorTx(
-		defaultWeight,                           // weight
-		uint64(defaultValidateStartTime.Unix()), // start time
-		uint64(defaultValidateEndTime.Unix()),   // end time
-		nodeID,                                  // node ID
-		testSubnet1.ID(),                        // subnet ID
+		&txs.SubnetValidator{
+			Validator: txs.Validator{
+				NodeID: nodeID,
+				Start:  uint64(defaultValidateStartTime.Unix()),
+				End:    uint64(defaultValidateEndTime.Unix()),
+				Wght:   defaultWeight,
+			},
+			Subnet: testSubnet1.ID(),
+		},
 		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
-		ids.ShortEmpty,
-		nil,
 	)
 	require.NoError(err)
 
@@ -568,14 +596,16 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 	{
 		// Node with ID nodeIDKey.PublicKey().Address() now validating subnet with ID testSubnet1.ID
 		duplicateSubnetTx, err := env.txBuilder.NewAddSubnetValidatorTx(
-			defaultWeight, // weight
-			uint64(defaultValidateStartTime.Unix())+1, // start time
-			uint64(defaultValidateEndTime.Unix()),     // end time
-			nodeID,                                    // node ID
-			testSubnet1.ID(),                          // subnet ID
+			&txs.SubnetValidator{
+				Validator: txs.Validator{
+					NodeID: nodeID,
+					Start:  uint64(defaultValidateStartTime.Unix()) + 1,
+					End:    uint64(defaultValidateEndTime.Unix()),
+					Wght:   defaultWeight,
+				},
+				Subnet: testSubnet1.ID(),
+			},
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
-			ids.ShortEmpty, // change addr
-			nil,
 		)
 		require.NoError(err)
 
@@ -602,14 +632,16 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 	{
 		// Case: Too few signatures
 		tx, err := env.txBuilder.NewAddSubnetValidatorTx(
-			defaultWeight, // weight
-			uint64(defaultValidateStartTime.Unix())+1,                                // start time
-			uint64(defaultValidateStartTime.Add(defaultMinStakingDuration).Unix())+1, // end time
-			nodeID,           // node ID
-			testSubnet1.ID(), // subnet ID
+			&txs.SubnetValidator{
+				Validator: txs.Validator{
+					NodeID: nodeID,
+					Start:  uint64(defaultValidateStartTime.Unix()) + 1,
+					End:    uint64(defaultValidateStartTime.Add(defaultMinStakingDuration).Unix()) + 1,
+					Wght:   defaultWeight,
+				},
+				Subnet: testSubnet1.ID(),
+			},
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[2]},
-			ids.ShortEmpty, // change addr
-			nil,
 		)
 		require.NoError(err)
 
@@ -639,21 +671,23 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 	{
 		// Case: Control Signature from invalid key (keys[3] is not a control key)
 		tx, err := env.txBuilder.NewAddSubnetValidatorTx(
-			defaultWeight, // weight
-			uint64(defaultValidateStartTime.Unix())+1,                                // start time
-			uint64(defaultValidateStartTime.Add(defaultMinStakingDuration).Unix())+1, // end time
-			nodeID,           // node ID
-			testSubnet1.ID(), // subnet ID
+			&txs.SubnetValidator{
+				Validator: txs.Validator{
+					NodeID: nodeID,
+					Start:  uint64(defaultValidateStartTime.Unix()) + 1,
+					End:    uint64(defaultValidateStartTime.Add(defaultMinStakingDuration).Unix()) + 1,
+					Wght:   defaultWeight,
+				},
+				Subnet: testSubnet1.ID(),
+			},
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], preFundedKeys[1]},
-			ids.ShortEmpty, // change addr
-			nil,
 		)
 		require.NoError(err)
 
 		// Replace a valid signature with one from keys[3]
 		sig, err := preFundedKeys[3].SignHash(hashing.ComputeHash256(tx.Unsigned.Bytes()))
 		require.NoError(err)
-		copy(tx.Creds[1].(*secp256k1fx.Credential).Sigs[0][:], sig)
+		copy(tx.Creds[0].(*secp256k1fx.Credential).Sigs[0][:], sig)
 
 		onCommitState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
@@ -675,14 +709,16 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		// Case: Proposed validator in pending validator set for subnet
 		// First, add validator to pending validator set of subnet
 		tx, err := env.txBuilder.NewAddSubnetValidatorTx(
-			defaultWeight, // weight
-			uint64(defaultValidateStartTime.Unix())+1,                                // start time
-			uint64(defaultValidateStartTime.Add(defaultMinStakingDuration).Unix())+1, // end time
-			nodeID,           // node ID
-			testSubnet1.ID(), // subnet ID
+			&txs.SubnetValidator{
+				Validator: txs.Validator{
+					NodeID: nodeID,
+					Start:  uint64(defaultValidateStartTime.Unix()) + 1,
+					End:    uint64(defaultValidateStartTime.Add(defaultMinStakingDuration).Unix()) + 1,
+					Wght:   defaultWeight,
+				},
+				Subnet: testSubnet1.ID(),
+			},
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
-			ids.ShortEmpty, // change addr
-			nil,
 		)
 		require.NoError(err)
 
@@ -729,15 +765,18 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 	{
 		// Case: Validator's start time too early
 		tx, err := env.txBuilder.NewAddValidatorTx(
-			env.config.MinValidatorStake,
-			uint64(chainTime.Unix()),
-			uint64(defaultValidateEndTime.Unix()),
-			nodeID,
-			ids.ShortEmpty,
+			&txs.Validator{
+				NodeID: nodeID,
+				Start:  uint64(chainTime.Unix()),
+				End:    uint64(defaultValidateEndTime.Unix()),
+				Wght:   env.config.MinValidatorStake,
+			},
+			&secp256k1fx.OutputOwners{
+				Threshold: 1,
+				Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+			},
 			reward.PercentDenominator,
 			[]*secp256k1.PrivateKey{preFundedKeys[0]},
-			ids.ShortEmpty, // change addr
-			nil,
 		)
 		require.NoError(err)
 
@@ -762,15 +801,18 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 
 		// Case: Validator already validating primary network
 		tx, err := env.txBuilder.NewAddValidatorTx(
-			env.config.MinValidatorStake,
-			uint64(defaultValidateStartTime.Unix())+1,
-			uint64(defaultValidateEndTime.Unix()),
-			nodeID,
-			ids.ShortEmpty,
+			&txs.Validator{
+				NodeID: nodeID,
+				Start:  uint64(defaultValidateStartTime.Unix()) + 1,
+				End:    uint64(defaultValidateEndTime.Unix()),
+				Wght:   env.config.MinValidatorStake,
+			},
+			&secp256k1fx.OutputOwners{
+				Threshold: 1,
+				Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+			},
 			reward.PercentDenominator,
 			[]*secp256k1.PrivateKey{preFundedKeys[0]},
-			ids.ShortEmpty, // change addr
-			nil,
 		)
 		require.NoError(err)
 
@@ -794,15 +836,18 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 		// Case: Validator in pending validator set of primary network
 		startTime := defaultValidateStartTime.Add(1 * time.Second)
 		tx, err := env.txBuilder.NewAddValidatorTx(
-			env.config.MinValidatorStake,                            // stake amount
-			uint64(startTime.Unix()),                                // start time
-			uint64(startTime.Add(defaultMinStakingDuration).Unix()), // end time
-			nodeID,
-			ids.ShortEmpty,
+			&txs.Validator{
+				NodeID: nodeID,
+				Start:  uint64(startTime.Unix()),
+				End:    uint64(startTime.Add(defaultMinStakingDuration).Unix()),
+				Wght:   env.config.MinValidatorStake,
+			},
+			&secp256k1fx.OutputOwners{
+				Threshold: 1,
+				Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+			},
 			reward.PercentDenominator, // shares
 			[]*secp256k1.PrivateKey{preFundedKeys[0]},
-			ids.ShortEmpty, // change addr
-			nil,
 		)
 		require.NoError(err)
 
@@ -840,15 +885,18 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 	{
 		// Case: Validator doesn't have enough tokens to cover stake amount
 		tx, err := env.txBuilder.NewAddValidatorTx( // create the tx
-			env.config.MinValidatorStake,
-			uint64(defaultValidateStartTime.Unix())+1,
-			uint64(defaultValidateEndTime.Unix()),
-			ids.GenerateTestNodeID(),
-			ids.ShortEmpty,
+			&txs.Validator{
+				NodeID: ids.GenerateTestNodeID(),
+				Start:  uint64(defaultValidateStartTime.Unix()) + 1,
+				End:    uint64(defaultValidateEndTime.Unix()),
+				Wght:   env.config.MinValidatorStake,
+			},
+			&secp256k1fx.OutputOwners{
+				Threshold: 1,
+				Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+			},
 			reward.PercentDenominator,
 			[]*secp256k1.PrivateKey{preFundedKeys[0]},
-			ids.ShortEmpty, // change addr
-			nil,
 		)
 		require.NoError(err)
 

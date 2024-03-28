@@ -70,6 +70,7 @@ type Service struct {
 	vm                    *VM
 	addrManager           avax.AddressManager
 	stakerAttributesCache *cache.LRU[ids.ID, *stakerAttributes]
+	atomicUtxosManager    avax.AtomicUTXOManager
 }
 
 // All attributes are optional and may not be filled for each stakerTx.
@@ -383,7 +384,7 @@ func (s *Service) GetUTXOs(_ *http.Request, args *api.GetUTXOsArgs, response *ap
 			limit,
 		)
 	} else {
-		utxos, endAddr, endUTXOID, err = s.vm.atomicUtxosManager.GetAtomicUTXOs(
+		utxos, endAddr, endUTXOID, err = s.atomicUtxosManager.GetAtomicUTXOs(
 			sourceChain,
 			addrSet,
 			startAddr,
