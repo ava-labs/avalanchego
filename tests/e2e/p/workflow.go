@@ -190,7 +190,7 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 
 				// retrieve fees paid for the tx
 				feeCfg := config.GetDynamicFeesConfig(true /*isEActive*/)
-				_, feeRates, err := xChainClient.GetFeeRates(e2e.DefaultContext())
+				feeRates, _, err := xChainClient.GetFeeRates(e2e.DefaultContext())
 				require.NoError(err)
 
 				feeCalc := fees.Calculator{

@@ -4,8 +4,6 @@
 package x
 
 import (
-	"math"
-
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -28,11 +26,11 @@ var _ = ginkgo.Describe("[Dynamic Fees]", func() {
 		customDynamicFeesConfig := commonfees.DynamicFeesConfig{
 			InitialFeeRate:     commonfees.Dimensions{1, 2, 3, 4},
 			MinFeeRate:         commonfees.Dimensions{1, 1, 1, 1},
-			UpdateCoefficient:  commonfees.Dimensions{2, 2, 2, 2},
-			BlockMaxComplexity: commonfees.Dimensions{math.MaxUint64, math.MaxUint64, math.MaxUint64, math.MaxUint64},
+			UpdateCoefficient:  commonfees.Dimensions{1, 1, 1, 1},
+			BlockMaxComplexity: commonfees.Max,
 
 			// BlockUnitsTarget are set to cause an increase of fees while simple transactions are issued
-			BlockTargetComplexityRate: commonfees.Dimensions{300, 50, 150, 800},
+			BlockTargetComplexityRate: commonfees.Dimensions{300, 80, 150, 800},
 		}
 
 		ginkgo.By("creating a new private network to ensure isolation from other tests")
