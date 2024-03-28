@@ -27,21 +27,18 @@ func New(
 	ctx *snow.Context,
 	cfg *config.Config,
 	state state.State,
-	atomicUTXOManager avax.AtomicUTXOManager,
 ) *Builder {
 	return &Builder{
-		ctx:               ctx,
-		cfg:               cfg,
-		state:             state,
-		atomicUTXOManager: atomicUTXOManager,
+		ctx:   ctx,
+		cfg:   cfg,
+		state: state,
 	}
 }
 
 type Builder struct {
-	ctx               *snow.Context
-	cfg               *config.Config
-	state             state.State
-	atomicUTXOManager avax.AtomicUTXOManager
+	ctx   *snow.Context
+	cfg   *config.Config
+	state state.State
 }
 
 func (b *Builder) NewImportTx(
@@ -344,7 +341,7 @@ func (b *Builder) builders(keys []*secp256k1.PrivateKey) (walletbuilder.Builder,
 	var (
 		kc      = secp256k1fx.NewKeychain(keys...)
 		addrs   = kc.Addresses()
-		backend = NewBackend(addrs, b.state, b.atomicUTXOManager)
+		backend = NewBackend(addrs, b.state, b.ctx.SharedMemory)
 		context = NewContext(b.ctx, b.cfg, backend.state.GetTimestamp())
 		builder = walletbuilder.New(addrs, context, backend)
 		signer  = walletsigner.New(kc, backend)

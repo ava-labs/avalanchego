@@ -163,7 +163,6 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller, f fork) *environment 
 			res.ctx,
 			res.config,
 			res.state,
-			res.atomicUTXOs,
 		)
 	} else {
 		genesisBlkID = ids.GenerateTestID()
@@ -175,7 +174,6 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller, f fork) *environment 
 			res.ctx,
 			res.config,
 			res.mockedState,
-			res.atomicUTXOs,
 		)
 
 		// setup expectations strictly needed for environment creation

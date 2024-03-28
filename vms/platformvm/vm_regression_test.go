@@ -486,7 +486,6 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 		vm.ctx,
 		&vm.Config,
 		vm.state,
-		avax.NewAtomicUTXOManager(vm.ctx.SharedMemory, txs.Codec),
 	)
 
 	addSubnetTx0, err := txBuilder.NewCreateSubnetTx(

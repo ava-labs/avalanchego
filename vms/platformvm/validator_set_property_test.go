@@ -36,7 +36,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
@@ -261,7 +260,6 @@ func addSubnetValidator(vm *VM, data *validatorInputData, subnetID ids.ID) (*sta
 		vm.ctx,
 		&vm.Config,
 		vm.state,
-		avax.NewAtomicUTXOManager(vm.ctx.SharedMemory, txs.Codec),
 	)
 
 	addr := keys[0].PublicKey().Address()
@@ -299,7 +297,6 @@ func addPrimaryValidatorWithBLSKey(vm *VM, data *validatorInputData) (*state.Sta
 		vm.ctx,
 		&vm.Config,
 		vm.state,
-		avax.NewAtomicUTXOManager(vm.ctx.SharedMemory, txs.Codec),
 	)
 
 	signedTx, err := txBuilder.NewAddPermissionlessValidatorTx(
@@ -719,7 +716,6 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 		vm.ctx,
 		&vm.Config,
 		vm.state,
-		avax.NewAtomicUTXOManager(vm.ctx.SharedMemory, txs.Codec),
 	)
 
 	// Create a subnet and store it in testSubnet1

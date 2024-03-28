@@ -201,7 +201,7 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 			cfg := *env.config
 			cfg.CreateBlockchainTxFee = test.fee
 			builderContext := vmbuilder.NewContext(env.ctx, &cfg, env.state.GetTimestamp())
-			backend := vmbuilder.NewBackend(addrs, env.state, env.atomicUTXOs)
+			backend := vmbuilder.NewBackend(addrs, env.state, env.msm)
 			pBuilder := walletbuilder.New(addrs, builderContext, backend)
 
 			utx, err := pBuilder.NewCreateChainTx(

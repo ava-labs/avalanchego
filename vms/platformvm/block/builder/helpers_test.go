@@ -158,7 +158,6 @@ func newEnvironment(t *testing.T, f fork) *environment { //nolint:unparam
 		res.ctx,
 		res.config,
 		res.state,
-		res.atomicUTXOs,
 	)
 
 	genesisID := res.state.GetLastAccepted()

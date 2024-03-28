@@ -149,7 +149,6 @@ func newEnvironment(t *testing.T, f fork) *environment {
 		ctx,
 		config,
 		baseState,
-		atomicUTXOs,
 	)
 
 	backend := Backend{
