@@ -51,7 +51,7 @@ const (
 	maxGetStakeAddrs = 256
 
 	// Max number of items allowed in a page
-	maxPageSize uint64 = 1024
+	maxPageSize = 1024
 
 	// Note: Staker attributes cache should be large enough so that no evictions
 	// happen when the API loops through all stakers.
@@ -367,8 +367,8 @@ func (s *Service) GetUTXOs(_ *http.Request, args *api.GetUTXOsArgs, response *ap
 		endUTXOID ids.ID
 	)
 	limit := int(args.Limit)
-	if limit <= 0 || int(maxPageSize) < limit {
-		limit = int(maxPageSize)
+	if limit <= 0 || maxPageSize < limit {
+		limit = maxPageSize
 	}
 
 	s.vm.ctx.Lock.Lock()
