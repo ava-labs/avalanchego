@@ -11,45 +11,42 @@ This API can be used for measuring node health.
 
 :::info
 
-This API set is for a specific node, it is unavailable on the [public server](/tooling/rpc-providers.md).
+This API set is for a specific node; it is unavailable on the [public server](/tooling/rpc-providers.md).
 
 :::
+
+## Health Checks
+
+The node periodically runs all health checks, including health checks for each chain.
+
+The frequency at which health checks are run can be specified with the [--health-check-frequency](/nodes/configure/avalanchego-config-flags.md) flag.
 
 ## Filterable Health Checks
 
 The health checks that are run by the node are filterable. You can specify which health checks
 you want to see by using `tags` filters. Returned results will only include health checks that
-match the specified tags and global
-health checks like `network`, `database` etc.
+match the specified tags and global health checks like `network`, `database` etc.
 When filtered, the returned results will not show the full node health,
 but only a subset of filtered health checks.
-This means the node can be still unhealthy in unfiltered checks, even if the returned results show that
-the node is healthy.
-AvalancheGo supports filtering tags by subnetIDs. For more information check Filtering sections below.
+This means the node can still be unhealthy in unfiltered checks, even if the returned results show that the node is healthy.
+AvalancheGo supports using subnetIDs as tags.
 
 ## GET Request
 
-To get an HTTP status code response that indicates the node’s health, make a `GET` request to
-`/ext/health`. If the node is healthy, it will return a `200` status code. If you want more in-depth
-information about a node’s health, use the JSON RPC methods.
+To get an HTTP status code response that indicates the node’s health, make a `GET` request.
+If the node is healthy, it will return a `200` status code.
+If the node is unhealthy, it will return a `503` status code.
+In-depth information about the node's health is included in the response body.
 
 ### Filtering
 
-To filter GET health checks, add a `tag` query parameter to the request. The `tag` parameter is a
-string.
-To filter health results by subnetID, use the
-`subnetID` tag. For example,
-to filter health results by subnetID `29uVeLPJB1eQJkzRemU8g8wZDw5uJRqpab5U2mX9euieVwiEbL`,
+To filter GET health checks, add a `tag` query parameter to the request.
+The `tag` parameter is a string.
+For example, to filter health results by subnetID `29uVeLPJB1eQJkzRemU8g8wZDw5uJRqpab5U2mX9euieVwiEbL`,
 use the following query:
 
 ```sh
-curl --location --request GET 'http://localhost:9650/ext/health?tag=29uVeLPJB1eQJkzRemU8g8wZDw5uJRqpab5U2mX9euieVwiEbL' \
---header 'Content-Type: application/json' \
---data-raw '{
-    "jsonrpc":"2.0",
-    "id"     :1,
-    "method" :"health.health",
-}'
+curl 'http://localhost:9650/ext/health?tag=29uVeLPJB1eQJkzRemU8g8wZDw5uJRqpab5U2mX9euieVwiEbL'
 ```
 
 In this example returned results will contain global health checks and health checks that are
@@ -57,21 +54,25 @@ related to subnetID `29uVeLPJB1eQJkzRemU8g8wZDw5uJRqpab5U2mX9euieVwiEbL`.
 
 **Note:** This filtering can show healthy results even if the node is unhealthy in other Chains/Subnets.
 
-In order to filter results by multiple tags, use multiple `tag` query parameters. For example, to
-filter health results by subnetID `29uVeLPJB1eQJkzRemU8g8wZDw5uJRqpab5U2mX9euieVwiEbL` and
+In order to filter results by multiple tags, use multiple `tag` query parameters.
+For example, to filter health results by subnetID `29uVeLPJB1eQJkzRemU8g8wZDw5uJRqpab5U2mX9euieVwiEbL` and
 `28nrH5T2BMvNrWecFcV3mfccjs6axM1TVyqe79MCv2Mhs8kxiY` use the following query:
 
 ```sh
-curl --location --request GET 'http://localhost:9650/ext/health?tag=29uVeLPJB1eQJkzRemU8g8wZDw5uJRqpab5U2mX9euieVwiEbL&tag=28nrH5T2BMvNrWecFcV3mfccjs6axM1TVyqe79MCv2Mhs8kxiY' \
---header 'Content-Type: application/json' \
---data-raw '{
-    "jsonrpc":"2.0",
-    "id"     :1,
-    "method" :"health.health",
-}'
+curl 'http://localhost:9650/ext/health?tag=29uVeLPJB1eQJkzRemU8g8wZDw5uJRqpab5U2mX9euieVwiEbL&tag=28nrH5T2BMvNrWecFcV3mfccjs6axM1TVyqe79MCv2Mhs8kxiY'
 ```
 
-Returned results will contain checks for both subnetIDs and global health checks.
+The returned results will include health checks for both subnetIDs as well as global health checks.
+
+### Endpoints
+
+The available endpoints for GET requests are:
+
+- `/ext/health` returns a holistic report of the status of the node.
+  **Most operators should monitor this status.**
+- `/ext/health/health` is the same as `/ext/health`.
+- `/ext/health/readiness` returns healthy once the node has finished initializing.
+- `/ext/health/liveness` returns healthy once the endpoint is available.
 
 ## JSON RPC Request
 
@@ -90,125 +91,215 @@ This API uses the `json 2.0` RPC format. For more information on making JSON RPC
 
 #### `health.health`
 
-The node runs a set of health checks every 30 seconds, including a health check for each chain. This
-method returns the last set of health check results.
-
-**Signature:**
-
-```sh
-health.health() -> {
-    checks: []{
-        checkName: {
-            message: JSON,
-            error: JSON,
-            timestamp: string,
-            duration: int,
-            contiguousFailures: int,
-            timeOfFirstFailure: int
-        }
-    },
-    healthy: bool
-}
-```
-
-`healthy` is true if the node if all health checks are passing.
-
-`checks` is a list of health check responses.
-
-- A check response may include a `message` with additional context.
-- A check response may include an `error` describing why the check failed.
-- `timestamp` is the timestamp of the last health check.
-- `duration` is the execution duration of the last health check, in nanoseconds.
-- `contiguousFailures` is the number of times in a row this check failed.
-- `timeOfFirstFailure` is the time this check first failed.
-
-More information on these measurements can be found in the documentation for the
-[go-sundheit](https://github.com/AppsFlyer/go-sundheit) library.
+This method returns the last set of health check results.
 
 **Example Call:**
 
 ```sh
-curl -X POST --data '{
+curl  -H 'Content-Type: application/json' --data '{
     "jsonrpc":"2.0",
     "id"     :1,
-    "method" :"health.health"
-}' -H 'content-type:application/json;' 127.0.0.1:9650/ext/health
+    "method" :"health.health",
+    "params": {
+        "tags": ["11111111111111111111111111111111LpoYY", "29uVeLPJB1eQJkzRemU8g8wZDw5uJRqpab5U2mX9euieVwiEbL"]
+    }
+}' 'http://localhost:9650/ext/health'
 ```
 
 **Example Response:**
 
-In this example response, the C-Chain’s health check is failing.
-
 ```json
 {
-  "jsonrpc": "2.0",
-  "result": {
-    "checks": {
-      "C": {
-        "message": null,
-        "error": {
-          "message": "example error message"
+    "jsonrpc": "2.0",
+    "result": {
+        "checks": {
+            "C": {
+                "message": {
+                    "engine": {
+                        "consensus": {
+                            "lastAcceptedHeight": 31273749,
+                            "lastAcceptedID": "2Y4gZGzQnu8UjnHod8j1BLewHFVEbzhULPNzqrSWEHkHNqDrYL",
+                            "longestProcessingBlock": "0s",
+                            "processingBlocks": 0
+                        },
+                        "vm": null
+                    },
+                    "networking": {
+                        "percentConnected": 0.9999592612587486
+                    }
+                },
+                "timestamp": "2024-03-26T19:44:45.2931-04:00",
+                "duration": 20375
+            },
+            "P": {
+                "message": {
+                    "engine": {
+                        "consensus": {
+                            "lastAcceptedHeight": 142517,
+                            "lastAcceptedID": "2e1FEPCBEkG2Q7WgyZh1v4nt3DXj1HDbDthyhxdq2Ltg3shSYq",
+                            "longestProcessingBlock": "0s",
+                            "processingBlocks": 0
+                        },
+                        "vm": null
+                    },
+                    "networking": {
+                        "percentConnected": 0.9999592612587486
+                    }
+                },
+                "timestamp": "2024-03-26T19:44:45.293115-04:00",
+                "duration": 8750
+            },
+            "X": {
+                "message": {
+                    "engine": {
+                        "consensus": {
+                            "lastAcceptedHeight": 24464,
+                            "lastAcceptedID": "XuFCsGaSw9cn7Vuz5e2fip4KvP46Xu53S8uDRxaC2QJmyYc3w",
+                            "longestProcessingBlock": "0s",
+                            "processingBlocks": 0
+                        },
+                        "vm": null
+                    },
+                    "networking": {
+                        "percentConnected": 0.9999592612587486
+                    }
+                },
+                "timestamp": "2024-03-26T19:44:45.29312-04:00",
+                "duration": 23291
+            },
+            "bootstrapped": {
+                "message": [],
+                "timestamp": "2024-03-26T19:44:45.293078-04:00",
+                "duration": 3375
+            },
+            "database": {
+                "timestamp": "2024-03-26T19:44:45.293102-04:00",
+                "duration": 1959
+            },
+            "diskspace": {
+                "message": {
+                    "availableDiskBytes": 227332591616
+                },
+                "timestamp": "2024-03-26T19:44:45.293106-04:00",
+                "duration": 3042
+            },
+            "network": {
+                "message": {
+                    "connectedPeers": 284,
+                    "sendFailRate": 0,
+                    "timeSinceLastMsgReceived": "293.098ms",
+                    "timeSinceLastMsgSent": "293.098ms"
+                },
+                "timestamp": "2024-03-26T19:44:45.2931-04:00",
+                "duration": 2333
+            },
+            "router": {
+                "message": {
+                    "longestRunningRequest": "66.90725ms",
+                    "outstandingRequests": 3
+                },
+                "timestamp": "2024-03-26T19:44:45.293097-04:00",
+                "duration": 3542
+            }
         },
-        "timestamp": "2020-10-14T14:04:20.57759662Z",
-        "duration": 465253,
-        "contiguousFailures": 50,
-        "timeOfFirstFailure": "2020-10-14T13:16:10.576435413Z"
-      },
-      "P": {
-        "message": {
-          "percentConnected": 0.9967694992864075
-        },
-        "timestamp": "2020-10-14T14:04:08.668743851Z",
-        "duration": 433363830,
-        "contiguousFailures": 0,
-        "timeOfFirstFailure": null
-      },
-      "X": {
-        "timestamp": "2020-10-14T14:04:20.3962705Z",
-        "duration": 1853,
-        "contiguousFailures": 0,
-        "timeOfFirstFailure": null
-      },
-      "chains.default.bootstrapped": {
-        "timestamp": "2020-10-14T14:04:04.238623814Z",
-        "duration": 8075,
-        "contiguousFailures": 0,
-        "timeOfFirstFailure": null
-      },
-      "network.validators.heartbeat": {
-        "message": {
-          "heartbeat": 1602684245
-        },
-        "timestamp": "2020-10-14T14:04:05.610007874Z",
-        "duration": 6124,
-        "contiguousFailures": 0,
-        "timeOfFirstFailure": null
-      }
+        "healthy": true
     },
-    "healthy": false
-  },
-  "id": 1
+    "id": 1
 }
 ```
 
-### Filtering
+In this example response, every check has passed. So, the node is healthy.
 
-JSON RPC methods in Health API supports filtering by tags. In order to filter results use `tags`
-params in the
-request body. `tags` accepts a list of tags. Currently only `subnetID`s are supported as tags.
-For example, to filter health results by subnetID `29uVeLPJB1eQJkzRemU8g8wZDw5uJRqpab5U2mX9euieVwiEbL`
-use the following request:
+**Response Explanation:**
+
+- `checks` is a list of health check responses.
+  - A check response may include a `message` with additional context.
+  - A check response may include an `error` describing why the check failed.
+  - `timestamp` is the timestamp of the last health check.
+  - `duration` is the execution duration of the last health check, in nanoseconds.
+  - `contiguousFailures` is the number of times in a row this check failed.
+  - `timeOfFirstFailure` is the time this check first failed.
+- `healthy` is true all the health checks are passing.
+
+#### `health.readiness`
+
+This method returns the last evaluation of the startup health check results.
+
+**Example Call:**
 
 ```sh
-curl -X POST --data '{
+curl  -H 'Content-Type: application/json' --data '{
     "jsonrpc":"2.0",
     "id"     :1,
-    "method" :"health.health",
-    "params":{
-        "tags": ["29uVeLPJB1eQJkzRemU8g8wZDw5uJRqpab5U2mX9euieVwiEbL"]
+    "method" :"health.readiness",
+    "params": {
+        "tags": ["11111111111111111111111111111111LpoYY", "29uVeLPJB1eQJkzRemU8g8wZDw5uJRqpab5U2mX9euieVwiEbL"]
     }
-}' -H 'content-type:application/json;' 127.0.0.1:9650/ext/health
+}' 'http://localhost:9650/ext/health'
 ```
 
-Returned results will contain checks for subnetID `29uVeLPJB1eQJkzRemU8g8wZDw5uJRqpab5U2mX9euieVwiEbL`
-and global health checks.
+**Example Response:**
+
+```json
+{
+    "jsonrpc": "2.0",
+    "result": {
+        "checks": {
+            "bootstrapped": {
+                "message": [],
+                "timestamp": "2024-03-26T20:02:45.299114-04:00",
+                "duration": 2834
+            }
+        },
+        "healthy": true
+    },
+    "id": 1
+}
+```
+
+In this example response, every check has passed. So, the node has finished the startup process.
+
+**Response Explanation:**
+
+- `checks` is a list of health check responses.
+  - A check response may include a `message` with additional context.
+  - A check response may include an `error` describing why the check failed.
+  - `timestamp` is the timestamp of the last health check.
+  - `duration` is the execution duration of the last health check, in nanoseconds.
+  - `contiguousFailures` is the number of times in a row this check failed.
+  - `timeOfFirstFailure` is the time this check first failed.
+- `healthy` is true all the health checks are passing.
+
+#### `health.liveness`
+
+This method returns healthy.
+
+**Example Call:**
+
+```sh
+curl  -H 'Content-Type: application/json' --data '{
+    "jsonrpc":"2.0",
+    "id"     :1,
+    "method" :"health.liveness"
+}' 'http://localhost:9650/ext/health'
+```
+
+**Example Response:**
+
+```json
+{
+    "jsonrpc": "2.0",
+    "result": {
+        "checks": {},
+        "healthy": true
+    },
+    "id": 1
+}
+```
+
+In this example response, the node was able to handle the request and mark the service as healthy.
+
+**Response Explanation:**
+
+- `checks` is an empty list.
+- `healthy` is true.
