@@ -273,7 +273,7 @@ func TestExecuteExitsWhenHalted(t *testing.T) {
 		newlyWantsParent, err := interval.Add(
 			db,
 			tree,
-			lastAcceptedHeight,
+			0,
 			block.Height(),
 			block.Bytes(),
 		)
