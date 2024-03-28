@@ -27,7 +27,7 @@ func main() {
 		container, err := client.GetContainerByIndex(ctx, nextIndex)
 		if err != nil {
 			time.Sleep(time.Second)
-			log.Printf("polling for next accepted block\n")
+			log.Println("polling for next accepted block")
 			continue
 		}
 
