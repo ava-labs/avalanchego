@@ -68,18 +68,21 @@ jobs:
         shell: bash
         run: ./scripts/build.sh -r
       - name: Start prometheus
+        if: secrets.PROMETHEUS_ID != ''
         shell: bash
         run: bash -x ./scripts/run_prometheus.sh
         env:
           PROMETHEUS_ID: ${{ secrets.PROMETHEUS_ID }}
           PROMETHEUS_PASSWORD: ${{ secrets.PROMETHEUS_PASSWORD }}
       - name: Start promtail
+        if: secrets.PROMETHEUS_ID != ''
         shell: bash
         run: bash -x ./scripts/run_promtail.sh
         env:
           LOKI_ID: ${{ secrets.LOKI_ID }}
           LOKI_PASSWORD: ${{ secrets.LOKI_PASSWORD }}
       - name: Notify of metrics availability
+        if: secrets.PROMETHEUS_ID != ''
         shell: bash
         run: .github/workflows/notify-metrics-availability.sh
         env:
@@ -118,18 +121,21 @@ jobs:
         shell: bash
         run: ./scripts/build.sh -r
       - name: Start prometheus
+        if: secrets.PROMETHEUS_ID != ''
         shell: bash
         run: bash -x ./scripts/run_prometheus.sh
         env:
           PROMETHEUS_ID: ${{ secrets.PROMETHEUS_ID }}
           PROMETHEUS_PASSWORD: ${{ secrets.PROMETHEUS_PASSWORD }}
       - name: Start promtail
+        if: secrets.PROMETHEUS_ID != ''
         shell: bash
         run: bash -x ./scripts/run_promtail.sh
         env:
           LOKI_ID: ${{ secrets.LOKI_ID }}
           LOKI_PASSWORD: ${{ secrets.LOKI_PASSWORD }}
       - name: Notify of metrics availability
+        if: secrets.PROMETHEUS_ID != ''
         shell: bash
         run: .github/workflows/notify-metrics-availability.sh
         env:
@@ -167,18 +173,21 @@ jobs:
         shell: bash
         run: ./scripts/build.sh
       - name: Start prometheus
+        if: secrets.PROMETHEUS_ID != ''
         shell: bash
         run: bash -x ./scripts/run_prometheus.sh
         env:
           PROMETHEUS_ID: ${{ secrets.PROMETHEUS_ID }}
           PROMETHEUS_PASSWORD: ${{ secrets.PROMETHEUS_PASSWORD }}
       - name: Start promtail
+        if: secrets.PROMETHEUS_ID != ''
         shell: bash
         run: bash -x ./scripts/run_promtail.sh
         env:
           LOKI_ID: ${{ secrets.LOKI_ID }}
           LOKI_PASSWORD: ${{ secrets.LOKI_PASSWORD }}
       - name: Notify of metrics availability
+        if: secrets.PROMETHEUS_ID != ''
         shell: bash
         run: .github/workflows/notify-metrics-availability.sh
         env:
