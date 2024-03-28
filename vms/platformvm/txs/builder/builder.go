@@ -11,7 +11,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
-	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
@@ -34,16 +33,18 @@ func New(
 	atomicUTXOManager avax.AtomicUTXOManager,
 ) *Builder {
 	return &Builder{
-		ctx:     ctx,
-		cfg:     cfg,
-		backend: NewBackend(set.Set[ids.ShortID]{}, state, atomicUTXOManager),
+		ctx:               ctx,
+		cfg:               cfg,
+		state:             state,
+		atomicUTXOManager: atomicUTXOManager,
 	}
 }
 
 type Builder struct {
-	ctx     *snow.Context
-	cfg     *config.Config
-	backend *Backend
+	ctx               *snow.Context
+	cfg               *config.Config
+	state             state.State
+	atomicUTXOManager avax.AtomicUTXOManager
 }
 
 func (b *Builder) NewImportTx(
@@ -346,11 +347,11 @@ func (b *Builder) builders(keys []*secp256k1.PrivateKey) (walletbuilder.Builder,
 	var (
 		kc      = secp256k1fx.NewKeychain(keys...)
 		addrs   = kc.Addresses()
-		context = NewContext(b.ctx, b.cfg, b.backend.state.GetTimestamp())
-		builder = walletbuilder.New(addrs, context, b.backend)
-		signer  = walletsigner.New(kc, b.backend)
+		backend = NewBackend(addrs, b.state, b.atomicUTXOManager)
+		context = NewContext(b.ctx, b.cfg, backend.state.GetTimestamp())
+		builder = walletbuilder.New(addrs, context, backend)
+		signer  = walletsigner.New(kc, backend)
 	)
-	b.backend.addrs = addrs
 
 	return builder, signer
 }
