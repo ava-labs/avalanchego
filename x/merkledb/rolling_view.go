@@ -163,7 +163,7 @@ func (v *RollingView) CommitToDB(ctx context.Context) error {
 	// Update child with correct parent trie
 	if v.child != nil {
 		v.child.ancestry.Lock()
-		v.parentTrie = v.db
+		v.child.parentTrie = v.db
 		v.child.ancestry.Unlock()
 	}
 	return nil
