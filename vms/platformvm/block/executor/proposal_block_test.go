@@ -368,7 +368,8 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 	// The order in which they do it is asserted; the order may depend on the staker.TxID,
 	// which in turns depend on every feature of the transaction creating the staker.
 	// So in this test we avoid ids.GenerateTestNodeID, in favour of ids.BuildTestNodeID
-	// so that TxID does not depend on the order we run tests.
+	// so that TxID does not depend on the order we run tests. We also explicitly declare
+	// the change address, to avoid picking a random one in case multiple funding keys are set.
 	staker0 := staker{
 		nodeID:        ids.BuildTestNodeID([]byte{0xf0}),
 		rewardAddress: ids.ShortID{0xf0},
