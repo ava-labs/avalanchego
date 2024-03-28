@@ -17,8 +17,11 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/avm/block"
+	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 const (
@@ -34,9 +37,11 @@ var (
 	blockPrefix     = []byte("block")
 	singletonPrefix = []byte("singleton")
 
-	isInitializedKey = []byte{0x00}
-	timestampKey     = []byte{0x01}
-	lastAcceptedKey  = []byte{0x02}
+	isInitializedKey     = []byte{0x00}
+	timestampKey         = []byte{0x01}
+	lastAcceptedKey      = []byte{0x02}
+	feeRatesKey          = []byte{0x03}
+	lastBlkComplexityKey = []byte{0x04}
 
 	_ State = (*state)(nil)
 )
@@ -49,6 +54,9 @@ type ReadOnlyChain interface {
 	GetBlock(blkID ids.ID) (block.Block, error)
 	GetLastAccepted() ids.ID
 	GetTimestamp() time.Time
+
+	GetFeeRates() (commonfees.Dimensions, error)
+	GetLastBlockComplexity() (commonfees.Dimensions, error)
 }
 
 type Chain interface {
@@ -60,6 +68,9 @@ type Chain interface {
 	AddBlock(block block.Block)
 	SetLastAccepted(blkID ids.ID)
 	SetTimestamp(t time.Time)
+
+	SetFeeRates(commonfees.Dimensions)
+	SetLastBlockComplexity(commonfees.Dimensions)
 }
 
 // State persistently maintains a set of UTXOs, transaction, statuses, and
@@ -78,6 +89,8 @@ type State interface {
 	// Invariant: After the chain is linearized, this function is expected to be
 	// called during startup.
 	InitializeChainState(stopVertexID ids.ID, genesisTimestamp time.Time) error
+
+	InitFees() error
 
 	// Discard uncommitted changes to the database.
 	Abort()
@@ -111,6 +124,7 @@ type State interface {
  *   '-- lastAcceptedKey -> lastAccepted
  */
 type state struct {
+	cfg    config.Config
 	parser block.Parser
 	db     *versiondb.Database
 
@@ -135,6 +149,9 @@ type state struct {
 	timestamp, persistedTimestamp       time.Time
 	singletonDB                         database.Database
 
+	feeRates          *commonfees.Dimensions // pointer, to allow customization for test networks
+	lastBlkComplexity commonfees.Dimensions
+
 	trackChecksum bool
 	txChecksum    ids.ID
 }
@@ -143,6 +160,7 @@ func New(
 	db *versiondb.Database,
 	parser block.Parser,
 	metrics prometheus.Registerer,
+	cfg config.Config,
 	trackChecksums bool,
 ) (State, error) {
 	utxoDB := prefixdb.New(utxoPrefix, db)
@@ -185,6 +203,7 @@ func New(
 
 	s := &state{
 		parser: parser,
+		cfg:    cfg,
 		db:     db,
 
 		modifiedUTXOs: make(map[ids.ID]*avax.UTXO),
@@ -203,8 +222,7 @@ func New(
 		blockCache:  blockCache,
 		blockDB:     blockDB,
 
-		singletonDB: singletonDB,
-
+		singletonDB:   singletonDB,
 		trackChecksum: trackChecksums,
 	}
 	return s, s.initTxChecksum()
@@ -345,6 +363,45 @@ func (s *state) InitializeChainState(stopVertexID ids.ID, genesisTimestamp time.
 	return err
 }
 
+func (s *state) InitFees() error {
+	s.feeRates = new(commonfees.Dimensions)
+	switch feeRatesBytes, err := s.singletonDB.Get(feeRatesKey); err {
+	case nil:
+		if err := s.feeRates.FromBytes(feeRatesBytes); err != nil {
+			return err
+		}
+
+	case database.ErrNotFound:
+		// fork introducing dynamic fees may not be active yet,
+		// hence we may have never stored fee rates. Load from config
+		// TODO: remove once fork is active
+		isEActivated := s.cfg.IsEActivated(s.GetTimestamp())
+		feeCfg := config.GetDynamicFeesConfig(isEActivated)
+		*s.feeRates = feeCfg.InitialFeeRate
+
+	default:
+		return err
+	}
+
+	switch lastBlkComplexityBytes, err := s.singletonDB.Get(lastBlkComplexityKey); err {
+	case nil:
+		if err := s.lastBlkComplexity.FromBytes(lastBlkComplexityBytes); err != nil {
+			return err
+		}
+
+	case database.ErrNotFound:
+		// fork introducing dynamic fees may not be active yet,
+		// hence we may have never stored block complexities. Set to nil
+		// TODO: remove once fork is active
+		s.lastBlkComplexity = commonfees.Empty
+
+	default:
+		return err
+	}
+
+	return nil
+}
+
 func (s *state) initializeChainState(stopVertexID ids.ID, genesisTimestamp time.Time) error {
 	genesis, err := block.NewStandardBlock(
 		stopVertexID,
@@ -385,6 +442,26 @@ func (s *state) GetTimestamp() time.Time {
 
 func (s *state) SetTimestamp(t time.Time) {
 	s.timestamp = t
+}
+
+func (s *state) GetFeeRates() (commonfees.Dimensions, error) {
+	if s.feeRates == nil {
+		return commonfees.Empty, nil
+	}
+	return *s.feeRates, nil
+}
+
+func (s *state) SetFeeRates(fr commonfees.Dimensions) {
+	feeRates := fr
+	s.feeRates = &feeRates
+}
+
+func (s *state) GetLastBlockComplexity() (commonfees.Dimensions, error) {
+	return s.lastBlkComplexity, nil
+}
+
+func (s *state) SetLastBlockComplexity(complexity commonfees.Dimensions) {
+	s.lastBlkComplexity = complexity
 }
 
 func (s *state) Commit() error {
@@ -492,6 +569,15 @@ func (s *state) writeMetadata() error {
 			return fmt.Errorf("failed to write timestamp: %w", err)
 		}
 		s.persistedTimestamp = s.timestamp
+	}
+
+	if s.feeRates != nil {
+		if err := s.singletonDB.Put(feeRatesKey, s.feeRates.Bytes()); err != nil {
+			return fmt.Errorf("failed to write fee rates: %w", err)
+		}
+	}
+	if err := s.singletonDB.Put(lastBlkComplexityKey, s.lastBlkComplexity.Bytes()); err != nil {
+		return fmt.Errorf("failed to write fee rates: %w", err)
 	}
 	if s.persistedLastAccepted != s.lastAccepted {
 		if err := database.PutID(s.singletonDB, lastAcceptedKey, s.lastAccepted); err != nil {

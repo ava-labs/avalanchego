@@ -80,13 +80,26 @@ var (
 	addrs []ids.ShortID              // addrs[i] corresponds to keys[i]
 
 	testFeesCfg = commonfees.DynamicFeesConfig{
-		FeeRate: commonfees.Dimensions{
+		InitialFeeRate: commonfees.Dimensions{
 			5 * units.NanoAvax,
 			5 * units.NanoAvax,
 			5 * units.NanoAvax,
 			5 * units.NanoAvax,
 		},
-		BlockMaxComplexity: commonfees.Max,
+		MinFeeRate: commonfees.Dimensions{
+			1 * units.NanoAvax,
+			1 * units.NanoAvax,
+			1 * units.NanoAvax,
+			1 * units.NanoAvax,
+		},
+		UpdateCoefficient: commonfees.Dimensions{
+			1,
+			1,
+			1,
+			1,
+		},
+		BlockMaxComplexity:        commonfees.Max,
+		BlockTargetComplexityRate: commonfees.Dimensions{1000, 1000, 1000, 10000},
 	}
 )
 
@@ -223,6 +236,7 @@ func setup(tb testing.TB, c *envConfig) *environment {
 				vm.parser.Codec(),
 				vm.ctx,
 				&vm.Config,
+				&vm.clock,
 				vm.state,
 				vm.AtomicUTXOManager,
 			),
@@ -352,7 +366,7 @@ func newTx(tb testing.TB, genesisBytes []byte, chainID ids.ID, parser txs.Parser
 // Sample from a set of addresses and return them raw and formatted as strings.
 // The size of the sample is between 1 and len(addrs)
 // If len(addrs) == 0, returns nil
-func sampleAddrs(tb testing.TB, addressFormatter avax.AddressManager, addrs []ids.ShortID) ([]ids.ShortID, []string) {
+func sampleAddrs(tb testing.TB, addressFormatter avax.AddressManager, addrs []ids.ShortID) ([]ids.ShortID, []string) { //nolint:unparam
 	require := require.New(tb)
 
 	sampledAddrs := []ids.ShortID{}

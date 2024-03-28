@@ -16,11 +16,12 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/state"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
+	"github.com/ava-labs/avalanchego/vms/avm/txs/fees"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/mempool"
-	"github.com/ava-labs/avalanchego/vms/components/fees"
 
 	blockexecutor "github.com/ava-labs/avalanchego/vms/avm/block/executor"
 	txexecutor "github.com/ava-labs/avalanchego/vms/avm/txs/executor"
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 // targetBlockSize is the max block size we aim to produce
@@ -76,13 +77,10 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 	}
 
 	preferredHeight := preferred.Height()
-	preferredTimestamp := preferred.Timestamp()
-
 	nextHeight := preferredHeight + 1
-	nextTimestamp := b.clk.Time() // [timestamp] = max(now, parentTime)
-	if preferredTimestamp.After(nextTimestamp) {
-		nextTimestamp = preferredTimestamp
-	}
+
+	parentBlkTime := preferred.Timestamp()
+	nextBlkTime := blockexecutor.NextBlockTime(parentBlkTime, b.clk)
 
 	stateDiff, err := state.NewDiff(preferredID, b.manager)
 	if err != nil {
@@ -94,18 +92,28 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 		inputs        set.Set[ids.ID]
 		remainingSize = targetBlockSize
 
-		chainTime  = stateDiff.GetTimestamp()
-		isEActive  = b.backend.Config.IsEActivated(chainTime)
-		feesCfg    = config.GetDynamicFeesConfig(isEActive)
-		feeManager = fees.NewManager(feesCfg.FeeRate)
+		chainTime = stateDiff.GetTimestamp()
+		isEActive = b.backend.Config.IsEActivated(chainTime)
+		feesCfg   = config.GetDynamicFeesConfig(isEActive)
 	)
+
+	feeManager, err := fees.UpdatedFeeManager(stateDiff, b.backend.Config, parentBlkTime, nextBlkTime)
+	if err != nil {
+		return nil, err
+	}
+
 	for {
 		tx, exists := b.mempool.Peek()
-		// Invariant: [mempool.MaxTxSize] < [targetBlockSize]. This guarantees
-		// that we will only stop building a block once there are no
-		// transactions in the mempool or the block is at least
-		// [targetBlockSize - mempool.MaxTxSize] bytes full.
-		if !exists || len(tx.Bytes()) > remainingSize {
+		if !exists {
+			break
+		}
+		txSize := len(tx.Bytes())
+
+		// pre e upgrade is active, we fill blocks till a target size
+		// post e upgrade is active, we fill blocks till a target complexity
+		done := (!isEActive && txSize > remainingSize) ||
+			(isEActive && !commonfees.Compare(feeManager.GetCumulatedComplexity(), feesCfg.BlockTargetComplexityRate))
+		if done {
 			break
 		}
 		b.mempool.Remove(tx)
@@ -156,9 +164,13 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 		inputs.Union(executor.Inputs)
 
 		txDiff.AddTx(tx)
+		txDiff.SetFeeRates(feeManager.GetFeeRates())
+		txDiff.SetLastBlockComplexity(feeManager.GetCumulatedComplexity())
 		txDiff.Apply(stateDiff)
 
-		remainingSize -= len(tx.Bytes())
+		if isEActive {
+			remainingSize -= txSize
+		}
 		blockTxs = append(blockTxs, tx)
 	}
 
@@ -169,7 +181,7 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 	statelessBlk, err := block.NewStandardBlock(
 		preferredID,
 		nextHeight,
-		nextTimestamp,
+		nextBlkTime,
 		blockTxs,
 		b.backend.Codec,
 	)

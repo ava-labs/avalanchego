@@ -21,7 +21,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/vms/avm/block/executor"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
+	"github.com/ava-labs/avalanchego/vms/avm/txs/fees"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/keystore"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -30,6 +32,7 @@ import (
 
 	avajson "github.com/ava-labs/avalanchego/utils/json"
 	safemath "github.com/ava-labs/avalanchego/utils/math"
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 const (
@@ -670,6 +673,51 @@ func (s *Service) GetAllBalances(_ *http.Request, args *GetAllBalancesArgs, repl
 		i++
 	}
 
+	return nil
+}
+
+// GetFeeRatesReply is the response from GetFeeRates
+type GetFeeRatesReply struct {
+	CurrentFeeRates commonfees.Dimensions `json:"currentFeeRates"`
+	NextFeeRates    commonfees.Dimensions `json:"nextFeesRates"`
+}
+
+// GetTimestamp returns the current timestamp on chain.
+func (s *Service) GetFeeRates(_ *http.Request, _ *struct{}, reply *GetFeeRatesReply) error {
+	s.vm.ctx.Log.Debug("API called",
+		zap.String("service", "platform"),
+		zap.String("method", "getFeeRates"),
+	)
+
+	s.vm.ctx.Lock.Lock()
+	defer s.vm.ctx.Lock.Unlock()
+
+	preferredID := s.vm.chainManager.Preferred()
+	onAccept, ok := s.vm.chainManager.GetState(preferredID)
+	if !ok {
+		return fmt.Errorf("could not retrieve state for block %s", preferredID)
+	}
+
+	currentFeeRates, err := onAccept.GetFeeRates()
+	if err != nil {
+		return err
+	}
+	reply.CurrentFeeRates = currentFeeRates
+
+	nextTimestamp := executor.NextBlockTime(onAccept.GetTimestamp(), &s.vm.clock)
+	isEActivated := s.vm.Config.IsEActivated(nextTimestamp)
+
+	if !isEActivated {
+		reply.NextFeeRates = reply.CurrentFeeRates
+		return nil
+	}
+
+	feeManager, err := fees.UpdatedFeeManager(onAccept, &s.vm.Config, onAccept.GetTimestamp(), nextTimestamp)
+	if err != nil {
+		return err
+	}
+
+	reply.NextFeeRates = feeManager.GetFeeRates()
 	return nil
 }
 

@@ -156,6 +156,7 @@ func TestBaseTx(t *testing.T) {
 			},
 			FeeManager:         commonfees.NewManager(commonfees.Empty),
 			BlockMaxComplexity: commonfees.Max,
+			Codec:              builder.Parser.Codec(),
 			Credentials:        tx.Creds,
 		}
 		require.NoError(utx.Visit(fc))
@@ -317,7 +318,10 @@ func TestCreateAssetTx(t *testing.T) {
 			Config: &config.Config{
 				CreateAssetTxFee: testContext.CreateAssetTxFee,
 			},
-			Credentials: tx.Creds,
+			FeeManager:         commonfees.NewManager(commonfees.Empty),
+			BlockMaxComplexity: commonfees.Max,
+			Codec:              builder.Parser.Codec(),
+			Credentials:        tx.Creds,
 		}
 		require.NoError(utx.Visit(fc))
 		require.Equal(99*units.MilliAvax, fc.Fee)
@@ -430,7 +434,10 @@ func TestMintNFTOperation(t *testing.T) {
 			Config: &config.Config{
 				TxFee: testContext.BaseTxFee,
 			},
-			Credentials: tx.Creds,
+			FeeManager:         commonfees.NewManager(commonfees.Empty),
+			BlockMaxComplexity: commonfees.Max,
+			Codec:              builder.Parser.Codec(),
+			Credentials:        tx.Creds,
 		}
 		require.NoError(utx.Visit(fc))
 		require.Equal(testContext.BaseTxFee, fc.Fee)
@@ -545,7 +552,10 @@ func TestMintFTOperation(t *testing.T) {
 			Config: &config.Config{
 				TxFee: testContext.BaseTxFee,
 			},
-			Credentials: tx.Creds,
+			FeeManager:         commonfees.NewManager(commonfees.Empty),
+			BlockMaxComplexity: commonfees.Max,
+			Codec:              builder.Parser.Codec(),
+			Credentials:        tx.Creds,
 		}
 		require.NoError(utx.Visit(fc))
 		require.Equal(testContext.BaseTxFee, fc.Fee)
@@ -657,7 +667,10 @@ func TestMintPropertyOperation(t *testing.T) {
 			Config: &config.Config{
 				TxFee: testContext.BaseTxFee,
 			},
-			Credentials: tx.Creds,
+			FeeManager:         commonfees.NewManager(commonfees.Empty),
+			BlockMaxComplexity: commonfees.Max,
+			Codec:              builder.Parser.Codec(),
+			Credentials:        tx.Creds,
 		}
 		require.NoError(utx.Visit(fc))
 		require.Equal(testContext.BaseTxFee, fc.Fee)
@@ -761,7 +774,10 @@ func TestBurnPropertyOperation(t *testing.T) {
 			Config: &config.Config{
 				TxFee: testContext.BaseTxFee,
 			},
-			Credentials: tx.Creds,
+			FeeManager:         commonfees.NewManager(commonfees.Empty),
+			BlockMaxComplexity: commonfees.Max,
+			Codec:              builder.Parser.Codec(),
+			Credentials:        tx.Creds,
 		}
 		require.NoError(utx.Visit(fc))
 		require.Equal(testContext.BaseTxFee, fc.Fee)

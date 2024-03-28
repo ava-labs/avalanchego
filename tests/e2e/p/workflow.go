@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/vms/avm"
 	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/fees"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -52,6 +53,7 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 			xBuilder := xWallet.Builder()
 			xContext := xBuilder.Context()
 			pChainClient := platformvm.NewClient(nodeURI.URI)
+			xChainClient := avm.NewClient(nodeURI.URI, "X")
 
 			tests.Outf("{{blue}} fetching minimal stake amounts {{/}}\n")
 			minValStake, minDelStake, err := pChainClient.GetMinStake(e2e.DefaultContext(), constants.PlatformChainID)
@@ -188,9 +190,12 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 
 				// retrieve fees paid for the tx
 				feeCfg := config.GetDynamicFeesConfig(true /*isEActive*/)
+				feeRates, _, err := xChainClient.GetFeeRates(e2e.DefaultContext())
+				require.NoError(err)
+
 				feeCalc := fees.Calculator{
 					IsEActive:          true,
-					FeeManager:         commonfees.NewManager(feeCfg.FeeRate),
+					FeeManager:         commonfees.NewManager(feeRates),
 					BlockMaxComplexity: feeCfg.BlockMaxComplexity,
 					Codec:              xbuilder.Parser.Codec(),
 					Credentials:        tx.Creds,
