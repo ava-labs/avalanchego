@@ -24,7 +24,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
-	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/sampler"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
@@ -77,12 +76,6 @@ var (
 
 	keys  = secp256k1.TestKeys()[:3] // TODO: Remove [:3]
 	addrs []ids.ShortID              // addrs[i] corresponds to keys[i]
-
-	noFeesTestConfig = &config.Config{
-		EUpgradeTime:     mockable.MaxTime,
-		TxFee:            0,
-		CreateAssetTxFee: 0,
-	}
 )
 
 func init() {
@@ -211,11 +204,11 @@ func setup(tb testing.TB, c *envConfig) *environment {
 		issuer:       issuer,
 		vm:           vm,
 		service: &Service{
-			vm: vm,
+			vm:               vm,
+			txBuilderBackend: newServiceBackend(vm.feeAssetID, vm.ctx, &vm.Config, vm.state, vm.AtomicUTXOManager),
 		},
 		walletService: &WalletService{
-			vm:         vm,
-			pendingTxs: linkedhashmap.New[ids.ID, *txs.Tx](),
+			walletServiceBackend: NewWalletServiceBackend(vm),
 		},
 	}
 
