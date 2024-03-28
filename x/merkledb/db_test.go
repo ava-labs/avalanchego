@@ -1287,3 +1287,45 @@ func TestGetChangeProofEmptyRootID(t *testing.T) {
 	)
 	require.ErrorIs(err, ErrEmptyProof)
 }
+
+func TestRollingView(t *testing.T) {
+	require := require.New(t)
+
+	db, err := getBasicDB()
+	require.NoError(err)
+
+	// Make a view and insert a key-value pair.
+	key1, key2, key3, key4 := []byte{1}, []byte{2}, []byte{3}, []byte{4}
+	value1, value2, value3 := []byte{1}, []byte{2}, []byte{3}
+	rv, err := db.NewRollingView(context.Background(), 2)
+	require.NoError(err)
+	require.NoError(rv.Process(context.Background(), string(key1), maybe.Some(value1)))
+	require.NoError(err)
+
+	// Create new rv
+	rv2, err := rv.NewRollingView(context.Background(), 2)
+	require.NoError(err)
+	require.NoError(rv2.Process(context.Background(), string(key2), maybe.Some(value2)))
+
+	// Commit rolling view
+	require.NoError(rv.CommitToDB(context.Background()))
+
+	// Add to rv2 (should now be rooted in db)
+	require.NoError(rv2.Process(context.Background(), string(key3), maybe.Some(value3)))
+
+	// Commit rolling view 2
+	require.NoError(rv2.CommitToDB(context.Background()))
+
+	// Make sure the key-value pairs are correct.
+	gotValue, err := db.Get(key1)
+	require.NoError(err)
+	require.Equal(value1, gotValue)
+	gotValue, err = db.Get(key2)
+	require.NoError(err)
+	require.Equal(value2, gotValue)
+	gotValue, err = db.Get(key3)
+	require.NoError(err)
+	require.Equal(value3, gotValue)
+	_, err = db.Get(key4)
+	require.ErrorIs(err, database.ErrNotFound)
+}
