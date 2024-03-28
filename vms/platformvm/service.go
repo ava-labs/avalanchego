@@ -36,7 +36,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	avajson "github.com/ava-labs/avalanchego/utils/json"
@@ -50,6 +49,9 @@ const (
 
 	// Max number of addresses that can be passed in as argument to GetStake
 	maxGetStakeAddrs = 256
+
+	// Max number of items allowed in a page
+	maxPageSize = 1024
 
 	// Note: Staker attributes cache should be large enough so that no evictions
 	// happen when the API loops through all stakers.
@@ -365,8 +367,8 @@ func (s *Service) GetUTXOs(_ *http.Request, args *api.GetUTXOsArgs, response *ap
 		endUTXOID ids.ID
 	)
 	limit := int(args.Limit)
-	if limit <= 0 || builder.MaxPageSize < limit {
-		limit = builder.MaxPageSize
+	if limit <= 0 || maxPageSize < limit {
+		limit = maxPageSize
 	}
 
 	s.vm.ctx.Lock.Lock()
