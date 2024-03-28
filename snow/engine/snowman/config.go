@@ -9,7 +9,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/validators"
 )
 
@@ -18,7 +17,7 @@ type Config struct {
 	common.AllGetsServer
 
 	Ctx                 *snow.ConsensusContext
-	VM                  block.ChainVM
+	VM                  VM
 	Sender              common.Sender
 	Validators          validators.Manager
 	ConnectedValidators tracker.Peers

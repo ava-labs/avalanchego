@@ -143,6 +143,7 @@ func (vm *VM) BatchedParseBlock(ctx context.Context, blks [][]byte) ([]snowman.B
 				SignedBlock: statelessSignedBlock,
 				postForkCommonComponents: postForkCommonComponents{
 					vm:       vm,
+					outerBlk: statelessSignedBlock,
 					innerBlk: innerBlks[innerBlocksIndex],
 					status:   status,
 				},
@@ -152,6 +153,7 @@ func (vm *VM) BatchedParseBlock(ctx context.Context, blks [][]byte) ([]snowman.B
 				Block: statelessBlk,
 				postForkCommonComponents: postForkCommonComponents{
 					vm:       vm,
+					outerBlk: statelessSignedBlock,
 					innerBlk: innerBlks[innerBlocksIndex],
 					status:   status,
 				},

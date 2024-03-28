@@ -239,6 +239,7 @@ func (b *preForkBlock) buildChild(ctx context.Context) (Block, error) {
 		SignedBlock: statelessBlock,
 		postForkCommonComponents: postForkCommonComponents{
 			vm:       b.vm,
+			outerBlk: statelessBlock,
 			innerBlk: innerBlock,
 			status:   choices.Processing,
 		},

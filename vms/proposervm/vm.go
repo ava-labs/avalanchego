@@ -290,15 +290,24 @@ func (vm *VM) GetBlock(ctx context.Context, id ids.ID) (snowman.Block, error) {
 	return vm.getBlock(ctx, id)
 }
 
+func (vm *VM) GetPreference() ids.ID {
+	return vm.preferred
+}
+
 func (vm *VM) SetPreference(ctx context.Context, preferred ids.ID) error {
-	if vm.preferred == preferred {
-		return nil
-	}
 	vm.preferred = preferred
+
+	if err := vm.State.SetPreference(preferred); err != nil {
+		return err
+	}
 
 	blk, err := vm.getPostForkBlock(ctx, preferred)
 	if err != nil {
-		return vm.ChainVM.SetPreference(ctx, preferred)
+		if err := vm.ChainVM.SetPreference(ctx, preferred); err != nil {
+			return err
+		}
+
+		return vm.db.Commit()
 	}
 
 	if err := vm.ChainVM.SetPreference(ctx, blk.getInnerBlk().ID()); err != nil {
@@ -344,6 +353,10 @@ func (vm *VM) SetPreference(ctx context.Context, preferred ids.ID) error {
 		return nil
 	}
 	vm.Scheduler.SetBuildBlockTime(nextStartTime)
+
+	if err := vm.db.Commit(); err != nil {
+		return err
+	}
 
 	vm.ctx.Log.Debug("set preference",
 		zap.Stringer("blkID", blk.ID()),
@@ -543,6 +556,7 @@ func (vm *VM) parsePostForkBlock(ctx context.Context, b []byte) (PostForkBlock, 
 			SignedBlock: statelessSignedBlock,
 			postForkCommonComponents: postForkCommonComponents{
 				vm:       vm,
+				outerBlk: statelessSignedBlock,
 				innerBlk: innerBlk,
 				status:   choices.Processing,
 			},
@@ -552,6 +566,7 @@ func (vm *VM) parsePostForkBlock(ctx context.Context, b []byte) (PostForkBlock, 
 			Block: statelessBlock,
 			postForkCommonComponents: postForkCommonComponents{
 				vm:       vm,
+				outerBlk: statelessSignedBlock,
 				innerBlk: innerBlk,
 				status:   choices.Processing,
 			},
@@ -617,6 +632,7 @@ func (vm *VM) getPostForkBlock(ctx context.Context, blkID ids.ID) (PostForkBlock
 			SignedBlock: statelessSignedBlock,
 			postForkCommonComponents: postForkCommonComponents{
 				vm:       vm,
+				outerBlk: statelessSignedBlock,
 				innerBlk: innerBlk,
 				status:   status,
 			},
@@ -626,6 +642,7 @@ func (vm *VM) getPostForkBlock(ctx context.Context, blkID ids.ID) (PostForkBlock
 		Block: statelessBlock,
 		postForkCommonComponents: postForkCommonComponents{
 			vm:       vm,
+			outerBlk: statelessBlock,
 			innerBlk: innerBlk,
 			status:   status,
 		},
@@ -652,6 +669,9 @@ func (vm *VM) acceptPostForkBlock(blk PostForkBlock) error {
 		return err
 	}
 	if err := vm.State.PutBlock(blk.getStatelessBlk(), choices.Accepted); err != nil {
+		return err
+	}
+	if err := vm.State.DeleteVerifiedBlock(blkID); err != nil {
 		return err
 	}
 	if err := vm.updateHeightIndex(height, blkID); err != nil {
@@ -701,6 +721,18 @@ func (vm *VM) verifyAndRecordInnerBlk(ctx context.Context, blockCtx *block.Conte
 		err = innerBlk.Verify(ctx)
 	}
 	if err != nil {
+		return err
+	}
+
+	if err := vm.State.PutVerifiedBlock(postFork.ID()); err != nil {
+		return err
+	}
+
+	if err := vm.State.PutBlock(postFork.getStatelessBlk(), choices.Processing); err != nil {
+		return err
+	}
+
+	if err := vm.db.Commit(); err != nil {
 		return err
 	}
 

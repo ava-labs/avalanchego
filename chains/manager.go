@@ -101,7 +101,8 @@ var (
 		propertyfx.ID:  &propertyfx.Factory{},
 	}
 
-	_ Manager = (*manager)(nil)
+	_ smeng.VM = (*snowmanVM)(nil)
+	_ Manager  = (*manager)(nil)
 )
 
 // Manager manages the chains running on this node.
@@ -712,7 +713,7 @@ func (m *manager) createAvalancheChain(
 
 	// Note: vmWrappingProposerVM is the VM that the Snowman engines should be
 	// using.
-	var vmWrappingProposerVM block.ChainVM = proposervm.New(
+	proposerVM := proposervm.New(
 		vmWrappedInsideProposerVM,
 		proposervm.Config{
 			ActivationTime:      m.ApricotPhase4Time,
@@ -725,6 +726,7 @@ func (m *manager) createAvalancheChain(
 		},
 	)
 
+	var vmWrappingProposerVM block.ChainVM = proposerVM
 	if m.MeterVMEnabled {
 		vmWrappingProposerVM = metervm.NewBlockVM(vmWrappingProposerVM)
 	}
@@ -732,11 +734,16 @@ func (m *manager) createAvalancheChain(
 		vmWrappingProposerVM = tracedvm.NewBlockVM(vmWrappingProposerVM, "proposervm", m.Tracer)
 	}
 
+	snowmanVM := &snowmanVM{
+		ChainVM:    vmWrappingProposerVM,
+		proposerVM: proposerVM,
+	}
+
 	// Note: linearizableVM is the VM that the Avalanche engines should be
 	// using.
 	linearizableVM := &initializeOnLinearizeVM{
 		DAGVM:          dagVM,
-		vmToInitialize: vmWrappingProposerVM,
+		vmToInitialize: snowmanVM,
 		vmToLinearize:  untracedVMWrappedInsideProposerVM,
 
 		registerer:   snowmanRegisterer,
@@ -788,7 +795,7 @@ func (m *manager) createAvalancheChain(
 	vdrs.RegisterCallbackListener(ctx.SubnetID, startupTracker)
 
 	snowGetHandler, err := snowgetter.New(
-		vmWrappingProposerVM,
+		snowmanVM,
 		snowmanMessageSender,
 		ctx.Log,
 		m.BootstrapMaxTimeGetAncestors,
@@ -809,7 +816,7 @@ func (m *manager) createAvalancheChain(
 	snowmanEngineConfig := smeng.Config{
 		Ctx:                 ctx,
 		AllGetsServer:       snowGetHandler,
-		VM:                  vmWrappingProposerVM,
+		VM:                  snowmanVM,
 		Sender:              snowmanMessageSender,
 		Validators:          vdrs,
 		ConnectedValidators: connectedValidators,
@@ -838,7 +845,7 @@ func (m *manager) createAvalancheChain(
 		Timer:                          h,
 		AncestorsMaxContainersReceived: m.BootstrapAncestorsMaxContainersReceived,
 		Blocked:                        blockBlocker,
-		VM:                             vmWrappingProposerVM,
+		VM:                             snowmanVM,
 	}
 	var snowmanBootstrapper common.BootstrapableEngine
 	snowmanBootstrapper, err = smbootstrap.New(
@@ -1045,12 +1052,13 @@ func (m *manager) createSnowmanChain(
 	)
 
 	chainAlias := m.PrimaryAliasOrDefault(ctx.ChainID)
+	wrappedVM := vm
 	if m.TracingEnabled {
-		vm = tracedvm.NewBlockVM(vm, chainAlias, m.Tracer)
+		wrappedVM = tracedvm.NewBlockVM(vm, chainAlias, m.Tracer)
 	}
 
-	vm = proposervm.New(
-		vm,
+	proposerVM := proposervm.New(
+		wrappedVM,
 		proposervm.Config{
 			ActivationTime:      m.ApricotPhase4Time,
 			DurangoTime:         version.GetDurangoTime(m.NetworkID),
@@ -1062,18 +1070,25 @@ func (m *manager) createSnowmanChain(
 		},
 	)
 
+	wrappedVM = proposerVM
+
 	if m.MeterVMEnabled {
-		vm = metervm.NewBlockVM(vm)
+		wrappedVM = metervm.NewBlockVM(wrappedVM)
 	}
 	if m.TracingEnabled {
-		vm = tracedvm.NewBlockVM(vm, "proposervm", m.Tracer)
+		wrappedVM = tracedvm.NewBlockVM(wrappedVM, "proposervm", m.Tracer)
+	}
+
+	snowmanVM := &snowmanVM{
+		ChainVM:    wrappedVM,
+		proposerVM: proposerVM,
 	}
 
 	// The channel through which a VM may send messages to the consensus engine
 	// VM uses this channel to notify engine that a block is ready to be made
 	msgChan := make(chan common.Message, defaultChannelSize)
 
-	if err := vm.Initialize(
+	if err := snowmanVM.Initialize(
 		context.TODO(),
 		ctx.Context,
 		vmDB,
@@ -1125,7 +1140,7 @@ func (m *manager) createSnowmanChain(
 	beacons.RegisterCallbackListener(ctx.SubnetID, startupTracker)
 
 	snowGetHandler, err := snowgetter.New(
-		vm,
+		snowmanVM,
 		messageSender,
 		ctx.Log,
 		m.BootstrapMaxTimeGetAncestors,
@@ -1146,7 +1161,7 @@ func (m *manager) createSnowmanChain(
 	engineConfig := smeng.Config{
 		Ctx:                 ctx,
 		AllGetsServer:       snowGetHandler,
-		VM:                  vm,
+		VM:                  snowmanVM,
 		Sender:              messageSender,
 		Validators:          vdrs,
 		ConnectedValidators: connectedValidators,
@@ -1176,7 +1191,7 @@ func (m *manager) createSnowmanChain(
 		Timer:                          h,
 		AncestorsMaxContainersReceived: m.BootstrapAncestorsMaxContainersReceived,
 		Blocked:                        blocked,
-		VM:                             vm,
+		VM:                             snowmanVM,
 		Bootstrapped:                   bootstrapFunc,
 	}
 	var bootstrapper common.BootstrapableEngine
@@ -1202,7 +1217,7 @@ func (m *manager) createSnowmanChain(
 		sampleK,
 		bootstrapWeight/2+1, // must be > 50%
 		m.StateSyncBeacons,
-		vm,
+		snowmanVM,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize state syncer configuration: %w", err)
@@ -1233,7 +1248,7 @@ func (m *manager) createSnowmanChain(
 	return &chain{
 		Name:    chainAlias,
 		Context: ctx,
-		VM:      vm,
+		VM:      snowmanVM,
 		Handler: h,
 	}, nil
 }
@@ -1371,4 +1386,13 @@ func (m *manager) getChainConfig(id ids.ID) (ChainConfig, error) {
 	}
 
 	return ChainConfig{}, nil
+}
+
+type snowmanVM struct {
+	block.ChainVM
+	proposerVM *proposervm.VM
+}
+
+func (vm *snowmanVM) GetPreference() ids.ID {
+	return vm.proposerVM.GetPreference()
 }
