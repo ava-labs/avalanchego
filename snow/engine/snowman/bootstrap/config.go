@@ -4,9 +4,9 @@
 package bootstrap
 
 import (
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
 	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -28,12 +28,9 @@ type Config struct {
 	// containers in an ancestors message it receives.
 	AncestorsMaxContainersReceived int
 
-	// Blocked tracks operations that are blocked on blocks
-	//
-	// It should be guaranteed that `MissingIDs` should contain all IDs
-	// referenced by the `MissingDependencies` that have not already been added
-	// to the queue.
-	Blocked *queue.JobsWithMissing
+	// Database used to track the fetched, but not yet executed, blocks during
+	// bootstrapping.
+	DB database.Database
 
 	VM block.ChainVM
 

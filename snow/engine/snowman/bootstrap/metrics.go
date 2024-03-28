@@ -11,7 +11,6 @@ import (
 
 type metrics struct {
 	numFetched, numAccepted prometheus.Counter
-	fetchETA                prometheus.Gauge
 }
 
 func newMetrics(namespace string, registerer prometheus.Registerer) (*metrics, error) {
@@ -26,17 +25,11 @@ func newMetrics(namespace string, registerer prometheus.Registerer) (*metrics, e
 			Name:      "accepted",
 			Help:      "Number of blocks accepted during bootstrapping",
 		}),
-		fetchETA: prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespace,
-			Name:      "eta_fetching_complete",
-			Help:      "ETA in nanoseconds until fetching phase of bootstrapping finishes",
-		}),
 	}
 
 	err := utils.Err(
 		registerer.Register(m.numFetched),
 		registerer.Register(m.numAccepted),
-		registerer.Register(m.fetchETA),
 	)
 	return m, err
 }
