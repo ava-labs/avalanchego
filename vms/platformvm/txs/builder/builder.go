@@ -23,9 +23,6 @@ import (
 	walletsigner "github.com/ava-labs/avalanchego/wallet/chain/p/signer"
 )
 
-// Max number of items allowed in a page
-const MaxPageSize = 1024
-
 func New(
 	ctx *snow.Context,
 	cfg *config.Config,
