@@ -5,7 +5,6 @@ package txstest
 
 import (
 	"context"
-	"fmt"
 	"math"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
@@ -49,34 +48,9 @@ func (b *Backend) UTXOs(_ context.Context, sourceChainID ids.ID) ([]*avax.UTXO, 
 		return avax.GetAllUTXOs(b.state, b.addrs)
 	}
 
-	addrsList := make([][]byte, b.addrs.Len())
-	i := 0
-	for addr := range b.addrs {
-		copied := addr
-		addrsList[i] = copied[:]
-		i++
-	}
-
-	allUTXOBytes, _, _, err := b.sharedMemory.Indexed(
-		sourceChainID,
-		addrsList,
-		ids.ShortEmpty[:],
-		ids.Empty[:],
-		math.MaxInt,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("error fetching atomic UTXOs: %w", err)
-	}
-
-	utxos := make([]*avax.UTXO, len(allUTXOBytes))
-	for i, utxoBytes := range allUTXOBytes {
-		utxo := &avax.UTXO{}
-		if _, err := txs.Codec.Unmarshal(utxoBytes, utxo); err != nil {
-			return nil, fmt.Errorf("error parsing UTXO: %w", err)
-		}
-		utxos[i] = utxo
-	}
-	return utxos, nil
+	atomicUTXOManager := avax.NewAtomicUTXOManager(b.sharedMemory, txs.Codec)
+	utxos, _, _, err := atomicUTXOManager.GetAtomicUTXOs(sourceChainID, b.addrs, ids.ShortEmpty, ids.Empty, math.MaxInt)
+	return utxos, err
 }
 
 func (b *Backend) GetUTXO(_ context.Context, chainID, utxoID ids.ID) (*avax.UTXO, error) {
