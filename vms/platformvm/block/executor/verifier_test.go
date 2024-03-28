@@ -231,6 +231,9 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 			Config: &config.Config{
 				ApricotPhase5Time: time.Now().Add(time.Hour),
 				BanffTime:         mockable.MaxTime, // banff is not activated
+				CortinaTime:       mockable.MaxTime,
+				DurangoTime:       mockable.MaxTime,
+				EUpgradeTime:      mockable.MaxTime,
 			},
 			Clk: &mockable.Clock{},
 		},
@@ -713,6 +716,9 @@ func TestVerifierVisitStandardBlockWithDuplicateInputs(t *testing.T) {
 			Config: &config.Config{
 				ApricotPhase5Time: time.Now().Add(time.Hour),
 				BanffTime:         mockable.MaxTime, // banff is not activated
+				CortinaTime:       mockable.MaxTime,
+				DurangoTime:       mockable.MaxTime,
+				EUpgradeTime:      mockable.MaxTime,
 			},
 			Clk: &mockable.Clock{},
 		},

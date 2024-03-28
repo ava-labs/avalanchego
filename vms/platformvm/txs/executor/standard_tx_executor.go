@@ -20,6 +20,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fees"
+
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 var (
@@ -33,8 +35,10 @@ var (
 type StandardTxExecutor struct {
 	// inputs, to be filled before visitor methods are called
 	*Backend
-	State state.Diff // state is expected to be modified
-	Tx    *txs.Tx
+	BlkFeeManager      *commonfees.Manager
+	BlockMaxComplexity commonfees.Dimensions
+	State              state.Diff // state is expected to be modified
+	Tx                 *txs.Tx
 
 	// outputs of visitor execution
 	OnAccept       func() // may be nil
@@ -58,6 +62,7 @@ func (e *StandardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 	var (
 		currentTimestamp = e.State.GetTimestamp()
 		isDurangoActive  = e.Config.IsDurangoActivated(currentTimestamp)
+		isEActive        = e.Config.IsEActivated(currentTimestamp)
 	)
 	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
 		return err
@@ -70,8 +75,12 @@ func (e *StandardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 
 	// Verify the flowcheck
 	feeCalculator := fees.Calculator{
-		Config:    e.Backend.Config,
-		ChainTime: e.State.GetTimestamp(),
+		IsEActive:          isEActive,
+		Config:             e.Backend.Config,
+		ChainTime:          currentTimestamp,
+		FeeManager:         e.BlkFeeManager,
+		BlockMaxComplexity: e.BlockMaxComplexity,
+		Credentials:        e.Tx.Creds,
 	}
 	if err := tx.Visit(&feeCalculator); err != nil {
 		return err
@@ -116,6 +125,7 @@ func (e *StandardTxExecutor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 	var (
 		currentTimestamp = e.State.GetTimestamp()
 		isDurangoActive  = e.Config.IsDurangoActivated(currentTimestamp)
+		isEActive        = e.Config.IsEActivated(currentTimestamp)
 	)
 	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
 		return err
@@ -123,8 +133,12 @@ func (e *StandardTxExecutor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 
 	// Verify the flowcheck
 	feeCalculator := fees.Calculator{
-		Config:    e.Backend.Config,
-		ChainTime: e.State.GetTimestamp(),
+		IsEActive:          isEActive,
+		Config:             e.Backend.Config,
+		ChainTime:          currentTimestamp,
+		FeeManager:         e.BlkFeeManager,
+		BlockMaxComplexity: e.BlockMaxComplexity,
+		Credentials:        e.Tx.Creds,
 	}
 	if err := tx.Visit(&feeCalculator); err != nil {
 		return err
@@ -163,6 +177,7 @@ func (e *StandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 	var (
 		currentTimestamp = e.State.GetTimestamp()
 		isDurangoActive  = e.Config.IsDurangoActivated(currentTimestamp)
+		isEActive        = e.Config.IsEActivated(currentTimestamp)
 	)
 	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
 		return err
@@ -210,9 +225,17 @@ func (e *StandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 		copy(ins[len(tx.Ins):], tx.ImportedInputs)
 
 		// Verify the flowcheck
+		var (
+			cfg              = e.Backend.Config
+			currentTimestamp = e.State.GetTimestamp()
+		)
 		feeCalculator := fees.Calculator{
-			Config:    e.Backend.Config,
-			ChainTime: e.State.GetTimestamp(),
+			IsEActive:          isEActive,
+			Config:             cfg,
+			ChainTime:          currentTimestamp,
+			FeeManager:         e.BlkFeeManager,
+			BlockMaxComplexity: e.BlockMaxComplexity,
+			Credentials:        e.Tx.Creds,
 		}
 		if err := tx.Visit(&feeCalculator); err != nil {
 			return err
@@ -258,14 +281,11 @@ func (e *StandardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 	var (
 		currentTimestamp = e.State.GetTimestamp()
 		isDurangoActive  = e.Config.IsDurangoActivated(currentTimestamp)
+		isEActive        = e.Config.IsEActivated(currentTimestamp)
 	)
 	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
 		return err
 	}
-
-	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.ExportedOutputs))
-	copy(outs, tx.Outs)
-	copy(outs[len(tx.Outs):], tx.ExportedOutputs)
 
 	if e.Bootstrapped.Get() {
 		if err := verify.SameSubnet(context.TODO(), e.Ctx, tx.DestinationChain); err != nil {
@@ -275,13 +295,20 @@ func (e *StandardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 
 	// Verify the flowcheck
 	feeCalculator := fees.Calculator{
-		Config:    e.Backend.Config,
-		ChainTime: e.State.GetTimestamp(),
+		IsEActive:          isEActive,
+		Config:             e.Backend.Config,
+		ChainTime:          currentTimestamp,
+		FeeManager:         e.BlkFeeManager,
+		BlockMaxComplexity: e.BlockMaxComplexity,
+		Credentials:        e.Tx.Creds,
 	}
 	if err := tx.Visit(&feeCalculator); err != nil {
 		return err
 	}
 
+	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.ExportedOutputs))
+	copy(outs, tx.Outs)
+	copy(outs[len(tx.Outs):], tx.ExportedOutputs)
 	if err := e.FlowChecker.VerifySpend(
 		tx,
 		e.State,
@@ -375,6 +402,8 @@ func (e *StandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 func (e *StandardTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
 	if err := verifyAddSubnetValidatorTx(
 		e.Backend,
+		e.BlkFeeManager,
+		e.BlockMaxComplexity,
 		e.State,
 		e.Tx,
 		tx,
@@ -420,6 +449,8 @@ func (e *StandardTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 func (e *StandardTxExecutor) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx) error {
 	staker, isCurrentValidator, err := verifyRemoveSubnetValidatorTx(
 		e.Backend,
+		e.BlkFeeManager,
+		e.BlockMaxComplexity,
 		e.State,
 		e.Tx,
 		tx,
@@ -428,13 +459,12 @@ func (e *StandardTxExecutor) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidat
 		return err
 	}
 
+	// Invariant: There are no permissioned subnet delegators to remove.
 	if isCurrentValidator {
 		e.State.DeleteCurrentValidator(staker)
 	} else {
 		e.State.DeletePendingValidator(staker)
 	}
-
-	// Invariant: There are no permissioned subnet delegators to remove.
 
 	txID := e.Tx.ID()
 	avax.Consume(e.State, tx.Ins)
@@ -451,6 +481,7 @@ func (e *StandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 	var (
 		currentTimestamp = e.State.GetTimestamp()
 		isDurangoActive  = e.Config.IsDurangoActivated(currentTimestamp)
+		isEActive        = e.Config.IsEActivated(currentTimestamp)
 	)
 	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
 		return err
@@ -467,14 +498,19 @@ func (e *StandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 		return err
 	}
 
-	totalRewardAmount := tx.MaximumSupply - tx.InitialSupply
 	feeCalculator := fees.Calculator{
-		Config:    e.Backend.Config,
-		ChainTime: currentTimestamp,
+		IsEActive:          isEActive,
+		Config:             e.Backend.Config,
+		ChainTime:          currentTimestamp,
+		FeeManager:         e.BlkFeeManager,
+		BlockMaxComplexity: e.BlockMaxComplexity,
+		Credentials:        e.Tx.Creds,
 	}
 	if err := tx.Visit(&feeCalculator); err != nil {
 		return err
 	}
+
+	totalRewardAmount := tx.MaximumSupply - tx.InitialSupply
 	if err := e.Backend.FlowChecker.VerifySpend(
 		tx,
 		e.State,
@@ -507,6 +543,8 @@ func (e *StandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 func (e *StandardTxExecutor) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessValidatorTx) error {
 	if err := verifyAddPermissionlessValidatorTx(
 		e.Backend,
+		e.BlkFeeManager,
+		e.BlockMaxComplexity,
 		e.State,
 		e.Tx,
 		tx,
@@ -539,6 +577,8 @@ func (e *StandardTxExecutor) AddPermissionlessValidatorTx(tx *txs.AddPermissionl
 func (e *StandardTxExecutor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDelegatorTx) error {
 	if err := verifyAddPermissionlessDelegatorTx(
 		e.Backend,
+		e.BlkFeeManager,
+		e.BlockMaxComplexity,
 		e.State,
 		e.Tx,
 		tx,
@@ -563,6 +603,8 @@ func (e *StandardTxExecutor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionl
 func (e *StandardTxExecutor) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwnershipTx) error {
 	err := verifyTransferSubnetOwnershipTx(
 		e.Backend,
+		e.BlkFeeManager,
+		e.BlockMaxComplexity,
 		e.State,
 		e.Tx,
 		tx,
@@ -580,7 +622,14 @@ func (e *StandardTxExecutor) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwn
 }
 
 func (e *StandardTxExecutor) BaseTx(tx *txs.BaseTx) error {
-	if !e.Backend.Config.IsDurangoActivated(e.State.GetTimestamp()) {
+	var (
+		cfg              = e.Backend.Config
+		currentTimestamp = e.State.GetTimestamp()
+		IsDurangoActive  = cfg.IsDurangoActivated(currentTimestamp)
+		isEActive        = cfg.IsEActivated(currentTimestamp)
+	)
+
+	if !IsDurangoActive {
 		return ErrDurangoUpgradeNotActive
 	}
 
@@ -594,13 +643,13 @@ func (e *StandardTxExecutor) BaseTx(tx *txs.BaseTx) error {
 	}
 
 	// Verify the flowcheck
-	var (
-		cfg              = e.Backend.Config
-		currentTimestamp = e.State.GetTimestamp()
-	)
 	feeCalculator := fees.Calculator{
-		Config:    cfg,
-		ChainTime: currentTimestamp,
+		IsEActive:          isEActive,
+		Config:             cfg,
+		ChainTime:          currentTimestamp,
+		FeeManager:         e.BlkFeeManager,
+		BlockMaxComplexity: e.BlockMaxComplexity,
+		Credentials:        e.Tx.Creds,
 	}
 	if err := tx.Visit(&feeCalculator); err != nil {
 		return err

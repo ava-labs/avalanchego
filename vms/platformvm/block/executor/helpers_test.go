@@ -36,6 +36,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/fees"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
@@ -128,7 +129,7 @@ type environment struct {
 	mockedState    *state.MockState
 	atomicUTXOs    avax.AtomicUTXOManager
 	uptimes        uptime.Manager
-	utxosHandler   utxo.Handler
+	utxosVerifier  utxo.Verifier
 	txBuilder      p_tx_builder.Builder
 	backend        *executor.Backend
 }
@@ -157,29 +158,25 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller, f fork) *environment 
 	if ctrl == nil {
 		res.state = defaultState(res.config, res.ctx, res.baseDB, rewardsCalc)
 		res.uptimes = uptime.NewManager(res.state, res.clk)
-		res.utxosHandler = utxo.NewHandler(res.ctx, res.clk, res.fx)
+		res.utxosVerifier = utxo.NewVerifier(res.ctx, res.clk, res.fx)
 		res.txBuilder = p_tx_builder.New(
 			res.ctx,
 			res.config,
-			res.clk,
-			res.fx,
 			res.state,
 			res.atomicUTXOs,
-			res.utxosHandler,
 		)
 	} else {
 		genesisBlkID = ids.GenerateTestID()
 		res.mockedState = state.NewMockState(ctrl)
 		res.uptimes = uptime.NewManager(res.mockedState, res.clk)
-		res.utxosHandler = utxo.NewHandler(res.ctx, res.clk, res.fx)
+		res.utxosVerifier = utxo.NewVerifier(res.ctx, res.clk, res.fx)
+
+		res.mockedState.EXPECT().GetTimestamp().Return(time.Time{}).AnyTimes() // to initialize createSubnet/BlockchainTx fee
 		res.txBuilder = p_tx_builder.New(
 			res.ctx,
 			res.config,
-			res.clk,
-			res.fx,
 			res.mockedState,
 			res.atomicUTXOs,
-			res.utxosHandler,
 		)
 
 		// setup expectations strictly needed for environment creation
@@ -192,7 +189,7 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller, f fork) *environment 
 		Clk:          res.clk,
 		Bootstrapped: res.isBootstrapped,
 		Fx:           res.fx,
-		FlowChecker:  res.utxosHandler,
+		FlowChecker:  res.utxosVerifier,
 		Uptimes:      res.uptimes,
 		Rewards:      rewardsCalc,
 	}
@@ -282,10 +279,14 @@ func addSubnet(env *environment) {
 		panic(err)
 	}
 
+	chainTime := env.state.GetTimestamp()
+	feeCfg := config.GetDynamicFeesConfig(env.config.IsEActivated(chainTime))
 	executor := executor.StandardTxExecutor{
-		Backend: env.backend,
-		State:   stateDiff,
-		Tx:      testSubnet1,
+		Backend:            env.backend,
+		BlkFeeManager:      fees.NewManager(feeCfg.FeeRate),
+		BlockMaxComplexity: feeCfg.BlockMaxComplexity,
+		State:              stateDiff,
+		Tx:                 testSubnet1,
 	}
 	err = testSubnet1.Unsigned.Visit(&executor)
 	if err != nil {

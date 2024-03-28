@@ -18,7 +18,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/vms/components/fees"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -332,6 +334,10 @@ func packBlockTxs(
 	}
 
 	var (
+		isEActivated = backend.Config.IsEActivated(timestamp)
+		feeCfg       = config.GetDynamicFeesConfig(isEActivated)
+		feeMan       = fees.NewManager(feeCfg.FeeRate)
+
 		blockTxs []*txs.Tx
 		inputs   set.Set[ids.ID]
 	)
@@ -355,9 +361,11 @@ func packBlockTxs(
 		}
 
 		executor := &txexecutor.StandardTxExecutor{
-			Backend: backend,
-			State:   txDiff,
-			Tx:      tx,
+			Backend:            backend,
+			BlkFeeManager:      feeMan,
+			BlockMaxComplexity: feeCfg.BlockMaxComplexity,
+			State:              txDiff,
+			Tx:                 tx,
 		}
 
 		err = tx.Unsigned.Visit(executor)

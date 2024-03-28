@@ -12,6 +12,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
+
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 var _ Metrics = (*metrics)(nil)
@@ -38,6 +40,9 @@ type Metrics interface {
 	SetTimeUntilUnstake(time.Duration)
 	// Mark when this node will unstake from a subnet.
 	SetTimeUntilSubnetUnstake(subnetID ids.ID, timeUntilUnstake time.Duration)
+
+	// Mark cumulated complexity of the latest accepted block
+	SetBlockComplexity(commonfees.Dimensions)
 }
 
 func New(
@@ -91,6 +96,26 @@ func New(
 			Name:      "validator_sets_duration_sum",
 			Help:      "Total amount of time generating validator sets in nanoseconds",
 		}),
+		blockBandwitdhComplexity: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "block_bandwidth_complexity",
+			Help:      "Cumulated bandwidth complexity over last accepted block",
+		}),
+		blockUTXOsReadComplexity: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "block_utxos_read_complexity",
+			Help:      "Cumulated utxos read complexity over last accepted block",
+		}),
+		blockUTXOsWriteComplexity: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "block_utxos_write_complexity",
+			Help:      "Cumulated utxos write complexity over last accepted block",
+		}),
+		blockComputeComplexity: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "block_compute_complexity",
+			Help:      "Cumulated compute complexity over last accepted block",
+		}),
 	}
 
 	errs := wrappers.Errs{Err: err}
@@ -107,6 +132,10 @@ func New(
 		registerer.Register(m.validatorSetsCached),
 		registerer.Register(m.validatorSetsHeightDiff),
 		registerer.Register(m.validatorSetsDuration),
+		registerer.Register(m.blockBandwitdhComplexity),
+		registerer.Register(m.blockUTXOsReadComplexity),
+		registerer.Register(m.blockUTXOsWriteComplexity),
+		registerer.Register(m.blockComputeComplexity),
 	)
 
 	return m, errs.Err
@@ -126,6 +155,11 @@ type metrics struct {
 	validatorSetsCreated    prometheus.Counter
 	validatorSetsHeightDiff prometheus.Gauge
 	validatorSetsDuration   prometheus.Gauge
+
+	blockBandwitdhComplexity  prometheus.Gauge
+	blockUTXOsReadComplexity  prometheus.Gauge
+	blockUTXOsWriteComplexity prometheus.Gauge
+	blockComputeComplexity    prometheus.Gauge
 }
 
 func (m *metrics) MarkAccepted(b block.Block) error {
@@ -162,4 +196,11 @@ func (m *metrics) SetTimeUntilUnstake(timeUntilUnstake time.Duration) {
 
 func (m *metrics) SetTimeUntilSubnetUnstake(subnetID ids.ID, timeUntilUnstake time.Duration) {
 	m.timeUntilSubnetUnstake.WithLabelValues(subnetID.String()).Set(float64(timeUntilUnstake))
+}
+
+func (m *metrics) SetBlockComplexity(units commonfees.Dimensions) {
+	m.blockBandwitdhComplexity.Set(float64(units[commonfees.Bandwidth]))
+	m.blockUTXOsReadComplexity.Set(float64(units[commonfees.UTXORead]))
+	m.blockUTXOsWriteComplexity.Set(float64(units[commonfees.UTXOWrite]))
+	m.blockComputeComplexity.Set(float64(units[commonfees.Compute]))
 }

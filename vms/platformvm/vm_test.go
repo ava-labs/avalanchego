@@ -58,15 +58,17 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fees"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/wallet/chain/p/builder"
 
 	smcon "github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	smeng "github.com/ava-labs/avalanchego/snow/engine/snowman"
 	snowgetter "github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
 	timetracker "github.com/ava-labs/avalanchego/snow/networking/tracker"
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 	blockbuilder "github.com/ava-labs/avalanchego/vms/platformvm/block/builder"
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
-	txbuilder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
@@ -78,7 +80,7 @@ const (
 	durango
 	eUpgrade
 
-	latestFork = durango
+	latestFork fork = eUpgrade
 
 	defaultWeight uint64 = 10000
 )
@@ -369,7 +371,25 @@ func TestGenesis(t *testing.T) {
 			require.NoError(err)
 
 			require.Equal(utxo.Address, addr)
-			require.Equal(uint64(utxo.Amount)-vm.CreateSubnetTxFee, out.Amount())
+
+			// we use the first key to fund a subnet creation in [defaultGenesis].
+			// As such we need to account for the subnet creation fee
+			var (
+				chainTime = vm.state.GetTimestamp()
+				feeCfg    = config.GetDynamicFeesConfig(vm.Config.IsEActivated(chainTime))
+				feeMan    = commonfees.NewManager(feeCfg.FeeRate)
+				feeCalc   = &fees.Calculator{
+					IsEActive:          vm.IsEActivated(chainTime),
+					Config:             &vm.Config,
+					ChainTime:          chainTime,
+					FeeManager:         feeMan,
+					BlockMaxComplexity: feeCfg.BlockMaxComplexity,
+					Credentials:        testSubnet1.Creds,
+				}
+			)
+
+			require.NoError(testSubnet1.Unsigned.Visit(feeCalc))
+			require.Equal(uint64(utxo.Amount)-feeCalc.Fee, out.Amount())
 		}
 	}
 
@@ -993,10 +1013,7 @@ func TestAtomicImport(t *testing.T) {
 		ids.ShortEmpty, // change addr
 		nil,
 	)
-	require.ErrorIs(err, txbuilder.ErrNoFunds)
-
-	// Provide the avm UTXO
-
+	require.ErrorIs(err, builder.ErrInsufficientFunds)
 	utxo := &avax.UTXO{
 		UTXOID: utxoID,
 		Asset:  avax.Asset{ID: vm.ctx.AVAXAssetID},
@@ -2149,6 +2166,9 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 			keys[0].PublicKey().Address(),
 		},
 	}
+	ctx, err := builder.NewSnowContext(vm.ctx.NetworkID, vm.ctx.AVAXAssetID)
+	require.NoError(err)
+	expectedOwner.InitCtx(ctx)
 	require.Equal(expectedOwner, subnetOwner)
 
 	transferSubnetOwnershipTx, err := vm.txBuilder.NewTransferSubnetOwnershipTx(
@@ -2184,6 +2204,7 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 			keys[1].PublicKey().Address(),
 		},
 	}
+	expectedOwner.InitCtx(ctx)
 	require.Equal(expectedOwner, subnetOwner)
 }
 
@@ -2244,7 +2265,22 @@ func TestBaseTx(t *testing.T) {
 	}
 	require.Equal(totalOutputAmt, key0OutputAmt+key1OutputAmt+changeAddrOutputAmt)
 
-	require.Equal(vm.TxFee, totalInputAmt-totalOutputAmt)
+	var (
+		chainTime = vm.state.GetTimestamp()
+		feeCfg    = config.GetDynamicFeesConfig(vm.Config.IsEActivated(chainTime))
+		feeMan    = commonfees.NewManager(feeCfg.FeeRate)
+		feeCalc   = &fees.Calculator{
+			IsEActive:          vm.IsEActivated(chainTime),
+			Config:             &vm.Config,
+			ChainTime:          chainTime,
+			FeeManager:         feeMan,
+			BlockMaxComplexity: feeCfg.BlockMaxComplexity,
+			Credentials:        baseTx.Creds,
+		}
+	)
+
+	require.NoError(baseTx.Unsigned.Visit(feeCalc))
+	require.Equal(feeCalc.Fee, totalInputAmt-totalOutputAmt)
 	require.Equal(sendAmt, key1OutputAmt)
 
 	vm.ctx.Lock.Unlock()
