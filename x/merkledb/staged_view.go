@@ -41,12 +41,14 @@ type StagedView struct {
 }
 
 func (v *StagedView) NewStagedView(context.Context) (*StagedView, error) {
-	return &StagedView{
+	nv := &StagedView{
 		root:       maybe.Bind(v.getRoot(), (*node).clone),
 		db:         v.db,
 		parentTrie: v,
 		tokenSize:  v.db.tokenSize,
-	}, nil
+	}
+	v.child = nv
+	return nv, nil
 }
 
 func (v *StagedView) Add(ctx context.Context, changes map[string]maybe.Maybe[[]byte]) error {
