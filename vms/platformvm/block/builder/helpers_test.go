@@ -155,6 +155,7 @@ func newEnvironment(t *testing.T, f fork) *environment { //nolint:unparam
 	res.txBuilder = txstest.NewBuilder(
 		res.ctx,
 		res.config,
+		res.clk,
 		res.state,
 	)
 

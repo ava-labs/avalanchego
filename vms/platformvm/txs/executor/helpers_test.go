@@ -33,7 +33,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/vms/components/fees"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
@@ -42,6 +41,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fees"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -146,6 +146,7 @@ func newEnvironment(t *testing.T, f fork) *environment {
 	txBuilder := txstest.NewBuilder(
 		ctx,
 		config,
+		clk,
 		baseState,
 	)
 
@@ -235,14 +236,17 @@ func addSubnet(
 	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
-	feeRates, err := env.state.GetFeeRates()
+	currentChainTime := env.state.GetTimestamp()
+	nextChainTime, _, err := state.NextBlockTime(stateDiff, env.clk)
 	require.NoError(err)
 
-	chainTime := env.state.GetTimestamp()
-	feeCfg := config.GetDynamicFeesConfig(env.config.IsEActivated(chainTime))
+	feeManager, err := fees.UpdatedFeeManager(stateDiff, env.config, currentChainTime, nextChainTime)
+	require.NoError(err)
+
+	feeCfg := config.GetDynamicFeesConfig(env.config.IsEActivated(currentChainTime))
 	executor := StandardTxExecutor{
 		Backend:            &env.backend,
-		BlkFeeManager:      fees.NewManager(feeRates),
+		BlkFeeManager:      feeManager,
 		BlockMaxComplexity: feeCfg.BlockMaxComplexity,
 		State:              stateDiff,
 		Tx:                 testSubnet1,

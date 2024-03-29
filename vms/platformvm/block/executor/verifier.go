@@ -11,13 +11,15 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/vms/components/fees"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fees"
+
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 var (
@@ -167,7 +169,7 @@ func (v *verifier) ApricotProposalBlock(b *block.ApricotProposalBlock) error {
 		return err
 	}
 
-	return v.proposalBlock(b, nil, onCommitState, onAbortState, fees.Empty, nil, nil, nil)
+	return v.proposalBlock(b, nil, onCommitState, onAbortState, commonfees.Empty, nil, nil, nil)
 }
 
 func (v *verifier) ApricotStandardBlock(b *block.ApricotStandardBlock) error {
@@ -232,7 +234,7 @@ func (v *verifier) ApricotAtomicBlock(b *block.ApricotAtomicBlock) error {
 
 		inputs:          atomicExecutor.Inputs,
 		timestamp:       atomicExecutor.OnAccept.GetTimestamp(),
-		blockComplexity: fees.Empty,
+		blockComplexity: commonfees.Empty,
 		atomicRequests:  atomicExecutor.AtomicRequests,
 	}
 	return nil
@@ -283,7 +285,7 @@ func (v *verifier) banffNonOptionBlock(b block.BanffBlock) error {
 		)
 	}
 
-	nextStakerChangeTime, err := executor.GetNextStakerChangeTime(parentState)
+	nextStakerChangeTime, err := state.GetNextStakerChangeTime(parentState)
 	if err != nil {
 		return fmt.Errorf("could not verify block timestamp: %w", err)
 	}
@@ -379,7 +381,7 @@ func (v *verifier) proposalBlock(
 	onDecisionState state.Diff,
 	onCommitState state.Diff,
 	onAbortState state.Diff,
-	blockComplexity fees.Dimensions,
+	blockComplexity commonfees.Dimensions,
 	inputs set.Set[ids.ID],
 	atomicRequests map[ids.ID]*atomic.Requests,
 	onAcceptFunc func(),
@@ -467,16 +469,12 @@ func (v *verifier) processStandardTxs(
 	parentBlkTime, blkTimestamp time.Time,
 ) (
 	set.Set[ids.ID],
-	*fees.Manager,
+	*commonfees.Manager,
 	map[ids.ID]*atomic.Requests,
 	func(),
 	error,
 ) {
 	feeRates, err := state.GetFeeRates()
-	if err != nil {
-		return nil, nil, nil, nil, err
-	}
-	parentBlkComplexity, err := state.GetLastBlockComplexity()
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
@@ -491,15 +489,11 @@ func (v *verifier) processStandardTxs(
 		atomicRequests = make(map[ids.ID]*atomic.Requests)
 	)
 
-	feeMan := fees.NewManager(feeRates)
+	feeMan := commonfees.NewManager(feeRates)
 	if isEActive {
-		if err := feeMan.UpdateFeeRates(
-			feesCfg,
-			parentBlkComplexity,
-			parentBlkTime.Unix(),
-			blkTimestamp.Unix(),
-		); err != nil {
-			return nil, nil, nil, nil, fmt.Errorf("failed updating fee rates, %w", err)
+		feeMan, err = fees.UpdatedFeeManager(state, v.txExecutorBackend.Config, parentBlkTime, blkTimestamp)
+		if err != nil {
+			return nil, nil, nil, nil, err
 		}
 	}
 

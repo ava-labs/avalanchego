@@ -5,20 +5,21 @@ package executor
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/vms/components/fees"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fees"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 	"github.com/ava-labs/avalanchego/vms/platformvm/validators"
+
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 var (
@@ -138,7 +139,7 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 	// retrieve parent block time before moving time forward
 	parentBlkTime := stateDiff.GetTimestamp()
 
-	nextBlkTime, _, err := executor.NextBlockTime(stateDiff, m.txExecutorBackend.Clk)
+	nextBlkTime, _, err := state.NextBlockTime(stateDiff, m.txExecutorBackend.Clk)
 	if err != nil {
 		return err
 	}
@@ -152,25 +153,17 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 	if err != nil {
 		return err
 	}
-	parentBlkComplexitty, err := stateDiff.GetLastBlockComplexity()
-	if err != nil {
-		return err
-	}
 
 	var (
 		isEActive = m.txExecutorBackend.Config.IsEActivated(nextBlkTime)
 		feesCfg   = config.GetDynamicFeesConfig(isEActive)
 	)
 
-	feeManager := fees.NewManager(feeRates)
+	feeManager := commonfees.NewManager(feeRates)
 	if isEActive {
-		if err := feeManager.UpdateFeeRates(
-			feesCfg,
-			parentBlkComplexitty,
-			parentBlkTime.Unix(),
-			nextBlkTime.Unix(),
-		); err != nil {
-			return fmt.Errorf("failed updating fee rates, %w", err)
+		feeManager, err = fees.UpdatedFeeManager(stateDiff, m.txExecutorBackend.Config, parentBlkTime, nextBlkTime)
+		if err != nil {
+			return err
 		}
 	}
 

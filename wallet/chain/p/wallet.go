@@ -280,8 +280,8 @@ type wallet struct {
 	signer  walletsigner.Signer
 	client  platformvm.Client
 
-	isEForkActive                bool
-	feeRates, blockMaxComplexity commonfees.Dimensions
+	isEForkActive                    bool
+	nextFeeRates, blockMaxComplexity commonfees.Dimensions
 }
 
 func (w *wallet) Builder() builder.Builder {
@@ -309,7 +309,7 @@ func (w *wallet) IssueBaseTx(
 			Config: &config.Config{
 				CreateSubnetTxFee: w.builder.Context().CreateSubnetTxFee,
 			},
-			FeeManager:         commonfees.NewManager(w.feeRates),
+			FeeManager:         commonfees.NewManager(w.nextFeeRates),
 			BlockMaxComplexity: w.blockMaxComplexity,
 		}
 	)
@@ -337,7 +337,7 @@ func (w *wallet) IssueAddValidatorTx(
 		Config: &config.Config{
 			AddPrimaryNetworkValidatorFee: w.builder.Context().AddPrimaryNetworkValidatorFee,
 		},
-		FeeManager:         commonfees.NewManager(w.feeRates),
+		FeeManager:         commonfees.NewManager(w.nextFeeRates),
 		BlockMaxComplexity: w.blockMaxComplexity,
 	}
 
@@ -361,7 +361,7 @@ func (w *wallet) IssueAddSubnetValidatorTx(
 		Config: &config.Config{
 			TxFee: w.builder.Context().BaseTxFee,
 		},
-		FeeManager:         commonfees.NewManager(w.feeRates),
+		FeeManager:         commonfees.NewManager(w.nextFeeRates),
 		BlockMaxComplexity: w.blockMaxComplexity,
 	}
 
@@ -387,7 +387,7 @@ func (w *wallet) IssueRemoveSubnetValidatorTx(
 		Config: &config.Config{
 			TxFee: w.builder.Context().BaseTxFee,
 		},
-		FeeManager:         commonfees.NewManager(w.feeRates),
+		FeeManager:         commonfees.NewManager(w.nextFeeRates),
 		BlockMaxComplexity: w.blockMaxComplexity,
 	}
 
@@ -413,7 +413,7 @@ func (w *wallet) IssueAddDelegatorTx(
 		Config: &config.Config{
 			AddPrimaryNetworkDelegatorFee: w.builder.Context().AddPrimaryNetworkDelegatorFee,
 		},
-		FeeManager:         commonfees.NewManager(w.feeRates),
+		FeeManager:         commonfees.NewManager(w.nextFeeRates),
 		BlockMaxComplexity: w.blockMaxComplexity,
 	}
 
@@ -441,7 +441,7 @@ func (w *wallet) IssueCreateChainTx(
 		Config: &config.Config{
 			CreateBlockchainTxFee: w.builder.Context().CreateBlockchainTxFee,
 		},
-		FeeManager:         commonfees.NewManager(w.feeRates),
+		FeeManager:         commonfees.NewManager(w.nextFeeRates),
 		BlockMaxComplexity: w.blockMaxComplexity,
 	}
 
@@ -466,7 +466,7 @@ func (w *wallet) IssueCreateSubnetTx(
 		Config: &config.Config{
 			CreateSubnetTxFee: w.builder.Context().CreateSubnetTxFee,
 		},
-		FeeManager:         commonfees.NewManager(w.feeRates),
+		FeeManager:         commonfees.NewManager(w.nextFeeRates),
 		BlockMaxComplexity: w.blockMaxComplexity,
 	}
 	utx, err := w.builder.NewCreateSubnetTx(owner, feeCalc, options...)
@@ -490,7 +490,7 @@ func (w *wallet) IssueTransferSubnetOwnershipTx(
 		Config: &config.Config{
 			TxFee: w.builder.Context().BaseTxFee,
 		},
-		FeeManager:         commonfees.NewManager(w.feeRates),
+		FeeManager:         commonfees.NewManager(w.nextFeeRates),
 		BlockMaxComplexity: w.blockMaxComplexity,
 	}
 
@@ -515,7 +515,7 @@ func (w *wallet) IssueImportTx(
 		Config: &config.Config{
 			TxFee: w.builder.Context().BaseTxFee,
 		},
-		FeeManager:         commonfees.NewManager(w.feeRates),
+		FeeManager:         commonfees.NewManager(w.nextFeeRates),
 		BlockMaxComplexity: w.blockMaxComplexity,
 	}
 
@@ -541,7 +541,7 @@ func (w *wallet) IssueExportTx(
 		Config: &config.Config{
 			TxFee: w.builder.Context().BaseTxFee,
 		},
-		FeeManager:         commonfees.NewManager(w.feeRates),
+		FeeManager:         commonfees.NewManager(w.nextFeeRates),
 		BlockMaxComplexity: w.blockMaxComplexity,
 	}
 
@@ -579,7 +579,7 @@ func (w *wallet) IssueTransformSubnetTx(
 		Config: &config.Config{
 			TransformSubnetTxFee: w.builder.Context().TransformSubnetTxFee,
 		},
-		FeeManager:         commonfees.NewManager(w.feeRates),
+		FeeManager:         commonfees.NewManager(w.nextFeeRates),
 		BlockMaxComplexity: w.blockMaxComplexity,
 	}
 	utx, err := w.builder.NewTransformSubnetTx(
@@ -626,7 +626,7 @@ func (w *wallet) IssueAddPermissionlessValidatorTx(
 			AddPrimaryNetworkValidatorFee: w.builder.Context().AddPrimaryNetworkValidatorFee,
 			AddSubnetValidatorFee:         w.builder.Context().AddSubnetValidatorFee,
 		},
-		FeeManager:         commonfees.NewManager(w.feeRates),
+		FeeManager:         commonfees.NewManager(w.nextFeeRates),
 		BlockMaxComplexity: w.blockMaxComplexity,
 	}
 
@@ -663,7 +663,7 @@ func (w *wallet) IssueAddPermissionlessDelegatorTx(
 			AddPrimaryNetworkDelegatorFee: w.builder.Context().AddPrimaryNetworkDelegatorFee,
 			AddSubnetDelegatorFee:         w.builder.Context().AddSubnetDelegatorFee,
 		},
-		FeeManager:         commonfees.NewManager(w.feeRates),
+		FeeManager:         commonfees.NewManager(w.nextFeeRates),
 		BlockMaxComplexity: w.blockMaxComplexity,
 	}
 
@@ -744,7 +744,7 @@ func (w *wallet) refreshFeesData(options ...common.Option) error {
 	eUpgradeTime := version.GetEUpgradeTime(w.builder.Context().NetworkID)
 	w.isEForkActive = !chainTime.Before(eUpgradeTime)
 
-	_, w.feeRates, err = w.client.GetFeeRates(ctx)
+	_, w.nextFeeRates, err = w.client.GetFeeRates(ctx)
 	if err != nil {
 		return err
 	}

@@ -485,6 +485,7 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 	txBuilder := txstest.NewBuilder(
 		vm.ctx,
 		&vm.Config,
+		&vm.clock,
 		vm.state,
 	)
 

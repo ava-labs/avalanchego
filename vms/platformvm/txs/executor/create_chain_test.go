@@ -167,14 +167,18 @@ func TestCreateChainTxValid(t *testing.T) {
 	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
-	feeRates, err := env.state.GetFeeRates()
+	currentTime := stateDiff.GetTimestamp()
+	nextBlkTime, _, err := state.NextBlockTime(stateDiff, env.clk)
 	require.NoError(err)
 
-	currentTime := stateDiff.GetTimestamp()
 	feeCfg := config.GetDynamicFeesConfig(env.config.IsEActivated(currentTime))
+
+	feeMan, err := fees.UpdatedFeeManager(stateDiff, env.config, currentTime, nextBlkTime)
+	require.NoError(err)
+
 	executor := StandardTxExecutor{
 		Backend:            &env.backend,
-		BlkFeeManager:      commonfees.NewManager(feeRates),
+		BlkFeeManager:      feeMan,
 		BlockMaxComplexity: feeCfg.BlockMaxComplexity,
 		State:              stateDiff,
 		Tx:                 tx,

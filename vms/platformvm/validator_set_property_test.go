@@ -259,6 +259,7 @@ func addSubnetValidator(vm *VM, data *validatorInputData, subnetID ids.ID) (*sta
 	txBuilder := txstest.NewBuilder(
 		vm.ctx,
 		&vm.Config,
+		&vm.clock,
 		vm.state,
 	)
 
@@ -296,6 +297,7 @@ func addPrimaryValidatorWithBLSKey(vm *VM, data *validatorInputData) (*state.Sta
 	txBuilder := txstest.NewBuilder(
 		vm.ctx,
 		&vm.Config,
+		&vm.clock,
 		vm.state,
 	)
 
@@ -716,6 +718,7 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 	txBuilder := txstest.NewBuilder(
 		vm.ctx,
 		&vm.Config,
+		&vm.clock,
 		vm.state,
 	)
 

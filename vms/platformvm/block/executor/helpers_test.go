@@ -160,6 +160,7 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller, f fork) *environment 
 		res.txBuilder = txstest.NewBuilder(
 			res.ctx,
 			res.config,
+			res.clk,
 			res.state,
 		)
 	} else {
@@ -171,6 +172,7 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller, f fork) *environment 
 		res.txBuilder = txstest.NewBuilder(
 			res.ctx,
 			res.config,
+			res.clk,
 			res.mockedState,
 		)
 

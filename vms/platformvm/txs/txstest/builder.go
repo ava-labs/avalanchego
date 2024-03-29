@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
@@ -20,7 +21,6 @@ import (
 	"github.com/ava-labs/avalanchego/wallet/chain/p/builder"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
-	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 	vmsigner "github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	walletsigner "github.com/ava-labs/avalanchego/wallet/chain/p/signer"
 )
@@ -28,11 +28,13 @@ import (
 func NewBuilder(
 	ctx *snow.Context,
 	cfg *config.Config,
+	clk *mockable.Clock,
 	state state.State,
 ) *Builder {
 	return &Builder{
 		ctx:   ctx,
 		cfg:   cfg,
+		clk:   clk,
 		state: state,
 	}
 }
@@ -40,6 +42,7 @@ func NewBuilder(
 type Builder struct {
 	ctx   *snow.Context
 	cfg   *config.Config
+	clk   *mockable.Clock
 	state state.State
 }
 
@@ -418,22 +421,27 @@ func (b *Builder) builders(keys []*secp256k1.PrivateKey) (builder.Builder, walle
 }
 
 func (b *Builder) feeCalculator() (*fees.Calculator, error) {
-	feeRates, err := b.state.GetFeeRates()
+	var (
+		currentChainTime = b.state.GetTimestamp()
+		isEActive        = b.cfg.IsEActivated(currentChainTime)
+		feeCfg           = config.GetDynamicFeesConfig(isEActive)
+	)
+
+	nextChainTime, _, err := state.NextBlockTime(b.state, b.clk)
+	if err != nil {
+		return nil, fmt.Errorf("failed calculating next block time: %w", err)
+	}
+
+	feeManager, err := fees.UpdatedFeeManager(b.state, b.cfg, currentChainTime, nextChainTime)
 	if err != nil {
 		return nil, err
 	}
 
-	var (
-		chainTime = b.state.GetTimestamp()
-		feeCfg    = config.GetDynamicFeesConfig(b.cfg.IsEActivated(chainTime))
-		isEActive = b.cfg.IsEActivated(chainTime)
-	)
-
 	return &fees.Calculator{
 		IsEActive:          isEActive,
 		Config:             b.cfg,
-		ChainTime:          chainTime,
-		FeeManager:         commonfees.NewManager(feeRates),
+		ChainTime:          nextChainTime,
+		FeeManager:         feeManager,
 		BlockMaxComplexity: feeCfg.BlockMaxComplexity,
 	}, nil
 }

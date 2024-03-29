@@ -29,7 +29,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/keystore"
-	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
@@ -37,7 +36,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fees"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	avajson "github.com/ava-labs/avalanchego/utils/json"
@@ -1853,7 +1852,7 @@ func (s *Service) GetFeeRates(_ *http.Request, _ *struct{}, reply *GetFeeRatesRe
 	}
 	reply.CurrentFeeRates = currentFeeRate
 
-	nextTimestamp, _, err := executor.NextBlockTime(onAccept, &s.vm.clock)
+	nextTimestamp, _, err := state.NextBlockTime(onAccept, &s.vm.clock)
 	if err != nil {
 		return fmt.Errorf("could not calculate next staker change time: %w", err)
 	}
@@ -1866,23 +1865,13 @@ func (s *Service) GetFeeRates(_ *http.Request, _ *struct{}, reply *GetFeeRatesRe
 
 	var (
 		currentTimestamp = onAccept.GetTimestamp()
-		feesCfg          = config.GetDynamicFeesConfig(isEActivated)
+		feeManager       = commonfees.NewManager(currentFeeRate)
 	)
 
-	parentBlkComplexity, err := onAccept.GetLastBlockComplexity()
-	if err != nil {
-		return err
-	}
-
-	feeManager := commonfees.NewManager(currentFeeRate)
 	if isEActivated {
-		if err := feeManager.UpdateFeeRates(
-			feesCfg,
-			parentBlkComplexity,
-			currentTimestamp.Unix(),
-			nextTimestamp.Unix(),
-		); err != nil {
-			return fmt.Errorf("failed updating fee rates, %w", err)
+		feeManager, err = fees.UpdatedFeeManager(onAccept, &s.vm.Config, currentTimestamp, nextTimestamp)
+		if err != nil {
+			return err
 		}
 	}
 	reply.NextFeeRates = feeManager.GetFeeRates()

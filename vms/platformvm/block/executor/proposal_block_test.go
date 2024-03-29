@@ -161,7 +161,6 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 	onParentAccept := state.NewMockDiff(ctrl)
 	onParentAccept.EXPECT().GetTimestamp().Return(parentTime).AnyTimes()
 	onParentAccept.EXPECT().GetFeeRates().Return(commonfees.Empty, nil).Times(2)
-	onParentAccept.EXPECT().GetLastBlockComplexity().Return(commonfees.Empty, nil).Times(2)
 	onParentAccept.EXPECT().GetCurrentSupply(constants.PrimaryNetworkID).Return(uint64(1000), nil).AnyTimes()
 
 	env.blkManager.(*manager).blkIDToState[parentID] = &blockState{
@@ -1421,7 +1420,7 @@ func TestAddValidatorProposalBlock(t *testing.T) {
 
 	// Advance time until next staker change time is [validatorEndTime]
 	for {
-		nextStakerChangeTime, err := executor.GetNextStakerChangeTime(env.state)
+		nextStakerChangeTime, err := state.GetNextStakerChangeTime(env.state)
 		require.NoError(err)
 		if nextStakerChangeTime.Equal(validatorEndTime) {
 			break
