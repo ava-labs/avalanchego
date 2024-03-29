@@ -321,15 +321,13 @@ impl<M: LinearStore> StoreInner<M> {
     }
 
     fn delete_descriptor(&mut self, desc_addr: DiskAddress) -> Result<(), ShaleError> {
-        let desc_size = ChunkDescriptor::SERIALIZED_LEN;
         // TODO: subtracting two disk addresses is only used here, probably can rewrite this
-        // debug_assert!((desc_addr.0 - self.header.base_addr.value.into()) % desc_size == 0);
-
+        // debug_assert!((desc_addr.0 - self.header.base_addr.value.into()) % ChunkDescriptor::SERIALIZED_LEN == 0);
         // Move the last descriptor to the position of the deleted descriptor
         #[allow(clippy::unwrap_used)]
         self.header
             .meta_store_tail
-            .modify(|r| *r -= desc_size as usize)
+            .modify(|r| *r -= ChunkDescriptor::SERIALIZED_LEN as usize)
             .unwrap();
 
         if desc_addr != DiskAddress(**self.header.meta_store_tail) {
