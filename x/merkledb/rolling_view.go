@@ -6,6 +6,7 @@ package merkledb
 import (
 	"context"
 	"errors"
+	"fmt"
 	"slices"
 	"sync"
 
@@ -243,6 +244,14 @@ func (v *RollingView) remove(key Key) error {
 		// i.e. There's the root and at least one more node.
 		parent.removeChild(nodeToDelete, v.tokenSize)
 
+		// Since we removed a child from [parent], we need to mark the node as
+		// changed.
+		//
+		// TODO: did adding this fix a bug?
+		if err := v.recordNodeChange(parent); err != nil {
+			return err
+		}
+
 		// merge the parent node and its child into a single node if possible
 		return v.compressNodePath(grandParent, parent)
 	}
@@ -455,6 +464,7 @@ func (v *RollingView) recordNodeDeleted(after *node, hadValue bool) error {
 // Must not be called after [calculateNodeIDs] has returned.
 func (v *RollingView) recordKeyChange(key Key, after *node, hadValue bool, newNode bool) error {
 	if existing, ok := v.changes.nodes[key]; ok {
+		fmt.Println("recordKeyChange", key, "before", existing.before, "prev after", existing.after, "new after", after)
 		existing.after = after
 		return nil
 	}
@@ -463,6 +473,7 @@ func (v *RollingView) recordKeyChange(key Key, after *node, hadValue bool, newNo
 		v.changes.nodes[key] = &change[*node]{
 			after: after,
 		}
+		fmt.Println("recordKeyChange", key, "before", nil, "after", after)
 		return nil
 	}
 
@@ -474,6 +485,7 @@ func (v *RollingView) recordKeyChange(key Key, after *node, hadValue bool, newNo
 		before: before,
 		after:  after,
 	}
+	fmt.Println("recordKeyChange", key, "before", before, "after", after)
 	return nil
 }
 
@@ -485,6 +497,7 @@ func (v *RollingView) recordValueChange(key Key, value maybe.Maybe[[]byte]) (*ch
 	// update the existing change if it exists
 	if existing, ok := v.changes.values[key]; ok {
 		existing.after = value
+		// TODO: Don't record changes until they are fixed?
 		return existing, nil
 	}
 
