@@ -52,21 +52,6 @@ func (fc *Calculator) AddValidatorTx(*txs.AddValidatorTx) error {
 	return nil
 }
 
-func (fc *Calculator) AddDelegatorTx(*txs.AddDelegatorTx) error {
-	// AddValidatorTx is banned following Durango activation, so we
-	// only return the pre EUpgrade fee here
-	fc.Fee = fc.Config.AddPrimaryNetworkDelegatorFee
-	return nil
-}
-
-func (*Calculator) AdvanceTimeTx(*txs.AdvanceTimeTx) error {
-	return nil // no fees
-}
-
-func (*Calculator) RewardValidatorTx(*txs.RewardValidatorTx) error {
-	return nil // no fees
-}
-
 func (fc *Calculator) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
 	if !fc.IsEActive {
 		fc.Fee = fc.Config.AddSubnetValidatorFee
@@ -80,6 +65,13 @@ func (fc *Calculator) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
 
 	_, err = fc.AddFeesFor(complexity)
 	return err
+}
+
+func (fc *Calculator) AddDelegatorTx(*txs.AddDelegatorTx) error {
+	// AddValidatorTx is banned following Durango activation, so we
+	// only return the pre EUpgrade fee here
+	fc.Fee = fc.Config.AddPrimaryNetworkDelegatorFee
+	return nil
 }
 
 func (fc *Calculator) CreateChainTx(tx *txs.CreateChainTx) error {
@@ -110,6 +102,14 @@ func (fc *Calculator) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 
 	_, err = fc.AddFeesFor(complexity)
 	return err
+}
+
+func (*Calculator) AdvanceTimeTx(*txs.AdvanceTimeTx) error {
+	return nil // no fees
+}
+
+func (*Calculator) RewardValidatorTx(*txs.RewardValidatorTx) error {
+	return nil // no fees
 }
 
 func (fc *Calculator) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx) error {
