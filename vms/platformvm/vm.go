@@ -464,7 +464,6 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 		stakerAttributesCache: &cache.LRU[ids.ID, *stakerAttributes]{
 			Size: stakerAttributesCacheSize,
 		},
-		atomicUtxosManager: avax.NewAtomicUTXOManager(vm.ctx.SharedMemory, txs.Codec),
 	}
 	err := server.RegisterService(service, "platform")
 	return map[string]http.Handler{

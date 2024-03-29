@@ -68,7 +68,6 @@ type VM struct {
 	metrics metrics.Metrics
 
 	avax.AddressManager
-	avax.AtomicUTXOManager
 	ids.Aliaser
 	utxo.Spender
 
@@ -227,7 +226,6 @@ func (vm *VM) Initialize(
 	}
 
 	codec := vm.parser.Codec()
-	vm.AtomicUTXOManager = avax.NewAtomicUTXOManager(ctx.SharedMemory, codec)
 	vm.Spender = utxo.NewSpender(&vm.clock, codec)
 
 	state, err := state.New(

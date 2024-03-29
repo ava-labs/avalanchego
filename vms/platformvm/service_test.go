@@ -83,7 +83,6 @@ func defaultService(t *testing.T) (*Service, *mutableSharedMemory, *txstest.Buil
 		stakerAttributesCache: &cache.LRU[ids.ID, *stakerAttributes]{
 			Size: stakerAttributesCacheSize,
 		},
-		atomicUtxosManager: avax.NewAtomicUTXOManager(vm.ctx.SharedMemory, txs.Codec),
 	}, mutableSharedMemory, txBuilder
 }
 

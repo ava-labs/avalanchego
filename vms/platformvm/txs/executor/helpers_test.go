@@ -33,7 +33,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
@@ -102,7 +101,6 @@ type environment struct {
 	fx             fx.Fx
 	state          state.State
 	states         map[ids.ID]state.Chain
-	atomicUTXOs    avax.AtomicUTXOManager
 	uptimes        uptime.Manager
 	utxosHandler   utxo.Verifier
 	txBuilder      *txstest.Builder
@@ -141,7 +139,6 @@ func newEnvironment(t *testing.T, f fork) *environment {
 	rewards := reward.NewCalculator(config.RewardConfig)
 	baseState := defaultState(config, ctx, baseDB, rewards)
 
-	atomicUTXOs := avax.NewAtomicUTXOManager(ctx.SharedMemory, txs.Codec)
 	uptimes := uptime.NewManager(baseState, clk)
 	utxosVerifier := utxo.NewVerifier(ctx, clk, fx)
 
@@ -172,7 +169,6 @@ func newEnvironment(t *testing.T, f fork) *environment {
 		fx:             fx,
 		state:          baseState,
 		states:         make(map[ids.ID]state.Chain),
-		atomicUTXOs:    atomicUTXOs,
 		uptimes:        uptimes,
 		utxosHandler:   utxosVerifier,
 		txBuilder:      txBuilder,
