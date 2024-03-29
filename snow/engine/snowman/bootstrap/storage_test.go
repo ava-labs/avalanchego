@@ -22,6 +22,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
+var _ block.Parser = testParser(nil)
+
 func TestGetMissingBlockIDs(t *testing.T) {
 	blocks := generateBlockchain(7)
 	parser := makeParser(blocks)
