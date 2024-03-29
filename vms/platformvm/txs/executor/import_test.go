@@ -4,6 +4,7 @@
 package executor
 
 import (
+	"context"
 	"math/rand"
 	"testing"
 	"time"
@@ -19,6 +20,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/chain/p/builder"
+
+	walletsigner "github.com/ava-labs/avalanchego/wallet/chain/p/signer"
 )
 
 var fundedSharedMemoryCalls byte
@@ -115,11 +118,14 @@ func TestNewImportTx(t *testing.T) {
 			require := require.New(t)
 
 			env.msm.SharedMemory = tt.sharedMemory
-			tx, err := env.txBuilder.NewImportTx(
+
+			builder, signer := env.txBuilder.Builders(tt.sourceKeys...)
+			utx, err := builder.NewImportTx(
 				tt.sourceChainID,
 				to,
-				tt.sourceKeys,
 			)
+			require.NoError(err)
+			tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
 			require.ErrorIs(err, tt.expectedErr)
 			if tt.expectedErr != nil {
 				return

@@ -74,7 +74,7 @@ func TestStandardTxExecutorAddValidatorTxEmptyID(t *testing.T) {
 	for _, test := range tests {
 		env.config.BanffTime = test.banffTime
 
-		builder, signer := env.txBuilder.Builders([]*secp256k1.PrivateKey{preFundedKeys[0]})
+		builder, signer := env.txBuilder.Builders(preFundedKeys[0])
 		utx, err := builder.NewAddValidatorTx(
 			&txs.Validator{
 				NodeID: ids.EmptyNodeID,
@@ -117,7 +117,7 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 	// [addMinStakeValidator] adds a new validator to the primary network's
 	// pending validator set with the minimum staking amount
 	addMinStakeValidator := func(target *environment) {
-		builder, signer := target.txBuilder.Builders([]*secp256k1.PrivateKey{preFundedKeys[0]})
+		builder, signer := target.txBuilder.Builders(preFundedKeys[0])
 		utx, err := builder.NewAddValidatorTx(
 			&txs.Validator{
 				NodeID: newValidatorID,
@@ -153,7 +153,7 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 	// [addMaxStakeValidator] adds a new validator to the primary network's
 	// pending validator set with the maximum staking amount
 	addMaxStakeValidator := func(target *environment) {
-		builder, signer := target.txBuilder.Builders([]*secp256k1.PrivateKey{preFundedKeys[0]})
+		builder, signer := target.txBuilder.Builders(preFundedKeys[0])
 		utx, err := builder.NewAddValidatorTx(
 			&txs.Validator{
 				NodeID: newValidatorID,
@@ -331,7 +331,7 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 			env := newEnvironment(t, apricotPhase5)
 			env.config.ApricotPhase3Time = tt.AP3Time
 
-			builder, signer := env.txBuilder.Builders(tt.feeKeys)
+			builder, signer := env.txBuilder.Builders(tt.feeKeys...)
 			utx, err := builder.NewAddDelegatorTx(
 				&txs.Validator{
 					NodeID: tt.nodeID,
@@ -1290,7 +1290,7 @@ func TestDurangoMemoField(t *testing.T) {
 					Tx:      subnetValTx,
 				}))
 
-				builder, signer = env.txBuilder.Builders(preFundedKeys)
+				builder, signer = env.txBuilder.Builders(preFundedKeys...)
 				utx2, err := builder.NewRemoveSubnetValidatorTx(
 					primaryValidator.NodeID,
 					testSubnet1.ID(),
@@ -1306,7 +1306,7 @@ func TestDurangoMemoField(t *testing.T) {
 		{
 			name: "TransformSubnetTx",
 			setupTest: func(env *environment, memoField []byte) (*txs.Tx, state.Diff) {
-				builder, signer := env.txBuilder.Builders(preFundedKeys)
+				builder, signer := env.txBuilder.Builders(preFundedKeys...)
 				utx, err := builder.NewTransformSubnetTx(
 					testSubnet1.TxID,          // subnetID
 					ids.GenerateTestID(),      // assetID
@@ -1345,7 +1345,7 @@ func TestDurangoMemoField(t *testing.T) {
 				sk, err := bls.NewSecretKey()
 				require.NoError(t, err)
 
-				txBuilder, txSigner := env.txBuilder.Builders(preFundedKeys)
+				txBuilder, txSigner := env.txBuilder.Builders(preFundedKeys...)
 				utx, err := txBuilder.NewAddPermissionlessValidatorTx(
 					&txs.SubnetValidator{
 						Validator: txs.Validator{
