@@ -11,7 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/wallet/chain/p/builder"
 )
 
-func NewContext(
+func newContext(
 	ctx *snow.Context,
 	cfg *config.Config,
 	timestamp time.Time,

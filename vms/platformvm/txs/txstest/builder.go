@@ -341,8 +341,8 @@ func (b *Builder) builders(keys []*secp256k1.PrivateKey) (builder.Builder, walle
 	var (
 		kc      = secp256k1fx.NewKeychain(keys...)
 		addrs   = kc.Addresses()
-		backend = NewBackend(addrs, b.state, b.ctx.SharedMemory)
-		context = NewContext(b.ctx, b.cfg, backend.state.GetTimestamp())
+		backend = newBackend(addrs, b.state, b.ctx.SharedMemory)
+		context = newContext(b.ctx, b.cfg, b.state.GetTimestamp())
 		builder = builder.New(addrs, context, backend)
 		signer  = walletsigner.New(kc, backend)
 	)
