@@ -47,8 +47,15 @@ func (b *Backend) UTXOs(_ context.Context, sourceChainID ids.ID) ([]*avax.UTXO, 
 		return avax.GetAllUTXOs(b.state, b.addrs)
 	}
 
-	atomicUTXOManager := avax.NewAtomicUTXOManager(b.sharedMemory, txs.Codec)
-	utxos, _, _, err := atomicUTXOManager.GetAtomicUTXOs(sourceChainID, b.addrs, ids.ShortEmpty, ids.Empty, math.MaxInt)
+	utxos, _, _, err := avax.GetAtomicUTXOs(
+		b.sharedMemory,
+		txs.Codec,
+		sourceChainID,
+		b.addrs,
+		ids.ShortEmpty,
+		ids.Empty,
+		math.MaxInt,
+	)
 	return utxos, err
 }
 

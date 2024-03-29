@@ -34,7 +34,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
@@ -115,7 +114,6 @@ type environment struct {
 	msm            *mutableSharedMemory
 	fx             fx.Fx
 	state          state.State
-	atomicUTXOs    avax.AtomicUTXOManager
 	uptimes        uptime.Manager
 	utxosVerifier  utxo.Verifier
 	txBuilder      *txstest.Builder
@@ -150,7 +148,6 @@ func newEnvironment(t *testing.T, f fork) *environment { //nolint:unparam
 	rewardsCalc := reward.NewCalculator(res.config.RewardConfig)
 	res.state = defaultState(t, res.config, res.ctx, res.baseDB, rewardsCalc)
 
-	res.atomicUTXOs = avax.NewAtomicUTXOManager(res.ctx.SharedMemory, txs.Codec)
 	res.uptimes = uptime.NewManager(res.state, res.clk)
 	res.utxosVerifier = utxo.NewVerifier(res.ctx, res.clk, res.fx)
 

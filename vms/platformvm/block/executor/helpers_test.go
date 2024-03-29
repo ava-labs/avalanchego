@@ -35,7 +35,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
@@ -127,7 +126,6 @@ type environment struct {
 	fx             fx.Fx
 	state          state.State
 	mockedState    *state.MockState
-	atomicUTXOs    avax.AtomicUTXOManager
 	uptimes        uptime.Manager
 	utxosVerifier  utxo.Verifier
 	txBuilder      *txstest.Builder
@@ -153,7 +151,6 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller, f fork) *environment 
 	res.fx = defaultFx(res.clk, res.ctx.Log, res.isBootstrapped.Get())
 
 	rewardsCalc := reward.NewCalculator(res.config.RewardConfig)
-	res.atomicUTXOs = avax.NewAtomicUTXOManager(res.ctx.SharedMemory, txs.Codec)
 
 	if ctrl == nil {
 		res.state = defaultState(res.config, res.ctx, res.baseDB, rewardsCalc)
