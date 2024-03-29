@@ -70,6 +70,7 @@ func TestNewExportTx(t *testing.T) {
 			)
 			require.NoError(err)
 			tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
+			require.NoError(err)
 
 			stateDiff, err := state.NewDiff(lastAcceptedID, env)
 			require.NoError(err)

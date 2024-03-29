@@ -178,7 +178,7 @@ func newEnvironment(t *testing.T, f fork) *environment {
 		backend:        backend,
 	}
 
-	addSubnet(t, env, txBuilder)
+	addSubnet(t, env)
 
 	t.Cleanup(func() {
 		env.ctx.Lock.Lock()
@@ -210,7 +210,6 @@ func newEnvironment(t *testing.T, f fork) *environment {
 func addSubnet(
 	t *testing.T,
 	env *environment,
-	txBuilder *txstest.Builder,
 ) {
 	require := require.New(t)
 
