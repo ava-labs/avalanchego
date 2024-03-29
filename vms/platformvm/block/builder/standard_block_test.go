@@ -66,11 +66,12 @@ func TestAtomicTxImports(t *testing.T) {
 
 	tx, err := env.txBuilder.NewImportTx(
 		env.ctx.XChainID,
-		recipientKey.PublicKey().Address(),
+		&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{recipientKey.PublicKey().Address()},
+		},
 		[]*secp256k1.PrivateKey{recipientKey},
-		ids.ShortEmpty, // change addr
 		commonfees.NoTip,
-		nil,
 	)
 	require.NoError(err)
 

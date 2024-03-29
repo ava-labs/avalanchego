@@ -1,51 +1,45 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package builder
+package txstest
 
 import (
 	"context"
-	"fmt"
+	"math"
 
-	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/wallet/chain/p/builder"
 	"github.com/ava-labs/avalanchego/wallet/chain/p/signer"
-
-	walletbuilder "github.com/ava-labs/avalanchego/wallet/chain/p/builder"
 )
 
 var (
-	_ walletbuilder.Backend = (*Backend)(nil)
-	_ signer.Backend        = (*Backend)(nil)
+	_ builder.Backend = (*Backend)(nil)
+	_ signer.Backend  = (*Backend)(nil)
 )
 
 func NewBackend(
-	cfg *config.Config,
+	addrs set.Set[ids.ShortID],
 	state state.State,
-	atomicUTXOsMan avax.AtomicUTXOManager,
+	sharedMemory atomic.SharedMemory,
 ) *Backend {
 	return &Backend{
-		cfg:            cfg,
-		state:          state,
-		atomicUTXOsMan: atomicUTXOsMan,
+		addrs:        addrs,
+		state:        state,
+		sharedMemory: sharedMemory,
 	}
 }
 
 type Backend struct {
-	cfg            *config.Config
-	addrs          set.Set[ids.ShortID]
-	state          state.State
-	atomicUTXOsMan avax.AtomicUTXOManager
-}
-
-func (b *Backend) ResetAddresses(addrs set.Set[ids.ShortID]) {
-	b.addrs = addrs
+	addrs        set.Set[ids.ShortID]
+	state        state.State
+	sharedMemory atomic.SharedMemory
 }
 
 func (b *Backend) UTXOs(_ context.Context, sourceChainID ids.ID) ([]*avax.UTXO, error) {
@@ -53,8 +47,16 @@ func (b *Backend) UTXOs(_ context.Context, sourceChainID ids.ID) ([]*avax.UTXO, 
 		return avax.GetAllUTXOs(b.state, b.addrs)
 	}
 
-	atomicUTXOs, _, _, err := b.atomicUTXOsMan.GetAtomicUTXOs(sourceChainID, b.addrs, ids.ShortEmpty, ids.Empty, MaxPageSize)
-	return atomicUTXOs, err
+	utxos, _, _, err := avax.GetAtomicUTXOs(
+		b.sharedMemory,
+		txs.Codec,
+		sourceChainID,
+		b.addrs,
+		ids.ShortEmpty,
+		ids.Empty,
+		math.MaxInt,
+	)
+	return utxos, err
 }
 
 func (b *Backend) GetUTXO(_ context.Context, chainID, utxoID ids.ID) (*avax.UTXO, error) {
@@ -62,16 +64,16 @@ func (b *Backend) GetUTXO(_ context.Context, chainID, utxoID ids.ID) (*avax.UTXO
 		return b.state.GetUTXO(utxoID)
 	}
 
-	atomicUTXOs, _, _, err := b.atomicUTXOsMan.GetAtomicUTXOs(chainID, b.addrs, ids.ShortEmpty, ids.Empty, MaxPageSize)
+	utxoBytes, err := b.sharedMemory.Get(chainID, [][]byte{utxoID[:]})
 	if err != nil {
-		return nil, fmt.Errorf("problem retrieving atomic UTXOs: %w", err)
+		return nil, err
 	}
-	for _, utxo := range atomicUTXOs {
-		if utxo.InputID() == utxoID {
-			return utxo, nil
-		}
+
+	utxo := avax.UTXO{}
+	if _, err := txs.Codec.Unmarshal(utxoBytes[0], &utxo); err != nil {
+		return nil, err
 	}
-	return nil, database.ErrNotFound
+	return &utxo, nil
 }
 
 func (b *Backend) GetSubnetOwner(_ context.Context, subnetID ids.ID) (fx.Owner, error) {

@@ -146,7 +146,14 @@ linters-settings:
       - name: string-format
         disabled: false
         arguments:
+        - ["b.Logf[0]", "/.*%.*/", "no format directive, use b.Log instead"]
         - ["fmt.Errorf[0]", "/.*%.*/", "no format directive, use errors.New instead"]
+        - ["fmt.Fprintf[1]", "/.*%.*/", "no format directive, use fmt.Fprint instead"]
+        - ["fmt.Printf[0]", "/.*%.*/", "no format directive, use fmt.Print instead"]
+        - ["fmt.Sprintf[0]", "/.*%.*/", "no format directive, use fmt.Sprint instead"]
+        - ["log.Fatalf[0]", "/.*%.*/", "no format directive, use log.Fatal instead"]
+        - ["log.Printf[0]", "/.*%.*/", "no format directive, use log.Print instead"]
+        - ["t.Logf[0]", "/.*%.*/", "no format directive, use t.Log instead"]
       # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#struct-tag
       - name: struct-tag
         disabled: false
@@ -159,6 +166,7 @@ linters-settings:
         arguments:
           - "fmt\\.Fprint"
           - "fmt\\.Fprintf"
+          - "fmt\\.Fprintln"
           - "fmt\\.Print"
           - "fmt\\.Printf"
           - "fmt\\.Println"
