@@ -160,6 +160,8 @@ func (v *RollingView) CommitToDB(ctx context.Context) error {
 	v.commitLock.Lock()
 	defer v.commitLock.Unlock()
 
+	// TODO: remove useless changes (to both nodes and values)
+
 	if err := v.calculateNodeIDs(ctx); err != nil {
 		return err
 	}
