@@ -214,9 +214,7 @@ func addSubnet(
 ) {
 	require := require.New(t)
 
-	// Create a subnet
-	var err error
-	builder, signer := env.txBuilder.Builders([]*secp256k1.PrivateKey{preFundedKeys[0]})
+	builder, signer := env.txBuilder.Builders(preFundedKeys[0])
 	utx, err := builder.NewCreateSubnetTx(
 		&secp256k1fx.OutputOwners{
 			Threshold: 2,
@@ -235,7 +233,6 @@ func addSubnet(
 	testSubnet1, err = walletsigner.SignUnsigned(context.Background(), signer, utx)
 	require.NoError(err)
 
-	// store it
 	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 

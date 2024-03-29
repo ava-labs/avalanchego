@@ -4,6 +4,7 @@
 package executor
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -50,6 +51,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	pvalidators "github.com/ava-labs/avalanchego/vms/platformvm/validators"
+	walletsigner "github.com/ava-labs/avalanchego/wallet/chain/p/signer"
 	walletcommon "github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
 
@@ -249,9 +251,8 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller, f fork) *environment 
 }
 
 func addSubnet(env *environment) {
-	// Create a subnet
-	var err error
-	testSubnet1, err = env.txBuilder.NewCreateSubnetTx(
+	builder, signer := env.txBuilder.Builders(preFundedKeys[0])
+	utx, err := builder.NewCreateSubnetTx(
 		&secp256k1fx.OutputOwners{
 			Threshold: 2,
 			Addrs: []ids.ShortID{
@@ -260,7 +261,6 @@ func addSubnet(env *environment) {
 				preFundedKeys[2].PublicKey().Address(),
 			},
 		},
-		[]*secp256k1.PrivateKey{preFundedKeys[0]},
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
@@ -269,8 +269,8 @@ func addSubnet(env *environment) {
 	if err != nil {
 		panic(err)
 	}
+	testSubnet1, err = walletsigner.SignUnsigned(context.Background(), signer, utx)
 
-	// store it
 	genesisID := env.state.GetLastAccepted()
 	stateDiff, err := state.NewDiff(genesisID, env.blkManager)
 	if err != nil {
@@ -489,7 +489,8 @@ func addPendingValidator(
 	rewardAddress ids.ShortID,
 	keys []*secp256k1.PrivateKey,
 ) (*txs.Tx, error) {
-	addPendingValidatorTx, err := env.txBuilder.NewAddValidatorTx(
+	builder, signer := env.txBuilder.Builders(keys...)
+	utx, err := builder.NewAddValidatorTx(
 		&txs.Validator{
 			NodeID: nodeID,
 			Start:  uint64(startTime.Unix()),
@@ -501,8 +502,11 @@ func addPendingValidator(
 			Addrs:     []ids.ShortID{rewardAddress},
 		},
 		reward.PercentDenominator,
-		keys,
 	)
+	if err != nil {
+		return nil, err
+	}
+	addPendingValidatorTx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
 	if err != nil {
 		return nil, err
 	}
