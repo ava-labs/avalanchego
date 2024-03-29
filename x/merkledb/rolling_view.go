@@ -60,7 +60,7 @@ func newRollingView(db *merkleDB, parentTrie RollingParent, changes int) *Rollin
 	}
 }
 
-func (v *RollingView) Process(ctx context.Context, key string, val maybe.Maybe[[]byte]) error {
+func (v *RollingView) Update(ctx context.Context, key string, val maybe.Maybe[[]byte]) error {
 	kkey := toKey(stringToByteSlice(key))
 	change, err := v.recordValueChange(kkey, maybe.Bind(val, slices.Clone[[]byte]))
 	if err != nil {

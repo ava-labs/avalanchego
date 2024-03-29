@@ -1299,7 +1299,7 @@ func TestRollingView(t *testing.T) {
 	value1, value2, value3 := []byte{1}, []byte{2}, []byte{3}
 	rv, err := db.NewRollingView(context.Background(), 2)
 	require.NoError(err)
-	require.NoError(rv.Process(context.Background(), string(key1), maybe.Some(value1)))
+	require.NoError(rv.Update(context.Background(), string(key1), maybe.Some(value1)))
 	nodes, values := rv.Changes()
 	require.Equal(1, nodes)
 	require.Equal(1, values)
@@ -1307,13 +1307,13 @@ func TestRollingView(t *testing.T) {
 	// Create new rv
 	rv2, err := rv.NewRollingView(context.Background(), 2)
 	require.NoError(err)
-	require.NoError(rv2.Process(context.Background(), string(key2), maybe.Some(value2)))
+	require.NoError(rv2.Update(context.Background(), string(key2), maybe.Some(value2)))
 
 	// Commit rolling view
 	require.NoError(rv.CommitToDB(context.Background()))
 
 	// Add to rv2 (should now be rooted in db)
-	require.NoError(rv2.Process(context.Background(), string(key3), maybe.Some(value3)))
+	require.NoError(rv2.Update(context.Background(), string(key3), maybe.Some(value3)))
 	nodes, values = rv2.Changes()
 	require.Equal(3, nodes)
 	require.Equal(2, values)
@@ -1337,8 +1337,8 @@ func TestRollingView(t *testing.T) {
 	// Perform a no-op change
 	rv3, err := db.NewRollingView(context.Background(), 100)
 	require.NoError(err)
-	require.NoError(rv3.Process(context.Background(), string(key4), maybe.Some(value1)))
-	require.NoError(rv3.Process(context.Background(), string(key4), maybe.Nothing[[]byte]()))
+	require.NoError(rv3.Update(context.Background(), string(key4), maybe.Some(value1)))
+	require.NoError(rv3.Update(context.Background(), string(key4), maybe.Nothing[[]byte]()))
 	nodes, values = rv3.Changes()
 	// TODO: figure out the best way to remove no-ops here
 	require.Equal(0, nodes)
