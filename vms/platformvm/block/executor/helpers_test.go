@@ -270,6 +270,9 @@ func addSubnet(env *environment) {
 		panic(err)
 	}
 	testSubnet1, err = walletsigner.SignUnsigned(context.Background(), signer, utx)
+	if err != nil {
+		panic(err)
+	}
 
 	genesisID := env.state.GetLastAccepted()
 	stateDiff, err := state.NewDiff(genesisID, env.blkManager)

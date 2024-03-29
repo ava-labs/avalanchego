@@ -69,6 +69,7 @@ import (
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	walletbuilder "github.com/ava-labs/avalanchego/wallet/chain/p/builder"
+	walletsigner "github.com/ava-labs/avalanchego/wallet/chain/p/signer"
 	walletcommon "github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
 
@@ -303,7 +304,7 @@ func defaultVM(t *testing.T, f fork) (*VM, *txstest.Builder, database.Database, 
 
 	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
 
-	builder := txstest.NewBuilder(
+	txBuilder := txstest.NewBuilder(
 		ctx,
 		&vm.Config,
 		vm.state,
@@ -312,8 +313,8 @@ func defaultVM(t *testing.T, f fork) (*VM, *txstest.Builder, database.Database, 
 	// Create a subnet and store it in testSubnet1
 	// Note: following Banff activation, block acceptance will move
 	// chain time ahead
-	var err error
-	testSubnet1, err = builder.NewCreateSubnetTx(
+	builder, signer := txBuilder.Builders(keys[0])
+	utx, err := builder.NewCreateSubnetTx(
 		&secp256k1fx.OutputOwners{
 			Threshold: 2,
 			Addrs: []ids.ShortID{
@@ -322,13 +323,15 @@ func defaultVM(t *testing.T, f fork) (*VM, *txstest.Builder, database.Database, 
 				keys[2].PublicKey().Address(),
 			},
 		},
-		[]*secp256k1.PrivateKey{keys[0]}, // pays tx fee
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
 		}),
 	)
 	require.NoError(err)
+	testSubnet1, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
+	require.NoError(err)
+
 	vm.ctx.Lock.Unlock()
 	require.NoError(vm.issueTxFromRPC(testSubnet1))
 	vm.ctx.Lock.Lock()
@@ -345,7 +348,7 @@ func defaultVM(t *testing.T, f fork) (*VM, *txstest.Builder, database.Database, 
 		require.NoError(vm.Shutdown(context.Background()))
 	})
 
-	return vm, builder, db, msm
+	return vm, txBuilder, db, msm
 }
 
 // Ensure genesis state is parsed from bytes and stored correctly
@@ -419,7 +422,8 @@ func TestAddValidatorCommit(t *testing.T) {
 	require.NoError(err)
 
 	// create valid tx
-	tx, err := txBuilder.NewAddPermissionlessValidatorTx(
+	builder, txSigner := txBuilder.Builders(keys[0])
+	utx, err := builder.NewAddPermissionlessValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
 				NodeID: nodeID,
@@ -440,8 +444,9 @@ func TestAddValidatorCommit(t *testing.T) {
 			Addrs:     []ids.ShortID{rewardAddress},
 		},
 		reward.PercentDenominator,
-		[]*secp256k1.PrivateKey{keys[0]},
 	)
+	require.NoError(err)
+	tx, err := walletsigner.SignUnsigned(context.Background(), txSigner, utx)
 	require.NoError(err)
 
 	// trigger block creation
@@ -476,7 +481,8 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 	endTime := startTime.Add(defaultMinStakingDuration)
 
 	// create invalid tx
-	tx, err := txBuilder.NewAddValidatorTx(
+	builder, txSigner := txBuilder.Builders(keys[0])
+	utx, err := builder.NewAddValidatorTx(
 		&txs.Validator{
 			NodeID: nodeID,
 			Start:  uint64(startTime.Unix()),
@@ -488,8 +494,9 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
 		},
 		reward.PercentDenominator,
-		[]*secp256k1.PrivateKey{keys[0]},
 	)
+	require.NoError(err)
+	tx, err := walletsigner.SignUnsigned(context.Background(), txSigner, utx)
 	require.NoError(err)
 
 	preferredID := vm.manager.Preferred()
@@ -533,7 +540,8 @@ func TestAddValidatorReject(t *testing.T) {
 	)
 
 	// create valid tx
-	tx, err := txBuilder.NewAddValidatorTx(
+	builder, txSigner := txBuilder.Builders(keys[0])
+	utx, err := builder.NewAddValidatorTx(
 		&txs.Validator{
 			NodeID: nodeID,
 			Start:  uint64(startTime.Unix()),
@@ -545,8 +553,9 @@ func TestAddValidatorReject(t *testing.T) {
 			Addrs:     []ids.ShortID{rewardAddress},
 		},
 		reward.PercentDenominator,
-		[]*secp256k1.PrivateKey{keys[0]},
 	)
+	require.NoError(err)
+	tx, err := walletsigner.SignUnsigned(context.Background(), txSigner, utx)
 	require.NoError(err)
 
 	// trigger block creation
@@ -584,7 +593,8 @@ func TestAddValidatorInvalidNotReissued(t *testing.T) {
 	require.NoError(err)
 
 	// create valid tx
-	tx, err := txBuilder.NewAddPermissionlessValidatorTx(
+	builder, txSigner := txBuilder.Builders(keys[0])
+	utx, err := builder.NewAddPermissionlessValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
 				NodeID: repeatNodeID,
@@ -605,8 +615,9 @@ func TestAddValidatorInvalidNotReissued(t *testing.T) {
 			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
 		},
 		reward.PercentDenominator,
-		[]*secp256k1.PrivateKey{keys[0]},
 	)
+	require.NoError(err)
+	tx, err := walletsigner.SignUnsigned(context.Background(), txSigner, utx)
 	require.NoError(err)
 
 	// trigger block creation
@@ -632,7 +643,8 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 	// create valid tx
 	// note that [startTime, endTime] is a subset of time that keys[0]
 	// validates primary network ([defaultValidateStartTime, defaultValidateEndTime])
-	tx, err := txBuilder.NewAddSubnetValidatorTx(
+	builder, txSigner := txBuilder.Builders(testSubnet1ControlKeys[0], testSubnet1ControlKeys[1])
+	utx, err := builder.NewAddSubnetValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
 				NodeID: nodeID,
@@ -642,8 +654,9 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 			},
 			Subnet: testSubnet1.ID(),
 		},
-		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 	)
+	require.NoError(err)
+	tx, err := walletsigner.SignUnsigned(context.Background(), txSigner, utx)
 	require.NoError(err)
 
 	// trigger block creation
@@ -682,7 +695,8 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 	// create valid tx
 	// note that [startTime, endTime] is a subset of time that keys[0]
 	// validates primary network ([defaultValidateStartTime, defaultValidateEndTime])
-	tx, err := txBuilder.NewAddSubnetValidatorTx(
+	builder, txSigner := txBuilder.Builders(testSubnet1ControlKeys[1], testSubnet1ControlKeys[2])
+	utx, err := builder.NewAddSubnetValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
 				NodeID: nodeID,
@@ -692,8 +706,9 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 			},
 			Subnet: testSubnet1.ID(),
 		},
-		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[1], testSubnet1ControlKeys[2]},
 	)
+	require.NoError(err)
+	tx, err := walletsigner.SignUnsigned(context.Background(), txSigner, utx)
 	require.NoError(err)
 
 	// trigger block creation
@@ -871,14 +886,16 @@ func TestCreateChain(t *testing.T) {
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
-	tx, err := txBuilder.NewCreateChainTx(
+	builder, txSigner := txBuilder.Builders(testSubnet1ControlKeys[0], testSubnet1ControlKeys[1])
+	utx, err := builder.NewCreateChainTx(
 		testSubnet1.ID(),
 		nil,
 		ids.ID{'t', 'e', 's', 't', 'v', 'm'},
 		nil,
 		"name",
-		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 	)
+	require.NoError(err)
+	tx, err := walletsigner.SignUnsigned(context.Background(), txSigner, utx)
 	require.NoError(err)
 
 	vm.ctx.Lock.Unlock()
@@ -919,8 +936,8 @@ func TestCreateSubnet(t *testing.T) {
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
-	nodeID := genesisNodeIDs[0]
-	createSubnetTx, err := txBuilder.NewCreateSubnetTx(
+	builder, txSigner := txBuilder.Builders(keys[0])
+	uCreateSubnetTx, err := builder.NewCreateSubnetTx(
 		&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs: []ids.ShortID{
@@ -928,12 +945,13 @@ func TestCreateSubnet(t *testing.T) {
 				keys[1].PublicKey().Address(),
 			},
 		},
-		[]*secp256k1.PrivateKey{keys[0]}, // payer
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
 		}),
 	)
+	require.NoError(err)
+	createSubnetTx, err := walletsigner.SignUnsigned(context.Background(), txSigner, uCreateSubnetTx)
 	require.NoError(err)
 
 	vm.ctx.Lock.Unlock()
@@ -965,10 +983,11 @@ func TestCreateSubnet(t *testing.T) {
 	require.True(found)
 
 	// Now that we've created a new subnet, add a validator to that subnet
+	nodeID := genesisNodeIDs[0]
 	startTime := vm.clock.Time().Add(txexecutor.SyncBound).Add(1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
 	// [startTime, endTime] is subset of time keys[0] validates default subnet so tx is valid
-	addValidatorTx, err := txBuilder.NewAddSubnetValidatorTx(
+	uAddValTx, err := builder.NewAddSubnetValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
 				NodeID: nodeID,
@@ -978,8 +997,9 @@ func TestCreateSubnet(t *testing.T) {
 			},
 			Subnet: createSubnetTx.ID(),
 		},
-		[]*secp256k1.PrivateKey{keys[0]},
 	)
+	require.NoError(err)
+	addValidatorTx, err := walletsigner.SignUnsigned(context.Background(), txSigner, uAddValTx)
 	require.NoError(err)
 
 	vm.ctx.Lock.Unlock()
@@ -1037,15 +1057,17 @@ func TestAtomicImport(t *testing.T) {
 	mutableSharedMemory.SharedMemory = m.NewSharedMemory(vm.ctx.ChainID)
 	peerSharedMemory := m.NewSharedMemory(vm.ctx.XChainID)
 
-	_, err := txBuilder.NewImportTx(
+	builder, txSigner := txBuilder.Builders(keys[0])
+	utx, err := builder.NewImportTx(
 		vm.ctx.XChainID,
 		&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{recipientKey.PublicKey().Address()},
 		},
-		[]*secp256k1.PrivateKey{keys[0]},
 	)
 	require.ErrorIs(err, walletbuilder.ErrInsufficientFunds)
+	_, err = walletsigner.SignUnsigned(context.Background(), txSigner, utx)
+	require.NoError(err)
 
 	// Provide the avm UTXO
 
@@ -1078,14 +1100,16 @@ func TestAtomicImport(t *testing.T) {
 		},
 	}))
 
-	tx, err := txBuilder.NewImportTx(
+	builder, txSigner = txBuilder.Builders(recipientKey)
+	utx, err = builder.NewImportTx(
 		vm.ctx.XChainID,
 		&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{recipientKey.PublicKey().Address()},
 		},
-		[]*secp256k1.PrivateKey{recipientKey},
 	)
+	require.NoError(err)
+	tx, err := walletsigner.SignUnsigned(context.Background(), txSigner, utx)
 	require.NoError(err)
 
 	vm.ctx.Lock.Unlock()
@@ -2074,7 +2098,8 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 	sk, err := bls.NewSecretKey()
 	require.NoError(err)
 
-	addValidatorTx, err := txBuilder.NewAddPermissionlessValidatorTx(
+	builder, txSigner := txBuilder.Builders(keys[0])
+	uAddValTx, err := builder.NewAddPermissionlessValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
 				NodeID: nodeID,
@@ -2095,12 +2120,13 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 			Addrs:     []ids.ShortID{id},
 		},
 		reward.PercentDenominator,
-		[]*secp256k1.PrivateKey{keys[0]},
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
 		}),
 	)
+	require.NoError(err)
+	addValidatorTx, err := walletsigner.SignUnsigned(context.Background(), txSigner, uAddValTx)
 	require.NoError(err)
 
 	vm.ctx.Lock.Unlock()
@@ -2114,17 +2140,18 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 	require.NoError(addValidatorBlock.Accept(context.Background()))
 	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
-	createSubnetTx, err := txBuilder.NewCreateSubnetTx(
+	uCreateSubnetTx, err := builder.NewCreateSubnetTx(
 		&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{id},
 		},
-		[]*secp256k1.PrivateKey{keys[0]},
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
 		}),
 	)
+	require.NoError(err)
+	createSubnetTx, err := walletsigner.SignUnsigned(context.Background(), txSigner, uCreateSubnetTx)
 	require.NoError(err)
 
 	vm.ctx.Lock.Unlock()
@@ -2138,7 +2165,8 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 	require.NoError(createSubnetBlock.Accept(context.Background()))
 	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
-	addSubnetValidatorTx, err := txBuilder.NewAddSubnetValidatorTx(
+	builder, txSigner = txBuilder.Builders(key, keys[1])
+	uAddSubnetValTx, err := builder.NewAddSubnetValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
 				NodeID: nodeID,
@@ -2148,23 +2176,26 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 			},
 			Subnet: createSubnetTx.ID(),
 		},
-		[]*secp256k1.PrivateKey{key, keys[1]},
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{keys[1].PublicKey().Address()},
 		}),
 	)
 	require.NoError(err)
+	addSubnetValidatorTx, err := walletsigner.SignUnsigned(context.Background(), txSigner, uAddSubnetValTx)
+	require.NoError(err)
 
-	removeSubnetValidatorTx, err := txBuilder.NewRemoveSubnetValidatorTx(
+	builder, txSigner = txBuilder.Builders(key, keys[2])
+	uRemoveSubnetValTx, err := builder.NewRemoveSubnetValidatorTx(
 		nodeID,
 		createSubnetTx.ID(),
-		[]*secp256k1.PrivateKey{key, keys[2]},
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{keys[2].PublicKey().Address()},
 		}),
 	)
+	require.NoError(err)
+	removeSubnetValidatorTx, err := walletsigner.SignUnsigned(context.Background(), txSigner, uRemoveSubnetValTx)
 	require.NoError(err)
 
 	statelessBlock, err := block.NewBanffStandardBlock(
@@ -2195,18 +2226,21 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
-	createSubnetTx, err := txBuilder.NewCreateSubnetTx(
+	builder, txSigner := txBuilder.Builders(keys[0])
+	uCreateSubnetTx, err := builder.NewCreateSubnetTx(
 		&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
 		},
-		[]*secp256k1.PrivateKey{keys[0]},
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
 		}),
 	)
 	require.NoError(err)
+	createSubnetTx, err := walletsigner.SignUnsigned(context.Background(), txSigner, uCreateSubnetTx)
+	require.NoError(err)
+
 	subnetID := createSubnetTx.ID()
 
 	vm.ctx.Lock.Unlock()
@@ -2237,14 +2271,15 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 	expectedOwner.InitCtx(ctx)
 	require.Equal(expectedOwner, subnetOwner)
 
-	transferSubnetOwnershipTx, err := txBuilder.NewTransferSubnetOwnershipTx(
+	uTransferSubnetOwnershipTx, err := builder.NewTransferSubnetOwnershipTx(
 		subnetID,
 		&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{keys[1].PublicKey().Address()},
 		},
-		[]*secp256k1.PrivateKey{keys[0]},
 	)
+	require.NoError(err)
+	transferSubnetOwnershipTx, err := walletsigner.SignUnsigned(context.Background(), txSigner, uTransferSubnetOwnershipTx)
 	require.NoError(err)
 
 	vm.ctx.Lock.Unlock()
@@ -2283,7 +2318,8 @@ func TestBaseTx(t *testing.T) {
 	sendAmt := uint64(100000)
 	changeAddr := ids.ShortEmpty
 
-	baseTx, err := txBuilder.NewBaseTx(
+	builder, txSigner := txBuilder.Builders(keys[0])
+	utx, err := builder.NewBaseTx(
 		[]*avax.TransferableOutput{
 			{
 				Asset: avax.Asset{ID: vm.ctx.AVAXAssetID},
@@ -2298,12 +2334,13 @@ func TestBaseTx(t *testing.T) {
 				},
 			},
 		},
-		[]*secp256k1.PrivateKey{keys[0]},
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{changeAddr},
 		}),
 	)
+	require.NoError(err)
+	baseTx, err := walletsigner.SignUnsigned(context.Background(), txSigner, utx)
 	require.NoError(err)
 
 	totalInputAmt := uint64(0)
@@ -2368,7 +2405,8 @@ func TestPruneMempool(t *testing.T) {
 	sendAmt := uint64(100000)
 	changeAddr := ids.ShortEmpty
 
-	baseTx, err := txBuilder.NewBaseTx(
+	builder, txSigner := txBuilder.Builders(keys[0])
+	utx, err := builder.NewBaseTx(
 		[]*avax.TransferableOutput{
 			{
 				Asset: avax.Asset{ID: vm.ctx.AVAXAssetID},
@@ -2383,12 +2421,13 @@ func TestPruneMempool(t *testing.T) {
 				},
 			},
 		},
-		[]*secp256k1.PrivateKey{keys[0]},
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{changeAddr},
 		}),
 	)
+	require.NoError(err)
+	baseTx, err := walletsigner.SignUnsigned(context.Background(), txSigner, utx)
 	require.NoError(err)
 
 	vm.ctx.Lock.Unlock()
@@ -2409,7 +2448,8 @@ func TestPruneMempool(t *testing.T) {
 	sk, err := bls.NewSecretKey()
 	require.NoError(err)
 
-	addValidatorTx, err := txBuilder.NewAddPermissionlessValidatorTx(
+	builder, txSigner = txBuilder.Builders(keys[1])
+	uAddValTx, err := builder.NewAddPermissionlessValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
 				NodeID: ids.GenerateTestNodeID(),
@@ -2430,8 +2470,9 @@ func TestPruneMempool(t *testing.T) {
 			Addrs:     []ids.ShortID{keys[2].Address()},
 		},
 		20000,
-		[]*secp256k1.PrivateKey{keys[1]},
 	)
+	require.NoError(err)
+	addValidatorTx, err := walletsigner.SignUnsigned(context.Background(), txSigner, uAddValTx)
 	require.NoError(err)
 
 	vm.ctx.Lock.Unlock()

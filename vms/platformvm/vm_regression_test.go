@@ -1729,7 +1729,7 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 		}),
 	)
 	require.NoError(err)
-	primaryTx, err := walletsigner.SignUnsigned(context.Background(), txSigner, utx)
+	primaryTx, err := walletsigner.SignUnsigned(context.Background(), txSigner, uPrimaryTx)
 	require.NoError(err)
 
 	vm.ctx.Lock.Unlock()
@@ -1750,7 +1750,8 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 	require.NoError(err)
 
 	// insert the subnet validator
-	subnetTx, err := txBuilder.NewAddSubnetValidatorTx(
+	builder, txSigner = txBuilder.Builders(keys[0], keys[1])
+	uAddSubnetValTx, err := builder.NewAddSubnetValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
 				NodeID: nodeID,
@@ -1760,14 +1761,13 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 			},
 			Subnet: subnetID,
 		},
-		[]*secp256k1.PrivateKey{keys[0], keys[1]},
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{addr},
 		}),
 	)
 	require.NoError(err)
-	tx, err := walletsigner.SignUnsigned(context.Background(), txSigner, utx)
+	subnetTx, err := walletsigner.SignUnsigned(context.Background(), txSigner, uAddSubnetValTx)
 	require.NoError(err)
 
 	vm.ctx.Lock.Unlock()
@@ -1831,7 +1831,8 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 	require.NoError(err)
 	require.NotEqual(sk1, sk2)
 
-	primaryRestartTx, err := txBuilder.NewAddPermissionlessValidatorTx(
+	builder, txSigner = txBuilder.Builders(keys...)
+	uPrimaryRestartTx, err := builder.NewAddPermissionlessValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
 				NodeID: nodeID,
@@ -1852,16 +1853,14 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 			Addrs:     []ids.ShortID{addr},
 		},
 		reward.PercentDenominator,
-		keys,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{addr},
 		}),
 	)
 	require.NoError(err)
-	tx, err := walletsigner.SignUnsigned(context.Background(), txSigner, utx)
+	primaryRestartTx, err := walletsigner.SignUnsigned(context.Background(), txSigner, uPrimaryRestartTx)
 	require.NoError(err)
-	uPrimaryRestartTx := primaryRestartTx.Unsigned.(*txs.AddPermissionlessValidatorTx)
 
 	vm.ctx.Lock.Unlock()
 	require.NoError(vm.issueTxFromRPC(primaryRestartTx))
@@ -1957,7 +1956,9 @@ func TestPrimaryNetworkValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	// Add a primary network validator with no BLS key
 	nodeID := ids.GenerateTestNodeID()
 	addr := keys[0].PublicKey().Address()
-	primaryTx1, err := txBuilder.NewAddValidatorTx(
+
+	builder, txSigner := txBuilder.Builders(keys[0])
+	uAddValTx1, err := builder.NewAddValidatorTx(
 		&txs.Validator{
 			NodeID: nodeID,
 			Start:  uint64(primaryStartTime1.Unix()),
@@ -1969,14 +1970,13 @@ func TestPrimaryNetworkValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 			Addrs:     []ids.ShortID{addr},
 		},
 		reward.PercentDenominator,
-		[]*secp256k1.PrivateKey{keys[0]},
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{addr},
 		}),
 	)
 	require.NoError(err)
-	tx, err := walletsigner.SignUnsigned(context.Background(), txSigner, utx)
+	primaryTx1, err := walletsigner.SignUnsigned(context.Background(), txSigner, uAddValTx1)
 	require.NoError(err)
 
 	vm.ctx.Lock.Unlock()
@@ -2027,7 +2027,8 @@ func TestPrimaryNetworkValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	sk2, err := bls.NewSecretKey()
 	require.NoError(err)
 
-	primaryRestartTx, err := txBuilder.NewAddPermissionlessValidatorTx(
+	builder, txSigner = txBuilder.Builders(keys...)
+	uPrimaryRestartTx, err := builder.NewAddPermissionlessValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
 				NodeID: nodeID,
@@ -2048,14 +2049,13 @@ func TestPrimaryNetworkValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 			Addrs:     []ids.ShortID{addr},
 		},
 		reward.PercentDenominator,
-		keys,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{addr},
 		}),
 	)
 	require.NoError(err)
-	tx, err := walletsigner.SignUnsigned(context.Background(), txSigner, utx)
+	primaryRestartTx, err := walletsigner.SignUnsigned(context.Background(), txSigner, uPrimaryRestartTx)
 	require.NoError(err)
 
 	vm.ctx.Lock.Unlock()
@@ -2116,7 +2116,9 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	// Add a primary network validator with no BLS key
 	nodeID := ids.GenerateTestNodeID()
 	addr := keys[0].PublicKey().Address()
-	primaryTx1, err := txBuilder.NewAddValidatorTx(
+
+	builder, txSigner := txBuilder.Builders(keys[0])
+	uPrimaryTx1, err := builder.NewAddValidatorTx(
 		&txs.Validator{
 			NodeID: nodeID,
 			Start:  uint64(primaryStartTime1.Unix()),
@@ -2128,14 +2130,13 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 			Addrs:     []ids.ShortID{addr},
 		},
 		reward.PercentDenominator,
-		[]*secp256k1.PrivateKey{keys[0]},
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{addr},
 		}),
 	)
 	require.NoError(err)
-	tx, err := walletsigner.SignUnsigned(context.Background(), txSigner, utx)
+	primaryTx1, err := walletsigner.SignUnsigned(context.Background(), txSigner, uPrimaryTx1)
 	require.NoError(err)
 
 	vm.ctx.Lock.Unlock()
@@ -2156,7 +2157,8 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	require.NoError(err)
 
 	// insert the subnet validator
-	subnetTx, err := txBuilder.NewAddSubnetValidatorTx(
+	builder, txSigner = txBuilder.Builders(keys[0], keys[1])
+	uAddSubnetValTx, err := builder.NewAddSubnetValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
 				NodeID: nodeID,
@@ -2166,14 +2168,13 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 			},
 			Subnet: subnetID,
 		},
-		[]*secp256k1.PrivateKey{keys[0], keys[1]},
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{addr},
 		}),
 	)
 	require.NoError(err)
-	tx, err := walletsigner.SignUnsigned(context.Background(), txSigner, utx)
+	subnetTx, err := walletsigner.SignUnsigned(context.Background(), txSigner, uAddSubnetValTx)
 	require.NoError(err)
 
 	vm.ctx.Lock.Unlock()
@@ -2236,7 +2237,8 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	sk2, err := bls.NewSecretKey()
 	require.NoError(err)
 
-	primaryRestartTx, err := txBuilder.NewAddPermissionlessValidatorTx(
+	builder, txSigner = txBuilder.Builders(keys...)
+	uPrimaryRestartTx, err := builder.NewAddPermissionlessValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
 				NodeID: nodeID,
@@ -2257,14 +2259,13 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 			Addrs:     []ids.ShortID{addr},
 		},
 		reward.PercentDenominator,
-		keys,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{addr},
 		}),
 	)
 	require.NoError(err)
-	tx, err := walletsigner.SignUnsigned(context.Background(), txSigner, utx)
+	primaryRestartTx, err := walletsigner.SignUnsigned(context.Background(), txSigner, uPrimaryRestartTx)
 	require.NoError(err)
 
 	vm.ctx.Lock.Unlock()
@@ -2332,7 +2333,9 @@ func TestSubnetValidatorSetAfterPrimaryNetworkValidatorRemoval(t *testing.T) {
 	// Add a primary network validator with no BLS key
 	nodeID := ids.GenerateTestNodeID()
 	addr := keys[0].PublicKey().Address()
-	primaryTx1, err := txBuilder.NewAddValidatorTx(
+
+	builder, txSigner := txBuilder.Builders(keys[0])
+	uPrimaryTx1, err := builder.NewAddValidatorTx(
 		&txs.Validator{
 			NodeID: nodeID,
 			Start:  uint64(primaryStartTime1.Unix()),
@@ -2344,14 +2347,13 @@ func TestSubnetValidatorSetAfterPrimaryNetworkValidatorRemoval(t *testing.T) {
 			Addrs:     []ids.ShortID{addr},
 		},
 		reward.PercentDenominator,
-		[]*secp256k1.PrivateKey{keys[0]},
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{addr},
 		}),
 	)
 	require.NoError(err)
-	tx, err := walletsigner.SignUnsigned(context.Background(), txSigner, utx)
+	primaryTx1, err := walletsigner.SignUnsigned(context.Background(), txSigner, uPrimaryTx1)
 	require.NoError(err)
 
 	vm.ctx.Lock.Unlock()
@@ -2369,7 +2371,8 @@ func TestSubnetValidatorSetAfterPrimaryNetworkValidatorRemoval(t *testing.T) {
 	require.NoError(err)
 
 	// insert the subnet validator
-	subnetTx, err := txBuilder.NewAddSubnetValidatorTx(
+	builder, txSigner = txBuilder.Builders(keys[0], keys[1])
+	uAddSubnetValTx, err := builder.NewAddSubnetValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
 				NodeID: nodeID,
@@ -2379,14 +2382,13 @@ func TestSubnetValidatorSetAfterPrimaryNetworkValidatorRemoval(t *testing.T) {
 			},
 			Subnet: subnetID,
 		},
-		[]*secp256k1.PrivateKey{keys[0], keys[1]},
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{addr},
 		}),
 	)
 	require.NoError(err)
-	tx, err := walletsigner.SignUnsigned(context.Background(), txSigner, utx)
+	subnetTx, err := walletsigner.SignUnsigned(context.Background(), txSigner, uAddSubnetValTx)
 	require.NoError(err)
 
 	vm.ctx.Lock.Unlock()
