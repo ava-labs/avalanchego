@@ -4,8 +4,6 @@
 package merkledb
 
 import (
-	"crypto/sha256"
-	"encoding/binary"
 	"slices"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -72,39 +70,7 @@ func (n *node) bytes() []byte {
 // Returns and caches the ID of this node.
 func (n *node) calculateID(metrics merkleMetrics) ids.ID {
 	metrics.HashCalculated()
-
-	var (
-		sha  = sha256.New()
-		hash ids.ID
-	)
-
-	_, _ = sha.Write(hash[:binary.PutUvarint(hash[:], uint64(len(n.children)))])
-
-	// ensure that the order of entries is consistent
-	keys := make([]byte, 0, BranchFactorLargest)
-	for k := range n.children {
-		keys = append(keys, k)
-	}
-	slices.Sort(keys)
-	for _, index := range keys {
-		entry := n.children[index]
-		_, _ = sha.Write(hash[:binary.PutUvarint(hash[:], uint64(index))])
-		_, _ = sha.Write(entry.id[:])
-	}
-
-	if n.valueDigest.HasValue() {
-		_, _ = sha.Write(trueBytes)
-		value := n.valueDigest.Value()
-		_, _ = sha.Write(hash[:binary.PutUvarint(hash[:], uint64(len(value)))])
-		_, _ = sha.Write(value)
-	} else {
-		_, _ = sha.Write(falseBytes)
-	}
-
-	_, _ = sha.Write(hash[:binary.PutUvarint(hash[:], uint64(n.key.length))])
-	_, _ = sha.Write(n.key.Bytes())
-	sha.Sum(hash[:0])
-	return hash
+	return hashNode(n)
 }
 
 // Set [n]'s value to [val].
