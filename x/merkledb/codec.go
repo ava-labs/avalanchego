@@ -107,7 +107,7 @@ func encodeDBNode(n *dbNode) []byte {
 //
 // Assumes [n] is non-nil.
 // This method is performance critical. It is not expected to perform any memory
-// alloactions.
+// allocations.
 func hashNode(n *node) ids.ID {
 	var (
 		sha  = sha256.New()
