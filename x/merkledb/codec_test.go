@@ -259,22 +259,13 @@ func TestUintSize(t *testing.T) {
 }
 
 func Benchmark_EncodeUint(b *testing.B) {
-<<<<<<< HEAD
-=======
-	c := codec.(*codecImpl)
-
->>>>>>> master
 	var dst bytes.Buffer
 	dst.Grow(binary.MaxVarintLen64)
 
 	for _, v := range []uint64{0, 1, 2, 32, 1024, 32768} {
 		b.Run(strconv.FormatUint(v, 10), func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
-<<<<<<< HEAD
 				encodeUint(&dst, v)
-=======
-				c.encodeUint(&dst, v)
->>>>>>> master
 				dst.Reset()
 			}
 		})
