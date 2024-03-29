@@ -4,6 +4,7 @@
 package executor
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"testing"
@@ -45,6 +46,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
+
+	walletsigner "github.com/ava-labs/avalanchego/wallet/chain/p/signer"
 )
 
 const (
@@ -213,7 +216,8 @@ func addSubnet(
 
 	// Create a subnet
 	var err error
-	testSubnet1, err = txBuilder.NewCreateSubnetTx(
+	builder, signer := env.txBuilder.Builders([]*secp256k1.PrivateKey{preFundedKeys[0]})
+	utx, err := builder.NewCreateSubnetTx(
 		&secp256k1fx.OutputOwners{
 			Threshold: 2,
 			Addrs: []ids.ShortID{
@@ -222,12 +226,13 @@ func addSubnet(
 				preFundedKeys[2].PublicKey().Address(),
 			},
 		},
-		[]*secp256k1.PrivateKey{preFundedKeys[0]},
 		common.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
 		}),
 	)
+	require.NoError(err)
+	testSubnet1, err = walletsigner.SignUnsigned(context.Background(), signer, utx)
 	require.NoError(err)
 
 	// store it
