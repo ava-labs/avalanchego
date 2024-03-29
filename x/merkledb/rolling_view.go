@@ -4,6 +4,7 @@
 package merkledb
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -466,6 +467,13 @@ func (v *RollingView) recordKeyChange(key Key, after *node, hadValue bool, newNo
 	if existing, ok := v.changes.nodes[key]; ok {
 		fmt.Println("recordKeyChange", key, "before", existing.before, "prev after", existing.after, "new after", after)
 		existing.after = after
+		// TODO: how to compare node equality?
+		if existing.before == nil && existing.after == nil {
+			delete(v.changes.nodes, key)
+		}
+		if existing.before != nil && existing.after != nil && bytes.Equal(codec.encodeHashValues(existing.before), codec.encodeHashValues(existing.after)) {
+			delete(v.changes.nodes, key)
+		}
 		return nil
 	}
 
@@ -498,6 +506,14 @@ func (v *RollingView) recordValueChange(key Key, value maybe.Maybe[[]byte]) (*ch
 	if existing, ok := v.changes.values[key]; ok {
 		existing.after = value
 		// TODO: Don't record changes until they are fixed?
+		//
+		// TODO: move this to commit step?
+		if existing.before.IsNothing() && existing.after.IsNothing() {
+			delete(v.changes.values, key)
+		}
+		if existing.before.HasValue() && existing.after.HasValue() && bytes.Equal(existing.before.Value(), existing.after.Value()) {
+			delete(v.changes.values, key)
+		}
 		return existing, nil
 	}
 
