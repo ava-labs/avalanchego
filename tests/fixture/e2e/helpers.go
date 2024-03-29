@@ -200,7 +200,7 @@ func CheckBootstrapIsPossible(network *tmpnet.Network) {
 	defer cancel()
 
 	node := tmpnet.NewEphemeralNode(tmpnet.FlagsMap{})
-	require.NoError(network.StartNode(DefaultContext(), ginkgo.GinkgoWriter, node))
+	require.NoError(network.StartNode(ctx, ginkgo.GinkgoWriter, node))
 	// StartNode will initiate node stop if an error is encountered during start,
 	// so no further cleanup effort is required if an error is seen here.
 
