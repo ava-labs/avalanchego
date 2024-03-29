@@ -39,7 +39,7 @@ func TestBuildBlockBasic(t *testing.T) {
 	defer env.ctx.Lock.Unlock()
 
 	// Create a valid transaction
-	builder, signer := env.txBuilder.Builders(testSubnet1ControlKeys[0], testSubnet1ControlKeys[1])
+	builder, signer := env.factory.MakeWallet(testSubnet1ControlKeys[0], testSubnet1ControlKeys[1])
 	utx, err := builder.NewCreateChainTx(
 		testSubnet1.ID(),
 		nil,
@@ -111,8 +111,8 @@ func TestBuildBlockShouldReward(t *testing.T) {
 	require.NoError(err)
 
 	// Create a valid [AddPermissionlessValidatorTx]
-	txBuilder, txSigner := env.txBuilder.Builders(preFundedKeys[0])
-	utx, err := txBuilder.NewAddPermissionlessValidatorTx(
+	builder, txSigner := env.factory.MakeWallet(preFundedKeys[0])
+	utx, err := builder.NewAddPermissionlessValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
 				NodeID: nodeID,
@@ -251,7 +251,7 @@ func TestBuildBlockForceAdvanceTime(t *testing.T) {
 	defer env.ctx.Lock.Unlock()
 
 	// Create a valid transaction
-	builder, signer := env.txBuilder.Builders(testSubnet1ControlKeys[0], testSubnet1ControlKeys[1])
+	builder, signer := env.factory.MakeWallet(testSubnet1ControlKeys[0], testSubnet1ControlKeys[1])
 	utx, err := builder.NewCreateChainTx(
 		testSubnet1.ID(),
 		nil,
@@ -320,7 +320,7 @@ func TestBuildBlockInvalidStakingDurations(t *testing.T) {
 	sk, err := bls.NewSecretKey()
 	require.NoError(err)
 
-	builder1, signer1 := env.txBuilder.Builders(preFundedKeys[0])
+	builder1, signer1 := env.factory.MakeWallet(preFundedKeys[0])
 	utx1, err := builder1.NewAddPermissionlessValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
@@ -361,7 +361,7 @@ func TestBuildBlockInvalidStakingDurations(t *testing.T) {
 	sk, err = bls.NewSecretKey()
 	require.NoError(err)
 
-	builder2, signer2 := env.txBuilder.Builders(preFundedKeys[2])
+	builder2, signer2 := env.factory.MakeWallet(preFundedKeys[2])
 	utx2, err := builder2.NewAddPermissionlessValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
@@ -426,7 +426,7 @@ func TestPreviouslyDroppedTxsCannotBeReAddedToMempool(t *testing.T) {
 	defer env.ctx.Lock.Unlock()
 
 	// Create a valid transaction
-	builder, signer := env.txBuilder.Builders(testSubnet1ControlKeys[0], testSubnet1ControlKeys[1])
+	builder, signer := env.factory.MakeWallet(testSubnet1ControlKeys[0], testSubnet1ControlKeys[1])
 	utx, err := builder.NewCreateChainTx(
 		testSubnet1.ID(),
 		nil,

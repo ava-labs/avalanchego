@@ -33,7 +33,7 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
-	builder, signer := env.txBuilder.Builders(preFundedKeys[0], preFundedKeys[1])
+	builder, signer := env.factory.MakeWallet(preFundedKeys[0], preFundedKeys[1])
 	utx, err := builder.NewCreateChainTx(
 		testSubnet1.ID(),
 		nil,
@@ -67,7 +67,7 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
-	builder, signer := env.txBuilder.Builders(testSubnet1ControlKeys[0], testSubnet1ControlKeys[1])
+	builder, signer := env.factory.MakeWallet(testSubnet1ControlKeys[0], testSubnet1ControlKeys[1])
 	utx, err := builder.NewCreateChainTx(
 		testSubnet1.ID(),
 		nil,
@@ -108,7 +108,7 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
-	builder, signer := env.txBuilder.Builders(testSubnet1ControlKeys[0], testSubnet1ControlKeys[1])
+	builder, signer := env.factory.MakeWallet(testSubnet1ControlKeys[0], testSubnet1ControlKeys[1])
 	utx, err := builder.NewCreateChainTx(
 		testSubnet1.ID(),
 		nil,
@@ -141,7 +141,7 @@ func TestCreateChainTxValid(t *testing.T) {
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
-	builder, signer := env.txBuilder.Builders(testSubnet1ControlKeys[0], testSubnet1ControlKeys[1])
+	builder, signer := env.factory.MakeWallet(testSubnet1ControlKeys[0], testSubnet1ControlKeys[1])
 	utx, err := builder.NewCreateChainTx(
 		testSubnet1.ID(),
 		nil,
@@ -208,8 +208,8 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 			cfg := *env.config
 			cfg.CreateBlockchainTxFee = test.fee
 
-			builderBlah := txstest.NewBuilder(env.ctx, &cfg, env.state)
-			builder, signer := builderBlah.Builders(preFundedKeys...)
+			factory := txstest.NewWalletFactory(env.ctx, &cfg, env.state)
+			builder, signer := factory.MakeWallet(preFundedKeys...)
 			utx, err := builder.NewCreateChainTx(
 				testSubnet1.ID(),
 				nil,

@@ -130,7 +130,7 @@ type environment struct {
 	mockedState    *state.MockState
 	uptimes        uptime.Manager
 	utxosVerifier  utxo.Verifier
-	txBuilder      *txstest.Builder
+	factory        *txstest.WalletFactory
 	backend        *executor.Backend
 }
 
@@ -158,7 +158,7 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller, f fork) *environment 
 		res.state = defaultState(res.config, res.ctx, res.baseDB, rewardsCalc)
 		res.uptimes = uptime.NewManager(res.state, res.clk)
 		res.utxosVerifier = utxo.NewVerifier(res.ctx, res.clk, res.fx)
-		res.txBuilder = txstest.NewBuilder(
+		res.factory = txstest.NewWalletFactory(
 			res.ctx,
 			res.config,
 			res.state,
@@ -168,8 +168,7 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller, f fork) *environment 
 		res.mockedState = state.NewMockState(ctrl)
 		res.uptimes = uptime.NewManager(res.mockedState, res.clk)
 		res.utxosVerifier = utxo.NewVerifier(res.ctx, res.clk, res.fx)
-
-		res.txBuilder = txstest.NewBuilder(
+		res.factory = txstest.NewWalletFactory(
 			res.ctx,
 			res.config,
 			res.mockedState,
@@ -251,7 +250,7 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller, f fork) *environment 
 }
 
 func addSubnet(env *environment) {
-	builder, signer := env.txBuilder.Builders(preFundedKeys[0])
+	builder, signer := env.factory.MakeWallet(preFundedKeys[0])
 	utx, err := builder.NewCreateSubnetTx(
 		&secp256k1fx.OutputOwners{
 			Threshold: 2,
@@ -492,7 +491,7 @@ func addPendingValidator(
 	rewardAddress ids.ShortID,
 	keys []*secp256k1.PrivateKey,
 ) (*txs.Tx, error) {
-	builder, signer := env.txBuilder.Builders(keys...)
+	builder, signer := env.factory.MakeWallet(keys...)
 	utx, err := builder.NewAddValidatorTx(
 		&txs.Validator{
 			NodeID: nodeID,

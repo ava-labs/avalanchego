@@ -241,7 +241,7 @@ func TestRewardDelegatorTxExecuteOnCommitPreDelegateeDeferral(t *testing.T) {
 	vdrEndTime := uint64(defaultValidateStartTime.Add(2 * defaultMinStakingDuration).Unix())
 	vdrNodeID := ids.GenerateTestNodeID()
 
-	builder, signer := env.txBuilder.Builders(preFundedKeys[0])
+	builder, signer := env.factory.MakeWallet(preFundedKeys[0])
 	uVdrTx, err := builder.NewAddValidatorTx(
 		&txs.Validator{
 			NodeID: vdrNodeID,
@@ -373,7 +373,7 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 	vdrEndTime := uint64(defaultValidateStartTime.Add(2 * defaultMinStakingDuration).Unix())
 	vdrNodeID := ids.GenerateTestNodeID()
 
-	builder, signer := env.txBuilder.Builders(preFundedKeys[0])
+	builder, signer := env.factory.MakeWallet(preFundedKeys[0])
 	uVdrTx, err := builder.NewAddValidatorTx(
 		&txs.Validator{
 			NodeID: vdrNodeID,
@@ -600,7 +600,7 @@ func TestRewardDelegatorTxAndValidatorTxExecuteOnCommitPostDelegateeDeferral(t *
 	vdrEndTime := uint64(defaultValidateStartTime.Add(2 * defaultMinStakingDuration).Unix())
 	vdrNodeID := ids.GenerateTestNodeID()
 
-	builder, signer := env.txBuilder.Builders(preFundedKeys[0])
+	builder, signer := env.factory.MakeWallet(preFundedKeys[0])
 	uVdrTx, err := builder.NewAddValidatorTx(
 		&txs.Validator{
 			NodeID: vdrNodeID,
@@ -773,7 +773,7 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	vdrEndTime := uint64(defaultValidateStartTime.Add(2 * defaultMinStakingDuration).Unix())
 	vdrNodeID := ids.GenerateTestNodeID()
 
-	builder, signer := env.txBuilder.Builders(preFundedKeys[0])
+	builder, signer := env.factory.MakeWallet(preFundedKeys[0])
 	uVdrTx, err := builder.NewAddValidatorTx(
 		&txs.Validator{
 			NodeID: vdrNodeID,

@@ -13,30 +13,30 @@ import (
 	"github.com/ava-labs/avalanchego/wallet/chain/p/signer"
 )
 
-func NewBuilder(
+func NewWalletFactory(
 	ctx *snow.Context,
 	cfg *config.Config,
 	state state.State,
-) *Builder {
-	return &Builder{
+) *WalletFactory {
+	return &WalletFactory{
 		ctx:   ctx,
 		cfg:   cfg,
 		state: state,
 	}
 }
 
-type Builder struct {
+type WalletFactory struct {
 	ctx   *snow.Context
 	cfg   *config.Config
 	state state.State
 }
 
-func (b *Builder) Builders(keys ...*secp256k1.PrivateKey) (builder.Builder, signer.Signer) {
+func (w *WalletFactory) MakeWallet(keys ...*secp256k1.PrivateKey) (builder.Builder, signer.Signer) {
 	var (
 		kc      = secp256k1fx.NewKeychain(keys...)
 		addrs   = kc.Addresses()
-		backend = newBackend(addrs, b.state, b.ctx.SharedMemory)
-		context = newContext(b.ctx, b.cfg, b.state.GetTimestamp())
+		backend = newBackend(addrs, w.state, w.ctx.SharedMemory)
+		context = newContext(w.ctx, w.cfg, w.state.GetTimestamp())
 	)
 
 	return builder.New(addrs, context, backend), signer.New(kc, backend)

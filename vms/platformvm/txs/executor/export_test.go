@@ -53,7 +53,7 @@ func TestNewExportTx(t *testing.T) {
 		t.Run(tt.description, func(t *testing.T) {
 			require := require.New(t)
 
-			builder, signer := env.txBuilder.Builders(tt.sourceKeys...)
+			builder, signer := env.factory.MakeWallet(tt.sourceKeys...)
 			utx, err := builder.NewExportTx(
 				tt.destinationChainID,
 				[]*avax.TransferableOutput{{

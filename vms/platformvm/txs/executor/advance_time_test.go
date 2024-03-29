@@ -379,7 +379,7 @@ func TestAdvanceTimeTxUpdateStakers(t *testing.T) {
 			}
 
 			for _, staker := range test.subnetStakers {
-				builder, signer := env.txBuilder.Builders(preFundedKeys[0], preFundedKeys[1])
+				builder, signer := env.factory.MakeWallet(preFundedKeys[0], preFundedKeys[1])
 				utx, err := builder.NewAddSubnetValidatorTx(
 					&txs.SubnetValidator{
 						Validator: txs.Validator{
@@ -479,7 +479,7 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 	subnetVdr1StartTime := defaultValidateStartTime
 	subnetVdr1EndTime := defaultValidateStartTime.Add(defaultMinStakingDuration)
 
-	builder, signer := env.txBuilder.Builders(preFundedKeys[0], preFundedKeys[1])
+	builder, signer := env.factory.MakeWallet(preFundedKeys[0], preFundedKeys[1])
 	utx, err := builder.NewAddSubnetValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
@@ -593,7 +593,7 @@ func TestTrackedSubnet(t *testing.T) {
 
 			subnetVdr1StartTime := defaultValidateStartTime.Add(1 * time.Minute)
 			subnetVdr1EndTime := defaultValidateStartTime.Add(10 * defaultMinStakingDuration).Add(1 * time.Minute)
-			builder, signer := env.txBuilder.Builders(preFundedKeys[0], preFundedKeys[1])
+			builder, signer := env.factory.MakeWallet(preFundedKeys[0], preFundedKeys[1])
 			utx, err := builder.NewAddSubnetValidatorTx(
 				&txs.SubnetValidator{
 					Validator: txs.Validator{
@@ -700,7 +700,7 @@ func TestAdvanceTimeTxDelegatorStakerWeight(t *testing.T) {
 	pendingDelegatorStartTime := pendingValidatorStartTime.Add(1 * time.Second)
 	pendingDelegatorEndTime := pendingDelegatorStartTime.Add(1 * time.Second)
 
-	builder, signer := env.txBuilder.Builders(preFundedKeys[0], preFundedKeys[1], preFundedKeys[4])
+	builder, signer := env.factory.MakeWallet(preFundedKeys[0], preFundedKeys[1], preFundedKeys[4])
 	utx, err := builder.NewAddDelegatorTx(
 		&txs.Validator{
 			NodeID: nodeID,
@@ -800,7 +800,7 @@ func TestAdvanceTimeTxDelegatorStakers(t *testing.T) {
 	// Add delegator
 	pendingDelegatorStartTime := pendingValidatorStartTime.Add(1 * time.Second)
 	pendingDelegatorEndTime := pendingDelegatorStartTime.Add(defaultMinStakingDuration)
-	builder, signer := env.txBuilder.Builders(preFundedKeys[0], preFundedKeys[1], preFundedKeys[4])
+	builder, signer := env.factory.MakeWallet(preFundedKeys[0], preFundedKeys[1], preFundedKeys[4])
 	utx, err := builder.NewAddDelegatorTx(
 		&txs.Validator{
 			NodeID: nodeID,
@@ -918,7 +918,7 @@ func addPendingValidator(
 	nodeID ids.NodeID,
 	keys []*secp256k1.PrivateKey,
 ) (*txs.Tx, error) {
-	builder, signer := env.txBuilder.Builders(keys...)
+	builder, signer := env.factory.MakeWallet(keys...)
 	utx, err := builder.NewAddValidatorTx(
 		&txs.Validator{
 			NodeID: nodeID,

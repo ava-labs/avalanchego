@@ -117,7 +117,7 @@ type environment struct {
 	state          state.State
 	uptimes        uptime.Manager
 	utxosVerifier  utxo.Verifier
-	txBuilder      *txstest.Builder
+	factory        *txstest.WalletFactory
 	backend        txexecutor.Backend
 }
 
@@ -151,12 +151,7 @@ func newEnvironment(t *testing.T, f fork) *environment { //nolint:unparam
 
 	res.uptimes = uptime.NewManager(res.state, res.clk)
 	res.utxosVerifier = utxo.NewVerifier(res.ctx, res.clk, res.fx)
-
-	res.txBuilder = txstest.NewBuilder(
-		res.ctx,
-		res.config,
-		res.state,
-	)
+	res.factory = txstest.NewWalletFactory(res.ctx, res.config, res.state)
 
 	genesisID := res.state.GetLastAccepted()
 	res.backend = txexecutor.Backend{
@@ -239,7 +234,7 @@ func newEnvironment(t *testing.T, f fork) *environment { //nolint:unparam
 func addSubnet(t *testing.T, env *environment) {
 	require := require.New(t)
 
-	builder, signer := env.txBuilder.Builders(preFundedKeys[0])
+	builder, signer := env.factory.MakeWallet(preFundedKeys[0])
 	utx, err := builder.NewCreateSubnetTx(
 		&secp256k1fx.OutputOwners{
 			Threshold: 2,

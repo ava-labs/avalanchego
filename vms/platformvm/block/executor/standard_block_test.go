@@ -510,7 +510,7 @@ func TestBanffStandardBlockUpdateStakers(t *testing.T) {
 			}
 
 			for _, staker := range test.subnetStakers {
-				builder, signer := env.txBuilder.Builders(preFundedKeys[0], preFundedKeys[1])
+				builder, signer := env.factory.MakeWallet(preFundedKeys[0], preFundedKeys[1])
 				utx, err := builder.NewAddSubnetValidatorTx(
 					&txs.SubnetValidator{
 						Validator: txs.Validator{
@@ -604,7 +604,7 @@ func TestBanffStandardBlockRemoveSubnetValidator(t *testing.T) {
 	subnetValidatorNodeID := genesisNodeIDs[0]
 	subnetVdr1StartTime := defaultValidateStartTime
 	subnetVdr1EndTime := defaultValidateStartTime.Add(defaultMinStakingDuration)
-	builder, signer := env.txBuilder.Builders(preFundedKeys[0], preFundedKeys[1])
+	builder, signer := env.factory.MakeWallet(preFundedKeys[0], preFundedKeys[1])
 	utx, err := builder.NewAddSubnetValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
@@ -710,7 +710,7 @@ func TestBanffStandardBlockTrackedSubnet(t *testing.T) {
 			subnetValidatorNodeID := genesisNodeIDs[0]
 			subnetVdr1StartTime := defaultGenesisTime.Add(1 * time.Minute)
 			subnetVdr1EndTime := defaultGenesisTime.Add(10 * defaultMinStakingDuration).Add(1 * time.Minute)
-			builder, signer := env.txBuilder.Builders(preFundedKeys[0], preFundedKeys[1])
+			builder, signer := env.factory.MakeWallet(preFundedKeys[0], preFundedKeys[1])
 			utx, err := builder.NewAddSubnetValidatorTx(
 				&txs.SubnetValidator{
 					Validator: txs.Validator{
@@ -805,7 +805,7 @@ func TestBanffStandardBlockDelegatorStakerWeight(t *testing.T) {
 	pendingDelegatorStartTime := pendingValidatorStartTime.Add(1 * time.Second)
 	pendingDelegatorEndTime := pendingDelegatorStartTime.Add(1 * time.Second)
 
-	builder, signer := env.txBuilder.Builders(preFundedKeys[0], preFundedKeys[1], preFundedKeys[4])
+	builder, signer := env.factory.MakeWallet(preFundedKeys[0], preFundedKeys[1], preFundedKeys[4])
 	utx, err := builder.NewAddDelegatorTx(
 		&txs.Validator{
 			NodeID: nodeID,
