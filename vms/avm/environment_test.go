@@ -233,12 +233,12 @@ func setup(tb testing.TB, c *envConfig) *environment {
 			vm: vm,
 			txBuilderBackend: newServiceBackend(
 				vm.feeAssetID,
-				vm.parser.Codec(),
 				vm.ctx,
 				&vm.Config,
 				&vm.clock,
 				vm.state,
-				vm.AtomicUTXOManager,
+				vm.ctx.SharedMemory,
+				vm.parser.Codec(),
 			),
 		},
 		walletService: &WalletService{
