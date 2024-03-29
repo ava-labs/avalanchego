@@ -4,18 +4,21 @@
 package executor
 
 import (
+	"context"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/wallet/chain/p/builder"
+	"github.com/ava-labs/avalanchego/wallet/chain/p/signer"
 )
 
 func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
@@ -54,21 +57,28 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 			env.ctx.Lock.Lock()
 			defer env.ctx.Lock.Unlock()
 
-			ins, outs, _, signers, err := env.utxosHandler.Spend(env.state, preFundedKeys, 0, test.fee, ids.ShortEmpty)
+			env.state.SetTimestamp(test.time) // to duly set fee
+
+			addrs := set.NewSet[ids.ShortID](len(preFundedKeys))
+			for _, key := range preFundedKeys {
+				addrs.Add(key.Address())
+			}
+
+			cfg := *env.config
+			cfg.CreateSubnetTxFee = test.fee
+			builderContext := txstest.NewContext(env.ctx, &cfg, env.state.GetTimestamp())
+			backend := txstest.NewBackend(addrs, env.state, env.msm)
+			pBuilder := builder.New(addrs, builderContext, backend)
+
+			utx, err := pBuilder.NewCreateSubnetTx(
+				&secp256k1fx.OutputOwners{}, // owner
+			)
 			require.NoError(err)
 
-			// Create the tx
-			utx := &txs.CreateSubnetTx{
-				BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-					NetworkID:    env.ctx.NetworkID,
-					BlockchainID: env.ctx.ChainID,
-					Ins:          ins,
-					Outs:         outs,
-				}},
-				Owner: &secp256k1fx.OutputOwners{},
-			}
-			tx := &txs.Tx{Unsigned: utx}
-			require.NoError(tx.Sign(txs.Codec, signers))
+			kc := secp256k1fx.NewKeychain(preFundedKeys...)
+			s := signer.New(kc, backend)
+			tx, err := signer.SignUnsigned(context.Background(), s, utx)
+			require.NoError(err)
 
 			stateDiff, err := state.NewDiff(lastAcceptedID, env)
 			require.NoError(err)

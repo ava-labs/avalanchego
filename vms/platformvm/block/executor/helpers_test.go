@@ -35,7 +35,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
@@ -46,11 +45,12 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
-	p_tx_builder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 	pvalidators "github.com/ava-labs/avalanchego/vms/platformvm/validators"
+	walletcommon "github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
 
 const (
@@ -126,10 +126,9 @@ type environment struct {
 	fx             fx.Fx
 	state          state.State
 	mockedState    *state.MockState
-	atomicUTXOs    avax.AtomicUTXOManager
 	uptimes        uptime.Manager
-	utxosHandler   utxo.Handler
-	txBuilder      p_tx_builder.Builder
+	utxosVerifier  utxo.Verifier
+	txBuilder      *txstest.Builder
 	backend        *executor.Backend
 }
 
@@ -152,34 +151,26 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller, f fork) *environment 
 	res.fx = defaultFx(res.clk, res.ctx.Log, res.isBootstrapped.Get())
 
 	rewardsCalc := reward.NewCalculator(res.config.RewardConfig)
-	res.atomicUTXOs = avax.NewAtomicUTXOManager(res.ctx.SharedMemory, txs.Codec)
 
 	if ctrl == nil {
 		res.state = defaultState(res.config, res.ctx, res.baseDB, rewardsCalc)
 		res.uptimes = uptime.NewManager(res.state, res.clk)
-		res.utxosHandler = utxo.NewHandler(res.ctx, res.clk, res.fx)
-		res.txBuilder = p_tx_builder.New(
+		res.utxosVerifier = utxo.NewVerifier(res.ctx, res.clk, res.fx)
+		res.txBuilder = txstest.NewBuilder(
 			res.ctx,
 			res.config,
-			res.clk,
-			res.fx,
 			res.state,
-			res.atomicUTXOs,
-			res.utxosHandler,
 		)
 	} else {
 		genesisBlkID = ids.GenerateTestID()
 		res.mockedState = state.NewMockState(ctrl)
 		res.uptimes = uptime.NewManager(res.mockedState, res.clk)
-		res.utxosHandler = utxo.NewHandler(res.ctx, res.clk, res.fx)
-		res.txBuilder = p_tx_builder.New(
+		res.utxosVerifier = utxo.NewVerifier(res.ctx, res.clk, res.fx)
+
+		res.txBuilder = txstest.NewBuilder(
 			res.ctx,
 			res.config,
-			res.clk,
-			res.fx,
 			res.mockedState,
-			res.atomicUTXOs,
-			res.utxosHandler,
 		)
 
 		// setup expectations strictly needed for environment creation
@@ -192,7 +183,7 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller, f fork) *environment 
 		Clk:          res.clk,
 		Bootstrapped: res.isBootstrapped,
 		Fx:           res.fx,
-		FlowChecker:  res.utxosHandler,
+		FlowChecker:  res.utxosVerifier,
 		Uptimes:      res.uptimes,
 		Rewards:      rewardsCalc,
 	}
@@ -261,15 +252,19 @@ func addSubnet(env *environment) {
 	// Create a subnet
 	var err error
 	testSubnet1, err = env.txBuilder.NewCreateSubnetTx(
-		2, // threshold; 2 sigs from keys[0], keys[1], keys[2] needed to add validator to this subnet
-		[]ids.ShortID{ // control keys
-			preFundedKeys[0].PublicKey().Address(),
-			preFundedKeys[1].PublicKey().Address(),
-			preFundedKeys[2].PublicKey().Address(),
+		&secp256k1fx.OutputOwners{
+			Threshold: 2,
+			Addrs: []ids.ShortID{
+				preFundedKeys[0].PublicKey().Address(),
+				preFundedKeys[1].PublicKey().Address(),
+				preFundedKeys[2].PublicKey().Address(),
+			},
 		},
 		[]*secp256k1.PrivateKey{preFundedKeys[0]},
-		preFundedKeys[0].PublicKey().Address(),
-		nil,
+		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
+		}),
 	)
 	if err != nil {
 		panic(err)
@@ -495,15 +490,18 @@ func addPendingValidator(
 	keys []*secp256k1.PrivateKey,
 ) (*txs.Tx, error) {
 	addPendingValidatorTx, err := env.txBuilder.NewAddValidatorTx(
-		env.config.MinValidatorStake,
-		uint64(startTime.Unix()),
-		uint64(endTime.Unix()),
-		nodeID,
-		rewardAddress,
+		&txs.Validator{
+			NodeID: nodeID,
+			Start:  uint64(startTime.Unix()),
+			End:    uint64(endTime.Unix()),
+			Wght:   env.config.MinValidatorStake,
+		},
+		&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{rewardAddress},
+		},
 		reward.PercentDenominator,
 		keys,
-		ids.ShortEmpty,
-		nil,
 	)
 	if err != nil {
 		return nil, err
