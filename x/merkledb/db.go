@@ -41,8 +41,6 @@ const (
 var (
 	_ MerkleDB = (*merkleDB)(nil)
 
-	codec = newCodec()
-
 	metadataPrefix         = []byte{0}
 	valueNodePrefix        = []byte{1}
 	intermediateNodePrefix = []byte{2}
@@ -985,7 +983,7 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *view) error
 		return db.baseDB.Delete(rootDBKey)
 	}
 
-	rootKey := codec.encodeKey(db.root.Value().key)
+	rootKey := encodeKey(db.root.Value().key)
 	return db.baseDB.Put(rootDBKey, rootKey)
 }
 
@@ -1177,7 +1175,7 @@ func (db *merkleDB) initializeRoot() error {
 	}
 
 	// Root is on disk.
-	rootKey, err := codec.decodeKey(rootKeyBytes)
+	rootKey, err := decodeKey(rootKeyBytes)
 	if err != nil {
 		return err
 	}
@@ -1351,5 +1349,5 @@ func cacheEntrySize(key Key, n *node) int {
 	if n == nil {
 		return cacheEntryOverHead + len(key.Bytes())
 	}
-	return cacheEntryOverHead + len(key.Bytes()) + codec.encodedDBNodeSize(&n.dbNode)
+	return cacheEntryOverHead + len(key.Bytes()) + encodedDBNodeSize(&n.dbNode)
 }
