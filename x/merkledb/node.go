@@ -15,6 +15,16 @@ import (
 
 const HashLength = 32
 
+var indexToVarint = [BranchFactorLargest][]byte{}
+
+func init() {
+	for i := 0; i < int(BranchFactorLargest); i++ {
+		var buf [binary.MaxVarintLen64]byte
+		bufLen := binary.PutUvarint(buf[:], uint64(i))
+		indexToVarint[i] = buf[:bufLen]
+	}
+}
+
 // Representation of a node stored in the database.
 type dbNode struct {
 	value    maybe.Maybe[[]byte]
@@ -78,7 +88,16 @@ func (n *node) calculateID(metrics merkleMetrics) ids.ID {
 		hash ids.ID
 	)
 
-	_, _ = sha.Write(hash[:binary.PutUvarint(hash[:], uint64(len(n.children)))])
+	var childrenLenVarInt []byte
+	if len(n.children) < int(BranchFactorLargest) {
+		childrenLenVarInt = indexToVarint[uint64(len(n.children))]
+	} else {
+		var buf [binary.MaxVarintLen64]byte
+		len := binary.PutUvarint(buf[:], uint64(len(n.children)))
+		childrenLenVarInt = buf[:len]
+	}
+
+	_, _ = sha.Write(childrenLenVarInt)
 
 	// ensure that the order of entries is consistent
 	keys := make([]byte, 0, BranchFactorLargest)
@@ -88,20 +107,39 @@ func (n *node) calculateID(metrics merkleMetrics) ids.ID {
 	slices.Sort(keys)
 	for _, index := range keys {
 		entry := n.children[index]
-		_, _ = sha.Write(hash[:binary.PutUvarint(hash[:], uint64(index))])
+		indexVarInt := indexToVarint[index]
+		_, _ = sha.Write(indexVarInt)
 		_, _ = sha.Write(entry.id[:])
 	}
 
 	if n.valueDigest.HasValue() {
 		_, _ = sha.Write(trueBytes)
 		value := n.valueDigest.Value()
-		_, _ = sha.Write(hash[:binary.PutUvarint(hash[:], uint64(len(value)))])
+
+		var valueLenVarInt []byte
+		if len(value) < int(BranchFactorLargest) {
+			valueLenVarInt = indexToVarint[uint64(len(value))]
+		} else {
+			var buf [binary.MaxVarintLen64]byte
+			len := binary.PutUvarint(buf[:], uint64(len(value)))
+			valueLenVarInt = buf[:len]
+		}
+		_, _ = sha.Write(valueLenVarInt)
 		_, _ = sha.Write(value)
 	} else {
 		_, _ = sha.Write(falseBytes)
 	}
 
-	_, _ = sha.Write(hash[:binary.PutUvarint(hash[:], uint64(n.key.length))])
+	var keyLenVarInt []byte
+	if n.key.length < int(BranchFactorLargest) {
+		keyLenVarInt = indexToVarint[uint64(n.key.length)]
+	} else {
+		var buf [binary.MaxVarintLen64]byte
+		len := binary.PutUvarint(buf[:], uint64(n.key.length))
+		keyLenVarInt = buf[:len]
+	}
+
+	_, _ = sha.Write(keyLenVarInt)
 	_, _ = sha.Write(n.key.Bytes())
 	sha.Sum(hash[:0])
 	return hash
