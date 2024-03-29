@@ -1340,6 +1340,7 @@ func TestRollingView(t *testing.T) {
 	require.NoError(rv3.Process(context.Background(), string(key4), maybe.Some(value1)))
 	require.NoError(rv3.Process(context.Background(), string(key4), maybe.Nothing[[]byte]()))
 	nodes, values = rv3.Changes()
+	// TODO: figure out the best way to remove no-ops here
 	require.Equal(0, nodes)
 	require.Equal(0, values)
 }
