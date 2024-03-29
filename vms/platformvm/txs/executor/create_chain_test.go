@@ -4,7 +4,6 @@
 package executor
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -24,8 +23,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-	"github.com/ava-labs/avalanchego/wallet/chain/p/builder"
-	"github.com/ava-labs/avalanchego/wallet/chain/p/signer"
 
 	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
@@ -171,14 +168,18 @@ func TestCreateChainTxValid(t *testing.T) {
 	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
-	feeRates, err := env.state.GetFeeRates()
+	currentTime := stateDiff.GetTimestamp()
+	nextBlkTime, _, err := state.NextBlockTime(stateDiff, env.clk)
 	require.NoError(err)
 
-	currentTime := stateDiff.GetTimestamp()
 	feeCfg := config.GetDynamicFeesConfig(env.config.IsEActivated(currentTime))
+
+	feeMan, err := fees.UpdatedFeeManager(stateDiff, env.config, currentTime, nextBlkTime)
+	require.NoError(err)
+
 	executor := StandardTxExecutor{
 		Backend:            &env.backend,
-		BlkFeeManager:      commonfees.NewManager(feeRates),
+		BlkFeeManager:      feeMan,
 		BlockMaxComplexity: feeCfg.BlockMaxComplexity,
 		State:              stateDiff,
 		Tx:                 tx,
@@ -229,35 +230,16 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 
 			cfg := *env.config
 			cfg.CreateBlockchainTxFee = test.fee
-			builderContext := txstest.NewContext(env.ctx, &cfg, env.state.GetTimestamp())
-			backend := txstest.NewBackend(addrs, env.state, env.msm)
-			pBuilder := builder.New(addrs, builderContext, backend)
-
-			var (
-				chainTime = env.state.GetTimestamp()
-				feeCfg    = config.GetDynamicFeesConfig(cfg.IsEActivated(chainTime))
-				feeCalc   = &fees.Calculator{
-					IsEActive:          false,
-					Config:             &cfg,
-					ChainTime:          test.time,
-					FeeManager:         commonfees.NewManager(feeCfg.InitialFeeRate),
-					BlockMaxComplexity: feeCfg.BlockMaxComplexity,
-				}
-			)
-
-			utx, err := pBuilder.NewCreateChainTx(
+			builder := txstest.NewBuilder(env.ctx, &cfg, env.clk, env.state)
+			tx, err := builder.NewCreateChainTx(
 				testSubnet1.ID(),
-				nil,                  // genesisData
-				ids.GenerateTestID(), // vmID
-				nil,                  // fxIDs
-				"",                   // chainName
-				feeCalc,
+				nil,
+				ids.GenerateTestID(),
+				nil,
+				"",
+				preFundedKeys,
+				commonfees.NoTip,
 			)
-			require.NoError(err)
-
-			kc := secp256k1fx.NewKeychain(preFundedKeys...)
-			s := signer.New(kc, backend)
-			tx, err := signer.SignUnsigned(context.Background(), s, utx)
 			require.NoError(err)
 
 			stateDiff, err := state.NewDiff(lastAcceptedID, env)
@@ -266,7 +248,7 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 			stateDiff.SetTimestamp(test.time)
 
 			currentTime := stateDiff.GetTimestamp()
-			feeCfg = config.GetDynamicFeesConfig(env.config.IsEActivated(currentTime))
+			feeCfg := config.GetDynamicFeesConfig(env.config.IsEActivated(currentTime))
 			executor := StandardTxExecutor{
 				Backend:            &env.backend,
 				BlkFeeManager:      commonfees.NewManager(feeCfg.InitialFeeRate),

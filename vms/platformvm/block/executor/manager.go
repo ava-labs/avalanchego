@@ -5,20 +5,21 @@ package executor
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/vms/components/fees"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fees"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 	"github.com/ava-labs/avalanchego/vms/platformvm/validators"
+
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 var (
@@ -42,7 +43,7 @@ type Manager interface {
 
 	// VerifyTx verifies that the transaction can be issued based on the currently
 	// preferred state. This should *not* be used to verify transactions in a block.
-	VerifyTx(tx *txs.Tx) (fees.TipPercentage, error)
+	VerifyTx(tx *txs.Tx) (commonfees.TipPercentage, error)
 
 	// VerifyUniqueInputs verifies that the inputs are not duplicated in the
 	// provided blk or any of its ancestors pinned in memory.
@@ -115,36 +116,32 @@ func (m *manager) NewBlock(blk block.Block) snowman.Block {
 	}
 }
 
-func (m *manager) VerifyTx(tx *txs.Tx) (fees.TipPercentage, error) {
+func (m *manager) VerifyTx(tx *txs.Tx) (commonfees.TipPercentage, error) {
 	if !m.txExecutorBackend.Bootstrapped.Get() {
-		return fees.NoTip, ErrChainNotSynced
+		return commonfees.NoTip, ErrChainNotSynced
 	}
 
 	stateDiff, err := state.NewDiff(m.Preferred(), m)
 	if err != nil {
-		return fees.NoTip, err
+		return commonfees.NoTip, err
 	}
 
 	// retrieve parent block time before moving time forward
 	parentBlkTime := stateDiff.GetTimestamp()
 
-	nextBlkTime, _, err := executor.NextBlockTime(stateDiff, m.txExecutorBackend.Clk)
+	nextBlkTime, _, err := state.NextBlockTime(stateDiff, m.txExecutorBackend.Clk)
 	if err != nil {
-		return fees.NoTip, err
+		return commonfees.NoTip, err
 	}
 
 	_, err = executor.AdvanceTimeTo(m.txExecutorBackend, stateDiff, nextBlkTime)
 	if err != nil {
-		return fees.NoTip, err
+		return commonfees.NoTip, err
 	}
 
 	feeRates, err := stateDiff.GetFeeRates()
 	if err != nil {
-		return fees.NoTip, err
-	}
-	parentBlkComplexity, err := stateDiff.GetLastBlockComplexity()
-	if err != nil {
-		return fees.NoTip, err
+		return commonfees.NoTip, err
 	}
 
 	var (
@@ -152,15 +149,11 @@ func (m *manager) VerifyTx(tx *txs.Tx) (fees.TipPercentage, error) {
 		feesCfg   = config.GetDynamicFeesConfig(isEActive)
 	)
 
-	feeManager := fees.NewManager(feeRates)
+	feeManager := commonfees.NewManager(feeRates)
 	if isEActive {
-		if err := feeManager.UpdateFeeRates(
-			feesCfg,
-			parentBlkComplexity,
-			parentBlkTime.Unix(),
-			nextBlkTime.Unix(),
-		); err != nil {
-			return fees.NoTip, fmt.Errorf("failed updating fee rates, %w", err)
+		feeManager, err = fees.UpdatedFeeManager(stateDiff, m.txExecutorBackend.Config, parentBlkTime, nextBlkTime)
+		if err != nil {
+			return commonfees.NoTip, err
 		}
 	}
 

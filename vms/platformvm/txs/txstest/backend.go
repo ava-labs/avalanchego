@@ -24,7 +24,7 @@ var (
 	_ signer.Backend  = (*Backend)(nil)
 )
 
-func NewBackend(
+func newBackend(
 	addrs set.Set[ids.ShortID],
 	state state.State,
 	sharedMemory atomic.SharedMemory,

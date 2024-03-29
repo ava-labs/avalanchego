@@ -4,8 +4,6 @@
 package executor
 
 import (
-	"fmt"
-
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
@@ -97,24 +95,16 @@ func (r *rejector) rejectBlock(b block.Block, blockType string) error {
 	if err != nil {
 		return err
 	}
-	parentBlkComplexity, err := preferredState.GetLastBlockComplexity()
-	if err != nil {
-		return err
-	}
 	feeManager := commonfees.NewManager(feeRates)
 	if isEActive {
-		nextBlkTime, _, err := executor.NextBlockTime(preferredState, r.txExecutorBackend.Clk)
+		nextBlkTime, _, err := state.NextBlockTime(preferredState, r.txExecutorBackend.Clk)
 		if err != nil {
 			return err
 		}
 
-		if err := feeManager.UpdateFeeRates(
-			feesCfg,
-			parentBlkComplexity,
-			currentTimestamp.Unix(),
-			nextBlkTime.Unix(),
-		); err != nil {
-			return fmt.Errorf("failed updating fee rates, %w", err)
+		feeManager, err = fees.UpdatedFeeManager(preferredState, cfg, currentTimestamp, nextBlkTime)
+		if err != nil {
+			return err
 		}
 	}
 

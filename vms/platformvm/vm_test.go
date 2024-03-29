@@ -308,6 +308,7 @@ func defaultVM(t *testing.T, f fork) (*VM, *txstest.Builder, database.Database, 
 	builder := txstest.NewBuilder(
 		ctx,
 		&vm.Config,
+		&vm.clock,
 		vm.state,
 	)
 
