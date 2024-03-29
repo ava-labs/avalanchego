@@ -21,11 +21,10 @@ type RollingParent interface {
 }
 
 type RollingView struct {
-	// the uncommitted parent trie of this view
-	// [validityTrackingLock] must be held when reading/writing this field.
-	ancestry   sync.Mutex
+	parentLock sync.Mutex
 	parentTrie RollingParent
-	child      *RollingView
+
+	child *RollingView // assumed only ever 1
 
 	// Changes made to this view.
 	// May include nodes that haven't been updated
@@ -45,6 +44,11 @@ func (v *RollingView) NewRollingView(_ context.Context, changes int) (*RollingVi
 	v.commitLock.Lock()
 	defer v.commitLock.Unlock()
 
+	// RollingView is not meant to be used with more than 1 child
+	if v.child != nil {
+		return nil, errors.New("RollingView already has a child")
+	}
+
 	nv := newRollingView(v.db, v, changes)
 	v.child = nv
 	return nv, nil
@@ -60,19 +64,19 @@ func newRollingView(db *merkleDB, parentTrie RollingParent, changes int) *Rollin
 	}
 }
 
-func (v *RollingView) Update(ctx context.Context, key string, val maybe.Maybe[[]byte]) error {
-	kkey := toKey(stringToByteSlice(key))
-	change, err := v.recordValueChange(kkey, maybe.Bind(val, slices.Clone[[]byte]))
+func (v *RollingView) Update(ctx context.Context, skey string, val maybe.Maybe[[]byte]) error {
+	key := toKey(stringToByteSlice(skey))
+	change, err := v.recordValueChange(key, maybe.Bind(val, slices.Clone[[]byte]))
 	if err != nil {
 		return err
 	}
 	if change.after.IsNothing() {
 		// Note we're setting [err] defined outside this function.
-		if err := v.remove(kkey); err != nil {
+		if err := v.remove(key); err != nil {
 			return err
 		}
 		// Note we're setting [err] defined outside this function.
-	} else if _, err := v.insert(kkey, change.after); err != nil {
+	} else if _, err := v.insert(key, change.after); err != nil {
 		return err
 	}
 	return nil
@@ -154,11 +158,11 @@ func (v *RollingView) CommitToDB(ctx context.Context) error {
 	ctx, span := v.db.infoTracer.Start(ctx, "MerkleDB.view.CommitToDB")
 	defer span.End()
 
-	v.db.commitLock.Lock()
-	defer v.db.commitLock.Unlock()
-
 	v.commitLock.Lock()
 	defer v.commitLock.Unlock()
+
+	v.db.commitLock.Lock()
+	defer v.db.commitLock.Unlock()
 
 	// TODO: remove useless changes (to both nodes and values)
 
@@ -167,13 +171,6 @@ func (v *RollingView) CommitToDB(ctx context.Context) error {
 	}
 	if err := v.db.commitRollingChanges(ctx, v); err != nil {
 		return err
-	}
-
-	// Update child with correct parent trie
-	if v.child != nil {
-		v.child.ancestry.Lock()
-		v.child.parentTrie = v.db
-		v.child.ancestry.Unlock()
 	}
 	return nil
 }
@@ -532,10 +529,17 @@ func (v *RollingView) getNode(key Key, hasValue bool) (*node, error) {
 	return v.getParentTrie().getEditableNode(key, hasValue)
 }
 
+func (v *RollingView) updateParent(newParent RollingParent) {
+	v.parentLock.Lock()
+	defer v.parentLock.Unlock()
+
+	v.parentTrie = newParent
+}
+
 // Get the parent trie of the view
 func (v *RollingView) getParentTrie() RollingParent {
-	v.ancestry.Lock()
-	defer v.ancestry.Unlock()
+	v.parentLock.Lock()
+	defer v.parentLock.Unlock()
 
 	return v.parentTrie
 }

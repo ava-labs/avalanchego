@@ -1023,6 +1023,13 @@ func (db *merkleDB) commitRollingChanges(ctx context.Context, trieToCommit *Roll
 	))
 	defer span.End()
 
+	// update children while hodling lock
+	if trieToCommit.child != nil {
+		// This will block all lookups until the db is consistent
+		// TODO: can we remove this?
+		trieToCommit.child.updateParent(db)
+	}
+
 	if len(changes.nodes) == 0 {
 		return nil
 	}
@@ -1063,6 +1070,7 @@ func (db *merkleDB) commitRollingChanges(ctx context.Context, trieToCommit *Roll
 		return err
 	}
 
+	// TODO: ensure we remove no-op changes by here
 	db.history.record(changes)
 
 	// Update root in database.
