@@ -560,40 +560,58 @@ impl<M: LinearStore> StoreInner<M> {
         Ok(res)
     }
 
-    fn alloc_new(&mut self, length: u64) -> Result<u64, ShaleError> {
+    fn alloc_new(&mut self, alloc_size: u64) -> Result<u64, ShaleError> {
         let region_size = 1 << self.regn_nbit;
-        let total_length = ChunkHeader::SERIALIZED_LEN + length + ChunkFooter::SERIALIZED_LEN;
-        let mut offset = *self.header.data_store_tail;
+        let new_chunk_size = ChunkHeader::SERIALIZED_LEN + alloc_size + ChunkFooter::SERIALIZED_LEN;
+        let mut free_chunk_header_offset = *self.header.data_store_tail;
+
         #[allow(clippy::unwrap_used)]
         self.header
             .data_store_tail
-            .modify(|r| {
+            .modify(|data_store_tail| {
                 // an item is always fully in one region
-                let rem = region_size - (offset & (region_size - 1)).get();
-                if rem < total_length as usize {
-                    offset += rem;
-                    *r += rem;
+                // TODO danlaine: we should document the above better. Where is this guaranteed?
+                let remaining_region_size =
+                    region_size - (free_chunk_header_offset & (region_size - 1)).get();
+
+                if remaining_region_size < new_chunk_size as usize {
+                    // There is not enough space in the current region for this alloc.
+                    // Move to the next region.
+                    free_chunk_header_offset += remaining_region_size;
+                    *data_store_tail += remaining_region_size;
                 }
-                *r += total_length as usize
+
+                *data_store_tail += new_chunk_size as usize
             })
             .unwrap();
-        let mut h = self.get_header(offset)?;
-        let mut f =
-            self.get_footer(offset + ChunkHeader::SERIALIZED_LEN as usize + length as usize)?;
+
+        let mut free_chunk_header = self.get_header(free_chunk_header_offset)?;
+
         #[allow(clippy::unwrap_used)]
-        h.modify(|h| {
-            h.chunk_size = length;
-            h.is_freed = false;
-            h.desc_addr = DiskAddress::null();
-        })
-        .unwrap();
+        free_chunk_header
+            .modify(|h| {
+                h.chunk_size = alloc_size;
+                h.is_freed = false;
+                h.desc_addr = DiskAddress::null();
+            })
+            .unwrap();
+
+        let mut free_chunk_footer = self.get_footer(
+            free_chunk_header_offset + ChunkHeader::SERIALIZED_LEN as usize + alloc_size as usize,
+        )?;
+
         #[allow(clippy::unwrap_used)]
-        f.modify(|f| f.chunk_size = length).unwrap();
+        free_chunk_footer
+            .modify(|f| f.chunk_size = alloc_size)
+            .unwrap();
+
         #[allow(clippy::unwrap_used)]
-        Ok((offset + ChunkHeader::SERIALIZED_LEN as usize)
-            .0
-            .unwrap()
-            .get() as u64)
+        Ok(
+            (free_chunk_header_offset + ChunkHeader::SERIALIZED_LEN as usize)
+                .0
+                .unwrap()
+                .get() as u64,
+        )
     }
 
     fn alloc(&mut self, length: u64) -> Result<u64, ShaleError> {
