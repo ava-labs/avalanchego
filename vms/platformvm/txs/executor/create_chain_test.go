@@ -21,13 +21,13 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fees"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/wallet/chain/p/builder"
 	"github.com/ava-labs/avalanchego/wallet/chain/p/signer"
 
 	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
-	vmbuilder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
-	walletbuilder "github.com/ava-labs/avalanchego/wallet/chain/p/builder"
 )
 
 // Ensure Execute fails when there are not enough control sigs
@@ -44,8 +44,6 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 		nil,
 		"chain name",
 		[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
-		ids.ShortEmpty,
-		nil,
 	)
 	require.NoError(err)
 
@@ -82,8 +80,6 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 		nil,
 		"chain name",
 		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
-		ids.ShortEmpty,
-		nil,
 	)
 	require.NoError(err)
 
@@ -127,8 +123,6 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 		nil,
 		"chain name",
 		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
-		ids.ShortEmpty,
-		nil,
 	)
 	require.NoError(err)
 
@@ -167,8 +161,6 @@ func TestCreateChainTxValid(t *testing.T) {
 		nil,
 		"chain name",
 		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
-		ids.ShortEmpty,
-		nil,
 	)
 	require.NoError(err)
 
@@ -233,11 +225,9 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 
 			cfg := *env.config
 			cfg.CreateBlockchainTxFee = test.fee
-
-			builderContext := vmbuilder.NewContext(env.ctx, &cfg, env.state.GetTimestamp())
-			backend := vmbuilder.NewBackend(&cfg, env.state, env.atomicUTXOs)
-			backend.ResetAddresses(addrs)
-			pBuilder := walletbuilder.New(addrs, builderContext, backend)
+			builderContext := txstest.NewContext(env.ctx, &cfg, env.state.GetTimestamp())
+			backend := txstest.NewBackend(addrs, env.state, env.msm)
+			pBuilder := builder.New(addrs, builderContext, backend)
 
 			var (
 				chainTime = env.state.GetTimestamp()
@@ -250,7 +240,6 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 					BlockMaxComplexity: feeCfg.BlockMaxComplexity,
 				}
 			)
-			backend.ResetAddresses(addrs)
 
 			utx, err := pBuilder.NewCreateChainTx(
 				testSubnet1.ID(),
