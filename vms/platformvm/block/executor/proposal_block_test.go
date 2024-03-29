@@ -538,7 +538,8 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 			env.config.TrackedSubnets.Add(subnetID)
 
 			for _, staker := range test.stakers {
-				tx, err := env.txBuilder.NewAddValidatorTx(
+				builder, signer := env.txBuilder.Builders(preFundedKeys[0])
+				utx, err := builder.NewAddValidatorTx(
 					&txs.Validator{
 						NodeID: staker.nodeID,
 						Start:  uint64(staker.startTime.Unix()),
@@ -550,12 +551,13 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 						Addrs:     []ids.ShortID{staker.rewardAddress},
 					},
 					reward.PercentDenominator,
-					[]*secp256k1.PrivateKey{preFundedKeys[0]},
 					walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 						Threshold: 1,
 						Addrs:     []ids.ShortID{ids.ShortEmpty},
 					}),
 				)
+				require.NoError(err)
+				tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
 				require.NoError(err)
 
 				staker, err := state.NewPendingStaker(
@@ -570,7 +572,8 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 			}
 
 			for _, subStaker := range test.subnetStakers {
-				tx, err := env.txBuilder.NewAddSubnetValidatorTx(
+				builder, signer := env.txBuilder.Builders(preFundedKeys[0], preFundedKeys[1])
+				utx, err := builder.NewAddSubnetValidatorTx(
 					&txs.SubnetValidator{
 						Validator: txs.Validator{
 							NodeID: subStaker.nodeID,
@@ -580,12 +583,13 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 						},
 						Subnet: subnetID,
 					},
-					[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
 					walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 						Threshold: 1,
 						Addrs:     []ids.ShortID{ids.ShortEmpty},
 					}),
 				)
+				require.NoError(err)
+				tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
 				require.NoError(err)
 
 				subnetStaker, err := state.NewPendingStaker(
@@ -605,7 +609,8 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 				// add Staker0 (with the right end time) to state
 				// so to allow proposalBlk issuance
 				staker0.endTime = newTime
-				addStaker0, err := env.txBuilder.NewAddValidatorTx(
+				builder, signer := env.txBuilder.Builders(preFundedKeys[0], preFundedKeys[1])
+				utx, err := builder.NewAddValidatorTx(
 					&txs.Validator{
 						NodeID: staker0.nodeID,
 						Start:  uint64(staker0.startTime.Unix()),
@@ -617,12 +622,13 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 						Addrs:     []ids.ShortID{staker0.rewardAddress},
 					},
 					reward.PercentDenominator,
-					[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
 					walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 						Threshold: 1,
 						Addrs:     []ids.ShortID{ids.ShortEmpty},
 					}),
 				)
+				require.NoError(err)
+				addStaker0, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
 				require.NoError(err)
 
 				// store Staker0 to state
@@ -997,7 +1003,8 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 	// just to allow proposalBlk issuance (with a reward Tx)
 	staker0StartTime := defaultGenesisTime
 	staker0EndTime := pendingValidatorStartTime
-	addStaker0, err := env.txBuilder.NewAddValidatorTx(
+	builder, signer := env.txBuilder.Builders(preFundedKeys[0], preFundedKeys[1])
+	utx, err := builder.NewAddValidatorTx(
 		&txs.Validator{
 			NodeID: ids.GenerateTestNodeID(),
 			Start:  uint64(staker0StartTime.Unix()),
@@ -1009,8 +1016,9 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
 		},
 		reward.PercentDenominator,
-		[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
 	)
+	require.NoError(err)
+	addStaker0, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
 	require.NoError(err)
 
 	// store Staker0 to state
@@ -1066,7 +1074,8 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 	pendingDelegatorStartTime := pendingValidatorStartTime.Add(1 * time.Second)
 	pendingDelegatorEndTime := pendingDelegatorStartTime.Add(1 * time.Second)
 
-	addDelegatorTx, err := env.txBuilder.NewAddDelegatorTx(
+	builder, signer = env.txBuilder.Builders(preFundedKeys[0], preFundedKeys[1], preFundedKeys[4])
+	uDelTx, err := builder.NewAddDelegatorTx(
 		&txs.Validator{
 			NodeID: nodeID,
 			Start:  uint64(pendingDelegatorStartTime.Unix()),
@@ -1077,12 +1086,9 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 			Threshold: 1,
 			Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
 		},
-		[]*secp256k1.PrivateKey{
-			preFundedKeys[0],
-			preFundedKeys[1],
-			preFundedKeys[4],
-		},
 	)
+	require.NoError(err)
+	addDelegatorTx, err := walletsigner.SignUnsigned(context.Background(), signer, uDelTx)
 	require.NoError(err)
 
 	staker, err = state.NewPendingStaker(
@@ -1099,7 +1105,8 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 	// add Staker0 (with the right end time) to state
 	// so to allow proposalBlk issuance
 	staker0EndTime = pendingDelegatorStartTime
-	addStaker0, err = env.txBuilder.NewAddValidatorTx(
+	builder, signer = env.txBuilder.Builders(preFundedKeys[0], preFundedKeys[1])
+	utx, err = builder.NewAddValidatorTx(
 		&txs.Validator{
 			NodeID: ids.GenerateTestNodeID(),
 			Start:  uint64(staker0StartTime.Unix()),
@@ -1111,8 +1118,9 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
 		},
 		reward.PercentDenominator,
-		[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
 	)
+	require.NoError(err)
+	addStaker0, err = walletsigner.SignUnsigned(context.Background(), signer, utx)
 	require.NoError(err)
 
 	// store Staker0 to state
@@ -1192,7 +1200,8 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 	// so to allow proposalBlk issuance
 	staker0StartTime := defaultGenesisTime
 	staker0EndTime := pendingValidatorStartTime
-	addStaker0, err := env.txBuilder.NewAddValidatorTx(
+	builder, txSigner := env.txBuilder.Builders(preFundedKeys[0], preFundedKeys[1])
+	utx, err := builder.NewAddValidatorTx(
 		&txs.Validator{
 			NodeID: ids.GenerateTestNodeID(),
 			Start:  uint64(staker0StartTime.Unix()),
@@ -1204,8 +1213,9 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
 		},
 		reward.PercentDenominator,
-		[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
 	)
+	require.NoError(err)
+	addStaker0, err := walletsigner.SignUnsigned(context.Background(), txSigner, utx)
 	require.NoError(err)
 
 	// store Staker0 to state
@@ -1260,7 +1270,8 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 	// Add delegator
 	pendingDelegatorStartTime := pendingValidatorStartTime.Add(1 * time.Second)
 	pendingDelegatorEndTime := pendingDelegatorStartTime.Add(defaultMinStakingDuration)
-	addDelegatorTx, err := env.txBuilder.NewAddDelegatorTx(
+	builder, txSigner = env.txBuilder.Builders(preFundedKeys[0], preFundedKeys[1], preFundedKeys[4])
+	uDelTx, err := builder.NewAddDelegatorTx(
 		&txs.Validator{
 			NodeID: nodeID,
 			Start:  uint64(pendingDelegatorStartTime.Unix()),
@@ -1271,12 +1282,9 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 			Threshold: 1,
 			Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
 		},
-		[]*secp256k1.PrivateKey{
-			preFundedKeys[0],
-			preFundedKeys[1],
-			preFundedKeys[4],
-		},
 	)
+	require.NoError(err)
+	addDelegatorTx, err := walletsigner.SignUnsigned(context.Background(), txSigner, uDelTx)
 	require.NoError(err)
 
 	staker, err = state.NewPendingStaker(
@@ -1293,7 +1301,8 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 	// add Staker0 (with the right end time) to state
 	// so to allow proposalBlk issuance
 	staker0EndTime = pendingDelegatorStartTime
-	addStaker0, err = env.txBuilder.NewAddValidatorTx(
+	builder, txSigner = env.txBuilder.Builders(preFundedKeys[0], preFundedKeys[1])
+	utx, err = builder.NewAddValidatorTx(
 		&txs.Validator{
 			NodeID: ids.GenerateTestNodeID(),
 			Start:  uint64(staker0StartTime.Unix()),
@@ -1305,8 +1314,9 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
 		},
 		reward.PercentDenominator,
-		[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
 	)
+	require.NoError(err)
+	addStaker0, err = walletsigner.SignUnsigned(context.Background(), txSigner, utx)
 	require.NoError(err)
 
 	// store Staker0 to state
@@ -1375,7 +1385,8 @@ func TestAddValidatorProposalBlock(t *testing.T) {
 	sk, err := bls.NewSecretKey()
 	require.NoError(err)
 
-	addValidatorTx, err := env.txBuilder.NewAddPermissionlessValidatorTx(
+	builder, txSigner := env.txBuilder.Builders(preFundedKeys[0], preFundedKeys[1], preFundedKeys[4])
+	utx, err := builder.NewAddPermissionlessValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
 				NodeID: nodeID,
@@ -1396,12 +1407,9 @@ func TestAddValidatorProposalBlock(t *testing.T) {
 			Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
 		},
 		10000,
-		[]*secp256k1.PrivateKey{
-			preFundedKeys[0],
-			preFundedKeys[1],
-			preFundedKeys[4],
-		},
 	)
+	require.NoError(err)
+	addValidatorTx, err := walletsigner.SignUnsigned(context.Background(), txSigner, utx)
 	require.NoError(err)
 
 	// Add validator through a [StandardBlock]
@@ -1462,7 +1470,7 @@ func TestAddValidatorProposalBlock(t *testing.T) {
 	sk, err = bls.NewSecretKey()
 	require.NoError(err)
 
-	addValidatorTx2, err := env.txBuilder.NewAddPermissionlessValidatorTx(
+	utx2, err := builder.NewAddPermissionlessValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
 				NodeID: nodeID,
@@ -1483,12 +1491,9 @@ func TestAddValidatorProposalBlock(t *testing.T) {
 			Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
 		},
 		10000,
-		[]*secp256k1.PrivateKey{
-			preFundedKeys[0],
-			preFundedKeys[1],
-			preFundedKeys[4],
-		},
 	)
+	require.NoError(err)
+	addValidatorTx2, err := walletsigner.SignUnsigned(context.Background(), txSigner, utx2)
 	require.NoError(err)
 
 	// Add validator through a [ProposalBlock] and reward the last one

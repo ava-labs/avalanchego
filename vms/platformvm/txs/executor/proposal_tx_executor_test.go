@@ -4,6 +4,7 @@
 package executor
 
 import (
+	"context"
 	"math"
 	"testing"
 	"time"
@@ -19,6 +20,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	walletsigner "github.com/ava-labs/avalanchego/wallet/chain/p/signer"
 )
 
 func TestProposalTxExecuteAddDelegator(t *testing.T) {
@@ -884,7 +887,8 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 
 	{
 		// Case: Validator doesn't have enough tokens to cover stake amount
-		tx, err := env.txBuilder.NewAddValidatorTx( // create the tx
+		builder, signer := env.txBuilder.Builders(preFundedKeys[0])
+		utx, err := builder.NewAddValidatorTx(
 			&txs.Validator{
 				NodeID: ids.GenerateTestNodeID(),
 				Start:  uint64(defaultValidateStartTime.Unix()) + 1,
@@ -896,8 +900,9 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 				Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
 			},
 			reward.PercentDenominator,
-			[]*secp256k1.PrivateKey{preFundedKeys[0]},
 		)
+		require.NoError(err)
+		tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
 		require.NoError(err)
 
 		// Remove all UTXOs owned by preFundedKeys[0]
