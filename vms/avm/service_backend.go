@@ -7,6 +7,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/ava-labs/avalanchego/chains/atomic"
+	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -24,7 +26,8 @@ func newServiceBackend(
 	ctx *snow.Context,
 	cfg *config.Config,
 	state state.State,
-	atomicUTXOsMan avax.AtomicUTXOManager,
+	sharedMemory atomic.SharedMemory,
+	codec codec.Manager,
 ) *serviceBackend {
 	backendCtx := &builder.Context{
 		NetworkID:        ctx.NetworkID,
@@ -35,21 +38,23 @@ func newServiceBackend(
 	}
 
 	return &serviceBackend{
-		ctx:            backendCtx,
-		xchainID:       ctx.XChainID,
-		cfg:            cfg,
-		state:          state,
-		atomicUTXOsMan: atomicUTXOsMan,
+		ctx:          backendCtx,
+		xchainID:     ctx.XChainID,
+		cfg:          cfg,
+		state:        state,
+		sharedMemory: sharedMemory,
+		codec:        codec,
 	}
 }
 
 type serviceBackend struct {
-	ctx            *builder.Context
-	xchainID       ids.ID
-	cfg            *config.Config
-	addrs          set.Set[ids.ShortID]
-	state          state.State
-	atomicUTXOsMan avax.AtomicUTXOManager
+	ctx          *builder.Context
+	xchainID     ids.ID
+	cfg          *config.Config
+	addrs        set.Set[ids.ShortID]
+	state        state.State
+	sharedMemory atomic.SharedMemory
+	codec        codec.Manager
 }
 
 func (b *serviceBackend) Context() *builder.Context {
@@ -65,7 +70,15 @@ func (b *serviceBackend) UTXOs(_ context.Context, sourceChainID ids.ID) ([]*avax
 		return avax.GetAllUTXOs(b.state, b.addrs)
 	}
 
-	atomicUTXOs, _, _, err := b.atomicUTXOsMan.GetAtomicUTXOs(sourceChainID, b.addrs, ids.ShortEmpty, ids.Empty, int(maxPageSize))
+	atomicUTXOs, _, _, err := avax.GetAtomicUTXOs(
+		b.sharedMemory,
+		b.codec,
+		sourceChainID,
+		b.addrs,
+		ids.ShortEmpty,
+		ids.Empty,
+		int(maxPageSize),
+	)
 	return atomicUTXOs, err
 }
 
@@ -74,7 +87,15 @@ func (b *serviceBackend) GetUTXO(_ context.Context, chainID, utxoID ids.ID) (*av
 		return b.state.GetUTXO(utxoID)
 	}
 
-	atomicUTXOs, _, _, err := b.atomicUTXOsMan.GetAtomicUTXOs(chainID, b.addrs, ids.ShortEmpty, ids.Empty, int(maxPageSize))
+	atomicUTXOs, _, _, err := avax.GetAtomicUTXOs(
+		b.sharedMemory,
+		b.codec,
+		chainID,
+		b.addrs,
+		ids.ShortEmpty,
+		ids.Empty,
+		int(maxPageSize),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("problem retrieving atomic UTXOs: %w", err)
 	}

@@ -205,7 +205,7 @@ func setup(tb testing.TB, c *envConfig) *environment {
 		vm:           vm,
 		service: &Service{
 			vm:               vm,
-			txBuilderBackend: newServiceBackend(vm.feeAssetID, vm.ctx, &vm.Config, vm.state, vm.AtomicUTXOManager),
+			txBuilderBackend: newServiceBackend(vm.feeAssetID, vm.ctx, &vm.Config, vm.state, vm.ctx.SharedMemory, vm.parser.Codec()),
 		},
 		walletService: &WalletService{
 			walletServiceBackend: NewWalletServiceBackend(vm),
