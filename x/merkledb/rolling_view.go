@@ -4,10 +4,8 @@
 package merkledb
 
 import (
-	"bytes"
 	"context"
 	"errors"
-	"fmt"
 	"slices"
 	"sync"
 
@@ -459,15 +457,7 @@ func (v *RollingView) recordNodeDeleted(after *node, hadValue bool) error {
 // Must not be called after [calculateNodeIDs] has returned.
 func (v *RollingView) recordKeyChange(key Key, after *node, hadValue bool, newNode bool) error {
 	if existing, ok := v.changes.nodes[key]; ok {
-		fmt.Println("recordKeyChange", key, "before", existing.before, "prev after", existing.after, "new after", after)
 		existing.after = after
-		// TODO: how to compare node equality?
-		if existing.before == nil && existing.after == nil {
-			delete(v.changes.nodes, key)
-		}
-		if existing.before != nil && existing.after != nil && bytes.Equal(codec.encodeHashValues(existing.before), codec.encodeHashValues(existing.after)) {
-			delete(v.changes.nodes, key)
-		}
 		return nil
 	}
 
@@ -475,7 +465,6 @@ func (v *RollingView) recordKeyChange(key Key, after *node, hadValue bool, newNo
 		v.changes.nodes[key] = &change[*node]{
 			after: after,
 		}
-		fmt.Println("recordKeyChange", key, "before", nil, "after", after)
 		return nil
 	}
 
@@ -487,7 +476,6 @@ func (v *RollingView) recordKeyChange(key Key, after *node, hadValue bool, newNo
 		before: before,
 		after:  after,
 	}
-	fmt.Println("recordKeyChange", key, "before", before, "after", after)
 	return nil
 }
 
@@ -499,15 +487,6 @@ func (v *RollingView) recordValueChange(key Key, value maybe.Maybe[[]byte]) (*ch
 	// update the existing change if it exists
 	if existing, ok := v.changes.values[key]; ok {
 		existing.after = value
-		// TODO: Don't record changes until they are fixed?
-		//
-		// TODO: move this to commit step?
-		if existing.before.IsNothing() && existing.after.IsNothing() {
-			delete(v.changes.values, key)
-		}
-		if existing.before.HasValue() && existing.after.HasValue() && bytes.Equal(existing.before.Value(), existing.after.Value()) {
-			delete(v.changes.values, key)
-		}
 		return existing, nil
 	}
 
