@@ -67,3 +67,71 @@ func Test_Node_Marshal_Errors(t *testing.T) {
 		require.ErrorIs(t, err, io.ErrUnexpectedEOF)
 	}
 }
+
+func Benchmark_CalculateID(b *testing.B) {
+	benchmarks := []struct {
+		name string
+		n    *node
+	}{
+		{
+			name: "empty node",
+			n:    newNode(Key{}),
+		},
+		{
+			name: "has value",
+			n: func() *node {
+				n := newNode(Key{})
+				n.setValue(maybe.Some([]byte("value1")))
+				return n
+			}(),
+		},
+		{
+			name: "1 child",
+			n: func() *node {
+				n := newNode(Key{})
+				childNode := newNode(ToKey([]byte{255}))
+				n.addChild(childNode, 4)
+				childNode.setValue(maybe.Some([]byte("value1")))
+				return n
+			}(),
+		},
+		{
+			name: "2 children",
+			n: func() *node {
+				n := newNode(Key{})
+
+				childNode1 := newNode(ToKey([]byte{255}))
+				childNode1.setValue(maybe.Some([]byte("value1")))
+
+				childNode2 := newNode(ToKey([]byte{237}))
+				childNode2.setValue(maybe.Some([]byte("value2")))
+
+				n.addChild(childNode1, 4)
+				n.addChild(childNode2, 4)
+				return n
+			}(),
+		},
+		{
+			name: "16 children",
+			n: func() *node {
+				n := newNode(Key{})
+
+				for i := byte(0); i < 16; i++ {
+					childNode := newNode(ToKey([]byte{i << 4}))
+					childNode.setValue(maybe.Some([]byte("some value")))
+
+					n.addChild(childNode, 4)
+				}
+				return n
+			}(),
+		},
+	}
+	for _, benchmark := range benchmarks {
+		ignoredMetrics := &mockMetrics{}
+		b.Run(benchmark.name, func(b *testing.B) {
+			for i := 0; i < b.N; i++ {
+				benchmark.n.calculateID(ignoredMetrics)
+			}
+		})
+	}
+}
