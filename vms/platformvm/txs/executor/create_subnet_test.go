@@ -4,7 +4,6 @@
 package executor
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -17,8 +16,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-	"github.com/ava-labs/avalanchego/wallet/chain/p/builder"
-	"github.com/ava-labs/avalanchego/wallet/chain/p/signer"
 )
 
 func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
@@ -66,18 +63,11 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 
 			cfg := *env.config
 			cfg.CreateSubnetTxFee = test.fee
-			builderContext := txstest.NewContext(env.ctx, &cfg, env.state.GetTimestamp())
-			backend := txstest.NewBackend(addrs, env.state, env.msm)
-			pBuilder := builder.New(addrs, builderContext, backend)
-
-			utx, err := pBuilder.NewCreateSubnetTx(
-				&secp256k1fx.OutputOwners{}, // owner
+			builder := txstest.NewBuilder(env.ctx, &cfg, env.state)
+			tx, err := builder.NewCreateSubnetTx(
+				&secp256k1fx.OutputOwners{},
+				preFundedKeys,
 			)
-			require.NoError(err)
-
-			kc := secp256k1fx.NewKeychain(preFundedKeys...)
-			s := signer.New(kc, backend)
-			tx, err := signer.SignUnsigned(context.Background(), s, utx)
 			require.NoError(err)
 
 			stateDiff, err := state.NewDiff(lastAcceptedID, env)
