@@ -124,12 +124,11 @@ func TestNewImportTx(t *testing.T) {
 				tt.sourceChainID,
 				to,
 			)
-			require.NoError(err)
-			tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
 			require.ErrorIs(err, tt.expectedErr)
 			if tt.expectedErr != nil {
 				return
 			}
+			tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
 			require.NoError(err)
 
 			unsignedTx := tx.Unsigned.(*txs.ImportTx)

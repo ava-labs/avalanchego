@@ -329,7 +329,7 @@ func defaultVM(t *testing.T, f fork) (*VM, *txstest.Builder, database.Database, 
 		}),
 	)
 	require.NoError(err)
-	testSubnet1, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
+	testSubnet1, err = walletsigner.SignUnsigned(context.Background(), signer, utx)
 	require.NoError(err)
 
 	vm.ctx.Lock.Unlock()
@@ -1057,8 +1057,8 @@ func TestAtomicImport(t *testing.T) {
 	mutableSharedMemory.SharedMemory = m.NewSharedMemory(vm.ctx.ChainID)
 	peerSharedMemory := m.NewSharedMemory(vm.ctx.XChainID)
 
-	builder, txSigner := txBuilder.Builders(keys[0])
-	utx, err := builder.NewImportTx(
+	builder, _ := txBuilder.Builders(keys[0])
+	_, err := builder.NewImportTx(
 		vm.ctx.XChainID,
 		&secp256k1fx.OutputOwners{
 			Threshold: 1,
@@ -1066,8 +1066,6 @@ func TestAtomicImport(t *testing.T) {
 		},
 	)
 	require.ErrorIs(err, walletbuilder.ErrInsufficientFunds)
-	_, err = walletsigner.SignUnsigned(context.Background(), txSigner, utx)
-	require.NoError(err)
 
 	// Provide the avm UTXO
 
@@ -1100,8 +1098,8 @@ func TestAtomicImport(t *testing.T) {
 		},
 	}))
 
-	builder, txSigner = txBuilder.Builders(recipientKey)
-	utx, err = builder.NewImportTx(
+	builder, txSigner := txBuilder.Builders(recipientKey)
+	utx, err := builder.NewImportTx(
 		vm.ctx.XChainID,
 		&secp256k1fx.OutputOwners{
 			Threshold: 1,
