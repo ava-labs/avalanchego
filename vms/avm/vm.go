@@ -67,7 +67,6 @@ type VM struct {
 	metrics metrics.Metrics
 
 	avax.AddressManager
-	avax.AtomicUTXOManager
 	ids.Aliaser
 	utxo.Spender
 
@@ -229,7 +228,6 @@ func (vm *VM) Initialize(
 	}
 
 	codec := vm.parser.Codec()
-	vm.AtomicUTXOManager = avax.NewAtomicUTXOManager(ctx.SharedMemory, codec)
 	vm.Spender = utxo.NewSpender(&vm.clock, codec)
 
 	state, err := state.New(
@@ -345,11 +343,11 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 		vm: vm,
 		txBuilderBackend: newServiceBackend(
 			vm.feeAssetID,
-			vm.parser.Codec(),
 			vm.ctx,
 			&vm.Config,
 			vm.state,
-			vm.AtomicUTXOManager,
+			vm.ctx.SharedMemory,
+			vm.parser.Codec(),
 		),
 	}, "avm"); err != nil {
 		return nil, err
