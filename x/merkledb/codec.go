@@ -84,25 +84,6 @@ func encodedDBNodeSize(n *dbNode) int {
 	return size
 }
 
-// Assumes [n] is non-nil.
-func encodeDBNode(n *dbNode) []byte {
-	buf := bytes.NewBuffer(make([]byte, 0, encodedDBNodeSize(n)))
-	encodeMaybeByteSlice(buf, n.value)
-	encodeUint(buf, uint64(len(n.children)))
-	// Note we insert children in order of increasing index
-	// for determinism.
-	keys := maps.Keys(n.children)
-	slices.Sort(keys)
-	for _, index := range keys {
-		entry := n.children[index]
-		encodeUint(buf, uint64(index))
-		encodeKeyToBuffer(buf, entry.compressedKey)
-		_, _ = buf.Write(entry.id[:])
-		encodeBool(buf, entry.hasValue)
-	}
-	return buf.Bytes()
-}
-
 // Returns the canonical hash of [n].
 //
 // Assumes [n] is non-nil.
@@ -151,6 +132,25 @@ func hashNode(n *node) ids.ID {
 	_, _ = sha.Write(n.key.Bytes())
 	sha.Sum(emptyHashBuffer)
 	return hash
+}
+
+// Assumes [n] is non-nil.
+func encodeDBNode(n *dbNode) []byte {
+	buf := bytes.NewBuffer(make([]byte, 0, encodedDBNodeSize(n)))
+	encodeMaybeByteSlice(buf, n.value)
+	encodeUint(buf, uint64(len(n.children)))
+	// Note we insert children in order of increasing index
+	// for determinism.
+	keys := maps.Keys(n.children)
+	slices.Sort(keys)
+	for _, index := range keys {
+		entry := n.children[index]
+		encodeUint(buf, uint64(index))
+		encodeKeyToBuffer(buf, entry.compressedKey)
+		_, _ = buf.Write(entry.id[:])
+		encodeBool(buf, entry.hasValue)
+	}
+	return buf.Bytes()
 }
 
 // Assumes [n] is non-nil.
@@ -235,6 +235,12 @@ func decodeBool(src *bytes.Reader) (bool, error) {
 	}
 }
 
+func encodeUint(dst *bytes.Buffer, value uint64) {
+	var buf [binary.MaxVarintLen64]byte
+	size := binary.PutUvarint(buf[:], value)
+	_, _ = dst.Write(buf[:size])
+}
+
 func decodeUint(src *bytes.Reader) (uint64, error) {
 	// To ensure encoding/decoding is canonical, we need to check for leading
 	// zeroes in the varint.
@@ -268,12 +274,6 @@ func decodeUint(src *bytes.Reader) (uint64, error) {
 	return val64, nil
 }
 
-func encodeUint(dst *bytes.Buffer, value uint64) {
-	var buf [binary.MaxVarintLen64]byte
-	size := binary.PutUvarint(buf[:], value)
-	_, _ = dst.Write(buf[:size])
-}
-
 func encodeMaybeByteSlice(dst *bytes.Buffer, maybeValue maybe.Maybe[[]byte]) {
 	hasValue := maybeValue.HasValue()
 	encodeBool(dst, hasValue)
@@ -299,6 +299,13 @@ func decodeMaybeByteSlice(src *bytes.Reader) (maybe.Maybe[[]byte], error) {
 	return maybe.Some(rawBytes), nil
 }
 
+func encodeByteSlice(dst *bytes.Buffer, value []byte) {
+	encodeUint(dst, uint64(len(value)))
+	if value != nil {
+		_, _ = dst.Write(value)
+	}
+}
+
 func decodeByteSlice(src *bytes.Reader) ([]byte, error) {
 	if minByteSliceLen > src.Len() {
 		return nil, io.ErrUnexpectedEOF
@@ -322,13 +329,6 @@ func decodeByteSlice(src *bytes.Reader) ([]byte, error) {
 		err = io.ErrUnexpectedEOF
 	}
 	return result, err
-}
-
-func encodeByteSlice(dst *bytes.Buffer, value []byte) {
-	encodeUint(dst, uint64(len(value)))
-	if value != nil {
-		_, _ = dst.Write(value)
-	}
 }
 
 func decodeID(src *bytes.Reader) (ids.ID, error) {
