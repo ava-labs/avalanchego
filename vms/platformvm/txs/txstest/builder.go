@@ -36,20 +36,7 @@ func (b *Builder) Builders(keys ...*secp256k1.PrivateKey) (builder.Builder, sign
 		kc      = secp256k1fx.NewKeychain(keys...)
 		addrs   = kc.Addresses()
 		backend = newBackend(addrs, b.state, b.ctx.SharedMemory)
-
-		timestamp = b.state.GetTimestamp()
-		context   = &builder.Context{
-			NetworkID:                     b.ctx.NetworkID,
-			AVAXAssetID:                   b.ctx.AVAXAssetID,
-			BaseTxFee:                     b.cfg.TxFee,
-			CreateSubnetTxFee:             b.cfg.GetCreateSubnetTxFee(timestamp),
-			TransformSubnetTxFee:          b.cfg.TransformSubnetTxFee,
-			CreateBlockchainTxFee:         b.cfg.GetCreateBlockchainTxFee(timestamp),
-			AddPrimaryNetworkValidatorFee: b.cfg.AddPrimaryNetworkValidatorFee,
-			AddPrimaryNetworkDelegatorFee: b.cfg.AddPrimaryNetworkDelegatorFee,
-			AddSubnetValidatorFee:         b.cfg.AddSubnetValidatorFee,
-			AddSubnetDelegatorFee:         b.cfg.AddSubnetDelegatorFee,
-		}
+		context = newContext(b.ctx, b.cfg, b.state.GetTimestamp())
 	)
 
 	return builder.New(addrs, context, backend), signer.New(kc, backend)
