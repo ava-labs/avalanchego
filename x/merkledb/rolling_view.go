@@ -528,3 +528,7 @@ func (v *RollingView) getParentTrie() RollingParent {
 
 	return v.parentTrie
 }
+
+func (v *RollingView) Changes() (int, int) {
+	return len(v.changes.nodes), len(v.changes.values)
+}

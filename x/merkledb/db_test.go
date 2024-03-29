@@ -1300,7 +1300,9 @@ func TestRollingView(t *testing.T) {
 	rv, err := db.NewRollingView(context.Background(), 2)
 	require.NoError(err)
 	require.NoError(rv.Process(context.Background(), string(key1), maybe.Some(value1)))
-	require.NoError(err)
+	nodes, values := rv.Changes()
+	require.Equal(nodes, 1)
+	require.Equal(values, 1)
 
 	// Create new rv
 	rv2, err := rv.NewRollingView(context.Background(), 2)
@@ -1312,6 +1314,9 @@ func TestRollingView(t *testing.T) {
 
 	// Add to rv2 (should now be rooted in db)
 	require.NoError(rv2.Process(context.Background(), string(key3), maybe.Some(value3)))
+	nodes, values = rv2.Changes()
+	require.Equal(nodes, 3)
+	require.Equal(values, 2)
 
 	// Commit rolling view 2
 	require.NoError(rv2.CommitToDB(context.Background()))
@@ -1328,4 +1333,13 @@ func TestRollingView(t *testing.T) {
 	require.Equal(value3, gotValue)
 	_, err = db.Get(key4)
 	require.ErrorIs(err, database.ErrNotFound)
+
+	// Perform a no-op change
+	rv3, err := db.NewRollingView(context.Background(), 100)
+	require.NoError(err)
+	require.NoError(rv3.Process(context.Background(), string(key4), maybe.Some(value1)))
+	require.NoError(rv3.Process(context.Background(), string(key4), maybe.Nothing[[]byte]()))
+	nodes, values = rv3.Changes()
+	require.Equal(nodes, 0)
+	require.Equal(values, 0)
 }
