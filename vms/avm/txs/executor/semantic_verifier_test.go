@@ -31,6 +31,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/fees"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/vms/nftfx"
+	"github.com/ava-labs/avalanchego/vms/propertyfx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
@@ -2179,6 +2181,468 @@ func TestSemanticVerifierImportTx(t *testing.T) {
 			feeCfg := config.GetDynamicFeesConfig(true /*isEActive*/)
 
 			err = tx.Unsigned.Visit(&SemanticVerifier{
+				Backend:            backend,
+				BlkFeeManager:      fees.NewManager(feeCfg.InitialFeeRate),
+				BlockMaxComplexity: feeCfg.BlockMaxComplexity,
+				State:              state,
+				Tx:                 tx,
+			})
+			require.ErrorIs(err, test.expectedErr)
+		})
+	}
+}
+
+func TestSemanticVerifierOperationTx(t *testing.T) {
+	ctx := snowtest.Context(t, snowtest.XChainID)
+
+	var (
+		secpFx     = &secp256k1fx.Fx{}
+		nftFx      = &nftfx.Fx{}
+		propertyFx = &propertyfx.Fx{}
+	)
+
+	typeToFxIndex := make(map[reflect.Type]int)
+	parser, err := txs.NewCustomParser(
+		typeToFxIndex,
+		new(mockable.Clock),
+		logging.NoWarn{},
+		[]fxs.Fx{
+			secpFx,
+			nftFx,
+			propertyFx,
+		},
+	)
+
+	require.NoError(t, err)
+	codec := parser.Codec()
+
+	feeAssetID := ids.GenerateTestID()
+	feeAsset := avax.Asset{
+		ID: feeAssetID,
+	}
+
+	outputOwners := secp256k1fx.OutputOwners{
+		Threshold: 1,
+		Addrs: []ids.ShortID{
+			keys[0].Address(),
+		},
+	}
+
+	utxoAmount := 20 * units.KiloAvax
+	utxoID := avax.UTXOID{
+		TxID:        ids.GenerateTestID(),
+		OutputIndex: 1,
+	}
+	utxo := &avax.UTXO{
+		UTXOID: utxoID,
+		Asset:  feeAsset,
+		Out: &secp256k1fx.TransferOutput{
+			Amt:          20 * units.KiloAvax,
+			OutputOwners: outputOwners,
+		},
+	}
+
+	opUTXOID := avax.UTXOID{
+		TxID:        ids.GenerateTestID(),
+		OutputIndex: 1,
+	}
+	opUTXO := &avax.UTXO{
+		UTXOID: opUTXOID,
+		Asset:  avax.Asset{ID: assetID},
+		Out: &secp256k1fx.MintOutput{
+			OutputOwners: outputOwners,
+		},
+	}
+
+	unsignedCreateAssetTx := txs.CreateAssetTx{
+		States: []*txs.InitialState{{
+			FxIndex: 0,
+		}},
+	}
+	createAssetTx := &txs.Tx{
+		Unsigned: &unsignedCreateAssetTx,
+	}
+
+	opTxInSigner := secp256k1fx.Input{
+		SigIndices: []uint32{
+			0,
+		},
+	}
+	opTxIn := avax.TransferableInput{
+		UTXOID: utxoID,
+		Asset:  feeAsset,
+		In: &secp256k1fx.TransferInput{
+			Amt:   utxoAmount,
+			Input: opTxInSigner,
+		},
+	}
+	opTxOut := avax.TransferableOutput{
+		Asset: avax.Asset{ID: feeAssetID},
+		Out: &secp256k1fx.TransferOutput{
+			Amt:          units.NanoAvax,
+			OutputOwners: outputOwners,
+		},
+	}
+	unsignedOperationTx := txs.OperationTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    constants.UnitTestID,
+			BlockchainID: chainID,
+			Ins:          []*avax.TransferableInput{&opTxIn},
+			Outs:         []*avax.TransferableOutput{&opTxOut},
+		}},
+		Ops: []*txs.Operation{{
+			Asset: avax.Asset{ID: assetID},
+			UTXOIDs: []*avax.UTXOID{
+				&opUTXOID,
+			},
+			Op: &secp256k1fx.MintOperation{
+				MintInput: secp256k1fx.Input{
+					SigIndices: []uint32{0},
+				},
+				MintOutput: secp256k1fx.MintOutput{
+					OutputOwners: outputOwners,
+				},
+				TransferOutput: secp256k1fx.TransferOutput{
+					Amt:          1,
+					OutputOwners: outputOwners,
+				},
+			},
+		}},
+	}
+
+	operationTx := txs.Tx{Unsigned: &unsignedOperationTx}
+	require.NoError(t, operationTx.SignSECP256K1Fx(
+		codec,
+		[][]*secp256k1.PrivateKey{
+			{keys[0]},
+			{keys[0]},
+		},
+	))
+
+	backend := &Backend{
+		Ctx:    ctx,
+		Config: &feeConfig,
+		Fxs: []*fxs.ParsedFx{
+			{
+				ID: secp256k1fx.ID,
+				Fx: secpFx,
+			},
+			{
+				ID: nftfx.ID,
+				Fx: nftFx,
+			},
+			{
+				ID: propertyfx.ID,
+				Fx: propertyFx,
+			},
+		},
+		Codec:         codec,
+		TypeToFxIndex: typeToFxIndex,
+		FeeAssetID:    feeAssetID,
+	}
+	require.NoError(t, secpFx.Bootstrapped())
+	require.NoError(t, nftFx.Bootstrapped())
+	require.NoError(t, propertyFx.Bootstrapped())
+
+	tests := []struct {
+		name        string
+		stateFunc   func(*gomock.Controller) state.Chain
+		txFunc      func(*require.Assertions) *txs.Tx
+		expectedErr error
+	}{
+		{
+			name: "valid",
+			stateFunc: func(ctrl *gomock.Controller) state.Chain {
+				state := state.NewMockChain(ctrl)
+				state.EXPECT().GetTimestamp().Return(time.Now().Truncate(time.Second))
+				state.EXPECT().GetUTXO(utxoID.InputID()).Return(utxo, nil).AnyTimes()
+				state.EXPECT().GetUTXO(opUTXO.InputID()).Return(opUTXO, nil).AnyTimes()
+				state.EXPECT().GetTx(feeAssetID).Return(createAssetTx, nil).AnyTimes()
+				return state
+			},
+			txFunc: func(*require.Assertions) *txs.Tx {
+				return &operationTx
+			},
+			expectedErr: nil,
+		},
+		{
+			name: "invalid output",
+			stateFunc: func(ctrl *gomock.Controller) state.Chain {
+				state := state.NewMockChain(ctrl)
+				state.EXPECT().GetTimestamp().Return(time.Now().Truncate(time.Second))
+				return state
+			},
+			txFunc: func(*require.Assertions) *txs.Tx {
+				output := opTxOut
+				output.Out = &secp256k1fx.TransferOutput{
+					Amt:          0,
+					OutputOwners: outputOwners,
+				}
+
+				unsignedTx := unsignedOperationTx
+				unsignedTx.Outs = []*avax.TransferableOutput{
+					&output,
+				}
+				return &txs.Tx{
+					Unsigned: &unsignedTx,
+					Creds:    operationTx.Creds,
+				}
+			},
+			expectedErr: secp256k1fx.ErrNoValueOutput,
+		},
+		{
+			name: "unsorted outputs",
+			stateFunc: func(ctrl *gomock.Controller) state.Chain {
+				state := state.NewMockChain(ctrl)
+				state.EXPECT().GetTimestamp().Return(time.Now().Truncate(time.Second))
+				return state
+			},
+			txFunc: func(*require.Assertions) *txs.Tx {
+				output0 := opTxOut
+				output0.Out = &secp256k1fx.TransferOutput{
+					Amt:          1,
+					OutputOwners: outputOwners,
+				}
+
+				output1 := opTxOut
+				output1.Out = &secp256k1fx.TransferOutput{
+					Amt:          2,
+					OutputOwners: outputOwners,
+				}
+
+				outputs := []*avax.TransferableOutput{
+					&output0,
+					&output1,
+				}
+				avax.SortTransferableOutputs(outputs, codec)
+				outputs[0], outputs[1] = outputs[1], outputs[0]
+
+				unsignedTx := unsignedOperationTx
+				unsignedTx.Outs = outputs
+				return &txs.Tx{
+					Unsigned: &unsignedTx,
+					Creds:    operationTx.Creds,
+				}
+			},
+			expectedErr: avax.ErrOutputsNotSorted,
+		},
+		{
+			name: "invalid input",
+			stateFunc: func(ctrl *gomock.Controller) state.Chain {
+				state := state.NewMockChain(ctrl)
+				state.EXPECT().GetTimestamp().Return(time.Now().Truncate(time.Second))
+				return state
+			},
+			txFunc: func(*require.Assertions) *txs.Tx {
+				input := opTxIn
+				input.In = &secp256k1fx.TransferInput{
+					Amt:   0,
+					Input: opTxInSigner,
+				}
+
+				tx := unsignedOperationTx
+				tx.Ins = []*avax.TransferableInput{
+					&input,
+				}
+				return &txs.Tx{
+					Unsigned: &tx,
+					Creds:    operationTx.Creds,
+				}
+			},
+			expectedErr: secp256k1fx.ErrNoValueInput,
+		},
+		{
+			name: "duplicate inputs",
+			stateFunc: func(ctrl *gomock.Controller) state.Chain {
+				state := state.NewMockChain(ctrl)
+				state.EXPECT().GetTimestamp().Return(time.Now().Truncate(time.Second))
+				return state
+			},
+			txFunc: func(*require.Assertions) *txs.Tx {
+				unsignedTx := unsignedOperationTx
+				unsignedTx.Ins = []*avax.TransferableInput{
+					&opTxIn,
+					&opTxIn,
+				}
+
+				tx := &txs.Tx{Unsigned: &unsignedTx}
+				require.NoError(t, tx.SignSECP256K1Fx(
+					codec,
+					[][]*secp256k1.PrivateKey{
+						{keys[0]},
+						{keys[0]},
+					}))
+
+				return tx
+			},
+			expectedErr: avax.ErrInputsNotSortedUnique,
+		},
+		{
+			name: "input overflow",
+			stateFunc: func(ctrl *gomock.Controller) state.Chain {
+				state := state.NewMockChain(ctrl)
+				state.EXPECT().GetTimestamp().Return(time.Now().Truncate(time.Second))
+				return state
+			},
+			txFunc: func(*require.Assertions) *txs.Tx {
+				input0 := opTxIn
+				input0.In = &secp256k1fx.TransferInput{
+					Amt:   1,
+					Input: opTxInSigner,
+				}
+
+				input1 := opTxIn
+				input1.UTXOID.OutputIndex++
+				input1.In = &secp256k1fx.TransferInput{
+					Amt:   math.MaxUint64,
+					Input: opTxInSigner,
+				}
+
+				unsignedTx := unsignedOperationTx
+				unsignedTx.Ins = []*avax.TransferableInput{
+					&input0,
+					&input1,
+				}
+				avax.SortTransferableInputsWithSigners(unsignedTx.Ins, make([][]*secp256k1.PrivateKey, 2))
+
+				tx := &txs.Tx{Unsigned: &unsignedTx}
+				require.NoError(t, tx.SignSECP256K1Fx(
+					codec,
+					[][]*secp256k1.PrivateKey{
+						{keys[0]},
+						{keys[0]},
+					}))
+				return tx
+			},
+			expectedErr: safemath.ErrOverflow,
+		},
+		{
+			name: "output overflow",
+			stateFunc: func(ctrl *gomock.Controller) state.Chain {
+				state := state.NewMockChain(ctrl)
+				state.EXPECT().GetTimestamp().Return(time.Now().Truncate(time.Second))
+				return state
+			},
+			txFunc: func(*require.Assertions) *txs.Tx {
+				output := opTxOut
+				output.Out = &secp256k1fx.TransferOutput{
+					Amt:          math.MaxUint64,
+					OutputOwners: outputOwners,
+				}
+
+				outputs := []*avax.TransferableOutput{
+					&output,
+				}
+				avax.SortTransferableOutputs(outputs, codec)
+
+				unsignedTx := unsignedOperationTx
+				unsignedTx.Outs = outputs
+				return &txs.Tx{
+					Unsigned: &unsignedTx,
+					Creds:    operationTx.Creds,
+				}
+			},
+			expectedErr: safemath.ErrOverflow,
+		},
+		{
+			name: "insufficient funds",
+			stateFunc: func(ctrl *gomock.Controller) state.Chain {
+				state := state.NewMockChain(ctrl)
+				state.EXPECT().GetTimestamp().Return(time.Now().Truncate(time.Second))
+				return state
+			},
+			txFunc: func(*require.Assertions) *txs.Tx {
+				input := opTxIn
+				input.In = &secp256k1fx.TransferInput{
+					Amt:   1,
+					Input: opTxInSigner,
+				}
+
+				unsignedTx := unsignedOperationTx
+				unsignedTx.Ins = []*avax.TransferableInput{
+					&input,
+				}
+				return &txs.Tx{
+					Unsigned: &unsignedTx,
+					Creds:    operationTx.Creds,
+				}
+			},
+			expectedErr: avax.ErrInsufficientFunds,
+		},
+		{
+			name: "barely sufficient funds",
+			stateFunc: func(ctrl *gomock.Controller) state.Chain {
+				state := state.NewMockChain(ctrl)
+
+				barelySufficientUtxo := &avax.UTXO{
+					UTXOID: utxoID,
+					Asset:  feeAsset,
+					Out: &secp256k1fx.TransferOutput{
+						Amt:          units.NanoAvax + feeConfig.TxFee,
+						OutputOwners: outputOwners,
+					},
+				}
+
+				state.EXPECT().GetTimestamp().Return(time.Now().Truncate(time.Second))
+				state.EXPECT().GetUTXO(utxoID.InputID()).Return(barelySufficientUtxo, nil).AnyTimes()
+				state.EXPECT().GetUTXO(opUTXO.InputID()).Return(opUTXO, nil).AnyTimes()
+				state.EXPECT().GetTx(feeAssetID).Return(createAssetTx, nil).AnyTimes()
+				return state
+			},
+			txFunc: func(*require.Assertions) *txs.Tx {
+				input := opTxIn
+				input.In = &secp256k1fx.TransferInput{
+					Amt:   units.NanoAvax + feeConfig.TxFee,
+					Input: opTxInSigner,
+				}
+
+				unsignedTx := unsignedOperationTx
+				unsignedTx.Ins = []*avax.TransferableInput{
+					&input,
+				}
+				return &txs.Tx{
+					Unsigned: &unsignedTx,
+					Creds:    operationTx.Creds,
+				}
+			},
+			expectedErr: nil,
+		},
+		{
+			name: "barely insufficient funds",
+			stateFunc: func(ctrl *gomock.Controller) state.Chain {
+				state := state.NewMockChain(ctrl)
+				state.EXPECT().GetTimestamp().Return(time.Now().Truncate(time.Second))
+				return state
+			},
+			txFunc: func(*require.Assertions) *txs.Tx {
+				input := opTxIn
+				input.In = &secp256k1fx.TransferInput{
+					Amt:   5065,
+					Input: opTxInSigner,
+				}
+
+				unsignedTx := unsignedOperationTx
+				unsignedTx.Ins = []*avax.TransferableInput{
+					&input,
+				}
+				return &txs.Tx{
+					Unsigned: &unsignedTx,
+					Creds:    operationTx.Creds,
+				}
+			},
+			expectedErr: avax.ErrInsufficientFunds,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
+			ctrl := gomock.NewController(t)
+
+			feeCfg := config.GetDynamicFeesConfig(true /*isEActive*/)
+
+			state := test.stateFunc(ctrl)
+			tx := test.txFunc(require)
+			err := tx.Unsigned.Visit(&SemanticVerifier{
 				Backend:            backend,
 				BlkFeeManager:      fees.NewManager(feeCfg.InitialFeeRate),
 				BlockMaxComplexity: feeCfg.BlockMaxComplexity,
