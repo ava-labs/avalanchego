@@ -32,7 +32,8 @@ type RollingView struct {
 	// but will when their ID is recalculated.
 	changes *changeSummary
 
-	db *merkleDB
+	commitLock sync.Mutex
+	db         *merkleDB
 
 	// The root of the trie represented by this view.
 	root maybe.Maybe[*node]
@@ -41,6 +42,9 @@ type RollingView struct {
 }
 
 func (v *RollingView) NewRollingView(_ context.Context, changes int) (*RollingView, error) {
+	v.commitLock.Lock()
+	defer v.commitLock.Unlock()
+
 	nv := newRollingView(v.db, v, changes)
 	v.child = nv
 	return nv, nil
@@ -152,6 +156,9 @@ func (v *RollingView) CommitToDB(ctx context.Context) error {
 
 	v.db.commitLock.Lock()
 	defer v.db.commitLock.Unlock()
+
+	v.commitLock.Lock()
+	defer v.commitLock.Unlock()
 
 	if err := v.calculateNodeIDs(ctx); err != nil {
 		return err
