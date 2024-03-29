@@ -245,13 +245,7 @@ func (v *RollingView) remove(key Key) error {
 		// i.e. There's the root and at least one more node.
 		parent.removeChild(nodeToDelete, v.tokenSize)
 
-		// Since we removed a child from [parent], we need to mark the node as
-		// changed.
-		//
-		// TODO: did adding this fix a bug?
-		if err := v.recordNodeChange(parent); err != nil {
-			return err
-		}
+		// We call node changed on this on the way to the child, so we don't need to call it again.
 
 		// merge the parent node and its child into a single node if possible
 		return v.compressNodePath(grandParent, parent)

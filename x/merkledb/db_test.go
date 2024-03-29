@@ -1342,6 +1342,10 @@ func TestRollingView(t *testing.T) {
 	require.NoError(rv3.Process(context.Background(), string(key4), maybe.Some(value1)))
 	t.Log("remove")
 	require.NoError(rv3.Process(context.Background(), string(key4), maybe.Nothing[[]byte]()))
+	t.Log("nodes changed", len(rv3.changes.nodes))
+	for k, change := range rv3.changes.nodes {
+		t.Log("end result", k, change.before, change.after)
+	}
 	nodes, values = rv3.Changes()
 	require.Equal(0, nodes)
 	require.Equal(0, values)
