@@ -5,6 +5,7 @@ package merkledb
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/binary"
 	"errors"
 	"io"
@@ -28,11 +29,6 @@ const (
 	minByteSliceLen      = minVarIntLen
 	minDBNodeLen         = minMaybeByteSliceLen + minVarIntLen
 	minChildLen          = minVarIntLen + minKeyLen + ids.IDLen + boolLen
-
-	estimatedKeyLen   = 64
-	estimatedValueLen = 64
-	// Child index, child ID
-	hashValuesChildLen = minVarIntLen + ids.IDLen
 )
 
 var (
@@ -47,8 +43,8 @@ var (
 	errIntOverflow        = errors.New("value overflows int")
 )
 
-// Note that bytes.Buffer.Write always returns nil, so we ignore its return
-// values in all encode methods.
+// Note that sha256.Write and bytes.Buffer.Write always returns nil, so we
+// ignore their return values.
 
 func childSize(index byte, childEntry *child) int {
 	// * index
@@ -107,30 +103,54 @@ func encodeDBNode(n *dbNode) []byte {
 	return buf.Bytes()
 }
 
-// Returns the bytes that will be hashed to generate [n]'s ID.
+// Returns the canonical hash of [n].
+//
 // Assumes [n] is non-nil.
-func encodeHashValues(n *node) []byte {
+// This method is performance critical. It is not expected to perform any memory
+// allocations.
+func hashNode(n *node) ids.ID {
 	var (
-		numChildren = len(n.children)
-		// Estimate size [hv] to prevent memory allocations
-		estimatedLen = minVarIntLen + numChildren*hashValuesChildLen + estimatedValueLen + estimatedKeyLen
-		buf          = bytes.NewBuffer(make([]byte, 0, estimatedLen))
+		sha  = sha256.New()
+		hash ids.ID
+		// The hash length is larger than the maximum Uvarint length. This
+		// ensures binary.AppendUvarint doesn't perform any memory allocations.
+		emptyHashBuffer = hash[:0]
 	)
 
-	encodeUint(buf, uint64(numChildren))
+	// By directly calling sha.Write rather than passing sha around as an
+	// io.Writer, the compiler can perform sufficient escape analysis to avoid
+	// allocating buffers on the heap.
+	_, _ = sha.Write(binary.AppendUvarint(emptyHashBuffer, uint64(len(n.children))))
 
-	// ensure that the order of entries is consistent
-	keys := maps.Keys(n.children)
+	// By allocating BranchFactorLargest rather than len(n.children), this slice
+	// is allocated on the stack rather than the heap. BranchFactorLargest is
+	// at least len(n.children) which avoids memory allocations.
+	keys := make([]byte, 0, BranchFactorLargest)
+	for k := range n.children {
+		keys = append(keys, k)
+	}
+
+	// Ensure that the order of entries is correct.
 	slices.Sort(keys)
 	for _, index := range keys {
 		entry := n.children[index]
-		encodeUint(buf, uint64(index))
-		_, _ = buf.Write(entry.id[:])
+		_, _ = sha.Write(binary.AppendUvarint(emptyHashBuffer, uint64(index)))
+		_, _ = sha.Write(entry.id[:])
 	}
-	encodeMaybeByteSlice(buf, n.valueDigest)
-	encodeKeyToBuffer(buf, n.key)
 
-	return buf.Bytes()
+	if n.valueDigest.HasValue() {
+		_, _ = sha.Write(trueBytes)
+		value := n.valueDigest.Value()
+		_, _ = sha.Write(binary.AppendUvarint(emptyHashBuffer, uint64(len(value))))
+		_, _ = sha.Write(value)
+	} else {
+		_, _ = sha.Write(falseBytes)
+	}
+
+	_, _ = sha.Write(binary.AppendUvarint(emptyHashBuffer, uint64(n.key.length)))
+	_, _ = sha.Write(n.key.Bytes())
+	sha.Sum(emptyHashBuffer)
+	return hash
 }
 
 // Assumes [n] is non-nil.
