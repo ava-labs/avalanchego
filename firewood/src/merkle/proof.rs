@@ -324,7 +324,7 @@ impl<N: AsRef<[u8]> + Send> Proof<N> {
                                     .inner_mut()
                                     .as_branch_mut()
                                     .expect("parent_node_ref must be a branch");
-                                node.chd_mut()[child_index] = Some(child_node.as_ptr());
+                                node.chd_mut()[child_index] = Some(child_node.as_addr());
                             })?;
 
                             child_node
@@ -539,7 +539,7 @@ where
                     _ => (),
                 };
 
-                parent = u_ref.as_ptr();
+                parent = u_ref.as_addr();
                 u_ref = merkle.get_node(left_node.expect("left_node none"))?;
                 index += 1;
             }
@@ -590,7 +590,7 @@ where
                 return Ok(false);
             }
 
-            let p = u_ref.as_ptr();
+            let p = u_ref.as_addr();
             index += n.partial_path.len();
 
             // Only one proof points to non-existent key.
@@ -727,7 +727,7 @@ fn unset_node_ref<K: AsRef<[u8]>, S: LinearStore, T: BinarySerde>(
 
     #[allow(clippy::unwrap_used)]
     let mut u_ref = merkle.get_node(node).map_err(|_| ProofError::NoSuchNode)?;
-    let p = u_ref.as_ptr();
+    let p = u_ref.as_addr();
 
     if index >= chunks.len() {
         return Err(ProofError::InvalidProof);

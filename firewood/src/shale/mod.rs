@@ -89,7 +89,7 @@ pub trait LinearStore: Debug + Send + Sync {
 }
 
 /// A wrapper of `StoredView` to enable writes. The direct construction (by [Obj::from_stored_view]
-/// or [StoredView::ptr_to_obj]) could be useful for some unsafe access to a low-level item (e.g.
+/// or [StoredView::addr_to_obj]) could be useful for some unsafe access to a low-level item (e.g.
 /// headers/metadata at bootstrap) stored at a given [DiskAddress].
 #[derive(Debug)]
 pub struct Obj<T: Storable> {
@@ -100,7 +100,7 @@ pub struct Obj<T: Storable> {
 
 impl<T: Storable> Obj<T> {
     #[inline(always)]
-    pub const fn as_ptr(&self) -> DiskAddress {
+    pub const fn as_addr(&self) -> DiskAddress {
         DiskAddress(NonZeroUsize::new(self.value.get_offset()))
     }
 
@@ -187,13 +187,13 @@ impl<'a, T: Storable + Debug> ObjRef<'a, T> {
     pub fn write(&mut self, modify: impl FnOnce(&mut T)) -> Result<(), ObjWriteSizeError> {
         self.inner.modify(modify)?;
 
-        self.cache.lock().dirty.insert(self.inner.as_ptr());
+        self.cache.lock().dirty.insert(self.inner.as_addr());
 
         Ok(())
     }
 
     pub fn into_ptr(self) -> DiskAddress {
-        self.deref().as_ptr()
+        self.deref().as_addr()
     }
 }
 
@@ -227,7 +227,7 @@ impl<'a, T: Storable + Debug> Deref for ObjRef<'a, T> {
 
 impl<'a, T: Storable> Drop for ObjRef<'a, T> {
     fn drop(&mut self) {
-        let ptr = self.inner.as_ptr();
+        let ptr = self.inner.as_addr();
         let mut cache = self.cache.lock();
         match cache.pinned.remove(&ptr) {
             Some(true) => {
@@ -357,7 +357,7 @@ impl<T: Storable + 'static> StoredView<T> {
     }
 
     #[inline(always)]
-    pub fn ptr_to_obj<U: LinearStore>(
+    pub fn addr_to_obj<U: LinearStore>(
         store: &U,
         ptr: DiskAddress,
         len_limit: u64,
@@ -483,7 +483,7 @@ impl<T: Storable> ObjCache<T> {
 
     #[inline(always)]
     fn put(&self, inner: Obj<T>) -> Obj<T> {
-        let ptr = inner.as_ptr();
+        let ptr = inner.as_addr();
         self.lock().pinned.insert(ptr, false);
         inner
     }

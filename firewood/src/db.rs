@@ -754,7 +754,7 @@ impl Db {
         header_offset: u64,
     ) -> Result<Obj<StoreHeader>, DbError> {
         let payload_header = DiskAddress::from(header_offset as usize);
-        StoredView::ptr_to_obj(
+        StoredView::addr_to_obj(
             meta_ref,
             payload_header,
             shale::compact::ChunkHeader::SERIALIZED_LEN,
@@ -764,7 +764,7 @@ impl Db {
 
     fn get_db_header_ref<K: LinearStore>(meta_ref: &K) -> Result<Obj<DbHeader>, DbError> {
         let db_header = DiskAddress::from(Db::PARAM_SIZE as usize);
-        StoredView::ptr_to_obj(meta_ref, db_header, DbHeader::MSIZE).map_err(Into::into)
+        StoredView::addr_to_obj(meta_ref, db_header, DbHeader::MSIZE).map_err(Into::into)
     }
 
     fn new_revision<K: LinearStore, T: Into<K>>(

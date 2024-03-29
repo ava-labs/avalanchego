@@ -302,22 +302,22 @@ impl From<StoreInner<StoreRevMut>> for StoreInner<StoreRevShared> {
 impl<M: LinearStore> StoreInner<M> {
     fn get_data_ref<U: Storable + 'static>(
         &self,
-        ptr: DiskAddress,
+        addr: DiskAddress,
         len_limit: u64,
     ) -> Result<Obj<U>, ShaleError> {
-        StoredView::ptr_to_obj(&self.data_store, ptr, len_limit)
+        StoredView::addr_to_obj(&self.data_store, addr, len_limit)
     }
 
-    fn get_header(&self, ptr: DiskAddress) -> Result<Obj<ChunkHeader>, ShaleError> {
-        self.get_data_ref::<ChunkHeader>(ptr, ChunkHeader::SERIALIZED_LEN)
+    fn get_header(&self, addr: DiskAddress) -> Result<Obj<ChunkHeader>, ShaleError> {
+        self.get_data_ref::<ChunkHeader>(addr, ChunkHeader::SERIALIZED_LEN)
     }
 
-    fn get_footer(&self, ptr: DiskAddress) -> Result<Obj<ChunkFooter>, ShaleError> {
-        self.get_data_ref::<ChunkFooter>(ptr, ChunkFooter::SERIALIZED_LEN)
+    fn get_footer(&self, addr: DiskAddress) -> Result<Obj<ChunkFooter>, ShaleError> {
+        self.get_data_ref::<ChunkFooter>(addr, ChunkFooter::SERIALIZED_LEN)
     }
 
-    fn get_descriptor(&self, ptr: DiskAddress) -> Result<Obj<ChunkDescriptor>, ShaleError> {
-        StoredView::ptr_to_obj(&self.meta_store, ptr, ChunkDescriptor::SERIALIZED_LEN)
+    fn get_descriptor(&self, addr: DiskAddress) -> Result<Obj<ChunkDescriptor>, ShaleError> {
+        StoredView::addr_to_obj(&self.meta_store, addr, ChunkDescriptor::SERIALIZED_LEN)
     }
 
     fn delete_descriptor(&mut self, desc_addr: DiskAddress) -> Result<(), ShaleError> {
@@ -464,12 +464,12 @@ impl<M: LinearStore> StoreInner<M> {
             old_alloc_addr = *self.header.base_addr;
         }
 
-        let mut ptr = old_alloc_addr;
+        let mut addr = old_alloc_addr;
         let mut res: Option<u64> = None;
         for _ in 0..self.alloc_max_walk {
-            assert!(ptr < tail);
+            assert!(addr < tail);
             let (chunk_size, desc_haddr) = {
-                let desc = self.get_descriptor(ptr)?;
+                let desc = self.get_descriptor(addr)?;
                 (desc.chunk_size as usize, desc.haddr)
             };
             let exit = if chunk_size == length as usize {
@@ -481,7 +481,7 @@ impl<M: LinearStore> StoreInner<M> {
                     #[allow(clippy::unwrap_used)]
                     header.modify(|h| h.is_freed = false).unwrap();
                 }
-                self.delete_descriptor(ptr)?;
+                self.delete_descriptor(addr)?;
                 true
             } else if chunk_size > length as usize + HEADER_SIZE + FOOTER_SIZE {
                 // able to split
@@ -538,22 +538,22 @@ impl<M: LinearStore> StoreInner<M> {
                         .modify(|f| f.chunk_size = rchunk_size as u64)
                         .unwrap();
                 }
-                self.delete_descriptor(ptr)?;
+                self.delete_descriptor(addr)?;
                 true
             } else {
                 false
             };
             #[allow(clippy::unwrap_used)]
             if exit {
-                self.header.alloc_addr.modify(|r| *r = ptr).unwrap();
+                self.header.alloc_addr.modify(|r| *r = addr).unwrap();
                 res = Some((desc_haddr + HEADER_SIZE) as u64);
                 break;
             }
-            ptr += DESCRIPTOR_SIZE;
-            if ptr >= tail {
-                ptr = *self.header.base_addr;
+            addr += DESCRIPTOR_SIZE;
+            if addr >= tail {
+                addr = *self.header.base_addr;
             }
-            if ptr == old_alloc_addr {
+            if addr == old_alloc_addr {
                 break;
             }
         }
@@ -677,15 +677,15 @@ impl<T: Storable + Debug + 'static, M: LinearStore> Store<T, M> {
     }
 
     #[allow(clippy::unwrap_used)]
-    pub(crate) fn free_item(&mut self, ptr: DiskAddress) -> Result<(), ShaleError> {
+    pub(crate) fn free_item(&mut self, addr: DiskAddress) -> Result<(), ShaleError> {
         let mut inner = self.inner.write().unwrap();
-        self.obj_cache.pop(ptr);
+        self.obj_cache.pop(addr);
         #[allow(clippy::unwrap_used)]
-        inner.free(ptr.unwrap().get() as u64)
+        inner.free(addr.unwrap().get() as u64)
     }
 
-    pub(crate) fn get_item(&self, ptr: DiskAddress) -> Result<ObjRef<'_, T>, ShaleError> {
-        let obj = self.obj_cache.get(ptr)?;
+    pub(crate) fn get_item(&self, addr: DiskAddress) -> Result<ObjRef<'_, T>, ShaleError> {
+        let obj = self.obj_cache.get(addr)?;
 
         #[allow(clippy::unwrap_used)]
         let inner = self.inner.read().unwrap();
@@ -696,17 +696,17 @@ impl<T: Storable + Debug + 'static, M: LinearStore> Store<T, M> {
         }
 
         #[allow(clippy::unwrap_used)]
-        if ptr < DiskAddress::from(StoreHeader::SERIALIZED_LEN as usize) {
+        if addr < DiskAddress::from(StoreHeader::SERIALIZED_LEN as usize) {
             return Err(ShaleError::InvalidAddressLength {
                 expected: StoreHeader::SERIALIZED_LEN,
-                found: ptr.0.map(|inner| inner.get()).unwrap_or_default() as u64,
+                found: addr.0.map(|inner| inner.get()).unwrap_or_default() as u64,
             });
         }
 
         let chunk_size = inner
-            .get_header(ptr - ChunkHeader::SERIALIZED_LEN as usize)?
+            .get_header(addr - ChunkHeader::SERIALIZED_LEN as usize)?
             .chunk_size;
-        let obj = self.obj_cache.put(inner.get_data_ref(ptr, chunk_size)?);
+        let obj = self.obj_cache.put(inner.get_data_ref(addr, chunk_size)?);
         let cache = &self.obj_cache;
 
         Ok(ObjRef::new(obj, cache))
@@ -790,7 +790,7 @@ mod tests {
         )
         .unwrap();
         let compact_header =
-            StoredView::ptr_to_obj(&dm, compact_header, ChunkHeader::SERIALIZED_LEN).unwrap();
+            StoredView::addr_to_obj(&dm, compact_header, ChunkHeader::SERIALIZED_LEN).unwrap();
         let mem_meta = dm;
         let mem_payload = InMemLinearStore::new(compact_size.get() as u64, 0x1);
 
@@ -801,8 +801,8 @@ mod tests {
         let data = b"hello world";
         let hash: [u8; HASH_SIZE] = sha3::Keccak256::digest(data).into();
         let obj_ref = store.put_item(Hash(hash), 0).unwrap();
-        assert_eq!(obj_ref.as_ptr(), DiskAddress::from(4113));
-        // create hash ptr from address and attempt to read dirty write.
+        assert_eq!(obj_ref.as_addr(), DiskAddress::from(4113));
+        // create hash addr from address and attempt to read dirty write.
         let hash_ref = store.get_item(DiskAddress::from(4113)).unwrap();
         // read before flush results in zeroed hash
         assert_eq!(hash_ref.as_ref(), ZERO_HASH.as_ref());

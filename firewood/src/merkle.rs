@@ -55,9 +55,9 @@ pub enum MerkleError {
 macro_rules! write_node {
     ($self: expr, $r: expr, $modify: expr, $parents: expr, $deleted: expr) => {
         if let Err(_) = $r.write($modify) {
-            let ptr = $self.put_node($r.clone())?.as_ptr();
+            let ptr = $self.put_node($r.clone())?.as_addr();
             set_parent(ptr, $parents);
-            $deleted.push($r.as_ptr());
+            $deleted.push($r.as_addr());
             true
         } else {
             false
@@ -191,7 +191,7 @@ impl<S: LinearStore, T> Merkle<S, T> {
                 Node::max_branch_node_size(),
             )
             .map_err(MerkleError::Shale)
-            .map(|node| node.as_ptr())
+            .map(|node| node.as_addr())
     }
 
     pub fn empty_root() -> &'static TrieHash {
@@ -336,7 +336,7 @@ impl<S: LinearStore, T> Merkle<S, T> {
 
                             let new_leaf = Node::from_leaf(LeafNode::new(Path(new_leaf_path), val));
 
-                            let new_leaf = self.put_node(new_leaf)?.as_ptr();
+                            let new_leaf = self.put_node(new_leaf)?.as_addr();
 
                             let mut children = [None; BranchNode::MAX_CHILDREN];
                             children[new_leaf_index as usize] = Some(new_leaf);
@@ -350,11 +350,11 @@ impl<S: LinearStore, T> Merkle<S, T> {
 
                             let new_branch = Node::from_branch(new_branch);
 
-                            let new_branch = self.put_node(new_branch)?.as_ptr();
+                            let new_branch = self.put_node(new_branch)?.as_addr();
 
                             set_parent(new_branch, &mut parents);
 
-                            deleted.push(node.as_ptr());
+                            deleted.push(node.as_addr());
                         }
 
                         // old node is a child of the new node
@@ -372,7 +372,7 @@ impl<S: LinearStore, T> Merkle<S, T> {
                                     node,
                                     Path(old_leaf_path.to_vec()),
                                 )?
-                                .as_ptr();
+                                .as_addr();
 
                             let mut new_branch = BranchNode {
                                 partial_path: Path(new_branch_path),
@@ -384,7 +384,7 @@ impl<S: LinearStore, T> Merkle<S, T> {
                             new_branch.children[old_leaf_index as usize] = Some(old_leaf);
 
                             let node = Node::from_branch(new_branch);
-                            let node = self.put_node(node)?.as_ptr();
+                            let node = self.put_node(node)?.as_addr();
 
                             set_parent(node, &mut parents);
                         }
@@ -409,11 +409,11 @@ impl<S: LinearStore, T> Merkle<S, T> {
                                     node,
                                     Path(old_leaf_path.to_vec()),
                                 )?
-                                .as_ptr();
+                                .as_addr();
 
                             let new_leaf = Node::from_leaf(LeafNode::new(Path(new_leaf_path), val));
 
-                            let new_leaf = self.put_node(new_leaf)?.as_ptr();
+                            let new_leaf = self.put_node(new_leaf)?.as_addr();
 
                             let mut new_branch = BranchNode {
                                 partial_path: Path(new_branch_path),
@@ -426,7 +426,7 @@ impl<S: LinearStore, T> Merkle<S, T> {
                             new_branch.children[new_leaf_index as usize] = Some(new_leaf);
 
                             let node = Node::from_branch(new_branch);
-                            let node = self.put_node(node)?.as_ptr();
+                            let node = self.put_node(node)?.as_addr();
 
                             set_parent(node, &mut parents);
                         }
@@ -447,7 +447,7 @@ impl<S: LinearStore, T> Merkle<S, T> {
                                     Path(key_nibbles.collect()),
                                     val,
                                 )))?
-                                .as_ptr();
+                                .as_addr();
 
                             // set the current child to point to this leaf
                             #[allow(clippy::indexing_slicing)]
@@ -503,7 +503,7 @@ impl<S: LinearStore, T> Merkle<S, T> {
                                         val,
                                     ));
 
-                                    let new_leaf = self.put_node(new_leaf)?.as_ptr();
+                                    let new_leaf = self.put_node(new_leaf)?.as_addr();
 
                                     #[allow(clippy::indexing_slicing)]
                                     node.write(|node| {
@@ -532,7 +532,7 @@ impl<S: LinearStore, T> Merkle<S, T> {
                                     node,
                                     Path(old_branch_path.to_vec()),
                                 )?
-                                .as_ptr();
+                                .as_addr();
 
                             let mut new_branch = BranchNode {
                                 partial_path: Path(new_branch_path),
@@ -544,7 +544,7 @@ impl<S: LinearStore, T> Merkle<S, T> {
                             new_branch.children[old_branch_index as usize] = Some(old_branch);
 
                             let node = Node::from_branch(new_branch);
-                            let node = self.put_node(node)?.as_ptr();
+                            let node = self.put_node(node)?.as_addr();
 
                             set_parent(node, &mut parents);
 
@@ -571,11 +571,11 @@ impl<S: LinearStore, T> Merkle<S, T> {
                                     node,
                                     Path(old_branch_path.to_vec()),
                                 )?
-                                .as_ptr();
+                                .as_addr();
 
                             let new_leaf = Node::from_leaf(LeafNode::new(Path(new_leaf_path), val));
 
-                            let new_leaf = self.put_node(new_leaf)?.as_ptr();
+                            let new_leaf = self.put_node(new_leaf)?.as_addr();
 
                             let mut new_branch = BranchNode {
                                 partial_path: Path(new_branch_path),
@@ -588,7 +588,7 @@ impl<S: LinearStore, T> Merkle<S, T> {
                             new_branch.children[new_leaf_index as usize] = Some(new_leaf);
 
                             let node = Node::from_branch(new_branch);
-                            let node = self.put_node(node)?.as_ptr();
+                            let node = self.put_node(node)?.as_addr();
 
                             set_parent(node, &mut parents);
 
@@ -640,7 +640,7 @@ impl<S: LinearStore, T> Merkle<S, T> {
                     &mut deleted
                 );
 
-                node.as_ptr()
+                node.as_addr()
             };
 
             if let Some((idx, more, ext, val)) = info {
@@ -664,7 +664,7 @@ impl<S: LinearStore, T> Merkle<S, T> {
                         value: Some(val),
                         children_encoded: Default::default(),
                     }))?
-                    .as_ptr();
+                    .as_addr();
 
                 set_parent(branch, &mut parents);
             }
@@ -727,9 +727,9 @@ impl<S: LinearStore, T> Merkle<S, T> {
                             child.rehash();
                         })?;
 
-                        set_parent(child.as_ptr(), &mut parents);
+                        set_parent(child.as_addr(), &mut parents);
 
-                        deleted.push(node.as_ptr());
+                        deleted.push(node.as_addr());
                     } else {
                         node.write(|node| {
                             node.as_branch_mut().value = None;
@@ -744,7 +744,7 @@ impl<S: LinearStore, T> Merkle<S, T> {
                     let value = Some(n.value.clone());
 
                     // TODO: handle unwrap better
-                    deleted.push(node.as_ptr());
+                    deleted.push(node.as_addr());
 
                     let (mut parent, child_index) = parents.pop().expect("parents is never empty");
 
@@ -805,11 +805,11 @@ impl<S: LinearStore, T> Merkle<S, T> {
                                 }
                             };
 
-                            let child = self.put_node(new_child)?.as_ptr();
+                            let child = self.put_node(new_child)?.as_addr();
 
                             set_parent(child, &mut parents);
 
-                            deleted.push(parent.as_ptr());
+                            deleted.push(parent.as_addr());
                         }
 
                         // branch nodes shouldn't have no children
@@ -819,10 +819,10 @@ impl<S: LinearStore, T> Merkle<S, T> {
                                 value.clone(),
                             ));
 
-                            let leaf = self.put_node(leaf)?.as_ptr();
+                            let leaf = self.put_node(leaf)?.as_addr();
                             set_parent(leaf, &mut parents);
 
-                            deleted.push(parent.as_ptr());
+                            deleted.push(parent.as_addr());
                         }
 
                         _ => parent.write(|parent| parent.rehash())?,
@@ -948,7 +948,7 @@ impl<S: LinearStore, T> Merkle<S, T> {
                 break;
             };
 
-            start_loop_callback(node_ref.as_ptr(), nib);
+            start_loop_callback(node_ref.as_addr(), nib);
 
             let next_ptr = match &node_ref.inner {
                 #[allow(clippy::indexing_slicing)]
@@ -1243,11 +1243,11 @@ impl<S: LinearStore, T> Merkle<S, T> {
         write_result: Result<(), ObjWriteSizeError>,
     ) -> Result<NodeObjRef<'a>, MerkleError> {
         if let Err(ObjWriteSizeError) = write_result {
-            let old_node_address = node.as_ptr();
+            let old_node_address = node.as_addr();
             node = self.put_node(node.into_inner())?;
             deleted.push(old_node_address);
 
-            set_parent(node.as_ptr(), parents);
+            set_parent(node.as_addr(), parents);
         }
 
         Ok(node)
@@ -1424,7 +1424,7 @@ mod tests {
             .unwrap(),
         )
         .unwrap();
-        let compact_header = shale::StoredView::ptr_to_obj(
+        let compact_header = shale::StoredView::addr_to_obj(
             &dm,
             compact_header,
             shale::compact::ChunkHeader::SERIALIZED_LEN,
@@ -2160,7 +2160,7 @@ mod tests {
         let root = merkle.get_node(root)?;
 
         let mut node_ref = merkle.put_node(node)?;
-        let addr = node_ref.as_ptr();
+        let addr = node_ref.as_addr();
 
         // make sure that doubling the path length will fail on a normal write
         let write_result = node_ref.write(|node| {
@@ -2181,7 +2181,7 @@ mod tests {
             Path(new_path.clone()),
         )?;
 
-        assert_ne!(node.as_ptr(), addr);
+        assert_ne!(node.as_addr(), addr);
         assert_eq!(&to_delete[0], &addr);
 
         let (path, value) = match node.inner() {

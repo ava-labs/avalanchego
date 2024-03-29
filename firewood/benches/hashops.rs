@@ -95,7 +95,7 @@ fn bench_merkle<const N: usize>(criterion: &mut Criterion) {
                     let merkle_payload_header = DiskAddress::from(0);
 
                     #[allow(clippy::unwrap_used)]
-                    let merkle_payload_header_ref = StoredView::ptr_to_obj(
+                    let merkle_payload_header_ref = StoredView::addr_to_obj(
                         &InMemLinearStore::new(2 * ChunkHeader::SERIALIZED_LEN, 9),
                         merkle_payload_header,
                         ChunkHeader::SERIALIZED_LEN,

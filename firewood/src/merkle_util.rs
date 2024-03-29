@@ -61,7 +61,7 @@ where
         )
         .expect("write should succeed");
         #[allow(clippy::unwrap_used)]
-        let compact_header = StoredView::ptr_to_obj(
+        let compact_header = StoredView::addr_to_obj(
             &dm,
             compact_header,
             shale::compact::ChunkHeader::SERIALIZED_LEN,

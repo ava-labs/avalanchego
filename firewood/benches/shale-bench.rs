@@ -82,7 +82,7 @@ fn serialize<T: LinearStore>(m: &T) {
     let compact_header_obj: DiskAddress = DiskAddress::from(0x0);
     #[allow(clippy::unwrap_used)]
     let _: Obj<StoreHeader> =
-        StoredView::ptr_to_obj(m, compact_header_obj, ChunkHeader::SERIALIZED_LEN).unwrap();
+        StoredView::addr_to_obj(m, compact_header_obj, ChunkHeader::SERIALIZED_LEN).unwrap();
 }
 
 fn bench_cursors(c: &mut Criterion) {
