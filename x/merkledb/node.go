@@ -47,7 +47,7 @@ func newNode(key Key) *node {
 // Parse [nodeBytes] to a node and set its key to [key].
 func parseNode(key Key, nodeBytes []byte) (*node, error) {
 	n := dbNode{}
-	if err := codec.decodeDBNode(nodeBytes, &n); err != nil {
+	if err := decodeDBNode(nodeBytes, &n); err != nil {
 		return nil, err
 	}
 	result := &node{
@@ -66,7 +66,7 @@ func (n *node) hasValue() bool {
 
 // Returns the byte representation of this node.
 func (n *node) bytes() []byte {
-	return codec.encodeDBNode(&n.dbNode)
+	return encodeDBNode(&n.dbNode)
 }
 
 // Returns and caches the ID of this node.

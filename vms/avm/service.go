@@ -433,7 +433,9 @@ func (s *Service) GetUTXOs(_ *http.Request, args *api.GetUTXOsArgs, reply *api.G
 			limit,
 		)
 	} else {
-		utxos, endAddr, endUTXOID, err = s.vm.GetAtomicUTXOs(
+		utxos, endAddr, endUTXOID, err = avax.GetAtomicUTXOs(
+			s.vm.ctx.SharedMemory,
+			s.vm.parser.Codec(),
 			sourceChain,
 			addrSet,
 			startAddr,
@@ -1782,7 +1784,15 @@ func (s *Service) buildImport(args *ImportArgs) (*txs.Tx, error) {
 		return nil, err
 	}
 
-	atomicUTXOs, _, _, err := s.vm.GetAtomicUTXOs(chainID, kc.Addrs, ids.ShortEmpty, ids.Empty, int(maxPageSize))
+	atomicUTXOs, _, _, err := avax.GetAtomicUTXOs(
+		s.vm.ctx.SharedMemory,
+		s.vm.parser.Codec(),
+		chainID,
+		kc.Addrs,
+		ids.ShortEmpty,
+		ids.Empty,
+		int(maxPageSize),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("problem retrieving user's atomic UTXOs: %w", err)
 	}
