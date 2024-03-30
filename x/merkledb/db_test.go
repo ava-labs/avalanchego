@@ -10,6 +10,7 @@ import (
 	"math/rand"
 	"slices"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 
@@ -1288,7 +1289,7 @@ func TestGetChangeProofEmptyRootID(t *testing.T) {
 	require.ErrorIs(err, ErrEmptyProof)
 }
 
-func TestRollingView(t *testing.T) {
+func TestRollingViewBasic(t *testing.T) {
 	require := require.New(t)
 
 	db, err := getBasicDB()
@@ -1343,4 +1344,92 @@ func TestRollingView(t *testing.T) {
 	// TODO: figure out the best way to remove no-ops here
 	require.Equal(0, nodes)
 	require.Equal(0, values)
+}
+
+func TestRollingViewAsync(t *testing.T) {
+	require := require.New(t)
+
+	// Make 5 goroutines and have them insert the same keys and periodicially check roots
+	type kv struct {
+		key   []byte
+		value []byte
+	}
+	listeners := make([]chan *kv, 5)
+	roots := make([][]ids.ID, 5)
+	wg := &sync.WaitGroup{}
+	for i := 0; i < 5; i++ {
+		listeners[i] = make(chan *kv, 1_000_000)
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+
+			db, err := getBasicDB()
+			require.NoError(err)
+			outstandingCommits := &sync.WaitGroup{}
+
+			rv, err := db.NewRollingView(context.Background(), 100_000)
+			require.NoError(err)
+
+			rootNum := 0
+			var cl sync.Mutex
+			for item := range listeners[i] {
+				if item == nil {
+					newRv, err := rv.NewRollingView(context.Background(), 100_000)
+					require.NoError(err)
+					oldRv := rv
+					rv = newRv
+					outstandingCommits.Add(1)
+					cl.Lock()
+					go func() {
+						defer outstandingCommits.Done()
+						defer cl.Unlock()
+
+						require.NoError(oldRv.CommitToDB(context.Background()))
+						root, err := db.GetMerkleRoot(context.Background())
+						require.NoError(err)
+						roots[i] = append(roots[i], root)
+						t.Log("id", i, "root", rootNum, "id", root)
+						rootNum++
+					}()
+					continue
+				}
+				require.NoError(rv.Update(context.TODO(), string(item.key), maybe.Some(item.value)))
+			}
+			outstandingCommits.Wait()
+		}(i)
+	}
+
+	// Add items to the listeners
+	rootsCreated := 0
+	for i := 0; i < 450_000; i++ {
+		var item *kv
+		if i%100_000 != 0 || i == 0 {
+			k := ids.GenerateTestID()
+			v := ids.GenerateTestID()
+			item = &kv{key: k[:], value: v[:]}
+		} else {
+			rootsCreated++
+		}
+		for j := 0; j < 5; j++ {
+			listeners[j] <- item
+		}
+	}
+
+	// Do one last commit
+	for j := 0; j < 5; j++ {
+		listeners[j] <- nil
+		rootsCreated++
+		close(listeners[j])
+	}
+	wg.Wait()
+
+	// Check roots
+	for i := 0; i < rootsCreated; i++ {
+		for j := 1; j < 5; j++ {
+			require.Equal(roots[0][i].String(), roots[j][i].String())
+		}
+	}
+
+	// Wait for keys and compare roots
+	wg.Wait()
 }
