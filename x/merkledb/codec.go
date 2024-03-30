@@ -36,20 +36,20 @@ var (
 	errTooManyChildren    = errors.New("too many children")
 )
 
-// based on the implementation of encodeUint which uses binary.PutUvarint
-func uintSize(value uint64) int {
-	if value == 0 {
-		return 1
-	}
-	return (bits.Len64(value) + 6) / 7
-}
-
 func childSize(index byte, childEntry *child) int {
 	// * index
 	// * child ID
 	// * child key
 	// * bool indicating whether the child has a value
 	return uintSize(uint64(index)) + ids.IDLen + keySize(childEntry.compressedKey) + boolLen
+}
+
+// based on the implementation of encodeUint which uses binary.PutUvarint
+func uintSize(value uint64) int {
+	if value == 0 {
+		return 1
+	}
+	return (bits.Len64(value) + 6) / 7
 }
 
 func keySize(p Key) int {
