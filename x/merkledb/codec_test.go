@@ -754,28 +754,6 @@ func Benchmark_HashNode(b *testing.B) {
 	}
 }
 
-/*
-Before:
-```
-Benchmark_HashNode/empty_node-12         	15459874	        76.00 ns/op	       0 B/op	       0 allocs/op
-Benchmark_HashNode/has_value-12          	13865698	        87.08 ns/op	       0 B/op	       0 allocs/op
-Benchmark_HashNode/has_key-12            	16045542	        75.12 ns/op	       0 B/op	       0 allocs/op
-Benchmark_HashNode/1_child-12            	 8345124	       142.2  ns/op	       0 B/op	       0 allocs/op
-Benchmark_HashNode/2_children-12         	 5880582	       204.8  ns/op	       0 B/op	       0 allocs/op
-Benchmark_HashNode/16_children-12        	 1205710	      1002    ns/op	       0 B/op	       0 allocs/op
-```
-
-After:
-```
-Benchmark_HashNode/empty_node-12         	15400492	        77.47 ns/op	       0 B/op	       0 allocs/op
-Benchmark_HashNode/has_value-12          	14085064	        90.31 ns/op	       0 B/op	       0 allocs/op
-Benchmark_HashNode/has_key-12            	15843788	        75.32 ns/op	       0 B/op	       0 allocs/op
-Benchmark_HashNode/1_child-12            	 8088014	       143.4  ns/op	       0 B/op	       0 allocs/op
-Benchmark_HashNode/2_children-12         	 5744546	       211.9  ns/op	       0 B/op	       0 allocs/op
-Benchmark_HashNode/16_children-12        	 1000000	      1015    ns/op	       0 B/op	       0 allocs/op
-```
-*/
-
 func Benchmark_EncodeDBNode(b *testing.B) {
 	for _, benchmark := range encodeDBNodeTests {
 		b.Run(benchmark.name, func(b *testing.B) {
@@ -785,26 +763,6 @@ func Benchmark_EncodeDBNode(b *testing.B) {
 		})
 	}
 }
-
-/*
-Before:
-```
-Benchmark_EncodeDBNode/empty_node-12         	37080334	        32.68 ns/op	       2 B/op	       1 allocs/op
-Benchmark_EncodeDBNode/has_value-12          	24886132	        49.37 ns/op	       8 B/op	       1 allocs/op
-Benchmark_EncodeDBNode/1_child-12            	 6334178	       190.6  ns/op	      48 B/op	       1 allocs/op
-Benchmark_EncodeDBNode/2_children-12         	 4398560	       276.7  ns/op	      96 B/op	       1 allocs/op
-Benchmark_EncodeDBNode/16_children-12        	  712402	      1687    ns/op	     640 B/op	       1 allocs/op
-```
-
-After:
-```
-Benchmark_EncodeDBNode/empty_node-12         	45195682	        26.28 ns/op	       2 B/op	       1 allocs/op
-Benchmark_EncodeDBNode/has_value-12          	30678374	        37.23 ns/op	       8 B/op	       1 allocs/op
-Benchmark_EncodeDBNode/1_child-12            	 7456542	       160.9  ns/op	      48 B/op	       1 allocs/op
-Benchmark_EncodeDBNode/2_children-12         	 5145237	       234.2  ns/op	      96 B/op	       1 allocs/op
-Benchmark_EncodeDBNode/16_children-12        	  873981	      1357    ns/op	     640 B/op	       1 allocs/op
-```
-*/
 
 func Benchmark_DecodeDBNode(b *testing.B) {
 	for _, benchmark := range encodeDBNodeTests {
@@ -818,26 +776,6 @@ func Benchmark_DecodeDBNode(b *testing.B) {
 	}
 }
 
-/*
-Before:
-```
-Benchmark_DecodeDBNode/empty_node-12         	 3798781	       319.1 ns/op	      96 B/op	       2 allocs/op
-Benchmark_DecodeDBNode/has_value-12          	 3377623	       354.7 ns/op	     101 B/op	       3 allocs/op
-Benchmark_DecodeDBNode/1_child-12            	 1868557	       636.2 ns/op	     296 B/op	       7 allocs/op
-Benchmark_DecodeDBNode/2_children-12         	 1424244	       834.9 ns/op	     400 B/op	      11 allocs/op
-Benchmark_DecodeDBNode/16_children-12        	  322118	      3703   ns/op	    2008 B/op	      52 allocs/op
-```
-
-After:
-```
-Benchmark_DecodeDBNode/empty_node-12         	 4664726	       258.2 ns/op	      48 B/op	       1 allocs/op
-Benchmark_DecodeDBNode/has_value-12          	 4133185	       294.4 ns/op	      56 B/op	       2 allocs/op
-Benchmark_DecodeDBNode/1_child-12            	 2417180	       504.6 ns/op	     216 B/op	       4 allocs/op
-Benchmark_DecodeDBNode/2_children-12         	 1914547	       623.8 ns/op	     288 B/op	       6 allocs/op
-Benchmark_DecodeDBNode/16_children-12        	  543964	      2535   ns/op	    1434 B/op	      19 allocs/op
-```
-*/
-
 func Benchmark_EncodeKey(b *testing.B) {
 	for _, benchmark := range encodeKeyTests {
 		b.Run(benchmark.name, func(b *testing.B) {
@@ -847,32 +785,6 @@ func Benchmark_EncodeKey(b *testing.B) {
 		})
 	}
 }
-
-/*
-Before:
-```
-Benchmark_EncodeKey/empty-12         	46250646	        25.21 ns/op	       1 B/op	       1 allocs/op
-Benchmark_EncodeKey/1_byte-12        	44681088	        27.93 ns/op	       2 B/op	       1 allocs/op
-Benchmark_EncodeKey/2_bytes-12       	44105148	        28.67 ns/op	       3 B/op	       1 allocs/op
-Benchmark_EncodeKey/4_bytes-12       	41435211	        29.48 ns/op	       5 B/op	       1 allocs/op
-Benchmark_EncodeKey/8_bytes-12       	32166406	        38.54 ns/op	      16 B/op	       1 allocs/op
-Benchmark_EncodeKey/32_bytes-12      	18818768	        59.47 ns/op	      48 B/op	       1 allocs/op
-Benchmark_EncodeKey/64_bytes-12      	12397254	        91.52 ns/op	      80 B/op	       1 allocs/op
-Benchmark_EncodeKey/1024_bytes-12    	 1252498	       943.9  ns/op	    1152 B/op	       1 allocs/op
-```
-
-After:
-```
-Benchmark_EncodeKey/empty-12         	64515549	        18.19 ns/op	       1 B/op	       1 allocs/op
-Benchmark_EncodeKey/1_byte-12        	57745863	        20.25 ns/op	       2 B/op	       1 allocs/op
-Benchmark_EncodeKey/2_bytes-12       	60071084	        21.66 ns/op	       3 B/op	       1 allocs/op
-Benchmark_EncodeKey/4_bytes-12       	54326704	        22.40 ns/op	       5 B/op	       1 allocs/op
-Benchmark_EncodeKey/8_bytes-12       	39456540	        31.78 ns/op	      16 B/op	       1 allocs/op
-Benchmark_EncodeKey/32_bytes-12      	22716714	        54.88 ns/op	      48 B/op	       1 allocs/op
-Benchmark_EncodeKey/64_bytes-12      	15396968	        78.62 ns/op	      80 B/op	       1 allocs/op
-Benchmark_EncodeKey/1024_bytes-12    	 1500788	       818.5  ns/op	    1152 B/op	       1 allocs/op
-```
-*/
 
 func Benchmark_DecodeKey(b *testing.B) {
 	for _, benchmark := range encodeKeyTests {
@@ -884,32 +796,6 @@ func Benchmark_DecodeKey(b *testing.B) {
 		})
 	}
 }
-
-/*
-Before:
-```
-Benchmark_DecodeKey/empty-12         	 4698616	       254.6 ns/op	      48 B/op	       1 allocs/op
-Benchmark_DecodeKey/1_byte-12        	 4528935	       269.5 ns/op	      49 B/op	       2 allocs/op
-Benchmark_DecodeKey/2_bytes-12       	 4270620	       281.5 ns/op	      52 B/op	       3 allocs/op
-Benchmark_DecodeKey/4_bytes-12       	 4181996	       289.0 ns/op	      56 B/op	       3 allocs/op
-Benchmark_DecodeKey/8_bytes-12       	 4075734	       297.0 ns/op	      64 B/op	       3 allocs/op
-Benchmark_DecodeKey/32_bytes-12      	 3519122	       343.1 ns/op	     112 B/op	       3 allocs/op
-Benchmark_DecodeKey/64_bytes-12      	 3218776	       374.2 ns/op	     176 B/op	       3 allocs/op
-Benchmark_DecodeKey/1024_bytes-12    	  840715	      1628   ns/op	    2096 B/op	       3 allocs/op
-```
-
-After:
-```
-Benchmark_DecodeKey/empty-12         	 6134431	       193.4 ns/op	       0 B/op	       0 allocs/op
-Benchmark_DecodeKey/1_byte-12        	 6164746	       195.0 ns/op	       0 B/op	       0 allocs/op
-Benchmark_DecodeKey/2_bytes-12       	 5763130	       208.3 ns/op	       2 B/op	       1 allocs/op
-Benchmark_DecodeKey/4_bytes-12       	 5699397	       210.0 ns/op	       4 B/op	       1 allocs/op
-Benchmark_DecodeKey/8_bytes-12       	 5605557	       214.6 ns/op	       8 B/op	       1 allocs/op
-Benchmark_DecodeKey/32_bytes-12      	 5206342	       230.3 ns/op	      32 B/op	       1 allocs/op
-Benchmark_DecodeKey/64_bytes-12      	 4850040	       247.1 ns/op	      64 B/op	       1 allocs/op
-Benchmark_DecodeKey/1024_bytes-12    	 1431144	       867.9 ns/op	    1024 B/op	       1 allocs/op
-```
-*/
 
 func Benchmark_EncodeUint(b *testing.B) {
 	w := codecWriter{
@@ -925,25 +811,3 @@ func Benchmark_EncodeUint(b *testing.B) {
 		})
 	}
 }
-
-/*
-Before:
-```
-Benchmark_EncodeUint/0-12  				181291690	         6.659 ns/op	       0 B/op	       0 allocs/op
-Benchmark_EncodeUint/1-12  				179944891	         6.607 ns/op	       0 B/op	       0 allocs/op
-Benchmark_EncodeUint/2-12  				184202994	         6.509 ns/op	       0 B/op	       0 allocs/op
-Benchmark_EncodeUint/32-12 				185757315	         6.527 ns/op	       0 B/op	       0 allocs/op
-Benchmark_EncodeUint/1024-12         	184936735	         6.668 ns/op	       0 B/op	       0 allocs/op
-Benchmark_EncodeUint/32768-12        	167698995	         7.095 ns/op	       0 B/op	       0 allocs/op
-```
-
-After:
-```
-Benchmark_EncodeUint/0-12  				552061826	         2.160 ns/op	       0 B/op	       0 allocs/op
-Benchmark_EncodeUint/1-12  				559716720	         2.148 ns/op	       0 B/op	       0 allocs/op
-Benchmark_EncodeUint/2-12  				553571922	         2.163 ns/op	       0 B/op	       0 allocs/op
-Benchmark_EncodeUint/32-12 				560677795	         2.138 ns/op	       0 B/op	       0 allocs/op
-Benchmark_EncodeUint/1024-12         	469645950	         2.546 ns/op	       0 B/op	       0 allocs/op
-Benchmark_EncodeUint/32768-12        	399744884	         3.039 ns/op	       0 B/op	       0 allocs/op
-```
-*/

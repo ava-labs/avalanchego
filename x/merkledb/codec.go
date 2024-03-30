@@ -288,7 +288,9 @@ func decodeKey(b []byte) (Key, error) {
 }
 
 type codecReader struct {
-	b    []byte
+	b []byte
+	// copy is used to flag to the reader if it is required to copy references
+	// to [b].
 	copy bool
 }
 
