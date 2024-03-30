@@ -1384,6 +1384,7 @@ func TestRollingViewAsync(t *testing.T) {
 						defer outstandingCommits.Done()
 						defer cl.Unlock()
 
+						// BUG: seems to be a bug with using a view before it's root is computed (likely with how the root is copied)
 						require.NoError(oldRv.CommitToDB(context.Background()))
 						root, err := db.GetMerkleRoot(context.Background())
 						require.NoError(err)
@@ -1416,10 +1417,10 @@ func TestRollingViewAsync(t *testing.T) {
 	}
 
 	// Do one last commit
-	for j := 0; j < 5; j++ {
-		listeners[j] <- nil
+	for i := 0; i < 5; i++ {
+		listeners[i] <- nil
 		rootsCreated++
-		close(listeners[j])
+		close(listeners[i])
 	}
 	wg.Wait()
 
