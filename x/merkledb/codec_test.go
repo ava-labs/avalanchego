@@ -4,7 +4,6 @@
 package merkledb
 
 import (
-	"bytes"
 	"encoding/binary"
 	"io"
 	"math"
@@ -94,7 +93,9 @@ var (
 	}{
 		{
 			name: "empty node",
-			n:    &dbNode{},
+			n: &dbNode{
+				children: make(map[byte]*child),
+			},
 			expectedBytes: []byte{
 				0x00, // value.HasValue()
 				0x00, // len(children)
@@ -103,7 +104,8 @@ var (
 		{
 			name: "has value",
 			n: &dbNode{
-				value: maybe.Some([]byte("value")),
+				value:    maybe.Some([]byte("value")),
+				children: make(map[byte]*child),
 			},
 			expectedBytes: []byte{
 				0x01,                    // value.HasValue()
@@ -459,21 +461,22 @@ func FuzzCodecBool(f *testing.F) {
 		) {
 			require := require.New(t)
 
-			reader := bytes.NewReader(b)
-			startLen := reader.Len()
-			got, err := decodeBool(reader)
+			r := codecReader{
+				b: b,
+			}
+			startLen := len(r.b)
+			got, err := r.Bool()
 			if err != nil {
 				t.SkipNow()
 			}
-			endLen := reader.Len()
+			endLen := len(r.b)
 			numRead := startLen - endLen
 
 			// Encoding [got] should be the same as [b].
-			var buf bytes.Buffer
-			encodeBool(&buf, got)
-			bufBytes := buf.Bytes()
-			require.Len(bufBytes, numRead)
-			require.Equal(b[:numRead], bufBytes)
+			w := codecWriter{}
+			w.Bool(got)
+			require.Len(w.b, numRead)
+			require.Equal(b[:numRead], w.b)
 		},
 	)
 }
@@ -486,21 +489,22 @@ func FuzzCodecInt(f *testing.F) {
 		) {
 			require := require.New(t)
 
-			reader := bytes.NewReader(b)
-			startLen := reader.Len()
-			got, err := decodeUint(reader)
+			c := codecReader{
+				b: b,
+			}
+			startLen := len(c.b)
+			got, err := c.Uvarint()
 			if err != nil {
 				t.SkipNow()
 			}
-			endLen := reader.Len()
+			endLen := len(c.b)
 			numRead := startLen - endLen
 
 			// Encoding [got] should be the same as [b].
-			var buf bytes.Buffer
-			encodeUint(&buf, got)
-			bufBytes := buf.Bytes()
-			require.Len(bufBytes, numRead)
-			require.Equal(b[:numRead], bufBytes)
+			w := codecWriter{}
+			w.Uvarint(got)
+			require.Len(w.b, numRead)
+			require.Equal(b[:numRead], w.b)
 		},
 	)
 }
@@ -557,13 +561,6 @@ func FuzzCodecDBNodeDeterministic(f *testing.F) {
 
 				value := maybe.Nothing[[]byte]()
 				if hasValue {
-					if len(valueBytes) == 0 {
-						// We do this because when we encode a value of []byte{}
-						// we will later decode it as nil.
-						// Doing this prevents inconsistency when comparing the
-						// encoded and decoded values below.
-						valueBytes = nil
-					}
 					value = maybe.Some(valueBytes)
 				}
 
@@ -595,6 +592,11 @@ func FuzzCodecDBNodeDeterministic(f *testing.F) {
 
 				nodeBytes2 := encodeDBNode(&gotNode)
 				require.Equal(nodeBytes, nodeBytes2)
+
+				// Enforce that modifying bytes after decodeDBNode doesn't
+				// modify the populated struct.
+				clear(nodeBytes)
+				require.Equal(node, gotNode)
 			}
 		},
 	)
@@ -605,7 +607,7 @@ func TestCodecDecodeDBNode_TooShort(t *testing.T) {
 
 	var (
 		parsedDBNode  dbNode
-		tooShortBytes = make([]byte, minDBNodeLen-1)
+		tooShortBytes = make([]byte, 1)
 	)
 	err := decodeDBNode(tooShortBytes, &parsedDBNode)
 	require.ErrorIs(err, io.ErrUnexpectedEOF)
@@ -684,11 +686,35 @@ func TestEncodeDBNode(t *testing.T) {
 	}
 }
 
+func TestDecodeDBNode(t *testing.T) {
+	for _, test := range encodeDBNodeTests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
+
+			var n dbNode
+			require.NoError(decodeDBNode(test.expectedBytes, &n))
+			require.Equal(test.n, &n)
+		})
+	}
+}
+
 func TestEncodeKey(t *testing.T) {
 	for _, test := range encodeKeyTests {
 		t.Run(test.name, func(t *testing.T) {
 			bytes := encodeKey(test.key)
 			require.Equal(t, test.expectedBytes, bytes)
+		})
+	}
+}
+
+func TestDecodeKey(t *testing.T) {
+	for _, test := range encodeKeyTests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
+
+			key, err := decodeKey(test.expectedBytes)
+			require.NoError(err)
+			require.Equal(test.key, key)
 		})
 	}
 }
@@ -728,6 +754,28 @@ func Benchmark_HashNode(b *testing.B) {
 	}
 }
 
+/*
+Before:
+```
+Benchmark_HashNode/empty_node-12         	15459874	        76.00 ns/op	       0 B/op	       0 allocs/op
+Benchmark_HashNode/has_value-12          	13865698	        87.08 ns/op	       0 B/op	       0 allocs/op
+Benchmark_HashNode/has_key-12            	16045542	        75.12 ns/op	       0 B/op	       0 allocs/op
+Benchmark_HashNode/1_child-12            	 8345124	       142.2  ns/op	       0 B/op	       0 allocs/op
+Benchmark_HashNode/2_children-12         	 5880582	       204.8  ns/op	       0 B/op	       0 allocs/op
+Benchmark_HashNode/16_children-12        	 1205710	      1002    ns/op	       0 B/op	       0 allocs/op
+```
+
+After:
+```
+Benchmark_HashNode/empty_node-12         	15400492	        77.47 ns/op	       0 B/op	       0 allocs/op
+Benchmark_HashNode/has_value-12          	14085064	        90.31 ns/op	       0 B/op	       0 allocs/op
+Benchmark_HashNode/has_key-12            	15843788	        75.32 ns/op	       0 B/op	       0 allocs/op
+Benchmark_HashNode/1_child-12            	 8088014	       143.4  ns/op	       0 B/op	       0 allocs/op
+Benchmark_HashNode/2_children-12         	 5744546	       211.9  ns/op	       0 B/op	       0 allocs/op
+Benchmark_HashNode/16_children-12        	 1000000	      1015    ns/op	       0 B/op	       0 allocs/op
+```
+*/
+
 func Benchmark_EncodeDBNode(b *testing.B) {
 	for _, benchmark := range encodeDBNodeTests {
 		b.Run(benchmark.name, func(b *testing.B) {
@@ -737,6 +785,58 @@ func Benchmark_EncodeDBNode(b *testing.B) {
 		})
 	}
 }
+
+/*
+Before:
+```
+Benchmark_EncodeDBNode/empty_node-12         	37080334	        32.68 ns/op	       2 B/op	       1 allocs/op
+Benchmark_EncodeDBNode/has_value-12          	24886132	        49.37 ns/op	       8 B/op	       1 allocs/op
+Benchmark_EncodeDBNode/1_child-12            	 6334178	       190.6  ns/op	      48 B/op	       1 allocs/op
+Benchmark_EncodeDBNode/2_children-12         	 4398560	       276.7  ns/op	      96 B/op	       1 allocs/op
+Benchmark_EncodeDBNode/16_children-12        	  712402	      1687    ns/op	     640 B/op	       1 allocs/op
+```
+
+After:
+```
+Benchmark_EncodeDBNode/empty_node-12         	45195682	        26.28 ns/op	       2 B/op	       1 allocs/op
+Benchmark_EncodeDBNode/has_value-12          	30678374	        37.23 ns/op	       8 B/op	       1 allocs/op
+Benchmark_EncodeDBNode/1_child-12            	 7456542	       160.9  ns/op	      48 B/op	       1 allocs/op
+Benchmark_EncodeDBNode/2_children-12         	 5145237	       234.2  ns/op	      96 B/op	       1 allocs/op
+Benchmark_EncodeDBNode/16_children-12        	  873981	      1357    ns/op	     640 B/op	       1 allocs/op
+```
+*/
+
+func Benchmark_DecodeDBNode(b *testing.B) {
+	for _, benchmark := range encodeDBNodeTests {
+		b.Run(benchmark.name, func(b *testing.B) {
+			for i := 0; i < b.N; i++ {
+				var n dbNode
+				err := decodeDBNode(benchmark.expectedBytes, &n)
+				require.NoError(b, err)
+			}
+		})
+	}
+}
+
+/*
+Before:
+```
+Benchmark_DecodeDBNode/empty_node-12         	 3798781	       319.1 ns/op	      96 B/op	       2 allocs/op
+Benchmark_DecodeDBNode/has_value-12          	 3377623	       354.7 ns/op	     101 B/op	       3 allocs/op
+Benchmark_DecodeDBNode/1_child-12            	 1868557	       636.2 ns/op	     296 B/op	       7 allocs/op
+Benchmark_DecodeDBNode/2_children-12         	 1424244	       834.9 ns/op	     400 B/op	      11 allocs/op
+Benchmark_DecodeDBNode/16_children-12        	  322118	      3703   ns/op	    2008 B/op	      52 allocs/op
+```
+
+After:
+```
+Benchmark_DecodeDBNode/empty_node-12         	 4664726	       258.2 ns/op	      48 B/op	       1 allocs/op
+Benchmark_DecodeDBNode/has_value-12          	 4133185	       294.4 ns/op	      56 B/op	       2 allocs/op
+Benchmark_DecodeDBNode/1_child-12            	 2417180	       504.6 ns/op	     216 B/op	       4 allocs/op
+Benchmark_DecodeDBNode/2_children-12         	 1914547	       623.8 ns/op	     288 B/op	       6 allocs/op
+Benchmark_DecodeDBNode/16_children-12        	  543964	      2535   ns/op	    1434 B/op	      19 allocs/op
+```
+*/
 
 func Benchmark_EncodeKey(b *testing.B) {
 	for _, benchmark := range encodeKeyTests {
@@ -748,16 +848,102 @@ func Benchmark_EncodeKey(b *testing.B) {
 	}
 }
 
-func Benchmark_EncodeUint(b *testing.B) {
-	var dst bytes.Buffer
-	dst.Grow(binary.MaxVarintLen64)
+/*
+Before:
+```
+Benchmark_EncodeKey/empty-12         	46250646	        25.21 ns/op	       1 B/op	       1 allocs/op
+Benchmark_EncodeKey/1_byte-12        	44681088	        27.93 ns/op	       2 B/op	       1 allocs/op
+Benchmark_EncodeKey/2_bytes-12       	44105148	        28.67 ns/op	       3 B/op	       1 allocs/op
+Benchmark_EncodeKey/4_bytes-12       	41435211	        29.48 ns/op	       5 B/op	       1 allocs/op
+Benchmark_EncodeKey/8_bytes-12       	32166406	        38.54 ns/op	      16 B/op	       1 allocs/op
+Benchmark_EncodeKey/32_bytes-12      	18818768	        59.47 ns/op	      48 B/op	       1 allocs/op
+Benchmark_EncodeKey/64_bytes-12      	12397254	        91.52 ns/op	      80 B/op	       1 allocs/op
+Benchmark_EncodeKey/1024_bytes-12    	 1252498	       943.9  ns/op	    1152 B/op	       1 allocs/op
+```
 
-	for _, v := range []uint64{0, 1, 2, 32, 1024, 32768} {
-		b.Run(strconv.FormatUint(v, 10), func(b *testing.B) {
+After:
+```
+Benchmark_EncodeKey/empty-12         	64515549	        18.19 ns/op	       1 B/op	       1 allocs/op
+Benchmark_EncodeKey/1_byte-12        	57745863	        20.25 ns/op	       2 B/op	       1 allocs/op
+Benchmark_EncodeKey/2_bytes-12       	60071084	        21.66 ns/op	       3 B/op	       1 allocs/op
+Benchmark_EncodeKey/4_bytes-12       	54326704	        22.40 ns/op	       5 B/op	       1 allocs/op
+Benchmark_EncodeKey/8_bytes-12       	39456540	        31.78 ns/op	      16 B/op	       1 allocs/op
+Benchmark_EncodeKey/32_bytes-12      	22716714	        54.88 ns/op	      48 B/op	       1 allocs/op
+Benchmark_EncodeKey/64_bytes-12      	15396968	        78.62 ns/op	      80 B/op	       1 allocs/op
+Benchmark_EncodeKey/1024_bytes-12    	 1500788	       818.5  ns/op	    1152 B/op	       1 allocs/op
+```
+*/
+
+func Benchmark_DecodeKey(b *testing.B) {
+	for _, benchmark := range encodeKeyTests {
+		b.Run(benchmark.name, func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
-				encodeUint(&dst, v)
-				dst.Reset()
+				_, err := decodeKey(benchmark.expectedBytes)
+				require.NoError(b, err)
 			}
 		})
 	}
 }
+
+/*
+Before:
+```
+Benchmark_DecodeKey/empty-12         	 4698616	       254.6 ns/op	      48 B/op	       1 allocs/op
+Benchmark_DecodeKey/1_byte-12        	 4528935	       269.5 ns/op	      49 B/op	       2 allocs/op
+Benchmark_DecodeKey/2_bytes-12       	 4270620	       281.5 ns/op	      52 B/op	       3 allocs/op
+Benchmark_DecodeKey/4_bytes-12       	 4181996	       289.0 ns/op	      56 B/op	       3 allocs/op
+Benchmark_DecodeKey/8_bytes-12       	 4075734	       297.0 ns/op	      64 B/op	       3 allocs/op
+Benchmark_DecodeKey/32_bytes-12      	 3519122	       343.1 ns/op	     112 B/op	       3 allocs/op
+Benchmark_DecodeKey/64_bytes-12      	 3218776	       374.2 ns/op	     176 B/op	       3 allocs/op
+Benchmark_DecodeKey/1024_bytes-12    	  840715	      1628   ns/op	    2096 B/op	       3 allocs/op
+```
+
+After:
+```
+Benchmark_DecodeKey/empty-12         	 6134431	       193.4 ns/op	       0 B/op	       0 allocs/op
+Benchmark_DecodeKey/1_byte-12        	 6164746	       195.0 ns/op	       0 B/op	       0 allocs/op
+Benchmark_DecodeKey/2_bytes-12       	 5763130	       208.3 ns/op	       2 B/op	       1 allocs/op
+Benchmark_DecodeKey/4_bytes-12       	 5699397	       210.0 ns/op	       4 B/op	       1 allocs/op
+Benchmark_DecodeKey/8_bytes-12       	 5605557	       214.6 ns/op	       8 B/op	       1 allocs/op
+Benchmark_DecodeKey/32_bytes-12      	 5206342	       230.3 ns/op	      32 B/op	       1 allocs/op
+Benchmark_DecodeKey/64_bytes-12      	 4850040	       247.1 ns/op	      64 B/op	       1 allocs/op
+Benchmark_DecodeKey/1024_bytes-12    	 1431144	       867.9 ns/op	    1024 B/op	       1 allocs/op
+```
+*/
+
+func Benchmark_EncodeUint(b *testing.B) {
+	w := codecWriter{
+		b: make([]byte, 0, binary.MaxVarintLen64),
+	}
+
+	for _, v := range []uint64{0, 1, 2, 32, 1024, 32768} {
+		b.Run(strconv.FormatUint(v, 10), func(b *testing.B) {
+			for i := 0; i < b.N; i++ {
+				w.Uvarint(v)
+				w.b = w.b[:0]
+			}
+		})
+	}
+}
+
+/*
+Before:
+```
+Benchmark_EncodeUint/0-12  				181291690	         6.659 ns/op	       0 B/op	       0 allocs/op
+Benchmark_EncodeUint/1-12  				179944891	         6.607 ns/op	       0 B/op	       0 allocs/op
+Benchmark_EncodeUint/2-12  				184202994	         6.509 ns/op	       0 B/op	       0 allocs/op
+Benchmark_EncodeUint/32-12 				185757315	         6.527 ns/op	       0 B/op	       0 allocs/op
+Benchmark_EncodeUint/1024-12         	184936735	         6.668 ns/op	       0 B/op	       0 allocs/op
+Benchmark_EncodeUint/32768-12        	167698995	         7.095 ns/op	       0 B/op	       0 allocs/op
+```
+
+After:
+```
+Benchmark_EncodeUint/0-12  				552061826	         2.160 ns/op	       0 B/op	       0 allocs/op
+Benchmark_EncodeUint/1-12  				559716720	         2.148 ns/op	       0 B/op	       0 allocs/op
+Benchmark_EncodeUint/2-12  				553571922	         2.163 ns/op	       0 B/op	       0 allocs/op
+Benchmark_EncodeUint/32-12 				560677795	         2.138 ns/op	       0 B/op	       0 allocs/op
+Benchmark_EncodeUint/1024-12         	469645950	         2.546 ns/op	       0 B/op	       0 allocs/op
+Benchmark_EncodeUint/32768-12        	399744884	         3.039 ns/op	       0 B/op	       0 allocs/op
+```
+*/
