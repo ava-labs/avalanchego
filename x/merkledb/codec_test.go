@@ -419,6 +419,16 @@ var (
 			},
 		},
 		{
+			name: "32 bytes",
+			key:  ToKey(make([]byte, 32)),
+			expectedBytes: append(
+				[]byte{
+					0x80, 0x04, // length
+				},
+				make([]byte, 32)..., // key
+			),
+		},
+		{
 			name: "64 bytes",
 			key:  ToKey(make([]byte, 64)),
 			expectedBytes: append(
