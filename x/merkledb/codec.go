@@ -362,10 +362,10 @@ func decodeID(src *bytes.Reader) (ids.ID, error) {
 }
 
 func encodeKey(key Key) []byte {
-	estimatedLen := binary.MaxVarintLen64 + len(key.Bytes())
-	dst := bytes.NewBuffer(make([]byte, 0, estimatedLen))
-	encodeKeyToBuffer(dst, key)
-	return dst.Bytes()
+	keyLen := uintSize(uint64(key.length)) + len(key.Bytes())
+	buf := bytes.NewBuffer(make([]byte, 0, keyLen))
+	encodeKeyToBuffer(buf, key)
+	return buf.Bytes()
 }
 
 func encodeKeyToBuffer(dst *bytes.Buffer, key Key) {
