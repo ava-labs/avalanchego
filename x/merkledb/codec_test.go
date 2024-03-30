@@ -222,11 +222,6 @@ var (
 				}
 				return n
 			}(),
-
-			// 0x01,                    // value.HasValue()
-			// 0x05,                    // len(value.Value())
-			// 'v', 'a', 'l', 'u', 'e', // value.Value()
-			// 0x02, // len(children)
 			expectedBytes: []byte{
 				0x01,                    // value.HasValue()
 				0x05,                    // len(value.Value())
