@@ -423,7 +423,7 @@ var (
 			key:  ToKey(make([]byte, 32)),
 			expectedBytes: append(
 				[]byte{
-					0x80, 0x04, // length
+					0x80, 0x02, // length
 				},
 				make([]byte, 32)..., // key
 			),
