@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"sync"
 	"testing"
 	"time"
 
@@ -18,9 +19,11 @@ import (
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -163,7 +166,7 @@ func TestPersistStakers(t *testing.T) {
 				r.Equal(lastUpdated, staker.StartTime)
 			},
 			checkDiffs: func(r *require.Assertions, s *state, staker *Staker, height uint64) {
-				weightDiffBytes, err := s.flatValidatorWeightDiffsDB.Get(marshalDiffKey(staker.SubnetID, height, staker.NodeID))
+				weightDiffBytes, err := s.validatorWeightDiffsDB.Get(marshalDiffKey(staker.SubnetID, height, staker.NodeID))
 				r.NoError(err)
 				weightDiff, err := unmarshalWeightDiff(weightDiffBytes)
 				r.NoError(err)
@@ -172,7 +175,7 @@ func TestPersistStakers(t *testing.T) {
 					Amount:   staker.Weight,
 				}, weightDiff)
 
-				blsDiffBytes, err := s.flatValidatorPublicKeyDiffsDB.Get(marshalDiffKey(staker.SubnetID, height, staker.NodeID))
+				blsDiffBytes, err := s.validatorPublicKeyDiffsDB.Get(marshalDiffKey(staker.SubnetID, height, staker.NodeID))
 				if staker.SubnetID == constants.PrimaryNetworkID {
 					r.NoError(err)
 					r.Nil(blsDiffBytes)
@@ -261,7 +264,7 @@ func TestPersistStakers(t *testing.T) {
 			checkValidatorUptimes: func(*require.Assertions, *state, *Staker) {},
 			checkDiffs: func(r *require.Assertions, s *state, staker *Staker, height uint64) {
 				// validator's weight must increase of delegator's weight amount
-				weightDiffBytes, err := s.flatValidatorWeightDiffsDB.Get(marshalDiffKey(staker.SubnetID, height, staker.NodeID))
+				weightDiffBytes, err := s.validatorWeightDiffsDB.Get(marshalDiffKey(staker.SubnetID, height, staker.NodeID))
 				r.NoError(err)
 				weightDiff, err := unmarshalWeightDiff(weightDiffBytes)
 				r.NoError(err)
@@ -317,10 +320,10 @@ func TestPersistStakers(t *testing.T) {
 			},
 			checkDiffs: func(r *require.Assertions, s *state, staker *Staker, height uint64) {
 				// pending validators weight diff and bls diffs are not stored
-				_, err := s.flatValidatorWeightDiffsDB.Get(marshalDiffKey(staker.SubnetID, height, staker.NodeID))
+				_, err := s.validatorWeightDiffsDB.Get(marshalDiffKey(staker.SubnetID, height, staker.NodeID))
 				r.ErrorIs(err, database.ErrNotFound)
 
-				_, err = s.flatValidatorPublicKeyDiffsDB.Get(marshalDiffKey(staker.SubnetID, height, staker.NodeID))
+				_, err = s.validatorPublicKeyDiffsDB.Get(marshalDiffKey(staker.SubnetID, height, staker.NodeID))
 				r.ErrorIs(err, database.ErrNotFound)
 			},
 		},
@@ -438,7 +441,7 @@ func TestPersistStakers(t *testing.T) {
 				r.ErrorIs(err, database.ErrNotFound)
 			},
 			checkDiffs: func(r *require.Assertions, s *state, staker *Staker, height uint64) {
-				weightDiffBytes, err := s.flatValidatorWeightDiffsDB.Get(marshalDiffKey(staker.SubnetID, height, staker.NodeID))
+				weightDiffBytes, err := s.validatorWeightDiffsDB.Get(marshalDiffKey(staker.SubnetID, height, staker.NodeID))
 				r.NoError(err)
 				weightDiff, err := unmarshalWeightDiff(weightDiffBytes)
 				r.NoError(err)
@@ -447,7 +450,7 @@ func TestPersistStakers(t *testing.T) {
 					Amount:   staker.Weight,
 				}, weightDiff)
 
-				blsDiffBytes, err := s.flatValidatorPublicKeyDiffsDB.Get(marshalDiffKey(staker.SubnetID, height, staker.NodeID))
+				blsDiffBytes, err := s.validatorPublicKeyDiffsDB.Get(marshalDiffKey(staker.SubnetID, height, staker.NodeID))
 				if staker.SubnetID == constants.PrimaryNetworkID {
 					r.NoError(err)
 					r.Equal(bls.PublicKeyFromValidUncompressedBytes(blsDiffBytes), staker.PublicKey)
@@ -536,7 +539,7 @@ func TestPersistStakers(t *testing.T) {
 			checkValidatorUptimes: func(*require.Assertions, *state, *Staker) {},
 			checkDiffs: func(r *require.Assertions, s *state, staker *Staker, height uint64) {
 				// validator's weight must decrease of delegator's weight amount
-				weightDiffBytes, err := s.flatValidatorWeightDiffsDB.Get(marshalDiffKey(staker.SubnetID, height, staker.NodeID))
+				weightDiffBytes, err := s.validatorWeightDiffsDB.Get(marshalDiffKey(staker.SubnetID, height, staker.NodeID))
 				r.NoError(err)
 				weightDiff, err := unmarshalWeightDiff(weightDiffBytes)
 				r.NoError(err)
@@ -592,10 +595,10 @@ func TestPersistStakers(t *testing.T) {
 				r.ErrorIs(err, database.ErrNotFound)
 			},
 			checkDiffs: func(r *require.Assertions, s *state, staker *Staker, height uint64) {
-				_, err := s.flatValidatorWeightDiffsDB.Get(marshalDiffKey(staker.SubnetID, height, staker.NodeID))
+				_, err := s.validatorWeightDiffsDB.Get(marshalDiffKey(staker.SubnetID, height, staker.NodeID))
 				r.ErrorIs(err, database.ErrNotFound)
 
-				_, err = s.flatValidatorPublicKeyDiffsDB.Get(marshalDiffKey(staker.SubnetID, height, staker.NodeID))
+				_, err = s.validatorPublicKeyDiffsDB.Get(marshalDiffKey(staker.SubnetID, height, staker.NodeID))
 				r.ErrorIs(err, database.ErrNotFound)
 			},
 		},
@@ -1293,6 +1296,74 @@ func requireEqualPublicKeysValidatorSet(
 	}
 }
 
+func TestParsedStateBlock(t *testing.T) {
+	var (
+		require = require.New(t)
+		blks    = makeBlocks(require)
+	)
+
+	for _, blk := range blks {
+		stBlk := stateBlk{
+			Bytes:  blk.Bytes(),
+			Status: choices.Accepted,
+		}
+
+		stBlkBytes, err := block.GenesisCodec.Marshal(block.CodecVersion, &stBlk)
+		require.NoError(err)
+
+		gotBlk, isStateBlk, err := parseStoredBlock(stBlkBytes)
+		require.NoError(err)
+		require.True(isStateBlk)
+		require.Equal(blk.ID(), gotBlk.ID())
+
+		gotBlk, isStateBlk, err = parseStoredBlock(blk.Bytes())
+		require.NoError(err)
+		require.False(isStateBlk)
+		require.Equal(blk.ID(), gotBlk.ID())
+	}
+}
+
+func TestReindexBlocks(t *testing.T) {
+	var (
+		require = require.New(t)
+		s       = newInitializedState(require).(*state)
+		blks    = makeBlocks(require)
+	)
+
+	// Populate the blocks using the legacy format.
+	for _, blk := range blks {
+		stBlk := stateBlk{
+			Bytes:  blk.Bytes(),
+			Status: choices.Accepted,
+		}
+		stBlkBytes, err := block.GenesisCodec.Marshal(block.CodecVersion, &stBlk)
+		require.NoError(err)
+
+		blkID := blk.ID()
+		require.NoError(s.blockDB.Put(blkID[:], stBlkBytes))
+	}
+
+	// Convert the indices to the new format.
+	require.NoError(s.ReindexBlocks(&sync.Mutex{}, logging.NoLog{}))
+
+	// Verify that the blocks are stored in the new format.
+	for _, blk := range blks {
+		blkID := blk.ID()
+		blkBytes, err := s.blockDB.Get(blkID[:])
+		require.NoError(err)
+
+		parsedBlk, err := block.Parse(block.GenesisCodec, blkBytes)
+		require.NoError(err)
+		require.Equal(blkID, parsedBlk.ID())
+	}
+
+	// Verify that the flag has been written to disk to allow skipping future
+	// reindexings.
+	reindexed, err := s.singletonDB.Has(BlocksReindexedKey)
+	require.NoError(err)
+	require.True(reindexed)
+}
+
 func TestStateSubnetOwner(t *testing.T) {
 	require := require.New(t)
 
@@ -1328,4 +1399,92 @@ func TestStateSubnetOwner(t *testing.T) {
 	owner, err = state.GetSubnetOwner(subnetID)
 	require.NoError(err)
 	require.Equal(owner2, owner)
+}
+
+func makeBlocks(require *require.Assertions) []block.Block {
+	var blks []block.Block
+	{
+		blk, err := block.NewApricotAbortBlock(ids.GenerateTestID(), 1000)
+		require.NoError(err)
+		blks = append(blks, blk)
+	}
+
+	{
+		blk, err := block.NewApricotAtomicBlock(ids.GenerateTestID(), 1000, &txs.Tx{
+			Unsigned: &txs.AdvanceTimeTx{
+				Time: 1000,
+			},
+		})
+		require.NoError(err)
+		blks = append(blks, blk)
+	}
+
+	{
+		blk, err := block.NewApricotCommitBlock(ids.GenerateTestID(), 1000)
+		require.NoError(err)
+		blks = append(blks, blk)
+	}
+
+	{
+		tx := &txs.Tx{
+			Unsigned: &txs.RewardValidatorTx{
+				TxID: ids.GenerateTestID(),
+			},
+		}
+		require.NoError(tx.Initialize(txs.Codec))
+		blk, err := block.NewApricotProposalBlock(ids.GenerateTestID(), 1000, tx)
+		require.NoError(err)
+		blks = append(blks, blk)
+	}
+
+	{
+		tx := &txs.Tx{
+			Unsigned: &txs.RewardValidatorTx{
+				TxID: ids.GenerateTestID(),
+			},
+		}
+		require.NoError(tx.Initialize(txs.Codec))
+		blk, err := block.NewApricotStandardBlock(ids.GenerateTestID(), 1000, []*txs.Tx{tx})
+		require.NoError(err)
+		blks = append(blks, blk)
+	}
+
+	{
+		blk, err := block.NewBanffAbortBlock(time.Now(), ids.GenerateTestID(), 1000)
+		require.NoError(err)
+		blks = append(blks, blk)
+	}
+
+	{
+		blk, err := block.NewBanffCommitBlock(time.Now(), ids.GenerateTestID(), 1000)
+		require.NoError(err)
+		blks = append(blks, blk)
+	}
+
+	{
+		tx := &txs.Tx{
+			Unsigned: &txs.RewardValidatorTx{
+				TxID: ids.GenerateTestID(),
+			},
+		}
+		require.NoError(tx.Initialize(txs.Codec))
+
+		blk, err := block.NewBanffProposalBlock(time.Now(), ids.GenerateTestID(), 1000, tx, []*txs.Tx{})
+		require.NoError(err)
+		blks = append(blks, blk)
+	}
+
+	{
+		tx := &txs.Tx{
+			Unsigned: &txs.RewardValidatorTx{
+				TxID: ids.GenerateTestID(),
+			},
+		}
+		require.NoError(tx.Initialize(txs.Codec))
+
+		blk, err := block.NewBanffStandardBlock(time.Now(), ids.GenerateTestID(), 1000, []*txs.Tx{tx})
+		require.NoError(err)
+		blks = append(blks, blk)
+	}
+	return blks
 }

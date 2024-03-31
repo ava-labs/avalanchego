@@ -9,6 +9,7 @@ import (
 	"io"
 	"math"
 	"math/rand"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -25,10 +26,9 @@ func FuzzCodecBool(f *testing.F) {
 		) {
 			require := require.New(t)
 
-			codec := codec.(*codecImpl)
 			reader := bytes.NewReader(b)
 			startLen := reader.Len()
-			got, err := codec.decodeBool(reader)
+			got, err := decodeBool(reader)
 			if err != nil {
 				t.SkipNow()
 			}
@@ -37,7 +37,7 @@ func FuzzCodecBool(f *testing.F) {
 
 			// Encoding [got] should be the same as [b].
 			var buf bytes.Buffer
-			codec.encodeBool(&buf, got)
+			encodeBool(&buf, got)
 			bufBytes := buf.Bytes()
 			require.Len(bufBytes, numRead)
 			require.Equal(b[:numRead], bufBytes)
@@ -53,10 +53,9 @@ func FuzzCodecInt(f *testing.F) {
 		) {
 			require := require.New(t)
 
-			codec := codec.(*codecImpl)
 			reader := bytes.NewReader(b)
 			startLen := reader.Len()
-			got, err := codec.decodeUint(reader)
+			got, err := decodeUint(reader)
 			if err != nil {
 				t.SkipNow()
 			}
@@ -65,7 +64,7 @@ func FuzzCodecInt(f *testing.F) {
 
 			// Encoding [got] should be the same as [b].
 			var buf bytes.Buffer
-			codec.encodeUint(&buf, got)
+			encodeUint(&buf, got)
 			bufBytes := buf.Bytes()
 			require.Len(bufBytes, numRead)
 			require.Equal(b[:numRead], bufBytes)
@@ -80,14 +79,13 @@ func FuzzCodecKey(f *testing.F) {
 			b []byte,
 		) {
 			require := require.New(t)
-			codec := codec.(*codecImpl)
-			got, err := codec.decodeKey(b)
+			got, err := decodeKey(b)
 			if err != nil {
 				t.SkipNow()
 			}
 
 			// Encoding [got] should be the same as [b].
-			gotBytes := codec.encodeKey(got)
+			gotBytes := encodeKey(got)
 			require.Equal(b, gotBytes)
 		},
 	)
@@ -100,14 +98,13 @@ func FuzzCodecDBNodeCanonical(f *testing.F) {
 			b []byte,
 		) {
 			require := require.New(t)
-			codec := codec.(*codecImpl)
 			node := &dbNode{}
-			if err := codec.decodeDBNode(b, node); err != nil {
+			if err := decodeDBNode(b, node); err != nil {
 				t.SkipNow()
 			}
 
 			// Encoding [node] should be the same as [b].
-			buf := codec.encodeDBNode(node)
+			buf := encodeDBNode(node)
 			require.Equal(b, buf)
 		},
 	)
@@ -157,13 +154,13 @@ func FuzzCodecDBNodeDeterministic(f *testing.F) {
 					children: children,
 				}
 
-				nodeBytes := codec.encodeDBNode(&node)
-				require.Len(nodeBytes, codec.encodedDBNodeSize(&node))
+				nodeBytes := encodeDBNode(&node)
+				require.Len(nodeBytes, encodedDBNodeSize(&node))
 				var gotNode dbNode
-				require.NoError(codec.decodeDBNode(nodeBytes, &gotNode))
+				require.NoError(decodeDBNode(nodeBytes, &gotNode))
 				require.Equal(node, gotNode)
 
-				nodeBytes2 := codec.encodeDBNode(&gotNode)
+				nodeBytes2 := encodeDBNode(&gotNode)
 				require.Equal(nodeBytes, nodeBytes2)
 			}
 		},
@@ -177,15 +174,12 @@ func TestCodecDecodeDBNode_TooShort(t *testing.T) {
 		parsedDBNode  dbNode
 		tooShortBytes = make([]byte, minDBNodeLen-1)
 	)
-	err := codec.decodeDBNode(tooShortBytes, &parsedDBNode)
+	err := decodeDBNode(tooShortBytes, &parsedDBNode)
 	require.ErrorIs(err, io.ErrUnexpectedEOF)
 }
 
-// Ensure that encodeHashValues is deterministic
-func FuzzEncodeHashValues(f *testing.F) {
-	codec1 := newCodec()
-	codec2 := newCodec()
-
+// Ensure that hashNode is deterministic
+func FuzzHashNode(f *testing.F) {
 	f.Fuzz(
 		func(
 			t *testing.T,
@@ -228,41 +222,200 @@ func FuzzEncodeHashValues(f *testing.F) {
 					},
 				}
 
-				// Serialize hv with both codecs
-				hvBytes1 := codec1.encodeHashValues(hv)
-				hvBytes2 := codec2.encodeHashValues(hv)
+				// Hash hv multiple times
+				hash1 := hashNode(hv)
+				hash2 := hashNode(hv)
 
 				// Make sure they're the same
-				require.Equal(hvBytes1, hvBytes2)
+				require.Equal(hash1, hash2)
 			}
 		},
 	)
 }
 
+func TestHashNode(t *testing.T) {
+	tests := []struct {
+		name         string
+		n            *node
+		expectedHash string
+	}{
+		{
+			name:         "empty node",
+			n:            newNode(Key{}),
+			expectedHash: "rbhtxoQ1DqWHvb6w66BZdVyjmPAneZUSwQq9uKj594qvFSdav",
+		},
+		{
+			name: "has value",
+			n: func() *node {
+				n := newNode(Key{})
+				n.setValue(maybe.Some([]byte("value1")))
+				return n
+			}(),
+			expectedHash: "2vx2xueNdWoH2uB4e8hbMU5jirtZkZ1c3ePCWDhXYaFRHpCbnQ",
+		},
+		{
+			name:         "has key",
+			n:            newNode(ToKey([]byte{0, 1, 2, 3, 4, 5, 6, 7})),
+			expectedHash: "2vA8ggXajhFEcgiF8zHTXgo8T2ALBFgffp1xfn48JEni1Uj5uK",
+		},
+		{
+			name: "1 child",
+			n: func() *node {
+				n := newNode(Key{})
+				childNode := newNode(ToKey([]byte{255}))
+				childNode.setValue(maybe.Some([]byte("value1")))
+				n.addChildWithID(childNode, 4, hashNode(childNode))
+				return n
+			}(),
+			expectedHash: "YfJRufqUKBv9ez6xZx6ogpnfDnw9fDsyebhYDaoaH57D3vRu3",
+		},
+		{
+			name: "2 children",
+			n: func() *node {
+				n := newNode(Key{})
+
+				childNode1 := newNode(ToKey([]byte{255}))
+				childNode1.setValue(maybe.Some([]byte("value1")))
+
+				childNode2 := newNode(ToKey([]byte{237}))
+				childNode2.setValue(maybe.Some([]byte("value2")))
+
+				n.addChildWithID(childNode1, 4, hashNode(childNode1))
+				n.addChildWithID(childNode2, 4, hashNode(childNode2))
+				return n
+			}(),
+			expectedHash: "YVmbx5MZtSKuYhzvHnCqGrswQcxmozAkv7xE1vTA2EiGpWUkv",
+		},
+		{
+			name: "16 children",
+			n: func() *node {
+				n := newNode(Key{})
+
+				for i := byte(0); i < 16; i++ {
+					childNode := newNode(ToKey([]byte{i << 4}))
+					childNode.setValue(maybe.Some([]byte("some value")))
+
+					n.addChildWithID(childNode, 4, hashNode(childNode))
+				}
+				return n
+			}(),
+			expectedHash: "5YiFLL7QV3f441See9uWePi3wVKsx9fgvX5VPhU8PRxtLqhwY",
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			hash := hashNode(test.n)
+			require.Equal(t, test.expectedHash, hash.String())
+		})
+	}
+}
+
 func TestCodecDecodeKeyLengthOverflowRegression(t *testing.T) {
-	codec := codec.(*codecImpl)
-	_, err := codec.decodeKey(binary.AppendUvarint(nil, math.MaxInt))
+	_, err := decodeKey(binary.AppendUvarint(nil, math.MaxInt))
 	require.ErrorIs(t, err, io.ErrUnexpectedEOF)
 }
 
 func TestUintSize(t *testing.T) {
-	c := codec.(*codecImpl)
-
 	// Test lower bound
-	expectedSize := c.uintSize(0)
+	expectedSize := uintSize(0)
 	actualSize := binary.PutUvarint(make([]byte, binary.MaxVarintLen64), 0)
 	require.Equal(t, expectedSize, actualSize)
 
 	// Test upper bound
-	expectedSize = c.uintSize(math.MaxUint64)
+	expectedSize = uintSize(math.MaxUint64)
 	actualSize = binary.PutUvarint(make([]byte, binary.MaxVarintLen64), math.MaxUint64)
 	require.Equal(t, expectedSize, actualSize)
 
 	// Test powers of 2
 	for power := 0; power < 64; power++ {
 		n := uint64(1) << uint(power)
-		expectedSize := c.uintSize(n)
+		expectedSize := uintSize(n)
 		actualSize := binary.PutUvarint(make([]byte, binary.MaxVarintLen64), n)
 		require.Equal(t, expectedSize, actualSize, power)
+	}
+}
+
+func Benchmark_HashNode(b *testing.B) {
+	benchmarks := []struct {
+		name string
+		n    *node
+	}{
+		{
+			name: "empty node",
+			n:    newNode(Key{}),
+		},
+		{
+			name: "has value",
+			n: func() *node {
+				n := newNode(Key{})
+				n.setValue(maybe.Some([]byte("value1")))
+				return n
+			}(),
+		},
+		{
+			name: "has key",
+			n:    newNode(ToKey([]byte{0, 1, 2, 3, 4, 5, 6, 7})),
+		},
+		{
+			name: "1 child",
+			n: func() *node {
+				n := newNode(Key{})
+				childNode := newNode(ToKey([]byte{255}))
+				childNode.setValue(maybe.Some([]byte("value1")))
+				n.addChildWithID(childNode, 4, hashNode(childNode))
+				return n
+			}(),
+		},
+		{
+			name: "2 children",
+			n: func() *node {
+				n := newNode(Key{})
+
+				childNode1 := newNode(ToKey([]byte{255}))
+				childNode1.setValue(maybe.Some([]byte("value1")))
+
+				childNode2 := newNode(ToKey([]byte{237}))
+				childNode2.setValue(maybe.Some([]byte("value2")))
+
+				n.addChildWithID(childNode1, 4, hashNode(childNode1))
+				n.addChildWithID(childNode2, 4, hashNode(childNode2))
+				return n
+			}(),
+		},
+		{
+			name: "16 children",
+			n: func() *node {
+				n := newNode(Key{})
+
+				for i := byte(0); i < 16; i++ {
+					childNode := newNode(ToKey([]byte{i << 4}))
+					childNode.setValue(maybe.Some([]byte("some value")))
+
+					n.addChildWithID(childNode, 4, hashNode(childNode))
+				}
+				return n
+			}(),
+		},
+	}
+	for _, benchmark := range benchmarks {
+		b.Run(benchmark.name, func(b *testing.B) {
+			for i := 0; i < b.N; i++ {
+				hashNode(benchmark.n)
+			}
+		})
+	}
+}
+
+func Benchmark_EncodeUint(b *testing.B) {
+	var dst bytes.Buffer
+	dst.Grow(binary.MaxVarintLen64)
+
+	for _, v := range []uint64{0, 1, 2, 32, 1024, 32768} {
+		b.Run(strconv.FormatUint(v, 10), func(b *testing.B) {
+			for i := 0; i < b.N; i++ {
+				encodeUint(&dst, v)
+				dst.Reset()
+			}
+		})
 	}
 }
