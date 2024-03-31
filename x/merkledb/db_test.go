@@ -1375,7 +1375,7 @@ func TestRollingViewAsync(t *testing.T) {
 			)
 			for item := range listeners[i] {
 				if item == nil {
-					// Generate root (child views require IDs to be populated on the parent
+					// Generate root (child views require IDs to be computed on the parent view)
 					root, err := rv.GetMerkleRoot(context.Background())
 					require.NoError(err)
 					roots[i] = append(roots[i], root)
@@ -1385,11 +1385,13 @@ func TestRollingViewAsync(t *testing.T) {
 					require.NoError(err)
 					oldRv := rv
 					rv = newRv
+
+					// Commit old view to disk
 					outstandingCommits.Add(1)
 					cl.Lock()
 					go func() {
-						defer outstandingCommits.Done()
 						defer cl.Unlock()
+						defer outstandingCommits.Done()
 
 						require.NoError(oldRv.CommitToDB(context.Background()))
 					}()
@@ -1423,15 +1425,12 @@ func TestRollingViewAsync(t *testing.T) {
 		close(listeners[i])
 	}
 	rootsCreated++
-	wg.Wait()
 
 	// Check roots
+	wg.Wait()
 	for i := 0; i < rootsCreated; i++ {
 		for j := 1; j < 5; j++ {
 			require.Equal(roots[0][i].String(), roots[j][i].String())
 		}
 	}
-
-	// Wait for keys and compare roots
-	wg.Wait()
 }

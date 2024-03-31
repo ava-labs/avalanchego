@@ -345,7 +345,8 @@ func (v *RollingView) insert(
 			commonPrefix       = oldRoot.key.Take(commonPrefixLength)
 			newRoot            = newNode(commonPrefix)
 
-			// TODO: we need this to be correct...
+			// TODO: We need to remove this calculation if we want to allow views to be built
+			// on top of other views prior to their root calculation.
 			oldRootID = oldRoot.calculateID(v.db.metrics)
 		)
 

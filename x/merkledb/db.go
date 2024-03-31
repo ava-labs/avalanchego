@@ -1000,9 +1000,6 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *view) error
 	return db.baseDB.Put(rootDBKey, rootKey)
 }
 
-// commitRollingChanges commits the changes in [trieToCommit] to [db].
-// Assumes [trieToCommit]'s node IDs have been calculated.
-// Assumes [db.commitLock] is held.
 func (db *merkleDB) commitRollingChanges(ctx context.Context, trieToCommit *RollingView) error {
 	db.lock.Lock()
 	defer db.lock.Unlock()
@@ -1022,6 +1019,10 @@ func (db *merkleDB) commitRollingChanges(ctx context.Context, trieToCommit *Roll
 		attribute.Int("valuesChanged", len(changes.values)),
 	))
 	defer span.End()
+
+	// We wait to update the parent reference of any child views until after committing the changes so that
+	// we don't block node reads unnecessarily (they will be the same whether reading from a view being
+	// committed or the db after commit).
 
 	if len(changes.nodes) == 0 {
 		return nil
