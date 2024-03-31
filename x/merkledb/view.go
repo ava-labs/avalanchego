@@ -49,7 +49,7 @@ type view struct {
 	// trie after the nodes have been calculated
 	valueChangesApplied utils.Atomic[bool]
 
-	// applyValueChangesOnce prevents node calculation from occuring multiple
+	// applyValueChangesOnce prevents node calculation from occurring multiple
 	// times
 	applyValueChangesOnce sync.Once
 
