@@ -45,11 +45,12 @@ type view struct {
 	committed  bool
 	commitLock sync.RWMutex
 
-	// tracking bool to enforce that no changes are made to the trie after the
-	// nodes have been calculated
+	// valueChangesApplied is used to enforce that no changes are made to the
+	// trie after the nodes have been calculated
 	valueChangesApplied utils.Atomic[bool]
 
-	// applyValueChangesOnce is a once to ensure that node calculation only occurs a single time
+	// applyValueChangesOnce prevents node calculation from occuring multiple
+	// times
 	applyValueChangesOnce sync.Once
 
 	// Controls the view's validity related fields.
