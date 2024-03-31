@@ -56,6 +56,7 @@ func (v *RollingView) NewRollingView(_ context.Context, changes int) (*RollingVi
 
 func newRollingView(db *merkleDB, parentTrie RollingParent, changes int) *RollingView {
 	return &RollingView{
+		// root will not be updated by the time we touch it
 		root:       maybe.Bind(parentTrie.getRoot(), (*node).clone),
 		db:         db,
 		parentTrie: parentTrie,
@@ -164,14 +165,15 @@ func (v *RollingView) CommitToDB(ctx context.Context) error {
 	v.db.commitLock.Lock()
 	defer v.db.commitLock.Unlock()
 
-	// TODO: remove useless changes (to both nodes and values)
-
-	if err := v.calculateNodeIDs(ctx); err != nil {
-		return err
-	}
 	if err := v.db.commitRollingChanges(ctx, v); err != nil {
 		return err
 	}
+
+	// TODO: we wait because it doesn't matter what we read
+	if v.child != nil {
+		v.child.updateParent(v.db)
+	}
+
 	return nil
 }
 
@@ -342,7 +344,9 @@ func (v *RollingView) insert(
 			commonPrefixLength = getLengthOfCommonPrefix(oldRoot.key, key, 0 /*offset*/, v.tokenSize)
 			commonPrefix       = oldRoot.key.Take(commonPrefixLength)
 			newRoot            = newNode(commonPrefix)
-			oldRootID          = oldRoot.calculateID(v.db.metrics)
+
+			// TODO: we need this to be correct...
+			oldRootID = oldRoot.calculateID(v.db.metrics)
 		)
 
 		// Call addChildWithID instead of addChild so the old root is added
@@ -546,4 +550,12 @@ func (v *RollingView) getParentTrie() RollingParent {
 
 func (v *RollingView) Changes() (int, int) {
 	return len(v.changes.nodes), len(v.changes.values)
+}
+
+// GetMerkleRoot returns the ID of the root of this view.
+func (v *RollingView) GetMerkleRoot(ctx context.Context) (ids.ID, error) {
+	if err := v.calculateNodeIDs(ctx); err != nil {
+		return ids.Empty, err
+	}
+	return v.changes.rootID, nil
 }

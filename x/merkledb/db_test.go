@@ -1365,15 +1365,22 @@ func TestRollingViewAsync(t *testing.T) {
 
 			db, err := getBasicDB()
 			require.NoError(err)
-			outstandingCommits := &sync.WaitGroup{}
 
 			rv, err := db.NewRollingView(context.Background(), 100_000)
 			require.NoError(err)
 
-			rootNum := 0
-			var cl sync.Mutex
+			var (
+				cl                 sync.Mutex
+				outstandingCommits = &sync.WaitGroup{}
+			)
 			for item := range listeners[i] {
 				if item == nil {
+					// Generate root (child views require IDs to be populated on the parent
+					root, err := rv.GetMerkleRoot(context.Background())
+					require.NoError(err)
+					roots[i] = append(roots[i], root)
+
+					// Create a new view
 					newRv, err := rv.NewRollingView(context.Background(), 100_000)
 					require.NoError(err)
 					oldRv := rv
@@ -1384,13 +1391,7 @@ func TestRollingViewAsync(t *testing.T) {
 						defer outstandingCommits.Done()
 						defer cl.Unlock()
 
-						// BUG: seems to be a bug with using a view before it's root is computed (likely with how the root is copied)
 						require.NoError(oldRv.CommitToDB(context.Background()))
-						root, err := db.GetMerkleRoot(context.Background())
-						require.NoError(err)
-						roots[i] = append(roots[i], root)
-						t.Log("id", i, "root", rootNum, "id", root)
-						rootNum++
 					}()
 					continue
 				}
@@ -1419,9 +1420,9 @@ func TestRollingViewAsync(t *testing.T) {
 	// Do one last commit
 	for i := 0; i < 5; i++ {
 		listeners[i] <- nil
-		rootsCreated++
 		close(listeners[i])
 	}
+	rootsCreated++
 	wg.Wait()
 
 	// Check roots
