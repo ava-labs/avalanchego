@@ -332,7 +332,7 @@ func (v *view) hashChangedNode(n *node) ids.ID {
 
 		totalBitLength := n.key.length + v.tokenSize + childEntry.compressedKey.length
 		buffer := keyBuffer[:bytesNeeded(totalBitLength)]
-		// Make sure the last byte of the key is orginally set correctly
+		// Make sure the last byte of the key is originally set correctly
 		if bytesForKey > 0 {
 			keyBuffer[bytesForKey-1] = lastKeyByte
 		}
