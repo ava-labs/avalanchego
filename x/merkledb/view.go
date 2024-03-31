@@ -294,7 +294,6 @@ func (v *view) hashChangedNode(n *node) ids.ID {
 	var wg sync.WaitGroup
 
 	for childIndex, childEntry := range n.children {
-		childEntry := childEntry // New variable so goroutine doesn't capture loop variable.
 		childKey := n.key.Extend(ToToken(childIndex, v.tokenSize), childEntry.compressedKey)
 		childNodeChange, ok := v.changes.nodes[childKey]
 		if !ok {
@@ -306,11 +305,11 @@ func (v *view) hashChangedNode(n *node) ids.ID {
 		// Try updating the child and its descendants in a goroutine.
 		if ok := v.db.hashNodesSema.TryAcquire(1); ok {
 			wg.Add(1)
-			go func() {
+			go func(childEntry *child) {
 				childEntry.id = v.hashChangedNode(childNodeChange.after)
 				v.db.hashNodesSema.Release(1)
 				wg.Done()
-			}()
+			}(childEntry)
 		} else {
 			// We're at the goroutine limit; do the work in this goroutine.
 			childEntry.id = v.hashChangedNode(childNodeChange.after)

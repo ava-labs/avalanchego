@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
@@ -51,8 +52,15 @@ var hashChangedNodesTests = []struct {
 	},
 }
 
-func makeViewForHashChangedNodes(t require.TestingT, numKeys uint64) *view {
-	db, err := getBasicDB()
+func makeViewForHashChangedNodes(t require.TestingT, numKeys uint64, parallelism uint) *view {
+	config := newDefaultConfig()
+	config.RootGenConcurrency = parallelism
+	db, err := newDatabase(
+		context.Background(),
+		memdb.New(),
+		newDefaultConfig(),
+		&mockMetrics{},
+	)
 	require.NoError(t, err)
 
 	ops := make([]database.BatchOp, 0, numKeys)
@@ -76,7 +84,7 @@ func makeViewForHashChangedNodes(t require.TestingT, numKeys uint64) *view {
 func Test_HashChangedNodes(t *testing.T) {
 	for _, test := range hashChangedNodesTests {
 		t.Run(test.name, func(t *testing.T) {
-			view := makeViewForHashChangedNodes(t, test.numKeys)
+			view := makeViewForHashChangedNodes(t, test.numKeys, 16)
 			ctx := context.Background()
 			view.hashChangedNodes(ctx)
 			require.Equal(t, test.expectedRootHash, view.changes.rootID.String())
@@ -86,7 +94,7 @@ func Test_HashChangedNodes(t *testing.T) {
 
 func Benchmark_HashChangedNodes(b *testing.B) {
 	for _, test := range hashChangedNodesTests {
-		view := makeViewForHashChangedNodes(b, test.numKeys)
+		view := makeViewForHashChangedNodes(b, test.numKeys, 1)
 		ctx := context.Background()
 		b.Run(test.name, func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
