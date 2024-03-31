@@ -98,81 +98,7 @@ func (v *RollingView) getRoot() maybe.Maybe[*node] {
 	return v.root
 }
 
-// Recalculates the node IDs for all changed nodes in the trie.
-// Cancelling [ctx] doesn't cancel calculation. It's used only for tracing.
-func (v *RollingView) calculateNodeIDs(ctx context.Context) error {
-	v.rootOnce.Do(func() {
-		oldRoot := maybe.Bind(v.root, (*node).clone)
-
-		// We wait to create the span until after checking that we need to actually
-		// calculateNodeIDs to make traces more useful (otherwise there may be a span
-		// per key modified even though IDs are not re-calculated).
-		_, span := v.db.infoTracer.Start(ctx, "MerkleDB.view.calculateNodeIDs")
-		defer span.End()
-
-		// Remove no-op up value changes
-		wg := &sync.WaitGroup{}
-		wg.Add(2)
-		go func() {
-			defer wg.Done()
-
-			for key, change := range v.changes.values {
-				if change.before.IsNothing() && change.after.IsNothing() {
-					delete(v.changes.values, key)
-					continue
-				}
-				if !change.before.IsNothing() && !change.after.IsNothing() && bytes.Equal(change.before.Value(), change.after.Value()) {
-					delete(v.changes.values, key)
-					continue
-				}
-			}
-		}()
-
-		// Compute root
-		go func() {
-			defer wg.Done()
-
-			// Calculate new root
-			if !v.root.IsNothing() {
-				_ = v.db.calculateNodeIDsSema.Acquire(context.Background(), 1)
-				v.changes.rootID = v.calculateNodeIDsHelper(v.root.Value())
-				v.db.calculateNodeIDsSema.Release(1)
-			} else {
-				v.changes.rootID = ids.Empty
-			}
-			v.changes.rootChange = change[maybe.Maybe[*node]]{
-				before: oldRoot,
-				after:  v.root,
-			}
-
-			// Remove nodes that didn't change
-			//
-			// This can happen if we add a value and then remove it
-			// or if through a series of updates the value is the same
-			// as the parent view.
-			//
-			// We can't do this during root generation because we may not
-			// touch all nodes in [v.changes.nodes].
-			for key, change := range v.changes.nodes {
-				if !change.before.equals(change.after) {
-					continue
-				}
-				delete(v.changes.nodes, key)
-			}
-
-			// Mark root as generated so we can commit
-			v.rootGenerated = true
-		}()
-
-		// Wait for work to be done
-		wg.Wait()
-	})
-	return nil
-}
-
-// Calculates the ID of all descendants of [n] which need to be recalculated,
-// and then calculates the ID of [n] itself.
-func (v *RollingView) calculateNodeIDsHelper(n *node) ids.ID {
+func (v *RollingView) merklizer(n *node) ids.ID {
 	// We use [wg] to wait until all descendants of [n] have been updated.
 	var wg sync.WaitGroup
 
@@ -190,13 +116,13 @@ func (v *RollingView) calculateNodeIDsHelper(n *node) ids.ID {
 		if ok := v.db.calculateNodeIDsSema.TryAcquire(1); ok {
 			wg.Add(1)
 			go func() {
-				childEntry.id = v.calculateNodeIDsHelper(childNodeChange.after)
+				childEntry.id = v.merklizer(childNodeChange.after)
 				v.db.calculateNodeIDsSema.Release(1)
 				wg.Done()
 			}()
 		} else {
 			// We're at the goroutine limit; do the work in this goroutine.
-			childEntry.id = v.calculateNodeIDsHelper(childNodeChange.after)
+			childEntry.id = v.merklizer(childNodeChange.after)
 		}
 	}
 
@@ -205,31 +131,6 @@ func (v *RollingView) calculateNodeIDsHelper(n *node) ids.ID {
 
 	// The IDs [n]'s descendants are up to date so we can calculate [n]'s ID.
 	return n.calculateID(v.db.metrics)
-}
-
-// CommitToDB commits changes from this view to the underlying DB.
-func (v *RollingView) CommitToDB(ctx context.Context) error {
-	ctx, span := v.db.infoTracer.Start(ctx, "MerkleDB.view.CommitToDB")
-	defer span.End()
-
-	v.commitLock.Lock()
-	defer v.commitLock.Unlock()
-
-	if !v.rootGenerated {
-		return errors.New("root not generated")
-	}
-
-	v.db.commitLock.Lock()
-	defer v.db.commitLock.Unlock()
-
-	if err := v.db.commitRollingChanges(ctx, v); err != nil {
-		return err
-	}
-
-	if v.child != nil {
-		v.child.updateParent(v.db)
-	}
-	return nil
 }
 
 func (v *RollingView) getValue(key Key) ([]byte, error) {
@@ -603,14 +504,100 @@ func (v *RollingView) getParentTrie() RollingParent {
 	return v.parentTrie
 }
 
+func (v *RollingView) Merklize(ctx context.Context) (ids.ID, error) {
+	v.rootOnce.Do(func() {
+		oldRoot := maybe.Bind(v.root, (*node).clone)
+
+		// We wait to create the span until after checking that we need to actually
+		// calculateNodeIDs to make traces more useful (otherwise there may be a span
+		// per key modified even though IDs are not re-calculated).
+		_, span := v.db.infoTracer.Start(ctx, "MerkleDB.view.calculateNodeIDs")
+		defer span.End()
+
+		// Remove no-op up value changes
+		wg := &sync.WaitGroup{}
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+
+			for key, change := range v.changes.values {
+				if !maybe.Equal(change.before, change.after, func(a, b []byte) bool { return bytes.Equal(a, b) }) {
+					continue
+				}
+				delete(v.changes.values, key)
+			}
+		}()
+
+		// Compute root
+		go func() {
+			defer wg.Done()
+
+			// Calculate new root
+			if !v.root.IsNothing() {
+				_ = v.db.calculateNodeIDsSema.Acquire(context.Background(), 1)
+				v.changes.rootID = v.merklizer(v.root.Value())
+				v.db.calculateNodeIDsSema.Release(1)
+			} else {
+				v.changes.rootID = ids.Empty
+			}
+			v.changes.rootChange = change[maybe.Maybe[*node]]{
+				before: oldRoot,
+				after:  v.root,
+			}
+
+			// Remove nodes that didn't change
+			//
+			// This can happen if we add a value and then remove it
+			// or if through a series of updates the value is the same
+			// as the parent view.
+			//
+			// We can't do this during root generation because we may not
+			// touch all nodes in [v.changes.nodes].
+			//
+			// TODO: find a more efficient way to do this (where we avoid iterating over everything)
+			for key, change := range v.changes.nodes {
+				if !change.before.equals(change.after) {
+					continue
+				}
+				delete(v.changes.nodes, key)
+			}
+
+			// Mark root as generated so we can commit
+			v.rootGenerated = true
+		}()
+
+		// Wait for work to be done
+		wg.Wait()
+	})
+	return v.changes.rootID, nil
+}
+
+// Only call after we merklize (where duplicates are removed)
 func (v *RollingView) Changes() (int, int) {
 	return len(v.changes.nodes), len(v.changes.values)
 }
 
-// GetMerkleRoot returns the ID of the root of this view.
-func (v *RollingView) GetMerkleRoot(ctx context.Context) (ids.ID, error) {
-	if err := v.calculateNodeIDs(ctx); err != nil {
-		return ids.Empty, err
+// Commit commits changes from this view to the underlying DB.
+func (v *RollingView) Commit(ctx context.Context) error {
+	ctx, span := v.db.infoTracer.Start(ctx, "MerkleDB.view.CommitToDB")
+	defer span.End()
+
+	v.commitLock.Lock()
+	defer v.commitLock.Unlock()
+
+	if !v.rootGenerated {
+		return errors.New("root not generated")
 	}
-	return v.changes.rootID, nil
+
+	v.db.commitLock.Lock()
+	defer v.db.commitLock.Unlock()
+
+	if err := v.db.commitRollingChanges(ctx, v); err != nil {
+		return err
+	}
+
+	if v.child != nil {
+		v.child.updateParent(v.db)
+	}
+	return nil
 }

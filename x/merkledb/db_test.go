@@ -1307,7 +1307,7 @@ func TestRollingViewBasic(t *testing.T) {
 	require.Error(err)
 
 	// Create new view after generation
-	_, err = rv.GetMerkleRoot(context.Background())
+	_, err = rv.Merklize(context.Background())
 	require.NoError(err)
 	nodes, values := rv.Changes()
 	require.Equal(1, nodes)
@@ -1317,18 +1317,18 @@ func TestRollingViewBasic(t *testing.T) {
 	require.NoError(rv2.Update(context.Background(), string(key2), maybe.Some(value2)))
 
 	// Commit
-	require.NoError(rv.CommitToDB(context.Background()))
+	require.NoError(rv.Commit(context.Background()))
 
 	// Add to rv2 (should now be rooted in db)
 	require.NoError(rv2.Update(context.Background(), string(key3), maybe.Some(value3)))
 
 	// Commit rolling view 2
-	_, err = rv2.GetMerkleRoot(context.Background())
+	_, err = rv2.Merklize(context.Background())
 	require.NoError(err)
 	nodes, values = rv2.Changes()
 	require.Equal(3, nodes)
 	require.Equal(2, values)
-	require.NoError(rv2.CommitToDB(context.Background()))
+	require.NoError(rv2.Commit(context.Background()))
 
 	// Make sure the key-value pairs are correct.
 	gotValue, err := db.Get(key1)
@@ -1348,7 +1348,7 @@ func TestRollingViewBasic(t *testing.T) {
 	require.NoError(err)
 	require.NoError(rv3.Update(context.Background(), string(key4), maybe.Some(value1)))
 	require.NoError(rv3.Update(context.Background(), string(key4), maybe.Nothing[[]byte]()))
-	_, err = rv3.GetMerkleRoot(context.Background())
+	_, err = rv3.Merklize(context.Background())
 	require.NoError(err)
 	nodes, values = rv3.Changes()
 	require.Equal(0, nodes)
@@ -1385,7 +1385,7 @@ func TestRollingViewAsync(t *testing.T) {
 			for item := range listeners[i] {
 				if item == nil {
 					// Generate root (child views require IDs to be computed on the parent view)
-					root, err := rv.GetMerkleRoot(context.Background())
+					root, err := rv.Merklize(context.Background())
 					require.NoError(err)
 					roots[i] = append(roots[i], root)
 
@@ -1402,7 +1402,7 @@ func TestRollingViewAsync(t *testing.T) {
 						defer cl.Unlock()
 						defer outstandingCommits.Done()
 
-						require.NoError(oldRv.CommitToDB(context.Background()))
+						require.NoError(oldRv.Commit(context.Background()))
 					}()
 					continue
 				}
@@ -1414,7 +1414,7 @@ func TestRollingViewAsync(t *testing.T) {
 
 	// Add items to the listeners
 	rootsCreated := 0
-	for i := 0; i < 450_000; i++ {
+	for i := 0; i < 550_000; i++ {
 		var item *kv
 		if i%100_000 != 0 || i == 0 {
 			k := ids.GenerateTestID()
