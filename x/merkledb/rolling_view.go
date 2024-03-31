@@ -150,6 +150,9 @@ func (v *RollingView) calculateNodeIDs(ctx context.Context) error {
 			// This can happen if we add a value and then remove it
 			// or if through a series of updates the value is the same
 			// as the parent view.
+			//
+			// We can't do this during root generation because we may not
+			// touch all nodes in [v.changes.nodes].
 			for key, change := range v.changes.nodes {
 				if !change.before.equals(change.after) {
 					continue
