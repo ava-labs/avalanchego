@@ -290,11 +290,59 @@ func (v *view) hashChangedNodes(ctx context.Context) {
 // Calculates the ID of all descendants of [n] which need to be recalculated,
 // and then calculates the ID of [n] itself.
 func (v *view) hashChangedNode(n *node) ids.ID {
-	// We use [wg] to wait until all descendants of [n] have been updated.
-	var wg sync.WaitGroup
+	if len(n.children) == 0 {
+		return n.calculateID(v.db.metrics)
+	}
+
+	// Calculate the size of the largest child key of this node. This allows
+	// only allocating a single slice for all of the keys.
+	var maxBitLength int
+	for _, childEntry := range n.children {
+		totalBitLength := n.key.length + v.tokenSize + childEntry.compressedKey.length
+		maxBitLength = max(maxBitLength, totalBitLength)
+	}
+
+	var (
+		maxBytesNeeded = bytesNeeded(maxBitLength)
+		// keyBuffer is allocated onto the heap because it is dynamically sized.
+		keyBuffer = make([]byte, maxBytesNeeded)
+		// childBuffer is allocated on the stack.
+		childBuffer = make([]byte, 1)
+		dualIndex   = dualBitIndex(v.tokenSize)
+		bytesForKey = bytesNeeded(n.key.length)
+		lastKeyByte byte
+
+		// We use [wg] to wait until all descendants of [n] have been updated.
+		wg sync.WaitGroup
+	)
+
+	if bytesForKey > 0 {
+		// We can just copy this node's key once. It doesn't change as we
+		// iterate over the children.
+		copy(keyBuffer, n.key.value)
+		lastKeyByte = keyBuffer[bytesForKey-1]
+	}
 
 	for childIndex, childEntry := range n.children {
-		childKey := n.key.Extend(ToToken(childIndex, v.tokenSize), childEntry.compressedKey)
+		childBuffer[0] = childIndex << dualIndex
+		childByteKey := Key{
+			value:  byteSliceToString(childBuffer),
+			length: v.tokenSize,
+		}
+
+		totalBitLength := n.key.length + v.tokenSize + childEntry.compressedKey.length
+		buffer := keyBuffer[:bytesNeeded(totalBitLength)]
+		// Make sure the last byte of the key is orginally set correctly
+		if bytesForKey > 0 {
+			keyBuffer[bytesForKey-1] = lastKeyByte
+		}
+		extendIntoBuffer(buffer, childByteKey, n.key.length)
+		extendIntoBuffer(buffer, childEntry.compressedKey, n.key.length+v.tokenSize)
+		childKey := Key{
+			value:  byteSliceToString(buffer),
+			length: totalBitLength,
+		}
+
 		childNodeChange, ok := v.changes.nodes[childKey]
 		if !ok {
 			// This child wasn't changed.
