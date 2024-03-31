@@ -1305,12 +1305,18 @@ func TestRollingViewBasic(t *testing.T) {
 	require.Equal(1, nodes)
 	require.Equal(1, values)
 
-	// Create new rv
+	// Try to create new rv before root generation
+	_, err = rv.NewRollingView(context.Background(), 2)
+	require.Error(err)
+
+	// Create new view after generation
+	_, err = rv.GetMerkleRoot(context.Background())
+	require.NoError(err)
 	rv2, err := rv.NewRollingView(context.Background(), 2)
 	require.NoError(err)
 	require.NoError(rv2.Update(context.Background(), string(key2), maybe.Some(value2)))
 
-	// Commit rolling view
+	// Commit
 	require.NoError(rv.CommitToDB(context.Background()))
 
 	// Add to rv2 (should now be rooted in db)
@@ -1320,6 +1326,8 @@ func TestRollingViewBasic(t *testing.T) {
 	require.Equal(2, values)
 
 	// Commit rolling view 2
+	_, err = rv2.GetMerkleRoot(context.Background())
+	require.NoError(err)
 	require.NoError(rv2.CommitToDB(context.Background()))
 
 	// Make sure the key-value pairs are correct.

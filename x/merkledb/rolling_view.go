@@ -31,6 +31,9 @@ type RollingView struct {
 	// but will when their ID is recalculated.
 	changes *changeSummary
 
+	rootGenerated bool
+	rootOnce      sync.Once
+
 	commitLock sync.Mutex
 	db         *merkleDB
 
@@ -43,6 +46,10 @@ type RollingView struct {
 func (v *RollingView) NewRollingView(_ context.Context, changes int) (*RollingView, error) {
 	v.commitLock.Lock()
 	defer v.commitLock.Unlock()
+
+	if !v.rootGenerated {
+		return nil, errors.New("root not generated")
+	}
 
 	// RollingView is not meant to be used with more than 1 child
 	if v.child != nil {
@@ -94,26 +101,29 @@ func (v *RollingView) getRoot() maybe.Maybe[*node] {
 // Recalculates the node IDs for all changed nodes in the trie.
 // Cancelling [ctx] doesn't cancel calculation. It's used only for tracing.
 func (v *RollingView) calculateNodeIDs(ctx context.Context) error {
-	oldRoot := maybe.Bind(v.root, (*node).clone)
+	v.rootOnce.Do(func() {
+		oldRoot := maybe.Bind(v.root, (*node).clone)
 
-	// We wait to create the span until after checking that we need to actually
-	// calculateNodeIDs to make traces more useful (otherwise there may be a span
-	// per key modified even though IDs are not re-calculated).
-	_, span := v.db.infoTracer.Start(ctx, "MerkleDB.view.calculateNodeIDs")
-	defer span.End()
+		// We wait to create the span until after checking that we need to actually
+		// calculateNodeIDs to make traces more useful (otherwise there may be a span
+		// per key modified even though IDs are not re-calculated).
+		_, span := v.db.infoTracer.Start(ctx, "MerkleDB.view.calculateNodeIDs")
+		defer span.End()
 
-	if !v.root.IsNothing() {
-		_ = v.db.calculateNodeIDsSema.Acquire(context.Background(), 1)
-		v.changes.rootID = v.calculateNodeIDsHelper(v.root.Value())
-		v.db.calculateNodeIDsSema.Release(1)
-	} else {
-		v.changes.rootID = ids.Empty
-	}
+		if !v.root.IsNothing() {
+			_ = v.db.calculateNodeIDsSema.Acquire(context.Background(), 1)
+			v.changes.rootID = v.calculateNodeIDsHelper(v.root.Value())
+			v.db.calculateNodeIDsSema.Release(1)
+		} else {
+			v.changes.rootID = ids.Empty
+		}
 
-	v.changes.rootChange = change[maybe.Maybe[*node]]{
-		before: oldRoot,
-		after:  v.root,
-	}
+		v.changes.rootChange = change[maybe.Maybe[*node]]{
+			before: oldRoot,
+			after:  v.root,
+		}
+		v.rootGenerated = true
+	})
 	return nil
 }
 
@@ -162,6 +172,10 @@ func (v *RollingView) CommitToDB(ctx context.Context) error {
 	v.commitLock.Lock()
 	defer v.commitLock.Unlock()
 
+	if !v.rootGenerated {
+		return errors.New("root not generated")
+	}
+
 	v.db.commitLock.Lock()
 	defer v.db.commitLock.Unlock()
 
@@ -169,11 +183,9 @@ func (v *RollingView) CommitToDB(ctx context.Context) error {
 		return err
 	}
 
-	// TODO: we wait because it doesn't matter what we read
 	if v.child != nil {
 		v.child.updateParent(v.db)
 	}
-
 	return nil
 }
 
