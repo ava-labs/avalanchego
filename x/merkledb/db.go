@@ -1023,16 +1023,6 @@ func (db *merkleDB) commitRollingChanges(ctx context.Context, trieToCommit *Roll
 	))
 	defer span.End()
 
-	// update children while hodling lock
-	if trieToCommit.child != nil {
-		// This will block all lookups until the db is consistent
-		// TODO: can we remove this?
-
-		// TODO: let's move this to after commits...won't matter what we read (need to make
-		// sure the nil check below doesn't mess this up).
-		trieToCommit.child.updateParent(db)
-	}
-
 	if len(changes.nodes) == 0 {
 		return nil
 	}
