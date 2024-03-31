@@ -4,6 +4,7 @@
 package merkledb
 
 import (
+	"bytes"
 	"slices"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -149,4 +150,32 @@ func (n *node) asProofNode() ProofNode {
 		pn.Children[index] = entry.id
 	}
 	return pn
+}
+
+func (n *node) equals(other *node) bool {
+	if n == nil && other == nil {
+		return true
+	}
+	if (n == nil && other != nil) || (n != nil && other == nil) {
+		return false
+	}
+	if n.key != other.key {
+		return false
+	}
+	if n.valueDigest.IsNothing() != other.valueDigest.IsNothing() {
+		return false
+	}
+	if !n.valueDigest.IsNothing() && !other.valueDigest.IsNothing() && !bytes.Equal(n.valueDigest.Value(), other.valueDigest.Value()) {
+		return false
+	}
+	if len(n.children) != len(other.children) {
+		return false
+	}
+	for key, child := range n.children {
+		otherChild, exists := other.children[key]
+		if !exists || child.id != otherChild.id || child.hasValue != otherChild.hasValue || child.compressedKey != otherChild.compressedKey {
+			return false
+		}
+	}
+	return true
 }

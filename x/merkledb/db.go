@@ -1064,7 +1064,7 @@ func (db *merkleDB) commitRollingChanges(ctx context.Context, trieToCommit *Roll
 		return err
 	}
 
-	// TODO: ensure we remove no-op changes by here
+	// It is critical that any no-op changes are removed prior to updating history.
 	db.history.record(changes)
 
 	// Update root in database.

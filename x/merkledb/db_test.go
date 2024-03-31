@@ -1301,9 +1301,6 @@ func TestRollingViewBasic(t *testing.T) {
 	rv, err := db.NewRollingView(context.Background(), 2)
 	require.NoError(err)
 	require.NoError(rv.Update(context.Background(), string(key1), maybe.Some(value1)))
-	nodes, values := rv.Changes()
-	require.Equal(1, nodes)
-	require.Equal(1, values)
 
 	// Try to create new rv before root generation
 	_, err = rv.NewRollingView(context.Background(), 2)
@@ -1312,6 +1309,9 @@ func TestRollingViewBasic(t *testing.T) {
 	// Create new view after generation
 	_, err = rv.GetMerkleRoot(context.Background())
 	require.NoError(err)
+	nodes, values := rv.Changes()
+	require.Equal(1, nodes)
+	require.Equal(1, values)
 	rv2, err := rv.NewRollingView(context.Background(), 2)
 	require.NoError(err)
 	require.NoError(rv2.Update(context.Background(), string(key2), maybe.Some(value2)))
@@ -1321,13 +1321,13 @@ func TestRollingViewBasic(t *testing.T) {
 
 	// Add to rv2 (should now be rooted in db)
 	require.NoError(rv2.Update(context.Background(), string(key3), maybe.Some(value3)))
-	nodes, values = rv2.Changes()
-	require.Equal(3, nodes)
-	require.Equal(2, values)
 
 	// Commit rolling view 2
 	_, err = rv2.GetMerkleRoot(context.Background())
 	require.NoError(err)
+	nodes, values = rv2.Changes()
+	require.Equal(3, nodes)
+	require.Equal(2, values)
 	require.NoError(rv2.CommitToDB(context.Background()))
 
 	// Make sure the key-value pairs are correct.
@@ -1348,8 +1348,9 @@ func TestRollingViewBasic(t *testing.T) {
 	require.NoError(err)
 	require.NoError(rv3.Update(context.Background(), string(key4), maybe.Some(value1)))
 	require.NoError(rv3.Update(context.Background(), string(key4), maybe.Nothing[[]byte]()))
+	_, err = rv3.GetMerkleRoot(context.Background())
+	require.NoError(err)
 	nodes, values = rv3.Changes()
-	// TODO: figure out the best way to remove no-ops here
 	require.Equal(0, nodes)
 	require.Equal(0, values)
 }

@@ -4,6 +4,7 @@
 package merkledb
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"slices"
@@ -74,17 +75,16 @@ func newRollingView(db *merkleDB, parentTrie RollingParent, changes int) *Rollin
 
 func (v *RollingView) Update(ctx context.Context, skey string, val maybe.Maybe[[]byte]) error {
 	key := toKey(stringToByteSlice(skey))
-	change, err := v.recordValueChange(key, maybe.Bind(val, slices.Clone[[]byte]))
-	if err != nil {
+	if err := v.recordValueChange(key, maybe.Bind(val, slices.Clone[[]byte])); err != nil {
 		return err
 	}
-	if change.after.IsNothing() {
+	if val.IsNothing() {
 		// Note we're setting [err] defined outside this function.
 		if err := v.remove(key); err != nil {
 			return err
 		}
 		// Note we're setting [err] defined outside this function.
-	} else if _, err := v.insert(key, change.after); err != nil {
+	} else if _, err := v.insert(key, val); err != nil {
 		return err
 	}
 	return nil
@@ -110,19 +110,59 @@ func (v *RollingView) calculateNodeIDs(ctx context.Context) error {
 		_, span := v.db.infoTracer.Start(ctx, "MerkleDB.view.calculateNodeIDs")
 		defer span.End()
 
-		if !v.root.IsNothing() {
-			_ = v.db.calculateNodeIDsSema.Acquire(context.Background(), 1)
-			v.changes.rootID = v.calculateNodeIDsHelper(v.root.Value())
-			v.db.calculateNodeIDsSema.Release(1)
-		} else {
-			v.changes.rootID = ids.Empty
-		}
+		// Remove no-op up value changes
+		wg := &sync.WaitGroup{}
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
 
-		v.changes.rootChange = change[maybe.Maybe[*node]]{
-			before: oldRoot,
-			after:  v.root,
-		}
-		v.rootGenerated = true
+			for key, change := range v.changes.values {
+				if change.before.IsNothing() && change.after.IsNothing() {
+					delete(v.changes.values, key)
+					continue
+				}
+				if !change.before.IsNothing() && !change.after.IsNothing() && bytes.Equal(change.before.Value(), change.after.Value()) {
+					delete(v.changes.values, key)
+					continue
+				}
+			}
+		}()
+
+		// Compute root
+		go func() {
+			defer wg.Done()
+
+			// Calculate new root
+			if !v.root.IsNothing() {
+				_ = v.db.calculateNodeIDsSema.Acquire(context.Background(), 1)
+				v.changes.rootID = v.calculateNodeIDsHelper(v.root.Value())
+				v.db.calculateNodeIDsSema.Release(1)
+			} else {
+				v.changes.rootID = ids.Empty
+			}
+			v.changes.rootChange = change[maybe.Maybe[*node]]{
+				before: oldRoot,
+				after:  v.root,
+			}
+
+			// Remove nodes that didn't change
+			//
+			// This can happen if we add a value and then remove it
+			// or if through a series of updates the value is the same
+			// as the parent view.
+			for key, change := range v.changes.nodes {
+				if !change.before.equals(change.after) {
+					continue
+				}
+				delete(v.changes.nodes, key)
+			}
+
+			// Mark root as generated so we can commit
+			v.rootGenerated = true
+		}()
+
+		// Wait for work to be done
+		wg.Wait()
 	})
 	return nil
 }
@@ -499,11 +539,11 @@ func (v *RollingView) recordKeyChange(key Key, after *node, hadValue bool, newNo
 // Doesn't actually change the trie data structure.
 // That's deferred until we call [calculateNodeIDs].
 // Must not be called after [calculateNodeIDs] has returned.
-func (v *RollingView) recordValueChange(key Key, value maybe.Maybe[[]byte]) (*change[maybe.Maybe[[]byte]], error) {
+func (v *RollingView) recordValueChange(key Key, value maybe.Maybe[[]byte]) error {
 	// update the existing change if it exists
 	if existing, ok := v.changes.values[key]; ok {
 		existing.after = value
-		return existing, nil
+		return nil
 	}
 
 	// grab the before value
@@ -515,15 +555,14 @@ func (v *RollingView) recordValueChange(key Key, value maybe.Maybe[[]byte]) (*ch
 	case database.ErrNotFound:
 		beforeMaybe = maybe.Nothing[[]byte]()
 	default:
-		return nil, err
+		return err
 	}
 
-	c := &change[maybe.Maybe[[]byte]]{
+	v.changes.values[key] = &change[maybe.Maybe[[]byte]]{
 		before: beforeMaybe,
 		after:  value,
 	}
-	v.changes.values[key] = c
-	return c, nil
+	return nil
 }
 
 // Retrieves a node with the given [key].
