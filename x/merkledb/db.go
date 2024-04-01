@@ -1075,7 +1075,7 @@ func (db *merkleDB) commitRollingChanges(ctx context.Context, trieToCommit *Roll
 		return db.baseDB.Delete(rootDBKey)
 	}
 
-	rootKey := codec.encodeKey(db.root.Value().key)
+	rootKey := encodeKey(db.root.Value().key)
 	return db.baseDB.Put(rootDBKey, rootKey)
 }
 
