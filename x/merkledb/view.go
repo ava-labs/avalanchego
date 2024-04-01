@@ -291,7 +291,7 @@ func (v *view) hashChangedNodes(ctx context.Context) {
 	// Allocate [keyBuffer] and populate it with the root node's key.
 	keyBuffer := v.db.hashNodesKeyPool.Acquire()
 	keyBuffer = v.setKeyBuffer(root, keyBuffer)
-	v.changes.rootID, keyBuffer = v.hashChangedNode(v.root.Value(), keyBuffer)
+	v.changes.rootID, keyBuffer = v.hashChangedNode(root, keyBuffer)
 	v.db.hashNodesKeyPool.Release(keyBuffer)
 }
 
@@ -346,9 +346,10 @@ func (v *view) hashChangedNode(n *node, keyBuffer []byte) (ids.ID, []byte) {
 			// This child wasn't changed.
 			continue
 		}
-		childEntry.hasValue = childNodeChange.after.hasValue()
 
 		childNode := childNodeChange.after
+		childEntry.hasValue = childNode.hasValue()
+
 		// If there are no children of the childNode, we can avoid constructing
 		// a new [innerKeyBuffer].
 		if len(childNode.children) == 0 {
