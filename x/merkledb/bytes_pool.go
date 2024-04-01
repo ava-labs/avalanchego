@@ -14,6 +14,7 @@ type bytesPool struct {
 func newBytesPool(numSlots int) *bytesPool {
 	return &bytesPool{
 		slots: make(chan struct{}, numSlots),
+		bytes: make([][]byte, 0, numSlots),
 	}
 }
 

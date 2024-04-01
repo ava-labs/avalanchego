@@ -281,8 +281,15 @@ func (v *view) hashChangedNodes(ctx context.Context) {
 		return
 	}
 
-	keyBuffer := v.db.hashNodesKeyPool.Acquire()
+	// If there are no children, we can avoid allocating [keyBuffer].
 	root := v.root.Value()
+	if len(root.children) == 0 {
+		v.changes.rootID = root.calculateID(v.db.metrics)
+		return
+	}
+
+	// Allocate [keyBuffer] and populate it with the root node's key.
+	keyBuffer := v.db.hashNodesKeyPool.Acquire()
 	keyBuffer = v.setKeyBuffer(root, keyBuffer)
 	v.changes.rootID, keyBuffer = v.hashChangedNode(v.root.Value(), keyBuffer)
 	v.db.hashNodesKeyPool.Release(keyBuffer)
@@ -290,12 +297,10 @@ func (v *view) hashChangedNodes(ctx context.Context) {
 
 // Calculates the ID of all descendants of [n] which need to be recalculated,
 // and then calculates the ID of [n] itself.
+//
+// Invariant: [keyBuffer] is populated with [n]'s key and is long enough to
+// contain all of [n]'s child keys.
 func (v *view) hashChangedNode(n *node, keyBuffer []byte) (ids.ID, []byte) {
-	// If there are no children, we can avoid allocating [keyBuffer].
-	if len(n.children) == 0 {
-		return n.calculateID(v.db.metrics), keyBuffer
-	}
-
 	var (
 		// childBuffer is allocated on the stack.
 		childBuffer = make([]byte, 1)
@@ -340,23 +345,27 @@ func (v *view) hashChangedNode(n *node, keyBuffer []byte) (ids.ID, []byte) {
 		}
 		childEntry.hasValue = childNodeChange.after.hasValue()
 
+		childNode := childNodeChange.after
+		if len(childNode.children) == 0 {
+			childEntry.id = childNode.calculateID(v.db.metrics)
+			continue
+		}
+
 		// Try updating the child and its descendants in a goroutine.
 		if innerKeyBuffer, ok := v.db.hashNodesKeyPool.TryAcquire(); ok {
 			wg.Add(1)
 			go func(childEntry *child, innerKeyBuffer []byte) {
-				childNode := childNodeChange.after
-				innerKeyBuffer = v.setKeyBuffer(childNode, innerKeyBuffer)
-				childEntry.id, innerKeyBuffer = v.hashChangedNode(childNode, innerKeyBuffer)
+				innerKeyBuffer = v.setKeyBuffer(childNodeChange.after, innerKeyBuffer)
+				childEntry.id, innerKeyBuffer = v.hashChangedNode(childNodeChange.after, innerKeyBuffer)
 				v.db.hashNodesKeyPool.Release(innerKeyBuffer)
 				wg.Done()
 			}(childEntry, innerKeyBuffer)
 		} else {
 			// We're at the goroutine limit; do the work in this goroutine.
-			childNode := childNodeChange.after
-			// We can skip copying the key here because the keyBuffer is already
-			// constructed to be childNode's key.
-			keyBuffer := v.setLengthForChildren(childNode, keyBuffer)
-			childEntry.id, keyBuffer = v.hashChangedNode(childNodeChange.after, keyBuffer)
+			// We can skip copying the key here because the keyBuffer is
+			// already constructed to be childNode's key.
+			keyBuffer = v.setLengthForChildren(childNode, keyBuffer)
+			childEntry.id, keyBuffer = v.hashChangedNode(childNode, keyBuffer)
 		}
 	}
 

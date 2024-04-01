@@ -36,7 +36,7 @@ func Benchmark_BytesPool_TryAcquire_Success(b *testing.B) {
 }
 
 func Benchmark_BytesPool_TryAcquire_Failure(b *testing.B) {
-	s := newBytesPool(b.N)
+	s := newBytesPool(1)
 	s.Acquire()
 
 	b.ResetTimer()
