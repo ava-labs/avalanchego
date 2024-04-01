@@ -317,11 +317,6 @@ func (v *view) hashChangedNode(n *node) ids.ID {
 		lastKeyByte byte
 
 		// We use [wg] to wait until all descendants of [n] have been updated.
-		//
-		// We use a pointer to avoid allocating the WaitGroup when no goroutines
-		// are created. Calls to Add and Wait both mark the WaitGroup as
-		// potentially escaping the stack, so the WaitGroup is never able to be
-		// allocated on the stack.
 		wg waitGroup
 	)
 
