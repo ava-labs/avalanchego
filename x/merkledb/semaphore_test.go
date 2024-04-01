@@ -3,9 +3,7 @@
 
 package merkledb
 
-import (
-	"testing"
-)
+import "testing"
 
 func Benchmark_Semaphore_Acquire(b *testing.B) {
 	s := make(semaphore, b.N)
