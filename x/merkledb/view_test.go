@@ -58,7 +58,7 @@ func makeViewForHashChangedNodes(t require.TestingT, numKeys uint64, parallelism
 	db, err := newDatabase(
 		context.Background(),
 		memdb.New(),
-		newDefaultConfig(),
+		config,
 		&mockMetrics{},
 	)
 	require.NoError(t, err)
