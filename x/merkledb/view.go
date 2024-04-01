@@ -281,18 +281,17 @@ func (v *view) hashChangedNodes(ctx context.Context) {
 		return
 	}
 
-	_ = v.db.hashNodesSema.Acquire(context.Background(), 1)
-	defer v.db.hashNodesSema.Release(1)
-
-	v.changes.rootID = v.hashChangedNode(v.root.Value())
+	keyBuffer := v.db.hashNodesKeyPool.Acquire()
+	v.changes.rootID, keyBuffer = v.hashChangedNode(v.root.Value(), keyBuffer)
+	v.db.hashNodesKeyPool.Release(keyBuffer)
 }
 
 // Calculates the ID of all descendants of [n] which need to be recalculated,
 // and then calculates the ID of [n] itself.
-func (v *view) hashChangedNode(n *node) ids.ID {
+func (v *view) hashChangedNode(n *node, keyBuffer []byte) (ids.ID, []byte) {
 	// If there are no children, we can avoid allocating [keyBuffer].
 	if len(n.children) == 0 {
-		return n.calculateID(v.db.metrics)
+		return n.calculateID(v.db.metrics), keyBuffer
 	}
 
 	// Calculate the size of the largest child key of this node. This allows
@@ -305,8 +304,6 @@ func (v *view) hashChangedNode(n *node) ids.ID {
 
 	var (
 		maxBytesNeeded = bytesNeeded(maxBitLength)
-		// keyBuffer is allocated onto the heap because it is dynamically sized.
-		keyBuffer = make([]byte, maxBytesNeeded)
 		// childBuffer is allocated on the stack.
 		childBuffer = make([]byte, 1)
 		dualIndex   = dualBitIndex(v.tokenSize)
@@ -320,6 +317,7 @@ func (v *view) hashChangedNode(n *node) ids.ID {
 		wg sync.WaitGroup
 	)
 
+	keyBuffer = setLength(keyBuffer, maxBytesNeeded)
 	if bytesForKey > 0 {
 		// We can just copy this node's key once. It doesn't change as we
 		// iterate over the children.
@@ -355,16 +353,16 @@ func (v *view) hashChangedNode(n *node) ids.ID {
 		childEntry.hasValue = childNodeChange.after.hasValue()
 
 		// Try updating the child and its descendants in a goroutine.
-		if ok := v.db.hashNodesSema.TryAcquire(1); ok {
+		if innerKeyBuffer, ok := v.db.hashNodesKeyPool.TryAcquire(); ok {
 			wg.Add(1)
-			go func(childEntry *child) {
-				childEntry.id = v.hashChangedNode(childNodeChange.after)
-				v.db.hashNodesSema.Release(1)
+			go func(childEntry *child, innerKeyBuffer []byte) {
+				childEntry.id, innerKeyBuffer = v.hashChangedNode(childNodeChange.after, innerKeyBuffer)
+				v.db.hashNodesKeyPool.Release(innerKeyBuffer)
 				wg.Done()
-			}(childEntry)
+			}(childEntry, innerKeyBuffer)
 		} else {
 			// We're at the goroutine limit; do the work in this goroutine.
-			childEntry.id = v.hashChangedNode(childNodeChange.after)
+			childEntry.id, keyBuffer = v.hashChangedNode(childNodeChange.after, keyBuffer)
 		}
 	}
 
@@ -372,7 +370,7 @@ func (v *view) hashChangedNode(n *node) ids.ID {
 	wg.Wait()
 
 	// The IDs [n]'s descendants are up to date so we can calculate [n]'s ID.
-	return n.calculateID(v.db.metrics)
+	return n.calculateID(v.db.metrics), keyBuffer
 }
 
 // GetProof returns a proof that [bytesPath] is in or not in trie [t].
