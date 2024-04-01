@@ -290,6 +290,7 @@ func (v *view) hashChangedNodes(ctx context.Context) {
 // Calculates the ID of all descendants of [n] which need to be recalculated,
 // and then calculates the ID of [n] itself.
 func (v *view) hashChangedNode(n *node) ids.ID {
+	// If there are no children, we can avoid allocating [keyBuffer].
 	if len(n.children) == 0 {
 		return n.calculateID(v.db.metrics)
 	}
