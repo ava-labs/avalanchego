@@ -298,7 +298,7 @@ func (v *view) hashChangedNodes(ctx context.Context) {
 // Calculates the ID of all descendants of [n] which need to be recalculated,
 // and then calculates the ID of [n] itself.
 //
-// Invariant: [keyBuffer] is populated with [n]'s key and is long enough to
+// Invariant: [keyBuffer] must be populated with [n]'s key and be long enough to
 // contain all of [n]'s child keys.
 func (v *view) hashChangedNode(n *node, keyBuffer []byte) (ids.ID, []byte) {
 	var (
@@ -327,9 +327,12 @@ func (v *view) hashChangedNode(n *node, keyBuffer []byte) (ids.ID, []byte) {
 
 		totalBitLength := n.key.length + v.tokenSize + childEntry.compressedKey.length
 		buffer := keyBuffer[:bytesNeeded(totalBitLength)]
-		// Make sure the last byte of the key is originally set correctly
+		// We don't need to copy this node's key. It's assumed to already be
+		// correct; except for the last byte. We must make sure the last byte of
+		// the key is originally set correctly because extendIntoBuffer may OR
+		// the last byte of the key.
 		if bytesForKey > 0 {
-			keyBuffer[bytesForKey-1] = lastKeyByte
+			buffer[bytesForKey-1] = lastKeyByte
 		}
 		extendIntoBuffer(buffer, childByteKey, n.key.length)
 		extendIntoBuffer(buffer, childEntry.compressedKey, n.key.length+v.tokenSize)
@@ -346,24 +349,27 @@ func (v *view) hashChangedNode(n *node, keyBuffer []byte) (ids.ID, []byte) {
 		childEntry.hasValue = childNodeChange.after.hasValue()
 
 		childNode := childNodeChange.after
+		// If there are no children of the childNode, we can avoid constructing
+		// a new [innerKeyBuffer].
 		if len(childNode.children) == 0 {
 			childEntry.id = childNode.calculateID(v.db.metrics)
 			continue
 		}
 
 		// Try updating the child and its descendants in a goroutine.
-		if innerKeyBuffer, ok := v.db.hashNodesKeyPool.TryAcquire(); ok {
+		if childKeyBuffer, ok := v.db.hashNodesKeyPool.TryAcquire(); ok {
 			wg.Add(1)
-			go func(childEntry *child, innerKeyBuffer []byte) {
-				innerKeyBuffer = v.setKeyBuffer(childNodeChange.after, innerKeyBuffer)
-				childEntry.id, innerKeyBuffer = v.hashChangedNode(childNodeChange.after, innerKeyBuffer)
-				v.db.hashNodesKeyPool.Release(innerKeyBuffer)
+			go func(childEntry *child, childKeyBuffer []byte) {
+				childKeyBuffer = v.setKeyBuffer(childNodeChange.after, childKeyBuffer)
+				childEntry.id, childKeyBuffer = v.hashChangedNode(childNodeChange.after, childKeyBuffer)
+				v.db.hashNodesKeyPool.Release(childKeyBuffer)
 				wg.Done()
-			}(childEntry, innerKeyBuffer)
+			}(childEntry, childKeyBuffer)
 		} else {
 			// We're at the goroutine limit; do the work in this goroutine.
-			// We can skip copying the key here because the keyBuffer is
-			// already constructed to be childNode's key.
+			//
+			// We can skip copying the key here because [keyBuffer] is already
+			// constructed to be childNode's key.
 			keyBuffer = v.setLengthForChildren(childNode, keyBuffer)
 			childEntry.id, keyBuffer = v.hashChangedNode(childNode, keyBuffer)
 		}
@@ -376,19 +382,19 @@ func (v *view) hashChangedNode(n *node, keyBuffer []byte) (ids.ID, []byte) {
 	return n.calculateID(v.db.metrics), keyBuffer
 }
 
+// setKeyBuffer expands [keyBuffer] to have sufficient size for any of [n]'s
+// child keys and populates [n]'s key into [keyBuffer]. If [keyBuffer] already
+// has sufficient size, this memory will not perform any memory allocations.
 func (v *view) setKeyBuffer(n *node, keyBuffer []byte) []byte {
 	keyBuffer = v.setLengthForChildren(n, keyBuffer)
-	// We can just copy this node's key once. It doesn't change as we iterate
-	// over the ancestors.
 	copy(keyBuffer, n.key.value)
 	return keyBuffer
 }
 
-// Calculate the size of the largest child key of this node. This allows only
-// allocating a single slice for all of the keys.
+// setKeyBuffer expands [keyBuffer] to have sufficient size for any of [n]'s
+// child keys.
 func (v *view) setLengthForChildren(n *node, keyBuffer []byte) []byte {
-	// Calculate the size of the largest child key of this node. This allows
-	// only allocating a single slice for all of the keys.
+	// Calculate the size of the largest child key of this node.
 	var maxBitLength int
 	for _, childEntry := range n.children {
 		maxBitLength = max(maxBitLength, childEntry.compressedKey.length)
