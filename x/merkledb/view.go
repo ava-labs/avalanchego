@@ -317,7 +317,12 @@ func (v *view) hashChangedNode(n *node) ids.ID {
 		lastKeyByte byte
 
 		// We use [wg] to wait until all descendants of [n] have been updated.
-		wg sync.WaitGroup
+		//
+		// We use a pointer to avoid allocating the WaitGroup when no goroutines
+		// are created. Calls to Add and Wait both mark the WaitGroup as
+		// potentially escaping the stack, so the WaitGroup is never able to be
+		// allocated on the stack.
+		wg *sync.WaitGroup
 	)
 
 	if bytesForKey > 0 {
@@ -356,20 +361,34 @@ func (v *view) hashChangedNode(n *node) ids.ID {
 
 		// Try updating the child and its descendants in a goroutine.
 		if ok := v.db.hashNodesSema.TryAcquire(1); ok {
+			// If this is the first child goroutine, we need to allocate the
+			// WaitGroup.
+			if wg == nil {
+				wg = new(sync.WaitGroup)
+			}
 			wg.Add(1)
-			go func(childEntry *child) {
+
+			// Passing variables explicitly through the function call rather
+			// than implicitly passing them through the scope of the function
+			// definition allows the passed variables to be allocated on the
+			// stack.
+			go func(wg *sync.WaitGroup, childEntry *child) {
 				childEntry.id = v.hashChangedNode(childNodeChange.after)
 				v.db.hashNodesSema.Release(1)
 				wg.Done()
-			}(childEntry)
+			}(wg, childEntry)
 		} else {
 			// We're at the goroutine limit; do the work in this goroutine.
 			childEntry.id = v.hashChangedNode(childNodeChange.after)
 		}
 	}
 
-	// Wait until all descendants of [n] have been updated.
-	wg.Wait()
+	// If the WaitGroup is never created, this call never created a child
+	// goroutine.
+	if wg != nil {
+		// Wait until all descendants of [n] have been updated.
+		wg.Wait()
+	}
 
 	// The IDs [n]'s descendants are up to date so we can calculate [n]'s ID.
 	return n.calculateID(v.db.metrics)
