@@ -322,7 +322,7 @@ func (v *view) hashChangedNode(n *node) ids.ID {
 		// are created. Calls to Add and Wait both mark the WaitGroup as
 		// potentially escaping the stack, so the WaitGroup is never able to be
 		// allocated on the stack.
-		wg *sync.WaitGroup
+		wg waitGroup
 	)
 
 	if bytesForKey > 0 {
@@ -361,11 +361,6 @@ func (v *view) hashChangedNode(n *node) ids.ID {
 
 		// Try updating the child and its descendants in a goroutine.
 		if ok := v.db.hashNodesSema.TryAcquire(1); ok {
-			// If this is the first child goroutine, we need to allocate the
-			// WaitGroup.
-			if wg == nil {
-				wg = new(sync.WaitGroup)
-			}
 			wg.Add(1)
 
 			// Passing variables explicitly through the function call rather
@@ -376,19 +371,15 @@ func (v *view) hashChangedNode(n *node) ids.ID {
 				childEntry.id = v.hashChangedNode(childNodeChange.after)
 				v.db.hashNodesSema.Release(1)
 				wg.Done()
-			}(wg, childEntry)
+			}(wg.wg, childEntry)
 		} else {
 			// We're at the goroutine limit; do the work in this goroutine.
 			childEntry.id = v.hashChangedNode(childNodeChange.after)
 		}
 	}
 
-	// If the WaitGroup is never created, this call never created a child
-	// goroutine.
-	if wg != nil {
-		// Wait until all descendants of [n] have been updated.
-		wg.Wait()
-	}
+	// Wait until all descendants of [n] have been updated.
+	wg.Wait()
 
 	// The IDs [n]'s descendants are up to date so we can calculate [n]'s ID.
 	return n.calculateID(v.db.metrics)
