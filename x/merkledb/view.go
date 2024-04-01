@@ -310,6 +310,9 @@ func (v *view) hashChangedNode(n *node) ids.ID {
 		childBuffer = make([]byte, 1)
 		dualIndex   = dualBitIndex(v.tokenSize)
 		bytesForKey = bytesNeeded(n.key.length)
+		// We track the last byte used by the key so that we can reset the
+		// value. for each key. This is needed because the child buffer may get
+		// ORed with this byte.
 		lastKeyByte byte
 
 		// We use [wg] to wait until all descendants of [n] have been updated.
