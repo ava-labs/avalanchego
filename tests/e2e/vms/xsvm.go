@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package vms
@@ -8,8 +8,6 @@ import (
 	"math"
 	"os"
 	"path/filepath"
-
-	ginkgo "github.com/onsi/ginkgo/v2"
 
 	"github.com/stretchr/testify/require"
 
@@ -24,6 +22,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/cmd/issue/importtx"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/cmd/issue/transfer"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/genesis"
+
+	ginkgo "github.com/onsi/ginkgo/v2"
 )
 
 var (
@@ -48,7 +48,7 @@ var _ = ginkgo.Describe("[XSVM]", func() {
 		require.NoError(err)
 		const xsvmPluginFilename = "v3m4wPxaHpvGr8qfMeyK6PRW3idZrPHmYcMTt7oXdK47yurVH"
 		xsvmPluginPath := filepath.Join(pluginDir, xsvmPluginFilename)
-		ginkgo.By(fmt.Sprintf("checking that xsvm plugin binary exists at path %s", xsvmPluginPath), func() {
+		ginkgo.By("checking that xsvm plugin binary exists at path "+xsvmPluginPath, func() {
 			_, err := os.Stat(xsvmPluginPath)
 			require.NoError(err)
 		})
