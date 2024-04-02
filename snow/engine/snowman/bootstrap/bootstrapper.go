@@ -555,7 +555,7 @@ func (b *Bootstrapper) markUnavailable(nodeID ids.NodeID) {
 //
 //   - blk is a block that is assumed to have been marked as acceptable by the
 //     bootstrapping engine.
-//   - ancestors is a set of blocks that can be used to optimisically lookup
+//   - ancestors is a set of blocks that can be used to optimistically lookup
 //     parent blocks. This enables the engine to process multiple blocks without
 //     relying on the VM to have stored blocks during `ParseBlock`.
 func (b *Bootstrapper) process(
@@ -598,7 +598,6 @@ func (b *Bootstrapper) process(
 				numFetched-b.initiallyFetched,         // Number of blocks we have fetched during this run
 				totalBlocksToFetch-b.initiallyFetched, // Number of blocks we expect to fetch during this run
 			)
-			b.fetchETA.Set(float64(eta))
 
 			if !b.restarted {
 				b.Ctx.Log.Info("fetching blocks",
@@ -649,10 +648,8 @@ func (b *Bootstrapper) tryStartExecuting(ctx context.Context) error {
 
 	numToExecute := b.tree.Len()
 	err = execute(
-		&haltableContext{
-			Context:  ctx,
-			Haltable: b,
-		},
+		ctx,
+		b,
 		log,
 		b.DB,
 		&parseAcceptor{
@@ -663,10 +660,7 @@ func (b *Bootstrapper) tryStartExecuting(ctx context.Context) error {
 		b.tree,
 		lastAcceptedHeight,
 	)
-	if errors.Is(err, errHalted) {
-		return nil
-	}
-	if err != nil {
+	if err != nil || b.Halted() {
 		return err
 	}
 
@@ -699,7 +693,6 @@ func (b *Bootstrapper) tryStartExecuting(ctx context.Context) error {
 		b.awaitingTimeout = true
 		return nil
 	}
-	b.fetchETA.Set(0)
 	return b.onFinished(ctx, b.requestID)
 }
 
@@ -724,7 +717,6 @@ func (b *Bootstrapper) Timeout(ctx context.Context) error {
 	if !b.Config.BootstrapTracker.IsBootstrapped() {
 		return b.restartBootstrapping(ctx)
 	}
-	b.fetchETA.Set(0)
 	return b.onFinished(ctx, b.requestID)
 }
 
