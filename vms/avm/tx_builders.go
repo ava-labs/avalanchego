@@ -259,17 +259,18 @@ func feeCalculator(backend txBuilderBackend) *fees.Calculator {
 		chainTime = backend.State().GetTimestamp()
 		cfg       = backend.Config()
 		isEActive = cfg.IsEActivated(chainTime)
-		feeCfg    = config.GetDynamicFeesConfig(isEActive)
-		feeMan    = commonfees.NewManager(feeCfg.FeeRate)
 	)
 
-	return &fees.Calculator{
-		IsEActive:          cfg.IsEActivated(chainTime),
-		Config:             cfg,
-		FeeManager:         feeMan,
-		BlockMaxComplexity: feeCfg.BlockMaxComplexity,
-		Codec:              backend.Codec(),
+	var feeCalculator *fees.Calculator
+	if !isEActive {
+		feeCalculator = fees.NewStaticCalculator(cfg)
+	} else {
+		feeCfg := config.GetDynamicFeesConfig(isEActive)
+		feeMan := commonfees.NewManager(feeCfg.FeeRate)
+		feeCalculator = fees.NewDynamicCalculator(backend.Codec(), feeMan, feeCfg.BlockMaxComplexity, nil)
 	}
+
+	return feeCalculator
 }
 
 func options(changeAddr ids.ShortID, memo []byte) []common.Option {

@@ -87,7 +87,7 @@ func TestBaseTxFees(t *testing.T) {
 			},
 			expectedError: nil,
 			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, fc.Config.TxFee, fc.Fee)
+				require.Equal(t, fc.config.TxFee, fc.Fee)
 			},
 		},
 		{
@@ -111,7 +111,7 @@ func TestBaseTxFees(t *testing.T) {
 						172,
 						1000,
 					},
-					fc.FeeManager.GetCumulatedComplexity(),
+					fc.feeManager.GetCumulatedComplexity(),
 				)
 			},
 		},
@@ -144,14 +144,13 @@ func TestBaseTxFees(t *testing.T) {
 				blockMaxComplexity = tt.consumedUnitCapsF()
 			}
 
-			fc := &Calculator{
-				IsEActive:          cfg.IsEActivated(chainTime),
-				Config:             cfg,
-				Codec:              codec,
-				FeeManager:         fees.NewManager(testFeeRates),
-				BlockMaxComplexity: blockMaxComplexity,
-				Credentials:        sTx.Creds,
+			var fc *Calculator
+			if !cfg.IsEActivated(chainTime) {
+				fc = NewStaticCalculator(cfg)
+			} else {
+				fc = NewDynamicCalculator(codec, fees.NewManager(testFeeRates), blockMaxComplexity, sTx.Creds)
 			}
+
 			err := uTx.Visit(fc)
 			r.ErrorIs(err, tt.expectedError)
 			tt.checksF(t, fc)
@@ -205,7 +204,7 @@ func TestCreateAssetTxFees(t *testing.T) {
 			},
 			expectedError: nil,
 			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, fc.Config.CreateAssetTxFee, fc.Fee)
+				require.Equal(t, fc.config.CreateAssetTxFee, fc.Fee)
 			},
 		},
 		{
@@ -229,7 +228,7 @@ func TestCreateAssetTxFees(t *testing.T) {
 						172,
 						1000,
 					},
-					fc.FeeManager.GetCumulatedComplexity(),
+					fc.feeManager.GetCumulatedComplexity(),
 				)
 			},
 		},
@@ -262,14 +261,13 @@ func TestCreateAssetTxFees(t *testing.T) {
 				blockMaxComplexity = tt.consumedUnitCapsF()
 			}
 
-			fc := &Calculator{
-				IsEActive:          cfg.IsEActivated(chainTime),
-				Config:             cfg,
-				Codec:              codec,
-				FeeManager:         fees.NewManager(testFeeRates),
-				BlockMaxComplexity: blockMaxComplexity,
-				Credentials:        sTx.Creds,
+			var fc *Calculator
+			if !cfg.IsEActivated(chainTime) {
+				fc = NewStaticCalculator(cfg)
+			} else {
+				fc = NewDynamicCalculator(codec, fees.NewManager(testFeeRates), blockMaxComplexity, sTx.Creds)
 			}
+
 			err := uTx.Visit(fc)
 			r.ErrorIs(err, tt.expectedError)
 			tt.checksF(t, fc)
@@ -323,7 +321,7 @@ func TestOperationTxFees(t *testing.T) {
 			},
 			expectedError: nil,
 			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, fc.Config.TxFee, fc.Fee)
+				require.Equal(t, fc.config.TxFee, fc.Fee)
 			},
 		},
 		{
@@ -347,7 +345,7 @@ func TestOperationTxFees(t *testing.T) {
 						172,
 						1000,
 					},
-					fc.FeeManager.GetCumulatedComplexity(),
+					fc.feeManager.GetCumulatedComplexity(),
 				)
 			},
 		},
@@ -380,14 +378,13 @@ func TestOperationTxFees(t *testing.T) {
 				blockMaxComplexity = tt.consumedUnitCapsF()
 			}
 
-			fc := &Calculator{
-				IsEActive:          cfg.IsEActivated(chainTime),
-				Config:             cfg,
-				Codec:              codec,
-				FeeManager:         fees.NewManager(testFeeRates),
-				BlockMaxComplexity: blockMaxComplexity,
-				Credentials:        sTx.Creds,
+			var fc *Calculator
+			if !cfg.IsEActivated(chainTime) {
+				fc = NewStaticCalculator(cfg)
+			} else {
+				fc = NewDynamicCalculator(codec, fees.NewManager(testFeeRates), blockMaxComplexity, sTx.Creds)
 			}
+
 			err := uTx.Visit(fc)
 			r.ErrorIs(err, tt.expectedError)
 			tt.checksF(t, fc)
@@ -437,7 +434,7 @@ func TestImportTxFees(t *testing.T) {
 			},
 			expectedError: nil,
 			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, fc.Config.TxFee, fc.Fee)
+				require.Equal(t, fc.config.TxFee, fc.Fee)
 			},
 		},
 		{
@@ -461,7 +458,7 @@ func TestImportTxFees(t *testing.T) {
 						262,
 						2000,
 					},
-					fc.FeeManager.GetCumulatedComplexity(),
+					fc.feeManager.GetCumulatedComplexity(),
 				)
 			},
 		},
@@ -494,14 +491,13 @@ func TestImportTxFees(t *testing.T) {
 				blockMaxComplexity = tt.consumedUnitCapsF()
 			}
 
-			fc := &Calculator{
-				IsEActive:          cfg.IsEActivated(chainTime),
-				Config:             cfg,
-				Codec:              codec,
-				FeeManager:         fees.NewManager(testFeeRates),
-				BlockMaxComplexity: blockMaxComplexity,
-				Credentials:        sTx.Creds,
+			var fc *Calculator
+			if !cfg.IsEActivated(chainTime) {
+				fc = NewStaticCalculator(cfg)
+			} else {
+				fc = NewDynamicCalculator(codec, fees.NewManager(testFeeRates), blockMaxComplexity, sTx.Creds)
 			}
+
 			err := uTx.Visit(fc)
 			r.ErrorIs(err, tt.expectedError)
 			tt.checksF(t, fc)
@@ -541,7 +537,7 @@ func TestExportTxFees(t *testing.T) {
 			},
 			expectedError: nil,
 			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, fc.Config.TxFee, fc.Fee)
+				require.Equal(t, fc.config.TxFee, fc.Fee)
 			},
 		},
 		{
@@ -565,7 +561,7 @@ func TestExportTxFees(t *testing.T) {
 						254,
 						1000,
 					},
-					fc.FeeManager.GetCumulatedComplexity(),
+					fc.feeManager.GetCumulatedComplexity(),
 				)
 			},
 		},
@@ -598,14 +594,13 @@ func TestExportTxFees(t *testing.T) {
 				blockMaxComplexity = tt.consumedUnitCapsF()
 			}
 
-			fc := &Calculator{
-				IsEActive:          cfg.IsEActivated(chainTime),
-				Config:             cfg,
-				Codec:              codec,
-				FeeManager:         fees.NewManager(testFeeRates),
-				BlockMaxComplexity: blockMaxComplexity,
-				Credentials:        sTx.Creds,
+			var fc *Calculator
+			if !cfg.IsEActivated(chainTime) {
+				fc = NewStaticCalculator(cfg)
+			} else {
+				fc = NewDynamicCalculator(codec, fees.NewManager(testFeeRates), blockMaxComplexity, sTx.Creds)
 			}
+
 			err := uTx.Visit(fc)
 			r.ErrorIs(err, tt.expectedError)
 			tt.checksF(t, fc)

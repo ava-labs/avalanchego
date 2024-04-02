@@ -171,6 +171,7 @@ type wallet struct {
 	client  avm.Client
 
 	isEForkActive                bool
+	staticFeesConfig             *config.Config
 	feeRates, blockMaxComplexity commonfees.Dimensions
 }
 
@@ -186,20 +187,7 @@ func (w *wallet) IssueBaseTx(
 	outputs []*avax.TransferableOutput,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	w.refreshFork(options...)
-
-	var (
-		feesMan = commonfees.NewManager(w.feeRates)
-		feeCalc = &fees.Calculator{
-			IsEActive: w.isEForkActive,
-			Config: &config.Config{
-				TxFee: w.builder.Context().BaseTxFee,
-			},
-			FeeManager:         feesMan,
-			BlockMaxComplexity: w.blockMaxComplexity,
-			Codec:              builder.Parser.Codec(),
-		}
-	)
+	feeCalc := w.feeCalculator(w.builder.Context(), options...)
 
 	utx, err := w.builder.NewBaseTx(outputs, feeCalc, options...)
 	if err != nil {
@@ -215,20 +203,7 @@ func (w *wallet) IssueCreateAssetTx(
 	initialState map[uint32][]verify.State,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	w.refreshFork(options...)
-
-	var (
-		feesMan = commonfees.NewManager(w.feeRates)
-		feeCalc = &fees.Calculator{
-			IsEActive: w.isEForkActive,
-			Config: &config.Config{
-				TxFee: w.builder.Context().BaseTxFee,
-			},
-			FeeManager:         feesMan,
-			BlockMaxComplexity: w.blockMaxComplexity,
-			Codec:              builder.Parser.Codec(),
-		}
-	)
+	feeCalc := w.feeCalculator(w.builder.Context(), options...)
 
 	utx, err := w.builder.NewCreateAssetTx(name, symbol, denomination, initialState, feeCalc, options...)
 	if err != nil {
@@ -241,20 +216,7 @@ func (w *wallet) IssueOperationTx(
 	operations []*txs.Operation,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	w.refreshFork(options...)
-
-	var (
-		feesMan = commonfees.NewManager(w.feeRates)
-		feeCalc = &fees.Calculator{
-			IsEActive: w.isEForkActive,
-			Config: &config.Config{
-				TxFee: w.builder.Context().BaseTxFee,
-			},
-			FeeManager:         feesMan,
-			BlockMaxComplexity: w.blockMaxComplexity,
-			Codec:              builder.Parser.Codec(),
-		}
-	)
+	feeCalc := w.feeCalculator(w.builder.Context(), options...)
 
 	utx, err := w.builder.NewOperationTx(operations, feeCalc, options...)
 	if err != nil {
@@ -267,20 +229,7 @@ func (w *wallet) IssueOperationTxMintFT(
 	outputs map[ids.ID]*secp256k1fx.TransferOutput,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	w.refreshFork(options...)
-
-	var (
-		feesMan = commonfees.NewManager(w.feeRates)
-		feeCalc = &fees.Calculator{
-			IsEActive: w.isEForkActive,
-			Config: &config.Config{
-				TxFee: w.builder.Context().BaseTxFee,
-			},
-			FeeManager:         feesMan,
-			BlockMaxComplexity: w.blockMaxComplexity,
-			Codec:              builder.Parser.Codec(),
-		}
-	)
+	feeCalc := w.feeCalculator(w.builder.Context(), options...)
 
 	utx, err := w.builder.NewOperationTxMintFT(outputs, feeCalc, options...)
 	if err != nil {
@@ -295,20 +244,7 @@ func (w *wallet) IssueOperationTxMintNFT(
 	owners []*secp256k1fx.OutputOwners,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	w.refreshFork(options...)
-
-	var (
-		feesMan = commonfees.NewManager(w.feeRates)
-		feeCalc = &fees.Calculator{
-			IsEActive: w.isEForkActive,
-			Config: &config.Config{
-				TxFee: w.builder.Context().BaseTxFee,
-			},
-			FeeManager:         feesMan,
-			BlockMaxComplexity: w.blockMaxComplexity,
-			Codec:              builder.Parser.Codec(),
-		}
-	)
+	feeCalc := w.feeCalculator(w.builder.Context(), options...)
 
 	utx, err := w.builder.NewOperationTxMintNFT(assetID, payload, owners, feeCalc, options...)
 	if err != nil {
@@ -322,20 +258,7 @@ func (w *wallet) IssueOperationTxMintProperty(
 	owner *secp256k1fx.OutputOwners,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	w.refreshFork(options...)
-
-	var (
-		feesMan = commonfees.NewManager(w.feeRates)
-		feeCalc = &fees.Calculator{
-			IsEActive: w.isEForkActive,
-			Config: &config.Config{
-				TxFee: w.builder.Context().BaseTxFee,
-			},
-			FeeManager:         feesMan,
-			BlockMaxComplexity: w.blockMaxComplexity,
-			Codec:              builder.Parser.Codec(),
-		}
-	)
+	feeCalc := w.feeCalculator(w.builder.Context(), options...)
 
 	utx, err := w.builder.NewOperationTxMintProperty(assetID, owner, feeCalc, options...)
 	if err != nil {
@@ -348,20 +271,7 @@ func (w *wallet) IssueOperationTxBurnProperty(
 	assetID ids.ID,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	w.refreshFork(options...)
-
-	var (
-		feesMan = commonfees.NewManager(w.feeRates)
-		feeCalc = &fees.Calculator{
-			IsEActive: w.isEForkActive,
-			Config: &config.Config{
-				TxFee: w.builder.Context().BaseTxFee,
-			},
-			FeeManager:         feesMan,
-			BlockMaxComplexity: w.blockMaxComplexity,
-			Codec:              builder.Parser.Codec(),
-		}
-	)
+	feeCalc := w.feeCalculator(w.builder.Context(), options...)
 
 	utx, err := w.builder.NewOperationTxBurnProperty(assetID, feeCalc, options...)
 	if err != nil {
@@ -375,20 +285,7 @@ func (w *wallet) IssueImportTx(
 	to *secp256k1fx.OutputOwners,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	w.refreshFork(options...)
-
-	var (
-		feesMan = commonfees.NewManager(w.feeRates)
-		feeCalc = &fees.Calculator{
-			IsEActive: w.isEForkActive,
-			Config: &config.Config{
-				TxFee: w.builder.Context().BaseTxFee,
-			},
-			FeeManager:         feesMan,
-			BlockMaxComplexity: w.blockMaxComplexity,
-			Codec:              builder.Parser.Codec(),
-		}
-	)
+	feeCalc := w.feeCalculator(w.builder.Context(), options...)
 
 	utx, err := w.builder.NewImportTx(chainID, to, feeCalc, options...)
 	if err != nil {
@@ -402,20 +299,7 @@ func (w *wallet) IssueExportTx(
 	outputs []*avax.TransferableOutput,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	w.refreshFork(options...)
-
-	var (
-		feesMan = commonfees.NewManager(w.feeRates)
-		feeCalc = &fees.Calculator{
-			IsEActive: w.isEForkActive,
-			Config: &config.Config{
-				TxFee: w.builder.Context().BaseTxFee,
-			},
-			FeeManager:         feesMan,
-			BlockMaxComplexity: w.blockMaxComplexity,
-			Codec:              builder.Parser.Codec(),
-		}
-	)
+	feeCalc := w.feeCalculator(w.builder.Context(), options...)
 
 	utx, err := w.builder.NewExportTx(chainID, outputs, feeCalc, options...)
 	if err != nil {
@@ -472,7 +356,21 @@ func (w *wallet) IssueTx(
 	return nil
 }
 
-func (w *wallet) refreshFork(_ ...common.Option) {
+func (w *wallet) feeCalculator(ctx *builder.Context, options ...common.Option) *fees.Calculator {
+	w.refreshFeesData(ctx, options...)
+
+	var feeCalculator *fees.Calculator
+	if !w.isEForkActive {
+		feeCalculator = fees.NewStaticCalculator(w.staticFeesConfig)
+	} else {
+		feeCfg := config.GetDynamicFeesConfig(w.isEForkActive)
+		feeMan := commonfees.NewManager(w.feeRates)
+		feeCalculator = fees.NewDynamicCalculator(builder.Parser.Codec(), feeMan, feeCfg.BlockMaxComplexity, nil)
+	}
+	return feeCalculator
+}
+
+func (w *wallet) refreshFeesData(ctx *builder.Context, _ ...common.Option) {
 	if w.isEForkActive {
 		// E fork enables dinamic fees and it is active
 		// not need to recheck
@@ -480,6 +378,8 @@ func (w *wallet) refreshFork(_ ...common.Option) {
 	}
 
 	eUpgradeTime := version.GetEUpgradeTime(w.builder.Context().NetworkID)
+
+	w.staticFeesConfig = staticFeesConfigFromContext(ctx)
 
 	// TODO ABENEGIA: consider introducing this method in X-chain as well
 	// chainTime, err := w.client.GetTimestamp(ctx)
@@ -491,4 +391,11 @@ func (w *wallet) refreshFork(_ ...common.Option) {
 	feeCfg := config.GetDynamicFeesConfig(w.isEForkActive)
 	w.feeRates = feeCfg.FeeRate
 	w.blockMaxComplexity = feeCfg.BlockMaxComplexity
+}
+
+func staticFeesConfigFromContext(ctx *builder.Context) *config.Config {
+	return &config.Config{
+		TxFee:            ctx.BaseTxFee,
+		CreateAssetTxFee: ctx.CreateAssetTxFee,
+	}
 }
