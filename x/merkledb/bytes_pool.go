@@ -47,14 +47,13 @@ func (p *bytesPool) pop() []byte {
 }
 
 func (p *bytesPool) Release(b []byte) {
+	p.bytesLock.Lock()
+	p.bytes = append(p.bytes, b)
+	p.bytesLock.Unlock()
+
 	select {
 	case <-p.slots:
 	default:
 		panic("release of unacquired semaphore")
 	}
-
-	p.bytesLock.Lock()
-	defer p.bytesLock.Unlock()
-
-	p.bytes = append(p.bytes, b)
 }
