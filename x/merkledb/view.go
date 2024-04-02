@@ -316,7 +316,7 @@ func (v *view) hashChangedNode(n *node) ids.ID {
 		lastKeyByte byte
 
 		// We use [wg] to wait until all descendants of [n] have been updated.
-		wg sync.WaitGroup
+		wg waitGroup
 	)
 
 	if bytesForKey > 0 {
@@ -360,11 +360,16 @@ func (v *view) hashChangedNode(n *node) ids.ID {
 		// Try updating the child and its descendants in a goroutine.
 		if ok := v.db.hashNodesSema.TryAcquire(1); ok {
 			wg.Add(1)
-			go func(childEntry *child) {
+
+			// Passing variables explicitly through the function call rather
+			// than implicitly passing them through the scope of the function
+			// definition allows the passed variables to be allocated on the
+			// stack.
+			go func(wg *sync.WaitGroup, childEntry *child) {
 				childEntry.id = v.hashChangedNode(childNodeChange.after)
 				v.db.hashNodesSema.Release(1)
 				wg.Done()
-			}(childEntry)
+			}(wg.wg, childEntry)
 		} else {
 			// We're at the goroutine limit; do the work in this goroutine.
 			childEntry.id = v.hashChangedNode(childNodeChange.after)
