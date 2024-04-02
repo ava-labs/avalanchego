@@ -13,8 +13,6 @@ import (
 	"math/bits"
 	"slices"
 
-	"golang.org/x/exp/maps"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/maybe"
 )
@@ -139,9 +137,16 @@ func encodeDBNode(n *dbNode) []byte {
 	buf := bytes.NewBuffer(make([]byte, 0, encodedDBNodeSize(n)))
 	encodeMaybeByteSlice(buf, n.value)
 	encodeUint(buf, uint64(len(n.children)))
-	// Note we insert children in order of increasing index
-	// for determinism.
-	keys := maps.Keys(n.children)
+
+	// By allocating BranchFactorLargest rather than len(n.children), this slice
+	// is allocated on the stack rather than the heap. BranchFactorLargest is
+	// at least len(n.children) which avoids memory allocations.
+	keys := make([]byte, 0, BranchFactorLargest)
+	for k := range n.children {
+		keys = append(keys, k)
+	}
+
+	// Ensure that the order of entries is correct.
 	slices.Sort(keys)
 	for _, index := range keys {
 		entry := n.children[index]
