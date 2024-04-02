@@ -311,9 +311,9 @@ func (v *view) hashChangedNode(n *node) ids.ID {
 		childBuffer = make([]byte, 1)
 		dualIndex   = dualBitIndex(v.tokenSize)
 		bytesForKey = bytesNeeded(n.key.length)
-		// We track the last byte used by the key so that we can reset the
-		// value. for each key. This is needed because the child buffer may get
-		// ORed with this byte.
+		// We track the last byte of [n.key] so that we can reset the value for
+		// each key. This is needed because the child buffer may get ORed at
+		// this byte.
 		lastKeyByte byte
 
 		// We use [wg] to wait until all descendants of [n] have been updated.
@@ -329,7 +329,9 @@ func (v *view) hashChangedNode(n *node) ids.ID {
 
 	for childIndex, childEntry := range n.children {
 		childBuffer[0] = childIndex << dualIndex
-		childByteKey := Key{
+		childIndexAsKey := Key{
+			// It is safe to use byteSliceToString because [childBuffer] is not
+			// modified while [childIndexAsKey] is in use.
 			value:  byteSliceToString(childBuffer),
 			length: v.tokenSize,
 		}
@@ -340,9 +342,11 @@ func (v *view) hashChangedNode(n *node) ids.ID {
 		if bytesForKey > 0 {
 			buffer[bytesForKey-1] = lastKeyByte
 		}
-		extendIntoBuffer(buffer, childByteKey, n.key.length)
+		extendIntoBuffer(buffer, childIndexAsKey, n.key.length)
 		extendIntoBuffer(buffer, childEntry.compressedKey, n.key.length+v.tokenSize)
 		childKey := Key{
+			// It is safe to use byteSliceToString because [buffer] is not
+			// modified while [childKey] is in use.
 			value:  byteSliceToString(buffer),
 			length: totalBitLength,
 		}
