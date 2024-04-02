@@ -3,6 +3,8 @@
 
 package config
 
+import "time"
+
 // Struct collecting all the foundational parameters of the AVM
 type Config struct {
 	// Fee that is burned by every non-asset creating transaction
@@ -10,4 +12,11 @@ type Config struct {
 
 	// Fee that must be burned by every asset creating transaction
 	CreateAssetTxFee uint64
+
+	// Time of the E network upgrade
+	EUpgradeTime time.Time
+}
+
+func (c *Config) IsEActivated(timestamp time.Time) bool {
+	return !timestamp.Before(c.EUpgradeTime)
 }

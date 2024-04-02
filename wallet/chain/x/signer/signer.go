@@ -1,19 +1,18 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package p
+package signer
 
 import (
+	"context"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/keychain"
+	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-
-	stdcontext "context"
 )
 
-var _ Signer = (*txSigner)(nil)
+var _ Signer = (*signer)(nil)
 
 type Signer interface {
 	// Sign adds as many missing signatures as possible to the provided
@@ -24,28 +23,27 @@ type Signer interface {
 	//
 	// If the signer doesn't have the ability to provide a required signature,
 	// the signature slot will be skipped without reporting an error.
-	Sign(ctx stdcontext.Context, tx *txs.Tx) error
+	Sign(ctx context.Context, tx *txs.Tx) error
 }
 
-type SignerBackend interface {
-	GetUTXO(ctx stdcontext.Context, chainID, utxoID ids.ID) (*avax.UTXO, error)
-	GetSubnetOwner(ctx stdcontext.Context, subnetID ids.ID) (fx.Owner, error)
+type Backend interface {
+	GetUTXO(ctx context.Context, chainID, utxoID ids.ID) (*avax.UTXO, error)
 }
 
-type txSigner struct {
+type signer struct {
 	kc      keychain.Keychain
-	backend SignerBackend
+	backend Backend
 }
 
-func NewSigner(kc keychain.Keychain, backend SignerBackend) Signer {
-	return &txSigner{
+func New(kc keychain.Keychain, backend Backend) Signer {
+	return &signer{
 		kc:      kc,
 		backend: backend,
 	}
 }
 
-func (s *txSigner) Sign(ctx stdcontext.Context, tx *txs.Tx) error {
-	return tx.Unsigned.Visit(&signerVisitor{
+func (s *signer) Sign(ctx context.Context, tx *txs.Tx) error {
+	return tx.Unsigned.Visit(&visitor{
 		kc:      s.kc,
 		backend: s.backend,
 		ctx:     ctx,
@@ -54,7 +52,7 @@ func (s *txSigner) Sign(ctx stdcontext.Context, tx *txs.Tx) error {
 }
 
 func SignUnsigned(
-	ctx stdcontext.Context,
+	ctx context.Context,
 	signer Signer,
 	utx txs.UnsignedTx,
 ) (*txs.Tx, error) {

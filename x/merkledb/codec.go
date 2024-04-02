@@ -5,40 +5,25 @@ package merkledb
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/binary"
 	"errors"
 	"io"
 	"math"
 	"math/bits"
 	"slices"
-	"sync"
-
-	"golang.org/x/exp/maps"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/maybe"
 )
 
 const (
-	boolLen              = 1
-	trueByte             = 1
-	falseByte            = 0
-	minVarIntLen         = 1
-	minMaybeByteSliceLen = boolLen
-	minKeyLen            = minVarIntLen
-	minByteSliceLen      = minVarIntLen
-	minDBNodeLen         = minMaybeByteSliceLen + minVarIntLen
-	minChildLen          = minVarIntLen + minKeyLen + ids.IDLen + boolLen
-
-	estimatedKeyLen   = 64
-	estimatedValueLen = 64
-	// Child index, child ID
-	hashValuesChildLen = minVarIntLen + ids.IDLen
+	boolLen   = 1
+	trueByte  = 1
+	falseByte = 0
 )
 
 var (
-	_ encoderDecoder = (*codecImpl)(nil)
-
 	trueBytes  = []byte{trueByte}
 	falseBytes = []byte{falseByte}
 
@@ -48,154 +33,213 @@ var (
 	errNonZeroKeyPadding  = errors.New("key partial byte should be padded with 0s")
 	errExtraSpace         = errors.New("trailing buffer space")
 	errIntOverflow        = errors.New("value overflows int")
+	errTooManyChildren    = errors.New("too many children")
 )
 
-// encoderDecoder defines the interface needed by merkleDB to marshal
-// and unmarshal relevant types.
-type encoderDecoder interface {
-	encoder
-	decoder
-}
-
-type encoder interface {
-	// Assumes [n] is non-nil.
-	encodeDBNode(n *dbNode) []byte
-	encodedDBNodeSize(n *dbNode) int
-
-	// Returns the bytes that will be hashed to generate [n]'s ID.
-	// Assumes [n] is non-nil.
-	encodeHashValues(n *node) []byte
-	encodeKey(key Key) []byte
-}
-
-type decoder interface {
-	// Assumes [n] is non-nil.
-	decodeDBNode(bytes []byte, n *dbNode) error
-	decodeKey(bytes []byte) (Key, error)
-}
-
-func newCodec() encoderDecoder {
-	return &codecImpl{
-		varIntPool: sync.Pool{
-			New: func() interface{} {
-				return make([]byte, binary.MaxVarintLen64)
-			},
-		},
-	}
-}
-
-// Note that bytes.Buffer.Write always returns nil, so we
-// can ignore its return values in [codecImpl] methods.
-type codecImpl struct {
-	// Invariant: Every byte slice returned by [varIntPool] has
-	// length [binary.MaxVarintLen64].
-	varIntPool sync.Pool
-}
-
-func (c *codecImpl) childSize(index byte, childEntry *child) int {
+func childSize(index byte, childEntry *child) int {
 	// * index
 	// * child ID
 	// * child key
 	// * bool indicating whether the child has a value
-	return c.uintSize(uint64(index)) + ids.IDLen + c.keySize(childEntry.compressedKey) + boolLen
+	return uintSize(uint64(index)) + ids.IDLen + keySize(childEntry.compressedKey) + boolLen
 }
 
-// based on the current implementation of codecImpl.encodeUint which uses binary.PutUvarint
-func (*codecImpl) uintSize(value uint64) int {
+// based on the implementation of encodeUint which uses binary.PutUvarint
+func uintSize(value uint64) int {
 	if value == 0 {
 		return 1
 	}
 	return (bits.Len64(value) + 6) / 7
 }
 
-func (c *codecImpl) keySize(p Key) int {
-	return c.uintSize(uint64(p.length)) + bytesNeeded(p.length)
+func keySize(p Key) int {
+	return uintSize(uint64(p.length)) + bytesNeeded(p.length)
 }
 
-func (c *codecImpl) encodedDBNodeSize(n *dbNode) int {
+// Assumes [n] is non-nil.
+func encodedDBNodeSize(n *dbNode) int {
 	// * number of children
 	// * bool indicating whether [n] has a value
 	// * the value (optional)
 	// * children
-	size := c.uintSize(uint64(len(n.children))) + boolLen
+	size := uintSize(uint64(len(n.children))) + boolLen
 	if n.value.HasValue() {
 		valueLen := len(n.value.Value())
-		size += c.uintSize(uint64(valueLen)) + valueLen
+		size += uintSize(uint64(valueLen)) + valueLen
 	}
 	// for each non-nil entry, we add the additional size of the child entry
 	for index, entry := range n.children {
-		size += c.childSize(index, entry)
+		size += childSize(index, entry)
 	}
 	return size
 }
 
-func (c *codecImpl) encodeDBNode(n *dbNode) []byte {
-	buf := bytes.NewBuffer(make([]byte, 0, c.encodedDBNodeSize(n)))
-	c.encodeMaybeByteSlice(buf, n.value)
-	c.encodeUint(buf, uint64(len(n.children)))
-	// Note we insert children in order of increasing index
-	// for determinism.
-	keys := maps.Keys(n.children)
-	slices.Sort(keys)
-	for _, index := range keys {
-		entry := n.children[index]
-		c.encodeUint(buf, uint64(index))
-		c.encodeKeyToBuffer(buf, entry.compressedKey)
-		_, _ = buf.Write(entry.id[:])
-		c.encodeBool(buf, entry.hasValue)
-	}
-	return buf.Bytes()
-}
-
-func (c *codecImpl) encodeHashValues(n *node) []byte {
+// Returns the canonical hash of [n].
+//
+// Assumes [n] is non-nil.
+// This method is performance critical. It is not expected to perform any memory
+// allocations.
+func hashNode(n *node) ids.ID {
 	var (
-		numChildren = len(n.children)
-		// Estimate size [hv] to prevent memory allocations
-		estimatedLen = minVarIntLen + numChildren*hashValuesChildLen + estimatedValueLen + estimatedKeyLen
-		buf          = bytes.NewBuffer(make([]byte, 0, estimatedLen))
+		// sha.Write always returns nil, so we ignore its return values.
+		sha  = sha256.New()
+		hash ids.ID
+		// The hash length is larger than the maximum Uvarint length. This
+		// ensures binary.AppendUvarint doesn't perform any memory allocations.
+		emptyHashBuffer = hash[:0]
 	)
 
-	c.encodeUint(buf, uint64(numChildren))
+	// By directly calling sha.Write rather than passing sha around as an
+	// io.Writer, the compiler can perform sufficient escape analysis to avoid
+	// allocating buffers on the heap.
+	numChildren := len(n.children)
+	_, _ = sha.Write(binary.AppendUvarint(emptyHashBuffer, uint64(numChildren)))
 
-	// ensure that the order of entries is consistent
-	keys := maps.Keys(n.children)
+	// Avoid allocating keys entirely if the node doesn't have any children.
+	if numChildren != 0 {
+		// By allocating BranchFactorLargest rather than len(n.children), this
+		// slice is allocated on the stack rather than the heap.
+		// BranchFactorLargest is at least len(n.children) which avoids memory
+		// allocations.
+		keys := make([]byte, 0, BranchFactorLargest)
+		for k := range n.children {
+			keys = append(keys, k)
+		}
+
+		// Ensure that the order of entries is correct.
+		slices.Sort(keys)
+		for _, index := range keys {
+			entry := n.children[index]
+			_, _ = sha.Write(binary.AppendUvarint(emptyHashBuffer, uint64(index)))
+			_, _ = sha.Write(entry.id[:])
+		}
+	}
+
+	if n.valueDigest.HasValue() {
+		_, _ = sha.Write(trueBytes)
+		value := n.valueDigest.Value()
+		_, _ = sha.Write(binary.AppendUvarint(emptyHashBuffer, uint64(len(value))))
+		_, _ = sha.Write(value)
+	} else {
+		_, _ = sha.Write(falseBytes)
+	}
+
+	_, _ = sha.Write(binary.AppendUvarint(emptyHashBuffer, uint64(n.key.length)))
+	_, _ = sha.Write(n.key.Bytes())
+	sha.Sum(emptyHashBuffer)
+	return hash
+}
+
+// Assumes [n] is non-nil.
+func encodeDBNode(n *dbNode) []byte {
+	length := encodedDBNodeSize(n)
+	w := codecWriter{
+		b: make([]byte, 0, length),
+	}
+
+	w.MaybeBytes(n.value)
+
+	numChildren := len(n.children)
+	w.Uvarint(uint64(numChildren))
+
+	// Avoid allocating keys entirely if the node doesn't have any children.
+	if numChildren == 0 {
+		return w.b
+	}
+
+	// By allocating BranchFactorLargest rather than len(n.children), this slice
+	// is allocated on the stack rather than the heap. BranchFactorLargest is
+	// at least len(n.children) which avoids memory allocations.
+	keys := make([]byte, 0, BranchFactorLargest)
+	for k := range n.children {
+		keys = append(keys, k)
+	}
+
+	// Ensure that the order of entries is correct.
 	slices.Sort(keys)
 	for _, index := range keys {
 		entry := n.children[index]
-		c.encodeUint(buf, uint64(index))
-		_, _ = buf.Write(entry.id[:])
+		w.Uvarint(uint64(index))
+		w.Key(entry.compressedKey)
+		w.ID(entry.id)
+		w.Bool(entry.hasValue)
 	}
-	c.encodeMaybeByteSlice(buf, n.valueDigest)
-	c.encodeKeyToBuffer(buf, n.key)
 
-	return buf.Bytes()
+	return w.b
 }
 
-func (c *codecImpl) decodeDBNode(b []byte, n *dbNode) error {
-	if minDBNodeLen > len(b) {
-		return io.ErrUnexpectedEOF
+func encodeKey(key Key) []byte {
+	length := uintSize(uint64(key.length)) + len(key.Bytes())
+	w := codecWriter{
+		b: make([]byte, 0, length),
+	}
+	w.Key(key)
+	return w.b
+}
+
+type codecWriter struct {
+	b []byte
+}
+
+func (w *codecWriter) Bool(v bool) {
+	if v {
+		w.b = append(w.b, trueByte)
+	} else {
+		w.b = append(w.b, falseByte)
+	}
+}
+
+func (w *codecWriter) Uvarint(v uint64) {
+	w.b = binary.AppendUvarint(w.b, v)
+}
+
+func (w *codecWriter) ID(v ids.ID) {
+	w.b = append(w.b, v[:]...)
+}
+
+func (w *codecWriter) Bytes(v []byte) {
+	w.Uvarint(uint64(len(v)))
+	w.b = append(w.b, v...)
+}
+
+func (w *codecWriter) MaybeBytes(v maybe.Maybe[[]byte]) {
+	hasValue := v.HasValue()
+	w.Bool(hasValue)
+	if hasValue {
+		w.Bytes(v.Value())
+	}
+}
+
+func (w *codecWriter) Key(v Key) {
+	w.Uvarint(uint64(v.length))
+	w.b = append(w.b, v.Bytes()...)
+}
+
+// Assumes [n] is non-nil.
+func decodeDBNode(b []byte, n *dbNode) error {
+	r := codecReader{
+		b:    b,
+		copy: true,
 	}
 
-	src := bytes.NewReader(b)
-
-	value, err := c.decodeMaybeByteSlice(src)
+	var err error
+	n.value, err = r.MaybeBytes()
 	if err != nil {
 		return err
 	}
-	n.value = value
 
-	numChildren, err := c.decodeUint(src)
-	switch {
-	case err != nil:
+	numChildren, err := r.Uvarint()
+	if err != nil {
 		return err
-	case numChildren > uint64(src.Len()/minChildLen):
-		return io.ErrUnexpectedEOF
+	}
+	if numChildren > uint64(BranchFactorLargest) {
+		return errTooManyChildren
 	}
 
 	n.children = make(map[byte]*child, numChildren)
 	var previousChild uint64
 	for i := uint64(0); i < numChildren; i++ {
-		index, err := c.decodeUint(src)
+		index, err := r.Uvarint()
 		if err != nil {
 			return err
 		}
@@ -204,15 +248,15 @@ func (c *codecImpl) decodeDBNode(b []byte, n *dbNode) error {
 		}
 		previousChild = index
 
-		compressedKey, err := c.decodeKeyFromReader(src)
+		compressedKey, err := r.Key()
 		if err != nil {
 			return err
 		}
-		childID, err := c.decodeID(src)
+		childID, err := r.ID()
 		if err != nil {
 			return err
 		}
-		hasValue, err := c.decodeBool(src)
+		hasValue, err := r.Bool()
 		if err != nil {
 			return err
 		}
@@ -222,205 +266,131 @@ func (c *codecImpl) decodeDBNode(b []byte, n *dbNode) error {
 			hasValue:      hasValue,
 		}
 	}
-	if src.Len() != 0 {
+	if len(r.b) != 0 {
 		return errExtraSpace
 	}
 	return nil
 }
 
-func (*codecImpl) encodeBool(dst *bytes.Buffer, value bool) {
-	bytesValue := falseBytes
-	if value {
-		bytesValue = trueBytes
+func decodeKey(b []byte) (Key, error) {
+	r := codecReader{
+		b:    b,
+		copy: true,
 	}
-	_, _ = dst.Write(bytesValue)
-}
-
-func (*codecImpl) decodeBool(src *bytes.Reader) (bool, error) {
-	boolByte, err := src.ReadByte()
-	switch {
-	case err == io.EOF:
-		return false, io.ErrUnexpectedEOF
-	case err != nil:
-		return false, err
-	case boolByte == trueByte:
-		return true, nil
-	case boolByte == falseByte:
-		return false, nil
-	default:
-		return false, errInvalidBool
-	}
-}
-
-func (*codecImpl) decodeUint(src *bytes.Reader) (uint64, error) {
-	// To ensure encoding/decoding is canonical, we need to check for leading
-	// zeroes in the varint.
-	// The last byte of the varint we read is the most significant byte.
-	// If it's 0, then it's a leading zero, which is considered invalid in the
-	// canonical encoding.
-	startLen := src.Len()
-	val64, err := binary.ReadUvarint(src)
-	if err != nil {
-		if err == io.EOF {
-			return 0, io.ErrUnexpectedEOF
-		}
-		return 0, err
-	}
-	endLen := src.Len()
-
-	// Just 0x00 is a valid value so don't check if the varint is 1 byte
-	if startLen-endLen > 1 {
-		if err := src.UnreadByte(); err != nil {
-			return 0, err
-		}
-		lastByte, err := src.ReadByte()
-		if err != nil {
-			return 0, err
-		}
-		if lastByte == 0x00 {
-			return 0, errLeadingZeroes
-		}
-	}
-
-	return val64, nil
-}
-
-func (c *codecImpl) encodeUint(dst *bytes.Buffer, value uint64) {
-	buf := c.varIntPool.Get().([]byte)
-	size := binary.PutUvarint(buf, value)
-	_, _ = dst.Write(buf[:size])
-	c.varIntPool.Put(buf)
-}
-
-func (c *codecImpl) encodeMaybeByteSlice(dst *bytes.Buffer, maybeValue maybe.Maybe[[]byte]) {
-	hasValue := maybeValue.HasValue()
-	c.encodeBool(dst, hasValue)
-	if hasValue {
-		c.encodeByteSlice(dst, maybeValue.Value())
-	}
-}
-
-func (c *codecImpl) decodeMaybeByteSlice(src *bytes.Reader) (maybe.Maybe[[]byte], error) {
-	if minMaybeByteSliceLen > src.Len() {
-		return maybe.Nothing[[]byte](), io.ErrUnexpectedEOF
-	}
-
-	if hasValue, err := c.decodeBool(src); err != nil || !hasValue {
-		return maybe.Nothing[[]byte](), err
-	}
-
-	rawBytes, err := c.decodeByteSlice(src)
-	if err != nil {
-		return maybe.Nothing[[]byte](), err
-	}
-
-	return maybe.Some(rawBytes), nil
-}
-
-func (c *codecImpl) decodeByteSlice(src *bytes.Reader) ([]byte, error) {
-	if minByteSliceLen > src.Len() {
-		return nil, io.ErrUnexpectedEOF
-	}
-
-	length, err := c.decodeUint(src)
-	switch {
-	case err == io.EOF:
-		return nil, io.ErrUnexpectedEOF
-	case err != nil:
-		return nil, err
-	case length == 0:
-		return nil, nil
-	case length > uint64(src.Len()):
-		return nil, io.ErrUnexpectedEOF
-	}
-
-	result := make([]byte, length)
-	_, err = io.ReadFull(src, result)
-	if err == io.EOF {
-		err = io.ErrUnexpectedEOF
-	}
-	return result, err
-}
-
-func (c *codecImpl) encodeByteSlice(dst *bytes.Buffer, value []byte) {
-	c.encodeUint(dst, uint64(len(value)))
-	if value != nil {
-		_, _ = dst.Write(value)
-	}
-}
-
-func (*codecImpl) decodeID(src *bytes.Reader) (ids.ID, error) {
-	if ids.IDLen > src.Len() {
-		return ids.ID{}, io.ErrUnexpectedEOF
-	}
-
-	var id ids.ID
-	_, err := io.ReadFull(src, id[:])
-	if err == io.EOF {
-		err = io.ErrUnexpectedEOF
-	}
-	return id, err
-}
-
-func (c *codecImpl) encodeKey(key Key) []byte {
-	estimatedLen := binary.MaxVarintLen64 + len(key.Bytes())
-	dst := bytes.NewBuffer(make([]byte, 0, estimatedLen))
-	c.encodeKeyToBuffer(dst, key)
-	return dst.Bytes()
-}
-
-func (c *codecImpl) encodeKeyToBuffer(dst *bytes.Buffer, key Key) {
-	c.encodeUint(dst, uint64(key.length))
-	_, _ = dst.Write(key.Bytes())
-}
-
-func (c *codecImpl) decodeKey(b []byte) (Key, error) {
-	src := bytes.NewReader(b)
-	key, err := c.decodeKeyFromReader(src)
+	key, err := r.Key()
 	if err != nil {
 		return Key{}, err
 	}
-	if src.Len() != 0 {
+	if len(r.b) != 0 {
 		return Key{}, errExtraSpace
 	}
-	return key, err
+	return key, nil
 }
 
-func (c *codecImpl) decodeKeyFromReader(src *bytes.Reader) (Key, error) {
-	if minKeyLen > src.Len() {
-		return Key{}, io.ErrUnexpectedEOF
+type codecReader struct {
+	b []byte
+	// copy is used to flag to the reader if it is required to copy references
+	// to [b].
+	copy bool
+}
+
+func (r *codecReader) Bool() (bool, error) {
+	if len(r.b) < boolLen {
+		return false, io.ErrUnexpectedEOF
+	}
+	boolByte := r.b[0]
+	if boolByte > trueByte {
+		return false, errInvalidBool
 	}
 
-	length, err := c.decodeUint(src)
+	r.b = r.b[boolLen:]
+	return boolByte == trueByte, nil
+}
+
+func (r *codecReader) Uvarint() (uint64, error) {
+	length, bytesRead := binary.Uvarint(r.b)
+	if bytesRead <= 0 {
+		return 0, io.ErrUnexpectedEOF
+	}
+
+	// To ensure decoding is canonical, we check for leading zeroes in the
+	// varint.
+	// The last byte of the varint includes the most significant bits.
+	// If the last byte is 0, then the number should have been encoded more
+	// efficiently by removing this leading zero.
+	if bytesRead > 1 && r.b[bytesRead-1] == 0x00 {
+		return 0, errLeadingZeroes
+	}
+
+	r.b = r.b[bytesRead:]
+	return length, nil
+}
+
+func (r *codecReader) ID() (ids.ID, error) {
+	if len(r.b) < ids.IDLen {
+		return ids.Empty, io.ErrUnexpectedEOF
+	}
+	id := ids.ID(r.b[:ids.IDLen])
+
+	r.b = r.b[ids.IDLen:]
+	return id, nil
+}
+
+func (r *codecReader) Bytes() ([]byte, error) {
+	length, err := r.Uvarint()
+	if err != nil {
+		return nil, err
+	}
+
+	if length > uint64(len(r.b)) {
+		return nil, io.ErrUnexpectedEOF
+	}
+	result := r.b[:length]
+	if r.copy {
+		result = bytes.Clone(result)
+	}
+
+	r.b = r.b[length:]
+	return result, nil
+}
+
+func (r *codecReader) MaybeBytes() (maybe.Maybe[[]byte], error) {
+	if hasValue, err := r.Bool(); err != nil || !hasValue {
+		return maybe.Nothing[[]byte](), err
+	}
+
+	bytes, err := r.Bytes()
+	return maybe.Some(bytes), err
+}
+
+func (r *codecReader) Key() (Key, error) {
+	bitLen, err := r.Uvarint()
 	if err != nil {
 		return Key{}, err
 	}
-	if length > math.MaxInt {
+	if bitLen > math.MaxInt {
 		return Key{}, errIntOverflow
 	}
+
 	result := Key{
-		length: int(length),
+		length: int(bitLen),
 	}
-	keyBytesLen := bytesNeeded(result.length)
-	if keyBytesLen > src.Len() {
+	byteLen := bytesNeeded(result.length)
+	if byteLen > len(r.b) {
 		return Key{}, io.ErrUnexpectedEOF
-	}
-	buffer := make([]byte, keyBytesLen)
-	if _, err := io.ReadFull(src, buffer); err != nil {
-		if err == io.EOF {
-			err = io.ErrUnexpectedEOF
-		}
-		return Key{}, err
 	}
 	if result.hasPartialByte() {
 		// Confirm that the padding bits in the partial byte are 0.
-		// We want to only look at the bits to the right of the last token, which is at index length-1.
+		// We want to only look at the bits to the right of the last token,
+		// which is at index length-1.
 		// Generate a mask where the (result.length % 8) left bits are 0.
 		paddingMask := byte(0xFF >> (result.length % 8))
-		if buffer[keyBytesLen-1]&paddingMask != 0 {
+		if r.b[byteLen-1]&paddingMask != 0 {
 			return Key{}, errNonZeroKeyPadding
 		}
 	}
-	result.value = string(buffer)
+	result.value = string(r.b[:byteLen])
+
+	r.b = r.b[byteLen:]
 	return result, nil
 }
