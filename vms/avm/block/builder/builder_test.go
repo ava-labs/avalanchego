@@ -144,6 +144,7 @@ func TestBuilderBuildBlock(t *testing.T) {
 				// Second loop iteration
 				mempool.EXPECT().Peek().Return(nil, false)
 				mempool.EXPECT().RequestBuildBlock()
+				mempool.EXPECT().SetEUpgradeActive()
 
 				return New(
 					&txexecutor.Backend{
@@ -196,6 +197,7 @@ func TestBuilderBuildBlock(t *testing.T) {
 				// Second loop iteration
 				mempool.EXPECT().Peek().Return(nil, false)
 				mempool.EXPECT().RequestBuildBlock()
+				mempool.EXPECT().SetEUpgradeActive()
 
 				return New(
 					&txexecutor.Backend{
@@ -249,6 +251,7 @@ func TestBuilderBuildBlock(t *testing.T) {
 				// Second loop iteration
 				mempool.EXPECT().Peek().Return(nil, false)
 				mempool.EXPECT().RequestBuildBlock()
+				mempool.EXPECT().SetEUpgradeActive()
 
 				return New(
 					&txexecutor.Backend{
@@ -341,6 +344,7 @@ func TestBuilderBuildBlock(t *testing.T) {
 				// Third loop iteration
 				mempool.EXPECT().Peek().Return(nil, false)
 				mempool.EXPECT().RequestBuildBlock()
+				mempool.EXPECT().SetEUpgradeActive()
 
 				// To marshal the tx/block
 				codec := codec.NewMockManager(ctrl)
@@ -420,6 +424,7 @@ func TestBuilderBuildBlock(t *testing.T) {
 				// Second loop iteration
 				mempool.EXPECT().Peek().Return(nil, false)
 				mempool.EXPECT().RequestBuildBlock()
+				mempool.EXPECT().SetEUpgradeActive()
 
 				// To marshal the tx/block
 				codec := codec.NewMockManager(ctrl)
@@ -501,6 +506,7 @@ func TestBuilderBuildBlock(t *testing.T) {
 				// Second loop iteration
 				mempool.EXPECT().Peek().Return(nil, false)
 				mempool.EXPECT().RequestBuildBlock()
+				mempool.EXPECT().SetEUpgradeActive()
 
 				// To marshal the tx/block
 				codec := codec.NewMockManager(ctrl)

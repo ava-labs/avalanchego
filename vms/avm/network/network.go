@@ -207,7 +207,9 @@ func (n *Network) IssueTxFromRPC(tx *txs.Tx) error {
 // returned.
 // If the tx is not added to the mempool, an error will be returned.
 func (n *Network) IssueTxFromRPCWithoutVerification(tx *txs.Tx) error {
-	// TODO ABENEGIA: FIX FEE PERCENTAGE
+	// TODO fix: since we issue these txs without verification, we don't calculate
+	// their tip, so we assign them zero tip. Consider finding ways to partially
+	// validate them, just enough extract the tip.
 	if err := n.mempool.AddWithoutVerification(tx, commonfees.NoTip); err != nil {
 		return err
 	}

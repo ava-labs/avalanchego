@@ -97,6 +97,14 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 		feesCfg   = config.GetDynamicFeesConfig(isEActive)
 	)
 
+	if isEActive {
+		// we lazily inform the mempool that the E upgrade has been activated.
+		// Lazily since we don't inform the mempool as soon as the first block
+		// post E upgrade has been accepted; instead we wait for the next block
+		// build.
+		b.mempool.SetEUpgradeActive()
+	}
+
 	feeManager, err := fees.UpdatedFeeManager(stateDiff, b.backend.Config, parentBlkTime, nextBlkTime)
 	if err != nil {
 		return nil, err

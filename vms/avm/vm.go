@@ -423,6 +423,10 @@ func (vm *VM) Linearize(ctx context.Context, stopVertexID ids.ID, toEngine chan<
 		return fmt.Errorf("failed to create mempool: %w", err)
 	}
 
+	if vm.Config.IsEActivated(vm.state.GetTimestamp()) {
+		mempool.SetEUpgradeActive()
+	}
+
 	vm.chainManager = blockexecutor.NewManager(
 		mempool,
 		vm.metrics,
