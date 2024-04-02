@@ -391,17 +391,17 @@ func TestGenesis(t *testing.T) {
 			// As such we need to account for the subnet creation fee
 			var (
 				chainTime = vm.state.GetTimestamp()
-				feeCfg    = config.GetDynamicFeesConfig(vm.Config.IsEActivated(chainTime))
-				feeMan    = commonfees.NewManager(feeCfg.FeeRate)
-				feeCalc   = &fees.Calculator{
-					IsEActive:          vm.IsEActivated(chainTime),
-					Config:             &vm.Config,
-					ChainTime:          chainTime,
-					FeeManager:         feeMan,
-					BlockMaxComplexity: feeCfg.BlockMaxComplexity,
-					Credentials:        testSubnet1.Creds,
-				}
+
+				feeCalc *fees.Calculator
 			)
+
+			if !vm.IsEActivated(chainTime) {
+				feeCalc = fees.NewStaticCalculator(&vm.Config, chainTime)
+			} else {
+				feeCfg := config.GetDynamicFeesConfig(vm.Config.IsEActivated(chainTime))
+				feeMan := commonfees.NewManager(feeCfg.FeeRate)
+				feeCalc = fees.NewDynamicCalculator(&vm.Config, feeMan, feeCfg.BlockMaxComplexity, testSubnet1.Creds)
+			}
 
 			require.NoError(testSubnet1.Unsigned.Visit(feeCalc))
 			require.Equal(uint64(utxo.Amount)-feeCalc.Fee, out.Amount())
@@ -2362,17 +2362,17 @@ func TestBaseTx(t *testing.T) {
 
 	var (
 		chainTime = vm.state.GetTimestamp()
-		feeCfg    = config.GetDynamicFeesConfig(vm.Config.IsEActivated(chainTime))
-		feeMan    = commonfees.NewManager(feeCfg.FeeRate)
-		feeCalc   = &fees.Calculator{
-			IsEActive:          vm.IsEActivated(chainTime),
-			Config:             &vm.Config,
-			ChainTime:          chainTime,
-			FeeManager:         feeMan,
-			BlockMaxComplexity: feeCfg.BlockMaxComplexity,
-			Credentials:        baseTx.Creds,
-		}
+
+		feeCalc *fees.Calculator
 	)
+
+	if !vm.IsEActivated(chainTime) {
+		feeCalc = fees.NewStaticCalculator(&vm.Config, chainTime)
+	} else {
+		feeCfg := config.GetDynamicFeesConfig(vm.Config.IsEActivated(chainTime))
+		feeMan := commonfees.NewManager(feeCfg.FeeRate)
+		feeCalc = fees.NewDynamicCalculator(&vm.Config, feeMan, feeCfg.BlockMaxComplexity, baseTx.Creds)
+	}
 
 	require.NoError(baseTx.Unsigned.Visit(feeCalc))
 	require.Equal(feeCalc.Fee, totalInputAmt-totalOutputAmt)
