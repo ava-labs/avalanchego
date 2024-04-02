@@ -320,8 +320,8 @@ func (v *view) hashChangedNode(n *node) ids.ID {
 	)
 
 	if bytesForKey > 0 {
-		// We can just copy this node's key once. It doesn't change as we
-		// iterate over the children.
+		// We only need to copy this node's key once because it does not change
+		// as we iterate over the children.
 		copy(keyBuffer, n.key.value)
 		lastKeyByte = keyBuffer[bytesForKey-1]
 	}
