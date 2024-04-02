@@ -29,12 +29,16 @@ import (
 var (
 	subnetAName = "xsvm-a"
 	subnetBName = "xsvm-b"
-
-	XSVMSubnetA = newXSVMSubnet(subnetAName)
-	XSVMSubnetB = newXSVMSubnet(subnetBName)
 )
 
-var _ = e2e.DescribePChain("[XSVM]", func() {
+func XSVMSubnets(nodes ...*tmpnet.Node) []*tmpnet.Subnet {
+	return []*tmpnet.Subnet{
+		newXSVMSubnet(subnetAName, nodes...),
+		newXSVMSubnet(subnetBName, nodes...),
+	}
+}
+
+var _ = ginkgo.Describe("[XSVM]", func() {
 	require := require.New(ginkgo.GinkgoT())
 
 	ginkgo.It("should support transfers between subnets", func() {
@@ -122,7 +126,11 @@ var _ = e2e.DescribePChain("[XSVM]", func() {
 	})
 })
 
-func newXSVMSubnet(name string) *tmpnet.Subnet {
+func newXSVMSubnet(name string, nodes ...*tmpnet.Node) *tmpnet.Subnet {
+	if len(nodes) == 0 {
+		panic("a subnet must be validated by at least one node")
+	}
+
 	key, err := secp256k1.NewPrivateKey()
 	if err != nil {
 		panic(err)
@@ -150,5 +158,6 @@ func newXSVMSubnet(name string) *tmpnet.Subnet {
 				PreFundedKey: key,
 			},
 		},
+		ValidatorIDs: tmpnet.NodesToIDs(nodes...),
 	}
 }

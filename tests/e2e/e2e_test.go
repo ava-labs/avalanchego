@@ -8,6 +8,8 @@ import (
 
 	"github.com/onsi/gomega"
 
+	"github.com/stretchr/testify/require"
+
 	// ensure test packages are scanned by ginkgo
 	_ "github.com/ava-labs/avalanchego/tests/e2e/banff"
 	_ "github.com/ava-labs/avalanchego/tests/e2e/c"
@@ -36,14 +38,18 @@ func init() {
 
 var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	// Run only once in the first ginkgo process
+
+	nodes, err := tmpnet.NewNodes(tmpnet.DefaultNodeCount)
+	require.NoError(ginkgo.GinkgoT(), err)
+
+	subnets := vms.XSVMSubnets(nodes...)
+
 	return e2e.NewTestEnvironment(
 		flagVars,
 		&tmpnet.Network{
-			Owner: "avalanchego-e2e",
-			Subnets: []*tmpnet.Subnet{
-				vms.XSVMSubnetA,
-				vms.XSVMSubnetB,
-			},
+			Owner:   "avalanchego-e2e",
+			Nodes:   nodes,
+			Subnets: subnets,
 		},
 	).Marshal()
 }, func(envBytes []byte) {
