@@ -5,6 +5,7 @@ package merkledb
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/binary"
 	"errors"
 	"io"
@@ -28,11 +29,6 @@ const (
 	minByteSliceLen      = minVarIntLen
 	minDBNodeLen         = minMaybeByteSliceLen + minVarIntLen
 	minChildLen          = minVarIntLen + minKeyLen + ids.IDLen + boolLen
-
-	estimatedKeyLen   = 64
-	estimatedValueLen = 64
-	// Child index, child ID
-	hashValuesChildLen = minVarIntLen + ids.IDLen
 )
 
 var (
@@ -47,8 +43,8 @@ var (
 	errIntOverflow        = errors.New("value overflows int")
 )
 
-// Note that bytes.Buffer.Write always returns nil, so we ignore its return
-// values in all encode methods.
+// Note that sha256.Write and bytes.Buffer.Write always returns nil, so we
+// ignore their return values.
 
 func childSize(index byte, childEntry *child) int {
 	// * index
@@ -88,6 +84,56 @@ func encodedDBNodeSize(n *dbNode) int {
 	return size
 }
 
+// Returns the canonical hash of [n].
+//
+// Assumes [n] is non-nil.
+// This method is performance critical. It is not expected to perform any memory
+// allocations.
+func hashNode(n *node) ids.ID {
+	var (
+		sha  = sha256.New()
+		hash ids.ID
+		// The hash length is larger than the maximum Uvarint length. This
+		// ensures binary.AppendUvarint doesn't perform any memory allocations.
+		emptyHashBuffer = hash[:0]
+	)
+
+	// By directly calling sha.Write rather than passing sha around as an
+	// io.Writer, the compiler can perform sufficient escape analysis to avoid
+	// allocating buffers on the heap.
+	_, _ = sha.Write(binary.AppendUvarint(emptyHashBuffer, uint64(len(n.children))))
+
+	// By allocating BranchFactorLargest rather than len(n.children), this slice
+	// is allocated on the stack rather than the heap. BranchFactorLargest is
+	// at least len(n.children) which avoids memory allocations.
+	keys := make([]byte, 0, BranchFactorLargest)
+	for k := range n.children {
+		keys = append(keys, k)
+	}
+
+	// Ensure that the order of entries is correct.
+	slices.Sort(keys)
+	for _, index := range keys {
+		entry := n.children[index]
+		_, _ = sha.Write(binary.AppendUvarint(emptyHashBuffer, uint64(index)))
+		_, _ = sha.Write(entry.id[:])
+	}
+
+	if n.valueDigest.HasValue() {
+		_, _ = sha.Write(trueBytes)
+		value := n.valueDigest.Value()
+		_, _ = sha.Write(binary.AppendUvarint(emptyHashBuffer, uint64(len(value))))
+		_, _ = sha.Write(value)
+	} else {
+		_, _ = sha.Write(falseBytes)
+	}
+
+	_, _ = sha.Write(binary.AppendUvarint(emptyHashBuffer, uint64(n.key.length)))
+	_, _ = sha.Write(n.key.Bytes())
+	sha.Sum(emptyHashBuffer)
+	return hash
+}
+
 // Assumes [n] is non-nil.
 func encodeDBNode(n *dbNode) []byte {
 	buf := bytes.NewBuffer(make([]byte, 0, encodedDBNodeSize(n)))
@@ -104,32 +150,6 @@ func encodeDBNode(n *dbNode) []byte {
 		_, _ = buf.Write(entry.id[:])
 		encodeBool(buf, entry.hasValue)
 	}
-	return buf.Bytes()
-}
-
-// Returns the bytes that will be hashed to generate [n]'s ID.
-// Assumes [n] is non-nil.
-func encodeHashValues(n *node) []byte {
-	var (
-		numChildren = len(n.children)
-		// Estimate size [hv] to prevent memory allocations
-		estimatedLen = minVarIntLen + numChildren*hashValuesChildLen + estimatedValueLen + estimatedKeyLen
-		buf          = bytes.NewBuffer(make([]byte, 0, estimatedLen))
-	)
-
-	encodeUint(buf, uint64(numChildren))
-
-	// ensure that the order of entries is consistent
-	keys := maps.Keys(n.children)
-	slices.Sort(keys)
-	for _, index := range keys {
-		entry := n.children[index]
-		encodeUint(buf, uint64(index))
-		_, _ = buf.Write(entry.id[:])
-	}
-	encodeMaybeByteSlice(buf, n.valueDigest)
-	encodeKeyToBuffer(buf, n.key)
-
 	return buf.Bytes()
 }
 
@@ -215,6 +235,12 @@ func decodeBool(src *bytes.Reader) (bool, error) {
 	}
 }
 
+func encodeUint(dst *bytes.Buffer, value uint64) {
+	var buf [binary.MaxVarintLen64]byte
+	size := binary.PutUvarint(buf[:], value)
+	_, _ = dst.Write(buf[:size])
+}
+
 func decodeUint(src *bytes.Reader) (uint64, error) {
 	// To ensure encoding/decoding is canonical, we need to check for leading
 	// zeroes in the varint.
@@ -248,12 +274,6 @@ func decodeUint(src *bytes.Reader) (uint64, error) {
 	return val64, nil
 }
 
-func encodeUint(dst *bytes.Buffer, value uint64) {
-	var buf [binary.MaxVarintLen64]byte
-	size := binary.PutUvarint(buf[:], value)
-	_, _ = dst.Write(buf[:size])
-}
-
 func encodeMaybeByteSlice(dst *bytes.Buffer, maybeValue maybe.Maybe[[]byte]) {
 	hasValue := maybeValue.HasValue()
 	encodeBool(dst, hasValue)
@@ -279,6 +299,13 @@ func decodeMaybeByteSlice(src *bytes.Reader) (maybe.Maybe[[]byte], error) {
 	return maybe.Some(rawBytes), nil
 }
 
+func encodeByteSlice(dst *bytes.Buffer, value []byte) {
+	encodeUint(dst, uint64(len(value)))
+	if value != nil {
+		_, _ = dst.Write(value)
+	}
+}
+
 func decodeByteSlice(src *bytes.Reader) ([]byte, error) {
 	if minByteSliceLen > src.Len() {
 		return nil, io.ErrUnexpectedEOF
@@ -302,13 +329,6 @@ func decodeByteSlice(src *bytes.Reader) ([]byte, error) {
 		err = io.ErrUnexpectedEOF
 	}
 	return result, err
-}
-
-func encodeByteSlice(dst *bytes.Buffer, value []byte) {
-	encodeUint(dst, uint64(len(value)))
-	if value != nil {
-		_, _ = dst.Write(value)
-	}
 }
 
 func decodeID(src *bytes.Reader) (ids.ID, error) {
