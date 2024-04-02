@@ -178,8 +178,8 @@ func TestCodecDecodeDBNode_TooShort(t *testing.T) {
 	require.ErrorIs(err, io.ErrUnexpectedEOF)
 }
 
-// Ensure that encodeHashValues is deterministic
-func FuzzEncodeHashValues(f *testing.F) {
+// Ensure that hashNode is deterministic
+func FuzzHashNode(f *testing.F) {
 	f.Fuzz(
 		func(
 			t *testing.T,
@@ -222,15 +222,92 @@ func FuzzEncodeHashValues(f *testing.F) {
 					},
 				}
 
-				// Serialize hv multiple times
-				hvBytes1 := encodeHashValues(hv)
-				hvBytes2 := encodeHashValues(hv)
+				// Hash hv multiple times
+				hash1 := hashNode(hv)
+				hash2 := hashNode(hv)
 
 				// Make sure they're the same
-				require.Equal(hvBytes1, hvBytes2)
+				require.Equal(hash1, hash2)
 			}
 		},
 	)
+}
+
+func TestHashNode(t *testing.T) {
+	tests := []struct {
+		name         string
+		n            *node
+		expectedHash string
+	}{
+		{
+			name:         "empty node",
+			n:            newNode(Key{}),
+			expectedHash: "rbhtxoQ1DqWHvb6w66BZdVyjmPAneZUSwQq9uKj594qvFSdav",
+		},
+		{
+			name: "has value",
+			n: func() *node {
+				n := newNode(Key{})
+				n.setValue(maybe.Some([]byte("value1")))
+				return n
+			}(),
+			expectedHash: "2vx2xueNdWoH2uB4e8hbMU5jirtZkZ1c3ePCWDhXYaFRHpCbnQ",
+		},
+		{
+			name:         "has key",
+			n:            newNode(ToKey([]byte{0, 1, 2, 3, 4, 5, 6, 7})),
+			expectedHash: "2vA8ggXajhFEcgiF8zHTXgo8T2ALBFgffp1xfn48JEni1Uj5uK",
+		},
+		{
+			name: "1 child",
+			n: func() *node {
+				n := newNode(Key{})
+				childNode := newNode(ToKey([]byte{255}))
+				childNode.setValue(maybe.Some([]byte("value1")))
+				n.addChildWithID(childNode, 4, hashNode(childNode))
+				return n
+			}(),
+			expectedHash: "YfJRufqUKBv9ez6xZx6ogpnfDnw9fDsyebhYDaoaH57D3vRu3",
+		},
+		{
+			name: "2 children",
+			n: func() *node {
+				n := newNode(Key{})
+
+				childNode1 := newNode(ToKey([]byte{255}))
+				childNode1.setValue(maybe.Some([]byte("value1")))
+
+				childNode2 := newNode(ToKey([]byte{237}))
+				childNode2.setValue(maybe.Some([]byte("value2")))
+
+				n.addChildWithID(childNode1, 4, hashNode(childNode1))
+				n.addChildWithID(childNode2, 4, hashNode(childNode2))
+				return n
+			}(),
+			expectedHash: "YVmbx5MZtSKuYhzvHnCqGrswQcxmozAkv7xE1vTA2EiGpWUkv",
+		},
+		{
+			name: "16 children",
+			n: func() *node {
+				n := newNode(Key{})
+
+				for i := byte(0); i < 16; i++ {
+					childNode := newNode(ToKey([]byte{i << 4}))
+					childNode.setValue(maybe.Some([]byte("some value")))
+
+					n.addChildWithID(childNode, 4, hashNode(childNode))
+				}
+				return n
+			}(),
+			expectedHash: "5YiFLL7QV3f441See9uWePi3wVKsx9fgvX5VPhU8PRxtLqhwY",
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			hash := hashNode(test.n)
+			require.Equal(t, test.expectedHash, hash.String())
+		})
+	}
 }
 
 func TestCodecDecodeKeyLengthOverflowRegression(t *testing.T) {
@@ -255,6 +332,77 @@ func TestUintSize(t *testing.T) {
 		expectedSize := uintSize(n)
 		actualSize := binary.PutUvarint(make([]byte, binary.MaxVarintLen64), n)
 		require.Equal(t, expectedSize, actualSize, power)
+	}
+}
+
+func Benchmark_HashNode(b *testing.B) {
+	benchmarks := []struct {
+		name string
+		n    *node
+	}{
+		{
+			name: "empty node",
+			n:    newNode(Key{}),
+		},
+		{
+			name: "has value",
+			n: func() *node {
+				n := newNode(Key{})
+				n.setValue(maybe.Some([]byte("value1")))
+				return n
+			}(),
+		},
+		{
+			name: "has key",
+			n:    newNode(ToKey([]byte{0, 1, 2, 3, 4, 5, 6, 7})),
+		},
+		{
+			name: "1 child",
+			n: func() *node {
+				n := newNode(Key{})
+				childNode := newNode(ToKey([]byte{255}))
+				childNode.setValue(maybe.Some([]byte("value1")))
+				n.addChildWithID(childNode, 4, hashNode(childNode))
+				return n
+			}(),
+		},
+		{
+			name: "2 children",
+			n: func() *node {
+				n := newNode(Key{})
+
+				childNode1 := newNode(ToKey([]byte{255}))
+				childNode1.setValue(maybe.Some([]byte("value1")))
+
+				childNode2 := newNode(ToKey([]byte{237}))
+				childNode2.setValue(maybe.Some([]byte("value2")))
+
+				n.addChildWithID(childNode1, 4, hashNode(childNode1))
+				n.addChildWithID(childNode2, 4, hashNode(childNode2))
+				return n
+			}(),
+		},
+		{
+			name: "16 children",
+			n: func() *node {
+				n := newNode(Key{})
+
+				for i := byte(0); i < 16; i++ {
+					childNode := newNode(ToKey([]byte{i << 4}))
+					childNode.setValue(maybe.Some([]byte("some value")))
+
+					n.addChildWithID(childNode, 4, hashNode(childNode))
+				}
+				return n
+			}(),
+		},
+	}
+	for _, benchmark := range benchmarks {
+		b.Run(benchmark.name, func(b *testing.B) {
+			for i := 0; i < b.N; i++ {
+				hashNode(benchmark.n)
+			}
+		})
 	}
 }
 
