@@ -93,14 +93,14 @@ impl Proposal {
                 BatchOp::Put { key, value } => {
                     let (header, merkle) = rev.borrow_split();
                     merkle
-                        .insert(key, value.as_ref().to_vec(), header.kv_root)
+                        .insert(key, value.as_ref().to_vec(), header.sentinel_addr)
                         .map_err(DbError::Merkle)?;
                     Ok(())
                 }
                 BatchOp::Delete { key } => {
                     let (header, merkle) = rev.borrow_split();
                     merkle
-                        .remove(key, header.kv_root)
+                        .remove(key, header.sentinel_addr)
                         .map_err(DbError::Merkle)?;
                     Ok(())
                 }

@@ -115,7 +115,7 @@ fn bench_merkle<const N: usize>(criterion: &mut Criterion) {
 
                     let merkle = MerkleWithEncoder::new(store);
                     #[allow(clippy::unwrap_used)]
-                    let root = merkle.init_root().unwrap();
+                    let sentinel_addr = merkle.init_sentinel().unwrap();
 
                     let keys: Vec<Vec<u8>> = repeat_with(|| {
                         (&mut rng)
@@ -126,12 +126,12 @@ fn bench_merkle<const N: usize>(criterion: &mut Criterion) {
                     .take(N)
                     .collect();
 
-                    (merkle, root, keys)
+                    (merkle, sentinel_addr, keys)
                 },
                 #[allow(clippy::unwrap_used)]
-                |(mut merkle, root, keys)| {
+                |(mut merkle, sentinel_addr, keys)| {
                     keys.into_iter()
-                        .for_each(|key| merkle.insert(key, vec![b'v'], root).unwrap())
+                        .for_each(|key| merkle.insert(key, vec![b'v'], sentinel_addr).unwrap())
                 },
                 BatchSize::SmallInput,
             );

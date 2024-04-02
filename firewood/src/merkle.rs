@@ -179,7 +179,8 @@ where
 }
 
 impl<S: LinearStore, T> Merkle<S, T> {
-    pub fn init_root(&self) -> Result<DiskAddress, MerkleError> {
+    /// Creates the sentinel node, puts it into the store, and returns its address.
+    pub fn init_sentinel(&self) -> Result<DiskAddress, MerkleError> {
         self.store
             .put_item(
                 Node::from_branch(BranchNode {
@@ -207,9 +208,9 @@ impl<S: LinearStore, T> Merkle<S, T> {
         })
     }
 
-    pub fn root_hash(&self, sentinel: DiskAddress) -> Result<TrieHash, MerkleError> {
+    pub fn root_hash(&self, sentinel_addr: DiskAddress) -> Result<TrieHash, MerkleError> {
         let root = self
-            .get_node(sentinel)?
+            .get_node(sentinel_addr)?
             .inner
             .as_branch()
             .ok_or(MerkleError::NotBranchNode)?
@@ -252,11 +253,11 @@ impl<S: LinearStore, T> Merkle<S, T> {
         Ok(())
     }
 
-    pub fn dump(&self, root: DiskAddress, w: &mut dyn Write) -> Result<(), MerkleError> {
-        if root.is_null() {
+    pub fn dump(&self, sentinel_addr: DiskAddress, w: &mut dyn Write) -> Result<(), MerkleError> {
+        if sentinel_addr.is_null() {
             write!(w, "<Empty>")?;
         } else {
-            self.dump_(root, w)?;
+            self.dump_(sentinel_addr, w)?;
         };
         Ok(())
     }
@@ -265,9 +266,9 @@ impl<S: LinearStore, T> Merkle<S, T> {
         &mut self,
         key: K,
         val: Vec<u8>,
-        root: DiskAddress,
+        sentinel_addr: DiskAddress,
     ) -> Result<(), MerkleError> {
-        let (parents, deleted) = self.insert_and_return_updates(key, val, root)?;
+        let (parents, deleted) = self.insert_and_return_updates(key, val, sentinel_addr)?;
 
         for mut r in parents {
             r.write(|u| u.rehash())?;
@@ -284,7 +285,7 @@ impl<S: LinearStore, T> Merkle<S, T> {
         &self,
         key: K,
         val: Vec<u8>,
-        root: DiskAddress,
+        sentinel_addr: DiskAddress,
     ) -> Result<(impl Iterator<Item = NodeObjRef>, Vec<DiskAddress>), MerkleError> {
         // as we split a node, we need to track deleted nodes and parents
         let mut deleted = Vec::new();
@@ -295,7 +296,7 @@ impl<S: LinearStore, T> Merkle<S, T> {
         // and always only has one child
         let mut key_nibbles = Nibbles::<1>::new(key.as_ref()).into_iter();
 
-        let mut node = self.get_node(root)?;
+        let mut node = self.get_node(sentinel_addr)?;
 
         // walk down the merkle tree starting from next_node, currently the root
         // return None if the value is inserted
@@ -676,9 +677,9 @@ impl<S: LinearStore, T> Merkle<S, T> {
     pub fn remove<K: AsRef<[u8]>>(
         &mut self,
         key: K,
-        root: DiskAddress,
+        sentinel_addr: DiskAddress,
     ) -> Result<Option<Vec<u8>>, MerkleError> {
-        if root.is_null() {
+        if sentinel_addr.is_null() {
             return Ok(None);
         }
 
@@ -686,7 +687,7 @@ impl<S: LinearStore, T> Merkle<S, T> {
 
         let value = {
             let (node, mut parents) =
-                self.get_node_and_parents_by_key(self.get_node(root)?, key)?;
+                self.get_node_and_parents_by_key(self.get_node(sentinel_addr)?, key)?;
 
             let Some(mut node) = node else {
                 return Ok(None);
@@ -864,12 +865,12 @@ impl<S: LinearStore, T> Merkle<S, T> {
         Ok(())
     }
 
-    pub fn remove_tree(&mut self, root: DiskAddress) -> Result<(), MerkleError> {
+    pub fn remove_tree(&mut self, sentinel_addr: DiskAddress) -> Result<(), MerkleError> {
         let mut deleted = Vec::new();
-        if root.is_null() {
+        if sentinel_addr.is_null() {
             return Ok(());
         }
-        self.remove_tree_(root, &mut deleted)?;
+        self.remove_tree_(sentinel_addr, &mut deleted)?;
         for ptr in deleted.into_iter() {
             self.free_node(ptr)?;
         }
@@ -1023,14 +1024,14 @@ impl<S: LinearStore, T> Merkle<S, T> {
     pub fn get_mut<K: AsRef<[u8]>>(
         &mut self,
         key: K,
-        root: DiskAddress,
+        sentinel_addr: DiskAddress,
     ) -> Result<Option<RefMut<S, T>>, MerkleError> {
-        if root.is_null() {
+        if sentinel_addr.is_null() {
             return Ok(None);
         }
 
         let (ptr, parents) = {
-            let root_node = self.get_node(root)?;
+            let root_node = self.get_node(sentinel_addr)?;
             let (node_ref, parents) = self.get_node_and_parent_addresses_by_key(root_node, key)?;
 
             (node_ref.map(|n| n.into_ptr()), parents)
@@ -1046,16 +1047,20 @@ impl<S: LinearStore, T> Merkle<S, T> {
     /// If the trie does not contain a value for key, the returned proof contains
     /// all nodes of the longest existing prefix of the key, ending with the node
     /// that proves the absence of the key (at least the root node).
-    pub fn prove<K>(&self, key: K, root: DiskAddress) -> Result<Proof<Vec<u8>>, MerkleError>
+    pub fn prove<K>(
+        &self,
+        key: K,
+        sentinel_addr: DiskAddress,
+    ) -> Result<Proof<Vec<u8>>, MerkleError>
     where
         K: AsRef<[u8]>,
     {
         let mut proofs = HashMap::new();
-        if root.is_null() {
+        if sentinel_addr.is_null() {
             return Ok(Proof(proofs));
         }
 
-        let sentinel_node = self.get_node(root)?;
+        let sentinel_node = self.get_node(sentinel_addr)?;
 
         let path_iter = self.path_iter(sentinel_node, key.as_ref());
 
@@ -1075,13 +1080,13 @@ impl<S: LinearStore, T> Merkle<S, T> {
     pub fn get<K: AsRef<[u8]>>(
         &self,
         key: K,
-        root: DiskAddress,
+        sentinel_addr: DiskAddress,
     ) -> Result<Option<Ref>, MerkleError> {
-        if root.is_null() {
+        if sentinel_addr.is_null() {
             return Ok(None);
         }
 
-        let root_node = self.get_node(root)?;
+        let root_node = self.get_node(sentinel_addr)?;
         let node_ref = self.get_node_by_key(root_node, key)?;
 
         Ok(node_ref.map(Ref))
@@ -1099,21 +1104,24 @@ impl<S: LinearStore, T> Merkle<S, T> {
         PathIterator::new(self, sentinel_node, key)
     }
 
-    pub(crate) fn key_value_iter(&self, root: DiskAddress) -> MerkleKeyValueStream<'_, S, T> {
-        MerkleKeyValueStream::new(self, root)
+    pub(crate) fn key_value_iter(
+        &self,
+        sentinel_addr: DiskAddress,
+    ) -> MerkleKeyValueStream<'_, S, T> {
+        MerkleKeyValueStream::new(self, sentinel_addr)
     }
 
     pub(crate) fn key_value_iter_from_key(
         &self,
-        root: DiskAddress,
+        sentinel_addr: DiskAddress,
         key: Key,
     ) -> MerkleKeyValueStream<'_, S, T> {
-        MerkleKeyValueStream::from_key(self, root, key)
+        MerkleKeyValueStream::from_key(self, sentinel_addr, key)
     }
 
     pub(super) async fn range_proof<K: api::KeyType + Send + Sync>(
         &self,
-        root: DiskAddress,
+        sentinel_addr: DiskAddress,
         first_key: Option<K>,
         last_key: Option<K>,
         limit: Option<usize>,
@@ -1134,10 +1142,9 @@ impl<S: LinearStore, T> Merkle<S, T> {
 
         let mut stream = match first_key {
             // TODO: fix the call-site to force the caller to do the allocation
-            Some(key) => {
-                self.key_value_iter_from_key(root, key.as_ref().to_vec().into_boxed_slice())
-            }
-            None => self.key_value_iter(root),
+            Some(key) => self
+                .key_value_iter_from_key(sentinel_addr, key.as_ref().to_vec().into_boxed_slice()),
+            None => self.key_value_iter(sentinel_addr),
         };
 
         // fetch the first key from the stream
@@ -1151,7 +1158,7 @@ impl<S: LinearStore, T> Merkle<S, T> {
         };
 
         let first_key_proof = self
-            .prove(&first_key, root)
+            .prove(&first_key, sentinel_addr)
             .map_err(|e| api::Error::InternalError(Box::new(e)))?;
         let limit = limit.map(|old_limit| old_limit - 1);
 
@@ -1192,7 +1199,7 @@ impl<S: LinearStore, T> Merkle<S, T> {
                 }))
             }
             Some((last_key, _)) => self
-                .prove(last_key, root)
+                .prove(last_key, sentinel_addr)
                 .map_err(|e| api::Error::InternalError(Box::new(e)))?,
         };
 
@@ -1542,11 +1549,11 @@ mod tests {
         let val = b"world";
 
         let mut merkle = create_test_merkle();
-        let root = merkle.init_root().unwrap();
+        let sentinel_addr = merkle.init_sentinel().unwrap();
 
-        merkle.insert(key, val.to_vec(), root).unwrap();
+        merkle.insert(key, val.to_vec(), sentinel_addr).unwrap();
 
-        let fetched_val = merkle.get(key, root).unwrap();
+        let fetched_val = merkle.get(key, sentinel_addr).unwrap();
 
         assert_eq!(fetched_val.as_deref(), val.as_slice().into());
     }
@@ -1554,16 +1561,16 @@ mod tests {
     #[test]
     fn insert_and_retrieve_multiple() {
         let mut merkle = create_test_merkle();
-        let root = merkle.init_root().unwrap();
+        let sentinel_addr = merkle.init_sentinel().unwrap();
 
         // insert values
         for key_val in u8::MIN..=u8::MAX {
             let key = vec![key_val];
             let val = vec![key_val];
 
-            merkle.insert(&key, val.clone(), root).unwrap();
+            merkle.insert(&key, val.clone(), sentinel_addr).unwrap();
 
-            let fetched_val = merkle.get(&key, root).unwrap();
+            let fetched_val = merkle.get(&key, sentinel_addr).unwrap();
 
             // make sure the value was inserted
             assert_eq!(fetched_val.as_deref(), val.as_slice().into());
@@ -1574,7 +1581,7 @@ mod tests {
             let key = vec![key_val];
             let val = vec![key_val];
 
-            let fetched_val = merkle.get(&key, root).unwrap();
+            let fetched_val = merkle.get(&key, sentinel_addr).unwrap();
 
             assert_eq!(fetched_val.as_deref(), val.as_slice().into());
         }
@@ -1617,18 +1624,18 @@ mod tests {
         ];
 
         let mut merkle = create_test_merkle();
-        let root = merkle.init_root().unwrap();
+        let sentinel_addr = merkle.init_sentinel().unwrap();
 
         for (key, val) in &key_val {
-            merkle.insert(key, val.to_vec(), root).unwrap();
+            merkle.insert(key, val.to_vec(), sentinel_addr).unwrap();
 
-            let fetched_val = merkle.get(key, root).unwrap();
+            let fetched_val = merkle.get(key, sentinel_addr).unwrap();
 
             assert_eq!(fetched_val.as_deref(), val.as_slice().into());
         }
 
         for (key, val) in key_val {
-            let fetched_val = merkle.get(key, root).unwrap();
+            let fetched_val = merkle.get(key, sentinel_addr).unwrap();
 
             assert_eq!(fetched_val.as_deref(), val.as_slice().into());
         }
@@ -1640,35 +1647,35 @@ mod tests {
         let val = b"world";
 
         let mut merkle = create_test_merkle();
-        let root = merkle.init_root().unwrap();
+        let sentinel_addr = merkle.init_sentinel().unwrap();
 
-        merkle.insert(key, val.to_vec(), root).unwrap();
+        merkle.insert(key, val.to_vec(), sentinel_addr).unwrap();
 
         assert_eq!(
-            merkle.get(key, root).unwrap().as_deref(),
+            merkle.get(key, sentinel_addr).unwrap().as_deref(),
             val.as_slice().into()
         );
 
-        let removed_val = merkle.remove(key, root).unwrap();
+        let removed_val = merkle.remove(key, sentinel_addr).unwrap();
         assert_eq!(removed_val.as_deref(), val.as_slice().into());
 
-        let fetched_val = merkle.get(key, root).unwrap();
+        let fetched_val = merkle.get(key, sentinel_addr).unwrap();
         assert!(fetched_val.is_none());
     }
 
     #[test]
     fn remove_many() {
         let mut merkle = create_test_merkle();
-        let root = merkle.init_root().unwrap();
+        let sentinel_addr = merkle.init_sentinel().unwrap();
 
         // insert values
         for key_val in u8::MIN..=u8::MAX {
             let key = &[key_val];
             let val = &[key_val];
 
-            merkle.insert(key, val.to_vec(), root).unwrap();
+            merkle.insert(key, val.to_vec(), sentinel_addr).unwrap();
 
-            let fetched_val = merkle.get(key, root).unwrap();
+            let fetched_val = merkle.get(key, sentinel_addr).unwrap();
 
             // make sure the value was inserted
             assert_eq!(fetched_val.as_deref(), val.as_slice().into());
@@ -1679,13 +1686,13 @@ mod tests {
             let key = &[key_val];
             let val = &[key_val];
 
-            let Ok(removed_val) = merkle.remove(key, root) else {
+            let Ok(removed_val) = merkle.remove(key, sentinel_addr) else {
                 panic!("({key_val}, {key_val}) missing");
             };
 
             assert_eq!(removed_val.as_deref(), val.as_slice().into());
 
-            let fetched_val = merkle.get(key, root).unwrap();
+            let fetched_val = merkle.get(key, sentinel_addr).unwrap();
             assert!(fetched_val.is_none());
         }
     }
@@ -1693,9 +1700,9 @@ mod tests {
     #[test]
     fn get_empty_proof() {
         let merkle = create_test_merkle();
-        let root = merkle.init_root().unwrap();
+        let sentinel_addr = merkle.init_sentinel().unwrap();
 
-        let proof = merkle.prove(b"any-key", root).unwrap();
+        let proof = merkle.prove(b"any-key", sentinel_addr).unwrap();
 
         assert!(proof.0.is_empty());
     }
@@ -1703,10 +1710,10 @@ mod tests {
     #[tokio::test]
     async fn empty_range_proof() {
         let merkle = create_test_merkle();
-        let root = merkle.init_root().unwrap();
+        let sentinel_addr = merkle.init_sentinel().unwrap();
 
         assert!(merkle
-            .range_proof::<&[u8]>(root, None, None, None)
+            .range_proof::<&[u8]>(sentinel_addr, None, None, None)
             .await
             .unwrap()
             .is_none());
@@ -1715,12 +1722,12 @@ mod tests {
     #[tokio::test]
     async fn range_proof_invalid_bounds() {
         let merkle = create_test_merkle();
-        let root = merkle.init_root().unwrap();
+        let sentinel_addr = merkle.init_sentinel().unwrap();
         let start_key = &[0x01];
         let end_key = &[0x00];
 
         match merkle
-            .range_proof::<&[u8]>(root, Some(start_key), Some(end_key), Some(1))
+            .range_proof::<&[u8]>(sentinel_addr, Some(start_key), Some(end_key), Some(1))
             .await
         {
             Err(api::Error::InvalidRange {
@@ -1735,25 +1742,25 @@ mod tests {
     #[tokio::test]
     async fn full_range_proof() {
         let mut merkle = create_test_merkle();
-        let root = merkle.init_root().unwrap();
+        let sentinel_addr = merkle.init_sentinel().unwrap();
         // insert values
         for key_val in u8::MIN..=u8::MAX {
             let key = &[key_val];
             let val = &[key_val];
 
-            merkle.insert(key, val.to_vec(), root).unwrap();
+            merkle.insert(key, val.to_vec(), sentinel_addr).unwrap();
         }
         merkle.flush_dirty();
 
         let rangeproof = merkle
-            .range_proof::<&[u8]>(root, None, None, None)
+            .range_proof::<&[u8]>(sentinel_addr, None, None, None)
             .await
             .unwrap()
             .unwrap();
         assert_eq!(rangeproof.middle.len(), u8::MAX as usize + 1);
         assert_ne!(rangeproof.first_key_proof.0, rangeproof.last_key_proof.0);
-        let left_proof = merkle.prove([u8::MIN], root).unwrap();
-        let right_proof = merkle.prove([u8::MAX], root).unwrap();
+        let left_proof = merkle.prove([u8::MIN], sentinel_addr).unwrap();
+        let right_proof = merkle.prove([u8::MAX], sentinel_addr).unwrap();
         assert_eq!(rangeproof.first_key_proof.0, left_proof.0);
         assert_eq!(rangeproof.last_key_proof.0, right_proof.0);
     }
@@ -1763,18 +1770,18 @@ mod tests {
         const RANDOM_KEY: u8 = 42;
 
         let mut merkle = create_test_merkle();
-        let root = merkle.init_root().unwrap();
+        let sentinel_addr = merkle.init_sentinel().unwrap();
         // insert values
         for key_val in u8::MIN..=u8::MAX {
             let key = &[key_val];
             let val = &[key_val];
 
-            merkle.insert(key, val.to_vec(), root).unwrap();
+            merkle.insert(key, val.to_vec(), sentinel_addr).unwrap();
         }
         merkle.flush_dirty();
 
         let rangeproof = merkle
-            .range_proof(root, Some([RANDOM_KEY]), None, Some(1))
+            .range_proof(sentinel_addr, Some([RANDOM_KEY]), None, Some(1))
             .await
             .unwrap()
             .unwrap();
@@ -1785,21 +1792,21 @@ mod tests {
     #[test]
     fn shared_path_proof() {
         let mut merkle = create_test_merkle();
-        let root = merkle.init_root().unwrap();
+        let sentinel_addr = merkle.init_sentinel().unwrap();
 
         let key1 = b"key1";
         let value1 = b"1";
-        merkle.insert(key1, value1.to_vec(), root).unwrap();
+        merkle.insert(key1, value1.to_vec(), sentinel_addr).unwrap();
 
         let key2 = b"key2";
         let value2 = b"2";
-        merkle.insert(key2, value2.to_vec(), root).unwrap();
+        merkle.insert(key2, value2.to_vec(), sentinel_addr).unwrap();
 
-        let root_hash = merkle.root_hash(root).unwrap();
+        let root_hash = merkle.root_hash(sentinel_addr).unwrap();
 
         let verified = {
             let key = key1;
-            let proof = merkle.prove(key, root).unwrap();
+            let proof = merkle.prove(key, sentinel_addr).unwrap();
             proof.verify(key, root_hash.0).unwrap()
         };
 
@@ -1807,7 +1814,7 @@ mod tests {
 
         let verified = {
             let key = key2;
-            let proof = merkle.prove(key, root).unwrap();
+            let proof = merkle.prove(key, sentinel_addr).unwrap();
             proof.verify(key, root_hash.0).unwrap()
         };
 
@@ -1838,20 +1845,20 @@ mod tests {
         ];
 
         let mut merkle = create_test_merkle();
-        let root = merkle.init_root().unwrap();
+        let sentinel_addr = merkle.init_sentinel().unwrap();
 
         for (key, val) in &pairs {
             let val = val.to_vec();
-            merkle.insert(key, val.clone(), root).unwrap();
+            merkle.insert(key, val.clone(), sentinel_addr).unwrap();
 
-            let fetched_val = merkle.get(key, root).unwrap();
+            let fetched_val = merkle.get(key, sentinel_addr).unwrap();
 
             // make sure the value was inserted
             assert_eq!(fetched_val.as_deref(), val.as_slice().into());
         }
 
         for (key, val) in pairs {
-            let fetched_val = merkle.get(key, root).unwrap();
+            let fetched_val = merkle.get(key, sentinel_addr).unwrap();
 
             // make sure the value was inserted
             assert_eq!(fetched_val.as_deref(), val.into());
@@ -1865,19 +1872,21 @@ mod tests {
         let overwrite = vec![2];
 
         let mut merkle = create_test_merkle();
-        let root = merkle.init_root().unwrap();
+        let sentinel_addr = merkle.init_sentinel().unwrap();
 
-        merkle.insert(&key, val.clone(), root).unwrap();
+        merkle.insert(&key, val.clone(), sentinel_addr).unwrap();
 
         assert_eq!(
-            merkle.get(&key, root).unwrap().as_deref(),
+            merkle.get(&key, sentinel_addr).unwrap().as_deref(),
             Some(val.as_slice())
         );
 
-        merkle.insert(&key, overwrite.clone(), root).unwrap();
+        merkle
+            .insert(&key, overwrite.clone(), sentinel_addr)
+            .unwrap();
 
         assert_eq!(
-            merkle.get(&key, root).unwrap().as_deref(),
+            merkle.get(&key, sentinel_addr).unwrap().as_deref(),
             Some(overwrite.as_slice())
         );
     }
@@ -1890,18 +1899,18 @@ mod tests {
         let val_2 = vec![2];
 
         let mut merkle = create_test_merkle();
-        let root = merkle.init_root().unwrap();
+        let sentinel_addr = merkle.init_sentinel().unwrap();
 
-        merkle.insert(&key, val.clone(), root).unwrap();
-        merkle.insert(&key_2, val_2.clone(), root).unwrap();
+        merkle.insert(&key, val.clone(), sentinel_addr).unwrap();
+        merkle.insert(&key_2, val_2.clone(), sentinel_addr).unwrap();
 
         assert_eq!(
-            merkle.get(&key, root).unwrap().as_deref(),
+            merkle.get(&key, sentinel_addr).unwrap().as_deref(),
             Some(val.as_slice())
         );
 
         assert_eq!(
-            merkle.get(&key_2, root).unwrap().as_deref(),
+            merkle.get(&key_2, sentinel_addr).unwrap().as_deref(),
             Some(val_2.as_slice())
         );
     }
@@ -1914,18 +1923,18 @@ mod tests {
         let val_2 = vec![2];
 
         let mut merkle = create_test_merkle();
-        let root = merkle.init_root().unwrap();
+        let sentinel_addr = merkle.init_sentinel().unwrap();
 
-        merkle.insert(&key, val.clone(), root).unwrap();
-        merkle.insert(&key_2, val_2.clone(), root).unwrap();
+        merkle.insert(&key, val.clone(), sentinel_addr).unwrap();
+        merkle.insert(&key_2, val_2.clone(), sentinel_addr).unwrap();
 
         assert_eq!(
-            merkle.get(&key, root).unwrap().as_deref(),
+            merkle.get(&key, sentinel_addr).unwrap().as_deref(),
             Some(val.as_slice())
         );
 
         assert_eq!(
-            merkle.get(&key_2, root).unwrap().as_deref(),
+            merkle.get(&key_2, sentinel_addr).unwrap().as_deref(),
             Some(val_2.as_slice())
         );
     }
@@ -1940,24 +1949,24 @@ mod tests {
         let val_3 = vec![3];
 
         let mut merkle = create_test_merkle();
-        let root = merkle.init_root().unwrap();
+        let sentinel_addr = merkle.init_sentinel().unwrap();
 
-        merkle.insert(&key, val.clone(), root).unwrap();
-        merkle.insert(&key_2, val_2.clone(), root).unwrap();
-        merkle.insert(&key_3, val_3.clone(), root).unwrap();
+        merkle.insert(&key, val.clone(), sentinel_addr).unwrap();
+        merkle.insert(&key_2, val_2.clone(), sentinel_addr).unwrap();
+        merkle.insert(&key_3, val_3.clone(), sentinel_addr).unwrap();
 
         assert_eq!(
-            merkle.get(&key, root).unwrap().as_deref(),
+            merkle.get(&key, sentinel_addr).unwrap().as_deref(),
             Some(val.as_slice())
         );
 
         assert_eq!(
-            merkle.get(&key_2, root).unwrap().as_deref(),
+            merkle.get(&key_2, sentinel_addr).unwrap().as_deref(),
             Some(val_2.as_slice())
         );
 
         assert_eq!(
-            merkle.get(&key_3, root).unwrap().as_deref(),
+            merkle.get(&key_3, sentinel_addr).unwrap().as_deref(),
             Some(val_3.as_slice())
         );
     }
@@ -1972,24 +1981,24 @@ mod tests {
         let val_3 = vec![3];
 
         let mut merkle = create_test_merkle();
-        let root = merkle.init_root().unwrap();
+        let sentinel_addr = merkle.init_sentinel().unwrap();
 
-        merkle.insert(&key, val.clone(), root).unwrap();
-        merkle.insert(&key_2, val_2.clone(), root).unwrap();
-        merkle.insert(&key_3, val_3.clone(), root).unwrap();
+        merkle.insert(&key, val.clone(), sentinel_addr).unwrap();
+        merkle.insert(&key_2, val_2.clone(), sentinel_addr).unwrap();
+        merkle.insert(&key_3, val_3.clone(), sentinel_addr).unwrap();
 
         assert_eq!(
-            merkle.get(&key, root).unwrap().as_deref(),
+            merkle.get(&key, sentinel_addr).unwrap().as_deref(),
             Some(val.as_slice())
         );
 
         assert_eq!(
-            merkle.get(&key_2, root).unwrap().as_deref(),
+            merkle.get(&key_2, sentinel_addr).unwrap().as_deref(),
             Some(val_2.as_slice())
         );
 
         assert_eq!(
-            merkle.get(&key_3, root).unwrap().as_deref(),
+            merkle.get(&key_3, sentinel_addr).unwrap().as_deref(),
             Some(val_3.as_slice())
         );
     }
@@ -2004,30 +2013,32 @@ mod tests {
         let overwrite = vec![3];
 
         let mut merkle = create_test_merkle();
-        let root = merkle.init_root().unwrap();
+        let sentinel_addr = merkle.init_sentinel().unwrap();
 
-        merkle.insert(&key, val.clone(), root).unwrap();
-        merkle.insert(&key_2, val_2.clone(), root).unwrap();
+        merkle.insert(&key, val.clone(), sentinel_addr).unwrap();
+        merkle.insert(&key_2, val_2.clone(), sentinel_addr).unwrap();
 
         assert_eq!(
-            merkle.get(&key, root).unwrap().as_deref(),
+            merkle.get(&key, sentinel_addr).unwrap().as_deref(),
             Some(val.as_slice())
         );
 
         assert_eq!(
-            merkle.get(&key_2, root).unwrap().as_deref(),
+            merkle.get(&key_2, sentinel_addr).unwrap().as_deref(),
             Some(val_2.as_slice())
         );
 
-        merkle.insert(&key, overwrite.clone(), root).unwrap();
+        merkle
+            .insert(&key, overwrite.clone(), sentinel_addr)
+            .unwrap();
 
         assert_eq!(
-            merkle.get(&key, root).unwrap().as_deref(),
+            merkle.get(&key, sentinel_addr).unwrap().as_deref(),
             Some(overwrite.as_slice())
         );
 
         assert_eq!(
-            merkle.get(&key_2, root).unwrap().as_deref(),
+            merkle.get(&key_2, sentinel_addr).unwrap().as_deref(),
             Some(val_2.as_slice())
         );
     }
@@ -2035,14 +2046,14 @@ mod tests {
     #[test]
     fn single_key_proof_with_one_node() {
         let mut merkle = create_test_merkle();
-        let root = merkle.init_root().unwrap();
+        let sentinel_addr = merkle.init_sentinel().unwrap();
         let key = b"key";
         let value = b"value";
 
-        merkle.insert(key, value.to_vec(), root).unwrap();
-        let root_hash = merkle.root_hash(root).unwrap();
+        merkle.insert(key, value.to_vec(), sentinel_addr).unwrap();
+        let root_hash = merkle.root_hash(sentinel_addr).unwrap();
 
-        let proof = merkle.prove(key, root).unwrap();
+        let proof = merkle.prove(key, sentinel_addr).unwrap();
 
         let verified = proof.verify(key, root_hash.0).unwrap();
 
@@ -2052,18 +2063,18 @@ mod tests {
     #[test]
     fn two_key_proof_without_shared_path() {
         let mut merkle = create_test_merkle();
-        let root = merkle.init_root().unwrap();
+        let sentinel_addr = merkle.init_sentinel().unwrap();
 
         let key1 = &[0x00];
         let key2 = &[0xff];
 
-        merkle.insert(key1, key1.to_vec(), root).unwrap();
-        merkle.insert(key2, key2.to_vec(), root).unwrap();
+        merkle.insert(key1, key1.to_vec(), sentinel_addr).unwrap();
+        merkle.insert(key2, key2.to_vec(), sentinel_addr).unwrap();
 
-        let root_hash = merkle.root_hash(root).unwrap();
+        let root_hash = merkle.root_hash(sentinel_addr).unwrap();
 
         let verified = {
-            let proof = merkle.prove(key1, root).unwrap();
+            let proof = merkle.prove(key1, sentinel_addr).unwrap();
             proof.verify(key1, root_hash.0).unwrap()
         };
 
@@ -2156,8 +2167,8 @@ mod tests {
         new_value: Vec<u8>,
     ) -> Result<(), MerkleError> {
         let merkle = create_test_merkle();
-        let root = merkle.init_root()?;
-        let root = merkle.get_node(root)?;
+        let sentinel_addr = merkle.init_sentinel()?;
+        let sentinel = merkle.get_node(sentinel_addr)?;
 
         let mut node_ref = merkle.put_node(node)?;
         let addr = node_ref.as_addr();
@@ -2173,7 +2184,7 @@ mod tests {
 
         let mut to_delete = vec![];
         // could be any branch node, convenient to use the root.
-        let mut parents = vec![(root, 0)];
+        let mut parents = vec![(sentinel, 0)];
 
         let node = merkle.update_path_and_move_node_if_larger(
             (&mut parents, &mut to_delete),

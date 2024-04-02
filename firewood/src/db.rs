@@ -191,7 +191,7 @@ fn get_sub_universe_from_empty_delta(
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Pod, Zeroable)]
 struct DbHeader {
-    kv_root: DiskAddress,
+    sentinel_addr: DiskAddress,
 }
 
 impl DbHeader {
@@ -199,7 +199,7 @@ impl DbHeader {
 
     pub const fn new_empty() -> Self {
         Self {
-            kv_root: DiskAddress::null(),
+            sentinel_addr: DiskAddress::null(),
         }
     }
 }
@@ -216,7 +216,7 @@ impl Storable for DbHeader {
         let root_bytes = root_bytes.as_slice();
 
         Ok(Self {
-            kv_root: root_bytes
+            sentinel_addr: root_bytes
                 .try_into()
                 .expect("Self::MSIZE == DiskAddress:MSIZE"),
         })
@@ -228,7 +228,7 @@ impl Storable for DbHeader {
 
     fn serialize(&self, to: &mut [u8]) -> Result<(), ShaleError> {
         let mut cur = Cursor::new(to);
-        cur.write_all(&self.kv_root.to_le_bytes())?;
+        cur.write_all(&self.sentinel_addr.to_le_bytes())?;
         Ok(())
     }
 }
@@ -290,13 +290,13 @@ impl<T: LinearStore> api::DbView for DbRev<T> {
 
     async fn root_hash(&self) -> Result<api::HashKey, api::Error> {
         self.merkle
-            .root_hash(self.header.kv_root)
+            .root_hash(self.header.sentinel_addr)
             .map(|h| *h)
             .map_err(|e| api::Error::IO(std::io::Error::new(ErrorKind::Other, e)))
     }
 
     async fn val<K: api::KeyType>(&self, key: K) -> Result<Option<Vec<u8>>, api::Error> {
-        let obj_ref = self.merkle.get(key, self.header.kv_root);
+        let obj_ref = self.merkle.get(key, self.header.sentinel_addr);
         match obj_ref {
             Err(e) => Err(api::Error::IO(std::io::Error::new(ErrorKind::Other, e))),
             Ok(obj) => Ok(obj.map(|inner| inner.deref().to_owned())),
@@ -308,7 +308,7 @@ impl<T: LinearStore> api::DbView for DbRev<T> {
         key: K,
     ) -> Result<Option<Proof<Vec<u8>>>, api::Error> {
         self.merkle
-            .prove(key, self.header.kv_root)
+            .prove(key, self.header.sentinel_addr)
             .map(Some)
             .map_err(|e| api::Error::IO(std::io::Error::new(ErrorKind::Other, e)))
     }
@@ -320,7 +320,7 @@ impl<T: LinearStore> api::DbView for DbRev<T> {
         limit: Option<usize>,
     ) -> Result<Option<api::RangeProof<Vec<u8>, Vec<u8>>>, api::Error> {
         self.merkle
-            .range_proof(self.header.kv_root, first_key, last_key, limit)
+            .range_proof(self.header.sentinel_addr, first_key, last_key, limit)
             .await
             .map_err(|e| api::Error::InternalError(Box::new(e)))
     }
@@ -330,34 +330,34 @@ impl<T: LinearStore> api::DbView for DbRev<T> {
         first_key: Option<K>,
     ) -> Result<Self::Stream<'_>, api::Error> {
         Ok(match first_key {
-            None => self.merkle.key_value_iter(self.header.kv_root),
+            None => self.merkle.key_value_iter(self.header.sentinel_addr),
             Some(key) => self
                 .merkle
-                .key_value_iter_from_key(self.header.kv_root, key.as_ref().into()),
+                .key_value_iter_from_key(self.header.sentinel_addr, key.as_ref().into()),
         })
     }
 }
 
 impl<T: LinearStore> DbRev<T> {
     pub fn stream(&self) -> merkle::MerkleKeyValueStream<'_, T, Bincode> {
-        self.merkle.key_value_iter(self.header.kv_root)
+        self.merkle.key_value_iter(self.header.sentinel_addr)
     }
 
     pub fn stream_from(&self, start_key: Key) -> merkle::MerkleKeyValueStream<'_, T, Bincode> {
         self.merkle
-            .key_value_iter_from_key(self.header.kv_root, start_key)
+            .key_value_iter_from_key(self.header.sentinel_addr, start_key)
     }
 
     /// Get root hash of the generic key-value storage.
     pub fn kv_root_hash(&self) -> Result<TrieHash, DbError> {
         self.merkle
-            .root_hash(self.header.kv_root)
+            .root_hash(self.header.sentinel_addr)
             .map_err(DbError::Merkle)
     }
 
     /// Get a value associated with a key.
     pub fn kv_get<K: AsRef<[u8]>>(&self, key: K) -> Option<Vec<u8>> {
-        let obj_ref = self.merkle.get(key, self.header.kv_root);
+        let obj_ref = self.merkle.get(key, self.header.sentinel_addr);
         match obj_ref {
             Err(_) => None,
             Ok(obj) => obj.map(|o| o.to_vec()),
@@ -367,12 +367,12 @@ impl<T: LinearStore> DbRev<T> {
     /// Dump the Trie of the generic key-value storage.
     pub fn kv_dump(&self, w: &mut dyn Write) -> Result<(), DbError> {
         self.merkle
-            .dump(self.header.kv_root, w)
+            .dump(self.header.sentinel_addr, w)
             .map_err(DbError::Merkle)
     }
 
     pub fn prove<K: AsRef<[u8]>>(&self, key: K) -> Result<Proof<Vec<u8>>, MerkleError> {
-        self.merkle.prove::<K>(key, self.header.kv_root)
+        self.merkle.prove::<K>(key, self.header.sentinel_addr)
     }
 
     /// Verifies a range proof is valid for a set of keys.
@@ -798,14 +798,14 @@ impl Db {
 
         let merkle = Merkle::new(merkle_store);
 
-        if db_header_ref.kv_root.is_null() {
+        if db_header_ref.sentinel_addr.is_null() {
             let mut err = Ok(());
             // create the sentinel node
             #[allow(clippy::unwrap_used)]
             db_header_ref
                 .modify(|r| {
                     err = (|| {
-                        r.kv_root = merkle.init_root()?;
+                        r.sentinel_addr = merkle.init_sentinel()?;
                         Ok(())
                     })();
                 })
@@ -838,14 +838,14 @@ impl Db {
                 BatchOp::Put { key, value } => {
                     let (header, merkle) = rev.borrow_split();
                     merkle
-                        .insert(key, value.as_ref().to_vec(), header.kv_root)
+                        .insert(key, value.as_ref().to_vec(), header.sentinel_addr)
                         .map_err(DbError::Merkle)?;
                     Ok(())
                 }
                 BatchOp::Delete { key } => {
                     let (header, merkle) = rev.borrow_split();
                     merkle
-                        .remove(key, header.kv_root)
+                        .remove(key, header.sentinel_addr)
                         .map_err(DbError::Merkle)?;
                     Ok(())
                 }

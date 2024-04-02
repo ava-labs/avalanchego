@@ -497,9 +497,11 @@ where
     // Add the sentinel root
     let mut right_chunks = vec![0];
     right_chunks.extend(right.as_ref().iter().copied().flat_map(to_nibble_array));
-    let root = in_mem_merkle.get_sentinel_address();
+    let sentinel_addr = in_mem_merkle.get_sentinel_address();
     let merkle = in_mem_merkle.get_merkle_mut();
-    let mut u_ref = merkle.get_node(root).map_err(|_| ProofError::NoSuchNode)?;
+    let mut u_ref = merkle
+        .get_node(sentinel_addr)
+        .map_err(|_| ProofError::NoSuchNode)?;
     let mut parent = DiskAddress::null();
 
     let mut fork_left = Ordering::Equal;
