@@ -322,6 +322,9 @@ func (v *view) hashChangedNode(n *node, keyBuffer []byte) (ids.ID, []byte) {
 		lastKeyByte = keyBuffer[bytesForKey-1]
 	}
 
+	// This loop is optimized to avoid allocations when calculating the
+	// [childKey] by reusing [keyBuffer] and leaving the first [bytesForKey-1]
+	// bytes unmodified.
 	for childIndex, childEntry := range n.children {
 		childBuffer[0] = childIndex << dualIndex
 		childIndexAsKey := Key{
