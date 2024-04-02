@@ -9,7 +9,7 @@
 
 Firewood is an embedded key-value store, optimized to store recent Merkleized blockchain
 state with minimal overhead. Firewood is implemented from the ground up to directly
-store trie nodes on-disk. Unlike most of state management approaches in the field,
+store trie nodes on-disk. Unlike most state management approaches in the field,
 it is not built on top of a generic KV store such as LevelDB/RocksDB. Firewood, like a
 B+-tree based database, directly uses the trie structure as the index on-disk. Thus,
 there is no additional “emulation” of the logical trie to flatten out the data structure
@@ -17,12 +17,12 @@ to feed into the underlying database that is unaware of the data being stored. T
 byproduct of this approach is that iteration is still fast (for serving state sync queries)
 but compaction is not required to maintain the index. Firewood was first conceived to provide
 a very fast storage layer for the EVM but could be used on any blockchain that
-requires authenticated state.
+requires an authenticated state.
 
 Firewood only attempts to store the latest state on-disk and will actively clean up
-unused state when state diffs are committed. To avoid reference counting trie nodes,
+unused data when state diffs are committed. To avoid reference counting trie nodes,
 Firewood does not copy-on-write (COW) the state trie and instead keeps
-one latest version of the trie index on disk and applies in-place updates to it.
+the latest version of the trie index on disk and applies in-place updates to it.
 Firewood keeps some configurable number of previous states in memory to power
 state sync (which may occur at a few roots behind the current state).
 
@@ -63,7 +63,7 @@ versions with no additional cost at all.
 - `Put` - An operation for a `Key`/`Value` pair. A put means "create if it doesn't
   exist, or update it if it does. A put operation is how you add a `Value` for a
   specific `Key`.
-- `Delete` - An operation indicating that a `Key` that should be removed from the trie.
+- `Delete` - An operation indicating that a `Key` should be removed from the trie.
 - `Batch Operation` - An operation of either `Put` or `Delete`.
 - `Batch` - An ordered set of `Batch Operation`s.
 - `Proposal` - A proposal consists of a base `Root Hash` and a `Batch`, but is not
@@ -100,13 +100,13 @@ reader and writer interfaces to have consistent read/write semantics.
 ### Seasoned milestone
 
 This milestone will add support for proposals, including proposed future
-branches, with a cache to make committing these branches efficiently.
+branches, with a cache to make committing these branches efficient.
 
-- [x] Be able to support multiple proposed revisions against latest committed
+- [x] Be able to support multiple proposed revisions against the latest committed
       version.
 - [x] Be able to propose a batch against the existing committed revision, or
       propose a batch against any existing proposed revision.
-- [x] Commit a batch that has been proposed will invalidate all other proposals
+- [x] Committing a batch that has been proposed will invalidate all other proposals
       that are not children of the committed proposed batch.
 - [x] Be able to quickly commit a batch that has been proposed.
 - [x] Remove RLP encoding
@@ -119,7 +119,7 @@ be developed for this milestone.
 
 - [x] Migrate to a fully async interface
 - [x] Pluggable encoding for nodes, for optional compatibility with MerkleDB
-- [ ] :runner: MerkleDB root hash in parity for seamless transition between MerkleDB
+- [ ] :runner: MerkleDB root hash in parity for a seamless transition between MerkleDB
       and Firewood.
 - [ ] :runner: Support replicating the full state with corresponding range proofs that
       verify the correctness of the data.
