@@ -34,7 +34,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
@@ -45,13 +44,14 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
-	txbuilder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	pvalidators "github.com/ava-labs/avalanchego/vms/platformvm/validators"
+	walletcommon "github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
 
 const (
@@ -114,10 +114,9 @@ type environment struct {
 	msm            *mutableSharedMemory
 	fx             fx.Fx
 	state          state.State
-	atomicUTXOs    avax.AtomicUTXOManager
 	uptimes        uptime.Manager
-	utxosHandler   utxo.Handler
-	txBuilder      txbuilder.Builder
+	utxosVerifier  utxo.Verifier
+	txBuilder      *txstest.Builder
 	backend        txexecutor.Backend
 }
 
@@ -149,18 +148,13 @@ func newEnvironment(t *testing.T, f fork) *environment { //nolint:unparam
 	rewardsCalc := reward.NewCalculator(res.config.RewardConfig)
 	res.state = defaultState(t, res.config, res.ctx, res.baseDB, rewardsCalc)
 
-	res.atomicUTXOs = avax.NewAtomicUTXOManager(res.ctx.SharedMemory, txs.Codec)
 	res.uptimes = uptime.NewManager(res.state, res.clk)
-	res.utxosHandler = utxo.NewHandler(res.ctx, res.clk, res.fx)
+	res.utxosVerifier = utxo.NewVerifier(res.ctx, res.clk, res.fx)
 
-	res.txBuilder = txbuilder.New(
+	res.txBuilder = txstest.NewBuilder(
 		res.ctx,
 		res.config,
-		res.clk,
-		res.fx,
 		res.state,
-		res.atomicUTXOs,
-		res.utxosHandler,
 	)
 
 	genesisID := res.state.GetLastAccepted()
@@ -170,7 +164,7 @@ func newEnvironment(t *testing.T, f fork) *environment { //nolint:unparam
 		Clk:          res.clk,
 		Bootstrapped: res.isBootstrapped,
 		Fx:           res.fx,
-		FlowChecker:  res.utxosHandler,
+		FlowChecker:  res.utxosVerifier,
 		Uptimes:      res.uptimes,
 		Rewards:      rewardsCalc,
 	}
@@ -247,15 +241,19 @@ func addSubnet(t *testing.T, env *environment) {
 	// Create a subnet
 	var err error
 	testSubnet1, err = env.txBuilder.NewCreateSubnetTx(
-		2, // threshold; 2 sigs from keys[0], keys[1], keys[2] needed to add validator to this subnet
-		[]ids.ShortID{ // control keys
-			preFundedKeys[0].PublicKey().Address(),
-			preFundedKeys[1].PublicKey().Address(),
-			preFundedKeys[2].PublicKey().Address(),
+		&secp256k1fx.OutputOwners{
+			Threshold: 2,
+			Addrs: []ids.ShortID{
+				preFundedKeys[0].PublicKey().Address(),
+				preFundedKeys[1].PublicKey().Address(),
+				preFundedKeys[2].PublicKey().Address(),
+			},
 		},
 		[]*secp256k1.PrivateKey{preFundedKeys[0]},
-		preFundedKeys[0].PublicKey().Address(),
-		nil,
+		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
+		}),
 	)
 	require.NoError(err)
 

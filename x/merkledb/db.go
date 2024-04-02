@@ -41,8 +41,6 @@ const (
 var (
 	_ MerkleDB = (*merkleDB)(nil)
 
-	codec = newCodec()
-
 	metadataPrefix         = []byte{0}
 	valueNodePrefix        = []byte{1}
 	intermediateNodePrefix = []byte{2}
@@ -218,9 +216,9 @@ type merkleDB struct {
 	// Valid children of this trie.
 	childViews []*view
 
-	// calculateNodeIDsSema controls the number of goroutines inside
-	// [calculateNodeIDsHelper] at any given time.
-	calculateNodeIDsSema *semaphore.Weighted
+	// hashNodesSema controls the number of goroutines that are created inside
+	// [hashChangedNode] at any given time.
+	hashNodesSema *semaphore.Weighted
 
 	tokenSize int
 }
@@ -272,12 +270,12 @@ func newDatabase(
 			bufferPool,
 			metrics,
 			int(config.ValueNodeCacheSize)),
-		history:              newTrieHistory(int(config.HistoryLength)),
-		debugTracer:          getTracerIfEnabled(config.TraceLevel, DebugTrace, config.Tracer),
-		infoTracer:           getTracerIfEnabled(config.TraceLevel, InfoTrace, config.Tracer),
-		childViews:           make([]*view, 0, defaultPreallocationSize),
-		calculateNodeIDsSema: semaphore.NewWeighted(int64(rootGenConcurrency)),
-		tokenSize:            BranchFactorToTokenSize[config.BranchFactor],
+		history:       newTrieHistory(int(config.HistoryLength)),
+		debugTracer:   getTracerIfEnabled(config.TraceLevel, DebugTrace, config.Tracer),
+		infoTracer:    getTracerIfEnabled(config.TraceLevel, InfoTrace, config.Tracer),
+		childViews:    make([]*view, 0, defaultPreallocationSize),
+		hashNodesSema: semaphore.NewWeighted(int64(rootGenConcurrency)),
+		tokenSize:     BranchFactorToTokenSize[config.BranchFactor],
 	}
 
 	if err := trieDB.initializeRoot(); err != nil {
@@ -985,7 +983,7 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *view) error
 		return db.baseDB.Delete(rootDBKey)
 	}
 
-	rootKey := codec.encodeKey(db.root.Value().key)
+	rootKey := encodeKey(db.root.Value().key)
 	return db.baseDB.Put(rootDBKey, rootKey)
 }
 
@@ -1177,7 +1175,7 @@ func (db *merkleDB) initializeRoot() error {
 	}
 
 	// Root is on disk.
-	rootKey, err := codec.decodeKey(rootKeyBytes)
+	rootKey, err := decodeKey(rootKeyBytes)
 	if err != nil {
 		return err
 	}
@@ -1351,5 +1349,5 @@ func cacheEntrySize(key Key, n *node) int {
 	if n == nil {
 		return cacheEntryOverHead + len(key.Bytes())
 	}
-	return cacheEntryOverHead + len(key.Bytes()) + codec.encodedDBNodeSize(&n.dbNode)
+	return cacheEntryOverHead + len(key.Bytes()) + encodedDBNodeSize(&n.dbNode)
 }
