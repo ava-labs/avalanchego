@@ -48,6 +48,8 @@ const (
 	BranchFactor4   = BranchFactor(4)
 	BranchFactor16  = BranchFactor(16)
 	BranchFactor256 = BranchFactor(256)
+
+	BranchFactorLargest = BranchFactor256
 )
 
 // Valid checks if BranchFactor [b] is one of the predefined valid options for BranchFactor
