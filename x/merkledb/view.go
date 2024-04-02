@@ -356,7 +356,7 @@ func (v *view) hashChangedNode(n *node, keyBuffer []byte) (ids.ID, []byte) {
 		childEntry.hasValue = childNode.hasValue()
 
 		// If there are no children of the childNode, we can avoid constructing
-		// a new [innerKeyBuffer].
+		// the buffer for the child keys.
 		if len(childNode.children) == 0 {
 			childEntry.id = childNode.calculateID(v.db.metrics)
 			continue
