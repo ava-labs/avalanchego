@@ -13,8 +13,6 @@ import (
 	"math/bits"
 	"slices"
 
-	"golang.org/x/exp/maps"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/maybe"
 )
@@ -101,22 +99,27 @@ func hashNode(n *node) ids.ID {
 	// By directly calling sha.Write rather than passing sha around as an
 	// io.Writer, the compiler can perform sufficient escape analysis to avoid
 	// allocating buffers on the heap.
-	_, _ = sha.Write(binary.AppendUvarint(emptyHashBuffer, uint64(len(n.children))))
+	numChildren := len(n.children)
+	_, _ = sha.Write(binary.AppendUvarint(emptyHashBuffer, uint64(numChildren)))
 
-	// By allocating BranchFactorLargest rather than len(n.children), this slice
-	// is allocated on the stack rather than the heap. BranchFactorLargest is
-	// at least len(n.children) which avoids memory allocations.
-	keys := make([]byte, 0, BranchFactorLargest)
-	for k := range n.children {
-		keys = append(keys, k)
-	}
+	// Avoid allocating keys entirely if the node doesn't have any children.
+	if numChildren != 0 {
+		// By allocating BranchFactorLargest rather than len(n.children), this
+		// slice is allocated on the stack rather than the heap.
+		// BranchFactorLargest is at least len(n.children) which avoids memory
+		// allocations.
+		keys := make([]byte, 0, BranchFactorLargest)
+		for k := range n.children {
+			keys = append(keys, k)
+		}
 
-	// Ensure that the order of entries is correct.
-	slices.Sort(keys)
-	for _, index := range keys {
-		entry := n.children[index]
-		_, _ = sha.Write(binary.AppendUvarint(emptyHashBuffer, uint64(index)))
-		_, _ = sha.Write(entry.id[:])
+		// Ensure that the order of entries is correct.
+		slices.Sort(keys)
+		for _, index := range keys {
+			entry := n.children[index]
+			_, _ = sha.Write(binary.AppendUvarint(emptyHashBuffer, uint64(index)))
+			_, _ = sha.Write(entry.id[:])
+		}
 	}
 
 	if n.valueDigest.HasValue() {
@@ -138,10 +141,24 @@ func hashNode(n *node) ids.ID {
 func encodeDBNode(n *dbNode) []byte {
 	buf := bytes.NewBuffer(make([]byte, 0, encodedDBNodeSize(n)))
 	encodeMaybeByteSlice(buf, n.value)
-	encodeUint(buf, uint64(len(n.children)))
-	// Note we insert children in order of increasing index
-	// for determinism.
-	keys := maps.Keys(n.children)
+
+	numChildren := len(n.children)
+	encodeUint(buf, uint64(numChildren))
+
+	// Avoid allocating keys entirely if the node doesn't have any children.
+	if numChildren == 0 {
+		return buf.Bytes()
+	}
+
+	// By allocating BranchFactorLargest rather than len(n.children), this slice
+	// is allocated on the stack rather than the heap. BranchFactorLargest is
+	// at least len(n.children) which avoids memory allocations.
+	keys := make([]byte, 0, BranchFactorLargest)
+	for k := range n.children {
+		keys = append(keys, k)
+	}
+
+	// Ensure that the order of entries is correct.
 	slices.Sort(keys)
 	for _, index := range keys {
 		entry := n.children[index]
@@ -345,10 +362,10 @@ func decodeID(src *bytes.Reader) (ids.ID, error) {
 }
 
 func encodeKey(key Key) []byte {
-	estimatedLen := binary.MaxVarintLen64 + len(key.Bytes())
-	dst := bytes.NewBuffer(make([]byte, 0, estimatedLen))
-	encodeKeyToBuffer(dst, key)
-	return dst.Bytes()
+	keyLen := uintSize(uint64(key.length)) + len(key.Bytes())
+	buf := bytes.NewBuffer(make([]byte, 0, keyLen))
+	encodeKeyToBuffer(buf, key)
+	return buf.Bytes()
 }
 
 func encodeKeyToBuffer(dst *bytes.Buffer, key Key) {

@@ -297,23 +297,22 @@ func (v *view) hashChangedNode(n *node) ids.ID {
 
 	// Calculate the size of the largest child key of this node. This allows
 	// only allocating a single slice for all of the keys.
-	var maxBitLength int
+	var maxChildBitLength int
 	for _, childEntry := range n.children {
-		totalBitLength := n.key.length + v.tokenSize + childEntry.compressedKey.length
-		maxBitLength = max(maxBitLength, totalBitLength)
+		maxChildBitLength = max(maxChildBitLength, childEntry.compressedKey.length)
 	}
 
 	var (
-		maxBytesNeeded = bytesNeeded(maxBitLength)
+		maxBytesNeeded = bytesNeeded(n.key.length + v.tokenSize + maxChildBitLength)
 		// keyBuffer is allocated onto the heap because it is dynamically sized.
 		keyBuffer = make([]byte, maxBytesNeeded)
 		// childBuffer is allocated on the stack.
 		childBuffer = make([]byte, 1)
 		dualIndex   = dualBitIndex(v.tokenSize)
 		bytesForKey = bytesNeeded(n.key.length)
-		// We track the last byte used by the key so that we can reset the
-		// value. for each key. This is needed because the child buffer may get
-		// ORed with this byte.
+		// We track the last byte of [n.key] so that we can reset the value for
+		// each key. This is needed because the child buffer may get ORed at
+		// this byte.
 		lastKeyByte byte
 
 		// We use [wg] to wait until all descendants of [n] have been updated.
@@ -321,15 +320,17 @@ func (v *view) hashChangedNode(n *node) ids.ID {
 	)
 
 	if bytesForKey > 0 {
-		// We can just copy this node's key once. It doesn't change as we
-		// iterate over the children.
+		// We only need to copy this node's key once because it does not change
+		// as we iterate over the children.
 		copy(keyBuffer, n.key.value)
 		lastKeyByte = keyBuffer[bytesForKey-1]
 	}
 
 	for childIndex, childEntry := range n.children {
 		childBuffer[0] = childIndex << dualIndex
-		childByteKey := Key{
+		childIndexAsKey := Key{
+			// It is safe to use byteSliceToString because [childBuffer] is not
+			// modified while [childIndexAsKey] is in use.
 			value:  byteSliceToString(childBuffer),
 			length: v.tokenSize,
 		}
@@ -338,11 +339,13 @@ func (v *view) hashChangedNode(n *node) ids.ID {
 		buffer := keyBuffer[:bytesNeeded(totalBitLength)]
 		// Make sure the last byte of the key is originally set correctly
 		if bytesForKey > 0 {
-			keyBuffer[bytesForKey-1] = lastKeyByte
+			buffer[bytesForKey-1] = lastKeyByte
 		}
-		extendIntoBuffer(buffer, childByteKey, n.key.length)
+		extendIntoBuffer(buffer, childIndexAsKey, n.key.length)
 		extendIntoBuffer(buffer, childEntry.compressedKey, n.key.length+v.tokenSize)
 		childKey := Key{
+			// It is safe to use byteSliceToString because [buffer] is not
+			// modified while [childKey] is in use.
 			value:  byteSliceToString(buffer),
 			length: totalBitLength,
 		}
@@ -563,7 +566,7 @@ func (v *view) getValue(key Key) ([]byte, error) {
 	return value, nil
 }
 
-// Must not be called after [calculateNodeIDs] has returned.
+// Must not be called after [applyValueChanges] has returned.
 func (v *view) remove(key Key) error {
 	if v.valueChangesApplied.Get() {
 		return ErrNodesAlreadyCalculated
@@ -629,7 +632,7 @@ func (v *view) remove(key Key) error {
 // Assumes at least one of the following is true:
 // * [n] has a value.
 // * [n] has children.
-// Must not be called after [calculateNodeIDs] has returned.
+// Must not be called after [applyValueChanges] has returned.
 func (v *view) compressNodePath(parent, n *node) error {
 	if v.valueChangesApplied.Get() {
 		return ErrNodesAlreadyCalculated
@@ -697,7 +700,7 @@ func (v *view) getEditableNode(key Key, hadValue bool) (*node, error) {
 }
 
 // insert a key/value pair into the correct node of the trie.
-// Must not be called after [calculateNodeIDs] has returned.
+// Must not be called after [applyValueChanges] has returned.
 func (v *view) insert(
 	key Key,
 	value maybe.Maybe[[]byte],
@@ -832,26 +835,26 @@ func getLengthOfCommonPrefix(first, second Key, secondOffset int, tokenSize int)
 }
 
 // Records that a node has been created.
-// Must not be called after [calculateNodeIDs] has returned.
+// Must not be called after [applyValueChanges] has returned.
 func (v *view) recordNewNode(after *node) error {
 	return v.recordKeyChange(after.key, after, after.hasValue(), true /* newNode */)
 }
 
 // Records that an existing node has been changed.
-// Must not be called after [calculateNodeIDs] has returned.
+// Must not be called after [applyValueChanges] has returned.
 func (v *view) recordNodeChange(after *node) error {
 	return v.recordKeyChange(after.key, after, after.hasValue(), false /* newNode */)
 }
 
 // Records that the node associated with the given key has been deleted.
-// Must not be called after [calculateNodeIDs] has returned.
+// Must not be called after [applyValueChanges] has returned.
 func (v *view) recordNodeDeleted(after *node, hadValue bool) error {
 	return v.recordKeyChange(after.key, nil, hadValue, false /* newNode */)
 }
 
 // Records that the node associated with the given key has been changed.
 // If it is an existing node, record what its value was before it was changed.
-// Must not be called after [calculateNodeIDs] has returned.
+// Must not be called after [applyValueChanges] has returned.
 func (v *view) recordKeyChange(key Key, after *node, hadValue bool, newNode bool) error {
 	if v.valueChangesApplied.Get() {
 		return ErrNodesAlreadyCalculated
@@ -882,8 +885,8 @@ func (v *view) recordKeyChange(key Key, after *node, hadValue bool, newNode bool
 
 // Records that a key's value has been added or updated.
 // Doesn't actually change the trie data structure.
-// That's deferred until we call [calculateNodeIDs].
-// Must not be called after [calculateNodeIDs] has returned.
+// That's deferred until we call [applyValueChanges].
+// Must not be called after [applyValueChanges] has returned.
 func (v *view) recordValueChange(key Key, value maybe.Maybe[[]byte]) error {
 	if v.valueChangesApplied.Get() {
 		return ErrNodesAlreadyCalculated
