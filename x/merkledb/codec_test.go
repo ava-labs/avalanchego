@@ -374,6 +374,81 @@ var (
 			},
 		},
 	}
+	encodeKeyTests = []struct {
+		name          string
+		key           Key
+		expectedBytes []byte
+	}{
+		{
+			name: "empty",
+			key:  ToKey([]byte{}),
+			expectedBytes: []byte{
+				0x00, // length
+			},
+		},
+		{
+			name: "1 byte",
+			key:  ToKey([]byte{0}),
+			expectedBytes: []byte{
+				0x08, // length
+				0x00, // key
+			},
+		},
+		{
+			name: "2 bytes",
+			key:  ToKey([]byte{0, 1}),
+			expectedBytes: []byte{
+				0x10,       // length
+				0x00, 0x01, // key
+			},
+		},
+		{
+			name: "4 bytes",
+			key:  ToKey([]byte{0, 1, 2, 3}),
+			expectedBytes: []byte{
+				0x20,                   // length
+				0x00, 0x01, 0x02, 0x03, // key
+			},
+		},
+		{
+			name: "8 bytes",
+			key:  ToKey([]byte{0, 1, 2, 3, 4, 5, 6, 7}),
+			expectedBytes: []byte{
+				0x40,                                           // length
+				0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, // key
+			},
+		},
+		{
+			name: "32 bytes",
+			key:  ToKey(make([]byte, 32)),
+			expectedBytes: append(
+				[]byte{
+					0x80, 0x02, // length
+				},
+				make([]byte, 32)..., // key
+			),
+		},
+		{
+			name: "64 bytes",
+			key:  ToKey(make([]byte, 64)),
+			expectedBytes: append(
+				[]byte{
+					0x80, 0x04, // length
+				},
+				make([]byte, 64)..., // key
+			),
+		},
+		{
+			name: "1024 bytes",
+			key:  ToKey(make([]byte, 1024)),
+			expectedBytes: append(
+				[]byte{
+					0x80, 0x40, // length
+				},
+				make([]byte, 1024)..., // key
+			),
+		},
+	}
 )
 
 func FuzzCodecBool(f *testing.F) {
@@ -609,6 +684,15 @@ func TestEncodeDBNode(t *testing.T) {
 	}
 }
 
+func TestEncodeKey(t *testing.T) {
+	for _, test := range encodeKeyTests {
+		t.Run(test.name, func(t *testing.T) {
+			bytes := encodeKey(test.key)
+			require.Equal(t, test.expectedBytes, bytes)
+		})
+	}
+}
+
 func TestCodecDecodeKeyLengthOverflowRegression(t *testing.T) {
 	_, err := decodeKey(binary.AppendUvarint(nil, math.MaxInt))
 	require.ErrorIs(t, err, io.ErrUnexpectedEOF)
@@ -649,6 +733,16 @@ func Benchmark_EncodeDBNode(b *testing.B) {
 		b.Run(benchmark.name, func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
 				encodeDBNode(benchmark.n)
+			}
+		})
+	}
+}
+
+func Benchmark_EncodeKey(b *testing.B) {
+	for _, benchmark := range encodeKeyTests {
+		b.Run(benchmark.name, func(b *testing.B) {
+			for i := 0; i < b.N; i++ {
+				encodeKey(benchmark.key)
 			}
 		})
 	}
