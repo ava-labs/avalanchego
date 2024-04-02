@@ -18,15 +18,9 @@ import (
 )
 
 const (
-	boolLen              = 1
-	trueByte             = 1
-	falseByte            = 0
-	minVarIntLen         = 1
-	minMaybeByteSliceLen = boolLen
-	minKeyLen            = minVarIntLen
-	minByteSliceLen      = minVarIntLen
-	minDBNodeLen         = minMaybeByteSliceLen + minVarIntLen
-	minChildLen          = minVarIntLen + minKeyLen + ids.IDLen + boolLen
+	boolLen   = 1
+	trueByte  = 1
+	falseByte = 0
 )
 
 var (
@@ -39,10 +33,8 @@ var (
 	errNonZeroKeyPadding  = errors.New("key partial byte should be padded with 0s")
 	errExtraSpace         = errors.New("trailing buffer space")
 	errIntOverflow        = errors.New("value overflows int")
+	errTooManyChildren    = errors.New("too many children")
 )
-
-// Note that sha256.Write and bytes.Buffer.Write always returns nil, so we
-// ignore their return values.
 
 func childSize(index byte, childEntry *child) int {
 	// * index
@@ -89,6 +81,7 @@ func encodedDBNodeSize(n *dbNode) int {
 // allocations.
 func hashNode(n *node) ids.ID {
 	var (
+		// sha.Write always returns nil, so we ignore its return values.
 		sha  = sha256.New()
 		hash ids.ID
 		// The hash length is larger than the maximum Uvarint length. This
@@ -139,15 +132,19 @@ func hashNode(n *node) ids.ID {
 
 // Assumes [n] is non-nil.
 func encodeDBNode(n *dbNode) []byte {
-	buf := bytes.NewBuffer(make([]byte, 0, encodedDBNodeSize(n)))
-	encodeMaybeByteSlice(buf, n.value)
+	length := encodedDBNodeSize(n)
+	w := codecWriter{
+		b: make([]byte, 0, length),
+	}
+
+	w.MaybeBytes(n.value)
 
 	numChildren := len(n.children)
-	encodeUint(buf, uint64(numChildren))
+	w.Uvarint(uint64(numChildren))
 
 	// Avoid allocating keys entirely if the node doesn't have any children.
 	if numChildren == 0 {
-		return buf.Bytes()
+		return w.b
 	}
 
 	// By allocating BranchFactorLargest rather than len(n.children), this slice
@@ -162,40 +159,87 @@ func encodeDBNode(n *dbNode) []byte {
 	slices.Sort(keys)
 	for _, index := range keys {
 		entry := n.children[index]
-		encodeUint(buf, uint64(index))
-		encodeKeyToBuffer(buf, entry.compressedKey)
-		_, _ = buf.Write(entry.id[:])
-		encodeBool(buf, entry.hasValue)
+		w.Uvarint(uint64(index))
+		w.Key(entry.compressedKey)
+		w.ID(entry.id)
+		w.Bool(entry.hasValue)
 	}
-	return buf.Bytes()
+
+	return w.b
+}
+
+func encodeKey(key Key) []byte {
+	length := uintSize(uint64(key.length)) + len(key.Bytes())
+	w := codecWriter{
+		b: make([]byte, 0, length),
+	}
+	w.Key(key)
+	return w.b
+}
+
+type codecWriter struct {
+	b []byte
+}
+
+func (w *codecWriter) Bool(v bool) {
+	if v {
+		w.b = append(w.b, trueByte)
+	} else {
+		w.b = append(w.b, falseByte)
+	}
+}
+
+func (w *codecWriter) Uvarint(v uint64) {
+	w.b = binary.AppendUvarint(w.b, v)
+}
+
+func (w *codecWriter) ID(v ids.ID) {
+	w.b = append(w.b, v[:]...)
+}
+
+func (w *codecWriter) Bytes(v []byte) {
+	w.Uvarint(uint64(len(v)))
+	w.b = append(w.b, v...)
+}
+
+func (w *codecWriter) MaybeBytes(v maybe.Maybe[[]byte]) {
+	hasValue := v.HasValue()
+	w.Bool(hasValue)
+	if hasValue {
+		w.Bytes(v.Value())
+	}
+}
+
+func (w *codecWriter) Key(v Key) {
+	w.Uvarint(uint64(v.length))
+	w.b = append(w.b, v.Bytes()...)
 }
 
 // Assumes [n] is non-nil.
 func decodeDBNode(b []byte, n *dbNode) error {
-	if minDBNodeLen > len(b) {
-		return io.ErrUnexpectedEOF
+	r := codecReader{
+		b:    b,
+		copy: true,
 	}
 
-	src := bytes.NewReader(b)
-
-	value, err := decodeMaybeByteSlice(src)
+	var err error
+	n.value, err = r.MaybeBytes()
 	if err != nil {
 		return err
 	}
-	n.value = value
 
-	numChildren, err := decodeUint(src)
-	switch {
-	case err != nil:
+	numChildren, err := r.Uvarint()
+	if err != nil {
 		return err
-	case numChildren > uint64(src.Len()/minChildLen):
-		return io.ErrUnexpectedEOF
+	}
+	if numChildren > uint64(BranchFactorLargest) {
+		return errTooManyChildren
 	}
 
 	n.children = make(map[byte]*child, numChildren)
 	var previousChild uint64
 	for i := uint64(0); i < numChildren; i++ {
-		index, err := decodeUint(src)
+		index, err := r.Uvarint()
 		if err != nil {
 			return err
 		}
@@ -204,15 +248,15 @@ func decodeDBNode(b []byte, n *dbNode) error {
 		}
 		previousChild = index
 
-		compressedKey, err := decodeKeyFromReader(src)
+		compressedKey, err := r.Key()
 		if err != nil {
 			return err
 		}
-		childID, err := decodeID(src)
+		childID, err := r.ID()
 		if err != nil {
 			return err
 		}
-		hasValue, err := decodeBool(src)
+		hasValue, err := r.Bool()
 		if err != nil {
 			return err
 		}
@@ -222,204 +266,131 @@ func decodeDBNode(b []byte, n *dbNode) error {
 			hasValue:      hasValue,
 		}
 	}
-	if src.Len() != 0 {
+	if len(r.b) != 0 {
 		return errExtraSpace
 	}
 	return nil
 }
 
-func encodeBool(dst *bytes.Buffer, value bool) {
-	bytesValue := falseBytes
-	if value {
-		bytesValue = trueBytes
-	}
-	_, _ = dst.Write(bytesValue)
-}
-
-func decodeBool(src *bytes.Reader) (bool, error) {
-	boolByte, err := src.ReadByte()
-	switch {
-	case err == io.EOF:
-		return false, io.ErrUnexpectedEOF
-	case err != nil:
-		return false, err
-	case boolByte == trueByte:
-		return true, nil
-	case boolByte == falseByte:
-		return false, nil
-	default:
-		return false, errInvalidBool
-	}
-}
-
-func encodeUint(dst *bytes.Buffer, value uint64) {
-	var buf [binary.MaxVarintLen64]byte
-	size := binary.PutUvarint(buf[:], value)
-	_, _ = dst.Write(buf[:size])
-}
-
-func decodeUint(src *bytes.Reader) (uint64, error) {
-	// To ensure encoding/decoding is canonical, we need to check for leading
-	// zeroes in the varint.
-	// The last byte of the varint we read is the most significant byte.
-	// If it's 0, then it's a leading zero, which is considered invalid in the
-	// canonical encoding.
-	startLen := src.Len()
-	val64, err := binary.ReadUvarint(src)
-	if err != nil {
-		if err == io.EOF {
-			return 0, io.ErrUnexpectedEOF
-		}
-		return 0, err
-	}
-	endLen := src.Len()
-
-	// Just 0x00 is a valid value so don't check if the varint is 1 byte
-	if startLen-endLen > 1 {
-		if err := src.UnreadByte(); err != nil {
-			return 0, err
-		}
-		lastByte, err := src.ReadByte()
-		if err != nil {
-			return 0, err
-		}
-		if lastByte == 0x00 {
-			return 0, errLeadingZeroes
-		}
-	}
-
-	return val64, nil
-}
-
-func encodeMaybeByteSlice(dst *bytes.Buffer, maybeValue maybe.Maybe[[]byte]) {
-	hasValue := maybeValue.HasValue()
-	encodeBool(dst, hasValue)
-	if hasValue {
-		encodeByteSlice(dst, maybeValue.Value())
-	}
-}
-
-func decodeMaybeByteSlice(src *bytes.Reader) (maybe.Maybe[[]byte], error) {
-	if minMaybeByteSliceLen > src.Len() {
-		return maybe.Nothing[[]byte](), io.ErrUnexpectedEOF
-	}
-
-	if hasValue, err := decodeBool(src); err != nil || !hasValue {
-		return maybe.Nothing[[]byte](), err
-	}
-
-	rawBytes, err := decodeByteSlice(src)
-	if err != nil {
-		return maybe.Nothing[[]byte](), err
-	}
-
-	return maybe.Some(rawBytes), nil
-}
-
-func encodeByteSlice(dst *bytes.Buffer, value []byte) {
-	encodeUint(dst, uint64(len(value)))
-	if value != nil {
-		_, _ = dst.Write(value)
-	}
-}
-
-func decodeByteSlice(src *bytes.Reader) ([]byte, error) {
-	if minByteSliceLen > src.Len() {
-		return nil, io.ErrUnexpectedEOF
-	}
-
-	length, err := decodeUint(src)
-	switch {
-	case err == io.EOF:
-		return nil, io.ErrUnexpectedEOF
-	case err != nil:
-		return nil, err
-	case length == 0:
-		return nil, nil
-	case length > uint64(src.Len()):
-		return nil, io.ErrUnexpectedEOF
-	}
-
-	result := make([]byte, length)
-	_, err = io.ReadFull(src, result)
-	if err == io.EOF {
-		err = io.ErrUnexpectedEOF
-	}
-	return result, err
-}
-
-func decodeID(src *bytes.Reader) (ids.ID, error) {
-	if ids.IDLen > src.Len() {
-		return ids.ID{}, io.ErrUnexpectedEOF
-	}
-
-	var id ids.ID
-	_, err := io.ReadFull(src, id[:])
-	if err == io.EOF {
-		err = io.ErrUnexpectedEOF
-	}
-	return id, err
-}
-
-func encodeKey(key Key) []byte {
-	keyLen := uintSize(uint64(key.length)) + len(key.Bytes())
-	buf := bytes.NewBuffer(make([]byte, 0, keyLen))
-	encodeKeyToBuffer(buf, key)
-	return buf.Bytes()
-}
-
-func encodeKeyToBuffer(dst *bytes.Buffer, key Key) {
-	encodeUint(dst, uint64(key.length))
-	_, _ = dst.Write(key.Bytes())
-}
-
 func decodeKey(b []byte) (Key, error) {
-	src := bytes.NewReader(b)
-	key, err := decodeKeyFromReader(src)
+	r := codecReader{
+		b:    b,
+		copy: true,
+	}
+	key, err := r.Key()
 	if err != nil {
 		return Key{}, err
 	}
-	if src.Len() != 0 {
+	if len(r.b) != 0 {
 		return Key{}, errExtraSpace
 	}
-	return key, err
+	return key, nil
 }
 
-func decodeKeyFromReader(src *bytes.Reader) (Key, error) {
-	if minKeyLen > src.Len() {
-		return Key{}, io.ErrUnexpectedEOF
+type codecReader struct {
+	b []byte
+	// copy is used to flag to the reader if it is required to copy references
+	// to [b].
+	copy bool
+}
+
+func (r *codecReader) Bool() (bool, error) {
+	if len(r.b) < boolLen {
+		return false, io.ErrUnexpectedEOF
+	}
+	boolByte := r.b[0]
+	if boolByte > trueByte {
+		return false, errInvalidBool
 	}
 
-	length, err := decodeUint(src)
+	r.b = r.b[boolLen:]
+	return boolByte == trueByte, nil
+}
+
+func (r *codecReader) Uvarint() (uint64, error) {
+	length, bytesRead := binary.Uvarint(r.b)
+	if bytesRead <= 0 {
+		return 0, io.ErrUnexpectedEOF
+	}
+
+	// To ensure decoding is canonical, we check for leading zeroes in the
+	// varint.
+	// The last byte of the varint includes the most significant bits.
+	// If the last byte is 0, then the number should have been encoded more
+	// efficiently by removing this leading zero.
+	if bytesRead > 1 && r.b[bytesRead-1] == 0x00 {
+		return 0, errLeadingZeroes
+	}
+
+	r.b = r.b[bytesRead:]
+	return length, nil
+}
+
+func (r *codecReader) ID() (ids.ID, error) {
+	if len(r.b) < ids.IDLen {
+		return ids.Empty, io.ErrUnexpectedEOF
+	}
+	id := ids.ID(r.b[:ids.IDLen])
+
+	r.b = r.b[ids.IDLen:]
+	return id, nil
+}
+
+func (r *codecReader) Bytes() ([]byte, error) {
+	length, err := r.Uvarint()
+	if err != nil {
+		return nil, err
+	}
+
+	if length > uint64(len(r.b)) {
+		return nil, io.ErrUnexpectedEOF
+	}
+	result := r.b[:length]
+	if r.copy {
+		result = bytes.Clone(result)
+	}
+
+	r.b = r.b[length:]
+	return result, nil
+}
+
+func (r *codecReader) MaybeBytes() (maybe.Maybe[[]byte], error) {
+	if hasValue, err := r.Bool(); err != nil || !hasValue {
+		return maybe.Nothing[[]byte](), err
+	}
+
+	bytes, err := r.Bytes()
+	return maybe.Some(bytes), err
+}
+
+func (r *codecReader) Key() (Key, error) {
+	bitLen, err := r.Uvarint()
 	if err != nil {
 		return Key{}, err
 	}
-	if length > math.MaxInt {
+	if bitLen > math.MaxInt {
 		return Key{}, errIntOverflow
 	}
+
 	result := Key{
-		length: int(length),
+		length: int(bitLen),
 	}
-	keyBytesLen := bytesNeeded(result.length)
-	if keyBytesLen > src.Len() {
+	byteLen := bytesNeeded(result.length)
+	if byteLen > len(r.b) {
 		return Key{}, io.ErrUnexpectedEOF
-	}
-	buffer := make([]byte, keyBytesLen)
-	if _, err := io.ReadFull(src, buffer); err != nil {
-		if err == io.EOF {
-			err = io.ErrUnexpectedEOF
-		}
-		return Key{}, err
 	}
 	if result.hasPartialByte() {
 		// Confirm that the padding bits in the partial byte are 0.
-		// We want to only look at the bits to the right of the last token, which is at index length-1.
+		// We want to only look at the bits to the right of the last token,
+		// which is at index length-1.
 		// Generate a mask where the (result.length % 8) left bits are 0.
 		paddingMask := byte(0xFF >> (result.length % 8))
-		if buffer[keyBytesLen-1]&paddingMask != 0 {
+		if r.b[byteLen-1]&paddingMask != 0 {
 			return Key{}, errNonZeroKeyPadding
 		}
 	}
-	result.value = string(buffer)
+	result.value = string(r.b[:byteLen])
+
+	r.b = r.b[byteLen:]
 	return result, nil
 }

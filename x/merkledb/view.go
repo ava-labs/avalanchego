@@ -312,7 +312,7 @@ func (v *view) hashChangedNode(n *node, keyBuffer []byte) (ids.ID, []byte) {
 		lastKeyByte byte
 
 		// We use [wg] to wait until all descendants of [n] have been updated.
-		wg sync.WaitGroup
+		wg waitGroup
 	)
 	if bytesForKey > 0 {
 		lastKeyByte = keyBuffer[bytesForKey-1]
@@ -369,12 +369,12 @@ func (v *view) hashChangedNode(n *node, keyBuffer []byte) (ids.ID, []byte) {
 		// Try updating the child and its descendants in a goroutine.
 		if childKeyBuffer, ok := v.db.hashNodesKeyPool.TryAcquire(); ok {
 			wg.Add(1)
-			go func(childEntry *child, childNode *node, childKeyBuffer []byte) {
+			go func(wg *sync.WaitGroup, childEntry *child, childNode *node, childKeyBuffer []byte) {
 				childKeyBuffer = v.setKeyBuffer(childNode, childKeyBuffer)
 				childEntry.id, childKeyBuffer = v.hashChangedNode(childNode, childKeyBuffer)
 				v.db.hashNodesKeyPool.Release(childKeyBuffer)
 				wg.Done()
-			}(childEntry, childNode, childKeyBuffer)
+			}(wg.wg, childEntry, childNode, childKeyBuffer)
 		} else {
 			// We're at the goroutine limit; do the work in this goroutine.
 			//
