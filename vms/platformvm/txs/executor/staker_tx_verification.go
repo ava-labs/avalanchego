@@ -164,11 +164,8 @@ func verifyAddValidatorTx(
 	}
 
 	// Verify the flowcheck
-	feeCalculator := fees.Calculator{
-		Config:    backend.Config,
-		ChainTime: currentTimestamp,
-	}
-	if err := tx.Visit(&feeCalculator); err != nil {
+	feeCalculator := fees.NewStaticCalculator(backend.Config, currentTimestamp)
+	if err := tx.Visit(feeCalculator); err != nil {
 		return nil, err
 	}
 
@@ -260,11 +257,8 @@ func verifyAddSubnetValidatorTx(
 	}
 
 	// Verify the flowcheck
-	feeCalculator := fees.Calculator{
-		Config:    backend.Config,
-		ChainTime: currentTimestamp,
-	}
-	if err := tx.Visit(&feeCalculator); err != nil {
+	feeCalculator := fees.NewStaticCalculator(backend.Config, currentTimestamp)
+	if err := tx.Visit(feeCalculator); err != nil {
 		return err
 	}
 
@@ -343,11 +337,8 @@ func verifyRemoveSubnetValidatorTx(
 	}
 
 	// Verify the flowcheck
-	feeCalculator := fees.Calculator{
-		Config:    backend.Config,
-		ChainTime: chainState.GetTimestamp(),
-	}
-	if err := tx.Visit(&feeCalculator); err != nil {
+	feeCalculator := fees.NewStaticCalculator(backend.Config, chainState.GetTimestamp())
+	if err := tx.Visit(feeCalculator); err != nil {
 		return nil, false, err
 	}
 
@@ -466,11 +457,8 @@ func verifyAddDelegatorTx(
 	}
 
 	// Verify the flowcheck
-	feeCalculator := fees.Calculator{
-		Config:    backend.Config,
-		ChainTime: chainState.GetTimestamp(),
-	}
-	if err := tx.Visit(&feeCalculator); err != nil {
+	feeCalculator := fees.NewStaticCalculator(backend.Config, chainState.GetTimestamp())
+	if err := tx.Visit(feeCalculator); err != nil {
 		return nil, err
 	}
 
@@ -591,11 +579,8 @@ func verifyAddPermissionlessValidatorTx(
 	copy(outs[len(tx.Outs):], tx.StakeOuts)
 
 	// Verify the flowcheck
-	feeCalculator := fees.Calculator{
-		Config:    backend.Config,
-		ChainTime: currentTimestamp,
-	}
-	if err := tx.Visit(&feeCalculator); err != nil {
+	feeCalculator := fees.NewStaticCalculator(backend.Config, currentTimestamp)
+	if err := tx.Visit(feeCalculator); err != nil {
 		return err
 	}
 
@@ -741,11 +726,8 @@ func verifyAddPermissionlessDelegatorTx(
 	}
 
 	// Verify the flowcheck
-	feeCalculator := fees.Calculator{
-		Config:    backend.Config,
-		ChainTime: currentTimestamp,
-	}
-	if err := tx.Visit(&feeCalculator); err != nil {
+	feeCalculator := fees.NewStaticCalculator(backend.Config, currentTimestamp)
+	if err := tx.Visit(feeCalculator); err != nil {
 		return err
 	}
 
@@ -801,11 +783,8 @@ func verifyTransferSubnetOwnershipTx(
 	}
 
 	// Verify the flowcheck
-	feeCalculator := fees.Calculator{
-		Config:    backend.Config,
-		ChainTime: chainState.GetTimestamp(),
-	}
-	if err := tx.Visit(&feeCalculator); err != nil {
+	feeCalculator := fees.NewStaticCalculator(backend.Config, chainState.GetTimestamp())
+	if err := tx.Visit(feeCalculator); err != nil {
 		return err
 	}
 
