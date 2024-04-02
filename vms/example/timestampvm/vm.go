@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/gorilla/rpc/v2"
-	log "github.com/inconshreveable/log15"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -24,6 +23,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/version"
+
+	log "github.com/inconshreveable/log15"
 )
 
 const (

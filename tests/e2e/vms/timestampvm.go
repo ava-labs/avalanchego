@@ -8,8 +8,6 @@ import (
 	"fmt"
 	"time"
 
-	ginkgo "github.com/onsi/ginkgo/v2"
-
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -17,7 +15,9 @@ import (
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/vms/example/timestampvm"
+
 	tsvm_client "github.com/ava-labs/avalanchego/vms/example/timestampvm/client"
+	ginkgo "github.com/onsi/ginkgo/v2"
 )
 
 var (
@@ -97,7 +97,7 @@ var _ = ginkgo.Describe("[TimestampVM]", ginkgo.Ordered, func() {
 				}
 				require.Greater(timestamp, uint64(now)-5)
 				require.Equal(data, blockData)
-				require.Equal(height, uint64(1))
+				require.Equal(uint64(1), height)
 				require.Equal(gid, pid)
 				return true
 			}, e2e.DefaultTimeout, e2e.DefaultPollingInterval, "failed to see height increase before timeout")

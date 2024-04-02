@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/onsi/gomega"
-
 	"github.com/stretchr/testify/require"
 
 	// ensure test packages are scanned by ginkgo

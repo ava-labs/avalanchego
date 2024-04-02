@@ -8,12 +8,12 @@ import (
 	"fmt"
 	"os"
 
-	log "github.com/inconshreveable/log15"
-
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/ulimit"
 	"github.com/ava-labs/avalanchego/vms/example/timestampvm"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm"
+
+	log "github.com/inconshreveable/log15"
 )
 
 func main() {
