@@ -21,7 +21,7 @@ import (
 func getNodeValue(t Trie, key string) ([]byte, error) {
 	path := ToKey([]byte(key))
 	if asView, ok := t.(*view); ok {
-		if err := asView.calculateNodeIDs(context.Background()); err != nil {
+		if err := asView.applyValueChanges(context.Background()); err != nil {
 			return nil, err
 		}
 	}
@@ -131,7 +131,7 @@ func TestVisitPathToKey(t *testing.T) {
 	require.NoError(err)
 	require.IsType(&view{}, trieIntf)
 	trie = trieIntf.(*view)
-	require.NoError(trie.calculateNodeIDs(context.Background()))
+	require.NoError(trie.applyValueChanges(context.Background()))
 
 	nodePath = make([]*node, 0, 1)
 	require.NoError(visitPathToKey(trie, ToKey(key1), func(n *node) error {
@@ -156,7 +156,7 @@ func TestVisitPathToKey(t *testing.T) {
 	require.NoError(err)
 	require.IsType(&view{}, trieIntf)
 	trie = trieIntf.(*view)
-	require.NoError(trie.calculateNodeIDs(context.Background()))
+	require.NoError(trie.applyValueChanges(context.Background()))
 
 	nodePath = make([]*node, 0, 2)
 	require.NoError(visitPathToKey(trie, ToKey(key2), func(n *node) error {
@@ -185,7 +185,7 @@ func TestVisitPathToKey(t *testing.T) {
 	require.NoError(err)
 	require.IsType(&view{}, trieIntf)
 	trie = trieIntf.(*view)
-	require.NoError(trie.calculateNodeIDs(context.Background()))
+	require.NoError(trie.applyValueChanges(context.Background()))
 
 	// Trie is:
 	//    []
@@ -775,7 +775,7 @@ func Test_Trie_ChainDeletion(t *testing.T) {
 	)
 	require.NoError(err)
 
-	require.NoError(newTrie.(*view).calculateNodeIDs(context.Background()))
+	require.NoError(newTrie.(*view).applyValueChanges(context.Background()))
 	maybeRoot := newTrie.getRoot()
 	require.NoError(err)
 	require.True(maybeRoot.HasValue())
@@ -794,7 +794,7 @@ func Test_Trie_ChainDeletion(t *testing.T) {
 		},
 	)
 	require.NoError(err)
-	require.NoError(newTrie.(*view).calculateNodeIDs(context.Background()))
+	require.NoError(newTrie.(*view).applyValueChanges(context.Background()))
 
 	// trie should be empty
 	root := newTrie.getRoot()
@@ -861,7 +861,7 @@ func Test_Trie_NodeCollapse(t *testing.T) {
 	)
 	require.NoError(err)
 
-	require.NoError(trie.(*view).calculateNodeIDs(context.Background()))
+	require.NoError(trie.(*view).applyValueChanges(context.Background()))
 
 	for _, kv := range kvs {
 		node, err := trie.getEditableNode(ToKey(kv.Key), true)
@@ -888,7 +888,7 @@ func Test_Trie_NodeCollapse(t *testing.T) {
 	)
 	require.NoError(err)
 
-	require.NoError(trie.(*view).calculateNodeIDs(context.Background()))
+	require.NoError(trie.(*view).applyValueChanges(context.Background()))
 
 	for _, kv := range deletedKVs {
 		_, err := trie.getEditableNode(ToKey(kv.Key), true)

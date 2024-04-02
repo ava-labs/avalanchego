@@ -216,9 +216,9 @@ type merkleDB struct {
 	// Valid children of this trie.
 	childViews []*view
 
-	// calculateNodeIDsSema controls the number of goroutines inside
-	// [calculateNodeIDsHelper] at any given time.
-	calculateNodeIDsSema *semaphore.Weighted
+	// hashNodesSema controls the number of goroutines that are created inside
+	// [hashChangedNode] at any given time.
+	hashNodesSema *semaphore.Weighted
 
 	tokenSize int
 }
@@ -270,12 +270,12 @@ func newDatabase(
 			bufferPool,
 			metrics,
 			int(config.ValueNodeCacheSize)),
-		history:              newTrieHistory(int(config.HistoryLength)),
-		debugTracer:          getTracerIfEnabled(config.TraceLevel, DebugTrace, config.Tracer),
-		infoTracer:           getTracerIfEnabled(config.TraceLevel, InfoTrace, config.Tracer),
-		childViews:           make([]*view, 0, defaultPreallocationSize),
-		calculateNodeIDsSema: semaphore.NewWeighted(int64(rootGenConcurrency)),
-		tokenSize:            BranchFactorToTokenSize[config.BranchFactor],
+		history:       newTrieHistory(int(config.HistoryLength)),
+		debugTracer:   getTracerIfEnabled(config.TraceLevel, DebugTrace, config.Tracer),
+		infoTracer:    getTracerIfEnabled(config.TraceLevel, InfoTrace, config.Tracer),
+		childViews:    make([]*view, 0, defaultPreallocationSize),
+		hashNodesSema: semaphore.NewWeighted(int64(rootGenConcurrency)),
+		tokenSize:     BranchFactorToTokenSize[config.BranchFactor],
 	}
 
 	if err := trieDB.initializeRoot(); err != nil {
