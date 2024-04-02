@@ -47,6 +47,7 @@ func (p *bytesPool) pop() []byte {
 }
 
 func (p *bytesPool) Release(b []byte) {
+	// Before waking anyone waiting on a slot, return the bytes.
 	p.bytesLock.Lock()
 	p.bytes = append(p.bytes, b)
 	p.bytesLock.Unlock()
