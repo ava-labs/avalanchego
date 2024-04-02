@@ -203,10 +203,7 @@ func newEnvironment(t *testing.T, f fork) *environment {
 	return env
 }
 
-func addSubnet(
-	t *testing.T,
-	env *environment,
-) {
+func addSubnet(t *testing.T, env *environment) {
 	require := require.New(t)
 
 	builder, signer := env.factory.MakeWallet(preFundedKeys[0])

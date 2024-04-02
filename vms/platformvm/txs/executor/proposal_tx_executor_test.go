@@ -35,14 +35,16 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 
 	// [addMinStakeValidator] adds a new validator to the primary network's
 	// pending validator set with the minimum staking amount
-	addMinStakeValidator := func(target *environment) {
-		builder, signer := target.factory.MakeWallet(preFundedKeys[0])
+	addMinStakeValidator := func(env *environment) {
+		require := require.New(t)
+
+		builder, signer := env.factory.MakeWallet(preFundedKeys[0])
 		utx, err := builder.NewAddValidatorTx(
 			&txs.Validator{
 				NodeID: newValidatorID,
 				Start:  newValidatorStartTime,
 				End:    newValidatorEndTime,
-				Wght:   target.config.MinValidatorStake,
+				Wght:   env.config.MinValidatorStake,
 			},
 			&secp256k1fx.OutputOwners{
 				Threshold: 1,
@@ -50,9 +52,9 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 			},
 			reward.PercentDenominator,
 		)
-		require.NoError(t, err)
+		require.NoError(err)
 		tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
-		require.NoError(t, err)
+		require.NoError(err)
 
 		addValTx := tx.Unsigned.(*txs.AddValidatorTx)
 		staker, err := state.NewCurrentStaker(
@@ -61,24 +63,26 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 			addValTx.StartTime(),
 			0,
 		)
-		require.NoError(t, err)
+		require.NoError(err)
 
-		target.state.PutCurrentValidator(staker)
-		target.state.AddTx(tx, status.Committed)
-		target.state.SetHeight(dummyHeight)
-		require.NoError(t, target.state.Commit())
+		env.state.PutCurrentValidator(staker)
+		env.state.AddTx(tx, status.Committed)
+		env.state.SetHeight(dummyHeight)
+		require.NoError(env.state.Commit())
 	}
 
 	// [addMaxStakeValidator] adds a new validator to the primary network's
 	// pending validator set with the maximum staking amount
-	addMaxStakeValidator := func(target *environment) {
-		builder, signer := target.factory.MakeWallet(preFundedKeys[0])
+	addMaxStakeValidator := func(env *environment) {
+		require := require.New(t)
+
+		builder, signer := env.factory.MakeWallet(preFundedKeys[0])
 		utx, err := builder.NewAddValidatorTx(
 			&txs.Validator{
 				NodeID: newValidatorID,
 				Start:  newValidatorStartTime,
 				End:    newValidatorEndTime,
-				Wght:   target.config.MaxValidatorStake,
+				Wght:   env.config.MaxValidatorStake,
 			},
 			&secp256k1fx.OutputOwners{
 				Threshold: 1,
@@ -86,9 +90,9 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 			},
 			reward.PercentDenominator,
 		)
-		require.NoError(t, err)
+		require.NoError(err)
 		tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
-		require.NoError(t, err)
+		require.NoError(err)
 
 		addValTx := tx.Unsigned.(*txs.AddValidatorTx)
 		staker, err := state.NewCurrentStaker(
@@ -97,160 +101,150 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 			addValTx.StartTime(),
 			0,
 		)
-		require.NoError(t, err)
+		require.NoError(err)
 
-		target.state.PutCurrentValidator(staker)
-		target.state.AddTx(tx, status.Committed)
-		target.state.SetHeight(dummyHeight)
-		require.NoError(t, target.state.Commit())
+		env.state.PutCurrentValidator(staker)
+		env.state.AddTx(tx, status.Committed)
+		env.state.SetHeight(dummyHeight)
+		require.NoError(env.state.Commit())
 	}
 
-	dummyH := newEnvironment(t, apricotPhase5)
-	currentTimestamp := dummyH.state.GetTimestamp()
+	env := newEnvironment(t, apricotPhase5)
+	currentTimestamp := env.state.GetTimestamp()
 
 	type test struct {
-		description   string
-		stakeAmount   uint64
-		startTime     uint64
-		endTime       uint64
-		nodeID        ids.NodeID
-		rewardAddress ids.ShortID
-		feeKeys       []*secp256k1.PrivateKey
-		setup         func(*environment)
-		AP3Time       time.Time
-		expectedErr   error
+		description string
+		stakeAmount uint64
+		startTime   uint64
+		endTime     uint64
+		nodeID      ids.NodeID
+		feeKeys     []*secp256k1.PrivateKey
+		setup       func(*environment)
+		AP3Time     time.Time
+		expectedErr error
 	}
 
 	tests := []test{
 		{
-			description:   "validator stops validating earlier than delegator",
-			stakeAmount:   dummyH.config.MinDelegatorStake,
-			startTime:     uint64(defaultValidateStartTime.Unix()) + 1,
-			endTime:       uint64(defaultValidateEndTime.Unix()) + 1,
-			nodeID:        nodeID,
-			rewardAddress: rewardAddress,
-			feeKeys:       []*secp256k1.PrivateKey{preFundedKeys[0]},
-			setup:         nil,
-			AP3Time:       defaultGenesisTime,
-			expectedErr:   ErrPeriodMismatch,
+			description: "validator stops validating earlier than delegator",
+			stakeAmount: env.config.MinDelegatorStake,
+			startTime:   uint64(defaultValidateStartTime.Unix()) + 1,
+			endTime:     uint64(defaultValidateEndTime.Unix()) + 1,
+			nodeID:      nodeID,
+			feeKeys:     []*secp256k1.PrivateKey{preFundedKeys[0]},
+			setup:       nil,
+			AP3Time:     defaultGenesisTime,
+			expectedErr: ErrPeriodMismatch,
 		},
 		{
-			description:   "validator not in the current or pending validator sets",
-			stakeAmount:   dummyH.config.MinDelegatorStake,
-			startTime:     uint64(defaultValidateStartTime.Add(5 * time.Second).Unix()),
-			endTime:       uint64(defaultValidateEndTime.Add(-5 * time.Second).Unix()),
-			nodeID:        newValidatorID,
-			rewardAddress: rewardAddress,
-			feeKeys:       []*secp256k1.PrivateKey{preFundedKeys[0]},
-			setup:         nil,
-			AP3Time:       defaultGenesisTime,
-			expectedErr:   database.ErrNotFound,
+			description: "validator not in the current or pending validator sets",
+			stakeAmount: env.config.MinDelegatorStake,
+			startTime:   uint64(defaultValidateStartTime.Add(5 * time.Second).Unix()),
+			endTime:     uint64(defaultValidateEndTime.Add(-5 * time.Second).Unix()),
+			nodeID:      newValidatorID,
+			feeKeys:     []*secp256k1.PrivateKey{preFundedKeys[0]},
+			setup:       nil,
+			AP3Time:     defaultGenesisTime,
+			expectedErr: database.ErrNotFound,
 		},
 		{
-			description:   "delegator starts before validator",
-			stakeAmount:   dummyH.config.MinDelegatorStake,
-			startTime:     newValidatorStartTime - 1, // start validating subnet before primary network
-			endTime:       newValidatorEndTime,
-			nodeID:        newValidatorID,
-			rewardAddress: rewardAddress,
-			feeKeys:       []*secp256k1.PrivateKey{preFundedKeys[0]},
-			setup:         addMinStakeValidator,
-			AP3Time:       defaultGenesisTime,
-			expectedErr:   ErrPeriodMismatch,
+			description: "delegator starts before validator",
+			stakeAmount: env.config.MinDelegatorStake,
+			startTime:   newValidatorStartTime - 1, // start validating subnet before primary network
+			endTime:     newValidatorEndTime,
+			nodeID:      newValidatorID,
+			feeKeys:     []*secp256k1.PrivateKey{preFundedKeys[0]},
+			setup:       addMinStakeValidator,
+			AP3Time:     defaultGenesisTime,
+			expectedErr: ErrPeriodMismatch,
 		},
 		{
-			description:   "delegator stops before validator",
-			stakeAmount:   dummyH.config.MinDelegatorStake,
-			startTime:     newValidatorStartTime,
-			endTime:       newValidatorEndTime + 1, // stop validating subnet after stopping validating primary network
-			nodeID:        newValidatorID,
-			rewardAddress: rewardAddress,
-			feeKeys:       []*secp256k1.PrivateKey{preFundedKeys[0]},
-			setup:         addMinStakeValidator,
-			AP3Time:       defaultGenesisTime,
-			expectedErr:   ErrPeriodMismatch,
+			description: "delegator stops before validator",
+			stakeAmount: env.config.MinDelegatorStake,
+			startTime:   newValidatorStartTime,
+			endTime:     newValidatorEndTime + 1, // stop validating subnet after stopping validating primary network
+			nodeID:      newValidatorID,
+			feeKeys:     []*secp256k1.PrivateKey{preFundedKeys[0]},
+			setup:       addMinStakeValidator,
+			AP3Time:     defaultGenesisTime,
+			expectedErr: ErrPeriodMismatch,
 		},
 		{
-			description:   "valid",
-			stakeAmount:   dummyH.config.MinDelegatorStake,
-			startTime:     newValidatorStartTime, // same start time as for primary network
-			endTime:       newValidatorEndTime,   // same end time as for primary network
-			nodeID:        newValidatorID,
-			rewardAddress: rewardAddress,
-			feeKeys:       []*secp256k1.PrivateKey{preFundedKeys[0]},
-			setup:         addMinStakeValidator,
-			AP3Time:       defaultGenesisTime,
-			expectedErr:   nil,
+			description: "valid",
+			stakeAmount: env.config.MinDelegatorStake,
+			startTime:   newValidatorStartTime, // same start time as for primary network
+			endTime:     newValidatorEndTime,   // same end time as for primary network
+			nodeID:      newValidatorID,
+			feeKeys:     []*secp256k1.PrivateKey{preFundedKeys[0]},
+			setup:       addMinStakeValidator,
+			AP3Time:     defaultGenesisTime,
+			expectedErr: nil,
 		},
 		{
-			description:   "starts delegating at current timestamp",
-			stakeAmount:   dummyH.config.MinDelegatorStake,           // weight
-			startTime:     uint64(currentTimestamp.Unix()),           // start time
-			endTime:       uint64(defaultValidateEndTime.Unix()),     // end time
-			nodeID:        nodeID,                                    // node ID
-			rewardAddress: rewardAddress,                             // Reward Address
-			feeKeys:       []*secp256k1.PrivateKey{preFundedKeys[0]}, // tx fee payer
-			setup:         nil,
-			AP3Time:       defaultGenesisTime,
-			expectedErr:   ErrTimestampNotBeforeStartTime,
+			description: "starts delegating at current timestamp",
+			stakeAmount: env.config.MinDelegatorStake,
+			startTime:   uint64(currentTimestamp.Unix()),
+			endTime:     uint64(defaultValidateEndTime.Unix()),
+			nodeID:      nodeID,
+			feeKeys:     []*secp256k1.PrivateKey{preFundedKeys[0]},
+			setup:       nil,
+			AP3Time:     defaultGenesisTime,
+			expectedErr: ErrTimestampNotBeforeStartTime,
 		},
 		{
-			description:   "tx fee paying key has no funds",
-			stakeAmount:   dummyH.config.MinDelegatorStake,             // weight
-			startTime:     uint64(defaultValidateStartTime.Unix()) + 1, // start time
-			endTime:       uint64(defaultValidateEndTime.Unix()),       // end time
-			nodeID:        nodeID,                                      // node ID
-			rewardAddress: rewardAddress,                               // Reward Address
-			feeKeys:       []*secp256k1.PrivateKey{preFundedKeys[1]},   // tx fee payer
-			setup: func(target *environment) { // Remove all UTXOs owned by keys[1]
-				utxoIDs, err := target.state.UTXOIDs(
+			description: "tx fee paying key has no funds",
+			stakeAmount: env.config.MinDelegatorStake,
+			startTime:   uint64(defaultValidateStartTime.Unix()) + 1,
+			endTime:     uint64(defaultValidateEndTime.Unix()),
+			nodeID:      nodeID,
+			feeKeys:     []*secp256k1.PrivateKey{preFundedKeys[1]},
+			setup: func(env *environment) { // Remove all UTXOs owned by keys[1]
+				utxoIDs, err := env.state.UTXOIDs(
 					preFundedKeys[1].PublicKey().Address().Bytes(),
 					ids.Empty,
 					math.MaxInt32)
 				require.NoError(t, err)
 
 				for _, utxoID := range utxoIDs {
-					target.state.DeleteUTXO(utxoID)
+					env.state.DeleteUTXO(utxoID)
 				}
-				target.state.SetHeight(dummyHeight)
-				require.NoError(t, target.state.Commit())
+				env.state.SetHeight(dummyHeight)
+				require.NoError(t, env.state.Commit())
 			},
 			AP3Time:     defaultGenesisTime,
 			expectedErr: ErrFlowCheckFailed,
 		},
 		{
-			description:   "over delegation before AP3",
-			stakeAmount:   dummyH.config.MinDelegatorStake,
-			startTime:     newValidatorStartTime, // same start time as for primary network
-			endTime:       newValidatorEndTime,   // same end time as for primary network
-			nodeID:        newValidatorID,
-			rewardAddress: rewardAddress,
-			feeKeys:       []*secp256k1.PrivateKey{preFundedKeys[0]},
-			setup:         addMaxStakeValidator,
-			AP3Time:       defaultValidateEndTime,
-			expectedErr:   nil,
+			description: "over delegation before AP3",
+			stakeAmount: env.config.MinDelegatorStake,
+			startTime:   newValidatorStartTime, // same start time as for primary network
+			endTime:     newValidatorEndTime,   // same end time as for primary network
+			nodeID:      newValidatorID,
+			feeKeys:     []*secp256k1.PrivateKey{preFundedKeys[0]},
+			setup:       addMaxStakeValidator,
+			AP3Time:     defaultValidateEndTime,
+			expectedErr: nil,
 		},
 		{
-			description:   "over delegation after AP3",
-			stakeAmount:   dummyH.config.MinDelegatorStake,
-			startTime:     newValidatorStartTime, // same start time as for primary network
-			endTime:       newValidatorEndTime,   // same end time as for primary network
-			nodeID:        newValidatorID,
-			rewardAddress: rewardAddress,
-			feeKeys:       []*secp256k1.PrivateKey{preFundedKeys[0]},
-			setup:         addMaxStakeValidator,
-			AP3Time:       defaultGenesisTime,
-			expectedErr:   ErrOverDelegated,
+			description: "over delegation after AP3",
+			stakeAmount: env.config.MinDelegatorStake,
+			startTime:   newValidatorStartTime, // same start time as for primary network
+			endTime:     newValidatorEndTime,   // same end time as for primary network
+			nodeID:      newValidatorID,
+			feeKeys:     []*secp256k1.PrivateKey{preFundedKeys[0]},
+			setup:       addMaxStakeValidator,
+			AP3Time:     defaultGenesisTime,
+			expectedErr: ErrOverDelegated,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.description, func(t *testing.T) {
 			require := require.New(t)
-			freshTH := newEnvironment(t, apricotPhase5)
-			freshTH.config.ApricotPhase3Time = tt.AP3Time
+			env := newEnvironment(t, apricotPhase5)
+			env.config.ApricotPhase3Time = tt.AP3Time
 
-			builder, signer := freshTH.factory.MakeWallet(tt.feeKeys...)
+			builder, signer := env.factory.MakeWallet(tt.feeKeys...)
 			utx, err := builder.NewAddDelegatorTx(
 				&txs.Validator{
 					NodeID: tt.nodeID,
@@ -260,7 +254,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 				},
 				&secp256k1fx.OutputOwners{
 					Threshold: 1,
-					Addrs:     []ids.ShortID{tt.rewardAddress},
+					Addrs:     []ids.ShortID{rewardAddress},
 				},
 			)
 			require.NoError(err)
@@ -268,19 +262,19 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 			require.NoError(err)
 
 			if tt.setup != nil {
-				tt.setup(freshTH)
+				tt.setup(env)
 			}
 
-			onCommitState, err := state.NewDiff(lastAcceptedID, freshTH)
+			onCommitState, err := state.NewDiff(lastAcceptedID, env)
 			require.NoError(err)
 
-			onAbortState, err := state.NewDiff(lastAcceptedID, freshTH)
+			onAbortState, err := state.NewDiff(lastAcceptedID, env)
 			require.NoError(err)
 
 			executor := ProposalTxExecutor{
 				OnCommitState: onCommitState,
 				OnAbortState:  onAbortState,
-				Backend:       &freshTH.backend,
+				Backend:       &env.backend,
 				Tx:            tx,
 			}
 			err = tx.Unsigned.Visit(&executor)
