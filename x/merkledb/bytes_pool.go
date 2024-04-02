@@ -58,10 +58,3 @@ func (p *bytesPool) Release(b []byte) {
 
 	p.bytes = append(p.bytes, b)
 }
-
-func setLength(b []byte, size int) []byte {
-	if size <= cap(b) {
-		return b[:size]
-	}
-	return append(b[:cap(b)], make([]byte, size-cap(b))...)
-}

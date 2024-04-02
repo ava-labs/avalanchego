@@ -298,8 +298,8 @@ func (v *view) hashChangedNodes(ctx context.Context) {
 // Calculates the ID of all descendants of [n] which need to be recalculated,
 // and then calculates the ID of [n] itself.
 //
-// Invariant: [keyBuffer] must be populated with [n]'s key and have a large
-// enough capacity to contain all of [n]'s child keys.
+// Invariant: [keyBuffer] must be populated with [n]'s key and have sufficient
+// length to contain any of [n]'s child keys.
 func (v *view) hashChangedNode(n *node, keyBuffer []byte) (ids.ID, []byte) {
 	var (
 		// childBuffer is allocated on the stack.
@@ -326,6 +326,11 @@ func (v *view) hashChangedNode(n *node, keyBuffer []byte) (ids.ID, []byte) {
 		}
 
 		totalBitLength := n.key.length + v.tokenSize + childEntry.compressedKey.length
+		// Because [keyBuffer] may have been modified in a prior iteration of
+		// this loop, it is not guaranteed that it's length is at least
+		// [bytesNeeded(totalBitLength)]. However, that's fine. The below
+		// slicing would only panic if the buffer didn't have sufficient
+		// capacity.
 		keyBuffer = keyBuffer[:bytesNeeded(totalBitLength)]
 		// We don't need to copy this node's key. It's assumed to already be
 		// correct; except for the last byte. We must make sure the last byte of
@@ -401,7 +406,14 @@ func (v *view) setLengthForChildren(n *node, keyBuffer []byte) []byte {
 		maxBitLength = max(maxBitLength, childEntry.compressedKey.length)
 	}
 	maxBytesNeeded := bytesNeeded(n.key.length + v.tokenSize + maxBitLength)
-	return setLength(keyBuffer, maxBytesNeeded)
+	return setBytesLength(keyBuffer, maxBytesNeeded)
+}
+
+func setBytesLength(b []byte, size int) []byte {
+	if size <= cap(b) {
+		return b[:size]
+	}
+	return append(b[:cap(b)], make([]byte, size-cap(b))...)
 }
 
 // GetProof returns a proof that [bytesPath] is in or not in trie [t].
