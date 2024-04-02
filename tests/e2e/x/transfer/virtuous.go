@@ -173,7 +173,6 @@ var _ = e2e.DescribeXChainSerial("[Virtuous Transfer Tx AVAX]", func() {
 				})
 
 				// retrieve the unit fees that will be used for the BaseTx
-				feeCfg := config.GetDynamicFeesConfig(true /*isEActive*/)
 				nodeURI := e2e.Env.GetRandomNodeURI()
 				xChainClient := avm.NewClient(nodeURI.URI, "X")
 				_, feeRates, err := xChainClient.GetFeeRates(e2e.DefaultContext())
@@ -197,15 +196,15 @@ var _ = e2e.DescribeXChainSerial("[Virtuous Transfer Tx AVAX]", func() {
 				require.NoError(err)
 
 				// retrieve fees paid for the BaseTx
-				feeCalc := fees.Calculator{
-					IsEActive:          true,
-					FeeManager:         commonfees.NewManager(feeRates),
-					BlockMaxComplexity: feeCfg.BlockMaxComplexity,
-					Codec:              xbuilder.Parser.Codec(),
-					Credentials:        tx.Creds,
-				}
+				feeCfg := config.GetDynamicFeesConfig(true /*isEActive*/)
+				feeCalc := fees.NewDynamicCalculator(
+					xbuilder.Parser.Codec(),
+					commonfees.NewManager(feeRates),
+					feeCfg.BlockMaxComplexity,
+					tx.Creds,
+				)
 
-				require.NoError(tx.Unsigned.Visit(&feeCalc))
+				require.NoError(tx.Unsigned.Visit(feeCalc))
 				senderNewBal := senderOrigBal - amountToTransfer - feeCalc.Fee
 				receiverNewBal := receiverOrigBal + amountToTransfer
 

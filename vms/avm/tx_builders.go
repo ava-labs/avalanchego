@@ -266,25 +266,27 @@ func builders(backend txBuilderBackend, kc *secp256k1fx.Keychain) (walletbuilder
 
 func feeCalculator(backend txBuilderBackend) (*fees.Calculator, error) {
 	var (
-		currentChainTime = backend.State().GetTimestamp()
-		nextChainTime    = executor.NextBlockTime(currentChainTime, backend.Clock())
-		cfg              = backend.Config()
-		isEActive        = cfg.IsEActivated(currentChainTime)
-		feeCfg           = config.GetDynamicFeesConfig(isEActive)
+		chainTime = backend.State().GetTimestamp()
+		cfg       = backend.Config()
+		isEActive = cfg.IsEActivated(chainTime)
 	)
 
-	feeManager, err := fees.UpdatedFeeManager(backend.State(), backend.Config(), currentChainTime, nextChainTime)
-	if err != nil {
-		return nil, err
+	var feeCalculator *fees.Calculator
+	if !isEActive {
+		feeCalculator = fees.NewStaticCalculator(cfg)
+	} else {
+		feeCfg := config.GetDynamicFeesConfig(isEActive)
+		nextChainTime := executor.NextBlockTime(chainTime, backend.Clock())
+
+		feeManager, err := fees.UpdatedFeeManager(backend.State(), backend.Config(), chainTime, nextChainTime)
+		if err != nil {
+			return nil, err
+		}
+
+		feeCalculator = fees.NewDynamicCalculator(backend.Codec(), feeManager, feeCfg.BlockMaxComplexity, nil)
 	}
 
-	return &fees.Calculator{
-		IsEActive:          isEActive,
-		Config:             cfg,
-		FeeManager:         feeManager,
-		BlockMaxComplexity: feeCfg.BlockMaxComplexity,
-		Codec:              backend.Codec(),
-	}, nil
+	return feeCalculator, nil
 }
 
 func options(changeAddr ids.ShortID, memo []byte) []common.Option {

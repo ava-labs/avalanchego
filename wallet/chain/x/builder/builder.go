@@ -538,11 +538,11 @@ func (b *builder) NewImportTx(
 			},
 		}
 
-		// update fees to target given the extra output added
 		outDimensions, err := commonfees.MeterOutput(Parser.Codec(), txs.CodecVersion, changeOut)
 		if err != nil {
 			return nil, fmt.Errorf("failed calculating output size: %w", err)
 		}
+		// update fees to target given the extra output added
 		if _, err := feeCalc.AddFeesFor(outDimensions); err != nil {
 			return nil, fmt.Errorf("account for output fees: %w", err)
 		}

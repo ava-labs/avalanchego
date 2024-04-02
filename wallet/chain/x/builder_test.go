@@ -13,7 +13,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/fees"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -45,6 +44,7 @@ var (
 		BaseTxFee:        units.MicroAvax,
 		CreateAssetTxFee: 99 * units.MilliAvax,
 	}
+	testStaticConfig = staticFeesConfigFromContext(testContext)
 
 	testFeeRates = commonfees.Dimensions{
 		1 * units.MicroAvax,
@@ -93,12 +93,13 @@ func TestBaseTx(t *testing.T) {
 	)
 
 	{ // Post E-Upgrade
-		feeCalc := &fees.Calculator{
-			IsEActive:          true,
-			FeeManager:         commonfees.NewManager(testFeeRates),
-			BlockMaxComplexity: testBlockMaxConsumedUnits,
-			Codec:              builder.Parser.Codec(),
-		}
+		feeCalc := fees.NewDynamicCalculator(
+			builder.Parser.Codec(),
+			commonfees.NewManager(testFeeRates),
+			testBlockMaxConsumedUnits,
+			nil,
+		)
+
 		utx, err := b.NewBaseTx(
 			outputsToMove,
 			feeCalc,
@@ -108,13 +109,13 @@ func TestBaseTx(t *testing.T) {
 		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
 
-		fc := &fees.Calculator{
-			IsEActive:          true,
-			FeeManager:         commonfees.NewManager(testFeeRates),
-			BlockMaxComplexity: testBlockMaxConsumedUnits,
-			Credentials:        tx.Creds,
-			Codec:              builder.Parser.Codec(),
-		}
+		fc := fees.NewDynamicCalculator(
+			builder.Parser.Codec(),
+			commonfees.NewManager(testFeeRates),
+			testBlockMaxConsumedUnits,
+			tx.Creds,
+		)
+
 		require.NoError(utx.Visit(fc))
 		require.Equal(9930*units.MicroAvax, fc.Fee)
 
@@ -131,34 +132,14 @@ func TestBaseTx(t *testing.T) {
 	}
 
 	{ // Pre E-Upgrade
-		feeCalc := &fees.Calculator{
-			IsEActive: false,
-			Config: &config.Config{
-				TxFee: testContext.BaseTxFee,
-			},
-			FeeManager:         commonfees.NewManager(commonfees.Empty),
-			BlockMaxComplexity: commonfees.Max,
-			Codec:              builder.Parser.Codec(),
-		}
+		feeCalc := fees.NewStaticCalculator(testStaticConfig)
 		utx, err := b.NewBaseTx(
 			outputsToMove,
 			feeCalc,
 		)
 		require.NoError(err)
 
-		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
-		require.NoError(err)
-
-		fc := &fees.Calculator{
-			IsEActive: false,
-			Config: &config.Config{
-				TxFee: testContext.BaseTxFee,
-			},
-			FeeManager:         commonfees.NewManager(commonfees.Empty),
-			BlockMaxComplexity: commonfees.Max,
-			Codec:              builder.Parser.Codec(),
-			Credentials:        tx.Creds,
-		}
+		fc := fees.NewStaticCalculator(testStaticConfig)
 		require.NoError(utx.Visit(fc))
 		require.Equal(testContext.BaseTxFee, fc.Fee)
 
@@ -249,12 +230,12 @@ func TestCreateAssetTx(t *testing.T) {
 
 	{
 		// Post E-Upgrade
-		feeCalc := &fees.Calculator{
-			IsEActive:          true,
-			FeeManager:         commonfees.NewManager(testFeeRates),
-			BlockMaxComplexity: testBlockMaxConsumedUnits,
-			Codec:              builder.Parser.Codec(),
-		}
+		feeCalc := fees.NewDynamicCalculator(
+			builder.Parser.Codec(),
+			commonfees.NewManager(testFeeRates),
+			testBlockMaxConsumedUnits,
+			nil,
+		)
 
 		utx, err := b.NewCreateAssetTx(
 			assetName,
@@ -268,13 +249,12 @@ func TestCreateAssetTx(t *testing.T) {
 		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
 
-		fc := &fees.Calculator{
-			IsEActive:          true,
-			FeeManager:         commonfees.NewManager(testFeeRates),
-			BlockMaxComplexity: testBlockMaxConsumedUnits,
-			Codec:              builder.Parser.Codec(),
-			Credentials:        tx.Creds,
-		}
+		fc := fees.NewDynamicCalculator(
+			builder.Parser.Codec(),
+			commonfees.NewManager(testFeeRates),
+			testBlockMaxConsumedUnits,
+			tx.Creds,
+		)
 		require.NoError(utx.Visit(fc))
 		require.Equal(9898*units.MicroAvax, fc.Fee)
 
@@ -291,15 +271,7 @@ func TestCreateAssetTx(t *testing.T) {
 
 	{
 		// Pre E-Upgrade
-		feeCalc := &fees.Calculator{
-			IsEActive: false,
-			Config: &config.Config{
-				CreateAssetTxFee: testContext.CreateAssetTxFee,
-			},
-			FeeManager:         commonfees.NewManager(commonfees.Empty),
-			BlockMaxComplexity: commonfees.Max,
-			Codec:              builder.Parser.Codec(),
-		}
+		feeCalc := fees.NewStaticCalculator(testStaticConfig)
 
 		utx, err := b.NewCreateAssetTx(
 			assetName,
@@ -310,19 +282,7 @@ func TestCreateAssetTx(t *testing.T) {
 		)
 		require.NoError(err)
 
-		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
-		require.NoError(err)
-
-		fc := &fees.Calculator{
-			IsEActive: false,
-			Config: &config.Config{
-				CreateAssetTxFee: testContext.CreateAssetTxFee,
-			},
-			FeeManager:         commonfees.NewManager(commonfees.Empty),
-			BlockMaxComplexity: commonfees.Max,
-			Codec:              builder.Parser.Codec(),
-			Credentials:        tx.Creds,
-		}
+		fc := fees.NewStaticCalculator(testStaticConfig)
 		require.NoError(utx.Visit(fc))
 		require.Equal(99*units.MilliAvax, fc.Fee)
 
@@ -367,12 +327,12 @@ func TestMintNFTOperation(t *testing.T) {
 
 	{
 		// Post E-Upgrade
-		feeCalc := &fees.Calculator{
-			IsEActive:          true,
-			FeeManager:         commonfees.NewManager(testFeeRates),
-			BlockMaxComplexity: testBlockMaxConsumedUnits,
-			Codec:              builder.Parser.Codec(),
-		}
+		feeCalc := fees.NewDynamicCalculator(
+			builder.Parser.Codec(),
+			commonfees.NewManager(testFeeRates),
+			testBlockMaxConsumedUnits,
+			nil,
+		)
 
 		utx, err := b.NewOperationTxMintNFT(
 			nftAssetID,
@@ -385,13 +345,12 @@ func TestMintNFTOperation(t *testing.T) {
 		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
 
-		fc := &fees.Calculator{
-			IsEActive:          true,
-			FeeManager:         commonfees.NewManager(testFeeRates),
-			BlockMaxComplexity: testBlockMaxConsumedUnits,
-			Codec:              builder.Parser.Codec(),
-			Credentials:        tx.Creds,
-		}
+		fc := fees.NewDynamicCalculator(
+			builder.Parser.Codec(),
+			commonfees.NewManager(testFeeRates),
+			testBlockMaxConsumedUnits,
+			tx.Creds,
+		)
 		require.NoError(utx.Visit(fc))
 		require.Equal(9818*units.MicroAvax, fc.Fee)
 
@@ -408,15 +367,7 @@ func TestMintNFTOperation(t *testing.T) {
 
 	{
 		// Pre E-Upgrade
-		feeCalc := &fees.Calculator{
-			IsEActive: false,
-			Config: &config.Config{
-				TxFee: testContext.BaseTxFee,
-			},
-			FeeManager:         commonfees.NewManager(commonfees.Empty),
-			BlockMaxComplexity: commonfees.Max,
-			Codec:              builder.Parser.Codec(),
-		}
+		feeCalc := fees.NewStaticCalculator(testStaticConfig)
 
 		utx, err := b.NewOperationTxMintNFT(
 			nftAssetID,
@@ -426,19 +377,7 @@ func TestMintNFTOperation(t *testing.T) {
 		)
 		require.NoError(err)
 
-		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
-		require.NoError(err)
-
-		fc := &fees.Calculator{
-			IsEActive: false,
-			Config: &config.Config{
-				TxFee: testContext.BaseTxFee,
-			},
-			FeeManager:         commonfees.NewManager(commonfees.Empty),
-			BlockMaxComplexity: commonfees.Max,
-			Codec:              builder.Parser.Codec(),
-			Credentials:        tx.Creds,
-		}
+		fc := fees.NewStaticCalculator(testStaticConfig)
 		require.NoError(utx.Visit(fc))
 		require.Equal(testContext.BaseTxFee, fc.Fee)
 
@@ -489,12 +428,12 @@ func TestMintFTOperation(t *testing.T) {
 
 	{
 		// Post E-Upgrade
-		feeCalc := &fees.Calculator{
-			IsEActive:          true,
-			FeeManager:         commonfees.NewManager(testFeeRates),
-			BlockMaxComplexity: testBlockMaxConsumedUnits,
-			Codec:              builder.Parser.Codec(),
-		}
+		feeCalc := fees.NewDynamicCalculator(
+			builder.Parser.Codec(),
+			commonfees.NewManager(testFeeRates),
+			testBlockMaxConsumedUnits,
+			nil,
+		)
 
 		utx, err := b.NewOperationTxMintFT(
 			outputs,
@@ -505,13 +444,12 @@ func TestMintFTOperation(t *testing.T) {
 		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
 
-		fc := &fees.Calculator{
-			IsEActive:          true,
-			FeeManager:         commonfees.NewManager(testFeeRates),
-			BlockMaxComplexity: testBlockMaxConsumedUnits,
-			Codec:              builder.Parser.Codec(),
-			Credentials:        tx.Creds,
-		}
+		fc := fees.NewDynamicCalculator(
+			builder.Parser.Codec(),
+			commonfees.NewManager(testFeeRates),
+			testBlockMaxConsumedUnits,
+			tx.Creds,
+		)
 		require.NoError(utx.Visit(fc))
 		require.Equal(9845*units.MicroAvax, fc.Fee)
 
@@ -528,15 +466,7 @@ func TestMintFTOperation(t *testing.T) {
 
 	{
 		// Pre E-Upgrade
-		feeCalc := &fees.Calculator{
-			IsEActive: false,
-			Config: &config.Config{
-				TxFee: testContext.BaseTxFee,
-			},
-			FeeManager:         commonfees.NewManager(commonfees.Empty),
-			BlockMaxComplexity: commonfees.Max,
-			Codec:              builder.Parser.Codec(),
-		}
+		feeCalc := fees.NewStaticCalculator(testStaticConfig)
 
 		utx, err := b.NewOperationTxMintFT(
 			outputs,
@@ -544,19 +474,7 @@ func TestMintFTOperation(t *testing.T) {
 		)
 		require.NoError(err)
 
-		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
-		require.NoError(err)
-
-		fc := &fees.Calculator{
-			IsEActive: false,
-			Config: &config.Config{
-				TxFee: testContext.BaseTxFee,
-			},
-			FeeManager:         commonfees.NewManager(commonfees.Empty),
-			BlockMaxComplexity: commonfees.Max,
-			Codec:              builder.Parser.Codec(),
-			Credentials:        tx.Creds,
-		}
+		fc := fees.NewStaticCalculator(testStaticConfig)
 		require.NoError(utx.Visit(fc))
 		require.Equal(testContext.BaseTxFee, fc.Fee)
 
@@ -602,12 +520,12 @@ func TestMintPropertyOperation(t *testing.T) {
 
 	{
 		// Post E-Upgrade
-		feeCalc := &fees.Calculator{
-			IsEActive:          true,
-			FeeManager:         commonfees.NewManager(testFeeRates),
-			BlockMaxComplexity: testBlockMaxConsumedUnits,
-			Codec:              builder.Parser.Codec(),
-		}
+		feeCalc := fees.NewDynamicCalculator(
+			builder.Parser.Codec(),
+			commonfees.NewManager(testFeeRates),
+			testBlockMaxConsumedUnits,
+			nil,
+		)
 
 		utx, err := b.NewOperationTxMintProperty(
 			propertyAssetID,
@@ -619,13 +537,12 @@ func TestMintPropertyOperation(t *testing.T) {
 		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
 
-		fc := &fees.Calculator{
-			IsEActive:          true,
-			FeeManager:         commonfees.NewManager(testFeeRates),
-			BlockMaxComplexity: testBlockMaxConsumedUnits,
-			Codec:              builder.Parser.Codec(),
-			Credentials:        tx.Creds,
-		}
+		fc := fees.NewDynamicCalculator(
+			builder.Parser.Codec(),
+			commonfees.NewManager(testFeeRates),
+			testBlockMaxConsumedUnits,
+			tx.Creds,
+		)
 		require.NoError(utx.Visit(fc))
 		require.Equal(9837*units.MicroAvax, fc.Fee)
 
@@ -642,15 +559,7 @@ func TestMintPropertyOperation(t *testing.T) {
 
 	{
 		// Pre E-Upgrade
-		feeCalc := &fees.Calculator{
-			IsEActive: false,
-			Config: &config.Config{
-				TxFee: testContext.BaseTxFee,
-			},
-			FeeManager:         commonfees.NewManager(commonfees.Empty),
-			BlockMaxComplexity: commonfees.Max,
-			Codec:              builder.Parser.Codec(),
-		}
+		feeCalc := fees.NewStaticCalculator(testStaticConfig)
 
 		utx, err := b.NewOperationTxMintProperty(
 			propertyAssetID,
@@ -659,19 +568,7 @@ func TestMintPropertyOperation(t *testing.T) {
 		)
 		require.NoError(err)
 
-		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
-		require.NoError(err)
-
-		fc := &fees.Calculator{
-			IsEActive: false,
-			Config: &config.Config{
-				TxFee: testContext.BaseTxFee,
-			},
-			FeeManager:         commonfees.NewManager(commonfees.Empty),
-			BlockMaxComplexity: commonfees.Max,
-			Codec:              builder.Parser.Codec(),
-			Credentials:        tx.Creds,
-		}
+		fc := fees.NewStaticCalculator(testStaticConfig)
 		require.NoError(utx.Visit(fc))
 		require.Equal(testContext.BaseTxFee, fc.Fee)
 
@@ -711,12 +608,12 @@ func TestBurnPropertyOperation(t *testing.T) {
 
 	{
 		// Post E-Upgrade
-		feeCalc := &fees.Calculator{
-			IsEActive:          true,
-			FeeManager:         commonfees.NewManager(testFeeRates),
-			BlockMaxComplexity: testBlockMaxConsumedUnits,
-			Codec:              builder.Parser.Codec(),
-		}
+		feeCalc := fees.NewDynamicCalculator(
+			builder.Parser.Codec(),
+			commonfees.NewManager(testFeeRates),
+			testBlockMaxConsumedUnits,
+			nil,
+		)
 
 		utx, err := b.NewOperationTxBurnProperty(
 			propertyAssetID,
@@ -727,13 +624,12 @@ func TestBurnPropertyOperation(t *testing.T) {
 		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
 
-		fc := &fees.Calculator{
-			IsEActive:          true,
-			FeeManager:         commonfees.NewManager(testFeeRates),
-			BlockMaxComplexity: testBlockMaxConsumedUnits,
-			Codec:              builder.Parser.Codec(),
-			Credentials:        tx.Creds,
-		}
+		fc := fees.NewDynamicCalculator(
+			builder.Parser.Codec(),
+			commonfees.NewManager(testFeeRates),
+			testBlockMaxConsumedUnits,
+			tx.Creds,
+		)
 		require.NoError(utx.Visit(fc))
 		require.Equal(9765*units.MicroAvax, fc.Fee)
 
@@ -750,15 +646,7 @@ func TestBurnPropertyOperation(t *testing.T) {
 
 	{
 		// Pre E-Upgrade
-		feeCalc := &fees.Calculator{
-			IsEActive: false,
-			Config: &config.Config{
-				TxFee: testContext.BaseTxFee,
-			},
-			FeeManager:         commonfees.NewManager(commonfees.Empty),
-			BlockMaxComplexity: commonfees.Max,
-			Codec:              builder.Parser.Codec(),
-		}
+		feeCalc := fees.NewStaticCalculator(testStaticConfig)
 
 		utx, err := b.NewOperationTxBurnProperty(
 			propertyAssetID,
@@ -766,19 +654,7 @@ func TestBurnPropertyOperation(t *testing.T) {
 		)
 		require.NoError(err)
 
-		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
-		require.NoError(err)
-
-		fc := &fees.Calculator{
-			IsEActive: false,
-			Config: &config.Config{
-				TxFee: testContext.BaseTxFee,
-			},
-			FeeManager:         commonfees.NewManager(commonfees.Empty),
-			BlockMaxComplexity: commonfees.Max,
-			Codec:              builder.Parser.Codec(),
-			Credentials:        tx.Creds,
-		}
+		fc := fees.NewStaticCalculator(testStaticConfig)
 		require.NoError(utx.Visit(fc))
 		require.Equal(testContext.BaseTxFee, fc.Fee)
 
@@ -830,12 +706,13 @@ func TestImportTx(t *testing.T) {
 	)
 
 	{ // Post E-Upgrade
-		feeCalc := &fees.Calculator{
-			IsEActive:          true,
-			FeeManager:         commonfees.NewManager(testFeeRates),
-			BlockMaxComplexity: testBlockMaxConsumedUnits,
-			Codec:              builder.Parser.Codec(),
-		}
+		feeCalc := fees.NewDynamicCalculator(
+			builder.Parser.Codec(),
+			commonfees.NewManager(testFeeRates),
+			testBlockMaxConsumedUnits,
+			nil,
+		)
+
 		utx, err := b.NewImportTx(
 			sourceChainID,
 			importTo,
@@ -846,13 +723,12 @@ func TestImportTx(t *testing.T) {
 		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
 
-		fc := &fees.Calculator{
-			IsEActive:          true,
-			FeeManager:         commonfees.NewManager(testFeeRates),
-			BlockMaxComplexity: testBlockMaxConsumedUnits,
-			Credentials:        tx.Creds,
-			Codec:              builder.Parser.Codec(),
-		}
+		fc := fees.NewDynamicCalculator(
+			builder.Parser.Codec(),
+			commonfees.NewManager(testFeeRates),
+			testBlockMaxConsumedUnits,
+			tx.Creds,
+		)
 		require.NoError(utx.Visit(fc))
 		require.Equal(14251*units.MicroAvax, fc.Fee)
 
@@ -870,15 +746,7 @@ func TestImportTx(t *testing.T) {
 	}
 
 	{ // Pre E-Upgrade
-		feeCalc := &fees.Calculator{
-			IsEActive: false,
-			Config: &config.Config{
-				TxFee: testContext.BaseTxFee,
-			},
-			FeeManager:         commonfees.NewManager(commonfees.Empty),
-			BlockMaxComplexity: commonfees.Max,
-			Codec:              builder.Parser.Codec(),
-		}
+		feeCalc := fees.NewStaticCalculator(testStaticConfig)
 		utx, err := b.NewImportTx(
 			sourceChainID,
 			importTo,
@@ -886,19 +754,7 @@ func TestImportTx(t *testing.T) {
 		)
 		require.NoError(err)
 
-		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
-		require.NoError(err)
-
-		fc := &fees.Calculator{
-			IsEActive: false,
-			Config: &config.Config{
-				TxFee: testContext.BaseTxFee,
-			},
-			FeeManager:         commonfees.NewManager(commonfees.Empty),
-			BlockMaxComplexity: commonfees.Max,
-			Credentials:        tx.Creds,
-			Codec:              builder.Parser.Codec(),
-		}
+		fc := fees.NewStaticCalculator(testStaticConfig)
 		require.NoError(utx.Visit(fc))
 		require.Equal(testContext.BaseTxFee, fc.Fee)
 
@@ -952,12 +808,13 @@ func TestExportTx(t *testing.T) {
 	)
 
 	{ // Post E-Upgrade
-		feeCalc := &fees.Calculator{
-			IsEActive:          true,
-			FeeManager:         commonfees.NewManager(testFeeRates),
-			BlockMaxComplexity: testBlockMaxConsumedUnits,
-			Codec:              builder.Parser.Codec(),
-		}
+		feeCalc := fees.NewDynamicCalculator(
+			builder.Parser.Codec(),
+			commonfees.NewManager(testFeeRates),
+			testBlockMaxConsumedUnits,
+			nil,
+		)
+
 		utx, err := b.NewExportTx(
 			subnetID,
 			exportedOutputs,
@@ -968,13 +825,12 @@ func TestExportTx(t *testing.T) {
 		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
 
-		fc := &fees.Calculator{
-			IsEActive:          true,
-			FeeManager:         commonfees.NewManager(testFeeRates),
-			BlockMaxComplexity: testBlockMaxConsumedUnits,
-			Credentials:        tx.Creds,
-			Codec:              builder.Parser.Codec(),
-		}
+		fc := fees.NewDynamicCalculator(
+			builder.Parser.Codec(),
+			commonfees.NewManager(testFeeRates),
+			testBlockMaxConsumedUnits,
+			tx.Creds,
+		)
 		require.NoError(utx.Visit(fc))
 		require.Equal(9966*units.MicroAvax, fc.Fee)
 
@@ -991,15 +847,7 @@ func TestExportTx(t *testing.T) {
 	}
 
 	{ // Pre E-Upgrade
-		feeCalc := &fees.Calculator{
-			IsEActive: false,
-			Config: &config.Config{
-				TxFee: testContext.BaseTxFee,
-			},
-			FeeManager:         commonfees.NewManager(commonfees.Empty),
-			BlockMaxComplexity: commonfees.Max,
-			Codec:              builder.Parser.Codec(),
-		}
+		feeCalc := fees.NewStaticCalculator(testStaticConfig)
 		utx, err := b.NewExportTx(
 			subnetID,
 			exportedOutputs,
@@ -1007,19 +855,7 @@ func TestExportTx(t *testing.T) {
 		)
 		require.NoError(err)
 
-		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
-		require.NoError(err)
-
-		fc := &fees.Calculator{
-			IsEActive: false,
-			Config: &config.Config{
-				TxFee: testContext.BaseTxFee,
-			},
-			FeeManager:         commonfees.NewManager(commonfees.Empty),
-			BlockMaxComplexity: commonfees.Max,
-			Credentials:        tx.Creds,
-			Codec:              builder.Parser.Codec(),
-		}
+		fc := fees.NewStaticCalculator(testStaticConfig)
 		require.NoError(utx.Visit(fc))
 		require.Equal(testContext.BaseTxFee, fc.Fee)
 
