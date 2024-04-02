@@ -99,22 +99,27 @@ func hashNode(n *node) ids.ID {
 	// By directly calling sha.Write rather than passing sha around as an
 	// io.Writer, the compiler can perform sufficient escape analysis to avoid
 	// allocating buffers on the heap.
-	_, _ = sha.Write(binary.AppendUvarint(emptyHashBuffer, uint64(len(n.children))))
+	numChildren := len(n.children)
+	_, _ = sha.Write(binary.AppendUvarint(emptyHashBuffer, uint64(numChildren)))
 
-	// By allocating BranchFactorLargest rather than len(n.children), this slice
-	// is allocated on the stack rather than the heap. BranchFactorLargest is
-	// at least len(n.children) which avoids memory allocations.
-	keys := make([]byte, 0, BranchFactorLargest)
-	for k := range n.children {
-		keys = append(keys, k)
-	}
+	// Avoid allocating keys entirely if the node doesn't have any children.
+	if numChildren != 0 {
+		// By allocating BranchFactorLargest rather than len(n.children), this
+		// slice is allocated on the stack rather than the heap.
+		// BranchFactorLargest is at least len(n.children) which avoids memory
+		// allocations.
+		keys := make([]byte, 0, BranchFactorLargest)
+		for k := range n.children {
+			keys = append(keys, k)
+		}
 
-	// Ensure that the order of entries is correct.
-	slices.Sort(keys)
-	for _, index := range keys {
-		entry := n.children[index]
-		_, _ = sha.Write(binary.AppendUvarint(emptyHashBuffer, uint64(index)))
-		_, _ = sha.Write(entry.id[:])
+		// Ensure that the order of entries is correct.
+		slices.Sort(keys)
+		for _, index := range keys {
+			entry := n.children[index]
+			_, _ = sha.Write(binary.AppendUvarint(emptyHashBuffer, uint64(index)))
+			_, _ = sha.Write(entry.id[:])
+		}
 	}
 
 	if n.valueDigest.HasValue() {
@@ -136,7 +141,14 @@ func hashNode(n *node) ids.ID {
 func encodeDBNode(n *dbNode) []byte {
 	buf := bytes.NewBuffer(make([]byte, 0, encodedDBNodeSize(n)))
 	encodeMaybeByteSlice(buf, n.value)
-	encodeUint(buf, uint64(len(n.children)))
+
+	numChildren := len(n.children)
+	encodeUint(buf, uint64(numChildren))
+
+	// Avoid allocating keys entirely if the node doesn't have any children.
+	if numChildren == 0 {
+		return buf.Bytes()
+	}
 
 	// By allocating BranchFactorLargest rather than len(n.children), this slice
 	// is allocated on the stack rather than the heap. BranchFactorLargest is
