@@ -70,8 +70,7 @@ func (n *node) bytes() []byte {
 // Returns and caches the ID of this node.
 func (n *node) calculateID(metrics merkleMetrics) ids.ID {
 	metrics.HashCalculated()
-	bytes := encodeHashValues(n)
-	return hashing.ComputeHash256Array(bytes)
+	return hashNode(n)
 }
 
 // Set [n]'s value to [val].
