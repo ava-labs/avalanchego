@@ -169,14 +169,14 @@ pub struct StoreHeader {
 }
 
 #[derive(Debug)]
-struct StoreHeaderSliced {
+struct StoreHeaderObjs {
     meta_store_tail: Obj<DiskAddress>,
     data_store_tail: Obj<DiskAddress>,
     base_addr: Obj<DiskAddress>,
     alloc_addr: Obj<DiskAddress>,
 }
 
-impl StoreHeaderSliced {
+impl StoreHeaderObjs {
     fn flush_dirty(&mut self) {
         self.meta_store_tail.flush_dirty();
         self.data_store_tail.flush_dirty();
@@ -202,8 +202,8 @@ impl StoreHeader {
         }
     }
 
-    fn into_fields(r: Obj<Self>) -> Result<StoreHeaderSliced, ShaleError> {
-        Ok(StoreHeaderSliced {
+    fn into_fields(r: Obj<Self>) -> Result<StoreHeaderObjs, ShaleError> {
+        Ok(StoreHeaderObjs {
             meta_store_tail: StoredView::slice(
                 &r,
                 Self::META_STORE_TAIL_OFFSET,
@@ -282,7 +282,7 @@ impl Storable for StoreHeader {
 struct StoreInner<M> {
     meta_store: M,
     data_store: M,
-    header: StoreHeaderSliced,
+    header: StoreHeaderObjs,
     alloc_max_walk: u64,
     regn_nbit: u64,
 }
@@ -357,22 +357,21 @@ impl<M: LinearStore> StoreInner<M> {
         Ok(DiskAddress(addr))
     }
 
-    fn free(&mut self, addr: u64) -> Result<(), ShaleError> {
+    fn free(&mut self, freed_addr: u64) -> Result<(), ShaleError> {
         let region_size = 1 << self.regn_nbit;
 
-        let header_offset = addr - ChunkHeader::SERIALIZED_LEN;
-        let header_chunk_size = {
-            let header = self.get_header(DiskAddress::from(header_offset as usize))?;
+        let mut freed_header_offset = freed_addr - ChunkHeader::SERIALIZED_LEN;
+        let mut freed_chunk_size = {
+            let header = self.get_header(DiskAddress::from(freed_header_offset as usize))?;
             assert!(!header.is_freed);
             header.chunk_size
         };
-        let mut free_header_offset = header_offset;
-        let mut free_chunk_size = header_chunk_size;
+        let mut freed_footer_offset = freed_addr + freed_chunk_size;
 
-        if header_offset & (region_size - 1) > 0 {
+        if freed_header_offset & (region_size - 1) > 0 {
             // TODO danlaine: document what this condition means.
             // merge with previous chunk if it's freed.
-            let prev_footer_offset = header_offset - ChunkFooter::SERIALIZED_LEN;
+            let prev_footer_offset = freed_header_offset - ChunkFooter::SERIALIZED_LEN;
             let prev_footer = self.get_footer(DiskAddress::from(prev_footer_offset as usize))?;
 
             let prev_header_offset =
@@ -380,37 +379,35 @@ impl<M: LinearStore> StoreInner<M> {
             let prev_header = self.get_header(DiskAddress::from(prev_header_offset as usize))?;
 
             if prev_header.is_freed {
-                free_header_offset = prev_header_offset;
-                free_chunk_size += ChunkHeader::SERIALIZED_LEN
+                freed_header_offset = prev_header_offset;
+                freed_chunk_size += ChunkHeader::SERIALIZED_LEN
                     + ChunkFooter::SERIALIZED_LEN
                     + prev_header.chunk_size;
                 self.delete_descriptor(prev_header.desc_addr)?;
             }
         }
 
-        let footer_offset = addr + header_chunk_size;
-        let mut free_footer_offset = footer_offset;
-
         #[allow(clippy::unwrap_used)]
-        if footer_offset + ChunkFooter::SERIALIZED_LEN
+        if freed_footer_offset + ChunkFooter::SERIALIZED_LEN
             < self.header.data_store_tail.unwrap().get() as u64
-            && (region_size - (footer_offset & (region_size - 1)))
+            && (region_size - (freed_footer_offset & (region_size - 1)))
                 >= ChunkFooter::SERIALIZED_LEN + ChunkHeader::SERIALIZED_LEN
         {
             // TODO danlaine: document what this condition means.
             // merge with next chunk if it's freed.
-            let next_header_offset = footer_offset + ChunkFooter::SERIALIZED_LEN;
+            let next_header_offset = freed_footer_offset + ChunkFooter::SERIALIZED_LEN;
             let next_header = self.get_header(DiskAddress::from(next_header_offset as usize))?;
+
             if next_header.is_freed {
                 let next_footer_offset =
                     next_header_offset + ChunkHeader::SERIALIZED_LEN + next_header.chunk_size;
-                free_footer_offset = next_footer_offset;
+                freed_footer_offset = next_footer_offset;
                 {
                     let next_footer =
                         self.get_footer(DiskAddress::from(next_footer_offset as usize))?;
                     assert!(next_header.chunk_size == next_footer.chunk_size);
                 }
-                free_chunk_size += ChunkHeader::SERIALIZED_LEN
+                freed_chunk_size += ChunkHeader::SERIALIZED_LEN
                     + ChunkFooter::SERIALIZED_LEN
                     + next_header.chunk_size;
                 self.delete_descriptor(next_header.desc_addr)?;
@@ -422,25 +419,25 @@ impl<M: LinearStore> StoreInner<M> {
             let mut desc = self.get_descriptor(desc_addr)?;
             #[allow(clippy::unwrap_used)]
             desc.modify(|d| {
-                d.chunk_size = free_chunk_size;
-                d.haddr = free_header_offset as usize;
+                d.chunk_size = freed_chunk_size;
+                d.haddr = freed_header_offset as usize;
             })
             .unwrap();
         }
-        let mut free_header = self.get_header(DiskAddress::from(free_header_offset as usize))?;
+        let mut freed_header = self.get_header(DiskAddress::from(freed_header_offset as usize))?;
         #[allow(clippy::unwrap_used)]
-        free_header
+        freed_header
             .modify(|h| {
-                h.chunk_size = free_chunk_size;
+                h.chunk_size = freed_chunk_size;
                 h.is_freed = true;
                 h.desc_addr = desc_addr;
             })
             .unwrap();
 
-        let mut free_footer = self.get_footer(DiskAddress::from(free_footer_offset as usize))?;
+        let mut free_footer = self.get_footer(DiskAddress::from(freed_footer_offset as usize))?;
         #[allow(clippy::unwrap_used)]
         free_footer
-            .modify(|f| f.chunk_size = free_chunk_size)
+            .modify(|f| f.chunk_size = freed_chunk_size)
             .unwrap();
 
         Ok(())
