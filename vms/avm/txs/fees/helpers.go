@@ -16,6 +16,10 @@ import (
 )
 
 func FinanceInput(feeCalc *Calculator, codec codec.Manager, input *avax.TransferableInput) (uint64, error) {
+	if !feeCalc.IsEActive {
+		return 0, nil // pre E-upgrade we have a fixed fee regardless how complex the input is
+	}
+
 	inDimensions, err := fees.MeterInput(codec, txs.CodecVersion, input)
 	if err != nil {
 		return 0, fmt.Errorf("failed calculating input size: %w", err)
@@ -28,6 +32,10 @@ func FinanceInput(feeCalc *Calculator, codec codec.Manager, input *avax.Transfer
 }
 
 func FinanceOutput(feeCalc *Calculator, codec codec.Manager, output *avax.TransferableOutput) (uint64, fees.Dimensions, error) {
+	if !feeCalc.IsEActive {
+		return 0, fees.Empty, nil // pre E-upgrade we have a fixed fee regardless how complex the output is
+	}
+
 	outDimensions, err := fees.MeterOutput(codec, txs.CodecVersion, output)
 	if err != nil {
 		return 0, fees.Empty, fmt.Errorf("failed calculating changeOut size: %w", err)
@@ -40,6 +48,10 @@ func FinanceOutput(feeCalc *Calculator, codec codec.Manager, output *avax.Transf
 }
 
 func FinanceCredential(feeCalc *Calculator, codec codec.Manager, keysCount int) (uint64, error) {
+	if !feeCalc.IsEActive {
+		return 0, nil // pre E-upgrade we have a fixed fee regardless how complex the credentials are
+	}
+
 	credDimensions, err := fees.MeterCredential(codec, txs.CodecVersion, keysCount)
 	if err != nil {
 		return 0, fmt.Errorf("failed calculating input size: %w", err)

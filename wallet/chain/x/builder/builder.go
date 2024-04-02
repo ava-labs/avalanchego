@@ -542,7 +542,6 @@ func (b *builder) NewImportTx(
 			},
 		}
 
-		// update fees to target given the extra output added
 		outDimensions, err := commonfees.MeterOutput(Parser.Codec(), txs.CodecVersion, changeOut)
 		if err != nil {
 			return nil, fmt.Errorf("failed calculating output size: %w", err)

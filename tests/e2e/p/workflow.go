@@ -63,9 +63,9 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 
 			tests.Outf("{{blue}} fetching X-chain tx fee {{/}}\n")
 			infoClient := info.NewClient(nodeURI.URI)
-			pchainFees, err := infoClient.GetTxFee(e2e.DefaultContext())
+			staticFees, err := infoClient.GetTxFee(e2e.DefaultContext())
 			require.NoError(err)
-			pChainTxFees := uint64(pchainFees.TxFee)
+			pChainTxFees := uint64(staticFees.TxFee)
 			tests.Outf("{{green}} P-chain TxFee: %d {{/}}\n", pChainTxFees)
 
 			// amount to transfer from P to X chain
@@ -193,15 +193,13 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 				feeRates, _, err := xChainClient.GetFeeRates(e2e.DefaultContext())
 				require.NoError(err)
 
-				feeCalc := fees.Calculator{
-					IsEActive:          true,
-					FeeManager:         commonfees.NewManager(feeRates),
-					BlockMaxComplexity: feeCfg.BlockMaxComplexity,
-					Codec:              xbuilder.Parser.Codec(),
-					Credentials:        tx.Creds,
-				}
-
-				require.NoError(tx.Unsigned.Visit(&feeCalc))
+				feeCalc := fees.NewDynamicCalculator(
+					xbuilder.Parser.Codec(),
+					commonfees.NewManager(feeRates),
+					feeCfg.BlockMaxComplexity,
+					tx.Creds,
+				)
+				require.NoError(tx.Unsigned.Visit(feeCalc))
 				xChainExportFee = feeCalc.Fee
 			})
 

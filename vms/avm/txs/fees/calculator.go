@@ -31,27 +31,48 @@ type Calculator struct {
 	IsEActive bool
 
 	// Pre E-Upgrade inputs
-	Config *config.Config
+	config *config.Config
 
 	// Post E-Upgrade inputs
-	FeeManager         *fees.Manager
-	BlockMaxComplexity fees.Dimensions
-	Codec              codec.Manager
+	feeManager         *fees.Manager
+	blockMaxComplexity fees.Dimensions
+	codec              codec.Manager
+	credentials        []*fxs.FxCredential
 
 	// TipPercentage can either be an input (e.g. when building a transaction)
 	// or an output (once a transaction is verified)
 	TipPercentage fees.TipPercentage
 
-	// common inputs
-	Credentials []*fxs.FxCredential
-
 	// outputs of visitor execution
 	Fee uint64
 }
 
+// NewStaticCalculator must be used pre E upgrade activation
+func NewStaticCalculator(cfg *config.Config) *Calculator {
+	return &Calculator{
+		config: cfg,
+	}
+}
+
+// NewDynamicCalculator must be used post E upgrade activation
+func NewDynamicCalculator(
+	codec codec.Manager,
+	feeManager *fees.Manager,
+	blockMaxComplexity fees.Dimensions,
+	creds []*fxs.FxCredential,
+) *Calculator {
+	return &Calculator{
+		IsEActive:          true,
+		feeManager:         feeManager,
+		blockMaxComplexity: blockMaxComplexity,
+		codec:              codec,
+		credentials:        creds,
+	}
+}
+
 func (fc *Calculator) BaseTx(tx *txs.BaseTx) error {
 	if !fc.IsEActive {
-		fc.Fee = fc.Config.TxFee
+		fc.Fee = fc.config.TxFee
 		return nil
 	}
 
@@ -66,7 +87,7 @@ func (fc *Calculator) BaseTx(tx *txs.BaseTx) error {
 
 func (fc *Calculator) CreateAssetTx(tx *txs.CreateAssetTx) error {
 	if !fc.IsEActive {
-		fc.Fee = fc.Config.CreateAssetTxFee
+		fc.Fee = fc.config.CreateAssetTxFee
 		return nil
 	}
 
@@ -81,7 +102,7 @@ func (fc *Calculator) CreateAssetTx(tx *txs.CreateAssetTx) error {
 
 func (fc *Calculator) OperationTx(tx *txs.OperationTx) error {
 	if !fc.IsEActive {
-		fc.Fee = fc.Config.TxFee
+		fc.Fee = fc.config.TxFee
 		return nil
 	}
 
@@ -96,7 +117,7 @@ func (fc *Calculator) OperationTx(tx *txs.OperationTx) error {
 
 func (fc *Calculator) ImportTx(tx *txs.ImportTx) error {
 	if !fc.IsEActive {
-		fc.Fee = fc.Config.TxFee
+		fc.Fee = fc.config.TxFee
 		return nil
 	}
 
@@ -115,7 +136,7 @@ func (fc *Calculator) ImportTx(tx *txs.ImportTx) error {
 
 func (fc *Calculator) ExportTx(tx *txs.ExportTx) error {
 	if !fc.IsEActive {
-		fc.Fee = fc.Config.TxFee
+		fc.Fee = fc.config.TxFee
 		return nil
 	}
 
@@ -139,7 +160,7 @@ func (fc *Calculator) meterTx(
 ) (fees.Dimensions, error) {
 	var complexity fees.Dimensions
 
-	uTxSize, err := fc.Codec.Size(txs.CodecVersion, uTx)
+	uTxSize, err := fc.codec.Size(txs.CodecVersion, uTx)
 	if err != nil {
 		return complexity, fmt.Errorf("couldn't calculate UnsignedTx marshal length: %w", err)
 	}
@@ -147,7 +168,7 @@ func (fc *Calculator) meterTx(
 
 	// meter credentials, one by one. Then account for the extra bytes needed to
 	// serialize a slice of credentials (codec version bytes + slice size bytes)
-	for i, cred := range fc.Credentials {
+	for i, cred := range fc.credentials {
 		var keysCount int
 		switch c := cred.Credential.(type) {
 		case *secp256k1fx.Credential:
@@ -159,7 +180,7 @@ func (fc *Calculator) meterTx(
 		default:
 			return complexity, fmt.Errorf("don't know how to calculate complexity of %T", cred)
 		}
-		credDimensions, err := fees.MeterCredential(fc.Codec, txs.CodecVersion, keysCount)
+		credDimensions, err := fees.MeterCredential(fc.codec, txs.CodecVersion, keysCount)
 		if err != nil {
 			return complexity, fmt.Errorf("failed adding credential %d: %w", i, err)
 		}
@@ -172,7 +193,7 @@ func (fc *Calculator) meterTx(
 	complexity[fees.Bandwidth] += codec.VersionSize
 
 	for _, in := range allIns {
-		inputDimensions, err := fees.MeterInput(fc.Codec, txs.CodecVersion, in)
+		inputDimensions, err := fees.MeterInput(fc.codec, txs.CodecVersion, in)
 		if err != nil {
 			return complexity, fmt.Errorf("failed retrieving size of inputs: %w", err)
 		}
@@ -184,7 +205,7 @@ func (fc *Calculator) meterTx(
 	}
 
 	for _, out := range allOuts {
-		outputDimensions, err := fees.MeterOutput(fc.Codec, txs.CodecVersion, out)
+		outputDimensions, err := fees.MeterOutput(fc.codec, txs.CodecVersion, out)
 		if err != nil {
 			return complexity, fmt.Errorf("failed retrieving size of outputs: %w", err)
 		}
@@ -199,12 +220,16 @@ func (fc *Calculator) meterTx(
 }
 
 func (fc *Calculator) AddFeesFor(complexity fees.Dimensions, tipPercentage fees.TipPercentage) (uint64, error) {
-	boundBreached, dimension := fc.FeeManager.CumulateComplexity(complexity, fc.BlockMaxComplexity)
+	if fc.feeManager == nil || complexity == fees.Empty {
+		return 0, nil
+	}
+
+	boundBreached, dimension := fc.feeManager.CumulateComplexity(complexity, fc.blockMaxComplexity)
 	if boundBreached {
 		return 0, fmt.Errorf("%w: breached dimension %d", errFailedComplexityCumulation, dimension)
 	}
 
-	fee, err := fc.FeeManager.CalculateFee(complexity, tipPercentage)
+	fee, err := fc.feeManager.CalculateFee(complexity, tipPercentage)
 	if err != nil {
 		return 0, fmt.Errorf("%w: %w", errFailedFeeCalculation, err)
 	}
@@ -213,11 +238,15 @@ func (fc *Calculator) AddFeesFor(complexity fees.Dimensions, tipPercentage fees.
 }
 
 func (fc *Calculator) RemoveFeesFor(unitsToRm fees.Dimensions, tipPercentage fees.TipPercentage) (uint64, error) {
-	if err := fc.FeeManager.RemoveComplexity(unitsToRm); err != nil {
+	if fc.feeManager == nil || unitsToRm == fees.Empty {
+		return 0, nil
+	}
+
+	if err := fc.feeManager.RemoveComplexity(unitsToRm); err != nil {
 		return 0, fmt.Errorf("failed removing units: %w", err)
 	}
 
-	fee, err := fc.FeeManager.CalculateFee(unitsToRm, tipPercentage)
+	fee, err := fc.feeManager.CalculateFee(unitsToRm, tipPercentage)
 	if err != nil {
 		return 0, fmt.Errorf("%w: %w", errFailedFeeCalculation, err)
 	}

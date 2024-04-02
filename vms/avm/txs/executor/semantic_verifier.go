@@ -142,16 +142,18 @@ func (v *SemanticVerifier) verifyBaseTx(
 	exportedOuts []*avax.TransferableOutput,
 	creds []*fxs.FxCredential,
 ) error {
-	isEActive := v.Config.IsEActivated(v.State.GetTimestamp())
-	feeCalculator := fees.Calculator{
-		IsEActive:          isEActive,
-		Config:             v.Config,
-		FeeManager:         v.BlkFeeManager,
-		BlockMaxComplexity: v.BlockMaxComplexity,
-		Codec:              v.Codec,
-		Credentials:        creds,
+	var (
+		isEActive = v.Config.IsEActivated(v.State.GetTimestamp())
+
+		feeCalculator *fees.Calculator
+	)
+	if !isEActive {
+		feeCalculator = fees.NewStaticCalculator(v.Config)
+	} else {
+		feeCalculator = fees.NewDynamicCalculator(v.Codec, v.BlkFeeManager, v.BlockMaxComplexity, creds)
 	}
-	if err := tx.Visit(&feeCalculator); err != nil {
+
+	if err := tx.Visit(feeCalculator); err != nil {
 		return err
 	}
 
