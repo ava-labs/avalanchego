@@ -213,7 +213,11 @@ func (n *Network) EnsureDefaultConfig(w io.Writer, avalancheGoPath string, plugi
 
 	// Ensure nodes are created
 	if len(n.Nodes) == 0 {
-		n.Nodes = NewNodes(nodeCount)
+		nodes, err := NewNodes(nodeCount)
+		if err != nil {
+			return err
+		}
+		n.Nodes = nodes
 	}
 
 	// Ensure nodes are configured
