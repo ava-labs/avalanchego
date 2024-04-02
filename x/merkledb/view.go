@@ -298,6 +298,10 @@ func (v *view) hashChangedNodes(ctx context.Context) {
 // Calculates the ID of all descendants of [n] which need to be recalculated,
 // and then calculates the ID of [n] itself.
 //
+// Returns a potentially expanded [keyBuffer]. By returning this value this
+// function is able to have a maximum total number of allocations shared across
+// multiple invokations.
+//
 // Invariant: [keyBuffer] must be populated with [n]'s key and have sufficient
 // length to contain any of [n]'s child keys.
 func (v *view) hashChangedNode(n *node, keyBuffer []byte) (ids.ID, []byte) {
@@ -329,15 +333,16 @@ func (v *view) hashChangedNode(n *node, keyBuffer []byte) (ids.ID, []byte) {
 
 		totalBitLength := n.key.length + v.tokenSize + childEntry.compressedKey.length
 		// Because [keyBuffer] may have been modified in a prior iteration of
-		// this loop, it is not guaranteed that it's length is at least
+		// this loop, it is not guaranteed that its length is at least
 		// [bytesNeeded(totalBitLength)]. However, that's fine. The below
 		// slicing would only panic if the buffer didn't have sufficient
 		// capacity.
 		keyBuffer = keyBuffer[:bytesNeeded(totalBitLength)]
 		// We don't need to copy this node's key. It's assumed to already be
 		// correct; except for the last byte. We must make sure the last byte of
-		// the key is originally set correctly because extendIntoBuffer may OR
-		// the last byte of the key.
+		// the key is set correctly because extendIntoBuffer does not modify
+		// the first [bytesForKey-1] bytes of [keyBuffer], however it may OR
+		// bits from the extension and overwrite the last byte.
 		if bytesForKey > 0 {
 			keyBuffer[bytesForKey-1] = lastKeyByte
 		}
@@ -394,15 +399,15 @@ func (v *view) hashChangedNode(n *node, keyBuffer []byte) (ids.ID, []byte) {
 
 // setKeyBuffer expands [keyBuffer] to have sufficient size for any of [n]'s
 // child keys and populates [n]'s key into [keyBuffer]. If [keyBuffer] already
-// has sufficient size, this memory will not perform any memory allocations.
+// has sufficient size, this function will not perform any memory allocations.
 func (v *view) setKeyBuffer(n *node, keyBuffer []byte) []byte {
 	keyBuffer = v.setLengthForChildren(n, keyBuffer)
 	copy(keyBuffer, n.key.value)
 	return keyBuffer
 }
 
-// setKeyBuffer expands [keyBuffer] to have sufficient size for any of [n]'s
-// child keys.
+// setLengthForChildren expands [keyBuffer] to have sufficient size for any of
+// [n]'s child keys.
 func (v *view) setLengthForChildren(n *node, keyBuffer []byte) []byte {
 	// Calculate the size of the largest child key of this node.
 	var maxBitLength int
