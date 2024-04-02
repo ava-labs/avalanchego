@@ -388,24 +388,24 @@ func TestGenesis(t *testing.T) {
 
 			require.Equal(utxo.Address, addr)
 
-			feeRates, err := vm.state.GetFeeRates()
-			require.NoError(err)
-
 			// we use the first key to fund a subnet creation in [defaultGenesis].
 			// As such we need to account for the subnet creation fee
 			var (
 				chainTime = vm.state.GetTimestamp()
-				feeCfg    = config.GetDynamicFeesConfig(vm.Config.IsEActivated(chainTime))
-				feeMan    = commonfees.NewManager(feeRates)
-				feeCalc   = &fees.Calculator{
-					IsEActive:          vm.IsEActivated(chainTime),
-					Config:             &vm.Config,
-					ChainTime:          chainTime,
-					FeeManager:         feeMan,
-					BlockMaxComplexity: feeCfg.BlockMaxComplexity,
-					Credentials:        testSubnet1.Creds,
-				}
+
+				feeCalc *fees.Calculator
 			)
+
+			if !vm.IsEActivated(chainTime) {
+				feeCalc = fees.NewStaticCalculator(&vm.Config, chainTime)
+			} else {
+				feeRates, err := vm.state.GetFeeRates()
+				require.NoError(err)
+
+				feeCfg := config.GetDynamicFeesConfig(vm.Config.IsEActivated(chainTime))
+				feeMan := commonfees.NewManager(feeRates)
+				feeCalc = fees.NewDynamicCalculator(&vm.Config, feeMan, feeCfg.BlockMaxComplexity, testSubnet1.Creds)
+			}
 
 			require.NoError(testSubnet1.Unsigned.Visit(feeCalc))
 			require.Equal(uint64(utxo.Amount)-feeCalc.Fee, out.Amount())
@@ -2364,22 +2364,22 @@ func TestBaseTx(t *testing.T) {
 	}
 	require.Equal(totalOutputAmt, key0OutputAmt+key1OutputAmt+changeAddrOutputAmt)
 
-	feeRates, err := vm.state.GetFeeRates()
-	require.NoError(err)
-
 	var (
 		chainTime = vm.state.GetTimestamp()
-		feeCfg    = config.GetDynamicFeesConfig(vm.Config.IsEActivated(chainTime))
-		feeMan    = commonfees.NewManager(feeRates)
-		feeCalc   = &fees.Calculator{
-			IsEActive:          vm.IsEActivated(chainTime),
-			Config:             &vm.Config,
-			ChainTime:          chainTime,
-			FeeManager:         feeMan,
-			BlockMaxComplexity: feeCfg.BlockMaxComplexity,
-			Credentials:        baseTx.Creds,
-		}
+
+		feeCalc *fees.Calculator
 	)
+
+	if !vm.IsEActivated(chainTime) {
+		feeCalc = fees.NewStaticCalculator(&vm.Config, chainTime)
+	} else {
+		feeRates, err := vm.state.GetFeeRates()
+		require.NoError(err)
+
+		feeCfg := config.GetDynamicFeesConfig(vm.Config.IsEActivated(chainTime))
+		feeMan := commonfees.NewManager(feeRates)
+		feeCalc = fees.NewDynamicCalculator(&vm.Config, feeMan, feeCfg.BlockMaxComplexity, baseTx.Creds)
+	}
 
 	require.NoError(baseTx.Unsigned.Visit(feeCalc))
 	require.Equal(feeCalc.Fee, totalInputAmt-totalOutputAmt)

@@ -74,15 +74,14 @@ func (e *StandardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 	}
 
 	// Verify the flowcheck
-	feeCalculator := fees.Calculator{
-		IsEActive:          isEActive,
-		Config:             e.Backend.Config,
-		ChainTime:          currentTimestamp,
-		FeeManager:         e.BlkFeeManager,
-		BlockMaxComplexity: e.BlockMaxComplexity,
-		Credentials:        e.Tx.Creds,
+	var feeCalculator *fees.Calculator
+	if !isEActive {
+		feeCalculator = fees.NewStaticCalculator(e.Backend.Config, e.State.GetTimestamp())
+	} else {
+		feeCalculator = fees.NewDynamicCalculator(e.Backend.Config, e.BlkFeeManager, e.BlockMaxComplexity, e.Tx.Creds)
 	}
-	if err := tx.Visit(&feeCalculator); err != nil {
+
+	if err := tx.Visit(feeCalculator); err != nil {
 		return err
 	}
 
@@ -132,15 +131,14 @@ func (e *StandardTxExecutor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 	}
 
 	// Verify the flowcheck
-	feeCalculator := fees.Calculator{
-		IsEActive:          isEActive,
-		Config:             e.Backend.Config,
-		ChainTime:          currentTimestamp,
-		FeeManager:         e.BlkFeeManager,
-		BlockMaxComplexity: e.BlockMaxComplexity,
-		Credentials:        e.Tx.Creds,
+	var feeCalculator *fees.Calculator
+	if !isEActive {
+		feeCalculator = fees.NewStaticCalculator(e.Backend.Config, e.State.GetTimestamp())
+	} else {
+		feeCalculator = fees.NewDynamicCalculator(e.Backend.Config, e.BlkFeeManager, e.BlockMaxComplexity, e.Tx.Creds)
 	}
-	if err := tx.Visit(&feeCalculator); err != nil {
+
+	if err := tx.Visit(feeCalculator); err != nil {
 		return err
 	}
 
@@ -225,19 +223,14 @@ func (e *StandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 		copy(ins[len(tx.Ins):], tx.ImportedInputs)
 
 		// Verify the flowcheck
-		var (
-			cfg              = e.Backend.Config
-			currentTimestamp = e.State.GetTimestamp()
-		)
-		feeCalculator := fees.Calculator{
-			IsEActive:          isEActive,
-			Config:             cfg,
-			ChainTime:          currentTimestamp,
-			FeeManager:         e.BlkFeeManager,
-			BlockMaxComplexity: e.BlockMaxComplexity,
-			Credentials:        e.Tx.Creds,
+		var feeCalculator *fees.Calculator
+		if !isEActive {
+			feeCalculator = fees.NewStaticCalculator(e.Backend.Config, e.State.GetTimestamp())
+		} else {
+			feeCalculator = fees.NewDynamicCalculator(e.Backend.Config, e.BlkFeeManager, e.BlockMaxComplexity, e.Tx.Creds)
 		}
-		if err := tx.Visit(&feeCalculator); err != nil {
+
+		if err := tx.Visit(feeCalculator); err != nil {
 			return err
 		}
 
@@ -294,15 +287,14 @@ func (e *StandardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 	}
 
 	// Verify the flowcheck
-	feeCalculator := fees.Calculator{
-		IsEActive:          isEActive,
-		Config:             e.Backend.Config,
-		ChainTime:          currentTimestamp,
-		FeeManager:         e.BlkFeeManager,
-		BlockMaxComplexity: e.BlockMaxComplexity,
-		Credentials:        e.Tx.Creds,
+	var feeCalculator *fees.Calculator
+	if !isEActive {
+		feeCalculator = fees.NewStaticCalculator(e.Backend.Config, e.State.GetTimestamp())
+	} else {
+		feeCalculator = fees.NewDynamicCalculator(e.Backend.Config, e.BlkFeeManager, e.BlockMaxComplexity, e.Tx.Creds)
 	}
-	if err := tx.Visit(&feeCalculator); err != nil {
+
+	if err := tx.Visit(feeCalculator); err != nil {
 		return err
 	}
 
@@ -498,15 +490,13 @@ func (e *StandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 		return err
 	}
 
-	feeCalculator := fees.Calculator{
-		IsEActive:          isEActive,
-		Config:             e.Backend.Config,
-		ChainTime:          currentTimestamp,
-		FeeManager:         e.BlkFeeManager,
-		BlockMaxComplexity: e.BlockMaxComplexity,
-		Credentials:        e.Tx.Creds,
+	var feeCalculator *fees.Calculator
+	if !isEActive {
+		feeCalculator = fees.NewStaticCalculator(e.Backend.Config, e.State.GetTimestamp())
+	} else {
+		feeCalculator = fees.NewDynamicCalculator(e.Backend.Config, e.BlkFeeManager, e.BlockMaxComplexity, e.Tx.Creds)
 	}
-	if err := tx.Visit(&feeCalculator); err != nil {
+	if err := tx.Visit(feeCalculator); err != nil {
 		return err
 	}
 
@@ -643,15 +633,14 @@ func (e *StandardTxExecutor) BaseTx(tx *txs.BaseTx) error {
 	}
 
 	// Verify the flowcheck
-	feeCalculator := fees.Calculator{
-		IsEActive:          isEActive,
-		Config:             cfg,
-		ChainTime:          currentTimestamp,
-		FeeManager:         e.BlkFeeManager,
-		BlockMaxComplexity: e.BlockMaxComplexity,
-		Credentials:        e.Tx.Creds,
+	var feeCalculator *fees.Calculator
+	if !isEActive {
+		feeCalculator = fees.NewStaticCalculator(e.Backend.Config, e.State.GetTimestamp())
+	} else {
+		feeCalculator = fees.NewDynamicCalculator(e.Backend.Config, e.BlkFeeManager, e.BlockMaxComplexity, e.Tx.Creds)
 	}
-	if err := tx.Visit(&feeCalculator); err != nil {
+
+	if err := tx.Visit(feeCalculator); err != nil {
 		return err
 	}
 

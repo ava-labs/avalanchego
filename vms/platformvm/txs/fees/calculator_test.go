@@ -70,9 +70,9 @@ func TestAddAndRemoveFees(t *testing.T) {
 	r := require.New(t)
 
 	fc := &Calculator{
-		IsEActive:          true,
-		FeeManager:         fees.NewManager(testFeeRates),
-		BlockMaxComplexity: testBlockMaxComplexity,
+		isEActive:          true,
+		feeManager:         fees.NewManager(testFeeRates),
+		blockMaxComplexity: testBlockMaxComplexity,
 	}
 
 	var (
@@ -82,25 +82,25 @@ func TestAddAndRemoveFees(t *testing.T) {
 
 	feeDelta, err := fc.AddFeesFor(units)
 	r.NoError(err)
-	r.Equal(units, fc.FeeManager.GetCumulatedComplexity())
+	r.Equal(units, fc.feeManager.GetCumulatedComplexity())
 	r.NotZero(feeDelta)
 	r.Equal(feeDelta, fc.Fee)
 
 	feeDelta2, err := fc.AddFeesFor(units)
 	r.NoError(err)
-	r.Equal(doubleUnits, fc.FeeManager.GetCumulatedComplexity())
+	r.Equal(doubleUnits, fc.feeManager.GetCumulatedComplexity())
 	r.Equal(feeDelta, feeDelta2)
 	r.Equal(feeDelta+feeDelta2, fc.Fee)
 
 	feeDelta3, err := fc.RemoveFeesFor(units)
 	r.NoError(err)
-	r.Equal(units, fc.FeeManager.GetCumulatedComplexity())
+	r.Equal(units, fc.feeManager.GetCumulatedComplexity())
 	r.Equal(feeDelta, feeDelta3)
 	r.Equal(feeDelta, fc.Fee)
 
 	feeDelta4, err := fc.RemoveFeesFor(units)
 	r.NoError(err)
-	r.Zero(fc.FeeManager.GetCumulatedComplexity())
+	r.Zero(fc.feeManager.GetCumulatedComplexity())
 	r.Equal(feeDelta, feeDelta4)
 	r.Zero(fc.Fee)
 }
@@ -124,7 +124,7 @@ func TestTxFees(t *testing.T) {
 			unsignedAndSignedTx: addValidatorTx,
 			expectedError:       nil,
 			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, fc.Config.AddPrimaryNetworkValidatorFee, fc.Fee)
+				require.Equal(t, fc.config.AddPrimaryNetworkValidatorFee, fc.Fee)
 			},
 		},
 		{
@@ -142,7 +142,7 @@ func TestTxFees(t *testing.T) {
 			expectedError:       nil,
 			unsignedAndSignedTx: addValidatorTx,
 			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, fc.Config.AddPrimaryNetworkValidatorFee, fc.Fee)
+				require.Equal(t, fc.config.AddPrimaryNetworkValidatorFee, fc.Fee)
 			},
 		},
 		{
@@ -160,7 +160,7 @@ func TestTxFees(t *testing.T) {
 			unsignedAndSignedTx: addSubnetValidatorTx,
 			expectedError:       nil,
 			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, fc.Config.AddSubnetValidatorFee, fc.Fee)
+				require.Equal(t, fc.config.AddSubnetValidatorFee, fc.Fee)
 			},
 		},
 		{
@@ -186,7 +186,7 @@ func TestTxFees(t *testing.T) {
 						172,
 						1000,
 					},
-					fc.FeeManager.GetCumulatedComplexity(),
+					fc.feeManager.GetCumulatedComplexity(),
 				)
 			},
 		},
@@ -226,7 +226,7 @@ func TestTxFees(t *testing.T) {
 			unsignedAndSignedTx: addDelegatorTx,
 			expectedError:       nil,
 			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, fc.Config.AddPrimaryNetworkDelegatorFee, fc.Fee)
+				require.Equal(t, fc.config.AddPrimaryNetworkDelegatorFee, fc.Fee)
 			},
 		},
 		{
@@ -244,7 +244,7 @@ func TestTxFees(t *testing.T) {
 			unsignedAndSignedTx: addDelegatorTx,
 			expectedError:       nil,
 			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, fc.Config.AddPrimaryNetworkDelegatorFee, fc.Fee)
+				require.Equal(t, fc.config.AddPrimaryNetworkDelegatorFee, fc.Fee)
 			},
 		},
 		{
@@ -262,7 +262,7 @@ func TestTxFees(t *testing.T) {
 			unsignedAndSignedTx: createChainTx,
 			expectedError:       nil,
 			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, fc.Config.CreateBlockchainTxFee, fc.Fee)
+				require.Equal(t, fc.config.CreateBlockchainTxFee, fc.Fee)
 			},
 		},
 		{
@@ -288,7 +288,7 @@ func TestTxFees(t *testing.T) {
 						172,
 						1000,
 					},
-					fc.FeeManager.GetCumulatedComplexity(),
+					fc.feeManager.GetCumulatedComplexity(),
 				)
 			},
 		},
@@ -328,7 +328,7 @@ func TestTxFees(t *testing.T) {
 			unsignedAndSignedTx: createSubnetTx,
 			expectedError:       nil,
 			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, fc.Config.CreateSubnetTxFee, fc.Fee)
+				require.Equal(t, fc.config.CreateSubnetTxFee, fc.Fee)
 			},
 		},
 		{
@@ -354,7 +354,7 @@ func TestTxFees(t *testing.T) {
 						172,
 						1000,
 					},
-					fc.FeeManager.GetCumulatedComplexity(),
+					fc.feeManager.GetCumulatedComplexity(),
 				)
 			},
 		},
@@ -394,7 +394,7 @@ func TestTxFees(t *testing.T) {
 			unsignedAndSignedTx: removeSubnetValidatorTx,
 			expectedError:       nil,
 			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, fc.Config.TxFee, fc.Fee)
+				require.Equal(t, fc.config.TxFee, fc.Fee)
 			},
 		},
 		{
@@ -420,7 +420,7 @@ func TestTxFees(t *testing.T) {
 						172,
 						1000,
 					},
-					fc.FeeManager.GetCumulatedComplexity(),
+					fc.feeManager.GetCumulatedComplexity(),
 				)
 			},
 		},
@@ -460,7 +460,7 @@ func TestTxFees(t *testing.T) {
 			unsignedAndSignedTx: transformSubnetTx,
 			expectedError:       nil,
 			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, fc.Config.TransformSubnetTxFee, fc.Fee)
+				require.Equal(t, fc.config.TransformSubnetTxFee, fc.Fee)
 			},
 		},
 		{
@@ -486,7 +486,7 @@ func TestTxFees(t *testing.T) {
 						172,
 						1000,
 					},
-					fc.FeeManager.GetCumulatedComplexity(),
+					fc.feeManager.GetCumulatedComplexity(),
 				)
 			},
 		},
@@ -526,7 +526,7 @@ func TestTxFees(t *testing.T) {
 			unsignedAndSignedTx: transferSubnetOwnershipTx,
 			expectedError:       nil,
 			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, fc.Config.TxFee, fc.Fee)
+				require.Equal(t, fc.config.TxFee, fc.Fee)
 			},
 		},
 		{
@@ -552,7 +552,7 @@ func TestTxFees(t *testing.T) {
 						172,
 						1000,
 					},
-					fc.FeeManager.GetCumulatedComplexity(),
+					fc.feeManager.GetCumulatedComplexity(),
 				)
 			},
 		},
@@ -592,7 +592,7 @@ func TestTxFees(t *testing.T) {
 			unsignedAndSignedTx: addPermissionlessValidatorTx,
 			expectedError:       nil,
 			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, fc.Config.AddSubnetValidatorFee, fc.Fee)
+				require.Equal(t, fc.config.AddSubnetValidatorFee, fc.Fee)
 			},
 		},
 		{
@@ -618,7 +618,7 @@ func TestTxFees(t *testing.T) {
 						266,
 						1000,
 					},
-					fc.FeeManager.GetCumulatedComplexity(),
+					fc.feeManager.GetCumulatedComplexity(),
 				)
 			},
 		},
@@ -658,7 +658,7 @@ func TestTxFees(t *testing.T) {
 			unsignedAndSignedTx: addPermissionlessDelegatorTx,
 			expectedError:       nil,
 			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, fc.Config.AddSubnetDelegatorFee, fc.Fee)
+				require.Equal(t, fc.config.AddSubnetDelegatorFee, fc.Fee)
 			},
 		},
 		{
@@ -684,7 +684,7 @@ func TestTxFees(t *testing.T) {
 						266,
 						1000,
 					},
-					fc.FeeManager.GetCumulatedComplexity(),
+					fc.feeManager.GetCumulatedComplexity(),
 				)
 			},
 		},
@@ -724,7 +724,7 @@ func TestTxFees(t *testing.T) {
 			unsignedAndSignedTx: baseTx,
 			expectedError:       nil,
 			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, fc.Config.TxFee, fc.Fee)
+				require.Equal(t, fc.config.TxFee, fc.Fee)
 			},
 		},
 		{
@@ -750,7 +750,7 @@ func TestTxFees(t *testing.T) {
 						172,
 						1000,
 					},
-					fc.FeeManager.GetCumulatedComplexity(),
+					fc.feeManager.GetCumulatedComplexity(),
 				)
 			},
 		},
@@ -790,7 +790,7 @@ func TestTxFees(t *testing.T) {
 			unsignedAndSignedTx: importTx,
 			expectedError:       nil,
 			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, fc.Config.TxFee, fc.Fee)
+				require.Equal(t, fc.config.TxFee, fc.Fee)
 			},
 		},
 		{
@@ -816,7 +816,7 @@ func TestTxFees(t *testing.T) {
 						262,
 						2000,
 					},
-					fc.FeeManager.GetCumulatedComplexity(),
+					fc.feeManager.GetCumulatedComplexity(),
 				)
 			},
 		},
@@ -856,7 +856,7 @@ func TestTxFees(t *testing.T) {
 			unsignedAndSignedTx: exportTx,
 			expectedError:       nil,
 			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, fc.Config.TxFee, fc.Fee)
+				require.Equal(t, fc.config.TxFee, fc.Fee)
 			},
 		},
 		{
@@ -882,7 +882,7 @@ func TestTxFees(t *testing.T) {
 						266,
 						1000,
 					},
-					fc.FeeManager.GetCumulatedComplexity(),
+					fc.feeManager.GetCumulatedComplexity(),
 				)
 			},
 		},
@@ -920,14 +920,13 @@ func TestTxFees(t *testing.T) {
 
 			uTx, sTx := tt.unsignedAndSignedTx(t)
 
-			fc := &Calculator{
-				IsEActive:          cfg.IsEActivated(chainTime),
-				Config:             cfg,
-				ChainTime:          chainTime,
-				FeeManager:         fees.NewManager(testFeeRates),
-				BlockMaxComplexity: maxComplexity,
-				Credentials:        sTx.Creds,
+			var fc *Calculator
+			if !cfg.IsEActivated(chainTime) {
+				fc = NewStaticCalculator(cfg, chainTime)
+			} else {
+				fc = NewDynamicCalculator(cfg, fees.NewManager(testFeeRates), maxComplexity, sTx.Creds)
 			}
+
 			err := uTx.Visit(fc)
 			r.ErrorIs(err, tt.expectedError)
 			tt.checksF(t, fc)

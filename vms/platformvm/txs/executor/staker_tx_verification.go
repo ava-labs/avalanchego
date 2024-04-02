@@ -101,7 +101,6 @@ func verifyAddValidatorTx(
 	var (
 		currentTimestamp = chainState.GetTimestamp()
 		isDurangoActive  = backend.Config.IsDurangoActivated(currentTimestamp)
-		isEActive        = false // AddValidatorTx is forbidden with Durango activation
 	)
 	if isDurangoActive {
 		return nil, ErrAddValidatorTxPostDurango
@@ -169,13 +168,8 @@ func verifyAddValidatorTx(
 	}
 
 	// Verify the flowcheck
-	feeCalculator := fees.Calculator{
-		IsEActive:   isEActive,
-		Config:      backend.Config,
-		ChainTime:   currentTimestamp,
-		Credentials: sTx.Creds,
-	}
-	if err := tx.Visit(&feeCalculator); err != nil {
+	feeCalculator := fees.NewStaticCalculator(backend.Config, currentTimestamp)
+	if err := tx.Visit(feeCalculator); err != nil {
 		return nil, err
 	}
 
@@ -270,15 +264,13 @@ func verifyAddSubnetValidatorTx(
 	}
 
 	// Verify the flowcheck
-	feeCalculator := fees.Calculator{
-		IsEActive:          isEActive,
-		Config:             backend.Config,
-		ChainTime:          currentTimestamp,
-		FeeManager:         feeManager,
-		BlockMaxComplexity: maxComplexity,
-		Credentials:        sTx.Creds,
+	var feeCalculator *fees.Calculator
+	if !isEActive {
+		feeCalculator = fees.NewStaticCalculator(backend.Config, currentTimestamp)
+	} else {
+		feeCalculator = fees.NewDynamicCalculator(backend.Config, feeManager, maxComplexity, sTx.Creds)
 	}
-	if err := tx.Visit(&feeCalculator); err != nil {
+	if err := tx.Visit(feeCalculator); err != nil {
 		return err
 	}
 
@@ -360,15 +352,14 @@ func verifyRemoveSubnetValidatorTx(
 	}
 
 	// Verify the flowcheck
-	feeCalculator := fees.Calculator{
-		IsEActive:          isEActive,
-		Config:             backend.Config,
-		ChainTime:          currentTimestamp,
-		FeeManager:         feeManager,
-		BlockMaxComplexity: maxComplexity,
-		Credentials:        sTx.Creds,
+	var feeCalculator *fees.Calculator
+	if !isEActive {
+		feeCalculator = fees.NewStaticCalculator(backend.Config, chainState.GetTimestamp())
+	} else {
+		feeCalculator = fees.NewDynamicCalculator(backend.Config, feeManager, maxComplexity, sTx.Creds)
 	}
-	if err := tx.Visit(&feeCalculator); err != nil {
+
+	if err := tx.Visit(feeCalculator); err != nil {
 		return nil, false, err
 	}
 
@@ -403,7 +394,6 @@ func verifyAddDelegatorTx(
 	var (
 		currentTimestamp = chainState.GetTimestamp()
 		isDurangoActive  = backend.Config.IsDurangoActivated(currentTimestamp)
-		isEActive        = false // AddDelegatorTx is forbidden with Durango activation
 	)
 	if isDurangoActive {
 		return nil, ErrAddDelegatorTxPostDurango
@@ -491,13 +481,8 @@ func verifyAddDelegatorTx(
 	}
 
 	// Verify the flowcheck
-	feeCalculator := fees.Calculator{
-		IsEActive:   isEActive,
-		Config:      backend.Config,
-		ChainTime:   currentTimestamp,
-		Credentials: sTx.Creds,
-	}
-	if err := tx.Visit(&feeCalculator); err != nil {
+	feeCalculator := fees.NewStaticCalculator(backend.Config, chainState.GetTimestamp())
+	if err := tx.Visit(feeCalculator); err != nil {
 		return nil, err
 	}
 
@@ -621,15 +606,14 @@ func verifyAddPermissionlessValidatorTx(
 	copy(outs[len(tx.Outs):], tx.StakeOuts)
 
 	// Verify the flowcheck
-	feeCalculator := fees.Calculator{
-		IsEActive:          isEActive,
-		Config:             backend.Config,
-		ChainTime:          currentTimestamp,
-		FeeManager:         feeManager,
-		BlockMaxComplexity: maxComplexity,
-		Credentials:        sTx.Creds,
+	var feeCalculator *fees.Calculator
+	if !isEActive {
+		feeCalculator = fees.NewStaticCalculator(backend.Config, currentTimestamp)
+	} else {
+		feeCalculator = fees.NewDynamicCalculator(backend.Config, feeManager, maxComplexity, sTx.Creds)
 	}
-	if err := tx.Visit(&feeCalculator); err != nil {
+
+	if err := tx.Visit(feeCalculator); err != nil {
 		return err
 	}
 
@@ -778,15 +762,14 @@ func verifyAddPermissionlessDelegatorTx(
 	}
 
 	// Verify the flowcheck
-	feeCalculator := fees.Calculator{
-		IsEActive:          isEActive,
-		Config:             backend.Config,
-		ChainTime:          currentTimestamp,
-		FeeManager:         feeManager,
-		BlockMaxComplexity: maxComplexity,
-		Credentials:        sTx.Creds,
+	var feeCalculator *fees.Calculator
+	if !isEActive {
+		feeCalculator = fees.NewStaticCalculator(backend.Config, currentTimestamp)
+	} else {
+		feeCalculator = fees.NewDynamicCalculator(backend.Config, feeManager, maxComplexity, sTx.Creds)
 	}
-	if err := tx.Visit(&feeCalculator); err != nil {
+
+	if err := tx.Visit(feeCalculator); err != nil {
 		return err
 	}
 
@@ -850,15 +833,14 @@ func verifyTransferSubnetOwnershipTx(
 	}
 
 	// Verify the flowcheck
-	feeCalculator := fees.Calculator{
-		IsEActive:          isEActive,
-		Config:             backend.Config,
-		ChainTime:          currentTimestamp,
-		FeeManager:         feeManager,
-		BlockMaxComplexity: maxComplexity,
-		Credentials:        sTx.Creds,
+	var feeCalculator *fees.Calculator
+	if !isEActive {
+		feeCalculator = fees.NewStaticCalculator(backend.Config, chainState.GetTimestamp())
+	} else {
+		feeCalculator = fees.NewDynamicCalculator(backend.Config, feeManager, maxComplexity, sTx.Creds)
 	}
-	if err := tx.Visit(&feeCalculator); err != nil {
+
+	if err := tx.Visit(feeCalculator); err != nil {
 		return err
 	}
 
