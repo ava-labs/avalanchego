@@ -24,18 +24,27 @@ var (
 	tsvmSubnetName = "timestamp"
 
 	genesisBytes = []byte("e2e")
+)
 
-	TSVMSubnet = &tmpnet.Subnet{
-		Name: tsvmSubnetName,
-		Chains: []*tmpnet.Chain{
-			{
-				VMID:    timestampvm.VMID,
-				Genesis: genesisBytes,
-				Config:  "{}",
+func TSVMSubnets(nodes ...*tmpnet.Node) []*tmpnet.Subnet {
+	if len(nodes) == 0 {
+		panic("a subnet must be validated by at least one node")
+	}
+
+	return []*tmpnet.Subnet{
+		{
+			Name: tsvmSubnetName,
+			Chains: []*tmpnet.Chain{
+				{
+					VMID:    timestampvm.VMID,
+					Genesis: genesisBytes,
+					Config:  "{}",
+				},
 			},
+			ValidatorIDs: tmpnet.NodesToIDs(nodes...),
 		},
 	}
-)
+}
 
 var _ = ginkgo.Describe("[TimestampVM]", ginkgo.Ordered, func() {
 	require := require.New(ginkgo.GinkgoT())
