@@ -298,8 +298,8 @@ func (v *view) hashChangedNodes(ctx context.Context) {
 // Calculates the ID of all descendants of [n] which need to be recalculated,
 // and then calculates the ID of [n] itself.
 //
-// Invariant: [keyBuffer] must be populated with [n]'s key and be long enough to
-// contain all of [n]'s child keys.
+// Invariant: [keyBuffer] must be populated with [n]'s key and have a large
+// enough capacity to contain all of [n]'s child keys.
 func (v *view) hashChangedNode(n *node, keyBuffer []byte) (ids.ID, []byte) {
 	var (
 		// childBuffer is allocated on the stack.
@@ -326,18 +326,18 @@ func (v *view) hashChangedNode(n *node, keyBuffer []byte) (ids.ID, []byte) {
 		}
 
 		totalBitLength := n.key.length + v.tokenSize + childEntry.compressedKey.length
-		buffer := keyBuffer[:bytesNeeded(totalBitLength)]
+		keyBuffer = keyBuffer[:bytesNeeded(totalBitLength)]
 		// We don't need to copy this node's key. It's assumed to already be
 		// correct; except for the last byte. We must make sure the last byte of
 		// the key is originally set correctly because extendIntoBuffer may OR
 		// the last byte of the key.
 		if bytesForKey > 0 {
-			buffer[bytesForKey-1] = lastKeyByte
+			keyBuffer[bytesForKey-1] = lastKeyByte
 		}
-		extendIntoBuffer(buffer, childByteKey, n.key.length)
-		extendIntoBuffer(buffer, childEntry.compressedKey, n.key.length+v.tokenSize)
+		extendIntoBuffer(keyBuffer, childByteKey, n.key.length)
+		extendIntoBuffer(keyBuffer, childEntry.compressedKey, n.key.length+v.tokenSize)
 		childKey := Key{
-			value:  byteSliceToString(buffer),
+			value:  byteSliceToString(keyBuffer),
 			length: totalBitLength,
 		}
 
@@ -360,12 +360,12 @@ func (v *view) hashChangedNode(n *node, keyBuffer []byte) (ids.ID, []byte) {
 		// Try updating the child and its descendants in a goroutine.
 		if childKeyBuffer, ok := v.db.hashNodesKeyPool.TryAcquire(); ok {
 			wg.Add(1)
-			go func(childEntry *child, childKeyBuffer []byte) {
-				childKeyBuffer = v.setKeyBuffer(childNodeChange.after, childKeyBuffer)
-				childEntry.id, childKeyBuffer = v.hashChangedNode(childNodeChange.after, childKeyBuffer)
+			go func(childEntry *child, childNode *node, childKeyBuffer []byte) {
+				childKeyBuffer = v.setKeyBuffer(childNode, childKeyBuffer)
+				childEntry.id, childKeyBuffer = v.hashChangedNode(childNode, childKeyBuffer)
 				v.db.hashNodesKeyPool.Release(childKeyBuffer)
 				wg.Done()
-			}(childEntry, childKeyBuffer)
+			}(childEntry, childNode, childKeyBuffer)
 		} else {
 			// We're at the goroutine limit; do the work in this goroutine.
 			//
