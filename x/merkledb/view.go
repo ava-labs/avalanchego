@@ -340,9 +340,9 @@ func (v *view) hashChangedNode(n *node, keyBuffer []byte) (ids.ID, []byte) {
 		keyBuffer = keyBuffer[:bytesNeeded(totalBitLength)]
 		// We don't need to copy this node's key. It's assumed to already be
 		// correct; except for the last byte. We must make sure the last byte of
-		// the key is set correctly because extendIntoBuffer does not modify
-		// the first [bytesForKey-1] bytes of [keyBuffer], however it may OR
-		// bits from the extension and overwrite the last byte.
+		// the key is set correctly because extendIntoBuffer may OR bits from
+		// the extension and overwrite the last byte. However, extendIntoBuffer
+		// does not modify the first [bytesForKey-1] bytes of [keyBuffer].
 		if bytesForKey > 0 {
 			keyBuffer[bytesForKey-1] = lastKeyByte
 		}
