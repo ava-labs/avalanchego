@@ -28,37 +28,59 @@ var (
 
 type Calculator struct {
 	// setup
-	IsEActive bool
+	isEActive bool
 
 	// Pre E-fork inputs
-	Config    *config.Config
-	ChainTime time.Time
+	config    *config.Config
+	chainTime time.Time
 
 	// Post E-fork inputs
-	FeeManager         *fees.Manager
-	BlockMaxComplexity fees.Dimensions
+	feeManager         *fees.Manager
+	blockMaxComplexity fees.Dimensions
+	credentials        []verify.Verifiable
 
 	// TipPercentage can either be an input (e.g. when building a transaction)
 	// or an output (once a transaction is verified)
 	TipPercentage fees.TipPercentage
 
-	// common inputs
-	Credentials []verify.Verifiable
-
 	// outputs of visitor execution
 	Fee uint64
+}
+
+// NewStaticCalculator must be used pre E upgrade activation
+func NewStaticCalculator(cfg *config.Config, chainTime time.Time) *Calculator {
+	return &Calculator{
+		config:    cfg,
+		chainTime: chainTime,
+	}
+}
+
+// NewDynamicCalculator must be used post E upgrade activation
+func NewDynamicCalculator(
+	cfg *config.Config,
+	feeManager *fees.Manager,
+	blockMaxComplexity fees.Dimensions,
+	creds []verify.Verifiable,
+) *Calculator {
+	return &Calculator{
+		isEActive:          true,
+		config:             cfg,
+		feeManager:         feeManager,
+		blockMaxComplexity: blockMaxComplexity,
+		credentials:        creds,
+	}
 }
 
 func (fc *Calculator) AddValidatorTx(*txs.AddValidatorTx) error {
 	// AddValidatorTx is banned following Durango activation, so we
 	// only return the pre EUpgrade fee here
-	fc.Fee = fc.Config.AddPrimaryNetworkValidatorFee
+	fc.Fee = fc.config.AddPrimaryNetworkValidatorFee
 	return nil
 }
 
 func (fc *Calculator) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
-	if !fc.IsEActive {
-		fc.Fee = fc.Config.AddSubnetValidatorFee
+	if !fc.isEActive {
+		fc.Fee = fc.config.AddSubnetValidatorFee
 		return nil
 	}
 
@@ -74,13 +96,13 @@ func (fc *Calculator) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
 func (fc *Calculator) AddDelegatorTx(*txs.AddDelegatorTx) error {
 	// AddValidatorTx is banned following Durango activation, so we
 	// only return the pre EUpgrade fee here
-	fc.Fee = fc.Config.AddPrimaryNetworkDelegatorFee
+	fc.Fee = fc.config.AddPrimaryNetworkDelegatorFee
 	return nil
 }
 
 func (fc *Calculator) CreateChainTx(tx *txs.CreateChainTx) error {
-	if !fc.IsEActive {
-		fc.Fee = fc.Config.GetCreateBlockchainTxFee(fc.ChainTime)
+	if !fc.isEActive {
+		fc.Fee = fc.config.GetCreateBlockchainTxFee(fc.chainTime)
 		return nil
 	}
 
@@ -94,8 +116,8 @@ func (fc *Calculator) CreateChainTx(tx *txs.CreateChainTx) error {
 }
 
 func (fc *Calculator) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
-	if !fc.IsEActive {
-		fc.Fee = fc.Config.GetCreateSubnetTxFee(fc.ChainTime)
+	if !fc.isEActive {
+		fc.Fee = fc.config.GetCreateSubnetTxFee(fc.chainTime)
 		return nil
 	}
 
@@ -117,8 +139,8 @@ func (*Calculator) RewardValidatorTx(*txs.RewardValidatorTx) error {
 }
 
 func (fc *Calculator) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx) error {
-	if !fc.IsEActive {
-		fc.Fee = fc.Config.TxFee
+	if !fc.isEActive {
+		fc.Fee = fc.config.TxFee
 		return nil
 	}
 
@@ -132,8 +154,8 @@ func (fc *Calculator) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx) e
 }
 
 func (fc *Calculator) TransformSubnetTx(tx *txs.TransformSubnetTx) error {
-	if !fc.IsEActive {
-		fc.Fee = fc.Config.TransformSubnetTxFee
+	if !fc.isEActive {
+		fc.Fee = fc.config.TransformSubnetTxFee
 		return nil
 	}
 
@@ -147,8 +169,8 @@ func (fc *Calculator) TransformSubnetTx(tx *txs.TransformSubnetTx) error {
 }
 
 func (fc *Calculator) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwnershipTx) error {
-	if !fc.IsEActive {
-		fc.Fee = fc.Config.TxFee
+	if !fc.isEActive {
+		fc.Fee = fc.config.TxFee
 		return nil
 	}
 
@@ -162,11 +184,11 @@ func (fc *Calculator) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwnershipT
 }
 
 func (fc *Calculator) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessValidatorTx) error {
-	if !fc.IsEActive {
+	if !fc.isEActive {
 		if tx.Subnet != constants.PrimaryNetworkID {
-			fc.Fee = fc.Config.AddSubnetValidatorFee
+			fc.Fee = fc.config.AddSubnetValidatorFee
 		} else {
-			fc.Fee = fc.Config.AddPrimaryNetworkValidatorFee
+			fc.Fee = fc.config.AddPrimaryNetworkValidatorFee
 		}
 		return nil
 	}
@@ -185,11 +207,11 @@ func (fc *Calculator) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessVali
 }
 
 func (fc *Calculator) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDelegatorTx) error {
-	if !fc.IsEActive {
+	if !fc.isEActive {
 		if tx.Subnet != constants.PrimaryNetworkID {
-			fc.Fee = fc.Config.AddSubnetDelegatorFee
+			fc.Fee = fc.config.AddSubnetDelegatorFee
 		} else {
-			fc.Fee = fc.Config.AddPrimaryNetworkDelegatorFee
+			fc.Fee = fc.config.AddPrimaryNetworkDelegatorFee
 		}
 		return nil
 	}
@@ -208,8 +230,8 @@ func (fc *Calculator) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDele
 }
 
 func (fc *Calculator) BaseTx(tx *txs.BaseTx) error {
-	if !fc.IsEActive {
-		fc.Fee = fc.Config.TxFee
+	if !fc.isEActive {
+		fc.Fee = fc.config.TxFee
 		return nil
 	}
 
@@ -223,8 +245,8 @@ func (fc *Calculator) BaseTx(tx *txs.BaseTx) error {
 }
 
 func (fc *Calculator) ImportTx(tx *txs.ImportTx) error {
-	if !fc.IsEActive {
-		fc.Fee = fc.Config.TxFee
+	if !fc.isEActive {
+		fc.Fee = fc.config.TxFee
 		return nil
 	}
 
@@ -242,8 +264,8 @@ func (fc *Calculator) ImportTx(tx *txs.ImportTx) error {
 }
 
 func (fc *Calculator) ExportTx(tx *txs.ExportTx) error {
-	if !fc.IsEActive {
-		fc.Fee = fc.Config.TxFee
+	if !fc.isEActive {
+		fc.Fee = fc.config.TxFee
 		return nil
 	}
 
@@ -275,7 +297,7 @@ func (fc *Calculator) meterTx(
 
 	// meter credentials, one by one. Then account for the extra bytes needed to
 	// serialize a slice of credentials (codec version bytes + slice size bytes)
-	for i, cred := range fc.Credentials {
+	for i, cred := range fc.credentials {
 		c, ok := cred.(*secp256k1fx.Credential)
 		if !ok {
 			return complexity, fmt.Errorf("don't know how to calculate complexity of %T", cred)
@@ -320,12 +342,12 @@ func (fc *Calculator) meterTx(
 }
 
 func (fc *Calculator) AddFeesFor(complexity fees.Dimensions, tipPercentage fees.TipPercentage) (uint64, error) {
-	boundBreached, dimension := fc.FeeManager.CumulateComplexity(complexity, fc.BlockMaxComplexity)
+	boundBreached, dimension := fc.feeManager.CumulateComplexity(complexity, fc.blockMaxComplexity)
 	if boundBreached {
 		return 0, fmt.Errorf("%w: breached dimension %d", errFailedComplexityCumulation, dimension)
 	}
 
-	fee, err := fc.FeeManager.CalculateFee(complexity, tipPercentage)
+	fee, err := fc.feeManager.CalculateFee(complexity, tipPercentage)
 	if err != nil {
 		return 0, fmt.Errorf("%w: %w", errFailedFeeCalculation, err)
 	}
@@ -335,11 +357,11 @@ func (fc *Calculator) AddFeesFor(complexity fees.Dimensions, tipPercentage fees.
 }
 
 func (fc *Calculator) RemoveFeesFor(unitsToRm fees.Dimensions, tipPercentage fees.TipPercentage) (uint64, error) {
-	if err := fc.FeeManager.RemoveComplexity(unitsToRm); err != nil {
+	if err := fc.feeManager.RemoveComplexity(unitsToRm); err != nil {
 		return 0, fmt.Errorf("failed removing units: %w", err)
 	}
 
-	fee, err := fc.FeeManager.CalculateFee(unitsToRm, tipPercentage)
+	fee, err := fc.feeManager.CalculateFee(unitsToRm, tipPercentage)
 	if err != nil {
 		return 0, fmt.Errorf("%w: %w", errFailedFeeCalculation, err)
 	}
