@@ -18,14 +18,30 @@ import (
 type FlagsMap map[string]interface{}
 
 // Utility function simplifying construction of a FlagsMap from a file.
-func ReadFlagsMap(path string, description string) (*FlagsMap, error) {
+func ReadFlagsMap(path string, description string) (FlagsMap, error) {
 	bytes, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read %s: %w", description, err)
 	}
-	flagsMap := &FlagsMap{}
-	if err := json.Unmarshal(bytes, flagsMap); err != nil {
+	flagsMap := FlagsMap{}
+	if err := json.Unmarshal(bytes, &flagsMap); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal %s: %w", description, err)
+	}
+	return flagsMap, nil
+}
+
+// Round-trips the provided interface through JSON to convert to a
+// FlagsMap. This allows for a cleaner serialization of embedded types
+// such as chain configuration.
+func InterfaceToFlagsMap(v interface{}) (FlagsMap, error) {
+	bytes, err := json.Marshal(v)
+	if err != nil {
+		return nil, err
+	}
+	flagsMap := FlagsMap{}
+	err = json.Unmarshal(bytes, &flagsMap)
+	if err != nil {
+		return nil, err
 	}
 	return flagsMap, nil
 }
