@@ -312,6 +312,12 @@ func (r *codecReader) Uvarint() (uint64, error) {
 	if bytesRead <= 0 {
 		return 0, io.ErrUnexpectedEOF
 	}
+
+	// To ensure decoding is canonical, we check for leading zeroes in the
+	// varint.
+	// The last byte of the varint includes the most significant bits.
+	// If the last byte is 0, then the number should have been encoded more
+	// efficiently by removing this leading zero.
 	if bytesRead > 1 && r.b[bytesRead-1] == 0x00 {
 		return 0, errLeadingZeroes
 	}
