@@ -30,22 +30,6 @@ func ReadFlagsMap(path string, description string) (FlagsMap, error) {
 	return flagsMap, nil
 }
 
-// Round-trips the provided interface through JSON to convert to a
-// FlagsMap. This allows for a cleaner serialization of embedded types
-// such as chain configuration.
-func InterfaceToFlagsMap(v interface{}) (FlagsMap, error) {
-	bytes, err := json.Marshal(v)
-	if err != nil {
-		return nil, err
-	}
-	flagsMap := FlagsMap{}
-	err = json.Unmarshal(bytes, &flagsMap)
-	if err != nil {
-		return nil, err
-	}
-	return flagsMap, nil
-}
-
 // SetDefaults ensures the effectiveness of flag overrides by only
 // setting values supplied in the defaults map that are not already
 // explicitly set.

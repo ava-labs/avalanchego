@@ -89,9 +89,9 @@ func NewPrivateKeys(keyCount int) ([]*secp256k1.PrivateKey, error) {
 }
 
 func NodesToIDs(nodes ...*Node) []ids.NodeID {
-	validatorIDs := make([]ids.NodeID, len(nodes))
+	nodeIDs := make([]ids.NodeID, len(nodes))
 	for i, node := range nodes {
-		validatorIDs[i] = node.NodeID
+		nodeIDs[i] = node.NodeID
 	}
-	return validatorIDs
+	return nodeIDs
 }
