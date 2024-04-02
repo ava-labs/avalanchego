@@ -300,7 +300,7 @@ func (v *view) hashChangedNodes(ctx context.Context) {
 //
 // Returns a potentially expanded [keyBuffer]. By returning this value this
 // function is able to have a maximum total number of allocations shared across
-// multiple invokations.
+// multiple invocations.
 //
 // Invariant: [keyBuffer] must be populated with [n]'s key and have sufficient
 // length to contain any of [n]'s child keys.
