@@ -290,12 +290,66 @@ func (v *view) hashChangedNodes(ctx context.Context) {
 // Calculates the ID of all descendants of [n] which need to be recalculated,
 // and then calculates the ID of [n] itself.
 func (v *view) hashChangedNode(n *node) ids.ID {
-	// We use [wg] to wait until all descendants of [n] have been updated.
-	var wg sync.WaitGroup
+	// If there are no children, we can avoid allocating [keyBuffer].
+	if len(n.children) == 0 {
+		return n.calculateID(v.db.metrics)
+	}
+
+	// Calculate the size of the largest child key of this node. This allows
+	// only allocating a single slice for all of the keys.
+	var maxChildBitLength int
+	for _, childEntry := range n.children {
+		maxChildBitLength = max(maxChildBitLength, childEntry.compressedKey.length)
+	}
+
+	var (
+		maxBytesNeeded = bytesNeeded(n.key.length + v.tokenSize + maxChildBitLength)
+		// keyBuffer is allocated onto the heap because it is dynamically sized.
+		keyBuffer = make([]byte, maxBytesNeeded)
+		// childBuffer is allocated on the stack.
+		childBuffer = make([]byte, 1)
+		dualIndex   = dualBitIndex(v.tokenSize)
+		bytesForKey = bytesNeeded(n.key.length)
+		// We track the last byte of [n.key] so that we can reset the value for
+		// each key. This is needed because the child buffer may get ORed at
+		// this byte.
+		lastKeyByte byte
+
+		// We use [wg] to wait until all descendants of [n] have been updated.
+		wg sync.WaitGroup
+	)
+
+	if bytesForKey > 0 {
+		// We only need to copy this node's key once because it does not change
+		// as we iterate over the children.
+		copy(keyBuffer, n.key.value)
+		lastKeyByte = keyBuffer[bytesForKey-1]
+	}
 
 	for childIndex, childEntry := range n.children {
-		childEntry := childEntry // New variable so goroutine doesn't capture loop variable.
-		childKey := n.key.Extend(ToToken(childIndex, v.tokenSize), childEntry.compressedKey)
+		childBuffer[0] = childIndex << dualIndex
+		childIndexAsKey := Key{
+			// It is safe to use byteSliceToString because [childBuffer] is not
+			// modified while [childIndexAsKey] is in use.
+			value:  byteSliceToString(childBuffer),
+			length: v.tokenSize,
+		}
+
+		totalBitLength := n.key.length + v.tokenSize + childEntry.compressedKey.length
+		buffer := keyBuffer[:bytesNeeded(totalBitLength)]
+		// Make sure the last byte of the key is originally set correctly
+		if bytesForKey > 0 {
+			buffer[bytesForKey-1] = lastKeyByte
+		}
+		extendIntoBuffer(buffer, childIndexAsKey, n.key.length)
+		extendIntoBuffer(buffer, childEntry.compressedKey, n.key.length+v.tokenSize)
+		childKey := Key{
+			// It is safe to use byteSliceToString because [buffer] is not
+			// modified while [childKey] is in use.
+			value:  byteSliceToString(buffer),
+			length: totalBitLength,
+		}
+
 		childNodeChange, ok := v.changes.nodes[childKey]
 		if !ok {
 			// This child wasn't changed.
@@ -306,11 +360,11 @@ func (v *view) hashChangedNode(n *node) ids.ID {
 		// Try updating the child and its descendants in a goroutine.
 		if ok := v.db.hashNodesSema.TryAcquire(1); ok {
 			wg.Add(1)
-			go func() {
+			go func(childEntry *child) {
 				childEntry.id = v.hashChangedNode(childNodeChange.after)
 				v.db.hashNodesSema.Release(1)
 				wg.Done()
-			}()
+			}(childEntry)
 		} else {
 			// We're at the goroutine limit; do the work in this goroutine.
 			childEntry.id = v.hashChangedNode(childNodeChange.after)
