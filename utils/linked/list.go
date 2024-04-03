@@ -53,6 +53,11 @@ func NewList[T any]() *List[T] {
 	return l
 }
 
+// Len returns the number of elements in l.
+func (l *List[_]) Len() int {
+	return l.length
+}
+
 // Front returns the element at the front of l.
 // If l is empty, nil is returned.
 func (l *List[T]) Front() *ListElement[T] {
@@ -69,6 +74,20 @@ func (l *List[T]) Back() *ListElement[T] {
 		return nil
 	}
 	return l.sentinel.prev
+}
+
+// Remove removes e from l if e is in l.
+func (l *List[T]) Remove(e *ListElement[T]) {
+	if e.list != l {
+		return
+	}
+
+	e.prev.next = e.next
+	e.next.prev = e.prev
+	e.next = nil
+	e.prev = nil
+	e.list = nil
+	l.length--
 }
 
 // PushFront inserts e at the front of l.
@@ -101,20 +120,6 @@ func (l *List[T]) InsertAfter(e *ListElement[T], location *ListElement[T]) {
 	}
 }
 
-// Remove removes e from l if e is in l.
-func (l *List[T]) Remove(e *ListElement[T]) {
-	if e.list != l {
-		return
-	}
-
-	e.prev.next = e.next
-	e.next.prev = e.prev
-	e.next = nil
-	e.prev = nil
-	e.list = nil
-	l.length--
-}
-
 // MoveToFront moves e to the front of l.
 // If e is not in l, l is not modified.
 func (l *List[T]) MoveToFront(e *ListElement[T]) {
@@ -143,10 +148,6 @@ func (l *List[T]) MoveBefore(e, location *ListElement[T]) {
 // If the elements are equal or not in l, the list is not modified.
 func (l *List[T]) MoveAfter(e, location *ListElement[T]) {
 	l.moveAfter(e, location)
-}
-
-func (l *List[_]) Len() int {
-	return l.length
 }
 
 func (l *List[T]) insertAfter(e, location *ListElement[T]) {
