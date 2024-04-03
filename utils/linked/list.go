@@ -35,6 +35,8 @@ func (e *ListElement[T]) Prev() *ListElement[T] {
 //
 // The primary design change is to remove all memory allocations from the list
 // definition. This allows these lists to be used in performance critical paths.
+// Additionally the zero value is not useful. Lists must be created with the
+// NewList method.
 type List[T any] struct {
 	// sentinel is only used as a placeholder to avoid complex nil checks.
 	// sentinel.Value is never used.
