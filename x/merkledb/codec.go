@@ -325,6 +325,7 @@ func (r *codecReader) Uvarint() (uint64, error) {
 
 	r.b = r.b[bytesRead:]
 	return length, nil
+
 }
 
 func (r *codecReader) ID() (ids.ID, error) {
