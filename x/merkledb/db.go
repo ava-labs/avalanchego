@@ -15,7 +15,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"go.opentelemetry.io/otel/attribute"
 	"golang.org/x/exp/maps"
-	"golang.org/x/sync/semaphore"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
@@ -216,9 +215,10 @@ type merkleDB struct {
 	// Valid children of this trie.
 	childViews []*view
 
-	// hashNodesSema controls the number of goroutines that are created inside
-	// [hashChangedNode] at any given time.
-	hashNodesSema *semaphore.Weighted
+	// hashNodesKeyPool controls the number of goroutines that are created
+	// inside [hashChangedNode] at any given time and provides slices for the
+	// keys needed while hashing.
+	hashNodesKeyPool *bytesPool
 
 	tokenSize int
 }
@@ -242,9 +242,9 @@ func newDatabase(
 		return nil, err
 	}
 
-	rootGenConcurrency := uint(runtime.NumCPU())
+	rootGenConcurrency := runtime.NumCPU()
 	if config.RootGenConcurrency != 0 {
-		rootGenConcurrency = config.RootGenConcurrency
+		rootGenConcurrency = int(config.RootGenConcurrency)
 	}
 
 	// Share a sync.Pool of []byte between the intermediateNodeDB and valueNodeDB
@@ -270,12 +270,12 @@ func newDatabase(
 			bufferPool,
 			metrics,
 			int(config.ValueNodeCacheSize)),
-		history:       newTrieHistory(int(config.HistoryLength)),
-		debugTracer:   getTracerIfEnabled(config.TraceLevel, DebugTrace, config.Tracer),
-		infoTracer:    getTracerIfEnabled(config.TraceLevel, InfoTrace, config.Tracer),
-		childViews:    make([]*view, 0, defaultPreallocationSize),
-		hashNodesSema: semaphore.NewWeighted(int64(rootGenConcurrency)),
-		tokenSize:     BranchFactorToTokenSize[config.BranchFactor],
+		history:          newTrieHistory(int(config.HistoryLength)),
+		debugTracer:      getTracerIfEnabled(config.TraceLevel, DebugTrace, config.Tracer),
+		infoTracer:       getTracerIfEnabled(config.TraceLevel, InfoTrace, config.Tracer),
+		childViews:       make([]*view, 0, defaultPreallocationSize),
+		hashNodesKeyPool: newBytesPool(rootGenConcurrency),
+		tokenSize:        BranchFactorToTokenSize[config.BranchFactor],
 	}
 
 	if err := trieDB.initializeRoot(); err != nil {

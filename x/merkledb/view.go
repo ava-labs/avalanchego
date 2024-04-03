@@ -281,39 +281,115 @@ func (v *view) hashChangedNodes(ctx context.Context) {
 		return
 	}
 
-	_ = v.db.hashNodesSema.Acquire(context.Background(), 1)
-	defer v.db.hashNodesSema.Release(1)
+	// If there are no children, we can avoid allocating [keyBuffer].
+	root := v.root.Value()
+	if len(root.children) == 0 {
+		v.changes.rootID = root.calculateID(v.db.metrics)
+		return
+	}
 
-	v.changes.rootID = v.hashChangedNode(v.root.Value())
+	// Allocate [keyBuffer] and populate it with the root node's key.
+	keyBuffer := v.db.hashNodesKeyPool.Acquire()
+	keyBuffer = v.setKeyBuffer(root, keyBuffer)
+	v.changes.rootID, keyBuffer = v.hashChangedNode(root, keyBuffer)
+	v.db.hashNodesKeyPool.Release(keyBuffer)
 }
 
 // Calculates the ID of all descendants of [n] which need to be recalculated,
 // and then calculates the ID of [n] itself.
-func (v *view) hashChangedNode(n *node) ids.ID {
-	// We use [wg] to wait until all descendants of [n] have been updated.
-	var wg sync.WaitGroup
+//
+// Returns a potentially expanded [keyBuffer]. By returning this value this
+// function is able to have a maximum total number of allocations shared across
+// multiple invocations.
+//
+// Invariant: [keyBuffer] must be populated with [n]'s key and have sufficient
+// length to contain any of [n]'s child keys.
+func (v *view) hashChangedNode(n *node, keyBuffer []byte) (ids.ID, []byte) {
+	var (
+		// childBuffer is allocated on the stack.
+		childBuffer = make([]byte, 1)
+		dualIndex   = dualBitIndex(v.tokenSize)
+		bytesForKey = bytesNeeded(n.key.length)
+		// We track the last byte of [n.key] so that we can reset the value for
+		// each key. This is needed because the child buffer may get ORed at
+		// this byte.
+		lastKeyByte byte
 
+		// We use [wg] to wait until all descendants of [n] have been updated.
+		wg waitGroup
+	)
+	if bytesForKey > 0 {
+		lastKeyByte = keyBuffer[bytesForKey-1]
+	}
+
+	// This loop is optimized to avoid allocations when calculating the
+	// [childKey] by reusing [keyBuffer] and leaving the first [bytesForKey-1]
+	// bytes unmodified.
 	for childIndex, childEntry := range n.children {
-		childEntry := childEntry // New variable so goroutine doesn't capture loop variable.
-		childKey := n.key.Extend(ToToken(childIndex, v.tokenSize), childEntry.compressedKey)
+		childBuffer[0] = childIndex << dualIndex
+		childIndexAsKey := Key{
+			// It is safe to use byteSliceToString because [childBuffer] is not
+			// modified while [childIndexAsKey] is in use.
+			value:  byteSliceToString(childBuffer),
+			length: v.tokenSize,
+		}
+
+		totalBitLength := n.key.length + v.tokenSize + childEntry.compressedKey.length
+		// Because [keyBuffer] may have been modified in a prior iteration of
+		// this loop, it is not guaranteed that its length is at least
+		// [bytesNeeded(totalBitLength)]. However, that's fine. The below
+		// slicing would only panic if the buffer didn't have sufficient
+		// capacity.
+		keyBuffer = keyBuffer[:bytesNeeded(totalBitLength)]
+		// We don't need to copy this node's key. It's assumed to already be
+		// correct; except for the last byte. We must make sure the last byte of
+		// the key is set correctly because extendIntoBuffer may OR bits from
+		// the extension and overwrite the last byte. However, extendIntoBuffer
+		// does not modify the first [bytesForKey-1] bytes of [keyBuffer].
+		if bytesForKey > 0 {
+			keyBuffer[bytesForKey-1] = lastKeyByte
+		}
+		extendIntoBuffer(keyBuffer, childIndexAsKey, n.key.length)
+		extendIntoBuffer(keyBuffer, childEntry.compressedKey, n.key.length+v.tokenSize)
+		childKey := Key{
+			// It is safe to use byteSliceToString because [keyBuffer] is not
+			// modified while [childKey] is in use.
+			value:  byteSliceToString(keyBuffer),
+			length: totalBitLength,
+		}
+
 		childNodeChange, ok := v.changes.nodes[childKey]
 		if !ok {
 			// This child wasn't changed.
 			continue
 		}
-		childEntry.hasValue = childNodeChange.after.hasValue()
+
+		childNode := childNodeChange.after
+		childEntry.hasValue = childNode.hasValue()
+
+		// If there are no children of the childNode, we can avoid constructing
+		// the buffer for the child keys.
+		if len(childNode.children) == 0 {
+			childEntry.id = childNode.calculateID(v.db.metrics)
+			continue
+		}
 
 		// Try updating the child and its descendants in a goroutine.
-		if ok := v.db.hashNodesSema.TryAcquire(1); ok {
+		if childKeyBuffer, ok := v.db.hashNodesKeyPool.TryAcquire(); ok {
 			wg.Add(1)
-			go func() {
-				childEntry.id = v.hashChangedNode(childNodeChange.after)
-				v.db.hashNodesSema.Release(1)
+			go func(wg *sync.WaitGroup, childEntry *child, childNode *node, childKeyBuffer []byte) {
+				childKeyBuffer = v.setKeyBuffer(childNode, childKeyBuffer)
+				childEntry.id, childKeyBuffer = v.hashChangedNode(childNode, childKeyBuffer)
+				v.db.hashNodesKeyPool.Release(childKeyBuffer)
 				wg.Done()
-			}()
+			}(wg.wg, childEntry, childNode, childKeyBuffer)
 		} else {
 			// We're at the goroutine limit; do the work in this goroutine.
-			childEntry.id = v.hashChangedNode(childNodeChange.after)
+			//
+			// We can skip copying the key here because [keyBuffer] is already
+			// constructed to be childNode's key.
+			keyBuffer = v.setLengthForChildren(childNode, keyBuffer)
+			childEntry.id, keyBuffer = v.hashChangedNode(childNode, keyBuffer)
 		}
 	}
 
@@ -321,7 +397,35 @@ func (v *view) hashChangedNode(n *node) ids.ID {
 	wg.Wait()
 
 	// The IDs [n]'s descendants are up to date so we can calculate [n]'s ID.
-	return n.calculateID(v.db.metrics)
+	return n.calculateID(v.db.metrics), keyBuffer
+}
+
+// setKeyBuffer expands [keyBuffer] to have sufficient size for any of [n]'s
+// child keys and populates [n]'s key into [keyBuffer]. If [keyBuffer] already
+// has sufficient size, this function will not perform any memory allocations.
+func (v *view) setKeyBuffer(n *node, keyBuffer []byte) []byte {
+	keyBuffer = v.setLengthForChildren(n, keyBuffer)
+	copy(keyBuffer, n.key.value)
+	return keyBuffer
+}
+
+// setLengthForChildren expands [keyBuffer] to have sufficient size for any of
+// [n]'s child keys.
+func (v *view) setLengthForChildren(n *node, keyBuffer []byte) []byte {
+	// Calculate the size of the largest child key of this node.
+	var maxBitLength int
+	for _, childEntry := range n.children {
+		maxBitLength = max(maxBitLength, childEntry.compressedKey.length)
+	}
+	maxBytesNeeded := bytesNeeded(n.key.length + v.tokenSize + maxBitLength)
+	return setBytesLength(keyBuffer, maxBytesNeeded)
+}
+
+func setBytesLength(b []byte, size int) []byte {
+	if size <= cap(b) {
+		return b[:size]
+	}
+	return append(b[:cap(b)], make([]byte, size-cap(b))...)
 }
 
 // GetProof returns a proof that [bytesPath] is in or not in trie [t].
