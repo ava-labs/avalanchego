@@ -196,44 +196,8 @@ func (m *messageQueue) Shutdown() {
 
 // canPop will return true for at least one message in [m.msgs]
 func (m *messageQueue) canPop(msg message.InboundMessage) bool {
-	// Always pop connected and disconnected messages.
-	if op := msg.Op(); op == message.ConnectedOp || op == message.DisconnectedOp || op == message.ConnectedSubnetOp {
-		return true
-	}
-
-	// If the deadline to handle [msg] has passed, always pop it.
-	// It will be dropped immediately.
-	if expiration := msg.Expiration(); m.clock.Time().After(expiration) {
-		return true
-	}
-	// Every node has some allowed CPU allocation depending on
-	// the number of nodes with unprocessed messages.
-	baseMaxCPU := 1 / float64(len(m.nodeToUnprocessedMsgs))
-	nodeID := msg.NodeID()
-	weight := m.vdrs.GetWeight(m.ctx.SubnetID, nodeID)
-
-	var portionWeight float64
-	if totalVdrsWeight, err := m.vdrs.TotalWeight(m.ctx.SubnetID); err != nil {
-		// The sum of validator weights should never overflow, but if they do,
-		// we treat portionWeight as 0.
-		m.ctx.Log.Error("failed to get total weight of validators",
-			zap.Stringer("subnetID", m.ctx.SubnetID),
-			zap.Error(err),
-		)
-	} else if totalVdrsWeight == 0 {
-		// The sum of validator weights should never be 0, but handle that case
-		// for completeness here to avoid divide by 0.
-		m.ctx.Log.Warn("validator set is empty",
-			zap.Stringer("subnetID", m.ctx.SubnetID),
-		)
-	} else {
-		portionWeight = float64(weight) / float64(totalVdrsWeight)
-	}
-
-	// Validators are allowed to use more CPU. More weight --> more CPU use allowed.
-	recentCPUUsage := m.cpuTracker.Usage(nodeID, m.clock.Time())
-	maxCPU := baseMaxCPU + (1.0-baseMaxCPU)*portionWeight
-	return recentCPUUsage <= maxCPU
+	// Always process messages (avoids iterating over queue for each delivery)
+	return true
 }
 
 type msgAndContext struct {
