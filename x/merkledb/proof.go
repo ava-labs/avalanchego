@@ -758,7 +758,7 @@ func verifyProofPath(proof []ProofNode, key maybe.Maybe[Key]) error {
 			return ErrPartialByteLengthWithValue
 		}
 
-		// each node should have a key that has the proven key as a prefix
+		// each node's key should be a prefix of [key]
 		if key.HasValue() && !key.Value().HasStrictPrefix(nodeKey) {
 			return ErrProofNodeNotForKey
 		}
