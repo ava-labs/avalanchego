@@ -24,7 +24,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
 	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/bootstrap"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
@@ -1307,8 +1306,6 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	baseDB := memdb.New()
 	vmDB := prefixdb.New(chains.VMDBPrefix, baseDB)
 	bootstrappingDB := prefixdb.New(chains.ChainBootstrappingDBPrefix, baseDB)
-	blocked, err := queue.NewWithMissing(bootstrappingDB, "", prometheus.NewRegistry())
-	require.NoError(err)
 
 	vm := &VM{Config: config.Config{
 		Chains:                 chains.TestManager,
@@ -1484,7 +1481,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		Sender:                         sender,
 		BootstrapTracker:               bootstrapTracker,
 		AncestorsMaxContainersReceived: 2000,
-		Blocked:                        blocked,
+		DB:                             bootstrappingDB,
 		VM:                             vm,
 	}
 
