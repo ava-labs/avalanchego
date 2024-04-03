@@ -59,13 +59,6 @@ func (db *valueNodeDB) Close() {
 	db.closed.Set(true)
 }
 
-func (db *valueNodeDB) NewBatch() *valueNodeBatch {
-	return &valueNodeBatch{
-		db:  db,
-		ops: make(map[Key]*node, defaultBufferLength),
-	}
-}
-
 func (db *valueNodeDB) Get(key Key) (*node, error) {
 	if cachedValue, isCached := db.nodeCache.Get(key); isCached {
 		db.metrics.ValueNodeCacheHit()
@@ -95,37 +88,50 @@ func (db *valueNodeDB) Clear() error {
 
 // Batch of database operations
 type valueNodeBatch struct {
-	db  *valueNodeDB
-	ops map[Key]*node
+	db    *valueNodeDB
+	batch database.Batch
+
+	err error
+}
+
+func (db *valueNodeDB) NewBatch() *valueNodeBatch {
+	return &valueNodeBatch{
+		db:    db,
+		batch: db.baseDB.NewBatch(),
+	}
 }
 
 func (b *valueNodeBatch) Put(key Key, value *node) {
-	b.ops[key] = value
+	if b.err != nil {
+		return
+	}
+
+	b.db.metrics.DatabaseNodeWrite()
+	b.db.nodeCache.Put(key, value)
+	prefixedKey := addPrefixToKey(b.db.bufferPool, valueNodePrefix, key.Bytes())
+	if err := b.batch.Put(prefixedKey, value.bytes()); err != nil {
+		b.err = err
+	}
+	b.db.bufferPool.Put(prefixedKey)
 }
 
 func (b *valueNodeBatch) Delete(key Key) {
-	b.ops[key] = nil
+	if b.err != nil {
+		return
+	}
+
+	b.db.metrics.DatabaseNodeWrite()
+	b.db.nodeCache.Put(key, nil)
+	prefixedKey := addPrefixToKey(b.db.bufferPool, valueNodePrefix, key.Bytes())
+	if err := b.batch.Delete(prefixedKey); err != nil {
+		b.err = err
+	}
+	b.db.bufferPool.Put(prefixedKey)
 }
 
 // Write flushes any accumulated data to the underlying database.
 func (b *valueNodeBatch) Write() error {
-	dbBatch := b.db.baseDB.NewBatch()
-	for key, n := range b.ops {
-		b.db.metrics.DatabaseNodeWrite()
-		b.db.nodeCache.Put(key, n)
-		prefixedKey := addPrefixToKey(b.db.bufferPool, valueNodePrefix, key.Bytes())
-		if n == nil {
-			if err := dbBatch.Delete(prefixedKey); err != nil {
-				return err
-			}
-		} else if err := dbBatch.Put(prefixedKey, n.bytes()); err != nil {
-			return err
-		}
-
-		b.db.bufferPool.Put(prefixedKey)
-	}
-
-	return dbBatch.Write()
+	return b.batch.Write()
 }
 
 type iterator struct {
