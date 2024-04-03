@@ -739,8 +739,9 @@ func verifyKeyValues(kvs []KeyValue, start maybe.Maybe[[]byte], end maybe.Maybe[
 //     since all keys with values are written in complete bytes([]byte).
 //   - Each key in [proof] is a strict prefix of the following key.
 //   - Each key in [proof] is a strict prefix of [keyBytes], except possibly the last.
-//   - If the last element in [proof] is [Key], this is an inclusion proof.
-//     Otherwise, this is an exclusion proof and [keyBytes] must not be in [proof].
+//
+// If the last element in [proof] is [Key], this is an inclusion proof.
+// Otherwise, this is an exclusion proof and [keyBytes] must not be in [proof].
 func verifyProofPath(proof []ProofNode, key maybe.Maybe[Key]) error {
 	if len(proof) == 0 {
 		return nil
