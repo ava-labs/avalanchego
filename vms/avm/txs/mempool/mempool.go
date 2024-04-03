@@ -160,8 +160,10 @@ func (m *mempool) Add(tx *txs.Tx) error {
 }
 
 func (m *mempool) Get(txID ids.ID) (*txs.Tx, bool) {
-	tx, ok := m.unissuedTxs.Get(txID)
-	return tx, ok
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+
+	return m.unissuedTxs.Get(txID)
 }
 
 func (m *mempool) Remove(txs ...*txs.Tx) {
@@ -190,6 +192,9 @@ func (m *mempool) Remove(txs ...*txs.Tx) {
 }
 
 func (m *mempool) Peek() (*txs.Tx, bool) {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+
 	_, tx, exists := m.unissuedTxs.Oldest()
 	return tx, exists
 }
@@ -207,6 +212,9 @@ func (m *mempool) Iterate(f func(*txs.Tx) bool) {
 }
 
 func (m *mempool) RequestBuildBlock() {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+
 	if m.unissuedTxs.Len() == 0 {
 		return
 	}

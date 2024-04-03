@@ -3,11 +3,7 @@
 
 package linked
 
-import (
-	"sync"
-
-	"github.com/ava-labs/avalanchego/utils"
-)
+import "github.com/ava-labs/avalanchego/utils"
 
 type keyValue[K, V any] struct {
 	key   K
@@ -18,7 +14,6 @@ type keyValue[K, V any] struct {
 //
 // Entries are tracked by insertion order.
 type Hashmap[K comparable, V any] struct {
-	lock      sync.RWMutex
 	entryMap  map[K]*ListElement[keyValue[K, V]]
 	entryList *List[keyValue[K, V]]
 	freeList  []*ListElement[keyValue[K, V]]
@@ -31,49 +26,7 @@ func NewHashmap[K comparable, V any]() *Hashmap[K, V] {
 	}
 }
 
-func (lh *Hashmap[K, V]) Put(key K, val V) {
-	lh.lock.Lock()
-	defer lh.lock.Unlock()
-
-	lh.put(key, val)
-}
-
-func (lh *Hashmap[K, V]) Get(key K) (V, bool) {
-	lh.lock.RLock()
-	defer lh.lock.RUnlock()
-
-	return lh.get(key)
-}
-
-func (lh *Hashmap[K, V]) Delete(key K) bool {
-	lh.lock.Lock()
-	defer lh.lock.Unlock()
-
-	return lh.delete(key)
-}
-
-func (lh *Hashmap[K, V]) Len() int {
-	lh.lock.RLock()
-	defer lh.lock.RUnlock()
-
-	return lh.len()
-}
-
-func (lh *Hashmap[K, V]) Oldest() (K, V, bool) {
-	lh.lock.RLock()
-	defer lh.lock.RUnlock()
-
-	return lh.oldest()
-}
-
-func (lh *Hashmap[K, V]) Newest() (K, V, bool) {
-	lh.lock.RLock()
-	defer lh.lock.RUnlock()
-
-	return lh.newest()
-}
-
-func (lh *Hashmap[K, V]) put(key K, value V) {
+func (lh *Hashmap[K, V]) Put(key K, value V) {
 	if e, ok := lh.entryMap[key]; ok {
 		lh.entryList.MoveToBack(e)
 		e.Value = keyValue[K, V]{
@@ -100,14 +53,14 @@ func (lh *Hashmap[K, V]) put(key K, value V) {
 	lh.entryList.PushBack(e)
 }
 
-func (lh *Hashmap[K, V]) get(key K) (V, bool) {
+func (lh *Hashmap[K, V]) Get(key K) (V, bool) {
 	if e, ok := lh.entryMap[key]; ok {
 		return e.Value.value, true
 	}
 	return utils.Zero[V](), false
 }
 
-func (lh *Hashmap[K, V]) delete(key K) bool {
+func (lh *Hashmap[K, V]) Delete(key K) bool {
 	e, ok := lh.entryMap[key]
 	if ok {
 		lh.entryList.Remove(e)
@@ -118,18 +71,18 @@ func (lh *Hashmap[K, V]) delete(key K) bool {
 	return ok
 }
 
-func (lh *Hashmap[K, V]) len() int {
+func (lh *Hashmap[K, V]) Len() int {
 	return len(lh.entryMap)
 }
 
-func (lh *Hashmap[K, V]) oldest() (K, V, bool) {
+func (lh *Hashmap[K, V]) Oldest() (K, V, bool) {
 	if e := lh.entryList.Front(); e != nil {
 		return e.Value.key, e.Value.value, true
 	}
 	return utils.Zero[K](), utils.Zero[V](), false
 }
 
-func (lh *Hashmap[K, V]) newest() (K, V, bool) {
+func (lh *Hashmap[K, V]) Newest() (K, V, bool) {
 	if e := lh.entryList.Back(); e != nil {
 		return e.Value.key, e.Value.value, true
 	}
@@ -159,9 +112,6 @@ func (it *Iterator[K, V]) Next() bool {
 		it.next = nil
 		return false
 	}
-
-	it.lh.lock.RLock()
-	defer it.lh.lock.RUnlock()
 
 	// If the iterator was not yet initialized, do it now.
 	if !it.initialized {

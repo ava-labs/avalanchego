@@ -174,6 +174,9 @@ func (m *mempool) Add(tx *txs.Tx) error {
 }
 
 func (m *mempool) Get(txID ids.ID) (*txs.Tx, bool) {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+
 	return m.unissuedTxs.Get(txID)
 }
 
@@ -203,6 +206,9 @@ func (m *mempool) Remove(txs ...*txs.Tx) {
 }
 
 func (m *mempool) Peek() (*txs.Tx, bool) {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+
 	_, tx, exists := m.unissuedTxs.Oldest()
 	return tx, exists
 }
@@ -240,6 +246,9 @@ func (m *mempool) GetDropReason(txID ids.ID) error {
 }
 
 func (m *mempool) RequestBuildBlock(emptyBlockPermitted bool) {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+
 	if !emptyBlockPermitted && m.unissuedTxs.Len() == 0 {
 		return
 	}
