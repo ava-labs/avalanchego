@@ -18,13 +18,13 @@ import (
 type FlagsMap map[string]interface{}
 
 // Utility function simplifying construction of a FlagsMap from a file.
-func ReadFlagsMap(path string, description string) (*FlagsMap, error) {
+func ReadFlagsMap(path string, description string) (FlagsMap, error) {
 	bytes, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read %s: %w", description, err)
 	}
-	flagsMap := &FlagsMap{}
-	if err := json.Unmarshal(bytes, flagsMap); err != nil {
+	flagsMap := FlagsMap{}
+	if err := json.Unmarshal(bytes, &flagsMap); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal %s: %w", description, err)
 	}
 	return flagsMap, nil

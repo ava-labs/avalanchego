@@ -140,7 +140,7 @@ func (n *Network) readChainConfigs() error {
 		if err != nil {
 			return err
 		}
-		n.ChainConfigs[chainAlias] = *chainConfig
+		n.ChainConfigs[chainAlias] = chainConfig
 	}
 
 	return nil
