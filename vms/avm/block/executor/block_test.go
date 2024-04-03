@@ -28,6 +28,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/mempool"
+
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 func TestBlockVerify(t *testing.T) {
@@ -128,10 +130,16 @@ func TestBlockVerify(t *testing.T) {
 
 				mempool := mempool.NewMockMempool(ctrl)
 				mempool.EXPECT().MarkDropped(errTx.ID(), errTest).Times(1)
+
+				mockState := state.NewMockState(ctrl)
+				mockState.EXPECT().GetFeeRates().Return(commonfees.Empty, nil).AnyTimes()
+				mockState.EXPECT().GetLastBlockComplexity().Return(commonfees.Empty, nil).AnyTimes()
+
 				return &Block{
 					Block: mockBlock,
 					manager: &manager{
 						backend:      defaultTestBackend(false, nil),
+						state:        mockState,
 						mempool:      mempool,
 						metrics:      metrics.NewMockMetrics(ctrl),
 						blkIDToState: map[ids.ID]*blockState{},
@@ -161,6 +169,9 @@ func TestBlockVerify(t *testing.T) {
 
 				mockState := state.NewMockState(ctrl)
 				mockState.EXPECT().GetBlock(parentID).Return(nil, errTest)
+				mockState.EXPECT().GetFeeRates().Return(commonfees.Empty, nil).AnyTimes()
+				mockState.EXPECT().GetLastBlockComplexity().Return(commonfees.Empty, nil).AnyTimes()
+
 				return &Block{
 					Block: mockBlock,
 					manager: &manager{
@@ -193,10 +204,13 @@ func TestBlockVerify(t *testing.T) {
 				parentID := ids.GenerateTestID()
 				mockBlock.EXPECT().Parent().Return(parentID).AnyTimes()
 
-				mockState := state.NewMockState(ctrl)
 				mockParentBlock := block.NewMockBlock(ctrl)
 				mockParentBlock.EXPECT().Height().Return(blockHeight) // Should be blockHeight - 1
+
+				mockState := state.NewMockState(ctrl)
 				mockState.EXPECT().GetBlock(parentID).Return(mockParentBlock, nil)
+				mockState.EXPECT().GetFeeRates().Return(commonfees.Empty, nil).AnyTimes()
+				mockState.EXPECT().GetLastBlockComplexity().Return(commonfees.Empty, nil).AnyTimes()
 
 				return &Block{
 					Block: mockBlock,
@@ -238,10 +252,15 @@ func TestBlockVerify(t *testing.T) {
 				mockParentState.EXPECT().GetLastAccepted().Return(parentID)
 				mockParentState.EXPECT().GetTimestamp().Return(blockTimestamp.Add(1))
 
+				mockState := state.NewMockState(ctrl)
+				mockState.EXPECT().GetFeeRates().Return(commonfees.Empty, nil).AnyTimes()
+				mockState.EXPECT().GetLastBlockComplexity().Return(commonfees.Empty, nil).AnyTimes()
+
 				return &Block{
 					Block: mockBlock,
 					manager: &manager{
 						backend: defaultTestBackend(false, nil),
+						state:   mockState,
 						blkIDToState: map[ids.ID]*blockState{
 							parentID: {
 								onAcceptState:  mockParentState,
@@ -282,7 +301,13 @@ func TestBlockVerify(t *testing.T) {
 
 				mockParentState := state.NewMockDiff(ctrl)
 				mockParentState.EXPECT().GetLastAccepted().Return(parentID)
+				mockParentState.EXPECT().GetFeeRates().Return(commonfees.Empty, nil)
+				mockParentState.EXPECT().GetLastBlockComplexity().Return(commonfees.Empty, nil)
 				mockParentState.EXPECT().GetTimestamp().Return(blockTimestamp)
+
+				mockState := state.NewMockState(ctrl)
+				mockState.EXPECT().GetFeeRates().Return(commonfees.Empty, nil).AnyTimes()
+				mockState.EXPECT().GetLastBlockComplexity().Return(commonfees.Empty, nil).AnyTimes()
 
 				mempool := mempool.NewMockMempool(ctrl)
 				mempool.EXPECT().MarkDropped(tx.ID(), errTest).Times(1)
@@ -290,6 +315,7 @@ func TestBlockVerify(t *testing.T) {
 					Block: mockBlock,
 					manager: &manager{
 						backend: defaultTestBackend(false, nil),
+						state:   mockState,
 						mempool: mempool,
 						metrics: metrics.NewMockMetrics(ctrl),
 						blkIDToState: map[ids.ID]*blockState{
@@ -334,6 +360,12 @@ func TestBlockVerify(t *testing.T) {
 				mockParentState := state.NewMockDiff(ctrl)
 				mockParentState.EXPECT().GetLastAccepted().Return(parentID)
 				mockParentState.EXPECT().GetTimestamp().Return(blockTimestamp)
+				mockParentState.EXPECT().GetFeeRates().Return(commonfees.Empty, nil)
+				mockParentState.EXPECT().GetLastBlockComplexity().Return(commonfees.Empty, nil)
+
+				mockState := state.NewMockState(ctrl)
+				mockState.EXPECT().GetFeeRates().Return(commonfees.Empty, nil).AnyTimes()
+				mockState.EXPECT().GetLastBlockComplexity().Return(commonfees.Empty, nil).AnyTimes()
 
 				mempool := mempool.NewMockMempool(ctrl)
 				mempool.EXPECT().MarkDropped(tx.ID(), errTest).Times(1)
@@ -343,6 +375,7 @@ func TestBlockVerify(t *testing.T) {
 						mempool: mempool,
 						metrics: metrics.NewMockMetrics(ctrl),
 						backend: defaultTestBackend(false, nil),
+						state:   mockState,
 						blkIDToState: map[ids.ID]*blockState{
 							parentID: {
 								onAcceptState:  mockParentState,
@@ -412,6 +445,12 @@ func TestBlockVerify(t *testing.T) {
 				mockParentState := state.NewMockDiff(ctrl)
 				mockParentState.EXPECT().GetLastAccepted().Return(parentID)
 				mockParentState.EXPECT().GetTimestamp().Return(blockTimestamp)
+				mockParentState.EXPECT().GetFeeRates().Return(commonfees.Empty, nil)
+				mockParentState.EXPECT().GetLastBlockComplexity().Return(commonfees.Empty, nil)
+
+				mockState := state.NewMockState(ctrl)
+				mockState.EXPECT().GetFeeRates().Return(commonfees.Empty, nil).AnyTimes()
+				mockState.EXPECT().GetLastBlockComplexity().Return(commonfees.Empty, nil).AnyTimes()
 
 				mempool := mempool.NewMockMempool(ctrl)
 				mempool.EXPECT().MarkDropped(tx2.ID(), ErrConflictingBlockTxs).Times(1)
@@ -421,6 +460,7 @@ func TestBlockVerify(t *testing.T) {
 						mempool: mempool,
 						metrics: metrics.NewMockMetrics(ctrl),
 						backend: defaultTestBackend(false, nil),
+						state:   mockState,
 						blkIDToState: map[ids.ID]*blockState{
 							parentID: {
 								onAcceptState:  mockParentState,
@@ -474,11 +514,18 @@ func TestBlockVerify(t *testing.T) {
 				mockParentState := state.NewMockDiff(ctrl)
 				mockParentState.EXPECT().GetLastAccepted().Return(parentID)
 				mockParentState.EXPECT().GetTimestamp().Return(blockTimestamp)
+				mockParentState.EXPECT().GetFeeRates().Return(commonfees.Empty, nil)
+				mockParentState.EXPECT().GetLastBlockComplexity().Return(commonfees.Empty, nil)
+
+				mockState := state.NewMockState(ctrl)
+				mockState.EXPECT().GetFeeRates().Return(commonfees.Empty, nil).AnyTimes()
+				mockState.EXPECT().GetLastBlockComplexity().Return(commonfees.Empty, nil).AnyTimes()
 
 				return &Block{
 					Block: mockBlock,
 					manager: &manager{
 						backend: defaultTestBackend(false, nil),
+						state:   mockState,
 						blkIDToState: map[ids.ID]*blockState{
 							parentID: {
 								onAcceptState:  mockParentState,
@@ -522,6 +569,12 @@ func TestBlockVerify(t *testing.T) {
 				mockParentState := state.NewMockDiff(ctrl)
 				mockParentState.EXPECT().GetLastAccepted().Return(parentID)
 				mockParentState.EXPECT().GetTimestamp().Return(blockTimestamp)
+				mockParentState.EXPECT().GetFeeRates().Return(commonfees.Empty, nil)
+				mockParentState.EXPECT().GetLastBlockComplexity().Return(commonfees.Empty, nil)
+
+				mockState := state.NewMockState(ctrl)
+				mockState.EXPECT().GetFeeRates().Return(commonfees.Empty, nil).AnyTimes()
+				mockState.EXPECT().GetLastBlockComplexity().Return(commonfees.Empty, nil).AnyTimes()
 
 				mockMempool := mempool.NewMockMempool(ctrl)
 				mockMempool.EXPECT().Remove([]*txs.Tx{tx})
@@ -531,6 +584,7 @@ func TestBlockVerify(t *testing.T) {
 						mempool: mockMempool,
 						metrics: metrics.NewMockMetrics(ctrl),
 						backend: defaultTestBackend(false, nil),
+						state:   mockState,
 						blkIDToState: map[ids.ID]*blockState{
 							parentID: {
 								onAcceptState:  mockParentState,
@@ -843,26 +897,37 @@ func TestBlockReject(t *testing.T) {
 				})
 
 				mempool := mempool.NewMockMempool(ctrl)
-				mempool.EXPECT().Add(validTx).Return(nil) // Only add the one that passes verification
+				mempool.EXPECT().Add(validTx, gomock.Any()).Return(nil) // Only add the one that passes verification
 				mempool.EXPECT().RequestBuildBlock()
 
 				lastAcceptedID := ids.GenerateTestID()
+				lastAcceptedMockBlock := block.NewMockBlock(ctrl)
+				lastAcceptedMockBlock.EXPECT().ID().Return(lastAcceptedID).AnyTimes()
+				lastAcceptedMockBlock.EXPECT().Timestamp().Return(time.Now().Truncate(time.Second)).AnyTimes()
+
 				mockState := state.NewMockState(ctrl)
 				mockState.EXPECT().GetLastAccepted().Return(lastAcceptedID).AnyTimes()
+				mockState.EXPECT().GetBlock(lastAcceptedID).Return(lastAcceptedMockBlock, nil).AnyTimes()
 				mockState.EXPECT().GetTimestamp().Return(time.Now()).AnyTimes()
+				mockState.EXPECT().GetFeeRates().Return(commonfees.Empty, nil).AnyTimes()
+				mockState.EXPECT().GetLastBlockComplexity().Return(commonfees.Empty, nil).AnyTimes()
+
+				manager := &manager{
+					lastAccepted: lastAcceptedID,
+					mempool:      mempool,
+					clk:          &mockable.Clock{},
+					metrics:      metrics.NewMockMetrics(ctrl),
+					backend:      defaultTestBackend(true, nil),
+					state:        mockState,
+					blkIDToState: map[ids.ID]*blockState{
+						blockID: {},
+					},
+				}
+				manager.SetPreference(lastAcceptedID)
 
 				return &Block{
-					Block: mockBlock,
-					manager: &manager{
-						lastAccepted: lastAcceptedID,
-						mempool:      mempool,
-						metrics:      metrics.NewMockMetrics(ctrl),
-						backend:      defaultTestBackend(true, nil),
-						state:        mockState,
-						blkIDToState: map[ids.ID]*blockState{
-							blockID: {},
-						},
-					},
+					Block:   mockBlock,
+					manager: manager,
 				}
 			},
 		},
@@ -895,27 +960,38 @@ func TestBlockReject(t *testing.T) {
 				})
 
 				mempool := mempool.NewMockMempool(ctrl)
-				mempool.EXPECT().Add(tx1).Return(nil)
-				mempool.EXPECT().Add(tx2).Return(nil)
+				mempool.EXPECT().Add(tx1, gomock.Any()).Return(nil)
+				mempool.EXPECT().Add(tx2, gomock.Any()).Return(nil)
 				mempool.EXPECT().RequestBuildBlock()
 
 				lastAcceptedID := ids.GenerateTestID()
+				lastAcceptedMockBlock := block.NewMockBlock(ctrl)
+				lastAcceptedMockBlock.EXPECT().ID().Return(lastAcceptedID).AnyTimes()
+				lastAcceptedMockBlock.EXPECT().Timestamp().Return(time.Now().Truncate(time.Second)).AnyTimes()
+
 				mockState := state.NewMockState(ctrl)
 				mockState.EXPECT().GetLastAccepted().Return(lastAcceptedID).AnyTimes()
+				mockState.EXPECT().GetBlock(lastAcceptedID).Return(lastAcceptedMockBlock, nil).AnyTimes()
 				mockState.EXPECT().GetTimestamp().Return(time.Now()).AnyTimes()
+				mockState.EXPECT().GetFeeRates().Return(commonfees.Empty, nil).AnyTimes()
+				mockState.EXPECT().GetLastBlockComplexity().Return(commonfees.Empty, nil).AnyTimes()
+
+				manager := &manager{
+					lastAccepted: lastAcceptedID,
+					mempool:      mempool,
+					clk:          &mockable.Clock{},
+					metrics:      metrics.NewMockMetrics(ctrl),
+					backend:      defaultTestBackend(true, nil),
+					state:        mockState,
+					blkIDToState: map[ids.ID]*blockState{
+						blockID: {},
+					},
+				}
+				manager.SetPreference(lastAcceptedID)
 
 				return &Block{
-					Block: mockBlock,
-					manager: &manager{
-						lastAccepted: lastAcceptedID,
-						mempool:      mempool,
-						metrics:      metrics.NewMockMetrics(ctrl),
-						backend:      defaultTestBackend(true, nil),
-						state:        mockState,
-						blkIDToState: map[ids.ID]*blockState{
-							blockID: {},
-						},
-					},
+					Block:   mockBlock,
+					manager: manager,
 				}
 			},
 		},

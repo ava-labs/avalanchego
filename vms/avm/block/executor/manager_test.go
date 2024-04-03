@@ -13,9 +13,12 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/avm/block"
 	"github.com/ava-labs/avalanchego/vms/avm/state"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
+
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 var (
@@ -136,9 +139,15 @@ func TestManagerVerifyTx(t *testing.T) {
 					Unsigned: unsigned,
 				}
 			},
-			managerF: func(*gomock.Controller) *manager {
+			managerF: func(ctrl *gomock.Controller) *manager {
+				state := state.NewMockState(ctrl)
+				// state.EXPECT().GetTimestamp().Return(time.Time{})
+				state.EXPECT().GetFeeRates().Return(commonfees.Empty, nil).AnyTimes()
+				state.EXPECT().GetLastBlockComplexity().Return(commonfees.Empty, nil).AnyTimes()
+
 				return &manager{
 					backend: defaultTestBackend(true, nil),
+					state:   state,
 				}
 			},
 			expectedErr: errTestSyntacticVerifyFail,
@@ -157,17 +166,27 @@ func TestManagerVerifyTx(t *testing.T) {
 			},
 			managerF: func(ctrl *gomock.Controller) *manager {
 				lastAcceptedID := ids.GenerateTestID()
+				lastAcceptedMockBlock := block.NewMockBlock(ctrl)
+				lastAcceptedMockBlock.EXPECT().ID().Return(lastAcceptedID).AnyTimes()
+				lastAcceptedMockBlock.EXPECT().Timestamp().Return(time.Now().Truncate(time.Second)).AnyTimes()
 
 				// These values don't matter for this test
 				state := state.NewMockState(ctrl)
-				state.EXPECT().GetLastAccepted().Return(lastAcceptedID)
-				state.EXPECT().GetTimestamp().Return(time.Time{})
+				state.EXPECT().GetLastAccepted().Return(lastAcceptedID).AnyTimes()
+				state.EXPECT().GetBlock(lastAcceptedID).Return(lastAcceptedMockBlock, nil).AnyTimes()
+				state.EXPECT().GetTimestamp().Return(time.Time{}).AnyTimes()
+				state.EXPECT().GetFeeRates().Return(commonfees.Empty, nil).AnyTimes()
+				state.EXPECT().GetLastBlockComplexity().Return(commonfees.Empty, nil).AnyTimes()
 
-				return &manager{
+				m := &manager{
 					backend:      defaultTestBackend(true, nil),
+					clk:          &mockable.Clock{},
 					state:        state,
 					lastAccepted: lastAcceptedID,
 				}
+				m.SetPreference(lastAcceptedID)
+
+				return m
 			},
 			expectedErr: errTestSemanticVerifyFail,
 		},
@@ -187,17 +206,26 @@ func TestManagerVerifyTx(t *testing.T) {
 			},
 			managerF: func(ctrl *gomock.Controller) *manager {
 				lastAcceptedID := ids.GenerateTestID()
+				lastAcceptedMockBlock := block.NewMockBlock(ctrl)
+				lastAcceptedMockBlock.EXPECT().ID().Return(lastAcceptedID).AnyTimes()
+				lastAcceptedMockBlock.EXPECT().Timestamp().Return(time.Now().Truncate(time.Second)).AnyTimes()
 
 				// These values don't matter for this test
 				state := state.NewMockState(ctrl)
-				state.EXPECT().GetLastAccepted().Return(lastAcceptedID)
-				state.EXPECT().GetTimestamp().Return(time.Time{})
+				state.EXPECT().GetLastAccepted().Return(lastAcceptedID).AnyTimes()
+				state.EXPECT().GetBlock(lastAcceptedID).Return(lastAcceptedMockBlock, nil).AnyTimes()
+				state.EXPECT().GetTimestamp().Return(time.Time{}).AnyTimes()
+				state.EXPECT().GetFeeRates().Return(commonfees.Empty, nil).AnyTimes()
+				state.EXPECT().GetLastBlockComplexity().Return(commonfees.Empty, nil).AnyTimes()
 
-				return &manager{
+				m := &manager{
 					backend:      defaultTestBackend(true, nil),
+					clk:          &mockable.Clock{},
 					state:        state,
 					lastAccepted: lastAcceptedID,
 				}
+				m.SetPreference(lastAcceptedID)
+				return m
 			},
 			expectedErr: errTestExecutionFail,
 		},
@@ -217,17 +245,26 @@ func TestManagerVerifyTx(t *testing.T) {
 			},
 			managerF: func(ctrl *gomock.Controller) *manager {
 				lastAcceptedID := ids.GenerateTestID()
+				lastAcceptedMockBlock := block.NewMockBlock(ctrl)
+				lastAcceptedMockBlock.EXPECT().ID().Return(lastAcceptedID).AnyTimes()
+				lastAcceptedMockBlock.EXPECT().Timestamp().Return(time.Now().Truncate(time.Second)).AnyTimes()
 
 				// These values don't matter for this test
 				state := state.NewMockState(ctrl)
-				state.EXPECT().GetLastAccepted().Return(lastAcceptedID)
-				state.EXPECT().GetTimestamp().Return(time.Time{})
+				state.EXPECT().GetLastAccepted().Return(lastAcceptedID).AnyTimes()
+				state.EXPECT().GetBlock(lastAcceptedID).Return(lastAcceptedMockBlock, nil).AnyTimes()
+				state.EXPECT().GetTimestamp().Return(time.Time{}).AnyTimes()
+				state.EXPECT().GetFeeRates().Return(commonfees.Empty, nil).AnyTimes()
+				state.EXPECT().GetLastBlockComplexity().Return(commonfees.Empty, nil).AnyTimes()
 
-				return &manager{
+				m := &manager{
 					backend:      defaultTestBackend(true, nil),
+					clk:          &mockable.Clock{},
 					state:        state,
 					lastAccepted: lastAcceptedID,
 				}
+				m.SetPreference(lastAcceptedID)
+				return m
 			},
 			expectedErr: nil,
 		},
@@ -240,7 +277,7 @@ func TestManagerVerifyTx(t *testing.T) {
 
 			m := test.managerF(ctrl)
 			tx := test.txF(ctrl)
-			err := m.VerifyTx(tx)
+			_, err := m.VerifyTx(tx)
 			require.ErrorIs(err, test.expectedErr)
 		})
 	}

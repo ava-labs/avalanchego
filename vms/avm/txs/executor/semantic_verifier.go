@@ -6,13 +6,18 @@ package executor
 import (
 	"context"
 	"errors"
+	"fmt"
 	"reflect"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/vms/avm/fxs"
 	"github.com/ava-labs/avalanchego/vms/avm/state"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
+	"github.com/ava-labs/avalanchego/vms/avm/txs/fees"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
+
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 var (
@@ -25,42 +30,27 @@ var (
 )
 
 type SemanticVerifier struct {
+	// inputs
 	*Backend
-	State state.ReadOnlyChain
-	Tx    *txs.Tx
+	BlkFeeManager      *commonfees.Manager
+	BlockMaxComplexity commonfees.Dimensions
+	State              state.ReadOnlyChain
+	Tx                 *txs.Tx
+
+	// outputs
+	TipPercentage commonfees.TipPercentage
 }
 
 func (v *SemanticVerifier) BaseTx(tx *txs.BaseTx) error {
-	for i, in := range tx.Ins {
-		// Note: Verification of the length of [t.tx.Creds] happens during
-		// syntactic verification, which happens before semantic verification.
-		cred := v.Tx.Creds[i].Credential
-		if err := v.verifyTransfer(tx, in, cred); err != nil {
-			return err
-		}
-	}
-
-	for _, out := range tx.Outs {
-		fxIndex, err := v.getFx(out.Out)
-		if err != nil {
-			return err
-		}
-
-		assetID := out.AssetID()
-		if err := v.verifyFxUsage(fxIndex, assetID); err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return v.verifyBaseTx(tx, nil, nil, v.Tx.Creds)
 }
 
 func (v *SemanticVerifier) CreateAssetTx(tx *txs.CreateAssetTx) error {
-	return v.BaseTx(&tx.BaseTx)
+	return v.verifyBaseTx(&tx.BaseTx, nil, nil, v.Tx.Creds)
 }
 
 func (v *SemanticVerifier) OperationTx(tx *txs.OperationTx) error {
-	if err := v.BaseTx(&tx.BaseTx); err != nil {
+	if err := v.verifyBaseTx(&tx.BaseTx, nil, nil, v.Tx.Creds); err != nil {
 		return err
 	}
 
@@ -81,7 +71,7 @@ func (v *SemanticVerifier) OperationTx(tx *txs.OperationTx) error {
 }
 
 func (v *SemanticVerifier) ImportTx(tx *txs.ImportTx) error {
-	if err := v.BaseTx(&tx.BaseTx); err != nil {
+	if err := v.verifyBaseTx(&tx.BaseTx, tx.ImportedIns, nil, v.Tx.Creds); err != nil {
 		return err
 	}
 
@@ -122,7 +112,7 @@ func (v *SemanticVerifier) ImportTx(tx *txs.ImportTx) error {
 }
 
 func (v *SemanticVerifier) ExportTx(tx *txs.ExportTx) error {
-	if err := v.BaseTx(&tx.BaseTx); err != nil {
+	if err := v.verifyBaseTx(&tx.BaseTx, nil, tx.ExportedOuts, v.Tx.Creds); err != nil {
 		return err
 	}
 
@@ -143,6 +133,69 @@ func (v *SemanticVerifier) ExportTx(tx *txs.ExportTx) error {
 			return err
 		}
 	}
+	return nil
+}
+
+func (v *SemanticVerifier) verifyBaseTx(
+	tx *txs.BaseTx,
+	importedIns []*avax.TransferableInput,
+	exportedOuts []*avax.TransferableOutput,
+	creds []*fxs.FxCredential,
+) error {
+	var (
+		isEActive = v.Config.IsEActivated(v.State.GetTimestamp())
+
+		feeCalculator *fees.Calculator
+	)
+	if !isEActive {
+		feeCalculator = fees.NewStaticCalculator(v.Config)
+	} else {
+		feeCalculator = fees.NewDynamicCalculator(v.Codec, v.BlkFeeManager, v.BlockMaxComplexity, creds)
+	}
+
+	if err := tx.Visit(feeCalculator); err != nil {
+		return err
+	}
+
+	feesPaid, err := avax.VerifyTx(
+		feeCalculator.Fee,
+		v.FeeAssetID,
+		[][]*avax.TransferableInput{tx.Ins, importedIns},
+		[][]*avax.TransferableOutput{tx.Outs, exportedOuts},
+		v.Codec,
+	)
+	if err != nil {
+		return err
+	}
+
+	if isEActive {
+		if err := feeCalculator.CalculateTipPercentage(feesPaid); err != nil {
+			return fmt.Errorf("failed estimating fee tip percentage: %w", err)
+		}
+		v.TipPercentage = feeCalculator.TipPercentage
+	}
+
+	for i, in := range tx.Ins {
+		// Note: Verification of the length of [t.tx.Creds] happens during
+		// syntactic verification, which happens before semantic verification.
+		cred := v.Tx.Creds[i].Credential
+		if err := v.verifyTransfer(tx, in, cred); err != nil {
+			return err
+		}
+	}
+
+	for _, out := range tx.Outs {
+		fxIndex, err := v.getFx(out.Out)
+		if err != nil {
+			return err
+		}
+
+		assetID := out.AssetID()
+		if err := v.verifyFxUsage(fxIndex, assetID); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 

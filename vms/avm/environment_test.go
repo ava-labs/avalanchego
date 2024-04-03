@@ -24,10 +24,10 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
-	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/sampler"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/avm/block/executor"
 	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
@@ -37,6 +37,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	avajson "github.com/ava-labs/avalanchego/utils/json"
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 	keystoreutils "github.com/ava-labs/avalanchego/vms/components/keystore"
 )
 
@@ -46,10 +47,10 @@ const (
 	durango fork = iota
 	eUpgrade
 
-	latest = durango
+	latest = eUpgrade
 
-	testTxFee    uint64 = 1000
-	startBalance uint64 = 50000
+	testTxFee    uint64 = units.MilliAvax
+	startBalance uint64 = 1000 * units.MilliAvax
 
 	username       = "bobby"
 	password       = "StrnasfqewiurPasswdn56d" //#nosec G101
@@ -78,10 +79,27 @@ var (
 	keys  = secp256k1.TestKeys()[:3] // TODO: Remove [:3]
 	addrs []ids.ShortID              // addrs[i] corresponds to keys[i]
 
-	noFeesTestConfig = &config.Config{
-		EUpgradeTime:     mockable.MaxTime,
-		TxFee:            0,
-		CreateAssetTxFee: 0,
+	testFeesCfg = commonfees.DynamicFeesConfig{
+		InitialFeeRate: commonfees.Dimensions{
+			5 * units.NanoAvax,
+			5 * units.NanoAvax,
+			5 * units.NanoAvax,
+			5 * units.NanoAvax,
+		},
+		MinFeeRate: commonfees.Dimensions{
+			1 * units.NanoAvax,
+			1 * units.NanoAvax,
+			1 * units.NanoAvax,
+			1 * units.NanoAvax,
+		},
+		UpdateCoefficient: commonfees.Dimensions{
+			1,
+			1,
+			1,
+			1,
+		},
+		BlockMaxComplexity:        commonfees.Max,
+		BlockTargetComplexityRate: commonfees.Dimensions{1000, 1000, 1000, 10000},
 	}
 )
 
@@ -170,6 +188,7 @@ func setup(tb testing.TB, c *envConfig) *environment {
 	}
 
 	vmDynamicConfig := DefaultConfig
+	vmDynamicConfig.DynamicFeesConfig = &testFeesCfg
 	vmDynamicConfig.IndexTransactions = true
 	if c.vmDynamicConfig != nil {
 		vmDynamicConfig = *c.vmDynamicConfig
@@ -212,10 +231,18 @@ func setup(tb testing.TB, c *envConfig) *environment {
 		vm:           vm,
 		service: &Service{
 			vm: vm,
+			txBuilderBackend: newServiceBackend(
+				vm.feeAssetID,
+				vm.ctx,
+				&vm.Config,
+				&vm.clock,
+				vm.state,
+				vm.ctx.SharedMemory,
+				vm.parser.Codec(),
+			),
 		},
 		walletService: &WalletService{
-			vm:         vm,
-			pendingTxs: linkedhashmap.New[ids.ID, *txs.Tx](),
+			walletServiceBackend: NewWalletServiceBackend(vm),
 		},
 	}
 
@@ -339,7 +366,7 @@ func newTx(tb testing.TB, genesisBytes []byte, chainID ids.ID, parser txs.Parser
 // Sample from a set of addresses and return them raw and formatted as strings.
 // The size of the sample is between 1 and len(addrs)
 // If len(addrs) == 0, returns nil
-func sampleAddrs(tb testing.TB, addressFormatter avax.AddressManager, addrs []ids.ShortID) ([]ids.ShortID, []string) {
+func sampleAddrs(tb testing.TB, addressFormatter avax.AddressManager, addrs []ids.ShortID) ([]ids.ShortID, []string) { //nolint:unparam
 	require := require.New(tb)
 
 	sampledAddrs := []ids.ShortID{}

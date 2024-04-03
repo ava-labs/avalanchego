@@ -29,7 +29,7 @@ func TestIndexTransaction_Ordered(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		vmStaticConfig: noFeesTestConfig,
+		fork: eUpgrade,
 	})
 	defer func() {
 		require.NoError(env.vm.Shutdown(context.Background()))
@@ -73,7 +73,7 @@ func TestIndexTransaction_MultipleTransactions(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		vmStaticConfig: noFeesTestConfig,
+		fork: eUpgrade,
 	})
 	defer func() {
 		require.NoError(env.vm.Shutdown(context.Background()))
@@ -121,7 +121,7 @@ func TestIndexTransaction_MultipleAddresses(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		vmStaticConfig: noFeesTestConfig,
+		fork: eUpgrade,
 	})
 	defer func() {
 		require.NoError(env.vm.Shutdown(context.Background()))
@@ -164,7 +164,7 @@ func TestIndexer_Read(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		vmStaticConfig: noFeesTestConfig,
+		fork: eUpgrade,
 	})
 	defer func() {
 		require.NoError(env.vm.Shutdown(context.Background()))
@@ -259,7 +259,7 @@ func buildUTXO(utxoID avax.UTXOID, txAssetID avax.Asset, addr ids.ShortID) *avax
 		UTXOID: utxoID,
 		Asset:  txAssetID,
 		Out: &secp256k1fx.TransferOutput{
-			Amt: 1000,
+			Amt: startBalance,
 			OutputOwners: secp256k1fx.OutputOwners{
 				Threshold: 1,
 				Addrs:     []ids.ShortID{addr},
@@ -277,14 +277,14 @@ func buildTX(chainID ids.ID, utxoID avax.UTXOID, txAssetID avax.Asset, address .
 				UTXOID: utxoID,
 				Asset:  txAssetID,
 				In: &secp256k1fx.TransferInput{
-					Amt:   1000,
+					Amt:   startBalance,
 					Input: secp256k1fx.Input{SigIndices: []uint32{0}},
 				},
 			}},
 			Outs: []*avax.TransferableOutput{{
 				Asset: txAssetID,
 				Out: &secp256k1fx.TransferOutput{
-					Amt: 1000,
+					Amt: startBalance - testTxFee,
 					OutputOwners: secp256k1fx.OutputOwners{
 						Threshold: 1,
 						Addrs:     address,

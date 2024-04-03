@@ -13,14 +13,11 @@ import (
 // Tip is expressed as a percentage of the base fee and it is burned as the required fee.
 
 const (
-	NoTip            = 0
-	MaxTipPercentage = 1_000
+	NoTip          = TipPercentage(0)
+	TipDenonimator = 1_000
 )
 
-var (
-	errTipPercentageNegative = errors.New("tip percentage negative")
-	errTipPercentageTooLarge = errors.New("tip percentage too large")
-)
+var errTipPercentageNegative = errors.New("tip percentage negative")
 
 type TipPercentage int
 
@@ -28,10 +25,5 @@ func (t TipPercentage) Validate() error {
 	if t < 0 {
 		return fmt.Errorf("%w, tip percentage %d", errTipPercentageNegative, t)
 	}
-
-	if t > MaxTipPercentage {
-		return fmt.Errorf("%w, tip percentage %d", errTipPercentageTooLarge, t)
-	}
-
 	return nil
 }

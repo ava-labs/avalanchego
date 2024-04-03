@@ -13,12 +13,15 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/avm/block"
+	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/state"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
+	"github.com/ava-labs/avalanchego/vms/avm/txs/fees"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/mempool"
 
 	blockexecutor "github.com/ava-labs/avalanchego/vms/avm/block/executor"
 	txexecutor "github.com/ava-labs/avalanchego/vms/avm/txs/executor"
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 // targetBlockSize is the max block size we aim to produce
@@ -74,13 +77,10 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 	}
 
 	preferredHeight := preferred.Height()
-	preferredTimestamp := preferred.Timestamp()
-
 	nextHeight := preferredHeight + 1
-	nextTimestamp := b.clk.Time() // [timestamp] = max(now, parentTime)
-	if preferredTimestamp.After(nextTimestamp) {
-		nextTimestamp = preferredTimestamp
-	}
+
+	parentBlkTime := preferred.Timestamp()
+	nextBlkTime := blockexecutor.NextBlockTime(parentBlkTime, b.clk)
 
 	stateDiff, err := state.NewDiff(preferredID, b.manager)
 	if err != nil {
@@ -91,14 +91,37 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 		blockTxs      []*txs.Tx
 		inputs        set.Set[ids.ID]
 		remainingSize = targetBlockSize
+
+		chainTime = stateDiff.GetTimestamp()
+		isEActive = b.backend.Config.IsEActivated(chainTime)
+		feesCfg   = config.GetDynamicFeesConfig(isEActive)
 	)
+
+	if isEActive {
+		// we lazily inform the mempool that the E upgrade has been activated.
+		// Lazily since we don't inform the mempool as soon as the first block
+		// post E upgrade has been accepted; instead we wait for the next block
+		// build.
+		b.mempool.SetEUpgradeActive()
+	}
+
+	feeManager, err := fees.UpdatedFeeManager(stateDiff, b.backend.Config, parentBlkTime, nextBlkTime)
+	if err != nil {
+		return nil, err
+	}
+
 	for {
 		tx, exists := b.mempool.Peek()
-		// Invariant: [mempool.MaxTxSize] < [targetBlockSize]. This guarantees
-		// that we will only stop building a block once there are no
-		// transactions in the mempool or the block is at least
-		// [targetBlockSize - mempool.MaxTxSize] bytes full.
-		if !exists || len(tx.Bytes()) > remainingSize {
+		if !exists {
+			break
+		}
+		txSize := len(tx.Bytes())
+
+		// pre e upgrade is active, we fill blocks till a target size
+		// post e upgrade is active, we fill blocks till a target complexity
+		done := (!isEActive && txSize > remainingSize) ||
+			(isEActive && !commonfees.Compare(feeManager.GetCumulatedComplexity(), feesCfg.BlockTargetComplexityRate))
+		if done {
 			break
 		}
 		b.mempool.Remove(tx)
@@ -111,9 +134,11 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 		}
 
 		err = tx.Unsigned.Visit(&txexecutor.SemanticVerifier{
-			Backend: b.backend,
-			State:   txDiff,
-			Tx:      tx,
+			Backend:            b.backend,
+			BlkFeeManager:      feeManager,
+			BlockMaxComplexity: feesCfg.BlockMaxComplexity,
+			State:              txDiff,
+			Tx:                 tx,
 		})
 		if err != nil {
 			txID := tx.ID()
@@ -147,9 +172,13 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 		inputs.Union(executor.Inputs)
 
 		txDiff.AddTx(tx)
+		txDiff.SetFeeRates(feeManager.GetFeeRates())
+		txDiff.SetLastBlockComplexity(feeManager.GetCumulatedComplexity())
 		txDiff.Apply(stateDiff)
 
-		remainingSize -= len(tx.Bytes())
+		if isEActive {
+			remainingSize -= txSize
+		}
 		blockTxs = append(blockTxs, tx)
 	}
 
@@ -160,7 +189,7 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 	statelessBlk, err := block.NewStandardBlock(
 		preferredID,
 		nextHeight,
-		nextTimestamp,
+		nextBlkTime,
 		blockTxs,
 		b.backend.Codec,
 	)

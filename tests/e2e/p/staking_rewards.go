@@ -302,12 +302,12 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 
 		ginkgo.By("checking expected rewards against actual rewards")
 		expectedRewardBalances := map[ids.ShortID]uint64{
-			alphaValidationRewardKey.Address(): preRewardBalances[alphaValidationRewardKey.Address()] + expectedValidationReward,
-			alphaDelegationRewardKey.Address(): preRewardBalances[alphaDelegationRewardKey.Address()] + expectedDelegationFee,
-			betaValidationRewardKey.Address():  preRewardBalances[betaValidationRewardKey.Address()] + 0, // Validator didn't meet uptime requirement
-			betaDelegationRewardKey.Address():  preRewardBalances[betaDelegationRewardKey.Address()] + 0, // Validator didn't meet uptime requirement
-			gammaDelegationRewardKey.Address(): preRewardBalances[gammaDelegationRewardKey.Address()] + expectedDelegatorReward,
-			deltaDelegationRewardKey.Address(): preRewardBalances[deltaDelegationRewardKey.Address()] + 0, // Validator didn't meet uptime requirement
+			alphaValidationRewardKey.Address(): expectedValidationReward,
+			alphaDelegationRewardKey.Address(): expectedDelegationFee,
+			betaValidationRewardKey.Address():  0, // Validator didn't meet uptime requirement
+			betaDelegationRewardKey.Address():  0, // Validator didn't meet uptime requirement
+			gammaDelegationRewardKey.Address(): expectedDelegatorReward,
+			deltaDelegationRewardKey.Address(): 0, // Validator didn't meet uptime requirement
 		}
 		for address := range expectedRewardBalances {
 			require.Equal(expectedRewardBalances[address], rewardBalances[address])

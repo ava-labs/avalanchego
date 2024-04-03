@@ -17,8 +17,10 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/vms/avm/block"
+	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/state"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/executor"
+	"github.com/ava-labs/avalanchego/vms/avm/txs/fees"
 )
 
 const SyncBound = 10 * time.Second
@@ -130,13 +132,25 @@ func (b *Block) Verify(context.Context) error {
 		atomicRequests: make(map[ids.ID]*atomic.Requests),
 	}
 
+	var (
+		isEActive = b.manager.backend.Config.IsEActivated(parentChainTime)
+		feesCfg   = config.GetDynamicFeesConfig(isEActive)
+	)
+
+	feeManager, err := fees.UpdatedFeeManager(stateDiff, b.manager.backend.Config, parentChainTime, newChainTime)
+	if err != nil {
+		return err
+	}
+
 	for _, tx := range txs {
 		// Verify that the tx is valid according to the current state of the
 		// chain.
 		err := tx.Unsigned.Visit(&executor.SemanticVerifier{
-			Backend: b.manager.backend,
-			State:   stateDiff,
-			Tx:      tx,
+			Backend:            b.manager.backend,
+			BlkFeeManager:      feeManager,
+			BlockMaxComplexity: feesCfg.BlockMaxComplexity,
+			State:              stateDiff,
+			Tx:                 tx,
 		})
 		if err != nil {
 			txID := tx.ID()
@@ -196,6 +210,11 @@ func (b *Block) Verify(context.Context) error {
 
 	// Now that the block has been executed, we can add the block data to the
 	// state diff.
+	if isEActive {
+		stateDiff.SetFeeRates(feeManager.GetFeeRates())
+		stateDiff.SetLastBlockComplexity(feeManager.GetCumulatedComplexity())
+	}
+
 	stateDiff.SetLastAccepted(blkID)
 	stateDiff.AddBlock(b.Block)
 
@@ -273,7 +292,8 @@ func (b *Block) Reject(context.Context) error {
 	)
 
 	for _, tx := range b.Txs() {
-		if err := b.manager.VerifyTx(tx); err != nil {
+		tipPercentage, err := b.manager.VerifyTx(tx)
+		if err != nil {
 			b.manager.backend.Ctx.Log.Debug("dropping invalidated tx",
 				zap.Stringer("txID", tx.ID()),
 				zap.Stringer("blkID", blkID),
@@ -281,7 +301,7 @@ func (b *Block) Reject(context.Context) error {
 			)
 			continue
 		}
-		if err := b.manager.mempool.Add(tx); err != nil {
+		if err := b.manager.mempool.Add(tx, tipPercentage); err != nil {
 			b.manager.backend.Ctx.Log.Debug("dropping valid tx",
 				zap.Stringer("txID", tx.ID()),
 				zap.Stringer("blkID", blkID),

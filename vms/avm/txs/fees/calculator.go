@@ -6,16 +6,16 @@ package fees
 import (
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/ava-labs/avalanchego/codec"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/vms/avm/config"
+	"github.com/ava-labs/avalanchego/vms/avm/fxs"
+	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/fees"
-	"github.com/ava-labs/avalanchego/vms/components/verify"
-	"github.com/ava-labs/avalanchego/vms/platformvm/config"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/nftfx"
+	"github.com/ava-labs/avalanchego/vms/propertyfx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -27,17 +27,17 @@ var (
 )
 
 type Calculator struct {
-	// setup
-	isEActive bool
+	// setup, to be filled before visitor methods are called
+	IsEActive bool
 
-	// Pre E-fork inputs
-	config    *config.Config
-	chainTime time.Time
+	// Pre E-Upgrade inputs
+	config *config.Config
 
-	// Post E-fork inputs
+	// Post E-Upgrade inputs
 	feeManager         *fees.Manager
 	blockMaxComplexity fees.Dimensions
-	credentials        []verify.Verifiable
+	codec              codec.Manager
+	credentials        []*fxs.FxCredential
 
 	// TipPercentage can either be an input (e.g. when building a transaction)
 	// or an output (once a transaction is verified)
@@ -48,189 +48,60 @@ type Calculator struct {
 }
 
 // NewStaticCalculator must be used pre E upgrade activation
-func NewStaticCalculator(cfg *config.Config, chainTime time.Time) *Calculator {
+func NewStaticCalculator(cfg *config.Config) *Calculator {
 	return &Calculator{
-		config:    cfg,
-		chainTime: chainTime,
+		config: cfg,
 	}
 }
 
 // NewDynamicCalculator must be used post E upgrade activation
 func NewDynamicCalculator(
-	cfg *config.Config,
+	codec codec.Manager,
 	feeManager *fees.Manager,
 	blockMaxComplexity fees.Dimensions,
-	creds []verify.Verifiable,
+	creds []*fxs.FxCredential,
 ) *Calculator {
 	return &Calculator{
-		isEActive:          true,
-		config:             cfg,
+		IsEActive:          true,
 		feeManager:         feeManager,
 		blockMaxComplexity: blockMaxComplexity,
+		codec:              codec,
 		credentials:        creds,
 	}
 }
 
-func (fc *Calculator) AddValidatorTx(*txs.AddValidatorTx) error {
-	// AddValidatorTx is banned following Durango activation, so we
-	// only return the pre EUpgrade fee here
-	fc.Fee = fc.config.AddPrimaryNetworkValidatorFee
-	return nil
-}
-
-func (fc *Calculator) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
-	if !fc.isEActive {
-		fc.Fee = fc.config.AddSubnetValidatorFee
-		return nil
-	}
-
-	complexity, err := fc.meterTx(tx, tx.Outs, tx.Ins)
-	if err != nil {
-		return err
-	}
-
-	_, err = fc.AddFeesFor(complexity, fc.TipPercentage)
-	return err
-}
-
-func (fc *Calculator) AddDelegatorTx(*txs.AddDelegatorTx) error {
-	// AddValidatorTx is banned following Durango activation, so we
-	// only return the pre EUpgrade fee here
-	fc.Fee = fc.config.AddPrimaryNetworkDelegatorFee
-	return nil
-}
-
-func (fc *Calculator) CreateChainTx(tx *txs.CreateChainTx) error {
-	if !fc.isEActive {
-		fc.Fee = fc.config.GetCreateBlockchainTxFee(fc.chainTime)
-		return nil
-	}
-
-	complexity, err := fc.meterTx(tx, tx.Outs, tx.Ins)
-	if err != nil {
-		return err
-	}
-
-	_, err = fc.AddFeesFor(complexity, fc.TipPercentage)
-	return err
-}
-
-func (fc *Calculator) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
-	if !fc.isEActive {
-		fc.Fee = fc.config.GetCreateSubnetTxFee(fc.chainTime)
-		return nil
-	}
-
-	complexity, err := fc.meterTx(tx, tx.Outs, tx.Ins)
-	if err != nil {
-		return err
-	}
-
-	_, err = fc.AddFeesFor(complexity, fc.TipPercentage)
-	return err
-}
-
-func (*Calculator) AdvanceTimeTx(*txs.AdvanceTimeTx) error {
-	return nil // no fees
-}
-
-func (*Calculator) RewardValidatorTx(*txs.RewardValidatorTx) error {
-	return nil // no fees
-}
-
-func (fc *Calculator) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx) error {
-	if !fc.isEActive {
-		fc.Fee = fc.config.TxFee
-		return nil
-	}
-
-	complexity, err := fc.meterTx(tx, tx.Outs, tx.Ins)
-	if err != nil {
-		return err
-	}
-
-	_, err = fc.AddFeesFor(complexity, fc.TipPercentage)
-	return err
-}
-
-func (fc *Calculator) TransformSubnetTx(tx *txs.TransformSubnetTx) error {
-	if !fc.isEActive {
-		fc.Fee = fc.config.TransformSubnetTxFee
-		return nil
-	}
-
-	complexity, err := fc.meterTx(tx, tx.Outs, tx.Ins)
-	if err != nil {
-		return err
-	}
-
-	_, err = fc.AddFeesFor(complexity, fc.TipPercentage)
-	return err
-}
-
-func (fc *Calculator) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwnershipTx) error {
-	if !fc.isEActive {
-		fc.Fee = fc.config.TxFee
-		return nil
-	}
-
-	complexity, err := fc.meterTx(tx, tx.Outs, tx.Ins)
-	if err != nil {
-		return err
-	}
-
-	_, err = fc.AddFeesFor(complexity, fc.TipPercentage)
-	return err
-}
-
-func (fc *Calculator) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessValidatorTx) error {
-	if !fc.isEActive {
-		if tx.Subnet != constants.PrimaryNetworkID {
-			fc.Fee = fc.config.AddSubnetValidatorFee
-		} else {
-			fc.Fee = fc.config.AddPrimaryNetworkValidatorFee
-		}
-		return nil
-	}
-
-	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.StakeOuts))
-	copy(outs, tx.Outs)
-	copy(outs[len(tx.Outs):], tx.StakeOuts)
-
-	complexity, err := fc.meterTx(tx, outs, tx.Ins)
-	if err != nil {
-		return err
-	}
-
-	_, err = fc.AddFeesFor(complexity, fc.TipPercentage)
-	return err
-}
-
-func (fc *Calculator) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDelegatorTx) error {
-	if !fc.isEActive {
-		if tx.Subnet != constants.PrimaryNetworkID {
-			fc.Fee = fc.config.AddSubnetDelegatorFee
-		} else {
-			fc.Fee = fc.config.AddPrimaryNetworkDelegatorFee
-		}
-		return nil
-	}
-
-	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.StakeOuts))
-	copy(outs, tx.Outs)
-	copy(outs[len(tx.Outs):], tx.StakeOuts)
-
-	complexity, err := fc.meterTx(tx, outs, tx.Ins)
-	if err != nil {
-		return err
-	}
-
-	_, err = fc.AddFeesFor(complexity, fc.TipPercentage)
-	return err
-}
-
 func (fc *Calculator) BaseTx(tx *txs.BaseTx) error {
-	if !fc.isEActive {
+	if !fc.IsEActive {
+		fc.Fee = fc.config.TxFee
+		return nil
+	}
+
+	complexity, err := fc.meterTx(tx, tx.Outs, tx.Ins)
+	if err != nil {
+		return err
+	}
+
+	_, err = fc.AddFeesFor(complexity, fc.TipPercentage)
+	return err
+}
+
+func (fc *Calculator) CreateAssetTx(tx *txs.CreateAssetTx) error {
+	if !fc.IsEActive {
+		fc.Fee = fc.config.CreateAssetTxFee
+		return nil
+	}
+
+	complexity, err := fc.meterTx(tx, tx.Outs, tx.Ins)
+	if err != nil {
+		return err
+	}
+
+	_, err = fc.AddFeesFor(complexity, fc.TipPercentage)
+	return err
+}
+
+func (fc *Calculator) OperationTx(tx *txs.OperationTx) error {
+	if !fc.IsEActive {
 		fc.Fee = fc.config.TxFee
 		return nil
 	}
@@ -245,14 +116,14 @@ func (fc *Calculator) BaseTx(tx *txs.BaseTx) error {
 }
 
 func (fc *Calculator) ImportTx(tx *txs.ImportTx) error {
-	if !fc.isEActive {
+	if !fc.IsEActive {
 		fc.Fee = fc.config.TxFee
 		return nil
 	}
 
-	ins := make([]*avax.TransferableInput, len(tx.Ins)+len(tx.ImportedInputs))
+	ins := make([]*avax.TransferableInput, len(tx.Ins)+len(tx.ImportedIns))
 	copy(ins, tx.Ins)
-	copy(ins[len(tx.Ins):], tx.ImportedInputs)
+	copy(ins[len(tx.Ins):], tx.ImportedIns)
 
 	complexity, err := fc.meterTx(tx, tx.Outs, ins)
 	if err != nil {
@@ -264,14 +135,14 @@ func (fc *Calculator) ImportTx(tx *txs.ImportTx) error {
 }
 
 func (fc *Calculator) ExportTx(tx *txs.ExportTx) error {
-	if !fc.isEActive {
+	if !fc.IsEActive {
 		fc.Fee = fc.config.TxFee
 		return nil
 	}
 
-	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.ExportedOutputs))
+	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.ExportedOuts))
 	copy(outs, tx.Outs)
-	copy(outs[len(tx.Outs):], tx.ExportedOutputs)
+	copy(outs[len(tx.Outs):], tx.ExportedOuts)
 
 	complexity, err := fc.meterTx(tx, outs, tx.Ins)
 	if err != nil {
@@ -289,7 +160,7 @@ func (fc *Calculator) meterTx(
 ) (fees.Dimensions, error) {
 	var complexity fees.Dimensions
 
-	uTxSize, err := txs.Codec.Size(txs.CodecVersion, uTx)
+	uTxSize, err := fc.codec.Size(txs.CodecVersion, uTx)
 	if err != nil {
 		return complexity, fmt.Errorf("couldn't calculate UnsignedTx marshal length: %w", err)
 	}
@@ -298,11 +169,18 @@ func (fc *Calculator) meterTx(
 	// meter credentials, one by one. Then account for the extra bytes needed to
 	// serialize a slice of credentials (codec version bytes + slice size bytes)
 	for i, cred := range fc.credentials {
-		c, ok := cred.(*secp256k1fx.Credential)
-		if !ok {
+		var keysCount int
+		switch c := cred.Credential.(type) {
+		case *secp256k1fx.Credential:
+			keysCount = len(c.Sigs)
+		case *propertyfx.Credential:
+			keysCount = len(c.Sigs)
+		case *nftfx.Credential:
+			keysCount = len(c.Sigs)
+		default:
 			return complexity, fmt.Errorf("don't know how to calculate complexity of %T", cred)
 		}
-		credDimensions, err := fees.MeterCredential(txs.Codec, txs.CodecVersion, len(c.Sigs))
+		credDimensions, err := fees.MeterCredential(fc.codec, txs.CodecVersion, keysCount)
 		if err != nil {
 			return complexity, fmt.Errorf("failed adding credential %d: %w", i, err)
 		}
@@ -315,7 +193,7 @@ func (fc *Calculator) meterTx(
 	complexity[fees.Bandwidth] += codec.VersionSize
 
 	for _, in := range allIns {
-		inputDimensions, err := fees.MeterInput(txs.Codec, txs.CodecVersion, in)
+		inputDimensions, err := fees.MeterInput(fc.codec, txs.CodecVersion, in)
 		if err != nil {
 			return complexity, fmt.Errorf("failed retrieving size of inputs: %w", err)
 		}
@@ -327,7 +205,7 @@ func (fc *Calculator) meterTx(
 	}
 
 	for _, out := range allOuts {
-		outputDimensions, err := fees.MeterOutput(txs.Codec, txs.CodecVersion, out)
+		outputDimensions, err := fees.MeterOutput(fc.codec, txs.CodecVersion, out)
 		if err != nil {
 			return complexity, fmt.Errorf("failed retrieving size of outputs: %w", err)
 		}
@@ -355,7 +233,6 @@ func (fc *Calculator) AddFeesFor(complexity fees.Dimensions, tipPercentage fees.
 	if err != nil {
 		return 0, fmt.Errorf("%w: %w", errFailedFeeCalculation, err)
 	}
-
 	fc.Fee += fee
 	return fee, nil
 }

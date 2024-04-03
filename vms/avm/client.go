@@ -17,6 +17,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/rpc"
+
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 var _ Client = (*client)(nil)
@@ -74,6 +76,8 @@ type Client interface {
 	//
 	// Deprecated: GetUTXOs should be used instead.
 	GetAllBalances(ctx context.Context, addr ids.ShortID, includePartial bool, options ...rpc.Option) ([]Balance, error)
+	// GetFeeRates returns the current fee rates and the next fee rates that a transaction must pay to be accepted
+	GetFeeRates(ctx context.Context, options ...rpc.Option) (commonfees.Dimensions, commonfees.Dimensions, error)
 	// CreateAsset creates a new asset and returns its assetID
 	//
 	// Deprecated: Transactions should be issued using the
@@ -404,6 +408,12 @@ func (c *client) GetAllBalances(
 		IncludePartial: includePartial,
 	}, res, options...)
 	return res.Balances, err
+}
+
+func (c *client) GetFeeRates(ctx context.Context, options ...rpc.Option) (commonfees.Dimensions, commonfees.Dimensions, error) {
+	res := &GetFeeRatesReply{}
+	err := c.requester.SendRequest(ctx, "avm.getFeeRates", struct{}{}, res, options...)
+	return res.CurrentFeeRates, res.NextFeeRates, err
 }
 
 // ClientHolder describes how much an address owns of an asset
