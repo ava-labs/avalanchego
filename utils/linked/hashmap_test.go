@@ -179,7 +179,19 @@ func TestIterator(t *testing.T) {
 	}
 }
 
-func Benchmark_Hashmap(b *testing.B) {
+func Benchmark_Hashmap_Put(b *testing.B) {
+	key := "hello"
+	value := "world"
+
+	lh := NewHashmap[string, string]()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		lh.Put(key, value)
+	}
+}
+
+func Benchmark_Hashmap_PutDelete(b *testing.B) {
 	key := "hello"
 	value := "world"
 
