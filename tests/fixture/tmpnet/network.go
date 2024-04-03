@@ -334,16 +334,6 @@ func (n *Network) Start(ctx context.Context, w io.Writer) error {
 	return nil
 }
 
-func (n *Network) AddEphemeralNode(ctx context.Context, w io.Writer, flags FlagsMap) (*Node, error) {
-	node := NewNode("")
-	node.Flags = flags
-	node.IsEphemeral = true
-	if err := n.StartNode(ctx, w, node); err != nil {
-		return nil, err
-	}
-	return node, nil
-}
-
 // Starts the provided node after configuring it for the network.
 func (n *Network) StartNode(ctx context.Context, w io.Writer, node *Node) error {
 	if err := n.EnsureNodeConfig(node); err != nil {
