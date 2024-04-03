@@ -77,7 +77,7 @@ func (l *List[T]) PushFront(e *ListElement[T]) {
 	l.insertAfter(e, &l.sentinel)
 }
 
-// PushFront inserts a e at the back of l.
+// PushBack inserts e at the back of l.
 // If e is already in a list, l is not modified.
 func (l *List[T]) PushBack(e *ListElement[T]) {
 	l.insertAfter(e, l.sentinel.prev)
@@ -177,4 +177,40 @@ func (l *List[T]) moveAfter(e, location *ListElement[T]) {
 	e.next = location.next
 	e.prev.next = e
 	e.next.prev = e
+}
+
+// PushFront inserts v into a new element at the front of l.
+func PushFront[T any](l *List[T], v T) {
+	l.PushFront(&ListElement[T]{
+		Value: v,
+	})
+}
+
+// PushBack inserts v into a new element at the back of l.
+func PushBack[T any](l *List[T], v T) {
+	l.PushBack(&ListElement[T]{
+		Value: v,
+	})
+}
+
+// InsertBefore inserts v into a new element immediately before location.
+// If location is not in l, l is not modified.
+func InsertBefore[T any](l *List[T], v T, location *ListElement[T]) {
+	l.InsertBefore(
+		&ListElement[T]{
+			Value: v,
+		},
+		location,
+	)
+}
+
+// InsertAfter inserts v into a new element immediately after location.
+// If location is not in l, l is not modified.
+func InsertAfter[T any](l *List[T], v T, location *ListElement[T]) {
+	l.InsertAfter(
+		&ListElement[T]{
+			Value: v,
+		},
+		location,
+	)
 }
