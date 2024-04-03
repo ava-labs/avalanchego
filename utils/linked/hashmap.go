@@ -21,6 +21,7 @@ type Hashmap[K comparable, V any] struct {
 	lock      sync.RWMutex
 	entryMap  map[K]*ListElement[keyValue[K, V]]
 	entryList *List[keyValue[K, V]]
+	freeList  []*ListElement[keyValue[K, V]]
 }
 
 func NewHashmap[K comparable, V any]() *Hashmap[K, V] {
@@ -79,16 +80,24 @@ func (lh *Hashmap[K, V]) put(key K, value V) {
 			key:   key,
 			value: value,
 		}
-	} else {
-		e = &ListElement[keyValue[K, V]]{
-			Value: keyValue[K, V]{
-				key:   key,
-				value: value,
-			},
-		}
-		lh.entryMap[key] = e
-		lh.entryList.PushBack(e)
+		return
 	}
+
+	var e *ListElement[keyValue[K, V]]
+	if numFree := len(lh.freeList); numFree > 0 {
+		numFree--
+		e = lh.freeList[numFree]
+		lh.freeList = lh.freeList[:numFree]
+	} else {
+		e = &ListElement[keyValue[K, V]]{}
+	}
+
+	e.Value = keyValue[K, V]{
+		key:   key,
+		value: value,
+	}
+	lh.entryMap[key] = e
+	lh.entryList.PushBack(e)
 }
 
 func (lh *Hashmap[K, V]) get(key K) (V, bool) {
@@ -103,6 +112,8 @@ func (lh *Hashmap[K, V]) delete(key K) bool {
 	if ok {
 		lh.entryList.Remove(e)
 		delete(lh.entryMap, key)
+		e.Value = keyValue[K, V]{} // Free the key value pair
+		lh.freeList = append(lh.freeList, e)
 	}
 	return ok
 }
