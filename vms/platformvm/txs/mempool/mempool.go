@@ -14,7 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
+	"github.com/ava-labs/avalanchego/utils/linked"
 	"github.com/ava-labs/avalanchego/utils/setmap"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -76,7 +76,7 @@ type Mempool interface {
 // consensus
 type mempool struct {
 	lock           sync.RWMutex
-	unissuedTxs    linkedhashmap.LinkedHashmap[ids.ID, *txs.Tx]
+	unissuedTxs    *linked.Hashmap[ids.ID, *txs.Tx]
 	consumedUTXOs  *setmap.SetMap[ids.ID, ids.ID] // TxID -> Consumed UTXOs
 	bytesAvailable int
 	droppedTxIDs   *cache.LRU[ids.ID, error] // TxID -> verification error
@@ -93,7 +93,7 @@ func New(
 	toEngine chan<- common.Message,
 ) (Mempool, error) {
 	m := &mempool{
-		unissuedTxs:    linkedhashmap.New[ids.ID, *txs.Tx](),
+		unissuedTxs:    linked.NewHashmap[ids.ID, *txs.Tx](),
 		consumedUTXOs:  setmap.New[ids.ID, ids.ID](),
 		bytesAvailable: maxMempoolSize,
 		droppedTxIDs:   &cache.LRU[ids.ID, error]{Size: droppedTxIDsCacheSize},

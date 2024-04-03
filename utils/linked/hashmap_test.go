@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package linkedhashmap
+package linked
 
 import (
 	"testing"
@@ -11,10 +11,10 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-func TestLinkedHashmap(t *testing.T) {
+func TestHashmap(t *testing.T) {
 	require := require.New(t)
 
-	lh := New[ids.ID, int]()
+	lh := NewHashmap[ids.ID, int]()
 	require.Zero(lh.Len(), "a new hashmap should be empty")
 
 	key0 := ids.GenerateTestID()
@@ -101,7 +101,7 @@ func TestIterator(t *testing.T) {
 
 	// Case: No elements
 	{
-		lh := New[ids.ID, int]()
+		lh := NewHashmap[ids.ID, int]()
 		iter := lh.NewIterator()
 		require.NotNil(iter)
 		// Should immediately be exhausted
@@ -114,7 +114,7 @@ func TestIterator(t *testing.T) {
 
 	// Case: 1 element
 	{
-		lh := New[ids.ID, int]()
+		lh := NewHashmap[ids.ID, int]()
 		iter := lh.NewIterator()
 		require.NotNil(iter)
 		lh.Put(id1, 1)
@@ -141,7 +141,7 @@ func TestIterator(t *testing.T) {
 
 	// Case: Multiple elements
 	{
-		lh := New[ids.ID, int]()
+		lh := NewHashmap[ids.ID, int]()
 		lh.Put(id1, 1)
 		lh.Put(id2, 2)
 		lh.Put(id3, 3)
@@ -162,7 +162,7 @@ func TestIterator(t *testing.T) {
 
 	// Case: Delete element that has been iterated over
 	{
-		lh := New[ids.ID, int]()
+		lh := NewHashmap[ids.ID, int]()
 		lh.Put(id1, 1)
 		lh.Put(id2, 2)
 		lh.Put(id3, 3)
