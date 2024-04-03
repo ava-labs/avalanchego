@@ -4,7 +4,6 @@
 package merkledb
 
 import (
-	"bytes"
 	"encoding/binary"
 	"io"
 	"math"
@@ -94,7 +93,9 @@ var (
 	}{
 		{
 			name: "empty node",
-			n:    &dbNode{},
+			n: &dbNode{
+				children: make(map[byte]*child),
+			},
 			expectedBytes: []byte{
 				0x00, // value.HasValue()
 				0x00, // len(children)
@@ -103,7 +104,8 @@ var (
 		{
 			name: "has value",
 			n: &dbNode{
-				value: maybe.Some([]byte("value")),
+				value:    maybe.Some([]byte("value")),
+				children: make(map[byte]*child),
 			},
 			expectedBytes: []byte{
 				0x01,                    // value.HasValue()
@@ -374,6 +376,81 @@ var (
 			},
 		},
 	}
+	encodeKeyTests = []struct {
+		name          string
+		key           Key
+		expectedBytes []byte
+	}{
+		{
+			name: "empty",
+			key:  ToKey([]byte{}),
+			expectedBytes: []byte{
+				0x00, // length
+			},
+		},
+		{
+			name: "1 byte",
+			key:  ToKey([]byte{0}),
+			expectedBytes: []byte{
+				0x08, // length
+				0x00, // key
+			},
+		},
+		{
+			name: "2 bytes",
+			key:  ToKey([]byte{0, 1}),
+			expectedBytes: []byte{
+				0x10,       // length
+				0x00, 0x01, // key
+			},
+		},
+		{
+			name: "4 bytes",
+			key:  ToKey([]byte{0, 1, 2, 3}),
+			expectedBytes: []byte{
+				0x20,                   // length
+				0x00, 0x01, 0x02, 0x03, // key
+			},
+		},
+		{
+			name: "8 bytes",
+			key:  ToKey([]byte{0, 1, 2, 3, 4, 5, 6, 7}),
+			expectedBytes: []byte{
+				0x40,                                           // length
+				0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, // key
+			},
+		},
+		{
+			name: "32 bytes",
+			key:  ToKey(make([]byte, 32)),
+			expectedBytes: append(
+				[]byte{
+					0x80, 0x02, // length
+				},
+				make([]byte, 32)..., // key
+			),
+		},
+		{
+			name: "64 bytes",
+			key:  ToKey(make([]byte, 64)),
+			expectedBytes: append(
+				[]byte{
+					0x80, 0x04, // length
+				},
+				make([]byte, 64)..., // key
+			),
+		},
+		{
+			name: "1024 bytes",
+			key:  ToKey(make([]byte, 1024)),
+			expectedBytes: append(
+				[]byte{
+					0x80, 0x40, // length
+				},
+				make([]byte, 1024)..., // key
+			),
+		},
+	}
 )
 
 func FuzzCodecBool(f *testing.F) {
@@ -384,21 +461,22 @@ func FuzzCodecBool(f *testing.F) {
 		) {
 			require := require.New(t)
 
-			reader := bytes.NewReader(b)
-			startLen := reader.Len()
-			got, err := decodeBool(reader)
+			r := codecReader{
+				b: b,
+			}
+			startLen := len(r.b)
+			got, err := r.Bool()
 			if err != nil {
 				t.SkipNow()
 			}
-			endLen := reader.Len()
+			endLen := len(r.b)
 			numRead := startLen - endLen
 
 			// Encoding [got] should be the same as [b].
-			var buf bytes.Buffer
-			encodeBool(&buf, got)
-			bufBytes := buf.Bytes()
-			require.Len(bufBytes, numRead)
-			require.Equal(b[:numRead], bufBytes)
+			w := codecWriter{}
+			w.Bool(got)
+			require.Len(w.b, numRead)
+			require.Equal(b[:numRead], w.b)
 		},
 	)
 }
@@ -411,21 +489,22 @@ func FuzzCodecInt(f *testing.F) {
 		) {
 			require := require.New(t)
 
-			reader := bytes.NewReader(b)
-			startLen := reader.Len()
-			got, err := decodeUint(reader)
+			c := codecReader{
+				b: b,
+			}
+			startLen := len(c.b)
+			got, err := c.Uvarint()
 			if err != nil {
 				t.SkipNow()
 			}
-			endLen := reader.Len()
+			endLen := len(c.b)
 			numRead := startLen - endLen
 
 			// Encoding [got] should be the same as [b].
-			var buf bytes.Buffer
-			encodeUint(&buf, got)
-			bufBytes := buf.Bytes()
-			require.Len(bufBytes, numRead)
-			require.Equal(b[:numRead], bufBytes)
+			w := codecWriter{}
+			w.Uvarint(got)
+			require.Len(w.b, numRead)
+			require.Equal(b[:numRead], w.b)
 		},
 	)
 }
@@ -482,13 +561,6 @@ func FuzzCodecDBNodeDeterministic(f *testing.F) {
 
 				value := maybe.Nothing[[]byte]()
 				if hasValue {
-					if len(valueBytes) == 0 {
-						// We do this because when we encode a value of []byte{}
-						// we will later decode it as nil.
-						// Doing this prevents inconsistency when comparing the
-						// encoded and decoded values below.
-						valueBytes = nil
-					}
 					value = maybe.Some(valueBytes)
 				}
 
@@ -520,6 +592,11 @@ func FuzzCodecDBNodeDeterministic(f *testing.F) {
 
 				nodeBytes2 := encodeDBNode(&gotNode)
 				require.Equal(nodeBytes, nodeBytes2)
+
+				// Enforce that modifying bytes after decodeDBNode doesn't
+				// modify the populated struct.
+				clear(nodeBytes)
+				require.Equal(node, gotNode)
 			}
 		},
 	)
@@ -530,7 +607,7 @@ func TestCodecDecodeDBNode_TooShort(t *testing.T) {
 
 	var (
 		parsedDBNode  dbNode
-		tooShortBytes = make([]byte, minDBNodeLen-1)
+		tooShortBytes = make([]byte, 1)
 	)
 	err := decodeDBNode(tooShortBytes, &parsedDBNode)
 	require.ErrorIs(err, io.ErrUnexpectedEOF)
@@ -609,6 +686,39 @@ func TestEncodeDBNode(t *testing.T) {
 	}
 }
 
+func TestDecodeDBNode(t *testing.T) {
+	for _, test := range encodeDBNodeTests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
+
+			var n dbNode
+			require.NoError(decodeDBNode(test.expectedBytes, &n))
+			require.Equal(test.n, &n)
+		})
+	}
+}
+
+func TestEncodeKey(t *testing.T) {
+	for _, test := range encodeKeyTests {
+		t.Run(test.name, func(t *testing.T) {
+			bytes := encodeKey(test.key)
+			require.Equal(t, test.expectedBytes, bytes)
+		})
+	}
+}
+
+func TestDecodeKey(t *testing.T) {
+	for _, test := range encodeKeyTests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
+
+			key, err := decodeKey(test.expectedBytes)
+			require.NoError(err)
+			require.Equal(test.key, key)
+		})
+	}
+}
+
 func TestCodecDecodeKeyLengthOverflowRegression(t *testing.T) {
 	_, err := decodeKey(binary.AppendUvarint(nil, math.MaxInt))
 	require.ErrorIs(t, err, io.ErrUnexpectedEOF)
@@ -654,15 +764,49 @@ func Benchmark_EncodeDBNode(b *testing.B) {
 	}
 }
 
+func Benchmark_DecodeDBNode(b *testing.B) {
+	for _, benchmark := range encodeDBNodeTests {
+		b.Run(benchmark.name, func(b *testing.B) {
+			for i := 0; i < b.N; i++ {
+				var n dbNode
+				err := decodeDBNode(benchmark.expectedBytes, &n)
+				require.NoError(b, err)
+			}
+		})
+	}
+}
+
+func Benchmark_EncodeKey(b *testing.B) {
+	for _, benchmark := range encodeKeyTests {
+		b.Run(benchmark.name, func(b *testing.B) {
+			for i := 0; i < b.N; i++ {
+				encodeKey(benchmark.key)
+			}
+		})
+	}
+}
+
+func Benchmark_DecodeKey(b *testing.B) {
+	for _, benchmark := range encodeKeyTests {
+		b.Run(benchmark.name, func(b *testing.B) {
+			for i := 0; i < b.N; i++ {
+				_, err := decodeKey(benchmark.expectedBytes)
+				require.NoError(b, err)
+			}
+		})
+	}
+}
+
 func Benchmark_EncodeUint(b *testing.B) {
-	var dst bytes.Buffer
-	dst.Grow(binary.MaxVarintLen64)
+	w := codecWriter{
+		b: make([]byte, 0, binary.MaxVarintLen64),
+	}
 
 	for _, v := range []uint64{0, 1, 2, 32, 1024, 32768} {
 		b.Run(strconv.FormatUint(v, 10), func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
-				encodeUint(&dst, v)
-				dst.Reset()
+				w.Uvarint(v)
+				w.b = w.b[:0]
 			}
 		})
 	}
