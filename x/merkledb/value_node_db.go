@@ -101,7 +101,7 @@ func (db *valueNodeDB) NewBatch() *valueNodeBatch {
 	}
 }
 
-func (b *valueNodeBatch) Put(key Key, value *node) {
+func (b *valueNodeBatch) write(key Key, value *node) {
 	if b.err != nil {
 		return
 	}
@@ -109,24 +109,21 @@ func (b *valueNodeBatch) Put(key Key, value *node) {
 	b.db.metrics.DatabaseNodeWrite()
 	b.db.nodeCache.Put(key, value)
 	prefixedKey := addPrefixToKey(b.db.bufferPool, valueNodePrefix, key.Bytes())
-	if err := b.batch.Put(prefixedKey, value.bytes()); err != nil {
-		b.err = err
+
+	if value != nil {
+		b.err = b.batch.Put(prefixedKey, value.bytes())
+	} else {
+		b.err = b.batch.Delete(prefixedKey)
 	}
 	b.db.bufferPool.Put(prefixedKey)
 }
 
-func (b *valueNodeBatch) Delete(key Key) {
-	if b.err != nil {
-		return
-	}
+func (b *valueNodeBatch) Put(key Key, value *node) {
+	b.write(key, value)
+}
 
-	b.db.metrics.DatabaseNodeWrite()
-	b.db.nodeCache.Put(key, nil)
-	prefixedKey := addPrefixToKey(b.db.bufferPool, valueNodePrefix, key.Bytes())
-	if err := b.batch.Delete(prefixedKey); err != nil {
-		b.err = err
-	}
-	b.db.bufferPool.Put(prefixedKey)
+func (b *valueNodeBatch) Delete(key Key) {
+	b.write(key, nil)
 }
 
 // Write flushes any accumulated data to the underlying database.
