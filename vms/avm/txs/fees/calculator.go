@@ -28,7 +28,7 @@ var (
 
 type Calculator struct {
 	// setup, to be filled before visitor methods are called
-	IsEActive bool
+	isEActive bool
 
 	// Pre E-Upgrade inputs
 	config *config.Config
@@ -62,7 +62,7 @@ func NewDynamicCalculator(
 	creds []*fxs.FxCredential,
 ) *Calculator {
 	return &Calculator{
-		IsEActive:          true,
+		isEActive:          true,
 		feeManager:         feeManager,
 		blockMaxComplexity: blockMaxComplexity,
 		codec:              codec,
@@ -71,7 +71,7 @@ func NewDynamicCalculator(
 }
 
 func (fc *Calculator) BaseTx(tx *txs.BaseTx) error {
-	if !fc.IsEActive {
+	if !fc.isEActive {
 		fc.Fee = fc.config.TxFee
 		return nil
 	}
@@ -86,7 +86,7 @@ func (fc *Calculator) BaseTx(tx *txs.BaseTx) error {
 }
 
 func (fc *Calculator) CreateAssetTx(tx *txs.CreateAssetTx) error {
-	if !fc.IsEActive {
+	if !fc.isEActive {
 		fc.Fee = fc.config.CreateAssetTxFee
 		return nil
 	}
@@ -101,7 +101,7 @@ func (fc *Calculator) CreateAssetTx(tx *txs.CreateAssetTx) error {
 }
 
 func (fc *Calculator) OperationTx(tx *txs.OperationTx) error {
-	if !fc.IsEActive {
+	if !fc.isEActive {
 		fc.Fee = fc.config.TxFee
 		return nil
 	}
@@ -116,7 +116,7 @@ func (fc *Calculator) OperationTx(tx *txs.OperationTx) error {
 }
 
 func (fc *Calculator) ImportTx(tx *txs.ImportTx) error {
-	if !fc.IsEActive {
+	if !fc.isEActive {
 		fc.Fee = fc.config.TxFee
 		return nil
 	}
@@ -135,7 +135,7 @@ func (fc *Calculator) ImportTx(tx *txs.ImportTx) error {
 }
 
 func (fc *Calculator) ExportTx(tx *txs.ExportTx) error {
-	if !fc.IsEActive {
+	if !fc.isEActive {
 		fc.Fee = fc.config.TxFee
 		return nil
 	}

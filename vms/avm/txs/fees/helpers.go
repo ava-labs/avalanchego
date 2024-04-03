@@ -16,7 +16,7 @@ import (
 )
 
 func FinanceInput(feeCalc *Calculator, codec codec.Manager, input *avax.TransferableInput) (uint64, error) {
-	if !feeCalc.IsEActive {
+	if !feeCalc.isEActive {
 		return 0, nil // pre E-upgrade we have a fixed fee regardless how complex the input is
 	}
 
@@ -32,7 +32,7 @@ func FinanceInput(feeCalc *Calculator, codec codec.Manager, input *avax.Transfer
 }
 
 func FinanceOutput(feeCalc *Calculator, codec codec.Manager, output *avax.TransferableOutput) (uint64, fees.Dimensions, error) {
-	if !feeCalc.IsEActive {
+	if !feeCalc.isEActive {
 		return 0, fees.Empty, nil // pre E-upgrade we have a fixed fee regardless how complex the output is
 	}
 
@@ -48,7 +48,7 @@ func FinanceOutput(feeCalc *Calculator, codec codec.Manager, output *avax.Transf
 }
 
 func FinanceCredential(feeCalc *Calculator, codec codec.Manager, keysCount int) (uint64, error) {
-	if !feeCalc.IsEActive {
+	if !feeCalc.isEActive {
 		return 0, nil // pre E-upgrade we have a fixed fee regardless how complex the credentials are
 	}
 
