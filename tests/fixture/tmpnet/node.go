@@ -94,6 +94,15 @@ func NewNode(dataDir string) *Node {
 	}
 }
 
+// Initializes an ephemeral node using the provided config flags
+func NewEphemeralNode(flags FlagsMap) *Node {
+	node := NewNode("")
+	node.Flags = flags
+	node.IsEphemeral = true
+
+	return node
+}
+
 // Initializes the specified number of nodes.
 func NewNodes(count int) []*Node {
 	nodes := make([]*Node, count)
