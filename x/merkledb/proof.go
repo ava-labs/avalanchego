@@ -135,7 +135,6 @@ type Proof struct {
 	Key Key
 
 	// If this is an inclusion proof, this is the value associated with [key].
-	// Note this may be Nothing if the key doesn't have a value.
 	// If this is an exclusion proof, this is Nothing.
 	Value maybe.Maybe[[]byte]
 }
