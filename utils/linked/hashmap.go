@@ -133,14 +133,14 @@ func (lh *Hashmap[K, V]) newest() (K, V, bool) {
 	return utils.Zero[K](), utils.Zero[V](), false
 }
 
-func (lh *Hashmap[K, V]) NewIterator() *Iterator[K, V] {
-	return &Iterator[K, V]{lh: lh}
+func (lh *Hashmap[K, V]) NewIterator() *HashmapIterator[K, V] {
+	return &HashmapIterator[K, V]{lh: lh}
 }
 
-// Iterates over the keys and values in a LinkedHashmap from oldest to newest.
+// HashmapIterator over the keys and values in a Hashmap from oldest to newest.
 // Assumes the underlying Hashmap is not modified while the iterator is in use,
 // except to delete elements that have already been iterated over.
-type Iterator[K comparable, V any] struct {
+type HashmapIterator[K comparable, V any] struct {
 	lh                     *Hashmap[K, V]
 	key                    K
 	value                  V
@@ -148,7 +148,7 @@ type Iterator[K comparable, V any] struct {
 	initialized, exhausted bool
 }
 
-func (it *Iterator[K, V]) Next() bool {
+func (it *HashmapIterator[K, V]) Next() bool {
 	// If the iterator has been exhausted, there is no next value.
 	if it.exhausted {
 		it.key = utils.Zero[K]()
@@ -184,10 +184,10 @@ func (it *Iterator[K, V]) Next() bool {
 	return true
 }
 
-func (it *Iterator[K, V]) Key() K {
+func (it *HashmapIterator[K, V]) Key() K {
 	return it.key
 }
 
-func (it *Iterator[K, V]) Value() V {
+func (it *HashmapIterator[K, V]) Value() V {
 	return it.value
 }
