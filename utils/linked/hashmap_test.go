@@ -178,3 +178,28 @@ func TestIterator(t *testing.T) {
 		require.False(iter.Next())
 	}
 }
+
+func Benchmark_Hashmap_Put(b *testing.B) {
+	key := "hello"
+	value := "world"
+
+	lh := NewHashmap[string, string]()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		lh.Put(key, value)
+	}
+}
+
+func Benchmark_Hashmap_PutDelete(b *testing.B) {
+	key := "hello"
+	value := "world"
+
+	lh := NewHashmap[string, string]()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		lh.Put(key, value)
+		lh.Delete(key)
+	}
+}
