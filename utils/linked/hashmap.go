@@ -3,9 +3,7 @@
 
 package linked
 
-import (
-	"github.com/ava-labs/avalanchego/utils"
-)
+import "github.com/ava-labs/avalanchego/utils"
 
 type keyValue[K, V any] struct {
 	key   K
