@@ -4,7 +4,6 @@
 package linked
 
 import (
-	"container/list"
 	"sync"
 
 	"github.com/ava-labs/avalanchego/utils"
@@ -20,14 +19,14 @@ type keyValue[K, V any] struct {
 // Entries are tracked by insertion order.
 type Hashmap[K comparable, V any] struct {
 	lock      sync.RWMutex
-	entryMap  map[K]*list.Element
-	entryList *list.List
+	entryMap  map[K]*ListElement[keyValue[K, V]]
+	entryList *List[keyValue[K, V]]
 }
 
 func NewHashmap[K comparable, V any]() *Hashmap[K, V] {
 	return &Hashmap[K, V]{
-		entryMap:  make(map[K]*list.Element),
-		entryList: list.New(),
+		entryMap:  make(map[K]*ListElement[keyValue[K, V]]),
+		entryList: NewList[keyValue[K, V]](),
 	}
 }
 
@@ -81,17 +80,20 @@ func (lh *Hashmap[K, V]) put(key K, value V) {
 			value: value,
 		}
 	} else {
-		lh.entryMap[key] = lh.entryList.PushBack(keyValue[K, V]{
-			key:   key,
-			value: value,
-		})
+		e = &ListElement[keyValue[K, V]]{
+			Value: keyValue[K, V]{
+				key:   key,
+				value: value,
+			},
+		}
+		lh.entryMap[key] = e
+		lh.entryList.PushBack(e)
 	}
 }
 
 func (lh *Hashmap[K, V]) get(key K) (V, bool) {
 	if e, ok := lh.entryMap[key]; ok {
-		kv := e.Value.(keyValue[K, V])
-		return kv.value, true
+		return e.Value.value, true
 	}
 	return utils.Zero[V](), false
 }
@@ -110,17 +112,15 @@ func (lh *Hashmap[K, V]) len() int {
 }
 
 func (lh *Hashmap[K, V]) oldest() (K, V, bool) {
-	if val := lh.entryList.Front(); val != nil {
-		kv := val.Value.(keyValue[K, V])
-		return kv.key, kv.value, true
+	if e := lh.entryList.Front(); e != nil {
+		return e.Value.key, e.Value.value, true
 	}
 	return utils.Zero[K](), utils.Zero[V](), false
 }
 
 func (lh *Hashmap[K, V]) newest() (K, V, bool) {
-	if val := lh.entryList.Back(); val != nil {
-		kv := val.Value.(keyValue[K, V])
-		return kv.key, kv.value, true
+	if e := lh.entryList.Back(); e != nil {
+		return e.Value.key, e.Value.value, true
 	}
 	return utils.Zero[K](), utils.Zero[V](), false
 }
@@ -136,7 +136,7 @@ type Iterator[K comparable, V any] struct {
 	lh                     *Hashmap[K, V]
 	key                    K
 	value                  V
-	next                   *list.Element
+	next                   *ListElement[keyValue[K, V]]
 	initialized, exhausted bool
 }
 
@@ -169,9 +169,8 @@ func (it *Iterator[K, V]) Next() bool {
 	// It's important to ensure that [it.next] is not nil
 	// by not deleting elements that have not yet been iterated
 	// over from [it.lh]
-	kv := it.next.Value.(keyValue[K, V])
-	it.key = kv.key
-	it.value = kv.value
+	it.key = it.next.Value.key
+	it.value = it.next.Value.value
 	it.next = it.next.Next() // Next time, return next element
 	it.exhausted = it.next == nil
 	return true
