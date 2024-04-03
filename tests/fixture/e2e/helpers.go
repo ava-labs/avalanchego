@@ -121,8 +121,8 @@ func Eventually(condition func() bool, waitFor time.Duration, tick time.Duration
 func AddEphemeralNode(network *tmpnet.Network, flags tmpnet.FlagsMap) *tmpnet.Node {
 	require := require.New(ginkgo.GinkgoT())
 
-	node, err := network.AddEphemeralNode(DefaultContext(), ginkgo.GinkgoWriter, flags)
-	require.NoError(err)
+	node := tmpnet.NewEphemeralNode(flags)
+	require.NoError(network.StartNode(DefaultContext(), ginkgo.GinkgoWriter, node))
 
 	ginkgo.DeferCleanup(func() {
 		tests.Outf("shutting down ephemeral node %q\n", node.NodeID)
@@ -199,10 +199,10 @@ func CheckBootstrapIsPossible(network *tmpnet.Network) {
 	ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
 	defer cancel()
 
-	node, err := network.AddEphemeralNode(ctx, ginkgo.GinkgoWriter, tmpnet.FlagsMap{})
-	// AddEphemeralNode will initiate node stop if an error is encountered during start,
+	node := tmpnet.NewEphemeralNode(tmpnet.FlagsMap{})
+	require.NoError(network.StartNode(ctx, ginkgo.GinkgoWriter, node))
+	// StartNode will initiate node stop if an error is encountered during start,
 	// so no further cleanup effort is required if an error is seen here.
-	require.NoError(err)
 
 	// Ensure the node is always stopped at the end of the check
 	defer func() {

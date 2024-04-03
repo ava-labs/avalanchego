@@ -57,7 +57,7 @@ type changeSummary struct {
 	// The ID of the trie after these changes.
 	rootID ids.ID
 	// The root before/after this change.
-	// Set in [calculateNodeIDs].
+	// Set in [applyValueChanges].
 	rootChange change[maybe.Maybe[*node]]
 	nodes      map[Key]*change[*node]
 	values     map[Key]*change[maybe.Maybe[[]byte]]
