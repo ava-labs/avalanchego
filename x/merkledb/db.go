@@ -44,6 +44,19 @@ var (
 	valueNodePrefix        = []byte{1}
 	intermediateNodePrefix = []byte{2}
 
+	// cleanShutdownKey is used to flag that the database did (or did not)
+	// previously shutdown correctly.
+	//
+	// If this key has value [hadCleanShutdown] it must be true that all
+	// intermediate nodes of the trie are correctly populated on disk and that
+	// the [rootDBKey] has the correct key for the root node.
+	//
+	// If this key has value [didNotHaveCleanShutdown] the intermediate nodes of
+	// the trie may not be correct and the [rootDBKey] may not exist or point to
+	// a node that node longer exists.
+	//
+	// Regardless of the value of [cleanShutdownKey], the value nodes must
+	// always be persisted correctly.
 	cleanShutdownKey        = []byte(string(metadataPrefix) + "cleanShutdown")
 	rootDBKey               = []byte(string(metadataPrefix) + "root")
 	hadCleanShutdown        = []byte{1}
