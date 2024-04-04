@@ -144,6 +144,11 @@ func verifyAddValidatorTx(
 	copy(outs, tx.Outs)
 	copy(outs[len(tx.Outs):], tx.StakeOuts)
 
+	feeCalculator := fees.NewDynamicCalculator(backend.Config, currentTimestamp, feeManager, commonfees.Max, sTx.Creds)
+	if err := tx.Visit(feeCalculator); err != nil {
+		return nil, err
+	}
+
 	if !backend.Bootstrapped.Get() {
 		return outs, nil
 	}
@@ -169,11 +174,6 @@ func verifyAddValidatorTx(
 	}
 
 	// Verify the flowcheck
-	feeCalculator := fees.NewDynamicCalculator(backend.Config, currentTimestamp, feeManager, commonfees.Max, sTx.Creds)
-	if err := tx.Visit(feeCalculator); err != nil {
-		return nil, err
-	}
-
 	if _, err = backend.FlowChecker.VerifySpend(
 		tx,
 		chainState,
@@ -230,6 +230,11 @@ func verifyAddSubnetValidatorTx(
 		return commonfees.NoTip, ErrStakeTooLong
 	}
 
+	feeCalculator := fees.NewDynamicCalculator(backend.Config, currentTimestamp, feeManager, maxComplexity, sTx.Creds)
+	if err := tx.Visit(feeCalculator); err != nil {
+		return commonfees.NoTip, err
+	}
+
 	if !backend.Bootstrapped.Get() {
 		return commonfees.NoTip, nil
 	}
@@ -265,11 +270,6 @@ func verifyAddSubnetValidatorTx(
 	}
 
 	// Verify the flowcheck
-	feeCalculator := fees.NewDynamicCalculator(backend.Config, currentTimestamp, feeManager, maxComplexity, sTx.Creds)
-	if err := tx.Visit(feeCalculator); err != nil {
-		return commonfees.NoTip, err
-	}
-
 	feesPaid, err := backend.FlowChecker.VerifySpend(
 		tx,
 		chainState,
@@ -344,6 +344,11 @@ func verifyRemoveSubnetValidatorTx(
 		return nil, false, commonfees.NoTip, ErrRemovePermissionlessValidator
 	}
 
+	feeCalculator := fees.NewDynamicCalculator(backend.Config, chainState.GetTimestamp(), feeManager, maxComplexity, sTx.Creds)
+	if err := tx.Visit(feeCalculator); err != nil {
+		return nil, false, commonfees.NoTip, err
+	}
+
 	if !backend.Bootstrapped.Get() {
 		// Not bootstrapped yet -- don't need to do full verification.
 		return vdr, isCurrentValidator, commonfees.NoTip, nil
@@ -355,12 +360,6 @@ func verifyRemoveSubnetValidatorTx(
 	}
 
 	// Verify the flowcheck
-	feeCalculator := fees.NewDynamicCalculator(backend.Config, chainState.GetTimestamp(), feeManager, maxComplexity, sTx.Creds)
-
-	if err := tx.Visit(feeCalculator); err != nil {
-		return nil, false, commonfees.NoTip, err
-	}
-
 	feesPaid, err := backend.FlowChecker.VerifySpend(
 		tx,
 		chainState,
@@ -437,6 +436,11 @@ func verifyAddDelegatorTx(
 	copy(outs, tx.Outs)
 	copy(outs[len(tx.Outs):], tx.StakeOuts)
 
+	feeCalculator := fees.NewDynamicCalculator(backend.Config, chainState.GetTimestamp(), feeManager, commonfees.Max, sTx.Creds)
+	if err := tx.Visit(feeCalculator); err != nil {
+		return nil, err
+	}
+
 	if !backend.Bootstrapped.Get() {
 		return outs, nil
 	}
@@ -487,11 +491,6 @@ func verifyAddDelegatorTx(
 	}
 
 	// Verify the flowcheck
-	feeCalculator := fees.NewDynamicCalculator(backend.Config, chainState.GetTimestamp(), feeManager, commonfees.Max, sTx.Creds)
-	if err := tx.Visit(feeCalculator); err != nil {
-		return nil, err
-	}
-
 	if _, err := backend.FlowChecker.VerifySpend(
 		tx,
 		chainState,
@@ -529,6 +528,11 @@ func verifyAddPermissionlessValidatorTx(
 		isEActive        = backend.Config.IsEActivated(currentTimestamp)
 	)
 	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
+		return commonfees.NoTip, err
+	}
+
+	feeCalculator := fees.NewDynamicCalculator(backend.Config, currentTimestamp, feeManager, maxComplexity, sTx.Creds)
+	if err := tx.Visit(feeCalculator); err != nil {
 		return commonfees.NoTip, err
 	}
 
@@ -612,12 +616,6 @@ func verifyAddPermissionlessValidatorTx(
 	copy(outs[len(tx.Outs):], tx.StakeOuts)
 
 	// Verify the flowcheck
-	feeCalculator := fees.NewDynamicCalculator(backend.Config, currentTimestamp, feeManager, maxComplexity, sTx.Creds)
-
-	if err := tx.Visit(feeCalculator); err != nil {
-		return commonfees.NoTip, err
-	}
-
 	feesPaid, err := backend.FlowChecker.VerifySpend(
 		tx,
 		chainState,
@@ -662,6 +660,11 @@ func verifyAddPermissionlessDelegatorTx(
 		isEActive        = backend.Config.IsEActivated(currentTimestamp)
 	)
 	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
+		return commonfees.NoTip, err
+	}
+
+	feeCalculator := fees.NewDynamicCalculator(backend.Config, currentTimestamp, feeManager, maxComplexity, sTx.Creds)
+	if err := tx.Visit(feeCalculator); err != nil {
 		return commonfees.NoTip, err
 	}
 
@@ -770,13 +773,6 @@ func verifyAddPermissionlessDelegatorTx(
 	}
 
 	// Verify the flowcheck
-	feeCalculator := fees.NewDynamicCalculator(backend.Config, currentTimestamp, feeManager, maxComplexity, sTx.Creds)
-
-	if err := tx.Visit(feeCalculator); err != nil {
-		return commonfees.NoTip, err
-	}
-
-	// Verify the flowcheck
 	feesPaid, err := backend.FlowChecker.VerifySpend(
 		tx,
 		chainState,
@@ -832,6 +828,11 @@ func verifyTransferSubnetOwnershipTx(
 		return commonfees.NoTip, err
 	}
 
+	feeCalculator := fees.NewDynamicCalculator(backend.Config, chainState.GetTimestamp(), feeManager, maxComplexity, sTx.Creds)
+	if err := tx.Visit(feeCalculator); err != nil {
+		return commonfees.NoTip, err
+	}
+
 	if !backend.Bootstrapped.Get() {
 		// Not bootstrapped yet -- don't need to do full verification.
 		return commonfees.NoTip, nil
@@ -843,12 +844,6 @@ func verifyTransferSubnetOwnershipTx(
 	}
 
 	// Verify the flowcheck
-	feeCalculator := fees.NewDynamicCalculator(backend.Config, chainState.GetTimestamp(), feeManager, maxComplexity, sTx.Creds)
-
-	if err := tx.Visit(feeCalculator); err != nil {
-		return commonfees.NoTip, err
-	}
-
 	feesPaid, err := backend.FlowChecker.VerifySpend(
 		tx,
 		chainState,

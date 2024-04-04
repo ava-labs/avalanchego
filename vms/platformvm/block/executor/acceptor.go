@@ -83,6 +83,7 @@ func (a *acceptor) ApricotAtomicBlock(b *block.ApricotAtomicBlock) error {
 	a.ctx.Log.Info(
 		"BLOCK COMPLEXITY",
 		zap.Stringer("blkID", b.ID()),
+		zap.String("blkType", "apricot atomic block"),
 		zap.Uint64("blkHeight", b.Height()),
 		zap.Int64("blkTimestamp", blkState.timestamp.Unix()),
 		zap.Any("consumedUnits", blkState.blockComplexity),
@@ -149,6 +150,7 @@ func (a *acceptor) optionBlock(b block.Block, blockType string) error {
 	a.ctx.Log.Info(
 		"BLOCK COMPLEXITY",
 		zap.Stringer("blkID", b.ID()),
+		zap.String("blkType", "proposal block"),
 		zap.Uint64("blkHeight", b.Height()),
 		zap.Int64("blkTimestamp", parentState.timestamp.Unix()),
 		zap.Any("consumedUnits", parentState.blockComplexity),
@@ -174,6 +176,7 @@ func (a *acceptor) optionBlock(b block.Block, blockType string) error {
 	a.ctx.Log.Info(
 		"BLOCK COMPLEXITY",
 		zap.Stringer("blkID", b.ID()),
+		zap.String("blkType", blockType),
 		zap.Uint64("blkHeight", b.Height()),
 		zap.Int64("blkTimestamp", parentState.timestamp.Unix()),
 		zap.Any("consumedUnits", blkState.blockComplexity),
@@ -261,6 +264,7 @@ func (a *acceptor) standardBlock(b block.Block, blockType string) error {
 	a.ctx.Log.Info(
 		"BLOCK COMPLEXITY",
 		zap.Stringer("blkID", b.ID()),
+		zap.String("blkType", blockType),
 		zap.Uint64("blkHeight", b.Height()),
 		zap.Int64("blkTimestamp", blkState.timestamp.Unix()),
 		zap.Any("consumedUnits", blkState.blockComplexity),

@@ -197,6 +197,11 @@ func (e *StandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 		utxoIDs[i] = utxoID[:]
 	}
 
+	feeCalculator := fees.NewDynamicCalculator(e.Backend.Config, e.State.GetTimestamp(), e.BlkFeeManager, e.BlockMaxComplexity, e.Tx.Creds)
+	if err := tx.Visit(feeCalculator); err != nil {
+		return err
+	}
+
 	// Skip verification of the shared memory inputs if the other primary
 	// network chains are not guaranteed to be up-to-date.
 	if e.Bootstrapped.Get() && !e.Config.PartialSyncPrimaryNetwork {
@@ -230,12 +235,6 @@ func (e *StandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 		copy(ins[len(tx.Ins):], tx.ImportedInputs)
 
 		// Verify the flowcheck
-		feeCalculator := fees.NewDynamicCalculator(e.Backend.Config, e.State.GetTimestamp(), e.BlkFeeManager, e.BlockMaxComplexity, e.Tx.Creds)
-
-		if err := tx.Visit(feeCalculator); err != nil {
-			return err
-		}
-
 		feesPaid, err := e.FlowChecker.VerifySpendUTXOs(
 			tx,
 			utxos,
@@ -290,6 +289,11 @@ func (e *StandardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 		return err
 	}
 
+	feeCalculator := fees.NewDynamicCalculator(e.Backend.Config, e.State.GetTimestamp(), e.BlkFeeManager, e.BlockMaxComplexity, e.Tx.Creds)
+	if err := tx.Visit(feeCalculator); err != nil {
+		return err
+	}
+
 	if e.Bootstrapped.Get() {
 		if err := verify.SameSubnet(context.TODO(), e.Ctx, tx.DestinationChain); err != nil {
 			return err
@@ -297,12 +301,6 @@ func (e *StandardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 	}
 
 	// Verify the flowcheck
-	feeCalculator := fees.NewDynamicCalculator(e.Backend.Config, e.State.GetTimestamp(), e.BlkFeeManager, e.BlockMaxComplexity, e.Tx.Creds)
-
-	if err := tx.Visit(feeCalculator); err != nil {
-		return err
-	}
-
 	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.ExportedOutputs))
 	copy(outs, tx.Outs)
 	copy(outs[len(tx.Outs):], tx.ExportedOutputs)
