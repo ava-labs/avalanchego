@@ -365,11 +365,6 @@ func (db *merkleDB) rebuild(ctx context.Context, cacheSize int) error {
 	if err := view.commitToDB(ctx); err != nil {
 		return err
 	}
-	// If the DB is empty, commitToDB may not have repaired the rootKey index.
-	// So, we explicitly repair that here.
-	if err := db.writeRootKey(); err != nil {
-		return err
-	}
 	return db.Compact(nil, nil)
 }
 
@@ -466,8 +461,26 @@ func (db *merkleDB) Close() error {
 		return err
 	}
 
-	// Successfully wrote intermediate nodes.
-	return db.baseDB.Put(cleanShutdownKey, hadCleanShutdown)
+	var (
+		batch = db.baseDB.NewBatch()
+		err   error
+	)
+	// Write the root key
+	if db.root.IsNothing() {
+		err = batch.Delete(rootDBKey)
+	} else {
+		rootKey := encodeKey(db.root.Value().key)
+		err = batch.Put(rootDBKey, rootKey)
+	}
+	if err != nil {
+		return err
+	}
+
+	// Write the clean shutdown marker
+	if err := batch.Put(cleanShutdownKey, hadCleanShutdown); err != nil {
+		return err
+	}
+	return batch.Write()
 }
 
 func (db *merkleDB) PrefetchPaths(keys [][]byte) error {
@@ -984,16 +997,7 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *view) error
 	// Update root in database.
 	db.root = changes.rootChange.after
 	db.rootID = changes.rootID
-	return db.writeRootKey()
-}
-
-func (db *merkleDB) writeRootKey() error {
-	if db.root.IsNothing() {
-		return db.baseDB.Delete(rootDBKey)
-	}
-
-	rootKey := encodeKey(db.root.Value().key)
-	return db.baseDB.Put(rootDBKey, rootKey)
+	return nil
 }
 
 // moveChildViewsToDB removes any child views from the trieToCommit and moves them to the db
