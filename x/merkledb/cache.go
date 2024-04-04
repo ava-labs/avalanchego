@@ -7,7 +7,7 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
+	"github.com/ava-labs/avalanchego/utils/linked"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
@@ -18,7 +18,7 @@ type onEvictCache[K comparable, V any] struct {
 	lock        sync.RWMutex
 	maxSize     int
 	currentSize int
-	fifo        linkedhashmap.LinkedHashmap[K, V]
+	fifo        *linked.Hashmap[K, V]
 	size        func(K, V) int
 	// Must not call any method that grabs [c.lock]
 	// because this would cause a deadlock.
@@ -33,7 +33,7 @@ func newOnEvictCache[K comparable, V any](
 ) onEvictCache[K, V] {
 	return onEvictCache[K, V]{
 		maxSize:    maxSize,
-		fifo:       linkedhashmap.New[K, V](),
+		fifo:       linked.NewHashmap[K, V](),
 		size:       size,
 		onEviction: onEviction,
 	}
@@ -71,7 +71,7 @@ func (c *onEvictCache[K, V]) Put(key K, value V) error {
 func (c *onEvictCache[K, V]) Flush() error {
 	c.lock.Lock()
 	defer func() {
-		c.fifo = linkedhashmap.New[K, V]()
+		c.fifo = linked.NewHashmap[K, V]()
 		c.lock.Unlock()
 	}()
 

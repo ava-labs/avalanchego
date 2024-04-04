@@ -86,12 +86,14 @@ linters-settings:
     rules:
       packages:
         deny:
-          - pkg: "io/ioutil"
-            desc: io/ioutil is deprecated. Use package io or os instead.
-          - pkg: "github.com/stretchr/testify/assert"
-            desc: github.com/stretchr/testify/require should be used instead.
+          - pkg: "container/list"
+            desc: github.com/ava-labs/avalanchego/utils/linked should be used instead.
           - pkg: "github.com/golang/mock/gomock"
             desc: go.uber.org/mock/gomock should be used instead.
+          - pkg: "github.com/stretchr/testify/assert"
+            desc: github.com/stretchr/testify/require should be used instead.
+          - pkg: "io/ioutil"
+            desc: io/ioutil is deprecated. Use package io or os instead.
   errorlint:
     # Check for plain type assertions and type switches.
     asserts: false
