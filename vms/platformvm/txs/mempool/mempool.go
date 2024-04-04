@@ -15,7 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/heap"
-	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
+	"github.com/ava-labs/avalanchego/utils/linked"
 	"github.com/ava-labs/avalanchego/utils/setmap"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -103,7 +103,7 @@ type mempool struct {
 
 	// unissued txs sorted by time they entered the mempool
 	// TODO: drop [unissuedTxs] once E upgrade is activated
-	unissuedTxs linkedhashmap.LinkedHashmap[ids.ID, *txs.Tx]
+	unissuedTxs *linked.Hashmap[ids.ID, *txs.Tx]
 
 	// Following E upgrade activation, mempool transactions are sorted by tip percentage
 	unissuedTxsByTipPercentage heap.Map[ids.ID, TxAndTipPercentage]
@@ -124,7 +124,7 @@ func New(
 	toEngine chan<- common.Message,
 ) (Mempool, error) {
 	m := &mempool{
-		unissuedTxs:                linkedhashmap.New[ids.ID, *txs.Tx](),
+		unissuedTxs:                linked.NewHashmap[ids.ID, *txs.Tx](),
 		unissuedTxsByTipPercentage: heap.NewMap[ids.ID, TxAndTipPercentage](lessTxAndTipPercent),
 		consumedUTXOs:              setmap.New[ids.ID, ids.ID](),
 		bytesAvailable:             maxMempoolSize,
@@ -169,7 +169,7 @@ func (m *mempool) Add(tx *txs.Tx, tipPercentage commonfees.TipPercentage) error 
 
 	// Note: a previously dropped tx can be re-added
 	txID := tx.ID()
-	if _, ok := m.Get(txID); ok {
+	if _, ok := m.get(txID); ok {
 		return fmt.Errorf("%w: %s", ErrDuplicateTx, txID)
 	}
 
@@ -215,6 +215,13 @@ func (m *mempool) Add(tx *txs.Tx, tipPercentage commonfees.TipPercentage) error 
 }
 
 func (m *mempool) Get(txID ids.ID) (*txs.Tx, bool) {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+
+	return m.get(txID)
+}
+
+func (m *mempool) get(txID ids.ID) (*txs.Tx, bool) {
 	if !m.isEUpgradeActive.Get() {
 		return m.unissuedTxs.Get(txID)
 	}
@@ -250,6 +257,9 @@ func (m *mempool) Remove(txs ...*txs.Tx) {
 }
 
 func (m *mempool) Peek() (*txs.Tx, bool) {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+
 	var (
 		tx     *txs.Tx
 		exists bool
@@ -308,6 +318,9 @@ func (m *mempool) GetDropReason(txID ids.ID) error {
 }
 
 func (m *mempool) RequestBuildBlock(emptyBlockPermitted bool) {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+
 	if !emptyBlockPermitted && (m.unissuedTxs.Len() == 0 || m.unissuedTxsByTipPercentage.Len() == 0) {
 		return
 	}

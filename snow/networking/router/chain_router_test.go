@@ -811,7 +811,9 @@ func TestRouterHonorsRequestedEngine(t *testing.T) {
 		chainRouter.HandleInbound(context.Background(), msg)
 	}
 
+	chainRouter.lock.Lock()
 	require.Zero(chainRouter.timedRequests.Len())
+	chainRouter.lock.Unlock()
 }
 
 func TestRouterClearTimeouts(t *testing.T) {
@@ -897,7 +899,10 @@ func TestRouterClearTimeouts(t *testing.T) {
 			)
 
 			chainRouter.HandleInbound(context.Background(), tt.responseMsg)
+
+			chainRouter.lock.Lock()
 			require.Zero(chainRouter.timedRequests.Len())
+			chainRouter.lock.Unlock()
 		})
 	}
 }
@@ -1383,7 +1388,9 @@ func TestAppRequest(t *testing.T) {
 			if tt.inboundMsg == nil || tt.inboundMsg.Op() == message.AppErrorOp {
 				engine.AppRequestFailedF = func(_ context.Context, nodeID ids.NodeID, requestID uint32, appErr *common.AppError) error {
 					defer wg.Done()
+					chainRouter.lock.Lock()
 					require.Zero(chainRouter.timedRequests.Len())
+					chainRouter.lock.Unlock()
 
 					require.Equal(ids.EmptyNodeID, nodeID)
 					require.Equal(wantRequestID, requestID)
@@ -1395,7 +1402,9 @@ func TestAppRequest(t *testing.T) {
 			} else if tt.inboundMsg.Op() == message.AppResponseOp {
 				engine.AppResponseF = func(_ context.Context, nodeID ids.NodeID, requestID uint32, msg []byte) error {
 					defer wg.Done()
+					chainRouter.lock.Lock()
 					require.Zero(chainRouter.timedRequests.Len())
+					chainRouter.lock.Unlock()
 
 					require.Equal(ids.EmptyNodeID, nodeID)
 					require.Equal(wantRequestID, requestID)
@@ -1407,7 +1416,9 @@ func TestAppRequest(t *testing.T) {
 
 			ctx := context.Background()
 			chainRouter.RegisterRequest(ctx, ids.EmptyNodeID, ids.Empty, ids.Empty, wantRequestID, tt.responseOp, tt.timeoutMsg, engineType)
+			chainRouter.lock.Lock()
 			require.Equal(1, chainRouter.timedRequests.Len())
+			chainRouter.lock.Unlock()
 
 			if tt.inboundMsg != nil {
 				chainRouter.HandleInbound(ctx, tt.inboundMsg)
@@ -1465,7 +1476,9 @@ func TestCrossChainAppRequest(t *testing.T) {
 			if tt.inboundMsg == nil || tt.inboundMsg.Op() == message.CrossChainAppErrorOp {
 				engine.CrossChainAppRequestFailedF = func(_ context.Context, chainID ids.ID, requestID uint32, appErr *common.AppError) error {
 					defer wg.Done()
+					chainRouter.lock.Lock()
 					require.Zero(chainRouter.timedRequests.Len())
+					chainRouter.lock.Unlock()
 
 					require.Equal(ids.Empty, chainID)
 					require.Equal(wantRequestID, requestID)
@@ -1477,7 +1490,9 @@ func TestCrossChainAppRequest(t *testing.T) {
 			} else if tt.inboundMsg.Op() == message.CrossChainAppResponseOp {
 				engine.CrossChainAppResponseF = func(_ context.Context, chainID ids.ID, requestID uint32, msg []byte) error {
 					defer wg.Done()
+					chainRouter.lock.Lock()
 					require.Zero(chainRouter.timedRequests.Len())
+					chainRouter.lock.Unlock()
 
 					require.Equal(ids.Empty, chainID)
 					require.Equal(wantRequestID, requestID)
@@ -1489,7 +1504,9 @@ func TestCrossChainAppRequest(t *testing.T) {
 
 			ctx := context.Background()
 			chainRouter.RegisterRequest(ctx, ids.EmptyNodeID, ids.Empty, ids.Empty, wantRequestID, tt.responseOp, tt.timeoutMsg, engineType)
+			chainRouter.lock.Lock()
 			require.Equal(1, chainRouter.timedRequests.Len())
+			chainRouter.lock.Unlock()
 
 			if tt.inboundMsg != nil {
 				chainRouter.HandleInbound(ctx, tt.inboundMsg)

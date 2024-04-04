@@ -14,7 +14,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/bag"
-	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
+	"github.com/ava-labs/avalanchego/utils/linked"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/metric"
 )
@@ -48,7 +48,7 @@ type set struct {
 	durPolls metric.Averager
 	factory  Factory
 	// maps requestID -> poll
-	polls linkedhashmap.LinkedHashmap[uint32, pollHolder]
+	polls *linked.Hashmap[uint32, pollHolder]
 }
 
 // NewSet returns a new empty set of polls
@@ -82,7 +82,7 @@ func NewSet(
 		numPolls: numPolls,
 		durPolls: durPolls,
 		factory:  factory,
-		polls:    linkedhashmap.New[uint32, pollHolder](),
+		polls:    linked.NewHashmap[uint32, pollHolder](),
 	}, nil
 }
 
