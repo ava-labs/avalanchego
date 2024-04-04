@@ -181,6 +181,12 @@ func (n *network) sendAppRequest(ctx context.Context, nodeID ids.NodeID, request
 		return nil
 	}
 
+	// If the context was cancelled, we can skip sending this request.
+	if err := ctx.Err(); err != nil {
+		n.activeAppRequests.Release(1)
+		return err
+	}
+
 	log.Debug("sending request to peer", "nodeID", nodeID, "requestLen", len(request))
 	n.peers.TrackPeer(nodeID)
 
@@ -191,8 +197,25 @@ func (n *network) sendAppRequest(ctx context.Context, nodeID ids.NodeID, request
 	nodeIDs.Add(nodeID)
 
 	// Send app request to [nodeID].
-	// On failure, release the slot from [activeAppRequests] and delete request from [outstandingRequestHandlers]
-	if err := n.appSender.SendAppRequest(ctx, nodeIDs, requestID, request); err != nil {
+	// On failure, release the slot from [activeAppRequests] and delete request
+	// from [outstandingRequestHandlers]
+	//
+	// Cancellation is removed from this context to avoid erroring unexpectedly.
+	// SendAppRequest should be non-blocking and any error other than context
+	// cancellation is unexpected.
+	//
+	// This guarantees that the network should never receive an unexpected
+	// AppResponse.
+	ctxWithoutCancel := context.WithoutCancel(ctx)
+	if err := n.appSender.SendAppRequest(ctxWithoutCancel, nodeIDs, requestID, request); err != nil {
+		log.Error(
+			"request to peer failed",
+			"nodeID", nodeID,
+			"requestID", requestID,
+			"requestLen", len(request),
+			"error", err,
+		)
+
 		n.activeAppRequests.Release(1)
 		delete(n.outstandingRequestHandlers, requestID)
 		return err
@@ -219,12 +242,35 @@ func (n *network) SendCrossChainRequest(ctx context.Context, chainID ids.ID, req
 		return nil
 	}
 
+	// If the context was cancelled, we can skip sending this request.
+	if err := ctx.Err(); err != nil {
+		n.activeCrossChainRequests.Release(1)
+		return err
+	}
+
 	requestID := n.nextRequestID()
 	n.outstandingRequestHandlers[requestID] = handler
 
 	// Send cross chain request to [chainID].
-	// On failure, release the slot from [activeCrossChainRequests] and delete request from [outstandingRequestHandlers].
-	if err := n.appSender.SendCrossChainAppRequest(ctx, chainID, requestID, request); err != nil {
+	// On failure, release the slot from [activeCrossChainRequests] and delete
+	// request from [outstandingRequestHandlers].
+	//
+	// Cancellation is removed from this context to avoid erroring unexpectedly.
+	// SendCrossChainAppRequest should be non-blocking and any error other than
+	// context cancellation is unexpected.
+	//
+	// This guarantees that the network should never receive an unexpected
+	// CrossChainAppResponse.
+	ctxWithoutCancel := context.WithoutCancel(ctx)
+	if err := n.appSender.SendCrossChainAppRequest(ctxWithoutCancel, chainID, requestID, request); err != nil {
+		log.Error(
+			"request to chain failed",
+			"chainID", chainID,
+			"requestID", requestID,
+			"requestLen", len(request),
+			"error", err,
+		)
+
 		n.activeCrossChainRequests.Release(1)
 		delete(n.outstandingRequestHandlers, requestID)
 		return err
