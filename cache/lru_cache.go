@@ -7,7 +7,7 @@ import (
 	"sync"
 
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
+	"github.com/ava-labs/avalanchego/utils/linked"
 )
 
 var _ Cacher[struct{}, struct{}] = (*LRU[struct{}, struct{}])(nil)
@@ -17,7 +17,7 @@ var _ Cacher[struct{}, struct{}] = (*LRU[struct{}, struct{}])(nil)
 // done, based on evicting the least recently used value.
 type LRU[K comparable, V any] struct {
 	lock     sync.Mutex
-	elements linkedhashmap.LinkedHashmap[K, V]
+	elements *linked.Hashmap[K, V]
 	// If set to <= 0, will be set internally to 1.
 	Size int
 }
@@ -92,7 +92,7 @@ func (c *LRU[K, _]) evict(key K) {
 }
 
 func (c *LRU[K, V]) flush() {
-	c.elements = linkedhashmap.New[K, V]()
+	c.elements = linked.NewHashmap[K, V]()
 }
 
 func (c *LRU[_, _]) len() int {
@@ -112,7 +112,7 @@ func (c *LRU[_, _]) portionFilled() float64 {
 // in the cache == [c.size] if necessary.
 func (c *LRU[K, V]) resize() {
 	if c.elements == nil {
-		c.elements = linkedhashmap.New[K, V]()
+		c.elements = linked.NewHashmap[K, V]()
 	}
 	if c.Size <= 0 {
 		c.Size = 1
