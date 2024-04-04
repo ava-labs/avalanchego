@@ -63,30 +63,40 @@ type Transitive struct {
 	validators          validators.Manager
 	connectedValidators tracker.Peers
 	consensus           snowman.Consensus
-	requestID           uint32
+
+	requestID uint32
+
 	// track outstanding preference requests
 	polls poll.Set
+
 	// blocks that have we have sent get requests for but haven't yet received
 	blkReqs            *bimap.BiMap[common.Request, ids.ID]
 	blkReqSourceMetric map[common.Request]prometheus.Counter
+
 	// blocks that are queued to be issued to consensus once missing dependencies are fetched
 	// Block ID --> Block
 	pending map[ids.ID]snowman.Block
+
 	// Block ID --> Parent ID
 	nonVerifieds ancestor.Tree
+
 	// Block ID --> Block.
 	// A block is put into this cache if it was not able to be issued. A block
 	// fails to be issued if verification on the block or one of its ancestors
 	// occurs.
 	nonVerifiedCache cache.Cacher[ids.ID, snowman.Block]
+
 	// acceptedFrontiers of the other validators of this chain
 	acceptedFrontiers tracker.Accepted
+
 	// operations that are blocked on a block being issued. This could be
 	// issuing another block, responding to a query, or applying votes to consensus
 	blocked event.Blocker
+
 	// number of times build block needs to be called once the number of
 	// processing blocks has gone below the optimal number.
 	pendingBuildBlocks int
+
 	// errs tracks if an error has occurred in a callback
 	errs wrappers.Errs
 }
