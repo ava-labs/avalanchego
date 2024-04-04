@@ -51,6 +51,10 @@ type Calculator struct {
 func NewStaticCalculator(cfg *config.Config) *Calculator {
 	return &Calculator{
 		config: cfg,
+
+		// TEMP TO TUNE PARAMETERS
+		feeManager:         fees.NewManager(fees.Empty),
+		blockMaxComplexity: fees.Max,
 	}
 }
 
@@ -71,56 +75,51 @@ func NewDynamicCalculator(
 }
 
 func (fc *Calculator) BaseTx(tx *txs.BaseTx) error {
-	if !fc.isEActive {
-		fc.Fee = fc.config.TxFee
-		return nil
-	}
-
 	complexity, err := fc.meterTx(tx, tx.Outs, tx.Ins)
 	if err != nil {
 		return err
 	}
 
 	_, err = fc.AddFeesFor(complexity, fc.TipPercentage)
+
+	// TEMP TO TUNE PARAMETERS
+	if !fc.isEActive {
+		fc.Fee = fc.config.TxFee
+	}
 	return err
 }
 
 func (fc *Calculator) CreateAssetTx(tx *txs.CreateAssetTx) error {
-	if !fc.isEActive {
-		fc.Fee = fc.config.CreateAssetTxFee
-		return nil
-	}
-
 	complexity, err := fc.meterTx(tx, tx.Outs, tx.Ins)
 	if err != nil {
 		return err
 	}
 
 	_, err = fc.AddFeesFor(complexity, fc.TipPercentage)
+
+	// TEMP TO TUNE PARAMETERS
+	if !fc.isEActive {
+		fc.Fee = fc.config.CreateAssetTxFee
+	}
 	return err
 }
 
 func (fc *Calculator) OperationTx(tx *txs.OperationTx) error {
-	if !fc.isEActive {
-		fc.Fee = fc.config.TxFee
-		return nil
-	}
-
 	complexity, err := fc.meterTx(tx, tx.Outs, tx.Ins)
 	if err != nil {
 		return err
 	}
 
 	_, err = fc.AddFeesFor(complexity, fc.TipPercentage)
+
+	// TEMP TO TUNE PARAMETERS
+	if !fc.isEActive {
+		fc.Fee = fc.config.TxFee
+	}
 	return err
 }
 
 func (fc *Calculator) ImportTx(tx *txs.ImportTx) error {
-	if !fc.isEActive {
-		fc.Fee = fc.config.TxFee
-		return nil
-	}
-
 	ins := make([]*avax.TransferableInput, len(tx.Ins)+len(tx.ImportedIns))
 	copy(ins, tx.Ins)
 	copy(ins[len(tx.Ins):], tx.ImportedIns)
@@ -131,15 +130,15 @@ func (fc *Calculator) ImportTx(tx *txs.ImportTx) error {
 	}
 
 	_, err = fc.AddFeesFor(complexity, fc.TipPercentage)
+
+	// TEMP TO TUNE PARAMETERS
+	if !fc.isEActive {
+		fc.Fee = fc.config.TxFee
+	}
 	return err
 }
 
 func (fc *Calculator) ExportTx(tx *txs.ExportTx) error {
-	if !fc.isEActive {
-		fc.Fee = fc.config.TxFee
-		return nil
-	}
-
 	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.ExportedOuts))
 	copy(outs, tx.Outs)
 	copy(outs[len(tx.Outs):], tx.ExportedOuts)
@@ -150,6 +149,11 @@ func (fc *Calculator) ExportTx(tx *txs.ExportTx) error {
 	}
 
 	_, err = fc.AddFeesFor(complexity, fc.TipPercentage)
+
+	// TEMP TO TUNE PARAMETERS
+	if !fc.isEActive {
+		fc.Fee = fc.config.TxFee
+	}
 	return err
 }
 

@@ -75,11 +75,18 @@ func NewDynamicCalculator(
 	}
 }
 
-func (fc *Calculator) AddValidatorTx(*txs.AddValidatorTx) error {
+func (fc *Calculator) AddValidatorTx(tx *txs.AddValidatorTx) error {
+	// TEMP TO TUNE PARAMETERS
+	complexity, err := fc.meterTx(tx, tx.Outs, tx.Ins)
+	if err != nil {
+		return err
+	}
+	_, err = fc.AddFeesFor(complexity, fc.TipPercentage)
+
 	// AddValidatorTx is banned following Durango activation, so we
 	// only return the pre EUpgrade fee here
 	fc.Fee = fc.config.AddPrimaryNetworkValidatorFee
-	return nil
+	return err
 }
 
 func (fc *Calculator) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
