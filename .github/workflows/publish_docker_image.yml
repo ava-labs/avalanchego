@@ -14,6 +14,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Install qemu (required for cross-platform builds)
+        run: |
+          sudo apt update
+          sudo apt -y install qemu qemu-user-static
       - name: Publish image to DockerHub
         env:
           DOCKER_USERNAME: ${{ secrets.docker_username }}
