@@ -10,10 +10,16 @@ The plugin version is unchanged at `35` and is compatible with version `v1.11.3`
 
 - Removed:
   - queue.NewWithMissing("block") metrics
+  - `eta_fetching_complete`
+
+- Added finer grained tracing of merkledb trie construction and hashing
+  - renamed `MerkleDB.view.calculateNodeIDs` to `MerkleDB.view.applyValueChanges`
+  - Added `MerkleDB.view.calculateNodeChanges`
+  - Added `MerkleDB.view.hashChangedNodes`
 
 ### Fixes
 
-- 
+- Fixed merkledb crash recovery
 
 ### What's Changed
 
