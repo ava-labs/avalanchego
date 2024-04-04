@@ -1288,7 +1288,7 @@ func TestGetChangeProofEmptyRootID(t *testing.T) {
 	require.ErrorIs(err, ErrEmptyProof)
 }
 
-func TestSimpleCrashRecovery(t *testing.T) {
+func TestCrashRecovery_IntermediateRootNode(t *testing.T) {
 	require := require.New(t)
 
 	baseDB := memdb.New()
@@ -1331,7 +1331,7 @@ func TestSimpleCrashRecovery(t *testing.T) {
 	require.Equal(expectedRoot, rootAfterRecovery)
 }
 
-func TestSubtleCrashRecovery(t *testing.T) {
+func TestCrashRecovery_RootKeyModification(t *testing.T) {
 	require := require.New(t)
 
 	baseDB := memdb.New()
