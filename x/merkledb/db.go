@@ -278,8 +278,24 @@ func newDatabase(
 		tokenSize:        BranchFactorToTokenSize[config.BranchFactor],
 	}
 
-	if err := trieDB.initializeRoot(); err != nil {
+	shutdownType, err := trieDB.baseDB.Get(cleanShutdownKey)
+	switch err {
+	case nil:
+	case database.ErrNotFound:
+		// If the marker wasn't found then the DB is being created for the first
+		// time and there is nothing to do.
+		shutdownType = hadCleanShutdown
+	default:
 		return nil, err
+	}
+	if bytes.Equal(shutdownType, didNotHaveCleanShutdown) {
+		if err := trieDB.rebuild(ctx, int(config.ValueNodeCacheSize)); err != nil {
+			return nil, err
+		}
+	} else {
+		if err := trieDB.initializeRoot(); err != nil {
+			return nil, err
+		}
 	}
 
 	// add current root to history (has no changes)
@@ -291,21 +307,6 @@ func newDatabase(
 		values: map[Key]*change[maybe.Maybe[[]byte]]{},
 		nodes:  map[Key]*change[*node]{},
 	})
-
-	shutdownType, err := trieDB.baseDB.Get(cleanShutdownKey)
-	switch err {
-	case nil:
-		if bytes.Equal(shutdownType, didNotHaveCleanShutdown) {
-			if err := trieDB.rebuild(ctx, int(config.ValueNodeCacheSize)); err != nil {
-				return nil, err
-			}
-		}
-	case database.ErrNotFound:
-		// If the marker wasn't found then the DB is being created for the first
-		// time and there is nothing to do.
-	default:
-		return nil, err
-	}
 
 	// mark that the db has not yet been cleanly closed
 	err = trieDB.baseDB.Put(cleanShutdownKey, didNotHaveCleanShutdown)
