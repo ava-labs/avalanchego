@@ -128,8 +128,13 @@ func (c *Client) AppGossip(
 	config common.SendConfig,
 	appGossipBytes []byte,
 ) error {
+	// Cancellation is removed from this context to avoid erroring unexpectedly.
+	// SendAppGossip should be non-blocking and any error other than context
+	// cancellation is unexpected.
+	ctxWithoutCancel := context.WithoutCancel(ctx)
+
 	return c.sender.SendAppGossip(
-		ctx,
+		ctxWithoutCancel,
 		config,
 		PrefixMessage(c.handlerPrefix, appGossipBytes),
 	)
