@@ -1330,3 +1330,63 @@ func TestSimpleCrashRecovery(t *testing.T) {
 	require.NoError(err)
 	require.Equal(expectedRoot, rootAfterRecovery)
 }
+
+func TestSubtleCrashRecovery(t *testing.T) {
+	require := require.New(t)
+
+	baseDB := memdb.New()
+	merkleDB, err := newDatabase(
+		context.Background(),
+		baseDB,
+		newDefaultConfig(),
+		&mockMetrics{},
+	)
+	require.NoError(err)
+
+	merkleDBBatch := merkleDB.NewBatch()
+	require.NoError(merkleDBBatch.Put([]byte("is this"), []byte("hope")))
+	require.NoError(merkleDBBatch.Put([]byte("expected?"), []byte("so")))
+	require.NoError(merkleDBBatch.Write())
+
+	rootValue, err := baseDB.Get(rootDBKey)
+	require.NoError(err)
+
+	merkleDBBatch.Reset()
+	require.NoError(merkleDBBatch.Delete([]byte("is this")))
+	require.NoError(merkleDBBatch.Delete([]byte("expected?")))
+	require.NoError(merkleDBBatch.Write())
+
+	expectedRoot, err := merkleDB.GetMerkleRoot(context.Background())
+	require.NoError(err)
+
+	// Repopulate the prior root value to simulate a process crash after writing
+	// the value batch but before writing the rootDBKey.
+	require.NoError(baseDB.Put(rootDBKey, rootValue))
+
+	// Do not `.Close()` the database to simulate a process crash.
+
+	// The trie is empty here, so repair doesn't commit any changes to the DB.
+	newMerkleDB, err := newDatabase(
+		context.Background(),
+		baseDB,
+		newDefaultConfig(),
+		&mockMetrics{},
+	)
+	require.NoError(err)
+
+	// Close the new merkleDB without any modifications to mark the shutdown as
+	// clean.
+	require.NoError(newMerkleDB.Close())
+
+	newMerkleDB, err = newDatabase(
+		context.Background(),
+		baseDB,
+		newDefaultConfig(),
+		&mockMetrics{},
+	)
+	require.NoError(err)
+
+	rootAfterRecovery, err := newMerkleDB.GetMerkleRoot(context.Background())
+	require.NoError(err)
+	require.Equal(expectedRoot, rootAfterRecovery)
+}
