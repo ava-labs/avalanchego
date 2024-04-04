@@ -6,12 +6,9 @@ package vms
 import (
 	"fmt"
 	"math"
-	"os"
-	"path/filepath"
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
@@ -43,15 +40,6 @@ var _ = ginkgo.Describe("[XSVM]", func() {
 
 	ginkgo.It("should support transfers between subnets", func() {
 		network := e2e.Env.GetNetwork()
-
-		pluginDir, err := network.DefaultFlags.GetStringVal(config.PluginDirKey)
-		require.NoError(err)
-		const xsvmPluginFilename = "v3m4wPxaHpvGr8qfMeyK6PRW3idZrPHmYcMTt7oXdK47yurVH"
-		xsvmPluginPath := filepath.Join(pluginDir, xsvmPluginFilename)
-		ginkgo.By("checking that xsvm plugin binary exists at path "+xsvmPluginPath, func() {
-			_, err := os.Stat(xsvmPluginPath)
-			require.NoError(err)
-		})
 
 		sourceSubnet := network.GetSubnet(subnetAName)
 		require.NotNil(sourceSubnet)
