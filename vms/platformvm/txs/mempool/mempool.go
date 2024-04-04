@@ -218,11 +218,7 @@ func (m *mempool) Get(txID ids.ID) (*txs.Tx, bool) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 
-	if !m.isEUpgradeActive.Get() {
-		return m.unissuedTxs.Get(txID)
-	}
-	v, found := m.unissuedTxsByTipPercentage.Get(txID)
-	return v.Tx, found
+	return m.get(txID)
 }
 
 func (m *mempool) get(txID ids.ID) (*txs.Tx, bool) {
