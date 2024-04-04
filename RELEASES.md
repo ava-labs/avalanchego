@@ -30,11 +30,49 @@ The plugin version is unchanged at `35` and is compatible with version `v1.11.3`
 
 ### What's Changed
 
-- 
-
-### New Contributors
-
-- 
+- Bump github.com/consensys/gnark-crypto from 0.10.0 to 0.12.1 by @dependabot in https://github.com/ava-labs/avalanchego/pull/2862
+- Push antithesis images by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2864
+- Revert removal of legacy P-chain block parsing by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2866
+- `tmpnet`: Ensure nodes are properly detached from the parent process by @marun in https://github.com/ava-labs/avalanchego/pull/2859
+- indicies -> indices by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2873
+- Reindex P-chain blocks by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2869
+- Add detail to tmpnet metrics documentation by @marun in https://github.com/ava-labs/avalanchego/pull/2854
+- docs migration by @meaghanfitzgerald in https://github.com/ava-labs/avalanchego/pull/2845
+- Implement interval tree to replace bootstrapping jobs queue by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2756
+- Cleanup codec constants by @abi87 in https://github.com/ava-labs/avalanchego/pull/2699
+- Update health API readme by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2875
+- `tmpnet`: Improve subnet configuration by @marun in https://github.com/ava-labs/avalanchego/pull/2871
+- Add tests for inefficient string formatting by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2878
+- [vms/platformvm] Declare `maxPageSize` in `service.go` by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/2881
+- [vms/platformvm] Use `wallet` sdk in `txstest.Builder` by @abi87 in https://github.com/ava-labs/avalanchego/pull/2751
+- Optimize encodeUint by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2882
+- [components/avax] Remove `AtomicUTXOManager` interface by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/2884
+- Remove merkledb codec struct by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2883
+- [vms/platformvm] Minimize exported functions in `txstest` by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/2888
+- `ci`: Skip monitoring if secrets are not present by @marun in https://github.com/ava-labs/avalanchego/pull/2880
+- Optimize merkledb hashing by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2886
+- [vms/platformvm] Miscellaneous testing cleanups by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/2891
+- Move functions around so that encode and decode are next to each other by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2892
+- Remove memory alloc from encodeDBNode by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2893
+- Interval tree syncing integration by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2855
+- Optimize hashing of leaf nodes by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2894
+- Improve performance of marshalling small keys by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2895
+- Improve tracing of merkledb trie updates by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2897
+- Remove usage of bytes.Buffer and bytes.Reader by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2896
+- Optimize key creation in hashing by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2899
+- Move bootstrapping queue out of common by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2856
+- Conditionally allocate WaitGroup memory by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2901
+- Reuse key buffers during hashing by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2902
+- Remove AddEphemeralNode by @joshua-kim in https://github.com/ava-labs/avalanchego/pull/2887
+- Rename linkedhashmap package to `linked` by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2907
+- [tmpnet] Misc cleanup to support xsvm warp test PR by @marun in https://github.com/ava-labs/avalanchego/pull/2903
+- Implement generic `linked.List` by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2908
+- Remove full message from error logs by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2912
+- Use generic linked list by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2909
+- Avoid allocating new list entries by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2910
+- Remove `linked.Hashmap` locking by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2911
+- Fix MerkleDB crash recovery by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2913
+- Remove cancellation for Send*AppRequest messages by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2915
 
 **Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.11.3...v1.11.4
 
