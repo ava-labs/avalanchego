@@ -52,6 +52,10 @@ func NewStaticCalculator(cfg *config.Config, chainTime time.Time) *Calculator {
 	return &Calculator{
 		config:    cfg,
 		chainTime: chainTime,
+
+		// TEMP TO TUNE PARAMETERS
+		feeManager:         fees.NewManager(fees.Empty),
+		blockMaxComplexity: fees.Max,
 	}
 }
 
@@ -79,54 +83,68 @@ func (fc *Calculator) AddValidatorTx(*txs.AddValidatorTx) error {
 }
 
 func (fc *Calculator) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
-	if !fc.isEActive {
-		fc.Fee = fc.config.AddSubnetValidatorFee
-		return nil
-	}
-
 	complexity, err := fc.meterTx(tx, tx.Outs, tx.Ins)
 	if err != nil {
 		return err
 	}
 
 	_, err = fc.AddFeesFor(complexity, fc.TipPercentage)
+
+	// TEMP TO TUNE PARAMETERS
+	if !fc.isEActive {
+		fc.Fee = fc.config.AddSubnetValidatorFee
+	}
 	return err
 }
 
-func (fc *Calculator) AddDelegatorTx(*txs.AddDelegatorTx) error {
-	// AddValidatorTx is banned following Durango activation, so we
-	// only return the pre EUpgrade fee here
-	fc.Fee = fc.config.AddPrimaryNetworkDelegatorFee
-	return nil
-}
-
-func (fc *Calculator) CreateChainTx(tx *txs.CreateChainTx) error {
-	if !fc.isEActive {
-		fc.Fee = fc.config.GetCreateBlockchainTxFee(fc.chainTime)
-		return nil
-	}
-
+func (fc *Calculator) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
+	// TEMP TO TUNE PARAMETERS
 	complexity, err := fc.meterTx(tx, tx.Outs, tx.Ins)
 	if err != nil {
 		return err
 	}
 
 	_, err = fc.AddFeesFor(complexity, fc.TipPercentage)
+
+	// TEMP TO TUNE PARAMETERS
+	if !fc.isEActive {
+		fc.Fee = fc.config.AddPrimaryNetworkDelegatorFee
+	}
+	return err
+
+	// // AddValidatorTx is banned following Durango activation, so we
+	// // only return the pre EUpgrade fee here
+	// fc.Fee = fc.config.AddPrimaryNetworkDelegatorFee
+	// return nil
+}
+
+func (fc *Calculator) CreateChainTx(tx *txs.CreateChainTx) error {
+	complexity, err := fc.meterTx(tx, tx.Outs, tx.Ins)
+	if err != nil {
+		return err
+	}
+
+	_, err = fc.AddFeesFor(complexity, fc.TipPercentage)
+
+	// TEMP TO TUNE PARAMETERS
+	if !fc.isEActive {
+		fc.Fee = fc.config.GetCreateBlockchainTxFee(fc.chainTime)
+	}
 	return err
 }
 
 func (fc *Calculator) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
-	if !fc.isEActive {
-		fc.Fee = fc.config.GetCreateSubnetTxFee(fc.chainTime)
-		return nil
-	}
-
 	complexity, err := fc.meterTx(tx, tx.Outs, tx.Ins)
 	if err != nil {
 		return err
 	}
 
 	_, err = fc.AddFeesFor(complexity, fc.TipPercentage)
+
+	// TEMP TO TUNE PARAMETERS
+	if !fc.isEActive {
+		fc.Fee = fc.config.GetCreateSubnetTxFee(fc.chainTime)
+	}
 	return err
 }
 
@@ -139,60 +157,74 @@ func (*Calculator) RewardValidatorTx(*txs.RewardValidatorTx) error {
 }
 
 func (fc *Calculator) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx) error {
-	if !fc.isEActive {
-		fc.Fee = fc.config.TxFee
-		return nil
-	}
-
 	complexity, err := fc.meterTx(tx, tx.Outs, tx.Ins)
 	if err != nil {
 		return err
 	}
 
 	_, err = fc.AddFeesFor(complexity, fc.TipPercentage)
+
+	// TEMP TO TUNE PARAMETERS
+	if !fc.isEActive {
+		fc.Fee = fc.config.TxFee
+	}
 	return err
 }
 
 func (fc *Calculator) TransformSubnetTx(tx *txs.TransformSubnetTx) error {
-	if !fc.isEActive {
-		fc.Fee = fc.config.TransformSubnetTxFee
-		return nil
-	}
-
 	complexity, err := fc.meterTx(tx, tx.Outs, tx.Ins)
 	if err != nil {
 		return err
 	}
 
 	_, err = fc.AddFeesFor(complexity, fc.TipPercentage)
+
+	// TEMP TO TUNE PARAMETERS
+	if !fc.isEActive {
+		fc.Fee = fc.config.TransformSubnetTxFee
+	}
 	return err
 }
 
 func (fc *Calculator) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwnershipTx) error {
-	if !fc.isEActive {
-		fc.Fee = fc.config.TxFee
-		return nil
-	}
-
 	complexity, err := fc.meterTx(tx, tx.Outs, tx.Ins)
 	if err != nil {
 		return err
 	}
 
 	_, err = fc.AddFeesFor(complexity, fc.TipPercentage)
+
+	// TEMP TO TUNE PARAMETERS
+	if !fc.isEActive {
+		fc.Fee = fc.config.TxFee
+	}
 	return err
 }
 
 func (fc *Calculator) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessValidatorTx) error {
+	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.StakeOuts))
+	copy(outs, tx.Outs)
+	copy(outs[len(tx.Outs):], tx.StakeOuts)
+
+	complexity, err := fc.meterTx(tx, outs, tx.Ins)
+	if err != nil {
+		return err
+	}
+
+	_, err = fc.AddFeesFor(complexity, fc.TipPercentage)
+
+	// TEMP TO TUNE PARAMETERS
 	if !fc.isEActive {
 		if tx.Subnet != constants.PrimaryNetworkID {
 			fc.Fee = fc.config.AddSubnetValidatorFee
 		} else {
 			fc.Fee = fc.config.AddPrimaryNetworkValidatorFee
 		}
-		return nil
 	}
+	return err
+}
 
+func (fc *Calculator) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDelegatorTx) error {
 	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.StakeOuts))
 	copy(outs, tx.Outs)
 	copy(outs[len(tx.Outs):], tx.StakeOuts)
@@ -203,53 +235,34 @@ func (fc *Calculator) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessVali
 	}
 
 	_, err = fc.AddFeesFor(complexity, fc.TipPercentage)
-	return err
-}
 
-func (fc *Calculator) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDelegatorTx) error {
+	// TEMP TO TUNE PARAMETERS
 	if !fc.isEActive {
 		if tx.Subnet != constants.PrimaryNetworkID {
 			fc.Fee = fc.config.AddSubnetDelegatorFee
 		} else {
 			fc.Fee = fc.config.AddPrimaryNetworkDelegatorFee
 		}
-		return nil
 	}
-
-	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.StakeOuts))
-	copy(outs, tx.Outs)
-	copy(outs[len(tx.Outs):], tx.StakeOuts)
-
-	complexity, err := fc.meterTx(tx, outs, tx.Ins)
-	if err != nil {
-		return err
-	}
-
-	_, err = fc.AddFeesFor(complexity, fc.TipPercentage)
 	return err
 }
 
 func (fc *Calculator) BaseTx(tx *txs.BaseTx) error {
-	if !fc.isEActive {
-		fc.Fee = fc.config.TxFee
-		return nil
-	}
-
 	complexity, err := fc.meterTx(tx, tx.Outs, tx.Ins)
 	if err != nil {
 		return err
 	}
 
 	_, err = fc.AddFeesFor(complexity, fc.TipPercentage)
+
+	// TEMP TO TUNE PARAMETERS
+	if !fc.isEActive {
+		fc.Fee = fc.config.TxFee
+	}
 	return err
 }
 
 func (fc *Calculator) ImportTx(tx *txs.ImportTx) error {
-	if !fc.isEActive {
-		fc.Fee = fc.config.TxFee
-		return nil
-	}
-
 	ins := make([]*avax.TransferableInput, len(tx.Ins)+len(tx.ImportedInputs))
 	copy(ins, tx.Ins)
 	copy(ins[len(tx.Ins):], tx.ImportedInputs)
@@ -260,15 +273,15 @@ func (fc *Calculator) ImportTx(tx *txs.ImportTx) error {
 	}
 
 	_, err = fc.AddFeesFor(complexity, fc.TipPercentage)
+
+	// TEMP TO TUNE PARAMETERS
+	if !fc.isEActive {
+		fc.Fee = fc.config.TxFee
+	}
 	return err
 }
 
 func (fc *Calculator) ExportTx(tx *txs.ExportTx) error {
-	if !fc.isEActive {
-		fc.Fee = fc.config.TxFee
-		return nil
-	}
-
 	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.ExportedOutputs))
 	copy(outs, tx.Outs)
 	copy(outs[len(tx.Outs):], tx.ExportedOutputs)
@@ -279,6 +292,11 @@ func (fc *Calculator) ExportTx(tx *txs.ExportTx) error {
 	}
 
 	_, err = fc.AddFeesFor(complexity, fc.TipPercentage)
+
+	// TEMP TO TUNE PARAMETERS
+	if !fc.isEActive {
+		fc.Fee = fc.config.TxFee
+	}
 	return err
 }
 
