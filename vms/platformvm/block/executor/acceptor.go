@@ -149,9 +149,9 @@ func (a *acceptor) optionBlock(b block.Block, blockType string) error {
 	a.metrics.SetBlockComplexity(parentState.blockComplexity)
 	a.ctx.Log.Info(
 		"BLOCK COMPLEXITY",
-		zap.Stringer("blkID", b.ID()),
+		zap.Stringer("blkID", b.Parent()),
 		zap.String("blkType", "proposal block"),
-		zap.Uint64("blkHeight", b.Height()),
+		zap.Uint64("blkHeight", b.Height()-1),
 		zap.Int64("blkTimestamp", parentState.timestamp.Unix()),
 		zap.Any("consumedUnits", parentState.blockComplexity),
 	)
@@ -173,14 +173,16 @@ func (a *acceptor) optionBlock(b block.Block, blockType string) error {
 
 	// we set option complexity at its parent block's one.
 	a.metrics.SetBlockComplexity(parentState.blockComplexity)
-	a.ctx.Log.Info(
-		"BLOCK COMPLEXITY",
-		zap.Stringer("blkID", b.ID()),
-		zap.String("blkType", blockType),
-		zap.Uint64("blkHeight", b.Height()),
-		zap.Int64("blkTimestamp", parentState.timestamp.Unix()),
-		zap.Any("consumedUnits", blkState.blockComplexity),
-	)
+
+	// AVOID LOGGING OPTIONS, WE KNOW THEY DON'T CHANGE COMPLEXITY
+	// a.ctx.Log.Info(
+	// 	"BLOCK COMPLEXITY",
+	// 	zap.Stringer("blkID", b.ID()),
+	// 	zap.String("blkType", blockType),
+	// 	zap.Uint64("blkHeight", b.Height()),
+	// 	zap.Int64("blkTimestamp", parentState.timestamp.Unix()),
+	// 	zap.Any("consumedUnits", parentState.blockComplexity),
+	// )
 
 	if err := blkState.onAcceptState.Apply(a.state); err != nil {
 		return err
