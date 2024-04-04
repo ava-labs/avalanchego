@@ -8,7 +8,10 @@ import (
 	"errors"
 	"fmt"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
@@ -100,6 +103,12 @@ func (c *Client) AppRequest(
 			requestID,
 			appRequestBytes,
 		); err != nil {
+			c.router.log.Error("unexpected error when sending message",
+				zap.Stringer("op", message.AppRequestOp),
+				zap.Stringer("nodeID", nodeID),
+				zap.Uint32("requestID", requestID),
+				zap.Error(err),
+			)
 			return err
 		}
 
@@ -160,6 +169,12 @@ func (c *Client) CrossChainAppRequest(
 		requestID,
 		PrefixMessage(c.handlerPrefix, appRequestBytes),
 	); err != nil {
+		c.router.log.Error("unexpected error when sending message",
+			zap.Stringer("op", message.CrossChainAppRequestOp),
+			zap.Stringer("chainID", chainID),
+			zap.Uint32("requestID", requestID),
+			zap.Error(err),
+		)
 		return err
 	}
 
