@@ -30,8 +30,8 @@ const defaultSubnetDirName = "subnets"
 type Chain struct {
 	// Set statically
 	VMID    ids.ID
-	Config  FlagsMap
-	Genesis FlagsMap
+	Config  string
+	Genesis []byte
 
 	// Set at runtime
 	ChainID      ids.ID
@@ -50,12 +50,8 @@ func (c *Chain) WriteConfig(chainDir string) error {
 		return fmt.Errorf("failed to create chain config dir: %w", err)
 	}
 
-	bytes, err := DefaultJSONMarshal(c.Config)
-	if err != nil {
-		return fmt.Errorf("failed to marshal config for chain %s: %w", c.ChainID, err)
-	}
 	path := filepath.Join(chainConfigDir, defaultConfigFilename)
-	if err := os.WriteFile(path, bytes, perms.ReadWrite); err != nil {
+	if err := os.WriteFile(path, []byte(c.Config), perms.ReadWrite); err != nil {
 		return fmt.Errorf("failed to write chain config: %w", err)
 	}
 
@@ -138,13 +134,9 @@ func (s *Subnet) CreateChains(ctx context.Context, w io.Writer, uri string) erro
 	}
 
 	for _, chain := range s.Chains {
-		genesisBytes, err := DefaultJSONMarshal(chain.Genesis)
-		if err != nil {
-			return fmt.Errorf("failed to marshal genesis for chain %s: %w", chain.VMID, err)
-		}
 		createChainTx, err := pWallet.IssueCreateChainTx(
 			s.SubnetID,
-			genesisBytes,
+			chain.Genesis,
 			chain.VMID,
 			nil,
 			"",
