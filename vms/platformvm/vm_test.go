@@ -397,7 +397,7 @@ func TestGenesis(t *testing.T) {
 			)
 
 			if !vm.IsEActivated(chainTime) {
-				feeCalc = fees.NewStaticCalculator(&vm.Config, chainTime)
+				feeCalc = fees.NewStaticCalculator(&vm.Config, chainTime, testSubnet1.Creds)
 			} else {
 				feeRates, err := vm.state.GetFeeRates()
 				require.NoError(err)
@@ -2387,7 +2387,7 @@ func TestBaseTx(t *testing.T) {
 	)
 
 	if !vm.IsEActivated(chainTime) {
-		feeCalc = fees.NewStaticCalculator(&vm.Config, chainTime)
+		feeCalc = fees.NewStaticCalculator(&vm.Config, chainTime, baseTx.Creds)
 	} else {
 		feeRates, err := vm.state.GetFeeRates()
 		require.NoError(err)

@@ -148,7 +148,7 @@ func (v *SemanticVerifier) verifyBaseTx(
 		feeCalculator *fees.Calculator
 	)
 	if !isEActive {
-		feeCalculator = fees.NewStaticCalculator(v.Config)
+		feeCalculator = fees.NewStaticCalculator(v.Config, creds)
 	} else {
 		feeCalculator = fees.NewDynamicCalculator(v.Codec, v.BlkFeeManager, v.BlockMaxComplexity, creds)
 	}

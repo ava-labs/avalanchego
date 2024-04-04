@@ -507,7 +507,7 @@ func (b *Builder) feeCalculator() (*fees.Calculator, error) {
 
 	var feeCalculator *fees.Calculator
 	if !isEActive {
-		feeCalculator = fees.NewStaticCalculator(b.cfg, chainTime)
+		feeCalculator = fees.NewStaticCalculator(b.cfg, chainTime, nil)
 	} else {
 		nextChainTime, _, err := state.NextBlockTime(b.state, b.clk)
 		if err != nil {

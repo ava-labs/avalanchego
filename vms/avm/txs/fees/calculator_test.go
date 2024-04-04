@@ -146,7 +146,7 @@ func TestBaseTxFees(t *testing.T) {
 
 			var fc *Calculator
 			if !cfg.IsEActivated(chainTime) {
-				fc = NewStaticCalculator(cfg)
+				fc = NewStaticCalculator(cfg, sTx.Creds)
 			} else {
 				fc = NewDynamicCalculator(codec, fees.NewManager(testFeeRates), blockMaxComplexity, sTx.Creds)
 			}
@@ -263,7 +263,7 @@ func TestCreateAssetTxFees(t *testing.T) {
 
 			var fc *Calculator
 			if !cfg.IsEActivated(chainTime) {
-				fc = NewStaticCalculator(cfg)
+				fc = NewStaticCalculator(cfg, sTx.Creds)
 			} else {
 				fc = NewDynamicCalculator(codec, fees.NewManager(testFeeRates), blockMaxComplexity, sTx.Creds)
 			}
@@ -380,7 +380,7 @@ func TestOperationTxFees(t *testing.T) {
 
 			var fc *Calculator
 			if !cfg.IsEActivated(chainTime) {
-				fc = NewStaticCalculator(cfg)
+				fc = NewStaticCalculator(cfg, sTx.Creds)
 			} else {
 				fc = NewDynamicCalculator(codec, fees.NewManager(testFeeRates), blockMaxComplexity, sTx.Creds)
 			}
@@ -493,7 +493,7 @@ func TestImportTxFees(t *testing.T) {
 
 			var fc *Calculator
 			if !cfg.IsEActivated(chainTime) {
-				fc = NewStaticCalculator(cfg)
+				fc = NewStaticCalculator(cfg, sTx.Creds)
 			} else {
 				fc = NewDynamicCalculator(codec, fees.NewManager(testFeeRates), blockMaxComplexity, sTx.Creds)
 			}
@@ -596,7 +596,7 @@ func TestExportTxFees(t *testing.T) {
 
 			var fc *Calculator
 			if !cfg.IsEActivated(chainTime) {
-				fc = NewStaticCalculator(cfg)
+				fc = NewStaticCalculator(cfg, sTx.Creds)
 			} else {
 				fc = NewDynamicCalculator(codec, fees.NewManager(testFeeRates), blockMaxComplexity, sTx.Creds)
 			}

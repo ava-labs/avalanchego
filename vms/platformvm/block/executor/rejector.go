@@ -115,7 +115,7 @@ func (r *rejector) rejectBlock(b block.Block, blockType string) error {
 
 		var feeCalculator *fees.Calculator
 		if !isEActive {
-			feeCalculator = fees.NewStaticCalculator(cfg, currentTimestamp)
+			feeCalculator = fees.NewStaticCalculator(cfg, currentTimestamp, tx.Creds)
 		} else {
 			feeCalculator = fees.NewDynamicCalculator(cfg, feeManager, feesCfg.BlockMaxComplexity, tx.Creds)
 		}

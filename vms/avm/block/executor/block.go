@@ -215,6 +215,13 @@ func (b *Block) Verify(context.Context) error {
 		stateDiff.SetLastBlockComplexity(feeManager.GetCumulatedComplexity())
 	}
 
+	b.manager.backend.Ctx.Log.Info(
+		"BLOCK COMPLEXITY",
+		zap.Uint64("blkHeight", b.Height()),
+		zap.Int64("blkTimestamp", b.Timestamp().Unix()),
+		zap.Any("consumedUnits", feeManager.GetCumulatedComplexity()),
+	)
+
 	stateDiff.SetLastAccepted(blkID)
 	stateDiff.AddBlock(b.Block)
 

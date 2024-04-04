@@ -48,7 +48,7 @@ type Calculator struct {
 }
 
 // NewStaticCalculator must be used pre E upgrade activation
-func NewStaticCalculator(cfg *config.Config, chainTime time.Time) *Calculator {
+func NewStaticCalculator(cfg *config.Config, chainTime time.Time, creds []verify.Verifiable) *Calculator {
 	return &Calculator{
 		config:    cfg,
 		chainTime: chainTime,
@@ -56,6 +56,7 @@ func NewStaticCalculator(cfg *config.Config, chainTime time.Time) *Calculator {
 		// TEMP TO TUNE PARAMETERS
 		feeManager:         fees.NewManager(fees.Empty),
 		blockMaxComplexity: fees.Max,
+		credentials:        creds,
 	}
 }
 

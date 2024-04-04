@@ -394,7 +394,7 @@ func TestGetBalance(t *testing.T) {
 			)
 
 			if !service.vm.IsEActivated(chainTime) {
-				feeCalc = fees.NewStaticCalculator(&service.vm.Config, chainTime)
+				feeCalc = fees.NewStaticCalculator(&service.vm.Config, chainTime, testSubnet1.Creds)
 			} else {
 				feeRates, err := service.vm.state.GetFeeRates()
 				require.NoError(err)

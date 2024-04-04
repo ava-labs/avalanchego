@@ -282,7 +282,7 @@ func feeCalculator(backend txBuilderBackend) (*fees.Calculator, error) {
 
 	var feeCalculator *fees.Calculator
 	if !isEActive {
-		feeCalculator = fees.NewStaticCalculator(cfg)
+		feeCalculator = fees.NewStaticCalculator(cfg, nil)
 	} else {
 		feeCfg := config.GetDynamicFeesConfig(isEActive)
 		nextChainTime := executor.NextBlockTime(chainTime, backend.Clock())

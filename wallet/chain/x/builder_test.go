@@ -132,14 +132,14 @@ func TestBaseTx(t *testing.T) {
 	}
 
 	{ // Pre E-Upgrade
-		feeCalc := fees.NewStaticCalculator(testStaticConfig)
+		feeCalc := fees.NewStaticCalculator(testStaticConfig, nil)
 		utx, err := b.NewBaseTx(
 			outputsToMove,
 			feeCalc,
 		)
 		require.NoError(err)
 
-		fc := fees.NewStaticCalculator(testStaticConfig)
+		fc := fees.NewStaticCalculator(testStaticConfig, nil)
 		require.NoError(utx.Visit(fc))
 		require.Equal(testContext.BaseTxFee, fc.Fee)
 
@@ -271,7 +271,7 @@ func TestCreateAssetTx(t *testing.T) {
 
 	{
 		// Pre E-Upgrade
-		feeCalc := fees.NewStaticCalculator(testStaticConfig)
+		feeCalc := fees.NewStaticCalculator(testStaticConfig, nil)
 
 		utx, err := b.NewCreateAssetTx(
 			assetName,
@@ -282,7 +282,7 @@ func TestCreateAssetTx(t *testing.T) {
 		)
 		require.NoError(err)
 
-		fc := fees.NewStaticCalculator(testStaticConfig)
+		fc := fees.NewStaticCalculator(testStaticConfig, nil)
 		require.NoError(utx.Visit(fc))
 		require.Equal(99*units.MilliAvax, fc.Fee)
 
@@ -367,7 +367,7 @@ func TestMintNFTOperation(t *testing.T) {
 
 	{
 		// Pre E-Upgrade
-		feeCalc := fees.NewStaticCalculator(testStaticConfig)
+		feeCalc := fees.NewStaticCalculator(testStaticConfig, nil)
 
 		utx, err := b.NewOperationTxMintNFT(
 			nftAssetID,
@@ -377,7 +377,7 @@ func TestMintNFTOperation(t *testing.T) {
 		)
 		require.NoError(err)
 
-		fc := fees.NewStaticCalculator(testStaticConfig)
+		fc := fees.NewStaticCalculator(testStaticConfig, nil)
 		require.NoError(utx.Visit(fc))
 		require.Equal(testContext.BaseTxFee, fc.Fee)
 
@@ -466,7 +466,7 @@ func TestMintFTOperation(t *testing.T) {
 
 	{
 		// Pre E-Upgrade
-		feeCalc := fees.NewStaticCalculator(testStaticConfig)
+		feeCalc := fees.NewStaticCalculator(testStaticConfig, nil)
 
 		utx, err := b.NewOperationTxMintFT(
 			outputs,
@@ -474,7 +474,7 @@ func TestMintFTOperation(t *testing.T) {
 		)
 		require.NoError(err)
 
-		fc := fees.NewStaticCalculator(testStaticConfig)
+		fc := fees.NewStaticCalculator(testStaticConfig, nil)
 		require.NoError(utx.Visit(fc))
 		require.Equal(testContext.BaseTxFee, fc.Fee)
 
@@ -559,7 +559,7 @@ func TestMintPropertyOperation(t *testing.T) {
 
 	{
 		// Pre E-Upgrade
-		feeCalc := fees.NewStaticCalculator(testStaticConfig)
+		feeCalc := fees.NewStaticCalculator(testStaticConfig, nil)
 
 		utx, err := b.NewOperationTxMintProperty(
 			propertyAssetID,
@@ -568,7 +568,7 @@ func TestMintPropertyOperation(t *testing.T) {
 		)
 		require.NoError(err)
 
-		fc := fees.NewStaticCalculator(testStaticConfig)
+		fc := fees.NewStaticCalculator(testStaticConfig, nil)
 		require.NoError(utx.Visit(fc))
 		require.Equal(testContext.BaseTxFee, fc.Fee)
 
@@ -646,7 +646,7 @@ func TestBurnPropertyOperation(t *testing.T) {
 
 	{
 		// Pre E-Upgrade
-		feeCalc := fees.NewStaticCalculator(testStaticConfig)
+		feeCalc := fees.NewStaticCalculator(testStaticConfig, nil)
 
 		utx, err := b.NewOperationTxBurnProperty(
 			propertyAssetID,
@@ -654,7 +654,7 @@ func TestBurnPropertyOperation(t *testing.T) {
 		)
 		require.NoError(err)
 
-		fc := fees.NewStaticCalculator(testStaticConfig)
+		fc := fees.NewStaticCalculator(testStaticConfig, nil)
 		require.NoError(utx.Visit(fc))
 		require.Equal(testContext.BaseTxFee, fc.Fee)
 
@@ -746,7 +746,7 @@ func TestImportTx(t *testing.T) {
 	}
 
 	{ // Pre E-Upgrade
-		feeCalc := fees.NewStaticCalculator(testStaticConfig)
+		feeCalc := fees.NewStaticCalculator(testStaticConfig, nil)
 		utx, err := b.NewImportTx(
 			sourceChainID,
 			importTo,
@@ -754,7 +754,7 @@ func TestImportTx(t *testing.T) {
 		)
 		require.NoError(err)
 
-		fc := fees.NewStaticCalculator(testStaticConfig)
+		fc := fees.NewStaticCalculator(testStaticConfig, nil)
 		require.NoError(utx.Visit(fc))
 		require.Equal(testContext.BaseTxFee, fc.Fee)
 
@@ -847,7 +847,7 @@ func TestExportTx(t *testing.T) {
 	}
 
 	{ // Pre E-Upgrade
-		feeCalc := fees.NewStaticCalculator(testStaticConfig)
+		feeCalc := fees.NewStaticCalculator(testStaticConfig, nil)
 		utx, err := b.NewExportTx(
 			subnetID,
 			exportedOutputs,
@@ -855,7 +855,7 @@ func TestExportTx(t *testing.T) {
 		)
 		require.NoError(err)
 
-		fc := fees.NewStaticCalculator(testStaticConfig)
+		fc := fees.NewStaticCalculator(testStaticConfig, nil)
 		require.NoError(utx.Visit(fc))
 		require.Equal(testContext.BaseTxFee, fc.Fee)
 
