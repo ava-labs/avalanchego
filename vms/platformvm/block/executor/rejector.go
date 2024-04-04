@@ -113,12 +113,7 @@ func (r *rejector) rejectBlock(b block.Block, blockType string) error {
 		// We recheck only the fees, withouth re-validating the whole transaction.
 		feeManager.ResetComplexity()
 
-		var feeCalculator *fees.Calculator
-		if !isEActive {
-			feeCalculator = fees.NewStaticCalculator(cfg, currentTimestamp, tx.Creds)
-		} else {
-			feeCalculator = fees.NewDynamicCalculator(cfg, feeManager, feesCfg.BlockMaxComplexity, tx.Creds)
-		}
+		feeCalculator := fees.NewDynamicCalculator(cfg, currentTimestamp, feeManager, feesCfg.BlockMaxComplexity, tx.Creds)
 
 		if err := tx.Unsigned.Visit(feeCalculator); err != nil {
 			r.ctx.Log.Info(

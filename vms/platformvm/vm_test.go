@@ -396,16 +396,12 @@ func TestGenesis(t *testing.T) {
 				feeCalc *fees.Calculator
 			)
 
-			if !vm.IsEActivated(chainTime) {
-				feeCalc = fees.NewStaticCalculator(&vm.Config, chainTime, testSubnet1.Creds)
-			} else {
-				feeRates, err := vm.state.GetFeeRates()
-				require.NoError(err)
+			feeRates, err := vm.state.GetFeeRates()
+			require.NoError(err)
 
-				feeCfg := config.GetDynamicFeesConfig(vm.Config.IsEActivated(chainTime))
-				feeMan := commonfees.NewManager(feeRates)
-				feeCalc = fees.NewDynamicCalculator(&vm.Config, feeMan, feeCfg.BlockMaxComplexity, testSubnet1.Creds)
-			}
+			feeCfg := config.GetDynamicFeesConfig(vm.Config.IsEActivated(chainTime))
+			feeMan := commonfees.NewManager(feeRates)
+			feeCalc = fees.NewDynamicCalculator(&vm.Config, chainTime, feeMan, feeCfg.BlockMaxComplexity, testSubnet1.Creds)
 
 			require.NoError(testSubnet1.Unsigned.Visit(feeCalc))
 			require.Equal(uint64(utxo.Amount)-feeCalc.Fee, out.Amount())
@@ -2386,16 +2382,12 @@ func TestBaseTx(t *testing.T) {
 		feeCalc *fees.Calculator
 	)
 
-	if !vm.IsEActivated(chainTime) {
-		feeCalc = fees.NewStaticCalculator(&vm.Config, chainTime, baseTx.Creds)
-	} else {
-		feeRates, err := vm.state.GetFeeRates()
-		require.NoError(err)
+	feeRates, err := vm.state.GetFeeRates()
+	require.NoError(err)
 
-		feeCfg := config.GetDynamicFeesConfig(vm.Config.IsEActivated(chainTime))
-		feeMan := commonfees.NewManager(feeRates)
-		feeCalc = fees.NewDynamicCalculator(&vm.Config, feeMan, feeCfg.BlockMaxComplexity, baseTx.Creds)
-	}
+	feeCfg := config.GetDynamicFeesConfig(vm.Config.IsEActivated(chainTime))
+	feeMan := commonfees.NewManager(feeRates)
+	feeCalc = fees.NewDynamicCalculator(&vm.Config, chainTime, feeMan, feeCfg.BlockMaxComplexity, baseTx.Creds)
 
 	require.NoError(baseTx.Unsigned.Visit(feeCalc))
 	require.Equal(feeCalc.Fee, totalInputAmt-totalOutputAmt)

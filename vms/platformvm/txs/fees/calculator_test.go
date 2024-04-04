@@ -925,7 +925,7 @@ func TestTxFees(t *testing.T) {
 			if !cfg.IsEActivated(chainTime) {
 				fc = NewStaticCalculator(cfg, chainTime, sTx.Creds)
 			} else {
-				fc = NewDynamicCalculator(cfg, fees.NewManager(testFeeRates), maxComplexity, sTx.Creds)
+				fc = NewDynamicCalculator(cfg, chainTime, fees.NewManager(testFeeRates), maxComplexity, sTx.Creds)
 			}
 
 			err := uTx.Visit(fc)

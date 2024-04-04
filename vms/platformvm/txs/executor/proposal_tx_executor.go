@@ -117,6 +117,7 @@ func (e *ProposalTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 
 	onAbortOuts, err := verifyAddValidatorTx(
 		e.Backend,
+		e.BlkFeeManager,
 		e.OnCommitState,
 		e.Tx,
 		tx,
@@ -212,6 +213,7 @@ func (e *ProposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 
 	onAbortOuts, err := verifyAddDelegatorTx(
 		e.Backend,
+		e.BlkFeeManager,
 		e.OnCommitState,
 		e.Tx,
 		tx,

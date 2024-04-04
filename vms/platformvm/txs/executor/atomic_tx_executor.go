@@ -21,6 +21,7 @@ var _ txs.Visitor = (*AtomicTxExecutor)(nil)
 type AtomicTxExecutor struct {
 	// inputs, to be filled before visitor methods are called
 	*Backend
+	BlkFeeManager *commonfees.Manager
 	ParentID      ids.ID
 	StateVersions state.Versions
 	Tx            *txs.Tx
@@ -104,7 +105,7 @@ func (e *AtomicTxExecutor) atomicTx(tx txs.UnsignedTx) error {
 	feesCfg := config.GetDynamicFeesConfig(false /*isEActive*/)
 	executor := StandardTxExecutor{
 		Backend:            e.Backend,
-		BlkFeeManager:      commonfees.NewManager(feesCfg.InitialFeeRate),
+		BlkFeeManager:      e.BlkFeeManager,
 		BlockMaxComplexity: feesCfg.BlockMaxComplexity,
 		State:              e.OnAccept,
 		Tx:                 e.Tx,

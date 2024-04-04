@@ -506,21 +506,17 @@ func (b *Builder) feeCalculator() (*fees.Calculator, error) {
 	)
 
 	var feeCalculator *fees.Calculator
-	if !isEActive {
-		feeCalculator = fees.NewStaticCalculator(b.cfg, chainTime, nil)
-	} else {
-		nextChainTime, _, err := state.NextBlockTime(b.state, b.clk)
-		if err != nil {
-			return nil, fmt.Errorf("failed calculating next block time: %w", err)
-		}
-
-		feeManager, err := fees.UpdatedFeeManager(b.state, b.cfg, chainTime, nextChainTime)
-		if err != nil {
-			return nil, err
-		}
-
-		feeCfg := config.GetDynamicFeesConfig(isEActive)
-		feeCalculator = fees.NewDynamicCalculator(b.cfg, feeManager, feeCfg.BlockMaxComplexity, nil)
+	nextChainTime, _, err := state.NextBlockTime(b.state, b.clk)
+	if err != nil {
+		return nil, fmt.Errorf("failed calculating next block time: %w", err)
 	}
+
+	feeManager, err := fees.UpdatedFeeManager(b.state, b.cfg, chainTime, nextChainTime)
+	if err != nil {
+		return nil, err
+	}
+
+	feeCfg := config.GetDynamicFeesConfig(isEActive)
+	feeCalculator = fees.NewDynamicCalculator(b.cfg, chainTime, feeManager, feeCfg.BlockMaxComplexity, nil)
 	return feeCalculator, nil
 }

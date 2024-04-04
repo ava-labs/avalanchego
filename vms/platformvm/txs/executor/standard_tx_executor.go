@@ -75,12 +75,7 @@ func (e *StandardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 	}
 
 	// Verify the flowcheck
-	var feeCalculator *fees.Calculator
-	if !isEActive {
-		feeCalculator = fees.NewStaticCalculator(e.Backend.Config, e.State.GetTimestamp(), e.Tx.Creds)
-	} else {
-		feeCalculator = fees.NewDynamicCalculator(e.Backend.Config, e.BlkFeeManager, e.BlockMaxComplexity, e.Tx.Creds)
-	}
+	feeCalculator := fees.NewDynamicCalculator(e.Backend.Config, currentTimestamp, e.BlkFeeManager, e.BlockMaxComplexity, e.Tx.Creds)
 
 	if err := tx.Visit(feeCalculator); err != nil {
 		return err
@@ -140,12 +135,7 @@ func (e *StandardTxExecutor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 	}
 
 	// Verify the flowcheck
-	var feeCalculator *fees.Calculator
-	if !isEActive {
-		feeCalculator = fees.NewStaticCalculator(e.Backend.Config, e.State.GetTimestamp(), e.Tx.Creds)
-	} else {
-		feeCalculator = fees.NewDynamicCalculator(e.Backend.Config, e.BlkFeeManager, e.BlockMaxComplexity, e.Tx.Creds)
-	}
+	feeCalculator := fees.NewDynamicCalculator(e.Backend.Config, e.State.GetTimestamp(), e.BlkFeeManager, e.BlockMaxComplexity, e.Tx.Creds)
 
 	if err := tx.Visit(feeCalculator); err != nil {
 		return err
@@ -240,12 +230,7 @@ func (e *StandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 		copy(ins[len(tx.Ins):], tx.ImportedInputs)
 
 		// Verify the flowcheck
-		var feeCalculator *fees.Calculator
-		if !isEActive {
-			feeCalculator = fees.NewStaticCalculator(e.Backend.Config, e.State.GetTimestamp(), e.Tx.Creds)
-		} else {
-			feeCalculator = fees.NewDynamicCalculator(e.Backend.Config, e.BlkFeeManager, e.BlockMaxComplexity, e.Tx.Creds)
-		}
+		feeCalculator := fees.NewDynamicCalculator(e.Backend.Config, e.State.GetTimestamp(), e.BlkFeeManager, e.BlockMaxComplexity, e.Tx.Creds)
 
 		if err := tx.Visit(feeCalculator); err != nil {
 			return err
@@ -312,12 +297,7 @@ func (e *StandardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 	}
 
 	// Verify the flowcheck
-	var feeCalculator *fees.Calculator
-	if !isEActive {
-		feeCalculator = fees.NewStaticCalculator(e.Backend.Config, e.State.GetTimestamp(), e.Tx.Creds)
-	} else {
-		feeCalculator = fees.NewDynamicCalculator(e.Backend.Config, e.BlkFeeManager, e.BlockMaxComplexity, e.Tx.Creds)
-	}
+	feeCalculator := fees.NewDynamicCalculator(e.Backend.Config, e.State.GetTimestamp(), e.BlkFeeManager, e.BlockMaxComplexity, e.Tx.Creds)
 
 	if err := tx.Visit(feeCalculator); err != nil {
 		return err
@@ -398,6 +378,7 @@ func (e *StandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 
 	if _, err := verifyAddValidatorTx(
 		e.Backend,
+		e.BlkFeeManager,
 		e.State,
 		e.Tx,
 		tx,
@@ -451,6 +432,7 @@ func (e *StandardTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 func (e *StandardTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 	if _, err := verifyAddDelegatorTx(
 		e.Backend,
+		e.BlkFeeManager,
 		e.State,
 		e.Tx,
 		tx,
@@ -526,12 +508,7 @@ func (e *StandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 		return err
 	}
 
-	var feeCalculator *fees.Calculator
-	if !isEActive {
-		feeCalculator = fees.NewStaticCalculator(e.Backend.Config, e.State.GetTimestamp(), e.Tx.Creds)
-	} else {
-		feeCalculator = fees.NewDynamicCalculator(e.Backend.Config, e.BlkFeeManager, e.BlockMaxComplexity, e.Tx.Creds)
-	}
+	feeCalculator := fees.NewDynamicCalculator(e.Backend.Config, e.State.GetTimestamp(), e.BlkFeeManager, e.BlockMaxComplexity, e.Tx.Creds)
 	if err := tx.Visit(feeCalculator); err != nil {
 		return err
 	}
@@ -682,12 +659,7 @@ func (e *StandardTxExecutor) BaseTx(tx *txs.BaseTx) error {
 	}
 
 	// Verify the flowcheck
-	var feeCalculator *fees.Calculator
-	if !isEActive {
-		feeCalculator = fees.NewStaticCalculator(e.Backend.Config, e.State.GetTimestamp(), e.Tx.Creds)
-	} else {
-		feeCalculator = fees.NewDynamicCalculator(e.Backend.Config, e.BlkFeeManager, e.BlockMaxComplexity, e.Tx.Creds)
-	}
+	feeCalculator := fees.NewDynamicCalculator(e.Backend.Config, e.State.GetTimestamp(), e.BlkFeeManager, e.BlockMaxComplexity, e.Tx.Creds)
 
 	if err := tx.Visit(feeCalculator); err != nil {
 		return err

@@ -63,13 +63,18 @@ func NewStaticCalculator(cfg *config.Config, chainTime time.Time, creds []verify
 // NewDynamicCalculator must be used post E upgrade activation
 func NewDynamicCalculator(
 	cfg *config.Config,
+	chainTime time.Time,
 	feeManager *fees.Manager,
 	blockMaxComplexity fees.Dimensions,
 	creds []verify.Verifiable,
 ) *Calculator {
 	return &Calculator{
-		isEActive:          true,
-		config:             cfg,
+		isEActive: true,
+		config:    cfg,
+
+		// TEMP TO TUNE PARAMETERS
+		chainTime: chainTime,
+
 		feeManager:         feeManager,
 		blockMaxComplexity: blockMaxComplexity,
 		credentials:        creds,

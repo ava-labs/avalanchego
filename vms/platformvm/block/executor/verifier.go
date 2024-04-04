@@ -100,7 +100,7 @@ func (v *verifier) BanffProposalBlock(b *block.BanffProposalBlock) error {
 		onDecisionState,
 		onCommitState,
 		onAbortState,
-		feesMan.GetCumulatedComplexity(),
+		feesMan,
 		inputs,
 		atomicRequests,
 		onAcceptFunc,
@@ -169,7 +169,7 @@ func (v *verifier) ApricotProposalBlock(b *block.ApricotProposalBlock) error {
 		return err
 	}
 
-	return v.proposalBlock(b, nil, onCommitState, onAbortState, commonfees.Empty, nil, nil, nil)
+	return v.proposalBlock(b, nil, onCommitState, onAbortState, commonfees.NewManager(commonfees.Empty), nil, nil, nil)
 }
 
 func (v *verifier) ApricotStandardBlock(b *block.ApricotStandardBlock) error {
@@ -205,8 +205,10 @@ func (v *verifier) ApricotAtomicBlock(b *block.ApricotAtomicBlock) error {
 		)
 	}
 
+	feeMan := commonfees.NewManager(commonfees.Empty)
 	atomicExecutor := executor.AtomicTxExecutor{
 		Backend:       v.txExecutorBackend,
+		BlkFeeManager: feeMan,
 		ParentID:      parentID,
 		StateVersions: v,
 		Tx:            b.Tx,
@@ -234,7 +236,7 @@ func (v *verifier) ApricotAtomicBlock(b *block.ApricotAtomicBlock) error {
 
 		inputs:          atomicExecutor.Inputs,
 		timestamp:       atomicExecutor.OnAccept.GetTimestamp(),
-		blockComplexity: commonfees.Empty,
+		blockComplexity: feeMan.GetCumulatedComplexity(),
 		atomicRequests:  atomicExecutor.AtomicRequests,
 	}
 	return nil
@@ -381,7 +383,7 @@ func (v *verifier) proposalBlock(
 	onDecisionState state.Diff,
 	onCommitState state.Diff,
 	onAbortState state.Diff,
-	blockComplexity commonfees.Dimensions,
+	feesMan *commonfees.Manager,
 	inputs set.Set[ids.ID],
 	atomicRequests map[ids.ID]*atomic.Requests,
 	onAcceptFunc func(),
@@ -390,6 +392,7 @@ func (v *verifier) proposalBlock(
 		OnCommitState: onCommitState,
 		OnAbortState:  onAbortState,
 		Backend:       v.txExecutorBackend,
+		BlkFeeManager: feesMan,
 		Tx:            b.Tx,
 	}
 
@@ -421,7 +424,7 @@ func (v *verifier) proposalBlock(
 		// never be modified by an Apricot Abort block and the timestamp will
 		// always be the same as the Banff Proposal Block.
 		timestamp:       onAbortState.GetTimestamp(),
-		blockComplexity: blockComplexity,
+		blockComplexity: feesMan.GetCumulatedComplexity(),
 		atomicRequests:  atomicRequests,
 	}
 	return nil

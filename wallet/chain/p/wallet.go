@@ -629,13 +629,9 @@ func (w *wallet) feeCalculator(ctx *builder.Context, options ...common.Option) (
 	}
 
 	var feeCalculator *fees.Calculator
-	if !w.isEForkActive {
-		feeCalculator = fees.NewStaticCalculator(w.staticFeesConfig, time.Time{}, nil)
-	} else {
-		feeCfg := config.GetDynamicFeesConfig(w.isEForkActive)
-		feeMan := commonfees.NewManager(w.nextFeeRates)
-		feeCalculator = fees.NewDynamicCalculator(w.staticFeesConfig, feeMan, feeCfg.BlockMaxComplexity, nil)
-	}
+	feeCfg := config.GetDynamicFeesConfig(w.isEForkActive)
+	feeMan := commonfees.NewManager(w.nextFeeRates)
+	feeCalculator = fees.NewDynamicCalculator(w.staticFeesConfig, time.Time{}, feeMan, feeCfg.BlockMaxComplexity, nil)
 	return feeCalculator, nil
 }
 
