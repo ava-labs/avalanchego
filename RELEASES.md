@@ -1,5 +1,30 @@
 # Release Notes
 
+## [v1.11.4](https://github.com/ava-labs/avalanchego/releases/tag/v1.11.4)
+
+This version is backwards compatible to [v1.11.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.11.0). It is optional, but encouraged.
+
+The plugin version is unchanged at `35` and is compatible with version `v1.11.3`.
+
+### APIs
+
+- Removed:
+  - queue.NewWithMissing("block") metrics
+
+### Fixes
+
+- 
+
+### What's Changed
+
+- 
+
+### New Contributors
+
+- 
+
+**Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.11.3...v1.11.4
+
 ## [v1.11.3](https://github.com/ava-labs/avalanchego/releases/tag/v1.11.3)
 
 This version is backwards compatible to [v1.11.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.11.0). It is optional, but encouraged.

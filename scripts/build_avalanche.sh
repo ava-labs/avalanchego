@@ -27,6 +27,7 @@ done
 # tests/antithesis/Dockerfile.node
 # tests/antithesis/Dockerfile.workload
 # Dockerfile
+# CONTRIBUTING.md
 # README.md
 # go.mod
 go_version_minimum="1.21.9"
