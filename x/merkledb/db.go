@@ -365,6 +365,11 @@ func (db *merkleDB) rebuild(ctx context.Context, cacheSize int) error {
 	if err := view.commitToDB(ctx); err != nil {
 		return err
 	}
+	// If the DB is empty, commitToDB may not have repaired the rootKey index.
+	// So, we explicitly repair that here.
+	if err := db.writeRootKey(); err != nil {
+		return err
+	}
 	return db.Compact(nil, nil)
 }
 
@@ -979,7 +984,10 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *view) error
 	// Update root in database.
 	db.root = changes.rootChange.after
 	db.rootID = changes.rootID
+	return db.writeRootKey()
+}
 
+func (db *merkleDB) writeRootKey() error {
 	if db.root.IsNothing() {
 		return db.baseDB.Delete(rootDBKey)
 	}
