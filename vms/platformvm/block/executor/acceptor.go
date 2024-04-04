@@ -80,6 +80,12 @@ func (a *acceptor) ApricotAtomicBlock(b *block.ApricotAtomicBlock) error {
 	}
 
 	a.metrics.SetBlockComplexity(blkState.blockComplexity)
+	a.ctx.Log.Info(
+		"BLOCK COMPLEXITY",
+		zap.Uint64("blkHeight", b.Height()),
+		zap.Int64("blkTimestamp", blkState.timestamp.Unix()),
+		zap.Any("consumedUnits", blkState.blockComplexity),
+	)
 
 	// Update the state to reflect the changes made in [onAcceptState].
 	if err := blkState.onAcceptState.Apply(a.state); err != nil {
@@ -139,6 +145,12 @@ func (a *acceptor) optionBlock(b block.Block, blockType string) error {
 	}
 
 	a.metrics.SetBlockComplexity(parentState.blockComplexity)
+	a.ctx.Log.Info(
+		"BLOCK COMPLEXITY",
+		zap.Uint64("blkHeight", b.Height()),
+		zap.Int64("blkTimestamp", parentState.timestamp.Unix()),
+		zap.Any("consumedUnits", parentState.blockComplexity),
+	)
 
 	if err := a.commonAccept(b); err != nil {
 		return err
@@ -157,6 +169,12 @@ func (a *acceptor) optionBlock(b block.Block, blockType string) error {
 
 	// we set option complexity at its parent block's one.
 	a.metrics.SetBlockComplexity(parentState.blockComplexity)
+	a.ctx.Log.Info(
+		"BLOCK COMPLEXITY",
+		zap.Uint64("blkHeight", b.Height()),
+		zap.Int64("blkTimestamp", parentState.timestamp.Unix()),
+		zap.Any("consumedUnits", blkState.blockComplexity),
+	)
 
 	if err := blkState.onAcceptState.Apply(a.state); err != nil {
 		return err
@@ -237,6 +255,12 @@ func (a *acceptor) standardBlock(b block.Block, blockType string) error {
 	}
 
 	a.metrics.SetBlockComplexity(blkState.blockComplexity)
+	a.ctx.Log.Info(
+		"BLOCK COMPLEXITY",
+		zap.Uint64("blkHeight", b.Height()),
+		zap.Int64("blkTimestamp", blkState.timestamp.Unix()),
+		zap.Any("consumedUnits", blkState.blockComplexity),
+	)
 
 	// Update the state to reflect the changes made in [onAcceptState].
 	if err := blkState.onAcceptState.Apply(a.state); err != nil {
