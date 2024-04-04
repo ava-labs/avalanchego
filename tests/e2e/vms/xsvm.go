@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm"
+	"github.com/ava-labs/avalanchego/vms/example/xsvm/api"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/cmd/issue/export"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/cmd/issue/importtx"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/cmd/issue/transfer"
@@ -26,6 +27,8 @@ import (
 var (
 	subnetAName = "xsvm-a"
 	subnetBName = "xsvm-b"
+
+	numTriggerTxs = 2 // Number of txs needed to activate the proposer VM fork
 )
 
 func XSVMSubnets(nodes ...*tmpnet.Node) []*tmpnet.Subnet {
@@ -55,6 +58,16 @@ var _ = ginkgo.Describe("[XSVM]", func() {
 		destinationKey, err := secp256k1.NewPrivateKey()
 		require.NoError(err)
 
+		ginkgo.By("checking that the funded key has sufficient funds for the export")
+		sourceClient := api.NewClient(apiNode.URI, sourceChain.ChainID.String())
+		initialSourcedBalance, err := sourceClient.Balance(
+			e2e.DefaultContext(),
+			sourceChain.PreFundedKey.Address(),
+			sourceChain.ChainID,
+		)
+		require.NoError(err)
+		require.GreaterOrEqual(initialSourcedBalance, units.Schmeckle)
+
 		ginkgo.By(fmt.Sprintf("exporting from chain %s on subnet %s", sourceChain.ChainID, sourceSubnet.SubnetID))
 		exportTxStatus, err := export.Export(
 			e2e.DefaultContext(),
@@ -74,7 +87,7 @@ var _ = ginkgo.Describe("[XSVM]", func() {
 			destinationChain.ChainID, destinationSubnet.SubnetID))
 		recipientKey, err := secp256k1.NewPrivateKey()
 		require.NoError(err)
-		for i := 0; i < 3; i++ {
+		for i := 0; i < numTriggerTxs; i++ {
 			transferTxStatus, err := transfer.Transfer(
 				e2e.DefaultContext(),
 				&transfer.Config{
@@ -108,9 +121,17 @@ var _ = ginkgo.Describe("[XSVM]", func() {
 		)
 		require.NoError(err)
 		tests.Outf(" issued transaction with ID: %s\n", importTxStatus.TxID)
-		tests.Outf(" waiting for transaction to be accepted...\n")
 
-		// TODO(marun) Verify the balances on both chains
+		ginkgo.By("checking that the balance of the source key has decreased")
+		sourceBalance, err := sourceClient.Balance(e2e.DefaultContext(), sourceChain.PreFundedKey.Address(), sourceChain.ChainID)
+		require.NoError(err)
+		require.GreaterOrEqual(initialSourcedBalance-units.Schmeckle, sourceBalance)
+
+		ginkgo.By("checking that the balance of the destination key is non-zero")
+		destinationClient := api.NewClient(apiNode.URI, destinationChain.ChainID.String())
+		destinationBalance, err := destinationClient.Balance(e2e.DefaultContext(), destinationKey.Address(), destinationChain.ChainID)
+		require.NoError(err)
+		require.NotZero(destinationBalance)
 	})
 })
 
