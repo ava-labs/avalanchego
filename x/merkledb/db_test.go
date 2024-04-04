@@ -1287,3 +1287,31 @@ func TestGetChangeProofEmptyRootID(t *testing.T) {
 	)
 	require.ErrorIs(err, ErrEmptyProof)
 }
+
+func TestSimpleCrashRecovery(t *testing.T) {
+	require := require.New(t)
+
+	baseDB := memdb.New()
+	merkleDB, err := newDatabase(
+		context.Background(),
+		baseDB,
+		newDefaultConfig(),
+		&mockMetrics{},
+	)
+	require.NoError(err)
+
+	merkleDBBatch := merkleDB.NewBatch()
+	require.NoError(merkleDBBatch.Put([]byte("is this"), nil))
+	require.NoError(merkleDBBatch.Put([]byte("expected?"), nil))
+	require.NoError(merkleDBBatch.Write())
+
+	// Do not `.Close()` the database to simulate a process crash.
+
+	_, err = newDatabase(
+		context.Background(),
+		baseDB,
+		newDefaultConfig(),
+		&mockMetrics{},
+	)
+	require.NoError(err)
+}
