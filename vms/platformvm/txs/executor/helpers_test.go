@@ -175,7 +175,7 @@ func newEnvironment(t *testing.T, f fork) *environment {
 		backend:        backend,
 	}
 
-	addSubnet(t, env, txBuilder)
+	addSubnet(t, env)
 
 	t.Cleanup(func() {
 		env.ctx.Lock.Lock()
@@ -204,16 +204,12 @@ func newEnvironment(t *testing.T, f fork) *environment {
 	return env
 }
 
-func addSubnet(
-	t *testing.T,
-	env *environment,
-	txBuilder *txstest.Builder,
-) {
+func addSubnet(t *testing.T, env *environment) {
 	require := require.New(t)
 
 	// Create a subnet
 	var err error
-	testSubnet1, err = txBuilder.NewCreateSubnetTx(
+	testSubnet1, err = env.txBuilder.NewCreateSubnetTx(
 		&secp256k1fx.OutputOwners{
 			Threshold: 2,
 			Addrs: []ids.ShortID{
