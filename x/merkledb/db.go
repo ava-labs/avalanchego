@@ -1166,12 +1166,11 @@ func (db *merkleDB) invalidateChildrenExcept(exception *view) {
 // Otherwise leave [db.root] as Nothing.
 func (db *merkleDB) initializeRoot() error {
 	rootKeyBytes, err := db.baseDB.Get(rootDBKey)
+	if errors.Is(err, database.ErrNotFound) {
+		return nil // Root isn't on disk.
+	}
 	if err != nil {
-		if !errors.Is(err, database.ErrNotFound) {
-			return err
-		}
-		// Root isn't on disk.
-		return nil
+		return err
 	}
 
 	// Root is on disk.
@@ -1181,8 +1180,7 @@ func (db *merkleDB) initializeRoot() error {
 	}
 
 	// First, see if root is an intermediate node.
-	var root *node
-	root, err = db.getEditableNode(rootKey, false /* hasValue */)
+	root, err := db.getEditableNode(rootKey, false /* hasValue */)
 	if err != nil {
 		if !errors.Is(err, database.ErrNotFound) {
 			return err
