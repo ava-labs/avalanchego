@@ -13,7 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
+	"github.com/ava-labs/avalanchego/utils/linked"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -39,7 +39,7 @@ func newInboundMsgByteThrottler(
 			nodeToVdrBytesUsed:     make(map[ids.NodeID]uint64),
 			nodeToAtLargeBytesUsed: make(map[ids.NodeID]uint64),
 		},
-		waitingToAcquire:   linkedhashmap.New[uint64, *msgMetadata](),
+		waitingToAcquire:   linked.NewHashmap[uint64, *msgMetadata](),
 		nodeToWaitingMsgID: make(map[ids.NodeID]uint64),
 	}
 	return t, t.metrics.initialize(namespace, registerer)
@@ -67,7 +67,7 @@ type inboundMsgByteThrottler struct {
 	// Node ID --> Msg ID for a message this node is waiting to acquire
 	nodeToWaitingMsgID map[ids.NodeID]uint64
 	// Msg ID --> *msgMetadata
-	waitingToAcquire linkedhashmap.LinkedHashmap[uint64, *msgMetadata]
+	waitingToAcquire *linked.Hashmap[uint64, *msgMetadata]
 	// Invariant: The node is only waiting on a single message at a time
 	//
 	// Invariant: waitingToAcquire.Get(nodeToWaitingMsgIDs[nodeID])

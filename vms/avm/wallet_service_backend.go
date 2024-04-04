@@ -10,7 +10,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
+	"github.com/ava-labs/avalanchego/utils/linked"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -31,7 +31,7 @@ func NewWalletServiceBackend(vm *VM) *walletServiceBackend {
 	return &walletServiceBackend{
 		ctx:        backendCtx,
 		vm:         vm,
-		pendingTxs: linkedhashmap.New[ids.ID, *txs.Tx](),
+		pendingTxs: linked.NewHashmap[ids.ID, *txs.Tx](),
 		utxos:      make([]*avax.UTXO, 0),
 	}
 }
@@ -39,7 +39,7 @@ func NewWalletServiceBackend(vm *VM) *walletServiceBackend {
 type walletServiceBackend struct {
 	ctx        *builder.Context
 	vm         *VM
-	pendingTxs linkedhashmap.LinkedHashmap[ids.ID, *txs.Tx]
+	pendingTxs *linked.Hashmap[ids.ID, *txs.Tx]
 	utxos      []*avax.UTXO
 
 	addrs set.Set[ids.ShortID]
