@@ -8,10 +8,17 @@ The plugin version is unchanged at `35` and is compatible with version `v1.11.3`
 
 ### APIs
 
-- Removed:
-  - queue.NewWithMissing("block") metrics
-  - `eta_fetching_complete`
-
+- Removed metrics for each chainID:
+  - `avalanche_{chainID}_bs_eta_fetching_complete`
+  - `avalanche_{chainID}_block_eta_execution_complete`
+  - `avalanche_{chainID}_block_jobs_cache_get_count`
+  - `avalanche_{chainID}_block_jobs_cache_get_sum`
+  - `avalanche_{chainID}_block_jobs_cache_hit`
+  - `avalanche_{chainID}_block_jobs_cache_len`
+  - `avalanche_{chainID}_block_jobs_cache_miss`
+  - `avalanche_{chainID}_block_jobs_cache_portion_filled`
+  - `avalanche_{chainID}_block_jobs_cache_put_count`
+  - `avalanche_{chainID}_block_jobs_cache_put_sum`
 - Added finer grained tracing of merkledb trie construction and hashing
   - renamed `MerkleDB.view.calculateNodeIDs` to `MerkleDB.view.applyValueChanges`
   - Added `MerkleDB.view.calculateNodeChanges`
