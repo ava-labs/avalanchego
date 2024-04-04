@@ -11,7 +11,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
-	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
+	"github.com/ava-labs/avalanchego/utils/linked"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -34,7 +34,7 @@ type metrics struct {
 	// processingBlocks keeps track of the [processingStart] that each block was
 	// issued into the consensus instance. This is used to calculate the amount
 	// of time to accept or reject the block.
-	processingBlocks linkedhashmap.LinkedHashmap[ids.ID, processingStart]
+	processingBlocks *linked.Hashmap[ids.ID, processingStart]
 
 	// numProcessing keeps track of the number of processing blocks
 	numProcessing prometheus.Gauge
@@ -90,7 +90,7 @@ func newMetrics(
 			Help:      "timestamp of the last accepted block in unix seconds",
 		}),
 
-		processingBlocks: linkedhashmap.New[ids.ID, processingStart](),
+		processingBlocks: linked.NewHashmap[ids.ID, processingStart](),
 
 		// e.g.,
 		// "avalanche_X_blks_processing" reports how many blocks are currently processing
