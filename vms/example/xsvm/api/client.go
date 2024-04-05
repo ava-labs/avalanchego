@@ -5,7 +5,6 @@ package api
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -19,8 +18,6 @@ import (
 )
 
 const defaultPollingInterval = 50 * time.Millisecond
-
-var errNotAccepted = errors.New("failed to see the tx accepted before timeout")
 
 // Client defines the xsvm API client.
 type Client interface {
@@ -67,12 +64,6 @@ type Client interface {
 		txID ids.ID,
 		options ...rpc.Option,
 	) (*warp.UnsignedMessage, []byte, error)
-	WaitForAcceptance(
-		ctx context.Context,
-		address ids.ShortID,
-		nonce uint64,
-		options ...rpc.Option,
-	) error
 }
 
 func NewClient(uri, chain string) Client {
@@ -254,8 +245,9 @@ func (c *client) Message(
 	return resp.Message, resp.Signature, resp.Message.Initialize()
 }
 
-func (c *client) WaitForAcceptance(
+func WaitForAcceptance(
 	ctx context.Context,
+	c Client,
 	address ids.ShortID,
 	nonce uint64,
 	options ...rpc.Option,
@@ -268,14 +260,14 @@ func (c *client) WaitForAcceptance(
 			return err
 		}
 		if currentNonce > nonce {
-			// The nonce increasing indicates the acceptance of a
-			// transaction issued with the original nonce
+			// The nonce increasing indicates the acceptance of a transaction
+			// issued with the specified nonce.
 			return nil
 		}
 
 		select {
 		case <-ctx.Done():
-			return errNotAccepted
+			return ctx.Err()
 		case <-ticker.C:
 		}
 	}

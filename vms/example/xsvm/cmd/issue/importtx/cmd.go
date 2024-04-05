@@ -143,7 +143,7 @@ func Import(ctx context.Context, config *Config) (*tx.TxIssueStatus, error) {
 		return nil, err
 	}
 
-	err = client.WaitForAcceptance(ctx, address, nonce)
+	err = api.WaitForAcceptance(ctx, client, address, nonce)
 	if err != nil {
 		return nil, err
 	}
