@@ -74,8 +74,7 @@ func Transfer(ctx context.Context, config *Config) (*tx.TxIssueStatus, error) {
 		return nil, err
 	}
 
-	err = api.WaitForAcceptance(ctx, client, address, nonce)
-	if err != nil {
+	if err := api.WaitForAcceptance(ctx, client, address, nonce); err != nil {
 		return nil, err
 	}
 
