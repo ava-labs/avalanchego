@@ -63,12 +63,23 @@ func (lh *Hashmap[K, V]) Get(key K) (V, bool) {
 func (lh *Hashmap[K, V]) Delete(key K) bool {
 	e, ok := lh.entryMap[key]
 	if ok {
-		lh.entryList.Remove(e)
-		delete(lh.entryMap, key)
-		e.Value = keyValue[K, V]{} // Free the key value pair
-		lh.freeList = append(lh.freeList, e)
+		lh.remove(e)
 	}
 	return ok
+}
+
+func (lh *Hashmap[K, V]) Clear() {
+	for _, e := range lh.entryMap {
+		lh.remove(e)
+	}
+}
+
+// remove assumes that [e] is currently in the Hashmap.
+func (lh *Hashmap[K, V]) remove(e *ListElement[keyValue[K, V]]) {
+	delete(lh.entryMap, e.Value.key)
+	lh.entryList.Remove(e)
+	e.Value = keyValue[K, V]{} // Free the key value pair
+	lh.freeList = append(lh.freeList, e)
 }
 
 func (lh *Hashmap[K, V]) Len() int {
