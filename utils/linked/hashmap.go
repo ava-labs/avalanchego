@@ -20,10 +20,19 @@ type Hashmap[K comparable, V any] struct {
 }
 
 func NewHashmap[K comparable, V any]() *Hashmap[K, V] {
-	return &Hashmap[K, V]{
-		entryMap:  make(map[K]*ListElement[keyValue[K, V]]),
+	return NewHashmapWithSize[K, V](0)
+}
+
+func NewHashmapWithSize[K comparable, V any](initialSize int) *Hashmap[K, V] {
+	lh := &Hashmap[K, V]{
+		entryMap:  make(map[K]*ListElement[keyValue[K, V]], initialSize),
 		entryList: NewList[keyValue[K, V]](),
+		freeList:  make([]*ListElement[keyValue[K, V]], initialSize),
 	}
+	for i := range lh.freeList {
+		lh.freeList[i] = &ListElement[keyValue[K, V]]{}
+	}
+	return lh
 }
 
 func (lh *Hashmap[K, V]) Put(key K, value V) {
