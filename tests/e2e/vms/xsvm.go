@@ -162,7 +162,7 @@ func newXSVMSubnet(name string, nodes ...*tmpnet.Node) *tmpnet.Subnet {
 		Name: name,
 		Chains: []*tmpnet.Chain{
 			{
-				VMID:         xsvm.VMID,
+				VMID:         xsvm.ID,
 				Genesis:      genesisBytes,
 				PreFundedKey: key,
 			},
