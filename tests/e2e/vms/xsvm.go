@@ -6,6 +6,7 @@ package vms
 import (
 	"fmt"
 	"math"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -28,7 +29,7 @@ var (
 	subnetAName = "xsvm-a"
 	subnetBName = "xsvm-b"
 
-	numTriggerTxs = 2 // Number of txs needed to activate the proposer VM fork
+	numTriggerTxs = 1 // Number of txs needed to activate the proposer VM fork
 )
 
 func XSVMSubnets(nodes ...*tmpnet.Node) []*tmpnet.Subnet {
@@ -129,9 +130,9 @@ var _ = ginkgo.Describe("[XSVM]", func() {
 
 		ginkgo.By("checking that the balance of the destination key is non-zero")
 		destinationClient := api.NewClient(apiNode.URI, destinationChain.ChainID.String())
-		destinationBalance, err := destinationClient.Balance(e2e.DefaultContext(), destinationKey.Address(), destinationChain.ChainID)
+		destinationBalance, err := destinationClient.Balance(e2e.DefaultContext(), destinationKey.Address(), sourceChain.ChainID)
 		require.NoError(err)
-		require.NotZero(destinationBalance)
+		require.Equal(units.Schmeckle, destinationBalance)
 	})
 })
 
@@ -146,7 +147,7 @@ func newXSVMSubnet(name string, nodes ...*tmpnet.Node) *tmpnet.Subnet {
 	}
 
 	genesisBytes, err := genesis.Codec.Marshal(genesis.CodecVersion, &genesis.Genesis{
-		Timestamp: 0,
+		Timestamp: time.Now().Unix(),
 		Allocations: []genesis.Allocation{
 			{
 				Address: key.Address(),
