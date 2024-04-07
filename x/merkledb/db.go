@@ -1031,8 +1031,8 @@ func (db *merkleDB) applyChanges(ctx context.Context, valueNodeBatch *valueNodeB
 	return nil
 }
 
-// commitValueChanges is a thin wrapper around [valueNodeBatch.Write()] to provide
-// tracing.
+// commitValueChanges is a thin wrapper around [valueNodeBatch.Write()] to
+// provide tracing.
 func (db *merkleDB) commitValueChanges(ctx context.Context, valueNodeBatch *valueNodeBatch) error {
 	_, span := db.infoTracer.Start(ctx, "MerkleDB.commitValueChanges")
 	defer span.End()
