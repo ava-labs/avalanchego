@@ -965,12 +965,12 @@ func (db *merkleDB) commitView(ctx context.Context, trieToCommit *view) error {
 		return nil
 	}
 
-	valueNodeBatch := db.valueNodeDB.NewBatch()
+	valueNodeBatch := db.baseDB.NewBatch()
 	if err := db.applyChanges(ctx, valueNodeBatch, changes); err != nil {
 		return err
 	}
 
-	if err := db.commitChanges(ctx, valueNodeBatch); err != nil {
+	if err := db.commitValueChanges(ctx, valueNodeBatch); err != nil {
 		return err
 	}
 
@@ -1001,7 +1001,7 @@ func (db *merkleDB) moveChildViewsToDB(trieToCommit *view) {
 // and [valueNodeBatch].
 //
 // assumes [db.lock] is held
-func (db *merkleDB) applyChanges(ctx context.Context, valueNodeBatch *valueNodeBatch, changes *changeSummary) error {
+func (db *merkleDB) applyChanges(ctx context.Context, valueNodeBatch database.KeyValueWriterDeleter, changes *changeSummary) error {
 	_, span := db.infoTracer.Start(ctx, "MerkleDB.applyChanges")
 	defer span.End()
 
@@ -1023,18 +1023,22 @@ func (db *merkleDB) applyChanges(ctx context.Context, valueNodeBatch *valueNodeB
 		}
 
 		if shouldAddValue {
-			valueNodeBatch.Put(key, nodeChange.after)
+			if err := db.valueNodeDB.Write(valueNodeBatch, key, nodeChange.after); err != nil {
+				return err
+			}
 		} else if shouldDeleteValue {
-			valueNodeBatch.Delete(key)
+			if err := db.valueNodeDB.Write(valueNodeBatch, key, nil); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
 }
 
-// commitChanges is a thin wrapper around [valueNodeBatch.Write()] to provide
-// tracing.
-func (db *merkleDB) commitChanges(ctx context.Context, valueNodeBatch *valueNodeBatch) error {
-	_, span := db.infoTracer.Start(ctx, "MerkleDB.commitChanges")
+// commitValueChanges is a thin wrapper around [valueNodeBatch.Write()] to
+// provide tracing.
+func (db *merkleDB) commitValueChanges(ctx context.Context, valueNodeBatch database.Batch) error {
+	_, span := db.infoTracer.Start(ctx, "MerkleDB.commitValueChanges")
 	defer span.End()
 
 	return valueNodeBatch.Write()
