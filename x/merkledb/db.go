@@ -965,39 +965,12 @@ func (db *merkleDB) commitView(ctx context.Context, trieToCommit *view) error {
 		return nil
 	}
 
-	currentValueNodeBatch := db.valueNodeDB.NewBatch()
-	_, nodesSpan := db.infoTracer.Start(ctx, "MerkleDB.commitView.writeNodes")
-	for key, nodeChange := range changes.nodes {
-		shouldAddIntermediate := nodeChange.after != nil && !nodeChange.after.hasValue()
-		shouldDeleteIntermediate := !shouldAddIntermediate && nodeChange.before != nil && !nodeChange.before.hasValue()
-
-		shouldAddValue := nodeChange.after != nil && nodeChange.after.hasValue()
-		shouldDeleteValue := !shouldAddValue && nodeChange.before != nil && nodeChange.before.hasValue()
-
-		if shouldAddIntermediate {
-			if err := db.intermediateNodeDB.Put(key, nodeChange.after); err != nil {
-				nodesSpan.End()
-				return err
-			}
-		} else if shouldDeleteIntermediate {
-			if err := db.intermediateNodeDB.Delete(key); err != nil {
-				nodesSpan.End()
-				return err
-			}
-		}
-
-		if shouldAddValue {
-			currentValueNodeBatch.Put(key, nodeChange.after)
-		} else if shouldDeleteValue {
-			currentValueNodeBatch.Delete(key)
-		}
+	valueNodeBatch := db.valueNodeDB.NewBatch()
+	if err := db.applyChanges(ctx, valueNodeBatch, changes); err != nil {
+		return err
 	}
-	nodesSpan.End()
 
-	_, commitSpan := db.infoTracer.Start(ctx, "MerkleDB.commitView.valueNodeDBCommit")
-	err := currentValueNodeBatch.Write()
-	commitSpan.End()
-	if err != nil {
+	if err := db.commitChanges(ctx, valueNodeBatch); err != nil {
 		return err
 	}
 
@@ -1009,8 +982,27 @@ func (db *merkleDB) commitView(ctx context.Context, trieToCommit *view) error {
 	return nil
 }
 
+// moveChildViewsToDB removes any child views from the trieToCommit and moves
+// them to the db.
+//
+// assumes [db.lock] is held
+func (db *merkleDB) moveChildViewsToDB(trieToCommit *view) {
+	trieToCommit.validityTrackingLock.Lock()
+	defer trieToCommit.validityTrackingLock.Unlock()
+
+	for _, childView := range trieToCommit.childViews {
+		childView.updateParent(db)
+		db.childViews = append(db.childViews, childView)
+	}
+	trieToCommit.childViews = make([]*view, 0, defaultPreallocationSize)
+}
+
+// applyChanges takes the [changes] and applies them to [db.intermediateNodeDB]
+// and [valueNodeBatch].
+//
+// assumes [db.lock] is held
 func (db *merkleDB) applyChanges(ctx context.Context, valueNodeBatch *valueNodeBatch, changes *changeSummary) error {
-	_, span := db.infoTracer.Start(ctx, "MerkleDB.commitView.writeNodes")
+	_, span := db.infoTracer.Start(ctx, "MerkleDB.applyChanges")
 	defer span.End()
 
 	for key, nodeChange := range changes.nodes {
@@ -1039,17 +1031,13 @@ func (db *merkleDB) applyChanges(ctx context.Context, valueNodeBatch *valueNodeB
 	return nil
 }
 
-// moveChildViewsToDB removes any child views from the trieToCommit and moves them to the db
-// assumes [db.lock] is held
-func (db *merkleDB) moveChildViewsToDB(trieToCommit *view) {
-	trieToCommit.validityTrackingLock.Lock()
-	defer trieToCommit.validityTrackingLock.Unlock()
+// commitChanges is a thin wrapper around [valueNodeBatch.Write()] to provide
+// tracing.
+func (db *merkleDB) commitChanges(ctx context.Context, valueNodeBatch *valueNodeBatch) error {
+	_, span := db.infoTracer.Start(ctx, "MerkleDB.commitChanges")
+	defer span.End()
 
-	for _, childView := range trieToCommit.childViews {
-		childView.updateParent(db)
-		db.childViews = append(db.childViews, childView)
-	}
-	trieToCommit.childViews = make([]*view, 0, defaultPreallocationSize)
+	return valueNodeBatch.Write()
 }
 
 // CommitToDB is a no-op for db since it is already in sync with itself.
