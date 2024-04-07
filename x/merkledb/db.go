@@ -970,7 +970,7 @@ func (db *merkleDB) commitView(ctx context.Context, trieToCommit *view) error {
 		return err
 	}
 
-	if err := db.commitChanges(ctx, valueNodeBatch); err != nil {
+	if err := db.commitValueChanges(ctx, valueNodeBatch); err != nil {
 		return err
 	}
 
@@ -1031,10 +1031,10 @@ func (db *merkleDB) applyChanges(ctx context.Context, valueNodeBatch *valueNodeB
 	return nil
 }
 
-// commitChanges is a thin wrapper around [valueNodeBatch.Write()] to provide
+// commitValueChanges is a thin wrapper around [valueNodeBatch.Write()] to provide
 // tracing.
-func (db *merkleDB) commitChanges(ctx context.Context, valueNodeBatch *valueNodeBatch) error {
-	_, span := db.infoTracer.Start(ctx, "MerkleDB.commitChanges")
+func (db *merkleDB) commitValueChanges(ctx context.Context, valueNodeBatch *valueNodeBatch) error {
+	_, span := db.infoTracer.Start(ctx, "MerkleDB.commitValueChanges")
 	defer span.End()
 
 	return valueNodeBatch.Write()
