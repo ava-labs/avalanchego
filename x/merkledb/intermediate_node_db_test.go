@@ -169,11 +169,11 @@ func FuzzIntermediateNodeDBConstructDBKey(f *testing.F) {
 				// for keys with tokens of size byte, no padding is added
 				require.Equal(p.Bytes(), (*constructedKey)[len(intermediateNodePrefix):])
 			case p.hasPartialByte():
-				require.Len(constructedKey, baseLength)
+				require.Len(*constructedKey, baseLength)
 				require.Equal(p.Extend(ToToken(1, tokenSize)).Bytes(), (*constructedKey)[len(intermediateNodePrefix):])
 			default:
 				// when a whole number of bytes, there is an extra padding byte
-				require.Len(constructedKey, baseLength+1)
+				require.Len(*constructedKey, baseLength+1)
 				require.Equal(p.Extend(ToToken(1, tokenSize)).Bytes(), (*constructedKey)[len(intermediateNodePrefix):])
 			}
 		}
