@@ -4,13 +4,13 @@
 package merkledb
 
 import (
-	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/maybe"
 )
 
@@ -23,9 +23,7 @@ func TestValueNodeDB(t *testing.T) {
 	cacheSize := 10_000
 	db := newValueNodeDB(
 		baseDB,
-		&sync.Pool{
-			New: func() interface{} { return make([]byte, 0) },
-		},
+		utils.NewBytesPool(),
 		&mockMetrics{},
 		cacheSize,
 	)
@@ -118,9 +116,7 @@ func TestValueNodeDBIterator(t *testing.T) {
 	cacheSize := 10
 	db := newValueNodeDB(
 		baseDB,
-		&sync.Pool{
-			New: func() interface{} { return make([]byte, 0) },
-		},
+		utils.NewBytesPool(),
 		&mockMetrics{},
 		cacheSize,
 	)
@@ -225,9 +221,7 @@ func TestValueNodeDBClear(t *testing.T) {
 	baseDB := memdb.New()
 	db := newValueNodeDB(
 		baseDB,
-		&sync.Pool{
-			New: func() interface{} { return make([]byte, 0) },
-		},
+		utils.NewBytesPool(),
 		&mockMetrics{},
 		cacheSize,
 	)

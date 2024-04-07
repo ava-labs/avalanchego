@@ -4,18 +4,17 @@
 package merkledb
 
 import (
-	"sync"
-
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/utils"
 )
 
+const defaultBatchOpsLength = 256
+
 var _ database.Iterator = (*iterator)(nil)
 
 type valueNodeDB struct {
-	// Holds unused []byte
-	bufferPool *sync.Pool
+	bufferPool *utils.BytesPool
 
 	// The underlying storage.
 	// Keys written to [baseDB] are prefixed with [valueNodePrefix].
@@ -31,7 +30,7 @@ type valueNodeDB struct {
 
 func newValueNodeDB(
 	db database.Database,
-	bufferPool *sync.Pool,
+	bufferPool *utils.BytesPool,
 	metrics merkleMetrics,
 	cacheSize int,
 ) *valueNodeDB {
@@ -45,14 +44,15 @@ func newValueNodeDB(
 
 func (db *valueNodeDB) newIteratorWithStartAndPrefix(start, prefix []byte) database.Iterator {
 	prefixedStart := addPrefixToKey(db.bufferPool, valueNodePrefix, start)
+	defer db.bufferPool.Put(prefixedStart)
+
 	prefixedPrefix := addPrefixToKey(db.bufferPool, valueNodePrefix, prefix)
-	i := &iterator{
+	defer db.bufferPool.Put(prefixedPrefix)
+
+	return &iterator{
 		db:       db,
-		nodeIter: db.baseDB.NewIteratorWithStartAndPrefix(prefixedStart, prefixedPrefix),
+		nodeIter: db.baseDB.NewIteratorWithStartAndPrefix(*prefixedStart, *prefixedPrefix),
 	}
-	db.bufferPool.Put(prefixedStart)
-	db.bufferPool.Put(prefixedPrefix)
-	return i
 }
 
 func (db *valueNodeDB) Close() {
@@ -62,7 +62,7 @@ func (db *valueNodeDB) Close() {
 func (db *valueNodeDB) NewBatch() *valueNodeBatch {
 	return &valueNodeBatch{
 		db:  db,
-		ops: make(map[Key]*node, defaultBufferLength),
+		ops: make(map[Key]*node, defaultBatchOpsLength),
 	}
 }
 
@@ -80,7 +80,7 @@ func (db *valueNodeDB) Get(key Key) (*node, error) {
 	defer db.bufferPool.Put(prefixedKey)
 
 	db.metrics.DatabaseNodeRead()
-	nodeBytes, err := db.baseDB.Get(prefixedKey)
+	nodeBytes, err := db.baseDB.Get(*prefixedKey)
 	if err != nil {
 		return nil, err
 	}
@@ -114,15 +114,17 @@ func (b *valueNodeBatch) Write() error {
 		b.db.metrics.DatabaseNodeWrite()
 		b.db.nodeCache.Put(key, n)
 		prefixedKey := addPrefixToKey(b.db.bufferPool, valueNodePrefix, key.Bytes())
+
+		var err error
 		if n == nil {
-			if err := dbBatch.Delete(prefixedKey); err != nil {
-				return err
-			}
-		} else if err := dbBatch.Put(prefixedKey, n.bytes()); err != nil {
+			err = dbBatch.Delete(*prefixedKey)
+		} else {
+			err = dbBatch.Put(*prefixedKey, n.bytes())
+		}
+		b.db.bufferPool.Put(prefixedKey)
+		if err != nil {
 			return err
 		}
-
-		b.db.bufferPool.Put(prefixedKey)
 	}
 
 	return dbBatch.Write()
