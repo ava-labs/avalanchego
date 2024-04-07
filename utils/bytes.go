@@ -43,14 +43,14 @@ const intSize = 32 << (^uint(0) >> 63) // 32 or 64
 // required to represent 20 (5). And therefore place the slice into bucket 4,
 // which has length 15. This is the bucket which produces the largest slices
 // that a length 19 slice can be used for.
-type BytesPool [intSize]*sync.Pool
+type BytesPool [intSize]sync.Pool
 
 func NewBytesPool() *BytesPool {
 	var p BytesPool
 	for i := range p {
 		// uint is used here to avoid overflowing int during the shift
 		size := uint(1)<<i - 1
-		p[i] = &sync.Pool{
+		p[i] = sync.Pool{
 			New: func() interface{} {
 				// Sync pool needs to return pointer-like values to avoid memory
 				// allocations.
