@@ -928,10 +928,10 @@ func (db *merkleDB) commitBatch(ops []database.BatchOp) error {
 	return view.commitToDB(context.Background())
 }
 
-// commitChanges commits the changes in [trieToCommit] to [db].
+// commitView commits the changes in [trieToCommit] to [db].
 // Assumes [trieToCommit]'s node IDs have been calculated.
 // Assumes [db.commitLock] is held.
-func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *view) error {
+func (db *merkleDB) commitView(ctx context.Context, trieToCommit *view) error {
 	db.lock.Lock()
 	defer db.lock.Unlock()
 
@@ -949,7 +949,7 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *view) error
 	}
 
 	changes := trieToCommit.changes
-	_, span := db.infoTracer.Start(ctx, "MerkleDB.commitChanges", oteltrace.WithAttributes(
+	_, span := db.infoTracer.Start(ctx, "MerkleDB.commitView", oteltrace.WithAttributes(
 		attribute.Int("nodesChanged", len(changes.nodes)),
 		attribute.Int("valuesChanged", len(changes.values)),
 	))
@@ -966,7 +966,7 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *view) error
 	}
 
 	currentValueNodeBatch := db.valueNodeDB.NewBatch()
-	_, nodesSpan := db.infoTracer.Start(ctx, "MerkleDB.commitChanges.writeNodes")
+	_, nodesSpan := db.infoTracer.Start(ctx, "MerkleDB.commitView.writeNodes")
 	for key, nodeChange := range changes.nodes {
 		shouldAddIntermediate := nodeChange.after != nil && !nodeChange.after.hasValue()
 		shouldDeleteIntermediate := !shouldAddIntermediate && nodeChange.before != nil && !nodeChange.before.hasValue()
@@ -994,7 +994,7 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *view) error
 	}
 	nodesSpan.End()
 
-	_, commitSpan := db.infoTracer.Start(ctx, "MerkleDB.commitChanges.valueNodeDBCommit")
+	_, commitSpan := db.infoTracer.Start(ctx, "MerkleDB.commitView.valueNodeDBCommit")
 	err := currentValueNodeBatch.Write()
 	commitSpan.End()
 	if err != nil {
@@ -1006,6 +1006,36 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *view) error
 	// Update root in database.
 	db.root = changes.rootChange.after
 	db.rootID = changes.rootID
+	return nil
+}
+
+func (db *merkleDB) applyChanges(ctx context.Context, valueNodeBatch *valueNodeBatch, changes *changeSummary) error {
+	_, span := db.infoTracer.Start(ctx, "MerkleDB.commitView.writeNodes")
+	defer span.End()
+
+	for key, nodeChange := range changes.nodes {
+		shouldAddIntermediate := nodeChange.after != nil && !nodeChange.after.hasValue()
+		shouldDeleteIntermediate := !shouldAddIntermediate && nodeChange.before != nil && !nodeChange.before.hasValue()
+
+		shouldAddValue := nodeChange.after != nil && nodeChange.after.hasValue()
+		shouldDeleteValue := !shouldAddValue && nodeChange.before != nil && nodeChange.before.hasValue()
+
+		if shouldAddIntermediate {
+			if err := db.intermediateNodeDB.Put(key, nodeChange.after); err != nil {
+				return err
+			}
+		} else if shouldDeleteIntermediate {
+			if err := db.intermediateNodeDB.Delete(key); err != nil {
+				return err
+			}
+		}
+
+		if shouldAddValue {
+			valueNodeBatch.Put(key, nodeChange.after)
+		} else if shouldDeleteValue {
+			valueNodeBatch.Delete(key)
+		}
+	}
 	return nil
 }
 
