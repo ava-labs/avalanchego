@@ -260,7 +260,7 @@ func newDatabase(
 		rootGenConcurrency = int(config.RootGenConcurrency)
 	}
 
-	// Share a bytes poolbetween the intermediateNodeDB and valueNodeDB to
+	// Share a bytes pool between the intermediateNodeDB and valueNodeDB to
 	// reduce memory allocations.
 	bufferPool := utils.NewBytesPool()
 
