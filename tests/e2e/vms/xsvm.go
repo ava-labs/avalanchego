@@ -28,8 +28,6 @@ import (
 var (
 	subnetAName = "xsvm-a"
 	subnetBName = "xsvm-b"
-
-	numTriggerTxs = 1 // Number of txs needed to activate the proposer VM fork
 )
 
 func XSVMSubnets(nodes ...*tmpnet.Node) []*tmpnet.Subnet {
@@ -84,25 +82,23 @@ var _ = ginkgo.Describe("[XSVM]", func() {
 		require.NoError(err)
 		tests.Outf(" issued transaction with ID: %s\n", exportTxStatus.TxID)
 
-		ginkgo.By(fmt.Sprintf("issuing transactions on chain %s on subnet %s to activate snowman++ consensus",
+		ginkgo.By(fmt.Sprintf("issuing transaction on chain %s on subnet %s to activate snowman++ consensus",
 			destinationChain.ChainID, destinationSubnet.SubnetID))
 		recipientKey, err := secp256k1.NewPrivateKey()
 		require.NoError(err)
-		for i := 0; i < numTriggerTxs; i++ {
-			transferTxStatus, err := transfer.Transfer(
-				e2e.DefaultContext(),
-				&transfer.Config{
-					URI:        apiNode.URI,
-					ChainID:    destinationChain.ChainID,
-					AssetID:    destinationChain.ChainID,
-					Amount:     units.Schmeckle,
-					To:         recipientKey.Address(),
-					PrivateKey: destinationChain.PreFundedKey,
-				},
-			)
-			require.NoError(err)
-			tests.Outf(" issued transaction with ID: %s\n", transferTxStatus.TxID)
-		}
+		transferTxStatus, err := transfer.Transfer(
+			e2e.DefaultContext(),
+			&transfer.Config{
+				URI:        apiNode.URI,
+				ChainID:    destinationChain.ChainID,
+				AssetID:    destinationChain.ChainID,
+				Amount:     units.Schmeckle,
+				To:         recipientKey.Address(),
+				PrivateKey: destinationChain.PreFundedKey,
+			},
+		)
+		require.NoError(err)
+		tests.Outf(" issued transaction with ID: %s\n", transferTxStatus.TxID)
 
 		ginkgo.By(fmt.Sprintf("importing to blockchain %s on subnet %s", destinationChain.ChainID, destinationSubnet.SubnetID))
 		sourceURIs := make([]string, len(network.Nodes))
