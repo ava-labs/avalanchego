@@ -354,7 +354,7 @@ func verifyRemoveSubnetValidatorTx(
 	// Verify the flowcheck
 	var feeCalculator *fees.Calculator
 	if !isEActive {
-		feeCalculator = fees.NewStaticCalculator(backend.Config, chainState.GetTimestamp())
+		feeCalculator = fees.NewStaticCalculator(backend.Config, currentTimestamp)
 	} else {
 		feeCalculator = fees.NewDynamicCalculator(backend.Config, feeManager, maxComplexity, sTx.Creds)
 	}
@@ -481,7 +481,7 @@ func verifyAddDelegatorTx(
 	}
 
 	// Verify the flowcheck
-	feeCalculator := fees.NewStaticCalculator(backend.Config, chainState.GetTimestamp())
+	feeCalculator := fees.NewStaticCalculator(backend.Config, currentTimestamp)
 	if err := tx.Visit(feeCalculator); err != nil {
 		return nil, err
 	}
@@ -835,7 +835,7 @@ func verifyTransferSubnetOwnershipTx(
 	// Verify the flowcheck
 	var feeCalculator *fees.Calculator
 	if !isEActive {
-		feeCalculator = fees.NewStaticCalculator(backend.Config, chainState.GetTimestamp())
+		feeCalculator = fees.NewStaticCalculator(backend.Config, currentTimestamp)
 	} else {
 		feeCalculator = fees.NewDynamicCalculator(backend.Config, feeManager, maxComplexity, sTx.Creds)
 	}
