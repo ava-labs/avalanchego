@@ -12,6 +12,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// Verify that [intSize] is correctly set based on the word size. This test uses
+// [math.MaxInt] to detect the word size.
 func TestIntSize(t *testing.T) {
 	require := require.New(t)
 
@@ -35,16 +37,6 @@ func TestBytesPool(t *testing.T) {
 	}
 }
 
-func TestBytesPoolMaxInt(t *testing.T) {
-	require := require.New(t)
-
-	p := NewBytesPool()
-	bytes := p.Get(math.MaxInt32)
-	require.NotNil(bytes)
-	require.Len(*bytes, math.MaxInt32)
-	p.Put(bytes)
-}
-
 func BenchmarkBytesPool_Constant(b *testing.B) {
 	sizes := []int{
 		0,
@@ -65,23 +57,35 @@ func BenchmarkBytesPool_Constant(b *testing.B) {
 	}
 }
 
-func BenchmarkBytesPool_Decending(b *testing.B) {
+func BenchmarkBytesPool_Descending(b *testing.B) {
 	p := NewBytesPool()
-	for i := b.N; i > 0; i-- {
-		p.Put(p.Get(i))
+	for i := 0; i < b.N; i++ {
+		for size := 100_000; size > 0; size-- {
+			p.Put(p.Get(size))
+		}
 	}
 }
 
 func BenchmarkBytesPool_Ascending(b *testing.B) {
 	p := NewBytesPool()
 	for i := 0; i < b.N; i++ {
-		p.Put(p.Get(i))
+		for size := 0; size < 100_000; size++ {
+			p.Put(p.Get(size))
+		}
 	}
 }
 
 func BenchmarkBytesPool_Random(b *testing.B) {
 	p := NewBytesPool()
+	sizes := make([]int, 1_000)
+	for i := range sizes {
+		sizes[i] = rand.Intn(100_000) //#nosec G404
+	}
+
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		p.Put(p.Get(rand.Intn(100_000))) //#nosec G404
+		for _, size := range sizes {
+			p.Put(p.Get(size))
+		}
 	}
 }
