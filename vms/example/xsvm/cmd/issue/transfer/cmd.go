@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/api"
+	"github.com/ava-labs/avalanchego/vms/example/xsvm/cmd/issue/status"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/tx"
 )
 
@@ -46,7 +47,7 @@ func transferFunc(c *cobra.Command, args []string) error {
 	return nil
 }
 
-func Transfer(ctx context.Context, config *Config) (*tx.TxIssueStatus, error) {
+func Transfer(ctx context.Context, config *Config) (*status.TxIssueStatus, error) {
 	client := api.NewClient(config.URI, config.ChainID.String())
 
 	address := config.PrivateKey.Address()
@@ -78,7 +79,7 @@ func Transfer(ctx context.Context, config *Config) (*tx.TxIssueStatus, error) {
 		return nil, err
 	}
 
-	return &tx.TxIssueStatus{
+	return &status.TxIssueStatus{
 		Tx:        stx,
 		TxID:      txID,
 		StartTime: issueTxStartTime,

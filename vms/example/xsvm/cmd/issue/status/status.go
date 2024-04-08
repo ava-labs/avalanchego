@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package tx
+package status
 
 import (
 	"encoding/json"
@@ -9,10 +9,11 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/vms/example/xsvm/tx"
 )
 
 type TxIssueStatus struct {
-	Tx        *Tx
+	Tx        *tx.Tx
 	TxID      ids.ID
 	StartTime time.Time
 }

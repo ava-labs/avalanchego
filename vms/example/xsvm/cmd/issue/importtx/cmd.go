@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/api"
+	"github.com/ava-labs/avalanchego/vms/example/xsvm/cmd/issue/status"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/tx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
@@ -51,7 +52,7 @@ func importFunc(c *cobra.Command, args []string) error {
 	return nil
 }
 
-func Import(ctx context.Context, config *Config) (*tx.TxIssueStatus, error) {
+func Import(ctx context.Context, config *Config) (*status.TxIssueStatus, error) {
 	var (
 		// Note: here we assume the unsigned message is correct from the last
 		//       URI in sourceURIs. In practice this shouldn't be done.
@@ -147,7 +148,7 @@ func Import(ctx context.Context, config *Config) (*tx.TxIssueStatus, error) {
 		return nil, err
 	}
 
-	return &tx.TxIssueStatus{
+	return &status.TxIssueStatus{
 		Tx:        stx,
 		TxID:      txID,
 		StartTime: issueTxStartTime,
