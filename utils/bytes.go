@@ -78,6 +78,6 @@ func (p *BytesPool) Get(length int) *[]byte {
 // of the provided slice is ignored and only its capacity is used.
 func (p *BytesPool) Put(bytes *[]byte) {
 	size := cap(*bytes)
-	index := bits.Len(uint(size+1)) - 1 // Round down
+	index := bits.Len(uint(size)+1) - 1 // Round down
 	p[index].Put(bytes)
 }
