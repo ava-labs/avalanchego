@@ -928,10 +928,10 @@ func (db *merkleDB) commitBatch(ops []database.BatchOp) error {
 	return view.commitToDB(context.Background())
 }
 
-// commitChanges commits the changes in [trieToCommit] to [db].
+// commitView commits the changes in [trieToCommit] to [db].
 // Assumes [trieToCommit]'s node IDs have been calculated.
 // Assumes [db.commitLock] is held.
-func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *view) error {
+func (db *merkleDB) commitView(ctx context.Context, trieToCommit *view) error {
 	db.lock.Lock()
 	defer db.lock.Unlock()
 
@@ -949,7 +949,7 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *view) error
 	}
 
 	changes := trieToCommit.changes
-	_, span := db.infoTracer.Start(ctx, "MerkleDB.commitChanges", oteltrace.WithAttributes(
+	_, span := db.infoTracer.Start(ctx, "MerkleDB.commitView", oteltrace.WithAttributes(
 		attribute.Int("nodesChanged", len(changes.nodes)),
 		attribute.Int("valuesChanged", len(changes.values)),
 	))
@@ -965,39 +965,12 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *view) error
 		return nil
 	}
 
-	currentValueNodeBatch := db.valueNodeDB.NewBatch()
-	_, nodesSpan := db.infoTracer.Start(ctx, "MerkleDB.commitChanges.writeNodes")
-	for key, nodeChange := range changes.nodes {
-		shouldAddIntermediate := nodeChange.after != nil && !nodeChange.after.hasValue()
-		shouldDeleteIntermediate := !shouldAddIntermediate && nodeChange.before != nil && !nodeChange.before.hasValue()
-
-		shouldAddValue := nodeChange.after != nil && nodeChange.after.hasValue()
-		shouldDeleteValue := !shouldAddValue && nodeChange.before != nil && nodeChange.before.hasValue()
-
-		if shouldAddIntermediate {
-			if err := db.intermediateNodeDB.Put(key, nodeChange.after); err != nil {
-				nodesSpan.End()
-				return err
-			}
-		} else if shouldDeleteIntermediate {
-			if err := db.intermediateNodeDB.Delete(key); err != nil {
-				nodesSpan.End()
-				return err
-			}
-		}
-
-		if shouldAddValue {
-			currentValueNodeBatch.Put(key, nodeChange.after)
-		} else if shouldDeleteValue {
-			currentValueNodeBatch.Delete(key)
-		}
+	valueNodeBatch := db.valueNodeDB.NewBatch()
+	if err := db.applyChanges(ctx, valueNodeBatch, changes); err != nil {
+		return err
 	}
-	nodesSpan.End()
 
-	_, commitSpan := db.infoTracer.Start(ctx, "MerkleDB.commitChanges.valueNodeDBCommit")
-	err := currentValueNodeBatch.Write()
-	commitSpan.End()
-	if err != nil {
+	if err := db.commitValueChanges(ctx, valueNodeBatch); err != nil {
 		return err
 	}
 
@@ -1009,7 +982,9 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *view) error
 	return nil
 }
 
-// moveChildViewsToDB removes any child views from the trieToCommit and moves them to the db
+// moveChildViewsToDB removes any child views from the trieToCommit and moves
+// them to the db.
+//
 // assumes [db.lock] is held
 func (db *merkleDB) moveChildViewsToDB(trieToCommit *view) {
 	trieToCommit.validityTrackingLock.Lock()
@@ -1020,6 +995,49 @@ func (db *merkleDB) moveChildViewsToDB(trieToCommit *view) {
 		db.childViews = append(db.childViews, childView)
 	}
 	trieToCommit.childViews = make([]*view, 0, defaultPreallocationSize)
+}
+
+// applyChanges takes the [changes] and applies them to [db.intermediateNodeDB]
+// and [valueNodeBatch].
+//
+// assumes [db.lock] is held
+func (db *merkleDB) applyChanges(ctx context.Context, valueNodeBatch *valueNodeBatch, changes *changeSummary) error {
+	_, span := db.infoTracer.Start(ctx, "MerkleDB.applyChanges")
+	defer span.End()
+
+	for key, nodeChange := range changes.nodes {
+		shouldAddIntermediate := nodeChange.after != nil && !nodeChange.after.hasValue()
+		shouldDeleteIntermediate := !shouldAddIntermediate && nodeChange.before != nil && !nodeChange.before.hasValue()
+
+		shouldAddValue := nodeChange.after != nil && nodeChange.after.hasValue()
+		shouldDeleteValue := !shouldAddValue && nodeChange.before != nil && nodeChange.before.hasValue()
+
+		if shouldAddIntermediate {
+			if err := db.intermediateNodeDB.Put(key, nodeChange.after); err != nil {
+				return err
+			}
+		} else if shouldDeleteIntermediate {
+			if err := db.intermediateNodeDB.Delete(key); err != nil {
+				return err
+			}
+		}
+
+		if shouldAddValue {
+			valueNodeBatch.Put(key, nodeChange.after)
+		} else if shouldDeleteValue {
+			valueNodeBatch.Delete(key)
+		}
+	}
+	return nil
+}
+
+// commitValueChanges is a thin wrapper around [valueNodeBatch.Write()] to
+// provide tracing.
+func (db *merkleDB) commitValueChanges(ctx context.Context, valueNodeBatch *valueNodeBatch) error {
+	_, span := db.infoTracer.Start(ctx, "MerkleDB.commitValueChanges")
+	defer span.End()
+
+	return valueNodeBatch.Write()
 }
 
 // CommitToDB is a no-op for db since it is already in sync with itself.
