@@ -260,13 +260,9 @@ func newDatabase(
 		rootGenConcurrency = int(config.RootGenConcurrency)
 	}
 
-	// Share a sync.Pool of []byte between the intermediateNodeDB and valueNodeDB
-	// to reduce memory allocations.
-	bufferPool := &sync.Pool{
-		New: func() interface{} {
-			return make([]byte, 0, defaultBufferLength)
-		},
-	}
+	// Share a bytes pool between the intermediateNodeDB and valueNodeDB to
+	// reduce memory allocations.
+	bufferPool := utils.NewBytesPool()
 
 	trieDB := &merkleDB{
 		metrics: metrics,
@@ -1341,31 +1337,15 @@ func (db *merkleDB) getTokenSize() int {
 }
 
 // Returns [key] prefixed by [prefix].
-// The returned []byte is taken from [bufferPool] and
-// should be returned to it when the caller is done with it.
-func addPrefixToKey(bufferPool *sync.Pool, prefix []byte, key []byte) []byte {
+// The returned *[]byte is taken from [bufferPool] and should be returned to it
+// when the caller is done with it.
+func addPrefixToKey(bufferPool *utils.BytesPool, prefix []byte, key []byte) *[]byte {
 	prefixLen := len(prefix)
 	keyLen := prefixLen + len(key)
-	prefixedKey := getBufferFromPool(bufferPool, keyLen)
-	copy(prefixedKey, prefix)
-	copy(prefixedKey[prefixLen:], key)
+	prefixedKey := bufferPool.Get(keyLen)
+	copy(*prefixedKey, prefix)
+	copy((*prefixedKey)[prefixLen:], key)
 	return prefixedKey
-}
-
-// Returns a []byte from [bufferPool] with length exactly [size].
-// The []byte is not guaranteed to be zeroed.
-func getBufferFromPool(bufferPool *sync.Pool, size int) []byte {
-	buffer := bufferPool.Get().([]byte)
-	if cap(buffer) >= size {
-		// The [] byte we got from the pool is big enough to hold the prefixed key
-		buffer = buffer[:size]
-	} else {
-		// The []byte from the pool wasn't big enough.
-		// Put it back and allocate a new, bigger one
-		bufferPool.Put(buffer)
-		buffer = make([]byte, size)
-	}
-	return buffer
 }
 
 // cacheEntrySize returns a rough approximation of the memory consumed by storing the key and node.
