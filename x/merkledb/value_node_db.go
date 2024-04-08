@@ -4,12 +4,18 @@
 package merkledb
 
 import (
+	"errors"
+
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/utils"
 )
 
-var _ database.Iterator = (*iterator)(nil)
+var (
+	_ database.Iterator = (*iterator)(nil)
+
+	errNodeMissingValue = errors.New("valueNodeDB contains node without a value")
+)
 
 type valueNodeDB struct {
 	bufferPool *utils.BytesPool
@@ -99,7 +105,8 @@ func (db *valueNodeDB) Clear() error {
 type iterator struct {
 	db       *valueNodeDB
 	nodeIter database.Iterator
-	current  *node
+	key      []byte
+	value    []byte
 	err      error
 }
 
@@ -114,21 +121,16 @@ func (i *iterator) Error() error {
 }
 
 func (i *iterator) Key() []byte {
-	if i.current == nil {
-		return nil
-	}
-	return i.current.key.Bytes()
+	return i.key
 }
 
 func (i *iterator) Value() []byte {
-	if i.current == nil {
-		return nil
-	}
-	return i.current.value.Value()
+	return i.value
 }
 
 func (i *iterator) Next() bool {
-	i.current = nil
+	i.key = nil
+	i.value = nil
 	if i.Error() != nil || i.db.closed.Get() {
 		return false
 	}
@@ -137,15 +139,25 @@ func (i *iterator) Next() bool {
 	}
 
 	i.db.metrics.DatabaseNodeRead()
-	key := i.nodeIter.Key()
-	key = key[valueNodePrefixLen:]
-	n, err := parseNode(ToKey(key), i.nodeIter.Value())
+
+	r := codecReader{
+		b: i.nodeIter.Value(),
+		// We are discarding the other bytes from the node, so we avoid copying
+		// the value here.
+		copy: false,
+	}
+	maybeValue, err := r.MaybeBytes()
 	if err != nil {
 		i.err = err
 		return false
 	}
+	if maybeValue.IsNothing() {
+		i.err = errNodeMissingValue
+		return false
+	}
 
-	i.current = n
+	i.key = i.nodeIter.Key()[valueNodePrefixLen:]
+	i.value = maybeValue.Value()
 	return true
 }
 

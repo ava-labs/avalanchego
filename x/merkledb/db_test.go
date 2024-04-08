@@ -1364,3 +1364,39 @@ func BenchmarkCommitView(b *testing.B) {
 		}
 	})
 }
+
+func BenchmarkIteration(b *testing.B) {
+	db, err := getBasicDB()
+	require.NoError(b, err)
+
+	ops := make([]database.BatchOp, 1_000)
+	for i := range ops {
+		k := binary.AppendUvarint(nil, uint64(i))
+		ops[i] = database.BatchOp{
+			Key:   k,
+			Value: hashing.ComputeHash256(k),
+		}
+	}
+
+	ctx := context.Background()
+	view, err := db.NewView(ctx, ViewChanges{BatchOps: ops})
+	require.NoError(b, err)
+
+	require.NoError(b, view.CommitToDB(ctx))
+
+	b.Run("create iterator", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			it := db.NewIterator()
+			it.Release()
+		}
+	})
+
+	b.Run("iterate", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			it := db.NewIterator()
+			for it.Next() {
+			}
+			it.Release()
+		}
+	})
+}
