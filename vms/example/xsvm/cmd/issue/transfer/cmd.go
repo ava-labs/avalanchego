@@ -82,6 +82,7 @@ func Transfer(ctx context.Context, config *Config) (*status.TxIssueStatus, error
 	return &status.TxIssueStatus{
 		Tx:        stx,
 		TxID:      txID,
+		Nonce:     nonce,
 		StartTime: issueTxStartTime,
 	}, nil
 }

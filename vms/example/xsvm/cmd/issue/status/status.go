@@ -15,6 +15,7 @@ import (
 type TxIssueStatus struct {
 	Tx        *tx.Tx
 	TxID      ids.ID
+	Nonce     uint64
 	StartTime time.Time
 }
 
