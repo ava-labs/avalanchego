@@ -9,8 +9,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 )
 
-const defaultBatchOpsLength = 256
-
 var _ database.Iterator = (*iterator)(nil)
 
 type valueNodeDB struct {
@@ -42,6 +40,18 @@ func newValueNodeDB(
 	}
 }
 
+func (db *valueNodeDB) Write(batch database.KeyValueWriterDeleter, key Key, n *node) error {
+	db.metrics.DatabaseNodeWrite()
+	db.nodeCache.Put(key, n)
+	prefixedKey := addPrefixToKey(db.bufferPool, valueNodePrefix, key.Bytes())
+	defer db.bufferPool.Put(prefixedKey)
+
+	if n == nil {
+		return batch.Delete(*prefixedKey)
+	}
+	return batch.Put(*prefixedKey, n.bytes())
+}
+
 func (db *valueNodeDB) newIteratorWithStartAndPrefix(start, prefix []byte) database.Iterator {
 	prefixedStart := addPrefixToKey(db.bufferPool, valueNodePrefix, start)
 	defer db.bufferPool.Put(prefixedStart)
@@ -57,13 +67,6 @@ func (db *valueNodeDB) newIteratorWithStartAndPrefix(start, prefix []byte) datab
 
 func (db *valueNodeDB) Close() {
 	db.closed.Set(true)
-}
-
-func (db *valueNodeDB) NewBatch() *valueNodeBatch {
-	return &valueNodeBatch{
-		db:  db,
-		ops: make(map[Key]*node, defaultBatchOpsLength),
-	}
 }
 
 func (db *valueNodeDB) Get(key Key) (*node, error) {
@@ -91,43 +94,6 @@ func (db *valueNodeDB) Get(key Key) (*node, error) {
 func (db *valueNodeDB) Clear() error {
 	db.nodeCache.Flush()
 	return database.AtomicClearPrefix(db.baseDB, db.baseDB, valueNodePrefix)
-}
-
-// Batch of database operations
-type valueNodeBatch struct {
-	db  *valueNodeDB
-	ops map[Key]*node
-}
-
-func (b *valueNodeBatch) Put(key Key, value *node) {
-	b.ops[key] = value
-}
-
-func (b *valueNodeBatch) Delete(key Key) {
-	b.ops[key] = nil
-}
-
-// Write flushes any accumulated data to the underlying database.
-func (b *valueNodeBatch) Write() error {
-	dbBatch := b.db.baseDB.NewBatch()
-	for key, n := range b.ops {
-		b.db.metrics.DatabaseNodeWrite()
-		b.db.nodeCache.Put(key, n)
-		prefixedKey := addPrefixToKey(b.db.bufferPool, valueNodePrefix, key.Bytes())
-
-		var err error
-		if n == nil {
-			err = dbBatch.Delete(*prefixedKey)
-		} else {
-			err = dbBatch.Put(*prefixedKey, n.bytes())
-		}
-		b.db.bufferPool.Put(prefixedKey)
-		if err != nil {
-			return err
-		}
-	}
-
-	return dbBatch.Write()
 }
 
 type iterator struct {

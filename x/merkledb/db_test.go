@@ -6,6 +6,7 @@ package merkledb
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
 	"fmt"
 	"math/rand"
 	"slices"
@@ -39,7 +40,7 @@ func newDB(ctx context.Context, db database.Database, config Config) (*merkleDB,
 
 func newDefaultConfig() Config {
 	return Config{
-		IntermediateWriteBatchSize:  10,
+		IntermediateWriteBatchSize:  256 * units.KiB,
 		HistoryLength:               defaultHistoryLength,
 		ValueNodeCacheSize:          units.MiB,
 		IntermediateNodeCacheSize:   units.MiB,
@@ -1329,4 +1330,37 @@ func TestCrashRecovery(t *testing.T) {
 	rootAfterRecovery, err := newMerkleDB.GetMerkleRoot(context.Background())
 	require.NoError(err)
 	require.Equal(expectedRoot, rootAfterRecovery)
+}
+
+func BenchmarkCommitView(b *testing.B) {
+	db, err := getBasicDB()
+	require.NoError(b, err)
+
+	ops := make([]database.BatchOp, 1_000)
+	for i := range ops {
+		k := binary.AppendUvarint(nil, uint64(i))
+		ops[i] = database.BatchOp{
+			Key:   k,
+			Value: hashing.ComputeHash256(k),
+		}
+	}
+
+	ctx := context.Background()
+	viewIntf, err := db.NewView(ctx, ViewChanges{BatchOps: ops})
+	require.NoError(b, err)
+
+	view := viewIntf.(*view)
+	require.NoError(b, view.applyValueChanges(ctx))
+
+	b.Run("apply and commit changes", func(b *testing.B) {
+		require := require.New(b)
+
+		for i := 0; i < b.N; i++ {
+			db.baseDB = memdb.New() // Keep each iteration independent
+
+			valueNodeBatch := db.baseDB.NewBatch()
+			require.NoError(db.applyChanges(ctx, valueNodeBatch, view.changes))
+			require.NoError(db.commitValueChanges(ctx, valueNodeBatch))
+		}
+	})
 }
