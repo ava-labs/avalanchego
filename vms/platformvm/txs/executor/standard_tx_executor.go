@@ -77,7 +77,7 @@ func (e *StandardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 	// Verify the flowcheck
 	var feeCalculator *fees.Calculator
 	if !isEActive {
-		feeCalculator = fees.NewStaticCalculator(e.Backend.Config, e.State.GetTimestamp())
+		feeCalculator = fees.NewStaticCalculator(e.Backend.Config, currentTimestamp)
 	} else {
 		feeCalculator = fees.NewDynamicCalculator(e.Backend.Config, e.BlkFeeManager, e.BlockMaxComplexity, e.Tx.Creds)
 	}
@@ -142,7 +142,7 @@ func (e *StandardTxExecutor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 	// Verify the flowcheck
 	var feeCalculator *fees.Calculator
 	if !isEActive {
-		feeCalculator = fees.NewStaticCalculator(e.Backend.Config, e.State.GetTimestamp())
+		feeCalculator = fees.NewStaticCalculator(e.Backend.Config, currentTimestamp)
 	} else {
 		feeCalculator = fees.NewDynamicCalculator(e.Backend.Config, e.BlkFeeManager, e.BlockMaxComplexity, e.Tx.Creds)
 	}
@@ -242,7 +242,7 @@ func (e *StandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 		// Verify the flowcheck
 		var feeCalculator *fees.Calculator
 		if !isEActive {
-			feeCalculator = fees.NewStaticCalculator(e.Backend.Config, e.State.GetTimestamp())
+			feeCalculator = fees.NewStaticCalculator(e.Backend.Config, currentTimestamp)
 		} else {
 			feeCalculator = fees.NewDynamicCalculator(e.Backend.Config, e.BlkFeeManager, e.BlockMaxComplexity, e.Tx.Creds)
 		}
@@ -314,7 +314,7 @@ func (e *StandardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 	// Verify the flowcheck
 	var feeCalculator *fees.Calculator
 	if !isEActive {
-		feeCalculator = fees.NewStaticCalculator(e.Backend.Config, e.State.GetTimestamp())
+		feeCalculator = fees.NewStaticCalculator(e.Backend.Config, currentTimestamp)
 	} else {
 		feeCalculator = fees.NewDynamicCalculator(e.Backend.Config, e.BlkFeeManager, e.BlockMaxComplexity, e.Tx.Creds)
 	}
@@ -528,7 +528,7 @@ func (e *StandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 
 	var feeCalculator *fees.Calculator
 	if !isEActive {
-		feeCalculator = fees.NewStaticCalculator(e.Backend.Config, e.State.GetTimestamp())
+		feeCalculator = fees.NewStaticCalculator(e.Backend.Config, currentTimestamp)
 	} else {
 		feeCalculator = fees.NewDynamicCalculator(e.Backend.Config, e.BlkFeeManager, e.BlockMaxComplexity, e.Tx.Creds)
 	}
@@ -684,7 +684,7 @@ func (e *StandardTxExecutor) BaseTx(tx *txs.BaseTx) error {
 	// Verify the flowcheck
 	var feeCalculator *fees.Calculator
 	if !isEActive {
-		feeCalculator = fees.NewStaticCalculator(e.Backend.Config, e.State.GetTimestamp())
+		feeCalculator = fees.NewStaticCalculator(e.Backend.Config, currentTimestamp)
 	} else {
 		feeCalculator = fees.NewDynamicCalculator(e.Backend.Config, e.BlkFeeManager, e.BlockMaxComplexity, e.Tx.Creds)
 	}
