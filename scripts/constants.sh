@@ -9,13 +9,14 @@ set -euo pipefail
 GOPATH="$(go env GOPATH)"
 
 # Avalabs docker hub
-DOCKERHUB_REPO="avaplatform/subnet-evm"
+# avaplatform/avalanchego - defaults to local as to avoid unintentional pushes
+# You should probably set it - export DOCKER_REPO='avaplatform/subnet-evm'
+DOCKERHUB_REPO=${DOCKER_REPO:-"subnet-evm"}
 
 # if this isn't a git repository (say building from a release), don't set our git constants.
 if [ ! -d .git ]; then
     CURRENT_BRANCH=""
     SUBNET_EVM_COMMIT=""
-    SUBNET_EVM_COMMIT_ID=""
 else
     # Current branch
     CURRENT_BRANCH=${CURRENT_BRANCH:-$(git describe --tags --exact-match 2>/dev/null || git symbolic-ref -q --short HEAD || git rev-parse --short HEAD || :)}
@@ -25,7 +26,6 @@ else
     # Use an abbreviated version of the full commit to tag the image.
     # WARNING: this will use the most recent commit even if there are un-committed changes present
     SUBNET_EVM_COMMIT="$(git --git-dir="$SUBNET_EVM_PATH/.git" rev-parse HEAD || :)"
-    SUBNET_EVM_COMMIT_ID="${SUBNET_EVM_COMMIT::8}"
 fi
 
 echo "Using branch: ${CURRENT_BRANCH}"
