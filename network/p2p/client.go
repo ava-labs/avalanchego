@@ -8,7 +8,10 @@ import (
 	"errors"
 	"fmt"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
@@ -72,6 +75,14 @@ func (c *Client) AppRequest(
 	appRequestBytes []byte,
 	onResponse AppResponseCallback,
 ) error {
+	// Cancellation is removed from this context to avoid erroring unexpectedly.
+	// SendAppRequest should be non-blocking and any error other than context
+	// cancellation is unexpected.
+	//
+	// This guarantees that the router should never receive an unexpected
+	// AppResponse.
+	ctxWithoutCancel := context.WithoutCancel(ctx)
+
 	c.router.lock.Lock()
 	defer c.router.lock.Unlock()
 
@@ -87,11 +98,17 @@ func (c *Client) AppRequest(
 		}
 
 		if err := c.sender.SendAppRequest(
-			ctx,
+			ctxWithoutCancel,
 			set.Of(nodeID),
 			requestID,
 			appRequestBytes,
 		); err != nil {
+			c.router.log.Error("unexpected error when sending message",
+				zap.Stringer("op", message.AppRequestOp),
+				zap.Stringer("nodeID", nodeID),
+				zap.Uint32("requestID", requestID),
+				zap.Error(err),
+			)
 			return err
 		}
 
@@ -111,8 +128,13 @@ func (c *Client) AppGossip(
 	config common.SendConfig,
 	appGossipBytes []byte,
 ) error {
+	// Cancellation is removed from this context to avoid erroring unexpectedly.
+	// SendAppGossip should be non-blocking and any error other than context
+	// cancellation is unexpected.
+	ctxWithoutCancel := context.WithoutCancel(ctx)
+
 	return c.sender.SendAppGossip(
-		ctx,
+		ctxWithoutCancel,
 		config,
 		PrefixMessage(c.handlerPrefix, appGossipBytes),
 	)
@@ -126,6 +148,14 @@ func (c *Client) CrossChainAppRequest(
 	appRequestBytes []byte,
 	onResponse CrossChainAppResponseCallback,
 ) error {
+	// Cancellation is removed from this context to avoid erroring unexpectedly.
+	// SendCrossChainAppRequest should be non-blocking and any error other than
+	// context cancellation is unexpected.
+	//
+	// This guarantees that the router should never receive an unexpected
+	// CrossChainAppResponse.
+	ctxWithoutCancel := context.WithoutCancel(ctx)
+
 	c.router.lock.Lock()
 	defer c.router.lock.Unlock()
 
@@ -139,11 +169,17 @@ func (c *Client) CrossChainAppRequest(
 	}
 
 	if err := c.sender.SendCrossChainAppRequest(
-		ctx,
+		ctxWithoutCancel,
 		chainID,
 		requestID,
 		PrefixMessage(c.handlerPrefix, appRequestBytes),
 	); err != nil {
+		c.router.log.Error("unexpected error when sending message",
+			zap.Stringer("op", message.CrossChainAppRequestOp),
+			zap.Stringer("chainID", chainID),
+			zap.Uint32("requestID", requestID),
+			zap.Error(err),
+		)
 		return err
 	}
 

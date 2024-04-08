@@ -65,15 +65,14 @@ func (c *onEvictCache[K, V]) Put(key K, value V) error {
 }
 
 // Flush removes all elements from the cache.
-// Returns the last non-nil error during [c.onEviction], if any.
-// If [c.onEviction] errors, it will still be called for any
-// subsequent elements and the cache will still be emptied.
+//
+// Returns the first non-nil error returned by [c.onEviction], if any.
+//
+// If [c.onEviction] errors, it will still be called for any subsequent elements
+// and the cache will still be emptied.
 func (c *onEvictCache[K, V]) Flush() error {
 	c.lock.Lock()
-	defer func() {
-		c.fifo = linked.NewHashmap[K, V]()
-		c.lock.Unlock()
-	}()
+	defer c.lock.Unlock()
 
 	return c.resize(0)
 }
