@@ -1287,3 +1287,46 @@ func TestGetChangeProofEmptyRootID(t *testing.T) {
 	)
 	require.ErrorIs(err, ErrEmptyProof)
 }
+
+func TestCrashRecovery(t *testing.T) {
+	require := require.New(t)
+
+	baseDB := memdb.New()
+	merkleDB, err := newDatabase(
+		context.Background(),
+		baseDB,
+		newDefaultConfig(),
+		&mockMetrics{},
+	)
+	require.NoError(err)
+
+	merkleDBBatch := merkleDB.NewBatch()
+	require.NoError(merkleDBBatch.Put([]byte("is this"), []byte("hope")))
+	require.NoError(merkleDBBatch.Put([]byte("expected?"), []byte("so")))
+	require.NoError(merkleDBBatch.Write())
+
+	expectedRoot, err := merkleDB.GetMerkleRoot(context.Background())
+	require.NoError(err)
+
+	// Do not `.Close()` the database to simulate a process crash.
+
+	newMerkleDB, err := newDatabase(
+		context.Background(),
+		baseDB,
+		newDefaultConfig(),
+		&mockMetrics{},
+	)
+	require.NoError(err)
+
+	value, err := newMerkleDB.Get([]byte("is this"))
+	require.NoError(err)
+	require.Equal([]byte("hope"), value)
+
+	value, err = newMerkleDB.Get([]byte("expected?"))
+	require.NoError(err)
+	require.Equal([]byte("so"), value)
+
+	rootAfterRecovery, err := newMerkleDB.GetMerkleRoot(context.Background())
+	require.NoError(err)
+	require.Equal(expectedRoot, rootAfterRecovery)
+}
