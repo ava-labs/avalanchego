@@ -180,6 +180,48 @@ func TestAppRequestResponse(t *testing.T) {
 	<-done
 }
 
+// Tests that the Client does not provide a cancelled context to the AppSender.
+func TestAppRequestCancelledContext(t *testing.T) {
+	require := require.New(t)
+	ctx := context.Background()
+
+	sentMessages := make(chan []byte, 1)
+	sender := &common.SenderTest{
+		SendAppRequestF: func(ctx context.Context, _ set.Set[ids.NodeID], _ uint32, msgBytes []byte) error {
+			require.NoError(ctx.Err())
+			sentMessages <- msgBytes
+			return nil
+		},
+	}
+	network, err := NewNetwork(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
+	require.NoError(err)
+	client := network.NewClient(handlerID)
+
+	wantResponse := []byte("response")
+	wantNodeID := ids.GenerateTestNodeID()
+	done := make(chan struct{})
+
+	callback := func(_ context.Context, gotNodeID ids.NodeID, gotResponse []byte, err error) {
+		require.Equal(wantNodeID, gotNodeID)
+		require.NoError(err)
+		require.Equal(wantResponse, gotResponse)
+
+		close(done)
+	}
+
+	cancelledCtx, cancel := context.WithCancel(ctx)
+	cancel()
+
+	want := []byte("request")
+	require.NoError(client.AppRequest(cancelledCtx, set.Of(wantNodeID), want, callback))
+	got := <-sentMessages
+	require.Equal(handlerPrefix, got[0])
+	require.Equal(want, got[1:])
+
+	require.NoError(network.AppResponse(ctx, wantNodeID, 1, wantResponse))
+	<-done
+}
+
 // Tests that the Client callback is given an error if the request fails
 func TestAppRequestFailed(t *testing.T) {
 	require := require.New(t)
@@ -236,6 +278,44 @@ func TestCrossChainAppRequestResponse(t *testing.T) {
 
 	require.NoError(client.CrossChainAppRequest(ctx, wantChainID, []byte("request"), callback))
 	<-sender.SentCrossChainAppRequest
+
+	require.NoError(network.CrossChainAppResponse(ctx, wantChainID, 1, wantResponse))
+	<-done
+}
+
+// Tests that the Client does not provide a cancelled context to the AppSender.
+func TestCrossChainAppRequestCancelledContext(t *testing.T) {
+	require := require.New(t)
+	ctx := context.Background()
+
+	sentMessages := make(chan []byte, 1)
+	sender := &common.SenderTest{
+		SendCrossChainAppRequestF: func(ctx context.Context, _ ids.ID, _ uint32, msgBytes []byte) {
+			require.NoError(ctx.Err())
+			sentMessages <- msgBytes
+		},
+	}
+	network, err := NewNetwork(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
+	require.NoError(err)
+	client := network.NewClient(handlerID)
+
+	cancelledCtx, cancel := context.WithCancel(ctx)
+	cancel()
+
+	wantChainID := ids.GenerateTestID()
+	wantResponse := []byte("response")
+	done := make(chan struct{})
+
+	callback := func(_ context.Context, gotChainID ids.ID, gotResponse []byte, err error) {
+		require.Equal(wantChainID, gotChainID)
+		require.NoError(err)
+		require.Equal(wantResponse, gotResponse)
+
+		close(done)
+	}
+
+	require.NoError(client.CrossChainAppRequest(cancelledCtx, wantChainID, []byte("request"), callback))
+	<-sentMessages
 
 	require.NoError(network.CrossChainAppResponse(ctx, wantChainID, 1, wantResponse))
 	<-done
