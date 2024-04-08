@@ -47,8 +47,8 @@ var (
 type ProposalTxExecutor struct {
 	// inputs, to be filled before visitor methods are called
 	*Backend
-	BlkFeeManager *commonfees.Manager
-	Tx            *txs.Tx
+	Tx *txs.Tx
+
 	// [OnCommitState] is the state used for validation.
 	// [OnCommitState] is modified by this struct's methods to
 	// reflect changes made to the state if the proposal is committed.
@@ -164,7 +164,7 @@ func (e *ProposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 
 	if _, err := verifyAddSubnetValidatorTx(
 		e.Backend,
-		e.BlkFeeManager,
+		commonfees.NewManager(commonfees.Empty),
 		commonfees.Max,
 		e.OnCommitState,
 		e.Tx,
