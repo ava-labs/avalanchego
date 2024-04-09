@@ -13,7 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/maybe"
 )
 
-var hashNodeTests = []struct {
+var sha256HashNodeTests = []struct {
 	name         string
 	n            *node
 	expectedHash string
@@ -137,8 +137,8 @@ func Fuzz_SHA256_HashNode(f *testing.F) {
 	)
 }
 
-func TestHashNode(t *testing.T) {
-	for _, test := range hashNodeTests {
+func Test_SHA256_HashNode(t *testing.T) {
+	for _, test := range sha256HashNodeTests {
 		t.Run(test.name, func(t *testing.T) {
 			hash := SHA256Hasher.HashNode(test.n)
 			require.Equal(t, test.expectedHash, hash.String())
@@ -146,8 +146,8 @@ func TestHashNode(t *testing.T) {
 	}
 }
 
-func Benchmark_HashNode(b *testing.B) {
-	for _, benchmark := range hashNodeTests {
+func Benchmark_SHA256_HashNode(b *testing.B) {
+	for _, benchmark := range sha256HashNodeTests {
 		b.Run(benchmark.name, func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
 				SHA256Hasher.HashNode(benchmark.n)
