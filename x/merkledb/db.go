@@ -165,7 +165,7 @@ type Config struct {
 
 	// Hasher defines the hash function to use when hashing the trie.
 	//
-	// If not hasher is specified, [SHA256Hasher] will be used.
+	// If not specified, [SHA256Hasher] will be used.
 	Hasher Hasher
 
 	// RootGenConcurrency is the number of goroutines to use when
