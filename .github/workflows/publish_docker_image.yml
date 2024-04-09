@@ -23,4 +23,4 @@ jobs:
           DOCKER_USERNAME: ${{ secrets.docker_username }}
           DOCKER_PASS: ${{ secrets.docker_pass }}
           DOCKER_REPO: ${{ secrets.docker_repo }}
-        run: .github/workflows/publish_image.sh
+        run: scripts/publish_image.sh
