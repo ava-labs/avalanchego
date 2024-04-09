@@ -19,7 +19,9 @@ jobs:
           sudo apt update
           sudo apt -y install qemu qemu-user-static
           sudo systemctl restart docker
-      - name: Publish image to DockerHub
+      - name: Create multiplatform docker builder
+        run: docker buildx create --use
+      - name: Build and publish images to DockerHub
         env:
           DOCKER_USERNAME: ${{ secrets.docker_username }}
           DOCKER_PASS: ${{ secrets.docker_pass }}
