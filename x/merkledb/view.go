@@ -649,7 +649,7 @@ func (v *view) remove(key Key) error {
 	}
 
 	hadValue := nodeToDelete.hasValue()
-	nodeToDelete.setValue(maybe.Nothing[[]byte]())
+	nodeToDelete.setValue(v.db.hasher, maybe.Nothing[[]byte]())
 
 	// if the removed node has no children, the node can be removed from the trie
 	if len(nodeToDelete.children) == 0 {
@@ -760,7 +760,7 @@ func (v *view) insert(
 	if v.root.IsNothing() {
 		// the trie is empty, so create a new root node.
 		root := newNode(key)
-		root.setValue(value)
+		root.setValue(v.db.hasher, value)
 		v.root = maybe.Some(root)
 		return root, v.recordNewNode(root)
 	}
@@ -803,7 +803,7 @@ func (v *view) insert(
 
 	// a node with that exact key already exists so update its value
 	if closestNode.key == key {
-		closestNode.setValue(value)
+		closestNode.setValue(v.db.hasher, value)
 		// closestNode was already marked as changed in the ancestry loop above
 		return closestNode, nil
 	}
@@ -816,7 +816,7 @@ func (v *view) insert(
 	if !hasChild {
 		// there are no existing nodes along the key [key], so create a new node to insert [value]
 		newNode := newNode(key)
-		newNode.setValue(value)
+		newNode.setValue(v.db.hasher, value)
 		closestNode.addChild(newNode, v.tokenSize)
 		return newNode, v.recordNewNode(newNode)
 	}
@@ -849,12 +849,12 @@ func (v *view) insert(
 
 	if key.length == branchNode.key.length {
 		// the branch node has exactly the key to be inserted as its key, so set the value on the branch node
-		branchNode.setValue(value)
+		branchNode.setValue(v.db.hasher, value)
 	} else {
 		// the key to be inserted is a child of the branch node
 		// create a new node and add the value to it
 		newNode := newNode(key)
-		newNode.setValue(value)
+		newNode.setValue(v.db.hasher, value)
 		branchNode.addChild(newNode, v.tokenSize)
 		if err := v.recordNewNode(newNode); err != nil {
 			return nil, err

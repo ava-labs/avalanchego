@@ -962,6 +962,7 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest, token
 				end,
 				root,
 				tokenSize,
+				SHA256Hasher,
 			))
 		case opGenerateChangeProof:
 			root, err := db.GetMerkleRoot(context.Background())

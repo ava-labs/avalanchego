@@ -24,7 +24,7 @@ func Test_IntermediateNodeDB(t *testing.T) {
 	require := require.New(t)
 
 	n := newNode(ToKey([]byte{0x00}))
-	n.setValue(maybe.Some([]byte{byte(0x02)}))
+	n.setValue(SHA256Hasher, maybe.Some([]byte{byte(0x02)}))
 	nodeSize := cacheEntrySize(n.key, n)
 
 	// use exact multiple of node size so require.Equal(1, db.nodeCache.fifo.Len()) is correct later
@@ -41,12 +41,13 @@ func Test_IntermediateNodeDB(t *testing.T) {
 		bufferSize,
 		evictionBatchSize,
 		4,
+		SHA256Hasher,
 	)
 
 	// Put a key-node pair
 	node1Key := ToKey([]byte{0x01})
 	node1 := newNode(node1Key)
-	node1.setValue(maybe.Some([]byte{byte(0x01)}))
+	node1.setValue(SHA256Hasher, maybe.Some([]byte{byte(0x01)}))
 	require.NoError(db.Put(node1Key, node1))
 
 	// Get the key-node pair from cache
@@ -56,7 +57,7 @@ func Test_IntermediateNodeDB(t *testing.T) {
 
 	// Overwrite the key-node pair
 	node1Updated := newNode(node1Key)
-	node1Updated.setValue(maybe.Some([]byte{byte(0x02)}))
+	node1Updated.setValue(SHA256Hasher, maybe.Some([]byte{byte(0x02)}))
 	require.NoError(db.Put(node1Key, node1Updated))
 
 	// Assert the key-node pair was overwritten
@@ -77,7 +78,7 @@ func Test_IntermediateNodeDB(t *testing.T) {
 	for {
 		key := ToKey([]byte{byte(added)})
 		node := newNode(Key{})
-		node.setValue(maybe.Some([]byte{byte(added)}))
+		node.setValue(SHA256Hasher, maybe.Some([]byte{byte(added)}))
 		newExpectedSize := expectedSize + cacheEntrySize(key, node)
 		if newExpectedSize > bufferSize {
 			// Don't trigger eviction.
@@ -97,7 +98,7 @@ func Test_IntermediateNodeDB(t *testing.T) {
 	// the added key prefix increasing the size tracked by the batch.
 	key := ToKey([]byte{byte(added)})
 	node := newNode(Key{})
-	node.setValue(maybe.Some([]byte{byte(added)}))
+	node.setValue(SHA256Hasher, maybe.Some([]byte{byte(added)}))
 	require.NoError(db.Put(key, node))
 
 	// Assert cache has expected number of elements
@@ -153,6 +154,7 @@ func FuzzIntermediateNodeDBConstructDBKey(f *testing.F) {
 				bufferSize,
 				evictionBatchSize,
 				tokenSize,
+				SHA256Hasher,
 			)
 
 			p := ToKey(key)
@@ -194,6 +196,7 @@ func Test_IntermediateNodeDB_ConstructDBKey_DirtyBuffer(t *testing.T) {
 		bufferSize,
 		evictionBatchSize,
 		4,
+		SHA256Hasher,
 	)
 
 	db.bufferPool.Put(&[]byte{0xFF, 0xFF, 0xFF})
@@ -225,6 +228,7 @@ func TestIntermediateNodeDBClear(t *testing.T) {
 		bufferSize,
 		evictionBatchSize,
 		4,
+		SHA256Hasher,
 	)
 
 	for _, b := range [][]byte{{1}, {2}, {3}} {
@@ -259,6 +263,7 @@ func TestIntermediateNodeDBDeleteEmptyKey(t *testing.T) {
 		bufferSize,
 		evictionBatchSize,
 		4,
+		SHA256Hasher,
 	)
 
 	emptyKey := ToKey([]byte{})
