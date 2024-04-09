@@ -17,14 +17,15 @@ build_and_test() {
   echo "listing images"
   docker images
 
+  local host_arch
+  host_arch="$(go env GOARCH)"
+
   if [[ "$repo" == *"/"* ]]; then
-    # Test all platforms for multiplatform builds
-    local platforms=("linux/amd64" "linux/arm64")
+    # Test all arches if testing a multi-arch image
+    local arches=("amd64" "arm64")
   else
     # Test only the host platform for single arch builds
-    local host_arch
-    host_arch="$(go env GOARCH)"
-    local platforms=("linux/$host_arch")
+    local arches=("$host_arch")
   fi
 
   # Check all of the images expected to have been built
@@ -35,11 +36,21 @@ build_and_test() {
     "$repo:$current_branch-race"
   )
 
-  for platform in "${platforms[@]}"; do
+  for arch in "${arches[@]}"; do
     for image in "${images[@]}"; do
-      echo "running 'avalanchego --version' for image $image for $platform"
-      # Check for image sanity by calling the binary with --version
-      docker run  -t --rm --platform "$platform" "$image" /avalanchego/build/avalanchego --version
+      if [[ "$host_arch" == "amd64" && "$arch" == "arm64" && "$image" =~ "-race" ]]; then
+        # Error reported when trying to sanity check this configuration:
+        #
+        #   FATAL: ThreadSanitizer: unsupported VMA range
+        #   FATAL: Found 39 - Supported 48
+        #
+        echo "skipping sanity check for $image"
+        echo "image is for arm64 and binary is compiled with race detection"
+        echo "amd64 github workers are known to run kernels incompatible with these images"
+      else
+        echo "checking sanity of image $image for $arch by running 'avalanchego --version'"
+        docker run  -t --rm --platform "linux/$arch" "$image" /avalanchego/build/avalanchego --version
+      fi
     done
   done
 }
