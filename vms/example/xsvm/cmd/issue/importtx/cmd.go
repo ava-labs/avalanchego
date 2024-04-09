@@ -52,7 +52,7 @@ func importFunc(c *cobra.Command, args []string) error {
 	return nil
 }
 
-func Import(ctx context.Context, config *Config) (*status.TxIssueStatus, error) {
+func Import(ctx context.Context, config *Config) (*status.TxIssuance, error) {
 	var (
 		// Note: here we assume the unsigned message is correct from the last
 		//       URI in sourceURIs. In practice this shouldn't be done.
@@ -148,7 +148,7 @@ func Import(ctx context.Context, config *Config) (*status.TxIssueStatus, error) 
 		return nil, err
 	}
 
-	return &status.TxIssueStatus{
+	return &status.TxIssuance{
 		Tx:        stx,
 		TxID:      txID,
 		Nonce:     nonce,

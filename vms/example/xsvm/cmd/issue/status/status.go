@@ -12,14 +12,14 @@ import (
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/tx"
 )
 
-type TxIssueStatus struct {
+type TxIssuance struct {
 	Tx        *tx.Tx
 	TxID      ids.ID
 	Nonce     uint64
 	StartTime time.Time
 }
 
-func (s *TxIssueStatus) GetMessage() (string, error) {
+func (s *TxIssuance) GetMessage() (string, error) {
 	txJSON, err := json.MarshalIndent(s.Tx, "", "  ")
 	if err != nil {
 		return "", err

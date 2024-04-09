@@ -47,7 +47,7 @@ func exportFunc(c *cobra.Command, args []string) error {
 	return nil
 }
 
-func Export(ctx context.Context, config *Config) (*status.TxIssueStatus, error) {
+func Export(ctx context.Context, config *Config) (*status.TxIssuance, error) {
 	client := api.NewClient(config.URI, config.SourceChainID.String())
 
 	address := config.PrivateKey.Address()
@@ -80,7 +80,7 @@ func Export(ctx context.Context, config *Config) (*status.TxIssueStatus, error) 
 		return nil, err
 	}
 
-	return &status.TxIssueStatus{
+	return &status.TxIssuance{
 		Tx:        stx,
 		TxID:      txID,
 		Nonce:     nonce,
