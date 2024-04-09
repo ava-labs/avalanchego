@@ -4,20 +4,16 @@
 package merkledb
 
 import (
-	"sync"
-
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/utils"
 )
-
-const defaultBufferLength = 256
 
 // Holds intermediate nodes. That is, those without values.
 // Changes to this database aren't written to [baseDB] until
 // they're evicted from the [nodeCache] or Flush is called.
 type intermediateNodeDB struct {
-	// Holds unused []byte
-	bufferPool *sync.Pool
+	bufferPool *utils.BytesPool
 
 	// The underlying storage.
 	// Keys written to [baseDB] are prefixed with [intermediateNodePrefix].
@@ -41,7 +37,7 @@ type intermediateNodeDB struct {
 
 func newIntermediateNodeDB(
 	db database.Database,
-	bufferPool *sync.Pool,
+	bufferPool *utils.BytesPool,
 	metrics merkleMetrics,
 	cacheSize int,
 	writeBufferSize int,
@@ -98,14 +94,15 @@ func (db *intermediateNodeDB) onEviction(key Key, n *node) error {
 	return nil
 }
 
-func (db *intermediateNodeDB) addToBatch(b database.Batch, key Key, n *node) error {
+func (db *intermediateNodeDB) addToBatch(b database.KeyValueWriterDeleter, key Key, n *node) error {
 	dbKey := db.constructDBKey(key)
 	defer db.bufferPool.Put(dbKey)
+
 	db.metrics.DatabaseNodeWrite()
 	if n == nil {
-		return b.Delete(dbKey)
+		return b.Delete(*dbKey)
 	}
-	return b.Put(dbKey, n.bytes())
+	return b.Put(*dbKey, n.bytes())
 }
 
 func (db *intermediateNodeDB) Get(key Key) (*node, error) {
@@ -128,12 +125,13 @@ func (db *intermediateNodeDB) Get(key Key) (*node, error) {
 	db.metrics.IntermediateNodeCacheMiss()
 
 	dbKey := db.constructDBKey(key)
+	defer db.bufferPool.Put(dbKey)
+
 	db.metrics.DatabaseNodeRead()
-	nodeBytes, err := db.baseDB.Get(dbKey)
+	nodeBytes, err := db.baseDB.Get(*dbKey)
 	if err != nil {
 		return nil, err
 	}
-	db.bufferPool.Put(dbKey)
 
 	return parseNode(key, nodeBytes)
 }
@@ -142,7 +140,7 @@ func (db *intermediateNodeDB) Get(key Key) (*node, error) {
 // We need to be able to differentiate between two keys of equal
 // byte length but different bit length, so we add padding to differentiate.
 // Additionally, we add a prefix indicating it is part of the intermediateNodeDB.
-func (db *intermediateNodeDB) constructDBKey(key Key) []byte {
+func (db *intermediateNodeDB) constructDBKey(key Key) *[]byte {
 	if db.tokenSize == 8 {
 		// For tokens of size byte, no padding is needed since byte length == token length
 		return addPrefixToKey(db.bufferPool, intermediateNodePrefix, key.Bytes())

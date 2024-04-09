@@ -4,18 +4,21 @@
 package merkledb
 
 import (
-	"sync"
+	"errors"
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/utils"
 )
 
-var _ database.Iterator = (*iterator)(nil)
+var (
+	_ database.Iterator = (*iterator)(nil)
+
+	errNodeMissingValue = errors.New("valueNodeDB contains node without a value")
+)
 
 type valueNodeDB struct {
-	// Holds unused []byte
-	bufferPool *sync.Pool
+	bufferPool *utils.BytesPool
 
 	// The underlying storage.
 	// Keys written to [baseDB] are prefixed with [valueNodePrefix].
@@ -31,7 +34,7 @@ type valueNodeDB struct {
 
 func newValueNodeDB(
 	db database.Database,
-	bufferPool *sync.Pool,
+	bufferPool *utils.BytesPool,
 	metrics merkleMetrics,
 	cacheSize int,
 ) *valueNodeDB {
@@ -43,27 +46,33 @@ func newValueNodeDB(
 	}
 }
 
+func (db *valueNodeDB) Write(batch database.KeyValueWriterDeleter, key Key, n *node) error {
+	db.metrics.DatabaseNodeWrite()
+	db.nodeCache.Put(key, n)
+	prefixedKey := addPrefixToKey(db.bufferPool, valueNodePrefix, key.Bytes())
+	defer db.bufferPool.Put(prefixedKey)
+
+	if n == nil {
+		return batch.Delete(*prefixedKey)
+	}
+	return batch.Put(*prefixedKey, n.bytes())
+}
+
 func (db *valueNodeDB) newIteratorWithStartAndPrefix(start, prefix []byte) database.Iterator {
 	prefixedStart := addPrefixToKey(db.bufferPool, valueNodePrefix, start)
+	defer db.bufferPool.Put(prefixedStart)
+
 	prefixedPrefix := addPrefixToKey(db.bufferPool, valueNodePrefix, prefix)
-	i := &iterator{
+	defer db.bufferPool.Put(prefixedPrefix)
+
+	return &iterator{
 		db:       db,
-		nodeIter: db.baseDB.NewIteratorWithStartAndPrefix(prefixedStart, prefixedPrefix),
+		nodeIter: db.baseDB.NewIteratorWithStartAndPrefix(*prefixedStart, *prefixedPrefix),
 	}
-	db.bufferPool.Put(prefixedStart)
-	db.bufferPool.Put(prefixedPrefix)
-	return i
 }
 
 func (db *valueNodeDB) Close() {
 	db.closed.Set(true)
-}
-
-func (db *valueNodeDB) NewBatch() *valueNodeBatch {
-	return &valueNodeBatch{
-		db:  db,
-		ops: make(map[Key]*node, defaultBufferLength),
-	}
 }
 
 func (db *valueNodeDB) Get(key Key) (*node, error) {
@@ -80,7 +89,7 @@ func (db *valueNodeDB) Get(key Key) (*node, error) {
 	defer db.bufferPool.Put(prefixedKey)
 
 	db.metrics.DatabaseNodeRead()
-	nodeBytes, err := db.baseDB.Get(prefixedKey)
+	nodeBytes, err := db.baseDB.Get(*prefixedKey)
 	if err != nil {
 		return nil, err
 	}
@@ -93,45 +102,11 @@ func (db *valueNodeDB) Clear() error {
 	return database.AtomicClearPrefix(db.baseDB, db.baseDB, valueNodePrefix)
 }
 
-// Batch of database operations
-type valueNodeBatch struct {
-	db  *valueNodeDB
-	ops map[Key]*node
-}
-
-func (b *valueNodeBatch) Put(key Key, value *node) {
-	b.ops[key] = value
-}
-
-func (b *valueNodeBatch) Delete(key Key) {
-	b.ops[key] = nil
-}
-
-// Write flushes any accumulated data to the underlying database.
-func (b *valueNodeBatch) Write() error {
-	dbBatch := b.db.baseDB.NewBatch()
-	for key, n := range b.ops {
-		b.db.metrics.DatabaseNodeWrite()
-		b.db.nodeCache.Put(key, n)
-		prefixedKey := addPrefixToKey(b.db.bufferPool, valueNodePrefix, key.Bytes())
-		if n == nil {
-			if err := dbBatch.Delete(prefixedKey); err != nil {
-				return err
-			}
-		} else if err := dbBatch.Put(prefixedKey, n.bytes()); err != nil {
-			return err
-		}
-
-		b.db.bufferPool.Put(prefixedKey)
-	}
-
-	return dbBatch.Write()
-}
-
 type iterator struct {
 	db       *valueNodeDB
 	nodeIter database.Iterator
-	current  *node
+	key      []byte
+	value    []byte
 	err      error
 }
 
@@ -146,21 +121,16 @@ func (i *iterator) Error() error {
 }
 
 func (i *iterator) Key() []byte {
-	if i.current == nil {
-		return nil
-	}
-	return i.current.key.Bytes()
+	return i.key
 }
 
 func (i *iterator) Value() []byte {
-	if i.current == nil {
-		return nil
-	}
-	return i.current.value.Value()
+	return i.value
 }
 
 func (i *iterator) Next() bool {
-	i.current = nil
+	i.key = nil
+	i.value = nil
 	if i.Error() != nil || i.db.closed.Get() {
 		return false
 	}
@@ -169,15 +139,25 @@ func (i *iterator) Next() bool {
 	}
 
 	i.db.metrics.DatabaseNodeRead()
-	key := i.nodeIter.Key()
-	key = key[valueNodePrefixLen:]
-	n, err := parseNode(ToKey(key), i.nodeIter.Value())
+
+	r := codecReader{
+		b: i.nodeIter.Value(),
+		// We are discarding the other bytes from the node, so we avoid copying
+		// the value here.
+		copy: false,
+	}
+	maybeValue, err := r.MaybeBytes()
 	if err != nil {
 		i.err = err
 		return false
 	}
+	if maybeValue.IsNothing() {
+		i.err = errNodeMissingValue
+		return false
+	}
 
-	i.current = n
+	i.key = i.nodeIter.Key()[valueNodePrefixLen:]
+	i.value = maybeValue.Value()
 	return true
 }
 

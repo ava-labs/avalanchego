@@ -495,13 +495,13 @@ func (v *view) commitToDB(ctx context.Context) error {
 	))
 	defer span.End()
 
-	// Call this here instead of in [v.db.commitChanges]
-	// because doing so there would be a deadlock.
+	// Call this here instead of in [v.db.commitView] because doing so there
+	// would be a deadlock.
 	if err := v.applyValueChanges(ctx); err != nil {
 		return err
 	}
 
-	if err := v.db.commitChanges(ctx, v); err != nil {
+	if err := v.db.commitView(ctx, v); err != nil {
 		return err
 	}
 

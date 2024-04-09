@@ -15,20 +15,401 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
+	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
+	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
+	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
+
+// Check that complexity of standard blocks is duly calculated once block is verified
+// Only transactions active post E upgrade are considered and tested pre and post E upgrade.
+func TestStandardBlockComplexity(t *testing.T) {
+	type test struct {
+		name      string
+		setupTest func(env *environment) *txs.Tx
+	}
+
+	tests := []test{
+		{
+			name: "AddPermissionlessValidatorTx",
+			setupTest: func(env *environment) *txs.Tx {
+				var (
+					nodeID    = ids.GenerateTestNodeID()
+					chainTime = env.state.GetTimestamp()
+					endTime   = chainTime.Add(defaultMaxStakingDuration)
+				)
+				sk, err := bls.NewSecretKey()
+				require.NoError(t, err)
+
+				tx, err := env.txBuilder.NewAddPermissionlessValidatorTx(
+					&txs.SubnetValidator{
+						Validator: txs.Validator{
+							NodeID: nodeID,
+							End:    uint64(endTime.Unix()),
+							Wght:   env.config.MinValidatorStake,
+						},
+						Subnet: constants.PrimaryNetworkID,
+					},
+					signer.NewProofOfPossession(sk),
+					env.ctx.AVAXAssetID,
+					&secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{ids.ShortEmpty},
+					},
+					&secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{ids.ShortEmpty},
+					},
+					reward.PercentDenominator,
+					preFundedKeys,
+				)
+				require.NoError(t, err)
+
+				return tx
+			},
+		},
+		{
+			name: "AddPermissionlessDelegatorTx",
+			setupTest: func(env *environment) *txs.Tx {
+				var primaryValidator *state.Staker
+				it, err := env.state.GetCurrentStakerIterator()
+				require.NoError(t, err)
+				for it.Next() {
+					staker := it.Value()
+					if staker.Priority != txs.PrimaryNetworkValidatorCurrentPriority {
+						continue
+					}
+					primaryValidator = staker
+					break
+				}
+				it.Release()
+
+				tx, err := env.txBuilder.NewAddPermissionlessDelegatorTx(
+					&txs.SubnetValidator{
+						Validator: txs.Validator{
+							NodeID: primaryValidator.NodeID,
+							End:    uint64(primaryValidator.EndTime.Unix()),
+							Wght:   env.config.MinDelegatorStake,
+						},
+						Subnet: constants.PrimaryNetworkID,
+					},
+					env.ctx.AVAXAssetID,
+					&secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{ids.ShortEmpty},
+					},
+					preFundedKeys,
+				)
+				require.NoError(t, err)
+
+				return tx
+			},
+		},
+		{
+			name: "AddSubnetValidatorTx",
+			setupTest: func(env *environment) *txs.Tx {
+				var primaryValidator *state.Staker
+				it, err := env.state.GetCurrentStakerIterator()
+				require.NoError(t, err)
+				for it.Next() {
+					staker := it.Value()
+					if staker.Priority != txs.PrimaryNetworkValidatorCurrentPriority {
+						continue
+					}
+					primaryValidator = staker
+					break
+				}
+				it.Release()
+
+				tx, err := env.txBuilder.NewAddSubnetValidatorTx(
+					&txs.SubnetValidator{
+						Validator: txs.Validator{
+							NodeID: primaryValidator.NodeID,
+							End:    uint64(primaryValidator.EndTime.Unix()),
+							Wght:   defaultMinValidatorStake,
+						},
+						Subnet: testSubnet1.TxID,
+					},
+					preFundedKeys,
+				)
+				require.NoError(t, err)
+
+				return tx
+			},
+		},
+		{
+			name: "CreateChainTx",
+			setupTest: func(env *environment) *txs.Tx {
+				createChainTx, err := env.txBuilder.NewCreateChainTx(
+					testSubnet1.TxID,
+					[]byte{},             // genesisData
+					ids.GenerateTestID(), // vmID
+					[]ids.ID{},           // fxIDs
+					"aaa",                // chain name
+					preFundedKeys,
+				)
+				require.NoError(t, err)
+				return createChainTx
+			},
+		},
+		{
+			name: "CreateSubnetTx",
+			setupTest: func(env *environment) *txs.Tx {
+				tx, err := env.txBuilder.NewCreateSubnetTx(
+					&secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+					},
+					preFundedKeys,
+				)
+				require.NoError(t, err)
+				return tx
+			},
+		},
+		{
+			name: "RemoveSubnetValidatorTx",
+			setupTest: func(env *environment) *txs.Tx {
+				var primaryValidator *state.Staker
+				it, err := env.state.GetCurrentStakerIterator()
+				require.NoError(t, err)
+				for it.Next() {
+					staker := it.Value()
+					if staker.Priority != txs.PrimaryNetworkValidatorCurrentPriority {
+						continue
+					}
+					primaryValidator = staker
+					break
+				}
+				it.Release()
+
+				endTime := primaryValidator.EndTime
+				subnetValTx, err := env.txBuilder.NewAddSubnetValidatorTx(
+					&txs.SubnetValidator{
+						Validator: txs.Validator{
+							NodeID: primaryValidator.NodeID,
+							Start:  0,
+							End:    uint64(endTime.Unix()),
+							Wght:   defaultWeight,
+						},
+						Subnet: testSubnet1.ID(),
+					},
+					[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
+				)
+				require.NoError(t, err)
+
+				onAcceptState, err := state.NewDiffOn(env.state)
+				require.NoError(t, err)
+
+				require.NoError(t, subnetValTx.Unsigned.Visit(&executor.StandardTxExecutor{
+					Backend: env.backend,
+					State:   onAcceptState,
+					Tx:      subnetValTx,
+				}))
+
+				require.NoError(t, onAcceptState.Apply(env.state))
+				require.NoError(t, env.state.Commit())
+
+				tx, err := env.txBuilder.NewRemoveSubnetValidatorTx(
+					primaryValidator.NodeID,
+					testSubnet1.ID(),
+					preFundedKeys,
+				)
+				require.NoError(t, err)
+
+				return tx
+			},
+		},
+		{
+			name: "TransformSubnetTx",
+			setupTest: func(env *environment) *txs.Tx {
+				tx, err := env.txBuilder.NewTransformSubnetTx(
+					testSubnet1.TxID,          // subnetID
+					ids.GenerateTestID(),      // assetID
+					10,                        // initial supply
+					10,                        // max supply
+					0,                         // min consumption rate
+					reward.PercentDenominator, // max consumption rate
+					2,                         // min validator stake
+					10,                        // max validator stake
+					time.Minute,               // min stake duration
+					time.Hour,                 // max stake duration
+					1,                         // min delegation fees
+					10,                        // min delegator stake
+					1,                         // max validator weight factor
+					80,                        // uptime requirement
+					preFundedKeys,
+				)
+				require.NoError(t, err)
+
+				return tx
+			},
+		},
+		{
+			name: "TransferSubnetOwnershipTx",
+			setupTest: func(env *environment) *txs.Tx {
+				tx, err := env.txBuilder.NewTransferSubnetOwnershipTx(
+					testSubnet1.TxID,
+					&secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{ids.ShortEmpty},
+					},
+					preFundedKeys,
+				)
+				require.NoError(t, err)
+
+				return tx
+			},
+		},
+		{
+			name: "ImportTx",
+			setupTest: func(env *environment) *txs.Tx {
+				// Skip shared memory checks
+				env.backend.Bootstrapped.Set(false)
+
+				var (
+					sourceChain  = env.ctx.XChainID
+					sourceKey    = preFundedKeys[1]
+					sourceAmount = 10 * units.Avax
+				)
+
+				sharedMemory := fundedSharedMemory(
+					t,
+					env,
+					sourceKey,
+					sourceChain,
+					map[ids.ID]uint64{
+						env.ctx.AVAXAssetID: sourceAmount,
+					},
+				)
+				env.msm.SharedMemory = sharedMemory
+
+				tx, err := env.txBuilder.NewImportTx(
+					sourceChain,
+					&secp256k1fx.OutputOwners{
+						Locktime:  0,
+						Threshold: 1,
+						Addrs:     []ids.ShortID{sourceKey.PublicKey().Address()},
+					},
+					preFundedKeys,
+				)
+				require.NoError(t, err)
+
+				// reactivate checks
+				env.backend.Bootstrapped.Set(true)
+				return tx
+			},
+		},
+		{
+			name: "ExportTx",
+			setupTest: func(env *environment) *txs.Tx {
+				tx, err := env.txBuilder.NewExportTx(
+					env.ctx.XChainID,
+					[]*avax.TransferableOutput{{
+						Asset: avax.Asset{ID: env.ctx.AVAXAssetID},
+						Out: &secp256k1fx.TransferOutput{
+							Amt: units.Avax,
+							OutputOwners: secp256k1fx.OutputOwners{
+								Locktime:  0,
+								Threshold: 1,
+								Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+							},
+						},
+					}},
+					preFundedKeys,
+				)
+				require.NoError(t, err)
+
+				return tx
+			},
+		},
+		{
+			name: "BaseTx",
+			setupTest: func(env *environment) *txs.Tx {
+				tx, err := env.txBuilder.NewBaseTx(
+					[]*avax.TransferableOutput{
+						{
+							Asset: avax.Asset{ID: env.ctx.AVAXAssetID},
+							Out: &secp256k1fx.TransferOutput{
+								Amt: 1,
+								OutputOwners: secp256k1fx.OutputOwners{
+									Threshold: 1,
+									Addrs:     []ids.ShortID{ids.ShortEmpty},
+								},
+							},
+						},
+					},
+					preFundedKeys,
+				)
+				require.NoError(t, err)
+
+				return tx
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		for _, dynamicFeesActive := range []bool{false, true} {
+			t.Run(tt.name, func(t *testing.T) {
+				require := require.New(t)
+
+				f := latestFork
+				if !dynamicFeesActive {
+					f = durango
+				}
+				env := newEnvironment(t, nil, f)
+				env.ctx.Lock.Lock()
+				defer env.ctx.Lock.Unlock()
+
+				tx := tt.setupTest(env)
+
+				nextBlkTime, _, err := state.NextBlockTime(env.state, env.clk)
+				require.NoError(err)
+
+				parentBlkID := env.state.GetLastAccepted()
+				parentBlk, err := env.state.GetStatelessBlock(parentBlkID)
+				require.NoError(err)
+
+				statelessBlk, err := block.NewBanffStandardBlock(
+					nextBlkTime,
+					parentBlkID,
+					parentBlk.Height()+1,
+					[]*txs.Tx{tx},
+				)
+				require.NoError(err)
+
+				blk := env.blkManager.NewBlock(statelessBlk)
+				require.NoError(blk.Verify(context.Background()))
+
+				// check that metered complexity is non-zero post E upgrade and zero pre E upgrade
+				blkState, found := env.blkManager.(*manager).blkIDToState[blk.ID()]
+				require.True(found)
+
+				if dynamicFeesActive {
+					require.NotEqual(commonfees.Empty, blkState.blockComplexity)
+				} else {
+					require.Equal(commonfees.Empty, blkState.blockComplexity)
+				}
+			})
+		}
+	}
+}
 
 func TestVerifierVisitProposalBlock(t *testing.T) {
 	require := require.New(t)
