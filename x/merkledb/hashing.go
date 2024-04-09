@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
+// TODO: Support configurable hash lengths
 const HashLength = 32
 
 var SHA256Hasher Hasher = &sha256Hasher{}
