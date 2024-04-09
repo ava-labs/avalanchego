@@ -155,17 +155,3 @@ func Benchmark_HashNode(b *testing.B) {
 		})
 	}
 }
-
-// Benchmark_HashNode/empty_node-12         	15512535	        76.75 ns/op	       0 B/op	       0 allocs/op
-// Benchmark_HashNode/has_value-12          	13994202	        85.44 ns/op	       0 B/op	       0 allocs/op
-// Benchmark_HashNode/has_key-12            	16025658	        73.92 ns/op	       0 B/op	       0 allocs/op
-// Benchmark_HashNode/1_child-12            	 8413833	       142.3 ns/op	       0 B/op	       0 allocs/op
-// Benchmark_HashNode/2_children-12         	 5875944	       204.5 ns/op	       0 B/op	       0 allocs/op
-// Benchmark_HashNode/16_children-12        	 1206897	       988.0 ns/op	       0 B/op	       0 allocs/op
-
-// Benchmark_HashNode/empty_node-12         	13344910	        81.39 ns/op	       0 B/op	       0 allocs/op
-// Benchmark_HashNode/has_value-12          	13953663	        87.54 ns/op	       0 B/op	       0 allocs/op
-// Benchmark_HashNode/has_key-12            	15724867	        76.84 ns/op	       0 B/op	       0 allocs/op
-// Benchmark_HashNode/1_child-12            	 8251053	       145.0 ns/op	       0 B/op	       0 allocs/op
-// Benchmark_HashNode/2_children-12         	 5770500	       208.3 ns/op	       0 B/op	       0 allocs/op
-// Benchmark_HashNode/16_children-12        	 1201893	       997.4 ns/op	       0 B/op	       0 allocs/op
