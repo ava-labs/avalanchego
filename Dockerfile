@@ -33,6 +33,9 @@ RUN go mod download
 # Copy the code into the container
 COPY . .
 
+# Ensure local builds are not available for inclusion in the final image
+RUN [ -d ./build ] && rm -rf ./build/* || true
+
 # Build avalanchego
 ARG RACE_FLAG=""
 RUN . ./build_env.sh && \
