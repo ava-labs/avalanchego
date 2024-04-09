@@ -291,4 +291,5 @@ jobs:
           sudo apt update
           sudo apt -y install qemu qemu-user-static
       - name: Check image build
-        run: scripts/tests.build_image.sh
+        shell: bash
+        run: bash -x scripts/tests.build_image.sh

@@ -11,6 +11,9 @@ FROM --platform=$BUILDPLATFORM golang:1.21.9-bullseye AS builder
 
 WORKDIR /build
 
+ARG TARGETPLATFORM
+ARG BUILDPLATFORM
+
 # Configure a cross-compiler if the target platform differs from the builder platform
 RUN if [ "$TARGETPLATFORM" = "linux/arm64" ] && [ "$BUILDPLATFORM" != "linux/arm64" ]; then \
     apt-get update && apt-get install -y gcc-aarch64-linux-gnu && \
@@ -32,7 +35,10 @@ COPY . .
 
 # Build avalanchego
 ARG RACE_FLAG=""
-RUN . ./build_env.sh && ./scripts/build.sh ${RACE_FLAG}
+RUN . ./build_env.sh && \
+    echo "{CC=$CC, TARGETPLATFORM=$TARGETPLATFORM, BUILDPLATFORM=$BUILDPLATFORM}" && \
+    export GOARCH=$(echo ${TARGETPLATFORM} | cut -d / -f2) && \
+    ./scripts/build.sh ${RACE_FLAG}
 
 # Create the build directory in the builder to avoid requiring
 # anything to be executed in the (potentially emulated) execution
