@@ -40,14 +40,16 @@ func newDB(ctx context.Context, db database.Database, config Config) (*merkleDB,
 
 func newDefaultConfig() Config {
 	return Config{
-		IntermediateWriteBatchSize:  256 * units.KiB,
+		BranchFactor:                BranchFactor16,
+		RootGenConcurrency:          0,
 		HistoryLength:               defaultHistoryLength,
 		ValueNodeCacheSize:          units.MiB,
 		IntermediateNodeCacheSize:   units.MiB,
 		IntermediateWriteBufferSize: units.KiB,
+		IntermediateWriteBatchSize:  256 * units.KiB,
 		Reg:                         prometheus.NewRegistry(),
+		TraceLevel:                  InfoTrace,
 		Tracer:                      trace.Noop,
-		BranchFactor:                BranchFactor16,
 	}
 }
 

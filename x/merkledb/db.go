@@ -238,7 +238,7 @@ type merkleDB struct {
 
 // New returns a new merkle database.
 func New(ctx context.Context, db database.Database, config Config) (MerkleDB, error) {
-	metrics, err := newMetrics("merkleDB", config.Reg)
+	metrics, err := newMetrics("merkledb", config.Reg)
 	if err != nil {
 		return nil, err
 	}
