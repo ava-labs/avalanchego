@@ -113,8 +113,6 @@ func (db *intermediateNodeDB) Get(key Key) (*node, error) {
 		}
 		return cachedValue, nil
 	}
-	db.metrics.IntermediateNodeCacheMiss()
-
 	if cachedValue, isCached := db.writeBuffer.Get(key); isCached {
 		db.metrics.IntermediateNodeCacheHit()
 		if cachedValue == nil {
