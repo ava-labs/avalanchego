@@ -13,6 +13,11 @@ set -euo pipefail
 #
 #  sudo apt-get install qemu qemu-user-static
 #
+# After installing qemu, it will also be necessary to start a new
+# builder that can support multiplatform builds:
+#
+#  docker buildx create --use
+#
 # Reference: https://docs.docker.com/buildx/working-with-buildx/
 
 # Directory above this script
