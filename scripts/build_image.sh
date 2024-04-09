@@ -43,7 +43,7 @@ if [[ "${avalanchego_dockerhub_repo}" == *"/"* ]]; then
   fi
 fi
 
-echo "Building Docker Image with tags: $avalanchego_dockerhub_repo:$commit_hash, $avalanchego_dockerhub_repo:$current_branch"
+echo "Building Docker Image with tags: $avalanchego_dockerhub_repo:$commit_hash , $avalanchego_dockerhub_repo:$current_branch"
 ${DOCKER_CMD} -t "$avalanchego_dockerhub_repo:$commit_hash" \
         -t "$avalanchego_dockerhub_repo:$current_branch" "$AVALANCHE_PATH" -f "$AVALANCHE_PATH/Dockerfile"
 
