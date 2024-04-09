@@ -284,7 +284,8 @@ func (v *view) hashChangedNodes(ctx context.Context) {
 	// If there are no children, we can avoid allocating [keyBuffer].
 	root := v.root.Value()
 	if len(root.children) == 0 {
-		v.changes.rootID = root.calculateID(v.db.metrics)
+		v.db.metrics.HashCalculated()
+		v.changes.rootID = v.db.hasher.HashNode(root)
 		return
 	}
 
@@ -370,7 +371,8 @@ func (v *view) hashChangedNode(n *node, keyBuffer []byte) (ids.ID, []byte) {
 		// If there are no children of the childNode, we can avoid constructing
 		// the buffer for the child keys.
 		if len(childNode.children) == 0 {
-			childEntry.id = childNode.calculateID(v.db.metrics)
+			v.db.metrics.HashCalculated()
+			childEntry.id = v.db.hasher.HashNode(childNode)
 			continue
 		}
 
@@ -397,7 +399,8 @@ func (v *view) hashChangedNode(n *node, keyBuffer []byte) (ids.ID, []byte) {
 	wg.Wait()
 
 	// The IDs [n]'s descendants are up to date so we can calculate [n]'s ID.
-	return n.calculateID(v.db.metrics), keyBuffer
+	v.db.metrics.HashCalculated()
+	return v.db.hasher.HashNode(n), keyBuffer
 }
 
 // setKeyBuffer expands [keyBuffer] to have sufficient size for any of [n]'s
@@ -779,8 +782,9 @@ func (v *view) insert(
 			commonPrefixLength = getLengthOfCommonPrefix(oldRoot.key, key, 0 /*offset*/, v.tokenSize)
 			commonPrefix       = oldRoot.key.Take(commonPrefixLength)
 			newRoot            = newNode(commonPrefix)
-			oldRootID          = oldRoot.calculateID(v.db.metrics)
+			oldRootID          = v.db.hasher.HashNode(oldRoot)
 		)
+		v.db.metrics.HashCalculated()
 
 		// Call addChildWithID instead of addChild so the old root is added
 		// to the new root with the correct ID.

@@ -11,8 +11,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/maybe"
 )
 
-const HashLength = 32
-
 // Representation of a node stored in the database.
 type dbNode struct {
 	value    maybe.Maybe[[]byte]
@@ -65,12 +63,6 @@ func (n *node) hasValue() bool {
 // Returns the byte representation of this node.
 func (n *node) bytes() []byte {
 	return encodeDBNode(&n.dbNode)
-}
-
-// Returns and caches the ID of this node.
-func (n *node) calculateID(metrics merkleMetrics) ids.ID {
-	metrics.HashCalculated()
-	return hashNode(n)
 }
 
 // Set [n]'s value to [val].

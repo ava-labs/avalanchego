@@ -163,6 +163,11 @@ type Config struct {
 	// BranchFactor determines the number of children each node can have.
 	BranchFactor BranchFactor
 
+	// Hasher defines the hash function to use when hashing the trie.
+	//
+	// If not hasher is specified, [SHA256Hasher] will be used.
+	Hasher Hasher
+
 	// RootGenConcurrency is the number of goroutines to use when
 	// generating a new state root.
 	//
@@ -234,6 +239,8 @@ type merkleDB struct {
 	hashNodesKeyPool *bytesPool
 
 	tokenSize int
+
+	hasher Hasher
 }
 
 // New returns a new merkle database.
@@ -253,6 +260,11 @@ func newDatabase(
 ) (*merkleDB, error) {
 	if err := config.BranchFactor.Valid(); err != nil {
 		return nil, err
+	}
+
+	hasher := config.Hasher
+	if hasher == nil {
+		hasher = SHA256Hasher
 	}
 
 	rootGenConcurrency := runtime.NumCPU()
@@ -285,6 +297,7 @@ func newDatabase(
 		childViews:       make([]*view, 0, defaultPreallocationSize),
 		hashNodesKeyPool: newBytesPool(rootGenConcurrency),
 		tokenSize:        BranchFactorToTokenSize[config.BranchFactor],
+		hasher:           hasher,
 	}
 
 	shutdownType, err := trieDB.baseDB.Get(cleanShutdownKey)
@@ -1237,7 +1250,8 @@ func (db *merkleDB) initializeRoot() error {
 		}
 	}
 
-	db.rootID = root.calculateID(db.metrics)
+	db.metrics.HashCalculated()
+	db.rootID = db.hasher.HashNode(root)
 	db.root = maybe.Some(root)
 	return nil
 }

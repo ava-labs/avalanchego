@@ -22,7 +22,6 @@ func Test_Node_Marshal(t *testing.T) {
 	childNode.setValue(maybe.Some([]byte("value")))
 	require.NotNil(t, childNode)
 
-	childNode.calculateID(&mockMetrics{})
 	root.addChild(childNode, 4)
 
 	data := root.bytes()
@@ -47,7 +46,6 @@ func Test_Node_Marshal_Errors(t *testing.T) {
 	childNode1.setValue(maybe.Some([]byte("value1")))
 	require.NotNil(t, childNode1)
 
-	childNode1.calculateID(&mockMetrics{})
 	root.addChild(childNode1, 4)
 
 	fullKey = ToKey([]byte{237})
@@ -56,7 +54,6 @@ func Test_Node_Marshal_Errors(t *testing.T) {
 	childNode2.setValue(maybe.Some([]byte("value2")))
 	require.NotNil(t, childNode2)
 
-	childNode2.calculateID(&mockMetrics{})
 	root.addChild(childNode2, 4)
 
 	data := root.bytes()
