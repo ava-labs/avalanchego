@@ -42,12 +42,7 @@ func importFunc(c *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-
-	msg, err := txStatus.GetMessage()
-	if err != nil {
-		return err
-	}
-	log.Print(msg)
+	log.Print(txStatus)
 
 	return nil
 }

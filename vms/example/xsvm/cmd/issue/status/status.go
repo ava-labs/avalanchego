@@ -19,10 +19,8 @@ type TxIssuance struct {
 	StartTime time.Time
 }
 
-func (s *TxIssuance) GetMessage() (string, error) {
+func (s *TxIssuance) String() string {
 	txJSON, err := json.MarshalIndent(s.Tx, "", "  ")
-	if err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("issued tx %s in %s\n%s\n", s.TxID, time.Since(s.StartTime), string(txJSON)), nil
+	return "failed to marshal transaction: " + err.Error()
+	return fmt.Sprintf("issued tx %s in %s\n%s\n", s.TxID, time.Since(s.StartTime), string(txJSON))
 }
