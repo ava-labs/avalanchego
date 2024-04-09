@@ -84,12 +84,12 @@ var _ = ginkgo.Describe("[XSVM]", func() {
 
 		ginkgo.By("checking that the export transaction has been accepted on all nodes")
 		for _, node := range network.Nodes[1:] {
-			client := api.NewClient(node.URI, sourceChain.ChainID.String())
-			e2e.Eventually(func() bool {
-				currentNonce, err := client.Nonce(e2e.DefaultContext(), destinationKey.Address())
-				require.NoError(err)
-				return currentNonce >= exportTxStatus.Nonce
-			}, e2e.DefaultTimeout, e2e.DefaultPollingInterval, "failed to see export transaction on all nodes before timeout")
+			require.NoError(api.WaitForAcceptance(
+				e2e.DefaultContext(),
+				api.NewClient(node.URI, sourceChain.ChainID.String()),
+				sourceChain.PreFundedKey.Address(),
+				exportTxStatus.Nonce,
+			))
 		}
 
 		ginkgo.By(fmt.Sprintf("issuing transaction on chain %s on subnet %s to activate snowman++ consensus",
