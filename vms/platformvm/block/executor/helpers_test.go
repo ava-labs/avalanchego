@@ -52,6 +52,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 	pvalidators "github.com/ava-labs/avalanchego/vms/platformvm/validators"
 	walletcommon "github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
@@ -292,7 +293,7 @@ func addSubnet(env *environment) {
 			},
 		},
 		[]*secp256k1.PrivateKey{preFundedKeys[0]},
-		fees.NoTip,
+		commonfees.NoTip,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
@@ -551,7 +552,7 @@ func addPendingValidator(
 		},
 		reward.PercentDenominator,
 		keys,
-		fees.NoTip,
+		commonfees.NoTip,
 	)
 	if err != nil {
 		return nil, err
