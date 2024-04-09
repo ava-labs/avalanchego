@@ -12,22 +12,39 @@ source "$AVALANCHE_PATH"/scripts/constants.sh
 build_and_test() {
   local repo=$1
 
-  DOCKER_REPO="${repo}" ./scripts/build_image.sh
+  DOCKER_REPO="$repo" ./scripts/build_image.sh
 
-  # Check for image sanity by calling the binary with --version
+  echo "listing images"
+  docker images
+
+  if [[ "$repo" == *"/"* ]]; then
+    # Test all platforms for multiplatform builds
+    local platforms=("linux/amd64" "linux/arm64")
+  else
+    # Test only the host platform for single arch builds
+    local host_arch
+    host_arch="$(go env GOARCH)"
+    local platforms=("linux/$host_arch")
+  fi
+
+  # Check all of the images expected to have been built
   local images=(
     "$repo:$commit_hash"
     "$repo:$current_branch"
     "$repo:$commit_hash-race"
     "$repo:$current_branch-race"
   )
-  for image in "${images[@]}"; do
-    echo "running 'avalanchego --version' for image ${image}"
-    docker run  -t --rm "${image}" /avalanchego/build/avalanchego --version
+
+  for platform in "${platforms[@]}"; do
+    for image in "${images[@]}"; do
+      echo "running 'avalanchego --version' for image $image for $platform"
+      # Check for image sanity by calling the binary with --version
+      docker run  -t --rm --platform "$platform" "$image" /avalanchego/build/avalanchego --version
+    done
   done
 }
 
-echo "checking build of local single-arch images"
+echo "checking build of single-arch images"
 build_and_test avalanchego
 
 echo "starting local docker registry to allow verification of multi-arch image builds"
@@ -48,6 +65,5 @@ function cleanup {
 }
 trap cleanup EXIT
 
-# TODO(marun) Check the sanity of images built for the non-host arch
 echo "checking build of multi-arch images"
 build_and_test "localhost:${REGISTRY_PORT}/avalanchego"
