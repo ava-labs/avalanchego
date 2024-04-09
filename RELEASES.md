@@ -26,6 +26,7 @@ The plugin version is unchanged at `35` and is compatible with version `v1.11.3`
 
 ### Fixes
 
+- Fixed p2p SDK handling of cancelled `AppRequest` messages
 - Fixed merkledb crash recovery
 
 ### What's Changed
