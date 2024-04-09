@@ -18,9 +18,10 @@ jobs:
         run: |
           sudo apt update
           sudo apt -y install qemu qemu-user-static
+          sudo systemctl restart docker
       - name: Publish image to DockerHub
         env:
           DOCKER_USERNAME: ${{ secrets.docker_username }}
           DOCKER_PASS: ${{ secrets.docker_pass }}
           DOCKER_REPO: ${{ secrets.docker_repo }}
-        run: scripts/publish_image.sh
+        run: scripts/build_image.sh
