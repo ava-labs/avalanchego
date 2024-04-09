@@ -81,7 +81,7 @@ type ClientConfig struct {
 	Log              logging.Logger
 	Metrics          SyncMetrics
 	BranchFactor     merkledb.BranchFactor
-	// If not [Hasher] is specified, [merkledb.SHA256Hasher] will be used.
+	// If not specified, [merkledb.SHA256Hasher] will be used.
 	Hasher merkledb.Hasher
 }
 
