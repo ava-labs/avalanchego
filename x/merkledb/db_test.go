@@ -48,6 +48,7 @@ func newDefaultConfig() Config {
 		Reg:                         prometheus.NewRegistry(),
 		Tracer:                      trace.Noop,
 		BranchFactor:                BranchFactor16,
+		Hasher:                      SHA256Hasher,
 	}
 }
 
