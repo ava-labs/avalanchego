@@ -92,7 +92,9 @@ func (c *LRU[K, _]) evict(key K) {
 }
 
 func (c *LRU[K, V]) flush() {
-	c.elements = linked.NewHashmap[K, V]()
+	if c.elements != nil {
+		c.elements.Clear()
+	}
 }
 
 func (c *LRU[_, _]) len() int {
