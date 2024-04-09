@@ -43,7 +43,7 @@ func Test_Proof_Simple(t *testing.T) {
 	proof, err := db.GetProof(ctx, []byte{})
 	require.NoError(err)
 
-	require.NoError(proof.Verify(ctx, expectedRoot, 4, SHA256Hasher))
+	require.NoError(proof.Verify(ctx, expectedRoot, db.tokenSize, db.hasher))
 }
 
 func Test_Proof_Verify_Bad_Data(t *testing.T) {
@@ -119,7 +119,7 @@ func Test_Proof_Verify_Bad_Data(t *testing.T) {
 
 			tt.malform(proof)
 
-			err = proof.Verify(context.Background(), db.getMerkleRoot(), 4, SHA256Hasher)
+			err = proof.Verify(context.Background(), db.getMerkleRoot(), db.tokenSize, db.hasher)
 			require.ErrorIs(err, tt.expectedErr)
 		})
 	}
