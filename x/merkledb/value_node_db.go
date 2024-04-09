@@ -27,7 +27,7 @@ type valueNodeDB struct {
 	// If a value is nil, the corresponding key isn't in the trie.
 	// Paths in [nodeCache] aren't prefixed with [valueNodePrefix].
 	nodeCache cache.Cacher[Key, *node]
-	metrics   merkleMetrics
+	metrics   metrics
 
 	closed utils.Atomic[bool]
 }
@@ -35,7 +35,7 @@ type valueNodeDB struct {
 func newValueNodeDB(
 	db database.Database,
 	bufferPool *utils.BytesPool,
-	metrics merkleMetrics,
+	metrics metrics,
 	cacheSize int,
 ) *valueNodeDB {
 	return &valueNodeDB{
