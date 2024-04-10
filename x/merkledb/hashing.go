@@ -14,7 +14,13 @@ import (
 // TODO: Support configurable hash lengths
 const HashLength = 32
 
-var SHA256Hasher Hasher = &sha256Hasher{}
+var (
+	SHA256Hasher Hasher = &sha256Hasher{}
+
+	// If a Hasher isn't specified, this package defaults to using the
+	// [SHA256Hasher].
+	DefaultHasher = SHA256Hasher
+)
 
 type Hasher interface {
 	// Returns the canonical hash of the non-nil [node].

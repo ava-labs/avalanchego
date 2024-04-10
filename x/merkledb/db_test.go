@@ -41,7 +41,7 @@ func newDB(ctx context.Context, db database.Database, config Config) (*merkleDB,
 func newDefaultConfig() Config {
 	return Config{
 		BranchFactor:                BranchFactor16,
-		Hasher:                      SHA256Hasher,
+		Hasher:                      DefaultHasher,
 		RootGenConcurrency:          0,
 		HistoryLength:               defaultHistoryLength,
 		ValueNodeCacheSize:          units.MiB,

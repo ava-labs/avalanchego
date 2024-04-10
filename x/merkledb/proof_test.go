@@ -23,7 +23,7 @@ import (
 
 func Test_Proof_Empty(t *testing.T) {
 	proof := &Proof{}
-	err := proof.Verify(context.Background(), ids.Empty, 4, SHA256Hasher)
+	err := proof.Verify(context.Background(), ids.Empty, 4, DefaultHasher)
 	require.ErrorIs(t, err, ErrEmptyProof)
 }
 
@@ -485,7 +485,7 @@ func Test_RangeProof_Syntactic_Verify(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := tt.proof.Verify(context.Background(), tt.start, tt.end, ids.Empty, 4, SHA256Hasher)
+			err := tt.proof.Verify(context.Background(), tt.start, tt.end, ids.Empty, 4, DefaultHasher)
 			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}

@@ -165,7 +165,7 @@ type Config struct {
 
 	// Hasher defines the hash function to use when hashing the trie.
 	//
-	// If not specified, [SHA256Hasher] will be used.
+	// If not specified, [DefaultHasher] will be used.
 	Hasher Hasher
 
 	// RootGenConcurrency is the number of goroutines to use when
@@ -264,7 +264,7 @@ func newDatabase(
 
 	hasher := config.Hasher
 	if hasher == nil {
-		hasher = SHA256Hasher
+		hasher = DefaultHasher
 	}
 
 	rootGenConcurrency := runtime.NumCPU()
