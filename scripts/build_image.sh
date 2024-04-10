@@ -39,12 +39,17 @@ DOCKER_IMAGE=${DOCKER_IMAGE:-"avalanchego"}
 
 DOCKER_CMD="docker buildx build"
 
-# Multi-arch images are prompted by image names that include a slash (/). The slash
-# indicates that a registry is involved, and multi-arch builds require the use of a
-# registry.
-#
-# If an image name does not include a slash, only a single-arch image can be built.
 if [[ "${DOCKER_IMAGE}" == *"/"* ]]; then
+  # Build a multi-arch image since the image name includes a slash which indicates
+  # the use of a registry e.g.
+  #
+  #  - dockerhub: [repo]/[image name]:[tag]
+  #  - private registry: [private registry hostname]/[image name]:[tag]
+  #
+  # A registry is required to build a multi-arch image since a multi-arch image is
+  # not really an image at all. A multi-arch image (also called a manifest) is
+  # basically a list of arch-specific images available from the same registry that
+  # hosts the manifest. Manifests are not supported for local images.
   PLATFORMS="${PLATFORMS:-linux/amd64,linux/arm64}"
   DOCKER_CMD="${DOCKER_CMD} --push --platform=${PLATFORMS}"
 
@@ -53,6 +58,9 @@ if [[ "${DOCKER_IMAGE}" == *"/"* ]]; then
     echo "$DOCKER_PASS" | docker login --username "$DOCKER_USERNAME" --password-stdin
   fi
 else
+  # Build a single-arch image since the image name does not include a slash which
+  # indicates that a registry is not available.
+  #
   # Building a single-arch image with buildx and having the resulting image show up
   # in the local store of docker images (ala 'docker build') requires explicitly
   # loading it from the buildx store with '--load'.
