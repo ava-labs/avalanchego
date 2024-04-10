@@ -37,6 +37,10 @@ fi
 # only be used to create local images.
 DOCKER_IMAGE=${DOCKER_IMAGE:-"avalanchego"}
 
+# buildx (BuildKit) improves the speed and UI of builds over the legacy builder and
+# simplifies creation of multi-arch images.
+#
+# Reference: https://docs.docker.com/build/buildkit/
 DOCKER_CMD="docker buildx build"
 
 if [[ "${DOCKER_IMAGE}" == *"/"* ]]; then
