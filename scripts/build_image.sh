@@ -33,8 +33,8 @@ if [[ $current_branch == *"-race" ]]; then
 fi
 
 # The published name should be 'avaplatform/avalanchego', but to avoid unintentional
-# pushes it is defaulted to 'avalanchego' (without the registry name) which is a
-# local-only name.
+# pushes it is defaulted to 'avalanchego' (without a repo or registry name) which can
+# only be used to create local images.
 DOCKER_IMAGE=${DOCKER_IMAGE:-"avalanchego"}
 
 DOCKER_CMD="docker buildx build"
