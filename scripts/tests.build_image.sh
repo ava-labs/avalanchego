@@ -42,7 +42,7 @@ build_and_test() {
 
   for arch in "${arches[@]}"; do
     for target_image in "${target_images[@]}"; do
-      if [[ "$host_arch" == "amd64" && "$arch" == "arm64" && "$image" =~ "-race" ]]; then
+      if [[ "$host_arch" == "amd64" && "$arch" == "arm64" && "$target_image" =~ "-race" ]]; then
         # Error reported when trying to sanity check this configuration in github ci:
         #
         #   FATAL: ThreadSanitizer: unsupported VMA range
@@ -52,7 +52,7 @@ build_and_test() {
         echo "image is for arm64 and binary is compiled with race detection"
         echo "amd64 github workers are known to run kernels incompatible with these images"
       else
-        echo "checking sanity of image $image for $arch by running 'avalanchego --version'"
+        echo "checking sanity of image $target_image for $arch by running 'avalanchego --version'"
         docker run  -t --rm --platform "linux/$arch" "$target_image" /avalanchego/build/avalanchego --version
       fi
     done
