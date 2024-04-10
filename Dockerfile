@@ -36,7 +36,7 @@ RUN go mod download
 # Copy the code into the container
 COPY . .
 
-# Ensure local builds are not available for inclusion in the final image
+# Ensure pre-existing builds are not available for inclusion in the final image
 RUN [ -d ./build ] && rm -rf ./build/* || true
 
 # Build avalanchego. The build environment is configured with build_env.sh from the step
