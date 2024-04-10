@@ -2,18 +2,10 @@
 
 set -euo pipefail
 
-################################################################
-# This script deploys a temporary network and configures
-# tests.e2e.sh to execute the e2e suite against it. This
-# validates that tmpnetctl is capable of starting a network and
-# that the e2e suite is capable of executing against a network
-# that it did not create.
-################################################################
+# This script verifies that a network can be reused across test runs.
 
 # e.g.,
 # ./scripts/build.sh
-# ./scripts/tests.e2e.existing.sh --ginkgo.label-filter=x               # All arguments are supplied to ginkgo
-# E2E_SERIAL=1 ./scripts/tests.e2e.sh                                   # Run tests serially
 # AVALANCHEGO_PATH=./build/avalanchego ./scripts/tests.e2e.existing.sh  # Customization of avalanchego path
 if ! [[ "$0" =~ scripts/tests.e2e.existing.sh ]]; then
   echo "must be run from repository root"
@@ -33,33 +25,33 @@ function print_separator {
 # Ensure network cleanup on teardown
 function cleanup {
   print_separator
-  echo "cleaning up temporary network"
-  if [[ -n "${TMPNET_NETWORK_DIR:-}" ]]; then
-    ./build/tmpnetctl stop-network
-  fi
+  echo "cleaning up reusable network"
+  ginkgo -v ./tests/e2e/e2e.test -- --stop-network
 }
 trap cleanup EXIT
 
-# Start a temporary network
-./scripts/build_tmpnetctl.sh
-print_separator
-./build/tmpnetctl start-network
+echo "building e2e.test"
+go install -v github.com/onsi/ginkgo/v2/ginkgo@v2.13.1
+ACK_GINKGO_RC=true ginkgo build ./tests/e2e
 
-# Determine the network configuration path from the latest symlink
-LATEST_SYMLINK_PATH="${HOME}/.tmpnet/networks/latest"
-if [[ -h "${LATEST_SYMLINK_PATH}" ]]; then
-  TMPNET_NETWORK_DIR="$(realpath "${LATEST_SYMLINK_PATH}")"
-  export TMPNET_NETWORK_DIR
-else
-  echo "failed to find configuration path: ${LATEST_SYMLINK_PATH} symlink not found"
-  exit 255
+print_separator
+echo "starting initial test run that should create the reusable network"
+ginkgo -v ./tests/e2e/e2e.test -- --reuse-network --ginkgo.focus-file=permissionless_subnets.go
+
+print_separator
+echo "determining the network path of the reusable network created by the first test run"
+SYMLINK_PATH="${HOME}/.tmpnet/networks/latest_avalanchego-e2e"
+INITIAL_NETWORK_DIR="$(realpath "${SYMLINK_PATH}")"
+
+print_separator
+echo "starting second test run that should reuse the network created by the first run"
+ginkgo -v ./tests/e2e/e2e.test -- --reuse-network --ginkgo.focus-file=permissionless_subnets.go
+
+
+SUBSEQUENT_NETWORK_DIR="$(realpath "${SYMLINK_PATH}")"
+echo "checking that the symlink path remains the same, indicating that the network was reused"
+if [[ "${INITIAL_NETWORK_DIR}" != "${SUBSEQUENT_NETWORK_DIR}" ]]; then
+  print_separator
+  echo "network was not reused across test runs"
+  exit 1
 fi
-
-print_separator
-# - Setting E2E_USE_EXISTING_NETWORK configures tests.e2e.sh to use
-#   the temporary network identified by TMPNET_NETWORK_DIR.
-# - Only a single test (selected with --ginkgo.focus-file) is required
-#   to validate that an existing network can be used by an e2e test
-#   suite run. Executing more tests would be duplicative of the testing
-#   performed against a network created by the test suite.
-E2E_USE_EXISTING_NETWORK=1 ./scripts/tests.e2e.sh --ginkgo.focus-file=permissionless_subnets.go
