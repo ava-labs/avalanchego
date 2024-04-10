@@ -284,8 +284,8 @@ func (v *view) hashChangedNodes(ctx context.Context) {
 	// If there are no children, we can avoid allocating [keyBuffer].
 	root := v.root.Value()
 	if len(root.children) == 0 {
-		v.db.metrics.HashCalculated()
 		v.changes.rootID = v.db.hasher.HashNode(root)
+		v.db.metrics.HashCalculated()
 		return
 	}
 
@@ -371,8 +371,8 @@ func (v *view) hashChangedNode(n *node, keyBuffer []byte) (ids.ID, []byte) {
 		// If there are no children of the childNode, we can avoid constructing
 		// the buffer for the child keys.
 		if len(childNode.children) == 0 {
-			v.db.metrics.HashCalculated()
 			childEntry.id = v.db.hasher.HashNode(childNode)
+			v.db.metrics.HashCalculated()
 			continue
 		}
 
