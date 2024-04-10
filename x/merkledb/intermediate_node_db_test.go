@@ -4,6 +4,7 @@
 package merkledb
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -12,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/maybe"
+	"github.com/ava-labs/avalanchego/utils/units"
 )
 
 // Tests:
@@ -277,4 +279,33 @@ func TestIntermediateNodeDBDeleteEmptyKey(t *testing.T) {
 	has, err = baseDB.Has(*emptyDBKey)
 	require.NoError(err)
 	require.False(has)
+}
+
+func Benchmark_IntermediateNodeDB_ConstructDBKey(b *testing.B) {
+	keyTokenSizes := []int{0, 1, 4, 16, 64, 256}
+	for _, tokenSize := range validTokenSizes {
+		db := newIntermediateNodeDB(
+			memdb.New(),
+			utils.NewBytesPool(),
+			&mockMetrics{},
+			units.MiB,
+			units.MiB,
+			units.MiB,
+			tokenSize,
+		)
+
+		for _, keyTokenSize := range keyTokenSizes {
+			keyBitSize := keyTokenSize * tokenSize
+			keyBytes := make([]byte, bytesNeeded(keyBitSize))
+			key := Key{
+				length: keyBitSize,
+				value:  string(keyBytes),
+			}
+			b.Run(fmt.Sprintf("%d/%d", tokenSize, keyTokenSize), func(b *testing.B) {
+				for i := 0; i < b.N; i++ {
+					db.bufferPool.Put(db.constructDBKey(key))
+				}
+			})
+		}
+	}
 }

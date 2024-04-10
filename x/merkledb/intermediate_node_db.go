@@ -140,11 +140,28 @@ func (db *intermediateNodeDB) Get(key Key) (*node, error) {
 // Additionally, we add a prefix indicating it is part of the intermediateNodeDB.
 func (db *intermediateNodeDB) constructDBKey(key Key) *[]byte {
 	if db.tokenSize == 8 {
-		// For tokens of size byte, no padding is needed since byte length == token length
+		// For tokens of size byte, no padding is needed since byte
+		// length == token length
 		return addPrefixToKey(db.bufferPool, intermediateNodePrefix, key.Bytes())
 	}
 
-	return addPrefixToKey(db.bufferPool, intermediateNodePrefix, key.Extend(ToToken(1, db.tokenSize)).Bytes())
+	var (
+		prefixLen              = len(intermediateNodePrefix)
+		prefixBitLen           = 8 * prefixLen
+		dualIndex              = dualBitIndex(db.tokenSize)
+		paddingByteValue  byte = 1 << dualIndex
+		paddingSliceValue      = []byte{paddingByteValue}
+		paddingKey             = Key{
+			value:  byteSliceToString(paddingSliceValue),
+			length: db.tokenSize,
+		}
+	)
+
+	bufferPtr := db.bufferPool.Get(bytesNeeded(prefixBitLen + key.length + db.tokenSize))
+	copy(*bufferPtr, intermediateNodePrefix)                          // add prefix
+	copy((*bufferPtr)[prefixLen:], key.Bytes())                       // add key
+	extendIntoBuffer(*bufferPtr, paddingKey, prefixBitLen+key.length) // add padding
+	return bufferPtr
 }
 
 func (db *intermediateNodeDB) Put(key Key, n *node) error {
