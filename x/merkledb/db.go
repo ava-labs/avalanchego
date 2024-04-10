@@ -219,7 +219,7 @@ type merkleDB struct {
 	// True iff the db has been closed.
 	closed bool
 
-	metrics merkleMetrics
+	metrics metrics
 
 	debugTracer trace.Tracer
 	infoTracer  trace.Tracer
@@ -245,7 +245,7 @@ type merkleDB struct {
 
 // New returns a new merkle database.
 func New(ctx context.Context, db database.Database, config Config) (MerkleDB, error) {
-	metrics, err := newMetrics("merkleDB", config.Reg)
+	metrics, err := newMetrics("merkledb", config.Reg)
 	if err != nil {
 		return nil, err
 	}
@@ -256,7 +256,7 @@ func newDatabase(
 	ctx context.Context,
 	db database.Database,
 	config Config,
-	metrics merkleMetrics,
+	metrics metrics,
 ) (*merkleDB, error) {
 	if err := config.BranchFactor.Valid(); err != nil {
 		return nil, err
