@@ -14,7 +14,10 @@ WORKDIR /build
 ARG TARGETPLATFORM
 ARG BUILDPLATFORM
 
-# Configure a cross-compiler if the target platform differs from the builder platform
+# Configure a cross-compiler if the target platform differs from the build platform.
+#
+# build_env.sh is used to capture the environmental changes required by the build step since RUN
+# environment state is not otherwise persistent.
 RUN if [ "$TARGETPLATFORM" = "linux/arm64" ] && [ "$BUILDPLATFORM" != "linux/arm64" ]; then \
     apt-get update && apt-get install -y gcc-aarch64-linux-gnu && \
     echo "export CC=aarch64-linux-gnu-gcc" > ./build_env.sh \
@@ -36,20 +39,21 @@ COPY . .
 # Ensure local builds are not available for inclusion in the final image
 RUN [ -d ./build ] && rm -rf ./build/* || true
 
-# Build avalanchego
+# Build avalanchego. The build environment is configured with build_env.sh from the step
+# enabling cross-compilation.
 ARG RACE_FLAG=""
 RUN . ./build_env.sh && \
     echo "{CC=$CC, TARGETPLATFORM=$TARGETPLATFORM, BUILDPLATFORM=$BUILDPLATFORM}" && \
     export GOARCH=$(echo ${TARGETPLATFORM} | cut -d / -f2) && \
     ./scripts/build.sh ${RACE_FLAG}
 
-# Create the build directory in the builder to avoid requiring
-# anything to be executed in the (potentially emulated) execution
-# container.
+# Create this directory in the builder to avoid requiring anything to be executed in the
+# potentially emulated execution container.
 RUN mkdir -p /avalanchego/build
 
 # ============= Cleanup Stage ================
-# Commands executed in this stage may be emulated (very slow) if TARGETPLATFORM and BUILDPLATFORM have different arches
+# Commands executed in this stage may be emulated (i.e. very slow) if TARGETPLATFORM and
+# BUILDPLATFORM have different arches.
 FROM debian:11-slim AS execution
 
 # Maintain compatibility with previous images
