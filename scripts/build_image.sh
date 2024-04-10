@@ -3,7 +3,7 @@
 set -euo pipefail
 
 # e.g.,
-# ./scripts/build_image.sh                                          # Build local single-arch image
+# ./scripts/build_image.sh                                           # Build local single-arch image
 # DOCKER_IMAGE=myavalanchego ./scripts/build_image.sh                # Build local single arch image with a custom image name
 # DOCKER_IMAGE=avaplatform/avalanchego ./scripts/build_image.sh      # Build and push multi-arch image to docker hub
 # DOCKER_IMAGE=localhost:5001/avalanchego ./scripts/build_image.sh   # Build and push multi-arch image to private registry
