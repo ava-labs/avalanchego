@@ -54,6 +54,8 @@ if [[ "${DOCKER_IMAGE}" == *"/"* ]]; then
   # not really an image at all. A multi-arch image (also called a manifest) is
   # basically a list of arch-specific images available from the same registry that
   # hosts the manifest. Manifests are not supported for local images.
+  #
+  # Reference: https://docs.docker.com/build/building/multi-platform/
   PLATFORMS="${PLATFORMS:-linux/amd64,linux/arm64}"
   DOCKER_CMD="${DOCKER_CMD} --push --platform=${PLATFORMS}"
 
