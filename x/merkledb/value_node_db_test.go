@@ -26,6 +26,7 @@ func TestValueNodeDB(t *testing.T) {
 		utils.NewBytesPool(),
 		&mockMetrics{},
 		cacheSize,
+		DefaultHasher,
 	)
 
 	// Getting a key that doesn't exist should return an error.
@@ -119,6 +120,7 @@ func TestValueNodeDBIterator(t *testing.T) {
 		utils.NewBytesPool(),
 		&mockMetrics{},
 		cacheSize,
+		DefaultHasher,
 	)
 
 	// Put key-node pairs.
@@ -224,6 +226,7 @@ func TestValueNodeDBClear(t *testing.T) {
 		utils.NewBytesPool(),
 		&mockMetrics{},
 		cacheSize,
+		DefaultHasher,
 	)
 
 	batch := db.baseDB.NewBatch()

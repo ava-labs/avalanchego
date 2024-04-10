@@ -33,6 +33,7 @@ type intermediateNodeDB struct {
 	evictionBatchSize int
 	metrics           metrics
 	tokenSize         int
+	hasher            Hasher
 }
 
 func newIntermediateNodeDB(
@@ -43,6 +44,7 @@ func newIntermediateNodeDB(
 	writeBufferSize int,
 	evictionBatchSize int,
 	tokenSize int,
+	hasher Hasher,
 ) *intermediateNodeDB {
 	result := &intermediateNodeDB{
 		metrics:           metrics,
@@ -50,6 +52,7 @@ func newIntermediateNodeDB(
 		bufferPool:        bufferPool,
 		evictionBatchSize: evictionBatchSize,
 		tokenSize:         tokenSize,
+		hasher:            hasher,
 		nodeCache:         cache.NewSizedLRU(cacheSize, cacheEntrySize),
 	}
 	result.writeBuffer = newOnEvictCache(
@@ -131,7 +134,7 @@ func (db *intermediateNodeDB) Get(key Key) (*node, error) {
 		return nil, err
 	}
 
-	return parseNode(key, nodeBytes)
+	return parseNode(db.hasher, key, nodeBytes)
 }
 
 // constructDBKey returns a key that can be used in [db.baseDB].
