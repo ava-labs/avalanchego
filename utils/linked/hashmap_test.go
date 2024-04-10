@@ -95,6 +95,23 @@ func TestHashmap(t *testing.T) {
 	require.Equal(1, val1, "wrong value")
 }
 
+func TestHashmapClear(t *testing.T) {
+	require := require.New(t)
+
+	lh := NewHashmap[int, int]()
+	lh.Put(1, 1)
+	lh.Put(2, 2)
+
+	lh.Clear()
+
+	require.Empty(lh.entryMap)
+	require.Zero(lh.entryList.Len())
+	require.Len(lh.freeList, 2)
+	for _, e := range lh.freeList {
+		require.Zero(e.Value) // Make sure the value is cleared
+	}
+}
+
 func TestIterator(t *testing.T) {
 	require := require.New(t)
 	id1, id2, id3 := ids.GenerateTestID(), ids.GenerateTestID(), ids.GenerateTestID()

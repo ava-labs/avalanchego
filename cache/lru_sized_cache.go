@@ -113,7 +113,7 @@ func (c *sizedLRU[K, _]) evict(key K) {
 }
 
 func (c *sizedLRU[K, V]) flush() {
-	c.elements = linked.NewHashmap[K, V]()
+	c.elements.Clear()
 	c.currentSize = 0
 }
 
