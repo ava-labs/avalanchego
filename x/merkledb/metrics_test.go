@@ -26,27 +26,27 @@ func Test_Metrics_Basic_Usage(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	db.metrics.(*mockMetrics).keyReadCount = 0
-	db.metrics.(*mockMetrics).keyWriteCount = 0
+	db.metrics.(*mockMetrics).nodeReadCount = 0
+	db.metrics.(*mockMetrics).nodeWriteCount = 0
 	db.metrics.(*mockMetrics).hashCount = 0
 
 	require.NoError(t, db.Put([]byte("key"), []byte("value")))
 
-	require.Equal(t, int64(1), db.metrics.(*mockMetrics).keyReadCount)
-	require.Equal(t, int64(1), db.metrics.(*mockMetrics).keyWriteCount)
+	require.Equal(t, int64(1), db.metrics.(*mockMetrics).nodeReadCount)
+	require.Equal(t, int64(1), db.metrics.(*mockMetrics).nodeWriteCount)
 	require.Equal(t, int64(1), db.metrics.(*mockMetrics).hashCount)
 
 	require.NoError(t, db.Delete([]byte("key")))
 
-	require.Equal(t, int64(1), db.metrics.(*mockMetrics).keyReadCount)
-	require.Equal(t, int64(2), db.metrics.(*mockMetrics).keyWriteCount)
+	require.Equal(t, int64(1), db.metrics.(*mockMetrics).nodeReadCount)
+	require.Equal(t, int64(2), db.metrics.(*mockMetrics).nodeWriteCount)
 	require.Equal(t, int64(1), db.metrics.(*mockMetrics).hashCount)
 
 	_, err = db.Get([]byte("key2"))
 	require.ErrorIs(t, err, database.ErrNotFound)
 
-	require.Equal(t, int64(2), db.metrics.(*mockMetrics).keyReadCount)
-	require.Equal(t, int64(2), db.metrics.(*mockMetrics).keyWriteCount)
+	require.Equal(t, int64(2), db.metrics.(*mockMetrics).nodeReadCount)
+	require.Equal(t, int64(2), db.metrics.(*mockMetrics).nodeWriteCount)
 	require.Equal(t, int64(1), db.metrics.(*mockMetrics).hashCount)
 }
 

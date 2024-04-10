@@ -68,7 +68,7 @@ func (n *node) bytes() []byte {
 }
 
 // Returns and caches the ID of this node.
-func (n *node) calculateID(metrics merkleMetrics) ids.ID {
+func (n *node) calculateID(metrics metrics) ids.ID {
 	metrics.HashCalculated()
 	return hashNode(n)
 }
