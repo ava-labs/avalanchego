@@ -2,6 +2,10 @@
 
 set -euo pipefail
 
+# This test script is intended to execute successfully on a ubuntu 22.04 host with either the
+# amd64 or arm64 arches. Recent docker (with buildx support) and qemu are required. See
+# build_image.sh for more details.
+
 # TODO(marun) Perform more extensive validation (e.g. e2e testing) against one or more images
 
 # Directory above this script
@@ -39,7 +43,7 @@ build_and_test() {
   for arch in "${arches[@]}"; do
     for target_image in "${target_images[@]}"; do
       if [[ "$host_arch" == "amd64" && "$arch" == "arm64" && "$image" =~ "-race" ]]; then
-        # Error reported when trying to sanity check this configuration:
+        # Error reported when trying to sanity check this configuration in github ci:
         #
         #   FATAL: ThreadSanitizer: unsupported VMA range
         #   FATAL: Found 39 - Supported 48
