@@ -34,9 +34,12 @@ echo "building e2e.test"
 go install -v github.com/onsi/ginkgo/v2/ginkgo@v2.13.1
 ACK_GINKGO_RC=true ginkgo build ./tests/e2e
 
+# The xsvm plugin is required to deploy the e2e suite's shared network
+./scripts/build_xsvm.sh
+
 print_separator
 echo "starting initial test run that should create the reusable network"
-ginkgo -v ./tests/e2e/e2e.test -- --reuse-network --ginkgo.focus-file=permissionless_subnets.go
+ginkgo -v ./tests/e2e/e2e.test -- --reuse-network --ginkgo.focus-file=xsvm.go
 
 print_separator
 echo "determining the network path of the reusable network created by the first test run"
@@ -45,7 +48,7 @@ INITIAL_NETWORK_DIR="$(realpath "${SYMLINK_PATH}")"
 
 print_separator
 echo "starting second test run that should reuse the network created by the first run"
-ginkgo -v ./tests/e2e/e2e.test -- --reuse-network --ginkgo.focus-file=permissionless_subnets.go
+ginkgo -v ./tests/e2e/e2e.test -- --reuse-network --ginkgo.focus-file=xsvm.go
 
 
 SUBSEQUENT_NETWORK_DIR="$(realpath "${SYMLINK_PATH}")"
