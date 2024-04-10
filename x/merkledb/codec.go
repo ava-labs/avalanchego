@@ -90,12 +90,14 @@ func encodeDBNode(n *dbNode) []byte {
 		return w.b
 	}
 
-	// By allocating BranchFactorLargest rather than len(n.children), this slice
+	// By allocating BranchFactorLargest rather than [numChildren], this slice
 	// is allocated on the stack rather than the heap. BranchFactorLargest is
-	// at least len(n.children) which avoids memory allocations.
-	keys := make([]byte, 0, BranchFactorLargest)
+	// at least [numChildren] which avoids memory allocations.
+	keys := make([]byte, numChildren, BranchFactorLargest)
+	i := 0
 	for k := range n.children {
-		keys = append(keys, k)
+		keys[i] = k
+		i++
 	}
 
 	// Ensure that the order of entries is correct.

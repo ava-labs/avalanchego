@@ -45,9 +45,9 @@ func (*sha256Hasher) HashNode(n *node) ids.ID {
 
 	// Avoid allocating keys entirely if the node doesn't have any children.
 	if numChildren != 0 {
-		// By allocating BranchFactorLargest rather than len(n.children), this
+		// By allocating BranchFactorLargest rather than [numChildren], this
 		// slice is allocated on the stack rather than the heap.
-		// BranchFactorLargest is at least len(n.children) which avoids memory
+		// BranchFactorLargest is at least [numChildren] which avoids memory
 		// allocations.
 		keys := make([]byte, numChildren, BranchFactorLargest)
 		i := 0
