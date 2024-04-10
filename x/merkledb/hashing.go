@@ -49,9 +49,11 @@ func (*sha256Hasher) HashNode(n *node) ids.ID {
 		// slice is allocated on the stack rather than the heap.
 		// BranchFactorLargest is at least len(n.children) which avoids memory
 		// allocations.
-		keys := make([]byte, 0, BranchFactorLargest)
+		keys := make([]byte, numChildren, BranchFactorLargest)
+		i := 0
 		for k := range n.children {
-			keys = append(keys, k)
+			keys[i] = k
+			i++
 		}
 
 		// Ensure that the order of entries is correct.
