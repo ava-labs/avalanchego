@@ -10,7 +10,8 @@ set -euo pipefail
 # DOCKER_IMAGE=localhost:5001/myavalanchego ./scripts/build_image.sh # Build and push multi-arch image to private registry with a custom image name
 
 # Multi-arch builds require Docker Buildx and QEMU. buildx should be enabled by
-# default as of this writing, and qemu can be installed on ubuntu as follows:
+# default in the verson of docker included with Ubuntu 22.04, and qemu can be
+# installed as follows:
 #
 #  sudo apt-get install qemu qemu-user-static
 #
