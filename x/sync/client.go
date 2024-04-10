@@ -81,7 +81,7 @@ type ClientConfig struct {
 	Log              logging.Logger
 	Metrics          SyncMetrics
 	BranchFactor     merkledb.BranchFactor
-	// If not specified, [merkledb.SHA256Hasher] will be used.
+	// If not specified, [merkledb.DefaultHasher] will be used.
 	Hasher merkledb.Hasher
 }
 
@@ -91,7 +91,7 @@ func NewClient(config *ClientConfig) (Client, error) {
 	}
 	hasher := config.Hasher
 	if hasher == nil {
-		hasher = merkledb.SHA256Hasher
+		hasher = merkledb.DefaultHasher
 	}
 	return &client{
 		networkClient:  config.NetworkClient,

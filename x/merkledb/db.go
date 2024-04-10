@@ -165,7 +165,7 @@ type Config struct {
 
 	// Hasher defines the hash function to use when hashing the trie.
 	//
-	// If not specified, [SHA256Hasher] will be used.
+	// If not specified, [DefaultHasher] will be used.
 	Hasher Hasher
 
 	// RootGenConcurrency is the number of goroutines to use when
@@ -219,7 +219,7 @@ type merkleDB struct {
 	// True iff the db has been closed.
 	closed bool
 
-	metrics merkleMetrics
+	metrics metrics
 
 	debugTracer trace.Tracer
 	infoTracer  trace.Tracer
@@ -245,7 +245,7 @@ type merkleDB struct {
 
 // New returns a new merkle database.
 func New(ctx context.Context, db database.Database, config Config) (MerkleDB, error) {
-	metrics, err := newMetrics("merkleDB", config.Reg)
+	metrics, err := newMetrics("merkledb", config.Reg)
 	if err != nil {
 		return nil, err
 	}
@@ -256,7 +256,7 @@ func newDatabase(
 	ctx context.Context,
 	db database.Database,
 	config Config,
-	metrics merkleMetrics,
+	metrics metrics,
 ) (*merkleDB, error) {
 	if err := config.BranchFactor.Valid(); err != nil {
 		return nil, err
@@ -264,7 +264,7 @@ func newDatabase(
 
 	hasher := config.Hasher
 	if hasher == nil {
-		hasher = SHA256Hasher
+		hasher = DefaultHasher
 	}
 
 	rootGenConcurrency := runtime.NumCPU()
@@ -1255,8 +1255,9 @@ func (db *merkleDB) initializeRoot() error {
 		}
 	}
 
-	db.metrics.HashCalculated()
 	db.rootID = db.hasher.HashNode(root)
+	db.metrics.HashCalculated()
+
 	db.root = maybe.Some(root)
 	return nil
 }
