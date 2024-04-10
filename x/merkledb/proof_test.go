@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"math/rand"
+	"slices"
 	"testing"
 	"time"
 
@@ -21,86 +22,100 @@ import (
 	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
-func Test_Proof_Empty(t *testing.T) {
-	proof := &Proof{}
-	err := proof.Verify(context.Background(), ids.Empty, 4)
-	require.ErrorIs(t, err, ErrEmptyProof)
-}
-
-func Test_Proof_Simple(t *testing.T) {
-	require := require.New(t)
-
-	db, err := getBasicDB()
-	require.NoError(err)
-
-	ctx := context.Background()
-	require.NoError(db.PutContext(ctx, []byte{}, []byte{1}))
-	require.NoError(db.PutContext(ctx, []byte{0}, []byte{2}))
-
-	expectedRoot, err := db.GetMerkleRoot(ctx)
-	require.NoError(err)
-
-	proof, err := db.GetProof(ctx, []byte{})
-	require.NoError(err)
-
-	require.NoError(proof.Verify(ctx, expectedRoot, 4))
-}
-
-func Test_Proof_Verify_Bad_Data(t *testing.T) {
+func Test_Proof_Verify(t *testing.T) {
 	type test struct {
 		name        string
+		proofKey    []byte
 		malform     func(proof *Proof)
 		expectedErr error
 	}
 
+	emptyValueKey := []byte{1, 2, 3}
+	nonEmptyValueKey := []byte{3, 4, 5}
+	nonExistentKey := []byte{5}
+
 	tests := []test{
 		{
-			name:        "happyPath",
+			name:        "happy path inclusion proof non-empty value",
+			proofKey:    nonEmptyValueKey,
 			malform:     func(*Proof) {},
 			expectedErr: nil,
 		},
 		{
-			name: "empty",
+			name:        "happy path inclusion proof empty value",
+			proofKey:    emptyValueKey,
+			malform:     func(*Proof) {},
+			expectedErr: nil,
+		},
+		{
+			name:        "happy path exclusion proof",
+			proofKey:    nonExistentKey,
+			malform:     func(*Proof) {},
+			expectedErr: nil,
+		},
+		{
+			name:     "empty inclusion proof path",
+			proofKey: nonEmptyValueKey,
 			malform: func(proof *Proof) {
 				proof.Path = nil
 			},
 			expectedErr: ErrEmptyProof,
 		},
 		{
-			name: "odd length key path with value",
+			name:     "empty exclusion proof path",
+			proofKey: nonExistentKey,
+			malform: func(proof *Proof) {
+				proof.Path = nil
+			},
+			expectedErr: ErrEmptyProof,
+		},
+		{
+			name:     "odd length key path with value; inclusion proof",
+			proofKey: nonEmptyValueKey,
 			malform: func(proof *Proof) {
 				proof.Path[0].ValueOrHash = maybe.Some([]byte{1, 2})
 			},
 			expectedErr: ErrPartialByteLengthWithValue,
 		},
 		{
-			name: "last proof node has missing value",
+			name:     "odd length key path with value; exclusion proof",
+			proofKey: nonExistentKey,
+			malform: func(proof *Proof) {
+				proof.Path[0].ValueOrHash = maybe.Some([]byte{1, 2})
+			},
+			expectedErr: ErrPartialByteLengthWithValue,
+		},
+		{
+			name:     "last inclusion proof node has wrong (non-empty) value; should be other non-empty value",
+			proofKey: nonEmptyValueKey,
+			malform: func(proof *Proof) {
+				proof.Path[len(proof.Path)-1].ValueOrHash = maybe.Some([]byte{1, 3, 3, 7})
+			},
+			expectedErr: ErrInclusionProofWrongValue,
+		},
+		{
+			name:     "last inclusion proof node has wrong (non-empty) value; should be empty value",
+			proofKey: emptyValueKey,
+			malform: func(proof *Proof) {
+				proof.Path[len(proof.Path)-1].ValueOrHash = maybe.Some([]byte{1, 3, 3, 7})
+			},
+			expectedErr: ErrInclusionProofWrongValue,
+		},
+		{
+			name:     "last inclusion proof node has wrong (empty) value",
+			proofKey: nonEmptyValueKey,
 			malform: func(proof *Proof) {
 				proof.Path[len(proof.Path)-1].ValueOrHash = maybe.Nothing[[]byte]()
 			},
-			expectedErr: ErrProofValueDoesntMatch,
+			expectedErr: ErrInclusionProofWrongValue,
 		},
 		{
-			name: "missing value on proof",
+			name:     "exclusion proof has value",
+			proofKey: nonExistentKey,
 			malform: func(proof *Proof) {
-				proof.Value = maybe.Nothing[[]byte]()
+				proof.Value = maybe.Some([]byte{1, 2, 3})
 			},
-			expectedErr: ErrProofValueDoesntMatch,
-		},
-		{
-			name: "mismatched value on proof",
-			malform: func(proof *Proof) {
-				proof.Value = maybe.Some([]byte{10})
-			},
-			expectedErr: ErrProofValueDoesntMatch,
-		},
-		{
-			name: "value of exclusion proof",
-			malform: func(proof *Proof) {
-				// remove the value node to make it look like it is an exclusion proof
-				proof.Path = proof.Path[:len(proof.Path)-1]
-			},
-			expectedErr: ErrProofValueDoesntMatch,
+			expectedErr: ErrExclusionProofUnexpectedValue,
 		},
 	}
 
@@ -111,9 +126,20 @@ func Test_Proof_Verify_Bad_Data(t *testing.T) {
 			db, err := getBasicDB()
 			require.NoError(err)
 
-			writeBasicBatch(t, db)
+			for _, kv := range []KeyValue{
+				{
+					Key:   emptyValueKey,
+					Value: nil,
+				},
+				{
+					Key:   nonEmptyValueKey,
+					Value: nonEmptyValueKey,
+				},
+			} {
+				require.NoError(db.Put(kv.Key, kv.Value))
+			}
 
-			proof, err := db.GetProof(context.Background(), []byte{2})
+			proof, err := db.GetProof(context.Background(), tt.proofKey)
 			require.NoError(err)
 			require.NotNil(proof)
 
@@ -123,9 +149,21 @@ func Test_Proof_Verify_Bad_Data(t *testing.T) {
 			require.ErrorIs(err, tt.expectedErr)
 		})
 	}
+
+	t.Run("proof key has partial byte", func(t *testing.T) {
+		require := require.New(t)
+
+		proof := &Proof{
+			Path: []ProofNode{{}},
+			Key:  ToKey([]byte{1}).Skip(1),
+		}
+
+		err := proof.Verify(context.Background(), ids.Empty, 4)
+		require.ErrorIs(err, ErrProofKeyPartialByte)
+	})
 }
 
-func Test_Proof_ValueOrHashMatches(t *testing.T) {
+func Test_ValueOrHashMatches(t *testing.T) {
 	require := require.New(t)
 
 	require.True(valueOrHashMatches(maybe.Some([]byte{0}), maybe.Some([]byte{0})))
@@ -1846,7 +1884,6 @@ func FuzzProofVerification(f *testing.F) {
 			context.Background(),
 			key,
 		)
-
 		require.NoError(err)
 
 		rootID, err := db.GetMerkleRoot(context.Background())
@@ -1854,19 +1891,37 @@ func FuzzProofVerification(f *testing.F) {
 
 		require.NoError(proof.Verify(context.Background(), rootID, db.tokenSize))
 
-		// Insert a new key-value pair
-		newKey := make([]byte, 32)
-		_, _ = rand.Read(newKey) // #nosec G404
-		newValue := make([]byte, 32)
-		_, _ = rand.Read(newValue) // #nosec G404
-		require.NoError(db.Put(newKey, newValue))
+		// Remove a proof node at random
+		removeIndex := rand.Intn(len(proof.Path))
+		removedNode := proof.Path[removeIndex]
+		proof.Path = append(proof.Path[:removeIndex], proof.Path[removeIndex+1:]...)
+		require.Error(proof.Verify(context.Background(), rootID, db.tokenSize)) //nolint:forbidigo
 
-		// Delete a key-value pair so database doesn't grow unbounded
-		iter := db.NewIterator()
-		deleteKey := iter.Key()
-		iter.Release()
+		// Re-add the proof node
+		proof.Path = slices.Insert(proof.Path, removeIndex, removedNode)
+		require.NoError(proof.Verify(context.Background(), rootID, db.tokenSize))
 
-		require.NoError(db.Delete(deleteKey))
+		// Change a key in a proof node at random
+		changeIndex := rand.Intn(len(proof.Path))
+		originalKey := proof.Path[changeIndex].Key
+		proof.Path[changeIndex].Key = ToKey([]byte{1, 3, 3, 7})
+		require.Error(proof.Verify(context.Background(), rootID, db.tokenSize)) //nolint:forbidigo
+
+		// Revert the change
+		proof.Path[changeIndex].Key = originalKey
+		require.NoError(proof.Verify(context.Background(), rootID, db.tokenSize))
+
+		// Change a value in a proof node at random
+		changeIndex = rand.Intn(len(proof.Path))
+		originalValue := proof.Path[changeIndex].ValueOrHash
+		proof.Path[changeIndex].ValueOrHash = maybe.Some([]byte{1, 3, 3, 7})
+		require.Error(proof.Verify(context.Background(), rootID, db.tokenSize)) //nolint:forbidigo
+
+		// Revert the change
+		proof.Path[changeIndex].ValueOrHash = originalValue
+
+		// Verifying the proof against a different root should fail
+		require.Error(proof.Verify(context.Background(), ids.GenerateTestID(), db.tokenSize)) //nolint:forbidigo
 	})
 }
 

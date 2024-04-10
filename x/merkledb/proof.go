@@ -23,32 +23,37 @@ import (
 const verificationCacheSize = math.MaxUint16
 
 var (
-	ErrInvalidProof                = errors.New("proof obtained an invalid root ID")
-	ErrInvalidMaxLength            = errors.New("expected max length to be > 0")
-	ErrNonIncreasingValues         = errors.New("keys sent are not in increasing order")
-	ErrStateFromOutsideOfRange     = errors.New("state key falls outside of the start->end range")
-	ErrNonIncreasingProofNodes     = errors.New("each proof node key must be a strict prefix of the next")
-	ErrExtraProofNodes             = errors.New("extra proof nodes in path")
-	ErrDataInMissingRootProof      = errors.New("there should be no state or deleted keys in a change proof that had a missing root")
-	ErrEmptyProof                  = errors.New("proof is empty")
-	ErrNoMerkleProof               = errors.New("empty key response must include merkle proof")
-	ErrShouldJustBeRoot            = errors.New("end proof should only contain root")
-	ErrNoStartProof                = errors.New("no start proof")
-	ErrNoEndProof                  = errors.New("no end proof")
-	ErrProofNodeNotForKey          = errors.New("the provided node has a key that is not a prefix of the specified key")
-	ErrProofValueDoesntMatch       = errors.New("the provided value does not match the proof node for the provided key's value")
-	ErrProofNodeHasUnincludedValue = errors.New("the provided proof has a value for a key within the range that is not present in the provided key/values")
-	ErrInvalidMaybe                = errors.New("maybe is nothing but has value")
-	ErrNilProofNode                = errors.New("proof node is nil")
-	ErrNilValueOrHash              = errors.New("proof node's valueOrHash field is nil")
-	ErrNilKey                      = errors.New("key is nil")
-	ErrInvalidKeyLength            = errors.New("key length doesn't match bytes length, check specified branchFactor")
-	ErrNilRangeProof               = errors.New("range proof is nil")
-	ErrNilChangeProof              = errors.New("change proof is nil")
-	ErrNilMaybeBytes               = errors.New("maybe bytes is nil")
-	ErrNilProof                    = errors.New("proof is nil")
-	ErrNilValue                    = errors.New("value is nil")
-	ErrUnexpectedEndProof          = errors.New("end proof should be empty")
+	ErrInvalidProof                  = errors.New("proof obtained an invalid root ID")
+	ErrInvalidMaxLength              = errors.New("expected max length to be > 0")
+	ErrNonIncreasingValues           = errors.New("keys sent are not in increasing order")
+	ErrStateFromOutsideOfRange       = errors.New("state key falls outside of the start->end range")
+	ErrNonIncreasingProofNodes       = errors.New("each proof node key must be a strict prefix of the next")
+	ErrExtraProofNodes               = errors.New("extra proof nodes in path")
+	ErrDataInMissingRootProof        = errors.New("there should be no state or deleted keys in a change proof that had a missing root")
+	ErrEmptyProof                    = errors.New("proof is empty")
+	ErrNoMerkleProof                 = errors.New("empty key response must include merkle proof")
+	ErrShouldJustBeRoot              = errors.New("end proof should only contain root")
+	ErrNoStartProof                  = errors.New("no start proof")
+	ErrNoEndProof                    = errors.New("no end proof")
+	ErrProofNodeNotForKey            = errors.New("the provided node has a key that is not a prefix of the specified key")
+	ErrInclusionProofWrongValue      = errors.New("the last proof node's value should match the proved value for an inclusion proof")
+	ErrExclusionProofUnexpectedValue = errors.New("exclusion proof's value should be Nothing")
+	ErrProofValueDoesntMatch         = errors.New("the provided value does not match the proof node for the provided key's value")
+	ErrProofNodeHasUnincludedValue   = errors.New("the provided proof has a value for a key within the range that is not present in the provided key/values")
+	ErrExpectedUnmatchedToken        = errors.New("expected at least one unmatched token")
+	ErrUnexpectedEndOfProof          = errors.New("unexpected end of proof")
+	ErrProofKeyPartialByte           = errors.New("proof key has a partial byte")
+	ErrInvalidMaybe                  = errors.New("maybe is nothing but has value")
+	ErrNilProofNode                  = errors.New("proof node is nil")
+	ErrNilValueOrHash                = errors.New("proof node's valueOrHash field is nil")
+	ErrNilKey                        = errors.New("key is nil")
+	ErrInvalidKeyLength              = errors.New("key length doesn't match bytes length, check specified branchFactor")
+	ErrNilRangeProof                 = errors.New("range proof is nil")
+	ErrNilChangeProof                = errors.New("change proof is nil")
+	ErrNilMaybeBytes                 = errors.New("maybe bytes is nil")
+	ErrNilProof                      = errors.New("proof is nil")
+	ErrNilValue                      = errors.New("value is nil")
+	ErrUnexpectedEndProof            = errors.New("end proof should be empty")
 )
 
 type ProofNode struct {
@@ -120,13 +125,17 @@ func (node *ProofNode) UnmarshalProto(pbNode *pb.ProofNode) error {
 type Proof struct {
 	// Nodes in the proof path from root --> target key
 	// (or node that would be where key is if it doesn't exist).
+	// If the key of the last element is [Key], this is an inclusion proof.
+	// Otherwise, this is an exclusion proof.
 	// Always contains at least the root.
 	Path []ProofNode
+
 	// This is a proof that [key] exists/doesn't exist.
+	// Must not have any partial bytes.
 	Key Key
 
-	// Nothing if [Key] isn't in the trie.
-	// Otherwise, the value corresponding to [Key].
+	// If this is an inclusion proof, this is the value associated with [key].
+	// If this is an exclusion proof, this is Nothing.
 	Value maybe.Maybe[[]byte]
 }
 
@@ -138,31 +147,39 @@ func (proof *Proof) Verify(ctx context.Context, expectedRootID ids.ID, tokenSize
 	if len(proof.Path) == 0 {
 		return ErrEmptyProof
 	}
-
+	if proof.Key.hasPartialByte() {
+		return ErrProofKeyPartialByte
+	}
 	if err := verifyProofPath(proof.Path, maybe.Some(proof.Key)); err != nil {
 		return err
 	}
 
-	// Confirm that the last proof node's value matches the claimed proof value
 	lastNode := proof.Path[len(proof.Path)-1]
+	isInclusionProof := lastNode.Key == proof.Key
 
-	// If the last proof node's key is [proof.Key] (i.e. this is an inclusion proof)
-	// then the value of the last proof node must match [proof.Value].
-	// Note partial byte length keys can never match the [proof.Key] since it's bytes,
-	// and thus has a whole number of bytes
-	if !lastNode.Key.hasPartialByte() &&
-		proof.Key == lastNode.Key &&
-		!valueOrHashMatches(proof.Value, lastNode.ValueOrHash) {
-		return ErrProofValueDoesntMatch
-	}
-
-	// If the last proof node has a length not evenly divisible into bytes or a different key than [proof.Key]
-	// then this is an exclusion proof and should prove that [proof.Key] isn't in the trie.
-	// Note length not evenly divisible into bytes can never match the [proof.Key] since it's bytes,
-	// and thus an exact number of bytes.
-	if (lastNode.Key.hasPartialByte() || proof.Key != lastNode.Key) &&
-		proof.Value.HasValue() {
-		return ErrProofValueDoesntMatch
+	switch {
+	case isInclusionProof && !valueOrHashMatches(proof.Value, lastNode.ValueOrHash):
+		return ErrInclusionProofWrongValue
+	case !isInclusionProof && proof.Value.HasValue():
+		return ErrExclusionProofUnexpectedValue
+	case !isInclusionProof && proof.Key.HasPrefix(lastNode.Key):
+		// The last node in an exclusion proof must be either:
+		// 1. The node that would be the parent of [proof.Key] if [proof.Key] were in the trie, or
+		// 2. The node that is where [proof.Key] would be if [proof.Key] were in the trie
+		// We are in case 1. Make sure there's no child which is a prefix of [proof.Key].
+		unmatchedKey := proof.Key.Skip(lastNode.Key.length)
+		if unmatchedKey.Length() < tokenSize {
+			// The last node's key is a prefix of [proof.Key], but isn't equal to it,
+			// so there should be at least one unmatched token.
+			return ErrExpectedUnmatchedToken
+		}
+		nextUnmatchedToken := unmatchedKey.Token(0, tokenSize)
+		if _, ok := lastNode.Children[nextUnmatchedToken]; ok {
+			// The proof path should include all nodes which are prefixes of [proof.Key]
+			// but there's another child of the last node which is a prefix of [proof.Key].
+			// That child (or its descendant) should be the last node in the proof path.
+			return ErrUnexpectedEndOfProof
+		}
 	}
 
 	// Don't bother locking [view] -- nobody else has a reference to it.
@@ -171,12 +188,12 @@ func (proof *Proof) Verify(ctx context.Context, expectedRootID ids.ID, tokenSize
 		return err
 	}
 
-	// Insert all proof nodes.
-	// [provenKey] is the key that we are proving exists, or the key
-	// that is the next key along the node path, proving that [proof.Key] doesn't exist in the trie.
+	// [provenKey] is the key that we are proving exists, or the key that is the
+	// next key along the node path, proving that [proof.Key] doesn't exist in the trie.
 	provenKey := maybe.Some(lastNode.Key)
 
-	if err = addPathInfo(view, proof.Path, provenKey, provenKey); err != nil {
+	// Insert all proof nodes.
+	if err := addPathInfo(view, proof.Path, provenKey, provenKey); err != nil {
 		return err
 	}
 
@@ -722,8 +739,6 @@ func verifyKeyValues(kvs []KeyValue, start maybe.Maybe[[]byte], end maybe.Maybe[
 //     since all keys with values are written in complete bytes([]byte).
 //   - Each key in [proof] is a strict prefix of the following key.
 //   - Each key in [proof] is a strict prefix of [keyBytes], except possibly the last.
-//   - If the last element in [proof] is [Key], this is an inclusion proof.
-//     Otherwise, this is an exclusion proof and [keyBytes] must not be in [proof].
 func verifyProofPath(proof []ProofNode, key maybe.Maybe[Key]) error {
 	if len(proof) == 0 {
 		return nil
@@ -740,12 +755,12 @@ func verifyProofPath(proof []ProofNode, key maybe.Maybe[Key]) error {
 			return ErrPartialByteLengthWithValue
 		}
 
-		// each node should have a key that has the proven key as a prefix
+		// each node's key should be a prefix of [key]
 		if key.HasValue() && !key.Value().HasStrictPrefix(nodeKey) {
 			return ErrProofNodeNotForKey
 		}
 
-		// each node should have a key that has a matching TokenConfig and is a prefix of the next node's key
+		// each node's key must be a prefix of the next node's key
 		nextKey := proof[i+1].Key
 		if !nextKey.HasStrictPrefix(nodeKey) {
 			return ErrNonIncreasingProofNodes
