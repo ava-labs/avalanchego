@@ -58,14 +58,14 @@ sequenceDiagram
     actor Alice
     actor Bob
     Note over Alice,Bob: Connection Created
-    par Alice sends Bob a Handshake message
+    par
         Alice->>Bob: AvalancheGo v1.0.0
-    and Bob sends Alice a Handshake message
+    and
         Bob->>Alice: AvalancheGo v1.11.4
     end
     Note left of Alice: v1.11.4 could be compatible with v1.0.0!
     Note right of Bob: v1.0.0 is incompatible with v1.11.4.
-    par Alice sends Bob a Peerlist message
+    par
         Alice->>Bob: Peerlist
     and Bob disconnects from Alice
         Bob-->Alice: Disconnect
@@ -87,9 +87,9 @@ sequenceDiagram
     end
     Note left of Alice: v1.11.4 could be compatible with v1.11.0!
     Note right of Bob: v1.11.0 is compatible with v1.11.4!
-    par Alice sends Bob a Peerlist message
+    par
         Alice->>Bob: Peerlist
-    and Bob sends Alice a Peerlist message
+    and
         Bob->>Alice: Peerlist
     end
     Note over Alice,Bob: Handshake Complete
