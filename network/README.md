@@ -47,14 +47,12 @@ A peer will then read the full message and attempt to parse it into either a net
 
 Upon connection to a new peer, a handshake is performed between the node attempting to establish the outbound connection to the peer and the peer receiving the inbound connection.
 
-When attempting to establish the connection, the first message that the node attempting to connect to the peer in the network is a `Handshake` message describing compatibility of the candidate node with the peer. As an example, nodes that are attempting to connect with an incompatible version of AvalancheGo or a significantly skewed local clock are rejected by the peer.
+When attempting to establish the connection, the first message that the nodes send are a `Handshake` messages describing compatibility of the nodes. As an example, nodes that are attempting to connect with an incompatible version of AvalancheGo or a significantly skewed local clock are rejected.
 
 ```mermaid
 sequenceDiagram
-Note over Node,Peer: Initiate Handshake
-Note left of Node: I want to connect to you!
-Note over Node,Peer: Handshake message
-Node->>Peer: AvalancheGo v1.0.0
+Note over Node,Peer: Connection Created
+Node<<->>Peer: AvalancheGo v1.0.0
 Note right of Peer: My version v1.9.4 is incompatible with your version v1.0.0.
 Peer-xNode: Connection dropped
 Note over Node,Peer: Handshake Failed
@@ -75,6 +73,12 @@ Note over Node,Peer: Handshake Complete
 ```
 
 Once the node attempting to join the network receives this `PeerList` message, the handshake is complete and the node is now connected to the peer.
+
+### Ping-Pong Messages
+
+All messages are prefixed with their length. Reading a message first reads the 4-byte message length from the connection. The rate limiting logic then waits until there is sufficient capacity to read these bytes from the connection.
+
+A peer will then read the full message and attempt to parse it into either a networking message or an application message. If the message is malformed the connection is not dropped. The peer will simply continue to the next sent message.
 
 ### Peer Handshake
 
