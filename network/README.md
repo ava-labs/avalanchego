@@ -47,7 +47,7 @@ sequenceDiagram
 
 ### Message Handling
 
-All messages are prefixed with their length. Reading a message first reads the 4-byte message length from the connection. The rate limiting logic then waits until there is sufficient capacity to read these bytes from the connection.
+All messages are prefixed with their length. Reading a message first reads the 4-byte message length from the connection. The rate-limiting logic then waits until there is sufficient capacity to read these bytes from the connection.
 
 A peer will then read the full message and attempt to parse it into either a networking message or an application message. If the message is malformed the connection is not dropped. The peer will simply continue to the next sent message.
 
@@ -55,7 +55,7 @@ A peer will then read the full message and attempt to parse it into either a net
 
 Upon connection to a new peer, a handshake is performed between the node attempting to establish the outbound connection to the peer and the peer receiving the inbound connection.
 
-When attempting to establish the connection, the first message that the node sends is a `Handshake` messages describing compatibility of the nodes. If the `Handshake` message is successfully received and the peer decides that it wants a connection with this node, it replies with a `PeerList` message that contains metadata about other peers that allows a node to connect to them. See [Peerlist Gossip](#peerlist-gossip).
+When attempting to establish the connection, the first message that the node sends is a `Handshake` message describing compatibility of the nodes. If the `Handshake` message is successfully received and the peer decides that it wants a connection with this node, it replies with a `PeerList` message that contains metadata about other peers that allows a node to connect to them. See [Peerlist Gossip](#peerlist-gossip).
 
 As an example, nodes that are attempting to connect with an incompatible version of AvalancheGo or a significantly skewed local clock are rejected.
 
@@ -79,7 +79,7 @@ sequenceDiagram
     Note over Alice,Bob: Handshake Failed
 ```
 
-Nodes that multually desire the connection will both respond with `PeerList` messages and complete the handshake.
+Nodes that mutually desire the connection will both respond with `PeerList` messages and complete the handshake.
 
 ```mermaid
 sequenceDiagram
@@ -103,7 +103,7 @@ sequenceDiagram
 
 ### Ping-Pong Messages
 
-Peers periodically send `Ping` messages containing perseived uptime information. This information can be used to monitor how the node is considered to be perform by the network. It is expected for a node to reply to a `Ping` message with a `Pong` message.
+Peers periodically send `Ping` messages containing perceived uptime information. This information can be used to monitor how the node is considered to be performing by the network. It is expected for a node to reply to a `Ping` message with a `Pong` message.
 
 ```mermaid
 sequenceDiagram
@@ -117,7 +117,7 @@ sequenceDiagram
 
 ## Peer Discovery
 
-When starting an Avalanche node, a node needs to be able to initiate some process that eventually allows itself to become a participating member of the network. In traditional web2 systems, it's common to use a web service by hitting the service's DNS and being routed to an available server behind a load balancer. In decentralized p2p systems however, connecting to a node is more complex as no single entity owns the network. [Avalanche consensus](https://docs.avax.network/overview/getting-started/avalanche-consensus) requires a node to repeatedly sample peers in the network, so each node needs some way of discovering and connecting to every other peer to participate in the protocol.
+When starting an Avalanche node, a node needs to be able to initiate some process that eventually allows itself to become a participating member of the network. In traditional web2 systems, it's common to use a web service by hitting the service's DNS and being routed to an available server behind a load balancer. In decentralized p2p systems, however, connecting to a node is more complex as no single entity owns the network. [Avalanche consensus](https://docs.avax.network/overview/getting-started/avalanche-consensus) requires a node to repeatedly sample peers in the network, so each node needs some way of discovering and connecting to every other peer to participate in the protocol.
 
 ### Inbound Connections
 
@@ -136,7 +136,7 @@ A node should initiate outbound connections to an `IP:Port` pair if one of the f
 
 To ensure that outbound connections are being made to the correct `IP:Port` pair of a node, all `IP:Port` pairs sent by the network are signed by the node that is claiming ownership of the pair. To prevent replays of these messages, the signature is over the `Timestamp` in addition to the `IP:Port` pair.
 
-The `Timestamp` guarantees that nodes provided an `IP:Port` pair are able to track the most up-to-date `IP:Port` pair of a peer.
+The `Timestamp` guarantees that nodes provided an `IP:Port` pair can track the most up-to-date `IP:Port` pair of a peer.
 
 ### Bootstrapping
 
@@ -144,7 +144,7 @@ In Avalanche, nodes connect to an initial set (this is user-configurable) of boo
 
 ### PeerList Gossip
 
-Once connected to an initial set of peers, a node is able to use these connections to discover additional peers.
+Once connected to an initial set of peers, a node can use these connections to discover additional peers.
 
 Peers are discovered by receiving [`PeerList`](#peerlist) messages during the [Peer Handshake](#peer-handshake). These messages quickly provide a node with knowledge of peers in the network. However, they offer no guarantee that the node will connect to and maintain connections with every peer in the network.
 
