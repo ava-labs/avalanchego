@@ -10,10 +10,12 @@
 - [Peer Discovery](#peer-discovery)
     - [Inbound Connections](#inbound-connections)
     - [Outbound Connections](#outbound-connections)
+      - [IP Authentication](#ip-authentication)
     - [Bootstrapping](#bootstrapping)
     - [PeerList Gossip](#peerlist-gossip)
-      - [Messages](#messages)
-      - [Gossip](#gossip)
+      - [Bloom Filter](#bloom-filter)
+      - [GetPeerList](#getpeerlist)
+      - [PeerList](#peerlist)
 
 ## Overview
 
