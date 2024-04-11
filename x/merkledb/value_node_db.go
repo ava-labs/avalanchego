@@ -27,7 +27,9 @@ type valueNodeDB struct {
 	// If a value is nil, the corresponding key isn't in the trie.
 	// Paths in [nodeCache] aren't prefixed with [valueNodePrefix].
 	nodeCache cache.Cacher[Key, *node]
-	metrics   merkleMetrics
+	metrics   metrics
+
+	hasher Hasher
 
 	closed utils.Atomic[bool]
 }
@@ -35,14 +37,16 @@ type valueNodeDB struct {
 func newValueNodeDB(
 	db database.Database,
 	bufferPool *utils.BytesPool,
-	metrics merkleMetrics,
+	metrics metrics,
 	cacheSize int,
+	hasher Hasher,
 ) *valueNodeDB {
 	return &valueNodeDB{
 		metrics:    metrics,
 		baseDB:     db,
 		bufferPool: bufferPool,
 		nodeCache:  cache.NewSizedLRU(cacheSize, cacheEntrySize),
+		hasher:     hasher,
 	}
 }
 
@@ -94,7 +98,7 @@ func (db *valueNodeDB) Get(key Key) (*node, error) {
 		return nil, err
 	}
 
-	return parseNode(key, nodeBytes)
+	return parseNode(db.hasher, key, nodeBytes)
 }
 
 func (db *valueNodeDB) Clear() error {

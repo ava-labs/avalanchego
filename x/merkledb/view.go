@@ -284,7 +284,8 @@ func (v *view) hashChangedNodes(ctx context.Context) {
 	// If there are no children, we can avoid allocating [keyBuffer].
 	root := v.root.Value()
 	if len(root.children) == 0 {
-		v.changes.rootID = root.calculateID(v.db.metrics)
+		v.changes.rootID = v.db.hasher.HashNode(root)
+		v.db.metrics.HashCalculated()
 		return
 	}
 
@@ -370,7 +371,8 @@ func (v *view) hashChangedNode(n *node, keyBuffer []byte) (ids.ID, []byte) {
 		// If there are no children of the childNode, we can avoid constructing
 		// the buffer for the child keys.
 		if len(childNode.children) == 0 {
-			childEntry.id = childNode.calculateID(v.db.metrics)
+			childEntry.id = v.db.hasher.HashNode(childNode)
+			v.db.metrics.HashCalculated()
 			continue
 		}
 
@@ -397,7 +399,8 @@ func (v *view) hashChangedNode(n *node, keyBuffer []byte) (ids.ID, []byte) {
 	wg.Wait()
 
 	// The IDs [n]'s descendants are up to date so we can calculate [n]'s ID.
-	return n.calculateID(v.db.metrics), keyBuffer
+	v.db.metrics.HashCalculated()
+	return v.db.hasher.HashNode(n), keyBuffer
 }
 
 // setKeyBuffer expands [keyBuffer] to have sufficient size for any of [n]'s
@@ -646,7 +649,7 @@ func (v *view) remove(key Key) error {
 	}
 
 	hadValue := nodeToDelete.hasValue()
-	nodeToDelete.setValue(maybe.Nothing[[]byte]())
+	nodeToDelete.setValue(v.db.hasher, maybe.Nothing[[]byte]())
 
 	// if the removed node has no children, the node can be removed from the trie
 	if len(nodeToDelete.children) == 0 {
@@ -757,7 +760,7 @@ func (v *view) insert(
 	if v.root.IsNothing() {
 		// the trie is empty, so create a new root node.
 		root := newNode(key)
-		root.setValue(value)
+		root.setValue(v.db.hasher, value)
 		v.root = maybe.Some(root)
 		return root, v.recordNewNode(root)
 	}
@@ -779,8 +782,9 @@ func (v *view) insert(
 			commonPrefixLength = getLengthOfCommonPrefix(oldRoot.key, key, 0 /*offset*/, v.tokenSize)
 			commonPrefix       = oldRoot.key.Take(commonPrefixLength)
 			newRoot            = newNode(commonPrefix)
-			oldRootID          = oldRoot.calculateID(v.db.metrics)
+			oldRootID          = v.db.hasher.HashNode(oldRoot)
 		)
+		v.db.metrics.HashCalculated()
 
 		// Call addChildWithID instead of addChild so the old root is added
 		// to the new root with the correct ID.
@@ -799,7 +803,7 @@ func (v *view) insert(
 
 	// a node with that exact key already exists so update its value
 	if closestNode.key == key {
-		closestNode.setValue(value)
+		closestNode.setValue(v.db.hasher, value)
 		// closestNode was already marked as changed in the ancestry loop above
 		return closestNode, nil
 	}
@@ -812,7 +816,7 @@ func (v *view) insert(
 	if !hasChild {
 		// there are no existing nodes along the key [key], so create a new node to insert [value]
 		newNode := newNode(key)
-		newNode.setValue(value)
+		newNode.setValue(v.db.hasher, value)
 		closestNode.addChild(newNode, v.tokenSize)
 		return newNode, v.recordNewNode(newNode)
 	}
@@ -845,12 +849,12 @@ func (v *view) insert(
 
 	if key.length == branchNode.key.length {
 		// the branch node has exactly the key to be inserted as its key, so set the value on the branch node
-		branchNode.setValue(value)
+		branchNode.setValue(v.db.hasher, value)
 	} else {
 		// the key to be inserted is a child of the branch node
 		// create a new node and add the value to it
 		newNode := newNode(key)
-		newNode.setValue(value)
+		newNode.setValue(v.db.hasher, value)
 		branchNode.addChild(newNode, v.tokenSize)
 		if err := v.recordNewNode(newNode); err != nil {
 			return nil, err
