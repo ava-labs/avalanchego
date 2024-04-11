@@ -213,7 +213,11 @@ func (n *Network) EnsureDefaultConfig(w io.Writer, avalancheGoPath string, plugi
 
 	// Ensure nodes are created
 	if len(n.Nodes) == 0 {
-		n.Nodes = NewNodes(nodeCount)
+		nodes, err := NewNodes(nodeCount)
+		if err != nil {
+			return err
+		}
+		n.Nodes = nodes
 	}
 
 	// Ensure nodes are configured
@@ -332,16 +336,6 @@ func (n *Network) Start(ctx context.Context, w io.Writer) error {
 	}
 
 	return nil
-}
-
-func (n *Network) AddEphemeralNode(ctx context.Context, w io.Writer, flags FlagsMap) (*Node, error) {
-	node := NewNode("")
-	node.Flags = flags
-	node.IsEphemeral = true
-	if err := n.StartNode(ctx, w, node); err != nil {
-		return nil, err
-	}
-	return node, nil
 }
 
 // Starts the provided node after configuring it for the network.

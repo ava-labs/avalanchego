@@ -19,14 +19,13 @@ func Test_Node_Marshal(t *testing.T) {
 	fullKey := ToKey([]byte("key"))
 	childNode := newNode(fullKey)
 	root.addChild(childNode, 4)
-	childNode.setValue(maybe.Some([]byte("value")))
+	childNode.setValue(DefaultHasher, maybe.Some([]byte("value")))
 	require.NotNil(t, childNode)
 
-	childNode.calculateID(&mockMetrics{})
 	root.addChild(childNode, 4)
 
 	data := root.bytes()
-	rootParsed, err := parseNode(ToKey([]byte("")), data)
+	rootParsed, err := parseNode(DefaultHasher, ToKey([]byte("")), data)
 	require.NoError(t, err)
 	require.Len(t, rootParsed.children, 1)
 
@@ -44,26 +43,24 @@ func Test_Node_Marshal_Errors(t *testing.T) {
 	fullKey := ToKey([]byte{255})
 	childNode1 := newNode(fullKey)
 	root.addChild(childNode1, 4)
-	childNode1.setValue(maybe.Some([]byte("value1")))
+	childNode1.setValue(DefaultHasher, maybe.Some([]byte("value1")))
 	require.NotNil(t, childNode1)
 
-	childNode1.calculateID(&mockMetrics{})
 	root.addChild(childNode1, 4)
 
 	fullKey = ToKey([]byte{237})
 	childNode2 := newNode(fullKey)
 	root.addChild(childNode2, 4)
-	childNode2.setValue(maybe.Some([]byte("value2")))
+	childNode2.setValue(DefaultHasher, maybe.Some([]byte("value2")))
 	require.NotNil(t, childNode2)
 
-	childNode2.calculateID(&mockMetrics{})
 	root.addChild(childNode2, 4)
 
 	data := root.bytes()
 
 	for i := 1; i < len(data); i++ {
 		broken := data[:i]
-		_, err := parseNode(ToKey([]byte("")), broken)
+		_, err := parseNode(DefaultHasher, ToKey([]byte("")), broken)
 		require.ErrorIs(t, err, io.ErrUnexpectedEOF)
 	}
 }

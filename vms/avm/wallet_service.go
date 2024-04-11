@@ -14,7 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/formatting"
-	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
+	"github.com/ava-labs/avalanchego/utils/linked"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
@@ -27,7 +27,7 @@ var errMissingUTXO = errors.New("missing utxo")
 
 type WalletService struct {
 	vm         *VM
-	pendingTxs linkedhashmap.LinkedHashmap[ids.ID, *txs.Tx]
+	pendingTxs *linked.Hashmap[ids.ID, *txs.Tx]
 }
 
 func (w *WalletService) decided(txID ids.ID) {

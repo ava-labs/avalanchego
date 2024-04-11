@@ -24,7 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
-	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
+	"github.com/ava-labs/avalanchego/utils/linked"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/sampler"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
@@ -215,7 +215,7 @@ func setup(tb testing.TB, c *envConfig) *environment {
 		},
 		walletService: &WalletService{
 			vm:         vm,
-			pendingTxs: linkedhashmap.New[ids.ID, *txs.Tx](),
+			pendingTxs: linked.NewHashmap[ids.ID, *txs.Tx](),
 		},
 	}
 
