@@ -47,7 +47,9 @@ A peer will then read the full message and attempt to parse it into either a net
 
 Upon connection to a new peer, a handshake is performed between the node attempting to establish the outbound connection to the peer and the peer receiving the inbound connection.
 
-When attempting to establish the connection, the first message that the nodes send are a `Handshake` messages describing compatibility of the nodes. As an example, nodes that are attempting to connect with an incompatible version of AvalancheGo or a significantly skewed local clock are rejected.
+When attempting to establish the connection, the first message that the nodes send are a `Handshake` messages describing compatibility of the nodes. If the `Handshake` message is successfully received and the peer decides that it wants a connection with this node, it replies with a `PeerList` message that contains metadata about other peers that allows a node to connect to them. See [Peerlist Gossip](#peerlist-gossip).
+
+As an example, nodes that are attempting to connect with an incompatible version of AvalancheGo or a significantly skewed local clock are rejected.
 
 ```mermaid
 sequenceDiagram
@@ -61,7 +63,7 @@ sequenceDiagram
     end
     Note left of Alice: v1.11.4 could be compatible with v1.0.0!
     Note right of Bob: v1.0.0 is incompatible with v1.11.4.
-    par Alice sends Bob the Peerlist message
+    par Alice sends Bob a Peerlist message
         Alice->>Bob: Peerlist
     and Bob disconnects from Alice
         Bob-->Alice: Disconnect
@@ -69,21 +71,27 @@ sequenceDiagram
     Note over Alice,Bob: Handshake Failed
 ```
 
-If the `Handshake` message is successfully received and the peer decides that it wants a connection with this node, it replies with a `PeerList` message that contains metadata about other peers that allows a node to connect to them. See [Peerlist Gossip](#peerlist-gossip).
+Nodes that multually desire the connection will both respond with `PeerList` messages and complete the handshake.
 
 ```mermaid
 sequenceDiagram
-Note over Node,Peer: Initiate Handshake
-Note left of Node: I want to connect to you!
-Note over Node,Peer: Handshake message
-Node->>Peer: AvalancheGo v1.9.4
-Note right of Peer: LGTM!
-Note over Node,Peer: PeerList message
-Peer->>Node: Peer-X, Peer-Y, Peer-Z
-Note over Node,Peer: Handshake Complete
+    actor Alice
+    actor Bob
+    Note over Alice,Bob: Connection Created
+    par Alice sends Bob a Handshake message
+        Alice->>Bob: AvalancheGo v1.11.0
+    and Bob sends Alice a Handshake message
+        Bob->>Alice: AvalancheGo v1.11.4
+    end
+    Note left of Alice: v1.11.4 could be compatible with v1.11.0!
+    Note right of Bob: v1.11.0 is compatible with v1.11.4!
+    par Alice sends Bob a Peerlist message
+        Alice->>Bob: Peerlist
+    and Bob sends Alice a Peerlist message
+        Bob->>Alice: Peerlist
+    end
+    Note over Alice,Bob: Handshake Complete
 ```
-
-Once the node attempting to join the network receives this `PeerList` message, the handshake is complete and the node is now connected to the peer.
 
 ### Ping-Pong Messages
 
