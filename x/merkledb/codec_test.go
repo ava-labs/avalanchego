@@ -18,74 +18,6 @@ import (
 )
 
 var (
-	hashNodeTests = []struct {
-		name         string
-		n            *node
-		expectedHash string
-	}{
-		{
-			name:         "empty node",
-			n:            newNode(Key{}),
-			expectedHash: "rbhtxoQ1DqWHvb6w66BZdVyjmPAneZUSwQq9uKj594qvFSdav",
-		},
-		{
-			name: "has value",
-			n: func() *node {
-				n := newNode(Key{})
-				n.setValue(maybe.Some([]byte("value1")))
-				return n
-			}(),
-			expectedHash: "2vx2xueNdWoH2uB4e8hbMU5jirtZkZ1c3ePCWDhXYaFRHpCbnQ",
-		},
-		{
-			name:         "has key",
-			n:            newNode(ToKey([]byte{0, 1, 2, 3, 4, 5, 6, 7})),
-			expectedHash: "2vA8ggXajhFEcgiF8zHTXgo8T2ALBFgffp1xfn48JEni1Uj5uK",
-		},
-		{
-			name: "1 child",
-			n: func() *node {
-				n := newNode(Key{})
-				childNode := newNode(ToKey([]byte{255}))
-				childNode.setValue(maybe.Some([]byte("value1")))
-				n.addChildWithID(childNode, 4, hashNode(childNode))
-				return n
-			}(),
-			expectedHash: "YfJRufqUKBv9ez6xZx6ogpnfDnw9fDsyebhYDaoaH57D3vRu3",
-		},
-		{
-			name: "2 children",
-			n: func() *node {
-				n := newNode(Key{})
-
-				childNode1 := newNode(ToKey([]byte{255}))
-				childNode1.setValue(maybe.Some([]byte("value1")))
-
-				childNode2 := newNode(ToKey([]byte{237}))
-				childNode2.setValue(maybe.Some([]byte("value2")))
-
-				n.addChildWithID(childNode1, 4, hashNode(childNode1))
-				n.addChildWithID(childNode2, 4, hashNode(childNode2))
-				return n
-			}(),
-			expectedHash: "YVmbx5MZtSKuYhzvHnCqGrswQcxmozAkv7xE1vTA2EiGpWUkv",
-		},
-		{
-			name: "16 children",
-			n: func() *node {
-				n := newNode(Key{})
-
-				for i := byte(0); i < 16; i++ {
-					childNode := newNode(ToKey([]byte{i << 4}))
-					childNode.setValue(maybe.Some([]byte("some value")))
-
-					n.addChildWithID(childNode, 4, hashNode(childNode))
-				}
-				return n
-			}(),
-			expectedHash: "5YiFLL7QV3f441See9uWePi3wVKsx9fgvX5VPhU8PRxtLqhwY",
-		},
-	}
 	encodeDBNodeTests = []struct {
 		name          string
 		n             *dbNode
@@ -613,70 +545,6 @@ func TestCodecDecodeDBNode_TooShort(t *testing.T) {
 	require.ErrorIs(err, io.ErrUnexpectedEOF)
 }
 
-// Ensure that hashNode is deterministic
-func FuzzHashNode(f *testing.F) {
-	f.Fuzz(
-		func(
-			t *testing.T,
-			randSeed int,
-		) {
-			require := require.New(t)
-			for _, bf := range validBranchFactors { // Create a random node
-				r := rand.New(rand.NewSource(int64(randSeed))) // #nosec G404
-
-				children := map[byte]*child{}
-				numChildren := r.Intn(int(bf)) // #nosec G404
-				for i := 0; i < numChildren; i++ {
-					compressedKeyLen := r.Intn(32) // #nosec G404
-					compressedKeyBytes := make([]byte, compressedKeyLen)
-					_, _ = r.Read(compressedKeyBytes) // #nosec G404
-
-					children[byte(i)] = &child{
-						compressedKey: ToKey(compressedKeyBytes),
-						id:            ids.GenerateTestID(),
-						hasValue:      r.Intn(2) == 1, // #nosec G404
-					}
-				}
-
-				hasValue := r.Intn(2) == 1 // #nosec G404
-				value := maybe.Nothing[[]byte]()
-				if hasValue {
-					valueBytes := make([]byte, r.Intn(64)) // #nosec G404
-					_, _ = r.Read(valueBytes)              // #nosec G404
-					value = maybe.Some(valueBytes)
-				}
-
-				key := make([]byte, r.Intn(32)) // #nosec G404
-				_, _ = r.Read(key)              // #nosec G404
-
-				hv := &node{
-					key: ToKey(key),
-					dbNode: dbNode{
-						children: children,
-						value:    value,
-					},
-				}
-
-				// Hash hv multiple times
-				hash1 := hashNode(hv)
-				hash2 := hashNode(hv)
-
-				// Make sure they're the same
-				require.Equal(hash1, hash2)
-			}
-		},
-	)
-}
-
-func TestHashNode(t *testing.T) {
-	for _, test := range hashNodeTests {
-		t.Run(test.name, func(t *testing.T) {
-			hash := hashNode(test.n)
-			require.Equal(t, test.expectedHash, hash.String())
-		})
-	}
-}
-
 func TestEncodeDBNode(t *testing.T) {
 	for _, test := range encodeDBNodeTests {
 		t.Run(test.name, func(t *testing.T) {
@@ -741,16 +609,6 @@ func TestUintSize(t *testing.T) {
 		expectedSize := uintSize(n)
 		actualSize := binary.PutUvarint(make([]byte, binary.MaxVarintLen64), n)
 		require.Equal(t, expectedSize, actualSize, power)
-	}
-}
-
-func Benchmark_HashNode(b *testing.B) {
-	for _, benchmark := range hashNodeTests {
-		b.Run(benchmark.name, func(b *testing.B) {
-			for i := 0; i < b.N; i++ {
-				hashNode(benchmark.n)
-			}
-		})
 	}
 }
 

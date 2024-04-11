@@ -220,16 +220,18 @@ func execute(
 		}
 
 		if err := blk.Verify(ctx); err != nil {
-			return fmt.Errorf("failed to verify block %s (%d) in bootstrapping: %w",
+			return fmt.Errorf("failed to verify block %s (height=%d, parentID=%s) in bootstrapping: %w",
 				blk.ID(),
 				height,
+				blk.Parent(),
 				err,
 			)
 		}
 		if err := blk.Accept(ctx); err != nil {
-			return fmt.Errorf("failed to accept block %s (%d) in bootstrapping: %w",
+			return fmt.Errorf("failed to accept block %s (height=%d, parentID=%s) in bootstrapping: %w",
 				blk.ID(),
 				height,
+				blk.Parent(),
 				err,
 			)
 		}

@@ -4,14 +4,16 @@
 package merkledb
 
 import (
-	"sync"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/maybe"
+	"github.com/ava-labs/avalanchego/utils/units"
 )
 
 // Tests:
@@ -24,7 +26,7 @@ func Test_IntermediateNodeDB(t *testing.T) {
 	require := require.New(t)
 
 	n := newNode(ToKey([]byte{0x00}))
-	n.setValue(maybe.Some([]byte{byte(0x02)}))
+	n.setValue(DefaultHasher, maybe.Some([]byte{byte(0x02)}))
 	nodeSize := cacheEntrySize(n.key, n)
 
 	// use exact multiple of node size so require.Equal(1, db.nodeCache.fifo.Len()) is correct later
@@ -35,20 +37,19 @@ func Test_IntermediateNodeDB(t *testing.T) {
 	baseDB := memdb.New()
 	db := newIntermediateNodeDB(
 		baseDB,
-		&sync.Pool{
-			New: func() interface{} { return make([]byte, 0) },
-		},
+		utils.NewBytesPool(),
 		&mockMetrics{},
 		cacheSize,
 		bufferSize,
 		evictionBatchSize,
 		4,
+		DefaultHasher,
 	)
 
 	// Put a key-node pair
 	node1Key := ToKey([]byte{0x01})
 	node1 := newNode(node1Key)
-	node1.setValue(maybe.Some([]byte{byte(0x01)}))
+	node1.setValue(DefaultHasher, maybe.Some([]byte{byte(0x01)}))
 	require.NoError(db.Put(node1Key, node1))
 
 	// Get the key-node pair from cache
@@ -58,7 +59,7 @@ func Test_IntermediateNodeDB(t *testing.T) {
 
 	// Overwrite the key-node pair
 	node1Updated := newNode(node1Key)
-	node1Updated.setValue(maybe.Some([]byte{byte(0x02)}))
+	node1Updated.setValue(DefaultHasher, maybe.Some([]byte{byte(0x02)}))
 	require.NoError(db.Put(node1Key, node1Updated))
 
 	// Assert the key-node pair was overwritten
@@ -79,7 +80,7 @@ func Test_IntermediateNodeDB(t *testing.T) {
 	for {
 		key := ToKey([]byte{byte(added)})
 		node := newNode(Key{})
-		node.setValue(maybe.Some([]byte{byte(added)}))
+		node.setValue(DefaultHasher, maybe.Some([]byte{byte(added)}))
 		newExpectedSize := expectedSize + cacheEntrySize(key, node)
 		if newExpectedSize > bufferSize {
 			// Don't trigger eviction.
@@ -99,7 +100,7 @@ func Test_IntermediateNodeDB(t *testing.T) {
 	// the added key prefix increasing the size tracked by the batch.
 	key := ToKey([]byte{byte(added)})
 	node := newNode(Key{})
-	node.setValue(maybe.Some([]byte{byte(added)}))
+	node.setValue(DefaultHasher, maybe.Some([]byte{byte(added)}))
 	require.NoError(db.Put(key, node))
 
 	// Assert cache has expected number of elements
@@ -149,14 +150,13 @@ func FuzzIntermediateNodeDBConstructDBKey(f *testing.F) {
 		for _, tokenSize := range validTokenSizes {
 			db := newIntermediateNodeDB(
 				baseDB,
-				&sync.Pool{
-					New: func() interface{} { return make([]byte, 0) },
-				},
+				utils.NewBytesPool(),
 				&mockMetrics{},
 				cacheSize,
 				bufferSize,
 				evictionBatchSize,
 				tokenSize,
+				DefaultHasher,
 			)
 
 			p := ToKey(key)
@@ -167,18 +167,18 @@ func FuzzIntermediateNodeDBConstructDBKey(f *testing.F) {
 			p = p.Take(int(uBitLength))
 			constructedKey := db.constructDBKey(p)
 			baseLength := len(p.value) + len(intermediateNodePrefix)
-			require.Equal(intermediateNodePrefix, constructedKey[:len(intermediateNodePrefix)])
+			require.Equal(intermediateNodePrefix, (*constructedKey)[:len(intermediateNodePrefix)])
 			switch {
 			case tokenSize == 8:
 				// for keys with tokens of size byte, no padding is added
-				require.Equal(p.Bytes(), constructedKey[len(intermediateNodePrefix):])
+				require.Equal(p.Bytes(), (*constructedKey)[len(intermediateNodePrefix):])
 			case p.hasPartialByte():
-				require.Len(constructedKey, baseLength)
-				require.Equal(p.Extend(ToToken(1, tokenSize)).Bytes(), constructedKey[len(intermediateNodePrefix):])
+				require.Len(*constructedKey, baseLength)
+				require.Equal(p.Extend(ToToken(1, tokenSize)).Bytes(), (*constructedKey)[len(intermediateNodePrefix):])
 			default:
 				// when a whole number of bytes, there is an extra padding byte
-				require.Len(constructedKey, baseLength+1)
-				require.Equal(p.Extend(ToToken(1, tokenSize)).Bytes(), constructedKey[len(intermediateNodePrefix):])
+				require.Len(*constructedKey, baseLength+1)
+				require.Equal(p.Extend(ToToken(1, tokenSize)).Bytes(), (*constructedKey)[len(intermediateNodePrefix):])
 			}
 		}
 	})
@@ -192,33 +192,28 @@ func Test_IntermediateNodeDB_ConstructDBKey_DirtyBuffer(t *testing.T) {
 	baseDB := memdb.New()
 	db := newIntermediateNodeDB(
 		baseDB,
-		&sync.Pool{
-			New: func() interface{} { return make([]byte, 0) },
-		},
+		utils.NewBytesPool(),
 		&mockMetrics{},
 		cacheSize,
 		bufferSize,
 		evictionBatchSize,
 		4,
+		DefaultHasher,
 	)
 
-	db.bufferPool.Put([]byte{0xFF, 0xFF, 0xFF})
+	db.bufferPool.Put(&[]byte{0xFF, 0xFF, 0xFF})
 	constructedKey := db.constructDBKey(ToKey([]byte{}))
-	require.Len(constructedKey, 2)
-	require.Equal(intermediateNodePrefix, constructedKey[:len(intermediateNodePrefix)])
-	require.Equal(byte(16), constructedKey[len(constructedKey)-1])
+	require.Len(*constructedKey, 2)
+	require.Equal(intermediateNodePrefix, (*constructedKey)[:len(intermediateNodePrefix)])
+	require.Equal(byte(16), (*constructedKey)[len(*constructedKey)-1])
 
-	db.bufferPool = &sync.Pool{
-		New: func() interface{} {
-			return make([]byte, 0, defaultBufferLength)
-		},
-	}
-	db.bufferPool.Put([]byte{0xFF, 0xFF, 0xFF})
+	db.bufferPool = utils.NewBytesPool()
+	db.bufferPool.Put(&[]byte{0xFF, 0xFF, 0xFF})
 	p := ToKey([]byte{0xF0}).Take(4)
 	constructedKey = db.constructDBKey(p)
-	require.Len(constructedKey, 2)
-	require.Equal(intermediateNodePrefix, constructedKey[:len(intermediateNodePrefix)])
-	require.Equal(p.Extend(ToToken(1, 4)).Bytes(), constructedKey[len(intermediateNodePrefix):])
+	require.Len(*constructedKey, 2)
+	require.Equal(intermediateNodePrefix, (*constructedKey)[:len(intermediateNodePrefix)])
+	require.Equal(p.Extend(ToToken(1, 4)).Bytes(), (*constructedKey)[len(intermediateNodePrefix):])
 }
 
 func TestIntermediateNodeDBClear(t *testing.T) {
@@ -229,14 +224,13 @@ func TestIntermediateNodeDBClear(t *testing.T) {
 	baseDB := memdb.New()
 	db := newIntermediateNodeDB(
 		baseDB,
-		&sync.Pool{
-			New: func() interface{} { return make([]byte, 0) },
-		},
+		utils.NewBytesPool(),
 		&mockMetrics{},
 		cacheSize,
 		bufferSize,
 		evictionBatchSize,
 		4,
+		DefaultHasher,
 	)
 
 	for _, b := range [][]byte{{1}, {2}, {3}} {
@@ -265,14 +259,13 @@ func TestIntermediateNodeDBDeleteEmptyKey(t *testing.T) {
 	baseDB := memdb.New()
 	db := newIntermediateNodeDB(
 		baseDB,
-		&sync.Pool{
-			New: func() interface{} { return make([]byte, 0) },
-		},
+		utils.NewBytesPool(),
 		&mockMetrics{},
 		cacheSize,
 		bufferSize,
 		evictionBatchSize,
 		4,
+		DefaultHasher,
 	)
 
 	emptyKey := ToKey([]byte{})
@@ -280,7 +273,7 @@ func TestIntermediateNodeDBDeleteEmptyKey(t *testing.T) {
 	require.NoError(db.Flush())
 
 	emptyDBKey := db.constructDBKey(emptyKey)
-	has, err := baseDB.Has(emptyDBKey)
+	has, err := baseDB.Has(*emptyDBKey)
 	require.NoError(err)
 	require.True(has)
 
@@ -288,7 +281,37 @@ func TestIntermediateNodeDBDeleteEmptyKey(t *testing.T) {
 	require.NoError(db.Flush())
 
 	emptyDBKey = db.constructDBKey(emptyKey)
-	has, err = baseDB.Has(emptyDBKey)
+	has, err = baseDB.Has(*emptyDBKey)
 	require.NoError(err)
 	require.False(has)
+}
+
+func Benchmark_IntermediateNodeDB_ConstructDBKey(b *testing.B) {
+	keyTokenSizes := []int{0, 1, 4, 16, 64, 256}
+	for _, tokenSize := range validTokenSizes {
+		db := newIntermediateNodeDB(
+			memdb.New(),
+			utils.NewBytesPool(),
+			&mockMetrics{},
+			units.MiB,
+			units.MiB,
+			units.MiB,
+			tokenSize,
+			DefaultHasher,
+		)
+
+		for _, keyTokenSize := range keyTokenSizes {
+			keyBitSize := keyTokenSize * tokenSize
+			keyBytes := make([]byte, bytesNeeded(keyBitSize))
+			key := Key{
+				length: keyBitSize,
+				value:  string(keyBytes),
+			}
+			b.Run(fmt.Sprintf("%d/%d", tokenSize, keyTokenSize), func(b *testing.B) {
+				for i := 0; i < b.N; i++ {
+					db.bufferPool.Put(db.constructDBKey(key))
+				}
+			})
+		}
+	}
 }

@@ -14,7 +14,6 @@ import (
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/trace"
-	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/maybe"
 
 	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
@@ -133,7 +132,12 @@ type Proof struct {
 // Verify returns nil if the trie given in [proof] has root [expectedRootID].
 // That is, this is a valid proof that [proof.Key] exists/doesn't exist
 // in the trie with root [expectedRootID].
-func (proof *Proof) Verify(ctx context.Context, expectedRootID ids.ID, tokenSize int) error {
+func (proof *Proof) Verify(
+	ctx context.Context,
+	expectedRootID ids.ID,
+	tokenSize int,
+	hasher Hasher,
+) error {
 	// Make sure the proof is well-formed.
 	if len(proof.Path) == 0 {
 		return ErrEmptyProof
@@ -152,7 +156,7 @@ func (proof *Proof) Verify(ctx context.Context, expectedRootID ids.ID, tokenSize
 	// and thus has a whole number of bytes
 	if !lastNode.Key.hasPartialByte() &&
 		proof.Key == lastNode.Key &&
-		!valueOrHashMatches(proof.Value, lastNode.ValueOrHash) {
+		!valueOrHashMatches(hasher, proof.Value, lastNode.ValueOrHash) {
 		return ErrProofValueDoesntMatch
 	}
 
@@ -278,6 +282,7 @@ func (proof *RangeProof) Verify(
 	end maybe.Maybe[[]byte],
 	expectedRootID ids.ID,
 	tokenSize int,
+	hasher Hasher,
 ) error {
 	switch {
 	case start.HasValue() && end.HasValue() && bytes.Compare(start.Value(), end.Value()) > 0:
@@ -325,6 +330,7 @@ func (proof *RangeProof) Verify(
 		return err
 	}
 	if err := verifyAllRangeProofKeyValuesPresent(
+		hasher,
 		proof.StartProof,
 		smallestProvenKey,
 		largestProvenKey,
@@ -339,6 +345,7 @@ func (proof *RangeProof) Verify(
 		return err
 	}
 	if err := verifyAllRangeProofKeyValuesPresent(
+		hasher,
 		proof.EndProof,
 		smallestProvenKey,
 		largestProvenKey,
@@ -453,7 +460,13 @@ func (proof *RangeProof) UnmarshalProto(pbProof *pb.RangeProof) error {
 
 // Verify that all non-intermediate nodes in [proof] which have keys
 // in [[start], [end]] have the value given for that key in [keysValues].
-func verifyAllRangeProofKeyValuesPresent(proof []ProofNode, start maybe.Maybe[Key], end maybe.Maybe[Key], keysValues map[Key][]byte) error {
+func verifyAllRangeProofKeyValuesPresent(
+	hasher Hasher,
+	proof []ProofNode,
+	start maybe.Maybe[Key],
+	end maybe.Maybe[Key],
+	keysValues map[Key][]byte,
+) error {
 	for i := 0; i < len(proof); i++ {
 		var (
 			node    = proof[i]
@@ -467,7 +480,7 @@ func verifyAllRangeProofKeyValuesPresent(proof []ProofNode, start maybe.Maybe[Ke
 				// We didn't get a key-value pair for this key, but the proof node has a value.
 				return ErrProofNodeHasUnincludedValue
 			}
-			if ok && !valueOrHashMatches(maybe.Some(value), node.ValueOrHash) {
+			if ok && !valueOrHashMatches(hasher, maybe.Some(value), node.ValueOrHash) {
 				// We got a key-value pair for this key, but the value in the proof
 				// node doesn't match the value we got for this key.
 				return ErrProofValueDoesntMatch
@@ -620,7 +633,7 @@ func (proof *ChangeProof) UnmarshalProto(pbProof *pb.ChangeProof) error {
 // - if the node's key is within the key range, that has a value that matches the value passed in the change list or in the db
 func verifyAllChangeProofKeyValuesPresent(
 	ctx context.Context,
-	db MerkleDB,
+	db *merkleDB,
 	proof []ProofNode,
 	start maybe.Maybe[Key],
 	end maybe.Maybe[Key],
@@ -650,7 +663,7 @@ func verifyAllChangeProofKeyValuesPresent(
 					value = maybe.Some(dbValue)
 				}
 			}
-			if !valueOrHashMatches(value, node.ValueOrHash) {
+			if !valueOrHashMatches(db.hasher, value, node.ValueOrHash) {
 				return ErrProofValueDoesntMatch
 			}
 		}
@@ -765,7 +778,11 @@ func verifyProofPath(proof []ProofNode, key maybe.Maybe[Key]) error {
 
 // Returns true if [value] and [valueDigest] match.
 // [valueOrHash] should be the [ValueOrHash] field of a [ProofNode].
-func valueOrHashMatches(value maybe.Maybe[[]byte], valueOrHash maybe.Maybe[[]byte]) bool {
+func valueOrHashMatches(
+	hasher Hasher,
+	value maybe.Maybe[[]byte],
+	valueOrHash maybe.Maybe[[]byte],
+) bool {
 	var (
 		valueIsNothing  = value.IsNothing()
 		digestIsNothing = valueOrHash.IsNothing()
@@ -781,8 +798,8 @@ func valueOrHashMatches(value maybe.Maybe[[]byte], valueOrHash maybe.Maybe[[]byt
 	case len(value.Value()) < HashLength:
 		return bytes.Equal(value.Value(), valueOrHash.Value())
 	default:
-		valueHash := hashing.ComputeHash256(value.Value())
-		return bytes.Equal(valueHash, valueOrHash.Value())
+		valueHash := hasher.HashValue(value.Value())
+		return bytes.Equal(valueHash[:], valueOrHash.Value())
 	}
 }
 
