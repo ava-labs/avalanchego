@@ -4,14 +4,14 @@
 
 - [Overview](#overview)
 - [Peers](#peers)
-  - [Lifecycle](#lifecycle)
+  - [Message Handling](#peer-handshake)
+  - [Peer Handshake](#peer-handshake)
+  - [Ping-Pong Messages](#ping-pong)
+- [Peer Discovery](#peer-discovery)
     - [Bootstrapping](#bootstrapping)
-    - [Connecting](#connecting)
-      - [Peer Handshake](#peer-handshake)
-    - [Connected](#connected)
-      - [PeerList Gossip](#peerlist-gossip)
-        - [Messages](#messages)
-        - [Gossip](#gossip)
+    - [Peerlist Gossip](#peerlist-gossip)
+      - [Messages](#messages)
+      - [Gossip](#gossip)
 
 ## Overview
 
@@ -36,6 +36,47 @@ sequenceDiagram
         Peer-1->>Peer-2: Read incoming messages
     end
 ```
+
+### Message Handling
+
+All messages are prefixed with their length. Reading a message first reads the 4-byte message length from the connection. The rate limiting logic then waits until there is sufficient capacity to read these bytes from the connection.
+
+A peer will then read the full message and attempt to parse it into either a networking message or an application message. If the message is malformed the connection is not dropped. The peer will simply continue to the next sent message.
+
+### Peer Handshake
+
+Upon connection to a new peer, a handshake is performed between the node attempting to establish the outbound connection to the peer and the peer receiving the inbound connection.
+
+When attempting to establish the connection, the first message that the node attempting to connect to the peer in the network is a `Handshake` message describing compatibility of the candidate node with the peer. As an example, nodes that are attempting to connect with an incompatible version of AvalancheGo or a significantly skewed local clock are rejected by the peer.
+
+```mermaid
+sequenceDiagram
+Note over Node,Peer: Initiate Handshake
+Note left of Node: I want to connect to you!
+Note over Node,Peer: Handshake message
+Node->>Peer: AvalancheGo v1.0.0
+Note right of Peer: My version v1.9.4 is incompatible with your version v1.0.0.
+Peer-xNode: Connection dropped
+Note over Node,Peer: Handshake Failed
+```
+
+If the `Handshake` message is successfully received and the peer decides that it wants a connection with this node, it replies with a `PeerList` message that contains metadata about other peers that allows a node to connect to them. See [Peerlist Gossip](#peerlist-gossip).
+
+```mermaid
+sequenceDiagram
+Note over Node,Peer: Initiate Handshake
+Note left of Node: I want to connect to you!
+Note over Node,Peer: Handshake message
+Node->>Peer: AvalancheGo v1.9.4
+Note right of Peer: LGTM!
+Note over Node,Peer: PeerList message
+Peer->>Node: Peer-X, Peer-Y, Peer-Z
+Note over Node,Peer: Handshake Complete
+```
+
+Once the node attempting to join the network receives this `PeerList` message, the handshake is complete and the node is now connected to the peer.
+
+### Peer Handshake
 
 ### Lifecycle
 
