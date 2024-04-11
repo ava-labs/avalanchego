@@ -4,11 +4,11 @@
 
 - [Overview](#overview)
 - [Peers](#peers)
-  - [Message Handling](#peer-handshake)
+  - [Message Handling](#message-handling)
   - [Peer Handshake](#peer-handshake)
-  - [Ping-Pong Messages](#ping-pong)
+  - [Ping-Pong Messages](#ping-pong-messages)
 - [Peer Discovery](#peer-discovery)
-    - [Inbound Connection](#inbound-connections)
+    - [Inbound Connections](#inbound-connections)
     - [Bootstrapping](#bootstrapping)
     - [PeerList Gossip](#peerlist-gossip)
       - [Messages](#messages)
@@ -137,6 +137,29 @@ Once connected to an initial set of peers, a node is able to use these connectio
 Peers are discovered by receiving `PeerList` messages:
 - sent during the [Peer Handshake](#peer-handshake).
 - sent in response to `GetPeerList` messages.
+
+
+#### IP Authentication
+
+To ensure that outbound connections are being made to the correct `IP:Port` pair of a node, all `IP:Port` pairs gossiped by the network are signed by the node's TLS key. To provide replay protection for these signed messages, the signature also includes the `Timestamp` that the `IP:Port` pair was signed.
+
+This guarantees that nodes provided these `IP:Port` pairs are able to track the most up-to-date `IP:Port` pair of any peer.
+
+#### Bloom Filter
+
+A [Bloom Filter](https://en.wikipedia.org/wiki/Bloom_filter) is used to track which nodes are known.
+
+The parametrization of the Bloom Filter is based on the number of desired peers.
+
+Entries in the Bloom Filter are determined by a locally calculated [`Salt`](https://en.wikipedia.org/wiki/Salt_(cryptography)) along with the `NodeID` and `Timestamp` of the most recently known `IP:Port`. The `Salt` is added to prevent griefing attacks where malicious nodes intentionally generate hash collisions with other virtuous nodes to reduce their connectivity.
+
+The Bloom Filter is reconstructed if there are more entries than expected to avoid increasing the false positive probability. It is also reconstructed periodically. When reconstructing the Bloom Filter, a new `Salt` is generated.
+
+To prevent a malicious node from arbitrarily filling this Bloom Filter, only `2` entries are added to the Bloom Filter. If a node's `IP:Port` pair changes once, it will immediately be added to the Bloom Filter. If a node's `IP:Port` pair changes more than once, it will only be added to the Bloom Filter after the Bloom Filter is reconstructed.
+
+#### GetPeerList Handling
+
+
 
 #### Connecting
 
