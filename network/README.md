@@ -97,7 +97,7 @@ sequenceDiagram
 
 ### Ping-Pong Messages
 
-Peers periodically send `Ping` messages containing perseived uptime information. This information can be used to determine if the node is considered to be performing well by the network. It is expected for a node to reply to a `Ping` message with a `Pong` message.
+Peers periodically send `Ping` messages containing perseived uptime information. This information can be used to monitor how the node is considered to be perform by the network. It is expected for a node to reply to a `Ping` message with a `Pong` message.
 
 ```mermaid
 sequenceDiagram
