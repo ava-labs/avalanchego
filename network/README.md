@@ -127,21 +127,9 @@ A node should initiate outbound connections to an `IP:Port` pair if one of the f
 - The `IP:Port` is believed to belong to a node in the default bootstrapper set that isn't already connected.
 - The `IP:Port` is believed to belong to a node in the current Primary Network validator set that isn't already connected.
 
-### Bootstrapping
-
-In Avalanche, nodes connect to an initial set (this is user-configurable) of bootstrap nodes.
-
-### PeerList Gossip
-
-Once connected to an initial set of peers, a node is able to use these connections to discover additional peers.
-
-Peers are discovered by receiving `PeerList` messages:
-- sent during the [Peer Handshake](#peer-handshake).
-- sent in response to `GetPeerList` messages.
-
 #### IP Authentication
 
-To ensure that outbound connections are being made to the correct `IP:Port` pair of a node, all `IP:Port` pairs gossiped by the network are signed by the node that is claiming ownership of the pair. To prevent replays of these messages, the signature is over the `Timestamp` in addition to the `IP:Port` pair.
+To ensure that outbound connections are being made to the correct `IP:Port` pair of a node, all `IP:Port` pairs sent by the network are signed by the node that is claiming ownership of the pair. To prevent replays of these messages, the signature is over the `Timestamp` in addition to the `IP:Port` pair.
 
 The `Timestamp` guarantees that nodes provided an `IP:Port` pair are able to track the most up-to-date `IP:Port` pair of a peer.
 
@@ -169,13 +157,17 @@ A `GetPeerList` message contains the Bloom Filter of the currently known peers a
 - The `IP:Port` pair the node shared during the `Handshake` message is the node's most recently known `IP:Port` pair.
 - The node claiming the `IP:Port` pair is either in the default bootstrapper set or is a current Primary Network validator.
 
+### Bootstrapping
+
+In Avalanche, nodes connect to an initial set (this is user-configurable) of bootstrap nodes.
+
 #### PeerList Gossip
 
-`Handshake` messages provide a node with initial knowledge of peers in the network, but offers no guarantee that the node will connect and maintain connections with every peer in the network.
+Once connected to an initial set of peers, a node is able to use these connections to discover additional peers.
 
-To provide an eventual guarantee that all peers learn of one another, periodically sends a `GetPeerList` message to a randomly selected validator with the node's current Bloom Filter and `Salt`.
+Peers are discovered by receiving `PeerList` messages during the [Peer Handshake](#peer-handshake). These messages quickly provide a node with knowledge of peers in the network. However, they offer no guarantee that the node will connect to and maintain connections with every peer in the network.
 
-A node follows the following steps for `PeerList` gossip:
+To provide an eventual guarantee that all peers learn of one another, nodes periodically send a `GetPeerList` message to a randomly selected validator with the node's current Bloom Filter and `Salt`.
 
 ```mermaid
 sequenceDiagram
