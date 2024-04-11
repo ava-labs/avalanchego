@@ -66,9 +66,9 @@ sequenceDiagram
     Note left of Alice: v1.11.4 could be compatible with v1.0.0!
     Note right of Bob: v1.0.0 is incompatible with v1.11.4.
     par
-        Alice->>Bob: Peerlist
-    and
         Bob-->>Alice: Disconnect
+    and
+        Alice-XBob: Peerlist
     end
     Note over Alice,Bob: Handshake Failed
 ```
