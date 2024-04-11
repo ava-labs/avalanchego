@@ -67,8 +67,8 @@ sequenceDiagram
     Note right of Bob: v1.0.0 is incompatible with v1.11.4.
     par
         Alice->>Bob: Peerlist
-    and Bob disconnects from Alice
-        Bob-->Alice: Disconnect
+    and
+        Bob-->>Alice: Disconnect
     end
     Note over Alice,Bob: Handshake Failed
 ```
