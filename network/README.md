@@ -62,9 +62,9 @@ sequenceDiagram
     Note left of Alice: LGTM!
     Note right of Bob: v1.11.4 is incompatible with v1.0.0.
     par Alice sends Bob the Peerlist message
-        Alice->>Bob: Peers
+        Alice->>Bob: Peerlist
     and Bob disconnects from Alice
-        Bob-xAlice: Disconnect
+        Bob-Alice: Disconnect
     end
     Note over Alice,Bob: Handshake Failed
 ```
