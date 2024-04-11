@@ -132,7 +132,7 @@ In Avalanche, nodes connect to an initial set (this is user-configurable) of boo
 
 ### PeerList Gossip
 
-Once connected to a initial a set of peers, a node is able to use them to discover additional peers in the network.
+Once connected to an initial set of peers, a node is able to use these connections to discover additional peers.
 
 Peers are discovered by receiving `PeerList` messages:
 - sent during the [Peer Handshake](#peer-handshake).
