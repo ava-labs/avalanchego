@@ -64,7 +64,7 @@ sequenceDiagram
     par Alice sends Bob the Peerlist message
         Alice->>Bob: Peerlist
     and Bob disconnects from Alice
-        Bob-Alice: Disconnect
+        Bob-->Alice: Disconnect
     end
     Note over Alice,Bob: Handshake Failed
 ```
