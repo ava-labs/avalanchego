@@ -52,7 +52,7 @@ When attempting to establish the connection, the first message that the nodes se
 ```mermaid
 sequenceDiagram
 Note over Node,Peer: Connection Created
-Node<<->>Peer: AvalancheGo v1.0.0
+Node<->Peer: AvalancheGo v1.0.0
 Note right of Peer: My version v1.9.4 is incompatible with your version v1.0.0.
 Peer-xNode: Connection dropped
 Note over Node,Peer: Handshake Failed
