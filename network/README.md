@@ -123,8 +123,9 @@ It is expected for Avalanche nodes to allow inbound connections. If a validator 
 Avalanche nodes that have identified the `IP:Port` pair of a node they want to connect to will initiate outbound connections to this `IP:Port` pair. If the connection is not able to complete the [Peer Handshake](#peer-handshake), the connection will be re-attempted with an [Exponential Backoff](https://en.wikipedia.org/wiki/Exponential_backoff).
 
 A node should initiate outbound connections to an `IP:Port` pair if one of the following is true:
-- The `IP:Port` is currently believed to belong to a node in the initial bootstrapper set.
-- The `IP:Port` is currently believed to belong to a node in the current Primary Network validator set.
+- The `IP:Port` is believed to belong to a node in the initial bootstrapper set that isn't already connected.
+- The `IP:Port` is believed to belong to a node in the default bootstrapper set that isn't already connected.
+- The `IP:Port` is believed to belong to a node in the current Primary Network validator set that isn't already connected.
 
 ### Bootstrapping
 
@@ -141,9 +142,9 @@ Peers are discovered by receiving `PeerList` messages:
 
 #### IP Authentication
 
-To ensure that outbound connections are being made to the correct `IP:Port` pair of a node, all `IP:Port` pairs gossiped by the network are signed by the node's TLS key. To provide replay protection for these signed messages, the signature also includes the `Timestamp` that the `IP:Port` pair was signed.
+To ensure that outbound connections are being made to the correct `IP:Port` pair of a node, all `IP:Port` pairs gossiped by the network are signed by the node that is claiming ownership of the pair. To prevent replays of these messages, the signature is over the `Timestamp` in addition to the `IP:Port` pair.
 
-This guarantees that nodes provided these `IP:Port` pairs are able to track the most up-to-date `IP:Port` pair of any peer.
+The `Timestamp` guarantees that nodes provided an `IP:Port` pair are able to track the most up-to-date `IP:Port` pair of a peer.
 
 #### Bloom Filter
 
@@ -155,11 +156,22 @@ Entries in the Bloom Filter are determined by a locally calculated [`Salt`](http
 
 The Bloom Filter is reconstructed if there are more entries than expected to avoid increasing the false positive probability. It is also reconstructed periodically. When reconstructing the Bloom Filter, a new `Salt` is generated.
 
-To prevent a malicious node from arbitrarily filling this Bloom Filter, only `2` entries are added to the Bloom Filter. If a node's `IP:Port` pair changes once, it will immediately be added to the Bloom Filter. If a node's `IP:Port` pair changes more than once, it will only be added to the Bloom Filter after the Bloom Filter is reconstructed.
+To prevent a malicious node from arbitrarily filling this Bloom Filter, only `2` entries are added to the Bloom Filter per node. If a node's `IP:Port` pair changes once, it will immediately be added to the Bloom Filter. If a node's `IP:Port` pair changes more than once, it will only be added to the Bloom Filter after the Bloom Filter is reconstructed.
 
-#### GetPeerList Handling
+#### GetPeerList
 
+A `GetPeerList` message contains the Bloom Filter of the currently known peers along with the `Salt` that was used to add entries to the Bloom Filter. Upon receipt of a `GetPeerList` message, a node is expected to respond with a `PeerList` message containing `IP:Port` pairs that satisfy all of the following constraints:
+- The node claiming the `IP:Port` pair is currently connected.
+- The `IP:Port` pair the node shared during the `Handshake` message is the node's most recently known `IP:Port` pair.
+- The node claiming the `IP:Port` pair is either in the default bootstrapper set or is a current Primary Network validator.
 
+#### PeerList
+
+`PeerList` messages are expected to contain `IP:Port` pairs that satisfy all of the following constraints:
+- The Bloom Filter sent when requesting the `PeerList` message does not contain the node claiming the `IP:Port` pair.
+- The node claiming the `IP:Port` pair is currently connected.
+- The `IP:Port` pair the node shared during the `Handshake` message is the node's most recently known `IP:Port` pair.
+- The node claiming the `IP:Port` pair is either in the default bootstrapper set or is a current Primary Network validator.
 
 #### Connecting
 
