@@ -59,10 +59,14 @@ sequenceDiagram
     and Bob sends Alice a Handshake message
         Bob->>Alice: AvalancheGo v1.11.4
     end
-Alice->>Bob: AvalancheGo v1.0.0
-Note right of Peer: My version v1.9.4 is incompatible with your version v1.0.0.
-Peer-xNode: Connection dropped
-Note over Node,Peer: Handshake Failed
+    Note left of Alice: LGTM!
+    Note right of Bob: v1.11.4 is incompatible with v1.0.0.
+    par Alice sends Bob the Peerlist message
+        Alice->>Bob: Peers
+    and Bob disconnects from Alice
+        Bob-xAlice: Disconnect
+    end
+    Note over Alice,Bob: Handshake Failed
 ```
 
 If the `Handshake` message is successfully received and the peer decides that it wants a connection with this node, it replies with a `PeerList` message that contains metadata about other peers that allows a node to connect to them. See [Peerlist Gossip](#peerlist-gossip).
