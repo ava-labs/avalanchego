@@ -139,7 +139,6 @@ Peers are discovered by receiving `PeerList` messages:
 - sent during the [Peer Handshake](#peer-handshake).
 - sent in response to `GetPeerList` messages.
 
-
 #### IP Authentication
 
 To ensure that outbound connections are being made to the correct `IP:Port` pair of a node, all `IP:Port` pairs gossiped by the network are signed by the node that is claiming ownership of the pair. To prevent replays of these messages, the signature is over the `Timestamp` in addition to the `IP:Port` pair.
@@ -162,8 +161,6 @@ To prevent a malicious node from arbitrarily filling this Bloom Filter, only `2`
 
 A `GetPeerList` message contains the Bloom Filter of the currently known peers along with the `Salt` that was used to add entries to the Bloom Filter. Upon receipt of a `GetPeerList` message, a node is expected to respond with a `PeerList` message.
 
-A node will periodically send a `GetPeerList` message to a randomly selected validator with the node's current Bloom Filter and `Salt`.
-
 #### PeerList
 
 `PeerList` messages are expected to contain `IP:Port` pairs that satisfy all of the following constraints:
@@ -174,32 +171,31 @@ A node will periodically send a `GetPeerList` message to a randomly selected val
 
 #### PeerList Gossip
 
-Handshake messages provide a node with some knowledge of peers in the network, but offers no guarantee that learning about a subset of peers from each peer the node connects with will result in the node learning about every peer in the network.
+`Handshake` messages provide a node with initial knowledge of peers in the network, but offers no guarantee that the node will connect and maintain connections with every peer in the network.
 
-To provide an eventual guarantee that all peers learn of one another, each node periodically requests peers from a random peer.
+To provide an eventual guarantee that all peers learn of one another, periodically sends a `GetPeerList` message to a randomly selected validator with the node's current Bloom Filter and `Salt`.
 
-To optimize bandwidth, each node tracks the most recent IPs of validators. The validator's nodeID and timestamp are inserted into a bloom filter which is used to select only necessary IPs to gossip.
-
-As the number of entries increases in the bloom filter, the probability of a false positive increases. False positives can cause recent IPs not to be gossiped when they otherwise should be, slowing down the rate of `PeerList` gossip. To prevent the bloom filter from having too many false positives, a new bloom filter is periodically generated and the number of entries a validator is allowed to have in the bloom filter is capped. Generating the new bloom filter both removes stale entries and modifies the hash functions to avoid persistent hash collisions.
-
-A node follows the following steps for of `PeerList` gossip:
+A node follows the following steps for `PeerList` gossip:
 
 ```mermaid
 sequenceDiagram
-Note left of Node: Initialize bloom filter
-Note left of Node: Bloom: [0, 0, 0]
-Node->>Peer-123: GetPeerList [0, 0, 0]
-Note right of Peer-123: Any peers can be sent.
-Peer-123->>Node: PeerList - Peer-1
-Note left of Node: Bloom: [1, 0, 0]
-Node->>Peer-123: GetPeerList [1, 0, 0]
-Note right of Peer-123: Either Peer-2 or Peer-3 can be sent.
-Peer-123->>Node: PeerList - Peer-3
-Note left of Node: Bloom: [1, 0, 1]
-Node->>Peer-123: GetPeerList [1, 0, 1]
-Note right of Peer-123: Only Peer-2 can be sent.
-Peer-123->>Node: PeerList - Peer-2
-Note left of Node: Bloom: [1, 1, 1]
-Node->>Peer-123: GetPeerList [1, 1, 1]
-Note right of Peer-123: There are no more peers left to send!
+    actor Alice
+    actor Bob
+    Note left of Alice: Initialize Bloom Filter
+    Note left of Alice: Bloom: [0, 0, 0]
+    Alice->>Bob: GetPeerList [0, 0, 0]
+    Note right of Bob: Any peers can be sent.
+    Bob->>Alice: PeerList - Peer-1
+    Note left of Alice: Bloom: [1, 0, 0]
+    Alice->>Bob: GetPeerList [1, 0, 0]
+    Note right of Bob: Either Peer-2 or Peer-3 can be sent.
+    Bob->>Alice: PeerList - Peer-3
+    Note left of Alice: Bloom: [1, 0, 1]
+    Alice->>Bob: GetPeerList [1, 0, 1]
+    Note right of Bob: Only Peer-2 can be sent.
+    Bob->>Alice: PeerList - Peer-2
+    Note left of Alice: Bloom: [1, 1, 1]
+    Alice->>Bob: GetPeerList [1, 1, 1]
+    Note right of Bob: There are no more peers left to send!
+    Bob->>Alice: PeerList - Empty
 ```
