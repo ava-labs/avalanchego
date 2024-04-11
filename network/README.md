@@ -154,7 +154,7 @@ To provide an eventual guarantee that all peers learn of one another, nodes peri
 
 A [Bloom Filter](https://en.wikipedia.org/wiki/Bloom_filter) is used to track which nodes are known.
 
-The parametrization of the Bloom Filter is based on the number of desired peers.
+The parameterization of the Bloom Filter is based on the number of desired peers.
 
 Entries in the Bloom Filter are determined by a locally calculated [`Salt`](https://en.wikipedia.org/wiki/Salt_(cryptography)) along with the `NodeID` and `Timestamp` of the most recently known `IP:Port`. The `Salt` is added to prevent griefing attacks where malicious nodes intentionally generate hash collisions with other virtuous nodes to reduce their connectivity.
 
