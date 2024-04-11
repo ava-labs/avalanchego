@@ -105,7 +105,7 @@ sequenceDiagram
     actor Bob
     Note left of Alice: Send Ping
     Alice->>Bob: I think your uptime is 95%
-    Note right of Bob: Respond with Pong
+    Note right of Bob: Send Pong
     Bob->>Alice: ACK
 ```
 
