@@ -63,8 +63,8 @@ sequenceDiagram
     and
         Bob->>Alice: AvalancheGo v1.11.4
     end
-    Note left of Alice: v1.11.4 could be compatible with v1.0.0!
     Note right of Bob: v1.0.0 is incompatible with v1.11.4.
+    Note left of Alice: v1.11.4 could be compatible with v1.0.0!
     par
         Bob-->>Alice: Disconnect
     and
@@ -85,12 +85,12 @@ sequenceDiagram
     and
         Bob->>Alice: AvalancheGo v1.11.4
     end
-    Note left of Alice: v1.11.4 could be compatible with v1.11.0!
     Note right of Bob: v1.11.0 is compatible with v1.11.4!
+    Note left of Alice: v1.11.4 could be compatible with v1.11.0!
     par
-        Alice->>Bob: Peerlist
-    and
         Bob->>Alice: Peerlist
+    and
+        Alice->>Bob: Peerlist
     end
     Note over Alice,Bob: Handshake Complete
 ```
