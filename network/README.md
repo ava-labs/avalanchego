@@ -27,13 +27,15 @@ Peers communicate by enqueuing messages between one another. Each peer on either
 
 ```mermaid
 sequenceDiagram
+    actor Alice
+    actor Bob
     loop 
-        Peer-1->>Peer-2: Write outbound messages
-        Peer-2->>Peer-1: Read incoming messages
+        Alice->>Bob: Write outbound messages
+        Bob->>Alice: Read incoming messages
     end
     loop
-        Peer-2->>Peer-1: Write outbound messages
-        Peer-1->>Peer-2: Read incoming messages
+        Bob->>Alice: Write outbound messages
+        Alice->>Bob: Read incoming messages
     end
 ```
 
@@ -78,9 +80,9 @@ sequenceDiagram
     actor Alice
     actor Bob
     Note over Alice,Bob: Connection Created
-    par Alice sends Bob a Handshake message
+    par
         Alice->>Bob: AvalancheGo v1.11.0
-    and Bob sends Alice a Handshake message
+    and
         Bob->>Alice: AvalancheGo v1.11.4
     end
     Note left of Alice: v1.11.4 could be compatible with v1.11.0!
