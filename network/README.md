@@ -8,8 +8,9 @@
   - [Peer Handshake](#peer-handshake)
   - [Ping-Pong Messages](#ping-pong)
 - [Peer Discovery](#peer-discovery)
+    - [Inbound Connection](#inbound-connections)
     - [Bootstrapping](#bootstrapping)
-    - [Peerlist Gossip](#peerlist-gossip)
+    - [PeerList Gossip](#peerlist-gossip)
       - [Messages](#messages)
       - [Gossip](#gossip)
 
@@ -109,18 +110,33 @@ sequenceDiagram
     Bob->>Alice: ACK
 ```
 
-### Peer Handshake
-
-### Lifecycle
-
-#### Bootstrapping
+## Peer Discovery
 
 When starting an Avalanche node, a node needs to be able to initiate some process that eventually allows itself to become a participating member of the network. In traditional web2 systems, it's common to use a web service by hitting the service's DNS and being routed to an available server behind a load balancer. In decentralized p2p systems however, connecting to a node is more complex as no single entity owns the network. [Avalanche consensus](https://docs.avax.network/overview/getting-started/avalanche-consensus) requires a node to repeatedly sample peers in the network, so each node needs some way of discovering and connecting to every other peer to participate in the protocol.
 
-In Avalanche, nodes connect to an initial set of bootstrapper nodes known as **beacons** (this is user-configurable). Once connected to a set of beacons, a node is able to discover other nodes in the network. Over time, a node eventually discovers other peers in the network through `PeerList` messages it receives through:
+### Inbound Connections
 
-- The handshake initiated between two peers when attempting to connect to a peer (see [Connecting](#connecting)).
-- Responses to periodically sent `GetPeerList` messages requesting a `PeerList` of unknown peers (see [Connected](#connected)).
+It is expected for Avalanche nodes to allow inbound connections. If a validator does not allow inbound connections, its observed uptime may be reduced.
+
+### Outbound Connections
+
+Avalanche nodes that have identified the `IP:Port` pair of a node they want to connect to will initiate outbound connections to this `IP:Port` pair. If the connection is not able to complete the [Peer Handshake](#peer-handshake), the connection will be re-attempted with an [Exponential Backoff](https://en.wikipedia.org/wiki/Exponential_backoff).
+
+A node should initiate outbound connections to an `IP:Port` pair if one of the following is true:
+- The `IP:Port` is currently believed to belong to a node in the initial bootstrapper set.
+- The `IP:Port` is currently believed to belong to a node in the current Primary Network validator set.
+
+### Bootstrapping
+
+In Avalanche, nodes connect to an initial set (this is user-configurable) of bootstrap nodes.
+
+### PeerList Gossip
+
+Once connected to a initial a set of peers, a node is able to use them to discover additional peers in the network.
+
+Peers are discovered by receiving `PeerList` messages:
+- sent during the [Peer Handshake](#peer-handshake).
+- sent in response to `GetPeerList` messages.
 
 #### Connecting
 
