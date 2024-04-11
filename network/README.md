@@ -9,6 +9,7 @@
   - [Ping-Pong Messages](#ping-pong-messages)
 - [Peer Discovery](#peer-discovery)
     - [Inbound Connections](#inbound-connections)
+    - [Outbound Connections](#outbound-connections)
     - [Bootstrapping](#bootstrapping)
     - [PeerList Gossip](#peerlist-gossip)
       - [Messages](#messages)
@@ -133,6 +134,18 @@ To ensure that outbound connections are being made to the correct `IP:Port` pair
 
 The `Timestamp` guarantees that nodes provided an `IP:Port` pair are able to track the most up-to-date `IP:Port` pair of a peer.
 
+### Bootstrapping
+
+In Avalanche, nodes connect to an initial set (this is user-configurable) of bootstrap nodes.
+
+### PeerList Gossip
+
+Once connected to an initial set of peers, a node is able to use these connections to discover additional peers.
+
+Peers are discovered by receiving [`PeerList`](#peerlist) messages during the [Peer Handshake](#peer-handshake). These messages quickly provide a node with knowledge of peers in the network. However, they offer no guarantee that the node will connect to and maintain connections with every peer in the network.
+
+To provide an eventual guarantee that all peers learn of one another, nodes periodically send a [`GetPeerList`](#getpeerlist) message to a randomly selected validator with the node's current [Bloom Filter](#bloom-filter) and `Salt`.
+
 #### Bloom Filter
 
 A [Bloom Filter](https://en.wikipedia.org/wiki/Bloom_filter) is used to track which nodes are known.
@@ -157,17 +170,9 @@ A `GetPeerList` message contains the Bloom Filter of the currently known peers a
 - The `IP:Port` pair the node shared during the `Handshake` message is the node's most recently known `IP:Port` pair.
 - The node claiming the `IP:Port` pair is either in the default bootstrapper set or is a current Primary Network validator.
 
-### Bootstrapping
+#### Example PeerList Gossip
 
-In Avalanche, nodes connect to an initial set (this is user-configurable) of bootstrap nodes.
-
-#### PeerList Gossip
-
-Once connected to an initial set of peers, a node is able to use these connections to discover additional peers.
-
-Peers are discovered by receiving `PeerList` messages during the [Peer Handshake](#peer-handshake). These messages quickly provide a node with knowledge of peers in the network. However, they offer no guarantee that the node will connect to and maintain connections with every peer in the network.
-
-To provide an eventual guarantee that all peers learn of one another, nodes periodically send a `GetPeerList` message to a randomly selected validator with the node's current Bloom Filter and `Salt`.
+The following diagram shows an example of `Alice` repeatedly learning about new peers from `Bob`.
 
 ```mermaid
 sequenceDiagram
