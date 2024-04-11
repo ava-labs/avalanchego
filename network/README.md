@@ -97,9 +97,17 @@ sequenceDiagram
 
 ### Ping-Pong Messages
 
-All messages are prefixed with their length. Reading a message first reads the 4-byte message length from the connection. The rate limiting logic then waits until there is sufficient capacity to read these bytes from the connection.
+Peers periodically send `Ping` messages containing perseived uptime information. This information can be used to determine if the node is considered to be performing well by the network. It is expected for a node to reply to a `Ping` message with a `Pong` message.
 
-A peer will then read the full message and attempt to parse it into either a networking message or an application message. If the message is malformed the connection is not dropped. The peer will simply continue to the next sent message.
+```mermaid
+sequenceDiagram
+    actor Alice
+    actor Bob
+    Note left of Alice: Send Ping
+    Alice->>Bob: I think your uptime is 95%
+    Note right of Bob: Respond with Pong
+    Bob->>Alice: ACK
+```
 
 ### Peer Handshake
 
