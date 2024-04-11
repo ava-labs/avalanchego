@@ -160,10 +160,9 @@ To prevent a malicious node from arbitrarily filling this Bloom Filter, only `2`
 
 #### GetPeerList
 
-A `GetPeerList` message contains the Bloom Filter of the currently known peers along with the `Salt` that was used to add entries to the Bloom Filter. Upon receipt of a `GetPeerList` message, a node is expected to respond with a `PeerList` message containing `IP:Port` pairs that satisfy all of the following constraints:
-- The node claiming the `IP:Port` pair is currently connected.
-- The `IP:Port` pair the node shared during the `Handshake` message is the node's most recently known `IP:Port` pair.
-- The node claiming the `IP:Port` pair is either in the default bootstrapper set or is a current Primary Network validator.
+A `GetPeerList` message contains the Bloom Filter of the currently known peers along with the `Salt` that was used to add entries to the Bloom Filter. Upon receipt of a `GetPeerList` message, a node is expected to respond with a `PeerList` message.
+
+A node will periodically send a `GetPeerList` message to a randomly selected validator with the node's current Bloom Filter and `Salt`.
 
 #### PeerList
 
@@ -173,69 +172,7 @@ A `GetPeerList` message contains the Bloom Filter of the currently known peers a
 - The `IP:Port` pair the node shared during the `Handshake` message is the node's most recently known `IP:Port` pair.
 - The node claiming the `IP:Port` pair is either in the default bootstrapper set or is a current Primary Network validator.
 
-#### Connecting
-
-##### Peer Handshake
-
-Upon connection to any peer, a handshake is performed between the node attempting to establish the outbound connection to the peer and the peer receiving the inbound connection.
-
-When attempting to establish the connection, the first message that the node attempting to connect to the peer in the network is a `Handshake` message describing compatibility of the candidate node with the peer. As an example, nodes that are attempting to connect with an incompatible version of AvalancheGo or a significantly skewed local clock are rejected by the peer.
-
-```mermaid
-sequenceDiagram
-Note over Node,Peer: Initiate Handshake
-Note left of Node: I want to connect to you!
-Note over Node,Peer: Handshake message
-Node->>Peer: AvalancheGo v1.0.0
-Note right of Peer: My version v1.9.4 is incompatible with your version v1.0.0.
-Peer-xNode: Connection dropped
-Note over Node,Peer: Handshake Failed
-```
-
-If the `Handshake` message is successfully received and the peer decides that it wants a connection with this node, it replies with a `PeerList` message that contains metadata about other peers that allows a node to connect to them. Upon reception of a `PeerList` message, a node will attempt to connect to any peers that the node is not already connected to to allow the node to discover more peers in the network.
-
-```mermaid
-sequenceDiagram
-Note over Node,Peer: Initiate Handshake
-Note left of Node: I want to connect to you!
-Note over Node,Peer: Handshake message
-Node->>Peer: AvalancheGo v1.9.4
-Note right of Peer: LGTM!
-Note over Node,Peer: PeerList message
-Peer->>Node: Peer-X, Peer-Y, Peer-Z
-Note over Node,Peer: Handshake Complete
-```
-
-Once the node attempting to join the network receives this `PeerList` message, the handshake is complete and the node is now connected to the peer. The node attempts to connect to the new peers discovered in the `PeerList` message. Each connection results in another peer handshake, which results in the node incrementally discovering more and more peers in the network as more and more `PeerList` messages are exchanged.
-
-#### Connected
-
-Some peers aren't discovered through the `PeerList` messages exchanged through peer handshakes. This can happen if a peer is either not randomly sampled, or if a new peer joins the network after the node has already connected to the network.
-
-```mermaid
-sequenceDiagram
-Node ->> Peer-1: Handshake - v1.9.5
-Peer-1 ->> Node: PeerList - Peer-2
-Note left of Node: Node is connected to Peer-1 and now tries to connect to Peer-2.
-Node ->> Peer-2: Handshake - v1.9.5
-Peer-2 ->> Node: PeerList - Peer-1
-Note left of Node: Peer-3 was never sampled, so we haven't connected yet!
-Node --> Peer-3: No connection
-```
-
-To guarantee that a node can discover all peers, each node periodically sends a `GetPeerList` message to a random peer.
-
-##### PeerList Gossip
-
-###### Messages
-
-A `GetPeerList` message requests that the peer sends a `PeerList` message. `GetPeerList` messages contain a bloom filter of already known peers to reduce useless bandwidth on `PeerList` messages. The bloom filter reduces bandwidth by enabling the `PeerList` message to only include peers that aren't already known.
-
-A `PeerList` is the message that is used to communicate the presence of peers in the network. Each `PeerList` message contains signed networking-level metadata about a peer that provides the necessary information to connect to it.
-
-Once peer metadata is received, the node will add that data to its bloom filter to prevent learning about it again.
-
-###### Gossip
+#### PeerList Gossip
 
 Handshake messages provide a node with some knowledge of peers in the network, but offers no guarantee that learning about a subset of peers from each peer the node connects with will result in the node learning about every peer in the network.
 
