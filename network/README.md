@@ -59,8 +59,8 @@ sequenceDiagram
     and Bob sends Alice a Handshake message
         Bob->>Alice: AvalancheGo v1.11.4
     end
-    Note left of Alice: LGTM!
-    Note right of Bob: v1.11.4 is incompatible with v1.0.0.
+    Note left of Alice: v1.11.4 could be compatible with v1.0.0!
+    Note right of Bob: v1.0.0 is incompatible with v1.11.4.
     par Alice sends Bob the Peerlist message
         Alice->>Bob: Peerlist
     and Bob disconnects from Alice
