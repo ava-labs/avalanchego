@@ -27,9 +27,10 @@ done
 # tests/antithesis/Dockerfile.node
 # tests/antithesis/Dockerfile.workload
 # Dockerfile
+# CONTRIBUTING.md
 # README.md
 # go.mod
-go_version_minimum="1.21.8"
+go_version_minimum="1.21.9"
 
 go_version() {
     go version | sed -nE -e 's/[^0-9.]+([0-9.]+).+/\1/p'
