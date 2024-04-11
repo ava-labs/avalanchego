@@ -54,9 +54,9 @@ sequenceDiagram
     actor Alice
     actor Bob
     Note over Alice,Bob: Connection Created
-    par Alice to Bob
+    par Alice sends Bob a Handshake message
         Alice->>Bob: AvalancheGo v1.0.0
-    and Bob to Alice
+    and Bob sends Alice a Handshake message
         Bob->>Alice: AvalancheGo v1.11.4
     end
 Alice->>Bob: AvalancheGo v1.0.0
