@@ -23,6 +23,8 @@ Avalanche is a decentralized [p2p](https://en.wikipedia.org/wiki/Peer-to-peer) (
 
 The `network` package implements the networking layer of the protocol which allows a node to discover, connect to, and communicate with other peers.
 
+All connections are authenticated using [TLS](https://en.wikipedia.org/wiki/Transport_Layer_Security). However, there is no reliance on any certificate authorities. The `network` package identifies peers by the public key in the leaf certificate.
+
 ## Peers
 
 Peers are defined as members of the network that communicate with one another to participate in the Avalanche protocol.
