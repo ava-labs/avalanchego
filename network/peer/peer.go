@@ -776,8 +776,7 @@ func (p *peer) handle(msg message.InboundMessage) {
 func (p *peer) handlePing(msg *p2p.Ping) {
 	p.observeUptimes(msg.Uptime, msg.SubnetUptimes)
 
-	primaryUptime, subnetUptimes := p.getUptimes()
-	pongMessage, err := p.MessageCreator.Pong(primaryUptime, subnetUptimes)
+	pongMessage, err := p.MessageCreator.Pong()
 	if err != nil {
 		p.Log.Error("failed to create message",
 			zap.Stringer("messageOp", message.PongOp),
@@ -826,20 +825,9 @@ func (p *peer) getUptimes() (uint32, []*p2p.SubnetUptime) {
 	return primaryUptimePercent, subnetUptimes
 }
 
-func (p *peer) handlePong(msg *p2p.Pong) {
-	// TODO: Remove once everyone sends uptimes in Ping messages.
-	p.observeUptimes(msg.Uptime, msg.SubnetUptimes)
-}
+func (*peer) handlePong(*p2p.Pong) {}
 
 func (p *peer) observeUptimes(primaryUptime uint32, subnetUptimes []*p2p.SubnetUptime) {
-	// TODO: Remove once everyone sends uptimes in Ping messages.
-	//
-	// If primaryUptime is 0, the message may not include any uptimes. This may
-	// happen with old Ping messages or new Pong messages.
-	if primaryUptime == 0 {
-		return
-	}
-
 	if primaryUptime > 100 {
 		p.Log.Debug("dropping message with invalid uptime",
 			zap.Stringer("nodeID", p.id),
