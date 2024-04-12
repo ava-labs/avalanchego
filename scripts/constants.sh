@@ -13,14 +13,18 @@ AVALANCHE_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd ) # Direct
 # Where AvalancheGo binary goes
 avalanchego_path="$AVALANCHE_PATH/build/avalanchego"
 
-# Avalabs docker hub
-# avaplatform/avalanchego - defaults to local as to avoid unintentional pushes
-# You should probably set it - export DOCKER_REPO='avaplatform/avalanchego'
-avalanchego_dockerhub_repo=${DOCKER_REPO:-"avalanchego"}
-
-# Current branch
+# Current branch  (shared between image build and its test script)
 # TODO: fix "fatal: No names found, cannot describe anything" in github CI
 current_branch=$(git symbolic-ref -q --short HEAD || git describe --tags --exact-match || true)
+# Supply a default branch when one is not discovered
+if [[ -z $current_branch ]]; then
+  current_branch=ci_dummy
+fi
+
+# Current commit (shared between image build and its test script)
+# WARNING: this will use the most recent commit even if there are un-committed changes present
+full_commit_hash="$(git --git-dir="$AVALANCHE_PATH/.git" rev-parse HEAD)"
+commit_hash="${full_commit_hash::8}"
 
 git_commit=${AVALANCHEGO_COMMIT:-$( git rev-list -1 HEAD )}
 
