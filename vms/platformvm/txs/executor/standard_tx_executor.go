@@ -45,6 +45,7 @@ type StandardTxExecutor struct {
 	Inputs         set.Set[ids.ID]
 	AtomicRequests map[ids.ID]*atomic.Requests // may be nil
 	TipPercentage  commonfees.TipPercentage
+	BaseFee        uint64
 }
 
 func (*StandardTxExecutor) AdvanceTimeTx(*txs.AdvanceTimeTx) error {
@@ -75,11 +76,12 @@ func (e *StandardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 	}
 
 	// Verify the flowcheck
-	feeCalculator := fees.NewDynamicCalculator(e.Backend.Config, currentTimestamp, e.BlkFeeManager, e.BlockMaxComplexity, e.Tx.Creds)
+	feeCalculator := fees.NewDynamicCalculator(e.Backend.Config, e.Backend.Ctx.Log, currentTimestamp, e.BlkFeeManager, e.BlockMaxComplexity, e.Tx.Creds)
 
 	if err := tx.Visit(feeCalculator); err != nil {
 		return err
 	}
+	e.BaseFee = feeCalculator.DynamicBaseFee
 
 	feesPaid, err := e.FlowChecker.VerifySpend(
 		tx,
@@ -135,11 +137,12 @@ func (e *StandardTxExecutor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 	}
 
 	// Verify the flowcheck
-	feeCalculator := fees.NewDynamicCalculator(e.Backend.Config, e.State.GetTimestamp(), e.BlkFeeManager, e.BlockMaxComplexity, e.Tx.Creds)
+	feeCalculator := fees.NewDynamicCalculator(e.Backend.Config, e.Backend.Ctx.Log, e.State.GetTimestamp(), e.BlkFeeManager, e.BlockMaxComplexity, e.Tx.Creds)
 
 	if err := tx.Visit(feeCalculator); err != nil {
 		return err
 	}
+	e.BaseFee = feeCalculator.DynamicBaseFee
 
 	feesPaid, err := e.FlowChecker.VerifySpend(
 		tx,
@@ -197,10 +200,11 @@ func (e *StandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 		utxoIDs[i] = utxoID[:]
 	}
 
-	feeCalculator := fees.NewDynamicCalculator(e.Backend.Config, e.State.GetTimestamp(), e.BlkFeeManager, e.BlockMaxComplexity, e.Tx.Creds)
+	feeCalculator := fees.NewDynamicCalculator(e.Backend.Config, e.Backend.Ctx.Log, e.State.GetTimestamp(), e.BlkFeeManager, e.BlockMaxComplexity, e.Tx.Creds)
 	if err := tx.Visit(feeCalculator); err != nil {
 		return err
 	}
+	e.BaseFee = feeCalculator.DynamicBaseFee
 
 	// Skip verification of the shared memory inputs if the other primary
 	// network chains are not guaranteed to be up-to-date.
@@ -289,10 +293,11 @@ func (e *StandardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 		return err
 	}
 
-	feeCalculator := fees.NewDynamicCalculator(e.Backend.Config, e.State.GetTimestamp(), e.BlkFeeManager, e.BlockMaxComplexity, e.Tx.Creds)
+	feeCalculator := fees.NewDynamicCalculator(e.Backend.Config, e.Backend.Ctx.Log, e.State.GetTimestamp(), e.BlkFeeManager, e.BlockMaxComplexity, e.Tx.Creds)
 	if err := tx.Visit(feeCalculator); err != nil {
 		return err
 	}
+	e.BaseFee = feeCalculator.DynamicBaseFee
 
 	if e.Bootstrapped.Get() {
 		if err := verify.SameSubnet(context.TODO(), e.Ctx, tx.DestinationChain); err != nil {
@@ -374,13 +379,15 @@ func (e *StandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 		return errEmptyNodeID
 	}
 
-	if _, err := verifyAddValidatorTx(
+	var err error
+	_, e.BaseFee, err = verifyAddValidatorTx(
 		e.Backend,
 		e.BlkFeeManager,
 		e.State,
 		e.Tx,
 		tx,
-	); err != nil {
+	)
+	if err != nil {
 		return err
 	}
 
@@ -404,7 +411,7 @@ func (e *StandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 }
 
 func (e *StandardTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
-	tipPercentage, err := verifyAddSubnetValidatorTx(
+	tipPercentage, baseFee, err := verifyAddSubnetValidatorTx(
 		e.Backend,
 		e.BlkFeeManager,
 		e.BlockMaxComplexity,
@@ -416,6 +423,7 @@ func (e *StandardTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 		return err
 	}
 	e.TipPercentage = tipPercentage
+	e.BaseFee = baseFee
 
 	if err := e.putStaker(tx); err != nil {
 		return err
@@ -428,15 +436,17 @@ func (e *StandardTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 }
 
 func (e *StandardTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
-	if _, err := verifyAddDelegatorTx(
+	_, baseFee, err := verifyAddDelegatorTx(
 		e.Backend,
 		e.BlkFeeManager,
 		e.State,
 		e.Tx,
 		tx,
-	); err != nil {
+	)
+	if err != nil {
 		return err
 	}
+	e.BaseFee = baseFee
 
 	if err := e.putStaker(tx); err != nil {
 		return err
@@ -454,7 +464,7 @@ func (e *StandardTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 // [tx.SubnetID].
 // Note: [tx.NodeID] may be either a current or pending validator.
 func (e *StandardTxExecutor) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx) error {
-	staker, isCurrentValidator, tipPercentage, err := verifyRemoveSubnetValidatorTx(
+	staker, isCurrentValidator, tipPercentage, baseFee, err := verifyRemoveSubnetValidatorTx(
 		e.Backend,
 		e.BlkFeeManager,
 		e.BlockMaxComplexity,
@@ -466,6 +476,7 @@ func (e *StandardTxExecutor) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidat
 		return err
 	}
 	e.TipPercentage = tipPercentage
+	e.BaseFee = baseFee
 
 	// Invariant: There are no permissioned subnet delegators to remove.
 	if isCurrentValidator {
@@ -506,10 +517,11 @@ func (e *StandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 		return err
 	}
 
-	feeCalculator := fees.NewDynamicCalculator(e.Backend.Config, e.State.GetTimestamp(), e.BlkFeeManager, e.BlockMaxComplexity, e.Tx.Creds)
+	feeCalculator := fees.NewDynamicCalculator(e.Backend.Config, e.Backend.Ctx.Log, e.State.GetTimestamp(), e.BlkFeeManager, e.BlockMaxComplexity, e.Tx.Creds)
 	if err := tx.Visit(feeCalculator); err != nil {
 		return err
 	}
+	e.BaseFee = feeCalculator.DynamicBaseFee
 
 	totalRewardAmount := tx.MaximumSupply - tx.InitialSupply
 	feesPaid, err := e.Backend.FlowChecker.VerifySpend(
@@ -550,7 +562,7 @@ func (e *StandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 }
 
 func (e *StandardTxExecutor) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessValidatorTx) error {
-	tipPercentage, err := verifyAddPermissionlessValidatorTx(
+	tipPercentage, baseFee, err := verifyAddPermissionlessValidatorTx(
 		e.Backend,
 		e.BlkFeeManager,
 		e.BlockMaxComplexity,
@@ -562,6 +574,7 @@ func (e *StandardTxExecutor) AddPermissionlessValidatorTx(tx *txs.AddPermissionl
 		return err
 	}
 	e.TipPercentage = tipPercentage
+	e.BaseFee = baseFee
 
 	if err := e.putStaker(tx); err != nil {
 		return err
@@ -586,7 +599,7 @@ func (e *StandardTxExecutor) AddPermissionlessValidatorTx(tx *txs.AddPermissionl
 }
 
 func (e *StandardTxExecutor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDelegatorTx) error {
-	tipPercentage, err := verifyAddPermissionlessDelegatorTx(
+	tipPercentage, baseFees, err := verifyAddPermissionlessDelegatorTx(
 		e.Backend,
 		e.BlkFeeManager,
 		e.BlockMaxComplexity,
@@ -598,6 +611,7 @@ func (e *StandardTxExecutor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionl
 		return err
 	}
 	e.TipPercentage = tipPercentage
+	e.BaseFee = baseFees
 
 	if err := e.putStaker(tx); err != nil {
 		return err
@@ -614,7 +628,7 @@ func (e *StandardTxExecutor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionl
 // This transaction will result in the ownership of [tx.Subnet] being transferred
 // to [tx.Owner].
 func (e *StandardTxExecutor) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwnershipTx) error {
-	tipPercentage, err := verifyTransferSubnetOwnershipTx(
+	tipPercentage, baseFee, err := verifyTransferSubnetOwnershipTx(
 		e.Backend,
 		e.BlkFeeManager,
 		e.BlockMaxComplexity,
@@ -626,6 +640,7 @@ func (e *StandardTxExecutor) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwn
 		return err
 	}
 	e.TipPercentage = tipPercentage
+	e.BaseFee = baseFee
 
 	e.State.SetSubnetOwner(tx.Subnet, tx.Owner)
 
@@ -657,11 +672,12 @@ func (e *StandardTxExecutor) BaseTx(tx *txs.BaseTx) error {
 	}
 
 	// Verify the flowcheck
-	feeCalculator := fees.NewDynamicCalculator(e.Backend.Config, e.State.GetTimestamp(), e.BlkFeeManager, e.BlockMaxComplexity, e.Tx.Creds)
+	feeCalculator := fees.NewDynamicCalculator(e.Backend.Config, e.Backend.Ctx.Log, e.State.GetTimestamp(), e.BlkFeeManager, e.BlockMaxComplexity, e.Tx.Creds)
 
 	if err := tx.Visit(feeCalculator); err != nil {
 		return err
 	}
+	e.BaseFee = feeCalculator.DynamicBaseFee
 
 	feesPaid, err := e.FlowChecker.VerifySpend(
 		tx,

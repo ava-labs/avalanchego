@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/fees"
@@ -925,7 +926,7 @@ func TestTxFees(t *testing.T) {
 			if !cfg.IsEActivated(chainTime) {
 				fc = NewStaticCalculator(cfg, chainTime, sTx.Creds)
 			} else {
-				fc = NewDynamicCalculator(cfg, chainTime, fees.NewManager(testFeeRates), maxComplexity, sTx.Creds)
+				fc = NewDynamicCalculator(cfg, logging.NoLog{}, chainTime, fees.NewManager(testFeeRates), maxComplexity, sTx.Creds)
 			}
 
 			err := uTx.Visit(fc)

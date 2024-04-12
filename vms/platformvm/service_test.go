@@ -398,7 +398,7 @@ func TestGetBalance(t *testing.T) {
 
 			feeCfg := config.GetDynamicFeesConfig(service.vm.Config.IsEActivated(chainTime))
 			feeMan := commonfees.NewManager(feeRates)
-			feeCalc = fees.NewDynamicCalculator(&service.vm.Config, chainTime, feeMan, feeCfg.BlockMaxComplexity, testSubnet1.Creds)
+			feeCalc = fees.NewDynamicCalculator(&service.vm.Config, logging.NoLog{}, chainTime, feeMan, feeCfg.BlockMaxComplexity, testSubnet1.Creds)
 
 			require.NoError(testSubnet1.Unsigned.Visit(feeCalc))
 

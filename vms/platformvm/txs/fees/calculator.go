@@ -8,8 +8,11 @@ import (
 	"fmt"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/fees"
@@ -29,6 +32,7 @@ var (
 type Calculator struct {
 	// setup
 	isEActive bool
+	log       logging.Logger
 
 	// Pre E-fork inputs
 	config    *config.Config
@@ -44,7 +48,8 @@ type Calculator struct {
 	TipPercentage fees.TipPercentage
 
 	// outputs of visitor execution
-	Fee uint64
+	Fee            uint64
+	DynamicBaseFee uint64
 }
 
 // NewStaticCalculator must be used pre E upgrade activation
@@ -63,6 +68,7 @@ func NewStaticCalculator(cfg *config.Config, chainTime time.Time, creds []verify
 // NewDynamicCalculator must be used post E upgrade activation
 func NewDynamicCalculator(
 	cfg *config.Config,
+	log logging.Logger,
 	chainTime time.Time,
 	feeManager *fees.Manager,
 	blockMaxComplexity fees.Dimensions,
@@ -70,6 +76,7 @@ func NewDynamicCalculator(
 ) *Calculator {
 	return &Calculator{
 		isEActive: true,
+		log:       log,
 		config:    cfg,
 
 		// TEMP TO TUNE PARAMETERS
@@ -88,6 +95,11 @@ func (fc *Calculator) AddValidatorTx(tx *txs.AddValidatorTx) error {
 		return err
 	}
 	_, err = fc.AddFeesFor(complexity, fc.TipPercentage)
+	fc.DynamicBaseFee = fc.Fee
+	fc.log.Warn("dynamic fees",
+		zap.String("txType", "AddValidatorTx"),
+		zap.Uint64("fee", fc.DynamicBaseFee),
+	)
 
 	// AddValidatorTx is banned following Durango activation, so we
 	// only return the pre EUpgrade fee here
@@ -102,6 +114,11 @@ func (fc *Calculator) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
 	}
 
 	_, err = fc.AddFeesFor(complexity, fc.TipPercentage)
+	fc.DynamicBaseFee = fc.Fee
+	fc.log.Warn("dynamic fees",
+		zap.String("txType", "AddSubnetValidatorTx"),
+		zap.Uint64("fee", fc.DynamicBaseFee),
+	)
 
 	// TEMP TO TUNE PARAMETERS
 	if !fc.isEActive {
@@ -118,6 +135,11 @@ func (fc *Calculator) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 	}
 
 	_, err = fc.AddFeesFor(complexity, fc.TipPercentage)
+	fc.DynamicBaseFee = fc.Fee
+	fc.log.Warn("dynamic fees",
+		zap.String("txType", "AddDelegatorTx"),
+		zap.Uint64("fee", fc.DynamicBaseFee),
+	)
 
 	// TEMP TO TUNE PARAMETERS
 	if !fc.isEActive {
@@ -138,6 +160,11 @@ func (fc *Calculator) CreateChainTx(tx *txs.CreateChainTx) error {
 	}
 
 	_, err = fc.AddFeesFor(complexity, fc.TipPercentage)
+	fc.DynamicBaseFee = fc.Fee
+	fc.log.Warn("dynamic fees",
+		zap.String("txType", "CreateChainTx"),
+		zap.Uint64("fee", fc.DynamicBaseFee),
+	)
 
 	// TEMP TO TUNE PARAMETERS
 	if !fc.isEActive {
@@ -153,6 +180,11 @@ func (fc *Calculator) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 	}
 
 	_, err = fc.AddFeesFor(complexity, fc.TipPercentage)
+	fc.DynamicBaseFee = fc.Fee
+	fc.log.Warn("dynamic fees",
+		zap.String("txType", "CreateSubnetTx"),
+		zap.Uint64("fee", fc.DynamicBaseFee),
+	)
 
 	// TEMP TO TUNE PARAMETERS
 	if !fc.isEActive {
@@ -176,6 +208,11 @@ func (fc *Calculator) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx) e
 	}
 
 	_, err = fc.AddFeesFor(complexity, fc.TipPercentage)
+	fc.DynamicBaseFee = fc.Fee
+	fc.log.Warn("dynamic fees",
+		zap.String("txType", "RemoveSubnetValidatorTx"),
+		zap.Uint64("fee", fc.DynamicBaseFee),
+	)
 
 	// TEMP TO TUNE PARAMETERS
 	if !fc.isEActive {
@@ -191,6 +228,11 @@ func (fc *Calculator) TransformSubnetTx(tx *txs.TransformSubnetTx) error {
 	}
 
 	_, err = fc.AddFeesFor(complexity, fc.TipPercentage)
+	fc.DynamicBaseFee = fc.Fee
+	fc.log.Warn("dynamic fees",
+		zap.String("txType", "TransformSubnetTx"),
+		zap.Uint64("fee", fc.DynamicBaseFee),
+	)
 
 	// TEMP TO TUNE PARAMETERS
 	if !fc.isEActive {
@@ -206,6 +248,11 @@ func (fc *Calculator) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwnershipT
 	}
 
 	_, err = fc.AddFeesFor(complexity, fc.TipPercentage)
+	fc.DynamicBaseFee = fc.Fee
+	fc.log.Warn("dynamic fees",
+		zap.String("txType", "TransferSubnetOwnershipTx"),
+		zap.Uint64("fee", fc.DynamicBaseFee),
+	)
 
 	// TEMP TO TUNE PARAMETERS
 	if !fc.isEActive {
@@ -225,6 +272,11 @@ func (fc *Calculator) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessVali
 	}
 
 	_, err = fc.AddFeesFor(complexity, fc.TipPercentage)
+	fc.DynamicBaseFee = fc.Fee
+	fc.log.Warn("dynamic fees",
+		zap.String("txType", "AddPermissionlessValidatorTx"),
+		zap.Uint64("fee", fc.DynamicBaseFee),
+	)
 
 	// TEMP TO TUNE PARAMETERS
 	if !fc.isEActive {
@@ -248,6 +300,11 @@ func (fc *Calculator) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDele
 	}
 
 	_, err = fc.AddFeesFor(complexity, fc.TipPercentage)
+	fc.DynamicBaseFee = fc.Fee
+	fc.log.Warn("dynamic fees",
+		zap.String("txType", "AddPermissionlessDelegatorTx"),
+		zap.Uint64("fee", fc.DynamicBaseFee),
+	)
 
 	// TEMP TO TUNE PARAMETERS
 	if !fc.isEActive {
@@ -267,6 +324,11 @@ func (fc *Calculator) BaseTx(tx *txs.BaseTx) error {
 	}
 
 	_, err = fc.AddFeesFor(complexity, fc.TipPercentage)
+	fc.DynamicBaseFee = fc.Fee
+	fc.log.Warn("dynamic fees",
+		zap.String("txType", "BaseTx"),
+		zap.Uint64("fee", fc.DynamicBaseFee),
+	)
 
 	// TEMP TO TUNE PARAMETERS
 	if !fc.isEActive {
@@ -286,6 +348,11 @@ func (fc *Calculator) ImportTx(tx *txs.ImportTx) error {
 	}
 
 	_, err = fc.AddFeesFor(complexity, fc.TipPercentage)
+	fc.DynamicBaseFee = fc.Fee
+	fc.log.Warn("dynamic fees",
+		zap.String("txType", "ImportTx"),
+		zap.Uint64("fee", fc.DynamicBaseFee),
+	)
 
 	// TEMP TO TUNE PARAMETERS
 	if !fc.isEActive {
@@ -305,6 +372,11 @@ func (fc *Calculator) ExportTx(tx *txs.ExportTx) error {
 	}
 
 	_, err = fc.AddFeesFor(complexity, fc.TipPercentage)
+	fc.DynamicBaseFee = fc.Fee
+	fc.log.Warn("dynamic fees",
+		zap.String("txType", "ExportTx"),
+		zap.Uint64("fee", fc.DynamicBaseFee),
+	)
 
 	// TEMP TO TUNE PARAMETERS
 	if !fc.isEActive {

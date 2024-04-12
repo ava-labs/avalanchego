@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
@@ -517,6 +518,6 @@ func (b *Builder) feeCalculator() (*fees.Calculator, error) {
 	}
 
 	feeCfg := config.GetDynamicFeesConfig(isEActive)
-	feeCalculator = fees.NewDynamicCalculator(b.cfg, chainTime, feeManager, feeCfg.BlockMaxComplexity, nil)
+	feeCalculator = fees.NewDynamicCalculator(b.cfg, logging.NoLog{}, chainTime, feeManager, feeCfg.BlockMaxComplexity, nil)
 	return feeCalculator, nil
 }

@@ -6,6 +6,7 @@ package executor
 import (
 	"go.uber.org/zap"
 
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
@@ -113,7 +114,7 @@ func (r *rejector) rejectBlock(b block.Block, blockType string) error {
 		// We recheck only the fees, withouth re-validating the whole transaction.
 		feeManager.ResetComplexity()
 
-		feeCalculator := fees.NewDynamicCalculator(cfg, currentTimestamp, feeManager, feesCfg.BlockMaxComplexity, tx.Creds)
+		feeCalculator := fees.NewDynamicCalculator(cfg, logging.NoLog{}, currentTimestamp, feeManager, feesCfg.BlockMaxComplexity, tx.Creds)
 
 		if err := tx.Unsigned.Visit(feeCalculator); err != nil {
 			r.ctx.Log.Info(

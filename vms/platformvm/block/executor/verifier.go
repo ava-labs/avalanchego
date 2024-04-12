@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fees"
+	"go.uber.org/zap"
 
 	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
@@ -74,7 +75,7 @@ func (v *verifier) BanffProposalBlock(b *block.BanffProposalBlock) error {
 		return err
 	}
 
-	inputs, feesMan, atomicRequests, onAcceptFunc, err := v.processStandardTxs(
+	inputs, feesMan, atomicRequests, onAcceptFunc, standardFees, err := v.processStandardTxs(
 		b.Transactions,
 		onDecisionState,
 		b.Parent(),
@@ -95,7 +96,7 @@ func (v *verifier) BanffProposalBlock(b *block.BanffProposalBlock) error {
 		return err
 	}
 
-	return v.proposalBlock(
+	proposalFees, err := v.proposalBlock(
 		&b.ApricotProposalBlock,
 		onDecisionState,
 		onCommitState,
@@ -105,6 +106,19 @@ func (v *verifier) BanffProposalBlock(b *block.BanffProposalBlock) error {
 		atomicRequests,
 		onAcceptFunc,
 	)
+	if err != nil {
+		return err
+	}
+
+	v.ctx.Log.Info(
+		"BLOCK COMPLEXITY",
+		zap.Stringer("blkID", b.ID()),
+		zap.Uint64("blkHeight", b.Height()),
+		zap.Uint64("total block fees", standardFees+proposalFees),
+		zap.Any("feeRates", feesMan.GetFeeRates()),
+		zap.Any("consumedUnits", feesMan.GetCumulatedComplexity()),
+	)
+	return nil
 }
 
 func (v *verifier) BanffStandardBlock(b *block.BanffStandardBlock) error {
@@ -169,7 +183,30 @@ func (v *verifier) ApricotProposalBlock(b *block.ApricotProposalBlock) error {
 		return err
 	}
 
-	return v.proposalBlock(b, nil, onCommitState, onAbortState, commonfees.NewManager(commonfees.Empty), nil, nil, nil)
+	feeRates, err := onCommitState.GetFeeRates()
+	if err != nil {
+		return err
+	}
+
+	// I CANNOT UPDATE THE feeRates for proposal blocks since they don't have timestamp pre Banff
+	// So I just keep the fee Rates I have
+	// My goal is to give an idea of how the system behave under stress and proposal blocks
+	// does not seem to cause much load
+	feeMan := commonfees.NewManager(feeRates)
+	proposalFees, err := v.proposalBlock(b, nil, onCommitState, onAbortState, feeMan, nil, nil, nil)
+	if err != nil {
+		return err
+	}
+
+	v.ctx.Log.Info(
+		"BLOCK COMPLEXITY",
+		zap.Stringer("blkID", b.ID()),
+		zap.Uint64("blkHeight", b.Height()),
+		zap.Uint64("total block fees", proposalFees),
+		zap.Any("feeRates", feeMan.GetFeeRates()),
+		zap.Any("consumedUnits", feeMan.GetCumulatedComplexity()),
+	)
+	return nil
 }
 
 func (v *verifier) ApricotStandardBlock(b *block.ApricotStandardBlock) error {
@@ -387,7 +424,10 @@ func (v *verifier) proposalBlock(
 	inputs set.Set[ids.ID],
 	atomicRequests map[ids.ID]*atomic.Requests,
 	onAcceptFunc func(),
-) error {
+) (
+	uint64, // cumulated block fees
+	error,
+) {
 	txExecutor := executor.ProposalTxExecutor{
 		OnCommitState: onCommitState,
 		OnAbortState:  onAbortState,
@@ -399,7 +439,7 @@ func (v *verifier) proposalBlock(
 	if err := b.Tx.Unsigned.Visit(&txExecutor); err != nil {
 		txID := b.Tx.ID()
 		v.MarkDropped(txID, err) // cache tx as dropped
-		return err
+		return txExecutor.BaseFee, err
 	}
 
 	onCommitState.AddTx(b.Tx, status.Committed)
@@ -427,7 +467,7 @@ func (v *verifier) proposalBlock(
 		blockComplexity: feesMan.GetCumulatedComplexity(),
 		atomicRequests:  atomicRequests,
 	}
-	return nil
+	return txExecutor.BaseFee, nil
 }
 
 // standardBlock populates the state of this block if [nil] is returned
@@ -437,7 +477,7 @@ func (v *verifier) standardBlock(
 	blkTimestamp time.Time,
 	onAcceptState state.Diff,
 ) error {
-	inputs, feeMan, atomicRequests, onAcceptFunc, err := v.processStandardTxs(
+	inputs, feeMan, atomicRequests, onAcceptFunc, totalBlockFees, err := v.processStandardTxs(
 		b.Transactions,
 		onAcceptState,
 		b.Parent(),
@@ -447,6 +487,15 @@ func (v *verifier) standardBlock(
 	if err != nil {
 		return err
 	}
+
+	v.ctx.Log.Info(
+		"BLOCK COMPLEXITY",
+		zap.Stringer("blkID", b.ID()),
+		zap.Uint64("blkHeight", b.Height()),
+		zap.Uint64("total block fees", totalBlockFees),
+		zap.Any("feeRates", feeMan.GetFeeRates()),
+		zap.Any("consumedUnits", feeMan.GetCumulatedComplexity()),
+	)
 
 	v.Mempool.Remove(b.Transactions...)
 
@@ -475,12 +524,13 @@ func (v *verifier) processStandardTxs(
 	*commonfees.Manager,
 	map[ids.ID]*atomic.Requests,
 	func(),
+	uint64, // total block fees
 	error,
 ) {
-	feeRates, err := state.GetFeeRates()
-	if err != nil {
-		return nil, nil, nil, nil, err
-	}
+	// feeRates, err := state.GetFeeRates()
+	// if err != nil {
+	// 	return nil, nil, nil, nil, 0, err
+	// }
 
 	var (
 		isEActive = v.txExecutorBackend.Config.IsEActivated(parentBlkTime)
@@ -490,15 +540,16 @@ func (v *verifier) processStandardTxs(
 		inputs         set.Set[ids.ID]
 		funcs          = make([]func(), 0, len(txs))
 		atomicRequests = make(map[ids.ID]*atomic.Requests)
+		totalBlockFees = uint64(0)
 	)
 
-	feeMan := commonfees.NewManager(feeRates)
-	if isEActive {
-		feeMan, err = fees.UpdatedFeeManager(state, v.txExecutorBackend.Config, parentBlkTime, blkTimestamp)
-		if err != nil {
-			return nil, nil, nil, nil, err
-		}
+	// feeMan := commonfees.NewManager(feeRates)
+	// if isEActive { // FOR TESTING, METER AND UPDATE FEES EVEN PRE-E-FORK
+	feeMan, err := fees.UpdatedFeeManager(state, v.txExecutorBackend.Config, parentBlkTime, blkTimestamp)
+	if err != nil {
+		return nil, nil, nil, nil, 0, err
 	}
+	// }
 
 	for _, tx := range txs {
 		txExecutor := executor.StandardTxExecutor{
@@ -511,11 +562,13 @@ func (v *verifier) processStandardTxs(
 		if err := tx.Unsigned.Visit(&txExecutor); err != nil {
 			txID := tx.ID()
 			v.MarkDropped(txID, err) // cache tx as dropped
-			return nil, nil, nil, nil, err
+			return nil, nil, nil, nil, 0, err
 		}
+		totalBlockFees += txExecutor.BaseFee
+
 		// ensure it doesn't overlap with current input batch
 		if inputs.Overlaps(txExecutor.Inputs) {
-			return nil, nil, nil, nil, ErrConflictingBlockTxs
+			return nil, nil, nil, nil, totalBlockFees, ErrConflictingBlockTxs
 		}
 		// Add UTXOs to batch
 		inputs.Union(txExecutor.Inputs)
@@ -539,13 +592,13 @@ func (v *verifier) processStandardTxs(
 	}
 
 	if err := v.verifyUniqueInputs(parentID, inputs); err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, nil, totalBlockFees, err
 	}
 
-	if isEActive {
-		state.SetFeeRates(feeMan.GetFeeRates())
-		state.SetLastBlockComplexity(feeMan.GetCumulatedComplexity())
-	}
+	// if isEActive { // FOR TESTING, METER AND UPDATE FEES EVEN PRE-E-FORK
+	state.SetFeeRates(feeMan.GetFeeRates())
+	state.SetLastBlockComplexity(feeMan.GetCumulatedComplexity())
+	// }
 
 	if numFuncs := len(funcs); numFuncs == 1 {
 		onAcceptFunc = funcs[0]
@@ -557,5 +610,5 @@ func (v *verifier) processStandardTxs(
 		}
 	}
 
-	return inputs, feeMan, atomicRequests, onAcceptFunc, nil
+	return inputs, feeMan, atomicRequests, onAcceptFunc, totalBlockFees, nil
 }

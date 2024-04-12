@@ -517,7 +517,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				tx         = tt.txF()
 			)
 
-			_, err := verifyAddPermissionlessValidatorTx(backend, feeManager, fees.Empty, state, sTx, tx)
+			_, _, err := verifyAddPermissionlessValidatorTx(backend, feeManager, fees.Empty, state, sTx, tx)
 			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}

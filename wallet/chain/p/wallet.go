@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
@@ -631,7 +632,7 @@ func (w *wallet) feeCalculator(ctx *builder.Context, options ...common.Option) (
 	var feeCalculator *fees.Calculator
 	feeCfg := config.GetDynamicFeesConfig(w.isEForkActive)
 	feeMan := commonfees.NewManager(w.nextFeeRates)
-	feeCalculator = fees.NewDynamicCalculator(w.staticFeesConfig, time.Time{}, feeMan, feeCfg.BlockMaxComplexity, nil)
+	feeCalculator = fees.NewDynamicCalculator(w.staticFeesConfig, logging.NoLog{}, time.Time{}, feeMan, feeCfg.BlockMaxComplexity, nil)
 	return feeCalculator, nil
 }
 
