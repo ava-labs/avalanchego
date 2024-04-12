@@ -76,15 +76,9 @@ message SubnetUptime {
   uint32 uptime = 2;
 }
 
-// Pong is sent in response to a Ping with the perceived uptime of the
-// peer.
+// Pong is sent in response to a Ping.
 message Pong {
-  // Deprecated: uptime is now sent in Ping
-  // Uptime percentage on the primary network [0, 100]
-  uint32 uptime = 1;
-  // Deprecated: uptime is now sent in Ping
-  // Uptime percentage on subnets
-  repeated SubnetUptime subnet_uptimes = 2;
+  reserved 1, 2; // Until E upgrade is activated.
 }
 
 // Handshake is the first outbound message sent to a peer when a connection is
