@@ -14,9 +14,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Publish image to DockerHub
+      - name: Install qemu (required for cross-platform builds)
+        run: |
+          sudo apt update
+          sudo apt -y install qemu qemu-user-static
+          sudo systemctl restart docker
+      - name: Create multiplatform docker builder
+        run: docker buildx create --use
+      - name: Build and publish images to DockerHub
         env:
           DOCKER_USERNAME: ${{ secrets.docker_username }}
           DOCKER_PASS: ${{ secrets.docker_pass }}
-          DOCKER_REPO: ${{ secrets.docker_repo }}
-        run: .github/workflows/publish_image.sh
+          DOCKER_IMAGE: ${{ secrets.docker_repo }}
+        run: scripts/build_image.sh
