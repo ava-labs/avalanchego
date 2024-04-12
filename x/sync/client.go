@@ -72,6 +72,7 @@ type client struct {
 	log              logging.Logger
 	metrics          SyncMetrics
 	tokenSize        int
+	hasher           merkledb.Hasher
 }
 
 type ClientConfig struct {
@@ -80,11 +81,17 @@ type ClientConfig struct {
 	Log              logging.Logger
 	Metrics          SyncMetrics
 	BranchFactor     merkledb.BranchFactor
+	// If not specified, [merkledb.DefaultHasher] will be used.
+	Hasher merkledb.Hasher
 }
 
 func NewClient(config *ClientConfig) (Client, error) {
 	if err := config.BranchFactor.Valid(); err != nil {
 		return nil, err
+	}
+	hasher := config.Hasher
+	if hasher == nil {
+		hasher = merkledb.DefaultHasher
 	}
 	return &client{
 		networkClient:  config.NetworkClient,
@@ -92,6 +99,7 @@ func NewClient(config *ClientConfig) (Client, error) {
 		log:            config.Log,
 		metrics:        config.Metrics,
 		tokenSize:      merkledb.BranchFactorToTokenSize[config.BranchFactor],
+		hasher:         hasher,
 	}, nil
 }
 
@@ -168,6 +176,7 @@ func (c *client) GetChangeProof(
 				endKey,
 				req.EndRootHash,
 				c.tokenSize,
+				c.hasher,
 			)
 			if err != nil {
 				return nil, err
@@ -206,6 +215,7 @@ func verifyRangeProof(
 	end maybe.Maybe[[]byte],
 	rootBytes []byte,
 	tokenSize int,
+	hasher merkledb.Hasher,
 ) error {
 	root, err := ids.ToID(rootBytes)
 	if err != nil {
@@ -226,6 +236,7 @@ func verifyRangeProof(
 		end,
 		root,
 		tokenSize,
+		hasher,
 	); err != nil {
 		return fmt.Errorf("%w due to %w", errInvalidRangeProof, err)
 	}
@@ -265,6 +276,7 @@ func (c *client) GetRangeProof(
 			maybeBytesToMaybe(req.EndKey),
 			req.RootHash,
 			c.tokenSize,
+			c.hasher,
 		); err != nil {
 			return nil, err
 		}

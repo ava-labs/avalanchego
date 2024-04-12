@@ -5,7 +5,6 @@ package merkledb
 
 import (
 	"bytes"
-	"crypto/sha256"
 	"encoding/binary"
 	"errors"
 	"io"
@@ -74,62 +73,6 @@ func encodedDBNodeSize(n *dbNode) int {
 	return size
 }
 
-// Returns the canonical hash of [n].
-//
-// Assumes [n] is non-nil.
-// This method is performance critical. It is not expected to perform any memory
-// allocations.
-func hashNode(n *node) ids.ID {
-	var (
-		// sha.Write always returns nil, so we ignore its return values.
-		sha  = sha256.New()
-		hash ids.ID
-		// The hash length is larger than the maximum Uvarint length. This
-		// ensures binary.AppendUvarint doesn't perform any memory allocations.
-		emptyHashBuffer = hash[:0]
-	)
-
-	// By directly calling sha.Write rather than passing sha around as an
-	// io.Writer, the compiler can perform sufficient escape analysis to avoid
-	// allocating buffers on the heap.
-	numChildren := len(n.children)
-	_, _ = sha.Write(binary.AppendUvarint(emptyHashBuffer, uint64(numChildren)))
-
-	// Avoid allocating keys entirely if the node doesn't have any children.
-	if numChildren != 0 {
-		// By allocating BranchFactorLargest rather than len(n.children), this
-		// slice is allocated on the stack rather than the heap.
-		// BranchFactorLargest is at least len(n.children) which avoids memory
-		// allocations.
-		keys := make([]byte, 0, BranchFactorLargest)
-		for k := range n.children {
-			keys = append(keys, k)
-		}
-
-		// Ensure that the order of entries is correct.
-		slices.Sort(keys)
-		for _, index := range keys {
-			entry := n.children[index]
-			_, _ = sha.Write(binary.AppendUvarint(emptyHashBuffer, uint64(index)))
-			_, _ = sha.Write(entry.id[:])
-		}
-	}
-
-	if n.valueDigest.HasValue() {
-		_, _ = sha.Write(trueBytes)
-		value := n.valueDigest.Value()
-		_, _ = sha.Write(binary.AppendUvarint(emptyHashBuffer, uint64(len(value))))
-		_, _ = sha.Write(value)
-	} else {
-		_, _ = sha.Write(falseBytes)
-	}
-
-	_, _ = sha.Write(binary.AppendUvarint(emptyHashBuffer, uint64(n.key.length)))
-	_, _ = sha.Write(n.key.Bytes())
-	sha.Sum(emptyHashBuffer)
-	return hash
-}
-
 // Assumes [n] is non-nil.
 func encodeDBNode(n *dbNode) []byte {
 	length := encodedDBNodeSize(n)
@@ -147,12 +90,14 @@ func encodeDBNode(n *dbNode) []byte {
 		return w.b
 	}
 
-	// By allocating BranchFactorLargest rather than len(n.children), this slice
+	// By allocating BranchFactorLargest rather than [numChildren], this slice
 	// is allocated on the stack rather than the heap. BranchFactorLargest is
-	// at least len(n.children) which avoids memory allocations.
-	keys := make([]byte, 0, BranchFactorLargest)
+	// at least [numChildren] which avoids memory allocations.
+	keys := make([]byte, numChildren, BranchFactorLargest)
+	i := 0
 	for k := range n.children {
-		keys = append(keys, k)
+		keys[i] = k
+		i++
 	}
 
 	// Ensure that the order of entries is correct.
