@@ -581,7 +581,7 @@ func TestIPTracker_OnValidatorAdded(t *testing.T) {
 			}(),
 		},
 		{
-			name: "manually gossipped",
+			name: "manually gossiped",
 			initialState: func() *ipTracker {
 				tracker := newTestIPTracker(t)
 				tracker.ManuallyGossip(ip.NodeID)
@@ -685,7 +685,7 @@ func TestIPTracker_OnValidatorRemoved(t *testing.T) {
 			}(),
 		},
 		{
-			name: "manually gossipped",
+			name: "manually gossiped",
 			initialState: func() *ipTracker {
 				tracker := newTestIPTracker(t)
 				tracker.ManuallyGossip(ip.NodeID)

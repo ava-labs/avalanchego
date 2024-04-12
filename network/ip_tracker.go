@@ -161,7 +161,7 @@ func (i *ipTracker) ManuallyGossip(nodeID ids.NodeID) {
 
 // WantsConnection returns true if any of the following conditions are met:
 //  1. The node has been manually tracked.
-//  2. The node has been manually gossipped.
+//  2. The node has been manually gossiped.
 //  3. The node is currently a validator.
 func (i *ipTracker) WantsConnection(nodeID ids.NodeID) bool {
 	i.lock.RLock()
