@@ -18,7 +18,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '~1.21.8'
+          go-version: '~1.21.9'
           check-latest: true
       - name: Run fuzz tests
         shell: bash

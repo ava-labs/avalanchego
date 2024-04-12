@@ -39,7 +39,7 @@ func (b *preForkBlock) acceptInnerBlk(ctx context.Context) error {
 }
 
 func (b *preForkBlock) Status() choices.Status {
-	forkHeight, err := b.vm.getForkHeight()
+	forkHeight, err := b.vm.GetForkHeight()
 	if err == database.ErrNotFound {
 		return b.Block.Status()
 	}
