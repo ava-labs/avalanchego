@@ -29,6 +29,8 @@ type valueNodeDB struct {
 	nodeCache cache.Cacher[Key, *node]
 	metrics   metrics
 
+	hasher Hasher
+
 	closed utils.Atomic[bool]
 }
 
@@ -37,12 +39,14 @@ func newValueNodeDB(
 	bufferPool *utils.BytesPool,
 	metrics metrics,
 	cacheSize int,
+	hasher Hasher,
 ) *valueNodeDB {
 	return &valueNodeDB{
 		metrics:    metrics,
 		baseDB:     db,
 		bufferPool: bufferPool,
 		nodeCache:  cache.NewSizedLRU(cacheSize, cacheEntrySize),
+		hasher:     hasher,
 	}
 }
 
@@ -94,7 +98,7 @@ func (db *valueNodeDB) Get(key Key) (*node, error) {
 		return nil, err
 	}
 
-	return parseNode(key, nodeBytes)
+	return parseNode(db.hasher, key, nodeBytes)
 }
 
 func (db *valueNodeDB) Clear() error {

@@ -51,10 +51,7 @@ type OutboundMsgBuilder interface {
 		subnetUptimes []*p2p.SubnetUptime,
 	) (OutboundMessage, error)
 
-	Pong(
-		primaryUptime uint32,
-		subnetUptimes []*p2p.SubnetUptime,
-	) (OutboundMessage, error)
+	Pong() (OutboundMessage, error)
 
 	GetStateSummaryFrontier(
 		chainID ids.ID,
@@ -216,17 +213,11 @@ func (b *outMsgBuilder) Ping(
 	)
 }
 
-func (b *outMsgBuilder) Pong(
-	primaryUptime uint32,
-	subnetUptimes []*p2p.SubnetUptime,
-) (OutboundMessage, error) {
+func (b *outMsgBuilder) Pong() (OutboundMessage, error) {
 	return b.builder.createOutbound(
 		&p2p.Message{
 			Message: &p2p.Message_Pong{
-				Pong: &p2p.Pong{
-					Uptime:        primaryUptime,
-					SubnetUptimes: subnetUptimes,
-				},
+				Pong: &p2p.Pong{},
 			},
 		},
 		compression.TypeNone,
