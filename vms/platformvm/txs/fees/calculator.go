@@ -75,7 +75,7 @@ func NewDynamicCalculator(
 	creds []verify.Verifiable,
 ) *Calculator {
 	return &Calculator{
-		isEActive: true,
+		isEActive: false, // TEMP FOR MEASUREMENTS
 		log:       log,
 		config:    cfg,
 

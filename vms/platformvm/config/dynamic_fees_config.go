@@ -14,6 +14,10 @@ import (
 )
 
 func init() {
+	// TO MEASURE
+	preEUpgradeDynamicFeesConfig = eUpgradeDynamicFeesConfig
+	preEUpgradeDynamicFeesConfig.BlockMaxComplexity = commonfees.Max
+
 	if customDynamicFeesConfig != nil {
 		if err := customDynamicFeesConfig.Validate(); err != nil {
 			panic(err)
