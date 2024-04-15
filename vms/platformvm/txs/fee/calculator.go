@@ -7,24 +7,26 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/upgrade"
 )
 
 var _ txs.Visitor = (*Calculator)(nil)
 
 type Calculator struct {
 	// Pre E-fork inputs
-	config    *config.Config
+	config    *StaticConfig
+	upgrades  *upgrade.Times
 	chainTime time.Time
 
 	// outputs of visitor execution
 	Fee uint64
 }
 
-func NewStaticCalculator(cfg *config.Config, chainTime time.Time) *Calculator {
+func NewStaticCalculator(cfg *StaticConfig, upgrades *upgrade.Times, chainTime time.Time) *Calculator {
 	return &Calculator{
 		config:    cfg,
+		upgrades:  upgrades,
 		chainTime: chainTime,
 	}
 }
@@ -45,7 +47,7 @@ func (fc *Calculator) AddDelegatorTx(*txs.AddDelegatorTx) error {
 }
 
 func (fc *Calculator) CreateChainTx(*txs.CreateChainTx) error {
-	if fc.config.IsApricotPhase3Activated(fc.chainTime) {
+	if fc.upgrades.IsApricotPhase3Activated(fc.chainTime) {
 		fc.Fee = fc.config.CreateBlockchainTxFee
 	} else {
 		fc.Fee = fc.config.CreateAssetTxFee
@@ -54,7 +56,7 @@ func (fc *Calculator) CreateChainTx(*txs.CreateChainTx) error {
 }
 
 func (fc *Calculator) CreateSubnetTx(*txs.CreateSubnetTx) error {
-	if fc.config.IsApricotPhase3Activated(fc.chainTime) {
+	if fc.upgrades.IsApricotPhase3Activated(fc.chainTime) {
 		fc.Fee = fc.config.CreateSubnetTxFee
 	} else {
 		fc.Fee = fc.config.CreateAssetTxFee

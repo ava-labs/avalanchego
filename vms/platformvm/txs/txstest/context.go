@@ -7,19 +7,20 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
+	"github.com/ava-labs/avalanchego/vms/platformvm/upgrade"
 	"github.com/ava-labs/avalanchego/wallet/chain/p/builder"
 )
 
 func newContext(
 	ctx *snow.Context,
-	cfg *config.Config,
+	cfg *fee.StaticConfig,
+	upgrades *upgrade.Times,
 	timestamp time.Time,
 ) (*builder.Context, error) {
 	var (
-		staticFeeCalc  = fee.NewStaticCalculator(cfg, timestamp)
+		staticFeeCalc  = fee.NewStaticCalculator(cfg, upgrades, timestamp)
 		createSubnetTx = &txs.CreateSubnetTx{}
 		createChainTx  = &txs.CreateChainTx{}
 	)

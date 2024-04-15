@@ -383,7 +383,7 @@ func (b *Builder) builders(keys []*secp256k1.PrivateKey) (builder.Builder, walle
 		backend = newBackend(addrs, b.state, b.ctx.SharedMemory)
 	)
 
-	context, err := newContext(b.ctx, b.cfg, b.state.GetTimestamp())
+	context, err := newContext(b.ctx, &b.cfg.StaticConfig, &b.cfg.Times, b.state.GetTimestamp())
 	if err != nil {
 		return nil, nil, err
 	}

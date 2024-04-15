@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/upgrade"
 )
 
@@ -42,32 +43,8 @@ type Config struct {
 	// Set of subnets that this node is validating
 	TrackedSubnets set.Set[ids.ID]
 
-	// Fee that is burned by every non-state creating transaction
-	TxFee uint64
-
-	// Fee that must be burned by every state creating transaction before AP3
-	CreateAssetTxFee uint64
-
-	// Fee that must be burned by every subnet creating transaction after AP3
-	CreateSubnetTxFee uint64
-
-	// Fee that must be burned by every transform subnet transaction
-	TransformSubnetTxFee uint64
-
-	// Fee that must be burned by every blockchain creating transaction after AP3
-	CreateBlockchainTxFee uint64
-
-	// Transaction fee for adding a primary network validator
-	AddPrimaryNetworkValidatorFee uint64
-
-	// Transaction fee for adding a primary network delegator
-	AddPrimaryNetworkDelegatorFee uint64
-
-	// Transaction fee for adding a subnet validator
-	AddSubnetValidatorFee uint64
-
-	// Transaction fee for adding a subnet delegator
-	AddSubnetDelegatorFee uint64
+	// static fees configuration
+	fee.StaticConfig
 
 	// The minimum amount of tokens one must bond to be a validator
 	MinValidatorStake uint64
