@@ -12,10 +12,9 @@ import (
 func TestNnarySnowflake(t *testing.T) {
 	require := require.New(t)
 
-	betaVirtuous := 2
-	betaRogue := 2
+	beta := 2
 
-	sf := newNnarySnowflake(betaVirtuous, betaRogue, Red)
+	sf := newNnarySnowflake(beta, Red)
 	sf.Add(Blue)
 	sf.Add(Green)
 
@@ -50,10 +49,9 @@ func TestNnarySnowflake(t *testing.T) {
 func TestNnarySnowflakeConfidenceReset(t *testing.T) {
 	require := require.New(t)
 
-	betaVirtuous := 4
-	betaRogue := 4
+	beta := 4
 
-	sf := newNnarySnowflake(betaVirtuous, betaRogue, Red)
+	sf := newNnarySnowflake(beta, Red)
 	sf.Add(Blue)
 	sf.Add(Green)
 
@@ -61,14 +59,14 @@ func TestNnarySnowflakeConfidenceReset(t *testing.T) {
 	require.False(sf.Finalized())
 
 	// Increase Blue's confidence without finalizing
-	for i := 0; i < betaRogue-1; i++ {
+	for i := 0; i < beta-1; i++ {
 		sf.RecordSuccessfulPoll(Blue)
 		require.Equal(Blue, sf.Preference())
 		require.False(sf.Finalized())
 	}
 
 	// Increase Red's confidence without finalizing
-	for i := 0; i < betaRogue-1; i++ {
+	for i := 0; i < beta-1; i++ {
 		sf.RecordSuccessfulPoll(Red)
 		require.Equal(Red, sf.Preference())
 		require.False(sf.Finalized())
@@ -83,40 +81,9 @@ func TestNnarySnowflakeConfidenceReset(t *testing.T) {
 func TestVirtuousNnarySnowflake(t *testing.T) {
 	require := require.New(t)
 
-	betaVirtuous := 2
-	betaRogue := 3
+	beta := 2
 
-	sb := newNnarySnowflake(betaVirtuous, betaRogue, Red)
-	require.Equal(Red, sb.Preference())
-	require.False(sb.Finalized())
-
-	sb.RecordSuccessfulPoll(Red)
-	require.Equal(Red, sb.Preference())
-	require.False(sb.Finalized())
-
-	sb.RecordSuccessfulPoll(Red)
-	require.Equal(Red, sb.Preference())
-	require.True(sb.Finalized())
-}
-
-func TestRogueNnarySnowflake(t *testing.T) {
-	require := require.New(t)
-
-	betaVirtuous := 1
-	betaRogue := 2
-
-	sb := newNnarySnowflake(betaVirtuous, betaRogue, Red)
-	require.False(sb.rogue)
-
-	sb.Add(Red)
-	require.False(sb.rogue)
-
-	sb.Add(Blue)
-	require.True(sb.rogue)
-
-	sb.Add(Red)
-	require.True(sb.rogue)
-
+	sb := newNnarySnowflake(beta, Red)
 	require.Equal(Red, sb.Preference())
 	require.False(sb.Finalized())
 

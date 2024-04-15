@@ -18,8 +18,7 @@ func TestFlat(t *testing.T) {
 		K:               3,
 		AlphaPreference: 2,
 		AlphaConfidence: 3,
-		BetaVirtuous:    1,
-		BetaRogue:       2,
+		Beta:            2,
 	}
 	f := NewFlat(SnowballFactory, params, Red)
 	f.Add(Green)

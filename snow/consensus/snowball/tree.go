@@ -350,7 +350,7 @@ func (u *unaryNode) Add(newChoice ids.ID) node {
 	b := &binaryNode{
 		tree:        u.tree,
 		bit:         index,
-		snow:        u.snow.Extend(u.tree.params.BetaRogue, bit),
+		snow:        u.snow.Extend(bit),
 		shouldReset: [2]bool{u.shouldReset, u.shouldReset},
 	}
 	b.preferences[bit] = u.preference
