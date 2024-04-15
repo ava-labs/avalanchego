@@ -15,7 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fees"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
@@ -164,7 +164,7 @@ func verifyAddValidatorTx(
 	}
 
 	// Verify the flowcheck
-	feeCalculator := fees.NewStaticCalculator(backend.Config, currentTimestamp)
+	feeCalculator := fee.NewStaticCalculator(backend.Config, currentTimestamp)
 	if err := tx.Visit(feeCalculator); err != nil {
 		return nil, err
 	}
@@ -257,7 +257,7 @@ func verifyAddSubnetValidatorTx(
 	}
 
 	// Verify the flowcheck
-	feeCalculator := fees.NewStaticCalculator(backend.Config, currentTimestamp)
+	feeCalculator := fee.NewStaticCalculator(backend.Config, currentTimestamp)
 	if err := tx.Visit(feeCalculator); err != nil {
 		return err
 	}
@@ -337,7 +337,7 @@ func verifyRemoveSubnetValidatorTx(
 	}
 
 	// Verify the flowcheck
-	feeCalculator := fees.NewStaticCalculator(backend.Config, chainState.GetTimestamp())
+	feeCalculator := fee.NewStaticCalculator(backend.Config, chainState.GetTimestamp())
 	if err := tx.Visit(feeCalculator); err != nil {
 		return nil, false, err
 	}
@@ -457,7 +457,7 @@ func verifyAddDelegatorTx(
 	}
 
 	// Verify the flowcheck
-	feeCalculator := fees.NewStaticCalculator(backend.Config, chainState.GetTimestamp())
+	feeCalculator := fee.NewStaticCalculator(backend.Config, chainState.GetTimestamp())
 	if err := tx.Visit(feeCalculator); err != nil {
 		return nil, err
 	}
@@ -579,7 +579,7 @@ func verifyAddPermissionlessValidatorTx(
 	copy(outs[len(tx.Outs):], tx.StakeOuts)
 
 	// Verify the flowcheck
-	feeCalculator := fees.NewStaticCalculator(backend.Config, currentTimestamp)
+	feeCalculator := fee.NewStaticCalculator(backend.Config, currentTimestamp)
 	if err := tx.Visit(feeCalculator); err != nil {
 		return err
 	}
@@ -726,7 +726,7 @@ func verifyAddPermissionlessDelegatorTx(
 	}
 
 	// Verify the flowcheck
-	feeCalculator := fees.NewStaticCalculator(backend.Config, currentTimestamp)
+	feeCalculator := fee.NewStaticCalculator(backend.Config, currentTimestamp)
 	if err := tx.Visit(feeCalculator); err != nil {
 		return err
 	}
@@ -783,7 +783,7 @@ func verifyTransferSubnetOwnershipTx(
 	}
 
 	// Verify the flowcheck
-	feeCalculator := fees.NewStaticCalculator(backend.Config, chainState.GetTimestamp())
+	feeCalculator := fee.NewStaticCalculator(backend.Config, chainState.GetTimestamp())
 	if err := tx.Visit(feeCalculator); err != nil {
 		return err
 	}

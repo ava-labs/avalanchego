@@ -19,7 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fees"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 )
 
 var (
@@ -69,7 +69,7 @@ func (e *StandardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 	}
 
 	// Verify the flowcheck
-	feeCalculator := fees.NewStaticCalculator(e.Backend.Config, e.State.GetTimestamp())
+	feeCalculator := fee.NewStaticCalculator(e.Backend.Config, e.State.GetTimestamp())
 	if err := tx.Visit(feeCalculator); err != nil {
 		return err
 	}
@@ -119,7 +119,7 @@ func (e *StandardTxExecutor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 	}
 
 	// Verify the flowcheck
-	feeCalculator := fees.NewStaticCalculator(e.Backend.Config, e.State.GetTimestamp())
+	feeCalculator := fee.NewStaticCalculator(e.Backend.Config, e.State.GetTimestamp())
 	if err := tx.Visit(feeCalculator); err != nil {
 		return err
 	}
@@ -204,7 +204,7 @@ func (e *StandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 		copy(ins[len(tx.Ins):], tx.ImportedInputs)
 
 		// Verify the flowcheck
-		feeCalculator := fees.NewStaticCalculator(e.Backend.Config, e.State.GetTimestamp())
+		feeCalculator := fee.NewStaticCalculator(e.Backend.Config, e.State.GetTimestamp())
 		if err := tx.Visit(feeCalculator); err != nil {
 			return err
 		}
@@ -265,7 +265,7 @@ func (e *StandardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 	}
 
 	// Verify the flowcheck
-	feeCalculator := fees.NewStaticCalculator(e.Backend.Config, e.State.GetTimestamp())
+	feeCalculator := fee.NewStaticCalculator(e.Backend.Config, e.State.GetTimestamp())
 	if err := tx.Visit(feeCalculator); err != nil {
 		return err
 	}
@@ -456,7 +456,7 @@ func (e *StandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 	}
 
 	totalRewardAmount := tx.MaximumSupply - tx.InitialSupply
-	feeCalculator := fees.NewStaticCalculator(e.Backend.Config, currentTimestamp)
+	feeCalculator := fee.NewStaticCalculator(e.Backend.Config, currentTimestamp)
 	if err := tx.Visit(feeCalculator); err != nil {
 		return err
 	}
@@ -583,7 +583,7 @@ func (e *StandardTxExecutor) BaseTx(tx *txs.BaseTx) error {
 		cfg              = e.Backend.Config
 		currentTimestamp = e.State.GetTimestamp()
 	)
-	feeCalculator := fees.NewStaticCalculator(cfg, currentTimestamp)
+	feeCalculator := fee.NewStaticCalculator(cfg, currentTimestamp)
 	if err := tx.Visit(feeCalculator); err != nil {
 		return err
 	}
