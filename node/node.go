@@ -75,6 +75,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
+	"github.com/ava-labs/avalanchego/vms/platformvm/upgrade"
 	"github.com/ava-labs/avalanchego/vms/registry"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/runtime"
 
@@ -1149,13 +1150,15 @@ func (n *Node) initVMs() error {
 				MinStakeDuration:              n.Config.MinStakeDuration,
 				MaxStakeDuration:              n.Config.MaxStakeDuration,
 				RewardConfig:                  n.Config.RewardConfig,
-				ApricotPhase3Time:             version.GetApricotPhase3Time(n.Config.NetworkID),
-				ApricotPhase5Time:             version.GetApricotPhase5Time(n.Config.NetworkID),
-				BanffTime:                     version.GetBanffTime(n.Config.NetworkID),
-				CortinaTime:                   version.GetCortinaTime(n.Config.NetworkID),
-				DurangoTime:                   version.GetDurangoTime(n.Config.NetworkID),
-				EUpgradeTime:                  eUpgradeTime,
-				UseCurrentHeight:              n.Config.UseCurrentHeight,
+				Times: upgrade.Times{
+					ApricotPhase3Time: version.GetApricotPhase3Time(n.Config.NetworkID),
+					ApricotPhase5Time: version.GetApricotPhase5Time(n.Config.NetworkID),
+					BanffTime:         version.GetBanffTime(n.Config.NetworkID),
+					CortinaTime:       version.GetCortinaTime(n.Config.NetworkID),
+					DurangoTime:       version.GetDurangoTime(n.Config.NetworkID),
+					EUpgradeTime:      eUpgradeTime,
+				},
+				UseCurrentHeight: n.Config.UseCurrentHeight,
 			},
 		}),
 		n.VMManager.RegisterFactory(context.TODO(), constants.AVMID, &avm.Factory{
