@@ -21,7 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fees"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
@@ -168,7 +168,7 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 
 				// retrieve fees paid for the tx
 				feeCfg := config.GetDynamicFeesConfig(true /*isEActive*/)
-				feeCalc := fees.NewDynamicCalculator(pChainStaticFees, commonfees.NewManager(feeCfg.FeeRate), feeCfg.BlockMaxComplexity, tx.Creds)
+				feeCalc := fee.NewDynamicCalculator(pChainStaticFees, commonfees.NewManager(feeCfg.FeeRate), feeCfg.BlockMaxComplexity, tx.Creds)
 				require.NoError(tx.Unsigned.Visit(feeCalc))
 				pChainExportFee = feeCalc.Fee
 			})

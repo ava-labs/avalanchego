@@ -57,7 +57,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fees"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
@@ -391,15 +391,15 @@ func TestGenesis(t *testing.T) {
 			var (
 				chainTime = vm.state.GetTimestamp()
 
-				feeCalc *fees.Calculator
+				feeCalc *fee.Calculator
 			)
 
 			if !vm.IsEActivated(chainTime) {
-				feeCalc = fees.NewStaticCalculator(&vm.Config, chainTime)
+				feeCalc = fee.NewStaticCalculator(&vm.Config, chainTime)
 			} else {
 				feeCfg := config.GetDynamicFeesConfig(vm.Config.IsEActivated(chainTime))
 				feeMan := commonfees.NewManager(feeCfg.FeeRate)
-				feeCalc = fees.NewDynamicCalculator(&vm.Config, feeMan, feeCfg.BlockMaxComplexity, testSubnet1.Creds)
+				feeCalc = fee.NewDynamicCalculator(&vm.Config, feeMan, feeCfg.BlockMaxComplexity, testSubnet1.Creds)
 			}
 
 			require.NoError(testSubnet1.Unsigned.Visit(feeCalc))
@@ -2360,15 +2360,15 @@ func TestBaseTx(t *testing.T) {
 	var (
 		chainTime = vm.state.GetTimestamp()
 
-		feeCalc *fees.Calculator
+		feeCalc *fee.Calculator
 	)
 
 	if !vm.IsEActivated(chainTime) {
-		feeCalc = fees.NewStaticCalculator(&vm.Config, chainTime)
+		feeCalc = fee.NewStaticCalculator(&vm.Config, chainTime)
 	} else {
 		feeCfg := config.GetDynamicFeesConfig(vm.Config.IsEActivated(chainTime))
 		feeMan := commonfees.NewManager(feeCfg.FeeRate)
-		feeCalc = fees.NewDynamicCalculator(&vm.Config, feeMan, feeCfg.BlockMaxComplexity, baseTx.Creds)
+		feeCalc = fee.NewDynamicCalculator(&vm.Config, feeMan, feeCfg.BlockMaxComplexity, baseTx.Creds)
 	}
 
 	require.NoError(baseTx.Unsigned.Visit(feeCalc))

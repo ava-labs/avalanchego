@@ -15,7 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fees"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/chain/p/builder"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
@@ -49,10 +49,11 @@ func (b *Builder) NewImportTx(
 	keys []*secp256k1.PrivateKey,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	var (
-		pBuilder, pSigner = b.builders(keys)
-		feeCalc           = b.feeCalculator()
-	)
+	pBuilder, pSigner, err := b.builders(keys)
+	if err != nil {
+		return nil, err
+	}
+	feeCalc := b.feeCalculator()
 
 	utx, err := pBuilder.NewImportTx(
 		chainID,
@@ -73,10 +74,11 @@ func (b *Builder) NewExportTx(
 	keys []*secp256k1.PrivateKey,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	var (
-		pBuilder, pSigner = b.builders(keys)
-		feeCalc           = b.feeCalculator()
-	)
+	pBuilder, pSigner, err := b.builders(keys)
+	if err != nil {
+		return nil, err
+	}
+	feeCalc := b.feeCalculator()
 
 	utx, err := pBuilder.NewExportTx(
 		chainID,
@@ -100,10 +102,11 @@ func (b *Builder) NewCreateChainTx(
 	keys []*secp256k1.PrivateKey,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	var (
-		pBuilder, pSigner = b.builders(keys)
-		feeCalc           = b.feeCalculator()
-	)
+	pBuilder, pSigner, err := b.builders(keys)
+	if err != nil {
+		return nil, err
+	}
+	feeCalc := b.feeCalculator()
 
 	utx, err := pBuilder.NewCreateChainTx(
 		subnetID,
@@ -126,10 +129,11 @@ func (b *Builder) NewCreateSubnetTx(
 	keys []*secp256k1.PrivateKey,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	var (
-		pBuilder, pSigner = b.builders(keys)
-		feeCalc           = b.feeCalculator()
-	)
+	pBuilder, pSigner, err := b.builders(keys)
+	if err != nil {
+		return nil, err
+	}
+	feeCalc := b.feeCalculator()
 
 	utx, err := pBuilder.NewCreateSubnetTx(
 		owner,
@@ -161,10 +165,11 @@ func (b *Builder) NewTransformSubnetTx(
 	keys []*secp256k1.PrivateKey,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	var (
-		pBuilder, pSigner = b.builders(keys)
-		feeCalc           = b.feeCalculator()
-	)
+	pBuilder, pSigner, err := b.builders(keys)
+	if err != nil {
+		return nil, err
+	}
+	feeCalc := b.feeCalculator()
 
 	utx, err := pBuilder.NewTransformSubnetTx(
 		subnetID,
@@ -198,10 +203,11 @@ func (b *Builder) NewAddValidatorTx(
 	keys []*secp256k1.PrivateKey,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	var (
-		pBuilder, pSigner = b.builders(keys)
-		feeCalc           = b.feeCalculator()
-	)
+	pBuilder, pSigner, err := b.builders(keys)
+	if err != nil {
+		return nil, err
+	}
+	feeCalc := b.feeCalculator()
 
 	utx, err := pBuilder.NewAddValidatorTx(
 		vdr,
@@ -227,10 +233,11 @@ func (b *Builder) NewAddPermissionlessValidatorTx(
 	keys []*secp256k1.PrivateKey,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	var (
-		pBuilder, pSigner = b.builders(keys)
-		feeCalc           = b.feeCalculator()
-	)
+	pBuilder, pSigner, err := b.builders(keys)
+	if err != nil {
+		return nil, err
+	}
+	feeCalc := b.feeCalculator()
 
 	utx, err := pBuilder.NewAddPermissionlessValidatorTx(
 		vdr,
@@ -255,10 +262,11 @@ func (b *Builder) NewAddDelegatorTx(
 	keys []*secp256k1.PrivateKey,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	var (
-		pBuilder, pSigner = b.builders(keys)
-		feeCalc           = b.feeCalculator()
-	)
+	pBuilder, pSigner, err := b.builders(keys)
+	if err != nil {
+		return nil, err
+	}
+	feeCalc := b.feeCalculator()
 
 	utx, err := pBuilder.NewAddDelegatorTx(
 		vdr,
@@ -280,10 +288,11 @@ func (b *Builder) NewAddPermissionlessDelegatorTx(
 	keys []*secp256k1.PrivateKey,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	var (
-		pBuilder, pSigner = b.builders(keys)
-		feeCalc           = b.feeCalculator()
-	)
+	pBuilder, pSigner, err := b.builders(keys)
+	if err != nil {
+		return nil, err
+	}
+	feeCalc := b.feeCalculator()
 
 	utx, err := pBuilder.NewAddPermissionlessDelegatorTx(
 		vdr,
@@ -304,10 +313,11 @@ func (b *Builder) NewAddSubnetValidatorTx(
 	keys []*secp256k1.PrivateKey,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	var (
-		pBuilder, pSigner = b.builders(keys)
-		feeCalc           = b.feeCalculator()
-	)
+	pBuilder, pSigner, err := b.builders(keys)
+	if err != nil {
+		return nil, err
+	}
+	feeCalc := b.feeCalculator()
 
 	utx, err := pBuilder.NewAddSubnetValidatorTx(
 		vdr,
@@ -327,10 +337,11 @@ func (b *Builder) NewRemoveSubnetValidatorTx(
 	keys []*secp256k1.PrivateKey,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	var (
-		pBuilder, pSigner = b.builders(keys)
-		feeCalc           = b.feeCalculator()
-	)
+	pBuilder, pSigner, err := b.builders(keys)
+	if err != nil {
+		return nil, err
+	}
+	feeCalc := b.feeCalculator()
 
 	utx, err := pBuilder.NewRemoveSubnetValidatorTx(
 		nodeID,
@@ -351,10 +362,11 @@ func (b *Builder) NewTransferSubnetOwnershipTx(
 	keys []*secp256k1.PrivateKey,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	var (
-		pBuilder, pSigner = b.builders(keys)
-		feeCalc           = b.feeCalculator()
-	)
+	pBuilder, pSigner, err := b.builders(keys)
+	if err != nil {
+		return nil, err
+	}
+	feeCalc := b.feeCalculator()
 
 	utx, err := pBuilder.NewTransferSubnetOwnershipTx(
 		subnetID,
@@ -374,10 +386,11 @@ func (b *Builder) NewBaseTx(
 	keys []*secp256k1.PrivateKey,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	var (
-		pBuilder, pSigner = b.builders(keys)
-		feeCalc           = b.feeCalculator()
-	)
+	pBuilder, pSigner, err := b.builders(keys)
+	if err != nil {
+		return nil, err
+	}
+	feeCalc := b.feeCalculator()
 
 	utx, err := pBuilder.NewBaseTx(
 		outputs,
@@ -391,31 +404,35 @@ func (b *Builder) NewBaseTx(
 	return walletsigner.SignUnsigned(context.Background(), pSigner, utx)
 }
 
-func (b *Builder) builders(keys []*secp256k1.PrivateKey) (builder.Builder, walletsigner.Signer) {
+func (b *Builder) builders(keys []*secp256k1.PrivateKey) (builder.Builder, walletsigner.Signer, error) {
 	var (
 		kc      = secp256k1fx.NewKeychain(keys...)
 		addrs   = kc.Addresses()
 		backend = newBackend(addrs, b.state, b.ctx.SharedMemory)
-		context = newContext(b.ctx, b.cfg, b.state.GetTimestamp())
-		builder = builder.New(addrs, context, backend)
-		signer  = walletsigner.New(kc, backend)
 	)
 
-	return builder, signer
+	context, err := newContext(b.ctx, b.cfg, b.state.GetTimestamp())
+	if err != nil {
+		return nil, nil, err
+	}
+
+	builder := builder.New(addrs, context, backend)
+	signer := walletsigner.New(kc, backend)
+	return builder, signer, nil
 }
 
-func (b *Builder) feeCalculator() *fees.Calculator {
+func (b *Builder) feeCalculator() *fee.Calculator {
 	var (
 		chainTime = b.state.GetTimestamp()
 		isEActive = b.cfg.IsEActivated(chainTime)
 	)
 
-	var feeCalculator *fees.Calculator
+	var feeCalculator *fee.Calculator
 	if !isEActive {
-		feeCalculator = fees.NewStaticCalculator(b.cfg, chainTime)
+		feeCalculator = fee.NewStaticCalculator(b.cfg, chainTime)
 	} else {
 		feeCfg := config.GetDynamicFeesConfig(isEActive)
-		feeCalculator = fees.NewDynamicCalculator(b.cfg, commonfees.NewManager(feeCfg.FeeRate), feeCfg.BlockMaxComplexity, nil)
+		feeCalculator = fee.NewDynamicCalculator(b.cfg, commonfees.NewManager(feeCfg.FeeRate), feeCfg.BlockMaxComplexity, nil)
 	}
 	return feeCalculator
 }
