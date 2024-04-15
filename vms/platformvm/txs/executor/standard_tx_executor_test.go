@@ -31,6 +31,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/upgrade"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
@@ -2080,12 +2081,14 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 
 func defaultTestConfig(t *testing.T, f fork, tm time.Time) *config.Config {
 	c := &config.Config{
-		ApricotPhase3Time: mockable.MaxTime,
-		ApricotPhase5Time: mockable.MaxTime,
-		BanffTime:         mockable.MaxTime,
-		CortinaTime:       mockable.MaxTime,
-		DurangoTime:       mockable.MaxTime,
-		EUpgradeTime:      mockable.MaxTime,
+		Times: upgrade.Times{
+			ApricotPhase3Time: mockable.MaxTime,
+			ApricotPhase5Time: mockable.MaxTime,
+			BanffTime:         mockable.MaxTime,
+			CortinaTime:       mockable.MaxTime,
+			DurangoTime:       mockable.MaxTime,
+			EUpgradeTime:      mockable.MaxTime,
+		},
 	}
 
 	switch f {

@@ -58,6 +58,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
+	"github.com/ava-labs/avalanchego/vms/platformvm/upgrade"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	smcon "github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -253,12 +254,14 @@ func defaultVM(t *testing.T, f fork) (*VM, *txstest.Builder, database.Database, 
 		MinStakeDuration:       defaultMinStakingDuration,
 		MaxStakeDuration:       defaultMaxStakingDuration,
 		RewardConfig:           defaultRewardConfig,
-		ApricotPhase3Time:      apricotPhase3Time,
-		ApricotPhase5Time:      apricotPhase5Time,
-		BanffTime:              banffTime,
-		CortinaTime:            cortinaTime,
-		DurangoTime:            durangoTime,
-		EUpgradeTime:           eUpgradeTime,
+		Times: upgrade.Times{
+			ApricotPhase3Time: apricotPhase3Time,
+			ApricotPhase5Time: apricotPhase5Time,
+			BanffTime:         banffTime,
+			CortinaTime:       cortinaTime,
+			DurangoTime:       durangoTime,
+			EUpgradeTime:      eUpgradeTime,
+		},
 	}}
 
 	db := memdb.New()
@@ -1177,10 +1180,12 @@ func TestRestartFullyAccepted(t *testing.T) {
 		MinStakeDuration:       defaultMinStakingDuration,
 		MaxStakeDuration:       defaultMaxStakingDuration,
 		RewardConfig:           defaultRewardConfig,
-		BanffTime:              latestForkTime,
-		CortinaTime:            latestForkTime,
-		DurangoTime:            latestForkTime,
-		EUpgradeTime:           mockable.MaxTime,
+		Times: upgrade.Times{
+			BanffTime:    latestForkTime,
+			CortinaTime:  latestForkTime,
+			DurangoTime:  latestForkTime,
+			EUpgradeTime: mockable.MaxTime,
+		},
 	}}
 
 	firstCtx := snowtest.Context(t, snowtest.PChainID)
@@ -1265,10 +1270,12 @@ func TestRestartFullyAccepted(t *testing.T) {
 		MinStakeDuration:       defaultMinStakingDuration,
 		MaxStakeDuration:       defaultMaxStakingDuration,
 		RewardConfig:           defaultRewardConfig,
-		BanffTime:              latestForkTime,
-		CortinaTime:            latestForkTime,
-		DurangoTime:            latestForkTime,
-		EUpgradeTime:           mockable.MaxTime,
+		Times: upgrade.Times{
+			BanffTime:    latestForkTime,
+			CortinaTime:  latestForkTime,
+			DurangoTime:  latestForkTime,
+			EUpgradeTime: mockable.MaxTime,
+		},
 	}}
 
 	secondCtx := snowtest.Context(t, snowtest.PChainID)
@@ -1314,10 +1321,12 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		MinStakeDuration:       defaultMinStakingDuration,
 		MaxStakeDuration:       defaultMaxStakingDuration,
 		RewardConfig:           defaultRewardConfig,
-		BanffTime:              latestForkTime,
-		CortinaTime:            latestForkTime,
-		DurangoTime:            latestForkTime,
-		EUpgradeTime:           mockable.MaxTime,
+		Times: upgrade.Times{
+			BanffTime:    latestForkTime,
+			CortinaTime:  latestForkTime,
+			DurangoTime:  latestForkTime,
+			EUpgradeTime: mockable.MaxTime,
+		},
 	}}
 
 	initialClkTime := latestForkTime.Add(time.Second)
@@ -1650,10 +1659,12 @@ func TestUnverifiedParent(t *testing.T) {
 		MinStakeDuration:       defaultMinStakingDuration,
 		MaxStakeDuration:       defaultMaxStakingDuration,
 		RewardConfig:           defaultRewardConfig,
-		BanffTime:              latestForkTime,
-		CortinaTime:            latestForkTime,
-		DurangoTime:            latestForkTime,
-		EUpgradeTime:           mockable.MaxTime,
+		Times: upgrade.Times{
+			BanffTime:    latestForkTime,
+			CortinaTime:  latestForkTime,
+			DurangoTime:  latestForkTime,
+			EUpgradeTime: mockable.MaxTime,
+		},
 	}}
 
 	initialClkTime := latestForkTime.Add(time.Second)
@@ -1811,10 +1822,12 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 		RewardConfig:           defaultRewardConfig,
 		Validators:             validators.NewManager(),
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		BanffTime:              latestForkTime,
-		CortinaTime:            latestForkTime,
-		DurangoTime:            latestForkTime,
-		EUpgradeTime:           mockable.MaxTime,
+		Times: upgrade.Times{
+			BanffTime:    latestForkTime,
+			CortinaTime:  latestForkTime,
+			DurangoTime:  latestForkTime,
+			EUpgradeTime: mockable.MaxTime,
+		},
 	}}
 
 	firstCtx := snowtest.Context(t, snowtest.PChainID)
@@ -1860,10 +1873,12 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 		UptimePercentage:       secondUptimePercentage / 100.,
 		Validators:             validators.NewManager(),
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		BanffTime:              latestForkTime,
-		CortinaTime:            latestForkTime,
-		DurangoTime:            latestForkTime,
-		EUpgradeTime:           mockable.MaxTime,
+		Times: upgrade.Times{
+			BanffTime:    latestForkTime,
+			CortinaTime:  latestForkTime,
+			DurangoTime:  latestForkTime,
+			EUpgradeTime: mockable.MaxTime,
+		},
 	}}
 
 	secondCtx := snowtest.Context(t, snowtest.PChainID)
@@ -1960,10 +1975,12 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 		RewardConfig:           defaultRewardConfig,
 		Validators:             validators.NewManager(),
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		BanffTime:              latestForkTime,
-		CortinaTime:            latestForkTime,
-		DurangoTime:            latestForkTime,
-		EUpgradeTime:           mockable.MaxTime,
+		Times: upgrade.Times{
+			BanffTime:    latestForkTime,
+			CortinaTime:  latestForkTime,
+			DurangoTime:  latestForkTime,
+			EUpgradeTime: mockable.MaxTime,
+		},
 	}}
 
 	ctx := snowtest.Context(t, snowtest.PChainID)

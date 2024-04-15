@@ -44,6 +44,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
+	"github.com/ava-labs/avalanchego/vms/platformvm/upgrade"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
@@ -661,11 +662,13 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 		MinStakeDuration:       defaultMinStakingDuration,
 		MaxStakeDuration:       defaultMaxStakingDuration,
 		RewardConfig:           defaultRewardConfig,
-		ApricotPhase3Time:      forkTime,
-		ApricotPhase5Time:      forkTime,
-		BanffTime:              forkTime,
-		CortinaTime:            forkTime,
-		EUpgradeTime:           mockable.MaxTime,
+		Times: upgrade.Times{
+			ApricotPhase3Time: forkTime,
+			ApricotPhase5Time: forkTime,
+			BanffTime:         forkTime,
+			CortinaTime:       forkTime,
+			EUpgradeTime:      mockable.MaxTime,
+		},
 	}}
 	vm.clock.Set(forkTime.Add(time.Second))
 
