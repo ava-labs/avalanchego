@@ -39,6 +39,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
@@ -365,6 +366,11 @@ func TestGetBalance(t *testing.T) {
 	require := require.New(t)
 	service, _, _ := defaultService(t)
 
+	staticFeeCalc := fee.NewStaticCalculator(&service.vm.Config, service.vm.clock.Time())
+	dummyCreateSubnetTx := &txs.CreateSubnetTx{}
+	require.NoError(dummyCreateSubnetTx.Visit(staticFeeCalc))
+	createSubnetFee := staticFeeCalc.Fee
+
 	// Ensure GetStake is correct for each of the genesis validators
 	genesis, _ := defaultGenesis(t, service.vm.ctx.AVAXAssetID)
 	for idx, utxo := range genesis.UTXOs {
@@ -380,7 +386,7 @@ func TestGetBalance(t *testing.T) {
 		if idx == 0 {
 			// we use the first key to fund a subnet creation in [defaultGenesis].
 			// As such we need to account for the subnet creation fee
-			balance = defaultBalance - service.vm.Config.GetCreateSubnetTxFee(service.vm.clock.Time())
+			balance = defaultBalance - createSubnetFee
 		}
 		require.Equal(avajson.Uint64(balance), reply.Balance)
 		require.Equal(avajson.Uint64(balance), reply.Unlocked)

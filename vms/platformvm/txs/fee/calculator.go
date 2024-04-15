@@ -45,12 +45,20 @@ func (fc *Calculator) AddDelegatorTx(*txs.AddDelegatorTx) error {
 }
 
 func (fc *Calculator) CreateChainTx(*txs.CreateChainTx) error {
-	fc.Fee = fc.config.GetCreateBlockchainTxFee(fc.chainTime)
+	if fc.config.IsApricotPhase3Activated(fc.chainTime) {
+		fc.Fee = fc.config.CreateBlockchainTxFee
+	} else {
+		fc.Fee = fc.config.CreateAssetTxFee
+	}
 	return nil
 }
 
 func (fc *Calculator) CreateSubnetTx(*txs.CreateSubnetTx) error {
-	fc.Fee = fc.config.GetCreateSubnetTxFee(fc.chainTime)
+	if fc.config.IsApricotPhase3Activated(fc.chainTime) {
+		fc.Fee = fc.config.CreateSubnetTxFee
+	} else {
+		fc.Fee = fc.config.CreateAssetTxFee
+	}
 	return nil
 }
 
