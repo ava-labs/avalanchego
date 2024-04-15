@@ -15,7 +15,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
-	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
@@ -42,15 +41,14 @@ var (
 	preFundedKeys             = secp256k1.TestKeys()
 	feeTestSigners            = [][]*secp256k1.PrivateKey{preFundedKeys}
 	feeTestDefaultStakeWeight = uint64(2024)
-	durangoTime               = time.Time{} // assume durango is active in these tests
 )
 
 type feeTests struct {
-	description           string
-	upgradesAndChainTimeF func() (*upgrade.Times, time.Time)
-	unsignedAndSignedTx   func(t *testing.T) (txs.UnsignedTx, *txs.Tx)
-	expectedError         error
-	checksF               func(*testing.T, *Calculator)
+	description         string
+	upgrade             func() upgrade.Upgrade
+	unsignedAndSignedTx func(t *testing.T) (txs.UnsignedTx, *txs.Tx)
+	expectedError       error
+	checksF             func(*testing.T, *Calculator)
 }
 
 func TestTxFees(t *testing.T) {
@@ -59,16 +57,8 @@ func TestTxFees(t *testing.T) {
 	tests := []feeTests{
 		{
 			description: "AddValidatorTx pre EUpgrade",
-			upgradesAndChainTimeF: func() (*upgrade.Times, time.Time) {
-				eUpgradeTime := time.Now().Truncate(time.Second)
-				chainTime := eUpgradeTime.Add(-1 * time.Second)
-
-				upgrades := upgrade.Times{
-					DurangoTime:  durangoTime,
-					EUpgradeTime: eUpgradeTime,
-				}
-
-				return &upgrades, chainTime
+			upgrade: func() upgrade.Upgrade {
+				return upgrade.Durango
 			},
 			unsignedAndSignedTx: addValidatorTx,
 			expectedError:       nil,
@@ -78,16 +68,8 @@ func TestTxFees(t *testing.T) {
 		},
 		{
 			description: "AddSubnetValidatorTx pre EUpgrade",
-			upgradesAndChainTimeF: func() (*upgrade.Times, time.Time) {
-				eUpgradeTime := time.Now().Truncate(time.Second)
-				chainTime := eUpgradeTime.Add(-1 * time.Second)
-
-				upgrades := upgrade.Times{
-					DurangoTime:  durangoTime,
-					EUpgradeTime: eUpgradeTime,
-				}
-
-				return &upgrades, chainTime
+			upgrade: func() upgrade.Upgrade {
+				return upgrade.Durango
 			},
 			unsignedAndSignedTx: addSubnetValidatorTx,
 			expectedError:       nil,
@@ -97,16 +79,8 @@ func TestTxFees(t *testing.T) {
 		},
 		{
 			description: "AddDelegatorTx pre EUpgrade",
-			upgradesAndChainTimeF: func() (*upgrade.Times, time.Time) {
-				eUpgradeTime := time.Now().Truncate(time.Second)
-				chainTime := eUpgradeTime.Add(-1 * time.Second)
-
-				upgrades := upgrade.Times{
-					DurangoTime:  durangoTime,
-					EUpgradeTime: eUpgradeTime,
-				}
-
-				return &upgrades, chainTime
+			upgrade: func() upgrade.Upgrade {
+				return upgrade.Durango
 			},
 			unsignedAndSignedTx: addDelegatorTx,
 			expectedError:       nil,
@@ -116,17 +90,8 @@ func TestTxFees(t *testing.T) {
 		},
 		{
 			description: "CreateChainTx pre ApricotPhase3",
-			upgradesAndChainTimeF: func() (*upgrade.Times, time.Time) {
-				apricotPhase3Time := time.Now().Truncate(time.Second)
-				chainTime := apricotPhase3Time.Add(-1 * time.Second)
-
-				upgrades := upgrade.Times{
-					ApricotPhase3Time: apricotPhase3Time,
-					DurangoTime:       mockable.MaxTime,
-					EUpgradeTime:      mockable.MaxTime,
-				}
-
-				return &upgrades, chainTime
+			upgrade: func() upgrade.Upgrade {
+				return upgrade.PreApricot
 			},
 			unsignedAndSignedTx: createChainTx,
 			expectedError:       nil,
@@ -136,16 +101,8 @@ func TestTxFees(t *testing.T) {
 		},
 		{
 			description: "CreateChainTx pre EUpgrade",
-			upgradesAndChainTimeF: func() (*upgrade.Times, time.Time) {
-				eUpgradeTime := time.Now().Truncate(time.Second)
-				chainTime := eUpgradeTime.Add(-1 * time.Second)
-
-				upgrades := upgrade.Times{
-					DurangoTime:  durangoTime,
-					EUpgradeTime: eUpgradeTime,
-				}
-
-				return &upgrades, chainTime
+			upgrade: func() upgrade.Upgrade {
+				return upgrade.Durango
 			},
 			unsignedAndSignedTx: createChainTx,
 			expectedError:       nil,
@@ -155,17 +112,8 @@ func TestTxFees(t *testing.T) {
 		},
 		{
 			description: "CreateSubnetTx pre ApricotPhase3",
-			upgradesAndChainTimeF: func() (*upgrade.Times, time.Time) {
-				apricotPhase3Time := time.Now().Truncate(time.Second)
-				chainTime := apricotPhase3Time.Add(-1 * time.Second)
-
-				upgrades := upgrade.Times{
-					ApricotPhase3Time: apricotPhase3Time,
-					DurangoTime:       mockable.MaxTime,
-					EUpgradeTime:      mockable.MaxTime,
-				}
-
-				return &upgrades, chainTime
+			upgrade: func() upgrade.Upgrade {
+				return upgrade.PreApricot
 			},
 			unsignedAndSignedTx: createSubnetTx,
 			expectedError:       nil,
@@ -175,16 +123,8 @@ func TestTxFees(t *testing.T) {
 		},
 		{
 			description: "CreateSubnetTx pre EUpgrade",
-			upgradesAndChainTimeF: func() (*upgrade.Times, time.Time) {
-				eUpgradeTime := time.Now().Truncate(time.Second)
-				chainTime := eUpgradeTime.Add(-1 * time.Second)
-
-				upgrades := upgrade.Times{
-					DurangoTime:  durangoTime,
-					EUpgradeTime: eUpgradeTime,
-				}
-
-				return &upgrades, chainTime
+			upgrade: func() upgrade.Upgrade {
+				return upgrade.Durango
 			},
 			unsignedAndSignedTx: createSubnetTx,
 			expectedError:       nil,
@@ -194,16 +134,8 @@ func TestTxFees(t *testing.T) {
 		},
 		{
 			description: "RemoveSubnetValidatorTx pre EUpgrade",
-			upgradesAndChainTimeF: func() (*upgrade.Times, time.Time) {
-				eUpgradeTime := time.Now().Truncate(time.Second)
-				chainTime := eUpgradeTime.Add(-1 * time.Second)
-
-				upgrades := upgrade.Times{
-					DurangoTime:  durangoTime,
-					EUpgradeTime: eUpgradeTime,
-				}
-
-				return &upgrades, chainTime
+			upgrade: func() upgrade.Upgrade {
+				return upgrade.Durango
 			},
 			unsignedAndSignedTx: removeSubnetValidatorTx,
 			expectedError:       nil,
@@ -213,16 +145,8 @@ func TestTxFees(t *testing.T) {
 		},
 		{
 			description: "TransformSubnetTx pre EUpgrade",
-			upgradesAndChainTimeF: func() (*upgrade.Times, time.Time) {
-				eUpgradeTime := time.Now().Truncate(time.Second)
-				chainTime := eUpgradeTime.Add(-1 * time.Second)
-
-				upgrades := upgrade.Times{
-					DurangoTime:  durangoTime,
-					EUpgradeTime: eUpgradeTime,
-				}
-
-				return &upgrades, chainTime
+			upgrade: func() upgrade.Upgrade {
+				return upgrade.Durango
 			},
 			unsignedAndSignedTx: transformSubnetTx,
 			expectedError:       nil,
@@ -232,16 +156,8 @@ func TestTxFees(t *testing.T) {
 		},
 		{
 			description: "TransferSubnetOwnershipTx pre EUpgrade",
-			upgradesAndChainTimeF: func() (*upgrade.Times, time.Time) {
-				eUpgradeTime := time.Now().Truncate(time.Second)
-				chainTime := eUpgradeTime.Add(-1 * time.Second)
-
-				upgrades := upgrade.Times{
-					DurangoTime:  durangoTime,
-					EUpgradeTime: eUpgradeTime,
-				}
-
-				return &upgrades, chainTime
+			upgrade: func() upgrade.Upgrade {
+				return upgrade.Durango
 			},
 			unsignedAndSignedTx: transferSubnetOwnershipTx,
 			expectedError:       nil,
@@ -251,16 +167,8 @@ func TestTxFees(t *testing.T) {
 		},
 		{
 			description: "AddPermissionlessValidatorTx Primary Network pre EUpgrade",
-			upgradesAndChainTimeF: func() (*upgrade.Times, time.Time) {
-				eUpgradeTime := time.Now().Truncate(time.Second)
-				chainTime := eUpgradeTime.Add(-1 * time.Second)
-
-				upgrades := upgrade.Times{
-					DurangoTime:  durangoTime,
-					EUpgradeTime: eUpgradeTime,
-				}
-
-				return &upgrades, chainTime
+			upgrade: func() upgrade.Upgrade {
+				return upgrade.Durango
 			},
 			unsignedAndSignedTx: func(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
 				return addPermissionlessValidatorTx(t, constants.PrimaryNetworkID)
@@ -272,16 +180,8 @@ func TestTxFees(t *testing.T) {
 		},
 		{
 			description: "AddPermissionlessValidatorTx Subnet pre EUpgrade",
-			upgradesAndChainTimeF: func() (*upgrade.Times, time.Time) {
-				eUpgradeTime := time.Now().Truncate(time.Second)
-				chainTime := eUpgradeTime.Add(-1 * time.Second)
-
-				upgrades := upgrade.Times{
-					DurangoTime:  durangoTime,
-					EUpgradeTime: eUpgradeTime,
-				}
-
-				return &upgrades, chainTime
+			upgrade: func() upgrade.Upgrade {
+				return upgrade.Durango
 			},
 			unsignedAndSignedTx: func(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
 				subnetID := ids.GenerateTestID()
@@ -295,16 +195,8 @@ func TestTxFees(t *testing.T) {
 		},
 		{
 			description: "AddPermissionlessDelegatorTx Primary Network pre EUpgrade",
-			upgradesAndChainTimeF: func() (*upgrade.Times, time.Time) {
-				eUpgradeTime := time.Now().Truncate(time.Second)
-				chainTime := eUpgradeTime.Add(-1 * time.Second)
-
-				upgrades := upgrade.Times{
-					DurangoTime:  durangoTime,
-					EUpgradeTime: eUpgradeTime,
-				}
-
-				return &upgrades, chainTime
+			upgrade: func() upgrade.Upgrade {
+				return upgrade.Durango
 			},
 			unsignedAndSignedTx: func(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
 				return addPermissionlessDelegatorTx(t, constants.PrimaryNetworkID)
@@ -316,16 +208,8 @@ func TestTxFees(t *testing.T) {
 		},
 		{
 			description: "AddPermissionlessDelegatorTx pre EUpgrade",
-			upgradesAndChainTimeF: func() (*upgrade.Times, time.Time) {
-				eUpgradeTime := time.Now().Truncate(time.Second)
-				chainTime := eUpgradeTime.Add(-1 * time.Second)
-
-				upgrades := upgrade.Times{
-					DurangoTime:  durangoTime,
-					EUpgradeTime: eUpgradeTime,
-				}
-
-				return &upgrades, chainTime
+			upgrade: func() upgrade.Upgrade {
+				return upgrade.Durango
 			},
 			unsignedAndSignedTx: func(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
 				subnetID := ids.GenerateTestID()
@@ -339,16 +223,8 @@ func TestTxFees(t *testing.T) {
 		},
 		{
 			description: "BaseTx pre EUpgrade",
-			upgradesAndChainTimeF: func() (*upgrade.Times, time.Time) {
-				eUpgradeTime := time.Now().Truncate(time.Second)
-				chainTime := eUpgradeTime.Add(-1 * time.Second)
-
-				upgrades := upgrade.Times{
-					DurangoTime:  durangoTime,
-					EUpgradeTime: eUpgradeTime,
-				}
-
-				return &upgrades, chainTime
+			upgrade: func() upgrade.Upgrade {
+				return upgrade.Durango
 			},
 			unsignedAndSignedTx: baseTx,
 			expectedError:       nil,
@@ -358,16 +234,8 @@ func TestTxFees(t *testing.T) {
 		},
 		{
 			description: "ImportTx pre EUpgrade",
-			upgradesAndChainTimeF: func() (*upgrade.Times, time.Time) {
-				eUpgradeTime := time.Now().Truncate(time.Second)
-				chainTime := eUpgradeTime.Add(-1 * time.Second)
-
-				upgrades := upgrade.Times{
-					DurangoTime:  durangoTime,
-					EUpgradeTime: eUpgradeTime,
-				}
-
-				return &upgrades, chainTime
+			upgrade: func() upgrade.Upgrade {
+				return upgrade.Durango
 			},
 			unsignedAndSignedTx: importTx,
 			expectedError:       nil,
@@ -377,16 +245,8 @@ func TestTxFees(t *testing.T) {
 		},
 		{
 			description: "ExportTx pre EUpgrade",
-			upgradesAndChainTimeF: func() (*upgrade.Times, time.Time) {
-				eUpgradeTime := time.Now().Truncate(time.Second)
-				chainTime := eUpgradeTime.Add(-1 * time.Second)
-
-				upgrades := upgrade.Times{
-					DurangoTime:  durangoTime,
-					EUpgradeTime: eUpgradeTime,
-				}
-
-				return &upgrades, chainTime
+			upgrade: func() upgrade.Upgrade {
+				return upgrade.Durango
 			},
 			unsignedAndSignedTx: exportTx,
 			expectedError:       nil,
@@ -396,16 +256,8 @@ func TestTxFees(t *testing.T) {
 		},
 		{
 			description: "RewardValidatorTx pre EUpgrade",
-			upgradesAndChainTimeF: func() (*upgrade.Times, time.Time) {
-				eUpgradeTime := time.Now().Truncate(time.Second)
-				chainTime := eUpgradeTime.Add(-1 * time.Second)
-
-				upgrades := upgrade.Times{
-					DurangoTime:  durangoTime,
-					EUpgradeTime: eUpgradeTime,
-				}
-
-				return &upgrades, chainTime
+			upgrade: func() upgrade.Upgrade {
+				return upgrade.Durango
 			},
 			unsignedAndSignedTx: func(_ *testing.T) (txs.UnsignedTx, *txs.Tx) {
 				return &txs.RewardValidatorTx{
@@ -419,16 +271,8 @@ func TestTxFees(t *testing.T) {
 		},
 		{
 			description: "AdvanceTimeTx pre EUpgrade",
-			upgradesAndChainTimeF: func() (*upgrade.Times, time.Time) {
-				eUpgradeTime := time.Now().Truncate(time.Second)
-				chainTime := eUpgradeTime.Add(-1 * time.Second)
-
-				upgrades := upgrade.Times{
-					DurangoTime:  durangoTime,
-					EUpgradeTime: eUpgradeTime,
-				}
-
-				return &upgrades, chainTime
+			upgrade: func() upgrade.Upgrade {
+				return upgrade.Durango
 			},
 			unsignedAndSignedTx: func(_ *testing.T) (txs.UnsignedTx, *txs.Tx) {
 				return &txs.AdvanceTimeTx{
@@ -444,10 +288,10 @@ func TestTxFees(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.description, func(t *testing.T) {
-			upgrades, chainTime := tt.upgradesAndChainTimeF()
+			upgrade := tt.upgrade()
 
 			uTx, _ := tt.unsignedAndSignedTx(t)
-			fc := NewStaticCalculator(&feeTestsDefaultCfg, upgrades, chainTime)
+			fc := NewStaticCalculator(&feeTestsDefaultCfg, upgrade)
 
 			err := uTx.Visit(fc)
 			r.ErrorIs(err, tt.expectedError)

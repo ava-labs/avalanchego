@@ -378,12 +378,13 @@ func (b *Builder) NewBaseTx(
 
 func (b *Builder) builders(keys []*secp256k1.PrivateKey) (builder.Builder, walletsigner.Signer, error) {
 	var (
-		kc      = secp256k1fx.NewKeychain(keys...)
-		addrs   = kc.Addresses()
-		backend = newBackend(addrs, b.state, b.ctx.SharedMemory)
+		kc            = secp256k1fx.NewKeychain(keys...)
+		addrs         = kc.Addresses()
+		backend       = newBackend(addrs, b.state, b.ctx.SharedMemory)
+		latestUpgrade = b.cfg.LatestActiveUpgrade(b.state.GetTimestamp())
 	)
 
-	context, err := newContext(b.ctx, &b.cfg.StaticConfig, &b.cfg.Times, b.state.GetTimestamp())
+	context, err := newContext(b.ctx, b.cfg.StaticConfig, latestUpgrade)
 	if err != nil {
 		return nil, nil, err
 	}

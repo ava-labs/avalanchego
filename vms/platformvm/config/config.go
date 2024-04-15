@@ -44,7 +44,7 @@ type Config struct {
 	TrackedSubnets set.Set[ids.ID]
 
 	// static fees configuration
-	fee.StaticConfig
+	*fee.StaticConfig
 
 	// The minimum amount of tokens one must bond to be a validator
 	MinValidatorStake uint64
@@ -71,7 +71,7 @@ type Config struct {
 	RewardConfig reward.Config
 
 	// All network upgrade timestamps
-	upgrade.Times
+	*upgrade.Times
 
 	// UseCurrentHeight forces [GetMinimumHeight] to return the current height
 	// of the P-Chain instead of the oldest block in the [recentlyAccepted]

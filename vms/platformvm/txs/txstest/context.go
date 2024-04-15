@@ -4,8 +4,6 @@
 package txstest
 
 import (
-	"time"
-
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
@@ -16,11 +14,10 @@ import (
 func newContext(
 	ctx *snow.Context,
 	cfg *fee.StaticConfig,
-	upgrades *upgrade.Times,
-	timestamp time.Time,
+	upgrade upgrade.Upgrade,
 ) (*builder.Context, error) {
 	var (
-		staticFeeCalc  = fee.NewStaticCalculator(cfg, upgrades, timestamp)
+		staticFeeCalc  = fee.NewStaticCalculator(cfg, upgrade)
 		createSubnetTx = &txs.CreateSubnetTx{}
 		createChainTx  = &txs.CreateChainTx{}
 	)

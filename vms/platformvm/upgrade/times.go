@@ -25,6 +25,25 @@ type Times struct {
 	EUpgradeTime time.Time
 }
 
+func (t *Times) LatestActiveUpgrade(timestamp time.Time) Upgrade {
+	switch {
+	case t.IsEActivated(timestamp):
+		return EUpgrade
+	case t.IsDurangoActivated(timestamp):
+		return Durango
+	case t.IsCortinaActivated(timestamp):
+		return Cortina
+	case t.IsBanffActivated(timestamp):
+		return Banff
+	case t.IsApricotPhase5Activated(timestamp):
+		return ApricotPhase5
+	case t.IsApricotPhase3Activated(timestamp):
+		return ApricotPhase3
+	default:
+		return PreApricot
+	}
+}
+
 func (t *Times) IsApricotPhase3Activated(timestamp time.Time) bool {
 	return !timestamp.Before(t.ApricotPhase3Time)
 }

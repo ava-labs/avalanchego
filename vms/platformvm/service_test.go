@@ -366,7 +366,8 @@ func TestGetBalance(t *testing.T) {
 	require := require.New(t)
 	service, _, _ := defaultService(t)
 
-	staticFeeCalc := fee.NewStaticCalculator(&service.vm.StaticConfig, &service.vm.Times, service.vm.clock.Time())
+	latestUpgrade := service.vm.Config.LatestActiveUpgrade(service.vm.clock.Time())
+	staticFeeCalc := fee.NewStaticCalculator(service.vm.StaticConfig, latestUpgrade)
 	dummyCreateSubnetTx := &txs.CreateSubnetTx{}
 	require.NoError(dummyCreateSubnetTx.Visit(staticFeeCalc))
 	createSubnetFee := staticFeeCalc.Fee

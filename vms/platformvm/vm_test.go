@@ -74,14 +74,7 @@ import (
 )
 
 const (
-	apricotPhase3 fork = iota
-	apricotPhase5
-	banff
-	cortina
-	durango
-	eUpgrade
-
-	latestFork = durango
+	latestFork = upgrade.Durango
 
 	defaultWeight uint64 = 10000
 )
@@ -137,8 +130,6 @@ func init() {
 		genesisNodeIDs = append(genesisNodeIDs, nodeID)
 	}
 }
-
-type fork uint8
 
 type mutableSharedMemory struct {
 	atomic.SharedMemory
@@ -204,7 +195,7 @@ func defaultGenesis(t *testing.T, avaxAssetID ids.ID) (*api.BuildGenesisArgs, []
 	return &buildGenesisArgs, genesisBytes
 }
 
-func defaultVM(t *testing.T, f fork) (*VM, *txstest.Builder, database.Database, *mutableSharedMemory) {
+func defaultVM(t *testing.T, f upgrade.Upgrade) (*VM, *txstest.Builder, database.Database, *mutableSharedMemory) {
 	require := require.New(t)
 	var (
 		apricotPhase3Time = mockable.MaxTime
@@ -219,22 +210,22 @@ func defaultVM(t *testing.T, f fork) (*VM, *txstest.Builder, database.Database, 
 	// to ensure test independence
 	latestForkTime = defaultGenesisTime.Add(time.Second)
 	switch f {
-	case eUpgrade:
+	case upgrade.EUpgrade:
 		eUpgradeTime = latestForkTime
 		fallthrough
-	case durango:
+	case upgrade.Durango:
 		durangoTime = latestForkTime
 		fallthrough
-	case cortina:
+	case upgrade.Cortina:
 		cortinaTime = latestForkTime
 		fallthrough
-	case banff:
+	case upgrade.Banff:
 		banffTime = latestForkTime
 		fallthrough
-	case apricotPhase5:
+	case upgrade.ApricotPhase5:
 		apricotPhase5Time = latestForkTime
 		fallthrough
-	case apricotPhase3:
+	case upgrade.ApricotPhase3:
 		apricotPhase3Time = latestForkTime
 	default:
 		require.FailNow("unhandled fork", f)
@@ -245,7 +236,7 @@ func defaultVM(t *testing.T, f fork) (*VM, *txstest.Builder, database.Database, 
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		SybilProtectionEnabled: true,
 		Validators:             validators.NewManager(),
-		StaticConfig: fee.StaticConfig{
+		StaticConfig: &fee.StaticConfig{
 			TxFee:                 defaultTxFee,
 			CreateSubnetTxFee:     100 * defaultTxFee,
 			TransformSubnetTxFee:  100 * defaultTxFee,
@@ -257,7 +248,7 @@ func defaultVM(t *testing.T, f fork) (*VM, *txstest.Builder, database.Database, 
 		MinStakeDuration:  defaultMinStakingDuration,
 		MaxStakeDuration:  defaultMaxStakingDuration,
 		RewardConfig:      defaultRewardConfig,
-		Times: upgrade.Times{
+		Times: &upgrade.Times{
 			ApricotPhase3Time: apricotPhase3Time,
 			ApricotPhase5Time: apricotPhase5Time,
 			BanffTime:         banffTime,
@@ -472,7 +463,7 @@ func TestAddValidatorCommit(t *testing.T) {
 // verify invalid attempt to add validator to primary network
 func TestInvalidAddValidatorCommit(t *testing.T) {
 	require := require.New(t)
-	vm, txBuilder, _, _ := defaultVM(t, cortina)
+	vm, txBuilder, _, _ := defaultVM(t, upgrade.Cortina)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
@@ -526,7 +517,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 // Reject attempt to add validator to primary network
 func TestAddValidatorReject(t *testing.T) {
 	require := require.New(t)
-	vm, txBuilder, _, _ := defaultVM(t, cortina)
+	vm, txBuilder, _, _ := defaultVM(t, upgrade.Cortina)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
@@ -1116,7 +1107,7 @@ func TestAtomicImport(t *testing.T) {
 // test optimistic asset import
 func TestOptimisticAtomicImport(t *testing.T) {
 	require := require.New(t)
-	vm, _, _, _ := defaultVM(t, apricotPhase3)
+	vm, _, _, _ := defaultVM(t, upgrade.ApricotPhase3)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
@@ -1183,7 +1174,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 		MinStakeDuration:       defaultMinStakingDuration,
 		MaxStakeDuration:       defaultMaxStakingDuration,
 		RewardConfig:           defaultRewardConfig,
-		Times: upgrade.Times{
+		Times: &upgrade.Times{
 			BanffTime:    latestForkTime,
 			CortinaTime:  latestForkTime,
 			DurangoTime:  latestForkTime,
@@ -1273,7 +1264,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 		MinStakeDuration:       defaultMinStakingDuration,
 		MaxStakeDuration:       defaultMaxStakingDuration,
 		RewardConfig:           defaultRewardConfig,
-		Times: upgrade.Times{
+		Times: &upgrade.Times{
 			BanffTime:    latestForkTime,
 			CortinaTime:  latestForkTime,
 			DurangoTime:  latestForkTime,
@@ -1324,7 +1315,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		MinStakeDuration:       defaultMinStakingDuration,
 		MaxStakeDuration:       defaultMaxStakingDuration,
 		RewardConfig:           defaultRewardConfig,
-		Times: upgrade.Times{
+		Times: &upgrade.Times{
 			BanffTime:    latestForkTime,
 			CortinaTime:  latestForkTime,
 			DurangoTime:  latestForkTime,
@@ -1662,7 +1653,7 @@ func TestUnverifiedParent(t *testing.T) {
 		MinStakeDuration:       defaultMinStakingDuration,
 		MaxStakeDuration:       defaultMaxStakingDuration,
 		RewardConfig:           defaultRewardConfig,
-		Times: upgrade.Times{
+		Times: &upgrade.Times{
 			BanffTime:    latestForkTime,
 			CortinaTime:  latestForkTime,
 			DurangoTime:  latestForkTime,
@@ -1825,7 +1816,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 		RewardConfig:           defaultRewardConfig,
 		Validators:             validators.NewManager(),
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		Times: upgrade.Times{
+		Times: &upgrade.Times{
 			BanffTime:    latestForkTime,
 			CortinaTime:  latestForkTime,
 			DurangoTime:  latestForkTime,
@@ -1876,7 +1867,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 		UptimePercentage:       secondUptimePercentage / 100.,
 		Validators:             validators.NewManager(),
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		Times: upgrade.Times{
+		Times: &upgrade.Times{
 			BanffTime:    latestForkTime,
 			CortinaTime:  latestForkTime,
 			DurangoTime:  latestForkTime,
@@ -1978,7 +1969,7 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 		RewardConfig:           defaultRewardConfig,
 		Validators:             validators.NewManager(),
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		Times: upgrade.Times{
+		Times: &upgrade.Times{
 			BanffTime:    latestForkTime,
 			CortinaTime:  latestForkTime,
 			DurangoTime:  latestForkTime,

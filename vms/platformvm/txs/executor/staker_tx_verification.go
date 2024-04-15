@@ -101,6 +101,7 @@ func verifyAddValidatorTx(
 	if backend.Config.IsDurangoActivated(currentTimestamp) {
 		return nil, ErrAddValidatorTxPostDurango
 	}
+	latestUpgrade := backend.Config.LatestActiveUpgrade(currentTimestamp)
 
 	// Verify the tx is well-formed
 	if err := sTx.SyntacticVerify(backend.Ctx); err != nil {
@@ -164,7 +165,7 @@ func verifyAddValidatorTx(
 	}
 
 	// Verify the flowcheck
-	feeCalculator := fee.NewStaticCalculator(&backend.Config.StaticConfig, &backend.Config.Times, currentTimestamp)
+	feeCalculator := fee.NewStaticCalculator(backend.Config.StaticConfig, latestUpgrade)
 	if err := tx.Visit(feeCalculator); err != nil {
 		return nil, err
 	}
@@ -201,6 +202,7 @@ func verifyAddSubnetValidatorTx(
 	var (
 		currentTimestamp = chainState.GetTimestamp()
 		isDurangoActive  = backend.Config.IsDurangoActivated(currentTimestamp)
+		latestUpgrade    = backend.Config.LatestActiveUpgrade(currentTimestamp)
 	)
 	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
 		return err
@@ -257,7 +259,7 @@ func verifyAddSubnetValidatorTx(
 	}
 
 	// Verify the flowcheck
-	feeCalculator := fee.NewStaticCalculator(&backend.Config.StaticConfig, &backend.Config.Times, currentTimestamp)
+	feeCalculator := fee.NewStaticCalculator(backend.Config.StaticConfig, latestUpgrade)
 	if err := tx.Visit(feeCalculator); err != nil {
 		return err
 	}
@@ -300,6 +302,7 @@ func verifyRemoveSubnetValidatorTx(
 	var (
 		currentTimestamp = chainState.GetTimestamp()
 		isDurangoActive  = backend.Config.IsDurangoActivated(currentTimestamp)
+		latestUpgrade    = backend.Config.LatestActiveUpgrade(currentTimestamp)
 	)
 	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
 		return nil, false, err
@@ -337,7 +340,7 @@ func verifyRemoveSubnetValidatorTx(
 	}
 
 	// Verify the flowcheck
-	feeCalculator := fee.NewStaticCalculator(&backend.Config.StaticConfig, &backend.Config.Times, chainState.GetTimestamp())
+	feeCalculator := fee.NewStaticCalculator(backend.Config.StaticConfig, latestUpgrade)
 	if err := tx.Visit(feeCalculator); err != nil {
 		return nil, false, err
 	}
@@ -374,6 +377,7 @@ func verifyAddDelegatorTx(
 	if backend.Config.IsDurangoActivated(currentTimestamp) {
 		return nil, ErrAddDelegatorTxPostDurango
 	}
+	latestUpgrade := backend.Config.LatestActiveUpgrade(currentTimestamp)
 
 	// Verify the tx is well-formed
 	if err := sTx.SyntacticVerify(backend.Ctx); err != nil {
@@ -457,7 +461,7 @@ func verifyAddDelegatorTx(
 	}
 
 	// Verify the flowcheck
-	feeCalculator := fee.NewStaticCalculator(&backend.Config.StaticConfig, &backend.Config.Times, chainState.GetTimestamp())
+	feeCalculator := fee.NewStaticCalculator(backend.Config.StaticConfig, latestUpgrade)
 	if err := tx.Visit(feeCalculator); err != nil {
 		return nil, err
 	}
@@ -494,6 +498,7 @@ func verifyAddPermissionlessValidatorTx(
 	var (
 		currentTimestamp = chainState.GetTimestamp()
 		isDurangoActive  = backend.Config.IsDurangoActivated(currentTimestamp)
+		latestUpgrade    = backend.Config.LatestActiveUpgrade(currentTimestamp)
 	)
 	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
 		return err
@@ -579,7 +584,7 @@ func verifyAddPermissionlessValidatorTx(
 	copy(outs[len(tx.Outs):], tx.StakeOuts)
 
 	// Verify the flowcheck
-	feeCalculator := fee.NewStaticCalculator(&backend.Config.StaticConfig, &backend.Config.Times, currentTimestamp)
+	feeCalculator := fee.NewStaticCalculator(backend.Config.StaticConfig, latestUpgrade)
 	if err := tx.Visit(feeCalculator); err != nil {
 		return err
 	}
@@ -616,6 +621,7 @@ func verifyAddPermissionlessDelegatorTx(
 	var (
 		currentTimestamp = chainState.GetTimestamp()
 		isDurangoActive  = backend.Config.IsDurangoActivated(currentTimestamp)
+		latestUpgrade    = backend.Config.LatestActiveUpgrade(currentTimestamp)
 	)
 	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
 		return err
@@ -726,7 +732,7 @@ func verifyAddPermissionlessDelegatorTx(
 	}
 
 	// Verify the flowcheck
-	feeCalculator := fee.NewStaticCalculator(&backend.Config.StaticConfig, &backend.Config.Times, currentTimestamp)
+	feeCalculator := fee.NewStaticCalculator(backend.Config.StaticConfig, latestUpgrade)
 	if err := tx.Visit(feeCalculator); err != nil {
 		return err
 	}
@@ -783,7 +789,8 @@ func verifyTransferSubnetOwnershipTx(
 	}
 
 	// Verify the flowcheck
-	feeCalculator := fee.NewStaticCalculator(&backend.Config.StaticConfig, &backend.Config.Times, chainState.GetTimestamp())
+	latestUpgrade := backend.Config.LatestActiveUpgrade(chainState.GetTimestamp())
+	feeCalculator := fee.NewStaticCalculator(backend.Config.StaticConfig, latestUpgrade)
 	if err := tx.Visit(feeCalculator); err != nil {
 		return err
 	}

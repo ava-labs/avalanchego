@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/upgrade"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/chain/p/builder"
 )
@@ -24,7 +25,7 @@ import (
 var fundedSharedMemoryCalls byte
 
 func TestNewImportTx(t *testing.T) {
-	env := newEnvironment(t, apricotPhase5)
+	env := newEnvironment(t, upgrade.ApricotPhase5)
 
 	type test struct {
 		description   string

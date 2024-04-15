@@ -61,13 +61,6 @@ const (
 
 	defaultWeight = 10000
 	trackChecksum = false
-
-	apricotPhase3 fork = iota
-	apricotPhase5
-	banff
-	cortina
-	durango
-	eUpgrade
 )
 
 var (
@@ -97,8 +90,6 @@ func init() {
 }
 
 type stakerStatus uint
-
-type fork uint8
 
 type staker struct {
 	nodeID             ids.NodeID
@@ -134,7 +125,7 @@ type environment struct {
 	backend        *executor.Backend
 }
 
-func newEnvironment(t *testing.T, ctrl *gomock.Controller, f fork) *environment {
+func newEnvironment(t *testing.T, ctrl *gomock.Controller, f upgrade.Upgrade) *environment {
 	res := &environment{
 		isBootstrapped: &utils.Atomic[bool]{},
 		config:         defaultConfig(t, f),
@@ -326,12 +317,12 @@ func defaultState(
 	return state
 }
 
-func defaultConfig(t *testing.T, f fork) *config.Config {
+func defaultConfig(t *testing.T, f upgrade.Upgrade) *config.Config {
 	c := &config.Config{
 		Chains:                 chains.TestManager,
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		Validators:             validators.NewManager(),
-		StaticConfig: fee.StaticConfig{
+		StaticConfig: &fee.StaticConfig{
 			TxFee:                 defaultTxFee,
 			CreateSubnetTxFee:     100 * defaultTxFee,
 			CreateBlockchainTxFee: 100 * defaultTxFee,
@@ -347,7 +338,7 @@ func defaultConfig(t *testing.T, f fork) *config.Config {
 			MintingPeriod:      365 * 24 * time.Hour,
 			SupplyCap:          720 * units.MegaAvax,
 		},
-		Times: upgrade.Times{
+		Times: &upgrade.Times{
 			ApricotPhase3Time: mockable.MaxTime,
 			ApricotPhase5Time: mockable.MaxTime,
 			BanffTime:         mockable.MaxTime,
@@ -358,22 +349,22 @@ func defaultConfig(t *testing.T, f fork) *config.Config {
 	}
 
 	switch f {
-	case eUpgrade:
+	case upgrade.EUpgrade:
 		c.EUpgradeTime = time.Time{} // neglecting fork ordering this for package tests
 		fallthrough
-	case durango:
+	case upgrade.Durango:
 		c.DurangoTime = time.Time{} // neglecting fork ordering for this package's tests
 		fallthrough
-	case cortina:
+	case upgrade.Cortina:
 		c.CortinaTime = time.Time{} // neglecting fork ordering for this package's tests
 		fallthrough
-	case banff:
+	case upgrade.Banff:
 		c.BanffTime = time.Time{} // neglecting fork ordering for this package's tests
 		fallthrough
-	case apricotPhase5:
+	case upgrade.ApricotPhase5:
 		c.ApricotPhase5Time = defaultValidateEndTime
 		fallthrough
-	case apricotPhase3:
+	case upgrade.ApricotPhase3:
 		c.ApricotPhase3Time = defaultValidateEndTime
 	default:
 		require.FailNow(t, "unhandled fork", f)

@@ -22,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/upgrade"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -110,7 +111,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 			backendF: func(*gomock.Controller) *Backend {
 				return &Backend{
 					Ctx:    ctx,
-					Config: defaultTestConfig(t, durango, activeForkTime),
+					Config: defaultTestConfig(t, upgrade.Durango, activeForkTime),
 				}
 			},
 			stateF: func(*gomock.Controller) state.Chain {
@@ -129,7 +130,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 			backendF: func(*gomock.Controller) *Backend {
 				return &Backend{
 					Ctx:          ctx,
-					Config:       defaultTestConfig(t, durango, activeForkTime),
+					Config:       defaultTestConfig(t, upgrade.Durango, activeForkTime),
 					Bootstrapped: &utils.Atomic[bool]{},
 				}
 			},
@@ -153,7 +154,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				bootstrapped.Set(true)
 				return &Backend{
 					Ctx:          ctx,
-					Config:       defaultTestConfig(t, cortina, activeForkTime),
+					Config:       defaultTestConfig(t, upgrade.Cortina, activeForkTime),
 					Bootstrapped: bootstrapped,
 				}
 			},
@@ -177,7 +178,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				bootstrapped.Set(true)
 				return &Backend{
 					Ctx:          ctx,
-					Config:       defaultTestConfig(t, durango, activeForkTime),
+					Config:       defaultTestConfig(t, upgrade.Durango, activeForkTime),
 					Bootstrapped: bootstrapped,
 				}
 			},
@@ -204,7 +205,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				bootstrapped.Set(true)
 				return &Backend{
 					Ctx:          ctx,
-					Config:       defaultTestConfig(t, durango, activeForkTime),
+					Config:       defaultTestConfig(t, upgrade.Durango, activeForkTime),
 					Bootstrapped: bootstrapped,
 				}
 			},
@@ -231,7 +232,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				bootstrapped.Set(true)
 				return &Backend{
 					Ctx:          ctx,
-					Config:       defaultTestConfig(t, durango, activeForkTime),
+					Config:       defaultTestConfig(t, upgrade.Durango, activeForkTime),
 					Bootstrapped: bootstrapped,
 				}
 			},
@@ -259,7 +260,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				bootstrapped.Set(true)
 				return &Backend{
 					Ctx:          ctx,
-					Config:       defaultTestConfig(t, durango, activeForkTime),
+					Config:       defaultTestConfig(t, upgrade.Durango, activeForkTime),
 					Bootstrapped: bootstrapped,
 				}
 			},
@@ -290,7 +291,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				bootstrapped.Set(true)
 				return &Backend{
 					Ctx:          ctx,
-					Config:       defaultTestConfig(t, durango, activeForkTime),
+					Config:       defaultTestConfig(t, upgrade.Durango, activeForkTime),
 					Bootstrapped: bootstrapped,
 				}
 			},
@@ -321,7 +322,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				bootstrapped.Set(true)
 				return &Backend{
 					Ctx:          ctx,
-					Config:       defaultTestConfig(t, durango, activeForkTime),
+					Config:       defaultTestConfig(t, upgrade.Durango, activeForkTime),
 					Bootstrapped: bootstrapped,
 				}
 			},
@@ -354,7 +355,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				bootstrapped.Set(true)
 				return &Backend{
 					Ctx:          ctx,
-					Config:       defaultTestConfig(t, durango, activeForkTime),
+					Config:       defaultTestConfig(t, upgrade.Durango, activeForkTime),
 					Bootstrapped: bootstrapped,
 				}
 			},
@@ -381,7 +382,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				bootstrapped.Set(true)
 				return &Backend{
 					Ctx:          ctx,
-					Config:       defaultTestConfig(t, durango, activeForkTime),
+					Config:       defaultTestConfig(t, upgrade.Durango, activeForkTime),
 					Bootstrapped: bootstrapped,
 				}
 			},
@@ -422,7 +423,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 					gomock.Any(),
 				).Return(ErrFlowCheckFailed)
 
-				cfg := defaultTestConfig(t, durango, activeForkTime)
+				cfg := defaultTestConfig(t, upgrade.Durango, activeForkTime)
 				cfg.AddSubnetValidatorFee = 1
 
 				return &Backend{
@@ -468,7 +469,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 					gomock.Any(),
 				).Return(nil)
 
-				cfg := defaultTestConfig(t, durango, activeForkTime)
+				cfg := defaultTestConfig(t, upgrade.Durango, activeForkTime)
 				cfg.AddSubnetValidatorFee = 1
 
 				return &Backend{

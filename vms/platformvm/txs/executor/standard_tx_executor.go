@@ -58,6 +58,7 @@ func (e *StandardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 	var (
 		currentTimestamp = e.State.GetTimestamp()
 		isDurangoActive  = e.Config.IsDurangoActivated(currentTimestamp)
+		latestUpgrade    = e.Backend.Config.LatestActiveUpgrade(currentTimestamp)
 	)
 	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
 		return err
@@ -69,7 +70,7 @@ func (e *StandardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 	}
 
 	// Verify the flowcheck
-	feeCalculator := fee.NewStaticCalculator(&e.Backend.Config.StaticConfig, &e.Backend.Config.Times, e.State.GetTimestamp())
+	feeCalculator := fee.NewStaticCalculator(e.Backend.Config.StaticConfig, latestUpgrade)
 	if err := tx.Visit(feeCalculator); err != nil {
 		return err
 	}
@@ -113,13 +114,14 @@ func (e *StandardTxExecutor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 	var (
 		currentTimestamp = e.State.GetTimestamp()
 		isDurangoActive  = e.Config.IsDurangoActivated(currentTimestamp)
+		latestUpgrade    = e.Backend.Config.LatestActiveUpgrade(currentTimestamp)
 	)
 	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
 		return err
 	}
 
 	// Verify the flowcheck
-	feeCalculator := fee.NewStaticCalculator(&e.Backend.Config.StaticConfig, &e.Backend.Config.Times, e.State.GetTimestamp())
+	feeCalculator := fee.NewStaticCalculator(e.Backend.Config.StaticConfig, latestUpgrade)
 	if err := tx.Visit(feeCalculator); err != nil {
 		return err
 	}
@@ -157,6 +159,7 @@ func (e *StandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 	var (
 		currentTimestamp = e.State.GetTimestamp()
 		isDurangoActive  = e.Config.IsDurangoActivated(currentTimestamp)
+		latestUpgrade    = e.Backend.Config.LatestActiveUpgrade(currentTimestamp)
 	)
 	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
 		return err
@@ -204,7 +207,7 @@ func (e *StandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 		copy(ins[len(tx.Ins):], tx.ImportedInputs)
 
 		// Verify the flowcheck
-		feeCalculator := fee.NewStaticCalculator(&e.Backend.Config.StaticConfig, &e.Backend.Config.Times, e.State.GetTimestamp())
+		feeCalculator := fee.NewStaticCalculator(e.Backend.Config.StaticConfig, latestUpgrade)
 		if err := tx.Visit(feeCalculator); err != nil {
 			return err
 		}
@@ -249,6 +252,7 @@ func (e *StandardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 	var (
 		currentTimestamp = e.State.GetTimestamp()
 		isDurangoActive  = e.Config.IsDurangoActivated(currentTimestamp)
+		latestUpgrade    = e.Backend.Config.LatestActiveUpgrade(currentTimestamp)
 	)
 	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
 		return err
@@ -265,7 +269,7 @@ func (e *StandardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 	}
 
 	// Verify the flowcheck
-	feeCalculator := fee.NewStaticCalculator(&e.Backend.Config.StaticConfig, &e.Backend.Config.Times, e.State.GetTimestamp())
+	feeCalculator := fee.NewStaticCalculator(e.Backend.Config.StaticConfig, latestUpgrade)
 	if err := tx.Visit(feeCalculator); err != nil {
 		return err
 	}
@@ -439,6 +443,7 @@ func (e *StandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 	var (
 		currentTimestamp = e.State.GetTimestamp()
 		isDurangoActive  = e.Config.IsDurangoActivated(currentTimestamp)
+		latestUpgrade    = e.Backend.Config.LatestActiveUpgrade(currentTimestamp)
 	)
 	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
 		return err
@@ -456,7 +461,7 @@ func (e *StandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 	}
 
 	totalRewardAmount := tx.MaximumSupply - tx.InitialSupply
-	feeCalculator := fee.NewStaticCalculator(&e.Backend.Config.StaticConfig, &e.Backend.Config.Times, currentTimestamp)
+	feeCalculator := fee.NewStaticCalculator(e.Backend.Config.StaticConfig, latestUpgrade)
 	if err := tx.Visit(feeCalculator); err != nil {
 		return err
 	}
@@ -582,8 +587,9 @@ func (e *StandardTxExecutor) BaseTx(tx *txs.BaseTx) error {
 	var (
 		cfg              = e.Backend.Config
 		currentTimestamp = e.State.GetTimestamp()
+		latestUpgrade    = cfg.LatestActiveUpgrade(currentTimestamp)
 	)
-	feeCalculator := fee.NewStaticCalculator(&cfg.StaticConfig, &cfg.Times, currentTimestamp)
+	feeCalculator := fee.NewStaticCalculator(cfg.StaticConfig, latestUpgrade)
 	if err := tx.Visit(feeCalculator); err != nil {
 		return err
 	}

@@ -5,43 +5,41 @@ package executor
 
 import (
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
+	"github.com/ava-labs/avalanchego/vms/platformvm/upgrade"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 func TestNewExportTx(t *testing.T) {
-	env := newEnvironment(t, banff)
-	env.ctx.Lock.Lock()
-	defer env.ctx.Lock.Unlock()
-
 	type test struct {
 		description        string
 		destinationChainID ids.ID
 		sourceKeys         []*secp256k1.PrivateKey
-		timestamp          time.Time
+		fork               upgrade.Upgrade
 	}
 
+	ctx := snowtest.Context(t, snowtest.PChainID) // the context used in env
 	sourceKey := preFundedKeys[0]
 
 	tests := []test{
 		{
 			description:        "P->X export",
-			destinationChainID: env.ctx.XChainID,
+			destinationChainID: ctx.XChainID,
 			sourceKeys:         []*secp256k1.PrivateKey{sourceKey},
-			timestamp:          defaultValidateStartTime,
+			fork:               upgrade.ApricotPhase3,
 		},
 		{
 			description:        "P->C export",
-			destinationChainID: env.ctx.CChainID,
+			destinationChainID: ctx.CChainID,
 			sourceKeys:         []*secp256k1.PrivateKey{sourceKey},
-			timestamp:          env.config.ApricotPhase5Time,
+			fork:               upgrade.ApricotPhase5,
 		},
 	}
 
@@ -49,6 +47,9 @@ func TestNewExportTx(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.description, func(t *testing.T) {
 			require := require.New(t)
+			env := newEnvironment(t, tt.fork)
+			env.ctx.Lock.Lock()
+			defer env.ctx.Lock.Unlock()
 
 			tx, err := env.txBuilder.NewExportTx(
 				tt.destinationChainID,
@@ -69,8 +70,6 @@ func TestNewExportTx(t *testing.T) {
 
 			stateDiff, err := state.NewDiff(lastAcceptedID, env)
 			require.NoError(err)
-
-			stateDiff.SetTimestamp(tt.timestamp)
 
 			verifier := StandardTxExecutor{
 				Backend: &env.backend,
