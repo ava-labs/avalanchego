@@ -53,7 +53,6 @@ var (
 		RecordPollTransitivelyResetConfidenceTest,
 		RecordPollInvalidVoteTest,
 		RecordPollTransitiveVotingTest,
-		RecordPollDivergedVotingTest,
 		RecordPollDivergedVotingWithNoConflictingBitTest,
 		RecordPollChangePreferredChainTest,
 		LastAcceptedTest,
@@ -920,109 +919,6 @@ func RecordPollTransitiveVotingTest(t *testing.T, factory Factory) {
 	require.Equal(choices.Rejected, block4.Status())
 }
 
-func RecordPollDivergedVotingTest(t *testing.T, factory Factory) {
-	sm := factory.New()
-	require := require.New(t)
-
-	snowCtx := snowtest.Context(t, snowtest.CChainID)
-	ctx := snowtest.ConsensusContext(snowCtx)
-	params := snowball.Parameters{
-		K:                     1,
-		AlphaPreference:       1,
-		AlphaConfidence:       1,
-		Beta:                  2,
-		ConcurrentRepolls:     1,
-		OptimalProcessing:     1,
-		MaxOutstandingItems:   1,
-		MaxItemProcessingTime: 1,
-	}
-	require.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp))
-
-	block0 := &TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.ID{0x0f}, // 1111
-			StatusV: choices.Processing,
-		},
-		ParentV: Genesis.IDV,
-		HeightV: Genesis.HeightV + 1,
-	}
-	block1 := &TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.ID{0x08}, // 0001
-			StatusV: choices.Processing,
-		},
-		ParentV: Genesis.IDV,
-		HeightV: Genesis.HeightV + 1,
-	}
-	block2 := &TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.ID{0x01}, // 1000
-			StatusV: choices.Processing,
-		},
-		ParentV: Genesis.IDV,
-		HeightV: Genesis.HeightV + 1,
-	}
-	block3 := &TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.Empty.Prefix(1),
-			StatusV: choices.Processing,
-		},
-		ParentV: block2.IDV,
-		HeightV: block2.HeightV + 1,
-	}
-
-	require.NoError(sm.Add(context.Background(), block0))
-
-	require.NoError(sm.Add(context.Background(), block1))
-
-	// The first bit is contested as either 0 or 1. When voting for [block0] and
-	// when the first bit is 1, the following bits have been decided to follow
-	// the 255 remaining bits of [block0].
-	votes0 := bag.Of(block0.ID())
-	require.NoError(sm.RecordPoll(context.Background(), votes0))
-
-	// Although we are adding in [block2] here - the underlying snowball
-	// instance has already decided it is rejected. Snowman doesn't actually
-	// know that though, because that is an implementation detail of the
-	// Snowball trie that is used.
-	require.NoError(sm.Add(context.Background(), block2))
-
-	// Because [block2] is effectively rejected, [block3] is also effectively
-	// rejected.
-	require.NoError(sm.Add(context.Background(), block3))
-
-	require.Equal(block0.ID(), sm.Preference())
-	require.Equal(choices.Processing, block0.Status(), "should not be accepted yet")
-	require.Equal(choices.Processing, block1.Status(), "should not be rejected yet")
-	require.Equal(choices.Processing, block2.Status(), "should not be rejected yet")
-	require.Equal(choices.Processing, block3.Status(), "should not be rejected yet")
-
-	// Current graph structure:
-	//       G
-	//     /   \
-	//    *     |
-	//   / \    |
-	//  0   2   1
-	//      |
-	//      3
-	// Tail = 0
-
-	// Transitively votes for [block2] by voting for its child [block3].
-	// Because [block2] shares the first bit with [block0] and the following
-	// bits have been finalized for [block0], the voting results in accepting
-	// [block0]. When [block0] is accepted, [block1] and [block2] are rejected
-	// as conflicting. [block2]'s child, [block3], is then rejected
-	// transitively.
-	votes3 := bag.Of(block3.ID())
-	require.NoError(sm.RecordPoll(context.Background(), votes3))
-
-	require.Zero(sm.NumProcessing())
-	require.Equal(choices.Accepted, block0.Status())
-	require.Equal(choices.Rejected, block1.Status())
-	require.Equal(choices.Rejected, block2.Status())
-	require.Equal(choices.Rejected, block3.Status())
-}
-
 func RecordPollDivergedVotingWithNoConflictingBitTest(t *testing.T, factory Factory) {
 	sm := factory.New()
 	require := require.New(t)
@@ -1298,6 +1194,12 @@ func LastAcceptedTest(t *testing.T, factory Factory) {
 	require.Equal(GenesisID, lastAcceptedID)
 	require.Equal(GenesisHeight, lastAcceptedHeight)
 
+	require.NoError(sm.RecordPoll(context.Background(), bag.Of(block0.IDV)))
+
+	lastAcceptedID, lastAcceptedHeight = sm.LastAccepted()
+	require.Equal(GenesisID, lastAcceptedID)
+	require.Equal(GenesisHeight, lastAcceptedHeight)
+
 	require.NoError(sm.RecordPoll(context.Background(), bag.Of(block1.IDV)))
 
 	lastAcceptedID, lastAcceptedHeight = sm.LastAccepted()
@@ -1305,6 +1207,12 @@ func LastAcceptedTest(t *testing.T, factory Factory) {
 	require.Equal(block0.HeightV, lastAcceptedHeight)
 
 	require.NoError(sm.RecordPoll(context.Background(), bag.Of(block1.IDV)))
+
+	lastAcceptedID, lastAcceptedHeight = sm.LastAccepted()
+	require.Equal(block1.IDV, lastAcceptedID)
+	require.Equal(block1.HeightV, lastAcceptedHeight)
+
+	require.NoError(sm.RecordPoll(context.Background(), bag.Of(block2.IDV)))
 
 	lastAcceptedID, lastAcceptedHeight = sm.LastAccepted()
 	require.Equal(block1.IDV, lastAcceptedID)
