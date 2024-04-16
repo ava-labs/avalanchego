@@ -875,7 +875,7 @@ func TestIPTracker_PreventBloomFilterAddition(t *testing.T) {
 	require.True(tracker.AddIP(ip))
 	require.True(tracker.AddIP(newerIP))
 	require.True(tracker.AddIP(newestIP))
-	require.Equal(maxIPEntriesPerValidator, tracker.bloomAdditions[ip.NodeID])
+	require.Equal(maxIPEntriesPerNode, tracker.bloomAdditions[ip.NodeID])
 	requireMetricsConsistent(t, tracker)
 }
 
