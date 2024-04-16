@@ -39,8 +39,7 @@ func main() {
 		log.Fatalf("failed to marshal validators: %v", err)
 	}
 
-	err = perms.WriteFile("validators.json", validatorsJSON, perms.ReadWrite)
-	if err != nil {
+	if err := perms.WriteFile("validators.json", validatorsJSON, perms.ReadWrite); err != nil {
 		log.Fatalf("failed to write validators: %v", err)
 	}
 }

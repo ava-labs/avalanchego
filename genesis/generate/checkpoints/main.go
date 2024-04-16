@@ -81,8 +81,7 @@ func main() {
 		log.Fatalf("failed to marshal checkpoints: %v", err)
 	}
 
-	err = perms.WriteFile("checkpoints.json", checkpointsJSON, perms.ReadWrite)
-	if err != nil {
+	if err := perms.WriteFile("checkpoints.json", checkpointsJSON, perms.ReadWrite; err != nil {
 		log.Fatalf("failed to write checkpoints: %v", err)
 	}
 }
