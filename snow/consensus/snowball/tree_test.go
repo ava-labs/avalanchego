@@ -461,56 +461,6 @@ func TestSnowballCloseTrinary(t *testing.T) {
 	require.False(tree.Finalized())
 }
 
-func TestSnowballAddRejected(t *testing.T) {
-	t.Skip()
-	require := require.New(t)
-
-	c0000 := ids.ID{0x00} // 0000
-	c1000 := ids.ID{0x01} // 1000
-	c0101 := ids.ID{0x0a} // 0101
-	c0010 := ids.ID{0x04} // 0010
-
-	params := Parameters{
-		K:               1,
-		AlphaPreference: 1,
-		AlphaConfidence: 1,
-		Beta:            2,
-	}
-	tree := NewTree(SnowballFactory, params, c0000)
-	tree.Add(c1000)
-	tree.Add(c0010)
-
-	require.Equal(c0000, tree.Preference())
-	require.False(tree.Finalized())
-
-	c0010Bag := bag.Of(c0010)
-	require.True(tree.RecordPoll(c0010Bag))
-
-	{
-		expected := `SB(Preference = 0, PreferenceStrength[0] = 1, PreferenceStrength[1] = 0, SF(Confidence = 1, Finalized = false, SL(Preference = 0))) Bit = 0
-    SB(Preference = 1, PreferenceStrength[0] = 0, PreferenceStrength[1] = 1, SF(Confidence = 1, Finalized = false, SL(Preference = 1))) Bit = 2
-        SB(PreferenceStrength = 0, SF(Confidence = 0, Finalized = false)) Bits = [3, 256)
-        SB(PreferenceStrength = 1, SF(Confidence = 1, Finalized = true)) Bits = [3, 256)
-    SB(PreferenceStrength = 0, SF(Confidence = 0, Finalized = false)) Bits = [1, 256)`
-		require.Equal(expected, tree.String())
-		require.Equal(c0010, tree.Preference())
-		require.False(tree.Finalized())
-	}
-
-	tree.Add(c0101)
-
-	{
-		expected := `SB(Preference = 0, PreferenceStrength[0] = 1, PreferenceStrength[1] = 0, SF(Confidence = 1, Finalized = false, SL(Preference = 0))) Bit = 0
-    SB(Preference = 1, PreferenceStrength[0] = 0, PreferenceStrength[1] = 1, SF(Confidence = 1, Finalized = false, SL(Preference = 1))) Bit = 2
-        SB(PreferenceStrength = 0, SF(Confidence = 0, Finalized = false)) Bits = [3, 256)
-        SB(PreferenceStrength = 1, SF(Confidence = 1, Finalized = true)) Bits = [3, 256)
-    SB(PreferenceStrength = 0, SF(Confidence = 0, Finalized = false)) Bits = [1, 256)`
-		require.Equal(expected, tree.String())
-		require.Equal(c0010, tree.Preference())
-		require.False(tree.Finalized())
-	}
-}
-
 func TestSnowballResetChild(t *testing.T) {
 	t.Skip()
 	require := require.New(t)
