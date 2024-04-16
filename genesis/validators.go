@@ -23,7 +23,7 @@ var (
 
 func init() {
 	if err := json.Unmarshal(validatorsPerNetworkJSON, &validatorsPerNetwork); err != nil {
-		panic(fmt.Sprintf("failed to decode validators.json %v", err))
+		panic(fmt.Sprintf("failed to decode validators.json: %v", err))
 	}
 }
 

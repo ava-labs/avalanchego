@@ -23,7 +23,7 @@ var (
 
 func init() {
 	if err := json.Unmarshal(checkpointsPerNetworkJSON, &checkpointsPerNetwork); err != nil {
-		panic(fmt.Sprintf("failed to decode checkpoints.json %v", err))
+		panic(fmt.Sprintf("failed to decode checkpoints.json: %v", err))
 	}
 }
 
