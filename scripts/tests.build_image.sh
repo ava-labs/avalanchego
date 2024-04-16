@@ -35,9 +35,9 @@ build_and_test() {
   # Check all of the images expected to have been built
   local target_images=(
     "$image_name:$commit_hash"
-    "$image_name:$current_branch"
+    "$image_name:$image_tag"
     "$image_name:$commit_hash-race"
-    "$image_name:$current_branch-race"
+    "$image_name:$image_tag-race"
   )
 
   for arch in "${arches[@]}"; do
