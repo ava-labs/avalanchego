@@ -1440,13 +1440,8 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		externalSender,
 		chainRouter,
 		timeoutManager,
-<<<<<<< HEAD
 		p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
-		subnets.New(consensusCtx.NodeID, subnets.Config{GossipConfig: gossipConfig}),
-=======
-		p2p.EngineType_ENGINE_TYPE_SNOWMAN,
 		subnets.New(consensusCtx.NodeID, subnets.Config{}),
->>>>>>> add-checkpoints
 	)
 	require.NoError(err)
 
@@ -1510,6 +1505,15 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	)
 	require.NoError(err)
 
+	p2pTracker, err := p2p.NewPeerTracker(
+		ctx.Log,
+		"peer_tracker",
+		consensusCtx.Registerer,
+		set.Of(ctx.NodeID),
+		nil,
+	)
+	require.NoError(err)
+
 	h, err := handler.New(
 		bootstrapConfig.Ctx,
 		beacons,
@@ -1520,6 +1524,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		vm,
 		subnets.New(ctx.NodeID, subnets.Config{}),
 		tracker.NewPeers(),
+		p2pTracker,
 	)
 	require.NoError(err)
 
