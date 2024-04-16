@@ -411,7 +411,10 @@ func (b *Bootstrapper) fetch(ctx context.Context, blkID ids.ID) error {
 
 	nodeID, ok := b.PeerTracker.SelectPeer()
 	if !ok {
-		// TODO: FIXME
+		// If we aren't connected to any peers, we send a request to ourself
+		// which is guaranteed to fail. We send this message to use the message
+		// timeout as a retry mechanism. Once we are connected to another node
+		// again we will select them to sample from.
 		nodeID = b.Ctx.NodeID
 	}
 
