@@ -19,6 +19,8 @@ import (
 const (
 	fujiURI    = "http://localhost:9650"
 	mainnetURI = "http://localhost:9660"
+
+	maxNumCheckpoints = 20
 )
 
 var (
@@ -36,28 +38,28 @@ var (
 func main() {
 	ctx := context.Background()
 
-	fujiPChainCheckpoints, err := getCheckpoints(ctx, fujiURI, "P", 10_000)
+	fujiPChainCheckpoints, err := getCheckpoints(ctx, fujiURI, "P")
 	if err != nil {
 		log.Fatalf("failed to fetch Fuji P-chain checkpoints: %v", err)
 	}
-	fujiXChainCheckpoints, err := getCheckpoints(ctx, fujiURI, "X", 10_000)
+	fujiXChainCheckpoints, err := getCheckpoints(ctx, fujiURI, "X")
 	if err != nil {
 		log.Fatalf("failed to fetch Fuji X-chain checkpoints: %v", err)
 	}
-	fujiCChainCheckpoints, err := getCheckpoints(ctx, fujiURI, "C", 1_000_000)
+	fujiCChainCheckpoints, err := getCheckpoints(ctx, fujiURI, "C")
 	if err != nil {
 		log.Fatalf("failed to fetch Fuji C-chain checkpoints: %v", err)
 	}
 
-	mainnetPChainCheckpoints, err := getCheckpoints(ctx, mainnetURI, "P", 500_000)
+	mainnetPChainCheckpoints, err := getCheckpoints(ctx, mainnetURI, "P")
 	if err != nil {
 		log.Fatalf("failed to fetch Mainnet P-chain checkpoints: %v", err)
 	}
-	mainnetXChainCheckpoints, err := getCheckpoints(ctx, mainnetURI, "X", 20_000)
+	mainnetXChainCheckpoints, err := getCheckpoints(ctx, mainnetURI, "X")
 	if err != nil {
 		log.Fatalf("failed to fetch Mainnet X-chain checkpoints: %v", err)
 	}
-	mainnetCChainCheckpoints, err := getCheckpoints(ctx, mainnetURI, "C", 2_000_000)
+	mainnetCChainCheckpoints, err := getCheckpoints(ctx, mainnetURI, "C")
 	if err != nil {
 		log.Fatalf("failed to fetch Mainnet C-chain checkpoints: %v", err)
 	}
@@ -89,19 +91,25 @@ func getCheckpoints(
 	ctx context.Context,
 	uri string,
 	chainAlias string,
-	interval uint64,
 ) (set.Set[ids.ID], error) {
 	var (
 		chainURI = fmt.Sprintf("%s/ext/index/%s/block", uri, chainAlias)
 		client   = indexer.NewClient(chainURI)
 	)
 
+	// If there haven't been any blocks accepted, this will return an error.
 	_, lastIndex, err := client.GetLastAccepted(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	var checkpoints set.Set[ids.ID]
+	var (
+		numAccepted = lastIndex + 1
+		// interval is rounded up to ensure that the number of checkpoints
+		// fetched is at most maxNumCheckpoints.
+		interval    = (numAccepted + maxNumCheckpoints - 1) / maxNumCheckpoints
+		checkpoints set.Set[ids.ID]
+	)
 	for index := interval - 1; index <= lastIndex; index += interval {
 		container, err := client.GetContainerByIndex(ctx, index)
 		if err != nil {
