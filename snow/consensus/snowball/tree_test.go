@@ -230,7 +230,6 @@ func TestSnowballAddPreviouslyRejected(t *testing.T) {
 }
 
 func TestSnowballNewUnary(t *testing.T) {
-	t.Skip()
 	require := require.New(t)
 
 	zero := ids.ID{0b00000000}
@@ -271,7 +270,7 @@ func TestSnowballNewUnary(t *testing.T) {
 	{
 		expected := `SB(Preference = 1, PreferenceStrength[0] = 0, PreferenceStrength[1] = 2, SF(Confidence = 2, Finalized = false, SL(Preference = 1))) Bit = 0
     SB(PreferenceStrength = 0, SF(Confidence = 0, Finalized = false)) Bits = [1, 256)
-    SB(PreferenceStrength = 2, SF(Confidence = 2, Finalized = true)) Bits = [1, 256)`
+    SB(PreferenceStrength = 2, SF(Confidence = 2, Finalized = false)) Bits = [1, 256)`
 		require.Equal(expected, tree.String())
 		require.Equal(one, tree.Preference())
 		require.False(tree.Finalized())
