@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/proto/pb/p2p"
+	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -20,10 +20,13 @@ import (
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/subnets"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math/meter"
 	"github.com/ava-labs/avalanchego/utils/resource"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/version"
 
+	p2ppb "github.com/ava-labs/avalanchego/proto/pb/p2p"
 	commontracker "github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 )
 
@@ -69,6 +72,16 @@ func TestHealthCheckSubnet(t *testing.T) {
 					ConsensusParameters: test.consensusParams,
 				},
 			)
+
+			p2pTracker, err := p2p.NewPeerTracker(
+				logging.NoLog{},
+				"",
+				prometheus.NewRegistry(),
+				nil,
+				version.CurrentApp,
+			)
+			require.NoError(err)
+
 			handlerIntf, err := New(
 				ctx,
 				vdrs,
@@ -79,6 +92,7 @@ func TestHealthCheckSubnet(t *testing.T) {
 				validators.UnhandledSubnetConnector,
 				sb,
 				peerTracker,
+				p2pTracker,
 			)
 			require.NoError(err)
 
@@ -103,7 +117,7 @@ func TestHealthCheckSubnet(t *testing.T) {
 			})
 
 			ctx.State.Set(snow.EngineState{
-				Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
+				Type:  p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
 				State: snow.NormalOp, // assumed bootstrap is done
 			})
 

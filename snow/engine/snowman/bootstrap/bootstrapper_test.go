@@ -379,9 +379,9 @@ func TestBootstrapperEmptyResponse(t *testing.T) {
 	require.NoError(bs.startSyncing(context.Background(), blocksToIDs(blks[1:2])))
 	require.Equal(requestedNodeID, peerID)
 
-	// add another 2 validators to the fetch set to test behavior on empty
-	// response
-	bs.fetchFrom.Add(ids.GenerateTestNodeID(), ids.GenerateTestNodeID())
+	// Add another 2 peers to the fetch set to test behavior on empty response.
+	bs.PeerTracker.Connected(ids.GenerateTestNodeID(), version.CurrentApp)
+	bs.PeerTracker.Connected(ids.GenerateTestNodeID(), version.CurrentApp)
 
 	require.NoError(bs.Ancestors(context.Background(), requestedNodeID, requestID, nil)) // respond with empty
 	require.NotEqual(requestedNodeID, peerID)
@@ -389,9 +389,6 @@ func TestBootstrapperEmptyResponse(t *testing.T) {
 	require.NoError(bs.Ancestors(context.Background(), requestedNodeID, requestID, blocksToBytes(blks[1:2])))
 	require.Equal(snow.Bootstrapping, config.Ctx.State.Get().State)
 	requireStatusIs(require, blks, choices.Accepted)
-
-	// check that peerID was removed from the fetch set
-	require.NotContains(bs.fetchFrom, peerID)
 }
 
 // There are multiple needed blocks and Ancestors returns all at once

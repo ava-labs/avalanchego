@@ -40,6 +40,8 @@ const (
 	// maxOutstandingBroadcastRequests is the maximum number of requests to have
 	// outstanding when broadcasting.
 	maxOutstandingBroadcastRequests = 50
+
+	epsilon = 1e-6 // small amount to add to time to avoid division by 0
 )
 
 var (
@@ -95,7 +97,8 @@ type Bootstrapper struct {
 	startTime time.Time
 
 	// tracks which validators were asked for which containers in which requests
-	outstandingRequests *bimap.BiMap[common.Request, ids.ID]
+	outstandingRequests     *bimap.BiMap[common.Request, ids.ID]
+	outstandingRequestTimes map[common.Request]time.Time
 
 	// number of state transitions executed
 	executedStateTransitions uint64
@@ -127,7 +130,8 @@ func New(config Config, onFinished func(ctx context.Context, lastReqID uint32) e
 		minority: bootstrapper.Noop,
 		majority: bootstrapper.Noop,
 
-		outstandingRequests: bimap.New[common.Request, ids.ID](),
+		outstandingRequests:     bimap.New[common.Request, ids.ID](),
+		outstandingRequestTimes: make(map[common.Request]time.Time),
 
 		executedStateTransitions: math.MaxInt,
 		onFinished:               onFinished,
@@ -415,13 +419,12 @@ func (b *Bootstrapper) fetch(ctx context.Context, blkID ids.ID) error {
 
 	b.requestID++
 
-	b.outstandingRequests.Put(
-		common.Request{
-			NodeID:    nodeID,
-			RequestID: b.requestID,
-		},
-		blkID,
-	)
+	request := common.Request{
+		NodeID:    nodeID,
+		RequestID: b.requestID,
+	}
+	b.outstandingRequests.Put(request, blkID)
+	b.outstandingRequestTimes[request] = time.Now()
 	b.Config.Sender.SendGetAncestors(ctx, nodeID, b.requestID, blkID) // request block and ancestors
 	return nil
 }
@@ -430,10 +433,11 @@ func (b *Bootstrapper) fetch(ctx context.Context, blkID ids.ID) error {
 // response to a GetAncestors message to [nodeID] with request ID [requestID]
 func (b *Bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, requestID uint32, blks [][]byte) error {
 	// Make sure this is in response to a request we made
-	wantedBlkID, ok := b.outstandingRequests.DeleteKey(common.Request{
+	request := common.Request{
 		NodeID:    nodeID,
 		RequestID: requestID,
-	})
+	}
+	wantedBlkID, ok := b.outstandingRequests.DeleteKey(request)
 	if !ok { // this message isn't in response to a request we made
 		b.Ctx.Log.Debug("received unexpected Ancestors",
 			zap.Stringer("nodeID", nodeID),
@@ -441,6 +445,8 @@ func (b *Bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, request
 		)
 		return nil
 	}
+	requestTime := b.outstandingRequestTimes[request]
+	delete(b.outstandingRequestTimes, request)
 
 	lenBlks := len(blks)
 	if lenBlks == 0 {
@@ -503,7 +509,11 @@ func (b *Bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, request
 		blockSet[block.ID()] = block
 	}
 
-	b.PeerTracker.RegisterResponse(nodeID, float64(numBytes))
+	var (
+		requestLatency = time.Since(requestTime).Seconds() + epsilon
+		bandwidth      = float64(numBytes) / requestLatency
+	)
+	b.PeerTracker.RegisterResponse(nodeID, bandwidth)
 
 	if err := b.process(ctx, requestedBlock, blockSet); err != nil {
 		return err
@@ -513,10 +523,11 @@ func (b *Bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, request
 }
 
 func (b *Bootstrapper) GetAncestorsFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
-	blkID, ok := b.outstandingRequests.DeleteKey(common.Request{
+	request := common.Request{
 		NodeID:    nodeID,
 		RequestID: requestID,
-	})
+	}
+	blkID, ok := b.outstandingRequests.DeleteKey(request)
 	if !ok {
 		b.Ctx.Log.Debug("unexpectedly called GetAncestorsFailed",
 			zap.Stringer("nodeID", nodeID),
@@ -524,6 +535,7 @@ func (b *Bootstrapper) GetAncestorsFailed(ctx context.Context, nodeID ids.NodeID
 		)
 		return nil
 	}
+	delete(b.outstandingRequestTimes, request)
 
 	// This node timed out their request.
 	b.PeerTracker.RegisterFailure(nodeID)
@@ -718,6 +730,7 @@ func (b *Bootstrapper) restartBootstrapping(ctx context.Context) error {
 	b.Ctx.Log.Debug("Checking for new frontiers")
 	b.restarted = true
 	b.outstandingRequests = bimap.New[common.Request, ids.ID]()
+	b.outstandingRequestTimes = make(map[common.Request]time.Time)
 	return b.startBootstrapping(ctx)
 }
 

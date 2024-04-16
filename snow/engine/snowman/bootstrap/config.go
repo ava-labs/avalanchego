@@ -25,6 +25,7 @@ type Config struct {
 	BootstrapTracker common.BootstrapTracker
 	Timer            common.Timer
 
+	// PeerTracker manages the set of nodes that we fetch the next block from.
 	PeerTracker *p2p.PeerTracker
 
 	// This node will only consider the first [AncestorsMaxContainersReceived]
