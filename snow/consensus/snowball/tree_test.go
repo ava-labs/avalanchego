@@ -461,7 +461,6 @@ func TestSnowballCloseTrinary(t *testing.T) {
 }
 
 func TestSnowballResetChild(t *testing.T) {
-	t.Skip()
 	require := require.New(t)
 
 	c0000 := ids.ID{0x00} // 0000
@@ -487,7 +486,7 @@ func TestSnowballResetChild(t *testing.T) {
 	{
 		expected := `SB(Preference = 0, PreferenceStrength[0] = 1, PreferenceStrength[1] = 0, SF(Confidence = 1, Finalized = false, SL(Preference = 0))) Bit = 0
     SB(Preference = 0, PreferenceStrength[0] = 1, PreferenceStrength[1] = 0, SF(Confidence = 1, Finalized = false, SL(Preference = 0))) Bit = 1
-        SB(PreferenceStrength = 1, SF(Confidence = 1, Finalized = true)) Bits = [2, 256)
+        SB(PreferenceStrength = 1, SF(Confidence = 1, Finalized = false)) Bits = [2, 256)
         SB(PreferenceStrength = 0, SF(Confidence = 0, Finalized = false)) Bits = [2, 256)
     SB(PreferenceStrength = 0, SF(Confidence = 0, Finalized = false)) Bits = [1, 256)`
 		require.Equal(expected, tree.String())
@@ -501,7 +500,7 @@ func TestSnowballResetChild(t *testing.T) {
 	{
 		expected := `SB(Preference = 0, PreferenceStrength[0] = 1, PreferenceStrength[1] = 0, SF(Confidence = 0, Finalized = false, SL(Preference = 0))) Bit = 0
     SB(Preference = 0, PreferenceStrength[0] = 1, PreferenceStrength[1] = 0, SF(Confidence = 1, Finalized = false, SL(Preference = 0))) Bit = 1
-        SB(PreferenceStrength = 1, SF(Confidence = 1, Finalized = true)) Bits = [2, 256)
+        SB(PreferenceStrength = 1, SF(Confidence = 1, Finalized = false)) Bits = [2, 256)
         SB(PreferenceStrength = 0, SF(Confidence = 0, Finalized = false)) Bits = [2, 256)
     SB(PreferenceStrength = 0, SF(Confidence = 0, Finalized = false)) Bits = [1, 256)`
 		require.Equal(expected, tree.String())
@@ -514,7 +513,7 @@ func TestSnowballResetChild(t *testing.T) {
 	{
 		expected := `SB(Preference = 0, PreferenceStrength[0] = 2, PreferenceStrength[1] = 0, SF(Confidence = 1, Finalized = false, SL(Preference = 0))) Bit = 0
     SB(Preference = 0, PreferenceStrength[0] = 2, PreferenceStrength[1] = 0, SF(Confidence = 1, Finalized = false, SL(Preference = 0))) Bit = 1
-        SB(PreferenceStrength = 2, SF(Confidence = 1, Finalized = true)) Bits = [2, 256)
+        SB(PreferenceStrength = 2, SF(Confidence = 1, Finalized = false)) Bits = [2, 256)
         SB(PreferenceStrength = 0, SF(Confidence = 0, Finalized = false)) Bits = [2, 256)
     SB(PreferenceStrength = 0, SF(Confidence = 0, Finalized = false)) Bits = [1, 256)`
 		require.Equal(expected, tree.String())
