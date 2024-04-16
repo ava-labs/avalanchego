@@ -20,7 +20,7 @@ const (
 	fujiURI    = "http://localhost:9650"
 	mainnetURI = "http://localhost:9660"
 
-	maxNumCheckpoints = 20
+	maxNumCheckpoints = 100
 )
 
 var (
