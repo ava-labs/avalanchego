@@ -786,6 +786,7 @@ func (m *manager) createAvalancheChain(
 		validators.UnhandledSubnetConnector, // avalanche chains don't use subnet connector
 		sb,
 		connectedValidators,
+		peerTracker,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error initializing network handler: %w", err)
@@ -1108,6 +1109,17 @@ func (m *manager) createSnowmanChain(
 	}
 	vdrs.RegisterCallbackListener(ctx.SubnetID, connectedValidators)
 
+	peerTracker, err := p2p.NewPeerTracker(
+		ctx.Log,
+		"peer_tracker",
+		ctx.Registerer,
+		set.Of(ctx.NodeID),
+		nil,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("error creating peer tracker: %w", err)
+	}
+
 	// Asynchronously passes messages from the network to the consensus engine
 	h, err := handler.New(
 		ctx,
@@ -1119,6 +1131,7 @@ func (m *manager) createSnowmanChain(
 		subnetConnector,
 		sb,
 		connectedValidators,
+		peerTracker,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize message handler: %w", err)
@@ -1178,6 +1191,7 @@ func (m *manager) createSnowmanChain(
 		Sender:                         messageSender,
 		BootstrapTracker:               sb,
 		Timer:                          h,
+		PeerTracker:                    peerTracker,
 		AncestorsMaxContainersReceived: m.BootstrapAncestorsMaxContainersReceived,
 		DB:                             bootstrappingDB,
 		VM:                             vm,
