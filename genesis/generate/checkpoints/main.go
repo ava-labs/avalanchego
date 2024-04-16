@@ -76,12 +76,12 @@ func main() {
 			mainnetCChainID:           mainnetCChainCheckpoints,
 		},
 	}
-	checkpointsJSON, err := json.MarshalIndent(checkpoints, "", "    ")
+	checkpointsJSON, err := json.MarshalIndent(checkpoints, "", "\t")
 	if err != nil {
 		log.Fatalf("failed to marshal checkpoints: %v", err)
 	}
 
-	if err := perms.WriteFile("checkpoints.json", checkpointsJSON, perms.ReadWrite; err != nil {
+	if err := perms.WriteFile("checkpoints.json", checkpointsJSON, perms.ReadWrite); err != nil {
 		log.Fatalf("failed to write checkpoints: %v", err)
 	}
 }

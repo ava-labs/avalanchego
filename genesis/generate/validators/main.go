@@ -34,7 +34,7 @@ func main() {
 		constants.FujiName:    fujiValidators,
 		constants.MainnetName: mainnetValidators,
 	}
-	validatorsJSON, err := json.MarshalIndent(validators, "", "    ")
+	validatorsJSON, err := json.MarshalIndent(validators, "", "\t")
 	if err != nil {
 		log.Fatalf("failed to marshal validators: %v", err)
 	}
