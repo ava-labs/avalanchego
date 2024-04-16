@@ -86,12 +86,14 @@ linters-settings:
     rules:
       packages:
         deny:
-          - pkg: "io/ioutil"
-            desc: io/ioutil is deprecated. Use package io or os instead.
-          - pkg: "github.com/stretchr/testify/assert"
-            desc: github.com/stretchr/testify/require should be used instead.
+          - pkg: "container/list"
+            desc: github.com/ava-labs/avalanchego/utils/linked should be used instead.
           - pkg: "github.com/golang/mock/gomock"
             desc: go.uber.org/mock/gomock should be used instead.
+          - pkg: "github.com/stretchr/testify/assert"
+            desc: github.com/stretchr/testify/require should be used instead.
+          - pkg: "io/ioutil"
+            desc: io/ioutil is deprecated. Use package io or os instead.
   errorlint:
     # Check for plain type assertions and type switches.
     asserts: false
@@ -146,7 +148,14 @@ linters-settings:
       - name: string-format
         disabled: false
         arguments:
+        - ["b.Logf[0]", "/.*%.*/", "no format directive, use b.Log instead"]
         - ["fmt.Errorf[0]", "/.*%.*/", "no format directive, use errors.New instead"]
+        - ["fmt.Fprintf[1]", "/.*%.*/", "no format directive, use fmt.Fprint instead"]
+        - ["fmt.Printf[0]", "/.*%.*/", "no format directive, use fmt.Print instead"]
+        - ["fmt.Sprintf[0]", "/.*%.*/", "no format directive, use fmt.Sprint instead"]
+        - ["log.Fatalf[0]", "/.*%.*/", "no format directive, use log.Fatal instead"]
+        - ["log.Printf[0]", "/.*%.*/", "no format directive, use log.Print instead"]
+        - ["t.Logf[0]", "/.*%.*/", "no format directive, use t.Log instead"]
       # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#struct-tag
       - name: struct-tag
         disabled: false
@@ -159,6 +168,7 @@ linters-settings:
         arguments:
           - "fmt\\.Fprint"
           - "fmt\\.Fprintf"
+          - "fmt\\.Fprintln"
           - "fmt\\.Print"
           - "fmt\\.Printf"
           - "fmt\\.Println"

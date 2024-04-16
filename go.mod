@@ -1,18 +1,17 @@
 module github.com/ava-labs/avalanchego
 
 // Changes to the minimum golang version must also be replicated in
-// scripts/build_avalanche.sh
 // tests/antithesis/Dockerfile.node
 // tests/antithesis/Dockerfile.workload
 // Dockerfile
 // README.md
-// go.mod (here, only major.minor can be specified)
-go 1.21
+// go.mod (here)
+go 1.21.9
 
 require (
 	github.com/DataDog/zstd v1.5.2
 	github.com/NYTimes/gziphandler v1.1.1
-	github.com/ava-labs/coreth v0.13.2-rc.2
+	github.com/ava-labs/coreth v0.13.3-rc.0
 	github.com/ava-labs/ledger-avalanche/go v0.0.0-20231102202641-ae2ebdaeac34
 	github.com/btcsuite/btcd/btcutil v1.1.3
 	github.com/cockroachdb/pebble v0.0.0-20230209160836-829675f94811

@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package linkedhashmap
+package linked
 
 import (
 	"testing"
@@ -11,10 +11,10 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-func TestLinkedHashmap(t *testing.T) {
+func TestHashmap(t *testing.T) {
 	require := require.New(t)
 
-	lh := New[ids.ID, int]()
+	lh := NewHashmap[ids.ID, int]()
 	require.Zero(lh.Len(), "a new hashmap should be empty")
 
 	key0 := ids.GenerateTestID()
@@ -95,13 +95,30 @@ func TestLinkedHashmap(t *testing.T) {
 	require.Equal(1, val1, "wrong value")
 }
 
+func TestHashmapClear(t *testing.T) {
+	require := require.New(t)
+
+	lh := NewHashmap[int, int]()
+	lh.Put(1, 1)
+	lh.Put(2, 2)
+
+	lh.Clear()
+
+	require.Empty(lh.entryMap)
+	require.Zero(lh.entryList.Len())
+	require.Len(lh.freeList, 2)
+	for _, e := range lh.freeList {
+		require.Zero(e.Value) // Make sure the value is cleared
+	}
+}
+
 func TestIterator(t *testing.T) {
 	require := require.New(t)
 	id1, id2, id3 := ids.GenerateTestID(), ids.GenerateTestID(), ids.GenerateTestID()
 
 	// Case: No elements
 	{
-		lh := New[ids.ID, int]()
+		lh := NewHashmap[ids.ID, int]()
 		iter := lh.NewIterator()
 		require.NotNil(iter)
 		// Should immediately be exhausted
@@ -114,7 +131,7 @@ func TestIterator(t *testing.T) {
 
 	// Case: 1 element
 	{
-		lh := New[ids.ID, int]()
+		lh := NewHashmap[ids.ID, int]()
 		iter := lh.NewIterator()
 		require.NotNil(iter)
 		lh.Put(id1, 1)
@@ -141,7 +158,7 @@ func TestIterator(t *testing.T) {
 
 	// Case: Multiple elements
 	{
-		lh := New[ids.ID, int]()
+		lh := NewHashmap[ids.ID, int]()
 		lh.Put(id1, 1)
 		lh.Put(id2, 2)
 		lh.Put(id3, 3)
@@ -162,7 +179,7 @@ func TestIterator(t *testing.T) {
 
 	// Case: Delete element that has been iterated over
 	{
-		lh := New[ids.ID, int]()
+		lh := NewHashmap[ids.ID, int]()
 		lh.Put(id1, 1)
 		lh.Put(id2, 2)
 		lh.Put(id3, 3)
@@ -176,5 +193,30 @@ func TestIterator(t *testing.T) {
 		require.Equal(3, iter.Value())
 		// Should be exhausted
 		require.False(iter.Next())
+	}
+}
+
+func Benchmark_Hashmap_Put(b *testing.B) {
+	key := "hello"
+	value := "world"
+
+	lh := NewHashmap[string, string]()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		lh.Put(key, value)
+	}
+}
+
+func Benchmark_Hashmap_PutDelete(b *testing.B) {
+	key := "hello"
+	value := "world"
+
+	lh := NewHashmap[string, string]()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		lh.Put(key, value)
+		lh.Delete(key)
 	}
 }

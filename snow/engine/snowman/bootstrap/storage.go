@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/bootstrap/interval"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -121,8 +122,11 @@ func process(
 // tree but not executed.
 //
 // execute assumes that getMissingBlockIDs would return an empty set.
+//
+// TODO: Replace usage of haltable with context cancellation.
 func execute(
 	ctx context.Context,
+	haltable common.Haltable,
 	log logging.Func,
 	db database.Database,
 	parser block.Parser,
@@ -160,7 +164,7 @@ func execute(
 		zap.Uint64("numToExecute", totalNumberToProcess),
 	)
 
-	for ctx.Err() == nil && iterator.Next() {
+	for !haltable.Halted() && iterator.Next() {
 		blkBytes := iterator.Value()
 		blk, err := parser.ParseBlock(ctx, blkBytes)
 		if err != nil {
@@ -198,13 +202,11 @@ func execute(
 			iterator = interval.GetBlockIterator(db)
 		}
 
-		now := time.Now()
-		if now.After(timeOfNextLog) {
+		if now := time.Now(); now.After(timeOfNextLog) {
 			var (
 				numProcessed = totalNumberToProcess - tree.Len()
 				eta          = timer.EstimateETA(startTime, numProcessed, totalNumberToProcess)
 			)
-
 			log("executing blocks",
 				zap.Uint64("numExecuted", numProcessed),
 				zap.Uint64("numToExecute", totalNumberToProcess),
@@ -218,16 +220,18 @@ func execute(
 		}
 
 		if err := blk.Verify(ctx); err != nil {
-			return fmt.Errorf("failed to verify block %s (%d) in bootstrapping: %w",
+			return fmt.Errorf("failed to verify block %s (height=%d, parentID=%s) in bootstrapping: %w",
 				blk.ID(),
 				height,
+				blk.Parent(),
 				err,
 			)
 		}
 		if err := blk.Accept(ctx); err != nil {
-			return fmt.Errorf("failed to accept block %s (%d) in bootstrapping: %w",
+			return fmt.Errorf("failed to accept block %s (height=%d, parentID=%s) in bootstrapping: %w",
 				blk.ID(),
 				height,
+				blk.Parent(),
 				err,
 			)
 		}
@@ -239,15 +243,12 @@ func execute(
 		return err
 	}
 
-	var (
-		numProcessed = totalNumberToProcess - tree.Len()
-		err          = ctx.Err()
-	)
+	numProcessed := totalNumberToProcess - tree.Len()
 	log("executed blocks",
 		zap.Uint64("numExecuted", numProcessed),
 		zap.Uint64("numToExecute", totalNumberToProcess),
+		zap.Bool("halted", haltable.Halted()),
 		zap.Duration("duration", time.Since(startTime)),
-		zap.Error(err),
 	)
-	return err
+	return nil
 }

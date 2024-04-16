@@ -154,9 +154,11 @@ HOME
             ├── config.json                              // Common configuration (including defaults and pre-funded keys)
             ├── genesis.json                             // Genesis for all nodes
             ├── network.env                              // Sets network dir env var to simplify network usage
-            └── subnets                                  // Parent directory for subnet definitions
-                ├─ subnet-a.json                         // Configuration for subnet-a and its chain(s)
-                └─ subnet-b.json                         // Configuration for subnet-b and its chain(s)
+            └── subnets                                  // Directory containing subnet config for both avalanchego and tmpnet
+                ├── subnet-a.json                        // tmpnet configuration for subnet-a and its chain(s)
+                ├── subnet-b.json                        // tmpnet configuration for subnet-b and its chain(s)
+                └── 2jRbWtaonb2RP8DEM5DBsd7o2o8d...RqNs9 // The ID of a subnet is the name of its configuration dir
+                    └── config.json                      // avalanchego configuration for subnet
 ```
 
 ### Common networking configuration
@@ -234,38 +236,75 @@ The process details of a node are written by avalanchego to
 process, the URI of the node's API, and the address other nodes can
 use to bootstrap themselves (aka staking address).
 
-## Metrics
+## Monitoring
 
-### Prometheus configuration
+Monitoring is an essential part of understanding the workings of a
+distributed system such as avalanchego. The tmpnet fixture enables
+collection of logs and metrics from temporary networks to a monitoring
+stack (prometheus+loki+grafana) to enable results to be analyzed and
+shared.
 
-When nodes are started, prometheus configuration for each node is
-written to `~/.tmpnet/prometheus/file_sd_configs/` with a filename of
-`[network uuid]-[node id].json`. Prometheus can be configured to
-scrape the nodes as per the following example:
+### Example usage
 
-```yaml
-scrape_configs:
-  - job_name: "avalanchego"
-    metrics_path: "/ext/metrics"
-    file_sd_configs:
-      - files:
-        - '/home/me/.tmpnet/prometheus/file_sd_configs/*.yaml'
+```bash
+# Start prometheus to collect metrics
+PROMETHEUS_ID=<id> PROMETHEUS_PASSWORD=<password> ./scripts/run_prometheus.sh
+
+# Start promtail to collect logs
+LOKI_ID=<id> LOKI_PASSWORD=<password> ./scripts/run_promtail.sh
+
+# Network start emits link to grafana displaying collected logs and metrics
+./build/tmpnetctl start-network
 ```
 
-### Viewing metrics
+### Metrics collection
 
-When  a network  is  started with  `tmpnet`, a  grafana  link for  the
-network's metrics will be emitted.
+When a node is started, configuration enabling collection of metrics
+from the node is written to
+`~/.tmpnet/prometheus/file_sd_configs/[network uuid]-[node id].json`.
 
-The metrics emitted by temporary networks configured with tmpnet will
-have the following labels applied:
+The `scripts/run_prometheus.sh` script starts prometheus in agent mode
+configured to scrape metrics from configured nodes and forward the
+metrics to a persistent prometheus instance. The script requires that
+the `PROMETHEUS_ID` and `PROMETHEUS_PASSWORD` env vars be set. By
+default the prometheus instance at
+https://prometheus-experimental.avax-dev.network will be targeted and
+this can be overridden via the `PROMETHEUS_URL` env var.
+
+### Log collection
+
+Nodes log are stored at `~/.tmpnet/networks/[network id]/[node
+id]/logs` by default, and can optionally be forwarded to loki with
+promtail.
+
+When a node is started, promtail configuration enabling
+collection of logs for the node is written to
+`~/.tmpnet/promtail/file_sd_configs/[network
+uuid]-[node id].json`.
+
+The `scripts/run_promtail.sh` script starts promtail configured to
+collect logs from configured nodes and forward the results to loki. The
+script requires that the `LOKI_ID` and `LOKI_PASSWORD` env vars be
+set. By default the loki instance at
+https://loki-experimental.avax-dev.network will be targeted and this
+can be overridden via the `LOKI_URL` env var.
+
+### Labels
+
+The logs and metrics collected for temporary networks will have the
+following labels applied:
 
  - `network_uuid`
+   - uniquely identifies a network across hosts
  - `node_id`
  - `is_ephemeral_node`
+   - 'ephemeral' nodes are expected to run for only a fraction of the
+     life of a network
  - `network_owner`
+   - an arbitrary string that can be used to differentiate results
+     when a CI job runs more than one network
 
-When a tmpnet network runs as part of github CI, the following
+When a network runs as part of a github CI job, the following
 additional labels will be applied:
 
  - `gh_repo`
@@ -274,3 +313,25 @@ additional labels will be applied:
  - `gh_run_number`
  - `gh_run_attempt`
  - `gh_job_id`
+
+These labels are sourced from Github Actions' `github` context as per
+https://docs.github.com/en/actions/learn-github-actions/contexts#github-context.
+
+### Viewing
+
+#### Local networks
+
+When a network is started with tmpnet, a link to the [default grafana
+instance](https://grafana-experimental.avax-dev.network) will be
+emitted. The dashboards will only be populated if prometheus and
+promtail are running locally (as per previous sections) to collect
+metrics and logs.
+
+#### CI
+
+Collection of logs and metrics is enabled for CI jobs that use
+tmpnet. Each job will execute a step titled `Notify of metrics
+availability` that emits a link to grafana parametized to show results
+for the job. Additional links to grafana parametized to show results
+for individual network will appear in the logs displaying the start of
+those networks.

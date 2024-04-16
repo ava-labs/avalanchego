@@ -27,7 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/json"
-	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
+	"github.com/ava-labs/avalanchego/utils/linked"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/version"
@@ -68,7 +68,6 @@ type VM struct {
 	metrics metrics.Metrics
 
 	avax.AddressManager
-	avax.AtomicUTXOManager
 	ids.Aliaser
 	utxo.Spender
 
@@ -227,7 +226,6 @@ func (vm *VM) Initialize(
 	}
 
 	codec := vm.parser.Codec()
-	vm.AtomicUTXOManager = avax.NewAtomicUTXOManager(ctx.SharedMemory, codec)
 	vm.Spender = utxo.NewSpender(&vm.clock, codec)
 
 	state, err := state.New(
@@ -247,7 +245,7 @@ func (vm *VM) Initialize(
 	}
 
 	vm.walletService.vm = vm
-	vm.walletService.pendingTxs = linkedhashmap.New[ids.ID, *txs.Tx]()
+	vm.walletService.pendingTxs = linked.NewHashmap[ids.ID, *txs.Tx]()
 
 	// use no op impl when disabled in config
 	if avmConfig.IndexTransactions {

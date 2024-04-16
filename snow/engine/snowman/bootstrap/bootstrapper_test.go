@@ -6,6 +6,7 @@ package bootstrap
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
 	"errors"
 	"testing"
 	"time"
@@ -746,7 +747,7 @@ func generateBlockchain(length uint64) []snowman.Block {
 		},
 		ParentV: ids.Empty,
 		HeightV: 0,
-		BytesV:  utils.RandomBytes(1024),
+		BytesV:  binary.AppendUvarint(nil, 0),
 	}
 	for height := uint64(1); height < length; height++ {
 		blocks[height] = &snowman.TestBlock{
@@ -756,7 +757,7 @@ func generateBlockchain(length uint64) []snowman.Block {
 			},
 			ParentV: blocks[height-1].ID(),
 			HeightV: height,
-			BytesV:  utils.RandomBytes(1024),
+			BytesV:  binary.AppendUvarint(nil, height),
 		}
 	}
 	return blocks

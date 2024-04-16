@@ -33,7 +33,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
@@ -42,9 +41,10 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
 
 const (
@@ -101,10 +101,9 @@ type environment struct {
 	fx             fx.Fx
 	state          state.State
 	states         map[ids.ID]state.Chain
-	atomicUTXOs    avax.AtomicUTXOManager
 	uptimes        uptime.Manager
-	utxosHandler   utxo.Handler
-	txBuilder      builder.Builder
+	utxosHandler   utxo.Verifier
+	txBuilder      *txstest.Builder
 	backend        Backend
 }
 
@@ -140,18 +139,13 @@ func newEnvironment(t *testing.T, f fork) *environment {
 	rewards := reward.NewCalculator(config.RewardConfig)
 	baseState := defaultState(config, ctx, baseDB, rewards)
 
-	atomicUTXOs := avax.NewAtomicUTXOManager(ctx.SharedMemory, txs.Codec)
 	uptimes := uptime.NewManager(baseState, clk)
-	utxoHandler := utxo.NewHandler(ctx, clk, fx)
+	utxosVerifier := utxo.NewVerifier(ctx, clk, fx)
 
-	txBuilder := builder.New(
+	txBuilder := txstest.NewBuilder(
 		ctx,
 		config,
-		clk,
-		fx,
 		baseState,
-		atomicUTXOs,
-		utxoHandler,
 	)
 
 	backend := Backend{
@@ -160,7 +154,7 @@ func newEnvironment(t *testing.T, f fork) *environment {
 		Clk:          clk,
 		Bootstrapped: &isBootstrapped,
 		Fx:           fx,
-		FlowChecker:  utxoHandler,
+		FlowChecker:  utxosVerifier,
 		Uptimes:      uptimes,
 		Rewards:      rewards,
 	}
@@ -175,14 +169,13 @@ func newEnvironment(t *testing.T, f fork) *environment {
 		fx:             fx,
 		state:          baseState,
 		states:         make(map[ids.ID]state.Chain),
-		atomicUTXOs:    atomicUTXOs,
 		uptimes:        uptimes,
-		utxosHandler:   utxoHandler,
+		utxosHandler:   utxosVerifier,
 		txBuilder:      txBuilder,
 		backend:        backend,
 	}
 
-	addSubnet(t, env, txBuilder)
+	addSubnet(t, env)
 
 	t.Cleanup(func() {
 		env.ctx.Lock.Lock()
@@ -211,25 +204,25 @@ func newEnvironment(t *testing.T, f fork) *environment {
 	return env
 }
 
-func addSubnet(
-	t *testing.T,
-	env *environment,
-	txBuilder builder.Builder,
-) {
+func addSubnet(t *testing.T, env *environment) {
 	require := require.New(t)
 
 	// Create a subnet
 	var err error
-	testSubnet1, err = txBuilder.NewCreateSubnetTx(
-		2, // threshold; 2 sigs from keys[0], keys[1], keys[2] needed to add validator to this subnet
-		[]ids.ShortID{ // control keys
-			preFundedKeys[0].PublicKey().Address(),
-			preFundedKeys[1].PublicKey().Address(),
-			preFundedKeys[2].PublicKey().Address(),
+	testSubnet1, err = env.txBuilder.NewCreateSubnetTx(
+		&secp256k1fx.OutputOwners{
+			Threshold: 2,
+			Addrs: []ids.ShortID{
+				preFundedKeys[0].PublicKey().Address(),
+				preFundedKeys[1].PublicKey().Address(),
+				preFundedKeys[2].PublicKey().Address(),
+			},
 		},
 		[]*secp256k1.PrivateKey{preFundedKeys[0]},
-		preFundedKeys[0].PublicKey().Address(),
-		nil,
+		common.WithChangeOwner(&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
+		}),
 	)
 	require.NoError(err)
 

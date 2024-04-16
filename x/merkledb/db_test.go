@@ -6,6 +6,7 @@ package merkledb
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
 	"fmt"
 	"math/rand"
 	"slices"
@@ -39,14 +40,17 @@ func newDB(ctx context.Context, db database.Database, config Config) (*merkleDB,
 
 func newDefaultConfig() Config {
 	return Config{
-		IntermediateWriteBatchSize:  10,
+		BranchFactor:                BranchFactor16,
+		Hasher:                      DefaultHasher,
+		RootGenConcurrency:          0,
 		HistoryLength:               defaultHistoryLength,
 		ValueNodeCacheSize:          units.MiB,
 		IntermediateNodeCacheSize:   units.MiB,
 		IntermediateWriteBufferSize: units.KiB,
+		IntermediateWriteBatchSize:  256 * units.KiB,
 		Reg:                         prometheus.NewRegistry(),
+		TraceLevel:                  InfoTrace,
 		Tracer:                      trace.Noop,
-		BranchFactor:                BranchFactor16,
 	}
 }
 
@@ -961,6 +965,7 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest, token
 				end,
 				root,
 				tokenSize,
+				db.hasher,
 			))
 		case opGenerateChangeProof:
 			root, err := db.GetMerkleRoot(context.Background())
@@ -1286,4 +1291,116 @@ func TestGetChangeProofEmptyRootID(t *testing.T) {
 		10,
 	)
 	require.ErrorIs(err, ErrEmptyProof)
+}
+
+func TestCrashRecovery(t *testing.T) {
+	require := require.New(t)
+
+	baseDB := memdb.New()
+	merkleDB, err := newDatabase(
+		context.Background(),
+		baseDB,
+		newDefaultConfig(),
+		&mockMetrics{},
+	)
+	require.NoError(err)
+
+	merkleDBBatch := merkleDB.NewBatch()
+	require.NoError(merkleDBBatch.Put([]byte("is this"), []byte("hope")))
+	require.NoError(merkleDBBatch.Put([]byte("expected?"), []byte("so")))
+	require.NoError(merkleDBBatch.Write())
+
+	expectedRoot, err := merkleDB.GetMerkleRoot(context.Background())
+	require.NoError(err)
+
+	// Do not `.Close()` the database to simulate a process crash.
+
+	newMerkleDB, err := newDatabase(
+		context.Background(),
+		baseDB,
+		newDefaultConfig(),
+		&mockMetrics{},
+	)
+	require.NoError(err)
+
+	value, err := newMerkleDB.Get([]byte("is this"))
+	require.NoError(err)
+	require.Equal([]byte("hope"), value)
+
+	value, err = newMerkleDB.Get([]byte("expected?"))
+	require.NoError(err)
+	require.Equal([]byte("so"), value)
+
+	rootAfterRecovery, err := newMerkleDB.GetMerkleRoot(context.Background())
+	require.NoError(err)
+	require.Equal(expectedRoot, rootAfterRecovery)
+}
+
+func BenchmarkCommitView(b *testing.B) {
+	db, err := getBasicDB()
+	require.NoError(b, err)
+
+	ops := make([]database.BatchOp, 1_000)
+	for i := range ops {
+		k := binary.AppendUvarint(nil, uint64(i))
+		ops[i] = database.BatchOp{
+			Key:   k,
+			Value: hashing.ComputeHash256(k),
+		}
+	}
+
+	ctx := context.Background()
+	viewIntf, err := db.NewView(ctx, ViewChanges{BatchOps: ops})
+	require.NoError(b, err)
+
+	view := viewIntf.(*view)
+	require.NoError(b, view.applyValueChanges(ctx))
+
+	b.Run("apply and commit changes", func(b *testing.B) {
+		require := require.New(b)
+
+		for i := 0; i < b.N; i++ {
+			db.baseDB = memdb.New() // Keep each iteration independent
+
+			valueNodeBatch := db.baseDB.NewBatch()
+			require.NoError(db.applyChanges(ctx, valueNodeBatch, view.changes))
+			require.NoError(db.commitValueChanges(ctx, valueNodeBatch))
+		}
+	})
+}
+
+func BenchmarkIteration(b *testing.B) {
+	db, err := getBasicDB()
+	require.NoError(b, err)
+
+	ops := make([]database.BatchOp, 1_000)
+	for i := range ops {
+		k := binary.AppendUvarint(nil, uint64(i))
+		ops[i] = database.BatchOp{
+			Key:   k,
+			Value: hashing.ComputeHash256(k),
+		}
+	}
+
+	ctx := context.Background()
+	view, err := db.NewView(ctx, ViewChanges{BatchOps: ops})
+	require.NoError(b, err)
+
+	require.NoError(b, view.CommitToDB(ctx))
+
+	b.Run("create iterator", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			it := db.NewIterator()
+			it.Release()
+		}
+	})
+
+	b.Run("iterate", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			it := db.NewIterator()
+			for it.Next() {
+			}
+			it.Release()
+		}
+	})
 }

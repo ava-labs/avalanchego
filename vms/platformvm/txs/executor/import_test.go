@@ -17,8 +17,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/wallet/chain/p/builder"
 )
 
 var fundedSharedMemoryCalls byte
@@ -54,7 +54,7 @@ func TestNewImportTx(t *testing.T) {
 				},
 			),
 			sourceKeys:  []*secp256k1.PrivateKey{sourceKey},
-			expectedErr: utxo.ErrInsufficientFunds,
+			expectedErr: builder.ErrInsufficientFunds,
 		},
 		{
 			description:   "can barely pay fee",
@@ -106,7 +106,10 @@ func TestNewImportTx(t *testing.T) {
 		},
 	}
 
-	to := ids.GenerateTestShortID()
+	to := &secp256k1fx.OutputOwners{
+		Threshold: 1,
+		Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+	}
 	for _, tt := range tests {
 		t.Run(tt.description, func(t *testing.T) {
 			require := require.New(t)
@@ -116,8 +119,6 @@ func TestNewImportTx(t *testing.T) {
 				tt.sourceChainID,
 				to,
 				tt.sourceKeys,
-				ids.ShortEmpty,
-				nil,
 			)
 			require.ErrorIs(err, tt.expectedErr)
 			if tt.expectedErr != nil {

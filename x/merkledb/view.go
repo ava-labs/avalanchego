@@ -45,11 +45,13 @@ type view struct {
 	committed  bool
 	commitLock sync.RWMutex
 
-	// tracking bool to enforce that no changes are made to the trie after the nodes have been calculated
-	nodesAlreadyCalculated utils.Atomic[bool]
+	// valueChangesApplied is used to enforce that no changes are made to the
+	// trie after the nodes have been calculated
+	valueChangesApplied utils.Atomic[bool]
 
-	// calculateNodesOnce is a once to ensure that node calculation only occurs a single time
-	calculateNodesOnce sync.Once
+	// applyValueChangesOnce prevents node calculation from occurring multiple
+	// times
+	applyValueChangesOnce sync.Once
 
 	// Controls the view's validity related fields.
 	// Must be held while reading/writing [childViews], [invalidated], and [parentTrie].
@@ -117,7 +119,7 @@ func (v *view) NewView(
 		return v.getParentTrie().NewView(ctx, changes)
 	}
 
-	if err := v.calculateNodeIDs(ctx); err != nil {
+	if err := v.applyValueChanges(ctx); err != nil {
 		return nil, err
 	}
 
@@ -198,8 +200,8 @@ func newViewWithChanges(
 	}
 	// since this is a set of historical changes, all nodes have already been calculated
 	// since no new changes have occurred, no new calculations need to be done
-	v.calculateNodesOnce.Do(func() {})
-	v.nodesAlreadyCalculated.Set(true)
+	v.applyValueChangesOnce.Do(func() {})
+	v.valueChangesApplied.Set(true)
 	return v, nil
 }
 
@@ -211,45 +213,32 @@ func (v *view) getRoot() maybe.Maybe[*node] {
 	return v.root
 }
 
-// Recalculates the node IDs for all changed nodes in the trie.
-// Cancelling [ctx] doesn't cancel calculation. It's used only for tracing.
-func (v *view) calculateNodeIDs(ctx context.Context) error {
+// applyValueChanges generates the node changes from the value changes. It then
+// hashes the changed nodes to calculate the new trie.
+//
+// Cancelling [ctx] doesn't cancel the operation. It's used only for tracing.
+func (v *view) applyValueChanges(ctx context.Context) error {
 	var err error
-	v.calculateNodesOnce.Do(func() {
+	v.applyValueChangesOnce.Do(func() {
+		// Create the span inside the once wrapper to make traces more useful.
+		// Otherwise, spans would be created during calls where the IDs are not
+		// re-calculated.
+		ctx, span := v.db.infoTracer.Start(ctx, "MerkleDB.view.applyValueChanges")
+		defer span.End()
+
 		if v.isInvalid() {
 			err = ErrInvalid
 			return
 		}
-		defer v.nodesAlreadyCalculated.Set(true)
+		defer v.valueChangesApplied.Set(true)
 
 		oldRoot := maybe.Bind(v.root, (*node).clone)
 
-		// We wait to create the span until after checking that we need to actually
-		// calculateNodeIDs to make traces more useful (otherwise there may be a span
-		// per key modified even though IDs are not re-calculated).
-		_, span := v.db.infoTracer.Start(ctx, "MerkleDB.view.calculateNodeIDs")
-		defer span.End()
-
-		// add all the changed key/values to the nodes of the trie
-		for key, change := range v.changes.values {
-			if change.after.IsNothing() {
-				// Note we're setting [err] defined outside this function.
-				if err = v.remove(key); err != nil {
-					return
-				}
-				// Note we're setting [err] defined outside this function.
-			} else if _, err = v.insert(key, change.after); err != nil {
-				return
-			}
+		// Note we're setting [err] defined outside this function.
+		if err = v.calculateNodeChanges(ctx); err != nil {
+			return
 		}
-
-		if !v.root.IsNothing() {
-			_ = v.db.calculateNodeIDsSema.Acquire(context.Background(), 1)
-			v.changes.rootID = v.calculateNodeIDsHelper(v.root.Value())
-			v.db.calculateNodeIDsSema.Release(1)
-		} else {
-			v.changes.rootID = ids.Empty
-		}
+		v.hashChangedNodes(ctx)
 
 		v.changes.rootChange = change[maybe.Maybe[*node]]{
 			before: oldRoot,
@@ -265,33 +254,144 @@ func (v *view) calculateNodeIDs(ctx context.Context) error {
 	return err
 }
 
+func (v *view) calculateNodeChanges(ctx context.Context) error {
+	_, span := v.db.infoTracer.Start(ctx, "MerkleDB.view.calculateNodeChanges")
+	defer span.End()
+
+	// Add all the changed key/values to the nodes of the trie
+	for key, change := range v.changes.values {
+		if change.after.IsNothing() {
+			if err := v.remove(key); err != nil {
+				return err
+			}
+		} else if _, err := v.insert(key, change.after); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (v *view) hashChangedNodes(ctx context.Context) {
+	_, span := v.db.infoTracer.Start(ctx, "MerkleDB.view.hashChangedNodes")
+	defer span.End()
+
+	if v.root.IsNothing() {
+		v.changes.rootID = ids.Empty
+		return
+	}
+
+	// If there are no children, we can avoid allocating [keyBuffer].
+	root := v.root.Value()
+	if len(root.children) == 0 {
+		v.changes.rootID = v.db.hasher.HashNode(root)
+		v.db.metrics.HashCalculated()
+		return
+	}
+
+	// Allocate [keyBuffer] and populate it with the root node's key.
+	keyBuffer := v.db.hashNodesKeyPool.Acquire()
+	keyBuffer = v.setKeyBuffer(root, keyBuffer)
+	v.changes.rootID, keyBuffer = v.hashChangedNode(root, keyBuffer)
+	v.db.hashNodesKeyPool.Release(keyBuffer)
+}
+
 // Calculates the ID of all descendants of [n] which need to be recalculated,
 // and then calculates the ID of [n] itself.
-func (v *view) calculateNodeIDsHelper(n *node) ids.ID {
-	// We use [wg] to wait until all descendants of [n] have been updated.
-	var wg sync.WaitGroup
+//
+// Returns a potentially expanded [keyBuffer]. By returning this value this
+// function is able to have a maximum total number of allocations shared across
+// multiple invocations.
+//
+// Invariant: [keyBuffer] must be populated with [n]'s key and have sufficient
+// length to contain any of [n]'s child keys.
+func (v *view) hashChangedNode(n *node, keyBuffer []byte) (ids.ID, []byte) {
+	var (
+		// childBuffer is allocated on the stack.
+		childBuffer = make([]byte, 1)
+		dualIndex   = dualBitIndex(v.tokenSize)
+		bytesForKey = bytesNeeded(n.key.length)
+		// We track the last byte of [n.key] so that we can reset the value for
+		// each key. This is needed because the child buffer may get ORed at
+		// this byte.
+		lastKeyByte byte
 
+		// We use [wg] to wait until all descendants of [n] have been updated.
+		wg waitGroup
+	)
+	if bytesForKey > 0 {
+		lastKeyByte = keyBuffer[bytesForKey-1]
+	}
+
+	// This loop is optimized to avoid allocations when calculating the
+	// [childKey] by reusing [keyBuffer] and leaving the first [bytesForKey-1]
+	// bytes unmodified.
 	for childIndex, childEntry := range n.children {
-		childEntry := childEntry // New variable so goroutine doesn't capture loop variable.
-		childKey := n.key.Extend(ToToken(childIndex, v.tokenSize), childEntry.compressedKey)
+		childBuffer[0] = childIndex << dualIndex
+		childIndexAsKey := Key{
+			// It is safe to use byteSliceToString because [childBuffer] is not
+			// modified while [childIndexAsKey] is in use.
+			value:  byteSliceToString(childBuffer),
+			length: v.tokenSize,
+		}
+
+		totalBitLength := n.key.length + v.tokenSize + childEntry.compressedKey.length
+		// Because [keyBuffer] may have been modified in a prior iteration of
+		// this loop, it is not guaranteed that its length is at least
+		// [bytesNeeded(totalBitLength)]. However, that's fine. The below
+		// slicing would only panic if the buffer didn't have sufficient
+		// capacity.
+		keyBuffer = keyBuffer[:bytesNeeded(totalBitLength)]
+		// We don't need to copy this node's key. It's assumed to already be
+		// correct; except for the last byte. We must make sure the last byte of
+		// the key is set correctly because extendIntoBuffer may OR bits from
+		// the extension and overwrite the last byte. However, extendIntoBuffer
+		// does not modify the first [bytesForKey-1] bytes of [keyBuffer].
+		if bytesForKey > 0 {
+			keyBuffer[bytesForKey-1] = lastKeyByte
+		}
+		extendIntoBuffer(keyBuffer, childIndexAsKey, n.key.length)
+		extendIntoBuffer(keyBuffer, childEntry.compressedKey, n.key.length+v.tokenSize)
+		childKey := Key{
+			// It is safe to use byteSliceToString because [keyBuffer] is not
+			// modified while [childKey] is in use.
+			value:  byteSliceToString(keyBuffer),
+			length: totalBitLength,
+		}
+
 		childNodeChange, ok := v.changes.nodes[childKey]
 		if !ok {
 			// This child wasn't changed.
 			continue
 		}
-		childEntry.hasValue = childNodeChange.after.hasValue()
+
+		childNode := childNodeChange.after
+		childEntry.hasValue = childNode.hasValue()
+
+		// If there are no children of the childNode, we can avoid constructing
+		// the buffer for the child keys.
+		if len(childNode.children) == 0 {
+			childEntry.id = v.db.hasher.HashNode(childNode)
+			v.db.metrics.HashCalculated()
+			continue
+		}
 
 		// Try updating the child and its descendants in a goroutine.
-		if ok := v.db.calculateNodeIDsSema.TryAcquire(1); ok {
+		if childKeyBuffer, ok := v.db.hashNodesKeyPool.TryAcquire(); ok {
 			wg.Add(1)
-			go func() {
-				childEntry.id = v.calculateNodeIDsHelper(childNodeChange.after)
-				v.db.calculateNodeIDsSema.Release(1)
+			go func(wg *sync.WaitGroup, childEntry *child, childNode *node, childKeyBuffer []byte) {
+				childKeyBuffer = v.setKeyBuffer(childNode, childKeyBuffer)
+				childEntry.id, childKeyBuffer = v.hashChangedNode(childNode, childKeyBuffer)
+				v.db.hashNodesKeyPool.Release(childKeyBuffer)
 				wg.Done()
-			}()
+			}(wg.wg, childEntry, childNode, childKeyBuffer)
 		} else {
 			// We're at the goroutine limit; do the work in this goroutine.
-			childEntry.id = v.calculateNodeIDsHelper(childNodeChange.after)
+			//
+			// We can skip copying the key here because [keyBuffer] is already
+			// constructed to be childNode's key.
+			keyBuffer = v.setLengthForChildren(childNode, keyBuffer)
+			childEntry.id, keyBuffer = v.hashChangedNode(childNode, keyBuffer)
 		}
 	}
 
@@ -299,7 +399,36 @@ func (v *view) calculateNodeIDsHelper(n *node) ids.ID {
 	wg.Wait()
 
 	// The IDs [n]'s descendants are up to date so we can calculate [n]'s ID.
-	return n.calculateID(v.db.metrics)
+	v.db.metrics.HashCalculated()
+	return v.db.hasher.HashNode(n), keyBuffer
+}
+
+// setKeyBuffer expands [keyBuffer] to have sufficient size for any of [n]'s
+// child keys and populates [n]'s key into [keyBuffer]. If [keyBuffer] already
+// has sufficient size, this function will not perform any memory allocations.
+func (v *view) setKeyBuffer(n *node, keyBuffer []byte) []byte {
+	keyBuffer = v.setLengthForChildren(n, keyBuffer)
+	copy(keyBuffer, n.key.value)
+	return keyBuffer
+}
+
+// setLengthForChildren expands [keyBuffer] to have sufficient size for any of
+// [n]'s child keys.
+func (v *view) setLengthForChildren(n *node, keyBuffer []byte) []byte {
+	// Calculate the size of the largest child key of this node.
+	var maxBitLength int
+	for _, childEntry := range n.children {
+		maxBitLength = max(maxBitLength, childEntry.compressedKey.length)
+	}
+	maxBytesNeeded := bytesNeeded(n.key.length + v.tokenSize + maxBitLength)
+	return setBytesLength(keyBuffer, maxBytesNeeded)
+}
+
+func setBytesLength(b []byte, size int) []byte {
+	if size <= cap(b) {
+		return b[:size]
+	}
+	return append(b[:cap(b)], make([]byte, size-cap(b))...)
 }
 
 // GetProof returns a proof that [bytesPath] is in or not in trie [t].
@@ -307,7 +436,7 @@ func (v *view) GetProof(ctx context.Context, key []byte) (*Proof, error) {
 	_, span := v.db.infoTracer.Start(ctx, "MerkleDB.view.GetProof")
 	defer span.End()
 
-	if err := v.calculateNodeIDs(ctx); err != nil {
+	if err := v.applyValueChanges(ctx); err != nil {
 		return nil, err
 	}
 
@@ -333,7 +462,7 @@ func (v *view) GetRangeProof(
 	_, span := v.db.infoTracer.Start(ctx, "MerkleDB.view.GetRangeProof")
 	defer span.End()
 
-	if err := v.calculateNodeIDs(ctx); err != nil {
+	if err := v.applyValueChanges(ctx); err != nil {
 		return nil, err
 	}
 	result, err := getRangeProof(v, start, end, maxLength)
@@ -369,13 +498,13 @@ func (v *view) commitToDB(ctx context.Context) error {
 	))
 	defer span.End()
 
-	// Call this here instead of in [v.db.commitChanges]
-	// because doing so there would be a deadlock.
-	if err := v.calculateNodeIDs(ctx); err != nil {
+	// Call this here instead of in [v.db.commitView] because doing so there
+	// would be a deadlock.
+	if err := v.applyValueChanges(ctx); err != nil {
 		return err
 	}
 
-	if err := v.db.commitChanges(ctx, v); err != nil {
+	if err := v.db.commitView(ctx, v); err != nil {
 		return err
 	}
 
@@ -417,7 +546,7 @@ func (v *view) updateParent(newParent View) {
 
 // GetMerkleRoot returns the ID of the root of this view.
 func (v *view) GetMerkleRoot(ctx context.Context) (ids.ID, error) {
-	if err := v.calculateNodeIDs(ctx); err != nil {
+	if err := v.applyValueChanges(ctx); err != nil {
 		return ids.Empty, err
 	}
 	return v.changes.rootID, nil
@@ -485,9 +614,9 @@ func (v *view) getValue(key Key) ([]byte, error) {
 	return value, nil
 }
 
-// Must not be called after [calculateNodeIDs] has returned.
+// Must not be called after [applyValueChanges] has returned.
 func (v *view) remove(key Key) error {
-	if v.nodesAlreadyCalculated.Get() {
+	if v.valueChangesApplied.Get() {
 		return ErrNodesAlreadyCalculated
 	}
 
@@ -520,7 +649,7 @@ func (v *view) remove(key Key) error {
 	}
 
 	hadValue := nodeToDelete.hasValue()
-	nodeToDelete.setValue(maybe.Nothing[[]byte]())
+	nodeToDelete.setValue(v.db.hasher, maybe.Nothing[[]byte]())
 
 	// if the removed node has no children, the node can be removed from the trie
 	if len(nodeToDelete.children) == 0 {
@@ -551,9 +680,9 @@ func (v *view) remove(key Key) error {
 // Assumes at least one of the following is true:
 // * [n] has a value.
 // * [n] has children.
-// Must not be called after [calculateNodeIDs] has returned.
+// Must not be called after [applyValueChanges] has returned.
 func (v *view) compressNodePath(parent, n *node) error {
-	if v.nodesAlreadyCalculated.Get() {
+	if v.valueChangesApplied.Get() {
 		return ErrNodesAlreadyCalculated
 	}
 
@@ -619,19 +748,19 @@ func (v *view) getEditableNode(key Key, hadValue bool) (*node, error) {
 }
 
 // insert a key/value pair into the correct node of the trie.
-// Must not be called after [calculateNodeIDs] has returned.
+// Must not be called after [applyValueChanges] has returned.
 func (v *view) insert(
 	key Key,
 	value maybe.Maybe[[]byte],
 ) (*node, error) {
-	if v.nodesAlreadyCalculated.Get() {
+	if v.valueChangesApplied.Get() {
 		return nil, ErrNodesAlreadyCalculated
 	}
 
 	if v.root.IsNothing() {
 		// the trie is empty, so create a new root node.
 		root := newNode(key)
-		root.setValue(value)
+		root.setValue(v.db.hasher, value)
 		v.root = maybe.Some(root)
 		return root, v.recordNewNode(root)
 	}
@@ -653,8 +782,9 @@ func (v *view) insert(
 			commonPrefixLength = getLengthOfCommonPrefix(oldRoot.key, key, 0 /*offset*/, v.tokenSize)
 			commonPrefix       = oldRoot.key.Take(commonPrefixLength)
 			newRoot            = newNode(commonPrefix)
-			oldRootID          = oldRoot.calculateID(v.db.metrics)
+			oldRootID          = v.db.hasher.HashNode(oldRoot)
 		)
+		v.db.metrics.HashCalculated()
 
 		// Call addChildWithID instead of addChild so the old root is added
 		// to the new root with the correct ID.
@@ -673,7 +803,7 @@ func (v *view) insert(
 
 	// a node with that exact key already exists so update its value
 	if closestNode.key == key {
-		closestNode.setValue(value)
+		closestNode.setValue(v.db.hasher, value)
 		// closestNode was already marked as changed in the ancestry loop above
 		return closestNode, nil
 	}
@@ -686,7 +816,7 @@ func (v *view) insert(
 	if !hasChild {
 		// there are no existing nodes along the key [key], so create a new node to insert [value]
 		newNode := newNode(key)
-		newNode.setValue(value)
+		newNode.setValue(v.db.hasher, value)
 		closestNode.addChild(newNode, v.tokenSize)
 		return newNode, v.recordNewNode(newNode)
 	}
@@ -719,12 +849,12 @@ func (v *view) insert(
 
 	if key.length == branchNode.key.length {
 		// the branch node has exactly the key to be inserted as its key, so set the value on the branch node
-		branchNode.setValue(value)
+		branchNode.setValue(v.db.hasher, value)
 	} else {
 		// the key to be inserted is a child of the branch node
 		// create a new node and add the value to it
 		newNode := newNode(key)
-		newNode.setValue(value)
+		newNode.setValue(v.db.hasher, value)
 		branchNode.addChild(newNode, v.tokenSize)
 		if err := v.recordNewNode(newNode); err != nil {
 			return nil, err
@@ -754,28 +884,28 @@ func getLengthOfCommonPrefix(first, second Key, secondOffset int, tokenSize int)
 }
 
 // Records that a node has been created.
-// Must not be called after [calculateNodeIDs] has returned.
+// Must not be called after [applyValueChanges] has returned.
 func (v *view) recordNewNode(after *node) error {
 	return v.recordKeyChange(after.key, after, after.hasValue(), true /* newNode */)
 }
 
 // Records that an existing node has been changed.
-// Must not be called after [calculateNodeIDs] has returned.
+// Must not be called after [applyValueChanges] has returned.
 func (v *view) recordNodeChange(after *node) error {
 	return v.recordKeyChange(after.key, after, after.hasValue(), false /* newNode */)
 }
 
 // Records that the node associated with the given key has been deleted.
-// Must not be called after [calculateNodeIDs] has returned.
+// Must not be called after [applyValueChanges] has returned.
 func (v *view) recordNodeDeleted(after *node, hadValue bool) error {
 	return v.recordKeyChange(after.key, nil, hadValue, false /* newNode */)
 }
 
 // Records that the node associated with the given key has been changed.
 // If it is an existing node, record what its value was before it was changed.
-// Must not be called after [calculateNodeIDs] has returned.
+// Must not be called after [applyValueChanges] has returned.
 func (v *view) recordKeyChange(key Key, after *node, hadValue bool, newNode bool) error {
-	if v.nodesAlreadyCalculated.Get() {
+	if v.valueChangesApplied.Get() {
 		return ErrNodesAlreadyCalculated
 	}
 
@@ -804,10 +934,10 @@ func (v *view) recordKeyChange(key Key, after *node, hadValue bool, newNode bool
 
 // Records that a key's value has been added or updated.
 // Doesn't actually change the trie data structure.
-// That's deferred until we call [calculateNodeIDs].
-// Must not be called after [calculateNodeIDs] has returned.
+// That's deferred until we call [applyValueChanges].
+// Must not be called after [applyValueChanges] has returned.
 func (v *view) recordValueChange(key Key, value maybe.Maybe[[]byte]) error {
-	if v.nodesAlreadyCalculated.Get() {
+	if v.valueChangesApplied.Get() {
 		return ErrNodesAlreadyCalculated
 	}
 

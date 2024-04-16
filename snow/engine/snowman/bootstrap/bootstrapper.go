@@ -155,7 +155,16 @@ func (b *Bootstrapper) Clear(context.Context) error {
 }
 
 func (b *Bootstrapper) Start(ctx context.Context, startReqID uint32) error {
-	b.Ctx.Log.Info("starting bootstrapper")
+	lastAccepted, err := b.getLastAccepted(ctx)
+	if err != nil {
+		return err
+	}
+
+	lastAcceptedHeight := lastAccepted.Height()
+	b.Ctx.Log.Info("starting bootstrapper",
+		zap.Stringer("lastAcceptedID", lastAccepted.ID()),
+		zap.Uint64("lastAcceptedHeight", lastAcceptedHeight),
+	)
 
 	b.Ctx.State.Set(snow.EngineState{
 		Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
@@ -166,10 +175,6 @@ func (b *Bootstrapper) Start(ctx context.Context, startReqID uint32) error {
 	}
 
 	// Set the starting height
-	lastAcceptedHeight, err := b.getLastAcceptedHeight(ctx)
-	if err != nil {
-		return err
-	}
 	b.startingHeight = lastAcceptedHeight
 	b.requestID = startReqID
 
@@ -559,7 +564,7 @@ func (b *Bootstrapper) markUnavailable(nodeID ids.NodeID) {
 //
 //   - blk is a block that is assumed to have been marked as acceptable by the
 //     bootstrapping engine.
-//   - ancestors is a set of blocks that can be used to optimisically lookup
+//   - ancestors is a set of blocks that can be used to optimistically lookup
 //     parent blocks. This enables the engine to process multiple blocks without
 //     relying on the VM to have stored blocks during `ParseBlock`.
 func (b *Bootstrapper) process(
@@ -567,7 +572,7 @@ func (b *Bootstrapper) process(
 	blk snowman.Block,
 	ancestors map[ids.ID]snowman.Block,
 ) error {
-	lastAcceptedHeight, err := b.getLastAcceptedHeight(ctx)
+	lastAccepted, err := b.getLastAccepted(ctx)
 	if err != nil {
 		return err
 	}
@@ -579,7 +584,7 @@ func (b *Bootstrapper) process(
 		batch,
 		b.tree,
 		b.missingBlockIDs,
-		lastAcceptedHeight,
+		lastAccepted.Height(),
 		blk,
 		ancestors,
 	)
@@ -602,7 +607,6 @@ func (b *Bootstrapper) process(
 				numFetched-b.initiallyFetched,         // Number of blocks we have fetched during this run
 				totalBlocksToFetch-b.initiallyFetched, // Number of blocks we expect to fetch during this run
 			)
-			b.fetchETA.Set(float64(eta))
 
 			if !b.restarted {
 				b.Ctx.Log.Info("fetching blocks",
@@ -641,7 +645,7 @@ func (b *Bootstrapper) tryStartExecuting(ctx context.Context) error {
 		return nil
 	}
 
-	lastAcceptedHeight, err := b.getLastAcceptedHeight(ctx)
+	lastAccepted, err := b.getLastAccepted(ctx)
 	if err != nil {
 		return err
 	}
@@ -653,10 +657,8 @@ func (b *Bootstrapper) tryStartExecuting(ctx context.Context) error {
 
 	numToExecute := b.tree.Len()
 	err = execute(
-		&haltableContext{
-			Context:  ctx,
-			Haltable: b,
-		},
+		ctx,
+		b,
 		log,
 		b.DB,
 		&parseAcceptor{
@@ -665,13 +667,23 @@ func (b *Bootstrapper) tryStartExecuting(ctx context.Context) error {
 			numAccepted: b.numAccepted,
 		},
 		b.tree,
-		lastAcceptedHeight,
+		lastAccepted.Height(),
 	)
-	if errors.Is(err, errHalted) {
-		return nil
-	}
 	if err != nil {
-		return err
+		// If a fatal error has occurred, include the last accepted block
+		// information.
+		lastAccepted, lastAcceptedErr := b.getLastAccepted(ctx)
+		if lastAcceptedErr != nil {
+			return fmt.Errorf("%w after %w", lastAcceptedErr, err)
+		}
+		return fmt.Errorf("%w with last accepted %s (height=%d)",
+			err,
+			lastAccepted.ID(),
+			lastAccepted.Height(),
+		)
+	}
+	if b.Halted() {
+		return nil
 	}
 
 	previouslyExecuted := b.executedStateTransitions
@@ -703,20 +715,19 @@ func (b *Bootstrapper) tryStartExecuting(ctx context.Context) error {
 		b.awaitingTimeout = true
 		return nil
 	}
-	b.fetchETA.Set(0)
 	return b.onFinished(ctx, b.requestID)
 }
 
-func (b *Bootstrapper) getLastAcceptedHeight(ctx context.Context) (uint64, error) {
+func (b *Bootstrapper) getLastAccepted(ctx context.Context) (snowman.Block, error) {
 	lastAcceptedID, err := b.VM.LastAccepted(ctx)
 	if err != nil {
-		return 0, fmt.Errorf("couldn't get last accepted ID: %w", err)
+		return nil, fmt.Errorf("couldn't get last accepted ID: %w", err)
 	}
 	lastAccepted, err := b.VM.GetBlock(ctx, lastAcceptedID)
 	if err != nil {
-		return 0, fmt.Errorf("couldn't get last accepted block: %w", err)
+		return nil, fmt.Errorf("couldn't get last accepted block %s: %w", lastAcceptedID, err)
 	}
-	return lastAccepted.Height(), nil
+	return lastAccepted, nil
 }
 
 func (b *Bootstrapper) Timeout(ctx context.Context) error {
@@ -728,7 +739,6 @@ func (b *Bootstrapper) Timeout(ctx context.Context) error {
 	if !b.Config.BootstrapTracker.IsBootstrapped() {
 		return b.restartBootstrapping(ctx)
 	}
-	b.fetchETA.Set(0)
 	return b.onFinished(ctx, b.requestID)
 }
 

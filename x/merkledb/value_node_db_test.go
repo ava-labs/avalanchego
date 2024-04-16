@@ -4,13 +4,13 @@
 package merkledb
 
 import (
-	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/maybe"
 )
 
@@ -23,11 +23,10 @@ func TestValueNodeDB(t *testing.T) {
 	cacheSize := 10_000
 	db := newValueNodeDB(
 		baseDB,
-		&sync.Pool{
-			New: func() interface{} { return make([]byte, 0) },
-		},
+		utils.NewBytesPool(),
 		&mockMetrics{},
 		cacheSize,
+		DefaultHasher,
 	)
 
 	// Getting a key that doesn't exist should return an error.
@@ -42,8 +41,8 @@ func TestValueNodeDB(t *testing.T) {
 		},
 		key: key,
 	}
-	batch := db.NewBatch()
-	batch.Put(key, node1)
+	batch := db.baseDB.NewBatch()
+	require.NoError(db.Write(batch, key, node1))
 	require.NoError(batch.Write())
 
 	// Get the key-node pair.
@@ -52,8 +51,8 @@ func TestValueNodeDB(t *testing.T) {
 	require.Equal(node1, node1Read)
 
 	// Delete the key-node pair.
-	batch = db.NewBatch()
-	batch.Delete(key)
+	batch = db.baseDB.NewBatch()
+	require.NoError(db.Write(batch, key, nil))
 	require.NoError(batch.Write())
 
 	// Key should be gone now.
@@ -61,9 +60,9 @@ func TestValueNodeDB(t *testing.T) {
 	require.ErrorIs(err, database.ErrNotFound)
 
 	// Put a key-node pair and delete it in the same batch.
-	batch = db.NewBatch()
-	batch.Put(key, node1)
-	batch.Delete(key)
+	batch = db.baseDB.NewBatch()
+	require.NoError(db.Write(batch, key, node1))
+	require.NoError(db.Write(batch, key, nil))
 	require.NoError(batch.Write())
 
 	// Key should still be gone.
@@ -77,9 +76,9 @@ func TestValueNodeDB(t *testing.T) {
 		},
 		key: key,
 	}
-	batch = db.NewBatch()
-	batch.Put(key, node1)
-	batch.Put(key, node2)
+	batch = db.baseDB.NewBatch()
+	require.NoError(db.Write(batch, key, node1))
+	require.NoError(db.Write(batch, key, node2))
 	require.NoError(batch.Write())
 
 	// Get the key-node pair.
@@ -88,8 +87,8 @@ func TestValueNodeDB(t *testing.T) {
 	require.Equal(node2, node2Read)
 
 	// Overwrite the key-node pair in a subsequent batch.
-	batch = db.NewBatch()
-	batch.Put(key, node1)
+	batch = db.baseDB.NewBatch()
+	require.NoError(db.Write(batch, key, node1))
 	require.NoError(batch.Write())
 
 	// Get the key-node pair.
@@ -118,11 +117,10 @@ func TestValueNodeDBIterator(t *testing.T) {
 	cacheSize := 10
 	db := newValueNodeDB(
 		baseDB,
-		&sync.Pool{
-			New: func() interface{} { return make([]byte, 0) },
-		},
+		utils.NewBytesPool(),
 		&mockMetrics{},
 		cacheSize,
+		DefaultHasher,
 	)
 
 	// Put key-node pairs.
@@ -134,8 +132,8 @@ func TestValueNodeDBIterator(t *testing.T) {
 			},
 			key: key,
 		}
-		batch := db.NewBatch()
-		batch.Put(key, node)
+		batch := db.baseDB.NewBatch()
+		require.NoError(db.Write(batch, key, node))
 		require.NoError(batch.Write())
 	}
 
@@ -172,8 +170,8 @@ func TestValueNodeDBIterator(t *testing.T) {
 		},
 		key: key,
 	}
-	batch := db.NewBatch()
-	batch.Put(key, n)
+	batch := db.baseDB.NewBatch()
+	require.NoError(db.Write(batch, key, n))
 	require.NoError(batch.Write())
 
 	key = ToKey([]byte{0xFF, 0x01})
@@ -183,8 +181,8 @@ func TestValueNodeDBIterator(t *testing.T) {
 		},
 		key: key,
 	}
-	batch = db.NewBatch()
-	batch.Put(key, n)
+	batch = db.baseDB.NewBatch()
+	require.NoError(db.Write(batch, key, n))
 	require.NoError(batch.Write())
 
 	// Iterate over the key-node pairs with a prefix.
@@ -225,16 +223,15 @@ func TestValueNodeDBClear(t *testing.T) {
 	baseDB := memdb.New()
 	db := newValueNodeDB(
 		baseDB,
-		&sync.Pool{
-			New: func() interface{} { return make([]byte, 0) },
-		},
+		utils.NewBytesPool(),
 		&mockMetrics{},
 		cacheSize,
+		DefaultHasher,
 	)
 
-	batch := db.NewBatch()
+	batch := db.baseDB.NewBatch()
 	for _, b := range [][]byte{{1}, {2}, {3}} {
-		batch.Put(ToKey(b), newNode(ToKey(b)))
+		require.NoError(db.Write(batch, ToKey(b), newNode(ToKey(b))))
 	}
 	require.NoError(batch.Write())
 

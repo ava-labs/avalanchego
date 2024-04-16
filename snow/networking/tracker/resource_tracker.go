@@ -12,7 +12,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
+	"github.com/ava-labs/avalanchego/utils/linked"
 	"github.com/ava-labs/avalanchego/utils/math/meter"
 	"github.com/ava-labs/avalanchego/utils/resource"
 )
@@ -200,7 +200,7 @@ type resourceTracker struct {
 	// utilized. This doesn't necessarily result in the meters being sorted
 	// based on their usage. However, in practice the nodes that are not being
 	// utilized will move towards the oldest elements where they can be deleted.
-	meters  linkedhashmap.LinkedHashmap[ids.NodeID, meter.Meter]
+	meters  *linked.Hashmap[ids.NodeID, meter.Meter]
 	metrics *trackerMetrics
 }
 
@@ -215,7 +215,7 @@ func NewResourceTracker(
 		resources:       resources,
 		processingMeter: factory.New(halflife),
 		halflife:        halflife,
-		meters:          linkedhashmap.New[ids.NodeID, meter.Meter](),
+		meters:          linked.NewHashmap[ids.NodeID, meter.Meter](),
 	}
 	var err error
 	t.metrics, err = newCPUTrackerMetrics("resource_tracker", reg)
