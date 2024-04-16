@@ -102,6 +102,21 @@ func (mr *MockOutboundMsgBuilderMockRecorder) Ancestors(arg0, arg1, arg2 any) *g
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Ancestors", reflect.TypeOf((*MockOutboundMsgBuilder)(nil).Ancestors), arg0, arg1, arg2)
 }
 
+// AppError mocks base method.
+func (m *MockOutboundMsgBuilder) AppError(arg0 ids.ID, arg1 uint32, arg2 int32, arg3 string) (OutboundMessage, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AppError", arg0, arg1, arg2, arg3)
+	ret0, _ := ret[0].(OutboundMessage)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// AppError indicates an expected call of AppError.
+func (mr *MockOutboundMsgBuilderMockRecorder) AppError(arg0, arg1, arg2, arg3 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AppError", reflect.TypeOf((*MockOutboundMsgBuilder)(nil).AppError), arg0, arg1, arg2, arg3)
+}
+
 // AppGossip mocks base method.
 func (m *MockOutboundMsgBuilder) AppGossip(arg0 ids.ID, arg1 []byte) (OutboundMessage, error) {
 	m.ctrl.T.Helper()
@@ -163,48 +178,48 @@ func (mr *MockOutboundMsgBuilderMockRecorder) Chits(arg0, arg1, arg2, arg3, arg4
 }
 
 // Get mocks base method.
-func (m *MockOutboundMsgBuilder) Get(arg0 ids.ID, arg1 uint32, arg2 time.Duration, arg3 ids.ID, arg4 p2p.EngineType) (OutboundMessage, error) {
+func (m *MockOutboundMsgBuilder) Get(arg0 ids.ID, arg1 uint32, arg2 time.Duration, arg3 ids.ID) (OutboundMessage, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Get", arg0, arg1, arg2, arg3, arg4)
+	ret := m.ctrl.Call(m, "Get", arg0, arg1, arg2, arg3)
 	ret0, _ := ret[0].(OutboundMessage)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Get indicates an expected call of Get.
-func (mr *MockOutboundMsgBuilderMockRecorder) Get(arg0, arg1, arg2, arg3, arg4 any) *gomock.Call {
+func (mr *MockOutboundMsgBuilderMockRecorder) Get(arg0, arg1, arg2, arg3 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*MockOutboundMsgBuilder)(nil).Get), arg0, arg1, arg2, arg3, arg4)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*MockOutboundMsgBuilder)(nil).Get), arg0, arg1, arg2, arg3)
 }
 
 // GetAccepted mocks base method.
-func (m *MockOutboundMsgBuilder) GetAccepted(arg0 ids.ID, arg1 uint32, arg2 time.Duration, arg3 []ids.ID, arg4 p2p.EngineType) (OutboundMessage, error) {
+func (m *MockOutboundMsgBuilder) GetAccepted(arg0 ids.ID, arg1 uint32, arg2 time.Duration, arg3 []ids.ID) (OutboundMessage, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetAccepted", arg0, arg1, arg2, arg3, arg4)
+	ret := m.ctrl.Call(m, "GetAccepted", arg0, arg1, arg2, arg3)
 	ret0, _ := ret[0].(OutboundMessage)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetAccepted indicates an expected call of GetAccepted.
-func (mr *MockOutboundMsgBuilderMockRecorder) GetAccepted(arg0, arg1, arg2, arg3, arg4 any) *gomock.Call {
+func (mr *MockOutboundMsgBuilderMockRecorder) GetAccepted(arg0, arg1, arg2, arg3 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAccepted", reflect.TypeOf((*MockOutboundMsgBuilder)(nil).GetAccepted), arg0, arg1, arg2, arg3, arg4)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAccepted", reflect.TypeOf((*MockOutboundMsgBuilder)(nil).GetAccepted), arg0, arg1, arg2, arg3)
 }
 
 // GetAcceptedFrontier mocks base method.
-func (m *MockOutboundMsgBuilder) GetAcceptedFrontier(arg0 ids.ID, arg1 uint32, arg2 time.Duration, arg3 p2p.EngineType) (OutboundMessage, error) {
+func (m *MockOutboundMsgBuilder) GetAcceptedFrontier(arg0 ids.ID, arg1 uint32, arg2 time.Duration) (OutboundMessage, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetAcceptedFrontier", arg0, arg1, arg2, arg3)
+	ret := m.ctrl.Call(m, "GetAcceptedFrontier", arg0, arg1, arg2)
 	ret0, _ := ret[0].(OutboundMessage)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetAcceptedFrontier indicates an expected call of GetAcceptedFrontier.
-func (mr *MockOutboundMsgBuilderMockRecorder) GetAcceptedFrontier(arg0, arg1, arg2, arg3 any) *gomock.Call {
+func (mr *MockOutboundMsgBuilderMockRecorder) GetAcceptedFrontier(arg0, arg1, arg2 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAcceptedFrontier", reflect.TypeOf((*MockOutboundMsgBuilder)(nil).GetAcceptedFrontier), arg0, arg1, arg2, arg3)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAcceptedFrontier", reflect.TypeOf((*MockOutboundMsgBuilder)(nil).GetAcceptedFrontier), arg0, arg1, arg2)
 }
 
 // GetAcceptedStateSummary mocks base method.
@@ -268,7 +283,7 @@ func (mr *MockOutboundMsgBuilderMockRecorder) GetStateSummaryFrontier(arg0, arg1
 }
 
 // Handshake mocks base method.
-func (m *MockOutboundMsgBuilder) Handshake(arg0 uint32, arg1 uint64, arg2 ips.IPPort, arg3, arg4 string, arg5, arg6, arg7 uint32, arg8 uint64, arg9 []byte, arg10 []ids.ID, arg11, arg12 []uint32, arg13, arg14 []byte) (OutboundMessage, error) {
+func (m *MockOutboundMsgBuilder) Handshake(arg0 uint32, arg1 uint64, arg2 ips.IPPort, arg3 string, arg4, arg5, arg6 uint32, arg7 uint64, arg8, arg9 []byte, arg10 []ids.ID, arg11, arg12 []uint32, arg13, arg14 []byte) (OutboundMessage, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Handshake", arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13, arg14)
 	ret0, _ := ret[0].(OutboundMessage)
@@ -313,63 +328,63 @@ func (mr *MockOutboundMsgBuilderMockRecorder) Ping(arg0, arg1 any) *gomock.Call 
 }
 
 // Pong mocks base method.
-func (m *MockOutboundMsgBuilder) Pong(arg0 uint32, arg1 []*p2p.SubnetUptime) (OutboundMessage, error) {
+func (m *MockOutboundMsgBuilder) Pong() (OutboundMessage, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Pong", arg0, arg1)
+	ret := m.ctrl.Call(m, "Pong")
 	ret0, _ := ret[0].(OutboundMessage)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Pong indicates an expected call of Pong.
-func (mr *MockOutboundMsgBuilderMockRecorder) Pong(arg0, arg1 any) *gomock.Call {
+func (mr *MockOutboundMsgBuilderMockRecorder) Pong() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Pong", reflect.TypeOf((*MockOutboundMsgBuilder)(nil).Pong), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Pong", reflect.TypeOf((*MockOutboundMsgBuilder)(nil).Pong))
 }
 
 // PullQuery mocks base method.
-func (m *MockOutboundMsgBuilder) PullQuery(arg0 ids.ID, arg1 uint32, arg2 time.Duration, arg3 ids.ID, arg4 uint64, arg5 p2p.EngineType) (OutboundMessage, error) {
+func (m *MockOutboundMsgBuilder) PullQuery(arg0 ids.ID, arg1 uint32, arg2 time.Duration, arg3 ids.ID, arg4 uint64) (OutboundMessage, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "PullQuery", arg0, arg1, arg2, arg3, arg4, arg5)
+	ret := m.ctrl.Call(m, "PullQuery", arg0, arg1, arg2, arg3, arg4)
 	ret0, _ := ret[0].(OutboundMessage)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // PullQuery indicates an expected call of PullQuery.
-func (mr *MockOutboundMsgBuilderMockRecorder) PullQuery(arg0, arg1, arg2, arg3, arg4, arg5 any) *gomock.Call {
+func (mr *MockOutboundMsgBuilderMockRecorder) PullQuery(arg0, arg1, arg2, arg3, arg4 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PullQuery", reflect.TypeOf((*MockOutboundMsgBuilder)(nil).PullQuery), arg0, arg1, arg2, arg3, arg4, arg5)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PullQuery", reflect.TypeOf((*MockOutboundMsgBuilder)(nil).PullQuery), arg0, arg1, arg2, arg3, arg4)
 }
 
 // PushQuery mocks base method.
-func (m *MockOutboundMsgBuilder) PushQuery(arg0 ids.ID, arg1 uint32, arg2 time.Duration, arg3 []byte, arg4 uint64, arg5 p2p.EngineType) (OutboundMessage, error) {
+func (m *MockOutboundMsgBuilder) PushQuery(arg0 ids.ID, arg1 uint32, arg2 time.Duration, arg3 []byte, arg4 uint64) (OutboundMessage, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "PushQuery", arg0, arg1, arg2, arg3, arg4, arg5)
+	ret := m.ctrl.Call(m, "PushQuery", arg0, arg1, arg2, arg3, arg4)
 	ret0, _ := ret[0].(OutboundMessage)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // PushQuery indicates an expected call of PushQuery.
-func (mr *MockOutboundMsgBuilderMockRecorder) PushQuery(arg0, arg1, arg2, arg3, arg4, arg5 any) *gomock.Call {
+func (mr *MockOutboundMsgBuilderMockRecorder) PushQuery(arg0, arg1, arg2, arg3, arg4 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PushQuery", reflect.TypeOf((*MockOutboundMsgBuilder)(nil).PushQuery), arg0, arg1, arg2, arg3, arg4, arg5)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PushQuery", reflect.TypeOf((*MockOutboundMsgBuilder)(nil).PushQuery), arg0, arg1, arg2, arg3, arg4)
 }
 
 // Put mocks base method.
-func (m *MockOutboundMsgBuilder) Put(arg0 ids.ID, arg1 uint32, arg2 []byte, arg3 p2p.EngineType) (OutboundMessage, error) {
+func (m *MockOutboundMsgBuilder) Put(arg0 ids.ID, arg1 uint32, arg2 []byte) (OutboundMessage, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Put", arg0, arg1, arg2, arg3)
+	ret := m.ctrl.Call(m, "Put", arg0, arg1, arg2)
 	ret0, _ := ret[0].(OutboundMessage)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Put indicates an expected call of Put.
-func (mr *MockOutboundMsgBuilderMockRecorder) Put(arg0, arg1, arg2, arg3 any) *gomock.Call {
+func (mr *MockOutboundMsgBuilderMockRecorder) Put(arg0, arg1, arg2 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Put", reflect.TypeOf((*MockOutboundMsgBuilder)(nil).Put), arg0, arg1, arg2, arg3)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Put", reflect.TypeOf((*MockOutboundMsgBuilder)(nil).Put), arg0, arg1, arg2)
 }
 
 // StateSummaryFrontier mocks base method.

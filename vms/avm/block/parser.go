@@ -5,7 +5,6 @@ package block
 
 import (
 	"reflect"
-	"time"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/utils"
@@ -31,8 +30,8 @@ type parser struct {
 	txs.Parser
 }
 
-func NewParser(durangoTime time.Time, fxs []fxs.Fx) (Parser, error) {
-	p, err := txs.NewParser(durangoTime, fxs)
+func NewParser(fxs []fxs.Fx) (Parser, error) {
+	p, err := txs.NewParser(fxs)
 	if err != nil {
 		return nil, err
 	}
@@ -49,13 +48,12 @@ func NewParser(durangoTime time.Time, fxs []fxs.Fx) (Parser, error) {
 }
 
 func NewCustomParser(
-	durangoTime time.Time,
 	typeToFxIndex map[reflect.Type]int,
 	clock *mockable.Clock,
 	log logging.Logger,
 	fxs []fxs.Fx,
 ) (Parser, error) {
-	p, err := txs.NewCustomParser(durangoTime, typeToFxIndex, clock, log, fxs)
+	p, err := txs.NewCustomParser(typeToFxIndex, clock, log, fxs)
 	if err != nil {
 		return nil, err
 	}

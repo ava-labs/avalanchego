@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	IPPortLen = 16 + wrappers.ShortLen
+	IPPortLen = net.IPv6len + wrappers.ShortLen
 	nullStr   = "null"
 )
 

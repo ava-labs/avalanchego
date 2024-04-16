@@ -14,7 +14,6 @@ import (
 	reflect "reflect"
 
 	ids "github.com/ava-labs/avalanchego/ids"
-	snow "github.com/ava-labs/avalanchego/snow"
 	set "github.com/ava-labs/avalanchego/utils/set"
 	gomock "go.uber.org/mock/gomock"
 )
@@ -40,20 +39,6 @@ func NewMockSender(ctrl *gomock.Controller) *MockSender {
 // EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockSender) EXPECT() *MockSenderMockRecorder {
 	return m.recorder
-}
-
-// Accept mocks base method.
-func (m *MockSender) Accept(ctx *snow.ConsensusContext, containerID ids.ID, container []byte) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Accept", ctx, containerID, container)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// Accept indicates an expected call of Accept.
-func (mr *MockSenderMockRecorder) Accept(ctx, containerID, container any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Accept", reflect.TypeOf((*MockSender)(nil).Accept), ctx, containerID, container)
 }
 
 // SendAccepted mocks base method.
@@ -104,32 +89,32 @@ func (mr *MockSenderMockRecorder) SendAncestors(ctx, nodeID, requestID, containe
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendAncestors", reflect.TypeOf((*MockSender)(nil).SendAncestors), ctx, nodeID, requestID, containers)
 }
 
-// SendAppGossip mocks base method.
-func (m *MockSender) SendAppGossip(ctx context.Context, appGossipBytes []byte) error {
+// SendAppError mocks base method.
+func (m *MockSender) SendAppError(ctx context.Context, nodeID ids.NodeID, requestID uint32, errorCode int32, errorMessage string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SendAppGossip", ctx, appGossipBytes)
+	ret := m.ctrl.Call(m, "SendAppError", ctx, nodeID, requestID, errorCode, errorMessage)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SendAppError indicates an expected call of SendAppError.
+func (mr *MockSenderMockRecorder) SendAppError(ctx, nodeID, requestID, errorCode, errorMessage any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendAppError", reflect.TypeOf((*MockSender)(nil).SendAppError), ctx, nodeID, requestID, errorCode, errorMessage)
+}
+
+// SendAppGossip mocks base method.
+func (m *MockSender) SendAppGossip(ctx context.Context, config SendConfig, appGossipBytes []byte) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SendAppGossip", ctx, config, appGossipBytes)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // SendAppGossip indicates an expected call of SendAppGossip.
-func (mr *MockSenderMockRecorder) SendAppGossip(ctx, appGossipBytes any) *gomock.Call {
+func (mr *MockSenderMockRecorder) SendAppGossip(ctx, config, appGossipBytes any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendAppGossip", reflect.TypeOf((*MockSender)(nil).SendAppGossip), ctx, appGossipBytes)
-}
-
-// SendAppGossipSpecific mocks base method.
-func (m *MockSender) SendAppGossipSpecific(ctx context.Context, nodeIDs set.Set[ids.NodeID], appGossipBytes []byte) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SendAppGossipSpecific", ctx, nodeIDs, appGossipBytes)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// SendAppGossipSpecific indicates an expected call of SendAppGossipSpecific.
-func (mr *MockSenderMockRecorder) SendAppGossipSpecific(ctx, nodeIDs, appGossipBytes any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendAppGossipSpecific", reflect.TypeOf((*MockSender)(nil).SendAppGossipSpecific), ctx, nodeIDs, appGossipBytes)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendAppGossip", reflect.TypeOf((*MockSender)(nil).SendAppGossip), ctx, config, appGossipBytes)
 }
 
 // SendAppRequest mocks base method.
@@ -170,6 +155,20 @@ func (m *MockSender) SendChits(ctx context.Context, nodeID ids.NodeID, requestID
 func (mr *MockSenderMockRecorder) SendChits(ctx, nodeID, requestID, preferredID, preferredIDAtHeight, acceptedID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendChits", reflect.TypeOf((*MockSender)(nil).SendChits), ctx, nodeID, requestID, preferredID, preferredIDAtHeight, acceptedID)
+}
+
+// SendCrossChainAppError mocks base method.
+func (m *MockSender) SendCrossChainAppError(ctx context.Context, chainID ids.ID, requestID uint32, errorCode int32, errorMessage string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SendCrossChainAppError", ctx, chainID, requestID, errorCode, errorMessage)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SendCrossChainAppError indicates an expected call of SendCrossChainAppError.
+func (mr *MockSenderMockRecorder) SendCrossChainAppError(ctx, chainID, requestID, errorCode, errorMessage any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendCrossChainAppError", reflect.TypeOf((*MockSender)(nil).SendCrossChainAppError), ctx, chainID, requestID, errorCode, errorMessage)
 }
 
 // SendCrossChainAppRequest mocks base method.
@@ -270,18 +269,6 @@ func (m *MockSender) SendGetStateSummaryFrontier(ctx context.Context, nodeIDs se
 func (mr *MockSenderMockRecorder) SendGetStateSummaryFrontier(ctx, nodeIDs, requestID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendGetStateSummaryFrontier", reflect.TypeOf((*MockSender)(nil).SendGetStateSummaryFrontier), ctx, nodeIDs, requestID)
-}
-
-// SendGossip mocks base method.
-func (m *MockSender) SendGossip(ctx context.Context, container []byte) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SendGossip", ctx, container)
-}
-
-// SendGossip indicates an expected call of SendGossip.
-func (mr *MockSenderMockRecorder) SendGossip(ctx, container any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendGossip", reflect.TypeOf((*MockSender)(nil).SendGossip), ctx, container)
 }
 
 // SendPullQuery mocks base method.

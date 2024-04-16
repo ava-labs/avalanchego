@@ -22,7 +22,7 @@ import (
 func TestAtomicTxImports(t *testing.T) {
 	require := require.New(t)
 
-	env := newEnvironment(t)
+	env := newEnvironment(t, latestFork)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
@@ -64,9 +64,11 @@ func TestAtomicTxImports(t *testing.T) {
 
 	tx, err := env.txBuilder.NewImportTx(
 		env.ctx.XChainID,
-		recipientKey.PublicKey().Address(),
+		&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{recipientKey.PublicKey().Address()},
+		},
 		[]*secp256k1.PrivateKey{recipientKey},
-		ids.ShortEmpty, // change addr
 	)
 	require.NoError(err)
 

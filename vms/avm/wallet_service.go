@@ -4,7 +4,6 @@
 package avm
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -15,7 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/formatting"
-	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
+	"github.com/ava-labs/avalanchego/utils/linked"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
@@ -28,7 +27,7 @@ var errMissingUTXO = errors.New("missing utxo")
 
 type WalletService struct {
 	vm         *VM
-	pendingTxs linkedhashmap.LinkedHashmap[ids.ID, *txs.Tx]
+	pendingTxs *linked.Hashmap[ids.ID, *txs.Tx]
 }
 
 func (w *WalletService) decided(txID ids.ID) {
@@ -45,7 +44,7 @@ func (w *WalletService) decided(txID ids.ID) {
 			return
 		}
 
-		err := w.vm.network.IssueVerifiedTx(context.TODO(), tx)
+		err := w.vm.network.IssueTxFromRPCWithoutVerification(tx)
 		if err == nil {
 			w.vm.ctx.Log.Info("issued tx to mempool over wallet API",
 				zap.Stringer("txID", txID),
@@ -78,7 +77,7 @@ func (w *WalletService) issue(tx *txs.Tx) (ids.ID, error) {
 	}
 
 	if w.pendingTxs.Len() == 0 {
-		if err := w.vm.network.IssueVerifiedTx(context.TODO(), tx); err == nil {
+		if err := w.vm.network.IssueTxFromRPCWithoutVerification(tx); err == nil {
 			w.vm.ctx.Log.Info("issued tx to mempool over wallet API",
 				zap.Stringer("txID", txID),
 			)

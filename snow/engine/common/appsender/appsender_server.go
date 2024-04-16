@@ -45,6 +45,15 @@ func (s *Server) SendCrossChainAppResponse(ctx context.Context, msg *appsenderpb
 	return &emptypb.Empty{}, s.appSender.SendCrossChainAppResponse(ctx, chainID, msg.RequestId, msg.Response)
 }
 
+func (s *Server) SendCrossChainAppError(ctx context.Context, msg *appsenderpb.SendCrossChainAppErrorMsg) (*emptypb.Empty, error) {
+	chainID, err := ids.ToID(msg.ChainId)
+	if err != nil {
+		return &emptypb.Empty{}, err
+	}
+
+	return &emptypb.Empty{}, s.appSender.SendCrossChainAppError(ctx, chainID, msg.RequestId, msg.ErrorCode, msg.ErrorMessage)
+}
+
 func (s *Server) SendAppRequest(ctx context.Context, req *appsenderpb.SendAppRequestMsg) (*emptypb.Empty, error) {
 	nodeIDs := set.NewSet[ids.NodeID](len(req.NodeIds))
 	for _, nodeIDBytes := range req.NodeIds {
@@ -67,12 +76,17 @@ func (s *Server) SendAppResponse(ctx context.Context, req *appsenderpb.SendAppRe
 	return &emptypb.Empty{}, err
 }
 
-func (s *Server) SendAppGossip(ctx context.Context, req *appsenderpb.SendAppGossipMsg) (*emptypb.Empty, error) {
-	err := s.appSender.SendAppGossip(ctx, req.Msg)
+func (s *Server) SendAppError(ctx context.Context, req *appsenderpb.SendAppErrorMsg) (*emptypb.Empty, error) {
+	nodeID, err := ids.ToNodeID(req.NodeId)
+	if err != nil {
+		return nil, err
+	}
+
+	err = s.appSender.SendAppError(ctx, nodeID, req.RequestId, req.ErrorCode, req.ErrorMessage)
 	return &emptypb.Empty{}, err
 }
 
-func (s *Server) SendAppGossipSpecific(ctx context.Context, req *appsenderpb.SendAppGossipSpecificMsg) (*emptypb.Empty, error) {
+func (s *Server) SendAppGossip(ctx context.Context, req *appsenderpb.SendAppGossipMsg) (*emptypb.Empty, error) {
 	nodeIDs := set.NewSet[ids.NodeID](len(req.NodeIds))
 	for _, nodeIDBytes := range req.NodeIds {
 		nodeID, err := ids.ToNodeID(nodeIDBytes)
@@ -81,6 +95,15 @@ func (s *Server) SendAppGossipSpecific(ctx context.Context, req *appsenderpb.Sen
 		}
 		nodeIDs.Add(nodeID)
 	}
-	err := s.appSender.SendAppGossipSpecific(ctx, nodeIDs, req.Msg)
+	err := s.appSender.SendAppGossip(
+		ctx,
+		common.SendConfig{
+			NodeIDs:       nodeIDs,
+			Validators:    int(req.Validators),
+			NonValidators: int(req.NonValidators),
+			Peers:         int(req.Peers),
+		},
+		req.Msg,
+	)
 	return &emptypb.Empty{}, err
 }

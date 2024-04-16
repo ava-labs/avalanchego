@@ -22,10 +22,11 @@ const _ = grpc.SupportPackageIsVersion7
 const (
 	AppSender_SendAppRequest_FullMethodName            = "/appsender.AppSender/SendAppRequest"
 	AppSender_SendAppResponse_FullMethodName           = "/appsender.AppSender/SendAppResponse"
+	AppSender_SendAppError_FullMethodName              = "/appsender.AppSender/SendAppError"
 	AppSender_SendAppGossip_FullMethodName             = "/appsender.AppSender/SendAppGossip"
-	AppSender_SendAppGossipSpecific_FullMethodName     = "/appsender.AppSender/SendAppGossipSpecific"
 	AppSender_SendCrossChainAppRequest_FullMethodName  = "/appsender.AppSender/SendCrossChainAppRequest"
 	AppSender_SendCrossChainAppResponse_FullMethodName = "/appsender.AppSender/SendCrossChainAppResponse"
+	AppSender_SendCrossChainAppError_FullMethodName    = "/appsender.AppSender/SendCrossChainAppError"
 )
 
 // AppSenderClient is the client API for AppSender service.
@@ -34,10 +35,11 @@ const (
 type AppSenderClient interface {
 	SendAppRequest(ctx context.Context, in *SendAppRequestMsg, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	SendAppResponse(ctx context.Context, in *SendAppResponseMsg, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	SendAppError(ctx context.Context, in *SendAppErrorMsg, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	SendAppGossip(ctx context.Context, in *SendAppGossipMsg, opts ...grpc.CallOption) (*emptypb.Empty, error)
-	SendAppGossipSpecific(ctx context.Context, in *SendAppGossipSpecificMsg, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	SendCrossChainAppRequest(ctx context.Context, in *SendCrossChainAppRequestMsg, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	SendCrossChainAppResponse(ctx context.Context, in *SendCrossChainAppResponseMsg, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	SendCrossChainAppError(ctx context.Context, in *SendCrossChainAppErrorMsg, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type appSenderClient struct {
@@ -66,18 +68,18 @@ func (c *appSenderClient) SendAppResponse(ctx context.Context, in *SendAppRespon
 	return out, nil
 }
 
-func (c *appSenderClient) SendAppGossip(ctx context.Context, in *SendAppGossipMsg, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+func (c *appSenderClient) SendAppError(ctx context.Context, in *SendAppErrorMsg, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	out := new(emptypb.Empty)
-	err := c.cc.Invoke(ctx, AppSender_SendAppGossip_FullMethodName, in, out, opts...)
+	err := c.cc.Invoke(ctx, AppSender_SendAppError_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *appSenderClient) SendAppGossipSpecific(ctx context.Context, in *SendAppGossipSpecificMsg, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+func (c *appSenderClient) SendAppGossip(ctx context.Context, in *SendAppGossipMsg, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	out := new(emptypb.Empty)
-	err := c.cc.Invoke(ctx, AppSender_SendAppGossipSpecific_FullMethodName, in, out, opts...)
+	err := c.cc.Invoke(ctx, AppSender_SendAppGossip_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -102,16 +104,26 @@ func (c *appSenderClient) SendCrossChainAppResponse(ctx context.Context, in *Sen
 	return out, nil
 }
 
+func (c *appSenderClient) SendCrossChainAppError(ctx context.Context, in *SendCrossChainAppErrorMsg, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, AppSender_SendCrossChainAppError_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AppSenderServer is the server API for AppSender service.
 // All implementations must embed UnimplementedAppSenderServer
 // for forward compatibility
 type AppSenderServer interface {
 	SendAppRequest(context.Context, *SendAppRequestMsg) (*emptypb.Empty, error)
 	SendAppResponse(context.Context, *SendAppResponseMsg) (*emptypb.Empty, error)
+	SendAppError(context.Context, *SendAppErrorMsg) (*emptypb.Empty, error)
 	SendAppGossip(context.Context, *SendAppGossipMsg) (*emptypb.Empty, error)
-	SendAppGossipSpecific(context.Context, *SendAppGossipSpecificMsg) (*emptypb.Empty, error)
 	SendCrossChainAppRequest(context.Context, *SendCrossChainAppRequestMsg) (*emptypb.Empty, error)
 	SendCrossChainAppResponse(context.Context, *SendCrossChainAppResponseMsg) (*emptypb.Empty, error)
+	SendCrossChainAppError(context.Context, *SendCrossChainAppErrorMsg) (*emptypb.Empty, error)
 	mustEmbedUnimplementedAppSenderServer()
 }
 
@@ -125,17 +137,20 @@ func (UnimplementedAppSenderServer) SendAppRequest(context.Context, *SendAppRequ
 func (UnimplementedAppSenderServer) SendAppResponse(context.Context, *SendAppResponseMsg) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SendAppResponse not implemented")
 }
+func (UnimplementedAppSenderServer) SendAppError(context.Context, *SendAppErrorMsg) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SendAppError not implemented")
+}
 func (UnimplementedAppSenderServer) SendAppGossip(context.Context, *SendAppGossipMsg) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SendAppGossip not implemented")
-}
-func (UnimplementedAppSenderServer) SendAppGossipSpecific(context.Context, *SendAppGossipSpecificMsg) (*emptypb.Empty, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method SendAppGossipSpecific not implemented")
 }
 func (UnimplementedAppSenderServer) SendCrossChainAppRequest(context.Context, *SendCrossChainAppRequestMsg) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SendCrossChainAppRequest not implemented")
 }
 func (UnimplementedAppSenderServer) SendCrossChainAppResponse(context.Context, *SendCrossChainAppResponseMsg) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SendCrossChainAppResponse not implemented")
+}
+func (UnimplementedAppSenderServer) SendCrossChainAppError(context.Context, *SendCrossChainAppErrorMsg) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SendCrossChainAppError not implemented")
 }
 func (UnimplementedAppSenderServer) mustEmbedUnimplementedAppSenderServer() {}
 
@@ -186,6 +201,24 @@ func _AppSender_SendAppResponse_Handler(srv interface{}, ctx context.Context, de
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AppSender_SendAppError_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SendAppErrorMsg)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AppSenderServer).SendAppError(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AppSender_SendAppError_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AppSenderServer).SendAppError(ctx, req.(*SendAppErrorMsg))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _AppSender_SendAppGossip_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(SendAppGossipMsg)
 	if err := dec(in); err != nil {
@@ -200,24 +233,6 @@ func _AppSender_SendAppGossip_Handler(srv interface{}, ctx context.Context, dec 
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(AppSenderServer).SendAppGossip(ctx, req.(*SendAppGossipMsg))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _AppSender_SendAppGossipSpecific_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(SendAppGossipSpecificMsg)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(AppSenderServer).SendAppGossipSpecific(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: AppSender_SendAppGossipSpecific_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AppSenderServer).SendAppGossipSpecific(ctx, req.(*SendAppGossipSpecificMsg))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -258,6 +273,24 @@ func _AppSender_SendCrossChainAppResponse_Handler(srv interface{}, ctx context.C
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AppSender_SendCrossChainAppError_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SendCrossChainAppErrorMsg)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AppSenderServer).SendCrossChainAppError(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AppSender_SendCrossChainAppError_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AppSenderServer).SendCrossChainAppError(ctx, req.(*SendCrossChainAppErrorMsg))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // AppSender_ServiceDesc is the grpc.ServiceDesc for AppSender service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -274,12 +307,12 @@ var AppSender_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _AppSender_SendAppResponse_Handler,
 		},
 		{
-			MethodName: "SendAppGossip",
-			Handler:    _AppSender_SendAppGossip_Handler,
+			MethodName: "SendAppError",
+			Handler:    _AppSender_SendAppError_Handler,
 		},
 		{
-			MethodName: "SendAppGossipSpecific",
-			Handler:    _AppSender_SendAppGossipSpecific_Handler,
+			MethodName: "SendAppGossip",
+			Handler:    _AppSender_SendAppGossip_Handler,
 		},
 		{
 			MethodName: "SendCrossChainAppRequest",
@@ -288,6 +321,10 @@ var AppSender_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SendCrossChainAppResponse",
 			Handler:    _AppSender_SendCrossChainAppResponse_Handler,
+		},
+		{
+			MethodName: "SendCrossChainAppError",
+			Handler:    _AppSender_SendCrossChainAppError_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

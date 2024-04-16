@@ -9,7 +9,6 @@ import (
 
 	"github.com/ava-labs/coreth/ethclient"
 	"github.com/ava-labs/coreth/plugin/evm"
-	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/codec"
@@ -22,8 +21,12 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/wallet/chain/c"
-	"github.com/ava-labs/avalanchego/wallet/chain/p"
 	"github.com/ava-labs/avalanchego/wallet/chain/x"
+
+	pbuilder "github.com/ava-labs/avalanchego/wallet/chain/p/builder"
+	xbuilder "github.com/ava-labs/avalanchego/wallet/chain/x/builder"
+	walletcommon "github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
+	ethcommon "github.com/ethereum/go-ethereum/common"
 )
 
 const (
@@ -55,12 +58,12 @@ type UTXOClient interface {
 
 type AVAXState struct {
 	PClient platformvm.Client
-	PCTX    p.Context
+	PCTX    *pbuilder.Context
 	XClient avm.Client
-	XCTX    x.Context
+	XCTX    *xbuilder.Context
 	CClient evm.Client
 	CCTX    c.Context
-	UTXOs   UTXOs
+	UTXOs   walletcommon.UTXOs
 }
 
 func FetchState(
@@ -76,7 +79,7 @@ func FetchState(
 	xClient := avm.NewClient(uri, "X")
 	cClient := evm.NewCChainClient(uri)
 
-	pCTX, err := p.NewContextFromClients(ctx, infoClient, xClient)
+	pCTX, err := pbuilder.NewContextFromClients(ctx, infoClient, xClient)
 	if err != nil {
 		return nil, err
 	}
@@ -91,7 +94,7 @@ func FetchState(
 		return nil, err
 	}
 
-	utxos := NewUTXOs()
+	utxos := walletcommon.NewUTXOs()
 	addrList := addrs.List()
 	chains := []struct {
 		id     ids.ID
@@ -104,9 +107,9 @@ func FetchState(
 			codec:  txs.Codec,
 		},
 		{
-			id:     xCTX.BlockchainID(),
+			id:     xCTX.BlockchainID,
 			client: xClient,
-			codec:  x.Parser.Codec(),
+			codec:  xbuilder.Parser.Codec(),
 		},
 		{
 			id:     cCTX.BlockchainID(),
@@ -143,13 +146,13 @@ func FetchState(
 
 type EthState struct {
 	Client   ethclient.Client
-	Accounts map[common.Address]*c.Account
+	Accounts map[ethcommon.Address]*c.Account
 }
 
 func FetchEthState(
 	ctx context.Context,
 	uri string,
-	addrs set.Set[common.Address],
+	addrs set.Set[ethcommon.Address],
 ) (*EthState, error) {
 	path := fmt.Sprintf(
 		"%s/ext/%s/C/rpc",
@@ -161,7 +164,7 @@ func FetchEthState(
 		return nil, err
 	}
 
-	accounts := make(map[common.Address]*c.Account, addrs.Len())
+	accounts := make(map[ethcommon.Address]*c.Account, addrs.Len())
 	for addr := range addrs {
 		balance, err := client.BalanceAt(ctx, addr, nil)
 		if err != nil {
@@ -188,7 +191,7 @@ func FetchEthState(
 // expires, then the returned error will be immediately reported.
 func AddAllUTXOs(
 	ctx context.Context,
-	utxos UTXOs,
+	utxos walletcommon.UTXOs,
 	client UTXOClient,
 	codec codec.Manager,
 	sourceChainID ids.ID,

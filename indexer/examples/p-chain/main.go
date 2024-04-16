@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/indexer"
-	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
 
 	platformvmblock "github.com/ava-labs/avalanchego/vms/platformvm/block"
@@ -29,12 +28,12 @@ func main() {
 		container, err := client.GetContainerByIndex(ctx, nextIndex)
 		if err != nil {
 			time.Sleep(time.Second)
-			log.Printf("polling for next accepted block\n")
+			log.Println("polling for next accepted block")
 			continue
 		}
 
 		platformvmBlockBytes := container.Bytes
-		proposerVMBlock, err := proposervmblock.Parse(container.Bytes, version.DefaultUpgradeTime)
+		proposerVMBlock, err := proposervmblock.Parse(container.Bytes)
 		if err == nil {
 			platformvmBlockBytes = proposerVMBlock.Block()
 		}

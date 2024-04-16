@@ -161,7 +161,7 @@ func getUPnPClient(client goupnp.ServiceClient) upnpClient {
 	}
 }
 
-// discover() tries to find  gateway device
+// discover() tries to find gateway device
 func discover(target string) *upnpRouter {
 	devs, err := goupnp.DiscoverDevices(target)
 	if err != nil {

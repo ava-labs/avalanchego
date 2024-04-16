@@ -24,6 +24,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
@@ -32,7 +34,7 @@ import (
 func TestBuildBlockBasic(t *testing.T) {
 	require := require.New(t)
 
-	env := newEnvironment(t)
+	env := newEnvironment(t, latestFork)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
@@ -44,14 +46,13 @@ func TestBuildBlockBasic(t *testing.T) {
 		nil,
 		"chain name",
 		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
-		ids.ShortEmpty,
 	)
 	require.NoError(err)
 	txID := tx.ID()
 
 	// Issue the transaction
 	env.ctx.Lock.Unlock()
-	require.NoError(env.network.IssueTx(context.Background(), tx))
+	require.NoError(env.network.IssueTxFromRPC(tx))
 	env.ctx.Lock.Lock()
 	_, ok := env.mempool.Get(txID)
 	require.True(ok)
@@ -74,7 +75,7 @@ func TestBuildBlockBasic(t *testing.T) {
 func TestBuildBlockDoesNotBuildWithEmptyMempool(t *testing.T) {
 	require := require.New(t)
 
-	env := newEnvironment(t)
+	env := newEnvironment(t, latestFork)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
@@ -91,7 +92,7 @@ func TestBuildBlockDoesNotBuildWithEmptyMempool(t *testing.T) {
 func TestBuildBlockShouldReward(t *testing.T) {
 	require := require.New(t)
 
-	env := newEnvironment(t)
+	env := newEnvironment(t, latestFork)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
@@ -109,22 +110,38 @@ func TestBuildBlockShouldReward(t *testing.T) {
 
 	// Create a valid [AddPermissionlessValidatorTx]
 	tx, err := env.txBuilder.NewAddPermissionlessValidatorTx(
-		defaultValidatorStake,
-		uint64(validatorStartTime.Unix()),
-		uint64(validatorEndTime.Unix()),
-		nodeID,
+		&txs.SubnetValidator{
+			Validator: txs.Validator{
+				NodeID: nodeID,
+				Start:  uint64(validatorStartTime.Unix()),
+				End:    uint64(validatorEndTime.Unix()),
+				Wght:   defaultValidatorStake,
+			},
+			Subnet: constants.PrimaryNetworkID,
+		},
 		signer.NewProofOfPossession(sk),
-		preFundedKeys[0].PublicKey().Address(),
+		env.ctx.AVAXAssetID,
+		&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
+		},
+		&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
+		},
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{preFundedKeys[0]},
-		preFundedKeys[0].PublicKey().Address(),
+		common.WithChangeOwner(&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
+		}),
 	)
 	require.NoError(err)
 	txID := tx.ID()
 
 	// Issue the transaction
 	env.ctx.Lock.Unlock()
-	require.NoError(env.network.IssueTx(context.Background(), tx))
+	require.NoError(env.network.IssueTxFromRPC(tx))
 	env.ctx.Lock.Lock()
 	_, ok := env.mempool.Get(txID)
 	require.True(ok)
@@ -192,7 +209,7 @@ func TestBuildBlockShouldReward(t *testing.T) {
 func TestBuildBlockAdvanceTime(t *testing.T) {
 	require := require.New(t)
 
-	env := newEnvironment(t)
+	env := newEnvironment(t, latestFork)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
@@ -225,7 +242,7 @@ func TestBuildBlockAdvanceTime(t *testing.T) {
 func TestBuildBlockForceAdvanceTime(t *testing.T) {
 	require := require.New(t)
 
-	env := newEnvironment(t)
+	env := newEnvironment(t, latestFork)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
@@ -237,14 +254,13 @@ func TestBuildBlockForceAdvanceTime(t *testing.T) {
 		nil,
 		"chain name",
 		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
-		ids.ShortEmpty,
 	)
 	require.NoError(err)
 	txID := tx.ID()
 
 	// Issue the transaction
 	env.ctx.Lock.Unlock()
-	require.NoError(env.network.IssueTx(context.Background(), tx))
+	require.NoError(env.network.IssueTxFromRPC(tx))
 	env.ctx.Lock.Lock()
 	_, ok := env.mempool.Get(txID)
 	require.True(ok)
@@ -276,113 +292,10 @@ func TestBuildBlockForceAdvanceTime(t *testing.T) {
 	require.Equal(nextTime.Unix(), standardBlk.Timestamp().Unix())
 }
 
-func TestBuildBlockDropExpiredStakerTxs(t *testing.T) {
-	require := require.New(t)
-
-	env := newEnvironment(t)
-	env.ctx.Lock.Lock()
-	defer env.ctx.Lock.Unlock()
-
-	// The [StartTime] in a staker tx is only validated pre-Durango.
-	// TODO: Delete this test post-Durango activation.
-	env.config.DurangoTime = mockable.MaxTime
-
-	var (
-		now                   = env.backend.Clk.Time()
-		defaultValidatorStake = 100 * units.MilliAvax
-
-		// Add a validator with StartTime in the future within [MaxFutureStartTime]
-		validatorStartTime = now.Add(txexecutor.MaxFutureStartTime - 1*time.Second)
-		validatorEndTime   = validatorStartTime.Add(360 * 24 * time.Hour)
-	)
-
-	tx1, err := env.txBuilder.NewAddValidatorTx(
-		defaultValidatorStake,
-		uint64(validatorStartTime.Unix()),
-		uint64(validatorEndTime.Unix()),
-		ids.GenerateTestNodeID(),
-		preFundedKeys[0].PublicKey().Address(),
-		reward.PercentDenominator,
-		[]*secp256k1.PrivateKey{preFundedKeys[0]},
-		preFundedKeys[0].PublicKey().Address(),
-	)
-	require.NoError(err)
-	require.NoError(env.mempool.Add(tx1))
-	tx1ID := tx1.ID()
-	_, ok := env.mempool.Get(tx1ID)
-	require.True(ok)
-
-	// Add a validator with StartTime before current chain time
-	validator2StartTime := now.Add(-5 * time.Second)
-	validator2EndTime := validator2StartTime.Add(360 * 24 * time.Hour)
-
-	tx2, err := env.txBuilder.NewAddValidatorTx(
-		defaultValidatorStake,
-		uint64(validator2StartTime.Unix()),
-		uint64(validator2EndTime.Unix()),
-		ids.GenerateTestNodeID(),
-		preFundedKeys[1].PublicKey().Address(),
-		reward.PercentDenominator,
-		[]*secp256k1.PrivateKey{preFundedKeys[1]},
-		preFundedKeys[1].PublicKey().Address(),
-	)
-	require.NoError(err)
-	require.NoError(env.mempool.Add(tx2))
-	tx2ID := tx2.ID()
-	_, ok = env.mempool.Get(tx2ID)
-	require.True(ok)
-
-	// Add a validator with StartTime in the future past [MaxFutureStartTime]
-	validator3StartTime := now.Add(txexecutor.MaxFutureStartTime + 5*time.Second)
-	validator3EndTime := validator2StartTime.Add(360 * 24 * time.Hour)
-
-	tx3, err := env.txBuilder.NewAddValidatorTx(
-		defaultValidatorStake,
-		uint64(validator3StartTime.Unix()),
-		uint64(validator3EndTime.Unix()),
-		ids.GenerateTestNodeID(),
-		preFundedKeys[2].PublicKey().Address(),
-		reward.PercentDenominator,
-		[]*secp256k1.PrivateKey{preFundedKeys[2]},
-		preFundedKeys[2].PublicKey().Address(),
-	)
-	require.NoError(err)
-	require.NoError(env.mempool.Add(tx3))
-	tx3ID := tx3.ID()
-	_, ok = env.mempool.Get(tx3ID)
-	require.True(ok)
-
-	// Only tx1 should be in a built block
-	blkIntf, err := env.Builder.BuildBlock(context.Background())
-	require.NoError(err)
-
-	require.IsType(&blockexecutor.Block{}, blkIntf)
-	blk := blkIntf.(*blockexecutor.Block)
-	require.Len(blk.Txs(), 1)
-	require.Equal(tx1ID, blk.Txs()[0].ID())
-
-	// Mempool should have none of the txs
-	_, ok = env.mempool.Get(tx1ID)
-	require.False(ok)
-	_, ok = env.mempool.Get(tx2ID)
-	require.False(ok)
-	_, ok = env.mempool.Get(tx3ID)
-	require.False(ok)
-
-	// Only tx2 and tx3 should be dropped
-	require.NoError(env.mempool.GetDropReason(tx1ID))
-
-	tx2DropReason := env.mempool.GetDropReason(tx2ID)
-	require.ErrorIs(tx2DropReason, txexecutor.ErrTimestampNotBeforeStartTime)
-
-	tx3DropReason := env.mempool.GetDropReason(tx3ID)
-	require.ErrorIs(tx3DropReason, txexecutor.ErrFutureStakeTime)
-}
-
 func TestBuildBlockInvalidStakingDurations(t *testing.T) {
 	require := require.New(t)
 
-	env := newEnvironment(t)
+	env := newEnvironment(t, latestFork)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
@@ -402,15 +315,31 @@ func TestBuildBlockInvalidStakingDurations(t *testing.T) {
 	require.NoError(err)
 
 	tx1, err := env.txBuilder.NewAddPermissionlessValidatorTx(
-		defaultValidatorStake,
-		uint64(now.Unix()),
-		uint64(validatorEndTime.Unix()),
-		ids.GenerateTestNodeID(),
+		&txs.SubnetValidator{
+			Validator: txs.Validator{
+				NodeID: ids.GenerateTestNodeID(),
+				Start:  uint64(now.Unix()),
+				End:    uint64(validatorEndTime.Unix()),
+				Wght:   defaultValidatorStake,
+			},
+			Subnet: constants.PrimaryNetworkID,
+		},
 		signer.NewProofOfPossession(sk),
-		preFundedKeys[0].PublicKey().Address(),
+		env.ctx.AVAXAssetID,
+		&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
+		},
+		&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
+		},
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{preFundedKeys[0]},
-		preFundedKeys[0].PublicKey().Address(),
+		common.WithChangeOwner(&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
+		}),
 	)
 	require.NoError(err)
 	require.NoError(env.mempool.Add(tx1))
@@ -425,15 +354,31 @@ func TestBuildBlockInvalidStakingDurations(t *testing.T) {
 	require.NoError(err)
 
 	tx2, err := env.txBuilder.NewAddPermissionlessValidatorTx(
-		defaultValidatorStake,
-		uint64(now.Unix()),
-		uint64(validator2EndTime.Unix()),
-		ids.GenerateTestNodeID(),
+		&txs.SubnetValidator{
+			Validator: txs.Validator{
+				NodeID: ids.GenerateTestNodeID(),
+				Start:  uint64(now.Unix()),
+				End:    uint64(validator2EndTime.Unix()),
+				Wght:   defaultValidatorStake,
+			},
+			Subnet: constants.PrimaryNetworkID,
+		},
 		signer.NewProofOfPossession(sk),
-		preFundedKeys[2].PublicKey().Address(),
+		env.ctx.AVAXAssetID,
+		&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{preFundedKeys[2].PublicKey().Address()},
+		},
+		&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{preFundedKeys[2].PublicKey().Address()},
+		},
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{preFundedKeys[2]},
-		preFundedKeys[2].PublicKey().Address(),
+		common.WithChangeOwner(&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{preFundedKeys[2].PublicKey().Address()},
+		}),
 	)
 	require.NoError(err)
 	require.NoError(env.mempool.Add(tx2))
@@ -466,7 +411,7 @@ func TestBuildBlockInvalidStakingDurations(t *testing.T) {
 func TestPreviouslyDroppedTxsCannotBeReAddedToMempool(t *testing.T) {
 	require := require.New(t)
 
-	env := newEnvironment(t)
+	env := newEnvironment(t, latestFork)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
@@ -478,7 +423,6 @@ func TestPreviouslyDroppedTxsCannotBeReAddedToMempool(t *testing.T) {
 		nil,
 		"chain name",
 		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
-		ids.ShortEmpty,
 	)
 	require.NoError(err)
 	txID := tx.ID()
@@ -495,7 +439,7 @@ func TestPreviouslyDroppedTxsCannotBeReAddedToMempool(t *testing.T) {
 
 	// Issue the transaction
 	env.ctx.Lock.Unlock()
-	err = env.network.IssueTx(context.Background(), tx)
+	err = env.network.IssueTxFromRPC(tx)
 	require.ErrorIs(err, errTestingDropped)
 	env.ctx.Lock.Lock()
 	_, ok := env.mempool.Get(txID)
@@ -509,7 +453,7 @@ func TestPreviouslyDroppedTxsCannotBeReAddedToMempool(t *testing.T) {
 func TestNoErrorOnUnexpectedSetPreferenceDuringBootstrapping(t *testing.T) {
 	require := require.New(t)
 
-	env := newEnvironment(t)
+	env := newEnvironment(t, latestFork)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 

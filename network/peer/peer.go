@@ -23,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/bloom"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -91,11 +92,6 @@ type Peer interface {
 	// guaranteed not to be delivered to the peer.
 	Send(ctx context.Context, msg message.OutboundMessage) bool
 
-	// StartSendPeerList attempts to send a PeerList message to this peer on
-	// this peer's gossip routine. It is not guaranteed that a PeerList will be
-	// sent.
-	StartSendPeerList()
-
 	// StartSendGetPeerList attempts to send a GetPeerList message to this peer
 	// on this peer's gossip routine. It is not guaranteed that a GetPeerList
 	// will be sent.
@@ -142,6 +138,14 @@ type peer struct {
 	supportedACPs set.Set[uint32]
 	objectedACPs  set.Set[uint32]
 
+	// txIDOfVerifiedBLSKey is the txID that added the BLS key that was most
+	// recently verified to have signed the IP.
+	//
+	// Invariant: Prior to the handshake being completed, this can only be
+	// accessed by the reader goroutine. After the handshake has been completed,
+	// this can only be accessed by the message sender goroutine.
+	txIDOfVerifiedBLSKey ids.ID
+
 	observedUptimesLock sync.RWMutex
 	// [observedUptimesLock] must be held while accessing [observedUptime]
 	// Subnet ID --> Our uptime for the given subnet as perceived by the peer
@@ -177,10 +181,6 @@ type peer struct {
 	// Must only be accessed atomically
 	lastSent, lastReceived int64
 
-	// peerListChan signals that we should attempt to send a PeerList to this
-	// peer
-	peerListChan chan struct{}
-
 	// getPeerListChan signals that we should attempt to send a GetPeerList to
 	// this peer
 	getPeerListChan chan struct{}
@@ -210,7 +210,6 @@ func Start(
 		onClosingCtxCancel: onClosingCtxCancel,
 		onClosed:           make(chan struct{}),
 		observedUptimes:    make(map[ids.ID]uint32),
-		peerListChan:       make(chan struct{}, 1),
 		getPeerListChan:    make(chan struct{}, 1),
 	}
 
@@ -316,13 +315,6 @@ func (p *peer) ObservedUptime(subnetID ids.ID) (uint32, bool) {
 
 func (p *peer) Send(ctx context.Context, msg message.OutboundMessage) bool {
 	return p.messageQueue.Push(ctx, msg)
-}
-
-func (p *peer) StartSendPeerList() {
-	select {
-	case p.peerListChan <- struct{}{}:
-	default:
-	}
 }
 
 func (p *peer) StartSendGetPeerList() {
@@ -531,26 +523,19 @@ func (p *peer) writeMessages() {
 	}
 
 	myVersion := p.VersionCompatibility.Version()
-	legacyApplication := &version.Application{
-		Name:  version.LegacyAppName,
-		Major: myVersion.Major,
-		Minor: myVersion.Minor,
-		Patch: myVersion.Patch,
-	}
-
 	knownPeersFilter, knownPeersSalt := p.Network.KnownPeers()
 
 	msg, err := p.MessageCreator.Handshake(
 		p.NetworkID,
 		p.Clock.Unix(),
 		mySignedIP.IPPort,
-		legacyApplication.String(),
 		myVersion.Name,
 		uint32(myVersion.Major),
 		uint32(myVersion.Minor),
 		uint32(myVersion.Patch),
 		mySignedIP.Timestamp,
-		mySignedIP.Signature,
+		mySignedIP.TLSSignature,
+		mySignedIP.BLSSignatureBytes,
 		p.MySubnets.List(),
 		p.SupportedACPs,
 		p.ObjectedACPs,
@@ -646,32 +631,6 @@ func (p *peer) sendNetworkMessages() {
 
 	for {
 		select {
-		case <-p.peerListChan:
-			peerIPs := p.Config.Network.Peers(p.id, bloom.EmptyFilter, nil)
-			if len(peerIPs) == 0 {
-				p.Log.Verbo(
-					"skipping peer gossip as there are no unknown peers",
-					zap.Stringer("nodeID", p.id),
-				)
-				continue
-			}
-
-			// Bypass throttling is disabled here to follow the non-handshake
-			// message sending pattern.
-			msg, err := p.Config.MessageCreator.PeerList(peerIPs, false /*=bypassThrottling*/)
-			if err != nil {
-				p.Log.Error("failed to create peer list message",
-					zap.Stringer("nodeID", p.id),
-					zap.Error(err),
-				)
-				continue
-			}
-
-			if !p.Send(p.onClosingCtx, msg) {
-				p.Log.Debug("failed to send peer list",
-					zap.Stringer("nodeID", p.id),
-				)
-			}
 		case <-p.getPeerListChan:
 			knownPeersFilter, knownPeersSalt := p.Config.Network.KnownPeers()
 			msg, err := p.Config.MessageCreator.GetPeerList(knownPeersFilter, knownPeersSalt)
@@ -697,16 +656,11 @@ func (p *peer) sendNetworkMessages() {
 				return
 			}
 
-			if p.finishedHandshake.Get() {
-				if err := p.VersionCompatibility.Compatible(p.version); err != nil {
-					p.Log.Debug("disconnecting from peer",
-						zap.String("reason", "version not compatible"),
-						zap.Stringer("nodeID", p.id),
-						zap.Stringer("peerVersion", p.version),
-						zap.Error(err),
-					)
-					return
-				}
+			// Only check if we should disconnect after the handshake is
+			// finished to avoid race conditions and accessing uninitialized
+			// values.
+			if p.finishedHandshake.Get() && p.shouldDisconnect() {
+				return
 			}
 
 			primaryUptime, subnetUptimes := p.getUptimes()
@@ -725,6 +679,60 @@ func (p *peer) sendNetworkMessages() {
 			return
 		}
 	}
+}
+
+// shouldDisconnect is called both during receipt of the Handshake message and
+// periodically when sending a Ping message (after finishing the handshake!).
+//
+// It is called during the Handshake to prevent marking a peer as connected and
+// then immediately disconnecting from them.
+//
+// It is called when sending a Ping message to account for validator set
+// changes. It's called when sending a Ping rather than in a validator set
+// callback to avoid signature verification on the P-chain accept path.
+func (p *peer) shouldDisconnect() bool {
+	if err := p.VersionCompatibility.Compatible(p.version); err != nil {
+		p.Log.Debug("disconnecting from peer",
+			zap.String("reason", "version not compatible"),
+			zap.Stringer("nodeID", p.id),
+			zap.Stringer("peerVersion", p.version),
+			zap.Error(err),
+		)
+		return true
+	}
+
+	// Enforce that all validators that have registered a BLS key are signing
+	// their IP with it after the activation of Durango.
+	vdr, ok := p.Validators.GetValidator(constants.PrimaryNetworkID, p.id)
+	if !ok || vdr.PublicKey == nil || vdr.TxID == p.txIDOfVerifiedBLSKey {
+		return false
+	}
+
+	if p.ip.BLSSignature == nil {
+		p.Log.Debug("disconnecting from peer",
+			zap.String("reason", "missing BLS signature"),
+			zap.Stringer("nodeID", p.id),
+		)
+		return true
+	}
+
+	validSignature := bls.VerifyProofOfPossession(
+		vdr.PublicKey,
+		p.ip.BLSSignature,
+		p.ip.UnsignedIP.bytes(),
+	)
+	if !validSignature {
+		p.Log.Debug("disconnecting from peer",
+			zap.String("reason", "invalid BLS signature"),
+			zap.Stringer("nodeID", p.id),
+		)
+		return true
+	}
+
+	// Avoid unnecessary signature verifications by only verifing the signature
+	// once per validation period.
+	p.txIDOfVerifiedBLSKey = vdr.TxID
+	return false
 }
 
 func (p *peer) handle(msg message.InboundMessage) {
@@ -768,8 +776,7 @@ func (p *peer) handle(msg message.InboundMessage) {
 func (p *peer) handlePing(msg *p2p.Ping) {
 	p.observeUptimes(msg.Uptime, msg.SubnetUptimes)
 
-	primaryUptime, subnetUptimes := p.getUptimes()
-	pongMessage, err := p.MessageCreator.Pong(primaryUptime, subnetUptimes)
+	pongMessage, err := p.MessageCreator.Pong()
 	if err != nil {
 		p.Log.Error("failed to create message",
 			zap.Stringer("messageOp", message.PongOp),
@@ -818,20 +825,9 @@ func (p *peer) getUptimes() (uint32, []*p2p.SubnetUptime) {
 	return primaryUptimePercent, subnetUptimes
 }
 
-func (p *peer) handlePong(msg *p2p.Pong) {
-	// TODO: Remove once everyone sends uptimes in Ping messages.
-	p.observeUptimes(msg.Uptime, msg.SubnetUptimes)
-}
+func (*peer) handlePong(*p2p.Pong) {}
 
 func (p *peer) observeUptimes(primaryUptime uint32, subnetUptimes []*p2p.SubnetUptime) {
-	// TODO: Remove once everyone sends uptimes in Ping messages.
-	//
-	// If primaryUptime is 0, the message may not include any uptimes. This may
-	// happen with old Ping messages or new Pong messages.
-	if primaryUptime == 0 {
-		return
-	}
-
 	if primaryUptime > 100 {
 		p.Log.Debug("dropping message with invalid uptime",
 			zap.Stringer("nodeID", p.id),
@@ -930,25 +926,11 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 		return
 	}
 
-	if msg.Client != nil {
-		p.version = &version.Application{
-			Name:  msg.Client.Name,
-			Major: int(msg.Client.Major),
-			Minor: int(msg.Client.Minor),
-			Patch: int(msg.Client.Patch),
-		}
-	} else {
-		// Handle legacy version field
-		peerVersion, err := version.ParseLegacyApplication(msg.MyVersion)
-		if err != nil {
-			p.Log.Debug("failed to parse peer version",
-				zap.Stringer("nodeID", p.id),
-				zap.Error(err),
-			)
-			p.StartClose()
-			return
-		}
-		p.version = peerVersion
+	p.version = &version.Application{
+		Name:  msg.Client.GetName(),
+		Major: int(msg.Client.GetMajor()),
+		Minor: int(msg.Client.GetMinor()),
+		Patch: int(msg.Client.GetPatch()),
 	}
 
 	if p.VersionCompatibility.Version().Before(p.version) {
@@ -963,16 +945,6 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 				zap.Stringer("peerVersion", p.version),
 			)
 		}
-	}
-
-	if err := p.VersionCompatibility.Compatible(p.version); err != nil {
-		p.Log.Verbo("peer version not compatible",
-			zap.Stringer("nodeID", p.id),
-			zap.Stringer("peerVersion", p.version),
-			zap.Error(err),
-		)
-		p.StartClose()
-		return
 	}
 
 	// handle subnet IDs
@@ -1076,13 +1048,14 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 			},
 			Timestamp: msg.IpSigningTime,
 		},
-		Signature: msg.Sig,
+		TLSSignature: msg.IpNodeIdSig,
 	}
 	maxTimestamp := myTime.Add(p.MaxClockDifference)
 	if err := p.ip.Verify(p.cert, maxTimestamp); err != nil {
 		if _, ok := p.Beacons.GetValidator(constants.PrimaryNetworkID, p.id); ok {
 			p.Log.Warn("beacon has invalid signature or is out of sync",
 				zap.Stringer("nodeID", p.id),
+				zap.String("signatureType", "tls"),
 				zap.Uint64("peerTime", msg.MyTime),
 				zap.Uint64("myTime", myTimeUnix),
 				zap.Error(err),
@@ -1090,12 +1063,38 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 		} else {
 			p.Log.Debug("peer has invalid signature or is out of sync",
 				zap.Stringer("nodeID", p.id),
+				zap.String("signatureType", "tls"),
 				zap.Uint64("peerTime", msg.MyTime),
 				zap.Uint64("myTime", myTimeUnix),
 				zap.Error(err),
 			)
 		}
 
+		p.StartClose()
+		return
+	}
+
+	// TODO: After v1.11.x is activated, require the key to be provided.
+	if len(msg.IpBlsSig) > 0 {
+		signature, err := bls.SignatureFromBytes(msg.IpBlsSig)
+		if err != nil {
+			p.Log.Debug("peer has malformed signature",
+				zap.Stringer("nodeID", p.id),
+				zap.String("signatureType", "bls"),
+				zap.Error(err),
+			)
+			p.StartClose()
+			return
+		}
+
+		p.ip.BLSSignature = signature
+		p.ip.BLSSignatureBytes = msg.IpBlsSig
+	}
+
+	// If the peer is running an incompatible version or has an invalid BLS
+	// signature, disconnect from them prior to marking the handshake as
+	// completed.
+	if p.shouldDisconnect() {
 		p.StartClose()
 		return
 	}
@@ -1196,22 +1195,9 @@ func (p *peer) handlePeerList(msg *p2p.PeerList) {
 		close(p.onFinishHandshake)
 	}
 
-	// Invariant: We do not account for clock skew here, as the sender of the
-	// certificate is expected to account for clock skew during the activation
-	// of Durango.
-	durangoTime := version.GetDurangoTime(p.NetworkID)
-	beforeDurango := time.Now().Before(durangoTime)
 	discoveredIPs := make([]*ips.ClaimedIPPort, len(msg.ClaimedIpPorts)) // the peers this peer told us about
 	for i, claimedIPPort := range msg.ClaimedIpPorts {
-		var (
-			tlsCert *staking.Certificate
-			err     error
-		)
-		if beforeDurango {
-			tlsCert, err = staking.ParseCertificate(claimedIPPort.X509Certificate)
-		} else {
-			tlsCert, err = staking.ParseCertificatePermissive(claimedIPPort.X509Certificate)
-		}
+		tlsCert, err := staking.ParseCertificate(claimedIPPort.X509Certificate)
 		if err != nil {
 			p.Log.Debug("message with invalid field",
 				zap.Stringer("nodeID", p.id),

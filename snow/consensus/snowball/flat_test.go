@@ -21,7 +21,7 @@ func TestFlat(t *testing.T) {
 		BetaVirtuous:    1,
 		BetaRogue:       2,
 	}
-	f := NewFlat(params, Red)
+	f := NewFlat(SnowballFactory, params, Red)
 	f.Add(Green)
 	f.Add(Blue)
 

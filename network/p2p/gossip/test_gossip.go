@@ -56,6 +56,11 @@ func (t *testSet) Add(gossipable *testTx) error {
 	return nil
 }
 
+func (t *testSet) Has(gossipID ids.ID) bool {
+	_, ok := t.txs[gossipID]
+	return ok
+}
+
 func (t *testSet) Iterate(f func(gossipable *testTx) bool) {
 	for _, tx := range t.txs {
 		if !f(tx) {

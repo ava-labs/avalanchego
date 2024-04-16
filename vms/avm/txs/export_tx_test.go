@@ -5,7 +5,6 @@ package txs
 
 import (
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -110,7 +109,6 @@ func TestExportTxSerialization(t *testing.T) {
 	}}
 
 	parser, err := NewParser(
-		time.Time{},
 		[]fxs.Fx{
 			&secp256k1fx.Fx{},
 		},

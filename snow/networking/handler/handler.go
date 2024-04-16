@@ -371,9 +371,10 @@ func (h *handler) dispatchSync(ctx context.Context) {
 		// If there is an error handling the message, shut down the chain
 		if err := h.handleSyncMsg(ctx, msg); err != nil {
 			h.StopWithError(ctx, fmt.Errorf(
-				"%w while processing sync message: %s",
+				"%w while processing sync message: %s from %s",
 				err,
-				msg,
+				msg.Op(),
+				msg.NodeID(),
 			))
 			return
 		}
@@ -429,7 +430,7 @@ func (h *handler) dispatchChans(ctx context.Context) {
 			h.StopWithError(ctx, fmt.Errorf(
 				"%w while processing chan message: %s",
 				err,
-				msg,
+				msg.Op(),
 			))
 			return
 		}
@@ -716,9 +717,7 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 				zap.String("field", "PreferredIDAtHeight"),
 				zap.Error(err),
 			)
-			// TODO: Require this field to be populated correctly after v1.11.x
-			// is activated.
-			preferredIDAtHeight = preferredID
+			return engine.QueryFailed(ctx, nodeID, msg.RequestId)
 		}
 
 		acceptedID, err := ids.ToID(msg.AcceptedId)
@@ -768,9 +767,10 @@ func (h *handler) handleAsyncMsg(ctx context.Context, msg Message) {
 	h.asyncMessagePool.Go(func() error {
 		if err := h.executeAsyncMsg(ctx, msg); err != nil {
 			h.StopWithError(ctx, fmt.Errorf(
-				"%w while processing async message: %s",
+				"%w while processing async message: %s from %s",
 				err,
-				msg,
+				msg.Op(),
+				msg.NodeID(),
 			))
 		}
 		return nil

@@ -419,20 +419,6 @@ func TestGetSubnetConfigsFromFile(t *testing.T) {
 			},
 			expectedErr: nil,
 		},
-		"gossip config": {
-			fileName:  "2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i.json",
-			givenJSON: `{"appGossipNonValidatorSize": 100 }`,
-			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
-				id, _ := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
-				config, ok := given[id]
-				require.True(ok)
-				require.Equal(uint(100), config.GossipConfig.AppGossipNonValidatorSize)
-				// must still respect defaults
-				require.Equal(20, config.ConsensusParameters.K)
-				require.Equal(uint(10), config.GossipConfig.AppGossipValidatorSize)
-			},
-			expectedErr: nil,
-		},
 	}
 
 	for name, test := range tests {
@@ -527,7 +513,6 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 				require.Equal(20, config.ConsensusParameters.AlphaConfidence)
 				require.Equal(30, config.ConsensusParameters.K)
 				// must still respect defaults
-				require.Equal(uint(10), config.GossipConfig.AppGossipValidatorSize)
 				require.Equal(256, config.ConsensusParameters.MaxOutstandingItems)
 			},
 			expectedErr: nil,

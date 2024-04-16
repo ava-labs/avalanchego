@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/compression"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
@@ -56,22 +57,6 @@ type PeerListGossipConfig struct {
 	// PeerListNumValidatorIPs is the number of validator IPs to gossip in every
 	// gossip event.
 	PeerListNumValidatorIPs uint32 `json:"peerListNumValidatorIPs"`
-
-	// PeerListValidatorGossipSize is the number of validators to gossip the IPs
-	// to in every IP gossip event.
-	PeerListValidatorGossipSize uint32 `json:"peerListValidatorGossipSize"`
-
-	// PeerListNonValidatorGossipSize is the number of non-validators to gossip
-	// the IPs to in every IP gossip event.
-	PeerListNonValidatorGossipSize uint32 `json:"peerListNonValidatorGossipSize"`
-
-	// PeerListPeersGossipSize is the number of peers to gossip
-	// the IPs to in every IP gossip event.
-	PeerListPeersGossipSize uint32 `json:"peerListPeersGossipSize"`
-
-	// PeerListGossipFreq is the frequency that this node will attempt to gossip
-	// signed IPs to its peers.
-	PeerListGossipFreq time.Duration `json:"peerListGossipFreq"`
 
 	// PeerListPullGossipFreq is the frequency that this node will attempt to
 	// request signed IPs from its peers.
@@ -142,6 +127,8 @@ type Config struct {
 
 	// TLSKey is this node's TLS key that is used to sign IPs.
 	TLSKey crypto.Signer `json:"-"`
+	// BLSKey is this node's BLS key that is used to sign IPs.
+	BLSKey *bls.SecretKey `json:"-"`
 
 	// TrackedSubnets of the node.
 	TrackedSubnets set.Set[ids.ID]    `json:"-"`

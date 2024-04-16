@@ -56,7 +56,6 @@ service VM {
   rpc BatchedParseBlock(BatchedParseBlockRequest) returns (BatchedParseBlockResponse);
 
   // HeightIndexedChainVM
-  rpc VerifyHeightIndex(google.protobuf.Empty) returns (VerifyHeightIndexResponse);
   rpc GetBlockIDAtHeight(GetBlockIDAtHeightRequest) returns (GetBlockIDAtHeightResponse);
 
   // StateSyncableVM
@@ -101,8 +100,7 @@ enum Error {
   ERROR_UNSPECIFIED = 0;
   ERROR_CLOSED = 1;
   ERROR_NOT_FOUND = 2;
-  ERROR_HEIGHT_INDEX_INCOMPLETE = 3;
-  ERROR_STATE_SYNC_NOT_IMPLEMENTED = 4;
+  ERROR_STATE_SYNC_NOT_IMPLEMENTED = 3;
 }
 
 message InitializeRequest {
@@ -332,10 +330,6 @@ message BatchedParseBlockRequest {
 
 message BatchedParseBlockResponse {
   repeated ParseBlockResponse response = 1;
-}
-
-message VerifyHeightIndexResponse {
-  Error err = 1;
 }
 
 message GetBlockIDAtHeightRequest {

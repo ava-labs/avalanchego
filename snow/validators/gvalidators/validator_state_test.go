@@ -184,8 +184,8 @@ func TestPublicKeyDeserialize(t *testing.T) {
 	require.NoError(err)
 	pk := bls.PublicFromSecretKey(sk)
 
-	pkBytes := bls.SerializePublicKey(pk)
-	pkDe := bls.DeserializePublicKey(pkBytes)
+	pkBytes := bls.PublicKeyToUncompressedBytes(pk)
+	pkDe := bls.PublicKeyFromValidUncompressedBytes(pkBytes)
 	require.NotNil(pkDe)
 	require.Equal(pk, pkDe)
 }

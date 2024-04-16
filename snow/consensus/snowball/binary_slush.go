@@ -5,8 +5,6 @@ package snowball
 
 import "fmt"
 
-var _ BinarySlush = (*binarySlush)(nil)
-
 func newBinarySlush(choice int) binarySlush {
 	return binarySlush{
 		preference: choice,

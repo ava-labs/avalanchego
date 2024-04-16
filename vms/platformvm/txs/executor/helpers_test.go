@@ -33,7 +33,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
@@ -42,14 +41,22 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
 
 const (
 	defaultWeight = 5 * units.MilliAvax
 	trackChecksum = false
+
+	apricotPhase3 fork = iota
+	apricotPhase5
+	banff
+	cortina
+	durango
+	eUpgrade
 )
 
 var (
@@ -78,6 +85,8 @@ func init() {
 	}
 }
 
+type fork uint8
+
 type mutableSharedMemory struct {
 	atomic.SharedMemory
 }
@@ -92,10 +101,9 @@ type environment struct {
 	fx             fx.Fx
 	state          state.State
 	states         map[ids.ID]state.Chain
-	atomicUTXOs    avax.AtomicUTXOManager
 	uptimes        uptime.Manager
-	utxosHandler   utxo.Handler
-	txBuilder      builder.Builder
+	utxosHandler   utxo.Verifier
+	txBuilder      *txstest.Builder
 	backend        Backend
 }
 
@@ -111,12 +119,12 @@ func (e *environment) SetState(blkID ids.ID, chainState state.Chain) {
 	e.states[blkID] = chainState
 }
 
-func newEnvironment(t *testing.T, postBanff, postCortina, postDurango bool) *environment {
+func newEnvironment(t *testing.T, f fork) *environment {
 	var isBootstrapped utils.Atomic[bool]
 	isBootstrapped.Set(true)
 
-	config := defaultConfig(postBanff, postCortina, postDurango)
-	clk := defaultClock(postBanff || postCortina || postDurango)
+	config := defaultConfig(t, f)
+	clk := defaultClock(f)
 
 	baseDB := versiondb.New(memdb.New())
 	ctx := snowtest.Context(t, snowtest.PChainID)
@@ -131,18 +139,13 @@ func newEnvironment(t *testing.T, postBanff, postCortina, postDurango bool) *env
 	rewards := reward.NewCalculator(config.RewardConfig)
 	baseState := defaultState(config, ctx, baseDB, rewards)
 
-	atomicUTXOs := avax.NewAtomicUTXOManager(ctx.SharedMemory, txs.Codec)
 	uptimes := uptime.NewManager(baseState, clk)
-	utxoHandler := utxo.NewHandler(ctx, clk, fx)
+	utxosVerifier := utxo.NewVerifier(ctx, clk, fx)
 
-	txBuilder := builder.New(
+	txBuilder := txstest.NewBuilder(
 		ctx,
 		config,
-		clk,
-		fx,
 		baseState,
-		atomicUTXOs,
-		utxoHandler,
 	)
 
 	backend := Backend{
@@ -151,7 +154,7 @@ func newEnvironment(t *testing.T, postBanff, postCortina, postDurango bool) *env
 		Clk:          clk,
 		Bootstrapped: &isBootstrapped,
 		Fx:           fx,
-		FlowChecker:  utxoHandler,
+		FlowChecker:  utxosVerifier,
 		Uptimes:      uptimes,
 		Rewards:      rewards,
 	}
@@ -166,14 +169,13 @@ func newEnvironment(t *testing.T, postBanff, postCortina, postDurango bool) *env
 		fx:             fx,
 		state:          baseState,
 		states:         make(map[ids.ID]state.Chain),
-		atomicUTXOs:    atomicUTXOs,
 		uptimes:        uptimes,
-		utxosHandler:   utxoHandler,
+		utxosHandler:   utxosVerifier,
 		txBuilder:      txBuilder,
 		backend:        backend,
 	}
 
-	addSubnet(t, env, txBuilder)
+	addSubnet(t, env)
 
 	t.Cleanup(func() {
 		env.ctx.Lock.Lock()
@@ -202,24 +204,25 @@ func newEnvironment(t *testing.T, postBanff, postCortina, postDurango bool) *env
 	return env
 }
 
-func addSubnet(
-	t *testing.T,
-	env *environment,
-	txBuilder builder.Builder,
-) {
+func addSubnet(t *testing.T, env *environment) {
 	require := require.New(t)
 
 	// Create a subnet
 	var err error
-	testSubnet1, err = txBuilder.NewCreateSubnetTx(
-		2, // threshold; 2 sigs from keys[0], keys[1], keys[2] needed to add validator to this subnet
-		[]ids.ShortID{ // control keys
-			preFundedKeys[0].PublicKey().Address(),
-			preFundedKeys[1].PublicKey().Address(),
-			preFundedKeys[2].PublicKey().Address(),
+	testSubnet1, err = env.txBuilder.NewCreateSubnetTx(
+		&secp256k1fx.OutputOwners{
+			Threshold: 2,
+			Addrs: []ids.ShortID{
+				preFundedKeys[0].PublicKey().Address(),
+				preFundedKeys[1].PublicKey().Address(),
+				preFundedKeys[2].PublicKey().Address(),
+			},
 		},
 		[]*secp256k1.PrivateKey{preFundedKeys[0]},
-		preFundedKeys[0].PublicKey().Address(),
+		common.WithChangeOwner(&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
+		}),
 	)
 	require.NoError(err)
 
@@ -270,21 +273,8 @@ func defaultState(
 	return state
 }
 
-func defaultConfig(postBanff, postCortina, postDurango bool) *config.Config {
-	banffTime := mockable.MaxTime
-	if postBanff {
-		banffTime = defaultValidateEndTime.Add(-2 * time.Second)
-	}
-	cortinaTime := mockable.MaxTime
-	if postCortina {
-		cortinaTime = defaultValidateStartTime.Add(-2 * time.Second)
-	}
-	durangoTime := mockable.MaxTime
-	if postDurango {
-		durangoTime = defaultValidateStartTime.Add(-2 * time.Second)
-	}
-
-	return &config.Config{
+func defaultConfig(t *testing.T, f fork) *config.Config {
+	c := &config.Config{
 		Chains:                 chains.TestManager,
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		Validators:             validators.NewManager(),
@@ -302,18 +292,43 @@ func defaultConfig(postBanff, postCortina, postDurango bool) *config.Config {
 			MintingPeriod:      365 * 24 * time.Hour,
 			SupplyCap:          720 * units.MegaAvax,
 		},
-		ApricotPhase3Time: defaultValidateEndTime,
-		ApricotPhase5Time: defaultValidateEndTime,
-		BanffTime:         banffTime,
-		CortinaTime:       cortinaTime,
-		DurangoTime:       durangoTime,
+		ApricotPhase3Time: mockable.MaxTime,
+		ApricotPhase5Time: mockable.MaxTime,
+		BanffTime:         mockable.MaxTime,
+		CortinaTime:       mockable.MaxTime,
+		DurangoTime:       mockable.MaxTime,
+		EUpgradeTime:      mockable.MaxTime,
 	}
+
+	switch f {
+	case eUpgrade:
+		c.EUpgradeTime = defaultValidateStartTime.Add(-2 * time.Second)
+		fallthrough
+	case durango:
+		c.DurangoTime = defaultValidateStartTime.Add(-2 * time.Second)
+		fallthrough
+	case cortina:
+		c.CortinaTime = defaultValidateStartTime.Add(-2 * time.Second)
+		fallthrough
+	case banff:
+		c.BanffTime = defaultValidateStartTime.Add(-2 * time.Second)
+		fallthrough
+	case apricotPhase5:
+		c.ApricotPhase5Time = defaultValidateEndTime
+		fallthrough
+	case apricotPhase3:
+		c.ApricotPhase3Time = defaultValidateEndTime
+	default:
+		require.FailNow(t, "unhandled fork", f)
+	}
+
+	return c
 }
 
-func defaultClock(postFork bool) *mockable.Clock {
+func defaultClock(f fork) *mockable.Clock {
 	now := defaultGenesisTime
-	if postFork {
-		// 1 second after Banff fork
+	if f >= banff {
+		// 1 second after active fork
 		now = defaultValidateEndTime.Add(-2 * time.Second)
 	}
 	clk := &mockable.Clock{}
@@ -341,7 +356,7 @@ func (fvi *fxVMInt) Logger() logging.Logger {
 
 func defaultFx(clk *mockable.Clock, log logging.Logger, isBootstrapped bool) fx.Fx {
 	fxVMInt := &fxVMInt{
-		registry: linearcodec.NewDefault(time.Time{}),
+		registry: linearcodec.NewDefault(),
 		clk:      clk,
 		log:      log,
 	}

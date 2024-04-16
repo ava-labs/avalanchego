@@ -20,7 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/network/dialer"
 	"github.com/ava-labs/avalanchego/network/peer"
 	"github.com/ava-labs/avalanchego/network/throttling"
-	"github.com/ava-labs/avalanchego/proto/pb/p2p"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/uptime"
@@ -28,6 +28,7 @@ import (
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math/meter"
@@ -48,13 +49,9 @@ var (
 		SendFailRateHalflife:         time.Second,
 	}
 	defaultPeerListGossipConfig = PeerListGossipConfig{
-		PeerListNumValidatorIPs:        100,
-		PeerListValidatorGossipSize:    100,
-		PeerListNonValidatorGossipSize: 100,
-		PeerListPeersGossipSize:        100,
-		PeerListGossipFreq:             time.Second,
-		PeerListPullGossipFreq:         time.Second,
-		PeerListBloomResetFreq:         constants.DefaultNetworkPeerListBloomResetFreq,
+		PeerListNumValidatorIPs: 100,
+		PeerListPullGossipFreq:  time.Second,
+		PeerListBloomResetFreq:  constants.DefaultNetworkPeerListBloomResetFreq,
 	}
 	defaultTimeoutConfig = TimeoutConfig{
 		PingPongTimeout:      30 * time.Second,
@@ -171,11 +168,15 @@ func newTestNetwork(t *testing.T, count int) (*testDialer, []*testListener, []id
 		ip, listener := dialer.NewListener()
 		nodeID, tlsCert, tlsConfig := getTLS(t, i)
 
+		blsKey, err := bls.NewSecretKey()
+		require.NoError(t, err)
+
 		config := defaultConfig
 		config.TLSConfig = tlsConfig
 		config.MyNodeID = nodeID
 		config.MyIPPort = ip
 		config.TLSKey = tlsCert.PrivateKey.(crypto.Signer)
+		config.BLSKey = blsKey
 
 		listeners[i] = listener
 		nodeIDs[i] = nodeID
@@ -322,11 +323,18 @@ func TestSend(t *testing.T) {
 	net0 := networks[0]
 
 	mc := newMessageCreator(t)
-	outboundGetMsg, err := mc.Get(ids.Empty, 1, time.Second, ids.Empty, p2p.EngineType_ENGINE_TYPE_SNOWMAN)
+	outboundGetMsg, err := mc.Get(ids.Empty, 1, time.Second, ids.Empty)
 	require.NoError(err)
 
 	toSend := set.Of(nodeIDs[1])
-	sentTo := net0.Send(outboundGetMsg, toSend, constants.PrimaryNetworkID, subnets.NoOpAllower)
+	sentTo := net0.Send(
+		outboundGetMsg,
+		common.SendConfig{
+			NodeIDs: toSend,
+		},
+		constants.PrimaryNetworkID,
+		subnets.NoOpAllower,
+	)
 	require.Equal(toSend, sentTo)
 
 	inboundGetMsg := <-received
@@ -338,7 +346,7 @@ func TestSend(t *testing.T) {
 	wg.Wait()
 }
 
-func TestSendAndGossipWithFilter(t *testing.T) {
+func TestSendWithFilter(t *testing.T) {
 	require := require.New(t)
 
 	received := make(chan message.InboundMessage)
@@ -360,24 +368,23 @@ func TestSendAndGossipWithFilter(t *testing.T) {
 	net0 := networks[0]
 
 	mc := newMessageCreator(t)
-	outboundGetMsg, err := mc.Get(ids.Empty, 1, time.Second, ids.Empty, p2p.EngineType_ENGINE_TYPE_SNOWMAN)
+	outboundGetMsg, err := mc.Get(ids.Empty, 1, time.Second, ids.Empty)
 	require.NoError(err)
 
 	toSend := set.Of(nodeIDs...)
 	validNodeID := nodeIDs[1]
-	sentTo := net0.Send(outboundGetMsg, toSend, constants.PrimaryNetworkID, newNodeIDConnector(validNodeID))
+	sentTo := net0.Send(
+		outboundGetMsg,
+		common.SendConfig{
+			NodeIDs: toSend,
+		},
+		constants.PrimaryNetworkID,
+		newNodeIDConnector(validNodeID),
+	)
 	require.Len(sentTo, 1)
 	require.Contains(sentTo, validNodeID)
 
 	inboundGetMsg := <-received
-	require.Equal(message.GetOp, inboundGetMsg.Op())
-
-	// Test Gossip now
-	sentTo = net0.Gossip(outboundGetMsg, constants.PrimaryNetworkID, 0, 0, len(nodeIDs), newNodeIDConnector(validNodeID))
-	require.Len(sentTo, 1)
-	require.Contains(sentTo, validNodeID)
-
-	inboundGetMsg = <-received
 	require.Equal(message.GetOp, inboundGetMsg.Op())
 
 	for _, net := range networks {
@@ -395,9 +402,12 @@ func TestTrackVerifiesSignatures(t *testing.T) {
 	nodeID, tlsCert, _ := getTLS(t, 1)
 	require.NoError(network.config.Validators.AddStaker(constants.PrimaryNetworkID, nodeID, nil, ids.Empty, 1))
 
-	err := network.Track([]*ips.ClaimedIPPort{
+	stakingCert, err := staking.ParseCertificate(tlsCert.Leaf.Raw)
+	require.NoError(err)
+
+	err = network.Track([]*ips.ClaimedIPPort{
 		ips.NewClaimedIPPort(
-			staking.CertificateFromX509(tlsCert.Leaf),
+			stakingCert,
 			ips.IPPort{
 				IP:   net.IPv4(123, 132, 123, 123),
 				Port: 10000,
@@ -542,7 +552,7 @@ func TestDialDeletesNonValidators(t *testing.T) {
 	}
 
 	config := configs[0]
-	signer := peer.NewIPSigner(config.MyIPPort, config.TLSKey)
+	signer := peer.NewIPSigner(config.MyIPPort, config.TLSKey, config.BLSKey)
 	ip, err := signer.GetSignedIP()
 	require.NoError(err)
 
@@ -550,15 +560,17 @@ func TestDialDeletesNonValidators(t *testing.T) {
 	wg.Add(len(networks))
 	for i, net := range networks {
 		if i != 0 {
-			err := net.Track([]*ips.ClaimedIPPort{
+			stakingCert, err := staking.ParseCertificate(config.TLSConfig.Certificates[0].Leaf.Raw)
+			require.NoError(err)
+
+			require.NoError(net.Track([]*ips.ClaimedIPPort{
 				ips.NewClaimedIPPort(
-					staking.CertificateFromX509(config.TLSConfig.Certificates[0].Leaf),
+					stakingCert,
 					ip.IPPort,
 					ip.Timestamp,
-					ip.Signature,
+					ip.TLSSignature,
 				),
-			})
-			require.NoError(err)
+			}))
 		}
 
 		go func(net Network) {

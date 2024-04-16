@@ -5,7 +5,6 @@ package staking
 
 import (
 	"crypto"
-	"crypto/x509"
 	"encoding/asn1"
 	"fmt"
 
@@ -30,12 +29,6 @@ var (
 	//	id-ecPublicKey OBJECT IDENTIFIER ::= {
 	//		iso(1) member-body(2) us(840) ansi-X9-62(10045) keyType(2) 1 }
 	oidPublicKeyECDSA = asn1.ObjectIdentifier{1, 2, 840, 10045, 2, 1}
-
-	// Ref: https://github.com/golang/go/blob/go1.19.12/src/crypto/x509/x509.go#L326-L350
-	signatureAlgorithmVerificationDetails = map[x509.SignatureAlgorithm]x509.PublicKeyAlgorithm{
-		x509.SHA256WithRSA:   x509.RSA,
-		x509.ECDSAWithSHA256: x509.ECDSA,
-	}
 )
 
 func init() {

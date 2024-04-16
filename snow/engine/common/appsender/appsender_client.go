@@ -48,6 +48,20 @@ func (c *Client) SendCrossChainAppResponse(ctx context.Context, chainID ids.ID, 
 	return err
 }
 
+func (c *Client) SendCrossChainAppError(ctx context.Context, chainID ids.ID, requestID uint32, errorCode int32, errorMessage string) error {
+	_, err := c.client.SendCrossChainAppError(
+		ctx,
+		&appsenderpb.SendCrossChainAppErrorMsg{
+			ChainId:      chainID[:],
+			RequestId:    requestID,
+			ErrorCode:    errorCode,
+			ErrorMessage: errorMessage,
+		},
+	)
+
+	return err
+}
+
 func (c *Client) SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, request []byte) error {
 	nodeIDsBytes := make([][]byte, nodeIDs.Len())
 	i := 0
@@ -78,28 +92,38 @@ func (c *Client) SendAppResponse(ctx context.Context, nodeID ids.NodeID, request
 	return err
 }
 
-func (c *Client) SendAppGossip(ctx context.Context, msg []byte) error {
-	_, err := c.client.SendAppGossip(
-		ctx,
-		&appsenderpb.SendAppGossipMsg{
-			Msg: msg,
+func (c *Client) SendAppError(ctx context.Context, nodeID ids.NodeID, requestID uint32, errorCode int32, errorMessage string) error {
+	_, err := c.client.SendAppError(ctx,
+		&appsenderpb.SendAppErrorMsg{
+			NodeId:       nodeID[:],
+			RequestId:    requestID,
+			ErrorCode:    errorCode,
+			ErrorMessage: errorMessage,
 		},
 	)
+
 	return err
 }
 
-func (c *Client) SendAppGossipSpecific(ctx context.Context, nodeIDs set.Set[ids.NodeID], msg []byte) error {
-	nodeIDsBytes := make([][]byte, nodeIDs.Len())
+func (c *Client) SendAppGossip(
+	ctx context.Context,
+	config common.SendConfig,
+	msg []byte,
+) error {
+	nodeIDs := make([][]byte, config.NodeIDs.Len())
 	i := 0
-	for nodeID := range nodeIDs {
-		nodeIDsBytes[i] = nodeID.Bytes()
+	for nodeID := range config.NodeIDs {
+		nodeIDs[i] = nodeID.Bytes()
 		i++
 	}
-	_, err := c.client.SendAppGossipSpecific(
+	_, err := c.client.SendAppGossip(
 		ctx,
-		&appsenderpb.SendAppGossipSpecificMsg{
-			NodeIds: nodeIDsBytes,
-			Msg:     msg,
+		&appsenderpb.SendAppGossipMsg{
+			NodeIds:       nodeIDs,
+			Validators:    uint64(config.Validators),
+			NonValidators: uint64(config.NonValidators),
+			Peers:         uint64(config.Peers),
+			Msg:           msg,
 		},
 	)
 	return err
