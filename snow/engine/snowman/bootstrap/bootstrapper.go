@@ -512,6 +512,8 @@ func (b *Bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, request
 		blockSet[block.ID()] = block
 	}
 
+	// TODO: Calculate bandwidth based on the blocks that were persisted to
+	// disk.
 	var (
 		requestLatency = time.Since(requestTime).Seconds() + epsilon
 		bandwidth      = float64(numBytes) / requestLatency
