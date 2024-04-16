@@ -167,13 +167,11 @@ func TestSnowballLastBinary(t *testing.T) {
 }
 
 func TestSnowballAddPreviouslyRejected(t *testing.T) {
-	t.Skip()
 	require := require.New(t)
 
 	zero := ids.ID{0b00000000}
 	one := ids.ID{0b00000001}
 	two := ids.ID{0b00000010}
-	four := ids.ID{0b00000100}
 
 	params := Parameters{
 		K:               1,
@@ -182,16 +180,13 @@ func TestSnowballAddPreviouslyRejected(t *testing.T) {
 		Beta:            2,
 	}
 	tree := NewTree(SnowballFactory, params, zero)
-	tree.Add(one)
-	tree.Add(four)
+	tree.Add(two)
 
 	{
-		expected := `SB(Preference = 0, PreferenceStrength[0] = 0, PreferenceStrength[1] = 0, SF(Confidence = 0, Finalized = false, SL(Preference = 0))) Bit = 0
-    SB(PreferenceStrength = 0, SF(Confidence = 0, Finalized = false)) Bits = [1, 2)
-        SB(Preference = 0, PreferenceStrength[0] = 0, PreferenceStrength[1] = 0, SF(Confidence = 0, Finalized = false, SL(Preference = 0))) Bit = 2
-            SB(PreferenceStrength = 0, SF(Confidence = 0, Finalized = false)) Bits = [3, 256)
-            SB(PreferenceStrength = 0, SF(Confidence = 0, Finalized = false)) Bits = [3, 256)
-    SB(PreferenceStrength = 0, SF(Confidence = 0, Finalized = false)) Bits = [1, 256)`
+		expected := `SB(PreferenceStrength = 0, SF(Confidence = 0, Finalized = false)) Bits = [0, 1)
+    SB(Preference = 0, PreferenceStrength[0] = 0, PreferenceStrength[1] = 0, SF(Confidence = 0, Finalized = false, SL(Preference = 0))) Bit = 1
+        SB(PreferenceStrength = 0, SF(Confidence = 0, Finalized = false)) Bits = [2, 256)
+        SB(PreferenceStrength = 0, SF(Confidence = 0, Finalized = false)) Bits = [2, 256)`
 		require.Equal(expected, tree.String())
 		require.Equal(zero, tree.Preference())
 		require.False(tree.Finalized())
@@ -201,24 +196,33 @@ func TestSnowballAddPreviouslyRejected(t *testing.T) {
 	require.True(tree.RecordPoll(zeroBag))
 
 	{
-		expected := `SB(Preference = 0, PreferenceStrength[0] = 1, PreferenceStrength[1] = 0, SF(Confidence = 1, Finalized = false, SL(Preference = 0))) Bit = 0
-    SB(Preference = 0, PreferenceStrength[0] = 1, PreferenceStrength[1] = 0, SF(Confidence = 1, Finalized = false, SL(Preference = 0))) Bit = 2
-        SB(PreferenceStrength = 1, SF(Confidence = 1, Finalized = true)) Bits = [3, 256)
-        SB(PreferenceStrength = 0, SF(Confidence = 0, Finalized = false)) Bits = [3, 256)
-    SB(PreferenceStrength = 0, SF(Confidence = 0, Finalized = false)) Bits = [1, 256)`
+		expected := `SB(PreferenceStrength = 1, SF(Confidence = 1, Finalized = false)) Bits = [0, 1)
+    SB(Preference = 0, PreferenceStrength[0] = 1, PreferenceStrength[1] = 0, SF(Confidence = 1, Finalized = false, SL(Preference = 0))) Bit = 1
+        SB(PreferenceStrength = 1, SF(Confidence = 1, Finalized = false)) Bits = [2, 256)
+        SB(PreferenceStrength = 0, SF(Confidence = 0, Finalized = false)) Bits = [2, 256)`
 		require.Equal(expected, tree.String())
 		require.Equal(zero, tree.Preference())
 		require.False(tree.Finalized())
 	}
 
-	tree.Add(two)
+	twoBag := bag.Of(two)
+	require.True(tree.RecordPoll(twoBag))
 
 	{
-		expected := `SB(Preference = 0, PreferenceStrength[0] = 1, PreferenceStrength[1] = 0, SF(Confidence = 1, Finalized = false, SL(Preference = 0))) Bit = 0
-    SB(Preference = 0, PreferenceStrength[0] = 1, PreferenceStrength[1] = 0, SF(Confidence = 1, Finalized = false, SL(Preference = 0))) Bit = 2
-        SB(PreferenceStrength = 1, SF(Confidence = 1, Finalized = true)) Bits = [3, 256)
-        SB(PreferenceStrength = 0, SF(Confidence = 0, Finalized = false)) Bits = [3, 256)
-    SB(PreferenceStrength = 0, SF(Confidence = 0, Finalized = false)) Bits = [1, 256)`
+		expected := `SB(Preference = 0, PreferenceStrength[0] = 1, PreferenceStrength[1] = 1, SF(Confidence = 1, Finalized = false, SL(Preference = 1))) Bit = 1
+    SB(PreferenceStrength = 1, SF(Confidence = 1, Finalized = false)) Bits = [2, 256)
+    SB(PreferenceStrength = 1, SF(Confidence = 1, Finalized = false)) Bits = [2, 256)`
+		require.Equal(expected, tree.String())
+		require.Equal(zero, tree.Preference())
+		require.False(tree.Finalized())
+	}
+
+	tree.Add(one)
+
+	{
+		expected := `SB(Preference = 0, PreferenceStrength[0] = 1, PreferenceStrength[1] = 1, SF(Confidence = 1, Finalized = false, SL(Preference = 1))) Bit = 1
+    SB(PreferenceStrength = 1, SF(Confidence = 1, Finalized = false)) Bits = [2, 256)
+    SB(PreferenceStrength = 1, SF(Confidence = 1, Finalized = false)) Bits = [2, 256)`
 		require.Equal(expected, tree.String())
 		require.Equal(zero, tree.Preference())
 		require.False(tree.Finalized())
