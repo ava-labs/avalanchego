@@ -30,6 +30,9 @@ var (
 
 // This fetches IDs of blocks periodically accepted on the P-chain, X-chain, and
 // C-chain on both Fuji and Mainnet.
+//
+// This expects to be able to communicate with a Fuji node at [fujiURI] and a
+// Mainnet node at [mainnetURI]. Both nodes must have the index API enabled.
 func main() {
 	ctx := context.Background()
 
