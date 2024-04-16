@@ -1179,7 +1179,9 @@ func TestEngineBlockingChitRequest(t *testing.T) {
 func TestEngineBlockingChitResponse(t *testing.T) {
 	require := require.New(t)
 
-	vdr, _, sender, vm, te, gBlk := setupDefaultConfig(t)
+	engCfg := DefaultConfig(t)
+	engCfg.Params.Beta = 2
+	vdr, _, sender, vm, te, gBlk := setup(t, engCfg)
 
 	sender.Default(true)
 
@@ -1595,6 +1597,7 @@ func TestEngineAggressivePolling(t *testing.T) {
 
 	engCfg := DefaultConfig(t)
 	engCfg.Params.ConcurrentRepolls = 2
+	engCfg.Params.Beta = 2
 
 	vals := validators.NewManager()
 	engCfg.Validators = vals
