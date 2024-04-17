@@ -766,7 +766,6 @@ func TestSnowballConsistent(t *testing.T) {
 }
 
 func TestSnowballFilterBinaryChildren(t *testing.T) {
-	t.Skip()
 	require := require.New(t)
 
 	c0000 := ids.ID{0b00000000}
@@ -814,11 +813,21 @@ func TestSnowballFilterBinaryChildren(t *testing.T) {
 	c0000Bag := bag.Of(c0000)
 	require.True(tree.RecordPoll(c0000Bag))
 
+	//                    *
+	//             /            \
+	//          0 (1)           1 (0) Bit = 0
+	//          |                        \
+	//          0 (1) Bits[1, 2)         000 (0) Bits [1, 256)
+	//         /    \
+	//      0 (1)    1 (0) Bit = 2
+	//      |         |
+	//      0 (1)     0 (0) Bits [3, 256)
 	{
 		expected := `SB(Preference = 0, PreferenceStrength[0] = 1, PreferenceStrength[1] = 0, SF(Confidence = 1, Finalized = false, SL(Preference = 0))) Bit = 0
-    SB(Preference = 0, PreferenceStrength[0] = 1, PreferenceStrength[1] = 0, SF(Confidence = 1, Finalized = false, SL(Preference = 0))) Bit = 2
-        SB(PreferenceStrength = 1, SF(Confidence = 1, Finalized = true)) Bits = [3, 256)
-        SB(PreferenceStrength = 0, SF(Confidence = 0, Finalized = false)) Bits = [3, 256)
+    SB(PreferenceStrength = 1, SF(Confidence = 1, Finalized = false)) Bits = [1, 2)
+        SB(Preference = 0, PreferenceStrength[0] = 1, PreferenceStrength[1] = 0, SF(Confidence = 1, Finalized = false, SL(Preference = 0))) Bit = 2
+            SB(PreferenceStrength = 1, SF(Confidence = 1, Finalized = false)) Bits = [3, 256)
+            SB(PreferenceStrength = 0, SF(Confidence = 0, Finalized = false)) Bits = [3, 256)
     SB(PreferenceStrength = 0, SF(Confidence = 0, Finalized = false)) Bits = [1, 256)`
 		require.Equal(expected, tree.String())
 		require.Equal(c0000, tree.Preference())
@@ -827,11 +836,29 @@ func TestSnowballFilterBinaryChildren(t *testing.T) {
 
 	tree.Add(c0100)
 
+	// Options:
+	// 1000
+	// 0000
+	// 0010
+	// 0100
+
+	// Results:
+	//                  *
+	//             /        \
+	//          0 (1)        1 (0)
+	//         /    \            \
+	//       0 (1)   1 (0)         000 (0)
+	//     /    \       \
+	// 0 (1)    1 (0)    00 (0)
+	// |         |
+	// 0 (1)     0 (0)
 	{
 		expected := `SB(Preference = 0, PreferenceStrength[0] = 1, PreferenceStrength[1] = 0, SF(Confidence = 1, Finalized = false, SL(Preference = 0))) Bit = 0
-    SB(Preference = 0, PreferenceStrength[0] = 1, PreferenceStrength[1] = 0, SF(Confidence = 1, Finalized = false, SL(Preference = 0))) Bit = 2
-        SB(PreferenceStrength = 1, SF(Confidence = 1, Finalized = true)) Bits = [3, 256)
-        SB(PreferenceStrength = 0, SF(Confidence = 0, Finalized = false)) Bits = [3, 256)
+    SB(Preference = 0, PreferenceStrength[0] = 1, PreferenceStrength[1] = 0, SF(Confidence = 1, Finalized = false, SL(Preference = 0))) Bit = 1
+        SB(Preference = 0, PreferenceStrength[0] = 1, PreferenceStrength[1] = 0, SF(Confidence = 1, Finalized = false, SL(Preference = 0))) Bit = 2
+            SB(PreferenceStrength = 1, SF(Confidence = 1, Finalized = false)) Bits = [3, 256)
+            SB(PreferenceStrength = 0, SF(Confidence = 0, Finalized = false)) Bits = [3, 256)
+        SB(PreferenceStrength = 0, SF(Confidence = 0, Finalized = false)) Bits = [2, 256)
     SB(PreferenceStrength = 0, SF(Confidence = 0, Finalized = false)) Bits = [1, 256)`
 		require.Equal(expected, tree.String())
 		require.Equal(c0000, tree.Preference())
@@ -841,10 +868,28 @@ func TestSnowballFilterBinaryChildren(t *testing.T) {
 	c0100Bag := bag.Of(c0100)
 	require.True(tree.RecordPoll(c0100Bag))
 
+	// Options:
+	// 1000
+	// 0000
+	// 0010
+	// 0100
+
+	// Results:
+	//                  *
+	//             /        \
+	//          0 (2)        1 (0) (eliminated)
+	//         /    \            \
+	//       0 (1r)   1 (1)         000 (0) (eliminated)
+	//     /    \       \
+	// 0 (1)    1 (0)    00 (1)
+	// |         |
+	// 0 (1)     0 (0)
 	{
-		expected := `SB(Preference = 0, PreferenceStrength[0] = 1, PreferenceStrength[1] = 0, SF(Confidence = 0, Finalized = false, SL(Preference = 0))) Bit = 2
-    SB(PreferenceStrength = 1, SF(Confidence = 1, Finalized = true)) Bits = [3, 256)
-    SB(PreferenceStrength = 0, SF(Confidence = 0, Finalized = false)) Bits = [3, 256)`
+		expected := `SB(Preference = 0, PreferenceStrength[0] = 1, PreferenceStrength[1] = 1, SF(Confidence = 1, Finalized = false, SL(Preference = 1))) Bit = 1
+    SB(Preference = 0, PreferenceStrength[0] = 1, PreferenceStrength[1] = 0, SF(Confidence = 1, Finalized = false, SL(Preference = 0))) Bit = 2
+        SB(PreferenceStrength = 1, SF(Confidence = 1, Finalized = false)) Bits = [3, 256)
+        SB(PreferenceStrength = 0, SF(Confidence = 0, Finalized = false)) Bits = [3, 256)
+    SB(PreferenceStrength = 1, SF(Confidence = 1, Finalized = false)) Bits = [2, 256)`
 		require.Equal(expected, tree.String())
 		require.Equal(c0000, tree.Preference())
 		require.False(tree.Finalized())
