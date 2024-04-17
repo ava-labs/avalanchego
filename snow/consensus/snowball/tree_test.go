@@ -641,11 +641,6 @@ func TestSnowballFineGrained(t *testing.T) {
 
 	tree.Add(c1100)
 
-	//     *
-	//   /   \
-	//  0     1
-	//  |     |
-	// 000    100
 	{
 		expected := `SB(Preference = 0, PreferenceStrength[0] = 0, PreferenceStrength[1] = 0, SF(Confidence = 0, Finalized = false, SL(Preference = 0))) Bit = 0
     SB(PreferenceStrength = 0, SF(Confidence = 0, Finalized = false)) Bits = [1, 256)
@@ -657,13 +652,6 @@ func TestSnowballFineGrained(t *testing.T) {
 
 	tree.Add(c1000)
 
-	//     *
-	//   /    \
-	//  0      1
-	//  |     /  \
-	// 000   0    1
-	//       |    |
-	//       00   00
 	{
 		expected := `SB(Preference = 0, PreferenceStrength[0] = 0, PreferenceStrength[1] = 0, SF(Confidence = 0, Finalized = false, SL(Preference = 0))) Bit = 0
     SB(PreferenceStrength = 0, SF(Confidence = 0, Finalized = false)) Bits = [1, 256)
@@ -676,21 +664,6 @@ func TestSnowballFineGrained(t *testing.T) {
 	}
 
 	tree.Add(c0010)
-
-	// 0000
-	// 1100
-	// 1000
-	// 0010
-
-	//          *
-	//      /      \
-	//    0          1
-	//    |         /  \
-	//    0        0    1
-	//   / \       |    |
-	//  0   1      00   00
-	//  |   |
-	//  0   0
 
 	{
 		expected := `SB(Preference = 0, PreferenceStrength[0] = 0, PreferenceStrength[1] = 0, SF(Confidence = 0, Finalized = false, SL(Preference = 0))) Bit = 0
@@ -709,20 +682,6 @@ func TestSnowballFineGrained(t *testing.T) {
 	c0000Bag := bag.Of(c0000)
 	require.True(tree.RecordPoll(c0000Bag))
 
-	// 0000
-	// 1100
-	// 1000
-	// 0010
-
-	//                 *
-	//          /            \
-	//        0 (1)            1
-	//        |               /  \
-	//        0 (1)          0    1
-	//       /    \          |    |
-	//      0 (1)  1         00   00
-	//      |      |
-	//      0 (1)  0
 	{
 		expected := `SB(Preference = 0, PreferenceStrength[0] = 1, PreferenceStrength[1] = 0, SF(Confidence = 1, Finalized = false, SL(Preference = 0))) Bit = 0
     SB(PreferenceStrength = 1, SF(Confidence = 1, Finalized = false)) Bits = [1, 2)
@@ -740,37 +699,6 @@ func TestSnowballFineGrained(t *testing.T) {
 	c0010Bag := bag.Of(c0010)
 	require.True(tree.RecordPoll(c0010Bag))
 
-	// 0000
-	// 1100
-	// 1000
-	// 0010
-
-	//                 *
-	//          /             \
-	//        0 (2f)           1 (eliminate this side of the tree)
-	//        |               /  \
-	//        0 (2f)         0    1
-	//       /    \          |    |
-	//      0 (1)  1 (1)     00   00
-	//      |      |
-	//      0 (1)  0 (1)
-
-	//        *
-	//        |
-	//        0 (2f)
-	//        |
-	//        0 (2f) (consolidated)
-	//       /    \
-	//      0 (1)  1 (1) Bit = 2
-	//      |      |
-	//      0 (1)  0 (1)
-
-	//         * (finalized 00)
-	//       /    \
-	//      0 (1)  1 (1) Bit = 2
-	//      |      |
-	//      0 (1)  0 (1)
-
 	{
 		expected := `SB(Preference = 0, PreferenceStrength[0] = 1, PreferenceStrength[1] = 1, SF(Confidence = 1, Finalized = false, SL(Preference = 1))) Bit = 2
     SB(PreferenceStrength = 1, SF(Confidence = 1, Finalized = false)) Bits = [3, 256)
@@ -781,22 +709,6 @@ func TestSnowballFineGrained(t *testing.T) {
 	}
 
 	require.True(tree.RecordPoll(c0010Bag))
-	// 0000
-	// 1100
-	// 1000
-	// 0010
-
-	//         * (finalized 00)
-	//       /    \
-	//      0 (1)  1 (2) Bit = 2
-	//      |      |
-	//      0 (1)  0 (2)
-
-	//         * (finalized 00)
-	//         |
-	//       1 (2) Bit = 2
-	//         |
-	//      0 (2)
 	{
 		expected := "SB(PreferenceStrength = 2, SF(Confidence = 2, Finalized = true)) Bits = [3, 256)"
 		require.Equal(expected, tree.String())
