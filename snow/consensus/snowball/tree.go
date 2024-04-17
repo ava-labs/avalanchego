@@ -139,7 +139,7 @@ type node interface {
 }
 
 // unary is a node with either no children, or a single child. It handles the
-// voting on a range of identical, virtuous, snow instances.
+// voting on a range of identical, unary, snow instances.
 type unaryNode struct {
 	// tree references the tree that contains this node
 	tree *Tree
@@ -470,7 +470,7 @@ func (u *unaryNode) Printable() (string, []node) {
 }
 
 // binaryNode is a node with either no children, or two children. It handles the
-// voting of a single, rogue, snow instance.
+// voting of a single, binary, snow instance.
 type binaryNode struct {
 	// tree references the tree that contains this node
 	tree *Tree

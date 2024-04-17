@@ -1649,9 +1649,9 @@ func RecordPollWithDefaultParameters(t *testing.T, factory Factory) {
 
 	votes := bag.Bag[ids.ID]{}
 	votes.AddCount(blk1.ID(), params.AlphaConfidence)
-	// as "blk1" and "blk2" are in conflict, we need beta rogue rounds to finalize
+	// Require beta rounds to finalize
 	for i := 0; i < params.Beta; i++ {
-		// should not finalize with less than beta rogue rounds
+		// should not finalize with less than beta rounds
 		require.Equal(2, sm.NumProcessing())
 		require.NoError(sm.RecordPoll(context.Background(), votes))
 	}
