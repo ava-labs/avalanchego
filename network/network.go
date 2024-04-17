@@ -244,7 +244,12 @@ func NewNetwork(
 	// Track all default bootstrappers to ensure their current IPs are gossiped
 	// like validator IPs.
 	for _, bootstrapper := range genesis.GetBootstrappers(config.NetworkID) {
-		ipTracker.ManuallyTrack(bootstrapper.ID)
+		ipTracker.ManuallyGossip(bootstrapper.ID)
+	}
+	// Track all recent validators to optimistically connect to them before the
+	// P-chain has finished syncing.
+	for nodeID := range genesis.GetValidators(config.NetworkID) {
+		ipTracker.ManuallyTrack(nodeID)
 	}
 
 	peerConfig := &peer.Config{

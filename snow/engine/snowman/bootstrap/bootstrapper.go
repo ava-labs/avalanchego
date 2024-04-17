@@ -14,6 +14,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/snow"
@@ -373,11 +374,13 @@ func (b *Bootstrapper) GetAcceptedFailed(ctx context.Context, nodeID ids.NodeID,
 	return b.sendBootstrappingMessagesOrFinish(ctx)
 }
 
-func (b *Bootstrapper) startSyncing(ctx context.Context, acceptedContainerIDs []ids.ID) error {
+func (b *Bootstrapper) startSyncing(ctx context.Context, acceptedBlockIDs []ids.ID) error {
 	// Initialize the fetch from set to the currently preferred peers
 	b.fetchFrom = b.StartupTracker.PreferredPeers()
 
-	b.missingBlockIDs.Add(acceptedContainerIDs...)
+	knownBlockIDs := genesis.GetCheckpoints(b.Ctx.NetworkID, b.Ctx.ChainID)
+	b.missingBlockIDs.Union(knownBlockIDs)
+	b.missingBlockIDs.Add(acceptedBlockIDs...)
 	numMissingBlockIDs := b.missingBlockIDs.Len()
 
 	log := b.Ctx.Log.Info
@@ -385,7 +388,8 @@ func (b *Bootstrapper) startSyncing(ctx context.Context, acceptedContainerIDs []
 		log = b.Ctx.Log.Debug
 	}
 	log("starting to fetch blocks",
-		zap.Int("numAcceptedBlocks", len(acceptedContainerIDs)),
+		zap.Int("numKnownBlocks", knownBlockIDs.Len()),
+		zap.Int("numAcceptedBlocks", len(acceptedBlockIDs)),
 		zap.Int("numMissingBlocks", numMissingBlockIDs),
 	)
 
