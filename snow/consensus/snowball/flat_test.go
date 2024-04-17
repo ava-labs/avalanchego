@@ -50,7 +50,7 @@ func TestFlat(t *testing.T) {
 
 	require.True(f.RecordPoll(threeGreen))
 	require.Equal(Green, f.Preference())
-	require.False(f.Finalized()) // Not finalized before BetaRogue rounds
+	require.False(f.Finalized()) // Not finalized before Beta rounds
 
 	require.True(f.RecordPoll(threeGreen))
 	require.Equal(Green, f.Preference())
