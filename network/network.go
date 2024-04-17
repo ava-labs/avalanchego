@@ -246,6 +246,11 @@ func NewNetwork(
 	for _, bootstrapper := range genesis.GetBootstrappers(config.NetworkID) {
 		ipTracker.ManuallyGossip(bootstrapper.ID)
 	}
+	// Track all recent validators to optimistically connect to them before the
+	// P-chain has finished syncing.
+	for nodeID := range genesis.GetValidators(config.NetworkID) {
+		ipTracker.ManuallyTrack(nodeID)
+	}
 
 	peerConfig := &peer.Config{
 		ReadBufferSize:  config.PeerReadBufferSize,
