@@ -67,13 +67,10 @@ func NewTestEnvironment(flagVars *FlagVars, desiredNetwork *tmpnet.Network) *Tes
 		var networkSymlink string // If populated, prompts removal of the referenced symlink if --stop-network is specified
 		if len(networkDir) == 0 {
 			// Attempt to reuse the network at the default owner path
-			var err error
 			symlinkPath, err := tmpnet.GetReusableNetworkPathForOwner(desiredNetwork.Owner)
 			require.NoError(err)
 			_, err = os.Stat(symlinkPath)
-			if errors.Is(err, os.ErrNotExist) {
-				// New network is required
-			} else {
+			if !errors.Is(err, os.ErrNotExist) {
 				// Try to load the existing network
 				require.NoError(err)
 				networkDir = symlinkPath
