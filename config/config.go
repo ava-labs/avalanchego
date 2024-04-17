@@ -59,7 +59,7 @@ const (
 var (
 	// Deprecated key --> deprecation message (i.e. which key replaces it)
 	// TODO: deprecate "BootstrapIDsKey" and "BootstrapIPsKey"
-	deprecatedKeys                = map[string]string{
+	deprecatedKeys = map[string]string{
 		KeystoreAPIEnabledKey: keystoreDeprecationMsg,
 	}
 
