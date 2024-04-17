@@ -813,15 +813,6 @@ func TestSnowballFilterBinaryChildren(t *testing.T) {
 	c0000Bag := bag.Of(c0000)
 	require.True(tree.RecordPoll(c0000Bag))
 
-	//                    *
-	//             /            \
-	//          0 (1)           1 (0) Bit = 0
-	//          |                        \
-	//          0 (1) Bits[1, 2)         000 (0) Bits [1, 256)
-	//         /    \
-	//      0 (1)    1 (0) Bit = 2
-	//      |         |
-	//      0 (1)     0 (0) Bits [3, 256)
 	{
 		expected := `SB(Preference = 0, PreferenceStrength[0] = 1, PreferenceStrength[1] = 0, SF(Confidence = 1, Finalized = false, SL(Preference = 0))) Bit = 0
     SB(PreferenceStrength = 1, SF(Confidence = 1, Finalized = false)) Bits = [1, 2)
@@ -836,22 +827,6 @@ func TestSnowballFilterBinaryChildren(t *testing.T) {
 
 	tree.Add(c0100)
 
-	// Options:
-	// 1000
-	// 0000
-	// 0010
-	// 0100
-
-	// Results:
-	//                  *
-	//             /        \
-	//          0 (1)        1 (0)
-	//         /    \            \
-	//       0 (1)   1 (0)         000 (0)
-	//     /    \       \
-	// 0 (1)    1 (0)    00 (0)
-	// |         |
-	// 0 (1)     0 (0)
 	{
 		expected := `SB(Preference = 0, PreferenceStrength[0] = 1, PreferenceStrength[1] = 0, SF(Confidence = 1, Finalized = false, SL(Preference = 0))) Bit = 0
     SB(Preference = 0, PreferenceStrength[0] = 1, PreferenceStrength[1] = 0, SF(Confidence = 1, Finalized = false, SL(Preference = 0))) Bit = 1
@@ -868,22 +843,6 @@ func TestSnowballFilterBinaryChildren(t *testing.T) {
 	c0100Bag := bag.Of(c0100)
 	require.True(tree.RecordPoll(c0100Bag))
 
-	// Options:
-	// 1000
-	// 0000
-	// 0010
-	// 0100
-
-	// Results:
-	//                  *
-	//             /        \
-	//          0 (2)        1 (0) (eliminated)
-	//         /    \            \
-	//       0 (1r)   1 (1)         000 (0) (eliminated)
-	//     /    \       \
-	// 0 (1)    1 (0)    00 (1)
-	// |         |
-	// 0 (1)     0 (0)
 	{
 		expected := `SB(Preference = 0, PreferenceStrength[0] = 1, PreferenceStrength[1] = 1, SF(Confidence = 1, Finalized = false, SL(Preference = 1))) Bit = 1
     SB(Preference = 0, PreferenceStrength[0] = 1, PreferenceStrength[1] = 0, SF(Confidence = 1, Finalized = false, SL(Preference = 0))) Bit = 2
