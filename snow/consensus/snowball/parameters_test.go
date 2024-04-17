@@ -100,12 +100,12 @@ func TestParametersVerify(t *testing.T) {
 			expectedError: ErrParametersInvalid,
 		},
 		{
-			name: "first half fun BetaRogue",
+			name: "first half fun alphaConfidence",
 			params: Parameters{
-				K:                     1,
-				AlphaPreference:       1,
-				AlphaConfidence:       1,
-				Beta:                  28,
+				K:                     30,
+				AlphaPreference:       28,
+				AlphaConfidence:       30,
+				Beta:                  2,
 				ConcurrentRepolls:     1,
 				OptimalProcessing:     1,
 				MaxOutstandingItems:   1,
@@ -114,11 +114,11 @@ func TestParametersVerify(t *testing.T) {
 			expectedError: nil,
 		},
 		{
-			name: "second half fun BetaRogue",
+			name: "second half fun alphaConfidence",
 			params: Parameters{
-				K:                     1,
-				AlphaPreference:       1,
-				AlphaConfidence:       1,
+				K:                     3,
+				AlphaPreference:       2,
+				AlphaConfidence:       3,
 				Beta:                  2,
 				ConcurrentRepolls:     1,
 				OptimalProcessing:     1,
