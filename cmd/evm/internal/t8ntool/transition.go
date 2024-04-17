@@ -202,92 +202,20 @@ func Transition(ctx *cli.Context) error {
 	// Set the chain id
 	chainConfig.ChainID = big.NewInt(ctx.Int64(ChainIDFlag.Name))
 
-	var txsWithKeys []*txWithKey
-	if txStr != stdinSelector {
-		inFile, err := os.Open(txStr)
-		if err != nil {
-			return NewError(ErrorIO, fmt.Errorf("failed reading txs file: %v", err))
-		}
-		defer inFile.Close()
-		decoder := json.NewDecoder(inFile)
-		if strings.HasSuffix(txStr, ".rlp") {
-			var body hexutil.Bytes
-			if err := decoder.Decode(&body); err != nil {
-				return err
-			}
-			var txs types.Transactions
-			if err := rlp.DecodeBytes(body, &txs); err != nil {
-				return err
-			}
-			for _, tx := range txs {
-				txsWithKeys = append(txsWithKeys, &txWithKey{
-					key: nil,
-					tx:  tx,
-				})
-			}
-		} else {
-			if err := decoder.Decode(&txsWithKeys); err != nil {
-				return NewError(ErrorJson, fmt.Errorf("failed unmarshaling txs-file: %v", err))
-			}
-		}
-	} else {
-		if len(inputData.TxRlp) > 0 {
-			// Decode the body of already signed transactions
-			body := common.FromHex(inputData.TxRlp)
-			var txs types.Transactions
-			if err := rlp.DecodeBytes(body, &txs); err != nil {
-				return err
-			}
-			for _, tx := range txs {
-				txsWithKeys = append(txsWithKeys, &txWithKey{
-					key: nil,
-					tx:  tx,
-				})
-			}
-		} else {
-			// JSON encoded transactions
-			txsWithKeys = inputData.Txs
-		}
+	if txs, err = loadTransactions(txStr, inputData, prestate.Env, chainConfig); err != nil {
+		return err
 	}
-	// We may have to sign the transactions.
-	signer := types.MakeSigner(chainConfig, big.NewInt(int64(prestate.Env.Number)), prestate.Env.Timestamp)
-
-	if txs, err = signUnsignedTransactions(txsWithKeys, signer); err != nil {
-		return NewError(ErrorJson, fmt.Errorf("failed signing transactions: %v", err))
-	}
-	// Sanity check, to not `panic` in state_transition
-	// NOTE: IsLondon replaced with IsSubnetEVM here
-	if chainConfig.IsSubnetEVM(prestate.Env.Timestamp) {
-		if prestate.Env.BaseFee != nil {
-			// Already set, base fee has precedent over parent base fee.
-		} else if prestate.Env.ParentBaseFee != nil && prestate.Env.Number != 0 {
-			parent := &types.Header{
-				Number:   new(big.Int).SetUint64(prestate.Env.Number - 1),
-				Time:     prestate.Env.ParentTimestamp,
-				BaseFee:  prestate.Env.ParentBaseFee,
-				GasUsed:  prestate.Env.ParentGasUsed,
-				GasLimit: prestate.Env.ParentGasLimit,
-				Extra:    make([]byte, params.DynamicFeeExtraDataSize), // TODO: consider passing extra through env
-			}
-			feeConfig := params.DefaultFeeConfig
-			if prestate.Env.MinBaseFee != nil {
-				// Override the default min base fee if it's set in the env
-				feeConfig.MinBaseFee = prestate.Env.MinBaseFee
-			}
-			_, prestate.Env.BaseFee, err = dummy.CalcBaseFee(chainConfig, feeConfig, parent, prestate.Env.Timestamp)
-			if err != nil {
-				return NewError(ErrorConfig, fmt.Errorf("failed calculating base fee: %v", err))
-			}
-		} else {
-			return NewError(ErrorConfig, errors.New("EIP-1559 config but missing 'currentBaseFee' in env section"))
-		}
+	if err := applyLondonChecks(&prestate.Env, chainConfig); err != nil {
+		return err
 	}
 	// NOTE: Removed isMerged logic here.
-	// isMerged := chainConfig.TerminalTotalDifficulty != nil && chainConfig.TerminalTotalDifficulty.BitLen() == 0
 	if prestate.Env.Random != nil {
 		// NOTE: subnet-evm continues to return the difficulty value for the RANDOM opcode,
 		// so for testing if Random is set in the environment, we copy it to difficulty instead.
 		prestate.Env.Difficulty = prestate.Env.Random
+	}
+	if err := applyCancunChecks(&prestate.Env, chainConfig); err != nil {
+		return err
 	}
 	// Run the test and aggregate the result
 	s, result, err := prestate.Apply(vmConfig, chainConfig, txs, ctx.Int64(RewardFlag.Name), getTracer)
@@ -355,31 +283,116 @@ func (t *txWithKey) UnmarshalJSON(input []byte) error {
 // and secondly to read them with the standard tx json format
 func signUnsignedTransactions(txs []*txWithKey, signer types.Signer) (types.Transactions, error) {
 	var signedTxs []*types.Transaction
-	for i, txWithKey := range txs {
-		tx := txWithKey.tx
-		key := txWithKey.key
-		v, r, s := tx.RawSignatureValues()
-		if key != nil && v.BitLen()+r.BitLen()+s.BitLen() == 0 {
-			// This transaction needs to be signed
-			var (
-				signed *types.Transaction
-				err    error
-			)
-			if txWithKey.protected {
-				signed, err = types.SignTx(tx, signer, key)
-			} else {
-				signed, err = types.SignTx(tx, types.FrontierSigner{}, key)
-			}
-			if err != nil {
-				return nil, NewError(ErrorJson, fmt.Errorf("tx %d: failed to sign tx: %v", i, err))
-			}
-			signedTxs = append(signedTxs, signed)
-		} else {
+	for i, tx := range txs {
+		var (
+			v, r, s = tx.tx.RawSignatureValues()
+			signed  *types.Transaction
+			err     error
+		)
+		if tx.key == nil || v.BitLen()+r.BitLen()+s.BitLen() != 0 {
 			// Already signed
-			signedTxs = append(signedTxs, tx)
+			signedTxs = append(signedTxs, tx.tx)
+			continue
 		}
+		// This transaction needs to be signed
+		if tx.protected {
+			signed, err = types.SignTx(tx.tx, signer, tx.key)
+		} else {
+			signed, err = types.SignTx(tx.tx, types.FrontierSigner{}, tx.key)
+		}
+		if err != nil {
+			return nil, NewError(ErrorJson, fmt.Errorf("tx %d: failed to sign tx: %v", i, err))
+		}
+		signedTxs = append(signedTxs, signed)
 	}
 	return signedTxs, nil
+}
+
+func loadTransactions(txStr string, inputData *input, env stEnv, chainConfig *params.ChainConfig) (types.Transactions, error) {
+	var txsWithKeys []*txWithKey
+	var signed types.Transactions
+	if txStr != stdinSelector {
+		data, err := os.ReadFile(txStr)
+		if err != nil {
+			return nil, NewError(ErrorIO, fmt.Errorf("failed reading txs file: %v", err))
+		}
+		if strings.HasSuffix(txStr, ".rlp") { // A file containing an rlp list
+			var body hexutil.Bytes
+			if err := json.Unmarshal(data, &body); err != nil {
+				return nil, err
+			}
+			// Already signed transactions
+			if err := rlp.DecodeBytes(body, &signed); err != nil {
+				return nil, err
+			}
+			return signed, nil
+		}
+		if err := json.Unmarshal(data, &txsWithKeys); err != nil {
+			return nil, NewError(ErrorJson, fmt.Errorf("failed unmarshaling txs-file: %v", err))
+		}
+	} else {
+		if len(inputData.TxRlp) > 0 {
+			// Decode the body of already signed transactions
+			body := common.FromHex(inputData.TxRlp)
+			// Already signed transactions
+			if err := rlp.DecodeBytes(body, &signed); err != nil {
+				return nil, err
+			}
+			return signed, nil
+		}
+		// JSON encoded transactions
+		txsWithKeys = inputData.Txs
+	}
+	// We may have to sign the transactions.
+	signer := types.MakeSigner(chainConfig, big.NewInt(int64(env.Number)), env.Timestamp)
+	return signUnsignedTransactions(txsWithKeys, signer)
+}
+
+func applyLondonChecks(env *stEnv, chainConfig *params.ChainConfig) error {
+	// NOTE: IsLondon replaced with IsSubnetEVM here
+	if !chainConfig.IsSubnetEVM(env.Timestamp) {
+		return nil
+	}
+	// Sanity check, to not `panic` in state_transition
+	if env.BaseFee != nil {
+		// Already set, base fee has precedent over parent base fee.
+		return nil
+	}
+	if env.ParentBaseFee == nil || env.Number == 0 {
+		return NewError(ErrorConfig, errors.New("EIP-1559 config but missing 'currentBaseFee' in env section"))
+	}
+	parent := &types.Header{
+		Number:   new(big.Int).SetUint64(env.Number - 1),
+		Time:     env.ParentTimestamp,
+		BaseFee:  env.ParentBaseFee,
+		GasUsed:  env.ParentGasUsed,
+		GasLimit: env.ParentGasLimit,
+		Extra:    make([]byte, params.DynamicFeeExtraDataSize), // TODO: consider passing extra through env
+	}
+	feeConfig := params.DefaultFeeConfig
+	if env.MinBaseFee != nil {
+		// Override the default min base fee if it's set in the env
+		feeConfig.MinBaseFee = env.MinBaseFee
+	}
+	var err error
+	_, env.BaseFee, err = dummy.CalcBaseFee(chainConfig, feeConfig, parent, env.Timestamp)
+	if err != nil {
+		return NewError(ErrorConfig, fmt.Errorf("failed calculating base fee: %v", err))
+	}
+	return nil
+}
+
+func applyCancunChecks(env *stEnv, chainConfig *params.ChainConfig) error {
+	if !chainConfig.IsCancun(big.NewInt(int64(env.Number)), env.Timestamp) {
+		env.ParentBeaconBlockRoot = nil // un-set it if it has been set too early
+		return nil
+	}
+	// Post-cancun
+	// We require EIP-4788 beacon root to be set in the env
+	if env.ParentBeaconBlockRoot == nil {
+		return NewError(ErrorConfig, errors.New("post-cancun env requires parentBeaconBlockRoot to be set"))
+	}
+	return nil
 }
 
 type Alloc map[common.Address]core.GenesisAccount

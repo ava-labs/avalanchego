@@ -40,8 +40,10 @@ import (
 	"testing/quick"
 
 	"github.com/ava-labs/subnet-evm/core/rawdb"
+	"github.com/ava-labs/subnet-evm/core/state/snapshot"
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/trie"
+	"github.com/ava-labs/subnet-evm/trie/triedb/pathdb"
 	"github.com/ava-labs/subnet-evm/trie/triestate"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -189,19 +191,32 @@ func (test *stateTest) run() bool {
 			storageList = append(storageList, copy2DSet(states.Storages))
 		}
 		disk      = rawdb.NewMemoryDatabase()
-		tdb       = trie.NewDatabaseWithConfig(disk, &trie.Config{OnCommit: onCommit})
+		tdb       = trie.NewDatabase(disk, &trie.Config{PathDB: pathdb.Defaults})
 		sdb       = NewDatabaseWithNodeDB(disk, tdb)
 		byzantium = rand.Intn(2) == 0
 	)
+	defer disk.Close()
+	defer tdb.Close()
+
+	var snaps *snapshot.Tree
+	if rand.Intn(3) == 0 {
+		snaps, _ = snapshot.New(snapshot.Config{
+			CacheSize:  1,
+			NoBuild:    false,
+			AsyncBuild: false,
+		}, disk, tdb, common.Hash{}, types.EmptyRootHash)
+	}
 	for i, actions := range test.actions {
 		root := types.EmptyRootHash
 		if i != 0 {
 			root = roots[len(roots)-1]
 		}
-		state, err := New(root, sdb, nil)
+		state, err := New(root, sdb, snaps)
 		if err != nil {
 			panic(err)
 		}
+		state.onCommit = onCommit
+
 		for i, action := range actions {
 			if i%test.chunk == 0 && i != 0 {
 				if byzantium {

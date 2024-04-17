@@ -51,6 +51,8 @@ import (
 	"github.com/ava-labs/subnet-evm/metrics"
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/trie"
+	"github.com/ava-labs/subnet-evm/trie/triedb/hashdb"
+	"github.com/ava-labs/subnet-evm/trie/triedb/pathdb"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/lru"
 	"github.com/ethereum/go-ethereum/ethdb"
@@ -164,7 +166,7 @@ type cacheableCoinbaseConfig struct {
 }
 
 // CacheConfig contains the configuration values for the trie database
-// that's resident in a blockchain.
+// and state snapshot these are resident in a blockchain.
 type CacheConfig struct {
 	TrieCleanLimit                  int     // Memory allowance (MB) to use for caching trie nodes in memory
 	TrieDirtyLimit                  int     // Memory limit (MB) at which to block on insert and force a flush of dirty trie nodes to disk
@@ -183,11 +185,34 @@ type CacheConfig struct {
 	AcceptedCacheSize               int     // Depth of accepted headers cache and accepted logs cache at the accepted tip
 	TxLookupLimit                   uint64  // Number of recent blocks for which to maintain transaction lookup indices
 	SkipTxIndexing                  bool    // Whether to skip transaction indexing
+	StateHistory                    uint64  // Number of blocks from head whose state histories are reserved.
+	StateScheme                     string  // Scheme used to store ethereum states and merkle tree nodes on top
 
 	SnapshotNoBuild bool // Whether the background generation is allowed
 	SnapshotWait    bool // Wait for snapshot construction on startup. TODO(karalabe): This is a dirty hack for testing, nuke it
 }
 
+// triedbConfig derives the configures for trie database.
+func (c *CacheConfig) triedbConfig() *trie.Config {
+	config := &trie.Config{Preimages: c.Preimages}
+	if c.StateScheme == rawdb.HashScheme {
+		config.HashDB = &hashdb.Config{
+			CleanCacheSize: c.TrieCleanLimit * 1024 * 1024,
+			StatsPrefix:    trieCleanCacheStatsNamespace,
+		}
+	}
+	if c.StateScheme == rawdb.PathScheme {
+		config.PathDB = &pathdb.Config{
+			StateHistory:   c.StateHistory,
+			CleanCacheSize: c.TrieCleanLimit * 1024 * 1024,
+			DirtyCacheSize: c.TrieDirtyLimit * 1024 * 1024,
+		}
+	}
+	return config
+}
+
+// DefaultCacheConfig are the default caching values if none are specified by the
+// user (also used during testing).
 var DefaultCacheConfig = &CacheConfig{
 	TrieCleanLimit:            256,
 	TrieDirtyLimit:            256,
@@ -198,6 +223,15 @@ var DefaultCacheConfig = &CacheConfig{
 	AcceptorQueueLimit:        64, // Provides 2 minutes of buffer (2s block target) for a commit delay
 	SnapshotLimit:             256,
 	AcceptedCacheSize:         32,
+	StateScheme:               rawdb.HashScheme,
+}
+
+// DefaultCacheConfigWithScheme returns a deep copied default cache config with
+// a provided trie node scheme.
+func DefaultCacheConfigWithScheme(scheme string) *CacheConfig {
+	config := *DefaultCacheConfig
+	config.StateScheme = scheme
+	return &config
 }
 
 // BlockChain represents the canonical chain given a database with a genesis
@@ -314,11 +348,8 @@ func NewBlockChain(
 		return nil, errCacheConfigNotSpecified
 	}
 	// Open trie database with provided config
-	triedb := trie.NewDatabaseWithConfig(db, &trie.Config{
-		Cache:       cacheConfig.TrieCleanLimit,
-		Preimages:   cacheConfig.Preimages,
-		StatsPrefix: trieCleanCacheStatsNamespace,
-	})
+	triedb := trie.NewDatabase(db, cacheConfig.triedbConfig())
+
 	// Setup the genesis block, commit the provided genesis specification
 	// to database if the genesis block is not present yet, or load the
 	// stored one from database.
@@ -433,6 +464,12 @@ func (bc *BlockChain) unindexBlocks(tail uint64, head uint64, done chan struct{}
 		close(done)
 	}()
 
+	// If head is 0, it means the chain is just initialized and no blocks are inserted,
+	// so don't need to indexing anything.
+	if head == 0 {
+		return
+	}
+
 	if head-txLookupLimit+1 >= tail {
 		// Unindex a part of stale indices and forward index tail to HEAD-limit
 		rawdb.UnindexTransactions(bc.db, tail, head-txLookupLimit+1, bc.quit)
@@ -464,6 +501,17 @@ func (bc *BlockChain) dispatchTxUnindexer() {
 		return
 	}
 	defer sub.Unsubscribe()
+	log.Info("Initialized transaction unindexer", "limit", txLookupLimit)
+
+	// TODO: Uncomment this code when the tx-unindexer fix is ready.
+	// Launch the initial processing if chain is not empty. This step is
+	// useful in these scenarios that chain has no progress and indexer
+	// is never triggered.
+	// if head := bc.lastAccepted; head != nil && head.NumberU64() > txLookupLimit {
+	// 	done = make(chan struct{})
+	// 	tail := rawdb.ReadTxIndexTail(bc.db)
+	// 	go bc.unindexBlocks(*tail, head.NumberU64(), done)
+	// }
 
 	for {
 		select {
@@ -968,15 +1016,21 @@ func (bc *BlockChain) stopWithoutSaving() {
 func (bc *BlockChain) Stop() {
 	bc.stopWithoutSaving()
 
+	if bc.triedb.Scheme() == rawdb.PathScheme {
+		// Ensure that the in-memory trie nodes are journaled to disk properly.
+		if err := bc.triedb.Journal(bc.CurrentBlock().Root); err != nil {
+			log.Info("Failed to journal in-memory trie nodes", "err", err)
+		}
+	}
 	log.Info("Shutting down state manager")
 	start := time.Now()
 	if err := bc.stateManager.Shutdown(); err != nil {
 		log.Error("Failed to Shutdown state manager", "err", err)
 	}
 	log.Info("State manager shut down", "t", time.Since(start))
-	// Flush the collected preimages to disk
-	if err := bc.stateCache.TrieDB().Close(); err != nil {
-		log.Error("Failed to close trie db", "err", err)
+	// Close the trie database, release all the held resources as the last step.
+	if err := bc.triedb.Close(); err != nil {
+		log.Error("Failed to close trie database", "err", err)
 	}
 	log.Info("Blockchain stopped")
 }
@@ -1223,6 +1277,11 @@ func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.
 	}
 	if err != nil {
 		return err
+	}
+	// If node is running in path mode, skip explicit gc operation
+	// which is unnecessary in this mode.
+	if bc.triedb.Scheme() == rawdb.PathScheme {
+		return nil
 	}
 
 	// Note: if InsertTrie must be the last step in verification that can return an error.
@@ -1927,7 +1986,7 @@ func (bc *BlockChain) reprocessState(current *types.Block, reexec uint64) error 
 		}
 	}
 
-	nodes, imgs := triedb.Size()
+	_, nodes, imgs := triedb.Size()
 	log.Info("Historical state regenerated", "block", current.NumberU64(), "elapsed", time.Since(start), "nodes", nodes, "preimages", imgs)
 	if previousRoot != (common.Hash{}) {
 		return triedb.Commit(previousRoot, true)
@@ -2028,7 +2087,7 @@ func (bc *BlockChain) populateMissingTries() error {
 		return fmt.Errorf("failed to write offline pruning success marker: %w", err)
 	}
 
-	nodes, imgs := triedb.Size()
+	_, nodes, imgs := triedb.Size()
 	log.Info("All missing tries populated", "startHeight", startHeight, "lastAcceptedHeight", lastAccepted, "missing", missing, "elapsed", time.Since(startTime), "nodes", nodes, "preimages", imgs)
 	return nil
 }

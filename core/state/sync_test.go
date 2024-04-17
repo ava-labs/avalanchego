@@ -22,6 +22,8 @@ import (
 	"github.com/ava-labs/subnet-evm/core/rawdb"
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/trie"
+	"github.com/ava-labs/subnet-evm/trie/triedb/hashdb"
+	"github.com/ava-labs/subnet-evm/trie/triedb/pathdb"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
@@ -36,10 +38,17 @@ type testAccount struct {
 }
 
 // makeTestState create a sample test state to test node-wise reconstruction.
-func makeTestState() (ethdb.Database, Database, common.Hash, []*testAccount) {
+func makeTestState(scheme string) (ethdb.Database, Database, *trie.Database, common.Hash, []*testAccount) {
 	// Create an empty state
+	config := &trie.Config{Preimages: true}
+	if scheme == rawdb.PathScheme {
+		config.PathDB = pathdb.Defaults
+	} else {
+		config.HashDB = hashdb.Defaults
+	}
 	db := rawdb.NewMemoryDatabase()
-	sdb := NewDatabaseWithConfig(db, &trie.Config{Preimages: true})
+	nodeDb := trie.NewDatabase(db, config)
+	sdb := NewDatabaseWithNodeDB(db, nodeDb)
 	state, _ := New(types.EmptyRootHash, sdb, nil)
 
 	// Fill it with some arbitrary data
@@ -64,11 +73,10 @@ func makeTestState() (ethdb.Database, Database, common.Hash, []*testAccount) {
 				obj.SetState(hash, hash)
 			}
 		}
-		state.updateStateObject(obj)
 		accounts = append(accounts, acc)
 	}
 	root, _ := state.Commit(0, false, false)
 
 	// Return the generated state
-	return db, sdb, root, accounts
+	return db, sdb, nodeDb, root, accounts
 }

@@ -41,6 +41,7 @@ import (
 	"github.com/ava-labs/subnet-evm/precompile/allowlist"
 	"github.com/ava-labs/subnet-evm/precompile/contracts/deployerallowlist"
 	"github.com/ava-labs/subnet-evm/trie"
+	"github.com/ava-labs/subnet-evm/trie/triedb/pathdb"
 	"github.com/ava-labs/subnet-evm/utils"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/ethereum/go-ethereum/common"
@@ -62,6 +63,11 @@ func TestGenesisBlockForTesting(t *testing.T) {
 }
 
 func TestSetupGenesis(t *testing.T) {
+	testSetupGenesis(t, rawdb.HashScheme)
+	testSetupGenesis(t, rawdb.PathScheme)
+}
+
+func testSetupGenesis(t *testing.T, scheme string) {
 	preSubnetConfig := *params.TestPreSubnetEVMConfig
 	preSubnetConfig.SubnetEVMTimestamp = utils.NewUint64(100)
 	var (
@@ -79,6 +85,7 @@ func TestSetupGenesis(t *testing.T) {
 	rollbackpreSubnetConfig := preSubnetConfig
 	rollbackpreSubnetConfig.SubnetEVMTimestamp = utils.NewUint64(90)
 	oldcustomg.Config = &rollbackpreSubnetConfig
+
 	tests := []struct {
 		name       string
 		fn         func(ethdb.Database) (*params.ChainConfig, common.Hash, error)
@@ -89,7 +96,7 @@ func TestSetupGenesis(t *testing.T) {
 		{
 			name: "genesis without ChainConfig",
 			fn: func(db ethdb.Database) (*params.ChainConfig, common.Hash, error) {
-				return setupGenesisBlock(db, trie.NewDatabase(db), new(Genesis), common.Hash{})
+				return setupGenesisBlock(db, trie.NewDatabase(db, newDbConfig(scheme)), new(Genesis), common.Hash{})
 			},
 			wantErr:    errGenesisNoConfig,
 			wantConfig: nil,
@@ -97,7 +104,7 @@ func TestSetupGenesis(t *testing.T) {
 		{
 			name: "no block in DB, genesis == nil",
 			fn: func(db ethdb.Database) (*params.ChainConfig, common.Hash, error) {
-				return setupGenesisBlock(db, trie.NewDatabase(db), nil, common.Hash{})
+				return setupGenesisBlock(db, trie.NewDatabase(db, newDbConfig(scheme)), nil, common.Hash{})
 			},
 			wantErr:    ErrNoGenesis,
 			wantConfig: nil,
@@ -105,8 +112,9 @@ func TestSetupGenesis(t *testing.T) {
 		{
 			name: "custom block in DB, genesis == nil",
 			fn: func(db ethdb.Database) (*params.ChainConfig, common.Hash, error) {
-				customg.MustCommit(db)
-				return setupGenesisBlock(db, trie.NewDatabase(db), nil, common.Hash{})
+				tdb := trie.NewDatabase(db, newDbConfig(scheme))
+				customg.Commit(db, tdb)
+				return setupGenesisBlock(db, tdb, nil, common.Hash{})
 			},
 			wantErr:    ErrNoGenesis,
 			wantConfig: nil,
@@ -114,8 +122,9 @@ func TestSetupGenesis(t *testing.T) {
 		{
 			name: "compatible config in DB",
 			fn: func(db ethdb.Database) (*params.ChainConfig, common.Hash, error) {
-				oldcustomg.MustCommit(db)
-				return setupGenesisBlock(db, trie.NewDatabase(db), &customg, customghash)
+				tdb := trie.NewDatabase(db, newDbConfig(scheme))
+				oldcustomg.Commit(db, tdb)
+				return setupGenesisBlock(db, tdb, &customg, customghash)
 			},
 			wantHash:   customghash,
 			wantConfig: customg.Config,
@@ -125,12 +134,19 @@ func TestSetupGenesis(t *testing.T) {
 			fn: func(db ethdb.Database) (*params.ChainConfig, common.Hash, error) {
 				// Commit the 'old' genesis block with SubnetEVM transition at 90.
 				// Advance to block #4, past the SubnetEVM transition block of customg.
-				genesis := oldcustomg.MustCommit(db)
+				tdb := trie.NewDatabase(db, newDbConfig(scheme))
+				genesis, err := oldcustomg.Commit(db, tdb)
+				if err != nil {
+					t.Fatal(err)
+				}
 
-				bc, _ := NewBlockChain(db, DefaultCacheConfig, &oldcustomg, dummy.NewFullFaker(), vm.Config{}, genesis.Hash(), false)
+				bc, _ := NewBlockChain(db, DefaultCacheConfigWithScheme(scheme), &oldcustomg, dummy.NewFullFaker(), vm.Config{}, genesis.Hash(), false)
 				defer bc.Stop()
 
-				blocks, _, _ := GenerateChain(oldcustomg.Config, genesis, dummy.NewFullFaker(), db, 4, 25, nil)
+				_, blocks, _, err := GenerateChainWithGenesis(&oldcustomg, dummy.NewFullFaker(), 4, 25, nil)
+				if err != nil {
+					t.Fatal(err)
+				}
 				bc.InsertChain(blocks)
 
 				for _, block := range blocks {
@@ -140,7 +156,7 @@ func TestSetupGenesis(t *testing.T) {
 				}
 
 				// This should return a compatibility error.
-				return setupGenesisBlock(db, trie.NewDatabase(db), &customg, bc.lastAccepted.Hash())
+				return setupGenesisBlock(db, tdb, &customg, bc.lastAccepted.Hash())
 			},
 			wantHash:   customghash,
 			wantConfig: customg.Config,
@@ -218,7 +234,7 @@ func TestStatefulPrecompilesConfigure(t *testing.T) {
 			genesisBlock := genesis.ToBlock()
 			genesisRoot := genesisBlock.Root()
 
-			_, _, err := setupGenesisBlock(db, trie.NewDatabase(db), genesis, genesisBlock.Hash())
+			_, _, err := setupGenesisBlock(db, trie.NewDatabase(db, trie.HashDefaults), genesis, genesisBlock.Hash())
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -280,7 +296,7 @@ func TestPrecompileActivationAfterHeaderBlock(t *testing.T) {
 	require.Less(bc.lastAccepted.Time(), *contractDeployerConfig.Timestamp())
 
 	// This should not return any error since the last accepted block is before the activation block.
-	config, _, err := setupGenesisBlock(db, trie.NewDatabase(db), &customg, bc.lastAccepted.Hash())
+	config, _, err := setupGenesisBlock(db, trie.NewDatabase(db, nil), &customg, bc.lastAccepted.Hash())
 	require.NoError(err)
 	if !reflect.DeepEqual(config, customg.Config) {
 		t.Errorf("returned %v\nwant     %v", config, customg.Config)
@@ -299,8 +315,8 @@ func TestGenesisWriteUpgradesRegression(t *testing.T) {
 	}
 
 	db := rawdb.NewMemoryDatabase()
-	genesisBlock := genesis.ToBlock()
-	trieDB := trie.NewDatabase(db)
+	trieDB := trie.NewDatabase(db, trie.HashDefaults)
+	genesisBlock := genesis.MustCommit(db, trieDB)
 
 	_, _, err := SetupGenesisBlock(db, trieDB, genesis, genesisBlock.Hash(), false)
 	require.NoError(err)
@@ -327,4 +343,11 @@ func TestGenesisWriteUpgradesRegression(t *testing.T) {
 	// This tests a regression where the UpgradeConfig would not be written to disk correctly.
 	_, _, err = SetupGenesisBlock(db, trieDB, genesis, lastAcceptedBlock.Hash(), false)
 	require.NoError(err)
+}
+
+func newDbConfig(scheme string) *trie.Config {
+	if scheme == rawdb.HashScheme {
+		return trie.HashDefaults
+	}
+	return &trie.Config{PathDB: pathdb.Defaults}
 }

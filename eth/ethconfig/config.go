@@ -30,10 +30,12 @@ import (
 	"time"
 
 	"github.com/ava-labs/subnet-evm/core"
+	"github.com/ava-labs/subnet-evm/core/rawdb"
 	"github.com/ava-labs/subnet-evm/core/txpool/blobpool"
 	"github.com/ava-labs/subnet-evm/core/txpool/legacypool"
 	"github.com/ava-labs/subnet-evm/eth/gasprice"
 	"github.com/ava-labs/subnet-evm/miner"
+	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ethereum/go-ethereum/common"
 )
 
@@ -55,6 +57,8 @@ var DefaultConfig = NewDefaultConfig()
 func NewDefaultConfig() Config {
 	return Config{
 		NetworkId:                 1,
+		StateHistory:              params.FullImmutabilityThreshold,
+		StateScheme:               rawdb.HashScheme,
 		TrieCleanCache:            512,
 		TrieDirtyCache:            256,
 		TrieDirtyCommitTarget:     20,
@@ -158,7 +162,11 @@ type Config struct {
 	// are reserved:
 	//  * 0:   means no limit
 	//  * N:   means N block limit [HEAD-N+1, HEAD] and delete extra indexes
-	TxLookupLimit uint64
+	// Deprecated, use 'TransactionHistory' instead.
+	TxLookupLimit      uint64 `toml:",omitempty"` // The maximum number of blocks from head whose tx indices are reserved.
+	TransactionHistory uint64 `toml:",omitempty"` // The maximum number of blocks from head whose tx indices are reserved.
+	StateHistory       uint64 `toml:",omitempty"` // The maximum number of blocks from head whose state histories are reserved.
+	StateScheme        string `toml:",omitempty"` // State scheme used to store ethereum state and merkle trie nodes on top
 
 	// SkipTxIndexing skips indexing transactions.
 	// This is useful for validators that don't need to index transactions.

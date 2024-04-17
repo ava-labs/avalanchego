@@ -150,14 +150,17 @@ func New(
 		"snapshot clean", common.StorageSize(config.SnapshotCache)*1024*1024,
 	)
 
-	// Note: RecoverPruning must be called to handle the case that we are midway through offline pruning.
-	// If the data directory is changed in between runs preventing RecoverPruning from performing its job correctly,
-	// it may cause DB corruption.
-	// Since RecoverPruning will only continue a pruning run that already began, we do not need to ensure that
-	// reprocessState has already been called and completed successfully. To ensure this, we must maintain
-	// that Prune is only run after reprocessState has finished successfully.
-	if err := pruner.RecoverPruning(config.OfflinePruningDataDirectory, chainDb); err != nil {
-		log.Error("Failed to recover state", "error", err)
+	// Try to recover offline state pruning only in hash-based.
+	if config.StateScheme == rawdb.HashScheme {
+		// Note: RecoverPruning must be called to handle the case that we are midway through offline pruning.
+		// If the data directory is changed in between runs preventing RecoverPruning from performing its job correctly,
+		// it may cause DB corruption.
+		// Since RecoverPruning will only continue a pruning run that already began, we do not need to ensure that
+		// reprocessState has already been called and completed successfully. To ensure this, we must maintain
+		// that Prune is only run after reprocessState has finished successfully.
+		if err := pruner.RecoverPruning(config.OfflinePruningDataDirectory, chainDb); err != nil {
+			log.Error("Failed to recover state", "error", err)
+		}
 	}
 
 	eth := &Ethereum{
@@ -175,7 +178,6 @@ func New(
 		settings:          settings,
 		shutdownTracker:   shutdowncheck.NewShutdownTracker(chainDb),
 	}
-
 	bcVersion := rawdb.ReadDatabaseVersion(chainDb)
 	dbVer := "<nil>"
 	if bcVersion != nil {
@@ -215,6 +217,8 @@ func New(
 			AcceptedCacheSize:               config.AcceptedCacheSize,
 			TxLookupLimit:                   config.TxLookupLimit,
 			SkipTxIndexing:                  config.SkipTxIndexing,
+			StateHistory:                    config.StateHistory,
+			StateScheme:                     config.StateScheme,
 		}
 	)
 

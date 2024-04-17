@@ -142,7 +142,35 @@ func (tree *layerTree) cap(root common.Hash, layers int) error {
 			return err
 		}
 		// Replace the entire layer tree with the flat base
-		tree.layers = map[common.Hash]layer{base.rootHash(): base}
+		// tree.layers = map[common.Hash]layer{base.rootHash(): base}
+		//
+		// Note: The original code above is replaced with the code below
+		// since we need to keep the children of the base layer, as these
+		// layers may be accessed by blocks in processing.
+		children := make(map[common.Hash][]common.Hash)
+		for root, layer := range tree.layers {
+			if dl, ok := layer.(*diffLayer); ok {
+				parent := dl.parentLayer().rootHash()
+				children[parent] = append(children[parent], root)
+				if parent == base.rootHash() {
+					dl.lock.Lock()
+					dl.parent = base
+					dl.lock.Unlock()
+				}
+			}
+		}
+
+		newLayers := map[common.Hash]layer{base.rootHash(): base}
+		var keepChildren func(root common.Hash)
+		keepChildren = func(root common.Hash) {
+			for _, child := range children[root] {
+				childLayer := tree.layers[child]
+				newLayers[child] = childLayer
+				keepChildren(child)
+			}
+		}
+		keepChildren(base.rootHash())
+		tree.layers = newLayers
 		return nil
 	}
 	// Dive until we run out of layers or reach the persistent database
