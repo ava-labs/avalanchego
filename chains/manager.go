@@ -885,9 +885,9 @@ func (m *manager) createAvalancheChain(
 	avalancheBootstrapperConfig := avbootstrap.Config{
 		AllGetsServer:                  avaGetHandler,
 		Ctx:                            ctx,
-		Beacons:                        vdrs,
 		StartupTracker:                 startupTracker,
 		Sender:                         avalancheMessageSender,
+		PeerTracker:                    peerTracker,
 		AncestorsMaxContainersReceived: m.BootstrapAncestorsMaxContainersReceived,
 		VtxBlocked:                     vtxBlocker,
 		TxBlocked:                      txBlocker,
