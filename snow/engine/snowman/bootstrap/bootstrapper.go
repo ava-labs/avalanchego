@@ -421,10 +421,6 @@ func (b *Bootstrapper) fetch(ctx context.Context, blkID ids.ID) error {
 	b.PeerTracker.RegisterRequest(nodeID)
 
 	b.requestID++
-<<<<<<< HEAD
-=======
-
->>>>>>> master
 	request := common.Request{
 		NodeID:    nodeID,
 		RequestID: b.requestID,
