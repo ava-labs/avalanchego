@@ -39,7 +39,7 @@ var (
 			10 * units.NanoAvax,
 			35 * units.NanoAvax,
 		},
-		UpdateCoefficient: commonfees.Dimensions{ // over 10_000
+		UpdateCoefficient: commonfees.Dimensions{ // over fees.CoeffDenom
 			30,
 			20,
 			25,

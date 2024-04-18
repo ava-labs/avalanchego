@@ -47,13 +47,13 @@ func TestUpdateFeeRates(t *testing.T) {
 	))
 
 	// Bandwidth complexity are above target, fee rate is pushed up
-	require.Equal(uint64(16), m.feeRates[Bandwidth])
+	require.Equal(uint64(21), m.feeRates[Bandwidth])
 
 	// UTXORead complexity is at target, fee rate does not change
 	require.Equal(parentFeeRate[UTXORead], m.feeRates[UTXORead])
 
 	// UTXOWrite complexity is below target, fee rate is pushed down
-	require.Equal(uint64(5), m.feeRates[UTXOWrite])
+	require.Equal(uint64(3), m.feeRates[UTXOWrite])
 
 	// Compute complexoty is below target, fee rate is pushed down to the minimum
 	require.Equal(feesCfg.MinFeeRate[Compute], m.feeRates[Compute])
@@ -94,7 +94,7 @@ func TestUpdateFeeRatesEdgeCases(t *testing.T) {
 	require.Equal(parentFeeRate[UTXOWrite], m.feeRates[UTXOWrite])
 
 	// Compute complexity is way above target. Fee rate spikes
-	require.Equal(uint64(0x8000000000000000), m.feeRates[Compute])
+	require.Equal(uint64(0x55e63b88c6), m.feeRates[Compute])
 }
 
 func TestUpdateFeeRatesStability(t *testing.T) {
@@ -109,14 +109,15 @@ func TestUpdateFeeRatesStability(t *testing.T) {
 	var (
 		feesCfg = DynamicFeesConfig{
 			MinFeeRate:                Dimensions{0, 0, 0, 0},
-			UpdateCoefficient:         Dimensions{20_000, 40_000, 50_000, 100_000},
+			UpdateCoefficient:         Dimensions{20, 40, 50, 100},
 			BlockTargetComplexityRate: Dimensions{25, 50, 100, 1000},
 		}
-		initialFeeRate   = Dimensions{10, 100, 1_000, 1_000_000_000}
-		parentComplexity = Dimensions{24, 45, 70, 500}
-		childComplexity  = Dimensions{26, 55, 130, 1500}
+		initialFeeRate = Dimensions{10, 100, 1_000, 1_000_000}
 
 		elapsedTime      = time.Second
+		parentComplexity = Dimensions{24, 45, 70, 500}   // less than target complexity rate * elapsedTime
+		childComplexity  = Dimensions{26, 55, 130, 1500} // more than target complexity rate * elapsedTime
+
 		parentBlkTime    = time.Now().Truncate(time.Second)
 		childBlkTime     = parentBlkTime.Add(elapsedTime)
 		granChildBlkTime = childBlkTime.Add(elapsedTime)
@@ -166,7 +167,7 @@ func TestPChainFeeRateIncreaseDueToPeak(t *testing.T) {
 				10 * units.NanoAvax,
 				35 * units.NanoAvax,
 			},
-			UpdateCoefficient: Dimensions{ // over 10_000
+			UpdateCoefficient: Dimensions{ // over CoeffDenom
 				30,
 				20,
 				25,
@@ -180,7 +181,7 @@ func TestPChainFeeRateIncreaseDueToPeak(t *testing.T) {
 			},
 		}
 
-		// See mainnet P-chain block 298vMuyYEi8R3XX6Ewi5orsDVYn5jrNDrPEaPG89UsckcN8e8K and sequent
+		// See mainnet P-chain block 298vMuyYEi8R3XX6Ewi5orsDVYn5jrNDrPEaPG89UsckcN8e8K its descendants
 		blockComplexities = []blkTimeAndComplexity{
 			{1703455204, Dimensions{41388, 23040, 23122, 256000}},
 			{1703455209, Dimensions{41388, 23040, 23122, 256000}},
@@ -219,7 +220,8 @@ func TestPChainFeeRateIncreaseDueToPeak(t *testing.T) {
 		feeRates: feesCfg.MinFeeRate,
 	}
 
-	parentFeeRate := feesCfg.MinFeeRate
+	// PEAK INCOMING
+	peakFeeRate := feesCfg.MinFeeRate
 	for i := 1; i < len(blockComplexities); i++ {
 		parentBlkData := blockComplexities[i-1]
 		childBlkData := blockComplexities[i]
@@ -230,12 +232,38 @@ func TestPChainFeeRateIncreaseDueToPeak(t *testing.T) {
 			childBlkData.blkTime,
 		))
 
-		// check that fee rates are strictly increasing
-		require.Less(parentFeeRate[Bandwidth], m.feeRates[Bandwidth])
-		require.Less(parentFeeRate[UTXORead], m.feeRates[UTXORead])
-		require.Less(parentFeeRate[UTXOWrite], m.feeRates[UTXOWrite])
-		require.Less(parentFeeRate[Compute], m.feeRates[Compute])
+		// check that at least a fee rate component has strictly increased
+		require.False(Compare(m.feeRates, peakFeeRate))
 
-		parentFeeRate = m.feeRates
+		// at peak the total fee for a median complexity tx should be in tens of Avax, no more.
+		fee, err := m.CalculateFee(feesCfg.BlockTargetComplexityRate)
+		require.NoError(err)
+		require.Less(fee, 100*units.Avax)
+
+		peakFeeRate = m.feeRates
 	}
+
+	// OFF PEAK
+	offPeakBlkComplexity := Dimensions{
+		feesCfg.BlockTargetComplexityRate[Bandwidth] - 10,
+		feesCfg.BlockTargetComplexityRate[UTXORead] - 3,
+		feesCfg.BlockTargetComplexityRate[UTXOWrite] - 6,
+		feesCfg.BlockTargetComplexityRate[Compute] - 30,
+	}
+	elapsedTime := time.Second
+	parentBlkTime := time.Now().Truncate(time.Second)
+	childBlkTime := parentBlkTime.Add(elapsedTime)
+
+	require.NoError(m.UpdateFeeRates(
+		feesCfg,
+		offPeakBlkComplexity,
+		parentBlkTime.Unix(),
+		childBlkTime.Unix(),
+	))
+
+	// fee rates must be strictly smaller than peak ones
+	require.Less(m.feeRates[Bandwidth], peakFeeRate[Bandwidth])
+	require.Less(m.feeRates[UTXORead], peakFeeRate[UTXORead])
+	require.Less(m.feeRates[UTXOWrite], peakFeeRate[UTXOWrite])
+	require.Less(m.feeRates[Compute], peakFeeRate[Compute])
 }

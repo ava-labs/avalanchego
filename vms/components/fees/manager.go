@@ -10,6 +10,9 @@ import (
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
+// the update fee algorithm has a UpdateCoefficient, normalized to  [CoeffDenom]
+const CoeffDenom = uint64(10_000)
+
 type Manager struct {
 	// Avax denominated fee rates, i.e. fees per unit of complexity.
 	feeRates Dimensions
@@ -118,12 +121,17 @@ func (m *Manager) UpdateFeeRates(
 
 func nextFeeRate(currentFeeRate, coeff, parentBlkComplexity, targetComplexityRate, elapsedTime uint64) uint64 {
 	// We update the fee rate with the formula:
-	// feeRate_{t+1} = feeRate_t * exp{coeff * (parentComplexity - targetComplexity)/(targetComplexity) }
-	// where [targetComplexity] is the complexity expected in the elapsed time.
+	//     feeRate_{t+1} = feeRate_t * exp(delta)
+	// where
+	//     delta == K * (parentComplexity - targetComplexity)/(targetComplexity)
+	// and [targetComplexity] is the median complexity expected in the elapsed time.
 	//
-	// We simplify the exponential for integer math. Specifically we approximate 1/ln(2) with 1_442/1_000
-	// so that exp { x } == 2^{ 1/ln(2) * x } ≈≈ 2^{1_442/1_000 * x}
-	// Finally we round the exponent to a uint64
+	// We approximate the exponential as follows:
+	// * For delta in the interval [0, 10], we use the following piecewise, linear function:
+	//       x \in [a,b] --> exp(X) ≈≈ (exp(b)-exp(a))(b-a)*(X-a) + exp(a)
+	// * For delta > 10 we approximate the exponential via a quadratic function
+	//       exp(X) ≈≈ (X-10)^2 + exp(10)
+	// The approximation is overall continuous, so it behaves well at the interval edges
 
 	// parent and child block may have the same timestamp. In this case targetComplexity will match targetComplexityRate
 	elapsedTime = max(1, elapsedTime)
@@ -132,22 +140,59 @@ func nextFeeRate(currentFeeRate, coeff, parentBlkComplexity, targetComplexityRat
 		targetComplexity = math.MaxUint64
 	}
 
-	switch {
-	case parentBlkComplexity > targetComplexity:
-		exp := 1442 * coeff * (parentBlkComplexity - targetComplexity) / targetComplexity / 1000 / 10_000
-		exp = min(exp, 62) // we cap the exponent to avoid an overflow of uint64 type
-		res, over := safemath.Mul64(currentFeeRate, 1<<exp)
-		if over != nil {
-			return math.MaxUint64
-		}
-		return res
-
-	case parentBlkComplexity < targetComplexity:
-		exp := 1442 * coeff * (targetComplexity - parentBlkComplexity) / targetComplexity / 1000 / 10_000
-		exp = min(exp, 62) // we cap the exponent to avoid an overflow of uint64 type
-		return currentFeeRate / (1 << exp)
-
-	default:
-		return currentFeeRate // unitsConsumed == target
+	if parentBlkComplexity == targetComplexity {
+		return currentFeeRate // complexity matches target, nothing to update
 	}
+
+	var (
+		delta uint64
+
+		// [increase] tells if
+		// [nextFeeRate] = [currentFeeRate] * [factor] or
+		// [nextFeeRate] = [currentFeeRate] / [factor]
+		increase bool
+
+		// [weight] is how much we increase or reduce the fee rate
+		weight uint64
+	)
+
+	// To control for numerical errors, we defer [coeff] normalization by [CoeffDenom]
+	// to the very end. This is possible since the approximation we use is piecewise linear.
+	if parentBlkComplexity > targetComplexity {
+		delta = coeff * (parentBlkComplexity - targetComplexity) / targetComplexity
+		increase = true
+	} else {
+		delta = coeff * (targetComplexity - parentBlkComplexity) / targetComplexity
+		increase = false
+	}
+
+	switch {
+	case delta < 1*CoeffDenom:
+		weight = 2*delta + 1*CoeffDenom
+	case delta < 2*CoeffDenom:
+		weight = 5*delta - 2*CoeffDenom
+	case delta < 3*CoeffDenom:
+		weight = 13*delta - 18*CoeffDenom
+	case delta < 4*CoeffDenom:
+		weight = 35*delta - 84*CoeffDenom
+	case delta < 5*CoeffDenom:
+		weight = 94*delta - 321*CoeffDenom
+	case delta < 6*CoeffDenom:
+		weight = 256*delta - 1131*CoeffDenom
+	case delta < 7*CoeffDenom:
+		weight = 694*delta - 3760*CoeffDenom
+	case delta < 8*CoeffDenom:
+		weight = 1885*delta - 12098*CoeffDenom
+	case delta < 9*CoeffDenom:
+		weight = 5123*delta - 38003*CoeffDenom
+	case delta < 10*CoeffDenom:
+		weight = 13924*delta - 117212*CoeffDenom
+	default:
+		weight = (delta/CoeffDenom - 10) ^ 2 + 22028
+	}
+
+	if increase {
+		return currentFeeRate * weight / CoeffDenom
+	}
+	return currentFeeRate * CoeffDenom / weight
 }
