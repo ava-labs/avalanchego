@@ -9,7 +9,14 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/avalanchego/utils/units"
 )
+
+type blkTimeAndComplexity struct {
+	blkTime    int64
+	complexity Dimensions
+}
 
 func TestUpdateFeeRates(t *testing.T) {
 	require := require.New(t)
@@ -143,4 +150,92 @@ func TestUpdateFeeRatesStability(t *testing.T) {
 	require.Equal(initialFeeRate[UTXORead], m2.feeRates[UTXORead])
 	require.Equal(initialFeeRate[UTXOWrite], m2.feeRates[UTXOWrite])
 	require.Equal(initialFeeRate[Compute], m2.feeRates[Compute])
+}
+
+func TestPChainFeeRateIncreaseDueToPeak(t *testing.T) {
+	// Complexity values comes from the mainnet historical peak as measured
+	// pre E upgrade activation
+
+	require := require.New(t)
+
+	var (
+		feesCfg = DynamicFeesConfig{
+			MinFeeRate: Dimensions{
+				60 * units.NanoAvax,
+				8 * units.NanoAvax,
+				10 * units.NanoAvax,
+				35 * units.NanoAvax,
+			},
+			UpdateCoefficient: Dimensions{ // over 10_000
+				30,
+				20,
+				25,
+				20,
+			},
+			BlockTargetComplexityRate: Dimensions{
+				200,
+				60,
+				80,
+				600,
+			},
+		}
+
+		// See mainnet P-chain block 298vMuyYEi8R3XX6Ewi5orsDVYn5jrNDrPEaPG89UsckcN8e8K and sequent
+		blockComplexities = []blkTimeAndComplexity{
+			{1703455204, Dimensions{41388, 23040, 23122, 256000}},
+			{1703455209, Dimensions{41388, 23040, 23122, 256000}},
+			{1703455222, Dimensions{41388, 23040, 23122, 256000}},
+			{1703455228, Dimensions{41388, 23040, 23122, 256000}},
+			{1703455236, Dimensions{41388, 23040, 23122, 256000}},
+			{1703455242, Dimensions{41388, 23040, 23122, 256000}},
+			{1703455250, Dimensions{41388, 23040, 23122, 256000}},
+			{1703455256, Dimensions{41388, 23040, 23122, 256000}},
+			{1703455320, Dimensions{41388, 23040, 23122, 256000}},
+			{1703455328, Dimensions{41388, 23040, 23122, 256000}},
+			{1703455334, Dimensions{41388, 23040, 23122, 256000}},
+			{1703455349, Dimensions{41388, 23040, 23122, 256000}},
+			{1703455356, Dimensions{41388, 23040, 23122, 256000}},
+			{1703455362, Dimensions{41388, 23040, 23122, 256000}},
+			{1703455412, Dimensions{41388, 23040, 23122, 256000}},
+			{1703455418, Dimensions{41388, 23040, 23122, 256000}},
+			{1703455424, Dimensions{41388, 23040, 23122, 256000}},
+			{1703455430, Dimensions{41388, 23040, 23122, 256000}},
+			{1703455437, Dimensions{41388, 23040, 23122, 256000}},
+			{1703455442, Dimensions{41388, 23040, 23122, 256000}},
+			{1703455448, Dimensions{41388, 23040, 23122, 256000}},
+			{1703455454, Dimensions{41388, 23040, 23122, 256000}},
+			{1703455460, Dimensions{41388, 23040, 23122, 256000}},
+			{1703455468, Dimensions{41388, 23040, 23122, 256000}},
+			{1703455489, Dimensions{41388, 23040, 23122, 256000}},
+			{1703455497, Dimensions{41388, 23040, 23122, 256000}},
+			{1703455503, Dimensions{41388, 23040, 23122, 256000}},
+			{1703455509, Dimensions{41388, 23040, 23122, 256000}},
+			{1703455517, Dimensions{41388, 23040, 23122, 256000}},
+			{1703455528, Dimensions{41388, 23040, 23122, 256000}},
+		}
+	)
+
+	m := &Manager{
+		feeRates: feesCfg.MinFeeRate,
+	}
+
+	parentFeeRate := feesCfg.MinFeeRate
+	for i := 1; i < len(blockComplexities); i++ {
+		parentBlkData := blockComplexities[i-1]
+		childBlkData := blockComplexities[i]
+		require.NoError(m.UpdateFeeRates(
+			feesCfg,
+			parentBlkData.complexity,
+			parentBlkData.blkTime,
+			childBlkData.blkTime,
+		))
+
+		// check that fee rates are strictly increasing
+		require.Less(parentFeeRate[Bandwidth], m.feeRates[Bandwidth])
+		require.Less(parentFeeRate[UTXORead], m.feeRates[UTXORead])
+		require.Less(parentFeeRate[UTXOWrite], m.feeRates[UTXOWrite])
+		require.Less(parentFeeRate[Compute], m.feeRates[Compute])
+
+		parentFeeRate = m.feeRates
+	}
 }
