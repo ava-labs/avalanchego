@@ -379,8 +379,8 @@ func TestBootstrapperEmptyResponse(t *testing.T) {
 	require.NoError(bs.startSyncing(context.Background(), blocksToIDs(blks[1:2])))
 	require.Equal(requestedNodeID, peerID)
 
-	// Add another 2 peers to the fetch set to test behavior on empty response.
-	bs.PeerTracker.Connected(ids.GenerateTestNodeID(), version.CurrentApp)
+	// Add another peer to allow a new node to be selected. A new node should be
+	// sampled if the prior response was empty.
 	bs.PeerTracker.Connected(ids.GenerateTestNodeID(), version.CurrentApp)
 
 	require.NoError(bs.Ancestors(context.Background(), requestedNodeID, requestID, nil)) // respond with empty

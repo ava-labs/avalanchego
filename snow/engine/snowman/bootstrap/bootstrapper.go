@@ -421,6 +421,10 @@ func (b *Bootstrapper) fetch(ctx context.Context, blkID ids.ID) error {
 	b.PeerTracker.RegisterRequest(nodeID)
 
 	b.requestID++
+<<<<<<< HEAD
+=======
+
+>>>>>>> master
 	request := common.Request{
 		NodeID:    nodeID,
 		RequestID: b.requestID,
@@ -503,12 +507,12 @@ func (b *Bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, request
 	}
 
 	var (
-		numBytes = len(requestedBlock.Bytes())
-		blockSet = make(map[ids.ID]snowman.Block, len(blocks))
+		numBytes  = len(requestedBlock.Bytes())
+		ancestors = make(map[ids.ID]snowman.Block, len(blocks))
 	)
 	for _, block := range blocks[1:] {
 		numBytes += len(block.Bytes())
-		blockSet[block.ID()] = block
+		ancestors[block.ID()] = block
 	}
 
 	// TODO: Calculate bandwidth based on the blocks that were persisted to
@@ -519,7 +523,7 @@ func (b *Bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, request
 	)
 	b.PeerTracker.RegisterResponse(nodeID, bandwidth)
 
-	if err := b.process(ctx, requestedBlock, blockSet); err != nil {
+	if err := b.process(ctx, requestedBlock, ancestors); err != nil {
 		return err
 	}
 

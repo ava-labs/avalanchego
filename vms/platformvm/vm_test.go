@@ -1474,10 +1474,10 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	require.NoError(err)
 
 	peerTracker, err := p2p.NewPeerTracker(
-		consensusCtx.Log,
-		"",
-		prometheus.NewRegistry(),
-		nil,
+		ctx.Log,
+		"peer_tracker",
+		consensusCtx.Registerer,
+		set.Of(ctx.NodeID),
 		nil,
 	)
 	require.NoError(err)
@@ -1505,15 +1505,6 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	)
 	require.NoError(err)
 
-	p2pTracker, err := p2p.NewPeerTracker(
-		ctx.Log,
-		"peer_tracker",
-		consensusCtx.Registerer,
-		set.Of(ctx.NodeID),
-		nil,
-	)
-	require.NoError(err)
-
 	h, err := handler.New(
 		bootstrapConfig.Ctx,
 		beacons,
@@ -1524,7 +1515,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		vm,
 		subnets.New(ctx.NodeID, subnets.Config{}),
 		tracker.NewPeers(),
-		p2pTracker,
+		peerTracker,
 	)
 	require.NoError(err)
 
