@@ -762,7 +762,7 @@ func (m *manager) createAvalancheChain(
 	if err != nil {
 		return nil, fmt.Errorf("error creating peer tracker: %w", err)
 	}
-	vdrs.RegisterCallbackListener(ctx.SubnetID, connectedValidators)
+	vdrs.RegisterSetCallbackListener(ctx.SubnetID, connectedValidators)
 
 	peerTracker, err := p2p.NewPeerTracker(
 		ctx.Log,
@@ -794,7 +794,7 @@ func (m *manager) createAvalancheChain(
 
 	connectedBeacons := tracker.NewPeers()
 	startupTracker := tracker.NewStartup(connectedBeacons, (3*bootstrapWeight+3)/4)
-	vdrs.RegisterCallbackListener(ctx.SubnetID, startupTracker)
+	vdrs.RegisterSetCallbackListener(ctx.SubnetID, startupTracker)
 
 	snowGetHandler, err := snowgetter.New(
 		vmWrappingProposerVM,
@@ -1107,7 +1107,7 @@ func (m *manager) createSnowmanChain(
 	if err != nil {
 		return nil, fmt.Errorf("error creating peer tracker: %w", err)
 	}
-	vdrs.RegisterCallbackListener(ctx.SubnetID, connectedValidators)
+	vdrs.RegisterSetCallbackListener(ctx.SubnetID, connectedValidators)
 
 	peerTracker, err := p2p.NewPeerTracker(
 		ctx.Log,
@@ -1139,7 +1139,7 @@ func (m *manager) createSnowmanChain(
 
 	connectedBeacons := tracker.NewPeers()
 	startupTracker := tracker.NewStartup(connectedBeacons, (3*bootstrapWeight+3)/4)
-	beacons.RegisterCallbackListener(ctx.SubnetID, startupTracker)
+	beacons.RegisterSetCallbackListener(ctx.SubnetID, startupTracker)
 
 	snowGetHandler, err := snowgetter.New(
 		vm,

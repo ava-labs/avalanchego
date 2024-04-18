@@ -239,7 +239,7 @@ func NewNetwork(
 	if err != nil {
 		return nil, fmt.Errorf("initializing ip tracker failed with: %w", err)
 	}
-	config.Validators.RegisterCallbackListener(constants.PrimaryNetworkID, ipTracker)
+	config.Validators.RegisterSetCallbackListener(constants.PrimaryNetworkID, ipTracker)
 
 	// Track all default bootstrappers to ensure their current IPs are gossiped
 	// like validator IPs.

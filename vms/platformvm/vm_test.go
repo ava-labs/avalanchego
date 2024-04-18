@@ -1460,7 +1460,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	totalWeight, err := beacons.TotalWeight(ctx.SubnetID)
 	require.NoError(err)
 	startup := tracker.NewStartup(peers, (totalWeight+1)/2)
-	beacons.RegisterCallbackListener(ctx.SubnetID, startup)
+	beacons.RegisterSetCallbackListener(ctx.SubnetID, startup)
 
 	// The engine handles consensus
 	snowGetHandler, err := snowgetter.New(
