@@ -10,12 +10,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/proto/pb/p2p"
+	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
@@ -28,7 +29,11 @@ import (
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/version"
+
+	p2ppb "github.com/ava-labs/avalanchego/proto/pb/p2p"
 )
 
 var (
@@ -86,12 +91,23 @@ func newConfig(t *testing.T) (Config, ids.NodeID, *common.SenderTest, *vertex.Te
 	avaGetHandler, err := getter.New(manager, sender, ctx.Log, time.Second, 2000, ctx.AvalancheRegisterer)
 	require.NoError(err)
 
+	p2pTracker, err := p2p.NewPeerTracker(
+		logging.NoLog{},
+		"",
+		prometheus.NewRegistry(),
+		nil,
+		version.CurrentApp,
+	)
+	require.NoError(err)
+
+	p2pTracker.Connected(peer, version.CurrentApp)
+
 	return Config{
 		AllGetsServer:                  avaGetHandler,
 		Ctx:                            ctx,
-		Beacons:                        vdrs,
 		StartupTracker:                 startupTracker,
 		Sender:                         sender,
+		PeerTracker:                    p2pTracker,
 		AncestorsMaxContainersReceived: 2000,
 		VtxBlocked:                     vtxBlocker,
 		TxBlocked:                      txBlocker,
@@ -151,7 +167,7 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 		config,
 		func(context.Context, uint32) error {
 			config.Ctx.State.Set(snow.EngineState{
-				Type:  p2p.EngineType_ENGINE_TYPE_AVALANCHE,
+				Type:  p2ppb.EngineType_ENGINE_TYPE_AVALANCHE,
 				State: snow.NormalOp,
 			})
 			return nil
@@ -257,7 +273,7 @@ func TestBootstrapperByzantineResponses(t *testing.T) {
 		config,
 		func(context.Context, uint32) error {
 			config.Ctx.State.Set(snow.EngineState{
-				Type:  p2p.EngineType_ENGINE_TYPE_AVALANCHE,
+				Type:  p2ppb.EngineType_ENGINE_TYPE_AVALANCHE,
 				State: snow.NormalOp,
 			})
 			return nil
@@ -423,7 +439,7 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 		config,
 		func(context.Context, uint32) error {
 			config.Ctx.State.Set(snow.EngineState{
-				Type:  p2p.EngineType_ENGINE_TYPE_AVALANCHE,
+				Type:  p2ppb.EngineType_ENGINE_TYPE_AVALANCHE,
 				State: snow.NormalOp,
 			})
 			return nil
@@ -546,7 +562,7 @@ func TestBootstrapperIncompleteAncestors(t *testing.T) {
 		config,
 		func(context.Context, uint32) error {
 			config.Ctx.State.Set(snow.EngineState{
-				Type:  p2p.EngineType_ENGINE_TYPE_AVALANCHE,
+				Type:  p2ppb.EngineType_ENGINE_TYPE_AVALANCHE,
 				State: snow.NormalOp,
 			})
 			return nil
@@ -619,112 +635,4 @@ func TestBootstrapperIncompleteAncestors(t *testing.T) {
 	require.Equal(choices.Accepted, vtx0.Status())
 	require.Equal(choices.Accepted, vtx1.Status())
 	require.Equal(choices.Accepted, vtx2.Status())
-}
-
-func TestBootstrapperUnexpectedVertex(t *testing.T) {
-	require := require.New(t)
-
-	config, peerID, sender, manager, vm := newConfig(t)
-
-	vtxID0 := ids.Empty.Prefix(0)
-	vtxID1 := ids.Empty.Prefix(1)
-
-	vtxBytes0 := []byte{0}
-	vtxBytes1 := []byte{1}
-
-	vtx0 := &avalanche.TestVertex{
-		TestDecidable: choices.TestDecidable{
-			IDV:     vtxID0,
-			StatusV: choices.Unknown,
-		},
-		HeightV: 0,
-		BytesV:  vtxBytes0,
-	}
-	vtx1 := &avalanche.TestVertex{ // vtx1 is the stop vertex
-		TestDecidable: choices.TestDecidable{
-			IDV:     vtxID1,
-			StatusV: choices.Unknown,
-		},
-		ParentsV: []avalanche.Vertex{vtx0},
-		HeightV:  1,
-		BytesV:   vtxBytes1,
-	}
-
-	config.StopVertexID = vtxID1
-	bs, err := New(
-		config,
-		func(context.Context, uint32) error {
-			config.Ctx.State.Set(snow.EngineState{
-				Type:  p2p.EngineType_ENGINE_TYPE_AVALANCHE,
-				State: snow.NormalOp,
-			})
-			return nil
-		},
-	)
-	require.NoError(err)
-
-	parsedVtx0 := false
-	parsedVtx1 := false
-	manager.GetVtxF = func(_ context.Context, vtxID ids.ID) (avalanche.Vertex, error) {
-		switch vtxID {
-		case vtxID0:
-			if parsedVtx0 {
-				return vtx0, nil
-			}
-			return nil, errUnknownVertex
-		case vtxID1:
-			if parsedVtx1 {
-				return vtx1, nil
-			}
-			return nil, errUnknownVertex
-		default:
-			require.FailNow(errUnknownVertex.Error())
-			return nil, errUnknownVertex
-		}
-	}
-	manager.ParseVtxF = func(_ context.Context, vtxBytes []byte) (avalanche.Vertex, error) {
-		switch {
-		case bytes.Equal(vtxBytes, vtxBytes0):
-			vtx0.StatusV = choices.Processing
-			parsedVtx0 = true
-			return vtx0, nil
-		case bytes.Equal(vtxBytes, vtxBytes1):
-			vtx1.StatusV = choices.Processing
-			parsedVtx1 = true
-			return vtx1, nil
-		default:
-			require.FailNow(errUnknownVertex.Error())
-			return nil, errUnknownVertex
-		}
-	}
-
-	requestIDs := map[ids.ID]uint32{}
-	sender.SendGetAncestorsF = func(_ context.Context, vdr ids.NodeID, reqID uint32, vtxID ids.ID) {
-		require.Equal(peerID, vdr)
-		requestIDs[vtxID] = reqID
-	}
-
-	vm.CantSetState = false
-	require.NoError(bs.Start(context.Background(), 0)) // should request vtx1
-	require.Contains(requestIDs, vtxID1)
-
-	reqID := requestIDs[vtxID1]
-	clear(requestIDs)
-	require.NoError(bs.Ancestors(context.Background(), peerID, reqID, [][]byte{vtxBytes0}))
-	require.Contains(requestIDs, vtxID1)
-
-	manager.EdgeF = func(context.Context) []ids.ID {
-		require.Equal(choices.Accepted, vtx1.Status())
-		return []ids.ID{vtxID1}
-	}
-
-	vm.LinearizeF = func(_ context.Context, stopVertexID ids.ID) error {
-		require.Equal(vtxID1, stopVertexID)
-		return nil
-	}
-
-	require.NoError(bs.Ancestors(context.Background(), peerID, reqID, [][]byte{vtxBytes1, vtxBytes0}))
-	require.Equal(choices.Accepted, vtx0.Status())
-	require.Equal(choices.Accepted, vtx1.Status())
-	require.Equal(snow.NormalOp, config.Ctx.State.Get().State)
 }
