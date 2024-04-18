@@ -61,7 +61,7 @@ func TestHealthCheckSubnet(t *testing.T) {
 			require.NoError(err)
 
 			peerTracker := commontracker.NewPeers()
-			vdrs.RegisterCallbackListener(ctx.SubnetID, peerTracker)
+			vdrs.RegisterSetCallbackListener(ctx.SubnetID, peerTracker)
 
 			sb := subnets.New(
 				ctx.NodeID,

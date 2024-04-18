@@ -71,7 +71,7 @@ func newConfig(t *testing.T) (Config, ids.NodeID, *common.SenderTest, *block.Tes
 	totalWeight, err := vdrs.TotalWeight(ctx.SubnetID)
 	require.NoError(err)
 	startupTracker := tracker.NewStartup(peerTracker, totalWeight/2+1)
-	vdrs.RegisterCallbackListener(ctx.SubnetID, startupTracker)
+	vdrs.RegisterSetCallbackListener(ctx.SubnetID, startupTracker)
 
 	require.NoError(startupTracker.Connected(context.Background(), peer, version.CurrentApp))
 
@@ -113,7 +113,7 @@ func TestBootstrapperStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 
 	peerTracker := tracker.NewPeers()
 	startupTracker := tracker.NewStartup(peerTracker, startupAlpha)
-	peers.RegisterCallbackListener(ctx.SubnetID, startupTracker)
+	peers.RegisterSetCallbackListener(ctx.SubnetID, startupTracker)
 
 	snowGetHandler, err := getter.New(vm, sender, ctx.Log, time.Second, 2000, ctx.Registerer)
 	require.NoError(err)
@@ -626,7 +626,7 @@ func TestBootstrapNoParseOnNew(t *testing.T) {
 	totalWeight, err := peers.TotalWeight(ctx.SubnetID)
 	require.NoError(err)
 	startupTracker := tracker.NewStartup(peerTracker, totalWeight/2+1)
-	peers.RegisterCallbackListener(ctx.SubnetID, startupTracker)
+	peers.RegisterSetCallbackListener(ctx.SubnetID, startupTracker)
 	require.NoError(startupTracker.Connected(context.Background(), peer, version.CurrentApp))
 
 	snowGetHandler, err := getter.New(vm, sender, ctx.Log, time.Second, 2000, ctx.Registerer)

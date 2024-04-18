@@ -421,7 +421,7 @@ func TestAddCallback(t *testing.T) {
 	m := NewManager()
 	subnetID := ids.GenerateTestID()
 	callCount := 0
-	m.RegisterCallbackListener(subnetID, &callbackListener{
+	m.RegisterSetCallbackListener(subnetID, &callbackListener{
 		t: t,
 		onAdd: func(nodeID ids.NodeID, pk *bls.PublicKey, txID ids.ID, weight uint64) {
 			require.Equal(nodeID0, nodeID)
@@ -452,7 +452,7 @@ func TestAddWeightCallback(t *testing.T) {
 	require.NoError(m.AddStaker(subnetID, nodeID0, nil, txID0, weight0))
 
 	callCount := 0
-	m.RegisterCallbackListener(subnetID, &callbackListener{
+	m.RegisterSetCallbackListener(subnetID, &callbackListener{
 		t: t,
 		onAdd: func(nodeID ids.NodeID, pk *bls.PublicKey, txID ids.ID, weight uint64) {
 			require.Equal(nodeID0, nodeID)
@@ -490,7 +490,7 @@ func TestRemoveWeightCallback(t *testing.T) {
 	require.NoError(m.AddStaker(subnetID, nodeID0, nil, txID0, weight0))
 
 	callCount := 0
-	m.RegisterCallbackListener(subnetID, &callbackListener{
+	m.RegisterSetCallbackListener(subnetID, &callbackListener{
 		t: t,
 		onAdd: func(nodeID ids.NodeID, pk *bls.PublicKey, txID ids.ID, weight uint64) {
 			require.Equal(nodeID0, nodeID)
@@ -527,7 +527,7 @@ func TestValidatorRemovedCallback(t *testing.T) {
 	require.NoError(m.AddStaker(subnetID, nodeID0, nil, txID0, weight0))
 
 	callCount := 0
-	m.RegisterCallbackListener(subnetID, &callbackListener{
+	m.RegisterSetCallbackListener(subnetID, &callbackListener{
 		t: t,
 		onAdd: func(nodeID ids.NodeID, pk *bls.PublicKey, txID ids.ID, weight uint64) {
 			require.Equal(nodeID0, nodeID)
