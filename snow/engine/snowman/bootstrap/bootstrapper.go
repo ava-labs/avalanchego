@@ -40,6 +40,8 @@ const (
 	// maxOutstandingBroadcastRequests is the maximum number of requests to have
 	// outstanding when broadcasting.
 	maxOutstandingBroadcastRequests = 50
+
+	epsilon = 1e-6 // small amount to add to time to avoid division by 0
 )
 
 var (
@@ -95,16 +97,8 @@ type Bootstrapper struct {
 	startTime time.Time
 
 	// tracks which validators were asked for which containers in which requests
-	outstandingRequests *bimap.BiMap[common.Request, ids.ID]
-
-	// fetchFrom is the set of nodes that we can fetch the next container from.
-	// When a container is fetched, the nodeID is removed from [fetchFrom] to
-	// attempt to limit a single request to a peer at any given time. When the
-	// response is received, either and Ancestors or an AncestorsFailed, the
-	// nodeID will be added back to [fetchFrom] unless the Ancestors message is
-	// empty. This is to attempt to prevent requesting containers from that peer
-	// again.
-	fetchFrom set.Set[ids.NodeID]
+	outstandingRequests     *bimap.BiMap[common.Request, ids.ID]
+	outstandingRequestTimes map[common.Request]time.Time
 
 	// number of state transitions executed
 	executedStateTransitions uint64
@@ -136,7 +130,8 @@ func New(config Config, onFinished func(ctx context.Context, lastReqID uint32) e
 		minority: bootstrapper.Noop,
 		majority: bootstrapper.Noop,
 
-		outstandingRequests: bimap.New[common.Request, ids.ID](),
+		outstandingRequests:     bimap.New[common.Request, ids.ID](),
+		outstandingRequestTimes: make(map[common.Request]time.Time),
 
 		executedStateTransitions: math.MaxInt,
 		onFinished:               onFinished,
@@ -199,10 +194,6 @@ func (b *Bootstrapper) Connected(ctx context.Context, nodeID ids.NodeID, nodeVer
 	if err := b.StartupTracker.Connected(ctx, nodeID, nodeVersion); err != nil {
 		return err
 	}
-	// Ensure fetchFrom reflects proper validator list
-	if _, ok := b.Beacons.GetValidator(b.Ctx.SubnetID, nodeID); ok {
-		b.fetchFrom.Add(nodeID)
-	}
 
 	return b.tryStartBootstrapping(ctx)
 }
@@ -211,13 +202,7 @@ func (b *Bootstrapper) Disconnected(ctx context.Context, nodeID ids.NodeID) erro
 	if err := b.VM.Disconnected(ctx, nodeID); err != nil {
 		return err
 	}
-
-	if err := b.StartupTracker.Disconnected(ctx, nodeID); err != nil {
-		return err
-	}
-
-	b.markUnavailable(nodeID)
-	return nil
+	return b.StartupTracker.Disconnected(ctx, nodeID)
 }
 
 // tryStartBootstrapping will start bootstrapping the first time it is called
@@ -375,9 +360,6 @@ func (b *Bootstrapper) GetAcceptedFailed(ctx context.Context, nodeID ids.NodeID,
 }
 
 func (b *Bootstrapper) startSyncing(ctx context.Context, acceptedBlockIDs []ids.ID) error {
-	// Initialize the fetch from set to the currently preferred peers
-	b.fetchFrom = b.StartupTracker.PreferredPeers()
-
 	knownBlockIDs := genesis.GetCheckpoints(b.Ctx.NetworkID, b.Ctx.ChainID)
 	b.missingBlockIDs.Union(knownBlockIDs)
 	b.missingBlockIDs.Add(acceptedBlockIDs...)
@@ -427,24 +409,26 @@ func (b *Bootstrapper) fetch(ctx context.Context, blkID ids.ID) error {
 		return nil
 	}
 
-	validatorID, ok := b.fetchFrom.Peek()
+	nodeID, ok := b.PeerTracker.SelectPeer()
 	if !ok {
-		return fmt.Errorf("dropping request for %s as there are no validators", blkID)
+		// If we aren't connected to any peers, we send a request to ourself
+		// which is guaranteed to fail. We send this message to use the message
+		// timeout as a retry mechanism. Once we are connected to another node
+		// again we will select them to sample from.
+		nodeID = b.Ctx.NodeID
 	}
 
-	// We only allow one outbound request at a time from a node
-	b.markUnavailable(validatorID)
+	b.PeerTracker.RegisterRequest(nodeID)
 
 	b.requestID++
 
-	b.outstandingRequests.Put(
-		common.Request{
-			NodeID:    validatorID,
-			RequestID: b.requestID,
-		},
-		blkID,
-	)
-	b.Config.Sender.SendGetAncestors(ctx, validatorID, b.requestID, blkID) // request block and ancestors
+	request := common.Request{
+		NodeID:    nodeID,
+		RequestID: b.requestID,
+	}
+	b.outstandingRequests.Put(request, blkID)
+	b.outstandingRequestTimes[request] = time.Now()
+	b.Config.Sender.SendGetAncestors(ctx, nodeID, b.requestID, blkID) // request block and ancestors
 	return nil
 }
 
@@ -452,10 +436,11 @@ func (b *Bootstrapper) fetch(ctx context.Context, blkID ids.ID) error {
 // response to a GetAncestors message to [nodeID] with request ID [requestID]
 func (b *Bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, requestID uint32, blks [][]byte) error {
 	// Make sure this is in response to a request we made
-	wantedBlkID, ok := b.outstandingRequests.DeleteKey(common.Request{
+	request := common.Request{
 		NodeID:    nodeID,
 		RequestID: requestID,
-	})
+	}
+	wantedBlkID, ok := b.outstandingRequests.DeleteKey(request)
 	if !ok { // this message isn't in response to a request we made
 		b.Ctx.Log.Debug("received unexpected Ancestors",
 			zap.Stringer("nodeID", nodeID),
@@ -463,6 +448,8 @@ func (b *Bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, request
 		)
 		return nil
 	}
+	requestTime := b.outstandingRequestTimes[request]
+	delete(b.outstandingRequestTimes, request)
 
 	lenBlks := len(blks)
 	if lenBlks == 0 {
@@ -471,14 +458,11 @@ func (b *Bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, request
 			zap.Uint32("requestID", requestID),
 		)
 
-		b.markUnavailable(nodeID)
+		b.PeerTracker.RegisterFailure(nodeID)
 
 		// Send another request for this
 		return b.fetch(ctx, wantedBlkID)
 	}
-
-	// This node has responded - so add it back into the set
-	b.fetchFrom.Add(nodeID)
 
 	if lenBlks > b.Config.AncestorsMaxContainersReceived {
 		blks = blks[:b.Config.AncestorsMaxContainersReceived]
@@ -496,6 +480,7 @@ func (b *Bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, request
 			zap.Uint32("requestID", requestID),
 			zap.Error(err),
 		)
+		b.PeerTracker.RegisterFailure(nodeID)
 		return b.fetch(ctx, wantedBlkID)
 	}
 
@@ -504,6 +489,7 @@ func (b *Bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, request
 			zap.Stringer("nodeID", nodeID),
 			zap.Uint32("requestID", requestID),
 		)
+		b.PeerTracker.RegisterFailure(nodeID)
 		return b.fetch(ctx, wantedBlkID)
 	}
 
@@ -513,14 +499,28 @@ func (b *Bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, request
 			zap.Stringer("expectedBlkID", wantedBlkID),
 			zap.Stringer("blkID", actualID),
 		)
+		b.PeerTracker.RegisterFailure(nodeID)
 		return b.fetch(ctx, wantedBlkID)
 	}
 
-	blockSet := make(map[ids.ID]snowman.Block, len(blocks))
+	var (
+		numBytes  = len(requestedBlock.Bytes())
+		ancestors = make(map[ids.ID]snowman.Block, len(blocks))
+	)
 	for _, block := range blocks[1:] {
-		blockSet[block.ID()] = block
+		numBytes += len(block.Bytes())
+		ancestors[block.ID()] = block
 	}
-	if err := b.process(ctx, requestedBlock, blockSet); err != nil {
+
+	// TODO: Calculate bandwidth based on the blocks that were persisted to
+	// disk.
+	var (
+		requestLatency = time.Since(requestTime).Seconds() + epsilon
+		bandwidth      = float64(numBytes) / requestLatency
+	)
+	b.PeerTracker.RegisterResponse(nodeID, bandwidth)
+
+	if err := b.process(ctx, requestedBlock, ancestors); err != nil {
 		return err
 	}
 
@@ -528,10 +528,11 @@ func (b *Bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, request
 }
 
 func (b *Bootstrapper) GetAncestorsFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
-	blkID, ok := b.outstandingRequests.DeleteKey(common.Request{
+	request := common.Request{
 		NodeID:    nodeID,
 		RequestID: requestID,
-	})
+	}
+	blkID, ok := b.outstandingRequests.DeleteKey(request)
 	if !ok {
 		b.Ctx.Log.Debug("unexpectedly called GetAncestorsFailed",
 			zap.Stringer("nodeID", nodeID),
@@ -539,25 +540,13 @@ func (b *Bootstrapper) GetAncestorsFailed(ctx context.Context, nodeID ids.NodeID
 		)
 		return nil
 	}
+	delete(b.outstandingRequestTimes, request)
 
-	// This node timed out their request, so we can add them back to [fetchFrom]
-	b.fetchFrom.Add(nodeID)
+	// This node timed out their request.
+	b.PeerTracker.RegisterFailure(nodeID)
 
 	// Send another request for this
 	return b.fetch(ctx, blkID)
-}
-
-// markUnavailable removes [nodeID] from the set of peers used to fetch
-// ancestors. If the set becomes empty, it is reset to the currently preferred
-// peers so bootstrapping can continue.
-func (b *Bootstrapper) markUnavailable(nodeID ids.NodeID) {
-	b.fetchFrom.Remove(nodeID)
-
-	// if [fetchFrom] has become empty, reset it to the currently preferred
-	// peers
-	if b.fetchFrom.Len() == 0 {
-		b.fetchFrom = b.StartupTracker.PreferredPeers()
-	}
 }
 
 // process a series of consecutive blocks starting at [blk].
@@ -746,6 +735,7 @@ func (b *Bootstrapper) restartBootstrapping(ctx context.Context) error {
 	b.Ctx.Log.Debug("Checking for new frontiers")
 	b.restarted = true
 	b.outstandingRequests = bimap.New[common.Request, ids.ID]()
+	b.outstandingRequestTimes = make(map[common.Request]time.Time)
 	return b.startBootstrapping(ctx)
 }
 
