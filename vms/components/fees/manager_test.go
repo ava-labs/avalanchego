@@ -17,7 +17,7 @@ func TestUpdateFeeRates(t *testing.T) {
 	var (
 		feesCfg = DynamicFeesConfig{
 			MinFeeRate:                Dimensions{1, 1, 1, 1},
-			UpdateCoefficient:         Dimensions{1, 2, 5, 10},
+			UpdateCoefficient:         Dimensions{10_000, 20_000, 50_000, 100_000},
 			BlockTargetComplexityRate: Dimensions{25, 25, 25, 25},
 		}
 		parentFeeRate    = Dimensions{1, 2, 10, 20}
@@ -58,7 +58,7 @@ func TestUpdateFeeRatesEdgeCases(t *testing.T) {
 	var (
 		feesCfg = DynamicFeesConfig{
 			MinFeeRate:                Dimensions{1, 0, 0, 0},
-			UpdateCoefficient:         Dimensions{1, 1, 1, 1},
+			UpdateCoefficient:         Dimensions{10_000, 10_000, 10_000, 10_000},
 			BlockTargetComplexityRate: Dimensions{math.MaxUint64, 1, 1, 1}, // a very skewed requirement for block complexity
 		}
 		parentFeeRate    = Dimensions{2, 1, 2, 2}
@@ -102,7 +102,7 @@ func TestUpdateFeeRatesStability(t *testing.T) {
 	var (
 		feesCfg = DynamicFeesConfig{
 			MinFeeRate:                Dimensions{0, 0, 0, 0},
-			UpdateCoefficient:         Dimensions{2, 4, 5, 10},
+			UpdateCoefficient:         Dimensions{20_000, 40_000, 50_000, 100_000},
 			BlockTargetComplexityRate: Dimensions{25, 50, 100, 1000},
 		}
 		initialFeeRate   = Dimensions{10, 100, 1_000, 1_000_000_000}

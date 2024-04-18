@@ -45,7 +45,7 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 	require.NoError(err)
 
 	// Remove a signature
-	tx.Creds[0].(*secp256k1fx.Credential).Sigs = tx.Creds[0].(*secp256k1fx.Credential).Sigs[1:]
+	tx.Creds[1].(*secp256k1fx.Credential).Sigs = tx.Creds[1].(*secp256k1fx.Credential).Sigs[1:]
 
 	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
@@ -94,7 +94,7 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 	// Replace a valid signature with one from another key
 	sig, err := key.SignHash(hashing.ComputeHash256(tx.Unsigned.Bytes()))
 	require.NoError(err)
-	copy(tx.Creds[0].(*secp256k1fx.Credential).Sigs[0][:], sig)
+	copy(tx.Creds[1].(*secp256k1fx.Credential).Sigs[0][:], sig)
 
 	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)

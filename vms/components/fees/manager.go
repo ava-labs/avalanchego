@@ -134,7 +134,7 @@ func nextFeeRate(currentFeeRate, coeff, parentBlkComplexity, targetComplexityRat
 
 	switch {
 	case parentBlkComplexity > targetComplexity:
-		exp := 1442 * coeff * (parentBlkComplexity - targetComplexity) / targetComplexity / 1000
+		exp := 1442 * coeff * (parentBlkComplexity - targetComplexity) / targetComplexity / 1000 / 10_000
 		exp = min(exp, 62) // we cap the exponent to avoid an overflow of uint64 type
 		res, over := safemath.Mul64(currentFeeRate, 1<<exp)
 		if over != nil {
@@ -143,7 +143,7 @@ func nextFeeRate(currentFeeRate, coeff, parentBlkComplexity, targetComplexityRat
 		return res
 
 	case parentBlkComplexity < targetComplexity:
-		exp := 1442 * coeff * (targetComplexity - parentBlkComplexity) / targetComplexity / 1000
+		exp := 1442 * coeff * (targetComplexity - parentBlkComplexity) / targetComplexity / 1000 / 10_000
 		exp = min(exp, 62) // we cap the exponent to avoid an overflow of uint64 type
 		return currentFeeRate / (1 << exp)
 
