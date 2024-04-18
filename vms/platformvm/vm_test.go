@@ -19,7 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
-	"github.com/ava-labs/avalanchego/proto/pb/p2p"
+	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
@@ -60,6 +60,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
+	p2ppb "github.com/ava-labs/avalanchego/proto/pb/p2p"
 	smcon "github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	smeng "github.com/ava-labs/avalanchego/snow/engine/snowman"
 	snowgetter "github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
@@ -1439,7 +1440,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		externalSender,
 		chainRouter,
 		timeoutManager,
-		p2p.EngineType_ENGINE_TYPE_SNOWMAN,
+		p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
 		subnets.New(consensusCtx.NodeID, subnets.Config{}),
 	)
 	require.NoError(err)
@@ -1472,12 +1473,22 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	)
 	require.NoError(err)
 
+	peerTracker, err := p2p.NewPeerTracker(
+		ctx.Log,
+		"peer_tracker",
+		consensusCtx.Registerer,
+		set.Of(ctx.NodeID),
+		nil,
+	)
+	require.NoError(err)
+
 	bootstrapConfig := bootstrap.Config{
 		AllGetsServer:                  snowGetHandler,
 		Ctx:                            consensusCtx,
 		Beacons:                        beacons,
 		SampleK:                        beacons.Count(ctx.SubnetID),
 		StartupTracker:                 startup,
+		PeerTracker:                    peerTracker,
 		Sender:                         sender,
 		BootstrapTracker:               bootstrapTracker,
 		AncestorsMaxContainersReceived: 2000,
@@ -1504,6 +1515,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		vm,
 		subnets.New(ctx.NodeID, subnets.Config{}),
 		tracker.NewPeers(),
+		peerTracker,
 	)
 	require.NoError(err)
 
@@ -1549,7 +1561,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	})
 
 	consensusCtx.State.Set(snow.EngineState{
-		Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
+		Type:  p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
 		State: snow.NormalOp,
 	})
 
@@ -1573,13 +1585,14 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		return config.NodeIDs
 	}
 
+	peerTracker.Connected(peerID, version.CurrentApp)
 	require.NoError(bootstrapper.Connected(context.Background(), peerID, version.CurrentApp))
 
 	externalSender.SendF = func(msg message.OutboundMessage, config common.SendConfig, _ ids.ID, _ subnets.Allower) set.Set[ids.NodeID] {
 		inMsgIntf, err := mc.Parse(msg.Bytes(), ctx.NodeID, func() {})
 		require.NoError(err)
 		require.Equal(message.GetAcceptedOp, inMsgIntf.Op())
-		inMsg := inMsgIntf.Message().(*p2p.GetAccepted)
+		inMsg := inMsgIntf.Message().(*p2ppb.GetAccepted)
 
 		reqID = inMsg.RequestId
 		return config.NodeIDs
@@ -1591,7 +1604,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		inMsgIntf, err := mc.Parse(msg.Bytes(), ctx.NodeID, func() {})
 		require.NoError(err)
 		require.Equal(message.GetAncestorsOp, inMsgIntf.Op())
-		inMsg := inMsgIntf.Message().(*p2p.GetAncestors)
+		inMsg := inMsgIntf.Message().(*p2ppb.GetAncestors)
 
 		reqID = inMsg.RequestId
 
@@ -1622,7 +1635,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		inMsgIntf, err := mc.Parse(msg.Bytes(), ctx.NodeID, func() {})
 		require.NoError(err)
 		require.Equal(message.GetAcceptedOp, inMsgIntf.Op())
-		inMsg := inMsgIntf.Message().(*p2p.GetAccepted)
+		inMsg := inMsgIntf.Message().(*p2ppb.GetAccepted)
 
 		reqID = inMsg.RequestId
 		return config.NodeIDs
