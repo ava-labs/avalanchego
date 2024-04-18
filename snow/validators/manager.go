@@ -279,6 +279,7 @@ func (m *manager) RegisterCallbackListener(listener ManagerCallbackListener) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
+	m.callbackListeners = append(m.callbackListeners, listener)
 	for _, set := range m.subnetToVdrs {
 		set.RegisterManagerCallbackListener(listener)
 	}
