@@ -111,6 +111,7 @@ func (m *Manager) UpdateFeeRates(
 			feesConfig.UpdateCoefficient[i],
 			parentBlkComplexity[i],
 			feesConfig.BlockTargetComplexityRate[i],
+			feesConfig.BlockMaxComplexity[i],
 			elapsedTime,
 		)
 		nextFeeRates = max(nextFeeRates, feesConfig.MinFeeRate[i])
@@ -119,7 +120,7 @@ func (m *Manager) UpdateFeeRates(
 	return nil
 }
 
-func nextFeeRate(currentFeeRate, coeff, parentBlkComplexity, targetComplexityRate, elapsedTime uint64) uint64 {
+func nextFeeRate(currentFeeRate, coeff, parentBlkComplexity, targetComplexityRate, maxBlkComplexity, elapsedTime uint64) uint64 {
 	// We update the fee rate with the formula:
 	//     feeRate_{t+1} = feeRate_t * exp(delta)
 	// where
@@ -127,10 +128,9 @@ func nextFeeRate(currentFeeRate, coeff, parentBlkComplexity, targetComplexityRat
 	// and [targetComplexity] is the median complexity expected in the elapsed time.
 	//
 	// We approximate the exponential as follows:
-	// * For delta in the interval [0, 10], we use the following piecewise, linear function:
+	// * For delta in the interval [0, MaxDelta], we use the following piecewise, linear function:
 	//       x \in [a,b] --> exp(X) ≈≈ (exp(b)-exp(a))(b-a)*(X-a) + exp(a)
-	// * For delta > 10 we approximate the exponential via a quadratic function
-	//       exp(X) ≈≈ (X-10)^2 + exp(10)
+	// MaxDelta is given by the max block complexity (MaxBlkComplexity - targetComplexity)/(targetComplexity)
 	// The approximation is overall continuous, so it behaves well at the interval edges
 
 	// parent and child block may have the same timestamp. In this case targetComplexity will match targetComplexityRate
@@ -145,7 +145,8 @@ func nextFeeRate(currentFeeRate, coeff, parentBlkComplexity, targetComplexityRat
 	}
 
 	var (
-		delta uint64
+		scaledDelta uint64
+		scaleCoeff  uint64
 
 		// [increase] tells if
 		// [nextFeeRate] = [currentFeeRate] * [factor] or
@@ -159,36 +160,57 @@ func nextFeeRate(currentFeeRate, coeff, parentBlkComplexity, targetComplexityRat
 	// To control for numerical errors, we defer [coeff] normalization by [CoeffDenom]
 	// to the very end. This is possible since the approximation we use is piecewise linear.
 	if parentBlkComplexity > targetComplexity {
-		delta = coeff * (parentBlkComplexity - targetComplexity) / targetComplexity
+		scaledDelta = 10 * (parentBlkComplexity - targetComplexity) / (maxBlkComplexity - targetComplexity)
+		scaleCoeff = coeff * (maxBlkComplexity - targetComplexity) / targetComplexity / CoeffDenom / 10
 		increase = true
 	} else {
-		delta = coeff * (targetComplexity - parentBlkComplexity) / targetComplexity
+		scaledDelta = 10 * (targetComplexity - parentBlkComplexity) / (maxBlkComplexity - targetComplexity)
+		scaleCoeff = coeff * (maxBlkComplexity - targetComplexity) / targetComplexity / CoeffDenom / 10
 		increase = false
 	}
 
+	var (
+		m, q      uint64
+		qPositive bool
+	)
 	switch {
-	case delta < 1*CoeffDenom:
-		weight = 2*delta + 1*CoeffDenom
-	case delta < 2*CoeffDenom:
-		weight = 5*delta - 2*CoeffDenom
-	case delta < 3*CoeffDenom:
-		weight = 13*delta - 18*CoeffDenom
-	case delta < 4*CoeffDenom:
-		weight = 35*delta - 84*CoeffDenom
-	case delta < 5*CoeffDenom:
-		weight = 94*delta - 321*CoeffDenom
-	case delta < 6*CoeffDenom:
-		weight = 256*delta - 1131*CoeffDenom
-	case delta < 7*CoeffDenom:
-		weight = 694*delta - 3760*CoeffDenom
-	case delta < 8*CoeffDenom:
-		weight = 1885*delta - 12098*CoeffDenom
-	case delta < 9*CoeffDenom:
-		weight = 5123*delta - 38003*CoeffDenom
-	case delta < 10*CoeffDenom:
-		weight = 13924*delta - 117212*CoeffDenom
+	case scaledDelta < 1:
+		m = 2
+		q = 1
+		qPositive = true
+	case scaledDelta < 2:
+		m = 5
+		q = 2
+	case scaledDelta < 3:
+		m = 13
+		q = 18
+	case scaledDelta < 4:
+		m = 35
+		q = 84
+	case scaledDelta < 5:
+		m = 94
+		q = 321
+	case scaledDelta < 6:
+		m = 256
+		q = 1131
+	case scaledDelta < 7:
+		m = 694
+		q = 3760
+	case scaledDelta < 8:
+		m = 1885
+		q = 12098
+	case scaledDelta < 9:
+		m = 5123
+		q = 38003
 	default:
-		weight = (delta/CoeffDenom - 10) ^ 2 + 22028
+		m = 13924
+		q = 117212
+	}
+
+	if !qPositive {
+		weight = scaleCoeff*(m*scaledDelta-q) + (scaleCoeff-1)*q
+	} else {
+		weight = scaleCoeff*(m*scaledDelta+q) - (scaleCoeff-1)*q
 	}
 
 	if increase {

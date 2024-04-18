@@ -24,7 +24,7 @@ func TestUpdateFeeRates(t *testing.T) {
 	var (
 		feesCfg = DynamicFeesConfig{
 			MinFeeRate:                Dimensions{1, 1, 1, 1},
-			UpdateCoefficient:         Dimensions{10_000, 20_000, 50_000, 100_000},
+			UpdateCoefficient:         Dimensions{1, 2, 5, 10},
 			BlockTargetComplexityRate: Dimensions{25, 25, 25, 25},
 		}
 		parentFeeRate    = Dimensions{1, 2, 10, 20}
@@ -172,6 +172,12 @@ func TestPChainFeeRateIncreaseDueToPeak(t *testing.T) {
 				20,
 				25,
 				20,
+			},
+			BlockMaxComplexity: Dimensions{
+				100_000,
+				40_000,
+				40_000,
+				500_000,
 			},
 			BlockTargetComplexityRate: Dimensions{
 				200,
