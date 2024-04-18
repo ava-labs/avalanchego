@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/bloom"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -38,7 +39,7 @@ const (
 	newTimestamp       = 2
 )
 
-var _ validators.SetCallbackListener = (*ipTracker)(nil)
+var _ validators.ManagerCallbackListener = (*ipTracker)(nil)
 
 func newIPTracker(
 	log logging.Logger,
@@ -260,7 +261,11 @@ func (i *ipTracker) Disconnected(nodeID ids.NodeID) {
 	i.removeGossipableIP(nodeID)
 }
 
-func (i *ipTracker) OnValidatorAdded(nodeID ids.NodeID, _ *bls.PublicKey, _ ids.ID, _ uint64) {
+func (i *ipTracker) OnValidatorAdded(subnetID ids.ID, nodeID ids.NodeID, _ *bls.PublicKey, _ ids.ID, _ uint64) {
+	if subnetID != constants.PrimaryNetworkID {
+		return
+	}
+
 	i.lock.Lock()
 	defer i.lock.Unlock()
 
@@ -302,9 +307,13 @@ func (i *ipTracker) addGossipableID(nodeID ids.NodeID) {
 	i.addGossipableIP(connectedIP)
 }
 
-func (*ipTracker) OnValidatorWeightChanged(ids.NodeID, uint64, uint64) {}
+func (*ipTracker) OnValidatorWeightChanged(ids.ID, ids.NodeID, uint64, uint64) {}
 
-func (i *ipTracker) OnValidatorRemoved(nodeID ids.NodeID, _ uint64) {
+func (i *ipTracker) OnValidatorRemoved(subnetID ids.ID, nodeID ids.NodeID, _ uint64) {
+	if subnetID != constants.PrimaryNetworkID {
+		return
+	}
+
 	i.lock.Lock()
 	defer i.lock.Unlock()
 
