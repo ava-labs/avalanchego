@@ -4,6 +4,7 @@
 package fees
 
 import (
+	"fmt"
 	"math"
 	"testing"
 	"time"
@@ -168,16 +169,22 @@ func TestPChainFeeRateIncreaseDueToPeak(t *testing.T) {
 				35 * units.NanoAvax,
 			},
 			UpdateCoefficient: Dimensions{ // over CoeffDenom
-				30,
-				20,
-				25,
-				20,
+				4,
+				1,
+				2,
+				3,
 			},
 			BlockTargetComplexityRate: Dimensions{
 				200,
 				60,
 				80,
 				600,
+			},
+			BlockMaxComplexity: Dimensions{
+				100_000,
+				60_000,
+				60_000,
+				600_000,
 			},
 		}
 
@@ -238,17 +245,17 @@ func TestPChainFeeRateIncreaseDueToPeak(t *testing.T) {
 		// at peak the total fee for a median complexity tx should be in tens of Avax, no more.
 		fee, err := m.CalculateFee(feesCfg.BlockTargetComplexityRate)
 		require.NoError(err)
-		require.Less(fee, 100*units.Avax)
+		require.Less(fee, 100*units.Avax, fmt.Sprintf("iteration: %d, total: %d", i, len(blockComplexities)))
 
 		peakFeeRate = m.feeRates
 	}
 
 	// OFF PEAK
 	offPeakBlkComplexity := Dimensions{
-		feesCfg.BlockTargetComplexityRate[Bandwidth] - 10,
-		feesCfg.BlockTargetComplexityRate[UTXORead] - 3,
-		feesCfg.BlockTargetComplexityRate[UTXOWrite] - 6,
-		feesCfg.BlockTargetComplexityRate[Compute] - 30,
+		feesCfg.BlockTargetComplexityRate[Bandwidth] * 1 / 10,
+		feesCfg.BlockTargetComplexityRate[UTXORead] * 1 / 10,
+		feesCfg.BlockTargetComplexityRate[UTXOWrite] * 1 / 10,
+		feesCfg.BlockTargetComplexityRate[Compute] * 1 / 10,
 	}
 	elapsedTime := time.Second
 	parentBlkTime := time.Now().Truncate(time.Second)

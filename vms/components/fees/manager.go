@@ -10,8 +10,8 @@ import (
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
-// the update fee algorithm has a UpdateCoefficient, normalized to  [CoeffDenom]
-const CoeffDenom = uint64(10_000)
+// the update fee algorithm has a UpdateCoefficient, normalized to [CoeffDenom]
+const CoeffDenom = uint64(1_000)
 
 type Manager struct {
 	// Avax denominated fee rates, i.e. fees per unit of complexity.
@@ -111,6 +111,7 @@ func (m *Manager) UpdateFeeRates(
 			feesConfig.UpdateCoefficient[i],
 			parentBlkComplexity[i],
 			feesConfig.BlockTargetComplexityRate[i],
+			feesConfig.BlockMaxComplexity[i],
 			elapsedTime,
 		)
 		nextFeeRates = max(nextFeeRates, feesConfig.MinFeeRate[i])
@@ -119,7 +120,14 @@ func (m *Manager) UpdateFeeRates(
 	return nil
 }
 
-func nextFeeRate(currentFeeRate, coeff, parentBlkComplexity, targetComplexityRate, elapsedTime uint64) uint64 {
+func nextFeeRate(
+	currentFeeRate,
+	coeff,
+	parentBlkComplexity,
+	targetComplexityRate,
+	maxComplexity,
+	elapsedTime uint64,
+) uint64 {
 	// We update the fee rate with the formula:
 	//     feeRate_{t+1} = feeRate_t * exp(delta)
 	// where
@@ -144,55 +152,108 @@ func nextFeeRate(currentFeeRate, coeff, parentBlkComplexity, targetComplexityRat
 		return currentFeeRate // complexity matches target, nothing to update
 	}
 
-	var (
-		delta uint64
+	// [increase] tells if
+	// [nextFeeRate] = [currentFeeRate] * [factor] or
+	// [nextFeeRate] = [currentFeeRate] / [factor]
+	var increase bool
 
-		// [increase] tells if
-		// [nextFeeRate] = [currentFeeRate] * [factor] or
-		// [nextFeeRate] = [currentFeeRate] / [factor]
-		increase bool
-
-		// [weight] is how much we increase or reduce the fee rate
-		weight uint64
-	)
-
-	// To control for numerical errors, we defer [coeff] normalization by [CoeffDenom]
-	// to the very end. This is possible since the approximation we use is piecewise linear.
-	if parentBlkComplexity > targetComplexity {
-		delta = coeff * (parentBlkComplexity - targetComplexity) / targetComplexity
+	var num1 uint64
+	if maxComplexity > targetComplexity {
+		num1 = coeff * (maxComplexity - targetComplexity)
 		increase = true
 	} else {
-		delta = coeff * (targetComplexity - parentBlkComplexity) / targetComplexity
+		num1 = coeff * (targetComplexity - maxComplexity)
 		increase = false
 	}
+	denom1 := CoeffDenom * targetComplexity
 
 	switch {
-	case delta < 1*CoeffDenom:
-		weight = 2*delta + 1*CoeffDenom
-	case delta < 2*CoeffDenom:
-		weight = 5*delta - 2*CoeffDenom
-	case delta < 3*CoeffDenom:
-		weight = 13*delta - 18*CoeffDenom
-	case delta < 4*CoeffDenom:
-		weight = 35*delta - 84*CoeffDenom
-	case delta < 5*CoeffDenom:
-		weight = 94*delta - 321*CoeffDenom
-	case delta < 6*CoeffDenom:
-		weight = 256*delta - 1131*CoeffDenom
-	case delta < 7*CoeffDenom:
-		weight = 694*delta - 3760*CoeffDenom
-	case delta < 8*CoeffDenom:
-		weight = 1885*delta - 12098*CoeffDenom
-	case delta < 9*CoeffDenom:
-		weight = 5123*delta - 38003*CoeffDenom
-	case delta < 10*CoeffDenom:
-		weight = 13924*delta - 117212*CoeffDenom
+	case num1 < 1*denom1:
+		num1 = 2*num1 + denom1
+	case num1 < 2*denom1:
+		num1 = 5*num1 - 2*denom1
+	case num1 < 3*denom1:
+		num1 = 13*num1 - 18*denom1
+	case num1 < 4*denom1:
+		num1 = 35*num1 - 84*denom1
+	case num1 < 5*denom1:
+		num1 = 94*num1 - 321*denom1
+	case num1 < 6*denom1:
+		num1 = 256*num1 - 1131*denom1
+	case num1 < 7*denom1:
+		num1 = 694*num1 - 3760*denom1
+	case num1 < 8*denom1:
+		num1 = 1885*num1 - 12098*denom1
+	case num1 < 9*denom1:
+		num1 = 5123*num1 - 38003*denom1
 	default:
-		weight = (delta/CoeffDenom - 10) ^ 2 + 22028
+		num1 = 13924*num1 - 117212*denom1
+	}
+
+	var (
+		num2   uint64
+		denom2 uint64
+	)
+
+	if maxComplexity > targetComplexity {
+		num2 = parentBlkComplexity + maxComplexity - 2*targetComplexity
+		denom2 = maxComplexity - targetComplexity
+	} else {
+		num2 = 2*targetComplexity - parentBlkComplexity - maxComplexity
+		denom2 = targetComplexity - maxComplexity
 	}
 
 	if increase {
-		return currentFeeRate * weight / CoeffDenom
+		return currentFeeRate * num1 * num2 / denom1 / denom2
+	} else {
+		return currentFeeRate * denom1 * num2 / num1 / denom2
 	}
-	return currentFeeRate * CoeffDenom / weight
+
+	////////////////////////////////////////////////////////////////////////////
+	////////////////////////////////////////////////////////////////////////////
+	////////////////////////////////////////////////////////////////////////////
+
+	// // To control for numerical errors, we defer [coeff] normalization by [CoeffDenom]
+	// // to the very end. This is possible since the approximation we use is piecewise linear.
+	// if parentBlkComplexity > targetComplexity {
+	// 	delta = coeff * (parentBlkComplexity - targetComplexity) / targetComplexity
+	// 	increase = true
+	// } else {
+	// 	delta = coeff * (targetComplexity - parentBlkComplexity) / targetComplexity
+	// 	increase = false
+	// }
+
+	// switch {
+	// case delta < 1*CoeffDenom:
+	// 	weight = 2*delta + 1*CoeffDenom
+	// case delta < 2*CoeffDenom:
+	// 	weight = 5*delta - 2*CoeffDenom
+	// case delta < 3*CoeffDenom:
+	// 	weight = 13*delta - 18*CoeffDenom
+	// case delta < 4*CoeffDenom:
+	// 	weight = 35*delta - 84*CoeffDenom
+	// case delta < 5*CoeffDenom:
+	// 	weight = 94*delta - 321*CoeffDenom
+	// case delta < 6*CoeffDenom:
+	// 	weight = 256*delta - 1131*CoeffDenom
+	// case delta < 7*CoeffDenom:
+	// 	weight = 694*delta - 3760*CoeffDenom
+	// case delta < 8*CoeffDenom:
+	// 	weight = 1885*delta - 12098*CoeffDenom
+	// case delta < 9*CoeffDenom:
+	// 	weight = 5123*delta - 38003*CoeffDenom
+	// case delta < 10*CoeffDenom:
+	// 	weight = 13924*delta - 117212*CoeffDenom
+	// default:
+	// 	weight = (delta/CoeffDenom - 10) ^ 2 + 22028
+	// }
+
+	// if increase {
+	// 	return currentFeeRate * weight / CoeffDenom
+	// }
+	// return currentFeeRate * CoeffDenom / weight
+
+	////////////////////////////////////////////////////////////////////////////
+	////////////////////////////////////////////////////////////////////////////
+	////////////////////////////////////////////////////////////////////////////
 }
