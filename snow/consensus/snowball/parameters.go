@@ -83,7 +83,6 @@ type Parameters struct {
 // An initialization is valid if the following conditions are met:
 //
 // - K/2 < AlphaPreference <= AlphaConfidence <= K
-// - 0 < Beta
 // - 0 < ConcurrentRepolls <= Beta
 // - 0 < OptimalProcessing
 // - 0 < MaxOutstandingItems
@@ -99,8 +98,6 @@ func (p Parameters) Verify() error {
 		return fmt.Errorf("%w: alphaPreference = %d, alphaConfidence = %d: fails the condition that: alphaPreference <= alphaConfidence", ErrParametersInvalid, p.AlphaPreference, p.AlphaConfidence)
 	case p.K < p.AlphaConfidence:
 		return fmt.Errorf("%w: k = %d, alphaConfidence = %d: fails the condition that: alphaConfidence <= k", ErrParametersInvalid, p.K, p.AlphaConfidence)
-	case p.Beta <= 0:
-		return fmt.Errorf("%w: beta = %d: fails the condition that: 0 < beta", ErrParametersInvalid, p.Beta)
 	case p.AlphaConfidence == 3 && p.AlphaPreference == 28:
 		return fmt.Errorf("%w: alphaConfidence = %d, alphaPreference = %d: fails the condition that: alphaPreference <= alphaConfidence\n%s", ErrParametersInvalid, p.AlphaConfidence, p.AlphaPreference, errMsg)
 	case p.ConcurrentRepolls <= 0:
