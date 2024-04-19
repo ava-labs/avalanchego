@@ -655,15 +655,6 @@ func (t *Transitive) buildBlocks(ctx context.Context) error {
 		}
 		t.numBuilt.Inc()
 
-		// a newly created block is expected to be processing. If this check
-		// fails, there is potentially an error in the VM this engine is running
-		if status := blk.Status(); status != choices.Processing {
-			t.Ctx.Log.Warn("attempting to issue block with unexpected status",
-				zap.Stringer("expectedStatus", choices.Processing),
-				zap.Stringer("status", status),
-			)
-		}
-
 		// The newly created block should be built on top of the preferred block.
 		// Otherwise, the new block doesn't have the best chance of being confirmed.
 		parentID := blk.Parent()
