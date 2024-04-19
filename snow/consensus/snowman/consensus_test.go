@@ -40,7 +40,7 @@ var (
 		NumProcessingTest,
 		AddToTailTest,
 		AddToNonTailTest,
-		AddToUnknownTest,
+		AddOnUnknownParentTest,
 		StatusOrProcessingPreviouslyAcceptedTest,
 		StatusOrProcessingPreviouslyRejectedTest,
 		StatusOrProcessingUnissuedTest,
@@ -243,8 +243,8 @@ func AddToNonTailTest(t *testing.T, factory Factory) {
 }
 
 // Make sure that adding a block that is detached from the rest of the tree
-// rejects the block
-func AddToUnknownTest(t *testing.T, factory Factory) {
+// returns an error
+func AddOnUnknownParentTest(t *testing.T, factory Factory) {
 	require := require.New(t)
 
 	sm := factory.New()
