@@ -539,6 +539,7 @@ func TestUngracefulAsyncShutdown(t *testing.T) {
 
 func TestTransactionIndices(t *testing.T) {
 	// Configure and generate a sample block chain
+	require := require.New(t)
 	var (
 		key1, _ = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
 		key2, _ = crypto.HexToECDSA("8a1f9a8f95be41cd7ccb6168179afb4504aefe388d1e14474d32c45c72ce7b7a")
@@ -553,17 +554,17 @@ func TestTransactionIndices(t *testing.T) {
 	)
 	genDb, blocks, _, err := GenerateChainWithGenesis(gspec, dummy.NewFaker(), 128, 10, func(i int, block *BlockGen) {
 		tx, err := types.SignTx(types.NewTransaction(block.TxNonce(addr1), addr2, big.NewInt(10000), params.TxGas, nil, nil), signer, key1)
-		require.NoError(t, err)
+		require.NoError(err)
 		block.AddTx(tx)
 	})
-	require.NoError(t, err)
+	require.NoError(err)
 
 	blocks2, _, err := GenerateChain(gspec.Config, blocks[len(blocks)-1], dummy.NewFaker(), genDb, 10, 10, func(i int, block *BlockGen) {
 		tx, err := types.SignTx(types.NewTransaction(block.TxNonce(addr1), addr2, big.NewInt(10000), params.TxGas, nil, nil), signer, key1)
-		require.NoError(t, err)
+		require.NoError(err)
 		block.AddTx(tx)
 	})
-	require.NoError(t, err)
+	require.NoError(err)
 
 	conf := &CacheConfig{
 		TrieCleanLimit:            256,
@@ -580,19 +581,19 @@ func TestTransactionIndices(t *testing.T) {
 	// Init block chain and check all needed indices has been indexed.
 	chainDB := rawdb.NewMemoryDatabase()
 	chain, err := createBlockChain(chainDB, conf, gspec, common.Hash{})
-	require.NoError(t, err)
+	require.NoError(err)
 
 	_, err = chain.InsertChain(blocks)
-	require.NoError(t, err)
+	require.NoError(err)
 
 	for _, block := range blocks {
 		err := chain.Accept(block)
-		require.NoError(t, err)
+		require.NoError(err)
 	}
 	chain.DrainAcceptorQueue()
 
 	lastAcceptedBlock := blocks[len(blocks)-1]
-	require.Equal(t, lastAcceptedBlock.Hash(), chain.CurrentHeader().Hash())
+	require.Equal(lastAcceptedBlock.Hash(), chain.CurrentHeader().Hash())
 
 	CheckTxIndices(t, nil, lastAcceptedBlock.NumberU64(), chain.db, false) // check all indices has been indexed
 	chain.Stop()
@@ -611,7 +612,7 @@ func TestTransactionIndices(t *testing.T) {
 			conf.TxLookupLimit = l
 
 			chain, err := createBlockChain(chainDB, conf, gspec, lastAcceptedBlock.Hash())
-			require.NoError(t, err)
+			require.NoError(err)
 
 			tail := getTail(l, lastAcceptedBlock.NumberU64())
 			// check if startup indices are correct
@@ -619,11 +620,11 @@ func TestTransactionIndices(t *testing.T) {
 
 			newBlks := blocks2[i : i+1]
 			_, err = chain.InsertChain(newBlks) // Feed chain a higher block to trigger indices updater.
-			require.NoError(t, err)
+			require.NoError(err)
 
 			lastAcceptedBlock = newBlks[0]
 			err = chain.Accept(lastAcceptedBlock) // Accept the block to trigger indices updater.
-			require.NoError(t, err)
+			require.NoError(err)
 			chain.DrainAcceptorQueue()
 
 			tail = getTail(l, lastAcceptedBlock.NumberU64())

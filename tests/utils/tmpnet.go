@@ -15,8 +15,9 @@ import (
 )
 
 var DefaultChainConfig = tmpnet.FlagsMap{
-	"log-level":        "debug",
-	"warp-api-enabled": true,
+	"log-level":         "debug",
+	"warp-api-enabled":  true,
+	"local-txs-enabled": true,
 }
 
 func NewTmpnetNodes(count int) []*tmpnet.Node {
