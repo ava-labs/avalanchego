@@ -90,7 +90,7 @@ func (n *Network) AddNode(t testing.TB, sm Consensus) error {
 			VerifyV: blk.Verify(context.Background()),
 			BytesV:  blk.Bytes(),
 		}
-		if err := sm.Add(context.Background(), myVtx); err != nil {
+		if err := sm.Add(myVtx); err != nil {
 			return err
 		}
 		deps[myVtx.ID()] = myDep

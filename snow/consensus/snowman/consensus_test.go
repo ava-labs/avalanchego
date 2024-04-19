@@ -60,7 +60,6 @@ var (
 		MetricsProcessingErrorTest,
 		MetricsAcceptedErrorTest,
 		MetricsRejectedErrorTest,
-		ErrorOnInitialRejectionTest,
 		ErrorOnAcceptTest,
 		ErrorOnRejectSiblingTest,
 		ErrorOnTransitiveRejectionTest,
@@ -145,7 +144,7 @@ func NumProcessingTest(t *testing.T, factory Factory) {
 	require.Zero(sm.NumProcessing())
 
 	// Adding to the previous preference will update the preference
-	require.NoError(sm.Add(context.Background(), block))
+	require.NoError(sm.Add(block))
 
 	require.Equal(1, sm.NumProcessing())
 
@@ -186,7 +185,7 @@ func AddToTailTest(t *testing.T, factory Factory) {
 	}
 
 	// Adding to the previous preference will update the preference
-	require.NoError(sm.Add(context.Background(), block))
+	require.NoError(sm.Add(block))
 	require.Equal(block.ID(), sm.Preference())
 	require.True(sm.IsPreferred(block))
 
@@ -234,12 +233,12 @@ func AddToNonTailTest(t *testing.T, factory Factory) {
 	}
 
 	// Adding to the previous preference will update the preference
-	require.NoError(sm.Add(context.Background(), firstBlock))
+	require.NoError(sm.Add(firstBlock))
 	require.Equal(firstBlock.IDV, sm.Preference())
 
 	// Adding to something other than the previous preference won't update the
 	// preference
-	require.NoError(sm.Add(context.Background(), secondBlock))
+	require.NoError(sm.Add(secondBlock))
 	require.Equal(firstBlock.IDV, sm.Preference())
 }
 
@@ -279,11 +278,9 @@ func AddToUnknownTest(t *testing.T, factory Factory) {
 		HeightV: parent.HeightV + 1,
 	}
 
-	// Adding a block with an unknown parent means the parent must have already
-	// been rejected. Therefore the block should be immediately rejected
-	require.NoError(sm.Add(context.Background(), block))
-	require.Equal(GenesisID, sm.Preference())
-	require.Equal(choices.Rejected, block.Status())
+	// Adding a block with an unknown parent should error.
+	err := sm.Add(block)
+	require.ErrorIs(err, errUnknownParentBlock)
 }
 
 func StatusOrProcessingPreviouslyAcceptedTest(t *testing.T, factory Factory) {
@@ -421,7 +418,7 @@ func StatusOrProcessingIssuedTest(t *testing.T, factory Factory) {
 		HeightV: Genesis.HeightV + 1,
 	}
 
-	require.NoError(sm.Add(context.Background(), block))
+	require.NoError(sm.Add(block))
 	require.Equal(choices.Processing, block.Status())
 	require.True(sm.Processing(block.ID()))
 	require.False(sm.Decided(block))
@@ -461,7 +458,7 @@ func RecordPollAcceptSingleBlockTest(t *testing.T, factory Factory) {
 		HeightV: Genesis.HeightV + 1,
 	}
 
-	require.NoError(sm.Add(context.Background(), block))
+	require.NoError(sm.Add(block))
 
 	votes := bag.Of(block.ID())
 	require.NoError(sm.RecordPoll(context.Background(), votes))
@@ -512,8 +509,8 @@ func RecordPollAcceptAndRejectTest(t *testing.T, factory Factory) {
 		HeightV: Genesis.HeightV + 1,
 	}
 
-	require.NoError(sm.Add(context.Background(), firstBlock))
-	require.NoError(sm.Add(context.Background(), secondBlock))
+	require.NoError(sm.Add(firstBlock))
+	require.NoError(sm.Add(secondBlock))
 
 	votes := bag.Of(firstBlock.ID())
 
@@ -569,8 +566,8 @@ func RecordPollSplitVoteNoChangeTest(t *testing.T, factory Factory) {
 		HeightV: Genesis.HeightV + 1,
 	}
 
-	require.NoError(sm.Add(context.Background(), firstBlock))
-	require.NoError(sm.Add(context.Background(), secondBlock))
+	require.NoError(sm.Add(firstBlock))
+	require.NoError(sm.Add(secondBlock))
 
 	votes := bag.Of(firstBlock.ID(), secondBlock.ID())
 
@@ -664,9 +661,9 @@ func RecordPollRejectTransitivelyTest(t *testing.T, factory Factory) {
 		HeightV: block1.HeightV + 1,
 	}
 
-	require.NoError(sm.Add(context.Background(), block0))
-	require.NoError(sm.Add(context.Background(), block1))
-	require.NoError(sm.Add(context.Background(), block2))
+	require.NoError(sm.Add(block0))
+	require.NoError(sm.Add(block1))
+	require.NoError(sm.Add(block2))
 
 	// Current graph structure:
 	//   G
@@ -743,10 +740,10 @@ func RecordPollTransitivelyResetConfidenceTest(t *testing.T, factory Factory) {
 		HeightV: block1.HeightV + 1,
 	}
 
-	require.NoError(sm.Add(context.Background(), block0))
-	require.NoError(sm.Add(context.Background(), block1))
-	require.NoError(sm.Add(context.Background(), block2))
-	require.NoError(sm.Add(context.Background(), block3))
+	require.NoError(sm.Add(block0))
+	require.NoError(sm.Add(block1))
+	require.NoError(sm.Add(block2))
+	require.NoError(sm.Add(block3))
 
 	// Current graph structure:
 	//   G
@@ -813,7 +810,7 @@ func RecordPollInvalidVoteTest(t *testing.T, factory Factory) {
 	}
 	unknownBlockID := ids.Empty.Prefix(2)
 
-	require.NoError(sm.Add(context.Background(), block))
+	require.NoError(sm.Add(block))
 
 	validVotes := bag.Of(block.ID())
 	require.NoError(sm.RecordPoll(context.Background(), validVotes))
@@ -886,11 +883,11 @@ func RecordPollTransitiveVotingTest(t *testing.T, factory Factory) {
 		HeightV: block3.HeightV + 1,
 	}
 
-	require.NoError(sm.Add(context.Background(), block0))
-	require.NoError(sm.Add(context.Background(), block1))
-	require.NoError(sm.Add(context.Background(), block2))
-	require.NoError(sm.Add(context.Background(), block3))
-	require.NoError(sm.Add(context.Background(), block4))
+	require.NoError(sm.Add(block0))
+	require.NoError(sm.Add(block1))
+	require.NoError(sm.Add(block2))
+	require.NoError(sm.Add(block3))
+	require.NoError(sm.Add(block4))
 
 	// Current graph structure:
 	//   G
@@ -989,9 +986,8 @@ func RecordPollDivergedVotingTest(t *testing.T, factory Factory) {
 		HeightV: block2.HeightV + 1,
 	}
 
-	require.NoError(sm.Add(context.Background(), block0))
-
-	require.NoError(sm.Add(context.Background(), block1))
+	require.NoError(sm.Add(block0))
+	require.NoError(sm.Add(block1))
 
 	// The first bit is contested as either 0 or 1. When voting for [block0] and
 	// when the first bit is 1, the following bits have been decided to follow
@@ -1003,11 +999,11 @@ func RecordPollDivergedVotingTest(t *testing.T, factory Factory) {
 	// instance has already decided it is rejected. Snowman doesn't actually
 	// know that though, because that is an implementation detail of the
 	// Snowball trie that is used.
-	require.NoError(sm.Add(context.Background(), block2))
+	require.NoError(sm.Add(block2))
 
 	// Because [block2] is effectively rejected, [block3] is also effectively
 	// rejected.
-	require.NoError(sm.Add(context.Background(), block3))
+	require.NoError(sm.Add(block3))
 
 	require.Equal(block0.ID(), sm.Preference())
 	require.Equal(choices.Processing, block0.Status(), "should not be accepted yet")
@@ -1093,8 +1089,8 @@ func RecordPollDivergedVotingWithNoConflictingBitTest(t *testing.T, factory Fact
 		HeightV: block2.HeightV + 1,
 	}
 
-	require.NoError(sm.Add(context.Background(), block0))
-	require.NoError(sm.Add(context.Background(), block1))
+	require.NoError(sm.Add(block0))
+	require.NoError(sm.Add(block1))
 
 	// When voting for [block0], we end up finalizing the first bit as 0. The
 	// second bit is contested as either 0 or 1. For when the second bit is 1,
@@ -1107,11 +1103,11 @@ func RecordPollDivergedVotingWithNoConflictingBitTest(t *testing.T, factory Fact
 	// instance has already decided it is rejected. Snowman doesn't actually
 	// know that though, because that is an implementation detail of the
 	// Snowball trie that is used.
-	require.NoError(sm.Add(context.Background(), block2))
+	require.NoError(sm.Add(block2))
 
 	// Because [block2] is effectively rejected, [block3] is also effectively
 	// rejected.
-	require.NoError(sm.Add(context.Background(), block3))
+	require.NoError(sm.Add(block3))
 
 	require.Equal(block0.ID(), sm.Preference())
 	require.Equal(choices.Processing, block0.Status(), "should not be decided yet")
@@ -1198,10 +1194,10 @@ func RecordPollChangePreferredChainTest(t *testing.T, factory Factory) {
 		HeightV: b1Block.HeightV + 1,
 	}
 
-	require.NoError(sm.Add(context.Background(), a1Block))
-	require.NoError(sm.Add(context.Background(), a2Block))
-	require.NoError(sm.Add(context.Background(), b1Block))
-	require.NoError(sm.Add(context.Background(), b2Block))
+	require.NoError(sm.Add(a1Block))
+	require.NoError(sm.Add(a2Block))
+	require.NoError(sm.Add(b1Block))
+	require.NoError(sm.Add(b2Block))
 
 	require.Equal(a2Block.ID(), sm.Preference())
 
@@ -1310,10 +1306,10 @@ func LastAcceptedTest(t *testing.T, factory Factory) {
 	require.Equal(GenesisID, lastAcceptedID)
 	require.Equal(GenesisHeight, lastAcceptedHeight)
 
-	require.NoError(sm.Add(context.Background(), block0))
-	require.NoError(sm.Add(context.Background(), block1))
-	require.NoError(sm.Add(context.Background(), block1Conflict))
-	require.NoError(sm.Add(context.Background(), block2))
+	require.NoError(sm.Add(block0))
+	require.NoError(sm.Add(block1))
+	require.NoError(sm.Add(block1Conflict))
+	require.NoError(sm.Add(block2))
 
 	lastAcceptedID, lastAcceptedHeight = sm.LastAccepted()
 	require.Equal(GenesisID, lastAcceptedID)
@@ -1428,46 +1424,6 @@ func MetricsRejectedErrorTest(t *testing.T, factory Factory) {
 	require.Error(err) //nolint:forbidigo // error is not exported https://github.com/prometheus/client_golang/blob/main/prometheus/registry.go#L315
 }
 
-func ErrorOnInitialRejectionTest(t *testing.T, factory Factory) {
-	require := require.New(t)
-
-	sm := factory.New()
-
-	snowCtx := snowtest.Context(t, snowtest.CChainID)
-	ctx := snowtest.ConsensusContext(snowCtx)
-	params := snowball.Parameters{
-		K:                     1,
-		AlphaPreference:       1,
-		AlphaConfidence:       1,
-		BetaVirtuous:          1,
-		BetaRogue:             1,
-		ConcurrentRepolls:     1,
-		OptimalProcessing:     1,
-		MaxOutstandingItems:   1,
-		MaxItemProcessingTime: 1,
-	}
-
-	require.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp))
-
-	rejectedBlock := &TestBlock{TestDecidable: choices.TestDecidable{
-		IDV:     ids.Empty.Prefix(1),
-		StatusV: choices.Rejected,
-	}}
-
-	block := &TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.Empty.Prefix(2),
-			RejectV: errTest,
-			StatusV: choices.Processing,
-		},
-		ParentV: rejectedBlock.IDV,
-		HeightV: rejectedBlock.HeightV + 1,
-	}
-
-	err := sm.Add(context.Background(), block)
-	require.ErrorIs(err, errTest)
-}
-
 func ErrorOnAcceptTest(t *testing.T, factory Factory) {
 	require := require.New(t)
 
@@ -1499,7 +1455,7 @@ func ErrorOnAcceptTest(t *testing.T, factory Factory) {
 		HeightV: Genesis.HeightV + 1,
 	}
 
-	require.NoError(sm.Add(context.Background(), block))
+	require.NoError(sm.Add(block))
 
 	votes := bag.Of(block.ID())
 	err := sm.RecordPoll(context.Background(), votes)
@@ -1545,8 +1501,8 @@ func ErrorOnRejectSiblingTest(t *testing.T, factory Factory) {
 		HeightV: Genesis.HeightV + 1,
 	}
 
-	require.NoError(sm.Add(context.Background(), block0))
-	require.NoError(sm.Add(context.Background(), block1))
+	require.NoError(sm.Add(block0))
+	require.NoError(sm.Add(block1))
 
 	votes := bag.Of(block0.ID())
 	err := sm.RecordPoll(context.Background(), votes)
@@ -1600,9 +1556,9 @@ func ErrorOnTransitiveRejectionTest(t *testing.T, factory Factory) {
 		HeightV: block1.HeightV + 1,
 	}
 
-	require.NoError(sm.Add(context.Background(), block0))
-	require.NoError(sm.Add(context.Background(), block1))
-	require.NoError(sm.Add(context.Background(), block2))
+	require.NoError(sm.Add(block0))
+	require.NoError(sm.Add(block1))
+	require.NoError(sm.Add(block2))
 
 	votes := bag.Of(block0.ID())
 	err := sm.RecordPoll(context.Background(), votes)
@@ -1664,15 +1620,7 @@ func ErrorOnAddDecidedBlockTest(t *testing.T, factory Factory) {
 	}
 	require.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp))
 
-	block0 := &TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.ID{0x03}, // 0b0011
-			StatusV: choices.Accepted,
-		},
-		ParentV: Genesis.IDV,
-		HeightV: Genesis.HeightV + 1,
-	}
-	err := sm.Add(context.Background(), block0)
+	err := sm.Add(Genesis)
 	require.ErrorIs(err, errDuplicateAdd)
 }
 
@@ -1712,8 +1660,8 @@ func ErrorOnAddDuplicateBlockIDTest(t *testing.T, factory Factory) {
 		HeightV: block0.HeightV + 1,
 	}
 
-	require.NoError(sm.Add(context.Background(), block0))
-	err := sm.Add(context.Background(), block1)
+	require.NoError(sm.Add(block0))
+	err := sm.Add(block1)
 	require.ErrorIs(err, errDuplicateAdd)
 }
 
@@ -1767,8 +1715,8 @@ func RecordPollWithDefaultParameters(t *testing.T, factory Factory) {
 		ParentV: Genesis.IDV,
 		HeightV: Genesis.HeightV + 1,
 	}
-	require.NoError(sm.Add(context.Background(), blk1))
-	require.NoError(sm.Add(context.Background(), blk2))
+	require.NoError(sm.Add(blk1))
+	require.NoError(sm.Add(blk2))
 
 	votes := bag.Bag[ids.ID]{}
 	votes.AddCount(blk1.ID(), params.AlphaConfidence)

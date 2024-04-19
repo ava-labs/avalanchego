@@ -106,6 +106,7 @@ func (v *voter) getProcessingAncestor(ctx context.Context, initialVote ids.ID) (
 	// in processing. Otherwise, we attempt to iterate through any blocks we
 	// have at our disposal as a best-effort mechanism to find a valid ancestor.
 	bubbledVote := v.t.nonVerifieds.GetAncestor(initialVote)
+	_, lastAcceptedHeight := v.t.Consensus.LastAccepted()
 	for {
 		blk, err := v.t.getBlock(ctx, bubbledVote)
 		// If we cannot retrieve the block, drop [vote]
@@ -120,13 +121,13 @@ func (v *voter) getProcessingAncestor(ctx context.Context, initialVote ids.ID) (
 			return ids.Empty, false
 		}
 
-		if v.t.Consensus.Decided(blk) {
+		height := blk.Height()
+		if height <= lastAcceptedHeight {
 			v.t.Ctx.Log.Debug("dropping vote",
 				zap.String("reason", "bubbled vote already decided"),
 				zap.Stringer("initialVoteID", initialVote),
 				zap.Stringer("bubbledVoteID", bubbledVote),
-				zap.Stringer("status", blk.Status()),
-				zap.Uint64("height", blk.Height()),
+				zap.Uint64("height", height),
 			)
 			v.t.numProcessingAncestorFetchesDropped.Inc()
 			return ids.Empty, false
@@ -136,7 +137,7 @@ func (v *voter) getProcessingAncestor(ctx context.Context, initialVote ids.ID) (
 			v.t.Ctx.Log.Verbo("applying vote",
 				zap.Stringer("initialVoteID", initialVote),
 				zap.Stringer("bubbledVoteID", bubbledVote),
-				zap.Uint64("height", blk.Height()),
+				zap.Uint64("height", height),
 			)
 			if bubbledVote != initialVote {
 				v.t.numProcessingAncestorFetchesSucceeded.Inc()
