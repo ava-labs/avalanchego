@@ -240,7 +240,7 @@ func TestPChainFeeRateIncreaseDueToPeak(t *testing.T) {
 		))
 
 		// check that at least a fee rate component has strictly increased
-		require.False(Compare(m.feeRates, peakFeeRate))
+		require.False(Compare(m.feeRates, peakFeeRate), fmt.Sprintf("failed at %d of %d iteration", i, len(blockComplexities)))
 
 		// at peak the total fee for a median complexity tx should be in tens of Avax, no more.
 		fee, err := m.CalculateFee(feesCfg.BlockTargetComplexityRate)
