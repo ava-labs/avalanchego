@@ -27,9 +27,10 @@ jobs:
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v3
         with:
-          version: v1.54
+          version: v1.56
           working-directory: .
           args: --timeout 10m
+          skip-pkg-cache: true
       - name: Run shellcheck
         shell: bash
         run: scripts/shellcheck.sh
