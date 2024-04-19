@@ -187,7 +187,7 @@ func AddToTailTest(t *testing.T, factory Factory) {
 	// Adding to the previous preference will update the preference
 	require.NoError(sm.Add(block))
 	require.Equal(block.ID(), sm.Preference())
-	require.True(sm.IsPreferred(block))
+	require.True(sm.IsPreferred(block.ID()))
 
 	pref, ok := sm.PreferenceAtHeight(block.Height())
 	require.True(ok)
@@ -306,7 +306,7 @@ func StatusOrProcessingPreviouslyAcceptedTest(t *testing.T, factory Factory) {
 	require.Equal(choices.Accepted, Genesis.Status())
 	require.False(sm.Processing(Genesis.ID()))
 	require.True(sm.Decided(Genesis))
-	require.True(sm.IsPreferred(Genesis))
+	require.True(sm.IsPreferred(Genesis.ID()))
 
 	pref, ok := sm.PreferenceAtHeight(Genesis.Height())
 	require.True(ok)
@@ -345,7 +345,7 @@ func StatusOrProcessingPreviouslyRejectedTest(t *testing.T, factory Factory) {
 	require.Equal(choices.Rejected, block.Status())
 	require.False(sm.Processing(block.ID()))
 	require.True(sm.Decided(block))
-	require.False(sm.IsPreferred(block))
+	require.False(sm.IsPreferred(block.ID()))
 
 	_, ok := sm.PreferenceAtHeight(block.Height())
 	require.False(ok)
@@ -383,7 +383,7 @@ func StatusOrProcessingUnissuedTest(t *testing.T, factory Factory) {
 	require.Equal(choices.Processing, block.Status())
 	require.False(sm.Processing(block.ID()))
 	require.False(sm.Decided(block))
-	require.False(sm.IsPreferred(block))
+	require.False(sm.IsPreferred(block.ID()))
 
 	_, ok := sm.PreferenceAtHeight(block.Height())
 	require.False(ok)
@@ -422,7 +422,7 @@ func StatusOrProcessingIssuedTest(t *testing.T, factory Factory) {
 	require.Equal(choices.Processing, block.Status())
 	require.True(sm.Processing(block.ID()))
 	require.False(sm.Decided(block))
-	require.True(sm.IsPreferred(block))
+	require.True(sm.IsPreferred(block.ID()))
 
 	pref, ok := sm.PreferenceAtHeight(block.Height())
 	require.True(ok)
@@ -1201,10 +1201,10 @@ func RecordPollChangePreferredChainTest(t *testing.T, factory Factory) {
 
 	require.Equal(a2Block.ID(), sm.Preference())
 
-	require.True(sm.IsPreferred(a1Block))
-	require.True(sm.IsPreferred(a2Block))
-	require.False(sm.IsPreferred(b1Block))
-	require.False(sm.IsPreferred(b2Block))
+	require.True(sm.IsPreferred(a1Block.ID()))
+	require.True(sm.IsPreferred(a2Block.ID()))
+	require.False(sm.IsPreferred(b1Block.ID()))
+	require.False(sm.IsPreferred(b2Block.ID()))
 
 	pref, ok := sm.PreferenceAtHeight(a1Block.Height())
 	require.True(ok)
@@ -1218,10 +1218,10 @@ func RecordPollChangePreferredChainTest(t *testing.T, factory Factory) {
 	require.NoError(sm.RecordPoll(context.Background(), b2Votes))
 
 	require.Equal(b2Block.ID(), sm.Preference())
-	require.False(sm.IsPreferred(a1Block))
-	require.False(sm.IsPreferred(a2Block))
-	require.True(sm.IsPreferred(b1Block))
-	require.True(sm.IsPreferred(b2Block))
+	require.False(sm.IsPreferred(a1Block.ID()))
+	require.False(sm.IsPreferred(a2Block.ID()))
+	require.True(sm.IsPreferred(b1Block.ID()))
+	require.True(sm.IsPreferred(b2Block.ID()))
 
 	pref, ok = sm.PreferenceAtHeight(b1Block.Height())
 	require.True(ok)
@@ -1236,10 +1236,10 @@ func RecordPollChangePreferredChainTest(t *testing.T, factory Factory) {
 	require.NoError(sm.RecordPoll(context.Background(), a1Votes))
 
 	require.Equal(a2Block.ID(), sm.Preference())
-	require.True(sm.IsPreferred(a1Block))
-	require.True(sm.IsPreferred(a2Block))
-	require.False(sm.IsPreferred(b1Block))
-	require.False(sm.IsPreferred(b2Block))
+	require.True(sm.IsPreferred(a1Block.ID()))
+	require.True(sm.IsPreferred(a2Block.ID()))
+	require.False(sm.IsPreferred(b1Block.ID()))
+	require.False(sm.IsPreferred(b2Block.ID()))
 
 	pref, ok = sm.PreferenceAtHeight(a1Block.Height())
 	require.True(ok)
@@ -1621,7 +1621,7 @@ func ErrorOnAddDecidedBlockTest(t *testing.T, factory Factory) {
 	require.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp))
 
 	err := sm.Add(Genesis)
-	require.ErrorIs(err, errDuplicateAdd)
+	require.ErrorIs(err, errUnknownParentBlock)
 }
 
 func ErrorOnAddDuplicateBlockIDTest(t *testing.T, factory Factory) {
