@@ -1197,7 +1197,7 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 	missingBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Unknown,
+			StatusV: choices.Processing,
 		},
 		ParentV: gBlk.ID(),
 		HeightV: 1,
@@ -1254,12 +1254,18 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 	sender.SendPushQueryF = nil
 	sender.CantSendPushQuery = false
 
-	require.NoError(te.Chits(context.Background(), vdr, *queryRequestID, blockingBlk.ID(), issuedBlk.ID(), blockingBlk.ID()))
+	require.NoError(te.Chits(context.Background(), vdr, *queryRequestID, blockingBlk.ID(), gBlk.ID(), blockingBlk.ID()))
 
 	require.Len(te.blocked, 2)
 	sender.CantSendPullQuery = false
+	sender.SendPullQueryF = func(_ context.Context, inVdrs set.Set[ids.NodeID], requestID uint32, blkID ids.ID, requestedHeight uint64) {
+		*queryRequestID = requestID
+		vdrSet := set.Of(vdr)
+		require.Equal(vdrSet, inVdrs)
+		require.Equal(blockingBlk.ID(), blkID)
+		require.Equal(uint64(1), requestedHeight)
+	}
 
-	missingBlk.StatusV = choices.Processing
 	require.NoError(te.issue(
 		context.Background(),
 		te.Ctx.NodeID,

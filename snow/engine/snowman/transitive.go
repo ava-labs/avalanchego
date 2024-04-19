@@ -938,19 +938,20 @@ func (t *Transitive) deliver(
 	issuedMetric prometheus.Counter,
 ) error {
 	blkID := blk.ID()
-	if t.Consensus.Decided(blk) || t.Consensus.Processing(blkID) {
+	blkHeight := blk.Height()
+	lastAcceptedID, lastAcceptedHeight := t.Consensus.LastAccepted()
+	if blkHeight <= lastAcceptedHeight || t.Consensus.Processing(blkID) {
 		return nil
 	}
 
 	// we are no longer waiting on adding the block to consensus, so it is no
 	// longer pending
 	t.removeFromPending(blk)
-	parentID := blk.Parent()
-	parent, err := t.getBlock(ctx, parentID)
+
 	// Because the dependency must have been fulfilled by the time this function
 	// is called - we don't expect [err] to be non-nil. But it is handled for
 	// completness and future proofing.
-	if err != nil || !(parent.Status() == choices.Accepted || t.Consensus.Processing(parentID)) {
+	if parentID := blk.Parent(); parentID != lastAcceptedID && !t.Consensus.Processing(parentID) {
 		// if the parent isn't processing or the last accepted block, then this
 		// block is effectively rejected
 		t.blocked.Abandon(ctx, blkID)
