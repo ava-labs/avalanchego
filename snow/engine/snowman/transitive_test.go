@@ -2027,7 +2027,7 @@ func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 		}
 	}
 
-	// for now, this VM should only be able to retrieve [gBlk] from storage
+	// for now, this VM should only be able to retrieve [Genesis] from storage
 	// this "GetBlockF" will be updated after blocks are verified/accepted
 	// in the following tests
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
@@ -2190,7 +2190,7 @@ func TestEngineBubbleVotesThroughInvalidChain(t *testing.T) {
 		}
 	}
 
-	// The VM should be able to retrieve [gBlk] and [blk1] from storage
+	// The VM should be able to retrieve [Genesis] and [blk1] from storage
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case GenesisID:
