@@ -1078,15 +1078,7 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 
 	require.Len(te.blocked, 2)
 	sender.CantSendPullQuery = false
-	sender.SendPullQueryF = func(_ context.Context, inVdrs set.Set[ids.NodeID], requestID uint32, blkID ids.ID, requestedHeight uint64) {
-		*queryRequestID = requestID
-		vdrSet := set.Of(vdr)
-		require.Equal(vdrSet, inVdrs)
-		require.Equal(missingBlk.ID(), blkID)
-		require.Equal(uint64(1), requestedHeight)
-	}
 
-	missingBlk.StatusV = choices.Processing
 	require.NoError(te.issue(
 		context.Background(),
 		te.Ctx.NodeID,
@@ -1283,8 +1275,6 @@ func TestEngineInvalidBlockIgnoredFromUnexpectedPeer(t *testing.T) {
 		}
 	}
 	sender.CantSendPullQuery = false
-
-	missingBlk.StatusV = choices.Processing
 
 	require.NoError(te.Put(context.Background(), vdr, *reqID, missingBlk.Bytes()))
 
@@ -1497,15 +1487,8 @@ func TestEngineDoubleChit(t *testing.T) {
 
 	vm.LastAcceptedF = nil
 
-	blk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		ParentV: GenesisID,
-		HeightV: 1,
-		BytesV:  []byte{1},
-	}
+	blks := BuildChain(Genesis, 1)
+	blk := blks[0]
 
 	queried := new(bool)
 	queryRequestID := new(uint32)
