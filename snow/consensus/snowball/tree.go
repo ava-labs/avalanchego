@@ -445,7 +445,6 @@ func (u *unaryNode) RecordPoll(votes bag.Bag[ids.ID], reset bool) (node, bool) {
 			// If I'm now decided, return my child
 			return newChild, true
 		}
-		u.child = newChild
 
 		// The child's preference may have changed
 		u.preference = u.child.Preference()
