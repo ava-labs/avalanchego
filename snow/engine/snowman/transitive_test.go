@@ -19,7 +19,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
-	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -1577,17 +1576,12 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 	vm.CantSetState = false
 	vm.CantSetPreference = false
 
-	gBlk := &snowman.TestBlock{TestDecidable: choices.TestDecidable{
-		IDV:     GenesisID,
-		StatusV: choices.Accepted,
-	}}
-
 	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
-		return gBlk.ID(), nil
+		return GenesisID, nil
 	}
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
-		require.Equal(gBlk.ID(), blkID)
-		return gBlk, nil
+		require.Equal(GenesisID, blkID)
+		return Genesis, nil
 	}
 
 	te, err := New(engCfg)
@@ -1598,25 +1592,8 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 	vm.GetBlockF = nil
 	vm.LastAcceptedF = nil
 
-	blk0 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		ParentV: gBlk.IDV,
-		HeightV: 1,
-		BytesV:  []byte{1},
-	}
-	blk1 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		ParentV: blk0.IDV,
-		HeightV: 2,
-		BytesV:  []byte{2},
-	}
-	blks := []snowman.Block{blk0, blk1}
+	blks := BuildChain(Genesis, 2)
+	blk0 := blks[0]
 
 	var (
 		queried bool
@@ -1632,8 +1609,8 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
-		case gBlk.ID():
-			return gBlk, nil
+		case GenesisID:
+			return Genesis, nil
 		default:
 			return nil, errUnknownBlock
 		}
@@ -1657,8 +1634,8 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
-		case gBlk.ID():
-			return gBlk, nil
+		case GenesisID:
+			return Genesis, nil
 		case blk0.ID():
 			return blk0, nil
 		default:
@@ -1676,33 +1653,12 @@ func TestEngineReceiveNewRejectedBlock(t *testing.T) {
 
 	vdr, _, sender, vm, te := setupDefaultConfig(t)
 
-	acceptedBlk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		ParentV: GenesisID,
-		HeightV: 1,
-		BytesV:  []byte{1},
-	}
-	rejectedBlk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Unknown,
-		},
-		ParentV: GenesisID,
-		HeightV: 1,
-		BytesV:  []byte{2},
-	}
-	pendingBlk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		ParentV: rejectedBlk.IDV,
-		HeightV: 2,
-		BytesV:  []byte{3},
-	}
+	acceptedBlks := BuildChain(Genesis, 1)
+	acceptedBlk := acceptedBlks[0]
+
+	rejectedBlks := BuildChain(Genesis, 2)
+	rejectedBlk := rejectedBlks[0]
+	pendingBlk := rejectedBlks[1]
 
 	vm.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
 		switch {
@@ -1768,33 +1724,12 @@ func TestEngineRejectionAmplification(t *testing.T) {
 
 	vdr, _, sender, vm, te := setupDefaultConfig(t)
 
-	acceptedBlk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		ParentV: GenesisID,
-		HeightV: 1,
-		BytesV:  []byte{1},
-	}
-	rejectedBlk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Unknown,
-		},
-		ParentV: GenesisID,
-		HeightV: 1,
-		BytesV:  []byte{2},
-	}
-	pendingBlk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		ParentV: rejectedBlk.IDV,
-		HeightV: 2,
-		BytesV:  []byte{3},
-	}
+	acceptedBlks := BuildChain(Genesis, 1)
+	acceptedBlk := acceptedBlks[0]
+
+	rejectedBlks := BuildChain(Genesis, 2)
+	rejectedBlk := rejectedBlks[0]
+	pendingBlk := rejectedBlks[1]
 
 	vm.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
 		switch {
@@ -1866,7 +1801,6 @@ func TestEngineRejectionAmplification(t *testing.T) {
 	require.False(queried)
 	require.True(asked)
 
-	rejectedBlk.StatusV = choices.Processing
 	require.NoError(te.Put(context.Background(), vdr, reqID, rejectedBlk.Bytes()))
 
 	require.False(queried)
@@ -1879,34 +1813,13 @@ func TestEngineTransitiveRejectionAmplificationDueToRejectedParent(t *testing.T)
 
 	vdr, _, sender, vm, te := setupDefaultConfig(t)
 
-	acceptedBlk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		ParentV: GenesisID,
-		HeightV: 1,
-		BytesV:  []byte{1},
-	}
-	rejectedBlk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Rejected,
-		},
-		ParentV: GenesisID,
-		HeightV: 1,
-		BytesV:  []byte{2},
-	}
-	pendingBlk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			RejectV: errUnexpectedCall,
-			StatusV: choices.Processing,
-		},
-		ParentV: rejectedBlk.IDV,
-		HeightV: 2,
-		BytesV:  []byte{3},
-	}
+	acceptedBlks := BuildChain(Genesis, 1)
+	acceptedBlk := acceptedBlks[0]
+
+	rejectedBlks := BuildChain(Genesis, 2)
+	rejectedBlk := rejectedBlks[0]
+	pendingBlk := rejectedBlks[1]
+	pendingBlk.RejectV = errUnexpectedCall
 
 	vm.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
 		switch {
@@ -1966,35 +1879,14 @@ func TestEngineTransitiveRejectionAmplificationDueToInvalidParent(t *testing.T) 
 
 	vdr, _, sender, vm, te := setupDefaultConfig(t)
 
-	acceptedBlk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		ParentV: GenesisID,
-		HeightV: 1,
-		BytesV:  []byte{1},
-	}
-	rejectedBlk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		ParentV: GenesisID,
-		HeightV: 1,
-		VerifyV: errUnexpectedCall,
-		BytesV:  []byte{2},
-	}
-	pendingBlk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			RejectV: errUnexpectedCall,
-			StatusV: choices.Processing,
-		},
-		ParentV: rejectedBlk.IDV,
-		HeightV: 2,
-		BytesV:  []byte{3},
-	}
+	acceptedBlks := BuildChain(Genesis, 1)
+	acceptedBlk := acceptedBlks[0]
+
+	rejectedBlks := BuildChain(Genesis, 2)
+	rejectedBlk := rejectedBlks[0]
+	rejectedBlk.VerifyV = errUnexpectedCall
+	pendingBlk := rejectedBlks[1]
+	pendingBlk.RejectV = errUnexpectedCall
 
 	vm.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
 		switch {
@@ -2057,24 +1949,11 @@ func TestEngineNonPreferredAmplification(t *testing.T) {
 
 	vdr, _, sender, vm, te := setupDefaultConfig(t)
 
-	preferredBlk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		ParentV: GenesisID,
-		HeightV: 1,
-		BytesV:  []byte{1},
-	}
-	nonPreferredBlk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		ParentV: GenesisID,
-		HeightV: 1,
-		BytesV:  []byte{2},
-	}
+	preferredBlks := BuildChain(Genesis, 1)
+	preferredBlk := preferredBlks[0]
+
+	nonPreferredBlks := BuildChain(Genesis, 1)
+	nonPreferredBlk := nonPreferredBlks[0]
 
 	vm.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
 		switch {
@@ -2128,28 +2007,12 @@ func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 	vdr, _, sender, vm, te := setupDefaultConfig(t)
 	expectedVdrSet := set.Of(vdr)
 
-	// [blk1] is a child of [gBlk] and currently passes verification
-	blk1 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		ParentV: GenesisID,
-		HeightV: 1,
-		BytesV:  []byte{1},
-	}
-	// [blk2] is a child of [blk1] and cannot pass verification until [blk1]
-	// has been marked as accepted.
-	blk2 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		ParentV: blk1.ID(),
-		HeightV: 2,
-		BytesV:  []byte{2},
-		VerifyV: errInvalid,
-	}
+	blks := BuildChain(Genesis, 2)
+	blk1 := blks[0]
+
+	// blk2 cannot pass verification until [blk1] has been marked as accepted.
+	blk2 := blks[1]
+	blk2.VerifyV = errInvalid
 
 	// The VM should be able to parse [blk1] and [blk2]
 	vm.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
@@ -2303,39 +2166,14 @@ func TestEngineBubbleVotesThroughInvalidChain(t *testing.T) {
 	vdr, _, sender, vm, te := setupDefaultConfig(t)
 	expectedVdrSet := set.Of(vdr)
 
-	// [blk1] is a child of [gBlk] and currently passes verification
-	blk1 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		ParentV: GenesisID,
-		HeightV: 1,
-		BytesV:  []byte{1},
-	}
-	// [blk2] is a child of [blk1] and cannot pass verification until [blk1]
-	// has been marked as accepted.
-	blk2 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		ParentV: blk1.ID(),
-		HeightV: 2,
-		BytesV:  []byte{2},
-		VerifyV: errInvalid,
-	}
-	// [blk3] is a child of [blk2] and will not attempt to be issued until
-	// [blk2] has successfully been verified.
-	blk3 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		ParentV: blk2.ID(),
-		HeightV: 3,
-		BytesV:  []byte{3},
-	}
+	blks := BuildChain(Genesis, 3)
+	blk1 := blks[0]
+
+	// blk2 cannot pass verification until [blk1] has been marked as accepted.
+	blk2 := blks[1]
+	blk2.VerifyV = errInvalid
+
+	blk3 := blks[2]
 
 	// The VM should be able to parse [blk1], [blk2], and [blk3]
 	vm.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
@@ -2441,33 +2279,18 @@ func TestEngineBuildBlockWithCachedNonVerifiedParent(t *testing.T) {
 
 	sender.Default(true)
 
-	grandParentBlk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		ParentV: GenesisID,
-		HeightV: 1,
-		BytesV:  []byte{1},
-	}
+	blks := BuildChain(Genesis, 3)
+	grandParentBlk := blks[0]
 
-	parentBlkA := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		ParentV: grandParentBlk.ID(),
-		HeightV: 2,
-		VerifyV: errTest, // Reports as invalid
-		BytesV:  []byte{2},
-	}
+	parentBlkA := blks[1]
+	parentBlkA.VerifyV = errInvalid
 
 	// Note that [parentBlkB] has the same [ID()] as [parentBlkA];
 	// it's a different instantiation of the same block.
 	parentBlkB := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
 			IDV:     parentBlkA.IDV,
-			StatusV: choices.Processing,
+			StatusV: parentBlkA.StatusV,
 		},
 		ParentV: parentBlkA.ParentV,
 		HeightV: parentBlkA.HeightV,
@@ -2475,15 +2298,7 @@ func TestEngineBuildBlockWithCachedNonVerifiedParent(t *testing.T) {
 	}
 
 	// Child of [parentBlkA]/[parentBlkB]
-	childBlk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		ParentV: parentBlkA.ID(),
-		HeightV: 3,
-		BytesV:  []byte{3},
-	}
+	childBlk := blks[2]
 
 	vm.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
 		require.Equal(grandParentBlk.BytesV, b)
@@ -2612,17 +2427,12 @@ func TestEngineApplyAcceptedFrontierInQueryFailed(t *testing.T) {
 	vm.CantSetState = false
 	vm.CantSetPreference = false
 
-	gBlk := &snowman.TestBlock{TestDecidable: choices.TestDecidable{
-		IDV:     ids.GenerateTestID(),
-		StatusV: choices.Accepted,
-	}}
-
 	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
-		return gBlk.ID(), nil
+		return GenesisID, nil
 	}
 	vm.GetBlockF = func(_ context.Context, id ids.ID) (snowman.Block, error) {
-		require.Equal(gBlk.ID(), id)
-		return gBlk, nil
+		require.Equal(GenesisID, id)
+		return Genesis, nil
 	}
 
 	te, err := New(engCfg)
@@ -2631,15 +2441,8 @@ func TestEngineApplyAcceptedFrontierInQueryFailed(t *testing.T) {
 
 	vm.LastAcceptedF = nil
 
-	blk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		ParentV: gBlk.IDV,
-		HeightV: 1,
-		BytesV:  []byte{1},
-	}
+	blks := BuildChain(Genesis, 1)
+	blk := blks[0]
 
 	queryRequestID := new(uint32)
 	sender.SendPushQueryF = func(_ context.Context, inVdrs set.Set[ids.NodeID], requestID uint32, blkBytes []byte, requestedHeight uint64) {
@@ -2659,8 +2462,8 @@ func TestEngineApplyAcceptedFrontierInQueryFailed(t *testing.T) {
 
 	vm.GetBlockF = func(_ context.Context, id ids.ID) (snowman.Block, error) {
 		switch id {
-		case gBlk.ID():
-			return gBlk, nil
+		case GenesisID:
+			return Genesis, nil
 		case blk.ID():
 			return blk, nil
 		}
@@ -2720,17 +2523,12 @@ func TestEngineRepollsMisconfiguredSubnet(t *testing.T) {
 	vm.CantSetState = false
 	vm.CantSetPreference = false
 
-	gBlk := &snowman.TestBlock{TestDecidable: choices.TestDecidable{
-		IDV:     ids.GenerateTestID(),
-		StatusV: choices.Accepted,
-	}}
-
 	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
-		return gBlk.ID(), nil
+		return GenesisID, nil
 	}
 	vm.GetBlockF = func(_ context.Context, id ids.ID) (snowman.Block, error) {
-		require.Equal(gBlk.ID(), id)
-		return gBlk, nil
+		require.Equal(GenesisID, id)
+		return Genesis, nil
 	}
 
 	te, err := New(engCfg)
@@ -2739,15 +2537,8 @@ func TestEngineRepollsMisconfiguredSubnet(t *testing.T) {
 
 	vm.LastAcceptedF = nil
 
-	blk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		ParentV: gBlk.IDV,
-		HeightV: 1,
-		BytesV:  []byte{1},
-	}
+	blks := BuildChain(Genesis, 1)
+	blk := blks[0]
 
 	// Issue the block. This shouldn't call the sender, because creating the
 	// poll should fail.
@@ -2785,8 +2576,8 @@ func TestEngineRepollsMisconfiguredSubnet(t *testing.T) {
 
 	vm.GetBlockF = func(_ context.Context, id ids.ID) (snowman.Block, error) {
 		switch id {
-		case gBlk.ID():
-			return gBlk, nil
+		case GenesisID:
+			return Genesis, nil
 		case blk.ID():
 			return blk, nil
 		}
@@ -2798,49 +2589,4 @@ func TestEngineRepollsMisconfiguredSubnet(t *testing.T) {
 	// set was misconfigured should result in it being accepted successfully.
 	require.NoError(te.Chits(context.Background(), vdr, queryRequestID, blk.ID(), blk.ID(), blk.ID()))
 	require.Equal(choices.Accepted, blk.Status())
-}
-
-func TestGetProcessingAncestor(t *testing.T) {
-	var (
-		ctx = snowtest.ConsensusContext(
-			snowtest.Context(t, snowtest.PChainID),
-		)
-	)
-	_ = ctx
-	tests := []struct {
-		name          string
-		engine        *Transitive
-		vote          ids.ID
-		expectedVote  ids.ID
-		expectedFound bool
-	}{
-		// {
-		// 	name: "vote for a block that is in the processing set",
-		// 	engine: &Transitive{
-		// 		Config: Config{
-		// 			Consensus: func() snowman.Consensus {
-		// 				c := &snowman.Topological{}
-		// 				require.NoError(t, c.Initialize(
-		// 					ctx,
-		// 					snowball.DefaultParameters,
-		// 					GenesisID,
-		// 					0,
-		// 					time.Now(),
-		// 				))
-		// 				return c
-		// 			}(),
-		// 		},
-		// 		nonVerifieds: ancestor.NewTree(),
-		// 	},
-		// },
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			require := require.New(t)
-
-			bubbledVote, found := test.engine.getProcessingAncestor(context.Background(), test.vote)
-			require.Equal(test.expectedFound, found)
-			require.Equal(test.expectedVote, bubbledVote)
-		})
-	}
 }
