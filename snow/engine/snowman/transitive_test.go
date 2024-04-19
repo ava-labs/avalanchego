@@ -10,15 +10,19 @@ import (
 	"testing"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/ancestor"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -58,6 +62,19 @@ func BuildChain(root *snowman.TestBlock, length int) []*snowman.TestBlock {
 		chain[i] = root
 	}
 	return chain
+}
+
+func MakeGetBlockF(blks ...[]*snowman.TestBlock) func(context.Context, ids.ID) (snowman.Block, error) {
+	return func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
+		for _, blkSet := range blks {
+			for _, blk := range blkSet {
+				if blk.Status() == choices.Accepted && blkID == blk.ID() {
+					return blk, nil
+				}
+			}
+		}
+		return nil, errUnknownBlock
+	}
 }
 
 func setup(t *testing.T, engCfg Config) (ids.NodeID, validators.Manager, *common.SenderTest, *block.TestVM, *Transitive) {
@@ -1022,7 +1039,10 @@ func TestEngineBlockingChitRequest(t *testing.T) {
 func TestEngineBlockingChitResponse(t *testing.T) {
 	require := require.New(t)
 
-	vdr, _, sender, vm, te := setupDefaultConfig(t)
+	config := DefaultConfig(t)
+	config.Params.BetaRogue = config.Params.BetaVirtuous
+
+	peerID, _, sender, vm, te := setup(t, config)
 
 	sender.Default(true)
 
@@ -1045,47 +1065,115 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 			return nil, errUnknownBlock
 		}
 	}
+	vm.ParseBlockF = func(_ context.Context, blkBytes []byte) (snowman.Block, error) {
+		switch {
+		case bytes.Equal(GenesisBytes, blkBytes):
+			return Genesis, nil
+		case bytes.Equal(issuedBlk.Bytes(), blkBytes):
+			return issuedBlk, nil
+		case bytes.Equal(missingBlk.Bytes(), blkBytes):
+			return missingBlk, nil
+		case bytes.Equal(blockingBlk.Bytes(), blkBytes):
+			return blockingBlk, nil
+		default:
+			return nil, errUnknownBlock
+		}
+	}
 
-	require.NoError(te.issue(
+	var getRequest *common.Request
+	sender.SendGetF = func(_ context.Context, nodeID ids.NodeID, requestID uint32, blkID ids.ID) {
+		require.Nil(getRequest)
+		getRequest = &common.Request{
+			NodeID:    nodeID,
+			RequestID: requestID,
+		}
+		require.Equal(missingBlk.ID(), blkID)
+	}
+
+	// Issuing [blockingBlk] will register an issuer job for [blockingBlk]
+	// awaiting on [missingBlk]. It will also send a request for [missingBlk].
+	require.NoError(te.Put(
 		context.Background(),
-		te.Ctx.NodeID,
-		blockingBlk,
-		false,
-		te.metrics.issued.WithLabelValues(unknownSource),
+		peerID,
+		0,
+		blockingBlk.Bytes(),
 	))
 
-	queryRequestID := new(uint32)
-	sender.SendPullQueryF = func(_ context.Context, inVdrs set.Set[ids.NodeID], requestID uint32, blkID ids.ID, requestedHeight uint64) {
-		*queryRequestID = requestID
-		vdrSet := set.Of(vdr)
-		require.Equal(vdrSet, inVdrs)
+	var queryRequest *common.Request
+	sender.SendPullQueryF = func(_ context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, blkID ids.ID, requestedHeight uint64) {
+		require.Nil(queryRequest)
+		require.Equal(set.Of(peerID), nodeIDs)
+		queryRequest = &common.Request{
+			NodeID:    peerID,
+			RequestID: requestID,
+		}
 		require.Equal(issuedBlk.ID(), blkID)
 		require.Equal(uint64(1), requestedHeight)
 	}
 
-	require.NoError(te.issue(
+	// Issuing [issuedBlk] will immediately adds [issuedBlk] to consensus, sets
+	// it as the preferred block, and sends a query for [issuedBlk].
+	require.NoError(te.Put(
 		context.Background(),
-		te.Ctx.NodeID,
-		issuedBlk,
-		false,
-		te.metrics.issued.WithLabelValues(unknownSource),
+		peerID,
+		0,
+		issuedBlk.Bytes(),
 	))
 
-	sender.SendPushQueryF = nil
-	sender.CantSendPushQuery = false
+	sender.SendPullQueryF = nil
 
-	require.NoError(te.Chits(context.Background(), vdr, *queryRequestID, blockingBlk.ID(), issuedBlk.ID(), blockingBlk.ID()))
-
+	// In response to the query for [issuedBlk], the peer is responding with,
+	// the currently pending issuance, [blockingBlk]. The direct conflict of
+	// [issuedBlk] is [missingBlk]. This registers a voter job dependent on
+	// [blockingBlk] and [missingBlk].
+	require.NoError(te.Chits(
+		context.Background(),
+		queryRequest.NodeID,
+		queryRequest.RequestID,
+		blockingBlk.ID(),
+		missingBlk.ID(),
+		blockingBlk.ID(),
+	))
 	require.Len(te.blocked, 2)
-	sender.CantSendPullQuery = false
 
-	require.NoError(te.issue(
+	queryRequest = nil
+	sender.SendPullQueryF = func(_ context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, blkID ids.ID, requestedHeight uint64) {
+		require.Nil(queryRequest)
+		require.Equal(set.Of(peerID), nodeIDs)
+		queryRequest = &common.Request{
+			NodeID:    peerID,
+			RequestID: requestID,
+		}
+		require.Equal(blockingBlk.ID(), blkID)
+		require.Equal(uint64(1), requestedHeight)
+	}
+
+	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
+		switch blkID {
+		case GenesisID:
+			return Genesis, nil
+		case issuedBlk.ID():
+			return issuedBlk, nil
+		case missingBlk.ID():
+			return missingBlk, nil
+		case blockingBlk.ID():
+			return blockingBlk, nil
+		default:
+			return nil, errUnknownBlock
+		}
+	}
+
+	// Issuing [missingBlk] will add the block into consensus. However, it will
+	// not send a query for it as it is not the preferred block.
+	require.NoError(te.Put(
 		context.Background(),
-		te.Ctx.NodeID,
-		missingBlk,
-		false,
-		te.metrics.issued.WithLabelValues(unknownSource),
+		getRequest.NodeID,
+		getRequest.RequestID,
+		missingBlk.Bytes(),
 	))
+	require.Equal(choices.Accepted, missingBlk.Status())
+	require.Equal(choices.Accepted, blockingBlk.Status())
+	require.Equal(choices.Rejected, issuedBlk.Status())
 }
 
 func TestEngineRetryFetch(t *testing.T) {
@@ -2572,4 +2660,173 @@ func TestEngineRepollsMisconfiguredSubnet(t *testing.T) {
 	// set was misconfigured should result in it being accepted successfully.
 	require.NoError(te.Chits(context.Background(), vdr, queryRequestID, blk.ID(), blk.ID(), blk.ID()))
 	require.Equal(choices.Accepted, blk.Status())
+}
+
+func TestGetProcessingAncestor(t *testing.T) {
+	var (
+		ctx = snowtest.ConsensusContext(
+			snowtest.Context(t, snowtest.PChainID),
+		)
+		issuedChain           = BuildChain(Genesis, 1)
+		unissuedOnIssuedChain = BuildChain(issuedChain[0], 1)
+	)
+
+	metrics, err := newMetrics("", prometheus.NewRegistry())
+	require.NoError(t, err)
+
+	c := &snowman.Topological{}
+	require.NoError(t, c.Initialize(
+		ctx,
+		snowball.DefaultParameters,
+		GenesisID,
+		0,
+		time.Now(),
+	))
+
+	for _, blk := range issuedChain {
+		require.NoError(t, c.Add(context.Background(), blk))
+	}
+
+	nonVerifiedAncestors := ancestor.NewTree()
+	nonVerifiedAncestors.Add(unissuedOnIssuedChain[0].ID(), unissuedOnIssuedChain[0].Parent())
+
+	tests := []struct {
+		name             string
+		engine           *Transitive
+		initialVote      ids.ID
+		expectedAncestor ids.ID
+		expectedFound    bool
+	}{
+		{
+			name: "drop accepted blockID",
+			engine: &Transitive{
+				Config: Config{
+					Ctx: ctx,
+					VM: &block.TestVM{
+						TestVM: common.TestVM{
+							T: t,
+						},
+						GetBlockF: MakeGetBlockF(
+							[]*snowman.TestBlock{Genesis},
+						),
+					},
+					Consensus: c,
+				},
+				metrics:          metrics,
+				nonVerifieds:     ancestor.NewTree(),
+				pending:          map[ids.ID]snowman.Block{},
+				nonVerifiedCache: &cache.Empty[ids.ID, snowman.Block]{},
+			},
+			initialVote:      GenesisID,
+			expectedAncestor: ids.Empty,
+			expectedFound:    false,
+		},
+		{
+			name: "return processing blockID",
+			engine: &Transitive{
+				Config: Config{
+					Ctx: ctx,
+					VM: &block.TestVM{
+						TestVM: common.TestVM{
+							T: t,
+						},
+						GetBlockF: MakeGetBlockF(
+							[]*snowman.TestBlock{Genesis},
+						),
+					},
+					Consensus: c,
+				},
+				metrics:          metrics,
+				nonVerifieds:     ancestor.NewTree(),
+				pending:          map[ids.ID]snowman.Block{},
+				nonVerifiedCache: &cache.Empty[ids.ID, snowman.Block]{},
+			},
+			initialVote:      issuedChain[0].ID(),
+			expectedAncestor: issuedChain[0].ID(),
+			expectedFound:    true,
+		},
+		{
+			name: "drop unknown blockID",
+			engine: &Transitive{
+				Config: Config{
+					Ctx: ctx,
+					VM: &block.TestVM{
+						TestVM: common.TestVM{
+							T: t,
+						},
+						GetBlockF: MakeGetBlockF(
+							[]*snowman.TestBlock{Genesis},
+						),
+					},
+					Consensus: c,
+				},
+				metrics:          metrics,
+				nonVerifieds:     ancestor.NewTree(),
+				pending:          map[ids.ID]snowman.Block{},
+				nonVerifiedCache: &cache.Empty[ids.ID, snowman.Block]{},
+			},
+			initialVote:      ids.GenerateTestID(),
+			expectedAncestor: ids.Empty,
+			expectedFound:    false,
+		},
+		{
+			name: "apply vote through ancestor tree",
+			engine: &Transitive{
+				Config: Config{
+					Ctx: ctx,
+					VM: &block.TestVM{
+						TestVM: common.TestVM{
+							T: t,
+						},
+						GetBlockF: MakeGetBlockF(
+							[]*snowman.TestBlock{Genesis},
+						),
+					},
+					Consensus: c,
+				},
+				metrics:          metrics,
+				nonVerifieds:     nonVerifiedAncestors,
+				pending:          map[ids.ID]snowman.Block{},
+				nonVerifiedCache: &cache.Empty[ids.ID, snowman.Block]{},
+			},
+			initialVote:      unissuedOnIssuedChain[0].ID(),
+			expectedAncestor: issuedChain[0].ID(),
+			expectedFound:    true,
+		},
+		{
+			name: "apply vote through pending set",
+			engine: &Transitive{
+				Config: Config{
+					Ctx: ctx,
+					VM: &block.TestVM{
+						TestVM: common.TestVM{
+							T: t,
+						},
+						GetBlockF: MakeGetBlockF(
+							[]*snowman.TestBlock{Genesis},
+						),
+					},
+					Consensus: c,
+				},
+				metrics:      metrics,
+				nonVerifieds: ancestor.NewTree(),
+				pending: map[ids.ID]snowman.Block{
+					unissuedOnIssuedChain[0].ID(): unissuedOnIssuedChain[0],
+				},
+				nonVerifiedCache: &cache.Empty[ids.ID, snowman.Block]{},
+			},
+			initialVote:      unissuedOnIssuedChain[0].ID(),
+			expectedAncestor: issuedChain[0].ID(),
+			expectedFound:    true,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
+
+			ancestor, found := test.engine.getProcessingAncestor(context.Background(), test.initialVote)
+			require.Equal(test.expectedAncestor, ancestor)
+			require.Equal(test.expectedFound, found)
+		})
+	}
 }
