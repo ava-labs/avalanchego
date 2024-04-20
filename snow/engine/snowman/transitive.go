@@ -15,7 +15,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman/poll"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -765,23 +764,22 @@ func (t *Transitive) issueWithAncestors(
 ) (bool, error) {
 	blkID := blk.ID()
 	// issue [blk] and its ancestors into consensus
-	status := blk.Status()
-	for status.Fetched() && !t.wasIssued(blk) {
+	for !t.wasIssued(blk) {
 		err := t.issue(ctx, t.Ctx.NodeID, blk, true, issuedMetric)
 		if err != nil {
 			return false, err
 		}
+
 		blkID = blk.Parent()
 		blk, err = t.getBlock(ctx, blkID)
 		if err != nil {
-			status = choices.Unknown
+			blk = nil
 			break
 		}
-		status = blk.Status()
 	}
 
 	// The block was issued into consensus. This is the happy path.
-	if status != choices.Unknown && (t.Consensus.Decided(blk) || t.Consensus.Processing(blkID)) {
+	if blk != nil && (t.Consensus.Decided(blk) || t.Consensus.Processing(blkID)) {
 		return true, nil
 	}
 
