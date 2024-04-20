@@ -1152,7 +1152,6 @@ func (t *Transitive) getProcessingAncestor(ctx context.Context, initialVote ids.
 				zap.String("reason", "bubbled vote already decided"),
 				zap.Stringer("initialVoteID", initialVote),
 				zap.Stringer("bubbledVoteID", bubbledVote),
-				zap.Stringer("status", blk.Status()),
 				zap.Uint64("height", height),
 			)
 			t.numGetProcessingAncestorResults.WithLabelValues(decidedResult).Inc()
