@@ -726,16 +726,15 @@ func (t *Transitive) issueFrom(
 	// issue [blk] and its ancestors to consensus.
 	blkID := blk.ID()
 	for !t.wasIssued(blk) {
-		if err := t.issue(ctx, nodeID, blk, false, issuedMetric); err != nil {
+		err := t.issue(ctx, nodeID, blk, false, issuedMetric)
+		if err != nil {
 			return false, err
 		}
 
 		blkID = blk.Parent()
-		var err error
 		blk, err = t.getBlock(ctx, blkID)
-
-		// If we don't have this ancestor, request it from [vdr]
-		if err != nil || !blk.Status().Fetched() {
+		if err != nil {
+			// If we don't have this ancestor, request it from [vdr]
 			t.sendRequest(ctx, nodeID, blkID, issuedMetric)
 			return false, nil
 		}
