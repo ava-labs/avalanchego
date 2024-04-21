@@ -15,7 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fees"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 	"github.com/ava-labs/avalanchego/vms/platformvm/validators"
 
@@ -161,7 +161,7 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 
 	feeManager := commonfees.NewManager(feeRates)
 	if isEActive {
-		feeManager, err = fees.UpdatedFeeManager(stateDiff, m.txExecutorBackend.Config, parentBlkTime, nextBlkTime)
+		feeManager, err = fee.UpdatedFeeManager(stateDiff, m.txExecutorBackend.Config, parentBlkTime, nextBlkTime)
 		if err != nil {
 			return err
 		}

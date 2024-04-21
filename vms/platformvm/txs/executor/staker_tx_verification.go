@@ -15,7 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fees"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
@@ -168,7 +168,7 @@ func verifyAddValidatorTx(
 	}
 
 	// Verify the flowcheck
-	feeCalculator := fees.NewStaticCalculator(backend.Config, currentTimestamp)
+	feeCalculator := fee.NewStaticCalculator(backend.Config, currentTimestamp)
 	if err := tx.Visit(feeCalculator); err != nil {
 		return nil, err
 	}
@@ -264,11 +264,11 @@ func verifyAddSubnetValidatorTx(
 	}
 
 	// Verify the flowcheck
-	var feeCalculator *fees.Calculator
+	var feeCalculator *fee.Calculator
 	if !isEActive {
-		feeCalculator = fees.NewStaticCalculator(backend.Config, currentTimestamp)
+		feeCalculator = fee.NewStaticCalculator(backend.Config, currentTimestamp)
 	} else {
-		feeCalculator = fees.NewDynamicCalculator(backend.Config, feeManager, maxComplexity, sTx.Creds)
+		feeCalculator = fee.NewDynamicCalculator(backend.Config, feeManager, maxComplexity, sTx.Creds)
 	}
 	if err := tx.Visit(feeCalculator); err != nil {
 		return err
@@ -352,11 +352,11 @@ func verifyRemoveSubnetValidatorTx(
 	}
 
 	// Verify the flowcheck
-	var feeCalculator *fees.Calculator
+	var feeCalculator *fee.Calculator
 	if !isEActive {
-		feeCalculator = fees.NewStaticCalculator(backend.Config, currentTimestamp)
+		feeCalculator = fee.NewStaticCalculator(backend.Config, currentTimestamp)
 	} else {
-		feeCalculator = fees.NewDynamicCalculator(backend.Config, feeManager, maxComplexity, sTx.Creds)
+		feeCalculator = fee.NewDynamicCalculator(backend.Config, feeManager, maxComplexity, sTx.Creds)
 	}
 
 	if err := tx.Visit(feeCalculator); err != nil {
@@ -481,7 +481,7 @@ func verifyAddDelegatorTx(
 	}
 
 	// Verify the flowcheck
-	feeCalculator := fees.NewStaticCalculator(backend.Config, currentTimestamp)
+	feeCalculator := fee.NewStaticCalculator(backend.Config, currentTimestamp)
 	if err := tx.Visit(feeCalculator); err != nil {
 		return nil, err
 	}
@@ -606,11 +606,11 @@ func verifyAddPermissionlessValidatorTx(
 	copy(outs[len(tx.Outs):], tx.StakeOuts)
 
 	// Verify the flowcheck
-	var feeCalculator *fees.Calculator
+	var feeCalculator *fee.Calculator
 	if !isEActive {
-		feeCalculator = fees.NewStaticCalculator(backend.Config, currentTimestamp)
+		feeCalculator = fee.NewStaticCalculator(backend.Config, currentTimestamp)
 	} else {
-		feeCalculator = fees.NewDynamicCalculator(backend.Config, feeManager, maxComplexity, sTx.Creds)
+		feeCalculator = fee.NewDynamicCalculator(backend.Config, feeManager, maxComplexity, sTx.Creds)
 	}
 
 	if err := tx.Visit(feeCalculator); err != nil {
@@ -762,11 +762,11 @@ func verifyAddPermissionlessDelegatorTx(
 	}
 
 	// Verify the flowcheck
-	var feeCalculator *fees.Calculator
+	var feeCalculator *fee.Calculator
 	if !isEActive {
-		feeCalculator = fees.NewStaticCalculator(backend.Config, currentTimestamp)
+		feeCalculator = fee.NewStaticCalculator(backend.Config, currentTimestamp)
 	} else {
-		feeCalculator = fees.NewDynamicCalculator(backend.Config, feeManager, maxComplexity, sTx.Creds)
+		feeCalculator = fee.NewDynamicCalculator(backend.Config, feeManager, maxComplexity, sTx.Creds)
 	}
 
 	if err := tx.Visit(feeCalculator); err != nil {
@@ -833,11 +833,11 @@ func verifyTransferSubnetOwnershipTx(
 	}
 
 	// Verify the flowcheck
-	var feeCalculator *fees.Calculator
+	var feeCalculator *fee.Calculator
 	if !isEActive {
-		feeCalculator = fees.NewStaticCalculator(backend.Config, currentTimestamp)
+		feeCalculator = fee.NewStaticCalculator(backend.Config, currentTimestamp)
 	} else {
-		feeCalculator = fees.NewDynamicCalculator(backend.Config, feeManager, maxComplexity, sTx.Creds)
+		feeCalculator = fee.NewDynamicCalculator(backend.Config, feeManager, maxComplexity, sTx.Creds)
 	}
 
 	if err := tx.Visit(feeCalculator); err != nil {

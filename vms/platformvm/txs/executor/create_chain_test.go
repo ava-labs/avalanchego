@@ -19,7 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fees"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -56,7 +56,7 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 
 	feeCfg := config.GetDynamicFeesConfig(env.config.IsEActivated(currentTime))
 
-	feeMan, err := fees.UpdatedFeeManager(stateDiff, env.config, currentTime, nextBlkTime)
+	feeMan, err := fee.UpdatedFeeManager(stateDiff, env.config, currentTime, nextBlkTime)
 	require.NoError(err)
 
 	executor := StandardTxExecutor{
@@ -105,7 +105,7 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 
 	feeCfg := config.GetDynamicFeesConfig(env.config.IsEActivated(currentTime))
 
-	feeMan, err := fees.UpdatedFeeManager(stateDiff, env.config, currentTime, nextBlkTime)
+	feeMan, err := fee.UpdatedFeeManager(stateDiff, env.config, currentTime, nextBlkTime)
 	require.NoError(err)
 
 	executor := StandardTxExecutor{
@@ -148,7 +148,7 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 
 	feeCfg := config.GetDynamicFeesConfig(env.config.IsEActivated(currentTime))
 
-	feeMan, err := fees.UpdatedFeeManager(stateDiff, env.config, currentTime, nextBlkTime)
+	feeMan, err := fee.UpdatedFeeManager(stateDiff, env.config, currentTime, nextBlkTime)
 	require.NoError(err)
 
 	executor := StandardTxExecutor{
@@ -188,7 +188,7 @@ func TestCreateChainTxValid(t *testing.T) {
 
 	feeCfg := config.GetDynamicFeesConfig(env.config.IsEActivated(currentTime))
 
-	feeMan, err := fees.UpdatedFeeManager(stateDiff, env.config, currentTime, nextBlkTime)
+	feeMan, err := fee.UpdatedFeeManager(stateDiff, env.config, currentTime, nextBlkTime)
 	require.NoError(err)
 
 	executor := StandardTxExecutor{

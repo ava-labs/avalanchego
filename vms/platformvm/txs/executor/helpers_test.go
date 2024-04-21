@@ -41,7 +41,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fees"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -236,7 +236,7 @@ func addSubnet(t *testing.T, env *environment) {
 	nextChainTime, _, err := state.NextBlockTime(stateDiff, env.clk)
 	require.NoError(err)
 
-	feeManager, err := fees.UpdatedFeeManager(stateDiff, env.config, currentChainTime, nextChainTime)
+	feeManager, err := fee.UpdatedFeeManager(stateDiff, env.config, currentChainTime, nextChainTime)
 	require.NoError(err)
 
 	feeCfg := config.GetDynamicFeesConfig(env.config.IsEActivated(currentChainTime))
