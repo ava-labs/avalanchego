@@ -10,8 +10,8 @@ import (
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
-// the update fee algorithm has a UpdateCoefficient, normalized to  [CoeffDenom]
-const CoeffDenom = uint64(10_000)
+// the update fee algorithm has a UpdateCoefficient, normalized to [CoeffDenom]
+const CoeffDenom = uint64(1_000)
 
 type Manager struct {
 	// Avax denominated fee rates, i.e. fees per unit of complexity.
@@ -111,7 +111,6 @@ func (m *Manager) UpdateFeeRates(
 			feesConfig.UpdateCoefficient[i],
 			parentBlkComplexity[i],
 			feesConfig.BlockTargetComplexityRate[i],
-			feesConfig.BlockMaxComplexity[i],
 			elapsedTime,
 		)
 		nextFeeRates = max(nextFeeRates, feesConfig.MinFeeRate[i])
@@ -120,7 +119,13 @@ func (m *Manager) UpdateFeeRates(
 	return nil
 }
 
-func nextFeeRate(currentFeeRate, coeff, parentBlkComplexity, targetComplexityRate, maxBlkComplexity, elapsedTime uint64) uint64 {
+func nextFeeRate(
+	currentFeeRate,
+	coeff,
+	parentBlkComplexity,
+	targetComplexityRate,
+	elapsedTime uint64,
+) uint64 {
 	// We update the fee rate with the formula:
 	//     feeRate_{t+1} = feeRate_t * exp(delta)
 	// where
@@ -128,10 +133,16 @@ func nextFeeRate(currentFeeRate, coeff, parentBlkComplexity, targetComplexityRat
 	// and [targetComplexity] is the median complexity expected in the elapsed time.
 	//
 	// We approximate the exponential as follows:
-	// * For delta in the interval [0, MaxDelta], we use the following piecewise, linear function:
-	//       x \in [a,b] --> exp(X) ≈≈ (exp(b)-exp(a))(b-a)*(X-a) + exp(a)
-	// MaxDelta is given by the max block complexity (MaxBlkComplexity - targetComplexity)/(targetComplexity)
-	// The approximation is overall continuous, so it behaves well at the interval edges
+	//
+	//                              1 + k * delta^2 if delta >= 0
+	// feeRate_{t+1} = feeRate_t *
+	//                              1 / (1 + k * delta^2) if delta < 0
+	//
+	// The approximation keeps two key properties of the exponential formula:
+	// 1. It's strictly increasing with delta
+	// 2. It's stable because feeRate(delta) * feeRate(-delta) = 1, meaning that
+	//    if complexity increase and decrease by the same amount in two consecutive blocks
+	//    the fee rate will go back to the original value.
 
 	// parent and child block may have the same timestamp. In this case targetComplexity will match targetComplexityRate
 	elapsedTime = max(1, elapsedTime)
@@ -145,76 +156,32 @@ func nextFeeRate(currentFeeRate, coeff, parentBlkComplexity, targetComplexityRat
 	}
 
 	var (
-		scaledDelta uint64
-		scaleCoeff  uint64
-
-		// [increase] tells if
-		// [nextFeeRate] = [currentFeeRate] * [factor] or
-		// [nextFeeRate] = [currentFeeRate] / [factor]
-		increase bool
-
-		// [weight] is how much we increase or reduce the fee rate
-		weight uint64
+		increaseFee bool
+		delta       uint64
 	)
 
-	// To control for numerical errors, we defer [coeff] normalization by [CoeffDenom]
-	// to the very end. This is possible since the approximation we use is piecewise linear.
-	if parentBlkComplexity > targetComplexity {
-		scaledDelta = 10 * (parentBlkComplexity - targetComplexity) / (maxBlkComplexity - targetComplexity)
-		scaleCoeff = coeff * (maxBlkComplexity - targetComplexity) / targetComplexity / CoeffDenom / 10
-		increase = true
+	if targetComplexity < parentBlkComplexity {
+		increaseFee = true
+		delta = parentBlkComplexity - targetComplexity
 	} else {
-		scaledDelta = 10 * (targetComplexity - parentBlkComplexity) / (maxBlkComplexity - targetComplexity)
-		scaleCoeff = coeff * (maxBlkComplexity - targetComplexity) / targetComplexity / CoeffDenom / 10
-		increase = false
+		increaseFee = false
+		delta = targetComplexity - parentBlkComplexity
 	}
 
-	var (
-		m, q      uint64
-		qPositive bool
-	)
-	switch {
-	case scaledDelta < 1:
-		m = 2
-		q = 1
-		qPositive = true
-	case scaledDelta < 2:
-		m = 5
-		q = 2
-	case scaledDelta < 3:
-		m = 13
-		q = 18
-	case scaledDelta < 4:
-		m = 35
-		q = 84
-	case scaledDelta < 5:
-		m = 94
-		q = 321
-	case scaledDelta < 6:
-		m = 256
-		q = 1131
-	case scaledDelta < 7:
-		m = 694
-		q = 3760
-	case scaledDelta < 8:
-		m = 1885
-		q = 12098
-	case scaledDelta < 9:
-		m = 5123
-		q = 38003
-	default:
-		m = 13924
-		q = 117212
+	num := coeff * delta * delta
+	denom := targetComplexity * targetComplexity * CoeffDenom
+
+	if increaseFee {
+		res, over := safemath.Mul64(currentFeeRate, denom+num)
+		if over != nil {
+			res = math.MaxUint64
+		}
+		return res / denom
 	}
 
-	if !qPositive {
-		weight = scaleCoeff*(m*scaledDelta-q) + (scaleCoeff-1)*q
-	} else {
-		weight = scaleCoeff*(m*scaledDelta+q) - (scaleCoeff-1)*q
+	res, over := safemath.Mul64(currentFeeRate, denom)
+	if over != nil {
+		res = math.MaxUint64
 	}
-
-	if increase {
-		return currentFeeRate * weight / CoeffDenom
-	}
-	return currentFeeRate * CoeffDenom / weight
+	return res / (denom + num)
 }
