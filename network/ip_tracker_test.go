@@ -829,19 +829,40 @@ func TestIPTracker_BloomFiltersEverything(t *testing.T) {
 	require.NoError(tracker.ResetBloom())
 }
 
-func TestIPTracker_BloomGrowsWithValidatorSet(t *testing.T) {
-	require := require.New(t)
-
-	tracker := newTestIPTracker(t)
-	initialMaxBloomCount := tracker.maxBloomCount
-	for i := 0; i < 2048; i++ {
-		tracker.OnValidatorAdded(ids.GenerateTestNodeID(), nil, ids.Empty, 0)
+func TestIPTracker_BloomGrows(t *testing.T) {
+	tests := []struct {
+		name string
+		add  func(tracker *ipTracker)
+	}{
+		{
+			name: "Add Validator",
+			add: func(tracker *ipTracker) {
+				tracker.OnValidatorAdded(ids.GenerateTestNodeID(), nil, ids.Empty, 0)
+			},
+		},
+		{
+			name: "Manually Track",
+			add: func(tracker *ipTracker) {
+				tracker.ManuallyTrack(ids.GenerateTestNodeID())
+			},
+		},
 	}
-	requireMetricsConsistent(t, tracker)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
 
-	require.NoError(tracker.ResetBloom())
-	require.Greater(tracker.maxBloomCount, initialMaxBloomCount)
-	requireMetricsConsistent(t, tracker)
+			tracker := newTestIPTracker(t)
+			initialMaxBloomCount := tracker.maxBloomCount
+			for i := 0; i < 2048; i++ {
+				test.add(tracker)
+			}
+			requireMetricsConsistent(t, tracker)
+
+			require.NoError(tracker.ResetBloom())
+			require.Greater(tracker.maxBloomCount, initialMaxBloomCount)
+			requireMetricsConsistent(t, tracker)
+		})
+	}
 }
 
 func TestIPTracker_BloomResetsDynamically(t *testing.T) {
@@ -875,7 +896,7 @@ func TestIPTracker_PreventBloomFilterAddition(t *testing.T) {
 	require.True(tracker.AddIP(ip))
 	require.True(tracker.AddIP(newerIP))
 	require.True(tracker.AddIP(newestIP))
-	require.Equal(maxIPEntriesPerValidator, tracker.bloomAdditions[ip.NodeID])
+	require.Equal(maxIPEntriesPerNode, tracker.bloomAdditions[ip.NodeID])
 	requireMetricsConsistent(t, tracker)
 }
 
