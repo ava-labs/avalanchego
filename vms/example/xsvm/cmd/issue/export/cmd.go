@@ -4,13 +4,14 @@
 package export
 
 import (
-	"encoding/json"
+	"context"
 	"log"
 	"time"
 
 	"github.com/spf13/cobra"
 
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/api"
+	"github.com/ava-labs/avalanchego/vms/example/xsvm/cmd/issue/status"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/tx"
 )
 
@@ -32,13 +33,22 @@ func exportFunc(c *cobra.Command, args []string) error {
 		return err
 	}
 
-	ctx := c.Context()
-
-	client := api.NewClient(config.URI, config.SourceChainID.String())
-
-	nonce, err := client.Nonce(ctx, config.PrivateKey.Address())
+	txStatus, err := Export(c.Context(), config)
 	if err != nil {
 		return err
+	}
+	log.Print(txStatus)
+
+	return nil
+}
+
+func Export(ctx context.Context, config *Config) (*status.TxIssuance, error) {
+	client := api.NewClient(config.URI, config.SourceChainID.String())
+
+	address := config.PrivateKey.Address()
+	nonce, err := client.Nonce(ctx, address)
+	if err != nil {
+		return nil, err
 	}
 
 	utx := &tx.Export{
@@ -52,19 +62,23 @@ func exportFunc(c *cobra.Command, args []string) error {
 	}
 	stx, err := tx.Sign(utx, config.PrivateKey)
 	if err != nil {
-		return err
-	}
-
-	txJSON, err := json.MarshalIndent(stx, "", "  ")
-	if err != nil {
-		return err
+		return nil, err
 	}
 
 	issueTxStartTime := time.Now()
 	txID, err := client.IssueTx(ctx, stx)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	log.Printf("issued tx %s in %s\n%s\n", txID, time.Since(issueTxStartTime), string(txJSON))
-	return nil
+
+	if err := api.WaitForAcceptance(ctx, client, address, nonce); err != nil {
+		return nil, err
+	}
+
+	return &status.TxIssuance{
+		Tx:        stx,
+		TxID:      txID,
+		Nonce:     nonce,
+		StartTime: issueTxStartTime,
+	}, nil
 }

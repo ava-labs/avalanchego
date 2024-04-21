@@ -27,9 +27,9 @@ const (
 	minCountEstimate               = 128
 	targetFalsePositiveProbability = .001
 	maxFalsePositiveProbability    = .01
-	// By setting maxIPEntriesPerValidator > 1, we allow validators to update
-	// their IP at least once per bloom filter reset.
-	maxIPEntriesPerValidator = 2
+	// By setting maxIPEntriesPerNode > 1, we allow nodes to update their IP at
+	// least once per bloom filter reset.
+	maxIPEntriesPerNode = 2
 
 	untrackedTimestamp = -2
 	olderTimestamp     = -1
@@ -329,7 +329,7 @@ func (i *ipTracker) updateMostRecentTrackedIP(ip *ips.ClaimedIPPort) {
 	i.numTrackedIPs.Set(float64(len(i.mostRecentTrackedIPs)))
 
 	oldCount := i.bloomAdditions[ip.NodeID]
-	if oldCount >= maxIPEntriesPerValidator {
+	if oldCount >= maxIPEntriesPerNode {
 		return
 	}
 
@@ -446,7 +446,7 @@ func (i *ipTracker) resetBloom() error {
 		return err
 	}
 
-	count := max(maxIPEntriesPerValidator*i.gossipableIDs.Len(), minCountEstimate)
+	count := max(maxIPEntriesPerNode*i.trackedIDs.Len(), minCountEstimate)
 	numHashes, numEntries := bloom.OptimalParameters(
 		count,
 		targetFalsePositiveProbability,

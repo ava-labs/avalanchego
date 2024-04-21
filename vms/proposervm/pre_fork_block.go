@@ -248,6 +248,7 @@ func (b *preForkBlock) buildChild(ctx context.Context) (Block, error) {
 		zap.Stringer("blkID", blk.ID()),
 		zap.Stringer("innerBlkID", innerBlock.ID()),
 		zap.Uint64("height", blk.Height()),
+		zap.Uint64("pChainHeight", pChainHeight),
 		zap.Time("parentTimestamp", parentTimestamp),
 		zap.Time("blockTimestamp", newTimestamp))
 	return blk, nil
