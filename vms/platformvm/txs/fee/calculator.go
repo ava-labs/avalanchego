@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package fees
+package fee
 
 import (
 	"errors"
@@ -102,7 +102,11 @@ func (fc *Calculator) AddDelegatorTx(*txs.AddDelegatorTx) error {
 
 func (fc *Calculator) CreateChainTx(tx *txs.CreateChainTx) error {
 	if !fc.isEActive {
-		fc.Fee = fc.config.GetCreateBlockchainTxFee(fc.chainTime)
+		if fc.config.IsApricotPhase3Activated(fc.chainTime) {
+			fc.Fee = fc.config.CreateBlockchainTxFee
+		} else {
+			fc.Fee = fc.config.CreateAssetTxFee
+		}
 		return nil
 	}
 
@@ -117,7 +121,11 @@ func (fc *Calculator) CreateChainTx(tx *txs.CreateChainTx) error {
 
 func (fc *Calculator) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 	if !fc.isEActive {
-		fc.Fee = fc.config.GetCreateSubnetTxFee(fc.chainTime)
+		if fc.config.IsApricotPhase3Activated(fc.chainTime) {
+			fc.Fee = fc.config.CreateSubnetTxFee
+		} else {
+			fc.Fee = fc.config.CreateAssetTxFee
+		}
 		return nil
 	}
 

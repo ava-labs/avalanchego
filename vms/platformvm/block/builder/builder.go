@@ -23,7 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fees"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 
 	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
@@ -365,7 +365,7 @@ func packBlockTxs(
 
 	feeMan := commonfees.NewManager(feeRates)
 	if isEActivated {
-		feeMan, err = fees.UpdatedFeeManager(stateDiff, backend.Config, parentBlkTime, timestamp)
+		feeMan, err = fee.UpdatedFeeManager(stateDiff, backend.Config, parentBlkTime, timestamp)
 		if err != nil {
 			return nil, err
 		}

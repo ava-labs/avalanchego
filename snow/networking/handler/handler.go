@@ -20,7 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
-	"github.com/ava-labs/avalanchego/proto/pb/p2p"
+	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
@@ -30,6 +30,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 
+	p2ppb "github.com/ava-labs/avalanchego/proto/pb/p2p"
 	commontracker "github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 )
 
@@ -123,6 +124,7 @@ type handler struct {
 
 	// Tracks the peers that are currently connected to this subnet
 	peerTracker commontracker.Peers
+	p2pTracker  *p2p.PeerTracker
 }
 
 // Initialize this consensus handler
@@ -137,6 +139,7 @@ func New(
 	subnetConnector validators.SubnetConnector,
 	subnet subnets.Subnet,
 	peerTracker commontracker.Peers,
+	p2pTracker *p2p.PeerTracker,
 ) (Handler, error) {
 	h := &handler{
 		ctx:             ctx,
@@ -151,6 +154,7 @@ func New(
 		subnetConnector: subnetConnector,
 		subnet:          subnet,
 		peerTracker:     peerTracker,
+		p2pTracker:      p2pTracker,
 	}
 	h.asyncMessagePool.SetLimit(threadPoolSize)
 
@@ -493,8 +497,8 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 	// We will attempt to pass the message to the requested type for the state
 	// we are currently in.
 	currentState := h.ctx.State.Get()
-	if msg.EngineType == p2p.EngineType_ENGINE_TYPE_SNOWMAN &&
-		currentState.Type == p2p.EngineType_ENGINE_TYPE_AVALANCHE {
+	if msg.EngineType == p2ppb.EngineType_ENGINE_TYPE_SNOWMAN &&
+		currentState.Type == p2ppb.EngineType_ENGINE_TYPE_AVALANCHE {
 		// The peer is requesting an engine type that hasn't been initialized
 		// yet. This means we know that this isn't a response, so we can safely
 		// drop the message.
@@ -507,9 +511,9 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 		return nil
 	}
 
-	var engineType p2p.EngineType
+	var engineType p2ppb.EngineType
 	switch msg.EngineType {
-	case p2p.EngineType_ENGINE_TYPE_AVALANCHE, p2p.EngineType_ENGINE_TYPE_SNOWMAN:
+	case p2ppb.EngineType_ENGINE_TYPE_AVALANCHE, p2ppb.EngineType_ENGINE_TYPE_SNOWMAN:
 		// The peer is requesting an engine type that has been initialized, so
 		// we should attempt to honor the request.
 		engineType = msg.EngineType
@@ -544,16 +548,16 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 	//            response fails.
 	switch msg := body.(type) {
 	// State messages should always be sent to the snowman engine
-	case *p2p.GetStateSummaryFrontier:
+	case *p2ppb.GetStateSummaryFrontier:
 		return engine.GetStateSummaryFrontier(ctx, nodeID, msg.RequestId)
 
-	case *p2p.StateSummaryFrontier:
+	case *p2ppb.StateSummaryFrontier:
 		return engine.StateSummaryFrontier(ctx, nodeID, msg.RequestId, msg.Summary)
 
 	case *message.GetStateSummaryFrontierFailed:
 		return engine.GetStateSummaryFrontierFailed(ctx, nodeID, msg.RequestID)
 
-	case *p2p.GetAcceptedStateSummary:
+	case *p2ppb.GetAcceptedStateSummary:
 		return engine.GetAcceptedStateSummary(
 			ctx,
 			nodeID,
@@ -561,7 +565,7 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 			set.Of(msg.Heights...),
 		)
 
-	case *p2p.AcceptedStateSummary:
+	case *p2ppb.AcceptedStateSummary:
 		summaryIDs, err := getIDs(msg.SummaryIds)
 		if err != nil {
 			h.ctx.Log.Debug("message with invalid field",
@@ -581,10 +585,10 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 
 	// Bootstrapping messages may be forwarded to either avalanche or snowman
 	// engines, depending on the EngineType field
-	case *p2p.GetAcceptedFrontier:
+	case *p2ppb.GetAcceptedFrontier:
 		return engine.GetAcceptedFrontier(ctx, nodeID, msg.RequestId)
 
-	case *p2p.AcceptedFrontier:
+	case *p2ppb.AcceptedFrontier:
 		containerID, err := ids.ToID(msg.ContainerId)
 		if err != nil {
 			h.ctx.Log.Debug("message with invalid field",
@@ -602,7 +606,7 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 	case *message.GetAcceptedFrontierFailed:
 		return engine.GetAcceptedFrontierFailed(ctx, nodeID, msg.RequestID)
 
-	case *p2p.GetAccepted:
+	case *p2ppb.GetAccepted:
 		containerIDs, err := getIDs(msg.ContainerIds)
 		if err != nil {
 			h.ctx.Log.Debug("message with invalid field",
@@ -617,7 +621,7 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 
 		return engine.GetAccepted(ctx, nodeID, msg.RequestId, containerIDs)
 
-	case *p2p.Accepted:
+	case *p2ppb.Accepted:
 		containerIDs, err := getIDs(msg.ContainerIds)
 		if err != nil {
 			h.ctx.Log.Debug("message with invalid field",
@@ -635,7 +639,7 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 	case *message.GetAcceptedFailed:
 		return engine.GetAcceptedFailed(ctx, nodeID, msg.RequestID)
 
-	case *p2p.GetAncestors:
+	case *p2ppb.GetAncestors:
 		containerID, err := ids.ToID(msg.ContainerId)
 		if err != nil {
 			h.ctx.Log.Debug("dropping message with invalid field",
@@ -653,10 +657,10 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 	case *message.GetAncestorsFailed:
 		return engine.GetAncestorsFailed(ctx, nodeID, msg.RequestID)
 
-	case *p2p.Ancestors:
+	case *p2ppb.Ancestors:
 		return engine.Ancestors(ctx, nodeID, msg.RequestId, msg.Containers)
 
-	case *p2p.Get:
+	case *p2ppb.Get:
 		containerID, err := ids.ToID(msg.ContainerId)
 		if err != nil {
 			h.ctx.Log.Debug("dropping message with invalid field",
@@ -674,13 +678,13 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 	case *message.GetFailed:
 		return engine.GetFailed(ctx, nodeID, msg.RequestID)
 
-	case *p2p.Put:
+	case *p2ppb.Put:
 		return engine.Put(ctx, nodeID, msg.RequestId, msg.Container)
 
-	case *p2p.PushQuery:
+	case *p2ppb.PushQuery:
 		return engine.PushQuery(ctx, nodeID, msg.RequestId, msg.Container, msg.RequestedHeight)
 
-	case *p2p.PullQuery:
+	case *p2ppb.PullQuery:
 		containerID, err := ids.ToID(msg.ContainerId)
 		if err != nil {
 			h.ctx.Log.Debug("dropping message with invalid field",
@@ -695,7 +699,7 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 
 		return engine.PullQuery(ctx, nodeID, msg.RequestId, containerID, msg.RequestedHeight)
 
-	case *p2p.Chits:
+	case *p2ppb.Chits:
 		preferredID, err := ids.ToID(msg.PreferredId)
 		if err != nil {
 			h.ctx.Log.Debug("message with invalid field",
@@ -743,6 +747,7 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 		if err != nil {
 			return err
 		}
+		h.p2pTracker.Connected(nodeID, msg.NodeVersion)
 		return engine.Connected(ctx, nodeID, msg.NodeVersion)
 
 	case *message.ConnectedSubnet:
@@ -753,6 +758,7 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 		if err != nil {
 			return err
 		}
+		h.p2pTracker.Disconnected(nodeID)
 		return engine.Disconnected(ctx, nodeID)
 
 	default:
@@ -826,7 +832,7 @@ func (h *handler) executeAsyncMsg(ctx context.Context, msg Message) error {
 	}
 
 	switch m := body.(type) {
-	case *p2p.AppRequest:
+	case *p2ppb.AppRequest:
 		return engine.AppRequest(
 			ctx,
 			nodeID,
@@ -835,10 +841,10 @@ func (h *handler) executeAsyncMsg(ctx context.Context, msg Message) error {
 			m.AppBytes,
 		)
 
-	case *p2p.AppResponse:
+	case *p2ppb.AppResponse:
 		return engine.AppResponse(ctx, nodeID, m.RequestId, m.AppBytes)
 
-	case *p2p.AppError:
+	case *p2ppb.AppError:
 		err := &common.AppError{
 			Code:    m.ErrorCode,
 			Message: m.ErrorMessage,
@@ -851,7 +857,7 @@ func (h *handler) executeAsyncMsg(ctx context.Context, msg Message) error {
 			err,
 		)
 
-	case *p2p.AppGossip:
+	case *p2ppb.AppGossip:
 		return engine.AppGossip(ctx, nodeID, m.AppBytes)
 
 	case *message.CrossChainAppRequest:

@@ -16,8 +16,9 @@ type FlagVars struct {
 	avalancheGoExecPath  string
 	pluginDir            string
 	networkDir           string
-	useExistingNetwork   bool
+	reuseNetwork         bool
 	networkShutdownDelay time.Duration
+	stopNetwork          bool
 }
 
 func (v *FlagVars) AvalancheGoExecPath() string {
@@ -29,7 +30,7 @@ func (v *FlagVars) PluginDir() string {
 }
 
 func (v *FlagVars) NetworkDir() string {
-	if !v.useExistingNetwork {
+	if !v.reuseNetwork {
 		return ""
 	}
 	if len(v.networkDir) > 0 {
@@ -38,12 +39,16 @@ func (v *FlagVars) NetworkDir() string {
 	return os.Getenv(tmpnet.NetworkDirEnvName)
 }
 
-func (v *FlagVars) UseExistingNetwork() bool {
-	return v.useExistingNetwork
+func (v *FlagVars) ReuseNetwork() bool {
+	return v.reuseNetwork
 }
 
 func (v *FlagVars) NetworkShutdownDelay() time.Duration {
 	return v.networkShutdownDelay
+}
+
+func (v *FlagVars) StopNetwork() bool {
+	return v.stopNetwork
 }
 
 func RegisterFlags() *FlagVars {
@@ -64,19 +69,25 @@ func RegisterFlags() *FlagVars {
 		&vars.networkDir,
 		"network-dir",
 		"",
-		fmt.Sprintf("[optional] the dir containing the configuration of an existing network to target for testing. Will only be used if --use-existing-network is specified. Also possible to configure via the %s env variable.", tmpnet.NetworkDirEnvName),
+		fmt.Sprintf("[optional] the dir containing the configuration of an existing network to target for testing. Will only be used if --reuse-network is specified. Also possible to configure via the %s env variable.", tmpnet.NetworkDirEnvName),
 	)
 	flag.BoolVar(
-		&vars.useExistingNetwork,
-		"use-existing-network",
+		&vars.reuseNetwork,
+		"reuse-network",
 		false,
-		"[optional] whether to target the existing network identified by --network-dir.",
+		"[optional] reuse an existing network. If an existing network is not already running, create a new one and leave it running for subsequent usage.",
 	)
 	flag.DurationVar(
 		&vars.networkShutdownDelay,
 		"network-shutdown-delay",
 		12*time.Second, // Make sure this value takes into account the scrape_interval defined in scripts/run_prometheus.sh
 		"[optional] the duration to wait before shutting down the test network at the end of the test run. A value greater than the scrape interval is suggested. 0 avoids waiting for shutdown.",
+	)
+	flag.BoolVar(
+		&vars.stopNetwork,
+		"stop-network",
+		false,
+		"[optional] stop an existing network and exit without executing any tests.",
 	)
 
 	return &vars

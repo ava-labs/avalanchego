@@ -2,8 +2,8 @@
 FROM docker.io/antithesishq/go-instrumentor AS instrumentor
 
 # Changes to the minimum golang version must also be replicated in
-# scripts/build_avalanche.sh
 # tests/antithesis/Dockerfile.node (here)
+# tests/antithesis/Dockerfile.workload
 # Dockerfile
 # README.md
 # go.mod

@@ -109,7 +109,7 @@ func New(config Config) (*Transitive, error) {
 	}
 
 	acceptedFrontiers := tracker.NewAccepted()
-	config.Validators.RegisterCallbackListener(config.Ctx.SubnetID, acceptedFrontiers)
+	config.Validators.RegisterSetCallbackListener(config.Ctx.SubnetID, acceptedFrontiers)
 
 	factory := poll.NewEarlyTermNoTraversalFactory(
 		config.Params.AlphaPreference,
