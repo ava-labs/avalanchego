@@ -111,7 +111,6 @@ func (m *Manager) UpdateFeeRates(
 			feesConfig.UpdateCoefficient[i],
 			parentBlkComplexity[i],
 			feesConfig.BlockTargetComplexityRate[i],
-			feesConfig.BlockMaxComplexity[i],
 			elapsedTime,
 		)
 		nextFeeRates = max(nextFeeRates, feesConfig.MinFeeRate[i])
@@ -125,7 +124,6 @@ func nextFeeRate(
 	coeff,
 	parentBlkComplexity,
 	targetComplexityRate,
-	maxComplexity,
 	elapsedTime uint64,
 ) uint64 {
 	// We update the fee rate with the formula:
@@ -135,7 +133,16 @@ func nextFeeRate(
 	// and [targetComplexity] is the median complexity expected in the elapsed time.
 	//
 	// We approximate the exponential as follows:
-	// TODO DESCRIBE IT
+	//
+	//                              1 + k * delta^2 if delta >= 0
+	// feeRate_{t+1} = feeRate_t *
+	//                              1 / (1 + k * delta^2) if delta < 0
+	//
+	// The approximation keeps two key properties of the exponential formula:
+	// 1. It's strictly increasing with delta
+	// 2. It's stable because feeRate(delta) * feeRate(-delta) = 1, meaning that
+	//    if complexity increase and decrease by the same amount in two consecutive blocks
+	//    the fee rate will go back to the original value.
 
 	// parent and child block may have the same timestamp. In this case targetComplexity will match targetComplexityRate
 	elapsedTime = max(1, elapsedTime)
@@ -150,71 +157,31 @@ func nextFeeRate(
 
 	var (
 		increaseFee bool
-
-		numExp   uint64
-		denomExp = CoeffDenom * targetComplexity
-
-		numFactor   uint64
-		denomFactor uint64
+		delta       uint64
 	)
 
-	// Assumes parentBlkComplexity <= maxComplexity
-	switch {
-	case targetComplexity < parentBlkComplexity:
+	if targetComplexity < parentBlkComplexity {
 		increaseFee = true
-		numExp = coeff * (maxComplexity - targetComplexity)
-
-		numFactor = maxComplexity + parentBlkComplexity - 2*targetComplexity
-		denomFactor = maxComplexity - targetComplexity
-
-	case parentBlkComplexity < targetComplexity && targetComplexity < maxComplexity:
+		delta = parentBlkComplexity - targetComplexity
+	} else {
 		increaseFee = false
-		numExp = coeff * (maxComplexity - targetComplexity)
-
-		numFactor = maxComplexity - parentBlkComplexity
-		denomFactor = maxComplexity - targetComplexity
-
-	case parentBlkComplexity < targetComplexity && targetComplexity == maxComplexity:
-		increaseFee = false
-		numExp = coeff * (maxComplexity - targetComplexity)
-
-		numFactor = 1
-		denomFactor = 1
-	default: // parentBlkComplexity < targetComplexity && maxComplexity < targetComplexity
-		increaseFee = false
-		numExp = coeff * (targetComplexity - maxComplexity)
-
-		numFactor = 2*targetComplexity - maxComplexity - parentBlkComplexity
-		denomFactor = targetComplexity - maxComplexity
+		delta = targetComplexity - parentBlkComplexity
 	}
 
-	// Exponentiate via the piecewise linear approximation
-	switch {
-	case numExp < 1*denomExp:
-		numExp = 2*numExp + denomExp
-	case numExp < 2*denomExp:
-		numExp = 5*numExp - 2*denomExp
-	case numExp < 3*denomExp:
-		numExp = 13*numExp - 18*denomExp
-	case numExp < 4*denomExp:
-		numExp = 35*numExp - 84*denomExp
-	case numExp < 5*denomExp:
-		numExp = 94*numExp - 321*denomExp
-	case numExp < 6*denomExp:
-		numExp = 256*numExp - 1131*denomExp
-	case numExp < 7*denomExp:
-		numExp = 694*numExp - 3760*denomExp
-	case numExp < 8*denomExp:
-		numExp = 1885*numExp - 12098*denomExp
-	case numExp < 9*denomExp:
-		numExp = 5123*numExp - 38003*denomExp
-	default:
-		numExp = 13924*numExp - 117212*denomExp
-	}
+	num := coeff * delta * delta
+	denom := targetComplexity * targetComplexity * CoeffDenom
 
 	if increaseFee {
-		return currentFeeRate * numExp * numFactor / denomExp / denomFactor
+		res, over := safemath.Mul64(currentFeeRate, denom+num)
+		if over != nil {
+			res = math.MaxUint64
+		}
+		return res / denom
 	}
 
-	return currentFeeRate * denomExp * numFactor / numExp / denomFactor
+	res, over := safemath.Mul64(currentFeeRate, denom)
+	if over != nil {
+		res = math.MaxUint64
+	}
+	return res / (denom + num)
 }
