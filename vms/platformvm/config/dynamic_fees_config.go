@@ -43,11 +43,11 @@ var (
 			10 * units.NanoAvax,
 			35 * units.NanoAvax,
 		},
-		UpdateCoefficient: commonfees.Dimensions{ // over 10_000
-			30,
-			20,
-			25,
-			20,
+		UpdateCoefficient: commonfees.Dimensions{ // over fees.CoeffDenom
+			3,
+			2,
+			2,
+			3,
 		},
 		BlockMaxComplexity: commonfees.Dimensions{
 			10_000,

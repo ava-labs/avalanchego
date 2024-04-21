@@ -15,7 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fees"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
@@ -145,7 +145,7 @@ func verifyAddValidatorTx(
 	copy(outs, tx.Outs)
 	copy(outs[len(tx.Outs):], tx.StakeOuts)
 
-	feeCalculator := fees.NewDynamicCalculator(backend.Config, backend.Ctx.Log, currentTimestamp, feeManager, commonfees.Max, sTx.Creds)
+	feeCalculator := fee.NewDynamicCalculator(backend.Config, backend.Ctx.Log, currentTimestamp, feeManager, commonfees.Max, sTx.Creds)
 	if err := tx.Visit(feeCalculator); err != nil {
 		return nil, 0, err
 	}
@@ -235,7 +235,7 @@ func verifyAddSubnetValidatorTx(
 		return commonfees.NoTip, 0, ErrStakeTooLong
 	}
 
-	feeCalculator := fees.NewDynamicCalculator(backend.Config, backend.Ctx.Log, currentTimestamp, feeManager, maxComplexity, sTx.Creds)
+	feeCalculator := fee.NewDynamicCalculator(backend.Config, backend.Ctx.Log, currentTimestamp, feeManager, maxComplexity, sTx.Creds)
 	if err := tx.Visit(feeCalculator); err != nil {
 		return commonfees.NoTip, 0, err
 	}
@@ -355,7 +355,7 @@ func verifyRemoveSubnetValidatorTx(
 		return nil, false, commonfees.NoTip, 0, ErrRemovePermissionlessValidator
 	}
 
-	feeCalculator := fees.NewDynamicCalculator(backend.Config, backend.Ctx.Log, chainState.GetTimestamp(), feeManager, maxComplexity, sTx.Creds)
+	feeCalculator := fee.NewDynamicCalculator(backend.Config, backend.Ctx.Log, chainState.GetTimestamp(), feeManager, maxComplexity, sTx.Creds)
 	if err := tx.Visit(feeCalculator); err != nil {
 		return nil, false, commonfees.NoTip, 0, err
 	}
@@ -448,7 +448,7 @@ func verifyAddDelegatorTx(
 	copy(outs, tx.Outs)
 	copy(outs[len(tx.Outs):], tx.StakeOuts)
 
-	feeCalculator := fees.NewDynamicCalculator(backend.Config, backend.Ctx.Log, chainState.GetTimestamp(), feeManager, commonfees.Max, sTx.Creds)
+	feeCalculator := fee.NewDynamicCalculator(backend.Config, backend.Ctx.Log, chainState.GetTimestamp(), feeManager, commonfees.Max, sTx.Creds)
 	if err := tx.Visit(feeCalculator); err != nil {
 		return nil, 0, err
 	}
@@ -547,7 +547,7 @@ func verifyAddPermissionlessValidatorTx(
 		return commonfees.NoTip, 0, err
 	}
 
-	feeCalculator := fees.NewDynamicCalculator(backend.Config, backend.Ctx.Log, currentTimestamp, feeManager, maxComplexity, sTx.Creds)
+	feeCalculator := fee.NewDynamicCalculator(backend.Config, backend.Ctx.Log, currentTimestamp, feeManager, maxComplexity, sTx.Creds)
 	if err := tx.Visit(feeCalculator); err != nil {
 		return commonfees.NoTip, 0, err
 	}
@@ -683,7 +683,7 @@ func verifyAddPermissionlessDelegatorTx(
 		return commonfees.NoTip, 0, err
 	}
 
-	feeCalculator := fees.NewDynamicCalculator(backend.Config, backend.Ctx.Log, currentTimestamp, feeManager, maxComplexity, sTx.Creds)
+	feeCalculator := fee.NewDynamicCalculator(backend.Config, backend.Ctx.Log, currentTimestamp, feeManager, maxComplexity, sTx.Creds)
 	if err := tx.Visit(feeCalculator); err != nil {
 		return commonfees.NoTip, 0, err
 	}
@@ -852,7 +852,7 @@ func verifyTransferSubnetOwnershipTx(
 		return commonfees.NoTip, 0, err
 	}
 
-	feeCalculator := fees.NewDynamicCalculator(backend.Config, backend.Ctx.Log, chainState.GetTimestamp(), feeManager, maxComplexity, sTx.Creds)
+	feeCalculator := fee.NewDynamicCalculator(backend.Config, backend.Ctx.Log, chainState.GetTimestamp(), feeManager, maxComplexity, sTx.Creds)
 	if err := tx.Visit(feeCalculator); err != nil {
 		return commonfees.NoTip, 0, err
 	}

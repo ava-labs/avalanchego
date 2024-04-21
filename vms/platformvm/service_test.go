@@ -40,7 +40,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fees"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
@@ -390,7 +390,7 @@ func TestGetBalance(t *testing.T) {
 			var (
 				chainTime = service.vm.state.GetTimestamp()
 
-				feeCalc *fees.Calculator
+				feeCalc *fee.Calculator
 			)
 
 			feeRates, err := service.vm.state.GetFeeRates()
@@ -398,7 +398,7 @@ func TestGetBalance(t *testing.T) {
 
 			feeCfg := config.GetDynamicFeesConfig(service.vm.Config.IsEActivated(chainTime))
 			feeMan := commonfees.NewManager(feeRates)
-			feeCalc = fees.NewDynamicCalculator(&service.vm.Config, logging.NoLog{}, chainTime, feeMan, feeCfg.BlockMaxComplexity, testSubnet1.Creds)
+			feeCalc = fee.NewDynamicCalculator(&service.vm.Config, logging.NoLog{}, chainTime, feeMan, feeCfg.BlockMaxComplexity, testSubnet1.Creds)
 
 			require.NoError(testSubnet1.Unsigned.Visit(feeCalc))
 

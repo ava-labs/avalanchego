@@ -36,7 +36,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fees"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	avajson "github.com/ava-labs/avalanchego/utils/json"
@@ -1869,7 +1869,7 @@ func (s *Service) GetFeeRates(_ *http.Request, _ *struct{}, reply *GetFeeRatesRe
 	)
 
 	if isEActivated {
-		feeManager, err = fees.UpdatedFeeManager(onAccept, &s.vm.Config, currentTimestamp, nextTimestamp)
+		feeManager, err = fee.UpdatedFeeManager(onAccept, &s.vm.Config, currentTimestamp, nextTimestamp)
 		if err != nil {
 			return err
 		}

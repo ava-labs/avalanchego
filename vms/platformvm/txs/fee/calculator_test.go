@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package fees
+package fee
 
 import (
 	"testing"
@@ -12,9 +12,11 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/fees"
@@ -112,14 +114,14 @@ func TestTxFees(t *testing.T) {
 
 	tests := []feeTests{
 		{
-			description: "AddValidatorTx pre E fork",
+			description: "AddValidatorTx pre EUpgrade",
 			cfgAndChainTimeF: func() (*config.Config, time.Time) {
-				eForkTime := time.Now().Truncate(time.Second)
-				chainTime := eForkTime.Add(-1 * time.Second)
+				eUpgradeTime := time.Now().Truncate(time.Second)
+				chainTime := eUpgradeTime.Add(-1 * time.Second)
 
 				cfg := feeTestsDefaultCfg
 				cfg.DurangoTime = durangoTime
-				cfg.EUpgradeTime = eForkTime
+				cfg.EUpgradeTime = eUpgradeTime
 
 				return &cfg, chainTime
 			},
@@ -130,7 +132,7 @@ func TestTxFees(t *testing.T) {
 			},
 		},
 		{
-			description: "AddValidatorTx post E fork, success",
+			description: "AddValidatorTx post EUpgrade, success",
 			cfgAndChainTimeF: func() (*config.Config, time.Time) {
 				eForkTime := time.Now().Truncate(time.Second)
 				chainTime := eForkTime.Add(time.Second)
@@ -148,14 +150,14 @@ func TestTxFees(t *testing.T) {
 			},
 		},
 		{
-			description: "AddSubnetValidatorTx pre E fork",
+			description: "AddSubnetValidatorTx pre EUpgrade",
 			cfgAndChainTimeF: func() (*config.Config, time.Time) {
-				eForkTime := time.Now().Truncate(time.Second)
-				chainTime := eForkTime.Add(-1 * time.Second)
+				eUpgradeTime := time.Now().Truncate(time.Second)
+				chainTime := eUpgradeTime.Add(-1 * time.Second)
 
 				cfg := feeTestsDefaultCfg
 				cfg.DurangoTime = durangoTime
-				cfg.EUpgradeTime = eForkTime
+				cfg.EUpgradeTime = eUpgradeTime
 
 				return &cfg, chainTime
 			},
@@ -166,7 +168,7 @@ func TestTxFees(t *testing.T) {
 			},
 		},
 		{
-			description: "AddSubnetValidatorTx post E fork, success",
+			description: "AddSubnetValidatorTx post EUpgrade, success",
 			cfgAndChainTimeF: func() (*config.Config, time.Time) {
 				eForkTime := time.Now().Truncate(time.Second)
 				chainTime := eForkTime.Add(time.Second)
@@ -193,7 +195,7 @@ func TestTxFees(t *testing.T) {
 			},
 		},
 		{
-			description: "AddSubnetValidatorTx post E fork, utxos read cap breached",
+			description: "AddSubnetValidatorTx post EUpgrade, utxos read cap breached",
 			cfgAndChainTimeF: func() (*config.Config, time.Time) {
 				eForkTime := time.Now().Truncate(time.Second)
 				chainTime := eForkTime.Add(time.Second)
@@ -214,14 +216,14 @@ func TestTxFees(t *testing.T) {
 			checksF:             func(*testing.T, *Calculator) {},
 		},
 		{
-			description: "AddDelegatorTx pre E fork",
+			description: "AddDelegatorTx pre EUpgrade",
 			cfgAndChainTimeF: func() (*config.Config, time.Time) {
-				eForkTime := time.Now().Truncate(time.Second)
-				chainTime := eForkTime.Add(-1 * time.Second)
+				eUpgradeTime := time.Now().Truncate(time.Second)
+				chainTime := eUpgradeTime.Add(-1 * time.Second)
 
 				cfg := feeTestsDefaultCfg
 				cfg.DurangoTime = durangoTime
-				cfg.EUpgradeTime = eForkTime
+				cfg.EUpgradeTime = eUpgradeTime
 
 				return &cfg, chainTime
 			},
@@ -232,7 +234,7 @@ func TestTxFees(t *testing.T) {
 			},
 		},
 		{
-			description: "AddDelegatorTx post E fork, success",
+			description: "AddDelegatorTx post EUpgrade, success",
 			cfgAndChainTimeF: func() (*config.Config, time.Time) {
 				eForkTime := time.Now().Truncate(time.Second)
 				chainTime := eForkTime.Add(time.Second)
@@ -250,14 +252,33 @@ func TestTxFees(t *testing.T) {
 			},
 		},
 		{
-			description: "CreateChainTx pre E fork",
+			description: "CreateChainTx pre ApricotPhase3",
 			cfgAndChainTimeF: func() (*config.Config, time.Time) {
-				eForkTime := time.Now().Truncate(time.Second)
-				chainTime := eForkTime.Add(-1 * time.Second)
+				apricotPhase3Time := time.Now().Truncate(time.Second)
+				chainTime := apricotPhase3Time.Add(-1 * time.Second)
+
+				cfg := feeTestsDefaultCfg
+				cfg.ApricotPhase3Time = apricotPhase3Time
+				cfg.DurangoTime = mockable.MaxTime
+				cfg.EUpgradeTime = mockable.MaxTime
+
+				return &cfg, chainTime
+			},
+			unsignedAndSignedTx: createChainTx,
+			expectedError:       nil,
+			checksF: func(t *testing.T, fc *Calculator) {
+				require.Equal(t, fc.config.CreateAssetTxFee, fc.Fee)
+			},
+		},
+		{
+			description: "CreateChainTx pre EUpgrade",
+			cfgAndChainTimeF: func() (*config.Config, time.Time) {
+				eUpgradeTime := time.Now().Truncate(time.Second)
+				chainTime := eUpgradeTime.Add(-1 * time.Second)
 
 				cfg := feeTestsDefaultCfg
 				cfg.DurangoTime = durangoTime
-				cfg.EUpgradeTime = eForkTime
+				cfg.EUpgradeTime = eUpgradeTime
 
 				return &cfg, chainTime
 			},
@@ -268,7 +289,7 @@ func TestTxFees(t *testing.T) {
 			},
 		},
 		{
-			description: "CreateChainTx post E fork, success",
+			description: "CreateChainTx post EUpgrade, success",
 			cfgAndChainTimeF: func() (*config.Config, time.Time) {
 				eForkTime := time.Now().Truncate(time.Second)
 				chainTime := eForkTime.Add(time.Second)
@@ -295,7 +316,7 @@ func TestTxFees(t *testing.T) {
 			},
 		},
 		{
-			description: "CreateChainTx post E fork, utxos read cap breached",
+			description: "CreateChainTx post EUpgrade, utxos read cap breached",
 			cfgAndChainTimeF: func() (*config.Config, time.Time) {
 				eForkTime := time.Now().Truncate(time.Second)
 				chainTime := eForkTime.Add(time.Second)
@@ -316,14 +337,33 @@ func TestTxFees(t *testing.T) {
 			checksF:       func(*testing.T, *Calculator) {},
 		},
 		{
-			description: "CreateSubnetTx pre E fork",
+			description: "CreateSubnetTx pre ApricotPhase3",
 			cfgAndChainTimeF: func() (*config.Config, time.Time) {
-				eForkTime := time.Now().Truncate(time.Second)
-				chainTime := eForkTime.Add(-1 * time.Second)
+				apricotPhase3Time := time.Now().Truncate(time.Second)
+				chainTime := apricotPhase3Time.Add(-1 * time.Second)
+
+				cfg := feeTestsDefaultCfg
+				cfg.ApricotPhase3Time = apricotPhase3Time
+				cfg.DurangoTime = mockable.MaxTime
+				cfg.EUpgradeTime = mockable.MaxTime
+
+				return &cfg, chainTime
+			},
+			unsignedAndSignedTx: createSubnetTx,
+			expectedError:       nil,
+			checksF: func(t *testing.T, fc *Calculator) {
+				require.Equal(t, fc.config.CreateAssetTxFee, fc.Fee)
+			},
+		},
+		{
+			description: "CreateSubnetTx pre EUpgrade",
+			cfgAndChainTimeF: func() (*config.Config, time.Time) {
+				eUpgradeTime := time.Now().Truncate(time.Second)
+				chainTime := eUpgradeTime.Add(-1 * time.Second)
 
 				cfg := feeTestsDefaultCfg
 				cfg.DurangoTime = durangoTime
-				cfg.EUpgradeTime = eForkTime
+				cfg.EUpgradeTime = eUpgradeTime
 
 				return &cfg, chainTime
 			},
@@ -334,7 +374,7 @@ func TestTxFees(t *testing.T) {
 			},
 		},
 		{
-			description: "CreateSubnetTx post E fork, success",
+			description: "CreateSubnetTx post EUpgrade, success",
 			cfgAndChainTimeF: func() (*config.Config, time.Time) {
 				eForkTime := time.Now().Truncate(time.Second)
 				chainTime := eForkTime.Add(time.Second)
@@ -361,7 +401,7 @@ func TestTxFees(t *testing.T) {
 			},
 		},
 		{
-			description: "CreateSubnetTx post E fork, utxos read cap breached",
+			description: "CreateSubnetTx post EUpgrade, utxos read cap breached",
 			cfgAndChainTimeF: func() (*config.Config, time.Time) {
 				eForkTime := time.Now().Truncate(time.Second)
 				chainTime := eForkTime.Add(time.Second)
@@ -382,14 +422,14 @@ func TestTxFees(t *testing.T) {
 			checksF:             func(*testing.T, *Calculator) {},
 		},
 		{
-			description: "RemoveSubnetValidatorTx pre E fork",
+			description: "RemoveSubnetValidatorTx pre EUpgrade",
 			cfgAndChainTimeF: func() (*config.Config, time.Time) {
-				eForkTime := time.Now().Truncate(time.Second)
-				chainTime := eForkTime.Add(-1 * time.Second)
+				eUpgradeTime := time.Now().Truncate(time.Second)
+				chainTime := eUpgradeTime.Add(-1 * time.Second)
 
 				cfg := feeTestsDefaultCfg
 				cfg.DurangoTime = durangoTime
-				cfg.EUpgradeTime = eForkTime
+				cfg.EUpgradeTime = eUpgradeTime
 
 				return &cfg, chainTime
 			},
@@ -400,7 +440,7 @@ func TestTxFees(t *testing.T) {
 			},
 		},
 		{
-			description: "RemoveSubnetValidatorTx post E fork, success",
+			description: "RemoveSubnetValidatorTx post EUpgrade, success",
 			cfgAndChainTimeF: func() (*config.Config, time.Time) {
 				eForkTime := time.Now().Truncate(time.Second)
 				chainTime := eForkTime.Add(time.Second)
@@ -427,7 +467,7 @@ func TestTxFees(t *testing.T) {
 			},
 		},
 		{
-			description: "RemoveSubnetValidatorTx post E fork, utxos read cap breached",
+			description: "RemoveSubnetValidatorTx post EUpgrade, utxos read cap breached",
 			cfgAndChainTimeF: func() (*config.Config, time.Time) {
 				eForkTime := time.Now().Truncate(time.Second)
 				chainTime := eForkTime.Add(time.Second)
@@ -448,14 +488,14 @@ func TestTxFees(t *testing.T) {
 			checksF:             func(*testing.T, *Calculator) {},
 		},
 		{
-			description: "TransformSubnetTx pre E fork",
+			description: "TransformSubnetTx pre EUpgrade",
 			cfgAndChainTimeF: func() (*config.Config, time.Time) {
-				eForkTime := time.Now().Truncate(time.Second)
-				chainTime := eForkTime.Add(-1 * time.Second)
+				eUpgradeTime := time.Now().Truncate(time.Second)
+				chainTime := eUpgradeTime.Add(-1 * time.Second)
 
 				cfg := feeTestsDefaultCfg
 				cfg.DurangoTime = durangoTime
-				cfg.EUpgradeTime = eForkTime
+				cfg.EUpgradeTime = eUpgradeTime
 
 				return &cfg, chainTime
 			},
@@ -466,7 +506,7 @@ func TestTxFees(t *testing.T) {
 			},
 		},
 		{
-			description: "TransformSubnetTx post E fork, success",
+			description: "TransformSubnetTx post EUpgrade, success",
 			cfgAndChainTimeF: func() (*config.Config, time.Time) {
 				eForkTime := time.Now().Truncate(time.Second)
 				chainTime := eForkTime.Add(time.Second)
@@ -493,7 +533,7 @@ func TestTxFees(t *testing.T) {
 			},
 		},
 		{
-			description: "TransformSubnetTx post E fork, utxos read cap breached",
+			description: "TransformSubnetTx post EUpgrade, utxos read cap breached",
 			cfgAndChainTimeF: func() (*config.Config, time.Time) {
 				eForkTime := time.Now().Truncate(time.Second)
 				chainTime := eForkTime.Add(time.Second)
@@ -514,14 +554,14 @@ func TestTxFees(t *testing.T) {
 			checksF:             func(*testing.T, *Calculator) {},
 		},
 		{
-			description: "TransferSubnetOwnershipTx pre E fork",
+			description: "TransferSubnetOwnershipTx pre EUpgrade",
 			cfgAndChainTimeF: func() (*config.Config, time.Time) {
-				eForkTime := time.Now().Truncate(time.Second)
-				chainTime := eForkTime.Add(-1 * time.Second)
+				eUpgradeTime := time.Now().Truncate(time.Second)
+				chainTime := eUpgradeTime.Add(-1 * time.Second)
 
 				cfg := feeTestsDefaultCfg
 				cfg.DurangoTime = durangoTime
-				cfg.EUpgradeTime = eForkTime
+				cfg.EUpgradeTime = eUpgradeTime
 
 				return &cfg, chainTime
 			},
@@ -532,7 +572,7 @@ func TestTxFees(t *testing.T) {
 			},
 		},
 		{
-			description: "TransferSubnetOwnershipTx post E fork, success",
+			description: "TransferSubnetOwnershipTx post EUpgrade, success",
 			cfgAndChainTimeF: func() (*config.Config, time.Time) {
 				eForkTime := time.Now().Truncate(time.Second)
 				chainTime := eForkTime.Add(time.Second)
@@ -559,7 +599,7 @@ func TestTxFees(t *testing.T) {
 			},
 		},
 		{
-			description: "TransferSubnetOwnershipTx post E fork, utxos read cap breached",
+			description: "TransferSubnetOwnershipTx post EUpgrade, utxos read cap breached",
 			cfgAndChainTimeF: func() (*config.Config, time.Time) {
 				eForkTime := time.Now().Truncate(time.Second)
 				chainTime := eForkTime.Add(time.Second)
@@ -580,25 +620,49 @@ func TestTxFees(t *testing.T) {
 			checksF:             func(*testing.T, *Calculator) {},
 		},
 		{
-			description: "AddPermissionlessValidatorTx pre E fork",
+			description: "AddPermissionlessValidatorTx Primary Network pre EUpgrade",
 			cfgAndChainTimeF: func() (*config.Config, time.Time) {
-				eForkTime := time.Now().Truncate(time.Second)
-				chainTime := eForkTime.Add(-1 * time.Second)
+				eUpgradeTime := time.Now().Truncate(time.Second)
+				chainTime := eUpgradeTime.Add(-1 * time.Second)
 
 				cfg := feeTestsDefaultCfg
 				cfg.DurangoTime = durangoTime
-				cfg.EUpgradeTime = eForkTime
+				cfg.EUpgradeTime = eUpgradeTime
 
 				return &cfg, chainTime
 			},
-			unsignedAndSignedTx: addPermissionlessValidatorTx,
-			expectedError:       nil,
+			unsignedAndSignedTx: func(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
+				return addPermissionlessValidatorTx(t, constants.PrimaryNetworkID)
+			},
+			expectedError: nil,
+			checksF: func(t *testing.T, fc *Calculator) {
+				require.Equal(t, fc.config.AddPrimaryNetworkValidatorFee, fc.Fee)
+			},
+		},
+		{
+			description: "AddPermissionlessValidatorTx Subnet pre EUpgrade",
+			cfgAndChainTimeF: func() (*config.Config, time.Time) {
+				eUpgradeTime := time.Now().Truncate(time.Second)
+				chainTime := eUpgradeTime.Add(-1 * time.Second)
+
+				cfg := feeTestsDefaultCfg
+				cfg.DurangoTime = durangoTime
+				cfg.EUpgradeTime = eUpgradeTime
+
+				return &cfg, chainTime
+			},
+			unsignedAndSignedTx: func(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
+				subnetID := ids.GenerateTestID()
+				require.NotEqual(t, constants.PrimaryNetworkID, subnetID)
+				return addPermissionlessValidatorTx(t, subnetID)
+			},
+			expectedError: nil,
 			checksF: func(t *testing.T, fc *Calculator) {
 				require.Equal(t, fc.config.AddSubnetValidatorFee, fc.Fee)
 			},
 		},
 		{
-			description: "AddPermissionlessValidatorTx post E fork, success",
+			description: "AddPermissionlessValidatorTx Primary Network post EUpgrade, success",
 			cfgAndChainTimeF: func() (*config.Config, time.Time) {
 				eForkTime := time.Now().Truncate(time.Second)
 				chainTime := eForkTime.Add(time.Second)
@@ -609,8 +673,10 @@ func TestTxFees(t *testing.T) {
 
 				return &cfg, chainTime
 			},
-			unsignedAndSignedTx: addPermissionlessValidatorTx,
-			expectedError:       nil,
+			unsignedAndSignedTx: func(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
+				return addPermissionlessValidatorTx(t, constants.PrimaryNetworkID)
+			},
+			expectedError: nil,
 			checksF: func(t *testing.T, fc *Calculator) {
 				require.Equal(t, 5939*units.MicroAvax, fc.Fee)
 				require.Equal(t,
@@ -625,7 +691,38 @@ func TestTxFees(t *testing.T) {
 			},
 		},
 		{
-			description: "AddPermissionlessValidatorTx post E fork, utxos read cap breached",
+			description: "AddPermissionlessValidatorTx Subnet post EUpgrade, success",
+			cfgAndChainTimeF: func() (*config.Config, time.Time) {
+				eForkTime := time.Now().Truncate(time.Second)
+				chainTime := eForkTime.Add(time.Second)
+
+				cfg := feeTestsDefaultCfg
+				cfg.DurangoTime = durangoTime
+				cfg.EUpgradeTime = eForkTime
+
+				return &cfg, chainTime
+			},
+			unsignedAndSignedTx: func(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
+				subnetID := ids.GenerateTestID()
+				require.NotEqual(t, constants.PrimaryNetworkID, subnetID)
+				return addPermissionlessValidatorTx(t, subnetID)
+			},
+			expectedError: nil,
+			checksF: func(t *testing.T, fc *Calculator) {
+				require.Equal(t, 5939*units.MicroAvax, fc.Fee)
+				require.Equal(t,
+					fees.Dimensions{
+						961,
+						90,
+						266,
+						1000,
+					},
+					fc.feeManager.GetCumulatedComplexity(),
+				)
+			},
+		},
+		{
+			description: "AddPermissionlessValidatorTx post EUpgrade, utxos read cap breached",
 			cfgAndChainTimeF: func() (*config.Config, time.Time) {
 				eForkTime := time.Now().Truncate(time.Second)
 				chainTime := eForkTime.Add(time.Second)
@@ -641,30 +738,57 @@ func TestTxFees(t *testing.T) {
 				caps[fees.UTXORead] = 90 - 1
 				return caps
 			},
-			unsignedAndSignedTx: addPermissionlessValidatorTx,
-			expectedError:       errFailedComplexityCumulation,
-			checksF:             func(*testing.T, *Calculator) {},
+			unsignedAndSignedTx: func(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
+				subnetID := ids.GenerateTestID()
+				return addPermissionlessValidatorTx(t, subnetID)
+			},
+			expectedError: errFailedComplexityCumulation,
+			checksF:       func(*testing.T, *Calculator) {},
 		},
 		{
-			description: "AddPermissionlessDelegatorTx pre E fork",
+			description: "AddPermissionlessDelegatorTx Primary Network pre EUpgrade",
 			cfgAndChainTimeF: func() (*config.Config, time.Time) {
-				eForkTime := time.Now().Truncate(time.Second)
-				chainTime := eForkTime.Add(-1 * time.Second)
+				eUpgradeTime := time.Now().Truncate(time.Second)
+				chainTime := eUpgradeTime.Add(-1 * time.Second)
 
 				cfg := feeTestsDefaultCfg
 				cfg.DurangoTime = durangoTime
-				cfg.EUpgradeTime = eForkTime
+				cfg.EUpgradeTime = eUpgradeTime
 
 				return &cfg, chainTime
 			},
-			unsignedAndSignedTx: addPermissionlessDelegatorTx,
-			expectedError:       nil,
+			unsignedAndSignedTx: func(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
+				return addPermissionlessDelegatorTx(t, constants.PrimaryNetworkID)
+			},
+			expectedError: nil,
+			checksF: func(t *testing.T, fc *Calculator) {
+				require.Equal(t, fc.config.AddPrimaryNetworkDelegatorFee, fc.Fee)
+			},
+		},
+		{
+			description: "AddPermissionlessDelegatorTx pre EUpgrade",
+			cfgAndChainTimeF: func() (*config.Config, time.Time) {
+				eUpgradeTime := time.Now().Truncate(time.Second)
+				chainTime := eUpgradeTime.Add(-1 * time.Second)
+
+				cfg := feeTestsDefaultCfg
+				cfg.DurangoTime = durangoTime
+				cfg.EUpgradeTime = eUpgradeTime
+
+				return &cfg, chainTime
+			},
+			unsignedAndSignedTx: func(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
+				subnetID := ids.GenerateTestID()
+				require.NotEqual(t, constants.PrimaryNetworkID, subnetID)
+				return addPermissionlessDelegatorTx(t, subnetID)
+			},
+			expectedError: nil,
 			checksF: func(t *testing.T, fc *Calculator) {
 				require.Equal(t, fc.config.AddSubnetDelegatorFee, fc.Fee)
 			},
 		},
 		{
-			description: "AddPermissionlessDelegatorTx post E fork, success",
+			description: "AddPermissionlessDelegatorTx Primary Network post EUpgrade, success",
 			cfgAndChainTimeF: func() (*config.Config, time.Time) {
 				eForkTime := time.Now().Truncate(time.Second)
 				chainTime := eForkTime.Add(time.Second)
@@ -675,8 +799,10 @@ func TestTxFees(t *testing.T) {
 
 				return &cfg, chainTime
 			},
-			unsignedAndSignedTx: addPermissionlessDelegatorTx,
-			expectedError:       nil,
+			unsignedAndSignedTx: func(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
+				return addPermissionlessDelegatorTx(t, constants.PrimaryNetworkID)
+			},
+			expectedError: nil,
 			checksF: func(t *testing.T, fc *Calculator) {
 				require.Equal(t, 5747*units.MicroAvax, fc.Fee)
 				require.Equal(t,
@@ -691,7 +817,36 @@ func TestTxFees(t *testing.T) {
 			},
 		},
 		{
-			description: "AddPermissionlessDelegatorTx post E fork, utxos read cap breached",
+			description: "AddPermissionlessDelegatorTx Subnet post EUpgrade, success",
+			cfgAndChainTimeF: func() (*config.Config, time.Time) {
+				eForkTime := time.Now().Truncate(time.Second)
+				chainTime := eForkTime.Add(time.Second)
+
+				cfg := feeTestsDefaultCfg
+				cfg.DurangoTime = durangoTime
+				cfg.EUpgradeTime = eForkTime
+
+				return &cfg, chainTime
+			},
+			unsignedAndSignedTx: func(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
+				return addPermissionlessDelegatorTx(t, constants.PrimaryNetworkID)
+			},
+			expectedError: nil,
+			checksF: func(t *testing.T, fc *Calculator) {
+				require.Equal(t, 5747*units.MicroAvax, fc.Fee)
+				require.Equal(t,
+					fees.Dimensions{
+						769,
+						90,
+						266,
+						1000,
+					},
+					fc.feeManager.GetCumulatedComplexity(),
+				)
+			},
+		},
+		{
+			description: "AddPermissionlessDelegatorTx Subnet post EUpgrade, utxos read cap breached",
 			cfgAndChainTimeF: func() (*config.Config, time.Time) {
 				eForkTime := time.Now().Truncate(time.Second)
 				chainTime := eForkTime.Add(time.Second)
@@ -707,19 +862,23 @@ func TestTxFees(t *testing.T) {
 				caps[fees.UTXORead] = 90 - 1
 				return caps
 			},
-			unsignedAndSignedTx: addPermissionlessDelegatorTx,
-			expectedError:       errFailedComplexityCumulation,
-			checksF:             func(*testing.T, *Calculator) {},
+			unsignedAndSignedTx: func(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
+				subnetID := ids.GenerateTestID()
+				require.NotEqual(t, constants.PrimaryNetworkID, subnetID)
+				return addPermissionlessValidatorTx(t, subnetID)
+			},
+			expectedError: errFailedComplexityCumulation,
+			checksF:       func(*testing.T, *Calculator) {},
 		},
 		{
-			description: "BaseTx pre E fork",
+			description: "BaseTx pre EUpgrade",
 			cfgAndChainTimeF: func() (*config.Config, time.Time) {
-				eForkTime := time.Now().Truncate(time.Second)
-				chainTime := eForkTime.Add(-1 * time.Second)
+				eUpgradeTime := time.Now().Truncate(time.Second)
+				chainTime := eUpgradeTime.Add(-1 * time.Second)
 
 				cfg := feeTestsDefaultCfg
 				cfg.DurangoTime = durangoTime
-				cfg.EUpgradeTime = eForkTime
+				cfg.EUpgradeTime = eUpgradeTime
 
 				return &cfg, chainTime
 			},
@@ -730,7 +889,7 @@ func TestTxFees(t *testing.T) {
 			},
 		},
 		{
-			description: "BaseTx post E fork, success",
+			description: "BaseTx post EUpgrade, success",
 			cfgAndChainTimeF: func() (*config.Config, time.Time) {
 				eForkTime := time.Now().Truncate(time.Second)
 				chainTime := eForkTime.Add(time.Second)
@@ -757,7 +916,7 @@ func TestTxFees(t *testing.T) {
 			},
 		},
 		{
-			description: "BaseTx post E fork, utxos read cap breached",
+			description: "BaseTx post EUpgrade, utxos read cap breached",
 			cfgAndChainTimeF: func() (*config.Config, time.Time) {
 				eForkTime := time.Now().Truncate(time.Second)
 				chainTime := eForkTime.Add(time.Second)
@@ -778,14 +937,14 @@ func TestTxFees(t *testing.T) {
 			checksF:             func(*testing.T, *Calculator) {},
 		},
 		{
-			description: "ImportTx pre E fork",
+			description: "ImportTx pre EUpgrade",
 			cfgAndChainTimeF: func() (*config.Config, time.Time) {
-				eForkTime := time.Now().Truncate(time.Second)
-				chainTime := eForkTime.Add(-1 * time.Second)
+				eUpgradeTime := time.Now().Truncate(time.Second)
+				chainTime := eUpgradeTime.Add(-1 * time.Second)
 
 				cfg := feeTestsDefaultCfg
 				cfg.DurangoTime = durangoTime
-				cfg.EUpgradeTime = eForkTime
+				cfg.EUpgradeTime = eUpgradeTime
 
 				return &cfg, chainTime
 			},
@@ -796,7 +955,7 @@ func TestTxFees(t *testing.T) {
 			},
 		},
 		{
-			description: "ImportTx post E fork, success",
+			description: "ImportTx post EUpgrade, success",
 			cfgAndChainTimeF: func() (*config.Config, time.Time) {
 				eForkTime := time.Now().Truncate(time.Second)
 				chainTime := eForkTime.Add(time.Second)
@@ -823,7 +982,7 @@ func TestTxFees(t *testing.T) {
 			},
 		},
 		{
-			description: "ImportTx post E fork, utxos read cap breached",
+			description: "ImportTx post EUpgrade, utxos read cap breached",
 			cfgAndChainTimeF: func() (*config.Config, time.Time) {
 				eForkTime := time.Now().Truncate(time.Second)
 				chainTime := eForkTime.Add(time.Second)
@@ -844,14 +1003,14 @@ func TestTxFees(t *testing.T) {
 			checksF:             func(*testing.T, *Calculator) {},
 		},
 		{
-			description: "ExportTx pre E fork",
+			description: "ExportTx pre EUpgrade",
 			cfgAndChainTimeF: func() (*config.Config, time.Time) {
-				eForkTime := time.Now().Truncate(time.Second)
-				chainTime := eForkTime.Add(-1 * time.Second)
+				eUpgradeTime := time.Now().Truncate(time.Second)
+				chainTime := eUpgradeTime.Add(-1 * time.Second)
 
 				cfg := feeTestsDefaultCfg
 				cfg.DurangoTime = durangoTime
-				cfg.EUpgradeTime = eForkTime
+				cfg.EUpgradeTime = eUpgradeTime
 
 				return &cfg, chainTime
 			},
@@ -862,7 +1021,7 @@ func TestTxFees(t *testing.T) {
 			},
 		},
 		{
-			description: "ExportTx post E fork, success",
+			description: "ExportTx post EUpgrade, success",
 			cfgAndChainTimeF: func() (*config.Config, time.Time) {
 				eForkTime := time.Now().Truncate(time.Second)
 				chainTime := eForkTime.Add(time.Second)
@@ -889,7 +1048,7 @@ func TestTxFees(t *testing.T) {
 			},
 		},
 		{
-			description: "ExportTx post E fork, utxos read cap breached",
+			description: "ExportTx post EUpgrade, utxos read cap breached",
 			cfgAndChainTimeF: func() (*config.Config, time.Time) {
 				eForkTime := time.Now().Truncate(time.Second)
 				chainTime := eForkTime.Add(time.Second)
@@ -908,6 +1067,50 @@ func TestTxFees(t *testing.T) {
 			unsignedAndSignedTx: exportTx,
 			expectedError:       errFailedComplexityCumulation,
 			checksF:             func(*testing.T, *Calculator) {},
+		},
+		{
+			description: "RewardValidatorTx pre EUpgrade",
+			cfgAndChainTimeF: func() (*config.Config, time.Time) {
+				eUpgradeTime := time.Now().Truncate(time.Second)
+				chainTime := eUpgradeTime.Add(-1 * time.Second)
+
+				cfg := feeTestsDefaultCfg
+				cfg.DurangoTime = durangoTime
+				cfg.EUpgradeTime = eUpgradeTime
+
+				return &cfg, chainTime
+			},
+			unsignedAndSignedTx: func(_ *testing.T) (txs.UnsignedTx, *txs.Tx) {
+				return &txs.RewardValidatorTx{
+					TxID: ids.GenerateTestID(),
+				}, nil
+			},
+			expectedError: nil,
+			checksF: func(t *testing.T, fc *Calculator) {
+				require.Equal(t, uint64(0), fc.Fee)
+			},
+		},
+		{
+			description: "AdvanceTimeTx pre EUpgrade",
+			cfgAndChainTimeF: func() (*config.Config, time.Time) {
+				eUpgradeTime := time.Now().Truncate(time.Second)
+				chainTime := eUpgradeTime.Add(-1 * time.Second)
+
+				cfg := feeTestsDefaultCfg
+				cfg.DurangoTime = durangoTime
+				cfg.EUpgradeTime = eUpgradeTime
+
+				return &cfg, chainTime
+			},
+			unsignedAndSignedTx: func(_ *testing.T) (txs.UnsignedTx, *txs.Tx) {
+				return &txs.AdvanceTimeTx{
+					Time: uint64(time.Now().Unix()),
+				}, nil
+			},
+			expectedError: nil,
+			checksF: func(t *testing.T, fc *Calculator) {
+				require.Equal(t, uint64(0), fc.Fee)
+			},
 		},
 	}
 
@@ -1124,7 +1327,7 @@ func transferSubnetOwnershipTx(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
 	return uTx, sTx
 }
 
-func addPermissionlessValidatorTx(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
+func addPermissionlessValidatorTx(t *testing.T, subnetID ids.ID) (txs.UnsignedTx, *txs.Tx) {
 	r := require.New(t)
 
 	defaultCtx := snowtest.Context(t, snowtest.PChainID)
@@ -1134,7 +1337,7 @@ func addPermissionlessValidatorTx(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
 	r.NoError(err)
 	uTx := &txs.AddPermissionlessValidatorTx{
 		BaseTx:    baseTx,
-		Subnet:    ids.GenerateTestID(),
+		Subnet:    subnetID,
 		Signer:    signer.NewProofOfPossession(sk),
 		StakeOuts: stakes,
 		ValidatorRewardsOwner: &secp256k1fx.OutputOwners{
@@ -1158,7 +1361,7 @@ func addPermissionlessValidatorTx(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
 	return uTx, sTx
 }
 
-func addPermissionlessDelegatorTx(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
+func addPermissionlessDelegatorTx(t *testing.T, subnetID ids.ID) (txs.UnsignedTx, *txs.Tx) {
 	r := require.New(t)
 
 	defaultCtx := snowtest.Context(t, snowtest.PChainID)
@@ -1172,7 +1375,7 @@ func addPermissionlessDelegatorTx(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
 			End:    12345 + 200*24*60*60,
 			Wght:   2 * units.KiloAvax,
 		},
-		Subnet:    ids.GenerateTestID(),
+		Subnet:    subnetID,
 		StakeOuts: stakes,
 		DelegationRewardsOwner: &secp256k1fx.OutputOwners{
 			Locktime:  0,

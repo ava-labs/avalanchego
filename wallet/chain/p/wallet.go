@@ -16,7 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fees"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/chain/p/builder"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
@@ -624,15 +624,15 @@ func (w *wallet) IssueTx(
 	return nil
 }
 
-func (w *wallet) feeCalculator(ctx *builder.Context, options ...common.Option) (*fees.Calculator, error) {
+func (w *wallet) feeCalculator(ctx *builder.Context, options ...common.Option) (*fee.Calculator, error) {
 	if err := w.refreshFeesData(ctx, options...); err != nil {
 		return nil, err
 	}
 
-	var feeCalculator *fees.Calculator
+	var feeCalculator *fee.Calculator
 	feeCfg := config.GetDynamicFeesConfig(w.isEForkActive)
 	feeMan := commonfees.NewManager(w.nextFeeRates)
-	feeCalculator = fees.NewDynamicCalculator(w.staticFeesConfig, logging.NoLog{}, time.Time{}, feeMan, feeCfg.BlockMaxComplexity, nil)
+	feeCalculator = fee.NewDynamicCalculator(w.staticFeesConfig, logging.NoLog{}, time.Time{}, feeMan, feeCfg.BlockMaxComplexity, nil)
 	return feeCalculator, nil
 }
 

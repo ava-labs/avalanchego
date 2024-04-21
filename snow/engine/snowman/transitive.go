@@ -109,7 +109,7 @@ func New(config Config) (*Transitive, error) {
 	}
 
 	acceptedFrontiers := tracker.NewAccepted()
-	config.Validators.RegisterCallbackListener(config.Ctx.SubnetID, acceptedFrontiers)
+	config.Validators.RegisterSetCallbackListener(config.Ctx.SubnetID, acceptedFrontiers)
 
 	factory := poll.NewEarlyTermNoTraversalFactory(
 		config.Params.AlphaPreference,
@@ -471,7 +471,8 @@ func (t *Transitive) Start(ctx context.Context, startReqID uint32) error {
 	}
 
 	// initialize consensus to the last accepted blockID
-	if err := t.Consensus.Initialize(t.Ctx, t.Params, lastAcceptedID, lastAccepted.Height(), lastAccepted.Timestamp()); err != nil {
+	lastAcceptedHeight := lastAccepted.Height()
+	if err := t.Consensus.Initialize(t.Ctx, t.Params, lastAcceptedID, lastAcceptedHeight, lastAccepted.Timestamp()); err != nil {
 		return err
 	}
 
@@ -501,8 +502,9 @@ func (t *Transitive) Start(ctx context.Context, startReqID uint32) error {
 		return err
 	}
 
-	t.Ctx.Log.Info("consensus starting",
-		zap.Stringer("lastAcceptedBlock", lastAcceptedID),
+	t.Ctx.Log.Info("starting consensus",
+		zap.Stringer("lastAcceptedID", lastAcceptedID),
+		zap.Uint64("lastAcceptedHeight", lastAcceptedHeight),
 	)
 	t.metrics.bootstrapFinished.Set(1)
 

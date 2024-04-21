@@ -19,7 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fees"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -30,7 +30,7 @@ import (
 // Ensure Execute fails when there are not enough control sigs
 func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, banff)
+	env := newEnvironment(t, eUpgrade)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
@@ -46,16 +46,23 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 	require.NoError(err)
 
 	// Remove a signature
-	tx.Creds[0].(*secp256k1fx.Credential).Sigs = tx.Creds[0].(*secp256k1fx.Credential).Sigs[1:]
+	tx.Creds[1].(*secp256k1fx.Credential).Sigs = tx.Creds[1].(*secp256k1fx.Credential).Sigs[1:]
 
 	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
-	chainTime := env.state.GetTimestamp()
-	feeCfg := config.GetDynamicFeesConfig(env.config.IsEActivated(chainTime))
+	currentTime := stateDiff.GetTimestamp()
+	nextBlkTime, _, err := state.NextBlockTime(stateDiff, env.clk)
+	require.NoError(err)
+
+	feeCfg := config.GetDynamicFeesConfig(env.config.IsEActivated(currentTime))
+
+	feeMan, err := fee.UpdatedFeeManager(stateDiff, env.config, currentTime, nextBlkTime)
+	require.NoError(err)
+
 	executor := StandardTxExecutor{
 		Backend:            &env.backend,
-		BlkFeeManager:      commonfees.NewManager(feeCfg.InitialFeeRate),
+		BlkFeeManager:      feeMan,
 		BlockMaxComplexity: feeCfg.BlockMaxComplexity,
 		State:              stateDiff,
 		Tx:                 tx,
@@ -67,7 +74,7 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 // Ensure Execute fails when an incorrect control signature is given
 func TestCreateChainTxWrongControlSig(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, banff)
+	env := newEnvironment(t, eUpgrade)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
@@ -89,16 +96,23 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 	// Replace a valid signature with one from another key
 	sig, err := key.SignHash(hashing.ComputeHash256(tx.Unsigned.Bytes()))
 	require.NoError(err)
-	copy(tx.Creds[0].(*secp256k1fx.Credential).Sigs[0][:], sig)
+	copy(tx.Creds[1].(*secp256k1fx.Credential).Sigs[0][:], sig)
 
 	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
-	chainTime := stateDiff.GetTimestamp()
-	feeCfg := config.GetDynamicFeesConfig(env.config.IsEActivated(chainTime))
+	currentTime := stateDiff.GetTimestamp()
+	nextBlkTime, _, err := state.NextBlockTime(stateDiff, env.clk)
+	require.NoError(err)
+
+	feeCfg := config.GetDynamicFeesConfig(env.config.IsEActivated(currentTime))
+
+	feeMan, err := fee.UpdatedFeeManager(stateDiff, env.config, currentTime, nextBlkTime)
+	require.NoError(err)
+
 	executor := StandardTxExecutor{
 		Backend:            &env.backend,
-		BlkFeeManager:      commonfees.NewManager(feeCfg.InitialFeeRate),
+		BlkFeeManager:      feeMan,
 		BlockMaxComplexity: feeCfg.BlockMaxComplexity,
 		State:              stateDiff,
 		Tx:                 tx,
@@ -131,14 +145,18 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
-	feeRates, err := env.state.GetFeeRates()
+	currentTime := stateDiff.GetTimestamp()
+	nextBlkTime, _, err := state.NextBlockTime(stateDiff, env.clk)
 	require.NoError(err)
 
-	currentTime := stateDiff.GetTimestamp()
 	feeCfg := config.GetDynamicFeesConfig(env.config.IsEActivated(currentTime))
+
+	feeMan, err := fee.UpdatedFeeManager(stateDiff, env.config, currentTime, nextBlkTime)
+	require.NoError(err)
+
 	executor := StandardTxExecutor{
 		Backend:            &env.backend,
-		BlkFeeManager:      commonfees.NewManager(feeRates),
+		BlkFeeManager:      feeMan,
 		BlockMaxComplexity: feeCfg.BlockMaxComplexity,
 		State:              stateDiff,
 		Tx:                 tx,
@@ -174,7 +192,7 @@ func TestCreateChainTxValid(t *testing.T) {
 
 	feeCfg := config.GetDynamicFeesConfig(env.config.IsEActivated(currentTime))
 
-	feeMan, err := fees.UpdatedFeeManager(stateDiff, env.config, currentTime, nextBlkTime)
+	feeMan, err := fee.UpdatedFeeManager(stateDiff, env.config, currentTime, nextBlkTime)
 	require.NoError(err)
 
 	executor := StandardTxExecutor{

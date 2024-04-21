@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -17,8 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fees"
-	"go.uber.org/zap"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 
 	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
@@ -545,7 +546,7 @@ func (v *verifier) processStandardTxs(
 
 	// feeMan := commonfees.NewManager(feeRates)
 	// if isEActive { // FOR TESTING, METER AND UPDATE FEES EVEN PRE-E-FORK
-	feeMan, err := fees.UpdatedFeeManager(state, v.txExecutorBackend.Config, parentBlkTime, blkTimestamp)
+	feeMan, err := fee.UpdatedFeeManager(state, v.txExecutorBackend.Config, parentBlkTime, blkTimestamp)
 	if err != nil {
 		return nil, nil, nil, nil, 0, err
 	}

@@ -17,7 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fees"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/chain/p/builder"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
@@ -55,7 +55,10 @@ func (b *Builder) NewImportTx(
 	tipPercentage commonfees.TipPercentage,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	pBuilder, pSigner := b.builders(keys)
+	pBuilder, pSigner, err := b.builders(keys)
+	if err != nil {
+		return nil, err
+	}
 	feeCalc, err := b.feeCalculator()
 	if err != nil {
 		return nil, err
@@ -86,7 +89,10 @@ func (b *Builder) NewExportTx(
 	tipPercentage commonfees.TipPercentage,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	pBuilder, pSigner := b.builders(keys)
+	pBuilder, pSigner, err := b.builders(keys)
+	if err != nil {
+		return nil, err
+	}
 	feeCalc, err := b.feeCalculator()
 	if err != nil {
 		return nil, err
@@ -120,7 +126,10 @@ func (b *Builder) NewCreateChainTx(
 	tipPercentage commonfees.TipPercentage,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	pBuilder, pSigner := b.builders(keys)
+	pBuilder, pSigner, err := b.builders(keys)
+	if err != nil {
+		return nil, err
+	}
 	feeCalc, err := b.feeCalculator()
 	if err != nil {
 		return nil, err
@@ -153,7 +162,10 @@ func (b *Builder) NewCreateSubnetTx(
 	tipPercentage commonfees.TipPercentage,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	pBuilder, pSigner := b.builders(keys)
+	pBuilder, pSigner, err := b.builders(keys)
+	if err != nil {
+		return nil, err
+	}
 	feeCalc, err := b.feeCalculator()
 	if err != nil {
 		return nil, err
@@ -195,7 +207,10 @@ func (b *Builder) NewTransformSubnetTx(
 	tipPercentage commonfees.TipPercentage,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	pBuilder, pSigner := b.builders(keys)
+	pBuilder, pSigner, err := b.builders(keys)
+	if err != nil {
+		return nil, err
+	}
 	feeCalc, err := b.feeCalculator()
 	if err != nil {
 		return nil, err
@@ -239,7 +254,10 @@ func (b *Builder) NewAddValidatorTx(
 	tipPercentage commonfees.TipPercentage,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	pBuilder, pSigner := b.builders(keys)
+	pBuilder, pSigner, err := b.builders(keys)
+	if err != nil {
+		return nil, err
+	}
 	feeCalc, err := b.feeCalculator()
 	if err != nil {
 		return nil, err
@@ -275,7 +293,10 @@ func (b *Builder) NewAddPermissionlessValidatorTx(
 	tipPercentage commonfees.TipPercentage,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	pBuilder, pSigner := b.builders(keys)
+	pBuilder, pSigner, err := b.builders(keys)
+	if err != nil {
+		return nil, err
+	}
 	feeCalc, err := b.feeCalculator()
 	if err != nil {
 		return nil, err
@@ -310,7 +331,10 @@ func (b *Builder) NewAddDelegatorTx(
 	tipPercentage commonfees.TipPercentage,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	pBuilder, pSigner := b.builders(keys)
+	pBuilder, pSigner, err := b.builders(keys)
+	if err != nil {
+		return nil, err
+	}
 	feeCalc, err := b.feeCalculator()
 	if err != nil {
 		return nil, err
@@ -342,7 +366,10 @@ func (b *Builder) NewAddPermissionlessDelegatorTx(
 	tipPercentage commonfees.TipPercentage,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	pBuilder, pSigner := b.builders(keys)
+	pBuilder, pSigner, err := b.builders(keys)
+	if err != nil {
+		return nil, err
+	}
 	feeCalc, err := b.feeCalculator()
 	if err != nil {
 		return nil, err
@@ -373,7 +400,10 @@ func (b *Builder) NewAddSubnetValidatorTx(
 	tipPercentage commonfees.TipPercentage,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	pBuilder, pSigner := b.builders(keys)
+	pBuilder, pSigner, err := b.builders(keys)
+	if err != nil {
+		return nil, err
+	}
 	feeCalc, err := b.feeCalculator()
 	if err != nil {
 		return nil, err
@@ -403,7 +433,10 @@ func (b *Builder) NewRemoveSubnetValidatorTx(
 	tipPercentage commonfees.TipPercentage,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	pBuilder, pSigner := b.builders(keys)
+	pBuilder, pSigner, err := b.builders(keys)
+	if err != nil {
+		return nil, err
+	}
 	feeCalc, err := b.feeCalculator()
 	if err != nil {
 		return nil, err
@@ -434,7 +467,10 @@ func (b *Builder) NewTransferSubnetOwnershipTx(
 	tipPercentage commonfees.TipPercentage,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	pBuilder, pSigner := b.builders(keys)
+	pBuilder, pSigner, err := b.builders(keys)
+	if err != nil {
+		return nil, err
+	}
 	feeCalc, err := b.feeCalculator()
 	if err != nil {
 		return nil, err
@@ -464,7 +500,10 @@ func (b *Builder) NewBaseTx(
 	tipPercentage commonfees.TipPercentage,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	pBuilder, pSigner := b.builders(keys)
+	pBuilder, pSigner, err := b.builders(keys)
+	if err != nil {
+		return nil, err
+	}
 	feeCalc, err := b.feeCalculator()
 	if err != nil {
 		return nil, err
@@ -487,37 +526,41 @@ func (b *Builder) NewBaseTx(
 	return walletsigner.SignUnsigned(context.Background(), pSigner, utx)
 }
 
-func (b *Builder) builders(keys []*secp256k1.PrivateKey) (builder.Builder, walletsigner.Signer) {
+func (b *Builder) builders(keys []*secp256k1.PrivateKey) (builder.Builder, walletsigner.Signer, error) {
 	var (
 		kc      = secp256k1fx.NewKeychain(keys...)
 		addrs   = kc.Addresses()
 		backend = newBackend(addrs, b.state, b.ctx.SharedMemory)
-		context = newContext(b.ctx, b.cfg, b.state.GetTimestamp())
-		builder = builder.New(addrs, context, backend)
-		signer  = walletsigner.New(kc, backend)
 	)
 
-	return builder, signer
+	context, err := newContext(b.ctx, b.cfg, b.state.GetTimestamp())
+	if err != nil {
+		return nil, nil, err
+	}
+
+	builder := builder.New(addrs, context, backend)
+	signer := walletsigner.New(kc, backend)
+	return builder, signer, nil
 }
 
-func (b *Builder) feeCalculator() (*fees.Calculator, error) {
+func (b *Builder) feeCalculator() (*fee.Calculator, error) {
 	var (
 		chainTime = b.state.GetTimestamp()
 		isEActive = b.cfg.IsEActivated(chainTime)
 	)
 
-	var feeCalculator *fees.Calculator
+	var feeCalculator *fee.Calculator
 	nextChainTime, _, err := state.NextBlockTime(b.state, b.clk)
 	if err != nil {
 		return nil, fmt.Errorf("failed calculating next block time: %w", err)
 	}
 
-	feeManager, err := fees.UpdatedFeeManager(b.state, b.cfg, chainTime, nextChainTime)
+	feeManager, err := fee.UpdatedFeeManager(b.state, b.cfg, chainTime, nextChainTime)
 	if err != nil {
 		return nil, err
 	}
 
 	feeCfg := config.GetDynamicFeesConfig(isEActive)
-	feeCalculator = fees.NewDynamicCalculator(b.cfg, logging.NoLog{}, chainTime, feeManager, feeCfg.BlockMaxComplexity, nil)
+	feeCalculator = fee.NewDynamicCalculator(b.cfg, logging.NoLog{}, chainTime, feeManager, feeCfg.BlockMaxComplexity, nil)
 	return feeCalculator, nil
 }

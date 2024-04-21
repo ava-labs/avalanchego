@@ -11,7 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fees"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 
 	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
@@ -103,18 +103,18 @@ func (r *rejector) rejectBlock(b block.Block, blockType string) error {
 			return err
 		}
 
-		feeManager, err = fees.UpdatedFeeManager(preferredState, cfg, currentTimestamp, nextBlkTime)
+		feeManager, err = fee.UpdatedFeeManager(preferredState, cfg, currentTimestamp, nextBlkTime)
 		if err != nil {
 			return err
 		}
 	}
 
 	for _, tx := range b.Txs() {
-		// With dynamic fees, the rejected txs may not be able to pay the updated required fees.
+		// With dynamic fees, the rejected txs may not be able to pay the updated required fee.
 		// We recheck only the fees, withouth re-validating the whole transaction.
 		feeManager.ResetComplexity()
 
-		feeCalculator := fees.NewDynamicCalculator(cfg, logging.NoLog{}, currentTimestamp, feeManager, feesCfg.BlockMaxComplexity, tx.Creds)
+		feeCalculator := fee.NewDynamicCalculator(cfg, logging.NoLog{}, currentTimestamp, feeManager, feesCfg.BlockMaxComplexity, tx.Creds)
 
 		if err := tx.Unsigned.Visit(feeCalculator); err != nil {
 			r.ctx.Log.Info(

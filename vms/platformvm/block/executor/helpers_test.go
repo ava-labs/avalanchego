@@ -5,6 +5,7 @@ package executor
 
 import (
 	"fmt"
+	"math/rand"
 	"testing"
 	"time"
 
@@ -35,7 +36,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/vms/components/fees"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
@@ -45,11 +46,13 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 	pvalidators "github.com/ava-labs/avalanchego/vms/platformvm/validators"
 	walletcommon "github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
@@ -58,15 +61,14 @@ const (
 	pending stakerStatus = iota
 	current
 
-	defaultWeight = 10000
-	trackChecksum = false
-
 	apricotPhase3 fork = iota
 	apricotPhase5
 	banff
 	cortina
 	durango
 	eUpgrade
+
+	latestFork = eUpgrade
 )
 
 var (
@@ -75,17 +77,24 @@ var (
 	defaultGenesisTime        = time.Date(1997, 1, 1, 0, 0, 0, 0, time.UTC)
 	defaultValidateStartTime  = defaultGenesisTime
 	defaultValidateEndTime    = defaultValidateStartTime.Add(10 * defaultMinStakingDuration)
-	defaultMinValidatorStake  = 5 * units.MilliAvax
-	defaultBalance            = 100 * defaultMinValidatorStake
-	preFundedKeys             = secp256k1.TestKeys()
-	avaxAssetID               = ids.ID{'y', 'e', 'e', 't'}
-	defaultTxFee              = uint64(100)
+
+	defaultMinValidatorStake = 5 * units.MilliAvax
+	defaultMaxValidatorStake = 500 * units.MilliAvax
+	defaultMinDelegatorStake = 1 * units.MilliAvax
+	defaultBalance           = 100 * defaultMinValidatorStake
+	defaultWeight            = defaultBalance / 2
+
+	preFundedKeys = secp256k1.TestKeys()
+	avaxAssetID   = ids.ID{'y', 'e', 'e', 't'}
+	defaultTxFee  = uint64(100)
 
 	genesisBlkID ids.ID
 	testSubnet1  *txs.Tx
 
 	// Node IDs of genesis validators. Initialized in init function
 	genesisNodeIDs []ids.NodeID
+
+	fundedSharedMemoryCalls byte
 )
 
 func init() {
@@ -98,6 +107,10 @@ func init() {
 type stakerStatus uint
 
 type fork uint8
+
+type mutableSharedMemory struct {
+	atomic.SharedMemory
+}
 
 type staker struct {
 	nodeID             ids.NodeID
@@ -124,6 +137,7 @@ type environment struct {
 	clk            *mockable.Clock
 	baseDB         *versiondb.Database
 	ctx            *snow.Context
+	msm            *mutableSharedMemory
 	fx             fx.Fx
 	state          state.State
 	mockedState    *state.MockState
@@ -148,6 +162,12 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller, f fork) *environment 
 	res.ctx = snowtest.Context(t, snowtest.PChainID)
 	res.ctx.AVAXAssetID = avaxAssetID
 	res.ctx.SharedMemory = m.NewSharedMemory(res.ctx.ChainID)
+
+	msm := &mutableSharedMemory{
+		SharedMemory: m.NewSharedMemory(res.ctx.ChainID),
+	}
+	res.ctx.SharedMemory = msm
+	res.msm = msm
 
 	res.fx = defaultFx(res.clk, res.ctx.Log, res.isBootstrapped.Get())
 
@@ -273,7 +293,7 @@ func addSubnet(env *environment) {
 			},
 		},
 		[]*secp256k1.PrivateKey{preFundedKeys[0]},
-		fees.NoTip,
+		commonfees.NoTip,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
@@ -290,16 +310,21 @@ func addSubnet(env *environment) {
 		panic(err)
 	}
 
-	feeRates, err := env.state.GetFeeRates()
+	chainTime := env.state.GetTimestamp()
+	nextChainTime, _, err := state.NextBlockTime(env.state, env.clk)
+	if err != nil {
+		panic(fmt.Errorf("failed calculating next block time: %w", err))
+	}
+
+	feeManager, err := fee.UpdatedFeeManager(env.state, env.config, chainTime, nextChainTime)
 	if err != nil {
 		panic(err)
 	}
 
-	chainTime := env.state.GetTimestamp()
 	feeCfg := config.GetDynamicFeesConfig(env.config.IsEActivated(chainTime))
 	executor := executor.StandardTxExecutor{
 		Backend:            env.backend,
-		BlkFeeManager:      fees.NewManager(feeRates),
+		BlkFeeManager:      feeManager,
 		BlockMaxComplexity: feeCfg.BlockMaxComplexity,
 		State:              stateDiff,
 		Tx:                 testSubnet1,
@@ -311,6 +336,9 @@ func addSubnet(env *environment) {
 
 	stateDiff.AddTx(testSubnet1, status.Committed)
 	if err := stateDiff.Apply(env.state); err != nil {
+		panic(err)
+	}
+	if err := env.state.Commit(); err != nil {
 		panic(err)
 	}
 }
@@ -354,9 +382,9 @@ func defaultConfig(t *testing.T, f fork) *config.Config {
 		TxFee:                  defaultTxFee,
 		CreateSubnetTxFee:      100 * defaultTxFee,
 		CreateBlockchainTxFee:  100 * defaultTxFee,
-		MinValidatorStake:      5 * units.MilliAvax,
-		MaxValidatorStake:      500 * units.MilliAvax,
-		MinDelegatorStake:      1 * units.MilliAvax,
+		MinValidatorStake:      defaultMinValidatorStake,
+		MaxValidatorStake:      defaultMaxValidatorStake,
+		MinDelegatorStake:      defaultMinDelegatorStake,
 		MinStakeDuration:       defaultMinStakingDuration,
 		MaxStakeDuration:       defaultMaxStakingDuration,
 		RewardConfig: reward.Config{
@@ -524,7 +552,7 @@ func addPendingValidator(
 		},
 		reward.PercentDenominator,
 		keys,
-		fees.NoTip,
+		commonfees.NoTip,
 	)
 	if err != nil {
 		return nil, err
@@ -546,4 +574,58 @@ func addPendingValidator(
 		return nil, err
 	}
 	return addPendingValidatorTx, nil
+}
+
+// Returns a shared memory where GetDatabase returns a database
+// where [recipientKey] has a balance of [amt]
+func fundedSharedMemory(
+	t *testing.T,
+	env *environment,
+	sourceKey *secp256k1.PrivateKey,
+	peerChain ids.ID,
+	assets map[ids.ID]uint64,
+) atomic.SharedMemory {
+	fundedSharedMemoryCalls++
+	m := atomic.NewMemory(prefixdb.New([]byte{fundedSharedMemoryCalls}, env.baseDB))
+
+	sm := m.NewSharedMemory(env.ctx.ChainID)
+	peerSharedMemory := m.NewSharedMemory(peerChain)
+
+	for assetID, amt := range assets {
+		// #nosec G404
+		utxo := &avax.UTXO{
+			UTXOID: avax.UTXOID{
+				TxID:        ids.GenerateTestID(),
+				OutputIndex: rand.Uint32(),
+			},
+			Asset: avax.Asset{ID: assetID},
+			Out: &secp256k1fx.TransferOutput{
+				Amt: amt,
+				OutputOwners: secp256k1fx.OutputOwners{
+					Locktime:  0,
+					Addrs:     []ids.ShortID{sourceKey.PublicKey().Address()},
+					Threshold: 1,
+				},
+			},
+		}
+		utxoBytes, err := txs.Codec.Marshal(txs.CodecVersion, utxo)
+		require.NoError(t, err)
+
+		inputID := utxo.InputID()
+		require.NoError(t, peerSharedMemory.Apply(map[ids.ID]*atomic.Requests{
+			env.ctx.ChainID: {
+				PutRequests: []*atomic.Element{
+					{
+						Key:   inputID[:],
+						Value: utxoBytes,
+						Traits: [][]byte{
+							sourceKey.PublicKey().Address().Bytes(),
+						},
+					},
+				},
+			},
+		}))
+	}
+
+	return sm
 }

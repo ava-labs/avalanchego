@@ -28,7 +28,7 @@ import (
 	pconfig "github.com/ava-labs/avalanchego/vms/platformvm/config"
 	psigner "github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	ptxs "github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	pfees "github.com/ava-labs/avalanchego/vms/platformvm/txs/fees"
+	pfees "github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	xbuilder "github.com/ava-labs/avalanchego/wallet/chain/x/builder"
 	ginkgo "github.com/onsi/ginkgo/v2"
 )

@@ -19,7 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fees"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 
 	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
@@ -76,7 +76,7 @@ func (e *StandardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 	}
 
 	// Verify the flowcheck
-	feeCalculator := fees.NewDynamicCalculator(e.Backend.Config, e.Backend.Ctx.Log, currentTimestamp, e.BlkFeeManager, e.BlockMaxComplexity, e.Tx.Creds)
+	feeCalculator := fee.NewDynamicCalculator(e.Backend.Config, e.Backend.Ctx.Log, currentTimestamp, e.BlkFeeManager, e.BlockMaxComplexity, e.Tx.Creds)
 
 	if err := tx.Visit(feeCalculator); err != nil {
 		return err
@@ -137,7 +137,7 @@ func (e *StandardTxExecutor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 	}
 
 	// Verify the flowcheck
-	feeCalculator := fees.NewDynamicCalculator(e.Backend.Config, e.Backend.Ctx.Log, e.State.GetTimestamp(), e.BlkFeeManager, e.BlockMaxComplexity, e.Tx.Creds)
+	feeCalculator := fee.NewDynamicCalculator(e.Backend.Config, e.Backend.Ctx.Log, e.State.GetTimestamp(), e.BlkFeeManager, e.BlockMaxComplexity, e.Tx.Creds)
 
 	if err := tx.Visit(feeCalculator); err != nil {
 		return err
@@ -200,7 +200,7 @@ func (e *StandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 		utxoIDs[i] = utxoID[:]
 	}
 
-	feeCalculator := fees.NewDynamicCalculator(e.Backend.Config, e.Backend.Ctx.Log, e.State.GetTimestamp(), e.BlkFeeManager, e.BlockMaxComplexity, e.Tx.Creds)
+	feeCalculator := fee.NewDynamicCalculator(e.Backend.Config, e.Backend.Ctx.Log, e.State.GetTimestamp(), e.BlkFeeManager, e.BlockMaxComplexity, e.Tx.Creds)
 	if err := tx.Visit(feeCalculator); err != nil {
 		return err
 	}
@@ -293,7 +293,7 @@ func (e *StandardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 		return err
 	}
 
-	feeCalculator := fees.NewDynamicCalculator(e.Backend.Config, e.Backend.Ctx.Log, e.State.GetTimestamp(), e.BlkFeeManager, e.BlockMaxComplexity, e.Tx.Creds)
+	feeCalculator := fee.NewDynamicCalculator(e.Backend.Config, e.Backend.Ctx.Log, e.State.GetTimestamp(), e.BlkFeeManager, e.BlockMaxComplexity, e.Tx.Creds)
 	if err := tx.Visit(feeCalculator); err != nil {
 		return err
 	}
@@ -517,7 +517,7 @@ func (e *StandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 		return err
 	}
 
-	feeCalculator := fees.NewDynamicCalculator(e.Backend.Config, e.Backend.Ctx.Log, e.State.GetTimestamp(), e.BlkFeeManager, e.BlockMaxComplexity, e.Tx.Creds)
+	feeCalculator := fee.NewDynamicCalculator(e.Backend.Config, e.Backend.Ctx.Log, e.State.GetTimestamp(), e.BlkFeeManager, e.BlockMaxComplexity, e.Tx.Creds)
 	if err := tx.Visit(feeCalculator); err != nil {
 		return err
 	}
@@ -672,7 +672,7 @@ func (e *StandardTxExecutor) BaseTx(tx *txs.BaseTx) error {
 	}
 
 	// Verify the flowcheck
-	feeCalculator := fees.NewDynamicCalculator(e.Backend.Config, e.Backend.Ctx.Log, e.State.GetTimestamp(), e.BlkFeeManager, e.BlockMaxComplexity, e.Tx.Creds)
+	feeCalculator := fee.NewDynamicCalculator(e.Backend.Config, e.Backend.Ctx.Log, e.State.GetTimestamp(), e.BlkFeeManager, e.BlockMaxComplexity, e.Tx.Creds)
 
 	if err := tx.Visit(feeCalculator); err != nil {
 		return err
