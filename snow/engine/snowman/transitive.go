@@ -262,25 +262,22 @@ func (t *Transitive) Put(ctx context.Context, nodeID ids.NodeID, requestID uint3
 	}
 
 	// issue the block into consensus. If the block has already been issued,
-	// this will be a noop. If this block has missing dependencies, vdr will
+	// this will be a noop. If this block has missing dependencies, nodeID will
 	// receive requests to fill the ancestry. dependencies that have already
 	// been fetched, but with missing dependencies themselves won't be requested
 	// from the vdr.
-	if _, err := t.issueFrom(ctx, nodeID, blk, issuedMetric); err != nil {
+	if _, err := t.issueChain(ctx, nodeID, blk, issuedMetric); err != nil {
 		return err
 	}
 	return t.executeDeferredWork(ctx)
 }
 
 func (t *Transitive) GetFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
-	// We don't assume that this function is called after a failed Get message.
-	// Check to see if we have an outstanding request and also get what the
-	// request was for if it exists.
-	req := common.Request{
+	request := common.Request{
 		NodeID:    nodeID,
 		RequestID: requestID,
 	}
-	blkID, ok := t.blkReqs.DeleteKey(req)
+	blkID, ok := t.blkReqs.DeleteKey(request)
 	if !ok {
 		t.Ctx.Log.Debug("unexpected GetFailed",
 			zap.Stringer("nodeID", nodeID),
@@ -288,9 +285,10 @@ func (t *Transitive) GetFailed(ctx context.Context, nodeID ids.NodeID, requestID
 		)
 		return nil
 	}
-	delete(t.blkReqSourceMetric, req)
+	delete(t.blkReqSourceMetric, request)
 
-	// Because the get request was dropped, we no longer expect blkID to be issued.
+	// Because the get request was dropped, we no longer expect blkID to be
+	// issued.
 	t.blocked.Abandon(ctx, blkID)
 	return t.executeDeferredWork(ctx)
 }
@@ -299,10 +297,7 @@ func (t *Transitive) PullQuery(ctx context.Context, nodeID ids.NodeID, requestID
 	t.sendChits(ctx, nodeID, requestID, requestedHeight)
 
 	issuedMetric := t.metrics.issued.WithLabelValues(pushGossipSource)
-
-	// Try to issue [blkID] to consensus.
-	// If we're missing an ancestor, request it from [vdr]
-	if _, err := t.issueFromByID(ctx, nodeID, blkID, issuedMetric); err != nil {
+	if _, err := t.issueID(ctx, nodeID, blkID, issuedMetric); err != nil {
 		return err
 	}
 
@@ -343,7 +338,7 @@ func (t *Transitive) PushQuery(ctx context.Context, nodeID ids.NodeID, requestID
 	// receive requests to fill the ancestry. dependencies that have already
 	// been fetched, but with missing dependencies themselves won't be requested
 	// from the vdr.
-	if _, err := t.issueFrom(ctx, nodeID, blk, issuedMetric); err != nil {
+	if _, err := t.issueChain(ctx, nodeID, blk, issuedMetric); err != nil {
 		return err
 	}
 
@@ -363,13 +358,13 @@ func (t *Transitive) Chits(ctx context.Context, nodeID ids.NodeID, requestID uin
 
 	issuedMetric := t.metrics.issued.WithLabelValues(pullGossipSource)
 
-	addedPreferred, err := t.issueFromByID(ctx, nodeID, preferredID, issuedMetric)
+	shouldWaitOnPreferred, err := t.issueID(ctx, nodeID, preferredID, issuedMetric)
 	if err != nil {
 		return err
 	}
 
 	var (
-		addedPreferredIDAtHeight = addedPreferred
+		shouldWaitOnPreferredIDAtHeight bool
 		// Invariant: The order of [responseOptions] must be [preferredID] then
 		// (optionally) [preferredIDAtHeight]. During vote application, the
 		// first vote that can be applied will be used. So, the votes should be
@@ -377,7 +372,7 @@ func (t *Transitive) Chits(ctx context.Context, nodeID ids.NodeID, requestID uin
 		responseOptions = []ids.ID{preferredID}
 	)
 	if preferredID != preferredIDAtHeight {
-		addedPreferredIDAtHeight, err = t.issueFromByID(ctx, nodeID, preferredIDAtHeight, issuedMetric)
+		shouldWaitOnPreferredIDAtHeight, err = t.issueID(ctx, nodeID, preferredIDAtHeight, issuedMetric)
 		if err != nil {
 			return err
 		}
@@ -395,10 +390,10 @@ func (t *Transitive) Chits(ctx context.Context, nodeID ids.NodeID, requestID uin
 
 	// Wait until [preferredID] and [preferredIDAtHeight] have been issued to
 	// consensus before applying this chit.
-	if !addedPreferred {
+	if shouldWaitOnPreferred {
 		v.deps.Add(preferredID)
 	}
-	if !addedPreferredIDAtHeight {
+	if shouldWaitOnPreferredIDAtHeight {
 		v.deps.Add(preferredIDAtHeight)
 	}
 
@@ -722,10 +717,10 @@ func (t *Transitive) repoll(ctx context.Context) {
 	}
 }
 
-// issueFromByID attempts to issue the branch ending with a block [blkID] into consensus.
-// If we do not have [blkID], request it.
-// Returns true if the block is processing in consensus or is decided.
-func (t *Transitive) issueFromByID(
+// issueID attempts to issue the branch ending with [blkID] into consensus.
+// Returns true if it is safe to register a dependency onto [blkID].
+// If an ancestor is missing, it will be requested from [nodeID].
+func (t *Transitive) issueID(
 	ctx context.Context,
 	nodeID ids.NodeID,
 	blkID ids.ID,
@@ -734,92 +729,77 @@ func (t *Transitive) issueFromByID(
 	blk, err := t.getBlock(ctx, blkID)
 	if err != nil {
 		t.sendRequest(ctx, nodeID, blkID, issuedMetric)
-		return false, nil
+		return true, nil
 	}
-	return t.issueFrom(ctx, nodeID, blk, issuedMetric)
+	return t.issueChain(ctx, nodeID, blk, issuedMetric)
 }
 
-// issueFrom attempts to issue the branch ending with block [blkID] to consensus.
-// Returns true if the block is processing in consensus or is decided.
-// If a dependency is missing, request it from [vdr].
-func (t *Transitive) issueFrom(
+// issueChain attempts to issue the chain of blocks ending with [blk] to
+// consensus.
+// Returns true if it is safe to register a dependency onto [blk].
+// If an ancestor is missing, it will be requested from [nodeID].
+func (t *Transitive) issueChain(
 	ctx context.Context,
 	nodeID ids.NodeID,
 	blk snowman.Block,
 	issuedMetric prometheus.Counter,
 ) (bool, error) {
-	// issue [blk] and its ancestors to consensus.
-	blkID := blk.ID()
-	for shouldBlockBeQueuedForIssuance(t.Consensus, t.pending, blk) {
-		err := t.issue(ctx, nodeID, blk, false, issuedMetric)
-		if err != nil {
-			return false, err
+	for {
+		blkID := blk.ID()
+		// Remove any outstanding requests for this block
+		if req, ok := t.blkReqs.DeleteValue(blkID); ok {
+			delete(t.blkReqSourceMetric, req)
 		}
 
-		blkID = blk.Parent()
-		blk, err = t.getBlock(ctx, blkID)
-		if err != nil {
-			// If we don't have this ancestor, request it from [vdr]
-			t.sendRequest(ctx, nodeID, blkID, issuedMetric)
+		// If this block is accepted, all the jobs should have already been
+		// fulfilled. If this block is rejected, it's possible that there are
+		// still jobs pending its issuance. So we must abandon those jobs.
+		if isBlockDecided(t.Consensus, blk) {
+			t.blocked.Abandon(ctx, blkID)
+			return false, t.errs.Err
+		}
+
+		// I'm either the last accepted block or processing. In either case, no
+		// one should register a dependency on me.
+		if canBlockHaveChildIssued(t.Consensus, blkID) {
 			return false, nil
 		}
+
+		// This block is already pending issuance. So, jobs can be queued on top
+		// of me.
+		if _, isPending := t.pending[blkID]; isPending {
+			return true, nil
+		}
+
+		// If our parent can have a child issued, we can be issued.
+		parentID := blk.Parent()
+		if canBlockHaveChildIssued(t.Consensus, parentID) {
+			// Delivering the block here will either abandon or fulfill the
+			// block.
+			return false, t.deliver(ctx, nodeID, blk, false, issuedMetric)
+		}
+
+		// mark that the block is queued to be added to consensus once its ancestors
+		// have been
+		t.pending[blkID] = blk
+		// Will add [blk] to consensus once its ancestors have been
+		t.blocked.Register(ctx, &issuer{
+			t:            t,
+			nodeID:       nodeID,
+			blk:          blk,
+			issuedMetric: issuedMetric,
+			deps:         set.Of(parentID),
+			push:         false,
+		})
+
+		var err error
+		blk, err = t.getBlock(ctx, parentID)
+		// If we don't have the parent block, we should request it.
+		if err != nil {
+			t.sendRequest(ctx, nodeID, blkID, issuedMetric)
+			return true, nil
+		}
 	}
-
-	// Remove any outstanding requests for this block
-	if req, ok := t.blkReqs.DeleteValue(blkID); ok {
-		delete(t.blkReqSourceMetric, req)
-	}
-
-	issued := t.ConsensusDecided(blk) || t.Consensus.Processing(blkID)
-	if issued {
-		// A dependency should never be waiting on a decided or processing
-		// block. However, if the block was marked as rejected by the VM, the
-		// dependencies may still be waiting. Therefore, they should abandoned.
-		t.blocked.Abandon(ctx, blkID)
-	}
-	return issued, t.errs.Err
-}
-
-// Issue [blk] to consensus once its ancestors have been issued.
-// If [push] is true, a push query will be used. Otherwise, a pull query will be
-// used.
-func (t *Transitive) issue(
-	ctx context.Context,
-	nodeID ids.NodeID,
-	blk snowman.Block,
-	push bool,
-	issuedMetric prometheus.Counter,
-) error {
-	blkID := blk.ID()
-
-	// mark that the block is queued to be added to consensus once its ancestors have been
-	t.pending[blkID] = blk
-
-	// Remove any outstanding requests for this block
-	if req, ok := t.blkReqs.DeleteValue(blkID); ok {
-		delete(t.blkReqSourceMetric, req)
-	}
-
-	// Will add [blk] to consensus once its ancestors have been
-	i := &issuer{
-		t:            t,
-		nodeID:       nodeID,
-		blk:          blk,
-		issuedMetric: issuedMetric,
-		push:         push,
-	}
-
-	// block on the parent if needed
-	if parentID := blk.Parent(); !canBlockHaveChildIssued(t.Consensus, parentID) {
-		t.Ctx.Log.Verbo("block waiting for parent to be issued",
-			zap.Stringer("blkID", blkID),
-			zap.Stringer("parentID", parentID),
-		)
-		i.deps.Add(parentID)
-	}
-
-	t.blocked.Register(ctx, i)
-	return t.errs.Err
 }
 
 // Request that [nodeID] send us block [blkID]
