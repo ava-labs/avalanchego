@@ -39,9 +39,6 @@ type Consensus interface {
 	// Returns if a critical error has occurred.
 	Add(Block) error
 
-	// Decided returns true if the block has been decided.
-	Decided(Block) bool
-
 	// Processing returns true if the block ID is currently processing.
 	Processing(ids.ID) bool
 

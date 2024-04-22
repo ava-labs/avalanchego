@@ -38,7 +38,7 @@ func (i *issuer) Fulfill(ctx context.Context, id ids.ID) {
 func (i *issuer) Abandon(ctx context.Context, _ ids.ID) {
 	if !i.abandoned {
 		blkID := i.blk.ID()
-		i.t.removeFromPending(i.blk)
+		delete(i.t.pending, blkID)
 		i.t.addToNonVerifieds(i.blk)
 		i.t.blocked.Abandon(ctx, blkID)
 	}

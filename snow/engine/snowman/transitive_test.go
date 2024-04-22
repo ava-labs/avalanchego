@@ -2881,3 +2881,217 @@ func TestGetProcessingAncestor(t *testing.T) {
 		})
 	}
 }
+
+func TestShouldBlockBeQueuedForIssuance(t *testing.T) {
+	var (
+		acceptedChain = BuildChain(Genesis, 1)
+		issuedChain   = BuildChain(acceptedChain[0], 1)
+		unissuedChain = BuildChain(acceptedChain[0], 2)
+	)
+
+	var (
+		c   = &snowman.Topological{}
+		ctx = snowtest.ConsensusContext(
+			snowtest.Context(t, snowtest.PChainID),
+		)
+	)
+	require.NoError(t, c.Initialize(
+		ctx,
+		snowball.DefaultParameters,
+		acceptedChain[0].ID(),
+		acceptedChain[0].Height(),
+		time.Now(),
+	))
+
+	for _, blk := range issuedChain {
+		require.NoError(t, c.Add(blk))
+	}
+
+	tests := []struct {
+		name          string
+		pendingBlocks map[ids.ID]snowman.Block
+		blk           snowman.Block
+		expected      bool
+	}{
+		{
+			name:          "previously accepted block should not be queued",
+			pendingBlocks: map[ids.ID]snowman.Block{},
+			blk:           Genesis,
+			expected:      false,
+		},
+		{
+			name:          "most recently accepted block should not be queued",
+			pendingBlocks: map[ids.ID]snowman.Block{},
+			blk:           acceptedChain[0],
+			expected:      false,
+		},
+		{
+			name:          "already processing block should not be queued",
+			pendingBlocks: map[ids.ID]snowman.Block{},
+			blk:           issuedChain[0],
+			expected:      false,
+		},
+		{
+			name: "already queued block should not be queued",
+			pendingBlocks: map[ids.ID]snowman.Block{
+				unissuedChain[1].ID(): unissuedChain[1],
+			},
+			blk:      unissuedChain[1],
+			expected: false,
+		},
+		{
+			name: "block to process queue should be added",
+			pendingBlocks: map[ids.ID]snowman.Block{
+				unissuedChain[1].ID(): unissuedChain[1],
+			},
+			blk:      unissuedChain[0],
+			expected: true,
+		},
+		{
+			name:          "issuable block should be added",
+			pendingBlocks: map[ids.ID]snowman.Block{},
+			blk:           unissuedChain[0],
+			expected:      true,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			result := shouldBlockBeQueuedForIssuance(c, test.pendingBlocks, test.blk)
+			require.Equal(t, test.expected, result)
+		})
+	}
+}
+
+func TestShouldBlockBeDropped(t *testing.T) {
+	var (
+		acceptedChain = BuildChain(Genesis, 1)
+		rejectedChain = BuildChain(Genesis, 2)
+		issuedChain   = BuildChain(acceptedChain[0], 1)
+		unissuedChain = BuildChain(acceptedChain[0], 1)
+	)
+
+	var (
+		c   = &snowman.Topological{}
+		ctx = snowtest.ConsensusContext(
+			snowtest.Context(t, snowtest.PChainID),
+		)
+	)
+	require.NoError(t, c.Initialize(
+		ctx,
+		snowball.DefaultParameters,
+		acceptedChain[0].ID(),
+		acceptedChain[0].Height(),
+		time.Now(),
+	))
+
+	for _, blk := range issuedChain {
+		require.NoError(t, c.Add(blk))
+	}
+
+	tests := []struct {
+		name     string
+		blk      snowman.Block
+		expected bool
+	}{
+		{
+			name:     "old accepted block was issued",
+			blk:      Genesis,
+			expected: true,
+		},
+		{
+			name:     "most recently accepted block was issued",
+			blk:      acceptedChain[0],
+			expected: true,
+		},
+		{
+			name:     "rejected block may have been issued",
+			blk:      rejectedChain[0],
+			expected: true,
+		},
+		{
+			name:     "rejected block may have been issued",
+			blk:      rejectedChain[1],
+			expected: true,
+		},
+		{
+			name:     "processing block was issued",
+			blk:      issuedChain[0],
+			expected: true,
+		},
+		{
+			name:     "unissued block should be able to be issued",
+			blk:      unissuedChain[0],
+			expected: false,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			result := shouldBlockBeDropped(c, test.blk)
+			require.Equal(t, test.expected, result)
+		})
+	}
+}
+
+func TestCanBlockHaveChildIssued(t *testing.T) {
+	var (
+		acceptedChain = BuildChain(Genesis, 1)
+		issuedChain   = BuildChain(acceptedChain[0], 1)
+		unissuedChain = BuildChain(acceptedChain[0], 1)
+	)
+
+	var (
+		c   = &snowman.Topological{}
+		ctx = snowtest.ConsensusContext(
+			snowtest.Context(t, snowtest.PChainID),
+		)
+	)
+	require.NoError(t, c.Initialize(
+		ctx,
+		snowball.DefaultParameters,
+		acceptedChain[0].ID(),
+		acceptedChain[0].Height(),
+		time.Now(),
+	))
+
+	for _, blk := range issuedChain {
+		require.NoError(t, c.Add(blk))
+	}
+
+	tests := []struct {
+		name     string
+		parentID ids.ID
+		expected bool
+	}{
+		{
+			name:     "old accepted block should not be issued on",
+			parentID: GenesisID,
+			expected: false,
+		},
+		{
+			name:     "most recently accepted block can be issued on",
+			parentID: acceptedChain[0].ID(),
+			expected: true,
+		},
+		{
+			name:     "unknown block should not be issued on",
+			parentID: ids.GenerateTestID(),
+			expected: false,
+		},
+		{
+			name:     "processing block can be issued on",
+			parentID: issuedChain[0].ID(),
+			expected: true,
+		},
+		{
+			name:     "unissued block should not be issued on",
+			parentID: unissuedChain[0].ID(),
+			expected: false,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			result := canBlockHaveChildIssued(c, test.parentID)
+			require.Equal(t, test.expected, result)
+		})
+	}
+}
