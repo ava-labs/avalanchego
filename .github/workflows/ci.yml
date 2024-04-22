@@ -69,21 +69,21 @@ jobs:
         run: ./scripts/build.sh -r
       - name: Start prometheus
         # Only run for the original repo; a forked repo won't have access to the monitoring credentials
-        if: (github.event.pull_request.head.repo.full_name == github.repository) || (github.event.repository.fork == false)
+        if: (github.event_name != 'pull_request') || (github.event.pull_request.head.repo.full_name == github.repository)
         shell: bash
         run: bash -x ./scripts/run_prometheus.sh
         env:
           PROMETHEUS_ID: ${{ secrets.PROMETHEUS_ID }}
           PROMETHEUS_PASSWORD: ${{ secrets.PROMETHEUS_PASSWORD }}
       - name: Start promtail
-        if: (github.event.pull_request.head.repo.full_name == github.repository) || (github.event.repository.fork == false)
+        if: (github.event_name != 'pull_request') || (github.event.pull_request.head.repo.full_name == github.repository)
         shell: bash
         run: bash -x ./scripts/run_promtail.sh
         env:
           LOKI_ID: ${{ secrets.LOKI_ID }}
           LOKI_PASSWORD: ${{ secrets.LOKI_PASSWORD }}
       - name: Notify of metrics availability
-        if: (github.event.pull_request.head.repo.full_name == github.repository) || (github.event.repository.fork == false)
+        if: (github.event_name != 'pull_request') || (github.event.pull_request.head.repo.full_name == github.repository)
         shell: bash
         run: .github/workflows/notify-metrics-availability.sh
         env:
@@ -123,21 +123,21 @@ jobs:
         run: ./scripts/build.sh -r
       - name: Start prometheus
         # Only run for the original repo; a forked repo won't have access to the monitoring credentials
-        if: (github.event.pull_request.head.repo.full_name == github.repository) || (github.event.repository.fork == false)
+        if: (github.event_name != 'pull_request') || (github.event.pull_request.head.repo.full_name == github.repository)
         shell: bash
         run: bash -x ./scripts/run_prometheus.sh
         env:
           PROMETHEUS_ID: ${{ secrets.PROMETHEUS_ID }}
           PROMETHEUS_PASSWORD: ${{ secrets.PROMETHEUS_PASSWORD }}
       - name: Start promtail
-        if: (github.event.pull_request.head.repo.full_name == github.repository) || (github.event.repository.fork == false)
+        if: (github.event_name != 'pull_request') || (github.event.pull_request.head.repo.full_name == github.repository)
         shell: bash
         run: bash -x ./scripts/run_promtail.sh
         env:
           LOKI_ID: ${{ secrets.LOKI_ID }}
           LOKI_PASSWORD: ${{ secrets.LOKI_PASSWORD }}
       - name: Notify of metrics availability
-        if: (github.event.pull_request.head.repo.full_name == github.repository) || (github.event.repository.fork == false)
+        if: (github.event_name != 'pull_request') || (github.event.pull_request.head.repo.full_name == github.repository)
         shell: bash
         run: .github/workflows/notify-metrics-availability.sh
         env:
@@ -176,21 +176,21 @@ jobs:
         run: ./scripts/build.sh
       - name: Start prometheus
         # Only run for the original repo; a forked repo won't have access to the monitoring credentials
-        if: (github.event.pull_request.head.repo.full_name == github.repository) || (github.event.repository.fork == false)
+        if: (github.event_name != 'pull_request') || (github.event.pull_request.head.repo.full_name == github.repository)
         shell: bash
         run: bash -x ./scripts/run_prometheus.sh
         env:
           PROMETHEUS_ID: ${{ secrets.PROMETHEUS_ID }}
           PROMETHEUS_PASSWORD: ${{ secrets.PROMETHEUS_PASSWORD }}
       - name: Start promtail
-        if: (github.event.pull_request.head.repo.full_name == github.repository) || (github.event.repository.fork == false)
+        if: (github.event_name != 'pull_request') || (github.event.pull_request.head.repo.full_name == github.repository)
         shell: bash
         run: bash -x ./scripts/run_promtail.sh
         env:
           LOKI_ID: ${{ secrets.LOKI_ID }}
           LOKI_PASSWORD: ${{ secrets.LOKI_PASSWORD }}
       - name: Notify of metrics availability
-        if: (github.event.pull_request.head.repo.full_name == github.repository) || (github.event.repository.fork == false)
+        if: (github.event_name != 'pull_request') || (github.event.pull_request.head.repo.full_name == github.repository)
         shell: bash
         run: .github/workflows/notify-metrics-availability.sh
         env:
