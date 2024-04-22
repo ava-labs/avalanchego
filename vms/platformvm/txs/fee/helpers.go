@@ -78,16 +78,16 @@ func UpdatedFeeManager(state state.Chain, cfg *config.Config, parentBlkTime, nex
 	}
 
 	feeManager := fees.NewManager(feeRates)
-	if isEActive {
-		if err := feeManager.UpdateFeeRates(
-			feeCfg,
-			parentBlkComplexity,
-			parentBlkTime.Unix(),
-			nextBlkTime.Unix(),
-		); err != nil {
-			return nil, fmt.Errorf("failed updating fee rates, %w", err)
-		}
+	// if isEActive { // REMOVED FOR MEASUREMENTS
+	if err := feeManager.UpdateFeeRates(
+		feeCfg,
+		parentBlkComplexity,
+		parentBlkTime.Unix(),
+		nextBlkTime.Unix(),
+	); err != nil {
+		return nil, fmt.Errorf("failed updating fee rates, %w", err)
 	}
+	// }
 
 	return feeManager, nil
 }
