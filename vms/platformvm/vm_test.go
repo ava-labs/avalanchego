@@ -409,8 +409,9 @@ func TestGenesis(t *testing.T) {
 				feeCalc = fee.NewDynamicCalculator(staticFeeCfg, feeMan, feeCfg.BlockMaxComplexity, testSubnet1.Creds)
 			}
 
-			require.NoError(testSubnet1.Unsigned.Visit(feeCalc))
-			require.Equal(uint64(utxo.Amount)-feeCalc.Fee, out.Amount())
+			fee, err := feeCalc.ComputeFee(testSubnet1.Unsigned)
+			require.NoError(err)
+			require.Equal(uint64(utxo.Amount)-fee, out.Amount())
 		}
 	}
 
@@ -2405,8 +2406,9 @@ func TestBaseTx(t *testing.T) {
 		feeCalc = fee.NewDynamicCalculator(staticFeeCfg, feeMan, feeCfg.BlockMaxComplexity, baseTx.Creds)
 	}
 
-	require.NoError(baseTx.Unsigned.Visit(feeCalc))
-	require.Equal(feeCalc.Fee, totalInputAmt-totalOutputAmt)
+	fee, err := feeCalc.ComputeFee(baseTx.Unsigned)
+	require.NoError(err)
+	require.Equal(fee, totalInputAmt-totalOutputAmt)
 	require.Equal(sendAmt, key1OutputAmt)
 
 	vm.ctx.Lock.Unlock()

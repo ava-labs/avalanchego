@@ -85,7 +85,8 @@ func (e *StandardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 		feeCalculator = fee.NewDynamicCalculator(staticFeesCfg, e.BlkFeeManager, e.BlockMaxComplexity, e.Tx.Creds)
 	}
 
-	if err := tx.Visit(feeCalculator); err != nil {
+	fee, err := feeCalculator.ComputeFee(tx)
+	if err != nil {
 		return err
 	}
 
@@ -96,7 +97,7 @@ func (e *StandardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 		tx.Outs,
 		baseTxCreds,
 		map[ids.ID]uint64{
-			e.Ctx.AVAXAssetID: feeCalculator.Fee,
+			e.Ctx.AVAXAssetID: fee,
 		},
 	); err != nil {
 		return err
@@ -146,7 +147,8 @@ func (e *StandardTxExecutor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 		feeCalculator = fee.NewDynamicCalculator(staticFeesCfg, e.BlkFeeManager, e.BlockMaxComplexity, e.Tx.Creds)
 	}
 
-	if err := tx.Visit(feeCalculator); err != nil {
+	fee, err := feeCalculator.ComputeFee(tx)
+	if err != nil {
 		return err
 	}
 
@@ -157,7 +159,7 @@ func (e *StandardTxExecutor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 		tx.Outs,
 		e.Tx.Creds,
 		map[ids.ID]uint64{
-			e.Ctx.AVAXAssetID: feeCalculator.Fee,
+			e.Ctx.AVAXAssetID: fee,
 		},
 	); err != nil {
 		return err
@@ -242,7 +244,8 @@ func (e *StandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 			feeCalculator = fee.NewDynamicCalculator(staticFeesCfg, e.BlkFeeManager, e.BlockMaxComplexity, e.Tx.Creds)
 		}
 
-		if err := tx.Visit(feeCalculator); err != nil {
+		fee, err := feeCalculator.ComputeFee(tx)
+		if err != nil {
 			return err
 		}
 
@@ -253,7 +256,7 @@ func (e *StandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 			tx.Outs,
 			e.Tx.Creds,
 			map[ids.ID]uint64{
-				e.Ctx.AVAXAssetID: feeCalculator.Fee,
+				e.Ctx.AVAXAssetID: fee,
 			},
 		); err != nil {
 			return err
@@ -310,7 +313,8 @@ func (e *StandardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 		feeCalculator = fee.NewDynamicCalculator(staticFeesCfg, e.BlkFeeManager, e.BlockMaxComplexity, e.Tx.Creds)
 	}
 
-	if err := tx.Visit(feeCalculator); err != nil {
+	fee, err := feeCalculator.ComputeFee(tx)
+	if err != nil {
 		return err
 	}
 
@@ -324,7 +328,7 @@ func (e *StandardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 		outs,
 		e.Tx.Creds,
 		map[ids.ID]uint64{
-			e.Ctx.AVAXAssetID: feeCalculator.Fee,
+			e.Ctx.AVAXAssetID: fee,
 		},
 	); err != nil {
 		return fmt.Errorf("failed verifySpend: %w", err)
@@ -516,7 +520,9 @@ func (e *StandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 	} else {
 		feeCalculator = fee.NewDynamicCalculator(staticFeesCfg, e.BlkFeeManager, e.BlockMaxComplexity, e.Tx.Creds)
 	}
-	if err := tx.Visit(feeCalculator); err != nil {
+
+	fee, err := feeCalculator.ComputeFee(tx)
+	if err != nil {
 		return err
 	}
 
@@ -531,7 +537,7 @@ func (e *StandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 		//            entry in this map literal from being overwritten by the
 		//            second entry.
 		map[ids.ID]uint64{
-			e.Ctx.AVAXAssetID: feeCalculator.Fee,
+			e.Ctx.AVAXAssetID: fee,
 			tx.AssetID:        totalRewardAmount,
 		},
 	); err != nil {
@@ -664,7 +670,8 @@ func (e *StandardTxExecutor) BaseTx(tx *txs.BaseTx) error {
 		feeCalculator = fee.NewDynamicCalculator(staticFeesCfg, e.BlkFeeManager, e.BlockMaxComplexity, e.Tx.Creds)
 	}
 
-	if err := tx.Visit(feeCalculator); err != nil {
+	fee, err := feeCalculator.ComputeFee(tx)
+	if err != nil {
 		return err
 	}
 
@@ -675,7 +682,7 @@ func (e *StandardTxExecutor) BaseTx(tx *txs.BaseTx) error {
 		tx.Outs,
 		e.Tx.Creds,
 		map[ids.ID]uint64{
-			e.Ctx.AVAXAssetID: feeCalculator.Fee,
+			e.Ctx.AVAXAssetID: fee,
 		},
 	); err != nil {
 		return err

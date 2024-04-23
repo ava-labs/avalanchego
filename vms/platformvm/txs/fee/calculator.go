@@ -20,20 +20,44 @@ import (
 )
 
 var (
-	_ txs.Visitor = (*Calculator)(nil)
+	_ txs.Visitor = (*calculator)(nil)
 
 	errFailedFeeCalculation       = errors.New("failed fee calculation")
 	errFailedComplexityCumulation = errors.New("failed cumulating complexity")
 )
 
 type Calculator struct {
+	c *calculator
+}
+
+func (c *Calculator) GetFee() uint64 {
+	return c.c.fee
+}
+
+func (c *Calculator) ResetFee(newFee uint64) {
+	c.c.fee = newFee
+}
+
+func (c *Calculator) ComputeFee(tx txs.UnsignedTx) (uint64, error) {
+	err := tx.Visit(c.c)
+	return c.c.fee, err
+}
+
+func (c *Calculator) AddFeesFor(complexity fees.Dimensions) (uint64, error) {
+	return c.c.addFeesFor(complexity)
+}
+
+func (c *Calculator) RemoveFeesFor(unitsToRm fees.Dimensions) (uint64, error) {
+	return c.c.removeFeesFor(unitsToRm)
+}
+
+type calculator struct {
 	// setup
 	isEActive bool
-
 	// Pre E-fork inputs
 	upgrades  upgrade.Times
 	staticCfg StaticConfig
-	chainTime time.Time
+	time      time.Time
 
 	// Post E-fork inputs
 	feeManager         *fees.Manager
@@ -41,14 +65,16 @@ type Calculator struct {
 	credentials        []verify.Verifiable
 
 	// outputs of visitor execution
-	Fee uint64
+	fee uint64
 }
 
 func NewStaticCalculator(cfg StaticConfig, ut upgrade.Times, chainTime time.Time) *Calculator {
 	return &Calculator{
-		upgrades:  ut,
-		staticCfg: cfg,
-		chainTime: chainTime,
+		c: &calculator{
+			upgrades:  ut,
+			staticCfg: cfg,
+			time:      chainTime,
+		},
 	}
 }
 
@@ -60,24 +86,26 @@ func NewDynamicCalculator(
 	creds []verify.Verifiable,
 ) *Calculator {
 	return &Calculator{
-		isEActive:          true,
-		staticCfg:          cfg,
-		feeManager:         feeManager,
-		blockMaxComplexity: blockMaxComplexity,
-		credentials:        creds,
+		c: &calculator{
+			isEActive:          true,
+			staticCfg:          cfg,
+			feeManager:         feeManager,
+			blockMaxComplexity: blockMaxComplexity,
+			credentials:        creds,
+		},
 	}
 }
 
-func (fc *Calculator) AddValidatorTx(*txs.AddValidatorTx) error {
+func (fc *calculator) AddValidatorTx(*txs.AddValidatorTx) error {
 	// AddValidatorTx is banned following Durango activation, so we
 	// only return the pre EUpgrade fee here
-	fc.Fee = fc.staticCfg.AddPrimaryNetworkValidatorFee
+	fc.fee = fc.staticCfg.AddPrimaryNetworkValidatorFee
 	return nil
 }
 
-func (fc *Calculator) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
+func (fc *calculator) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
 	if !fc.isEActive {
-		fc.Fee = fc.staticCfg.AddSubnetValidatorFee
+		fc.fee = fc.staticCfg.AddSubnetValidatorFee
 		return nil
 	}
 
@@ -86,20 +114,20 @@ func (fc *Calculator) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
 		return err
 	}
 
-	_, err = fc.AddFeesFor(complexity)
+	_, err = fc.addFeesFor(complexity)
 	return err
 }
 
-func (fc *Calculator) AddDelegatorTx(*txs.AddDelegatorTx) error {
+func (fc *calculator) AddDelegatorTx(*txs.AddDelegatorTx) error {
 	// AddValidatorTx is banned following Durango activation, so we
 	// only return the pre EUpgrade fee here
-	fc.Fee = fc.staticCfg.AddPrimaryNetworkDelegatorFee
+	fc.fee = fc.staticCfg.AddPrimaryNetworkDelegatorFee
 	return nil
 }
 
-func (fc *Calculator) CreateChainTx(tx *txs.CreateChainTx) error {
+func (fc *calculator) CreateChainTx(tx *txs.CreateChainTx) error {
 	if !fc.isEActive {
-		fc.Fee = fc.staticCfg.GetCreateBlockchainTxFee(fc.upgrades, fc.chainTime)
+		fc.fee = fc.staticCfg.GetCreateBlockchainTxFee(fc.upgrades, fc.time)
 		return nil
 	}
 
@@ -108,13 +136,13 @@ func (fc *Calculator) CreateChainTx(tx *txs.CreateChainTx) error {
 		return err
 	}
 
-	_, err = fc.AddFeesFor(complexity)
+	_, err = fc.addFeesFor(complexity)
 	return err
 }
 
-func (fc *Calculator) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
+func (fc *calculator) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 	if !fc.isEActive {
-		fc.Fee = fc.staticCfg.GetCreateSubnetTxFee(fc.upgrades, fc.chainTime)
+		fc.fee = fc.staticCfg.GetCreateSubnetTxFee(fc.upgrades, fc.time)
 		return nil
 	}
 
@@ -123,21 +151,21 @@ func (fc *Calculator) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 		return err
 	}
 
-	_, err = fc.AddFeesFor(complexity)
+	_, err = fc.addFeesFor(complexity)
 	return err
 }
 
-func (*Calculator) AdvanceTimeTx(*txs.AdvanceTimeTx) error {
+func (*calculator) AdvanceTimeTx(*txs.AdvanceTimeTx) error {
 	return nil // no fees
 }
 
-func (*Calculator) RewardValidatorTx(*txs.RewardValidatorTx) error {
+func (*calculator) RewardValidatorTx(*txs.RewardValidatorTx) error {
 	return nil // no fees
 }
 
-func (fc *Calculator) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx) error {
+func (fc *calculator) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx) error {
 	if !fc.isEActive {
-		fc.Fee = fc.staticCfg.TxFee
+		fc.fee = fc.staticCfg.TxFee
 		return nil
 	}
 
@@ -146,13 +174,13 @@ func (fc *Calculator) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx) e
 		return err
 	}
 
-	_, err = fc.AddFeesFor(complexity)
+	_, err = fc.addFeesFor(complexity)
 	return err
 }
 
-func (fc *Calculator) TransformSubnetTx(tx *txs.TransformSubnetTx) error {
+func (fc *calculator) TransformSubnetTx(tx *txs.TransformSubnetTx) error {
 	if !fc.isEActive {
-		fc.Fee = fc.staticCfg.TransformSubnetTxFee
+		fc.fee = fc.staticCfg.TransformSubnetTxFee
 		return nil
 	}
 
@@ -161,13 +189,13 @@ func (fc *Calculator) TransformSubnetTx(tx *txs.TransformSubnetTx) error {
 		return err
 	}
 
-	_, err = fc.AddFeesFor(complexity)
+	_, err = fc.addFeesFor(complexity)
 	return err
 }
 
-func (fc *Calculator) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwnershipTx) error {
+func (fc *calculator) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwnershipTx) error {
 	if !fc.isEActive {
-		fc.Fee = fc.staticCfg.TxFee
+		fc.fee = fc.staticCfg.TxFee
 		return nil
 	}
 
@@ -176,16 +204,16 @@ func (fc *Calculator) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwnershipT
 		return err
 	}
 
-	_, err = fc.AddFeesFor(complexity)
+	_, err = fc.addFeesFor(complexity)
 	return err
 }
 
-func (fc *Calculator) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessValidatorTx) error {
+func (fc *calculator) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessValidatorTx) error {
 	if !fc.isEActive {
 		if tx.Subnet != constants.PrimaryNetworkID {
-			fc.Fee = fc.staticCfg.AddSubnetValidatorFee
+			fc.fee = fc.staticCfg.AddSubnetValidatorFee
 		} else {
-			fc.Fee = fc.staticCfg.AddPrimaryNetworkValidatorFee
+			fc.fee = fc.staticCfg.AddPrimaryNetworkValidatorFee
 		}
 		return nil
 	}
@@ -199,16 +227,16 @@ func (fc *Calculator) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessVali
 		return err
 	}
 
-	_, err = fc.AddFeesFor(complexity)
+	_, err = fc.addFeesFor(complexity)
 	return err
 }
 
-func (fc *Calculator) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDelegatorTx) error {
+func (fc *calculator) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDelegatorTx) error {
 	if !fc.isEActive {
 		if tx.Subnet != constants.PrimaryNetworkID {
-			fc.Fee = fc.staticCfg.AddSubnetDelegatorFee
+			fc.fee = fc.staticCfg.AddSubnetDelegatorFee
 		} else {
-			fc.Fee = fc.staticCfg.AddPrimaryNetworkDelegatorFee
+			fc.fee = fc.staticCfg.AddPrimaryNetworkDelegatorFee
 		}
 		return nil
 	}
@@ -222,13 +250,13 @@ func (fc *Calculator) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDele
 		return err
 	}
 
-	_, err = fc.AddFeesFor(complexity)
+	_, err = fc.addFeesFor(complexity)
 	return err
 }
 
-func (fc *Calculator) BaseTx(tx *txs.BaseTx) error {
+func (fc *calculator) BaseTx(tx *txs.BaseTx) error {
 	if !fc.isEActive {
-		fc.Fee = fc.staticCfg.TxFee
+		fc.fee = fc.staticCfg.TxFee
 		return nil
 	}
 
@@ -237,13 +265,13 @@ func (fc *Calculator) BaseTx(tx *txs.BaseTx) error {
 		return err
 	}
 
-	_, err = fc.AddFeesFor(complexity)
+	_, err = fc.addFeesFor(complexity)
 	return err
 }
 
-func (fc *Calculator) ImportTx(tx *txs.ImportTx) error {
+func (fc *calculator) ImportTx(tx *txs.ImportTx) error {
 	if !fc.isEActive {
-		fc.Fee = fc.staticCfg.TxFee
+		fc.fee = fc.staticCfg.TxFee
 		return nil
 	}
 
@@ -256,13 +284,13 @@ func (fc *Calculator) ImportTx(tx *txs.ImportTx) error {
 		return err
 	}
 
-	_, err = fc.AddFeesFor(complexity)
+	_, err = fc.addFeesFor(complexity)
 	return err
 }
 
-func (fc *Calculator) ExportTx(tx *txs.ExportTx) error {
+func (fc *calculator) ExportTx(tx *txs.ExportTx) error {
 	if !fc.isEActive {
-		fc.Fee = fc.staticCfg.TxFee
+		fc.fee = fc.staticCfg.TxFee
 		return nil
 	}
 
@@ -275,11 +303,11 @@ func (fc *Calculator) ExportTx(tx *txs.ExportTx) error {
 		return err
 	}
 
-	_, err = fc.AddFeesFor(complexity)
+	_, err = fc.addFeesFor(complexity)
 	return err
 }
 
-func (fc *Calculator) meterTx(
+func (fc *calculator) meterTx(
 	uTx txs.UnsignedTx,
 	allOuts []*avax.TransferableOutput,
 	allIns []*avax.TransferableInput,
@@ -338,7 +366,7 @@ func (fc *Calculator) meterTx(
 	return complexity, nil
 }
 
-func (fc *Calculator) AddFeesFor(complexity fees.Dimensions) (uint64, error) {
+func (fc *calculator) addFeesFor(complexity fees.Dimensions) (uint64, error) {
 	if fc.feeManager == nil || complexity == fees.Empty {
 		return 0, nil
 	}
@@ -353,11 +381,11 @@ func (fc *Calculator) AddFeesFor(complexity fees.Dimensions) (uint64, error) {
 		return 0, fmt.Errorf("%w: %w", errFailedFeeCalculation, err)
 	}
 
-	fc.Fee += fee
+	fc.fee += fee
 	return fee, nil
 }
 
-func (fc *Calculator) RemoveFeesFor(unitsToRm fees.Dimensions) (uint64, error) {
+func (fc *calculator) removeFeesFor(unitsToRm fees.Dimensions) (uint64, error) {
 	if fc.feeManager == nil || unitsToRm == fees.Empty {
 		return 0, nil
 	}
@@ -371,6 +399,6 @@ func (fc *Calculator) RemoveFeesFor(unitsToRm fees.Dimensions) (uint64, error) {
 		return 0, fmt.Errorf("%w: %w", errFailedFeeCalculation, err)
 	}
 
-	fc.Fee -= fee
+	fc.fee -= fee
 	return fee, nil
 }

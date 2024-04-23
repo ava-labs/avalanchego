@@ -173,7 +173,9 @@ func verifyAddValidatorTx(
 		upgrades      = backend.Config.Times
 	)
 	feeCalculator := fee.NewStaticCalculator(staticFeesCfg, upgrades, currentTimestamp)
-	if err := tx.Visit(feeCalculator); err != nil {
+
+	fee, err := feeCalculator.ComputeFee(tx)
+	if err != nil {
 		return nil, err
 	}
 
@@ -184,7 +186,7 @@ func verifyAddValidatorTx(
 		outs,
 		sTx.Creds,
 		map[ids.ID]uint64{
-			backend.Ctx.AVAXAssetID: feeCalculator.Fee,
+			backend.Ctx.AVAXAssetID: fee,
 		},
 	); err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
@@ -278,7 +280,9 @@ func verifyAddSubnetValidatorTx(
 	} else {
 		feeCalculator = fee.NewDynamicCalculator(staticFeesCfg, feeManager, maxComplexity, sTx.Creds)
 	}
-	if err := tx.Visit(feeCalculator); err != nil {
+
+	fee, err := feeCalculator.ComputeFee(tx)
+	if err != nil {
 		return err
 	}
 
@@ -289,7 +293,7 @@ func verifyAddSubnetValidatorTx(
 		tx.Outs,
 		baseTxCreds,
 		map[ids.ID]uint64{
-			backend.Ctx.AVAXAssetID: feeCalculator.Fee,
+			backend.Ctx.AVAXAssetID: fee,
 		},
 	); err != nil {
 		return fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
@@ -371,7 +375,8 @@ func verifyRemoveSubnetValidatorTx(
 		feeCalculator = fee.NewDynamicCalculator(staticFeesCfg, feeManager, maxComplexity, sTx.Creds)
 	}
 
-	if err := tx.Visit(feeCalculator); err != nil {
+	fee, err := feeCalculator.ComputeFee(tx)
+	if err != nil {
 		return nil, false, err
 	}
 
@@ -382,7 +387,7 @@ func verifyRemoveSubnetValidatorTx(
 		tx.Outs,
 		baseTxCreds,
 		map[ids.ID]uint64{
-			backend.Ctx.AVAXAssetID: feeCalculator.Fee,
+			backend.Ctx.AVAXAssetID: fee,
 		},
 	); err != nil {
 		return nil, false, fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
@@ -498,7 +503,9 @@ func verifyAddDelegatorTx(
 		upgrades      = backend.Config.Times
 	)
 	feeCalculator := fee.NewStaticCalculator(staticFeesCfg, upgrades, currentTimestamp)
-	if err := tx.Visit(feeCalculator); err != nil {
+
+	fee, err := feeCalculator.ComputeFee(tx)
+	if err != nil {
 		return nil, err
 	}
 
@@ -509,7 +516,7 @@ func verifyAddDelegatorTx(
 		outs,
 		sTx.Creds,
 		map[ids.ID]uint64{
-			backend.Ctx.AVAXAssetID: feeCalculator.Fee,
+			backend.Ctx.AVAXAssetID: fee,
 		},
 	); err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
@@ -633,7 +640,8 @@ func verifyAddPermissionlessValidatorTx(
 		feeCalculator = fee.NewDynamicCalculator(staticFeesCfg, feeManager, maxComplexity, sTx.Creds)
 	}
 
-	if err := tx.Visit(feeCalculator); err != nil {
+	fee, err := feeCalculator.ComputeFee(tx)
+	if err != nil {
 		return err
 	}
 
@@ -644,7 +652,7 @@ func verifyAddPermissionlessValidatorTx(
 		outs,
 		sTx.Creds,
 		map[ids.ID]uint64{
-			backend.Ctx.AVAXAssetID: feeCalculator.Fee,
+			backend.Ctx.AVAXAssetID: fee,
 		},
 	); err != nil {
 		return fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
@@ -793,7 +801,8 @@ func verifyAddPermissionlessDelegatorTx(
 		feeCalculator = fee.NewDynamicCalculator(staticFeesCfg, feeManager, maxComplexity, sTx.Creds)
 	}
 
-	if err := tx.Visit(feeCalculator); err != nil {
+	fee, err := feeCalculator.ComputeFee(tx)
+	if err != nil {
 		return err
 	}
 
@@ -805,7 +814,7 @@ func verifyAddPermissionlessDelegatorTx(
 		outs,
 		sTx.Creds,
 		map[ids.ID]uint64{
-			backend.Ctx.AVAXAssetID: feeCalculator.Fee,
+			backend.Ctx.AVAXAssetID: fee,
 		},
 	); err != nil {
 		return fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
@@ -868,7 +877,8 @@ func verifyTransferSubnetOwnershipTx(
 		feeCalculator = fee.NewDynamicCalculator(staticFeesCfg, feeManager, maxComplexity, sTx.Creds)
 	}
 
-	if err := tx.Visit(feeCalculator); err != nil {
+	fee, err := feeCalculator.ComputeFee(tx)
+	if err != nil {
 		return err
 	}
 
@@ -879,7 +889,7 @@ func verifyTransferSubnetOwnershipTx(
 		tx.Outs,
 		baseTxCreds,
 		map[ids.ID]uint64{
-			backend.Ctx.AVAXAssetID: feeCalculator.Fee,
+			backend.Ctx.AVAXAssetID: fee,
 		},
 	); err != nil {
 		return fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)

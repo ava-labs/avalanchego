@@ -398,9 +398,9 @@ func TestGetBalance(t *testing.T) {
 				feeCalc = fee.NewDynamicCalculator(staticFeeCfg, feeMan, feeCfg.BlockMaxComplexity, testSubnet1.Creds)
 			}
 
-			require.NoError(testSubnet1.Unsigned.Visit(feeCalc))
-
-			balance = defaultBalance - feeCalc.Fee
+			fee, err := feeCalc.ComputeFee(testSubnet1.Unsigned)
+			require.NoError(err)
+			balance = defaultBalance - fee
 		}
 		require.Equal(avajson.Uint64(balance), reply.Balance)
 		require.Equal(avajson.Uint64(balance), reply.Unlocked)
