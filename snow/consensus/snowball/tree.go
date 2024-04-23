@@ -560,7 +560,6 @@ func (b *binaryNode) RecordPoll(votes bag.Bag[ids.ID], reset bool) (node, bool) 
 			// to this poll. Therefore, we must have decided on bit.
 			return newChild, true
 		}
-		b.children[bit] = newChild
 		b.preferences[bit] = newChild.Preference()
 	}
 	b.shouldReset[bit] = false // We passed the reset down
