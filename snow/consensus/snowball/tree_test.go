@@ -210,9 +210,9 @@ func TestSnowballAddDecidedFirstBit(t *testing.T) {
 	require := require.New(t)
 
 	zero := ids.Empty
-	one := ids.ID{0x01}
-	two := ids.ID{0x02}
-	three := ids.ID{0x03}
+	c1000 := ids.ID{0x01}
+	c1100 := ids.ID{0x03}
+	c0110 := ids.ID{0x06}
 
 	params := Parameters{
 		K:               1,
@@ -221,8 +221,8 @@ func TestSnowballAddDecidedFirstBit(t *testing.T) {
 		Beta:            2,
 	}
 	tree := NewTree(SnowballFactory, params, zero)
-	tree.Add(one)
-	tree.Add(three)
+	tree.Add(c1000)
+	tree.Add(c1100)
 
 	expected := `SB(Preference = 0, PreferenceStrength[0] = 0, PreferenceStrength[1] = 0, SF(Confidence = 0, Finalized = false, SL(Preference = 0))) Bit = 0
     SB(PreferenceStrength = 0, SF(Confidence = 0, Finalized = false)) Bits = [1, 256)
@@ -233,9 +233,9 @@ func TestSnowballAddDecidedFirstBit(t *testing.T) {
 	require.Equal(zero, tree.Preference())
 	require.False(tree.Finalized())
 
-	oneBag := bag.Of(one)
+	oneBag := bag.Of(c1000)
 	require.True(tree.RecordPoll(oneBag))
-	require.Equal(one, tree.Preference())
+	require.Equal(c1000, tree.Preference())
 	require.False(tree.Finalized())
 
 	expected = `SB(Preference = 1, PreferenceStrength[0] = 0, PreferenceStrength[1] = 1, SF(Confidence = 1, Finalized = false, SL(Preference = 1))) Bit = 0
@@ -245,9 +245,9 @@ func TestSnowballAddDecidedFirstBit(t *testing.T) {
         SB(PreferenceStrength = 0, SF(Confidence = 0, Finalized = false)) Bits = [2, 256)`
 	require.Equal(expected, tree.String())
 
-	threeBag := bag.Of(three)
+	threeBag := bag.Of(c1100)
 	require.True(tree.RecordPoll(threeBag))
-	require.Equal(one, tree.Preference())
+	require.Equal(c1000, tree.Preference())
 	require.False(tree.Finalized())
 
 	expected = `SB(Preference = 0, PreferenceStrength[0] = 1, PreferenceStrength[1] = 1, SF(Confidence = 1, Finalized = false, SL(Preference = 1))) Bit = 1
@@ -255,8 +255,8 @@ func TestSnowballAddDecidedFirstBit(t *testing.T) {
     SB(PreferenceStrength = 1, SF(Confidence = 1, Finalized = false)) Bits = [2, 256)`
 	require.Equal(expected, tree.String())
 
-	// Adding two should have no effect because the first bit is already decided
-	tree.Add(two)
+	// Adding six should have no effect because the first bit is already decided
+	tree.Add(c0110)
 	require.Equal(expected, tree.String())
 }
 
