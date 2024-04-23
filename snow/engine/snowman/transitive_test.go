@@ -68,7 +68,7 @@ func MakeGetBlockF(blks ...[]*snowman.TestBlock) func(context.Context, ids.ID) (
 	return func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		for _, blkSet := range blks {
 			for _, blk := range blkSet {
-				if blk.Status() == choices.Accepted && blkID == blk.ID() {
+				if blkID == blk.ID() {
 					return blk, nil
 				}
 			}
