@@ -54,10 +54,7 @@ func (b *Builder) NewImportTx(
 	tipPercentage commonfees.TipPercentage,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	pBuilder, pSigner, err := b.builders(keys)
-	if err != nil {
-		return nil, err
-	}
+	pBuilder, pSigner := b.builders(keys)
 	feeCalc, err := b.feeCalculator()
 	if err != nil {
 		return nil, err
@@ -88,10 +85,7 @@ func (b *Builder) NewExportTx(
 	tipPercentage commonfees.TipPercentage,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	pBuilder, pSigner, err := b.builders(keys)
-	if err != nil {
-		return nil, err
-	}
+	pBuilder, pSigner := b.builders(keys)
 	feeCalc, err := b.feeCalculator()
 	if err != nil {
 		return nil, err
@@ -125,10 +119,7 @@ func (b *Builder) NewCreateChainTx(
 	tipPercentage commonfees.TipPercentage,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	pBuilder, pSigner, err := b.builders(keys)
-	if err != nil {
-		return nil, err
-	}
+	pBuilder, pSigner := b.builders(keys)
 	feeCalc, err := b.feeCalculator()
 	if err != nil {
 		return nil, err
@@ -161,10 +152,7 @@ func (b *Builder) NewCreateSubnetTx(
 	tipPercentage commonfees.TipPercentage,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	pBuilder, pSigner, err := b.builders(keys)
-	if err != nil {
-		return nil, err
-	}
+	pBuilder, pSigner := b.builders(keys)
 	feeCalc, err := b.feeCalculator()
 	if err != nil {
 		return nil, err
@@ -206,10 +194,7 @@ func (b *Builder) NewTransformSubnetTx(
 	tipPercentage commonfees.TipPercentage,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	pBuilder, pSigner, err := b.builders(keys)
-	if err != nil {
-		return nil, err
-	}
+	pBuilder, pSigner := b.builders(keys)
 	feeCalc, err := b.feeCalculator()
 	if err != nil {
 		return nil, err
@@ -253,10 +238,7 @@ func (b *Builder) NewAddValidatorTx(
 	tipPercentage commonfees.TipPercentage,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	pBuilder, pSigner, err := b.builders(keys)
-	if err != nil {
-		return nil, err
-	}
+	pBuilder, pSigner := b.builders(keys)
 	feeCalc, err := b.feeCalculator()
 	if err != nil {
 		return nil, err
@@ -292,10 +274,7 @@ func (b *Builder) NewAddPermissionlessValidatorTx(
 	tipPercentage commonfees.TipPercentage,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	pBuilder, pSigner, err := b.builders(keys)
-	if err != nil {
-		return nil, err
-	}
+	pBuilder, pSigner := b.builders(keys)
 	feeCalc, err := b.feeCalculator()
 	if err != nil {
 		return nil, err
@@ -330,10 +309,7 @@ func (b *Builder) NewAddDelegatorTx(
 	tipPercentage commonfees.TipPercentage,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	pBuilder, pSigner, err := b.builders(keys)
-	if err != nil {
-		return nil, err
-	}
+	pBuilder, pSigner := b.builders(keys)
 	feeCalc, err := b.feeCalculator()
 	if err != nil {
 		return nil, err
@@ -365,10 +341,7 @@ func (b *Builder) NewAddPermissionlessDelegatorTx(
 	tipPercentage commonfees.TipPercentage,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	pBuilder, pSigner, err := b.builders(keys)
-	if err != nil {
-		return nil, err
-	}
+	pBuilder, pSigner := b.builders(keys)
 	feeCalc, err := b.feeCalculator()
 	if err != nil {
 		return nil, err
@@ -399,10 +372,7 @@ func (b *Builder) NewAddSubnetValidatorTx(
 	tipPercentage commonfees.TipPercentage,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	pBuilder, pSigner, err := b.builders(keys)
-	if err != nil {
-		return nil, err
-	}
+	pBuilder, pSigner := b.builders(keys)
 	feeCalc, err := b.feeCalculator()
 	if err != nil {
 		return nil, err
@@ -432,10 +402,7 @@ func (b *Builder) NewRemoveSubnetValidatorTx(
 	tipPercentage commonfees.TipPercentage,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	pBuilder, pSigner, err := b.builders(keys)
-	if err != nil {
-		return nil, err
-	}
+	pBuilder, pSigner := b.builders(keys)
 	feeCalc, err := b.feeCalculator()
 	if err != nil {
 		return nil, err
@@ -466,10 +433,7 @@ func (b *Builder) NewTransferSubnetOwnershipTx(
 	tipPercentage commonfees.TipPercentage,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	pBuilder, pSigner, err := b.builders(keys)
-	if err != nil {
-		return nil, err
-	}
+	pBuilder, pSigner := b.builders(keys)
 	feeCalc, err := b.feeCalculator()
 	if err != nil {
 		return nil, err
@@ -499,10 +463,7 @@ func (b *Builder) NewBaseTx(
 	tipPercentage commonfees.TipPercentage,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	pBuilder, pSigner, err := b.builders(keys)
-	if err != nil {
-		return nil, err
-	}
+	pBuilder, pSigner := b.builders(keys)
 	feeCalc, err := b.feeCalculator()
 	if err != nil {
 		return nil, err
@@ -525,21 +486,17 @@ func (b *Builder) NewBaseTx(
 	return walletsigner.SignUnsigned(context.Background(), pSigner, utx)
 }
 
-func (b *Builder) builders(keys []*secp256k1.PrivateKey) (builder.Builder, walletsigner.Signer, error) {
+func (b *Builder) builders(keys []*secp256k1.PrivateKey) (builder.Builder, walletsigner.Signer) {
 	var (
 		kc      = secp256k1fx.NewKeychain(keys...)
 		addrs   = kc.Addresses()
+		context = newContext(b.ctx, b.cfg, b.state.GetTimestamp())
 		backend = newBackend(addrs, b.state, b.ctx.SharedMemory)
 	)
 
-	context, err := newContext(b.ctx, b.cfg, b.state.GetTimestamp())
-	if err != nil {
-		return nil, nil, err
-	}
-
 	builder := builder.New(addrs, context, backend)
 	signer := walletsigner.New(kc, backend)
-	return builder, signer, nil
+	return builder, signer
 }
 
 func (b *Builder) feeCalculator() (*fee.Calculator, error) {
