@@ -62,7 +62,7 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 			infoClient := info.NewClient(nodeURI.URI)
 			staticFees, err := infoClient.GetTxFee(e2e.DefaultContext())
 			require.NoError(err)
-			pChainStaticFees := &config.Config{
+			pChainStaticFees := fee.StaticConfig{
 				TxFee:                         uint64(staticFees.TxFee),
 				CreateSubnetTxFee:             uint64(staticFees.CreateSubnetTxFee),
 				TransformSubnetTxFee:          uint64(staticFees.TransformSubnetTxFee),

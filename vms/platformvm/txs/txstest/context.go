@@ -8,8 +8,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/wallet/chain/p/builder"
 )
 
@@ -17,32 +15,22 @@ func newContext(
 	ctx *snow.Context,
 	cfg *config.Config,
 	timestamp time.Time,
-) (*builder.Context, error) {
+) *builder.Context {
 	var (
-		staticFeeCalc  = fee.NewStaticCalculator(cfg, timestamp)
-		createSubnetTx = &txs.CreateSubnetTx{}
-		createChainTx  = &txs.CreateChainTx{}
+		staticFeesCfg = cfg.StaticConfig
+		upgrades      = cfg.Times
 	)
-	if err := createSubnetTx.Visit(staticFeeCalc); err != nil {
-		return nil, err
-	}
-	createSubnetFee := staticFeeCalc.Fee
-
-	if err := createChainTx.Visit(staticFeeCalc); err != nil {
-		return nil, err
-	}
-	createChainFee := staticFeeCalc.Fee
 
 	return &builder.Context{
 		NetworkID:                     ctx.NetworkID,
 		AVAXAssetID:                   ctx.AVAXAssetID,
-		BaseTxFee:                     cfg.TxFee,
-		CreateSubnetTxFee:             createSubnetFee,
-		TransformSubnetTxFee:          cfg.TransformSubnetTxFee,
-		CreateBlockchainTxFee:         createChainFee,
-		AddPrimaryNetworkValidatorFee: cfg.AddPrimaryNetworkValidatorFee,
-		AddPrimaryNetworkDelegatorFee: cfg.AddPrimaryNetworkDelegatorFee,
-		AddSubnetValidatorFee:         cfg.AddSubnetValidatorFee,
-		AddSubnetDelegatorFee:         cfg.AddSubnetDelegatorFee,
-	}, nil
+		BaseTxFee:                     staticFeesCfg.TxFee,
+		CreateSubnetTxFee:             staticFeesCfg.GetCreateSubnetTxFee(upgrades, timestamp),
+		TransformSubnetTxFee:          staticFeesCfg.TransformSubnetTxFee,
+		CreateBlockchainTxFee:         staticFeesCfg.GetCreateBlockchainTxFee(upgrades, timestamp),
+		AddPrimaryNetworkValidatorFee: staticFeesCfg.AddPrimaryNetworkValidatorFee,
+		AddPrimaryNetworkDelegatorFee: staticFeesCfg.AddPrimaryNetworkDelegatorFee,
+		AddSubnetValidatorFee:         staticFeesCfg.AddSubnetValidatorFee,
+		AddSubnetDelegatorFee:         staticFeesCfg.AddSubnetDelegatorFee,
+	}
 }
