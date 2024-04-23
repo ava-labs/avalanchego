@@ -99,11 +99,7 @@ func (fc *Calculator) AddDelegatorTx(*txs.AddDelegatorTx) error {
 
 func (fc *Calculator) CreateChainTx(tx *txs.CreateChainTx) error {
 	if !fc.isEActive {
-		if fc.upgrades.IsApricotPhase3Activated(fc.chainTime) {
-			fc.Fee = fc.staticCfg.CreateBlockchainTxFee
-		} else {
-			fc.Fee = fc.staticCfg.CreateAssetTxFee
-		}
+		fc.Fee = fc.staticCfg.GetCreateBlockchainTxFee(fc.upgrades, fc.chainTime)
 		return nil
 	}
 
@@ -118,11 +114,7 @@ func (fc *Calculator) CreateChainTx(tx *txs.CreateChainTx) error {
 
 func (fc *Calculator) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 	if !fc.isEActive {
-		if fc.upgrades.IsApricotPhase3Activated(fc.chainTime) {
-			fc.Fee = fc.staticCfg.CreateSubnetTxFee
-		} else {
-			fc.Fee = fc.staticCfg.CreateAssetTxFee
-		}
+		fc.Fee = fc.staticCfg.GetCreateSubnetTxFee(fc.upgrades, fc.chainTime)
 		return nil
 	}
 
