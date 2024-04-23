@@ -50,6 +50,7 @@ func DefaultFlags() FlagsMap {
 		config.LogDisplayLevelKey:               logging.Off.String(), // Display logging not needed since nodes run headless
 		config.LogLevelKey:                      logging.Debug.String(),
 		config.MinStakeDurationKey:              DefaultMinStakeDuration.String(),
+		config.ProposerVMUseCurrentHeightKey:    true,
 	}
 }
 
