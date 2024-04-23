@@ -10,15 +10,19 @@ import (
 	"testing"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/ancestor"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -60,10 +64,21 @@ func BuildChain(root *snowman.TestBlock, length int) []*snowman.TestBlock {
 	return chain
 }
 
-func setup(t *testing.T) (ids.NodeID, validators.Manager, *common.SenderTest, *block.TestVM, *Transitive) {
-	require := require.New(t)
+func MakeGetBlockF(blks ...[]*snowman.TestBlock) func(context.Context, ids.ID) (snowman.Block, error) {
+	return func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
+		for _, blkSet := range blks {
+			for _, blk := range blkSet {
+				if blkID == blk.ID() {
+					return blk, nil
+				}
+			}
+		}
+		return nil, errUnknownBlock
+	}
+}
 
-	config := DefaultConfig(t)
+func setup(t *testing.T, config Config) (ids.NodeID, validators.Manager, *common.SenderTest, *block.TestVM, *Transitive) {
+	require := require.New(t)
 
 	vdr := ids.GenerateTestNodeID()
 	require.NoError(config.Validators.AddStaker(config.Ctx.SubnetID, vdr, nil, ids.Empty, 1))
@@ -119,7 +134,7 @@ func setup(t *testing.T) (ids.NodeID, validators.Manager, *common.SenderTest, *b
 func TestEngineDropsAttemptToIssueBlockAfterFailedRequest(t *testing.T) {
 	require := require.New(t)
 
-	peerID, _, sender, vm, engine := setup(t)
+	peerID, _, sender, vm, engine := setup(t, DefaultConfig(t))
 
 	blks := BuildChain(Genesis, 2)
 	parent := blks[0]
@@ -167,7 +182,7 @@ func TestEngineDropsAttemptToIssueBlockAfterFailedRequest(t *testing.T) {
 func TestEngineQuery(t *testing.T) {
 	require := require.New(t)
 
-	peerID, _, sender, vm, engine := setup(t)
+	peerID, _, sender, vm, engine := setup(t, DefaultConfig(t))
 
 	blks := BuildChain(Genesis, 2)
 	parent := blks[0]
@@ -452,7 +467,7 @@ func TestEngineMultipleQuery(t *testing.T) {
 func TestEngineBlockedIssue(t *testing.T) {
 	require := require.New(t)
 
-	_, _, sender, vm, te := setup(t)
+	_, _, sender, vm, te := setup(t, DefaultConfig(t))
 
 	sender.Default(false)
 
@@ -494,7 +509,7 @@ func TestEngineBlockedIssue(t *testing.T) {
 func TestEngineRespondsToGetRequest(t *testing.T) {
 	require := require.New(t)
 
-	vdr, _, sender, vm, te := setup(t)
+	vdr, _, sender, vm, te := setup(t, DefaultConfig(t))
 
 	sender.Default(false)
 
@@ -520,7 +535,7 @@ func TestEngineRespondsToGetRequest(t *testing.T) {
 func TestEnginePushQuery(t *testing.T) {
 	require := require.New(t)
 
-	vdr, _, sender, vm, te := setup(t)
+	vdr, _, sender, vm, te := setup(t, DefaultConfig(t))
 
 	sender.Default(true)
 
@@ -575,7 +590,7 @@ func TestEnginePushQuery(t *testing.T) {
 func TestEngineBuildBlock(t *testing.T) {
 	require := require.New(t)
 
-	vdr, _, sender, vm, te := setup(t)
+	vdr, _, sender, vm, te := setup(t, DefaultConfig(t))
 
 	sender.Default(true)
 
@@ -613,7 +628,7 @@ func TestEngineBuildBlock(t *testing.T) {
 
 func TestEngineRepoll(t *testing.T) {
 	require := require.New(t)
-	vdr, _, sender, _, te := setup(t)
+	vdr, _, sender, _, te := setup(t, DefaultConfig(t))
 
 	sender.Default(true)
 
@@ -798,7 +813,7 @@ func TestEngineNoRepollQuery(t *testing.T) {
 func TestEngineAbandonQuery(t *testing.T) {
 	require := require.New(t)
 
-	vdr, _, sender, vm, te := setup(t)
+	vdr, _, sender, vm, te := setup(t, DefaultConfig(t))
 
 	sender.Default(true)
 
@@ -828,7 +843,7 @@ func TestEngineAbandonQuery(t *testing.T) {
 func TestEngineAbandonChit(t *testing.T) {
 	require := require.New(t)
 
-	vdr, _, sender, vm, te := setup(t)
+	vdr, _, sender, vm, te := setup(t, DefaultConfig(t))
 
 	sender.Default(true)
 
@@ -882,7 +897,7 @@ func TestEngineAbandonChit(t *testing.T) {
 func TestEngineAbandonChitWithUnexpectedPutBlock(t *testing.T) {
 	require := require.New(t)
 
-	vdr, _, sender, vm, te := setup(t)
+	vdr, _, sender, vm, te := setup(t, DefaultConfig(t))
 
 	sender.Default(true)
 
@@ -943,7 +958,7 @@ func TestEngineAbandonChitWithUnexpectedPutBlock(t *testing.T) {
 func TestEngineBlockingChitRequest(t *testing.T) {
 	require := require.New(t)
 
-	vdr, _, sender, vm, te := setup(t)
+	vdr, _, sender, vm, te := setup(t, DefaultConfig(t))
 
 	sender.Default(true)
 
@@ -1000,7 +1015,10 @@ func TestEngineBlockingChitRequest(t *testing.T) {
 func TestEngineBlockingChitResponse(t *testing.T) {
 	require := require.New(t)
 
-	vdr, _, sender, vm, te := setup(t)
+	config := DefaultConfig(t)
+	config.Params.BetaRogue = config.Params.BetaVirtuous
+
+	peerID, _, sender, vm, te := setup(t, config)
 
 	sender.Default(true)
 
@@ -1023,53 +1041,121 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 			return nil, errUnknownBlock
 		}
 	}
+	vm.ParseBlockF = func(_ context.Context, blkBytes []byte) (snowman.Block, error) {
+		switch {
+		case bytes.Equal(GenesisBytes, blkBytes):
+			return Genesis, nil
+		case bytes.Equal(issuedBlk.Bytes(), blkBytes):
+			return issuedBlk, nil
+		case bytes.Equal(missingBlk.Bytes(), blkBytes):
+			return missingBlk, nil
+		case bytes.Equal(blockingBlk.Bytes(), blkBytes):
+			return blockingBlk, nil
+		default:
+			return nil, errUnknownBlock
+		}
+	}
 
-	require.NoError(te.issue(
+	var getRequest *common.Request
+	sender.SendGetF = func(_ context.Context, nodeID ids.NodeID, requestID uint32, blkID ids.ID) {
+		require.Nil(getRequest)
+		getRequest = &common.Request{
+			NodeID:    nodeID,
+			RequestID: requestID,
+		}
+		require.Equal(missingBlk.ID(), blkID)
+	}
+
+	// Issuing [blockingBlk] will register an issuer job for [blockingBlk]
+	// awaiting on [missingBlk]. It will also send a request for [missingBlk].
+	require.NoError(te.Put(
 		context.Background(),
-		te.Ctx.NodeID,
-		blockingBlk,
-		false,
-		te.metrics.issued.WithLabelValues(unknownSource),
+		peerID,
+		0,
+		blockingBlk.Bytes(),
 	))
 
-	queryRequestID := new(uint32)
-	sender.SendPullQueryF = func(_ context.Context, inVdrs set.Set[ids.NodeID], requestID uint32, blkID ids.ID, requestedHeight uint64) {
-		*queryRequestID = requestID
-		vdrSet := set.Of(vdr)
-		require.Equal(vdrSet, inVdrs)
+	var queryRequest *common.Request
+	sender.SendPullQueryF = func(_ context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, blkID ids.ID, requestedHeight uint64) {
+		require.Nil(queryRequest)
+		require.Equal(set.Of(peerID), nodeIDs)
+		queryRequest = &common.Request{
+			NodeID:    peerID,
+			RequestID: requestID,
+		}
 		require.Equal(issuedBlk.ID(), blkID)
 		require.Equal(uint64(1), requestedHeight)
 	}
 
-	require.NoError(te.issue(
+	// Issuing [issuedBlk] will immediately adds [issuedBlk] to consensus, sets
+	// it as the preferred block, and sends a query for [issuedBlk].
+	require.NoError(te.Put(
 		context.Background(),
-		te.Ctx.NodeID,
-		issuedBlk,
-		false,
-		te.metrics.issued.WithLabelValues(unknownSource),
+		peerID,
+		0,
+		issuedBlk.Bytes(),
 	))
 
-	sender.SendPushQueryF = nil
-	sender.CantSendPushQuery = false
+	sender.SendPullQueryF = nil
 
-	require.NoError(te.Chits(context.Background(), vdr, *queryRequestID, blockingBlk.ID(), issuedBlk.ID(), blockingBlk.ID()))
-
+	// In response to the query for [issuedBlk], the peer is responding with,
+	// the currently pending issuance, [blockingBlk]. The direct conflict of
+	// [issuedBlk] is [missingBlk]. This registers a voter job dependent on
+	// [blockingBlk] and [missingBlk].
+	require.NoError(te.Chits(
+		context.Background(),
+		queryRequest.NodeID,
+		queryRequest.RequestID,
+		blockingBlk.ID(),
+		missingBlk.ID(),
+		blockingBlk.ID(),
+	))
 	require.Len(te.blocked, 2)
-	sender.CantSendPullQuery = false
 
-	require.NoError(te.issue(
+	queryRequest = nil
+	sender.SendPullQueryF = func(_ context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, blkID ids.ID, requestedHeight uint64) {
+		require.Nil(queryRequest)
+		require.Equal(set.Of(peerID), nodeIDs)
+		queryRequest = &common.Request{
+			NodeID:    peerID,
+			RequestID: requestID,
+		}
+		require.Equal(blockingBlk.ID(), blkID)
+		require.Equal(uint64(1), requestedHeight)
+	}
+
+	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
+		switch blkID {
+		case GenesisID:
+			return Genesis, nil
+		case issuedBlk.ID():
+			return issuedBlk, nil
+		case missingBlk.ID():
+			return missingBlk, nil
+		case blockingBlk.ID():
+			return blockingBlk, nil
+		default:
+			return nil, errUnknownBlock
+		}
+	}
+
+	// Issuing [missingBlk] will add the block into consensus. However, it will
+	// not send a query for it as it is not the preferred block.
+	require.NoError(te.Put(
 		context.Background(),
-		te.Ctx.NodeID,
-		missingBlk,
-		false,
-		te.metrics.issued.WithLabelValues(unknownSource),
+		getRequest.NodeID,
+		getRequest.RequestID,
+		missingBlk.Bytes(),
 	))
+	require.Equal(choices.Accepted, missingBlk.Status())
+	require.Equal(choices.Accepted, blockingBlk.Status())
+	require.Equal(choices.Rejected, issuedBlk.Status())
 }
 
 func TestEngineRetryFetch(t *testing.T) {
 	require := require.New(t)
 
-	vdr, _, sender, vm, te := setup(t)
+	vdr, _, sender, vm, te := setup(t, DefaultConfig(t))
 
 	sender.Default(true)
 
@@ -1109,7 +1195,7 @@ func TestEngineRetryFetch(t *testing.T) {
 func TestEngineUndeclaredDependencyDeadlock(t *testing.T) {
 	require := require.New(t)
 
-	vdr, _, sender, vm, te := setup(t)
+	vdr, _, sender, vm, te := setup(t, DefaultConfig(t))
 
 	sender.Default(true)
 
@@ -1161,7 +1247,7 @@ func TestEngineUndeclaredDependencyDeadlock(t *testing.T) {
 func TestEngineGossip(t *testing.T) {
 	require := require.New(t)
 
-	nodeID, _, sender, vm, te := setup(t)
+	nodeID, _, sender, vm, te := setup(t, DefaultConfig(t))
 
 	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
 		return GenesisID, nil
@@ -1185,7 +1271,7 @@ func TestEngineGossip(t *testing.T) {
 func TestEngineInvalidBlockIgnoredFromUnexpectedPeer(t *testing.T) {
 	require := require.New(t)
 
-	vdr, vdrs, sender, vm, te := setup(t)
+	vdr, vdrs, sender, vm, te := setup(t, DefaultConfig(t))
 
 	secondVdr := ids.GenerateTestNodeID()
 	require.NoError(vdrs.AddStaker(te.Ctx.SubnetID, secondVdr, nil, ids.Empty, 1))
@@ -1262,7 +1348,7 @@ func TestEngineInvalidBlockIgnoredFromUnexpectedPeer(t *testing.T) {
 func TestEnginePushQueryRequestIDConflict(t *testing.T) {
 	require := require.New(t)
 
-	vdr, _, sender, vm, te := setup(t)
+	vdr, _, sender, vm, te := setup(t, DefaultConfig(t))
 
 	sender.Default(true)
 
@@ -1612,7 +1698,7 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 func TestEngineReceiveNewRejectedBlock(t *testing.T) {
 	require := require.New(t)
 
-	vdr, _, sender, vm, te := setup(t)
+	vdr, _, sender, vm, te := setup(t, DefaultConfig(t))
 
 	acceptedBlks := BuildChain(Genesis, 1)
 	acceptedBlk := acceptedBlks[0]
@@ -1683,7 +1769,7 @@ func TestEngineReceiveNewRejectedBlock(t *testing.T) {
 func TestEngineRejectionAmplification(t *testing.T) {
 	require := require.New(t)
 
-	vdr, _, sender, vm, te := setup(t)
+	vdr, _, sender, vm, te := setup(t, DefaultConfig(t))
 
 	acceptedBlks := BuildChain(Genesis, 1)
 	acceptedBlk := acceptedBlks[0]
@@ -1772,7 +1858,7 @@ func TestEngineRejectionAmplification(t *testing.T) {
 func TestEngineTransitiveRejectionAmplificationDueToRejectedParent(t *testing.T) {
 	require := require.New(t)
 
-	vdr, _, sender, vm, te := setup(t)
+	vdr, _, sender, vm, te := setup(t, DefaultConfig(t))
 
 	acceptedBlks := BuildChain(Genesis, 1)
 	acceptedBlk := acceptedBlks[0]
@@ -1838,7 +1924,7 @@ func TestEngineTransitiveRejectionAmplificationDueToRejectedParent(t *testing.T)
 func TestEngineTransitiveRejectionAmplificationDueToInvalidParent(t *testing.T) {
 	require := require.New(t)
 
-	vdr, _, sender, vm, te := setup(t)
+	vdr, _, sender, vm, te := setup(t, DefaultConfig(t))
 
 	acceptedBlks := BuildChain(Genesis, 1)
 	acceptedBlk := acceptedBlks[0]
@@ -1908,7 +1994,7 @@ func TestEngineTransitiveRejectionAmplificationDueToInvalidParent(t *testing.T) 
 func TestEngineNonPreferredAmplification(t *testing.T) {
 	require := require.New(t)
 
-	vdr, _, sender, vm, te := setup(t)
+	vdr, _, sender, vm, te := setup(t, DefaultConfig(t))
 
 	preferredBlks := BuildChain(Genesis, 1)
 	preferredBlk := preferredBlks[0]
@@ -1965,7 +2051,7 @@ func TestEngineNonPreferredAmplification(t *testing.T) {
 func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 	require := require.New(t)
 
-	vdr, _, sender, vm, te := setup(t)
+	vdr, _, sender, vm, te := setup(t, DefaultConfig(t))
 	expectedVdrSet := set.Of(vdr)
 
 	blks := BuildChain(Genesis, 2)
@@ -2124,7 +2210,7 @@ func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 func TestEngineBubbleVotesThroughInvalidChain(t *testing.T) {
 	require := require.New(t)
 
-	vdr, _, sender, vm, te := setup(t)
+	vdr, _, sender, vm, te := setup(t, DefaultConfig(t))
 	expectedVdrSet := set.Of(vdr)
 
 	blks := BuildChain(Genesis, 3)
@@ -2236,7 +2322,8 @@ func TestEngineBubbleVotesThroughInvalidChain(t *testing.T) {
 
 func TestEngineBuildBlockWithCachedNonVerifiedParent(t *testing.T) {
 	require := require.New(t)
-	vdr, _, sender, vm, te := setup(t)
+
+	vdr, _, sender, vm, te := setup(t, DefaultConfig(t))
 
 	sender.Default(true)
 
@@ -2550,4 +2637,173 @@ func TestEngineRepollsMisconfiguredSubnet(t *testing.T) {
 	// set was misconfigured should result in it being accepted successfully.
 	require.NoError(te.Chits(context.Background(), vdr, queryRequestID, blk.ID(), blk.ID(), blk.ID()))
 	require.Equal(choices.Accepted, blk.Status())
+}
+
+func TestGetProcessingAncestor(t *testing.T) {
+	var (
+		ctx = snowtest.ConsensusContext(
+			snowtest.Context(t, snowtest.PChainID),
+		)
+		issuedChain           = BuildChain(Genesis, 1)
+		unissuedOnIssuedChain = BuildChain(issuedChain[0], 1)
+	)
+
+	metrics, err := newMetrics("", prometheus.NewRegistry())
+	require.NoError(t, err)
+
+	c := &snowman.Topological{}
+	require.NoError(t, c.Initialize(
+		ctx,
+		snowball.DefaultParameters,
+		GenesisID,
+		0,
+		time.Now(),
+	))
+
+	for _, blk := range issuedChain {
+		require.NoError(t, c.Add(context.Background(), blk))
+	}
+
+	nonVerifiedAncestors := ancestor.NewTree()
+	nonVerifiedAncestors.Add(unissuedOnIssuedChain[0].ID(), unissuedOnIssuedChain[0].Parent())
+
+	tests := []struct {
+		name             string
+		engine           *Transitive
+		initialVote      ids.ID
+		expectedAncestor ids.ID
+		expectedFound    bool
+	}{
+		{
+			name: "drop accepted blockID",
+			engine: &Transitive{
+				Config: Config{
+					Ctx: ctx,
+					VM: &block.TestVM{
+						TestVM: common.TestVM{
+							T: t,
+						},
+						GetBlockF: MakeGetBlockF(
+							[]*snowman.TestBlock{Genesis},
+						),
+					},
+					Consensus: c,
+				},
+				metrics:          metrics,
+				nonVerifieds:     ancestor.NewTree(),
+				pending:          map[ids.ID]snowman.Block{},
+				nonVerifiedCache: &cache.Empty[ids.ID, snowman.Block]{},
+			},
+			initialVote:      GenesisID,
+			expectedAncestor: ids.Empty,
+			expectedFound:    false,
+		},
+		{
+			name: "return processing blockID",
+			engine: &Transitive{
+				Config: Config{
+					Ctx: ctx,
+					VM: &block.TestVM{
+						TestVM: common.TestVM{
+							T: t,
+						},
+						GetBlockF: MakeGetBlockF(
+							[]*snowman.TestBlock{Genesis},
+						),
+					},
+					Consensus: c,
+				},
+				metrics:          metrics,
+				nonVerifieds:     ancestor.NewTree(),
+				pending:          map[ids.ID]snowman.Block{},
+				nonVerifiedCache: &cache.Empty[ids.ID, snowman.Block]{},
+			},
+			initialVote:      issuedChain[0].ID(),
+			expectedAncestor: issuedChain[0].ID(),
+			expectedFound:    true,
+		},
+		{
+			name: "drop unknown blockID",
+			engine: &Transitive{
+				Config: Config{
+					Ctx: ctx,
+					VM: &block.TestVM{
+						TestVM: common.TestVM{
+							T: t,
+						},
+						GetBlockF: MakeGetBlockF(
+							[]*snowman.TestBlock{Genesis},
+						),
+					},
+					Consensus: c,
+				},
+				metrics:          metrics,
+				nonVerifieds:     ancestor.NewTree(),
+				pending:          map[ids.ID]snowman.Block{},
+				nonVerifiedCache: &cache.Empty[ids.ID, snowman.Block]{},
+			},
+			initialVote:      ids.GenerateTestID(),
+			expectedAncestor: ids.Empty,
+			expectedFound:    false,
+		},
+		{
+			name: "apply vote through ancestor tree",
+			engine: &Transitive{
+				Config: Config{
+					Ctx: ctx,
+					VM: &block.TestVM{
+						TestVM: common.TestVM{
+							T: t,
+						},
+						GetBlockF: MakeGetBlockF(
+							[]*snowman.TestBlock{Genesis},
+						),
+					},
+					Consensus: c,
+				},
+				metrics:          metrics,
+				nonVerifieds:     nonVerifiedAncestors,
+				pending:          map[ids.ID]snowman.Block{},
+				nonVerifiedCache: &cache.Empty[ids.ID, snowman.Block]{},
+			},
+			initialVote:      unissuedOnIssuedChain[0].ID(),
+			expectedAncestor: issuedChain[0].ID(),
+			expectedFound:    true,
+		},
+		{
+			name: "apply vote through pending set",
+			engine: &Transitive{
+				Config: Config{
+					Ctx: ctx,
+					VM: &block.TestVM{
+						TestVM: common.TestVM{
+							T: t,
+						},
+						GetBlockF: MakeGetBlockF(
+							[]*snowman.TestBlock{Genesis},
+						),
+					},
+					Consensus: c,
+				},
+				metrics:      metrics,
+				nonVerifieds: ancestor.NewTree(),
+				pending: map[ids.ID]snowman.Block{
+					unissuedOnIssuedChain[0].ID(): unissuedOnIssuedChain[0],
+				},
+				nonVerifiedCache: &cache.Empty[ids.ID, snowman.Block]{},
+			},
+			initialVote:      unissuedOnIssuedChain[0].ID(),
+			expectedAncestor: issuedChain[0].ID(),
+			expectedFound:    true,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
+
+			ancestor, found := test.engine.getProcessingAncestor(context.Background(), test.initialVote)
+			require.Equal(test.expectedAncestor, ancestor)
+			require.Equal(test.expectedFound, found)
+		})
+	}
 }
