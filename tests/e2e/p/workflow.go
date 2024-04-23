@@ -18,7 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
-	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
@@ -62,7 +61,7 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 			infoClient := info.NewClient(nodeURI.URI)
 			staticFees, err := infoClient.GetTxFee(e2e.DefaultContext())
 			require.NoError(err)
-			pChainStaticFees := &config.Config{
+			pChainStaticFees := fee.StaticConfig{
 				TxFee:                         uint64(staticFees.TxFee),
 				CreateSubnetTxFee:             uint64(staticFees.CreateSubnetTxFee),
 				TransformSubnetTxFee:          uint64(staticFees.TransformSubnetTxFee),
@@ -170,7 +169,7 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 				require.NoError(err)
 
 				// retrieve fees paid for the tx
-				feeCfg := config.GetDynamicFeesConfig(true /*isEActive*/)
+				feeCfg := fee.GetDynamicConfig(true /*isEActive*/)
 				feeCalc := fee.NewDynamicCalculator(pChainStaticFees, commonfees.NewManager(nextFeeRates), feeCfg.BlockMaxComplexity, tx.Creds)
 				require.NoError(tx.Unsigned.Visit(feeCalc))
 				pChainExportFee = feeCalc.Fee

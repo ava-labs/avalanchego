@@ -1869,7 +1869,15 @@ func (s *Service) GetFeeRates(_ *http.Request, _ *struct{}, reply *GetFeeRatesRe
 	)
 
 	if isEActivated {
-		feeManager, err = fee.UpdatedFeeManager(onAccept, &s.vm.Config, currentTimestamp, nextTimestamp)
+		feeRates, err := onAccept.GetFeeRates()
+		if err != nil {
+			return fmt.Errorf("failed retrieving fee rates: %w", err)
+		}
+		parentBlkComplexity, err := onAccept.GetLastBlockComplexity()
+		if err != nil {
+			return fmt.Errorf("failed retrieving last block complexity: %w", err)
+		}
+		feeManager, err = fee.UpdatedFeeManager(feeRates, parentBlkComplexity, s.vm.Config.Times, currentTimestamp, nextTimestamp)
 		if err != nil {
 			return err
 		}

@@ -5,12 +5,12 @@ package executor
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
-	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -156,12 +156,20 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 
 	var (
 		isEActive = m.txExecutorBackend.Config.IsEActivated(nextBlkTime)
-		feesCfg   = config.GetDynamicFeesConfig(isEActive)
+		feesCfg   = fee.GetDynamicConfig(isEActive)
 	)
 
 	feeManager := commonfees.NewManager(feeRates)
 	if isEActive {
-		feeManager, err = fee.UpdatedFeeManager(stateDiff, m.txExecutorBackend.Config, parentBlkTime, nextBlkTime)
+		feeRates, err := stateDiff.GetFeeRates()
+		if err != nil {
+			return fmt.Errorf("failed retrieving fee rates: %w", err)
+		}
+		parentBlkComplexity, err := stateDiff.GetLastBlockComplexity()
+		if err != nil {
+			return fmt.Errorf("failed retrieving last block complexity: %w", err)
+		}
+		feeManager, err = fee.UpdatedFeeManager(feeRates, parentBlkComplexity, m.txExecutorBackend.Config.Times, parentBlkTime, nextBlkTime)
 		if err != nil {
 			return err
 		}

@@ -45,6 +45,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
+	"github.com/ava-labs/avalanchego/vms/platformvm/upgrade"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
@@ -442,10 +443,12 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 		MinStakeDuration:       defaultMinStakingDuration,
 		MaxStakeDuration:       defaultMaxStakingDuration,
 		RewardConfig:           defaultRewardConfig,
-		BanffTime:              latestForkTime,
-		CortinaTime:            mockable.MaxTime,
-		DurangoTime:            mockable.MaxTime,
-		EUpgradeTime:           mockable.MaxTime,
+		Times: upgrade.Times{
+			BanffTime:    latestForkTime,
+			CortinaTime:  mockable.MaxTime,
+			DurangoTime:  mockable.MaxTime,
+			EUpgradeTime: mockable.MaxTime,
+		},
 	}}
 
 	ctx := snowtest.Context(t, snowtest.PChainID)

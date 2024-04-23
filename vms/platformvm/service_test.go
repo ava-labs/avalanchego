@@ -35,7 +35,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block/builder"
-	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -384,20 +383,21 @@ func TestGetBalance(t *testing.T) {
 			// we use the first key to fund a subnet creation in [defaultGenesis].
 			// As such we need to account for the subnet creation fee
 			var (
-				chainTime = service.vm.state.GetTimestamp()
-
-				feeCalc *fee.Calculator
+				chainTime    = service.vm.state.GetTimestamp()
+				staticFeeCfg = service.vm.Config.StaticConfig
+				feeCalc      *fee.Calculator
 			)
 
 			if !service.vm.IsEActivated(chainTime) {
-				feeCalc = fee.NewStaticCalculator(&service.vm.Config, chainTime)
+				upgrades := service.vm.Config.Times
+				feeCalc = fee.NewStaticCalculator(staticFeeCfg, upgrades, chainTime)
 			} else {
 				feeRates, err := service.vm.state.GetFeeRates()
 				require.NoError(err)
 
-				feeCfg := config.GetDynamicFeesConfig(service.vm.Config.IsEActivated(chainTime))
+				feeCfg := fee.GetDynamicConfig(service.vm.Config.IsEActivated(chainTime))
 				feeMan := commonfees.NewManager(feeRates)
-				feeCalc = fee.NewDynamicCalculator(&service.vm.Config, feeMan, feeCfg.BlockMaxComplexity, testSubnet1.Creds)
+				feeCalc = fee.NewDynamicCalculator(staticFeeCfg, feeMan, feeCfg.BlockMaxComplexity, testSubnet1.Creds)
 			}
 
 			require.NoError(testSubnet1.Unsigned.Visit(feeCalc))
@@ -771,7 +771,7 @@ func TestGetBlock(t *testing.T) {
 			service, _, txBuilder := defaultService(t)
 			service.vm.ctx.Lock.Lock()
 
-			service.vm.Config.CreateAssetTxFee = 100 * defaultTxFee
+			service.vm.CreateAssetTxFee = 100 * defaultTxFee
 
 			// Make a block an accept it, then check we can get it.
 			tx, err := txBuilder.NewCreateChainTx( // Test GetTx works for standard blocks
