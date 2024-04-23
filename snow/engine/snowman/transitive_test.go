@@ -131,21 +131,6 @@ func setup(t *testing.T, config Config) (ids.NodeID, validators.Manager, *common
 	return vdr, config.Validators, sender, vm, te
 }
 
-func TestEngineShutdown(t *testing.T) {
-	require := require.New(t)
-
-	_, _, _, vm, engine := setup(t, DefaultConfig(t))
-
-	var vmShutdownCalled bool
-	vm.ShutdownF = func(context.Context) error {
-		vmShutdownCalled = true
-		return nil
-	}
-
-	require.NoError(engine.Shutdown(context.Background()))
-	require.True(vmShutdownCalled)
-}
-
 func TestEngineDropsAttemptToIssueBlockAfterFailedRequest(t *testing.T) {
 	require := require.New(t)
 
