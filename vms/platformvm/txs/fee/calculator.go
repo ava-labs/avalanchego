@@ -43,6 +43,7 @@ type calculator struct {
 	// Pre E-fork inputs
 	upgrades  upgrade.Times
 	staticCfg StaticConfig
+	time      time.Time
 
 	// outputs of visitor execution
 	fee uint64
