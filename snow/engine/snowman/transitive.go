@@ -15,7 +15,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman/poll"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -26,7 +25,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/bag"
 	"github.com/ava-labs/avalanchego/utils/bimap"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
@@ -157,11 +155,11 @@ func (t *Transitive) Gossip(ctx context.Context) error {
 			zap.Int("numProcessing", numProcessing),
 		)
 
-		// repoll is called here to unblock the engine if it previously errored
-		// when attempting to issue a query. This can happen if a subnet was
-		// temporarily misconfigured and there were no validators.
-		t.repoll(ctx)
-		return nil
+		// executeDeferredWork is called here to unblock the engine if it
+		// previously errored when attempting to issue a query. This can happen
+		// if a subnet was temporarily misconfigured and there were no
+		// validators.
+		return t.executeDeferredWork(ctx)
 	}
 
 	t.Ctx.Log.Verbo("sampling from validators",
@@ -202,59 +200,46 @@ func (t *Transitive) Gossip(ctx context.Context) error {
 }
 
 func (t *Transitive) Put(ctx context.Context, nodeID ids.NodeID, requestID uint32, blkBytes []byte) error {
+	request := common.Request{
+		NodeID:    nodeID,
+		RequestID: requestID,
+	}
+	expectedBlkID, ok := t.blkReqs.DeleteKey(request)
+	if !ok {
+		t.Ctx.Log.Debug("unexpected Put",
+			zap.Stringer("nodeID", nodeID),
+			zap.Uint32("requestID", requestID),
+		)
+		t.metrics.numUselessPutBytes.Add(float64(len(blkBytes)))
+		return nil
+	}
+	issuedMetric := t.blkReqSourceMetric[request]
+	delete(t.blkReqSourceMetric, request)
+
 	blk, err := t.VM.ParseBlock(ctx, blkBytes)
 	if err != nil {
-		if t.Ctx.Log.Enabled(logging.Verbo) {
-			t.Ctx.Log.Verbo("failed to parse block",
-				zap.Stringer("nodeID", nodeID),
-				zap.Uint32("requestID", requestID),
-				zap.Binary("block", blkBytes),
-				zap.Error(err),
-			)
-		} else {
-			t.Ctx.Log.Debug("failed to parse block",
-				zap.Stringer("nodeID", nodeID),
-				zap.Uint32("requestID", requestID),
-				zap.Error(err),
-			)
-		}
-		// because GetFailed doesn't utilize the assumption that we actually
-		// sent a Get message, we can safely call GetFailed here to potentially
-		// abandon the request.
-		return t.GetFailed(ctx, nodeID, requestID)
+		t.Ctx.Log.Debug("failed to parse block",
+			zap.Stringer("nodeID", nodeID),
+			zap.Uint32("requestID", requestID),
+			zap.Error(err),
+		)
+
+		t.metrics.numUselessPutBytes.Add(float64(len(blkBytes)))
+		t.blocked.Abandon(ctx, expectedBlkID)
+		return t.executeDeferredWork(ctx)
 	}
 
-	var (
-		req = common.Request{
-			NodeID:    nodeID,
-			RequestID: requestID,
-		}
-		issuedMetric prometheus.Counter
-	)
-	switch expectedBlkID, ok := t.blkReqs.GetValue(req); {
-	case ok:
-		actualBlkID := blk.ID()
-		if actualBlkID != expectedBlkID {
-			t.Ctx.Log.Debug("incorrect block returned in Put",
-				zap.Stringer("nodeID", nodeID),
-				zap.Uint32("requestID", requestID),
-				zap.Stringer("blkID", actualBlkID),
-				zap.Stringer("expectedBlkID", expectedBlkID),
-			)
-			// We assume that [blk] is useless because it doesn't match what we
-			// expected.
-			return t.GetFailed(ctx, nodeID, requestID)
-		}
+	if actualBlkID := blk.ID(); actualBlkID != expectedBlkID {
+		t.Ctx.Log.Debug("incorrect block returned in Put",
+			zap.Stringer("nodeID", nodeID),
+			zap.Uint32("requestID", requestID),
+			zap.Stringer("blkID", actualBlkID),
+			zap.Stringer("expectedBlkID", expectedBlkID),
+		)
 
-		issuedMetric = t.blkReqSourceMetric[req]
-	default:
-		// This can happen if this block was provided to this engine while a Get
-		// request was outstanding. For example, the block may have been locally
-		// built or the node may have received a PushQuery with this block.
-		//
-		// Note: It is still possible this block will be issued here, because
-		// the block may have previously failed verification.
-		issuedMetric = t.metrics.issued.WithLabelValues(unknownSource)
+		t.metrics.numUselessPutBytes.Add(float64(len(blkBytes)))
+		t.blocked.Abandon(ctx, expectedBlkID)
+		return t.executeDeferredWork(ctx)
 	}
 
 	if !shouldBlockBeQueuedForIssuance(t.Consensus, t.pending, blk) {
@@ -310,20 +295,11 @@ func (t *Transitive) PushQuery(ctx context.Context, nodeID ids.NodeID, requestID
 	blk, err := t.VM.ParseBlock(ctx, blkBytes)
 	// If parsing fails, we just drop the request, as we didn't ask for it
 	if err != nil {
-		if t.Ctx.Log.Enabled(logging.Verbo) {
-			t.Ctx.Log.Verbo("failed to parse block",
-				zap.Stringer("nodeID", nodeID),
-				zap.Uint32("requestID", requestID),
-				zap.Binary("block", blkBytes),
-				zap.Error(err),
-			)
-		} else {
-			t.Ctx.Log.Debug("failed to parse block",
-				zap.Stringer("nodeID", nodeID),
-				zap.Uint32("requestID", requestID),
-				zap.Error(err),
-			)
-		}
+		t.Ctx.Log.Debug("failed to parse block",
+			zap.Stringer("nodeID", nodeID),
+			zap.Uint32("requestID", requestID),
+			zap.Error(err),
+		)
 		return nil
 	}
 
@@ -331,17 +307,15 @@ func (t *Transitive) PushQuery(ctx context.Context, nodeID ids.NodeID, requestID
 		t.metrics.numUselessPushQueryBytes.Add(float64(len(blkBytes)))
 	}
 
-	issuedMetric := t.metrics.issued.WithLabelValues(pushGossipSource)
-
 	// issue the block into consensus. If the block has already been issued,
 	// this will be a noop. If this block has missing dependencies, nodeID will
 	// receive requests to fill the ancestry. dependencies that have already
 	// been fetched, but with missing dependencies themselves won't be requested
 	// from the vdr.
+	issuedMetric := t.metrics.issued.WithLabelValues(pushGossipSource)
 	if _, err := t.issueChain(ctx, nodeID, blk, issuedMetric); err != nil {
 		return err
 	}
-
 	return t.executeDeferredWork(ctx)
 }
 
@@ -357,7 +331,6 @@ func (t *Transitive) Chits(ctx context.Context, nodeID ids.NodeID, requestID uin
 	)
 
 	issuedMetric := t.metrics.issued.WithLabelValues(pullGossipSource)
-
 	shouldWaitOnPreferred, err := t.issueID(ctx, nodeID, preferredID, issuedMetric)
 	if err != nil {
 		return err
@@ -560,6 +533,16 @@ func (t *Transitive) executeDeferredWork(ctx context.Context) error {
 		}
 	}
 
+	if t.Consensus.NumProcessing() > 0 {
+		// if we are issuing a repoll, we should gossip our current preferences
+		// to propagate the most likely branch as quickly as possible.
+		preferredID := t.Consensus.Preference()
+
+		for i := t.polls.Len(); i < t.Params.ConcurrentRepolls; i++ {
+			t.sendQuery(ctx, preferredID, nil, false)
+		}
+	}
+
 	t.metrics.numRequests.Set(float64(t.blkReqs.Len()))
 	t.metrics.numBlocked.Set(float64(len(t.pending)))
 	t.metrics.numBlockers.Set(float64(t.blocked.Len()))
@@ -703,18 +686,6 @@ func (t *Transitive) buildBlock(ctx context.Context) error {
 
 	issuedMetric := t.metrics.issued.WithLabelValues(builtSource)
 	return t.deliver(ctx, t.Ctx.NodeID, blk, true, issuedMetric)
-}
-
-// Issue another poll to the network, asking what it prefers given the block we prefer.
-// Helps move consensus along.
-func (t *Transitive) repoll(ctx context.Context) {
-	// if we are issuing a repoll, we should gossip our current preferences to
-	// propagate the most likely branch as quickly as possible
-	prefID := t.Consensus.Preference()
-
-	for i := t.polls.Len(); i < t.Params.ConcurrentRepolls; i++ {
-		t.sendQuery(ctx, prefID, nil, false)
-	}
 }
 
 // issueID attempts to issue the branch ending with [blkID] into consensus.
@@ -894,104 +865,105 @@ func (t *Transitive) deliver(
 	push bool,
 	issuedMetric prometheus.Counter,
 ) error {
-	if shouldBlockBeDropped(t.Consensus, blk) {
-		return nil
-	}
+	var (
+		blksToIssue   = make([]snowman.Block, 1, 3)
+		blksToFulfill = make([]snowman.Block, 0, 3)
+		blksToAbandon = make([]ids.ID, 0, 3)
+	)
+	blksToIssue[0] = blk
+	for len(blksToIssue) > 0 {
+		blk := blksToIssue[0]
+		blksToIssue = blksToIssue[1:]
 
-	// we are no longer waiting on adding the block to consensus, so it is no
-	// longer pending
-	blkID := blk.ID()
-	delete(t.pending, blkID)
+		blkID := blk.ID()
 
-	// Because the dependency must have been fulfilled by the time this function
-	// is called - we don't expect [err] to be non-nil. But it is handled for
-	// completness and future proofing.
-	if parentID := blk.Parent(); !canBlockHaveChildIssued(t.Consensus, parentID) {
-		// if the parent isn't processing or the last accepted block, then this
-		// block is effectively rejected
-		t.blocked.Abandon(ctx, blkID)
-		return t.errs.Err
-	}
-
-	// By ensuring that the parent is either processing or accepted, it is
-	// guaranteed that the parent was successfully verified. This means that
-	// calling Verify on this block is allowed.
-	blkAdded, err := t.addUnverifiedBlockToConsensus(ctx, nodeID, blk, issuedMetric)
-	if err != nil {
-		return err
-	}
-	if !blkAdded {
-		t.blocked.Abandon(ctx, blkID)
-		return t.errs.Err
-	}
-
-	// Add all the oracle blocks if they exist. We call verify on all the blocks
-	// and add them to consensus before marking anything as fulfilled to avoid
-	// any potential reentrant bugs.
-	added := []snowman.Block{}
-	dropped := []snowman.Block{}
-	if blk, ok := blk.(snowman.OracleBlock); ok {
-		options, err := blk.Options(ctx)
-		if err != snowman.ErrNotOracle {
-			if err != nil {
-				return err
-			}
-
-			for _, blk := range options {
-				blkAdded, err := t.addUnverifiedBlockToConsensus(ctx, nodeID, blk, issuedMetric)
-				if err != nil {
-					return err
-				}
-				if blkAdded {
-					added = append(added, blk)
-				} else {
-					dropped = append(dropped, blk)
-				}
-			}
+		// If the block has already been issued, we don't need to issue it again
+		if shouldBlockBeDropped(t.Consensus, blk) {
+			blksToAbandon = append(blksToAbandon, blkID)
+			continue
 		}
+
+		parentID := blk.Parent()
+		if !canBlockHaveChildIssued(t.Consensus, parentID) {
+			blksToAbandon = append(blksToAbandon, blkID)
+			continue
+		}
+
+		// make sure this block is valid
+		blkHeight := blk.Height()
+		if err := blk.Verify(ctx); err != nil {
+			t.Ctx.Log.Debug("block verification failed",
+				zap.Stringer("nodeID", nodeID),
+				zap.Stringer("blkID", blkID),
+				zap.Uint64("height", blkHeight),
+				zap.Error(err),
+			)
+
+			// if verify fails, then all descendants are also invalid
+			t.addToNonVerifieds(blk)
+			blksToAbandon = append(blksToAbandon, blkID)
+			continue
+		}
+
+		issuedMetric.Inc()
+		t.nonVerifieds.Remove(blkID)
+		t.nonVerifiedCache.Evict(blkID)
+		t.metrics.issuerStake.Observe(float64(t.Validators.GetWeight(t.Ctx.SubnetID, nodeID)))
+		t.Ctx.Log.Verbo("adding block to consensus",
+			zap.Stringer("nodeID", nodeID),
+			zap.Stringer("blkID", blkID),
+			zap.Uint64("height", blkHeight),
+		)
+		err := t.Consensus.Add(&memoryBlock{
+			Block:   blk,
+			metrics: t.metrics,
+			tree:    t.nonVerifieds,
+		})
+		if err != nil {
+			return err
+		}
+
+		blksToFulfill = append(blksToFulfill, blk)
+
+		oracleBlock, ok := blk.(snowman.OracleBlock)
+		if !ok {
+			continue
+		}
+
+		options, err := oracleBlock.Options(ctx)
+		if err == snowman.ErrNotOracle {
+			continue
+		}
+		if err != nil {
+			return err
+		}
+
+		blksToIssue = append(blksToIssue, options[:]...)
 	}
 
 	if err := t.VM.SetPreference(ctx, t.Consensus.Preference()); err != nil {
 		return err
 	}
 
-	// If the block is now preferred, query the network for its preferences
-	// with this new block.
-	if t.Consensus.IsPreferred(blkID) {
-		t.sendQuery(ctx, blkID, blk.Bytes(), push)
-	}
-
-	t.blocked.Fulfill(ctx, blkID)
-	for _, blk := range added {
+	for _, blk := range blksToFulfill {
 		blkID := blk.ID()
 		if t.Consensus.IsPreferred(blkID) {
 			t.sendQuery(ctx, blkID, blk.Bytes(), push)
 		}
 
 		delete(t.pending, blkID)
+		if req, ok := t.blkReqs.DeleteValue(blkID); ok {
+			delete(t.blkReqSourceMetric, req)
+		}
 		t.blocked.Fulfill(ctx, blkID)
-		if req, ok := t.blkReqs.DeleteValue(blkID); ok {
-			delete(t.blkReqSourceMetric, req)
-		}
 	}
-	for _, blk := range dropped {
-		blkID := blk.ID()
+	for _, blkID := range blksToAbandon {
 		delete(t.pending, blkID)
-		t.blocked.Abandon(ctx, blkID)
 		if req, ok := t.blkReqs.DeleteValue(blkID); ok {
 			delete(t.blkReqSourceMetric, req)
 		}
+		t.blocked.Abandon(ctx, blkID)
 	}
-
-	// It's possible that the blocks we just added to consensus were decided
-	// immediately by votes that were pending their issuance. If this is the
-	// case, we should not be requesting any chits.
-	if t.Consensus.NumProcessing() == 0 {
-		return t.errs.Err
-	}
-
-	// If we should issue multiple queries at the same time, we need to repoll
-	t.repoll(ctx)
 	return t.errs.Err
 }
 
@@ -1105,17 +1077,6 @@ func (t *Transitive) getProcessingAncestor(ctx context.Context, initialVote ids.
 
 		bubbledVote = blk.Parent()
 	}
-}
-
-func (t *Transitive) ConsensusDecided(blk snowman.Block) bool {
-	// If the block is decided, then it must have been previously issued.
-	if blk.Status().Decided() {
-		return true
-	}
-	// If the block is marked as fetched, we can check if it has been
-	// transitively rejected.
-	_, lastAcceptedHeight := t.Consensus.LastAccepted()
-	return blk.Status() == choices.Processing && blk.Height() <= lastAcceptedHeight
 }
 
 func shouldBlockBeQueuedForIssuance(

@@ -87,12 +87,4 @@ func (v *voter) Update(ctx context.Context) {
 		v.t.errs.Add(err)
 		return
 	}
-
-	if v.t.Consensus.NumProcessing() == 0 {
-		v.t.Ctx.Log.Debug("Snowman engine can quiesce")
-		return
-	}
-
-	v.t.Ctx.Log.Debug("Snowman engine can't quiesce")
-	v.t.repoll(ctx)
 }
