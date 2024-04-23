@@ -45,7 +45,7 @@ func cachedBlockSize(_ ids.ID, blk snowman.Block) int {
 // Transitive dependencies.
 type Transitive struct {
 	Config
-	metrics
+	*metrics
 
 	// list of NoOpsHandler for messages dropped by engine
 	common.StateSummaryFrontierHandler
@@ -125,8 +125,14 @@ func New(config Config) (*Transitive, error) {
 		return nil, err
 	}
 
-	t := &Transitive{
+	metrics, err := newMetrics("", config.Ctx.Registerer)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Transitive{
 		Config:                      config,
+		metrics:                     metrics,
 		StateSummaryFrontierHandler: common.NewNoOpStateSummaryFrontierHandler(config.Ctx.Log),
 		AcceptedStateSummaryHandler: common.NewNoOpAcceptedStateSummaryHandler(config.Ctx.Log),
 		AcceptedFrontierHandler:     common.NewNoOpAcceptedFrontierHandler(config.Ctx.Log),
@@ -141,9 +147,7 @@ func New(config Config) (*Transitive, error) {
 		polls:                       polls,
 		blkReqs:                     bimap.New[common.Request, ids.ID](),
 		blkReqSourceMetric:          make(map[common.Request]prometheus.Counter),
-	}
-
-	return t, t.metrics.Initialize("", config.Ctx.Registerer)
+	}, nil
 }
 
 func (t *Transitive) Gossip(ctx context.Context) error {
@@ -1036,6 +1040,13 @@ func (t *Transitive) deliver(
 		}
 	}
 
+	// It's possible that the blocks we just added to consensus were decided
+	// immediately by votes that were pending their issuance. If this is the
+	// case, we should not be requesting any chits.
+	if t.Consensus.NumProcessing() == 0 {
+		return t.errs.Err
+	}
+
 	// If we should issue multiple queries at the same time, we need to repoll
 	t.repoll(ctx)
 	return t.errs.Err
@@ -1103,7 +1114,59 @@ func (t *Transitive) addUnverifiedBlockToConsensus(
 	)
 	return true, t.Consensus.Add(ctx, &memoryBlock{
 		Block:   blk,
-		metrics: &t.metrics,
+		metrics: t.metrics,
 		tree:    t.nonVerifieds,
 	})
+}
+
+// getProcessingAncestor finds [initialVote]'s most recent ancestor that is
+// processing in consensus. If no ancestor could be found, false is returned.
+//
+// Note: If [initialVote] is processing, then [initialVote] will be returned.
+func (t *Transitive) getProcessingAncestor(ctx context.Context, initialVote ids.ID) (ids.ID, bool) {
+	// If [bubbledVote] != [initialVote], it is guaranteed that [bubbledVote] is
+	// in processing. Otherwise, we attempt to iterate through any blocks we
+	// have at our disposal as a best-effort mechanism to find a valid ancestor.
+	bubbledVote := t.nonVerifieds.GetAncestor(initialVote)
+	for {
+		if t.Consensus.Processing(bubbledVote) {
+			t.Ctx.Log.Verbo("applying vote",
+				zap.Stringer("initialVoteID", initialVote),
+				zap.Stringer("bubbledVoteID", bubbledVote),
+			)
+			if bubbledVote != initialVote {
+				t.numProcessingAncestorFetchesSucceeded.Inc()
+			} else {
+				t.numProcessingAncestorFetchesUnneeded.Inc()
+			}
+			return bubbledVote, true
+		}
+
+		blk, err := t.getBlock(ctx, bubbledVote)
+		// If we cannot retrieve the block, drop [vote]
+		if err != nil {
+			t.Ctx.Log.Debug("dropping vote",
+				zap.String("reason", "ancestor couldn't be fetched"),
+				zap.Stringer("initialVoteID", initialVote),
+				zap.Stringer("bubbledVoteID", bubbledVote),
+				zap.Error(err),
+			)
+			t.numProcessingAncestorFetchesFailed.Inc()
+			return ids.Empty, false
+		}
+
+		if t.Consensus.Decided(blk) {
+			t.Ctx.Log.Debug("dropping vote",
+				zap.String("reason", "bubbled vote already decided"),
+				zap.Stringer("initialVoteID", initialVote),
+				zap.Stringer("bubbledVoteID", bubbledVote),
+				zap.Stringer("status", blk.Status()),
+				zap.Uint64("height", blk.Height()),
+			)
+			t.numProcessingAncestorFetchesDropped.Inc()
+			return ids.Empty, false
+		}
+
+		bubbledVote = blk.Parent()
+	}
 }
