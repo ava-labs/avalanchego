@@ -275,6 +275,7 @@ func (p *postForkCommonComponents) buildChild(
 		zap.Stringer("blkID", child.ID()),
 		zap.Stringer("innerBlkID", innerBlock.ID()),
 		zap.Uint64("height", child.Height()),
+		zap.Uint64("pChainHeight", pChainHeight),
 		zap.Time("parentTimestamp", parentTimestamp),
 		zap.Time("blockTimestamp", newTimestamp),
 	)

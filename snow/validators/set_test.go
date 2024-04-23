@@ -17,10 +17,43 @@ import (
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
+var _ SetCallbackListener = (*setCallbackListener)(nil)
+
+type setCallbackListener struct {
+	t         *testing.T
+	onAdd     func(ids.NodeID, *bls.PublicKey, ids.ID, uint64)
+	onWeight  func(ids.NodeID, uint64, uint64)
+	onRemoved func(ids.NodeID, uint64)
+}
+
+func (c *setCallbackListener) OnValidatorAdded(nodeID ids.NodeID, pk *bls.PublicKey, txID ids.ID, weight uint64) {
+	if c.onAdd != nil {
+		c.onAdd(nodeID, pk, txID, weight)
+	} else {
+		c.t.Fail()
+	}
+}
+
+func (c *setCallbackListener) OnValidatorRemoved(nodeID ids.NodeID, weight uint64) {
+	if c.onRemoved != nil {
+		c.onRemoved(nodeID, weight)
+	} else {
+		c.t.Fail()
+	}
+}
+
+func (c *setCallbackListener) OnValidatorWeightChanged(nodeID ids.NodeID, oldWeight, newWeight uint64) {
+	if c.onWeight != nil {
+		c.onWeight(nodeID, oldWeight, newWeight)
+	} else {
+		c.t.Fail()
+	}
+}
+
 func TestSetAddDuplicate(t *testing.T) {
 	require := require.New(t)
 
-	s := newSet()
+	s := newSet(ids.Empty, nil)
 
 	nodeID := ids.GenerateTestNodeID()
 	require.NoError(s.Add(nodeID, nil, ids.Empty, 1))
@@ -32,7 +65,7 @@ func TestSetAddDuplicate(t *testing.T) {
 func TestSetAddOverflow(t *testing.T) {
 	require := require.New(t)
 
-	s := newSet()
+	s := newSet(ids.Empty, nil)
 	require.NoError(s.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1))
 
 	require.NoError(s.Add(ids.GenerateTestNodeID(), nil, ids.Empty, math.MaxUint64))
@@ -44,7 +77,7 @@ func TestSetAddOverflow(t *testing.T) {
 func TestSetAddWeightOverflow(t *testing.T) {
 	require := require.New(t)
 
-	s := newSet()
+	s := newSet(ids.Empty, nil)
 
 	require.NoError(s.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1))
 
@@ -60,7 +93,7 @@ func TestSetAddWeightOverflow(t *testing.T) {
 func TestSetGetWeight(t *testing.T) {
 	require := require.New(t)
 
-	s := newSet()
+	s := newSet(ids.Empty, nil)
 
 	nodeID := ids.GenerateTestNodeID()
 	require.Zero(s.GetWeight(nodeID))
@@ -83,7 +116,7 @@ func TestSetSubsetWeight(t *testing.T) {
 
 	subset := set.Of(nodeID0, nodeID1)
 
-	s := newSet()
+	s := newSet(ids.Empty, nil)
 
 	require.NoError(s.Add(nodeID0, nil, ids.Empty, weight0))
 	require.NoError(s.Add(nodeID1, nil, ids.Empty, weight1))
@@ -98,7 +131,7 @@ func TestSetSubsetWeight(t *testing.T) {
 func TestSetRemoveWeightMissingValidator(t *testing.T) {
 	require := require.New(t)
 
-	s := newSet()
+	s := newSet(ids.Empty, nil)
 
 	require.NoError(s.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1))
 
@@ -109,7 +142,7 @@ func TestSetRemoveWeightMissingValidator(t *testing.T) {
 func TestSetRemoveWeightUnderflow(t *testing.T) {
 	require := require.New(t)
 
-	s := newSet()
+	s := newSet(ids.Empty, nil)
 
 	require.NoError(s.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1))
 
@@ -127,7 +160,7 @@ func TestSetRemoveWeightUnderflow(t *testing.T) {
 func TestSetGet(t *testing.T) {
 	require := require.New(t)
 
-	s := newSet()
+	s := newSet(ids.Empty, nil)
 
 	nodeID := ids.GenerateTestNodeID()
 	_, ok := s.Get(nodeID)
@@ -164,7 +197,7 @@ func TestSetGet(t *testing.T) {
 func TestSetLen(t *testing.T) {
 	require := require.New(t)
 
-	s := newSet()
+	s := newSet(ids.Empty, nil)
 
 	setLen := s.Len()
 	require.Zero(setLen)
@@ -195,7 +228,7 @@ func TestSetLen(t *testing.T) {
 func TestSetMap(t *testing.T) {
 	require := require.New(t)
 
-	s := newSet()
+	s := newSet(ids.Empty, nil)
 
 	m := s.Map()
 	require.Empty(m)
@@ -278,7 +311,7 @@ func TestSetWeight(t *testing.T) {
 	vdr1 := ids.BuildTestNodeID([]byte{2})
 	weight1 := uint64(123)
 
-	s := newSet()
+	s := newSet(ids.Empty, nil)
 	require.NoError(s.Add(vdr0, nil, ids.Empty, weight0))
 
 	require.NoError(s.Add(vdr1, nil, ids.Empty, weight1))
@@ -292,7 +325,7 @@ func TestSetWeight(t *testing.T) {
 func TestSetSample(t *testing.T) {
 	require := require.New(t)
 
-	s := newSet()
+	s := newSet(ids.Empty, nil)
 
 	sampled, err := s.Sample(0)
 	require.NoError(err)
@@ -337,7 +370,7 @@ func TestSetString(t *testing.T) {
 		0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
 	})
 
-	s := newSet()
+	s := newSet(ids.Empty, nil)
 	require.NoError(s.Add(nodeID0, nil, ids.Empty, 1))
 
 	require.NoError(s.Add(nodeID1, nil, ids.Empty, math.MaxInt64-1))
@@ -347,39 +380,6 @@ func TestSetString(t *testing.T) {
     Validator[1]: NodeID-QLbz7JHiBTspS962RLKV8GndWFwdYhk6V, 9223372036854775806`
 	result := s.String()
 	require.Equal(expected, result)
-}
-
-var _ SetCallbackListener = (*callbackListener)(nil)
-
-type callbackListener struct {
-	t         *testing.T
-	onAdd     func(ids.NodeID, *bls.PublicKey, ids.ID, uint64)
-	onWeight  func(ids.NodeID, uint64, uint64)
-	onRemoved func(ids.NodeID, uint64)
-}
-
-func (c *callbackListener) OnValidatorAdded(nodeID ids.NodeID, pk *bls.PublicKey, txID ids.ID, weight uint64) {
-	if c.onAdd != nil {
-		c.onAdd(nodeID, pk, txID, weight)
-	} else {
-		c.t.Fail()
-	}
-}
-
-func (c *callbackListener) OnValidatorRemoved(nodeID ids.NodeID, weight uint64) {
-	if c.onRemoved != nil {
-		c.onRemoved(nodeID, weight)
-	} else {
-		c.t.Fail()
-	}
-}
-
-func (c *callbackListener) OnValidatorWeightChanged(nodeID ids.NodeID, oldWeight, newWeight uint64) {
-	if c.onWeight != nil {
-		c.onWeight(nodeID, oldWeight, newWeight)
-	} else {
-		c.t.Fail()
-	}
 }
 
 func TestSetAddCallback(t *testing.T) {
@@ -392,10 +392,10 @@ func TestSetAddCallback(t *testing.T) {
 	txID0 := ids.GenerateTestID()
 	weight0 := uint64(1)
 
-	s := newSet()
+	s := newSet(ids.Empty, nil)
 	callCount := 0
 	require.False(s.HasCallbackRegistered())
-	s.RegisterCallbackListener(&callbackListener{
+	s.RegisterCallbackListener(&setCallbackListener{
 		t: t,
 		onAdd: func(nodeID ids.NodeID, pk *bls.PublicKey, txID ids.ID, weight uint64) {
 			require.Equal(nodeID0, nodeID)
@@ -418,12 +418,12 @@ func TestSetAddWeightCallback(t *testing.T) {
 	weight0 := uint64(1)
 	weight1 := uint64(93)
 
-	s := newSet()
+	s := newSet(ids.Empty, nil)
 	require.NoError(s.Add(nodeID0, nil, txID0, weight0))
 
 	callCount := 0
 	require.False(s.HasCallbackRegistered())
-	s.RegisterCallbackListener(&callbackListener{
+	s.RegisterCallbackListener(&setCallbackListener{
 		t: t,
 		onAdd: func(nodeID ids.NodeID, pk *bls.PublicKey, txID ids.ID, weight uint64) {
 			require.Equal(nodeID0, nodeID)
@@ -452,12 +452,12 @@ func TestSetRemoveWeightCallback(t *testing.T) {
 	weight0 := uint64(93)
 	weight1 := uint64(92)
 
-	s := newSet()
+	s := newSet(ids.Empty, nil)
 	require.NoError(s.Add(nodeID0, nil, txID0, weight0))
 
 	callCount := 0
 	require.False(s.HasCallbackRegistered())
-	s.RegisterCallbackListener(&callbackListener{
+	s.RegisterCallbackListener(&setCallbackListener{
 		t: t,
 		onAdd: func(nodeID ids.NodeID, pk *bls.PublicKey, txID ids.ID, weight uint64) {
 			require.Equal(nodeID0, nodeID)
@@ -485,12 +485,12 @@ func TestSetValidatorRemovedCallback(t *testing.T) {
 	txID0 := ids.GenerateTestID()
 	weight0 := uint64(93)
 
-	s := newSet()
+	s := newSet(ids.Empty, nil)
 	require.NoError(s.Add(nodeID0, nil, txID0, weight0))
 
 	callCount := 0
 	require.False(s.HasCallbackRegistered())
-	s.RegisterCallbackListener(&callbackListener{
+	s.RegisterCallbackListener(&setCallbackListener{
 		t: t,
 		onAdd: func(nodeID ids.NodeID, pk *bls.PublicKey, txID ids.ID, weight uint64) {
 			require.Equal(nodeID0, nodeID)
