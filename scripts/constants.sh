@@ -13,12 +13,15 @@ AVALANCHE_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd ) # Direct
 # Where AvalancheGo binary goes
 avalanchego_path="$AVALANCHE_PATH/build/avalanchego"
 
-# Current branch  (shared between image build and its test script)
+# Image tag based on current branch  (shared between image build and its test script)
 # TODO: fix "fatal: No names found, cannot describe anything" in github CI
-current_branch=$(git symbolic-ref -q --short HEAD || git describe --tags --exact-match || true)
-# Supply a default branch when one is not discovered
-if [[ -z $current_branch ]]; then
-  current_branch=ci_dummy
+image_tag=$(git symbolic-ref -q --short HEAD || git describe --tags --exact-match || true)
+if [[ -z $image_tag ]]; then
+  # Supply a default tag when one is not discovered
+  image_tag=ci_dummy
+elif [[ "$image_tag" == */* ]]; then
+  # Slashes are not legal for docker image tags - replace with dashes
+  image_tag=$(echo "$image_tag" | tr '/' '-')
 fi
 
 # Current commit (shared between image build and its test script)
