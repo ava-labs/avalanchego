@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
@@ -221,7 +222,7 @@ func (v *verifier) ApricotStandardBlock(b *block.ApricotStandardBlock) error {
 		return err
 	}
 
-	return v.standardBlock(b, time.Time{}, time.Time{}, onAcceptState)
+	return v.standardBlock(b, time.Time{}, mockable.MaxTime, onAcceptState)
 }
 
 func (v *verifier) ApricotAtomicBlock(b *block.ApricotAtomicBlock) error {
