@@ -168,7 +168,11 @@ func verifyAddValidatorTx(
 	}
 
 	// Verify the flowcheck
-	feeCalculator := fee.NewStaticCalculator(backend.Config, currentTimestamp)
+	var (
+		staticFeesCfg = backend.Config.StaticConfig
+		upgrades      = backend.Config.Times
+	)
+	feeCalculator := fee.NewStaticCalculator(staticFeesCfg, upgrades, currentTimestamp)
 	if err := tx.Visit(feeCalculator); err != nil {
 		return nil, err
 	}
@@ -264,11 +268,15 @@ func verifyAddSubnetValidatorTx(
 	}
 
 	// Verify the flowcheck
-	var feeCalculator *fee.Calculator
+	var (
+		feeCalculator *fee.Calculator
+		staticFeesCfg = backend.Config.StaticConfig
+	)
 	if !isEActive {
-		feeCalculator = fee.NewStaticCalculator(backend.Config, currentTimestamp)
+		upgrades := backend.Config.Times
+		feeCalculator = fee.NewStaticCalculator(staticFeesCfg, upgrades, currentTimestamp)
 	} else {
-		feeCalculator = fee.NewDynamicCalculator(backend.Config, feeManager, maxComplexity, sTx.Creds)
+		feeCalculator = fee.NewDynamicCalculator(staticFeesCfg, feeManager, maxComplexity, sTx.Creds)
 	}
 	if err := tx.Visit(feeCalculator); err != nil {
 		return commonfees.NoTip, err
@@ -359,11 +367,15 @@ func verifyRemoveSubnetValidatorTx(
 	}
 
 	// Verify the flowcheck
-	var feeCalculator *fee.Calculator
+	var (
+		feeCalculator *fee.Calculator
+		staticFeesCfg = backend.Config.StaticConfig
+	)
 	if !isEActive {
-		feeCalculator = fee.NewStaticCalculator(backend.Config, currentTimestamp)
+		upgrades := backend.Config.Times
+		feeCalculator = fee.NewStaticCalculator(staticFeesCfg, upgrades, currentTimestamp)
 	} else {
-		feeCalculator = fee.NewDynamicCalculator(backend.Config, feeManager, maxComplexity, sTx.Creds)
+		feeCalculator = fee.NewDynamicCalculator(staticFeesCfg, feeManager, maxComplexity, sTx.Creds)
 	}
 
 	if err := tx.Visit(feeCalculator); err != nil {
@@ -495,7 +507,11 @@ func verifyAddDelegatorTx(
 	}
 
 	// Verify the flowcheck
-	feeCalculator := fee.NewStaticCalculator(backend.Config, currentTimestamp)
+	var (
+		staticFeesCfg = backend.Config.StaticConfig
+		upgrades      = backend.Config.Times
+	)
+	feeCalculator := fee.NewStaticCalculator(staticFeesCfg, upgrades, currentTimestamp)
 	if err := tx.Visit(feeCalculator); err != nil {
 		return nil, err
 	}
@@ -620,11 +636,15 @@ func verifyAddPermissionlessValidatorTx(
 	copy(outs[len(tx.Outs):], tx.StakeOuts)
 
 	// Verify the flowcheck
-	var feeCalculator *fee.Calculator
+	var (
+		feeCalculator *fee.Calculator
+		staticFeesCfg = backend.Config.StaticConfig
+	)
 	if !isEActive {
-		feeCalculator = fee.NewStaticCalculator(backend.Config, currentTimestamp)
+		upgrades := backend.Config.Times
+		feeCalculator = fee.NewStaticCalculator(staticFeesCfg, upgrades, currentTimestamp)
 	} else {
-		feeCalculator = fee.NewDynamicCalculator(backend.Config, feeManager, maxComplexity, sTx.Creds)
+		feeCalculator = fee.NewDynamicCalculator(staticFeesCfg, feeManager, maxComplexity, sTx.Creds)
 	}
 
 	if err := tx.Visit(feeCalculator); err != nil {
@@ -783,11 +803,15 @@ func verifyAddPermissionlessDelegatorTx(
 	}
 
 	// Verify the flowcheck
-	var feeCalculator *fee.Calculator
+	var (
+		feeCalculator *fee.Calculator
+		staticFeesCfg = backend.Config.StaticConfig
+	)
 	if !isEActive {
-		feeCalculator = fee.NewStaticCalculator(backend.Config, currentTimestamp)
+		upgrades := backend.Config.Times
+		feeCalculator = fee.NewStaticCalculator(staticFeesCfg, upgrades, currentTimestamp)
 	} else {
-		feeCalculator = fee.NewDynamicCalculator(backend.Config, feeManager, maxComplexity, sTx.Creds)
+		feeCalculator = fee.NewDynamicCalculator(staticFeesCfg, feeManager, maxComplexity, sTx.Creds)
 	}
 
 	if err := tx.Visit(feeCalculator); err != nil {
@@ -861,11 +885,15 @@ func verifyTransferSubnetOwnershipTx(
 	}
 
 	// Verify the flowcheck
-	var feeCalculator *fee.Calculator
+	var (
+		feeCalculator *fee.Calculator
+		staticFeesCfg = backend.Config.StaticConfig
+	)
 	if !isEActive {
-		feeCalculator = fee.NewStaticCalculator(backend.Config, currentTimestamp)
+		upgrades := backend.Config.Times
+		feeCalculator = fee.NewStaticCalculator(staticFeesCfg, upgrades, currentTimestamp)
 	} else {
-		feeCalculator = fee.NewDynamicCalculator(backend.Config, feeManager, maxComplexity, sTx.Creds)
+		feeCalculator = fee.NewDynamicCalculator(staticFeesCfg, feeManager, maxComplexity, sTx.Creds)
 	}
 
 	if err := tx.Visit(feeCalculator); err != nil {

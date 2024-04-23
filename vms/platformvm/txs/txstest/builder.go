@@ -544,26 +544,36 @@ func (b *Builder) builders(keys []*secp256k1.PrivateKey) (builder.Builder, walle
 
 func (b *Builder) feeCalculator() (*fee.Calculator, error) {
 	var (
-		chainTime = b.state.GetTimestamp()
-		isEActive = b.cfg.IsEActivated(chainTime)
+		staticFeeCfg = b.cfg.StaticConfig
+		upgrades     = b.cfg.Times
+		chainTime    = b.state.GetTimestamp()
+		isEActive    = upgrades.IsEActivated(chainTime)
 	)
 
 	var feeCalculator *fee.Calculator
 	if !isEActive {
-		feeCalculator = fee.NewStaticCalculator(b.cfg, chainTime)
+		feeCalculator = fee.NewStaticCalculator(staticFeeCfg, upgrades, chainTime)
 	} else {
 		nextChainTime, _, err := state.NextBlockTime(b.state, b.clk)
 		if err != nil {
 			return nil, fmt.Errorf("failed calculating next block time: %w", err)
 		}
+		feeRates, err := b.state.GetFeeRates()
+		if err != nil {
+			return nil, fmt.Errorf("failed retrieving fee rates: %w", err)
+		}
+		parentBlkComplexity, err := b.state.GetLastBlockComplexity()
+		if err != nil {
+			return nil, fmt.Errorf("failed retrieving last block complexity: %w", err)
+		}
 
-		feeManager, err := fee.UpdatedFeeManager(b.state, b.cfg, chainTime, nextChainTime)
+		feeManager, err := fee.UpdatedFeeManager(feeRates, parentBlkComplexity, b.cfg.Times, chainTime, nextChainTime)
 		if err != nil {
 			return nil, err
 		}
 
-		feeCfg := config.GetDynamicFeesConfig(isEActive)
-		feeCalculator = fee.NewDynamicCalculator(b.cfg, feeManager, feeCfg.BlockMaxComplexity, nil)
+		feeCfg := fee.GetDynamicConfig(isEActive)
+		feeCalculator = fee.NewDynamicCalculator(staticFeeCfg, feeManager, feeCfg.BlockMaxComplexity, nil)
 	}
 	return feeCalculator, nil
 }

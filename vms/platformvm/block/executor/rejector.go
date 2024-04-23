@@ -4,10 +4,11 @@
 package executor
 
 import (
+	"fmt"
+
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
-	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
@@ -88,7 +89,7 @@ func (r *rejector) rejectBlock(b block.Block, blockType string) error {
 		currentTimestamp = preferredState.GetTimestamp()
 		cfg              = r.txExecutorBackend.Config
 		isEActive        = cfg.IsEActivated(currentTimestamp)
-		feesCfg          = config.GetDynamicFeesConfig(isEActive)
+		feesCfg          = fee.GetDynamicConfig(isEActive)
 	)
 
 	feeRates, err := preferredState.GetFeeRates()
@@ -101,8 +102,15 @@ func (r *rejector) rejectBlock(b block.Block, blockType string) error {
 		if err != nil {
 			return err
 		}
-
-		feeManager, err = fee.UpdatedFeeManager(preferredState, cfg, currentTimestamp, nextBlkTime)
+		feeRates, err := preferredState.GetFeeRates()
+		if err != nil {
+			return fmt.Errorf("failed retrieving fee rates: %w", err)
+		}
+		parentBlkComplexity, err := preferredState.GetLastBlockComplexity()
+		if err != nil {
+			return fmt.Errorf("failed retrieving last block complexity: %w", err)
+		}
+		feeManager, err = fee.UpdatedFeeManager(feeRates, parentBlkComplexity, cfg.Times, currentTimestamp, nextBlkTime)
 		if err != nil {
 			return err
 		}
@@ -113,11 +121,15 @@ func (r *rejector) rejectBlock(b block.Block, blockType string) error {
 		// We recheck only the fees, withouth re-validating the whole transaction.
 		feeManager.ResetComplexity()
 
-		var feeCalculator *fee.Calculator
+		var (
+			feeCalculator *fee.Calculator
+			staticFeeCfg  = cfg.StaticConfig
+		)
 		if !isEActive {
-			feeCalculator = fee.NewStaticCalculator(cfg, currentTimestamp)
+			upgrades := cfg.Times
+			feeCalculator = fee.NewStaticCalculator(staticFeeCfg, upgrades, currentTimestamp)
 		} else {
-			feeCalculator = fee.NewDynamicCalculator(cfg, feeManager, feesCfg.BlockMaxComplexity, tx.Creds)
+			feeCalculator = fee.NewDynamicCalculator(staticFeeCfg, feeManager, feesCfg.BlockMaxComplexity, tx.Creds)
 		}
 
 		if err := tx.Unsigned.Visit(feeCalculator); err != nil {

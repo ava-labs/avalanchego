@@ -42,6 +42,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
@@ -1333,7 +1334,7 @@ func (s *state) loadMetadata() error {
 		// hence we may have never stored fee rates. Load from config
 		// TODO: remove once fork is active
 		isEActive := s.cfg.IsEActivated(timestamp)
-		*s.feeRate = config.GetDynamicFeesConfig(isEActive).InitialFeeRate
+		*s.feeRate = fee.GetDynamicConfig(isEActive).InitialFeeRate
 
 	default:
 		return err

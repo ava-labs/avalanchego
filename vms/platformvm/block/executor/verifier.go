@@ -12,7 +12,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
-	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -481,7 +480,7 @@ func (v *verifier) processStandardTxs(
 
 	var (
 		isEActive = v.txExecutorBackend.Config.IsEActivated(parentBlkTime)
-		feesCfg   = config.GetDynamicFeesConfig(isEActive)
+		feesCfg   = fee.GetDynamicConfig(isEActive)
 
 		onAcceptFunc   func()
 		inputs         set.Set[ids.ID]
@@ -491,7 +490,15 @@ func (v *verifier) processStandardTxs(
 
 	feeMan := commonfees.NewManager(feeRates)
 	if isEActive {
-		feeMan, err = fee.UpdatedFeeManager(state, v.txExecutorBackend.Config, parentBlkTime, blkTimestamp)
+		feeRates, err := state.GetFeeRates()
+		if err != nil {
+			return nil, nil, nil, nil, fmt.Errorf("failed retrieving fee rates: %w", err)
+		}
+		parentBlkComplexity, err := state.GetLastBlockComplexity()
+		if err != nil {
+			return nil, nil, nil, nil, fmt.Errorf("failed retrieving last block complexity: %w", err)
+		}
+		feeMan, err = fee.UpdatedFeeManager(feeRates, parentBlkComplexity, v.txExecutorBackend.Config.Times, parentBlkTime, blkTimestamp)
 		if err != nil {
 			return nil, nil, nil, nil, err
 		}

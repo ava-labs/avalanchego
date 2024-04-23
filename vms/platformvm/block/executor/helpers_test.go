@@ -49,6 +49,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
+	"github.com/ava-labs/avalanchego/vms/platformvm/upgrade"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
@@ -315,13 +316,21 @@ func addSubnet(env *environment) {
 	if err != nil {
 		panic(fmt.Errorf("failed calculating next block time: %w", err))
 	}
+	feeRates, err := env.state.GetFeeRates()
+	if err != nil {
+		panic(fmt.Errorf("failed retrieving fee rates: %w", err))
+	}
+	parentBlkComplexity, err := env.state.GetLastBlockComplexity()
+	if err != nil {
+		panic(fmt.Errorf("failed retrieving last block complexity: %w", err))
+	}
 
-	feeManager, err := fee.UpdatedFeeManager(env.state, env.config, chainTime, nextChainTime)
+	feeManager, err := fee.UpdatedFeeManager(feeRates, parentBlkComplexity, env.config.Times, chainTime, nextChainTime)
 	if err != nil {
 		panic(err)
 	}
 
-	feeCfg := config.GetDynamicFeesConfig(env.config.IsEActivated(chainTime))
+	feeCfg := fee.GetDynamicConfig(env.config.IsEActivated(chainTime))
 	executor := executor.StandardTxExecutor{
 		Backend:            env.backend,
 		BlkFeeManager:      feeManager,
@@ -379,26 +388,30 @@ func defaultConfig(t *testing.T, f fork) *config.Config {
 		Chains:                 chains.TestManager,
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		Validators:             validators.NewManager(),
-		TxFee:                  defaultTxFee,
-		CreateSubnetTxFee:      100 * defaultTxFee,
-		CreateBlockchainTxFee:  100 * defaultTxFee,
-		MinValidatorStake:      defaultMinValidatorStake,
-		MaxValidatorStake:      defaultMaxValidatorStake,
-		MinDelegatorStake:      defaultMinDelegatorStake,
-		MinStakeDuration:       defaultMinStakingDuration,
-		MaxStakeDuration:       defaultMaxStakingDuration,
+		StaticConfig: fee.StaticConfig{
+			TxFee:                 defaultTxFee,
+			CreateSubnetTxFee:     100 * defaultTxFee,
+			CreateBlockchainTxFee: 100 * defaultTxFee,
+		},
+		MinValidatorStake: defaultMinValidatorStake,
+		MaxValidatorStake: defaultMaxValidatorStake,
+		MinDelegatorStake: defaultMinDelegatorStake,
+		MinStakeDuration:  defaultMinStakingDuration,
+		MaxStakeDuration:  defaultMaxStakingDuration,
 		RewardConfig: reward.Config{
 			MaxConsumptionRate: .12 * reward.PercentDenominator,
 			MinConsumptionRate: .10 * reward.PercentDenominator,
 			MintingPeriod:      365 * 24 * time.Hour,
 			SupplyCap:          720 * units.MegaAvax,
 		},
-		ApricotPhase3Time: mockable.MaxTime,
-		ApricotPhase5Time: mockable.MaxTime,
-		BanffTime:         mockable.MaxTime,
-		CortinaTime:       mockable.MaxTime,
-		DurangoTime:       mockable.MaxTime,
-		EUpgradeTime:      mockable.MaxTime,
+		Times: upgrade.Times{
+			ApricotPhase3Time: mockable.MaxTime,
+			ApricotPhase5Time: mockable.MaxTime,
+			BanffTime:         mockable.MaxTime,
+			CortinaTime:       mockable.MaxTime,
+			DurangoTime:       mockable.MaxTime,
+			EUpgradeTime:      mockable.MaxTime,
+		},
 	}
 
 	switch f {

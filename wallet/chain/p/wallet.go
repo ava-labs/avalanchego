@@ -12,10 +12,10 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
-	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
+	"github.com/ava-labs/avalanchego/vms/platformvm/upgrade"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/chain/p/builder"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
@@ -271,7 +271,7 @@ func NewWallet(
 		builder: builder,
 		signer:  signer,
 		client:  client,
-		staticFeesConfig: &config.Config{
+		staticFeesConfig: fee.StaticConfig{
 			TxFee:                         uint64(0),
 			CreateAssetTxFee:              uint64(0),
 			CreateSubnetTxFee:             uint64(0),
@@ -292,7 +292,7 @@ type wallet struct {
 	client  platformvm.Client
 
 	isEForkActive                    bool
-	staticFeesConfig                 *config.Config
+	staticFeesConfig                 fee.StaticConfig
 	nextFeeRates, blockMaxComplexity commonfees.Dimensions
 }
 
@@ -639,9 +639,9 @@ func (w *wallet) feeCalculator(ctx *builder.Context, options ...common.Option) (
 
 	var feeCalculator *fee.Calculator
 	if !w.isEForkActive {
-		feeCalculator = fee.NewStaticCalculator(w.staticFeesConfig, time.Time{})
+		feeCalculator = fee.NewStaticCalculator(w.staticFeesConfig, upgrade.Times{}, time.Time{})
 	} else {
-		feeCfg := config.GetDynamicFeesConfig(w.isEForkActive)
+		feeCfg := fee.GetDynamicConfig(w.isEForkActive)
 		feeMan := commonfees.NewManager(w.nextFeeRates)
 		feeCalculator = fee.NewDynamicCalculator(w.staticFeesConfig, feeMan, feeCfg.BlockMaxComplexity, nil)
 	}
@@ -669,13 +669,13 @@ func (w *wallet) refreshFeesData(ctx *builder.Context, options ...common.Option)
 
 	eUpgradeTime := version.GetEUpgradeTime(w.builder.Context().NetworkID)
 	w.isEForkActive = !chainTime.Before(eUpgradeTime)
-	feeCfg := config.GetDynamicFeesConfig(w.isEForkActive)
+	feeCfg := fee.GetDynamicConfig(w.isEForkActive)
 	w.blockMaxComplexity = feeCfg.BlockMaxComplexity
 	return nil
 }
 
-func staticFeesConfigFromContext(ctx *builder.Context) *config.Config {
-	return &config.Config{
+func staticFeesConfigFromContext(ctx *builder.Context) fee.StaticConfig {
+	return fee.StaticConfig{
 		TxFee:                         ctx.BaseTxFee,
 		CreateSubnetTxFee:             ctx.CreateSubnetTxFee,
 		TransformSubnetTxFee:          ctx.TransformSubnetTxFee,
