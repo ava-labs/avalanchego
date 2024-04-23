@@ -2322,6 +2322,7 @@ func TestEngineBubbleVotesThroughInvalidChain(t *testing.T) {
 
 func TestEngineBuildBlockWithCachedNonVerifiedParent(t *testing.T) {
 	require := require.New(t)
+
 	vdr, _, sender, vm, te := setup(t, DefaultConfig(t))
 
 	sender.Default(true)
