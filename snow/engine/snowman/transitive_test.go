@@ -77,36 +77,32 @@ func MakeGetBlockF(blks ...[]*snowman.TestBlock) func(context.Context, ids.ID) (
 	}
 }
 
-func setup(t *testing.T, engCfg Config) (ids.NodeID, validators.Manager, *common.SenderTest, *block.TestVM, *Transitive) {
+func setup(t *testing.T, config Config) (ids.NodeID, validators.Manager, *common.SenderTest, *block.TestVM, *Transitive) {
 	require := require.New(t)
 
-	vals := validators.NewManager()
-	engCfg.Validators = vals
-
 	vdr := ids.GenerateTestNodeID()
-	require.NoError(vals.AddStaker(engCfg.Ctx.SubnetID, vdr, nil, ids.Empty, 1))
-	require.NoError(engCfg.ConnectedValidators.Connected(context.Background(), vdr, version.CurrentApp))
-
-	vals.RegisterSetCallbackListener(engCfg.Ctx.SubnetID, engCfg.ConnectedValidators)
+	require.NoError(config.Validators.AddStaker(config.Ctx.SubnetID, vdr, nil, ids.Empty, 1))
+	require.NoError(config.ConnectedValidators.Connected(context.Background(), vdr, version.CurrentApp))
+	config.Validators.RegisterSetCallbackListener(config.Ctx.SubnetID, config.ConnectedValidators)
 
 	sender := &common.SenderTest{T: t}
-	engCfg.Sender = sender
+	config.Sender = sender
 	sender.Default(true)
 
 	vm := &block.TestVM{}
 	vm.T = t
-	engCfg.VM = vm
+	config.VM = vm
 
 	snowGetHandler, err := getter.New(
 		vm,
 		sender,
-		engCfg.Ctx.Log,
+		config.Ctx.Log,
 		time.Second,
 		2000,
-		engCfg.Ctx.Registerer,
+		config.Ctx.Registerer,
 	)
 	require.NoError(err)
-	engCfg.AllGetsServer = snowGetHandler
+	config.AllGetsServer = snowGetHandler
 
 	vm.Default(true)
 	vm.CantSetState = false
@@ -125,25 +121,20 @@ func setup(t *testing.T, engCfg Config) (ids.NodeID, validators.Manager, *common
 		}
 	}
 
-	te, err := New(engCfg)
+	te, err := New(config)
 	require.NoError(err)
 
 	require.NoError(te.Start(context.Background(), 0))
 
 	vm.GetBlockF = nil
 	vm.LastAcceptedF = nil
-	return vdr, vals, sender, vm, te
-}
-
-func setupDefaultConfig(t *testing.T) (ids.NodeID, validators.Manager, *common.SenderTest, *block.TestVM, *Transitive) {
-	engCfg := DefaultConfig(t)
-	return setup(t, engCfg)
+	return vdr, config.Validators, sender, vm, te
 }
 
 func TestEngineShutdown(t *testing.T) {
 	require := require.New(t)
 
-	_, _, _, vm, engine := setupDefaultConfig(t)
+	_, _, _, vm, engine := setup(t, DefaultConfig(t))
 
 	var vmShutdownCalled bool
 	vm.ShutdownF = func(context.Context) error {
@@ -158,7 +149,7 @@ func TestEngineShutdown(t *testing.T) {
 func TestEngineDropsAttemptToIssueBlockAfterFailedRequest(t *testing.T) {
 	require := require.New(t)
 
-	peerID, _, sender, vm, engine := setupDefaultConfig(t)
+	peerID, _, sender, vm, engine := setup(t, DefaultConfig(t))
 
 	blks := BuildChain(Genesis, 2)
 	parent := blks[0]
@@ -206,7 +197,7 @@ func TestEngineDropsAttemptToIssueBlockAfterFailedRequest(t *testing.T) {
 func TestEngineQuery(t *testing.T) {
 	require := require.New(t)
 
-	peerID, _, sender, vm, engine := setupDefaultConfig(t)
+	peerID, _, sender, vm, engine := setup(t, DefaultConfig(t))
 
 	blks := BuildChain(Genesis, 2)
 	parent := blks[0]
@@ -491,7 +482,7 @@ func TestEngineMultipleQuery(t *testing.T) {
 func TestEngineBlockedIssue(t *testing.T) {
 	require := require.New(t)
 
-	_, _, sender, vm, te := setupDefaultConfig(t)
+	_, _, sender, vm, te := setup(t, DefaultConfig(t))
 
 	sender.Default(false)
 
@@ -533,7 +524,7 @@ func TestEngineBlockedIssue(t *testing.T) {
 func TestEngineRespondsToGetRequest(t *testing.T) {
 	require := require.New(t)
 
-	vdr, _, sender, vm, te := setupDefaultConfig(t)
+	vdr, _, sender, vm, te := setup(t, DefaultConfig(t))
 
 	sender.Default(false)
 
@@ -559,7 +550,7 @@ func TestEngineRespondsToGetRequest(t *testing.T) {
 func TestEnginePushQuery(t *testing.T) {
 	require := require.New(t)
 
-	vdr, _, sender, vm, te := setupDefaultConfig(t)
+	vdr, _, sender, vm, te := setup(t, DefaultConfig(t))
 
 	sender.Default(true)
 
@@ -614,7 +605,7 @@ func TestEnginePushQuery(t *testing.T) {
 func TestEngineBuildBlock(t *testing.T) {
 	require := require.New(t)
 
-	vdr, _, sender, vm, te := setupDefaultConfig(t)
+	vdr, _, sender, vm, te := setup(t, DefaultConfig(t))
 
 	sender.Default(true)
 
@@ -652,7 +643,7 @@ func TestEngineBuildBlock(t *testing.T) {
 
 func TestEngineRepoll(t *testing.T) {
 	require := require.New(t)
-	vdr, _, sender, _, te := setupDefaultConfig(t)
+	vdr, _, sender, _, te := setup(t, DefaultConfig(t))
 
 	sender.Default(true)
 
@@ -837,7 +828,7 @@ func TestEngineNoRepollQuery(t *testing.T) {
 func TestEngineAbandonQuery(t *testing.T) {
 	require := require.New(t)
 
-	vdr, _, sender, vm, te := setupDefaultConfig(t)
+	vdr, _, sender, vm, te := setup(t, DefaultConfig(t))
 
 	sender.Default(true)
 
@@ -867,7 +858,7 @@ func TestEngineAbandonQuery(t *testing.T) {
 func TestEngineAbandonChit(t *testing.T) {
 	require := require.New(t)
 
-	vdr, _, sender, vm, te := setupDefaultConfig(t)
+	vdr, _, sender, vm, te := setup(t, DefaultConfig(t))
 
 	sender.Default(true)
 
@@ -921,7 +912,7 @@ func TestEngineAbandonChit(t *testing.T) {
 func TestEngineAbandonChitWithUnexpectedPutBlock(t *testing.T) {
 	require := require.New(t)
 
-	vdr, _, sender, vm, te := setupDefaultConfig(t)
+	vdr, _, sender, vm, te := setup(t, DefaultConfig(t))
 
 	sender.Default(true)
 
@@ -982,7 +973,7 @@ func TestEngineAbandonChitWithUnexpectedPutBlock(t *testing.T) {
 func TestEngineBlockingChitRequest(t *testing.T) {
 	require := require.New(t)
 
-	vdr, _, sender, vm, te := setupDefaultConfig(t)
+	vdr, _, sender, vm, te := setup(t, DefaultConfig(t))
 
 	sender.Default(true)
 
@@ -1179,7 +1170,7 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 func TestEngineRetryFetch(t *testing.T) {
 	require := require.New(t)
 
-	vdr, _, sender, vm, te := setupDefaultConfig(t)
+	vdr, _, sender, vm, te := setup(t, DefaultConfig(t))
 
 	sender.Default(true)
 
@@ -1219,7 +1210,7 @@ func TestEngineRetryFetch(t *testing.T) {
 func TestEngineUndeclaredDependencyDeadlock(t *testing.T) {
 	require := require.New(t)
 
-	vdr, _, sender, vm, te := setupDefaultConfig(t)
+	vdr, _, sender, vm, te := setup(t, DefaultConfig(t))
 
 	sender.Default(true)
 
@@ -1271,7 +1262,7 @@ func TestEngineUndeclaredDependencyDeadlock(t *testing.T) {
 func TestEngineGossip(t *testing.T) {
 	require := require.New(t)
 
-	nodeID, _, sender, vm, te := setupDefaultConfig(t)
+	nodeID, _, sender, vm, te := setup(t, DefaultConfig(t))
 
 	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
 		return GenesisID, nil
@@ -1295,7 +1286,7 @@ func TestEngineGossip(t *testing.T) {
 func TestEngineInvalidBlockIgnoredFromUnexpectedPeer(t *testing.T) {
 	require := require.New(t)
 
-	vdr, vdrs, sender, vm, te := setupDefaultConfig(t)
+	vdr, vdrs, sender, vm, te := setup(t, DefaultConfig(t))
 
 	secondVdr := ids.GenerateTestNodeID()
 	require.NoError(vdrs.AddStaker(te.Ctx.SubnetID, secondVdr, nil, ids.Empty, 1))
@@ -1372,7 +1363,7 @@ func TestEngineInvalidBlockIgnoredFromUnexpectedPeer(t *testing.T) {
 func TestEnginePushQueryRequestIDConflict(t *testing.T) {
 	require := require.New(t)
 
-	vdr, _, sender, vm, te := setupDefaultConfig(t)
+	vdr, _, sender, vm, te := setup(t, DefaultConfig(t))
 
 	sender.Default(true)
 
@@ -1722,7 +1713,7 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 func TestEngineReceiveNewRejectedBlock(t *testing.T) {
 	require := require.New(t)
 
-	vdr, _, sender, vm, te := setupDefaultConfig(t)
+	vdr, _, sender, vm, te := setup(t, DefaultConfig(t))
 
 	acceptedBlks := BuildChain(Genesis, 1)
 	acceptedBlk := acceptedBlks[0]
@@ -1793,7 +1784,7 @@ func TestEngineReceiveNewRejectedBlock(t *testing.T) {
 func TestEngineRejectionAmplification(t *testing.T) {
 	require := require.New(t)
 
-	vdr, _, sender, vm, te := setupDefaultConfig(t)
+	vdr, _, sender, vm, te := setup(t, DefaultConfig(t))
 
 	acceptedBlks := BuildChain(Genesis, 1)
 	acceptedBlk := acceptedBlks[0]
@@ -1882,7 +1873,7 @@ func TestEngineRejectionAmplification(t *testing.T) {
 func TestEngineTransitiveRejectionAmplificationDueToRejectedParent(t *testing.T) {
 	require := require.New(t)
 
-	vdr, _, sender, vm, te := setupDefaultConfig(t)
+	vdr, _, sender, vm, te := setup(t, DefaultConfig(t))
 
 	acceptedBlks := BuildChain(Genesis, 1)
 	acceptedBlk := acceptedBlks[0]
@@ -1948,7 +1939,7 @@ func TestEngineTransitiveRejectionAmplificationDueToRejectedParent(t *testing.T)
 func TestEngineTransitiveRejectionAmplificationDueToInvalidParent(t *testing.T) {
 	require := require.New(t)
 
-	vdr, _, sender, vm, te := setupDefaultConfig(t)
+	vdr, _, sender, vm, te := setup(t, DefaultConfig(t))
 
 	acceptedBlks := BuildChain(Genesis, 1)
 	acceptedBlk := acceptedBlks[0]
@@ -2018,7 +2009,7 @@ func TestEngineTransitiveRejectionAmplificationDueToInvalidParent(t *testing.T) 
 func TestEngineNonPreferredAmplification(t *testing.T) {
 	require := require.New(t)
 
-	vdr, _, sender, vm, te := setupDefaultConfig(t)
+	vdr, _, sender, vm, te := setup(t, DefaultConfig(t))
 
 	preferredBlks := BuildChain(Genesis, 1)
 	preferredBlk := preferredBlks[0]
@@ -2075,7 +2066,7 @@ func TestEngineNonPreferredAmplification(t *testing.T) {
 func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 	require := require.New(t)
 
-	vdr, _, sender, vm, te := setupDefaultConfig(t)
+	vdr, _, sender, vm, te := setup(t, DefaultConfig(t))
 	expectedVdrSet := set.Of(vdr)
 
 	blks := BuildChain(Genesis, 2)
@@ -2234,7 +2225,7 @@ func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 func TestEngineBubbleVotesThroughInvalidChain(t *testing.T) {
 	require := require.New(t)
 
-	vdr, _, sender, vm, te := setupDefaultConfig(t)
+	vdr, _, sender, vm, te := setup(t, DefaultConfig(t))
 	expectedVdrSet := set.Of(vdr)
 
 	blks := BuildChain(Genesis, 3)
@@ -2346,7 +2337,7 @@ func TestEngineBubbleVotesThroughInvalidChain(t *testing.T) {
 
 func TestEngineBuildBlockWithCachedNonVerifiedParent(t *testing.T) {
 	require := require.New(t)
-	vdr, _, sender, vm, te := setupDefaultConfig(t)
+	vdr, _, sender, vm, te := setup(t, DefaultConfig(t))
 
 	sender.Default(true)
 
