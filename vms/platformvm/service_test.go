@@ -384,17 +384,18 @@ func TestGetBalance(t *testing.T) {
 			// we use the first key to fund a subnet creation in [defaultGenesis].
 			// As such we need to account for the subnet creation fee
 			var (
-				chainTime = service.vm.state.GetTimestamp()
-
-				feeCalc *fee.Calculator
+				chainTime    = service.vm.state.GetTimestamp()
+				staticFeeCfg = service.vm.Config.StaticConfig
+				feeCalc      *fee.Calculator
 			)
 
 			if !service.vm.IsEActivated(chainTime) {
-				feeCalc = fee.NewStaticCalculator(&service.vm.Config, chainTime)
+				upgrades := service.vm.Config.Times
+				feeCalc = fee.NewStaticCalculator(staticFeeCfg, upgrades, chainTime)
 			} else {
 				feeCfg := config.GetDynamicFeesConfig(service.vm.Config.IsEActivated(chainTime))
 				feeMan := commonfees.NewManager(feeCfg.FeeRate)
-				feeCalc = fee.NewDynamicCalculator(&service.vm.Config, feeMan, feeCfg.BlockMaxComplexity, testSubnet1.Creds)
+				feeCalc = fee.NewDynamicCalculator(staticFeeCfg, feeMan, feeCfg.BlockMaxComplexity, testSubnet1.Creds)
 			}
 
 			require.NoError(testSubnet1.Unsigned.Visit(feeCalc))
@@ -768,7 +769,7 @@ func TestGetBlock(t *testing.T) {
 			service, _, txBuilder := defaultService(t)
 			service.vm.ctx.Lock.Lock()
 
-			service.vm.Config.CreateAssetTxFee = 100 * defaultTxFee
+			service.vm.CreateAssetTxFee = 100 * defaultTxFee
 
 			// Make a block an accept it, then check we can get it.
 			tx, err := txBuilder.NewCreateChainTx( // Test GetTx works for standard blocks

@@ -19,7 +19,9 @@ func newContext(
 	timestamp time.Time,
 ) (*builder.Context, error) {
 	var (
-		staticFeeCalc  = fee.NewStaticCalculator(cfg, timestamp)
+		staticFeesCfg  = cfg.StaticConfig
+		upgrades       = cfg.Times
+		staticFeeCalc  = fee.NewStaticCalculator(staticFeesCfg, upgrades, timestamp)
 		createSubnetTx = &txs.CreateSubnetTx{}
 		createChainTx  = &txs.CreateChainTx{}
 	)
@@ -36,13 +38,13 @@ func newContext(
 	return &builder.Context{
 		NetworkID:                     ctx.NetworkID,
 		AVAXAssetID:                   ctx.AVAXAssetID,
-		BaseTxFee:                     cfg.TxFee,
+		BaseTxFee:                     staticFeesCfg.TxFee,
 		CreateSubnetTxFee:             createSubnetFee,
-		TransformSubnetTxFee:          cfg.TransformSubnetTxFee,
+		TransformSubnetTxFee:          staticFeesCfg.TransformSubnetTxFee,
 		CreateBlockchainTxFee:         createChainFee,
-		AddPrimaryNetworkValidatorFee: cfg.AddPrimaryNetworkValidatorFee,
-		AddPrimaryNetworkDelegatorFee: cfg.AddPrimaryNetworkDelegatorFee,
-		AddSubnetValidatorFee:         cfg.AddSubnetValidatorFee,
-		AddSubnetDelegatorFee:         cfg.AddSubnetDelegatorFee,
+		AddPrimaryNetworkValidatorFee: staticFeesCfg.AddPrimaryNetworkValidatorFee,
+		AddPrimaryNetworkDelegatorFee: staticFeesCfg.AddPrimaryNetworkDelegatorFee,
+		AddSubnetValidatorFee:         staticFeesCfg.AddSubnetValidatorFee,
+		AddSubnetDelegatorFee:         staticFeesCfg.AddSubnetDelegatorFee,
 	}, nil
 }

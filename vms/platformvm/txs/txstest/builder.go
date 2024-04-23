@@ -423,16 +423,19 @@ func (b *Builder) builders(keys []*secp256k1.PrivateKey) (builder.Builder, walle
 
 func (b *Builder) feeCalculator() *fee.Calculator {
 	var (
-		chainTime = b.state.GetTimestamp()
-		isEActive = b.cfg.IsEActivated(chainTime)
+		staticFeeCfg = b.cfg.StaticConfig
+		upgrades     = b.cfg.Times
+		chainTime    = b.state.GetTimestamp()
+		isEActive    = upgrades.IsEActivated(chainTime)
 	)
 
 	var feeCalculator *fee.Calculator
 	if !isEActive {
-		feeCalculator = fee.NewStaticCalculator(b.cfg, chainTime)
+		feeCalculator = fee.NewStaticCalculator(staticFeeCfg, upgrades, chainTime)
 	} else {
 		feeCfg := config.GetDynamicFeesConfig(isEActive)
-		feeCalculator = fee.NewDynamicCalculator(b.cfg, commonfees.NewManager(feeCfg.FeeRate), feeCfg.BlockMaxComplexity, nil)
+		feeMan := commonfees.NewManager(feeCfg.FeeRate)
+		feeCalculator = fee.NewDynamicCalculator(staticFeeCfg, feeMan, feeCfg.BlockMaxComplexity, nil)
 	}
 	return feeCalculator
 }
