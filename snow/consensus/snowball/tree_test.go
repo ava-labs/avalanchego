@@ -166,6 +166,100 @@ func TestSnowballLastBinary(t *testing.T) {
 	require.Equal(expected, tree.String())
 }
 
+func TestSnowballFirstBinary(t *testing.T) {
+	require := require.New(t)
+
+	zero := ids.Empty
+	one := ids.ID{0x01}
+
+	params := Parameters{
+		K:               1,
+		AlphaPreference: 1,
+		AlphaConfidence: 1,
+		Beta:            2,
+	}
+	tree := NewTree(SnowballFactory, params, zero)
+	tree.Add(one)
+
+	expected := `SB(Preference = 0, PreferenceStrength[0] = 0, PreferenceStrength[1] = 0, SF(Confidence = 0, Finalized = false, SL(Preference = 0))) Bit = 0
+    SB(PreferenceStrength = 0, SF(Confidence = 0, Finalized = false)) Bits = [1, 256)
+    SB(PreferenceStrength = 0, SF(Confidence = 0, Finalized = false)) Bits = [1, 256)`
+	require.Equal(expected, tree.String())
+	require.Equal(zero, tree.Preference())
+	require.False(tree.Finalized())
+
+	oneBag := bag.Of(one)
+	require.True(tree.RecordPoll(oneBag))
+	require.Equal(one, tree.Preference())
+	require.False(tree.Finalized())
+
+	expected = `SB(Preference = 1, PreferenceStrength[0] = 0, PreferenceStrength[1] = 1, SF(Confidence = 1, Finalized = false, SL(Preference = 1))) Bit = 0
+    SB(PreferenceStrength = 0, SF(Confidence = 0, Finalized = false)) Bits = [1, 256)
+    SB(PreferenceStrength = 1, SF(Confidence = 1, Finalized = false)) Bits = [1, 256)`
+	require.Equal(expected, tree.String())
+
+	require.True(tree.RecordPoll(oneBag))
+	require.Equal(one, tree.Preference())
+	require.True(tree.Finalized())
+
+	expected = `SB(PreferenceStrength = 2, SF(Confidence = 2, Finalized = true)) Bits = [1, 256)`
+	require.Equal(expected, tree.String())
+}
+
+func TestSnowballAddDecidedFirstBit(t *testing.T) {
+	require := require.New(t)
+
+	zero := ids.Empty
+	one := ids.ID{0x01}
+	two := ids.ID{0x02}
+	three := ids.ID{0x03}
+
+	params := Parameters{
+		K:               1,
+		AlphaPreference: 1,
+		AlphaConfidence: 1,
+		Beta:            2,
+	}
+	tree := NewTree(SnowballFactory, params, zero)
+	tree.Add(one)
+	tree.Add(three)
+
+	expected := `SB(Preference = 0, PreferenceStrength[0] = 0, PreferenceStrength[1] = 0, SF(Confidence = 0, Finalized = false, SL(Preference = 0))) Bit = 0
+    SB(PreferenceStrength = 0, SF(Confidence = 0, Finalized = false)) Bits = [1, 256)
+    SB(Preference = 0, PreferenceStrength[0] = 0, PreferenceStrength[1] = 0, SF(Confidence = 0, Finalized = false, SL(Preference = 0))) Bit = 1
+        SB(PreferenceStrength = 0, SF(Confidence = 0, Finalized = false)) Bits = [2, 256)
+        SB(PreferenceStrength = 0, SF(Confidence = 0, Finalized = false)) Bits = [2, 256)`
+	require.Equal(expected, tree.String())
+	require.Equal(zero, tree.Preference())
+	require.False(tree.Finalized())
+
+	oneBag := bag.Of(one)
+	require.True(tree.RecordPoll(oneBag))
+	require.Equal(one, tree.Preference())
+	require.False(tree.Finalized())
+
+	expected = `SB(Preference = 1, PreferenceStrength[0] = 0, PreferenceStrength[1] = 1, SF(Confidence = 1, Finalized = false, SL(Preference = 1))) Bit = 0
+    SB(PreferenceStrength = 0, SF(Confidence = 0, Finalized = false)) Bits = [1, 256)
+    SB(Preference = 0, PreferenceStrength[0] = 1, PreferenceStrength[1] = 0, SF(Confidence = 1, Finalized = false, SL(Preference = 0))) Bit = 1
+        SB(PreferenceStrength = 1, SF(Confidence = 1, Finalized = false)) Bits = [2, 256)
+        SB(PreferenceStrength = 0, SF(Confidence = 0, Finalized = false)) Bits = [2, 256)`
+	require.Equal(expected, tree.String())
+
+	threeBag := bag.Of(three)
+	require.True(tree.RecordPoll(threeBag))
+	require.Equal(one, tree.Preference())
+	require.False(tree.Finalized())
+
+	expected = `SB(Preference = 0, PreferenceStrength[0] = 1, PreferenceStrength[1] = 1, SF(Confidence = 1, Finalized = false, SL(Preference = 1))) Bit = 1
+    SB(PreferenceStrength = 1, SF(Confidence = 1, Finalized = false)) Bits = [2, 256)
+    SB(PreferenceStrength = 1, SF(Confidence = 1, Finalized = false)) Bits = [2, 256)`
+	require.Equal(expected, tree.String())
+
+	// Adding two should have no effect because the first bit is already decided
+	tree.Add(two)
+	require.Equal(expected, tree.String())
+}
+
 func TestSnowballAddPreviouslyRejected(t *testing.T) {
 	require := require.New(t)
 
