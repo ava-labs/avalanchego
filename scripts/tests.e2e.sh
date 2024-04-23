@@ -7,7 +7,6 @@ set -euo pipefail
 # ./scripts/tests.e2e.sh --ginkgo.label-filter=x                                       # All arguments are supplied to ginkgo
 # E2E_SERIAL=1 ./scripts/tests.e2e.sh                                                  # Run tests serially
 # AVALANCHEGO_PATH=./build/avalanchego ./scripts/tests.e2e.sh                          # Customization of avalanchego path
-# E2E_USE_EXISTING_NETWORK=1 TMPNET_NETWORK_DIR=/path/to ./scripts/tests.e2e.sh        # Execute against an existing network
 if ! [[ "$0" =~ scripts/tests.e2e.sh ]]; then
   echo "must be run from repository root"
   exit 255
@@ -27,16 +26,14 @@ go install -v github.com/onsi/ginkgo/v2/ginkgo@v2.13.1
 ACK_GINKGO_RC=true ginkgo build ./tests/e2e
 ./tests/e2e/e2e.test --help
 
-#################################
-# Since TMPNET_NETWORK_DIR may be set in the environment (e.g. to configure ginkgo
-# or tmpnetctl), configuring the use of an existing network with this script
-# requires the extra step of setting E2E_USE_EXISTING_NETWORK=1.
-if [[ -n "${E2E_USE_EXISTING_NETWORK:-}" && -n "${TMPNET_NETWORK_DIR:-}" ]]; then
-  E2E_ARGS="--use-existing-network"
-else
-  AVALANCHEGO_PATH="$(realpath "${AVALANCHEGO_PATH:-./build/avalanchego}")"
-  E2E_ARGS="--avalanchego-path=${AVALANCHEGO_PATH}"
-fi
+# Enable subnet testing by building xsvm
+./scripts/build_xsvm.sh
+echo ""
+
+# Ensure an absolute path to avoid dependency on the working directory
+# of script execution.
+AVALANCHEGO_PATH="$(realpath "${AVALANCHEGO_PATH:-./build/avalanchego}")"
+E2E_ARGS="--avalanchego-path=${AVALANCHEGO_PATH}"
 
 #################################
 # Determine ginkgo args

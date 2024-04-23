@@ -292,7 +292,7 @@ type GetLoggerLevelArgs struct {
 	LoggerName string `json:"loggerName"`
 }
 
-// GetLogLevel returns the log level and display level of all loggers.
+// GetLoggerLevel returns the log level and display level of all loggers.
 func (a *Admin) GetLoggerLevel(_ *http.Request, args *GetLoggerLevelArgs, reply *LoggerLevelReply) error {
 	a.Log.Debug("API called",
 		zap.String("service", "admin"),
