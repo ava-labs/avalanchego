@@ -1002,7 +1002,7 @@ func (bc *BlockChain) setPreference(block *types.Block) error {
 	return nil
 }
 
-// LastAcceptedBlock returns the last block to be marked as accepted. It may or
+// LastConsensusAcceptedBlock returns the last block to be marked as accepted. It may or
 // may not yet be processed.
 func (bc *BlockChain) LastConsensusAcceptedBlock() *types.Block {
 	bc.chainmu.Lock()

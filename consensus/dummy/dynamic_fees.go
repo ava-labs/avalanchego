@@ -187,7 +187,7 @@ func CalcBaseFee(config *params.ChainConfig, parent *types.Header, timestamp uin
 	return newRollupWindow, baseFee, nil
 }
 
-// EstiamteNextBaseFee attempts to estimate the next base fee based on a block with [parent] being built at
+// EstimateNextBaseFee attempts to estimate the next base fee based on a block with [parent] being built at
 // [timestamp].
 // If [timestamp] is less than the timestamp of [parent], then it uses the same timestamp as parent.
 // Warning: This function should only be used in estimation and should not be used when calculating the canonical
