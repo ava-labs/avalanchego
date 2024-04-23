@@ -69,7 +69,11 @@ func (e *StandardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 	}
 
 	// Verify the flowcheck
-	feeCalculator := fee.NewStaticCalculator(e.Backend.Config, e.State.GetTimestamp())
+	var (
+		staticFeesCfg = e.Backend.Config.StaticConfig
+		upgrades      = e.Backend.Config.Times
+	)
+	feeCalculator := fee.NewStaticCalculator(staticFeesCfg, upgrades, currentTimestamp)
 	if err := tx.Visit(feeCalculator); err != nil {
 		return err
 	}
@@ -119,7 +123,11 @@ func (e *StandardTxExecutor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 	}
 
 	// Verify the flowcheck
-	feeCalculator := fee.NewStaticCalculator(e.Backend.Config, e.State.GetTimestamp())
+	var (
+		staticFeesCfg = e.Backend.Config.StaticConfig
+		upgrades      = e.Backend.Config.Times
+	)
+	feeCalculator := fee.NewStaticCalculator(staticFeesCfg, upgrades, currentTimestamp)
 	if err := tx.Visit(feeCalculator); err != nil {
 		return err
 	}
@@ -204,7 +212,11 @@ func (e *StandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 		copy(ins[len(tx.Ins):], tx.ImportedInputs)
 
 		// Verify the flowcheck
-		feeCalculator := fee.NewStaticCalculator(e.Backend.Config, e.State.GetTimestamp())
+		var (
+			staticFeesCfg = e.Backend.Config.StaticConfig
+			upgrades      = e.Backend.Config.Times
+		)
+		feeCalculator := fee.NewStaticCalculator(staticFeesCfg, upgrades, currentTimestamp)
 		if err := tx.Visit(feeCalculator); err != nil {
 			return err
 		}
@@ -265,7 +277,11 @@ func (e *StandardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 	}
 
 	// Verify the flowcheck
-	feeCalculator := fee.NewStaticCalculator(e.Backend.Config, e.State.GetTimestamp())
+	var (
+		staticFeesCfg = e.Backend.Config.StaticConfig
+		upgrades      = e.Backend.Config.Times
+	)
+	feeCalculator := fee.NewStaticCalculator(staticFeesCfg, upgrades, currentTimestamp)
 	if err := tx.Visit(feeCalculator); err != nil {
 		return err
 	}
@@ -455,11 +471,16 @@ func (e *StandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 		return err
 	}
 
-	totalRewardAmount := tx.MaximumSupply - tx.InitialSupply
-	feeCalculator := fee.NewStaticCalculator(e.Backend.Config, currentTimestamp)
+	var (
+		staticFeesCfg = e.Backend.Config.StaticConfig
+		upgrades      = e.Backend.Config.Times
+	)
+	feeCalculator := fee.NewStaticCalculator(staticFeesCfg, upgrades, currentTimestamp)
 	if err := tx.Visit(feeCalculator); err != nil {
 		return err
 	}
+
+	totalRewardAmount := tx.MaximumSupply - tx.InitialSupply
 	if err := e.Backend.FlowChecker.VerifySpend(
 		tx,
 		e.State,
@@ -580,10 +601,11 @@ func (e *StandardTxExecutor) BaseTx(tx *txs.BaseTx) error {
 
 	// Verify the flowcheck
 	var (
-		cfg              = e.Backend.Config
+		staticFeesCfg    = e.Backend.Config.StaticConfig
+		upgrades         = e.Backend.Config.Times
 		currentTimestamp = e.State.GetTimestamp()
 	)
-	feeCalculator := fee.NewStaticCalculator(cfg, currentTimestamp)
+	feeCalculator := fee.NewStaticCalculator(staticFeesCfg, upgrades, currentTimestamp)
 	if err := tx.Visit(feeCalculator); err != nil {
 		return err
 	}

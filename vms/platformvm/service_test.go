@@ -366,7 +366,9 @@ func TestGetBalance(t *testing.T) {
 	require := require.New(t)
 	service, _, _ := defaultService(t)
 
-	staticFeeCalc := fee.NewStaticCalculator(&service.vm.Config, service.vm.clock.Time())
+	staticFeeCfg := service.vm.Config.StaticConfig
+	upgrades := service.vm.Config.Times
+	staticFeeCalc := fee.NewStaticCalculator(staticFeeCfg, upgrades, service.vm.clock.Time())
 	dummyCreateSubnetTx := &txs.CreateSubnetTx{}
 	require.NoError(dummyCreateSubnetTx.Visit(staticFeeCalc))
 	createSubnetFee := staticFeeCalc.Fee
@@ -755,7 +757,7 @@ func TestGetBlock(t *testing.T) {
 			service, _, txBuilder := defaultService(t)
 			service.vm.ctx.Lock.Lock()
 
-			service.vm.Config.CreateAssetTxFee = 100 * defaultTxFee
+			service.vm.CreateAssetTxFee = 100 * defaultTxFee
 
 			// Make a block an accept it, then check we can get it.
 			tx, err := txBuilder.NewCreateChainTx( // Test GetTx works for standard blocks
