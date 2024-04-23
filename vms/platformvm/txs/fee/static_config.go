@@ -3,6 +3,12 @@
 
 package fee
 
+import (
+	"time"
+
+	"github.com/ava-labs/avalanchego/vms/platformvm/upgrade"
+)
+
 type StaticConfig struct {
 	// Fee that is burned by every non-state creating transaction
 	TxFee uint64
@@ -42,4 +48,18 @@ type StaticConfig struct {
 
 	// Minimum fee that can be charged for delegation
 	MinDelegationFee uint32
+}
+
+func (c *StaticConfig) GetCreateBlockchainTxFee(upgrades upgrade.Times, timestamp time.Time) uint64 {
+	if upgrades.IsApricotPhase3Activated(timestamp) {
+		return c.CreateBlockchainTxFee
+	}
+	return c.CreateAssetTxFee
+}
+
+func (c *StaticConfig) GetCreateSubnetTxFee(upgrades upgrade.Times, timestamp time.Time) uint64 {
+	if upgrades.IsApricotPhase3Activated(timestamp) {
+		return c.CreateSubnetTxFee
+	}
+	return c.CreateAssetTxFee
 }
