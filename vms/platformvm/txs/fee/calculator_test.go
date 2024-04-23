@@ -49,13 +49,10 @@ type feeTests struct {
 	description         string
 	cfgAndChainTimeF    func() (StaticConfig, upgrade.Times, time.Time)
 	unsignedAndSignedTx func(t *testing.T) (txs.UnsignedTx, *txs.Tx)
-	expectedError       error
-	checksF             func(*testing.T, *Calculator)
+	expected            uint64
 }
 
 func TestTxFees(t *testing.T) {
-	r := require.New(t)
-
 	tests := []feeTests{
 		{
 			description: "AddValidatorTx pre EUpgrade",
@@ -71,10 +68,7 @@ func TestTxFees(t *testing.T) {
 				return cfg, upgrade, chainTime
 			},
 			unsignedAndSignedTx: addValidatorTx,
-			expectedError:       nil,
-			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, fc.staticCfg.AddPrimaryNetworkValidatorFee, fc.Fee)
-			},
+			expected:            feeTestsDefaultCfg.AddPrimaryNetworkValidatorFee,
 		},
 		{
 			description: "AddSubnetValidatorTx pre EUpgrade",
@@ -90,10 +84,7 @@ func TestTxFees(t *testing.T) {
 				return cfg, upgrade, chainTime
 			},
 			unsignedAndSignedTx: addSubnetValidatorTx,
-			expectedError:       nil,
-			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, fc.staticCfg.AddSubnetValidatorFee, fc.Fee)
-			},
+			expected:            feeTestsDefaultCfg.AddSubnetValidatorFee,
 		},
 		{
 			description: "AddDelegatorTx pre EUpgrade",
@@ -109,10 +100,7 @@ func TestTxFees(t *testing.T) {
 				return cfg, upgrade, chainTime
 			},
 			unsignedAndSignedTx: addDelegatorTx,
-			expectedError:       nil,
-			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, fc.staticCfg.AddPrimaryNetworkDelegatorFee, fc.Fee)
-			},
+			expected:            feeTestsDefaultCfg.AddPrimaryNetworkDelegatorFee,
 		},
 		{
 			description: "CreateChainTx pre ApricotPhase3",
@@ -129,10 +117,7 @@ func TestTxFees(t *testing.T) {
 				return cfg, upgrade, chainTime
 			},
 			unsignedAndSignedTx: createChainTx,
-			expectedError:       nil,
-			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, fc.staticCfg.CreateAssetTxFee, fc.Fee)
-			},
+			expected:            feeTestsDefaultCfg.CreateAssetTxFee,
 		},
 		{
 			description: "CreateChainTx pre EUpgrade",
@@ -148,10 +133,7 @@ func TestTxFees(t *testing.T) {
 				return cfg, upgrade, chainTime
 			},
 			unsignedAndSignedTx: createChainTx,
-			expectedError:       nil,
-			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, fc.staticCfg.CreateBlockchainTxFee, fc.Fee)
-			},
+			expected:            feeTestsDefaultCfg.CreateBlockchainTxFee,
 		},
 		{
 			description: "CreateSubnetTx pre ApricotPhase3",
@@ -168,10 +150,7 @@ func TestTxFees(t *testing.T) {
 				return cfg, upgrade, chainTime
 			},
 			unsignedAndSignedTx: createSubnetTx,
-			expectedError:       nil,
-			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, fc.staticCfg.CreateAssetTxFee, fc.Fee)
-			},
+			expected:            feeTestsDefaultCfg.CreateAssetTxFee,
 		},
 		{
 			description: "CreateSubnetTx pre EUpgrade",
@@ -187,10 +166,7 @@ func TestTxFees(t *testing.T) {
 				return cfg, upgrade, chainTime
 			},
 			unsignedAndSignedTx: createSubnetTx,
-			expectedError:       nil,
-			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, fc.staticCfg.CreateSubnetTxFee, fc.Fee)
-			},
+			expected:            feeTestsDefaultCfg.CreateSubnetTxFee,
 		},
 		{
 			description: "RemoveSubnetValidatorTx pre EUpgrade",
@@ -206,10 +182,7 @@ func TestTxFees(t *testing.T) {
 				return cfg, upgrade, chainTime
 			},
 			unsignedAndSignedTx: removeSubnetValidatorTx,
-			expectedError:       nil,
-			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, fc.staticCfg.TxFee, fc.Fee)
-			},
+			expected:            feeTestsDefaultCfg.TxFee,
 		},
 		{
 			description: "TransformSubnetTx pre EUpgrade",
@@ -225,10 +198,7 @@ func TestTxFees(t *testing.T) {
 				return cfg, upgrade, chainTime
 			},
 			unsignedAndSignedTx: transformSubnetTx,
-			expectedError:       nil,
-			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, fc.staticCfg.TransformSubnetTxFee, fc.Fee)
-			},
+			expected:            feeTestsDefaultCfg.TransformSubnetTxFee,
 		},
 		{
 			description: "TransferSubnetOwnershipTx pre EUpgrade",
@@ -244,10 +214,7 @@ func TestTxFees(t *testing.T) {
 				return cfg, upgrade, chainTime
 			},
 			unsignedAndSignedTx: transferSubnetOwnershipTx,
-			expectedError:       nil,
-			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, fc.staticCfg.TxFee, fc.Fee)
-			},
+			expected:            feeTestsDefaultCfg.TxFee,
 		},
 		{
 			description: "AddPermissionlessValidatorTx Primary Network pre EUpgrade",
@@ -265,10 +232,7 @@ func TestTxFees(t *testing.T) {
 			unsignedAndSignedTx: func(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
 				return addPermissionlessValidatorTx(t, constants.PrimaryNetworkID)
 			},
-			expectedError: nil,
-			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, fc.staticCfg.AddPrimaryNetworkValidatorFee, fc.Fee)
-			},
+			expected: feeTestsDefaultCfg.AddPrimaryNetworkValidatorFee,
 		},
 		{
 			description: "AddPermissionlessValidatorTx Subnet pre EUpgrade",
@@ -288,10 +252,7 @@ func TestTxFees(t *testing.T) {
 				require.NotEqual(t, constants.PrimaryNetworkID, subnetID)
 				return addPermissionlessValidatorTx(t, subnetID)
 			},
-			expectedError: nil,
-			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, fc.staticCfg.AddSubnetValidatorFee, fc.Fee)
-			},
+			expected: feeTestsDefaultCfg.AddSubnetValidatorFee,
 		},
 		{
 			description: "AddPermissionlessDelegatorTx Primary Network pre EUpgrade",
@@ -309,10 +270,7 @@ func TestTxFees(t *testing.T) {
 			unsignedAndSignedTx: func(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
 				return addPermissionlessDelegatorTx(t, constants.PrimaryNetworkID)
 			},
-			expectedError: nil,
-			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, fc.staticCfg.AddPrimaryNetworkDelegatorFee, fc.Fee)
-			},
+			expected: feeTestsDefaultCfg.AddPrimaryNetworkDelegatorFee,
 		},
 		{
 			description: "AddPermissionlessDelegatorTx pre EUpgrade",
@@ -332,10 +290,7 @@ func TestTxFees(t *testing.T) {
 				require.NotEqual(t, constants.PrimaryNetworkID, subnetID)
 				return addPermissionlessDelegatorTx(t, subnetID)
 			},
-			expectedError: nil,
-			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, fc.staticCfg.AddSubnetDelegatorFee, fc.Fee)
-			},
+			expected: feeTestsDefaultCfg.AddSubnetDelegatorFee,
 		},
 		{
 			description: "BaseTx pre EUpgrade",
@@ -351,10 +306,7 @@ func TestTxFees(t *testing.T) {
 				return cfg, upgrade, chainTime
 			},
 			unsignedAndSignedTx: baseTx,
-			expectedError:       nil,
-			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, fc.staticCfg.TxFee, fc.Fee)
-			},
+			expected:            feeTestsDefaultCfg.TxFee,
 		},
 		{
 			description: "ImportTx pre EUpgrade",
@@ -370,10 +322,7 @@ func TestTxFees(t *testing.T) {
 				return cfg, upgrade, chainTime
 			},
 			unsignedAndSignedTx: importTx,
-			expectedError:       nil,
-			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, fc.staticCfg.TxFee, fc.Fee)
-			},
+			expected:            feeTestsDefaultCfg.TxFee,
 		},
 		{
 			description: "ExportTx pre EUpgrade",
@@ -389,10 +338,7 @@ func TestTxFees(t *testing.T) {
 				return cfg, upgrade, chainTime
 			},
 			unsignedAndSignedTx: exportTx,
-			expectedError:       nil,
-			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, fc.staticCfg.TxFee, fc.Fee)
-			},
+			expected:            feeTestsDefaultCfg.TxFee,
 		},
 		{
 			description: "RewardValidatorTx pre EUpgrade",
@@ -412,10 +358,7 @@ func TestTxFees(t *testing.T) {
 					TxID: ids.GenerateTestID(),
 				}, nil
 			},
-			expectedError: nil,
-			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, uint64(0), fc.Fee)
-			},
+			expected: 0,
 		},
 		{
 			description: "AdvanceTimeTx pre EUpgrade",
@@ -435,10 +378,7 @@ func TestTxFees(t *testing.T) {
 					Time: uint64(time.Now().Unix()),
 				}, nil
 			},
-			expectedError: nil,
-			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, uint64(0), fc.Fee)
-			},
+			expected: 0,
 		},
 	}
 
@@ -447,11 +387,9 @@ func TestTxFees(t *testing.T) {
 			cfg, upgrades, chainTime := tt.cfgAndChainTimeF()
 
 			uTx, _ := tt.unsignedAndSignedTx(t)
-			fc := NewStaticCalculator(cfg, upgrades, chainTime)
+			fc := NewStaticCalculator(cfg, upgrades)
 
-			err := uTx.Visit(fc)
-			r.ErrorIs(err, tt.expectedError)
-			tt.checksF(t, fc)
+			require.Equal(t, tt.expected, fc.GetFee(uTx, chainTime))
 		})
 	}
 }

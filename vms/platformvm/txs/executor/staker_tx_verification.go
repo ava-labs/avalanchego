@@ -168,10 +168,8 @@ func verifyAddValidatorTx(
 		staticFeesCfg = backend.Config.StaticConfig
 		upgrades      = backend.Config.Times
 	)
-	feeCalculator := fee.NewStaticCalculator(staticFeesCfg, upgrades, currentTimestamp)
-	if err := tx.Visit(feeCalculator); err != nil {
-		return nil, err
-	}
+	feeCalculator := fee.NewStaticCalculator(staticFeesCfg, upgrades)
+	fee := feeCalculator.GetFee(tx, currentTimestamp)
 
 	if err := backend.FlowChecker.VerifySpend(
 		tx,
@@ -180,7 +178,7 @@ func verifyAddValidatorTx(
 		outs,
 		sTx.Creds,
 		map[ids.ID]uint64{
-			backend.Ctx.AVAXAssetID: feeCalculator.Fee,
+			backend.Ctx.AVAXAssetID: fee,
 		},
 	); err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
@@ -265,10 +263,8 @@ func verifyAddSubnetValidatorTx(
 		staticFeesCfg = backend.Config.StaticConfig
 		upgrades      = backend.Config.Times
 	)
-	feeCalculator := fee.NewStaticCalculator(staticFeesCfg, upgrades, currentTimestamp)
-	if err := tx.Visit(feeCalculator); err != nil {
-		return err
-	}
+	feeCalculator := fee.NewStaticCalculator(staticFeesCfg, upgrades)
+	fee := feeCalculator.GetFee(tx, currentTimestamp)
 
 	if err := backend.FlowChecker.VerifySpend(
 		tx,
@@ -277,7 +273,7 @@ func verifyAddSubnetValidatorTx(
 		tx.Outs,
 		baseTxCreds,
 		map[ids.ID]uint64{
-			backend.Ctx.AVAXAssetID: feeCalculator.Fee,
+			backend.Ctx.AVAXAssetID: fee,
 		},
 	); err != nil {
 		return fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
@@ -349,10 +345,8 @@ func verifyRemoveSubnetValidatorTx(
 		staticFeesCfg = backend.Config.StaticConfig
 		upgrades      = backend.Config.Times
 	)
-	feeCalculator := fee.NewStaticCalculator(staticFeesCfg, upgrades, currentTimestamp)
-	if err := tx.Visit(feeCalculator); err != nil {
-		return nil, false, err
-	}
+	feeCalculator := fee.NewStaticCalculator(staticFeesCfg, upgrades)
+	fee := feeCalculator.GetFee(tx, currentTimestamp)
 
 	if err := backend.FlowChecker.VerifySpend(
 		tx,
@@ -361,7 +355,7 @@ func verifyRemoveSubnetValidatorTx(
 		tx.Outs,
 		baseTxCreds,
 		map[ids.ID]uint64{
-			backend.Ctx.AVAXAssetID: feeCalculator.Fee,
+			backend.Ctx.AVAXAssetID: fee,
 		},
 	); err != nil {
 		return nil, false, fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
@@ -473,10 +467,8 @@ func verifyAddDelegatorTx(
 		staticFeesCfg = backend.Config.StaticConfig
 		upgrades      = backend.Config.Times
 	)
-	feeCalculator := fee.NewStaticCalculator(staticFeesCfg, upgrades, currentTimestamp)
-	if err := tx.Visit(feeCalculator); err != nil {
-		return nil, err
-	}
+	feeCalculator := fee.NewStaticCalculator(staticFeesCfg, upgrades)
+	fee := feeCalculator.GetFee(tx, currentTimestamp)
 
 	if err := backend.FlowChecker.VerifySpend(
 		tx,
@@ -485,7 +477,7 @@ func verifyAddDelegatorTx(
 		outs,
 		sTx.Creds,
 		map[ids.ID]uint64{
-			backend.Ctx.AVAXAssetID: feeCalculator.Fee,
+			backend.Ctx.AVAXAssetID: fee,
 		},
 	); err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
@@ -599,10 +591,8 @@ func verifyAddPermissionlessValidatorTx(
 		staticFeesCfg = backend.Config.StaticConfig
 		upgrades      = backend.Config.Times
 	)
-	feeCalculator := fee.NewStaticCalculator(staticFeesCfg, upgrades, currentTimestamp)
-	if err := tx.Visit(feeCalculator); err != nil {
-		return err
-	}
+	feeCalculator := fee.NewStaticCalculator(staticFeesCfg, upgrades)
+	fee := feeCalculator.GetFee(tx, currentTimestamp)
 
 	if err := backend.FlowChecker.VerifySpend(
 		tx,
@@ -611,7 +601,7 @@ func verifyAddPermissionlessValidatorTx(
 		outs,
 		sTx.Creds,
 		map[ids.ID]uint64{
-			backend.Ctx.AVAXAssetID: feeCalculator.Fee,
+			backend.Ctx.AVAXAssetID: fee,
 		},
 	); err != nil {
 		return fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
@@ -750,10 +740,8 @@ func verifyAddPermissionlessDelegatorTx(
 		staticFeesCfg = backend.Config.StaticConfig
 		upgrades      = backend.Config.Times
 	)
-	feeCalculator := fee.NewStaticCalculator(staticFeesCfg, upgrades, currentTimestamp)
-	if err := tx.Visit(feeCalculator); err != nil {
-		return err
-	}
+	feeCalculator := fee.NewStaticCalculator(staticFeesCfg, upgrades)
+	fee := feeCalculator.GetFee(tx, currentTimestamp)
 
 	// Verify the flowcheck
 	if err := backend.FlowChecker.VerifySpend(
@@ -763,7 +751,7 @@ func verifyAddPermissionlessDelegatorTx(
 		outs,
 		sTx.Creds,
 		map[ids.ID]uint64{
-			backend.Ctx.AVAXAssetID: feeCalculator.Fee,
+			backend.Ctx.AVAXAssetID: fee,
 		},
 	); err != nil {
 		return fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
@@ -812,10 +800,8 @@ func verifyTransferSubnetOwnershipTx(
 		upgrades         = backend.Config.Times
 		currentTimestamp = chainState.GetTimestamp()
 	)
-	feeCalculator := fee.NewStaticCalculator(staticFeesCfg, upgrades, currentTimestamp)
-	if err := tx.Visit(feeCalculator); err != nil {
-		return err
-	}
+	feeCalculator := fee.NewStaticCalculator(staticFeesCfg, upgrades)
+	fee := feeCalculator.GetFee(tx, currentTimestamp)
 
 	if err := backend.FlowChecker.VerifySpend(
 		tx,
@@ -824,7 +810,7 @@ func verifyTransferSubnetOwnershipTx(
 		tx.Outs,
 		baseTxCreds,
 		map[ids.ID]uint64{
-			backend.Ctx.AVAXAssetID: feeCalculator.Fee,
+			backend.Ctx.AVAXAssetID: fee,
 		},
 	); err != nil {
 		return fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)

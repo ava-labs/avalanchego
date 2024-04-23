@@ -11,103 +11,121 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/upgrade"
 )
 
-var _ txs.Visitor = (*Calculator)(nil)
+var _ txs.Visitor = (*calculator)(nil)
+
+func NewStaticCalculator(config StaticConfig, upgradeTimes upgrade.Times) Calculator {
+	return Calculator{
+		config:       config,
+		upgradeTimes: upgradeTimes,
+	}
+}
 
 type Calculator struct {
+	config       StaticConfig
+	upgradeTimes upgrade.Times
+}
+
+func (c Calculator) GetFee(tx txs.UnsignedTx, time time.Time) uint64 {
+	tmp := &calculator{
+		upgrades:  c.upgradeTimes,
+		staticCfg: c.config,
+		time:      time,
+	}
+
+	// this is guaranteed to never return an error
+	_ = tx.Visit(tmp)
+	return tmp.fee
+}
+
+// calculator is intentionally unexported and used through Calculator to provide
+// a more convenient API
+type calculator struct {
 	// Pre E-fork inputs
 	upgrades  upgrade.Times
 	staticCfg StaticConfig
-	chainTime time.Time
+	time      time.Time
 
 	// outputs of visitor execution
-	Fee uint64
+	fee uint64
 }
 
-func NewStaticCalculator(cfg StaticConfig, ut upgrade.Times, chainTime time.Time) *Calculator {
-	return &Calculator{
-		upgrades:  ut,
-		staticCfg: cfg,
-		chainTime: chainTime,
-	}
-}
-
-func (fc *Calculator) AddValidatorTx(*txs.AddValidatorTx) error {
-	fc.Fee = fc.staticCfg.AddPrimaryNetworkValidatorFee
+func (c *calculator) AddValidatorTx(*txs.AddValidatorTx) error {
+	c.fee = c.staticCfg.AddPrimaryNetworkValidatorFee
 	return nil
 }
 
-func (fc *Calculator) AddSubnetValidatorTx(*txs.AddSubnetValidatorTx) error {
-	fc.Fee = fc.staticCfg.AddSubnetValidatorFee
+func (c *calculator) AddSubnetValidatorTx(*txs.AddSubnetValidatorTx) error {
+	c.fee = c.staticCfg.AddSubnetValidatorFee
 	return nil
 }
 
-func (fc *Calculator) AddDelegatorTx(*txs.AddDelegatorTx) error {
-	fc.Fee = fc.staticCfg.AddPrimaryNetworkDelegatorFee
+func (c *calculator) AddDelegatorTx(*txs.AddDelegatorTx) error {
+	c.fee = c.staticCfg.AddPrimaryNetworkDelegatorFee
 	return nil
 }
 
-func (fc *Calculator) CreateChainTx(*txs.CreateChainTx) error {
-	fc.Fee = fc.staticCfg.GetCreateBlockchainTxFee(fc.upgrades, fc.chainTime)
+func (c *calculator) CreateChainTx(*txs.CreateChainTx) error {
+	c.fee = c.staticCfg.GetCreateBlockchainTxFee(c.upgrades, c.time)
 	return nil
 }
 
-func (fc *Calculator) CreateSubnetTx(*txs.CreateSubnetTx) error {
-	fc.Fee = fc.staticCfg.GetCreateSubnetTxFee(fc.upgrades, fc.chainTime)
+func (c *calculator) CreateSubnetTx(*txs.CreateSubnetTx) error {
+	c.fee = c.staticCfg.GetCreateSubnetTxFee(c.upgrades, c.time)
 	return nil
 }
 
-func (*Calculator) AdvanceTimeTx(*txs.AdvanceTimeTx) error {
+func (*calculator) AdvanceTimeTx(*txs.AdvanceTimeTx) error {
 	return nil // no fees
 }
 
-func (*Calculator) RewardValidatorTx(*txs.RewardValidatorTx) error {
+func (*calculator) RewardValidatorTx(*txs.RewardValidatorTx) error {
 	return nil // no fees
 }
 
-func (fc *Calculator) RemoveSubnetValidatorTx(*txs.RemoveSubnetValidatorTx) error {
-	fc.Fee = fc.staticCfg.TxFee
+func (c *calculator) RemoveSubnetValidatorTx(*txs.RemoveSubnetValidatorTx) error {
+	c.fee = c.staticCfg.TxFee
 	return nil
 }
 
-func (fc *Calculator) TransformSubnetTx(*txs.TransformSubnetTx) error {
-	fc.Fee = fc.staticCfg.TransformSubnetTxFee
+func (c *calculator) TransformSubnetTx(*txs.TransformSubnetTx) error {
+	c.fee = c.staticCfg.TransformSubnetTxFee
 	return nil
 }
 
-func (fc *Calculator) TransferSubnetOwnershipTx(*txs.TransferSubnetOwnershipTx) error {
-	fc.Fee = fc.staticCfg.TxFee
+func (c *calculator) TransferSubnetOwnershipTx(*txs.TransferSubnetOwnershipTx) error {
+	c.fee = c.staticCfg.TxFee
 	return nil
 }
 
-func (fc *Calculator) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessValidatorTx) error {
+func (c *calculator) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessValidatorTx) error {
 	if tx.Subnet != constants.PrimaryNetworkID {
-		fc.Fee = fc.staticCfg.AddSubnetValidatorFee
+		c.fee = c.staticCfg.AddSubnetValidatorFee
 	} else {
-		fc.Fee = fc.staticCfg.AddPrimaryNetworkValidatorFee
+		c.fee = c.staticCfg.AddPrimaryNetworkValidatorFee
 	}
 	return nil
 }
 
-func (fc *Calculator) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDelegatorTx) error {
+func (c *calculator) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDelegatorTx) error {
 	if tx.Subnet != constants.PrimaryNetworkID {
-		fc.Fee = fc.staticCfg.AddSubnetDelegatorFee
+		c.fee = c.staticCfg.AddSubnetDelegatorFee
 	} else {
-		fc.Fee = fc.staticCfg.AddPrimaryNetworkDelegatorFee
+		c.fee = c.staticCfg.AddPrimaryNetworkDelegatorFee
 	}
 	return nil
 }
 
-func (fc *Calculator) BaseTx(*txs.BaseTx) error {
-	fc.Fee = fc.staticCfg.TxFee
+func (c *calculator) BaseTx(*txs.BaseTx) error {
+	c.fee = c.staticCfg.TxFee
 	return nil
 }
 
-func (fc *Calculator) ImportTx(*txs.ImportTx) error {
-	fc.Fee = fc.staticCfg.TxFee
+func (c *calculator) ImportTx(*txs.ImportTx) error {
+	c.fee = c.staticCfg.TxFee
 	return nil
 }
 
-func (fc *Calculator) ExportTx(*txs.ExportTx) error {
-	fc.Fee = fc.staticCfg.TxFee
+func (c *calculator) ExportTx(*txs.ExportTx) error {
+	c.fee = c.staticCfg.TxFee
 	return nil
 }
