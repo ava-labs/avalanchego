@@ -1019,6 +1019,9 @@ func (pool *LegacyPool) promoteTx(addr common.Address, hash common.Hash, tx *typ
 // If sync is set, the method will block until all internal maintenance related
 // to the add is finished. Only use this during tests for determinism!
 func (pool *LegacyPool) Add(txs []*txpool.Transaction, local bool, sync bool) []error {
+	// Do not treat as local if local transactions have been disabled
+	local = local && !pool.config.NoLocals
+
 	unwrapped := make([]*types.Transaction, len(txs))
 	for i, tx := range txs {
 		unwrapped[i] = tx.Tx
