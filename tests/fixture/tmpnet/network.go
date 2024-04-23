@@ -123,7 +123,10 @@ func StartNewNetwork(
 	if err := network.Create(rootNetworkDir); err != nil {
 		return err
 	}
-	return network.Start(ctx, w)
+	if err := network.Start(ctx, w); err != nil {
+		return err
+	}
+	return network.CreateSubnets(ctx, w)
 }
 
 // Stops the nodes of the network configured in the provided directory.
@@ -774,4 +777,13 @@ func getDefaultRootNetworkDir() (string, error) {
 		return "", err
 	}
 	return filepath.Join(tmpnetPath, "networks"), nil
+}
+
+// Retrieves the path to a reusable network path for the given owner.
+func GetReusableNetworkPathForOwner(owner string) (string, error) {
+	networkPath, err := getDefaultRootNetworkDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(networkPath, "latest_"+owner), nil
 }

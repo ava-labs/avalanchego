@@ -665,9 +665,10 @@ func (s *sender) SendGetAncestors(ctx context.Context, nodeID ids.NodeID, reques
 		s.engineType,
 	)
 
-	// Sending a GetAncestors to myself always fails.
+	// Sending a GetAncestors to myself will fail. To avoid constantly sending
+	// myself requests when not connected to any peers, we rely on the timeout
+	// firing to deliver the GetAncestorsFailed message.
 	if nodeID == s.ctx.NodeID {
-		go s.router.HandleInbound(ctx, inMsg)
 		return
 	}
 
