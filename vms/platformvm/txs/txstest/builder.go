@@ -445,7 +445,7 @@ func (b *Builder) feeCalculator() (*fee.Calculator, error) {
 			return nil, fmt.Errorf("failed retrieving last block complexity: %w", err)
 		}
 
-		feeManager, err := fee.UpdatedFeeManager(feeRates, parentBlkComplexity, b.cfg.Times, chainTime, nextChainTime)
+		feeManager, err := fee.UpdatedFeeManager(feeRates, parentBlkComplexity, b.cfg.Config, chainTime, nextChainTime)
 		if err != nil {
 			return nil, err
 		}

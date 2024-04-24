@@ -315,7 +315,7 @@ func addSubnet(env *environment) {
 		panic(fmt.Errorf("failed retrieving last block complexity: %w", err))
 	}
 
-	feeManager, err := fee.UpdatedFeeManager(feeRates, parentBlkComplexity, env.config.Times, chainTime, nextChainTime)
+	feeManager, err := fee.UpdatedFeeManager(feeRates, parentBlkComplexity, env.config.Config, chainTime, nextChainTime)
 	if err != nil {
 		panic(err)
 	}

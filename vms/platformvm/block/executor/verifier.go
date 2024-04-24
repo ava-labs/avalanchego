@@ -498,7 +498,7 @@ func (v *verifier) processStandardTxs(
 		if err != nil {
 			return nil, nil, nil, nil, fmt.Errorf("failed retrieving last block complexity: %w", err)
 		}
-		feeMan, err = fee.UpdatedFeeManager(feeRates, parentBlkComplexity, v.txExecutorBackend.Config.Times, parentBlkTime, blkTimestamp)
+		feeMan, err = fee.UpdatedFeeManager(feeRates, parentBlkComplexity, v.txExecutorBackend.Config.Config, parentBlkTime, blkTimestamp)
 		if err != nil {
 			return nil, nil, nil, nil, err
 		}

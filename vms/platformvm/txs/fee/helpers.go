@@ -61,7 +61,7 @@ func FinanceCredential(feeCalc *Calculator, keysCount int) (uint64, error) {
 	return addedFees, nil
 }
 
-func UpdatedFeeManager(feeRates, parentBlkComplexity fees.Dimensions, upgrades upgrade.Times, parentBlkTime, nextBlkTime time.Time) (*fees.Manager, error) {
+func UpdatedFeeManager(feeRates, parentBlkComplexity fees.Dimensions, upgrades upgrade.Config, parentBlkTime, nextBlkTime time.Time) (*fees.Manager, error) {
 	var (
 		isEActive = upgrades.IsEActivated(parentBlkTime)
 		feeCfg    = GetDynamicConfig(isEActive)
