@@ -68,6 +68,7 @@ var (
 		ErrorOnAddDecidedBlockTest,
 		ErrorOnAddDuplicateBlockIDTest,
 		RecordPollWithDefaultParameters,
+		RecordPollRegressionCalculateInDegreeIndegreeCalculation,
 	}
 
 	errTest = errors.New("non-nil error")
@@ -1779,4 +1780,64 @@ func RecordPollWithDefaultParameters(t *testing.T, factory Factory) {
 		require.NoError(sm.RecordPoll(context.Background(), votes))
 	}
 	require.Zero(sm.NumProcessing())
+}
+
+// If a block that was voted for received additional votes from another block,
+// the indegree of the topological sort should not traverse into the parent
+// node.
+func RecordPollRegressionCalculateInDegreeIndegreeCalculation(t *testing.T, factory Factory) {
+	require := require.New(t)
+
+	sm := factory.New()
+
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	ctx := snowtest.ConsensusContext(snowCtx)
+	params := snowball.Parameters{
+		K:                     3,
+		AlphaPreference:       2,
+		AlphaConfidence:       2,
+		BetaVirtuous:          1,
+		BetaRogue:             1,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
+	}
+	require.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp))
+
+	blk1 := &TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.ID{1},
+			StatusV: choices.Processing,
+		},
+		ParentV: Genesis.IDV,
+		HeightV: Genesis.HeightV + 1,
+	}
+	blk2 := &TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.ID{2},
+			StatusV: choices.Processing,
+		},
+		ParentV: blk1.IDV,
+		HeightV: blk1.HeightV + 1,
+	}
+	blk3 := &TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.ID{3},
+			StatusV: choices.Processing,
+		},
+		ParentV: blk2.IDV,
+		HeightV: blk2.HeightV + 1,
+	}
+	require.NoError(sm.Add(context.Background(), blk1))
+	require.NoError(sm.Add(context.Background(), blk2))
+	require.NoError(sm.Add(context.Background(), blk3))
+
+	votes := bag.Bag[ids.ID]{}
+	votes.AddCount(blk2.ID(), 1)
+	votes.AddCount(blk3.ID(), 2)
+	require.NoError(sm.RecordPoll(context.Background(), votes))
+	require.Equal(choices.Accepted, blk1.Status())
+	require.Equal(choices.Accepted, blk2.Status())
+	require.Equal(choices.Accepted, blk3.Status())
 }
