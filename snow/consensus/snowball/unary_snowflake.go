@@ -40,10 +40,6 @@ type unarySnowflake struct {
 }
 
 func (sf *unarySnowflake) RecordPoll(count int) {
-	if sf.finalized {
-		return // This instance is already decided.
-	}
-
 	minAlphaConfidence := sf.alphaConfidence[0]
 	if count < minAlphaConfidence {
 		sf.RecordUnsuccessfulPoll()
@@ -73,9 +69,11 @@ func (sf *unarySnowflake) Finalized() bool {
 }
 
 func (sf *unarySnowflake) Extend(choice int) Binary {
+	confidence := make([]int, len(sf.confidence))
+	copy(confidence, sf.confidence)
 	return &binarySnowflake{
 		binarySlush:     binarySlush{preference: choice},
-		confidence:      sf.confidence,
+		confidence:      confidence,
 		alphaPreference: sf.alphaPreference,
 		alphaConfidence: sf.alphaConfidence,
 		beta:            sf.beta,
@@ -85,11 +83,14 @@ func (sf *unarySnowflake) Extend(choice int) Binary {
 
 func (sf *unarySnowflake) Clone() Unary {
 	newSnowflake := *sf
+	// Copy the confidence slice
+	newSnowflake.confidence = make([]int, len(sf.confidence))
+	copy(newSnowflake.confidence, sf.confidence)
 	return &newSnowflake
 }
 
 func (sf *unarySnowflake) String() string {
 	return fmt.Sprintf("SF(Confidence = %d, Finalized = %v)",
-		sf.confidence,
+		sf.confidence[0],
 		sf.finalized)
 }

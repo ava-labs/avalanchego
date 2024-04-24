@@ -30,10 +30,12 @@ func (sb *unarySnowball) RecordPoll(count int) {
 }
 
 func (sb *unarySnowball) Extend(choice int) Binary {
+	confidence := make([]int, len(sb.confidence))
+	copy(confidence, sb.confidence)
 	bs := &binarySnowball{
 		binarySnowflake: binarySnowflake{
 			binarySlush:     binarySlush{preference: choice},
-			confidence:      sb.confidence,
+			confidence:      confidence,
 			alphaPreference: sb.alphaPreference,
 			alphaConfidence: sb.alphaConfidence,
 			beta:            sb.beta,
@@ -47,6 +49,9 @@ func (sb *unarySnowball) Extend(choice int) Binary {
 
 func (sb *unarySnowball) Clone() Unary {
 	newSnowball := *sb
+	// Copy the confidence slice
+	newSnowball.confidence = make([]int, len(sb.confidence))
+	copy(newSnowball.confidence, sb.confidence)
 	return &newSnowball
 }
 

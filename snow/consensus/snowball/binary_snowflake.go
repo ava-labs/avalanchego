@@ -83,7 +83,7 @@ func (sf *binarySnowflake) Finalized() bool {
 
 func (sf *binarySnowflake) String() string {
 	return fmt.Sprintf("SF(Confidence = %d, Finalized = %v, %s)",
-		sf.confidence,
+		sf.confidence[0],
 		sf.finalized,
 		&sf.binarySlush)
 }

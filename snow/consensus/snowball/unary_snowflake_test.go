@@ -12,7 +12,7 @@ import (
 func UnarySnowflakeStateTest(t *testing.T, sf *unarySnowflake, expectedConfidence int, expectedFinalized bool) {
 	require := require.New(t)
 
-	require.Equal(expectedConfidence, sf.confidence)
+	require.Equal(expectedConfidence, sf.confidence[0])
 	require.Equal(expectedFinalized, sf.Finalized())
 }
 

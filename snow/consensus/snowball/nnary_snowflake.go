@@ -90,7 +90,7 @@ func (sf *nnarySnowflake) Finalized() bool {
 
 func (sf *nnarySnowflake) String() string {
 	return fmt.Sprintf("SF(Confidence = %d, Finalized = %v, %s)",
-		sf.confidence,
+		sf.confidence[0],
 		sf.finalized,
 		&sf.nnarySlush)
 }

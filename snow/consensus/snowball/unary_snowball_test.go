@@ -13,7 +13,7 @@ func UnarySnowballStateTest(t *testing.T, sb *unarySnowball, expectedPreferenceS
 	require := require.New(t)
 
 	require.Equal(expectedPreferenceStrength, sb.preferenceStrength)
-	require.Equal(expectedConfidence, sb.confidence)
+	require.Equal(expectedConfidence, sb.confidence[0])
 	require.Equal(expectedFinalized, sb.Finalized())
 }
 
