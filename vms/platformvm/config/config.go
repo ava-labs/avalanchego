@@ -20,6 +20,12 @@ import (
 
 // Struct collecting all foundational parameters of PlatformVM
 type Config struct {
+	// All network upgrade timestamps
+	upgrade.Config
+
+	// All static fees config active before E-upgrade
+	fee.StaticConfig
+
 	// The node's chain manager
 	Chains chains.Manager
 
@@ -42,8 +48,6 @@ type Config struct {
 
 	// Set of subnets that this node is validating
 	TrackedSubnets set.Set[ids.ID]
-
-	fee.StaticConfig
 
 	// The minimum amount of tokens one must bond to be a validator
 	MinValidatorStake uint64
@@ -68,9 +72,6 @@ type Config struct {
 
 	// Config for the minting function
 	RewardConfig reward.Config
-
-	// All network upgrade timestamps
-	upgrade.Times
 
 	// UseCurrentHeight forces [GetMinimumHeight] to return the current height
 	// of the P-Chain instead of the oldest block in the [recentlyAccepted]

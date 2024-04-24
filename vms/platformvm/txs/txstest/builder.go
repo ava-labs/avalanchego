@@ -369,19 +369,19 @@ func (b *Builder) builders(keys []*secp256k1.PrivateKey) (builder.Builder, walle
 	var (
 		kc      = secp256k1fx.NewKeychain(keys...)
 		addrs   = kc.Addresses()
-		context = newContext(b.ctx, b.cfg, b.state.GetTimestamp())
 		backend = newBackend(addrs, b.state, b.ctx.SharedMemory)
+		context = newContext(b.ctx, b.cfg, b.state.GetTimestamp())
+		builder = builder.New(addrs, context, backend)
+		signer  = walletsigner.New(kc, backend)
 	)
 
-	builder := builder.New(addrs, context, backend)
-	signer := walletsigner.New(kc, backend)
 	return builder, signer
 }
 
 func (b *Builder) feeCalculator() *fee.Calculator {
 	var (
 		staticFeeCfg = b.cfg.StaticConfig
-		upgrades     = b.cfg.Times
+		upgrades     = b.cfg.Config
 		chainTime    = b.state.GetTimestamp()
 		isEActive    = upgrades.IsEActivated(chainTime)
 	)
