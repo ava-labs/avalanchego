@@ -14,7 +14,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -74,6 +76,35 @@ func MakeGetBlockF(blks ...[]*snowman.TestBlock) func(context.Context, ids.ID) (
 			}
 		}
 		return nil, errUnknownBlock
+	}
+}
+
+func MakeParseBlockF(blks ...[]*snowman.TestBlock) func(context.Context, []byte) (snowman.Block, error) {
+	return func(_ context.Context, blkBytes []byte) (snowman.Block, error) {
+		for _, blkSet := range blks {
+			for _, blk := range blkSet {
+				if bytes.Equal(blkBytes, blk.Bytes()) {
+					return blk, nil
+				}
+			}
+		}
+		return nil, errUnknownBlock
+	}
+}
+
+func MakeLastAcceptedBlockF(defaultBlk *snowman.TestBlock, blks ...[]*snowman.TestBlock) func(context.Context) (ids.ID, error) {
+	return func(_ context.Context) (ids.ID, error) {
+		highestHeight := defaultBlk.Height()
+		highestID := defaultBlk.ID()
+		for _, blkSet := range blks {
+			for _, blk := range blkSet {
+				if blk.Status() == choices.Accepted && blk.Height() > highestHeight {
+					highestHeight = blk.Height()
+					highestID = blk.ID()
+				}
+			}
+		}
+		return highestID, nil
 	}
 }
 
@@ -2632,6 +2663,275 @@ func TestEngineRepollsMisconfiguredSubnet(t *testing.T) {
 	// set was misconfigured should result in it being accepted successfully.
 	require.NoError(te.Chits(context.Background(), vdr, queryRequestID, blk.ID(), blk.ID(), blk.ID()))
 	require.Equal(choices.Accepted, blk.Status())
+}
+
+// Full blockchain structure:
+//
+//	  G
+//	 / \
+//	0   3
+//	|   |
+//	1   4
+//	|
+//	2
+//
+// K = 3, Alpha = 2, Beta = 1, ConcurrentRepolls = 1
+//
+// Initial configuration:
+//
+//	G
+//	|
+//	0
+//	|
+//	1
+//	|
+//	2
+//
+// The following is a regression test for a bug where the engine would stall.
+//
+//  1. Poll = 0: Handle a chit for block 1.
+//  2. Poll = 0: Handle a chit for block 2.
+//  3. Poll = 0: Handle a chit for block 3. This will issue a Get request for block 3. This will block on the issuance of block 3.
+//  4. Attempt to issue block 4. This will block on the issuance of block 3.
+//  5. Poll = 1: Handle a chit for block 1.
+//  6. Poll = 1: Handle a chit for block 2.
+//  7. Poll = 1: Handle a chit for block 4. This will block on the issuance of block 4.
+//  8. Issue block 3.
+//     Poll = 0 terminates. This will accept blocks 0 and 1. This will also reject block 3.
+//     Block = 4 will attempt to be delivered, but because it is effectively rejected due to the acceptance of block 1, it will be dropped.
+//     Poll = 1 should terminate and block 2 should be repolled.
+func TestEngineVoteStallRegression(t *testing.T) {
+	require := require.New(t)
+
+	config := DefaultConfig(t)
+	config.Params = snowball.Parameters{
+		K:                     3,
+		AlphaPreference:       2,
+		AlphaConfidence:       2,
+		Beta:                  1,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
+	}
+
+	nodeID0 := ids.GenerateTestNodeID()
+	nodeID1 := ids.GenerateTestNodeID()
+	nodeID2 := ids.GenerateTestNodeID()
+	nodeIDs := []ids.NodeID{nodeID0, nodeID1, nodeID2}
+
+	require.NoError(config.Validators.AddStaker(config.Ctx.SubnetID, nodeID0, nil, ids.Empty, 1))
+	require.NoError(config.Validators.AddStaker(config.Ctx.SubnetID, nodeID1, nil, ids.Empty, 1))
+	require.NoError(config.Validators.AddStaker(config.Ctx.SubnetID, nodeID2, nil, ids.Empty, 1))
+
+	sender := &common.SenderTest{
+		T:          t,
+		SendChitsF: func(context.Context, ids.NodeID, uint32, ids.ID, ids.ID, ids.ID) {},
+	}
+	sender.Default(true)
+	config.Sender = sender
+
+	acceptedChain := BuildChain(Genesis, 3)
+	rejectedChain := BuildChain(Genesis, 2)
+
+	vm := &block.TestVM{
+		TestVM: common.TestVM{
+			T: t,
+			InitializeF: func(
+				context.Context,
+				*snow.Context,
+				database.Database,
+				[]byte,
+				[]byte,
+				[]byte,
+				chan<- common.Message,
+				[]*common.Fx,
+				common.AppSender,
+			) error {
+				return nil
+			},
+			SetStateF: func(context.Context, snow.State) error {
+				return nil
+			},
+		},
+		ParseBlockF: MakeParseBlockF(
+			[]*snowman.TestBlock{Genesis},
+			acceptedChain,
+			rejectedChain,
+		),
+		GetBlockF: MakeGetBlockF(
+			[]*snowman.TestBlock{Genesis},
+			acceptedChain,
+		),
+		SetPreferenceF: func(context.Context, ids.ID) error {
+			return nil
+		},
+		LastAcceptedF: MakeLastAcceptedBlockF(
+			Genesis,
+			acceptedChain,
+		),
+	}
+	vm.Default(true)
+	config.VM = vm
+
+	engine, err := New(config)
+	require.NoError(err)
+	require.NoError(engine.Start(context.Background(), 0))
+
+	var pollRequestIDs []uint32
+	sender.SendPullQueryF = func(_ context.Context, polledNodeIDs set.Set[ids.NodeID], requestID uint32, _ ids.ID, _ uint64) {
+		require.Equal(set.Of(nodeIDs...), polledNodeIDs)
+		pollRequestIDs = append(pollRequestIDs, requestID)
+	}
+
+	// Issue block 0.
+	require.NoError(engine.PushQuery(
+		context.Background(),
+		nodeID0,
+		0,
+		acceptedChain[0].Bytes(),
+		0,
+	))
+	require.Len(pollRequestIDs, 1)
+
+	// Issue block 1.
+	require.NoError(engine.PushQuery(
+		context.Background(),
+		nodeID0,
+		0,
+		acceptedChain[1].Bytes(),
+		0,
+	))
+	require.Len(pollRequestIDs, 2)
+
+	// Issue block 2.
+	require.NoError(engine.PushQuery(
+		context.Background(),
+		nodeID0,
+		0,
+		acceptedChain[2].Bytes(),
+		0,
+	))
+	require.Len(pollRequestIDs, 3)
+
+	// Apply votes in poll 0 to the blocks that will be accepted.
+	require.NoError(engine.Chits(
+		context.Background(),
+		nodeID0,
+		pollRequestIDs[0],
+		acceptedChain[1].ID(),
+		acceptedChain[1].ID(),
+		acceptedChain[1].ID(),
+	))
+	require.NoError(engine.Chits(
+		context.Background(),
+		nodeID1,
+		pollRequestIDs[0],
+		acceptedChain[2].ID(),
+		acceptedChain[2].ID(),
+		acceptedChain[2].ID(),
+	))
+
+	// Attempt to apply votes in poll 0 for block 3. This will send a Get
+	// request for block 3 and register the chits as a dependency on block 3.
+	var getBlock3Request *common.Request
+	sender.SendGetF = func(_ context.Context, nodeID ids.NodeID, requestID uint32, blkID ids.ID) {
+		require.Nil(getBlock3Request)
+		require.Equal(nodeID2, nodeID)
+		getBlock3Request = &common.Request{
+			NodeID:    nodeID,
+			RequestID: requestID,
+		}
+		require.Equal(rejectedChain[0].ID(), blkID)
+	}
+
+	require.NoError(engine.Chits(
+		context.Background(),
+		nodeID2,
+		pollRequestIDs[0],
+		rejectedChain[0].ID(),
+		rejectedChain[0].ID(),
+		rejectedChain[0].ID(),
+	))
+	require.NotNil(getBlock3Request)
+
+	// Attempt to issue block 4. This will register a dependency on block 3 for
+	// the issuance of block 4.
+	require.NoError(engine.PushQuery(
+		context.Background(),
+		nodeID0,
+		0,
+		rejectedChain[1].Bytes(),
+		0,
+	))
+	require.Len(pollRequestIDs, 3)
+
+	// Apply votes in poll 1 that will cause blocks 3 and 4 to be rejected once
+	// poll 0 finishes.
+	require.NoError(engine.Chits(
+		context.Background(),
+		nodeID0,
+		pollRequestIDs[1],
+		acceptedChain[1].ID(),
+		acceptedChain[1].ID(),
+		acceptedChain[1].ID(),
+	))
+	require.NoError(engine.Chits(
+		context.Background(),
+		nodeID1,
+		pollRequestIDs[1],
+		acceptedChain[2].ID(),
+		acceptedChain[2].ID(),
+		acceptedChain[2].ID(),
+	))
+	require.NoError(engine.Chits(
+		context.Background(),
+		nodeID2,
+		pollRequestIDs[1],
+		rejectedChain[1].ID(),
+		rejectedChain[1].ID(),
+		rejectedChain[1].ID(),
+	))
+
+	// Provide block 3.
+	// This will cause poll 0 to terminate and accept blocks 0 and 1.
+	// Then the engine will attempt to deliver block 4, but because block 1 is
+	// accepted, block 4 will be dropped.
+	// Then poll 1 should terminate because block 4 was dropped.
+	vm.GetBlockF = MakeGetBlockF(
+		[]*snowman.TestBlock{Genesis},
+		acceptedChain,
+		rejectedChain,
+	)
+
+	require.NoError(engine.Put(
+		context.Background(),
+		getBlock3Request.NodeID,
+		getBlock3Request.RequestID,
+		rejectedChain[0].Bytes(),
+	))
+	require.Equal(choices.Accepted, acceptedChain[0].Status())
+	require.Equal(choices.Accepted, acceptedChain[1].Status())
+	require.Equal(choices.Processing, acceptedChain[2].Status())
+	require.Equal(choices.Rejected, rejectedChain[0].Status())
+
+	// Then engine should issue as many queries as needed to confirm block 2.
+	for i := 2; i < len(pollRequestIDs); i++ {
+		for _, nodeID := range nodeIDs {
+			require.NoError(engine.Chits(
+				context.Background(),
+				nodeID,
+				pollRequestIDs[i],
+				acceptedChain[2].ID(),
+				acceptedChain[2].ID(),
+				acceptedChain[2].ID(),
+			))
+		}
+	}
+	require.Equal(choices.Accepted, acceptedChain[0].Status())
+	require.Equal(choices.Accepted, acceptedChain[1].Status())
+	require.Equal(choices.Accepted, acceptedChain[2].Status())
+	require.Equal(choices.Rejected, rejectedChain[0].Status())
 }
 
 func TestGetProcessingAncestor(t *testing.T) {

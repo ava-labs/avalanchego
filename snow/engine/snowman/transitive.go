@@ -950,14 +950,19 @@ func (t *Transitive) deliver(
 	push bool,
 	issuedMetric prometheus.Counter,
 ) error {
-	blkID := blk.ID()
-	if t.Consensus.Decided(blk) || t.Consensus.Processing(blkID) {
-		return nil
-	}
-
 	// we are no longer waiting on adding the block to consensus, so it is no
 	// longer pending
 	t.removeFromPending(blk)
+
+	blkID := blk.ID()
+	if t.Consensus.Decided(blk) || t.Consensus.Processing(blkID) {
+		// If [blk] is decided, then it shouldn't be added to consensus.
+		// Similarly, if [blkID] is already in the processing set, it shouldn't
+		// be added to consensus again.
+		t.blocked.Abandon(ctx, blkID)
+		return t.errs.Err
+	}
+
 	parentID := blk.Parent()
 	parent, err := t.getBlock(ctx, parentID)
 	// Because the dependency must have been fulfilled by the time this function
