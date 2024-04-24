@@ -159,7 +159,7 @@ func (m *manager) VerifyTx(tx *txs.Tx) (commonfees.TipPercentage, error) {
 		if err != nil {
 			return commonfees.NoTip, fmt.Errorf("failed retrieving last block complexity: %w", err)
 		}
-		feeManager, err = fee.UpdatedFeeManager(feeRates, parentBlkComplexity, m.txExecutorBackend.Config.Times, parentBlkTime, nextBlkTime)
+		feeManager, err = fee.UpdatedFeeManager(feeRates, parentBlkComplexity, m.txExecutorBackend.Config.Config, parentBlkTime, nextBlkTime)
 		if err != nil {
 			return commonfees.NoTip, err
 		}

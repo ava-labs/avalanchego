@@ -1877,7 +1877,7 @@ func (s *Service) GetFeeRates(_ *http.Request, _ *struct{}, reply *GetFeeRatesRe
 		if err != nil {
 			return fmt.Errorf("failed retrieving last block complexity: %w", err)
 		}
-		feeManager, err = fee.UpdatedFeeManager(feeRates, parentBlkComplexity, s.vm.Config.Times, currentTimestamp, nextTimestamp)
+		feeManager, err = fee.UpdatedFeeManager(feeRates, parentBlkComplexity, s.vm.Config.Config, currentTimestamp, nextTimestamp)
 		if err != nil {
 			return err
 		}

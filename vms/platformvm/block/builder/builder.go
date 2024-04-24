@@ -373,7 +373,7 @@ func packBlockTxs(
 			return nil, fmt.Errorf("failed retrieving last block complexity: %w", err)
 		}
 
-		feeMan, err = fee.UpdatedFeeManager(feeRates, parentBlkComplexity, backend.Config.Times, parentBlkTime, timestamp)
+		feeMan, err = fee.UpdatedFeeManager(feeRates, parentBlkComplexity, backend.Config.Config, parentBlkTime, timestamp)
 		if err != nil {
 			return nil, err
 		}

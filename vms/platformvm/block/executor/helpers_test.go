@@ -325,7 +325,7 @@ func addSubnet(env *environment) {
 		panic(fmt.Errorf("failed retrieving last block complexity: %w", err))
 	}
 
-	feeManager, err := fee.UpdatedFeeManager(feeRates, parentBlkComplexity, env.config.Times, chainTime, nextChainTime)
+	feeManager, err := fee.UpdatedFeeManager(feeRates, parentBlkComplexity, env.config.Config, chainTime, nextChainTime)
 	if err != nil {
 		panic(err)
 	}
@@ -404,7 +404,7 @@ func defaultConfig(t *testing.T, f fork) *config.Config {
 			MintingPeriod:      365 * 24 * time.Hour,
 			SupplyCap:          720 * units.MegaAvax,
 		},
-		Times: upgrade.Times{
+		Config: upgrade.Config{
 			ApricotPhase3Time: mockable.MaxTime,
 			ApricotPhase5Time: mockable.MaxTime,
 			BanffTime:         mockable.MaxTime,

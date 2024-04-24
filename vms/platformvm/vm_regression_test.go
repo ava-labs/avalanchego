@@ -453,7 +453,7 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 		MinStakeDuration:       defaultMinStakingDuration,
 		MaxStakeDuration:       defaultMaxStakingDuration,
 		RewardConfig:           defaultRewardConfig,
-		Times: upgrade.Times{
+		Config: upgrade.Config{
 			BanffTime:    latestForkTime,
 			CortinaTime:  mockable.MaxTime,
 			DurangoTime:  mockable.MaxTime,

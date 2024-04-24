@@ -62,7 +62,7 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 	parentBlkComplexity, err := stateDiff.GetLastBlockComplexity()
 	require.NoError(err)
 
-	feeMan, err := fee.UpdatedFeeManager(feeRates, parentBlkComplexity, env.config.Times, currentTime, nextBlkTime)
+	feeMan, err := fee.UpdatedFeeManager(feeRates, parentBlkComplexity, env.config.Config, currentTime, nextBlkTime)
 	require.NoError(err)
 
 	executor := StandardTxExecutor{
@@ -118,7 +118,7 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 	parentBlkComplexity, err := stateDiff.GetLastBlockComplexity()
 	require.NoError(err)
 
-	feeMan, err := fee.UpdatedFeeManager(feeRates, parentBlkComplexity, env.config.Times, currentTime, nextBlkTime)
+	feeMan, err := fee.UpdatedFeeManager(feeRates, parentBlkComplexity, env.config.Config, currentTime, nextBlkTime)
 	require.NoError(err)
 
 	executor := StandardTxExecutor{
@@ -168,7 +168,7 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 	parentBlkComplexity, err := stateDiff.GetLastBlockComplexity()
 	require.NoError(err)
 
-	feeMan, err := fee.UpdatedFeeManager(feeRates, parentBlkComplexity, env.config.Times, currentTime, nextBlkTime)
+	feeMan, err := fee.UpdatedFeeManager(feeRates, parentBlkComplexity, env.config.Config, currentTime, nextBlkTime)
 	require.NoError(err)
 
 	executor := StandardTxExecutor{
@@ -215,7 +215,7 @@ func TestCreateChainTxValid(t *testing.T) {
 	parentBlkComplexity, err := stateDiff.GetLastBlockComplexity()
 	require.NoError(err)
 
-	feeMan, err := fee.UpdatedFeeManager(feeRates, parentBlkComplexity, env.config.Times, currentTime, nextBlkTime)
+	feeMan, err := fee.UpdatedFeeManager(feeRates, parentBlkComplexity, env.config.Config, currentTime, nextBlkTime)
 	require.NoError(err)
 
 	executor := StandardTxExecutor{

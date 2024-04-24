@@ -243,7 +243,7 @@ func addSubnet(t *testing.T, env *environment) {
 	require.NoError(err)
 	parentBlkComplexity, err := stateDiff.GetLastBlockComplexity()
 	require.NoError(err)
-	feeManager, err := fee.UpdatedFeeManager(feeRates, parentBlkComplexity, env.config.Times, currentChainTime, nextChainTime)
+	feeManager, err := fee.UpdatedFeeManager(feeRates, parentBlkComplexity, env.config.Config, currentChainTime, nextChainTime)
 	require.NoError(err)
 
 	feeCfg := fee.GetDynamicConfig(env.config.IsEActivated(currentChainTime))
@@ -313,7 +313,7 @@ func defaultConfig(t *testing.T, f fork) *config.Config {
 			MintingPeriod:      365 * 24 * time.Hour,
 			SupplyCap:          720 * units.MegaAvax,
 		},
-		Times: upgrade.Times{
+		Config: upgrade.Config{
 			ApricotPhase3Time: mockable.MaxTime,
 			ApricotPhase5Time: mockable.MaxTime,
 			BanffTime:         mockable.MaxTime,

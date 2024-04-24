@@ -110,7 +110,7 @@ func (r *rejector) rejectBlock(b block.Block, blockType string) error {
 		if err != nil {
 			return fmt.Errorf("failed retrieving last block complexity: %w", err)
 		}
-		feeManager, err = fee.UpdatedFeeManager(feeRates, parentBlkComplexity, cfg.Times, currentTimestamp, nextBlkTime)
+		feeManager, err = fee.UpdatedFeeManager(feeRates, parentBlkComplexity, cfg.Config, currentTimestamp, nextBlkTime)
 		if err != nil {
 			return err
 		}
@@ -126,7 +126,7 @@ func (r *rejector) rejectBlock(b block.Block, blockType string) error {
 			staticFeeCfg  = cfg.StaticConfig
 		)
 		if !isEActive {
-			upgrades := cfg.Times
+			upgrades := cfg.Config
 			feeCalculator = fee.NewStaticCalculator(staticFeeCfg, upgrades, currentTimestamp)
 		} else {
 			feeCalculator = fee.NewDynamicCalculator(staticFeeCfg, feeManager, feesCfg.BlockMaxComplexity, tx.Creds)
