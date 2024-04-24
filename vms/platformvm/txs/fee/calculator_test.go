@@ -201,7 +201,7 @@ func TestTxFees(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			uTx := tt.unsignedTx(t)
 			fc := NewStaticCalculator(feeTestsDefaultCfg, upgrades)
-			require.Equal(t, tt.expected, fc.GetFee(uTx, tt.chainTime))
+			require.Equal(t, tt.expected, fc.CalculateFee(uTx, tt.chainTime))
 		})
 	}
 }

@@ -165,7 +165,7 @@ func verifyAddValidatorTx(
 
 	// Verify the flowcheck
 	feeCalculator := fee.NewStaticCalculator(backend.Config.StaticConfig, backend.Config.Config)
-	fee := feeCalculator.GetFee(tx, currentTimestamp)
+	fee := feeCalculator.CalculateFee(tx, currentTimestamp)
 
 	if err := backend.FlowChecker.VerifySpend(
 		tx,
@@ -256,7 +256,7 @@ func verifyAddSubnetValidatorTx(
 
 	// Verify the flowcheck
 	feeCalculator := fee.NewStaticCalculator(backend.Config.StaticConfig, backend.Config.Config)
-	fee := feeCalculator.GetFee(tx, currentTimestamp)
+	fee := feeCalculator.CalculateFee(tx, currentTimestamp)
 
 	if err := backend.FlowChecker.VerifySpend(
 		tx,
@@ -334,7 +334,7 @@ func verifyRemoveSubnetValidatorTx(
 
 	// Verify the flowcheck
 	feeCalculator := fee.NewStaticCalculator(backend.Config.StaticConfig, backend.Config.Config)
-	fee := feeCalculator.GetFee(tx, currentTimestamp)
+	fee := feeCalculator.CalculateFee(tx, currentTimestamp)
 
 	if err := backend.FlowChecker.VerifySpend(
 		tx,
@@ -452,7 +452,7 @@ func verifyAddDelegatorTx(
 
 	// Verify the flowcheck
 	feeCalculator := fee.NewStaticCalculator(backend.Config.StaticConfig, backend.Config.Config)
-	fee := feeCalculator.GetFee(tx, currentTimestamp)
+	fee := feeCalculator.CalculateFee(tx, currentTimestamp)
 
 	if err := backend.FlowChecker.VerifySpend(
 		tx,
@@ -572,7 +572,7 @@ func verifyAddPermissionlessValidatorTx(
 
 	// Verify the flowcheck
 	feeCalculator := fee.NewStaticCalculator(backend.Config.StaticConfig, backend.Config.Config)
-	fee := feeCalculator.GetFee(tx, currentTimestamp)
+	fee := feeCalculator.CalculateFee(]tx, currentTimestamp)
 
 	if err := backend.FlowChecker.VerifySpend(
 		tx,
@@ -717,7 +717,7 @@ func verifyAddPermissionlessDelegatorTx(
 
 	// Verify the flowcheck
 	feeCalculator := fee.NewStaticCalculator(backend.Config.StaticConfig, backend.Config.Config)
-	fee := feeCalculator.GetFee(tx, currentTimestamp)
+	fee := feeCalculator.CalculateFee(tx, currentTimestamp)
 
 	// Verify the flowcheck
 	if err := backend.FlowChecker.VerifySpend(
@@ -773,7 +773,7 @@ func verifyTransferSubnetOwnershipTx(
 	// Verify the flowcheck
 	currentTimestamp := chainState.GetTimestamp()
 	feeCalculator := fee.NewStaticCalculator(backend.Config.StaticConfig, backend.Config.Config)
-	fee := feeCalculator.GetFee(tx, currentTimestamp)
+	fee := feeCalculator.CalculateFee(tx, currentTimestamp)
 
 	if err := backend.FlowChecker.VerifySpend(
 		tx,

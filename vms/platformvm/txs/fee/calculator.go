@@ -25,7 +25,7 @@ type Calculator struct {
 	upgradeTimes upgrade.Config
 }
 
-func (c Calculator) GetFee(tx txs.UnsignedTx, time time.Time) uint64 {
+func (c Calculator) CalculateFee(tx txs.UnsignedTx, time time.Time) uint64 {
 	tmp := &calculator{
 		upgrades:  c.upgradeTimes,
 		staticCfg: c.config,

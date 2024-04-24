@@ -70,7 +70,7 @@ func (e *StandardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 
 	// Verify the flowcheck
 	feeCalculator := fee.NewStaticCalculator(e.Backend.Config.StaticConfig, e.Backend.Config.Config)
-	fee := feeCalculator.GetFee(tx, currentTimestamp)
+	fee := feeCalculator.CalculateFee(tx, currentTimestamp)
 
 	if err := e.FlowChecker.VerifySpend(
 		tx,
@@ -118,7 +118,7 @@ func (e *StandardTxExecutor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 
 	// Verify the flowcheck
 	feeCalculator := fee.NewStaticCalculator(e.Backend.Config.StaticConfig, e.Backend.Config.Config)
-	fee := feeCalculator.GetFee(tx, currentTimestamp)
+	fee := feeCalculator.CalculateFee(tx, currentTimestamp)
 
 	if err := e.FlowChecker.VerifySpend(
 		tx,
@@ -201,7 +201,7 @@ func (e *StandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 
 		// Verify the flowcheck
 		feeCalculator := fee.NewStaticCalculator(e.Backend.Config.StaticConfig, e.Backend.Config.Config)
-		fee := feeCalculator.GetFee(tx, currentTimestamp)
+		fee := feeCalculator.CalculateFee(tx, currentTimestamp)
 
 		if err := e.FlowChecker.VerifySpendUTXOs(
 			tx,
@@ -260,7 +260,7 @@ func (e *StandardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 
 	// Verify the flowcheck
 	feeCalculator := fee.NewStaticCalculator(e.Backend.Config.StaticConfig, e.Backend.Config.Config)
-	fee := feeCalculator.GetFee(tx, currentTimestamp)
+	fee := feeCalculator.CalculateFee(tx, currentTimestamp)
 
 	if err := e.FlowChecker.VerifySpend(
 		tx,
@@ -449,7 +449,7 @@ func (e *StandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 
 	// Verify the flowcheck
 	feeCalculator := fee.NewStaticCalculator(e.Backend.Config.StaticConfig, e.Backend.Config.Config)
-	fee := feeCalculator.GetFee(tx, currentTimestamp)
+	fee := feeCalculator.CalculateFee(tx, currentTimestamp)
 
 	totalRewardAmount := tx.MaximumSupply - tx.InitialSupply
 	if err := e.Backend.FlowChecker.VerifySpend(
@@ -573,7 +573,7 @@ func (e *StandardTxExecutor) BaseTx(tx *txs.BaseTx) error {
 	// Verify the flowcheck
 	currentTimestamp := e.State.GetTimestamp()
 	feeCalculator := fee.NewStaticCalculator(e.Backend.Config.StaticConfig, e.Backend.Config.Config)
-	fee := feeCalculator.GetFee(tx, currentTimestamp)
+	fee := feeCalculator.CalculateFee(tx, currentTimestamp)
 
 	if err := e.FlowChecker.VerifySpend(
 		tx,
