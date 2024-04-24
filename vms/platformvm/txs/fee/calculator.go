@@ -56,11 +56,13 @@ func (fc *Calculator) CreateSubnetTx(*txs.CreateSubnetTx) error {
 	return nil
 }
 
-func (*Calculator) AdvanceTimeTx(*txs.AdvanceTimeTx) error {
+func (fc *Calculator) AdvanceTimeTx(*txs.AdvanceTimeTx) error {
+	fc.Fee = 0
 	return nil // no fees
 }
 
-func (*Calculator) RewardValidatorTx(*txs.RewardValidatorTx) error {
+func (fc *Calculator) RewardValidatorTx(*txs.RewardValidatorTx) error {
+	fc.Fee = 0
 	return nil // no fees
 }
 

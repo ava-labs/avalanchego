@@ -15,7 +15,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
-	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
@@ -27,7 +26,22 @@ import (
 )
 
 var (
-	feeTestsDefaultCfg = StaticConfig{
+	preFundedKeys             = secp256k1.TestKeys()
+	feeTestDefaultStakeWeight = uint64(2024)
+)
+
+func TestTxFees(t *testing.T) {
+	r := require.New(t)
+
+	type feeTests struct {
+		name          string
+		chainTime     time.Time
+		unsignedTx    func(t *testing.T) txs.UnsignedTx
+		expectedError error
+		checksF       func(*testing.T, *Calculator)
+	}
+
+	feeTestsDefaultCfg := StaticConfig{
 		TxFee:                         1 * units.Avax,
 		CreateAssetTxFee:              2 * units.Avax,
 		CreateSubnetTxFee:             3 * units.Avax,
@@ -39,230 +53,111 @@ var (
 		AddSubnetDelegatorFee:         9 * units.Avax,
 	}
 
-	preFundedKeys             = secp256k1.TestKeys()
-	feeTestSigners            = [][]*secp256k1.PrivateKey{preFundedKeys}
-	feeTestDefaultStakeWeight = uint64(2024)
-	durangoTime               = time.Time{} // assume durango is active in these tests
-)
-
-type feeTests struct {
-	description         string
-	cfgAndChainTimeF    func() (StaticConfig, upgrade.Config, time.Time)
-	unsignedAndSignedTx func(t *testing.T) (txs.UnsignedTx, *txs.Tx)
-	expectedError       error
-	checksF             func(*testing.T, *Calculator)
-}
-
-func TestTxFees(t *testing.T) {
-	r := require.New(t)
+	latestForkTime := time.Unix(1713945427, 0)
+	upgrades := upgrade.Config{
+		EUpgradeTime:      latestForkTime,
+		DurangoTime:       latestForkTime.Add(-1 * time.Hour),
+		CortinaTime:       latestForkTime.Add(-2 * time.Hour),
+		BanffTime:         latestForkTime.Add(-3 * time.Hour),
+		ApricotPhase5Time: latestForkTime.Add(-4 * time.Hour),
+		ApricotPhase3Time: latestForkTime.Add(-5 * time.Hour),
+	}
 
 	tests := []feeTests{
 		{
-			description: "AddValidatorTx pre EUpgrade",
-			cfgAndChainTimeF: func() (StaticConfig, upgrade.Config, time.Time) {
-				eUpgradeTime := time.Now().Truncate(time.Second)
-				chainTime := eUpgradeTime.Add(-1 * time.Second)
-
-				cfg := feeTestsDefaultCfg
-				upgrade := upgrade.Config{
-					DurangoTime:  durangoTime,
-					EUpgradeTime: eUpgradeTime,
-				}
-				return cfg, upgrade, chainTime
-			},
-			unsignedAndSignedTx: addValidatorTx,
-			expectedError:       nil,
+			name:          "AddValidatorTx pre EUpgrade",
+			chainTime:     upgrades.EUpgradeTime.Add(-1 * time.Second),
+			unsignedTx:    addValidatorTx,
+			expectedError: nil,
 			checksF: func(t *testing.T, fc *Calculator) {
 				require.Equal(t, fc.staticCfg.AddPrimaryNetworkValidatorFee, fc.Fee)
 			},
 		},
 		{
-			description: "AddSubnetValidatorTx pre EUpgrade",
-			cfgAndChainTimeF: func() (StaticConfig, upgrade.Config, time.Time) {
-				eUpgradeTime := time.Now().Truncate(time.Second)
-				chainTime := eUpgradeTime.Add(-1 * time.Second)
-
-				cfg := feeTestsDefaultCfg
-				upgrade := upgrade.Config{
-					DurangoTime:  durangoTime,
-					EUpgradeTime: eUpgradeTime,
-				}
-				return cfg, upgrade, chainTime
-			},
-			unsignedAndSignedTx: addSubnetValidatorTx,
-			expectedError:       nil,
+			name:          "AddSubnetValidatorTx pre EUpgrade",
+			chainTime:     upgrades.EUpgradeTime.Add(-1 * time.Second),
+			unsignedTx:    addSubnetValidatorTx,
+			expectedError: nil,
 			checksF: func(t *testing.T, fc *Calculator) {
 				require.Equal(t, fc.staticCfg.AddSubnetValidatorFee, fc.Fee)
 			},
 		},
 		{
-			description: "AddDelegatorTx pre EUpgrade",
-			cfgAndChainTimeF: func() (StaticConfig, upgrade.Config, time.Time) {
-				eUpgradeTime := time.Now().Truncate(time.Second)
-				chainTime := eUpgradeTime.Add(-1 * time.Second)
-
-				cfg := feeTestsDefaultCfg
-				upgrade := upgrade.Config{
-					DurangoTime:  durangoTime,
-					EUpgradeTime: eUpgradeTime,
-				}
-				return cfg, upgrade, chainTime
-			},
-			unsignedAndSignedTx: addDelegatorTx,
-			expectedError:       nil,
+			name:          "AddDelegatorTx pre EUpgrade",
+			chainTime:     upgrades.EUpgradeTime.Add(-1 * time.Second),
+			unsignedTx:    addDelegatorTx,
+			expectedError: nil,
 			checksF: func(t *testing.T, fc *Calculator) {
 				require.Equal(t, fc.staticCfg.AddPrimaryNetworkDelegatorFee, fc.Fee)
 			},
 		},
 		{
-			description: "CreateChainTx pre ApricotPhase3",
-			cfgAndChainTimeF: func() (StaticConfig, upgrade.Config, time.Time) {
-				apricotPhase3Time := time.Now().Truncate(time.Second)
-				chainTime := apricotPhase3Time.Add(-1 * time.Second)
-
-				cfg := feeTestsDefaultCfg
-				upgrade := upgrade.Config{
-					ApricotPhase3Time: apricotPhase3Time,
-					DurangoTime:       mockable.MaxTime,
-					EUpgradeTime:      mockable.MaxTime,
-				}
-				return cfg, upgrade, chainTime
-			},
-			unsignedAndSignedTx: createChainTx,
-			expectedError:       nil,
+			name:          "CreateChainTx pre ApricotPhase3",
+			chainTime:     upgrades.ApricotPhase3Time.Add(-1 * time.Second),
+			unsignedTx:    createChainTx,
+			expectedError: nil,
 			checksF: func(t *testing.T, fc *Calculator) {
 				require.Equal(t, fc.staticCfg.CreateAssetTxFee, fc.Fee)
 			},
 		},
 		{
-			description: "CreateChainTx pre EUpgrade",
-			cfgAndChainTimeF: func() (StaticConfig, upgrade.Config, time.Time) {
-				eUpgradeTime := time.Now().Truncate(time.Second)
-				chainTime := eUpgradeTime.Add(-1 * time.Second)
-
-				cfg := feeTestsDefaultCfg
-				upgrade := upgrade.Config{
-					DurangoTime:  durangoTime,
-					EUpgradeTime: eUpgradeTime,
-				}
-				return cfg, upgrade, chainTime
-			},
-			unsignedAndSignedTx: createChainTx,
-			expectedError:       nil,
+			name:          "CreateChainTx pre EUpgrade",
+			chainTime:     upgrades.EUpgradeTime.Add(-1 * time.Second),
+			unsignedTx:    createChainTx,
+			expectedError: nil,
 			checksF: func(t *testing.T, fc *Calculator) {
 				require.Equal(t, fc.staticCfg.CreateBlockchainTxFee, fc.Fee)
 			},
 		},
 		{
-			description: "CreateSubnetTx pre ApricotPhase3",
-			cfgAndChainTimeF: func() (StaticConfig, upgrade.Config, time.Time) {
-				apricotPhase3Time := time.Now().Truncate(time.Second)
-				chainTime := apricotPhase3Time.Add(-1 * time.Second)
-
-				cfg := feeTestsDefaultCfg
-				upgrade := upgrade.Config{
-					ApricotPhase3Time: apricotPhase3Time,
-					DurangoTime:       mockable.MaxTime,
-					EUpgradeTime:      mockable.MaxTime,
-				}
-				return cfg, upgrade, chainTime
-			},
-			unsignedAndSignedTx: createSubnetTx,
-			expectedError:       nil,
+			name:          "CreateSubnetTx pre ApricotPhase3",
+			chainTime:     upgrades.ApricotPhase3Time.Add(-1 * time.Second),
+			unsignedTx:    createSubnetTx,
+			expectedError: nil,
 			checksF: func(t *testing.T, fc *Calculator) {
 				require.Equal(t, fc.staticCfg.CreateAssetTxFee, fc.Fee)
 			},
 		},
 		{
-			description: "CreateSubnetTx pre EUpgrade",
-			cfgAndChainTimeF: func() (StaticConfig, upgrade.Config, time.Time) {
-				eUpgradeTime := time.Now().Truncate(time.Second)
-				chainTime := eUpgradeTime.Add(-1 * time.Second)
-
-				cfg := feeTestsDefaultCfg
-				upgrade := upgrade.Config{
-					DurangoTime:  durangoTime,
-					EUpgradeTime: eUpgradeTime,
-				}
-				return cfg, upgrade, chainTime
-			},
-			unsignedAndSignedTx: createSubnetTx,
-			expectedError:       nil,
+			name:          "CreateSubnetTx pre EUpgrade",
+			chainTime:     upgrades.EUpgradeTime.Add(-1 * time.Second),
+			unsignedTx:    createSubnetTx,
+			expectedError: nil,
 			checksF: func(t *testing.T, fc *Calculator) {
 				require.Equal(t, fc.staticCfg.CreateSubnetTxFee, fc.Fee)
 			},
 		},
 		{
-			description: "RemoveSubnetValidatorTx pre EUpgrade",
-			cfgAndChainTimeF: func() (StaticConfig, upgrade.Config, time.Time) {
-				eUpgradeTime := time.Now().Truncate(time.Second)
-				chainTime := eUpgradeTime.Add(-1 * time.Second)
-
-				cfg := feeTestsDefaultCfg
-				upgrade := upgrade.Config{
-					DurangoTime:  durangoTime,
-					EUpgradeTime: eUpgradeTime,
-				}
-				return cfg, upgrade, chainTime
-			},
-			unsignedAndSignedTx: removeSubnetValidatorTx,
-			expectedError:       nil,
+			name:          "RemoveSubnetValidatorTx pre EUpgrade",
+			chainTime:     upgrades.EUpgradeTime.Add(-1 * time.Second),
+			unsignedTx:    removeSubnetValidatorTx,
+			expectedError: nil,
 			checksF: func(t *testing.T, fc *Calculator) {
 				require.Equal(t, fc.staticCfg.TxFee, fc.Fee)
 			},
 		},
 		{
-			description: "TransformSubnetTx pre EUpgrade",
-			cfgAndChainTimeF: func() (StaticConfig, upgrade.Config, time.Time) {
-				eUpgradeTime := time.Now().Truncate(time.Second)
-				chainTime := eUpgradeTime.Add(-1 * time.Second)
-
-				cfg := feeTestsDefaultCfg
-				upgrade := upgrade.Config{
-					DurangoTime:  durangoTime,
-					EUpgradeTime: eUpgradeTime,
-				}
-				return cfg, upgrade, chainTime
-			},
-			unsignedAndSignedTx: transformSubnetTx,
-			expectedError:       nil,
+			name:          "TransformSubnetTx pre EUpgrade",
+			chainTime:     upgrades.EUpgradeTime.Add(-1 * time.Second),
+			unsignedTx:    transformSubnetTx,
+			expectedError: nil,
 			checksF: func(t *testing.T, fc *Calculator) {
 				require.Equal(t, fc.staticCfg.TransformSubnetTxFee, fc.Fee)
 			},
 		},
 		{
-			description: "TransferSubnetOwnershipTx pre EUpgrade",
-			cfgAndChainTimeF: func() (StaticConfig, upgrade.Config, time.Time) {
-				eUpgradeTime := time.Now().Truncate(time.Second)
-				chainTime := eUpgradeTime.Add(-1 * time.Second)
-
-				cfg := feeTestsDefaultCfg
-				upgrade := upgrade.Config{
-					DurangoTime:  durangoTime,
-					EUpgradeTime: eUpgradeTime,
-				}
-				return cfg, upgrade, chainTime
-			},
-			unsignedAndSignedTx: transferSubnetOwnershipTx,
-			expectedError:       nil,
+			name:          "TransferSubnetOwnershipTx pre EUpgrade",
+			chainTime:     upgrades.EUpgradeTime.Add(-1 * time.Second),
+			unsignedTx:    transferSubnetOwnershipTx,
+			expectedError: nil,
 			checksF: func(t *testing.T, fc *Calculator) {
 				require.Equal(t, fc.staticCfg.TxFee, fc.Fee)
 			},
 		},
 		{
-			description: "AddPermissionlessValidatorTx Primary Network pre EUpgrade",
-			cfgAndChainTimeF: func() (StaticConfig, upgrade.Config, time.Time) {
-				eUpgradeTime := time.Now().Truncate(time.Second)
-				chainTime := eUpgradeTime.Add(-1 * time.Second)
-
-				cfg := feeTestsDefaultCfg
-				upgrade := upgrade.Config{
-					DurangoTime:  durangoTime,
-					EUpgradeTime: eUpgradeTime,
-				}
-				return cfg, upgrade, chainTime
-			},
-			unsignedAndSignedTx: func(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
+			name:      "AddPermissionlessValidatorTx Primary Network pre EUpgrade",
+			chainTime: upgrades.EUpgradeTime.Add(-1 * time.Second),
+			unsignedTx: func(t *testing.T) txs.UnsignedTx {
 				return addPermissionlessValidatorTx(t, constants.PrimaryNetworkID)
 			},
 			expectedError: nil,
@@ -271,19 +166,9 @@ func TestTxFees(t *testing.T) {
 			},
 		},
 		{
-			description: "AddPermissionlessValidatorTx Subnet pre EUpgrade",
-			cfgAndChainTimeF: func() (StaticConfig, upgrade.Config, time.Time) {
-				eUpgradeTime := time.Now().Truncate(time.Second)
-				chainTime := eUpgradeTime.Add(-1 * time.Second)
-
-				cfg := feeTestsDefaultCfg
-				upgrade := upgrade.Config{
-					DurangoTime:  durangoTime,
-					EUpgradeTime: eUpgradeTime,
-				}
-				return cfg, upgrade, chainTime
-			},
-			unsignedAndSignedTx: func(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
+			name:      "AddPermissionlessValidatorTx Subnet pre EUpgrade",
+			chainTime: upgrades.EUpgradeTime.Add(-1 * time.Second),
+			unsignedTx: func(t *testing.T) txs.UnsignedTx {
 				subnetID := ids.GenerateTestID()
 				require.NotEqual(t, constants.PrimaryNetworkID, subnetID)
 				return addPermissionlessValidatorTx(t, subnetID)
@@ -294,19 +179,9 @@ func TestTxFees(t *testing.T) {
 			},
 		},
 		{
-			description: "AddPermissionlessDelegatorTx Primary Network pre EUpgrade",
-			cfgAndChainTimeF: func() (StaticConfig, upgrade.Config, time.Time) {
-				eUpgradeTime := time.Now().Truncate(time.Second)
-				chainTime := eUpgradeTime.Add(-1 * time.Second)
-
-				cfg := feeTestsDefaultCfg
-				upgrade := upgrade.Config{
-					DurangoTime:  durangoTime,
-					EUpgradeTime: eUpgradeTime,
-				}
-				return cfg, upgrade, chainTime
-			},
-			unsignedAndSignedTx: func(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
+			name:      "AddPermissionlessDelegatorTx Primary Network pre EUpgrade",
+			chainTime: upgrades.EUpgradeTime.Add(-1 * time.Second),
+			unsignedTx: func(t *testing.T) txs.UnsignedTx {
 				return addPermissionlessDelegatorTx(t, constants.PrimaryNetworkID)
 			},
 			expectedError: nil,
@@ -315,19 +190,9 @@ func TestTxFees(t *testing.T) {
 			},
 		},
 		{
-			description: "AddPermissionlessDelegatorTx pre EUpgrade",
-			cfgAndChainTimeF: func() (StaticConfig, upgrade.Config, time.Time) {
-				eUpgradeTime := time.Now().Truncate(time.Second)
-				chainTime := eUpgradeTime.Add(-1 * time.Second)
-
-				cfg := feeTestsDefaultCfg
-				upgrade := upgrade.Config{
-					DurangoTime:  durangoTime,
-					EUpgradeTime: eUpgradeTime,
-				}
-				return cfg, upgrade, chainTime
-			},
-			unsignedAndSignedTx: func(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
+			name:      "AddPermissionlessDelegatorTx pre EUpgrade",
+			chainTime: upgrades.EUpgradeTime.Add(-1 * time.Second),
+			unsignedTx: func(t *testing.T) txs.UnsignedTx {
 				subnetID := ids.GenerateTestID()
 				require.NotEqual(t, constants.PrimaryNetworkID, subnetID)
 				return addPermissionlessDelegatorTx(t, subnetID)
@@ -338,79 +203,39 @@ func TestTxFees(t *testing.T) {
 			},
 		},
 		{
-			description: "BaseTx pre EUpgrade",
-			cfgAndChainTimeF: func() (StaticConfig, upgrade.Config, time.Time) {
-				eUpgradeTime := time.Now().Truncate(time.Second)
-				chainTime := eUpgradeTime.Add(-1 * time.Second)
-
-				cfg := feeTestsDefaultCfg
-				upgrade := upgrade.Config{
-					DurangoTime:  durangoTime,
-					EUpgradeTime: eUpgradeTime,
-				}
-				return cfg, upgrade, chainTime
-			},
-			unsignedAndSignedTx: baseTx,
-			expectedError:       nil,
+			name:          "BaseTx pre EUpgrade",
+			chainTime:     upgrades.EUpgradeTime.Add(-1 * time.Second),
+			unsignedTx:    baseTx,
+			expectedError: nil,
 			checksF: func(t *testing.T, fc *Calculator) {
 				require.Equal(t, fc.staticCfg.TxFee, fc.Fee)
 			},
 		},
 		{
-			description: "ImportTx pre EUpgrade",
-			cfgAndChainTimeF: func() (StaticConfig, upgrade.Config, time.Time) {
-				eUpgradeTime := time.Now().Truncate(time.Second)
-				chainTime := eUpgradeTime.Add(-1 * time.Second)
-
-				cfg := feeTestsDefaultCfg
-				upgrade := upgrade.Config{
-					DurangoTime:  durangoTime,
-					EUpgradeTime: eUpgradeTime,
-				}
-				return cfg, upgrade, chainTime
-			},
-			unsignedAndSignedTx: importTx,
-			expectedError:       nil,
+			name:          "ImportTx pre EUpgrade",
+			chainTime:     upgrades.EUpgradeTime.Add(-1 * time.Second),
+			unsignedTx:    importTx,
+			expectedError: nil,
 			checksF: func(t *testing.T, fc *Calculator) {
 				require.Equal(t, fc.staticCfg.TxFee, fc.Fee)
 			},
 		},
 		{
-			description: "ExportTx pre EUpgrade",
-			cfgAndChainTimeF: func() (StaticConfig, upgrade.Config, time.Time) {
-				eUpgradeTime := time.Now().Truncate(time.Second)
-				chainTime := eUpgradeTime.Add(-1 * time.Second)
-
-				cfg := feeTestsDefaultCfg
-				upgrade := upgrade.Config{
-					DurangoTime:  durangoTime,
-					EUpgradeTime: eUpgradeTime,
-				}
-				return cfg, upgrade, chainTime
-			},
-			unsignedAndSignedTx: exportTx,
-			expectedError:       nil,
+			name:          "ExportTx pre EUpgrade",
+			chainTime:     upgrades.EUpgradeTime.Add(-1 * time.Second),
+			unsignedTx:    exportTx,
+			expectedError: nil,
 			checksF: func(t *testing.T, fc *Calculator) {
 				require.Equal(t, fc.staticCfg.TxFee, fc.Fee)
 			},
 		},
 		{
-			description: "RewardValidatorTx pre EUpgrade",
-			cfgAndChainTimeF: func() (StaticConfig, upgrade.Config, time.Time) {
-				eUpgradeTime := time.Now().Truncate(time.Second)
-				chainTime := eUpgradeTime.Add(-1 * time.Second)
-
-				cfg := feeTestsDefaultCfg
-				upgrade := upgrade.Config{
-					DurangoTime:  durangoTime,
-					EUpgradeTime: eUpgradeTime,
-				}
-				return cfg, upgrade, chainTime
-			},
-			unsignedAndSignedTx: func(_ *testing.T) (txs.UnsignedTx, *txs.Tx) {
+			name:      "RewardValidatorTx pre EUpgrade",
+			chainTime: upgrades.EUpgradeTime.Add(-1 * time.Second),
+			unsignedTx: func(_ *testing.T) txs.UnsignedTx {
 				return &txs.RewardValidatorTx{
 					TxID: ids.GenerateTestID(),
-				}, nil
+				}
 			},
 			expectedError: nil,
 			checksF: func(t *testing.T, fc *Calculator) {
@@ -418,22 +243,12 @@ func TestTxFees(t *testing.T) {
 			},
 		},
 		{
-			description: "AdvanceTimeTx pre EUpgrade",
-			cfgAndChainTimeF: func() (StaticConfig, upgrade.Config, time.Time) {
-				eUpgradeTime := time.Now().Truncate(time.Second)
-				chainTime := eUpgradeTime.Add(-1 * time.Second)
-
-				cfg := feeTestsDefaultCfg
-				upgrade := upgrade.Config{
-					DurangoTime:  durangoTime,
-					EUpgradeTime: eUpgradeTime,
-				}
-				return cfg, upgrade, chainTime
-			},
-			unsignedAndSignedTx: func(_ *testing.T) (txs.UnsignedTx, *txs.Tx) {
+			name:      "AdvanceTimeTx pre EUpgrade",
+			chainTime: upgrades.EUpgradeTime.Add(-1 * time.Second),
+			unsignedTx: func(_ *testing.T) txs.UnsignedTx {
 				return &txs.AdvanceTimeTx{
 					Time: uint64(time.Now().Unix()),
-				}, nil
+				}
 			},
 			expectedError: nil,
 			checksF: func(t *testing.T, fc *Calculator) {
@@ -443,11 +258,9 @@ func TestTxFees(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.description, func(t *testing.T) {
-			cfg, upgrades, chainTime := tt.cfgAndChainTimeF()
-
-			uTx, _ := tt.unsignedAndSignedTx(t)
-			fc := NewStaticCalculator(cfg, upgrades, chainTime)
+		t.Run(tt.name, func(t *testing.T) {
+			uTx := tt.unsignedTx(t)
+			fc := NewStaticCalculator(feeTestsDefaultCfg, upgrades, tt.chainTime)
 
 			err := uTx.Visit(fc)
 			r.ErrorIs(err, tt.expectedError)
@@ -456,9 +269,7 @@ func TestTxFees(t *testing.T) {
 	}
 }
 
-func addValidatorTx(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
-	r := require.New(t)
-
+func addValidatorTx(t *testing.T) txs.UnsignedTx {
 	defaultCtx := snowtest.Context(t, snowtest.PChainID)
 
 	baseTx, stakes, _ := txsCreationHelpers(defaultCtx)
@@ -478,15 +289,10 @@ func addValidatorTx(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
 		},
 		DelegationShares: reward.PercentDenominator,
 	}
-	sTx, err := txs.NewSigned(uTx, txs.Codec, feeTestSigners)
-	r.NoError(err)
-
-	return uTx, sTx
+	return uTx
 }
 
-func addSubnetValidatorTx(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
-	r := require.New(t)
-
+func addSubnetValidatorTx(t *testing.T) txs.UnsignedTx {
 	defaultCtx := snowtest.Context(t, snowtest.PChainID)
 
 	subnetID := ids.GenerateTestID()
@@ -504,14 +310,10 @@ func addSubnetValidatorTx(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
 		},
 		SubnetAuth: subnetAuth,
 	}
-	sTx, err := txs.NewSigned(uTx, txs.Codec, feeTestSigners)
-	r.NoError(err)
-	return uTx, sTx
+	return uTx
 }
 
-func addDelegatorTx(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
-	r := require.New(t)
-
+func addDelegatorTx(t *testing.T) txs.UnsignedTx {
 	defaultCtx := snowtest.Context(t, snowtest.PChainID)
 
 	baseTx, stakes, _ := txsCreationHelpers(defaultCtx)
@@ -530,14 +332,10 @@ func addDelegatorTx(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
 			Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
 		},
 	}
-	sTx, err := txs.NewSigned(uTx, txs.Codec, feeTestSigners)
-	r.NoError(err)
-	return uTx, sTx
+	return uTx
 }
 
-func createChainTx(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
-	r := require.New(t)
-
+func createChainTx(t *testing.T) txs.UnsignedTx {
 	defaultCtx := snowtest.Context(t, snowtest.PChainID)
 
 	baseTx, _, subnetAuth := txsCreationHelpers(defaultCtx)
@@ -550,14 +348,10 @@ func createChainTx(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
 		GenesisData: []byte{0xff},
 		SubnetAuth:  subnetAuth,
 	}
-	sTx, err := txs.NewSigned(uTx, txs.Codec, feeTestSigners)
-	r.NoError(err)
-	return uTx, sTx
+	return uTx
 }
 
-func createSubnetTx(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
-	r := require.New(t)
-
+func createSubnetTx(t *testing.T) txs.UnsignedTx {
 	defaultCtx := snowtest.Context(t, snowtest.PChainID)
 
 	baseTx, _, _ := txsCreationHelpers(defaultCtx)
@@ -568,14 +362,10 @@ func createSubnetTx(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
 			Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
 		},
 	}
-	sTx, err := txs.NewSigned(uTx, txs.Codec, feeTestSigners)
-	r.NoError(err)
-	return uTx, sTx
+	return uTx
 }
 
-func removeSubnetValidatorTx(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
-	r := require.New(t)
-
+func removeSubnetValidatorTx(t *testing.T) txs.UnsignedTx {
 	defaultCtx := snowtest.Context(t, snowtest.PChainID)
 
 	baseTx, _, auth := txsCreationHelpers(defaultCtx)
@@ -585,14 +375,10 @@ func removeSubnetValidatorTx(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
 		Subnet:     ids.GenerateTestID(),
 		SubnetAuth: auth,
 	}
-	sTx, err := txs.NewSigned(uTx, txs.Codec, feeTestSigners)
-	r.NoError(err)
-	return uTx, sTx
+	return uTx
 }
 
-func transformSubnetTx(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
-	r := require.New(t)
-
+func transformSubnetTx(t *testing.T) txs.UnsignedTx {
 	defaultCtx := snowtest.Context(t, snowtest.PChainID)
 
 	baseTx, _, auth := txsCreationHelpers(defaultCtx)
@@ -614,14 +400,10 @@ func transformSubnetTx(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
 		UptimeRequirement:        0,
 		SubnetAuth:               auth,
 	}
-	sTx, err := txs.NewSigned(uTx, txs.Codec, feeTestSigners)
-	r.NoError(err)
-	return uTx, sTx
+	return uTx
 }
 
-func transferSubnetOwnershipTx(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
-	r := require.New(t)
-
+func transferSubnetOwnershipTx(t *testing.T) txs.UnsignedTx {
 	defaultCtx := snowtest.Context(t, snowtest.PChainID)
 
 	baseTx, _, _ := txsCreationHelpers(defaultCtx)
@@ -639,12 +421,10 @@ func transferSubnetOwnershipTx(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
 			},
 		},
 	}
-	sTx, err := txs.NewSigned(uTx, txs.Codec, feeTestSigners)
-	r.NoError(err)
-	return uTx, sTx
+	return uTx
 }
 
-func addPermissionlessValidatorTx(t *testing.T, subnetID ids.ID) (txs.UnsignedTx, *txs.Tx) {
+func addPermissionlessValidatorTx(t *testing.T, subnetID ids.ID) txs.UnsignedTx {
 	r := require.New(t)
 
 	defaultCtx := snowtest.Context(t, snowtest.PChainID)
@@ -673,14 +453,10 @@ func addPermissionlessValidatorTx(t *testing.T, subnetID ids.ID) (txs.UnsignedTx
 		},
 		DelegationShares: reward.PercentDenominator,
 	}
-	sTx, err := txs.NewSigned(uTx, txs.Codec, feeTestSigners)
-	r.NoError(err)
-	return uTx, sTx
+	return uTx
 }
 
-func addPermissionlessDelegatorTx(t *testing.T, subnetID ids.ID) (txs.UnsignedTx, *txs.Tx) {
-	r := require.New(t)
-
+func addPermissionlessDelegatorTx(t *testing.T, subnetID ids.ID) txs.UnsignedTx {
 	defaultCtx := snowtest.Context(t, snowtest.PChainID)
 
 	baseTx, stakes, _ := txsCreationHelpers(defaultCtx)
@@ -702,26 +478,18 @@ func addPermissionlessDelegatorTx(t *testing.T, subnetID ids.ID) (txs.UnsignedTx
 			},
 		},
 	}
-	sTx, err := txs.NewSigned(uTx, txs.Codec, feeTestSigners)
-	r.NoError(err)
-	return uTx, sTx
+	return uTx
 }
 
-func baseTx(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
-	r := require.New(t)
-
+func baseTx(t *testing.T) txs.UnsignedTx {
 	defaultCtx := snowtest.Context(t, snowtest.PChainID)
 
 	baseTx, _, _ := txsCreationHelpers(defaultCtx)
 	uTx := &baseTx
-	sTx, err := txs.NewSigned(uTx, txs.Codec, feeTestSigners)
-	r.NoError(err)
-	return uTx, sTx
+	return uTx
 }
 
-func importTx(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
-	r := require.New(t)
-
+func importTx(t *testing.T) txs.UnsignedTx {
 	defaultCtx := snowtest.Context(t, snowtest.PChainID)
 
 	baseTx, _, _ := txsCreationHelpers(defaultCtx)
@@ -740,14 +508,10 @@ func importTx(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
 			},
 		}},
 	}
-	sTx, err := txs.NewSigned(uTx, txs.Codec, feeTestSigners)
-	r.NoError(err)
-	return uTx, sTx
+	return uTx
 }
 
-func exportTx(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
-	r := require.New(t)
-
+func exportTx(t *testing.T) txs.UnsignedTx {
 	defaultCtx := snowtest.Context(t, snowtest.PChainID)
 
 	baseTx, outputs, _ := txsCreationHelpers(defaultCtx)
@@ -756,9 +520,7 @@ func exportTx(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
 		DestinationChain: ids.GenerateTestID(),
 		ExportedOutputs:  outputs,
 	}
-	sTx, err := txs.NewSigned(uTx, txs.Codec, feeTestSigners)
-	r.NoError(err)
-	return uTx, sTx
+	return uTx
 }
 
 func txsCreationHelpers(defaultCtx *snow.Context) (
