@@ -40,26 +40,10 @@ func (sb *binarySnowball) Preference() int {
 }
 
 func (sb *binarySnowball) RecordPoll(count, choice int) {
-	switch {
-	case count >= sb.alphaConfidence:
-		sb.recordSuccessfulPoll(choice)
-	case count >= sb.alphaPreference:
-		sb.recordPollPreference(choice)
-	default:
-		// If the poll was unsuccessful, RecordUnsuccessfulPoll should
-		// have been called instead.
-		sb.RecordUnsuccessfulPoll()
+	if count >= sb.alphaPreference {
+		sb.increasePreferenceStrength(choice)
 	}
-}
-
-func (sb *binarySnowball) recordSuccessfulPoll(choice int) {
-	sb.increasePreferenceStrength(choice)
-	sb.binarySnowflake.recordSuccessfulPoll(choice)
-}
-
-func (sb *binarySnowball) recordPollPreference(choice int) {
-	sb.increasePreferenceStrength(choice)
-	sb.binarySnowflake.recordPollPreference(choice)
+	sb.binarySnowflake.RecordPoll(count, choice)
 }
 
 func (sb *binarySnowball) String() string {

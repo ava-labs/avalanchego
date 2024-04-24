@@ -48,26 +48,10 @@ func (sb *nnarySnowball) Preference() ids.ID {
 }
 
 func (sb *nnarySnowball) RecordPoll(count int, choice ids.ID) {
-	switch {
-	case count >= sb.alphaConfidence:
-		sb.recordSuccessfulPoll(choice)
-	case count >= sb.alphaPreference:
-		sb.recordPollPreference(choice)
-	default:
-		// If the poll was unsuccessful, RecordUnsuccessfulPoll should
-		// have been called instead.
-		sb.RecordUnsuccessfulPoll()
+	if count >= sb.alphaPreference {
+		sb.increasePreferenceStrength(choice)
 	}
-}
-
-func (sb *nnarySnowball) recordSuccessfulPoll(choice ids.ID) {
-	sb.increasePreferenceStrength(choice)
-	sb.nnarySnowflake.recordSuccessfulPoll(choice)
-}
-
-func (sb *nnarySnowball) recordPollPreference(choice ids.ID) {
-	sb.increasePreferenceStrength(choice)
-	sb.nnarySnowflake.recordPollPreference(choice)
+	sb.nnarySnowflake.RecordPoll(count, choice)
 }
 
 func (sb *nnarySnowball) String() string {

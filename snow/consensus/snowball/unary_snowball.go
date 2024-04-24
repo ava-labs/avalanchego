@@ -23,26 +23,10 @@ type unarySnowball struct {
 }
 
 func (sb *unarySnowball) RecordPoll(count int) {
-	switch {
-	case count >= sb.alphaConfidence:
-		sb.recordSuccessfulPoll()
-	case count >= sb.alphaPreference:
-		sb.recordPollPreference()
-	default:
-		// If the poll was unsuccessful, RecordUnsuccessfulPoll should
-		// have been called instead.
-		sb.RecordUnsuccessfulPoll()
+	if count >= sb.alphaPreference {
+		sb.preferenceStrength++
 	}
-}
-
-func (sb *unarySnowball) recordSuccessfulPoll() {
-	sb.preferenceStrength++
-	sb.unarySnowflake.recordSuccessfulPoll()
-}
-
-func (sb *unarySnowball) recordPollPreference() {
-	sb.preferenceStrength++
-	sb.unarySnowflake.RecordUnsuccessfulPoll()
+	sb.unarySnowflake.RecordPoll(count)
 }
 
 func (sb *unarySnowball) Extend(choice int) Binary {
