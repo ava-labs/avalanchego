@@ -71,10 +71,12 @@ func (sf *unarySnowflake) Finalized() bool {
 
 func (sf *unarySnowflake) Extend(choice int) Binary {
 	return &binarySnowflake{
-		binarySlush: binarySlush{preference: choice},
-		confidence:  sf.confidence,
-		beta:        sf.beta,
-		finalized:   sf.finalized,
+		binarySlush:     binarySlush{preference: choice},
+		confidence:      sf.confidence,
+		alphaPreference: sf.alphaPreference,
+		alphaConfidence: sf.alphaConfidence,
+		beta:            sf.beta,
+		finalized:       sf.finalized,
 	}
 }
 

@@ -48,10 +48,12 @@ func (sb *unarySnowball) recordPollPreference() {
 func (sb *unarySnowball) Extend(choice int) Binary {
 	bs := &binarySnowball{
 		binarySnowflake: binarySnowflake{
-			binarySlush: binarySlush{preference: choice},
-			confidence:  sb.confidence,
-			beta:        sb.beta,
-			finalized:   sb.Finalized(),
+			binarySlush:     binarySlush{preference: choice},
+			confidence:      sb.confidence,
+			alphaPreference: sb.alphaPreference,
+			alphaConfidence: sb.alphaConfidence,
+			beta:            sb.beta,
+			finalized:       sb.Finalized(),
 		},
 		preference: choice,
 	}
