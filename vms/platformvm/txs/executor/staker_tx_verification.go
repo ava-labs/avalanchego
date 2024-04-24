@@ -572,7 +572,7 @@ func verifyAddPermissionlessValidatorTx(
 
 	// Verify the flowcheck
 	feeCalculator := fee.NewStaticCalculator(backend.Config.StaticConfig, backend.Config.Config)
-	fee := feeCalculator.CalculateFee(]tx, currentTimestamp)
+	fee := feeCalculator.CalculateFee(tx, currentTimestamp)
 
 	if err := backend.FlowChecker.VerifySpend(
 		tx,
