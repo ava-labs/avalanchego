@@ -50,14 +50,14 @@ type StaticConfig struct {
 	MinDelegationFee uint32
 }
 
-func (c *StaticConfig) GetCreateBlockchainTxFee(upgrades upgrade.Times, timestamp time.Time) uint64 {
+func (c *StaticConfig) GetCreateBlockchainTxFee(upgrades upgrade.Config, timestamp time.Time) uint64 {
 	if upgrades.IsApricotPhase3Activated(timestamp) {
 		return c.CreateBlockchainTxFee
 	}
 	return c.CreateAssetTxFee
 }
 
-func (c *StaticConfig) GetCreateSubnetTxFee(upgrades upgrade.Times, timestamp time.Time) uint64 {
+func (c *StaticConfig) GetCreateSubnetTxFee(upgrades upgrade.Config, timestamp time.Time) uint64 {
 	if upgrades.IsApricotPhase3Activated(timestamp) {
 		return c.CreateSubnetTxFee
 	}

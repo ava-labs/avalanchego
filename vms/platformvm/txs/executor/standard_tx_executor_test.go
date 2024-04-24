@@ -2081,7 +2081,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 
 func defaultTestConfig(t *testing.T, f fork, tm time.Time) *config.Config {
 	c := &config.Config{
-		Times: upgrade.Times{
+		Config: upgrade.Config{
 			ApricotPhase3Time: mockable.MaxTime,
 			ApricotPhase5Time: mockable.MaxTime,
 			BanffTime:         mockable.MaxTime,

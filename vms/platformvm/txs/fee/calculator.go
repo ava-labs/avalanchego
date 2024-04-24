@@ -13,7 +13,7 @@ import (
 
 var _ txs.Visitor = (*calculator)(nil)
 
-func NewStaticCalculator(config StaticConfig, upgradeTimes upgrade.Times) Calculator {
+func NewStaticCalculator(config StaticConfig, upgradeTimes upgrade.Config) Calculator {
 	return Calculator{
 		config:       config,
 		upgradeTimes: upgradeTimes,
@@ -22,7 +22,7 @@ func NewStaticCalculator(config StaticConfig, upgradeTimes upgrade.Times) Calcul
 
 type Calculator struct {
 	config       StaticConfig
-	upgradeTimes upgrade.Times
+	upgradeTimes upgrade.Config
 }
 
 func (c Calculator) GetFee(tx txs.UnsignedTx, time time.Time) uint64 {
@@ -41,7 +41,7 @@ func (c Calculator) GetFee(tx txs.UnsignedTx, time time.Time) uint64 {
 // a more convenient API
 type calculator struct {
 	// Pre E-fork inputs
-	upgrades  upgrade.Times
+	upgrades  upgrade.Config
 	staticCfg StaticConfig
 	time      time.Time
 
@@ -74,11 +74,13 @@ func (c *calculator) CreateSubnetTx(*txs.CreateSubnetTx) error {
 	return nil
 }
 
-func (*calculator) AdvanceTimeTx(*txs.AdvanceTimeTx) error {
+func (c *calculator) AdvanceTimeTx(*txs.AdvanceTimeTx) error {
+	c.fee = 0
 	return nil // no fees
 }
 
-func (*calculator) RewardValidatorTx(*txs.RewardValidatorTx) error {
+func (c *calculator) RewardValidatorTx(*txs.RewardValidatorTx) error {
+	c.fee = 0
 	return nil // no fees
 }
 
