@@ -47,7 +47,7 @@ var (
 
 type feeTests struct {
 	description         string
-	cfgAndChainTimeF    func() (StaticConfig, upgrade.Times, time.Time)
+	cfgAndChainTimeF    func() (StaticConfig, upgrade.Config, time.Time)
 	unsignedAndSignedTx func(t *testing.T) (txs.UnsignedTx, *txs.Tx)
 	expectedError       error
 	checksF             func(*testing.T, *Calculator)
@@ -59,12 +59,12 @@ func TestTxFees(t *testing.T) {
 	tests := []feeTests{
 		{
 			description: "AddValidatorTx pre EUpgrade",
-			cfgAndChainTimeF: func() (StaticConfig, upgrade.Times, time.Time) {
+			cfgAndChainTimeF: func() (StaticConfig, upgrade.Config, time.Time) {
 				eUpgradeTime := time.Now().Truncate(time.Second)
 				chainTime := eUpgradeTime.Add(-1 * time.Second)
 
 				cfg := feeTestsDefaultCfg
-				upgrade := upgrade.Times{
+				upgrade := upgrade.Config{
 					DurangoTime:  durangoTime,
 					EUpgradeTime: eUpgradeTime,
 				}
@@ -78,12 +78,12 @@ func TestTxFees(t *testing.T) {
 		},
 		{
 			description: "AddSubnetValidatorTx pre EUpgrade",
-			cfgAndChainTimeF: func() (StaticConfig, upgrade.Times, time.Time) {
+			cfgAndChainTimeF: func() (StaticConfig, upgrade.Config, time.Time) {
 				eUpgradeTime := time.Now().Truncate(time.Second)
 				chainTime := eUpgradeTime.Add(-1 * time.Second)
 
 				cfg := feeTestsDefaultCfg
-				upgrade := upgrade.Times{
+				upgrade := upgrade.Config{
 					DurangoTime:  durangoTime,
 					EUpgradeTime: eUpgradeTime,
 				}
@@ -97,12 +97,12 @@ func TestTxFees(t *testing.T) {
 		},
 		{
 			description: "AddDelegatorTx pre EUpgrade",
-			cfgAndChainTimeF: func() (StaticConfig, upgrade.Times, time.Time) {
+			cfgAndChainTimeF: func() (StaticConfig, upgrade.Config, time.Time) {
 				eUpgradeTime := time.Now().Truncate(time.Second)
 				chainTime := eUpgradeTime.Add(-1 * time.Second)
 
 				cfg := feeTestsDefaultCfg
-				upgrade := upgrade.Times{
+				upgrade := upgrade.Config{
 					DurangoTime:  durangoTime,
 					EUpgradeTime: eUpgradeTime,
 				}
@@ -116,12 +116,12 @@ func TestTxFees(t *testing.T) {
 		},
 		{
 			description: "CreateChainTx pre ApricotPhase3",
-			cfgAndChainTimeF: func() (StaticConfig, upgrade.Times, time.Time) {
+			cfgAndChainTimeF: func() (StaticConfig, upgrade.Config, time.Time) {
 				apricotPhase3Time := time.Now().Truncate(time.Second)
 				chainTime := apricotPhase3Time.Add(-1 * time.Second)
 
 				cfg := feeTestsDefaultCfg
-				upgrade := upgrade.Times{
+				upgrade := upgrade.Config{
 					ApricotPhase3Time: apricotPhase3Time,
 					DurangoTime:       mockable.MaxTime,
 					EUpgradeTime:      mockable.MaxTime,
@@ -136,12 +136,12 @@ func TestTxFees(t *testing.T) {
 		},
 		{
 			description: "CreateChainTx pre EUpgrade",
-			cfgAndChainTimeF: func() (StaticConfig, upgrade.Times, time.Time) {
+			cfgAndChainTimeF: func() (StaticConfig, upgrade.Config, time.Time) {
 				eUpgradeTime := time.Now().Truncate(time.Second)
 				chainTime := eUpgradeTime.Add(-1 * time.Second)
 
 				cfg := feeTestsDefaultCfg
-				upgrade := upgrade.Times{
+				upgrade := upgrade.Config{
 					DurangoTime:  durangoTime,
 					EUpgradeTime: eUpgradeTime,
 				}
@@ -155,12 +155,12 @@ func TestTxFees(t *testing.T) {
 		},
 		{
 			description: "CreateSubnetTx pre ApricotPhase3",
-			cfgAndChainTimeF: func() (StaticConfig, upgrade.Times, time.Time) {
+			cfgAndChainTimeF: func() (StaticConfig, upgrade.Config, time.Time) {
 				apricotPhase3Time := time.Now().Truncate(time.Second)
 				chainTime := apricotPhase3Time.Add(-1 * time.Second)
 
 				cfg := feeTestsDefaultCfg
-				upgrade := upgrade.Times{
+				upgrade := upgrade.Config{
 					ApricotPhase3Time: apricotPhase3Time,
 					DurangoTime:       mockable.MaxTime,
 					EUpgradeTime:      mockable.MaxTime,
@@ -175,12 +175,12 @@ func TestTxFees(t *testing.T) {
 		},
 		{
 			description: "CreateSubnetTx pre EUpgrade",
-			cfgAndChainTimeF: func() (StaticConfig, upgrade.Times, time.Time) {
+			cfgAndChainTimeF: func() (StaticConfig, upgrade.Config, time.Time) {
 				eUpgradeTime := time.Now().Truncate(time.Second)
 				chainTime := eUpgradeTime.Add(-1 * time.Second)
 
 				cfg := feeTestsDefaultCfg
-				upgrade := upgrade.Times{
+				upgrade := upgrade.Config{
 					DurangoTime:  durangoTime,
 					EUpgradeTime: eUpgradeTime,
 				}
@@ -194,12 +194,12 @@ func TestTxFees(t *testing.T) {
 		},
 		{
 			description: "RemoveSubnetValidatorTx pre EUpgrade",
-			cfgAndChainTimeF: func() (StaticConfig, upgrade.Times, time.Time) {
+			cfgAndChainTimeF: func() (StaticConfig, upgrade.Config, time.Time) {
 				eUpgradeTime := time.Now().Truncate(time.Second)
 				chainTime := eUpgradeTime.Add(-1 * time.Second)
 
 				cfg := feeTestsDefaultCfg
-				upgrade := upgrade.Times{
+				upgrade := upgrade.Config{
 					DurangoTime:  durangoTime,
 					EUpgradeTime: eUpgradeTime,
 				}
@@ -213,12 +213,12 @@ func TestTxFees(t *testing.T) {
 		},
 		{
 			description: "TransformSubnetTx pre EUpgrade",
-			cfgAndChainTimeF: func() (StaticConfig, upgrade.Times, time.Time) {
+			cfgAndChainTimeF: func() (StaticConfig, upgrade.Config, time.Time) {
 				eUpgradeTime := time.Now().Truncate(time.Second)
 				chainTime := eUpgradeTime.Add(-1 * time.Second)
 
 				cfg := feeTestsDefaultCfg
-				upgrade := upgrade.Times{
+				upgrade := upgrade.Config{
 					DurangoTime:  durangoTime,
 					EUpgradeTime: eUpgradeTime,
 				}
@@ -232,12 +232,12 @@ func TestTxFees(t *testing.T) {
 		},
 		{
 			description: "TransferSubnetOwnershipTx pre EUpgrade",
-			cfgAndChainTimeF: func() (StaticConfig, upgrade.Times, time.Time) {
+			cfgAndChainTimeF: func() (StaticConfig, upgrade.Config, time.Time) {
 				eUpgradeTime := time.Now().Truncate(time.Second)
 				chainTime := eUpgradeTime.Add(-1 * time.Second)
 
 				cfg := feeTestsDefaultCfg
-				upgrade := upgrade.Times{
+				upgrade := upgrade.Config{
 					DurangoTime:  durangoTime,
 					EUpgradeTime: eUpgradeTime,
 				}
@@ -251,12 +251,12 @@ func TestTxFees(t *testing.T) {
 		},
 		{
 			description: "AddPermissionlessValidatorTx Primary Network pre EUpgrade",
-			cfgAndChainTimeF: func() (StaticConfig, upgrade.Times, time.Time) {
+			cfgAndChainTimeF: func() (StaticConfig, upgrade.Config, time.Time) {
 				eUpgradeTime := time.Now().Truncate(time.Second)
 				chainTime := eUpgradeTime.Add(-1 * time.Second)
 
 				cfg := feeTestsDefaultCfg
-				upgrade := upgrade.Times{
+				upgrade := upgrade.Config{
 					DurangoTime:  durangoTime,
 					EUpgradeTime: eUpgradeTime,
 				}
@@ -272,12 +272,12 @@ func TestTxFees(t *testing.T) {
 		},
 		{
 			description: "AddPermissionlessValidatorTx Subnet pre EUpgrade",
-			cfgAndChainTimeF: func() (StaticConfig, upgrade.Times, time.Time) {
+			cfgAndChainTimeF: func() (StaticConfig, upgrade.Config, time.Time) {
 				eUpgradeTime := time.Now().Truncate(time.Second)
 				chainTime := eUpgradeTime.Add(-1 * time.Second)
 
 				cfg := feeTestsDefaultCfg
-				upgrade := upgrade.Times{
+				upgrade := upgrade.Config{
 					DurangoTime:  durangoTime,
 					EUpgradeTime: eUpgradeTime,
 				}
@@ -295,12 +295,12 @@ func TestTxFees(t *testing.T) {
 		},
 		{
 			description: "AddPermissionlessDelegatorTx Primary Network pre EUpgrade",
-			cfgAndChainTimeF: func() (StaticConfig, upgrade.Times, time.Time) {
+			cfgAndChainTimeF: func() (StaticConfig, upgrade.Config, time.Time) {
 				eUpgradeTime := time.Now().Truncate(time.Second)
 				chainTime := eUpgradeTime.Add(-1 * time.Second)
 
 				cfg := feeTestsDefaultCfg
-				upgrade := upgrade.Times{
+				upgrade := upgrade.Config{
 					DurangoTime:  durangoTime,
 					EUpgradeTime: eUpgradeTime,
 				}
@@ -316,12 +316,12 @@ func TestTxFees(t *testing.T) {
 		},
 		{
 			description: "AddPermissionlessDelegatorTx pre EUpgrade",
-			cfgAndChainTimeF: func() (StaticConfig, upgrade.Times, time.Time) {
+			cfgAndChainTimeF: func() (StaticConfig, upgrade.Config, time.Time) {
 				eUpgradeTime := time.Now().Truncate(time.Second)
 				chainTime := eUpgradeTime.Add(-1 * time.Second)
 
 				cfg := feeTestsDefaultCfg
-				upgrade := upgrade.Times{
+				upgrade := upgrade.Config{
 					DurangoTime:  durangoTime,
 					EUpgradeTime: eUpgradeTime,
 				}
@@ -339,12 +339,12 @@ func TestTxFees(t *testing.T) {
 		},
 		{
 			description: "BaseTx pre EUpgrade",
-			cfgAndChainTimeF: func() (StaticConfig, upgrade.Times, time.Time) {
+			cfgAndChainTimeF: func() (StaticConfig, upgrade.Config, time.Time) {
 				eUpgradeTime := time.Now().Truncate(time.Second)
 				chainTime := eUpgradeTime.Add(-1 * time.Second)
 
 				cfg := feeTestsDefaultCfg
-				upgrade := upgrade.Times{
+				upgrade := upgrade.Config{
 					DurangoTime:  durangoTime,
 					EUpgradeTime: eUpgradeTime,
 				}
@@ -358,12 +358,12 @@ func TestTxFees(t *testing.T) {
 		},
 		{
 			description: "ImportTx pre EUpgrade",
-			cfgAndChainTimeF: func() (StaticConfig, upgrade.Times, time.Time) {
+			cfgAndChainTimeF: func() (StaticConfig, upgrade.Config, time.Time) {
 				eUpgradeTime := time.Now().Truncate(time.Second)
 				chainTime := eUpgradeTime.Add(-1 * time.Second)
 
 				cfg := feeTestsDefaultCfg
-				upgrade := upgrade.Times{
+				upgrade := upgrade.Config{
 					DurangoTime:  durangoTime,
 					EUpgradeTime: eUpgradeTime,
 				}
@@ -377,12 +377,12 @@ func TestTxFees(t *testing.T) {
 		},
 		{
 			description: "ExportTx pre EUpgrade",
-			cfgAndChainTimeF: func() (StaticConfig, upgrade.Times, time.Time) {
+			cfgAndChainTimeF: func() (StaticConfig, upgrade.Config, time.Time) {
 				eUpgradeTime := time.Now().Truncate(time.Second)
 				chainTime := eUpgradeTime.Add(-1 * time.Second)
 
 				cfg := feeTestsDefaultCfg
-				upgrade := upgrade.Times{
+				upgrade := upgrade.Config{
 					DurangoTime:  durangoTime,
 					EUpgradeTime: eUpgradeTime,
 				}
@@ -396,12 +396,12 @@ func TestTxFees(t *testing.T) {
 		},
 		{
 			description: "RewardValidatorTx pre EUpgrade",
-			cfgAndChainTimeF: func() (StaticConfig, upgrade.Times, time.Time) {
+			cfgAndChainTimeF: func() (StaticConfig, upgrade.Config, time.Time) {
 				eUpgradeTime := time.Now().Truncate(time.Second)
 				chainTime := eUpgradeTime.Add(-1 * time.Second)
 
 				cfg := feeTestsDefaultCfg
-				upgrade := upgrade.Times{
+				upgrade := upgrade.Config{
 					DurangoTime:  durangoTime,
 					EUpgradeTime: eUpgradeTime,
 				}
@@ -419,12 +419,12 @@ func TestTxFees(t *testing.T) {
 		},
 		{
 			description: "AdvanceTimeTx pre EUpgrade",
-			cfgAndChainTimeF: func() (StaticConfig, upgrade.Times, time.Time) {
+			cfgAndChainTimeF: func() (StaticConfig, upgrade.Config, time.Time) {
 				eUpgradeTime := time.Now().Truncate(time.Second)
 				chainTime := eUpgradeTime.Add(-1 * time.Second)
 
 				cfg := feeTestsDefaultCfg
-				upgrade := upgrade.Times{
+				upgrade := upgrade.Config{
 					DurangoTime:  durangoTime,
 					EUpgradeTime: eUpgradeTime,
 				}

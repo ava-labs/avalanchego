@@ -165,7 +165,7 @@ func verifyAddValidatorTx(
 
 	// Verify the flowcheck
 
-	feeCalculator := fee.NewStaticCalculator(backend.Config.StaticConfig, backend.Config.Times, currentTimestamp)
+	feeCalculator := fee.NewStaticCalculator(backend.Config.StaticConfig, backend.Config.Config, currentTimestamp)
 	if err := tx.Visit(feeCalculator); err != nil {
 		return nil, err
 	}
@@ -259,7 +259,7 @@ func verifyAddSubnetValidatorTx(
 
 	// Verify the flowcheck
 
-	feeCalculator := fee.NewStaticCalculator(backend.Config.StaticConfig, backend.Config.Times, currentTimestamp)
+	feeCalculator := fee.NewStaticCalculator(backend.Config.StaticConfig, backend.Config.Config, currentTimestamp)
 	if err := tx.Visit(feeCalculator); err != nil {
 		return err
 	}
@@ -340,7 +340,7 @@ func verifyRemoveSubnetValidatorTx(
 
 	// Verify the flowcheck
 
-	feeCalculator := fee.NewStaticCalculator(backend.Config.StaticConfig, backend.Config.Times, currentTimestamp)
+	feeCalculator := fee.NewStaticCalculator(backend.Config.StaticConfig, backend.Config.Config, currentTimestamp)
 	if err := tx.Visit(feeCalculator); err != nil {
 		return nil, false, err
 	}
@@ -461,7 +461,7 @@ func verifyAddDelegatorTx(
 
 	// Verify the flowcheck
 
-	feeCalculator := fee.NewStaticCalculator(backend.Config.StaticConfig, backend.Config.Times, currentTimestamp)
+	feeCalculator := fee.NewStaticCalculator(backend.Config.StaticConfig, backend.Config.Config, currentTimestamp)
 	if err := tx.Visit(feeCalculator); err != nil {
 		return nil, err
 	}
@@ -584,7 +584,7 @@ func verifyAddPermissionlessValidatorTx(
 
 	// Verify the flowcheck
 
-	feeCalculator := fee.NewStaticCalculator(backend.Config.StaticConfig, backend.Config.Times, currentTimestamp)
+	feeCalculator := fee.NewStaticCalculator(backend.Config.StaticConfig, backend.Config.Config, currentTimestamp)
 	if err := tx.Visit(feeCalculator); err != nil {
 		return err
 	}
@@ -732,7 +732,7 @@ func verifyAddPermissionlessDelegatorTx(
 
 	// Verify the flowcheck
 
-	feeCalculator := fee.NewStaticCalculator(backend.Config.StaticConfig, backend.Config.Times, currentTimestamp)
+	feeCalculator := fee.NewStaticCalculator(backend.Config.StaticConfig, backend.Config.Config, currentTimestamp)
 	if err := tx.Visit(feeCalculator); err != nil {
 		return err
 	}
@@ -790,7 +790,7 @@ func verifyTransferSubnetOwnershipTx(
 
 	// Verify the flowcheck
 	currentTimestamp := chainState.GetTimestamp()
-	feeCalculator := fee.NewStaticCalculator(backend.Config.StaticConfig, backend.Config.Times, currentTimestamp)
+	feeCalculator := fee.NewStaticCalculator(backend.Config.StaticConfig, backend.Config.Config, currentTimestamp)
 	if err := tx.Visit(feeCalculator); err != nil {
 		return err
 	}

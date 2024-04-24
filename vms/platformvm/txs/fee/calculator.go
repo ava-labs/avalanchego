@@ -15,7 +15,7 @@ var _ txs.Visitor = (*Calculator)(nil)
 
 type Calculator struct {
 	// Pre E-fork inputs
-	upgrades  upgrade.Times
+	upgrades  upgrade.Config
 	staticCfg StaticConfig
 	chainTime time.Time
 
@@ -23,7 +23,7 @@ type Calculator struct {
 	Fee uint64
 }
 
-func NewStaticCalculator(cfg StaticConfig, ut upgrade.Times, chainTime time.Time) *Calculator {
+func NewStaticCalculator(cfg StaticConfig, ut upgrade.Config, chainTime time.Time) *Calculator {
 	return &Calculator{
 		upgrades:  ut,
 		staticCfg: cfg,

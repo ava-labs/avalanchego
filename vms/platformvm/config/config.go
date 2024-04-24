@@ -21,7 +21,7 @@ import (
 // Struct collecting all foundational parameters of PlatformVM
 type Config struct {
 	// All network upgrade timestamps
-	upgrade.Times
+	upgrade.Config
 
 	// All static fees config active before E-upgrade
 	fee.StaticConfig
