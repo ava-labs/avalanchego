@@ -667,7 +667,7 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 		MinStakeDuration:  defaultMinStakingDuration,
 		MaxStakeDuration:  defaultMaxStakingDuration,
 		RewardConfig:      defaultRewardConfig,
-		Times: upgrade.Times{
+		Config: upgrade.Config{
 			ApricotPhase3Time: forkTime,
 			ApricotPhase5Time: forkTime,
 			BanffTime:         forkTime,
