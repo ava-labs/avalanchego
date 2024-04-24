@@ -31,9 +31,14 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 )
 
-// maxBloomSaltLen restricts the allowed size of the bloom salt to prevent
-// excessively expensive bloom filter contains checks.
-const maxBloomSaltLen = 32
+const (
+	// maxBloomSaltLen restricts the allowed size of the bloom salt to prevent
+	// excessively expensive bloom filter contains checks.
+	maxBloomSaltLen = 32
+	// maxNumTrackedSubnets limits how many subnets a peer can track to prevent
+	// excessive memory usage.
+	maxNumTrackedSubnets = 16
+)
 
 var (
 	errClosed = errors.New("closed")
@@ -263,9 +268,8 @@ func (p *peer) Info() Info {
 		publicIPStr = p.ip.IPPort.String()
 	}
 
-	uptimes := make(map[ids.ID]json.Uint32, p.trackedSubnets.Len())
-
-	for subnetID := range p.trackedSubnets {
+	uptimes := make(map[ids.ID]json.Uint32, p.MySubnets.Len())
+	for subnetID := range p.MySubnets {
 		uptime, exist := p.ObservedUptime(subnetID)
 		if !exist {
 			continue
@@ -802,8 +806,12 @@ func (p *peer) getUptimes() (uint32, []*p2p.SubnetUptime) {
 		primaryUptime = 0
 	}
 
-	subnetUptimes := make([]*p2p.SubnetUptime, 0, p.trackedSubnets.Len())
-	for subnetID := range p.trackedSubnets {
+	subnetUptimes := make([]*p2p.SubnetUptime, 0, p.MySubnets.Len())
+	for subnetID := range p.MySubnets {
+		if !p.trackedSubnets.Contains(subnetID) {
+			continue
+		}
+
 		subnetUptime, err := p.UptimeCalculator.CalculateUptimePercent(p.id, subnetID)
 		if err != nil {
 			p.Log.Debug("failed to get peer uptime percentage",
@@ -947,6 +955,17 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 		}
 	}
 
+	if numTrackedSubnets := len(msg.TrackedSubnets); numTrackedSubnets > maxNumTrackedSubnets {
+		p.Log.Debug("message with invalid field",
+			zap.Stringer("nodeID", p.id),
+			zap.Stringer("messageOp", message.HandshakeOp),
+			zap.String("field", "TrackedSubnets"),
+			zap.Int("numTrackedSubnets", numTrackedSubnets),
+		)
+		p.StartClose()
+		return
+	}
+
 	// handle subnet IDs
 	for _, subnetIDBytes := range msg.TrackedSubnets {
 		subnetID, err := ids.ToID(subnetIDBytes)
@@ -958,10 +977,7 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 			p.StartClose()
 			return
 		}
-		// add only if we also track this subnet
-		if p.MySubnets.Contains(subnetID) {
-			p.trackedSubnets.Add(subnetID)
-		}
+		p.trackedSubnets.Add(subnetID)
 	}
 
 	for _, acp := range msg.SupportedAcps {
@@ -1101,7 +1117,7 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 
 	p.gotHandshake.Set(true)
 
-	peerIPs := p.Network.Peers(p.id, knownPeers, salt)
+	peerIPs := p.Network.Peers(p.trackedSubnets, p.id, knownPeers, salt)
 
 	// We bypass throttling here to ensure that the handshake message is
 	// acknowledged correctly.
@@ -1158,7 +1174,7 @@ func (p *peer) handleGetPeerList(msg *p2p.GetPeerList) {
 		return
 	}
 
-	peerIPs := p.Network.Peers(p.id, filter, salt)
+	peerIPs := p.Network.Peers(p.trackedSubnets, p.id, filter, salt)
 	if len(peerIPs) == 0 {
 		p.Log.Debug("skipping sending of empty peer list",
 			zap.Stringer("nodeID", p.id),

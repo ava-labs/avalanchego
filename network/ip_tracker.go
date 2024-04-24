@@ -42,6 +42,7 @@ const (
 var _ validators.ManagerCallbackListener = (*ipTracker)(nil)
 
 func newIPTracker(
+	trackedSubnets set.Set[ids.ID],
 	log logging.Logger,
 	namespace string,
 	registerer prometheus.Registerer,
@@ -52,7 +53,8 @@ func newIPTracker(
 		return nil, err
 	}
 	tracker := &ipTracker{
-		log: log,
+		trackedSubnets: trackedSubnets,
+		log:            log,
 		numTrackedIPs: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespace,
 			Name:      "tracked_ips",
@@ -80,6 +82,7 @@ func newIPTracker(
 }
 
 type ipTracker struct {
+	trackedSubnets   set.Set[ids.ID]
 	log              logging.Logger
 	numTrackedIPs    prometheus.Gauge
 	numGossipableIPs prometheus.Gauge
@@ -96,7 +99,7 @@ type ipTracker struct {
 	// mostRecentTrackedIPs tracks the most recent IP of each node whose
 	// connection is desired.
 	//
-	// An IP is tracked if one of the following conditions are met:
+	// An IP is tracked if any of the following conditions are met:
 	// - The node was manually tracked
 	// - The node was manually requested to be gossiped
 	// - The node is a validator
@@ -149,7 +152,11 @@ func (i *ipTracker) ManuallyTrack(nodeID ids.NodeID) {
 //
 // In order to avoid persistent network gossip, it's important for nodes in the
 // network to agree upon manually gossiped nodeIDs.
-func (i *ipTracker) ManuallyGossip(nodeID ids.NodeID) {
+func (i *ipTracker) ManuallyGossip(subnetID ids.ID, nodeID ids.NodeID) {
+	if subnetID != constants.PrimaryNetworkID {
+		return
+	}
+
 	i.lock.Lock()
 	defer i.lock.Unlock()
 
@@ -215,7 +222,9 @@ func (i *ipTracker) GetIP(nodeID ids.NodeID) (*ips.ClaimedIPPort, bool) {
 
 // Connected is called when a connection is established. The peer should have
 // provided [ip] during the handshake.
-func (i *ipTracker) Connected(ip *ips.ClaimedIPPort) {
+func (i *ipTracker) Connected(ip *ips.ClaimedIPPort, trackedSubnets set.Set[ids.ID]) {
+	_ = trackedSubnets
+
 	i.lock.Lock()
 	defer i.lock.Unlock()
 
@@ -394,11 +403,14 @@ func (i *ipTracker) removeGossipableIP(nodeID ids.NodeID) {
 // the number of eligible IPs to return low, it's possible that every IP will be
 // iterated over while handling this call.
 func (i *ipTracker) GetGossipableIPs(
+	trackedSubnets set.Set[ids.ID],
 	exceptNodeID ids.NodeID,
 	exceptIPs *bloom.ReadFilter,
 	salt []byte,
 	maxNumIPs int,
 ) []*ips.ClaimedIPPort {
+	_ = trackedSubnets
+
 	var (
 		uniform = sampler.NewUniform()
 		ips     = make([]*ips.ClaimedIPPort, 0, maxNumIPs)

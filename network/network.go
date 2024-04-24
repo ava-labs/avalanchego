@@ -235,7 +235,8 @@ func NewNetwork(
 		return nil, fmt.Errorf("initializing network metrics failed with: %w", err)
 	}
 
-	ipTracker, err := newIPTracker(log, config.Namespace, metricsRegisterer)
+	// TODO: Should pass in [config.TrackedSubnets] rather than [nil]
+	ipTracker, err := newIPTracker(nil, log, config.Namespace, metricsRegisterer)
 	if err != nil {
 		return nil, fmt.Errorf("initializing ip tracker failed with: %w", err)
 	}
@@ -244,7 +245,7 @@ func NewNetwork(
 	// Track all default bootstrappers to ensure their current IPs are gossiped
 	// like validator IPs.
 	for _, bootstrapper := range genesis.GetBootstrappers(config.NetworkID) {
-		ipTracker.ManuallyGossip(bootstrapper.ID)
+		ipTracker.ManuallyGossip(constants.PrimaryNetworkID, bootstrapper.ID)
 	}
 	// Track all recent validators to optimistically connect to them before the
 	// P-chain has finished syncing.
@@ -454,14 +455,17 @@ func (n *network) Connected(nodeID ids.NodeID) {
 		peerIP.Timestamp,
 		peerIP.TLSSignature,
 	)
-	n.ipTracker.Connected(newIP)
+	trackedSubnets := peer.TrackedSubnets()
+	n.ipTracker.Connected(newIP, trackedSubnets)
 
 	n.metrics.markConnected(peer)
 
 	peerVersion := peer.Version()
 	n.router.Connected(nodeID, peerVersion, constants.PrimaryNetworkID)
-	for subnetID := range peer.TrackedSubnets() {
-		n.router.Connected(nodeID, peerVersion, subnetID)
+	for subnetID := range trackedSubnets {
+		if n.peerConfig.MySubnets.Contains(subnetID) {
+			n.router.Connected(nodeID, peerVersion, subnetID)
+		}
 	}
 }
 
@@ -509,8 +513,14 @@ func (n *network) KnownPeers() ([]byte, []byte) {
 	return n.ipTracker.Bloom()
 }
 
-func (n *network) Peers(except ids.NodeID, knownPeers *bloom.ReadFilter, salt []byte) []*ips.ClaimedIPPort {
+func (n *network) Peers(
+	trackedSubnets set.Set[ids.ID],
+	except ids.NodeID,
+	knownPeers *bloom.ReadFilter,
+	salt []byte,
+) []*ips.ClaimedIPPort {
 	return n.ipTracker.GetGossipableIPs(
+		trackedSubnets,
 		except,
 		knownPeers,
 		salt,
