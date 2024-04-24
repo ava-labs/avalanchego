@@ -51,15 +51,14 @@ func (sf *unarySnowflake) RecordPoll(count int) {
 	}
 
 	for i, alphaConfidence := range sf.alphaConfidence {
-		if count >= alphaConfidence {
-			sf.confidence[i]++
-			if sf.confidence[i] >= sf.beta[i] {
-				sf.finalized = true
-				return
-			}
-		} else {
-			// For all i' >= i, confidence[i'] = 0
+		if count < alphaConfidence {
 			clear(sf.confidence[i:])
+			return
+		}
+
+		sf.confidence[i]++
+		if sf.confidence[i] >= sf.beta[i] {
+			sf.finalized = true
 			return
 		}
 	}
