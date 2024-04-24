@@ -12,9 +12,10 @@ import (
 func TestNnarySnowball(t *testing.T) {
 	require := require.New(t)
 
+	alphaPreference, alphaConfidence := 1, 1
 	beta := 2
 
-	sb := newNnarySnowball(beta, Red)
+	sb := newNnarySnowball(alphaPreference, alphaConfidence, beta, Red)
 	sb.Add(Blue)
 	sb.Add(Green)
 
@@ -53,9 +54,10 @@ func TestNnarySnowball(t *testing.T) {
 func TestVirtuousNnarySnowball(t *testing.T) {
 	require := require.New(t)
 
+	alphaPreference, alphaConfidence := 1, 1
 	beta := 1
 
-	sb := newNnarySnowball(beta, Red)
+	sb := newNnarySnowball(alphaPreference, alphaConfidence, beta, Red)
 
 	require.Equal(Red, sb.Preference())
 	require.False(sb.Finalized())
@@ -68,9 +70,10 @@ func TestVirtuousNnarySnowball(t *testing.T) {
 func TestNarySnowballRecordUnsuccessfulPoll(t *testing.T) {
 	require := require.New(t)
 
+	alphaPreference, alphaConfidence := 1, 1
 	beta := 2
 
-	sb := newNnarySnowball(beta, Red)
+	sb := newNnarySnowball(alphaPreference, alphaConfidence, beta, Red)
 	sb.Add(Blue)
 
 	require.Equal(Red, sb.Preference())
@@ -106,9 +109,10 @@ func TestNarySnowballRecordUnsuccessfulPoll(t *testing.T) {
 func TestNarySnowballDifferentSnowflakeColor(t *testing.T) {
 	require := require.New(t)
 
+	alphaPreference, alphaConfidence := 1, 1
 	beta := 2
 
-	sb := newNnarySnowball(beta, Red)
+	sb := newNnarySnowball(alphaPreference, alphaConfidence, beta, Red)
 	sb.Add(Blue)
 
 	require.Equal(Red, sb.Preference())

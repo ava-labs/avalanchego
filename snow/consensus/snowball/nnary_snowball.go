@@ -11,9 +11,9 @@ import (
 
 var _ Nnary = (*nnarySnowball)(nil)
 
-func newNnarySnowball(beta int, choice ids.ID) nnarySnowball {
+func newNnarySnowball(alphaPreference, alphaConfidence, beta int, choice ids.ID) nnarySnowball {
 	return nnarySnowball{
-		nnarySnowflake:     newNnarySnowflake(beta, choice),
+		nnarySnowflake:     newNnarySnowflake(alphaPreference, alphaConfidence, beta, choice),
 		preference:         choice,
 		preferenceStrength: make(map[ids.ID]int),
 	}
@@ -45,6 +45,19 @@ func (sb *nnarySnowball) Preference() ids.ID {
 		return sb.nnarySnowflake.Preference()
 	}
 	return sb.preference
+}
+
+func (sb *nnarySnowball) RecordPoll(count int, choice ids.ID) {
+	switch {
+	case count >= sb.alphaConfidence:
+		sb.RecordSuccessfulPoll(choice)
+	case count >= sb.alphaPreference:
+		sb.RecordPollPreference(choice)
+	default:
+		// If the poll was unsuccessful, RecordUnsuccessfulPoll should
+		// have been called instead.
+		sb.RecordUnsuccessfulPoll()
+	}
 }
 
 func (sb *nnarySnowball) RecordSuccessfulPoll(choice ids.ID) {

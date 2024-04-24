@@ -12,9 +12,10 @@ import (
 func TestNnarySnowflake(t *testing.T) {
 	require := require.New(t)
 
+	alphaPreference, alphaConfidence := 1, 1
 	beta := 2
 
-	sf := newNnarySnowflake(beta, Red)
+	sf := newNnarySnowflake(alphaPreference, alphaConfidence, beta, Red)
 	sf.Add(Blue)
 	sf.Add(Green)
 
@@ -49,9 +50,10 @@ func TestNnarySnowflake(t *testing.T) {
 func TestNnarySnowflakeConfidenceReset(t *testing.T) {
 	require := require.New(t)
 
+	alphaPreference, alphaConfidence := 1, 1
 	beta := 4
 
-	sf := newNnarySnowflake(beta, Red)
+	sf := newNnarySnowflake(alphaPreference, alphaConfidence, beta, Red)
 	sf.Add(Blue)
 	sf.Add(Green)
 
@@ -81,9 +83,10 @@ func TestNnarySnowflakeConfidenceReset(t *testing.T) {
 func TestVirtuousNnarySnowflake(t *testing.T) {
 	require := require.New(t)
 
+	alphaPreference, alphaConfidence := 1, 1
 	beta := 2
 
-	sb := newNnarySnowflake(beta, Red)
+	sb := newNnarySnowflake(alphaPreference, alphaConfidence, beta, Red)
 	require.Equal(Red, sb.Preference())
 	require.False(sb.Finalized())
 

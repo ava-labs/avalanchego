@@ -7,9 +7,9 @@ import "fmt"
 
 var _ Unary = (*unarySnowball)(nil)
 
-func newUnarySnowball(beta int) unarySnowball {
+func newUnarySnowball(alphaPreference, alphaConfidence, beta int) unarySnowball {
 	return unarySnowball{
-		unarySnowflake: newUnarySnowflake(beta),
+		unarySnowflake: newUnarySnowflake(alphaPreference, alphaConfidence, beta),
 	}
 }
 
@@ -20,6 +20,19 @@ type unarySnowball struct {
 
 	// preferenceStrength tracks the total number of polls with a preference
 	preferenceStrength int
+}
+
+func (sb *unarySnowball) RecordPoll(count int) {
+	switch {
+	case count >= sb.alphaConfidence:
+		sb.RecordSuccessfulPoll()
+	case count >= sb.alphaPreference:
+		sb.RecordPollPreference()
+	default:
+		// If the poll was unsuccessful, RecordUnsuccessfulPoll should
+		// have been called instead.
+		sb.RecordUnsuccessfulPoll()
+	}
 }
 
 func (sb *unarySnowball) RecordSuccessfulPoll() {

@@ -7,9 +7,11 @@ import "fmt"
 
 var _ Unary = (*unarySnowflake)(nil)
 
-func newUnarySnowflake(beta int) unarySnowflake {
+func newUnarySnowflake(alphaPreference, alphaConfidence, beta int) unarySnowflake {
 	return unarySnowflake{
-		beta: beta,
+		alphaPreference: alphaPreference,
+		alphaConfidence: alphaConfidence,
+		beta:            beta,
 	}
 }
 
@@ -19,6 +21,12 @@ type unarySnowflake struct {
 	// finalization.
 	beta int
 
+	// alphaPreference is the threshold required to update the preference
+	alphaPreference int
+
+	// alphaConfidence is the threshold required to increment the confidence counter
+	alphaConfidence int
+
 	// confidence tracks the number of successful polls in a row that have
 	// returned the preference
 	confidence int
@@ -26,6 +34,19 @@ type unarySnowflake struct {
 	// finalized prevents the state from changing after the required number of
 	// consecutive polls has been reached
 	finalized bool
+}
+
+func (sf *unarySnowflake) RecordPoll(count int) {
+	switch {
+	case count >= sf.alphaConfidence:
+		sf.RecordSuccessfulPoll()
+	case count >= sf.alphaPreference:
+		sf.RecordPollPreference()
+	default:
+		// If the poll was unsuccessful, RecordUnsuccessfulPoll should
+		// have been called instead.
+		sf.RecordUnsuccessfulPoll()
+	}
 }
 
 func (sf *unarySnowflake) RecordSuccessfulPoll() {

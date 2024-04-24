@@ -11,10 +11,12 @@ import (
 
 var _ Nnary = (*nnarySnowflake)(nil)
 
-func newNnarySnowflake(beta int, choice ids.ID) nnarySnowflake {
+func newNnarySnowflake(alphaPreference, alphaConfidence, beta int, choice ids.ID) nnarySnowflake {
 	return nnarySnowflake{
-		nnarySlush: newNnarySlush(choice),
-		beta:       beta,
+		nnarySlush:      newNnarySlush(choice),
+		alphaPreference: alphaPreference,
+		alphaConfidence: alphaConfidence,
+		beta:            beta,
 	}
 }
 
@@ -28,6 +30,12 @@ type nnarySnowflake struct {
 	// finalization.
 	beta int
 
+	// alphaPreference is the threshold required to update the preference
+	alphaPreference int
+
+	// alphaConfidence is the threshold required to increment the confidence counter
+	alphaConfidence int
+
 	// confidence tracks the number of successful polls in a row that have
 	// returned the preference
 	confidence int
@@ -38,6 +46,23 @@ type nnarySnowflake struct {
 }
 
 func (*nnarySnowflake) Add(_ ids.ID) {}
+
+func (sf *nnarySnowflake) RecordPoll(count int, choice ids.ID) {
+	if sf.finalized {
+		return // This instance is already decided.
+	}
+
+	switch {
+	case count >= sf.alphaConfidence:
+		sf.RecordSuccessfulPoll(choice)
+	case count >= sf.alphaPreference:
+		sf.RecordPollPreference(choice)
+	default:
+		// If the poll was unsuccessful, RecordUnsuccessfulPoll should
+		// have been called instead.
+		sf.RecordUnsuccessfulPoll()
+	}
+}
 
 func (sf *nnarySnowflake) RecordSuccessfulPoll(choice ids.ID) {
 	if sf.finalized {

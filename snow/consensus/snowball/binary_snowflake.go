@@ -7,10 +7,12 @@ import "fmt"
 
 var _ Binary = (*binarySnowflake)(nil)
 
-func newBinarySnowflake(beta, choice int) binarySnowflake {
+func newBinarySnowflake(alphaPreference, alphaConfidence, beta, choice int) binarySnowflake {
 	return binarySnowflake{
-		binarySlush: newBinarySlush(choice),
-		beta:        beta,
+		binarySlush:     newBinarySlush(choice),
+		alphaPreference: alphaPreference,
+		alphaConfidence: alphaConfidence,
+		beta:            beta,
 	}
 }
 
@@ -23,6 +25,12 @@ type binarySnowflake struct {
 	// returned the preference
 	confidence int
 
+	// alphaPreference is the threshold required to update the preference
+	alphaPreference int
+
+	// alphaConfidence is the threshold required to increment the confidence counter
+	alphaConfidence int
+
 	// beta is the number of consecutive successful queries required for
 	// finalization.
 	beta int
@@ -30,6 +38,23 @@ type binarySnowflake struct {
 	// finalized prevents the state from changing after the required number of
 	// consecutive polls has been reached
 	finalized bool
+}
+
+func (sf *binarySnowflake) RecordPoll(count, choice int) {
+	if sf.finalized {
+		return // This instance is already decided.
+	}
+
+	switch {
+	case count >= sf.alphaConfidence:
+		sf.RecordSuccessfulPoll(choice)
+	case count >= sf.alphaPreference:
+		sf.RecordPollPreference(choice)
+	default:
+		// If the poll was unsuccessful, RecordUnsuccessfulPoll should
+		// have been called instead.
+		sf.RecordUnsuccessfulPoll()
+	}
 }
 
 func (sf *binarySnowflake) RecordSuccessfulPoll(choice int) {

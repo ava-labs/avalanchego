@@ -15,9 +15,10 @@ func TestBinarySnowflake(t *testing.T) {
 	blue := 0
 	red := 1
 
+	alphaPreference, alphaConfidence := 1, 1
 	beta := 2
 
-	sf := newBinarySnowflake(beta, red)
+	sf := newBinarySnowflake(alphaPreference, alphaConfidence, beta, red)
 
 	require.Equal(red, sf.Preference())
 	require.False(sf.Finalized())

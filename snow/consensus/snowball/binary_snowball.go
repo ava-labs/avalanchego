@@ -7,9 +7,9 @@ import "fmt"
 
 var _ Binary = (*binarySnowball)(nil)
 
-func newBinarySnowball(beta, choice int) binarySnowball {
+func newBinarySnowball(alphaPreference int, alphaConfidence int, beta int, choice int) binarySnowball {
 	return binarySnowball{
-		binarySnowflake: newBinarySnowflake(beta, choice),
+		binarySnowflake: newBinarySnowflake(alphaPreference, alphaConfidence, beta, choice),
 		preference:      choice,
 	}
 }
@@ -37,6 +37,19 @@ func (sb *binarySnowball) Preference() int {
 		return sb.binarySnowflake.Preference()
 	}
 	return sb.preference
+}
+
+func (sb *binarySnowball) RecordPoll(count, choice int) {
+	switch {
+	case count >= sb.alphaConfidence:
+		sb.RecordSuccessfulPoll(choice)
+	case count >= sb.alphaPreference:
+		sb.RecordPollPreference(choice)
+	default:
+		// If the poll was unsuccessful, RecordUnsuccessfulPoll should
+		// have been called instead.
+		sb.RecordUnsuccessfulPoll()
+	}
 }
 
 func (sb *binarySnowball) RecordSuccessfulPoll(choice int) {

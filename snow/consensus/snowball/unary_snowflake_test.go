@@ -19,9 +19,10 @@ func UnarySnowflakeStateTest(t *testing.T, sf *unarySnowflake, expectedConfidenc
 func TestUnarySnowflake(t *testing.T) {
 	require := require.New(t)
 
+	alphaPreference, alphaConfidence := 1, 1
 	beta := 2
 
-	sf := newUnarySnowflake(beta)
+	sf := newUnarySnowflake(alphaPreference, alphaConfidence, beta)
 
 	sf.RecordSuccessfulPoll()
 	UnarySnowflakeStateTest(t, &sf, 1, false)
@@ -42,11 +43,11 @@ func TestUnarySnowflake(t *testing.T) {
 
 	binarySnowflake.RecordUnsuccessfulPoll()
 
-	binarySnowflake.RecordSuccessfulPoll(1)
+	binarySnowflake.RecordPoll(alphaConfidence, 1)
 
 	require.False(binarySnowflake.Finalized())
 
-	binarySnowflake.RecordSuccessfulPoll(1)
+	binarySnowflake.RecordPoll(alphaConfidence, 1)
 
 	require.Equal(1, binarySnowflake.Preference())
 	require.True(binarySnowflake.Finalized())
