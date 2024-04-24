@@ -49,7 +49,7 @@ func (sf *binarySnowflake) RecordPoll(count, choice int) {
 	}
 
 	if choice != sf.preference && count >= sf.alphaPreference {
-		sf.preference = choice
+		sf.binarySlush.RecordSuccessfulPoll(choice)
 		clear(sf.confidence)
 	}
 

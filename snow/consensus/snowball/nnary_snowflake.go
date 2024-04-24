@@ -56,7 +56,7 @@ func (sf *nnarySnowflake) RecordPoll(count int, choice ids.ID) {
 	}
 
 	if choice != sf.preference && count >= sf.alphaPreference {
-		sf.preference = choice
+		sf.nnarySlush.RecordSuccessfulPoll(choice)
 		clear(sf.confidence)
 	}
 
