@@ -2680,7 +2680,7 @@ func TestEngineRepollsMisconfiguredSubnet(t *testing.T) {
 //	|
 //	2
 //
-// K = 3, Alpha = 2, Beta = 2, ConcurrentRepolls = 2
+// K = 3, Alpha = 2, Beta = 1, ConcurrentRepolls = 1
 //
 // Initial configuration:
 //
