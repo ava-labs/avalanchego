@@ -1,5 +1,21 @@
 # Release Notes
 
+## [v1.11.5](https://github.com/ava-labs/avalanchego/releases/tag/v1.11.5)
+
+This version is backwards compatible to [v1.11.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.11.0). It is optional, but encouraged.
+
+The plugin version is unchanged at `35` and is compatible with versions `v1.11.3-v1.11.4`.
+
+### APIs
+
+### Configs
+
+### Fixes
+
+### What's Changed
+
+**Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.11.4...v1.11.5
+
 ## [v1.11.4](https://github.com/ava-labs/avalanchego/releases/tag/v1.11.4)
 
 This version is backwards compatible to [v1.11.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.11.0). It is optional, but encouraged.
