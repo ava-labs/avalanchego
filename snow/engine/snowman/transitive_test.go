@@ -2694,20 +2694,17 @@ func TestEngineRepollsMisconfiguredSubnet(t *testing.T) {
 //
 // The following is a regression test for a bug where the engine would stall.
 //
-//  01. Poll = 0: Handle a chit for block 1.
-//  02. Poll = 0: Handle a chit for block 1.
-//     Poll = 0 terminates because block 1 has reached alpha confidence.
-//  03. Poll = 1: Handle a chit for block 1.
-//  04. Poll = 1: Handle a chit for block 2.
-//  05. Poll = 1: Handle a chit for block 3. This will issue a Get request for block 3.
-//  06. Attempt to issue block 4. This will block on the issuance of block 3.
-//  07. Poll = 2: Handle a chit for block 1.
-//  08. Poll = 2: Handle a chit for block 2.
-//  09. Poll = 2: Handle a chit for block 4. This will block on the issuance of block 4.
-//  10. Issue block 3.
-//     Poll = 1 terminates. This will accept blocks 0 and 1. This will also reject block 3.
+//  1. Poll = 0: Handle a chit for block 1.
+//  2. Poll = 0: Handle a chit for block 2.
+//  3. Poll = 0: Handle a chit for block 3. This will issue a Get request for block 3. This will block on the issuance of block 3.
+//  4. Attempt to issue block 4. This will block on the issuance of block 3.
+//  5. Poll = 1: Handle a chit for block 1.
+//  6. Poll = 1: Handle a chit for block 2.
+//  7. Poll = 1: Handle a chit for block 4. This will block on the issuance of block 4.
+//  8. Issue block 3.
+//     Poll = 0 terminates. This will accept blocks 0 and 1. This will also reject block 3.
 //     Block = 4 will attempt to be delivered, but because it is effectively rejected due to the acceptance of block 1, it will be dropped.
-//     Poll = 2 should terminate and block 2 should be repolled.
+//     Poll = 1 should terminate and block 2 should be repolled.
 func TestEngineVoteStallRegression(t *testing.T) {
 	require := require.New(t)
 
@@ -2716,9 +2713,9 @@ func TestEngineVoteStallRegression(t *testing.T) {
 		K:                     3,
 		AlphaPreference:       2,
 		AlphaConfidence:       2,
-		BetaVirtuous:          2,
-		BetaRogue:             2,
-		ConcurrentRepolls:     2,
+		BetaVirtuous:          1,
+		BetaRogue:             1,
+		ConcurrentRepolls:     1,
 		OptimalProcessing:     1,
 		MaxOutstandingItems:   1,
 		MaxItemProcessingTime: 1,
@@ -2801,7 +2798,7 @@ func TestEngineVoteStallRegression(t *testing.T) {
 		acceptedChain[0].Bytes(),
 		0,
 	))
-	require.Len(pollRequestIDs, 2)
+	require.Len(pollRequestIDs, 1)
 
 	// Issue block 1.
 	require.NoError(engine.PushQuery(
@@ -2811,7 +2808,7 @@ func TestEngineVoteStallRegression(t *testing.T) {
 		acceptedChain[1].Bytes(),
 		0,
 	))
-	require.Len(pollRequestIDs, 3)
+	require.Len(pollRequestIDs, 2)
 
 	// Issue block 2.
 	require.NoError(engine.PushQuery(
@@ -2821,24 +2818,13 @@ func TestEngineVoteStallRegression(t *testing.T) {
 		acceptedChain[2].Bytes(),
 		0,
 	))
-	require.Len(pollRequestIDs, 4)
+	require.Len(pollRequestIDs, 3)
 
-	for _, nodeID := range nodeIDs {
-		require.NoError(engine.Chits(
-			context.Background(),
-			nodeID,
-			pollRequestIDs[0],
-			acceptedChain[1].ID(),
-			acceptedChain[1].ID(),
-			acceptedChain[1].ID(),
-		))
-	}
-	require.Len(pollRequestIDs, 4)
-
+	// Apply votes in poll 0 to the blocks that will be accepted.
 	require.NoError(engine.Chits(
 		context.Background(),
 		nodeID0,
-		pollRequestIDs[1],
+		pollRequestIDs[0],
 		acceptedChain[1].ID(),
 		acceptedChain[1].ID(),
 		acceptedChain[1].ID(),
@@ -2846,12 +2832,14 @@ func TestEngineVoteStallRegression(t *testing.T) {
 	require.NoError(engine.Chits(
 		context.Background(),
 		nodeID1,
-		pollRequestIDs[1],
+		pollRequestIDs[0],
 		acceptedChain[2].ID(),
 		acceptedChain[2].ID(),
 		acceptedChain[2].ID(),
 	))
 
+	// Attempt to apply votes in poll 0 for block 3. This will send a Get
+	// request for block 3 and register the chits as a dependency on block 3.
 	var getBlock3Request *common.Request
 	sender.SendGetF = func(_ context.Context, nodeID ids.NodeID, requestID uint32, blkID ids.ID) {
 		require.Nil(getBlock3Request)
@@ -2866,14 +2854,15 @@ func TestEngineVoteStallRegression(t *testing.T) {
 	require.NoError(engine.Chits(
 		context.Background(),
 		nodeID2,
-		pollRequestIDs[1],
+		pollRequestIDs[0],
 		rejectedChain[0].ID(),
 		rejectedChain[0].ID(),
 		rejectedChain[0].ID(),
 	))
 	require.NotNil(getBlock3Request)
 
-	// Issue block 4.
+	// Attempt to issue block 4. This will register a dependency on block 3 for
+	// the issuance of block 4.
 	require.NoError(engine.PushQuery(
 		context.Background(),
 		nodeID0,
@@ -2881,12 +2870,14 @@ func TestEngineVoteStallRegression(t *testing.T) {
 		rejectedChain[1].Bytes(),
 		0,
 	))
-	require.Len(pollRequestIDs, 4)
+	require.Len(pollRequestIDs, 3)
 
+	// Apply votes in poll 1 that will cause blocks 3 and 4 to be rejected once
+	// poll 0 finishes.
 	require.NoError(engine.Chits(
 		context.Background(),
 		nodeID0,
-		pollRequestIDs[2],
+		pollRequestIDs[1],
 		acceptedChain[1].ID(),
 		acceptedChain[1].ID(),
 		acceptedChain[1].ID(),
@@ -2894,7 +2885,7 @@ func TestEngineVoteStallRegression(t *testing.T) {
 	require.NoError(engine.Chits(
 		context.Background(),
 		nodeID1,
-		pollRequestIDs[2],
+		pollRequestIDs[1],
 		acceptedChain[2].ID(),
 		acceptedChain[2].ID(),
 		acceptedChain[2].ID(),
@@ -2902,12 +2893,17 @@ func TestEngineVoteStallRegression(t *testing.T) {
 	require.NoError(engine.Chits(
 		context.Background(),
 		nodeID2,
-		pollRequestIDs[2],
+		pollRequestIDs[1],
 		rejectedChain[1].ID(),
 		rejectedChain[1].ID(),
 		rejectedChain[1].ID(),
 	))
 
+	// Provide block 3.
+	// This will cause poll 0 to terminate and accept blocks 0 and 1.
+	// Then the engine will attempt to deliver block 4, but because block 1 is
+	// accepted, block 4 will be dropped.
+	// Then poll 1 should terminate because block 4 was dropped.
 	vm.GetBlockF = MakeGetBlockF(
 		[]*snowman.TestBlock{Genesis},
 		acceptedChain,
@@ -2925,7 +2921,8 @@ func TestEngineVoteStallRegression(t *testing.T) {
 	require.Equal(choices.Processing, acceptedChain[2].Status())
 	require.Equal(choices.Rejected, rejectedChain[0].Status())
 
-	for i := 3; i < len(pollRequestIDs); i++ {
+	// Then engine should issue as many queries as needed to confirm block 2.
+	for i := 2; i < len(pollRequestIDs); i++ {
 		for _, nodeID := range nodeIDs {
 			require.NoError(engine.Chits(
 				context.Background(),
