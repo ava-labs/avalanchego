@@ -78,7 +78,7 @@ func (sf *nnarySnowflake) recordSuccessfulPoll(choice ids.ID) {
 	}
 
 	sf.finalized = sf.confidence >= sf.beta
-	sf.nnarySlush.recordSuccessfulPoll(choice)
+	sf.nnarySlush.RecordSuccessfulPoll(choice)
 }
 
 func (sf *nnarySnowflake) recordPollPreference(choice ids.ID) {
@@ -87,7 +87,7 @@ func (sf *nnarySnowflake) recordPollPreference(choice ids.ID) {
 	}
 
 	sf.confidence = 0
-	sf.nnarySlush.recordSuccessfulPoll(choice)
+	sf.nnarySlush.RecordSuccessfulPoll(choice)
 }
 
 func (sf *nnarySnowflake) RecordUnsuccessfulPoll() {
