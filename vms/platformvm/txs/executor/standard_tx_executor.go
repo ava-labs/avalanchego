@@ -69,11 +69,7 @@ func (e *StandardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 	}
 
 	// Verify the flowcheck
-	var (
-		staticFeesCfg = e.Backend.Config.StaticConfig
-		upgrades      = e.Backend.Config.Times
-	)
-	feeCalculator := fee.NewStaticCalculator(staticFeesCfg, upgrades, currentTimestamp)
+	feeCalculator := fee.NewStaticCalculator(e.Backend.Config.StaticConfig, e.Backend.Config.Times, currentTimestamp)
 	if err := tx.Visit(feeCalculator); err != nil {
 		return err
 	}
@@ -123,11 +119,7 @@ func (e *StandardTxExecutor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 	}
 
 	// Verify the flowcheck
-	var (
-		staticFeesCfg = e.Backend.Config.StaticConfig
-		upgrades      = e.Backend.Config.Times
-	)
-	feeCalculator := fee.NewStaticCalculator(staticFeesCfg, upgrades, currentTimestamp)
+	feeCalculator := fee.NewStaticCalculator(e.Backend.Config.StaticConfig, e.Backend.Config.Times, currentTimestamp)
 	if err := tx.Visit(feeCalculator); err != nil {
 		return err
 	}
@@ -212,11 +204,7 @@ func (e *StandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 		copy(ins[len(tx.Ins):], tx.ImportedInputs)
 
 		// Verify the flowcheck
-		var (
-			staticFeesCfg = e.Backend.Config.StaticConfig
-			upgrades      = e.Backend.Config.Times
-		)
-		feeCalculator := fee.NewStaticCalculator(staticFeesCfg, upgrades, currentTimestamp)
+		feeCalculator := fee.NewStaticCalculator(e.Backend.Config.StaticConfig, e.Backend.Config.Times, currentTimestamp)
 		if err := tx.Visit(feeCalculator); err != nil {
 			return err
 		}
@@ -277,11 +265,7 @@ func (e *StandardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 	}
 
 	// Verify the flowcheck
-	var (
-		staticFeesCfg = e.Backend.Config.StaticConfig
-		upgrades      = e.Backend.Config.Times
-	)
-	feeCalculator := fee.NewStaticCalculator(staticFeesCfg, upgrades, currentTimestamp)
+	feeCalculator := fee.NewStaticCalculator(e.Backend.Config.StaticConfig, e.Backend.Config.Times, currentTimestamp)
 	if err := tx.Visit(feeCalculator); err != nil {
 		return err
 	}
@@ -471,11 +455,7 @@ func (e *StandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 		return err
 	}
 
-	var (
-		staticFeesCfg = e.Backend.Config.StaticConfig
-		upgrades      = e.Backend.Config.Times
-	)
-	feeCalculator := fee.NewStaticCalculator(staticFeesCfg, upgrades, currentTimestamp)
+	feeCalculator := fee.NewStaticCalculator(e.Backend.Config.StaticConfig, e.Backend.Config.Times, currentTimestamp)
 	if err := tx.Visit(feeCalculator); err != nil {
 		return err
 	}
@@ -600,12 +580,8 @@ func (e *StandardTxExecutor) BaseTx(tx *txs.BaseTx) error {
 	}
 
 	// Verify the flowcheck
-	var (
-		staticFeesCfg    = e.Backend.Config.StaticConfig
-		upgrades         = e.Backend.Config.Times
-		currentTimestamp = e.State.GetTimestamp()
-	)
-	feeCalculator := fee.NewStaticCalculator(staticFeesCfg, upgrades, currentTimestamp)
+	currentTimestamp := e.State.GetTimestamp()
+	feeCalculator := fee.NewStaticCalculator(e.Backend.Config.StaticConfig, e.Backend.Config.Times, currentTimestamp)
 	if err := tx.Visit(feeCalculator); err != nil {
 		return err
 	}

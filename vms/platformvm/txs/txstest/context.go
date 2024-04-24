@@ -16,21 +16,16 @@ func newContext(
 	cfg *config.Config,
 	timestamp time.Time,
 ) *builder.Context {
-	var (
-		staticFeesCfg = cfg.StaticConfig
-		upgrades      = cfg.Times
-	)
-
 	return &builder.Context{
 		NetworkID:                     ctx.NetworkID,
 		AVAXAssetID:                   ctx.AVAXAssetID,
-		BaseTxFee:                     staticFeesCfg.TxFee,
-		CreateSubnetTxFee:             staticFeesCfg.GetCreateSubnetTxFee(upgrades, timestamp),
-		TransformSubnetTxFee:          staticFeesCfg.TransformSubnetTxFee,
-		CreateBlockchainTxFee:         staticFeesCfg.GetCreateBlockchainTxFee(upgrades, timestamp),
-		AddPrimaryNetworkValidatorFee: staticFeesCfg.AddPrimaryNetworkValidatorFee,
-		AddPrimaryNetworkDelegatorFee: staticFeesCfg.AddPrimaryNetworkDelegatorFee,
-		AddSubnetValidatorFee:         staticFeesCfg.AddSubnetValidatorFee,
-		AddSubnetDelegatorFee:         staticFeesCfg.AddSubnetDelegatorFee,
+		BaseTxFee:                     cfg.TxFee,
+		CreateSubnetTxFee:             cfg.GetCreateSubnetTxFee(cfg.Times, timestamp),
+		TransformSubnetTxFee:          cfg.TransformSubnetTxFee,
+		CreateBlockchainTxFee:         cfg.GetCreateBlockchainTxFee(cfg.Times, timestamp),
+		AddPrimaryNetworkValidatorFee: cfg.AddPrimaryNetworkValidatorFee,
+		AddPrimaryNetworkDelegatorFee: cfg.AddPrimaryNetworkDelegatorFee,
+		AddSubnetValidatorFee:         cfg.AddSubnetValidatorFee,
+		AddSubnetDelegatorFee:         cfg.AddSubnetDelegatorFee,
 	}
 }
