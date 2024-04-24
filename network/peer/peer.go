@@ -977,7 +977,9 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 			p.StartClose()
 			return
 		}
-		p.trackedSubnets.Add(subnetID)
+		if subnetID != constants.PrimaryNetworkID {
+			p.trackedSubnets.Add(subnetID)
+		}
 	}
 
 	for _, acp := range msg.SupportedAcps {
