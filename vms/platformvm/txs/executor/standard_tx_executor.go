@@ -79,7 +79,7 @@ func (e *StandardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 		staticFeesCfg = e.Backend.Config.StaticConfig
 	)
 	if !isEActive {
-		upgrades := e.Backend.Config.Times
+		upgrades := e.Backend.Config.Config
 		feeCalculator = fee.NewStaticCalculator(staticFeesCfg, upgrades, currentTimestamp)
 	} else {
 		feeCalculator = fee.NewDynamicCalculator(staticFeesCfg, e.BlkFeeManager, e.BlockMaxComplexity, e.Tx.Creds)
@@ -141,7 +141,7 @@ func (e *StandardTxExecutor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 		staticFeesCfg = e.Backend.Config.StaticConfig
 	)
 	if !isEActive {
-		upgrades := e.Backend.Config.Times
+		upgrades := e.Backend.Config.Config
 		feeCalculator = fee.NewStaticCalculator(staticFeesCfg, upgrades, currentTimestamp)
 	} else {
 		feeCalculator = fee.NewDynamicCalculator(staticFeesCfg, e.BlkFeeManager, e.BlockMaxComplexity, e.Tx.Creds)
@@ -238,7 +238,7 @@ func (e *StandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 			staticFeesCfg = e.Backend.Config.StaticConfig
 		)
 		if !isEActive {
-			upgrades := e.Backend.Config.Times
+			upgrades := e.Backend.Config.Config
 			feeCalculator = fee.NewStaticCalculator(staticFeesCfg, upgrades, currentTimestamp)
 		} else {
 			feeCalculator = fee.NewDynamicCalculator(staticFeesCfg, e.BlkFeeManager, e.BlockMaxComplexity, e.Tx.Creds)
@@ -307,7 +307,7 @@ func (e *StandardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 		staticFeesCfg = e.Backend.Config.StaticConfig
 	)
 	if !isEActive {
-		upgrades := e.Backend.Config.Times
+		upgrades := e.Backend.Config.Config
 		feeCalculator = fee.NewStaticCalculator(staticFeesCfg, upgrades, currentTimestamp)
 	} else {
 		feeCalculator = fee.NewDynamicCalculator(staticFeesCfg, e.BlkFeeManager, e.BlockMaxComplexity, e.Tx.Creds)
@@ -515,7 +515,7 @@ func (e *StandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 		staticFeesCfg = e.Backend.Config.StaticConfig
 	)
 	if !isEActive {
-		upgrades := e.Backend.Config.Times
+		upgrades := e.Backend.Config.Config
 		feeCalculator = fee.NewStaticCalculator(staticFeesCfg, upgrades, currentTimestamp)
 	} else {
 		feeCalculator = fee.NewDynamicCalculator(staticFeesCfg, e.BlkFeeManager, e.BlockMaxComplexity, e.Tx.Creds)
@@ -664,7 +664,7 @@ func (e *StandardTxExecutor) BaseTx(tx *txs.BaseTx) error {
 		staticFeesCfg = e.Backend.Config.StaticConfig
 	)
 	if !isEActive {
-		upgrades := e.Backend.Config.Times
+		upgrades := e.Backend.Config.Config
 		feeCalculator = fee.NewStaticCalculator(staticFeesCfg, upgrades, currentTimestamp)
 	} else {
 		feeCalculator = fee.NewDynamicCalculator(staticFeesCfg, e.BlkFeeManager, e.BlockMaxComplexity, e.Tx.Creds)

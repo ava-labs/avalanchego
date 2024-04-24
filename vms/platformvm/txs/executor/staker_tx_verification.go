@@ -168,12 +168,7 @@ func verifyAddValidatorTx(
 	}
 
 	// Verify the flowcheck
-	var (
-		staticFeesCfg = backend.Config.StaticConfig
-		upgrades      = backend.Config.Times
-	)
-	feeCalculator := fee.NewStaticCalculator(staticFeesCfg, upgrades, currentTimestamp)
-
+	feeCalculator := fee.NewStaticCalculator(backend.Config.StaticConfig, backend.Config.Config, currentTimestamp)
 	fee, err := feeCalculator.ComputeFee(tx)
 	if err != nil {
 		return nil, err
@@ -275,7 +270,7 @@ func verifyAddSubnetValidatorTx(
 		staticFeesCfg = backend.Config.StaticConfig
 	)
 	if !isEActive {
-		upgrades := backend.Config.Times
+		upgrades := backend.Config.Config
 		feeCalculator = fee.NewStaticCalculator(staticFeesCfg, upgrades, currentTimestamp)
 	} else {
 		feeCalculator = fee.NewDynamicCalculator(staticFeesCfg, feeManager, maxComplexity, sTx.Creds)
@@ -369,7 +364,7 @@ func verifyRemoveSubnetValidatorTx(
 		staticFeesCfg = backend.Config.StaticConfig
 	)
 	if !isEActive {
-		upgrades := backend.Config.Times
+		upgrades := backend.Config.Config
 		feeCalculator = fee.NewStaticCalculator(staticFeesCfg, upgrades, currentTimestamp)
 	} else {
 		feeCalculator = fee.NewDynamicCalculator(staticFeesCfg, feeManager, maxComplexity, sTx.Creds)
@@ -498,12 +493,7 @@ func verifyAddDelegatorTx(
 	}
 
 	// Verify the flowcheck
-	var (
-		staticFeesCfg = backend.Config.StaticConfig
-		upgrades      = backend.Config.Times
-	)
-	feeCalculator := fee.NewStaticCalculator(staticFeesCfg, upgrades, currentTimestamp)
-
+	feeCalculator := fee.NewStaticCalculator(backend.Config.StaticConfig, backend.Config.Config, currentTimestamp)
 	fee, err := feeCalculator.ComputeFee(tx)
 	if err != nil {
 		return nil, err
@@ -634,7 +624,7 @@ func verifyAddPermissionlessValidatorTx(
 		staticFeesCfg = backend.Config.StaticConfig
 	)
 	if !isEActive {
-		upgrades := backend.Config.Times
+		upgrades := backend.Config.Config
 		feeCalculator = fee.NewStaticCalculator(staticFeesCfg, upgrades, currentTimestamp)
 	} else {
 		feeCalculator = fee.NewDynamicCalculator(staticFeesCfg, feeManager, maxComplexity, sTx.Creds)
@@ -795,7 +785,7 @@ func verifyAddPermissionlessDelegatorTx(
 		staticFeesCfg = backend.Config.StaticConfig
 	)
 	if !isEActive {
-		upgrades := backend.Config.Times
+		upgrades := backend.Config.Config
 		feeCalculator = fee.NewStaticCalculator(staticFeesCfg, upgrades, currentTimestamp)
 	} else {
 		feeCalculator = fee.NewDynamicCalculator(staticFeesCfg, feeManager, maxComplexity, sTx.Creds)
@@ -871,7 +861,7 @@ func verifyTransferSubnetOwnershipTx(
 		staticFeesCfg = backend.Config.StaticConfig
 	)
 	if !isEActive {
-		upgrades := backend.Config.Times
+		upgrades := backend.Config.Config
 		feeCalculator = fee.NewStaticCalculator(staticFeesCfg, upgrades, currentTimestamp)
 	} else {
 		feeCalculator = fee.NewDynamicCalculator(staticFeesCfg, feeManager, maxComplexity, sTx.Creds)

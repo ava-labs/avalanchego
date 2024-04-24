@@ -259,7 +259,7 @@ func defaultVM(t *testing.T, f fork) (*VM, *txstest.Builder, database.Database, 
 		MinStakeDuration:  defaultMinStakingDuration,
 		MaxStakeDuration:  defaultMaxStakingDuration,
 		RewardConfig:      defaultRewardConfig,
-		Times: upgrade.Times{
+		Config: upgrade.Config{
 			ApricotPhase3Time: apricotPhase3Time,
 			ApricotPhase5Time: apricotPhase5Time,
 			BanffTime:         banffTime,
@@ -401,7 +401,7 @@ func TestGenesis(t *testing.T) {
 			)
 
 			if !vm.IsEActivated(chainTime) {
-				upgrades := vm.Config.Times
+				upgrades := vm.Config.Config
 				feeCalc = fee.NewStaticCalculator(staticFeeCfg, upgrades, chainTime)
 			} else {
 				feeCfg := config.GetDynamicFeesConfig(vm.Config.IsEActivated(chainTime))
@@ -1204,7 +1204,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 		MinStakeDuration:       defaultMinStakingDuration,
 		MaxStakeDuration:       defaultMaxStakingDuration,
 		RewardConfig:           defaultRewardConfig,
-		Times: upgrade.Times{
+		Config: upgrade.Config{
 			BanffTime:    latestForkTime,
 			CortinaTime:  latestForkTime,
 			DurangoTime:  latestForkTime,
@@ -1294,7 +1294,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 		MinStakeDuration:       defaultMinStakingDuration,
 		MaxStakeDuration:       defaultMaxStakingDuration,
 		RewardConfig:           defaultRewardConfig,
-		Times: upgrade.Times{
+		Config: upgrade.Config{
 			BanffTime:    latestForkTime,
 			CortinaTime:  latestForkTime,
 			DurangoTime:  latestForkTime,
@@ -1345,7 +1345,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		MinStakeDuration:       defaultMinStakingDuration,
 		MaxStakeDuration:       defaultMaxStakingDuration,
 		RewardConfig:           defaultRewardConfig,
-		Times: upgrade.Times{
+		Config: upgrade.Config{
 			BanffTime:    latestForkTime,
 			CortinaTime:  latestForkTime,
 			DurangoTime:  latestForkTime,
@@ -1695,7 +1695,7 @@ func TestUnverifiedParent(t *testing.T) {
 		MinStakeDuration:       defaultMinStakingDuration,
 		MaxStakeDuration:       defaultMaxStakingDuration,
 		RewardConfig:           defaultRewardConfig,
-		Times: upgrade.Times{
+		Config: upgrade.Config{
 			BanffTime:    latestForkTime,
 			CortinaTime:  latestForkTime,
 			DurangoTime:  latestForkTime,
@@ -1858,7 +1858,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 		RewardConfig:           defaultRewardConfig,
 		Validators:             validators.NewManager(),
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		Times: upgrade.Times{
+		Config: upgrade.Config{
 			BanffTime:    latestForkTime,
 			CortinaTime:  latestForkTime,
 			DurangoTime:  latestForkTime,
@@ -1909,7 +1909,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 		UptimePercentage:       secondUptimePercentage / 100.,
 		Validators:             validators.NewManager(),
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		Times: upgrade.Times{
+		Config: upgrade.Config{
 			BanffTime:    latestForkTime,
 			CortinaTime:  latestForkTime,
 			DurangoTime:  latestForkTime,
@@ -2011,7 +2011,7 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 		RewardConfig:           defaultRewardConfig,
 		Validators:             validators.NewManager(),
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		Times: upgrade.Times{
+		Config: upgrade.Config{
 			BanffTime:    latestForkTime,
 			CortinaTime:  latestForkTime,
 			DurangoTime:  latestForkTime,
@@ -2398,7 +2398,7 @@ func TestBaseTx(t *testing.T) {
 	)
 
 	if !vm.IsEActivated(chainTime) {
-		upgrades := vm.Config.Times
+		upgrades := vm.Config.Config
 		feeCalc = fee.NewStaticCalculator(staticFeeCfg, upgrades, chainTime)
 	} else {
 		feeCfg := config.GetDynamicFeesConfig(vm.Config.IsEActivated(chainTime))

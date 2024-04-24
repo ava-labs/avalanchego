@@ -55,7 +55,7 @@ type calculator struct {
 	// setup
 	isEActive bool
 	// Pre E-fork inputs
-	upgrades  upgrade.Times
+	upgrades  upgrade.Config
 	staticCfg StaticConfig
 	time      time.Time
 
@@ -68,7 +68,7 @@ type calculator struct {
 	fee uint64
 }
 
-func NewStaticCalculator(cfg StaticConfig, ut upgrade.Times, chainTime time.Time) *Calculator {
+func NewStaticCalculator(cfg StaticConfig, ut upgrade.Config, chainTime time.Time) *Calculator {
 	return &Calculator{
 		c: &calculator{
 			upgrades:  ut,
@@ -155,11 +155,13 @@ func (fc *calculator) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 	return err
 }
 
-func (*calculator) AdvanceTimeTx(*txs.AdvanceTimeTx) error {
+func (fc *calculator) AdvanceTimeTx(*txs.AdvanceTimeTx) error {
+	fc.fee = 0
 	return nil // no fees
 }
 
-func (*calculator) RewardValidatorTx(*txs.RewardValidatorTx) error {
+func (fc *calculator) RewardValidatorTx(*txs.RewardValidatorTx) error {
+	fc.fee = 0
 	return nil // no fees
 }
 

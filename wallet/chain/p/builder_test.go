@@ -128,14 +128,14 @@ func TestBaseTx(t *testing.T) {
 	}
 
 	{ // Pre E-Upgrade
-		feeCalc := fee.NewStaticCalculator(testStaticConfig, upgrade.Times{}, time.Time{})
+		feeCalc := fee.NewStaticCalculator(testStaticConfig, upgrade.Config{}, time.Time{})
 		utx, err := builder.NewBaseTx(
 			outputsToMove,
 			feeCalc,
 		)
 		require.NoError(err)
 
-		fc := fee.NewStaticCalculator(testStaticConfig, upgrade.Times{}, time.Time{})
+		fc := fee.NewStaticCalculator(testStaticConfig, upgrade.Config{}, time.Time{})
 		fee, err := fc.ComputeFee(utx)
 		require.NoError(err)
 		require.Equal(testContext.BaseTxFee, fee)
@@ -228,11 +228,11 @@ func TestAddSubnetValidatorTx(t *testing.T) {
 	}
 
 	{ // Pre E-Upgrade
-		feeCalc := fee.NewStaticCalculator(testStaticConfig, upgrade.Times{}, time.Time{})
+		feeCalc := fee.NewStaticCalculator(testStaticConfig, upgrade.Config{}, time.Time{})
 		utx, err := builder.NewAddSubnetValidatorTx(subnetValidator, feeCalc)
 		require.NoError(err)
 
-		fc := fee.NewStaticCalculator(testStaticConfig, upgrade.Times{}, time.Time{})
+		fc := fee.NewStaticCalculator(testStaticConfig, upgrade.Config{}, time.Time{})
 		fee, err := fc.ComputeFee(utx)
 		require.NoError(err)
 		require.Equal(testContext.AddSubnetValidatorFee, fee)
@@ -321,7 +321,7 @@ func TestRemoveSubnetValidatorTx(t *testing.T) {
 	}
 
 	{ // Pre E-Upgrade
-		feeCalc := fee.NewStaticCalculator(testStaticConfig, upgrade.Times{}, time.Time{})
+		feeCalc := fee.NewStaticCalculator(testStaticConfig, upgrade.Config{}, time.Time{})
 		utx, err := builder.NewRemoveSubnetValidatorTx(
 			ids.GenerateTestNodeID(),
 			subnetID,
@@ -329,7 +329,7 @@ func TestRemoveSubnetValidatorTx(t *testing.T) {
 		)
 		require.NoError(err)
 
-		fc := fee.NewStaticCalculator(testStaticConfig, upgrade.Times{}, time.Time{})
+		fc := fee.NewStaticCalculator(testStaticConfig, upgrade.Config{}, time.Time{})
 		fee, err := fc.ComputeFee(utx)
 		require.NoError(err)
 		require.Equal(testContext.BaseTxFee, fee)
@@ -426,7 +426,7 @@ func TestCreateChainTx(t *testing.T) {
 	}
 
 	{ // Pre E-Upgrade
-		feeCalc := fee.NewStaticCalculator(testStaticConfig, upgrade.Times{}, time.Time{})
+		feeCalc := fee.NewStaticCalculator(testStaticConfig, upgrade.Config{}, time.Time{})
 		utx, err := builder.NewCreateChainTx(
 			subnetID,
 			genesisBytes,
@@ -437,7 +437,7 @@ func TestCreateChainTx(t *testing.T) {
 		)
 		require.NoError(err)
 
-		fc := fee.NewStaticCalculator(testStaticConfig, upgrade.Times{}, time.Time{})
+		fc := fee.NewStaticCalculator(testStaticConfig, upgrade.Config{}, time.Time{})
 		fee, err := fc.ComputeFee(utx)
 		require.NoError(err)
 		require.Equal(testContext.CreateBlockchainTxFee, fee)
@@ -524,14 +524,14 @@ func TestCreateSubnetTx(t *testing.T) {
 	}
 
 	{ // Pre E-Upgrade
-		feeCalc := fee.NewStaticCalculator(testStaticConfig, upgrade.Times{}, time.Time{})
+		feeCalc := fee.NewStaticCalculator(testStaticConfig, upgrade.Config{}, time.Time{})
 		utx, err := builder.NewCreateSubnetTx(
 			subnetOwner,
 			feeCalc,
 		)
 		require.NoError(err)
 
-		fc := fee.NewStaticCalculator(testStaticConfig, upgrade.Times{}, time.Time{})
+		fc := fee.NewStaticCalculator(testStaticConfig, upgrade.Config{}, time.Time{})
 		fee, err := fc.ComputeFee(utx)
 		require.NoError(err)
 		require.Equal(testContext.CreateSubnetTxFee, fee)
@@ -619,7 +619,7 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 	}
 
 	{ // Pre E-Upgrade
-		feeCalc := fee.NewStaticCalculator(testStaticConfig, upgrade.Times{}, time.Time{})
+		feeCalc := fee.NewStaticCalculator(testStaticConfig, upgrade.Config{}, time.Time{})
 		utx, err := builder.NewTransferSubnetOwnershipTx(
 			subnetID,
 			subnetOwner,
@@ -627,7 +627,7 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 		)
 		require.NoError(err)
 
-		fc := fee.NewStaticCalculator(testStaticConfig, upgrade.Times{}, time.Time{})
+		fc := fee.NewStaticCalculator(testStaticConfig, upgrade.Config{}, time.Time{})
 		fee, err := fc.ComputeFee(utx)
 		require.NoError(err)
 		require.Equal(testContext.BaseTxFee, fee)
@@ -711,7 +711,7 @@ func TestImportTx(t *testing.T) {
 	}
 
 	{ // Pre E-Upgrade
-		feeCalc := fee.NewStaticCalculator(testStaticConfig, upgrade.Times{}, time.Time{})
+		feeCalc := fee.NewStaticCalculator(testStaticConfig, upgrade.Config{}, time.Time{})
 		utx, err := builder.NewImportTx(
 			sourceChainID,
 			importTo,
@@ -719,7 +719,7 @@ func TestImportTx(t *testing.T) {
 		)
 		require.NoError(err)
 
-		fc := fee.NewStaticCalculator(testStaticConfig, upgrade.Times{}, time.Time{})
+		fc := fee.NewStaticCalculator(testStaticConfig, upgrade.Config{}, time.Time{})
 		fee, err := fc.ComputeFee(utx)
 		require.NoError(err)
 		require.Equal(testContext.BaseTxFee, fee)
@@ -800,7 +800,7 @@ func TestExportTx(t *testing.T) {
 	}
 
 	{ // Pre E-Upgrade
-		feeCalc := fee.NewStaticCalculator(testStaticConfig, upgrade.Times{}, time.Time{})
+		feeCalc := fee.NewStaticCalculator(testStaticConfig, upgrade.Config{}, time.Time{})
 		utx, err := builder.NewExportTx(
 			subnetID,
 			exportedOutputs,
@@ -808,7 +808,7 @@ func TestExportTx(t *testing.T) {
 		)
 		require.NoError(err)
 
-		fc := fee.NewStaticCalculator(testStaticConfig, upgrade.Times{}, time.Time{})
+		fc := fee.NewStaticCalculator(testStaticConfig, upgrade.Config{}, time.Time{})
 		fee, err := fc.ComputeFee(utx)
 		require.NoError(err)
 		require.Equal(testContext.BaseTxFee, fee)
@@ -916,7 +916,7 @@ func TestTransformSubnetTx(t *testing.T) {
 	}
 
 	{ // Pre E-Upgrade
-		feeCalc := fee.NewStaticCalculator(testStaticConfig, upgrade.Times{}, time.Time{})
+		feeCalc := fee.NewStaticCalculator(testStaticConfig, upgrade.Config{}, time.Time{})
 		utx, err := builder.NewTransformSubnetTx(
 			subnetID,
 			subnetAssetID,
@@ -936,7 +936,7 @@ func TestTransformSubnetTx(t *testing.T) {
 		)
 		require.NoError(err)
 
-		fc := fee.NewStaticCalculator(testStaticConfig, upgrade.Times{}, time.Time{})
+		fc := fee.NewStaticCalculator(testStaticConfig, upgrade.Config{}, time.Time{})
 		fee, err := fc.ComputeFee(utx)
 		require.NoError(err)
 		require.Equal(testContext.TransformSubnetTxFee, fee)
@@ -1039,7 +1039,7 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 	}
 
 	{ // Pre E-Upgrade
-		feeCalc := fee.NewStaticCalculator(testStaticConfig, upgrade.Times{}, time.Time{})
+		feeCalc := fee.NewStaticCalculator(testStaticConfig, upgrade.Config{}, time.Time{})
 		utx, err := builder.NewAddPermissionlessValidatorTx(
 			&txs.SubnetValidator{
 				Validator: txs.Validator{
@@ -1058,7 +1058,7 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 		)
 		require.NoError(err)
 
-		fc := fee.NewStaticCalculator(testStaticConfig, upgrade.Times{}, time.Time{})
+		fc := fee.NewStaticCalculator(testStaticConfig, upgrade.Config{}, time.Time{})
 		fee, err := fc.ComputeFee(utx)
 		require.NoError(err)
 		require.Equal(testContext.AddPrimaryNetworkValidatorFee, fee)
@@ -1151,7 +1151,7 @@ func TestAddPermissionlessDelegatorTx(t *testing.T) {
 	}
 
 	{ // Pre E-Upgrade
-		feeCalc := fee.NewStaticCalculator(testStaticConfig, upgrade.Times{}, time.Time{})
+		feeCalc := fee.NewStaticCalculator(testStaticConfig, upgrade.Config{}, time.Time{})
 		utx, err := builder.NewAddPermissionlessDelegatorTx(
 			&txs.SubnetValidator{
 				Validator: txs.Validator{
@@ -1167,7 +1167,7 @@ func TestAddPermissionlessDelegatorTx(t *testing.T) {
 		)
 		require.NoError(err)
 
-		fc := fee.NewStaticCalculator(testStaticConfig, upgrade.Times{}, time.Time{})
+		fc := fee.NewStaticCalculator(testStaticConfig, upgrade.Config{}, time.Time{})
 		fee, err := fc.ComputeFee(utx)
 		require.NoError(err)
 		require.Equal(testContext.AddPrimaryNetworkDelegatorFee, fee)

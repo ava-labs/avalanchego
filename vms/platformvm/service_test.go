@@ -390,7 +390,7 @@ func TestGetBalance(t *testing.T) {
 			)
 
 			if !service.vm.IsEActivated(chainTime) {
-				upgrades := service.vm.Config.Times
+				upgrades := service.vm.Config.Config
 				feeCalc = fee.NewStaticCalculator(staticFeeCfg, upgrades, chainTime)
 			} else {
 				feeCfg := config.GetDynamicFeesConfig(service.vm.Config.IsEActivated(chainTime))
