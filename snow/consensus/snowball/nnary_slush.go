@@ -28,7 +28,7 @@ func (sl *nnarySlush) Preference() ids.ID {
 	return sl.preference
 }
 
-func (sl *nnarySlush) RecordSuccessfulPoll(choice ids.ID) {
+func (sl *nnarySlush) recordSuccessfulPoll(choice ids.ID) {
 	sl.preference = choice
 }
 

@@ -39,9 +39,9 @@ type unarySnowflake struct {
 func (sf *unarySnowflake) RecordPoll(count int) {
 	switch {
 	case count >= sf.alphaConfidence:
-		sf.RecordSuccessfulPoll()
+		sf.recordSuccessfulPoll()
 	case count >= sf.alphaPreference:
-		sf.RecordPollPreference()
+		sf.recordPollPreference()
 	default:
 		// If the poll was unsuccessful, RecordUnsuccessfulPoll should
 		// have been called instead.
@@ -49,15 +49,15 @@ func (sf *unarySnowflake) RecordPoll(count int) {
 	}
 }
 
-func (sf *unarySnowflake) RecordSuccessfulPoll() {
+func (sf *unarySnowflake) recordSuccessfulPoll() {
 	sf.confidence++
 	sf.finalized = sf.finalized || sf.confidence >= sf.beta
 }
 
-// RecordPollPreference fails to reach an alpha threshold to increase our
+// recordPollPreference fails to reach an alpha threshold to increase our
 // confidence, so this calls RecordUnsuccessfulPoll to reset the confidence
 // counter.
-func (sf *unarySnowflake) RecordPollPreference() {
+func (sf *unarySnowflake) recordPollPreference() {
 	sf.RecordUnsuccessfulPoll()
 }
 

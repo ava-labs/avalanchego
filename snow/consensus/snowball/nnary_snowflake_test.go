@@ -12,7 +12,7 @@ import (
 func TestNnarySnowflake(t *testing.T) {
 	require := require.New(t)
 
-	alphaPreference, alphaConfidence := 1, 1
+	alphaPreference, alphaConfidence := 1, 2
 	beta := 2
 
 	sf := newNnarySnowflake(alphaPreference, alphaConfidence, beta, Red)
@@ -22,27 +22,27 @@ func TestNnarySnowflake(t *testing.T) {
 	require.Equal(Red, sf.Preference())
 	require.False(sf.Finalized())
 
-	sf.RecordSuccessfulPoll(Blue)
+	sf.RecordPoll(alphaConfidence, Blue)
 	require.Equal(Blue, sf.Preference())
 	require.False(sf.Finalized())
 
-	sf.RecordPollPreference(Red)
+	sf.RecordPoll(alphaPreference, Red)
 	require.Equal(Red, sf.Preference())
 	require.False(sf.Finalized())
 
-	sf.RecordSuccessfulPoll(Red)
+	sf.RecordPoll(alphaConfidence, Red)
 	require.Equal(Red, sf.Preference())
 	require.False(sf.Finalized())
 
-	sf.RecordSuccessfulPoll(Red)
+	sf.RecordPoll(alphaConfidence, Red)
 	require.Equal(Red, sf.Preference())
 	require.True(sf.Finalized())
 
-	sf.RecordPollPreference(Blue)
+	sf.RecordPoll(alphaPreference, Blue)
 	require.Equal(Red, sf.Preference())
 	require.True(sf.Finalized())
 
-	sf.RecordSuccessfulPoll(Blue)
+	sf.RecordPoll(alphaConfidence, Blue)
 	require.Equal(Red, sf.Preference())
 	require.True(sf.Finalized())
 }
@@ -50,7 +50,7 @@ func TestNnarySnowflake(t *testing.T) {
 func TestNnarySnowflakeConfidenceReset(t *testing.T) {
 	require := require.New(t)
 
-	alphaPreference, alphaConfidence := 1, 1
+	alphaPreference, alphaConfidence := 1, 2
 	beta := 4
 
 	sf := newNnarySnowflake(alphaPreference, alphaConfidence, beta, Red)
@@ -62,20 +62,20 @@ func TestNnarySnowflakeConfidenceReset(t *testing.T) {
 
 	// Increase Blue's confidence without finalizing
 	for i := 0; i < beta-1; i++ {
-		sf.RecordSuccessfulPoll(Blue)
+		sf.RecordPoll(alphaConfidence, Blue)
 		require.Equal(Blue, sf.Preference())
 		require.False(sf.Finalized())
 	}
 
 	// Increase Red's confidence without finalizing
 	for i := 0; i < beta-1; i++ {
-		sf.RecordSuccessfulPoll(Red)
+		sf.RecordPoll(alphaConfidence, Red)
 		require.Equal(Red, sf.Preference())
 		require.False(sf.Finalized())
 	}
 
 	// One more round of voting for Red should accept Red
-	sf.RecordSuccessfulPoll(Red)
+	sf.RecordPoll(alphaConfidence, Red)
 	require.Equal(Red, sf.Preference())
 	require.True(sf.Finalized())
 }
@@ -83,18 +83,18 @@ func TestNnarySnowflakeConfidenceReset(t *testing.T) {
 func TestVirtuousNnarySnowflake(t *testing.T) {
 	require := require.New(t)
 
-	alphaPreference, alphaConfidence := 1, 1
+	alphaPreference, alphaConfidence := 1, 2
 	beta := 2
 
 	sb := newNnarySnowflake(alphaPreference, alphaConfidence, beta, Red)
 	require.Equal(Red, sb.Preference())
 	require.False(sb.Finalized())
 
-	sb.RecordSuccessfulPoll(Red)
+	sb.RecordPoll(alphaConfidence, Red)
 	require.Equal(Red, sb.Preference())
 	require.False(sb.Finalized())
 
-	sb.RecordSuccessfulPoll(Red)
+	sb.RecordPoll(alphaConfidence, Red)
 	require.Equal(Red, sb.Preference())
 	require.True(sb.Finalized())
 }

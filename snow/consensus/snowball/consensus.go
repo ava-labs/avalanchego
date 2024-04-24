@@ -48,9 +48,8 @@ type Factory interface {
 
 // Nnary is a snow instance deciding between an unbounded number of values.
 // The caller samples k nodes and then calls
-// 1. RecordSuccessfulPoll if choice collects >= alphaConfidence votes
-// 2. RecordPollPreference if choice collects >= alphaPreference votes
-// 3. RecordUnsuccessfulPoll otherwise
+// 1. RecordPoll if choice collects >= alphaPreference votes
+// 2. RecordUnsuccessfulPoll otherwise
 type Nnary interface {
 	fmt.Stringer
 
@@ -73,9 +72,8 @@ type Nnary interface {
 
 // Binary is a snow instance deciding between two values.
 // The caller samples k nodes and then calls
-// 1. RecordSuccessfulPoll if choice collects >= alphaConfidence votes
-// 2. RecordPollPreference if choice collects >= alphaPreference votes
-// 3. RecordUnsuccessfulPoll otherwise
+// 1. RecordPoll if choice collects >= alphaPreference votes
+// 2. RecordUnsuccessfulPoll otherwise
 type Binary interface {
 	fmt.Stringer
 
@@ -95,9 +93,8 @@ type Binary interface {
 
 // Unary is a snow instance deciding on one value.
 // The caller samples k nodes and then calls
-// 1. RecordSuccessfulPoll if choice collects >= alphaConfidence votes
-// 2. RecordPollPreference if choice collects >= alphaPreference votes
-// 3. RecordUnsuccessfulPoll otherwise
+// 1. RecordPoll if choice collects >= alphaPreference votes
+// 2. RecordUnsuccessfulPoll otherwise
 type Unary interface {
 	fmt.Stringer
 
