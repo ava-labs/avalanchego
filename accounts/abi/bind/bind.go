@@ -373,7 +373,7 @@ func bindBasicTypeGo(kind abi.Type) string {
 	}
 }
 
-// bindNewTypeNewGo converts new types to Go ones.
+// bindTypeNewGo converts new types to Go ones.
 func bindTypeNewGo(kind abi.Type, structs map[string]*TmplStruct) string {
 	switch kind.T {
 	case abi.TupleTy:
