@@ -355,8 +355,7 @@ func TestEngineMultipleQuery(t *testing.T) {
 		K:                     3,
 		AlphaPreference:       2,
 		AlphaConfidence:       2,
-		BetaVirtuous:          1,
-		BetaRogue:             2,
+		Beta:                  1,
 		ConcurrentRepolls:     1,
 		OptimalProcessing:     1,
 		MaxOutstandingItems:   1,
@@ -684,8 +683,7 @@ func TestVoteCanceling(t *testing.T) {
 		K:                     3,
 		AlphaPreference:       2,
 		AlphaConfidence:       2,
-		BetaVirtuous:          1,
-		BetaRogue:             2,
+		Beta:                  1,
 		ConcurrentRepolls:     1,
 		OptimalProcessing:     1,
 		MaxOutstandingItems:   1,
@@ -1047,7 +1045,6 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 	require := require.New(t)
 
 	config := DefaultConfig(t)
-	config.Params.BetaRogue = config.Params.BetaVirtuous
 
 	peerID, _, sender, vm, te := setup(t, config)
 
@@ -1458,6 +1455,7 @@ func TestEngineAggressivePolling(t *testing.T) {
 
 	engCfg := DefaultConfig(t)
 	engCfg.Params.ConcurrentRepolls = 2
+	engCfg.Params.Beta = 2
 
 	vals := validators.NewManager()
 	engCfg.Validators = vals
@@ -1537,8 +1535,7 @@ func TestEngineDoubleChit(t *testing.T) {
 		K:                     2,
 		AlphaPreference:       2,
 		AlphaConfidence:       2,
-		BetaVirtuous:          1,
-		BetaRogue:             2,
+		Beta:                  1,
 		ConcurrentRepolls:     1,
 		OptimalProcessing:     1,
 		MaxOutstandingItems:   1,
@@ -2479,8 +2476,7 @@ func TestEngineApplyAcceptedFrontierInQueryFailed(t *testing.T) {
 		K:                     1,
 		AlphaPreference:       1,
 		AlphaConfidence:       1,
-		BetaVirtuous:          2,
-		BetaRogue:             2,
+		Beta:                  2,
 		ConcurrentRepolls:     1,
 		OptimalProcessing:     1,
 		MaxOutstandingItems:   1,
@@ -2576,8 +2572,7 @@ func TestEngineRepollsMisconfiguredSubnet(t *testing.T) {
 		K:                     1,
 		AlphaPreference:       1,
 		AlphaConfidence:       1,
-		BetaVirtuous:          1,
-		BetaRogue:             1,
+		Beta:                  1,
 		ConcurrentRepolls:     1,
 		OptimalProcessing:     1,
 		MaxOutstandingItems:   1,
