@@ -69,10 +69,8 @@ func (e *StandardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 	}
 
 	// Verify the flowcheck
-	feeCalculator := fee.NewStaticCalculator(e.Backend.Config.StaticFeeConfig, e.Backend.Config.UpgradeConfig, currentTimestamp)
-	if err := tx.Visit(feeCalculator); err != nil {
-		return err
-	}
+	feeCalculator := fee.NewStaticCalculator(e.Backend.Config.StaticFeeConfig, e.Backend.Config.UpgradeConfig)
+	fee := feeCalculator.CalculateFee(tx, currentTimestamp)
 
 	if err := e.FlowChecker.VerifySpend(
 		tx,
@@ -81,7 +79,7 @@ func (e *StandardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 		tx.Outs,
 		baseTxCreds,
 		map[ids.ID]uint64{
-			e.Ctx.AVAXAssetID: feeCalculator.Fee,
+			e.Ctx.AVAXAssetID: fee,
 		},
 	); err != nil {
 		return err
@@ -119,10 +117,8 @@ func (e *StandardTxExecutor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 	}
 
 	// Verify the flowcheck
-	feeCalculator := fee.NewStaticCalculator(e.Backend.Config.StaticFeeConfig, e.Backend.Config.UpgradeConfig, currentTimestamp)
-	if err := tx.Visit(feeCalculator); err != nil {
-		return err
-	}
+	feeCalculator := fee.NewStaticCalculator(e.Backend.Config.StaticFeeConfig, e.Backend.Config.UpgradeConfig)
+	fee := feeCalculator.CalculateFee(tx, currentTimestamp)
 
 	if err := e.FlowChecker.VerifySpend(
 		tx,
@@ -131,7 +127,7 @@ func (e *StandardTxExecutor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 		tx.Outs,
 		e.Tx.Creds,
 		map[ids.ID]uint64{
-			e.Ctx.AVAXAssetID: feeCalculator.Fee,
+			e.Ctx.AVAXAssetID: fee,
 		},
 	); err != nil {
 		return err
@@ -204,10 +200,8 @@ func (e *StandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 		copy(ins[len(tx.Ins):], tx.ImportedInputs)
 
 		// Verify the flowcheck
-		feeCalculator := fee.NewStaticCalculator(e.Backend.Config.StaticFeeConfig, e.Backend.Config.UpgradeConfig, currentTimestamp)
-		if err := tx.Visit(feeCalculator); err != nil {
-			return err
-		}
+		feeCalculator := fee.NewStaticCalculator(e.Backend.Config.StaticFeeConfig, e.Backend.Config.UpgradeConfig)
+		fee := feeCalculator.CalculateFee(tx, currentTimestamp)
 
 		if err := e.FlowChecker.VerifySpendUTXOs(
 			tx,
@@ -216,7 +210,7 @@ func (e *StandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 			tx.Outs,
 			e.Tx.Creds,
 			map[ids.ID]uint64{
-				e.Ctx.AVAXAssetID: feeCalculator.Fee,
+				e.Ctx.AVAXAssetID: fee,
 			},
 		); err != nil {
 			return err
@@ -265,10 +259,8 @@ func (e *StandardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 	}
 
 	// Verify the flowcheck
-	feeCalculator := fee.NewStaticCalculator(e.Backend.Config.StaticFeeConfig, e.Backend.Config.UpgradeConfig, currentTimestamp)
-	if err := tx.Visit(feeCalculator); err != nil {
-		return err
-	}
+	feeCalculator := fee.NewStaticCalculator(e.Backend.Config.StaticFeeConfig, e.Backend.Config.UpgradeConfig)
+	fee := feeCalculator.CalculateFee(tx, currentTimestamp)
 
 	if err := e.FlowChecker.VerifySpend(
 		tx,
@@ -277,7 +269,7 @@ func (e *StandardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 		outs,
 		e.Tx.Creds,
 		map[ids.ID]uint64{
-			e.Ctx.AVAXAssetID: feeCalculator.Fee,
+			e.Ctx.AVAXAssetID: fee,
 		},
 	); err != nil {
 		return fmt.Errorf("failed verifySpend: %w", err)
@@ -455,10 +447,9 @@ func (e *StandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 		return err
 	}
 
-	feeCalculator := fee.NewStaticCalculator(e.Backend.Config.StaticFeeConfig, e.Backend.Config.UpgradeConfig, currentTimestamp)
-	if err := tx.Visit(feeCalculator); err != nil {
-		return err
-	}
+	// Verify the flowcheck
+	feeCalculator := fee.NewStaticCalculator(e.Backend.Config.StaticFeeConfig, e.Backend.Config.UpgradeConfig)
+	fee := feeCalculator.CalculateFee(tx, currentTimestamp)
 
 	totalRewardAmount := tx.MaximumSupply - tx.InitialSupply
 	if err := e.Backend.FlowChecker.VerifySpend(
@@ -471,7 +462,7 @@ func (e *StandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 		//            entry in this map literal from being overwritten by the
 		//            second entry.
 		map[ids.ID]uint64{
-			e.Ctx.AVAXAssetID: feeCalculator.Fee,
+			e.Ctx.AVAXAssetID: fee,
 			tx.AssetID:        totalRewardAmount,
 		},
 	); err != nil {
@@ -581,10 +572,8 @@ func (e *StandardTxExecutor) BaseTx(tx *txs.BaseTx) error {
 
 	// Verify the flowcheck
 	currentTimestamp := e.State.GetTimestamp()
-	feeCalculator := fee.NewStaticCalculator(e.Backend.Config.StaticFeeConfig, e.Backend.Config.UpgradeConfig, currentTimestamp)
-	if err := tx.Visit(feeCalculator); err != nil {
-		return err
-	}
+	feeCalculator := fee.NewStaticCalculator(e.Backend.Config.StaticFeeConfig, e.Backend.Config.UpgradeConfig)
+	fee := feeCalculator.CalculateFee(tx, currentTimestamp)
 
 	if err := e.FlowChecker.VerifySpend(
 		tx,
@@ -593,7 +582,7 @@ func (e *StandardTxExecutor) BaseTx(tx *txs.BaseTx) error {
 		tx.Outs,
 		e.Tx.Creds,
 		map[ids.ID]uint64{
-			e.Ctx.AVAXAssetID: feeCalculator.Fee,
+			e.Ctx.AVAXAssetID: fee,
 		},
 	); err != nil {
 		return err

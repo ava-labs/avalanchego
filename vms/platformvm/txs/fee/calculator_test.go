@@ -31,14 +31,11 @@ var (
 )
 
 func TestTxFees(t *testing.T) {
-	r := require.New(t)
-
 	type feeTests struct {
-		name          string
-		chainTime     time.Time
-		unsignedTx    func(t *testing.T) txs.UnsignedTx
-		expectedError error
-		checksF       func(*testing.T, *Calculator)
+		name       string
+		chainTime  time.Time
+		unsignedTx func(t *testing.T) txs.UnsignedTx
+		expected   uint64
 	}
 
 	feeTestsDefaultCfg := StaticConfig{
@@ -65,94 +62,64 @@ func TestTxFees(t *testing.T) {
 
 	tests := []feeTests{
 		{
-			name:          "AddValidatorTx pre EUpgrade",
-			chainTime:     upgrades.EUpgradeTime.Add(-1 * time.Second),
-			unsignedTx:    addValidatorTx,
-			expectedError: nil,
-			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, fc.staticCfg.AddPrimaryNetworkValidatorFee, fc.Fee)
-			},
+			name:       "AddValidatorTx pre EUpgrade",
+			chainTime:  upgrades.EUpgradeTime.Add(-1 * time.Second),
+			unsignedTx: addValidatorTx,
+			expected:   feeTestsDefaultCfg.AddPrimaryNetworkValidatorFee,
 		},
 		{
-			name:          "AddSubnetValidatorTx pre EUpgrade",
-			chainTime:     upgrades.EUpgradeTime.Add(-1 * time.Second),
-			unsignedTx:    addSubnetValidatorTx,
-			expectedError: nil,
-			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, fc.staticCfg.AddSubnetValidatorFee, fc.Fee)
-			},
+			name:       "AddSubnetValidatorTx pre EUpgrade",
+			chainTime:  upgrades.EUpgradeTime.Add(-1 * time.Second),
+			unsignedTx: addSubnetValidatorTx,
+			expected:   feeTestsDefaultCfg.AddSubnetValidatorFee,
 		},
 		{
-			name:          "AddDelegatorTx pre EUpgrade",
-			chainTime:     upgrades.EUpgradeTime.Add(-1 * time.Second),
-			unsignedTx:    addDelegatorTx,
-			expectedError: nil,
-			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, fc.staticCfg.AddPrimaryNetworkDelegatorFee, fc.Fee)
-			},
+			name:       "AddDelegatorTx pre EUpgrade",
+			chainTime:  upgrades.EUpgradeTime.Add(-1 * time.Second),
+			unsignedTx: addDelegatorTx,
+			expected:   feeTestsDefaultCfg.AddPrimaryNetworkDelegatorFee,
 		},
 		{
-			name:          "CreateChainTx pre ApricotPhase3",
-			chainTime:     upgrades.ApricotPhase3Time.Add(-1 * time.Second),
-			unsignedTx:    createChainTx,
-			expectedError: nil,
-			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, fc.staticCfg.CreateAssetTxFee, fc.Fee)
-			},
+			name:       "CreateChainTx pre ApricotPhase3",
+			chainTime:  upgrades.ApricotPhase3Time.Add(-1 * time.Second),
+			unsignedTx: createChainTx,
+			expected:   feeTestsDefaultCfg.CreateAssetTxFee,
 		},
 		{
-			name:          "CreateChainTx pre EUpgrade",
-			chainTime:     upgrades.EUpgradeTime.Add(-1 * time.Second),
-			unsignedTx:    createChainTx,
-			expectedError: nil,
-			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, fc.staticCfg.CreateBlockchainTxFee, fc.Fee)
-			},
+			name:       "CreateChainTx pre EUpgrade",
+			chainTime:  upgrades.EUpgradeTime.Add(-1 * time.Second),
+			unsignedTx: createChainTx,
+			expected:   feeTestsDefaultCfg.CreateBlockchainTxFee,
 		},
 		{
-			name:          "CreateSubnetTx pre ApricotPhase3",
-			chainTime:     upgrades.ApricotPhase3Time.Add(-1 * time.Second),
-			unsignedTx:    createSubnetTx,
-			expectedError: nil,
-			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, fc.staticCfg.CreateAssetTxFee, fc.Fee)
-			},
+			name:       "CreateSubnetTx pre ApricotPhase3",
+			chainTime:  upgrades.ApricotPhase3Time.Add(-1 * time.Second),
+			unsignedTx: createSubnetTx,
+			expected:   feeTestsDefaultCfg.CreateAssetTxFee,
 		},
 		{
-			name:          "CreateSubnetTx pre EUpgrade",
-			chainTime:     upgrades.EUpgradeTime.Add(-1 * time.Second),
-			unsignedTx:    createSubnetTx,
-			expectedError: nil,
-			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, fc.staticCfg.CreateSubnetTxFee, fc.Fee)
-			},
+			name:       "CreateSubnetTx pre EUpgrade",
+			chainTime:  upgrades.EUpgradeTime.Add(-1 * time.Second),
+			unsignedTx: createSubnetTx,
+			expected:   feeTestsDefaultCfg.CreateSubnetTxFee,
 		},
 		{
-			name:          "RemoveSubnetValidatorTx pre EUpgrade",
-			chainTime:     upgrades.EUpgradeTime.Add(-1 * time.Second),
-			unsignedTx:    removeSubnetValidatorTx,
-			expectedError: nil,
-			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, fc.staticCfg.TxFee, fc.Fee)
-			},
+			name:       "RemoveSubnetValidatorTx pre EUpgrade",
+			chainTime:  upgrades.EUpgradeTime.Add(-1 * time.Second),
+			unsignedTx: removeSubnetValidatorTx,
+			expected:   feeTestsDefaultCfg.TxFee,
 		},
 		{
-			name:          "TransformSubnetTx pre EUpgrade",
-			chainTime:     upgrades.EUpgradeTime.Add(-1 * time.Second),
-			unsignedTx:    transformSubnetTx,
-			expectedError: nil,
-			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, fc.staticCfg.TransformSubnetTxFee, fc.Fee)
-			},
+			name:       "TransformSubnetTx pre EUpgrade",
+			chainTime:  upgrades.EUpgradeTime.Add(-1 * time.Second),
+			unsignedTx: transformSubnetTx,
+			expected:   feeTestsDefaultCfg.TransformSubnetTxFee,
 		},
 		{
-			name:          "TransferSubnetOwnershipTx pre EUpgrade",
-			chainTime:     upgrades.EUpgradeTime.Add(-1 * time.Second),
-			unsignedTx:    transferSubnetOwnershipTx,
-			expectedError: nil,
-			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, fc.staticCfg.TxFee, fc.Fee)
-			},
+			name:       "TransferSubnetOwnershipTx pre EUpgrade",
+			chainTime:  upgrades.EUpgradeTime.Add(-1 * time.Second),
+			unsignedTx: transferSubnetOwnershipTx,
+			expected:   feeTestsDefaultCfg.TxFee,
 		},
 		{
 			name:      "AddPermissionlessValidatorTx Primary Network pre EUpgrade",
@@ -160,10 +127,7 @@ func TestTxFees(t *testing.T) {
 			unsignedTx: func(t *testing.T) txs.UnsignedTx {
 				return addPermissionlessValidatorTx(t, constants.PrimaryNetworkID)
 			},
-			expectedError: nil,
-			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, fc.staticCfg.AddPrimaryNetworkValidatorFee, fc.Fee)
-			},
+			expected: feeTestsDefaultCfg.AddPrimaryNetworkValidatorFee,
 		},
 		{
 			name:      "AddPermissionlessValidatorTx Subnet pre EUpgrade",
@@ -173,10 +137,7 @@ func TestTxFees(t *testing.T) {
 				require.NotEqual(t, constants.PrimaryNetworkID, subnetID)
 				return addPermissionlessValidatorTx(t, subnetID)
 			},
-			expectedError: nil,
-			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, fc.staticCfg.AddSubnetValidatorFee, fc.Fee)
-			},
+			expected: feeTestsDefaultCfg.AddSubnetValidatorFee,
 		},
 		{
 			name:      "AddPermissionlessDelegatorTx Primary Network pre EUpgrade",
@@ -184,10 +145,7 @@ func TestTxFees(t *testing.T) {
 			unsignedTx: func(t *testing.T) txs.UnsignedTx {
 				return addPermissionlessDelegatorTx(t, constants.PrimaryNetworkID)
 			},
-			expectedError: nil,
-			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, fc.staticCfg.AddPrimaryNetworkDelegatorFee, fc.Fee)
-			},
+			expected: feeTestsDefaultCfg.AddPrimaryNetworkDelegatorFee,
 		},
 		{
 			name:      "AddPermissionlessDelegatorTx pre EUpgrade",
@@ -197,37 +155,25 @@ func TestTxFees(t *testing.T) {
 				require.NotEqual(t, constants.PrimaryNetworkID, subnetID)
 				return addPermissionlessDelegatorTx(t, subnetID)
 			},
-			expectedError: nil,
-			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, fc.staticCfg.AddSubnetDelegatorFee, fc.Fee)
-			},
+			expected: feeTestsDefaultCfg.AddSubnetDelegatorFee,
 		},
 		{
-			name:          "BaseTx pre EUpgrade",
-			chainTime:     upgrades.EUpgradeTime.Add(-1 * time.Second),
-			unsignedTx:    baseTx,
-			expectedError: nil,
-			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, fc.staticCfg.TxFee, fc.Fee)
-			},
+			name:       "BaseTx pre EUpgrade",
+			chainTime:  upgrades.EUpgradeTime.Add(-1 * time.Second),
+			unsignedTx: baseTx,
+			expected:   feeTestsDefaultCfg.TxFee,
 		},
 		{
-			name:          "ImportTx pre EUpgrade",
-			chainTime:     upgrades.EUpgradeTime.Add(-1 * time.Second),
-			unsignedTx:    importTx,
-			expectedError: nil,
-			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, fc.staticCfg.TxFee, fc.Fee)
-			},
+			name:       "ImportTx pre EUpgrade",
+			chainTime:  upgrades.EUpgradeTime.Add(-1 * time.Second),
+			unsignedTx: importTx,
+			expected:   feeTestsDefaultCfg.TxFee,
 		},
 		{
-			name:          "ExportTx pre EUpgrade",
-			chainTime:     upgrades.EUpgradeTime.Add(-1 * time.Second),
-			unsignedTx:    exportTx,
-			expectedError: nil,
-			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, fc.staticCfg.TxFee, fc.Fee)
-			},
+			name:       "ExportTx pre EUpgrade",
+			chainTime:  upgrades.EUpgradeTime.Add(-1 * time.Second),
+			unsignedTx: exportTx,
+			expected:   feeTestsDefaultCfg.TxFee,
 		},
 		{
 			name:      "RewardValidatorTx pre EUpgrade",
@@ -237,10 +183,7 @@ func TestTxFees(t *testing.T) {
 					TxID: ids.GenerateTestID(),
 				}
 			},
-			expectedError: nil,
-			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, uint64(0), fc.Fee)
-			},
+			expected: 0,
 		},
 		{
 			name:      "AdvanceTimeTx pre EUpgrade",
@@ -250,21 +193,15 @@ func TestTxFees(t *testing.T) {
 					Time: uint64(time.Now().Unix()),
 				}
 			},
-			expectedError: nil,
-			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, uint64(0), fc.Fee)
-			},
+			expected: 0,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			uTx := tt.unsignedTx(t)
-			fc := NewStaticCalculator(feeTestsDefaultCfg, upgrades, tt.chainTime)
-
-			err := uTx.Visit(fc)
-			r.ErrorIs(err, tt.expectedError)
-			tt.checksF(t, fc)
+			fc := NewStaticCalculator(feeTestsDefaultCfg, upgrades)
+			require.Equal(t, tt.expected, fc.CalculateFee(uTx, tt.chainTime))
 		})
 	}
 }
