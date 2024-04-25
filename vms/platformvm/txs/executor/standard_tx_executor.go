@@ -57,7 +57,7 @@ func (e *StandardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 
 	var (
 		currentTimestamp = e.State.GetTimestamp()
-		isDurangoActive  = e.Config.IsDurangoActivated(currentTimestamp)
+		isDurangoActive  = e.Config.UpgradeConfig.IsDurangoActivated(currentTimestamp)
 	)
 	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
 		return err
@@ -69,7 +69,7 @@ func (e *StandardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 	}
 
 	// Verify the flowcheck
-	feeCalculator := fee.NewStaticCalculator(e.Backend.Config.StaticConfig, e.Backend.Config.Config, currentTimestamp)
+	feeCalculator := fee.NewStaticCalculator(e.Backend.Config.StaticFeeConfig, e.Backend.Config.UpgradeConfig, currentTimestamp)
 	if err := tx.Visit(feeCalculator); err != nil {
 		return err
 	}
@@ -112,14 +112,14 @@ func (e *StandardTxExecutor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 
 	var (
 		currentTimestamp = e.State.GetTimestamp()
-		isDurangoActive  = e.Config.IsDurangoActivated(currentTimestamp)
+		isDurangoActive  = e.Config.UpgradeConfig.IsDurangoActivated(currentTimestamp)
 	)
 	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
 		return err
 	}
 
 	// Verify the flowcheck
-	feeCalculator := fee.NewStaticCalculator(e.Backend.Config.StaticConfig, e.Backend.Config.Config, currentTimestamp)
+	feeCalculator := fee.NewStaticCalculator(e.Backend.Config.StaticFeeConfig, e.Backend.Config.UpgradeConfig, currentTimestamp)
 	if err := tx.Visit(feeCalculator); err != nil {
 		return err
 	}
@@ -156,7 +156,7 @@ func (e *StandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 
 	var (
 		currentTimestamp = e.State.GetTimestamp()
-		isDurangoActive  = e.Config.IsDurangoActivated(currentTimestamp)
+		isDurangoActive  = e.Config.UpgradeConfig.IsDurangoActivated(currentTimestamp)
 	)
 	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
 		return err
@@ -204,7 +204,7 @@ func (e *StandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 		copy(ins[len(tx.Ins):], tx.ImportedInputs)
 
 		// Verify the flowcheck
-		feeCalculator := fee.NewStaticCalculator(e.Backend.Config.StaticConfig, e.Backend.Config.Config, currentTimestamp)
+		feeCalculator := fee.NewStaticCalculator(e.Backend.Config.StaticFeeConfig, e.Backend.Config.UpgradeConfig, currentTimestamp)
 		if err := tx.Visit(feeCalculator); err != nil {
 			return err
 		}
@@ -248,7 +248,7 @@ func (e *StandardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 
 	var (
 		currentTimestamp = e.State.GetTimestamp()
-		isDurangoActive  = e.Config.IsDurangoActivated(currentTimestamp)
+		isDurangoActive  = e.Config.UpgradeConfig.IsDurangoActivated(currentTimestamp)
 	)
 	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
 		return err
@@ -265,7 +265,7 @@ func (e *StandardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 	}
 
 	// Verify the flowcheck
-	feeCalculator := fee.NewStaticCalculator(e.Backend.Config.StaticConfig, e.Backend.Config.Config, currentTimestamp)
+	feeCalculator := fee.NewStaticCalculator(e.Backend.Config.StaticFeeConfig, e.Backend.Config.UpgradeConfig, currentTimestamp)
 	if err := tx.Visit(feeCalculator); err != nil {
 		return err
 	}
@@ -438,7 +438,7 @@ func (e *StandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 
 	var (
 		currentTimestamp = e.State.GetTimestamp()
-		isDurangoActive  = e.Config.IsDurangoActivated(currentTimestamp)
+		isDurangoActive  = e.Config.UpgradeConfig.IsDurangoActivated(currentTimestamp)
 	)
 	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
 		return err
@@ -455,7 +455,7 @@ func (e *StandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 		return err
 	}
 
-	feeCalculator := fee.NewStaticCalculator(e.Backend.Config.StaticConfig, e.Backend.Config.Config, currentTimestamp)
+	feeCalculator := fee.NewStaticCalculator(e.Backend.Config.StaticFeeConfig, e.Backend.Config.UpgradeConfig, currentTimestamp)
 	if err := tx.Visit(feeCalculator); err != nil {
 		return err
 	}
@@ -566,7 +566,7 @@ func (e *StandardTxExecutor) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwn
 }
 
 func (e *StandardTxExecutor) BaseTx(tx *txs.BaseTx) error {
-	if !e.Backend.Config.IsDurangoActivated(e.State.GetTimestamp()) {
+	if !e.Backend.Config.UpgradeConfig.IsDurangoActivated(e.State.GetTimestamp()) {
 		return ErrDurangoUpgradeNotActive
 	}
 
@@ -581,7 +581,7 @@ func (e *StandardTxExecutor) BaseTx(tx *txs.BaseTx) error {
 
 	// Verify the flowcheck
 	currentTimestamp := e.State.GetTimestamp()
-	feeCalculator := fee.NewStaticCalculator(e.Backend.Config.StaticConfig, e.Backend.Config.Config, currentTimestamp)
+	feeCalculator := fee.NewStaticCalculator(e.Backend.Config.StaticFeeConfig, e.Backend.Config.UpgradeConfig, currentTimestamp)
 	if err := tx.Visit(feeCalculator); err != nil {
 		return err
 	}
@@ -616,7 +616,7 @@ func (e *StandardTxExecutor) putStaker(stakerTx txs.Staker) error {
 		err       error
 	)
 
-	if !e.Config.IsDurangoActivated(chainTime) {
+	if !e.Config.UpgradeConfig.IsDurangoActivated(chainTime) {
 		// Pre-Durango, stakers set a future [StartTime] and are added to the
 		// pending staker set. They are promoted to the current staker set once
 		// the chain time reaches [StartTime].

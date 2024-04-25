@@ -365,7 +365,10 @@ func TestGetBalance(t *testing.T) {
 	require := require.New(t)
 	service, _, _ := defaultService(t)
 
-	createSubnetFee := service.vm.Config.GetCreateSubnetTxFee(service.vm.Config.Config, service.vm.clock.Time())
+	createSubnetFee := service.vm.Config.StaticFeeConfig.GetCreateSubnetTxFee(
+		service.vm.Config.UpgradeConfig,
+		service.vm.clock.Time(),
+	)
 
 	// Ensure GetStake is correct for each of the genesis validators
 	genesis, _ := defaultGenesis(t, service.vm.ctx.AVAXAssetID)
@@ -751,7 +754,7 @@ func TestGetBlock(t *testing.T) {
 			service, _, txBuilder := defaultService(t)
 			service.vm.ctx.Lock.Lock()
 
-			service.vm.CreateAssetTxFee = 100 * defaultTxFee
+			service.vm.StaticFeeConfig.CreateAssetTxFee = 100 * defaultTxFee
 
 			// Make a block an accept it, then check we can get it.
 			tx, err := txBuilder.NewCreateChainTx( // Test GetTx works for standard blocks

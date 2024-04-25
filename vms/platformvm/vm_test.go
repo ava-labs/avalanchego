@@ -246,7 +246,7 @@ func defaultVM(t *testing.T, f fork) (*VM, *txstest.Builder, database.Database, 
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		SybilProtectionEnabled: true,
 		Validators:             validators.NewManager(),
-		StaticConfig: fee.StaticConfig{
+		StaticFeeConfig: fee.StaticConfig{
 			TxFee:                 defaultTxFee,
 			CreateSubnetTxFee:     100 * defaultTxFee,
 			TransformSubnetTxFee:  100 * defaultTxFee,
@@ -258,7 +258,7 @@ func defaultVM(t *testing.T, f fork) (*VM, *txstest.Builder, database.Database, 
 		MinStakeDuration:  defaultMinStakingDuration,
 		MaxStakeDuration:  defaultMaxStakingDuration,
 		RewardConfig:      defaultRewardConfig,
-		Config: upgrade.Config{
+		UpgradeConfig: upgrade.Config{
 			ApricotPhase3Time: apricotPhase3Time,
 			ApricotPhase5Time: apricotPhase5Time,
 			BanffTime:         banffTime,
@@ -390,7 +390,7 @@ func TestGenesis(t *testing.T) {
 			require.NoError(err)
 
 			require.Equal(utxo.Address, addr)
-			require.Equal(uint64(utxo.Amount)-vm.CreateSubnetTxFee, out.Amount())
+			require.Equal(uint64(utxo.Amount)-vm.StaticFeeConfig.CreateSubnetTxFee, out.Amount())
 		}
 	}
 
@@ -1184,7 +1184,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 		MinStakeDuration:       defaultMinStakingDuration,
 		MaxStakeDuration:       defaultMaxStakingDuration,
 		RewardConfig:           defaultRewardConfig,
-		Config: upgrade.Config{
+		UpgradeConfig: upgrade.Config{
 			BanffTime:    latestForkTime,
 			CortinaTime:  latestForkTime,
 			DurangoTime:  latestForkTime,
@@ -1274,7 +1274,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 		MinStakeDuration:       defaultMinStakingDuration,
 		MaxStakeDuration:       defaultMaxStakingDuration,
 		RewardConfig:           defaultRewardConfig,
-		Config: upgrade.Config{
+		UpgradeConfig: upgrade.Config{
 			BanffTime:    latestForkTime,
 			CortinaTime:  latestForkTime,
 			DurangoTime:  latestForkTime,
@@ -1325,7 +1325,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		MinStakeDuration:       defaultMinStakingDuration,
 		MaxStakeDuration:       defaultMaxStakingDuration,
 		RewardConfig:           defaultRewardConfig,
-		Config: upgrade.Config{
+		UpgradeConfig: upgrade.Config{
 			BanffTime:    latestForkTime,
 			CortinaTime:  latestForkTime,
 			DurangoTime:  latestForkTime,
@@ -1675,7 +1675,7 @@ func TestUnverifiedParent(t *testing.T) {
 		MinStakeDuration:       defaultMinStakingDuration,
 		MaxStakeDuration:       defaultMaxStakingDuration,
 		RewardConfig:           defaultRewardConfig,
-		Config: upgrade.Config{
+		UpgradeConfig: upgrade.Config{
 			BanffTime:    latestForkTime,
 			CortinaTime:  latestForkTime,
 			DurangoTime:  latestForkTime,
@@ -1838,7 +1838,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 		RewardConfig:           defaultRewardConfig,
 		Validators:             validators.NewManager(),
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		Config: upgrade.Config{
+		UpgradeConfig: upgrade.Config{
 			BanffTime:    latestForkTime,
 			CortinaTime:  latestForkTime,
 			DurangoTime:  latestForkTime,
@@ -1889,7 +1889,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 		UptimePercentage:       secondUptimePercentage / 100.,
 		Validators:             validators.NewManager(),
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		Config: upgrade.Config{
+		UpgradeConfig: upgrade.Config{
 			BanffTime:    latestForkTime,
 			CortinaTime:  latestForkTime,
 			DurangoTime:  latestForkTime,
@@ -1991,7 +1991,7 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 		RewardConfig:           defaultRewardConfig,
 		Validators:             validators.NewManager(),
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		Config: upgrade.Config{
+		UpgradeConfig: upgrade.Config{
 			BanffTime:    latestForkTime,
 			CortinaTime:  latestForkTime,
 			DurangoTime:  latestForkTime,
@@ -2371,7 +2371,7 @@ func TestBaseTx(t *testing.T) {
 	}
 	require.Equal(totalOutputAmt, key0OutputAmt+key1OutputAmt+changeAddrOutputAmt)
 
-	require.Equal(vm.TxFee, totalInputAmt-totalOutputAmt)
+	require.Equal(vm.StaticFeeConfig.TxFee, totalInputAmt-totalOutputAmt)
 	require.Equal(sendAmt, key1OutputAmt)
 
 	vm.ctx.Lock.Unlock()

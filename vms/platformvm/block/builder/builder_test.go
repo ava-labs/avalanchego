@@ -301,7 +301,7 @@ func TestBuildBlockInvalidStakingDurations(t *testing.T) {
 
 	// Post-Durango, [StartTime] is no longer validated. Staking durations are
 	// based on the current chain timestamp and must be validated.
-	env.config.DurangoTime = time.Time{}
+	env.config.UpgradeConfig.DurangoTime = time.Time{}
 
 	var (
 		now                   = env.backend.Clk.Time()

@@ -19,13 +19,13 @@ func newContext(
 	return &builder.Context{
 		NetworkID:                     ctx.NetworkID,
 		AVAXAssetID:                   ctx.AVAXAssetID,
-		BaseTxFee:                     cfg.TxFee,
-		CreateSubnetTxFee:             cfg.GetCreateSubnetTxFee(cfg.Config, timestamp),
-		TransformSubnetTxFee:          cfg.TransformSubnetTxFee,
-		CreateBlockchainTxFee:         cfg.GetCreateBlockchainTxFee(cfg.Config, timestamp),
-		AddPrimaryNetworkValidatorFee: cfg.AddPrimaryNetworkValidatorFee,
-		AddPrimaryNetworkDelegatorFee: cfg.AddPrimaryNetworkDelegatorFee,
-		AddSubnetValidatorFee:         cfg.AddSubnetValidatorFee,
-		AddSubnetDelegatorFee:         cfg.AddSubnetDelegatorFee,
+		BaseTxFee:                     cfg.StaticFeeConfig.TxFee,
+		CreateSubnetTxFee:             cfg.StaticFeeConfig.GetCreateSubnetTxFee(cfg.UpgradeConfig, timestamp),
+		TransformSubnetTxFee:          cfg.StaticFeeConfig.TransformSubnetTxFee,
+		CreateBlockchainTxFee:         cfg.StaticFeeConfig.GetCreateBlockchainTxFee(cfg.UpgradeConfig, timestamp),
+		AddPrimaryNetworkValidatorFee: cfg.StaticFeeConfig.AddPrimaryNetworkValidatorFee,
+		AddPrimaryNetworkDelegatorFee: cfg.StaticFeeConfig.AddPrimaryNetworkDelegatorFee,
+		AddSubnetValidatorFee:         cfg.StaticFeeConfig.AddSubnetValidatorFee,
+		AddSubnetDelegatorFee:         cfg.StaticFeeConfig.AddSubnetDelegatorFee,
 	}
 }
