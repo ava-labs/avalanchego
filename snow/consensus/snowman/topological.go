@@ -409,20 +409,17 @@ func (ts *Topological) calculateInDegree(votes bag.Bag[ids.ID]) {
 			parentID = n.blk.Parent()
 
 			// Increase the inDegree by one
-			kahn := ts.kahnNodes[parentID]
+			kahn, previouslySeen := ts.kahnNodes[parentID]
 			kahn.inDegree++
 			ts.kahnNodes[parentID] = kahn
 
 			// If we have already seen this block, then we shouldn't increase
 			// the inDegree of the ancestors through this block again.
-			if kahn.inDegree != 1 {
+			if previouslySeen {
+				// Nodes are only leaves if they have no inbound edges.
+				ts.leaves.Remove(parentID)
 				break
 			}
-
-			// If I am transitively seeing this block for the first time, either
-			// the block was previously unknown or it was previously a leaf.
-			// Regardless, it shouldn't be tracked as a leaf.
-			ts.leaves.Remove(parentID)
 		}
 	}
 }
