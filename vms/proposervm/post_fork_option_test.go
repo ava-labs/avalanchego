@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
@@ -23,7 +24,7 @@ import (
 var _ snowman.OracleBlock = (*TestOptionsBlock)(nil)
 
 type TestOptionsBlock struct {
-	snowman.TestBlock
+	snowmantest.Block
 	opts    [2]snowman.Block
 	optsErr error
 }
@@ -47,7 +48,7 @@ func TestBlockVerify_PostForkOption_ParentChecks(t *testing.T) {
 
 	// create post fork oracle block ...
 	oracleCoreBlk := &TestOptionsBlock{
-		TestBlock: snowman.TestBlock{
+		Block: snowmantest.Block{
 			TestDecidable: choices.TestDecidable{
 				IDV:     ids.Empty.Prefix(1111),
 				StatusV: choices.Processing,
@@ -58,7 +59,7 @@ func TestBlockVerify_PostForkOption_ParentChecks(t *testing.T) {
 		},
 	}
 	oracleCoreBlk.opts = [2]snowman.Block{
-		&snowman.TestBlock{
+		&snowmantest.Block{
 			TestDecidable: choices.TestDecidable{
 				IDV:     ids.Empty.Prefix(2222),
 				StatusV: choices.Processing,
@@ -67,7 +68,7 @@ func TestBlockVerify_PostForkOption_ParentChecks(t *testing.T) {
 			ParentV: oracleCoreBlk.ID(),
 			HeightV: oracleCoreBlk.Height() + 1,
 		},
-		&snowman.TestBlock{
+		&snowmantest.Block{
 			TestDecidable: choices.TestDecidable{
 				IDV:     ids.Empty.Prefix(3333),
 				StatusV: choices.Processing,
@@ -130,7 +131,7 @@ func TestBlockVerify_PostForkOption_ParentChecks(t *testing.T) {
 	// show we can build on options
 	require.NoError(proVM.SetPreference(context.Background(), opts[0].ID()))
 
-	childCoreBlk := &snowman.TestBlock{
+	childCoreBlk := &snowmantest.Block{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.Empty.Prefix(4444),
 			StatusV: choices.Processing,
@@ -166,7 +167,7 @@ func TestBlockVerify_PostForkOption_CoreBlockVerifyIsCalledOnce(t *testing.T) {
 
 	// create post fork oracle block ...
 	oracleCoreBlk := &TestOptionsBlock{
-		TestBlock: snowman.TestBlock{
+		Block: snowmantest.Block{
 			TestDecidable: choices.TestDecidable{
 				IDV:     ids.Empty.Prefix(1111),
 				StatusV: choices.Processing,
@@ -176,7 +177,7 @@ func TestBlockVerify_PostForkOption_CoreBlockVerifyIsCalledOnce(t *testing.T) {
 			HeightV: coreGenBlk.Height() + 1,
 		},
 	}
-	coreOpt0 := &snowman.TestBlock{
+	coreOpt0 := &snowmantest.Block{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.Empty.Prefix(2222),
 			StatusV: choices.Processing,
@@ -185,7 +186,7 @@ func TestBlockVerify_PostForkOption_CoreBlockVerifyIsCalledOnce(t *testing.T) {
 		ParentV: oracleCoreBlk.ID(),
 		HeightV: oracleCoreBlk.Height() + 1,
 	}
-	coreOpt1 := &snowman.TestBlock{
+	coreOpt1 := &snowmantest.Block{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.Empty.Prefix(3333),
 			StatusV: choices.Processing,
@@ -271,7 +272,7 @@ func TestBlockAccept_PostForkOption_SetsLastAcceptedBlock(t *testing.T) {
 
 	// create post fork oracle block ...
 	oracleCoreBlk := &TestOptionsBlock{
-		TestBlock: snowman.TestBlock{
+		Block: snowmantest.Block{
 			TestDecidable: choices.TestDecidable{
 				IDV:     ids.Empty.Prefix(1111),
 				StatusV: choices.Processing,
@@ -282,7 +283,7 @@ func TestBlockAccept_PostForkOption_SetsLastAcceptedBlock(t *testing.T) {
 		},
 	}
 	oracleCoreBlk.opts = [2]snowman.Block{
-		&snowman.TestBlock{
+		&snowmantest.Block{
 			TestDecidable: choices.TestDecidable{
 				IDV:     ids.Empty.Prefix(2222),
 				StatusV: choices.Processing,
@@ -291,7 +292,7 @@ func TestBlockAccept_PostForkOption_SetsLastAcceptedBlock(t *testing.T) {
 			ParentV: oracleCoreBlk.ID(),
 			HeightV: oracleCoreBlk.Height() + 1,
 		},
-		&snowman.TestBlock{
+		&snowmantest.Block{
 			TestDecidable: choices.TestDecidable{
 				IDV:     ids.Empty.Prefix(3333),
 				StatusV: choices.Processing,
@@ -384,7 +385,7 @@ func TestBlockReject_InnerBlockIsNotRejected(t *testing.T) {
 
 	// create post fork oracle block ...
 	oracleCoreBlk := &TestOptionsBlock{
-		TestBlock: snowman.TestBlock{
+		Block: snowmantest.Block{
 			TestDecidable: choices.TestDecidable{
 				IDV:     ids.Empty.Prefix(1111),
 				StatusV: choices.Processing,
@@ -395,7 +396,7 @@ func TestBlockReject_InnerBlockIsNotRejected(t *testing.T) {
 		},
 	}
 	oracleCoreBlk.opts = [2]snowman.Block{
-		&snowman.TestBlock{
+		&snowmantest.Block{
 			TestDecidable: choices.TestDecidable{
 				IDV:     ids.Empty.Prefix(2222),
 				StatusV: choices.Processing,
@@ -404,7 +405,7 @@ func TestBlockReject_InnerBlockIsNotRejected(t *testing.T) {
 			ParentV: oracleCoreBlk.ID(),
 			HeightV: oracleCoreBlk.Height() + 1,
 		},
-		&snowman.TestBlock{
+		&snowmantest.Block{
 			TestDecidable: choices.TestDecidable{
 				IDV:     ids.Empty.Prefix(3333),
 				StatusV: choices.Processing,
@@ -488,7 +489,7 @@ func TestBlockVerify_PostForkOption_ParentIsNotOracleWithError(t *testing.T) {
 	}()
 
 	coreBlk := &TestOptionsBlock{
-		TestBlock: snowman.TestBlock{
+		Block: snowmantest.Block{
 			TestDecidable: choices.TestDecidable{
 				IDV:     ids.GenerateTestID(),
 				StatusV: choices.Processing,
@@ -500,7 +501,7 @@ func TestBlockVerify_PostForkOption_ParentIsNotOracleWithError(t *testing.T) {
 		optsErr: snowman.ErrNotOracle,
 	}
 
-	coreChildBlk := &snowman.TestBlock{
+	coreChildBlk := &snowmantest.Block{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
@@ -574,7 +575,7 @@ func TestOptionTimestampValidity(t *testing.T) {
 
 	coreOracleBlkID := ids.GenerateTestID()
 	coreOracleBlk := &TestOptionsBlock{
-		TestBlock: snowman.TestBlock{
+		Block: snowmantest.Block{
 			TestDecidable: choices.TestDecidable{
 				IDV:     coreOracleBlkID,
 				StatusV: choices.Processing,
@@ -584,7 +585,7 @@ func TestOptionTimestampValidity(t *testing.T) {
 			HeightV: coreGenBlk.Height() + 1,
 		},
 		opts: [2]snowman.Block{
-			&snowman.TestBlock{
+			&snowmantest.Block{
 				TestDecidable: choices.TestDecidable{
 					IDV:     ids.GenerateTestID(),
 					StatusV: choices.Processing,
@@ -593,7 +594,7 @@ func TestOptionTimestampValidity(t *testing.T) {
 				ParentV: coreOracleBlkID,
 				HeightV: coreGenBlk.Height() + 2,
 			},
-			&snowman.TestBlock{
+			&snowmantest.Block{
 				TestDecidable: choices.TestDecidable{
 					IDV:     ids.GenerateTestID(),
 					StatusV: choices.Processing,

@@ -31,7 +31,7 @@ func TestOracle_PreForkBlkImplementsInterface(t *testing.T) {
 
 	// setup
 	proBlk := preForkBlock{
-		Block: &snowman.TestBlock{},
+		Block: &snowmantest.Block{},
 	}
 
 	// test
@@ -62,7 +62,7 @@ func TestOracle_PreForkBlkCanBuiltOnPreForkOption(t *testing.T) {
 
 	// create pre fork oracle block ...
 	oracleCoreBlk := &TestOptionsBlock{
-		TestBlock: snowman.TestBlock{
+		Block: snowmantest.Block{
 			TestDecidable: choices.TestDecidable{
 				IDV:     ids.Empty.Prefix(1111),
 				StatusV: choices.Processing,
@@ -72,7 +72,7 @@ func TestOracle_PreForkBlkCanBuiltOnPreForkOption(t *testing.T) {
 		},
 	}
 	oracleCoreBlk.opts = [2]snowman.Block{
-		&snowman.TestBlock{
+		&snowmantest.Block{
 			TestDecidable: choices.TestDecidable{
 				IDV:     ids.Empty.Prefix(2222),
 				StatusV: choices.Processing,
@@ -80,7 +80,7 @@ func TestOracle_PreForkBlkCanBuiltOnPreForkOption(t *testing.T) {
 			BytesV:  []byte{2},
 			ParentV: oracleCoreBlk.ID(),
 		},
-		&snowman.TestBlock{
+		&snowmantest.Block{
 			TestDecidable: choices.TestDecidable{
 				IDV:     ids.Empty.Prefix(3333),
 				StatusV: choices.Processing,
@@ -122,7 +122,7 @@ func TestOracle_PreForkBlkCanBuiltOnPreForkOption(t *testing.T) {
 	require.NoError(proVM.SetPreference(context.Background(), opts[0].ID()))
 
 	lastCoreBlk := &TestOptionsBlock{
-		TestBlock: snowman.TestBlock{
+		Block: snowmantest.Block{
 			TestDecidable: choices.TestDecidable{
 				IDV:     ids.Empty.Prefix(4444),
 				StatusV: choices.Processing,
@@ -154,7 +154,7 @@ func TestOracle_PostForkBlkCanBuiltOnPreForkOption(t *testing.T) {
 
 	// create pre fork oracle block pre activation time...
 	oracleCoreBlk := &TestOptionsBlock{
-		TestBlock: snowman.TestBlock{
+		Block: snowmantest.Block{
 			TestDecidable: choices.TestDecidable{
 				IDV:     ids.Empty.Prefix(1111),
 				StatusV: choices.Processing,
@@ -167,7 +167,7 @@ func TestOracle_PostForkBlkCanBuiltOnPreForkOption(t *testing.T) {
 
 	// ... whose options are post activation time
 	oracleCoreBlk.opts = [2]snowman.Block{
-		&snowman.TestBlock{
+		&snowmantest.Block{
 			TestDecidable: choices.TestDecidable{
 				IDV:     ids.Empty.Prefix(2222),
 				StatusV: choices.Processing,
@@ -176,7 +176,7 @@ func TestOracle_PostForkBlkCanBuiltOnPreForkOption(t *testing.T) {
 			ParentV:    oracleCoreBlk.ID(),
 			TimestampV: activationTime.Add(time.Second),
 		},
-		&snowman.TestBlock{
+		&snowmantest.Block{
 			TestDecidable: choices.TestDecidable{
 				IDV:     ids.Empty.Prefix(3333),
 				StatusV: choices.Processing,
@@ -219,7 +219,7 @@ func TestOracle_PostForkBlkCanBuiltOnPreForkOption(t *testing.T) {
 	require.NoError(proVM.SetPreference(context.Background(), opts[0].ID()))
 
 	lastCoreBlk := &TestOptionsBlock{
-		TestBlock: snowman.TestBlock{
+		Block: snowmantest.Block{
 			TestDecidable: choices.TestDecidable{
 				IDV:     ids.Empty.Prefix(4444),
 				StatusV: choices.Processing,
@@ -252,7 +252,7 @@ func TestBlockVerify_PreFork_ParentChecks(t *testing.T) {
 	require.True(coreGenBlk.Timestamp().Before(activationTime))
 
 	// create parent block ...
-	parentCoreBlk := &snowman.TestBlock{
+	parentCoreBlk := &snowmantest.Block{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.Empty.Prefix(1111),
 			StatusV: choices.Processing,
@@ -289,7 +289,7 @@ func TestBlockVerify_PreFork_ParentChecks(t *testing.T) {
 	require.NoError(err)
 
 	// .. create child block ...
-	childCoreBlk := &snowman.TestBlock{
+	childCoreBlk := &snowmantest.Block{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
@@ -332,7 +332,7 @@ func TestBlockVerify_BlocksBuiltOnPreForkGenesis(t *testing.T) {
 	preActivationTime := activationTime.Add(-1 * time.Second)
 	proVM.Set(preActivationTime)
 
-	coreBlk := &snowman.TestBlock{
+	coreBlk := &snowmantest.Block{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.Empty.Prefix(1111),
 			StatusV: choices.Processing,
@@ -386,7 +386,7 @@ func TestBlockVerify_BlocksBuiltOnPreForkGenesis(t *testing.T) {
 	}
 	require.NoError(proVM.SetPreference(context.Background(), preForkChild.ID()))
 
-	secondCoreBlk := &snowman.TestBlock{
+	secondCoreBlk := &snowmantest.Block{
 		TestDecidable: choices.TestDecidable{
 			IDV: ids.Empty.Prefix(2222),
 		},
@@ -417,7 +417,7 @@ func TestBlockVerify_BlocksBuiltOnPreForkGenesis(t *testing.T) {
 	require.NoError(lastPreForkBlk.Verify(context.Background()))
 
 	require.NoError(proVM.SetPreference(context.Background(), lastPreForkBlk.ID()))
-	thirdCoreBlk := &snowman.TestBlock{
+	thirdCoreBlk := &snowmantest.Block{
 		TestDecidable: choices.TestDecidable{
 			IDV: ids.Empty.Prefix(333),
 		},
@@ -464,7 +464,7 @@ func TestBlockVerify_BlocksBuiltOnPostForkGenesis(t *testing.T) {
 	}()
 
 	// build parent block after fork activation time ...
-	coreBlock := &snowman.TestBlock{
+	coreBlock := &snowmantest.Block{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.Empty.Prefix(1111),
 			StatusV: choices.Processing,
@@ -507,7 +507,7 @@ func TestBlockAccept_PreFork_SetsLastAcceptedBlock(t *testing.T) {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
 
-	coreBlk := &snowman.TestBlock{
+	coreBlk := &snowmantest.Block{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.Empty.Prefix(1111),
 			StatusV: choices.Processing,
@@ -569,7 +569,7 @@ func TestBlockReject_PreForkBlock_InnerBlockIsRejected(t *testing.T) {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
 
-	coreBlk := &snowman.TestBlock{
+	coreBlk := &snowmantest.Block{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.Empty.Prefix(111),
 			StatusV: choices.Processing,
@@ -610,7 +610,7 @@ func TestBlockVerify_ForkBlockIsOracleBlock(t *testing.T) {
 
 	coreBlkID := ids.GenerateTestID()
 	coreBlk := &TestOptionsBlock{
-		TestBlock: snowman.TestBlock{
+		Block: snowmantest.Block{
 			TestDecidable: choices.TestDecidable{
 				IDV:     coreBlkID,
 				StatusV: choices.Processing,
@@ -620,7 +620,7 @@ func TestBlockVerify_ForkBlockIsOracleBlock(t *testing.T) {
 			TimestampV: postActivationTime,
 		},
 		opts: [2]snowman.Block{
-			&snowman.TestBlock{
+			&snowmantest.Block{
 				TestDecidable: choices.TestDecidable{
 					IDV:     ids.GenerateTestID(),
 					StatusV: choices.Processing,
@@ -629,7 +629,7 @@ func TestBlockVerify_ForkBlockIsOracleBlock(t *testing.T) {
 				ParentV:    coreBlkID,
 				TimestampV: postActivationTime,
 			},
-			&snowman.TestBlock{
+			&snowmantest.Block{
 				TestDecidable: choices.TestDecidable{
 					IDV:     ids.GenerateTestID(),
 					StatusV: choices.Processing,
@@ -704,7 +704,7 @@ func TestBlockVerify_ForkBlockIsOracleBlockButChildrenAreSigned(t *testing.T) {
 
 	coreBlkID := ids.GenerateTestID()
 	coreBlk := &TestOptionsBlock{
-		TestBlock: snowman.TestBlock{
+		Block: snowmantest.Block{
 			TestDecidable: choices.TestDecidable{
 				IDV:     coreBlkID,
 				StatusV: choices.Processing,
@@ -714,7 +714,7 @@ func TestBlockVerify_ForkBlockIsOracleBlockButChildrenAreSigned(t *testing.T) {
 			TimestampV: postActivationTime,
 		},
 		opts: [2]snowman.Block{
-			&snowman.TestBlock{
+			&snowmantest.Block{
 				TestDecidable: choices.TestDecidable{
 					IDV:     ids.GenerateTestID(),
 					StatusV: choices.Processing,
@@ -723,7 +723,7 @@ func TestBlockVerify_ForkBlockIsOracleBlockButChildrenAreSigned(t *testing.T) {
 				ParentV:    coreBlkID,
 				TimestampV: postActivationTime,
 			},
-			&snowman.TestBlock{
+			&snowmantest.Block{
 				TestDecidable: choices.TestDecidable{
 					IDV:     ids.GenerateTestID(),
 					StatusV: choices.Processing,

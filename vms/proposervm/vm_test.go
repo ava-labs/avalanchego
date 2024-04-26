@@ -83,12 +83,12 @@ func initTestProposerVM(
 	*fullVM,
 	*validators.TestState,
 	*VM,
-	*snowman.TestBlock,
+	*snowmantest.Block,
 	database.Database,
 ) {
 	require := require.New(t)
 
-	coreGenBlk := &snowman.TestBlock{
+	coreGenBlk := &snowmantest.Block{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Accepted,
@@ -259,7 +259,7 @@ func TestBuildBlockTimestampAreRoundedToSeconds(t *testing.T) {
 	skewedTimestamp := time.Now().Truncate(time.Second).Add(time.Millisecond)
 	proVM.Set(skewedTimestamp)
 
-	coreBlk := &snowman.TestBlock{
+	coreBlk := &snowmantest.Block{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.Empty.Prefix(111),
 			StatusV: choices.Processing,
@@ -292,7 +292,7 @@ func TestBuildBlockIsIdempotent(t *testing.T) {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
 
-	coreBlk := &snowman.TestBlock{
+	coreBlk := &snowmantest.Block{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.Empty.Prefix(111),
 			StatusV: choices.Processing,
@@ -330,7 +330,7 @@ func TestFirstProposerBlockIsBuiltOnTopOfGenesis(t *testing.T) {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
 
-	coreBlk := &snowman.TestBlock{
+	coreBlk := &snowmantest.Block{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.Empty.Prefix(111),
 			StatusV: choices.Processing,
@@ -368,7 +368,7 @@ func TestProposerBlocksAreBuiltOnPreferredProBlock(t *testing.T) {
 	}()
 
 	// add two proBlks...
-	coreBlk1 := &snowman.TestBlock{
+	coreBlk1 := &snowmantest.Block{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.Empty.Prefix(111),
 			StatusV: choices.Processing,
@@ -383,7 +383,7 @@ func TestProposerBlocksAreBuiltOnPreferredProBlock(t *testing.T) {
 	proBlk1, err := proVM.BuildBlock(context.Background())
 	require.NoError(err)
 
-	coreBlk2 := &snowman.TestBlock{
+	coreBlk2 := &snowmantest.Block{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.Empty.Prefix(222),
 			StatusV: choices.Processing,
@@ -401,7 +401,7 @@ func TestProposerBlocksAreBuiltOnPreferredProBlock(t *testing.T) {
 	require.NoError(proBlk2.Verify(context.Background()))
 
 	// ...and set one as preferred
-	var prefcoreBlk *snowman.TestBlock
+	var prefcoreBlk *snowmantest.Block
 	coreVM.SetPreferenceF = func(_ context.Context, prefID ids.ID) error {
 		switch prefID {
 		case coreBlk1.ID():
@@ -430,7 +430,7 @@ func TestProposerBlocksAreBuiltOnPreferredProBlock(t *testing.T) {
 	require.NoError(proVM.SetPreference(context.Background(), proBlk2.ID()))
 
 	// build block...
-	coreBlk3 := &snowman.TestBlock{
+	coreBlk3 := &snowmantest.Block{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.Empty.Prefix(333),
 			StatusV: choices.Processing,
@@ -463,7 +463,7 @@ func TestCoreBlocksMustBeBuiltOnPreferredCoreBlock(t *testing.T) {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
 
-	coreBlk1 := &snowman.TestBlock{
+	coreBlk1 := &snowmantest.Block{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.Empty.Prefix(111),
 			StatusV: choices.Processing,
@@ -478,7 +478,7 @@ func TestCoreBlocksMustBeBuiltOnPreferredCoreBlock(t *testing.T) {
 	proBlk1, err := proVM.BuildBlock(context.Background())
 	require.NoError(err)
 
-	coreBlk2 := &snowman.TestBlock{
+	coreBlk2 := &snowmantest.Block{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.Empty.Prefix(222),
 			StatusV: choices.Processing,
@@ -497,7 +497,7 @@ func TestCoreBlocksMustBeBuiltOnPreferredCoreBlock(t *testing.T) {
 	require.NoError(proBlk2.Verify(context.Background()))
 
 	// ...and set one as preferred
-	var wronglyPreferredcoreBlk *snowman.TestBlock
+	var wronglyPreferredcoreBlk *snowmantest.Block
 	coreVM.SetPreferenceF = func(_ context.Context, prefID ids.ID) error {
 		switch prefID {
 		case coreBlk1.ID():
@@ -526,7 +526,7 @@ func TestCoreBlocksMustBeBuiltOnPreferredCoreBlock(t *testing.T) {
 	require.NoError(proVM.SetPreference(context.Background(), proBlk2.ID()))
 
 	// build block...
-	coreBlk3 := &snowman.TestBlock{
+	coreBlk3 := &snowmantest.Block{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.Empty.Prefix(333),
 			StatusV: choices.Processing,
@@ -560,7 +560,7 @@ func TestCoreBlockFailureCauseProposerBlockParseFailure(t *testing.T) {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
 
-	innerBlk := &snowman.TestBlock{
+	innerBlk := &snowmantest.Block{
 		BytesV: []byte{1},
 	}
 	coreVM.ParseBlockF = func(context.Context, []byte) (snowman.Block, error) {
@@ -603,7 +603,7 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 	}()
 
 	// create two Proposer blocks at the same height
-	innerBlk := &snowman.TestBlock{
+	innerBlk := &snowmantest.Block{
 		BytesV:  []byte{1},
 		ParentV: gencoreBlk.ID(),
 		HeightV: gencoreBlk.Height() + 1,
@@ -679,7 +679,7 @@ func TestTwoProBlocksWithSameParentCanBothVerify(t *testing.T) {
 	}()
 
 	// one block is built from this proVM
-	localcoreBlk := &snowman.TestBlock{
+	localcoreBlk := &snowmantest.Block{
 		BytesV:  []byte{111},
 		ParentV: coreGenBlk.ID(),
 		HeightV: coreGenBlk.Height() + 1,
@@ -693,7 +693,7 @@ func TestTwoProBlocksWithSameParentCanBothVerify(t *testing.T) {
 	require.NoError(builtBlk.Verify(context.Background()))
 
 	// another block with same parent comes from network and is parsed
-	netcoreBlk := &snowman.TestBlock{
+	netcoreBlk := &snowmantest.Block{
 		BytesV:  []byte{222},
 		ParentV: coreGenBlk.ID(),
 		HeightV: coreGenBlk.Height() + 1,
@@ -771,7 +771,7 @@ func TestPreFork_BuildBlock(t *testing.T) {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
 
-	coreBlk := &snowman.TestBlock{
+	coreBlk := &snowmantest.Block{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.Empty.Prefix(333),
 			StatusV: choices.Processing,
@@ -812,7 +812,7 @@ func TestPreFork_ParseBlock(t *testing.T) {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
 
-	coreBlk := &snowman.TestBlock{
+	coreBlk := &snowmantest.Block{
 		TestDecidable: choices.TestDecidable{
 			IDV: ids.Empty.Prefix(2021),
 		},
@@ -851,7 +851,7 @@ func TestPreFork_SetPreference(t *testing.T) {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
 
-	coreBlk0 := &snowman.TestBlock{
+	coreBlk0 := &snowmantest.Block{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.Empty.Prefix(333),
 			StatusV: choices.Processing,
@@ -889,7 +889,7 @@ func TestPreFork_SetPreference(t *testing.T) {
 	}
 	require.NoError(proVM.SetPreference(context.Background(), builtBlk.ID()))
 
-	coreBlk1 := &snowman.TestBlock{
+	coreBlk1 := &snowmantest.Block{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.Empty.Prefix(444),
 			StatusV: choices.Processing,
@@ -910,7 +910,7 @@ func TestPreFork_SetPreference(t *testing.T) {
 func TestExpiredBuildBlock(t *testing.T) {
 	require := require.New(t)
 
-	coreGenBlk := &snowman.TestBlock{
+	coreGenBlk := &snowmantest.Block{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Accepted,
@@ -1026,7 +1026,7 @@ func TestExpiredBuildBlock(t *testing.T) {
 
 	// Before calling BuildBlock, verify a remote block and set it as the
 	// preferred block.
-	coreBlk := &snowman.TestBlock{
+	coreBlk := &snowmantest.Block{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
@@ -1124,7 +1124,7 @@ func TestInnerBlockDeduplication(t *testing.T) {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
 
-	coreBlk := &snowman.TestBlock{
+	coreBlk := &snowmantest.Block{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
@@ -1217,7 +1217,7 @@ func TestInnerBlockDeduplication(t *testing.T) {
 func TestInnerVMRollback(t *testing.T) {
 	require := require.New(t)
 
-	coreGenBlk := &snowman.TestBlock{
+	coreGenBlk := &snowmantest.Block{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Accepted,
@@ -1314,7 +1314,7 @@ func TestInnerVMRollback(t *testing.T) {
 	require.NoError(proVM.SetState(context.Background(), snow.NormalOp))
 	require.NoError(proVM.SetPreference(context.Background(), coreGenBlk.IDV))
 
-	coreBlk := &snowman.TestBlock{
+	coreBlk := &snowmantest.Block{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
@@ -1433,7 +1433,7 @@ func TestBuildBlockDuringWindow(t *testing.T) {
 		}, nil
 	}
 
-	coreBlk0 := &snowman.TestBlock{
+	coreBlk0 := &snowmantest.Block{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
@@ -1442,7 +1442,7 @@ func TestBuildBlockDuringWindow(t *testing.T) {
 		ParentV: coreGenBlk.ID(),
 		HeightV: coreGenBlk.Height() + 1,
 	}
-	coreBlk1 := &snowman.TestBlock{
+	coreBlk1 := &snowmantest.Block{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
@@ -1530,7 +1530,7 @@ func TestTwoForks_OneIsAccepted(t *testing.T) {
 	}()
 
 	// create pre-fork block X and post-fork block A
-	xBlock := &snowman.TestBlock{
+	xBlock := &snowmantest.Block{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
@@ -1549,7 +1549,7 @@ func TestTwoForks_OneIsAccepted(t *testing.T) {
 	require.NoError(aBlock.Verify(context.Background()))
 
 	// use a different way to construct pre-fork block Y and post-fork block B
-	yBlock := &snowman.TestBlock{
+	yBlock := &snowmantest.Block{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
@@ -1579,7 +1579,7 @@ func TestTwoForks_OneIsAccepted(t *testing.T) {
 	require.NoError(bBlock.Verify(context.Background()))
 
 	// append Z/C to Y/B
-	zBlock := &snowman.TestBlock{
+	zBlock := &snowmantest.Block{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
@@ -1626,7 +1626,7 @@ func TestTooFarAdvanced(t *testing.T) {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
 
-	xBlock := &snowman.TestBlock{
+	xBlock := &snowmantest.Block{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
@@ -1637,7 +1637,7 @@ func TestTooFarAdvanced(t *testing.T) {
 		TimestampV: gBlock.Timestamp(),
 	}
 
-	yBlock := &snowman.TestBlock{
+	yBlock := &snowmantest.Block{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
@@ -1722,7 +1722,7 @@ func TestTwoOptions_OneIsAccepted(t *testing.T) {
 
 	xBlockID := ids.GenerateTestID()
 	xBlock := &TestOptionsBlock{
-		TestBlock: snowman.TestBlock{
+		Block: snowmantest.Block{
 			TestDecidable: choices.TestDecidable{
 				IDV:     xBlockID,
 				StatusV: choices.Processing,
@@ -1732,7 +1732,7 @@ func TestTwoOptions_OneIsAccepted(t *testing.T) {
 			TimestampV: coreGenBlk.Timestamp(),
 		},
 		opts: [2]snowman.Block{
-			&snowman.TestBlock{
+			&snowmantest.Block{
 				TestDecidable: choices.TestDecidable{
 					IDV:     ids.GenerateTestID(),
 					StatusV: choices.Processing,
@@ -1741,7 +1741,7 @@ func TestTwoOptions_OneIsAccepted(t *testing.T) {
 				ParentV:    xBlockID,
 				TimestampV: coreGenBlk.Timestamp(),
 			},
-			&snowman.TestBlock{
+			&snowmantest.Block{
 				TestDecidable: choices.TestDecidable{
 					IDV:     ids.GenerateTestID(),
 					StatusV: choices.Processing,
@@ -1798,7 +1798,7 @@ func TestLaggedPChainHeight(t *testing.T) {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
 
-	innerBlock := &snowman.TestBlock{
+	innerBlock := &snowmantest.Block{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
@@ -1826,7 +1826,7 @@ func TestLaggedPChainHeight(t *testing.T) {
 func TestRejectedHeightNotIndexed(t *testing.T) {
 	require := require.New(t)
 
-	coreGenBlk := &snowman.TestBlock{
+	coreGenBlk := &snowmantest.Block{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Accepted,
@@ -1953,7 +1953,7 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 	require.NoError(proVM.SetPreference(context.Background(), coreGenBlk.IDV))
 
 	// create inner block X and outer block A
-	xBlock := &snowman.TestBlock{
+	xBlock := &snowmantest.Block{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
@@ -1974,7 +1974,7 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 	require.NoError(aBlock.Verify(context.Background()))
 
 	// use a different way to construct inner block Y and outer block B
-	yBlock := &snowman.TestBlock{
+	yBlock := &snowmantest.Block{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
@@ -2025,7 +2025,7 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 	require := require.New(t)
 
-	coreGenBlk := &snowman.TestBlock{
+	coreGenBlk := &snowmantest.Block{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Accepted,
@@ -2153,7 +2153,7 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 
 	xBlockID := ids.GenerateTestID()
 	xBlock := &TestOptionsBlock{
-		TestBlock: snowman.TestBlock{
+		Block: snowmantest.Block{
 			TestDecidable: choices.TestDecidable{
 				IDV:     xBlockID,
 				StatusV: choices.Processing,
@@ -2163,7 +2163,7 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 			TimestampV: coreGenBlk.Timestamp(),
 		},
 		opts: [2]snowman.Block{
-			&snowman.TestBlock{
+			&snowmantest.Block{
 				TestDecidable: choices.TestDecidable{
 					IDV:     ids.GenerateTestID(),
 					StatusV: choices.Processing,
@@ -2172,7 +2172,7 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 				ParentV:    xBlockID,
 				TimestampV: coreGenBlk.Timestamp(),
 			},
-			&snowman.TestBlock{
+			&snowmantest.Block{
 				TestDecidable: choices.TestDecidable{
 					IDV:     ids.GenerateTestID(),
 					StatusV: choices.Processing,
@@ -2347,7 +2347,7 @@ func TestVMInnerBlkCacheDeduplicationRegression(t *testing.T) {
 	}()
 
 	// create pre-fork block X and post-fork block A
-	xBlock := &snowman.TestBlock{
+	xBlock := &snowmantest.Block{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
@@ -2373,7 +2373,7 @@ func TestVMInnerBlkCacheDeduplicationRegression(t *testing.T) {
 	)
 	require.NoError(err)
 
-	xBlockCopy := &snowman.TestBlock{
+	xBlockCopy := &snowmantest.Block{
 		TestDecidable: choices.TestDecidable{
 			IDV:     xBlock.IDV,
 			StatusV: choices.Processing,
@@ -2426,7 +2426,7 @@ func TestVMInnerBlkMarkedAcceptedRegression(t *testing.T) {
 	}()
 
 	// create an inner block and wrap it in an postForkBlock.
-	innerBlock := &snowman.TestBlock{
+	innerBlock := &snowmantest.Block{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
@@ -2616,7 +2616,7 @@ func TestVM_VerifyBlockWithContext(t *testing.T) {
 func TestHistoricalBlockDeletion(t *testing.T) {
 	require := require.New(t)
 
-	coreGenBlk := &snowman.TestBlock{
+	coreGenBlk := &snowmantest.Block{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Accepted,
@@ -2714,7 +2714,7 @@ func TestHistoricalBlockDeletion(t *testing.T) {
 
 	issueBlock := func() {
 		lastAcceptedBlock := acceptedBlocks[currentHeight]
-		innerBlock := &snowman.TestBlock{
+		innerBlock := &snowmantest.Block{
 			TestDecidable: choices.TestDecidable{
 				IDV:     ids.GenerateTestID(),
 				StatusV: choices.Processing,

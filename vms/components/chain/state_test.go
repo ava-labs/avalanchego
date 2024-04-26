@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/metric"
 )
@@ -31,12 +32,12 @@ var (
 )
 
 type TestBlock struct {
-	*snowman.TestBlock
+	*snowmantest.Block
 }
 
 // SetStatus sets the status of the Block.
 func (b *TestBlock) SetStatus(status choices.Status) {
-	b.TestBlock.TestDecidable.StatusV = status
+	b.Block.TestDecidable.StatusV = status
 }
 
 // NewTestBlock returns a new test block with height, bytes, and ID derived from [i]
@@ -45,7 +46,7 @@ func NewTestBlock(i uint64, parentID ids.ID) *TestBlock {
 	b := []byte{byte(i)}
 	id := hashing.ComputeHash256Array(b)
 	return &TestBlock{
-		TestBlock: &snowman.TestBlock{
+		Block: &snowmantest.Block{
 			TestDecidable: choices.TestDecidable{
 				IDV:     id,
 				StatusV: choices.Unknown,
@@ -199,7 +200,7 @@ func TestState(t *testing.T) {
 	blk3Bytes := []byte{byte(3)}
 	blk3ID := hashing.ComputeHash256Array(blk3Bytes)
 	blk3 := &TestBlock{
-		TestBlock: &snowman.TestBlock{
+		Block: &snowmantest.Block{
 			TestDecidable: choices.TestDecidable{
 				IDV:     blk3ID,
 				StatusV: choices.Processing,
@@ -630,7 +631,7 @@ func TestSetLastAcceptedBlock(t *testing.T) {
 	postSetBlk1Bytes := []byte{byte(200)}
 	postSetBlk2Bytes := []byte{byte(201)}
 	postSetBlk1 := &TestBlock{
-		TestBlock: &snowman.TestBlock{
+		Block: &snowmantest.Block{
 			TestDecidable: choices.TestDecidable{
 				IDV:     hashing.ComputeHash256Array(postSetBlk1Bytes),
 				StatusV: choices.Accepted,
@@ -641,7 +642,7 @@ func TestSetLastAcceptedBlock(t *testing.T) {
 		},
 	}
 	postSetBlk2 := &TestBlock{
-		TestBlock: &snowman.TestBlock{
+		Block: &snowmantest.Block{
 			TestDecidable: choices.TestDecidable{
 				IDV:     hashing.ComputeHash256Array(postSetBlk2Bytes),
 				StatusV: choices.Processing,

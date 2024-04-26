@@ -119,7 +119,7 @@ func TestPreDurangoValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 	parentTime := time.Now().Truncate(time.Second)
 	proVM.Set(parentTime)
 
-	coreParentBlk := &snowman.TestBlock{
+	coreParentBlk := &snowmantest.Block{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
@@ -177,7 +177,7 @@ func TestPreDurangoValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 		}, nil
 	}
 
-	coreChildBlk := &snowman.TestBlock{
+	coreChildBlk := &snowmantest.Block{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
@@ -256,7 +256,7 @@ func TestPreDurangoNonValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 	parentTime := time.Now().Truncate(time.Second)
 	proVM.Set(parentTime)
 
-	coreParentBlk := &snowman.TestBlock{
+	coreParentBlk := &snowmantest.Block{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
@@ -316,7 +316,7 @@ func TestPreDurangoNonValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 		}, nil
 	}
 
-	coreChildBlk := &snowman.TestBlock{
+	coreChildBlk := &snowmantest.Block{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,

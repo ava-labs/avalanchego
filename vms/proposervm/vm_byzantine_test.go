@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
@@ -41,7 +42,7 @@ func TestInvalidByzantineProposerParent(t *testing.T) {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
 
-	xBlock := &snowman.TestBlock{
+	xBlock := &snowmantest.Block{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
@@ -63,7 +64,7 @@ func TestInvalidByzantineProposerParent(t *testing.T) {
 	require.NoError(aBlock.Accept(context.Background()))
 
 	yBlockBytes := []byte{2}
-	yBlock := &snowman.TestBlock{
+	yBlock := &snowmantest.Block{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
@@ -115,7 +116,7 @@ func TestInvalidByzantineProposerOracleParent(t *testing.T) {
 
 	xBlockID := ids.GenerateTestID()
 	xBlock := &TestOptionsBlock{
-		TestBlock: snowman.TestBlock{
+		Block: snowmantest.Block{
 			TestDecidable: choices.TestDecidable{
 				IDV:     xBlockID,
 				StatusV: choices.Processing,
@@ -124,7 +125,7 @@ func TestInvalidByzantineProposerOracleParent(t *testing.T) {
 			ParentV: coreGenBlk.ID(),
 		},
 		opts: [2]snowman.Block{
-			&snowman.TestBlock{
+			&snowmantest.Block{
 				TestDecidable: choices.TestDecidable{
 					IDV:     ids.GenerateTestID(),
 					StatusV: choices.Processing,
@@ -132,7 +133,7 @@ func TestInvalidByzantineProposerOracleParent(t *testing.T) {
 				BytesV:  []byte{2},
 				ParentV: xBlockID,
 			},
-			&snowman.TestBlock{
+			&snowmantest.Block{
 				TestDecidable: choices.TestDecidable{
 					IDV:     ids.GenerateTestID(),
 					StatusV: choices.Processing,
@@ -221,7 +222,7 @@ func TestInvalidByzantineProposerPreForkParent(t *testing.T) {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
 
-	xBlock := &snowman.TestBlock{
+	xBlock := &snowmantest.Block{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
@@ -235,7 +236,7 @@ func TestInvalidByzantineProposerPreForkParent(t *testing.T) {
 	}
 
 	yBlockBytes := []byte{2}
-	yBlock := &snowman.TestBlock{
+	yBlock := &snowmantest.Block{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
@@ -313,7 +314,7 @@ func TestBlockVerify_PostForkOption_FaultyParent(t *testing.T) {
 	}()
 
 	xBlock := &TestOptionsBlock{
-		TestBlock: snowman.TestBlock{
+		Block: snowmantest.Block{
 			TestDecidable: choices.TestDecidable{
 				IDV:     ids.GenerateTestID(),
 				StatusV: choices.Processing,
@@ -322,7 +323,7 @@ func TestBlockVerify_PostForkOption_FaultyParent(t *testing.T) {
 			ParentV: coreGenBlk.ID(),
 		},
 		opts: [2]snowman.Block{
-			&snowman.TestBlock{
+			&snowmantest.Block{
 				TestDecidable: choices.TestDecidable{
 					IDV:     ids.GenerateTestID(),
 					StatusV: choices.Processing,
@@ -330,7 +331,7 @@ func TestBlockVerify_PostForkOption_FaultyParent(t *testing.T) {
 				BytesV:  []byte{2},
 				ParentV: coreGenBlk.ID(), // valid block should reference xBlock
 			},
-			&snowman.TestBlock{
+			&snowmantest.Block{
 				TestDecidable: choices.TestDecidable{
 					IDV:     ids.GenerateTestID(),
 					StatusV: choices.Processing,
@@ -415,7 +416,7 @@ func TestBlockVerify_InvalidPostForkOption(t *testing.T) {
 	// create an Oracle pre-fork block X
 	xBlockID := ids.GenerateTestID()
 	xBlock := &TestOptionsBlock{
-		TestBlock: snowman.TestBlock{
+		Block: snowmantest.Block{
 			TestDecidable: choices.TestDecidable{
 				IDV:     xBlockID,
 				StatusV: choices.Processing,
@@ -424,7 +425,7 @@ func TestBlockVerify_InvalidPostForkOption(t *testing.T) {
 			ParentV: coreGenBlk.ID(),
 		},
 		opts: [2]snowman.Block{
-			&snowman.TestBlock{
+			&snowmantest.Block{
 				TestDecidable: choices.TestDecidable{
 					IDV:     ids.GenerateTestID(),
 					StatusV: choices.Processing,
@@ -432,7 +433,7 @@ func TestBlockVerify_InvalidPostForkOption(t *testing.T) {
 				BytesV:  []byte{2},
 				ParentV: xBlockID,
 			},
-			&snowman.TestBlock{
+			&snowmantest.Block{
 				TestDecidable: choices.TestDecidable{
 					IDV:     ids.GenerateTestID(),
 					StatusV: choices.Processing,
@@ -448,7 +449,7 @@ func TestBlockVerify_InvalidPostForkOption(t *testing.T) {
 	xInnerOption := xInnerOptions[0]
 
 	// create a non-Oracle pre-fork block Y
-	yBlock := &snowman.TestBlock{
+	yBlock := &snowmantest.Block{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
@@ -527,7 +528,7 @@ func TestBlockVerify_InvalidPostForkOption(t *testing.T) {
 	// create post-fork block B from Y
 	zBlockID := ids.GenerateTestID()
 	zBlock := &TestOptionsBlock{
-		TestBlock: snowman.TestBlock{
+		Block: snowmantest.Block{
 			TestDecidable: choices.TestDecidable{
 				IDV:     zBlockID,
 				StatusV: choices.Processing,
@@ -536,7 +537,7 @@ func TestBlockVerify_InvalidPostForkOption(t *testing.T) {
 			ParentV: coreGenBlk.ID(),
 		},
 		opts: [2]snowman.Block{
-			&snowman.TestBlock{
+			&snowmantest.Block{
 				TestDecidable: choices.TestDecidable{
 					IDV:     ids.GenerateTestID(),
 					StatusV: choices.Processing,
@@ -544,7 +545,7 @@ func TestBlockVerify_InvalidPostForkOption(t *testing.T) {
 				BytesV:  []byte{2},
 				ParentV: zBlockID,
 			},
-			&snowman.TestBlock{
+			&snowmantest.Block{
 				TestDecidable: choices.TestDecidable{
 					IDV:     ids.GenerateTestID(),
 					StatusV: choices.Processing,
@@ -608,7 +609,7 @@ func TestGetBlock_MutatedSignature(t *testing.T) {
 	proVM.Set(coreGenBlk.Timestamp())
 
 	// Create valid core blocks to build our chain on.
-	coreBlk0 := &snowman.TestBlock{
+	coreBlk0 := &snowmantest.Block{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.Empty.Prefix(1111),
 			StatusV: choices.Processing,
@@ -618,7 +619,7 @@ func TestGetBlock_MutatedSignature(t *testing.T) {
 		HeightV: coreGenBlk.Height() + 1,
 	}
 
-	coreBlk1 := &snowman.TestBlock{
+	coreBlk1 := &snowmantest.Block{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.Empty.Prefix(2222),
 			StatusV: choices.Processing,
