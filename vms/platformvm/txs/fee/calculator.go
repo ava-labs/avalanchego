@@ -256,12 +256,16 @@ func (c *calculator) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessValid
 		if tx.Subnet != constants.PrimaryNetworkID {
 			c.fee = c.staticCfg.AddSubnetValidatorFee
 		} else {
-			c.fee = c.staticCfg.CreateAssetTxFee
+			c.fee = c.staticCfg.AddPrimaryNetworkValidatorFee
 		}
 		return nil
 	}
 
-	complexity, err := c.meterTx(tx, tx.Outs, tx.Ins)
+	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.StakeOuts))
+	copy(outs, tx.Outs)
+	copy(outs[len(tx.Outs):], tx.StakeOuts)
+
+	complexity, err := c.meterTx(tx, outs, tx.Ins)
 	if err != nil {
 		return err
 	}
