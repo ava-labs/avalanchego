@@ -11,11 +11,10 @@ import (
 
 var _ Nnary = (*nnarySnowflake)(nil)
 
-func newNnarySnowflake(betaVirtuous, betaRogue int, choice ids.ID) nnarySnowflake {
+func newNnarySnowflake(beta int, choice ids.ID) nnarySnowflake {
 	return nnarySnowflake{
-		nnarySlush:   newNnarySlush(choice),
-		betaVirtuous: betaVirtuous,
-		betaRogue:    betaRogue,
+		nnarySlush: newNnarySlush(choice),
+		beta:       beta,
 	}
 }
 
@@ -25,29 +24,20 @@ type nnarySnowflake struct {
 	// wrap the n-nary slush logic
 	nnarySlush
 
-	// betaVirtuous is the number of consecutive successful queries required for
-	// finalization on a virtuous instance.
-	betaVirtuous int
-
-	// betaRogue is the number of consecutive successful queries required for
-	// finalization on a rogue instance.
-	betaRogue int
+	// beta is the number of consecutive successful queries required for
+	// finalization.
+	beta int
 
 	// confidence tracks the number of successful polls in a row that have
 	// returned the preference
 	confidence int
-
-	// rogue tracks if this instance has multiple choices or only one
-	rogue bool
 
 	// finalized prevents the state from changing after the required number of
 	// consecutive polls has been reached
 	finalized bool
 }
 
-func (sf *nnarySnowflake) Add(choice ids.ID) {
-	sf.rogue = sf.rogue || choice != sf.preference
-}
+func (*nnarySnowflake) Add(_ ids.ID) {}
 
 func (sf *nnarySnowflake) RecordSuccessfulPoll(choice ids.ID) {
 	if sf.finalized {
@@ -62,8 +52,7 @@ func (sf *nnarySnowflake) RecordSuccessfulPoll(choice ids.ID) {
 		sf.confidence = 1
 	}
 
-	sf.finalized = (!sf.rogue && sf.confidence >= sf.betaVirtuous) ||
-		sf.confidence >= sf.betaRogue
+	sf.finalized = sf.confidence >= sf.beta
 	sf.nnarySlush.RecordSuccessfulPoll(choice)
 }
 

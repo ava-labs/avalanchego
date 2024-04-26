@@ -45,7 +45,7 @@ func TestUnarySnowball(t *testing.T) {
 
 	UnarySnowballStateTest(t, sbClone, 4, 1, false)
 
-	binarySnowball := sbClone.Extend(beta, 0)
+	binarySnowball := sbClone.Extend(0)
 
 	expected := "SB(Preference = 0, PreferenceStrength[0] = 4, PreferenceStrength[1] = 0, SF(Confidence = 1, Finalized = false, SL(Preference = 0)))"
 	require.Equal(expected, binarySnowball.String())
