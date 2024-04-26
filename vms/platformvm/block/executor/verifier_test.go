@@ -442,7 +442,7 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 	verifier := &verifier{
 		txExecutorBackend: &executor.Backend{
 			Config: &config.Config{
-				Config: upgrade.Config{
+				UpgradeConfig: upgrade.Config{
 					BanffTime: mockable.MaxTime, // banff is not activated
 				},
 			},
@@ -528,7 +528,7 @@ func TestVerifierVisitAtomicBlock(t *testing.T) {
 	verifier := &verifier{
 		txExecutorBackend: &executor.Backend{
 			Config: &config.Config{
-				Config: upgrade.Config{
+				UpgradeConfig: upgrade.Config{
 					ApricotPhase5Time: time.Now().Add(time.Hour),
 					BanffTime:         mockable.MaxTime, // banff is not activated
 				},
@@ -617,7 +617,7 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 	verifier := &verifier{
 		txExecutorBackend: &executor.Backend{
 			Config: &config.Config{
-				Config: upgrade.Config{
+				UpgradeConfig: upgrade.Config{
 					ApricotPhase5Time: time.Now().Add(time.Hour),
 					BanffTime:         mockable.MaxTime, // banff is not activated
 					CortinaTime:       mockable.MaxTime,
@@ -727,7 +727,7 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 	verifier := &verifier{
 		txExecutorBackend: &executor.Backend{
 			Config: &config.Config{
-				Config: upgrade.Config{
+				UpgradeConfig: upgrade.Config{
 					BanffTime: mockable.MaxTime, // banff is not activated
 				},
 			},
@@ -800,7 +800,7 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 	verifier := &verifier{
 		txExecutorBackend: &executor.Backend{
 			Config: &config.Config{
-				Config: upgrade.Config{
+				UpgradeConfig: upgrade.Config{
 					BanffTime: mockable.MaxTime, // banff is not activated
 				},
 			},
@@ -861,7 +861,7 @@ func TestVerifyUnverifiedParent(t *testing.T) {
 	verifier := &verifier{
 		txExecutorBackend: &executor.Backend{
 			Config: &config.Config{
-				Config: upgrade.Config{
+				UpgradeConfig: upgrade.Config{
 					BanffTime: mockable.MaxTime, // banff is not activated
 				},
 			},
@@ -935,7 +935,7 @@ func TestBanffAbortBlockTimestampChecks(t *testing.T) {
 			verifier := &verifier{
 				txExecutorBackend: &executor.Backend{
 					Config: &config.Config{
-						Config: upgrade.Config{
+						UpgradeConfig: upgrade.Config{
 							BanffTime: time.Time{}, // banff is activated
 						},
 					},
@@ -1033,7 +1033,7 @@ func TestBanffCommitBlockTimestampChecks(t *testing.T) {
 			verifier := &verifier{
 				txExecutorBackend: &executor.Backend{
 					Config: &config.Config{
-						Config: upgrade.Config{
+						UpgradeConfig: upgrade.Config{
 							BanffTime: time.Time{}, // banff is activated
 						},
 					},
@@ -1114,7 +1114,7 @@ func TestVerifierVisitStandardBlockWithDuplicateInputs(t *testing.T) {
 	verifier := &verifier{
 		txExecutorBackend: &executor.Backend{
 			Config: &config.Config{
-				Config: upgrade.Config{
+				UpgradeConfig: upgrade.Config{
 					ApricotPhase5Time: time.Now().Add(time.Hour),
 					BanffTime:         mockable.MaxTime, // banff is not activated
 					CortinaTime:       mockable.MaxTime,
@@ -1208,7 +1208,7 @@ func TestVerifierVisitApricotStandardBlockWithProposalBlockParent(t *testing.T) 
 	verifier := &verifier{
 		txExecutorBackend: &executor.Backend{
 			Config: &config.Config{
-				Config: upgrade.Config{
+				UpgradeConfig: upgrade.Config{
 					BanffTime: mockable.MaxTime, // banff is not activated
 				},
 			},
@@ -1267,7 +1267,7 @@ func TestVerifierVisitBanffStandardBlockWithProposalBlockParent(t *testing.T) {
 	verifier := &verifier{
 		txExecutorBackend: &executor.Backend{
 			Config: &config.Config{
-				Config: upgrade.Config{
+				UpgradeConfig: upgrade.Config{
 					BanffTime: time.Time{}, // banff is activated
 				},
 			},
@@ -1306,7 +1306,7 @@ func TestVerifierVisitApricotCommitBlockUnexpectedParentState(t *testing.T) {
 	verifier := &verifier{
 		txExecutorBackend: &executor.Backend{
 			Config: &config.Config{
-				Config: upgrade.Config{
+				UpgradeConfig: upgrade.Config{
 					BanffTime: mockable.MaxTime, // banff is not activated
 				},
 			},
@@ -1351,7 +1351,7 @@ func TestVerifierVisitBanffCommitBlockUnexpectedParentState(t *testing.T) {
 	verifier := &verifier{
 		txExecutorBackend: &executor.Backend{
 			Config: &config.Config{
-				Config: upgrade.Config{
+				UpgradeConfig: upgrade.Config{
 					BanffTime: time.Time{}, // banff is activated
 				},
 			},
@@ -1397,7 +1397,7 @@ func TestVerifierVisitApricotAbortBlockUnexpectedParentState(t *testing.T) {
 	verifier := &verifier{
 		txExecutorBackend: &executor.Backend{
 			Config: &config.Config{
-				Config: upgrade.Config{
+				UpgradeConfig: upgrade.Config{
 					BanffTime: mockable.MaxTime, // banff is not activated
 				},
 			},
@@ -1442,7 +1442,7 @@ func TestVerifierVisitBanffAbortBlockUnexpectedParentState(t *testing.T) {
 	verifier := &verifier{
 		txExecutorBackend: &executor.Backend{
 			Config: &config.Config{
-				Config: upgrade.Config{
+				UpgradeConfig: upgrade.Config{
 					BanffTime: time.Time{}, // banff is activated
 				},
 			},

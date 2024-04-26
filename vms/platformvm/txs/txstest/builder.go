@@ -380,8 +380,8 @@ func (b *Builder) builders(keys []*secp256k1.PrivateKey) (builder.Builder, walle
 
 func (b *Builder) feeCalculator() *fee.Calculator {
 	var (
-		staticFeeCfg = b.cfg.StaticConfig
-		upgrades     = b.cfg.Config
+		staticFeeCfg = b.cfg.StaticFeeConfig
+		upgrades     = b.cfg.UpgradeConfig
 		chainTime    = b.state.GetTimestamp()
 		isEActive    = upgrades.IsEActivated(chainTime)
 	)

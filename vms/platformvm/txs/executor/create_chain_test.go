@@ -50,7 +50,7 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 	require.NoError(err)
 
 	chainTime := env.state.GetTimestamp()
-	feeCfg := config.GetDynamicFeesConfig(env.config.IsEActivated(chainTime))
+	feeCfg := config.GetDynamicFeesConfig(env.config.UpgradeConfig.IsEActivated(chainTime))
 	executor := StandardTxExecutor{
 		Backend:            &env.backend,
 		BlkFeeManager:      commonfees.NewManager(feeCfg.FeeRate),
@@ -92,7 +92,7 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 	require.NoError(err)
 
 	chainTime := stateDiff.GetTimestamp()
-	feeCfg := config.GetDynamicFeesConfig(env.config.IsEActivated(chainTime))
+	feeCfg := config.GetDynamicFeesConfig(env.config.UpgradeConfig.IsEActivated(chainTime))
 	executor := StandardTxExecutor{
 		Backend:            &env.backend,
 		BlkFeeManager:      commonfees.NewManager(feeCfg.FeeRate),
@@ -128,7 +128,7 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 	require.NoError(err)
 
 	currentTime := stateDiff.GetTimestamp()
-	feeCfg := config.GetDynamicFeesConfig(env.config.IsEActivated(currentTime))
+	feeCfg := config.GetDynamicFeesConfig(env.config.UpgradeConfig.IsEActivated(currentTime))
 	executor := StandardTxExecutor{
 		Backend:            &env.backend,
 		BlkFeeManager:      commonfees.NewManager(feeCfg.FeeRate),
@@ -161,7 +161,7 @@ func TestCreateChainTxValid(t *testing.T) {
 	require.NoError(err)
 
 	currentTime := stateDiff.GetTimestamp()
-	feeCfg := config.GetDynamicFeesConfig(env.config.IsEActivated(currentTime))
+	feeCfg := config.GetDynamicFeesConfig(env.config.UpgradeConfig.IsEActivated(currentTime))
 	executor := StandardTxExecutor{
 		Backend:            &env.backend,
 		BlkFeeManager:      commonfees.NewManager(feeCfg.FeeRate),
@@ -204,7 +204,7 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 			require := require.New(t)
 
 			env := newEnvironment(t, banff)
-			env.config.ApricotPhase3Time = ap3Time
+			env.config.UpgradeConfig.ApricotPhase3Time = ap3Time
 
 			addrs := set.NewSet[ids.ShortID](len(preFundedKeys))
 			for _, key := range preFundedKeys {
@@ -214,7 +214,7 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 			env.state.SetTimestamp(test.time) // to duly set fee
 
 			cfg := *env.config
-			cfg.CreateBlockchainTxFee = test.fee
+			cfg.StaticFeeConfig.CreateBlockchainTxFee = test.fee
 			builder := txstest.NewBuilder(env.ctx, &cfg, env.state)
 			tx, err := builder.NewCreateChainTx(
 				testSubnet1.ID(),
@@ -232,7 +232,7 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 			stateDiff.SetTimestamp(test.time)
 
 			currentTime := stateDiff.GetTimestamp()
-			feeCfg := config.GetDynamicFeesConfig(env.config.IsEActivated(currentTime))
+			feeCfg := config.GetDynamicFeesConfig(env.config.UpgradeConfig.IsEActivated(currentTime))
 			executor := StandardTxExecutor{
 				Backend:            &env.backend,
 				BlkFeeManager:      commonfees.NewManager(feeCfg.FeeRate),

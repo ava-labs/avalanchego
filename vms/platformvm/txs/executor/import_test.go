@@ -50,7 +50,7 @@ func TestNewImportTx(t *testing.T) {
 				sourceKey,
 				env.ctx.XChainID,
 				map[ids.ID]uint64{
-					env.ctx.AVAXAssetID: env.config.TxFee - 1,
+					env.ctx.AVAXAssetID: env.config.StaticFeeConfig.TxFee - 1,
 				},
 			),
 			sourceKeys:  []*secp256k1.PrivateKey{sourceKey},
@@ -65,7 +65,7 @@ func TestNewImportTx(t *testing.T) {
 				sourceKey,
 				env.ctx.XChainID,
 				map[ids.ID]uint64{
-					env.ctx.AVAXAssetID: env.config.TxFee,
+					env.ctx.AVAXAssetID: env.config.StaticFeeConfig.TxFee,
 				},
 			),
 			sourceKeys:  []*secp256k1.PrivateKey{sourceKey},
@@ -80,11 +80,11 @@ func TestNewImportTx(t *testing.T) {
 				sourceKey,
 				env.ctx.CChainID,
 				map[ids.ID]uint64{
-					env.ctx.AVAXAssetID: env.config.TxFee,
+					env.ctx.AVAXAssetID: env.config.StaticFeeConfig.TxFee,
 				},
 			),
 			sourceKeys:  []*secp256k1.PrivateKey{sourceKey},
-			timestamp:   env.config.ApricotPhase5Time,
+			timestamp:   env.config.UpgradeConfig.ApricotPhase5Time,
 			expectedErr: nil,
 		},
 		{
@@ -96,12 +96,12 @@ func TestNewImportTx(t *testing.T) {
 				sourceKey,
 				env.ctx.XChainID,
 				map[ids.ID]uint64{
-					env.ctx.AVAXAssetID: env.config.TxFee,
+					env.ctx.AVAXAssetID: env.config.StaticFeeConfig.TxFee,
 					customAssetID:       1,
 				},
 			),
 			sourceKeys:  []*secp256k1.PrivateKey{sourceKey},
-			timestamp:   env.config.ApricotPhase5Time,
+			timestamp:   env.config.UpgradeConfig.ApricotPhase5Time,
 			expectedErr: nil,
 		},
 	}
@@ -143,7 +143,7 @@ func TestNewImportTx(t *testing.T) {
 				totalOut += out.Out.Amount()
 			}
 
-			require.Equal(env.config.TxFee, totalIn-totalOut)
+			require.Equal(env.config.StaticFeeConfig.TxFee, totalIn-totalOut)
 
 			stateDiff, err := state.NewDiff(lastAcceptedID, env)
 			require.NoError(err)

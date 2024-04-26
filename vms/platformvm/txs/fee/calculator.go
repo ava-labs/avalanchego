@@ -54,12 +54,13 @@ func (c *Calculator) RemoveFeesFor(unitsToRm fees.Dimensions) (uint64, error) {
 type calculator struct {
 	// setup
 	isEActive bool
-	// Pre E-fork inputs
+
+	// Pre E-upgrade inputs
 	upgrades  upgrade.Config
 	staticCfg StaticConfig
 	time      time.Time
 
-	// Post E-fork inputs
+	// Post E-upgrade inputs
 	feeManager         *fees.Manager
 	blockMaxComplexity fees.Dimensions
 	credentials        []verify.Verifiable
@@ -96,126 +97,134 @@ func NewDynamicCalculator(
 	}
 }
 
-func (fc *calculator) AddValidatorTx(*txs.AddValidatorTx) error {
+func (c *calculator) AddValidatorTx(*txs.AddValidatorTx) error {
 	// AddValidatorTx is banned following Durango activation, so we
 	// only return the pre EUpgrade fee here
-	fc.fee = fc.staticCfg.AddPrimaryNetworkValidatorFee
+	c.fee = c.staticCfg.AddPrimaryNetworkValidatorFee
 	return nil
 }
 
-func (fc *calculator) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
-	if !fc.isEActive {
-		fc.fee = fc.staticCfg.AddSubnetValidatorFee
+func (c *calculator) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
+	if !c.isEActive {
+		c.fee = c.staticCfg.AddSubnetValidatorFee
 		return nil
 	}
 
-	complexity, err := fc.meterTx(tx, tx.Outs, tx.Ins)
+	complexity, err := c.meterTx(tx, tx.Outs, tx.Ins)
 	if err != nil {
 		return err
 	}
 
-	_, err = fc.addFeesFor(complexity)
+	_, err = c.addFeesFor(complexity)
 	return err
 }
 
-func (fc *calculator) AddDelegatorTx(*txs.AddDelegatorTx) error {
+func (c *calculator) AddDelegatorTx(*txs.AddDelegatorTx) error {
 	// AddValidatorTx is banned following Durango activation, so we
 	// only return the pre EUpgrade fee here
-	fc.fee = fc.staticCfg.AddPrimaryNetworkDelegatorFee
+	c.fee = c.staticCfg.AddPrimaryNetworkDelegatorFee
 	return nil
 }
 
-func (fc *calculator) CreateChainTx(tx *txs.CreateChainTx) error {
-	if !fc.isEActive {
-		fc.fee = fc.staticCfg.GetCreateBlockchainTxFee(fc.upgrades, fc.time)
-		return nil
-	}
-
-	complexity, err := fc.meterTx(tx, tx.Outs, tx.Ins)
-	if err != nil {
-		return err
-	}
-
-	_, err = fc.addFeesFor(complexity)
-	return err
-}
-
-func (fc *calculator) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
-	if !fc.isEActive {
-		fc.fee = fc.staticCfg.GetCreateSubnetTxFee(fc.upgrades, fc.time)
-		return nil
-	}
-
-	complexity, err := fc.meterTx(tx, tx.Outs, tx.Ins)
-	if err != nil {
-		return err
-	}
-
-	_, err = fc.addFeesFor(complexity)
-	return err
-}
-
-func (fc *calculator) AdvanceTimeTx(*txs.AdvanceTimeTx) error {
-	fc.fee = 0
-	return nil // no fees
-}
-
-func (fc *calculator) RewardValidatorTx(*txs.RewardValidatorTx) error {
-	fc.fee = 0
-	return nil // no fees
-}
-
-func (fc *calculator) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx) error {
-	if !fc.isEActive {
-		fc.fee = fc.staticCfg.TxFee
-		return nil
-	}
-
-	complexity, err := fc.meterTx(tx, tx.Outs, tx.Ins)
-	if err != nil {
-		return err
-	}
-
-	_, err = fc.addFeesFor(complexity)
-	return err
-}
-
-func (fc *calculator) TransformSubnetTx(tx *txs.TransformSubnetTx) error {
-	if !fc.isEActive {
-		fc.fee = fc.staticCfg.TransformSubnetTxFee
-		return nil
-	}
-
-	complexity, err := fc.meterTx(tx, tx.Outs, tx.Ins)
-	if err != nil {
-		return err
-	}
-
-	_, err = fc.addFeesFor(complexity)
-	return err
-}
-
-func (fc *calculator) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwnershipTx) error {
-	if !fc.isEActive {
-		fc.fee = fc.staticCfg.TxFee
-		return nil
-	}
-
-	complexity, err := fc.meterTx(tx, tx.Outs, tx.Ins)
-	if err != nil {
-		return err
-	}
-
-	_, err = fc.addFeesFor(complexity)
-	return err
-}
-
-func (fc *calculator) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessValidatorTx) error {
-	if !fc.isEActive {
-		if tx.Subnet != constants.PrimaryNetworkID {
-			fc.fee = fc.staticCfg.AddSubnetValidatorFee
+func (c *calculator) CreateChainTx(tx *txs.CreateChainTx) error {
+	if !c.isEActive {
+		if c.upgrades.IsApricotPhase3Activated(c.time) {
+			c.fee = c.staticCfg.CreateBlockchainTxFee
 		} else {
-			fc.fee = fc.staticCfg.AddPrimaryNetworkValidatorFee
+			c.fee = c.staticCfg.CreateAssetTxFee
+		}
+		return nil
+	}
+
+	complexity, err := c.meterTx(tx, tx.Outs, tx.Ins)
+	if err != nil {
+		return err
+	}
+
+	_, err = c.addFeesFor(complexity)
+	return err
+}
+
+func (c *calculator) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
+	if !c.isEActive {
+		if c.upgrades.IsApricotPhase3Activated(c.time) {
+			c.fee = c.staticCfg.CreateSubnetTxFee
+		} else {
+			c.fee = c.staticCfg.CreateAssetTxFee
+		}
+		return nil
+	}
+
+	complexity, err := c.meterTx(tx, tx.Outs, tx.Ins)
+	if err != nil {
+		return err
+	}
+
+	_, err = c.addFeesFor(complexity)
+	return err
+}
+
+func (c *calculator) AdvanceTimeTx(*txs.AdvanceTimeTx) error {
+	c.fee = 0
+	return nil // no fees
+}
+
+func (c *calculator) RewardValidatorTx(*txs.RewardValidatorTx) error {
+	c.fee = 0
+	return nil // no fees
+}
+
+func (c *calculator) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx) error {
+	if !c.isEActive {
+		c.fee = c.staticCfg.TxFee
+		return nil
+	}
+
+	complexity, err := c.meterTx(tx, tx.Outs, tx.Ins)
+	if err != nil {
+		return err
+	}
+
+	_, err = c.addFeesFor(complexity)
+	return err
+}
+
+func (c *calculator) TransformSubnetTx(tx *txs.TransformSubnetTx) error {
+	if !c.isEActive {
+		c.fee = c.staticCfg.TransformSubnetTxFee
+		return nil
+	}
+
+	complexity, err := c.meterTx(tx, tx.Outs, tx.Ins)
+	if err != nil {
+		return err
+	}
+
+	_, err = c.addFeesFor(complexity)
+	return err
+}
+
+func (c *calculator) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwnershipTx) error {
+	if !c.isEActive {
+		c.fee = c.staticCfg.TxFee
+		return nil
+	}
+
+	complexity, err := c.meterTx(tx, tx.Outs, tx.Ins)
+	if err != nil {
+		return err
+	}
+
+	_, err = c.addFeesFor(complexity)
+	return err
+}
+
+func (c *calculator) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessValidatorTx) error {
+	if !c.isEActive {
+		if tx.Subnet != constants.PrimaryNetworkID {
+			c.fee = c.staticCfg.AddSubnetValidatorFee
+		} else {
+			c.fee = c.staticCfg.AddPrimaryNetworkValidatorFee
 		}
 		return nil
 	}
@@ -224,21 +233,21 @@ func (fc *calculator) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessVali
 	copy(outs, tx.Outs)
 	copy(outs[len(tx.Outs):], tx.StakeOuts)
 
-	complexity, err := fc.meterTx(tx, outs, tx.Ins)
+	complexity, err := c.meterTx(tx, outs, tx.Ins)
 	if err != nil {
 		return err
 	}
 
-	_, err = fc.addFeesFor(complexity)
+	_, err = c.addFeesFor(complexity)
 	return err
 }
 
-func (fc *calculator) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDelegatorTx) error {
-	if !fc.isEActive {
+func (c *calculator) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDelegatorTx) error {
+	if !c.isEActive {
 		if tx.Subnet != constants.PrimaryNetworkID {
-			fc.fee = fc.staticCfg.AddSubnetDelegatorFee
+			c.fee = c.staticCfg.AddSubnetDelegatorFee
 		} else {
-			fc.fee = fc.staticCfg.AddPrimaryNetworkDelegatorFee
+			c.fee = c.staticCfg.AddPrimaryNetworkDelegatorFee
 		}
 		return nil
 	}
@@ -247,33 +256,33 @@ func (fc *calculator) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDele
 	copy(outs, tx.Outs)
 	copy(outs[len(tx.Outs):], tx.StakeOuts)
 
-	complexity, err := fc.meterTx(tx, outs, tx.Ins)
+	complexity, err := c.meterTx(tx, outs, tx.Ins)
 	if err != nil {
 		return err
 	}
 
-	_, err = fc.addFeesFor(complexity)
+	_, err = c.addFeesFor(complexity)
 	return err
 }
 
-func (fc *calculator) BaseTx(tx *txs.BaseTx) error {
-	if !fc.isEActive {
-		fc.fee = fc.staticCfg.TxFee
+func (c *calculator) BaseTx(tx *txs.BaseTx) error {
+	if !c.isEActive {
+		c.fee = c.staticCfg.TxFee
 		return nil
 	}
 
-	complexity, err := fc.meterTx(tx, tx.Outs, tx.Ins)
+	complexity, err := c.meterTx(tx, tx.Outs, tx.Ins)
 	if err != nil {
 		return err
 	}
 
-	_, err = fc.addFeesFor(complexity)
+	_, err = c.addFeesFor(complexity)
 	return err
 }
 
-func (fc *calculator) ImportTx(tx *txs.ImportTx) error {
-	if !fc.isEActive {
-		fc.fee = fc.staticCfg.TxFee
+func (c *calculator) ImportTx(tx *txs.ImportTx) error {
+	if !c.isEActive {
+		c.fee = c.staticCfg.TxFee
 		return nil
 	}
 
@@ -281,18 +290,18 @@ func (fc *calculator) ImportTx(tx *txs.ImportTx) error {
 	copy(ins, tx.Ins)
 	copy(ins[len(tx.Ins):], tx.ImportedInputs)
 
-	complexity, err := fc.meterTx(tx, tx.Outs, ins)
+	complexity, err := c.meterTx(tx, tx.Outs, ins)
 	if err != nil {
 		return err
 	}
 
-	_, err = fc.addFeesFor(complexity)
+	_, err = c.addFeesFor(complexity)
 	return err
 }
 
-func (fc *calculator) ExportTx(tx *txs.ExportTx) error {
-	if !fc.isEActive {
-		fc.fee = fc.staticCfg.TxFee
+func (c *calculator) ExportTx(tx *txs.ExportTx) error {
+	if !c.isEActive {
+		c.fee = c.staticCfg.TxFee
 		return nil
 	}
 
@@ -300,16 +309,16 @@ func (fc *calculator) ExportTx(tx *txs.ExportTx) error {
 	copy(outs, tx.Outs)
 	copy(outs[len(tx.Outs):], tx.ExportedOutputs)
 
-	complexity, err := fc.meterTx(tx, outs, tx.Ins)
+	complexity, err := c.meterTx(tx, outs, tx.Ins)
 	if err != nil {
 		return err
 	}
 
-	_, err = fc.addFeesFor(complexity)
+	_, err = c.addFeesFor(complexity)
 	return err
 }
 
-func (fc *calculator) meterTx(
+func (c *calculator) meterTx(
 	uTx txs.UnsignedTx,
 	allOuts []*avax.TransferableOutput,
 	allIns []*avax.TransferableInput,
@@ -324,7 +333,7 @@ func (fc *calculator) meterTx(
 
 	// meter credentials, one by one. Then account for the extra bytes needed to
 	// serialize a slice of credentials (codec version bytes + slice size bytes)
-	for i, cred := range fc.credentials {
+	for i, cred := range c.credentials {
 		c, ok := cred.(*secp256k1fx.Credential)
 		if !ok {
 			return complexity, fmt.Errorf("don't know how to calculate complexity of %T", cred)
@@ -368,39 +377,39 @@ func (fc *calculator) meterTx(
 	return complexity, nil
 }
 
-func (fc *calculator) addFeesFor(complexity fees.Dimensions) (uint64, error) {
-	if fc.feeManager == nil || complexity == fees.Empty {
+func (c *calculator) addFeesFor(complexity fees.Dimensions) (uint64, error) {
+	if c.feeManager == nil || complexity == fees.Empty {
 		return 0, nil
 	}
 
-	boundBreached, dimension := fc.feeManager.CumulateComplexity(complexity, fc.blockMaxComplexity)
+	boundBreached, dimension := c.feeManager.CumulateComplexity(complexity, c.blockMaxComplexity)
 	if boundBreached {
 		return 0, fmt.Errorf("%w: breached dimension %d", errFailedComplexityCumulation, dimension)
 	}
 
-	fee, err := fc.feeManager.CalculateFee(complexity)
+	fee, err := c.feeManager.CalculateFee(complexity)
 	if err != nil {
 		return 0, fmt.Errorf("%w: %w", errFailedFeeCalculation, err)
 	}
 
-	fc.fee += fee
+	c.fee += fee
 	return fee, nil
 }
 
-func (fc *calculator) removeFeesFor(unitsToRm fees.Dimensions) (uint64, error) {
-	if fc.feeManager == nil || unitsToRm == fees.Empty {
+func (c *calculator) removeFeesFor(unitsToRm fees.Dimensions) (uint64, error) {
+	if c.feeManager == nil || unitsToRm == fees.Empty {
 		return 0, nil
 	}
 
-	if err := fc.feeManager.RemoveComplexity(unitsToRm); err != nil {
+	if err := c.feeManager.RemoveComplexity(unitsToRm); err != nil {
 		return 0, fmt.Errorf("failed removing units: %w", err)
 	}
 
-	fee, err := fc.feeManager.CalculateFee(unitsToRm)
+	fee, err := c.feeManager.CalculateFee(unitsToRm)
 	if err != nil {
 		return 0, fmt.Errorf("%w: %w", errFailedFeeCalculation, err)
 	}
 
-	fc.fee -= fee
+	c.fee -= fee
 	return fee, nil
 }

@@ -182,11 +182,11 @@ func (v *verifier) ApricotAtomicBlock(b *block.ApricotAtomicBlock) error {
 	parentID := b.Parent()
 	currentTimestamp := v.getTimestamp(parentID)
 	cfg := v.txExecutorBackend.Config
-	if cfg.IsApricotPhase5Activated(currentTimestamp) {
+	if cfg.UpgradeConfig.IsApricotPhase5Activated(currentTimestamp) {
 		return fmt.Errorf(
 			"the chain timestamp (%d) is after the apricot phase 5 time (%d), hence atomic transactions should go through the standard block",
 			currentTimestamp.Unix(),
-			cfg.ApricotPhase5Time.Unix(),
+			cfg.UpgradeConfig.ApricotPhase5Time.Unix(),
 		)
 	}
 
@@ -294,7 +294,7 @@ func (v *verifier) apricotCommonBlock(b block.Block) error {
 	// during the verification of the ProposalBlock.
 	parentID := b.Parent()
 	timestamp := v.getTimestamp(parentID)
-	if v.txExecutorBackend.Config.IsBanffActivated(timestamp) {
+	if v.txExecutorBackend.Config.UpgradeConfig.IsBanffActivated(timestamp) {
 		return fmt.Errorf("%w: timestamp = %s", errApricotBlockIssuedAfterFork, timestamp)
 	}
 	return v.commonBlock(b)
@@ -447,7 +447,7 @@ func (v *verifier) processStandardTxs(txs []*txs.Tx, state state.Diff, parentID 
 	error,
 ) {
 	var (
-		isEActive = v.txExecutorBackend.Config.IsEActivated(state.GetTimestamp())
+		isEActive = v.txExecutorBackend.Config.UpgradeConfig.IsEActivated(state.GetTimestamp())
 		feesCfg   = config.GetDynamicFeesConfig(isEActive)
 		feesMan   = fees.NewManager(feesCfg.FeeRate)
 

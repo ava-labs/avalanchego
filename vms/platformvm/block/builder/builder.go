@@ -334,7 +334,7 @@ func packBlockTxs(
 	}
 
 	var (
-		isEActivated = backend.Config.IsEActivated(timestamp)
+		isEActivated = backend.Config.UpgradeConfig.IsEActivated(timestamp)
 		feeCfg       = config.GetDynamicFeesConfig(isEActivated)
 		feeMan       = fees.NewManager(feeCfg.FeeRate)
 
