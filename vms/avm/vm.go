@@ -108,7 +108,7 @@ type VM struct {
 
 	addressTxsIndexer index.AddressTxsIndexer
 
-	txExecutorBackend *txexecutor.Backend
+	txBackend *txexecutor.Backend
 
 	// Cancelled on shutdown
 	onShutdownCtx context.Context
@@ -260,7 +260,7 @@ func (vm *VM) Initialize(
 		}
 	}
 
-	vm.txExecutorBackend = &txexecutor.Backend{
+	vm.txBackend = &txexecutor.Backend{
 		Ctx:           ctx,
 		Config:        &vm.Config,
 		Fxs:           vm.fxs,
@@ -277,7 +277,7 @@ func (vm *VM) Initialize(
 
 // onBootstrapStarted is called by the consensus engine when it starts bootstrapping this chain
 func (vm *VM) onBootstrapStarted() error {
-	vm.txExecutorBackend.Bootstrapped = false
+	vm.txBackend.Bootstrapped = false
 	for _, fx := range vm.fxs {
 		if err := fx.Fx.Bootstrapping(); err != nil {
 			return err
@@ -287,7 +287,7 @@ func (vm *VM) onBootstrapStarted() error {
 }
 
 func (vm *VM) onNormalOperationsStarted() error {
-	vm.txExecutorBackend.Bootstrapped = true
+	vm.txBackend.Bootstrapped = true
 	for _, fx := range vm.fxs {
 		if err := fx.Fx.Bootstrapped(); err != nil {
 			return err
@@ -411,13 +411,13 @@ func (vm *VM) Linearize(ctx context.Context, stopVertexID ids.ID, toEngine chan<
 		mempool,
 		vm.metrics,
 		vm.state,
-		vm.txExecutorBackend,
+		vm.txBackend,
 		&vm.clock,
 		vm.onAccept,
 	)
 
 	vm.Builder = blockbuilder.New(
-		vm.txExecutorBackend,
+		vm.txBackend,
 		vm.chainManager,
 		&vm.clock,
 		mempool,
@@ -480,7 +480,7 @@ func (vm *VM) ParseTx(_ context.Context, bytes []byte) (snowstorm.Tx, error) {
 	}
 
 	err = tx.Unsigned.Visit(&txexecutor.SyntacticVerifier{
-		Backend: vm.txExecutorBackend,
+		Backend: vm.txBackend,
 		Tx:      tx,
 	})
 	if err != nil {

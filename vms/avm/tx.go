@@ -45,7 +45,7 @@ func (tx *Tx) Accept(context.Context) error {
 	}
 
 	executor := &executor.Executor{
-		Codec: tx.vm.txExecutorBackend.Codec,
+		Codec: tx.vm.txBackend.Codec,
 		State: tx.vm.state,
 		Tx:    tx.tx,
 	}
@@ -126,7 +126,7 @@ func (tx *Tx) Verify(context.Context) error {
 		return fmt.Errorf("%w: %s", errTxNotProcessing, s)
 	}
 	return tx.tx.Unsigned.Visit(&executor.SemanticVerifier{
-		Backend: tx.vm.txExecutorBackend,
+		Backend: tx.vm.txBackend,
 		State:   tx.vm.state,
 		Tx:      tx.tx,
 	})
