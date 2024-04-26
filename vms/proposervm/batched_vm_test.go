@@ -62,7 +62,7 @@ func TestGetAncestorsPreForkOnly(t *testing.T) {
 		activationTime = mockable.MaxTime
 		durangoTime    = activationTime
 	)
-	coreVM, proRemoteVM, coreGenBlk := initTestRemoteProposerVM(t, activationTime, durangoTime)
+	coreVM, proRemoteVM := initTestRemoteProposerVM(t, activationTime, durangoTime)
 	defer func() {
 		require.NoError(proRemoteVM.Shutdown(context.Background()))
 	}()
@@ -74,9 +74,9 @@ func TestGetAncestorsPreForkOnly(t *testing.T) {
 			StatusV: choices.Processing,
 		},
 		BytesV:     []byte{1},
-		ParentV:    coreGenBlk.ID(),
-		HeightV:    coreGenBlk.Height() + 1,
-		TimestampV: coreGenBlk.Timestamp(),
+		ParentV:    snowmantest.GenesisID,
+		HeightV:    snowmantest.GenesisHeight + 1,
+		TimestampV: snowmantest.GenesisTimestamp,
 	}
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return coreBlk1, nil
@@ -212,7 +212,7 @@ func TestGetAncestorsPostForkOnly(t *testing.T) {
 		activationTime = time.Unix(0, 0)
 		durangoTime    = activationTime
 	)
-	coreVM, proRemoteVM, coreGenBlk := initTestRemoteProposerVM(t, activationTime, durangoTime)
+	coreVM, proRemoteVM := initTestRemoteProposerVM(t, activationTime, durangoTime)
 	defer func() {
 		require.NoError(proRemoteVM.Shutdown(context.Background()))
 	}()
@@ -224,8 +224,8 @@ func TestGetAncestorsPostForkOnly(t *testing.T) {
 			StatusV: choices.Processing,
 		},
 		BytesV:  []byte{1},
-		ParentV: coreGenBlk.ID(),
-		HeightV: coreGenBlk.Height() + 1,
+		ParentV: snowmantest.GenesisID,
+		HeightV: snowmantest.GenesisHeight + 1,
 	}
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return coreBlk1, nil
@@ -301,8 +301,8 @@ func TestGetAncestorsPostForkOnly(t *testing.T) {
 
 	coreVM.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
 		switch {
-		case bytes.Equal(b, coreGenBlk.Bytes()):
-			return coreGenBlk, nil
+		case bytes.Equal(b, snowmantest.GenesisBytes):
+			return snowmantest.Genesis, nil
 		case bytes.Equal(b, coreBlk1.Bytes()):
 			return coreBlk1, nil
 		case bytes.Equal(b, coreBlk2.Bytes()):
@@ -372,7 +372,7 @@ func TestGetAncestorsAtSnomanPlusPlusFork(t *testing.T) {
 	)
 
 	// enable ProBlks in next future
-	coreVM, proRemoteVM, coreGenBlk := initTestRemoteProposerVM(t, forkTime, durangoTime)
+	coreVM, proRemoteVM := initTestRemoteProposerVM(t, forkTime, durangoTime)
 	defer func() {
 		require.NoError(proRemoteVM.Shutdown(context.Background()))
 	}()
@@ -385,8 +385,8 @@ func TestGetAncestorsAtSnomanPlusPlusFork(t *testing.T) {
 			StatusV: choices.Processing,
 		},
 		BytesV:     []byte{1},
-		ParentV:    coreGenBlk.ID(),
-		HeightV:    coreGenBlk.Height() + 1,
+		ParentV:    snowmantest.GenesisID,
+		HeightV:    snowmantest.GenesisHeight + 1,
 		TimestampV: preForkTime,
 	}
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
@@ -574,7 +574,7 @@ func TestBatchedParseBlockPreForkOnly(t *testing.T) {
 		activationTime = mockable.MaxTime
 		durangoTime    = activationTime
 	)
-	coreVM, proRemoteVM, coreGenBlk := initTestRemoteProposerVM(t, activationTime, durangoTime)
+	coreVM, proRemoteVM := initTestRemoteProposerVM(t, activationTime, durangoTime)
 	defer func() {
 		require.NoError(proRemoteVM.Shutdown(context.Background()))
 	}()
@@ -586,8 +586,8 @@ func TestBatchedParseBlockPreForkOnly(t *testing.T) {
 			StatusV: choices.Processing,
 		},
 		BytesV:  []byte{1},
-		ParentV: coreGenBlk.ID(),
-		HeightV: coreGenBlk.Height() + 1,
+		ParentV: snowmantest.GenesisID,
+		HeightV: snowmantest.GenesisHeight + 1,
 	}
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return coreBlk1, nil
@@ -696,7 +696,7 @@ func TestBatchedParseBlockPostForkOnly(t *testing.T) {
 		activationTime = time.Unix(0, 0)
 		durangoTime    = activationTime
 	)
-	coreVM, proRemoteVM, coreGenBlk := initTestRemoteProposerVM(t, activationTime, durangoTime)
+	coreVM, proRemoteVM := initTestRemoteProposerVM(t, activationTime, durangoTime)
 	defer func() {
 		require.NoError(proRemoteVM.Shutdown(context.Background()))
 	}()
@@ -708,8 +708,8 @@ func TestBatchedParseBlockPostForkOnly(t *testing.T) {
 			StatusV: choices.Processing,
 		},
 		BytesV:  []byte{1},
-		ParentV: coreGenBlk.ID(),
-		HeightV: coreGenBlk.Height() + 1,
+		ParentV: snowmantest.GenesisID,
+		HeightV: snowmantest.GenesisHeight + 1,
 	}
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return coreBlk1, nil
@@ -813,7 +813,7 @@ func TestBatchedParseBlockAtSnomanPlusPlusFork(t *testing.T) {
 	)
 
 	// enable ProBlks in next future
-	coreVM, proRemoteVM, coreGenBlk := initTestRemoteProposerVM(t, forkTime, durangoTime)
+	coreVM, proRemoteVM := initTestRemoteProposerVM(t, forkTime, durangoTime)
 	defer func() {
 		require.NoError(proRemoteVM.Shutdown(context.Background()))
 	}()
@@ -826,8 +826,8 @@ func TestBatchedParseBlockAtSnomanPlusPlusFork(t *testing.T) {
 			StatusV: choices.Processing,
 		},
 		BytesV:     []byte{1},
-		ParentV:    coreGenBlk.ID(),
-		HeightV:    coreGenBlk.Height() + 1,
+		ParentV:    snowmantest.GenesisID,
+		HeightV:    snowmantest.GenesisHeight + 1,
 		TimestampV: preForkTime,
 	}
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
@@ -978,19 +978,8 @@ func initTestRemoteProposerVM(
 ) (
 	TestRemoteProposerVM,
 	*VM,
-	*snowmantest.Block,
 ) {
 	require := require.New(t)
-
-	coreGenBlk := &snowmantest.Block{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Accepted,
-		},
-		HeightV:    0,
-		TimestampV: snowmantest.GenesisTimestamp,
-		BytesV:     []byte{0},
-	}
 
 	initialState := []byte("genesis state")
 	coreVM := TestRemoteProposerVM{
@@ -1014,20 +1003,20 @@ func initTestRemoteProposerVM(
 		return nil
 	}
 	coreVM.LastAcceptedF = func(context.Context) (ids.ID, error) {
-		return coreGenBlk.ID(), nil
+		return snowmantest.GenesisID, nil
 	}
 	coreVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch {
-		case blkID == coreGenBlk.ID():
-			return coreGenBlk, nil
+		case blkID == snowmantest.GenesisID:
+			return snowmantest.Genesis, nil
 		default:
 			return nil, errUnknownBlock
 		}
 	}
 	coreVM.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
 		switch {
-		case bytes.Equal(b, coreGenBlk.Bytes()):
-			return coreGenBlk, nil
+		case bytes.Equal(b, snowmantest.GenesisBytes):
+			return snowmantest.Genesis, nil
 		default:
 			return nil, errUnknownBlock
 		}
@@ -1050,7 +1039,7 @@ func initTestRemoteProposerVM(
 		T: t,
 	}
 	valState.GetMinimumHeightF = func(context.Context) (uint64, error) {
-		return coreGenBlk.Height(), nil
+		return snowmantest.GenesisHeight, nil
 	}
 	valState.GetCurrentHeightF = func(context.Context) (uint64, error) {
 		return defaultPChainHeight, nil
@@ -1102,6 +1091,6 @@ func initTestRemoteProposerVM(
 	coreVM.InitializeF = nil
 
 	require.NoError(proVM.SetState(context.Background(), snow.NormalOp))
-	require.NoError(proVM.SetPreference(context.Background(), coreGenBlk.IDV))
-	return coreVM, proVM, coreGenBlk
+	require.NoError(proVM.SetPreference(context.Background(), snowmantest.GenesisID))
+	return coreVM, proVM
 }
