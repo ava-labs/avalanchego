@@ -110,7 +110,7 @@ func TestPreDurangoValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 		activationTime = time.Unix(0, 0)
 		durangoTime    = mockable.MaxTime
 	)
-	coreVM, valState, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+	coreVM, valState, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(ctx))
 	}()
@@ -125,8 +125,8 @@ func TestPreDurangoValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 			StatusV: choices.Processing,
 		},
 		BytesV:  []byte{1},
-		ParentV: coreGenBlk.ID(),
-		HeightV: coreGenBlk.Height() + 1,
+		ParentV: snowmantest.GenesisID,
+		HeightV: snowmantest.GenesisHeight + 1,
 	}
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return coreParentBlk, nil
@@ -135,8 +135,8 @@ func TestPreDurangoValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 		switch {
 		case blkID == coreParentBlk.ID():
 			return coreParentBlk, nil
-		case blkID == coreGenBlk.ID():
-			return coreGenBlk, nil
+		case blkID == snowmantest.GenesisID:
+			return snowmantest.Genesis, nil
 		default:
 			return nil, errUnknownBlock
 		}
@@ -145,8 +145,8 @@ func TestPreDurangoValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 		switch {
 		case bytes.Equal(b, coreParentBlk.Bytes()):
 			return coreParentBlk, nil
-		case bytes.Equal(b, coreGenBlk.Bytes()):
-			return coreGenBlk, nil
+		case bytes.Equal(b, snowmantest.GenesisBytes):
+			return snowmantest.Genesis, nil
 		default:
 			return nil, errUnknownBlock
 		}
@@ -247,7 +247,7 @@ func TestPreDurangoNonValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 		activationTime = time.Unix(0, 0)
 		durangoTime    = mockable.MaxTime
 	)
-	coreVM, valState, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+	coreVM, valState, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(ctx))
 	}()
@@ -262,8 +262,8 @@ func TestPreDurangoNonValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 			StatusV: choices.Processing,
 		},
 		BytesV:  []byte{1},
-		ParentV: coreGenBlk.ID(),
-		HeightV: coreGenBlk.Height() + 1,
+		ParentV: snowmantest.GenesisID,
+		HeightV: snowmantest.GenesisHeight + 1,
 	}
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return coreParentBlk, nil
@@ -272,8 +272,8 @@ func TestPreDurangoNonValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 		switch {
 		case blkID == coreParentBlk.ID():
 			return coreParentBlk, nil
-		case blkID == coreGenBlk.ID():
-			return coreGenBlk, nil
+		case blkID == snowmantest.GenesisID:
+			return snowmantest.Genesis, nil
 		default:
 			return nil, errUnknownBlock
 		}
@@ -282,8 +282,8 @@ func TestPreDurangoNonValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 		switch {
 		case bytes.Equal(b, coreParentBlk.Bytes()):
 			return coreParentBlk, nil
-		case bytes.Equal(b, coreGenBlk.Bytes()):
-			return coreGenBlk, nil
+		case bytes.Equal(b, snowmantest.GenesisBytes):
+			return snowmantest.Genesis, nil
 		default:
 			return nil, errUnknownBlock
 		}

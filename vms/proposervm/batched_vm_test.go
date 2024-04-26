@@ -33,7 +33,7 @@ func TestCoreVMNotRemote(t *testing.T) {
 		activationTime = time.Unix(0, 0)
 		durangoTime    = activationTime
 	)
-	_, _, proVM, _, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+	_, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
