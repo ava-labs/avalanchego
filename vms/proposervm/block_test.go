@@ -17,7 +17,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
@@ -119,15 +118,7 @@ func TestPreDurangoValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 	parentTime := time.Now().Truncate(time.Second)
 	proVM.Set(parentTime)
 
-	coreParentBlk := &snowmantest.Block{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		BytesV:  []byte{1},
-		ParentV: snowmantest.GenesisID,
-		HeightV: snowmantest.GenesisHeight + 1,
-	}
+	coreParentBlk := snowmantest.BuildChild(snowmantest.Genesis)
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return coreParentBlk, nil
 	}
@@ -177,15 +168,7 @@ func TestPreDurangoValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 		}, nil
 	}
 
-	coreChildBlk := &snowmantest.Block{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		BytesV:  []byte{2},
-		ParentV: coreParentBlk.ID(),
-		HeightV: coreParentBlk.Height() + 1,
-	}
+	coreChildBlk := snowmantest.BuildChild(coreParentBlk)
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return coreChildBlk, nil
 	}
@@ -256,15 +239,7 @@ func TestPreDurangoNonValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 	parentTime := time.Now().Truncate(time.Second)
 	proVM.Set(parentTime)
 
-	coreParentBlk := &snowmantest.Block{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		BytesV:  []byte{1},
-		ParentV: snowmantest.GenesisID,
-		HeightV: snowmantest.GenesisHeight + 1,
-	}
+	coreParentBlk := snowmantest.BuildChild(snowmantest.Genesis)
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return coreParentBlk, nil
 	}
@@ -316,15 +291,7 @@ func TestPreDurangoNonValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 		}, nil
 	}
 
-	coreChildBlk := &snowmantest.Block{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		BytesV:  []byte{2},
-		ParentV: coreParentBlk.ID(),
-		HeightV: coreParentBlk.Height() + 1,
-	}
+	coreChildBlk := snowmantest.BuildChild(coreParentBlk)
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return coreChildBlk, nil
 	}
