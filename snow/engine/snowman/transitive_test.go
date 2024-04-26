@@ -39,11 +39,10 @@ var (
 	errUnexpectedCall = errors.New("unexpected call")
 	errTest           = errors.New("non-nil test")
 
-	GenesisID    = ids.GenerateTestID()
 	GenesisBytes = utils.RandomBytes(32)
 	Genesis      = &snowmantest.Block{
 		TestDecidable: choices.TestDecidable{
-			IDV:     GenesisID,
+			IDV:     snowmantest.GenesisID,
 			StatusV: choices.Accepted,
 		},
 		BytesV: GenesisBytes,
@@ -124,12 +123,12 @@ func setup(t *testing.T, config Config) (ids.NodeID, validators.Manager, *common
 	vm.CantSetPreference = false
 
 	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
-		return GenesisID, nil
+		return snowmantest.GenesisID, nil
 	}
 
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
-		case GenesisID:
+		case snowmantest.GenesisID:
 			return Genesis, nil
 		default:
 			return nil, errUnknownBlock
@@ -170,7 +169,7 @@ func TestEngineDropsAttemptToIssueBlockAfterFailedRequest(t *testing.T) {
 	}
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
-		case GenesisID:
+		case snowmantest.GenesisID:
 			return Genesis, nil
 		default:
 			return nil, errUnknownBlock
@@ -208,9 +207,9 @@ func TestEngineQuery(t *testing.T) {
 		require.False(sendChitsCalled)
 		sendChitsCalled = true
 		require.Equal(uint32(15), requestID)
-		require.Equal(GenesisID, preferredID)
-		require.Equal(GenesisID, preferredIDByHeight)
-		require.Equal(GenesisID, accepted)
+		require.Equal(snowmantest.GenesisID, preferredID)
+		require.Equal(snowmantest.GenesisID, preferredIDByHeight)
+		require.Equal(snowmantest.GenesisID, accepted)
 	}
 
 	var getBlockCalled bool
@@ -218,7 +217,7 @@ func TestEngineQuery(t *testing.T) {
 		getBlockCalled = true
 
 		switch blkID {
-		case GenesisID:
+		case snowmantest.GenesisID:
 			return Genesis, nil
 		default:
 			return nil, errUnknownBlock
@@ -235,7 +234,7 @@ func TestEngineQuery(t *testing.T) {
 		require.Equal(peerID, nodeID)
 		require.Contains([]ids.ID{
 			parent.ID(),
-			GenesisID,
+			snowmantest.GenesisID,
 		}, blkID)
 	}
 
@@ -370,10 +369,10 @@ func TestEngineMultipleQuery(t *testing.T) {
 	vm.CantSetPreference = false
 
 	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
-		return GenesisID, nil
+		return snowmantest.GenesisID, nil
 	}
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
-		require.Equal(GenesisID, blkID)
+		require.Equal(snowmantest.GenesisID, blkID)
 		return Genesis, nil
 	}
 
@@ -403,7 +402,7 @@ func TestEngineMultipleQuery(t *testing.T) {
 
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
-		case GenesisID:
+		case snowmantest.GenesisID:
 			return Genesis, nil
 		default:
 			return nil, errUnknownBlock
@@ -420,7 +419,7 @@ func TestEngineMultipleQuery(t *testing.T) {
 
 	vm.GetBlockF = func(_ context.Context, id ids.ID) (snowman.Block, error) {
 		switch id {
-		case GenesisID:
+		case snowmantest.GenesisID:
 			return Genesis, nil
 		case blk0.ID():
 			return blk0, nil
@@ -492,7 +491,7 @@ func TestEngineBlockedIssue(t *testing.T) {
 	sender.SendGetF = func(context.Context, ids.NodeID, uint32, ids.ID) {}
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
-		case GenesisID:
+		case snowmantest.GenesisID:
 			return Genesis, nil
 		case blk0.ID():
 			return blk0, nil
@@ -528,7 +527,7 @@ func TestEngineRespondsToGetRequest(t *testing.T) {
 	sender.Default(false)
 
 	vm.GetBlockF = func(_ context.Context, id ids.ID) (snowman.Block, error) {
-		require.Equal(GenesisID, id)
+		require.Equal(snowmantest.GenesisID, id)
 		return Genesis, nil
 	}
 
@@ -542,7 +541,7 @@ func TestEngineRespondsToGetRequest(t *testing.T) {
 		require.Equal(GenesisBytes, blk)
 	}
 
-	require.NoError(te.Get(context.Background(), vdr, 123, GenesisID))
+	require.NoError(te.Get(context.Background(), vdr, 123, snowmantest.GenesisID))
 	require.True(sentPut)
 }
 
@@ -565,7 +564,7 @@ func TestEnginePushQuery(t *testing.T) {
 
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
-		case GenesisID:
+		case snowmantest.GenesisID:
 			return Genesis, nil
 		case blk.ID():
 			return blk, nil
@@ -580,9 +579,9 @@ func TestEnginePushQuery(t *testing.T) {
 		*chitted = true
 		require.Equal(vdr, inVdr)
 		require.Equal(uint32(20), requestID)
-		require.Equal(GenesisID, preferredID)
-		require.Equal(GenesisID, preferredIDByHeight)
-		require.Equal(GenesisID, acceptedID)
+		require.Equal(snowmantest.GenesisID, preferredID)
+		require.Equal(snowmantest.GenesisID, preferredIDByHeight)
+		require.Equal(snowmantest.GenesisID, acceptedID)
 	}
 
 	queried := new(bool)
@@ -613,7 +612,7 @@ func TestEngineBuildBlock(t *testing.T) {
 
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
-		case GenesisID:
+		case snowmantest.GenesisID:
 			return Genesis, nil
 		default:
 			return nil, errUnknownBlock
@@ -698,10 +697,10 @@ func TestVoteCanceling(t *testing.T) {
 	vm.CantSetPreference = false
 
 	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
-		return GenesisID, nil
+		return snowmantest.GenesisID, nil
 	}
 	vm.GetBlockF = func(_ context.Context, id ids.ID) (snowman.Block, error) {
-		require.Equal(GenesisID, id)
+		require.Equal(snowmantest.GenesisID, id)
 		return Genesis, nil
 	}
 
@@ -762,11 +761,11 @@ func TestEngineNoQuery(t *testing.T) {
 	vm := &block.TestVM{}
 	vm.T = t
 	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
-		return GenesisID, nil
+		return snowmantest.GenesisID, nil
 	}
 
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
-		if blkID == GenesisID {
+		if blkID == snowmantest.GenesisID {
 			return Genesis, nil
 		}
 		return nil, errUnknownBlock
@@ -803,11 +802,11 @@ func TestEngineNoRepollQuery(t *testing.T) {
 	vm := &block.TestVM{}
 	vm.T = t
 	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
-		return GenesisID, nil
+		return snowmantest.GenesisID, nil
 	}
 
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
-		if blkID == GenesisID {
+		if blkID == snowmantest.GenesisID {
 			return Genesis, nil
 		}
 		return nil, errUnknownBlock
@@ -865,7 +864,7 @@ func TestEngineAbandonChit(t *testing.T) {
 
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
-		case GenesisID:
+		case snowmantest.GenesisID:
 			return Genesis, nil
 		case blk.ID():
 			return nil, errUnknownBlock
@@ -919,7 +918,7 @@ func TestEngineAbandonChitWithUnexpectedPutBlock(t *testing.T) {
 
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
-		case GenesisID:
+		case snowmantest.GenesisID:
 			return Genesis, nil
 		case blk.ID():
 			return nil, errUnknownBlock
@@ -982,7 +981,7 @@ func TestEngineBlockingChitRequest(t *testing.T) {
 
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
-		case GenesisID:
+		case snowmantest.GenesisID:
 			return Genesis, nil
 		case blockingBlk.ID():
 			return blockingBlk, nil
@@ -1043,7 +1042,7 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
-		case GenesisID:
+		case snowmantest.GenesisID:
 			return Genesis, nil
 		case issuedBlk.ID():
 			return issuedBlk, nil
@@ -1138,7 +1137,7 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
-		case GenesisID:
+		case snowmantest.GenesisID:
 			return Genesis, nil
 		case issuedBlk.ID():
 			return issuedBlk, nil
@@ -1226,7 +1225,7 @@ func TestEngineUndeclaredDependencyDeadlock(t *testing.T) {
 
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
-		case GenesisID:
+		case snowmantest.GenesisID:
 			return Genesis, nil
 		case validBlk.ID():
 			return validBlk, nil
@@ -1262,10 +1261,10 @@ func TestEngineGossip(t *testing.T) {
 	nodeID, _, sender, vm, te := setup(t, DefaultConfig(t))
 
 	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
-		return GenesisID, nil
+		return snowmantest.GenesisID, nil
 	}
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
-		require.Equal(GenesisID, blkID)
+		require.Equal(snowmantest.GenesisID, blkID)
 		return Genesis, nil
 	}
 
@@ -1305,7 +1304,7 @@ func TestEngineInvalidBlockIgnoredFromUnexpectedPeer(t *testing.T) {
 
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
-		case GenesisID:
+		case snowmantest.GenesisID:
 			return Genesis, nil
 		case pendingBlk.ID():
 			if !*parsed {
@@ -1339,7 +1338,7 @@ func TestEngineInvalidBlockIgnoredFromUnexpectedPeer(t *testing.T) {
 	}
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
-		case GenesisID:
+		case snowmantest.GenesisID:
 			return Genesis, nil
 		case missingBlk.ID():
 			if !*parsed {
@@ -1379,7 +1378,7 @@ func TestEnginePushQueryRequestIDConflict(t *testing.T) {
 
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
-		case GenesisID:
+		case snowmantest.GenesisID:
 			return Genesis, nil
 		case pendingBlk.ID():
 			if !*parsed {
@@ -1416,7 +1415,7 @@ func TestEnginePushQueryRequestIDConflict(t *testing.T) {
 	}
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
-		case GenesisID:
+		case snowmantest.GenesisID:
 			return Genesis, nil
 		case missingBlk.ID():
 			if !*parsed {
@@ -1460,10 +1459,10 @@ func TestEngineAggressivePolling(t *testing.T) {
 	vm.CantSetPreference = false
 
 	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
-		return GenesisID, nil
+		return snowmantest.GenesisID, nil
 	}
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
-		require.Equal(GenesisID, blkID)
+		require.Equal(snowmantest.GenesisID, blkID)
 		return Genesis, nil
 	}
 
@@ -1489,7 +1488,7 @@ func TestEngineAggressivePolling(t *testing.T) {
 
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
-		case GenesisID:
+		case snowmantest.GenesisID:
 			return Genesis, nil
 		case pendingBlk.ID():
 			if !*parsed {
@@ -1549,10 +1548,10 @@ func TestEngineDoubleChit(t *testing.T) {
 	vm.CantSetPreference = false
 
 	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
-		return GenesisID, nil
+		return snowmantest.GenesisID, nil
 	}
 	vm.GetBlockF = func(_ context.Context, id ids.ID) (snowman.Block, error) {
-		require.Equal(GenesisID, id)
+		require.Equal(snowmantest.GenesisID, id)
 		return Genesis, nil
 	}
 
@@ -1587,7 +1586,7 @@ func TestEngineDoubleChit(t *testing.T) {
 
 	vm.GetBlockF = func(_ context.Context, id ids.ID) (snowman.Block, error) {
 		switch id {
-		case GenesisID:
+		case snowmantest.GenesisID:
 			return Genesis, nil
 		case blk.ID():
 			return blk, nil
@@ -1636,10 +1635,10 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 	vm.CantSetPreference = false
 
 	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
-		return GenesisID, nil
+		return snowmantest.GenesisID, nil
 	}
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
-		require.Equal(GenesisID, blkID)
+		require.Equal(snowmantest.GenesisID, blkID)
 		return Genesis, nil
 	}
 
@@ -1668,7 +1667,7 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
-		case GenesisID:
+		case snowmantest.GenesisID:
 			return Genesis, nil
 		default:
 			return nil, errUnknownBlock
@@ -1693,7 +1692,7 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
-		case GenesisID:
+		case snowmantest.GenesisID:
 			return Genesis, nil
 		case blk0.ID():
 			return blk0, nil
@@ -1735,7 +1734,7 @@ func TestEngineReceiveNewRejectedBlock(t *testing.T) {
 
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
-		case GenesisID:
+		case snowmantest.GenesisID:
 			return Genesis, nil
 		case acceptedBlk.ID():
 			return acceptedBlk, nil
@@ -1806,7 +1805,7 @@ func TestEngineRejectionAmplification(t *testing.T) {
 
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
-		case GenesisID:
+		case snowmantest.GenesisID:
 			return Genesis, nil
 		case acceptedBlk.ID():
 			return acceptedBlk, nil
@@ -1830,7 +1829,7 @@ func TestEngineRejectionAmplification(t *testing.T) {
 
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
-		case GenesisID:
+		case snowmantest.GenesisID:
 			return Genesis, nil
 		case acceptedBlk.ID():
 			return acceptedBlk, nil
@@ -1896,7 +1895,7 @@ func TestEngineTransitiveRejectionAmplificationDueToRejectedParent(t *testing.T)
 
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
-		case GenesisID:
+		case snowmantest.GenesisID:
 			return Genesis, nil
 		case acceptedBlk.ID():
 			return acceptedBlk, nil
@@ -1963,7 +1962,7 @@ func TestEngineTransitiveRejectionAmplificationDueToInvalidParent(t *testing.T) 
 
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
-		case GenesisID:
+		case snowmantest.GenesisID:
 			return Genesis, nil
 		default:
 			return nil, errUnknownBlock
@@ -1984,7 +1983,7 @@ func TestEngineTransitiveRejectionAmplificationDueToInvalidParent(t *testing.T) 
 
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
-		case GenesisID:
+		case snowmantest.GenesisID:
 			return Genesis, nil
 		case rejectedBlk.ID():
 			return rejectedBlk, nil
@@ -2028,7 +2027,7 @@ func TestEngineNonPreferredAmplification(t *testing.T) {
 
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
-		case GenesisID:
+		case snowmantest.GenesisID:
 			return Genesis, nil
 		default:
 			return nil, errUnknownBlock
@@ -2091,7 +2090,7 @@ func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 	// in the following tests
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
-		case GenesisID:
+		case snowmantest.GenesisID:
 			return Genesis, nil
 		default:
 			return nil, errUnknownBlock
@@ -2140,7 +2139,7 @@ func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 	// now [blk1] is verified, vm can return it
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
-		case GenesisID:
+		case snowmantest.GenesisID:
 			return Genesis, nil
 		case blk1.ID():
 			return blk1, nil
@@ -2176,7 +2175,7 @@ func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 	blk2.VerifyV = nil
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
-		case GenesisID:
+		case snowmantest.GenesisID:
 			return Genesis, nil
 		case blk1.ID():
 			return blk1, nil
@@ -2252,7 +2251,7 @@ func TestEngineBubbleVotesThroughInvalidChain(t *testing.T) {
 	// The VM should be able to retrieve [Genesis] and [blk1] from storage
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
-		case GenesisID:
+		case snowmantest.GenesisID:
 			return Genesis, nil
 		case blk1.ID():
 			return blk1, nil
@@ -2367,7 +2366,7 @@ func TestEngineBuildBlockWithCachedNonVerifiedParent(t *testing.T) {
 
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
-		case GenesisID:
+		case snowmantest.GenesisID:
 			return Genesis, nil
 		case grandParentBlk.IDV:
 			return grandParentBlk, nil
@@ -2403,7 +2402,7 @@ func TestEngineBuildBlockWithCachedNonVerifiedParent(t *testing.T) {
 
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
-		case GenesisID:
+		case snowmantest.GenesisID:
 			return Genesis, nil
 		case grandParentBlk.IDV:
 			return grandParentBlk, nil
@@ -2487,10 +2486,10 @@ func TestEngineApplyAcceptedFrontierInQueryFailed(t *testing.T) {
 	vm.CantSetPreference = false
 
 	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
-		return GenesisID, nil
+		return snowmantest.GenesisID, nil
 	}
 	vm.GetBlockF = func(_ context.Context, id ids.ID) (snowman.Block, error) {
-		require.Equal(GenesisID, id)
+		require.Equal(snowmantest.GenesisID, id)
 		return Genesis, nil
 	}
 
@@ -2521,7 +2520,7 @@ func TestEngineApplyAcceptedFrontierInQueryFailed(t *testing.T) {
 
 	vm.GetBlockF = func(_ context.Context, id ids.ID) (snowman.Block, error) {
 		switch id {
-		case GenesisID:
+		case snowmantest.GenesisID:
 			return Genesis, nil
 		case blk.ID():
 			return blk, nil
@@ -2582,10 +2581,10 @@ func TestEngineRepollsMisconfiguredSubnet(t *testing.T) {
 	vm.CantSetPreference = false
 
 	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
-		return GenesisID, nil
+		return snowmantest.GenesisID, nil
 	}
 	vm.GetBlockF = func(_ context.Context, id ids.ID) (snowman.Block, error) {
-		require.Equal(GenesisID, id)
+		require.Equal(snowmantest.GenesisID, id)
 		return Genesis, nil
 	}
 
@@ -2634,7 +2633,7 @@ func TestEngineRepollsMisconfiguredSubnet(t *testing.T) {
 
 	vm.GetBlockF = func(_ context.Context, id ids.ID) (snowman.Block, error) {
 		switch id {
-		case GenesisID:
+		case snowmantest.GenesisID:
 			return Genesis, nil
 		case blk.ID():
 			return blk, nil
@@ -2934,7 +2933,7 @@ func TestGetProcessingAncestor(t *testing.T) {
 	require.NoError(t, c.Initialize(
 		ctx,
 		snowball.DefaultParameters,
-		GenesisID,
+		snowmantest.GenesisID,
 		0,
 		time.Now(),
 	))
@@ -2973,7 +2972,7 @@ func TestGetProcessingAncestor(t *testing.T) {
 				pending:          map[ids.ID]snowman.Block{},
 				nonVerifiedCache: &cache.Empty[ids.ID, snowman.Block]{},
 			},
-			initialVote:      GenesisID,
+			initialVote:      snowmantest.GenesisID,
 			expectedAncestor: ids.Empty,
 			expectedFound:    false,
 		},
