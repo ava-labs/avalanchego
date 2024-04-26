@@ -31,7 +31,7 @@ func TestOracle_PreForkBlkImplementsInterface(t *testing.T) {
 
 	// setup
 	proBlk := preForkBlock{
-		Block: &snowmantest.Block{},
+		Block: snowmantest.BuildChild(snowmantest.Genesis),
 	}
 
 	// test
@@ -61,32 +61,13 @@ func TestOracle_PreForkBlkCanBuiltOnPreForkOption(t *testing.T) {
 	}()
 
 	// create pre fork oracle block ...
+	coreTestBlk := snowmantest.BuildChild(snowmantest.Genesis)
+	preferredTestBlk := snowmantest.BuildChild(coreTestBlk)
 	oracleCoreBlk := &TestOptionsBlock{
-		Block: snowmantest.Block{
-			TestDecidable: choices.TestDecidable{
-				IDV:     ids.Empty.Prefix(1111),
-				StatusV: choices.Processing,
-			},
-			BytesV:  []byte{1},
-			ParentV: snowmantest.GenesisID,
-		},
-	}
-	oracleCoreBlk.opts = [2]snowman.Block{
-		&snowmantest.Block{
-			TestDecidable: choices.TestDecidable{
-				IDV:     ids.Empty.Prefix(2222),
-				StatusV: choices.Processing,
-			},
-			BytesV:  []byte{2},
-			ParentV: oracleCoreBlk.ID(),
-		},
-		&snowmantest.Block{
-			TestDecidable: choices.TestDecidable{
-				IDV:     ids.Empty.Prefix(3333),
-				StatusV: choices.Processing,
-			},
-			BytesV:  []byte{3},
-			ParentV: oracleCoreBlk.ID(),
+		Block: *coreTestBlk,
+		opts: [2]snowman.Block{
+			preferredTestBlk,
+			snowmantest.BuildChild(coreTestBlk),
 		},
 	}
 
@@ -122,14 +103,7 @@ func TestOracle_PreForkBlkCanBuiltOnPreForkOption(t *testing.T) {
 	require.NoError(proVM.SetPreference(context.Background(), opts[0].ID()))
 
 	lastCoreBlk := &TestOptionsBlock{
-		Block: snowmantest.Block{
-			TestDecidable: choices.TestDecidable{
-				IDV:     ids.Empty.Prefix(4444),
-				StatusV: choices.Processing,
-			},
-			BytesV:  []byte{4},
-			ParentV: oracleCoreBlk.opts[0].ID(),
-		},
+		Block: *snowmantest.BuildChild(preferredTestBlk),
 	}
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return lastCoreBlk, nil
