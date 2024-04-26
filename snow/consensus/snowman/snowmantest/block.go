@@ -13,13 +13,16 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 )
 
-const GenesisHeight uint64 = 0
+const (
+	GenesisHeight        uint64 = 0
+	GenesisUnixTimestamp int64  = 1
+)
 
 var (
 	_ utils.Sortable[*Block] = (*Block)(nil)
 
 	GenesisID        = ids.GenerateTestID()
-	GenesisTimestamp = time.Unix(1, 0)
+	GenesisTimestamp = time.Unix(GenesisUnixTimestamp, 0)
 	GenesisBytes     = GenesisID[:]
 	Genesis          = BuildChain(1)[0]
 )

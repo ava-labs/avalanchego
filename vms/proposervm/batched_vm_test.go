@@ -988,7 +988,7 @@ func initTestRemoteProposerVM(
 			StatusV: choices.Accepted,
 		},
 		HeightV:    0,
-		TimestampV: genesisTimestamp,
+		TimestampV: snowmantest.GenesisTimestamp,
 		BytesV:     []byte{0},
 	}
 

@@ -50,9 +50,6 @@ var (
 	pTestSigner crypto.Signer
 	pTestCert   *staking.Certificate
 
-	genesisUnixTimestamp int64 = 1000
-	genesisTimestamp           = time.Unix(genesisUnixTimestamp, 0)
-
 	defaultPChainHeight uint64 = 2000
 
 	errUnknownBlock      = errors.New("unknown block")
@@ -94,7 +91,7 @@ func initTestProposerVM(
 			StatusV: choices.Accepted,
 		},
 		HeightV:    0,
-		TimestampV: genesisTimestamp,
+		TimestampV: snowmantest.GenesisTimestamp,
 		BytesV:     []byte{0},
 	}
 
@@ -916,7 +913,7 @@ func TestExpiredBuildBlock(t *testing.T) {
 			StatusV: choices.Accepted,
 		},
 		HeightV:    0,
-		TimestampV: genesisTimestamp,
+		TimestampV: snowmantest.GenesisTimestamp,
 		BytesV:     []byte{0},
 	}
 
@@ -1223,7 +1220,7 @@ func TestInnerVMRollback(t *testing.T) {
 			StatusV: choices.Accepted,
 		},
 		HeightV:    0,
-		TimestampV: genesisTimestamp,
+		TimestampV: snowmantest.GenesisTimestamp,
 		BytesV:     []byte{0},
 	}
 
@@ -1832,7 +1829,7 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 			StatusV: choices.Accepted,
 		},
 		HeightV:    0,
-		TimestampV: genesisTimestamp,
+		TimestampV: snowmantest.GenesisTimestamp,
 		BytesV:     []byte{0},
 	}
 
@@ -2031,7 +2028,7 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 			StatusV: choices.Accepted,
 		},
 		HeightV:    0,
-		TimestampV: genesisTimestamp,
+		TimestampV: snowmantest.GenesisTimestamp,
 		BytesV:     []byte{0},
 	}
 
@@ -2622,7 +2619,7 @@ func TestHistoricalBlockDeletion(t *testing.T) {
 			StatusV: choices.Accepted,
 		},
 		HeightV:    0,
-		TimestampV: genesisTimestamp,
+		TimestampV: snowmantest.GenesisTimestamp,
 		BytesV:     utils.RandomBytes(1024),
 	}
 	acceptedBlocks := []snowman.Block{coreGenBlk}
