@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/ancestor"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
@@ -40,7 +41,7 @@ var (
 
 	GenesisID    = ids.GenerateTestID()
 	GenesisBytes = utils.RandomBytes(32)
-	Genesis      = &snowman.TestBlock{
+	Genesis      = &snowmantest.Block{
 		TestDecidable: choices.TestDecidable{
 			IDV:     GenesisID,
 			StatusV: choices.Accepted,
@@ -49,24 +50,7 @@ var (
 	}
 )
 
-func BuildChain(root *snowman.TestBlock, length int) []*snowman.TestBlock {
-	chain := make([]*snowman.TestBlock, length)
-	for i := range chain {
-		root = &snowman.TestBlock{
-			TestDecidable: choices.TestDecidable{
-				IDV:     ids.GenerateTestID(),
-				StatusV: choices.Processing,
-			},
-			ParentV: root.ID(),
-			HeightV: root.Height() + 1,
-			BytesV:  utils.RandomBytes(32),
-		}
-		chain[i] = root
-	}
-	return chain
-}
-
-func MakeGetBlockF(blks ...[]*snowman.TestBlock) func(context.Context, ids.ID) (snowman.Block, error) {
+func MakeGetBlockF(blks ...[]*snowmantest.Block) func(context.Context, ids.ID) (snowman.Block, error) {
 	return func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		for _, blkSet := range blks {
 			for _, blk := range blkSet {
@@ -79,7 +63,7 @@ func MakeGetBlockF(blks ...[]*snowman.TestBlock) func(context.Context, ids.ID) (
 	}
 }
 
-func MakeParseBlockF(blks ...[]*snowman.TestBlock) func(context.Context, []byte) (snowman.Block, error) {
+func MakeParseBlockF(blks ...[]*snowmantest.Block) func(context.Context, []byte) (snowman.Block, error) {
 	return func(_ context.Context, blkBytes []byte) (snowman.Block, error) {
 		for _, blkSet := range blks {
 			for _, blk := range blkSet {
@@ -92,7 +76,7 @@ func MakeParseBlockF(blks ...[]*snowman.TestBlock) func(context.Context, []byte)
 	}
 }
 
-func MakeLastAcceptedBlockF(defaultBlk *snowman.TestBlock, blks ...[]*snowman.TestBlock) func(context.Context) (ids.ID, error) {
+func MakeLastAcceptedBlockF(defaultBlk *snowmantest.Block, blks ...[]*snowmantest.Block) func(context.Context) (ids.ID, error) {
 	return func(_ context.Context) (ids.ID, error) {
 		highestHeight := defaultBlk.Height()
 		highestID := defaultBlk.ID()
@@ -167,7 +151,7 @@ func TestEngineDropsAttemptToIssueBlockAfterFailedRequest(t *testing.T) {
 
 	peerID, _, sender, vm, engine := setup(t, DefaultConfig(t))
 
-	blks := BuildChain(Genesis, 2)
+	blks := snowmantest.BuildChain(Genesis, 2)
 	parent := blks[0]
 	child := blks[1]
 
@@ -215,7 +199,7 @@ func TestEngineQuery(t *testing.T) {
 
 	peerID, _, sender, vm, engine := setup(t, DefaultConfig(t))
 
-	blks := BuildChain(Genesis, 2)
+	blks := snowmantest.BuildChain(Genesis, 2)
 	parent := blks[0]
 	child := blks[1]
 
@@ -401,7 +385,7 @@ func TestEngineMultipleQuery(t *testing.T) {
 	vm.GetBlockF = nil
 	vm.LastAcceptedF = nil
 
-	blks := BuildChain(Genesis, 2)
+	blks := snowmantest.BuildChain(Genesis, 2)
 	blk0 := blks[0]
 	blk1 := blks[1]
 
@@ -501,7 +485,7 @@ func TestEngineBlockedIssue(t *testing.T) {
 
 	sender.Default(false)
 
-	blks := BuildChain(Genesis, 2)
+	blks := snowmantest.BuildChain(Genesis, 2)
 	blk0 := blks[0]
 	blk1 := blks[1]
 
@@ -569,7 +553,7 @@ func TestEnginePushQuery(t *testing.T) {
 
 	sender.Default(true)
 
-	blks := BuildChain(Genesis, 1)
+	blks := snowmantest.BuildChain(Genesis, 1)
 	blk := blks[0]
 
 	vm.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
@@ -624,7 +608,7 @@ func TestEngineBuildBlock(t *testing.T) {
 
 	sender.Default(true)
 
-	blks := BuildChain(Genesis, 1)
+	blks := snowmantest.BuildChain(Genesis, 1)
 	blk := blks[0]
 
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
@@ -728,7 +712,7 @@ func TestVoteCanceling(t *testing.T) {
 
 	vm.LastAcceptedF = nil
 
-	blks := BuildChain(Genesis, 1)
+	blks := snowmantest.BuildChain(Genesis, 1)
 	blk := blks[0]
 
 	queried := new(bool)
@@ -795,7 +779,7 @@ func TestEngineNoQuery(t *testing.T) {
 
 	require.NoError(te.Start(context.Background(), 0))
 
-	blks := BuildChain(Genesis, 1)
+	blks := snowmantest.BuildChain(Genesis, 1)
 	blk := blks[0]
 
 	require.NoError(te.issue(
@@ -876,7 +860,7 @@ func TestEngineAbandonChit(t *testing.T) {
 
 	sender.Default(true)
 
-	blks := BuildChain(Genesis, 1)
+	blks := snowmantest.BuildChain(Genesis, 1)
 	blk := blks[0]
 
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
@@ -930,7 +914,7 @@ func TestEngineAbandonChitWithUnexpectedPutBlock(t *testing.T) {
 
 	sender.Default(true)
 
-	blks := BuildChain(Genesis, 1)
+	blks := snowmantest.BuildChain(Genesis, 1)
 	blk := blks[0]
 
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
@@ -991,7 +975,7 @@ func TestEngineBlockingChitRequest(t *testing.T) {
 
 	sender.Default(true)
 
-	blks := BuildChain(Genesis, 3)
+	blks := snowmantest.BuildChain(Genesis, 3)
 	missingBlk := blks[0]
 	parentBlk := blks[1]
 	blockingBlk := blks[2]
@@ -1050,10 +1034,10 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 
 	sender.Default(true)
 
-	issuedBlks := BuildChain(Genesis, 1)
+	issuedBlks := snowmantest.BuildChain(Genesis, 1)
 	issuedBlk := issuedBlks[0]
 
-	blockingBlks := BuildChain(Genesis, 2)
+	blockingBlks := snowmantest.BuildChain(Genesis, 2)
 	missingBlk := blockingBlks[0]
 	blockingBlk := blockingBlks[1]
 
@@ -1187,7 +1171,7 @@ func TestEngineRetryFetch(t *testing.T) {
 
 	sender.Default(true)
 
-	blks := BuildChain(Genesis, 1)
+	blks := snowmantest.BuildChain(Genesis, 1)
 	missingBlk := blks[0]
 
 	vm.CantGetBlock = false
@@ -1227,7 +1211,7 @@ func TestEngineUndeclaredDependencyDeadlock(t *testing.T) {
 
 	sender.Default(true)
 
-	blks := BuildChain(Genesis, 2)
+	blks := snowmantest.BuildChain(Genesis, 2)
 	validBlk := blks[0]
 
 	invalidBlk := blks[1]
@@ -1306,7 +1290,7 @@ func TestEngineInvalidBlockIgnoredFromUnexpectedPeer(t *testing.T) {
 
 	sender.Default(true)
 
-	blks := BuildChain(Genesis, 2)
+	blks := snowmantest.BuildChain(Genesis, 2)
 	missingBlk := blks[0]
 	pendingBlk := blks[1]
 
@@ -1380,7 +1364,7 @@ func TestEnginePushQueryRequestIDConflict(t *testing.T) {
 
 	sender.Default(true)
 
-	blks := BuildChain(Genesis, 2)
+	blks := snowmantest.BuildChain(Genesis, 2)
 	missingBlk := blks[0]
 	pendingBlk := blks[1]
 
@@ -1491,7 +1475,7 @@ func TestEngineAggressivePolling(t *testing.T) {
 	vm.GetBlockF = nil
 	vm.LastAcceptedF = nil
 
-	blks := BuildChain(Genesis, 1)
+	blks := snowmantest.BuildChain(Genesis, 1)
 	pendingBlk := blks[0]
 
 	parsed := new(bool)
@@ -1579,7 +1563,7 @@ func TestEngineDoubleChit(t *testing.T) {
 
 	vm.LastAcceptedF = nil
 
-	blks := BuildChain(Genesis, 1)
+	blks := snowmantest.BuildChain(Genesis, 1)
 	blk := blks[0]
 
 	queried := new(bool)
@@ -1667,7 +1651,7 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 	vm.GetBlockF = nil
 	vm.LastAcceptedF = nil
 
-	blks := BuildChain(Genesis, 2)
+	blks := snowmantest.BuildChain(Genesis, 2)
 	blk0 := blks[0]
 
 	var (
@@ -1728,10 +1712,10 @@ func TestEngineReceiveNewRejectedBlock(t *testing.T) {
 
 	vdr, _, sender, vm, te := setup(t, DefaultConfig(t))
 
-	acceptedBlks := BuildChain(Genesis, 1)
+	acceptedBlks := snowmantest.BuildChain(Genesis, 1)
 	acceptedBlk := acceptedBlks[0]
 
-	rejectedBlks := BuildChain(Genesis, 2)
+	rejectedBlks := snowmantest.BuildChain(Genesis, 2)
 	rejectedBlk := rejectedBlks[0]
 	pendingBlk := rejectedBlks[1]
 
@@ -1799,10 +1783,10 @@ func TestEngineRejectionAmplification(t *testing.T) {
 
 	vdr, _, sender, vm, te := setup(t, DefaultConfig(t))
 
-	acceptedBlks := BuildChain(Genesis, 1)
+	acceptedBlks := snowmantest.BuildChain(Genesis, 1)
 	acceptedBlk := acceptedBlks[0]
 
-	rejectedBlks := BuildChain(Genesis, 2)
+	rejectedBlks := snowmantest.BuildChain(Genesis, 2)
 	rejectedBlk := rejectedBlks[0]
 	pendingBlk := rejectedBlks[1]
 
@@ -1888,10 +1872,10 @@ func TestEngineTransitiveRejectionAmplificationDueToRejectedParent(t *testing.T)
 
 	vdr, _, sender, vm, te := setup(t, DefaultConfig(t))
 
-	acceptedBlks := BuildChain(Genesis, 1)
+	acceptedBlks := snowmantest.BuildChain(Genesis, 1)
 	acceptedBlk := acceptedBlks[0]
 
-	rejectedBlks := BuildChain(Genesis, 2)
+	rejectedBlks := snowmantest.BuildChain(Genesis, 2)
 	rejectedBlk := rejectedBlks[0]
 	pendingBlk := rejectedBlks[1]
 	pendingBlk.RejectV = errUnexpectedCall
@@ -1954,10 +1938,10 @@ func TestEngineTransitiveRejectionAmplificationDueToInvalidParent(t *testing.T) 
 
 	vdr, _, sender, vm, te := setup(t, DefaultConfig(t))
 
-	acceptedBlks := BuildChain(Genesis, 1)
+	acceptedBlks := snowmantest.BuildChain(Genesis, 1)
 	acceptedBlk := acceptedBlks[0]
 
-	rejectedBlks := BuildChain(Genesis, 2)
+	rejectedBlks := snowmantest.BuildChain(Genesis, 2)
 	rejectedBlk := rejectedBlks[0]
 	rejectedBlk.VerifyV = errUnexpectedCall
 	pendingBlk := rejectedBlks[1]
@@ -2024,10 +2008,10 @@ func TestEngineNonPreferredAmplification(t *testing.T) {
 
 	vdr, _, sender, vm, te := setup(t, DefaultConfig(t))
 
-	preferredBlks := BuildChain(Genesis, 1)
+	preferredBlks := snowmantest.BuildChain(Genesis, 1)
 	preferredBlk := preferredBlks[0]
 
-	nonPreferredBlks := BuildChain(Genesis, 1)
+	nonPreferredBlks := snowmantest.BuildChain(Genesis, 1)
 	nonPreferredBlk := nonPreferredBlks[0]
 
 	vm.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
@@ -2082,7 +2066,7 @@ func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 	vdr, _, sender, vm, te := setup(t, DefaultConfig(t))
 	expectedVdrSet := set.Of(vdr)
 
-	blks := BuildChain(Genesis, 2)
+	blks := snowmantest.BuildChain(Genesis, 2)
 	blk1 := blks[0]
 
 	// blk2 cannot pass verification until [blk1] has been marked as accepted.
@@ -2241,7 +2225,7 @@ func TestEngineBubbleVotesThroughInvalidChain(t *testing.T) {
 	vdr, _, sender, vm, te := setup(t, DefaultConfig(t))
 	expectedVdrSet := set.Of(vdr)
 
-	blks := BuildChain(Genesis, 3)
+	blks := snowmantest.BuildChain(Genesis, 3)
 	blk1 := blks[0]
 
 	// blk2 cannot pass verification until [blk1] has been marked as accepted.
@@ -2355,7 +2339,7 @@ func TestEngineBuildBlockWithCachedNonVerifiedParent(t *testing.T) {
 
 	sender.Default(true)
 
-	blks := BuildChain(Genesis, 3)
+	blks := snowmantest.BuildChain(Genesis, 3)
 	grandParentBlk := blks[0]
 
 	parentBlkA := blks[1]
@@ -2363,7 +2347,7 @@ func TestEngineBuildBlockWithCachedNonVerifiedParent(t *testing.T) {
 
 	// Note that [parentBlkB] has the same [ID()] as [parentBlkA];
 	// it's a different instantiation of the same block.
-	parentBlkB := &snowman.TestBlock{
+	parentBlkB := &snowmantest.Block{
 		TestDecidable: choices.TestDecidable{
 			IDV:     parentBlkA.IDV,
 			StatusV: parentBlkA.StatusV,
@@ -2516,7 +2500,7 @@ func TestEngineApplyAcceptedFrontierInQueryFailed(t *testing.T) {
 
 	vm.LastAcceptedF = nil
 
-	blks := BuildChain(Genesis, 1)
+	blks := snowmantest.BuildChain(Genesis, 1)
 	blk := blks[0]
 
 	queryRequestID := new(uint32)
@@ -2611,7 +2595,7 @@ func TestEngineRepollsMisconfiguredSubnet(t *testing.T) {
 
 	vm.LastAcceptedF = nil
 
-	blks := BuildChain(Genesis, 1)
+	blks := snowmantest.BuildChain(Genesis, 1)
 	blk := blks[0]
 
 	// Issue the block. This shouldn't call the sender, because creating the
@@ -2731,8 +2715,8 @@ func TestEngineVoteStallRegression(t *testing.T) {
 	sender.Default(true)
 	config.Sender = sender
 
-	acceptedChain := BuildChain(Genesis, 3)
-	rejectedChain := BuildChain(Genesis, 2)
+	acceptedChain := snowmantest.BuildChain(Genesis, 3)
+	rejectedChain := snowmantest.BuildChain(Genesis, 2)
 
 	vm := &block.TestVM{
 		TestVM: common.TestVM{
@@ -2755,12 +2739,12 @@ func TestEngineVoteStallRegression(t *testing.T) {
 			},
 		},
 		ParseBlockF: MakeParseBlockF(
-			[]*snowman.TestBlock{Genesis},
+			[]*snowmantest.Block{Genesis},
 			acceptedChain,
 			rejectedChain,
 		),
 		GetBlockF: MakeGetBlockF(
-			[]*snowman.TestBlock{Genesis},
+			[]*snowmantest.Block{Genesis},
 			acceptedChain,
 		),
 		SetPreferenceF: func(context.Context, ids.ID) error {
@@ -2899,7 +2883,7 @@ func TestEngineVoteStallRegression(t *testing.T) {
 	// accepted, block 4 will be dropped.
 	// Then poll 1 should terminate because block 4 was dropped.
 	vm.GetBlockF = MakeGetBlockF(
-		[]*snowman.TestBlock{Genesis},
+		[]*snowmantest.Block{Genesis},
 		acceptedChain,
 		rejectedChain,
 	)
@@ -2939,8 +2923,8 @@ func TestGetProcessingAncestor(t *testing.T) {
 		ctx = snowtest.ConsensusContext(
 			snowtest.Context(t, snowtest.PChainID),
 		)
-		issuedChain           = BuildChain(Genesis, 1)
-		unissuedOnIssuedChain = BuildChain(issuedChain[0], 1)
+		issuedChain           = snowmantest.BuildChain(Genesis, 1)
+		unissuedOnIssuedChain = snowmantest.BuildChain(issuedChain[0], 1)
 	)
 
 	metrics, err := newMetrics("", prometheus.NewRegistry())
@@ -2979,7 +2963,7 @@ func TestGetProcessingAncestor(t *testing.T) {
 							T: t,
 						},
 						GetBlockF: MakeGetBlockF(
-							[]*snowman.TestBlock{Genesis},
+							[]*snowmantest.Block{Genesis},
 						),
 					},
 					Consensus: c,
@@ -3003,7 +2987,7 @@ func TestGetProcessingAncestor(t *testing.T) {
 							T: t,
 						},
 						GetBlockF: MakeGetBlockF(
-							[]*snowman.TestBlock{Genesis},
+							[]*snowmantest.Block{Genesis},
 						),
 					},
 					Consensus: c,
@@ -3027,7 +3011,7 @@ func TestGetProcessingAncestor(t *testing.T) {
 							T: t,
 						},
 						GetBlockF: MakeGetBlockF(
-							[]*snowman.TestBlock{Genesis},
+							[]*snowmantest.Block{Genesis},
 						),
 					},
 					Consensus: c,
@@ -3051,7 +3035,7 @@ func TestGetProcessingAncestor(t *testing.T) {
 							T: t,
 						},
 						GetBlockF: MakeGetBlockF(
-							[]*snowman.TestBlock{Genesis},
+							[]*snowmantest.Block{Genesis},
 						),
 					},
 					Consensus: c,
@@ -3075,7 +3059,7 @@ func TestGetProcessingAncestor(t *testing.T) {
 							T: t,
 						},
 						GetBlockF: MakeGetBlockF(
-							[]*snowman.TestBlock{Genesis},
+							[]*snowmantest.Block{Genesis},
 						),
 					},
 					Consensus: c,

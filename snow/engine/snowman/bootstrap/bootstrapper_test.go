@@ -21,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
@@ -157,7 +158,7 @@ func TestBootstrapperStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 
 	blkID0 := ids.Empty.Prefix(0)
 	blkBytes0 := []byte{0}
-	blk0 := &snowman.TestBlock{
+	blk0 := &snowmantest.Block{
 		TestDecidable: choices.TestDecidable{
 			IDV:     blkID0,
 			StatusV: choices.Accepted,
@@ -548,7 +549,7 @@ func TestBootstrapOldBlockAfterStateSync(t *testing.T) {
 	blks := generateBlockchain(2)
 	initializeVMWithBlockchain(vm, blks)
 
-	blks[0].(*snowman.TestBlock).StatusV = choices.Processing
+	blks[0].(*snowmantest.Block).StatusV = choices.Processing
 	require.NoError(blks[1].Accept(context.Background()))
 
 	bs, err := New(
@@ -656,7 +657,7 @@ func TestBootstrapNoParseOnNew(t *testing.T) {
 	snowGetHandler, err := getter.New(vm, sender, ctx.Log, time.Second, 2000, ctx.Registerer)
 	require.NoError(err)
 
-	blk0 := &snowman.TestBlock{
+	blk0 := &snowmantest.Block{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Accepted,
@@ -665,7 +666,7 @@ func TestBootstrapNoParseOnNew(t *testing.T) {
 		BytesV:  utils.RandomBytes(32),
 	}
 
-	blk1 := &snowman.TestBlock{
+	blk1 := &snowmantest.Block{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
@@ -776,7 +777,7 @@ func generateBlockchain(length uint64) []snowman.Block {
 	}
 
 	blocks := make([]snowman.Block, length)
-	blocks[0] = &snowman.TestBlock{
+	blocks[0] = &snowmantest.Block{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Accepted,
@@ -786,7 +787,7 @@ func generateBlockchain(length uint64) []snowman.Block {
 		BytesV:  binary.AppendUvarint(nil, 0),
 	}
 	for height := uint64(1); height < length; height++ {
-		blocks[height] = &snowman.TestBlock{
+		blocks[height] = &snowmantest.Block{
 			TestDecidable: choices.TestDecidable{
 				IDV:     ids.GenerateTestID(),
 				StatusV: choices.Processing,

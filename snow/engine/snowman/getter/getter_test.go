@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -81,11 +82,11 @@ func TestFilterAccepted(t *testing.T) {
 	blkID1 := ids.GenerateTestID()
 	blkID2 := ids.GenerateTestID()
 
-	blk0 := &snowman.TestBlock{TestDecidable: choices.TestDecidable{
+	blk0 := &snowmantest.Block{TestDecidable: choices.TestDecidable{
 		IDV:     blkID0,
 		StatusV: choices.Accepted,
 	}}
-	blk1 := &snowman.TestBlock{TestDecidable: choices.TestDecidable{
+	blk1 := &snowmantest.Block{TestDecidable: choices.TestDecidable{
 		IDV:     blkID1,
 		StatusV: choices.Accepted,
 	}}
