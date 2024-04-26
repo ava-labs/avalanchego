@@ -234,16 +234,18 @@ func addSubnet(t *testing.T, env *environment) {
 	require.NoError(err)
 
 	currentChainTime := env.state.GetTimestamp()
+	upgrades := env.config.UpgradeConfig
+
 	nextChainTime, _, err := state.NextBlockTime(stateDiff, env.clk)
 	require.NoError(err)
 	feeRates, err := stateDiff.GetFeeRates()
 	require.NoError(err)
 	parentBlkComplexity, err := stateDiff.GetLastBlockComplexity()
 	require.NoError(err)
-	feeManager, err := fee.UpdatedFeeManager(feeRates, parentBlkComplexity, env.config.Config, currentChainTime, nextChainTime)
+	feeManager, err := fee.UpdatedFeeManager(feeRates, parentBlkComplexity, upgrades, currentChainTime, nextChainTime)
 	require.NoError(err)
 
-	feeCfg := fee.GetDynamicConfig(env.config.IsEActivated(currentChainTime))
+	feeCfg := fee.GetDynamicConfig(upgrades.IsEActivated(currentChainTime))
 	executor := StandardTxExecutor{
 		Backend:            &env.backend,
 		BlkFeeManager:      feeManager,
@@ -294,7 +296,7 @@ func defaultConfig(t *testing.T, f fork) *config.Config {
 		Chains:                 chains.TestManager,
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		Validators:             validators.NewManager(),
-		StaticConfig: fee.StaticConfig{
+		StaticFeeConfig: fee.StaticConfig{
 			TxFee:                 defaultTxFee,
 			CreateSubnetTxFee:     100 * defaultTxFee,
 			CreateBlockchainTxFee: 100 * defaultTxFee,
@@ -310,7 +312,7 @@ func defaultConfig(t *testing.T, f fork) *config.Config {
 			MintingPeriod:      365 * 24 * time.Hour,
 			SupplyCap:          720 * units.MegaAvax,
 		},
-		Config: upgrade.Config{
+		UpgradeConfig: upgrade.Config{
 			ApricotPhase3Time: mockable.MaxTime,
 			ApricotPhase5Time: mockable.MaxTime,
 			BanffTime:         mockable.MaxTime,
@@ -322,22 +324,22 @@ func defaultConfig(t *testing.T, f fork) *config.Config {
 
 	switch f {
 	case eUpgrade:
-		c.EUpgradeTime = defaultValidateStartTime.Add(-2 * time.Second)
+		c.UpgradeConfig.EUpgradeTime = defaultValidateStartTime.Add(-2 * time.Second)
 		fallthrough
 	case durango:
-		c.DurangoTime = defaultValidateStartTime.Add(-2 * time.Second)
+		c.UpgradeConfig.DurangoTime = defaultValidateStartTime.Add(-2 * time.Second)
 		fallthrough
 	case cortina:
-		c.CortinaTime = defaultValidateStartTime.Add(-2 * time.Second)
+		c.UpgradeConfig.CortinaTime = defaultValidateStartTime.Add(-2 * time.Second)
 		fallthrough
 	case banff:
-		c.BanffTime = defaultValidateStartTime.Add(-2 * time.Second)
+		c.UpgradeConfig.BanffTime = defaultValidateStartTime.Add(-2 * time.Second)
 		fallthrough
 	case apricotPhase5:
-		c.ApricotPhase5Time = defaultValidateEndTime
+		c.UpgradeConfig.ApricotPhase5Time = defaultValidateEndTime
 		fallthrough
 	case apricotPhase3:
-		c.ApricotPhase3Time = defaultValidateEndTime
+		c.UpgradeConfig.ApricotPhase3Time = defaultValidateEndTime
 	default:
 		require.FailNow(t, "unhandled fork", f)
 	}

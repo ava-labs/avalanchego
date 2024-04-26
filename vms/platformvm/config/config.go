@@ -20,12 +20,6 @@ import (
 
 // Struct collecting all foundational parameters of PlatformVM
 type Config struct {
-	// All network upgrade timestamps
-	upgrade.Config
-
-	// All static fees config active before E-upgrade
-	fee.StaticConfig
-
 	// The node's chain manager
 	Chains chains.Manager
 
@@ -36,6 +30,9 @@ type Config struct {
 	// Invariant: The primary network's validator set should be empty before
 	//            calling VM.Initialize.
 	Validators validators.Manager
+
+	// All static fees config active before E-upgrade
+	StaticFeeConfig fee.StaticConfig
 
 	// Provides access to the uptime manager as a thread safe data structure
 	UptimeLockedCalculator uptime.LockedCalculator
@@ -72,6 +69,9 @@ type Config struct {
 
 	// Config for the minting function
 	RewardConfig reward.Config
+
+	// All network upgrade timestamps
+	UpgradeConfig upgrade.Config
 
 	// UseCurrentHeight forces [GetMinimumHeight] to return the current height
 	// of the P-Chain instead of the oldest block in the [recentlyAccepted]

@@ -100,7 +100,8 @@ func verifyAddValidatorTx(
 ) {
 	var (
 		currentTimestamp = chainState.GetTimestamp()
-		isDurangoActive  = backend.Config.IsDurangoActivated(currentTimestamp)
+		upgrades         = backend.Config.UpgradeConfig
+		isDurangoActive  = upgrades.IsDurangoActivated(currentTimestamp)
 	)
 	if isDurangoActive {
 		return nil, ErrAddValidatorTxPostDurango
@@ -168,9 +169,9 @@ func verifyAddValidatorTx(
 	}
 
 	// Verify the flowcheck
-
-	feeCalculator := fee.NewStaticCalculator(backend.Config.StaticConfig, backend.Config.Config, currentTimestamp)
-	if err := tx.Visit(feeCalculator); err != nil {
+	feeCalculator := fee.NewStaticCalculator(backend.Config.StaticFeeConfig, upgrades, currentTimestamp)
+	fee, err := feeCalculator.ComputeFee(tx)
+	if err != nil {
 		return nil, err
 	}
 
@@ -181,7 +182,7 @@ func verifyAddValidatorTx(
 		outs,
 		sTx.Creds,
 		map[ids.ID]uint64{
-			backend.Ctx.AVAXAssetID: feeCalculator.Fee,
+			backend.Ctx.AVAXAssetID: fee,
 		},
 	); err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
@@ -207,8 +208,9 @@ func verifyAddSubnetValidatorTx(
 
 	var (
 		currentTimestamp = chainState.GetTimestamp()
-		isDurangoActive  = backend.Config.IsDurangoActivated(currentTimestamp)
-		isEActive        = backend.Config.IsEActivated(currentTimestamp)
+		upgrades         = backend.Config.UpgradeConfig
+		isDurangoActive  = upgrades.IsDurangoActivated(currentTimestamp)
+		isEActive        = upgrades.IsEActivated(currentTimestamp)
 	)
 	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
 		return err
@@ -267,15 +269,16 @@ func verifyAddSubnetValidatorTx(
 	// Verify the flowcheck
 	var (
 		feeCalculator *fee.Calculator
-		staticFeesCfg = backend.Config.StaticConfig
+		staticFeesCfg = backend.Config.StaticFeeConfig
 	)
 	if !isEActive {
-		upgrades := backend.Config.Config
 		feeCalculator = fee.NewStaticCalculator(staticFeesCfg, upgrades, currentTimestamp)
 	} else {
 		feeCalculator = fee.NewDynamicCalculator(staticFeesCfg, feeManager, maxComplexity, sTx.Creds)
 	}
-	if err := tx.Visit(feeCalculator); err != nil {
+
+	fee, err := feeCalculator.ComputeFee(tx)
+	if err != nil {
 		return err
 	}
 
@@ -286,7 +289,7 @@ func verifyAddSubnetValidatorTx(
 		tx.Outs,
 		baseTxCreds,
 		map[ids.ID]uint64{
-			backend.Ctx.AVAXAssetID: feeCalculator.Fee,
+			backend.Ctx.AVAXAssetID: fee,
 		},
 	); err != nil {
 		return fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
@@ -318,8 +321,9 @@ func verifyRemoveSubnetValidatorTx(
 
 	var (
 		currentTimestamp = chainState.GetTimestamp()
-		isDurangoActive  = backend.Config.IsDurangoActivated(currentTimestamp)
-		isEActive        = backend.Config.IsEActivated(currentTimestamp)
+		upgrades         = backend.Config.UpgradeConfig
+		isDurangoActive  = upgrades.IsDurangoActivated(currentTimestamp)
+		isEActive        = upgrades.IsEActivated(currentTimestamp)
 	)
 	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
 		return nil, false, err
@@ -359,16 +363,16 @@ func verifyRemoveSubnetValidatorTx(
 	// Verify the flowcheck
 	var (
 		feeCalculator *fee.Calculator
-		staticFeesCfg = backend.Config.StaticConfig
+		staticFeesCfg = backend.Config.StaticFeeConfig
 	)
 	if !isEActive {
-		upgrades := backend.Config.Config
 		feeCalculator = fee.NewStaticCalculator(staticFeesCfg, upgrades, currentTimestamp)
 	} else {
 		feeCalculator = fee.NewDynamicCalculator(staticFeesCfg, feeManager, maxComplexity, sTx.Creds)
 	}
 
-	if err := tx.Visit(feeCalculator); err != nil {
+	fee, err := feeCalculator.ComputeFee(tx)
+	if err != nil {
 		return nil, false, err
 	}
 
@@ -379,7 +383,7 @@ func verifyRemoveSubnetValidatorTx(
 		tx.Outs,
 		baseTxCreds,
 		map[ids.ID]uint64{
-			backend.Ctx.AVAXAssetID: feeCalculator.Fee,
+			backend.Ctx.AVAXAssetID: fee,
 		},
 	); err != nil {
 		return nil, false, fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
@@ -402,7 +406,8 @@ func verifyAddDelegatorTx(
 ) {
 	var (
 		currentTimestamp = chainState.GetTimestamp()
-		isDurangoActive  = backend.Config.IsDurangoActivated(currentTimestamp)
+		upgrades         = backend.Config.UpgradeConfig
+		isDurangoActive  = upgrades.IsDurangoActivated(currentTimestamp)
 	)
 	if isDurangoActive {
 		return nil, ErrAddDelegatorTxPostDurango
@@ -462,7 +467,7 @@ func verifyAddDelegatorTx(
 		return nil, ErrStakeOverflow
 	}
 
-	if backend.Config.IsApricotPhase3Activated(currentTimestamp) {
+	if upgrades.IsApricotPhase3Activated(currentTimestamp) {
 		maximumWeight = min(maximumWeight, backend.Config.MaxValidatorStake)
 	}
 
@@ -490,9 +495,9 @@ func verifyAddDelegatorTx(
 	}
 
 	// Verify the flowcheck
-
-	feeCalculator := fee.NewStaticCalculator(backend.Config.StaticConfig, backend.Config.Config, currentTimestamp)
-	if err := tx.Visit(feeCalculator); err != nil {
+	feeCalculator := fee.NewStaticCalculator(backend.Config.StaticFeeConfig, upgrades, currentTimestamp)
+	fee, err := feeCalculator.ComputeFee(tx)
+	if err != nil {
 		return nil, err
 	}
 
@@ -503,7 +508,7 @@ func verifyAddDelegatorTx(
 		outs,
 		sTx.Creds,
 		map[ids.ID]uint64{
-			backend.Ctx.AVAXAssetID: feeCalculator.Fee,
+			backend.Ctx.AVAXAssetID: fee,
 		},
 	); err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
@@ -529,8 +534,9 @@ func verifyAddPermissionlessValidatorTx(
 
 	var (
 		currentTimestamp = chainState.GetTimestamp()
-		isDurangoActive  = backend.Config.IsDurangoActivated(currentTimestamp)
-		isEActive        = backend.Config.IsEActivated(currentTimestamp)
+		upgrades         = backend.Config.UpgradeConfig
+		isDurangoActive  = upgrades.IsDurangoActivated(currentTimestamp)
+		isEActive        = upgrades.IsEActivated(currentTimestamp)
 	)
 	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
 		return err
@@ -618,16 +624,16 @@ func verifyAddPermissionlessValidatorTx(
 	// Verify the flowcheck
 	var (
 		feeCalculator *fee.Calculator
-		staticFeesCfg = backend.Config.StaticConfig
+		staticFeesCfg = backend.Config.StaticFeeConfig
 	)
 	if !isEActive {
-		upgrades := backend.Config.Config
 		feeCalculator = fee.NewStaticCalculator(staticFeesCfg, upgrades, currentTimestamp)
 	} else {
 		feeCalculator = fee.NewDynamicCalculator(staticFeesCfg, feeManager, maxComplexity, sTx.Creds)
 	}
 
-	if err := tx.Visit(feeCalculator); err != nil {
+	fee, err := feeCalculator.ComputeFee(tx)
+	if err != nil {
 		return err
 	}
 
@@ -638,7 +644,7 @@ func verifyAddPermissionlessValidatorTx(
 		outs,
 		sTx.Creds,
 		map[ids.ID]uint64{
-			backend.Ctx.AVAXAssetID: feeCalculator.Fee,
+			backend.Ctx.AVAXAssetID: fee,
 		},
 	); err != nil {
 		return fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
@@ -664,8 +670,9 @@ func verifyAddPermissionlessDelegatorTx(
 
 	var (
 		currentTimestamp = chainState.GetTimestamp()
-		isDurangoActive  = backend.Config.IsDurangoActivated(currentTimestamp)
-		isEActive        = backend.Config.IsEActivated(currentTimestamp)
+		upgrades         = backend.Config.UpgradeConfig
+		isDurangoActive  = upgrades.IsDurangoActivated(currentTimestamp)
+		isEActive        = upgrades.IsEActivated(currentTimestamp)
 	)
 	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
 		return err
@@ -778,16 +785,16 @@ func verifyAddPermissionlessDelegatorTx(
 	// Verify the flowcheck
 	var (
 		feeCalculator *fee.Calculator
-		staticFeesCfg = backend.Config.StaticConfig
+		staticFeesCfg = backend.Config.StaticFeeConfig
 	)
 	if !isEActive {
-		upgrades := backend.Config.Config
 		feeCalculator = fee.NewStaticCalculator(staticFeesCfg, upgrades, currentTimestamp)
 	} else {
 		feeCalculator = fee.NewDynamicCalculator(staticFeesCfg, feeManager, maxComplexity, sTx.Creds)
 	}
 
-	if err := tx.Visit(feeCalculator); err != nil {
+	fee, err := feeCalculator.ComputeFee(tx)
+	if err != nil {
 		return err
 	}
 
@@ -799,7 +806,7 @@ func verifyAddPermissionlessDelegatorTx(
 		outs,
 		sTx.Creds,
 		map[ids.ID]uint64{
-			backend.Ctx.AVAXAssetID: feeCalculator.Fee,
+			backend.Ctx.AVAXAssetID: fee,
 		},
 	); err != nil {
 		return fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
@@ -823,8 +830,9 @@ func verifyTransferSubnetOwnershipTx(
 ) error {
 	var (
 		currentTimestamp = chainState.GetTimestamp()
-		isDurangoActive  = backend.Config.IsDurangoActivated(currentTimestamp)
-		isEActive        = backend.Config.IsEActivated(currentTimestamp)
+		upgrades         = backend.Config.UpgradeConfig
+		isDurangoActive  = upgrades.IsDurangoActivated(currentTimestamp)
+		isEActive        = upgrades.IsEActivated(currentTimestamp)
 	)
 
 	if !isDurangoActive {
@@ -853,16 +861,16 @@ func verifyTransferSubnetOwnershipTx(
 	// Verify the flowcheck
 	var (
 		feeCalculator *fee.Calculator
-		staticFeesCfg = backend.Config.StaticConfig
+		staticFeesCfg = backend.Config.StaticFeeConfig
 	)
 	if !isEActive {
-		upgrades := backend.Config.Config
 		feeCalculator = fee.NewStaticCalculator(staticFeesCfg, upgrades, currentTimestamp)
 	} else {
 		feeCalculator = fee.NewDynamicCalculator(staticFeesCfg, feeManager, maxComplexity, sTx.Creds)
 	}
 
-	if err := tx.Visit(feeCalculator); err != nil {
+	fee, err := feeCalculator.ComputeFee(tx)
+	if err != nil {
 		return err
 	}
 
@@ -873,7 +881,7 @@ func verifyTransferSubnetOwnershipTx(
 		tx.Outs,
 		baseTxCreds,
 		map[ids.ID]uint64{
-			backend.Ctx.AVAXAssetID: feeCalculator.Fee,
+			backend.Ctx.AVAXAssetID: fee,
 		},
 	); err != nil {
 		return fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)

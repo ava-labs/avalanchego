@@ -1856,7 +1856,9 @@ func (s *Service) GetFeeRates(_ *http.Request, _ *struct{}, reply *GetFeeRatesRe
 	if err != nil {
 		return fmt.Errorf("could not calculate next staker change time: %w", err)
 	}
-	isEActivated := s.vm.Config.IsEActivated(nextTimestamp)
+
+	upgrades := s.vm.Config.UpgradeConfig
+	isEActivated := upgrades.IsEActivated(nextTimestamp)
 
 	if !isEActivated {
 		reply.NextFeeRates = reply.CurrentFeeRates
@@ -1877,7 +1879,7 @@ func (s *Service) GetFeeRates(_ *http.Request, _ *struct{}, reply *GetFeeRatesRe
 		if err != nil {
 			return fmt.Errorf("failed retrieving last block complexity: %w", err)
 		}
-		feeManager, err = fee.UpdatedFeeManager(feeRates, parentBlkComplexity, s.vm.Config.Config, currentTimestamp, nextTimestamp)
+		feeManager, err = fee.UpdatedFeeManager(feeRates, parentBlkComplexity, upgrades, currentTimestamp, nextTimestamp)
 		if err != nil {
 			return err
 		}

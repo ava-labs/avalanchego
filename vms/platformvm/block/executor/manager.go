@@ -155,7 +155,8 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 	}
 
 	var (
-		isEActive = m.txExecutorBackend.Config.IsEActivated(nextBlkTime)
+		upgrades  = m.txExecutorBackend.Config.UpgradeConfig
+		isEActive = upgrades.IsEActivated(nextBlkTime)
 		feesCfg   = fee.GetDynamicConfig(isEActive)
 	)
 
@@ -169,7 +170,7 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 		if err != nil {
 			return fmt.Errorf("failed retrieving last block complexity: %w", err)
 		}
-		feeManager, err = fee.UpdatedFeeManager(feeRates, parentBlkComplexity, m.txExecutorBackend.Config.Config, parentBlkTime, nextBlkTime)
+		feeManager, err = fee.UpdatedFeeManager(feeRates, parentBlkComplexity, upgrades, parentBlkTime, nextBlkTime)
 		if err != nil {
 			return err
 		}

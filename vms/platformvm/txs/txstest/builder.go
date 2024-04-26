@@ -422,8 +422,8 @@ func (b *Builder) builders(keys []*secp256k1.PrivateKey) (builder.Builder, walle
 
 func (b *Builder) feeCalculator() (*fee.Calculator, error) {
 	var (
-		staticFeeCfg = b.cfg.StaticConfig
-		upgrades     = b.cfg.Config
+		staticFeeCfg = b.cfg.StaticFeeConfig
+		upgrades     = b.cfg.UpgradeConfig
 		chainTime    = b.state.GetTimestamp()
 		isEActive    = upgrades.IsEActivated(chainTime)
 	)
@@ -445,7 +445,7 @@ func (b *Builder) feeCalculator() (*fee.Calculator, error) {
 			return nil, fmt.Errorf("failed retrieving last block complexity: %w", err)
 		}
 
-		feeManager, err := fee.UpdatedFeeManager(feeRates, parentBlkComplexity, b.cfg.Config, chainTime, nextChainTime)
+		feeManager, err := fee.UpdatedFeeManager(feeRates, parentBlkComplexity, b.cfg.UpgradeConfig, chainTime, nextChainTime)
 		if err != nil {
 			return nil, err
 		}

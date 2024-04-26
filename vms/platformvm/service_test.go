@@ -384,25 +384,25 @@ func TestGetBalance(t *testing.T) {
 			// As such we need to account for the subnet creation fee
 			var (
 				chainTime    = service.vm.state.GetTimestamp()
-				staticFeeCfg = service.vm.Config.StaticConfig
+				staticFeeCfg = service.vm.Config.StaticFeeConfig
+				upgrades     = service.vm.Config.UpgradeConfig
 				feeCalc      *fee.Calculator
 			)
 
-			if !service.vm.IsEActivated(chainTime) {
-				upgrades := service.vm.Config.Config
+			if !upgrades.IsEActivated(chainTime) {
 				feeCalc = fee.NewStaticCalculator(staticFeeCfg, upgrades, chainTime)
 			} else {
 				feeRates, err := service.vm.state.GetFeeRates()
 				require.NoError(err)
 
-				feeCfg := fee.GetDynamicConfig(service.vm.Config.IsEActivated(chainTime))
+				feeCfg := fee.GetDynamicConfig(true)
 				feeMan := commonfees.NewManager(feeRates)
 				feeCalc = fee.NewDynamicCalculator(staticFeeCfg, feeMan, feeCfg.BlockMaxComplexity, testSubnet1.Creds)
 			}
 
-			require.NoError(testSubnet1.Unsigned.Visit(feeCalc))
-
-			balance = defaultBalance - feeCalc.Fee
+			fee, err := feeCalc.ComputeFee(testSubnet1.Unsigned)
+			require.NoError(err)
+			balance = defaultBalance - fee
 		}
 		require.Equal(avajson.Uint64(balance), reply.Balance)
 		require.Equal(avajson.Uint64(balance), reply.Unlocked)
@@ -771,7 +771,7 @@ func TestGetBlock(t *testing.T) {
 			service, _, txBuilder := defaultService(t)
 			service.vm.ctx.Lock.Lock()
 
-			service.vm.CreateAssetTxFee = 100 * defaultTxFee
+			service.vm.StaticFeeConfig.CreateAssetTxFee = 100 * defaultTxFee
 
 			// Make a block an accept it, then check we can get it.
 			tx, err := txBuilder.NewCreateChainTx( // Test GetTx works for standard blocks

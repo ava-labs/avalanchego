@@ -1134,7 +1134,7 @@ func (n *Node) initVMs() error {
 				SybilProtectionEnabled:    n.Config.SybilProtectionEnabled,
 				PartialSyncPrimaryNetwork: n.Config.PartialSyncPrimaryNetwork,
 				TrackedSubnets:            n.Config.TrackedSubnets,
-				StaticConfig: fee.StaticConfig{
+				StaticFeeConfig: fee.StaticConfig{
 					TxFee:                         n.Config.TxFee,
 					CreateAssetTxFee:              n.Config.CreateAssetTxFee,
 					CreateSubnetTxFee:             n.Config.CreateSubnetTxFee,
@@ -1153,7 +1153,7 @@ func (n *Node) initVMs() error {
 				MinStakeDuration:  n.Config.MinStakeDuration,
 				MaxStakeDuration:  n.Config.MaxStakeDuration,
 				RewardConfig:      n.Config.RewardConfig,
-				Config: upgrade.Config{
+				UpgradeConfig: upgrade.Config{
 					ApricotPhase3Time: version.GetApricotPhase3Time(n.Config.NetworkID),
 					ApricotPhase5Time: version.GetApricotPhase5Time(n.Config.NetworkID),
 					BanffTime:         version.GetBanffTime(n.Config.NetworkID),
