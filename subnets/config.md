@@ -84,8 +84,7 @@ same values used for the Primary Network, which are given [CLI Snow Parameters](
 | :------------------------------- | :-------------------- |
 | --snow-sample-size               | k                     |
 | --snow-quorum-size               | alpha                 |
-| --snow-virtuous-commit-threshold | `betaVirtuous`        |
-| --snow-rogue-commit-threshold    | `betaRogue`           |
+| --snow-commit-threshold          | `beta`                |
 | --snow-concurrent-repolls        | concurrentRepolls     |
 | --snow-optimal-processing        | `optimalProcessing`   |
 | --snow-max-processing            | maxOutstandingItems   |

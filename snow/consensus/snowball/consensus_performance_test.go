@@ -22,8 +22,7 @@ func TestDualAlphaOptimization(t *testing.T) {
 			K:               20,
 			AlphaPreference: 15,
 			AlphaConfidence: 15,
-			BetaVirtuous:    15,
-			BetaRogue:       20,
+			Beta:            20,
 		}
 		seed   uint64 = 0
 		source        = prng.NewMT19937()
