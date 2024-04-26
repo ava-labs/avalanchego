@@ -352,7 +352,9 @@ func TestIPTracker_Connected(t *testing.T) {
 			ip:           ip,
 			expectedState: func() *ipTracker {
 				tracker := newTestIPTracker(t)
-				tracker.connected[ip.NodeID] = ip
+				tracker.connected[ip.NodeID] = &connectedNode{
+					ip: ip,
+				}
 				return tracker
 			}(),
 		},
@@ -369,7 +371,9 @@ func TestIPTracker_Connected(t *testing.T) {
 				tracker.OnValidatorAdded(constants.PrimaryNetworkID, ip.NodeID, nil, ids.Empty, 0)
 				tracker.mostRecentTrackedIPs[ip.NodeID] = ip
 				tracker.bloomAdditions[ip.NodeID] = 1
-				tracker.connected[ip.NodeID] = ip
+				tracker.connected[ip.NodeID] = &connectedNode{
+					ip: ip,
+				}
 				tracker.gossipableIndices[ip.NodeID] = 0
 				tracker.gossipableIPs = []*ips.ClaimedIPPort{
 					ip,
@@ -390,7 +394,9 @@ func TestIPTracker_Connected(t *testing.T) {
 				tracker := newTestIPTracker(t)
 				tracker.OnValidatorAdded(constants.PrimaryNetworkID, ip.NodeID, nil, ids.Empty, 0)
 				require.True(t, tracker.AddIP(newerIP))
-				tracker.connected[ip.NodeID] = ip
+				tracker.connected[ip.NodeID] = &connectedNode{
+					ip: ip,
+				}
 				return tracker
 			}(),
 		},
@@ -409,7 +415,9 @@ func TestIPTracker_Connected(t *testing.T) {
 				require.True(t, tracker.AddIP(ip))
 				tracker.mostRecentTrackedIPs[newerIP.NodeID] = newerIP
 				tracker.bloomAdditions[newerIP.NodeID] = 2
-				tracker.connected[newerIP.NodeID] = newerIP
+				tracker.connected[newerIP.NodeID] = &connectedNode{
+					ip: newerIP,
+				}
 				tracker.gossipableIndices[newerIP.NodeID] = 0
 				tracker.gossipableIPs = []*ips.ClaimedIPPort{
 					newerIP,
@@ -430,7 +438,9 @@ func TestIPTracker_Connected(t *testing.T) {
 				tracker := newTestIPTracker(t)
 				tracker.OnValidatorAdded(constants.PrimaryNetworkID, ip.NodeID, nil, ids.Empty, 0)
 				require.True(t, tracker.AddIP(ip))
-				tracker.connected[ip.NodeID] = ip
+				tracker.connected[ip.NodeID] = &connectedNode{
+					ip: ip,
+				}
 				tracker.gossipableIndices[ip.NodeID] = 0
 				tracker.gossipableIPs = []*ips.ClaimedIPPort{
 					ip,
