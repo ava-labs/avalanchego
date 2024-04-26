@@ -25,6 +25,7 @@ type Calculator struct {
 	upgradeTimes upgrade.Config
 }
 
+// [CalculateFee] returns the minimal fee needed to accept [tx], at chain time [time]
 func (c Calculator) CalculateFee(tx txs.UnsignedTx, time time.Time) uint64 {
 	tmp := &calculator{
 		upgrades:  c.upgradeTimes,
