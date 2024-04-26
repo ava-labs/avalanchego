@@ -76,6 +76,12 @@ var (
 
 	keys  = secp256k1.TestKeys()[:3] // TODO: Remove [:3]
 	addrs []ids.ShortID              // addrs[i] corresponds to keys[i]
+
+	noFeesTestConfig = &config.Config{
+		EUpgradeTime:     mockable.MaxTime,
+		TxFee:            0,
+		CreateAssetTxFee: 0,
+	}
 )
 
 func init() {

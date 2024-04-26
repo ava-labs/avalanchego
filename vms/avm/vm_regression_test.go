@@ -10,6 +10,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
+	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
@@ -19,7 +22,9 @@ import (
 func TestVerifyFxUsage(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{fork: latest})
+	env := setup(t, &envConfig{
+		vmStaticConfig: noFeesTestConfig,
+	})
 	env.vm.ctx.Lock.Unlock()
 	defer func() {
 		env.vm.ctx.Lock.Lock()
@@ -27,81 +32,85 @@ func TestVerifyFxUsage(t *testing.T) {
 		env.vm.ctx.Lock.Unlock()
 	}()
 
-	var (
-		key = keys[0]
-		kc  = secp256k1fx.NewKeychain()
-	)
-	kc.Add(key)
-
-	initialStates := map[uint32][]verify.State{
-		uint32(0): {
-			&secp256k1fx.TransferOutput{
-				Amt: 1,
-				OutputOwners: secp256k1fx.OutputOwners{
-					Threshold: 1,
-					Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+	createAssetTx := &txs.Tx{Unsigned: &txs.CreateAssetTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    constants.UnitTestID,
+			BlockchainID: env.vm.ctx.XChainID,
+		}},
+		Name:         "Team Rocket",
+		Symbol:       "TR",
+		Denomination: 0,
+		States: []*txs.InitialState{
+			{
+				FxIndex: 0,
+				Outs: []verify.State{
+					&secp256k1fx.TransferOutput{
+						Amt: 1,
+						OutputOwners: secp256k1fx.OutputOwners{
+							Threshold: 1,
+							Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+						},
+					},
+				},
+			},
+			{
+				FxIndex: 1,
+				Outs: []verify.State{
+					&nftfx.MintOutput{
+						GroupID: 1,
+						OutputOwners: secp256k1fx.OutputOwners{
+							Threshold: 1,
+							Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+						},
+					},
 				},
 			},
 		},
-		uint32(1): {
-			&nftfx.MintOutput{
-				GroupID: 1,
-				OutputOwners: secp256k1fx.OutputOwners{
-					Threshold: 1,
-					Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
-				},
-			},
-		},
-	}
-
-	// Create the asset
-	createAssetTx, _, err := buildCreateAssetTx(
-		env.service.txBuilderBackend,
-		"Team Rocket", // name
-		"TR",          // symbol
-		0,             // denomination
-		initialStates,
-		kc,
-		key.Address(),
-	)
-	require.NoError(err)
+	}}
+	require.NoError(createAssetTx.Initialize(env.vm.parser.Codec()))
 	issueAndAccept(require, env.vm, env.issuer, createAssetTx)
 
-	// Mint the NFT
-	env.service.txBuilderBackend.ResetAddresses(kc.Addresses())
-	mintNFTTx, err := mintNFT(
-		env.service.txBuilderBackend,
-		createAssetTx.ID(),
-		[]byte{'h', 'e', 'l', 'l', 'o'}, // payload
-		[]*secp256k1fx.OutputOwners{{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{key.Address()},
+	mintNFTTx := &txs.Tx{Unsigned: &txs.OperationTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    constants.UnitTestID,
+			BlockchainID: env.vm.ctx.XChainID,
 		}},
-		kc,
-		key.Address(),
-	)
-	require.NoError(err)
+		Ops: []*txs.Operation{{
+			Asset: avax.Asset{ID: createAssetTx.ID()},
+			UTXOIDs: []*avax.UTXOID{{
+				TxID:        createAssetTx.ID(),
+				OutputIndex: 1,
+			}},
+			Op: &nftfx.MintOperation{
+				MintInput: secp256k1fx.Input{
+					SigIndices: []uint32{0},
+				},
+				GroupID: 1,
+				Payload: []byte{'h', 'e', 'l', 'l', 'o'},
+				Outputs: []*secp256k1fx.OutputOwners{{}},
+			},
+		}},
+	}}
+	require.NoError(mintNFTTx.SignNFTFx(env.vm.parser.Codec(), [][]*secp256k1.PrivateKey{{keys[0]}}))
 	issueAndAccept(require, env.vm, env.issuer, mintNFTTx)
 
-	// move the NFT
-	to := keys[2].PublicKey().Address()
-	env.service.txBuilderBackend.ResetAddresses(kc.Addresses())
-	spendTx, _, err := buildBaseTx(
-		env.service.txBuilderBackend,
-		[]*avax.TransferableOutput{{
+	spendTx := &txs.Tx{Unsigned: &txs.BaseTx{BaseTx: avax.BaseTx{
+		NetworkID:    constants.UnitTestID,
+		BlockchainID: env.vm.ctx.XChainID,
+		Ins: []*avax.TransferableInput{{
+			UTXOID: avax.UTXOID{
+				TxID:        createAssetTx.ID(),
+				OutputIndex: 0,
+			},
 			Asset: avax.Asset{ID: createAssetTx.ID()},
-			Out: &secp256k1fx.TransferOutput{
+			In: &secp256k1fx.TransferInput{
 				Amt: 1,
-				OutputOwners: secp256k1fx.OutputOwners{
-					Threshold: 1,
-					Addrs:     []ids.ShortID{to},
+				Input: secp256k1fx.Input{
+					SigIndices: []uint32{0},
 				},
 			},
 		}},
-		nil, // memo
-		kc,
-		key.Address(),
-	)
-	require.NoError(err)
+	}}}
+	require.NoError(spendTx.SignSECP256K1Fx(env.vm.parser.Codec(), [][]*secp256k1.PrivateKey{{keys[0]}}))
 	issueAndAccept(require, env.vm, env.issuer, spendTx)
 }
