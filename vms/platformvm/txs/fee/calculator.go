@@ -65,12 +65,20 @@ func (c *calculator) AddDelegatorTx(*txs.AddDelegatorTx) error {
 }
 
 func (c *calculator) CreateChainTx(*txs.CreateChainTx) error {
-	c.fee = c.staticCfg.GetCreateBlockchainTxFee(c.upgrades, c.time)
+	if c.upgrades.IsApricotPhase3Activated(c.time) {
+		c.fee = c.staticCfg.CreateBlockchainTxFee
+	} else {
+		c.fee = c.staticCfg.CreateAssetTxFee
+	}
 	return nil
 }
 
 func (c *calculator) CreateSubnetTx(*txs.CreateSubnetTx) error {
-	c.fee = c.staticCfg.GetCreateSubnetTxFee(c.upgrades, c.time)
+	if c.upgrades.IsApricotPhase3Activated(c.time) {
+		c.fee = c.staticCfg.CreateSubnetTxFee
+	} else {
+		c.fee = c.staticCfg.CreateAssetTxFee
+	}
 	return nil
 }
 

@@ -8,6 +8,8 @@ import (
 
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/wallet/chain/p/builder"
 )
 
@@ -16,13 +18,19 @@ func newContext(
 	cfg *config.Config,
 	timestamp time.Time,
 ) *builder.Context {
+	var (
+		feeStaticCalc   = fee.NewStaticCalculator(cfg.StaticFeeConfig, cfg.UpgradeConfig)
+		createSubnetFee = feeStaticCalc.CalculateFee(&txs.CreateSubnetTx{}, timestamp)
+		createChainFee  = feeStaticCalc.CalculateFee(&txs.CreateChainTx{}, timestamp)
+	)
+
 	return &builder.Context{
 		NetworkID:                     ctx.NetworkID,
 		AVAXAssetID:                   ctx.AVAXAssetID,
 		BaseTxFee:                     cfg.StaticFeeConfig.TxFee,
-		CreateSubnetTxFee:             cfg.StaticFeeConfig.GetCreateSubnetTxFee(cfg.UpgradeConfig, timestamp),
+		CreateSubnetTxFee:             createSubnetFee,
 		TransformSubnetTxFee:          cfg.StaticFeeConfig.TransformSubnetTxFee,
-		CreateBlockchainTxFee:         cfg.StaticFeeConfig.GetCreateBlockchainTxFee(cfg.UpgradeConfig, timestamp),
+		CreateBlockchainTxFee:         createChainFee,
 		AddPrimaryNetworkValidatorFee: cfg.StaticFeeConfig.AddPrimaryNetworkValidatorFee,
 		AddPrimaryNetworkDelegatorFee: cfg.StaticFeeConfig.AddPrimaryNetworkDelegatorFee,
 		AddSubnetValidatorFee:         cfg.StaticFeeConfig.AddSubnetValidatorFee,
