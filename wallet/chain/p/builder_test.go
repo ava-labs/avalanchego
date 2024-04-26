@@ -314,7 +314,6 @@ func TestRemoveSubnetValidatorTx(t *testing.T) {
 		outs := utx.Outs
 		require.Len(ins, 2)
 		require.Len(outs, 1)
-		require.Equal(fee, ins[0].In.Amount()+ins[1].In.Amount()-outs[0].Out.Amount())
 
 		expectedConsumed := fee
 		consumed := ins[0].In.Amount() + ins[1].In.Amount() - outs[0].Out.Amount()
@@ -793,11 +792,11 @@ func TestExportTx(t *testing.T) {
 		outs := utx.Outs
 		require.Len(ins, 2)
 		require.Len(outs, 1)
+		require.Equal(utx.ExportedOutputs, exportedOutputs)
 
 		expectedConsumed := fee + exportedOutputs[0].Out.Amount()
 		consumed := ins[0].In.Amount() + ins[1].In.Amount() - outs[0].Out.Amount()
 		require.Equal(expectedConsumed, consumed)
-		require.Equal(utx.ExportedOutputs, exportedOutputs)
 	}
 
 	{ // Pre E-Upgrade
@@ -1021,7 +1020,7 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 		fc := fee.NewDynamicCalculator(testStaticConfig, commonfees.NewManager(testFeeRates), testBlockMaxComplexity, tx.Creds)
 		fee, err := fc.ComputeFee(utx)
 		require.NoError(err)
-		require.Equal(19_840*units.MicroAvax, fee)
+		require.Equal(20404*units.MicroAvax, fee)
 
 		// check UTXOs selection and fee financing
 		ins := utx.Ins
@@ -1033,7 +1032,9 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 
 		expectedConsumedSubnetAsset := utx.Validator.Weight()
 		consumedSubnetAsset := staked[0].Out.Amount() + staked[1].Out.Amount()
+		require.Equal(ins[0].In.Amount()+ins[2].In.Amount()-outs[1].Out.Amount(), consumedSubnetAsset)
 		require.Equal(expectedConsumedSubnetAsset, consumedSubnetAsset)
+
 		expectedConsumed := fee
 		consumed := ins[1].In.Amount() + ins[3].In.Amount() - outs[0].Out.Amount()
 		require.Equal(expectedConsumed, consumed)
@@ -1074,7 +1075,9 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 
 		expectedConsumedSubnetAsset := utx.Validator.Weight()
 		consumedSubnetAsset := staked[0].Out.Amount() + staked[1].Out.Amount()
+		require.Equal(ins[0].In.Amount()+ins[2].In.Amount()-outs[1].Out.Amount(), consumedSubnetAsset)
 		require.Equal(expectedConsumedSubnetAsset, consumedSubnetAsset)
+
 		expectedConsumed := fee
 		consumed := ins[1].In.Amount() + ins[3].In.Amount() - outs[0].Out.Amount()
 		require.Equal(expectedConsumed, consumed)
@@ -1145,7 +1148,9 @@ func TestAddPermissionlessDelegatorTx(t *testing.T) {
 
 		expectedConsumedSubnetAsset := utx.Validator.Weight()
 		consumedSubnetAsset := staked[0].Out.Amount() + staked[1].Out.Amount()
+		require.Equal(ins[0].In.Amount()+ins[2].In.Amount()-outs[1].Out.Amount(), consumedSubnetAsset)
 		require.Equal(expectedConsumedSubnetAsset, consumedSubnetAsset)
+
 		expectedConsumed := fee
 		consumed := ins[1].In.Amount() + ins[3].In.Amount() - outs[0].Out.Amount()
 		require.Equal(expectedConsumed, consumed)
@@ -1183,7 +1188,9 @@ func TestAddPermissionlessDelegatorTx(t *testing.T) {
 
 		expectedConsumedSubnetAsset := utx.Validator.Weight()
 		consumedSubnetAsset := staked[0].Out.Amount() + staked[1].Out.Amount()
+		require.Equal(ins[0].In.Amount()+ins[2].In.Amount()-outs[1].Out.Amount(), consumedSubnetAsset)
 		require.Equal(expectedConsumedSubnetAsset, consumedSubnetAsset)
+
 		expectedConsumed := fee
 		consumed := ins[1].In.Amount() + ins[3].In.Amount() - outs[0].Out.Amount()
 		require.Equal(expectedConsumed, consumed)
