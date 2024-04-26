@@ -1804,7 +1804,7 @@ func TestLaggedPChainHeight(t *testing.T) {
 	block := blockIntf.(*postForkBlock)
 
 	pChainHeight := block.PChainHeight()
-	require.Equal(pChainHeight, snowmantest.GenesisHeight)
+	require.Equal(snowmantest.GenesisHeight, pChainHeight)
 }
 
 // Ensure that rejecting a block does not modify the accepted block ID for the
