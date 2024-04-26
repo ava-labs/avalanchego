@@ -27,7 +27,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
 )
@@ -39,13 +38,12 @@ var (
 	errUnexpectedCall = errors.New("unexpected call")
 	errTest           = errors.New("non-nil test")
 
-	GenesisBytes = utils.RandomBytes(32)
-	Genesis      = &snowmantest.Block{
+	Genesis = &snowmantest.Block{
 		TestDecidable: choices.TestDecidable{
 			IDV:     snowmantest.GenesisID,
 			StatusV: choices.Accepted,
 		},
-		BytesV: GenesisBytes,
+		BytesV: snowmantest.GenesisBytes,
 	}
 )
 
@@ -538,7 +536,7 @@ func TestEngineRespondsToGetRequest(t *testing.T) {
 
 		require.Equal(vdr, nodeID)
 		require.Equal(uint32(123), requestID)
-		require.Equal(GenesisBytes, blk)
+		require.Equal(snowmantest.GenesisBytes, blk)
 	}
 
 	require.NoError(te.Get(context.Background(), vdr, 123, snowmantest.GenesisID))
@@ -957,13 +955,13 @@ func TestEngineAbandonChitWithUnexpectedPutBlock(t *testing.T) {
 	sender.CantSendPullQuery = false
 
 	vm.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
-		require.Equal(GenesisBytes, b)
+		require.Equal(snowmantest.GenesisBytes, b)
 		return Genesis, nil
 	}
 
 	// Respond with an unexpected block and verify that the request is correctly
 	// cleared.
-	require.NoError(te.Put(context.Background(), vdr, reqID, GenesisBytes))
+	require.NoError(te.Put(context.Background(), vdr, reqID, snowmantest.GenesisBytes))
 	require.Empty(te.blocked)
 }
 
@@ -1054,7 +1052,7 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 	}
 	vm.ParseBlockF = func(_ context.Context, blkBytes []byte) (snowman.Block, error) {
 		switch {
-		case bytes.Equal(GenesisBytes, blkBytes):
+		case bytes.Equal(snowmantest.GenesisBytes, blkBytes):
 			return Genesis, nil
 		case bytes.Equal(issuedBlk.Bytes(), blkBytes):
 			return issuedBlk, nil
