@@ -36,7 +36,7 @@ func BuildChild(parent *Block) *Block {
 		},
 		ParentV:    parent.ID(),
 		HeightV:    parent.Height() + 1,
-		TimestampV: parent.Timestamp().Add(time.Second),
+		TimestampV: parent.Timestamp(),
 		BytesV:     blkID[:],
 	}
 }
