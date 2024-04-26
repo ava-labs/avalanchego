@@ -139,7 +139,7 @@ type node interface {
 }
 
 // unary is a node with either no children, or a single child. It handles the
-// voting on a range of identical, virtuous, snow instances.
+// voting on a range of identical, unary, snow instances.
 type unaryNode struct {
 	// tree references the tree that contains this node
 	tree *Tree
@@ -350,7 +350,7 @@ func (u *unaryNode) Add(newChoice ids.ID) node {
 	b := &binaryNode{
 		tree:        u.tree,
 		bit:         index,
-		snow:        u.snow.Extend(u.tree.params.BetaRogue, bit),
+		snow:        u.snow.Extend(bit),
 		shouldReset: [2]bool{u.shouldReset, u.shouldReset},
 	}
 	b.preferences[bit] = u.preference
@@ -445,7 +445,6 @@ func (u *unaryNode) RecordPoll(votes bag.Bag[ids.ID], reset bool) (node, bool) {
 			// If I'm now decided, return my child
 			return newChild, true
 		}
-		u.child = newChild
 
 		// The child's preference may have changed
 		u.preference = u.child.Preference()
@@ -470,7 +469,7 @@ func (u *unaryNode) Printable() (string, []node) {
 }
 
 // binaryNode is a node with either no children, or two children. It handles the
-// voting of a single, rogue, snow instance.
+// voting of a single, binary, snow instance.
 type binaryNode struct {
 	// tree references the tree that contains this node
 	tree *Tree
@@ -508,9 +507,7 @@ func (b *binaryNode) Add(id ids.ID) node {
 	// If child is nil, then we are running an instance on the last bit. Finding
 	// two hashes that are equal up to the last bit would be really cool though.
 	// Regardless, the case is handled
-	if child != nil &&
-		// + 1 is used because we already explicitly check the p.bit bit
-		ids.EqualSubset(b.bit+1, child.DecidedPrefix(), b.preferences[bit], id) {
+	if child != nil {
 		b.children[bit] = child.Add(id)
 	}
 	// If child is nil, then the id has already been added to the tree, so
@@ -557,20 +554,12 @@ func (b *binaryNode) RecordPoll(votes bag.Bag[ids.ID], reset bool) (node, bool) 
 	}
 
 	if child := b.children[bit]; child != nil {
-		// The votes are filtered to ensure that they are votes that should
-		// count for the child
-		decidedPrefix := child.DecidedPrefix()
-		filteredVotes := prunedVotes.Filter(func(id ids.ID) bool {
-			return ids.EqualSubset(b.bit+1, decidedPrefix, b.preferences[bit], id)
-		})
-
-		newChild, _ := child.RecordPoll(filteredVotes, b.shouldReset[bit])
+		newChild, _ := child.RecordPoll(prunedVotes, b.shouldReset[bit])
 		if b.snow.Finalized() {
 			// If we are decided here, that means we must have decided due
 			// to this poll. Therefore, we must have decided on bit.
 			return newChild, true
 		}
-		b.children[bit] = newChild
 		b.preferences[bit] = newChild.Preference()
 	}
 	b.shouldReset[bit] = false // We passed the reset down

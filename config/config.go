@@ -59,12 +59,8 @@ const (
 var (
 	// Deprecated key --> deprecation message (i.e. which key replaces it)
 	// TODO: deprecate "BootstrapIDsKey" and "BootstrapIPsKey"
-	commitThresholdDeprecationMsg = fmt.Sprintf("use --%s instead", SnowCommitThresholdKey)
-	deprecatedKeys                = map[string]string{
+	deprecatedKeys = map[string]string{
 		KeystoreAPIEnabledKey: keystoreDeprecationMsg,
-
-		SnowRogueCommitThresholdKey:    commitThresholdDeprecationMsg,
-		SnowVirtuousCommitThresholdKey: commitThresholdDeprecationMsg,
 	}
 
 	errConflictingACPOpinion                  = errors.New("supporting and objecting to the same ACP")
@@ -95,8 +91,7 @@ func getConsensusConfig(v *viper.Viper) snowball.Parameters {
 		K:                     v.GetInt(SnowSampleSizeKey),
 		AlphaPreference:       v.GetInt(SnowPreferenceQuorumSizeKey),
 		AlphaConfidence:       v.GetInt(SnowConfidenceQuorumSizeKey),
-		BetaVirtuous:          v.GetInt(SnowCommitThresholdKey),
-		BetaRogue:             v.GetInt(SnowCommitThresholdKey),
+		Beta:                  v.GetInt(SnowCommitThresholdKey),
 		ConcurrentRepolls:     v.GetInt(SnowConcurrentRepollsKey),
 		OptimalProcessing:     v.GetInt(SnowOptimalProcessingKey),
 		MaxOutstandingItems:   v.GetInt(SnowMaxProcessingKey),
@@ -105,10 +100,6 @@ func getConsensusConfig(v *viper.Viper) snowball.Parameters {
 	if v.IsSet(SnowQuorumSizeKey) {
 		p.AlphaPreference = v.GetInt(SnowQuorumSizeKey)
 		p.AlphaConfidence = p.AlphaPreference
-	}
-	if v.IsSet(SnowRogueCommitThresholdKey) {
-		p.BetaVirtuous = v.GetInt(SnowRogueCommitThresholdKey)
-		p.BetaRogue = v.GetInt(SnowRogueCommitThresholdKey)
 	}
 	return p
 }
@@ -949,7 +940,7 @@ func getChainConfigs(v *viper.Viper) (map[string]chains.ChainConfig, error) {
 	return getChainConfigsFromDir(v)
 }
 
-// ReadsChainConfigs reads chain config files from static directories and returns map with contents,
+// readChainConfigPath reads chain config files from static directories and returns map with contents,
 // if successful.
 func readChainConfigPath(chainConfigPath string) (map[string]chains.ChainConfig, error) {
 	chainDirs, err := filepath.Glob(filepath.Join(chainConfigPath, "*"))
@@ -987,7 +978,7 @@ func readChainConfigPath(chainConfigPath string) (map[string]chains.ChainConfig,
 	return chainConfigMap, nil
 }
 
-// getSubnetConfigsFromFlags reads subnet configs from the correct place
+// getSubnetConfigs reads subnet configs from the correct place
 // (flag or file) and returns a non-nil map.
 func getSubnetConfigs(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]subnets.Config, error) {
 	if v.IsSet(SubnetConfigContentKey) {

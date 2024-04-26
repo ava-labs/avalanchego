@@ -18,8 +18,7 @@ func TestFlat(t *testing.T) {
 		K:               3,
 		AlphaPreference: 2,
 		AlphaConfidence: 3,
-		BetaVirtuous:    1,
-		BetaRogue:       2,
+		Beta:            2,
 	}
 	f := NewFlat(SnowballFactory, params, Red)
 	f.Add(Green)
@@ -51,7 +50,7 @@ func TestFlat(t *testing.T) {
 
 	require.True(f.RecordPoll(threeGreen))
 	require.Equal(Green, f.Preference())
-	require.False(f.Finalized()) // Not finalized before BetaRogue rounds
+	require.False(f.Finalized()) // Not finalized before Beta rounds
 
 	require.True(f.RecordPoll(threeGreen))
 	require.Equal(Green, f.Preference())
