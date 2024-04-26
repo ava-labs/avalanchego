@@ -18,7 +18,7 @@ func TestAcceptSingleBlock(t *testing.T) {
 
 	tr := New()
 
-	block := snowmantest.BuildChildBlock(snowmantest.Genesis)
+	block := snowmantest.BuildChild(snowmantest.Genesis)
 	_, contains := tr.Get(block)
 	require.False(contains)
 
@@ -39,8 +39,8 @@ func TestAcceptBlockConflict(t *testing.T) {
 
 	tr := New()
 
-	blockToAccept := snowmantest.BuildChildBlock(snowmantest.Genesis)
-	blockToReject := snowmantest.BuildChildBlock(snowmantest.Genesis)
+	blockToAccept := snowmantest.BuildChild(snowmantest.Genesis)
+	blockToReject := snowmantest.BuildChild(snowmantest.Genesis)
 
 	// add conflicting blocks
 	tr.Add(blockToAccept)
@@ -69,9 +69,9 @@ func TestAcceptChainConflict(t *testing.T) {
 
 	tr := New()
 
-	blockToAccept := snowmantest.BuildChildBlock(snowmantest.Genesis)
-	blockToReject := snowmantest.BuildChildBlock(snowmantest.Genesis)
-	blockToRejectChild := snowmantest.BuildChildBlock(blockToReject)
+	blockToAccept := snowmantest.BuildChild(snowmantest.Genesis)
+	blockToReject := snowmantest.BuildChild(snowmantest.Genesis)
+	blockToRejectChild := snowmantest.BuildChild(blockToReject)
 
 	// add conflicting blocks.
 	tr.Add(blockToAccept)

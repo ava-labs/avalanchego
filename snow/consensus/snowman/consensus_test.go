@@ -134,7 +134,7 @@ func NumProcessingTest(t *testing.T, factory Factory) {
 		snowmantest.GenesisTimestamp,
 	))
 
-	block := snowmantest.BuildChildBlock(snowmantest.Genesis)
+	block := snowmantest.BuildChild(snowmantest.Genesis)
 
 	require.Zero(sm.NumProcessing())
 
@@ -173,7 +173,7 @@ func AddToTailTest(t *testing.T, factory Factory) {
 		snowmantest.GenesisTimestamp,
 	))
 
-	block := snowmantest.BuildChildBlock(snowmantest.Genesis)
+	block := snowmantest.BuildChild(snowmantest.Genesis)
 
 	// Adding to the previous preference will update the preference
 	require.NoError(sm.Add(context.Background(), block))
@@ -211,8 +211,8 @@ func AddToNonTailTest(t *testing.T, factory Factory) {
 		snowmantest.GenesisTimestamp,
 	))
 
-	firstBlock := snowmantest.BuildChildBlock(snowmantest.Genesis)
-	secondBlock := snowmantest.BuildChildBlock(snowmantest.Genesis)
+	firstBlock := snowmantest.BuildChild(snowmantest.Genesis)
+	secondBlock := snowmantest.BuildChild(snowmantest.Genesis)
 
 	// Adding to the previous preference will update the preference
 	require.NoError(sm.Add(context.Background(), firstBlock))
@@ -327,7 +327,7 @@ func StatusOrProcessingPreviouslyRejectedTest(t *testing.T, factory Factory) {
 		snowmantest.GenesisTimestamp,
 	))
 
-	block := snowmantest.BuildChildBlock(snowmantest.Genesis)
+	block := snowmantest.BuildChild(snowmantest.Genesis)
 	require.NoError(block.Reject(context.Background()))
 
 	require.Equal(choices.Rejected, block.Status())
@@ -364,7 +364,7 @@ func StatusOrProcessingUnissuedTest(t *testing.T, factory Factory) {
 		snowmantest.GenesisTimestamp,
 	))
 
-	block := snowmantest.BuildChildBlock(snowmantest.Genesis)
+	block := snowmantest.BuildChild(snowmantest.Genesis)
 
 	require.Equal(choices.Processing, block.Status())
 	require.False(sm.Processing(block.ID()))
@@ -400,7 +400,7 @@ func StatusOrProcessingIssuedTest(t *testing.T, factory Factory) {
 		snowmantest.GenesisTimestamp,
 	))
 
-	block := snowmantest.BuildChildBlock(snowmantest.Genesis)
+	block := snowmantest.BuildChild(snowmantest.Genesis)
 
 	require.NoError(sm.Add(context.Background(), block))
 	require.Equal(choices.Processing, block.Status())
@@ -438,7 +438,7 @@ func RecordPollAcceptSingleBlockTest(t *testing.T, factory Factory) {
 		snowmantest.GenesisTimestamp,
 	))
 
-	block := snowmantest.BuildChildBlock(snowmantest.Genesis)
+	block := snowmantest.BuildChild(snowmantest.Genesis)
 
 	require.NoError(sm.Add(context.Background(), block))
 
@@ -479,8 +479,8 @@ func RecordPollAcceptAndRejectTest(t *testing.T, factory Factory) {
 		snowmantest.GenesisTimestamp,
 	))
 
-	firstBlock := snowmantest.BuildChildBlock(snowmantest.Genesis)
-	secondBlock := snowmantest.BuildChildBlock(snowmantest.Genesis)
+	firstBlock := snowmantest.BuildChild(snowmantest.Genesis)
+	secondBlock := snowmantest.BuildChild(snowmantest.Genesis)
 
 	require.NoError(sm.Add(context.Background(), firstBlock))
 	require.NoError(sm.Add(context.Background(), secondBlock))
@@ -527,8 +527,8 @@ func RecordPollSplitVoteNoChangeTest(t *testing.T, factory Factory) {
 		snowmantest.GenesisTimestamp,
 	))
 
-	firstBlock := snowmantest.BuildChildBlock(snowmantest.Genesis)
-	secondBlock := snowmantest.BuildChildBlock(snowmantest.Genesis)
+	firstBlock := snowmantest.BuildChild(snowmantest.Genesis)
+	secondBlock := snowmantest.BuildChild(snowmantest.Genesis)
 
 	require.NoError(sm.Add(context.Background(), firstBlock))
 	require.NoError(sm.Add(context.Background(), secondBlock))
@@ -610,9 +610,9 @@ func RecordPollRejectTransitivelyTest(t *testing.T, factory Factory) {
 		snowmantest.GenesisTimestamp,
 	))
 
-	block0 := snowmantest.BuildChildBlock(snowmantest.Genesis)
-	block1 := snowmantest.BuildChildBlock(snowmantest.Genesis)
-	block2 := snowmantest.BuildChildBlock(block1)
+	block0 := snowmantest.BuildChild(snowmantest.Genesis)
+	block1 := snowmantest.BuildChild(snowmantest.Genesis)
+	block2 := snowmantest.BuildChild(block1)
 
 	require.NoError(sm.Add(context.Background(), block0))
 	require.NoError(sm.Add(context.Background(), block1))
@@ -665,10 +665,10 @@ func RecordPollTransitivelyResetConfidenceTest(t *testing.T, factory Factory) {
 		snowmantest.GenesisTimestamp,
 	))
 
-	block0 := snowmantest.BuildChildBlock(snowmantest.Genesis)
-	block1 := snowmantest.BuildChildBlock(snowmantest.Genesis)
-	block2 := snowmantest.BuildChildBlock(block1)
-	block3 := snowmantest.BuildChildBlock(block1)
+	block0 := snowmantest.BuildChild(snowmantest.Genesis)
+	block1 := snowmantest.BuildChild(snowmantest.Genesis)
+	block2 := snowmantest.BuildChild(block1)
+	block3 := snowmantest.BuildChild(block1)
 
 	require.NoError(sm.Add(context.Background(), block0))
 	require.NoError(sm.Add(context.Background(), block1))
@@ -735,7 +735,7 @@ func RecordPollInvalidVoteTest(t *testing.T, factory Factory) {
 		snowmantest.GenesisTimestamp,
 	))
 
-	block := snowmantest.BuildChildBlock(snowmantest.Genesis)
+	block := snowmantest.BuildChild(snowmantest.Genesis)
 	unknownBlockID := ids.GenerateTestID()
 
 	require.NoError(sm.Add(context.Background(), block))
@@ -775,11 +775,11 @@ func RecordPollTransitiveVotingTest(t *testing.T, factory Factory) {
 		snowmantest.GenesisTimestamp,
 	))
 
-	block0 := snowmantest.BuildChildBlock(snowmantest.Genesis)
-	block1 := snowmantest.BuildChildBlock(block0)
-	block2 := snowmantest.BuildChildBlock(block1)
-	block3 := snowmantest.BuildChildBlock(block0)
-	block4 := snowmantest.BuildChildBlock(block3)
+	block0 := snowmantest.BuildChild(snowmantest.Genesis)
+	block1 := snowmantest.BuildChild(block0)
+	block2 := snowmantest.BuildChild(block1)
+	block3 := snowmantest.BuildChild(block0)
+	block4 := snowmantest.BuildChild(block3)
 
 	require.NoError(sm.Add(context.Background(), block0))
 	require.NoError(sm.Add(context.Background(), block1))
@@ -880,7 +880,7 @@ func RecordPollDivergedVotingWithNoConflictingBitTest(t *testing.T, factory Fact
 		ParentV: snowmantest.GenesisID,
 		HeightV: snowmantest.GenesisHeight + 1,
 	}
-	block3 := snowmantest.BuildChildBlock(block2)
+	block3 := snowmantest.BuildChild(block2)
 
 	require.NoError(sm.Add(context.Background(), block0))
 	require.NoError(sm.Add(context.Background(), block1))
@@ -959,10 +959,10 @@ func RecordPollChangePreferredChainTest(t *testing.T, factory Factory) {
 		snowmantest.GenesisTimestamp,
 	))
 
-	a1Block := snowmantest.BuildChildBlock(snowmantest.Genesis)
-	b1Block := snowmantest.BuildChildBlock(snowmantest.Genesis)
-	a2Block := snowmantest.BuildChildBlock(a1Block)
-	b2Block := snowmantest.BuildChildBlock(b1Block)
+	a1Block := snowmantest.BuildChild(snowmantest.Genesis)
+	b1Block := snowmantest.BuildChild(snowmantest.Genesis)
+	a2Block := snowmantest.BuildChild(a1Block)
+	b2Block := snowmantest.BuildChild(b1Block)
 
 	require.NoError(sm.Add(context.Background(), a1Block))
 	require.NoError(sm.Add(context.Background(), a2Block))
@@ -1044,10 +1044,10 @@ func LastAcceptedTest(t *testing.T, factory Factory) {
 		snowmantest.GenesisTimestamp,
 	))
 
-	block0 := snowmantest.BuildChildBlock(snowmantest.Genesis)
-	block1 := snowmantest.BuildChildBlock(block0)
-	block2 := snowmantest.BuildChildBlock(block1)
-	block1Conflict := snowmantest.BuildChildBlock(block0)
+	block0 := snowmantest.BuildChild(snowmantest.Genesis)
+	block1 := snowmantest.BuildChild(block0)
+	block2 := snowmantest.BuildChild(block1)
+	block1Conflict := snowmantest.BuildChild(block0)
 
 	lastAcceptedID, lastAcceptedHeight := sm.LastAccepted()
 	require.Equal(snowmantest.GenesisID, lastAcceptedID)
@@ -1261,7 +1261,7 @@ func ErrorOnAcceptTest(t *testing.T, factory Factory) {
 		snowmantest.GenesisTimestamp,
 	))
 
-	block := snowmantest.BuildChildBlock(snowmantest.Genesis)
+	block := snowmantest.BuildChild(snowmantest.Genesis)
 	block.AcceptV = errTest
 
 	require.NoError(sm.Add(context.Background(), block))
@@ -1297,8 +1297,8 @@ func ErrorOnRejectSiblingTest(t *testing.T, factory Factory) {
 		snowmantest.GenesisTimestamp,
 	))
 
-	block0 := snowmantest.BuildChildBlock(snowmantest.Genesis)
-	block1 := snowmantest.BuildChildBlock(snowmantest.Genesis)
+	block0 := snowmantest.BuildChild(snowmantest.Genesis)
+	block1 := snowmantest.BuildChild(snowmantest.Genesis)
 	block1.RejectV = errTest
 
 	require.NoError(sm.Add(context.Background(), block0))
@@ -1335,9 +1335,9 @@ func ErrorOnTransitiveRejectionTest(t *testing.T, factory Factory) {
 		snowmantest.GenesisTimestamp,
 	))
 
-	block0 := snowmantest.BuildChildBlock(snowmantest.Genesis)
-	block1 := snowmantest.BuildChildBlock(snowmantest.Genesis)
-	block2 := snowmantest.BuildChildBlock(block1)
+	block0 := snowmantest.BuildChild(snowmantest.Genesis)
+	block1 := snowmantest.BuildChild(snowmantest.Genesis)
+	block2 := snowmantest.BuildChild(block1)
 	block2.RejectV = errTest
 
 	require.NoError(sm.Add(context.Background(), block0))
@@ -1408,7 +1408,7 @@ func ErrorOnAddDecidedBlockTest(t *testing.T, factory Factory) {
 		snowmantest.GenesisTimestamp,
 	))
 
-	block := snowmantest.BuildChildBlock(snowmantest.Genesis)
+	block := snowmantest.BuildChild(snowmantest.Genesis)
 	require.NoError(block.Accept(context.Background()))
 
 	err := sm.Add(context.Background(), block)
@@ -1455,8 +1455,8 @@ func RecordPollWithDefaultParameters(t *testing.T, factory Factory) {
 	))
 
 	// "blk1" and "blk2" are in conflict
-	blk1 := snowmantest.BuildChildBlock(snowmantest.Genesis)
-	blk2 := snowmantest.BuildChildBlock(snowmantest.Genesis)
+	blk1 := snowmantest.BuildChild(snowmantest.Genesis)
+	blk2 := snowmantest.BuildChild(snowmantest.Genesis)
 
 	require.NoError(sm.Add(context.Background(), blk1))
 	require.NoError(sm.Add(context.Background(), blk2))
@@ -1500,9 +1500,9 @@ func RecordPollRegressionCalculateInDegreeIndegreeCalculation(t *testing.T, fact
 		snowmantest.GenesisTimestamp,
 	))
 
-	blk1 := snowmantest.BuildChildBlock(snowmantest.Genesis)
-	blk2 := snowmantest.BuildChildBlock(blk1)
-	blk3 := snowmantest.BuildChildBlock(blk2)
+	blk1 := snowmantest.BuildChild(snowmantest.Genesis)
+	blk2 := snowmantest.BuildChild(blk1)
+	blk3 := snowmantest.BuildChild(blk2)
 
 	require.NoError(sm.Add(context.Background(), blk1))
 	require.NoError(sm.Add(context.Background(), blk2))

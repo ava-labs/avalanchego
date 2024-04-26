@@ -21,18 +21,10 @@ var (
 	GenesisID        = ids.GenerateTestID()
 	GenesisTimestamp = time.Unix(1, 0)
 	GenesisBytes     = GenesisID[:]
-	Genesis          = &Block{
-		TestDecidable: choices.TestDecidable{
-			IDV:     GenesisID,
-			StatusV: choices.Accepted,
-		},
-		HeightV:    GenesisHeight,
-		TimestampV: GenesisTimestamp,
-		BytesV:     GenesisBytes,
-	}
+	Genesis          = BuildChain(1)[0]
 )
 
-func BuildChildBlock(parent *Block) *Block {
+func BuildChild(parent *Block) *Block {
 	blkID := ids.GenerateTestID()
 	return &Block{
 		TestDecidable: choices.TestDecidable{
@@ -46,10 +38,27 @@ func BuildChildBlock(parent *Block) *Block {
 	}
 }
 
-func BuildChain(parent *Block, length int) []*Block {
+func BuildChain(length int) []*Block {
+	if length == 0 {
+		return nil
+	}
+
+	genesis := &Block{
+		TestDecidable: choices.TestDecidable{
+			IDV:     GenesisID,
+			StatusV: choices.Accepted,
+		},
+		HeightV:    GenesisHeight,
+		TimestampV: GenesisTimestamp,
+		BytesV:     GenesisBytes,
+	}
+	return append([]*Block{genesis}, BuildDescendants(genesis, length-1)...)
+}
+
+func BuildDescendants(parent *Block, length int) []*Block {
 	chain := make([]*Block, length)
 	for i := range chain {
-		parent = BuildChildBlock(parent)
+		parent = BuildChild(parent)
 		chain[i] = parent
 	}
 	return chain
