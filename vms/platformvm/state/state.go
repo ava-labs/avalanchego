@@ -1333,7 +1333,7 @@ func (s *state) loadMetadata() error {
 		// fork introducing dynamic fees may not be active yet,
 		// hence we may have never stored fee rates. Load from config
 		// TODO: remove once fork is active
-		isEActive := s.cfg.IsEActivated(timestamp)
+		isEActive := s.cfg.UpgradeConfig.IsEActivated(timestamp)
 		*s.feeRate = fee.GetDynamicConfig(isEActive).InitialFeeRate
 
 	default:
@@ -1691,7 +1691,7 @@ func (s *state) initValidatorSets() error {
 
 func (s *state) write(updateValidators bool, height uint64) error {
 	codecVersion := CodecVersion1
-	if !s.cfg.IsDurangoActivated(s.GetTimestamp()) {
+	if !s.cfg.UpgradeConfig.IsDurangoActivated(s.GetTimestamp()) {
 		codecVersion = CodecVersion0
 	}
 

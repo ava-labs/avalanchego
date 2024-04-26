@@ -347,7 +347,8 @@ func packBlockTxs(
 	}
 
 	var (
-		isEActivated = backend.Config.IsEActivated(timestamp)
+		upgrades     = backend.Config.UpgradeConfig
+		isEActivated = upgrades.IsEActivated(timestamp)
 		feeCfg       = fee.GetDynamicConfig(isEActivated)
 
 		blockTxs []mempool.TxAndTipPercentage
@@ -373,7 +374,7 @@ func packBlockTxs(
 			return nil, fmt.Errorf("failed retrieving last block complexity: %w", err)
 		}
 
-		feeMan, err = fee.UpdatedFeeManager(feeRates, parentBlkComplexity, backend.Config.Config, parentBlkTime, timestamp)
+		feeMan, err = fee.UpdatedFeeManager(feeRates, parentBlkComplexity, upgrades, parentBlkTime, timestamp)
 		if err != nil {
 			return nil, err
 		}

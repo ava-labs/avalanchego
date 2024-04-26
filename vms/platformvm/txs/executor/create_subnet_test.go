@@ -53,7 +53,7 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 			require := require.New(t)
 
 			env := newEnvironment(t, apricotPhase3)
-			env.config.ApricotPhase3Time = ap3Time
+			env.config.UpgradeConfig.ApricotPhase3Time = ap3Time
 			env.ctx.Lock.Lock()
 			defer env.ctx.Lock.Unlock()
 
@@ -65,7 +65,7 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 			}
 
 			cfg := *env.config
-			cfg.CreateSubnetTxFee = test.fee
+			cfg.StaticFeeConfig.CreateSubnetTxFee = test.fee
 			builder := txstest.NewBuilder(env.ctx, &cfg, env.clk, env.state)
 			tx, err := builder.NewCreateSubnetTx(
 				&secp256k1fx.OutputOwners{},
@@ -80,7 +80,7 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 			stateDiff.SetTimestamp(test.time)
 
 			chainTime := stateDiff.GetTimestamp()
-			feeCfg := fee.GetDynamicConfig(env.config.IsEActivated(chainTime))
+			feeCfg := fee.GetDynamicConfig(env.config.UpgradeConfig.IsEActivated(chainTime))
 			executor := StandardTxExecutor{
 				Backend:            &env.backend,
 				BlkFeeManager:      commonfees.NewManager(feeCfg.InitialFeeRate),

@@ -184,7 +184,7 @@ func newEnvironment(t *testing.T, f fork) *environment { //nolint:unparam
 
 	res.mempool, err = mempool.New("mempool", registerer, nil)
 	require.NoError(err)
-	if res.config.IsEActivated(res.state.GetTimestamp()) {
+	if res.config.UpgradeConfig.IsEActivated(res.state.GetTimestamp()) {
 		res.mempool.SetEUpgradeActive()
 	}
 
@@ -274,7 +274,7 @@ func addSubnet(t *testing.T, env *environment) {
 	require.NoError(err)
 
 	chainTime := env.state.GetTimestamp()
-	feeCfg := fee.GetDynamicConfig(env.config.IsEActivated(chainTime))
+	feeCfg := fee.GetDynamicConfig(env.config.UpgradeConfig.IsEActivated(chainTime))
 	executor := txexecutor.StandardTxExecutor{
 		Backend:            &env.backend,
 		BlkFeeManager:      fees.NewManager(feeRates),
@@ -323,7 +323,7 @@ func defaultConfig(t *testing.T, f fork) *config.Config {
 		Chains:                 chains.TestManager,
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		Validators:             validators.NewManager(),
-		StaticConfig: fee.StaticConfig{
+		StaticFeeConfig: fee.StaticConfig{
 			TxFee:                 defaultTxFee,
 			CreateSubnetTxFee:     100 * defaultTxFee,
 			CreateBlockchainTxFee: 100 * defaultTxFee,
@@ -339,7 +339,7 @@ func defaultConfig(t *testing.T, f fork) *config.Config {
 			MintingPeriod:      365 * 24 * time.Hour,
 			SupplyCap:          720 * units.MegaAvax,
 		},
-		Config: upgrade.Config{
+		UpgradeConfig: upgrade.Config{
 			ApricotPhase3Time: mockable.MaxTime,
 			ApricotPhase5Time: mockable.MaxTime,
 			BanffTime:         mockable.MaxTime,
@@ -351,22 +351,22 @@ func defaultConfig(t *testing.T, f fork) *config.Config {
 
 	switch f {
 	case eUpgrade:
-		c.EUpgradeTime = time.Time{} // neglecting fork ordering this for package tests
+		c.UpgradeConfig.EUpgradeTime = time.Time{} // neglecting fork ordering this for package tests
 		fallthrough
 	case durango:
-		c.DurangoTime = time.Time{} // neglecting fork ordering for this package's tests
+		c.UpgradeConfig.DurangoTime = time.Time{} // neglecting fork ordering for this package's tests
 		fallthrough
 	case cortina:
-		c.CortinaTime = time.Time{} // neglecting fork ordering for this package's tests
+		c.UpgradeConfig.CortinaTime = time.Time{} // neglecting fork ordering for this package's tests
 		fallthrough
 	case banff:
-		c.BanffTime = time.Time{} // neglecting fork ordering for this package's tests
+		c.UpgradeConfig.BanffTime = time.Time{} // neglecting fork ordering for this package's tests
 		fallthrough
 	case apricotPhase5:
-		c.ApricotPhase5Time = defaultValidateEndTime
+		c.UpgradeConfig.ApricotPhase5Time = defaultValidateEndTime
 		fallthrough
 	case apricotPhase3:
-		c.ApricotPhase3Time = defaultValidateEndTime
+		c.UpgradeConfig.ApricotPhase3Time = defaultValidateEndTime
 	default:
 		require.FailNow(t, "unhandled fork", f)
 	}

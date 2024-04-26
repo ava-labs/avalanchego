@@ -225,7 +225,7 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller, f fork) *environment 
 	}
 
 	if ctrl == nil {
-		if res.config.IsEActivated(res.state.GetTimestamp()) {
+		if res.config.UpgradeConfig.IsEActivated(res.state.GetTimestamp()) {
 			res.mempool.SetEUpgradeActive()
 		}
 
@@ -238,7 +238,7 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller, f fork) *environment 
 		)
 		addSubnet(res)
 	} else {
-		if res.config.IsEActivated(res.mockedState.GetTimestamp()) {
+		if res.config.UpgradeConfig.IsEActivated(res.mockedState.GetTimestamp()) {
 			res.mempool.SetEUpgradeActive()
 		}
 
@@ -312,6 +312,7 @@ func addSubnet(env *environment) {
 	}
 
 	chainTime := env.state.GetTimestamp()
+	upgrades := env.config.UpgradeConfig
 	nextChainTime, _, err := state.NextBlockTime(env.state, env.clk)
 	if err != nil {
 		panic(fmt.Errorf("failed calculating next block time: %w", err))
@@ -325,12 +326,12 @@ func addSubnet(env *environment) {
 		panic(fmt.Errorf("failed retrieving last block complexity: %w", err))
 	}
 
-	feeManager, err := fee.UpdatedFeeManager(feeRates, parentBlkComplexity, env.config.Config, chainTime, nextChainTime)
+	feeManager, err := fee.UpdatedFeeManager(feeRates, parentBlkComplexity, upgrades, chainTime, nextChainTime)
 	if err != nil {
 		panic(err)
 	}
 
-	feeCfg := fee.GetDynamicConfig(env.config.IsEActivated(chainTime))
+	feeCfg := fee.GetDynamicConfig(upgrades.IsEActivated(chainTime))
 	executor := executor.StandardTxExecutor{
 		Backend:            env.backend,
 		BlkFeeManager:      feeManager,
@@ -388,7 +389,7 @@ func defaultConfig(t *testing.T, f fork) *config.Config {
 		Chains:                 chains.TestManager,
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		Validators:             validators.NewManager(),
-		StaticConfig: fee.StaticConfig{
+		StaticFeeConfig: fee.StaticConfig{
 			TxFee:                 defaultTxFee,
 			CreateSubnetTxFee:     100 * defaultTxFee,
 			CreateBlockchainTxFee: 100 * defaultTxFee,
@@ -404,7 +405,7 @@ func defaultConfig(t *testing.T, f fork) *config.Config {
 			MintingPeriod:      365 * 24 * time.Hour,
 			SupplyCap:          720 * units.MegaAvax,
 		},
-		Config: upgrade.Config{
+		UpgradeConfig: upgrade.Config{
 			ApricotPhase3Time: mockable.MaxTime,
 			ApricotPhase5Time: mockable.MaxTime,
 			BanffTime:         mockable.MaxTime,
@@ -416,22 +417,22 @@ func defaultConfig(t *testing.T, f fork) *config.Config {
 
 	switch f {
 	case eUpgrade:
-		c.EUpgradeTime = time.Time{} // neglecting fork ordering this for package tests
+		c.UpgradeConfig.EUpgradeTime = time.Time{} // neglecting fork ordering this for package tests
 		fallthrough
 	case durango:
-		c.DurangoTime = time.Time{} // neglecting fork ordering for this package's tests
+		c.UpgradeConfig.DurangoTime = time.Time{} // neglecting fork ordering for this package's tests
 		fallthrough
 	case cortina:
-		c.CortinaTime = time.Time{} // neglecting fork ordering for this package's tests
+		c.UpgradeConfig.CortinaTime = time.Time{} // neglecting fork ordering for this package's tests
 		fallthrough
 	case banff:
-		c.BanffTime = time.Time{} // neglecting fork ordering for this package's tests
+		c.UpgradeConfig.BanffTime = time.Time{} // neglecting fork ordering for this package's tests
 		fallthrough
 	case apricotPhase5:
-		c.ApricotPhase5Time = defaultValidateEndTime
+		c.UpgradeConfig.ApricotPhase5Time = defaultValidateEndTime
 		fallthrough
 	case apricotPhase3:
-		c.ApricotPhase3Time = defaultValidateEndTime
+		c.UpgradeConfig.ApricotPhase3Time = defaultValidateEndTime
 	default:
 		require.FailNow(t, "unhandled fork", f)
 	}

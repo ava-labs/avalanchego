@@ -30,6 +30,7 @@ import (
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
 	stdcontext "context"
+
 	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 	blssigner "github.com/ava-labs/avalanchego/vms/platformvm/signer"
 )
@@ -111,8 +112,9 @@ func TestBaseTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := fee.NewDynamicCalculator(testStaticConfig, commonfees.NewManager(testFeeRates), testBlockMaxComplexity, tx.Creds)
-		require.NoError(utx.Visit(fc))
-		require.Equal(9930*units.MicroAvax, fc.Fee)
+		fee, err := fc.ComputeFee(utx)
+		require.NoError(err)
+		require.Equal(9930*units.MicroAvax, fee)
 
 		// check UTXOs selection and fee financing
 		ins := utx.Ins
@@ -120,7 +122,7 @@ func TestBaseTx(t *testing.T) {
 		require.Len(ins, 2)
 		require.Len(outs, 2)
 
-		expectedConsumed := fc.Fee + outputsToMove[0].Out.Amount()
+		expectedConsumed := fee + outputsToMove[0].Out.Amount()
 		consumed := ins[0].In.Amount() + ins[1].In.Amount() - outs[0].Out.Amount()
 		require.Equal(expectedConsumed, consumed)
 		require.Equal(outputsToMove[0], outs[1])
@@ -135,8 +137,9 @@ func TestBaseTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := fee.NewStaticCalculator(testStaticConfig, upgrade.Config{}, time.Time{})
-		require.NoError(utx.Visit(fc))
-		require.Equal(testContext.BaseTxFee, fc.Fee)
+		fee, err := fc.ComputeFee(utx)
+		require.NoError(err)
+		require.Equal(testContext.BaseTxFee, fee)
 
 		// check UTXOs selection and fee financing
 		ins := utx.Ins
@@ -144,7 +147,7 @@ func TestBaseTx(t *testing.T) {
 		require.Len(ins, 2)
 		require.Len(outs, 2)
 
-		expectedConsumed := fc.Fee + outputsToMove[0].Out.Amount()
+		expectedConsumed := fee + outputsToMove[0].Out.Amount()
 		consumed := ins[0].In.Amount() + ins[1].In.Amount() - outs[0].Out.Amount()
 		require.Equal(expectedConsumed, consumed)
 		require.Equal(outputsToMove[0], outs[1])
@@ -210,8 +213,9 @@ func TestAddSubnetValidatorTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := fee.NewDynamicCalculator(testStaticConfig, commonfees.NewManager(testFeeRates), testBlockMaxComplexity, tx.Creds)
-		require.NoError(utx.Visit(fc))
-		require.Equal(9765*units.MicroAvax, fc.Fee)
+		fee, err := fc.ComputeFee(utx)
+		require.NoError(err)
+		require.Equal(9765*units.MicroAvax, fee)
 
 		// check UTXOs selection and fee financing
 		ins := utx.Ins
@@ -219,7 +223,7 @@ func TestAddSubnetValidatorTx(t *testing.T) {
 		require.Len(ins, 2)
 		require.Len(outs, 1)
 
-		expectedConsumed := fc.Fee
+		expectedConsumed := fee
 		consumed := ins[0].In.Amount() + ins[1].In.Amount() - outs[0].Out.Amount()
 		require.Equal(expectedConsumed, consumed)
 	}
@@ -230,8 +234,9 @@ func TestAddSubnetValidatorTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := fee.NewStaticCalculator(testStaticConfig, upgrade.Config{}, time.Time{})
-		require.NoError(utx.Visit(fc))
-		require.Equal(testContext.AddSubnetValidatorFee, fc.Fee)
+		fee, err := fc.ComputeFee(utx)
+		require.NoError(err)
+		require.Equal(testContext.AddSubnetValidatorFee, fee)
 
 		// check UTXOs selection and fee financing
 		ins := utx.Ins
@@ -239,7 +244,7 @@ func TestAddSubnetValidatorTx(t *testing.T) {
 		require.Len(ins, 2)
 		require.Len(outs, 1)
 
-		expectedConsumed := fc.Fee
+		expectedConsumed := fee
 		consumed := ins[0].In.Amount() + ins[1].In.Amount() - outs[0].Out.Amount()
 		require.Equal(expectedConsumed, consumed)
 	}
@@ -300,17 +305,18 @@ func TestRemoveSubnetValidatorTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := fee.NewDynamicCalculator(testStaticConfig, commonfees.NewManager(testFeeRates), testBlockMaxComplexity, tx.Creds)
-		require.NoError(utx.Visit(fc))
-		require.Equal(9741*units.MicroAvax, fc.Fee)
+		fee, err := fc.ComputeFee(utx)
+		require.NoError(err)
+		require.Equal(9741*units.MicroAvax, fee)
 
 		// check UTXOs selection and fee financing
 		ins := utx.Ins
 		outs := utx.Outs
 		require.Len(ins, 2)
 		require.Len(outs, 1)
-		require.Equal(fc.Fee, ins[0].In.Amount()+ins[1].In.Amount()-outs[0].Out.Amount())
+		require.Equal(fee, ins[0].In.Amount()+ins[1].In.Amount()-outs[0].Out.Amount())
 
-		expectedConsumed := fc.Fee
+		expectedConsumed := fee
 		consumed := ins[0].In.Amount() + ins[1].In.Amount() - outs[0].Out.Amount()
 		require.Equal(expectedConsumed, consumed)
 	}
@@ -325,8 +331,9 @@ func TestRemoveSubnetValidatorTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := fee.NewStaticCalculator(testStaticConfig, upgrade.Config{}, time.Time{})
-		require.NoError(utx.Visit(fc))
-		require.Equal(testContext.BaseTxFee, fc.Fee)
+		fee, err := fc.ComputeFee(utx)
+		require.NoError(err)
+		require.Equal(testContext.BaseTxFee, fee)
 
 		// check UTXOs selection and fee financing
 		ins := utx.Ins
@@ -334,7 +341,7 @@ func TestRemoveSubnetValidatorTx(t *testing.T) {
 		require.Len(ins, 1)
 		require.Len(outs, 1)
 
-		expectedConsumed := fc.Fee
+		expectedConsumed := fee
 		consumed := ins[0].In.Amount() - outs[0].Out.Amount()
 		require.Equal(expectedConsumed, consumed)
 	}
@@ -404,8 +411,9 @@ func TestCreateChainTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := fee.NewDynamicCalculator(testStaticConfig, commonfees.NewManager(testFeeRates), testBlockMaxComplexity, tx.Creds)
-		require.NoError(utx.Visit(fc))
-		require.Equal(9808*units.MicroAvax, fc.Fee)
+		fee, err := fc.ComputeFee(utx)
+		require.NoError(err)
+		require.Equal(9808*units.MicroAvax, fee)
 
 		// check UTXOs selection and fee financing
 		ins := utx.Ins
@@ -413,7 +421,7 @@ func TestCreateChainTx(t *testing.T) {
 		require.Len(ins, 2)
 		require.Len(outs, 1)
 
-		expectedConsumed := fc.Fee
+		expectedConsumed := fee
 		consumed := ins[0].In.Amount() + ins[1].In.Amount() - outs[0].Out.Amount()
 		require.Equal(expectedConsumed, consumed)
 	}
@@ -431,8 +439,9 @@ func TestCreateChainTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := fee.NewStaticCalculator(testStaticConfig, upgrade.Config{}, time.Time{})
-		require.NoError(utx.Visit(fc))
-		require.Equal(testContext.CreateBlockchainTxFee, fc.Fee)
+		fee, err := fc.ComputeFee(utx)
+		require.NoError(err)
+		require.Equal(testContext.CreateBlockchainTxFee, fee)
 
 		// check UTXOs selection and fee financing
 		ins := utx.Ins
@@ -440,7 +449,7 @@ func TestCreateChainTx(t *testing.T) {
 		require.Len(ins, 1)
 		require.Len(outs, 1)
 
-		expectedConsumed := fc.Fee
+		expectedConsumed := fee
 		consumed := ins[0].In.Amount() - outs[0].Out.Amount()
 		require.Equal(expectedConsumed, consumed)
 	}
@@ -500,8 +509,9 @@ func TestCreateSubnetTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := fee.NewDynamicCalculator(testStaticConfig, commonfees.NewManager(testFeeRates), testBlockMaxComplexity, tx.Creds)
-		require.NoError(utx.Visit(fc))
-		require.Equal(9644*units.MicroAvax, fc.Fee)
+		fee, err := fc.ComputeFee(utx)
+		require.NoError(err)
+		require.Equal(9644*units.MicroAvax, fee)
 
 		// check UTXOs selection and fee financing
 		ins := utx.Ins
@@ -509,7 +519,7 @@ func TestCreateSubnetTx(t *testing.T) {
 		require.Len(ins, 2)
 		require.Len(outs, 1)
 
-		expectedConsumed := fc.Fee
+		expectedConsumed := fee
 		consumed := ins[0].In.Amount() + ins[1].In.Amount() - outs[0].Out.Amount()
 		require.Equal(expectedConsumed, consumed)
 	}
@@ -523,8 +533,9 @@ func TestCreateSubnetTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := fee.NewStaticCalculator(testStaticConfig, upgrade.Config{}, time.Time{})
-		require.NoError(utx.Visit(fc))
-		require.Equal(testContext.CreateSubnetTxFee, fc.Fee)
+		fee, err := fc.ComputeFee(utx)
+		require.NoError(err)
+		require.Equal(testContext.CreateSubnetTxFee, fee)
 
 		// check UTXOs selection and fee financing
 		ins := utx.Ins
@@ -532,7 +543,7 @@ func TestCreateSubnetTx(t *testing.T) {
 		require.Len(ins, 1)
 		require.Len(outs, 1)
 
-		expectedConsumed := fc.Fee
+		expectedConsumed := fee
 		consumed := ins[0].In.Amount() - outs[0].Out.Amount()
 		require.Equal(expectedConsumed, consumed)
 	}
@@ -593,8 +604,9 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := fee.NewDynamicCalculator(testStaticConfig, commonfees.NewManager(testFeeRates), testBlockMaxComplexity, tx.Creds)
-		require.NoError(utx.Visit(fc))
-		require.Equal(9761*units.MicroAvax, fc.Fee)
+		fee, err := fc.ComputeFee(utx)
+		require.NoError(err)
+		require.Equal(9761*units.MicroAvax, fee)
 
 		// check UTXOs selection and fee financing
 		ins := utx.Ins
@@ -602,7 +614,7 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 		require.Len(ins, 2)
 		require.Len(outs, 1)
 
-		expectedConsumed := fc.Fee
+		expectedConsumed := fee
 		consumed := ins[0].In.Amount() + ins[1].In.Amount() - outs[0].Out.Amount()
 		require.Equal(expectedConsumed, consumed)
 	}
@@ -617,8 +629,9 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := fee.NewStaticCalculator(testStaticConfig, upgrade.Config{}, time.Time{})
-		require.NoError(utx.Visit(fc))
-		require.Equal(testContext.BaseTxFee, fc.Fee)
+		fee, err := fc.ComputeFee(utx)
+		require.NoError(err)
+		require.Equal(testContext.BaseTxFee, fee)
 
 		// check UTXOs selection and fee financing
 		ins := utx.Ins
@@ -626,7 +639,7 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 		require.Len(ins, 1)
 		require.Len(outs, 1)
 
-		expectedConsumed := fc.Fee
+		expectedConsumed := fee
 		consumed := ins[0].In.Amount() - outs[0].Out.Amount()
 		require.Equal(expectedConsumed, consumed)
 	}
@@ -681,8 +694,9 @@ func TestImportTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := fee.NewDynamicCalculator(testStaticConfig, commonfees.NewManager(testFeeRates), testBlockMaxComplexity, tx.Creds)
-		require.NoError(utx.Visit(fc))
-		require.Equal(14251*units.MicroAvax, fc.Fee)
+		fee, err := fc.ComputeFee(utx)
+		require.NoError(err)
+		require.Equal(14251*units.MicroAvax, fee)
 
 		// check UTXOs selection and fee financing
 		ins := utx.Ins
@@ -692,7 +706,7 @@ func TestImportTx(t *testing.T) {
 		require.Len(importedIns, 1)
 		require.Len(outs, 1)
 
-		expectedConsumed := fc.Fee
+		expectedConsumed := fee
 		consumed := importedIns[0].In.Amount() + ins[0].In.Amount() + ins[1].In.Amount() - outs[0].Out.Amount()
 		require.Equal(expectedConsumed, consumed)
 	}
@@ -707,8 +721,9 @@ func TestImportTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := fee.NewStaticCalculator(testStaticConfig, upgrade.Config{}, time.Time{})
-		require.NoError(utx.Visit(fc))
-		require.Equal(testContext.BaseTxFee, fc.Fee)
+		fee, err := fc.ComputeFee(utx)
+		require.NoError(err)
+		require.Equal(testContext.BaseTxFee, fee)
 
 		// check UTXOs selection and fee financing
 		ins := utx.Ins
@@ -718,7 +733,7 @@ func TestImportTx(t *testing.T) {
 		require.Len(importedIns, 1)
 		require.Len(outs, 1)
 
-		expectedConsumed := fc.Fee
+		expectedConsumed := fee
 		consumed := importedIns[0].In.Amount() - outs[0].Out.Amount()
 		require.Equal(expectedConsumed, consumed)
 	}
@@ -769,8 +784,9 @@ func TestExportTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := fee.NewDynamicCalculator(testStaticConfig, commonfees.NewManager(testFeeRates), testBlockMaxComplexity, tx.Creds)
-		require.NoError(utx.Visit(fc))
-		require.Equal(9966*units.MicroAvax, fc.Fee)
+		fee, err := fc.ComputeFee(utx)
+		require.NoError(err)
+		require.Equal(9966*units.MicroAvax, fee)
 
 		// check UTXOs selection and fee financing
 		ins := utx.Ins
@@ -778,7 +794,7 @@ func TestExportTx(t *testing.T) {
 		require.Len(ins, 2)
 		require.Len(outs, 1)
 
-		expectedConsumed := fc.Fee + exportedOutputs[0].Out.Amount()
+		expectedConsumed := fee + exportedOutputs[0].Out.Amount()
 		consumed := ins[0].In.Amount() + ins[1].In.Amount() - outs[0].Out.Amount()
 		require.Equal(expectedConsumed, consumed)
 		require.Equal(utx.ExportedOutputs, exportedOutputs)
@@ -794,8 +810,9 @@ func TestExportTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := fee.NewStaticCalculator(testStaticConfig, upgrade.Config{}, time.Time{})
-		require.NoError(utx.Visit(fc))
-		require.Equal(testContext.BaseTxFee, fc.Fee)
+		fee, err := fc.ComputeFee(utx)
+		require.NoError(err)
+		require.Equal(testContext.BaseTxFee, fee)
 
 		// check UTXOs selection and fee financing
 		ins := utx.Ins
@@ -803,7 +820,7 @@ func TestExportTx(t *testing.T) {
 		require.Len(ins, 2)
 		require.Len(outs, 1)
 
-		expectedConsumed := fc.Fee + exportedOutputs[0].Out.Amount()
+		expectedConsumed := fee + exportedOutputs[0].Out.Amount()
 		consumed := ins[0].In.Amount() + ins[1].In.Amount() - outs[0].Out.Amount()
 		require.Equal(expectedConsumed, consumed)
 		require.Equal(utx.ExportedOutputs, exportedOutputs)
@@ -881,8 +898,9 @@ func TestTransformSubnetTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := fee.NewDynamicCalculator(testStaticConfig, commonfees.NewManager(testFeeRates), testBlockMaxComplexity, tx.Creds)
-		require.NoError(utx.Visit(fc))
-		require.Equal(14763*units.MicroAvax, fc.Fee)
+		fee, err := fc.ComputeFee(utx)
+		require.NoError(err)
+		require.Equal(14763*units.MicroAvax, fee)
 
 		// check UTXOs selection and fee financing
 		ins := utx.Ins
@@ -893,7 +911,7 @@ func TestTransformSubnetTx(t *testing.T) {
 		expectedConsumedSubnetAsset := maxSupply - initialSupply
 		consumedSubnetAsset := ins[0].In.Amount() - outs[1].Out.Amount()
 		require.Equal(expectedConsumedSubnetAsset, consumedSubnetAsset)
-		expectedConsumed := fc.Fee
+		expectedConsumed := fee
 		consumed := ins[1].In.Amount() + ins[2].In.Amount() - outs[0].Out.Amount()
 		require.Equal(expectedConsumed, consumed)
 	}
@@ -920,8 +938,9 @@ func TestTransformSubnetTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := fee.NewStaticCalculator(testStaticConfig, upgrade.Config{}, time.Time{})
-		require.NoError(utx.Visit(fc))
-		require.Equal(testContext.TransformSubnetTxFee, fc.Fee)
+		fee, err := fc.ComputeFee(utx)
+		require.NoError(err)
+		require.Equal(testContext.TransformSubnetTxFee, fee)
 
 		// check UTXOs selection and fee financing
 		ins := utx.Ins
@@ -932,7 +951,7 @@ func TestTransformSubnetTx(t *testing.T) {
 		expectedConsumedSubnetAsset := maxSupply - initialSupply
 		consumedSubnetAsset := ins[0].In.Amount() - outs[1].Out.Amount()
 		require.Equal(expectedConsumedSubnetAsset, consumedSubnetAsset)
-		expectedConsumed := fc.Fee
+		expectedConsumed := fee
 		consumed := ins[1].In.Amount() - outs[0].Out.Amount()
 		require.Equal(expectedConsumed, consumed)
 	}
@@ -1000,8 +1019,9 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := fee.NewDynamicCalculator(testStaticConfig, commonfees.NewManager(testFeeRates), testBlockMaxComplexity, tx.Creds)
-		require.NoError(utx.Visit(fc))
-		require.Equal(20404*units.MicroAvax, fc.Fee)
+		fee, err := fc.ComputeFee(utx)
+		require.NoError(err)
+		require.Equal(19_840*units.MicroAvax, fee)
 
 		// check UTXOs selection and fee financing
 		ins := utx.Ins
@@ -1014,7 +1034,7 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 		expectedConsumedSubnetAsset := utx.Validator.Weight()
 		consumedSubnetAsset := staked[0].Out.Amount() + staked[1].Out.Amount()
 		require.Equal(expectedConsumedSubnetAsset, consumedSubnetAsset)
-		expectedConsumed := fc.Fee
+		expectedConsumed := fee
 		consumed := ins[1].In.Amount() + ins[3].In.Amount() - outs[0].Out.Amount()
 		require.Equal(expectedConsumed, consumed)
 	}
@@ -1040,8 +1060,9 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := fee.NewStaticCalculator(testStaticConfig, upgrade.Config{}, time.Time{})
-		require.NoError(utx.Visit(fc))
-		require.Equal(testContext.AddPrimaryNetworkValidatorFee, fc.Fee)
+		fee, err := fc.ComputeFee(utx)
+		require.NoError(err)
+		require.Equal(testContext.AddPrimaryNetworkValidatorFee, fee)
 
 		// check UTXOs selection and fee financing
 		ins := utx.Ins
@@ -1054,7 +1075,7 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 		expectedConsumedSubnetAsset := utx.Validator.Weight()
 		consumedSubnetAsset := staked[0].Out.Amount() + staked[1].Out.Amount()
 		require.Equal(expectedConsumedSubnetAsset, consumedSubnetAsset)
-		expectedConsumed := fc.Fee
+		expectedConsumed := fee
 		consumed := ins[1].In.Amount() + ins[3].In.Amount() - outs[0].Out.Amount()
 		require.Equal(expectedConsumed, consumed)
 	}
@@ -1110,8 +1131,9 @@ func TestAddPermissionlessDelegatorTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := fee.NewDynamicCalculator(testStaticConfig, commonfees.NewManager(testFeeRates), testBlockMaxComplexity, tx.Creds)
-		require.NoError(utx.Visit(fc))
-		require.Equal(20212*units.MicroAvax, fc.Fee)
+		fee, err := fc.ComputeFee(utx)
+		require.NoError(err)
+		require.Equal(20212*units.MicroAvax, fee)
 
 		// check UTXOs selection and fee financing
 		ins := utx.Ins
@@ -1124,7 +1146,7 @@ func TestAddPermissionlessDelegatorTx(t *testing.T) {
 		expectedConsumedSubnetAsset := utx.Validator.Weight()
 		consumedSubnetAsset := staked[0].Out.Amount() + staked[1].Out.Amount()
 		require.Equal(expectedConsumedSubnetAsset, consumedSubnetAsset)
-		expectedConsumed := fc.Fee
+		expectedConsumed := fee
 		consumed := ins[1].In.Amount() + ins[3].In.Amount() - outs[0].Out.Amount()
 		require.Equal(expectedConsumed, consumed)
 	}
@@ -1147,8 +1169,9 @@ func TestAddPermissionlessDelegatorTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := fee.NewStaticCalculator(testStaticConfig, upgrade.Config{}, time.Time{})
-		require.NoError(utx.Visit(fc))
-		require.Equal(testContext.AddPrimaryNetworkDelegatorFee, fc.Fee)
+		fee, err := fc.ComputeFee(utx)
+		require.NoError(err)
+		require.Equal(testContext.AddPrimaryNetworkDelegatorFee, fee)
 
 		// check UTXOs selection and fee financing
 		ins := utx.Ins
@@ -1161,7 +1184,7 @@ func TestAddPermissionlessDelegatorTx(t *testing.T) {
 		expectedConsumedSubnetAsset := utx.Validator.Weight()
 		consumedSubnetAsset := staked[0].Out.Amount() + staked[1].Out.Amount()
 		require.Equal(expectedConsumedSubnetAsset, consumedSubnetAsset)
-		expectedConsumed := fc.Fee
+		expectedConsumed := fee
 		consumed := ins[1].In.Amount() + ins[3].In.Amount() - outs[0].Out.Amount()
 		require.Equal(expectedConsumed, consumed)
 	}

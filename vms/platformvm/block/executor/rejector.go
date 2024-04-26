@@ -88,7 +88,8 @@ func (r *rejector) rejectBlock(b block.Block, blockType string) error {
 	var (
 		currentTimestamp = preferredState.GetTimestamp()
 		cfg              = r.txExecutorBackend.Config
-		isEActive        = cfg.IsEActivated(currentTimestamp)
+		upgrades         = cfg.UpgradeConfig
+		isEActive        = upgrades.IsEActivated(currentTimestamp)
 		feesCfg          = fee.GetDynamicConfig(isEActive)
 	)
 
@@ -110,7 +111,7 @@ func (r *rejector) rejectBlock(b block.Block, blockType string) error {
 		if err != nil {
 			return fmt.Errorf("failed retrieving last block complexity: %w", err)
 		}
-		feeManager, err = fee.UpdatedFeeManager(feeRates, parentBlkComplexity, cfg.Config, currentTimestamp, nextBlkTime)
+		feeManager, err = fee.UpdatedFeeManager(feeRates, parentBlkComplexity, upgrades, currentTimestamp, nextBlkTime)
 		if err != nil {
 			return err
 		}
@@ -123,16 +124,15 @@ func (r *rejector) rejectBlock(b block.Block, blockType string) error {
 
 		var (
 			feeCalculator *fee.Calculator
-			staticFeeCfg  = cfg.StaticConfig
+			staticFeeCfg  = cfg.StaticFeeConfig
 		)
 		if !isEActive {
-			upgrades := cfg.Config
 			feeCalculator = fee.NewStaticCalculator(staticFeeCfg, upgrades, currentTimestamp)
 		} else {
 			feeCalculator = fee.NewDynamicCalculator(staticFeeCfg, feeManager, feesCfg.BlockMaxComplexity, tx.Creds)
 		}
 
-		if err := tx.Unsigned.Visit(feeCalculator); err != nil {
+		if _, err := feeCalculator.ComputeFee(tx.Unsigned); err != nil {
 			r.ctx.Log.Info(
 				"tx failed fees checks",
 				zap.Stringer("txID", tx.ID()),
@@ -142,7 +142,7 @@ func (r *rejector) rejectBlock(b block.Block, blockType string) error {
 		}
 
 		// TODO ABENEGIA: re-validate txs here. Tip may have changed due to change in base fee!!!
-		if err := r.Mempool.Add(tx, feeCalculator.TipPercentage); err != nil {
+		if err := r.Mempool.Add(tx, feeCalculator.GetTipPercentage()); err != nil {
 			r.ctx.Log.Debug(
 				"failed to reissue tx",
 				zap.Stringer("txID", tx.ID()),

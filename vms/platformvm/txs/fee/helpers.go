@@ -14,7 +14,7 @@ import (
 )
 
 func FinanceInput(feeCalc *Calculator, input *avax.TransferableInput) (uint64, error) {
-	if !feeCalc.isEActive {
+	if !feeCalc.c.isEActive {
 		return 0, nil // pre E-upgrade we have a fixed fee regardless how complex the input is
 	}
 
@@ -22,7 +22,7 @@ func FinanceInput(feeCalc *Calculator, input *avax.TransferableInput) (uint64, e
 	if err != nil {
 		return 0, fmt.Errorf("failed calculating input size: %w", err)
 	}
-	addedFees, err := feeCalc.AddFeesFor(inDimensions, feeCalc.TipPercentage)
+	addedFees, err := feeCalc.AddFeesFor(inDimensions)
 	if err != nil {
 		return 0, fmt.Errorf("account for input fees: %w", err)
 	}
@@ -30,7 +30,7 @@ func FinanceInput(feeCalc *Calculator, input *avax.TransferableInput) (uint64, e
 }
 
 func FinanceOutput(feeCalc *Calculator, output *avax.TransferableOutput) (uint64, fees.Dimensions, error) {
-	if !feeCalc.isEActive {
+	if !feeCalc.c.isEActive {
 		return 0, fees.Empty, nil // pre E-upgrade we have a fixed fee regardless how complex the output is
 	}
 
@@ -38,7 +38,7 @@ func FinanceOutput(feeCalc *Calculator, output *avax.TransferableOutput) (uint64
 	if err != nil {
 		return 0, fees.Empty, fmt.Errorf("failed calculating changeOut size: %w", err)
 	}
-	addedFees, err := feeCalc.AddFeesFor(outDimensions, feeCalc.TipPercentage)
+	addedFees, err := feeCalc.AddFeesFor(outDimensions)
 	if err != nil {
 		return 0, fees.Empty, fmt.Errorf("account for stakedOut fees: %w", err)
 	}
@@ -46,7 +46,7 @@ func FinanceOutput(feeCalc *Calculator, output *avax.TransferableOutput) (uint64
 }
 
 func FinanceCredential(feeCalc *Calculator, keysCount int) (uint64, error) {
-	if !feeCalc.isEActive {
+	if !feeCalc.c.isEActive {
 		return 0, nil // pre E-upgrade we have a fixed fee regardless how complex the credentials are
 	}
 
@@ -54,7 +54,7 @@ func FinanceCredential(feeCalc *Calculator, keysCount int) (uint64, error) {
 	if err != nil {
 		return 0, fmt.Errorf("failed calculating input size: %w", err)
 	}
-	addedFees, err := feeCalc.AddFeesFor(credDimensions, feeCalc.TipPercentage)
+	addedFees, err := feeCalc.AddFeesFor(credDimensions)
 	if err != nil {
 		return 0, fmt.Errorf("account for input fees: %w", err)
 	}

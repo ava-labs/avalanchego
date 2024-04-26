@@ -73,7 +73,7 @@ func TestStandardTxExecutorAddValidatorTxEmptyID(t *testing.T) {
 	}
 	for _, test := range tests {
 		// Case: Empty validator node ID after banff
-		env.config.BanffTime = test.banffTime
+		env.config.UpgradeConfig.BanffTime = test.banffTime
 
 		tx, err := env.txBuilder.NewAddValidatorTx( // create the tx
 			&txs.Validator{
@@ -96,7 +96,7 @@ func TestStandardTxExecutorAddValidatorTxEmptyID(t *testing.T) {
 		require.NoError(err)
 
 		chainTime := env.state.GetTimestamp()
-		feeCfg := fee.GetDynamicConfig(env.config.IsEActivated(chainTime))
+		feeCfg := fee.GetDynamicConfig(env.config.UpgradeConfig.IsEActivated(chainTime))
 		executor := StandardTxExecutor{
 			Backend:            &env.backend,
 			BlkFeeManager:      fees.NewManager(feeCfg.InitialFeeRate),
@@ -325,7 +325,7 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 		t.Run(tt.description, func(t *testing.T) {
 			require := require.New(t)
 			env := newEnvironment(t, apricotPhase5)
-			env.config.ApricotPhase3Time = tt.AP3Time
+			env.config.UpgradeConfig.ApricotPhase3Time = tt.AP3Time
 
 			tx, err := env.txBuilder.NewAddDelegatorTx(
 				&txs.Validator{
@@ -350,10 +350,10 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 			onAcceptState, err := state.NewDiff(lastAcceptedID, env)
 			require.NoError(err)
 
-			env.config.BanffTime = onAcceptState.GetTimestamp()
+			env.config.UpgradeConfig.BanffTime = onAcceptState.GetTimestamp()
 
 			chainTime := env.state.GetTimestamp()
-			feeCfg := fee.GetDynamicConfig(env.config.IsEActivated(chainTime))
+			feeCfg := fee.GetDynamicConfig(env.config.UpgradeConfig.IsEActivated(chainTime))
 			executor := StandardTxExecutor{
 				Backend:            &env.backend,
 				BlkFeeManager:      fees.NewManager(feeCfg.InitialFeeRate),
@@ -399,7 +399,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		require.NoError(err)
 
 		chainTime := env.state.GetTimestamp()
-		feeCfg := fee.GetDynamicConfig(env.config.IsEActivated(chainTime))
+		feeCfg := fee.GetDynamicConfig(env.config.UpgradeConfig.IsEActivated(chainTime))
 		executor := StandardTxExecutor{
 			Backend:            &env.backend,
 			BlkFeeManager:      fees.NewManager(feeCfg.InitialFeeRate),
@@ -435,7 +435,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		require.NoError(err)
 
 		chainTime := env.state.GetTimestamp()
-		feeCfg := fee.GetDynamicConfig(env.config.IsEActivated(chainTime))
+		feeCfg := fee.GetDynamicConfig(env.config.UpgradeConfig.IsEActivated(chainTime))
 		executor := StandardTxExecutor{
 			Backend:            &env.backend,
 			BlkFeeManager:      fees.NewManager(feeCfg.InitialFeeRate),
@@ -490,7 +490,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		require.NoError(err)
 
 		chainTime := env.state.GetTimestamp()
-		feeCfg := fee.GetDynamicConfig(env.config.IsEActivated(chainTime))
+		feeCfg := fee.GetDynamicConfig(env.config.UpgradeConfig.IsEActivated(chainTime))
 		executor := StandardTxExecutor{
 			Backend:            &env.backend,
 			BlkFeeManager:      fees.NewManager(feeCfg.InitialFeeRate),
@@ -541,7 +541,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		require.NoError(err)
 
 		chainTime := env.state.GetTimestamp()
-		feeCfg := fee.GetDynamicConfig(env.config.IsEActivated(chainTime))
+		feeCfg := fee.GetDynamicConfig(env.config.UpgradeConfig.IsEActivated(chainTime))
 		executor := StandardTxExecutor{
 			Backend:            &env.backend,
 			BlkFeeManager:      fees.NewManager(feeCfg.InitialFeeRate),
@@ -575,7 +575,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		require.NoError(err)
 
 		chainTime := env.state.GetTimestamp()
-		feeCfg := fee.GetDynamicConfig(env.config.IsEActivated(chainTime))
+		feeCfg := fee.GetDynamicConfig(env.config.UpgradeConfig.IsEActivated(chainTime))
 		executor := StandardTxExecutor{
 			Backend:            &env.backend,
 			BlkFeeManager:      fees.NewManager(feeCfg.InitialFeeRate),
@@ -609,7 +609,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		require.NoError(err)
 
 		chainTime := env.state.GetTimestamp()
-		feeCfg := fee.GetDynamicConfig(env.config.IsEActivated(chainTime))
+		feeCfg := fee.GetDynamicConfig(env.config.UpgradeConfig.IsEActivated(chainTime))
 		executor := StandardTxExecutor{
 			Backend:            &env.backend,
 			BlkFeeManager:      fees.NewManager(feeCfg.InitialFeeRate),
@@ -645,7 +645,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		require.NoError(err)
 
 		chainTime := env.state.GetTimestamp()
-		feeCfg := fee.GetDynamicConfig(env.config.IsEActivated(chainTime))
+		feeCfg := fee.GetDynamicConfig(env.config.UpgradeConfig.IsEActivated(chainTime))
 		executor := StandardTxExecutor{
 			Backend:            &env.backend,
 			BlkFeeManager:      fees.NewManager(feeCfg.InitialFeeRate),
@@ -713,7 +713,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		require.NoError(err)
 
 		chainTime := env.state.GetTimestamp()
-		feeCfg := fee.GetDynamicConfig(env.config.IsEActivated(chainTime))
+		feeCfg := fee.GetDynamicConfig(env.config.UpgradeConfig.IsEActivated(chainTime))
 		executor := StandardTxExecutor{
 			Backend:            &env.backend,
 			BlkFeeManager:      fees.NewManager(feeCfg.InitialFeeRate),
@@ -758,7 +758,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		require.NoError(err)
 
 		chainTime := env.state.GetTimestamp()
-		feeCfg := fee.GetDynamicConfig(env.config.IsEActivated(chainTime))
+		feeCfg := fee.GetDynamicConfig(env.config.UpgradeConfig.IsEActivated(chainTime))
 		executor := StandardTxExecutor{
 			Backend:            &env.backend,
 			BlkFeeManager:      fees.NewManager(feeCfg.InitialFeeRate),
@@ -799,7 +799,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		require.NoError(err)
 
 		chainTime := env.state.GetTimestamp()
-		feeCfg := fee.GetDynamicConfig(env.config.IsEActivated(chainTime))
+		feeCfg := fee.GetDynamicConfig(env.config.UpgradeConfig.IsEActivated(chainTime))
 		executor := StandardTxExecutor{
 			Backend:            &env.backend,
 			BlkFeeManager:      fees.NewManager(feeCfg.InitialFeeRate),
@@ -838,7 +838,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		require.NoError(err)
 
 		chainTime := env.state.GetTimestamp()
-		feeCfg := fee.GetDynamicConfig(env.config.IsEActivated(chainTime))
+		feeCfg := fee.GetDynamicConfig(env.config.UpgradeConfig.IsEActivated(chainTime))
 		executor := StandardTxExecutor{
 			Backend:            &env.backend,
 			BlkFeeManager:      fees.NewManager(feeCfg.InitialFeeRate),
@@ -887,7 +887,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		require.NoError(err)
 
 		chainTime := env.state.GetTimestamp()
-		feeCfg := fee.GetDynamicConfig(env.config.IsEActivated(chainTime))
+		feeCfg := fee.GetDynamicConfig(env.config.UpgradeConfig.IsEActivated(chainTime))
 		executor := StandardTxExecutor{
 			Backend:            &env.backend,
 			BlkFeeManager:      fees.NewManager(feeCfg.InitialFeeRate),
@@ -931,7 +931,7 @@ func TestBanffStandardTxExecutorAddValidator(t *testing.T) {
 		require.NoError(err)
 
 		chainTime := env.state.GetTimestamp()
-		feeCfg := fee.GetDynamicConfig(env.config.IsEActivated(chainTime))
+		feeCfg := fee.GetDynamicConfig(env.config.UpgradeConfig.IsEActivated(chainTime))
 		executor := StandardTxExecutor{
 			Backend:            &env.backend,
 			BlkFeeManager:      fees.NewManager(feeCfg.InitialFeeRate),
@@ -979,7 +979,7 @@ func TestBanffStandardTxExecutorAddValidator(t *testing.T) {
 		onAcceptState.AddTx(tx, status.Committed)
 
 		chainTime := env.state.GetTimestamp()
-		feeCfg := fee.GetDynamicConfig(env.config.IsEActivated(chainTime))
+		feeCfg := fee.GetDynamicConfig(env.config.UpgradeConfig.IsEActivated(chainTime))
 		executor := StandardTxExecutor{
 			Backend:            &env.backend,
 			BlkFeeManager:      fees.NewManager(feeCfg.InitialFeeRate),
@@ -1024,7 +1024,7 @@ func TestBanffStandardTxExecutorAddValidator(t *testing.T) {
 		onAcceptState.AddTx(tx, status.Committed)
 
 		chainTime := env.state.GetTimestamp()
-		feeCfg := fee.GetDynamicConfig(env.config.IsEActivated(chainTime))
+		feeCfg := fee.GetDynamicConfig(env.config.UpgradeConfig.IsEActivated(chainTime))
 		executor := StandardTxExecutor{
 			Backend:            &env.backend,
 			BlkFeeManager:      fees.NewManager(feeCfg.InitialFeeRate),
@@ -1068,7 +1068,7 @@ func TestBanffStandardTxExecutorAddValidator(t *testing.T) {
 		}
 
 		chainTime := env.state.GetTimestamp()
-		feeCfg := fee.GetDynamicConfig(env.config.IsEActivated(chainTime))
+		feeCfg := fee.GetDynamicConfig(env.config.UpgradeConfig.IsEActivated(chainTime))
 		executor := StandardTxExecutor{
 			Backend:            &env.backend,
 			BlkFeeManager:      fees.NewManager(feeCfg.InitialFeeRate),
@@ -1710,7 +1710,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 
 				cfg := defaultTestConfig(t, durango, env.latestForkTime)
 				chainTime := env.state.GetTimestamp()
-				feeCfg := fee.GetDynamicConfig(cfg.IsEActivated(chainTime))
+				feeCfg := fee.GetDynamicConfig(cfg.UpgradeConfig.IsEActivated(chainTime))
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config:       defaultTestConfig(t, durango, env.latestForkTime),
@@ -1767,7 +1767,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 
 				cfg := defaultTestConfig(t, durango, env.latestForkTime)
 				chainTime := env.state.GetTimestamp()
-				feeCfg := fee.GetDynamicConfig(cfg.IsEActivated(chainTime))
+				feeCfg := fee.GetDynamicConfig(cfg.UpgradeConfig.IsEActivated(chainTime))
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config:       defaultTestConfig(t, durango, env.latestForkTime),
@@ -1800,7 +1800,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 
 				cfg := defaultTestConfig(t, durango, env.latestForkTime)
 				chainTime := env.state.GetTimestamp()
-				feeCfg := fee.GetDynamicConfig(cfg.IsEActivated(chainTime))
+				feeCfg := fee.GetDynamicConfig(cfg.UpgradeConfig.IsEActivated(chainTime))
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config:       defaultTestConfig(t, durango, env.latestForkTime),
@@ -1831,7 +1831,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 
 				cfg := defaultTestConfig(t, durango, env.latestForkTime)
 				chainTime := env.state.GetTimestamp()
-				feeCfg := fee.GetDynamicConfig(cfg.IsEActivated(chainTime))
+				feeCfg := fee.GetDynamicConfig(cfg.UpgradeConfig.IsEActivated(chainTime))
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config:       defaultTestConfig(t, durango, env.latestForkTime),
@@ -1861,7 +1861,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 
 				cfg := defaultTestConfig(t, durango, env.latestForkTime)
 				chainTime := env.state.GetTimestamp()
-				feeCfg := fee.GetDynamicConfig(cfg.IsEActivated(chainTime))
+				feeCfg := fee.GetDynamicConfig(cfg.UpgradeConfig.IsEActivated(chainTime))
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config:       defaultTestConfig(t, durango, env.latestForkTime),
@@ -1893,7 +1893,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 
 				cfg := defaultTestConfig(t, durango, env.latestForkTime)
 				chainTime := env.state.GetTimestamp()
-				feeCfg := fee.GetDynamicConfig(cfg.IsEActivated(chainTime))
+				feeCfg := fee.GetDynamicConfig(cfg.UpgradeConfig.IsEActivated(chainTime))
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config:       defaultTestConfig(t, durango, env.latestForkTime),
@@ -1928,7 +1928,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 
 				cfg := defaultTestConfig(t, durango, env.latestForkTime)
 				chainTime := env.state.GetTimestamp()
-				feeCfg := fee.GetDynamicConfig(cfg.IsEActivated(chainTime))
+				feeCfg := fee.GetDynamicConfig(cfg.UpgradeConfig.IsEActivated(chainTime))
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config:       defaultTestConfig(t, durango, env.latestForkTime),
@@ -2114,7 +2114,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 				cfg := defaultTestConfig(t, durango, env.latestForkTime)
 				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
 				chainTime := env.state.GetTimestamp()
-				feeCfg := fee.GetDynamicConfig(cfg.IsEActivated(chainTime))
+				feeCfg := fee.GetDynamicConfig(cfg.UpgradeConfig.IsEActivated(chainTime))
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config:       defaultTestConfig(t, durango, env.latestForkTime),
@@ -2145,7 +2145,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 				cfg.MaxStakeDuration = math.MaxInt64
 				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
 				chainTime := env.state.GetTimestamp()
-				feeCfg := fee.GetDynamicConfig(cfg.IsEActivated(chainTime))
+				feeCfg := fee.GetDynamicConfig(cfg.UpgradeConfig.IsEActivated(chainTime))
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config:       cfg,
@@ -2181,7 +2181,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 				cfg := defaultTestConfig(t, durango, env.latestForkTime)
 				cfg.MaxStakeDuration = math.MaxInt64
 				chainTime := env.state.GetTimestamp()
-				feeCfg := fee.GetDynamicConfig(cfg.IsEActivated(chainTime))
+				feeCfg := fee.GetDynamicConfig(cfg.UpgradeConfig.IsEActivated(chainTime))
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config:       cfg,
@@ -2222,7 +2222,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 				cfg := defaultTestConfig(t, durango, env.latestForkTime)
 				cfg.MaxStakeDuration = math.MaxInt64
 				chainTime := env.state.GetTimestamp()
-				feeCfg := fee.GetDynamicConfig(cfg.IsEActivated(chainTime))
+				feeCfg := fee.GetDynamicConfig(cfg.UpgradeConfig.IsEActivated(chainTime))
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config:       cfg,
@@ -2256,7 +2256,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 
 func defaultTestConfig(t *testing.T, f fork, tm time.Time) *config.Config {
 	c := &config.Config{
-		Config: upgrade.Config{
+		UpgradeConfig: upgrade.Config{
 			ApricotPhase3Time: mockable.MaxTime,
 			ApricotPhase5Time: mockable.MaxTime,
 			BanffTime:         mockable.MaxTime,
@@ -2268,22 +2268,22 @@ func defaultTestConfig(t *testing.T, f fork, tm time.Time) *config.Config {
 
 	switch f {
 	case eUpgrade:
-		c.EUpgradeTime = tm
+		c.UpgradeConfig.EUpgradeTime = tm
 		fallthrough
 	case durango:
-		c.DurangoTime = tm
+		c.UpgradeConfig.DurangoTime = tm
 		fallthrough
 	case cortina:
-		c.CortinaTime = tm
+		c.UpgradeConfig.CortinaTime = tm
 		fallthrough
 	case banff:
-		c.BanffTime = tm
+		c.UpgradeConfig.BanffTime = tm
 		fallthrough
 	case apricotPhase5:
-		c.ApricotPhase5Time = tm
+		c.UpgradeConfig.ApricotPhase5Time = tm
 		fallthrough
 	case apricotPhase3:
-		c.ApricotPhase3Time = tm
+		c.UpgradeConfig.ApricotPhase3Time = tm
 	default:
 		require.FailNow(t, "unhandled fork", f)
 	}

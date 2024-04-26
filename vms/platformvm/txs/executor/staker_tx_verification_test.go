@@ -427,7 +427,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				).Return(uint64(0), ErrFlowCheckFailed)
 
 				cfg := defaultTestConfig(t, durango, activeForkTime)
-				cfg.AddSubnetValidatorFee = 1
+				cfg.StaticFeeConfig.AddSubnetValidatorFee = 1
 
 				return &Backend{
 					FlowChecker:  flowChecker,
@@ -473,7 +473,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				).Return(uint64(0), nil)
 
 				cfg := defaultTestConfig(t, durango, activeForkTime)
-				cfg.AddSubnetValidatorFee = 1
+				cfg.StaticFeeConfig.AddSubnetValidatorFee = 1
 
 				return &Backend{
 					FlowChecker:  flowChecker,

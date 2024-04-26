@@ -247,7 +247,7 @@ func defaultVM(t *testing.T, f fork) (*VM, *txstest.Builder, database.Database, 
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		SybilProtectionEnabled: true,
 		Validators:             validators.NewManager(),
-		StaticConfig: fee.StaticConfig{
+		StaticFeeConfig: fee.StaticConfig{
 			TxFee:                 defaultTxFee,
 			CreateSubnetTxFee:     100 * defaultTxFee,
 			TransformSubnetTxFee:  100 * defaultTxFee,
@@ -259,7 +259,7 @@ func defaultVM(t *testing.T, f fork) (*VM, *txstest.Builder, database.Database, 
 		MinStakeDuration:  defaultMinStakingDuration,
 		MaxStakeDuration:  defaultMaxStakingDuration,
 		RewardConfig:      defaultRewardConfig,
-		Config: upgrade.Config{
+		UpgradeConfig: upgrade.Config{
 			ApricotPhase3Time: apricotPhase3Time,
 			ApricotPhase5Time: apricotPhase5Time,
 			BanffTime:         banffTime,
@@ -398,24 +398,25 @@ func TestGenesis(t *testing.T) {
 			// As such we need to account for the subnet creation fee
 			var (
 				chainTime    = vm.state.GetTimestamp()
-				staticFeeCfg = vm.Config.StaticConfig
+				staticFeeCfg = vm.Config.StaticFeeConfig
+				upgrades     = vm.Config.UpgradeConfig
 				feeCalc      *fee.Calculator
 			)
 
-			if !vm.IsEActivated(chainTime) {
-				upgrades := vm.Config.Config
+			if !upgrades.IsEActivated(chainTime) {
 				feeCalc = fee.NewStaticCalculator(staticFeeCfg, upgrades, chainTime)
 			} else {
 				feeRates, err := vm.state.GetFeeRates()
 				require.NoError(err)
 
-				feeCfg := fee.GetDynamicConfig(vm.Config.IsEActivated(chainTime))
+				feeCfg := fee.GetDynamicConfig(upgrades.IsEActivated(chainTime))
 				feeMan := commonfees.NewManager(feeRates)
 				feeCalc = fee.NewDynamicCalculator(staticFeeCfg, feeMan, feeCfg.BlockMaxComplexity, testSubnet1.Creds)
 			}
 
-			require.NoError(testSubnet1.Unsigned.Visit(feeCalc))
-			require.Equal(uint64(utxo.Amount)-feeCalc.Fee, out.Amount())
+			fee, err := feeCalc.ComputeFee(testSubnet1.Unsigned)
+			require.NoError(err)
+			require.Equal(uint64(utxo.Amount)-fee, out.Amount())
 		}
 	}
 
@@ -1219,7 +1220,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 		MinStakeDuration:       defaultMinStakingDuration,
 		MaxStakeDuration:       defaultMaxStakingDuration,
 		RewardConfig:           defaultRewardConfig,
-		Config: upgrade.Config{
+		UpgradeConfig: upgrade.Config{
 			BanffTime:    latestForkTime,
 			CortinaTime:  latestForkTime,
 			DurangoTime:  latestForkTime,
@@ -1309,7 +1310,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 		MinStakeDuration:       defaultMinStakingDuration,
 		MaxStakeDuration:       defaultMaxStakingDuration,
 		RewardConfig:           defaultRewardConfig,
-		Config: upgrade.Config{
+		UpgradeConfig: upgrade.Config{
 			BanffTime:    latestForkTime,
 			CortinaTime:  latestForkTime,
 			DurangoTime:  latestForkTime,
@@ -1360,7 +1361,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		MinStakeDuration:       defaultMinStakingDuration,
 		MaxStakeDuration:       defaultMaxStakingDuration,
 		RewardConfig:           defaultRewardConfig,
-		Config: upgrade.Config{
+		UpgradeConfig: upgrade.Config{
 			BanffTime:    latestForkTime,
 			CortinaTime:  latestForkTime,
 			DurangoTime:  latestForkTime,
@@ -1576,8 +1577,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 			K:                     1,
 			AlphaPreference:       1,
 			AlphaConfidence:       1,
-			BetaVirtuous:          20,
-			BetaRogue:             20,
+			Beta:                  20,
 			ConcurrentRepolls:     1,
 			OptimalProcessing:     1,
 			MaxOutstandingItems:   1,
@@ -1710,7 +1710,7 @@ func TestUnverifiedParent(t *testing.T) {
 		MinStakeDuration:       defaultMinStakingDuration,
 		MaxStakeDuration:       defaultMaxStakingDuration,
 		RewardConfig:           defaultRewardConfig,
-		Config: upgrade.Config{
+		UpgradeConfig: upgrade.Config{
 			BanffTime:    latestForkTime,
 			CortinaTime:  latestForkTime,
 			DurangoTime:  latestForkTime,
@@ -1873,7 +1873,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 		RewardConfig:           defaultRewardConfig,
 		Validators:             validators.NewManager(),
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		Config: upgrade.Config{
+		UpgradeConfig: upgrade.Config{
 			BanffTime:    latestForkTime,
 			CortinaTime:  latestForkTime,
 			DurangoTime:  latestForkTime,
@@ -1924,7 +1924,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 		UptimePercentage:       secondUptimePercentage / 100.,
 		Validators:             validators.NewManager(),
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		Config: upgrade.Config{
+		UpgradeConfig: upgrade.Config{
 			BanffTime:    latestForkTime,
 			CortinaTime:  latestForkTime,
 			DurangoTime:  latestForkTime,
@@ -2026,7 +2026,7 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 		RewardConfig:           defaultRewardConfig,
 		Validators:             validators.NewManager(),
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		Config: upgrade.Config{
+		UpgradeConfig: upgrade.Config{
 			BanffTime:    latestForkTime,
 			CortinaTime:  latestForkTime,
 			DurangoTime:  latestForkTime,
@@ -2415,24 +2415,25 @@ func TestBaseTx(t *testing.T) {
 
 	var (
 		chainTime    = vm.state.GetTimestamp()
-		staticFeeCfg = vm.Config.StaticConfig
+		staticFeeCfg = vm.Config.StaticFeeConfig
+		upgrades     = vm.Config.UpgradeConfig
 		feeCalc      *fee.Calculator
 	)
 
-	if !vm.IsEActivated(chainTime) {
-		upgrades := vm.Config.Config
+	if !upgrades.IsEActivated(chainTime) {
 		feeCalc = fee.NewStaticCalculator(staticFeeCfg, upgrades, chainTime)
 	} else {
 		feeRates, err := vm.state.GetFeeRates()
 		require.NoError(err)
 
-		feeCfg := fee.GetDynamicConfig(vm.Config.IsEActivated(chainTime))
+		feeCfg := fee.GetDynamicConfig(upgrades.IsEActivated(chainTime))
 		feeMan := commonfees.NewManager(feeRates)
 		feeCalc = fee.NewDynamicCalculator(staticFeeCfg, feeMan, feeCfg.BlockMaxComplexity, baseTx.Creds)
 	}
 
-	require.NoError(baseTx.Unsigned.Visit(feeCalc))
-	require.Equal(feeCalc.Fee, totalInputAmt-totalOutputAmt)
+	fee, err := feeCalc.ComputeFee(baseTx.Unsigned)
+	require.NoError(err)
+	require.Equal(fee, totalInputAmt-totalOutputAmt)
 	require.Equal(sendAmt, key1OutputAmt)
 
 	vm.ctx.Lock.Unlock()
