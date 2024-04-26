@@ -123,8 +123,6 @@ const (
 	SnowQuorumSizeKey                                  = "snow-quorum-size"
 	SnowPreferenceQuorumSizeKey                        = "snow-preference-quorum-size"
 	SnowConfidenceQuorumSizeKey                        = "snow-confidence-quorum-size"
-	SnowVirtuousCommitThresholdKey                     = "snow-virtuous-commit-threshold"
-	SnowRogueCommitThresholdKey                        = "snow-rogue-commit-threshold"
 	SnowCommitThresholdKey                             = "snow-commit-threshold"
 	SnowConcurrentRepollsKey                           = "snow-concurrent-repolls"
 	SnowOptimalProcessingKey                           = "snow-optimal-processing"
