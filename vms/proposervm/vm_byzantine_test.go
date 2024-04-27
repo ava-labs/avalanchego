@@ -42,15 +42,7 @@ func TestInvalidByzantineProposerParent(t *testing.T) {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
 
-	xBlock := &snowmantest.Block{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		BytesV:  []byte{1},
-		ParentV: snowmantest.GenesisID,
-		HeightV: snowmantest.GenesisHeight + 1,
-	}
+	xBlock := snowmantest.BuildChild(snowmantest.Genesis)
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return xBlock, nil
 	}
@@ -63,25 +55,15 @@ func TestInvalidByzantineProposerParent(t *testing.T) {
 	require.NoError(aBlock.Verify(context.Background()))
 	require.NoError(aBlock.Accept(context.Background()))
 
-	yBlockBytes := []byte{2}
-	yBlock := &snowmantest.Block{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		BytesV:  yBlockBytes,
-		ParentV: xBlock.ID(),
-		HeightV: xBlock.Height() + 1,
-	}
-
+	yBlock := snowmantest.BuildChild(xBlock)
 	coreVM.ParseBlockF = func(_ context.Context, blockBytes []byte) (snowman.Block, error) {
-		if !bytes.Equal(blockBytes, yBlockBytes) {
+		if !bytes.Equal(blockBytes, yBlock.Bytes()) {
 			return nil, errUnknownBlock
 		}
 		return yBlock, nil
 	}
 
-	parsedBlock, err := proVM.ParseBlock(context.Background(), yBlockBytes)
+	parsedBlock, err := proVM.ParseBlock(context.Background(), yBlock.Bytes())
 	if err != nil {
 		// If there was an error parsing, then this is fine.
 		return
@@ -114,33 +96,12 @@ func TestInvalidByzantineProposerOracleParent(t *testing.T) {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
 
-	xBlockID := ids.GenerateTestID()
+	xTestBlock := snowmantest.BuildChild(snowmantest.Genesis)
 	xBlock := &TestOptionsBlock{
-		Block: snowmantest.Block{
-			TestDecidable: choices.TestDecidable{
-				IDV:     xBlockID,
-				StatusV: choices.Processing,
-			},
-			BytesV:  []byte{1},
-			ParentV: snowmantest.GenesisID,
-		},
+		Block: *xTestBlock,
 		opts: [2]snowman.Block{
-			&snowmantest.Block{
-				TestDecidable: choices.TestDecidable{
-					IDV:     ids.GenerateTestID(),
-					StatusV: choices.Processing,
-				},
-				BytesV:  []byte{2},
-				ParentV: xBlockID,
-			},
-			&snowmantest.Block{
-				TestDecidable: choices.TestDecidable{
-					IDV:     ids.GenerateTestID(),
-					StatusV: choices.Processing,
-				},
-				BytesV:  []byte{3},
-				ParentV: xBlockID,
-			},
+			snowmantest.BuildChild(xTestBlock),
+			snowmantest.BuildChild(xTestBlock),
 		},
 	}
 
@@ -222,30 +183,12 @@ func TestInvalidByzantineProposerPreForkParent(t *testing.T) {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
 
-	xBlock := &snowmantest.Block{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		BytesV:  []byte{1},
-		ParentV: snowmantest.GenesisID,
-		HeightV: snowmantest.GenesisHeight + 1,
-	}
+	xBlock := snowmantest.BuildChild(snowmantest.Genesis)
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return xBlock, nil
 	}
 
-	yBlockBytes := []byte{2}
-	yBlock := &snowmantest.Block{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		BytesV:  yBlockBytes,
-		ParentV: xBlock.ID(),
-		HeightV: xBlock.Height() + 1,
-	}
-
+	yBlock := snowmantest.BuildChild(xBlock)
 	coreVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case snowmantest.GenesisID:
@@ -314,31 +257,10 @@ func TestBlockVerify_PostForkOption_FaultyParent(t *testing.T) {
 	}()
 
 	xBlock := &TestOptionsBlock{
-		Block: snowmantest.Block{
-			TestDecidable: choices.TestDecidable{
-				IDV:     ids.GenerateTestID(),
-				StatusV: choices.Processing,
-			},
-			BytesV:  []byte{1},
-			ParentV: snowmantest.GenesisID,
-		},
-		opts: [2]snowman.Block{
-			&snowmantest.Block{
-				TestDecidable: choices.TestDecidable{
-					IDV:     ids.GenerateTestID(),
-					StatusV: choices.Processing,
-				},
-				BytesV:  []byte{2},
-				ParentV: snowmantest.GenesisID, // valid block should reference xBlock
-			},
-			&snowmantest.Block{
-				TestDecidable: choices.TestDecidable{
-					IDV:     ids.GenerateTestID(),
-					StatusV: choices.Processing,
-				},
-				BytesV:  []byte{3},
-				ParentV: snowmantest.GenesisID, // valid block should reference xBlock
-			},
+		Block: *snowmantest.BuildChild(snowmantest.Genesis),
+		opts: [2]snowman.Block{ // valid blocks should reference xBlock
+			snowmantest.BuildChild(snowmantest.Genesis),
+			snowmantest.BuildChild(snowmantest.Genesis),
 		},
 	}
 
@@ -414,33 +336,12 @@ func TestBlockVerify_InvalidPostForkOption(t *testing.T) {
 	}()
 
 	// create an Oracle pre-fork block X
-	xBlockID := ids.GenerateTestID()
+	xTestBlock := snowmantest.BuildChild(snowmantest.Genesis)
 	xBlock := &TestOptionsBlock{
-		Block: snowmantest.Block{
-			TestDecidable: choices.TestDecidable{
-				IDV:     xBlockID,
-				StatusV: choices.Processing,
-			},
-			BytesV:  []byte{1},
-			ParentV: snowmantest.GenesisID,
-		},
+		Block: *xTestBlock,
 		opts: [2]snowman.Block{
-			&snowmantest.Block{
-				TestDecidable: choices.TestDecidable{
-					IDV:     ids.GenerateTestID(),
-					StatusV: choices.Processing,
-				},
-				BytesV:  []byte{2},
-				ParentV: xBlockID,
-			},
-			&snowmantest.Block{
-				TestDecidable: choices.TestDecidable{
-					IDV:     ids.GenerateTestID(),
-					StatusV: choices.Processing,
-				},
-				BytesV:  []byte{3},
-				ParentV: xBlockID,
-			},
+			snowmantest.BuildChild(xTestBlock),
+			snowmantest.BuildChild(xTestBlock),
 		},
 	}
 
@@ -449,16 +350,7 @@ func TestBlockVerify_InvalidPostForkOption(t *testing.T) {
 	xInnerOption := xInnerOptions[0]
 
 	// create a non-Oracle pre-fork block Y
-	yBlock := &snowmantest.Block{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		BytesV:  []byte{1},
-		ParentV: snowmantest.GenesisID,
-		HeightV: snowmantest.GenesisHeight + 1,
-	}
-
+	yBlock := snowmantest.BuildChild(snowmantest.Genesis)
 	ySlb, err := block.BuildUnsigned(
 		snowmantest.GenesisID,
 		snowmantest.GenesisTimestamp,
@@ -526,33 +418,12 @@ func TestBlockVerify_InvalidPostForkOption(t *testing.T) {
 
 	// create an Oracle pre-fork block Z
 	// create post-fork block B from Y
-	zBlockID := ids.GenerateTestID()
+	zTestBlock := snowmantest.BuildChild(snowmantest.Genesis)
 	zBlock := &TestOptionsBlock{
-		Block: snowmantest.Block{
-			TestDecidable: choices.TestDecidable{
-				IDV:     zBlockID,
-				StatusV: choices.Processing,
-			},
-			BytesV:  []byte{1},
-			ParentV: snowmantest.GenesisID,
-		},
+		Block: *zTestBlock,
 		opts: [2]snowman.Block{
-			&snowmantest.Block{
-				TestDecidable: choices.TestDecidable{
-					IDV:     ids.GenerateTestID(),
-					StatusV: choices.Processing,
-				},
-				BytesV:  []byte{2},
-				ParentV: zBlockID,
-			},
-			&snowmantest.Block{
-				TestDecidable: choices.TestDecidable{
-					IDV:     ids.GenerateTestID(),
-					StatusV: choices.Processing,
-				},
-				BytesV:  []byte{3},
-				ParentV: zBlockID,
-			},
+			snowmantest.BuildChild(zTestBlock),
+			snowmantest.BuildChild(zTestBlock),
 		},
 	}
 
@@ -609,26 +480,8 @@ func TestGetBlock_MutatedSignature(t *testing.T) {
 	proVM.Set(snowmantest.GenesisTimestamp)
 
 	// Create valid core blocks to build our chain on.
-	coreBlk0 := &snowmantest.Block{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.Empty.Prefix(1111),
-			StatusV: choices.Processing,
-		},
-		BytesV:  []byte{1},
-		ParentV: snowmantest.GenesisID,
-		HeightV: snowmantest.GenesisHeight + 1,
-	}
-
-	coreBlk1 := &snowmantest.Block{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.Empty.Prefix(2222),
-			StatusV: choices.Processing,
-		},
-		BytesV:  []byte{2},
-		ParentV: coreBlk0.ID(),
-		HeightV: coreBlk0.Height() + 1,
-	}
-
+	coreBlk0 := snowmantest.BuildChild(snowmantest.Genesis)
+	coreBlk1 := snowmantest.BuildChild(coreBlk0)
 	coreVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case snowmantest.GenesisID:
