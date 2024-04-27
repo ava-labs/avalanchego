@@ -2021,8 +2021,8 @@ func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 	expectedVdrSet := set.Of(vdr)
 
 	blk1 := snowmantest.BuildChild(snowmantest.Genesis)
-	blk2 := snowmantest.BuildChild(blk1)
 	// blk2 cannot pass verification until [blk1] has been marked as accepted.
+	blk2 := snowmantest.BuildChild(blk1)
 	blk2.VerifyV = errInvalid
 
 	// The VM should be able to parse [blk1] and [blk2]
