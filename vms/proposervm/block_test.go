@@ -123,10 +123,10 @@ func TestPreDurangoValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 		return coreParentBlk, nil
 	}
 	coreVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
-		switch {
-		case blkID == coreParentBlk.ID():
+		switch blkID {
+		case coreParentBlk.ID():
 			return coreParentBlk, nil
-		case blkID == snowmantest.GenesisID:
+		case snowmantest.GenesisID:
 			return snowmantest.Genesis, nil
 		default:
 			return nil, errUnknownBlock
@@ -244,10 +244,10 @@ func TestPreDurangoNonValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 		return coreParentBlk, nil
 	}
 	coreVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
-		switch {
-		case blkID == coreParentBlk.ID():
+		switch blkID {
+		case coreParentBlk.ID():
 			return coreParentBlk, nil
-		case blkID == snowmantest.GenesisID:
+		case snowmantest.GenesisID:
 			return snowmantest.Genesis, nil
 		default:
 			return nil, errUnknownBlock

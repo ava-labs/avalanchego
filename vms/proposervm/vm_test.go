@@ -106,8 +106,8 @@ func initTestProposerVM(
 		return snowmantest.GenesisID, nil
 	}
 	coreVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
-		switch {
-		case blkID == snowmantest.GenesisID:
+		switch blkID {
+		case snowmantest.GenesisID:
 			return snowmantest.Genesis, nil
 		default:
 			return nil, errUnknownBlock
