@@ -58,7 +58,6 @@ import (
 
 	"github.com/ava-labs/coreth/consensus/dummy"
 	"github.com/ava-labs/coreth/core"
-	"github.com/ava-labs/coreth/core/txpool"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/eth"
 	"github.com/ava-labs/coreth/params"
@@ -98,15 +97,17 @@ var (
 	genesisJSONDurango = `{"config":{"chainId":43111,"homesteadBlock":0,"daoForkBlock":0,"daoForkSupport":true,"eip150Block":0,"eip150Hash":"0x2086799aeebeae135c246c65021c82b4e15a2c451340993aacfd2751886514f0","eip155Block":0,"eip158Block":0,"byzantiumBlock":0,"constantinopleBlock":0,"petersburgBlock":0,"istanbulBlock":0,"muirGlacierBlock":0,"apricotPhase1BlockTimestamp":0,"apricotPhase2BlockTimestamp":0,"apricotPhase3BlockTimestamp":0,"apricotPhase4BlockTimestamp":0,"apricotPhase5BlockTimestamp":0,"apricotPhasePre6BlockTimestamp":0,"apricotPhase6BlockTimestamp":0,"apricotPhasePost6BlockTimestamp":0,"banffBlockTimestamp":0,"cortinaBlockTimestamp":0,"durangoBlockTimestamp":0},"nonce":"0x0","timestamp":"0x0","extraData":"0x00","gasLimit":"0x5f5e100","difficulty":"0x0","mixHash":"0x0000000000000000000000000000000000000000000000000000000000000000","coinbase":"0x0000000000000000000000000000000000000000","alloc":{"0x99b9DEA54C48Dfea6aA9A4Ca4623633EE04ddbB5":{"balance":"0x56bc75e2d63100000"},"0100000000000000000000000000000000000000":{"code":"0x7300000000000000000000000000000000000000003014608060405260043610603d5760003560e01c80631e010439146042578063b6510bb314606e575b600080fd5b605c60048036036020811015605657600080fd5b503560b1565b60408051918252519081900360200190f35b818015607957600080fd5b5060af60048036036080811015608e57600080fd5b506001600160a01b03813516906020810135906040810135906060013560b6565b005b30cd90565b836001600160a01b031681836108fc8690811502906040516000604051808303818888878c8acf9550505050505015801560f4573d6000803e3d6000fd5b505050505056fea26469706673582212201eebce970fe3f5cb96bf8ac6ba5f5c133fc2908ae3dcd51082cfee8f583429d064736f6c634300060a0033","balance":"0x0"}},"number":"0x0","gasUsed":"0x0","parentHash":"0x0000000000000000000000000000000000000000000000000000000000000000"}`
 	genesisJSONLatest  = genesisJSONDurango
 
+	genesisJSONCancun = `{"config":{"chainId":43111,"cancunTime":0,"homesteadBlock":0,"daoForkBlock":0,"daoForkSupport":true,"eip150Block":0,"eip150Hash":"0x2086799aeebeae135c246c65021c82b4e15a2c451340993aacfd2751886514f0","eip155Block":0,"eip158Block":0,"byzantiumBlock":0,"constantinopleBlock":0,"petersburgBlock":0,"istanbulBlock":0,"muirGlacierBlock":0,"apricotPhase1BlockTimestamp":0,"apricotPhase2BlockTimestamp":0,"apricotPhase3BlockTimestamp":0,"apricotPhase4BlockTimestamp":0,"apricotPhase5BlockTimestamp":0,"apricotPhasePre6BlockTimestamp":0,"apricotPhase6BlockTimestamp":0,"apricotPhasePost6BlockTimestamp":0,"banffBlockTimestamp":0,"cortinaBlockTimestamp":0,"durangoBlockTimestamp":0},"nonce":"0x0","timestamp":"0x0","extraData":"0x00","gasLimit":"0x5f5e100","difficulty":"0x0","mixHash":"0x0000000000000000000000000000000000000000000000000000000000000000","coinbase":"0x0000000000000000000000000000000000000000","alloc":{"0x99b9DEA54C48Dfea6aA9A4Ca4623633EE04ddbB5":{"balance":"0x56bc75e2d63100000"},"0100000000000000000000000000000000000000":{"code":"0x7300000000000000000000000000000000000000003014608060405260043610603d5760003560e01c80631e010439146042578063b6510bb314606e575b600080fd5b605c60048036036020811015605657600080fd5b503560b1565b60408051918252519081900360200190f35b818015607957600080fd5b5060af60048036036080811015608e57600080fd5b506001600160a01b03813516906020810135906040810135906060013560b6565b005b30cd90565b836001600160a01b031681836108fc8690811502906040516000604051808303818888878c8acf9550505050505015801560f4573d6000803e3d6000fd5b505050505056fea26469706673582212201eebce970fe3f5cb96bf8ac6ba5f5c133fc2908ae3dcd51082cfee8f583429d064736f6c634300060a0033","balance":"0x0"}},"number":"0x0","gasUsed":"0x0","parentHash":"0x0000000000000000000000000000000000000000000000000000000000000000"}`
+
 	apricotRulesPhase0 = params.Rules{}
-	apricotRulesPhase1 = params.Rules{IsApricotPhase1: true}
-	apricotRulesPhase2 = params.Rules{IsApricotPhase1: true, IsApricotPhase2: true}
-	apricotRulesPhase3 = params.Rules{IsApricotPhase1: true, IsApricotPhase2: true, IsApricotPhase3: true}
-	apricotRulesPhase4 = params.Rules{IsApricotPhase1: true, IsApricotPhase2: true, IsApricotPhase3: true, IsApricotPhase4: true}
-	apricotRulesPhase5 = params.Rules{IsApricotPhase1: true, IsApricotPhase2: true, IsApricotPhase3: true, IsApricotPhase4: true, IsApricotPhase5: true}
-	apricotRulesPhase6 = params.Rules{IsApricotPhase1: true, IsApricotPhase2: true, IsApricotPhase3: true, IsApricotPhase4: true, IsApricotPhase5: true, IsApricotPhasePre6: true, IsApricotPhase6: true, IsApricotPhasePost6: true}
-	banffRules         = params.Rules{IsApricotPhase1: true, IsApricotPhase2: true, IsApricotPhase3: true, IsApricotPhase4: true, IsApricotPhase5: true, IsApricotPhasePre6: true, IsApricotPhase6: true, IsApricotPhasePost6: true, IsBanff: true}
-	// cortinaRules    = params.Rules{IsApricotPhase1: true, IsApricotPhase2: true, IsApricotPhase3: true, IsApricotPhase4: true, IsApricotPhase5: true, IsApricotPhasePre6: true, IsApricotPhase6: true, IsApricotPhasePost6: true, IsBanff: true, IsCortina: true}
+	apricotRulesPhase1 = params.Rules{AvalancheRules: params.AvalancheRules{IsApricotPhase1: true}}
+	apricotRulesPhase2 = params.Rules{AvalancheRules: params.AvalancheRules{IsApricotPhase1: true, IsApricotPhase2: true}}
+	apricotRulesPhase3 = params.Rules{AvalancheRules: params.AvalancheRules{IsApricotPhase1: true, IsApricotPhase2: true, IsApricotPhase3: true}}
+	apricotRulesPhase4 = params.Rules{AvalancheRules: params.AvalancheRules{IsApricotPhase1: true, IsApricotPhase2: true, IsApricotPhase3: true, IsApricotPhase4: true}}
+	apricotRulesPhase5 = params.Rules{AvalancheRules: params.AvalancheRules{IsApricotPhase1: true, IsApricotPhase2: true, IsApricotPhase3: true, IsApricotPhase4: true, IsApricotPhase5: true}}
+	apricotRulesPhase6 = params.Rules{AvalancheRules: params.AvalancheRules{IsApricotPhase1: true, IsApricotPhase2: true, IsApricotPhase3: true, IsApricotPhase4: true, IsApricotPhase5: true, IsApricotPhasePre6: true, IsApricotPhase6: true, IsApricotPhasePost6: true}}
+	banffRules         = params.Rules{AvalancheRules: params.AvalancheRules{IsApricotPhase1: true, IsApricotPhase2: true, IsApricotPhase3: true, IsApricotPhase4: true, IsApricotPhase5: true, IsApricotPhasePre6: true, IsApricotPhase6: true, IsApricotPhasePost6: true, IsBanff: true}}
+	// cortinaRules    = params.Rules{AvalancheRules: params.AvalancheRules{IsApricotPhase1: true, IsApricotPhase2: true, IsApricotPhase3: true, IsApricotPhase4: true, IsApricotPhase5: true, IsApricotPhasePre6: true, IsApricotPhase6: true, IsApricotPhasePost6: true, IsBanff: true, IsCortina: true}}
 )
 
 func init() {
@@ -3732,11 +3733,7 @@ func TestBuildApricotPhase5Block(t *testing.T) {
 		}
 		txs[i] = signedTx
 	}
-	wrapped := make([]*txpool.Transaction, len(txs))
-	for i, tx := range txs {
-		wrapped[i] = &txpool.Transaction{Tx: tx}
-	}
-	errs := vm.txPool.Add(wrapped, false, false)
+	errs := vm.txPool.Add(txs, false, false)
 	for i, err := range errs {
 		if err != nil {
 			t.Fatalf("Failed to add tx at index %d: %s", i, err)
@@ -4098,4 +4095,121 @@ func TestSkipChainConfigCheckCompatible(t *testing.T) {
 	err = reinitVM.Initialize(context.Background(), vm.ctx, dbManager, genesisWithUpgradeBytes, []byte{}, config, issuer, []*commonEng.Fx{}, appSender)
 	require.NoError(t, err)
 	require.NoError(t, reinitVM.Shutdown(context.Background()))
+}
+
+func TestParentBeaconRootBlock(t *testing.T) {
+	tests := []struct {
+		name          string
+		genesisJSON   string
+		beaconRoot    *common.Hash
+		expectedError bool
+		errString     string
+	}{
+		{
+			name:          "non-empty parent beacon root in Durango",
+			genesisJSON:   genesisJSONDurango,
+			beaconRoot:    &common.Hash{0x01},
+			expectedError: true,
+			// err string wont work because it will also fail with blob gas is non-empty (zeroed)
+		},
+		{
+			name:          "empty parent beacon root in Durango",
+			genesisJSON:   genesisJSONDurango,
+			beaconRoot:    &common.Hash{},
+			expectedError: true,
+		},
+		{
+			name:          "nil parent beacon root in Durango",
+			genesisJSON:   genesisJSONDurango,
+			beaconRoot:    nil,
+			expectedError: false,
+		},
+		{
+			name:          "non-empty parent beacon root in Cancun",
+			genesisJSON:   genesisJSONCancun,
+			beaconRoot:    &common.Hash{0x01},
+			expectedError: true,
+			errString:     "expected empty hash",
+		},
+		{
+			name:          "empty parent beacon root in Cancun",
+			genesisJSON:   genesisJSONCancun,
+			beaconRoot:    &common.Hash{},
+			expectedError: false,
+		},
+		{
+			name:          "nil parent beacon root in Cancun",
+			genesisJSON:   genesisJSONCancun,
+			beaconRoot:    nil,
+			expectedError: true,
+			errString:     "header is missing parentBeaconRoot",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			importAmount := uint64(1000000000)
+			issuer, vm, _, _, _ := GenesisVMWithUTXOs(t, true, test.genesisJSON, "", "", map[ids.ShortID]uint64{
+				testShortIDAddrs[0]: importAmount,
+			})
+
+			defer func() {
+				if err := vm.Shutdown(context.Background()); err != nil {
+					t.Fatal(err)
+				}
+			}()
+
+			importTx, err := vm.newImportTx(vm.ctx.XChainID, testEthAddrs[0], initialBaseFee, []*secp256k1.PrivateKey{testKeys[0]})
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if err := vm.mempool.AddLocalTx(importTx); err != nil {
+				t.Fatal(err)
+			}
+
+			<-issuer
+
+			blk, err := vm.BuildBlock(context.Background())
+			if err != nil {
+				t.Fatalf("Failed to build block with import transaction: %s", err)
+			}
+
+			// Modify the block to have a parent beacon root
+			ethBlock := blk.(*chain.BlockWrapper).Block.(*Block).ethBlock
+			header := types.CopyHeader(ethBlock.Header())
+			header.ParentBeaconRoot = test.beaconRoot
+			parentBeaconEthBlock := types.NewBlockWithExtData(
+				header,
+				nil,
+				nil,
+				nil,
+				new(trie.Trie),
+				ethBlock.ExtData(),
+				false,
+			)
+
+			parentBeaconBlock, err := vm.newBlock(parentBeaconEthBlock)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			errCheck := func(err error) {
+				if test.expectedError {
+					if test.errString != "" {
+						require.ErrorContains(t, err, test.errString)
+					} else {
+						require.Error(t, err)
+					}
+				} else {
+					require.NoError(t, err)
+				}
+			}
+
+			_, err = vm.ParseBlock(context.Background(), parentBeaconBlock.Bytes())
+			errCheck(err)
+			err = parentBeaconBlock.Verify(context.Background())
+			errCheck(err)
+		})
+	}
 }

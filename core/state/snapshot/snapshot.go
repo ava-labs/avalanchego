@@ -38,7 +38,6 @@ import (
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/metrics"
 	"github.com/ava-labs/coreth/trie"
-	"github.com/ava-labs/coreth/utils"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/log"
@@ -569,6 +568,9 @@ func (t *Tree) AbortGeneration() {
 // for it to shutdown before returning (if it is running). This call should not
 // be made concurrently.
 func (dl *diskLayer) abortGeneration() bool {
+	dl.lock.Lock()
+	defer dl.lock.Unlock()
+
 	// Store ideal time for abort to get better estimate of load
 	//
 	// Note that we set this time regardless if abortion was skipped otherwise we
@@ -921,51 +923,20 @@ func (t *Tree) DiskRoot() common.Hash {
 	return t.diskRoot()
 }
 
-func (t *Tree) DiskAccountIterator(seek common.Hash) AccountIterator {
-	t.lock.Lock()
-	defer t.lock.Unlock()
+// Size returns the memory usage of the diff layers above the disk layer and the
+// dirty nodes buffered in the disk layer. Currently, the implementation uses a
+// special diff layer (the first) as an aggregator simulating a dirty buffer, so
+// the second return will always be 0. However, this will be made consistent with
+// the pathdb, which will require a second return.
+func (t *Tree) Size() (diffs common.StorageSize, buf common.StorageSize) {
+	t.lock.RLock()
+	defer t.lock.RUnlock()
 
-	return t.disklayer().AccountIterator(seek)
-}
-
-func (t *Tree) DiskStorageIterator(account common.Hash, seek common.Hash) StorageIterator {
-	t.lock.Lock()
-	defer t.lock.Unlock()
-
-	it, _ := t.disklayer().StorageIterator(account, seek)
-	return it
-}
-
-// NewDiskLayer creates a diskLayer for direct access to the contents of the on-disk
-// snapshot. Does not perform any validation.
-func NewDiskLayer(diskdb ethdb.KeyValueStore) Snapshot {
-	return &diskLayer{
-		diskdb:  diskdb,
-		created: time.Now(),
-
-		// state sync uses iterators to access data, so this cache is not used.
-		// initializing it out of caution.
-		cache: utils.NewMeteredCache(32*1024, "", 0),
+	var size common.StorageSize
+	for _, layer := range t.blockLayers {
+		if layer, ok := layer.(*diffLayer); ok {
+			size += common.StorageSize(layer.memory)
+		}
 	}
-}
-
-// NewTestTree creates a *Tree with a pre-populated diskLayer
-func NewTestTree(diskdb ethdb.KeyValueStore, blockHash, root common.Hash) *Tree {
-	base := &diskLayer{
-		diskdb:    diskdb,
-		root:      root,
-		blockHash: blockHash,
-		cache:     utils.NewMeteredCache(128*256, "", 0),
-		created:   time.Now(),
-	}
-	return &Tree{
-		blockLayers: map[common.Hash]snapshot{
-			blockHash: base,
-		},
-		stateLayers: map[common.Hash]map[common.Hash]snapshot{
-			root: {
-				blockHash: base,
-			},
-		},
-	}
+	return size, 0
 }

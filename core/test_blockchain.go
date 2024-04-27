@@ -8,6 +8,7 @@ import (
 	"math/big"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/ava-labs/coreth/consensus/dummy"
 	"github.com/ava-labs/coreth/core/rawdb"
@@ -17,6 +18,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var TestCallbacks = dummy.ConsensusCallbacks{
@@ -1459,4 +1462,49 @@ func TestInsertChainValidBlockFee(t *testing.T, create func(db ethdb.Database, g
 	}
 
 	checkBlockChainState(t, blockchain, gspec, chainDB, create, checkState)
+}
+
+// CheckTxIndices checks that the transaction indices are correctly stored in the database ([tail, head]).
+func CheckTxIndices(t *testing.T, expectedTail *uint64, head uint64, db ethdb.Database, allowNilBlocks bool) {
+	var tailValue uint64
+	if expectedTail != nil {
+		tailValue = *expectedTail
+	}
+	checkTxIndicesHelper(t, expectedTail, tailValue, head, head, db, allowNilBlocks)
+}
+
+// checkTxIndicesHelper checks that the transaction indices are correctly stored in the database.
+// [expectedTail] is the expected value of the tail index.
+// [indexedFrom] is the block number from which the transactions should be indexed.
+// [indexedTo] is the block number to which the transactions should be indexed.
+// [head] is the block number of the head block.
+func checkTxIndicesHelper(t *testing.T, expectedTail *uint64, indexedFrom uint64, indexedTo uint64, head uint64, db ethdb.Database, allowNilBlocks bool) {
+	if expectedTail == nil {
+		require.Nil(t, rawdb.ReadTxIndexTail(db))
+	} else {
+		var stored uint64
+		tailValue := *expectedTail
+
+		require.EventuallyWithTf(t,
+			func(c *assert.CollectT) {
+				stored = *rawdb.ReadTxIndexTail(db)
+				require.Equalf(t, tailValue, stored, "expected tail to be %d, found %d", tailValue, stored)
+			},
+			30*time.Second, 500*time.Millisecond, "expected tail to be %d eventually", tailValue)
+	}
+
+	for i := uint64(0); i <= head; i++ {
+		block := rawdb.ReadBlock(db, rawdb.ReadCanonicalHash(db, i), i)
+		if block == nil && allowNilBlocks {
+			continue
+		}
+		for _, tx := range block.Transactions() {
+			index := rawdb.ReadTxLookupEntry(db, tx.Hash())
+			if i < indexedFrom {
+				require.Nilf(t, index, "Transaction indices should be deleted, number %d hash %s", i, tx.Hash().Hex())
+			} else if i <= indexedTo {
+				require.NotNilf(t, index, "Missing transaction indices, number %d hash %s", i, tx.Hash().Hex())
+			}
+		}
+	}
 }

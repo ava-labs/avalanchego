@@ -38,10 +38,15 @@ import (
 	"github.com/ava-labs/coreth/metrics"
 	"github.com/ava-labs/coreth/trie/trienode"
 	"github.com/ava-labs/coreth/trie/triestate"
+	"github.com/ava-labs/coreth/utils"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
+)
+
+const (
+	cacheStatsUpdateFrequency = 1000 // update trie cache stats once per 1000 ops
 )
 
 var (
@@ -86,7 +91,23 @@ type cache interface {
 	HasGet([]byte, []byte) ([]byte, bool)
 	Del([]byte)
 	Set([]byte, []byte)
+	Reset()
 	SaveToFileConcurrent(string, int) error
+}
+
+// Config contains the settings for database.
+type Config struct {
+	CleanCacheSize int    // Maximum memory allowance (in bytes) for caching clean nodes
+	StatsPrefix    string // Prefix for cache stats (disabled if empty)
+}
+
+// Defaults is the default setting for database if it's not specified.
+// Notably, clean cache is disabled explicitly,
+var Defaults = &Config{
+	// Explicitly set clean cache size to 0 to avoid creating fastcache,
+	// otherwise database must be closed when it's no longer needed to
+	// prevent memory leak.
+	CleanCacheSize: 0,
 }
 
 // Database is an intermediate write layer between the trie data structures and
@@ -144,7 +165,14 @@ func (n *cachedNode) forChildren(resolver ChildResolver, onChild func(hash commo
 }
 
 // New initializes the hash-based node database.
-func New(diskdb ethdb.Database, cleans cache, resolver ChildResolver) *Database {
+func New(diskdb ethdb.Database, config *Config, resolver ChildResolver) *Database {
+	if config == nil {
+		config = Defaults
+	}
+	var cleans cache
+	if config.CleanCacheSize > 0 {
+		cleans = utils.NewMeteredCache(config.CleanCacheSize, config.StatsPrefix, cacheStatsUpdateFrequency)
+	}
 	return &Database{
 		diskdb:   diskdb,
 		resolver: resolver,
@@ -690,7 +718,10 @@ func (db *Database) update(root common.Hash, parent common.Hash, nodes *trienode
 
 // Size returns the current storage size of the memory cache in front of the
 // persistent database layer.
-func (db *Database) Size() common.StorageSize {
+//
+// The first return will always be 0, representing the memory stored in unbounded
+// diff layers above the dirty cache. This is only available in pathdb.
+func (db *Database) Size() (common.StorageSize, common.StorageSize) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
@@ -698,11 +729,16 @@ func (db *Database) Size() common.StorageSize {
 	// the total memory consumption, the maintenance metadata is also needed to be
 	// counted.
 	var metadataSize = common.StorageSize(len(db.dirties) * cachedNodeSize)
-	return db.dirtiesSize + db.childrenSize + metadataSize
+	return 0, db.dirtiesSize + db.childrenSize + metadataSize
 }
 
 // Close closes the trie database and releases all held resources.
-func (db *Database) Close() error { return nil }
+func (db *Database) Close() error {
+	if db.cleans != nil {
+		db.cleans.Reset()
+	}
+	return nil
+}
 
 // Scheme returns the node scheme used in the database.
 func (db *Database) Scheme() string {

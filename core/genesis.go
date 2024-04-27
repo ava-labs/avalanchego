@@ -188,9 +188,12 @@ func SetupGenesisBlock(
 		}
 		return genesis.Config, block.Hash(), nil
 	}
-	// We have the genesis block in database but the corresponding state is missing.
+	// The genesis block is present(perhaps in ancient database) while the
+	// state database is not initialized yet. It can happen that the node
+	// is initialized with an external ancient store. Commit genesis state
+	// in this case.
 	header := rawdb.ReadHeader(db, stored, 0)
-	if header.Root != types.EmptyRootHash && !rawdb.HasLegacyTrieNode(db, header.Root) {
+	if header.Root != types.EmptyRootHash && !triedb.Initialized(header.Root) {
 		// Ensure the stored genesis matches with the given one.
 		hash := genesis.ToBlock().Hash()
 		if hash != stored {
@@ -249,7 +252,7 @@ func SetupGenesisBlock(
 // to the given database (or discards it if nil).
 func (g *Genesis) ToBlock() *types.Block {
 	db := rawdb.NewMemoryDatabase()
-	return g.toBlock(db, trie.NewDatabase(db))
+	return g.toBlock(db, trie.NewDatabase(db, nil))
 }
 
 // TODO: migrate this function to "flush" for more similarity with upstream.
@@ -311,6 +314,11 @@ func (g *Genesis) toBlock(db ethdb.Database, triedb *trie.Database) *types.Block
 			}
 		}
 		if conf.IsCancun(num, g.Timestamp) {
+			// EIP-4788: The parentBeaconBlockRoot of the genesis block is always
+			// the zero hash. This is because the genesis block does not have a parent
+			// by definition.
+			head.ParentBeaconRoot = new(common.Hash)
+			// EIP-4844 fields
 			head.ExcessBlobGas = g.ExcessBlobGas
 			head.BlobGasUsed = g.BlobGasUsed
 			if head.ExcessBlobGas == nil {
@@ -357,10 +365,8 @@ func (g *Genesis) Commit(db ethdb.Database, triedb *trie.Database) (*types.Block
 
 // MustCommit writes the genesis block and state to db, panicking on error.
 // The block is committed as the canonical head block.
-// Note the state changes will be committed in hash-based scheme, use Commit
-// if path-scheme is preferred.
-func (g *Genesis) MustCommit(db ethdb.Database) *types.Block {
-	block, err := g.Commit(db, trie.NewDatabase(db))
+func (g *Genesis) MustCommit(db ethdb.Database, triedb *trie.Database) *types.Block {
+	block, err := g.Commit(db, triedb)
 	if err != nil {
 		panic(err)
 	}
@@ -374,7 +380,7 @@ func GenesisBlockForTesting(db ethdb.Database, addr common.Address, balance *big
 		Alloc:   GenesisAlloc{addr: {Balance: balance}},
 		BaseFee: big.NewInt(params.ApricotPhase3InitialBaseFee),
 	}
-	return g.MustCommit(db)
+	return g.MustCommit(db, trie.NewDatabase(db, trie.HashDefaults))
 }
 
 // ReadBlockByHash reads the block with the given hash from the database.

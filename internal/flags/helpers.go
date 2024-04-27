@@ -28,12 +28,19 @@ package flags
 
 import (
 	"fmt"
+	"os"
+	"regexp"
 	"strings"
 
 	"github.com/ava-labs/coreth/internal/version"
 	"github.com/ava-labs/coreth/params"
+	"github.com/mattn/go-isatty"
 	"github.com/urfave/cli/v2"
 )
+
+// usecolor defines whether the CLI help should use colored output or normal dumb
+// colorless terminal formatting.
+var usecolor = (isatty.IsTerminal(os.Stdout.Fd()) || isatty.IsCygwinTerminal(os.Stdout.Fd())) && os.Getenv("TERM") != "dumb"
 
 // NewApp creates an app with sane defaults.
 func NewApp(usage string) *cli.App {
@@ -139,6 +146,14 @@ func doMigrateFlags(ctx *cli.Context) {
 }
 
 func init() {
+	if usecolor {
+		// Annotate all help categories with colors
+		cli.AppHelpTemplate = regexp.MustCompile("[A-Z ]+:").ReplaceAllString(cli.AppHelpTemplate, "\u001B[33m$0\u001B[0m")
+
+		// Annotate flag categories with colors (private template, so need to
+		// copy-paste the entire thing here...)
+		cli.AppHelpTemplate = strings.ReplaceAll(cli.AppHelpTemplate, "{{template \"visibleFlagCategoryTemplate\" .}}", "{{range .VisibleFlagCategories}}\n   {{if .Name}}\u001B[33m{{.Name}}\u001B[0m\n\n   {{end}}{{$flglen := len .Flags}}{{range $i, $e := .Flags}}{{if eq (subtract $flglen $i) 1}}{{$e}}\n{{else}}{{$e}}\n   {{end}}{{end}}{{end}}")
+	}
 	cli.FlagStringer = FlagString
 }
 
@@ -148,37 +163,31 @@ func FlagString(f cli.Flag) string {
 	if !ok {
 		return ""
 	}
-
 	needsPlaceholder := df.TakesValue()
 	placeholder := ""
 	if needsPlaceholder {
 		placeholder = "value"
 	}
 
-	namesText := pad(cli.FlagNamePrefixer(df.Names(), placeholder), 30)
+	namesText := cli.FlagNamePrefixer(df.Names(), placeholder)
 
 	defaultValueString := ""
 	if s := df.GetDefaultText(); s != "" {
 		defaultValueString = " (default: " + s + ")"
 	}
-
-	usage := strings.TrimSpace(df.GetUsage())
 	envHint := strings.TrimSpace(cli.FlagEnvHinter(df.GetEnvVars(), ""))
-	if len(envHint) > 0 {
-		usage += " " + envHint
+	if envHint != "" {
+		envHint = " (" + envHint[1:len(envHint)-1] + ")"
 	}
-
+	usage := strings.TrimSpace(df.GetUsage())
 	usage = wordWrap(usage, 80)
 	usage = indent(usage, 10)
 
-	return fmt.Sprintf("\n    %s%s\n%s", namesText, defaultValueString, usage)
-}
-
-func pad(s string, length int) string {
-	if len(s) < length {
-		s += strings.Repeat(" ", length-len(s))
+	if usecolor {
+		return fmt.Sprintf("\n    \u001B[32m%-35s%-35s\u001B[0m%s\n%s", namesText, defaultValueString, envHint, usage)
+	} else {
+		return fmt.Sprintf("\n    %-35s%-35s%s\n%s", namesText, defaultValueString, envHint, usage)
 	}
-	return s
 }
 
 func indent(s string, nspace int) string {

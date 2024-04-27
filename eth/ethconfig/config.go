@@ -30,10 +30,12 @@ import (
 	"time"
 
 	"github.com/ava-labs/coreth/core"
+	"github.com/ava-labs/coreth/core/rawdb"
 	"github.com/ava-labs/coreth/core/txpool/blobpool"
 	"github.com/ava-labs/coreth/core/txpool/legacypool"
 	"github.com/ava-labs/coreth/eth/gasprice"
 	"github.com/ava-labs/coreth/miner"
+	"github.com/ava-labs/coreth/params"
 	"github.com/ethereum/go-ethereum/common"
 )
 
@@ -55,6 +57,8 @@ var DefaultConfig = NewDefaultConfig()
 func NewDefaultConfig() Config {
 	return Config{
 		NetworkId:                 1,
+		StateHistory:              params.FullImmutabilityThreshold,
+		StateScheme:               rawdb.HashScheme,
 		TrieCleanCache:            512,
 		TrieDirtyCache:            256,
 		TrieDirtyCommitTarget:     20,
@@ -88,7 +92,7 @@ type Config struct {
 	PopulateMissingTries            *uint64 // Height at which to start re-populating missing tries on startup.
 	PopulateMissingTriesParallelism int     // Number of concurrent readers to use when re-populating missing tries on startup.
 	AllowMissingTries               bool    // Whether to allow an archival node to run with pruning enabled and corrupt a complete index.
-	SnapshotDelayInit               bool    // Whether snapshot tree should be initialized on startup or delayed until explicit call
+	SnapshotDelayInit               bool    // Whether snapshot tree should be initialized on startup or delayed until explicit call (= StateSyncEnabled)
 	SnapshotWait                    bool    // Whether to wait for the initial snapshot generation
 	SnapshotVerify                  bool    // Whether to verify generated snapshots
 	SkipSnapshotRebuild             bool    // Whether to skip rebuilding the snapshot in favor of returning an error (only set to true for tests)
@@ -158,7 +162,11 @@ type Config struct {
 	// are reserved:
 	//  * 0:   means no limit
 	//  * N:   means N block limit [HEAD-N+1, HEAD] and delete extra indexes
-	TxLookupLimit uint64
+	// Deprecated, use 'TransactionHistory' instead.
+	TxLookupLimit      uint64 `toml:",omitempty"` // The maximum number of blocks from head whose tx indices are reserved.
+	TransactionHistory uint64 `toml:",omitempty"` // The maximum number of blocks from head whose tx indices are reserved.
+	StateHistory       uint64 `toml:",omitempty"` // The maximum number of blocks from head whose state histories are reserved.
+	StateScheme        string `toml:",omitempty"` // State scheme used to store ethereum state and merkle trie nodes on top
 
 	// SkipTxIndexing skips indexing transactions.
 	// This is useful for validators that don't need to index transactions.

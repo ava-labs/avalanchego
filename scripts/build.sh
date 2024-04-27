@@ -23,8 +23,8 @@ fi
 # Check if CORETH_COMMIT is set, if not retrieve the last commit from the repo.
 # This is used in the Dockerfile to allow a commit hash to be passed in without
 # including the .git/ directory within the Docker image.
-coreth_commit=${CORETH_COMMIT:-$( git rev-list -1 HEAD )}
+CORETH_COMMIT=${CORETH_COMMIT:-$(git rev-list -1 HEAD)}
 
-# Build Coreth, which is run as a subprocess
-echo "Building Coreth @ GitCommit: $coreth_commit"
-go build -ldflags "-X github.com/ava-labs/coreth/plugin/evm.GitCommit=$coreth_commit" -o "$binary_path" "plugin/"*.go
+# Build Coreth, which runs as a subprocess
+echo "Building Coreth @ GitCommit: $CORETH_COMMIT"
+go build -ldflags "-X github.com/ava-labs/coreth/plugin/evm.GitCommit=$CORETH_COMMIT" -o "$binary_path" "plugin/"*.go

@@ -227,7 +227,7 @@ func ReadHeader(db ethdb.Reader, hash common.Hash, number uint64) *types.Header 
 		return nil
 	}
 	header := new(types.Header)
-	if err := rlp.Decode(bytes.NewReader(data), header); err != nil {
+	if err := rlp.DecodeBytes(data, header); err != nil {
 		log.Error("Invalid block header RLP", "hash", hash, "err", err)
 		return nil
 	}
@@ -313,7 +313,7 @@ func ReadBody(db ethdb.Reader, hash common.Hash, number uint64) *types.Body {
 		return nil
 	}
 	body := new(types.Body)
-	if err := rlp.Decode(bytes.NewReader(data), body); err != nil {
+	if err := rlp.DecodeBytes(data, body); err != nil {
 		log.Error("Invalid block body RLP", "hash", hash, "err", err)
 		return nil
 	}

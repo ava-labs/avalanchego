@@ -39,7 +39,6 @@ import (
 	"github.com/ava-labs/coreth/core/bloombits"
 	"github.com/ava-labs/coreth/core/rawdb"
 	"github.com/ava-labs/coreth/core/state"
-	"github.com/ava-labs/coreth/core/txpool"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/core/vm"
 	"github.com/ava-labs/coreth/eth/gasprice"
@@ -240,7 +239,10 @@ func (b *EthAPIBackend) StateAndHeaderByNumber(ctx context.Context, number rpc.B
 		return nil, nil, errors.New("header not found")
 	}
 	stateDb, err := b.eth.BlockChain().StateAt(header.Root)
-	return stateDb, header, err
+	if err != nil {
+		return nil, nil, err
+	}
+	return stateDb, header, nil
 }
 
 func (b *EthAPIBackend) StateAndHeaderByNumberOrHash(ctx context.Context, blockNrOrHash rpc.BlockNumberOrHash) (*state.StateDB, *types.Header, error) {
@@ -259,7 +261,10 @@ func (b *EthAPIBackend) StateAndHeaderByNumberOrHash(ctx context.Context, blockN
 			return nil, nil, errors.New("header for hash not found")
 		}
 		stateDb, err := b.eth.BlockChain().StateAt(header.Root)
-		return stateDb, header, err
+		if err != nil {
+			return nil, nil, err
+		}
+		return stateDb, header, nil
 	}
 	return nil, nil, errors.New("invalid arguments; neither block nor hash specified")
 }
@@ -332,7 +337,7 @@ func (b *EthAPIBackend) SendTx(ctx context.Context, signedTx *types.Transaction)
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	if err := b.eth.txPool.Add([]*txpool.Transaction{{Tx: signedTx}}, true, false)[0]; err != nil {
+	if err := b.eth.txPool.Add([]*types.Transaction{signedTx}, true, false)[0]; err != nil {
 		return err
 	}
 
@@ -348,7 +353,7 @@ func (b *EthAPIBackend) GetPoolTransactions() (types.Transactions, error) {
 	for _, batch := range pending {
 		for _, lazy := range batch {
 			if tx := lazy.Resolve(); tx != nil {
-				txs = append(txs, tx.Tx)
+				txs = append(txs, tx)
 			}
 		}
 	}
@@ -356,10 +361,7 @@ func (b *EthAPIBackend) GetPoolTransactions() (types.Transactions, error) {
 }
 
 func (b *EthAPIBackend) GetPoolTransaction(hash common.Hash) *types.Transaction {
-	if tx := b.eth.txPool.Get(hash); tx != nil {
-		return tx.Tx
-	}
-	return nil
+	return b.eth.txPool.Get(hash)
 }
 
 func (b *EthAPIBackend) GetTransaction(ctx context.Context, txHash common.Hash) (*types.Transaction, common.Hash, uint64, uint64, error) {
@@ -489,7 +491,7 @@ func (b *EthAPIBackend) GetMaxBlocksPerRequest() int64 {
 }
 
 func (b *EthAPIBackend) StateAtBlock(ctx context.Context, block *types.Block, reexec uint64, base *state.StateDB, readOnly bool, preferDisk bool) (*state.StateDB, tracers.StateReleaseFunc, error) {
-	return b.eth.StateAtBlock(ctx, block, reexec, base, readOnly, preferDisk)
+	return b.eth.stateAtBlock(ctx, block, reexec, base, readOnly, preferDisk)
 }
 
 func (b *EthAPIBackend) StateAtNextBlock(ctx context.Context, parent, nextBlock *types.Block, reexec uint64, base *state.StateDB, readOnly bool, preferDisk bool) (*state.StateDB, tracers.StateReleaseFunc, error) {

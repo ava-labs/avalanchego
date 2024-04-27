@@ -230,12 +230,6 @@ func (bc *BlockChain) HasBlockAndState(hash common.Hash, number uint64) bool {
 	return bc.HasState(block.Root())
 }
 
-// TrieNode retrieves a blob of data associated with a trie node
-// either from ephemeral in-memory cache, or from persistent storage.
-func (bc *BlockChain) TrieNode(hash common.Hash) ([]byte, error) {
-	return bc.stateCache.TrieDB().Node(hash)
-}
-
 // State returns a new mutable state based on the current HEAD block.
 func (bc *BlockChain) State() (*state.StateDB, error) {
 	return bc.StateAt(bc.CurrentBlock().Root)

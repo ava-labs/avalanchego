@@ -176,3 +176,18 @@ func NewSyncPerformedIterator(db ethdb.Iteratee) ethdb.Iterator {
 func UnpackSyncPerformedKey(key []byte) uint64 {
 	return binary.BigEndian.Uint64(key[len(syncPerformedPrefix):])
 }
+
+// GetLatestSyncPerformed returns the latest block number state synced performed to.
+func GetLatestSyncPerformed(db ethdb.Iteratee) uint64 {
+	it := NewSyncPerformedIterator(db)
+	defer it.Release()
+
+	var latestSyncPerformed uint64
+	for it.Next() {
+		syncPerformed := UnpackSyncPerformedKey(it.Key())
+		if syncPerformed > latestSyncPerformed {
+			latestSyncPerformed = syncPerformed
+		}
+	}
+	return latestSyncPerformed
+}

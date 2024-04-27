@@ -67,7 +67,7 @@ func NewStateSyncer(config *StateSyncerConfig) (*stateSync, error) {
 		db:              config.DB,
 		client:          config.Client,
 		root:            config.Root,
-		trieDB:          trie.NewDatabase(config.DB),
+		trieDB:          trie.NewDatabase(config.DB, nil),
 		snapshot:        snapshot.NewDiskLayer(config.DB),
 		stats:           newTrieSyncStats(),
 		triesInProgress: make(map[common.Hash]*trieToSync),

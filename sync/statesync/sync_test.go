@@ -74,7 +74,7 @@ func testSync(t *testing.T, test syncTest) {
 		return
 	}
 
-	assertDBConsistency(t, root, clientDB, serverTrieDB, trie.NewDatabase(clientDB))
+	assertDBConsistency(t, root, clientDB, serverTrieDB, trie.NewDatabase(clientDB, nil))
 }
 
 // testSyncResumes tests a series of syncTests work as expected, invoking a callback function after each
@@ -120,7 +120,7 @@ func TestSimpleSyncCases(t *testing.T) {
 		"accounts": {
 			prepareForTest: func(t *testing.T) (ethdb.Database, ethdb.Database, *trie.Database, common.Hash) {
 				serverDB := rawdb.NewMemoryDatabase()
-				serverTrieDB := trie.NewDatabase(serverDB)
+				serverTrieDB := trie.NewDatabase(serverDB, nil)
 				root, _ := syncutils.FillAccounts(t, serverTrieDB, common.Hash{}, numAccounts, nil)
 				return rawdb.NewMemoryDatabase(), serverDB, serverTrieDB, root
 			},
@@ -128,7 +128,7 @@ func TestSimpleSyncCases(t *testing.T) {
 		"accounts with code": {
 			prepareForTest: func(t *testing.T) (ethdb.Database, ethdb.Database, *trie.Database, common.Hash) {
 				serverDB := rawdb.NewMemoryDatabase()
-				serverTrieDB := trie.NewDatabase(serverDB)
+				serverTrieDB := trie.NewDatabase(serverDB, nil)
 				root, _ := syncutils.FillAccounts(t, serverTrieDB, common.Hash{}, numAccounts, func(t *testing.T, index int, account types.StateAccount) types.StateAccount {
 					if index%3 == 0 {
 						codeBytes := make([]byte, 256)
@@ -149,7 +149,7 @@ func TestSimpleSyncCases(t *testing.T) {
 		"accounts with code and storage": {
 			prepareForTest: func(t *testing.T) (ethdb.Database, ethdb.Database, *trie.Database, common.Hash) {
 				serverDB := rawdb.NewMemoryDatabase()
-				serverTrieDB := trie.NewDatabase(serverDB)
+				serverTrieDB := trie.NewDatabase(serverDB, nil)
 				root := fillAccountsWithStorage(t, serverDB, serverTrieDB, common.Hash{}, numAccounts)
 				return rawdb.NewMemoryDatabase(), serverDB, serverTrieDB, root
 			},
@@ -157,7 +157,7 @@ func TestSimpleSyncCases(t *testing.T) {
 		"accounts with storage": {
 			prepareForTest: func(t *testing.T) (ethdb.Database, ethdb.Database, *trie.Database, common.Hash) {
 				serverDB := rawdb.NewMemoryDatabase()
-				serverTrieDB := trie.NewDatabase(serverDB)
+				serverTrieDB := trie.NewDatabase(serverDB, nil)
 				root, _ := syncutils.FillAccounts(t, serverTrieDB, common.Hash{}, numAccounts, func(t *testing.T, i int, account types.StateAccount) types.StateAccount {
 					if i%5 == 0 {
 						account.Root, _, _ = syncutils.GenerateTrie(t, serverTrieDB, 16, common.HashLength)
@@ -171,7 +171,7 @@ func TestSimpleSyncCases(t *testing.T) {
 		"accounts with overlapping storage": {
 			prepareForTest: func(t *testing.T) (ethdb.Database, ethdb.Database, *trie.Database, common.Hash) {
 				serverDB := rawdb.NewMemoryDatabase()
-				serverTrieDB := trie.NewDatabase(serverDB)
+				serverTrieDB := trie.NewDatabase(serverDB, nil)
 				root, _ := FillAccountsWithOverlappingStorage(t, serverTrieDB, common.Hash{}, numAccounts, 3)
 				return rawdb.NewMemoryDatabase(), serverDB, serverTrieDB, root
 			},
@@ -179,7 +179,7 @@ func TestSimpleSyncCases(t *testing.T) {
 		"failed to fetch leafs": {
 			prepareForTest: func(t *testing.T) (ethdb.Database, ethdb.Database, *trie.Database, common.Hash) {
 				serverDB := rawdb.NewMemoryDatabase()
-				serverTrieDB := trie.NewDatabase(serverDB)
+				serverTrieDB := trie.NewDatabase(serverDB, nil)
 				root, _ := syncutils.FillAccounts(t, serverTrieDB, common.Hash{}, numAccountsSmall, nil)
 				return rawdb.NewMemoryDatabase(), serverDB, serverTrieDB, root
 			},
@@ -191,7 +191,7 @@ func TestSimpleSyncCases(t *testing.T) {
 		"failed to fetch code": {
 			prepareForTest: func(t *testing.T) (ethdb.Database, ethdb.Database, *trie.Database, common.Hash) {
 				serverDB := rawdb.NewMemoryDatabase()
-				serverTrieDB := trie.NewDatabase(serverDB)
+				serverTrieDB := trie.NewDatabase(serverDB, nil)
 				root := fillAccountsWithStorage(t, serverDB, serverTrieDB, common.Hash{}, numAccountsSmall)
 				return rawdb.NewMemoryDatabase(), serverDB, serverTrieDB, root
 			},
@@ -211,7 +211,7 @@ func TestSimpleSyncCases(t *testing.T) {
 
 func TestCancelSync(t *testing.T) {
 	serverDB := rawdb.NewMemoryDatabase()
-	serverTrieDB := trie.NewDatabase(serverDB)
+	serverTrieDB := trie.NewDatabase(serverDB, nil)
 	// Create trie with 2000 accounts (more than one leaf request)
 	root := fillAccountsWithStorage(t, serverDB, serverTrieDB, common.Hash{}, 2000)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -252,7 +252,7 @@ func (i *interruptLeafsIntercept) getLeafsIntercept(request message.LeafsRequest
 
 func TestResumeSyncAccountsTrieInterrupted(t *testing.T) {
 	serverDB := rawdb.NewMemoryDatabase()
-	serverTrieDB := trie.NewDatabase(serverDB)
+	serverTrieDB := trie.NewDatabase(serverDB, nil)
 	root, _ := FillAccountsWithOverlappingStorage(t, serverTrieDB, common.Hash{}, 2000, 3)
 	clientDB := rawdb.NewMemoryDatabase()
 	intercept := &interruptLeafsIntercept{
@@ -278,7 +278,7 @@ func TestResumeSyncAccountsTrieInterrupted(t *testing.T) {
 
 func TestResumeSyncLargeStorageTrieInterrupted(t *testing.T) {
 	serverDB := rawdb.NewMemoryDatabase()
-	serverTrieDB := trie.NewDatabase(serverDB)
+	serverTrieDB := trie.NewDatabase(serverDB, nil)
 
 	largeStorageRoot, _, _ := syncutils.GenerateTrie(t, serverTrieDB, 2000, common.HashLength)
 	root, _ := syncutils.FillAccounts(t, serverTrieDB, common.Hash{}, 2000, func(t *testing.T, index int, account types.StateAccount) types.StateAccount {
@@ -310,7 +310,7 @@ func TestResumeSyncLargeStorageTrieInterrupted(t *testing.T) {
 
 func TestResumeSyncToNewRootAfterLargeStorageTrieInterrupted(t *testing.T) {
 	serverDB := rawdb.NewMemoryDatabase()
-	serverTrieDB := trie.NewDatabase(serverDB)
+	serverTrieDB := trie.NewDatabase(serverDB, nil)
 
 	largeStorageRoot1, _, _ := syncutils.GenerateTrie(t, serverTrieDB, 2000, common.HashLength)
 	largeStorageRoot2, _, _ := syncutils.GenerateTrie(t, serverTrieDB, 2000, common.HashLength)
@@ -351,7 +351,7 @@ func TestResumeSyncToNewRootAfterLargeStorageTrieInterrupted(t *testing.T) {
 
 func TestResumeSyncLargeStorageTrieWithConsecutiveDuplicatesInterrupted(t *testing.T) {
 	serverDB := rawdb.NewMemoryDatabase()
-	serverTrieDB := trie.NewDatabase(serverDB)
+	serverTrieDB := trie.NewDatabase(serverDB, nil)
 
 	largeStorageRoot, _, _ := syncutils.GenerateTrie(t, serverTrieDB, 2000, common.HashLength)
 	root, _ := syncutils.FillAccounts(t, serverTrieDB, common.Hash{}, 100, func(t *testing.T, index int, account types.StateAccount) types.StateAccount {
@@ -383,7 +383,7 @@ func TestResumeSyncLargeStorageTrieWithConsecutiveDuplicatesInterrupted(t *testi
 
 func TestResumeSyncLargeStorageTrieWithSpreadOutDuplicatesInterrupted(t *testing.T) {
 	serverDB := rawdb.NewMemoryDatabase()
-	serverTrieDB := trie.NewDatabase(serverDB)
+	serverTrieDB := trie.NewDatabase(serverDB, nil)
 
 	largeStorageRoot, _, _ := syncutils.GenerateTrie(t, serverTrieDB, 2000, common.HashLength)
 	root, _ := syncutils.FillAccounts(t, serverTrieDB, common.Hash{}, 100, func(t *testing.T, index int, account types.StateAccount) types.StateAccount {
@@ -436,7 +436,7 @@ func TestResyncNewRootAfterDeletes(t *testing.T) {
 		},
 		"delete intermediate storage nodes": {
 			deleteBetweenSyncs: func(t *testing.T, root common.Hash, clientDB ethdb.Database) {
-				clientTrieDB := trie.NewDatabase(clientDB)
+				clientTrieDB := trie.NewDatabase(clientDB, nil)
 				tr, err := trie.New(trie.TrieID(root), clientTrieDB)
 				if err != nil {
 					t.Fatal(err)
@@ -482,7 +482,7 @@ func TestResyncNewRootAfterDeletes(t *testing.T) {
 		},
 		"delete intermediate account trie nodes": {
 			deleteBetweenSyncs: func(t *testing.T, root common.Hash, clientDB ethdb.Database) {
-				clientTrieDB := trie.NewDatabase(clientDB)
+				clientTrieDB := trie.NewDatabase(clientDB, nil)
 				tr, err := trie.New(trie.TrieID(root), clientTrieDB)
 				if err != nil {
 					t.Fatal(err)
@@ -501,7 +501,7 @@ func testSyncerSyncsToNewRoot(t *testing.T, deleteBetweenSyncs func(*testing.T, 
 	rand.Seed(1)
 	clientDB := rawdb.NewMemoryDatabase()
 	serverDB := rawdb.NewMemoryDatabase()
-	serverTrieDB := trie.NewDatabase(serverDB)
+	serverTrieDB := trie.NewDatabase(serverDB, nil)
 
 	root1, _ := FillAccountsWithOverlappingStorage(t, serverTrieDB, common.Hash{}, 1000, 3)
 	root2, _ := FillAccountsWithOverlappingStorage(t, serverTrieDB, root1, 1000, 3)

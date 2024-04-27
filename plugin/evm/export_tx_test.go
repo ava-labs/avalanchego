@@ -1776,7 +1776,6 @@ func TestNewExportTx(t *testing.T) {
 				t.Fatalf("Failed to create commit batch for VM due to %s", err)
 			}
 			chainID, atomicRequests, err := exportTx.AtomicOps()
-
 			if err != nil {
 				t.Fatalf("Failed to accept export transaction due to: %s", err)
 			}
@@ -1964,7 +1963,6 @@ func TestNewExportTxMulticoin(t *testing.T) {
 				t.Fatalf("Failed to create commit batch for VM due to %s", err)
 			}
 			chainID, atomicRequests, err := exportTx.AtomicOps()
-
 			if err != nil {
 				t.Fatalf("Failed to accept export transaction due to: %s", err)
 			}

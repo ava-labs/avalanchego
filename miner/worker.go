@@ -40,6 +40,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/coreth/consensus"
 	"github.com/ava-labs/coreth/consensus/dummy"
+	"github.com/ava-labs/coreth/consensus/misc/eip4844"
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/core/state"
 	"github.com/ava-labs/coreth/core/txpool"
@@ -70,6 +71,8 @@ type environment struct {
 	header   *types.Header
 	txs      []*types.Transaction
 	receipts []*types.Receipt
+	sidecars []*types.BlobTxSidecar
+	blobs    int
 	size     uint64
 
 	rules            params.Rules
@@ -97,10 +100,11 @@ type worker struct {
 	pendingLogsFeed event.Feed
 
 	// Subscriptions
-	mux      *event.TypeMux // TODO replace
-	mu       sync.RWMutex   // The lock used to protect the coinbase and extra fields
-	coinbase common.Address
-	clock    *mockable.Clock // Allows us mock the clock for testing
+	mux        *event.TypeMux // TODO replace
+	mu         sync.RWMutex   // The lock used to protect the coinbase and extra fields
+	coinbase   common.Address
+	clock      *mockable.Clock // Allows us mock the clock for testing
+	beaconRoot *common.Hash    // TODO: set to empty hash, retained for upstream compatibility and future use
 }
 
 func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus.Engine, eth Backend, mux *event.TypeMux, clock *mockable.Clock) *worker {
@@ -113,6 +117,7 @@ func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus
 		mux:         mux,
 		coinbase:    config.Etherbase,
 		clock:       clock,
+		beaconRoot:  &common.Hash{},
 	}
 
 	return worker
@@ -166,6 +171,19 @@ func (w *worker) commitNewWork(predicateContext *precompileconfig.PredicateConte
 			return nil, fmt.Errorf("failed to calculate new base fee: %w", err)
 		}
 	}
+	// Apply EIP-4844, EIP-4788.
+	if w.chainConfig.IsCancun(header.Number, header.Time) {
+		var excessBlobGas uint64
+		if w.chainConfig.IsCancun(parent.Number, parent.Time) {
+			excessBlobGas = eip4844.CalcExcessBlobGas(*parent.ExcessBlobGas, *parent.BlobGasUsed)
+		} else {
+			// For the first post-fork block, both parent.data_gas_used and parent.excess_data_gas are evaluated as 0
+			excessBlobGas = eip4844.CalcExcessBlobGas(0, 0)
+		}
+		header.BlobGasUsed = new(uint64)
+		header.ExcessBlobGas = &excessBlobGas
+		header.ParentBeaconRoot = w.beaconRoot
+	}
 
 	if w.coinbase == (common.Address{}) {
 		return nil, errors.New("cannot mine without etherbase")
@@ -178,6 +196,11 @@ func (w *worker) commitNewWork(predicateContext *precompileconfig.PredicateConte
 	env, err := w.createCurrentEnvironment(predicateContext, parent, header, tstart)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new current environment: %w", err)
+	}
+	if header.ParentBeaconRoot != nil {
+		context := core.NewEVMBlockContext(header, w.chain, nil)
+		vmenv := vm.NewEVM(context, vm.TxContext{}, env.state, w.chainConfig, vm.Config{})
+		core.ProcessBeaconBlockRoot(*header.ParentBeaconRoot, vmenv, env.state)
 	}
 	// Ensure we always stop prefetcher after block building is complete.
 	defer func() {
@@ -193,10 +216,9 @@ func (w *worker) commitNewWork(predicateContext *precompileconfig.PredicateConte
 		return nil, err
 	}
 
-	// Fill the block with all available pending transactions.
 	pending := w.eth.TxPool().PendingWithBaseFee(true, header.BaseFee)
 
-	// Split the pending transactions into locals and remotes
+	// Split the pending transactions into locals and remotes.
 	localTxs := make(map[common.Address][]*txpool.LazyTransaction)
 	remoteTxs := pending
 	for _, account := range w.eth.TxPool().Locals() {
@@ -205,6 +227,8 @@ func (w *worker) commitNewWork(predicateContext *precompileconfig.PredicateConte
 			localTxs[account] = txs
 		}
 	}
+
+	// Fill the block with all available pending transactions.
 	if len(localTxs) > 0 {
 		txs := newTransactionsByPriceAndNonce(env.signer, localTxs, header.BaseFee)
 		w.commitTransactions(env, txs, header.Coinbase)
@@ -237,7 +261,47 @@ func (w *worker) createCurrentEnvironment(predicateContext *precompileconfig.Pre
 	}, nil
 }
 
-func (w *worker) commitTransaction(env *environment, tx *txpool.Transaction, coinbase common.Address) ([]*types.Log, error) {
+func (w *worker) commitTransaction(env *environment, tx *types.Transaction, coinbase common.Address) ([]*types.Log, error) {
+	if tx.Type() == types.BlobTxType {
+		return w.commitBlobTransaction(env, tx, coinbase)
+	}
+
+	receipt, err := w.applyTransaction(env, tx, coinbase)
+	if err != nil {
+		return nil, err
+	}
+	env.txs = append(env.txs, tx)
+	env.receipts = append(env.receipts, receipt)
+	return receipt.Logs, nil
+}
+
+func (w *worker) commitBlobTransaction(env *environment, tx *types.Transaction, coinbase common.Address) ([]*types.Log, error) {
+	sc := tx.BlobTxSidecar()
+	if sc == nil {
+		panic("blob transaction without blobs in miner")
+	}
+	// Checking against blob gas limit: It's kind of ugly to perform this check here, but there
+	// isn't really a better place right now. The blob gas limit is checked at block validation time
+	// and not during execution. This means core.ApplyTransaction will not return an error if the
+	// tx has too many blobs. So we have to explicitly check it here.
+	if (env.blobs+len(sc.Blobs))*params.BlobTxBlobGasPerBlob > params.MaxBlobGasPerBlock {
+		return nil, errors.New("max data blobs reached")
+	}
+
+	receipt, err := w.applyTransaction(env, tx, coinbase)
+	if err != nil {
+		return nil, err
+	}
+	env.txs = append(env.txs, tx.WithoutBlobTxSidecar())
+	env.receipts = append(env.receipts, receipt)
+	env.sidecars = append(env.sidecars, sc)
+	env.blobs += len(sc.Blobs)
+	*env.header.BlobGasUsed += receipt.BlobGasUsed
+	return receipt.Logs, nil
+}
+
+// applyTransaction runs the transaction. If execution fails, state and gas pool are reverted.
+func (w *worker) applyTransaction(env *environment, tx *types.Transaction, coinbase common.Address) (*types.Receipt, error) {
 	var (
 		snap         = env.state.Snapshot()
 		gp           = env.gasPool.Gas()
@@ -245,30 +309,25 @@ func (w *worker) commitTransaction(env *environment, tx *txpool.Transaction, coi
 	)
 
 	if env.rules.IsDurango {
-		results, err := core.CheckPredicates(env.rules, env.predicateContext, tx.Tx)
+		results, err := core.CheckPredicates(env.rules, env.predicateContext, tx)
 		if err != nil {
-			log.Debug("Transaction predicate failed verification in miner", "tx", tx.Tx.Hash(), "err", err)
+			log.Debug("Transaction predicate failed verification in miner", "tx", tx.Hash(), "err", err)
 			return nil, err
 		}
-		env.predicateResults.SetTxResults(tx.Tx.Hash(), results)
+		env.predicateResults.SetTxResults(tx.Hash(), results)
 
 		blockContext = core.NewEVMBlockContextWithPredicateResults(env.header, w.chain, &coinbase, env.predicateResults)
 	} else {
 		blockContext = core.NewEVMBlockContext(env.header, w.chain, &coinbase)
 	}
 
-	receipt, err := core.ApplyTransaction(w.chainConfig, w.chain, blockContext, env.gasPool, env.state, env.header, tx.Tx, &env.header.GasUsed, *w.chain.GetVMConfig())
+	receipt, err := core.ApplyTransaction(w.chainConfig, w.chain, blockContext, env.gasPool, env.state, env.header, tx, &env.header.GasUsed, *w.chain.GetVMConfig())
 	if err != nil {
 		env.state.RevertToSnapshot(snap)
 		env.gasPool.SetGas(gp)
-		env.predicateResults.DeleteTxResults(tx.Tx.Hash())
-		return nil, err
+		env.predicateResults.DeleteTxResults(tx.Hash())
 	}
-	env.txs = append(env.txs, tx.Tx)
-	env.receipts = append(env.receipts, receipt)
-	env.size += tx.Tx.Size()
-
-	return receipt.Logs, nil
+	return receipt, err
 }
 
 func (w *worker) commitTransactions(env *environment, txs *transactionsByPriceAndNonce, coinbase common.Address) {
@@ -286,38 +345,37 @@ func (w *worker) commitTransactions(env *environment, txs *transactionsByPriceAn
 		tx := ltx.Resolve()
 		if tx == nil {
 			log.Warn("Ignoring evicted transaction")
-
 			txs.Pop()
 			continue
 		}
 		// Abort transaction if it won't fit in the block and continue to search for a smaller
 		// transction that will fit.
-		if totalTxsSize := env.size + tx.Tx.Size(); totalTxsSize > targetTxsSize {
-			log.Trace("Skipping transaction that would exceed target size", "hash", tx.Tx.Hash(), "totalTxsSize", totalTxsSize, "txSize", tx.Tx.Size())
-
+		if totalTxsSize := env.size + tx.Size(); totalTxsSize > targetTxsSize {
+			log.Trace("Skipping transaction that would exceed target size", "hash", tx.Hash(), "totalTxsSize", totalTxsSize, "txSize", tx.Size())
 			txs.Pop()
 			continue
 		}
+
 		// Error may be ignored here. The error has already been checked
 		// during transaction acceptance is the transaction pool.
-		from, _ := types.Sender(env.signer, tx.Tx)
+		from, _ := types.Sender(env.signer, tx)
 
 		// Check whether the tx is replay protected. If we're not in the EIP155 hf
 		// phase, start ignoring the sender until we do.
-		if tx.Tx.Protected() && !w.chainConfig.IsEIP155(env.header.Number) {
-			log.Trace("Ignoring reply protected transaction", "hash", tx.Tx.Hash(), "eip155", w.chainConfig.EIP155Block)
-
+		if tx.Protected() && !w.chainConfig.IsEIP155(env.header.Number) {
+			log.Trace("Ignoring replay protected transaction", "hash", tx.Hash(), "eip155", w.chainConfig.EIP155Block)
 			txs.Pop()
 			continue
 		}
+
 		// Start executing the transaction
-		env.state.SetTxContext(tx.Tx.Hash(), env.tcount)
+		env.state.SetTxContext(tx.Hash(), env.tcount)
 
 		_, err := w.commitTransaction(env, tx, coinbase)
 		switch {
 		case errors.Is(err, core.ErrNonceTooLow):
 			// New head notification data race between the transaction pool and miner, shift
-			log.Trace("Skipping transaction with low nonce", "sender", from, "nonce", tx.Tx.Nonce())
+			log.Trace("Skipping transaction with low nonce", "sender", from, "nonce", tx.Nonce())
 			txs.Shift()
 
 		case errors.Is(err, nil):
@@ -327,7 +385,7 @@ func (w *worker) commitTransactions(env *environment, txs *transactionsByPriceAn
 		default:
 			// Transaction is regarded as invalid, drop all consecutive transactions from
 			// the same sender because of `nonce-too-high` clause.
-			log.Debug("Transaction failed, account skipped", "hash", tx.Tx.Hash(), "err", err)
+			log.Debug("Transaction failed, account skipped", "hash", tx.Hash(), "err", err)
 			txs.Pop()
 		}
 	}
