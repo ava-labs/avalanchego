@@ -58,7 +58,7 @@ type codeSyncer struct {
 	done   <-chan struct{}
 }
 
-// newCodeSyncer returns a a code syncer that will sync code bytes from the network in a separate thread.
+// newCodeSyncer returns a code syncer that will sync code bytes from the network in a separate thread.
 func newCodeSyncer(config CodeSyncerConfig) *codeSyncer {
 	return &codeSyncer{
 		CodeSyncerConfig:      config,

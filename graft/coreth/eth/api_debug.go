@@ -40,6 +40,7 @@ import (
 	"github.com/ava-labs/coreth/trie"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 )
@@ -170,11 +171,15 @@ type storageEntry struct {
 }
 
 // StorageRangeAt returns the storage at the given block height and transaction index.
-func (api *DebugAPI) StorageRangeAt(ctx context.Context, blockHash common.Hash, txIndex int, contractAddress common.Address, keyStart hexutil.Bytes, maxResult int) (StorageRangeResult, error) {
-	// Retrieve the block
-	block := api.eth.blockchain.GetBlockByHash(blockHash)
+func (api *DebugAPI) StorageRangeAt(ctx context.Context, blockNrOrHash rpc.BlockNumberOrHash, txIndex int, contractAddress common.Address, keyStart hexutil.Bytes, maxResult int) (StorageRangeResult, error) {
+	var block *types.Block
+
+	block, err := api.eth.APIBackend.BlockByNumberOrHash(ctx, blockNrOrHash)
+	if err != nil {
+		return StorageRangeResult{}, err
+	}
 	if block == nil {
-		return StorageRangeResult{}, fmt.Errorf("block %#x not found", blockHash)
+		return StorageRangeResult{}, fmt.Errorf("block %v not found", blockNrOrHash)
 	}
 	_, _, statedb, release, err := api.eth.stateAtTransaction(ctx, block, txIndex, 0)
 	if err != nil {
@@ -182,18 +187,20 @@ func (api *DebugAPI) StorageRangeAt(ctx context.Context, blockHash common.Hash, 
 	}
 	defer release()
 
-	st, err := statedb.StorageTrie(contractAddress)
+	return storageRangeAt(statedb, block.Root(), contractAddress, keyStart, maxResult)
+}
+
+func storageRangeAt(statedb *state.StateDB, root common.Hash, address common.Address, start []byte, maxResult int) (StorageRangeResult, error) {
+	storageRoot := statedb.GetStorageRoot(address)
+	if storageRoot == types.EmptyRootHash || storageRoot == (common.Hash{}) {
+		return StorageRangeResult{}, nil // empty storage
+	}
+	id := trie.StorageTrieID(root, crypto.Keccak256Hash(address.Bytes()), storageRoot)
+	tr, err := trie.NewStateTrie(id, statedb.Database().TrieDB())
 	if err != nil {
 		return StorageRangeResult{}, err
 	}
-	if st == nil {
-		return StorageRangeResult{}, fmt.Errorf("account %x doesn't exist", contractAddress)
-	}
-	return storageRangeAt(st, keyStart, maxResult)
-}
-
-func storageRangeAt(st state.Trie, start []byte, maxResult int) (StorageRangeResult, error) {
-	trieIt, err := st.NodeIterator(start)
+	trieIt, err := tr.NodeIterator(start)
 	if err != nil {
 		return StorageRangeResult{}, err
 	}
@@ -205,7 +212,7 @@ func storageRangeAt(st state.Trie, start []byte, maxResult int) (StorageRangeRes
 			return StorageRangeResult{}, err
 		}
 		e := storageEntry{Value: common.BytesToHash(content)}
-		if preimage := st.GetKey(it.Key); preimage != nil {
+		if preimage := tr.GetKey(it.Key); preimage != nil {
 			preimage := common.BytesToHash(preimage)
 			e.Key = &preimage
 		}
@@ -278,7 +285,7 @@ func (api *DebugAPI) getModifiedAccounts(startBlock, endBlock *types.Block) ([]c
 	if startBlock.Number().Uint64() >= endBlock.Number().Uint64() {
 		return nil, fmt.Errorf("start block height (%d) must be less than end block height (%d)", startBlock.Number().Uint64(), endBlock.Number().Uint64())
 	}
-	triedb := api.eth.BlockChain().StateCache().TrieDB()
+	triedb := api.eth.BlockChain().TrieDB()
 
 	oldTrie, err := trie.NewStateTrie(trie.StateTrieID(startBlock.Root()), triedb)
 	if err != nil {
@@ -316,6 +323,9 @@ func (api *DebugAPI) getModifiedAccounts(startBlock, endBlock *types.Block) ([]c
 // The (from, to) parameters are the sequence of blocks to search, which can go
 // either forwards or backwards
 func (api *DebugAPI) GetAccessibleState(from, to rpc.BlockNumber) (uint64, error) {
+	if api.eth.blockchain.TrieDB().Scheme() == rawdb.PathScheme {
+		return 0, errors.New("state history is not yet available in path-based scheme")
+	}
 	var resolveNum = func(num rpc.BlockNumber) (uint64, error) {
 		// We don't have state for pending (-2), so treat it as latest
 		if num.Int64() < 0 {

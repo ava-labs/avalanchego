@@ -28,16 +28,26 @@ package tests
 
 import (
 	"github.com/ava-labs/coreth/core"
+	"github.com/ava-labs/coreth/core/rawdb"
 	"github.com/ava-labs/coreth/core/state"
 	"github.com/ava-labs/coreth/core/state/snapshot"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/trie"
+	"github.com/ava-labs/coreth/trie/triedb/hashdb"
+	"github.com/ava-labs/coreth/trie/triedb/pathdb"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
 )
 
-func MakePreState(db ethdb.Database, accounts core.GenesisAlloc, snapshotter bool) (*snapshot.Tree, *state.StateDB) {
-	sdb := state.NewDatabaseWithConfig(db, &trie.Config{Preimages: true})
+func MakePreState(db ethdb.Database, accounts core.GenesisAlloc, snapshotter bool, scheme string) (*trie.Database, *snapshot.Tree, *state.StateDB) {
+	tconf := &trie.Config{Preimages: true}
+	if scheme == rawdb.HashScheme {
+		tconf.HashDB = hashdb.Defaults
+	} else {
+		tconf.PathDB = pathdb.Defaults
+	}
+	triedb := trie.NewDatabase(db, tconf)
+	sdb := state.NewDatabaseWithNodeDB(db, triedb)
 	statedb, _ := state.New(types.EmptyRootHash, sdb, nil)
 	for addr, a := range accounts {
 		statedb.SetCode(addr, a.Code)
@@ -58,8 +68,8 @@ func MakePreState(db ethdb.Database, accounts core.GenesisAlloc, snapshotter boo
 			AsyncBuild: false,
 			SkipVerify: true,
 		}
-		snaps, _ = snapshot.New(snapconfig, db, sdb.TrieDB(), common.Hash{}, root)
+		snaps, _ = snapshot.New(snapconfig, db, triedb, common.Hash{}, root)
 	}
 	statedb, _ = state.New(root, sdb, snaps)
-	return snaps, statedb
+	return triedb, snaps, statedb
 }

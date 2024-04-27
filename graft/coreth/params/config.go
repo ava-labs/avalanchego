@@ -31,7 +31,6 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"time"
 
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/version"
@@ -446,15 +445,6 @@ func getChainConfig(networkID uint32, chainID *big.Int) *ChainConfig {
 	}
 }
 
-func getUpgradeTime(networkID uint32, upgradeTimes map[uint32]time.Time) *uint64 {
-	if upgradeTime, ok := upgradeTimes[networkID]; ok {
-		return utils.TimeToNewUint64(upgradeTime)
-	}
-	// If the upgrade time isn't specified, default being enabled in the
-	// genesis.
-	return utils.NewUint64(0)
-}
-
 // ChainConfig is the core config which determines the blockchain settings.
 //
 // ChainConfig is stored in the database on a per block basis. This means
@@ -741,17 +731,17 @@ func (c *ChainConfig) Verify() error {
 	return nil
 }
 
+type fork struct {
+	name      string
+	block     *big.Int // some go-ethereum forks use block numbers
+	timestamp *uint64  // Avalanche forks use timestamps
+	optional  bool     // if true, the fork may be nil and next fork is still allowed
+}
+
 // CheckConfigForkOrder checks that we don't "skip" any forks, geth isn't pluggable enough
 // to guarantee that forks can be implemented in a different order than on official networks
 func (c *ChainConfig) CheckConfigForkOrder() error {
-	type fork struct {
-		name      string
-		block     *big.Int // some go-ethereum forks use block numbers
-		timestamp *uint64  // Avalanche forks use timestamps
-		optional  bool     // if true, the fork may be nil and next fork is still allowed
-	}
-	var lastFork fork
-	for _, cur := range []fork{
+	ethForks := []fork{
 		{name: "homesteadBlock", block: c.HomesteadBlock},
 		{name: "daoForkBlock", block: c.DAOForkBlock, optional: true},
 		{name: "eip150Block", block: c.EIP150Block},
@@ -762,68 +752,72 @@ func (c *ChainConfig) CheckConfigForkOrder() error {
 		{name: "petersburgBlock", block: c.PetersburgBlock},
 		{name: "istanbulBlock", block: c.IstanbulBlock},
 		{name: "muirGlacierBlock", block: c.MuirGlacierBlock, optional: true},
-	} {
-		if cur.block != nil && common.Big0.Cmp(cur.block) != 0 {
+		{name: "cancunTime", timestamp: c.CancunTime},
+	}
+
+	// Check that forks are enabled in order
+	if err := checkForks(ethForks, true); err != nil {
+		return err
+	}
+
+	// Note: In Avalanche, hard forks must take place via block timestamps instead
+	// of block numbers since blocks are produced asynchronously. Therefore, we do not
+	// check that the block timestamps in the same way as for
+	// the block number forks since it would not be a meaningful comparison.
+	// Instead, we check only that Phases are enabled in order.
+	// Note: we do not add the optional stateful precompile configs in here because they are optional
+	// and independent, such that the ordering they are enabled does not impact the correctness of the
+	// chain config.
+	if err := checkForks(c.forkOrder(), false); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// checkForks checks that forks are enabled in order and returns an error if not
+// [blockFork] is true if the fork is a block number fork, false if it is a timestamp fork
+func checkForks(forks []fork, blockFork bool) error {
+	lastFork := fork{}
+	for _, cur := range forks {
+		if blockFork && cur.block != nil && common.Big0.Cmp(cur.block) != 0 {
 			return errNonGenesisForkByHeight
 		}
 		if lastFork.name != "" {
-			// Next one must be higher number
-			if lastFork.block == nil && cur.block != nil {
-				return fmt.Errorf("unsupported fork ordering: %v not enabled, but %v enabled at %v",
-					lastFork.name, cur.name, cur.block)
-			}
-			if lastFork.block != nil && cur.block != nil {
-				if lastFork.block.Cmp(cur.block) > 0 {
-					return fmt.Errorf("unsupported fork ordering: %v enabled at %v, but %v enabled at %v",
+			switch {
+			// Non-optional forks must all be present in the chain config up to the last defined fork
+			case lastFork.block == nil && lastFork.timestamp == nil && (cur.block != nil || cur.timestamp != nil):
+				if cur.block != nil {
+					return fmt.Errorf("unsupported fork ordering: %v not enabled, but %v enabled at block %v",
+						lastFork.name, cur.name, cur.block)
+				} else {
+					return fmt.Errorf("unsupported fork ordering: %v not enabled, but %v enabled at timestamp %v",
+						lastFork.name, cur.name, cur.timestamp)
+				}
+
+			// Fork (whether defined by block or timestamp) must follow the fork definition sequence
+			case (lastFork.block != nil && cur.block != nil) || (lastFork.timestamp != nil && cur.timestamp != nil):
+				if lastFork.block != nil && lastFork.block.Cmp(cur.block) > 0 {
+					return fmt.Errorf("unsupported fork ordering: %v enabled at block %v, but %v enabled at block %v",
 						lastFork.name, lastFork.block, cur.name, cur.block)
+				} else if lastFork.timestamp != nil && *lastFork.timestamp > *cur.timestamp {
+					return fmt.Errorf("unsupported fork ordering: %v enabled at timestamp %v, but %v enabled at timestamp %v",
+						lastFork.name, lastFork.timestamp, cur.name, cur.timestamp)
+				}
+
+				// Timestamp based forks can follow block based ones, but not the other way around
+				if lastFork.timestamp != nil && cur.block != nil {
+					return fmt.Errorf("unsupported fork ordering: %v used timestamp ordering, but %v reverted to block ordering",
+						lastFork.name, cur.name)
 				}
 			}
 		}
 		// If it was optional and not set, then ignore it
-		if !cur.optional || cur.block != nil {
+		if !cur.optional || (cur.block != nil || cur.timestamp != nil) {
 			lastFork = cur
 		}
 	}
 
-	// Note: ApricotPhase1 and ApricotPhase2 override the rules set by block number
-	// hard forks. In Avalanche, hard forks must take place via block timestamps instead
-	// of block numbers since blocks are produced asynchronously. Therefore, we do not
-	// check that the block timestamps for Apricot Phase1 and Phase2 in the same way as for
-	// the block number forks since it would not be a meaningful comparison.
-	// Instead, we check only that Apricot Phases are enabled in order.
-	lastFork = fork{}
-	for _, cur := range []fork{
-		{name: "apricotPhase1BlockTimestamp", timestamp: c.ApricotPhase1BlockTimestamp},
-		{name: "apricotPhase2BlockTimestamp", timestamp: c.ApricotPhase2BlockTimestamp},
-		{name: "apricotPhase3BlockTimestamp", timestamp: c.ApricotPhase3BlockTimestamp},
-		{name: "apricotPhase4BlockTimestamp", timestamp: c.ApricotPhase4BlockTimestamp},
-		{name: "apricotPhase5BlockTimestamp", timestamp: c.ApricotPhase5BlockTimestamp},
-		{name: "apricotPhasePre6BlockTimestamp", timestamp: c.ApricotPhasePre6BlockTimestamp},
-		{name: "apricotPhase6BlockTimestamp", timestamp: c.ApricotPhase6BlockTimestamp},
-		{name: "apricotPhasePost6BlockTimestamp", timestamp: c.ApricotPhasePost6BlockTimestamp},
-		{name: "banffBlockTimestamp", timestamp: c.BanffBlockTimestamp},
-		{name: "cortinaBlockTimestamp", timestamp: c.CortinaBlockTimestamp},
-		{name: "durangoBlockTimestamp", timestamp: c.DurangoBlockTimestamp},
-		{name: "cancunTime", timestamp: c.CancunTime},
-	} {
-		if lastFork.name != "" {
-			// Next one must be higher number
-			if lastFork.timestamp == nil && cur.timestamp != nil {
-				return fmt.Errorf("unsupported fork ordering: %v not enabled, but %v enabled at %v",
-					lastFork.name, cur.name, cur.timestamp)
-			}
-			if lastFork.timestamp != nil && cur.timestamp != nil {
-				if *lastFork.timestamp > *cur.timestamp {
-					return fmt.Errorf("unsupported fork ordering: %v enabled at %v, but %v enabled at %v",
-						lastFork.name, lastFork.timestamp, cur.name, cur.timestamp)
-				}
-			}
-		}
-		// If it was optional and not set, then ignore it
-		if !cur.optional || cur.timestamp != nil {
-			lastFork = cur
-		}
-	}
 	// TODO(aaronbuchwald) check that avalanche block timestamps are at least possible with the other rule set changes
 	// additional change: require that block number hard forks are either 0 or nil since they should not
 	// be enabled at a specific block number.
@@ -1032,11 +1026,7 @@ type Rules struct {
 	IsCancun                                                bool
 
 	// Rules for Avalanche releases
-	IsApricotPhase1, IsApricotPhase2, IsApricotPhase3, IsApricotPhase4, IsApricotPhase5 bool
-	IsApricotPhasePre6, IsApricotPhase6, IsApricotPhasePost6                            bool
-	IsBanff                                                                             bool
-	IsCortina                                                                           bool
-	IsDurango                                                                           bool
+	AvalancheRules
 
 	// ActivePrecompiles maps addresses to stateful precompiled contracts that are enabled
 	// for this rule set.
@@ -1082,17 +1072,7 @@ func (c *ChainConfig) rules(num *big.Int, timestamp uint64) Rules {
 func (c *ChainConfig) Rules(blockNum *big.Int, timestamp uint64) Rules {
 	rules := c.rules(blockNum, timestamp)
 
-	rules.IsApricotPhase1 = c.IsApricotPhase1(timestamp)
-	rules.IsApricotPhase2 = c.IsApricotPhase2(timestamp)
-	rules.IsApricotPhase3 = c.IsApricotPhase3(timestamp)
-	rules.IsApricotPhase4 = c.IsApricotPhase4(timestamp)
-	rules.IsApricotPhase5 = c.IsApricotPhase5(timestamp)
-	rules.IsApricotPhasePre6 = c.IsApricotPhasePre6(timestamp)
-	rules.IsApricotPhase6 = c.IsApricotPhase6(timestamp)
-	rules.IsApricotPhasePost6 = c.IsApricotPhasePost6(timestamp)
-	rules.IsBanff = c.IsBanff(timestamp)
-	rules.IsCortina = c.IsCortina(timestamp)
-	rules.IsDurango = c.IsDurango(timestamp)
+	rules.AvalancheRules = c.GetAvalancheRules(timestamp)
 
 	// Initialize the stateful precompiles that should be enabled at [blockTimestamp].
 	rules.ActivePrecompiles = make(map[common.Address]precompileconfig.Config)

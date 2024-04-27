@@ -25,6 +25,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -169,6 +170,10 @@ func TestGossipSubscribe(t *testing.T) {
 	defer cancel()
 	go gossipTxPool.Subscribe(ctx)
 
+	require.Eventually(func() bool {
+		return gossipTxPool.IsSubscribed()
+	}, 10*time.Second, 500*time.Millisecond, "expected gossipTxPool to be subscribed")
+
 	// create eth txs
 	ethTxs := getValidEthTxs(key, 10, big.NewInt(226*params.GWei))
 
@@ -178,20 +183,17 @@ func TestGossipSubscribe(t *testing.T) {
 		require.NoError(err, "failed adding tx to remote mempool")
 	}
 
-	require.Eventually(
-		func() bool {
+	require.EventuallyWithTf(
+		func(c *assert.CollectT) {
 			gossipTxPool.lock.RLock()
 			defer gossipTxPool.lock.RUnlock()
 
-			for _, tx := range ethTxs {
-				if !gossipTxPool.bloom.Has(&GossipEthTx{Tx: tx}) {
-					return false
-				}
+			for i, tx := range ethTxs {
+				require.Truef(gossipTxPool.bloom.Has(&GossipEthTx{Tx: tx}), "expected tx[%d] to be in bloom filter", i)
 			}
-			return true
 		},
-		10*time.Second,
-		10*time.Millisecond,
+		30*time.Second,
+		500*time.Millisecond,
 		"expected all transactions to eventually be in the bloom filter",
 	)
 }

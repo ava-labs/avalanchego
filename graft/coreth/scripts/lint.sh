@@ -8,7 +8,7 @@ set -o pipefail
 # checking for this specific version is an attempt to avoid skew
 # between local and CI execution. The latest version (v1.55.1) seems
 # to cause spurious failures
-KNOWN_GOOD_VERSION="v1.54"
+KNOWN_GOOD_VERSION="v1.56"
 VERSION="$(golangci-lint --version | sed -e 's+golangci-lint has version \(v1.*\)\..* built.*+\1+')"
 if [[ "${VERSION}" != "${KNOWN_GOOD_VERSION}" ]]; then
   echo "expected golangci-lint ${KNOWN_GOOD_VERSION}, but ${VERSION} was used"

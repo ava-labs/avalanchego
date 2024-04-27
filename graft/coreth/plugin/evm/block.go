@@ -35,23 +35,19 @@ var (
 )
 
 var (
-	bonusBlockMainnetHeights = make(map[uint64]ids.ID)
-
 	//go:embed bonus_blocks.json
 	mainnetBonusBlocksJson []byte
-
-	// mainnetBonusBlocksParsed is a map of bonus block numbers to the parsed
-	// data. These blocks are hardcoded so nodes that do not have these blocks
-	// can add their atomic operations to the atomic trie so all nodes on have a
-	// canonical atomic trie.
-	// Initially, bonus blocks were not indexed into the atomic trie. However, a
-	// regression caused some nodes to index these blocks.
-	mainnetBonusBlocksParsed map[uint64]*types.Block = make(map[uint64]*types.Block)
 
 	errMissingUTXOs = errors.New("missing UTXOs")
 )
 
-func init() {
+// readMainnetBonusBlocks returns maps of bonus block numbers to the parsed
+// data and block numbers to block IDs. These blocks are hardcoded so nodes that do not have these blocks
+// can add their atomic operations to the atomic trie so all nodes on have a
+// canonical atomic trie.
+// Initially, bonus blocks were not indexed into the atomic trie. However, a
+// regression caused some nodes to index these blocks.
+func readMainnetBonusBlocks() (map[uint64]*types.Block, map[uint64]ids.ID, error) {
 	mainnetBonusBlocks := map[uint64]string{
 		102972: "Njm9TcLUXRojZk8YhEM6ksvfiPdC1TME4zJvGaDXgzMCyB6oB",
 		103105: "BYqLB6xpqy7HsAgP2XNfGE8Ubg1uEzse5mBPTSJH9z5s8pvMa",
@@ -112,37 +108,41 @@ func init() {
 		103633: "2QiHZwLhQ3xLuyyfcdo5yCUfoSqWDvRZox5ECU19HiswfroCGp",
 	}
 
+	bonusBlockMainnetHeights := make(map[uint64]ids.ID)
 	for height, blkIDStr := range mainnetBonusBlocks {
 		blkID, err := ids.FromString(blkIDStr)
 		if err != nil {
-			panic(err)
+			return nil, nil, err
 		}
 		bonusBlockMainnetHeights[height] = blkID
 	}
 
 	var rlpMap map[uint64]string
+	mainnetBonusBlocksParsed := make(map[uint64]*types.Block)
 	err := json.Unmarshal(mainnetBonusBlocksJson, &rlpMap)
 	if err != nil {
-		panic(err)
+		return nil, nil, err
 	}
 	for height, rlpHex := range rlpMap {
 		expectedHash, ok := bonusBlockMainnetHeights[height]
 		if !ok {
-			panic(fmt.Sprintf("missing bonus block at height %d", height))
+			return nil, nil, fmt.Errorf("missing bonus block at height %d", height)
 		}
 		var ethBlock types.Block
 		if err := rlp.DecodeBytes(common.Hex2Bytes(rlpHex), &ethBlock); err != nil {
-			panic(fmt.Sprintf("failed to decode bonus block at height %d: %s", height, err))
+			return nil, nil, fmt.Errorf("failed to decode bonus block at height %d: %s", height, err)
 		}
 		if ids.ID(ethBlock.Hash()) != expectedHash {
-			panic(fmt.Sprintf("block ID mismatch at (%s != %s)", ids.ID(ethBlock.Hash()), expectedHash))
+			return nil, nil, fmt.Errorf("block ID mismatch at (%s != %s)", ids.ID(ethBlock.Hash()), expectedHash)
 		}
 
 		mainnetBonusBlocksParsed[height] = &ethBlock
 	}
 	if len(mainnetBonusBlocksParsed) != len(bonusBlockMainnetHeights) {
-		panic("mismatched bonus block heights")
+		return nil, nil, errors.New("mismatched bonus block heights")
 	}
+
+	return mainnetBonusBlocksParsed, bonusBlockMainnetHeights, nil
 }
 
 // Block implements the snowman.Block interface

@@ -157,8 +157,7 @@ func (g gatherer) Gather() ([]*dto.MetricFamily, error) {
 		case metrics.ResettingTimer:
 			snapshot := m.Snapshot()
 
-			vals := snapshot.Values()
-			count := uint64(len(vals))
+			count := uint64(snapshot.Count())
 			if count == 0 {
 				continue
 			}
@@ -167,7 +166,7 @@ func (g gatherer) Gather() ([]*dto.MetricFamily, error) {
 			qs := make([]*dto.Quantile, len(pv))
 			for i := range pvShort {
 				v := pv[i]
-				s := float64(ps[i])
+				s := ps[i]
 				qs[i] = &dto.Quantile{
 					Quantile: &v,
 					Value:    &s,

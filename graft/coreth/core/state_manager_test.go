@@ -26,8 +26,8 @@ func (t *MockTrieDB) Commit(root common.Hash, report bool) error {
 	t.LastCommit = root
 	return nil
 }
-func (t *MockTrieDB) Size() (common.StorageSize, common.StorageSize) {
-	return 0, 0
+func (t *MockTrieDB) Size() (common.StorageSize, common.StorageSize, common.StorageSize) {
+	return 0, 0, 0
 }
 func (t *MockTrieDB) Cap(limit common.StorageSize) error {
 	return nil

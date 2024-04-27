@@ -116,7 +116,7 @@ func testAtomicSyncer(t *testing.T, serverTrieDB *trie.Database, targetHeight ui
 	syncutils.AssertTrieConsistency(t, targetRoot, serverTrieDB, clientTrieDB, nil)
 
 	// check all commit heights are created correctly
-	hasher := trie.NewEmpty(trie.NewDatabase(rawdb.NewMemoryDatabase()))
+	hasher := trie.NewEmpty(trie.NewDatabase(rawdb.NewMemoryDatabase(), nil))
 	assert.NoError(t, err)
 
 	serverTrie, err := trie.New(trie.TrieID(targetRoot), serverTrieDB)
@@ -153,7 +153,7 @@ func testAtomicSyncer(t *testing.T, serverTrieDB *trie.Database, targetHeight ui
 func TestAtomicSyncer(t *testing.T) {
 	rand.Seed(1)
 	targetHeight := 10 * uint64(commitInterval)
-	serverTrieDB := trie.NewDatabase(rawdb.NewMemoryDatabase())
+	serverTrieDB := trie.NewDatabase(rawdb.NewMemoryDatabase(), nil)
 	root, _, _ := syncutils.GenerateTrie(t, serverTrieDB, int(targetHeight), atomicKeyLength)
 
 	testAtomicSyncer(t, serverTrieDB, targetHeight, root, nil, int64(targetHeight))
@@ -162,7 +162,7 @@ func TestAtomicSyncer(t *testing.T) {
 func TestAtomicSyncerResume(t *testing.T) {
 	rand.Seed(1)
 	targetHeight := 10 * uint64(commitInterval)
-	serverTrieDB := trie.NewDatabase(rawdb.NewMemoryDatabase())
+	serverTrieDB := trie.NewDatabase(rawdb.NewMemoryDatabase(), nil)
 	numTrieKeys := int(targetHeight) - 1 // no atomic ops for genesis
 	root, _, _ := syncutils.GenerateTrie(t, serverTrieDB, numTrieKeys, atomicKeyLength)
 
@@ -179,7 +179,7 @@ func TestAtomicSyncerResume(t *testing.T) {
 func TestAtomicSyncerResumeNewRootCheckpoint(t *testing.T) {
 	rand.Seed(1)
 	targetHeight1 := 10 * uint64(commitInterval)
-	serverTrieDB := trie.NewDatabase(rawdb.NewMemoryDatabase())
+	serverTrieDB := trie.NewDatabase(rawdb.NewMemoryDatabase(), nil)
 	numTrieKeys1 := int(targetHeight1) - 1 // no atomic ops for genesis
 	root1, _, _ := syncutils.GenerateTrie(t, serverTrieDB, numTrieKeys1, atomicKeyLength)
 

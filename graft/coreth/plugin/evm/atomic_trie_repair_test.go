@@ -23,6 +23,8 @@ type atomicTrieRepairTest struct {
 
 func TestAtomicTrieRepair(t *testing.T) {
 	require := require.New(t)
+	mainnetBonusBlocksParsed, bonusBlockMainnetHeights, err := readMainnetBonusBlocks()
+	require.NoError(err)
 	for name, test := range map[string]atomicTrieRepairTest{
 		"needs repair": {
 			setup:                   func(a *atomicTrie, db *versiondb.Database) {},
@@ -65,6 +67,8 @@ func (test atomicTrieRepairTest) test(t *testing.T) {
 	a := atomicBackend.AtomicTrie().(*atomicTrie)
 
 	// make a commit at a height larger than all bonus blocks
+	mainnetBonusBlocksParsed, bonusBlockMainnetHeights, err := readMainnetBonusBlocks()
+	require.NoError(err)
 	maxBonusBlockHeight := slices.Max(maps.Keys(mainnetBonusBlocksParsed))
 	commitHeight := nearestCommitHeight(maxBonusBlockHeight, commitInterval) + commitInterval
 	err = a.commit(commitHeight, types.EmptyRootHash)
@@ -98,6 +102,8 @@ func verifyAtomicTrieIsAlreadyRepaired(
 	// and empty slices as equal
 	expectedKeys := 0
 	expected := make(map[uint64]map[ids.ID][]byte)
+	mainnetBonusBlocksParsed, bonusBlockMainnetHeights, err := readMainnetBonusBlocks()
+	require.NoError(err)
 	for height, block := range mainnetBonusBlocksParsed {
 		txs, err := ExtractAtomicTxs(block.ExtData(), false, Codec)
 		require.NoError(err)
