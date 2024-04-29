@@ -48,3 +48,7 @@ func (d *TestDecidable) Reject(context.Context) error {
 func (d *TestDecidable) Status() Status {
 	return d.StatusV
 }
+
+func (d *TestDecidable) SetStatus(status Status) {
+	d.StatusV = status
+}
