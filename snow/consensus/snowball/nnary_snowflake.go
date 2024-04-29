@@ -52,21 +52,15 @@ func (sf *nnarySnowflake) RecordPoll(count int, choice ids.ID) {
 		return // This instance is already decided.
 	}
 
-	switch {
-	case count >= sf.alphaConfidence:
-		sf.recordSuccessfulPoll(choice)
-	case count >= sf.alphaPreference:
-		sf.recordPollPreference(choice)
-	default:
-		// If the poll was unsuccessful, RecordUnsuccessfulPoll should
-		// have been called instead.
+	if count < sf.alphaPreference {
 		sf.RecordUnsuccessfulPoll()
+		return
 	}
-}
 
-func (sf *nnarySnowflake) recordSuccessfulPoll(choice ids.ID) {
-	if sf.finalized {
-		return // This instance is already decided.
+	if count < sf.alphaConfidence {
+		sf.confidence = 0
+		sf.nnarySlush.RecordSuccessfulPoll(choice)
+		return
 	}
 
 	if preference := sf.Preference(); preference == choice {
@@ -78,15 +72,6 @@ func (sf *nnarySnowflake) recordSuccessfulPoll(choice ids.ID) {
 	}
 
 	sf.finalized = sf.confidence >= sf.beta
-	sf.nnarySlush.RecordSuccessfulPoll(choice)
-}
-
-func (sf *nnarySnowflake) recordPollPreference(choice ids.ID) {
-	if sf.finalized {
-		return // This instance is already decided.
-	}
-
-	sf.confidence = 0
 	sf.nnarySlush.RecordSuccessfulPoll(choice)
 }
 

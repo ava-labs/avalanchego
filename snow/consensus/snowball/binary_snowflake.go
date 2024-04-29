@@ -45,21 +45,15 @@ func (sf *binarySnowflake) RecordPoll(count, choice int) {
 		return // This instance is already decided.
 	}
 
-	switch {
-	case count >= sf.alphaConfidence:
-		sf.recordSuccessfulPoll(choice)
-	case count >= sf.alphaPreference:
-		sf.recordPollPreference(choice)
-	default:
-		// If the poll was unsuccessful, RecordUnsuccessfulPoll should
-		// have been called instead.
+	if count < sf.alphaPreference {
 		sf.RecordUnsuccessfulPoll()
+		return
 	}
-}
 
-func (sf *binarySnowflake) recordSuccessfulPoll(choice int) {
-	if sf.finalized {
-		return // This instance is already decided.
+	if count < sf.alphaConfidence {
+		sf.confidence = 0
+		sf.binarySlush.RecordSuccessfulPoll(choice)
+		return
 	}
 
 	if preference := sf.Preference(); preference == choice {
@@ -71,15 +65,6 @@ func (sf *binarySnowflake) recordSuccessfulPoll(choice int) {
 	}
 
 	sf.finalized = sf.confidence >= sf.beta
-	sf.binarySlush.RecordSuccessfulPoll(choice)
-}
-
-func (sf *binarySnowflake) recordPollPreference(choice int) {
-	if sf.finalized {
-		return // This instance is already decided.
-	}
-
-	sf.confidence = 0
 	sf.binarySlush.RecordSuccessfulPoll(choice)
 }
 
