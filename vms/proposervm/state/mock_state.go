@@ -83,6 +83,20 @@ func (mr *MockStateMockRecorder) DeleteLastAccepted() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteLastAccepted", reflect.TypeOf((*MockState)(nil).DeleteLastAccepted))
 }
 
+// DeleteVerifiedBlock mocks base method.
+func (m *MockState) DeleteVerifiedBlock(arg0 ids.ID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteVerifiedBlock", arg0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteVerifiedBlock indicates an expected call of DeleteVerifiedBlock.
+func (mr *MockStateMockRecorder) DeleteVerifiedBlock(arg0 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteVerifiedBlock", reflect.TypeOf((*MockState)(nil).DeleteVerifiedBlock), arg0)
+}
+
 // GetBlock mocks base method.
 func (m *MockState) GetBlock(arg0 ids.ID) (block.Block, choices.Status, error) {
 	m.ctrl.T.Helper()
@@ -159,6 +173,36 @@ func (mr *MockStateMockRecorder) GetMinimumHeight() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMinimumHeight", reflect.TypeOf((*MockState)(nil).GetMinimumHeight))
 }
 
+// GetPreference mocks base method.
+func (m *MockState) GetPreference() (ids.ID, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetPreference")
+	ret0, _ := ret[0].(ids.ID)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetPreference indicates an expected call of GetPreference.
+func (mr *MockStateMockRecorder) GetPreference() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPreference", reflect.TypeOf((*MockState)(nil).GetPreference))
+}
+
+// HasVerifiedBlock mocks base method.
+func (m *MockState) HasVerifiedBlock(arg0 ids.ID) (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "HasVerifiedBlock", arg0)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// HasVerifiedBlock indicates an expected call of HasVerifiedBlock.
+func (mr *MockStateMockRecorder) HasVerifiedBlock(arg0 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HasVerifiedBlock", reflect.TypeOf((*MockState)(nil).HasVerifiedBlock), arg0)
+}
+
 // PutBlock mocks base method.
 func (m *MockState) PutBlock(arg0 block.Block, arg1 choices.Status) error {
 	m.ctrl.T.Helper()
@@ -171,6 +215,20 @@ func (m *MockState) PutBlock(arg0 block.Block, arg1 choices.Status) error {
 func (mr *MockStateMockRecorder) PutBlock(arg0, arg1 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutBlock", reflect.TypeOf((*MockState)(nil).PutBlock), arg0, arg1)
+}
+
+// PutVerifiedBlock mocks base method.
+func (m *MockState) PutVerifiedBlock(arg0 ids.ID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PutVerifiedBlock", arg0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// PutVerifiedBlock indicates an expected call of PutVerifiedBlock.
+func (mr *MockStateMockRecorder) PutVerifiedBlock(arg0 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutVerifiedBlock", reflect.TypeOf((*MockState)(nil).PutVerifiedBlock), arg0)
 }
 
 // SetBlockIDAtHeight mocks base method.
@@ -213,4 +271,18 @@ func (m *MockState) SetLastAccepted(arg0 ids.ID) error {
 func (mr *MockStateMockRecorder) SetLastAccepted(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetLastAccepted", reflect.TypeOf((*MockState)(nil).SetLastAccepted), arg0)
+}
+
+// SetPreference mocks base method.
+func (m *MockState) SetPreference(arg0 ids.ID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetPreference", arg0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SetPreference indicates an expected call of SetPreference.
+func (mr *MockStateMockRecorder) SetPreference(arg0 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetPreference", reflect.TypeOf((*MockState)(nil).SetPreference), arg0)
 }

@@ -44,13 +44,6 @@ func (b *postForkBlock) acceptInnerBlk(ctx context.Context) error {
 	return b.vm.Tree.Accept(ctx, b.innerBlk)
 }
 
-func (b *postForkBlock) Reject(context.Context) error {
-	// We do not reject the inner block here because it may be accepted later
-	delete(b.vm.verifiedBlocks, b.ID())
-	b.status = choices.Rejected
-	return nil
-}
-
 func (b *postForkBlock) Status() choices.Status {
 	if b.status == choices.Accepted && b.Height() > b.vm.lastAcceptedHeight {
 		return choices.Processing
@@ -104,6 +97,7 @@ func (b *postForkBlock) Options(ctx context.Context) ([2]snowman.Block, error) {
 			Block: statelessOuterOption,
 			postForkCommonComponents: postForkCommonComponents{
 				vm:       b.vm,
+				outerBlk: statelessOuterOption,
 				innerBlk: innerOption,
 				status:   innerOption.Status(),
 			},

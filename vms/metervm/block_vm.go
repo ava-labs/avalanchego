@@ -23,13 +23,15 @@ var (
 	_ block.BuildBlockWithContextChainVM = (*blockVM)(nil)
 	_ block.BatchedChainVM               = (*blockVM)(nil)
 	_ block.StateSyncableVM              = (*blockVM)(nil)
+	_ block.GetInitialPreferenceVM       = (*blockVM)(nil)
 )
 
 type blockVM struct {
 	block.ChainVM
-	buildBlockVM block.BuildBlockWithContextChainVM
-	batchedVM    block.BatchedChainVM
-	ssVM         block.StateSyncableVM
+	buildBlockVM           block.BuildBlockWithContextChainVM
+	batchedVM              block.BatchedChainVM
+	ssVM                   block.StateSyncableVM
+	getInitialPreferenceVM block.GetInitialPreferenceVM
 
 	blockMetrics
 	clock mockable.Clock
@@ -39,11 +41,13 @@ func NewBlockVM(vm block.ChainVM) block.ChainVM {
 	buildBlockVM, _ := vm.(block.BuildBlockWithContextChainVM)
 	batchedVM, _ := vm.(block.BatchedChainVM)
 	ssVM, _ := vm.(block.StateSyncableVM)
+	getInitialPreferenceVM, _ := vm.(block.GetInitialPreferenceVM)
 	return &blockVM{
-		ChainVM:      vm,
-		buildBlockVM: buildBlockVM,
-		batchedVM:    batchedVM,
-		ssVM:         ssVM,
+		ChainVM:                vm,
+		buildBlockVM:           buildBlockVM,
+		batchedVM:              batchedVM,
+		ssVM:                   ssVM,
+		getInitialPreferenceVM: getInitialPreferenceVM,
 	}
 }
 
@@ -156,4 +160,12 @@ func (vm *blockVM) GetBlockIDAtHeight(ctx context.Context, height uint64) (ids.I
 	end := vm.clock.Time()
 	vm.blockMetrics.getBlockIDAtHeight.Observe(float64(end.Sub(start)))
 	return blockID, err
+}
+
+func (vm *blockVM) GetInitialPreference(ctx context.Context) (ids.ID, error) {
+	if vm.getInitialPreferenceVM == nil {
+		return vm.ChainVM.LastAccepted(ctx)
+	}
+
+	return vm.getInitialPreferenceVM.GetInitialPreference(ctx)
 }

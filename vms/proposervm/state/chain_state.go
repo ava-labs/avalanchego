@@ -10,18 +10,26 @@ import (
 
 const (
 	lastAcceptedByte byte = iota
+	preferredByte
+	verifiedByte
 )
 
 var (
-	lastAcceptedKey = []byte{lastAcceptedByte}
-
-	_ ChainState = (*chainState)(nil)
+	lastAcceptedKey            = []byte{lastAcceptedByte}
+	preferredKey               = []byte{preferredByte}
+	_               ChainState = (*chainState)(nil)
 )
 
 type ChainState interface {
 	SetLastAccepted(blkID ids.ID) error
 	DeleteLastAccepted() error
 	GetLastAccepted() (ids.ID, error)
+
+	PutVerifiedBlock(blkID ids.ID) error
+	HasVerifiedBlock(blkID ids.ID) (bool, error)
+	DeleteVerifiedBlock(blkID ids.ID) error
+	SetPreference(preferredID ids.ID) error
+	GetPreference() (ids.ID, error)
 }
 
 type chainState struct {
@@ -29,7 +37,7 @@ type chainState struct {
 	db           database.Database
 }
 
-func NewChainState(db database.Database) ChainState {
+func newChainState(db database.Database) *chainState {
 	return &chainState{db: db}
 }
 
@@ -60,4 +68,31 @@ func (s *chainState) GetLastAccepted() (ids.ID, error) {
 	}
 	s.lastAccepted = lastAccepted
 	return lastAccepted, nil
+}
+
+func (s *chainState) PutVerifiedBlock(blkID ids.ID) error {
+	return s.db.Put(verifiedBlockKey(blkID), nil)
+}
+
+func (s *chainState) HasVerifiedBlock(blkID ids.ID) (bool, error) {
+	return s.db.Has(verifiedBlockKey(blkID))
+}
+
+func (s *chainState) DeleteVerifiedBlock(blkID ids.ID) error {
+	return s.db.Delete(verifiedBlockKey(blkID))
+}
+
+func (s *chainState) SetPreference(preferredID ids.ID) error {
+	return database.PutID(s.db, preferredKey, preferredID)
+}
+
+func (s *chainState) GetPreference() (ids.ID, error) {
+	return database.GetID(s.db, preferredKey)
+}
+
+func verifiedBlockKey(blkID ids.ID) []byte {
+	preferredBlkIDKey := make([]byte, ids.IDLen+1)
+	preferredBlkIDKey[0] = verifiedByte
+	copy(preferredBlkIDKey[1:], blkID[:])
+	return preferredBlkIDKey
 }

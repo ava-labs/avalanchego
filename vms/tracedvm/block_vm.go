@@ -28,9 +28,10 @@ var (
 
 type blockVM struct {
 	block.ChainVM
-	buildBlockVM block.BuildBlockWithContextChainVM
-	batchedVM    block.BatchedChainVM
-	ssVM         block.StateSyncableVM
+	buildBlockVM           block.BuildBlockWithContextChainVM
+	batchedVM              block.BatchedChainVM
+	ssVM                   block.StateSyncableVM
+	getInitialPreferenceVM block.GetInitialPreferenceVM
 	// ChainVM tags
 	initializeTag              string
 	buildBlockTag              string
@@ -64,11 +65,13 @@ func NewBlockVM(vm block.ChainVM, name string, tracer trace.Tracer) block.ChainV
 	buildBlockVM, _ := vm.(block.BuildBlockWithContextChainVM)
 	batchedVM, _ := vm.(block.BatchedChainVM)
 	ssVM, _ := vm.(block.StateSyncableVM)
+	getInitialPreferenceVM, _ := vm.(block.GetInitialPreferenceVM)
 	return &blockVM{
 		ChainVM:                       vm,
 		buildBlockVM:                  buildBlockVM,
 		batchedVM:                     batchedVM,
 		ssVM:                          ssVM,
+		getInitialPreferenceVM:        getInitialPreferenceVM,
 		initializeTag:                 name + ".initialize",
 		buildBlockTag:                 name + ".buildBlock",
 		parseBlockTag:                 name + ".parseBlock",
@@ -181,4 +184,12 @@ func (vm *blockVM) GetBlockIDAtHeight(ctx context.Context, height uint64) (ids.I
 	defer span.End()
 
 	return vm.ChainVM.GetBlockIDAtHeight(ctx, height)
+}
+
+func (vm *blockVM) GetInitialPreference(ctx context.Context) (ids.ID, error) {
+	if vm.getInitialPreferenceVM == nil {
+		return vm.ChainVM.LastAccepted(ctx)
+	}
+
+	return vm.getInitialPreferenceVM.GetInitialPreference(ctx)
 }

@@ -13,14 +13,20 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
+
+	snowmanblock "github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
 var errDuplicateVerify = errors.New("duplicate verify")
@@ -1135,4 +1141,355 @@ func TestBlockVerify_PostForkBlock_PChainTooLow(t *testing.T) {
 
 	err = invalidChild.Verify(context.Background())
 	require.ErrorIs(err, errPChainHeightTooLow)
+}
+
+// Tests that blocks are persisted on verify and deleted upon a consensus
+// decision
+func TestProposerVMBlockDecision(t *testing.T) {
+	activationTime := time.Unix(0, 0)
+
+	type blockDecision struct {
+		snowman.Block
+		reject bool
+	}
+
+	tests := []struct {
+		name       string
+		genesisBlk snowman.Block
+		blks       []blockDecision
+	}{
+		{
+			name: "accept block",
+			genesisBlk: &snowman.TestBlock{
+				TestDecidable: choices.TestDecidable{
+					IDV:     ids.ID{0},
+					StatusV: choices.Accepted,
+				},
+				HeightV:    0,
+				TimestampV: activationTime.Add(time.Second),
+				BytesV:     []byte{0},
+			},
+			blks: []blockDecision{
+				{
+					Block: &snowman.TestBlock{
+						TestDecidable: choices.TestDecidable{
+							IDV:     ids.ID{1},
+							StatusV: choices.Processing,
+						},
+						ParentV:    ids.ID{0},
+						HeightV:    1,
+						TimestampV: activationTime.Add(2 * time.Second),
+						BytesV:     []byte{1},
+					},
+				},
+				{
+					Block: &snowman.TestBlock{
+						TestDecidable: choices.TestDecidable{
+							IDV:     ids.ID{2},
+							StatusV: choices.Processing,
+						},
+						ParentV:    ids.ID{1},
+						HeightV:    2,
+						TimestampV: activationTime.Add(3 * time.Second),
+						BytesV:     []byte{2},
+					},
+				},
+			},
+		},
+		{
+			name: "reject block during transition",
+			genesisBlk: &snowman.TestBlock{
+				TestDecidable: choices.TestDecidable{
+					IDV:     ids.ID{0},
+					StatusV: choices.Accepted,
+				},
+				HeightV:    0,
+				TimestampV: activationTime.Add(time.Second),
+				BytesV:     []byte{0},
+			},
+			blks: []blockDecision{
+				{
+					Block: &snowman.TestBlock{
+						TestDecidable: choices.TestDecidable{
+							IDV:     ids.ID{1},
+							StatusV: choices.Processing,
+						},
+						ParentV:    ids.ID{0},
+						HeightV:    1,
+						TimestampV: activationTime.Add(2 * time.Second),
+						BytesV:     []byte{1},
+					},
+					reject: true,
+				},
+			},
+		},
+		{
+			name: "reject block after transition",
+			genesisBlk: &snowman.TestBlock{
+				TestDecidable: choices.TestDecidable{
+					IDV:     ids.ID{0},
+					StatusV: choices.Accepted,
+				},
+				HeightV:    0,
+				TimestampV: activationTime.Add(time.Second),
+				BytesV:     []byte{0},
+			},
+			blks: []blockDecision{
+				{
+					Block: &snowman.TestBlock{
+						TestDecidable: choices.TestDecidable{
+							IDV:     ids.ID{1},
+							StatusV: choices.Processing,
+						},
+						ParentV:    ids.ID{0},
+						HeightV:    1,
+						TimestampV: activationTime.Add(2 * time.Second),
+						BytesV:     []byte{1},
+					},
+				},
+				{
+					Block: &snowman.TestBlock{
+						TestDecidable: choices.TestDecidable{
+							IDV:     ids.ID{2},
+							StatusV: choices.Processing,
+						},
+						ParentV:    ids.ID{1},
+						HeightV:    2,
+						TimestampV: activationTime.Add(3 * time.Second),
+						BytesV:     []byte{2},
+					},
+					reject: true,
+				},
+			},
+		},
+		{
+			name: "accept options block",
+			genesisBlk: &snowman.TestBlock{
+				TestDecidable: choices.TestDecidable{
+					IDV:     ids.ID{0},
+					StatusV: choices.Accepted,
+				},
+				HeightV:    0,
+				TimestampV: activationTime.Add(time.Second),
+				BytesV:     []byte{0},
+			},
+			blks: []blockDecision{
+				{
+					Block: &TestOptionsBlock{
+						TestBlock: snowman.TestBlock{
+							TestDecidable: choices.TestDecidable{
+								IDV:     ids.ID{1},
+								StatusV: choices.Processing,
+							},
+							ParentV:    ids.ID{0},
+							HeightV:    1,
+							TimestampV: activationTime.Add(2 * time.Second),
+							BytesV:     []byte{1},
+						},
+						opts: [2]snowman.Block{
+							&snowman.TestBlock{
+								TestDecidable: choices.TestDecidable{
+									IDV:     ids.ID{2},
+									StatusV: choices.Processing,
+								},
+								ParentV:    ids.ID{1},
+								HeightV:    2,
+								TimestampV: activationTime.Add(3 * time.Second),
+								BytesV:     []byte{2},
+							},
+							&snowman.TestBlock{
+								TestDecidable: choices.TestDecidable{
+									IDV:     ids.ID{3},
+									StatusV: choices.Processing,
+								},
+								ParentV:    ids.ID{1},
+								HeightV:    2,
+								TimestampV: activationTime.Add(3 * time.Second),
+								BytesV:     []byte{3},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "reject options block",
+			genesisBlk: &snowman.TestBlock{
+				TestDecidable: choices.TestDecidable{
+					IDV:     ids.ID{0},
+					StatusV: choices.Accepted,
+				},
+				HeightV:    0,
+				TimestampV: activationTime.Add(time.Second),
+				BytesV:     []byte{0},
+			},
+			blks: []blockDecision{
+				{
+					Block: &TestOptionsBlock{
+						TestBlock: snowman.TestBlock{
+							TestDecidable: choices.TestDecidable{
+								IDV:     ids.ID{1},
+								StatusV: choices.Processing,
+							},
+							ParentV:    ids.ID{0},
+							HeightV:    1,
+							TimestampV: activationTime.Add(2 * time.Second),
+							BytesV:     []byte{1},
+						},
+						opts: [2]snowman.Block{
+							&snowman.TestBlock{
+								TestDecidable: choices.TestDecidable{
+									IDV:     ids.ID{2},
+									StatusV: choices.Processing,
+								},
+								ParentV:    ids.ID{1},
+								HeightV:    2,
+								TimestampV: activationTime.Add(3 * time.Second),
+								BytesV:     []byte{2},
+							},
+							&snowman.TestBlock{
+								TestDecidable: choices.TestDecidable{
+									IDV:     ids.ID{3},
+									StatusV: choices.Processing,
+								},
+								ParentV:    ids.ID{1},
+								HeightV:    2,
+								TimestampV: activationTime.Add(3 * time.Second),
+								BytesV:     []byte{3},
+							},
+						},
+					},
+					reject: true,
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+			ctx := context.Background()
+
+			innerVMBlockIDs := map[ids.ID]snowman.Block{
+				tt.genesisBlk.ID(): tt.genesisBlk,
+			}
+			innerVMBlockBytes := map[string]snowman.Block{
+				string(tt.genesisBlk.Bytes()): tt.genesisBlk,
+			}
+
+			innerVM := &snowmanblock.TestVM{
+				TestVM: common.TestVM{
+					InitializeF: func(context.Context, *snow.Context, database.Database, []byte, []byte, []byte, chan<- common.Message, []*common.Fx, common.AppSender) error {
+						return nil
+					},
+				},
+				LastAcceptedF: func(context.Context) (ids.ID, error) {
+					return tt.genesisBlk.ID(), nil
+				},
+				GetBlockF: func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
+					if blk, ok := innerVMBlockIDs[blkID]; ok {
+						return blk, nil
+					}
+
+					return nil, errUnknownBlock
+				},
+				ParseBlockF: func(_ context.Context, b []byte) (snowman.Block, error) {
+					if blk, ok := innerVMBlockBytes[string(b)]; ok {
+						return blk, nil
+					}
+
+					return nil, errUnknownBlock
+				},
+			}
+
+			vm := New(
+				innerVM,
+				Config{
+					ActivationTime:      activationTime,
+					DurangoTime:         activationTime,
+					MinimumPChainHeight: 0,
+					MinBlkDelay:         DefaultMinBlockDelay,
+					NumHistoricalBlocks: DefaultNumHistoricalBlocks,
+					StakingLeafSigner:   pTestSigner,
+					StakingCertLeaf:     pTestCert,
+				},
+			)
+
+			chainCtx := snowtest.Context(t, ids.ID{1})
+			chainCtx.ValidatorState = &validators.TestState{
+				T: t,
+				GetMinimumHeightF: func(context.Context) (uint64, error) {
+					return 0, nil
+				},
+				GetCurrentHeightF: func(context.Context) (uint64, error) {
+					return defaultPChainHeight, nil
+				},
+				GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+					return map[ids.NodeID]*validators.GetValidatorOutput{}, nil
+				},
+			}
+
+			db := prefixdb.New([]byte{0}, memdb.New())
+			require.NoError(vm.Initialize(
+				context.Background(),
+				chainCtx,
+				db,
+				nil,
+				nil,
+				nil,
+				nil,
+				nil,
+				nil,
+			))
+
+			require.NoError(vm.SetState(ctx, snow.NormalOp))
+			require.NoError(vm.SetPreference(ctx, tt.genesisBlk.ID()))
+
+			for _, blk := range tt.blks {
+				innerVMBlockIDs[blk.ID()] = blk
+				innerVMBlockBytes[string(blk.Bytes())] = blk
+				innerVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
+					return blk, nil
+				}
+
+				builtBlk, err := vm.BuildBlock(ctx)
+				require.NoError(err)
+
+				require.NoError(builtBlk.Verify(ctx))
+
+				ok, err := vm.State.HasVerifiedBlock(builtBlk.ID())
+				require.NoError(err)
+				require.True(ok)
+				gotBlk, status, err := vm.State.GetBlock(builtBlk.ID())
+				require.NoError(err)
+				require.Equal(builtBlk.Bytes(), gotBlk.Bytes())
+				require.Equal(choices.Processing, status)
+
+				if blk.reject {
+					require.NoError(builtBlk.Reject(ctx))
+
+					_, _, err = vm.State.GetBlock(builtBlk.ID())
+					require.ErrorIs(err, database.ErrNotFound)
+				} else {
+					require.NoError(builtBlk.Accept(ctx))
+
+					gotBlk, status, err := vm.State.GetBlock(builtBlk.ID())
+					require.Equal(builtBlk.Bytes(), gotBlk.Bytes())
+					require.Equal(choices.Accepted, status)
+					require.NoError(err)
+
+					require.NoError(vm.SetPreference(ctx, builtBlk.ID()))
+					innerVM.LastAcceptedF = func(context.Context) (ids.ID, error) {
+						return blk.ID(), nil
+					}
+				}
+
+				ok, err = vm.State.HasVerifiedBlock(builtBlk.ID())
+				require.NoError(err)
+				require.False(ok)
+			}
+
+			require.NoError(vm.Shutdown(ctx))
+		})
+	}
 }
