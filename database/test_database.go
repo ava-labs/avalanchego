@@ -307,7 +307,7 @@ func TestBatchDelete(t *testing.T, db Database) {
 	require.NoError(db.Delete(key))
 }
 
-// TestMemorySafetyDatabase ensures it is safe to modify a key after passing it
+// TestMemorySafetyBatch ensures it is safe to modify a key after passing it
 // to Batch.Put.
 func TestMemorySafetyBatch(t *testing.T, db Database) {
 	require := require.New(t)

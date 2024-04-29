@@ -461,8 +461,8 @@ func (n *network) Connected(nodeID ids.NodeID) {
 
 	peerVersion := peer.Version()
 	n.router.Connected(nodeID, peerVersion, constants.PrimaryNetworkID)
-	for subnetID := range trackedSubnets {
-		if n.peerConfig.MySubnets.Contains(subnetID) {
+	for subnetID := range n.peerConfig.MySubnets {
+		if trackedSubnets.Contains(subnetID) {
 			n.router.Connected(nodeID, peerVersion, subnetID)
 		}
 	}

@@ -11,7 +11,6 @@ import (
 	"runtime"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
@@ -20,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/bag"
 )
@@ -27,14 +27,6 @@ import (
 type testFunc func(*testing.T, Factory)
 
 var (
-	GenesisID        = ids.Empty.Prefix(0)
-	GenesisHeight    = uint64(0)
-	GenesisTimestamp = time.Unix(1, 0)
-	Genesis          = &TestBlock{TestDecidable: choices.TestDecidable{
-		IDV:     GenesisID,
-		StatusV: choices.Accepted,
-	}}
-
 	testFuncs = []testFunc{
 		InitializeTest,
 		NumProcessingTest,
@@ -53,7 +45,6 @@ var (
 		RecordPollTransitivelyResetConfidenceTest,
 		RecordPollInvalidVoteTest,
 		RecordPollTransitiveVotingTest,
-		RecordPollDivergedVotingTest,
 		RecordPollDivergedVotingWithNoConflictingBitTest,
 		RecordPollChangePreferredChainTest,
 		LastAcceptedTest,
@@ -66,8 +57,8 @@ var (
 		ErrorOnTransitiveRejectionTest,
 		RandomizedConsistencyTest,
 		ErrorOnAddDecidedBlockTest,
-		ErrorOnAddDuplicateBlockIDTest,
 		RecordPollWithDefaultParameters,
+		RecordPollRegressionCalculateInDegreeIndegreeCalculation,
 	}
 
 	errTest = errors.New("non-nil error")
@@ -98,17 +89,22 @@ func InitializeTest(t *testing.T, factory Factory) {
 		K:                     1,
 		AlphaPreference:       1,
 		AlphaConfidence:       1,
-		BetaVirtuous:          3,
-		BetaRogue:             5,
+		Beta:                  3,
 		ConcurrentRepolls:     1,
 		OptimalProcessing:     1,
 		MaxOutstandingItems:   1,
 		MaxItemProcessingTime: 1,
 	}
 
-	require.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp))
+	require.NoError(sm.Initialize(
+		ctx,
+		params,
+		snowmantest.GenesisID,
+		snowmantest.GenesisHeight,
+		snowmantest.GenesisTimestamp,
+	))
 
-	require.Equal(GenesisID, sm.Preference())
+	require.Equal(snowmantest.GenesisID, sm.Preference())
 	require.Zero(sm.NumProcessing())
 }
 
@@ -124,34 +120,30 @@ func NumProcessingTest(t *testing.T, factory Factory) {
 		K:                     1,
 		AlphaPreference:       1,
 		AlphaConfidence:       1,
-		BetaVirtuous:          1,
-		BetaRogue:             1,
+		Beta:                  1,
 		ConcurrentRepolls:     1,
 		OptimalProcessing:     1,
 		MaxOutstandingItems:   1,
 		MaxItemProcessingTime: 1,
 	}
-	require.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp))
+	require.NoError(sm.Initialize(
+		ctx,
+		params,
+		snowmantest.GenesisID,
+		snowmantest.GenesisHeight,
+		snowmantest.GenesisTimestamp,
+	))
 
-	block := &TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.Empty.Prefix(1),
-			StatusV: choices.Processing,
-		},
-		ParentV: Genesis.IDV,
-		HeightV: Genesis.HeightV + 1,
-	}
+	block := snowmantest.BuildChild(snowmantest.Genesis)
 
 	require.Zero(sm.NumProcessing())
 
 	// Adding to the previous preference will update the preference
 	require.NoError(sm.Add(context.Background(), block))
-
 	require.Equal(1, sm.NumProcessing())
 
 	votes := bag.Of(block.ID())
 	require.NoError(sm.RecordPoll(context.Background(), votes))
-
 	require.Zero(sm.NumProcessing())
 }
 
@@ -167,23 +159,21 @@ func AddToTailTest(t *testing.T, factory Factory) {
 		K:                     1,
 		AlphaPreference:       1,
 		AlphaConfidence:       1,
-		BetaVirtuous:          3,
-		BetaRogue:             5,
+		Beta:                  3,
 		ConcurrentRepolls:     1,
 		OptimalProcessing:     1,
 		MaxOutstandingItems:   1,
 		MaxItemProcessingTime: 1,
 	}
-	require.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp))
+	require.NoError(sm.Initialize(
+		ctx,
+		params,
+		snowmantest.GenesisID,
+		snowmantest.GenesisHeight,
+		snowmantest.GenesisTimestamp,
+	))
 
-	block := &TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.Empty.Prefix(1),
-			StatusV: choices.Processing,
-		},
-		ParentV: Genesis.IDV,
-		HeightV: Genesis.HeightV + 1,
-	}
+	block := snowmantest.BuildChild(snowmantest.Genesis)
 
 	// Adding to the previous preference will update the preference
 	require.NoError(sm.Add(context.Background(), block))
@@ -207,31 +197,22 @@ func AddToNonTailTest(t *testing.T, factory Factory) {
 		K:                     1,
 		AlphaPreference:       1,
 		AlphaConfidence:       1,
-		BetaVirtuous:          3,
-		BetaRogue:             5,
+		Beta:                  3,
 		ConcurrentRepolls:     1,
 		OptimalProcessing:     1,
 		MaxOutstandingItems:   1,
 		MaxItemProcessingTime: 1,
 	}
-	require.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp))
+	require.NoError(sm.Initialize(
+		ctx,
+		params,
+		snowmantest.GenesisID,
+		snowmantest.GenesisHeight,
+		snowmantest.GenesisTimestamp,
+	))
 
-	firstBlock := &TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.Empty.Prefix(1),
-			StatusV: choices.Processing,
-		},
-		ParentV: Genesis.IDV,
-		HeightV: Genesis.HeightV + 1,
-	}
-	secondBlock := &TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.Empty.Prefix(2),
-			StatusV: choices.Processing,
-		},
-		ParentV: Genesis.IDV,
-		HeightV: Genesis.HeightV + 1,
-	}
+	firstBlock := snowmantest.BuildChild(snowmantest.Genesis)
+	secondBlock := snowmantest.BuildChild(snowmantest.Genesis)
 
 	// Adding to the previous preference will update the preference
 	require.NoError(sm.Add(context.Background(), firstBlock))
@@ -256,33 +237,33 @@ func AddToUnknownTest(t *testing.T, factory Factory) {
 		K:                     1,
 		AlphaPreference:       1,
 		AlphaConfidence:       1,
-		BetaVirtuous:          3,
-		BetaRogue:             5,
+		Beta:                  3,
 		ConcurrentRepolls:     1,
 		OptimalProcessing:     1,
 		MaxOutstandingItems:   1,
 		MaxItemProcessingTime: 1,
 	}
-	require.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp))
+	require.NoError(sm.Initialize(
+		ctx,
+		params,
+		snowmantest.GenesisID,
+		snowmantest.GenesisHeight,
+		snowmantest.GenesisTimestamp,
+	))
 
-	parent := &TestBlock{TestDecidable: choices.TestDecidable{
-		IDV:     ids.Empty.Prefix(1),
-		StatusV: choices.Unknown,
-	}}
-
-	block := &TestBlock{
+	block := &snowmantest.Block{
 		TestDecidable: choices.TestDecidable{
-			IDV:     ids.Empty.Prefix(2),
+			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		ParentV: parent.IDV,
-		HeightV: parent.HeightV + 1,
+		ParentV: ids.GenerateTestID(),
+		HeightV: snowmantest.GenesisHeight + 2,
 	}
 
 	// Adding a block with an unknown parent means the parent must have already
 	// been rejected. Therefore the block should be immediately rejected
 	require.NoError(sm.Add(context.Background(), block))
-	require.Equal(GenesisID, sm.Preference())
+	require.Equal(snowmantest.GenesisID, sm.Preference())
 	require.Equal(choices.Rejected, block.Status())
 }
 
@@ -297,23 +278,28 @@ func StatusOrProcessingPreviouslyAcceptedTest(t *testing.T, factory Factory) {
 		K:                     1,
 		AlphaPreference:       1,
 		AlphaConfidence:       1,
-		BetaVirtuous:          3,
-		BetaRogue:             5,
+		Beta:                  3,
 		ConcurrentRepolls:     1,
 		OptimalProcessing:     1,
 		MaxOutstandingItems:   1,
 		MaxItemProcessingTime: 1,
 	}
-	require.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp))
+	require.NoError(sm.Initialize(
+		ctx,
+		params,
+		snowmantest.GenesisID,
+		snowmantest.GenesisHeight,
+		snowmantest.GenesisTimestamp,
+	))
 
-	require.Equal(choices.Accepted, Genesis.Status())
-	require.False(sm.Processing(Genesis.ID()))
-	require.True(sm.Decided(Genesis))
-	require.True(sm.IsPreferred(Genesis))
+	require.Equal(choices.Accepted, snowmantest.Genesis.Status())
+	require.False(sm.Processing(snowmantest.Genesis.ID()))
+	require.True(sm.Decided(snowmantest.Genesis))
+	require.True(sm.IsPreferred(snowmantest.Genesis))
 
-	pref, ok := sm.PreferenceAtHeight(Genesis.Height())
+	pref, ok := sm.PreferenceAtHeight(snowmantest.Genesis.Height())
 	require.True(ok)
-	require.Equal(Genesis.ID(), pref)
+	require.Equal(snowmantest.Genesis.ID(), pref)
 }
 
 func StatusOrProcessingPreviouslyRejectedTest(t *testing.T, factory Factory) {
@@ -327,23 +313,22 @@ func StatusOrProcessingPreviouslyRejectedTest(t *testing.T, factory Factory) {
 		K:                     1,
 		AlphaPreference:       1,
 		AlphaConfidence:       1,
-		BetaVirtuous:          3,
-		BetaRogue:             5,
+		Beta:                  3,
 		ConcurrentRepolls:     1,
 		OptimalProcessing:     1,
 		MaxOutstandingItems:   1,
 		MaxItemProcessingTime: 1,
 	}
-	require.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp))
+	require.NoError(sm.Initialize(
+		ctx,
+		params,
+		snowmantest.GenesisID,
+		snowmantest.GenesisHeight,
+		snowmantest.GenesisTimestamp,
+	))
 
-	block := &TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.Empty.Prefix(1),
-			StatusV: choices.Rejected,
-		},
-		ParentV: Genesis.IDV,
-		HeightV: Genesis.HeightV + 1,
-	}
+	block := snowmantest.BuildChild(snowmantest.Genesis)
+	require.NoError(block.Reject(context.Background()))
 
 	require.Equal(choices.Rejected, block.Status())
 	require.False(sm.Processing(block.ID()))
@@ -365,23 +350,21 @@ func StatusOrProcessingUnissuedTest(t *testing.T, factory Factory) {
 		K:                     1,
 		AlphaPreference:       1,
 		AlphaConfidence:       1,
-		BetaVirtuous:          3,
-		BetaRogue:             5,
+		Beta:                  3,
 		ConcurrentRepolls:     1,
 		OptimalProcessing:     1,
 		MaxOutstandingItems:   1,
 		MaxItemProcessingTime: 1,
 	}
-	require.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp))
+	require.NoError(sm.Initialize(
+		ctx,
+		params,
+		snowmantest.GenesisID,
+		snowmantest.GenesisHeight,
+		snowmantest.GenesisTimestamp,
+	))
 
-	block := &TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.Empty.Prefix(1),
-			StatusV: choices.Processing,
-		},
-		ParentV: Genesis.IDV,
-		HeightV: Genesis.HeightV + 1,
-	}
+	block := snowmantest.BuildChild(snowmantest.Genesis)
 
 	require.Equal(choices.Processing, block.Status())
 	require.False(sm.Processing(block.ID()))
@@ -403,23 +386,21 @@ func StatusOrProcessingIssuedTest(t *testing.T, factory Factory) {
 		K:                     1,
 		AlphaPreference:       1,
 		AlphaConfidence:       1,
-		BetaVirtuous:          3,
-		BetaRogue:             5,
+		Beta:                  3,
 		ConcurrentRepolls:     1,
 		OptimalProcessing:     1,
 		MaxOutstandingItems:   1,
 		MaxItemProcessingTime: 1,
 	}
-	require.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp))
+	require.NoError(sm.Initialize(
+		ctx,
+		params,
+		snowmantest.GenesisID,
+		snowmantest.GenesisHeight,
+		snowmantest.GenesisTimestamp,
+	))
 
-	block := &TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.Empty.Prefix(1),
-			StatusV: choices.Processing,
-		},
-		ParentV: Genesis.IDV,
-		HeightV: Genesis.HeightV + 1,
-	}
+	block := snowmantest.BuildChild(snowmantest.Genesis)
 
 	require.NoError(sm.Add(context.Background(), block))
 	require.Equal(choices.Processing, block.Status())
@@ -443,23 +424,21 @@ func RecordPollAcceptSingleBlockTest(t *testing.T, factory Factory) {
 		K:                     1,
 		AlphaPreference:       1,
 		AlphaConfidence:       1,
-		BetaVirtuous:          2,
-		BetaRogue:             3,
+		Beta:                  2,
 		ConcurrentRepolls:     1,
 		OptimalProcessing:     1,
 		MaxOutstandingItems:   1,
 		MaxItemProcessingTime: 1,
 	}
-	require.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp))
+	require.NoError(sm.Initialize(
+		ctx,
+		params,
+		snowmantest.GenesisID,
+		snowmantest.GenesisHeight,
+		snowmantest.GenesisTimestamp,
+	))
 
-	block := &TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.Empty.Prefix(1),
-			StatusV: choices.Processing,
-		},
-		ParentV: Genesis.IDV,
-		HeightV: Genesis.HeightV + 1,
-	}
+	block := snowmantest.BuildChild(snowmantest.Genesis)
 
 	require.NoError(sm.Add(context.Background(), block))
 
@@ -486,31 +465,22 @@ func RecordPollAcceptAndRejectTest(t *testing.T, factory Factory) {
 		K:                     1,
 		AlphaPreference:       1,
 		AlphaConfidence:       1,
-		BetaVirtuous:          1,
-		BetaRogue:             2,
+		Beta:                  2,
 		ConcurrentRepolls:     1,
 		OptimalProcessing:     1,
 		MaxOutstandingItems:   1,
 		MaxItemProcessingTime: 1,
 	}
-	require.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp))
+	require.NoError(sm.Initialize(
+		ctx,
+		params,
+		snowmantest.GenesisID,
+		snowmantest.GenesisHeight,
+		snowmantest.GenesisTimestamp,
+	))
 
-	firstBlock := &TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.Empty.Prefix(1),
-			StatusV: choices.Processing,
-		},
-		ParentV: Genesis.IDV,
-		HeightV: Genesis.HeightV + 1,
-	}
-	secondBlock := &TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.Empty.Prefix(2),
-			StatusV: choices.Processing,
-		},
-		ParentV: Genesis.IDV,
-		HeightV: Genesis.HeightV + 1,
-	}
+	firstBlock := snowmantest.BuildChild(snowmantest.Genesis)
+	secondBlock := snowmantest.BuildChild(snowmantest.Genesis)
 
 	require.NoError(sm.Add(context.Background(), firstBlock))
 	require.NoError(sm.Add(context.Background(), secondBlock))
@@ -543,31 +513,22 @@ func RecordPollSplitVoteNoChangeTest(t *testing.T, factory Factory) {
 		K:                     2,
 		AlphaPreference:       2,
 		AlphaConfidence:       2,
-		BetaVirtuous:          1,
-		BetaRogue:             2,
+		Beta:                  1,
 		ConcurrentRepolls:     1,
 		OptimalProcessing:     1,
 		MaxOutstandingItems:   1,
 		MaxItemProcessingTime: 1,
 	}
-	require.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp))
+	require.NoError(sm.Initialize(
+		ctx,
+		params,
+		snowmantest.GenesisID,
+		snowmantest.GenesisHeight,
+		snowmantest.GenesisTimestamp,
+	))
 
-	firstBlock := &TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.Empty.Prefix(1),
-			StatusV: choices.Processing,
-		},
-		ParentV: Genesis.IDV,
-		HeightV: Genesis.HeightV + 1,
-	}
-	secondBlock := &TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.Empty.Prefix(2),
-			StatusV: choices.Processing,
-		},
-		ParentV: Genesis.IDV,
-		HeightV: Genesis.HeightV + 1,
-	}
+	firstBlock := snowmantest.BuildChild(snowmantest.Genesis)
+	secondBlock := snowmantest.BuildChild(snowmantest.Genesis)
 
 	require.NoError(sm.Add(context.Background(), firstBlock))
 	require.NoError(sm.Add(context.Background(), secondBlock))
@@ -604,19 +565,24 @@ func RecordPollWhenFinalizedTest(t *testing.T, factory Factory) {
 		K:                     1,
 		AlphaPreference:       1,
 		AlphaConfidence:       1,
-		BetaVirtuous:          1,
-		BetaRogue:             2,
+		Beta:                  1,
 		ConcurrentRepolls:     1,
 		OptimalProcessing:     1,
 		MaxOutstandingItems:   1,
 		MaxItemProcessingTime: 1,
 	}
-	require.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp))
+	require.NoError(sm.Initialize(
+		ctx,
+		params,
+		snowmantest.GenesisID,
+		snowmantest.GenesisHeight,
+		snowmantest.GenesisTimestamp,
+	))
 
-	votes := bag.Of(GenesisID)
+	votes := bag.Of(snowmantest.GenesisID)
 	require.NoError(sm.RecordPoll(context.Background(), votes))
 	require.Zero(sm.NumProcessing())
-	require.Equal(GenesisID, sm.Preference())
+	require.Equal(snowmantest.GenesisID, sm.Preference())
 }
 
 func RecordPollRejectTransitivelyTest(t *testing.T, factory Factory) {
@@ -630,39 +596,23 @@ func RecordPollRejectTransitivelyTest(t *testing.T, factory Factory) {
 		K:                     1,
 		AlphaPreference:       1,
 		AlphaConfidence:       1,
-		BetaVirtuous:          1,
-		BetaRogue:             1,
+		Beta:                  1,
 		ConcurrentRepolls:     1,
 		OptimalProcessing:     1,
 		MaxOutstandingItems:   1,
 		MaxItemProcessingTime: 1,
 	}
-	require.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp))
+	require.NoError(sm.Initialize(
+		ctx,
+		params,
+		snowmantest.GenesisID,
+		snowmantest.GenesisHeight,
+		snowmantest.GenesisTimestamp,
+	))
 
-	block0 := &TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.Empty.Prefix(1),
-			StatusV: choices.Processing,
-		},
-		ParentV: Genesis.IDV,
-		HeightV: Genesis.HeightV + 1,
-	}
-	block1 := &TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.Empty.Prefix(2),
-			StatusV: choices.Processing,
-		},
-		ParentV: Genesis.IDV,
-		HeightV: Genesis.HeightV + 1,
-	}
-	block2 := &TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.Empty.Prefix(3),
-			StatusV: choices.Processing,
-		},
-		ParentV: block1.IDV,
-		HeightV: block1.HeightV + 1,
-	}
+	block0 := snowmantest.BuildChild(snowmantest.Genesis)
+	block1 := snowmantest.BuildChild(snowmantest.Genesis)
+	block2 := snowmantest.BuildChild(block1)
 
 	require.NoError(sm.Add(context.Background(), block0))
 	require.NoError(sm.Add(context.Background(), block1))
@@ -701,47 +651,24 @@ func RecordPollTransitivelyResetConfidenceTest(t *testing.T, factory Factory) {
 		K:                     1,
 		AlphaPreference:       1,
 		AlphaConfidence:       1,
-		BetaVirtuous:          2,
-		BetaRogue:             2,
+		Beta:                  2,
 		ConcurrentRepolls:     1,
 		OptimalProcessing:     1,
 		MaxOutstandingItems:   1,
 		MaxItemProcessingTime: 1,
 	}
-	require.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp))
+	require.NoError(sm.Initialize(
+		ctx,
+		params,
+		snowmantest.GenesisID,
+		snowmantest.GenesisHeight,
+		snowmantest.GenesisTimestamp,
+	))
 
-	block0 := &TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.Empty.Prefix(1),
-			StatusV: choices.Processing,
-		},
-		ParentV: Genesis.IDV,
-		HeightV: Genesis.HeightV + 1,
-	}
-	block1 := &TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.Empty.Prefix(2),
-			StatusV: choices.Processing,
-		},
-		ParentV: Genesis.IDV,
-		HeightV: Genesis.HeightV + 1,
-	}
-	block2 := &TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.Empty.Prefix(3),
-			StatusV: choices.Processing,
-		},
-		ParentV: block1.IDV,
-		HeightV: block1.HeightV + 1,
-	}
-	block3 := &TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.Empty.Prefix(4),
-			StatusV: choices.Processing,
-		},
-		ParentV: block1.IDV,
-		HeightV: block1.HeightV + 1,
-	}
+	block0 := snowmantest.BuildChild(snowmantest.Genesis)
+	block1 := snowmantest.BuildChild(snowmantest.Genesis)
+	block2 := snowmantest.BuildChild(block1)
+	block3 := snowmantest.BuildChild(block1)
 
 	require.NoError(sm.Add(context.Background(), block0))
 	require.NoError(sm.Add(context.Background(), block1))
@@ -794,24 +721,22 @@ func RecordPollInvalidVoteTest(t *testing.T, factory Factory) {
 		K:                     1,
 		AlphaPreference:       1,
 		AlphaConfidence:       1,
-		BetaVirtuous:          2,
-		BetaRogue:             2,
+		Beta:                  2,
 		ConcurrentRepolls:     1,
 		OptimalProcessing:     1,
 		MaxOutstandingItems:   1,
 		MaxItemProcessingTime: 1,
 	}
-	require.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp))
+	require.NoError(sm.Initialize(
+		ctx,
+		params,
+		snowmantest.GenesisID,
+		snowmantest.GenesisHeight,
+		snowmantest.GenesisTimestamp,
+	))
 
-	block := &TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.Empty.Prefix(1),
-			StatusV: choices.Processing,
-		},
-		ParentV: Genesis.IDV,
-		HeightV: Genesis.HeightV + 1,
-	}
-	unknownBlockID := ids.Empty.Prefix(2)
+	block := snowmantest.BuildChild(snowmantest.Genesis)
+	unknownBlockID := ids.GenerateTestID()
 
 	require.NoError(sm.Add(context.Background(), block))
 
@@ -836,55 +761,25 @@ func RecordPollTransitiveVotingTest(t *testing.T, factory Factory) {
 		K:                     3,
 		AlphaPreference:       3,
 		AlphaConfidence:       3,
-		BetaVirtuous:          1,
-		BetaRogue:             1,
+		Beta:                  1,
 		ConcurrentRepolls:     1,
 		OptimalProcessing:     1,
 		MaxOutstandingItems:   1,
 		MaxItemProcessingTime: 1,
 	}
-	require.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp))
+	require.NoError(sm.Initialize(
+		ctx,
+		params,
+		snowmantest.GenesisID,
+		snowmantest.GenesisHeight,
+		snowmantest.GenesisTimestamp,
+	))
 
-	block0 := &TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.Empty.Prefix(1),
-			StatusV: choices.Processing,
-		},
-		ParentV: Genesis.IDV,
-		HeightV: Genesis.HeightV + 1,
-	}
-	block1 := &TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.Empty.Prefix(2),
-			StatusV: choices.Processing,
-		},
-		ParentV: block0.IDV,
-		HeightV: block0.HeightV + 1,
-	}
-	block2 := &TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.Empty.Prefix(3),
-			StatusV: choices.Processing,
-		},
-		ParentV: block1.IDV,
-		HeightV: block1.HeightV + 1,
-	}
-	block3 := &TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.Empty.Prefix(4),
-			StatusV: choices.Processing,
-		},
-		ParentV: block0.IDV,
-		HeightV: block0.HeightV + 1,
-	}
-	block4 := &TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.Empty.Prefix(5),
-			StatusV: choices.Processing,
-		},
-		ParentV: block3.IDV,
-		HeightV: block3.HeightV + 1,
-	}
+	block0 := snowmantest.BuildChild(snowmantest.Genesis)
+	block1 := snowmantest.BuildChild(block0)
+	block2 := snowmantest.BuildChild(block1)
+	block3 := snowmantest.BuildChild(block0)
+	block4 := snowmantest.BuildChild(block3)
 
 	require.NoError(sm.Add(context.Background(), block0))
 	require.NoError(sm.Add(context.Background(), block1))
@@ -937,110 +832,6 @@ func RecordPollTransitiveVotingTest(t *testing.T, factory Factory) {
 	require.Equal(choices.Rejected, block4.Status())
 }
 
-func RecordPollDivergedVotingTest(t *testing.T, factory Factory) {
-	sm := factory.New()
-	require := require.New(t)
-
-	snowCtx := snowtest.Context(t, snowtest.CChainID)
-	ctx := snowtest.ConsensusContext(snowCtx)
-	params := snowball.Parameters{
-		K:                     1,
-		AlphaPreference:       1,
-		AlphaConfidence:       1,
-		BetaVirtuous:          1,
-		BetaRogue:             2,
-		ConcurrentRepolls:     1,
-		OptimalProcessing:     1,
-		MaxOutstandingItems:   1,
-		MaxItemProcessingTime: 1,
-	}
-	require.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp))
-
-	block0 := &TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.ID{0x0f}, // 1111
-			StatusV: choices.Processing,
-		},
-		ParentV: Genesis.IDV,
-		HeightV: Genesis.HeightV + 1,
-	}
-	block1 := &TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.ID{0x08}, // 0001
-			StatusV: choices.Processing,
-		},
-		ParentV: Genesis.IDV,
-		HeightV: Genesis.HeightV + 1,
-	}
-	block2 := &TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.ID{0x01}, // 1000
-			StatusV: choices.Processing,
-		},
-		ParentV: Genesis.IDV,
-		HeightV: Genesis.HeightV + 1,
-	}
-	block3 := &TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.Empty.Prefix(1),
-			StatusV: choices.Processing,
-		},
-		ParentV: block2.IDV,
-		HeightV: block2.HeightV + 1,
-	}
-
-	require.NoError(sm.Add(context.Background(), block0))
-
-	require.NoError(sm.Add(context.Background(), block1))
-
-	// The first bit is contested as either 0 or 1. When voting for [block0] and
-	// when the first bit is 1, the following bits have been decided to follow
-	// the 255 remaining bits of [block0].
-	votes0 := bag.Of(block0.ID())
-	require.NoError(sm.RecordPoll(context.Background(), votes0))
-
-	// Although we are adding in [block2] here - the underlying snowball
-	// instance has already decided it is rejected. Snowman doesn't actually
-	// know that though, because that is an implementation detail of the
-	// Snowball trie that is used.
-	require.NoError(sm.Add(context.Background(), block2))
-
-	// Because [block2] is effectively rejected, [block3] is also effectively
-	// rejected.
-	require.NoError(sm.Add(context.Background(), block3))
-
-	require.Equal(block0.ID(), sm.Preference())
-	require.Equal(choices.Processing, block0.Status(), "should not be accepted yet")
-	require.Equal(choices.Processing, block1.Status(), "should not be rejected yet")
-	require.Equal(choices.Processing, block2.Status(), "should not be rejected yet")
-	require.Equal(choices.Processing, block3.Status(), "should not be rejected yet")
-
-	// Current graph structure:
-	//       G
-	//     /   \
-	//    *     |
-	//   / \    |
-	//  0   2   1
-	//      |
-	//      3
-	// Tail = 0
-
-	// Transitively votes for [block2] by voting for its child [block3].
-	// Because [block2] shares the first bit with [block0] and the following
-	// bits have been finalized for [block0], the voting results in accepting
-	// [block0]. When [block0] is accepted, [block1] and [block2] are rejected
-	// as conflicting. [block2]'s child, [block3], is then rejected
-	// transitively.
-	votes3 := bag.Of(block3.ID())
-	require.NoError(sm.RecordPoll(context.Background(), votes3))
-
-	require.Zero(sm.NumProcessing())
-	require.Equal(choices.Accepted, block0.Status())
-	require.Equal(choices.Rejected, block1.Status())
-	require.Equal(choices.Rejected, block2.Status())
-	require.Equal(choices.Rejected, block3.Status())
-}
-
 func RecordPollDivergedVotingWithNoConflictingBitTest(t *testing.T, factory Factory) {
 	sm := factory.New()
 	require := require.New(t)
@@ -1051,47 +842,45 @@ func RecordPollDivergedVotingWithNoConflictingBitTest(t *testing.T, factory Fact
 		K:                     1,
 		AlphaPreference:       1,
 		AlphaConfidence:       1,
-		BetaVirtuous:          1,
-		BetaRogue:             2,
+		Beta:                  2,
 		ConcurrentRepolls:     1,
 		OptimalProcessing:     1,
 		MaxOutstandingItems:   1,
 		MaxItemProcessingTime: 1,
 	}
-	require.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp))
+	require.NoError(sm.Initialize(
+		ctx,
+		params,
+		snowmantest.GenesisID,
+		snowmantest.GenesisHeight,
+		snowmantest.GenesisTimestamp,
+	))
 
-	block0 := &TestBlock{
+	block0 := &snowmantest.Block{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.ID{0x06}, // 0110
 			StatusV: choices.Processing,
 		},
-		ParentV: Genesis.IDV,
-		HeightV: Genesis.HeightV + 1,
+		ParentV: snowmantest.GenesisID,
+		HeightV: snowmantest.GenesisHeight + 1,
 	}
-	block1 := &TestBlock{
+	block1 := &snowmantest.Block{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.ID{0x08}, // 0001
 			StatusV: choices.Processing,
 		},
-		ParentV: Genesis.IDV,
-		HeightV: Genesis.HeightV + 1,
+		ParentV: snowmantest.GenesisID,
+		HeightV: snowmantest.GenesisHeight + 1,
 	}
-	block2 := &TestBlock{
+	block2 := &snowmantest.Block{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.ID{0x01}, // 1000
 			StatusV: choices.Processing,
 		},
-		ParentV: Genesis.IDV,
-		HeightV: Genesis.HeightV + 1,
+		ParentV: snowmantest.GenesisID,
+		HeightV: snowmantest.GenesisHeight + 1,
 	}
-	block3 := &TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.Empty.Prefix(1),
-			StatusV: choices.Processing,
-		},
-		ParentV: block2.IDV,
-		HeightV: block2.HeightV + 1,
-	}
+	block3 := snowmantest.BuildChild(block2)
 
 	require.NoError(sm.Add(context.Background(), block0))
 	require.NoError(sm.Add(context.Background(), block1))
@@ -1156,47 +945,24 @@ func RecordPollChangePreferredChainTest(t *testing.T, factory Factory) {
 		K:                     1,
 		AlphaPreference:       1,
 		AlphaConfidence:       1,
-		BetaVirtuous:          10,
-		BetaRogue:             10,
+		Beta:                  10,
 		ConcurrentRepolls:     1,
 		OptimalProcessing:     1,
 		MaxOutstandingItems:   1,
 		MaxItemProcessingTime: 1,
 	}
-	require.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp))
+	require.NoError(sm.Initialize(
+		ctx,
+		params,
+		snowmantest.GenesisID,
+		snowmantest.GenesisHeight,
+		snowmantest.GenesisTimestamp,
+	))
 
-	a1Block := &TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		ParentV: Genesis.IDV,
-		HeightV: Genesis.HeightV + 1,
-	}
-	b1Block := &TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		ParentV: Genesis.IDV,
-		HeightV: Genesis.HeightV + 1,
-	}
-	a2Block := &TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		ParentV: a1Block.IDV,
-		HeightV: a1Block.HeightV + 1,
-	}
-	b2Block := &TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		ParentV: b1Block.IDV,
-		HeightV: b1Block.HeightV + 1,
-	}
+	a1Block := snowmantest.BuildChild(snowmantest.Genesis)
+	b1Block := snowmantest.BuildChild(snowmantest.Genesis)
+	a2Block := snowmantest.BuildChild(a1Block)
+	b2Block := snowmantest.BuildChild(b1Block)
 
 	require.NoError(sm.Add(context.Background(), a1Block))
 	require.NoError(sm.Add(context.Background(), a2Block))
@@ -1264,51 +1030,28 @@ func LastAcceptedTest(t *testing.T, factory Factory) {
 		K:                     1,
 		AlphaPreference:       1,
 		AlphaConfidence:       1,
-		BetaVirtuous:          1,
-		BetaRogue:             2,
+		Beta:                  2,
 		ConcurrentRepolls:     1,
 		OptimalProcessing:     1,
 		MaxOutstandingItems:   1,
 		MaxItemProcessingTime: 1,
 	}
-	require.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp))
+	require.NoError(sm.Initialize(
+		ctx,
+		params,
+		snowmantest.GenesisID,
+		snowmantest.GenesisHeight,
+		snowmantest.GenesisTimestamp,
+	))
 
-	block0 := &TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		ParentV: Genesis.IDV,
-		HeightV: Genesis.HeightV + 1,
-	}
-	block1 := &TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		ParentV: block0.IDV,
-		HeightV: block0.HeightV + 1,
-	}
-	block2 := &TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		ParentV: block1.IDV,
-		HeightV: block1.HeightV + 1,
-	}
-	block1Conflict := &TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		ParentV: block0.IDV,
-		HeightV: block0.HeightV + 1,
-	}
+	block0 := snowmantest.BuildChild(snowmantest.Genesis)
+	block1 := snowmantest.BuildChild(block0)
+	block2 := snowmantest.BuildChild(block1)
+	block1Conflict := snowmantest.BuildChild(block0)
 
 	lastAcceptedID, lastAcceptedHeight := sm.LastAccepted()
-	require.Equal(GenesisID, lastAcceptedID)
-	require.Equal(GenesisHeight, lastAcceptedHeight)
+	require.Equal(snowmantest.GenesisID, lastAcceptedID)
+	require.Equal(snowmantest.GenesisHeight, lastAcceptedHeight)
 
 	require.NoError(sm.Add(context.Background(), block0))
 	require.NoError(sm.Add(context.Background(), block1))
@@ -1316,8 +1059,14 @@ func LastAcceptedTest(t *testing.T, factory Factory) {
 	require.NoError(sm.Add(context.Background(), block2))
 
 	lastAcceptedID, lastAcceptedHeight = sm.LastAccepted()
-	require.Equal(GenesisID, lastAcceptedID)
-	require.Equal(GenesisHeight, lastAcceptedHeight)
+	require.Equal(snowmantest.GenesisID, lastAcceptedID)
+	require.Equal(snowmantest.GenesisHeight, lastAcceptedHeight)
+
+	require.NoError(sm.RecordPoll(context.Background(), bag.Of(block0.IDV)))
+
+	lastAcceptedID, lastAcceptedHeight = sm.LastAccepted()
+	require.Equal(snowmantest.GenesisID, lastAcceptedID)
+	require.Equal(snowmantest.GenesisHeight, lastAcceptedHeight)
 
 	require.NoError(sm.RecordPoll(context.Background(), bag.Of(block1.IDV)))
 
@@ -1326,6 +1075,12 @@ func LastAcceptedTest(t *testing.T, factory Factory) {
 	require.Equal(block0.HeightV, lastAcceptedHeight)
 
 	require.NoError(sm.RecordPoll(context.Background(), bag.Of(block1.IDV)))
+
+	lastAcceptedID, lastAcceptedHeight = sm.LastAccepted()
+	require.Equal(block1.IDV, lastAcceptedID)
+	require.Equal(block1.HeightV, lastAcceptedHeight)
+
+	require.NoError(sm.RecordPoll(context.Background(), bag.Of(block2.IDV)))
 
 	lastAcceptedID, lastAcceptedHeight = sm.LastAccepted()
 	require.Equal(block1.IDV, lastAcceptedID)
@@ -1349,22 +1104,26 @@ func MetricsProcessingErrorTest(t *testing.T, factory Factory) {
 		K:                     1,
 		AlphaPreference:       1,
 		AlphaConfidence:       1,
-		BetaVirtuous:          1,
-		BetaRogue:             1,
+		Beta:                  1,
 		ConcurrentRepolls:     1,
 		OptimalProcessing:     1,
 		MaxOutstandingItems:   1,
 		MaxItemProcessingTime: 1,
 	}
 
-	numProcessing := prometheus.NewGauge(
-		prometheus.GaugeOpts{
-			Name: "blks_processing",
-		})
+	numProcessing := prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "blks_processing",
+	})
 
 	require.NoError(ctx.Registerer.Register(numProcessing))
 
-	err := sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp)
+	err := sm.Initialize(
+		ctx,
+		params,
+		snowmantest.GenesisID,
+		snowmantest.GenesisHeight,
+		snowmantest.GenesisTimestamp,
+	)
 	require.Error(err) //nolint:forbidigo // error is not exported https://github.com/prometheus/client_golang/blob/main/prometheus/registry.go#L315
 }
 
@@ -1379,22 +1138,26 @@ func MetricsAcceptedErrorTest(t *testing.T, factory Factory) {
 		K:                     1,
 		AlphaPreference:       1,
 		AlphaConfidence:       1,
-		BetaVirtuous:          1,
-		BetaRogue:             1,
+		Beta:                  1,
 		ConcurrentRepolls:     1,
 		OptimalProcessing:     1,
 		MaxOutstandingItems:   1,
 		MaxItemProcessingTime: 1,
 	}
 
-	numAccepted := prometheus.NewGauge(
-		prometheus.GaugeOpts{
-			Name: "blks_accepted_count",
-		})
+	numAccepted := prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "blks_accepted_count",
+	})
 
 	require.NoError(ctx.Registerer.Register(numAccepted))
 
-	err := sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp)
+	err := sm.Initialize(
+		ctx,
+		params,
+		snowmantest.GenesisID,
+		snowmantest.GenesisHeight,
+		snowmantest.GenesisTimestamp,
+	)
 	require.Error(err) //nolint:forbidigo // error is not exported https://github.com/prometheus/client_golang/blob/main/prometheus/registry.go#L315
 }
 
@@ -1409,22 +1172,26 @@ func MetricsRejectedErrorTest(t *testing.T, factory Factory) {
 		K:                     1,
 		AlphaPreference:       1,
 		AlphaConfidence:       1,
-		BetaVirtuous:          1,
-		BetaRogue:             1,
+		Beta:                  1,
 		ConcurrentRepolls:     1,
 		OptimalProcessing:     1,
 		MaxOutstandingItems:   1,
 		MaxItemProcessingTime: 1,
 	}
 
-	numRejected := prometheus.NewGauge(
-		prometheus.GaugeOpts{
-			Name: "blks_rejected_count",
-		})
+	numRejected := prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "blks_rejected_count",
+	})
 
 	require.NoError(ctx.Registerer.Register(numRejected))
 
-	err := sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp)
+	err := sm.Initialize(
+		ctx,
+		params,
+		snowmantest.GenesisID,
+		snowmantest.GenesisHeight,
+		snowmantest.GenesisTimestamp,
+	)
 	require.Error(err) //nolint:forbidigo // error is not exported https://github.com/prometheus/client_golang/blob/main/prometheus/registry.go#L315
 }
 
@@ -1439,29 +1206,29 @@ func ErrorOnInitialRejectionTest(t *testing.T, factory Factory) {
 		K:                     1,
 		AlphaPreference:       1,
 		AlphaConfidence:       1,
-		BetaVirtuous:          1,
-		BetaRogue:             1,
+		Beta:                  1,
 		ConcurrentRepolls:     1,
 		OptimalProcessing:     1,
 		MaxOutstandingItems:   1,
 		MaxItemProcessingTime: 1,
 	}
 
-	require.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp))
+	require.NoError(sm.Initialize(
+		ctx,
+		params,
+		snowmantest.GenesisID,
+		snowmantest.GenesisHeight,
+		snowmantest.GenesisTimestamp,
+	))
 
-	rejectedBlock := &TestBlock{TestDecidable: choices.TestDecidable{
-		IDV:     ids.Empty.Prefix(1),
-		StatusV: choices.Rejected,
-	}}
-
-	block := &TestBlock{
+	block := &snowmantest.Block{
 		TestDecidable: choices.TestDecidable{
-			IDV:     ids.Empty.Prefix(2),
+			IDV:     ids.GenerateTestID(),
 			RejectV: errTest,
 			StatusV: choices.Processing,
 		},
-		ParentV: rejectedBlock.IDV,
-		HeightV: rejectedBlock.HeightV + 1,
+		ParentV: ids.GenerateTestID(),
+		HeightV: snowmantest.GenesisHeight + 1,
 	}
 
 	err := sm.Add(context.Background(), block)
@@ -1479,25 +1246,23 @@ func ErrorOnAcceptTest(t *testing.T, factory Factory) {
 		K:                     1,
 		AlphaPreference:       1,
 		AlphaConfidence:       1,
-		BetaVirtuous:          1,
-		BetaRogue:             1,
+		Beta:                  1,
 		ConcurrentRepolls:     1,
 		OptimalProcessing:     1,
 		MaxOutstandingItems:   1,
 		MaxItemProcessingTime: 1,
 	}
 
-	require.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp))
+	require.NoError(sm.Initialize(
+		ctx,
+		params,
+		snowmantest.GenesisID,
+		snowmantest.GenesisHeight,
+		snowmantest.GenesisTimestamp,
+	))
 
-	block := &TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.Empty.Prefix(1),
-			AcceptV: errTest,
-			StatusV: choices.Processing,
-		},
-		ParentV: Genesis.IDV,
-		HeightV: Genesis.HeightV + 1,
-	}
+	block := snowmantest.BuildChild(snowmantest.Genesis)
+	block.AcceptV = errTest
 
 	require.NoError(sm.Add(context.Background(), block))
 
@@ -1517,33 +1282,24 @@ func ErrorOnRejectSiblingTest(t *testing.T, factory Factory) {
 		K:                     1,
 		AlphaPreference:       1,
 		AlphaConfidence:       1,
-		BetaVirtuous:          1,
-		BetaRogue:             1,
+		Beta:                  1,
 		ConcurrentRepolls:     1,
 		OptimalProcessing:     1,
 		MaxOutstandingItems:   1,
 		MaxItemProcessingTime: 1,
 	}
 
-	require.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp))
+	require.NoError(sm.Initialize(
+		ctx,
+		params,
+		snowmantest.GenesisID,
+		snowmantest.GenesisHeight,
+		snowmantest.GenesisTimestamp,
+	))
 
-	block0 := &TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.Empty.Prefix(1),
-			StatusV: choices.Processing,
-		},
-		ParentV: Genesis.IDV,
-		HeightV: Genesis.HeightV + 1,
-	}
-	block1 := &TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.Empty.Prefix(2),
-			RejectV: errTest,
-			StatusV: choices.Processing,
-		},
-		ParentV: Genesis.IDV,
-		HeightV: Genesis.HeightV + 1,
-	}
+	block0 := snowmantest.BuildChild(snowmantest.Genesis)
+	block1 := snowmantest.BuildChild(snowmantest.Genesis)
+	block1.RejectV = errTest
 
 	require.NoError(sm.Add(context.Background(), block0))
 	require.NoError(sm.Add(context.Background(), block1))
@@ -1564,41 +1320,25 @@ func ErrorOnTransitiveRejectionTest(t *testing.T, factory Factory) {
 		K:                     1,
 		AlphaPreference:       1,
 		AlphaConfidence:       1,
-		BetaVirtuous:          1,
-		BetaRogue:             1,
+		Beta:                  1,
 		ConcurrentRepolls:     1,
 		OptimalProcessing:     1,
 		MaxOutstandingItems:   1,
 		MaxItemProcessingTime: 1,
 	}
 
-	require.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp))
+	require.NoError(sm.Initialize(
+		ctx,
+		params,
+		snowmantest.GenesisID,
+		snowmantest.GenesisHeight,
+		snowmantest.GenesisTimestamp,
+	))
 
-	block0 := &TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.Empty.Prefix(1),
-			StatusV: choices.Processing,
-		},
-		ParentV: Genesis.IDV,
-		HeightV: Genesis.HeightV + 1,
-	}
-	block1 := &TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.Empty.Prefix(2),
-			StatusV: choices.Processing,
-		},
-		ParentV: Genesis.IDV,
-		HeightV: Genesis.HeightV + 1,
-	}
-	block2 := &TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.Empty.Prefix(3),
-			RejectV: errTest,
-			StatusV: choices.Processing,
-		},
-		ParentV: block1.IDV,
-		HeightV: block1.HeightV + 1,
-	}
+	block0 := snowmantest.BuildChild(snowmantest.Genesis)
+	block1 := snowmantest.BuildChild(snowmantest.Genesis)
+	block2 := snowmantest.BuildChild(block1)
+	block2.RejectV = errTest
 
 	require.NoError(sm.Add(context.Background(), block0))
 	require.NoError(sm.Add(context.Background(), block1))
@@ -1619,8 +1359,7 @@ func RandomizedConsistencyTest(t *testing.T, factory Factory) {
 			K:                     20,
 			AlphaPreference:       15,
 			AlphaConfidence:       15,
-			BetaVirtuous:          20,
-			BetaRogue:             30,
+			Beta:                  20,
 			ConcurrentRepolls:     1,
 			OptimalProcessing:     1,
 			MaxOutstandingItems:   1,
@@ -1655,65 +1394,24 @@ func ErrorOnAddDecidedBlockTest(t *testing.T, factory Factory) {
 		K:                     1,
 		AlphaPreference:       1,
 		AlphaConfidence:       1,
-		BetaVirtuous:          1,
-		BetaRogue:             1,
+		Beta:                  1,
 		ConcurrentRepolls:     1,
 		OptimalProcessing:     1,
 		MaxOutstandingItems:   1,
 		MaxItemProcessingTime: 1,
 	}
-	require.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp))
+	require.NoError(sm.Initialize(
+		ctx,
+		params,
+		snowmantest.GenesisID,
+		snowmantest.GenesisHeight,
+		snowmantest.GenesisTimestamp,
+	))
 
-	block0 := &TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.ID{0x03}, // 0b0011
-			StatusV: choices.Accepted,
-		},
-		ParentV: Genesis.IDV,
-		HeightV: Genesis.HeightV + 1,
-	}
-	err := sm.Add(context.Background(), block0)
-	require.ErrorIs(err, errDuplicateAdd)
-}
+	block := snowmantest.BuildChild(snowmantest.Genesis)
+	require.NoError(block.Accept(context.Background()))
 
-func ErrorOnAddDuplicateBlockIDTest(t *testing.T, factory Factory) {
-	sm := factory.New()
-	require := require.New(t)
-
-	snowCtx := snowtest.Context(t, snowtest.CChainID)
-	ctx := snowtest.ConsensusContext(snowCtx)
-	params := snowball.Parameters{
-		K:                     1,
-		AlphaPreference:       1,
-		AlphaConfidence:       1,
-		BetaVirtuous:          1,
-		BetaRogue:             1,
-		ConcurrentRepolls:     1,
-		OptimalProcessing:     1,
-		MaxOutstandingItems:   1,
-		MaxItemProcessingTime: 1,
-	}
-	require.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp))
-
-	block0 := &TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.ID{0x03}, // 0b0011
-			StatusV: choices.Processing,
-		},
-		ParentV: Genesis.IDV,
-		HeightV: Genesis.HeightV + 1,
-	}
-	block1 := &TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.ID{0x03}, // 0b0011, same as block0
-			StatusV: choices.Processing,
-		},
-		ParentV: block0.IDV,
-		HeightV: block0.HeightV + 1,
-	}
-
-	require.NoError(sm.Add(context.Background(), block0))
-	err := sm.Add(context.Background(), block1)
+	err := sm.Add(context.Background(), block)
 	require.ErrorIs(err, errDuplicateAdd)
 }
 
@@ -1748,35 +1446,73 @@ func RecordPollWithDefaultParameters(t *testing.T, factory Factory) {
 	snowCtx := snowtest.Context(t, snowtest.CChainID)
 	ctx := snowtest.ConsensusContext(snowCtx)
 	params := snowball.DefaultParameters
-	require.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp))
+	require.NoError(sm.Initialize(
+		ctx,
+		params,
+		snowmantest.GenesisID,
+		snowmantest.GenesisHeight,
+		snowmantest.GenesisTimestamp,
+	))
 
 	// "blk1" and "blk2" are in conflict
-	blk1 := &TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.ID{1},
-			StatusV: choices.Processing,
-		},
-		ParentV: Genesis.IDV,
-		HeightV: Genesis.HeightV + 1,
-	}
-	blk2 := &TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.ID{2},
-			StatusV: choices.Processing,
-		},
-		ParentV: Genesis.IDV,
-		HeightV: Genesis.HeightV + 1,
-	}
+	blk1 := snowmantest.BuildChild(snowmantest.Genesis)
+	blk2 := snowmantest.BuildChild(snowmantest.Genesis)
+
 	require.NoError(sm.Add(context.Background(), blk1))
 	require.NoError(sm.Add(context.Background(), blk2))
 
 	votes := bag.Bag[ids.ID]{}
 	votes.AddCount(blk1.ID(), params.AlphaConfidence)
-	// as "blk1" and "blk2" are in conflict, we need beta rogue rounds to finalize
-	for i := 0; i < params.BetaRogue; i++ {
-		// should not finalize with less than beta rogue rounds
+	// Require beta rounds to finalize
+	for i := 0; i < params.Beta; i++ {
+		// should not finalize with less than beta rounds
 		require.Equal(2, sm.NumProcessing())
 		require.NoError(sm.RecordPoll(context.Background(), votes))
 	}
 	require.Zero(sm.NumProcessing())
+}
+
+// If a block that was voted for received additional votes from another block,
+// the indegree of the topological sort should not traverse into the parent
+// node.
+func RecordPollRegressionCalculateInDegreeIndegreeCalculation(t *testing.T, factory Factory) {
+	require := require.New(t)
+
+	sm := factory.New()
+
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	ctx := snowtest.ConsensusContext(snowCtx)
+	params := snowball.Parameters{
+		K:                     3,
+		AlphaPreference:       2,
+		AlphaConfidence:       2,
+		Beta:                  1,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
+	}
+	require.NoError(sm.Initialize(
+		ctx,
+		params,
+		snowmantest.GenesisID,
+		snowmantest.GenesisHeight,
+		snowmantest.GenesisTimestamp,
+	))
+
+	blk1 := snowmantest.BuildChild(snowmantest.Genesis)
+	blk2 := snowmantest.BuildChild(blk1)
+	blk3 := snowmantest.BuildChild(blk2)
+
+	require.NoError(sm.Add(context.Background(), blk1))
+	require.NoError(sm.Add(context.Background(), blk2))
+	require.NoError(sm.Add(context.Background(), blk3))
+
+	votes := bag.Bag[ids.ID]{}
+	votes.AddCount(blk2.ID(), 1)
+	votes.AddCount(blk3.ID(), 2)
+	require.NoError(sm.RecordPoll(context.Background(), votes))
+	require.Equal(choices.Accepted, blk1.Status())
+	require.Equal(choices.Accepted, blk2.Status())
+	require.Equal(choices.Accepted, blk3.Status())
 }

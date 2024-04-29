@@ -136,8 +136,8 @@ type peer struct {
 	// version is the claimed version the peer is running that we received in
 	// the Handshake message.
 	version *version.Application
-	// trackedSubnets is the subset of subnetIDs the peer sent us in the Handshake
-	// message that we are also tracking.
+	// trackedSubnets are the subnetIDs the peer sent us in the Handshake
+	// message.
 	trackedSubnets set.Set[ids.ID]
 	// options of ACPs provided in the Handshake message.
 	supportedACPs set.Set[uint32]
@@ -967,6 +967,17 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 	}
 
 	// handle subnet IDs
+	if numTrackedSubnets := len(msg.TrackedSubnets); numTrackedSubnets > maxNumTrackedSubnets {
+		p.Log.Debug("message with invalid field",
+			zap.Stringer("nodeID", p.id),
+			zap.Stringer("messageOp", message.HandshakeOp),
+			zap.String("field", "TrackedSubnets"),
+			zap.Int("numTrackedSubnets", numTrackedSubnets),
+		)
+		p.StartClose()
+		return
+	}
+
 	for _, subnetIDBytes := range msg.TrackedSubnets {
 		subnetID, err := ids.ToID(subnetIDBytes)
 		if err != nil {

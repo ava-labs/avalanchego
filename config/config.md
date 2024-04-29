@@ -960,7 +960,7 @@ Snow consensus requires repolling transactions that are issued during low time
 of network usage. This parameter lets one define how aggressive the client will
 be in finalizing these pending transactions. This should only be changed after
 careful consideration of the tradeoffs of Snow consensus. The value must be at
-least `1` and at most `--snow-rogue-commit-threshold`. Defaults to `4`.
+least `1` and at most `--snow-commit-threshold`. Defaults to `4`.
 
 ##### `--snow-sample-size` (int)
 
@@ -977,21 +977,13 @@ transaction. This parameter lets us define the `alpha` value used for consensus.
 This should only be changed after careful consideration of the tradeoffs of Snow
 consensus. The value must be at greater than `k/2`. Defaults to `15`.
 
-##### `--snow-virtuous-commit-threshold` (int)
+##### `--snow-commit-threshold` (int)
 
-Snow consensus defines `beta1` as the number of consecutive polls that a
-virtuous transaction must increase its confidence for it to be accepted. This
-parameter lets us define the `beta1` value used for consensus. This should only
+Snow consensus defines `beta` as the number of consecutive polls that a
+container must increase its confidence for it to be accepted. This
+parameter lets us define the `beta` value used for consensus. This should only
 be changed after careful consideration of the tradeoffs of Snow consensus. The
-value must be at least `1`. Defaults to `15`.
-
-##### `--snow-rogue-commit-threshold` (int)
-
-Snow consensus defines `beta2` as the number of consecutive polls that a rogue
-transaction must increase its confidence for it to be accepted. This parameter
-lets us define the `beta2` value used for consensus. This should only be changed
-after careful consideration of the tradeoffs of Snow consensus. The value must
-be at least `beta1`. Defaults to `20`.
+value must be at least `1`. Defaults to `20`.
 
 ##### `--snow-optimal-processing` (int)
 

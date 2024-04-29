@@ -187,8 +187,8 @@ func (m *metrics) markConnected(peer peer.Peer) {
 	m.connected.Inc()
 
 	trackedSubnets := peer.TrackedSubnets()
-	for subnetID := range trackedSubnets {
-		if m.trackedSubnets.Contains(subnetID) {
+	for subnetID := range m.trackedSubnets {
+		if trackedSubnets.Contains(subnetID) {
 			m.numSubnetPeers.WithLabelValues(subnetID.String()).Inc()
 		}
 	}
@@ -206,8 +206,8 @@ func (m *metrics) markDisconnected(peer peer.Peer) {
 	m.disconnected.Inc()
 
 	trackedSubnets := peer.TrackedSubnets()
-	for subnetID := range trackedSubnets {
-		if m.trackedSubnets.Contains(subnetID) {
+	for subnetID := range m.trackedSubnets {
+		if trackedSubnets.Contains(subnetID) {
 			m.numSubnetPeers.WithLabelValues(subnetID.String()).Dec()
 		}
 	}
