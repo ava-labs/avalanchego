@@ -2774,7 +2774,11 @@ func TestProposerVMInitialPreference(t *testing.T) {
 				nil,
 				&common.SenderTest{},
 			))
-			require.Equal(tt.wantInitialPreferenceID, vm.GetInitialPreference())
+
+			got, err := vm.GetInitialPreference(ctx)
+			require.NoError(err)
+			require.Equal(tt.wantInitialPreferenceID, got)
+
 			require.NoError(vm.Shutdown(ctx))
 		})
 	}
