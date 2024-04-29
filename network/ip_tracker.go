@@ -462,12 +462,14 @@ func (i *ipTracker) removeGossipableIP(nodeID ids.NodeID) {
 	i.numGossipableIPs.Dec()
 }
 
-// GetGossipableIPs returns the latest IPs of connected validators. The returned
-// IPs will not contain [exceptNodeID] or any IPs contained in [exceptIPs]. If
-// the number of eligible IPs to return low, it's possible that every IP will be
-// iterated over while handling this call.
+// GetGossipableIPs returns the latest IPs of connected validators. If
+// [trackedSubnets] is non-nil, only IPs of validators in the provided subnets
+// or the primary network are returned. The returned IPs will not contain
+// [exceptNodeID] or any IPs contained in [exceptIPs]. If the number of eligible
+// IPs to return low, it's possible that every IP will be iterated over while
+// handling this call.
 func (i *ipTracker) GetGossipableIPs(
-	trackedSubnets set.Set[ids.ID],
+	trackedSubnets *set.Set[ids.ID],
 	exceptNodeID ids.NodeID,
 	exceptIPs *bloom.ReadFilter,
 	salt []byte,

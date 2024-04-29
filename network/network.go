@@ -514,7 +514,7 @@ func (n *network) KnownPeers() ([]byte, []byte) {
 }
 
 func (n *network) Peers(
-	trackedSubnets set.Set[ids.ID],
+	trackedSubnets *set.Set[ids.ID],
 	except ids.NodeID,
 	knownPeers *bloom.ReadFilter,
 	salt []byte,
