@@ -177,13 +177,14 @@ func (p *postForkCommonComponents) Verify(
 func (p *postForkCommonComponents) Reject(context.Context) error {
 	// we do not reject the inner block here because that block may be contained
 	// in the proposer block that is causing this block to be rejected.
-	delete(p.vm.verifiedBlocks, p.outerBlk.ID())
+	outerBlkID := p.outerBlk.ID()
+	delete(p.vm.verifiedBlocks, outerBlkID)
 	p.status = choices.Rejected
-	if err := p.vm.State.DeleteVerifiedBlock(p.outerBlk.ID()); err != nil {
+	if err := p.vm.State.DeleteVerifiedBlock(outerBlkID); err != nil {
 		return err
 	}
 
-	return p.vm.State.DeleteBlock(p.outerBlk.ID())
+	return p.vm.State.DeleteBlock(outerBlkID)
 }
 
 // Return the child (a *postForkBlock) of this block
