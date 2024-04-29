@@ -9,32 +9,16 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
-	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-)
-
-var (
-	GenesisID = ids.GenerateTestID()
-	Genesis   = &snowman.TestBlock{TestDecidable: choices.TestDecidable{
-		IDV:     GenesisID,
-		StatusV: choices.Accepted,
-	}}
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
 )
 
 func TestAcceptSingleBlock(t *testing.T) {
 	require := require.New(t)
 
-	block := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		ParentV: Genesis.ID(),
-	}
-
 	tr := New()
 
+	block := snowmantest.BuildChild(snowmantest.Genesis)
 	_, contains := tr.Get(block)
 	require.False(contains)
 
@@ -53,23 +37,10 @@ func TestAcceptSingleBlock(t *testing.T) {
 func TestAcceptBlockConflict(t *testing.T) {
 	require := require.New(t)
 
-	blockToAccept := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		ParentV: Genesis.ID(),
-	}
-
-	blockToReject := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		ParentV: Genesis.ID(),
-	}
-
 	tr := New()
+
+	blockToAccept := snowmantest.BuildChild(snowmantest.Genesis)
+	blockToReject := snowmantest.BuildChild(snowmantest.Genesis)
 
 	// add conflicting blocks
 	tr.Add(blockToAccept)
@@ -96,31 +67,11 @@ func TestAcceptBlockConflict(t *testing.T) {
 func TestAcceptChainConflict(t *testing.T) {
 	require := require.New(t)
 
-	blockToAccept := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		ParentV: Genesis.ID(),
-	}
-
-	blockToReject := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		ParentV: Genesis.ID(),
-	}
-
-	blockToRejectChild := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		ParentV: blockToReject.ID(),
-	}
-
 	tr := New()
+
+	blockToAccept := snowmantest.BuildChild(snowmantest.Genesis)
+	blockToReject := snowmantest.BuildChild(snowmantest.Genesis)
+	blockToRejectChild := snowmantest.BuildChild(blockToReject)
 
 	// add conflicting blocks.
 	tr.Add(blockToAccept)
