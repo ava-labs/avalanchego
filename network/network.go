@@ -263,6 +263,7 @@ func NewNetwork(
 		Network:              nil, // This is set below.
 		Router:               router,
 		VersionCompatibility: version.GetCompatibility(config.NetworkID),
+		MyNodeID:             config.MyNodeID,
 		MySubnets:            config.TrackedSubnets,
 		Beacons:              config.Beacons,
 		Validators:           config.Validators,

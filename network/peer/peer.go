@@ -545,6 +545,7 @@ func (p *peer) writeMessages() {
 		p.ObjectedACPs,
 		knownPeersFilter,
 		knownPeersSalt,
+		p.Validators.GetWeight(constants.PrimaryNetworkID, p.MyNodeID) != 0,
 	)
 	if err != nil {
 		p.Log.Error("failed to create message",
@@ -637,7 +638,11 @@ func (p *peer) sendNetworkMessages() {
 		select {
 		case <-p.getPeerListChan:
 			knownPeersFilter, knownPeersSalt := p.Config.Network.KnownPeers()
-			msg, err := p.Config.MessageCreator.GetPeerList(knownPeersFilter, knownPeersSalt)
+			msg, err := p.Config.MessageCreator.GetPeerList(
+				knownPeersFilter,
+				knownPeersSalt,
+				p.Validators.GetWeight(constants.PrimaryNetworkID, p.MyNodeID) != 0,
+			)
 			if err != nil {
 				p.Log.Error("failed to create get peer list message",
 					zap.Stringer("nodeID", p.id),

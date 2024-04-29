@@ -33,6 +33,7 @@ type Config struct {
 	Network              Network
 	Router               router.InboundHandler
 	VersionCompatibility version.Compatibility
+	MyNodeID             ids.NodeID
 	MySubnets            set.Set[ids.ID]
 	Beacons              validators.Manager
 	Validators           validators.Manager
