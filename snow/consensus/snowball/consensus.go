@@ -59,8 +59,7 @@ type Nnary interface {
 	// Returns the currently preferred choice to be finalized
 	Preference() ids.ID
 
-	// RecordPoll records a poll that reaches at least an alphaPreference
-	// threshold.
+	// RecordPoll records the results of a network poll
 	RecordPoll(count int, choice ids.ID)
 
 	// RecordUnsuccessfulPoll resets the snowflake counter of this instance
@@ -80,8 +79,7 @@ type Binary interface {
 	// Returns the currently preferred choice to be finalized
 	Preference() int
 
-	// RecordPoll records a poll that reaches at least an alphaPreference
-	// threshold.
+	// RecordPoll records the results of a network poll
 	RecordPoll(count, choice int)
 
 	// RecordUnsuccessfulPoll resets the snowflake counter of this instance
@@ -98,8 +96,7 @@ type Binary interface {
 type Unary interface {
 	fmt.Stringer
 
-	// RecordPoll records a poll that reaches at least an alphaPreference
-	// threshold.
+	// RecordPoll records the results of a network poll
 	RecordPoll(count int)
 
 	// RecordUnsuccessfulPoll resets the snowflake counter of this instance
