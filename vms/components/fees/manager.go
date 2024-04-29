@@ -10,6 +10,9 @@ import (
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
+// the update fee algorithm has a UpdateCoefficient, normalized to [CoeffDenom]
+const CoeffDenom = uint64(1_000)
+
 type Manager struct {
 	// Avax denominated fee rates, i.e. fees per unit of complexity.
 	feeRates Dimensions
@@ -142,14 +145,30 @@ func (m *Manager) UpdateFeeRates(
 	return nil
 }
 
-func nextFeeRate(currentFeeRate, coeff, parentBlkComplexity, targetComplexityRate, elapsedTime uint64) uint64 {
+func nextFeeRate(
+	currentFeeRate,
+	coeff,
+	parentBlkComplexity,
+	targetComplexityRate,
+	elapsedTime uint64,
+) uint64 {
 	// We update the fee rate with the formula:
-	// feeRate_{t+1} = feeRate_t * exp{coeff * (parentComplexity - targetComplexity)/(targetComplexity) }
-	// where [targetComplexity] is the complexity expected in the elapsed time.
+	//     feeRate_{t+1} = feeRate_t * exp(delta)
+	// where
+	//     delta == K * (parentComplexity - targetComplexity)/(targetComplexity)
+	// and [targetComplexity] is the median complexity expected in the elapsed time.
 	//
-	// We simplify the exponential for integer math. Specifically we approximate 1/ln(2) with 1_442/1_000
-	// so that exp { x } == 2^{ 1/ln(2) * x } ≈≈ 2^{1_442/1_000 * x}
-	// Finally we round the exponent to a uint64
+	// We approximate the exponential as follows:
+	//
+	//                              1 + k * delta^2 if delta >= 0
+	// feeRate_{t+1} = feeRate_t *
+	//                              1 / (1 + k * delta^2) if delta < 0
+	//
+	// The approximation keeps two key properties of the exponential formula:
+	// 1. It's strictly increasing with delta
+	// 2. It's stable because feeRate(delta) * feeRate(-delta) = 1, meaning that
+	//    if complexity increase and decrease by the same amount in two consecutive blocks
+	//    the fee rate will go back to the original value.
 
 	// parent and child block may have the same timestamp. In this case targetComplexity will match targetComplexityRate
 	elapsedTime = max(1, elapsedTime)
@@ -158,22 +177,37 @@ func nextFeeRate(currentFeeRate, coeff, parentBlkComplexity, targetComplexityRat
 		targetComplexity = math.MaxUint64
 	}
 
-	switch {
-	case parentBlkComplexity > targetComplexity:
-		exp := 1442 * coeff * (parentBlkComplexity - targetComplexity) / targetComplexity / 1000
-		exp = min(exp, 62) // we cap the exponent to avoid an overflow of uint64 type
-		res, over := safemath.Mul64(currentFeeRate, 1<<exp)
-		if over != nil {
-			return math.MaxUint64
-		}
-		return res
-
-	case parentBlkComplexity < targetComplexity:
-		exp := 1442 * coeff * (targetComplexity - parentBlkComplexity) / targetComplexity / 1000
-		exp = min(exp, 62) // we cap the exponent to avoid an overflow of uint64 type
-		return currentFeeRate / (1 << exp)
-
-	default:
-		return currentFeeRate // unitsConsumed == target
+	if parentBlkComplexity == targetComplexity {
+		return currentFeeRate // complexity matches target, nothing to update
 	}
+
+	var (
+		increaseFee bool
+		delta       uint64
+	)
+
+	if targetComplexity < parentBlkComplexity {
+		increaseFee = true
+		delta = parentBlkComplexity - targetComplexity
+	} else {
+		increaseFee = false
+		delta = targetComplexity - parentBlkComplexity
+	}
+
+	num := coeff * delta * delta
+	denom := targetComplexity * targetComplexity * CoeffDenom
+
+	if increaseFee {
+		res, over := safemath.Mul64(currentFeeRate, denom+num)
+		if over != nil {
+			res = math.MaxUint64
+		}
+		return res / denom
+	}
+
+	res, over := safemath.Mul64(currentFeeRate, denom)
+	if over != nil {
+		res = math.MaxUint64
+	}
+	return res / (denom + num)
 }
