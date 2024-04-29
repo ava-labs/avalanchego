@@ -28,11 +28,6 @@ type Flat struct {
 
 func (f *Flat) RecordPoll(votes bag.Bag[ids.ID]) bool {
 	pollMode, numVotes := votes.Mode()
-	if numVotes < f.params.AlphaPreference {
-		f.Nnary.RecordUnsuccessfulPoll()
-		return false
-	}
-
 	f.Nnary.RecordPoll(numVotes, pollMode)
-	return true
+	return numVotes >= f.params.AlphaPreference
 }
