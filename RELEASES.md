@@ -54,6 +54,8 @@ The plugin version is unchanged at `35` and is compatible with versions `v1.11.3
 - Exit topological sort earlier by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2965
 - Consolidate beta by @aaronbuchwald in https://github.com/ava-labs/avalanchego/pull/2949
 - Abandon decided blocks by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2968
+- Bump bufbuild/buf-setup-action from 1.30.0 to 1.31.0 by @dependabot in https://github.com/ava-labs/avalanchego/pull/2923
+- Cleanup test block creation by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2973
 
 ### New Contributors
 
