@@ -49,7 +49,13 @@ func (sb *nnarySnowball) Preference() ids.ID {
 
 func (sb *nnarySnowball) RecordPoll(count int, choice ids.ID) {
 	if count >= sb.alphaPreference {
-		sb.increasePreferenceStrength(choice)
+		preferenceStrength := sb.preferenceStrength[choice] + 1
+		sb.preferenceStrength[choice] = preferenceStrength
+
+		if preferenceStrength > sb.maxPreferenceStrength {
+			sb.preference = choice
+			sb.maxPreferenceStrength = preferenceStrength
+		}
 	}
 	sb.nnarySnowflake.RecordPoll(count, choice)
 }
@@ -57,14 +63,4 @@ func (sb *nnarySnowball) RecordPoll(count int, choice ids.ID) {
 func (sb *nnarySnowball) String() string {
 	return fmt.Sprintf("SB(Preference = %s, PreferenceStrength = %d, %s)",
 		sb.preference, sb.maxPreferenceStrength, &sb.nnarySnowflake)
-}
-
-func (sb *nnarySnowball) increasePreferenceStrength(choice ids.ID) {
-	preferenceStrength := sb.preferenceStrength[choice] + 1
-	sb.preferenceStrength[choice] = preferenceStrength
-
-	if preferenceStrength > sb.maxPreferenceStrength {
-		sb.preference = choice
-		sb.maxPreferenceStrength = preferenceStrength
-	}
 }

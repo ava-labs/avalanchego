@@ -41,7 +41,10 @@ func (sb *binarySnowball) Preference() int {
 
 func (sb *binarySnowball) RecordPoll(count, choice int) {
 	if count >= sb.alphaPreference {
-		sb.increasePreferenceStrength(choice)
+		sb.preferenceStrength[choice]++
+		if sb.preferenceStrength[choice] > sb.preferenceStrength[1-choice] {
+			sb.preference = choice
+		}
 	}
 	sb.binarySnowflake.RecordPoll(count, choice)
 }
@@ -53,11 +56,4 @@ func (sb *binarySnowball) String() string {
 		sb.preferenceStrength[0],
 		sb.preferenceStrength[1],
 		&sb.binarySnowflake)
-}
-
-func (sb *binarySnowball) increasePreferenceStrength(choice int) {
-	sb.preferenceStrength[choice]++
-	if sb.preferenceStrength[choice] > sb.preferenceStrength[1-choice] {
-		sb.preference = choice
-	}
 }
