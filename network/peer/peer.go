@@ -960,17 +960,6 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 		}
 	}
 
-	if numTrackedSubnets := len(msg.TrackedSubnets); numTrackedSubnets > maxNumTrackedSubnets {
-		p.Log.Debug("message with invalid field",
-			zap.Stringer("nodeID", p.id),
-			zap.Stringer("messageOp", message.HandshakeOp),
-			zap.String("field", "TrackedSubnets"),
-			zap.Int("numTrackedSubnets", numTrackedSubnets),
-		)
-		p.StartClose()
-		return
-	}
-
 	// handle subnet IDs
 	if numTrackedSubnets := len(msg.TrackedSubnets); numTrackedSubnets > maxNumTrackedSubnets {
 		p.Log.Debug("message with invalid field",
