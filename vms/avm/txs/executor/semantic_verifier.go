@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm/txs/fees"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"go.uber.org/zap"
 
 	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
@@ -38,21 +39,43 @@ type SemanticVerifier struct {
 	Tx                 *txs.Tx
 
 	// outputs
+	BaseFee       uint64 // NEEDED FOR MEASUREMENTS AND LOGGING
 	TipPercentage commonfees.TipPercentage
 }
 
 func (v *SemanticVerifier) BaseTx(tx *txs.BaseTx) error {
-	return v.verifyBaseTx(tx, nil, nil, v.Tx.Creds)
+	err := v.verifyBaseTx(tx, nil, nil, v.Tx.Creds)
+	if err != nil {
+		return err
+	}
+	v.Ctx.Log.Warn("dynamic fees",
+		zap.String("txType", "BaseTx"),
+		zap.Uint64("fee", v.BaseFee),
+	)
+	return nil
 }
 
 func (v *SemanticVerifier) CreateAssetTx(tx *txs.CreateAssetTx) error {
-	return v.verifyBaseTx(&tx.BaseTx, nil, nil, v.Tx.Creds)
+	err := v.verifyBaseTx(&tx.BaseTx, nil, nil, v.Tx.Creds)
+	if err != nil {
+		return err
+	}
+
+	v.Ctx.Log.Warn("dynamic fees",
+		zap.String("txType", "CreateAssetTx"),
+		zap.Uint64("fee", v.BaseFee),
+	)
+	return nil
 }
 
 func (v *SemanticVerifier) OperationTx(tx *txs.OperationTx) error {
 	if err := v.verifyBaseTx(&tx.BaseTx, nil, nil, v.Tx.Creds); err != nil {
 		return err
 	}
+	v.Ctx.Log.Warn("dynamic fees",
+		zap.String("txType", "OperationTx"),
+		zap.Uint64("fee", v.BaseFee),
+	)
 
 	if !v.Bootstrapped || v.Tx.ID().String() == "MkvpJS13eCnEYeYi9B5zuWrU9goG9RBj7nr83U7BjrFV22a12" {
 		return nil
@@ -74,6 +97,10 @@ func (v *SemanticVerifier) ImportTx(tx *txs.ImportTx) error {
 	if err := v.verifyBaseTx(&tx.BaseTx, tx.ImportedIns, nil, v.Tx.Creds); err != nil {
 		return err
 	}
+	v.Ctx.Log.Warn("dynamic fees",
+		zap.String("txType", "ImportTx"),
+		zap.Uint64("fee", v.BaseFee),
+	)
 
 	if !v.Bootstrapped {
 		return nil
@@ -115,6 +142,10 @@ func (v *SemanticVerifier) ExportTx(tx *txs.ExportTx) error {
 	if err := v.verifyBaseTx(&tx.BaseTx, nil, tx.ExportedOuts, v.Tx.Creds); err != nil {
 		return err
 	}
+	v.Ctx.Log.Warn("dynamic fees",
+		zap.String("txType", "ExportTx"),
+		zap.Uint64("fee", v.BaseFee),
+	)
 
 	if v.Bootstrapped {
 		if err := verify.SameSubnet(context.TODO(), v.Ctx, tx.DestinationChain); err != nil {
@@ -156,6 +187,7 @@ func (v *SemanticVerifier) verifyBaseTx(
 	if err := tx.Visit(feeCalculator); err != nil {
 		return err
 	}
+	v.BaseFee = feeCalculator.Fee
 
 	feesPaid, err := avax.VerifyTx(
 		feeCalculator.Fee,

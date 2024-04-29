@@ -142,21 +142,24 @@ func (b *Block) Verify(context.Context) error {
 		return err
 	}
 
+	totalBlkFees := uint64(0)
 	for _, tx := range txs {
 		// Verify that the tx is valid according to the current state of the
 		// chain.
-		err := tx.Unsigned.Visit(&executor.SemanticVerifier{
+		txExecutor := &executor.SemanticVerifier{
 			Backend:            b.manager.backend,
 			BlkFeeManager:      feeManager,
 			BlockMaxComplexity: feesCfg.BlockMaxComplexity,
 			State:              stateDiff,
 			Tx:                 tx,
-		})
+		}
+		err := tx.Unsigned.Visit(txExecutor)
 		if err != nil {
 			txID := tx.ID()
 			b.manager.mempool.MarkDropped(txID, err)
 			return err
 		}
+		totalBlkFees += txExecutor.BaseFee
 
 		// Apply the txs state changes to the state.
 		//
@@ -215,12 +218,15 @@ func (b *Block) Verify(context.Context) error {
 		stateDiff.SetLastBlockComplexity(feeManager.GetCumulatedComplexity())
 	}
 
-	// b.manager.backend.Ctx.Log.Info(
-	// 	"BLOCK COMPLEXITY",
-	// 	zap.Uint64("blkHeight", b.Height()),
-	// 	zap.Int64("blkTimestamp", b.Timestamp().Unix()),
-	// 	zap.Any("consumedUnits", feeManager.GetCumulatedComplexity()),
-	// )
+	b.manager.backend.Ctx.Log.Info(
+		"BLOCK COMPLEXITY",
+		zap.Stringer("blkID", b.ID()),
+		zap.Uint64("blkHeight", b.Height()),
+		zap.Uint64("blkTimestamp", uint64(b.Timestamp().Unix())),
+		zap.Uint64("total block fees", totalBlkFees),
+		zap.Any("feeRates", feeManager.GetFeeRates()),
+		zap.Any("consumedUnits", feeManager.GetCumulatedComplexity()),
+	)
 
 	stateDiff.SetLastAccepted(blkID)
 	stateDiff.AddBlock(b.Block)
