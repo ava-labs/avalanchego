@@ -216,7 +216,7 @@ func TestPChainFeeRateIncreaseDueToPeak(t *testing.T) {
 			))
 
 		// at peak the total fee for a median complexity tx should be in tens of Avax, no more.
-		fee, err := m.CalculateFee(feesCfg.BlockTargetComplexityRate)
+		fee, err := m.CalculateFee(feesCfg.BlockTargetComplexityRate, NoTip)
 		require.NoError(err)
 		require.Less(fee, 100*units.Avax, fmt.Sprintf("iteration: %d, total: %d", i, len(blockComplexities)))
 
