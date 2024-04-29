@@ -38,7 +38,7 @@ func TestUnarySnowflake(t *testing.T) {
 
 	UnarySnowflakeStateTest(t, sfClone, 1, false)
 
-	binarySnowflake := sfClone.Extend(beta, 0)
+	binarySnowflake := sfClone.Extend(0)
 
 	binarySnowflake.RecordUnsuccessfulPoll()
 

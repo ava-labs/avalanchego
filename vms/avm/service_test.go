@@ -555,6 +555,10 @@ func TestServiceGetTxJSON_BaseTx(t *testing.T) {
 		env.vm.ctx.Lock.Unlock()
 	}()
 
+	// to avoid tests flackiness we fix clock time wrt chain time
+	// so to have stable updated fee rates.
+	env.vm.clock.Set(env.vm.state.GetTimestamp().Add(time.Second))
+
 	newTx := newAvaxBaseTxWithOutputs(t, env)
 	issueAndAccept(require, env.vm, env.issuer, newTx)
 
@@ -593,7 +597,7 @@ func TestServiceGetTxJSON_BaseTx(t *testing.T) {
 					"addresses": [
 						"X-testing1d6kkj0qh4wcmus3tk59npwt3rluc6en72ngurd"
 					],
-					"amount": 999995542,
+					"amount": 999992084,
 					"locktime": 0,
 					"threshold": 1
 				}
@@ -652,6 +656,10 @@ func TestServiceGetTxJSON_ExportTx(t *testing.T) {
 		env.vm.ctx.Lock.Unlock()
 	}()
 
+	// to avoid tests flackiness we fix clock time wrt chain time
+	// so to have stable updated fee rates.
+	env.vm.clock.Set(env.vm.state.GetTimestamp().Add(time.Second))
+
 	newTx := buildTestExportTx(t, env, env.vm.ctx.CChainID)
 	issueAndAccept(require, env.vm, env.issuer, newTx)
 
@@ -677,7 +685,7 @@ func TestServiceGetTxJSON_ExportTx(t *testing.T) {
 					"addresses": [
 						"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
 					],
-					"amount": 999995486,
+					"amount": 999991972,
 					"locktime": 0,
 					"threshold": 1
 				}
@@ -755,6 +763,10 @@ func TestServiceGetTxJSON_CreateAssetTx(t *testing.T) {
 		env.vm.ctx.Lock.Unlock()
 	}()
 
+	// to avoid tests flackiness we fix clock time wrt chain time
+	// so to have stable updated fee rates.
+	env.vm.clock.Set(env.vm.state.GetTimestamp().Add(time.Second))
+
 	initialStates := map[uint32][]verify.State{
 		uint32(0): {
 			&nftfx.MintOutput{
@@ -826,7 +838,7 @@ func TestServiceGetTxJSON_CreateAssetTx(t *testing.T) {
 					"addresses": [
 						"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
 					],
-					"amount": 999996286,
+					"amount": 999992572,
 					"locktime": 0,
 					"threshold": 1
 				}
@@ -921,7 +933,7 @@ func TestServiceGetTxJSON_CreateAssetTx(t *testing.T) {
 			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 			"credential": {
 				"signatures": [
-					"0xf1d2a476b36e07debd906c4aae0238e9d1275c1cfd806ceeb8968818d3df0ad524cdae56b687fde9dbd0a18739da7656d140a675766c164e38af726fa822ad2100"
+					"0xe943dfd81049dc87f0acecd7a94f2b42717891f230ce04d73fe501c9d4e29f8b5fcd3c6b763f1074da01799fb782d221bc6f5fdebce41180b18bd6aa1cff91c700"
 				]
 			}
 		}
@@ -951,6 +963,10 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 		require.NoError(env.vm.Shutdown(context.Background()))
 		env.vm.ctx.Lock.Unlock()
 	}()
+
+	// to avoid tests flackiness we fix clock time wrt chain time
+	// so to have stable updated fee rates.
+	env.vm.clock.Set(env.vm.state.GetTimestamp().Add(time.Second))
 
 	key := keys[0]
 	initialStates := map[uint32][]verify.State{
@@ -1001,7 +1017,7 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 					"addresses": [
 						"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
 					],
-					"amount": 999994946,
+					"amount": 999988192,
 					"locktime": 0,
 					"threshold": 1
 				}
@@ -1009,12 +1025,12 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 		],
 		"inputs": [
 			{
-				"txID": "5qm7raFsDQzXgWJ77ygRZ1Ey4qd1ru5sMhcB8iirkKyQQ736D",
+				"txID": "L46hctVP2oNMKje6VQdk6bSxbXbi2BCgWvWWmHhFJ3yGZMTJc",
 				"outputIndex": 0,
 				"assetID": "tvLKci3hNoCX4NijS6TfiT6XJJY3gGKd2git6SSVTG5J8Nfby",
 				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 				"input": {
-					"amount": 999996646,
+					"amount": 999993292,
 					"signatureIndices": [
 						0
 					]
@@ -1058,7 +1074,7 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 			"credential": {
 				"signatures": [
-					"0x63ce475c0f2abf1d98c68034bdf1409c2ab6e0120753013886f184e5b13b85356ff793fdd38a5b6877022e0e584c610d6b3e077133ed8a7efab36fa631dcf34e01"
+					"0x3ca34a1e672a4d34b0ac30df5b90c0afeda87702464d13e9e69fb6173ae3537b5736c2d72848d86d99d7f91b3475abfba9c0cc32b10a9e29393144e4dedaf44800"
 				]
 			}
 		},
@@ -1066,7 +1082,7 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 			"fxID": "qd2U4HDWUvMrVUeTcCHp6xH3Qpnn1XbU5MDdnBoiifFqvgXwT",
 			"credential": {
 				"signatures": [
-					"0x63ce475c0f2abf1d98c68034bdf1409c2ab6e0120753013886f184e5b13b85356ff793fdd38a5b6877022e0e584c610d6b3e077133ed8a7efab36fa631dcf34e01"
+					"0x3ca34a1e672a4d34b0ac30df5b90c0afeda87702464d13e9e69fb6173ae3537b5736c2d72848d86d99d7f91b3475abfba9c0cc32b10a9e29393144e4dedaf44800"
 				]
 			}
 		}
@@ -1102,6 +1118,10 @@ func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
 		require.NoError(env.vm.Shutdown(context.Background()))
 		env.vm.ctx.Lock.Unlock()
 	}()
+
+	// to avoid tests flackiness we fix clock time wrt chain time
+	// so to have stable updated fee rates.
+	env.vm.clock.Set(env.vm.state.GetTimestamp().Add(time.Second))
 
 	key := keys[0]
 	initialStates := map[uint32][]verify.State{
@@ -1155,7 +1175,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
 					"addresses": [
 						"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
 					],
-					"amount": 999994793,
+					"amount": 999987749,
 					"locktime": 0,
 					"threshold": 1
 				}
@@ -1163,12 +1183,12 @@ func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
 		],
 		"inputs": [
 			{
-				"txID": "yKvG3o8msJ7QAv2T6pvqPbTc1hJpaFUhvsHepRZ9MayMLw2w6",
+				"txID": "2aTrnk4R7eRdaZjYi6JwwVmKkce8xqbXDubYE54q4ojUbkGx51",
 				"outputIndex": 0,
 				"assetID": "tvLKci3hNoCX4NijS6TfiT6XJJY3gGKd2git6SSVTG5J8Nfby",
 				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 				"input": {
-					"amount": 999996630,
+					"amount": 999993260,
 					"signatureIndices": [
 						0
 					]
@@ -1240,7 +1260,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
 			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 			"credential": {
 				"signatures": [
-					"0xc222a8cd263bab6f3895b4623df8ca4346b02c32c9adc63c56d0c7dad5db5d7a0dd7e17ce07cec024de546015868239d04cff92f1c9fc46a9b54426f15d9ab1801"
+					"0x659fa1e905ccdb514746cee3f009d138e7a627504d9d1ac1f0bacfb31cef8250040db7ef63d6b941d3ffcbbd1f32ef236210a303d454a63ab9c7a1a51a07496c01"
 				]
 			}
 		},
@@ -1248,7 +1268,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
 			"fxID": "qd2U4HDWUvMrVUeTcCHp6xH3Qpnn1XbU5MDdnBoiifFqvgXwT",
 			"credential": {
 				"signatures": [
-					"0xc222a8cd263bab6f3895b4623df8ca4346b02c32c9adc63c56d0c7dad5db5d7a0dd7e17ce07cec024de546015868239d04cff92f1c9fc46a9b54426f15d9ab1801"
+					"0x659fa1e905ccdb514746cee3f009d138e7a627504d9d1ac1f0bacfb31cef8250040db7ef63d6b941d3ffcbbd1f32ef236210a303d454a63ab9c7a1a51a07496c01"
 				]
 			}
 		},
@@ -1292,6 +1312,10 @@ func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 		require.NoError(env.vm.Shutdown(context.Background()))
 		env.vm.ctx.Lock.Unlock()
 	}()
+
+	// to avoid tests flackiness we fix clock time wrt chain time
+	// so to have stable updated fee rates.
+	env.vm.clock.Set(env.vm.state.GetTimestamp().Add(time.Second))
 
 	key := keys[0]
 	initialStates := map[uint32][]verify.State{
@@ -1339,7 +1363,7 @@ func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 					"addresses": [
 						"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
 					],
-					"amount": 999994927,
+					"amount": 999988127,
 					"locktime": 0,
 					"threshold": 1
 				}
@@ -1347,12 +1371,12 @@ func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 		],
 		"inputs": [
 			{
-				"txID": "2Pb53uW6P9BpQ9pN4PNffTi8AcLgeALjtTSFTeTL65baHicAR5",
+				"txID": "2amsBFNL9FXTY7A3jZegVgC2fkYcoSVAzUsoh4ywmrCbQXYYDt",
 				"outputIndex": 0,
 				"assetID": "tvLKci3hNoCX4NijS6TfiT6XJJY3gGKd2git6SSVTG5J8Nfby",
 				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 				"input": {
-					"amount": 999996654,
+					"amount": 999993308,
 					"signatureIndices": [
 						0
 					]
@@ -1400,7 +1424,7 @@ func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 			"credential": {
 				"signatures": [
-					"0x67c966f5571b51b25d7890366ecc5548251618966ae1d20bddb89442999e8fda3691619295fdb821e1e8d16fc05e29e4d661535712143b84f1a43070a5e669db01"
+					"0x3398fcc938cf42475a65d1d748e782d0d5be8b0b9039a210e6abe943983953e451fceccc283eda0a93859ac920d0cf45e63b7f326667f7e79ae0573192556f4a00"
 				]
 			}
 		},
@@ -1408,7 +1432,7 @@ func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 			"credential": {
 				"signatures": [
-					"0x67c966f5571b51b25d7890366ecc5548251618966ae1d20bddb89442999e8fda3691619295fdb821e1e8d16fc05e29e4d661535712143b84f1a43070a5e669db01"
+					"0x3398fcc938cf42475a65d1d748e782d0d5be8b0b9039a210e6abe943983953e451fceccc283eda0a93859ac920d0cf45e63b7f326667f7e79ae0573192556f4a00"
 				]
 			}
 		}
@@ -1444,6 +1468,10 @@ func TestServiceGetTxJSON_OperationTxWithMultipleSecpMintOp(t *testing.T) {
 		require.NoError(env.vm.Shutdown(context.Background()))
 		env.vm.ctx.Lock.Unlock()
 	}()
+
+	// to avoid tests flackiness we fix clock time wrt chain time
+	// so to have stable updated fee rates.
+	env.vm.clock.Set(env.vm.state.GetTimestamp().Add(time.Second))
 
 	key := keys[0]
 	initialStates := map[uint32][]verify.State{
@@ -1495,7 +1523,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleSecpMintOp(t *testing.T) {
 					"addresses": [
 						"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
 					],
-					"amount": 999994755,
+					"amount": 999987619,
 					"locktime": 0,
 					"threshold": 1
 				}
@@ -1503,12 +1531,12 @@ func TestServiceGetTxJSON_OperationTxWithMultipleSecpMintOp(t *testing.T) {
 		],
 		"inputs": [
 			{
-				"txID": "2SbcXEUatKafkjWi7ZAnTqjzumyHLM6LNSy2PC5PTqThdibZLZ",
+				"txID": "2XFtZCtpqfcQC8zGDTSfyy8v5ks2WX83Dj4iXfoUjcEcHBA1CJ",
 				"outputIndex": 0,
 				"assetID": "tvLKci3hNoCX4NijS6TfiT6XJJY3gGKd2git6SSVTG5J8Nfby",
 				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 				"input": {
-					"amount": 999996646,
+					"amount": 999993292,
 					"signatureIndices": [
 						0
 					]
@@ -1596,7 +1624,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleSecpMintOp(t *testing.T) {
 			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 			"credential": {
 				"signatures": [
-					"0xf592dc536526516c8df78d787845bb6ae367b0ae62a6db93e4ebc010347c15c704665dc2c6cca3acba2af45190c92fd038e3831aa72f9dad63cce6d56b53fe1e01"
+					"0xd47a9aadf3acb5e46eca69104142c0c9a5b1db36c47255b0b764f56a4e3d0d4769a4a6bb1ca3d5159722635198d1edb85d4914c3732a391a4e8a96cb84205ad001"
 				]
 			}
 		},
@@ -1604,7 +1632,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleSecpMintOp(t *testing.T) {
 			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 			"credential": {
 				"signatures": [
-					"0xf592dc536526516c8df78d787845bb6ae367b0ae62a6db93e4ebc010347c15c704665dc2c6cca3acba2af45190c92fd038e3831aa72f9dad63cce6d56b53fe1e01"
+					"0xd47a9aadf3acb5e46eca69104142c0c9a5b1db36c47255b0b764f56a4e3d0d4769a4a6bb1ca3d5159722635198d1edb85d4914c3732a391a4e8a96cb84205ad001"
 				]
 			}
 		}
@@ -1640,6 +1668,10 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
 		require.NoError(env.vm.Shutdown(context.Background()))
 		env.vm.ctx.Lock.Unlock()
 	}()
+
+	// to avoid tests flackiness we fix clock time wrt chain time
+	// so to have stable updated fee rates.
+	env.vm.clock.Set(env.vm.state.GetTimestamp().Add(time.Second))
 
 	key := keys[0]
 	initialStates := map[uint32][]verify.State{
@@ -1682,7 +1714,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
 					"addresses": [
 						"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
 					],
-					"amount": 999995043,
+					"amount": 999988387,
 					"locktime": 0,
 					"threshold": 1
 				}
@@ -1690,12 +1722,12 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
 		],
 		"inputs": [
 			{
-				"txID": "2QaaDARUZ3uEiGwFfdzhNQUNdFtJVqw7fDevM9evcqsCEyjXo7",
+				"txID": "2qYV13hjDYcy8KQTCT4pUGdN29MTqGHdcgXuZhHhrHAVW4W3Cu",
 				"outputIndex": 0,
 				"assetID": "tvLKci3hNoCX4NijS6TfiT6XJJY3gGKd2git6SSVTG5J8Nfby",
 				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 				"input": {
-					"amount": 999996742,
+					"amount": 999993484,
 					"signatureIndices": [
 						0
 					]
@@ -1740,7 +1772,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
 			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 			"credential": {
 				"signatures": [
-					"0x8c3c994f62e60944c73bab594c8ece929c99b0cc6cb5e67adf760e0ebaa210316599f1e9c51f4e8a703c7e6731a34ff710f06c511875be8d9f834dfd8e05596e01"
+					"0x5d55e6489ba9884d9fc88e1447d55e6a0fab85957e2afce004d85c5f34ce061e68c905707941fe16f59eb15df1ab1067c90c3102fea9e60d2ab505fbdf2d06fe00"
 				]
 			}
 		},
@@ -1784,6 +1816,10 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) 
 		require.NoError(env.vm.Shutdown(context.Background()))
 		env.vm.ctx.Lock.Unlock()
 	}()
+
+	// to avoid tests flackiness we fix clock time wrt chain time
+	// so to have stable updated fee rates.
+	env.vm.clock.Set(env.vm.state.GetTimestamp().Add(time.Second))
 
 	key := keys[0]
 	initialStates := map[uint32][]verify.State{
@@ -1833,7 +1869,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) 
 					"addresses": [
 						"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
 					],
-					"amount": 999994827,
+					"amount": 999987819,
 					"locktime": 0,
 					"threshold": 1
 				}
@@ -1841,12 +1877,12 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) 
 		],
 		"inputs": [
 			{
-				"txID": "27GtULJnoV8AsmqF12nrPE6sMfLpmWxPWdCtnAHFbN1M9p39pG",
+				"txID": "vu6reemKheEHERYDUArcb6U1T3CJWP149ux1Liga1LrcoH7ta",
 				"outputIndex": 0,
 				"assetID": "tvLKci3hNoCX4NijS6TfiT6XJJY3gGKd2git6SSVTG5J8Nfby",
 				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 				"input": {
-					"amount": 999996662,
+					"amount": 999993324,
 					"signatureIndices": [
 						0
 					]
@@ -1920,7 +1956,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) 
 			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 			"credential": {
 				"signatures": [
-					"0xd3a729b8eea5a36ba20f376e190bac4eeaa634351bdf769baf74ce3c8bd4cb860ad85276ca1c9efd059a83690dee1f6d21bc2cf955c3a481cd67722be06d4d7601"
+					"0xbe32eb12a68afae7955b88519c4499ce045f8883076410573fdf00f47139f1533be66ffcce307426a828b8c9a1ea719eb2197bab033e88f0ce05fecdb61d438601"
 				]
 			}
 		},
