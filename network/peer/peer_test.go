@@ -40,7 +40,6 @@ type testPeer struct {
 type rawTestPeer struct {
 	config         *Config
 	cert           *staking.Certificate
-	nodeID         ids.NodeID
 	inboundMsgChan <-chan message.InboundMessage
 }
 
@@ -109,7 +108,7 @@ func newRawTestPeer(t *testing.T, config Config) *rawTestPeer {
 	require.NoError(err)
 	cert, err := staking.ParseCertificate(tlsCert.Leaf.Raw)
 	require.NoError(err)
-	nodeID := ids.NodeIDFromCert(cert)
+	config.MyNodeID = ids.NodeIDFromCert(cert)
 
 	ip := ips.NewDynamicIPPort(net.IPv6loopback, 1)
 	tls := tlsCert.PrivateKey.(crypto.Signer)
@@ -126,7 +125,6 @@ func newRawTestPeer(t *testing.T, config Config) *rawTestPeer {
 	return &rawTestPeer{
 		config:         &config,
 		cert:           cert,
-		nodeID:         nodeID,
 		inboundMsgChan: inboundMsgChan,
 	}
 }
@@ -137,10 +135,10 @@ func startTestPeer(self *rawTestPeer, peer *rawTestPeer, conn net.Conn) *testPee
 			self.config,
 			conn,
 			peer.cert,
-			peer.nodeID,
+			peer.config.MyNodeID,
 			NewThrottledMessageQueue(
 				self.config.Metrics,
-				peer.nodeID,
+				peer.config.MyNodeID,
 				logging.NoLog{},
 				throttling.NewNoOutboundThrottler(),
 			),
@@ -410,7 +408,7 @@ func TestInvalidBLSKeyDisconnects(t *testing.T) {
 
 	require.NoError(rawPeer0.config.Validators.AddStaker(
 		constants.PrimaryNetworkID,
-		rawPeer1.nodeID,
+		rawPeer1.config.MyNodeID,
 		bls.PublicFromSecretKey(rawPeer1.config.IPSigner.blsSigner),
 		ids.GenerateTestID(),
 		1,
@@ -420,7 +418,7 @@ func TestInvalidBLSKeyDisconnects(t *testing.T) {
 	require.NoError(err)
 	require.NoError(rawPeer1.config.Validators.AddStaker(
 		constants.PrimaryNetworkID,
-		rawPeer0.nodeID,
+		rawPeer0.config.MyNodeID,
 		bls.PublicFromSecretKey(bogusBLSKey), // This is the wrong BLS key for this peer
 		ids.GenerateTestID(),
 		1,
