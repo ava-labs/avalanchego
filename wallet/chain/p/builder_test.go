@@ -30,7 +30,6 @@ import (
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
 	stdcontext "context"
-
 	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 	blssigner "github.com/ava-labs/avalanchego/vms/platformvm/signer"
 )
