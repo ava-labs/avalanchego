@@ -329,6 +329,76 @@ func TestPingUptimes(t *testing.T) {
 	}
 }
 
+func TestTrackedSubnets(t *testing.T) {
+	sharedConfig := newConfig(t)
+	rawPeer0 := newRawTestPeer(t, sharedConfig)
+	rawPeer1 := newRawTestPeer(t, sharedConfig)
+
+	tests := []struct {
+		name             string
+		trackedSubnets   set.Set[ids.ID]
+		shouldDisconnect bool
+	}{
+		{
+			name:             "primary network only",
+			trackedSubnets:   nil,
+			shouldDisconnect: false,
+		},
+		{
+			name:             "single subnet",
+			trackedSubnets:   set.Of(ids.GenerateTestID()),
+			shouldDisconnect: false,
+		},
+		{
+			name: "max subnets",
+			trackedSubnets: func() set.Set[ids.ID] {
+				trackedSubnets := set.NewSet[ids.ID](maxNumTrackedSubnets)
+				for i := 0; i < maxNumTrackedSubnets; i++ {
+					trackedSubnets.Add(ids.GenerateTestID())
+				}
+				return trackedSubnets
+			}(),
+			shouldDisconnect: false,
+		},
+		{
+			name: "too many subnets",
+			trackedSubnets: func() set.Set[ids.ID] {
+				trackedSubnets := set.NewSet[ids.ID](maxNumTrackedSubnets + 1)
+				for i := 0; i < maxNumTrackedSubnets+1; i++ {
+					trackedSubnets.Add(ids.GenerateTestID())
+				}
+				return trackedSubnets
+			}(),
+			shouldDisconnect: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
+
+			rawPeer0.config.MySubnets = test.trackedSubnets
+			peer0, peer1 := startTestPeers(rawPeer0, rawPeer1)
+			if test.shouldDisconnect {
+				require.NoError(peer0.AwaitClosed(context.Background()))
+				require.NoError(peer1.AwaitClosed(context.Background()))
+				return
+			}
+
+			defer func() {
+				peer1.StartClose()
+				peer0.StartClose()
+				require.NoError(peer0.AwaitClosed(context.Background()))
+				require.NoError(peer1.AwaitClosed(context.Background()))
+			}()
+
+			awaitReady(t, peer0, peer1)
+			require.Empty(peer0.TrackedSubnets())
+			require.Equal(test.trackedSubnets, peer1.TrackedSubnets())
+		})
+	}
+}
+
 // Test that a peer using the wrong BLS key is disconnected from.
 func TestInvalidBLSKeyDisconnects(t *testing.T) {
 	require := require.New(t)
