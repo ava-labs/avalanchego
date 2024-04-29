@@ -692,40 +692,49 @@ func TestTransactionSkipIndexing(t *testing.T) {
 
 	// test1: Init block chain and check all indices has been skipped.
 	chainDB := rawdb.NewMemoryDatabase()
-	chain, err := createAndInsertChain(chainDB, conf, gspec, blocks, common.Hash{})
+	chain, err := createAndInsertChain(chainDB, conf, gspec, blocks, common.Hash{},
+		func(b *types.Block) {
+			bNumber := b.NumberU64()
+			checkTxIndicesHelper(t, nil, bNumber+1, bNumber+1, bNumber, chainDB, false) // check all indices has been skipped
+		})
 	require.NoError(err)
-	currentBlockNumber := chain.CurrentBlock().Number.Uint64()
-	checkTxIndicesHelper(t, nil, currentBlockNumber+1, currentBlockNumber+1, currentBlockNumber, chainDB, false) // check all indices has been skipped
 	chain.Stop()
 
 	// test2: specify lookuplimit with tx index skipping enabled. Blocks should not be indexed but tail should be updated.
 	conf.TxLookupLimit = 2
-	chain, err = createAndInsertChain(chainDB, conf, gspec, blocks2[0:1], chain.CurrentHeader().Hash())
+	chainDB = rawdb.NewMemoryDatabase()
+	chain, err = createAndInsertChain(chainDB, conf, gspec, blocks, common.Hash{},
+		func(b *types.Block) {
+			bNumber := b.NumberU64()
+			tail := bNumber - conf.TxLookupLimit + 1
+			checkTxIndicesHelper(t, &tail, bNumber+1, bNumber+1, bNumber, chainDB, false) // check all indices has been skipped
+		})
 	require.NoError(err)
-	currentBlockNumber = chain.CurrentBlock().Number.Uint64()
-	tail := currentBlockNumber - conf.TxLookupLimit + 1
-	checkTxIndicesHelper(t, &tail, currentBlockNumber+1, currentBlockNumber+1, currentBlockNumber, chainDB, false) // check all indices has been skipped
 	chain.Stop()
 
 	// test3: tx index skipping and unindexer disabled. Blocks should be indexed and tail should be updated.
 	conf.TxLookupLimit = 0
 	conf.SkipTxIndexing = false
 	chainDB = rawdb.NewMemoryDatabase()
-	chain, err = createAndInsertChain(chainDB, conf, gspec, blocks, common.Hash{})
+	chain, err = createAndInsertChain(chainDB, conf, gspec, blocks, common.Hash{},
+		func(b *types.Block) {
+			bNumber := b.NumberU64()
+			checkTxIndicesHelper(t, nil, 0, bNumber, bNumber, chainDB, false) // check all indices has been indexed
+		})
 	require.NoError(err)
-	currentBlockNumber = chain.CurrentBlock().Number.Uint64()
-	checkTxIndicesHelper(t, nil, 0, currentBlockNumber, currentBlockNumber, chainDB, false) // check all indices has been indexed
 	chain.Stop()
 
 	// now change tx index skipping to true and check that the indices are skipped for the last block
 	// and old indices are removed up to the tail, but [tail, current) indices are still there.
 	conf.TxLookupLimit = 2
 	conf.SkipTxIndexing = true
-	chain, err = createAndInsertChain(chainDB, conf, gspec, blocks2[0:1], chain.CurrentHeader().Hash())
+	chain, err = createAndInsertChain(chainDB, conf, gspec, blocks2[0:1], chain.CurrentHeader().Hash(),
+		func(b *types.Block) {
+			bNumber := b.NumberU64()
+			tail := bNumber - conf.TxLookupLimit + 1
+			checkTxIndicesHelper(t, &tail, tail, bNumber-1, bNumber, chainDB, false)
+		})
 	require.NoError(err)
-	currentBlockNumber = chain.CurrentBlock().Number.Uint64()
-	tail = currentBlockNumber - conf.TxLookupLimit + 1
-	checkTxIndicesHelper(t, &tail, tail, currentBlockNumber-1, currentBlockNumber, chainDB, false)
 	chain.Stop()
 }
 
@@ -1302,7 +1311,7 @@ func TestEIP3651(t *testing.T) {
 	}
 }
 
-func createAndInsertChain(db ethdb.Database, cacheConfig *CacheConfig, gspec *Genesis, blocks types.Blocks, lastAcceptedHash common.Hash) (*BlockChain, error) {
+func createAndInsertChain(db ethdb.Database, cacheConfig *CacheConfig, gspec *Genesis, blocks types.Blocks, lastAcceptedHash common.Hash, accepted func(*types.Block)) (*BlockChain, error) {
 	chain, err := createBlockChain(db, cacheConfig, gspec, lastAcceptedHash)
 	if err != nil {
 		return nil, err
@@ -1316,8 +1325,11 @@ func createAndInsertChain(db ethdb.Database, cacheConfig *CacheConfig, gspec *Ge
 		if err != nil {
 			return nil, err
 		}
+		chain.DrainAcceptorQueue()
+		if accepted != nil {
+			accepted(block)
+		}
 	}
-	chain.DrainAcceptorQueue()
 
 	return chain, nil
 }

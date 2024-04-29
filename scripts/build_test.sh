@@ -3,9 +3,6 @@
 set -o errexit
 set -o nounset
 set -o pipefail
-
-export GOGC=25
-
 # TODO(marun) Ensure the working directory is the repository root or a non-canonical set of tests may be executed
 
 # Root directory
@@ -24,4 +21,4 @@ source "$SUBNET_EVM_PATH"/scripts/constants.sh
 # parallelism, and test coverage.
 # DO NOT RUN tests from the top level "tests" directory since they are run by ginkgo
 # shellcheck disable=SC2046
-go test -shuffle=on -race -coverprofile=coverage.out -covermode=atomic -timeout="30m" "$@" $(go list ./... | grep -v github.com/ava-labs/subnet-evm/tests)
+go test -shuffle=on -race -timeout="${TIMEOUT:-600s}" -coverprofile=coverage.out -covermode=atomic  "$@" $(go list ./... | grep -v github.com/ava-labs/subnet-evm/tests)

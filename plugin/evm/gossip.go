@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -108,10 +109,28 @@ type GossipEthTxPool struct {
 
 	bloom *gossip.BloomFilter
 	lock  sync.RWMutex
+
+	// subscribed is set to true when the gossip subscription is active
+	// mostly used for testing
+	subscribed atomic.Bool
+}
+
+// IsSubscribed returns whether or not the gossip subscription is active.
+func (g *GossipEthTxPool) IsSubscribed() bool {
+	return g.subscribed.Load()
 }
 
 func (g *GossipEthTxPool) Subscribe(ctx context.Context) {
-	g.mempool.SubscribeNewTxsEvent(g.pendingTxs)
+	sub := g.mempool.SubscribeNewTxsEvent(g.pendingTxs)
+	if sub == nil {
+		log.Warn("failed to subscribe to new txs event")
+		return
+	}
+	g.subscribed.CompareAndSwap(false, true)
+	defer func() {
+		sub.Unsubscribe()
+		g.subscribed.CompareAndSwap(true, false)
+	}()
 
 	for {
 		select {

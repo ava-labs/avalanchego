@@ -30,30 +30,23 @@ func GenerateTrie(t *testing.T, trieDB *trie.Database, numKeys int, keySize int)
 	if keySize < wrappers.LongLen+1 {
 		t.Fatal("key size must be at least 9 bytes (8 bytes for uint64 and 1 random byte)")
 	}
-	testTrie := trie.NewEmpty(trieDB)
-
-	keys, values := FillTrie(t, numKeys, keySize, testTrie)
-
-	// Commit the root to [trieDB]
-	root, nodes, err := testTrie.Commit(false)
-	assert.NoError(t, err)
-	err = trieDB.Update(root, types.EmptyRootHash, 0, trienode.NewWithNodeSet(nodes), nil)
-	assert.NoError(t, err)
-	err = trieDB.Commit(root, false)
-	assert.NoError(t, err)
-
-	return root, keys, values
+	return FillTrie(t, 0, numKeys, keySize, trieDB, types.EmptyRootHash)
 }
 
 // FillTrie fills a given trie with [numKeys] number of keys, each of size [keySize]
 // returns inserted keys and values
 // FillTrie reads from [rand] and the caller should call rand.Seed(n) for deterministic results
-func FillTrie(t *testing.T, numKeys int, keySize int, testTrie *trie.Trie) ([][]byte, [][]byte) {
+func FillTrie(t *testing.T, start, numKeys int, keySize int, trieDB *trie.Database, root common.Hash) (common.Hash, [][]byte, [][]byte) {
+	testTrie, err := trie.New(trie.TrieID(root), trieDB)
+	if err != nil {
+		t.Fatalf("error creating trie: %v", err)
+	}
+
 	keys := make([][]byte, 0, numKeys)
 	values := make([][]byte, 0, numKeys)
 
 	// Generate key-value pairs
-	for i := 0; i < numKeys; i++ {
+	for i := start; i < numKeys; i++ {
 		key := make([]byte, keySize)
 		binary.BigEndian.PutUint64(key[:wrappers.LongLen], uint64(i+1))
 		_, err := rand.Read(key[wrappers.LongLen:])
@@ -68,7 +61,16 @@ func FillTrie(t *testing.T, numKeys int, keySize int, testTrie *trie.Trie) ([][]
 		keys = append(keys, key)
 		values = append(values, value)
 	}
-	return keys, values
+
+	// Commit the root to [trieDB]
+	nextRoot, nodes, err := testTrie.Commit(false)
+	assert.NoError(t, err)
+	err = trieDB.Update(nextRoot, root, 0, trienode.NewWithNodeSet(nodes), nil)
+	assert.NoError(t, err)
+	err = trieDB.Commit(nextRoot, false)
+	assert.NoError(t, err)
+
+	return nextRoot, keys, values
 }
 
 // AssertTrieConsistency ensures given trieDB [a] and [b] both have the same

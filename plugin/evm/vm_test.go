@@ -80,9 +80,10 @@ var (
 	password        = "CjasdjhiPeirbSenfeI13" // #nosec G101
 	// Use chainId: 43111, so that it does not overlap with any Avalanche ChainIDs, which may have their
 	// config overridden in vm.Initialize.
+	genesisJSONPreSubnetEVM = `{"config":{"chainId":43111,"homesteadBlock":0,"eip150Block":0,"eip155Block":0,"eip158Block":0,"byzantiumBlock":0,"constantinopleBlock":0,"petersburgBlock":0,"istanbulBlock":0,"muirGlacierBlock":0},"nonce":"0x0","timestamp":"0x0","extraData":"0x00","gasLimit":"0x7A1200","difficulty":"0x0","mixHash":"0x0000000000000000000000000000000000000000000000000000000000000000","coinbase":"0x0000000000000000000000000000000000000000","alloc":{"0x71562b71999873DB5b286dF957af199Ec94617F7": {"balance":"0x4192927743b88000"}, "0x703c4b2bD70c169f5717101CaeE543299Fc946C7": {"balance":"0x4192927743b88000"}},"number":"0x0","gasUsed":"0x0","parentHash":"0x0000000000000000000000000000000000000000000000000000000000000000"}`
 	genesisJSONSubnetEVM    = `{"config":{"chainId":43111,"homesteadBlock":0,"eip150Block":0,"eip155Block":0,"eip158Block":0,"byzantiumBlock":0,"constantinopleBlock":0,"petersburgBlock":0,"istanbulBlock":0,"muirGlacierBlock":0,"subnetEVMTimestamp":0},"nonce":"0x0","timestamp":"0x0","extraData":"0x00","gasLimit":"0x7A1200","difficulty":"0x0","mixHash":"0x0000000000000000000000000000000000000000000000000000000000000000","coinbase":"0x0000000000000000000000000000000000000000","alloc":{"0x71562b71999873DB5b286dF957af199Ec94617F7": {"balance":"0x4192927743b88000"}, "0x703c4b2bD70c169f5717101CaeE543299Fc946C7": {"balance":"0x4192927743b88000"}},"number":"0x0","gasUsed":"0x0","parentHash":"0x0000000000000000000000000000000000000000000000000000000000000000"}`
 	genesisJSONDurango      = `{"config":{"chainId":43111,"homesteadBlock":0,"eip150Block":0,"eip155Block":0,"eip158Block":0,"byzantiumBlock":0,"constantinopleBlock":0,"petersburgBlock":0,"istanbulBlock":0,"muirGlacierBlock":0,"subnetEVMTimestamp":0,"durangoTimestamp":0},"nonce":"0x0","timestamp":"0x0","extraData":"0x00","gasLimit":"0x7A1200","difficulty":"0x0","mixHash":"0x0000000000000000000000000000000000000000000000000000000000000000","coinbase":"0x0000000000000000000000000000000000000000","alloc":{"0x71562b71999873DB5b286dF957af199Ec94617F7": {"balance":"0x4192927743b88000"}, "0x703c4b2bD70c169f5717101CaeE543299Fc946C7": {"balance":"0x4192927743b88000"}},"number":"0x0","gasUsed":"0x0","parentHash":"0x0000000000000000000000000000000000000000000000000000000000000000"}`
-	genesisJSONPreSubnetEVM = `{"config":{"chainId":43111,"homesteadBlock":0,"eip150Block":0,"eip155Block":0,"eip158Block":0,"byzantiumBlock":0,"constantinopleBlock":0,"petersburgBlock":0,"istanbulBlock":0,"muirGlacierBlock":0},"nonce":"0x0","timestamp":"0x0","extraData":"0x00","gasLimit":"0x7A1200","difficulty":"0x0","mixHash":"0x0000000000000000000000000000000000000000000000000000000000000000","coinbase":"0x0000000000000000000000000000000000000000","alloc":{"0x71562b71999873DB5b286dF957af199Ec94617F7": {"balance":"0x4192927743b88000"}, "0x703c4b2bD70c169f5717101CaeE543299Fc946C7": {"balance":"0x4192927743b88000"}},"number":"0x0","gasUsed":"0x0","parentHash":"0x0000000000000000000000000000000000000000000000000000000000000000"}`
+	genesisJSONCancun       = `{"config":{"chainId":43111,"homesteadBlock":0,"eip150Block":0,"eip155Block":0,"eip158Block":0,"byzantiumBlock":0,"constantinopleBlock":0,"petersburgBlock":0,"istanbulBlock":0,"muirGlacierBlock":0,"subnetEVMTimestamp":0,"durangoTimestamp":0,"cancunTime":0},"nonce":"0x0","timestamp":"0x0","extraData":"0x00","gasLimit":"0x7A1200","difficulty":"0x0","mixHash":"0x0000000000000000000000000000000000000000000000000000000000000000","coinbase":"0x0000000000000000000000000000000000000000","alloc":{"0x71562b71999873DB5b286dF957af199Ec94617F7": {"balance":"0x4192927743b88000"}, "0x703c4b2bD70c169f5717101CaeE543299Fc946C7": {"balance":"0x4192927743b88000"}},"number":"0x0","gasUsed":"0x0","parentHash":"0x0000000000000000000000000000000000000000000000000000000000000000"}`
 	genesisJSONLatest       = genesisJSONDurango
 
 	firstTxAmount  = new(big.Int).Mul(big.NewInt(testMinGasPrice), big.NewInt(21000*100))
@@ -3269,4 +3270,110 @@ func TestCrossChainMessagestoVM(t *testing.T) {
 	err = vm.Network.CrossChainAppRequest(context.Background(), requestingChainID, 1, time.Now().Add(60*time.Second), crossChainRequest)
 	require.NoError(err)
 	require.True(calledSendCrossChainAppResponseFn, "sendCrossChainAppResponseFn was not called")
+}
+func TestParentBeaconRootBlock(t *testing.T) {
+	tests := []struct {
+		name          string
+		genesisJSON   string
+		beaconRoot    *common.Hash
+		expectedError bool
+		errString     string
+	}{
+		{
+			name:          "non-empty parent beacon root in Durango",
+			genesisJSON:   genesisJSONDurango,
+			beaconRoot:    &common.Hash{0x01},
+			expectedError: true,
+			// err string wont work because it will also fail with blob gas is non-empty (zeroed)
+		},
+		{
+			name:          "empty parent beacon root in Durango",
+			genesisJSON:   genesisJSONDurango,
+			beaconRoot:    &common.Hash{},
+			expectedError: true,
+		},
+		{
+			name:          "nil parent beacon root in Durango",
+			genesisJSON:   genesisJSONDurango,
+			beaconRoot:    nil,
+			expectedError: false,
+		},
+		{
+			name:          "non-empty parent beacon root in Cancun",
+			genesisJSON:   genesisJSONCancun,
+			beaconRoot:    &common.Hash{0x01},
+			expectedError: true,
+			errString:     "expected empty hash",
+		},
+		{
+			name:          "empty parent beacon root in Cancun",
+			genesisJSON:   genesisJSONCancun,
+			beaconRoot:    &common.Hash{},
+			expectedError: false,
+		},
+		{
+			name:          "nil parent beacon root in Cancun",
+			genesisJSON:   genesisJSONCancun,
+			beaconRoot:    nil,
+			expectedError: true,
+			errString:     "header is missing parentBeaconRoot",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			issuer, vm, _, _ := GenesisVM(t, true, test.genesisJSON, "", "")
+
+			defer func() {
+				if err := vm.Shutdown(context.Background()); err != nil {
+					t.Fatal(err)
+				}
+			}()
+
+			tx := types.NewTransaction(uint64(0), testEthAddrs[1], firstTxAmount, 21000, big.NewInt(testMinGasPrice), nil)
+			signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[0])
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			txErrors := vm.txPool.AddRemotesSync([]*types.Transaction{signedTx})
+			for i, err := range txErrors {
+				if err != nil {
+					t.Fatalf("Failed to add tx at index %d: %s", i, err)
+				}
+			}
+
+			<-issuer
+
+			blk, err := vm.BuildBlock(context.Background())
+			if err != nil {
+				t.Fatalf("Failed to build block with import transaction: %s", err)
+			}
+
+			// Modify the block to have a parent beacon root
+			ethBlock := blk.(*chain.BlockWrapper).Block.(*Block).ethBlock
+			header := types.CopyHeader(ethBlock.Header())
+			header.ParentBeaconRoot = test.beaconRoot
+			parentBeaconEthBlock := ethBlock.WithSeal(header)
+
+			parentBeaconBlock := vm.newBlock(parentBeaconEthBlock)
+
+			errCheck := func(err error) {
+				if test.expectedError {
+					if test.errString != "" {
+						require.ErrorContains(t, err, test.errString)
+					} else {
+						require.Error(t, err)
+					}
+				} else {
+					require.NoError(t, err)
+				}
+			}
+
+			_, err = vm.ParseBlock(context.Background(), parentBeaconBlock.Bytes())
+			errCheck(err)
+			err = parentBeaconBlock.Verify(context.Background())
+			errCheck(err)
+		})
+	}
 }

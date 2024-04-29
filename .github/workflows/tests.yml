@@ -36,19 +36,29 @@ jobs:
         run: scripts/shellcheck.sh
 
   unit_test:
-    name: Golang Unit Tests
-    runs-on: ubuntu-20.04
+    name: Golang Unit Tests v${{ matrix.go }} (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-20.04, ubuntu-latest, windows-latest]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.min_go_version }}
           check-latest: true
+      - name: Set timeout on Windows # Windows UT run slower and need a longer timeout
+        shell: bash
+        if: matrix.os == 'windows-latest'
+        run: echo "TIMEOUT=1200s" >> $GITHUB_ENV
       - run: go mod download
         shell: bash
       - run: ./scripts/build.sh ./build/subnetevm
         shell: bash
-      - run: ./scripts/build_test.sh -race
+      - run: ./scripts/build_test.sh
+        env:
+         TIMEOUT: ${{ env.TIMEOUT }}
         shell: bash
       - run: ./scripts/coverage.sh
         shell: bash

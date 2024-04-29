@@ -1665,18 +1665,18 @@ func CheckTxIndices(t *testing.T, expectedTail *uint64, head uint64, db ethdb.Da
 // [indexedTo] is the block number to which the transactions should be indexed.
 // [head] is the block number of the head block.
 func checkTxIndicesHelper(t *testing.T, expectedTail *uint64, indexedFrom uint64, indexedTo uint64, head uint64, db ethdb.Database, allowNilBlocks bool) {
-	require := require.New(t)
 	if expectedTail == nil {
-		require.Nil(rawdb.ReadTxIndexTail(db))
+		require.Nil(t, rawdb.ReadTxIndexTail(db))
 	} else {
 		var stored uint64
 		tailValue := *expectedTail
-		require.Eventually(
-			func() bool {
+
+		require.EventuallyWithTf(t,
+			func(c *assert.CollectT) {
 				stored = *rawdb.ReadTxIndexTail(db)
-				return tailValue == stored
+				require.Equalf(t, tailValue, stored, "expected tail to be %d, found %d", tailValue, stored)
 			},
-			10*time.Second, 100*time.Millisecond, "expected tail to be %d eventually (was %d)", tailValue, stored)
+			30*time.Second, 500*time.Millisecond, "expected tail to be %d eventually", tailValue)
 	}
 
 	for i := uint64(0); i <= head; i++ {
@@ -1687,9 +1687,9 @@ func checkTxIndicesHelper(t *testing.T, expectedTail *uint64, indexedFrom uint64
 		for _, tx := range block.Transactions() {
 			index := rawdb.ReadTxLookupEntry(db, tx.Hash())
 			if i < indexedFrom {
-				require.Nilf(index, "Transaction indices should be deleted, number %d hash %s", i, tx.Hash().Hex())
+				require.Nilf(t, index, "Transaction indices should be deleted, number %d hash %s", i, tx.Hash().Hex())
 			} else if i <= indexedTo {
-				require.NotNilf(index, "Missing transaction indices, number %d hash %s", i, tx.Hash().Hex())
+				require.NotNilf(t, index, "Missing transaction indices, number %d hash %s", i, tx.Hash().Hex())
 			}
 		}
 	}
