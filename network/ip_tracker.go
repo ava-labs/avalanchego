@@ -92,8 +92,14 @@ type trackedNode struct {
 	manuallyTracked bool
 	// subnets contains all the subnets that this node is a validator of.
 	subnets set.Set[ids.ID]
+	// subnets contains the subset of [subnets] that the local node also tracks.
+	trackedSubnets set.Set[ids.ID]
 	// ip is the most recently known IP of this node.
 	ip *ips.ClaimedIPPort
+}
+
+func (n *trackedNode) wantsConnection() bool {
+	return n.manuallyTracked || n.trackedSubnets.Len() > 0
 }
 
 type connectedNode struct {
@@ -215,18 +221,19 @@ func (i *ipTracker) ManuallyGossip(subnetID ids.ID, nodeID ids.NodeID) {
 
 // WantsConnection returns true if any of the following conditions are met:
 //  1. The node has been manually tracked.
-//  2. The node has been manually gossiped.
-//  3. The node is currently a validator.
+//  2. The node has been manually gossiped on a tracked subnet.
+//  3. The node is currently a validator on a tracked subnet.
 func (i *ipTracker) WantsConnection(nodeID ids.NodeID) bool {
 	i.lock.RLock()
 	defer i.lock.RUnlock()
 
-	return i.trackedIDs.Contains(nodeID)
+	node, ok := i.tracked[nodeID]
+	return ok && node.wantsConnection()
 }
 
 // ShouldVerifyIP is used as an optimization to avoid unnecessary IP
 // verification. It returns true if all of the following conditions are met:
-//  1. The provided IP is from a node whose connection is desired.
+//  1. The provided IP is from a node whose connection is desired on any subnet.
 //  2. This IP is newer than the most recent IP we know of for the node.
 func (i *ipTracker) ShouldVerifyIP(ip *ips.ClaimedIPPort) bool {
 	i.lock.RLock()
@@ -244,29 +251,34 @@ func (i *ipTracker) ShouldVerifyIP(ip *ips.ClaimedIPPort) bool {
 // AddIP attempts to update the node's IP to the provided IP. This function
 // assumes the provided IP has been verified. Returns true if all of the
 // following conditions are met:
-//  1. The provided IP is from a node whose connection is desired.
+//  1. The provided IP is from a node whose connection is desired on a tracked
+//     subnet.
 //  2. This IP is newer than the most recent IP we know of for the node.
 //
-// If the previous IP was marked as gossipable, calling this function will
-// remove the IP from the gossipable set.
+// If the previous IP for this node was marked as gossipable, calling this
+// function will remove the previous IP from the gossipable set.
 func (i *ipTracker) AddIP(ip *ips.ClaimedIPPort) bool {
 	i.lock.Lock()
 	defer i.lock.Unlock()
 
-	return i.addIP(ip) > sameTimestamp
+	timestampComparison, wantsConnection := i.addIP(ip)
+	return wantsConnection && timestampComparison > sameTimestamp
 }
 
-// GetIP returns the most recent IP of the provided nodeID. If a connection to
-// this nodeID is not desired, this function will return false.
+// GetIP returns the most recent IP of the provided nodeID. Returns true if all
+// of the following conditions are met:
+//  1. There is currently an IP for the provided nodeID.
+//  1. The provided IP is from a node whose connection is desired on a tracked
+//     subnet.
 func (i *ipTracker) GetIP(nodeID ids.NodeID) (*ips.ClaimedIPPort, bool) {
 	i.lock.RLock()
 	defer i.lock.RUnlock()
 
 	node, ok := i.tracked[nodeID]
-	if !ok {
+	if !ok || node.ip == nil {
 		return nil, false
 	}
-	return node.ip, node.ip != nil
+	return node.ip, node.wantsConnection()
 }
 
 // Connected is called when a connection is established. The peer should have
@@ -279,15 +291,16 @@ func (i *ipTracker) Connected(ip *ips.ClaimedIPPort, trackedSubnets set.Set[ids.
 		trackedSubnets: trackedSubnets,
 		ip:             ip,
 	}
-	if i.addIP(ip) >= sameTimestamp && i.gossipableIDs.Contains(ip.NodeID) {
+	timestampComparison, _ := i.addIP(ip)
+	if timestampComparison >= sameTimestamp && i.gossipableIDs.Contains(ip.NodeID) {
 		i.addGossipableIP(ip)
 	}
 }
 
-func (i *ipTracker) addIP(ip *ips.ClaimedIPPort) int {
+func (i *ipTracker) addIP(ip *ips.ClaimedIPPort) (int, bool) {
 	node, ok := i.tracked[ip.NodeID]
 	if !ok {
-		return untrackedTimestamp
+		return untrackedTimestamp, false
 	}
 
 	if node.ip == nil {
@@ -296,19 +309,19 @@ func (i *ipTracker) addIP(ip *ips.ClaimedIPPort) int {
 		i.updateMostRecentTrackedIP(ip)
 		// Because we didn't previously have an IP, we know we aren't currently
 		// connected to them.
-		return newTimestamp
+		return newTimestamp, node.wantsConnection()
 	}
 
 	if node.ip.Timestamp > ip.Timestamp {
-		return olderTimestamp // This IP is old than the previously known IP.
+		return olderTimestamp, false // This IP is older than the previously known IP.
 	}
 	if node.ip.Timestamp == ip.Timestamp {
-		return sameTimestamp // This IP is equal to the previously known IP.
+		return sameTimestamp, false // This IP is equal to the previously known IP.
 	}
 
 	i.updateMostRecentTrackedIP(ip)
 	i.removeGossipableIP(ip.NodeID)
-	return newerTimestamp
+	return newerTimestamp, node.wantsConnection()
 }
 
 // Disconnected is called when a connection to the peer is closed.
