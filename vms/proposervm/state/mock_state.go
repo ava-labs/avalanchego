@@ -84,9 +84,9 @@ func (mr *MockStateMockRecorder) DeleteLastAccepted() *gomock.Call {
 }
 
 // DeleteVerifiedBlock mocks base method.
-func (m *MockState) DeleteVerifiedBlock(arg0 ids.ID) error {
+func (m *MockState) DeleteProcessingBlock(arg0 ids.ID) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteVerifiedBlock", arg0)
+	ret := m.ctrl.Call(m, "DeleteProcessingBlock", arg0)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
@@ -94,7 +94,7 @@ func (m *MockState) DeleteVerifiedBlock(arg0 ids.ID) error {
 // DeleteVerifiedBlock indicates an expected call of DeleteVerifiedBlock.
 func (mr *MockStateMockRecorder) DeleteVerifiedBlock(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteVerifiedBlock", reflect.TypeOf((*MockState)(nil).DeleteVerifiedBlock), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteProcessingBlock", reflect.TypeOf((*MockState)(nil).DeleteProcessingBlock), arg0)
 }
 
 // GetBlock mocks base method.
@@ -189,9 +189,9 @@ func (mr *MockStateMockRecorder) GetPreference() *gomock.Call {
 }
 
 // HasVerifiedBlock mocks base method.
-func (m *MockState) HasVerifiedBlock(arg0 ids.ID) (bool, error) {
+func (m *MockState) HasProcessingBlock(arg0 ids.ID) (bool, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "HasVerifiedBlock", arg0)
+	ret := m.ctrl.Call(m, "HasProcessingBlock", arg0)
 	ret0, _ := ret[0].(bool)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
@@ -200,7 +200,7 @@ func (m *MockState) HasVerifiedBlock(arg0 ids.ID) (bool, error) {
 // HasVerifiedBlock indicates an expected call of HasVerifiedBlock.
 func (mr *MockStateMockRecorder) HasVerifiedBlock(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HasVerifiedBlock", reflect.TypeOf((*MockState)(nil).HasVerifiedBlock), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HasProcessingBlock", reflect.TypeOf((*MockState)(nil).HasProcessingBlock), arg0)
 }
 
 // PutBlock mocks base method.
@@ -218,9 +218,9 @@ func (mr *MockStateMockRecorder) PutBlock(arg0, arg1 any) *gomock.Call {
 }
 
 // PutVerifiedBlock mocks base method.
-func (m *MockState) PutVerifiedBlock(arg0 ids.ID) error {
+func (m *MockState) PutProcessingBlock(arg0 ids.ID) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "PutVerifiedBlock", arg0)
+	ret := m.ctrl.Call(m, "PutProcessingBlock", arg0)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
@@ -228,7 +228,7 @@ func (m *MockState) PutVerifiedBlock(arg0 ids.ID) error {
 // PutVerifiedBlock indicates an expected call of PutVerifiedBlock.
 func (mr *MockStateMockRecorder) PutVerifiedBlock(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutVerifiedBlock", reflect.TypeOf((*MockState)(nil).PutVerifiedBlock), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutProcessingBlock", reflect.TypeOf((*MockState)(nil).PutProcessingBlock), arg0)
 }
 
 // SetBlockIDAtHeight mocks base method.

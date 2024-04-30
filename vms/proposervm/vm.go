@@ -669,7 +669,7 @@ func (vm *VM) acceptPostForkBlock(blk PostForkBlock) error {
 	if err := vm.State.PutBlock(blk.getStatelessBlk(), choices.Accepted); err != nil {
 		return err
 	}
-	if err := vm.State.DeleteVerifiedBlock(blkID); err != nil {
+	if err := vm.State.DeleteProcessingBlock(blkID); err != nil {
 		return err
 	}
 	if err := vm.updateHeightIndex(height, blkID); err != nil {
@@ -722,7 +722,7 @@ func (vm *VM) verifyAndRecordInnerBlk(ctx context.Context, blockCtx *block.Conte
 		return err
 	}
 
-	if err := vm.State.PutVerifiedBlock(postFork.ID()); err != nil {
+	if err := vm.State.PutProcessingBlock(postFork.ID()); err != nil {
 		return err
 	}
 

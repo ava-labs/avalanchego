@@ -5,6 +5,7 @@ package state
 
 import (
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 )
 
@@ -15,9 +16,12 @@ const (
 )
 
 var (
-	lastAcceptedKey            = []byte{lastAcceptedByte}
-	preferredKey               = []byte{preferredByte}
-	_               ChainState = (*chainState)(nil)
+	lastAcceptedKey = []byte{lastAcceptedByte}
+	preferredKey    = []byte{preferredByte}
+
+	processingBlockDBPrefix = []byte("processing_block")
+
+	_ ChainState = (*chainState)(nil)
 )
 
 type ChainState interface {
@@ -25,9 +29,9 @@ type ChainState interface {
 	DeleteLastAccepted() error
 	GetLastAccepted() (ids.ID, error)
 
-	PutVerifiedBlock(blkID ids.ID) error
-	HasVerifiedBlock(blkID ids.ID) (bool, error)
-	DeleteVerifiedBlock(blkID ids.ID) error
+	PutProcessingBlock(blkID ids.ID) error
+	HasProcessingBlock(blkID ids.ID) (bool, error)
+	DeleteProcessingBlock(blkID ids.ID) error
 	SetPreference(preferredID ids.ID) error
 	GetPreference() (ids.ID, error)
 }
@@ -35,10 +39,15 @@ type ChainState interface {
 type chainState struct {
 	lastAccepted ids.ID
 	db           database.Database
+
+	processingBlockDB database.Database
 }
 
 func newChainState(db database.Database) *chainState {
-	return &chainState{db: db}
+	return &chainState{
+		db:                db,
+		processingBlockDB: prefixdb.New(processingBlockDBPrefix, db),
+	}
 }
 
 func (s *chainState) SetLastAccepted(blkID ids.ID) error {
@@ -70,16 +79,16 @@ func (s *chainState) GetLastAccepted() (ids.ID, error) {
 	return lastAccepted, nil
 }
 
-func (s *chainState) PutVerifiedBlock(blkID ids.ID) error {
-	return s.db.Put(verifiedBlockKey(blkID), nil)
+func (s *chainState) PutProcessingBlock(blkID ids.ID) error {
+	return s.processingBlockDB.Put(blkID[:], nil)
 }
 
-func (s *chainState) HasVerifiedBlock(blkID ids.ID) (bool, error) {
-	return s.db.Has(verifiedBlockKey(blkID))
+func (s *chainState) HasProcessingBlock(blkID ids.ID) (bool, error) {
+	return s.processingBlockDB.Has(blkID[:])
 }
 
-func (s *chainState) DeleteVerifiedBlock(blkID ids.ID) error {
-	return s.db.Delete(verifiedBlockKey(blkID))
+func (s *chainState) DeleteProcessingBlock(blkID ids.ID) error {
+	return s.processingBlockDB.Delete(blkID[:])
 }
 
 func (s *chainState) SetPreference(preferredID ids.ID) error {
@@ -88,11 +97,4 @@ func (s *chainState) SetPreference(preferredID ids.ID) error {
 
 func (s *chainState) GetPreference() (ids.ID, error) {
 	return database.GetID(s.db, preferredKey)
-}
-
-func verifiedBlockKey(blkID ids.ID) []byte {
-	preferredBlkIDKey := make([]byte, ids.IDLen+1)
-	preferredBlkIDKey[0] = verifiedByte
-	copy(preferredBlkIDKey[1:], blkID[:])
-	return preferredBlkIDKey
 }

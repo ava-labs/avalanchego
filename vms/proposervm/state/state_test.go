@@ -112,7 +112,7 @@ func TestPruneVerifiedBlocksOnRestart(t *testing.T) {
 			require.NoError(state.SetPreference(tt.preferredBlks[len(tt.preferredBlks)-1].ID()))
 
 			for _, blk := range append(tt.preferredBlks, tt.verifiedBlks...) {
-				require.NoError(state.PutVerifiedBlock(blk.ID()))
+				require.NoError(state.PutProcessingBlock(blk.ID()))
 				require.NoError(state.PutBlock(blk, choices.Processing))
 			}
 
@@ -123,7 +123,7 @@ func TestPruneVerifiedBlocksOnRestart(t *testing.T) {
 			require.NoError(err)
 
 			for _, blk := range tt.verifiedBlks {
-				ok, err := state.HasVerifiedBlock(blk.ID())
+				ok, err := state.HasProcessingBlock(blk.ID())
 				require.NoError(err)
 				require.False(ok)
 
@@ -132,7 +132,7 @@ func TestPruneVerifiedBlocksOnRestart(t *testing.T) {
 			}
 
 			for _, blk := range tt.preferredBlks {
-				ok, err := state.HasVerifiedBlock(blk.ID())
+				ok, err := state.HasProcessingBlock(blk.ID())
 				require.NoError(err)
 				require.True(ok)
 			}

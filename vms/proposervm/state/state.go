@@ -98,7 +98,7 @@ func (s *state) pruneVerifiedBlocks(db *versiondb.Database) error {
 			continue
 		}
 
-		if err := s.chainState.DeleteVerifiedBlock(blkID); err != nil {
+		if err := s.chainState.DeleteProcessingBlock(blkID); err != nil {
 			return nil
 		}
 

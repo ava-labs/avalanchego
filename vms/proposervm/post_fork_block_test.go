@@ -1457,7 +1457,7 @@ func TestProposerVMBlockDecision(t *testing.T) {
 
 				require.NoError(builtBlk.Verify(ctx))
 
-				ok, err := vm.State.HasVerifiedBlock(builtBlk.ID())
+				ok, err := vm.State.HasProcessingBlock(builtBlk.ID())
 				require.NoError(err)
 				require.True(ok)
 				gotBlk, status, err := vm.State.GetBlock(builtBlk.ID())
@@ -1484,7 +1484,7 @@ func TestProposerVMBlockDecision(t *testing.T) {
 					}
 				}
 
-				ok, err = vm.State.HasVerifiedBlock(builtBlk.ID())
+				ok, err = vm.State.HasProcessingBlock(builtBlk.ID())
 				require.NoError(err)
 				require.False(ok)
 			}

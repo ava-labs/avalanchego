@@ -180,7 +180,7 @@ func (p *postForkCommonComponents) Reject(context.Context) error {
 	outerBlkID := p.outerBlk.ID()
 	delete(p.vm.verifiedBlocks, outerBlkID)
 	p.status = choices.Rejected
-	if err := p.vm.State.DeleteVerifiedBlock(outerBlkID); err != nil {
+	if err := p.vm.State.DeleteProcessingBlock(outerBlkID); err != nil {
 		return err
 	}
 

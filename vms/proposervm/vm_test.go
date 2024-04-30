@@ -2637,7 +2637,7 @@ func TestBlockDecision(t *testing.T) {
 		require.NoError(err)
 		require.Equal(choices.Processing, gotBlk.Status())
 
-		ok, err := proposerVM.HasVerifiedBlock(builtBlk.ID())
+		ok, err := proposerVM.HasProcessingBlock(builtBlk.ID())
 		require.NoError(err)
 		require.True(ok)
 
@@ -2671,7 +2671,7 @@ func TestBlockDecision(t *testing.T) {
 			require.NoError(builtBlk.Accept(ctx))
 		}
 
-		ok, err = proposerVM.HasVerifiedBlock(builtBlk.ID())
+		ok, err = proposerVM.HasProcessingBlock(builtBlk.ID())
 		require.NoError(err)
 		require.False(ok)
 
