@@ -42,17 +42,17 @@ func TestMeteredState(t *testing.T) {
 	testChainState(a, s)
 }
 
-// We should delete any pending verified blocks on startup, in the event that
-// a block which was previously verified issued to consensus never had
-// accept/reject called on it (e.g. if went offline).
-func TestPruneVerifiedBlocksOnRestart(t *testing.T) {
+// We should delete any pending processing blocks on startup, in the event that
+// a block which was previously processing in consensus never had accept/reject
+// called on it (e.g. if went offline).
+func TestPruneProcessingBlocksOnRestart(t *testing.T) {
 	gBlk, err := block.BuildUnsigned(ids.Empty, time.Time{}, 0, []byte("genesis"))
 	require.NoError(t, err)
 
 	tests := []struct {
-		name          string
-		preferredBlks []block.Block
-		verifiedBlks  []block.Block
+		name           string
+		preferredBlks  []block.Block
+		processingBlks []block.Block
 	}{
 		{
 			//  [g]
@@ -77,17 +77,17 @@ func TestPruneVerifiedBlocksOnRestart(t *testing.T) {
 			// *[1]*   [3]
 			//   |      |
 			// *[2]*   [4]
-			name: "multiple verified branches",
+			name: "multiple processing branches",
 			preferredBlks: func() []block.Block {
-				blk1, err := block.BuildUnsigned(gBlk.ID(), time.Time{}, 0, []byte("block 0"))
+				blk1, err := block.BuildUnsigned(gBlk.ID(), time.Time{}, 0, []byte("block 1"))
 				require.NoError(t, err)
 
-				blk2, err := block.BuildUnsigned(blk1.ID(), time.Time{}, 0, []byte("block 0"))
+				blk2, err := block.BuildUnsigned(blk1.ID(), time.Time{}, 0, []byte("block 2"))
 				require.NoError(t, err)
 
 				return []block.Block{blk1, blk2}
 			}(),
-			verifiedBlks: func() []block.Block {
+			processingBlks: func() []block.Block {
 				blk3, err := block.BuildUnsigned(gBlk.ID(), time.Time{}, 0, []byte("block 3"))
 				require.NoError(t, err)
 
@@ -111,7 +111,7 @@ func TestPruneVerifiedBlocksOnRestart(t *testing.T) {
 			// Our preference is the tip of the preferred chain
 			require.NoError(state.SetPreference(tt.preferredBlks[len(tt.preferredBlks)-1].ID()))
 
-			for _, blk := range append(tt.preferredBlks, tt.verifiedBlks...) {
+			for _, blk := range append(tt.preferredBlks, tt.processingBlks...) {
 				require.NoError(state.PutProcessingBlock(blk.ID()))
 				require.NoError(state.PutBlock(blk, choices.Processing))
 			}
@@ -122,7 +122,7 @@ func TestPruneVerifiedBlocksOnRestart(t *testing.T) {
 			state, err = New(db)
 			require.NoError(err)
 
-			for _, blk := range tt.verifiedBlks {
+			for _, blk := range tt.processingBlks {
 				ok, err := state.HasProcessingBlock(blk.ID())
 				require.NoError(err)
 				require.False(ok)
