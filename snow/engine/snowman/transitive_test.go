@@ -39,6 +39,39 @@ var (
 	errTest           = errors.New("non-nil test")
 )
 
+func BuildOracleBlock(root *snowmantest.Block) *snowman.TestOracleBlock {
+	oracleBlk := BuildBlock(root)
+
+	return &snowman.TestOracleBlock{
+		TestBlock: oracleBlk,
+		OptionsV: [2]snowman.Block{
+			BuildBlock(oracleBlk),
+			BuildBlock(oracleBlk),
+		},
+	}
+}
+
+func BuildBlock(root snowmantest.Block) *snowmantest.Block {
+	return &snowmantest.Block{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentV: root.ID(),
+		HeightV: root.Height() + 1,
+		BytesV:  utils.RandomBytes(32),
+	}
+}
+
+func BuildChain(root *snowmantest.Block, length int) []*snowmantest.Block {
+	chain := make([]*snowmantest.Block, length)
+	for i := range chain {
+		root = BuildBlock(root)
+		chain[i] = root
+	}
+	return chain
+}
+
 func MakeGetBlockF(blks ...[]*snowmantest.Block) func(context.Context, ids.ID) (snowman.Block, error) {
 	return func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		for _, blkSet := range blks {
@@ -51,6 +84,8 @@ func MakeGetBlockF(blks ...[]*snowmantest.Block) func(context.Context, ids.ID) (
 		return nil, errUnknownBlock
 	}
 }
+
+
 
 func MakeParseBlockF(blks ...[]*snowmantest.Block) func(context.Context, []byte) (snowman.Block, error) {
 	return func(_ context.Context, blkBytes []byte) (snowman.Block, error) {
@@ -3028,23 +3063,52 @@ func TestGetProcessingAncestor(t *testing.T) {
 // and any previously processing preferred blocks are issued to consensus
 func TestTransitiveStart(t *testing.T) {
 	tests := []struct {
-		name        string
-		accepted    *snowman.TestBlock
-		preferences []*snowman.TestBlock
+		name               string
+		accepted           snowman.Block
+		preferences        []snowman.Block
+		expectedProcessing int
 	}{
 		{
-			name:     "last accepted",
+			name:     "no blocks in preference chain",
 			accepted: Genesis,
 		},
 		{
-			name:        "single block in preference chain",
-			accepted:    Genesis,
-			preferences: BuildChain(Genesis, 1),
+			name:     "preferred chain before last accepted",
+			accepted: Genesis,
+			preferences: func() []snowman.Block {
+				blk := BuildChain(Genesis, 1)[0]
+				return []snowman.Block{snowman.Block(blk)}
+			}(),
+			expectedProcessing: 1,
 		},
 		{
-			name:        "multiple blocks in preference chain",
+			name:        "preferred chain at last accepted",
 			accepted:    Genesis,
-			preferences: BuildChain(Genesis, 2),
+			preferences: []snowman.Block{Genesis},
+		},
+		{
+			name:     "multiple blocks in preference chain",
+			accepted: Genesis,
+			preferences: func() []snowman.Block {
+				testBlks := BuildChain(Genesis, 2)
+				blks := make([]snowman.Block, 0, len(testBlks))
+
+				for _, blk := range testBlks {
+					blks = append(blks, snowman.Block(blk))
+				}
+
+				return blks
+			}(),
+			expectedProcessing: 2,
+		},
+		{
+			name:     "single oracle block in preference chain",
+			accepted: Genesis,
+			preferences: func() []snowman.Block {
+				blk := BuildOracleBlock(Genesis)
+				return []snowman.Block{snowman.Block(blk)}
+			}(),
+			expectedProcessing: 3,
 		},
 	}
 
@@ -3092,10 +3156,23 @@ func TestTransitiveStart(t *testing.T) {
 				return tt.accepted.ID(), nil
 			}
 
-			blks := make(map[ids.ID]*snowman.TestBlock)
-			blks[tt.accepted.IDV] = tt.accepted
+			blks := make(map[ids.ID]snowman.Block)
+			blks[tt.accepted.ID()] = tt.accepted
 			for _, blk := range tt.preferences {
 				blks[blk.ID()] = blk
+
+				// If this is an oracle block, persist the children
+				oracleBlk, ok := blk.(snowman.OracleBlock)
+				if !ok {
+					continue
+				}
+
+				options, err := oracleBlk.Options(context.Background())
+				require.NoError(err)
+
+				blks[options[0].ID()] = options[0]
+				blks[options[1].ID()] = options[1]
+
 			}
 
 			vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
@@ -3119,22 +3196,53 @@ func TestTransitiveStart(t *testing.T) {
 
 			// Any previously preferred blocks should be re-issued into
 			// consensus
-			require.Equal(len(tt.preferences), te.Consensus.NumProcessing())
-			for _, preference := range tt.preferences {
-				require.True(te.Consensus.Processing(preference.ID()))
-				gotPreference, ok := te.Consensus.PreferenceAtHeight(preference.Height())
-				require.True(ok)
-				require.Equal(preference.ID(), gotPreference)
+			require.Equal(tt.expectedProcessing, te.Consensus.NumProcessing())
+			if tt.expectedProcessing > 0 {
+				for _, preference := range tt.preferences {
+					require.True(te.Consensus.Processing(preference.ID()))
+					require.True(te.Consensus.IsPreferred(preference))
+					gotPreferredID, ok := te.Consensus.PreferenceAtHeight(preference.Height())
+					require.True(ok)
+					require.Equal(preference.ID(), gotPreferredID)
+
+					// If this is an oracle block, verify that we prefer the correct
+					// child option block.
+					oracleBlk, ok := preference.(snowman.OracleBlock)
+					if !ok {
+						continue
+					}
+
+					options, err := oracleBlk.Options(context.Background())
+					require.NoError(err)
+
+					require.True(te.Consensus.Processing(options[0].ID()))
+					require.True(te.Consensus.IsPreferred(options[0]))
+
+					require.True(te.Consensus.Processing(options[1].ID()))
+					require.False(te.Consensus.IsPreferred(options[1]))
+
+					wantPreferredOptionID, ok := te.Consensus.PreferenceAtHeight(preference.Height() + 1)
+					require.True(ok)
+					require.Equal(wantPreferredOptionID, options[0].ID())
+				}
 			}
 
 			// We should prefer the block in our preference chain with the
 			// largest height
-			preferredTip := tt.accepted.ID()
+			preferredTip := tt.accepted
 			if len(tt.preferences) > 0 {
-				preferredTip = tt.preferences[len(tt.preferences)-1].ID()
+				preferredTip = tt.preferences[len(tt.preferences)-1]
 			}
 
-			require.Equal(preferredTip, te.Consensus.Preference())
+			// We should prefer an option block if the tip is an oracle block
+			oracleBlk, ok := preferredTip.(snowman.OracleBlock)
+			if ok {
+				options, err := oracleBlk.Options(context.Background())
+				require.NoError(err)
+				preferredTip = options[0]
+			}
+
+			require.Equal(preferredTip.ID(), te.Consensus.Preference())
 		})
 	}
 }
