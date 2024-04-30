@@ -124,8 +124,6 @@ var (
 	// Its threshold is 2
 	testSubnet1            *txs.Tx
 	testSubnet1ControlKeys = keys[0:3]
-
-	_ smeng.VM = (*testVM)(nil)
 )
 
 func init() {
@@ -1337,10 +1335,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	ctx.Lock.Lock()
 
 	msgChan := make(chan common.Message, 1)
-	consensusVM := &testVM{
-		VM: vm,
-	}
-	require.NoError(consensusVM.Initialize(
+	require.NoError(vm.Initialize(
 		context.Background(),
 		ctx,
 		vmDB,
@@ -1527,7 +1522,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	engineConfig := smeng.Config{
 		Ctx:           bootstrapConfig.Ctx,
 		AllGetsServer: snowGetHandler,
-		VM:            consensusVM,
+		VM:            bootstrapConfig.VM,
 		Sender:        bootstrapConfig.Sender,
 		Validators:    beacons,
 		Params: snowball.Parameters{
@@ -2473,12 +2468,4 @@ func TestPruneMempool(t *testing.T) {
 	require.False(ok)
 	_, ok = vm.Builder.Get(baseTxID)
 	require.True(ok)
-}
-
-type testVM struct {
-	*VM
-}
-
-func (t *testVM) GetInitialPreference() ids.ID {
-	return t.VM.manager.Preferred()
 }

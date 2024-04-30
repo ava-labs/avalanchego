@@ -58,8 +58,8 @@ type Transitive struct {
 	common.AppHandler
 	validators.Connector
 
-	vm        block.GetInitialPreferenceVM
-	requestID uint32
+	getInitialPreferenceVM block.GetInitialPreferenceVM
+	requestID              uint32
 
 	// track outstanding preference requests
 	polls poll.Set
@@ -133,6 +133,7 @@ func New(config Config) (*Transitive, error) {
 		return nil, err
 	}
 
+	getInitialPreferenceVM, _ := config.VM.(block.GetInitialPreferenceVM)
 	return &Transitive{
 		Config:                      config,
 		metrics:                     metrics,
@@ -143,7 +144,7 @@ func New(config Config) (*Transitive, error) {
 		AncestorsHandler:            common.NewNoOpAncestorsHandler(config.Ctx.Log),
 		AppHandler:                  config.VM,
 		Connector:                   config.VM,
-		vm:                          config.VM.(block.GetInitialPreferenceVM),
+		getInitialPreferenceVM:      getInitialPreferenceVM,
 		pending:                     make(map[ids.ID]snowman.Block),
 		nonVerifieds:                ancestor.NewTree(),
 		nonVerifiedCache:            nonVerifiedCache,
@@ -485,11 +486,11 @@ func (t *Transitive) Start(ctx context.Context, startReqID uint32) error {
 
 	// Default to using the last accepted block if the VM does not define its
 	// own initial preferred block.
-	if t.vm == nil {
+	if t.getInitialPreferenceVM == nil {
 		preferredID = lastAcceptedID
 		preferredBlock = lastAccepted
 	} else {
-		preferredID, err := t.vm.GetInitialPreference(ctx)
+		preferredID, err := t.getInitialPreferenceVM.GetInitialPreference(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to get initial preference: %w", err)
 		}

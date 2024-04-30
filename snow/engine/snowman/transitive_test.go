@@ -81,7 +81,7 @@ func MakeLastAcceptedBlockF(defaultBlk *snowmantest.Block, blks ...[]*snowmantes
 	}
 }
 
-func setup(t *testing.T, config Config) (ids.NodeID, validators.Manager, *common.SenderTest, *TestVM, *Transitive) {
+func setup(t *testing.T, config Config) (ids.NodeID, validators.Manager, *common.SenderTest, *block.TestVM, *Transitive) {
 	require := require.New(t)
 
 	vdr := ids.GenerateTestNodeID()
@@ -93,9 +93,7 @@ func setup(t *testing.T, config Config) (ids.NodeID, validators.Manager, *common
 	config.Sender = sender
 	sender.Default(true)
 
-	vm := &TestVM{
-		TestVM: &block.TestVM{},
-	}
+	vm := &block.TestVM{}
 	vm.T = t
 	config.VM = vm
 
@@ -116,10 +114,6 @@ func setup(t *testing.T, config Config) (ids.NodeID, validators.Manager, *common
 
 	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
 		return snowmantest.GenesisID, nil
-	}
-
-	vm.GetInitialPreferenceF = func(ctx context.Context) (ids.ID, error) {
-		return GenesisID, nil
 	}
 
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
@@ -354,9 +348,7 @@ func TestEngineMultipleQuery(t *testing.T) {
 	engCfg.Sender = sender
 	sender.Default(true)
 
-	vm := &TestVM{
-		TestVM: &block.TestVM{},
-	}
+	vm := &block.TestVM{}
 	vm.T = t
 	engCfg.VM = vm
 
@@ -367,11 +359,6 @@ func TestEngineMultipleQuery(t *testing.T) {
 	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
 		return snowmantest.GenesisID, nil
 	}
-
-	vm.GetInitialPreferenceF = func(context.Context) (ids.ID, error) {
-		return GenesisID, nil
-	}
-
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		require.Equal(snowmantest.GenesisID, blkID)
 		return snowmantest.Genesis, nil
@@ -685,9 +672,7 @@ func TestVoteCanceling(t *testing.T) {
 	engCfg.Sender = sender
 	sender.Default(true)
 
-	vm := &TestVM{
-		TestVM: &block.TestVM{},
-	}
+	vm := &block.TestVM{}
 	vm.T = t
 	engCfg.VM = vm
 
@@ -698,11 +683,6 @@ func TestVoteCanceling(t *testing.T) {
 	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
 		return snowmantest.GenesisID, nil
 	}
-
-	vm.GetInitialPreferenceF = func(context.Context) (ids.ID, error) {
-		return GenesisID, nil
-	}
-
 	vm.GetBlockF = func(_ context.Context, id ids.ID) (snowman.Block, error) {
 		require.Equal(snowmantest.GenesisID, id)
 		return snowmantest.Genesis, nil
@@ -761,16 +741,10 @@ func TestEngineNoQuery(t *testing.T) {
 	engCfg.Sender = sender
 	sender.Default(true)
 
-	vm := &TestVM{
-		TestVM: &block.TestVM{},
-	}
+	vm := &block.TestVM{}
 	vm.T = t
 	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
 		return snowmantest.GenesisID, nil
-	}
-
-	vm.GetInitialPreferenceF = func(context.Context) (ids.ID, error) {
-		return GenesisID, nil
 	}
 
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
@@ -807,16 +781,10 @@ func TestEngineNoRepollQuery(t *testing.T) {
 	engCfg.Sender = sender
 	sender.Default(true)
 
-	vm := &TestVM{
-		TestVM: &block.TestVM{},
-	}
+	vm := &block.TestVM{}
 	vm.T = t
 	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
 		return snowmantest.GenesisID, nil
-	}
-
-	vm.GetInitialPreferenceF = func(context.Context) (ids.ID, error) {
-		return GenesisID, nil
 	}
 
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
@@ -1454,9 +1422,7 @@ func TestEngineAggressivePolling(t *testing.T) {
 	engCfg.Sender = sender
 	sender.Default(true)
 
-	vm := &TestVM{
-		TestVM: &block.TestVM{},
-	}
+	vm := &block.TestVM{}
 	vm.T = t
 	engCfg.VM = vm
 
@@ -1467,11 +1433,6 @@ func TestEngineAggressivePolling(t *testing.T) {
 	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
 		return snowmantest.GenesisID, nil
 	}
-
-	vm.GetInitialPreferenceF = func(context.Context) (ids.ID, error) {
-		return GenesisID, nil
-	}
-
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		require.Equal(snowmantest.GenesisID, blkID)
 		return snowmantest.Genesis, nil
@@ -1549,9 +1510,7 @@ func TestEngineDoubleChit(t *testing.T) {
 
 	sender.Default(true)
 
-	vm := &TestVM{
-		TestVM: &block.TestVM{},
-	}
+	vm := &block.TestVM{}
 	vm.T = t
 	engCfg.VM = vm
 
@@ -1562,11 +1521,6 @@ func TestEngineDoubleChit(t *testing.T) {
 	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
 		return snowmantest.GenesisID, nil
 	}
-
-	vm.GetInitialPreferenceF = func(context.Context) (ids.ID, error) {
-		return GenesisID, nil
-	}
-
 	vm.GetBlockF = func(_ context.Context, id ids.ID) (snowman.Block, error) {
 		require.Equal(snowmantest.GenesisID, id)
 		return snowmantest.Genesis, nil
@@ -1642,9 +1596,7 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 	engCfg.Sender = sender
 	sender.Default(true)
 
-	vm := &TestVM{
-		TestVM: &block.TestVM{},
-	}
+	vm := &block.TestVM{}
 	vm.T = t
 	engCfg.VM = vm
 
@@ -1655,11 +1607,6 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
 		return snowmantest.GenesisID, nil
 	}
-
-	vm.GetInitialPreferenceF = func(context.Context) (ids.ID, error) {
-		return GenesisID, nil
-	}
-
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		require.Equal(snowmantest.GenesisID, blkID)
 		return snowmantest.Genesis, nil
@@ -2472,9 +2419,7 @@ func TestEngineApplyAcceptedFrontierInQueryFailed(t *testing.T) {
 
 	sender.Default(true)
 
-	vm := &TestVM{
-		TestVM: &block.TestVM{},
-	}
+	vm := &block.TestVM{}
 	vm.T = t
 	engCfg.VM = vm
 
@@ -2485,11 +2430,6 @@ func TestEngineApplyAcceptedFrontierInQueryFailed(t *testing.T) {
 	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
 		return snowmantest.GenesisID, nil
 	}
-
-	vm.GetInitialPreferenceF = func(context.Context) (ids.ID, error) {
-		return GenesisID, nil
-	}
-
 	vm.GetBlockF = func(_ context.Context, id ids.ID) (snowman.Block, error) {
 		require.Equal(snowmantest.GenesisID, id)
 		return snowmantest.Genesis, nil
@@ -2573,9 +2513,7 @@ func TestEngineRepollsMisconfiguredSubnet(t *testing.T) {
 
 	sender.Default(true)
 
-	vm := &TestVM{
-		TestVM: &block.TestVM{},
-	}
+	vm := &block.TestVM{}
 	vm.T = t
 	engCfg.VM = vm
 
@@ -3148,7 +3086,7 @@ func TestTransitiveStart(t *testing.T) {
 			cfg.Sender = sender
 			sender.Default(true)
 
-			vm := &TestVM{
+			vm := &TestGetInitialPreferenceVM{
 				TestVM: &block.TestVM{},
 			}
 			vm.T = t

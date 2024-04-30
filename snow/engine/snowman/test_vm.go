@@ -11,16 +11,16 @@ import (
 )
 
 var (
-	_ block.ChainVM                = (*TestVM)(nil)
-	_ block.GetInitialPreferenceVM = (*TestVM)(nil)
+	_ block.ChainVM                = (*TestGetInitialPreferenceVM)(nil)
+	_ block.GetInitialPreferenceVM = (*TestGetInitialPreferenceVM)(nil)
 )
 
-type TestVM struct {
+type TestGetInitialPreferenceVM struct {
 	*block.TestVM
 	GetInitialPreferenceF func(ctx context.Context) (ids.ID, error)
 }
 
-func (t *TestVM) GetInitialPreference(ctx context.Context) (ids.ID, error) {
+func (t *TestGetInitialPreferenceVM) GetInitialPreference(ctx context.Context) (ids.ID, error) {
 	if t.GetInitialPreferenceF != nil {
 		return t.GetInitialPreferenceF(ctx)
 	}

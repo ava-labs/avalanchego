@@ -20,7 +20,7 @@ func DefaultConfig(t testing.TB) Config {
 
 	return Config{
 		Ctx: snowtest.ConsensusContext(ctx),
-		VM: &TestVM{
+		VM: &TestGetInitialPreferenceVM{
 			TestVM: &block.TestVM{},
 		},
 		Sender:              &common.SenderTest{},
