@@ -3035,24 +3035,6 @@ func TestTransitiveStart(t *testing.T) {
 		HeightV: 0,
 	}
 
-	blk1 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		ParentV: gBlk.IDV,
-		HeightV: 1,
-	}
-
-	blk2 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		ParentV: blk1.IDV,
-		HeightV: 2,
-	}
-
 	tests := []struct {
 		name        string
 		accepted    *snowman.TestBlock
@@ -3063,14 +3045,45 @@ func TestTransitiveStart(t *testing.T) {
 			accepted: gBlk,
 		},
 		{
-			name:        "single block in preference chain",
-			accepted:    gBlk,
-			preferences: []*snowman.TestBlock{blk1},
+			name:     "single block in preference chain",
+			accepted: gBlk,
+			preferences: func() []*snowman.TestBlock {
+				return []*snowman.TestBlock{
+					{
+						TestDecidable: choices.TestDecidable{
+							IDV:     ids.GenerateTestID(),
+							StatusV: choices.Processing,
+						},
+						ParentV: gBlk.IDV,
+						HeightV: 1,
+					},
+				}
+			}(),
 		},
 		{
-			name:        "multiple blocks in preference chain",
-			accepted:    gBlk,
-			preferences: []*snowman.TestBlock{blk1, blk2},
+			name:     "multiple blocks in preference chain",
+			accepted: gBlk,
+			preferences: func() []*snowman.TestBlock {
+				blk1 := &snowman.TestBlock{
+					TestDecidable: choices.TestDecidable{
+						IDV:     ids.GenerateTestID(),
+						StatusV: choices.Processing,
+					},
+					ParentV: gBlk.IDV,
+					HeightV: 1,
+				}
+
+				blk2 := &snowman.TestBlock{
+					TestDecidable: choices.TestDecidable{
+						IDV:     ids.GenerateTestID(),
+						StatusV: choices.Processing,
+					},
+					ParentV: blk1.IDV,
+					HeightV: 2,
+				}
+
+				return []*snowman.TestBlock{blk1, blk2}
+			}(),
 		},
 	}
 
