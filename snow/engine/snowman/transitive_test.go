@@ -3027,14 +3027,6 @@ func TestGetProcessingAncestor(t *testing.T) {
 // Tests that upon Start consensus is initialized with the last accepted block
 // and any previously processing preferred blocks are issued to consensus
 func TestTransitiveStart(t *testing.T) {
-	gBlk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     Genesis.IDV,
-			StatusV: choices.Accepted,
-		},
-		HeightV: 0,
-	}
-
 	tests := []struct {
 		name        string
 		accepted    *snowman.TestBlock
@@ -3042,48 +3034,17 @@ func TestTransitiveStart(t *testing.T) {
 	}{
 		{
 			name:     "last accepted",
-			accepted: gBlk,
+			accepted: Genesis,
 		},
 		{
-			name:     "single block in preference chain",
-			accepted: gBlk,
-			preferences: func() []*snowman.TestBlock {
-				return []*snowman.TestBlock{
-					{
-						TestDecidable: choices.TestDecidable{
-							IDV:     ids.GenerateTestID(),
-							StatusV: choices.Processing,
-						},
-						ParentV: gBlk.IDV,
-						HeightV: 1,
-					},
-				}
-			}(),
+			name:        "single block in preference chain",
+			accepted:    Genesis,
+			preferences: BuildChain(Genesis, 1),
 		},
 		{
-			name:     "multiple blocks in preference chain",
-			accepted: gBlk,
-			preferences: func() []*snowman.TestBlock {
-				blk1 := &snowman.TestBlock{
-					TestDecidable: choices.TestDecidable{
-						IDV:     ids.GenerateTestID(),
-						StatusV: choices.Processing,
-					},
-					ParentV: gBlk.IDV,
-					HeightV: 1,
-				}
-
-				blk2 := &snowman.TestBlock{
-					TestDecidable: choices.TestDecidable{
-						IDV:     ids.GenerateTestID(),
-						StatusV: choices.Processing,
-					},
-					ParentV: blk1.IDV,
-					HeightV: 2,
-				}
-
-				return []*snowman.TestBlock{blk1, blk2}
-			}(),
+			name:        "multiple blocks in preference chain",
+			accepted:    Genesis,
+			preferences: BuildChain(Genesis, 2),
 		},
 	}
 
