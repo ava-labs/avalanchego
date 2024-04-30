@@ -3062,6 +3062,7 @@ func TestGetProcessingAncestor(t *testing.T) {
 // Tests that upon Start consensus is initialized with the last accepted block
 // and any previously processing preferred blocks are issued to consensus
 func TestTransitiveStart(t *testing.T) {
+	//TODO add preferred chain before last accepted test cases
 	tests := []struct {
 		name               string
 		accepted           snowman.Block
@@ -3073,24 +3074,15 @@ func TestTransitiveStart(t *testing.T) {
 			accepted: Genesis,
 		},
 		{
-			name:     "preferred chain before last accepted",
-			accepted: Genesis,
-			preferences: func() []snowman.Block {
-				blk := BuildChain(Genesis, 1)[0]
-				return []snowman.Block{snowman.Block(blk)}
-			}(),
-			expectedProcessing: 1,
-		},
-		{
 			name:        "preferred chain at last accepted",
 			accepted:    Genesis,
 			preferences: []snowman.Block{Genesis},
 		},
 		{
-			name:     "multiple blocks in preference chain",
+			name:     "preferred chain after last accepted",
 			accepted: Genesis,
 			preferences: func() []snowman.Block {
-				testBlks := BuildChain(Genesis, 2)
+				testBlks := BuildChain(Genesis, 5)
 				blks := make([]snowman.Block, 0, len(testBlks))
 
 				for _, blk := range testBlks {
@@ -3099,10 +3091,10 @@ func TestTransitiveStart(t *testing.T) {
 
 				return blks
 			}(),
-			expectedProcessing: 2,
+			expectedProcessing: 5,
 		},
 		{
-			name:     "single oracle block in preference chain",
+			name:     "preferred chain after last accepted - oracle block",
 			accepted: Genesis,
 			preferences: func() []snowman.Block {
 				blk := BuildOracleBlock(Genesis)
