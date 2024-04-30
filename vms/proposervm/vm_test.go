@@ -2692,24 +2692,59 @@ func TestBlockDecision(t *testing.T) {
 
 // The VM should set its initial preference to its previous preference
 func TestProposerVMInitialPreference(t *testing.T) {
+	cert, err := staking.NewTLSCert()
+	require.NoError(t, err)
+	stakingCert, err := staking.ParseCertificate(cert.Leaf.Raw)
+	require.NoError(t, err)
+	signer := cert.PrivateKey.(crypto.Signer)
+
+	// Create a blockchain with one accepted block and one processing block
+	//	   [0]
+	//		|
+	//	  *[1]*
+	blk0, err := statelessblock.Build(
+		ids.GenerateTestID(),
+		time.Time{},
+		0,
+		stakingCert,
+		[]byte{0},
+		ids.Empty,
+		signer,
+	)
+
+	blk1, err := statelessblock.Build(
+		blk0.ID(),
+		time.Time{},
+		0,
+		stakingCert,
+		[]byte{0},
+		ids.Empty,
+		signer,
+	)
+
 	tests := []struct {
 		name                    string
-		lastAcceptedID          ids.ID
-		initialPreferenceID     ids.ID
+		lastAccepted            statelessblock.Block
+		initialPreference       statelessblock.Block
+		initialPreferenceStatus choices.Status
 		wantInitialPreferenceID ids.ID
 	}{
 		{
-			// if there is no prior preference we should prefer the last
+			// If there is no prior preference we should default to the last
 			// accepted block
-			name:                    "no previous preference",
-			lastAcceptedID:          ids.ID{1},
-			wantInitialPreferenceID: ids.ID{1},
+			name:                    "previous preference is last accepted",
+			lastAccepted:            blk0,
+			initialPreference:       blk0,
+			initialPreferenceStatus: choices.Accepted,
+			wantInitialPreferenceID: blk0.ID(),
 		},
 		{
-			name:                    "previous preference",
-			lastAcceptedID:          ids.ID{1},
-			initialPreferenceID:     ids.ID{2},
-			wantInitialPreferenceID: ids.ID{2},
+			// If there is a prior preference we should prefer it
+			name:                    "previous preference is not last accepted",
+			lastAccepted:            blk0,
+			initialPreference:       blk1,
+			initialPreferenceStatus: choices.Processing,
+			wantInitialPreferenceID: blk1.ID(),
 		},
 	}
 
@@ -2735,7 +2770,7 @@ func TestProposerVMInitialPreference(t *testing.T) {
 					},
 				},
 				LastAcceptedF: func(context.Context) (ids.ID, error) {
-					return tt.lastAcceptedID, nil
+					return tt.lastAccepted.ID(), nil
 				},
 				GetBlockF: func(context.Context, ids.ID) (snowman.Block, error) {
 					return nil, nil
@@ -2757,9 +2792,12 @@ func TestProposerVMInitialPreference(t *testing.T) {
 				nil,
 				&common.SenderTest{},
 			))
-			if tt.initialPreferenceID != ids.Empty {
-				require.NoError(vm.State.SetPreference(tt.initialPreferenceID))
-			}
+
+			require.NoError(vm.State.PutBlock(tt.lastAccepted, choices.Accepted))
+
+			require.NoError(vm.State.PutBlock(tt.initialPreference, tt.initialPreferenceStatus))
+			require.NoError(vm.State.SetPreference(tt.initialPreference.ID()))
+
 			require.NoError(vm.Shutdown(ctx))
 
 			vm = New(innerVM, Config{})

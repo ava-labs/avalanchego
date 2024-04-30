@@ -6,6 +6,7 @@ package proposervm
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -526,19 +527,25 @@ func TestOptionTimestampValidity(t *testing.T) {
 	require.NoError(option.Verify(context.Background()))
 
 	require.NoError(statefulBlock.Accept(context.Background()))
+	require.NoError(proVM.SetPreference(context.Background(), statefulBlock.ID()))
 
 	coreVM.GetBlockF = func(context.Context, ids.ID) (snowman.Block, error) {
 		require.FailNow("called GetBlock when unable to handle the error")
 		return nil, nil
 	}
-	coreVM.ParseBlockF = func(context.Context, []byte) (snowman.Block, error) {
-		require.FailNow("called ParseBlock when unable to handle the error")
-		return nil, nil
+	coreVM.ParseBlockF = func(_ context.Context, blkBytes []byte) (snowman.Block, error) {
+		switch {
+		case bytes.Equal(option.Bytes(), blkBytes):
+			return option, nil
+		default:
+			return nil, fmt.Errorf("called ParseBlock unexpectedly")
+		}
 	}
 
 	require.Equal(oracleBlkTime, option.Timestamp())
 
 	require.NoError(option.Accept(context.Background()))
+	require.NoError(proVM.SetPreference(context.Background(), option.ID()))
 	require.NoError(proVM.Shutdown(context.Background()))
 
 	// Restart the node.
