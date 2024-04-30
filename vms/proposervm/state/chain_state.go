@@ -5,21 +5,17 @@ package state
 
 import (
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 )
 
 const (
 	lastAcceptedByte byte = iota
 	preferredByte
-	verifiedByte
 )
 
 var (
 	lastAcceptedKey = []byte{lastAcceptedByte}
 	preferredKey    = []byte{preferredByte}
-
-	processingBlockDBPrefix = []byte("processing_block")
 
 	_ ChainState = (*chainState)(nil)
 )
@@ -29,9 +25,6 @@ type ChainState interface {
 	DeleteLastAccepted() error
 	GetLastAccepted() (ids.ID, error)
 
-	PutProcessingBlock(blkID ids.ID) error
-	HasProcessingBlock(blkID ids.ID) (bool, error)
-	DeleteProcessingBlock(blkID ids.ID) error
 	SetPreference(preferredID ids.ID) error
 	GetPreference() (ids.ID, error)
 }
@@ -39,15 +32,11 @@ type ChainState interface {
 type chainState struct {
 	lastAccepted ids.ID
 	db           database.Database
-
-	processingBlockDB database.Database
 }
 
+// TODO undo diff
 func newChainState(db database.Database) *chainState {
-	return &chainState{
-		db:                db,
-		processingBlockDB: prefixdb.New(processingBlockDBPrefix, db),
-	}
+	return &chainState{db: db}
 }
 
 func (s *chainState) SetLastAccepted(blkID ids.ID) error {
@@ -77,18 +66,6 @@ func (s *chainState) GetLastAccepted() (ids.ID, error) {
 	}
 	s.lastAccepted = lastAccepted
 	return lastAccepted, nil
-}
-
-func (s *chainState) PutProcessingBlock(blkID ids.ID) error {
-	return s.processingBlockDB.Put(blkID[:], nil)
-}
-
-func (s *chainState) HasProcessingBlock(blkID ids.ID) (bool, error) {
-	return s.processingBlockDB.Has(blkID[:])
-}
-
-func (s *chainState) DeleteProcessingBlock(blkID ids.ID) error {
-	return s.processingBlockDB.Delete(blkID[:])
 }
 
 func (s *chainState) SetPreference(preferredID ids.ID) error {

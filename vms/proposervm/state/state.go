@@ -26,12 +26,14 @@ type State interface {
 	ChainState
 	BlockState
 	HeightIndex
+	ProcessingBlockIndex
 }
 
 type state struct {
 	*chainState
 	BlockState
 	HeightIndex
+	processingBlockIndex
 }
 
 func New(db *versiondb.Database) (State, error) {
@@ -40,9 +42,10 @@ func New(db *versiondb.Database) (State, error) {
 	heightDB := prefixdb.New(heightIndexPrefix, db)
 
 	s := &state{
-		chainState:  newChainState(chainDB),
-		BlockState:  NewBlockState(blockDB),
-		HeightIndex: NewHeightIndex(heightDB, db),
+		chainState:           newChainState(chainDB),
+		BlockState:           NewBlockState(blockDB),
+		HeightIndex:          NewHeightIndex(heightDB, db),
+		processingBlockIndex: newProcessingBlockIndex(db),
 	}
 
 	return s, s.pruneProcessingBlocks(db)
@@ -59,9 +62,10 @@ func NewMetered(db *versiondb.Database, namespace string, metrics prometheus.Reg
 	}
 
 	s := &state{
-		chainState:  newChainState(chainDB),
-		BlockState:  blockState,
-		HeightIndex: NewHeightIndex(heightDB, db),
+		chainState:           newChainState(chainDB),
+		BlockState:           blockState,
+		HeightIndex:          NewHeightIndex(heightDB, db),
+		processingBlockIndex: newProcessingBlockIndex(db),
 	}
 
 	return s, s.pruneProcessingBlocks(db)
@@ -80,18 +84,18 @@ func (s *state) pruneProcessingBlocks(db *versiondb.Database) error {
 	preferredBlkIDs := set.Set[ids.ID]{}
 	preferredBlk, status, err := s.BlockState.GetBlock(preferredID)
 	if err != nil {
-		return fmt.Errorf("failed to get block: %w", err)
+		return fmt.Errorf("failed to get preferred chain tip: %w", err)
 	}
 
 	for status == choices.Processing {
 		preferredBlkIDs.Add(preferredBlk.ID())
 		preferredBlk, status, err = s.BlockState.GetBlock(preferredBlk.ParentID())
 		if err != nil {
-			return fmt.Errorf("failed to get block: %w", err)
+			return fmt.Errorf("failed to get block in preferred chain: %w", err)
 		}
 	}
 
-	iter := s.chainState.processingBlockDB.NewIterator()
+	iter := s.processingBlockIndex.db.NewIterator()
 	defer iter.Release()
 
 	for iter.Next() {
@@ -104,7 +108,7 @@ func (s *state) pruneProcessingBlocks(db *versiondb.Database) error {
 			continue
 		}
 
-		if err := s.chainState.DeleteProcessingBlock(blkID); err != nil {
+		if err := s.processingBlockIndex.DeleteProcessingBlock(blkID); err != nil {
 			return fmt.Errorf("failed to delete processing block from index: %w", err)
 		}
 
