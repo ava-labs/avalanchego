@@ -1,14 +1,12 @@
+# The version is supplied as a build argument rather than hard-coded
+# to minimize the cost of version changes.
+ARG GO_VERSION
+
 # Antithesis: Getting the Antithesis golang instrumentation library
 FROM docker.io/antithesishq/go-instrumentor AS instrumentor
 
-# Changes to the minimum golang version must also be replicated in
-# tests/antithesis/Dockerfile.node (here)
-# tests/antithesis/Dockerfile.workload
-# Dockerfile
-# README.md
-# go.mod
 # ============= Compilation Stage ================
-FROM golang:1.21.9-bullseye AS builder
+FROM golang:$GO_VERSION-bullseye AS builder
 
 WORKDIR /build
 # Copy and download avalanche dependencies using go mod
@@ -30,7 +28,7 @@ COPY --from=instrumentor /opt/antithesis/lib /lib
 RUN mkdir -p /avalanchego_instrumented
 
 # Park the .git file in a safe location
-RUN mkdir -p /opt/tmp/ 
+RUN mkdir -p /opt/tmp/
 RUN cp -r .git /opt/tmp/
 
 # Instrument avalanchego
