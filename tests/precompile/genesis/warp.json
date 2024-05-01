@@ -21,7 +21,7 @@
       "blockGasCostStep": 500000
     },
     "warpConfig": {
-      "blockTimestamp": 0
+      "blockTimestamp": 1607144400
     }
   },
   "alloc": {
@@ -33,7 +33,7 @@
     }
   },
   "nonce": "0x0",
-  "timestamp": "0x0",
+  "timestamp": "0x5FCB13D0",
   "extraData": "0x00",
   "gasLimit": "0x1312D00",
   "difficulty": "0x0",

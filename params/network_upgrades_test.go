@@ -181,7 +181,8 @@ func TestVerifyNetworkUpgrades(t *testing.T) {
 			name: "ValidNetworkUpgrades",
 			upgrades: &NetworkUpgrades{
 				SubnetEVMTimestamp: utils.NewUint64(0),
-				DurangoTimestamp:   utils.NewUint64(2),
+				DurangoTimestamp:   utils.NewUint64(1607144400),
+				EUpgradeTimestamp:  utils.NewUint64(1607144400),
 			},
 			networkID: 1111,
 			expected:  true,
@@ -213,10 +214,30 @@ func TestVerifyNetworkUpgrades(t *testing.T) {
 			networkID: constants.MainnetID,
 			expected:  false,
 		},
+		{
+			name: "Invalid EUpgrade nil",
+			upgrades: &NetworkUpgrades{
+				SubnetEVMTimestamp: utils.NewUint64(0),
+				DurangoTimestamp:   utils.NewUint64(2),
+				EUpgradeTimestamp:  nil,
+			},
+			networkID: 1,
+			expected:  false,
+		},
+		{
+			name: "Invalid EUpgrade before Durango",
+			upgrades: &NetworkUpgrades{
+				SubnetEVMTimestamp: utils.NewUint64(0),
+				DurangoTimestamp:   utils.NewUint64(2),
+				EUpgradeTimestamp:  utils.NewUint64(1),
+			},
+			networkID: 1,
+			expected:  false,
+		},
 	}
 	for _, test := range testcases {
 		t.Run(test.name, func(t *testing.T) {
-			err := test.upgrades.VerifyNetworkUpgrades(test.networkID)
+			err := test.upgrades.verifyNetworkUpgrades(test.networkID)
 			if test.expected {
 				require.Nil(t, err)
 			} else {

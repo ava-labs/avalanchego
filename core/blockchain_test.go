@@ -1215,7 +1215,8 @@ func TestEIP3651(t *testing.T) {
 		addr2   = crypto.PubkeyToAddress(key2.PublicKey)
 		funds   = new(big.Int).Mul(common.Big1, big.NewInt(params.Ether))
 		gspec   = &Genesis{
-			Config: params.TestChainConfig,
+			Config:    params.TestChainConfig,
+			Timestamp: uint64(params.DefaultGenesisTime.Unix()),
 			Alloc: GenesisAlloc{
 				addr1: {Balance: funds},
 				addr2: {Balance: funds},

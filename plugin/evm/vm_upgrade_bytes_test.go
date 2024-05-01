@@ -14,6 +14,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/snow"
 	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
 	"github.com/ava-labs/subnet-evm/core"
 	"github.com/ava-labs/subnet-evm/core/types"
@@ -30,9 +31,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var (
+	DefaultEUpgradeTime = uint64(version.GetEUpgradeTime(testNetworkID).Unix())
+)
+
 func TestVMUpgradeBytesPrecompile(t *testing.T) {
 	// Make a TxAllowListConfig upgrade at genesis and convert it to JSON to apply as upgradeBytes.
-	enableAllowListTimestamp := time.Unix(0, 0) // enable at genesis
+	enableAllowListTimestamp := params.DefaultGenesisTime // enable at default genesis time
 	upgradeConfig := &params.UpgradeConfig{
 		PrecompileUpgrades: []params.PrecompileUpgrade{
 			{
@@ -47,6 +52,7 @@ func TestVMUpgradeBytesPrecompile(t *testing.T) {
 
 	// initialize the VM with these upgrade bytes
 	issuer, vm, dbManager, appSender := GenesisVM(t, true, genesisJSONSubnetEVM, "", string(upgradeBytesJSON))
+	vm.clock.Set(enableAllowListTimestamp)
 
 	// Submit a successful transaction
 	tx0 := types.NewTransaction(uint64(0), testEthAddrs[0], big.NewInt(1), 21000, big.NewInt(testMinGasPrice), nil)
@@ -75,7 +81,7 @@ func TestVMUpgradeBytesPrecompile(t *testing.T) {
 	}
 
 	// prepare the new upgrade bytes to disable the TxAllowList
-	disableAllowListTimestamp := enableAllowListTimestamp.Add(10 * time.Hour) // arbitrary choice
+	disableAllowListTimestamp := vm.clock.Time().Add(10 * time.Hour) // arbitrary choice
 	upgradeConfig.PrecompileUpgrades = append(
 		upgradeConfig.PrecompileUpgrades,
 		params.PrecompileUpgrade{
@@ -171,7 +177,7 @@ func TestNetworkUpgradesOverriden(t *testing.T) {
 	upgradeBytesJSON := `{
 			"networkUpgradeOverrides": {
 				"subnetEVMTimestamp": 2,
-				"durangoTimestamp": 5
+				"durangoTimestamp": 1607144402
 			}
 		}`
 
@@ -206,7 +212,8 @@ func TestNetworkUpgradesOverriden(t *testing.T) {
 	require.False(t, vm.chainConfig.IsSubnetEVM(0))
 	require.True(t, vm.chainConfig.IsSubnetEVM(2))
 	require.False(t, vm.chainConfig.IsDurango(0))
-	require.True(t, vm.chainConfig.IsDurango(5))
+	require.False(t, vm.chainConfig.IsDurango(uint64(version.DefaultUpgradeTime.Unix())))
+	require.True(t, vm.chainConfig.IsDurango(1607144402))
 }
 
 func mustMarshal(t *testing.T, v interface{}) string {
@@ -249,7 +256,7 @@ func TestVMStateUpgrade(t *testing.T) {
 		Code:          upgradedCode,
 	}
 
-	upgradeTimestamp := time.Unix(10, 0) // arbitrary timestamp to perform the network upgrade
+	upgradeTimestamp := params.DefaultGenesisTime.Add(10 * time.Hour)
 	upgradeBytesJSON := fmt.Sprintf(
 		`{
 			"stateUpgrades": [
@@ -317,4 +324,64 @@ func TestVMStateUpgrade(t *testing.T) {
 	require.Equal(t, state.GetCodeHash(newAccount), crypto.Keccak256Hash(upgradedCode))
 	require.Equal(t, state.GetNonce(newAccount), uint64(1)) // Nonce should be set to 1 when code is set if nonce was 0
 	require.Equal(t, state.GetState(newAccount, storageKey), newAccountUpgrade.Storage[storageKey])
+}
+
+func TestVMEupgradeActivatesCancun(t *testing.T) {
+	tests := []struct {
+		name        string
+		genesisJSON string
+		upgradeJSON string
+		check       func(*testing.T, *VM) // function to check the VM state
+	}{
+		{
+			name:        "EUpgrade activates Cancun",
+			genesisJSON: genesisJSONEUpgrade,
+			check: func(t *testing.T, vm *VM) {
+				require.True(t, vm.chainConfig.IsCancun(common.Big0, DefaultEUpgradeTime))
+			},
+		},
+		{
+			name:        "Later EUpgrade activates Cancun",
+			genesisJSON: genesisJSONDurango,
+			upgradeJSON: func() string {
+				upgrade := &params.UpgradeConfig{
+					NetworkUpgradeOverrides: &params.NetworkUpgrades{
+						EUpgradeTimestamp: utils.NewUint64(DefaultEUpgradeTime + 2),
+					},
+				}
+				b, err := json.Marshal(upgrade)
+				require.NoError(t, err)
+				return string(b)
+			}(),
+			check: func(t *testing.T, vm *VM) {
+				require.False(t, vm.chainConfig.IsCancun(common.Big0, DefaultEUpgradeTime))
+				require.True(t, vm.chainConfig.IsCancun(common.Big0, DefaultEUpgradeTime+2))
+			},
+		},
+		{
+			name:        "Changed EUpgrade changes Cancun",
+			genesisJSON: genesisJSONEUpgrade,
+			upgradeJSON: func() string {
+				upgrade := &params.UpgradeConfig{
+					NetworkUpgradeOverrides: &params.NetworkUpgrades{
+						EUpgradeTimestamp: utils.NewUint64(DefaultEUpgradeTime + 2),
+					},
+				}
+				b, err := json.Marshal(upgrade)
+				require.NoError(t, err)
+				return string(b)
+			}(),
+			check: func(t *testing.T, vm *VM) {
+				require.False(t, vm.chainConfig.IsCancun(common.Big0, DefaultEUpgradeTime))
+				require.True(t, vm.chainConfig.IsCancun(common.Big0, DefaultEUpgradeTime+2))
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			_, vm, _, _ := GenesisVM(t, true, test.genesisJSON, "", test.upgradeJSON)
+			defer func() { require.NoError(t, vm.Shutdown(context.Background())) }()
+			test.check(t, vm)
+		})
+	}
 }

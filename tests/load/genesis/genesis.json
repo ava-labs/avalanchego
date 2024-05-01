@@ -1,16 +1,6 @@
 {
   "config": {
     "chainId": 99999,
-    "homesteadBlock": 0,
-    "eip150Block": 0,
-    "eip155Block": 0,
-    "eip158Block": 0,
-    "byzantiumBlock": 0,
-    "constantinopleBlock": 0,
-    "petersburgBlock": 0,
-    "istanbulBlock": 0,
-    "muirGlacierBlock": 0,
-    "subnetEVMTimestamp": 0,
     "feeConfig": {
       "gasLimit": 200000000,
       "minBaseFee": 1000000000,
@@ -31,7 +21,7 @@
     }
   },
   "nonce": "0x0",
-  "timestamp": "0x0",
+  "timestamp": "0x5FCB13D0",
   "extraData": "0x00",
   "gasLimit": "0xBEBC200",
   "difficulty": "0x0",

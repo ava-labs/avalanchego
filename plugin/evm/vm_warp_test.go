@@ -49,7 +49,7 @@ func TestSendWarpMessage(t *testing.T) {
 	genesis := &core.Genesis{}
 	require.NoError(genesis.UnmarshalJSON([]byte(genesisJSONDurango)))
 	genesis.Config.GenesisPrecompiles = params.Precompiles{
-		warp.ConfigKey: warp.NewDefaultConfig(utils.NewUint64(0)),
+		warp.ConfigKey: warp.NewDefaultConfig(utils.TimeToNewUint64(params.DefaultGenesisTime)),
 	}
 	genesisJSON, err := genesis.MarshalJSON()
 	require.NoError(err)
@@ -249,7 +249,7 @@ func testWarpVMTransaction(t *testing.T, unsignedMessage *avalancheWarp.Unsigned
 	genesis := &core.Genesis{}
 	require.NoError(genesis.UnmarshalJSON([]byte(genesisJSONDurango)))
 	genesis.Config.GenesisPrecompiles = params.Precompiles{
-		warp.ConfigKey: warp.NewDefaultConfig(utils.NewUint64(0)),
+		warp.ConfigKey: warp.NewDefaultConfig(utils.TimeToNewUint64(params.DefaultGenesisTime)),
 	}
 	genesisJSON, err := genesis.MarshalJSON()
 	require.NoError(err)
@@ -406,7 +406,7 @@ func TestReceiveWarpMessage(t *testing.T) {
 	genesis := &core.Genesis{}
 	require.NoError(genesis.UnmarshalJSON([]byte(genesisJSONDurango)))
 	genesis.Config.GenesisPrecompiles = params.Precompiles{
-		warp.ConfigKey: warp.NewDefaultConfig(utils.NewUint64(0)),
+		warp.ConfigKey: warp.NewDefaultConfig(utils.TimeToNewUint64(params.DefaultGenesisTime)),
 	}
 	genesisJSON, err := genesis.MarshalJSON()
 	require.NoError(err)
