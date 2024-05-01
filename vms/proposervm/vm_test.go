@@ -2821,3 +2821,107 @@ func TestProposerVMInitialPreference(t *testing.T) {
 		})
 	}
 }
+
+func TestOnlyPreferredOptionPersisted(t *testing.T) {
+	require := require.New(t)
+	ctx := context.Background()
+
+	innerVM := &block.TestVM{
+		TestVM: common.TestVM{
+			InitializeF: func(
+				context.Context,
+				*snow.Context,
+				database.Database,
+				[]byte,
+				[]byte,
+				[]byte,
+				chan<- common.Message,
+				[]*common.Fx,
+				common.AppSender,
+			) error {
+				return nil
+			},
+		},
+	}
+
+	chainCtx := snowtest.Context(t, ids.GenerateTestID())
+	db := memdb.New()
+
+	vm := New(innerVM, Config{})
+	require.NoError(vm.Initialize(
+		ctx,
+		chainCtx,
+		db,
+		nil,
+		nil,
+		nil,
+		make(chan common.Message),
+		nil,
+		&common.SenderTest{},
+	))
+
+	innerBlk := &snowman.TestOracleBlock{
+		TestBlock: &snowman.TestBlock{},
+		OptionsV: [2]snowman.Block{
+			&snowman.TestBlock{
+				TestDecidable: choices.TestDecidable{
+					IDV: ids.GenerateTestID(),
+				},
+			},
+			&snowman.TestBlock{
+				TestDecidable: choices.TestDecidable{
+					IDV: ids.GenerateTestID(),
+				},
+			},
+		},
+	}
+
+	cert, err := staking.NewTLSCert()
+	require.NoError(err)
+
+	stakingCert, err := staking.ParseCertificate(cert.Leaf.Raw)
+	require.NoError(err)
+
+	outerBlk, err := statelessblock.Build(
+		ids.GenerateTestID(),
+		time.Time{},
+		0,
+		stakingCert,
+		[]byte("foobar"),
+		ids.GenerateTestID(),
+		cert.PrivateKey.(crypto.Signer),
+	)
+	require.NoError(err)
+
+	blk := postForkBlock{
+		SignedBlock: outerBlk,
+		postForkCommonComponents: postForkCommonComponents{
+			vm:       vm,
+			outerBlk: outerBlk,
+			innerBlk: innerBlk,
+			status:   choices.Processing,
+		},
+	}
+
+	options, err := blk.Options(ctx)
+	require.NoError(blk.Verify(ctx))
+
+	optionBlk0 := options[0]
+	optionBlk1 := options[1]
+
+	require.NoError(optionBlk0.Verify(ctx))
+	require.NoError(optionBlk1.Verify(ctx))
+
+	// invariant: we prefer the first option
+	require.NoError(vm.SetPreference(ctx, optionBlk0.ID()))
+
+	// invariant: we only store the preferred chain
+	require.True(vm.HasProcessingBlock(blk.ID()))
+	require.True(vm.HasProcessingBlock(optionBlk0.ID()))
+	require.False(vm.HasProcessingBlock(optionBlk1.ID()))
+
+	// changing preferences should still persist the correct chain
+	require.True(vm.HasProcessingBlock(blk.ID()))
+	require.False(vm.HasProcessingBlock(optionBlk0.ID()))
+	require.True(vm.HasProcessingBlock(optionBlk1.ID()))
+}
