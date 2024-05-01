@@ -36,10 +36,8 @@ import (
 	"time"
 
 	"github.com/ava-labs/subnet-evm/accounts"
-	"github.com/ava-labs/subnet-evm/accounts/abi"
 	"github.com/ava-labs/subnet-evm/accounts/keystore"
 	"github.com/ava-labs/subnet-evm/accounts/scwallet"
-	"github.com/ava-labs/subnet-evm/commontype"
 	"github.com/ava-labs/subnet-evm/consensus"
 	"github.com/ava-labs/subnet-evm/core"
 	"github.com/ava-labs/subnet-evm/core/state"
@@ -140,10 +138,6 @@ func (s *EthereumAPI) FeeHistory(ctx context.Context, blockCount math.HexOrDecim
 // so we always return false here for API compatibility.
 func (s *EthereumAPI) Syncing() (interface{}, error) {
 	return false, nil
-}
-
-func (s *BlockChainAPI) GetChainConfig(ctx context.Context) *params.ChainConfigWithUpgradesJSON {
-	return s.b.ChainConfig().ToWithUpgradesJSON()
 }
 
 // TxPoolAPI offers and API for the transaction pool. It only operates on data that is non-confidential.
@@ -618,44 +612,6 @@ func NewBlockChainAPI(b Backend) *BlockChainAPI {
 // in CL clients.
 func (api *BlockChainAPI) ChainId() *hexutil.Big {
 	return (*hexutil.Big)(api.b.ChainConfig().ChainID)
-}
-
-// GetActivePrecompilesAt returns the active precompile configs at the given block timestamp.
-func (s *BlockChainAPI) GetActivePrecompilesAt(ctx context.Context, blockTimestamp *uint64) params.Precompiles {
-	var timestamp uint64
-	if blockTimestamp == nil {
-		timestamp = s.b.CurrentHeader().Time
-	} else {
-		timestamp = *blockTimestamp
-	}
-
-	return s.b.ChainConfig().EnabledStatefulPrecompiles(timestamp)
-}
-
-type FeeConfigResult struct {
-	FeeConfig     commontype.FeeConfig `json:"feeConfig"`
-	LastChangedAt *big.Int             `json:"lastChangedAt,omitempty"`
-}
-
-func (s *BlockChainAPI) FeeConfig(ctx context.Context, blockNrOrHash *rpc.BlockNumberOrHash) (*FeeConfigResult, error) {
-	var (
-		header *types.Header
-		err    error
-	)
-	if blockNrOrHash == nil {
-		header = s.b.CurrentHeader()
-	} else {
-		header, err = s.b.HeaderByNumberOrHash(ctx, *blockNrOrHash)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	feeConfig, lastChangedAt, err := s.b.GetFeeConfigAt(header)
-	if err != nil {
-		return nil, err
-	}
-	return &FeeConfigResult{FeeConfig: feeConfig, LastChangedAt: lastChangedAt}, nil
 }
 
 // BlockNumber returns the block number of the chain head.
@@ -1175,69 +1131,6 @@ func DoCall(ctx context.Context, b Backend, args TransactionArgs, blockNrOrHash 
 	return doCall(ctx, b, args, state, header, overrides, blockOverrides, timeout, globalGasCap)
 }
 
-func newRevertError(result *core.ExecutionResult) *revertError {
-	reason, errUnpack := abi.UnpackRevert(result.Revert())
-	err := errors.New("execution reverted")
-	if errUnpack == nil {
-		err = fmt.Errorf("execution reverted: %v", reason)
-	}
-	return &revertError{
-		error:  err,
-		reason: hexutil.Encode(result.Revert()),
-	}
-}
-
-// revertError is an API error that encompasses an EVM revertal with JSON error
-// code and a binary data blob.
-type revertError struct {
-	error
-	reason string // revert reason hex encoded
-}
-
-// ErrorCode returns the JSON error code for a revertal.
-// See: https://github.com/ethereum/wiki/wiki/JSON-RPC-Error-Codes-Improvement-Proposal
-func (e *revertError) ErrorCode() int {
-	return 3
-}
-
-// ErrorData returns the hex encoded revert reason.
-func (e *revertError) ErrorData() interface{} {
-	return e.reason
-}
-
-type ExecutionResult struct {
-	UsedGas    uint64        `json:"gas"`        // Total used gas but include the refunded gas
-	ErrCode    int           `json:"errCode"`    // EVM error code
-	Err        string        `json:"err"`        // Any error encountered during the execution(listed in core/vm/errors.go)
-	ReturnData hexutil.Bytes `json:"returnData"` // Data from evm(function result or data supplied with revert opcode)
-}
-
-// CallDetailed performs the same call as Call, but returns the full context
-func (s *BlockChainAPI) CallDetailed(ctx context.Context, args TransactionArgs, blockNrOrHash rpc.BlockNumberOrHash, overrides *StateOverride) (*ExecutionResult, error) {
-	result, err := DoCall(ctx, s.b, args, blockNrOrHash, overrides, nil, s.b.RPCEVMTimeout(), s.b.RPCGasCap())
-	if err != nil {
-		return nil, err
-	}
-
-	reply := &ExecutionResult{
-		UsedGas:    result.UsedGas,
-		ReturnData: result.ReturnData,
-	}
-	if result.Err != nil {
-		if err, ok := result.Err.(rpc.Error); ok {
-			reply.ErrCode = err.ErrorCode()
-		}
-		reply.Err = result.Err.Error()
-	}
-	// If the result contains a revert reason, try to unpack and return it.
-	if len(result.Revert()) > 0 {
-		err := newRevertError(result)
-		reply.ErrCode = err.ErrorCode()
-		reply.Err = err.Error()
-	}
-	return reply, nil
-}
-
 // Call executes the given transaction on the state for the given block number.
 //
 // Additionally, the caller can specify a batch of contract for fields overriding.
@@ -1255,7 +1148,7 @@ func (s *BlockChainAPI) Call(ctx context.Context, args TransactionArgs, blockNrO
 	}
 	// If the result contains a revert reason, try to unpack and return it.
 	if len(result.Revert()) > 0 {
-		return nil, newRevertError(result)
+		return nil, newRevertError(result.Revert())
 	}
 	return result.Return(), result.Err
 }
@@ -1361,7 +1254,7 @@ func DoEstimateGas(ctx context.Context, b Backend, args TransactionArgs, blockNr
 	if failed {
 		if result != nil && result.Err != vmerrs.ErrOutOfGas {
 			if len(result.Revert()) > 0 {
-				return 0, newRevertError(result)
+				return 0, newRevertError(result.Revert())
 			}
 			return 0, result.Err
 		}
@@ -1738,46 +1631,6 @@ func AccessList(ctx context.Context, b Backend, blockNrOrHash rpc.BlockNumberOrH
 		}
 		prevTracer = tracer
 	}
-}
-
-// Note: this API is moved directly from ./eth/api.go to ensure that it is available under an API that is enabled by
-// default without duplicating the code and serving the same API in the original location as well without creating a
-// cyclic import.
-//
-// BadBlockArgs represents the entries in the list returned when bad blocks are queried.
-type BadBlockArgs struct {
-	Hash   common.Hash            `json:"hash"`
-	Block  map[string]interface{} `json:"block"`
-	RLP    string                 `json:"rlp"`
-	Reason *core.BadBlockReason   `json:"reason"`
-}
-
-// GetBadBlocks returns a list of the last 'bad blocks' that the client has seen on the network
-// and returns them as a JSON list of block hashes.
-func (s *BlockChainAPI) GetBadBlocks(ctx context.Context) ([]*BadBlockArgs, error) {
-	var (
-		badBlocks, reasons = s.b.BadBlocks()
-		results            = make([]*BadBlockArgs, 0, len(badBlocks))
-	)
-	for i, block := range badBlocks {
-		var (
-			blockRlp  string
-			blockJSON map[string]interface{}
-		)
-		if rlpBytes, err := rlp.EncodeToBytes(block); err != nil {
-			blockRlp = err.Error() // Hacky, but hey, it works
-		} else {
-			blockRlp = fmt.Sprintf("%#x", rlpBytes)
-		}
-		blockJSON = RPCMarshalBlock(block, true, true, s.b.ChainConfig())
-		results = append(results, &BadBlockArgs{
-			Hash:   block.Hash(),
-			RLP:    blockRlp,
-			Block:  blockJSON,
-			Reason: reasons[i],
-		})
-	}
-	return results, nil
 }
 
 // TransactionAPI exposes methods for reading and creating transaction data.
