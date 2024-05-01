@@ -29,8 +29,8 @@ jobs:
         username: _json_key
         password: ${{ secrets.ANTITHESIS_GAR_JSON_KEY }}
 
-    - name: Get Go version from project
-      run: .github/workflows/go_version_env.sh >> $GITHUB_ENV
+    - name: Set the Go version in the environment
+      uses: ./.github/actions/set-go-version-in-env
 
     - name: Build node
       id: build-node-image

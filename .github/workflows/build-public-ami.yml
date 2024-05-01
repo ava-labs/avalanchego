@@ -21,11 +21,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-      - run: .github/workflows/go_version_env.sh >> $GITHUB_ENV
-      - uses: actions/setup-go@v5
-        with:
-          go-version: '${{ env.GO_VERSION }}'
-          check-latest: true
+      - uses: ./.github/actions/setup-go-for-project
       - run: go version
 
       - name: Install aws cli

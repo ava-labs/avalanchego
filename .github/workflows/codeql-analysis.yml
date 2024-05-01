@@ -42,14 +42,8 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Get Go version from project
-        run: .github/workflows/go_version_env.sh >> $GITHUB_ENV
-
       - name: Setup Golang
-        uses: actions/setup-go@v5
-        with:
-          go-version: '${{ env.GO_VERSION }}'
-          check-latest: true
+        uses: ./.github/actions/setup-go-for-project
 
       # Initializes the CodeQL tools for scanning.
       - name: Initialize CodeQL
