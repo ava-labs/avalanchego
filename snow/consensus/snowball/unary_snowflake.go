@@ -94,7 +94,7 @@ func (sf *unarySnowflake) Clone() Unary {
 }
 
 func (sf *unarySnowflake) String() string {
-	return fmt.Sprintf("SF(Confidence = %d, Finalized = %v)",
-		sf.confidence[0],
+	return fmt.Sprintf("SF(Confidence = %v, Finalized = %v)",
+		sf.confidence,
 		sf.finalized)
 }

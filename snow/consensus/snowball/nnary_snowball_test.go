@@ -101,7 +101,7 @@ func TestNarySnowballRecordUnsuccessfulPoll(t *testing.T) {
 	require.Equal(Blue, sb.Preference())
 	require.True(sb.Finalized())
 
-	expected := "SB(Preference = TtF4d2QWbk5vzQGTEPrN48x6vwgAoAmKQ9cbp79inpQmcRKES, PreferenceStrength = 3, SF(Confidence = 2, Finalized = true, SL(Preference = TtF4d2QWbk5vzQGTEPrN48x6vwgAoAmKQ9cbp79inpQmcRKES)))"
+	expected := "SB(Preference = TtF4d2QWbk5vzQGTEPrN48x6vwgAoAmKQ9cbp79inpQmcRKES, PreferenceStrength = 3, SF(Confidence = [2], Finalized = true, SL(Preference = TtF4d2QWbk5vzQGTEPrN48x6vwgAoAmKQ9cbp79inpQmcRKES)))"
 	require.Equal(expected, sb.String())
 
 	for i := 0; i < 4; i++ {

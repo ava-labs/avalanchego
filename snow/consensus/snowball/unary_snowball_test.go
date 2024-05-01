@@ -50,7 +50,7 @@ func TestUnarySnowball(t *testing.T) {
 
 	binarySnowball := sbClone.Extend(0)
 
-	expected := "SB(Preference = 0, PreferenceStrength[0] = 4, PreferenceStrength[1] = 0, SF(Confidence = 1, Finalized = false, SL(Preference = 0)))"
+	expected := "SB(Preference = 0, PreferenceStrength[0] = 4, PreferenceStrength[1] = 0, SF(Confidence = [1], Finalized = false, SL(Preference = 0)))"
 	require.Equal(expected, binarySnowball.String())
 
 	binarySnowball.RecordUnsuccessfulPoll()
@@ -72,6 +72,6 @@ func TestUnarySnowball(t *testing.T) {
 	require.Equal(1, binarySnowball.Preference())
 	require.True(binarySnowball.Finalized())
 
-	expected = "SB(PreferenceStrength = 4, SF(Confidence = 1, Finalized = false))"
+	expected = "SB(PreferenceStrength = 4, SF(Confidence = [1], Finalized = false))"
 	require.Equal(expected, sb.String())
 }
