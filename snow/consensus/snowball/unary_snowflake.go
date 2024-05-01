@@ -10,26 +10,34 @@ var _ Unary = (*unarySnowflake)(nil)
 func newUnarySnowflake(alphaPreference, alphaConfidence, beta int) unarySnowflake {
 	return unarySnowflake{
 		alphaPreference: alphaPreference,
-		alphaConfidence: alphaConfidence,
-		beta:            beta,
+		alphaConfidence: []int{alphaConfidence},
+		beta:            []int{beta},
+		confidence:      make([]int, 1),
 	}
 }
 
 // unarySnowflake is the implementation of a unary snowflake instance
+// Invariant:
+// len(alphaConfidence) == len(beta) == len(confidence)
+// alphaConfidence[i] < alphaConfidence[i+1] for all i
+// beta[i] < beta[i+1] for all i
+// confidence[i] >= confidence[i+1] for all i (except after finalizing due to early termination)
 type unarySnowflake struct {
-	// beta is the number of consecutive successful queries required for
-	// finalization.
-	beta int
-
 	// alphaPreference is the threshold required to update the preference
 	alphaPreference int
 
-	// alphaConfidence is the threshold required to increment the confidence counter
-	alphaConfidence int
+	// alphaConfidence[i] gives the alphaConfidence threshold required to increment
+	// confidence[i]
+	alphaConfidence []int
 
-	// confidence tracks the number of successful polls in a row that have
-	// returned the preference
-	confidence int
+	// beta[i] gives the number of consecutive polls reaching alphaConfidence[i]
+	// required to finalize.
+	beta []int
+
+	// confidence is the number of consecutive succcessful polls for a given
+	// alphaConfidence threshold.
+	// This instance finalizes when confidence[i] >= beta[i] for any i
+	confidence []int
 
 	// finalized prevents the state from changing after the required number of
 	// consecutive polls has been reached
@@ -37,17 +45,27 @@ type unarySnowflake struct {
 }
 
 func (sf *unarySnowflake) RecordPoll(count int) {
-	if count < sf.alphaConfidence {
-		sf.RecordUnsuccessfulPoll()
-		return
-	}
+	for i, alphaConfidence := range sf.alphaConfidence {
+		// If I did not reach this alpha threshold, I did not
+		// reach any more alpha thresholds.
+		// Clear the remaining confidence counters.
+		if count < alphaConfidence {
+			clear(sf.confidence[i:])
+			return
+		}
 
-	sf.confidence++
-	sf.finalized = sf.finalized || sf.confidence >= sf.beta
+		// I reached this alpha threshold, increment the confidence counter
+		// and check if I can finalize.
+		sf.confidence[i]++
+		if sf.confidence[i] >= sf.beta[i] {
+			sf.finalized = true
+			return
+		}
+	}
 }
 
 func (sf *unarySnowflake) RecordUnsuccessfulPoll() {
-	sf.confidence = 0
+	clear(sf.confidence)
 }
 
 func (sf *unarySnowflake) Finalized() bool {
@@ -55,9 +73,11 @@ func (sf *unarySnowflake) Finalized() bool {
 }
 
 func (sf *unarySnowflake) Extend(choice int) Binary {
+	confidence := make([]int, len(sf.confidence))
+	copy(confidence, sf.confidence)
 	return &binarySnowflake{
 		binarySlush:     binarySlush{preference: choice},
-		confidence:      sf.confidence,
+		confidence:      confidence,
 		alphaPreference: sf.alphaPreference,
 		alphaConfidence: sf.alphaConfidence,
 		beta:            sf.beta,
@@ -67,11 +87,14 @@ func (sf *unarySnowflake) Extend(choice int) Binary {
 
 func (sf *unarySnowflake) Clone() Unary {
 	newSnowflake := *sf
+	// Copy the confidence slice
+	newSnowflake.confidence = make([]int, len(sf.confidence))
+	copy(newSnowflake.confidence, sf.confidence)
 	return &newSnowflake
 }
 
 func (sf *unarySnowflake) String() string {
 	return fmt.Sprintf("SF(Confidence = %d, Finalized = %v)",
-		sf.confidence,
+		sf.confidence[0],
 		sf.finalized)
 }

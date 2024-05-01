@@ -15,30 +15,38 @@ func newNnarySnowflake(alphaPreference, alphaConfidence, beta int, choice ids.ID
 	return nnarySnowflake{
 		nnarySlush:      newNnarySlush(choice),
 		alphaPreference: alphaPreference,
-		alphaConfidence: alphaConfidence,
-		beta:            beta,
+		alphaConfidence: []int{alphaConfidence},
+		beta:            []int{beta},
+		confidence:      make([]int, 1),
 	}
 }
 
 // nnarySnowflake is the implementation of a snowflake instance with an
 // unbounded number of choices
+// Invariant:
+// len(alphaConfidence) == len(beta) == len(confidence)
+// alphaConfidence[i] < alphaConfidence[i+1] for all i
+// beta[i] < beta[i+1] for all i
+// confidence[i] >= confidence[i+1] for all i (except after finalizing due to early termination)
 type nnarySnowflake struct {
 	// wrap the n-nary slush logic
 	nnarySlush
 
-	// beta is the number of consecutive successful queries required for
-	// finalization.
-	beta int
-
 	// alphaPreference is the threshold required to update the preference
 	alphaPreference int
 
-	// alphaConfidence is the threshold required to increment the confidence counter
-	alphaConfidence int
+	// alphaConfidence[i] gives the alphaConfidence threshold required to increment
+	// confidence[i]
+	alphaConfidence []int
 
-	// confidence tracks the number of successful polls in a row that have
-	// returned the preference
-	confidence int
+	// beta[i] gives the number of consecutive polls reaching alphaConfidence[i]
+	// required to finalize.
+	beta []int
+
+	// confidence is the number of consecutive succcessful polls for a given
+	// alphaConfidence threshold.
+	// This instance finalizes when confidence[i] >= beta[i] for any i
+	confidence []int
 
 	// finalized prevents the state from changing after the required number of
 	// consecutive polls has been reached
@@ -57,26 +65,34 @@ func (sf *nnarySnowflake) RecordPoll(count int, choice ids.ID) {
 		return
 	}
 
-	if count < sf.alphaConfidence {
-		sf.confidence = 0
+	// If I need to change my preference, record the new preference
+	// and reset all my confidence counters.
+	if choice != sf.Preference() {
+		clear(sf.confidence)
 		sf.nnarySlush.RecordSuccessfulPoll(choice)
-		return
 	}
 
-	if preference := sf.Preference(); preference == choice {
-		sf.confidence++
-	} else {
-		// confidence is set to 1 because there has already been 1 successful
-		// poll, namely this poll.
-		sf.confidence = 1
-	}
+	for i, alphaConfidence := range sf.alphaConfidence {
+		// If I did not reach this alpha threshold, I did not
+		// reach any more alpha thresholds.
+		// Clear the remaining confidence counters.
+		if count < alphaConfidence {
+			clear(sf.confidence[i:])
+			return
+		}
 
-	sf.finalized = sf.confidence >= sf.beta
-	sf.nnarySlush.RecordSuccessfulPoll(choice)
+		// I reached this alpha threshold, increment the confidence counter
+		// and check if I can finalize.
+		sf.confidence[i]++
+		if sf.confidence[i] >= sf.beta[i] {
+			sf.finalized = true
+			return
+		}
+	}
 }
 
 func (sf *nnarySnowflake) RecordUnsuccessfulPoll() {
-	sf.confidence = 0
+	clear(sf.confidence)
 }
 
 func (sf *nnarySnowflake) Finalized() bool {
@@ -85,7 +101,7 @@ func (sf *nnarySnowflake) Finalized() bool {
 
 func (sf *nnarySnowflake) String() string {
 	return fmt.Sprintf("SF(Confidence = %d, Finalized = %v, %s)",
-		sf.confidence,
+		sf.confidence[0],
 		sf.finalized,
 		&sf.nnarySlush)
 }
