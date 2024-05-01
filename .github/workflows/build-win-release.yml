@@ -24,9 +24,11 @@ jobs:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v4
 
+      - run: .github/workflows/go_version_env.sh >> $GITHUB_ENV
+
       - uses: actions/setup-go@v5
         with:
-          go-version: '~1.21.9'
+          go-version: '${{ env.GO_VERSION }}'
           check-latest: true
 
       - run: go version
