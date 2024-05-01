@@ -10,9 +10,6 @@ on:
     tags:
       - "*"
 
-env:
-  go_version: '~1.21.9'
-
 jobs:
   build-x86_64-binaries-tarball:
     runs-on: ubuntu-20.04
@@ -20,9 +17,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - run: .github/workflows/go_version_env.sh >> $GITHUB_ENV
+
       - uses: actions/setup-go@v5
         with:
-          go-version: ${{ env.go_version }}
+          go-version: ${{ env.GO_VERSION }}
           check-latest: true
 
       - run: go version
@@ -82,9 +81,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - run: .github/workflows/go_version_env.sh >> $GITHUB_ENV
+
       - uses: actions/setup-go@v3
         with:
-          go-version: ${{ env.go_version }}
+          go-version: ${{ env.GO_VERSION }}
           check-latest: true
 
       - run: go version
