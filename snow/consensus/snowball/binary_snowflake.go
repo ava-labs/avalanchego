@@ -20,9 +20,9 @@ func newBinarySnowflake(alphaPreference, alphaConfidence, beta, choice int) bina
 // binarySnowflake is the implementation of a binary snowflake instance
 // Invariant:
 // len(alphaConfidence) == len(beta) == len(confidence)
-// alphaConfidence[i] < alphaConfidence[i+1] for all i
-// beta[i] < beta[i+1] for all i
-// confidence[i] >= confidence[i+1] for all i (except after finalizing due to early termination)
+// alphaConfidence[i] < alphaConfidence[i+1]
+// beta[i] < beta[i+1]
+// confidence[i] >= confidence[i+1] (except after finalizing due to early termination)
 type binarySnowflake struct {
 	// wrap the binary slush logic
 	binarySlush

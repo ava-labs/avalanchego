@@ -25,9 +25,9 @@ func newNnarySnowflake(alphaPreference, alphaConfidence, beta int, choice ids.ID
 // unbounded number of choices
 // Invariant:
 // len(alphaConfidence) == len(beta) == len(confidence)
-// alphaConfidence[i] < alphaConfidence[i+1] for all i
-// beta[i] < beta[i+1] for all i
-// confidence[i] >= confidence[i+1] for all i (except after finalizing due to early termination)
+// alphaConfidence[i] < alphaConfidence[i+1]
+// beta[i] < beta[i+1]
+// confidence[i] >= confidence[i+1] (except after finalizing due to early termination)
 type nnarySnowflake struct {
 	// wrap the n-nary slush logic
 	nnarySlush

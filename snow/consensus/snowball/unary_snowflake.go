@@ -19,9 +19,9 @@ func newUnarySnowflake(alphaPreference, alphaConfidence, beta int) unarySnowflak
 // unarySnowflake is the implementation of a unary snowflake instance
 // Invariant:
 // len(alphaConfidence) == len(beta) == len(confidence)
-// alphaConfidence[i] < alphaConfidence[i+1] for all i
-// beta[i] < beta[i+1] for all i
-// confidence[i] >= confidence[i+1] for all i (except after finalizing due to early termination)
+// alphaConfidence[i] < alphaConfidence[i+1]
+// beta[i] < beta[i+1]
+// confidence[i] >= confidence[i+1] (except after finalizing due to early termination)
 type unarySnowflake struct {
 	// alphaPreference is the threshold required to update the preference
 	alphaPreference int
