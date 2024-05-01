@@ -416,21 +416,14 @@ func (u *unaryNode) RecordPoll(votes bag.Bag[ids.ID], reset bool) (node, bool) {
 		u.shouldReset = true // Make sure my child is also reset correctly
 	}
 
-	switch numVotes := votes.Len(); {
-	case numVotes >= u.tree.params.AlphaConfidence:
-		// I got enough votes to increase my confidence
-		u.snow.RecordSuccessfulPoll()
-	case numVotes >= u.tree.params.AlphaPreference:
-		// I got enough votes to update my preference, but not increase my
-		// confidence.
-		u.snow.RecordPollPreference()
-	default:
-		// I didn't get enough votes, I must reset and my child must reset as
-		// well
+	numVotes := votes.Len()
+	if numVotes < u.tree.params.AlphaPreference {
 		u.snow.RecordUnsuccessfulPoll()
 		u.shouldReset = true
 		return u, false
 	}
+
+	u.snow.RecordPoll(numVotes)
 
 	if u.child != nil {
 		// We are guaranteed that u.commonPrefix will equal
@@ -538,20 +531,15 @@ func (b *binaryNode) RecordPoll(votes bag.Bag[ids.ID], reset bool) (node, bool) 
 	b.shouldReset[1-bit] = true // They didn't get the threshold of votes
 
 	prunedVotes := splitVotes[bit]
-	switch numVotes := prunedVotes.Len(); {
-	case numVotes >= b.tree.params.AlphaConfidence:
-		// I got enough votes to increase my confidence.
-		b.snow.RecordSuccessfulPoll(bit)
-	case numVotes >= b.tree.params.AlphaPreference:
-		// I got enough votes to update my preference, but not increase my
-		// confidence.
-		b.snow.RecordPollPreference(bit)
-	default:
+	numVotes := prunedVotes.Len()
+	if numVotes < b.tree.params.AlphaPreference {
 		b.snow.RecordUnsuccessfulPoll()
 		// The winning child didn't get enough votes either
 		b.shouldReset[bit] = true
 		return b, false
 	}
+
+	b.snow.RecordPoll(numVotes, bit)
 
 	if child := b.children[bit]; child != nil {
 		newChild, _ := child.RecordPoll(prunedVotes, b.shouldReset[bit])
