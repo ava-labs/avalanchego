@@ -23,7 +23,7 @@ func New[K comparable, V any](
 	namespace string,
 	registerer prometheus.Registerer,
 	cache cache.Cacher[K, V],
-) (cache.Cacher[K, V], error) {
+) (*Cache[K, V], error) {
 	metrics, err := newMetrics(namespace, registerer)
 	return &Cache[K, V]{
 		Cacher:  cache,
