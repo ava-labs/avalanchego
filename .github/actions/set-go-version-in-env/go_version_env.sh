@@ -8,7 +8,7 @@ set -euo pipefail
 # `go list -m -f '{{.GoVersion}}'` should be preferred outside of CI
 # when go is already installed.
 
-# 2 directories above this script
-AVALANCHE_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd ../.. && pwd )
+# 3 directories above this script
+AVALANCHE_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd ../../.. && pwd )
 
 echo GO_VERSION="~$(sed -n -e 's/^go //p' "${AVALANCHE_PATH}"/go.mod)"
