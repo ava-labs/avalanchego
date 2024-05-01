@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
@@ -139,7 +140,7 @@ func TestBlockSignatureHandler(t *testing.T) {
 		TestVM: common.TestVM{T: t},
 		GetBlockF: func(ctx context.Context, i ids.ID) (snowman.Block, error) {
 			if i == blkID {
-				return &snowman.TestBlock{
+				return &snowmantest.Block{
 					TestDecidable: choices.TestDecidable{
 						IDV:     blkID,
 						StatusV: choices.Accepted,
