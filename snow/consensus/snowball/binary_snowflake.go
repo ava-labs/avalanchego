@@ -7,13 +7,13 @@ import "fmt"
 
 var _ Binary = (*binarySnowflake)(nil)
 
-func newBinarySnowflake(alphaPreference, alphaConfidence, beta, choice int) binarySnowflake {
+func newBinarySnowflake(alphaPreference int, alphaConfidence []int, beta []int, choice int) binarySnowflake {
 	return binarySnowflake{
 		binarySlush:     newBinarySlush(choice),
 		alphaPreference: alphaPreference,
-		alphaConfidence: []int{alphaConfidence},
-		beta:            []int{beta},
-		confidence:      make([]int, 1),
+		alphaConfidence: alphaConfidence,
+		beta:            beta,
+		confidence:      make([]int, len(alphaConfidence)),
 	}
 }
 

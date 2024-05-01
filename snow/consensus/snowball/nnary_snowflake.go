@@ -11,13 +11,13 @@ import (
 
 var _ Nnary = (*nnarySnowflake)(nil)
 
-func newNnarySnowflake(alphaPreference, alphaConfidence, beta int, choice ids.ID) nnarySnowflake {
+func newNnarySnowflake(alphaPreference int, alphaConfidence []int, beta []int, choice ids.ID) nnarySnowflake {
 	return nnarySnowflake{
 		nnarySlush:      newNnarySlush(choice),
 		alphaPreference: alphaPreference,
-		alphaConfidence: []int{alphaConfidence},
-		beta:            []int{beta},
-		confidence:      make([]int, 1),
+		alphaConfidence: alphaConfidence,
+		beta:            beta,
+		confidence:      make([]int, len(alphaConfidence)),
 	}
 }
 

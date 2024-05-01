@@ -7,12 +7,12 @@ import "fmt"
 
 var _ Unary = (*unarySnowflake)(nil)
 
-func newUnarySnowflake(alphaPreference, alphaConfidence, beta int) unarySnowflake {
+func newUnarySnowflake(alphaPreference int, alphaConfidence, beta []int) unarySnowflake {
 	return unarySnowflake{
 		alphaPreference: alphaPreference,
-		alphaConfidence: []int{alphaConfidence},
-		beta:            []int{beta},
-		confidence:      make([]int, 1),
+		alphaConfidence: alphaConfidence,
+		beta:            beta,
+		confidence:      make([]int, len(alphaConfidence)),
 	}
 }
 

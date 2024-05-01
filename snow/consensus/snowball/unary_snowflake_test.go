@@ -20,9 +20,11 @@ func TestUnarySnowflake(t *testing.T) {
 	require := require.New(t)
 
 	alphaPreference, alphaConfidence := 1, 2
+	alphaConfidences := []int{alphaConfidence}
 	beta := 2
+	betas := []int{beta}
 
-	sf := newUnarySnowflake(alphaPreference, alphaConfidence, beta)
+	sf := newUnarySnowflake(alphaPreference, alphaConfidences, betas)
 
 	sf.RecordPoll(alphaConfidence)
 	UnarySnowflakeStateTest(t, &sf, []int{1}, false)

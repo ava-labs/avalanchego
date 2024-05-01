@@ -21,9 +21,11 @@ func TestUnarySnowball(t *testing.T) {
 	require := require.New(t)
 
 	alphaPreference, alphaConfidence := 1, 2
+	alphaConfidences := []int{alphaConfidence}
 	beta := 2
+	betas := []int{beta}
 
-	sb := newUnarySnowball(alphaPreference, alphaConfidence, beta)
+	sb := newUnarySnowball(alphaPreference, alphaConfidences, betas)
 
 	sb.RecordPoll(alphaConfidence)
 	UnarySnowballStateTest(t, &sb, 1, []int{1}, false)
