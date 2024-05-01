@@ -10,5 +10,7 @@ runs:
   using: composite
   steps:
     - name: Set the project Go version in the environment
+      # A script works across different platforms but attempting to replicate the script directly in
+      # the run statement runs into platform-specific path handling issues.
       run: .github/actions/set-go-version-in-env/go_version_env.sh >> $GITHUB_ENV
       shell: bash
