@@ -16,13 +16,12 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/metric"
 )
 
 var (
-	_ Block = (*TestBlock)(nil)
-
 	errCantBuildBlock       = errors.New("can't build new block")
 	errVerify               = errors.New("verify failed")
 	errAccept               = errors.New("accept failed")
@@ -30,36 +29,25 @@ var (
 	errUnexpectedBlockBytes = errors.New("unexpected block bytes")
 )
 
-type TestBlock struct {
-	*snowman.TestBlock
-}
-
-// SetStatus sets the status of the Block.
-func (b *TestBlock) SetStatus(status choices.Status) {
-	b.TestBlock.TestDecidable.StatusV = status
-}
-
 // NewTestBlock returns a new test block with height, bytes, and ID derived from [i]
 // and using [parentID] as the parent block ID
-func NewTestBlock(i uint64, parentID ids.ID) *TestBlock {
+func NewTestBlock(i uint64, parentID ids.ID) *snowmantest.Block {
 	b := []byte{byte(i)}
 	id := hashing.ComputeHash256Array(b)
-	return &TestBlock{
-		TestBlock: &snowman.TestBlock{
-			TestDecidable: choices.TestDecidable{
-				IDV:     id,
-				StatusV: choices.Unknown,
-			},
-			HeightV: i,
-			ParentV: parentID,
-			BytesV:  b,
+	return &snowmantest.Block{
+		TestDecidable: choices.TestDecidable{
+			IDV:     id,
+			StatusV: choices.Unknown,
 		},
+		HeightV: i,
+		ParentV: parentID,
+		BytesV:  b,
 	}
 }
 
 // NewTestBlocks generates [numBlocks] consecutive blocks
-func NewTestBlocks(numBlocks uint64) []*TestBlock {
-	blks := make([]*TestBlock, 0, numBlocks)
+func NewTestBlocks(numBlocks uint64) []*snowmantest.Block {
+	blks := make([]*snowmantest.Block, 0, numBlocks)
 	parentID := ids.Empty
 	for i := uint64(0); i < numBlocks; i++ {
 		blks = append(blks, NewTestBlock(i, parentID))
@@ -70,18 +58,17 @@ func NewTestBlocks(numBlocks uint64) []*TestBlock {
 	return blks
 }
 
-func createInternalBlockFuncs(t *testing.T, blks []*TestBlock) (
+func createInternalBlockFuncs(blks []*snowmantest.Block) (
 	func(ctx context.Context, blkID ids.ID) (snowman.Block, error),
 	func(ctx context.Context, b []byte) (snowman.Block, error),
 	func(ctx context.Context, height uint64) (ids.ID, error),
 ) {
-	blkMap := make(map[ids.ID]*TestBlock)
-	blkByteMap := make(map[byte]*TestBlock)
+	blkMap := make(map[ids.ID]*snowmantest.Block)
+	blkBytesMap := make(map[string]*snowmantest.Block)
 	for _, blk := range blks {
 		blkMap[blk.ID()] = blk
 		blkBytes := blk.Bytes()
-		require.Len(t, blkBytes, 1)
-		blkByteMap[blkBytes[0]] = blk
+		blkBytesMap[string(blkBytes)] = blk
 	}
 
 	getBlock := func(_ context.Context, id ids.ID) (snowman.Block, error) {
@@ -94,11 +81,7 @@ func createInternalBlockFuncs(t *testing.T, blks []*TestBlock) (
 	}
 
 	parseBlk := func(_ context.Context, b []byte) (snowman.Block, error) {
-		if len(b) != 1 {
-			return nil, fmt.Errorf("expected block bytes to be length 1, but found %d", len(b))
-		}
-
-		blk, ok := blkByteMap[b[0]]
+		blk, ok := blkBytesMap[string(b)]
 		if !ok {
 			return nil, fmt.Errorf("%w: %x", errUnexpectedBlockBytes, b)
 		}
@@ -196,22 +179,10 @@ func TestState(t *testing.T) {
 	blk2 := testBlks[2]
 	// Need to create a block with a different bytes and hash here
 	// to generate a conflict with blk2
-	blk3Bytes := []byte{byte(3)}
-	blk3ID := hashing.ComputeHash256Array(blk3Bytes)
-	blk3 := &TestBlock{
-		TestBlock: &snowman.TestBlock{
-			TestDecidable: choices.TestDecidable{
-				IDV:     blk3ID,
-				StatusV: choices.Processing,
-			},
-			HeightV: uint64(2),
-			BytesV:  blk3Bytes,
-			ParentV: blk1.IDV,
-		},
-	}
+	blk3 := snowmantest.BuildChild(blk1)
 	testBlks = append(testBlks, blk3)
 
-	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(t, testBlks)
+	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(testBlks)
 	chainState := NewState(&Config{
 		DecidedCacheSize:    2,
 		MissingCacheSize:    2,
@@ -290,7 +261,7 @@ func TestBuildBlock(t *testing.T) {
 	genesisBlock.SetStatus(choices.Accepted)
 	blk1 := testBlks[1]
 
-	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(t, testBlks)
+	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(testBlks)
 	buildBlock := func(context.Context) (snowman.Block, error) {
 		// Once the block is built, mark it as processing
 		blk1.SetStatus(choices.Processing)
@@ -335,7 +306,7 @@ func TestStateDecideBlock(t *testing.T) {
 	badVerifyBlk.VerifyV = errVerify
 	badRejectBlk := testBlks[3]
 	badRejectBlk.RejectV = errReject
-	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(t, testBlks)
+	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(testBlks)
 	chainState := NewState(&Config{
 		DecidedCacheSize:    2,
 		MissingCacheSize:    2,
@@ -388,7 +359,7 @@ func TestStateParent(t *testing.T) {
 	blk1 := testBlks[1]
 	blk2 := testBlks[2]
 
-	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(t, testBlks)
+	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(testBlks)
 	chainState := NewState(&Config{
 		DecidedCacheSize:    2,
 		MissingCacheSize:    2,
@@ -429,7 +400,7 @@ func TestGetBlockInternal(t *testing.T) {
 	genesisBlock := testBlks[0]
 	genesisBlock.SetStatus(choices.Accepted)
 
-	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(t, testBlks)
+	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(testBlks)
 	chainState := NewState(&Config{
 		DecidedCacheSize:    2,
 		MissingCacheSize:    2,
@@ -443,13 +414,13 @@ func TestGetBlockInternal(t *testing.T) {
 	})
 
 	genesisBlockInternal := chainState.LastAcceptedBlockInternal()
-	require.IsType(&TestBlock{}, genesisBlockInternal)
+	require.IsType(&snowmantest.Block{}, genesisBlockInternal)
 	require.Equal(genesisBlock.ID(), genesisBlockInternal.ID())
 
 	blk, err := chainState.GetBlockInternal(context.Background(), genesisBlock.ID())
 	require.NoError(err)
 
-	require.IsType(&TestBlock{}, blk)
+	require.IsType(&snowmantest.Block{}, blk)
 	require.Equal(genesisBlock.ID(), blk.ID())
 }
 
@@ -461,7 +432,7 @@ func TestGetBlockError(t *testing.T) {
 	genesisBlock.SetStatus(choices.Accepted)
 	blk1 := testBlks[1]
 
-	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(t, testBlks)
+	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(testBlks)
 	wrappedGetBlock := func(ctx context.Context, id ids.ID) (snowman.Block, error) {
 		blk, err := getBlock(ctx, id)
 		if err != nil {
@@ -498,7 +469,7 @@ func TestParseBlockError(t *testing.T) {
 	genesisBlock := testBlks[0]
 	genesisBlock.SetStatus(choices.Accepted)
 
-	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(t, testBlks)
+	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(testBlks)
 	chainState := NewState(&Config{
 		DecidedCacheSize:    2,
 		MissingCacheSize:    2,
@@ -520,7 +491,7 @@ func TestBuildBlockError(t *testing.T) {
 	genesisBlock := testBlks[0]
 	genesisBlock.SetStatus(choices.Accepted)
 
-	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(t, testBlks)
+	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(testBlks)
 	chainState := NewState(&Config{
 		DecidedCacheSize:    2,
 		MissingCacheSize:    2,
@@ -546,7 +517,7 @@ func TestMeteredCache(t *testing.T) {
 	genesisBlock := testBlks[0]
 	genesisBlock.SetStatus(choices.Accepted)
 
-	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(t, testBlks)
+	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(testBlks)
 	config := &Config{
 		DecidedCacheSize:    2,
 		MissingCacheSize:    2,
@@ -574,7 +545,7 @@ func TestStateBytesToIDCache(t *testing.T) {
 	blk1 := testBlks[1]
 	blk2 := testBlks[2]
 
-	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(t, testBlks)
+	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(testBlks)
 	buildBlock := func(context.Context) (snowman.Block, error) {
 		require.FailNow("shouldn't have been called")
 		return nil, nil
@@ -627,34 +598,13 @@ func TestSetLastAcceptedBlock(t *testing.T) {
 	genesisBlock.SetStatus(choices.Accepted)
 
 	postSetBlk1ParentID := hashing.ComputeHash256Array([]byte{byte(199)})
-	postSetBlk1Bytes := []byte{byte(200)}
-	postSetBlk2Bytes := []byte{byte(201)}
-	postSetBlk1 := &TestBlock{
-		TestBlock: &snowman.TestBlock{
-			TestDecidable: choices.TestDecidable{
-				IDV:     hashing.ComputeHash256Array(postSetBlk1Bytes),
-				StatusV: choices.Accepted,
-			},
-			HeightV: uint64(200),
-			BytesV:  postSetBlk1Bytes,
-			ParentV: postSetBlk1ParentID,
-		},
-	}
-	postSetBlk2 := &TestBlock{
-		TestBlock: &snowman.TestBlock{
-			TestDecidable: choices.TestDecidable{
-				IDV:     hashing.ComputeHash256Array(postSetBlk2Bytes),
-				StatusV: choices.Processing,
-			},
-			HeightV: uint64(201),
-			BytesV:  postSetBlk2Bytes,
-			ParentV: postSetBlk1.IDV,
-		},
-	}
+	postSetBlk1 := NewTestBlock(200, postSetBlk1ParentID)
+	postSetBlk2 := NewTestBlock(201, postSetBlk1.ID())
+
 	// note we do not need to parse postSetBlk1 so it is omitted here
 	testBlks = append(testBlks, postSetBlk2)
 
-	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(t, testBlks)
+	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(testBlks)
 	chainState := NewState(&Config{
 		LastAcceptedBlock:  genesisBlock,
 		GetBlock:           getBlock,
@@ -695,7 +645,7 @@ func TestSetLastAcceptedBlockWithProcessingBlocksErrors(t *testing.T) {
 	blk1 := testBlks[1]
 	resetBlk := testBlks[4]
 
-	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(t, testBlks)
+	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(testBlks)
 	buildBlock := func(context.Context) (snowman.Block, error) {
 		// Once the block is built, mark it as processing
 		blk1.SetStatus(choices.Processing)
@@ -737,7 +687,7 @@ func TestStateParseTransitivelyAcceptedBlock(t *testing.T) {
 	blk2 := testBlks[2]
 	blk2.SetStatus(choices.Accepted)
 
-	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(t, testBlks)
+	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(testBlks)
 	chainState := NewState(&Config{
 		DecidedCacheSize:    2,
 		MissingCacheSize:    2,
@@ -763,7 +713,7 @@ func TestIsProcessing(t *testing.T) {
 	genesisBlock.SetStatus(choices.Accepted)
 	blk1 := testBlks[1]
 
-	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(t, testBlks)
+	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(testBlks)
 	chainState := NewState(&Config{
 		DecidedCacheSize:    2,
 		MissingCacheSize:    2,

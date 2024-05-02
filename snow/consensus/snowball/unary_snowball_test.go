@@ -20,23 +20,24 @@ func UnarySnowballStateTest(t *testing.T, sb *unarySnowball, expectedPreferenceS
 func TestUnarySnowball(t *testing.T) {
 	require := require.New(t)
 
+	alphaPreference, alphaConfidence := 1, 2
 	beta := 2
 
-	sb := newUnarySnowball(beta)
+	sb := newUnarySnowball(alphaPreference, alphaConfidence, beta)
 
-	sb.RecordSuccessfulPoll()
+	sb.RecordPoll(alphaConfidence)
 	UnarySnowballStateTest(t, &sb, 1, 1, false)
 
-	sb.RecordPollPreference()
+	sb.RecordPoll(alphaPreference)
 	UnarySnowballStateTest(t, &sb, 2, 0, false)
 
-	sb.RecordSuccessfulPoll()
+	sb.RecordPoll(alphaConfidence)
 	UnarySnowballStateTest(t, &sb, 3, 1, false)
 
 	sb.RecordUnsuccessfulPoll()
 	UnarySnowballStateTest(t, &sb, 3, 0, false)
 
-	sb.RecordSuccessfulPoll()
+	sb.RecordPoll(alphaConfidence)
 	UnarySnowballStateTest(t, &sb, 4, 1, false)
 
 	sbCloneIntf := sb.Clone()
@@ -54,18 +55,18 @@ func TestUnarySnowball(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		require.Zero(binarySnowball.Preference())
 		require.False(binarySnowball.Finalized())
-		binarySnowball.RecordSuccessfulPoll(1)
+		binarySnowball.RecordPoll(alphaConfidence, 1)
 		binarySnowball.RecordUnsuccessfulPoll()
 	}
 
 	require.Equal(1, binarySnowball.Preference())
 	require.False(binarySnowball.Finalized())
 
-	binarySnowball.RecordSuccessfulPoll(1)
+	binarySnowball.RecordPoll(alphaConfidence, 1)
 	require.Equal(1, binarySnowball.Preference())
 	require.False(binarySnowball.Finalized())
 
-	binarySnowball.RecordSuccessfulPoll(1)
+	binarySnowball.RecordPoll(alphaConfidence, 1)
 	require.Equal(1, binarySnowball.Preference())
 	require.True(binarySnowball.Finalized())
 
