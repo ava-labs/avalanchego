@@ -19,10 +19,8 @@ func DefaultConfig(t testing.TB) Config {
 	ctx := snowtest.Context(t, snowtest.PChainID)
 
 	return Config{
-		Ctx: snowtest.ConsensusContext(ctx),
-		VM: &TestGetInitialPreferenceVM{
-			TestVM: &block.TestVM{},
-		},
+		Ctx:                 snowtest.ConsensusContext(ctx),
+		VM:                  &block.TestVM{},
 		Sender:              &common.SenderTest{},
 		Validators:          validators.NewManager(),
 		ConnectedValidators: tracker.NewPeers(),
