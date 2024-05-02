@@ -328,6 +328,39 @@ func (vm *VM) SetPreference(ctx context.Context, preferred ids.ID) error {
 		return vm.db.Commit()
 	}
 
+	// If this is an option block, we need to update our persisted preference
+	optionBlk, ok := blk.(*postForkOption)
+	if ok {
+		// If we prefer an option block, we need to delete its sibling from the
+		// processing block index
+		parentBlk, _, err := vm.State.GetBlock(optionBlk.Parent())
+		if err != nil {
+			return err
+		}
+
+		postForkBlk, ok := parentBlk.(*)
+		if !ok {
+			//This is unexpected because a postForkOption is guaranteed to be a
+			//child of a PostForkBlock
+			//return err
+		}
+
+		oracleBlk, ok := postForkBlk.getStatelessBlk().(*postForkBlock)
+		if !ok {
+			return err
+		}
+
+		siblingOptionBlk, err := vm.getSiblingOption(ctx, optionBlk.ID(), oracleBlk)
+		if err != nil {
+			return err
+		}
+
+		// Remove our sibling from the index
+		if err := vm.State.DeleteProcessingBlock(siblingOptionBlk.ID()); err != nil {
+			return err
+		}
+	}
+
 	if err := vm.ChainVM.SetPreference(ctx, blk.getInnerBlk().ID()); err != nil {
 		return err
 	}
@@ -382,6 +415,23 @@ func (vm *VM) SetPreference(ctx context.Context, preferred ids.ID) error {
 		zap.Time("nextStartTime", nextStartTime),
 	)
 	return nil
+}
+
+func (vm *VM) getSiblingOption(
+	ctx context.Context,
+	blkID ids.ID,
+	block snowman.OracleBlock,
+) (snowman.Block, error) {
+	options, err := block.Options(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if blkID == options[0].ID() {
+		return options[1], nil
+	}
+
+	return options[0], nil
 }
 
 func (vm *VM) getPreDurangoSlotTime(

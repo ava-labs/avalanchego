@@ -2826,6 +2826,13 @@ func TestOnlyPreferredOptionPersisted(t *testing.T) {
 	require := require.New(t)
 	ctx := context.Background()
 
+	chainCtx := snowtest.Context(t, ids.GenerateTestID())
+	chainCtx.ValidatorState = &validators.TestState{
+		GetCurrentHeightF: func(context.Context) (uint64, error) {
+			return 0, nil
+		},
+	}
+
 	innerVM := &block.TestVM{
 		TestVM: common.TestVM{
 			InitializeF: func(
@@ -2843,11 +2850,72 @@ func TestOnlyPreferredOptionPersisted(t *testing.T) {
 			},
 		},
 	}
-
-	chainCtx := snowtest.Context(t, ids.GenerateTestID())
-	db := memdb.New()
-
 	vm := New(innerVM, Config{})
+
+	blk0 := &snowman.TestBlock{}
+
+	outerBlk1, err := statelessblock.BuildUnsigned(
+		blk0.ID(),
+		time.Time{},
+		0,
+		[]byte("foobar"),
+	)
+	require.NoError(err)
+
+	innerBlk1 := &snowman.TestOracleBlock{
+		TestBlock: &snowman.TestBlock{
+			TestDecidable: choices.TestDecidable{
+				IDV:     ids.GenerateTestID(),
+				StatusV: choices.Processing,
+			},
+			ParentV: blk0.ID(),
+			HeightV: blk0.HeightV + 1,
+		},
+	}
+
+	innerBlk1.OptionsV = [2]snowman.Block{
+		&snowman.TestBlock{
+			TestDecidable: choices.TestDecidable{
+				IDV:     ids.GenerateTestID(),
+				StatusV: choices.Processing,
+			},
+			ParentV: innerBlk1.IDV,
+			HeightV: innerBlk1.HeightV + 1,
+		},
+		&snowman.TestBlock{
+			TestDecidable: choices.TestDecidable{
+				IDV:     ids.GenerateTestID(),
+				StatusV: choices.Processing,
+			},
+			ParentV: innerBlk1.IDV,
+			HeightV: innerBlk1.HeightV + 1,
+		},
+	}
+
+	blk1 := &postForkBlock{
+		SignedBlock: outerBlk1,
+		postForkCommonComponents: postForkCommonComponents{
+			vm:       vm,
+			outerBlk: outerBlk1,
+			innerBlk: innerBlk1,
+			status:   choices.Processing,
+		},
+	}
+
+	innerVM.LastAcceptedF = func(context.Context) (ids.ID, error) {
+		return blk0.ID(), nil
+	}
+
+	innerVM.GetBlockF = func(ctx context.Context, blkID ids.ID) (snowman.Block, error) {
+		switch blkID {
+		case blk0.ID():
+			return blk0, nil
+		default:
+			return nil, fmt.Errorf("unexpected block")
+		}
+	}
+
+	db := memdb.New()
 	require.NoError(vm.Initialize(
 		ctx,
 		chainCtx,
@@ -2860,52 +2928,9 @@ func TestOnlyPreferredOptionPersisted(t *testing.T) {
 		&common.SenderTest{},
 	))
 
-	innerBlk := &snowman.TestOracleBlock{
-		TestBlock: &snowman.TestBlock{},
-		OptionsV: [2]snowman.Block{
-			&snowman.TestBlock{
-				TestDecidable: choices.TestDecidable{
-					IDV: ids.GenerateTestID(),
-				},
-			},
-			&snowman.TestBlock{
-				TestDecidable: choices.TestDecidable{
-					IDV: ids.GenerateTestID(),
-				},
-			},
-		},
-	}
+	require.NoError(blk1.Verify(ctx))
 
-	cert, err := staking.NewTLSCert()
-	require.NoError(err)
-
-	stakingCert, err := staking.ParseCertificate(cert.Leaf.Raw)
-	require.NoError(err)
-
-	outerBlk, err := statelessblock.Build(
-		ids.GenerateTestID(),
-		time.Time{},
-		0,
-		stakingCert,
-		[]byte("foobar"),
-		ids.GenerateTestID(),
-		cert.PrivateKey.(crypto.Signer),
-	)
-	require.NoError(err)
-
-	blk := postForkBlock{
-		SignedBlock: outerBlk,
-		postForkCommonComponents: postForkCommonComponents{
-			vm:       vm,
-			outerBlk: outerBlk,
-			innerBlk: innerBlk,
-			status:   choices.Processing,
-		},
-	}
-
-	options, err := blk.Options(ctx)
-	require.NoError(blk.Verify(ctx))
-
+	options, err := blk1.Options(ctx)
 	optionBlk0 := options[0]
 	optionBlk1 := options[1]
 
@@ -2916,12 +2941,12 @@ func TestOnlyPreferredOptionPersisted(t *testing.T) {
 	require.NoError(vm.SetPreference(ctx, optionBlk0.ID()))
 
 	// invariant: we only store the preferred chain
-	require.True(vm.HasProcessingBlock(blk.ID()))
+	require.True(vm.HasProcessingBlock(blk1.ID()))
 	require.True(vm.HasProcessingBlock(optionBlk0.ID()))
 	require.False(vm.HasProcessingBlock(optionBlk1.ID()))
 
 	// changing preferences should still persist the correct chain
-	require.True(vm.HasProcessingBlock(blk.ID()))
+	require.True(vm.HasProcessingBlock(blk1.ID()))
 	require.False(vm.HasProcessingBlock(optionBlk0.ID()))
 	require.True(vm.HasProcessingBlock(optionBlk1.ID()))
 }
