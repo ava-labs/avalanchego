@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/bag"
@@ -18,7 +19,7 @@ import (
 
 type Network struct {
 	params         snowball.Parameters
-	colors         []*TestBlock
+	colors         []*snowmantest.Block
 	rngSource      sampler.Source
 	nodes, running []Consensus
 }
@@ -26,13 +27,13 @@ type Network struct {
 func NewNetwork(params snowball.Parameters, numColors int, rngSource sampler.Source) *Network {
 	n := &Network{
 		params: params,
-		colors: []*TestBlock{{
+		colors: []*snowmantest.Block{{
 			TestDecidable: choices.TestDecidable{
 				IDV:     ids.Empty.Prefix(rngSource.Uint64()),
 				StatusV: choices.Processing,
 			},
-			ParentV: Genesis.IDV,
-			HeightV: 1,
+			ParentV: snowmantest.GenesisID,
+			HeightV: snowmantest.GenesisHeight + 1,
 		}},
 		rngSource: rngSource,
 	}
@@ -42,7 +43,7 @@ func NewNetwork(params snowball.Parameters, numColors int, rngSource sampler.Sou
 		s.Initialize(uint64(len(n.colors)))
 		dependencyInd, _ := s.Next()
 		dependency := n.colors[dependencyInd]
-		n.colors = append(n.colors, &TestBlock{
+		n.colors = append(n.colors, &snowmantest.Block{
 			TestDecidable: choices.TestDecidable{
 				IDV:     ids.Empty.Prefix(rngSource.Uint64()),
 				StatusV: choices.Processing,
@@ -58,7 +59,7 @@ func (n *Network) shuffleColors() {
 	s := sampler.NewDeterministicUniform(n.rngSource)
 	s.Initialize(uint64(len(n.colors)))
 	indices, _ := s.Sample(len(n.colors))
-	colors := []*TestBlock(nil)
+	colors := []*snowmantest.Block(nil)
 	for _, index := range indices {
 		colors = append(colors, n.colors[int(index)])
 	}
@@ -69,7 +70,7 @@ func (n *Network) shuffleColors() {
 func (n *Network) AddNode(t testing.TB, sm Consensus) error {
 	snowCtx := snowtest.Context(t, snowtest.CChainID)
 	ctx := snowtest.ConsensusContext(snowCtx)
-	if err := sm.Initialize(ctx, n.params, Genesis.ID(), Genesis.Height(), Genesis.Timestamp()); err != nil {
+	if err := sm.Initialize(ctx, n.params, snowmantest.GenesisID, snowmantest.GenesisHeight, snowmantest.GenesisTimestamp); err != nil {
 		return err
 	}
 
@@ -80,7 +81,7 @@ func (n *Network) AddNode(t testing.TB, sm Consensus) error {
 		if !found {
 			myDep = blk.Parent()
 		}
-		myVtx := &TestBlock{
+		myBlock := &snowmantest.Block{
 			TestDecidable: choices.TestDecidable{
 				IDV:     blk.ID(),
 				StatusV: blk.Status(),
@@ -90,10 +91,10 @@ func (n *Network) AddNode(t testing.TB, sm Consensus) error {
 			VerifyV: blk.Verify(context.Background()),
 			BytesV:  blk.Bytes(),
 		}
-		if err := sm.Add(context.Background(), myVtx); err != nil {
+		if err := sm.Add(context.Background(), myBlock); err != nil {
 			return err
 		}
-		deps[myVtx.ID()] = myDep
+		deps[myBlock.ID()] = myDep
 	}
 	n.nodes = append(n.nodes, sm)
 	n.running = append(n.running, sm)
