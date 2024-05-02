@@ -136,6 +136,7 @@ func (m *Manager) UpdateFeeRates(
 			m.feeRates[i],
 			feesConfig.UpdateCoefficient[i],
 			parentBlkComplexity[i],
+			feesConfig.BlockMaxComplexity[i],
 			feesConfig.BlockTargetComplexityRate[i],
 			elapsedTime,
 		)
@@ -149,6 +150,7 @@ func nextFeeRate(
 	currentFeeRate,
 	coeff,
 	parentBlkComplexity,
+	maxBlockComplexity,
 	targetComplexityRate,
 	elapsedTime uint64,
 ) uint64 {
@@ -160,9 +162,9 @@ func nextFeeRate(
 	//
 	// We approximate the exponential as follows:
 	//
-	//                              1 + k * delta^2 if delta >= 0
+	//                              1 + (k * delta)^2 if delta >= 0
 	// feeRate_{t+1} = feeRate_t *
-	//                              1 / (1 + k * delta^2) if delta < 0
+	//                              1 / (1 + (k * delta)^2) if delta < 0
 	//
 	// The approximation keeps two key properties of the exponential formula:
 	// 1. It's strictly increasing with delta
@@ -174,8 +176,12 @@ func nextFeeRate(
 	elapsedTime = max(1, elapsedTime)
 	targetComplexity, over := safemath.Mul64(targetComplexityRate, elapsedTime)
 	if over != nil {
-		targetComplexity = math.MaxUint64
+		targetComplexity = maxBlockComplexity
 	}
+
+	// regardless how low network load has been, we won't allow
+	// blocks larger than max block complexity
+	targetComplexity = min(targetComplexity, maxBlockComplexity)
 
 	if parentBlkComplexity == targetComplexity {
 		return currentFeeRate // complexity matches target, nothing to update
@@ -194,8 +200,8 @@ func nextFeeRate(
 		delta = targetComplexity - parentBlkComplexity
 	}
 
-	num := coeff * delta * delta
-	denom := targetComplexity * targetComplexity * CoeffDenom
+	num := coeff * coeff * delta * delta
+	denom := targetComplexity * targetComplexity * CoeffDenom * CoeffDenom
 
 	if increaseFee {
 		res, over := safemath.Mul64(currentFeeRate, denom+num)

@@ -52,10 +52,10 @@ var (
 			60_000,
 		},
 		BlockTargetComplexityRate: commonfees.Dimensions{
-			200,
+			250,
 			60,
-			80,
-			600,
+			120,
+			650,
 		},
 	}
 

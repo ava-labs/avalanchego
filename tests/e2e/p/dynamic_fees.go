@@ -4,6 +4,7 @@
 package p
 
 import (
+	"fmt"
 	"math"
 
 	"github.com/stretchr/testify/require"
@@ -26,11 +27,11 @@ var _ = ginkgo.Describe("[Dynamic Fees]", func() {
 		customDynamicFeesConfig := commonfees.DynamicFeesConfig{
 			InitialFeeRate:     commonfees.Dimensions{1, 2, 3, 4},
 			MinFeeRate:         commonfees.Dimensions{1, 1, 1, 1},
-			UpdateCoefficient:  commonfees.Dimensions{1, 1, 1, 1},
+			UpdateCoefficient:  commonfees.Dimensions{5, 2, 2, 3},
 			BlockMaxComplexity: commonfees.Dimensions{math.MaxUint64, math.MaxUint64, math.MaxUint64, math.MaxUint64},
 
 			// BlockUnitsTarget are set to cause an increase of fees while simple transactions are issued
-			BlockTargetComplexityRate: commonfees.Dimensions{1_000, 1_000, 1_000, 3_000},
+			BlockTargetComplexityRate: commonfees.Dimensions{250, 60, 120, 650},
 		}
 
 		ginkgo.By("creating a new private network to ensure isolation from other tests")
@@ -116,7 +117,10 @@ var _ = ginkgo.Describe("[Dynamic Fees]", func() {
 						tests.Outf("{{blue}} current fee rates: %v {{/}}\n", updatedFeeRates)
 
 						ginkgo.By("check that fee rates components have increased")
-						require.True(commonfees.Compare(currFeeRates, updatedFeeRates))
+						require.True(
+							commonfees.Compare(currFeeRates, updatedFeeRates),
+							fmt.Sprintf("previous fee rates %v, current fee rates %v", currFeeRates, updatedFeeRates),
+						)
 						currFeeRates = updatedFeeRates
 					}
 				})
