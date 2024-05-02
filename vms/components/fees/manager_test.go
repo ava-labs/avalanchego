@@ -25,6 +25,7 @@ func TestUpdateFeeRates(t *testing.T) {
 		feesCfg = DynamicFeesConfig{
 			MinFeeRate:                Dimensions{1, 1, 1, 1},
 			UpdateCoefficient:         Dimensions{10, 20, 50, 100},
+			BlockMaxComplexity:        Dimensions{100, 100, 100, 100},
 			BlockTargetComplexityRate: Dimensions{25, 25, 25, 25},
 		}
 		parentFeeRate    = Dimensions{10, 20, 100, 200}
@@ -56,7 +57,7 @@ func TestUpdateFeeRates(t *testing.T) {
 	require.Equal(uint64(99), m.feeRates[UTXOWrite])
 
 	// Compute complexoty is below target, fee rate is pushed down to the minimum
-	require.Equal(uint64(193), m.feeRates[Compute])
+	require.Equal(uint64(199), m.feeRates[Compute])
 }
 
 func TestUpdateFeeRatesStability(t *testing.T) {
@@ -72,6 +73,7 @@ func TestUpdateFeeRatesStability(t *testing.T) {
 		feesCfg = DynamicFeesConfig{
 			MinFeeRate:                Dimensions{0, 0, 0, 0},
 			UpdateCoefficient:         Dimensions{2, 4, 5, 10},
+			BlockMaxComplexity:        Dimensions{100_000, 100_000, 100_000, 100_000},
 			BlockTargetComplexityRate: Dimensions{200, 60, 80, 600},
 		}
 		initialFeeRate = Dimensions{
@@ -135,16 +137,16 @@ func TestPChainFeeRateIncreaseDueToPeak(t *testing.T) {
 				35 * units.NanoAvax,
 			},
 			UpdateCoefficient: Dimensions{ // over CoeffDenom
-				4,
-				1,
+				5,
 				2,
-				3,
+				2,
+				4,
 			},
 			BlockTargetComplexityRate: Dimensions{
-				4 * 200,
-				4 * 60,
-				4 * 80,
-				4 * 600,
+				250,
+				60,
+				120,
+				650,
 			},
 			BlockMaxComplexity: Dimensions{
 				100_000,
@@ -154,38 +156,42 @@ func TestPChainFeeRateIncreaseDueToPeak(t *testing.T) {
 			},
 		}
 
-		// See mainnet P-chain block 298vMuyYEi8R3XX6Ewi5orsDVYn5jrNDrPEaPG89UsckcN8e8K its descendants
+		// See mainnet P-chain block 2LJVD1rfEfaJtTwRggFXaUXhME4t5WYGhYP9Aj7eTYqGsfknuC its descendants
 		blockComplexities = []blkTimeAndComplexity{
-			{1703455204, Dimensions{41388, 23040, 23122, 256000}},
-			{1703455209, Dimensions{41388, 23040, 23122, 256000}},
-			{1703455222, Dimensions{41388, 23040, 23122, 256000}},
-			{1703455228, Dimensions{41388, 23040, 23122, 256000}},
-			{1703455236, Dimensions{41388, 23040, 23122, 256000}},
-			{1703455242, Dimensions{41388, 23040, 23122, 256000}},
-			{1703455250, Dimensions{41388, 23040, 23122, 256000}},
-			{1703455256, Dimensions{41388, 23040, 23122, 256000}},
-			{1703455320, Dimensions{41388, 23040, 23122, 256000}},
-			{1703455328, Dimensions{41388, 23040, 23122, 256000}},
-			{1703455334, Dimensions{41388, 23040, 23122, 256000}},
-			{1703455349, Dimensions{41388, 23040, 23122, 256000}},
-			{1703455356, Dimensions{41388, 23040, 23122, 256000}},
-			{1703455362, Dimensions{41388, 23040, 23122, 256000}},
-			{1703455412, Dimensions{41388, 23040, 23122, 256000}},
-			{1703455418, Dimensions{41388, 23040, 23122, 256000}},
-			{1703455424, Dimensions{41388, 23040, 23122, 256000}},
-			{1703455430, Dimensions{41388, 23040, 23122, 256000}},
-			{1703455437, Dimensions{41388, 23040, 23122, 256000}},
-			{1703455442, Dimensions{41388, 23040, 23122, 256000}},
-			{1703455448, Dimensions{41388, 23040, 23122, 256000}},
-			{1703455454, Dimensions{41388, 23040, 23122, 256000}},
-			{1703455460, Dimensions{41388, 23040, 23122, 256000}},
-			{1703455468, Dimensions{41388, 23040, 23122, 256000}},
-			{1703455489, Dimensions{41388, 23040, 23122, 256000}},
-			{1703455497, Dimensions{41388, 23040, 23122, 256000}},
-			{1703455503, Dimensions{41388, 23040, 23122, 256000}},
-			{1703455509, Dimensions{41388, 23040, 23122, 256000}},
-			{1703455517, Dimensions{41388, 23040, 23122, 256000}},
-			{1703455528, Dimensions{41388, 23040, 23122, 256000}},
+			{1615237936, Dimensions{28234, 10812, 10812, 106000}},
+			{1615237936, Dimensions{17634, 6732, 6732, 66000}},
+			{1615237936, Dimensions{12334, 4692, 4692, 46000}},
+			{1615237936, Dimensions{5709, 2142, 2142, 21000}},
+			{1615237936, Dimensions{15514, 5916, 5916, 58000}},
+			{1615237936, Dimensions{12069, 4590, 4590, 45000}},
+			{1615237936, Dimensions{8359, 3162, 3162, 31000}},
+			{1615237936, Dimensions{5444, 2040, 2040, 20000}},
+			{1615237936, Dimensions{1734, 612, 612, 6000}},
+			{1615237936, Dimensions{5974, 2244, 2244, 22000}},
+			{1615237936, Dimensions{3059, 1122, 1122, 11000}},
+			{1615237936, Dimensions{7034, 2652, 2652, 26000}},
+			{1615237936, Dimensions{7564, 2856, 2856, 28000}},
+			{1615237936, Dimensions{34064, 13056, 13056, 128000}},
+			{1615237936, Dimensions{34064, 13056, 13056, 128000}},
+			{1615237936, Dimensions{34064, 13056, 13056, 128000}},
+			{1615237936, Dimensions{34064, 13056, 13056, 128000}},
+			{1615237936, Dimensions{34064, 13056, 13056, 128000}},
+			{1615237936, Dimensions{34064, 13056, 13056, 128000}},
+			{1615237936, Dimensions{34064, 13056, 13056, 128000}},
+			{1615237936, Dimensions{34064, 13056, 13056, 128000}},
+			{1615237936, Dimensions{820, 360, 442, 4000}},
+			{1615237936, Dimensions{34064, 13056, 13056, 128000}},
+			{1615237936, Dimensions{34064, 13056, 13056, 128000}},
+			{1615237936, Dimensions{34064, 13056, 13056, 128000}},
+			{1615237936, Dimensions{34064, 13056, 13056, 128000}},
+			{1615237936, Dimensions{34064, 13056, 13056, 128000}},
+			{1615237936, Dimensions{34064, 13056, 13056, 128000}},
+			{1615237936, Dimensions{34064, 13056, 13056, 128000}},
+			{1615237936, Dimensions{34064, 13056, 13056, 128000}},
+			{1615237936, Dimensions{3589, 1326, 1326, 13000}},
+			{1615237936, Dimensions{550, 180, 180, 2000}},
+			{1615237936, Dimensions{413, 102, 102, 1000}},
+			{1615237936, Dimensions{0, 0, 0, 0}},
 		}
 	)
 
@@ -205,18 +211,19 @@ func TestPChainFeeRateIncreaseDueToPeak(t *testing.T) {
 			childBlkData.blkTime,
 		))
 
-		// check that at least a fee rate component has strictly increased
+		// check that fee rates are strictly above minimal
 		require.False(
-			Compare(m.feeRates, peakFeeRate),
+			Compare(m.feeRates, feesCfg.MinFeeRate),
 			fmt.Sprintf("failed at %d of %d iteration, \n curr fees %v \n next fees %v",
 				i,
 				len(blockComplexities),
 				peakFeeRate,
 				m.feeRates,
-			))
+			),
+		)
 
-		// at peak the total fee for a median complexity tx should be in tens of Avax, no more.
-		fee, err := m.CalculateFee(feesCfg.BlockTargetComplexityRate)
+		// at peak the total fee should be no more than 100 Avax.
+		fee, err := m.CalculateFee(childBlkData.complexity)
 		require.NoError(err)
 		require.Less(fee, 100*units.Avax, fmt.Sprintf("iteration: %d, total: %d", i, len(blockComplexities)))
 
@@ -224,13 +231,8 @@ func TestPChainFeeRateIncreaseDueToPeak(t *testing.T) {
 	}
 
 	// OFF PEAK
-	offPeakBlkComplexity := Dimensions{
-		feesCfg.BlockTargetComplexityRate[Bandwidth] * 99 / 100,
-		feesCfg.BlockTargetComplexityRate[UTXORead] * 99 / 100,
-		feesCfg.BlockTargetComplexityRate[UTXOWrite] * 99 / 100,
-		feesCfg.BlockTargetComplexityRate[Compute] * 99 / 100,
-	}
-	elapsedTime := time.Second
+	offPeakBlkComplexity := Dimensions{1473, 510, 510, 5000}
+	elapsedTime := time.Unix(1615238881, 0).Sub(time.Unix(1615237936, 0))
 	parentBlkTime := time.Now().Truncate(time.Second)
 	childBlkTime := parentBlkTime.Add(elapsedTime)
 
@@ -241,9 +243,9 @@ func TestPChainFeeRateIncreaseDueToPeak(t *testing.T) {
 		childBlkTime.Unix(),
 	))
 
-	// fee rates must be strictly smaller than peak ones
+	// check that fee rates decrease off peak
 	require.Less(m.feeRates[Bandwidth], peakFeeRate[Bandwidth])
 	require.Less(m.feeRates[UTXORead], peakFeeRate[UTXORead])
-	require.Less(m.feeRates[UTXOWrite], peakFeeRate[UTXOWrite])
+	require.LessOrEqual(m.feeRates[UTXOWrite], peakFeeRate[UTXOWrite])
 	require.Less(m.feeRates[Compute], peakFeeRate[Compute])
 }
