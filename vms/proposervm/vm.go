@@ -333,21 +333,14 @@ func (vm *VM) SetPreference(ctx context.Context, preferred ids.ID) error {
 	if ok {
 		// If we prefer an option block, we need to delete its sibling from the
 		// processing block index
-		parentBlk, _, err := vm.State.GetBlock(optionBlk.Parent())
+		parentBlk, err := vm.getPostForkBlock(ctx, optionBlk.ParentID())
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to get parent block: %w", err)
 		}
 
-		postForkBlk, ok := parentBlk.(*)
+		oracleBlk, ok := parentBlk.(*postForkBlock)
 		if !ok {
-			//This is unexpected because a postForkOption is guaranteed to be a
-			//child of a PostForkBlock
-			//return err
-		}
-
-		oracleBlk, ok := postForkBlk.getStatelessBlk().(*postForkBlock)
-		if !ok {
-			return err
+			return fmt.Errorf("parent of option block is not an oracle block")
 		}
 
 		siblingOptionBlk, err := vm.getSiblingOption(ctx, optionBlk.ID(), oracleBlk)
@@ -355,8 +348,13 @@ func (vm *VM) SetPreference(ctx context.Context, preferred ids.ID) error {
 			return err
 		}
 
-		// Remove our sibling from the index
+		// Remove our sibling from the index and insert the newly preferred
+		// option
 		if err := vm.State.DeleteProcessingBlock(siblingOptionBlk.ID()); err != nil {
+			return err
+		}
+
+		if err := vm.State.PutProcessingBlock(optionBlk.ID()); err != nil {
 			return err
 		}
 	}

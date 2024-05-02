@@ -2870,6 +2870,7 @@ func TestOnlyPreferredOptionPersisted(t *testing.T) {
 			},
 			ParentV: blk0.ID(),
 			HeightV: blk0.HeightV + 1,
+			BytesV:  []byte{0},
 		},
 	}
 
@@ -2881,6 +2882,7 @@ func TestOnlyPreferredOptionPersisted(t *testing.T) {
 			},
 			ParentV: innerBlk1.IDV,
 			HeightV: innerBlk1.HeightV + 1,
+			BytesV:  []byte{1},
 		},
 		&snowman.TestBlock{
 			TestDecidable: choices.TestDecidable{
@@ -2889,6 +2891,7 @@ func TestOnlyPreferredOptionPersisted(t *testing.T) {
 			},
 			ParentV: innerBlk1.IDV,
 			HeightV: innerBlk1.HeightV + 1,
+			BytesV:  []byte{2},
 		},
 	}
 
@@ -2946,7 +2949,11 @@ func TestOnlyPreferredOptionPersisted(t *testing.T) {
 	require.False(vm.HasProcessingBlock(optionBlk1.ID()))
 
 	// changing preferences should still persist the correct chain
+	require.NoError(vm.SetPreference(ctx, optionBlk1.ID()))
+
 	require.True(vm.HasProcessingBlock(blk1.ID()))
 	require.False(vm.HasProcessingBlock(optionBlk0.ID()))
 	require.True(vm.HasProcessingBlock(optionBlk1.ID()))
+
+	require.NoError(vm.Shutdown(ctx))
 }
