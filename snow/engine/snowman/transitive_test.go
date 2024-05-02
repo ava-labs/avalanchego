@@ -51,7 +51,7 @@ func BuildOracleBlock(root *snowmantest.Block) *snowman.TestOracleBlock {
 	}
 }
 
-func BuildBlock(root snowmantest.Block) *snowmantest.Block {
+func BuildBlock(root *snowmantest.Block) *snowmantest.Block {
 	return &snowmantest.Block{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
