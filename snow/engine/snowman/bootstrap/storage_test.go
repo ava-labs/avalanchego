@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/bootstrap/interval"
@@ -25,7 +26,7 @@ import (
 var _ block.Parser = testParser(nil)
 
 func TestGetMissingBlockIDs(t *testing.T) {
-	blocks := generateBlockchain(7)
+	blocks := snowmantest.BuildChain(7)
 	parser := makeParser(blocks)
 
 	tests := []struct {
@@ -103,7 +104,7 @@ func TestGetMissingBlockIDs(t *testing.T) {
 }
 
 func TestProcess(t *testing.T) {
-	blocks := generateBlockchain(7)
+	blocks := snowmantest.BuildChain(7)
 
 	tests := []struct {
 		name                        string
@@ -259,7 +260,7 @@ func TestExecute(t *testing.T) {
 			tree, err := interval.NewTree(db)
 			require.NoError(err)
 
-			blocks := generateBlockchain(numBlocks)
+			blocks := snowmantest.BuildChain(numBlocks)
 			parser := makeParser(blocks)
 			for _, blk := range blocks {
 				_, err := interval.Add(db, tree, 0, blk.Height(), blk.Bytes())
@@ -299,7 +300,7 @@ func (f testParser) ParseBlock(ctx context.Context, bytes []byte) (snowman.Block
 	return f(ctx, bytes)
 }
 
-func makeParser(blocks []snowman.Block) block.Parser {
+func makeParser(blocks []*snowmantest.Block) block.Parser {
 	return testParser(func(_ context.Context, b []byte) (snowman.Block, error) {
 		for _, block := range blocks {
 			if bytes.Equal(b, block.Bytes()) {
