@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
@@ -40,13 +41,6 @@ func helperBuildStateSyncTestObjects(t *testing.T) (*fullVM, *VM) {
 	}
 
 	// load innerVM expectations
-	innerGenesisBlk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV: ids.ID{'i', 'n', 'n', 'e', 'r', 'G', 'e', 'n', 'e', 's', 'i', 's', 'I', 'D'},
-		},
-		HeightV: 0,
-		BytesV:  []byte("genesis state"),
-	}
 	innerVM.InitializeF = func(context.Context, *snow.Context, database.Database,
 		[]byte, []byte, []byte, chan<- common.Message,
 		[]*common.Fx, common.AppSender,
@@ -54,10 +48,10 @@ func helperBuildStateSyncTestObjects(t *testing.T) (*fullVM, *VM) {
 		return nil
 	}
 	innerVM.LastAcceptedF = func(context.Context) (ids.ID, error) {
-		return innerGenesisBlk.ID(), nil
+		return snowmantest.GenesisID, nil
 	}
 	innerVM.GetBlockF = func(context.Context, ids.ID) (snowman.Block, error) {
-		return innerGenesisBlk, nil
+		return snowmantest.Genesis, nil
 	}
 
 	// create the VM
@@ -81,7 +75,7 @@ func helperBuildStateSyncTestObjects(t *testing.T) (*fullVM, *VM) {
 		context.Background(),
 		ctx,
 		prefixdb.New([]byte{}, memdb.New()),
-		innerGenesisBlk.Bytes(),
+		snowmantest.GenesisBytes,
 		nil,
 		nil,
 		nil,
@@ -166,7 +160,7 @@ func TestStateSyncGetOngoingSyncStateSummary(t *testing.T) {
 	require.NoError(vm.SetForkHeight(innerSummary.Height() - 1))
 
 	// store post fork block associated with summary
-	innerBlk := &snowman.TestBlock{
+	innerBlk := &snowmantest.Block{
 		BytesV:  []byte{1},
 		ParentV: ids.GenerateTestID(),
 		HeightV: innerSummary.Height(),
@@ -250,7 +244,7 @@ func TestStateSyncGetLastStateSummary(t *testing.T) {
 	require.NoError(vm.SetForkHeight(innerSummary.Height() - 1))
 
 	// store post fork block associated with summary
-	innerBlk := &snowman.TestBlock{
+	innerBlk := &snowmantest.Block{
 		BytesV:  []byte{1},
 		ParentV: ids.GenerateTestID(),
 		HeightV: innerSummary.Height(),
@@ -337,7 +331,7 @@ func TestStateSyncGetStateSummary(t *testing.T) {
 	require.NoError(vm.SetForkHeight(innerSummary.Height() - 1))
 
 	// store post fork block associated with summary
-	innerBlk := &snowman.TestBlock{
+	innerBlk := &snowmantest.Block{
 		BytesV:  []byte{1},
 		ParentV: ids.GenerateTestID(),
 		HeightV: innerSummary.Height(),
@@ -409,7 +403,7 @@ func TestParseStateSummary(t *testing.T) {
 	require.NoError(vm.SetForkHeight(innerSummary.Height() - 1))
 
 	// store post fork block associated with summary
-	innerBlk := &snowman.TestBlock{
+	innerBlk := &snowmantest.Block{
 		BytesV:  []byte{1},
 		ParentV: ids.GenerateTestID(),
 		HeightV: innerSummary.Height(),
@@ -467,7 +461,7 @@ func TestStateSummaryAccept(t *testing.T) {
 	require.NoError(vm.SetForkHeight(innerSummary.Height() - 1))
 
 	// store post fork block associated with summary
-	innerBlk := &snowman.TestBlock{
+	innerBlk := &snowmantest.Block{
 		BytesV:  []byte{1},
 		ParentV: ids.GenerateTestID(),
 		HeightV: innerSummary.Height(),
@@ -538,7 +532,7 @@ func TestStateSummaryAcceptOlderBlock(t *testing.T) {
 	vm.lastAcceptedHeight = innerSummary.Height() + 1
 
 	// store post fork block associated with summary
-	innerBlk := &snowman.TestBlock{
+	innerBlk := &snowmantest.Block{
 		BytesV:  []byte{1},
 		ParentV: ids.GenerateTestID(),
 		HeightV: innerSummary.Height(),

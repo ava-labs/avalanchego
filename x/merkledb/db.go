@@ -163,6 +163,11 @@ type Config struct {
 	// BranchFactor determines the number of children each node can have.
 	BranchFactor BranchFactor
 
+	// Hasher defines the hash function to use when hashing the trie.
+	//
+	// If not specified, [DefaultHasher] will be used.
+	Hasher Hasher
+
 	// RootGenConcurrency is the number of goroutines to use when
 	// generating a new state root.
 	//
@@ -214,7 +219,7 @@ type merkleDB struct {
 	// True iff the db has been closed.
 	closed bool
 
-	metrics merkleMetrics
+	metrics metrics
 
 	debugTracer trace.Tracer
 	infoTracer  trace.Tracer
@@ -234,11 +239,13 @@ type merkleDB struct {
 	hashNodesKeyPool *bytesPool
 
 	tokenSize int
+
+	hasher Hasher
 }
 
 // New returns a new merkle database.
 func New(ctx context.Context, db database.Database, config Config) (MerkleDB, error) {
-	metrics, err := newMetrics("merkleDB", config.Reg)
+	metrics, err := newMetrics("merkledb", config.Reg)
 	if err != nil {
 		return nil, err
 	}
@@ -249,10 +256,15 @@ func newDatabase(
 	ctx context.Context,
 	db database.Database,
 	config Config,
-	metrics merkleMetrics,
+	metrics metrics,
 ) (*merkleDB, error) {
 	if err := config.BranchFactor.Valid(); err != nil {
 		return nil, err
+	}
+
+	hasher := config.Hasher
+	if hasher == nil {
+		hasher = DefaultHasher
 	}
 
 	rootGenConcurrency := runtime.NumCPU()
@@ -274,17 +286,23 @@ func newDatabase(
 			int(config.IntermediateNodeCacheSize),
 			int(config.IntermediateWriteBufferSize),
 			int(config.IntermediateWriteBatchSize),
-			BranchFactorToTokenSize[config.BranchFactor]),
-		valueNodeDB: newValueNodeDB(db,
+			BranchFactorToTokenSize[config.BranchFactor],
+			hasher,
+		),
+		valueNodeDB: newValueNodeDB(
+			db,
 			bufferPool,
 			metrics,
-			int(config.ValueNodeCacheSize)),
+			int(config.ValueNodeCacheSize),
+			hasher,
+		),
 		history:          newTrieHistory(int(config.HistoryLength)),
 		debugTracer:      getTracerIfEnabled(config.TraceLevel, DebugTrace, config.Tracer),
 		infoTracer:       getTracerIfEnabled(config.TraceLevel, InfoTrace, config.Tracer),
 		childViews:       make([]*view, 0, defaultPreallocationSize),
 		hashNodesKeyPool: newBytesPool(rootGenConcurrency),
 		tokenSize:        BranchFactorToTokenSize[config.BranchFactor],
+		hasher:           hasher,
 	}
 
 	shutdownType, err := trieDB.baseDB.Get(cleanShutdownKey)
@@ -1237,7 +1255,9 @@ func (db *merkleDB) initializeRoot() error {
 		}
 	}
 
-	db.rootID = root.calculateID(db.metrics)
+	db.rootID = db.hasher.HashNode(root)
+	db.metrics.HashCalculated()
+
 	db.root = maybe.Some(root)
 	return nil
 }

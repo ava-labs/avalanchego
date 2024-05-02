@@ -23,7 +23,7 @@ import (
 
 func Test_Proof_Empty(t *testing.T) {
 	proof := &Proof{}
-	err := proof.Verify(context.Background(), ids.Empty, 4)
+	err := proof.Verify(context.Background(), ids.Empty, 4, DefaultHasher)
 	require.ErrorIs(t, err, ErrEmptyProof)
 }
 
@@ -43,7 +43,7 @@ func Test_Proof_Simple(t *testing.T) {
 	proof, err := db.GetProof(ctx, []byte{})
 	require.NoError(err)
 
-	require.NoError(proof.Verify(ctx, expectedRoot, 4))
+	require.NoError(proof.Verify(ctx, expectedRoot, db.tokenSize, db.hasher))
 }
 
 func Test_Proof_Verify_Bad_Data(t *testing.T) {
@@ -119,7 +119,7 @@ func Test_Proof_Verify_Bad_Data(t *testing.T) {
 
 			tt.malform(proof)
 
-			err = proof.Verify(context.Background(), db.getMerkleRoot(), 4)
+			err = proof.Verify(context.Background(), db.getMerkleRoot(), db.tokenSize, db.hasher)
 			require.ErrorIs(err, tt.expectedErr)
 		})
 	}
@@ -128,14 +128,14 @@ func Test_Proof_Verify_Bad_Data(t *testing.T) {
 func Test_Proof_ValueOrHashMatches(t *testing.T) {
 	require := require.New(t)
 
-	require.True(valueOrHashMatches(maybe.Some([]byte{0}), maybe.Some([]byte{0})))
-	require.False(valueOrHashMatches(maybe.Nothing[[]byte](), maybe.Some(hashing.ComputeHash256([]byte{0}))))
-	require.True(valueOrHashMatches(maybe.Nothing[[]byte](), maybe.Nothing[[]byte]()))
+	require.True(valueOrHashMatches(SHA256Hasher, maybe.Some([]byte{0}), maybe.Some([]byte{0})))
+	require.False(valueOrHashMatches(SHA256Hasher, maybe.Nothing[[]byte](), maybe.Some(hashing.ComputeHash256([]byte{0}))))
+	require.True(valueOrHashMatches(SHA256Hasher, maybe.Nothing[[]byte](), maybe.Nothing[[]byte]()))
 
-	require.False(valueOrHashMatches(maybe.Some([]byte{0}), maybe.Nothing[[]byte]()))
-	require.False(valueOrHashMatches(maybe.Nothing[[]byte](), maybe.Some([]byte{0})))
-	require.False(valueOrHashMatches(maybe.Nothing[[]byte](), maybe.Some(hashing.ComputeHash256([]byte{1}))))
-	require.False(valueOrHashMatches(maybe.Some(hashing.ComputeHash256([]byte{0})), maybe.Nothing[[]byte]()))
+	require.False(valueOrHashMatches(SHA256Hasher, maybe.Some([]byte{0}), maybe.Nothing[[]byte]()))
+	require.False(valueOrHashMatches(SHA256Hasher, maybe.Nothing[[]byte](), maybe.Some([]byte{0})))
+	require.False(valueOrHashMatches(SHA256Hasher, maybe.Nothing[[]byte](), maybe.Some(hashing.ComputeHash256([]byte{1}))))
+	require.False(valueOrHashMatches(SHA256Hasher, maybe.Some(hashing.ComputeHash256([]byte{0})), maybe.Nothing[[]byte]()))
 }
 
 func Test_RangeProof_Extra_Value(t *testing.T) {
@@ -159,6 +159,7 @@ func Test_RangeProof_Extra_Value(t *testing.T) {
 		maybe.Some([]byte{5, 5}),
 		db.rootID,
 		db.tokenSize,
+		db.hasher,
 	))
 
 	proof.KeyValues = append(proof.KeyValues, KeyValue{Key: []byte{5}, Value: []byte{5}})
@@ -169,6 +170,7 @@ func Test_RangeProof_Extra_Value(t *testing.T) {
 		maybe.Some([]byte{5, 5}),
 		db.rootID,
 		db.tokenSize,
+		db.hasher,
 	)
 	require.ErrorIs(err, ErrInvalidProof)
 }
@@ -239,7 +241,7 @@ func Test_RangeProof_Verify_Bad_Data(t *testing.T) {
 
 			tt.malform(proof)
 
-			err = proof.Verify(context.Background(), maybe.Some([]byte{2}), maybe.Some([]byte{3, 0}), db.getMerkleRoot(), db.tokenSize)
+			err = proof.Verify(context.Background(), maybe.Some([]byte{2}), maybe.Some([]byte{3, 0}), db.getMerkleRoot(), db.tokenSize, db.hasher)
 			require.ErrorIs(err, tt.expectedErr)
 		})
 	}
@@ -299,10 +301,10 @@ func Test_Proof(t *testing.T) {
 
 	expectedRootID, err := trie.GetMerkleRoot(context.Background())
 	require.NoError(err)
-	require.NoError(proof.Verify(context.Background(), expectedRootID, dbTrie.tokenSize))
+	require.NoError(proof.Verify(context.Background(), expectedRootID, dbTrie.tokenSize, dbTrie.hasher))
 
 	proof.Path[0].Key = ToKey([]byte("key1"))
-	err = proof.Verify(context.Background(), expectedRootID, dbTrie.tokenSize)
+	err = proof.Verify(context.Background(), expectedRootID, dbTrie.tokenSize, dbTrie.hasher)
 	require.ErrorIs(err, ErrProofNodeNotForKey)
 }
 
@@ -483,7 +485,7 @@ func Test_RangeProof_Syntactic_Verify(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := tt.proof.Verify(context.Background(), tt.start, tt.end, ids.Empty, 4)
+			err := tt.proof.Verify(context.Background(), tt.start, tt.end, ids.Empty, 4, DefaultHasher)
 			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}
@@ -523,6 +525,7 @@ func Test_RangeProof(t *testing.T) {
 		maybe.Some([]byte{3, 5}),
 		db.rootID,
 		db.tokenSize,
+		db.hasher,
 	))
 }
 
@@ -577,6 +580,7 @@ func Test_RangeProof_NilStart(t *testing.T) {
 		maybe.Some([]byte("key35")),
 		db.rootID,
 		db.tokenSize,
+		db.hasher,
 	))
 }
 
@@ -617,6 +621,7 @@ func Test_RangeProof_NilEnd(t *testing.T) {
 		maybe.Nothing[[]byte](),
 		db.rootID,
 		db.tokenSize,
+		db.hasher,
 	))
 }
 
@@ -660,6 +665,7 @@ func Test_RangeProof_EmptyValues(t *testing.T) {
 		maybe.Some([]byte("key2")),
 		db.rootID,
 		db.tokenSize,
+		db.hasher,
 	))
 }
 
@@ -1751,6 +1757,7 @@ func FuzzRangeProofInvariants(f *testing.F) {
 			end,
 			rootID,
 			db.tokenSize,
+			db.hasher,
 		))
 
 		// Make sure the start proof doesn't contain any nodes
@@ -1796,7 +1803,7 @@ func FuzzRangeProofInvariants(f *testing.F) {
 			rootID, err := db.GetMerkleRoot(context.Background())
 			require.NoError(err)
 
-			require.NoError(proof.Verify(context.Background(), rootID, db.tokenSize))
+			require.NoError(proof.Verify(context.Background(), rootID, db.tokenSize, db.hasher))
 		default:
 			require.NotEmpty(rangeProof.EndProof)
 
@@ -1811,7 +1818,7 @@ func FuzzRangeProofInvariants(f *testing.F) {
 			rootID, err := db.GetMerkleRoot(context.Background())
 			require.NoError(err)
 
-			require.NoError(proof.Verify(context.Background(), rootID, db.tokenSize))
+			require.NoError(proof.Verify(context.Background(), rootID, db.tokenSize, db.hasher))
 		}
 	})
 }
@@ -1852,7 +1859,7 @@ func FuzzProofVerification(f *testing.F) {
 		rootID, err := db.GetMerkleRoot(context.Background())
 		require.NoError(err)
 
-		require.NoError(proof.Verify(context.Background(), rootID, db.tokenSize))
+		require.NoError(proof.Verify(context.Background(), rootID, db.tokenSize, db.hasher))
 
 		// Insert a new key-value pair
 		newKey := make([]byte, 32)

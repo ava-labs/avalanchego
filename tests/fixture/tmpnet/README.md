@@ -66,9 +66,17 @@ $ ./build/tmpnetctl stop-network --network-dir=/path/to/network
 Note the export of the path ending in `latest`. This is a symlink that
 is set to the last network created by `tmpnetctl start-network`. Setting
 the `TMPNET_NETWORK_DIR` env var to this symlink ensures that
-`tmpnetctl` commands and e2e execution with
-`--use-existing-network` will target the most recently deployed temporary
+`tmpnetctl` commands target the most recently deployed temporary
 network.
+
+#### Deprecated usage with e2e suite
+
+`tmpnetctl` was previously used to create temporary networks for use
+across multiple e2e test runs. As the usage of temporary networks has
+expanded to require subnets, that usage has been supplanted by the
+`--reuse-network` flag defined for the e2e suite. It was easier to
+support defining subnet configuration in the e2e suite in code than to
+extend a cli tool like `tmpnetctl` to support similar capabilities.
 
 ### Via code
 

@@ -50,7 +50,7 @@ func (v *voter) Update(ctx context.Context) {
 	for i, voteOption := range v.responseOptions {
 		// To prevent any potential deadlocks with undisclosed dependencies,
 		// votes must be bubbled to the nearest valid block
-		vote, shouldVote = v.getProcessingAncestor(ctx, voteOption)
+		vote, shouldVote = v.t.getProcessingAncestor(ctx, voteOption)
 		if shouldVote {
 			voteIndex = i
 			break
@@ -95,57 +95,4 @@ func (v *voter) Update(ctx context.Context) {
 
 	v.t.Ctx.Log.Debug("Snowman engine can't quiesce")
 	v.t.repoll(ctx)
-}
-
-// getProcessingAncestor finds [initialVote]'s most recent ancestor that is
-// processing in consensus. If no ancestor could be found, false is returned.
-//
-// Note: If [initialVote] is processing, then [initialVote] will be returned.
-func (v *voter) getProcessingAncestor(ctx context.Context, initialVote ids.ID) (ids.ID, bool) {
-	// If [bubbledVote] != [initialVote], it is guaranteed that [bubbledVote] is
-	// in processing. Otherwise, we attempt to iterate through any blocks we
-	// have at our disposal as a best-effort mechanism to find a valid ancestor.
-	bubbledVote := v.t.nonVerifieds.GetAncestor(initialVote)
-	for {
-		blk, err := v.t.getBlock(ctx, bubbledVote)
-		// If we cannot retrieve the block, drop [vote]
-		if err != nil {
-			v.t.Ctx.Log.Debug("dropping vote",
-				zap.String("reason", "ancestor couldn't be fetched"),
-				zap.Stringer("initialVoteID", initialVote),
-				zap.Stringer("bubbledVoteID", bubbledVote),
-				zap.Error(err),
-			)
-			v.t.numProcessingAncestorFetchesFailed.Inc()
-			return ids.Empty, false
-		}
-
-		if v.t.Consensus.Decided(blk) {
-			v.t.Ctx.Log.Debug("dropping vote",
-				zap.String("reason", "bubbled vote already decided"),
-				zap.Stringer("initialVoteID", initialVote),
-				zap.Stringer("bubbledVoteID", bubbledVote),
-				zap.Stringer("status", blk.Status()),
-				zap.Uint64("height", blk.Height()),
-			)
-			v.t.numProcessingAncestorFetchesDropped.Inc()
-			return ids.Empty, false
-		}
-
-		if v.t.Consensus.Processing(bubbledVote) {
-			v.t.Ctx.Log.Verbo("applying vote",
-				zap.Stringer("initialVoteID", initialVote),
-				zap.Stringer("bubbledVoteID", bubbledVote),
-				zap.Uint64("height", blk.Height()),
-			)
-			if bubbledVote != initialVote {
-				v.t.numProcessingAncestorFetchesSucceeded.Inc()
-			} else {
-				v.t.numProcessingAncestorFetchesUnneeded.Inc()
-			}
-			return bubbledVote, true
-		}
-
-		bubbledVote = blk.Parent()
-	}
 }

@@ -39,7 +39,7 @@ func (b *preForkBlock) acceptInnerBlk(ctx context.Context) error {
 }
 
 func (b *preForkBlock) Status() choices.Status {
-	forkHeight, err := b.vm.getForkHeight()
+	forkHeight, err := b.vm.GetForkHeight()
 	if err == database.ErrNotFound {
 		return b.Block.Status()
 	}
@@ -248,6 +248,7 @@ func (b *preForkBlock) buildChild(ctx context.Context) (Block, error) {
 		zap.Stringer("blkID", blk.ID()),
 		zap.Stringer("innerBlkID", innerBlock.ID()),
 		zap.Uint64("height", blk.Height()),
+		zap.Uint64("pChainHeight", pChainHeight),
 		zap.Time("parentTimestamp", parentTimestamp),
 		zap.Time("blockTimestamp", newTimestamp))
 	return blk, nil

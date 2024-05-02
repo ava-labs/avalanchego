@@ -353,7 +353,7 @@ func (vm *VM) onNormalOperationsStarted() error {
 	}
 
 	vl := validators.NewLogger(vm.ctx.Log, constants.PrimaryNetworkID, vm.ctx.NodeID)
-	vm.Validators.RegisterCallbackListener(constants.PrimaryNetworkID, vl)
+	vm.Validators.RegisterSetCallbackListener(constants.PrimaryNetworkID, vl)
 
 	for subnetID := range vm.TrackedSubnets {
 		vdrIDs := vm.Validators.GetValidatorIDs(subnetID)
@@ -362,7 +362,7 @@ func (vm *VM) onNormalOperationsStarted() error {
 		}
 
 		vl := validators.NewLogger(vm.ctx.Log, subnetID, vm.ctx.NodeID)
-		vm.Validators.RegisterCallbackListener(subnetID, vl)
+		vm.Validators.RegisterSetCallbackListener(subnetID, vl)
 	}
 
 	if err := vm.state.Commit(); err != nil {
