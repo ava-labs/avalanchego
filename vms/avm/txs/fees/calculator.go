@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/codec"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
@@ -17,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/nftfx"
 	"github.com/ava-labs/avalanchego/vms/propertyfx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"go.uber.org/zap"
 )
 
 var (
@@ -29,6 +31,7 @@ var (
 type Calculator struct {
 	// setup, to be filled before visitor methods are called
 	isEActive bool
+	log       logging.Logger
 
 	// Pre E-Upgrade inputs
 	config *config.Config
@@ -61,13 +64,17 @@ func NewStaticCalculator(cfg *config.Config, creds []*fxs.FxCredential) *Calcula
 
 // NewDynamicCalculator must be used post E upgrade activation
 func NewDynamicCalculator(
+	log logging.Logger,
+	cfg *config.Config,
 	codec codec.Manager,
 	feeManager *fees.Manager,
 	blockMaxComplexity fees.Dimensions,
 	creds []*fxs.FxCredential,
 ) *Calculator {
 	return &Calculator{
-		isEActive:          true,
+		isEActive:          false, // TO MEASURE
+		log:                log,
+		config:             cfg,
 		feeManager:         feeManager,
 		blockMaxComplexity: blockMaxComplexity,
 		codec:              codec,
@@ -82,6 +89,11 @@ func (fc *Calculator) BaseTx(tx *txs.BaseTx) error {
 	}
 
 	_, err = fc.AddFeesFor(complexity, fc.TipPercentage)
+
+	fc.log.Warn("dynamic fees",
+		zap.String("txType", "BaseTx"),
+		zap.Any("complexity", complexity),
+	)
 
 	// TEMP TO TUNE PARAMETERS
 	if !fc.isEActive {
@@ -98,6 +110,11 @@ func (fc *Calculator) CreateAssetTx(tx *txs.CreateAssetTx) error {
 
 	_, err = fc.AddFeesFor(complexity, fc.TipPercentage)
 
+	fc.log.Warn("dynamic fees",
+		zap.String("txType", "BaseTx"),
+		zap.Any("complexity", complexity),
+	)
+
 	// TEMP TO TUNE PARAMETERS
 	if !fc.isEActive {
 		fc.Fee = fc.config.CreateAssetTxFee
@@ -112,6 +129,11 @@ func (fc *Calculator) OperationTx(tx *txs.OperationTx) error {
 	}
 
 	_, err = fc.AddFeesFor(complexity, fc.TipPercentage)
+
+	fc.log.Warn("dynamic fees",
+		zap.String("txType", "BaseTx"),
+		zap.Any("complexity", complexity),
+	)
 
 	// TEMP TO TUNE PARAMETERS
 	if !fc.isEActive {
@@ -132,6 +154,11 @@ func (fc *Calculator) ImportTx(tx *txs.ImportTx) error {
 
 	_, err = fc.AddFeesFor(complexity, fc.TipPercentage)
 
+	fc.log.Warn("dynamic fees",
+		zap.String("txType", "BaseTx"),
+		zap.Any("complexity", complexity),
+	)
+
 	// TEMP TO TUNE PARAMETERS
 	if !fc.isEActive {
 		fc.Fee = fc.config.TxFee
@@ -150,6 +177,11 @@ func (fc *Calculator) ExportTx(tx *txs.ExportTx) error {
 	}
 
 	_, err = fc.AddFeesFor(complexity, fc.TipPercentage)
+
+	fc.log.Warn("dynamic fees",
+		zap.String("txType", "BaseTx"),
+		zap.Any("complexity", complexity),
+	)
 
 	// TEMP TO TUNE PARAMETERS
 	if !fc.isEActive {

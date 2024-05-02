@@ -8,6 +8,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/avm"
@@ -394,7 +395,13 @@ func (w *wallet) feeCalculator(ctx *builder.Context, options ...common.Option) (
 	} else {
 		feeCfg := config.GetDynamicFeesConfig(w.isEForkActive)
 		feeMan := commonfees.NewManager(w.nextFeeRates)
-		feeCalculator = fees.NewDynamicCalculator(builder.Parser.Codec(), feeMan, feeCfg.BlockMaxComplexity, nil)
+		feeCalculator = fees.NewDynamicCalculator(
+			logging.NoLog{},
+			builder.Parser.Codec(),
+			feeMan,
+			feeCfg.BlockMaxComplexity,
+			nil,
+		)
 	}
 	return feeCalculator, nil
 }

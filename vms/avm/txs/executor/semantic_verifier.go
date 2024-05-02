@@ -178,11 +178,11 @@ func (v *SemanticVerifier) verifyBaseTx(
 
 		feeCalculator *fees.Calculator
 	)
-	if !isEActive {
-		feeCalculator = fees.NewStaticCalculator(v.Config, creds)
-	} else {
-		feeCalculator = fees.NewDynamicCalculator(v.Codec, v.BlkFeeManager, v.BlockMaxComplexity, creds)
-	}
+	// if !isEActive {
+	// 	feeCalculator = fees.NewStaticCalculator(v.Config, creds)
+	// } else {
+	feeCalculator = fees.NewDynamicCalculator(v.Ctx.Log, v.Config, v.Codec, v.BlkFeeManager, v.BlockMaxComplexity, creds)
+	// }
 
 	if err := tx.Visit(feeCalculator); err != nil {
 		return err

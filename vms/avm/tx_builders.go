@@ -9,6 +9,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/avm/block/executor"
@@ -292,7 +293,7 @@ func feeCalculator(backend txBuilderBackend) (*fees.Calculator, error) {
 			return nil, err
 		}
 
-		feeCalculator = fees.NewDynamicCalculator(backend.Codec(), feeManager, feeCfg.BlockMaxComplexity, nil)
+		feeCalculator = fees.NewDynamicCalculator(logging.NoLog{}, backend.Config(), backend.Codec(), feeManager, feeCfg.BlockMaxComplexity, nil)
 	}
 
 	return feeCalculator, nil

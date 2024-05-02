@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/fees"
@@ -24,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
 	stdcontext "context"
+
 	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
@@ -93,7 +95,7 @@ func TestBaseTx(t *testing.T) {
 	)
 
 	{ // Post E-Upgrade
-		feeCalc := fees.NewDynamicCalculator(
+		feeCalc := fees.NewDynamicCalculator(logging.NoLog{},
 			builder.Parser.Codec(),
 			commonfees.NewManager(testFeeRates),
 			testBlockMaxConsumedUnits,
@@ -109,7 +111,7 @@ func TestBaseTx(t *testing.T) {
 		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
 
-		fc := fees.NewDynamicCalculator(
+		fc := fees.NewDynamicCalculator(logging.NoLog{},
 			builder.Parser.Codec(),
 			commonfees.NewManager(testFeeRates),
 			testBlockMaxConsumedUnits,
@@ -230,7 +232,7 @@ func TestCreateAssetTx(t *testing.T) {
 
 	{
 		// Post E-Upgrade
-		feeCalc := fees.NewDynamicCalculator(
+		feeCalc := fees.NewDynamicCalculator(logging.NoLog{},
 			builder.Parser.Codec(),
 			commonfees.NewManager(testFeeRates),
 			testBlockMaxConsumedUnits,
@@ -249,7 +251,7 @@ func TestCreateAssetTx(t *testing.T) {
 		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
 
-		fc := fees.NewDynamicCalculator(
+		fc := fees.NewDynamicCalculator(logging.NoLog{},
 			builder.Parser.Codec(),
 			commonfees.NewManager(testFeeRates),
 			testBlockMaxConsumedUnits,
@@ -327,7 +329,7 @@ func TestMintNFTOperation(t *testing.T) {
 
 	{
 		// Post E-Upgrade
-		feeCalc := fees.NewDynamicCalculator(
+		feeCalc := fees.NewDynamicCalculator(logging.NoLog{},
 			builder.Parser.Codec(),
 			commonfees.NewManager(testFeeRates),
 			testBlockMaxConsumedUnits,
@@ -345,7 +347,7 @@ func TestMintNFTOperation(t *testing.T) {
 		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
 
-		fc := fees.NewDynamicCalculator(
+		fc := fees.NewDynamicCalculator(logging.NoLog{},
 			builder.Parser.Codec(),
 			commonfees.NewManager(testFeeRates),
 			testBlockMaxConsumedUnits,
@@ -428,7 +430,7 @@ func TestMintFTOperation(t *testing.T) {
 
 	{
 		// Post E-Upgrade
-		feeCalc := fees.NewDynamicCalculator(
+		feeCalc := fees.NewDynamicCalculator(logging.NoLog{},
 			builder.Parser.Codec(),
 			commonfees.NewManager(testFeeRates),
 			testBlockMaxConsumedUnits,
@@ -444,7 +446,7 @@ func TestMintFTOperation(t *testing.T) {
 		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
 
-		fc := fees.NewDynamicCalculator(
+		fc := fees.NewDynamicCalculator(logging.NoLog{},
 			builder.Parser.Codec(),
 			commonfees.NewManager(testFeeRates),
 			testBlockMaxConsumedUnits,
@@ -520,7 +522,7 @@ func TestMintPropertyOperation(t *testing.T) {
 
 	{
 		// Post E-Upgrade
-		feeCalc := fees.NewDynamicCalculator(
+		feeCalc := fees.NewDynamicCalculator(logging.NoLog{},
 			builder.Parser.Codec(),
 			commonfees.NewManager(testFeeRates),
 			testBlockMaxConsumedUnits,
@@ -537,7 +539,7 @@ func TestMintPropertyOperation(t *testing.T) {
 		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
 
-		fc := fees.NewDynamicCalculator(
+		fc := fees.NewDynamicCalculator(logging.NoLog{},
 			builder.Parser.Codec(),
 			commonfees.NewManager(testFeeRates),
 			testBlockMaxConsumedUnits,
@@ -608,7 +610,7 @@ func TestBurnPropertyOperation(t *testing.T) {
 
 	{
 		// Post E-Upgrade
-		feeCalc := fees.NewDynamicCalculator(
+		feeCalc := fees.NewDynamicCalculator(logging.NoLog{},
 			builder.Parser.Codec(),
 			commonfees.NewManager(testFeeRates),
 			testBlockMaxConsumedUnits,
@@ -624,7 +626,7 @@ func TestBurnPropertyOperation(t *testing.T) {
 		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
 
-		fc := fees.NewDynamicCalculator(
+		fc := fees.NewDynamicCalculator(logging.NoLog{},
 			builder.Parser.Codec(),
 			commonfees.NewManager(testFeeRates),
 			testBlockMaxConsumedUnits,
@@ -706,7 +708,7 @@ func TestImportTx(t *testing.T) {
 	)
 
 	{ // Post E-Upgrade
-		feeCalc := fees.NewDynamicCalculator(
+		feeCalc := fees.NewDynamicCalculator(logging.NoLog{},
 			builder.Parser.Codec(),
 			commonfees.NewManager(testFeeRates),
 			testBlockMaxConsumedUnits,
@@ -723,7 +725,7 @@ func TestImportTx(t *testing.T) {
 		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
 
-		fc := fees.NewDynamicCalculator(
+		fc := fees.NewDynamicCalculator(logging.NoLog{},
 			builder.Parser.Codec(),
 			commonfees.NewManager(testFeeRates),
 			testBlockMaxConsumedUnits,
@@ -808,7 +810,7 @@ func TestExportTx(t *testing.T) {
 	)
 
 	{ // Post E-Upgrade
-		feeCalc := fees.NewDynamicCalculator(
+		feeCalc := fees.NewDynamicCalculator(logging.NoLog{},
 			builder.Parser.Codec(),
 			commonfees.NewManager(testFeeRates),
 			testBlockMaxConsumedUnits,
@@ -825,7 +827,7 @@ func TestExportTx(t *testing.T) {
 		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
 
-		fc := fees.NewDynamicCalculator(
+		fc := fees.NewDynamicCalculator(logging.NoLog{},
 			builder.Parser.Codec(),
 			commonfees.NewManager(testFeeRates),
 			testBlockMaxConsumedUnits,

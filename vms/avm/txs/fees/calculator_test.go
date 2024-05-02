@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/avm/block"
@@ -148,7 +149,7 @@ func TestBaseTxFees(t *testing.T) {
 			if !cfg.IsEActivated(chainTime) {
 				fc = NewStaticCalculator(cfg, sTx.Creds)
 			} else {
-				fc = NewDynamicCalculator(codec, fees.NewManager(testFeeRates), blockMaxComplexity, sTx.Creds)
+				fc = NewDynamicCalculator(logging.NoLog{}, codec, fees.NewManager(testFeeRates), blockMaxComplexity, sTx.Creds)
 			}
 
 			err := uTx.Visit(fc)
@@ -265,7 +266,7 @@ func TestCreateAssetTxFees(t *testing.T) {
 			if !cfg.IsEActivated(chainTime) {
 				fc = NewStaticCalculator(cfg, sTx.Creds)
 			} else {
-				fc = NewDynamicCalculator(codec, fees.NewManager(testFeeRates), blockMaxComplexity, sTx.Creds)
+				fc = NewDynamicCalculator(logging.NoLog{}, codec, fees.NewManager(testFeeRates), blockMaxComplexity, sTx.Creds)
 			}
 
 			err := uTx.Visit(fc)
@@ -382,7 +383,7 @@ func TestOperationTxFees(t *testing.T) {
 			if !cfg.IsEActivated(chainTime) {
 				fc = NewStaticCalculator(cfg, sTx.Creds)
 			} else {
-				fc = NewDynamicCalculator(codec, fees.NewManager(testFeeRates), blockMaxComplexity, sTx.Creds)
+				fc = NewDynamicCalculator(logging.NoLog{}, codec, fees.NewManager(testFeeRates), blockMaxComplexity, sTx.Creds)
 			}
 
 			err := uTx.Visit(fc)
@@ -495,7 +496,7 @@ func TestImportTxFees(t *testing.T) {
 			if !cfg.IsEActivated(chainTime) {
 				fc = NewStaticCalculator(cfg, sTx.Creds)
 			} else {
-				fc = NewDynamicCalculator(codec, fees.NewManager(testFeeRates), blockMaxComplexity, sTx.Creds)
+				fc = NewDynamicCalculator(logging.NoLog{}, codec, fees.NewManager(testFeeRates), blockMaxComplexity, sTx.Creds)
 			}
 
 			err := uTx.Visit(fc)
@@ -598,7 +599,7 @@ func TestExportTxFees(t *testing.T) {
 			if !cfg.IsEActivated(chainTime) {
 				fc = NewStaticCalculator(cfg, sTx.Creds)
 			} else {
-				fc = NewDynamicCalculator(codec, fees.NewManager(testFeeRates), blockMaxComplexity, sTx.Creds)
+				fc = NewDynamicCalculator(logging.NoLog{}, codec, fees.NewManager(testFeeRates), blockMaxComplexity, sTx.Creds)
 			}
 
 			err := uTx.Visit(fc)

@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/avm"
 	"github.com/ava-labs/avalanchego/vms/avm/config"
@@ -198,6 +199,7 @@ var _ = e2e.DescribeXChainSerial("[Virtuous Transfer Tx AVAX]", func() {
 				// retrieve fees paid for the BaseTx
 				feeCfg := config.GetDynamicFeesConfig(true /*isEActive*/)
 				feeCalc := fees.NewDynamicCalculator(
+					logging.NoLog{},
 					xbuilder.Parser.Codec(),
 					commonfees.NewManager(feeRates),
 					feeCfg.BlockMaxComplexity,

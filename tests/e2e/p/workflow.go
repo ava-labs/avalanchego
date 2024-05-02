@@ -208,6 +208,7 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 				require.NoError(err)
 
 				feeCalc := xfees.NewDynamicCalculator(
+					logging.NoLog{},
 					xbuilder.Parser.Codec(),
 					commonfees.NewManager(feeRates),
 					feeCfg.BlockMaxComplexity,
