@@ -44,7 +44,7 @@ func TestChainState(t *testing.T) {
 	a := require.New(t)
 
 	db := memdb.New()
-	cs := newChainState(db)
+	cs := NewChainState(db)
 
 	testChainState(a, cs)
 }

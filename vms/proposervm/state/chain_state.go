@@ -34,8 +34,7 @@ type chainState struct {
 	db           database.Database
 }
 
-// TODO undo diff
-func newChainState(db database.Database) *chainState {
+func NewChainState(db database.Database) ChainState {
 	return &chainState{db: db}
 }
 

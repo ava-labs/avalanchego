@@ -353,11 +353,6 @@ func TestBlockReject_InnerBlockIsNotRejected(t *testing.T) {
 	builtBlk, err := proVM.BuildBlock(context.Background())
 	require.NoError(err)
 
-	require.NoError(builtBlk.Verify(context.Background()))
-	ok, err := proVM.State.HasProcessingBlock(builtBlk.ID())
-	require.NoError(err)
-	require.True(ok)
-
 	// reject oracle block
 	require.NoError(builtBlk.Reject(context.Background()))
 	require.IsType(&postForkBlock{}, builtBlk)

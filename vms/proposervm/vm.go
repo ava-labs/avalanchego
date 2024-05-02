@@ -312,7 +312,6 @@ func (vm *VM) SetPreference(ctx context.Context, preferred ids.ID) error {
 	if vm.preferred == preferred {
 		return nil
 	}
-
 	vm.preferred = preferred
 
 	if err := vm.State.SetPreference(preferred); err != nil {
@@ -321,6 +320,7 @@ func (vm *VM) SetPreference(ctx context.Context, preferred ids.ID) error {
 
 	blk, err := vm.getPostForkBlock(ctx, preferred)
 	if err != nil {
+		// This is before the ProposerVM fork
 		if err := vm.ChainVM.SetPreference(ctx, preferred); err != nil {
 			return err
 		}
@@ -343,7 +343,7 @@ func (vm *VM) SetPreference(ctx context.Context, preferred ids.ID) error {
 			return fmt.Errorf("parent of option block is not an oracle block")
 		}
 
-		siblingOptionBlk, err := vm.getSiblingOption(ctx, optionBlk.ID(), oracleBlk)
+		siblingOptionBlk, err := getSiblingOption(ctx, optionBlk.ID(), oracleBlk)
 		if err != nil {
 			return err
 		}
@@ -415,7 +415,7 @@ func (vm *VM) SetPreference(ctx context.Context, preferred ids.ID) error {
 	return nil
 }
 
-func (vm *VM) getSiblingOption(
+func getSiblingOption(
 	ctx context.Context,
 	blkID ids.ID,
 	block snowman.OracleBlock,

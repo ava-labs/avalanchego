@@ -30,7 +30,7 @@ type State interface {
 }
 
 type state struct {
-	*chainState
+	ChainState
 	BlockState
 	HeightIndex
 	processingBlockIndex
@@ -42,7 +42,7 @@ func New(db *versiondb.Database) (State, error) {
 	heightDB := prefixdb.New(heightIndexPrefix, db)
 
 	s := &state{
-		chainState:           newChainState(chainDB),
+		ChainState:           NewChainState(chainDB),
 		BlockState:           NewBlockState(blockDB),
 		HeightIndex:          NewHeightIndex(heightDB, db),
 		processingBlockIndex: newProcessingBlockIndex(db),
@@ -62,7 +62,7 @@ func NewMetered(db *versiondb.Database, namespace string, metrics prometheus.Reg
 	}
 
 	s := &state{
-		chainState:           newChainState(chainDB),
+		ChainState:           NewChainState(chainDB),
 		BlockState:           blockState,
 		HeightIndex:          NewHeightIndex(heightDB, db),
 		processingBlockIndex: newProcessingBlockIndex(db),
@@ -72,7 +72,7 @@ func NewMetered(db *versiondb.Database, namespace string, metrics prometheus.Reg
 }
 
 func (s *state) pruneProcessingBlocks(db *versiondb.Database) error {
-	preferredID, err := s.chainState.GetPreference()
+	preferredID, err := s.ChainState.GetPreference()
 	switch {
 	case err == database.ErrNotFound:
 		return nil
