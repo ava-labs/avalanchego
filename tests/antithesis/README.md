@@ -8,11 +8,14 @@ enables discovery and reproduction of anomalous behavior.
 
 ## Package details
 
-| Filename     | Purpose                                                                           |
-|:-------------|:----------------------------------------------------------------------------------|
-| compose.go   | Enables generation of Docker Compose project files for antithesis testing.        |
-| avalanchego/ | Contains resources supporting antithesis testing of avalanchego's primary chains. |
-
+| Filename       | Purpose                                                                         |
+|:---------------|:--------------------------------------------------------------------------------|
+| compose.go     | Generates Docker Compose project files and volume paths for antithesis testing. |
+| config.go      | Defines common flags for the workload binary.                                   |
+| init_db.go     | Initializes db state for subnet testing.                                        |
+| node_health.go | Helper to check node health.                                                    |
+| avalanchego/   | Defines an antithesis test setup for avalanchego's primary chains.              |
+| xsvm/          | Defines an antithesis test setup for the xsvm VM.                               |
 
 ## Instrumentation
 
@@ -45,3 +48,55 @@ a test setup:
 In addition, github workflows are suggested to ensure
 `scripts/tests.build_antithesis_images.sh` runs against PRs and
 `scripts/build_antithesis_images.sh` runs against pushes.
+
+## Troubleshooting a test setup
+
+### Running a workload directly
+
+The workload of the 'avalanchego' test setup can be invoked against an
+arbitrary network:
+
+```bash
+$ AVAWL_URIS="http://10.0.20.3:9650 http://10.0.20.4:9650" go run ./tests/antithesis/avalanchego
+```
+
+The workload of a subnet test setup like 'xsvm' additionally requires
+a network with a configured chain for the xsvm VM and the ID for that
+chain needs to be provided to the workload:
+
+```bash
+$ AVAWL_URIS=... CHAIN_IDS="2S9ypz...AzMj9" go run ./tests/antithesis/xsvm
+```
+
+### Running a workload with docker-compose
+
+Running the test script for a given test setup with the `DEBUG` flag
+set will avoid cleaning up the the temporary directory where the
+docker-compose setup is written to. This will allow manual invocation of
+docker-compose to see the log output of the workload.
+
+```bash
+$ DEBUG=1 ./scripts/tests.build_antithesis_images.sh
+```
+
+After the test script has terminated, the name of the temporary
+directory will appear in the output of the script:
+
+```
+...
+using temporary directory /tmp/tmp.E6eHdDr4ln as the docker-compose path"
+...
+```
+
+Running compose from the temporary directory will ensure the workload
+output appears on stdout for inspection:
+
+```bash
+$ cd [temporary directory]
+
+# Start the compose project
+$ docker-compose up
+
+# Cleanup the compose project
+$ docker-compose down --volumes
+```

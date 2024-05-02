@@ -11,11 +11,11 @@ import (
 	"os"
 	"time"
 
-	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/tests/antithesis"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -38,13 +38,13 @@ import (
 const NumKeys = 5
 
 func main() {
-	c, err := NewConfig(os.Args)
+	c, err := antithesis.NewConfig(os.Args)
 	if err != nil {
 		log.Fatalf("invalid config: %s", err)
 	}
 
 	ctx := context.Background()
-	awaitHealthyNodes(ctx, c.URIs)
+	antithesis.AwaitHealthyNodes(ctx, c.URIs)
 
 	kc := secp256k1fx.NewKeychain(genesis.EWOQKey)
 	walletSyncStartTime := time.Now()
@@ -131,39 +131,6 @@ func main() {
 		go w.run(ctx)
 	}
 	genesisWorkload.run(ctx)
-}
-
-func awaitHealthyNodes(ctx context.Context, uris []string) {
-	for _, uri := range uris {
-		awaitHealthyNode(ctx, uri)
-	}
-	log.Println("all nodes reported healthy")
-}
-
-func awaitHealthyNode(ctx context.Context, uri string) {
-	client := health.NewClient(uri)
-	ticker := time.NewTicker(100 * time.Millisecond)
-	defer ticker.Stop()
-
-	log.Printf("awaiting node health at %s", uri)
-	for {
-		res, err := client.Health(ctx, nil)
-		switch {
-		case err != nil:
-			log.Printf("node couldn't be reached at %s", uri)
-		case res.Healthy:
-			log.Printf("node reported healthy at %s", uri)
-			return
-		default:
-			log.Printf("node reported unhealthy at %s", uri)
-		}
-
-		select {
-		case <-ticker.C:
-		case <-ctx.Done():
-			log.Printf("node health check cancelled at %s", uri)
-		}
-	}
 }
 
 type workload struct {

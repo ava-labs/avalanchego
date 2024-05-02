@@ -31,3 +31,10 @@ jobs:
         IMAGE_PREFIX: ${{ env.REGISTRY }}/${{ env.REPOSITORY }}
         TAG: latest
         TEST_SETUP: avalanchego
+
+    - name: Build images for xsvm test setup
+      run: bash -x ./scripts/build_antithesis_images.sh
+      env:
+        IMAGE_PREFIX: ${{ env.REGISTRY }}/${{ env.REPOSITORY }}
+        TAG: latest
+        TEST_SETUP: xsvm

@@ -10,6 +10,10 @@ set -euo pipefail
 #   4. Stopping the workload and its target network
 #
 
+# e.g.,
+# TEST_SETUP=avalanchego ./scripts/tests.build_antithesis_images.sh                 # Test build of images for avalanchego test setup
+# DEBUG=1 TEST_SETUP=avalanchego ./scripts/tests.build_antithesis_images.sh         # Retain the temporary compose path for troubleshooting
+
 AVALANCHE_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd )
 
 # Discover the default tag that will be used for the image
@@ -27,6 +31,8 @@ docker create --name "${CONTAINER_NAME}" "${IMAGE_NAME}:${TAG}" /bin/true
 
 # Create a temporary directory to write the compose configuration to
 TMPDIR="$(mktemp -d)"
+echo "using temporary directory ${TMPDIR} as the docker-compose path"
+
 COMPOSE_FILE="${TMPDIR}/docker-compose.yml"
 COMPOSE_CMD="docker-compose -f ${COMPOSE_FILE}"
 
@@ -36,8 +42,10 @@ function cleanup {
   docker rm "${CONTAINER_NAME}"
   echo "stopping and removing the docker compose project"
   ${COMPOSE_CMD} down --volumes
-  echo "removing temporary dir"
-  rm -rf "${TMPDIR}"
+  if [[ -z "${DEBUG:-}" ]]; then
+    echo "removing temporary dir"
+    rm -rf "${TMPDIR}"
+  fi
 }
 trap cleanup EXIT
 
@@ -47,9 +55,12 @@ docker cp "${CONTAINER_NAME}":/docker-compose.yml "${COMPOSE_FILE}"
 # Copy the volume paths out of the container
 docker cp "${CONTAINER_NAME}":/volumes "${TMPDIR}/"
 
-# Run the docker compose project for one minute without error
+# Run the docker compose project for 2 minutes without error. 2
+# minutes is suggested because the way docker-compose brings all
+# containers up simultaneously and the lack of coordination results in
+# exponential back-off on the nodes trying to bootstrap.
 ${COMPOSE_CMD} up -d
-sleep 60
+sleep 120
 if ${COMPOSE_CMD} ps -q | xargs docker inspect -f '{{ .State.Status }}' | grep -v 'running'; then
   echo "An error occurred."
   exit 255

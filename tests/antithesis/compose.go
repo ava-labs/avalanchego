@@ -102,15 +102,38 @@ func newComposeProject(network *tmpnet.Network, nodeImageName string, workloadIm
 			config.StakingTLSKeyContentKey:    tlsKey,
 			config.StakingCertContentKey:      tlsCert,
 			config.StakingSignerKeyContentKey: signerKey,
+			// Ensure consistency with tmpnet defaults
+			config.IndexEnabledKey: "true",
 		}
 
-		nodeName := "avalanche"
+		serviceName := getServiceName(i)
+
+		volumes := []types.ServiceVolumeConfig{
+			{
+				Type:   types.VolumeTypeBind,
+				Source: fmt.Sprintf("./volumes/%s/logs", serviceName),
+				Target: "/root/.avalanchego/logs",
+			},
+		}
+
+		trackSubnets, err := node.Flags.GetStringVal(config.TrackSubnetsKey)
+		if err != nil {
+			return nil, err
+		}
+		if len(trackSubnets) > 0 {
+			env[config.TrackSubnetsKey] = trackSubnets
+			// DB volume will need to initialized with the subnet
+			volumes = append(volumes, types.ServiceVolumeConfig{
+				Type:   types.VolumeTypeBind,
+				Source: fmt.Sprintf("./volumes/%s/db", serviceName),
+				Target: "/root/.avalanchego/db",
+			})
+		}
+
 		if i == 0 {
-			nodeName += "-bootstrap-node"
 			bootstrapIP = address + ":9651"
 			bootstrapIDs = node.NodeID.String()
 		} else {
-			nodeName = fmt.Sprintf("%s-node-%d", nodeName, i+1)
 			env[config.BootstrapIPsKey] = bootstrapIP
 			env[config.BootstrapIDsKey] = bootstrapIDs
 		}
@@ -120,18 +143,12 @@ func newComposeProject(network *tmpnet.Network, nodeImageName string, workloadIm
 		env = keyMapToEnvVarMap(env)
 
 		services[i+1] = types.ServiceConfig{
-			Name:          nodeName,
-			ContainerName: nodeName,
-			Hostname:      nodeName,
+			Name:          serviceName,
+			ContainerName: serviceName,
+			Hostname:      serviceName,
 			Image:         nodeImageName,
-			Volumes: []types.ServiceVolumeConfig{
-				{
-					Type:   types.VolumeTypeBind,
-					Source: fmt.Sprintf("./volumes/%s/logs", nodeName),
-					Target: "/root/.avalanchego/logs",
-				},
-			},
-			Environment: env.ToMappingWithEquals(),
+			Volumes:       volumes,
+			Environment:   env.ToMappingWithEquals(),
 			Networks: map[string]*types.ServiceNetworkConfig{
 				networkName: {
 					Ipv4Address: address,
@@ -145,6 +162,15 @@ func newComposeProject(network *tmpnet.Network, nodeImageName string, workloadIm
 
 	workloadEnv := types.Mapping{
 		"AVAWL_URIS": strings.Join(uris, " "),
+	}
+	chainIDs := []string{}
+	for _, subnet := range network.Subnets {
+		for _, chain := range subnet.Chains {
+			chainIDs = append(chainIDs, chain.ChainID.String())
+		}
+	}
+	if len(chainIDs) > 0 {
+		workloadEnv["AVAWL_CHAIN_IDS"] = strings.Join(chainIDs, " ")
 	}
 
 	workloadName := "workload"
@@ -187,4 +213,15 @@ func keyMapToEnvVarMap(keyMap types.Mapping) types.Mapping {
 		envVarMap[envVar] = val
 	}
 	return envVarMap
+}
+
+// Retrieve the service name for a node at the given index. Common to
+// GenerateComposeConfig and InitDBVolumes to ensure consistency
+// between db volumes configuration and volume paths.
+func getServiceName(index int) string {
+	baseName := "avalanche"
+	if index == 0 {
+		return baseName + "-bootstrap-node"
+	}
+	return fmt.Sprintf("%s-node-%d", baseName, index+1)
 }
