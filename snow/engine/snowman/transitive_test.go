@@ -3062,44 +3062,56 @@ func TestGetProcessingAncestor(t *testing.T) {
 // Tests that upon Start consensus is initialized with the last accepted block
 // and any previously processing preferred blocks are issued to consensus
 func TestTransitiveStart(t *testing.T) {
-	//TODO add preferred chain before last accepted test cases
+	blk := BuildBlock(Genesis)
+	oracleBlk := BuildOracleBlock(Genesis)
+
 	tests := []struct {
 		name               string
-		accepted           snowman.Block
-		preferences        []snowman.Block
+		lastAccepted       snowman.Block
+		preferredChain     []snowman.Block
 		expectedProcessing int
 	}{
 		{
-			name:     "no blocks in preference chain",
-			accepted: Genesis,
+			name:         "no blocks in preferred chain",
+			lastAccepted: Genesis,
 		},
 		{
-			name:        "preferred chain at last accepted",
-			accepted:    Genesis,
-			preferences: []snowman.Block{Genesis},
+			name:           "preferred chain before last accepted",
+			lastAccepted:   blk,
+			preferredChain: []snowman.Block{Genesis},
 		},
 		{
-			name:     "preferred chain after last accepted",
-			accepted: Genesis,
-			preferences: func() []snowman.Block {
-				testBlks := BuildChain(Genesis, 5)
-				blks := make([]snowman.Block, 0, len(testBlks))
+			name:           "preferred chain before last accepted - oracle",
+			lastAccepted:   oracleBlk,
+			preferredChain: []snowman.Block{Genesis},
+		},
+		{
+			name:           "preferred chain at last accepted",
+			lastAccepted:   Genesis,
+			preferredChain: []snowman.Block{Genesis},
+		},
+		{
+			name:               "preferred chain after last accepted",
+			lastAccepted:       Genesis,
+			preferredChain:     []snowman.Block{blk},
+			expectedProcessing: 1,
+		},
+		{
+			name:         "preferred chain after last accepted - multiple blocks",
+			lastAccepted: Genesis,
+			preferredChain: func() []snowman.Block {
+				blk0 := BuildBlock(Genesis)
+				blk1 := BuildBlock(blk0)
+				blk2 := BuildBlock(blk1)
 
-				for _, blk := range testBlks {
-					blks = append(blks, snowman.Block(blk))
-				}
-
-				return blks
+				return []snowman.Block{blk0, blk1, blk2}
 			}(),
-			expectedProcessing: 5,
+			expectedProcessing: 3,
 		},
 		{
-			name:     "preferred chain after last accepted - oracle block",
-			accepted: Genesis,
-			preferences: func() []snowman.Block {
-				blk := BuildOracleBlock(Genesis)
-				return []snowman.Block{snowman.Block(blk)}
-			}(),
+			name:               "preferred chain after last accepted - oracle block",
+			lastAccepted:       Genesis,
+			preferredChain:     []snowman.Block{oracleBlk},
 			expectedProcessing: 3,
 		},
 	}
@@ -3137,20 +3149,20 @@ func TestTransitiveStart(t *testing.T) {
 			cfg.AllGetsServer = snowGetHandler
 
 			vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
-				return tt.accepted.ID(), nil
+				return tt.lastAccepted.ID(), nil
 			}
 
 			vm.GetInitialPreferenceF = func(context.Context) (ids.ID, error) {
-				if len(tt.preferences) > 0 {
-					return tt.preferences[len(tt.preferences)-1].ID(), nil
+				if len(tt.preferredChain) > 0 {
+					return tt.preferredChain[len(tt.preferredChain)-1].ID(), nil
 				}
 
-				return tt.accepted.ID(), nil
+				return tt.lastAccepted.ID(), nil
 			}
 
 			blks := make(map[ids.ID]snowman.Block)
-			blks[tt.accepted.ID()] = tt.accepted
-			for _, blk := range tt.preferences {
+			blks[tt.lastAccepted.ID()] = tt.lastAccepted
+			for _, blk := range tt.preferredChain {
 				blks[blk.ID()] = blk
 
 				// If this is an oracle block, persist the children
@@ -3183,14 +3195,14 @@ func TestTransitiveStart(t *testing.T) {
 
 			// Consensus should be initialized with the last accepted block
 			lastAccepted, lastAcceptedHeight := te.Consensus.LastAccepted()
-			require.Equal(tt.accepted.ID(), lastAccepted)
-			require.Equal(tt.accepted.Height(), lastAcceptedHeight)
+			require.Equal(tt.lastAccepted.ID(), lastAccepted)
+			require.Equal(tt.lastAccepted.Height(), lastAcceptedHeight)
 
 			// Any previously preferred blocks should be re-issued into
 			// consensus
 			require.Equal(tt.expectedProcessing, te.Consensus.NumProcessing())
 			if tt.expectedProcessing > 0 {
-				for _, preference := range tt.preferences {
+				for _, preference := range tt.preferredChain {
 					require.True(te.Consensus.Processing(preference.ID()))
 					require.True(te.Consensus.IsPreferred(preference))
 					gotPreferredID, ok := te.Consensus.PreferenceAtHeight(preference.Height())
@@ -3221,20 +3233,20 @@ func TestTransitiveStart(t *testing.T) {
 
 			// We should prefer the block in our preference chain with the
 			// largest height
-			preferredTip := tt.accepted
-			if len(tt.preferences) > 0 {
-				preferredTip = tt.preferences[len(tt.preferences)-1]
+			wantPreferredTip := tt.lastAccepted
+			if len(tt.preferredChain) > 0 && tt.preferredChain[len(tt.preferredChain)-1].Height() > tt.lastAccepted.Height() {
+				wantPreferredTip = tt.preferredChain[len(tt.preferredChain)-1]
+
+				// We should prefer an option block if the tip is an oracle block
+				oracleBlk, ok := wantPreferredTip.(snowman.OracleBlock)
+				if ok {
+					options, err := oracleBlk.Options(context.Background())
+					require.NoError(err)
+					wantPreferredTip = options[0]
+				}
 			}
 
-			// We should prefer an option block if the tip is an oracle block
-			oracleBlk, ok := preferredTip.(snowman.OracleBlock)
-			if ok {
-				options, err := oracleBlk.Options(context.Background())
-				require.NoError(err)
-				preferredTip = options[0]
-			}
-
-			require.Equal(preferredTip.ID(), te.Consensus.Preference())
+			require.Equal(wantPreferredTip.ID(), te.Consensus.Preference())
 		})
 	}
 }
