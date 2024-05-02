@@ -6,7 +6,6 @@ package bootstrap
 import (
 	"bytes"
 	"context"
-	"encoding/binary"
 	"errors"
 	"testing"
 	"time"
@@ -21,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
@@ -28,7 +28,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
 
@@ -155,23 +154,13 @@ func TestBootstrapperStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 		VM:                             vm,
 	}
 
-	blkID0 := ids.Empty.Prefix(0)
-	blkBytes0 := []byte{0}
-	blk0 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     blkID0,
-			StatusV: choices.Accepted,
-		},
-		HeightV: 0,
-		BytesV:  blkBytes0,
-	}
 	vm.CantLastAccepted = false
 	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
-		return blk0.ID(), nil
+		return snowmantest.GenesisID, nil
 	}
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
-		require.Equal(blk0.ID(), blkID)
-		return blk0, nil
+		require.Equal(snowmantest.GenesisID, blkID)
+		return snowmantest.Genesis, nil
 	}
 
 	// create bootstrapper
@@ -226,7 +215,7 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 
 	config, _, _, vm := newConfig(t)
 
-	blks := generateBlockchain(1)
+	blks := snowmantest.BuildChain(1)
 	initializeVMWithBlockchain(vm, blks)
 
 	bs, err := New(
@@ -254,7 +243,7 @@ func TestBootstrapperUnknownByzantineResponse(t *testing.T) {
 
 	config, peerID, sender, vm := newConfig(t)
 
-	blks := generateBlockchain(2)
+	blks := snowmantest.BuildChain(2)
 	initializeVMWithBlockchain(vm, blks)
 
 	bs, err := New(
@@ -299,7 +288,7 @@ func TestBootstrapperPartialFetch(t *testing.T) {
 
 	config, peerID, sender, vm := newConfig(t)
 
-	blks := generateBlockchain(4)
+	blks := snowmantest.BuildChain(4)
 	initializeVMWithBlockchain(vm, blks)
 
 	bs, err := New(
@@ -349,7 +338,7 @@ func TestBootstrapperEmptyResponse(t *testing.T) {
 
 	config, peerID, sender, vm := newConfig(t)
 
-	blks := generateBlockchain(2)
+	blks := snowmantest.BuildChain(2)
 	initializeVMWithBlockchain(vm, blks)
 
 	bs, err := New(
@@ -397,7 +386,7 @@ func TestBootstrapperAncestors(t *testing.T) {
 
 	config, peerID, sender, vm := newConfig(t)
 
-	blks := generateBlockchain(4)
+	blks := snowmantest.BuildChain(4)
 	initializeVMWithBlockchain(vm, blks)
 
 	bs, err := New(
@@ -442,7 +431,7 @@ func TestBootstrapperFinalized(t *testing.T) {
 
 	config, peerID, sender, vm := newConfig(t)
 
-	blks := generateBlockchain(3)
+	blks := snowmantest.BuildChain(3)
 	initializeVMWithBlockchain(vm, blks)
 
 	bs, err := New(
@@ -484,7 +473,7 @@ func TestRestartBootstrapping(t *testing.T) {
 
 	config, peerID, sender, vm := newConfig(t)
 
-	blks := generateBlockchain(5)
+	blks := snowmantest.BuildChain(5)
 	initializeVMWithBlockchain(vm, blks)
 
 	bs, err := New(
@@ -545,10 +534,10 @@ func TestBootstrapOldBlockAfterStateSync(t *testing.T) {
 
 	config, peerID, sender, vm := newConfig(t)
 
-	blks := generateBlockchain(2)
+	blks := snowmantest.BuildChain(2)
 	initializeVMWithBlockchain(vm, blks)
 
-	blks[0].(*snowman.TestBlock).StatusV = choices.Processing
+	blks[0].StatusV = choices.Processing
 	require.NoError(blks[1].Accept(context.Background()))
 
 	bs, err := New(
@@ -588,7 +577,7 @@ func TestBootstrapContinueAfterHalt(t *testing.T) {
 
 	config, _, _, vm := newConfig(t)
 
-	blks := generateBlockchain(2)
+	blks := snowmantest.BuildChain(2)
 	initializeVMWithBlockchain(vm, blks)
 
 	bs, err := New(
@@ -656,28 +645,11 @@ func TestBootstrapNoParseOnNew(t *testing.T) {
 	snowGetHandler, err := getter.New(vm, sender, ctx.Log, time.Second, 2000, ctx.Registerer)
 	require.NoError(err)
 
-	blk0 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Accepted,
-		},
-		HeightV: 0,
-		BytesV:  utils.RandomBytes(32),
-	}
-
-	blk1 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		ParentV: blk0.ID(),
-		HeightV: 1,
-		BytesV:  utils.RandomBytes(32),
-	}
+	blk1 := snowmantest.BuildChild(snowmantest.Genesis)
 
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
-		require.Equal(blk0.ID(), blkID)
-		return blk0, nil
+		require.Equal(snowmantest.GenesisID, blkID)
+		return snowmantest.Genesis, nil
 	}
 
 	intervalDB := memdb.New()
@@ -732,7 +704,7 @@ func TestBootstrapperReceiveStaleAncestorsMessage(t *testing.T) {
 
 	config, peerID, sender, vm := newConfig(t)
 
-	blks := generateBlockchain(3)
+	blks := snowmantest.BuildChain(3)
 	initializeVMWithBlockchain(vm, blks)
 
 	bs, err := New(
@@ -770,36 +742,7 @@ func TestBootstrapperReceiveStaleAncestorsMessage(t *testing.T) {
 	require.Equal(snow.Bootstrapping, config.Ctx.State.Get().State)
 }
 
-func generateBlockchain(length uint64) []snowman.Block {
-	if length == 0 {
-		return nil
-	}
-
-	blocks := make([]snowman.Block, length)
-	blocks[0] = &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Accepted,
-		},
-		ParentV: ids.Empty,
-		HeightV: 0,
-		BytesV:  binary.AppendUvarint(nil, 0),
-	}
-	for height := uint64(1); height < length; height++ {
-		blocks[height] = &snowman.TestBlock{
-			TestDecidable: choices.TestDecidable{
-				IDV:     ids.GenerateTestID(),
-				StatusV: choices.Processing,
-			},
-			ParentV: blocks[height-1].ID(),
-			HeightV: height,
-			BytesV:  binary.AppendUvarint(nil, height),
-		}
-	}
-	return blocks
-}
-
-func initializeVMWithBlockchain(vm *block.TestVM, blocks []snowman.Block) {
+func initializeVMWithBlockchain(vm *block.TestVM, blocks []*snowmantest.Block) {
 	vm.CantSetState = false
 	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
 		var (
@@ -833,13 +776,13 @@ func initializeVMWithBlockchain(vm *block.TestVM, blocks []snowman.Block) {
 	}
 }
 
-func requireStatusIs(require *require.Assertions, blocks []snowman.Block, status choices.Status) {
+func requireStatusIs(require *require.Assertions, blocks []*snowmantest.Block, status choices.Status) {
 	for i, blk := range blocks {
 		require.Equal(status, blk.Status(), i)
 	}
 }
 
-func blocksToIDs(blocks []snowman.Block) []ids.ID {
+func blocksToIDs(blocks []*snowmantest.Block) []ids.ID {
 	blkIDs := make([]ids.ID, len(blocks))
 	for i, blk := range blocks {
 		blkIDs[i] = blk.ID()
@@ -847,7 +790,7 @@ func blocksToIDs(blocks []snowman.Block) []ids.ID {
 	return blkIDs
 }
 
-func blocksToBytes(blocks []snowman.Block) [][]byte {
+func blocksToBytes(blocks []*snowmantest.Block) [][]byte {
 	numBlocks := len(blocks)
 	blkBytes := make([][]byte, numBlocks)
 	for i, blk := range blocks {

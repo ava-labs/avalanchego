@@ -14,8 +14,8 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -77,30 +77,23 @@ func TestFilterAccepted(t *testing.T) {
 	require := require.New(t)
 	bs, vm, sender := newTest(t)
 
-	blkID0 := ids.GenerateTestID()
-	blkID1 := ids.GenerateTestID()
-	blkID2 := ids.GenerateTestID()
+	acceptedBlk := snowmantest.BuildChild(snowmantest.Genesis)
+	require.NoError(acceptedBlk.Accept(context.Background()))
 
-	blk0 := &snowman.TestBlock{TestDecidable: choices.TestDecidable{
-		IDV:     blkID0,
-		StatusV: choices.Accepted,
-	}}
-	blk1 := &snowman.TestBlock{TestDecidable: choices.TestDecidable{
-		IDV:     blkID1,
-		StatusV: choices.Accepted,
-	}}
+	unknownBlkID := ids.GenerateTestID()
 
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
-		case blkID0:
-			return blk0, nil
-		case blkID1:
-			return blk1, nil
-		case blkID2:
+		case snowmantest.GenesisID:
+			return snowmantest.Genesis, nil
+		case acceptedBlk.ID():
+			return acceptedBlk, nil
+		case unknownBlkID:
+			return nil, errUnknownBlock
+		default:
+			require.FailNow(errUnknownBlock.Error())
 			return nil, errUnknownBlock
 		}
-		require.FailNow(errUnknownBlock.Error())
-		return nil, errUnknownBlock
 	}
 
 	var accepted []ids.ID
@@ -108,11 +101,11 @@ func TestFilterAccepted(t *testing.T) {
 		accepted = frontier
 	}
 
-	blkIDs := set.Of(blkID0, blkID1, blkID2)
+	blkIDs := set.Of(snowmantest.GenesisID, acceptedBlk.ID(), unknownBlkID)
 	require.NoError(bs.GetAccepted(context.Background(), ids.EmptyNodeID, 0, blkIDs))
 
 	require.Len(accepted, 2)
-	require.Contains(accepted, blkID0)
-	require.Contains(accepted, blkID1)
-	require.NotContains(accepted, blkID2)
+	require.Contains(accepted, snowmantest.GenesisID)
+	require.Contains(accepted, acceptedBlk.ID())
+	require.NotContains(accepted, unknownBlkID)
 }
