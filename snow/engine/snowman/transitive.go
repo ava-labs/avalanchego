@@ -151,6 +151,9 @@ func New(config Config) (*Transitive, error) {
 }
 
 func (t *Transitive) Gossip(ctx context.Context) error {
+	t.Ctx.Lock.Lock()
+	defer t.Ctx.Lock.Unlock()
+
 	lastAcceptedID, lastAcceptedHeight := t.Consensus.LastAccepted()
 	if numProcessing := t.Consensus.NumProcessing(); numProcessing != 0 {
 		t.Ctx.Log.Debug("skipping block gossip",
@@ -441,6 +444,9 @@ func (t *Transitive) Shutdown(ctx context.Context) error {
 func (t *Transitive) Notify(ctx context.Context, msg common.Message) error {
 	switch msg {
 	case common.PendingTxs:
+		t.Ctx.Lock.Lock()
+		defer t.Ctx.Lock.Unlock()
+
 		// the pending txs message means we should attempt to build a block.
 		t.pendingBuildBlocks++
 		return t.executeDeferredWork(ctx)

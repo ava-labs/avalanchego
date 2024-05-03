@@ -719,6 +719,9 @@ func (b *Bootstrapper) getLastAccepted(ctx context.Context) (snowman.Block, erro
 }
 
 func (b *Bootstrapper) Timeout(ctx context.Context) error {
+	b.Ctx.Lock.Lock()
+	defer b.Ctx.Lock.Unlock()
+
 	if !b.awaitingTimeout {
 		return errUnexpectedTimeout
 	}
