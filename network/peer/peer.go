@@ -478,7 +478,7 @@ func (p *peer) readMessages() {
 				zap.Error(err),
 			)
 
-			p.Metrics.FailedToParse.Inc()
+			p.Metrics.NumFailedToParse.Inc()
 
 			// Couldn't parse the message. Read the next one.
 			onFinishedHandling()
@@ -906,7 +906,8 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 	myTimeUnix := uint64(myTime.Unix())
 	clockDifference := math.Abs(float64(msg.MyTime) - float64(myTimeUnix))
 
-	p.Metrics.ClockSkew.Observe(clockDifference)
+	p.Metrics.ClockSkewCount.Inc()
+	p.Metrics.ClockSkewSum.Add(clockDifference)
 
 	if clockDifference > p.MaxClockDifference.Seconds() {
 		if _, ok := p.Beacons.GetValidator(constants.PrimaryNetworkID, p.id); ok {
