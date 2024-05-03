@@ -5,7 +5,6 @@ package gossip
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"go.uber.org/zap"
@@ -73,23 +72,13 @@ func (h Handler[T]) AppRequest(_ context.Context, _ ids.NodeID, _ time.Time, req
 
 		return responseSize <= h.targetResponseSize
 	})
-
 	if err != nil {
 		return nil, err
 	}
 
-	sentCountMetric, err := h.metrics.sentCount.GetMetricWith(pullLabels)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get sent count metric: %w", err)
+	if err := h.metrics.observeMessage(sentPullLabels, len(gossipBytes), responseSize); err != nil {
+		return nil, err
 	}
-
-	sentBytesMetric, err := h.metrics.sentBytes.GetMetricWith(pullLabels)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get sent bytes metric: %w", err)
-	}
-
-	sentCountMetric.Add(float64(len(gossipBytes)))
-	sentBytesMetric.Add(float64(responseSize))
 
 	return MarshalAppResponse(gossipBytes)
 }
@@ -123,18 +112,9 @@ func (h Handler[_]) AppGossip(_ context.Context, nodeID ids.NodeID, gossipBytes 
 		}
 	}
 
-	receivedCountMetric, err := h.metrics.receivedCount.GetMetricWith(pushLabels)
-	if err != nil {
-		h.log.Error("failed to get received count metric", zap.Error(err))
-		return
+	if err := h.metrics.observeMessage(receivedPushLabels, len(gossip), receivedBytes); err != nil {
+		h.log.Error("failed to update metrics",
+			zap.Error(err),
+		)
 	}
-
-	receivedBytesMetric, err := h.metrics.receivedBytes.GetMetricWith(pushLabels)
-	if err != nil {
-		h.log.Error("failed to get received bytes metric", zap.Error(err))
-		return
-	}
-
-	receivedCountMetric.Add(float64(len(gossip)))
-	receivedBytesMetric.Add(float64(receivedBytes))
 }
