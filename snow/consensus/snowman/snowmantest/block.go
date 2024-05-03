@@ -10,7 +10,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
-	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils"
 )
 
@@ -27,48 +26,6 @@ var (
 	GenesisBytes     = GenesisID[:]
 	Genesis          = BuildChain(1)[0]
 )
-
-// TODO improve block setup code
-func BuildOracleBlock(
-	parent *Block,
-	oracleStatus choices.Status,
-	optionStatus choices.Status,
-) *OracleBlock {
-	oracleBlk := BuildBlock(parent, oracleStatus)
-
-	return &OracleBlock{
-		Block: oracleBlk,
-		OptionsV: [2]snowman.Block{
-			BuildBlock(oracleBlk, optionStatus),
-			BuildBlock(oracleBlk, optionStatus),
-		},
-	}
-}
-
-// option must be [0, 1]
-func BuildBlockFromOracle(parent *OracleBlock, status choices.Status, option int) *Block {
-	return &Block{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: status,
-		},
-		ParentV: parent.OptionsV[option].ID(),
-		HeightV: parent.OptionsV[option].Height() + 1,
-		BytesV:  utils.RandomBytes(32),
-	}
-}
-
-func BuildBlock(parent *Block, status choices.Status) *Block {
-	return &Block{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: status,
-		},
-		ParentV: parent.ID(),
-		HeightV: parent.Height() + 1,
-		BytesV:  utils.RandomBytes(32),
-	}
-}
 
 func BuildChild(parent *Block) *Block {
 	blkID := ids.GenerateTestID()

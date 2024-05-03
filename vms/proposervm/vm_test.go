@@ -2862,8 +2862,8 @@ func TestOnlyPreferredOptionPersisted(t *testing.T) {
 	)
 	require.NoError(err)
 
-	innerBlk1 := &snowmantest.OracleBlock{
-		TestBlock: &snowmantest.Block{
+	innerBlk1 := &snowman.TestOracleBlock{
+		Block: &snowmantest.Block{
 			TestDecidable: choices.TestDecidable{
 				IDV:     ids.GenerateTestID(),
 				StatusV: choices.Processing,

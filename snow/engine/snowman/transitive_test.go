@@ -27,6 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
 )
@@ -38,6 +39,48 @@ var (
 	errUnexpectedCall = errors.New("unexpected call")
 	errTest           = errors.New("non-nil test")
 )
+
+// TODO improve block setup code
+func BuildOracleBlock(
+	parent *snowmantest.Block,
+	oracleStatus choices.Status,
+	optionStatus choices.Status,
+) *snowman.TestOracleBlock {
+	oracleBlk := BuildBlock(parent, oracleStatus)
+
+	return &snowman.TestOracleBlock{
+		Block: oracleBlk,
+		OptionsV: [2]snowman.Block{
+			BuildBlock(oracleBlk, optionStatus),
+			BuildBlock(oracleBlk, optionStatus),
+		},
+	}
+}
+
+// option must be [0, 1]
+func BuildBlockFromOracle(parent *snowman.TestOracleBlock, status choices.Status, option int) *snowmantest.Block {
+	return &snowmantest.Block{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: status,
+		},
+		ParentV: parent.OptionsV[option].ID(),
+		HeightV: parent.OptionsV[option].Height() + 1,
+		BytesV:  utils.RandomBytes(32),
+	}
+}
+
+func BuildBlock(parent *snowmantest.Block, status choices.Status) *snowmantest.Block {
+	return &snowmantest.Block{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: status,
+		},
+		ParentV: parent.ID(),
+		HeightV: parent.Height() + 1,
+		BytesV:  utils.RandomBytes(32),
+	}
+}
 
 func MakeGetBlockF(blks ...[]*snowmantest.Block) func(context.Context, ids.ID) (snowman.Block, error) {
 	return func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
@@ -3035,31 +3078,31 @@ func TestTransitiveStart(t *testing.T) {
 		{
 			name: "no blocks in preferred chain",
 			setup: func() (snowman.Block, []snowman.Block) {
-				return snowmantest.BuildBlock(snowmantest.Genesis, choices.Accepted), nil
+				return BuildBlock(snowmantest.Genesis, choices.Accepted), nil
 			},
 		},
 		{
 			name: "preferred chain before last accepted",
 			setup: func() (snowman.Block, []snowman.Block) {
-				blk0 := snowmantest.BuildBlock(snowmantest.Genesis, choices.Processing)
-				blk1 := snowmantest.BuildBlock(blk0, choices.Processing)
+				blk0 := BuildBlock(snowmantest.Genesis, choices.Processing)
+				blk1 := BuildBlock(blk0, choices.Processing)
 
-				return snowmantest.BuildBlock(blk1, choices.Accepted), []snowman.Block{blk0, blk1}
+				return BuildBlock(blk1, choices.Accepted), []snowman.Block{blk0, blk1}
 			},
 		},
 		{
 			name: "preferred chain before last accepted - oracle",
 			setup: func() (snowman.Block, []snowman.Block) {
-				blk0 := snowmantest.BuildBlock(snowmantest.Genesis, choices.Processing)
-				blk1 := snowmantest.BuildOracleBlock(blk0, choices.Processing, choices.Processing)
+				blk0 := BuildBlock(snowmantest.Genesis, choices.Processing)
+				blk1 := BuildOracleBlock(blk0, choices.Processing, choices.Processing)
 
-				return snowmantest.BuildBlockFromOracle(blk1, choices.Accepted, 0), []snowman.Block{blk0, blk1}
+				return BuildBlockFromOracle(blk1, choices.Accepted, 0), []snowman.Block{blk0, blk1}
 			},
 		},
 		{
 			name: "preferred chain at last accepted",
 			setup: func() (snowman.Block, []snowman.Block) {
-				blk0 := snowmantest.BuildBlock(snowmantest.Genesis, choices.Processing)
+				blk0 := BuildBlock(snowmantest.Genesis, choices.Processing)
 
 				return blk0, []snowman.Block{blk0}
 			},
@@ -3067,7 +3110,7 @@ func TestTransitiveStart(t *testing.T) {
 		{
 			name: "preferred chain at last accepted - oracle",
 			setup: func() (snowman.Block, []snowman.Block) {
-				blk0 := snowmantest.BuildOracleBlock(snowmantest.Genesis, choices.Accepted, choices.Processing)
+				blk0 := BuildOracleBlock(snowmantest.Genesis, choices.Accepted, choices.Processing)
 
 				return blk0, []snowman.Block{blk0}
 			},
@@ -3076,7 +3119,7 @@ func TestTransitiveStart(t *testing.T) {
 		{
 			name: "preferred chain after last accepted",
 			setup: func() (snowman.Block, []snowman.Block) {
-				blk0 := snowmantest.BuildBlock(snowmantest.Genesis, choices.Processing)
+				blk0 := BuildBlock(snowmantest.Genesis, choices.Processing)
 
 				return snowmantest.Genesis, []snowman.Block{blk0}
 			},
@@ -3085,9 +3128,9 @@ func TestTransitiveStart(t *testing.T) {
 		{
 			name: "preferred chain after last accepted - multiple blocks",
 			setup: func() (snowman.Block, []snowman.Block) {
-				blk0 := snowmantest.BuildBlock(snowmantest.Genesis, choices.Processing)
-				blk1 := snowmantest.BuildBlock(blk0, choices.Processing)
-				blk2 := snowmantest.BuildBlock(blk1, choices.Processing)
+				blk0 := BuildBlock(snowmantest.Genesis, choices.Processing)
+				blk1 := BuildBlock(blk0, choices.Processing)
+				blk2 := BuildBlock(blk1, choices.Processing)
 
 				return snowmantest.Genesis, []snowman.Block{blk0, blk1, blk2}
 			},
@@ -3096,7 +3139,7 @@ func TestTransitiveStart(t *testing.T) {
 		{
 			name: "preferred chain after last accepted - oracle block",
 			setup: func() (snowman.Block, []snowman.Block) {
-				blk0 := snowmantest.BuildOracleBlock(snowmantest.Genesis, choices.Processing, choices.Processing)
+				blk0 := BuildOracleBlock(snowmantest.Genesis, choices.Processing, choices.Processing)
 
 				return snowmantest.Genesis, []snowman.Block{blk0}
 			},
@@ -3193,7 +3236,7 @@ func TestTransitiveStart(t *testing.T) {
 			require.Equal(tt.expectedProcessing, te.Consensus.NumProcessing())
 			if tt.expectedProcessing > 0 {
 				for _, preference := range preferredChain {
-					oracleBlk, ok := preference.(*snowmantest.OracleBlock)
+					oracleBlk, ok := preference.(*snowman.TestOracleBlock)
 					if ok {
 						// An oracle block can be accepted while its children
 						// are still processing.
