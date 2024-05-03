@@ -2511,14 +2511,14 @@ func TestHistoricalBlockDeletion(t *testing.T) {
 // Tests end-to-end flow for block preferences. Blocks should be persisted upon
 // verification and deleted upon accept/reject.
 func TestBlockDecision(t *testing.T) {
-	innerGenesisBlk := &snowman.TestBlock{
+	innerGenesisBlk := &snowmantest.Block{
 		TestDecidable: choices.TestDecidable{
 			StatusV: choices.Accepted,
 		},
 		HeightV: 0,
 		BytesV:  []byte("genesis"),
 	}
-	innerBuiltBlk := &snowman.TestBlock{
+	innerBuiltBlk := &snowmantest.Block{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
@@ -2852,7 +2852,7 @@ func TestOnlyPreferredOptionPersisted(t *testing.T) {
 	}
 	vm := New(innerVM, Config{})
 
-	blk0 := &snowman.TestBlock{}
+	blk0 := &snowmantest.Block{}
 
 	outerBlk1, err := statelessblock.BuildUnsigned(
 		blk0.ID(),
@@ -2863,7 +2863,7 @@ func TestOnlyPreferredOptionPersisted(t *testing.T) {
 	require.NoError(err)
 
 	innerBlk1 := &snowmantest.OracleBlock{
-		TestBlock: &snowman.TestBlock{
+		TestBlock: &snowmantest.Block{
 			TestDecidable: choices.TestDecidable{
 				IDV:     ids.GenerateTestID(),
 				StatusV: choices.Processing,
@@ -2875,7 +2875,7 @@ func TestOnlyPreferredOptionPersisted(t *testing.T) {
 	}
 
 	innerBlk1.OptionsV = [2]snowman.Block{
-		&snowman.TestBlock{
+		&snowmantest.Block{
 			TestDecidable: choices.TestDecidable{
 				IDV:     ids.GenerateTestID(),
 				StatusV: choices.Processing,
@@ -2884,7 +2884,7 @@ func TestOnlyPreferredOptionPersisted(t *testing.T) {
 			HeightV: innerBlk1.HeightV + 1,
 			BytesV:  []byte{1},
 		},
-		&snowman.TestBlock{
+		&snowmantest.Block{
 			TestDecidable: choices.TestDecidable{
 				IDV:     ids.GenerateTestID(),
 				StatusV: choices.Processing,

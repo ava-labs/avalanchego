@@ -21,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
@@ -1160,7 +1161,7 @@ func TestProposerVMBlockDecision(t *testing.T) {
 	}{
 		{
 			name: "accept block",
-			genesisBlk: &snowman.TestBlock{
+			genesisBlk: &snowmantest.Block{
 				TestDecidable: choices.TestDecidable{
 					IDV:     ids.ID{0},
 					StatusV: choices.Accepted,
@@ -1171,7 +1172,7 @@ func TestProposerVMBlockDecision(t *testing.T) {
 			},
 			blks: []blockDecision{
 				{
-					Block: &snowman.TestBlock{
+					Block: &snowmantest.Block{
 						TestDecidable: choices.TestDecidable{
 							IDV:     ids.ID{1},
 							StatusV: choices.Processing,
@@ -1183,7 +1184,7 @@ func TestProposerVMBlockDecision(t *testing.T) {
 					},
 				},
 				{
-					Block: &snowman.TestBlock{
+					Block: &snowmantest.Block{
 						TestDecidable: choices.TestDecidable{
 							IDV:     ids.ID{2},
 							StatusV: choices.Processing,
@@ -1198,7 +1199,7 @@ func TestProposerVMBlockDecision(t *testing.T) {
 		},
 		{
 			name: "reject block during transition",
-			genesisBlk: &snowman.TestBlock{
+			genesisBlk: &snowmantest.Block{
 				TestDecidable: choices.TestDecidable{
 					IDV:     ids.ID{0},
 					StatusV: choices.Accepted,
@@ -1209,7 +1210,7 @@ func TestProposerVMBlockDecision(t *testing.T) {
 			},
 			blks: []blockDecision{
 				{
-					Block: &snowman.TestBlock{
+					Block: &snowmantest.Block{
 						TestDecidable: choices.TestDecidable{
 							IDV:     ids.ID{1},
 							StatusV: choices.Processing,
@@ -1225,7 +1226,7 @@ func TestProposerVMBlockDecision(t *testing.T) {
 		},
 		{
 			name: "reject block after transition",
-			genesisBlk: &snowman.TestBlock{
+			genesisBlk: &snowmantest.Block{
 				TestDecidable: choices.TestDecidable{
 					IDV:     ids.ID{0},
 					StatusV: choices.Accepted,
@@ -1236,7 +1237,7 @@ func TestProposerVMBlockDecision(t *testing.T) {
 			},
 			blks: []blockDecision{
 				{
-					Block: &snowman.TestBlock{
+					Block: &snowmantest.Block{
 						TestDecidable: choices.TestDecidable{
 							IDV:     ids.ID{1},
 							StatusV: choices.Processing,
@@ -1248,7 +1249,7 @@ func TestProposerVMBlockDecision(t *testing.T) {
 					},
 				},
 				{
-					Block: &snowman.TestBlock{
+					Block: &snowmantest.Block{
 						TestDecidable: choices.TestDecidable{
 							IDV:     ids.ID{2},
 							StatusV: choices.Processing,
@@ -1264,7 +1265,7 @@ func TestProposerVMBlockDecision(t *testing.T) {
 		},
 		{
 			name: "accept options block",
-			genesisBlk: &snowman.TestBlock{
+			genesisBlk: &snowmantest.Block{
 				TestDecidable: choices.TestDecidable{
 					IDV:     ids.ID{0},
 					StatusV: choices.Accepted,
@@ -1276,7 +1277,7 @@ func TestProposerVMBlockDecision(t *testing.T) {
 			blks: []blockDecision{
 				{
 					Block: &TestOptionsBlock{
-						TestBlock: snowman.TestBlock{
+						Block: snowmantest.Block{
 							TestDecidable: choices.TestDecidable{
 								IDV:     ids.ID{1},
 								StatusV: choices.Processing,
@@ -1287,7 +1288,7 @@ func TestProposerVMBlockDecision(t *testing.T) {
 							BytesV:     []byte{1},
 						},
 						opts: [2]snowman.Block{
-							&snowman.TestBlock{
+							&snowmantest.Block{
 								TestDecidable: choices.TestDecidable{
 									IDV:     ids.ID{2},
 									StatusV: choices.Processing,
@@ -1297,7 +1298,7 @@ func TestProposerVMBlockDecision(t *testing.T) {
 								TimestampV: activationTime.Add(3 * time.Second),
 								BytesV:     []byte{2},
 							},
-							&snowman.TestBlock{
+							&snowmantest.Block{
 								TestDecidable: choices.TestDecidable{
 									IDV:     ids.ID{3},
 									StatusV: choices.Processing,
@@ -1314,7 +1315,7 @@ func TestProposerVMBlockDecision(t *testing.T) {
 		},
 		{
 			name: "reject options block",
-			genesisBlk: &snowman.TestBlock{
+			genesisBlk: &snowmantest.Block{
 				TestDecidable: choices.TestDecidable{
 					IDV:     ids.ID{0},
 					StatusV: choices.Accepted,
@@ -1326,7 +1327,7 @@ func TestProposerVMBlockDecision(t *testing.T) {
 			blks: []blockDecision{
 				{
 					Block: &TestOptionsBlock{
-						TestBlock: snowman.TestBlock{
+						Block: snowmantest.Block{
 							TestDecidable: choices.TestDecidable{
 								IDV:     ids.ID{1},
 								StatusV: choices.Processing,
@@ -1337,7 +1338,7 @@ func TestProposerVMBlockDecision(t *testing.T) {
 							BytesV:     []byte{1},
 						},
 						opts: [2]snowman.Block{
-							&snowman.TestBlock{
+							&snowmantest.Block{
 								TestDecidable: choices.TestDecidable{
 									IDV:     ids.ID{2},
 									StatusV: choices.Processing,
@@ -1347,7 +1348,7 @@ func TestProposerVMBlockDecision(t *testing.T) {
 								TimestampV: activationTime.Add(3 * time.Second),
 								BytesV:     []byte{2},
 							},
-							&snowman.TestBlock{
+							&snowmantest.Block{
 								TestDecidable: choices.TestDecidable{
 									IDV:     ids.ID{3},
 									StatusV: choices.Processing,
