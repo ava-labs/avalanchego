@@ -10,19 +10,13 @@ on:
     tags:
       - "*"
 
-env:
-  go_version: '~1.21.9'
-
 jobs:
   build-jammy-amd64-package:
     runs-on: ubuntu-22.04
 
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.go_version }}
-          check-latest: true
+      - uses: ./.github/actions/setup-go-for-project
       - run: go version
 
       - name: Build the avalanchego binaries
@@ -79,10 +73,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.go_version }}
-          check-latest: true
+      - uses: ./.github/actions/setup-go-for-project
       - run: go version
 
       - name: Build the avalanchego binaries

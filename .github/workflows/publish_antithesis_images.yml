@@ -6,7 +6,7 @@ on:
     branches:
       - master
 
-env: 
+env:
   REGISTRY: us-central1-docker.pkg.dev
   REPOSITORY: molten-verve-216720/avalanche-repository
   NODE_NAME: avalanche-node
@@ -28,18 +28,25 @@ jobs:
         registry: ${{ env.REGISTRY }}
         username: _json_key
         password: ${{ secrets.ANTITHESIS_GAR_JSON_KEY }}
-    
+
+    - name: Set the Go version in the environment
+      uses: ./.github/actions/set-go-version-in-env
+
     - name: Build node
       id: build-node-image
       run: |
-        docker build -t $REGISTRY/$REPOSITORY/$NODE_NAME:$TAG -f ./tests/antithesis/Dockerfile.node .
+        docker build --build-arg GO_VERSION=${GO_VERSION} -t $REGISTRY/$REPOSITORY/$NODE_NAME:$TAG -f ./tests/antithesis/Dockerfile.node .
         echo "name=image::$REGISTRY/$REPOSITORY/$NODE_NAME:$TAG" >> $GITHUB_OUTPUT
+      env:
+        GO_VERSION: '${{ env.GO_VERSION }}'
 
     - name: Build workload
       id: build-workload-image
       run: |
-        docker build -t $REGISTRY/$REPOSITORY/$WORKLOAD_NAME:$TAG -f ./tests/antithesis/Dockerfile.workload .
+        docker build --build-arg GO_VERSION=${GO_VERSION} -t $REGISTRY/$REPOSITORY/$WORKLOAD_NAME:$TAG -f ./tests/antithesis/Dockerfile.workload .
         echo "name=image::$REGISTRY/$REPOSITORY/$WORKLOAD_NAME:$TAG" >> $GITHUB_OUTPUT
+      env:
+        GO_VERSION: '${{ env.GO_VERSION }}'
 
     - name: Build config
       id: build-config-image
