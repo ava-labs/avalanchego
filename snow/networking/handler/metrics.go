@@ -38,14 +38,14 @@ func newMetrics(namespace string, reg prometheus.Registerer) (*metrics, error) {
 			prometheus.CounterOpts{
 				Namespace: namespace,
 				Name:      "message_handling_time",
-				Help:      "time spent handling a message",
+				Help:      "time spent handling messages",
 			},
 			opLabels,
 		),
 		lockingTime: prometheus.NewCounter(prometheus.CounterOpts{
 			Namespace: namespace,
 			Name:      "locking_time",
-			Help:      "time spent waiting on acquire the context lock",
+			Help:      "time spent acquiring the context lock",
 		}),
 	}
 	return m, utils.Err(
