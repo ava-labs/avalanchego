@@ -6,7 +6,7 @@ package proposervm
 import (
 	"bytes"
 	"context"
-	"fmt"
+	"errors"
 	"testing"
 	"time"
 
@@ -533,7 +533,7 @@ func TestOptionTimestampValidity(t *testing.T) {
 		case bytes.Equal(option.Bytes(), blkBytes):
 			return option, nil
 		default:
-			return nil, fmt.Errorf("called ParseBlock unexpectedly")
+			return nil, errors.New("called ParseBlock unexpectedly")
 		}
 	}
 

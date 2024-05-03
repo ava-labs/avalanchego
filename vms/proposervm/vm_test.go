@@ -2711,6 +2711,7 @@ func TestProposerVMInitialPreference(t *testing.T) {
 		ids.Empty,
 		signer,
 	)
+	require.NoError(t, err)
 
 	blk1, err := statelessblock.Build(
 		blk0.ID(),
@@ -2721,6 +2722,7 @@ func TestProposerVMInitialPreference(t *testing.T) {
 		ids.Empty,
 		signer,
 	)
+	require.NoError(t, err)
 
 	tests := []struct {
 		name                    string
@@ -2909,12 +2911,12 @@ func TestOnlyPreferredOptionPersisted(t *testing.T) {
 		return blk0.ID(), nil
 	}
 
-	innerVM.GetBlockF = func(ctx context.Context, blkID ids.ID) (snowman.Block, error) {
+	innerVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case blk0.ID():
 			return blk0, nil
 		default:
-			return nil, fmt.Errorf("unexpected block")
+			return nil, errors.New("unexpected block")
 		}
 	}
 
@@ -2934,6 +2936,7 @@ func TestOnlyPreferredOptionPersisted(t *testing.T) {
 	require.NoError(blk1.Verify(ctx))
 
 	options, err := blk1.Options(ctx)
+	require.NoError(err)
 	optionBlk0 := options[0]
 	optionBlk1 := options[1]
 

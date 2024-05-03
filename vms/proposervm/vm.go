@@ -340,7 +340,11 @@ func (vm *VM) SetPreference(ctx context.Context, preferred ids.ID) error {
 
 		oracleBlk, ok := parentBlk.(*postForkBlock)
 		if !ok {
-			return fmt.Errorf("parent of option block is not an oracle block")
+			return fmt.Errorf(
+				"parent %s of option block %s is not an oracle block",
+				optionBlk.ParentID(),
+				optionBlk.ID(),
+			)
 		}
 
 		siblingOptionBlk, err := getSiblingOption(ctx, optionBlk.ID(), oracleBlk)
