@@ -1,6 +1,9 @@
 module github.com/ava-labs/avalanchego
 
-// The minimum golang version defined here will be reused for CI and image builds.
+// Changes to the minimum golang version must also be replicated in
+// CONTRIBUTING.md
+// README.md
+// go.mod (here)
 go 1.21.9
 
 require (
