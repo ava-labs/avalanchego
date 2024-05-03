@@ -501,7 +501,9 @@ func (t *Transitive) Start(ctx context.Context, startReqID uint32) error {
 		}
 	}
 
-	// latest preference
+	// Check if the initial setup is more recent than the last accepted
+	// block. This can occur if we shut down while a set of blocks was still
+	// processing in consensus.
 	preferredTip := lastAcceptedID
 	if preferredBlock.Height() > lastAccepted.Height() {
 		preferredTip = preferredID
@@ -532,7 +534,6 @@ func (t *Transitive) Start(ctx context.Context, startReqID uint32) error {
 	}
 
 	issuedMetric := t.metrics.issued.WithLabelValues(builtSource)
-
 	// to maintain the invariant that oracle blocks are issued in the correct
 	// preferences, we need to handle the case that we are bootstrapping into an oracle block
 	if oracleBlk, ok := lastAccepted.(snowman.OracleBlock); ok {
@@ -553,9 +554,10 @@ func (t *Transitive) Start(ctx context.Context, startReqID uint32) error {
 		}
 	}
 
+	// All blocks in the preferred chain must be re-issued into consensus to
+	// decide them because they were previously processing when this node
+	// shutdown.
 	for _, preferredBlk := range preferredChain {
-		// If I'm in the preferred chain and am not the last accepted block, then I need to
-		// be delivered to insert into consensus.
 		if preferredBlk.Status() == choices.Processing {
 			if err := t.deliver(ctx, t.Ctx.NodeID, preferredBlk, false, issuedMetric); err != nil {
 				return err
