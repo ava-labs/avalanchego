@@ -556,10 +556,8 @@ func (t *Transitive) Start(ctx context.Context, startReqID uint32) error {
 
 	// Re-issue all blocks in the preferred chain into consensus
 	for _, preferredBlk := range preferredChain {
-		if preferredBlk.Status() == choices.Processing {
-			if err := t.deliver(ctx, t.Ctx.NodeID, preferredBlk, false, issuedMetric); err != nil {
-				return err
-			}
+		if err := t.deliver(ctx, t.Ctx.NodeID, preferredBlk, false, issuedMetric); err != nil {
+			return err
 		}
 	}
 
