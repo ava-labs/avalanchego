@@ -90,49 +90,54 @@ type gossipMempool struct {
 	bloom *gossip.BloomFilter
 }
 
-func (g *gossipMempool) Add(tx *txs.Tx) error {
-	txID := tx.ID()
-	if _, ok := g.Mempool.Get(txID); ok {
-		return fmt.Errorf("tx %s dropped: %w", txID, mempool.ErrDuplicateTx)
+func (g *gossipMempool) Add(txns ...*txs.Tx) []error {
+	errs := make([]error, len(txns))
+	for i, tx := range txns {
+		txID := tx.ID()
+		if _, ok := g.Mempool.Get(txID); ok {
+			errs[i] = fmt.Errorf("tx %s dropped: %w", txID, mempool.ErrDuplicateTx)
+			continue
+		}
+
+		if errs[i] = g.Mempool.GetDropReason(txID); errs[i] != nil {
+			// If the tx is being dropped - just ignore it
+			//
+			// TODO: Should we allow re-verification of the transaction even if it
+			// failed previously?
+			continue
+		}
+
+		if errs[i] = g.txVerifier.VerifyTx(tx); errs[i] != nil {
+			g.Mempool.MarkDropped(txID, errs[i])
+			continue
+		}
+
+		if errs[i] = g.Mempool.Add(tx); errs[i] != nil {
+			g.Mempool.MarkDropped(txID, errs[i])
+			continue
+		}
+
+		g.lock.Lock()
+		defer g.lock.Unlock()
+
+		g.bloom.Add(tx)
+		var reset bool
+		reset, errs[i] = gossip.ResetBloomFilterIfNeeded(g.bloom, g.Mempool.Len()*bloomChurnMultiplier)
+		if errs[i] != nil {
+			continue
+		}
+
+		if reset {
+			g.log.Debug("resetting bloom filter")
+			g.Mempool.Iterate(func(tx *txs.Tx) bool {
+				g.bloom.Add(tx)
+				return true
+			})
+		}
 	}
-
-	if reason := g.Mempool.GetDropReason(txID); reason != nil {
-		// If the tx is being dropped - just ignore it
-		//
-		// TODO: Should we allow re-verification of the transaction even if it
-		// failed previously?
-		return reason
-	}
-
-	if err := g.txVerifier.VerifyTx(tx); err != nil {
-		g.Mempool.MarkDropped(txID, err)
-		return err
-	}
-
-	if err := g.Mempool.Add(tx); err != nil {
-		g.Mempool.MarkDropped(txID, err)
-		return err
-	}
-
-	g.lock.Lock()
-	defer g.lock.Unlock()
-
-	g.bloom.Add(tx)
-	reset, err := gossip.ResetBloomFilterIfNeeded(g.bloom, g.Mempool.Len()*bloomChurnMultiplier)
-	if err != nil {
-		return err
-	}
-
-	if reset {
-		g.log.Debug("resetting bloom filter")
-		g.Mempool.Iterate(func(tx *txs.Tx) bool {
-			g.bloom.Add(tx)
-			return true
-		})
-	}
-
 	g.Mempool.RequestBuildBlock(false)
-	return nil
+
+	return errs
 }
 
 func (g *gossipMempool) Has(txID ids.ID) bool {

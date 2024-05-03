@@ -42,18 +42,22 @@ type testSet struct {
 	onAdd func(tx *testTx)
 }
 
-func (t *testSet) Add(gossipable *testTx) error {
-	if _, ok := t.txs[gossipable.id]; ok {
-		return fmt.Errorf("%s already present", gossipable.id)
+func (t *testSet) Add(gossipables ...*testTx) []error {
+	errs := make([]error, len(gossipables))
+	for i, gossipable := range gossipables {
+		if _, ok := t.txs[gossipable.id]; ok {
+			errs[i] = fmt.Errorf("%s already present", gossipable.id)
+			continue
+		}
+
+		t.txs[gossipable.id] = gossipable
+		t.bloom.Add(gossipable)
+		if t.onAdd != nil {
+			t.onAdd(gossipable)
+		}
 	}
 
-	t.txs[gossipable.id] = gossipable
-	t.bloom.Add(gossipable)
-	if t.onAdd != nil {
-		t.onAdd(gossipable)
-	}
-
-	return nil
+	return errs
 }
 
 func (t *testSet) Has(gossipID ids.ID) bool {

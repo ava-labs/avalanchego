@@ -190,8 +190,8 @@ func (n *Network) PullGossip(ctx context.Context) {
 // returned.
 // If the tx is not added to the mempool, an error will be returned.
 func (n *Network) IssueTxFromRPC(tx *txs.Tx) error {
-	if err := n.mempool.Add(tx); err != nil {
-		return err
+	if errs := n.mempool.Add(tx); errs[0] != nil {
+		return errs[0]
 	}
 	n.txPushGossiper.Add(tx)
 	return nil

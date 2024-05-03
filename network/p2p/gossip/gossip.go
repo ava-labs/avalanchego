@@ -198,7 +198,7 @@ func (p *PullGossiper[_]) Gossip(ctx context.Context) error {
 	return nil
 }
 
-func (p *PullGossiper[_]) handleResponse(
+func (p *PullGossiper[T]) handleResponse(
 	_ context.Context,
 	nodeID ids.NodeID,
 	responseBytes []byte,
@@ -220,6 +220,7 @@ func (p *PullGossiper[_]) handleResponse(
 	}
 
 	receivedBytes := 0
+	gossipables := make([]T, 0, len(gossip))
 	for _, bytes := range gossip {
 		receivedBytes += len(bytes)
 
@@ -233,20 +234,24 @@ func (p *PullGossiper[_]) handleResponse(
 			continue
 		}
 
-		gossipID := gossipable.GossipID()
 		p.log.Debug(
 			"received gossip",
 			zap.Stringer("nodeID", nodeID),
-			zap.Stringer("id", gossipID),
+			zap.Stringer("id", gossipable.GossipID()),
 		)
-		if err := p.set.Add(gossipable); err != nil {
+
+		gossipables = append(gossipables, gossipable)
+	}
+
+	errs := p.set.Add(gossipables...)
+	for i, err := range errs {
+		if err != nil {
 			p.log.Debug(
 				"failed to add gossip to the known set",
 				zap.Stringer("nodeID", nodeID),
-				zap.Stringer("id", gossipID),
+				zap.Stringer("id", gossipables[i].GossipID()),
 				zap.Error(err),
 			)
-			continue
 		}
 	}
 
@@ -596,8 +601,12 @@ func (EmptySet[_]) Gossip(context.Context) error {
 	return nil
 }
 
-func (EmptySet[T]) Add(T) error {
-	return errEmptySetCantAdd
+func (EmptySet[T]) Add(gossipables ...T) []error {
+	errs := make([]error, len(gossipables))
+	for i := range errs {
+		errs[i] = errEmptySetCantAdd
+	}
+	return errs
 }
 
 func (EmptySet[T]) Has(ids.ID) bool {
@@ -616,8 +625,8 @@ func (FullSet[_]) Gossip(context.Context) error {
 	return nil
 }
 
-func (FullSet[T]) Add(T) error {
-	return nil
+func (FullSet[T]) Add(gossipables ...T) []error {
+	return make([]error, len(gossipables))
 }
 
 func (FullSet[T]) Has(ids.ID) bool {
