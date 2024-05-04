@@ -47,7 +47,7 @@ func TestGossipMempoolAddVerificationError(t *testing.T) {
 	)
 	require.NoError(err)
 
-	err = gossipMempool.Add(tx)
+	err = gossipMempool.Add(tx)[0]
 	require.ErrorIs(err, errFoo)
 	require.False(gossipMempool.bloom.Has(tx))
 }
@@ -81,7 +81,7 @@ func TestGossipMempoolAddError(t *testing.T) {
 	)
 	require.NoError(err)
 
-	err = gossipMempool.Add(tx)
+	err = gossipMempool.Add(tx)[0]
 	require.ErrorIs(err, errFoo)
 	require.False(gossipMempool.bloom.Has(tx))
 }
@@ -112,7 +112,7 @@ func TestMempoolDuplicate(t *testing.T) {
 	)
 	require.NoError(err)
 
-	err = gossipMempool.Add(tx)
+	err = gossipMempool.Add(tx)[0]
 	require.ErrorIs(err, mempool.ErrDuplicateTx)
 	require.False(gossipMempool.bloom.Has(tx))
 }
@@ -147,6 +147,6 @@ func TestGossipAddBloomFilter(t *testing.T) {
 	)
 	require.NoError(err)
 
-	require.NoError(gossipMempool.Add(tx))
+	require.NoError(gossipMempool.Add(tx)[0])
 	require.True(gossipMempool.bloom.Has(tx))
 }

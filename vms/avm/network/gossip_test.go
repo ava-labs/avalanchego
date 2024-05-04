@@ -87,7 +87,7 @@ func TestGossipMempoolAdd(t *testing.T) {
 		TxID: ids.GenerateTestID(),
 	}
 
-	require.NoError(mempool.Add(tx))
+	require.NoError(mempool.Add(tx)[0])
 	require.True(mempool.bloom.Has(tx))
 }
 

@@ -92,10 +92,12 @@ type gossipMempool struct {
 
 func (g *gossipMempool) Add(txns ...*txs.Tx) []error {
 	errs := make([]error, len(txns))
+	hasErr := false
 	for i, tx := range txns {
 		txID := tx.ID()
 		if _, ok := g.Mempool.Get(txID); ok {
 			errs[i] = fmt.Errorf("tx %s dropped: %w", txID, mempool.ErrDuplicateTx)
+			hasErr = true
 			continue
 		}
 
@@ -104,16 +106,19 @@ func (g *gossipMempool) Add(txns ...*txs.Tx) []error {
 			//
 			// TODO: Should we allow re-verification of the transaction even if it
 			// failed previously?
+			hasErr = true
 			continue
 		}
 
 		if errs[i] = g.txVerifier.VerifyTx(tx); errs[i] != nil {
 			g.Mempool.MarkDropped(txID, errs[i])
+			hasErr = true
 			continue
 		}
 
 		if errs[i] = g.Mempool.Add(tx); errs[i] != nil {
 			g.Mempool.MarkDropped(txID, errs[i])
+			hasErr = true
 			continue
 		}
 
@@ -123,6 +128,7 @@ func (g *gossipMempool) Add(txns ...*txs.Tx) []error {
 		var reset bool
 		reset, errs[i] = gossip.ResetBloomFilterIfNeeded(g.bloom, g.Mempool.Len()*bloomChurnMultiplier)
 		if errs[i] != nil {
+			hasErr = true
 			continue
 		}
 
@@ -136,7 +142,9 @@ func (g *gossipMempool) Add(txns ...*txs.Tx) []error {
 
 		g.lock.Unlock()
 	}
-	g.Mempool.RequestBuildBlock(false)
+	if !hasErr {
+		g.Mempool.RequestBuildBlock(false)
+	}
 
 	return errs
 }

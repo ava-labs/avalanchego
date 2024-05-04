@@ -116,8 +116,9 @@ func TestGossiperGossip(t *testing.T) {
 				txs:   make(map[ids.ID]*testTx),
 				bloom: responseBloom,
 			}
-			for _, item := range tt.responder {
-				require.NoError(responseSet.Add(item))
+			errs := responseSet.Add(tt.responder...)
+			for _, err := range errs {
+				require.NoError(err)
 			}
 
 			metrics, err := NewMetrics(prometheus.NewRegistry(), "")
@@ -147,8 +148,9 @@ func TestGossiperGossip(t *testing.T) {
 				txs:   make(map[ids.ID]*testTx),
 				bloom: bloom,
 			}
-			for _, item := range tt.requester {
-				require.NoError(requestSet.Add(item))
+			errs = requestSet.Add(tt.requester...)
+			for _, err := range errs {
+				require.NoError(err)
 			}
 
 			requestClient := requestNetwork.NewClient(0x0)
