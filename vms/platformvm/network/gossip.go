@@ -118,7 +118,6 @@ func (g *gossipMempool) Add(txns ...*txs.Tx) []error {
 		}
 
 		g.lock.Lock()
-		defer g.lock.Unlock()
 
 		g.bloom.Add(tx)
 		var reset bool
@@ -134,6 +133,8 @@ func (g *gossipMempool) Add(txns ...*txs.Tx) []error {
 				return true
 			})
 		}
+
+		g.lock.Unlock()
 	}
 	g.Mempool.RequestBuildBlock(false)
 
