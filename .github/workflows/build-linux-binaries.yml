@@ -10,9 +10,6 @@ on:
     tags:
       - "*"
 
-env:
-  go_version: '~1.21.9'
-
 jobs:
   build-x86_64-binaries-tarball:
     runs-on: ubuntu-20.04
@@ -20,10 +17,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.go_version }}
-          check-latest: true
+      - uses: ./.github/actions/setup-go-for-project
 
       - run: go version
 
@@ -82,10 +76,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-go@v3
-        with:
-          go-version: ${{ env.go_version }}
-          check-latest: true
+      - uses: ./.github/actions/setup-go-for-project-v3
 
       - run: go version
 
