@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -115,6 +116,11 @@ func (tx *Tx) UTXOs() []*avax.UTXO {
 		}
 	}
 	return utxos
+}
+
+// InputIDs returns the set of inputs this transaction consumes
+func (tx *Tx) InputIDs() set.Set[ids.ID] {
+	return tx.Unsigned.InputIDs()
 }
 
 func (tx *Tx) SyntacticVerify(ctx *snow.Context) error {

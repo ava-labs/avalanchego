@@ -97,6 +97,10 @@ func (t *Tx) UTXOs() []*avax.UTXO {
 	return u.utxos
 }
 
+func (t *Tx) InputIDs() set.Set[ids.ID] {
+	return t.Unsigned.InputIDs()
+}
+
 func (t *Tx) SignSECP256K1Fx(c codec.Manager, signers [][]*secp256k1.PrivateKey) error {
 	unsignedBytes, err := c.Marshal(CodecVersion, &t.Unsigned)
 	if err != nil {
