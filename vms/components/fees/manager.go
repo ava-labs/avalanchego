@@ -106,13 +106,17 @@ func (m *Manager) UpdateFeeRates(
 
 	elapsedTime := uint64(childBlkTime - parentBlkTime)
 	for i := Dimension(0); i < FeeDimensions; i++ {
+		targetBlkComplexity := targetComplexity(
+			feesConfig.BlockTargetComplexityRate[i],
+			elapsedTime,
+			feesConfig.BlockMaxComplexity[i],
+		)
+
 		nextFeeRates := nextFeeRate(
 			m.feeRates[i],
 			feesConfig.UpdateCoefficient[i],
 			parentBlkComplexity[i],
-			feesConfig.BlockMaxComplexity[i],
-			feesConfig.BlockTargetComplexityRate[i],
-			elapsedTime,
+			targetBlkComplexity,
 		)
 		nextFeeRates = max(nextFeeRates, feesConfig.MinFeeRate[i])
 		m.feeRates[i] = nextFeeRates
@@ -124,15 +128,13 @@ func nextFeeRate(
 	currentFeeRate,
 	coeff,
 	parentBlkComplexity,
-	maxBlockComplexity,
-	targetComplexityRate,
-	elapsedTime uint64,
+	targetBlkComplexity uint64,
 ) uint64 {
 	// We update the fee rate with the formula:
-	//     feeRate_{t+1} = feeRate_t * exp(delta)
+	//     feeRate_{t+1} = feeRate_t * exp(k*delta)
 	// where
-	//     delta == K * (parentComplexity - targetComplexity)/(targetComplexity)
-	// and [targetComplexity] is the median complexity expected in the elapsed time.
+	//     delta == (parentComplexity - targetBlkComplexity)/targetBlkComplexity
+	// and [targetBlkComplexity] is the median complexity expected in the elapsed time.
 	//
 	// We approximate the exponential as follows:
 	//
@@ -146,18 +148,7 @@ func nextFeeRate(
 	//    if complexity increase and decrease by the same amount in two consecutive blocks
 	//    the fee rate will go back to the original value.
 
-	// parent and child block may have the same timestamp. In this case targetComplexity will match targetComplexityRate
-	elapsedTime = max(1, elapsedTime)
-	targetComplexity, over := safemath.Mul64(targetComplexityRate, elapsedTime)
-	if over != nil {
-		targetComplexity = maxBlockComplexity
-	}
-
-	// regardless how low network load has been, we won't allow
-	// blocks larger than max block complexity
-	targetComplexity = min(targetComplexity, maxBlockComplexity)
-
-	if parentBlkComplexity == targetComplexity {
+	if parentBlkComplexity == targetBlkComplexity {
 		return currentFeeRate // complexity matches target, nothing to update
 	}
 
@@ -166,16 +157,16 @@ func nextFeeRate(
 		delta       uint64
 	)
 
-	if targetComplexity < parentBlkComplexity {
+	if targetBlkComplexity < parentBlkComplexity {
 		increaseFee = true
-		delta = parentBlkComplexity - targetComplexity
+		delta = parentBlkComplexity - targetBlkComplexity
 	} else {
 		increaseFee = false
-		delta = targetComplexity - parentBlkComplexity
+		delta = targetBlkComplexity - parentBlkComplexity
 	}
 
 	num := coeff * coeff * delta * delta
-	denom := targetComplexity * targetComplexity * CoeffDenom * CoeffDenom
+	denom := targetBlkComplexity * targetBlkComplexity * CoeffDenom * CoeffDenom
 
 	if increaseFee {
 		res, over := safemath.Mul64(currentFeeRate, denom+num)
@@ -190,4 +181,23 @@ func nextFeeRate(
 		res = math.MaxUint64
 	}
 	return res / (denom + num)
+}
+
+func targetComplexity(
+	targetComplexityRate,
+	elapsedTime,
+	maxBlockComplexity uint64,
+) uint64 {
+	// parent and child block may have the same timestamp. In this case targetComplexity will match targetComplexityRate
+	elapsedTime = max(1, elapsedTime)
+	targetComplexity, over := safemath.Mul64(targetComplexityRate, elapsedTime)
+	if over != nil {
+		targetComplexity = maxBlockComplexity
+	}
+
+	// regardless how low network load has been, we won't allow
+	// blocks larger than max block complexity
+	targetComplexity = min(targetComplexity, maxBlockComplexity)
+
+	return targetComplexity
 }

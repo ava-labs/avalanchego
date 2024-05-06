@@ -5,6 +5,7 @@ package fees
 
 import (
 	"fmt"
+	"math"
 	"testing"
 	"time"
 
@@ -248,4 +249,41 @@ func TestPChainFeeRateIncreaseDueToPeak(t *testing.T) {
 	require.Less(m.feeRates[UTXORead], peakFeeRate[UTXORead])
 	require.LessOrEqual(m.feeRates[UTXOWrite], peakFeeRate[UTXOWrite])
 	require.Less(m.feeRates[Compute], peakFeeRate[Compute])
+}
+
+func TestExponentialFeeApproximation(t *testing.T) {
+	currentFeeRate := 10 * units.MicroAvax
+
+	tests := []struct {
+		coeff               uint64
+		parentBlkComplexity uint64
+		targetBlkComplexity uint64
+		want                uint64
+	}{
+		{1, 250, 250, currentFeeRate},              // parent == target -> no fee changes, regardless the update coefficient
+		{math.MaxUint64, 250, 250, currentFeeRate}, // parent == target -> no fee changes, regardless the update coefficient
+
+		{1, 2_749, 250, currentFeeRate},
+		{1, 2_750, 250, currentFeeRate + 1},
+		{1, 5_000, 250, currentFeeRate + 3},
+		{1, 10_000, 250, currentFeeRate + 15},
+		{1, 20_000, 250, currentFeeRate + 62},
+		{1, 30_000, 250, currentFeeRate + 141},
+		{1, 40_000, 250, currentFeeRate + 252},
+		{1, 50_000, 250, currentFeeRate + 396},
+		{1, 100_000, 250, currentFeeRate + 1_592},
+		{1, 500_000, 250, currentFeeRate + 39_960},
+		{1, 1_000_000, 250, currentFeeRate + 159_920},
+
+		{1, 0, 1_000, currentFeeRate - 1}, // TODO ABENEGIA: fix this
+	}
+	for _, tt := range tests {
+		have := nextFeeRate(
+			currentFeeRate,
+			tt.coeff,
+			tt.parentBlkComplexity,
+			tt.targetBlkComplexity,
+		)
+		require.Equal(t, tt.want, have)
+	}
 }
