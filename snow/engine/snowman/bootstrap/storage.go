@@ -134,7 +134,6 @@ func execute(
 	tree *interval.Tree,
 	lastAcceptedHeight uint64,
 ) error {
-
 	totalNumberToProcess := tree.Len()
 	if totalNumberToProcess > minBlocksToCompact {
 		log("compacting database before executing blocks...")
