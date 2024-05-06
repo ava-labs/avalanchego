@@ -26,12 +26,12 @@ func TestInterface(t *testing.T) {
 	}
 }
 
-func TestSuffix(t *testing.T) {
+func TestPrefixLimit(t *testing.T) {
 	testString := []string{"hello", "world", "a\xff", "\x01\xff\xff\xff\xff"}
 	expected := []string{"hellp", "worle", "b\x00", "\x02\x00\x00\x00\x00"}
 	for i, str := range testString {
 		db := newDB([]byte(str), nil)
-		require.Equal(t, db.dbSuffix, []byte(expected[i]))
+		require.Equal(t, db.dbLimit, []byte(expected[i]))
 	}
 }
 
