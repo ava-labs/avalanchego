@@ -84,14 +84,16 @@ func (s *state) pruneProcessingBlocks(db *versiondb.Database) error {
 	preferredBlkIDs := set.Set[ids.ID]{}
 	preferredBlk, status, err := s.BlockState.GetBlock(preferredID)
 	if err != nil {
-		return fmt.Errorf("failed to get preferred chain tip: %w", err)
+		return fmt.Errorf("failed to get preferred chain tip %s: %w", preferredID, err)
 	}
 
 	for status == choices.Processing {
 		preferredBlkIDs.Add(preferredBlk.ID())
-		preferredBlk, status, err = s.BlockState.GetBlock(preferredBlk.ParentID())
+
+		parentID := preferredBlk.ParentID()
+		preferredBlk, status, err = s.BlockState.GetBlock(parentID)
 		if err != nil {
-			return fmt.Errorf("failed to get block in preferred chain: %w", err)
+			return fmt.Errorf("failed to get block in preferred chain %s: %w", parentID, err)
 		}
 	}
 
@@ -109,11 +111,11 @@ func (s *state) pruneProcessingBlocks(db *versiondb.Database) error {
 		}
 
 		if err := s.processingBlockIndex.DeleteProcessingBlock(blkID); err != nil {
-			return fmt.Errorf("failed to delete processing block from index: %w", err)
+			return fmt.Errorf("failed to delete processing block %s from index: %w", blkID, err)
 		}
 
 		if err := s.BlockState.DeleteBlock(blkID); err != nil {
-			return fmt.Errorf("failed to delete processing block: %w", err)
+			return fmt.Errorf("failed to delete processing block %s: %w", blkID, err)
 		}
 	}
 
