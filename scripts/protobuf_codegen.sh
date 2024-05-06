@@ -7,19 +7,14 @@ if ! [[ "$0" =~ scripts/protobuf_codegen.sh ]]; then
   exit 255
 fi
 
-## install "buf"
-# any version changes here should also be bumped in Dockerfile.buf
-# ref. https://docs.buf.build/installation
-# ref. https://github.com/bufbuild/buf/releases
-BUF_VERSION='1.30.0'
+## ensure the correct version of "buf" is installed
+BUF_VERSION='1.31.0'
 if [[ $(buf --version | cut -f2 -d' ') != "${BUF_VERSION}" ]]; then
   echo "could not find buf ${BUF_VERSION}, is it installed + in PATH?"
   exit 255
 fi
 
 ## install "protoc-gen-go"
-# any version changes here should also be bumped in Dockerfile.buf
-# ref. https://github.com/protocolbuffers/protobuf-go/releases
 PROTOC_GEN_GO_VERSION='v1.33.0'
 go install -v google.golang.org/protobuf/cmd/protoc-gen-go@${PROTOC_GEN_GO_VERSION}
 if [[ $(protoc-gen-go --version | cut -f2 -d' ') != "${PROTOC_GEN_GO_VERSION}" ]]; then
@@ -29,9 +24,6 @@ if [[ $(protoc-gen-go --version | cut -f2 -d' ') != "${PROTOC_GEN_GO_VERSION}" ]
 fi
 
 ### install "protoc-gen-go-grpc"
-# any version changes here should also be bumped in Dockerfile.buf
-# ref. https://pkg.go.dev/google.golang.org/grpc/cmd/protoc-gen-go-grpc
-# ref. https://github.com/grpc/grpc-go/blob/master/cmd/protoc-gen-go-grpc/main.go
 PROTOC_GEN_GO_GRPC_VERSION='1.3.0'
 go install -v google.golang.org/grpc/cmd/protoc-gen-go-grpc@v${PROTOC_GEN_GO_GRPC_VERSION}
 if [[ $(protoc-gen-go-grpc --version | cut -f2 -d' ') != "${PROTOC_GEN_GO_GRPC_VERSION}" ]]; then

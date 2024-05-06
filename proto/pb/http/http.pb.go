@@ -152,7 +152,7 @@ type Userinfo struct {
 	Username string `protobuf:"bytes,1,opt,name=username,proto3" json:"username,omitempty"`
 	// password is the password for the user
 	Password string `protobuf:"bytes,2,opt,name=password,proto3" json:"password,omitempty"`
-	// password_set is a boolean which is true if the passord is set
+	// password_set is a boolean which is true if the password is set
 	PasswordSet bool `protobuf:"varint,3,opt,name=password_set,json=passwordSet,proto3" json:"password_set,omitempty"`
 }
 
@@ -216,7 +216,7 @@ type Element struct {
 
 	// key is a element key in a key value pair
 	Key string `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
-	// values are a list of strings coresponding to the key
+	// values are a list of strings corresponding to the key
 	Values []string `protobuf:"bytes,2,rep,name=values,proto3" json:"values,omitempty"`
 }
 

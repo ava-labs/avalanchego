@@ -28,7 +28,7 @@ AVALANCHE_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd )
 # Load the constants
 source "$AVALANCHE_PATH"/scripts/constants.sh
 
-if [[ $current_branch == *"-race" ]]; then
+if [[ $image_tag == *"-race" ]]; then
   echo "Branch name must not end in '-race'"
   exit 1
 fi
@@ -43,6 +43,12 @@ DOCKER_IMAGE=${DOCKER_IMAGE:-"avalanchego"}
 #
 # Reference: https://docs.docker.com/build/buildkit/
 DOCKER_CMD="docker buildx build"
+
+# The dockerfile doesn't specify the golang version to minimize the
+# changes required to bump the version. Instead, the golang version is
+# provided as an argument.
+GO_VERSION="$(go list -m -f '{{.GoVersion}}')"
+DOCKER_CMD="${DOCKER_CMD} --build-arg GO_VERSION=${GO_VERSION}"
 
 if [[ "${DOCKER_IMAGE}" == *"/"* ]]; then
   # Build a multi-arch image since the image name includes a slash which indicates
@@ -74,16 +80,16 @@ else
   DOCKER_CMD="${DOCKER_CMD} --load"
 fi
 
-echo "Building Docker Image with tags: $DOCKER_IMAGE:$commit_hash , $DOCKER_IMAGE:$current_branch"
-${DOCKER_CMD} -t "$DOCKER_IMAGE:$commit_hash" -t "$DOCKER_IMAGE:$current_branch" \
+echo "Building Docker Image with tags: $DOCKER_IMAGE:$commit_hash , $DOCKER_IMAGE:$image_tag"
+${DOCKER_CMD} -t "$DOCKER_IMAGE:$commit_hash" -t "$DOCKER_IMAGE:$image_tag" \
               "$AVALANCHE_PATH" -f "$AVALANCHE_PATH/Dockerfile"
 
-echo "Building Docker Image with tags: $DOCKER_IMAGE:$commit_hash-race , $DOCKER_IMAGE:$current_branch-race"
-${DOCKER_CMD} --build-arg="RACE_FLAG=-r" -t "$DOCKER_IMAGE:$commit_hash-race" -t "$DOCKER_IMAGE:$current_branch-race" \
+echo "Building Docker Image with tags: $DOCKER_IMAGE:$commit_hash-race , $DOCKER_IMAGE:$image_tag-race"
+${DOCKER_CMD} --build-arg="RACE_FLAG=-r" -t "$DOCKER_IMAGE:$commit_hash-race" -t "$DOCKER_IMAGE:$image_tag-race" \
               "$AVALANCHE_PATH" -f "$AVALANCHE_PATH/Dockerfile"
 
 # Only tag the latest image for the master branch when images are pushed to a registry
-if [[ "${DOCKER_IMAGE}" == *"/"* && $current_branch == "master" ]]; then
+if [[ "${DOCKER_IMAGE}" == *"/"* && $image_tag == "master" ]]; then
   echo "Tagging current avalanchego images as $DOCKER_IMAGE:latest"
   docker buildx imagetools create -t "$DOCKER_IMAGE:latest" "$DOCKER_IMAGE:$commit_hash"
 fi

@@ -159,7 +159,7 @@ To regenerate the protobuf go code, run `scripts/protobuf_codegen.sh` from the r
 
 This should only be necessary when upgrading protobuf versions or modifying .proto definition files.
 
-To use this script, you must have [buf](https://docs.buf.build/installation) (v1.30.0), protoc-gen-go (v1.33.0) and protoc-gen-go-grpc (v1.3.0) installed.
+To use this script, you must have [buf](https://docs.buf.build/installation) (v1.31.0), protoc-gen-go (v1.33.0) and protoc-gen-go-grpc (v1.3.0) installed.
 
 To install the buf dependencies:
 
@@ -184,13 +184,6 @@ scripts/protobuf_codegen.sh
 ```
 
 For more information, refer to the [GRPC Golang Quick Start Guide](https://grpc.io/docs/languages/go/quickstart/).
-
-### Running protobuf codegen from docker
-
-```sh
-docker build -t avalanche:protobuf_codegen -f api/Dockerfile.buf .
-docker run -t -i -v $(pwd):/opt/avalanche -w/opt/avalanche avalanche:protobuf_codegen bash -c "scripts/protobuf_codegen.sh"
-```
 
 ### Running mock codegen
 

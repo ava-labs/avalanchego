@@ -15,7 +15,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
-	"github.com/ava-labs/avalanchego/proto/pb/p2p"
+	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
@@ -33,11 +33,12 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/version"
 
+	p2ppb "github.com/ava-labs/avalanchego/proto/pb/p2p"
 	commontracker "github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 )
 
 const (
-	engineType         = p2p.EngineType_ENGINE_TYPE_AVALANCHE
+	engineType         = p2ppb.EngineType_ENGINE_TYPE_AVALANCHE
 	testThreadPoolSize = 2
 )
 
@@ -92,6 +93,16 @@ func TestShutdown(t *testing.T) {
 		time.Second,
 	)
 	require.NoError(err)
+
+	p2pTracker, err := p2p.NewPeerTracker(
+		logging.NoLog{},
+		"",
+		prometheus.NewRegistry(),
+		nil,
+		version.CurrentApp,
+	)
+	require.NoError(err)
+
 	h, err := handler.New(
 		chainCtx,
 		vdrs,
@@ -102,6 +113,7 @@ func TestShutdown(t *testing.T) {
 		validators.UnhandledSubnetConnector,
 		subnets.New(chainCtx.NodeID, subnets.Config{}),
 		commontracker.NewPeers(),
+		p2pTracker,
 	)
 	require.NoError(err)
 
@@ -230,6 +242,16 @@ func TestShutdownTimesOut(t *testing.T) {
 		time.Second,
 	)
 	require.NoError(err)
+
+	p2pTracker, err := p2p.NewPeerTracker(
+		logging.NoLog{},
+		"",
+		prometheus.NewRegistry(),
+		nil,
+		version.CurrentApp,
+	)
+	require.NoError(err)
+
 	h, err := handler.New(
 		ctx,
 		vdrs,
@@ -240,6 +262,7 @@ func TestShutdownTimesOut(t *testing.T) {
 		validators.UnhandledSubnetConnector,
 		subnets.New(ctx.NodeID, subnets.Config{}),
 		commontracker.NewPeers(),
+		p2pTracker,
 	)
 	require.NoError(err)
 
@@ -305,7 +328,7 @@ func TestShutdownTimesOut(t *testing.T) {
 		chainID := ids.ID{}
 		msg := handler.Message{
 			InboundMessage: message.InboundPullQuery(chainID, 1, time.Hour, ids.GenerateTestID(), 0, nodeID),
-			EngineType:     p2p.EngineType_ENGINE_TYPE_UNSPECIFIED,
+			EngineType:     p2ppb.EngineType_ENGINE_TYPE_UNSPECIFIED,
 		}
 		h.Push(context.Background(), msg)
 
@@ -390,6 +413,15 @@ func TestRouterTimeout(t *testing.T) {
 	)
 	require.NoError(err)
 
+	p2pTracker, err := p2p.NewPeerTracker(
+		logging.NoLog{},
+		"",
+		prometheus.NewRegistry(),
+		nil,
+		version.CurrentApp,
+	)
+	require.NoError(err)
+
 	h, err := handler.New(
 		ctx,
 		vdrs,
@@ -400,6 +432,7 @@ func TestRouterTimeout(t *testing.T) {
 		validators.UnhandledSubnetConnector,
 		subnets.New(ctx.NodeID, subnets.Config{}),
 		commontracker.NewPeers(),
+		p2pTracker,
 	)
 	require.NoError(err)
 
@@ -465,7 +498,7 @@ func TestRouterTimeout(t *testing.T) {
 		return nil
 	}
 	ctx.State.Set(snow.EngineState{
-		Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
+		Type:  p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
 		State: snow.Bootstrapping, // assumed bootstrapping is ongoing
 	})
 
@@ -504,7 +537,7 @@ func TestRouterTimeout(t *testing.T) {
 				ctx.ChainID,
 				requestID,
 			),
-			p2p.EngineType_ENGINE_TYPE_SNOWMAN,
+			p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
 		)
 	}
 
@@ -523,7 +556,7 @@ func TestRouterTimeout(t *testing.T) {
 				ctx.ChainID,
 				requestID,
 			),
-			p2p.EngineType_ENGINE_TYPE_SNOWMAN,
+			p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
 		)
 	}
 
@@ -542,7 +575,7 @@ func TestRouterTimeout(t *testing.T) {
 				ctx.ChainID,
 				requestID,
 			),
-			p2p.EngineType_ENGINE_TYPE_SNOWMAN,
+			p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
 		)
 	}
 
@@ -561,7 +594,7 @@ func TestRouterTimeout(t *testing.T) {
 				ctx.ChainID,
 				requestID,
 			),
-			p2p.EngineType_ENGINE_TYPE_SNOWMAN,
+			p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
 		)
 	}
 
@@ -579,9 +612,9 @@ func TestRouterTimeout(t *testing.T) {
 				nodeID,
 				ctx.ChainID,
 				requestID,
-				p2p.EngineType_ENGINE_TYPE_SNOWMAN,
+				p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
 			),
-			p2p.EngineType_ENGINE_TYPE_SNOWMAN,
+			p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
 		)
 	}
 
@@ -600,7 +633,7 @@ func TestRouterTimeout(t *testing.T) {
 				ctx.ChainID,
 				requestID,
 			),
-			p2p.EngineType_ENGINE_TYPE_SNOWMAN,
+			p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
 		)
 	}
 
@@ -619,7 +652,7 @@ func TestRouterTimeout(t *testing.T) {
 				ctx.ChainID,
 				requestID,
 			),
-			p2p.EngineType_ENGINE_TYPE_SNOWMAN,
+			p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
 		)
 	}
 
@@ -640,7 +673,7 @@ func TestRouterTimeout(t *testing.T) {
 				common.ErrTimeout.Code,
 				common.ErrTimeout.Message,
 			),
-			p2p.EngineType_ENGINE_TYPE_SNOWMAN,
+			p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
 		)
 	}
 
@@ -662,7 +695,7 @@ func TestRouterTimeout(t *testing.T) {
 				common.ErrTimeout.Code,
 				common.ErrTimeout.Message,
 			),
-			p2p.EngineType_ENGINE_TYPE_SNOWMAN,
+			p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
 		)
 	}
 
@@ -750,7 +783,7 @@ func TestRouterHonorsRequestedEngine(t *testing.T) {
 				ctx.ChainID,
 				requestID,
 			),
-			p2p.EngineType_ENGINE_TYPE_UNSPECIFIED,
+			p2ppb.EngineType_ENGINE_TYPE_UNSPECIFIED,
 		)
 		msg := message.InboundStateSummaryFrontier(
 			ctx.ChainID,
@@ -760,7 +793,7 @@ func TestRouterHonorsRequestedEngine(t *testing.T) {
 		)
 
 		h.EXPECT().Push(gomock.Any(), gomock.Any()).Do(func(_ context.Context, msg handler.Message) {
-			require.Equal(p2p.EngineType_ENGINE_TYPE_UNSPECIFIED, msg.EngineType)
+			require.Equal(p2ppb.EngineType_ENGINE_TYPE_UNSPECIFIED, msg.EngineType)
 		})
 		chainRouter.HandleInbound(context.Background(), msg)
 	}
@@ -806,7 +839,7 @@ func TestRouterHonorsRequestedEngine(t *testing.T) {
 		)
 
 		h.EXPECT().Push(gomock.Any(), gomock.Any()).Do(func(_ context.Context, msg handler.Message) {
-			require.Equal(p2p.EngineType_ENGINE_TYPE_UNSPECIFIED, msg.EngineType)
+			require.Equal(p2ppb.EngineType_ENGINE_TYPE_UNSPECIFIED, msg.EngineType)
 		})
 		chainRouter.HandleInbound(context.Background(), msg)
 	}
@@ -963,6 +996,16 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 		time.Second,
 	)
 	require.NoError(err)
+
+	p2pTracker, err := p2p.NewPeerTracker(
+		logging.NoLog{},
+		"",
+		prometheus.NewRegistry(),
+		nil,
+		version.CurrentApp,
+	)
+	require.NoError(err)
+
 	h, err := handler.New(
 		ctx,
 		vdrs,
@@ -973,6 +1016,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 		validators.UnhandledSubnetConnector,
 		sb,
 		commontracker.NewPeers(),
+		p2pTracker,
 	)
 	require.NoError(err)
 
@@ -991,7 +1035,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 		return nil
 	}
 	ctx.State.Set(snow.EngineState{
-		Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
+		Type:  p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
 		State: snow.Bootstrapping, // assumed bootstrapping is ongoing
 	})
 
@@ -1111,15 +1155,15 @@ func TestConnectedSubnet(t *testing.T) {
 
 	myConnectedMsg := handler.Message{
 		InboundMessage: message.InternalConnected(myNodeID, version.CurrentApp),
-		EngineType:     p2p.EngineType_ENGINE_TYPE_UNSPECIFIED,
+		EngineType:     p2ppb.EngineType_ENGINE_TYPE_UNSPECIFIED,
 	}
 	mySubnetConnectedMsg0 := handler.Message{
 		InboundMessage: message.InternalConnectedSubnet(myNodeID, subnetID0),
-		EngineType:     p2p.EngineType_ENGINE_TYPE_UNSPECIFIED,
+		EngineType:     p2ppb.EngineType_ENGINE_TYPE_UNSPECIFIED,
 	}
 	mySubnetConnectedMsg1 := handler.Message{
 		InboundMessage: message.InternalConnectedSubnet(myNodeID, subnetID1),
-		EngineType:     p2p.EngineType_ENGINE_TYPE_UNSPECIFIED,
+		EngineType:     p2ppb.EngineType_ENGINE_TYPE_UNSPECIFIED,
 	}
 
 	platformHandler := handler.NewMockHandler(ctrl)
@@ -1133,28 +1177,28 @@ func TestConnectedSubnet(t *testing.T) {
 
 	peerConnectedMsg := handler.Message{
 		InboundMessage: message.InternalConnected(peerNodeID, version.CurrentApp),
-		EngineType:     p2p.EngineType_ENGINE_TYPE_UNSPECIFIED,
+		EngineType:     p2ppb.EngineType_ENGINE_TYPE_UNSPECIFIED,
 	}
 	platformHandler.EXPECT().Push(gomock.Any(), peerConnectedMsg).Times(1)
 	chainRouter.Connected(peerNodeID, version.CurrentApp, constants.PrimaryNetworkID)
 
 	peerSubnetConnectedMsg0 := handler.Message{
 		InboundMessage: message.InternalConnectedSubnet(peerNodeID, subnetID0),
-		EngineType:     p2p.EngineType_ENGINE_TYPE_UNSPECIFIED,
+		EngineType:     p2ppb.EngineType_ENGINE_TYPE_UNSPECIFIED,
 	}
 	platformHandler.EXPECT().Push(gomock.Any(), peerSubnetConnectedMsg0).Times(1)
 	chainRouter.Connected(peerNodeID, version.CurrentApp, subnetID0)
 
 	myDisconnectedMsg := handler.Message{
 		InboundMessage: message.InternalDisconnected(myNodeID),
-		EngineType:     p2p.EngineType_ENGINE_TYPE_UNSPECIFIED,
+		EngineType:     p2ppb.EngineType_ENGINE_TYPE_UNSPECIFIED,
 	}
 	platformHandler.EXPECT().Push(gomock.Any(), myDisconnectedMsg).Times(1)
 	chainRouter.Benched(constants.PlatformChainID, myNodeID)
 
 	peerDisconnectedMsg := handler.Message{
 		InboundMessage: message.InternalDisconnected(peerNodeID),
-		EngineType:     p2p.EngineType_ENGINE_TYPE_UNSPECIFIED,
+		EngineType:     p2ppb.EngineType_ENGINE_TYPE_UNSPECIFIED,
 	}
 	platformHandler.EXPECT().Push(gomock.Any(), peerDisconnectedMsg).Times(1)
 	chainRouter.Benched(constants.PlatformChainID, peerNodeID)
@@ -1235,6 +1279,15 @@ func TestValidatorOnlyAllowedNodeMessageDrops(t *testing.T) {
 	)
 	require.NoError(err)
 
+	p2pTracker, err := p2p.NewPeerTracker(
+		logging.NoLog{},
+		"",
+		prometheus.NewRegistry(),
+		nil,
+		version.CurrentApp,
+	)
+	require.NoError(err)
+
 	h, err := handler.New(
 		ctx,
 		vdrs,
@@ -1245,6 +1298,7 @@ func TestValidatorOnlyAllowedNodeMessageDrops(t *testing.T) {
 		validators.UnhandledSubnetConnector,
 		sb,
 		commontracker.NewPeers(),
+		p2pTracker,
 	)
 	require.NoError(err)
 
@@ -1564,6 +1618,16 @@ func newChainRouterTest(t *testing.T) (*ChainRouter, *common.EngineTest) {
 		time.Second,
 	)
 	require.NoError(t, err)
+
+	p2pTracker, err := p2p.NewPeerTracker(
+		logging.NoLog{},
+		"",
+		prometheus.NewRegistry(),
+		nil,
+		version.CurrentApp,
+	)
+	require.NoError(t, err)
+
 	h, err := handler.New(
 		ctx,
 		vdrs,
@@ -1574,6 +1638,7 @@ func newChainRouterTest(t *testing.T) (*ChainRouter, *common.EngineTest) {
 		validators.UnhandledSubnetConnector,
 		subnets.New(ctx.NodeID, subnets.Config{}),
 		commontracker.NewPeers(),
+		p2pTracker,
 	)
 	require.NoError(t, err)
 
@@ -1605,7 +1670,7 @@ func newChainRouterTest(t *testing.T) (*ChainRouter, *common.EngineTest) {
 		},
 	})
 	ctx.State.Set(snow.EngineState{
-		Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
+		Type:  p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
 		State: snow.NormalOp, // assumed bootstrapping is done
 	})
 

@@ -5,7 +5,9 @@ package e2e
 
 import (
 	"encoding/json"
+	"errors"
 	"math/rand"
+	"os"
 	"time"
 
 	"github.com/stretchr/testify/require"
@@ -58,52 +60,80 @@ func (te *TestEnvironment) Marshal() []byte {
 func NewTestEnvironment(flagVars *FlagVars, desiredNetwork *tmpnet.Network) *TestEnvironment {
 	require := require.New(ginkgo.GinkgoT())
 
-	networkDir := flagVars.NetworkDir()
-
-	// Load or create a test network
 	var network *tmpnet.Network
-	if len(networkDir) > 0 {
-		var err error
-		network, err = tmpnet.ReadNetwork(networkDir)
-		require.NoError(err)
-		tests.Outf("{{yellow}}Using an existing network configured at %s{{/}}\n", network.Dir)
-
-		// Set the desired subnet configuration to ensure subsequent creation.
-		for _, subnet := range desiredNetwork.Subnets {
-			if existing := network.GetSubnet(subnet.Name); existing != nil {
-				// Already present
-				continue
+	// Need to load the network if it is being stopped or reused
+	if flagVars.StopNetwork() || flagVars.ReuseNetwork() {
+		networkDir := flagVars.NetworkDir()
+		var networkSymlink string // If populated, prompts removal of the referenced symlink if --stop-network is specified
+		if len(networkDir) == 0 {
+			// Attempt to reuse the network at the default owner path
+			symlinkPath, err := tmpnet.GetReusableNetworkPathForOwner(desiredNetwork.Owner)
+			require.NoError(err)
+			_, err = os.Stat(symlinkPath)
+			if !errors.Is(err, os.ErrNotExist) {
+				// Try to load the existing network
+				require.NoError(err)
+				networkDir = symlinkPath
+				// Enable removal of the referenced symlink if --stop-network is specified
+				networkSymlink = symlinkPath
 			}
-			network.Subnets = append(network.Subnets, subnet)
 		}
-	} else {
-		network = desiredNetwork
-		StartNetwork(network, flagVars.AvalancheGoExecPath(), flagVars.PluginDir(), flagVars.NetworkShutdownDelay())
+
+		if len(networkDir) > 0 {
+			var err error
+			network, err = tmpnet.ReadNetwork(networkDir)
+			require.NoError(err)
+			tests.Outf("{{yellow}}Loaded a network configured at %s{{/}}\n", network.Dir)
+		}
+
+		if flagVars.StopNetwork() {
+			if len(networkSymlink) > 0 {
+				// Remove the symlink to avoid attempts to reuse the stopped network
+				tests.Outf("Removing symlink %s\n", networkSymlink)
+				if err := os.Remove(networkSymlink); !errors.Is(err, os.ErrNotExist) {
+					require.NoError(err)
+				}
+			}
+			if network != nil {
+				tests.Outf("Stopping network\n")
+				require.NoError(network.Stop(DefaultContext()))
+			} else {
+				tests.Outf("No network to stop\n")
+			}
+			os.Exit(0)
+		}
 	}
 
-	// A new network will always need subnet creation and an existing
-	// network will also need subnets to be created the first time it
-	// is used.
-	require.NoError(network.CreateSubnets(DefaultContext(), ginkgo.GinkgoWriter))
+	// Start a new network
+	if network == nil {
+		network = desiredNetwork
+		StartNetwork(
+			network,
+			flagVars.AvalancheGoExecPath(),
+			flagVars.PluginDir(),
+			flagVars.NetworkShutdownDelay(),
+			flagVars.ReuseNetwork(),
+		)
 
-	// Wait for chains to have bootstrapped on all nodes
-	Eventually(func() bool {
-		for _, subnet := range network.Subnets {
-			for _, validatorID := range subnet.ValidatorIDs {
-				uri, err := network.GetURIForNodeID(validatorID)
-				require.NoError(err)
-				infoClient := info.NewClient(uri)
-				for _, chain := range subnet.Chains {
-					isBootstrapped, err := infoClient.IsBootstrapped(DefaultContext(), chain.ChainID.String())
-					// Ignore errors since a chain id that is not yet known will result in a recoverable error.
-					if err != nil || !isBootstrapped {
-						return false
+		// Wait for chains to have bootstrapped on all nodes
+		Eventually(func() bool {
+			for _, subnet := range network.Subnets {
+				for _, validatorID := range subnet.ValidatorIDs {
+					uri, err := network.GetURIForNodeID(validatorID)
+					require.NoError(err)
+					infoClient := info.NewClient(uri)
+					for _, chain := range subnet.Chains {
+						isBootstrapped, err := infoClient.IsBootstrapped(DefaultContext(), chain.ChainID.String())
+						// Ignore errors since a chain id that is not yet known will result in a recoverable error.
+						if err != nil || !isBootstrapped {
+							return false
+						}
 					}
 				}
 			}
-		}
-		return true
-	}, DefaultTimeout, DefaultPollingInterval, "failed to see all chains bootstrap before timeout")
+			return true
+		}, DefaultTimeout, DefaultPollingInterval, "failed to see all chains bootstrap before timeout")
+	}
 
 	uris := network.GetNodeURIs()
 	require.NotEmpty(uris, "network contains no nodes")
@@ -173,5 +203,6 @@ func (te *TestEnvironment) StartPrivateNetwork(network *tmpnet.Network) {
 		sharedNetwork.DefaultRuntimeConfig.AvalancheGoPath,
 		pluginDir,
 		te.PrivateNetworkShutdownDelay,
+		false, /* reuseNetwork */
 	)
 }
