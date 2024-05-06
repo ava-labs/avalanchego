@@ -104,6 +104,15 @@ func (m *Manager) UpdateFeeRates(
 		return fmt.Errorf("unexpected block times, parentBlkTim %v, childBlkTime %v", parentBlkTime, childBlkTime)
 	}
 
+	// We update the fee rate with the formula:
+	//     feeRate_{t+1} = feeRate_t * exp(k*delta)
+	// where
+	//     delta == (parentComplexity - targetBlkComplexity)/targetBlkComplexity
+	// and [targetBlkComplexity] is the target complexity expected in the elapsed time.
+	// We update the fee rate trying to guarantee the following stability property:
+	// 		feeRate(delta) * feeRate(-delta) = 1
+	// so that fee rates won't change much when block complexity wiggles around target complexity
+
 	elapsedTime := uint64(childBlkTime - parentBlkTime)
 	for i := Dimension(0); i < FeeDimensions; i++ {
 		targetBlkComplexity := targetComplexity(
@@ -112,44 +121,39 @@ func (m *Manager) UpdateFeeRates(
 			feesConfig.BlockMaxComplexity[i],
 		)
 
-		nextFeeRates := nextFeeRate(
-			m.feeRates[i],
+		factorNum, factorDenom := updateFactor(
 			feesConfig.UpdateCoefficient[i],
 			parentBlkComplexity[i],
 			targetBlkComplexity,
 		)
+		nextFeeRates, over := safemath.Mul64(m.feeRates[i], factorNum)
+		if over != nil {
+			nextFeeRates = math.MaxUint64
+		}
+		nextFeeRates /= factorDenom
+
 		nextFeeRates = max(nextFeeRates, feesConfig.MinFeeRate[i])
 		m.feeRates[i] = nextFeeRates
 	}
 	return nil
 }
 
-func nextFeeRate(
-	currentFeeRate,
+func updateFactor(
 	coeff,
 	parentBlkComplexity,
 	targetBlkComplexity uint64,
-) uint64 {
-	// We update the fee rate with the formula:
-	//     feeRate_{t+1} = feeRate_t * exp(k*delta)
-	// where
-	//     delta == (parentComplexity - targetBlkComplexity)/targetBlkComplexity
-	// and [targetBlkComplexity] is the median complexity expected in the elapsed time.
+) (uint64, uint64) {
+	// We use the following piece-wise Taylor approximation for the exponential function:
 	//
-	// We approximate the exponential as follows:
+	//	if B > T --> exp{k * (B-T)/T} ≈≈      1 + k * abs(B-T)/T + 1/2 *  (abs(B-T)/T)^2
+	//  if B < T --> exp{k * (B-T)/T} ≈≈ 1/ ( 1 + k * abs(B-T)/T + 1/2 *  (abs(B-T)/T)^2 )
 	//
-	//                              1 + (k * delta)^2 if delta >= 0
-	// feeRate_{t+1} = feeRate_t *
-	//                              1 / (1 + (k * delta)^2) if delta < 0
-	//
-	// The approximation keeps two key properties of the exponential formula:
-	// 1. It's strictly increasing with delta
-	// 2. It's stable because feeRate(delta) * feeRate(-delta) = 1, meaning that
-	//    if complexity increase and decrease by the same amount in two consecutive blocks
-	//    the fee rate will go back to the original value.
+	// Note that the approximation guarantees that factor(delta)*factor(-delta) == 1
+	// We express the result with the pair (numerator, denominator)
+	// to increase precision with small deltas
 
 	if parentBlkComplexity == targetBlkComplexity {
-		return currentFeeRate // complexity matches target, nothing to update
+		return 1, 1 // complexity matches target, nothing to update
 	}
 
 	var (
@@ -165,22 +169,48 @@ func nextFeeRate(
 		delta = targetBlkComplexity - parentBlkComplexity
 	}
 
-	num := coeff * coeff * delta * delta
-	denom := targetBlkComplexity * targetBlkComplexity * CoeffDenom * CoeffDenom
+	// exp{A/B} ≈≈ 1 + A/B + 1/2 * A^2/B^2 == (B^2 + (A+B)^2) / (2*B^2)
+	var (
+		a, b, b2 uint64
+		n, d     uint64
+		over     error
+	)
+
+	a, over = safemath.Mul64(coeff, delta)
+	if over != nil {
+		a = math.MaxUint64
+	}
+	b, over = safemath.Mul64(CoeffDenom, targetBlkComplexity)
+	if over != nil {
+		b = math.MaxUint64
+	}
+	b2, over = safemath.Mul64(b, b)
+	if over != nil {
+		b2 = math.MaxUint64
+	}
+
+	n, over = safemath.Add64(a, b)
+	if over != nil {
+		n = math.MaxUint64
+	}
+	n, over = safemath.Mul64(n, n)
+	if over != nil {
+		n = math.MaxUint64
+	}
+	n, over = safemath.Add64(b2, n)
+	if over != nil {
+		n = math.MaxUint64
+	}
+
+	d, over = safemath.Mul64(2, b2)
+	if over != nil {
+		n = math.MaxUint64
+	}
 
 	if increaseFee {
-		res, over := safemath.Mul64(currentFeeRate, denom+num)
-		if over != nil {
-			res = math.MaxUint64
-		}
-		return res / denom
+		return n, d
 	}
-
-	res, over := safemath.Mul64(currentFeeRate, denom)
-	if over != nil {
-		res = math.MaxUint64
-	}
-	return res / (denom + num)
+	return d, n
 }
 
 func targetComplexity(

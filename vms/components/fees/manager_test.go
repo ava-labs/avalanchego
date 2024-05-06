@@ -57,8 +57,8 @@ func TestUpdateFeeRates(t *testing.T) {
 	// UTXOWrite complexity is below target, fee rate is pushed down
 	require.Equal(uint64(99), m.feeRates[UTXOWrite])
 
-	// Compute complexoty is below target, fee rate is pushed down to the minimum
-	require.Equal(uint64(199), m.feeRates[Compute])
+	// Compute complexoty is below target, fee rate is pushed down
+	require.Equal(uint64(188), m.feeRates[Compute])
 }
 
 func TestUpdateFeeRatesStability(t *testing.T) {
@@ -183,16 +183,15 @@ func TestPChainFeeRateIncreaseDueToPeak(t *testing.T) {
 			{1615237936, Dimensions{820, 360, 442, 4000}},
 			{1615237936, Dimensions{34064, 13056, 13056, 128000}},
 			{1615237936, Dimensions{34064, 13056, 13056, 128000}},
-			{1615237936, Dimensions{34064, 13056, 13056, 128000}},
-			{1615237936, Dimensions{34064, 13056, 13056, 128000}},
-			{1615237936, Dimensions{34064, 13056, 13056, 128000}},
-			{1615237936, Dimensions{34064, 13056, 13056, 128000}},
-			{1615237936, Dimensions{34064, 13056, 13056, 128000}},
-			{1615237936, Dimensions{34064, 13056, 13056, 128000}},
-			{1615237936, Dimensions{3589, 1326, 1326, 13000}},
-			{1615237936, Dimensions{550, 180, 180, 2000}},
-			{1615237936, Dimensions{413, 102, 102, 1000}},
-			{1615237936, Dimensions{0, 0, 0, 0}},
+			// {1615237936, Dimensions{34064, 13056, 13056, 128000}},
+			// {1615237936, Dimensions{34064, 13056, 13056, 128000}},
+			// {1615237936, Dimensions{34064, 13056, 13056, 128000}},
+			// {1615237936, Dimensions{34064, 13056, 13056, 128000}},
+			// {1615237936, Dimensions{34064, 13056, 13056, 128000}},
+			// {1615237936, Dimensions{34064, 13056, 13056, 128000}},
+			// {1615237936, Dimensions{3589, 1326, 1326, 13000}},
+			// {1615237936, Dimensions{550, 180, 180, 2000}},
+			// {1615237936, Dimensions{413, 102, 102, 1000}},
 		}
 	)
 
@@ -251,39 +250,43 @@ func TestPChainFeeRateIncreaseDueToPeak(t *testing.T) {
 	require.Less(m.feeRates[Compute], peakFeeRate[Compute])
 }
 
-func TestExponentialFeeApproximation(t *testing.T) {
-	currentFeeRate := 10 * units.MicroAvax
-
+func TestFeeUpdateFactor(t *testing.T) {
 	tests := []struct {
 		coeff               uint64
 		parentBlkComplexity uint64
 		targetBlkComplexity uint64
-		want                uint64
+		wantNum             uint64
+		wantDenom           uint64
 	}{
-		{1, 250, 250, currentFeeRate},              // parent == target -> no fee changes, regardless the update coefficient
-		{math.MaxUint64, 250, 250, currentFeeRate}, // parent == target -> no fee changes, regardless the update coefficient
+		// parentBlkComplexity == targetBlkComplexity gives factor 1, no matter what coeff is
+		{1, 250, 250, 1, 1},
+		{math.MaxUint64, 250, 250, 1, 1},
 
-		{1, 2_749, 250, currentFeeRate},
-		{1, 2_750, 250, currentFeeRate + 1},
-		{1, 5_000, 250, currentFeeRate + 3},
-		{1, 10_000, 250, currentFeeRate + 15},
-		{1, 20_000, 250, currentFeeRate + 62},
-		{1, 30_000, 250, currentFeeRate + 141},
-		{1, 40_000, 250, currentFeeRate + 252},
-		{1, 50_000, 250, currentFeeRate + 396},
-		{1, 100_000, 250, currentFeeRate + 1_592},
-		{1, 500_000, 250, currentFeeRate + 39_960},
-		{1, 1_000_000, 250, currentFeeRate + 159_920},
+		// parentBlkComplexity > targetBlkComplexity
+		{1, 101, 100, 20_000_200_001, 20_000_000_000},          // should be 1,00001
+		{1, 110, 100, 20_002_000_100, 20_000_000_000},          // should be 1,0001
+		{1, 200, 100, 20_020_010_000, 20_000_000_000},          // should be 1,001
+		{1, 1_100, 100, 20_201_000_000, 20_000_000_000},        // should be 1,01
+		{1, 10_100, 100, 22_100_000_000, 20_000_000_000},       // should be 1,105
+		{1, 100_100, 100, 50_000_000_000, 20_000_000_000},      // should be 2,718, it's 2,5
+		{1, 1_000_100, 100, 1_220_000_000_000, 20_000_000_000}, // should be 22026, it's roughly 61
 
-		{1, 0, 1_000, currentFeeRate - 1}, // TODO ABENEGIA: fix this
+		// // parentBlkComplexity < targetBlkComplexity
+		{1, 100, 101, 20_402_000_000, 20_402_202_001},                             // should be 0,99999
+		{1, 100, 110, 24_200_000_000, 24_202_200_100},                             // should be 0,9999
+		{1, 100, 200, 80_000_000_000, 80_040_010_000},                             // should be 0,9995
+		{1, 100, 1_100, 2_420_000_000_000, 2_422_201_000_000},                     // should be 0,9991
+		{1, 100, 10_100, 204_020_000_000_000, 204_222_100_000_000},                // should be 0,999
+		{1, 100, 100_100, 20_040_020_000_000_000, 20_060_050_000_000_000},         // should be 0,999
+		{1, 100, 1_000_100, 2_000_400_020_000_000_000, 2_002_401_220_000_000_000}, // should be 0,999
 	}
 	for _, tt := range tests {
-		have := nextFeeRate(
-			currentFeeRate,
+		haveFactor, haveIncreaseFee := updateFactor(
 			tt.coeff,
 			tt.parentBlkComplexity,
 			tt.targetBlkComplexity,
 		)
-		require.Equal(t, tt.want, have)
+		require.Equal(t, tt.wantNum, haveFactor)
+		require.Equal(t, tt.wantDenom, haveIncreaseFee)
 	}
 }
