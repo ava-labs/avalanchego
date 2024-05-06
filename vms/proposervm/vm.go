@@ -314,10 +314,6 @@ func (vm *VM) SetPreference(ctx context.Context, preferred ids.ID) error {
 	}
 	vm.preferred = preferred
 
-	if err := vm.State.SetPreference(preferred); err != nil {
-		return err
-	}
-
 	blk, err := vm.getPostForkBlock(ctx, preferred)
 	if err != nil {
 		// This is before the ProposerVM fork
@@ -326,6 +322,10 @@ func (vm *VM) SetPreference(ctx context.Context, preferred ids.ID) error {
 		}
 
 		return vm.db.Commit()
+	}
+
+	if err := vm.State.SetPreference(preferred); err != nil {
+		return err
 	}
 
 	// If this is an option block, we need to update our persisted preference
