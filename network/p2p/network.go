@@ -17,14 +17,17 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/sampler"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
 )
 
+const initialPeersSize = 32
+
 var (
 	_ validators.Connector = (*Network)(nil)
 	_ common.AppHandler    = (*Network)(nil)
-	_ NodeSampler          = (*peerSampler)(nil)
+	_ NodeSampler          = (*Peers)(nil)
 
 	opLabel      = "op"
 	handlerLabel = "handlerID"
@@ -42,10 +45,10 @@ func (o clientOptionFunc) apply(options *clientOptions) {
 	o(options)
 }
 
-// WithValidatorSampling configures Client.AppRequestAny to sample validators
-func WithValidatorSampling(validators *Validators) ClientOption {
+// WithCustomSampler configures Client.AppRequestAny to sample from [s].
+func WithCustomSampler(s NodeSampler) ClientOption {
 	return clientOptionFunc(func(options *clientOptions) {
-		options.nodeSampler = validators
+		options.nodeSampler = s
 	})
 }
 
@@ -90,7 +93,9 @@ func NewNetwork(
 	}
 
 	return &Network{
-		Peers:  &Peers{},
+		Peers: &Peers{
+			set: set.NewSlice[ids.NodeID](initialPeersSize),
+		},
 		log:    log,
 		sender: sender,
 		router: newRouter(log, sender, metrics),
@@ -148,17 +153,16 @@ func (n *Network) Disconnected(_ context.Context, nodeID ids.NodeID) error {
 
 // NewClient returns a Client that can be used to send messages for the
 // corresponding protocol.
-func (n *Network) NewClient(handlerID uint64, options ...ClientOption) *Client {
+func (n *Network) NewClient(self ids.NodeID, handlerID uint64, options ...ClientOption) *Client {
 	client := &Client{
+		self:          self,
 		handlerID:     handlerID,
 		handlerIDStr:  strconv.FormatUint(handlerID, 10),
 		handlerPrefix: ProtocolPrefix(handlerID),
 		sender:        n.sender,
 		router:        n.router,
 		options: &clientOptions{
-			nodeSampler: &peerSampler{
-				peers: n.Peers,
-			},
+			nodeSampler: n.Peers,
 		},
 	}
 
@@ -177,7 +181,7 @@ func (n *Network) AddHandler(handlerID uint64, handler Handler) error {
 // Peers contains metadata about the current set of connected peers
 type Peers struct {
 	lock sync.RWMutex
-	set  set.SampleableSet[ids.NodeID]
+	set  *set.Slice[ids.NodeID]
 }
 
 func (p *Peers) add(nodeID ids.NodeID) {
@@ -194,7 +198,7 @@ func (p *Peers) remove(nodeID ids.NodeID) {
 	p.set.Remove(nodeID)
 }
 
-func (p *Peers) has(nodeID ids.NodeID) bool {
+func (p *Peers) Has(nodeID ids.NodeID) bool {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 
@@ -202,19 +206,34 @@ func (p *Peers) has(nodeID ids.NodeID) bool {
 }
 
 // Sample returns a pseudo-random sample of up to limit Peers
-func (p *Peers) Sample(limit int) []ids.NodeID {
+func (p *Peers) Sample(
+	_ context.Context,
+	canReturn func(ids.NodeID) bool,
+	limit int,
+) []ids.NodeID {
+	var (
+		uniform = sampler.NewUniform()
+		sampled = make([]ids.NodeID, 0, limit)
+	)
+
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 
-	return p.set.Sample(limit)
-}
+	uniform.Initialize(uint64(len(p.set.Elements)))
+	for len(sampled) < limit {
+		i, err := uniform.Next()
+		if err != nil {
+			break
+		}
 
-type peerSampler struct {
-	peers *Peers
-}
+		nodeID := p.set.Elements[i]
+		if !canReturn(nodeID) {
+			continue
+		}
 
-func (p peerSampler) Sample(_ context.Context, limit int) []ids.NodeID {
-	return p.peers.Sample(limit)
+		sampled = append(sampled, nodeID)
+	}
+	return sampled
 }
 
 func ProtocolPrefix(handlerID uint64) []byte {

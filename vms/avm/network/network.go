@@ -61,15 +61,17 @@ func New(
 		parser: parser,
 	}
 	validators := p2p.NewValidators(
-		p2pNetwork.Peers,
 		log,
 		subnetID,
 		vdrs,
 		config.MaxValidatorSetStaleness,
 	)
 	txGossipClient := p2pNetwork.NewClient(
+		nodeID,
 		txGossipHandlerID,
-		p2p.WithValidatorSampling(validators),
+		p2p.WithCustomSampler(
+			p2p.RestrictSampler(validators, p2pNetwork.Peers.Has),
+		),
 	)
 	txGossipMetrics, err := gossip.NewMetrics(registerer, "tx")
 	if err != nil {

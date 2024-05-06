@@ -66,7 +66,7 @@ func TestMessageRouting(t *testing.T) {
 	network, err := NewNetwork(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
 	require.NoError(err)
 	require.NoError(network.AddHandler(1, testHandler))
-	client := network.NewClient(1)
+	client := network.NewClient(ids.GenerateTestNodeID(), 1)
 
 	require.NoError(client.AppGossip(
 		ctx,
@@ -101,7 +101,7 @@ func TestClientPrefixesMessages(t *testing.T) {
 	network, err := NewNetwork(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
 	require.NoError(err)
 	require.NoError(network.Connected(ctx, ids.EmptyNodeID, nil))
-	client := network.NewClient(handlerID)
+	client := network.NewClient(ids.GenerateTestNodeID(), handlerID)
 
 	want := []byte("message")
 
@@ -156,7 +156,7 @@ func TestAppRequestResponse(t *testing.T) {
 	}
 	network, err := NewNetwork(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
 	require.NoError(err)
-	client := network.NewClient(handlerID)
+	client := network.NewClient(ids.GenerateTestNodeID(), handlerID)
 
 	wantResponse := []byte("response")
 	wantNodeID := ids.GenerateTestNodeID()
@@ -195,7 +195,7 @@ func TestAppRequestCancelledContext(t *testing.T) {
 	}
 	network, err := NewNetwork(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
 	require.NoError(err)
-	client := network.NewClient(handlerID)
+	client := network.NewClient(ids.GenerateTestNodeID(), handlerID)
 
 	wantResponse := []byte("response")
 	wantNodeID := ids.GenerateTestNodeID()
@@ -232,7 +232,7 @@ func TestAppRequestFailed(t *testing.T) {
 	}
 	network, err := NewNetwork(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
 	require.NoError(err)
-	client := network.NewClient(handlerID)
+	client := network.NewClient(ids.GenerateTestNodeID(), handlerID)
 
 	wantNodeID := ids.GenerateTestNodeID()
 	done := make(chan struct{})
@@ -262,7 +262,7 @@ func TestCrossChainAppRequestResponse(t *testing.T) {
 	}
 	network, err := NewNetwork(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
 	require.NoError(err)
-	client := network.NewClient(handlerID)
+	client := network.NewClient(ids.GenerateTestNodeID(), handlerID)
 
 	wantChainID := ids.GenerateTestID()
 	wantResponse := []byte("response")
@@ -297,7 +297,7 @@ func TestCrossChainAppRequestCancelledContext(t *testing.T) {
 	}
 	network, err := NewNetwork(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
 	require.NoError(err)
-	client := network.NewClient(handlerID)
+	client := network.NewClient(ids.GenerateTestNodeID(), handlerID)
 
 	cancelledCtx, cancel := context.WithCancel(ctx)
 	cancel()
@@ -331,7 +331,7 @@ func TestCrossChainAppRequestFailed(t *testing.T) {
 	}
 	network, err := NewNetwork(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
 	require.NoError(err)
-	client := network.NewClient(handlerID)
+	client := network.NewClient(ids.GenerateTestNodeID(), handlerID)
 
 	wantChainID := ids.GenerateTestID()
 	done := make(chan struct{})
@@ -466,7 +466,7 @@ func TestAppRequestDuplicateRequestIDs(t *testing.T) {
 
 	network, err := NewNetwork(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
 	require.NoError(err)
-	client := network.NewClient(0x1)
+	client := network.NewClient(ids.GenerateTestNodeID(), 0x1)
 
 	noOpCallback := func(context.Context, ids.NodeID, []byte, error) {}
 	// create a request that never gets a response
@@ -487,57 +487,75 @@ func TestPeersSample(t *testing.T) {
 	nodeID2 := ids.GenerateTestNodeID()
 	nodeID3 := ids.GenerateTestNodeID()
 
+	allowAll := set.Of(nodeID1, nodeID2, nodeID3)
+
 	tests := []struct {
 		name         string
 		connected    set.Set[ids.NodeID]
+		allowed      set.Set[ids.NodeID]
 		disconnected set.Set[ids.NodeID]
 		limit        int
 	}{
 		{
-			name:  "no peers",
-			limit: 1,
+			name:    "no peers",
+			allowed: allowAll,
+			limit:   1,
 		},
 		{
 			name:      "one peer connected",
 			connected: set.Of(nodeID1),
+			allowed:   allowAll,
 			limit:     1,
 		},
 		{
 			name:      "multiple peers connected",
 			connected: set.Of(nodeID1, nodeID2, nodeID3),
+			allowed:   allowAll,
 			limit:     1,
 		},
 		{
 			name:         "peer connects and disconnects - 1",
 			connected:    set.Of(nodeID1),
+			allowed:      allowAll,
 			disconnected: set.Of(nodeID1),
 			limit:        1,
 		},
 		{
 			name:         "peer connects and disconnects - 2",
 			connected:    set.Of(nodeID1, nodeID2),
+			allowed:      allowAll,
 			disconnected: set.Of(nodeID2),
 			limit:        1,
 		},
 		{
 			name:         "peer connects and disconnects - 2",
 			connected:    set.Of(nodeID1, nodeID2, nodeID3),
+			allowed:      allowAll,
 			disconnected: set.Of(nodeID1, nodeID2),
 			limit:        1,
 		},
 		{
 			name:      "less than limit peers",
 			connected: set.Of(nodeID1, nodeID2, nodeID3),
+			allowed:   allowAll,
 			limit:     4,
 		},
 		{
 			name:      "limit peers",
 			connected: set.Of(nodeID1, nodeID2, nodeID3),
+			allowed:   allowAll,
 			limit:     3,
 		},
 		{
 			name:      "more than limit peers",
 			connected: set.Of(nodeID1, nodeID2, nodeID3),
+			allowed:   allowAll,
+			limit:     2,
+		},
+		{
+			name:      "restrict peer",
+			connected: set.Of(nodeID1, nodeID2, nodeID3),
+			allowed:   set.Of(nodeID1),
 			limit:     2,
 		},
 	}
@@ -560,8 +578,13 @@ func TestPeersSample(t *testing.T) {
 			sampleable := set.Set[ids.NodeID]{}
 			sampleable.Union(tt.connected)
 			sampleable.Difference(tt.disconnected)
+			for nodeID := range sampleable {
+				if !tt.allowed.Contains(nodeID) {
+					sampleable.Remove(nodeID)
+				}
+			}
 
-			sampled := network.Peers.Sample(tt.limit)
+			sampled := network.Peers.Sample(context.Background(), tt.allowed.Contains, tt.limit)
 			require.Len(sampled, min(tt.limit, len(sampleable)))
 			require.Subset(sampleable, sampled)
 		})
@@ -569,18 +592,28 @@ func TestPeersSample(t *testing.T) {
 }
 
 func TestAppRequestAnyNodeSelection(t *testing.T) {
+	self := ids.GenerateTestNodeID()
+	peerID := ids.GenerateTestNodeID()
+
 	tests := []struct {
-		name     string
-		peers    []ids.NodeID
-		expected error
+		name          string
+		connected     []ids.NodeID
+		expectedPeers []ids.NodeID
+		expected      error
 	}{
 		{
 			name:     "no peers",
 			expected: ErrNoPeers,
 		},
 		{
-			name:  "has peers",
-			peers: []ids.NodeID{ids.GenerateTestNodeID()},
+			name:      "only connected to self",
+			connected: []ids.NodeID{self},
+			expected:  ErrNoPeers,
+		},
+		{
+			name:          "has peers",
+			connected:     []ids.NodeID{peerID},
+			expectedPeers: []ids.NodeID{peerID},
 		},
 	}
 
@@ -598,15 +631,15 @@ func TestAppRequestAnyNodeSelection(t *testing.T) {
 
 			n, err := NewNetwork(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
 			require.NoError(err)
-			for _, peer := range tt.peers {
+			for _, peer := range tt.connected {
 				require.NoError(n.Connected(context.Background(), peer, &version.Application{}))
 			}
 
-			client := n.NewClient(1)
+			client := n.NewClient(self, 1)
 
 			err = client.AppRequestAny(context.Background(), []byte("foobar"), nil)
 			require.ErrorIs(err, tt.expected)
-			require.Subset(tt.peers, sent.List())
+			require.Subset(tt.expectedPeers, sent.List())
 		})
 	}
 }
@@ -619,63 +652,69 @@ func TestNodeSamplerClientOption(t *testing.T) {
 	tests := []struct {
 		name        string
 		peers       []ids.NodeID
-		option      func(t *testing.T, n *Network) ClientOption
+		options     []ClientOption
 		expected    []ids.NodeID
 		expectedErr error
 	}{
 		{
-			name:  "default",
-			peers: []ids.NodeID{nodeID0, nodeID1, nodeID2},
-			option: func(*testing.T, *Network) ClientOption {
-				return clientOptionFunc(func(*clientOptions) {})
-			},
+			name:     "default",
+			peers:    []ids.NodeID{nodeID0, nodeID1, nodeID2},
+			options:  nil,
 			expected: []ids.NodeID{nodeID0, nodeID1, nodeID2},
 		},
 		{
 			name:  "validator connected",
 			peers: []ids.NodeID{nodeID0, nodeID1},
-			option: func(_ *testing.T, n *Network) ClientOption {
-				state := &validators.TestState{
-					GetCurrentHeightF: func(context.Context) (uint64, error) {
-						return 0, nil
-					},
-					GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
-						return map[ids.NodeID]*validators.GetValidatorOutput{
-							nodeID1: {
-								NodeID: nodeID1,
-								Weight: 1,
+			options: []ClientOption{
+				WithCustomSampler(
+					NewValidators(
+						logging.NoLog{},
+						ids.Empty,
+						&validators.TestState{
+							GetCurrentHeightF: func(context.Context) (uint64, error) {
+								return 0, nil
 							},
-						}, nil
-					},
-				}
-
-				validators := NewValidators(n.Peers, n.log, ids.Empty, state, 0)
-				return WithValidatorSampling(validators)
+							GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+								return map[ids.NodeID]*validators.GetValidatorOutput{
+									nodeID1: {
+										NodeID: nodeID1,
+										Weight: 1,
+									},
+								}, nil
+							},
+						},
+						0,
+					),
+				),
 			},
 			expected: []ids.NodeID{nodeID1},
 		},
 		{
 			name:  "validator disconnected",
 			peers: []ids.NodeID{nodeID0},
-			option: func(_ *testing.T, n *Network) ClientOption {
-				state := &validators.TestState{
-					GetCurrentHeightF: func(context.Context) (uint64, error) {
-						return 0, nil
-					},
-					GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
-						return map[ids.NodeID]*validators.GetValidatorOutput{
-							nodeID1: {
-								NodeID: nodeID1,
-								Weight: 1,
+			options: []ClientOption{
+				WithCustomSampler(
+					NewValidators(
+						logging.NoLog{},
+						ids.Empty,
+						&validators.TestState{
+							GetCurrentHeightF: func(context.Context) (uint64, error) {
+								return 0, nil
 							},
-						}, nil
-					},
-				}
-
-				validators := NewValidators(n.Peers, n.log, ids.Empty, state, 0)
-				return WithValidatorSampling(validators)
+							GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+								return map[ids.NodeID]*validators.GetValidatorOutput{
+									nodeID1: {
+										NodeID: nodeID1,
+										Weight: 1,
+									},
+								}, nil
+							},
+						},
+						0,
+					),
+				),
 			},
-			expectedErr: ErrNoPeers,
+			expected: []ids.NodeID{nodeID1},
 		},
 	}
 
@@ -698,7 +737,7 @@ func TestNodeSamplerClientOption(t *testing.T) {
 				require.NoError(network.Connected(ctx, peer, nil))
 			}
 
-			client := network.NewClient(0, tt.option(t, network))
+			client := network.NewClient(ids.GenerateTestNodeID(), 0, tt.options...)
 
 			if err = client.AppRequestAny(ctx, []byte("request"), nil); err != nil {
 				close(done)
@@ -716,6 +755,6 @@ func TestMultipleClients(t *testing.T) {
 
 	n, err := NewNetwork(logging.NoLog{}, &common.SenderTest{}, prometheus.NewRegistry(), "")
 	require.NoError(err)
-	_ = n.NewClient(0)
-	_ = n.NewClient(0)
+	_ = n.NewClient(ids.GenerateTestNodeID(), 0)
+	_ = n.NewClient(ids.GenerateTestNodeID(), 0)
 }
