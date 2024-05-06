@@ -138,11 +138,7 @@ func (m *Manager) UpdateFeeRates(
 	return nil
 }
 
-func updateFactor(
-	coeff,
-	parentBlkComplexity,
-	targetBlkComplexity uint64,
-) (uint64, uint64) {
+func updateFactor(k, b, t uint64) (uint64, uint64) {
 	// We use the following piece-wise approximation for the exponential function:
 	//
 	//	if B > T --> exp{k * (B-T)/T} ≈≈    Approx(k,B,T)
@@ -152,7 +148,7 @@ func updateFactor(
 	// We express the result with the pair (numerator, denominator)
 	// to increase precision with small deltas
 
-	if parentBlkComplexity == targetBlkComplexity {
+	if b == t {
 		return 1, 1 // complexity matches target, nothing to update
 	}
 
@@ -161,25 +157,25 @@ func updateFactor(
 		delta       uint64
 	)
 
-	if targetBlkComplexity < parentBlkComplexity {
+	if t < b {
 		increaseFee = true
-		delta = parentBlkComplexity - targetBlkComplexity
+		delta = b - t
 	} else {
 		increaseFee = false
-		delta = targetBlkComplexity - parentBlkComplexity
+		delta = t - b
 	}
 
 	var n, d uint64
-	a, over := safemath.Mul64(coeff, delta)
+	x, over := safemath.Mul64(k, delta)
 	if over != nil {
-		a = math.MaxUint64
+		x = math.MaxUint64
 	}
-	b, over := safemath.Mul64(CoeffDenom, targetBlkComplexity)
+	y, over := safemath.Mul64(CoeffDenom, t)
 	if over != nil {
-		b = math.MaxUint64
+		y = math.MaxUint64
 	}
 
-	n, d = ExpPiecewiseApproximation(a, b)
+	n, d = ExpPiecewiseApproximation(x, y)
 	// n, d = expTaylorApproximation(a, b)
 
 	if increaseFee {
@@ -189,21 +185,35 @@ func updateFactor(
 }
 
 // piecewise approximation data. exp(x) ≈≈ m_i * x ± q_i in [i,i+1]
-var (
-	ms     = [...]uint64{2, 5, 13, 35, 94, 256, 694, 1885, 5123, 13924}
-	qs     = [...]uint64{1, 2, 18, 84, 321, 1131, 3760, 12098, 38003, 117212}
-	qSigns = [...]bool{true, false, false, false, false, false, false, false, false, false}
-)
 
 func ExpPiecewiseApproximation(a, b uint64) (uint64, uint64) { // exported to appease linter.
-	idx := int(a / b)
-	if idx >= len(ms) {
-		idx = len(ms) - 1
-	}
+	var (
+		m, q uint64
+		sign bool
+	)
 
-	m := ms[idx]
-	q := qs[idx]
-	sign := qSigns[idx]
+	switch v := a / b; {
+	case v < 1:
+		m, q, sign = 2, 1, true
+	case v < 2:
+		m, q, sign = 5, 2, false
+	case v < 3:
+		m, q, sign = 13, 18, false
+	case v < 4:
+		m, q, sign = 35, 84, false
+	case v < 5:
+		m, q, sign = 94, 321, false
+	case v < 6:
+		m, q, sign = 256, 1131, false
+	case v < 7:
+		m, q, sign = 694, 3760, false
+	case v < 8:
+		m, q, sign = 1885, 12098, false
+	case v < 9:
+		m, q, sign = 5123, 38003, false
+	default:
+		m, q, sign = 13924, 117212, false
+	}
 
 	// m(A/B) - q == (m*A-q*B)/B
 	n1, over := safemath.Mul64(m, a)
