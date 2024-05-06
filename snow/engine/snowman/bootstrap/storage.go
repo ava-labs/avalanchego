@@ -25,6 +25,7 @@ const (
 	batchWritePeriod      = 64
 	iteratorReleasePeriod = 1024
 	logPeriod             = 5 * time.Second
+	minBlocksToCompact    = 5000
 )
 
 // getMissingBlockIDs returns the ID of the blocks that should be fetched to
@@ -133,6 +134,12 @@ func execute(
 	tree *interval.Tree,
 	lastAcceptedHeight uint64,
 ) error {
+
+	if tree.Len() > minBlocksToCompact {
+		log("compacting before iteration...")
+		db.Compact(nil, nil)
+	}
+
 	var (
 		batch                    = db.NewBatch()
 		processedSinceBatchWrite uint
