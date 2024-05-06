@@ -324,6 +324,7 @@ func (vm *VM) SetPreference(ctx context.Context, preferred ids.ID) error {
 		return vm.db.Commit()
 	}
 
+	// Persist consensus preferences if the ProposerVM fork is activated.
 	if err := vm.State.SetPreference(preferred); err != nil {
 		return err
 	}
