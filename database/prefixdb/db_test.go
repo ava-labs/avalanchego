@@ -4,12 +4,12 @@
 package prefixdb
 
 import (
-	"bytes"
 	"fmt"
 	"testing"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/stretchr/testify/require"
 )
 
 func TestInterface(t *testing.T) {
@@ -31,11 +31,7 @@ func TestSuffix(t *testing.T) {
 	expected := []string{"hellp", "worle", "b\x00", "\x02\x00\x00\x00\x00"}
 	for i, str := range testString {
 		db := newDB([]byte(str), nil)
-		suf := db.suffix()
-		if !bytes.Equal(*suf, []byte(expected[i])) {
-			t.Fatalf("Expected %s but got %s", expected[i], string(*suf))
-		}
-		db.bufferPool.Put(suf)
+		require.Equal(t, db.dbSuffix, []byte(expected[i]))
 	}
 }
 

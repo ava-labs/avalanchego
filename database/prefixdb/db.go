@@ -23,7 +23,9 @@ var (
 // a unique value.
 type Database struct {
 	// All keys in this db begin with this byte slice
-	dbPrefix   []byte
+	dbPrefix []byte
+	// Lexically one greater than dbPrefix, defining the end of this db's key range
+	dbSuffix   []byte
 	bufferPool *utils.BytesPool
 
 	// lock needs to be held during Close to guarantee db will not be set to nil
@@ -37,9 +39,23 @@ type Database struct {
 func newDB(prefix []byte, db database.Database) *Database {
 	return &Database{
 		dbPrefix:   prefix,
+		dbSuffix:   incrementByteSlice(prefix),
 		db:         db,
 		bufferPool: utils.NewBytesPool(),
 	}
+}
+
+func incrementByteSlice(orig []byte) []byte {
+	n := len(orig)
+	buf := make([]byte, n)
+	copy(buf, orig)
+	for i := n - 1; i >= 0; i-- {
+		buf[i]++
+		if buf[i] != 0 {
+			break
+		}
+	}
+	return buf
 }
 
 // New returns a new prefixed database
@@ -189,12 +205,10 @@ func (db *Database) Compact(start, limit []byte) error {
 	prefixedStart := db.prefix(start)
 	defer db.bufferPool.Put(prefixedStart)
 
-	var prefixedLimit *[]byte
 	if limit == nil {
-		prefixedLimit = db.suffix()
-	} else {
-		prefixedLimit = db.prefix(limit)
+		return db.db.Compact(*prefixedStart, db.dbSuffix)
 	}
+	prefixedLimit := db.prefix(limit)
 	defer db.bufferPool.Put(prefixedLimit)
 
 	return db.db.Compact(*prefixedStart, *prefixedLimit)
@@ -235,21 +249,6 @@ func (db *Database) prefix(key []byte) *[]byte {
 	prefixedKey := db.bufferPool.Get(keyLen)
 	copy(*prefixedKey, db.dbPrefix)
 	copy((*prefixedKey)[len(db.dbPrefix):], key)
-	return prefixedKey
-}
-
-func (db *Database) suffix() *[]byte {
-	keyLen := len(db.dbPrefix)
-	prefixedKey := db.bufferPool.Get(keyLen)
-	copy(*prefixedKey, db.dbPrefix)
-	n := len(db.dbPrefix)
-	// lexically increment prefix to find the suffix of this db range
-	for i := n - 1; i >= 0; i-- {
-		(*prefixedKey)[i]++
-		if (*prefixedKey)[i] != 0 {
-			break
-		}
-	}
 	return prefixedKey
 }
 
