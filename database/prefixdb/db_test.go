@@ -4,6 +4,7 @@
 package prefixdb
 
 import (
+	"bytes"
 	"fmt"
 	"testing"
 
@@ -22,6 +23,19 @@ func TestInterface(t *testing.T) {
 			test(t, NewNested([]byte("wor"), New([]byte("ld"), db)))
 			test(t, NewNested([]byte("ld"), New([]byte("wor"), db)))
 		})
+	}
+}
+
+func TestSuffix(t *testing.T) {
+	testString := []string{"hello", "world", "a\xff", "\x01\xff\xff\xff\xff"}
+	expected := []string{"hellp", "worle", "b\x00", "\x02\x00\x00\x00\x00"}
+	for i, str := range testString {
+		db := newDB([]byte(str), nil)
+		suf := db.suffix()
+		if !bytes.Equal(*suf, []byte(expected[i])) {
+			t.Fatalf("Expected %s but got %s", expected[i], string(*suf))
+		}
+		db.bufferPool.Put(suf)
 	}
 }
 
