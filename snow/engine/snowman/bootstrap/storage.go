@@ -135,8 +135,9 @@ func execute(
 	lastAcceptedHeight uint64,
 ) error {
 
-	if tree.Len() > minBlocksToCompact {
-		log("compacting before iteration...")
+	totalNumberToProcess := tree.Len()
+	if totalNumberToProcess > minBlocksToCompact {
+		log("compacting database before executing blocks...")
 		db.Compact(nil, nil)
 	}
 
@@ -159,9 +160,8 @@ func execute(
 		iterator                      = interval.GetBlockIterator(db)
 		processedSinceIteratorRelease uint
 
-		startTime            = time.Now()
-		timeOfNextLog        = startTime.Add(logPeriod)
-		totalNumberToProcess = tree.Len()
+		startTime     = time.Now()
+		timeOfNextLog = startTime.Add(logPeriod)
 	)
 	defer func() {
 		iterator.Release()
