@@ -189,7 +189,12 @@ func (db *Database) Compact(start, limit []byte) error {
 	prefixedStart := db.prefix(start)
 	defer db.bufferPool.Put(prefixedStart)
 
-	prefixedLimit := db.prefix(limit)
+	var prefixedLimit *[]byte
+	if limit == nil {
+		prefixedLimit = db.suffix()
+	} else {
+		prefixedLimit = db.prefix(limit)
+	}
 	defer db.bufferPool.Put(prefixedLimit)
 
 	return db.db.Compact(*prefixedStart, *prefixedLimit)
@@ -230,6 +235,21 @@ func (db *Database) prefix(key []byte) *[]byte {
 	prefixedKey := db.bufferPool.Get(keyLen)
 	copy(*prefixedKey, db.dbPrefix)
 	copy((*prefixedKey)[len(db.dbPrefix):], key)
+	return prefixedKey
+}
+
+func (db *Database) suffix() *[]byte {
+	keyLen := len(db.dbPrefix)
+	prefixedKey := db.bufferPool.Get(keyLen)
+	copy(*prefixedKey, db.dbPrefix)
+	n := len(db.dbPrefix)
+	// lexically increment prefix to find the suffix of this db range
+	for i := n - 1; i >= 0; i-- {
+		(*prefixedKey)[i]++
+		if (*prefixedKey)[i] != 0 {
+			break
+		}
+	}
 	return prefixedKey
 }
 
