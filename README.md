@@ -185,13 +185,6 @@ scripts/protobuf_codegen.sh
 
 For more information, refer to the [GRPC Golang Quick Start Guide](https://grpc.io/docs/languages/go/quickstart/).
 
-### Running protobuf codegen from docker
-
-```sh
-docker build -t avalanche:protobuf_codegen -f api/Dockerfile.buf .
-docker run -t -i -v $(pwd):/opt/avalanche -w/opt/avalanche avalanche:protobuf_codegen bash -c "scripts/protobuf_codegen.sh"
-```
-
 ### Running mock codegen
 
 To regenerate the [gomock](https://github.com/uber-go/mock) code, run `scripts/mock.gen.sh` from the root of the repo.
