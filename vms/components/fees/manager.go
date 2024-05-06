@@ -143,10 +143,10 @@ func updateFactor(
 	parentBlkComplexity,
 	targetBlkComplexity uint64,
 ) (uint64, uint64) {
-	// We use the following piece-wise Taylor approximation for the exponential function:
+	// We use the following piece-wise approximation for the exponential function:
 	//
-	//	if B > T --> exp{k * (B-T)/T} ≈≈      1 + k * abs(B-T)/T + 1/2 *  (abs(B-T)/T)^2
-	//  if B < T --> exp{k * (B-T)/T} ≈≈ 1/ ( 1 + k * abs(B-T)/T + 1/2 *  (abs(B-T)/T)^2 )
+	//	if B > T --> exp{k * (B-T)/T} ≈≈    Approx(k,B,T)
+	//  if B < T --> exp{k * (B-T)/T} ≈≈ 1/ Approx(k,B,T)
 	//
 	// Note that the approximation guarantees that factor(delta)*factor(-delta) == 1
 	// We express the result with the pair (numerator, denominator)
@@ -169,21 +169,72 @@ func updateFactor(
 		delta = targetBlkComplexity - parentBlkComplexity
 	}
 
-	// exp{A/B} ≈≈ 1 + A/B + 1/2 * A^2/B^2 == (B^2 + (A+B)^2) / (2*B^2)
-	var (
-		a, b, b2 uint64
-		n, d     uint64
-		over     error
-	)
-
-	a, over = safemath.Mul64(coeff, delta)
+	var n, d uint64
+	a, over := safemath.Mul64(coeff, delta)
 	if over != nil {
 		a = math.MaxUint64
 	}
-	b, over = safemath.Mul64(CoeffDenom, targetBlkComplexity)
+	b, over := safemath.Mul64(CoeffDenom, targetBlkComplexity)
 	if over != nil {
 		b = math.MaxUint64
 	}
+
+	n, d = ExpPiecewiseApproximation(a, b)
+	// n, d = expTaylorApproximation(a, b)
+
+	if increaseFee {
+		return n, d
+	}
+	return d, n
+}
+
+// piecewise approximation data. exp(x) ≈≈ m_i * x ± q_i in [i,i+1]
+var (
+	ms     = [...]uint64{2, 5, 13, 35, 94, 256, 694, 1885, 5123, 13924}
+	qs     = [...]uint64{1, 2, 18, 84, 321, 1131, 3760, 12098, 38003, 117212}
+	qSigns = [...]bool{true, false, false, false, false, false, false, false, false, false}
+)
+
+func ExpPiecewiseApproximation(a, b uint64) (uint64, uint64) { // exported to appease linter.
+	idx := int(a / b)
+	if idx >= len(ms) {
+		idx = len(ms) - 1
+	}
+
+	m := ms[idx]
+	q := qs[idx]
+	sign := qSigns[idx]
+
+	// m(A/B) - q == (m*A-q*B)/B
+	n1, over := safemath.Mul64(m, a)
+	if over != nil {
+		return math.MaxUint64, b
+	}
+	n2, over := safemath.Mul64(q, b)
+	if over != nil {
+		return math.MaxUint64, b
+	}
+
+	var n uint64
+	if !sign {
+		n = n1 - n2
+	} else {
+		n, over = safemath.Add64(n1, n2)
+		if over != nil {
+			return math.MaxUint64, b
+		}
+	}
+	return n, b
+}
+
+func ExpTaylorApproximation(a, b uint64) (uint64, uint64) { // exported to appease linter.
+	//	TAYLOR APPROXIMATION
+	// exp{A/B} ≈≈ 1 + A/B + 1/2 * A^2/B^2 == (B^2 + (A+B)^2) / (2*B^2)
+	var (
+		n, d, b2 uint64
+		over     error
+	)
+
 	b2, over = safemath.Mul64(b, b)
 	if over != nil {
 		b2 = math.MaxUint64
@@ -201,16 +252,11 @@ func updateFactor(
 	if over != nil {
 		n = math.MaxUint64
 	}
-
 	d, over = safemath.Mul64(2, b2)
 	if over != nil {
 		n = math.MaxUint64
 	}
-
-	if increaseFee {
-		return n, d
-	}
-	return d, n
+	return n, d
 }
 
 func targetComplexity(
