@@ -44,6 +44,12 @@ DOCKER_IMAGE=${DOCKER_IMAGE:-"avalanchego"}
 # Reference: https://docs.docker.com/build/buildkit/
 DOCKER_CMD="docker buildx build"
 
+# The dockerfile doesn't specify the golang version to minimize the
+# changes required to bump the version. Instead, the golang version is
+# provided as an argument.
+GO_VERSION="$(go list -m -f '{{.GoVersion}}')"
+DOCKER_CMD="${DOCKER_CMD} --build-arg GO_VERSION=${GO_VERSION}"
+
 if [[ "${DOCKER_IMAGE}" == *"/"* ]]; then
   # Build a multi-arch image since the image name includes a slash which indicates
   # the use of a registry e.g.
