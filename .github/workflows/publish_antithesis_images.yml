@@ -30,7 +30,9 @@ jobs:
         password: ${{ secrets.ANTITHESIS_GAR_JSON_KEY }}
 
     - name: Set the Go version in the environment
-      uses: ./.github/actions/set-go-version-in-env
+      # Need an exact version vs the range (~x.x.x) provided by set-go-version-in-env action
+      run: echo GO_VERSION="$(go list -m -f '{{.GoVersion}}')" >> $GITHUB_ENV
+      shell: bash
 
     - name: Build node
       id: build-node-image
