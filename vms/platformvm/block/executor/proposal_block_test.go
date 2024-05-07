@@ -29,6 +29,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 	walletcommon "github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
 
@@ -159,6 +160,7 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 
 	onParentAccept := state.NewMockDiff(ctrl)
 	onParentAccept.EXPECT().GetTimestamp().Return(parentTime).AnyTimes()
+	onParentAccept.EXPECT().GetFeeRates().Return(commonfees.Empty, nil).Times(2)
 	onParentAccept.EXPECT().GetCurrentSupply(constants.PrimaryNetworkID).Return(uint64(1000), nil).AnyTimes()
 
 	env.blkManager.(*manager).blkIDToState[parentID] = &blockState{
@@ -550,6 +552,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 					},
 					reward.PercentDenominator,
 					[]*secp256k1.PrivateKey{preFundedKeys[0]},
+					commonfees.NoTip,
 					walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 						Threshold: 1,
 						Addrs:     []ids.ShortID{ids.ShortEmpty},
@@ -580,6 +583,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 						Subnet: subnetID,
 					},
 					[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
+					commonfees.NoTip,
 					walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 						Threshold: 1,
 						Addrs:     []ids.ShortID{ids.ShortEmpty},
@@ -617,6 +621,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 					},
 					reward.PercentDenominator,
 					[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
+					commonfees.NoTip,
 					walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 						Threshold: 1,
 						Addrs:     []ids.ShortID{ids.ShortEmpty},
@@ -723,6 +728,7 @@ func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 			Subnet: subnetID,
 		},
 		[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
+		commonfees.NoTip,
 	)
 	require.NoError(err)
 
@@ -754,6 +760,7 @@ func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 			Subnet: subnetID,
 		},
 		[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
+		commonfees.NoTip,
 	)
 	require.NoError(err)
 
@@ -789,6 +796,7 @@ func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 		},
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
+		commonfees.NoTip,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{ids.ShortEmpty},
@@ -878,6 +886,7 @@ func TestBanffProposalBlockTrackedSubnet(t *testing.T) {
 					Subnet: subnetID,
 				},
 				[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
+				commonfees.NoTip,
 			)
 			require.NoError(err)
 
@@ -911,6 +920,7 @@ func TestBanffProposalBlockTrackedSubnet(t *testing.T) {
 				},
 				reward.PercentDenominator,
 				[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
+				commonfees.NoTip,
 			)
 			require.NoError(err)
 
@@ -1000,6 +1010,7 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 		},
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
+		commonfees.NoTip,
 	)
 	require.NoError(err)
 
@@ -1072,6 +1083,7 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 			preFundedKeys[1],
 			preFundedKeys[4],
 		},
+		commonfees.NoTip,
 	)
 	require.NoError(err)
 
@@ -1102,6 +1114,7 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 		},
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
+		commonfees.NoTip,
 	)
 	require.NoError(err)
 
@@ -1195,6 +1208,7 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 		},
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
+		commonfees.NoTip,
 	)
 	require.NoError(err)
 
@@ -1266,6 +1280,7 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 			preFundedKeys[1],
 			preFundedKeys[4],
 		},
+		commonfees.NoTip,
 	)
 	require.NoError(err)
 
@@ -1296,6 +1311,7 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 		},
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
+		commonfees.NoTip,
 	)
 	require.NoError(err)
 
@@ -1391,6 +1407,7 @@ func TestAddValidatorProposalBlock(t *testing.T) {
 			preFundedKeys[1],
 			preFundedKeys[4],
 		},
+		commonfees.NoTip,
 	)
 	require.NoError(err)
 
@@ -1418,7 +1435,7 @@ func TestAddValidatorProposalBlock(t *testing.T) {
 
 	// Advance time until next staker change time is [validatorEndTime]
 	for {
-		nextStakerChangeTime, err := executor.GetNextStakerChangeTime(env.state)
+		nextStakerChangeTime, err := state.GetNextStakerChangeTime(env.state)
 		require.NoError(err)
 		if nextStakerChangeTime.Equal(validatorEndTime) {
 			break
@@ -1478,6 +1495,7 @@ func TestAddValidatorProposalBlock(t *testing.T) {
 			preFundedKeys[1],
 			preFundedKeys[4],
 		},
+		commonfees.NoTip,
 	)
 	require.NoError(err)
 

@@ -15,13 +15,21 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/vms/avm"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
-	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
+	xconfig "github.com/ava-labs/avalanchego/vms/avm/config"
+	xfees "github.com/ava-labs/avalanchego/vms/avm/txs/fees"
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
+	pconfig "github.com/ava-labs/avalanchego/vms/platformvm/config"
+	psigner "github.com/ava-labs/avalanchego/vms/platformvm/signer"
+	ptxs "github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	pfees "github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
+	xbuilder "github.com/ava-labs/avalanchego/wallet/chain/x/builder"
 	ginkgo "github.com/onsi/ginkgo/v2"
 )
 
@@ -48,6 +56,7 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 			xBuilder := xWallet.Builder()
 			xContext := xBuilder.Context()
 			pChainClient := platformvm.NewClient(nodeURI.URI)
+			xChainClient := avm.NewClient(nodeURI.URI, "X")
 
 			tests.Outf("{{blue}} fetching minimal stake amounts {{/}}\n")
 			minValStake, minDelStake, err := pChainClient.GetMinStake(e2e.DefaultContext(), constants.PlatformChainID)
@@ -55,33 +64,34 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 			tests.Outf("{{green}} minimal validator stake: %d {{/}}\n", minValStake)
 			tests.Outf("{{green}} minimal delegator stake: %d {{/}}\n", minDelStake)
 
-			tests.Outf("{{blue}} fetching tx fee {{/}}\n")
+			tests.Outf("{{blue}} fetching X-chain tx fee {{/}}\n")
 			infoClient := info.NewClient(nodeURI.URI)
-			fees, err := infoClient.GetTxFee(e2e.DefaultContext())
+			staticFees, err := infoClient.GetTxFee(e2e.DefaultContext())
 			require.NoError(err)
-			txFees := uint64(fees.TxFee)
-			tests.Outf("{{green}} txFee: %d {{/}}\n", txFees)
+			pChainStaticFees := &pconfig.Config{
+				TxFee:                         uint64(staticFees.TxFee),
+				CreateSubnetTxFee:             uint64(staticFees.CreateSubnetTxFee),
+				TransformSubnetTxFee:          uint64(staticFees.TransformSubnetTxFee),
+				CreateBlockchainTxFee:         uint64(staticFees.CreateBlockchainTxFee),
+				AddPrimaryNetworkValidatorFee: uint64(staticFees.AddPrimaryNetworkValidatorFee),
+				AddPrimaryNetworkDelegatorFee: uint64(staticFees.AddPrimaryNetworkDelegatorFee),
+				AddSubnetValidatorFee:         uint64(staticFees.AddSubnetValidatorFee),
+				AddSubnetDelegatorFee:         uint64(staticFees.AddSubnetDelegatorFee),
+			}
 
 			// amount to transfer from P to X chain
 			toTransfer := 1 * units.Avax
 
 			pShortAddr := keychain.Keys[0].Address()
 			xTargetAddr := keychain.Keys[1].Address()
-			ginkgo.By("check selected keys have sufficient funds", func() {
-				pBalances, err := pWallet.Builder().GetBalance()
-				pBalance := pBalances[avaxAssetID]
-				minBalance := minValStake + txFees + minDelStake + txFees + toTransfer + txFees
-				require.NoError(err)
-				require.GreaterOrEqual(pBalance, minBalance)
-			})
 
 			// Use a random node ID to ensure that repeated test runs
 			// will succeed against a network that persists across runs.
 			validatorID, err := ids.ToNodeID(utils.RandomBytes(ids.NodeIDLen))
 			require.NoError(err)
 
-			vdr := &txs.SubnetValidator{
-				Validator: txs.Validator{
+			vdr := &ptxs.SubnetValidator{
+				Validator: ptxs.Validator{
 					NodeID: validatorID,
 					End:    uint64(time.Now().Add(72 * time.Hour).Unix()),
 					Wght:   minValStake,
@@ -96,7 +106,7 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 
 			sk, err := bls.NewSecretKey()
 			require.NoError(err)
-			pop := signer.NewProofOfPossession(sk)
+			pop := psigner.NewProofOfPossession(sk)
 
 			ginkgo.By("issue add validator tx", func() {
 				_, err := pWallet.IssueAddPermissionlessValidatorTx(
@@ -143,8 +153,12 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 				OutputOwners: outputOwner,
 			}
 
+			pChainExportFee := uint64(0)
 			ginkgo.By("export avax from P to X chain", func() {
-				_, err := pWallet.IssueExportTx(
+				_, nextFeeRates, err := pChainClient.GetFeeRates(e2e.DefaultContext())
+				require.NoError(err)
+
+				tx, err := pWallet.IssueExportTx(
 					xContext.BlockchainID,
 					[]*avax.TransferableOutput{
 						{
@@ -157,6 +171,12 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 					e2e.WithDefaultContext(),
 				)
 				require.NoError(err)
+
+				// retrieve fees paid for the tx
+				feeCfg := pconfig.GetDynamicFeesConfig(true /*isEActive*/)
+				feeCalc := pfees.NewDynamicCalculator(pChainStaticFees, logging.NoLog{}, time.Time{}, commonfees.NewManager(nextFeeRates), feeCfg.BlockMaxComplexity, tx.Creds)
+				require.NoError(tx.Unsigned.Visit(feeCalc))
+				pChainExportFee = feeCalc.Fee
 			})
 
 			// check balances post export
@@ -171,15 +191,31 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 			tests.Outf("{{blue}} X-chain balance after P->X export: %d {{/}}\n", xPreImportBalance)
 
 			require.Equal(xPreImportBalance, xStartBalance) // import not performed yet
-			require.Equal(pPreImportBalance, pStartBalance-toTransfer-txFees)
+			require.Equal(pPreImportBalance, pStartBalance-toTransfer-pChainExportFee)
 
+			xChainExportFee := uint64(0)
 			ginkgo.By("import avax from P into X chain", func() {
-				_, err := xWallet.IssueImportTx(
+				tx, err := xWallet.IssueImportTx(
 					constants.PlatformChainID,
 					&outputOwner,
 					e2e.WithDefaultContext(),
 				)
 				require.NoError(err)
+
+				// retrieve fees paid for the tx
+				feeCfg := xconfig.GetDynamicFeesConfig(true /*isEActive*/)
+				feeRates, _, err := xChainClient.GetFeeRates(e2e.DefaultContext())
+				require.NoError(err)
+
+				feeCalc := xfees.NewDynamicCalculator(
+					logging.NoLog{},
+					xbuilder.Parser.Codec(),
+					commonfees.NewManager(feeRates),
+					feeCfg.BlockMaxComplexity,
+					tx.Creds,
+				)
+				require.NoError(tx.Unsigned.Visit(feeCalc))
+				xChainExportFee = feeCalc.Fee
 			})
 
 			// check balances post import
@@ -193,7 +229,7 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 			xFinalBalance := xBalances[avaxAssetID]
 			tests.Outf("{{blue}} X-chain balance after P->X import: %d {{/}}\n", xFinalBalance)
 
-			require.Equal(xFinalBalance, xPreImportBalance+toTransfer-txFees) // import not performed yet
+			require.Equal(xFinalBalance, xPreImportBalance+toTransfer-xChainExportFee) // import not performed yet
 			require.Equal(pFinalBalance, pPreImportBalance)
 		})
 })

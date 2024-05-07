@@ -23,6 +23,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 func TestApricotStandardBlockTimeVerification(t *testing.T) {
@@ -55,6 +57,8 @@ func TestApricotStandardBlockTimeVerification(t *testing.T) {
 	env.mockedState.EXPECT().GetLastAccepted().Return(parentID).AnyTimes()
 	env.mockedState.EXPECT().GetTimestamp().Return(chainTime).AnyTimes()
 	onParentAccept.EXPECT().GetTimestamp().Return(chainTime).AnyTimes()
+	onParentAccept.EXPECT().GetFeeRates().Return(commonfees.Empty, nil).AnyTimes()
+	onParentAccept.EXPECT().GetLastBlockComplexity().Return(commonfees.Empty, nil).AnyTimes()
 
 	// wrong height
 	apricotChildBlk, err := block.NewApricotStandardBlock(
@@ -148,6 +152,8 @@ func TestBanffStandardBlockTimeVerification(t *testing.T) {
 	}
 	utxoID := utxo.InputID()
 	onParentAccept.EXPECT().GetUTXO(utxoID).Return(utxo, nil).AnyTimes()
+	onParentAccept.EXPECT().GetFeeRates().Return(commonfees.Empty, nil).AnyTimes()
+	onParentAccept.EXPECT().GetLastBlockComplexity().Return(commonfees.Empty, nil).AnyTimes()
 
 	// Create the tx
 	utx := &txs.CreateSubnetTx{
@@ -519,6 +525,7 @@ func TestBanffStandardBlockUpdateStakers(t *testing.T) {
 						Subnet: subnetID,
 					},
 					[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
+					commonfees.NoTip,
 				)
 				require.NoError(err)
 
@@ -611,6 +618,7 @@ func TestBanffStandardBlockRemoveSubnetValidator(t *testing.T) {
 			Subnet: subnetID,
 		},
 		[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
+		commonfees.NoTip,
 	)
 	require.NoError(err)
 
@@ -642,6 +650,7 @@ func TestBanffStandardBlockRemoveSubnetValidator(t *testing.T) {
 			Subnet: subnetID,
 		},
 		[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
+		commonfees.NoTip,
 	)
 	require.NoError(err)
 
@@ -714,6 +723,7 @@ func TestBanffStandardBlockTrackedSubnet(t *testing.T) {
 					Subnet: subnetID,
 				},
 				[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
+				commonfees.NoTip,
 			)
 			require.NoError(err)
 
@@ -812,6 +822,7 @@ func TestBanffStandardBlockDelegatorStakerWeight(t *testing.T) {
 			preFundedKeys[1],
 			preFundedKeys[4],
 		},
+		commonfees.NoTip,
 	)
 	require.NoError(err)
 

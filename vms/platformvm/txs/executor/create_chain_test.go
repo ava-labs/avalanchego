@@ -16,17 +16,21 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 // Ensure Execute fails when there are not enough control sigs
 func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, banff)
+	env := newEnvironment(t, eUpgrade)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
@@ -37,19 +41,31 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 		nil,
 		"chain name",
 		[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
+		commonfees.NoTip,
 	)
 	require.NoError(err)
 
 	// Remove a signature
-	tx.Creds[0].(*secp256k1fx.Credential).Sigs = tx.Creds[0].(*secp256k1fx.Credential).Sigs[1:]
+	tx.Creds[1].(*secp256k1fx.Credential).Sigs = tx.Creds[1].(*secp256k1fx.Credential).Sigs[1:]
 
 	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
+	currentTime := stateDiff.GetTimestamp()
+	nextBlkTime, _, err := state.NextBlockTime(stateDiff, env.clk)
+	require.NoError(err)
+
+	feeCfg := config.GetDynamicFeesConfig(env.config.IsEActivated(currentTime))
+
+	feeMan, err := fee.UpdatedFeeManager(stateDiff, env.config, currentTime, nextBlkTime)
+	require.NoError(err)
+
 	executor := StandardTxExecutor{
-		Backend: &env.backend,
-		State:   stateDiff,
-		Tx:      tx,
+		Backend:            &env.backend,
+		BlkFeeManager:      feeMan,
+		BlockMaxComplexity: feeCfg.BlockMaxComplexity,
+		State:              stateDiff,
+		Tx:                 tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
 	require.ErrorIs(err, errUnauthorizedSubnetModification)
@@ -58,7 +74,7 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 // Ensure Execute fails when an incorrect control signature is given
 func TestCreateChainTxWrongControlSig(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, banff)
+	env := newEnvironment(t, eUpgrade)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
@@ -69,6 +85,7 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 		nil,
 		"chain name",
 		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+		commonfees.NoTip,
 	)
 	require.NoError(err)
 
@@ -79,15 +96,26 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 	// Replace a valid signature with one from another key
 	sig, err := key.SignHash(hashing.ComputeHash256(tx.Unsigned.Bytes()))
 	require.NoError(err)
-	copy(tx.Creds[0].(*secp256k1fx.Credential).Sigs[0][:], sig)
+	copy(tx.Creds[1].(*secp256k1fx.Credential).Sigs[0][:], sig)
 
 	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
+	currentTime := stateDiff.GetTimestamp()
+	nextBlkTime, _, err := state.NextBlockTime(stateDiff, env.clk)
+	require.NoError(err)
+
+	feeCfg := config.GetDynamicFeesConfig(env.config.IsEActivated(currentTime))
+
+	feeMan, err := fee.UpdatedFeeManager(stateDiff, env.config, currentTime, nextBlkTime)
+	require.NoError(err)
+
 	executor := StandardTxExecutor{
-		Backend: &env.backend,
-		State:   stateDiff,
-		Tx:      tx,
+		Backend:            &env.backend,
+		BlkFeeManager:      feeMan,
+		BlockMaxComplexity: feeCfg.BlockMaxComplexity,
+		State:              stateDiff,
+		Tx:                 tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
 	require.ErrorIs(err, errUnauthorizedSubnetModification)
@@ -97,7 +125,7 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 // its validator set doesn't exist
 func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, banff)
+	env := newEnvironment(t, eUpgrade)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
@@ -108,6 +136,7 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 		nil,
 		"chain name",
 		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+		commonfees.NoTip,
 	)
 	require.NoError(err)
 
@@ -116,10 +145,21 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
+	currentTime := stateDiff.GetTimestamp()
+	nextBlkTime, _, err := state.NextBlockTime(stateDiff, env.clk)
+	require.NoError(err)
+
+	feeCfg := config.GetDynamicFeesConfig(env.config.IsEActivated(currentTime))
+
+	feeMan, err := fee.UpdatedFeeManager(stateDiff, env.config, currentTime, nextBlkTime)
+	require.NoError(err)
+
 	executor := StandardTxExecutor{
-		Backend: &env.backend,
-		State:   stateDiff,
-		Tx:      tx,
+		Backend:            &env.backend,
+		BlkFeeManager:      feeMan,
+		BlockMaxComplexity: feeCfg.BlockMaxComplexity,
+		State:              stateDiff,
+		Tx:                 tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
 	require.ErrorIs(err, database.ErrNotFound)
@@ -128,7 +168,7 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 // Ensure valid tx passes semanticVerify
 func TestCreateChainTxValid(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, banff)
+	env := newEnvironment(t, eUpgrade)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
@@ -139,16 +179,28 @@ func TestCreateChainTxValid(t *testing.T) {
 		nil,
 		"chain name",
 		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+		commonfees.NoTip,
 	)
 	require.NoError(err)
 
 	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
+	currentTime := stateDiff.GetTimestamp()
+	nextBlkTime, _, err := state.NextBlockTime(stateDiff, env.clk)
+	require.NoError(err)
+
+	feeCfg := config.GetDynamicFeesConfig(env.config.IsEActivated(currentTime))
+
+	feeMan, err := fee.UpdatedFeeManager(stateDiff, env.config, currentTime, nextBlkTime)
+	require.NoError(err)
+
 	executor := StandardTxExecutor{
-		Backend: &env.backend,
-		State:   stateDiff,
-		Tx:      tx,
+		Backend:            &env.backend,
+		BlkFeeManager:      feeMan,
+		BlockMaxComplexity: feeCfg.BlockMaxComplexity,
+		State:              stateDiff,
+		Tx:                 tx,
 	}
 	require.NoError(tx.Unsigned.Visit(&executor))
 }
@@ -196,7 +248,7 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 
 			cfg := *env.config
 			cfg.CreateBlockchainTxFee = test.fee
-			builder := txstest.NewBuilder(env.ctx, &cfg, env.state)
+			builder := txstest.NewBuilder(env.ctx, &cfg, env.clk, env.state)
 			tx, err := builder.NewCreateChainTx(
 				testSubnet1.ID(),
 				nil,
@@ -204,6 +256,7 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 				nil,
 				"",
 				preFundedKeys,
+				commonfees.NoTip,
 			)
 			require.NoError(err)
 
@@ -212,10 +265,14 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 
 			stateDiff.SetTimestamp(test.time)
 
+			currentTime := stateDiff.GetTimestamp()
+			feeCfg := config.GetDynamicFeesConfig(env.config.IsEActivated(currentTime))
 			executor := StandardTxExecutor{
-				Backend: &env.backend,
-				State:   stateDiff,
-				Tx:      tx,
+				Backend:            &env.backend,
+				BlkFeeManager:      commonfees.NewManager(feeCfg.InitialFeeRate),
+				BlockMaxComplexity: feeCfg.BlockMaxComplexity,
+				State:              stateDiff,
+				Tx:                 tx,
 			}
 			err = tx.Unsigned.Visit(&executor)
 			require.ErrorIs(err, test.expectedError)

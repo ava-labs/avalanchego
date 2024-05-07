@@ -19,6 +19,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
+
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 var (
@@ -32,13 +35,17 @@ var (
 type StandardTxExecutor struct {
 	// inputs, to be filled before visitor methods are called
 	*Backend
-	State state.Diff // state is expected to be modified
-	Tx    *txs.Tx
+	BlkFeeManager      *commonfees.Manager
+	BlockMaxComplexity commonfees.Dimensions
+	State              state.Diff // state is expected to be modified
+	Tx                 *txs.Tx
 
 	// outputs of visitor execution
 	OnAccept       func() // may be nil
 	Inputs         set.Set[ids.ID]
 	AtomicRequests map[ids.ID]*atomic.Requests // may be nil
+	TipPercentage  commonfees.TipPercentage
+	BaseFee        uint64
 }
 
 func (*StandardTxExecutor) AdvanceTimeTx(*txs.AdvanceTimeTx) error {
@@ -57,6 +64,7 @@ func (e *StandardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 	var (
 		currentTimestamp = e.State.GetTimestamp()
 		isDurangoActive  = e.Config.IsDurangoActivated(currentTimestamp)
+		isEActive        = e.Config.IsEActivated(currentTimestamp)
 	)
 	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
 		return err
@@ -68,18 +76,32 @@ func (e *StandardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 	}
 
 	// Verify the flowcheck
-	createBlockchainTxFee := e.Config.GetCreateBlockchainTxFee(currentTimestamp)
-	if err := e.FlowChecker.VerifySpend(
+	feeCalculator := fee.NewDynamicCalculator(e.Backend.Config, e.Backend.Ctx.Log, currentTimestamp, e.BlkFeeManager, e.BlockMaxComplexity, e.Tx.Creds)
+
+	if err := tx.Visit(feeCalculator); err != nil {
+		return err
+	}
+	e.BaseFee = feeCalculator.DynamicBaseFee
+
+	feesPaid, err := e.FlowChecker.VerifySpend(
 		tx,
 		e.State,
 		tx.Ins,
 		tx.Outs,
 		baseTxCreds,
 		map[ids.ID]uint64{
-			e.Ctx.AVAXAssetID: createBlockchainTxFee,
+			e.Ctx.AVAXAssetID: feeCalculator.Fee,
 		},
-	); err != nil {
+	)
+	if err != nil {
 		return err
+	}
+
+	if isEActive {
+		if err := feeCalculator.CalculateTipPercentage(feesPaid); err != nil {
+			return fmt.Errorf("failed estimating fee tip percentage: %w", err)
+		}
+		e.TipPercentage = feeCalculator.TipPercentage
 	}
 
 	txID := e.Tx.ID()
@@ -108,24 +130,39 @@ func (e *StandardTxExecutor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 	var (
 		currentTimestamp = e.State.GetTimestamp()
 		isDurangoActive  = e.Config.IsDurangoActivated(currentTimestamp)
+		isEActive        = e.Config.IsEActivated(currentTimestamp)
 	)
 	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
 		return err
 	}
 
 	// Verify the flowcheck
-	createSubnetTxFee := e.Config.GetCreateSubnetTxFee(currentTimestamp)
-	if err := e.FlowChecker.VerifySpend(
+	feeCalculator := fee.NewDynamicCalculator(e.Backend.Config, e.Backend.Ctx.Log, e.State.GetTimestamp(), e.BlkFeeManager, e.BlockMaxComplexity, e.Tx.Creds)
+
+	if err := tx.Visit(feeCalculator); err != nil {
+		return err
+	}
+	e.BaseFee = feeCalculator.DynamicBaseFee
+
+	feesPaid, err := e.FlowChecker.VerifySpend(
 		tx,
 		e.State,
 		tx.Ins,
 		tx.Outs,
 		e.Tx.Creds,
 		map[ids.ID]uint64{
-			e.Ctx.AVAXAssetID: createSubnetTxFee,
+			e.Ctx.AVAXAssetID: feeCalculator.Fee,
 		},
-	); err != nil {
+	)
+	if err != nil {
 		return err
+	}
+
+	if isEActive {
+		if err := feeCalculator.CalculateTipPercentage(feesPaid); err != nil {
+			return fmt.Errorf("failed estimating fee tip percentage: %w", err)
+		}
+		e.TipPercentage = feeCalculator.TipPercentage
 	}
 
 	txID := e.Tx.ID()
@@ -148,6 +185,7 @@ func (e *StandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 	var (
 		currentTimestamp = e.State.GetTimestamp()
 		isDurangoActive  = e.Config.IsDurangoActivated(currentTimestamp)
+		isEActive        = e.Config.IsEActivated(currentTimestamp)
 	)
 	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
 		return err
@@ -161,6 +199,12 @@ func (e *StandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 		e.Inputs.Add(utxoID)
 		utxoIDs[i] = utxoID[:]
 	}
+
+	feeCalculator := fee.NewDynamicCalculator(e.Backend.Config, e.Backend.Ctx.Log, e.State.GetTimestamp(), e.BlkFeeManager, e.BlockMaxComplexity, e.Tx.Creds)
+	if err := tx.Visit(feeCalculator); err != nil {
+		return err
+	}
+	e.BaseFee = feeCalculator.DynamicBaseFee
 
 	// Skip verification of the shared memory inputs if the other primary
 	// network chains are not guaranteed to be up-to-date.
@@ -194,17 +238,26 @@ func (e *StandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 		copy(ins, tx.Ins)
 		copy(ins[len(tx.Ins):], tx.ImportedInputs)
 
-		if err := e.FlowChecker.VerifySpendUTXOs(
+		// Verify the flowcheck
+		feesPaid, err := e.FlowChecker.VerifySpendUTXOs(
 			tx,
 			utxos,
 			ins,
 			tx.Outs,
 			e.Tx.Creds,
 			map[ids.ID]uint64{
-				e.Ctx.AVAXAssetID: e.Config.TxFee,
+				e.Ctx.AVAXAssetID: feeCalculator.Fee,
 			},
-		); err != nil {
+		)
+		if err != nil {
 			return err
+		}
+
+		if isEActive {
+			if err := feeCalculator.CalculateTipPercentage(feesPaid); err != nil {
+				return fmt.Errorf("failed estimating fee tip percentage: %w", err)
+			}
+			e.TipPercentage = feeCalculator.TipPercentage
 		}
 	}
 
@@ -234,14 +287,17 @@ func (e *StandardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 	var (
 		currentTimestamp = e.State.GetTimestamp()
 		isDurangoActive  = e.Config.IsDurangoActivated(currentTimestamp)
+		isEActive        = e.Config.IsEActivated(currentTimestamp)
 	)
 	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
 		return err
 	}
 
-	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.ExportedOutputs))
-	copy(outs, tx.Outs)
-	copy(outs[len(tx.Outs):], tx.ExportedOutputs)
+	feeCalculator := fee.NewDynamicCalculator(e.Backend.Config, e.Backend.Ctx.Log, e.State.GetTimestamp(), e.BlkFeeManager, e.BlockMaxComplexity, e.Tx.Creds)
+	if err := tx.Visit(feeCalculator); err != nil {
+		return err
+	}
+	e.BaseFee = feeCalculator.DynamicBaseFee
 
 	if e.Bootstrapped.Get() {
 		if err := verify.SameSubnet(context.TODO(), e.Ctx, tx.DestinationChain); err != nil {
@@ -250,17 +306,28 @@ func (e *StandardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 	}
 
 	// Verify the flowcheck
-	if err := e.FlowChecker.VerifySpend(
+	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.ExportedOutputs))
+	copy(outs, tx.Outs)
+	copy(outs[len(tx.Outs):], tx.ExportedOutputs)
+	feesPaid, err := e.FlowChecker.VerifySpend(
 		tx,
 		e.State,
 		tx.Ins,
 		outs,
 		e.Tx.Creds,
 		map[ids.ID]uint64{
-			e.Ctx.AVAXAssetID: e.Config.TxFee,
+			e.Ctx.AVAXAssetID: feeCalculator.Fee,
 		},
-	); err != nil {
+	)
+	if err != nil {
 		return fmt.Errorf("failed verifySpend: %w", err)
+	}
+
+	if isEActive {
+		if err := feeCalculator.CalculateTipPercentage(feesPaid); err != nil {
+			return fmt.Errorf("failed estimating fee tip percentage: %w", err)
+		}
+		e.TipPercentage = feeCalculator.TipPercentage
 	}
 
 	txID := e.Tx.ID()
@@ -312,12 +379,15 @@ func (e *StandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 		return errEmptyNodeID
 	}
 
-	if _, err := verifyAddValidatorTx(
+	var err error
+	_, e.BaseFee, err = verifyAddValidatorTx(
 		e.Backend,
+		e.BlkFeeManager,
 		e.State,
 		e.Tx,
 		tx,
-	); err != nil {
+	)
+	if err != nil {
 		return err
 	}
 
@@ -341,14 +411,19 @@ func (e *StandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 }
 
 func (e *StandardTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
-	if err := verifyAddSubnetValidatorTx(
+	tipPercentage, baseFee, err := verifyAddSubnetValidatorTx(
 		e.Backend,
+		e.BlkFeeManager,
+		e.BlockMaxComplexity,
 		e.State,
 		e.Tx,
 		tx,
-	); err != nil {
+	)
+	if err != nil {
 		return err
 	}
+	e.TipPercentage = tipPercentage
+	e.BaseFee = baseFee
 
 	if err := e.putStaker(tx); err != nil {
 		return err
@@ -361,14 +436,17 @@ func (e *StandardTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 }
 
 func (e *StandardTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
-	if _, err := verifyAddDelegatorTx(
+	_, baseFee, err := verifyAddDelegatorTx(
 		e.Backend,
+		e.BlkFeeManager,
 		e.State,
 		e.Tx,
 		tx,
-	); err != nil {
+	)
+	if err != nil {
 		return err
 	}
+	e.BaseFee = baseFee
 
 	if err := e.putStaker(tx); err != nil {
 		return err
@@ -386,8 +464,10 @@ func (e *StandardTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 // [tx.SubnetID].
 // Note: [tx.NodeID] may be either a current or pending validator.
 func (e *StandardTxExecutor) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx) error {
-	staker, isCurrentValidator, err := verifyRemoveSubnetValidatorTx(
+	staker, isCurrentValidator, tipPercentage, baseFee, err := verifyRemoveSubnetValidatorTx(
 		e.Backend,
+		e.BlkFeeManager,
+		e.BlockMaxComplexity,
 		e.State,
 		e.Tx,
 		tx,
@@ -395,14 +475,15 @@ func (e *StandardTxExecutor) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidat
 	if err != nil {
 		return err
 	}
+	e.TipPercentage = tipPercentage
+	e.BaseFee = baseFee
 
+	// Invariant: There are no permissioned subnet delegators to remove.
 	if isCurrentValidator {
 		e.State.DeleteCurrentValidator(staker)
 	} else {
 		e.State.DeletePendingValidator(staker)
 	}
-
-	// Invariant: There are no permissioned subnet delegators to remove.
 
 	txID := e.Tx.ID()
 	avax.Consume(e.State, tx.Ins)
@@ -419,6 +500,7 @@ func (e *StandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 	var (
 		currentTimestamp = e.State.GetTimestamp()
 		isDurangoActive  = e.Config.IsDurangoActivated(currentTimestamp)
+		isEActive        = e.Config.IsEActivated(currentTimestamp)
 	)
 	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
 		return err
@@ -435,8 +517,14 @@ func (e *StandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 		return err
 	}
 
+	feeCalculator := fee.NewDynamicCalculator(e.Backend.Config, e.Backend.Ctx.Log, e.State.GetTimestamp(), e.BlkFeeManager, e.BlockMaxComplexity, e.Tx.Creds)
+	if err := tx.Visit(feeCalculator); err != nil {
+		return err
+	}
+	e.BaseFee = feeCalculator.DynamicBaseFee
+
 	totalRewardAmount := tx.MaximumSupply - tx.InitialSupply
-	if err := e.Backend.FlowChecker.VerifySpend(
+	feesPaid, err := e.Backend.FlowChecker.VerifySpend(
 		tx,
 		e.State,
 		tx.Ins,
@@ -446,11 +534,19 @@ func (e *StandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 		//            entry in this map literal from being overwritten by the
 		//            second entry.
 		map[ids.ID]uint64{
-			e.Ctx.AVAXAssetID: e.Config.TransformSubnetTxFee,
+			e.Ctx.AVAXAssetID: feeCalculator.Fee,
 			tx.AssetID:        totalRewardAmount,
 		},
-	); err != nil {
+	)
+	if err != nil {
 		return err
+	}
+
+	if isEActive {
+		if err := feeCalculator.CalculateTipPercentage(feesPaid); err != nil {
+			return fmt.Errorf("failed estimating fee tip percentage: %w", err)
+		}
+		e.TipPercentage = feeCalculator.TipPercentage
 	}
 
 	txID := e.Tx.ID()
@@ -466,14 +562,19 @@ func (e *StandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 }
 
 func (e *StandardTxExecutor) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessValidatorTx) error {
-	if err := verifyAddPermissionlessValidatorTx(
+	tipPercentage, baseFee, err := verifyAddPermissionlessValidatorTx(
 		e.Backend,
+		e.BlkFeeManager,
+		e.BlockMaxComplexity,
 		e.State,
 		e.Tx,
 		tx,
-	); err != nil {
+	)
+	if err != nil {
 		return err
 	}
+	e.TipPercentage = tipPercentage
+	e.BaseFee = baseFee
 
 	if err := e.putStaker(tx); err != nil {
 		return err
@@ -498,14 +599,19 @@ func (e *StandardTxExecutor) AddPermissionlessValidatorTx(tx *txs.AddPermissionl
 }
 
 func (e *StandardTxExecutor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDelegatorTx) error {
-	if err := verifyAddPermissionlessDelegatorTx(
+	tipPercentage, baseFees, err := verifyAddPermissionlessDelegatorTx(
 		e.Backend,
+		e.BlkFeeManager,
+		e.BlockMaxComplexity,
 		e.State,
 		e.Tx,
 		tx,
-	); err != nil {
+	)
+	if err != nil {
 		return err
 	}
+	e.TipPercentage = tipPercentage
+	e.BaseFee = baseFees
 
 	if err := e.putStaker(tx); err != nil {
 		return err
@@ -522,8 +628,10 @@ func (e *StandardTxExecutor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionl
 // This transaction will result in the ownership of [tx.Subnet] being transferred
 // to [tx.Owner].
 func (e *StandardTxExecutor) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwnershipTx) error {
-	err := verifyTransferSubnetOwnershipTx(
+	tipPercentage, baseFee, err := verifyTransferSubnetOwnershipTx(
 		e.Backend,
+		e.BlkFeeManager,
+		e.BlockMaxComplexity,
 		e.State,
 		e.Tx,
 		tx,
@@ -531,6 +639,8 @@ func (e *StandardTxExecutor) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwn
 	if err != nil {
 		return err
 	}
+	e.TipPercentage = tipPercentage
+	e.BaseFee = baseFee
 
 	e.State.SetSubnetOwner(tx.Subnet, tx.Owner)
 
@@ -541,7 +651,14 @@ func (e *StandardTxExecutor) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwn
 }
 
 func (e *StandardTxExecutor) BaseTx(tx *txs.BaseTx) error {
-	if !e.Backend.Config.IsDurangoActivated(e.State.GetTimestamp()) {
+	var (
+		cfg              = e.Backend.Config
+		currentTimestamp = e.State.GetTimestamp()
+		IsDurangoActive  = cfg.IsDurangoActivated(currentTimestamp)
+		isEActive        = cfg.IsEActivated(currentTimestamp)
+	)
+
+	if !IsDurangoActive {
 		return ErrDurangoUpgradeNotActive
 	}
 
@@ -555,17 +672,32 @@ func (e *StandardTxExecutor) BaseTx(tx *txs.BaseTx) error {
 	}
 
 	// Verify the flowcheck
-	if err := e.FlowChecker.VerifySpend(
+	feeCalculator := fee.NewDynamicCalculator(e.Backend.Config, e.Backend.Ctx.Log, e.State.GetTimestamp(), e.BlkFeeManager, e.BlockMaxComplexity, e.Tx.Creds)
+
+	if err := tx.Visit(feeCalculator); err != nil {
+		return err
+	}
+	e.BaseFee = feeCalculator.DynamicBaseFee
+
+	feesPaid, err := e.FlowChecker.VerifySpend(
 		tx,
 		e.State,
 		tx.Ins,
 		tx.Outs,
 		e.Tx.Creds,
 		map[ids.ID]uint64{
-			e.Ctx.AVAXAssetID: e.Config.TxFee,
+			e.Ctx.AVAXAssetID: feeCalculator.Fee,
 		},
-	); err != nil {
+	)
+	if err != nil {
 		return err
+	}
+
+	if isEActive {
+		if err := feeCalculator.CalculateTipPercentage(feesPaid); err != nil {
+			return fmt.Errorf("failed estimating fee tip percentage: %w", err)
+		}
+		e.TipPercentage = feeCalculator.TipPercentage
 	}
 
 	txID := e.Tx.ID()
@@ -573,6 +705,7 @@ func (e *StandardTxExecutor) BaseTx(tx *txs.BaseTx) error {
 	avax.Consume(e.State, tx.Ins)
 	// Produce the UTXOS
 	avax.Produce(e.State, txID, tx.Outs)
+	e.TipPercentage = feeCalculator.TipPercentage
 	return nil
 }
 

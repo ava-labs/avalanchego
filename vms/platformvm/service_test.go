@@ -35,15 +35,18 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block/builder"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
 	avajson "github.com/ava-labs/avalanchego/utils/json"
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 	vmkeystore "github.com/ava-labs/avalanchego/vms/components/keystore"
 	pchainapi "github.com/ava-labs/avalanchego/vms/platformvm/api"
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
@@ -173,6 +176,7 @@ func TestGetTxStatus(t *testing.T) {
 			Addrs:     []ids.ShortID{ids.ShortEmpty},
 		},
 		[]*secp256k1.PrivateKey{recipientKey},
+		commonfees.NoTip,
 	)
 	require.NoError(err)
 
@@ -224,6 +228,7 @@ func TestGetTx(t *testing.T) {
 					[]ids.ID{},
 					"chain name",
 					[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+					commonfees.NoTip,
 					common.WithChangeOwner(&secp256k1fx.OutputOwners{
 						Threshold: 1,
 						Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
@@ -258,6 +263,7 @@ func TestGetTx(t *testing.T) {
 					rewardsOwner,
 					0,
 					[]*secp256k1.PrivateKey{keys[0]},
+					commonfees.NoTip,
 					common.WithChangeOwner(&secp256k1fx.OutputOwners{
 						Threshold: 1,
 						Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
@@ -282,6 +288,7 @@ func TestGetTx(t *testing.T) {
 						},
 					}},
 					[]*secp256k1.PrivateKey{keys[0]},
+					commonfees.NoTip,
 					common.WithChangeOwner(&secp256k1fx.OutputOwners{
 						Threshold: 1,
 						Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
@@ -380,7 +387,22 @@ func TestGetBalance(t *testing.T) {
 		if idx == 0 {
 			// we use the first key to fund a subnet creation in [defaultGenesis].
 			// As such we need to account for the subnet creation fee
-			balance = defaultBalance - service.vm.Config.GetCreateSubnetTxFee(service.vm.clock.Time())
+			var (
+				chainTime = service.vm.state.GetTimestamp()
+
+				feeCalc *fee.Calculator
+			)
+
+			feeRates, err := service.vm.state.GetFeeRates()
+			require.NoError(err)
+
+			feeCfg := config.GetDynamicFeesConfig(service.vm.Config.IsEActivated(chainTime))
+			feeMan := commonfees.NewManager(feeRates)
+			feeCalc = fee.NewDynamicCalculator(&service.vm.Config, logging.NoLog{}, chainTime, feeMan, feeCfg.BlockMaxComplexity, testSubnet1.Creds)
+
+			require.NoError(testSubnet1.Unsigned.Visit(feeCalc))
+
+			balance = defaultBalance - feeCalc.Fee
 		}
 		require.Equal(avajson.Uint64(balance), reply.Balance)
 		require.Equal(avajson.Uint64(balance), reply.Unlocked)
@@ -475,6 +497,7 @@ func TestGetStake(t *testing.T) {
 			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
 		},
 		[]*secp256k1.PrivateKey{keys[0]},
+		commonfees.NoTip,
 		common.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
@@ -538,6 +561,7 @@ func TestGetStake(t *testing.T) {
 		},
 		0,
 		[]*secp256k1.PrivateKey{keys[0]},
+		commonfees.NoTip,
 		common.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
@@ -623,6 +647,7 @@ func TestGetCurrentValidators(t *testing.T) {
 			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
 		},
 		[]*secp256k1.PrivateKey{keys[0]},
+		commonfees.NoTip,
 		common.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
@@ -759,6 +784,7 @@ func TestGetBlock(t *testing.T) {
 				[]ids.ID{},
 				"chain name",
 				[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+				commonfees.NoTip,
 				common.WithChangeOwner(&secp256k1fx.OutputOwners{
 					Threshold: 1,
 					Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
@@ -1033,4 +1059,31 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 			require.Equal(json.RawMessage(expectedJSON), reply.Block)
 		})
 	}
+}
+
+func TestGetFeeRates(t *testing.T) {
+	require := require.New(t)
+	service, _, _ := defaultService(t)
+
+	reply := GetFeeRatesReply{}
+	require.NoError(service.GetFeeRates(nil, nil, &reply))
+
+	service.vm.ctx.Lock.Lock()
+
+	feeRates, err := service.vm.state.GetFeeRates()
+	require.NoError(err)
+	require.Equal(feeRates, reply.CurrentFeeRates)
+
+	updatedFeeRates := commonfees.Dimensions{
+		123,
+		456,
+		789,
+		1011,
+	}
+	service.vm.state.SetFeeRates(updatedFeeRates)
+
+	service.vm.ctx.Lock.Unlock()
+
+	require.NoError(service.GetFeeRates(nil, nil, &reply))
+	require.Equal(updatedFeeRates, reply.CurrentFeeRates)
 }

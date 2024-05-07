@@ -238,6 +238,17 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 		delegatorData := data[0].Delegators[0]
 		actualGammaDelegationPeriod := time.Duration(delegatorData.EndTime-delegatorData.StartTime) * time.Second
 
+		preRewardBalances := make(map[ids.ShortID]uint64, len(rewardKeys))
+		for _, rewardKey := range rewardKeys {
+			keychain := secp256k1fx.NewKeychain(rewardKey)
+			baseWallet := e2e.NewWallet(keychain, nodeURI)
+			pWallet := baseWallet.P()
+			balances, err := pWallet.Builder().GetBalance()
+			require.NoError(err)
+			preRewardBalances[rewardKey.Address()] = balances[pWallet.Builder().Context().AVAXAssetID]
+		}
+		require.Len(preRewardBalances, len(rewardKeys))
+
 		ginkgo.By("waiting until all validation periods are over")
 		// The beta validator was the last added and so has the latest end time. The
 		// delegation periods are shorter than the validation periods.

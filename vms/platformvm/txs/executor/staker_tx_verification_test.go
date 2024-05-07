@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/fees"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
@@ -102,7 +103,10 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 			Creds:    []verify.Verifiable{},
 		}
 	)
-	verifiedSignedTx.SetBytes([]byte{1}, []byte{2})
+
+	unsignedBytes := []byte{1}
+	signedBytes := []byte{2}
+	verifiedSignedTx.SetBytes(unsignedBytes, signedBytes)
 
 	tests := []test{
 		{
@@ -420,7 +424,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 					gomock.Any(),
 					gomock.Any(),
 					gomock.Any(),
-				).Return(ErrFlowCheckFailed)
+				).Return(uint64(0), ErrFlowCheckFailed)
 
 				cfg := defaultTestConfig(t, durango, activeForkTime)
 				cfg.AddSubnetValidatorFee = 1
@@ -453,7 +457,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 			expectedErr: ErrFlowCheckFailed,
 		},
 		{
-			name: "success",
+			name: "success pre EUpgrade",
 			backendF: func(ctrl *gomock.Controller) *Backend {
 				bootstrapped := &utils.Atomic[bool]{}
 				bootstrapped.Set(true)
@@ -466,7 +470,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 					gomock.Any(),
 					gomock.Any(),
 					gomock.Any(),
-				).Return(nil)
+				).Return(uint64(0), nil)
 
 				cfg := defaultTestConfig(t, durango, activeForkTime)
 				cfg.AddSubnetValidatorFee = 1
@@ -506,12 +510,14 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 
 			var (
 				backend = tt.backendF(ctrl)
-				state   = tt.stateF(ctrl)
-				sTx     = tt.sTxF()
-				tx      = tt.txF()
+
+				feeManager = fees.NewManager(fees.Empty)
+				state      = tt.stateF(ctrl)
+				sTx        = tt.sTxF()
+				tx         = tt.txF()
 			)
 
-			err := verifyAddPermissionlessValidatorTx(backend, state, sTx, tx)
+			_, _, err := verifyAddPermissionlessValidatorTx(backend, feeManager, fees.Empty, state, sTx, tx)
 			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}

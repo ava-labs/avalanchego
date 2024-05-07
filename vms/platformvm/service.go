@@ -36,10 +36,12 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	avajson "github.com/ava-labs/avalanchego/utils/json"
 	safemath "github.com/ava-labs/avalanchego/utils/math"
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 	platformapi "github.com/ava-labs/avalanchego/vms/platformvm/api"
 )
 
@@ -1820,6 +1822,61 @@ func (s *Service) GetBlockByHeight(_ *http.Request, args *api.GetBlockByHeightAr
 
 	response.Block, err = json.Marshal(result)
 	return err
+}
+
+// GetFeeRatesReply is the response from GetFeeRates
+type GetFeeRatesReply struct {
+	CurrentFeeRates commonfees.Dimensions `json:"currentFeeRates"`
+	NextFeeRates    commonfees.Dimensions `json:"nextFeeRates"`
+}
+
+// GetTimestamp returns the current timestamp on chain.
+func (s *Service) GetFeeRates(_ *http.Request, _ *struct{}, reply *GetFeeRatesReply) error {
+	s.vm.ctx.Log.Debug("API called",
+		zap.String("service", "platform"),
+		zap.String("method", "getFeeRates"),
+	)
+
+	s.vm.ctx.Lock.Lock()
+	defer s.vm.ctx.Lock.Unlock()
+
+	preferredID := s.vm.manager.Preferred()
+	onAccept, ok := s.vm.manager.GetState(preferredID)
+	if !ok {
+		return fmt.Errorf("could not retrieve state for block %s", preferredID)
+	}
+
+	currentFeeRate, err := onAccept.GetFeeRates()
+	if err != nil {
+		return err
+	}
+	reply.CurrentFeeRates = currentFeeRate
+
+	nextTimestamp, _, err := state.NextBlockTime(onAccept, &s.vm.clock)
+	if err != nil {
+		return fmt.Errorf("could not calculate next staker change time: %w", err)
+	}
+	isEActivated := s.vm.Config.IsEActivated(nextTimestamp)
+
+	if !isEActivated {
+		reply.NextFeeRates = reply.CurrentFeeRates
+		return nil
+	}
+
+	var (
+		currentTimestamp = onAccept.GetTimestamp()
+		feeManager       = commonfees.NewManager(currentFeeRate)
+	)
+
+	if isEActivated {
+		feeManager, err = fee.UpdatedFeeManager(onAccept, &s.vm.Config, currentTimestamp, nextTimestamp)
+		if err != nil {
+			return err
+		}
+	}
+	reply.NextFeeRates = feeManager.GetFeeRates()
+
+	return nil
 }
 
 func (s *Service) getAPIUptime(staker *state.Staker) (*avajson.Float32, error) {

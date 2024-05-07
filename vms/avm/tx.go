@@ -15,8 +15,10 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/executor"
+	"github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 var (
@@ -45,7 +47,7 @@ func (tx *Tx) Accept(context.Context) error {
 	}
 
 	executor := &executor.Executor{
-		Codec: tx.vm.txBackend.Codec,
+		Codec: tx.vm.txExecutorBackend.Codec,
 		State: tx.vm.state,
 		Tx:    tx.tx,
 	}
@@ -125,9 +127,22 @@ func (tx *Tx) Verify(context.Context) error {
 	if s := tx.Status(); s != choices.Processing {
 		return fmt.Errorf("%w: %s", errTxNotProcessing, s)
 	}
+
+	feeRates, err := tx.vm.state.GetFeeRates()
+	if err != nil {
+		return fmt.Errorf("failed retrieving fee rates: %w", err)
+	}
+
+	var (
+		isEActive  = tx.vm.txExecutorBackend.Config.IsEActivated(tx.vm.state.GetTimestamp())
+		feeCfg     = config.GetDynamicFeesConfig(isEActive)
+		feeManager = fees.NewManager(feeRates)
+	)
 	return tx.tx.Unsigned.Visit(&executor.SemanticVerifier{
-		Backend: tx.vm.txBackend,
-		State:   tx.vm.state,
-		Tx:      tx.tx,
+		Backend:            tx.vm.txExecutorBackend,
+		BlkFeeManager:      feeManager,
+		BlockMaxComplexity: feeCfg.BlockMaxComplexity,
+		State:              tx.vm.state,
+		Tx:                 tx.tx,
 	})
 }

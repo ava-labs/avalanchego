@@ -201,13 +201,14 @@ func SortTransferableInputsWithSigners(ins []*TransferableInput, signers [][]*se
 
 // VerifyTx verifies that the inputs and outputs flowcheck, including a fee.
 // Additionally, this verifies that the inputs and outputs are sorted.
+// Returns fee paid by the target transaction
 func VerifyTx(
 	feeAmount uint64,
 	feeAssetID ids.ID,
 	allIns [][]*TransferableInput,
 	allOuts [][]*TransferableOutput,
 	c codec.Manager,
-) error {
+) (uint64, error) {
 	fc := NewFlowChecker()
 
 	fc.Produce(feeAssetID, feeAmount) // The txFee must be burned
@@ -216,12 +217,12 @@ func VerifyTx(
 	for _, outs := range allOuts {
 		for _, out := range outs {
 			if err := out.Verify(); err != nil {
-				return err
+				return 0, err
 			}
 			fc.Produce(out.AssetID(), out.Output().Amount())
 		}
 		if !IsSortedTransferableOutputs(outs, c) {
-			return ErrOutputsNotSorted
+			return 0, ErrOutputsNotSorted
 		}
 	}
 
@@ -229,14 +230,14 @@ func VerifyTx(
 	for _, ins := range allIns {
 		for _, in := range ins {
 			if err := in.Verify(); err != nil {
-				return err
+				return 0, err
 			}
 			fc.Consume(in.AssetID(), in.Input().Amount())
 		}
 		if !utils.IsSortedAndUnique(ins) {
-			return ErrInputsNotSortedUnique
+			return 0, ErrInputsNotSortedUnique
 		}
 	}
 
-	return fc.Verify()
+	return fc.Fees(feeAssetID, feeAmount), fc.Verify()
 }

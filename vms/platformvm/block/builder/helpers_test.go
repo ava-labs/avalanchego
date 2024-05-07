@@ -34,6 +34,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/vms/components/fees"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
@@ -154,6 +155,7 @@ func newEnvironment(t *testing.T, f fork) *environment { //nolint:unparam
 	res.txBuilder = txstest.NewBuilder(
 		res.ctx,
 		res.config,
+		res.clk,
 		res.state,
 	)
 
@@ -180,6 +182,9 @@ func newEnvironment(t *testing.T, f fork) *environment { //nolint:unparam
 
 	res.mempool, err = mempool.New("mempool", registerer, nil)
 	require.NoError(err)
+	if res.config.IsEActivated(res.state.GetTimestamp()) {
+		res.mempool.SetEUpgradeActive()
+	}
 
 	res.blkManager = blockexecutor.NewManager(
 		res.mempool,
@@ -250,6 +255,7 @@ func addSubnet(t *testing.T, env *environment) {
 			},
 		},
 		[]*secp256k1.PrivateKey{preFundedKeys[0]},
+		fees.NoTip,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
@@ -262,15 +268,23 @@ func addSubnet(t *testing.T, env *environment) {
 	stateDiff, err := state.NewDiff(genesisID, env.blkManager)
 	require.NoError(err)
 
+	feeRates, err := env.state.GetFeeRates()
+	require.NoError(err)
+
+	chainTime := env.state.GetTimestamp()
+	feeCfg := config.GetDynamicFeesConfig(env.config.IsEActivated(chainTime))
 	executor := txexecutor.StandardTxExecutor{
-		Backend: &env.backend,
-		State:   stateDiff,
-		Tx:      testSubnet1,
+		Backend:            &env.backend,
+		BlkFeeManager:      fees.NewManager(feeRates),
+		BlockMaxComplexity: feeCfg.BlockMaxComplexity,
+		State:              stateDiff,
+		Tx:                 testSubnet1,
 	}
 	require.NoError(testSubnet1.Unsigned.Visit(&executor))
 
 	stateDiff.AddTx(testSubnet1, status.Committed)
 	require.NoError(stateDiff.Apply(env.state))
+	require.NoError(env.state.Commit())
 }
 
 func defaultState(

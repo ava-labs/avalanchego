@@ -79,6 +79,16 @@ func (a *acceptor) ApricotAtomicBlock(b *block.ApricotAtomicBlock) error {
 		return fmt.Errorf("%w %s", errMissingBlockState, blkID)
 	}
 
+	a.metrics.SetBlockComplexity(blkState.blockComplexity)
+	// a.ctx.Log.Info(
+	// 	"BLOCK COMPLEXITY",
+	// 	zap.Stringer("blkID", b.ID()),
+	// 	zap.String("blkType", "apricot atomic block"),
+	// 	zap.Uint64("blkHeight", b.Height()),
+	// 	zap.Int64("blkTimestamp", blkState.timestamp.Unix()),
+	// 	zap.Any("consumedUnits", blkState.blockComplexity),
+	// )
+
 	// Update the state to reflect the changes made in [onAcceptState].
 	if err := blkState.onAcceptState.Apply(a.state); err != nil {
 		return err
@@ -136,6 +146,16 @@ func (a *acceptor) optionBlock(b block.Block, blockType string) error {
 		return err
 	}
 
+	a.metrics.SetBlockComplexity(parentState.blockComplexity)
+	// a.ctx.Log.Info(
+	// 	"BLOCK COMPLEXITY",
+	// 	zap.Stringer("blkID", b.Parent()),
+	// 	zap.String("blkType", "proposal block"),
+	// 	zap.Uint64("blkHeight", b.Height()-1),
+	// 	zap.Int64("blkTimestamp", parentState.timestamp.Unix()),
+	// 	zap.Any("consumedUnits", parentState.blockComplexity),
+	// )
+
 	if err := a.commonAccept(b); err != nil {
 		return err
 	}
@@ -150,6 +170,20 @@ func (a *acceptor) optionBlock(b block.Block, blockType string) error {
 	if !ok {
 		return fmt.Errorf("%w %s", errMissingBlockState, blkID)
 	}
+
+	// we set option complexity at its parent block's one.
+	a.metrics.SetBlockComplexity(parentState.blockComplexity)
+
+	// AVOID LOGGING OPTIONS, WE KNOW THEY DON'T CHANGE COMPLEXITY
+	// a.ctx.Log.Info(
+	// 	"BLOCK COMPLEXITY",
+	// 	zap.Stringer("blkID", b.ID()),
+	// 	zap.String("blkType", blockType),
+	// 	zap.Uint64("blkHeight", b.Height()),
+	// 	zap.Int64("blkTimestamp", parentState.timestamp.Unix()),
+	// 	zap.Any("consumedUnits", parentState.blockComplexity),
+	// )
+
 	if err := blkState.onAcceptState.Apply(a.state); err != nil {
 		return err
 	}
@@ -227,6 +261,16 @@ func (a *acceptor) standardBlock(b block.Block, blockType string) error {
 	if !ok {
 		return fmt.Errorf("%w %s", errMissingBlockState, blkID)
 	}
+
+	a.metrics.SetBlockComplexity(blkState.blockComplexity)
+	// a.ctx.Log.Info(
+	// 	"BLOCK COMPLEXITY",
+	// 	zap.Stringer("blkID", b.ID()),
+	// 	zap.String("blkType", blockType),
+	// 	zap.Uint64("blkHeight", b.Height()),
+	// 	zap.Int64("blkTimestamp", blkState.timestamp.Unix()),
+	// 	zap.Any("consumedUnits", blkState.blockComplexity),
+	// )
 
 	// Update the state to reflect the changes made in [onAcceptState].
 	if err := blkState.onAcceptState.Apply(a.state); err != nil {

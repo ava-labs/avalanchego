@@ -10,12 +10,16 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 	"github.com/ava-labs/avalanchego/vms/platformvm/validators"
+
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 var (
@@ -39,7 +43,7 @@ type Manager interface {
 
 	// VerifyTx verifies that the transaction can be issued based on the currently
 	// preferred state. This should *not* be used to verify transactions in a block.
-	VerifyTx(tx *txs.Tx) error
+	VerifyTx(tx *txs.Tx) (commonfees.TipPercentage, error)
 
 	// VerifyUniqueInputs verifies that the inputs are not duplicated in the
 	// provided blk or any of its ancestors pinned in memory.
@@ -57,6 +61,7 @@ func NewManager(
 	backend := &backend{
 		Mempool:      mempool,
 		lastAccepted: lastAccepted,
+		preferred:    lastAccepted,
 		state:        s,
 		ctx:          txExecutorBackend.Ctx,
 		blkIDToState: map[ids.ID]*blockState{},
@@ -75,10 +80,10 @@ func NewManager(
 			bootstrapped: txExecutorBackend.Bootstrapped,
 		},
 		rejector: &rejector{
-			backend:         backend,
-			addTxsToMempool: !txExecutorBackend.Config.PartialSyncPrimaryNetwork,
+			backend:           backend,
+			txExecutorBackend: txExecutorBackend,
+			addTxsToMempool:   !txExecutorBackend.Config.PartialSyncPrimaryNetwork,
 		},
-		preferred:         lastAccepted,
 		txExecutorBackend: txExecutorBackend,
 	}
 }
@@ -89,7 +94,6 @@ type manager struct {
 	acceptor block.Visitor
 	rejector block.Visitor
 
-	preferred         ids.ID
 	txExecutorBackend *executor.Backend
 }
 
@@ -112,41 +116,56 @@ func (m *manager) NewBlock(blk block.Block) snowman.Block {
 	}
 }
 
-func (m *manager) SetPreference(blkID ids.ID) bool {
-	updated := m.preferred != blkID
-	m.preferred = blkID
-	return updated
-}
-
-func (m *manager) Preferred() ids.ID {
-	return m.preferred
-}
-
-func (m *manager) VerifyTx(tx *txs.Tx) error {
+func (m *manager) VerifyTx(tx *txs.Tx) (commonfees.TipPercentage, error) {
 	if !m.txExecutorBackend.Bootstrapped.Get() {
-		return ErrChainNotSynced
+		return commonfees.NoTip, ErrChainNotSynced
 	}
 
-	stateDiff, err := state.NewDiff(m.preferred, m)
+	stateDiff, err := state.NewDiff(m.Preferred(), m)
 	if err != nil {
-		return err
+		return commonfees.NoTip, err
 	}
 
-	nextBlkTime, _, err := executor.NextBlockTime(stateDiff, m.txExecutorBackend.Clk)
+	// retrieve parent block time before moving time forward
+	parentBlkTime := stateDiff.GetTimestamp()
+
+	nextBlkTime, _, err := state.NextBlockTime(stateDiff, m.txExecutorBackend.Clk)
 	if err != nil {
-		return err
+		return commonfees.NoTip, err
 	}
 
 	_, err = executor.AdvanceTimeTo(m.txExecutorBackend, stateDiff, nextBlkTime)
 	if err != nil {
-		return err
+		return commonfees.NoTip, err
 	}
 
-	return tx.Unsigned.Visit(&executor.StandardTxExecutor{
-		Backend: m.txExecutorBackend,
-		State:   stateDiff,
-		Tx:      tx,
-	})
+	feeRates, err := stateDiff.GetFeeRates()
+	if err != nil {
+		return commonfees.NoTip, err
+	}
+
+	var (
+		isEActive = m.txExecutorBackend.Config.IsEActivated(nextBlkTime)
+		feesCfg   = config.GetDynamicFeesConfig(isEActive)
+	)
+
+	feeManager := commonfees.NewManager(feeRates)
+	if isEActive {
+		feeManager, err = fee.UpdatedFeeManager(stateDiff, m.txExecutorBackend.Config, parentBlkTime, nextBlkTime)
+		if err != nil {
+			return commonfees.NoTip, err
+		}
+	}
+
+	standardExecutor := &executor.StandardTxExecutor{
+		Backend:            m.txExecutorBackend,
+		BlkFeeManager:      feeManager,
+		BlockMaxComplexity: feesCfg.BlockMaxComplexity,
+		State:              stateDiff,
+		Tx:                 tx,
+	}
+	err = tx.Unsigned.Visit(standardExecutor)
+	return standardExecutor.TipPercentage, err
 }
 
 func (m *manager) VerifyUniqueInputs(blkID ids.ID, inputs set.Set[ids.ID]) error {

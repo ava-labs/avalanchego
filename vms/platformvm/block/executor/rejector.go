@@ -6,7 +6,14 @@ package executor
 import (
 	"go.uber.org/zap"
 
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
+
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 var _ block.Visitor = (*rejector)(nil)
@@ -16,7 +23,9 @@ var _ block.Visitor = (*rejector)(nil)
 // being shutdown.
 type rejector struct {
 	*backend
-	addTxsToMempool bool
+
+	txExecutorBackend *executor.Backend
+	addTxsToMempool   bool
 }
 
 func (r *rejector) BanffAbortBlock(b *block.BanffAbortBlock) error {
@@ -71,8 +80,53 @@ func (r *rejector) rejectBlock(b block.Block, blockType string) error {
 		return nil
 	}
 
+	preferredState, err := state.NewDiff(r.backend.Preferred(), r.backend)
+	if err != nil {
+		return err
+	}
+
+	var (
+		currentTimestamp = preferredState.GetTimestamp()
+		cfg              = r.txExecutorBackend.Config
+		isEActive        = cfg.IsEActivated(currentTimestamp)
+		feesCfg          = config.GetDynamicFeesConfig(isEActive)
+	)
+
+	feeRates, err := preferredState.GetFeeRates()
+	if err != nil {
+		return err
+	}
+	feeManager := commonfees.NewManager(feeRates)
+	if isEActive {
+		nextBlkTime, _, err := state.NextBlockTime(preferredState, r.txExecutorBackend.Clk)
+		if err != nil {
+			return err
+		}
+
+		feeManager, err = fee.UpdatedFeeManager(preferredState, cfg, currentTimestamp, nextBlkTime)
+		if err != nil {
+			return err
+		}
+	}
+
 	for _, tx := range b.Txs() {
-		if err := r.Mempool.Add(tx); err != nil {
+		// With dynamic fees, the rejected txs may not be able to pay the updated required fee.
+		// We recheck only the fees, withouth re-validating the whole transaction.
+		feeManager.ResetComplexity()
+
+		feeCalculator := fee.NewDynamicCalculator(cfg, logging.NoLog{}, currentTimestamp, feeManager, feesCfg.BlockMaxComplexity, tx.Creds)
+
+		if err := tx.Unsigned.Visit(feeCalculator); err != nil {
+			r.ctx.Log.Info(
+				"tx failed fees checks",
+				zap.Stringer("txID", tx.ID()),
+				zap.Stringer("blkID", blkID),
+				zap.Error(err),
+			)
+		}
+
+		// TODO ABENEGIA: re-validate txs here. Tip may have changed due to change in base fee!!!
+		if err := r.Mempool.Add(tx, feeCalculator.TipPercentage); err != nil {
 			r.ctx.Log.Debug(
 				"failed to reissue tx",
 				zap.Stringer("txID", tx.ID()),

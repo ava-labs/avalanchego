@@ -17,6 +17,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 var preFundedKeys = secp256k1.TestKeys()
@@ -37,7 +39,7 @@ func TestBlockBuilderMaxMempoolSizeHandling(t *testing.T) {
 	// shortcut to simulated almost filled mempool
 	mpool.(*mempool).bytesAvailable = len(tx.Bytes()) - 1
 
-	err = mpool.Add(tx)
+	err = mpool.Add(tx, commonfees.NoTip)
 	require.ErrorIs(err, ErrMempoolFull)
 
 	// tx should not be marked as dropped if the mempool is full
@@ -48,7 +50,7 @@ func TestBlockBuilderMaxMempoolSizeHandling(t *testing.T) {
 	// shortcut to simulated almost filled mempool
 	mpool.(*mempool).bytesAvailable = len(tx.Bytes())
 
-	err = mpool.Add(tx)
+	err = mpool.Add(tx, commonfees.NoTip)
 	require.NoError(err, "should have added tx to mempool")
 }
 
@@ -68,7 +70,7 @@ func TestDecisionTxsInMempool(t *testing.T) {
 		require.False(ok)
 
 		// we can insert
-		require.NoError(mpool.Add(tx))
+		require.NoError(mpool.Add(tx, commonfees.NoTip))
 
 		// we can get it
 		got, ok := mpool.Get(tx.ID())
@@ -82,7 +84,7 @@ func TestDecisionTxsInMempool(t *testing.T) {
 		require.False(ok)
 
 		// we can reinsert it again to grow the mempool
-		require.NoError(mpool.Add(tx))
+		require.NoError(mpool.Add(tx, commonfees.NoTip))
 	}
 }
 
@@ -104,7 +106,7 @@ func TestProposalTxsInMempool(t *testing.T) {
 		require.False(ok)
 
 		// we can insert
-		require.NoError(mpool.Add(tx))
+		require.NoError(mpool.Add(tx, commonfees.NoTip))
 
 		// we can get it
 		got, ok := mpool.Get(tx.ID())
@@ -118,7 +120,7 @@ func TestProposalTxsInMempool(t *testing.T) {
 		require.False(ok)
 
 		// we can reinsert it again to grow the mempool
-		require.NoError(mpool.Add(tx))
+		require.NoError(mpool.Add(tx, commonfees.NoTip))
 	}
 }
 
@@ -218,8 +220,8 @@ func TestPeekTxs(t *testing.T) {
 	require.False(exists)
 	require.Nil(tx)
 
-	require.NoError(mempool.Add(testDecisionTxs[0]))
-	require.NoError(mempool.Add(testProposalTxs[0]))
+	require.NoError(mempool.Add(testDecisionTxs[0], commonfees.NoTip))
+	require.NoError(mempool.Add(testProposalTxs[0], commonfees.NoTip))
 
 	tx, exists = mempool.Peek()
 	require.True(exists)
@@ -253,7 +255,7 @@ func TestRemoveConflicts(t *testing.T) {
 	conflictTxs, err := createTestDecisionTxs(1)
 	require.NoError(err)
 
-	require.NoError(mempool.Add(txs[0]))
+	require.NoError(mempool.Add(txs[0], commonfees.NoTip))
 
 	tx, exists := mempool.Peek()
 	require.True(exists)
@@ -281,8 +283,8 @@ func TestIterate(t *testing.T) {
 	require.NoError(err)
 	proposalTx := testProposalTxs[0]
 
-	require.NoError(mempool.Add(decisionTx))
-	require.NoError(mempool.Add(proposalTx))
+	require.NoError(mempool.Add(decisionTx, commonfees.NoTip))
+	require.NoError(mempool.Add(proposalTx, commonfees.NoTip))
 
 	expectedSet := set.Of(
 		decisionTx.ID(),

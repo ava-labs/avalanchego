@@ -17,6 +17,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/mempool"
+
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 var (
@@ -114,12 +116,13 @@ func (g *gossipMempool) Add(tx *txs.Tx) error {
 	}
 
 	// Verify the tx at the currently preferred state
-	if err := g.txVerifier.VerifyTx(tx); err != nil {
+	tipPercentage, err := g.txVerifier.VerifyTx(tx)
+	if err != nil {
 		g.Mempool.MarkDropped(txID, err)
 		return err
 	}
 
-	return g.AddWithoutVerification(tx)
+	return g.AddWithoutVerification(tx, tipPercentage)
 }
 
 func (g *gossipMempool) Has(txID ids.ID) bool {
@@ -127,8 +130,8 @@ func (g *gossipMempool) Has(txID ids.ID) bool {
 	return ok
 }
 
-func (g *gossipMempool) AddWithoutVerification(tx *txs.Tx) error {
-	if err := g.Mempool.Add(tx); err != nil {
+func (g *gossipMempool) AddWithoutVerification(tx *txs.Tx, tipPercentage commonfees.TipPercentage) error {
+	if err := g.Mempool.Add(tx, tipPercentage); err != nil {
 		g.Mempool.MarkDropped(tx.ID(), err)
 		return err
 	}

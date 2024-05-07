@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/fees"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -252,6 +253,7 @@ func TestRewardDelegatorTxExecuteOnCommitPreDelegateeDeferral(t *testing.T) {
 		},
 		reward.PercentDenominator/4,
 		[]*secp256k1.PrivateKey{preFundedKeys[0]},
+		fees.NoTip,
 	)
 	require.NoError(err)
 
@@ -270,6 +272,7 @@ func TestRewardDelegatorTxExecuteOnCommitPreDelegateeDeferral(t *testing.T) {
 			Addrs:     []ids.ShortID{delRewardAddress},
 		},
 		[]*secp256k1.PrivateKey{preFundedKeys[0]},
+		fees.NoTip,
 	)
 	require.NoError(err)
 
@@ -381,6 +384,7 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 		},
 		reward.PercentDenominator/4,
 		[]*secp256k1.PrivateKey{preFundedKeys[0]},
+		fees.NoTip,
 	)
 	require.NoError(err)
 
@@ -399,6 +403,7 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 			Addrs:     []ids.ShortID{delRewardAddress},
 		},
 		[]*secp256k1.PrivateKey{preFundedKeys[0]},
+		fees.NoTip,
 	)
 	require.NoError(err)
 
@@ -605,6 +610,7 @@ func TestRewardDelegatorTxAndValidatorTxExecuteOnCommitPostDelegateeDeferral(t *
 		},
 		reward.PercentDenominator/4,
 		[]*secp256k1.PrivateKey{preFundedKeys[0]},
+		fees.NoTip,
 	)
 	require.NoError(err)
 
@@ -623,6 +629,7 @@ func TestRewardDelegatorTxAndValidatorTxExecuteOnCommitPostDelegateeDeferral(t *
 			Addrs:     []ids.ShortID{delRewardAddress},
 		},
 		[]*secp256k1.PrivateKey{preFundedKeys[0]},
+		fees.NoTip,
 	)
 	require.NoError(err)
 
@@ -775,6 +782,7 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 		},
 		reward.PercentDenominator/4,
 		[]*secp256k1.PrivateKey{preFundedKeys[0]},
+		fees.NoTip,
 	)
 	require.NoError(err)
 
@@ -792,6 +800,7 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 			Addrs:     []ids.ShortID{delRewardAddress},
 		},
 		[]*secp256k1.PrivateKey{preFundedKeys[0]},
+		fees.NoTip,
 	)
 	require.NoError(err)
 

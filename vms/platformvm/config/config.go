@@ -144,20 +144,6 @@ func (c *Config) IsEActivated(timestamp time.Time) bool {
 	return !timestamp.Before(c.EUpgradeTime)
 }
 
-func (c *Config) GetCreateBlockchainTxFee(timestamp time.Time) uint64 {
-	if c.IsApricotPhase3Activated(timestamp) {
-		return c.CreateBlockchainTxFee
-	}
-	return c.CreateAssetTxFee
-}
-
-func (c *Config) GetCreateSubnetTxFee(timestamp time.Time) uint64 {
-	if c.IsApricotPhase3Activated(timestamp) {
-		return c.CreateSubnetTxFee
-	}
-	return c.CreateAssetTxFee
-}
-
 // Create the blockchain described in [tx], but only if this node is a member of
 // the subnet that validates the chain
 func (c *Config) CreateChain(chainID ids.ID, tx *txs.CreateChainTx) {

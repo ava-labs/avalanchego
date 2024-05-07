@@ -110,7 +110,11 @@ func (vm *VM) Initialize(
 	if err != nil {
 		return err
 	}
-	chainCtx.Log.Info("using VM execution config", zap.Reflect("config", execConfig))
+	chainCtx.Log.Info("retrieved VM execution config", zap.Reflect("config", execConfig))
+
+	if err := config.ResetDynamicFeesConfig(chainCtx, execConfig.DynamicFeesConfig); err != nil {
+		return fmt.Errorf("failed resetting dynamic fees config: %w", err)
+	}
 
 	registerer := prometheus.NewRegistry()
 	if err := chainCtx.Metrics.Register(registerer); err != nil {
@@ -169,6 +173,9 @@ func (vm *VM) Initialize(
 	mempool, err := mempool.New("mempool", registerer, toEngine)
 	if err != nil {
 		return fmt.Errorf("failed to create mempool: %w", err)
+	}
+	if vm.IsEActivated(vm.state.GetTimestamp()) {
+		mempool.SetEUpgradeActive()
 	}
 
 	vm.manager = blockexecutor.NewManager(
@@ -273,11 +280,12 @@ func (vm *VM) pruneMempool() error {
 		return err
 	}
 
-	for _, tx := range blockTxs {
-		if err := vm.Builder.Add(tx); err != nil {
+	for _, v := range blockTxs {
+		// TODO ABENEGIA: make PackBlockTxs return tipPercentage too!
+		if err := vm.Builder.Add(v.Tx, v.TipPercentage); err != nil {
 			vm.ctx.Log.Debug(
 				"failed to reissue tx",
-				zap.Stringer("txID", tx.ID()),
+				zap.Stringer("txID", v.Tx.ID()),
 				zap.Error(err),
 			)
 		}

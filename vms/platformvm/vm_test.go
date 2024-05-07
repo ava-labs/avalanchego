@@ -57,6 +57,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
@@ -65,6 +66,7 @@ import (
 	smeng "github.com/ava-labs/avalanchego/snow/engine/snowman"
 	snowgetter "github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
 	timetracker "github.com/ava-labs/avalanchego/snow/networking/tracker"
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 	blockbuilder "github.com/ava-labs/avalanchego/vms/platformvm/block/builder"
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
@@ -80,7 +82,7 @@ const (
 	durango
 	eUpgrade
 
-	latestFork = durango
+	latestFork fork = eUpgrade
 
 	defaultWeight uint64 = 10000
 )
@@ -306,6 +308,7 @@ func defaultVM(t *testing.T, f fork) (*VM, *txstest.Builder, database.Database, 
 	builder := txstest.NewBuilder(
 		ctx,
 		&vm.Config,
+		&vm.clock,
 		vm.state,
 	)
 
@@ -323,6 +326,7 @@ func defaultVM(t *testing.T, f fork) (*VM, *txstest.Builder, database.Database, 
 			},
 		},
 		[]*secp256k1.PrivateKey{keys[0]}, // pays tx fee
+		commonfees.NoTip,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
@@ -384,7 +388,24 @@ func TestGenesis(t *testing.T) {
 			require.NoError(err)
 
 			require.Equal(utxo.Address, addr)
-			require.Equal(uint64(utxo.Amount)-vm.CreateSubnetTxFee, out.Amount())
+
+			// we use the first key to fund a subnet creation in [defaultGenesis].
+			// As such we need to account for the subnet creation fee
+			var (
+				chainTime = vm.state.GetTimestamp()
+
+				feeCalc *fee.Calculator
+			)
+
+			feeRates, err := vm.state.GetFeeRates()
+			require.NoError(err)
+
+			feeCfg := config.GetDynamicFeesConfig(vm.Config.IsEActivated(chainTime))
+			feeMan := commonfees.NewManager(feeRates)
+			feeCalc = fee.NewDynamicCalculator(&vm.Config, logging.NoLog{}, chainTime, feeMan, feeCfg.BlockMaxComplexity, testSubnet1.Creds)
+
+			require.NoError(testSubnet1.Unsigned.Visit(feeCalc))
+			require.Equal(uint64(utxo.Amount)-feeCalc.Fee, out.Amount())
 		}
 	}
 
@@ -441,6 +462,7 @@ func TestAddValidatorCommit(t *testing.T) {
 		},
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[0]},
+		commonfees.NoTip,
 	)
 	require.NoError(err)
 
@@ -489,6 +511,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 		},
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[0]},
+		commonfees.NoTip,
 	)
 	require.NoError(err)
 
@@ -546,6 +569,7 @@ func TestAddValidatorReject(t *testing.T) {
 		},
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[0]},
+		commonfees.NoTip,
 	)
 	require.NoError(err)
 
@@ -606,6 +630,7 @@ func TestAddValidatorInvalidNotReissued(t *testing.T) {
 		},
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[0]},
+		commonfees.NoTip,
 	)
 	require.NoError(err)
 
@@ -643,6 +668,7 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 			Subnet: testSubnet1.ID(),
 		},
 		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+		commonfees.NoTip,
 	)
 	require.NoError(err)
 
@@ -693,6 +719,7 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 			Subnet: testSubnet1.ID(),
 		},
 		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[1], testSubnet1ControlKeys[2]},
+		commonfees.NoTip,
 	)
 	require.NoError(err)
 
@@ -878,6 +905,7 @@ func TestCreateChain(t *testing.T) {
 		nil,
 		"name",
 		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+		commonfees.NoTip,
 	)
 	require.NoError(err)
 
@@ -929,6 +957,7 @@ func TestCreateSubnet(t *testing.T) {
 			},
 		},
 		[]*secp256k1.PrivateKey{keys[0]}, // payer
+		commonfees.NoTip,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
@@ -979,6 +1008,7 @@ func TestCreateSubnet(t *testing.T) {
 			Subnet: createSubnetTx.ID(),
 		},
 		[]*secp256k1.PrivateKey{keys[0]},
+		commonfees.NoTip,
 	)
 	require.NoError(err)
 
@@ -1044,11 +1074,11 @@ func TestAtomicImport(t *testing.T) {
 			Addrs:     []ids.ShortID{recipientKey.PublicKey().Address()},
 		},
 		[]*secp256k1.PrivateKey{keys[0]},
+		commonfees.NoTip,
 	)
 	require.ErrorIs(err, walletbuilder.ErrInsufficientFunds)
 
 	// Provide the avm UTXO
-
 	utxo := &avax.UTXO{
 		UTXOID: utxoID,
 		Asset:  avax.Asset{ID: vm.ctx.AVAXAssetID},
@@ -1085,6 +1115,7 @@ func TestAtomicImport(t *testing.T) {
 			Addrs:     []ids.ShortID{recipientKey.PublicKey().Address()},
 		},
 		[]*secp256k1.PrivateKey{recipientKey},
+		commonfees.NoTip,
 	)
 	require.NoError(err)
 
@@ -2105,6 +2136,7 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 		},
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[0]},
+		commonfees.NoTip,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
@@ -2129,6 +2161,7 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 			Addrs:     []ids.ShortID{id},
 		},
 		[]*secp256k1.PrivateKey{keys[0]},
+		commonfees.NoTip,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
@@ -2158,6 +2191,7 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 			Subnet: createSubnetTx.ID(),
 		},
 		[]*secp256k1.PrivateKey{key, keys[1]},
+		commonfees.NoTip,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{keys[1].PublicKey().Address()},
@@ -2169,6 +2203,7 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 		nodeID,
 		createSubnetTx.ID(),
 		[]*secp256k1.PrivateKey{key, keys[2]},
+		commonfees.NoTip,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{keys[2].PublicKey().Address()},
@@ -2211,6 +2246,7 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 			Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
 		},
 		[]*secp256k1.PrivateKey{keys[0]},
+		commonfees.NoTip,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
@@ -2254,6 +2290,7 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 			Addrs:     []ids.ShortID{keys[1].PublicKey().Address()},
 		},
 		[]*secp256k1.PrivateKey{keys[0]},
+		commonfees.NoTip,
 	)
 	require.NoError(err)
 
@@ -2309,6 +2346,7 @@ func TestBaseTx(t *testing.T) {
 			},
 		},
 		[]*secp256k1.PrivateKey{keys[0]},
+		commonfees.NoTip,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{changeAddr},
@@ -2350,7 +2388,21 @@ func TestBaseTx(t *testing.T) {
 	}
 	require.Equal(totalOutputAmt, key0OutputAmt+key1OutputAmt+changeAddrOutputAmt)
 
-	require.Equal(vm.TxFee, totalInputAmt-totalOutputAmt)
+	var (
+		chainTime = vm.state.GetTimestamp()
+
+		feeCalc *fee.Calculator
+	)
+
+	feeRates, err := vm.state.GetFeeRates()
+	require.NoError(err)
+
+	feeCfg := config.GetDynamicFeesConfig(vm.Config.IsEActivated(chainTime))
+	feeMan := commonfees.NewManager(feeRates)
+	feeCalc = fee.NewDynamicCalculator(&vm.Config, logging.NoLog{}, chainTime, feeMan, feeCfg.BlockMaxComplexity, baseTx.Creds)
+
+	require.NoError(baseTx.Unsigned.Visit(feeCalc))
+	require.Equal(feeCalc.Fee, totalInputAmt-totalOutputAmt)
 	require.Equal(sendAmt, key1OutputAmt)
 
 	vm.ctx.Lock.Unlock()
@@ -2370,7 +2422,7 @@ func TestBaseTx(t *testing.T) {
 
 func TestPruneMempool(t *testing.T) {
 	require := require.New(t)
-	vm, txBuilder, _, _ := defaultVM(t, latestFork)
+	vm, txBuilder, _, _ := defaultVM(t, durango)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
@@ -2394,6 +2446,7 @@ func TestPruneMempool(t *testing.T) {
 			},
 		},
 		[]*secp256k1.PrivateKey{keys[0]},
+		commonfees.NoTip,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{changeAddr},
@@ -2441,6 +2494,7 @@ func TestPruneMempool(t *testing.T) {
 		},
 		20000,
 		[]*secp256k1.PrivateKey{keys[1]},
+		commonfees.NoTip,
 	)
 	require.NoError(err)
 

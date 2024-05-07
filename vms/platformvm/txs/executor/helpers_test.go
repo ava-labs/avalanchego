@@ -41,10 +41,13 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
+
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 const (
@@ -145,6 +148,7 @@ func newEnvironment(t *testing.T, f fork) *environment {
 	txBuilder := txstest.NewBuilder(
 		ctx,
 		config,
+		clk,
 		baseState,
 	)
 
@@ -219,6 +223,7 @@ func addSubnet(t *testing.T, env *environment) {
 			},
 		},
 		[]*secp256k1.PrivateKey{preFundedKeys[0]},
+		commonfees.NoTip,
 		common.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
@@ -230,10 +235,20 @@ func addSubnet(t *testing.T, env *environment) {
 	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
+	currentChainTime := env.state.GetTimestamp()
+	nextChainTime, _, err := state.NextBlockTime(stateDiff, env.clk)
+	require.NoError(err)
+
+	feeManager, err := fee.UpdatedFeeManager(stateDiff, env.config, currentChainTime, nextChainTime)
+	require.NoError(err)
+
+	feeCfg := config.GetDynamicFeesConfig(env.config.IsEActivated(currentChainTime))
 	executor := StandardTxExecutor{
-		Backend: &env.backend,
-		State:   stateDiff,
-		Tx:      testSubnet1,
+		Backend:            &env.backend,
+		BlkFeeManager:      feeManager,
+		BlockMaxComplexity: feeCfg.BlockMaxComplexity,
+		State:              stateDiff,
+		Tx:                 testSubnet1,
 	}
 	require.NoError(testSubnet1.Unsigned.Visit(&executor))
 
