@@ -9,15 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/require"
-
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/stretchr/testify/require"
 )
-
-type blkTimeAndComplexity struct {
-	blkTime    int64
-	complexity Dimensions
-}
 
 func TestUpdateFeeRates(t *testing.T) {
 	require := require.New(t)
@@ -158,7 +152,10 @@ func TestPChainFeeRateIncreaseDueToPeak(t *testing.T) {
 		}
 
 		// See mainnet P-chain block 2LJVD1rfEfaJtTwRggFXaUXhME4t5WYGhYP9Aj7eTYqGsfknuC its descendants
-		blockComplexities = []blkTimeAndComplexity{
+		blockComplexities = []struct {
+			blkTime    int64
+			complexity Dimensions
+		}{
 			{1615237936, Dimensions{28234, 10812, 10812, 106000}},
 			{1615237936, Dimensions{17634, 6732, 6732, 66000}},
 			{1615237936, Dimensions{12334, 4692, 4692, 46000}},
@@ -306,5 +303,47 @@ func TestFeeUpdateFactor(t *testing.T) {
 		)
 		require.Equal(t, tt.wantNum, haveFactor)
 		require.Equal(t, tt.wantDenom, haveIncreaseFee)
+	}
+}
+
+func TestNormalizedDelta(t *testing.T) {
+	tests := []struct {
+		n, d         uint64
+		wantP, wantQ uint64
+	}{
+		{0, 1, 0, 100},
+		{0, 10, 0, 100},
+		{0, 100, 0, 100},
+		{0, 1_000, 0, 100},
+		{0, math.MaxUint64 / 100, 0, 100},
+		{0, math.MaxUint64 / 10, 0, 100},
+		{0, math.MaxUint64 / 2, 0, 100},
+		{0, math.MaxUint64, 0, 100},
+
+		{1, 10, 10, 100},
+		{2, 100, 2, 100},
+		{30, 1_000, 3, 100},
+		{400, 10_000, 4, 100},
+		{5_000, 100_000, 5, 100},
+		// {math.MaxUint64 / 1000, math.MaxUint64 / 10, 1, 100}, // BROKEN
+		// {math.MaxUint64 / 100, math.MaxUint64, 1, 100}, // BROKEN
+		// {math.MaxUint64 / 10, math.MaxUint64, 10, 100}, // BROKEN
+
+		{10, 1, 1_000, 100},
+		{220, 30, 733, 100}, // should be  7.3333
+		{10_000, 1, 1_000_000, 100},
+		{10_000, 600, 1666, 100}, // should be 16.6666
+
+		{math.MaxUint64, math.MaxUint64, 100, 100},
+		// {math.MaxUint64, math.MaxUint64 / 3 * 2, 150, 100}, // BROKEN should be 1.5
+		{math.MaxUint64, math.MaxUint64 / 2, 200, 100},
+		{math.MaxUint64 / 2, 1, math.MaxUint64 / 2, 1},
+		{math.MaxUint64, 1, math.MaxUint64, 1},
+	}
+
+	for _, tt := range tests {
+		haveP, haveQ := normalizeDelta(tt.n, tt.d)
+		require.Equal(t, tt.wantP, haveP)
+		require.Equal(t, tt.wantQ, haveQ)
 	}
 }

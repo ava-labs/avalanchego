@@ -95,6 +95,21 @@ func (m *Manager) RemoveComplexity(unitsToRm Dimensions) error {
 	return nil
 }
 
+// UpdateFeeRates calculates next fee rates.
+// We update the fee rate with the formula:
+//
+//	feeRate_{t+1} = Max(feeRate_t * exp(k*delta), minFeeRate)
+//
+// where
+//
+//	delta == (parentComplexity - targetBlkComplexity)/targetBlkComplexity
+//
+// and [targetBlkComplexity] is the target complexity expected in the elapsed time.
+// We update the fee rate trying to guarantee the following stability property:
+//
+//	feeRate(delta) * feeRate(-delta) = 1
+//
+// so that fee rates won't change much when block complexity wiggles around target complexity
 func (m *Manager) UpdateFeeRates(
 	feesConfig DynamicFeesConfig,
 	parentBlkComplexity Dimensions,
@@ -103,15 +118,6 @@ func (m *Manager) UpdateFeeRates(
 	if childBlkTime < parentBlkTime {
 		return fmt.Errorf("unexpected block times, parentBlkTim %v, childBlkTime %v", parentBlkTime, childBlkTime)
 	}
-
-	// We update the fee rate with the formula:
-	//     feeRate_{t+1} = feeRate_t * exp(k*delta)
-	// where
-	//     delta == (parentComplexity - targetBlkComplexity)/targetBlkComplexity
-	// and [targetBlkComplexity] is the target complexity expected in the elapsed time.
-	// We update the fee rate trying to guarantee the following stability property:
-	// 		feeRate(delta) * feeRate(-delta) = 1
-	// so that fee rates won't change much when block complexity wiggles around target complexity
 
 	elapsedTime := uint64(childBlkTime - parentBlkTime)
 	for i := Dimension(0); i < FeeDimensions; i++ {
@@ -138,16 +144,32 @@ func (m *Manager) UpdateFeeRates(
 	return nil
 }
 
-func updateFactor(k, b, t uint64) (uint64, uint64) {
-	// We use the following piece-wise approximation for the exponential function:
-	//
-	//	if B > T --> exp{k * (B-T)/T} ≈≈    Approx(k,B,T)
-	//  if B < T --> exp{k * (B-T)/T} ≈≈ 1/ Approx(k,B,T)
-	//
-	// Note that the approximation guarantees that factor(delta)*factor(-delta) == 1
-	// We express the result with the pair (numerator, denominator)
-	// to increase precision with small deltas
+func targetComplexity(targetComplexityRate, elapsedTime, maxBlockComplexity uint64) uint64 {
+	// parent and child block may have the same timestamp. In this case targetComplexity will match targetComplexityRate
+	elapsedTime = max(1, elapsedTime)
+	targetComplexity, over := safemath.Mul64(targetComplexityRate, elapsedTime)
+	if over != nil {
+		targetComplexity = maxBlockComplexity
+	}
 
+	// regardless how low network load has been, we won't allow
+	// blocks larger than max block complexity
+	targetComplexity = min(targetComplexity, maxBlockComplexity)
+	return targetComplexity
+}
+
+// updateFactor uses the following piece-wise approximation for the exponential function:
+//
+//	if B > T --> exp{k * (B-T)/T} ≈≈    Approx(k,B,T)
+//	if B < T --> exp{k * (B-T)/T} ≈≈ 1/ Approx(k,B,T)
+//
+// Note that the approximation guarantees stability, since
+//
+//	factor(k, B=T+X, T)*factor(k, B=T-X, T) == 1
+//
+// We express the result with the pair (numerator, denominator)
+// to increase precision with small deltas
+func updateFactor(k, b, t uint64) (uint64, uint64) {
 	if b == t {
 		return 1, 1 // complexity matches target, nothing to update
 	}
@@ -165,27 +187,47 @@ func updateFactor(k, b, t uint64) (uint64, uint64) {
 		delta = t - b
 	}
 
-	var n, d uint64
-	x, over := safemath.Mul64(k, delta)
+	n, over := safemath.Mul64(k, delta)
 	if over != nil {
-		x = math.MaxUint64
+		n = math.MaxUint64
 	}
-	y, over := safemath.Mul64(CoeffDenom, t)
+	d, over := safemath.Mul64(CoeffDenom, t)
 	if over != nil {
-		y = math.MaxUint64
+		d = math.MaxUint64
 	}
 
-	n, d = ExpPiecewiseApproximation(x, y)
-	// n, d = expTaylorApproximation(a, b)
-
+	x, y := normalizeDelta(n, d)
+	p, q := ExpPiecewiseApproximation(x, y)
 	if increaseFee {
-		return n, d
+		return p, q
 	}
-	return d, n
+	return q, p
+}
+
+func normalizeDelta(n, d uint64) (uint64, uint64) {
+	var (
+		p = n / d
+		q = uint64(1)
+		r = n % d
+	)
+	for i := 1; i <= 2; i++ {
+		p1, over := safemath.Mul64(10, p)
+		if over != nil {
+			break
+		}
+		n, over = safemath.Mul64(10, r)
+		if over != nil {
+			n = math.MaxUint64
+		}
+		p = p1 + n/d
+		q *= 10
+		r = n % d
+	}
+
+	return p, q
 }
 
 // piecewise approximation data. exp(x) ≈≈ m_i * x ± q_i in [i,i+1]
-
 func ExpPiecewiseApproximation(a, b uint64) (uint64, uint64) { // exported to appease linter.
 	var (
 		m, q uint64
@@ -267,23 +309,4 @@ func ExpTaylorApproximation(a, b uint64) (uint64, uint64) { // exported to appea
 		n = math.MaxUint64
 	}
 	return n, d
-}
-
-func targetComplexity(
-	targetComplexityRate,
-	elapsedTime,
-	maxBlockComplexity uint64,
-) uint64 {
-	// parent and child block may have the same timestamp. In this case targetComplexity will match targetComplexityRate
-	elapsedTime = max(1, elapsedTime)
-	targetComplexity, over := safemath.Mul64(targetComplexityRate, elapsedTime)
-	if over != nil {
-		targetComplexity = maxBlockComplexity
-	}
-
-	// regardless how low network load has been, we won't allow
-	// blocks larger than max block complexity
-	targetComplexity = min(targetComplexity, maxBlockComplexity)
-
-	return targetComplexity
 }
