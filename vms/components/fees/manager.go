@@ -11,7 +11,7 @@ import (
 )
 
 // the update fee algorithm has a UpdateCoefficient, normalized to [CoeffDenom]
-const CoeffDenom = uint64(1_000)
+const CoeffDenom = uint64(20)
 
 type Manager struct {
 	// Avax denominated fee rates, i.e. fees per unit of complexity.
@@ -196,39 +196,15 @@ func updateFactor(k, b, t uint64) (uint64, uint64) {
 		d = math.MaxUint64
 	}
 
-	x, y := normalizeDelta(n, d)
-	p, q := ExpPiecewiseApproximation(x, y)
+	p, q := expPiecewiseApproximation(n, d)
 	if increaseFee {
 		return p, q
 	}
 	return q, p
 }
 
-func normalizeDelta(n, d uint64) (uint64, uint64) {
-	var (
-		p = n / d
-		q = uint64(1)
-		r = n % d
-	)
-	for i := 1; i <= 2; i++ {
-		p1, over := safemath.Mul64(10, p)
-		if over != nil {
-			break
-		}
-		n, over = safemath.Mul64(10, r)
-		if over != nil {
-			n = math.MaxUint64
-		}
-		p = p1 + n/d
-		q *= 10
-		r = n % d
-	}
-
-	return p, q
-}
-
 // piecewise approximation data. exp(x) ≈≈ m_i * x ± q_i in [i,i+1]
-func ExpPiecewiseApproximation(a, b uint64) (uint64, uint64) { // exported to appease linter.
+func expPiecewiseApproximation(a, b uint64) (uint64, uint64) { // exported to appease linter.
 	var (
 		m, q uint64
 		sign bool
@@ -277,36 +253,4 @@ func ExpPiecewiseApproximation(a, b uint64) (uint64, uint64) { // exported to ap
 		}
 	}
 	return n, b
-}
-
-func ExpTaylorApproximation(a, b uint64) (uint64, uint64) { // exported to appease linter.
-	//	TAYLOR APPROXIMATION
-	// exp{A/B} ≈≈ 1 + A/B + 1/2 * A^2/B^2 == (B^2 + (A+B)^2) / (2*B^2)
-	var (
-		n, d, b2 uint64
-		over     error
-	)
-
-	b2, over = safemath.Mul64(b, b)
-	if over != nil {
-		b2 = math.MaxUint64
-	}
-
-	n, over = safemath.Add64(a, b)
-	if over != nil {
-		n = math.MaxUint64
-	}
-	n, over = safemath.Mul64(n, n)
-	if over != nil {
-		n = math.MaxUint64
-	}
-	n, over = safemath.Add64(b2, n)
-	if over != nil {
-		n = math.MaxUint64
-	}
-	d, over = safemath.Mul64(2, b2)
-	if over != nil {
-		n = math.MaxUint64
-	}
-	return n, d
 }

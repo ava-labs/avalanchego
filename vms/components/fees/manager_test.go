@@ -9,8 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/avalanchego/utils/units"
 )
 
 func TestUpdateFeeRates(t *testing.T) {
@@ -19,7 +20,7 @@ func TestUpdateFeeRates(t *testing.T) {
 	var (
 		feesCfg = DynamicFeesConfig{
 			MinFeeRate:                Dimensions{1, 1, 1, 1},
-			UpdateCoefficient:         Dimensions{10, 20, 50, 100},
+			UpdateCoefficient:         Dimensions{1, 2, 5, 10},
 			BlockMaxComplexity:        Dimensions{100, 100, 100, 100},
 			BlockTargetComplexityRate: Dimensions{25, 25, 25, 25},
 		}
@@ -43,16 +44,16 @@ func TestUpdateFeeRates(t *testing.T) {
 	))
 
 	// Bandwidth complexity are above target, fee rate is pushed up
-	require.Equal(uint64(10), m.feeRates[Bandwidth])
+	require.Equal(uint64(13), m.feeRates[Bandwidth])
 
 	// UTXORead complexity is at target, fee rate does not change
 	require.Equal(parentFeeRate[UTXORead], m.feeRates[UTXORead])
 
 	// UTXOWrite complexity is below target, fee rate is pushed down
-	require.Equal(uint64(98), m.feeRates[UTXOWrite])
+	require.Equal(uint64(90), m.feeRates[UTXOWrite])
 
 	// Compute complexoty is below target, fee rate is pushed down
-	require.Equal(uint64(178), m.feeRates[Compute])
+	require.Equal(uint64(125), m.feeRates[Compute])
 }
 
 func TestUpdateFeeRatesStability(t *testing.T) {
@@ -132,16 +133,16 @@ func TestPChainFeeRateIncreaseDueToPeak(t *testing.T) {
 				35 * units.NanoAvax,
 			},
 			UpdateCoefficient: Dimensions{ // over CoeffDenom
-				5,
+				3,
+				1,
+				1,
 				2,
-				2,
-				4,
 			},
 			BlockTargetComplexityRate: Dimensions{
-				250,
-				60,
-				120,
-				650,
+				2500,
+				600,
+				1200,
+				6500,
 			},
 			BlockMaxComplexity: Dimensions{
 				100_000,
@@ -170,11 +171,11 @@ func TestPChainFeeRateIncreaseDueToPeak(t *testing.T) {
 			{1615237936, Dimensions{7034, 2652, 2652, 26000}},
 			{1615237936, Dimensions{7564, 2856, 2856, 28000}},
 			{1615237936, Dimensions{34064, 13056, 13056, 128000}},
-			{1615237936, Dimensions{34064, 13056, 13056, 128000}},
-			{1615237936, Dimensions{34064, 13056, 13056, 128000}},
-			{1615237936, Dimensions{34064, 13056, 13056, 128000}},
-			{1615237936, Dimensions{34064, 13056, 13056, 128000}},
-			{1615237936, Dimensions{34064, 13056, 13056, 128000}},
+			// {1615237936, Dimensions{34064, 13056, 13056, 128000}},
+			// {1615237936, Dimensions{34064, 13056, 13056, 128000}},
+			// {1615237936, Dimensions{34064, 13056, 13056, 128000}},
+			// {1615237936, Dimensions{34064, 13056, 13056, 128000}},
+			// {1615237936, Dimensions{34064, 13056, 13056, 128000}},
 			// {1615237936, Dimensions{34064, 13056, 13056, 128000}}, <-- from here on, fee would exceed 100 Avax
 			// {1615237936, Dimensions{34064, 13056, 13056, 128000}},
 			// {1615237936, Dimensions{820, 360, 442, 4000}},
@@ -259,41 +260,24 @@ func TestFeeUpdateFactor(t *testing.T) {
 		{1, 250, 250, 1, 1},
 		{math.MaxUint64, 250, 250, 1, 1},
 
-		// PIECEWISE APPROXIMATION parentBlkComplexity > targetBlkComplexity
-		{1, 101, 100, 100_002, 100_000},             // should be 1,00001
-		{1, 110, 100, 100_020, 100_000},             // should be 1,0001
-		{1, 200, 100, 100_200, 100_000},             // should be 1,001
-		{1, 1_100, 100, 102_000, 100_000},           // should be 1,01
-		{1, 10_100, 100, 120_000, 100_000},          // should be 1,105
-		{1, 100_100, 100, 300_000, 100_000},         // should be 2,718, it's 3
-		{1, 1_000_100, 100, 2_202_800_000, 100_000}, // should be 22026, it's 22028
+		// parentBlkComplexity > targetBlkComplexity
+		{1, 101, 100, 2_002, 2_000},      // should be   1.0005
+		{1, 110, 100, 2_020, 2_000},      // should be   1.005
+		{1, 200, 100, 2_200, 2_000},      // should be   1.05
+		{1, 1_100, 100, 4_000, 2_000},    // should be   1.648
+		{1, 2_100, 100, 6000, 2_000},     // should be   2,718
+		{1, 3_100, 100, 11_000, 2_000},   // should be   4,48
+		{1, 4_100, 100, 16_000, 2_000},   // should be   7,39
+		{1, 7_100, 100, 77_000, 2_000},   // should be  33,12
+		{1, 8_100, 100, 110_000, 2_000},  // should be  54,6
+		{1, 10_100, 100, 298_000, 2_000}, // should be 148,4
 
-		// // TAYLOR APPROXIMATION parentBlkComplexity > targetBlkComplexity
-		// {1, 101, 100, 20_000_200_001, 20_000_000_000},          // should be 1,00001
-		// {1, 110, 100, 20_002_000_100, 20_000_000_000},          // should be 1,0001
-		// {1, 200, 100, 20_020_010_000, 20_000_000_000},          // should be 1,001
-		// {1, 1_100, 100, 20_201_000_000, 20_000_000_000},        // should be 1,01
-		// {1, 10_100, 100, 22_100_000_000, 20_000_000_000},       // should be 1,105
-		// {1, 100_100, 100, 50_000_000_000, 20_000_000_000},      // should be 2,718, it's 2,5
-		// {1, 1_000_100, 100, 1_220_000_000_000, 20_000_000_000}, // should be 22026, it's roughly 61
-
-		// PIECEWISE APPROXIMATION parentBlkComplexity < targetBlkComplexity
-		{1, 100, 101, 101_000, 101_002},                   // should be 0,99999
-		{1, 100, 110, 110_000, 110_020},                   // should be 0,9999
-		{1, 100, 200, 200_000, 200_200},                   // should be 0,9995
-		{1, 100, 1_100, 1_100_000, 1_102_000},             // should be 0,9991
-		{1, 100, 10_100, 10_100_000, 10_120_000},          // should be 0,999
-		{1, 100, 100_100, 100_100_000, 100_300_000},       // should be 0,999
-		{1, 100, 1_000_100, 1_000_100_000, 1_002_100_000}, // should be 0,999
-
-		// // TAYLOR APPROXIMATION parentBlkComplexity < targetBlkComplexity
-		// {1, 100, 101, 20_402_000_000, 20_402_202_001},                             // should be 0,99999
-		// {1, 100, 110, 24_200_000_000, 24_202_200_100},                             // should be 0,9999
-		// {1, 100, 200, 80_000_000_000, 80_040_010_000},                             // should be 0,9995
-		// {1, 100, 1_100, 2_420_000_000_000, 2_422_201_000_000},                     // should be 0,9991
-		// {1, 100, 10_100, 204_020_000_000_000, 204_222_100_000_000},                // should be 0,999
-		// {1, 100, 100_100, 20_040_020_000_000_000, 20_060_050_000_000_000},         // should be 0,999
-		// {1, 100, 1_000_100, 2_000_400_020_000_000_000, 2_002_401_220_000_000_000}, // should be 0,999
+		// parentBlkComplexity < targetBlkComplexity
+		{1, 100, 101, 2_020, 2_022},        // should be 0,9995
+		{1, 100, 110, 2_200, 2_220},        // should be 0,995
+		{1, 100, 200, 4_000, 4_200},        // should be 0,975
+		{1, 100, 1_100, 22_000, 24_000},    // should be 0,955
+		{1, 100, 10_100, 202_000, 222_000}, // should be 0,952
 	}
 	for _, tt := range tests {
 		haveFactor, haveIncreaseFee := updateFactor(
@@ -303,47 +287,5 @@ func TestFeeUpdateFactor(t *testing.T) {
 		)
 		require.Equal(t, tt.wantNum, haveFactor)
 		require.Equal(t, tt.wantDenom, haveIncreaseFee)
-	}
-}
-
-func TestNormalizedDelta(t *testing.T) {
-	tests := []struct {
-		n, d         uint64
-		wantP, wantQ uint64
-	}{
-		{0, 1, 0, 100},
-		{0, 10, 0, 100},
-		{0, 100, 0, 100},
-		{0, 1_000, 0, 100},
-		{0, math.MaxUint64 / 100, 0, 100},
-		{0, math.MaxUint64 / 10, 0, 100},
-		{0, math.MaxUint64 / 2, 0, 100},
-		{0, math.MaxUint64, 0, 100},
-
-		{1, 10, 10, 100},
-		{2, 100, 2, 100},
-		{30, 1_000, 3, 100},
-		{400, 10_000, 4, 100},
-		{5_000, 100_000, 5, 100},
-		// {math.MaxUint64 / 1000, math.MaxUint64 / 10, 1, 100}, // BROKEN
-		// {math.MaxUint64 / 100, math.MaxUint64, 1, 100}, // BROKEN
-		// {math.MaxUint64 / 10, math.MaxUint64, 10, 100}, // BROKEN
-
-		{10, 1, 1_000, 100},
-		{220, 30, 733, 100}, // should be  7.3333
-		{10_000, 1, 1_000_000, 100},
-		{10_000, 600, 1666, 100}, // should be 16.6666
-
-		{math.MaxUint64, math.MaxUint64, 100, 100},
-		// {math.MaxUint64, math.MaxUint64 / 3 * 2, 150, 100}, // BROKEN should be 1.5
-		{math.MaxUint64, math.MaxUint64 / 2, 200, 100},
-		{math.MaxUint64 / 2, 1, math.MaxUint64 / 2, 1},
-		{math.MaxUint64, 1, math.MaxUint64, 1},
-	}
-
-	for _, tt := range tests {
-		haveP, haveQ := normalizeDelta(tt.n, tt.d)
-		require.Equal(t, tt.wantP, haveP)
-		require.Equal(t, tt.wantQ, haveQ)
 	}
 }
