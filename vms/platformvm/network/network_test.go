@@ -17,7 +17,9 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
+	"github.com/ava-labs/avalanchego/vms/txs/mempool"
+
+	pmempool "github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 )
 
 var (
@@ -58,7 +60,7 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 
 	type test struct {
 		name                      string
-		mempoolFunc               func(*gomock.Controller) mempool.Mempool
+		mempoolFunc               func(*gomock.Controller) pmempool.Mempool
 		txVerifier                testTxVerifier
 		partialSyncPrimaryNetwork bool
 		appSenderFunc             func(*gomock.Controller) common.AppSender
@@ -68,8 +70,8 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 	tests := []test{
 		{
 			name: "mempool has transaction",
-			mempoolFunc: func(ctrl *gomock.Controller) mempool.Mempool {
-				mempool := mempool.NewMockMempool(ctrl)
+			mempoolFunc: func(ctrl *gomock.Controller) pmempool.Mempool {
+				mempool := pmempool.NewMockMempool(ctrl)
 				mempool.EXPECT().Get(gomock.Any()).Return(tx, true)
 				return mempool
 			},
@@ -80,8 +82,8 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 		},
 		{
 			name: "transaction marked as dropped in mempool",
-			mempoolFunc: func(ctrl *gomock.Controller) mempool.Mempool {
-				mempool := mempool.NewMockMempool(ctrl)
+			mempoolFunc: func(ctrl *gomock.Controller) pmempool.Mempool {
+				mempool := pmempool.NewMockMempool(ctrl)
 				mempool.EXPECT().Get(gomock.Any()).Return(nil, false)
 				mempool.EXPECT().GetDropReason(gomock.Any()).Return(errTest)
 				return mempool
@@ -94,8 +96,8 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 		},
 		{
 			name: "transaction invalid",
-			mempoolFunc: func(ctrl *gomock.Controller) mempool.Mempool {
-				mempool := mempool.NewMockMempool(ctrl)
+			mempoolFunc: func(ctrl *gomock.Controller) pmempool.Mempool {
+				mempool := pmempool.NewMockMempool(ctrl)
 				mempool.EXPECT().Get(gomock.Any()).Return(nil, false)
 				mempool.EXPECT().GetDropReason(gomock.Any()).Return(nil)
 				mempool.EXPECT().MarkDropped(gomock.Any(), gomock.Any())
@@ -110,8 +112,8 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 		},
 		{
 			name: "can't add transaction to mempool",
-			mempoolFunc: func(ctrl *gomock.Controller) mempool.Mempool {
-				mempool := mempool.NewMockMempool(ctrl)
+			mempoolFunc: func(ctrl *gomock.Controller) pmempool.Mempool {
+				mempool := pmempool.NewMockMempool(ctrl)
 				mempool.EXPECT().Get(gomock.Any()).Return(nil, false)
 				mempool.EXPECT().GetDropReason(gomock.Any()).Return(nil)
 				mempool.EXPECT().Add(gomock.Any()).Return(errTest)
@@ -126,8 +128,8 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 		},
 		{
 			name: "mempool is disabled if primary network is not being fully synced",
-			mempoolFunc: func(ctrl *gomock.Controller) mempool.Mempool {
-				return mempool.NewMockMempool(ctrl)
+			mempoolFunc: func(ctrl *gomock.Controller) pmempool.Mempool {
+				return pmempool.NewMockMempool(ctrl)
 			},
 			partialSyncPrimaryNetwork: true,
 			appSenderFunc: func(ctrl *gomock.Controller) common.AppSender {
@@ -137,8 +139,8 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 		},
 		{
 			name: "happy path",
-			mempoolFunc: func(ctrl *gomock.Controller) mempool.Mempool {
-				mempool := mempool.NewMockMempool(ctrl)
+			mempoolFunc: func(ctrl *gomock.Controller) pmempool.Mempool {
+				mempool := pmempool.NewMockMempool(ctrl)
 				mempool.EXPECT().Get(gomock.Any()).Return(nil, false)
 				mempool.EXPECT().GetDropReason(gomock.Any()).Return(nil)
 				mempool.EXPECT().Add(gomock.Any()).Return(nil)

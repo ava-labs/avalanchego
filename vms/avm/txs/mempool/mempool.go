@@ -6,47 +6,27 @@ package mempool
 import (
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
+
 	txmempool "github.com/ava-labs/avalanchego/vms/txs/mempool"
 )
 
-var (
-	_ Mempool = (*mempool)(nil)
-
-	ErrDuplicateTx = txmempool.ErrDuplicateTx
-)
+var _ Mempool = (*mempool)(nil)
 
 // Mempool contains transactions that have not yet been put into a block.
 type Mempool interface {
-	Add(tx *txs.Tx) error
-	Get(txID ids.ID) (*txs.Tx, bool)
-	// Remove [txs] and any conflicts of [txs] from the mempool.
-	Remove(txs ...*txs.Tx)
-
-	// Peek returns the oldest tx in the mempool.
-	Peek() (tx *txs.Tx, exists bool)
-
-	// Iterate over transactions from oldest to newest until the function
-	// returns false or there are no more transactions.
-	Iterate(f func(tx *txs.Tx) bool)
+	txmempool.Mempool[*txs.Tx]
 
 	// RequestBuildBlock notifies the consensus engine that a block should be
 	// built if there is at least one transaction in the mempool.
 	RequestBuildBlock()
-
-	// Note: Dropped txs are added to droppedTxIDs but not evicted from
-	// unissued. This allows previously dropped txs to be possibly reissued.
-	MarkDropped(txID ids.ID, reason error)
-	GetDropReason(txID ids.ID) error
-
-	// Len returns the number of txs in the mempool.
-	Len() int
 }
 
 type mempool struct {
-	*txmempool.Mempool[*txs.Tx]
+	txmempool.Mempool[*txs.Tx]
+
+	toEngine chan<- common.Message
 }
 
 func New(
@@ -54,16 +34,26 @@ func New(
 	registerer prometheus.Registerer,
 	toEngine chan<- common.Message,
 ) (Mempool, error) {
-	m, err := txmempool.New[*txs.Tx](
-		namespace,
-		registerer,
-		toEngine,
-		"count",
-		"Number of transactions in the mempool",
+	metrics, err := txmempool.NewMetrics(namespace, registerer)
+	if err != nil {
+		return nil, err
+	}
+	pool := txmempool.New[*txs.Tx](
+		metrics,
 	)
-	return &mempool{m}, err
+	return &mempool{
+		Mempool:  pool,
+		toEngine: toEngine,
+	}, nil
 }
 
 func (m *mempool) RequestBuildBlock() {
-	m.Mempool.RequestBuildBlock(false)
+	if m.Len() == 0 {
+		return
+	}
+
+	select {
+	case m.toEngine <- common.PendingTxs:
+	default:
+	}
 }

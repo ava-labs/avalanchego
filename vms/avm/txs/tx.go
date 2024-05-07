@@ -88,6 +88,10 @@ func (t *Tx) Bytes() []byte {
 	return t.bytes
 }
 
+func (t *Tx) Size() int {
+	return len(t.bytes)
+}
+
 // UTXOs returns the UTXOs transaction is producing.
 func (t *Tx) UTXOs() []*avax.UTXO {
 	u := utxoGetter{tx: t}

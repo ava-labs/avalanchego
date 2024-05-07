@@ -93,6 +93,10 @@ func (tx *Tx) Bytes() []byte {
 	return tx.bytes
 }
 
+func (tx *Tx) Size() int {
+	return len(tx.bytes)
+}
+
 func (tx *Tx) ID() ids.ID {
 	return tx.TxID
 }
