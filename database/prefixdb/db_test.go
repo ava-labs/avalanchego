@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 )
@@ -22,6 +24,15 @@ func TestInterface(t *testing.T) {
 			test(t, NewNested([]byte("wor"), New([]byte("ld"), db)))
 			test(t, NewNested([]byte("ld"), New([]byte("wor"), db)))
 		})
+	}
+}
+
+func TestPrefixLimit(t *testing.T) {
+	testString := []string{"hello", "world", "a\xff", "\x01\xff\xff\xff\xff"}
+	expected := []string{"hellp", "worle", "b\x00", "\x02\x00\x00\x00\x00"}
+	for i, str := range testString {
+		db := newDB([]byte(str), nil)
+		require.Equal(t, db.dbLimit, []byte(expected[i]))
 	}
 }
 
