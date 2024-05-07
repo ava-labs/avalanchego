@@ -137,8 +137,7 @@ func execute(
 	totalNumberToProcess := tree.Len()
 	if totalNumberToProcess > minBlocksToCompact {
 		log("compacting database before executing blocks...")
-		err := db.Compact(nil, nil)
-		if err != nil {
+		if err := db.Compact(nil, nil); err != nil {
 			// Not a fatal error, log and move on.
 			log("failed to compact bootstrap database before executing blocks", zap.Error(err))
 		}
