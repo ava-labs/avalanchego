@@ -5,13 +5,8 @@
 
 package tmpnet
 
-import (
-	"os/exec"
-	"syscall"
-)
+import "os/exec"
 
 func configureDetachedProcess(cmd *exec.Cmd) {
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		CreationFlags: syscall.CREATE_NEW_PROCESS_GROUP,
-	}
+	panic("tmpnet deployment to windows is not supported")
 }
