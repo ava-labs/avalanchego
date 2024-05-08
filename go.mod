@@ -4,7 +4,7 @@ module github.com/ava-labs/avalanchego
 // CONTRIBUTING.md
 // README.md
 // go.mod (here)
-go 1.21.9
+go 1.21.10
 
 require (
 	github.com/DataDog/zstd v1.5.2
