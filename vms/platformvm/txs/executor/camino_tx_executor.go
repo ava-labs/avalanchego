@@ -1253,6 +1253,8 @@ func (e *CaminoStandardTxExecutor) RewardsImportTx(tx *txs.RewardsImportTx) erro
 		return err
 	}
 
+	chainTime := e.State.GetTimestamp()
+
 	if e.Bootstrapped.Get() {
 		// Getting all treasury utxos exported from c-chain, collecting ones that are old enough
 
@@ -1265,7 +1267,7 @@ func (e *CaminoStandardTxExecutor) RewardsImportTx(tx *txs.RewardsImportTx) erro
 			return fmt.Errorf("error fetching atomic UTXOs: %w", err)
 		}
 
-		chainTimestamp := uint64(e.State.GetTimestamp().Unix())
+		chainTimestamp := uint64(chainTime.Unix())
 
 		utxos := []*avax.UTXO{}
 		for _, utxoBytes := range allUTXOBytes {
@@ -1327,18 +1329,34 @@ func (e *CaminoStandardTxExecutor) RewardsImportTx(tx *txs.RewardsImportTx) erro
 			continue
 		}
 
-		addValidatorTx, _, err := e.State.GetTx(staker.TxID)
-		if err != nil {
-			return err
+		var txRewardOwner *secp256k1fx.OutputOwners
+		if e.Config.IsAthensPhaseActivated(chainTime) {
+			addValidatorTx, _, err := e.State.GetTx(staker.TxID)
+			if err != nil {
+				return err
+			}
+			unsignedAddValidatorTx, ok := addValidatorTx.Unsigned.(*txs.CaminoAddValidatorTx)
+			if !ok {
+				return errWrongTxType
+			}
+			txRewardOwner, ok = unsignedAddValidatorTx.RewardsOwner.(*secp256k1fx.OutputOwners)
+			if !ok {
+				return errWrongOwnerType
+			}
+		} else {
+			validatorAddr, err := e.State.GetShortIDLink(
+				ids.ShortID(staker.NodeID),
+				state.ShortLinkKeyRegisterNode,
+			)
+			if err != nil {
+				return err
+			}
+			txRewardOwner = &secp256k1fx.OutputOwners{
+				Threshold: 1,
+				Addrs:     []ids.ShortID{validatorAddr},
+			}
 		}
-		unsignedAddValidatorTx, ok := addValidatorTx.Unsigned.(*txs.CaminoAddValidatorTx)
-		if !ok {
-			return errWrongTxType
-		}
-		txRewardOwner, ok := unsignedAddValidatorTx.RewardsOwner.(*secp256k1fx.OutputOwners)
-		if !ok {
-			return errWrongOwnerType
-		}
+
 		ownerID, err := txs.GetOwnerID(txRewardOwner)
 		if err != nil {
 			return err
