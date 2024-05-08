@@ -156,3 +156,5 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	rsc.io/tmplfunc v0.0.3 // indirect
 )
+
+replace github.com/ava-labs/coreth => github.com/lebdron/coreth v0.12.9-rc.9.0.20240508233954-e7b07b849892
