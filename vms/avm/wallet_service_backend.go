@@ -13,14 +13,16 @@ import (
 	"github.com/ava-labs/avalanchego/utils/linked"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
+	"github.com/ava-labs/avalanchego/vms/avm/txs/builder"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/wallet/chain/x/builder"
+
+	walletbuilder "github.com/ava-labs/avalanchego/wallet/chain/x/builder"
 )
 
-var _ txBuilderBackend = (*walletServiceBackend)(nil)
+var _ builder.TxBuilderBackend = (*walletServiceBackend)(nil)
 
 func NewWalletServiceBackend(vm *VM) *walletServiceBackend {
-	backendCtx := &builder.Context{
+	backendCtx := &walletbuilder.Context{
 		NetworkID:        vm.ctx.NetworkID,
 		BlockchainID:     vm.ctx.XChainID,
 		AVAXAssetID:      vm.feeAssetID,
@@ -37,7 +39,7 @@ func NewWalletServiceBackend(vm *VM) *walletServiceBackend {
 }
 
 type walletServiceBackend struct {
-	ctx        *builder.Context
+	ctx        *walletbuilder.Context
 	vm         *VM
 	pendingTxs *linked.Hashmap[ids.ID, *txs.Tx]
 	utxos      []*avax.UTXO
@@ -45,7 +47,7 @@ type walletServiceBackend struct {
 	addrs set.Set[ids.ShortID]
 }
 
-func (b *walletServiceBackend) Context() *builder.Context {
+func (b *walletServiceBackend) Context() *walletbuilder.Context {
 	return b.ctx
 }
 
