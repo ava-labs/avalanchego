@@ -87,7 +87,7 @@ network := &tmpnet.Network{                   // Configure non-default values fo
     DefaultFlags: tmpnet.FlagsMap{
         config.LogLevelKey: "INFO",           // Change one of the network's defaults
     },
-    Nodes: tmpnet.NewNodesOrDie(5),           // Number of initial validating nodes
+    Nodes: tmpnet.NewNodesOrPanic(5),           // Number of initial validating nodes
     Subnets: []*tmpnet.Subnet{                // Subnets to create on the new network once it is running
         {
             Name: "xsvm-a",                   // User-defined name used to reference subnet in code and on disk

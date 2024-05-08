@@ -112,7 +112,7 @@ type Network struct {
 func NewDefaultNetwork(owner string) *Network {
 	return &Network{
 		Owner: owner,
-		Nodes: NewNodesOrDie(DefaultNodeCount),
+		Nodes: NewNodesOrPanic(DefaultNodeCount),
 	}
 }
 

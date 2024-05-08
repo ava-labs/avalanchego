@@ -104,7 +104,7 @@ func NewEphemeralNode(flags FlagsMap) *Node {
 }
 
 // Initializes the specified number of nodes.
-func NewNodesOrDie(count int) []*Node {
+func NewNodesOrPanic(count int) []*Node {
 	nodes := make([]*Node, count)
 	for i := range nodes {
 		node := NewNode("")

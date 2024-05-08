@@ -37,7 +37,7 @@ func init() {
 var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	// Run only once in the first ginkgo process
 
-	nodes := tmpnet.NewNodesOrDie(flagVars.NodeCount())
+	nodes := tmpnet.NewNodesOrPanic(flagVars.NodeCount())
 	subnets := vms.XSVMSubnets(nodes...)
 	return e2e.NewTestEnvironment(
 		flagVars,

@@ -66,7 +66,7 @@ func main() {
 
 			network := &tmpnet.Network{
 				Owner: networkOwner,
-				Nodes: tmpnet.NewNodesOrDie(int(nodeCount)),
+				Nodes: tmpnet.NewNodesOrPanic(int(nodeCount)),
 			}
 
 			// Extreme upper bound, should never take this long
