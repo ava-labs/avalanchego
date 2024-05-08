@@ -5,88 +5,191 @@ package meterdb
 
 import (
 	"context"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/utils/timer/mockable"
+	"github.com/ava-labs/avalanchego/utils"
 )
+
+const methodLabel = "method"
 
 var (
 	_ database.Database = (*Database)(nil)
 	_ database.Batch    = (*batch)(nil)
 	_ database.Iterator = (*iterator)(nil)
+
+	methodLabels = []string{methodLabel}
+	hasLabel     = prometheus.Labels{
+		methodLabel: "has",
+	}
+	getLabel = prometheus.Labels{
+		methodLabel: "get",
+	}
+	putLabel = prometheus.Labels{
+		methodLabel: "put",
+	}
+	deleteLabel = prometheus.Labels{
+		methodLabel: "delete",
+	}
+	newBatchLabel = prometheus.Labels{
+		methodLabel: "new_batch",
+	}
+	newIteratorLabel = prometheus.Labels{
+		methodLabel: "new_iterator",
+	}
+	compactLabel = prometheus.Labels{
+		methodLabel: "compact",
+	}
+	closeLabel = prometheus.Labels{
+		methodLabel: "close",
+	}
+	healthCheckLabel = prometheus.Labels{
+		methodLabel: "health_check",
+	}
+	batchPutLabel = prometheus.Labels{
+		methodLabel: "batch_put",
+	}
+	batchDeleteLabel = prometheus.Labels{
+		methodLabel: "batch_delete",
+	}
+	batchSizeLabel = prometheus.Labels{
+		methodLabel: "batch_size",
+	}
+	batchWriteLabel = prometheus.Labels{
+		methodLabel: "batch_write",
+	}
+	batchResetLabel = prometheus.Labels{
+		methodLabel: "batch_reset",
+	}
+	batchReplayLabel = prometheus.Labels{
+		methodLabel: "batch_replay",
+	}
+	batchInnerLabel = prometheus.Labels{
+		methodLabel: "batch_inner",
+	}
+	iteratorNextLabel = prometheus.Labels{
+		methodLabel: "iterator_next",
+	}
+	iteratorErrorLabel = prometheus.Labels{
+		methodLabel: "iterator_error",
+	}
+	iteratorKeyLabel = prometheus.Labels{
+		methodLabel: "iterator_key",
+	}
+	iteratorValueLabel = prometheus.Labels{
+		methodLabel: "iterator_value",
+	}
+	iteratorReleaseLabel = prometheus.Labels{
+		methodLabel: "iterator_release",
+	}
 )
 
 // Database tracks the amount of time each operation takes and how many bytes
 // are read/written to the underlying database instance.
 type Database struct {
-	metrics
-	db    database.Database
-	clock mockable.Clock
+	db database.Database
+
+	calls    *prometheus.CounterVec
+	duration *prometheus.CounterVec
+	size     *prometheus.CounterVec
 }
 
 // New returns a new database with added metrics
 func New(
 	namespace string,
-	registerer prometheus.Registerer,
+	reg prometheus.Registerer,
 	db database.Database,
 ) (*Database, error) {
-	metrics, err := newMetrics(namespace, registerer)
-	return &Database{
-		metrics: metrics,
-		db:      db,
-	}, err
+	meterDB := &Database{
+		db: db,
+		calls: prometheus.NewCounterVec(
+			prometheus.CounterOpts{
+				Namespace: namespace,
+				Name:      "calls",
+				Help:      "number of calls to the database",
+			},
+			methodLabels,
+		),
+		duration: prometheus.NewCounterVec(
+			prometheus.CounterOpts{
+				Namespace: namespace,
+				Name:      "duration",
+				Help:      "time spent in database calls (ns)",
+			},
+			methodLabels,
+		),
+		size: prometheus.NewCounterVec(
+			prometheus.CounterOpts{
+				Namespace: namespace,
+				Name:      "size",
+				Help:      "size of data passed in database calls",
+			},
+			methodLabels,
+		),
+	}
+	return meterDB, utils.Err(
+		reg.Register(meterDB.calls),
+		reg.Register(meterDB.duration),
+		reg.Register(meterDB.size),
+	)
 }
 
 func (db *Database) Has(key []byte) (bool, error) {
-	start := db.clock.Time()
+	start := time.Now()
 	has, err := db.db.Has(key)
-	end := db.clock.Time()
-	db.readSize.Observe(float64(len(key)))
-	db.has.Observe(float64(end.Sub(start)))
-	db.hasSize.Observe(float64(len(key)))
+	duration := time.Since(start)
+
+	db.calls.With(hasLabel).Inc()
+	db.duration.With(hasLabel).Add(float64(duration))
+	db.size.With(hasLabel).Add(float64(len(key)))
 	return has, err
 }
 
 func (db *Database) Get(key []byte) ([]byte, error) {
-	start := db.clock.Time()
+	start := time.Now()
 	value, err := db.db.Get(key)
-	end := db.clock.Time()
-	db.readSize.Observe(float64(len(key) + len(value)))
-	db.get.Observe(float64(end.Sub(start)))
-	db.getSize.Observe(float64(len(key) + len(value)))
+	duration := time.Since(start)
+
+	db.calls.With(getLabel).Inc()
+	db.duration.With(getLabel).Add(float64(duration))
+	db.size.With(getLabel).Add(float64(len(key) + len(value)))
 	return value, err
 }
 
 func (db *Database) Put(key, value []byte) error {
-	start := db.clock.Time()
+	start := time.Now()
 	err := db.db.Put(key, value)
-	end := db.clock.Time()
-	db.writeSize.Observe(float64(len(key) + len(value)))
-	db.put.Observe(float64(end.Sub(start)))
-	db.putSize.Observe(float64(len(key) + len(value)))
+	duration := time.Since(start)
+
+	db.calls.With(putLabel).Inc()
+	db.duration.With(putLabel).Add(float64(duration))
+	db.size.With(putLabel).Add(float64(len(key) + len(value)))
 	return err
 }
 
 func (db *Database) Delete(key []byte) error {
-	start := db.clock.Time()
+	start := time.Now()
 	err := db.db.Delete(key)
-	end := db.clock.Time()
-	db.writeSize.Observe(float64(len(key)))
-	db.delete.Observe(float64(end.Sub(start)))
-	db.deleteSize.Observe(float64(len(key)))
+	duration := time.Since(start)
+
+	db.calls.With(deleteLabel).Inc()
+	db.duration.With(deleteLabel).Add(float64(duration))
+	db.size.With(deleteLabel).Add(float64(len(key)))
 	return err
 }
 
 func (db *Database) NewBatch() database.Batch {
-	start := db.clock.Time()
+	start := time.Now()
 	b := &batch{
 		batch: db.db.NewBatch(),
 		db:    db,
 	}
-	end := db.clock.Time()
-	db.newBatch.Observe(float64(end.Sub(start)))
+	duration := time.Since(start)
+
+	db.calls.With(newBatchLabel).Inc()
+	db.duration.With(newBatchLabel).Add(float64(duration))
 	return b
 }
 
@@ -106,37 +209,45 @@ func (db *Database) NewIteratorWithStartAndPrefix(
 	start,
 	prefix []byte,
 ) database.Iterator {
-	startTime := db.clock.Time()
+	startTime := time.Now()
 	it := &iterator{
 		iterator: db.db.NewIteratorWithStartAndPrefix(start, prefix),
 		db:       db,
 	}
-	end := db.clock.Time()
-	db.newIterator.Observe(float64(end.Sub(startTime)))
+	duration := time.Since(startTime)
+
+	db.calls.With(newIteratorLabel).Inc()
+	db.duration.With(newIteratorLabel).Add(float64(duration))
 	return it
 }
 
 func (db *Database) Compact(start, limit []byte) error {
-	startTime := db.clock.Time()
+	startTime := time.Now()
 	err := db.db.Compact(start, limit)
-	end := db.clock.Time()
-	db.compact.Observe(float64(end.Sub(startTime)))
+	duration := time.Since(startTime)
+
+	db.calls.With(compactLabel).Inc()
+	db.duration.With(compactLabel).Add(float64(duration))
 	return err
 }
 
 func (db *Database) Close() error {
-	start := db.clock.Time()
+	start := time.Now()
 	err := db.db.Close()
-	end := db.clock.Time()
-	db.close.Observe(float64(end.Sub(start)))
+	duration := time.Since(start)
+
+	db.calls.With(closeLabel).Inc()
+	db.duration.With(closeLabel).Add(float64(duration))
 	return err
 }
 
 func (db *Database) HealthCheck(ctx context.Context) (interface{}, error) {
-	start := db.clock.Time()
+	start := time.Now()
 	result, err := db.db.HealthCheck(ctx)
-	end := db.clock.Time()
-	db.healthCheck.Observe(float64(end.Sub(start)))
+	duration := time.Since(start)
+
+	db.calls.With(healthCheckLabel).Inc()
+	db.duration.With(healthCheckLabel).Add(float64(duration))
 	return result, err
 }
 
@@ -146,62 +257,75 @@ type batch struct {
 }
 
 func (b *batch) Put(key, value []byte) error {
-	start := b.db.clock.Time()
+	start := time.Now()
 	err := b.batch.Put(key, value)
-	end := b.db.clock.Time()
-	b.db.bPut.Observe(float64(end.Sub(start)))
-	b.db.bPutSize.Observe(float64(len(key) + len(value)))
+	duration := time.Since(start)
+
+	b.db.calls.With(batchPutLabel).Inc()
+	b.db.duration.With(batchPutLabel).Add(float64(duration))
+	b.db.size.With(batchPutLabel).Add(float64(len(key) + len(value)))
 	return err
 }
 
 func (b *batch) Delete(key []byte) error {
-	start := b.db.clock.Time()
+	start := time.Now()
 	err := b.batch.Delete(key)
-	end := b.db.clock.Time()
-	b.db.bDelete.Observe(float64(end.Sub(start)))
-	b.db.bDeleteSize.Observe(float64(len(key)))
+	duration := time.Since(start)
+
+	b.db.calls.With(batchDeleteLabel).Inc()
+	b.db.duration.With(batchDeleteLabel).Add(float64(duration))
+	b.db.size.With(batchDeleteLabel).Add(float64(len(key)))
 	return err
 }
 
 func (b *batch) Size() int {
-	start := b.db.clock.Time()
+	start := time.Now()
 	size := b.batch.Size()
-	end := b.db.clock.Time()
-	b.db.bSize.Observe(float64(end.Sub(start)))
+	duration := time.Since(start)
+
+	b.db.calls.With(batchSizeLabel).Inc()
+	b.db.duration.With(batchSizeLabel).Add(float64(duration))
 	return size
 }
 
 func (b *batch) Write() error {
-	start := b.db.clock.Time()
+	start := time.Now()
 	err := b.batch.Write()
-	end := b.db.clock.Time()
-	batchSize := float64(b.batch.Size())
-	b.db.writeSize.Observe(batchSize)
-	b.db.bWrite.Observe(float64(end.Sub(start)))
-	b.db.bWriteSize.Observe(batchSize)
+	duration := time.Since(start)
+	size := b.batch.Size()
+
+	b.db.calls.With(batchWriteLabel).Inc()
+	b.db.duration.With(batchWriteLabel).Add(float64(duration))
+	b.db.size.With(batchWriteLabel).Add(float64(size))
 	return err
 }
 
 func (b *batch) Reset() {
-	start := b.db.clock.Time()
+	start := time.Now()
 	b.batch.Reset()
-	end := b.db.clock.Time()
-	b.db.bReset.Observe(float64(end.Sub(start)))
+	duration := time.Since(start)
+
+	b.db.calls.With(batchResetLabel).Inc()
+	b.db.duration.With(batchResetLabel).Add(float64(duration))
 }
 
 func (b *batch) Replay(w database.KeyValueWriterDeleter) error {
-	start := b.db.clock.Time()
+	start := time.Now()
 	err := b.batch.Replay(w)
-	end := b.db.clock.Time()
-	b.db.bReplay.Observe(float64(end.Sub(start)))
+	duration := time.Since(start)
+
+	b.db.calls.With(batchReplayLabel).Inc()
+	b.db.duration.With(batchReplayLabel).Add(float64(duration))
 	return err
 }
 
 func (b *batch) Inner() database.Batch {
-	start := b.db.clock.Time()
+	start := time.Now()
 	inner := b.batch.Inner()
-	end := b.db.clock.Time()
-	b.db.bInner.Observe(float64(end.Sub(start)))
+	duration := time.Since(start)
+
+	b.db.calls.With(batchInnerLabel).Inc()
+	b.db.duration.With(batchInnerLabel).Add(float64(duration))
 	return inner
 }
 
@@ -211,43 +335,52 @@ type iterator struct {
 }
 
 func (it *iterator) Next() bool {
-	start := it.db.clock.Time()
+	start := time.Now()
 	next := it.iterator.Next()
-	end := it.db.clock.Time()
-	it.db.iNext.Observe(float64(end.Sub(start)))
-	size := float64(len(it.iterator.Key()) + len(it.iterator.Value()))
-	it.db.readSize.Observe(size)
-	it.db.iNextSize.Observe(size)
+	duration := time.Since(start)
+	size := len(it.iterator.Key()) + len(it.iterator.Value())
+
+	it.db.calls.With(iteratorNextLabel).Inc()
+	it.db.duration.With(iteratorNextLabel).Add(float64(duration))
+	it.db.size.With(iteratorNextLabel).Add(float64(size))
 	return next
 }
 
 func (it *iterator) Error() error {
-	start := it.db.clock.Time()
+	start := time.Now()
 	err := it.iterator.Error()
-	end := it.db.clock.Time()
-	it.db.iError.Observe(float64(end.Sub(start)))
+	duration := time.Since(start)
+
+	it.db.calls.With(iteratorErrorLabel).Inc()
+	it.db.duration.With(iteratorErrorLabel).Add(float64(duration))
 	return err
 }
 
 func (it *iterator) Key() []byte {
-	start := it.db.clock.Time()
+	start := time.Now()
 	key := it.iterator.Key()
-	end := it.db.clock.Time()
-	it.db.iKey.Observe(float64(end.Sub(start)))
+	duration := time.Since(start)
+
+	it.db.calls.With(iteratorKeyLabel).Inc()
+	it.db.duration.With(iteratorKeyLabel).Add(float64(duration))
 	return key
 }
 
 func (it *iterator) Value() []byte {
-	start := it.db.clock.Time()
+	start := time.Now()
 	value := it.iterator.Value()
-	end := it.db.clock.Time()
-	it.db.iValue.Observe(float64(end.Sub(start)))
+	duration := time.Since(start)
+
+	it.db.calls.With(iteratorValueLabel).Inc()
+	it.db.duration.With(iteratorValueLabel).Add(float64(duration))
 	return value
 }
 
 func (it *iterator) Release() {
-	start := it.db.clock.Time()
+	start := time.Now()
 	it.iterator.Release()
-	end := it.db.clock.Time()
-	it.db.iRelease.Observe(float64(end.Sub(start)))
+	duration := time.Since(start)
+
+	it.db.calls.With(iteratorReleaseLabel).Inc()
+	it.db.duration.With(iteratorReleaseLabel).Add(float64(duration))
 }
