@@ -26,7 +26,7 @@ var errMissingUTXO = errors.New("missing utxo")
 
 type WalletService struct {
 	*walletServiceBackend
-	b *builder.Builder
+	builder *builder.Builder
 }
 
 func (w *WalletService) decided(txID ids.ID) {
@@ -224,7 +224,7 @@ func (w *WalletService) SendMultiple(_ *http.Request, args *SendMultipleArgs, re
 		})
 	}
 
-	tx, _, err := w.b.BuildBaseTx(outs, memoBytes, kc, changeAddr)
+	tx, err := w.builder.BaseTx(outs, memoBytes, kc, changeAddr)
 	if err != nil {
 		return err
 	}

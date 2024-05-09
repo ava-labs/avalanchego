@@ -205,7 +205,7 @@ func setup(tb testing.TB, c *envConfig) *environment {
 	issuer := make(chan common.Message, 1)
 
 	var (
-		serviceBackend = newServiceBackend(vm.ctx, &vm.Config, vm.state, vm.ctx.SharedMemory, vm.parser.Codec())
+		serviceBackend = newServiceBackend(vm.ctx, vm.state, vm.ctx.SharedMemory, vm.parser.Codec())
 		walletBackend  = NewWalletServiceBackend(vm)
 	)
 
@@ -217,7 +217,7 @@ func setup(tb testing.TB, c *envConfig) *environment {
 		vm:           vm,
 		service: &Service{
 			vm: vm,
-			b: builder.NewBuilder(
+			builder: builder.NewBuilder(
 				vm.ctx,
 				&vm.Config,
 				vm.feeAssetID,
@@ -226,7 +226,7 @@ func setup(tb testing.TB, c *envConfig) *environment {
 		},
 		walletService: &WalletService{
 			walletServiceBackend: walletBackend,
-			b: builder.NewBuilder(
+			builder: builder.NewBuilder(
 				vm.ctx,
 				&vm.Config,
 				vm.feeAssetID,

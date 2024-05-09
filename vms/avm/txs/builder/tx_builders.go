@@ -44,13 +44,13 @@ func NewBuilder(
 	}
 }
 
-func (b *Builder) BuildCreateAssetTx(
+func (b *Builder) CreateAssetTx(
 	name, symbol string,
 	denomination byte,
 	initialStates map[uint32][]verify.State,
 	kc *secp256k1fx.Keychain,
 	changeAddr ids.ShortID,
-) (*txs.Tx, ids.ShortID, error) {
+) (*txs.Tx, error) {
 	xBuilder, xSigner := b.builders(kc)
 
 	utx, err := xBuilder.NewCreateAssetTx(
@@ -61,23 +61,23 @@ func (b *Builder) BuildCreateAssetTx(
 		options(changeAddr, nil /*memo*/)...,
 	)
 	if err != nil {
-		return nil, ids.ShortEmpty, fmt.Errorf("failed building base tx: %w", err)
+		return nil, fmt.Errorf("failed building base tx: %w", err)
 	}
 
 	tx, err := signer.SignUnsigned(context.Background(), xSigner, utx)
 	if err != nil {
-		return nil, ids.ShortEmpty, err
+		return nil, err
 	}
 
-	return tx, changeAddr, nil
+	return tx, nil
 }
 
-func (b *Builder) BuildBaseTx(
+func (b *Builder) BaseTx(
 	outs []*avax.TransferableOutput,
 	memo []byte,
 	kc *secp256k1fx.Keychain,
 	changeAddr ids.ShortID,
-) (*txs.Tx, ids.ShortID, error) {
+) (*txs.Tx, error) {
 	xBuilder, xSigner := b.builders(kc)
 
 	utx, err := xBuilder.NewBaseTx(
@@ -85,15 +85,15 @@ func (b *Builder) BuildBaseTx(
 		options(changeAddr, memo)...,
 	)
 	if err != nil {
-		return nil, ids.ShortEmpty, fmt.Errorf("failed building base tx: %w", err)
+		return nil, fmt.Errorf("failed building base tx: %w", err)
 	}
 
 	tx, err := signer.SignUnsigned(context.Background(), xSigner, utx)
 	if err != nil {
-		return nil, ids.ShortEmpty, err
+		return nil, err
 	}
 
-	return tx, changeAddr, nil
+	return tx, nil
 }
 
 func (b *Builder) MintNFT(
@@ -136,7 +136,7 @@ func (b *Builder) MintFTs(
 	return signer.SignUnsigned(context.Background(), xSigner, utx)
 }
 
-func (b *Builder) BuildOperation(
+func (b *Builder) Operation(
 	ops []*txs.Operation,
 	kc *secp256k1fx.Keychain,
 	changeAddr ids.ShortID,
@@ -154,7 +154,7 @@ func (b *Builder) BuildOperation(
 	return signer.SignUnsigned(context.Background(), xSigner, utx)
 }
 
-func (b *Builder) BuildImportTx(
+func (b *Builder) ImportTx(
 	sourceChain ids.ID,
 	to ids.ShortID,
 	kc *secp256k1fx.Keychain,
@@ -178,14 +178,14 @@ func (b *Builder) BuildImportTx(
 	return signer.SignUnsigned(context.Background(), xSigner, utx)
 }
 
-func (b *Builder) BuildExportTx(
+func (b *Builder) ExportTx(
 	destinationChain ids.ID,
 	to ids.ShortID,
 	exportedAssetID ids.ID,
 	exportedAmt uint64,
 	kc *secp256k1fx.Keychain,
 	changeAddr ids.ShortID,
-) (*txs.Tx, ids.ShortID, error) {
+) (*txs.Tx, error) {
 	xBuilder, xSigner := b.builders(kc)
 
 	outputs := []*avax.TransferableOutput{{
@@ -206,14 +206,14 @@ func (b *Builder) BuildExportTx(
 		options(changeAddr, nil /*memo*/)...,
 	)
 	if err != nil {
-		return nil, ids.ShortEmpty, fmt.Errorf("failed building export tx: %w", err)
+		return nil, fmt.Errorf("failed building export tx: %w", err)
 	}
 
 	tx, err := signer.SignUnsigned(context.Background(), xSigner, utx)
 	if err != nil {
-		return nil, ids.ShortEmpty, err
+		return nil, err
 	}
-	return tx, changeAddr, nil
+	return tx, nil
 }
 
 func (b *Builder) builders(kc *secp256k1fx.Keychain) (builder.Builder, signer.Signer) {
