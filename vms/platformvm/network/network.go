@@ -67,7 +67,7 @@ func New(
 	txGossipClient := p2pNetwork.NewClient(
 		nodeID,
 		TxGossipHandlerID,
-		p2p.WithCustomSampler(
+		p2p.WithSampler(
 			p2p.RestrictSampler(validators, p2pNetwork.Peers.Has),
 		),
 	)

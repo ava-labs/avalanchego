@@ -45,8 +45,8 @@ func (o clientOptionFunc) apply(options *clientOptions) {
 	o(options)
 }
 
-// WithCustomSampler configures Client.AppRequestAny to sample from [s].
-func WithCustomSampler(s NodeSampler) ClientOption {
+// WithSampler configures Client.AppRequestAny to sample from [s].
+func WithSampler(s NodeSampler) ClientOption {
 	return clientOptionFunc(func(options *clientOptions) {
 		options.nodeSampler = s
 	})

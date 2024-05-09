@@ -666,7 +666,7 @@ func TestNodeSamplerClientOption(t *testing.T) {
 			name:  "validator connected",
 			peers: []ids.NodeID{nodeID0, nodeID1},
 			options: []ClientOption{
-				WithCustomSampler(
+				WithSampler(
 					NewValidators(
 						logging.NoLog{},
 						ids.Empty,
@@ -693,7 +693,7 @@ func TestNodeSamplerClientOption(t *testing.T) {
 			name:  "validator disconnected",
 			peers: []ids.NodeID{nodeID0},
 			options: []ClientOption{
-				WithCustomSampler(
+				WithSampler(
 					NewValidators(
 						logging.NoLog{},
 						ids.Empty,
