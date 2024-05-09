@@ -9,7 +9,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -20,23 +19,16 @@ import (
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
 
-type TxBuilderBackend interface {
-	builder.Backend
-	signer.Backend
-
-	ResetAddresses(addrs set.Set[ids.ShortID])
-}
-
 type Builder struct {
-	backend TxBuilderBackend
+	backend AVMBuilderBackend
 	ctx     *builder.Context
 }
 
-func NewBuilder(
+func New(
 	ctx *snow.Context,
 	cfg *config.Config,
 	feeAssetID ids.ID,
-	backend TxBuilderBackend,
+	backend AVMBuilderBackend,
 ) *Builder {
 	return &Builder{
 		backend: backend,
@@ -217,11 +209,15 @@ func (b *Builder) ExportTx(
 }
 
 func (b *Builder) builders(kc *secp256k1fx.Keychain) (builder.Builder, signer.Signer) {
-	addrs := kc.Addresses()
-	b.backend.ResetAddresses(addrs)
-
-	builder := builder.New(addrs, b.ctx, b.backend)
-	signer := signer.New(kc, b.backend)
+	var (
+		addrs = kc.Addresses()
+		wa    = &walletBackendAdapter{
+			b:     b.backend,
+			addrs: addrs,
+		}
+		builder = builder.New(addrs, b.ctx, wa)
+		signer  = signer.New(kc, wa)
+	)
 	return builder, signer
 }
 

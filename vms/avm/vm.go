@@ -247,7 +247,7 @@ func (vm *VM) Initialize(
 	walletServiceBackend := NewWalletServiceBackend(vm)
 	vm.walletService = WalletService{
 		walletServiceBackend: walletServiceBackend,
-		builder: builder.NewBuilder(
+		builder: builder.New(
 			vm.ctx,
 			&vm.Config,
 			vm.feeAssetID,
@@ -348,7 +348,7 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 	// name this service "avm"
 	if err := rpcServer.RegisterService(&Service{
 		vm: vm,
-		builder: builder.NewBuilder(
+		builder: builder.New(
 			vm.ctx,
 			&vm.Config,
 			vm.feeAssetID,

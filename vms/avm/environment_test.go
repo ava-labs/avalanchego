@@ -217,7 +217,7 @@ func setup(tb testing.TB, c *envConfig) *environment {
 		vm:           vm,
 		service: &Service{
 			vm: vm,
-			builder: builder.NewBuilder(
+			builder: builder.New(
 				vm.ctx,
 				&vm.Config,
 				vm.feeAssetID,
@@ -226,7 +226,7 @@ func setup(tb testing.TB, c *envConfig) *environment {
 		},
 		walletService: &WalletService{
 			walletServiceBackend: walletBackend,
-			builder: builder.NewBuilder(
+			builder: builder.New(
 				vm.ctx,
 				&vm.Config,
 				vm.feeAssetID,
