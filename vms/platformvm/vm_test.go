@@ -2330,7 +2330,7 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 
 func TestBaseTx(t *testing.T) {
 	require := require.New(t)
-	vm, txBuilder, _, _ := defaultVM(t, latestFork)
+	vm, txBuilder, _, _ := defaultVM(t, durango)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
