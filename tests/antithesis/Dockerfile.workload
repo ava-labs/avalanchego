@@ -1,11 +1,9 @@
-# Changes to the minimum golang version must also be replicated in
-# tests/antithesis/Dockerfile.node
-# tests/antithesis/Dockerfile.workload (here)
-# Dockerfile
-# README.md
-# go.mod
+# The version is supplied as a build argument rather than hard-coded
+# to minimize the cost of version changes.
+ARG GO_VERSION
+
 # ============= Compilation Stage ================
-FROM golang:1.21.9-bullseye AS builder
+FROM golang:$GO_VERSION-bullseye AS builder
 
 WORKDIR /build
 # Copy and download avalanche dependencies using go mod

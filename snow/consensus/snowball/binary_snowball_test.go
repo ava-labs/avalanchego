@@ -15,25 +15,26 @@ func TestBinarySnowball(t *testing.T) {
 	red := 0
 	blue := 1
 
+	alphaPreference, alphaConfidence := 2, 3
 	beta := 2
 
-	sb := newBinarySnowball(beta, red)
+	sb := newBinarySnowball(alphaPreference, alphaConfidence, beta, red)
 	require.Equal(red, sb.Preference())
 	require.False(sb.Finalized())
 
-	sb.RecordSuccessfulPoll(blue)
+	sb.RecordPoll(alphaConfidence, blue)
 	require.Equal(blue, sb.Preference())
 	require.False(sb.Finalized())
 
-	sb.RecordSuccessfulPoll(red)
+	sb.RecordPoll(alphaConfidence, red)
 	require.Equal(blue, sb.Preference())
 	require.False(sb.Finalized())
 
-	sb.RecordSuccessfulPoll(blue)
+	sb.RecordPoll(alphaConfidence, blue)
 	require.Equal(blue, sb.Preference())
 	require.False(sb.Finalized())
 
-	sb.RecordSuccessfulPoll(blue)
+	sb.RecordPoll(alphaConfidence, blue)
 	require.Equal(blue, sb.Preference())
 	require.True(sb.Finalized())
 }
@@ -44,29 +45,30 @@ func TestBinarySnowballRecordPollPreference(t *testing.T) {
 	red := 0
 	blue := 1
 
+	alphaPreference, alphaConfidence := 1, 2
 	beta := 2
 
-	sb := newBinarySnowball(beta, red)
+	sb := newBinarySnowball(alphaPreference, alphaConfidence, beta, red)
 	require.Equal(red, sb.Preference())
 	require.False(sb.Finalized())
 
-	sb.RecordSuccessfulPoll(blue)
+	sb.RecordPoll(alphaConfidence, blue)
 	require.Equal(blue, sb.Preference())
 	require.False(sb.Finalized())
 
-	sb.RecordSuccessfulPoll(red)
+	sb.RecordPoll(alphaConfidence, red)
 	require.Equal(blue, sb.Preference())
 	require.False(sb.Finalized())
 
-	sb.RecordPollPreference(red)
+	sb.RecordPoll(alphaPreference, red)
 	require.Equal(red, sb.Preference())
 	require.False(sb.Finalized())
 
-	sb.RecordSuccessfulPoll(red)
+	sb.RecordPoll(alphaConfidence, red)
 	require.Equal(red, sb.Preference())
 	require.False(sb.Finalized())
 
-	sb.RecordSuccessfulPoll(red)
+	sb.RecordPoll(alphaConfidence, red)
 	require.Equal(red, sb.Preference())
 	require.True(sb.Finalized())
 
@@ -80,23 +82,24 @@ func TestBinarySnowballRecordUnsuccessfulPoll(t *testing.T) {
 	red := 0
 	blue := 1
 
+	alphaPreference, alphaConfidence := 1, 2
 	beta := 2
 
-	sb := newBinarySnowball(beta, red)
+	sb := newBinarySnowball(alphaPreference, alphaConfidence, beta, red)
 	require.Equal(red, sb.Preference())
 	require.False(sb.Finalized())
 
-	sb.RecordSuccessfulPoll(blue)
+	sb.RecordPoll(alphaConfidence, blue)
 	require.Equal(blue, sb.Preference())
 	require.False(sb.Finalized())
 
 	sb.RecordUnsuccessfulPoll()
 
-	sb.RecordSuccessfulPoll(blue)
+	sb.RecordPoll(alphaConfidence, blue)
 	require.Equal(blue, sb.Preference())
 	require.False(sb.Finalized())
 
-	sb.RecordSuccessfulPoll(blue)
+	sb.RecordPoll(alphaConfidence, blue)
 	require.Equal(blue, sb.Preference())
 	require.True(sb.Finalized())
 
@@ -110,32 +113,33 @@ func TestBinarySnowballAcceptWeirdColor(t *testing.T) {
 	blue := 0
 	red := 1
 
+	alphaPreference, alphaConfidence := 1, 2
 	beta := 2
 
-	sb := newBinarySnowball(beta, red)
+	sb := newBinarySnowball(alphaPreference, alphaConfidence, beta, red)
 
 	require.Equal(red, sb.Preference())
 	require.False(sb.Finalized())
 
-	sb.RecordSuccessfulPoll(red)
+	sb.RecordPoll(alphaConfidence, red)
 	sb.RecordUnsuccessfulPoll()
 
 	require.Equal(red, sb.Preference())
 	require.False(sb.Finalized())
 
-	sb.RecordSuccessfulPoll(red)
+	sb.RecordPoll(alphaConfidence, red)
 
 	sb.RecordUnsuccessfulPoll()
 
 	require.Equal(red, sb.Preference())
 	require.False(sb.Finalized())
 
-	sb.RecordSuccessfulPoll(blue)
+	sb.RecordPoll(alphaConfidence, blue)
 
 	require.Equal(red, sb.Preference())
 	require.False(sb.Finalized())
 
-	sb.RecordSuccessfulPoll(blue)
+	sb.RecordPoll(alphaConfidence, blue)
 
 	require.Equal(blue, sb.Preference())
 	require.True(sb.Finalized())
@@ -150,22 +154,23 @@ func TestBinarySnowballLockColor(t *testing.T) {
 	red := 0
 	blue := 1
 
+	alphaPreference, alphaConfidence := 1, 2
 	beta := 1
 
-	sb := newBinarySnowball(beta, red)
+	sb := newBinarySnowball(alphaPreference, alphaConfidence, beta, red)
 
-	sb.RecordSuccessfulPoll(red)
-
-	require.Equal(red, sb.Preference())
-	require.True(sb.Finalized())
-
-	sb.RecordSuccessfulPoll(blue)
+	sb.RecordPoll(alphaConfidence, red)
 
 	require.Equal(red, sb.Preference())
 	require.True(sb.Finalized())
 
-	sb.RecordPollPreference(blue)
-	sb.RecordSuccessfulPoll(blue)
+	sb.RecordPoll(alphaConfidence, blue)
+
+	require.Equal(red, sb.Preference())
+	require.True(sb.Finalized())
+
+	sb.RecordPoll(alphaPreference, blue)
+	sb.RecordPoll(alphaConfidence, blue)
 
 	require.Equal(red, sb.Preference())
 	require.True(sb.Finalized())
