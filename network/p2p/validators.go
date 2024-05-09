@@ -16,14 +16,12 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/sampler"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 var (
 	_ ValidatorSet    = (*Validators)(nil)
 	_ ValidatorSubset = (*Validators)(nil)
-	_ NodeSampler     = (*Validators)(nil)
 )
 
 type ValidatorSet interface {
@@ -108,41 +106,6 @@ func (v *Validators) refresh(ctx context.Context) {
 	v.lastUpdated = time.Now()
 }
 
-// Sample returns a random sample of connected validators whose nodeID can be
-// returned.
-func (v *Validators) Sample(
-	ctx context.Context,
-	canReturn func(ids.NodeID) bool,
-	limit int,
-) []ids.NodeID {
-	v.lock.Lock()
-	defer v.lock.Unlock()
-
-	v.refresh(ctx)
-
-	var (
-		uniform = sampler.NewUniform()
-		sampled = make([]ids.NodeID, 0, limit)
-	)
-
-	uniform.Initialize(uint64(len(v.validatorList)))
-	for len(sampled) < limit {
-		i, err := uniform.Next()
-		if err != nil {
-			break
-		}
-
-		nodeID := v.validatorList[i].nodeID
-		if !canReturn(nodeID) {
-			continue
-		}
-
-		sampled = append(sampled, nodeID)
-	}
-
-	return sampled
-}
-
 // Top returns the top [percentage] of validators, regardless of if they are
 // connected or not.
 func (v *Validators) Top(ctx context.Context, percentage float64) []ids.NodeID {
@@ -171,7 +134,7 @@ func (v *Validators) Top(ctx context.Context, percentage float64) []ids.NodeID {
 	return top
 }
 
-// Has returns if nodeID is a connected validator
+// Has returns if nodeID is a validator
 func (v *Validators) Has(ctx context.Context, nodeID ids.NodeID) bool {
 	v.lock.Lock()
 	defer v.lock.Unlock()
