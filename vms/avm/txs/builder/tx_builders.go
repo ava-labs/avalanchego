@@ -217,13 +217,11 @@ func (b *Builder) BuildExportTx(
 }
 
 func (b *Builder) builders(kc *secp256k1fx.Keychain) (builder.Builder, signer.Signer) {
-	var (
-		addrs   = kc.Addresses()
-		builder = builder.New(addrs, b.ctx, b.backend)
-		signer  = signer.New(kc, b.backend)
-	)
+	addrs := kc.Addresses()
 	b.backend.ResetAddresses(addrs)
 
+	builder := builder.New(addrs, b.ctx, b.backend)
+	signer := signer.New(kc, b.backend)
 	return builder, signer
 }
 
