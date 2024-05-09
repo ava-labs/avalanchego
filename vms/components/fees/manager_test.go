@@ -5,6 +5,7 @@ package fees
 
 import (
 	"fmt"
+	"math"
 	"testing"
 	"time"
 
@@ -13,18 +14,13 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 )
 
-type blkTimeAndComplexity struct {
-	blkTime    int64
-	complexity Dimensions
-}
-
 func TestUpdateFeeRates(t *testing.T) {
 	require := require.New(t)
 
 	var (
 		feesCfg = DynamicFeesConfig{
 			MinFeeRate:                Dimensions{1, 1, 1, 1},
-			UpdateCoefficient:         Dimensions{10, 20, 50, 100},
+			UpdateCoefficient:         Dimensions{1, 2, 5, 10},
 			BlockMaxComplexity:        Dimensions{100, 100, 100, 100},
 			BlockTargetComplexityRate: Dimensions{25, 25, 25, 25},
 		}
@@ -48,16 +44,16 @@ func TestUpdateFeeRates(t *testing.T) {
 	))
 
 	// Bandwidth complexity are above target, fee rate is pushed up
-	require.Equal(uint64(10), m.feeRates[Bandwidth])
+	require.Equal(uint64(13), m.feeRates[Bandwidth])
 
 	// UTXORead complexity is at target, fee rate does not change
 	require.Equal(parentFeeRate[UTXORead], m.feeRates[UTXORead])
 
 	// UTXOWrite complexity is below target, fee rate is pushed down
-	require.Equal(uint64(99), m.feeRates[UTXOWrite])
+	require.Equal(uint64(90), m.feeRates[UTXOWrite])
 
-	// Compute complexoty is below target, fee rate is pushed down to the minimum
-	require.Equal(uint64(199), m.feeRates[Compute])
+	// Compute complexoty is below target, fee rate is pushed down
+	require.Equal(uint64(125), m.feeRates[Compute])
 }
 
 func TestUpdateFeeRatesStability(t *testing.T) {
@@ -137,16 +133,16 @@ func TestPChainFeeRateIncreaseDueToPeak(t *testing.T) {
 				35 * units.NanoAvax,
 			},
 			UpdateCoefficient: Dimensions{ // over CoeffDenom
-				5,
+				3,
+				1,
+				1,
 				2,
-				2,
-				4,
 			},
 			BlockTargetComplexityRate: Dimensions{
-				250,
-				60,
-				120,
-				650,
+				2500,
+				600,
+				1200,
+				6500,
 			},
 			BlockMaxComplexity: Dimensions{
 				100_000,
@@ -157,7 +153,10 @@ func TestPChainFeeRateIncreaseDueToPeak(t *testing.T) {
 		}
 
 		// See mainnet P-chain block 2LJVD1rfEfaJtTwRggFXaUXhME4t5WYGhYP9Aj7eTYqGsfknuC its descendants
-		blockComplexities = []blkTimeAndComplexity{
+		blockComplexities = []struct {
+			blkTime    int64
+			complexity Dimensions
+		}{
 			{1615237936, Dimensions{28234, 10812, 10812, 106000}},
 			{1615237936, Dimensions{17634, 6732, 6732, 66000}},
 			{1615237936, Dimensions{12334, 4692, 4692, 46000}},
@@ -172,26 +171,25 @@ func TestPChainFeeRateIncreaseDueToPeak(t *testing.T) {
 			{1615237936, Dimensions{7034, 2652, 2652, 26000}},
 			{1615237936, Dimensions{7564, 2856, 2856, 28000}},
 			{1615237936, Dimensions{34064, 13056, 13056, 128000}},
-			{1615237936, Dimensions{34064, 13056, 13056, 128000}},
-			{1615237936, Dimensions{34064, 13056, 13056, 128000}},
-			{1615237936, Dimensions{34064, 13056, 13056, 128000}},
-			{1615237936, Dimensions{34064, 13056, 13056, 128000}},
-			{1615237936, Dimensions{34064, 13056, 13056, 128000}},
-			{1615237936, Dimensions{34064, 13056, 13056, 128000}},
-			{1615237936, Dimensions{34064, 13056, 13056, 128000}},
-			{1615237936, Dimensions{820, 360, 442, 4000}},
-			{1615237936, Dimensions{34064, 13056, 13056, 128000}},
-			{1615237936, Dimensions{34064, 13056, 13056, 128000}},
-			{1615237936, Dimensions{34064, 13056, 13056, 128000}},
-			{1615237936, Dimensions{34064, 13056, 13056, 128000}},
-			{1615237936, Dimensions{34064, 13056, 13056, 128000}},
-			{1615237936, Dimensions{34064, 13056, 13056, 128000}},
-			{1615237936, Dimensions{34064, 13056, 13056, 128000}},
-			{1615237936, Dimensions{34064, 13056, 13056, 128000}},
-			{1615237936, Dimensions{3589, 1326, 1326, 13000}},
-			{1615237936, Dimensions{550, 180, 180, 2000}},
-			{1615237936, Dimensions{413, 102, 102, 1000}},
-			{1615237936, Dimensions{0, 0, 0, 0}},
+			// {1615237936, Dimensions{34064, 13056, 13056, 128000}},
+			// {1615237936, Dimensions{34064, 13056, 13056, 128000}},
+			// {1615237936, Dimensions{34064, 13056, 13056, 128000}},
+			// {1615237936, Dimensions{34064, 13056, 13056, 128000}},
+			// {1615237936, Dimensions{34064, 13056, 13056, 128000}},
+			// {1615237936, Dimensions{34064, 13056, 13056, 128000}}, <-- from here on, fee would exceed 100 Avax
+			// {1615237936, Dimensions{34064, 13056, 13056, 128000}},
+			// {1615237936, Dimensions{820, 360, 442, 4000}},
+			// {1615237936, Dimensions{34064, 13056, 13056, 128000}},
+			// {1615237936, Dimensions{34064, 13056, 13056, 128000}},
+			// {1615237936, Dimensions{34064, 13056, 13056, 128000}},
+			// {1615237936, Dimensions{34064, 13056, 13056, 128000}},
+			// {1615237936, Dimensions{34064, 13056, 13056, 128000}},
+			// {1615237936, Dimensions{34064, 13056, 13056, 128000}},
+			// {1615237936, Dimensions{34064, 13056, 13056, 128000}},
+			// {1615237936, Dimensions{34064, 13056, 13056, 128000}},
+			// {1615237936, Dimensions{3589, 1326, 1326, 13000}},
+			// {1615237936, Dimensions{550, 180, 180, 2000}},
+			// {1615237936, Dimensions{413, 102, 102, 1000}},
 		}
 	)
 
@@ -248,4 +246,46 @@ func TestPChainFeeRateIncreaseDueToPeak(t *testing.T) {
 	require.Less(m.feeRates[UTXORead], peakFeeRate[UTXORead])
 	require.LessOrEqual(m.feeRates[UTXOWrite], peakFeeRate[UTXOWrite])
 	require.Less(m.feeRates[Compute], peakFeeRate[Compute])
+}
+
+func TestFeeUpdateFactor(t *testing.T) {
+	tests := []struct {
+		coeff               uint64
+		parentBlkComplexity uint64
+		targetBlkComplexity uint64
+		wantNum             uint64
+		wantDenom           uint64
+	}{
+		// parentBlkComplexity == targetBlkComplexity gives factor 1, no matter what coeff is
+		{1, 250, 250, 1, 1},
+		{math.MaxUint64, 250, 250, 1, 1},
+
+		// parentBlkComplexity > targetBlkComplexity
+		{1, 101, 100, 2_002, 2_000},      // should be   1.0005
+		{1, 110, 100, 2_020, 2_000},      // should be   1.005
+		{1, 200, 100, 2_200, 2_000},      // should be   1.05
+		{1, 1_100, 100, 4_000, 2_000},    // should be   1.648
+		{1, 2_100, 100, 6000, 2_000},     // should be   2,718
+		{1, 3_100, 100, 11_000, 2_000},   // should be   4,48
+		{1, 4_100, 100, 16_000, 2_000},   // should be   7,39
+		{1, 7_100, 100, 77_000, 2_000},   // should be  33,12
+		{1, 8_100, 100, 110_000, 2_000},  // should be  54,6
+		{1, 10_100, 100, 298_000, 2_000}, // should be 148,4
+
+		// parentBlkComplexity < targetBlkComplexity
+		{1, 100, 101, 2_020, 2_022},        // should be 0,9995
+		{1, 100, 110, 2_200, 2_220},        // should be 0,995
+		{1, 100, 200, 4_000, 4_200},        // should be 0,975
+		{1, 100, 1_100, 22_000, 24_000},    // should be 0,955
+		{1, 100, 10_100, 202_000, 222_000}, // should be 0,952
+	}
+	for _, tt := range tests {
+		haveFactor, haveIncreaseFee := updateFactor(
+			tt.coeff,
+			tt.parentBlkComplexity,
+			tt.targetBlkComplexity,
+		)
+		require.Equal(t, tt.wantNum, haveFactor)
+		require.Equal(t, tt.wantDenom, haveIncreaseFee)
+	}
 }

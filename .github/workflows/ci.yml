@@ -20,7 +20,6 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  go_version: '~1.21.9'
   grafana_url: https://grafana-experimental.avax-dev.network/d/kBQpRdWnk/avalanche-main-dashboard?orgId=1&refresh=10s&var-filter=is_ephemeral_node%7C%3D%7Cfalse&var-filter=gh_repo%7C%3D%7Cava-labs%2Favalanchego&var-filter=gh_run_id%7C%3D%7C${{ github.run_id }}&var-filter=gh_run_attempt%7C%3D%7C${{ github.run_attempt }}
 
 jobs:
@@ -32,10 +31,7 @@ jobs:
         os: [macos-12, ubuntu-20.04, ubuntu-22.04, windows-2022, [self-hosted, linux, ARM64, focal], [self-hosted, linux, ARM64, jammy]]
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-go@v3
-        with:
-          go-version: ${{ env.go_version }}
-          check-latest: true
+      - uses: ./.github/actions/setup-go-for-project-v3
       - name: Set timeout on Windows # Windows UT run slower and need a longer timeout
         shell: bash
         if: matrix.os == 'windows-2022'
@@ -49,10 +45,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.go_version }}
-          check-latest: true
+      - uses: ./.github/actions/setup-go-for-project
       - name: fuzz_test
         shell: bash
         run: ./scripts/build_fuzz.sh 10 # Run each fuzz test 10 seconds
@@ -60,10 +53,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.go_version }}
-          check-latest: true
+      - uses: ./.github/actions/setup-go-for-project
       - name: Build AvalancheGo Binary
         shell: bash
         run: ./scripts/build.sh -r
@@ -114,10 +104,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.go_version }}
-          check-latest: true
+      - uses: ./.github/actions/setup-go-for-project
       - name: Build AvalancheGo Binary
         shell: bash
         run: ./scripts/build.sh -r
@@ -167,10 +154,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.go_version }}
-          check-latest: true
+      - uses: ./.github/actions/setup-go-for-project
       - name: Build AvalancheGo Binary
         shell: bash
         run: ./scripts/build.sh
@@ -220,10 +204,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.go_version }}
-          check-latest: true
+      - uses: ./.github/actions/setup-go-for-project
       - name: Run static analysis tests
         shell: bash
         run: scripts/lint.sh
@@ -246,10 +227,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.go_version }}
-          check-latest: true
+      - uses: ./.github/actions/setup-go-for-project
       - uses: bufbuild/buf-setup-action@v1.31.0
       - shell: bash
         run: scripts/protobuf_codegen.sh
@@ -260,10 +238,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.go_version }}
-          check-latest: true
+      - uses: ./.github/actions/setup-go-for-project
       - shell: bash
         run: scripts/mock.gen.sh
       - shell: bash
@@ -273,10 +248,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.go_version }}
-          check-latest: true
+      - uses: ./.github/actions/setup-go-for-project
       - shell: bash
         run: go mod tidy
       - shell: bash
@@ -297,7 +269,9 @@ jobs:
     runs-on: ubuntu-latest
     name: govulncheck
     steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/set-go-version-in-env
       - id: govulncheck
         uses: golang/govulncheck-action@v1
         with:
-          go-version-input: ${{ env.go_version }}
+          go-version-input: ${{ env.GO_VERSION }}
