@@ -8,7 +8,9 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -22,19 +24,34 @@ type TxBuilderBackend interface {
 	builder.Backend
 	signer.Backend
 
-	Context() *builder.Context
 	ResetAddresses(addrs set.Set[ids.ShortID])
 }
 
-func BuildCreateAssetTx(
+type Builder struct {
+	backend TxBuilderBackend
+	ctx     *builder.Context
+}
+
+func NewBuilder(
+	ctx *snow.Context,
+	cfg *config.Config,
+	feeAssetID ids.ID,
 	backend TxBuilderBackend,
+) *Builder {
+	return &Builder{
+		backend: backend,
+		ctx:     newContext(ctx, cfg, feeAssetID),
+	}
+}
+
+func (b *Builder) BuildCreateAssetTx(
 	name, symbol string,
 	denomination byte,
 	initialStates map[uint32][]verify.State,
 	kc *secp256k1fx.Keychain,
 	changeAddr ids.ShortID,
 ) (*txs.Tx, ids.ShortID, error) {
-	xBuilder, xSigner := builders(backend, kc)
+	xBuilder, xSigner := b.builders(kc)
 
 	utx, err := xBuilder.NewCreateAssetTx(
 		name,
@@ -55,14 +72,13 @@ func BuildCreateAssetTx(
 	return tx, changeAddr, nil
 }
 
-func BuildBaseTx(
-	backend TxBuilderBackend,
+func (b *Builder) BuildBaseTx(
 	outs []*avax.TransferableOutput,
 	memo []byte,
 	kc *secp256k1fx.Keychain,
 	changeAddr ids.ShortID,
 ) (*txs.Tx, ids.ShortID, error) {
-	xBuilder, xSigner := builders(backend, kc)
+	xBuilder, xSigner := b.builders(kc)
 
 	utx, err := xBuilder.NewBaseTx(
 		outs,
@@ -80,15 +96,14 @@ func BuildBaseTx(
 	return tx, changeAddr, nil
 }
 
-func MintNFT(
-	backend TxBuilderBackend,
+func (b *Builder) MintNFT(
 	assetID ids.ID,
 	payload []byte,
 	owners []*secp256k1fx.OutputOwners,
 	kc *secp256k1fx.Keychain,
 	changeAddr ids.ShortID,
 ) (*txs.Tx, error) {
-	xBuilder, xSigner := builders(backend, kc)
+	xBuilder, xSigner := b.builders(kc)
 
 	utx, err := xBuilder.NewOperationTxMintNFT(
 		assetID,
@@ -103,13 +118,12 @@ func MintNFT(
 	return signer.SignUnsigned(context.Background(), xSigner, utx)
 }
 
-func MintFTs(
-	backend TxBuilderBackend,
+func (b *Builder) MintFTs(
 	outputs map[ids.ID]*secp256k1fx.TransferOutput,
 	kc *secp256k1fx.Keychain,
 	changeAddr ids.ShortID,
 ) (*txs.Tx, error) {
-	xBuilder, xSigner := builders(backend, kc)
+	xBuilder, xSigner := b.builders(kc)
 
 	utx, err := xBuilder.NewOperationTxMintFT(
 		outputs,
@@ -122,13 +136,12 @@ func MintFTs(
 	return signer.SignUnsigned(context.Background(), xSigner, utx)
 }
 
-func BuildOperation(
-	backend TxBuilderBackend,
+func (b *Builder) BuildOperation(
 	ops []*txs.Operation,
 	kc *secp256k1fx.Keychain,
 	changeAddr ids.ShortID,
 ) (*txs.Tx, error) {
-	xBuilder, xSigner := builders(backend, kc)
+	xBuilder, xSigner := b.builders(kc)
 
 	utx, err := xBuilder.NewOperationTx(
 		ops,
@@ -141,13 +154,12 @@ func BuildOperation(
 	return signer.SignUnsigned(context.Background(), xSigner, utx)
 }
 
-func BuildImportTx(
-	backend TxBuilderBackend,
+func (b *Builder) BuildImportTx(
 	sourceChain ids.ID,
 	to ids.ShortID,
 	kc *secp256k1fx.Keychain,
 ) (*txs.Tx, error) {
-	xBuilder, xSigner := builders(backend, kc)
+	xBuilder, xSigner := b.builders(kc)
 
 	outOwner := &secp256k1fx.OutputOwners{
 		Locktime:  0,
@@ -166,8 +178,7 @@ func BuildImportTx(
 	return signer.SignUnsigned(context.Background(), xSigner, utx)
 }
 
-func BuildExportTx(
-	backend TxBuilderBackend,
+func (b *Builder) BuildExportTx(
 	destinationChain ids.ID,
 	to ids.ShortID,
 	exportedAssetID ids.ID,
@@ -175,7 +186,7 @@ func BuildExportTx(
 	kc *secp256k1fx.Keychain,
 	changeAddr ids.ShortID,
 ) (*txs.Tx, ids.ShortID, error) {
-	xBuilder, xSigner := builders(backend, kc)
+	xBuilder, xSigner := b.builders(kc)
 
 	outputs := []*avax.TransferableOutput{{
 		Asset: avax.Asset{ID: exportedAssetID},
@@ -205,14 +216,13 @@ func BuildExportTx(
 	return tx, changeAddr, nil
 }
 
-func builders(backend TxBuilderBackend, kc *secp256k1fx.Keychain) (builder.Builder, signer.Signer) {
+func (b *Builder) builders(kc *secp256k1fx.Keychain) (builder.Builder, signer.Signer) {
 	var (
 		addrs   = kc.Addresses()
-		builder = builder.New(addrs, backend.Context(), backend)
-		signer  = signer.New(kc, backend)
+		builder = builder.New(addrs, b.ctx, b.backend)
+		signer  = signer.New(kc, b.backend)
 	)
-
-	backend.ResetAddresses(addrs)
+	b.backend.ResetAddresses(addrs)
 
 	return builder, signer
 }

@@ -17,30 +17,18 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm/state"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/builder"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-
-	walletbuilder "github.com/ava-labs/avalanchego/wallet/chain/x/builder"
 )
 
 var _ builder.TxBuilderBackend = (*serviceBackend)(nil)
 
 func newServiceBackend(
-	feeAssetID ids.ID,
 	ctx *snow.Context,
 	cfg *config.Config,
 	state state.State,
 	sharedMemory atomic.SharedMemory,
 	codec codec.Manager,
 ) *serviceBackend {
-	backendCtx := &walletbuilder.Context{
-		NetworkID:        ctx.NetworkID,
-		BlockchainID:     ctx.XChainID,
-		AVAXAssetID:      feeAssetID,
-		BaseTxFee:        cfg.TxFee,
-		CreateAssetTxFee: cfg.CreateAssetTxFee,
-	}
-
 	return &serviceBackend{
-		ctx:          backendCtx,
 		xchainID:     ctx.XChainID,
 		cfg:          cfg,
 		state:        state,
@@ -50,17 +38,12 @@ func newServiceBackend(
 }
 
 type serviceBackend struct {
-	ctx          *walletbuilder.Context
 	xchainID     ids.ID
 	cfg          *config.Config
 	addrs        set.Set[ids.ShortID]
 	state        state.State
 	sharedMemory atomic.SharedMemory
 	codec        codec.Manager
-}
-
-func (b *serviceBackend) Context() *walletbuilder.Context {
-	return b.ctx
 }
 
 func (b *serviceBackend) ResetAddresses(addrs set.Set[ids.ShortID]) {

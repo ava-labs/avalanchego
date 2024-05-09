@@ -15,23 +15,12 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/builder"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-
-	walletbuilder "github.com/ava-labs/avalanchego/wallet/chain/x/builder"
 )
 
 var _ builder.TxBuilderBackend = (*walletServiceBackend)(nil)
 
 func NewWalletServiceBackend(vm *VM) *walletServiceBackend {
-	backendCtx := &walletbuilder.Context{
-		NetworkID:        vm.ctx.NetworkID,
-		BlockchainID:     vm.ctx.XChainID,
-		AVAXAssetID:      vm.feeAssetID,
-		BaseTxFee:        vm.Config.TxFee,
-		CreateAssetTxFee: vm.Config.CreateAssetTxFee,
-	}
-
 	return &walletServiceBackend{
-		ctx:        backendCtx,
 		vm:         vm,
 		pendingTxs: linked.NewHashmap[ids.ID, *txs.Tx](),
 		utxos:      make([]*avax.UTXO, 0),
@@ -39,16 +28,11 @@ func NewWalletServiceBackend(vm *VM) *walletServiceBackend {
 }
 
 type walletServiceBackend struct {
-	ctx        *walletbuilder.Context
 	vm         *VM
 	pendingTxs *linked.Hashmap[ids.ID, *txs.Tx]
 	utxos      []*avax.UTXO
 
 	addrs set.Set[ids.ShortID]
-}
-
-func (b *walletServiceBackend) Context() *walletbuilder.Context {
-	return b.ctx
 }
 
 func (b *walletServiceBackend) ResetAddresses(addrs set.Set[ids.ShortID]) {
