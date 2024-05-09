@@ -127,7 +127,7 @@ func toCanonicalDir(dir string) (string, error) {
 	return filepath.EvalSymlinks(absDir)
 }
 
-func StartNewNetwork(
+func BootstrapNewNetwork(
 	ctx context.Context,
 	w io.Writer,
 	network *Network,
@@ -144,10 +144,7 @@ func StartNewNetwork(
 	if err := network.Create(rootNetworkDir); err != nil {
 		return err
 	}
-	if err := network.Start(ctx, w); err != nil {
-		return err
-	}
-	return network.CreateSubnets(ctx, w)
+	return network.Bootstrap(ctx, w)
 }
 
 // Stops the nodes of the network configured in the provided directory.
@@ -325,26 +322,33 @@ func (n *Network) Create(rootDir string) error {
 	return n.Write()
 }
 
-// Starts all nodes in the network
-func (n *Network) Start(ctx context.Context, w io.Writer) error {
-	if _, err := fmt.Fprintf(w, "Starting network %s (UUID: %s)\n", n.Dir, n.UUID); err != nil {
-		return err
+// Starts the specified nodes
+func (n *Network) Start(ctx context.Context, w io.Writer, nodesToStart ...*Node) error {
+	nodesToWaitFor := nodesToStart
+	if len(nodesToStart) < len(n.Nodes) && nodesToStart[0] != n.Nodes[0] {
+		// Wait for all nodes to ensure health is logged for the bootstrap node
+		nodesToWaitFor = n.Nodes
+	} else {
+		// Simplify output by only logging network start for the first node or when all nodes are starting at once
+		if _, err := fmt.Fprintf(w, "Starting network %s (UUID: %s)\n", n.Dir, n.UUID); err != nil {
+			return err
+		}
 	}
 
 	// Record the time before nodes are started to ensure visibility of subsequently collected metrics via the emitted link
 	startTime := time.Now()
 
 	// Configure the networking for each node and start
-	for _, node := range n.Nodes {
+	for _, node := range nodesToStart {
 		if err := n.StartNode(ctx, w, node); err != nil {
 			return err
 		}
 	}
 
-	if _, err := fmt.Fprint(w, "Waiting for all nodes to report healthy...\n\n"); err != nil {
+	if _, err := fmt.Fprint(w, "Waiting for nodes to report healthy...\n\n"); err != nil {
 		return err
 	}
-	if err := n.WaitForHealthy(ctx, w); err != nil {
+	if err := waitForHealthy(ctx, w, nodesToWaitFor); err != nil {
 		return err
 	}
 	if _, err := fmt.Fprintf(w, "\nStarted network %s (UUID: %s)\n", n.Dir, n.UUID); err != nil {
@@ -356,6 +360,48 @@ func (n *Network) Start(ctx context.Context, w io.Writer) error {
 	}
 
 	return nil
+}
+
+// Start the network for the first time
+func (n *Network) Bootstrap(ctx context.Context, w io.Writer) error {
+	if len(n.Subnets) == 0 || len(n.Nodes) == 1 {
+		// Start all nodes at once if a staged start is not worth it
+		return n.Start(ctx, w, n.Nodes...)
+	}
+
+	// Reduce the cost of subnet creation for a network of multiple nodes by
+	// creating subnets with a single node with sybil protection
+	// disabled. This allows the creation of initial subnet state without
+	// requiring coordination between multiple nodes.
+
+	bootstrapNode := n.Nodes[0]
+	if _, err := fmt.Fprintf(w, "Starting a single-node network with %s for quicker subnet creation\n", bootstrapNode.NodeID); err != nil {
+		return err
+	}
+	bootstrapNode.Flags[config.SybilProtectionEnabledKey] = false
+	if err := n.Start(ctx, w, bootstrapNode); err != nil {
+		return err
+	}
+	if err := n.CreateSubnets(ctx, w); err != nil {
+		return err
+	}
+
+	if _, err := fmt.Fprintf(w, "Restarting %s with sybil protection enabled to serve as bootstrap node\n", bootstrapNode.NodeID); err != nil {
+		return err
+	}
+	delete(bootstrapNode.Flags, config.SybilProtectionEnabledKey)
+	// Avoid using RestartNode since the node won't be able to report healthy until other nodes are started.
+	if err := bootstrapNode.Stop(ctx); err != nil {
+		return fmt.Errorf("failed to stop node %s: %w", bootstrapNode.NodeID, err)
+	}
+	if err := n.StartNode(ctx, w, bootstrapNode); err != nil {
+		return fmt.Errorf("failed to start node %s: %w", bootstrapNode.NodeID, err)
+	}
+
+	if _, err := fmt.Fprint(w, "Starting remaining nodes...\n"); err != nil {
+		return err
+	}
+	return n.Start(ctx, w, n.Nodes[1:]...)
 }
 
 // Starts the provided node after configuring it for the network.
@@ -413,41 +459,6 @@ func (n *Network) RestartNode(ctx context.Context, w io.Writer, node *Node) erro
 		return err
 	}
 	return WaitForHealthy(ctx, node)
-}
-
-// Waits until all nodes in the network are healthy.
-func (n *Network) WaitForHealthy(ctx context.Context, w io.Writer) error {
-	ticker := time.NewTicker(networkHealthCheckInterval)
-	defer ticker.Stop()
-
-	healthyNodes := set.NewSet[ids.NodeID](len(n.Nodes))
-	for healthyNodes.Len() < len(n.Nodes) {
-		for _, node := range n.Nodes {
-			if healthyNodes.Contains(node.NodeID) {
-				continue
-			}
-
-			healthy, err := node.IsHealthy(ctx)
-			if err != nil && !errors.Is(err, ErrNotRunning) {
-				return err
-			}
-			if !healthy {
-				continue
-			}
-
-			healthyNodes.Add(node.NodeID)
-			if _, err := fmt.Fprintf(w, "%s is healthy @ %s\n", node.NodeID, node.URI); err != nil {
-				return err
-			}
-		}
-
-		select {
-		case <-ctx.Done():
-			return fmt.Errorf("failed to see all nodes healthy before timeout: %w", ctx.Err())
-		case <-ticker.C:
-		}
-	}
-	return nil
 }
 
 // Stops all nodes in the network.
@@ -662,6 +673,10 @@ func (n *Network) CreateSubnets(ctx context.Context, w io.Writer) error {
 		reconfiguredNodes = append(reconfiguredNodes, node)
 	}
 	for _, node := range reconfiguredNodes {
+		if len(node.URI) == 0 {
+			// Only running nodes should be restarted
+			continue
+		}
 		if err := n.RestartNode(ctx, w, node); err != nil {
 			return err
 		}
@@ -779,6 +794,41 @@ func (n *Network) getBootstrapIPsAndIDs(skippedNode *Node) ([]string, []string, 
 	}
 
 	return bootstrapIPs, bootstrapIDs, nil
+}
+
+// Waits until the provided nodes are healthy.
+func waitForHealthy(ctx context.Context, w io.Writer, nodes []*Node) error {
+	ticker := time.NewTicker(networkHealthCheckInterval)
+	defer ticker.Stop()
+
+	healthyNodes := set.NewSet[ids.NodeID](len(nodes))
+	for healthyNodes.Len() < len(nodes) {
+		for _, node := range nodes {
+			if healthyNodes.Contains(node.NodeID) {
+				continue
+			}
+
+			healthy, err := node.IsHealthy(ctx)
+			if err != nil && !errors.Is(err, ErrNotRunning) {
+				return err
+			}
+			if !healthy {
+				continue
+			}
+
+			healthyNodes.Add(node.NodeID)
+			if _, err := fmt.Fprintf(w, "%s is healthy @ %s\n", node.NodeID, node.URI); err != nil {
+				return err
+			}
+		}
+
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("failed to see all nodes healthy before timeout: %w", ctx.Err())
+		case <-ticker.C:
+		}
+	}
+	return nil
 }
 
 // Retrieves the root dir for tmpnet data.
