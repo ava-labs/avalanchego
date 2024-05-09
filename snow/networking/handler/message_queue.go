@@ -7,6 +7,7 @@ import (
 	"context"
 	"sync"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -78,7 +79,6 @@ func NewMessageQueue(
 	vdrs validators.Manager,
 	cpuTracker tracker.Tracker,
 	metricsNamespace string,
-	ops []message.Op,
 ) (MessageQueue, error) {
 	m := &messageQueue{
 		ctx:                   ctx,
@@ -88,7 +88,7 @@ func NewMessageQueue(
 		nodeToUnprocessedMsgs: make(map[ids.NodeID]int),
 		msgAndCtxs:            buffer.NewUnboundedDeque[*msgAndContext](1 /*=initSize*/),
 	}
-	return m, m.metrics.initialize(metricsNamespace, ctx.Registerer, ops)
+	return m, m.metrics.initialize(metricsNamespace, ctx.Registerer)
 }
 
 func (m *messageQueue) Push(ctx context.Context, msg Message) {
@@ -108,9 +108,10 @@ func (m *messageQueue) Push(ctx context.Context, msg Message) {
 	m.nodeToUnprocessedMsgs[msg.NodeID()]++
 
 	// Update metrics
+	m.metrics.count.With(prometheus.Labels{
+		opLabel: msg.Op().String(),
+	}).Inc()
 	m.metrics.nodesWithMessages.Set(float64(len(m.nodeToUnprocessedMsgs)))
-	m.metrics.len.Inc()
-	m.metrics.ops[msg.Op()].Inc()
 
 	// Signal a waiting thread
 	m.cond.Signal()
@@ -154,9 +155,10 @@ func (m *messageQueue) Pop() (context.Context, Message, bool) {
 			if m.nodeToUnprocessedMsgs[nodeID] == 0 {
 				delete(m.nodeToUnprocessedMsgs, nodeID)
 			}
+			m.metrics.count.With(prometheus.Labels{
+				opLabel: msg.Op().String(),
+			}).Dec()
 			m.metrics.nodesWithMessages.Set(float64(len(m.nodeToUnprocessedMsgs)))
-			m.metrics.len.Dec()
-			m.metrics.ops[msg.Op()].Dec()
 			return ctx, msg, true
 		}
 		// [msg.nodeID] is causing excessive CPU usage.
@@ -186,8 +188,8 @@ func (m *messageQueue) Shutdown() {
 	m.nodeToUnprocessedMsgs = nil
 
 	// Update metrics
+	m.metrics.count.Reset()
 	m.metrics.nodesWithMessages.Set(0)
-	m.metrics.len.Set(0)
 
 	// Mark the queue as closed
 	m.closed = true

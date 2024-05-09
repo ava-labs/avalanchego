@@ -4,8 +4,6 @@
 package avm
 
 import (
-	"context"
-
 	"golang.org/x/exp/maps"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -13,23 +11,14 @@ import (
 	"github.com/ava-labs/avalanchego/utils/linked"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
+	"github.com/ava-labs/avalanchego/vms/avm/txs/builder"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/wallet/chain/x/builder"
 )
 
-var _ txBuilderBackend = (*walletServiceBackend)(nil)
+var _ builder.AVMBuilderBackend = (*walletServiceBackend)(nil)
 
 func NewWalletServiceBackend(vm *VM) *walletServiceBackend {
-	backendCtx := &builder.Context{
-		NetworkID:        vm.ctx.NetworkID,
-		BlockchainID:     vm.ctx.XChainID,
-		AVAXAssetID:      vm.feeAssetID,
-		BaseTxFee:        vm.Config.TxFee,
-		CreateAssetTxFee: vm.Config.CreateAssetTxFee,
-	}
-
 	return &walletServiceBackend{
-		ctx:        backendCtx,
 		vm:         vm,
 		pendingTxs: linked.NewHashmap[ids.ID, *txs.Tx](),
 		utxos:      make([]*avax.UTXO, 0),
@@ -37,24 +26,13 @@ func NewWalletServiceBackend(vm *VM) *walletServiceBackend {
 }
 
 type walletServiceBackend struct {
-	ctx        *builder.Context
 	vm         *VM
 	pendingTxs *linked.Hashmap[ids.ID, *txs.Tx]
 	utxos      []*avax.UTXO
-
-	addrs set.Set[ids.ShortID]
 }
 
-func (b *walletServiceBackend) Context() *builder.Context {
-	return b.ctx
-}
-
-func (b *walletServiceBackend) ResetAddresses(addrs set.Set[ids.ShortID]) {
-	b.addrs = addrs
-}
-
-func (b *walletServiceBackend) UTXOs(_ context.Context, _ ids.ID) ([]*avax.UTXO, error) {
-	res, err := avax.GetAllUTXOs(b.vm.state, b.addrs)
+func (b *walletServiceBackend) UTXOs(addrs set.Set[ids.ShortID], _ ids.ID) ([]*avax.UTXO, error) {
+	res, err := avax.GetAllUTXOs(b.vm.state, addrs)
 	if err != nil {
 		return nil, err
 	}
@@ -62,8 +40,8 @@ func (b *walletServiceBackend) UTXOs(_ context.Context, _ ids.ID) ([]*avax.UTXO,
 	return res, nil
 }
 
-func (b *walletServiceBackend) GetUTXO(_ context.Context, _, utxoID ids.ID) (*avax.UTXO, error) {
-	allUTXOs, err := avax.GetAllUTXOs(b.vm.state, b.addrs)
+func (b *walletServiceBackend) GetUTXO(addrs set.Set[ids.ShortID], _, utxoID ids.ID) (*avax.UTXO, error) {
+	allUTXOs, err := avax.GetAllUTXOs(b.vm.state, addrs)
 	if err != nil {
 		return nil, err
 	}

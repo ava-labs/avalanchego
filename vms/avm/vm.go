@@ -36,6 +36,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm/network"
 	"github.com/ava-labs/avalanchego/vms/avm/state"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
+	"github.com/ava-labs/avalanchego/vms/avm/txs/builder"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/mempool"
 	"github.com/ava-labs/avalanchego/vms/avm/utxo"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -243,7 +244,16 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	vm.walletService.walletServiceBackend = NewWalletServiceBackend(vm)
+	walletServiceBackend := NewWalletServiceBackend(vm)
+	vm.walletService = WalletService{
+		walletServiceBackend: walletServiceBackend,
+		builder: builder.New(
+			vm.ctx,
+			&vm.Config,
+			vm.feeAssetID,
+			walletServiceBackend,
+		),
+	}
 
 	// use no op impl when disabled in config
 	if avmConfig.IndexTransactions {
@@ -337,8 +347,13 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 	rpcServer.RegisterAfterFunc(vm.metrics.AfterRequest)
 	// name this service "avm"
 	if err := rpcServer.RegisterService(&Service{
-		vm:               vm,
-		txBuilderBackend: newServiceBackend(vm.feeAssetID, vm.ctx, &vm.Config, vm.state, vm.ctx.SharedMemory, vm.parser.Codec()),
+		vm: vm,
+		builder: builder.New(
+			vm.ctx,
+			&vm.Config,
+			vm.feeAssetID,
+			newServiceBackend(vm.ctx, vm.state, vm.ctx.SharedMemory, vm.parser.Codec()),
+		),
 	}, "avm"); err != nil {
 		return nil, err
 	}

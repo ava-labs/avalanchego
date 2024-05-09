@@ -4,7 +4,6 @@
 package avm
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
@@ -13,34 +12,21 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/state"
+	"github.com/ava-labs/avalanchego/vms/avm/txs/builder"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/wallet/chain/x/builder"
 )
 
-var _ txBuilderBackend = (*serviceBackend)(nil)
+var _ builder.AVMBuilderBackend = (*serviceBackend)(nil)
 
 func newServiceBackend(
-	feeAssetID ids.ID,
 	ctx *snow.Context,
-	cfg *config.Config,
 	state state.State,
 	sharedMemory atomic.SharedMemory,
 	codec codec.Manager,
 ) *serviceBackend {
-	backendCtx := &builder.Context{
-		NetworkID:        ctx.NetworkID,
-		BlockchainID:     ctx.XChainID,
-		AVAXAssetID:      feeAssetID,
-		BaseTxFee:        cfg.TxFee,
-		CreateAssetTxFee: cfg.CreateAssetTxFee,
-	}
-
 	return &serviceBackend{
-		ctx:          backendCtx,
 		xchainID:     ctx.XChainID,
-		cfg:          cfg,
 		state:        state,
 		sharedMemory: sharedMemory,
 		codec:        codec,
@@ -48,33 +34,22 @@ func newServiceBackend(
 }
 
 type serviceBackend struct {
-	ctx          *builder.Context
 	xchainID     ids.ID
-	cfg          *config.Config
-	addrs        set.Set[ids.ShortID]
 	state        state.State
 	sharedMemory atomic.SharedMemory
 	codec        codec.Manager
 }
 
-func (b *serviceBackend) Context() *builder.Context {
-	return b.ctx
-}
-
-func (b *serviceBackend) ResetAddresses(addrs set.Set[ids.ShortID]) {
-	b.addrs = addrs
-}
-
-func (b *serviceBackend) UTXOs(_ context.Context, sourceChainID ids.ID) ([]*avax.UTXO, error) {
+func (b *serviceBackend) UTXOs(addrs set.Set[ids.ShortID], sourceChainID ids.ID) ([]*avax.UTXO, error) {
 	if sourceChainID == b.xchainID {
-		return avax.GetAllUTXOs(b.state, b.addrs)
+		return avax.GetAllUTXOs(b.state, addrs)
 	}
 
 	atomicUTXOs, _, _, err := avax.GetAtomicUTXOs(
 		b.sharedMemory,
 		b.codec,
 		sourceChainID,
-		b.addrs,
+		addrs,
 		ids.ShortEmpty,
 		ids.Empty,
 		int(maxPageSize),
@@ -82,7 +57,7 @@ func (b *serviceBackend) UTXOs(_ context.Context, sourceChainID ids.ID) ([]*avax
 	return atomicUTXOs, err
 }
 
-func (b *serviceBackend) GetUTXO(_ context.Context, chainID, utxoID ids.ID) (*avax.UTXO, error) {
+func (b *serviceBackend) GetUTXO(addrs set.Set[ids.ShortID], chainID, utxoID ids.ID) (*avax.UTXO, error) {
 	if chainID == b.xchainID {
 		return b.state.GetUTXO(utxoID)
 	}
@@ -91,7 +66,7 @@ func (b *serviceBackend) GetUTXO(_ context.Context, chainID, utxoID ids.ID) (*av
 		b.sharedMemory,
 		b.codec,
 		chainID,
-		b.addrs,
+		addrs,
 		ids.ShortEmpty,
 		ids.Empty,
 		int(maxPageSize),

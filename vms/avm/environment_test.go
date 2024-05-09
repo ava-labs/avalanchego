@@ -31,6 +31,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
+	"github.com/ava-labs/avalanchego/vms/avm/txs/builder"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -197,6 +198,11 @@ func setup(tb testing.TB, c *envConfig) *environment {
 	stopVertexID := ids.GenerateTestID()
 	issuer := make(chan common.Message, 1)
 
+	var (
+		serviceBackend = newServiceBackend(vm.ctx, vm.state, vm.ctx.SharedMemory, vm.parser.Codec())
+		walletBackend  = NewWalletServiceBackend(vm)
+	)
+
 	env := &environment{
 		genesisBytes: genesisBytes,
 		genesisTx:    getCreateTxFromGenesisTest(tb, genesisBytes, assetName),
@@ -204,11 +210,22 @@ func setup(tb testing.TB, c *envConfig) *environment {
 		issuer:       issuer,
 		vm:           vm,
 		service: &Service{
-			vm:               vm,
-			txBuilderBackend: newServiceBackend(vm.feeAssetID, vm.ctx, &vm.Config, vm.state, vm.ctx.SharedMemory, vm.parser.Codec()),
+			vm: vm,
+			builder: builder.New(
+				vm.ctx,
+				&vm.Config,
+				vm.feeAssetID,
+				serviceBackend,
+			),
 		},
 		walletService: &WalletService{
-			walletServiceBackend: NewWalletServiceBackend(vm),
+			walletServiceBackend: walletBackend,
+			builder: builder.New(
+				vm.ctx,
+				&vm.Config,
+				vm.feeAssetID,
+				walletBackend,
+			),
 		},
 	}
 

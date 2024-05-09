@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
+	"github.com/ava-labs/avalanchego/vms/avm/txs/builder"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/mempool"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -25,6 +26,7 @@ var errMissingUTXO = errors.New("missing utxo")
 
 type WalletService struct {
 	*walletServiceBackend
+	builder *builder.Builder
 }
 
 func (w *WalletService) decided(txID ids.ID) {
@@ -222,8 +224,7 @@ func (w *WalletService) SendMultiple(_ *http.Request, args *SendMultipleArgs, re
 		})
 	}
 
-	w.walletServiceBackend.ResetAddresses(kc.Addresses())
-	tx, _, err := buildBaseTx(w.walletServiceBackend, outs, memoBytes, kc, changeAddr)
+	tx, err := w.builder.BaseTx(outs, memoBytes, kc, changeAddr)
 	if err != nil {
 		return err
 	}

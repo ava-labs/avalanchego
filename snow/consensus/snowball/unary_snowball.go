@@ -7,9 +7,9 @@ import "fmt"
 
 var _ Unary = (*unarySnowball)(nil)
 
-func newUnarySnowball(beta int) unarySnowball {
+func newUnarySnowball(alphaPreference, alphaConfidence, beta int) unarySnowball {
 	return unarySnowball{
-		unarySnowflake: newUnarySnowflake(beta),
+		unarySnowflake: newUnarySnowflake(alphaPreference, alphaConfidence, beta),
 	}
 }
 
@@ -22,23 +22,22 @@ type unarySnowball struct {
 	preferenceStrength int
 }
 
-func (sb *unarySnowball) RecordSuccessfulPoll() {
-	sb.preferenceStrength++
-	sb.unarySnowflake.RecordSuccessfulPoll()
-}
-
-func (sb *unarySnowball) RecordPollPreference() {
-	sb.preferenceStrength++
-	sb.unarySnowflake.RecordUnsuccessfulPoll()
+func (sb *unarySnowball) RecordPoll(count int) {
+	if count >= sb.alphaPreference {
+		sb.preferenceStrength++
+	}
+	sb.unarySnowflake.RecordPoll(count)
 }
 
 func (sb *unarySnowball) Extend(choice int) Binary {
 	bs := &binarySnowball{
 		binarySnowflake: binarySnowflake{
-			binarySlush: binarySlush{preference: choice},
-			confidence:  sb.confidence,
-			beta:        sb.beta,
-			finalized:   sb.Finalized(),
+			binarySlush:     binarySlush{preference: choice},
+			confidence:      sb.confidence,
+			alphaPreference: sb.alphaPreference,
+			alphaConfidence: sb.alphaConfidence,
+			beta:            sb.beta,
+			finalized:       sb.Finalized(),
 		},
 		preference: choice,
 	}
