@@ -3,9 +3,7 @@
 
 package set
 
-import (
-	"github.com/ava-labs/avalanchego/utils"
-)
+import "github.com/ava-labs/avalanchego/utils"
 
 // Slice is a set of elements that supports indexing.
 type Slice[T comparable] struct {
