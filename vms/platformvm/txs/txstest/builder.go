@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -53,7 +54,7 @@ func (b *Builder) NewImportTx(
 	options ...common.Option,
 ) (*txs.Tx, error) {
 	pBuilder, pSigner := b.builders(keys)
-	feeCalc, err := b.feeCalculator()
+	feeCalc, err := b.FeeCalculator(nil)
 	if err != nil {
 		return nil, err
 	}
@@ -78,7 +79,7 @@ func (b *Builder) NewExportTx(
 	options ...common.Option,
 ) (*txs.Tx, error) {
 	pBuilder, pSigner := b.builders(keys)
-	feeCalc, err := b.feeCalculator()
+	feeCalc, err := b.FeeCalculator(nil)
 	if err != nil {
 		return nil, err
 	}
@@ -106,7 +107,7 @@ func (b *Builder) NewCreateChainTx(
 	options ...common.Option,
 ) (*txs.Tx, error) {
 	pBuilder, pSigner := b.builders(keys)
-	feeCalc, err := b.feeCalculator()
+	feeCalc, err := b.FeeCalculator(nil)
 	if err != nil {
 		return nil, err
 	}
@@ -133,7 +134,7 @@ func (b *Builder) NewCreateSubnetTx(
 	options ...common.Option,
 ) (*txs.Tx, error) {
 	pBuilder, pSigner := b.builders(keys)
-	feeCalc, err := b.feeCalculator()
+	feeCalc, err := b.FeeCalculator(nil)
 	if err != nil {
 		return nil, err
 	}
@@ -169,7 +170,7 @@ func (b *Builder) NewTransformSubnetTx(
 	options ...common.Option,
 ) (*txs.Tx, error) {
 	pBuilder, pSigner := b.builders(keys)
-	feeCalc, err := b.feeCalculator()
+	feeCalc, err := b.FeeCalculator(nil)
 	if err != nil {
 		return nil, err
 	}
@@ -207,7 +208,7 @@ func (b *Builder) NewAddValidatorTx(
 	options ...common.Option,
 ) (*txs.Tx, error) {
 	pBuilder, pSigner := b.builders(keys)
-	feeCalc, err := b.feeCalculator()
+	feeCalc, err := b.FeeCalculator(nil)
 	if err != nil {
 		return nil, err
 	}
@@ -237,7 +238,7 @@ func (b *Builder) NewAddPermissionlessValidatorTx(
 	options ...common.Option,
 ) (*txs.Tx, error) {
 	pBuilder, pSigner := b.builders(keys)
-	feeCalc, err := b.feeCalculator()
+	feeCalc, err := b.FeeCalculator(nil)
 	if err != nil {
 		return nil, err
 	}
@@ -266,7 +267,7 @@ func (b *Builder) NewAddDelegatorTx(
 	options ...common.Option,
 ) (*txs.Tx, error) {
 	pBuilder, pSigner := b.builders(keys)
-	feeCalc, err := b.feeCalculator()
+	feeCalc, err := b.FeeCalculator(nil)
 	if err != nil {
 		return nil, err
 	}
@@ -292,7 +293,7 @@ func (b *Builder) NewAddPermissionlessDelegatorTx(
 	options ...common.Option,
 ) (*txs.Tx, error) {
 	pBuilder, pSigner := b.builders(keys)
-	feeCalc, err := b.feeCalculator()
+	feeCalc, err := b.FeeCalculator(nil)
 	if err != nil {
 		return nil, err
 	}
@@ -317,7 +318,7 @@ func (b *Builder) NewAddSubnetValidatorTx(
 	options ...common.Option,
 ) (*txs.Tx, error) {
 	pBuilder, pSigner := b.builders(keys)
-	feeCalc, err := b.feeCalculator()
+	feeCalc, err := b.FeeCalculator(nil)
 	if err != nil {
 		return nil, err
 	}
@@ -341,7 +342,7 @@ func (b *Builder) NewRemoveSubnetValidatorTx(
 	options ...common.Option,
 ) (*txs.Tx, error) {
 	pBuilder, pSigner := b.builders(keys)
-	feeCalc, err := b.feeCalculator()
+	feeCalc, err := b.FeeCalculator(nil)
 	if err != nil {
 		return nil, err
 	}
@@ -366,7 +367,7 @@ func (b *Builder) NewTransferSubnetOwnershipTx(
 	options ...common.Option,
 ) (*txs.Tx, error) {
 	pBuilder, pSigner := b.builders(keys)
-	feeCalc, err := b.feeCalculator()
+	feeCalc, err := b.FeeCalculator(nil)
 	if err != nil {
 		return nil, err
 	}
@@ -390,7 +391,7 @@ func (b *Builder) NewBaseTx(
 	options ...common.Option,
 ) (*txs.Tx, error) {
 	pBuilder, pSigner := b.builders(keys)
-	feeCalc, err := b.feeCalculator()
+	feeCalc, err := b.FeeCalculator(nil)
 	if err != nil {
 		return nil, err
 	}
@@ -420,7 +421,7 @@ func (b *Builder) builders(keys []*secp256k1.PrivateKey) (builder.Builder, walle
 	return builder, signer
 }
 
-func (b *Builder) feeCalculator() (*fee.Calculator, error) {
+func (b *Builder) FeeCalculator(creds []verify.Verifiable) (*fee.Calculator, error) {
 	var (
 		staticFeeCfg = b.cfg.StaticFeeConfig
 		upgrades     = b.cfg.UpgradeConfig
@@ -451,7 +452,7 @@ func (b *Builder) feeCalculator() (*fee.Calculator, error) {
 		}
 
 		feeCfg := fee.GetDynamicConfig(isEActive)
-		feeCalculator = fee.NewDynamicCalculator(staticFeeCfg, feeManager, feeCfg.BlockMaxComplexity, nil)
+		feeCalculator = fee.NewDynamicCalculator(staticFeeCfg, feeManager, feeCfg.BlockMaxComplexity, creds)
 	}
 	return feeCalculator, nil
 }
