@@ -23,11 +23,12 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
+	"github.com/ava-labs/avalanchego/vms/txs/mempool"
 
 	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
+	pmempool "github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 )
 
 // targetBlockSize is maximum number of transaction bytes to place into a
@@ -44,7 +45,7 @@ var (
 )
 
 type Builder interface {
-	mempool.Mempool
+	pmempool.Mempool
 
 	// StartBlockTimer starts to issue block creation requests to advance the
 	// chain timestamp.
@@ -68,12 +69,12 @@ type Builder interface {
 	// preferred state.
 	//
 	// Note: This function does not call the consensus engine.
-	PackBlockTxs(targetBlockSize int) ([]mempool.TxAndTipPercentage, error)
+	PackBlockTxs(targetBlockSize int) ([]mempool.TxAndTipPercentage[*txs.Tx], error)
 }
 
 // builder implements a simple builder to convert txs into valid blocks
 type builder struct {
-	mempool.Mempool
+	pmempool.Mempool
 
 	txExecutorBackend *txexecutor.Backend
 	blkManager        blockexecutor.Manager
@@ -86,7 +87,7 @@ type builder struct {
 }
 
 func New(
-	mempool mempool.Mempool,
+	mempool pmempool.Mempool,
 	txExecutorBackend *txexecutor.Backend,
 	blkManager blockexecutor.Manager,
 ) Builder {
@@ -238,7 +239,7 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 	return b.blkManager.NewBlock(statelessBlk), nil
 }
 
-func (b *builder) PackBlockTxs(targetBlockSize int) ([]mempool.TxAndTipPercentage, error) {
+func (b *builder) PackBlockTxs(targetBlockSize int) ([]mempool.TxAndTipPercentage[*txs.Tx], error) {
 	preferredID := b.blkManager.Preferred()
 	preferredState, ok := b.blkManager.GetState(preferredID)
 	if !ok {
@@ -323,12 +324,12 @@ func buildBlock(
 func packBlockTxs(
 	parentID ids.ID,
 	parentState state.Chain,
-	mpool mempool.Mempool,
+	mpool pmempool.Mempool,
 	backend *txexecutor.Backend,
 	manager blockexecutor.Manager,
 	timestamp time.Time,
 	remainingSize int,
-) ([]mempool.TxAndTipPercentage, error) {
+) ([]mempool.TxAndTipPercentage[*txs.Tx], error) {
 	// retrieve parent block time before moving time forward
 	parentBlkTime := parentState.GetTimestamp()
 
@@ -351,7 +352,7 @@ func packBlockTxs(
 		isEActivated = upgrades.IsEActivated(timestamp)
 		feeCfg       = fee.GetDynamicConfig(isEActivated)
 
-		blockTxs []mempool.TxAndTipPercentage
+		blockTxs []mempool.TxAndTipPercentage[*txs.Tx]
 		inputs   set.Set[ids.ID]
 	)
 
@@ -441,7 +442,7 @@ func packBlockTxs(
 		if !isEActivated {
 			remainingSize -= txSize
 		}
-		blockTxs = append(blockTxs, mempool.TxAndTipPercentage{
+		blockTxs = append(blockTxs, mempool.TxAndTipPercentage[*txs.Tx]{
 			Tx:            tx,
 			TipPercentage: executor.TipPercentage,
 		})

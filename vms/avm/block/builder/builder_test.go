@@ -35,6 +35,7 @@ import (
 
 	blkexecutor "github.com/ava-labs/avalanchego/vms/avm/block/executor"
 	txexecutor "github.com/ava-labs/avalanchego/vms/avm/txs/executor"
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 const trackChecksums = false
@@ -507,7 +508,7 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 	// add a tx to the mempool
 	tx := transactions[0]
 	txID := tx.ID()
-	require.NoError(mempool.Add(tx))
+	require.NoError(mempool.Add(tx, commonfees.NoTip))
 
 	_, ok := mempool.Get(txID)
 	require.True(ok)

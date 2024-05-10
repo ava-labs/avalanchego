@@ -2348,11 +2348,11 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 
 func TestBaseTx(t *testing.T) {
 	require := require.New(t)
-	vm, txBuilder, _, _ := defaultVM(t, durango)
+	vm, txBuilder, _, _ := defaultVM(t, latestFork)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
-	sendAmt := uint64(100000)
+	sendAmt := uint64(100_000)
 	changeAddr := ids.ShortEmpty
 
 	baseTx, err := txBuilder.NewBaseTx(
@@ -2413,23 +2413,8 @@ func TestBaseTx(t *testing.T) {
 	}
 	require.Equal(totalOutputAmt, key0OutputAmt+key1OutputAmt+changeAddrOutputAmt)
 
-	var (
-		chainTime    = vm.state.GetTimestamp()
-		staticFeeCfg = vm.Config.StaticFeeConfig
-		upgrades     = vm.Config.UpgradeConfig
-		feeCalc      *fee.Calculator
-	)
-
-	if !upgrades.IsEActivated(chainTime) {
-		feeCalc = fee.NewStaticCalculator(staticFeeCfg, upgrades, chainTime)
-	} else {
-		feeRates, err := vm.state.GetFeeRates()
-		require.NoError(err)
-
-		feeCfg := fee.GetDynamicConfig(upgrades.IsEActivated(chainTime))
-		feeMan := commonfees.NewManager(feeRates)
-		feeCalc = fee.NewDynamicCalculator(staticFeeCfg, feeMan, feeCfg.BlockMaxComplexity, baseTx.Creds)
-	}
+	feeCalc, err := txBuilder.FeeCalculator(baseTx.Creds)
+	require.NoError(err)
 
 	fee, err := feeCalc.ComputeFee(baseTx.Unsigned)
 	require.NoError(err)

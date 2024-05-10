@@ -67,15 +67,6 @@ func UpdatedFeeManager(feeRates, parentBlkComplexity fees.Dimensions, upgrades u
 		feeCfg    = GetDynamicConfig(isEActive)
 	)
 
-	// feeRates, err := state.GetFeeRates()
-	// if err != nil {
-	// 	return nil, fmt.Errorf("failed retrieving fee rates: %w", err)
-	// }
-	// parentBlkComplexity, err := state.GetLastBlockComplexity()
-	// if err != nil {
-	// 	return nil, fmt.Errorf("failed retrieving last block complexity: %w", err)
-	// }
-
 	feeManager := fees.NewManager(feeRates)
 	if isEActive {
 		if err := feeManager.UpdateFeeRates(

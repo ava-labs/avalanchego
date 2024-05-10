@@ -16,7 +16,10 @@ import (
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
-	"github.com/ava-labs/avalanchego/vms/avm/txs/mempool"
+	"github.com/ava-labs/avalanchego/vms/txs/mempool"
+
+	xmempool "github.com/ava-labs/avalanchego/vms/avm/txs/mempool"
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 var (
@@ -66,7 +69,7 @@ func (g *txParser) UnmarshalGossip(bytes []byte) (*txs.Tx, error) {
 }
 
 func newGossipMempool(
-	mempool mempool.Mempool,
+	mempool xmempool.Mempool,
 	registerer prometheus.Registerer,
 	log logging.Logger,
 	txVerifier TxVerifier,
@@ -86,7 +89,7 @@ func newGossipMempool(
 }
 
 type gossipMempool struct {
-	mempool.Mempool
+	xmempool.Mempool
 	log        logging.Logger
 	txVerifier TxVerifier
 	parser     txs.Parser
@@ -128,7 +131,7 @@ func (g *gossipMempool) Has(txID ids.ID) bool {
 }
 
 func (g *gossipMempool) AddWithoutVerification(tx *txs.Tx) error {
-	if err := g.Mempool.Add(tx); err != nil {
+	if err := g.Mempool.Add(tx, commonfees.NoTip); err != nil {
 		g.Mempool.MarkDropped(tx.ID(), err)
 		return err
 	}

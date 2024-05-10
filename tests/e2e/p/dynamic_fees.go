@@ -31,7 +31,7 @@ var _ = ginkgo.Describe("[Dynamic Fees]", func() {
 			BlockMaxComplexity: commonfees.Dimensions{math.MaxUint64, math.MaxUint64, math.MaxUint64, math.MaxUint64},
 
 			// BlockUnitsTarget are set to cause an increase of fees while simple transactions are issued
-			BlockTargetComplexityRate: commonfees.Dimensions{250, 60, 120, 650},
+			BlockTargetComplexityRate: commonfees.Dimensions{120, 30, 60, 300},
 		}
 
 		ginkgo.By("creating a new private network to ensure isolation from other tests")
@@ -132,7 +132,16 @@ var _ = ginkgo.Describe("[Dynamic Fees]", func() {
 						_, currFeeRates, err = pChainClient.GetFeeRates(e2e.DefaultContext())
 						require.NoError(err)
 						tests.Outf("{{blue}} next fee rates: %v {{/}}\n", currFeeRates)
-						return commonfees.Compare(initialFeeRates, currFeeRates)
+
+						ratesStrictlyLower := false
+						for i := 0; i < len(initialFeeRates); i++ {
+							if currFeeRates[i] < initialFeeRates[i] {
+								ratesStrictlyLower = true
+								break
+							}
+						}
+
+						return ratesStrictlyLower
 					}, e2e.DefaultTimeout, e2e.DefaultPollingInterval, "failed to see gas price decrease before timeout")
 					tests.Outf("\n{{blue}}fee rates have decreased to %v{{/}}\n", currFeeRates)
 				})

@@ -19,6 +19,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm/block"
 	"github.com/ava-labs/avalanchego/vms/avm/state"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/executor"
+
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 const SyncBound = 10 * time.Second
@@ -281,7 +283,7 @@ func (b *Block) Reject(context.Context) error {
 			)
 			continue
 		}
-		if err := b.manager.mempool.Add(tx); err != nil {
+		if err := b.manager.mempool.Add(tx, commonfees.NoTip); err != nil {
 			b.manager.backend.Ctx.Log.Debug("dropping valid tx",
 				zap.Stringer("txID", tx.ID()),
 				zap.Stringer("blkID", blkID),
