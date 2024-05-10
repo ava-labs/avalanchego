@@ -27,6 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
@@ -342,7 +343,7 @@ func TestBuildBlockInvalidStakingDurations(t *testing.T) {
 		}),
 	)
 	require.NoError(err)
-	require.NoError(env.mempool.Add(tx1))
+	require.NoError(env.mempool.Add(tx1, commonfees.NoTip))
 	tx1ID := tx1.ID()
 	_, ok := env.mempool.Get(tx1ID)
 	require.True(ok)
@@ -381,7 +382,7 @@ func TestBuildBlockInvalidStakingDurations(t *testing.T) {
 		}),
 	)
 	require.NoError(err)
-	require.NoError(env.mempool.Add(tx2))
+	require.NoError(env.mempool.Add(tx2, commonfees.NoTip))
 	tx2ID := tx2.ID()
 	_, ok = env.mempool.Get(tx2ID)
 	require.True(ok)
