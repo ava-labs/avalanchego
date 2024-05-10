@@ -37,17 +37,18 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm/network"
 	"github.com/ava-labs/avalanchego/vms/avm/state"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
-	"github.com/ava-labs/avalanchego/vms/avm/txs/mempool"
 	"github.com/ava-labs/avalanchego/vms/avm/utxo"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/index"
 	"github.com/ava-labs/avalanchego/vms/components/keystore"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/vms/txs/mempool"
 
 	blockbuilder "github.com/ava-labs/avalanchego/vms/avm/block/builder"
 	blockexecutor "github.com/ava-labs/avalanchego/vms/avm/block/executor"
 	extensions "github.com/ava-labs/avalanchego/vms/avm/fxs"
 	txexecutor "github.com/ava-labs/avalanchego/vms/avm/txs/executor"
+	xmempool "github.com/ava-labs/avalanchego/vms/avm/txs/mempool"
 )
 
 const assetToFxCacheSize = 1024
@@ -401,7 +402,7 @@ func (vm *VM) Linearize(ctx context.Context, stopVertexID ids.ID, toEngine chan<
 		return err
 	}
 
-	mempool, err := mempool.New("mempool", vm.registerer, toEngine)
+	mempool, err := xmempool.New("mempool", vm.registerer, toEngine)
 	if err != nil {
 		return fmt.Errorf("failed to create mempool: %w", err)
 	}

@@ -14,7 +14,9 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
+	"github.com/ava-labs/avalanchego/vms/txs/mempool"
+
+	pmempool "github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 )
 
 var errFoo = errors.New("foo")
@@ -29,7 +31,7 @@ func TestGossipMempoolAddVerificationError(t *testing.T) {
 		TxID: txID,
 	}
 
-	mempool := mempool.NewMockMempool(ctrl)
+	mempool := pmempool.NewMockMempool(ctrl)
 	txVerifier := testTxVerifier{err: errFoo}
 
 	mempool.EXPECT().Get(txID).Return(nil, false)
@@ -63,7 +65,7 @@ func TestGossipMempoolAddError(t *testing.T) {
 	}
 
 	txVerifier := testTxVerifier{}
-	mempool := mempool.NewMockMempool(ctrl)
+	mempool := pmempool.NewMockMempool(ctrl)
 
 	mempool.EXPECT().Get(txID).Return(nil, false)
 	mempool.EXPECT().GetDropReason(txID).Return(nil)
@@ -91,7 +93,7 @@ func TestMempoolDuplicate(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 
-	testMempool := mempool.NewMockMempool(ctrl)
+	testMempool := pmempool.NewMockMempool(ctrl)
 	txVerifier := testTxVerifier{}
 
 	txID := ids.GenerateTestID()
@@ -128,7 +130,7 @@ func TestGossipAddBloomFilter(t *testing.T) {
 	}
 
 	txVerifier := testTxVerifier{}
-	mempool := mempool.NewMockMempool(ctrl)
+	mempool := pmempool.NewMockMempool(ctrl)
 
 	mempool.EXPECT().Get(txID).Return(nil, false)
 	mempool.EXPECT().GetDropReason(txID).Return(nil)
