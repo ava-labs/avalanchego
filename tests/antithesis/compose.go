@@ -183,7 +183,7 @@ func keyMapToEnvVarMap(keyMap types.Mapping) types.Mapping {
 	envVarMap := make(types.Mapping, len(keyMap))
 	for key, val := range keyMap {
 		// e.g. network-id -> AVAGO_NETWORK_ID
-		envVar := "AVAGO_" + strings.ToUpper(strings.ReplaceAll(key, "-", "_"))
+		envVar := strings.ToUpper(config.EnvPrefix + "_" + config.DashesToUnderscores.Replace(key))
 		envVarMap[envVar] = val
 	}
 	return envVarMap

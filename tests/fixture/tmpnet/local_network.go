@@ -11,7 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 )
 
-func LocalNetworkOrDie() *Network {
+func LocalNetworkOrPanic() *Network {
 	// Temporary network configured with local network keys
 	// See: /staking/local/README.md
 	network := &Network{

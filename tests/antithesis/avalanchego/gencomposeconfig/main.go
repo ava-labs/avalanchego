@@ -29,7 +29,7 @@ func main() {
 	nodeImageName := fmt.Sprintf("%s-node:%s", baseImageName, imageTag)
 	workloadImageName := fmt.Sprintf("%s-workload:%s", baseImageName, imageTag)
 
-	network := tmpnet.LocalNetworkOrDie()
+	network := tmpnet.LocalNetworkOrPanic()
 	err := antithesis.GenerateComposeConfig(network, nodeImageName, workloadImageName, targetPath)
 	if err != nil {
 		log.Fatalf("failed to generate config for docker-compose: %s", err)
