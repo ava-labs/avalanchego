@@ -40,7 +40,7 @@ func awaitHealthyNode(ctx context.Context, uri string) {
 		select {
 		case <-ticker.C:
 		case <-ctx.Done():
-			log.Printf("node health check cancelled at %s", uri)
+			log.Fatalf("node health check cancelled at %s", uri)
 		}
 	}
 }
