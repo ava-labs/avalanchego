@@ -29,8 +29,8 @@ var (
 
 func XSVMSubnets(nodes ...*tmpnet.Node) []*tmpnet.Subnet {
 	return []*tmpnet.Subnet{
-		subnet.NewXSVMSubnetOrDie(subnetAName, nil /* key, will be generated */, nodes...),
-		subnet.NewXSVMSubnetOrDie(subnetBName, nil /* key, will be generated */, nodes...),
+		subnet.NewXSVMOrPanic(subnetAName, nil /* key, will be generated */, nodes...),
+		subnet.NewXSVMOrPanic(subnetBName, nil /* key, will be generated */, nodes...),
 	}
 }
 

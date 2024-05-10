@@ -44,7 +44,7 @@ func main() {
 	// Create a network with an xsvm subnet
 	network := tmpnet.LocalNetworkOrPanic()
 	network.Subnets = []*tmpnet.Subnet{
-		subnet.NewXSVMSubnetOrDie("xsvm", genesis.VMRQKey, network.Nodes...),
+		subnet.NewXSVMOrPanic("xsvm", genesis.VMRQKey, network.Nodes...),
 	}
 
 	if err := antithesis.InitDBVolumes(network, avalancheGoPath, pluginDir, targetPath); err != nil {

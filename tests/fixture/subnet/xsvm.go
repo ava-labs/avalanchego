@@ -13,7 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/genesis"
 )
 
-func NewXSVMSubnetOrDie(name string, key *secp256k1.PrivateKey, nodes ...*tmpnet.Node) *tmpnet.Subnet {
+func NewXSVMOrPanic(name string, key *secp256k1.PrivateKey, nodes ...*tmpnet.Node) *tmpnet.Subnet {
 	if len(nodes) == 0 {
 		panic("a subnet must be validated by at least one node")
 	}
