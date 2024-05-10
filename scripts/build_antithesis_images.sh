@@ -56,7 +56,7 @@ function build_images {
   local docker_cmd="docker buildx build --build-arg GO_VERSION=${GO_VERSION} --build-arg NODE_IMAGE=${node_image_name}"
 
   if [[ "${test_setup}" == "xsvm" ]]; then
-    # The xsvm node image is build on the avalanchego node image
+    # The xsvm node image is built on the avalanchego node image
     docker_cmd="${docker_cmd} --build-arg AVALANCHEGO_NODE_IMAGE=${avalanchego_node_image_name}"
   fi
 
