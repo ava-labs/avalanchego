@@ -5,6 +5,7 @@ package antithesis
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"time"
 
@@ -12,14 +13,17 @@ import (
 )
 
 // Waits for the nodes at the provided URIs to report healthy.
-func AwaitHealthyNodes(ctx context.Context, uris []string) {
+func AwaitHealthyNodes(ctx context.Context, uris []string) error {
 	for _, uri := range uris {
-		awaitHealthyNode(ctx, uri)
+		if err := awaitHealthyNode(ctx, uri); err != nil {
+			return err
+		}
 	}
 	log.Println("all nodes reported healthy")
+	return nil
 }
 
-func awaitHealthyNode(ctx context.Context, uri string) {
+func awaitHealthyNode(ctx context.Context, uri string) error {
 	client := health.NewClient(uri)
 	ticker := time.NewTicker(100 * time.Millisecond)
 	defer ticker.Stop()
@@ -32,7 +36,7 @@ func awaitHealthyNode(ctx context.Context, uri string) {
 			log.Printf("node couldn't be reached at %s", uri)
 		case res.Healthy:
 			log.Printf("node reported healthy at %s", uri)
-			return
+			return nil
 		default:
 			log.Printf("node reported unhealthy at %s", uri)
 		}
@@ -40,7 +44,7 @@ func awaitHealthyNode(ctx context.Context, uri string) {
 		select {
 		case <-ticker.C:
 		case <-ctx.Done():
-			log.Fatalf("node health check cancelled at %s", uri)
+			return fmt.Errorf("node health check cancelled at %s", uri)
 		}
 	}
 }

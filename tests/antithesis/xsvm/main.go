@@ -31,7 +31,9 @@ func main() {
 	}
 
 	ctx := context.Background()
-	antithesis.AwaitHealthyNodes(ctx, c.URIs)
+	if err := antithesis.AwaitHealthyNodes(ctx, c.URIs); err != nil {
+		log.Fatalf("failed to await healthy nodes: %s", err)
+	}
 
 	if len(c.ChainIDs) != 1 {
 		log.Fatalf("expected 1 chainID, saw %d", len(c.ChainIDs))

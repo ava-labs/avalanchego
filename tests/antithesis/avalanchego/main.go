@@ -44,7 +44,9 @@ func main() {
 	}
 
 	ctx := context.Background()
-	antithesis.AwaitHealthyNodes(ctx, c.URIs)
+	if err := antithesis.AwaitHealthyNodes(ctx, c.URIs); err != nil {
+		log.Fatalf("failed to await healthy nodes: %s", err)
+	}
 
 	kc := secp256k1fx.NewKeychain(genesis.EWOQKey)
 	walletSyncStartTime := time.Now()
