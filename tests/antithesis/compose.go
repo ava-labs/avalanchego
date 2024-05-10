@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/compose-spec/compose-go/types"
@@ -94,7 +95,6 @@ func newComposeProject(network *tmpnet.Network, nodeImageName string, workloadIm
 
 		env := types.Mapping{
 			config.NetworkNameKey:             constants.LocalName,
-			config.AdminAPIEnabledKey:         "true",
 			config.LogLevelKey:                logging.Debug.String(),
 			config.LogDisplayLevelKey:         logging.Trace.String(),
 			config.HTTPHostKey:                "0.0.0.0",
@@ -102,8 +102,18 @@ func newComposeProject(network *tmpnet.Network, nodeImageName string, workloadIm
 			config.StakingTLSKeyContentKey:    tlsKey,
 			config.StakingCertContentKey:      tlsCert,
 			config.StakingSignerKeyContentKey: signerKey,
-			// Ensure consistency with tmpnet defaults
-			config.IndexEnabledKey: "true",
+		}
+
+		// Apply configuration appropriate to a test network
+		for k, v := range tmpnet.DefaultTestFlags() {
+			switch value := v.(type) {
+			case string:
+				env[k] = value
+			case bool:
+				env[k] = strconv.FormatBool(value)
+			default:
+				return nil, fmt.Errorf("unable to convert unsupported type %T to string", v)
+			}
 		}
 
 		serviceName := getServiceName(i)

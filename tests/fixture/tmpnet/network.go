@@ -198,7 +198,7 @@ func (n *Network) EnsureDefaultConfig(w io.Writer, avalancheGoPath string, plugi
 	if n.DefaultFlags == nil {
 		n.DefaultFlags = FlagsMap{}
 	}
-	n.DefaultFlags.SetDefaults(DefaultFlags())
+	n.DefaultFlags.SetDefaults(DefaultTmpnetFlags())
 
 	if len(n.Nodes) == 1 {
 		// Sybil protection needs to be disabled for a single node network to start

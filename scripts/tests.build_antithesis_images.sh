@@ -55,12 +55,10 @@ docker cp "${CONTAINER_NAME}":/docker-compose.yml "${COMPOSE_FILE}"
 # Copy the volume paths out of the container
 docker cp "${CONTAINER_NAME}":/volumes "${TMPDIR}/"
 
-# Run the docker compose project for 2 minutes without error. 2
-# minutes is suggested because the way docker-compose brings all
-# containers up simultaneously and the lack of coordination results in
-# exponential back-off on the nodes trying to bootstrap.
+# Run the docker compose project for 30 seconds without error. Local
+# network bootstrap is ~6s, but github workers can be much slower.
 ${COMPOSE_CMD} up -d
-sleep 120
+sleep 30
 if ${COMPOSE_CMD} ps -q | xargs docker inspect -f '{{ .State.Status }}' | grep -v 'running'; then
   echo "An error occurred."
   exit 255
