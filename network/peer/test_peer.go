@@ -85,7 +85,6 @@ func StartTestPeer(
 	}
 
 	metrics, err := NewMetrics(
-		logging.NoLog{},
 		"",
 		prometheus.NewRegistry(),
 	)

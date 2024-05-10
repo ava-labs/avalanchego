@@ -28,17 +28,6 @@ type Flat struct {
 
 func (f *Flat) RecordPoll(votes bag.Bag[ids.ID]) bool {
 	pollMode, numVotes := votes.Mode()
-	switch {
-	// AlphaConfidence is guaranteed to be >= AlphaPreference, so we must check
-	// if the poll had enough votes to increase the confidence first.
-	case numVotes >= f.params.AlphaConfidence:
-		f.RecordSuccessfulPoll(pollMode)
-		return true
-	case numVotes >= f.params.AlphaPreference:
-		f.RecordPollPreference(pollMode)
-		return true
-	default:
-		f.RecordUnsuccessfulPoll()
-		return false
-	}
+	f.Nnary.RecordPoll(numVotes, pollMode)
+	return numVotes >= f.params.AlphaPreference
 }

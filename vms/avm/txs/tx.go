@@ -88,6 +88,10 @@ func (t *Tx) Bytes() []byte {
 	return t.bytes
 }
 
+func (t *Tx) Size() int {
+	return len(t.bytes)
+}
+
 // UTXOs returns the UTXOs transaction is producing.
 func (t *Tx) UTXOs() []*avax.UTXO {
 	u := utxoGetter{tx: t}
@@ -95,6 +99,10 @@ func (t *Tx) UTXOs() []*avax.UTXO {
 	// returned from the utxoGetter.
 	_ = t.Unsigned.Visit(&u)
 	return u.utxos
+}
+
+func (t *Tx) InputIDs() set.Set[ids.ID] {
+	return t.Unsigned.InputIDs()
 }
 
 func (t *Tx) SignSECP256K1Fx(c codec.Manager, signers [][]*secp256k1.PrivateKey) error {

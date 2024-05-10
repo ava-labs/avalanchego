@@ -4,69 +4,54 @@
 package handler
 
 import (
-	"fmt"
-
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/avalanchego/message"
-	"github.com/ava-labs/avalanchego/utils/metric"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/utils"
 )
 
 type metrics struct {
-	expired      prometheus.Counter
-	asyncExpired prometheus.Counter
-	messages     map[message.Op]*messageProcessing
-}
-
-type messageProcessing struct {
-	processingTime  metric.Averager
-	msgHandlingTime metric.Averager
+	expired             *prometheus.CounterVec // op
+	messages            *prometheus.CounterVec // op
+	lockingTime         prometheus.Counter
+	messageHandlingTime *prometheus.CounterVec // op
 }
 
 func newMetrics(namespace string, reg prometheus.Registerer) (*metrics, error) {
-	errs := wrappers.Errs{}
-
-	expired := prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: namespace,
-		Name:      "expired",
-		Help:      "Incoming sync messages dropped because the message deadline expired",
-	})
-	asyncExpired := prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: namespace,
-		Name:      "async_expired",
-		Help:      "Incoming async messages dropped because the message deadline expired",
-	})
-	errs.Add(
-		reg.Register(expired),
-		reg.Register(asyncExpired),
-	)
-
-	messages := make(map[message.Op]*messageProcessing, len(message.ConsensusOps))
-	for _, op := range message.ConsensusOps {
-		opStr := op.String()
-		messageProcessing := &messageProcessing{
-			processingTime: metric.NewAveragerWithErrs(
-				namespace,
-				opStr,
-				"time (in ns) spent handling a "+opStr,
-				reg,
-				&errs,
-			),
-			msgHandlingTime: metric.NewAveragerWithErrs(
-				namespace,
-				opStr+"_msg_handling",
-				fmt.Sprintf("time (in ns) spent handling a %s after grabbing the lock", opStr),
-				reg,
-				&errs,
-			),
-		}
-		messages[op] = messageProcessing
+	m := &metrics{
+		expired: prometheus.NewCounterVec(
+			prometheus.CounterOpts{
+				Namespace: namespace,
+				Name:      "expired",
+				Help:      "messages dropped because the deadline expired",
+			},
+			opLabels,
+		),
+		messages: prometheus.NewCounterVec(
+			prometheus.CounterOpts{
+				Namespace: namespace,
+				Name:      "messages",
+				Help:      "messages handled",
+			},
+			opLabels,
+		),
+		messageHandlingTime: prometheus.NewCounterVec(
+			prometheus.CounterOpts{
+				Namespace: namespace,
+				Name:      "message_handling_time",
+				Help:      "time spent handling messages",
+			},
+			opLabels,
+		),
+		lockingTime: prometheus.NewCounter(prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "locking_time",
+			Help:      "time spent acquiring the context lock",
+		}),
 	}
-
-	return &metrics{
-		expired:      expired,
-		asyncExpired: asyncExpired,
-		messages:     messages,
-	}, errs.Err
+	return m, utils.Err(
+		reg.Register(m.expired),
+		reg.Register(m.messages),
+		reg.Register(m.messageHandlingTime),
+		reg.Register(m.lockingTime),
+	)
 }

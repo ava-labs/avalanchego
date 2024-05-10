@@ -40,14 +40,15 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/vms/txs/mempool"
 
 	snowmanblock "github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	blockbuilder "github.com/ava-labs/avalanchego/vms/platformvm/block/builder"
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
+	pmempool "github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 	pvalidators "github.com/ava-labs/avalanchego/vms/platformvm/validators"
 )
 
@@ -166,7 +167,7 @@ func (vm *VM) Initialize(
 		Bootstrapped: &vm.bootstrapped,
 	}
 
-	mempool, err := mempool.New("mempool", registerer, toEngine)
+	mempool, err := pmempool.New("mempool", registerer, toEngine)
 	if err != nil {
 		return fmt.Errorf("failed to create mempool: %w", err)
 	}

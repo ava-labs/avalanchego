@@ -1,12 +1,10 @@
-# Changes to the minimum golang version must also be replicated in
-# tests/antithesis/Dockerfile.node
-# tests/antithesis/Dockerfile.workload
-# Dockerfile (here)
-# README.md
-# go.mod
+# The version is supplied as a build argument rather than hard-coded
+# to minimize the cost of version changes.
+ARG GO_VERSION
+
 # ============= Compilation Stage ================
 # Always use the native platform to ensure fast builds
-FROM --platform=$BUILDPLATFORM golang:1.21.9-bullseye AS builder
+FROM --platform=$BUILDPLATFORM golang:$GO_VERSION-bullseye AS builder
 
 WORKDIR /build
 
