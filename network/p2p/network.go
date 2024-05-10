@@ -63,8 +63,8 @@ func NewNetwork(
 	namespace string,
 ) (*Network, error) {
 	metrics := metrics{
-		msgTime: prometheus.NewCounterVec(
-			prometheus.CounterOpts{
+		msgTime: prometheus.NewGaugeVec(
+			prometheus.GaugeOpts{
 				Namespace: namespace,
 				Name:      "msg_time",
 				Help:      "message handling time (ns)",
