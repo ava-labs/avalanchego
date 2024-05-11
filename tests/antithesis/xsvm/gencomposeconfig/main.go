@@ -47,11 +47,16 @@ func main() {
 		subnet.NewXSVMOrPanic("xsvm", genesis.VMRQKey, network.Nodes...),
 	}
 
-	if err := antithesis.InitDBVolumes(network, avalancheGoPath, pluginDir, targetPath); err != nil {
-		log.Fatalf("failed to initialize db volumes: %s", err)
+	bootstrapVolumePath, err := antithesis.GetBootstrapVolumePath(targetPath)
+	if err != nil {
+		log.Fatalf("failed to get bootstrap volume path: %v", err)
+	}
+
+	if err := antithesis.InitBootstrapDB(network, avalancheGoPath, pluginDir, bootstrapVolumePath); err != nil {
+		log.Fatalf("failed to initialize db volumes: %v", err)
 	}
 
 	if err := antithesis.GenerateComposeConfig(network, nodeImageName, workloadImageName, targetPath); err != nil {
-		log.Fatalf("failed to generate config for docker-compose: %s", err)
+		log.Fatalf("failed to generate config for docker-compose: %v", err)
 	}
 }

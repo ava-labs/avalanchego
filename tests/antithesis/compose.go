@@ -20,6 +20,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/perms"
 )
 
+const bootstrapIndex = 0
+
 // Initialize the given path with the docker-compose configuration (compose file and
 // volumes) needed for an Antithesis test setup.
 func GenerateComposeConfig(
@@ -132,12 +134,14 @@ func newComposeProject(network *tmpnet.Network, nodeImageName string, workloadIm
 		}
 		if len(trackSubnets) > 0 {
 			env[config.TrackSubnetsKey] = trackSubnets
-			// DB volume will need to initialized with the subnet
-			volumes = append(volumes, types.ServiceVolumeConfig{
-				Type:   types.VolumeTypeBind,
-				Source: fmt.Sprintf("./volumes/%s/db", serviceName),
-				Target: "/root/.avalanchego/db",
-			})
+			if i == bootstrapIndex {
+				// DB volume for bootstrap node will need to initialized with the subnet
+				volumes = append(volumes, types.ServiceVolumeConfig{
+					Type:   types.VolumeTypeBind,
+					Source: fmt.Sprintf("./volumes/%s/db", serviceName),
+					Target: "/root/.avalanchego/db",
+				})
+			}
 		}
 
 		if i == 0 {

@@ -6,6 +6,7 @@ set -euo pipefail
 
 # e.g.,
 # TEST_SETUP=avalanchego ./scripts/build_antithesis_images.sh                                    # Build local images for avalanchego
+# TEST_SETUP=avalanchego NODE_ONLY=1 ./scripts/build_antithesis_images.sh                        # Build only a local node image for avalanchego
 # TEST_SETUP=xsvm ./scripts/build_antithesis_images.sh                                           # Build local images for xsvm
 # TEST_SETUP=xsvm IMAGE_PREFIX=<registry>/<repo> TAG=latest ./scripts/build_antithesis_images.sh # Specify a prefix to enable image push and use a specific tag
 
@@ -60,20 +61,45 @@ function build_images {
     docker_cmd="${docker_cmd} --build-arg AVALANCHEGO_NODE_IMAGE=${avalanchego_node_image_name}"
   fi
 
-  # Build node image first to allow the config and workload image builds to use it.
+  # Build node image first to allow the workload image to use it.
   ${docker_cmd} -t "${node_image_name}" -f "${node_dockerfile}" "${AVALANCHE_PATH}"
 
-  if [[ -z "${node_only}" || "${node_only}" == "0" ]]; then
+  if [[ -n "${node_only}" ]]; then
     # Skip building the config and workload images. Supports building the avalanchego
     # node image as the base image for the xsvm node image.
-    ${docker_cmd} --build-arg IMAGE_TAG="${TAG}" -t "${config_image_name}" -f "${base_dockerfile}.config" "${AVALANCHE_PATH}"
-    ${docker_cmd} -t "${workload_image_name}" -f "${base_dockerfile}.workload" "${AVALANCHE_PATH}"
+    return
   fi
+
+  TARGET_PATH="${AVALANCHE_PATH}/build/antithesis/${test_setup}"
+  if [[ -d "${TARGET_PATH}" ]]; then
+    # Ensure the target path is empty before generating the compose config
+    rm -r "${TARGET_PATH:?}"
+  fi
+
+  # Define the env vars for the compose config generation
+  COMPOSE_ENV="TARGET_PATH=${TARGET_PATH} IMAGE_TAG=${TAG}"
+
+  if [[ "${test_setup}" == "xsvm" ]]; then
+    # Ensure avalanchego and xsvm binaries are available to create an initial db state that includes subnets.
+    "${AVALANCHE_PATH}"/scripts/build.sh
+    "${AVALANCHE_PATH}"/scripts/build_xsvm.sh
+    COMPOSE_ENV="${COMPOSE_ENV} AVALANCHEGO_PATH=${AVALANCHE_PATH}/build/avalanchego AVALANCHEGO_PLUGIN_DIR=${HOME}/.avalanchego/plugins"
+  fi
+
+  # Generate compose config for copying into the config image
+  # shellcheck disable=SC2086
+  env ${COMPOSE_ENV} go run "${AVALANCHE_PATH}/tests/antithesis/${test_setup}/gencomposeconfig"
+
+  # Build the config image
+  ${docker_cmd} -t "${config_image_name}" -f "${base_dockerfile}.config" "${AVALANCHE_PATH}"
+
+  # Build the workload image
+  ${docker_cmd} -t "${workload_image_name}" -f "${base_dockerfile}.workload" "${AVALANCHE_PATH}"
 }
 
 TEST_SETUP="${TEST_SETUP:-}"
 if [[ "${TEST_SETUP}" == "avalanchego" ]]; then
-  build_images avalanchego "${AVALANCHE_PATH}/Dockerfile"
+  build_images avalanchego "${AVALANCHE_PATH}/Dockerfile" "${NODE_ONLY:-}"
 elif [[ "${TEST_SETUP}" == "xsvm" ]]; then
   # Only build the node image to use as the base for the xsvm image
   NODE_ONLY=1

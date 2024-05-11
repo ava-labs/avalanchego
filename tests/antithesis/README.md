@@ -8,14 +8,14 @@ enables discovery and reproduction of anomalous behavior.
 
 ## Package details
 
-| Filename       | Purpose                                                                         |
-|:---------------|:--------------------------------------------------------------------------------|
-| compose.go     | Generates Docker Compose project files and volume paths for antithesis testing. |
-| config.go      | Defines common flags for the workload binary.                                   |
-| init_db.go     | Initializes db state for subnet testing.                                        |
-| node_health.go | Helper to check node health.                                                    |
-| avalanchego/   | Defines an antithesis test setup for avalanchego's primary chains.              |
-| xsvm/          | Defines an antithesis test setup for the xsvm VM.                               |
+| Filename       | Purpose                                                                            |
+|:---------------|:-----------------------------------------------------------------------------------|
+| compose.go     | Generates Docker Compose project file and initial database for antithesis testing. |
+| config.go      | Defines common flags for the workload binary.                                      |
+| init_db.go     | Initializes initial db state for subnet testing.                                   |
+| node_health.go | Helper to check node health.                                                       |
+| avalanchego/   | Defines an antithesis test setup for avalanchego's primary chains.                 |
+| xsvm/          | Defines an antithesis test setup for the xsvm VM.                                  |
 
 ## Instrumentation
 
