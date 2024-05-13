@@ -30,14 +30,15 @@ GO_VERSION="$(go list -m -f '{{.GoVersion}}')"
 function build_images {
   local test_setup=$1
   local uninstrumented_node_dockerfile=$2
-  local node_only=${3:-}
+  local image_prefix=$3
+  local node_only=${4:-}
 
   # Define image names
   local base_image_name="antithesis-${test_setup}"
   local avalanchego_node_image_name="antithesis-avalanchego-node:${TAG}"
-  if [[ -n "${IMAGE_PREFIX}" ]]; then
-    base_image_name="${IMAGE_PREFIX}/${base_image_name}"
-    avalanchego_node_image_name="${IMAGE_PREFIX}/${avalanchego_node_image_name}"
+  if [[ -n "${image_prefix}" ]]; then
+    base_image_name="${image_prefix}/${base_image_name}"
+    avalanchego_node_image_name="${image_prefix}/${avalanchego_node_image_name}"
   fi
   local node_image_name="${base_image_name}-node:${TAG}"
   local workload_image_name="${base_image_name}-workload:${TAG}"
@@ -63,6 +64,10 @@ function build_images {
 
   # Build node image first to allow the workload image to use it.
   ${docker_cmd} -t "${node_image_name}" -f "${node_dockerfile}" "${AVALANCHE_PATH}"
+  if [[ -n "${image_prefix}" ]]; then
+    # Push images with an image prefix since the prefix defines a registry location
+    docker_cmd="${docker_cmd} --push"
+  fi
 
   if [[ -n "${node_only}" ]]; then
     # Skip building the config and workload images. Supports building the avalanchego
@@ -99,13 +104,14 @@ function build_images {
 
 TEST_SETUP="${TEST_SETUP:-}"
 if [[ "${TEST_SETUP}" == "avalanchego" ]]; then
-  build_images avalanchego "${AVALANCHE_PATH}/Dockerfile" "${NODE_ONLY:-}"
+  build_images avalanchego "${AVALANCHE_PATH}/Dockerfile" "${IMAGE_PREFIX}" "${NODE_ONLY:-}"
 elif [[ "${TEST_SETUP}" == "xsvm" ]]; then
-  # Only build the node image to use as the base for the xsvm image
+  # Only build the node image to use as the base for the xsvm image. Provide an empty
+  # image prefix (the 3rd argument) to prevent the image from being pushed
   NODE_ONLY=1
-  build_images avalanchego "${AVALANCHE_PATH}/Dockerfile" "${NODE_ONLY}"
+  build_images avalanchego "${AVALANCHE_PATH}/Dockerfile" "" "${NODE_ONLY}"
 
-  build_images xsvm "${AVALANCHE_PATH}/vms/example/xsvm/Dockerfile"
+  build_images xsvm "${AVALANCHE_PATH}/vms/example/xsvm/Dockerfile" "${IMAGE_PREFIX}"
 else
   echo "TEST_SETUP must be set. Valid values are 'avalanchego' or 'xsvm'"
   exit 255
