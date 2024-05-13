@@ -50,6 +50,10 @@ function build_images {
 
   # Define default build command
   local docker_cmd="docker buildx build --build-arg GO_VERSION=${GO_VERSION}"
+  if [[ -n "${IMAGE_PREFIX}" ]]; then
+    # Push images with an image prefix since the prefix defines a registry location
+    docker_cmd="${docker_cmd} --push"
+  fi
 
   # Build node image first to allow the config and workload image builds to use it.
   ${docker_cmd} -t "${node_image_name}" -f "${node_dockerfile}" "${AVALANCHE_PATH}"
