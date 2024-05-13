@@ -9,25 +9,34 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-// PeerValidatorFilter only samples other validators
-type PeerValidatorFilter struct {
-	self         ids.NodeID
+var (
+	_ SamplingFilter = (*PeerSamplingFilter)(nil)
+)
+
+// NewPeerSamplingFilter returns an instance of PeerSamplingFilter
+func NewPeerSamplingFilter(self ids.NodeID) *PeerSamplingFilter {
+	return &PeerSamplingFilter{self: self}
+}
+
+// PeerSamplingFilter only allows sampling other peers
+type PeerSamplingFilter struct {
+	self ids.NodeID
+}
+
+func (p *PeerSamplingFilter) Filter(_ context.Context, nodeID ids.NodeID) bool {
+	return p.self != nodeID
+}
+
+// NewValidatorSamplingFilter returns an instance of ValidatorSamplingFilter
+func NewValidatorSamplingFilter(validatorSet ValidatorSet) *ValidatorSamplingFilter {
+	return &ValidatorSamplingFilter{validatorSet: validatorSet}
+}
+
+// ValidatorSamplingFilter only samples other validators
+type ValidatorSamplingFilter struct {
 	validatorSet ValidatorSet
 }
 
-func (p *PeerValidatorFilter) Filter(
-	ctx context.Context,
-	nodeID ids.NodeID,
-) bool {
-	return nodeID != p.self && p.validatorSet.Has(ctx, nodeID)
-}
-
-func NewPeerValidatorFilter(
-	self ids.NodeID,
-	validatorSet ValidatorSet,
-) *PeerValidatorFilter {
-	return &PeerValidatorFilter{
-		self:         self,
-		validatorSet: validatorSet,
-	}
+func (v *ValidatorSamplingFilter) Filter(ctx context.Context, nodeID ids.NodeID) bool {
+	return v.validatorSet.Has(ctx, nodeID)
 }

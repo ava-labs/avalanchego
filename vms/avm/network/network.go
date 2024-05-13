@@ -69,7 +69,7 @@ func New(
 	txGossipClient := p2pNetwork.NewClient(
 		txGossipHandlerID,
 		p2p.WithSamplingFilters(
-			p2p.NewPeerValidatorFilter(nodeID, validators),
+			p2p.NewValidatorSamplingFilter(nodeID, validators),
 		),
 	)
 	txGossipMetrics, err := gossip.NewMetrics(registerer, "tx")

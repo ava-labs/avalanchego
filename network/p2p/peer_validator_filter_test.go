@@ -13,7 +13,41 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
-func TestPeerValidatorFilter_Filter(t *testing.T) {
+func TestPeerSamplingFilter(t *testing.T) {
+	tests := []struct {
+		name     string
+		self     ids.NodeID
+		nodeID   ids.NodeID
+		expected bool
+	}{
+		{
+			name:   "dropped from filter",
+			self:   ids.EmptyNodeID,
+			nodeID: ids.EmptyNodeID,
+		},
+		{
+			name:     "in filter",
+			self:     ids.EmptyNodeID,
+			nodeID:   ids.GenerateTestNodeID(),
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+
+			filter := NewPeerSamplingFilter(tt.self)
+
+			require.Equal(
+				tt.expected,
+				filter.Filter(context.Background(), tt.nodeID),
+			)
+		})
+	}
+}
+
+func TestValidatorSamplingFilter(t *testing.T) {
 	tests := []struct {
 		name       string
 		validators []ids.NodeID
@@ -42,8 +76,7 @@ func TestPeerValidatorFilter_Filter(t *testing.T) {
 				validatorSet.Add(validator)
 			}
 
-			filter := NewPeerValidatorFilter(
-				ids.GenerateTestNodeID(),
+			filter := NewValidatorSamplingFilter(
 				&testValidatorSet{
 					validators: validatorSet,
 				},
