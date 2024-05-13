@@ -768,9 +768,9 @@ func (p *peer) handle(msg message.InboundMessage) {
 	}
 	if !p.finishedHandshake.Get() {
 		p.Log.Debug("dropping message",
-			zap.String("reason", "handshake isn't finished"),
 			zap.Stringer("nodeID", p.id),
 			zap.Stringer("messageOp", msg.Op()),
+			zap.String("reason", "handshake isn't finished"),
 		)
 		msg.OnFinishedHandling()
 		return
