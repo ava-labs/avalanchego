@@ -708,14 +708,6 @@ func (p *peer) shouldDisconnect() bool {
 		return false
 	}
 
-	if p.ip.BLSSignature == nil {
-		p.Log.Debug("disconnecting from peer",
-			zap.String("reason", "missing BLS signature"),
-			zap.Stringer("nodeID", p.id),
-		)
-		return true
-	}
-
 	validSignature := bls.VerifyProofOfPossession(
 		vdr.PublicKey,
 		p.ip.BLSSignature,
@@ -1075,22 +1067,19 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 		return
 	}
 
-	// TODO: After v1.11.x is activated, require the key to be provided.
-	if len(msg.IpBlsSig) > 0 {
-		signature, err := bls.SignatureFromBytes(msg.IpBlsSig)
-		if err != nil {
-			p.Log.Debug("peer has malformed signature",
-				zap.Stringer("nodeID", p.id),
-				zap.String("signatureType", "bls"),
-				zap.Error(err),
-			)
-			p.StartClose()
-			return
-		}
-
-		p.ip.BLSSignature = signature
-		p.ip.BLSSignatureBytes = msg.IpBlsSig
+	signature, err := bls.SignatureFromBytes(msg.IpBlsSig)
+	if err != nil {
+		p.Log.Debug("peer has malformed signature",
+			zap.Stringer("nodeID", p.id),
+			zap.String("signatureType", "bls"),
+			zap.Error(err),
+		)
+		p.StartClose()
+		return
 	}
+
+	p.ip.BLSSignature = signature
+	p.ip.BLSSignatureBytes = msg.IpBlsSig
 
 	// If the peer is running an incompatible version or has an invalid BLS
 	// signature, disconnect from them prior to marking the handshake as
@@ -1228,8 +1217,8 @@ func (p *peer) handlePeerList(msg *p2p.PeerList) {
 				zap.String("field", "Port"),
 				zap.Uint32("port", claimedIPPort.IpPort),
 			)
-			// TODO: After v1.11.x is activated, close the peer here.
-			continue
+			p.StartClose()
+			return
 		}
 
 		discoveredIPs[i] = ips.NewClaimedIPPort(
