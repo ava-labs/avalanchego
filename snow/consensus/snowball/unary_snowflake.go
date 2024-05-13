@@ -7,9 +7,11 @@ import "fmt"
 
 var _ Unary = (*unarySnowflake)(nil)
 
-func newUnarySnowflake(beta int) unarySnowflake {
+func newUnarySnowflake(alphaPreference, alphaConfidence, beta int) unarySnowflake {
 	return unarySnowflake{
-		beta: beta,
+		alphaPreference: alphaPreference,
+		alphaConfidence: alphaConfidence,
+		beta:            beta,
 	}
 }
 
@@ -18,6 +20,12 @@ type unarySnowflake struct {
 	// beta is the number of consecutive successful queries required for
 	// finalization.
 	beta int
+
+	// alphaPreference is the threshold required to update the preference
+	alphaPreference int
+
+	// alphaConfidence is the threshold required to increment the confidence counter
+	alphaConfidence int
 
 	// confidence tracks the number of successful polls in a row that have
 	// returned the preference
@@ -28,16 +36,14 @@ type unarySnowflake struct {
 	finalized bool
 }
 
-func (sf *unarySnowflake) RecordSuccessfulPoll() {
+func (sf *unarySnowflake) RecordPoll(count int) {
+	if count < sf.alphaConfidence {
+		sf.RecordUnsuccessfulPoll()
+		return
+	}
+
 	sf.confidence++
 	sf.finalized = sf.finalized || sf.confidence >= sf.beta
-}
-
-// RecordPollPreference fails to reach an alpha threshold to increase our
-// confidence, so this calls RecordUnsuccessfulPoll to reset the confidence
-// counter.
-func (sf *unarySnowflake) RecordPollPreference() {
-	sf.RecordUnsuccessfulPoll()
 }
 
 func (sf *unarySnowflake) RecordUnsuccessfulPoll() {
@@ -50,10 +56,12 @@ func (sf *unarySnowflake) Finalized() bool {
 
 func (sf *unarySnowflake) Extend(choice int) Binary {
 	return &binarySnowflake{
-		binarySlush: binarySlush{preference: choice},
-		confidence:  sf.confidence,
-		beta:        sf.beta,
-		finalized:   sf.finalized,
+		binarySlush:     binarySlush{preference: choice},
+		confidence:      sf.confidence,
+		alphaPreference: sf.alphaPreference,
+		alphaConfidence: sf.alphaConfidence,
+		beta:            sf.beta,
+		finalized:       sf.finalized,
 	}
 }
 

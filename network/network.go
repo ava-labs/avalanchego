@@ -225,7 +225,7 @@ func NewNetwork(
 		return nil, fmt.Errorf("initializing outbound message throttler failed with: %w", err)
 	}
 
-	peerMetrics, err := peer.NewMetrics(log, config.Namespace, metricsRegisterer)
+	peerMetrics, err := peer.NewMetrics(config.Namespace, metricsRegisterer)
 	if err != nil {
 		return nil, fmt.Errorf("initializing peer metrics failed with: %w", err)
 	}

@@ -196,7 +196,7 @@ type BuildGenesisReply struct {
 	Encoding formatting.Encoding `json:"encoding"`
 }
 
-// beck32ToID takes bech32 address and produces a shortID
+// bech32ToID takes bech32 address and produces a shortID
 func bech32ToID(addrStr string) (ids.ShortID, error) {
 	_, addrBytes, err := address.ParseBech32(addrStr)
 	if err != nil {

@@ -23,7 +23,9 @@ var (
 // a unique value.
 type Database struct {
 	// All keys in this db begin with this byte slice
-	dbPrefix   []byte
+	dbPrefix []byte
+	// Lexically one greater than dbPrefix, defining the end of this db's key range
+	dbLimit    []byte
 	bufferPool *utils.BytesPool
 
 	// lock needs to be held during Close to guarantee db will not be set to nil
@@ -37,9 +39,23 @@ type Database struct {
 func newDB(prefix []byte, db database.Database) *Database {
 	return &Database{
 		dbPrefix:   prefix,
+		dbLimit:    incrementByteSlice(prefix),
 		db:         db,
 		bufferPool: utils.NewBytesPool(),
 	}
+}
+
+func incrementByteSlice(orig []byte) []byte {
+	n := len(orig)
+	buf := make([]byte, n)
+	copy(buf, orig)
+	for i := n - 1; i >= 0; i-- {
+		buf[i]++
+		if buf[i] != 0 {
+			break
+		}
+	}
+	return buf
 }
 
 // New returns a new prefixed database
@@ -189,6 +205,9 @@ func (db *Database) Compact(start, limit []byte) error {
 	prefixedStart := db.prefix(start)
 	defer db.bufferPool.Put(prefixedStart)
 
+	if limit == nil {
+		return db.db.Compact(*prefixedStart, db.dbLimit)
+	}
 	prefixedLimit := db.prefix(limit)
 	defer db.bufferPool.Put(prefixedLimit)
 

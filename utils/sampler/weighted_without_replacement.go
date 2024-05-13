@@ -11,7 +11,7 @@ type WeightedWithoutReplacement interface {
 	Sample(count int) ([]int, error)
 }
 
-// NewWeightedWithoutReplacement returns a new sampler
+// NewDeterministicWeightedWithoutReplacement returns a new sampler
 func NewDeterministicWeightedWithoutReplacement(source Source) WeightedWithoutReplacement {
 	return &weightedWithoutReplacementGeneric{
 		u: NewDeterministicUniform(source),

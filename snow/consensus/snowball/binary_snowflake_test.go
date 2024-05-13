@@ -15,37 +15,38 @@ func TestBinarySnowflake(t *testing.T) {
 	blue := 0
 	red := 1
 
+	alphaPreference, alphaConfidence := 1, 2
 	beta := 2
 
-	sf := newBinarySnowflake(beta, red)
+	sf := newBinarySnowflake(alphaPreference, alphaConfidence, beta, red)
 
 	require.Equal(red, sf.Preference())
 	require.False(sf.Finalized())
 
-	sf.RecordSuccessfulPoll(blue)
+	sf.RecordPoll(alphaConfidence, blue)
 
 	require.Equal(blue, sf.Preference())
 	require.False(sf.Finalized())
 
-	sf.RecordSuccessfulPoll(red)
+	sf.RecordPoll(alphaConfidence, red)
 
 	require.Equal(red, sf.Preference())
 	require.False(sf.Finalized())
 
-	sf.RecordSuccessfulPoll(blue)
+	sf.RecordPoll(alphaConfidence, blue)
 
 	require.Equal(blue, sf.Preference())
 	require.False(sf.Finalized())
 
-	sf.RecordPollPreference(red)
+	sf.RecordPoll(alphaPreference, red)
 	require.Equal(red, sf.Preference())
 	require.False(sf.Finalized())
 
-	sf.RecordSuccessfulPoll(blue)
+	sf.RecordPoll(alphaConfidence, blue)
 	require.Equal(blue, sf.Preference())
 	require.False(sf.Finalized())
 
-	sf.RecordSuccessfulPoll(blue)
+	sf.RecordPoll(alphaConfidence, blue)
 	require.Equal(blue, sf.Preference())
 	require.True(sf.Finalized())
 }
