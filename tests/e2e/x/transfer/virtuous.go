@@ -173,7 +173,7 @@ var _ = e2e.DescribeXChainSerial("[Virtuous Transfer Tx AVAX]", func() {
 				// Special-case the transfer amount from the funded key to ensure
 				// that new keys have enough funds to perform their own transfers.
 				if shortAddrs[fromIdx] == env.PreFundedKey.Address() {
-					amountToTransfer = units.Avax
+					amountToTransfer = 10 * units.Avax
 				}
 
 				senderNewBal := senderOrigBal - amountToTransfer - xContext.BaseTxFee
