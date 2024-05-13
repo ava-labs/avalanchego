@@ -8,4 +8,4 @@ AVALANCHE_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd )
 source "$AVALANCHE_PATH"/scripts/constants.sh
 
 echo "Building Workload..."
-go build -o "$AVALANCHE_PATH/build/workload" "$AVALANCHE_PATH/tests/antithesis/"*.go
+go build -o "$AVALANCHE_PATH/build/antithesis-avalanchego-workload" "$AVALANCHE_PATH/tests/antithesis/avalanchego/"*.go

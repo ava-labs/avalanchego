@@ -6,11 +6,11 @@ package main
 import (
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
+	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
 )
 
@@ -62,7 +62,7 @@ func parseFlags(arguments []string) (*viper.Viper, error) {
 
 	v := viper.New()
 	v.AutomaticEnv()
-	v.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
+	v.SetEnvKeyReplacer(config.DashesToUnderscores)
 	v.SetEnvPrefix(EnvPrefix)
 	if err := v.BindPFlags(fs); err != nil {
 		return nil, fmt.Errorf("failed binding pflags: %w", err)

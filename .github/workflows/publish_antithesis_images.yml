@@ -9,10 +9,6 @@ on:
 env:
   REGISTRY: us-central1-docker.pkg.dev
   REPOSITORY: molten-verve-216720/avalanche-repository
-  NODE_NAME: avalanche-node
-  WORKLOAD_NAME: workload
-  CONFIG_NAME: config
-  TAG: latest
 
 jobs:
   antithesis:
@@ -29,35 +25,9 @@ jobs:
         username: _json_key
         password: ${{ secrets.ANTITHESIS_GAR_JSON_KEY }}
 
-    - name: Set the Go version in the environment
-      # Need an exact version vs the range (~x.x.x) provided by set-go-version-in-env action
-      run: echo GO_VERSION="$(go list -m -f '{{.GoVersion}}')" >> $GITHUB_ENV
-      shell: bash
-
-    - name: Build node
-      id: build-node-image
-      run: |
-        docker build --build-arg GO_VERSION=${GO_VERSION} -t $REGISTRY/$REPOSITORY/$NODE_NAME:$TAG -f ./tests/antithesis/Dockerfile.node .
-        echo "name=image::$REGISTRY/$REPOSITORY/$NODE_NAME:$TAG" >> $GITHUB_OUTPUT
+    - name: Build images for avalanchego test setup
+      run: bash -x ./scripts/build_antithesis_images.sh
       env:
-        GO_VERSION: '${{ env.GO_VERSION }}'
-
-    - name: Build workload
-      id: build-workload-image
-      run: |
-        docker build --build-arg GO_VERSION=${GO_VERSION} -t $REGISTRY/$REPOSITORY/$WORKLOAD_NAME:$TAG -f ./tests/antithesis/Dockerfile.workload .
-        echo "name=image::$REGISTRY/$REPOSITORY/$WORKLOAD_NAME:$TAG" >> $GITHUB_OUTPUT
-      env:
-        GO_VERSION: '${{ env.GO_VERSION }}'
-
-    - name: Build config
-      id: build-config-image
-      run: |
-        docker build -t $REGISTRY/$REPOSITORY/$CONFIG_NAME:$TAG -f ./tests/antithesis/Dockerfile.config .
-        echo "name=image::$REGISTRY/$REPOSITORY/$CONFIG_NAME:$TAG" >> $GITHUB_OUTPUT
-
-    - name: Publish images
-      run: |
-        docker push ${REGISTRY}/${REPOSITORY}/${NODE_NAME}:${TAG}
-        docker push ${REGISTRY}/${REPOSITORY}/${WORKLOAD_NAME}:${TAG}
-        docker push ${REGISTRY}/${REPOSITORY}/${CONFIG_NAME}:${TAG}
+        IMAGE_PREFIX: ${{ env.REGISTRY }}/${{ env.REPOSITORY }}
+        TAG: latest
+        TEST_SETUP: avalanchego
