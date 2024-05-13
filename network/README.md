@@ -127,7 +127,7 @@ It is expected for Avalanche nodes to allow inbound connections. If a validator 
 
 Avalanche nodes that have identified the `IP:Port` pair of a node they want to connect to will initiate outbound connections to this `IP:Port` pair. If the connection is not able to complete the [Peer Handshake](#peer-handshake), the connection will be re-attempted with an [Exponential Backoff](https://en.wikipedia.org/wiki/Exponential_backoff).
 
-A node should initiate outbound connections to an `IP:Port` pair that is beleived to belong to a node that is not connected and meets at least one of the following conditions:
+A node should initiate outbound connections to an `IP:Port` pair that is believed to belong to a node that is not connected and meets at least one of the following conditions:
 - The node is in the initial bootstrapper set.
 - The node is in the default bootstrapper set.
 - The node in the current Primary Network validator set.

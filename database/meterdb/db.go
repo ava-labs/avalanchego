@@ -92,7 +92,7 @@ type Database struct {
 	db database.Database
 
 	calls    *prometheus.CounterVec
-	duration *prometheus.CounterVec
+	duration *prometheus.GaugeVec
 	size     *prometheus.CounterVec
 }
 
@@ -112,8 +112,8 @@ func New(
 			},
 			methodLabels,
 		),
-		duration: prometheus.NewCounterVec(
-			prometheus.CounterOpts{
+		duration: prometheus.NewGaugeVec(
+			prometheus.GaugeOpts{
 				Namespace: namespace,
 				Name:      "duration",
 				Help:      "time spent in database calls (ns)",
