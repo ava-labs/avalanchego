@@ -651,7 +651,7 @@ func (p *peer) sendNetworkMessages() {
 					zap.Stringer("messageOp", message.GetPeerListOp),
 					zap.Error(err),
 				)
-				continue
+				return
 			}
 
 			p.Send(p.onClosingCtx, msg)
@@ -838,6 +838,7 @@ func (p *peer) handlePing(msg *p2p.Ping) {
 			zap.Stringer("messageOp", message.PongOp),
 			zap.Error(err),
 		)
+		p.StartClose()
 		return
 	}
 
