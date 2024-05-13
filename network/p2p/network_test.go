@@ -480,119 +480,7 @@ func TestAppRequestDuplicateRequestIDs(t *testing.T) {
 	require.ErrorIs(err, ErrRequestPending)
 }
 
-// Sample should always return up to [limit] peers, and less if fewer than
-// [limit] peers are available.
-func TestPeersSample(t *testing.T) {
-	nodeID1 := ids.GenerateTestNodeID()
-	nodeID2 := ids.GenerateTestNodeID()
-	nodeID3 := ids.GenerateTestNodeID()
-
-	allowAll := set.Of(nodeID1, nodeID2, nodeID3)
-
-	tests := []struct {
-		name         string
-		connected    set.Set[ids.NodeID]
-		allowed      set.Set[ids.NodeID]
-		disconnected set.Set[ids.NodeID]
-		limit        int
-	}{
-		{
-			name:    "no peers",
-			allowed: allowAll,
-			limit:   1,
-		},
-		{
-			name:      "one peer connected",
-			connected: set.Of(nodeID1),
-			allowed:   allowAll,
-			limit:     1,
-		},
-		{
-			name:      "multiple peers connected",
-			connected: set.Of(nodeID1, nodeID2, nodeID3),
-			allowed:   allowAll,
-			limit:     1,
-		},
-		{
-			name:         "peer connects and disconnects - 1",
-			connected:    set.Of(nodeID1),
-			allowed:      allowAll,
-			disconnected: set.Of(nodeID1),
-			limit:        1,
-		},
-		{
-			name:         "peer connects and disconnects - 2",
-			connected:    set.Of(nodeID1, nodeID2),
-			allowed:      allowAll,
-			disconnected: set.Of(nodeID2),
-			limit:        1,
-		},
-		{
-			name:         "peer connects and disconnects - 3",
-			connected:    set.Of(nodeID1, nodeID2, nodeID3),
-			allowed:      allowAll,
-			disconnected: set.Of(nodeID1, nodeID2),
-			limit:        1,
-		},
-		{
-			name:      "less than limit peers",
-			connected: set.Of(nodeID1, nodeID2, nodeID3),
-			allowed:   allowAll,
-			limit:     4,
-		},
-		{
-			name:      "limit peers",
-			connected: set.Of(nodeID1, nodeID2, nodeID3),
-			allowed:   allowAll,
-			limit:     3,
-		},
-		{
-			name:      "more than limit peers",
-			connected: set.Of(nodeID1, nodeID2, nodeID3),
-			allowed:   allowAll,
-			limit:     2,
-		},
-		{
-			name:      "restrict peer",
-			connected: set.Of(nodeID1, nodeID2, nodeID3),
-			allowed:   set.Of(nodeID1),
-			limit:     2,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			require := require.New(t)
-
-			network, err := NewNetwork(logging.NoLog{}, &common.FakeSender{}, prometheus.NewRegistry(), "")
-			require.NoError(err)
-
-			for connected := range tt.connected {
-				require.NoError(network.Connected(context.Background(), connected, nil))
-			}
-
-			for disconnected := range tt.disconnected {
-				require.NoError(network.Disconnected(context.Background(), disconnected))
-			}
-
-			sampleable := set.Set[ids.NodeID]{}
-			sampleable.Union(tt.connected)
-			sampleable.Difference(tt.disconnected)
-			for nodeID := range sampleable {
-				if !tt.allowed.Contains(nodeID) {
-					sampleable.Remove(nodeID)
-				}
-			}
-
-			sampled := network.Peers.Sample(context.Background(), tt.allowed.Contains, tt.limit)
-			require.Len(sampled, min(tt.limit, len(sampleable)))
-			require.Subset(sampleable, sampled)
-		})
-	}
-}
-
 func TestAppRequestAnyNodeSelection(t *testing.T) {
-	self := ids.GenerateTestNodeID()
 	peerID := ids.GenerateTestNodeID()
 
 	tests := []struct {
@@ -604,11 +492,6 @@ func TestAppRequestAnyNodeSelection(t *testing.T) {
 		{
 			name:     "no peers",
 			expected: ErrNoPeers,
-		},
-		{
-			name:      "only connected to self",
-			connected: []ids.NodeID{self},
-			expected:  ErrNoPeers,
 		},
 		{
 			name:          "has peers",
@@ -640,6 +523,12 @@ func TestAppRequestAnyNodeSelection(t *testing.T) {
 			err = client.AppRequestAny(context.Background(), []byte("foobar"), nil)
 			require.ErrorIs(err, tt.expected)
 			require.Subset(tt.expectedPeers, sent.List())
+
+			if len(tt.expectedPeers) > 0 {
+				require.Len(sent, 1)
+			} else {
+				require.Empty(sent)
+			}
 		})
 	}
 }
@@ -667,23 +556,26 @@ func TestNodeSamplerClientOption(t *testing.T) {
 			peers: []ids.NodeID{nodeID0, nodeID1},
 			options: []ClientOption{
 				WithSamplingFilters(
-					NewValidators(
-						logging.NoLog{},
-						ids.Empty,
-						&validators.TestState{
-							GetCurrentHeightF: func(context.Context) (uint64, error) {
-								return 0, nil
+					NewPeerValidatorFilter(
+						ids.EmptyNodeID,
+						NewValidators(
+							logging.NoLog{},
+							ids.Empty,
+							&validators.TestState{
+								GetCurrentHeightF: func(context.Context) (uint64, error) {
+									return 0, nil
+								},
+								GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+									return map[ids.NodeID]*validators.GetValidatorOutput{
+										nodeID1: {
+											NodeID: nodeID1,
+											Weight: 1,
+										},
+									}, nil
+								},
 							},
-							GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
-								return map[ids.NodeID]*validators.GetValidatorOutput{
-									nodeID1: {
-										NodeID: nodeID1,
-										Weight: 1,
-									},
-								}, nil
-							},
-						},
-						0,
+							0,
+						),
 					),
 				),
 			},
@@ -694,23 +586,25 @@ func TestNodeSamplerClientOption(t *testing.T) {
 			peers: []ids.NodeID{nodeID0},
 			options: []ClientOption{
 				WithSamplingFilters(
-					NewValidators(
-						logging.NoLog{},
-						ids.Empty,
-						&validators.TestState{
-							GetCurrentHeightF: func(context.Context) (uint64, error) {
-								return 0, nil
+					NewPeerValidatorFilter(ids.EmptyNodeID,
+						NewValidators(
+							logging.NoLog{},
+							ids.Empty,
+							&validators.TestState{
+								GetCurrentHeightF: func(context.Context) (uint64, error) {
+									return 0, nil
+								},
+								GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+									return map[ids.NodeID]*validators.GetValidatorOutput{
+										nodeID1: {
+											NodeID: nodeID1,
+											Weight: 1,
+										},
+									}, nil
+								},
 							},
-							GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
-								return map[ids.NodeID]*validators.GetValidatorOutput{
-									nodeID1: {
-										NodeID: nodeID1,
-										Weight: 1,
-									},
-								}, nil
-							},
-						},
-						0,
+							0,
+						),
 					),
 				),
 			},

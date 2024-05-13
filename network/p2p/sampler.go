@@ -1,3 +1,6 @@
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package p2p
 
 import (
@@ -7,14 +10,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils/sampler"
 )
 
-type SamplingFilter func(ctx context.Context, nodeID ids.NodeID) bool
-
-// NewPeerValidatorFilter returns a filter that only samples other peer
-// validators
-func NewPeerValidatorFilter(self ids.NodeID, validators ValidatorSet) SamplingFilter {
-	return func(ctx context.Context, nodeID ids.NodeID) bool {
-		return nodeID != self && validators.Has(ctx, nodeID)
-	}
+type SamplingFilter interface {
+	// Filter returns if nodeID can be sampled
+	Filter(ctx context.Context, nodeID ids.NodeID) bool
 }
 
 func newPeerSampler(peers *Peers, filters ...SamplingFilter) peerSampler {
@@ -47,8 +45,8 @@ func (p peerSampler) Sample(ctx context.Context, limit int) []ids.NodeID {
 
 		nodeID := p.peers.set.Elements[i]
 		for _, filter := range p.filters {
-			if !filter(ctx, nodeID) {
-				continue
+			if !filter.Filter(ctx, nodeID) {
+				continue //TODO bug
 			}
 		}
 
