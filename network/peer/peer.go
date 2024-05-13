@@ -38,7 +38,6 @@ const (
 
 	disconnectingLog         = "disconnecting from peer"
 	failedToCreateMessageLog = "failed to create message"
-	failedToSendMessageLog   = "failed to send message"
 	failedToSetDeadlineLog   = "failed to set connection deadline"
 	failedToGetUptimeLog     = "failed to get peer uptime percentage"
 	malformedMessageLog      = "malformed message"
@@ -655,12 +654,7 @@ func (p *peer) sendNetworkMessages() {
 				continue
 			}
 
-			if !p.Send(p.onClosingCtx, msg) {
-				p.Log.Debug(failedToSendMessageLog,
-					zap.Stringer("nodeID", p.id),
-					zap.Stringer("messageOp", message.GetPeerListOp),
-				)
-			}
+			p.Send(p.onClosingCtx, msg)
 		case <-sendPingsTicker.C:
 			if !p.Network.AllowConnection(p.id) {
 				p.Log.Debug(disconnectingLog,
@@ -688,12 +682,7 @@ func (p *peer) sendNetworkMessages() {
 				return
 			}
 
-			if !p.Send(p.onClosingCtx, pingMessage) {
-				p.Log.Debug(failedToSendMessageLog,
-					zap.Stringer("nodeID", p.id),
-					zap.Stringer("messageOp", message.PingOp),
-				)
-			}
+			p.Send(p.onClosingCtx, pingMessage)
 		case <-p.onClosingCtx.Done():
 			return
 		}
@@ -852,12 +841,7 @@ func (p *peer) handlePing(msg *p2p.Ping) {
 		return
 	}
 
-	if !p.Send(p.onClosingCtx, pongMessage) {
-		p.Log.Debug(failedToSendMessageLog,
-			zap.Stringer("nodeID", p.id),
-			zap.Stringer("messageOp", message.PongOp),
-		)
-	}
+	p.Send(p.onClosingCtx, pongMessage)
 }
 
 func (p *peer) getUptimes() (uint32, []*p2p.SubnetUptime) {
@@ -1142,7 +1126,7 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 	if !p.Send(p.onClosingCtx, peerListMsg) {
 		// Because throttling was marked to be bypassed with this message,
 		// sending should only fail if the peer has started closing.
-		p.Log.Debug(failedToSendMessageLog,
+		p.Log.Debug("failed to send reliable message",
 			zap.Stringer("nodeID", p.id),
 			zap.Stringer("messageOp", message.PeerListOp),
 			zap.Error(p.onClosingCtx.Err()),
@@ -1205,12 +1189,7 @@ func (p *peer) handleGetPeerList(msg *p2p.GetPeerList) {
 		return
 	}
 
-	if !p.Send(p.onClosingCtx, peerListMsg) {
-		p.Log.Debug(failedToSendMessageLog,
-			zap.Stringer("nodeID", p.id),
-			zap.Stringer("messageOp", message.PeerListOp),
-		)
-	}
+	p.Send(p.onClosingCtx, peerListMsg)
 }
 
 func (p *peer) handlePeerList(msg *p2p.PeerList) {
