@@ -1120,6 +1120,7 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 			zap.Stringer("messageOp", message.PeerListOp),
 			zap.Error(err),
 		)
+		p.StartClose()
 		return
 	}
 
@@ -1131,6 +1132,7 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 			zap.Stringer("messageOp", message.PeerListOp),
 			zap.Error(p.onClosingCtx.Err()),
 		)
+		p.StartClose()
 	}
 }
 
