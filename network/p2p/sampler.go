@@ -44,14 +44,22 @@ func (p peerSampler) Sample(ctx context.Context, limit int) []ids.NodeID {
 		}
 
 		nodeID := p.peers.set.Elements[i]
-		for _, filter := range p.filters {
-			if !filter.Filter(ctx, nodeID) {
-				continue //TODO bug
-			}
+		if !p.canSample(ctx, nodeID) {
+			continue
 		}
 
 		sampled = append(sampled, nodeID)
 	}
 
 	return sampled
+}
+
+func (p peerSampler) canSample(ctx context.Context, nodeID ids.NodeID) bool {
+	for _, filter := range p.filters {
+		if !filter.Filter(ctx, nodeID) {
+			return false
+		}
+	}
+
+	return true
 }
