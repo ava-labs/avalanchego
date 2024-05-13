@@ -230,7 +230,7 @@ func (b *benchlist) RegisterResponse(nodeID ids.NodeID) {
 	delete(b.failureStreaks, nodeID)
 }
 
-// RegisterResponse notes that a request to [nodeID] timed out
+// RegisterFailure notes that a request to [nodeID] timed out
 func (b *benchlist) RegisterFailure(nodeID ids.NodeID) {
 	b.lock.Lock()
 	defer b.lock.Unlock()

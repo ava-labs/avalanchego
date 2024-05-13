@@ -18,7 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
 	"github.com/ava-labs/avalanchego/utils/hashing"
-	"github.com/ava-labs/avalanchego/utils/metric"
 )
 
 var (
@@ -532,7 +531,7 @@ func TestMeteredCache(t *testing.T) {
 	_, err := NewMeteredState(registry, config)
 	require.NoError(err)
 	_, err = NewMeteredState(registry, config)
-	require.ErrorIs(err, metric.ErrFailedRegistering)
+	require.Error(err) //nolint:forbidigo // error is not exported https://github.com/prometheus/client_golang/blob/main/prometheus/registry.go#L315
 }
 
 // Test the bytesToIDCache

@@ -64,7 +64,6 @@ func newConfig(t *testing.T) Config {
 	require := require.New(t)
 
 	metrics, err := NewMetrics(
-		logging.NoLog{},
 		"",
 		prometheus.NewRegistry(),
 	)
