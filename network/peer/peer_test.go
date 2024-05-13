@@ -82,7 +82,6 @@ func makeRawTestPeers(t *testing.T, trackedSubnets set.Set[ids.ID]) (*rawTestPee
 	mc := newMessageCreator(t)
 
 	metrics, err := NewMetrics(
-		logging.NoLog{},
 		"",
 		prometheus.NewRegistry(),
 	)
