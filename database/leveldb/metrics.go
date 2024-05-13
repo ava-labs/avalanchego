@@ -19,7 +19,7 @@ type metrics struct {
 	writesDelayedCount prometheus.Counter
 	// total amount of time (in ns) that writes that have been delayed due to
 	// compaction
-	writesDelayedDuration prometheus.Counter
+	writesDelayedDuration prometheus.Gauge
 	// set to 1 if there is currently at least one write that is being delayed
 	// due to compaction
 	writeIsDelayed prometheus.Gauge
@@ -44,7 +44,7 @@ type metrics struct {
 	// size of each level
 	levelSize *prometheus.GaugeVec
 	// amount of time spent compacting each level
-	levelDuration *prometheus.CounterVec
+	levelDuration *prometheus.GaugeVec
 	// amount of bytes read while compacting each level
 	levelReads *prometheus.CounterVec
 	// amount of bytes written while compacting each level
@@ -69,7 +69,7 @@ func newMetrics(namespace string, reg prometheus.Registerer) (metrics, error) {
 			Name:      "writes_delayed",
 			Help:      "number of cumulative writes that have been delayed due to compaction",
 		}),
-		writesDelayedDuration: prometheus.NewCounter(prometheus.CounterOpts{
+		writesDelayedDuration: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespace,
 			Name:      "writes_delayed_duration",
 			Help:      "amount of time (in ns) that writes have been delayed due to compaction",
@@ -129,8 +129,8 @@ func newMetrics(namespace string, reg prometheus.Registerer) (metrics, error) {
 			},
 			levelLabels,
 		),
-		levelDuration: prometheus.NewCounterVec(
-			prometheus.CounterOpts{
+		levelDuration: prometheus.NewGaugeVec(
+			prometheus.GaugeOpts{
 				Namespace: namespace,
 				Name:      "duration",
 				Help:      "amount of time (in ns) spent in compaction by level",

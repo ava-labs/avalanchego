@@ -79,8 +79,16 @@ type Network struct {
 	// Path where network configuration and data is stored
 	Dir string
 
+	// Id of the network. If zero, must be set in Genesis.
+	NetworkID uint32
+
 	// Configuration common across nodes
-	Genesis      *genesis.UnparsedConfig
+
+	// Genesis for the network. If nil, NetworkID must be non-zero
+	Genesis *genesis.UnparsedConfig
+
+	// Configuration for primary network chains (P, X, C)
+	// TODO(marun) Rename to PrimaryChainConfigs
 	ChainConfigs map[string]FlagsMap
 
 	// Default configuration to use when creating new nodes
@@ -490,9 +498,13 @@ func (n *Network) EnsureNodeConfig(node *Node) error {
 	node.NetworkOwner = n.Owner
 
 	// Set the network name if available
-	if n.Genesis != nil && n.Genesis.NetworkID > 0 {
+	networkID := n.NetworkID
+	if networkID == 0 && n.Genesis != nil && n.Genesis.NetworkID > 0 {
+		networkID = n.Genesis.NetworkID
+	}
+	if networkID > 0 {
 		// Convert the network id to a string to ensure consistency in JSON round-tripping.
-		flags[config.NetworkNameKey] = strconv.FormatUint(uint64(n.Genesis.NetworkID), 10)
+		flags[config.NetworkNameKey] = strconv.FormatUint(uint64(networkID), 10)
 	}
 
 	if err := node.EnsureKeys(); err != nil {
