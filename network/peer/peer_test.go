@@ -231,6 +231,7 @@ func TestPingUptimes(t *testing.T) {
 				require.NoError(t, err)
 				return pingMsg
 			}(),
+			shouldClose: false,
 			assertFn: func(require *require.Assertions, peer *testPeer) {
 				uptime, ok := peer.ObservedUptime(constants.PrimaryNetworkID)
 				require.True(ok)
@@ -256,6 +257,7 @@ func TestPingUptimes(t *testing.T) {
 				require.NoError(t, err)
 				return pingMsg
 			}(),
+			shouldClose: false,
 			assertFn: func(require *require.Assertions, peer *testPeer) {
 				uptime, ok := peer.ObservedUptime(constants.PrimaryNetworkID)
 				require.True(ok)
@@ -288,31 +290,30 @@ func TestPingUptimes(t *testing.T) {
 				return pingMsg
 			}(),
 			shouldClose: true,
+			assertFn:    nil,
 		},
 	}
 
-	// Note: we reuse peers across tests because newRawTestPeer takes awhile to
-	// run.
+	// The raw peers are generated outside of the test cases to avoid generating
+	// many TLS keys.
 	rawPeer0 := newRawTestPeer(t, sharedConfig)
 	rawPeer1 := newRawTestPeer(t, sharedConfig)
-
-	peer0, peer1 := startTestPeers(rawPeer0, rawPeer1)
-	awaitReady(t, peer0, peer1)
-	defer func() {
-		peer1.StartClose()
-		peer0.StartClose()
-		require.NoError(t, peer0.AwaitClosed(context.Background()))
-		require.NoError(t, peer1.AwaitClosed(context.Background()))
-	}()
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			require := require.New(t)
 
+			peer0, peer1 := startTestPeers(rawPeer0, rawPeer1)
+			awaitReady(t, peer0, peer1)
+			defer func() {
+				peer1.StartClose()
+				peer0.StartClose()
+				require.NoError(peer0.AwaitClosed(context.Background()))
+				require.NoError(peer1.AwaitClosed(context.Background()))
+			}()
+
 			require.True(peer0.Send(context.Background(), tc.msg))
 
-			// Note: shouldClose can only be `true` for the last test because
-			// we reuse peers across tests.
 			if tc.shouldClose {
 				require.NoError(peer1.AwaitClosed(context.Background()))
 				return
