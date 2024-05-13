@@ -35,10 +35,8 @@ function build_images {
 
   # Define image names
   local base_image_name="antithesis-${test_setup}"
-  local avalanchego_node_image_name="antithesis-avalanchego-node:${TAG}"
   if [[ -n "${image_prefix}" ]]; then
     base_image_name="${image_prefix}/${base_image_name}"
-    avalanchego_node_image_name="${image_prefix}/${avalanchego_node_image_name}"
   fi
   local node_image_name="${base_image_name}-node:${TAG}"
   local workload_image_name="${base_image_name}-workload:${TAG}"
@@ -58,8 +56,9 @@ function build_images {
   local docker_cmd="docker buildx build --build-arg GO_VERSION=${GO_VERSION} --build-arg NODE_IMAGE=${node_image_name}"
 
   if [[ "${test_setup}" == "xsvm" ]]; then
-    # The xsvm node image is built on the avalanchego node image
-    docker_cmd="${docker_cmd} --build-arg AVALANCHEGO_NODE_IMAGE=${avalanchego_node_image_name}"
+    # The xsvm node image is built on the avalanchego node image, which is assumed to have already been
+    # built. The image name doesn't include the image prefix because it is not intended to be pushed.
+    docker_cmd="${docker_cmd} --build-arg AVALANCHEGO_NODE_IMAGE=antithesis-avalanchego-node:${TAG}"
   fi
 
   # Build node image first to allow the workload image to use it.
