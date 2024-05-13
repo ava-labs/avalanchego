@@ -505,12 +505,11 @@ func (n *network) Connected(ctx context.Context, nodeID ids.NodeID, nodeVersion 
 		return nil
 	}
 
-	if nodeID == n.self {
-		log.Debug("skipping registering self as peer")
-		return nil
+	if nodeID != n.self {
+		// The legacy peer tracker doesn't expect to be connected to itself.
+		n.peers.Connected(nodeID, nodeVersion)
 	}
 
-	n.peers.Connected(nodeID, nodeVersion)
 	return n.p2pNetwork.Connected(ctx, nodeID, nodeVersion)
 }
 
@@ -524,7 +523,11 @@ func (n *network) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
 		return nil
 	}
 
-	n.peers.Disconnected(nodeID)
+	if nodeID != n.self {
+		// The legacy peer tracker doesn't expect to be connected to itself.
+		n.peers.Disconnected(nodeID)
+	}
+
 	return n.p2pNetwork.Disconnected(ctx, nodeID)
 }
 
