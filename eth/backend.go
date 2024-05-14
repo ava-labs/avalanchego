@@ -214,7 +214,7 @@ func New(
 			SnapshotNoBuild:                 config.SkipSnapshotRebuild,
 			Preimages:                       config.Preimages,
 			AcceptedCacheSize:               config.AcceptedCacheSize,
-			TxLookupLimit:                   config.TxLookupLimit,
+			TransactionHistory:              config.TransactionHistory,
 			SkipTxIndexing:                  config.SkipTxIndexing,
 			StateHistory:                    config.StateHistory,
 			StateScheme:                     config.StateScheme,

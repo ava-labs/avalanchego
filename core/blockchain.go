@@ -183,7 +183,7 @@ type CacheConfig struct {
 	SnapshotVerify                  bool    // Verify generated snapshots
 	Preimages                       bool    // Whether to store preimage of trie key to the disk
 	AcceptedCacheSize               int     // Depth of accepted headers cache and accepted logs cache at the accepted tip
-	TxLookupLimit                   uint64  // Number of recent blocks for which to maintain transaction lookup indices
+	TransactionHistory              uint64  // Number of recent blocks for which to maintain transaction lookup indices
 	SkipTxIndexing                  bool    // Whether to skip transaction indexing
 	StateHistory                    uint64  // Number of blocks from head whose state histories are reserved.
 	StateScheme                     string  // Scheme used to store ethereum states and merkle tree nodes on top
@@ -448,7 +448,7 @@ func NewBlockChain(
 	bc.warmAcceptedCaches()
 
 	// if txlookup limit is 0 (uindexing disabled), we don't need to repair the tx index tail.
-	if bc.cacheConfig.TxLookupLimit != 0 {
+	if bc.cacheConfig.TransactionHistory != 0 {
 		latestStateSynced := rawdb.GetLatestSyncPerformed(bc.db)
 		bc.setTxIndexTail(latestStateSynced)
 	}
@@ -457,7 +457,7 @@ func NewBlockChain(
 	go bc.startAcceptor()
 
 	// Start tx indexer/unindexer if required.
-	if bc.cacheConfig.TxLookupLimit != 0 {
+	if bc.cacheConfig.TransactionHistory != 0 {
 		bc.wg.Add(1)
 		var (
 			headCh = make(chan ChainEvent, 1) // Buffered to avoid locking up the event feed
@@ -480,7 +480,7 @@ func NewBlockChain(
 // unindexBlocks unindexes transactions depending on user configuration
 func (bc *BlockChain) unindexBlocks(tail uint64, head uint64, done chan struct{}) {
 	start := time.Now()
-	txLookupLimit := bc.cacheConfig.TxLookupLimit
+	txLookupLimit := bc.cacheConfig.TransactionHistory
 	bc.txIndexTailLock.Lock()
 	defer func() {
 		txUnindexTimer.Inc(time.Since(start).Milliseconds())
@@ -506,7 +506,7 @@ func (bc *BlockChain) unindexBlocks(tail uint64, head uint64, done chan struct{}
 // Invariant: If TxLookupLimit is 0, it means all tx indices will be preserved.
 // Meaning that this function should never be called.
 func (bc *BlockChain) maintainTxIndex(headCh <-chan ChainEvent) {
-	txLookupLimit := bc.cacheConfig.TxLookupLimit
+	txLookupLimit := bc.cacheConfig.TransactionHistory
 
 	// If the user just upgraded to a new version which supports transaction
 	// index pruning, write the new tail and remove anything older.
@@ -952,7 +952,7 @@ func (bc *BlockChain) ValidateCanonicalChain() error {
 		// that the transactions have been indexed, if we are checking below the last accepted
 		// block.
 		shouldIndexTxs := !bc.cacheConfig.SkipTxIndexing &&
-			(bc.cacheConfig.TxLookupLimit == 0 || bc.lastAccepted.NumberU64() < current.Number.Uint64()+bc.cacheConfig.TxLookupLimit)
+			(bc.cacheConfig.TransactionHistory == 0 || bc.lastAccepted.NumberU64() < current.Number.Uint64()+bc.cacheConfig.TransactionHistory)
 		if current.Number.Uint64() <= bc.lastAccepted.NumberU64() && shouldIndexTxs {
 			// Ensure that all of the transactions have been stored correctly in the canonical
 			// chain
@@ -2217,7 +2217,7 @@ func (bc *BlockChain) ResetToStateSyncedBlock(block *types.Block) error {
 	}
 
 	// if txlookup limit is 0 (uindexing disabled), we don't need to repair the tx index tail.
-	if bc.cacheConfig.TxLookupLimit != 0 {
+	if bc.cacheConfig.TransactionHistory != 0 {
 		bc.setTxIndexTail(block.NumberU64())
 	}
 
