@@ -589,7 +589,7 @@ func getGossipableIPs[T any](
 	defer i.lock.RUnlock()
 
 	for subnetID := range iter {
-		if subnetID != constants.PrimaryNetworkID && !allowed(subnetID) {
+		if !allowed(subnetID) {
 			continue
 		}
 

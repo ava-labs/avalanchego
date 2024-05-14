@@ -565,7 +565,9 @@ func (n *network) Peers(
 		return getGossipableIPs(
 			n.ipTracker,
 			trackedSubnets,
-			n.ipTracker.trackedSubnets.Contains,
+			func(subnetID ids.ID) bool {
+				return subnetID == constants.PrimaryNetworkID || n.ipTracker.trackedSubnets.Contains(subnetID)
+			},
 			peerID,
 			knownPeers,
 			salt,
