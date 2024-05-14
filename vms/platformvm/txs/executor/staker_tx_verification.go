@@ -97,7 +97,7 @@ func verifyAddValidatorTx(
 	error,
 ) {
 	currentTimestamp := chainState.GetTimestamp()
-	if backend.Config.IsDurangoActivated(currentTimestamp) {
+	if backend.Config.UpgradeConfig.IsDurangoActivated(currentTimestamp) {
 		return nil, ErrAddValidatorTxPostDurango
 	}
 
@@ -194,7 +194,7 @@ func verifyAddSubnetValidatorTx(
 
 	var (
 		currentTimestamp = chainState.GetTimestamp()
-		isDurangoActive  = backend.Config.IsDurangoActivated(currentTimestamp)
+		isDurangoActive  = backend.Config.UpgradeConfig.IsDurangoActivated(currentTimestamp)
 	)
 	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
 		return err
@@ -288,7 +288,7 @@ func verifyRemoveSubnetValidatorTx(
 
 	var (
 		currentTimestamp = chainState.GetTimestamp()
-		isDurangoActive  = backend.Config.IsDurangoActivated(currentTimestamp)
+		isDurangoActive  = backend.Config.UpgradeConfig.IsDurangoActivated(currentTimestamp)
 	)
 	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
 		return nil, false, err
@@ -355,7 +355,7 @@ func verifyAddDelegatorTx(
 	error,
 ) {
 	currentTimestamp := chainState.GetTimestamp()
-	if backend.Config.IsDurangoActivated(currentTimestamp) {
+	if backend.Config.UpgradeConfig.IsDurangoActivated(currentTimestamp) {
 		return nil, ErrAddDelegatorTxPostDurango
 	}
 
@@ -413,7 +413,7 @@ func verifyAddDelegatorTx(
 		return nil, ErrStakeOverflow
 	}
 
-	if backend.Config.IsApricotPhase3Activated(currentTimestamp) {
+	if backend.Config.UpgradeConfig.IsApricotPhase3Activated(currentTimestamp) {
 		maximumWeight = min(maximumWeight, backend.Config.MaxValidatorStake)
 	}
 
@@ -472,7 +472,7 @@ func verifyAddPermissionlessValidatorTx(
 
 	var (
 		currentTimestamp = chainState.GetTimestamp()
-		isDurangoActive  = backend.Config.IsDurangoActivated(currentTimestamp)
+		isDurangoActive  = backend.Config.UpgradeConfig.IsDurangoActivated(currentTimestamp)
 	)
 	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
 		return err
@@ -594,7 +594,7 @@ func verifyAddPermissionlessDelegatorTx(
 
 	var (
 		currentTimestamp = chainState.GetTimestamp()
-		isDurangoActive  = backend.Config.IsDurangoActivated(currentTimestamp)
+		isDurangoActive  = backend.Config.UpgradeConfig.IsDurangoActivated(currentTimestamp)
 	)
 	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
 		return err
@@ -737,7 +737,7 @@ func verifyTransferSubnetOwnershipTx(
 	sTx *txs.Tx,
 	tx *txs.TransferSubnetOwnershipTx,
 ) error {
-	if !backend.Config.IsDurangoActivated(chainState.GetTimestamp()) {
+	if !backend.Config.UpgradeConfig.IsDurangoActivated(chainState.GetTimestamp()) {
 		return ErrDurangoUpgradeNotActive
 	}
 
