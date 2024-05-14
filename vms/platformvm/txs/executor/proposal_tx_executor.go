@@ -103,12 +103,12 @@ func (e *ProposalTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 	// activation. Following the activation, AddValidatorTxs must be issued into
 	// StandardBlocks.
 	currentTimestamp := e.OnCommitState.GetTimestamp()
-	if e.Config.IsBanffActivated(currentTimestamp) {
+	if e.Config.UpgradeConfig.IsBanffActivated(currentTimestamp) {
 		return fmt.Errorf(
 			"%w: timestamp (%s) >= Banff fork time (%s)",
 			ErrProposedAddStakerTxAfterBanff,
 			currentTimestamp,
-			e.Config.BanffTime,
+			e.Config.UpgradeConfig.BanffTime,
 		)
 	}
 
@@ -150,12 +150,12 @@ func (e *ProposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 	// activation. Following the activation, AddSubnetValidatorTxs must be
 	// issued into StandardBlocks.
 	currentTimestamp := e.OnCommitState.GetTimestamp()
-	if e.Config.IsBanffActivated(currentTimestamp) {
+	if e.Config.UpgradeConfig.IsBanffActivated(currentTimestamp) {
 		return fmt.Errorf(
 			"%w: timestamp (%s) >= Banff fork time (%s)",
 			ErrProposedAddStakerTxAfterBanff,
 			currentTimestamp,
-			e.Config.BanffTime,
+			e.Config.UpgradeConfig.BanffTime,
 		)
 	}
 
@@ -196,12 +196,12 @@ func (e *ProposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 	// activation. Following the activation, AddDelegatorTxs must be issued into
 	// StandardBlocks.
 	currentTimestamp := e.OnCommitState.GetTimestamp()
-	if e.Config.IsBanffActivated(currentTimestamp) {
+	if e.Config.UpgradeConfig.IsBanffActivated(currentTimestamp) {
 		return fmt.Errorf(
 			"%w: timestamp (%s) >= Banff fork time (%s)",
 			ErrProposedAddStakerTxAfterBanff,
 			currentTimestamp,
-			e.Config.BanffTime,
+			e.Config.UpgradeConfig.BanffTime,
 		)
 	}
 
@@ -248,12 +248,12 @@ func (e *ProposalTxExecutor) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
 
 	// Validate [newChainTime]
 	newChainTime := tx.Timestamp()
-	if e.Config.IsBanffActivated(newChainTime) {
+	if e.Config.UpgradeConfig.IsBanffActivated(newChainTime) {
 		return fmt.Errorf(
 			"%w: proposed timestamp (%s) >= Banff fork time (%s)",
 			ErrAdvanceTimeTxIssuedAfterBanff,
 			newChainTime,
-			e.Config.BanffTime,
+			e.Config.UpgradeConfig.BanffTime,
 		)
 	}
 
@@ -558,7 +558,7 @@ func (e *ProposalTxExecutor) rewardDelegatorTx(uDelegatorTx txs.DelegatorTx, del
 	}
 
 	// Reward the delegatee here
-	if e.Config.IsCortinaActivated(validator.StartTime) {
+	if e.Config.UpgradeConfig.IsCortinaActivated(validator.StartTime) {
 		previousDelegateeReward, err := e.OnCommitState.GetDelegateeReward(
 			validator.SubnetID,
 			validator.NodeID,
