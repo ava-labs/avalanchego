@@ -185,7 +185,7 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 			require := require.New(t)
 
 			env := newEnvironment(t, banff)
-			env.config.ApricotPhase3Time = ap3Time
+			env.config.UpgradeConfig.ApricotPhase3Time = ap3Time
 
 			addrs := set.NewSet[ids.ShortID](len(preFundedKeys))
 			for _, key := range preFundedKeys {

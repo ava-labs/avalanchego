@@ -84,7 +84,7 @@ func TestNewImportTx(t *testing.T) {
 				},
 			),
 			sourceKeys:  []*secp256k1.PrivateKey{sourceKey},
-			timestamp:   env.config.ApricotPhase5Time,
+			timestamp:   env.config.UpgradeConfig.ApricotPhase5Time,
 			expectedErr: nil,
 		},
 		{
@@ -101,7 +101,7 @@ func TestNewImportTx(t *testing.T) {
 				},
 			),
 			sourceKeys:  []*secp256k1.PrivateKey{sourceKey},
-			timestamp:   env.config.ApricotPhase5Time,
+			timestamp:   env.config.UpgradeConfig.ApricotPhase5Time,
 			expectedErr: nil,
 		},
 	}

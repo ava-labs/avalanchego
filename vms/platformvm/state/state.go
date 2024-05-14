@@ -1628,7 +1628,7 @@ func (s *state) initValidatorSets() error {
 
 func (s *state) write(updateValidators bool, height uint64) error {
 	codecVersion := CodecVersion1
-	if !s.cfg.IsDurangoActivated(s.GetTimestamp()) {
+	if !s.cfg.UpgradeConfig.IsDurangoActivated(s.GetTimestamp()) {
 		codecVersion = CodecVersion0
 	}
 
