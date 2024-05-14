@@ -515,91 +515,6 @@ func (i *ipTracker) updateMostRecentTrackedIP(ip *ips.ClaimedIPPort) {
 	i.bloomMetrics.Count.Inc()
 }
 
-// GetGossipableIPs returns the latest IPs of connected validators. If
-// [trackedSubnets] is non-nil, only IPs of validators in the provided subnets
-// or the primary network are returned. The returned IPs will not contain
-// [exceptNodeID] or any IPs contained in [exceptIPs]. If the number of eligible
-// IPs to return low, it's possible that every IP will be iterated over while
-// handling this call.
-func (i *ipTracker) GetGossipableIPs(
-	trackedSubnets *set.Set[ids.ID],
-	exceptNodeID ids.NodeID,
-	exceptIPs *bloom.ReadFilter,
-	salt []byte,
-	maxNumIPs int,
-) []*ips.ClaimedIPPort {
-	if trackedSubnets == nil {
-		return i.getAllGossipableIPs(exceptNodeID, exceptIPs, salt, maxNumIPs)
-	}
-	return i.getGossipableIPs(*trackedSubnets, exceptNodeID, exceptIPs, salt, maxNumIPs)
-}
-
-func (i *ipTracker) getAllGossipableIPs(
-	exceptNodeID ids.NodeID,
-	exceptIPs *bloom.ReadFilter,
-	salt []byte,
-	maxNumIPs int,
-) []*ips.ClaimedIPPort {
-	var (
-		ips     = make([]*ips.ClaimedIPPort, 0, maxNumIPs)
-		nodeIDs = set.NewSet[ids.NodeID](maxNumIPs)
-	)
-
-	i.lock.RLock()
-	defer i.lock.RUnlock()
-
-	for _, subnet := range i.subnet {
-		ips = subnet.getGossipableIPs(
-			exceptNodeID,
-			exceptIPs,
-			salt,
-			maxNumIPs,
-			ips,
-			nodeIDs,
-		)
-		if len(ips) >= maxNumIPs {
-			break
-		}
-	}
-	return ips
-}
-
-func (i *ipTracker) getGossipableIPs(
-	trackedSubnets set.Set[ids.ID],
-	exceptNodeID ids.NodeID,
-	exceptIPs *bloom.ReadFilter,
-	salt []byte,
-	maxNumIPs int,
-) []*ips.ClaimedIPPort {
-	var (
-		ips     = make([]*ips.ClaimedIPPort, 0, maxNumIPs)
-		nodeIDs = set.NewSet[ids.NodeID](maxNumIPs)
-	)
-
-	i.lock.RLock()
-	defer i.lock.RUnlock()
-
-	for subnetID := range trackedSubnets {
-		subnet, ok := i.subnet[subnetID]
-		if !ok {
-			continue
-		}
-
-		ips = subnet.getGossipableIPs(
-			exceptNodeID,
-			exceptIPs,
-			salt,
-			maxNumIPs,
-			ips,
-			nodeIDs,
-		)
-		if len(ips) >= maxNumIPs {
-			break
-		}
-	}
-	return ips
-}
-
 // ResetBloom prunes the current bloom filter. This must be called periodically
 // to ensure that validators that change their IPs are updated correctly and
 // that validators that left the validator set are removed.
@@ -654,4 +569,46 @@ func (i *ipTracker) resetBloom() error {
 	}
 	i.bloomMetrics.Reset(newFilter, i.maxBloomCount)
 	return nil
+}
+
+func getGossipableIPs[T any](
+	i *ipTracker,
+	iter map[ids.ID]T, // The values in this map aren't actually used.
+	allowed func(ids.ID) bool,
+	exceptNodeID ids.NodeID,
+	exceptIPs *bloom.ReadFilter,
+	salt []byte,
+	maxNumIPs int,
+) []*ips.ClaimedIPPort {
+	var (
+		ips     = make([]*ips.ClaimedIPPort, 0, maxNumIPs)
+		nodeIDs = set.NewSet[ids.NodeID](maxNumIPs)
+	)
+
+	i.lock.RLock()
+	defer i.lock.RUnlock()
+
+	for subnetID := range iter {
+		if subnetID != constants.PrimaryNetworkID && !allowed(subnetID) {
+			continue
+		}
+
+		subnet, ok := i.subnet[subnetID]
+		if !ok {
+			continue
+		}
+
+		ips = subnet.getGossipableIPs(
+			exceptNodeID,
+			exceptIPs,
+			salt,
+			maxNumIPs,
+			ips,
+			nodeIDs,
+		)
+		if len(ips) >= maxNumIPs {
+			break
+		}
+	}
+	return ips
 }

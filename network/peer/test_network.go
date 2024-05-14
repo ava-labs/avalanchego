@@ -30,6 +30,12 @@ func (testNetwork) KnownPeers() ([]byte, []byte) {
 	return bloom.EmptyFilter.Marshal(), nil
 }
 
-func (testNetwork) Peers(*set.Set[ids.ID], ids.NodeID, *bloom.ReadFilter, []byte) []*ips.ClaimedIPPort {
+func (testNetwork) Peers(
+	ids.NodeID,
+	set.Set[ids.ID],
+	bool,
+	*bloom.ReadFilter,
+	[]byte,
+) []*ips.ClaimedIPPort {
 	return nil
 }
