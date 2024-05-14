@@ -142,7 +142,7 @@ type msgBuilder struct {
 
 	zstdCompressor compression.Compressor
 	count          *prometheus.CounterVec // type + op + direction
-	duration       *prometheus.CounterVec // type + op + direction
+	duration       *prometheus.GaugeVec   // type + op + direction
 
 	maxMessageTimeout time.Duration
 }
@@ -170,8 +170,8 @@ func newMsgBuilder(
 			},
 			metricLabels,
 		),
-		duration: prometheus.NewCounterVec(
-			prometheus.CounterOpts{
+		duration: prometheus.NewGaugeVec(
+			prometheus.GaugeOpts{
 				Namespace: namespace,
 				Name:      "compressed_duration",
 				Help:      "time spent handling compressed messages",

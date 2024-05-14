@@ -85,8 +85,7 @@ type ValidatorHandler struct {
 
 func (v ValidatorHandler) AppGossip(ctx context.Context, nodeID ids.NodeID, gossipBytes []byte) {
 	if !v.validatorSet.Has(ctx, nodeID) {
-		v.log.Debug(
-			"dropping message",
+		v.log.Debug("dropping message",
 			zap.Stringer("nodeID", nodeID),
 			zap.String("reason", "not a validator"),
 		)
@@ -127,6 +126,7 @@ func (r *responder) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID
 			zap.Time("deadline", deadline),
 			zap.Uint64("handlerID", r.handlerID),
 			zap.Binary("message", request),
+			zap.Error(err),
 		)
 		return nil
 	}
