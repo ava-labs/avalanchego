@@ -56,6 +56,8 @@ func WithSamplingFilters(filters ...SamplingFilter) ClientOption {
 type clientOptions struct {
 	// samplingFilters is used to select nodes to route Client.AppRequestAny to
 	samplingFilters []SamplingFilter
+	// sampler is used to sample nodes
+	sampler Sampler
 }
 
 // NewNetwork returns an instance of Network
