@@ -58,12 +58,17 @@ func newIPTracker(
 		numTrackedIPs: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespace,
 			Name:      "tracked_ips",
-			Help:      "Number of IPs this node is willing to dial",
+			Help:      "number of IPs this node is willing to dial",
 		}),
 		numGossipableIPs: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespace,
 			Name:      "gossipable_ips",
-			Help:      "Number of IPs this node is willing to gossip",
+			Help:      "number of IPs this node has observed as able to be gossiped",
+		}),
+		numSubnets: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "subnets",
+			Help:      "number of subnets this node is monitoring",
 		}),
 		bloomMetrics:   bloomMetrics,
 		tracked:        make(map[ids.NodeID]*trackedNode),
@@ -74,6 +79,7 @@ func newIPTracker(
 	err = utils.Err(
 		registerer.Register(tracker.numTrackedIPs),
 		registerer.Register(tracker.numGossipableIPs),
+		registerer.Register(tracker.numSubnets),
 	)
 	if err != nil {
 		return nil, err
@@ -118,6 +124,8 @@ type connectedNode struct {
 }
 
 type gossipableSubnet struct {
+	numGossipableIPs prometheus.Gauge
+
 	// manuallyGossipable contains the nodeIDs of all nodes whose IP was
 	// manually configured to be gossiped for this subnet.
 	manuallyGossipable set.Set[ids.NodeID]
@@ -133,6 +141,7 @@ type gossipableSubnet struct {
 }
 
 func (s *gossipableSubnet) addGossipableIP(ip *ips.ClaimedIPPort) {
+	s.numGossipableIPs.Inc()
 	s.gossipableIndices[ip.NodeID] = len(s.gossipableIPs)
 	s.gossipableIPs = append(s.gossipableIPs, ip)
 }
@@ -150,6 +159,7 @@ func (s *gossipableSubnet) removeGossipableIP(nodeID ids.NodeID) {
 		s.gossipableIPs[indexToRemove] = replacementIP
 	}
 
+	s.numGossipableIPs.Dec()
 	delete(s.gossipableIndices, nodeID)
 	s.gossipableIPs[newNumGossipable] = nil
 	s.gossipableIPs = s.gossipableIPs[:newNumGossipable]
@@ -197,6 +207,7 @@ type ipTracker struct {
 	log              logging.Logger
 	numTrackedIPs    prometheus.Gauge
 	numGossipableIPs prometheus.Gauge
+	numSubnets       prometheus.Gauge
 	bloomMetrics     *bloom.Metrics
 
 	lock    sync.RWMutex
@@ -340,7 +351,7 @@ func (i *ipTracker) addIP(ip *ips.ClaimedIPPort) (int, *trackedNode) {
 	if node.ip == nil {
 		// This is the first IP we've heard from the validator, so it is the
 		// most recent.
-		i.updateMostRecentTrackedIP(ip)
+		i.updateMostRecentTrackedIP(node, ip)
 		// Because we didn't previously have an IP, we know we aren't currently
 		// connected to them.
 		return newTimestamp, node
@@ -353,7 +364,7 @@ func (i *ipTracker) addIP(ip *ips.ClaimedIPPort) (int, *trackedNode) {
 		return sameTimestamp, node // This IP is equal to the previously known IP.
 	}
 
-	i.updateMostRecentTrackedIP(ip)
+	i.updateMostRecentTrackedIP(node, ip)
 	i.removeGossipableIP(ip.NodeID)
 	return newerTimestamp, node
 }
@@ -394,6 +405,7 @@ func (i *ipTracker) OnValidatorAdded(subnetID ids.ID, nodeID ids.NodeID, _ *bls.
 func (i *ipTracker) addTrackableID(nodeID ids.NodeID, subnetID *ids.ID) {
 	nodeTracker, previouslyTracked := i.tracked[nodeID]
 	if !previouslyTracked {
+		i.numTrackedIPs.Inc()
 		nodeTracker = &trackedNode{}
 		i.tracked[nodeID] = nodeTracker
 	}
@@ -418,13 +430,15 @@ func (i *ipTracker) addTrackableID(nodeID ids.NodeID, subnetID *ids.ID) {
 
 	// Because we previously weren't tracking this nodeID, the IP from the
 	// connection is guaranteed to be the most up-to-date IP that we know.
-	i.updateMostRecentTrackedIP(node.ip)
+	i.updateMostRecentTrackedIP(nodeTracker, node.ip)
 }
 
 func (i *ipTracker) addGossipableID(nodeID ids.NodeID, subnetID ids.ID, manuallyGossiped bool) {
 	subnet, ok := i.subnet[subnetID]
 	if !ok {
+		i.numSubnets.Inc()
 		subnet = &gossipableSubnet{
+			numGossipableIPs:  i.numGossipableIPs,
 			gossipableIndices: make(map[ids.NodeID]int),
 		}
 		i.subnet[subnetID] = subnet
@@ -469,6 +483,7 @@ func (i *ipTracker) OnValidatorRemoved(subnetID ids.ID, nodeID ids.NodeID, _ uin
 	subnet.removeGossipableIP(nodeID)
 
 	if subnet.canDelete() {
+		i.numSubnets.Dec()
 		delete(i.subnet, subnetID)
 	}
 
@@ -481,12 +496,13 @@ func (i *ipTracker) OnValidatorRemoved(subnetID ids.ID, nodeID ids.NodeID, _ uin
 	trackedNode.trackedSubnets.Remove(subnetID)
 
 	if trackedNode.canDelete() {
+		i.numTrackedIPs.Dec()
 		delete(i.tracked, nodeID)
 	}
 }
 
-func (i *ipTracker) updateMostRecentTrackedIP(ip *ips.ClaimedIPPort) {
-	i.tracked[ip.NodeID].ip = ip
+func (i *ipTracker) updateMostRecentTrackedIP(node *trackedNode, ip *ips.ClaimedIPPort) {
+	node.ip = ip
 
 	oldCount := i.bloomAdditions[ip.NodeID]
 	if oldCount >= maxIPEntriesPerNode {
