@@ -42,6 +42,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
+	"github.com/ava-labs/avalanchego/vms/platformvm/upgrade"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
@@ -292,32 +293,34 @@ func defaultConfig(t *testing.T, f fork) *config.Config {
 			MintingPeriod:      365 * 24 * time.Hour,
 			SupplyCap:          720 * units.MegaAvax,
 		},
-		ApricotPhase3Time: mockable.MaxTime,
-		ApricotPhase5Time: mockable.MaxTime,
-		BanffTime:         mockable.MaxTime,
-		CortinaTime:       mockable.MaxTime,
-		DurangoTime:       mockable.MaxTime,
-		EUpgradeTime:      mockable.MaxTime,
+		UpgradeConfig: upgrade.Config{
+			ApricotPhase3Time: mockable.MaxTime,
+			ApricotPhase5Time: mockable.MaxTime,
+			BanffTime:         mockable.MaxTime,
+			CortinaTime:       mockable.MaxTime,
+			DurangoTime:       mockable.MaxTime,
+			EUpgradeTime:      mockable.MaxTime,
+		},
 	}
 
 	switch f {
 	case eUpgrade:
-		c.EUpgradeTime = defaultValidateStartTime.Add(-2 * time.Second)
+		c.UpgradeConfig.EUpgradeTime = defaultValidateStartTime.Add(-2 * time.Second)
 		fallthrough
 	case durango:
-		c.DurangoTime = defaultValidateStartTime.Add(-2 * time.Second)
+		c.UpgradeConfig.DurangoTime = defaultValidateStartTime.Add(-2 * time.Second)
 		fallthrough
 	case cortina:
-		c.CortinaTime = defaultValidateStartTime.Add(-2 * time.Second)
+		c.UpgradeConfig.CortinaTime = defaultValidateStartTime.Add(-2 * time.Second)
 		fallthrough
 	case banff:
-		c.BanffTime = defaultValidateStartTime.Add(-2 * time.Second)
+		c.UpgradeConfig.BanffTime = defaultValidateStartTime.Add(-2 * time.Second)
 		fallthrough
 	case apricotPhase5:
-		c.ApricotPhase5Time = defaultValidateEndTime
+		c.UpgradeConfig.ApricotPhase5Time = defaultValidateEndTime
 		fallthrough
 	case apricotPhase3:
-		c.ApricotPhase3Time = defaultValidateEndTime
+		c.UpgradeConfig.ApricotPhase3Time = defaultValidateEndTime
 	default:
 		require.FailNow(t, "unhandled fork", f)
 	}

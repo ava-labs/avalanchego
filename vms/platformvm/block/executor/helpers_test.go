@@ -46,6 +46,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
+	"github.com/ava-labs/avalanchego/vms/platformvm/upgrade"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
@@ -343,32 +344,34 @@ func defaultConfig(t *testing.T, f fork) *config.Config {
 			MintingPeriod:      365 * 24 * time.Hour,
 			SupplyCap:          720 * units.MegaAvax,
 		},
-		ApricotPhase3Time: mockable.MaxTime,
-		ApricotPhase5Time: mockable.MaxTime,
-		BanffTime:         mockable.MaxTime,
-		CortinaTime:       mockable.MaxTime,
-		DurangoTime:       mockable.MaxTime,
-		EUpgradeTime:      mockable.MaxTime,
+		UpgradeConfig: upgrade.Config{
+			ApricotPhase3Time: mockable.MaxTime,
+			ApricotPhase5Time: mockable.MaxTime,
+			BanffTime:         mockable.MaxTime,
+			CortinaTime:       mockable.MaxTime,
+			DurangoTime:       mockable.MaxTime,
+			EUpgradeTime:      mockable.MaxTime,
+		},
 	}
 
 	switch f {
 	case eUpgrade:
-		c.EUpgradeTime = time.Time{} // neglecting fork ordering this for package tests
+		c.UpgradeConfig.EUpgradeTime = time.Time{} // neglecting fork ordering this for package tests
 		fallthrough
 	case durango:
-		c.DurangoTime = time.Time{} // neglecting fork ordering for this package's tests
+		c.UpgradeConfig.DurangoTime = time.Time{} // neglecting fork ordering for this package's tests
 		fallthrough
 	case cortina:
-		c.CortinaTime = time.Time{} // neglecting fork ordering for this package's tests
+		c.UpgradeConfig.CortinaTime = time.Time{} // neglecting fork ordering for this package's tests
 		fallthrough
 	case banff:
-		c.BanffTime = time.Time{} // neglecting fork ordering for this package's tests
+		c.UpgradeConfig.BanffTime = time.Time{} // neglecting fork ordering for this package's tests
 		fallthrough
 	case apricotPhase5:
-		c.ApricotPhase5Time = defaultValidateEndTime
+		c.UpgradeConfig.ApricotPhase5Time = defaultValidateEndTime
 		fallthrough
 	case apricotPhase3:
-		c.ApricotPhase3Time = defaultValidateEndTime
+		c.UpgradeConfig.ApricotPhase3Time = defaultValidateEndTime
 	default:
 		require.FailNow(t, "unhandled fork", f)
 	}
