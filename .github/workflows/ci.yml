@@ -265,6 +265,16 @@ jobs:
       - name: Check image build
         shell: bash
         run: bash -x scripts/tests.build_image.sh
+  test_build_antithesis_avalanchego_image:
+    name: Antithesis avalanchego build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check image build for avalanchego test setup
+        shell: bash
+        run: bash -x scripts/tests.build_antithesis_images.sh
+        env:
+          TEST_SETUP: avalanchego
   govulncheck:
     runs-on: ubuntu-latest
     name: govulncheck
