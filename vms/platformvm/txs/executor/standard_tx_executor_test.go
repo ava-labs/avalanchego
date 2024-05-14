@@ -31,6 +31,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/upgrade"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
@@ -70,7 +71,7 @@ func TestStandardTxExecutorAddValidatorTxEmptyID(t *testing.T) {
 	}
 	for _, test := range tests {
 		// Case: Empty validator node ID after banff
-		env.config.BanffTime = test.banffTime
+		env.config.UpgradeConfig.BanffTime = test.banffTime
 
 		tx, err := env.txBuilder.NewAddValidatorTx( // create the tx
 			&txs.Validator{
@@ -315,7 +316,7 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 		t.Run(tt.description, func(t *testing.T) {
 			require := require.New(t)
 			env := newEnvironment(t, apricotPhase5)
-			env.config.ApricotPhase3Time = tt.AP3Time
+			env.config.UpgradeConfig.ApricotPhase3Time = tt.AP3Time
 
 			tx, err := env.txBuilder.NewAddDelegatorTx(
 				&txs.Validator{
@@ -339,7 +340,7 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 			onAcceptState, err := state.NewDiff(lastAcceptedID, env)
 			require.NoError(err)
 
-			env.config.BanffTime = onAcceptState.GetTimestamp()
+			env.config.UpgradeConfig.BanffTime = onAcceptState.GetTimestamp()
 
 			executor := StandardTxExecutor{
 				Backend: &env.backend,
@@ -2080,32 +2081,34 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 
 func defaultTestConfig(t *testing.T, f fork, tm time.Time) *config.Config {
 	c := &config.Config{
-		ApricotPhase3Time: mockable.MaxTime,
-		ApricotPhase5Time: mockable.MaxTime,
-		BanffTime:         mockable.MaxTime,
-		CortinaTime:       mockable.MaxTime,
-		DurangoTime:       mockable.MaxTime,
-		EUpgradeTime:      mockable.MaxTime,
+		UpgradeConfig: upgrade.Config{
+			ApricotPhase3Time: mockable.MaxTime,
+			ApricotPhase5Time: mockable.MaxTime,
+			BanffTime:         mockable.MaxTime,
+			CortinaTime:       mockable.MaxTime,
+			DurangoTime:       mockable.MaxTime,
+			EUpgradeTime:      mockable.MaxTime,
+		},
 	}
 
 	switch f {
 	case eUpgrade:
-		c.EUpgradeTime = tm
+		c.UpgradeConfig.EUpgradeTime = tm
 		fallthrough
 	case durango:
-		c.DurangoTime = tm
+		c.UpgradeConfig.DurangoTime = tm
 		fallthrough
 	case cortina:
-		c.CortinaTime = tm
+		c.UpgradeConfig.CortinaTime = tm
 		fallthrough
 	case banff:
-		c.BanffTime = tm
+		c.UpgradeConfig.BanffTime = tm
 		fallthrough
 	case apricotPhase5:
-		c.ApricotPhase5Time = tm
+		c.UpgradeConfig.ApricotPhase5Time = tm
 		fallthrough
 	case apricotPhase3:
-		c.ApricotPhase3Time = tm
+		c.UpgradeConfig.ApricotPhase3Time = tm
 	default:
 		require.FailNow(t, "unhandled fork", f)
 	}
