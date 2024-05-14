@@ -334,6 +334,18 @@ func TestTrackedSubnets(t *testing.T) {
 	rawPeer0 := newRawTestPeer(t, sharedConfig)
 	rawPeer1 := newRawTestPeer(t, sharedConfig)
 
+	makeSubnetIDs := func(numSubnets int) set.Set[ids.ID] {
+		if numSubnets == 0 {
+			return nil
+		}
+
+		subnetIDs := set.NewSet[ids.ID](numSubnets)
+		for i := 0; i < numSubnets; i++ {
+			subnetIDs.Add(ids.GenerateTestID())
+		}
+		return subnetIDs
+	}
+
 	tests := []struct {
 		name             string
 		trackedSubnets   set.Set[ids.ID]
@@ -341,34 +353,22 @@ func TestTrackedSubnets(t *testing.T) {
 	}{
 		{
 			name:             "primary network only",
-			trackedSubnets:   nil,
+			trackedSubnets:   makeSubnetIDs(0),
 			shouldDisconnect: false,
 		},
 		{
 			name:             "single subnet",
-			trackedSubnets:   set.Of(ids.GenerateTestID()),
+			trackedSubnets:   makeSubnetIDs(1),
 			shouldDisconnect: false,
 		},
 		{
-			name: "max subnets",
-			trackedSubnets: func() set.Set[ids.ID] {
-				trackedSubnets := set.NewSet[ids.ID](maxNumTrackedSubnets)
-				for i := 0; i < maxNumTrackedSubnets; i++ {
-					trackedSubnets.Add(ids.GenerateTestID())
-				}
-				return trackedSubnets
-			}(),
+			name:             "max subnets",
+			trackedSubnets:   makeSubnetIDs(maxNumTrackedSubnets),
 			shouldDisconnect: false,
 		},
 		{
-			name: "too many subnets",
-			trackedSubnets: func() set.Set[ids.ID] {
-				trackedSubnets := set.NewSet[ids.ID](maxNumTrackedSubnets + 1)
-				for i := 0; i < maxNumTrackedSubnets+1; i++ {
-					trackedSubnets.Add(ids.GenerateTestID())
-				}
-				return trackedSubnets
-			}(),
+			name:             "too many subnets",
+			trackedSubnets:   makeSubnetIDs(maxNumTrackedSubnets + 1),
 			shouldDisconnect: true,
 		},
 	}
