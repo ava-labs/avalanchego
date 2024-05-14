@@ -46,7 +46,7 @@ type Client struct {
 	handlerIDStr  string
 	handlerPrefix []byte
 	router        *router
-	sampler       peerSampler
+	peers         *Peers
 	sender        common.AppSender
 	options       *clientOptions
 }
@@ -59,7 +59,7 @@ func (c *Client) AppRequestAny(
 	appRequestBytes []byte,
 	onResponse AppResponseCallback,
 ) error {
-	sampled := c.sampler.Sample(ctx, 1)
+	sampled := c.peers.sample(ctx, 1, c.options.samplingFilters...)
 	if len(sampled) != 1 {
 		return ErrNoPeers
 	}

@@ -13,6 +13,12 @@ var (
 	_ SamplingFilter = (*PeerSamplingFilter)(nil)
 )
 
+// SamplingFilter is used to filter nodes that can be sampled from Peers
+type SamplingFilter interface {
+	// Filter returns if nodeID can be sampled
+	Filter(ctx context.Context, nodeID ids.NodeID) bool
+}
+
 // NewPeerSamplingFilter returns an instance of PeerSamplingFilter
 func NewPeerSamplingFilter(self ids.NodeID) *PeerSamplingFilter {
 	return &PeerSamplingFilter{self: self}

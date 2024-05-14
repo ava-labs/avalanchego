@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/sampler"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
 )
@@ -164,8 +165,8 @@ func (n *Network) NewClient(handlerID uint64, options ...ClientOption) *Client {
 		handlerPrefix: ProtocolPrefix(handlerID),
 		sender:        n.sender,
 		router:        n.router,
+		peers:         n.Peers,
 		options:       clientOptions,
-		sampler:       newPeerSampler(n.Peers, clientOptions.samplingFilters...),
 	}
 }
 
@@ -199,6 +200,46 @@ func (p *Peers) Has(nodeID ids.NodeID) bool {
 	defer p.lock.RUnlock()
 
 	return p.set.Contains(nodeID)
+}
+
+// Sample returns a pseudo-random sample of up to limit Peers
+func (p *Peers) sample(
+	ctx context.Context,
+	limit int,
+	filters ...SamplingFilter,
+) []ids.NodeID {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+
+	uniform := sampler.NewUniform()
+	uniform.Initialize(uint64(len(p.set.Elements)))
+
+	sampled := make([]ids.NodeID, 0, limit)
+	for len(sampled) < limit {
+		i, err := uniform.Next()
+		if err != nil {
+			break
+		}
+
+		nodeID := p.set.Elements[i]
+		if !canSample(ctx, nodeID, filters...) {
+			continue
+		}
+
+		sampled = append(sampled, nodeID)
+	}
+
+	return sampled
+}
+
+func canSample(ctx context.Context, nodeID ids.NodeID, filters ...SamplingFilter) bool {
+	for _, filter := range filters {
+		if !filter.Filter(ctx, nodeID) {
+			return false
+		}
+	}
+
+	return true
 }
 
 func ProtocolPrefix(handlerID uint64) []byte {

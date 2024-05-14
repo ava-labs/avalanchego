@@ -500,7 +500,7 @@ func TestClientAppRequestAny(t *testing.T) {
 			expected: ErrNoPeers,
 		},
 		{
-			name:      "no peers - no peers matching filter",
+			name:      "no peers - no peers match filter",
 			connected: []ids.NodeID{peerID},
 			filters: []SamplingFilter{
 				testFilter{},
@@ -508,12 +508,12 @@ func TestClientAppRequestAny(t *testing.T) {
 			expected: ErrNoPeers,
 		},
 		{
-			name:          "has peers",
+			name:          "has peers - no filter",
 			connected:     []ids.NodeID{peerID},
 			expectedPeers: []ids.NodeID{peerID},
 		},
 		{
-			name:      "has peers in filter",
+			name:      "has peers - peer matches filter",
 			connected: []ids.NodeID{peerID},
 			filters: []SamplingFilter{
 				testFilter{
@@ -523,7 +523,7 @@ func TestClientAppRequestAny(t *testing.T) {
 			expectedPeers: []ids.NodeID{peerID},
 		},
 		{
-			name:      "has peers in multiple filters",
+			name:      "has peers - peer matches multiple filters",
 			connected: []ids.NodeID{peerID},
 			filters: []SamplingFilter{
 				testFilter{
