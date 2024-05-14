@@ -17,13 +17,6 @@ import (
 )
 
 func TestTxFees(t *testing.T) {
-	type feeTests struct {
-		name       string
-		chainTime  time.Time
-		unsignedTx func() txs.UnsignedTx
-		expected   uint64
-	}
-
 	feeTestsDefaultCfg := StaticConfig{
 		TxFee:                         1 * units.Avax,
 		CreateAssetTxFee:              2 * units.Avax,
@@ -46,64 +39,73 @@ func TestTxFees(t *testing.T) {
 		ApricotPhase3Time: latestForkTime.Add(-5 * time.Hour),
 	}
 
-	tests := []feeTests{
+	// chain times needed to have specific upgrades active
+	preEUpgradeTime := upgrades.EUpgradeTime.Add(-1 * time.Second)
+	preApricotPhase3Time := upgrades.ApricotPhase3Time.Add(-1 * time.Second)
+
+	tests := []struct {
+		name       string
+		chainTime  time.Time
+		unsignedTx func() txs.UnsignedTx
+		expected   uint64
+	}{
 		{
 			name:       "AddValidatorTx pre EUpgrade",
-			chainTime:  upgrades.EUpgradeTime.Add(-1 * time.Second),
+			chainTime:  preEUpgradeTime,
 			unsignedTx: addValidatorTx,
 			expected:   feeTestsDefaultCfg.AddPrimaryNetworkValidatorFee,
 		},
 		{
 			name:       "AddSubnetValidatorTx pre EUpgrade",
-			chainTime:  upgrades.EUpgradeTime.Add(-1 * time.Second),
+			chainTime:  preEUpgradeTime,
 			unsignedTx: addSubnetValidatorTx,
 			expected:   feeTestsDefaultCfg.AddSubnetValidatorFee,
 		},
 		{
 			name:       "AddDelegatorTx pre EUpgrade",
-			chainTime:  upgrades.EUpgradeTime.Add(-1 * time.Second),
+			chainTime:  preEUpgradeTime,
 			unsignedTx: addDelegatorTx,
 			expected:   feeTestsDefaultCfg.AddPrimaryNetworkDelegatorFee,
 		},
 		{
 			name:       "CreateChainTx pre ApricotPhase3",
-			chainTime:  upgrades.ApricotPhase3Time.Add(-1 * time.Second),
+			chainTime:  preApricotPhase3Time,
 			unsignedTx: createChainTx,
 			expected:   feeTestsDefaultCfg.CreateAssetTxFee,
 		},
 		{
 			name:       "CreateChainTx pre EUpgrade",
-			chainTime:  upgrades.EUpgradeTime.Add(-1 * time.Second),
+			chainTime:  preEUpgradeTime,
 			unsignedTx: createChainTx,
 			expected:   feeTestsDefaultCfg.CreateBlockchainTxFee,
 		},
 		{
 			name:       "CreateSubnetTx pre ApricotPhase3",
-			chainTime:  upgrades.ApricotPhase3Time.Add(-1 * time.Second),
+			chainTime:  preApricotPhase3Time,
 			unsignedTx: createSubnetTx,
 			expected:   feeTestsDefaultCfg.CreateAssetTxFee,
 		},
 		{
 			name:       "CreateSubnetTx pre EUpgrade",
-			chainTime:  upgrades.EUpgradeTime.Add(-1 * time.Second),
+			chainTime:  preEUpgradeTime,
 			unsignedTx: createSubnetTx,
 			expected:   feeTestsDefaultCfg.CreateSubnetTxFee,
 		},
 		{
 			name:       "RemoveSubnetValidatorTx pre EUpgrade",
-			chainTime:  upgrades.EUpgradeTime.Add(-1 * time.Second),
+			chainTime:  preEUpgradeTime,
 			unsignedTx: removeSubnetValidatorTx,
 			expected:   feeTestsDefaultCfg.TxFee,
 		},
 		{
 			name:       "TransformSubnetTx pre EUpgrade",
-			chainTime:  upgrades.EUpgradeTime.Add(-1 * time.Second),
+			chainTime:  preEUpgradeTime,
 			unsignedTx: transformSubnetTx,
 			expected:   feeTestsDefaultCfg.TransformSubnetTxFee,
 		},
 		{
 			name:       "TransferSubnetOwnershipTx pre EUpgrade",
-			chainTime:  upgrades.EUpgradeTime.Add(-1 * time.Second),
+			chainTime:  preEUpgradeTime,
 			unsignedTx: transferSubnetOwnershipTx,
 			expected:   feeTestsDefaultCfg.TxFee,
 		},
@@ -145,19 +147,19 @@ func TestTxFees(t *testing.T) {
 		},
 		{
 			name:       "BaseTx pre EUpgrade",
-			chainTime:  upgrades.EUpgradeTime.Add(-1 * time.Second),
+			chainTime:  preEUpgradeTime,
 			unsignedTx: baseTx,
 			expected:   feeTestsDefaultCfg.TxFee,
 		},
 		{
 			name:       "ImportTx pre EUpgrade",
-			chainTime:  upgrades.EUpgradeTime.Add(-1 * time.Second),
+			chainTime:  preEUpgradeTime,
 			unsignedTx: importTx,
 			expected:   feeTestsDefaultCfg.TxFee,
 		},
 		{
 			name:       "ExportTx pre EUpgrade",
-			chainTime:  upgrades.EUpgradeTime.Add(-1 * time.Second),
+			chainTime:  preEUpgradeTime,
 			unsignedTx: exportTx,
 			expected:   feeTestsDefaultCfg.TxFee,
 		},
