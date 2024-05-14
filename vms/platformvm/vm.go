@@ -472,19 +472,25 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 	}, err
 }
 
-func (vm *VM) Connected(_ context.Context, nodeID ids.NodeID, _ *version.Application) error {
-	return vm.uptimeManager.Connect(nodeID, constants.PrimaryNetworkID)
+func (vm *VM) Connected(ctx context.Context, nodeID ids.NodeID, version *version.Application) error {
+	if err := vm.uptimeManager.Connect(nodeID, constants.PrimaryNetworkID); err != nil {
+		return err
+	}
+	return vm.Network.Connected(ctx, nodeID, version)
 }
 
 func (vm *VM) ConnectedSubnet(_ context.Context, nodeID ids.NodeID, subnetID ids.ID) error {
 	return vm.uptimeManager.Connect(nodeID, subnetID)
 }
 
-func (vm *VM) Disconnected(_ context.Context, nodeID ids.NodeID) error {
+func (vm *VM) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
 	if err := vm.uptimeManager.Disconnect(nodeID); err != nil {
 		return err
 	}
-	return vm.state.Commit()
+	if err := vm.state.Commit(); err != nil {
+		return err
+	}
+	return vm.Network.Disconnected(ctx, nodeID)
 }
 
 func (vm *VM) CodecRegistry() codec.Registry {

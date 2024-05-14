@@ -25,7 +25,7 @@ jobs:
         username: _json_key
         password: ${{ secrets.ANTITHESIS_GAR_JSON_KEY }}
 
-    - name: Build images for avalanchego test setup
+    - name: Build and push images for avalanchego test setup
       run: bash -x ./scripts/build_antithesis_images.sh
       env:
         IMAGE_PREFIX: ${{ env.REGISTRY }}/${{ env.REPOSITORY }}
