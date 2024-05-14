@@ -515,6 +515,9 @@ func (n *network) KnownPeers() ([]byte, []byte) {
 
 // There are 3 types of responses:
 //
+// - Respond with subnet IPs tracked by both ourselves and the peer
+//   - We do not consider ourself to be a primary network validator
+//
 // - Respond with all subnet IPs
 //   - The peer requests all peers
 //   - We believe the peer to be a primary network validator
@@ -524,9 +527,6 @@ func (n *network) KnownPeers() ([]byte, []byte) {
 //   - Either the peer does not request all peers or we don't consider them to
 //     be a primary network validator
 //   - We believe ourself to be a primary network validator
-//
-// - Respond with subnet IPs tracked by both ourselves and the peer
-//   - We do not consider ourself to be a primary network validator
 //
 // The reason we allow the peer to request all peers is so that we can avoid
 // sending unnecessary data in the case that we consider them a primary network
@@ -538,30 +538,8 @@ func (n *network) Peers(
 	knownPeers *bloom.ReadFilter,
 	salt []byte,
 ) []*ips.ClaimedIPPort {
-	areTheyAValidator := n.config.Validators.GetWeight(constants.PrimaryNetworkID, peerID) != 0
 	areWeAValidator := n.config.Validators.GetWeight(constants.PrimaryNetworkID, n.config.MyNodeID) != 0
-	switch {
-	case requestAllPeers && areTheyAValidator && areWeAValidator:
-		return getGossipableIPs(
-			n.ipTracker,
-			n.ipTracker.subnet,
-			func(ids.ID) bool { return true },
-			peerID,
-			knownPeers,
-			salt,
-			int(n.config.PeerListNumValidatorIPs),
-		)
-	case areWeAValidator:
-		return getGossipableIPs(
-			n.ipTracker,
-			trackedSubnets,
-			func(ids.ID) bool { return true },
-			peerID,
-			knownPeers,
-			salt,
-			int(n.config.PeerListNumValidatorIPs),
-		)
-	default:
+	if !areWeAValidator {
 		return getGossipableIPs(
 			n.ipTracker,
 			trackedSubnets,
@@ -574,6 +552,29 @@ func (n *network) Peers(
 			int(n.config.PeerListNumValidatorIPs),
 		)
 	}
+
+	areTheyAValidator := n.config.Validators.GetWeight(constants.PrimaryNetworkID, peerID) != 0
+	if requestAllPeers && areTheyAValidator {
+		return getGossipableIPs(
+			n.ipTracker,
+			n.ipTracker.subnet,
+			func(ids.ID) bool { return true },
+			peerID,
+			knownPeers,
+			salt,
+			int(n.config.PeerListNumValidatorIPs),
+		)
+	}
+
+	return getGossipableIPs(
+		n.ipTracker,
+		trackedSubnets,
+		func(ids.ID) bool { return true },
+		peerID,
+		knownPeers,
+		salt,
+		int(n.config.PeerListNumValidatorIPs),
+	)
 }
 
 // Dispatch starts accepting connections from other nodes attempting to connect
