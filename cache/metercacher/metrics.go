@@ -27,10 +27,10 @@ var (
 
 type metrics struct {
 	getCount *prometheus.CounterVec
-	getTime  *prometheus.CounterVec
+	getTime  *prometheus.GaugeVec
 
 	putCount prometheus.Counter
-	putTime  prometheus.Counter
+	putTime  prometheus.Gauge
 
 	len           prometheus.Gauge
 	portionFilled prometheus.Gauge
@@ -49,8 +49,8 @@ func newMetrics(
 			},
 			resultLabels,
 		),
-		getTime: prometheus.NewCounterVec(
-			prometheus.CounterOpts{
+		getTime: prometheus.NewGaugeVec(
+			prometheus.GaugeOpts{
 				Namespace: namespace,
 				Name:      "get_time",
 				Help:      "time spent (ns) in get calls",
@@ -62,7 +62,7 @@ func newMetrics(
 			Name:      "put_count",
 			Help:      "number of put calls",
 		}),
-		putTime: prometheus.NewCounter(prometheus.CounterOpts{
+		putTime: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespace,
 			Name:      "put_time",
 			Help:      "time spent (ns) in put calls",
