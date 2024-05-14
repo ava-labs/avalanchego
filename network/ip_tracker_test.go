@@ -48,7 +48,7 @@ func requireEqual(t *testing.T, expected, actual *ipTracker) {
 
 func requireMetricsConsistent(t *testing.T, tracker *ipTracker) {
 	require := require.New(t)
-	require.Equal(float64(len(tracker.mostRecentTrackedIPs)), testutil.ToFloat64(tracker.numTrackedIPs))
+	require.Equal(float64(len(tracker.tracked)), testutil.ToFloat64(tracker.numTrackedPeers))
 	require.Equal(float64(len(tracker.gossipableIPs)), testutil.ToFloat64(tracker.numGossipableIPs))
 	require.Equal(float64(tracker.bloom.Count()), testutil.ToFloat64(tracker.bloomMetrics.Count))
 	require.Equal(float64(tracker.maxBloomCount), testutil.ToFloat64(tracker.bloomMetrics.MaxCount))

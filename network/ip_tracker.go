@@ -55,19 +55,19 @@ func newIPTracker(
 	tracker := &ipTracker{
 		trackedSubnets: trackedSubnets,
 		log:            log,
-		numTrackedIPs: prometheus.NewGauge(prometheus.GaugeOpts{
+		numTrackedPeers: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespace,
-			Name:      "tracked_ips",
-			Help:      "number of IPs this node is willing to dial",
+			Name:      "tracked_peers",
+			Help:      "number of peers this node is monitoring",
 		}),
 		numGossipableIPs: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespace,
 			Name:      "gossipable_ips",
-			Help:      "number of IPs this node has observed as able to be gossiped",
+			Help:      "number of IPs this node considers able to be gossiped",
 		}),
-		numSubnets: prometheus.NewGauge(prometheus.GaugeOpts{
+		numTrackedSubnets: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespace,
-			Name:      "subnets",
+			Name:      "tracked_subnets",
 			Help:      "number of subnets this node is monitoring",
 		}),
 		bloomMetrics:   bloomMetrics,
@@ -77,9 +77,9 @@ func newIPTracker(
 		subnet:         make(map[ids.ID]*gossipableSubnet),
 	}
 	err = utils.Err(
-		registerer.Register(tracker.numTrackedIPs),
+		registerer.Register(tracker.numTrackedPeers),
 		registerer.Register(tracker.numGossipableIPs),
-		registerer.Register(tracker.numSubnets),
+		registerer.Register(tracker.numTrackedSubnets),
 	)
 	if err != nil {
 		return nil, err
@@ -203,12 +203,12 @@ func (s *gossipableSubnet) canDelete() bool {
 }
 
 type ipTracker struct {
-	trackedSubnets   set.Set[ids.ID]
-	log              logging.Logger
-	numTrackedIPs    prometheus.Gauge
-	numGossipableIPs prometheus.Gauge
-	numSubnets       prometheus.Gauge
-	bloomMetrics     *bloom.Metrics
+	trackedSubnets    set.Set[ids.ID]
+	log               logging.Logger
+	numTrackedPeers   prometheus.Gauge
+	numGossipableIPs  prometheus.Gauge
+	numTrackedSubnets prometheus.Gauge
+	bloomMetrics      *bloom.Metrics
 
 	lock    sync.RWMutex
 	tracked map[ids.NodeID]*trackedNode
@@ -405,7 +405,7 @@ func (i *ipTracker) OnValidatorAdded(subnetID ids.ID, nodeID ids.NodeID, _ *bls.
 func (i *ipTracker) addTrackableID(nodeID ids.NodeID, subnetID *ids.ID) {
 	nodeTracker, previouslyTracked := i.tracked[nodeID]
 	if !previouslyTracked {
-		i.numTrackedIPs.Inc()
+		i.numTrackedPeers.Inc()
 		nodeTracker = &trackedNode{}
 		i.tracked[nodeID] = nodeTracker
 	}
@@ -436,7 +436,7 @@ func (i *ipTracker) addTrackableID(nodeID ids.NodeID, subnetID *ids.ID) {
 func (i *ipTracker) addGossipableID(nodeID ids.NodeID, subnetID ids.ID, manuallyGossiped bool) {
 	subnet, ok := i.subnet[subnetID]
 	if !ok {
-		i.numSubnets.Inc()
+		i.numTrackedSubnets.Inc()
 		subnet = &gossipableSubnet{
 			numGossipableIPs:  i.numGossipableIPs,
 			gossipableIndices: make(map[ids.NodeID]int),
@@ -483,7 +483,7 @@ func (i *ipTracker) OnValidatorRemoved(subnetID ids.ID, nodeID ids.NodeID, _ uin
 	subnet.removeGossipableIP(nodeID)
 
 	if subnet.canDelete() {
-		i.numSubnets.Dec()
+		i.numTrackedSubnets.Dec()
 		delete(i.subnet, subnetID)
 	}
 
@@ -496,7 +496,7 @@ func (i *ipTracker) OnValidatorRemoved(subnetID ids.ID, nodeID ids.NodeID, _ uin
 	trackedNode.trackedSubnets.Remove(subnetID)
 
 	if trackedNode.canDelete() {
-		i.numTrackedIPs.Dec()
+		i.numTrackedPeers.Dec()
 		delete(i.tracked, nodeID)
 	}
 }
