@@ -45,6 +45,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
+	"github.com/ava-labs/avalanchego/vms/platformvm/upgrade"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
@@ -251,7 +252,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			require := require.New(t)
 
 			vm, txBuilder, _, _ := defaultVM(t, apricotPhase3)
-			vm.ApricotPhase3Time = test.ap3Time
+			vm.UpgradeConfig.ApricotPhase3Time = test.ap3Time
 
 			vm.ctx.Lock.Lock()
 			defer vm.ctx.Lock.Unlock()
@@ -442,10 +443,12 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 		MinStakeDuration:       defaultMinStakingDuration,
 		MaxStakeDuration:       defaultMaxStakingDuration,
 		RewardConfig:           defaultRewardConfig,
-		BanffTime:              latestForkTime,
-		CortinaTime:            mockable.MaxTime,
-		DurangoTime:            mockable.MaxTime,
-		EUpgradeTime:           mockable.MaxTime,
+		UpgradeConfig: upgrade.Config{
+			BanffTime:    latestForkTime,
+			CortinaTime:  mockable.MaxTime,
+			DurangoTime:  mockable.MaxTime,
+			EUpgradeTime: mockable.MaxTime,
+		},
 	}}
 
 	ctx := snowtest.Context(t, snowtest.PChainID)
