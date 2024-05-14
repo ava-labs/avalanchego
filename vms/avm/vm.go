@@ -426,7 +426,6 @@ func (vm *VM) Linearize(ctx context.Context, stopVertexID ids.ID, toEngine chan<
 	vm.network, err = network.New(
 		vm.ctx.Log,
 		vm.ctx.NodeID,
-		vm.ctx.SubnetID,
 		vm.ctx.ValidatorState,
 		vm.parser,
 		network.NewLockedTxVerifier(

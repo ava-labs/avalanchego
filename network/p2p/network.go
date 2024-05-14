@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/sampler"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -61,6 +62,8 @@ type clientOptions struct {
 func NewNetwork(
 	log logging.Logger,
 	sender common.AppSender,
+	validatorState validators.State,
+	maxValidatorSetStaleness time.Duration,
 	registerer prometheus.Registerer,
 	namespace string,
 ) (*Network, error) {
@@ -95,6 +98,12 @@ func NewNetwork(
 		Peers: &Peers{
 			set: set.NewSlice[ids.NodeID](initialPeersSize),
 		},
+		Validators: newValidators(
+			log,
+			constants.PrimaryNetworkID,
+			validatorState,
+			maxValidatorSetStaleness,
+		),
 		log:    log,
 		sender: sender,
 		router: newRouter(log, sender, metrics),
@@ -104,7 +113,8 @@ func NewNetwork(
 // Network exposes networking state and supports building p2p application
 // protocols
 type Network struct {
-	Peers *Peers
+	Peers      *Peers
+	Validators *Validators
 
 	log    logging.Logger
 	sender common.AppSender

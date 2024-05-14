@@ -32,7 +32,7 @@ type ValidatorSubset interface {
 	Top(ctx context.Context, percentage float64) []ids.NodeID // TODO return error
 }
 
-func NewValidators(
+func newValidators(
 	log logging.Logger,
 	subnetID ids.ID,
 	validators validators.State,

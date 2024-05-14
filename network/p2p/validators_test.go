@@ -118,7 +118,7 @@ func TestValidatorsTop(t *testing.T) {
 			mockValidators.EXPECT().GetCurrentHeight(gomock.Any()).Return(uint64(1), nil)
 			mockValidators.EXPECT().GetValidatorSet(gomock.Any(), uint64(1), subnetID).Return(validatorSet, nil)
 
-			v := NewValidators(logging.NoLog{}, subnetID, mockValidators, time.Second)
+			v := newValidators(logging.NoLog{}, subnetID, mockValidators, time.Second)
 			ctx := context.Background()
 			nodeIDs := v.Top(ctx, test.percentage)
 			require.Equal(test.expected, nodeIDs)
