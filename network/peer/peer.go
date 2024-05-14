@@ -143,7 +143,7 @@ type peer struct {
 	// the Handshake message.
 	version *version.Application
 	// trackedSubnets are the subnetIDs the peer sent us in the Handshake
-	// message.
+	// message. The primary network ID is always included.
 	trackedSubnets set.Set[ids.ID]
 	// options of ACPs provided in the Handshake message.
 	supportedACPs set.Set[uint32]
@@ -973,6 +973,7 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 		return
 	}
 
+	p.trackedSubnets.Add(constants.PrimaryNetworkID)
 	for _, subnetIDBytes := range msg.TrackedSubnets {
 		subnetID, err := ids.ToID(subnetIDBytes)
 		if err != nil {
@@ -985,9 +986,7 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 			p.StartClose()
 			return
 		}
-		if subnetID != constants.PrimaryNetworkID {
-			p.trackedSubnets.Add(subnetID)
-		}
+		p.trackedSubnets.Add(subnetID)
 	}
 
 	for _, acp := range msg.SupportedAcps {

@@ -332,21 +332,17 @@ func TestTrackedSubnets(t *testing.T) {
 	rawPeer0 := newRawTestPeer(t, sharedConfig)
 	rawPeer1 := newRawTestPeer(t, sharedConfig)
 
-	makeSubnetIDs := func(numSubnets int) set.Set[ids.ID] {
-		if numSubnets == 0 {
-			return nil
-		}
-
-		subnetIDs := set.NewSet[ids.ID](numSubnets)
-		for i := 0; i < numSubnets; i++ {
-			subnetIDs.Add(ids.GenerateTestID())
+	makeSubnetIDs := func(numSubnets int) []ids.ID {
+		subnetIDs := make([]ids.ID, numSubnets)
+		for i := range subnetIDs {
+			subnetIDs[i] = ids.GenerateTestID()
 		}
 		return subnetIDs
 	}
 
 	tests := []struct {
 		name             string
-		trackedSubnets   set.Set[ids.ID]
+		trackedSubnets   []ids.ID
 		shouldDisconnect bool
 	}{
 		{
@@ -375,7 +371,7 @@ func TestTrackedSubnets(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 
-			rawPeer0.config.MySubnets = test.trackedSubnets
+			rawPeer0.config.MySubnets = set.Of(test.trackedSubnets...)
 			peer0, peer1 := startTestPeers(rawPeer0, rawPeer1)
 			if test.shouldDisconnect {
 				require.NoError(peer0.AwaitClosed(context.Background()))
@@ -391,8 +387,12 @@ func TestTrackedSubnets(t *testing.T) {
 			}()
 
 			awaitReady(t, peer0, peer1)
-			require.Empty(peer0.TrackedSubnets())
-			require.Equal(test.trackedSubnets, peer1.TrackedSubnets())
+
+			require.Equal(set.Of(constants.PrimaryNetworkID), peer0.TrackedSubnets())
+
+			expectedTrackedSubnets := set.Of(test.trackedSubnets...)
+			expectedTrackedSubnets.Add(constants.PrimaryNetworkID)
+			require.Equal(expectedTrackedSubnets, peer1.TrackedSubnets())
 		})
 	}
 }

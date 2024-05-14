@@ -34,13 +34,14 @@ type Config struct {
 	Router               router.InboundHandler
 	VersionCompatibility version.Compatibility
 	MyNodeID             ids.NodeID
-	MySubnets            set.Set[ids.ID]
-	Beacons              validators.Manager
-	Validators           validators.Manager
-	NetworkID            uint32
-	PingFrequency        time.Duration
-	PongTimeout          time.Duration
-	MaxClockDifference   time.Duration
+	// MySubnets does not include the primary network ID
+	MySubnets          set.Set[ids.ID]
+	Beacons            validators.Manager
+	Validators         validators.Manager
+	NetworkID          uint32
+	PingFrequency      time.Duration
+	PongTimeout        time.Duration
+	MaxClockDifference time.Duration
 
 	SupportedACPs []uint32
 	ObjectedACPs  []uint32

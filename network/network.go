@@ -750,8 +750,7 @@ func (n *network) getPeers(
 			continue
 		}
 
-		trackedSubnets := peer.TrackedSubnets()
-		if subnetID != constants.PrimaryNetworkID && !trackedSubnets.Contains(subnetID) {
+		if trackedSubnets := peer.TrackedSubnets(); !trackedSubnets.Contains(subnetID) {
 			continue
 		}
 
@@ -787,8 +786,7 @@ func (n *network) samplePeers(
 		numValidatorsToSample+config.NonValidators+config.Peers,
 		func(p peer.Peer) bool {
 			// Only return peers that are tracking [subnetID]
-			trackedSubnets := p.TrackedSubnets()
-			if subnetID != constants.PrimaryNetworkID && !trackedSubnets.Contains(subnetID) {
+			if trackedSubnets := p.TrackedSubnets(); !trackedSubnets.Contains(subnetID) {
 				return false
 			}
 
