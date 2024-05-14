@@ -17,7 +17,7 @@ import (
 var (
 	_ database.Iterator = (*iter)(nil)
 
-	errCouldntGetValue = errors.New("couldnt get iterator value")
+	errCouldNotGetValue = errors.New("could not get iterator value")
 )
 
 type iter struct {
@@ -63,16 +63,16 @@ func (it *iter) Next() bool {
 		return false
 	}
 
-	it.nextKey = it.iter.Key()
-
-	var err error
-	it.nextVal, err = it.iter.ValueAndErr()
+	key := it.iter.Key()
+	value, err := it.iter.ValueAndErr()
 	if err != nil {
 		it.hasNext = false
-		it.err = fmt.Errorf("%w: %w", errCouldntGetValue, err)
+		it.err = fmt.Errorf("%w: %w", errCouldNotGetValue, err)
 		return false
 	}
 
+	it.nextKey = slices.Clone(key)
+	it.nextVal = slices.Clone(value)
 	return true
 }
 
