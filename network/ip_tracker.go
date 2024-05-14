@@ -102,6 +102,13 @@ func (n *trackedNode) wantsConnection() bool {
 	return n.manuallyTracked || n.trackedSubnets.Len() > 0
 }
 
+func (n *trackedNode) canDelete() bool {
+	if n == nil {
+		return true
+	}
+	return !n.manuallyTracked && n.subnets.Len() == 0
+}
+
 type connectedNode struct {
 	// trackedSubnets contains all the subnets that this node is syncing.
 	trackedSubnets set.Set[ids.ID]
@@ -166,16 +173,23 @@ func (s *gossipableSubnet) getGossipableIPs(
 		}
 
 		ip := s.gossipableIPs[index]
-		if ip.NodeID == exceptNodeID || nodeIDs.Contains(ip.NodeID) {
+		if ip.NodeID == exceptNodeID ||
+			nodeIDs.Contains(ip.NodeID) ||
+			bloom.Contains(exceptIPs, ip.GossipID[:], salt) {
 			continue
 		}
 
-		if !bloom.Contains(exceptIPs, ip.GossipID[:], salt) {
-			ips = append(ips, ip)
-			nodeIDs.Add(ip.NodeID)
-		}
+		ips = append(ips, ip)
+		nodeIDs.Add(ip.NodeID)
 	}
 	return ips
+}
+
+func (s *gossipableSubnet) canDelete() bool {
+	if s == nil {
+		return true
+	}
+	return s.manuallyGossipable.Len() == 0 && s.gossipableIDs.Len() == 0
 }
 
 type ipTracker struct {
@@ -384,7 +398,6 @@ func (i *ipTracker) addTrackableID(nodeID ids.NodeID, subnetID *ids.ID) {
 		i.tracked[nodeID] = nodeTracker
 	}
 
-	nodeTracker.manuallyTracked = nodeTracker.manuallyTracked || subnetID == nil
 	if subnetID == nil {
 		nodeTracker.manuallyTracked = true
 	} else {
@@ -455,6 +468,10 @@ func (i *ipTracker) OnValidatorRemoved(subnetID ids.ID, nodeID ids.NodeID, _ uin
 	subnet.gossipableIDs.Remove(nodeID)
 	subnet.removeGossipableIP(nodeID)
 
+	if subnet.canDelete() {
+		delete(i.subnet, subnetID)
+	}
+
 	trackedNode, ok := i.tracked[nodeID]
 	if !ok {
 		return
@@ -463,11 +480,9 @@ func (i *ipTracker) OnValidatorRemoved(subnetID ids.ID, nodeID ids.NodeID, _ uin
 	trackedNode.subnets.Remove(subnetID)
 	trackedNode.trackedSubnets.Remove(subnetID)
 
-	if trackedNode.manuallyTracked || trackedNode.subnets.Len() > 0 {
-		return
+	if trackedNode.canDelete() {
+		delete(i.tracked, nodeID)
 	}
-
-	delete(i.tracked, nodeID)
 }
 
 func (i *ipTracker) updateMostRecentTrackedIP(ip *ips.ClaimedIPPort) {
