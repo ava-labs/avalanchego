@@ -16,6 +16,7 @@ import (
 )
 
 type metrics struct {
+	// trackedSubnets does not include the primary network ID
 	trackedSubnets set.Set[ids.ID]
 
 	numTracked                      prometheus.Gauge
@@ -42,7 +43,11 @@ type metrics struct {
 	peerConnectedStartTimesSum float64
 }
 
-func newMetrics(namespace string, registerer prometheus.Registerer, trackedSubnets set.Set[ids.ID]) (*metrics, error) {
+func newMetrics(
+	namespace string,
+	registerer prometheus.Registerer,
+	trackedSubnets set.Set[ids.ID],
+) (*metrics, error) {
 	m := &metrics{
 		trackedSubnets: trackedSubnets,
 		numPeers: prometheus.NewGauge(prometheus.GaugeOpts{
