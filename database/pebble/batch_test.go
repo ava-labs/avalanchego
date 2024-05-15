@@ -17,7 +17,7 @@ func TestBatch(t *testing.T) {
 	require := require.New(t)
 	dirName := t.TempDir()
 
-	db, err := New(dirName, DefaultConfigBytes, logging.NoLog{}, "", prometheus.NewRegistry())
+	db, err := New(dirName, nil, logging.NoLog{}, "", prometheus.NewRegistry())
 	require.NoError(err)
 
 	batchIntf := db.NewBatch()
