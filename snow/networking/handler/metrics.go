@@ -12,8 +12,8 @@ import (
 type metrics struct {
 	expired             *prometheus.CounterVec // op
 	messages            *prometheus.CounterVec // op
-	lockingTime         prometheus.Counter
-	messageHandlingTime *prometheus.CounterVec // op
+	lockingTime         prometheus.Gauge
+	messageHandlingTime *prometheus.GaugeVec // op
 }
 
 func newMetrics(namespace string, reg prometheus.Registerer) (*metrics, error) {
@@ -34,15 +34,15 @@ func newMetrics(namespace string, reg prometheus.Registerer) (*metrics, error) {
 			},
 			opLabels,
 		),
-		messageHandlingTime: prometheus.NewCounterVec(
-			prometheus.CounterOpts{
+		messageHandlingTime: prometheus.NewGaugeVec(
+			prometheus.GaugeOpts{
 				Namespace: namespace,
 				Name:      "message_handling_time",
 				Help:      "time spent handling messages",
 			},
 			opLabels,
 		),
-		lockingTime: prometheus.NewCounter(prometheus.CounterOpts{
+		lockingTime: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespace,
 			Name:      "locking_time",
 			Help:      "time spent acquiring the context lock",

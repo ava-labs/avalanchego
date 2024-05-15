@@ -2,6 +2,9 @@
 # to minimize the cost of version changes.
 ARG GO_VERSION
 
+# NODE_IMAGE needs to identify an existing node image and should include the tag
+ARG NODE_IMAGE
+
 # ============= Compilation Stage ================
 FROM golang:$GO_VERSION-bullseye AS builder
 
@@ -15,12 +18,13 @@ RUN go mod download
 COPY . .
 
 # Build the workload
-RUN ./scripts/build_antithesis_workload.sh
+RUN ./scripts/build_antithesis_avalanchego_workload.sh
 
 # ============= Cleanup Stage ================
-FROM debian:11-slim AS execution
+# Base the workflow on the node image to support bootstrap testing
+FROM $NODE_IMAGE AS execution
 
 # Copy the executable into the container
-COPY --from=builder /build/build/workload ./workload
+COPY --from=builder /build/build/antithesis-avalanchego-workload ./workload
 
 CMD [ "./workload" ]
