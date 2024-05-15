@@ -719,7 +719,6 @@ func verifyAddPermissionlessDelegatorTx(
 	feeCalculator := fee.NewStaticCalculator(backend.Config.StaticFeeConfig, backend.Config.UpgradeConfig)
 	fee := feeCalculator.CalculateFee(tx, currentTimestamp)
 
-	// Verify the flowcheck
 	if err := backend.FlowChecker.VerifySpend(
 		tx,
 		chainState,
