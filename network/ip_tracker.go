@@ -93,9 +93,11 @@ func newIPTracker(
 type trackedNode struct {
 	// manuallyTracked tracks if this node's connection was manually requested.
 	manuallyTracked bool
-	// subnets contains all the subnets that this node is a validator of.
+	// subnets contains all the subnets that this node is a validator of,
+	// including potentially the primary network.
 	subnets set.Set[ids.ID]
-	// subnets contains the subset of [subnets] that the local node also tracks.
+	// subnets contains the subset of [subnets] that the local node also tracks,
+	// including potentially the primary network.
 	trackedSubnets set.Set[ids.ID]
 	// ip is the most recently known IP of this node.
 	ip *ips.ClaimedIPPort
@@ -116,7 +118,8 @@ func (n *trackedNode) canDelete() bool {
 }
 
 type connectedNode struct {
-	// trackedSubnets contains all the subnets that this node is syncing.
+	// trackedSubnets contains all the subnets that this node is syncing,
+	// including the primary network.
 	trackedSubnets set.Set[ids.ID]
 	// ip this node claimed when connecting to use. The IP is not necessarily
 	// the same IP as in mostRecentTrackedIPs.
@@ -203,6 +206,7 @@ func (s *gossipableSubnet) canDelete() bool {
 }
 
 type ipTracker struct {
+	// trackedSubnets does not include the primary network.
 	trackedSubnets    set.Set[ids.ID]
 	log               logging.Logger
 	numTrackedPeers   prometheus.Gauge
