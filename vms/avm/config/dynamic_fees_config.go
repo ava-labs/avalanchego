@@ -13,21 +13,35 @@ import (
 	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
-// EUpgradeDynamicFeesConfig to be tuned TODO ABENEGIA
+func init() {
+	if err := eUpgradeDynamicFeesConfig.Validate(); err != nil {
+		panic(err)
+	}
+}
+
+// eUpgradeDynamicFeesConfig to be tuned TODO ABENEGIA
 var (
 	eUpgradeDynamicFeesConfig = commonfees.DynamicFeesConfig{
-		FeeRate: commonfees.Dimensions{
+		InitialFeeRate: commonfees.Dimensions{
 			1 * units.NanoAvax,
 			2 * units.NanoAvax,
 			3 * units.NanoAvax,
 			4 * units.NanoAvax,
 		},
-
-		BlockMaxComplexity: commonfees.Max,
+		MinFeeRate: commonfees.Dimensions{},
+		UpdateCoefficient: commonfees.Dimensions{
+			1,
+			1,
+			1,
+			1,
+		},
+		BlockMaxComplexity:        commonfees.Max,
+		BlockTargetComplexityRate: commonfees.Dimensions{1000, 1000, 1000, 2000},
 	}
 
+	// TODO ABENEGIA: decide if and how to validate preEUpgradeDynamicFeesConfig
 	preEUpgradeDynamicFeesConfig = commonfees.DynamicFeesConfig{
-		FeeRate:            commonfees.Empty,
+		InitialFeeRate:     commonfees.Empty,
 		BlockMaxComplexity: commonfees.Max,
 	}
 

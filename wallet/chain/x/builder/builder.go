@@ -542,12 +542,9 @@ func (b *builder) NewImportTx(
 		if err != nil {
 			return nil, fmt.Errorf("failed calculating output size: %w", err)
 		}
-
-		if feeCalc.IsEActive {
-			// update fees to target given the extra output added
-			if _, err := feeCalc.AddFeesFor(outDimensions); err != nil {
-				return nil, fmt.Errorf("account for output fees: %w", err)
-			}
+		// update fees to target given the extra output added
+		if _, err := feeCalc.AddFeesFor(outDimensions); err != nil {
+			return nil, fmt.Errorf("account for output fees: %w", err)
 		}
 
 		switch {
@@ -563,14 +560,12 @@ func (b *builder) NewImportTx(
 			return utx, b.initCtx(utx)
 
 		default:
-			if feeCalc.IsEActive {
-				// imported avax are not enough to pay fees
-				// Drop the changeOut and finance the tx
-				if _, err := feeCalc.RemoveFeesFor(outDimensions); err != nil {
-					return nil, fmt.Errorf("failed reverting change output: %w", err)
-				}
-				feeCalc.Fee -= importedAVAX
+			// imported avax are not enough to pay fees
+			// Drop the changeOut and finance the tx
+			if _, err := feeCalc.RemoveFeesFor(outDimensions); err != nil {
+				return nil, fmt.Errorf("failed reverting change output: %w", err)
 			}
+			feeCalc.Fee -= importedAVAX
 		}
 	}
 

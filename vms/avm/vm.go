@@ -235,6 +235,7 @@ func (vm *VM) Initialize(
 		vm.db,
 		vm.parser,
 		vm.registerer,
+		vm.Config,
 		avmConfig.ChecksumsEnabled,
 	)
 	if err != nil {
@@ -346,6 +347,7 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 			vm.feeAssetID,
 			vm.ctx,
 			&vm.Config,
+			&vm.clock,
 			vm.state,
 			vm.ctx.SharedMemory,
 			vm.parser.Codec(),
@@ -410,6 +412,10 @@ func (vm *VM) Linearize(ctx context.Context, stopVertexID ids.ID, toEngine chan<
 	time := version.GetCortinaTime(vm.ctx.NetworkID)
 	err := vm.state.InitializeChainState(stopVertexID, time)
 	if err != nil {
+		return err
+	}
+
+	if err := vm.state.InitFees(); err != nil {
 		return err
 	}
 

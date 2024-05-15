@@ -36,6 +36,7 @@ import (
 
 	blkexecutor "github.com/ava-labs/avalanchego/vms/avm/block/executor"
 	txexecutor "github.com/ava-labs/avalanchego/vms/avm/txs/executor"
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 const trackChecksums = false
@@ -122,15 +123,19 @@ func TestBuilderBuildBlock(t *testing.T) {
 				preferredState := state.NewMockChain(ctrl)
 				preferredState.EXPECT().GetLastAccepted().Return(preferredID)
 				preferredState.EXPECT().GetTimestamp().Return(preferredTimestamp)
+				preferredState.EXPECT().GetFeeRates().Return(commonfees.Empty, nil)
+				preferredState.EXPECT().GetLastBlockComplexity().Return(commonfees.Empty, nil)
 
 				manager := blkexecutor.NewMockManager(ctrl)
 				manager.EXPECT().Preferred().Return(preferredID)
 				manager.EXPECT().GetStatelessBlock(preferredID).Return(preferredBlock, nil)
-				manager.EXPECT().GetState(preferredID).Return(preferredState, true)
+				manager.EXPECT().GetState(preferredID).Return(preferredState, true).AnyTimes()
 
 				unsignedTx := txs.NewMockUnsignedTx(ctrl)
 				unsignedTx.EXPECT().Visit(gomock.Any()).Return(errTest) // Fail semantic verification
+				unsignedTx.EXPECT().SetBytes(gomock.Any())              // needed for the SetBytes below
 				tx := &txs.Tx{Unsigned: unsignedTx}
+				tx.SetBytes([]byte{0x0, 0x1}, []byte{0xff, 0xff})
 
 				mempool := mempool.NewMockMempool(ctrl)
 				mempool.EXPECT().Peek().Return(tx, true)
@@ -169,16 +174,20 @@ func TestBuilderBuildBlock(t *testing.T) {
 				preferredState := state.NewMockChain(ctrl)
 				preferredState.EXPECT().GetLastAccepted().Return(preferredID)
 				preferredState.EXPECT().GetTimestamp().Return(preferredTimestamp)
+				preferredState.EXPECT().GetFeeRates().Return(commonfees.Empty, nil)
+				preferredState.EXPECT().GetLastBlockComplexity().Return(commonfees.Empty, nil)
 
 				manager := blkexecutor.NewMockManager(ctrl)
 				manager.EXPECT().Preferred().Return(preferredID)
 				manager.EXPECT().GetStatelessBlock(preferredID).Return(preferredBlock, nil)
-				manager.EXPECT().GetState(preferredID).Return(preferredState, true)
+				manager.EXPECT().GetState(preferredID).Return(preferredState, true).AnyTimes()
 
 				unsignedTx := txs.NewMockUnsignedTx(ctrl)
 				unsignedTx.EXPECT().Visit(gomock.Any()).Return(nil)     // Pass semantic verification
+				unsignedTx.EXPECT().SetBytes(gomock.Any())              // needed for the SetBytes below
 				unsignedTx.EXPECT().Visit(gomock.Any()).Return(errTest) // Fail execution
 				tx := &txs.Tx{Unsigned: unsignedTx}
+				tx.SetBytes([]byte{0x0, 0x1}, []byte{0xff, 0xff})
 
 				mempool := mempool.NewMockMempool(ctrl)
 				mempool.EXPECT().Peek().Return(tx, true)
@@ -217,17 +226,21 @@ func TestBuilderBuildBlock(t *testing.T) {
 				preferredState := state.NewMockChain(ctrl)
 				preferredState.EXPECT().GetLastAccepted().Return(preferredID)
 				preferredState.EXPECT().GetTimestamp().Return(preferredTimestamp)
+				preferredState.EXPECT().GetFeeRates().Return(commonfees.Empty, nil)
+				preferredState.EXPECT().GetLastBlockComplexity().Return(commonfees.Empty, nil)
 
 				manager := blkexecutor.NewMockManager(ctrl)
 				manager.EXPECT().Preferred().Return(preferredID)
 				manager.EXPECT().GetStatelessBlock(preferredID).Return(preferredBlock, nil)
-				manager.EXPECT().GetState(preferredID).Return(preferredState, true)
+				manager.EXPECT().GetState(preferredID).Return(preferredState, true).AnyTimes()
 				manager.EXPECT().VerifyUniqueInputs(preferredID, gomock.Any()).Return(errTest)
 
 				unsignedTx := txs.NewMockUnsignedTx(ctrl)
 				unsignedTx.EXPECT().Visit(gomock.Any()).Return(nil) // Pass semantic verification
 				unsignedTx.EXPECT().Visit(gomock.Any()).Return(nil) // Pass execution
+				unsignedTx.EXPECT().SetBytes(gomock.Any())          // needed for the SetBytes below
 				tx := &txs.Tx{Unsigned: unsignedTx}
+				tx.SetBytes([]byte{0x0, 0x1}, []byte{0xff, 0xff})
 
 				mempool := mempool.NewMockMempool(ctrl)
 				mempool.EXPECT().Peek().Return(tx, true)
@@ -266,6 +279,8 @@ func TestBuilderBuildBlock(t *testing.T) {
 				preferredState := state.NewMockChain(ctrl)
 				preferredState.EXPECT().GetLastAccepted().Return(preferredID)
 				preferredState.EXPECT().GetTimestamp().Return(preferredTimestamp)
+				preferredState.EXPECT().GetFeeRates().Return(commonfees.Empty, nil)
+				preferredState.EXPECT().GetLastBlockComplexity().Return(commonfees.Empty, nil)
 
 				// tx1 and tx2 both consume [inputID].
 				// tx1 is added to the block first, so tx2 should be dropped.
@@ -302,7 +317,7 @@ func TestBuilderBuildBlock(t *testing.T) {
 				manager := blkexecutor.NewMockManager(ctrl)
 				manager.EXPECT().Preferred().Return(preferredID)
 				manager.EXPECT().GetStatelessBlock(preferredID).Return(preferredBlock, nil)
-				manager.EXPECT().GetState(preferredID).Return(preferredState, true)
+				manager.EXPECT().GetState(preferredID).Return(preferredState, true).AnyTimes()
 				manager.EXPECT().VerifyUniqueInputs(preferredID, gomock.Any()).Return(nil)
 				// Assert created block has one tx, tx1,
 				// and other fields are set correctly.
@@ -367,11 +382,13 @@ func TestBuilderBuildBlock(t *testing.T) {
 				preferredState := state.NewMockChain(ctrl)
 				preferredState.EXPECT().GetLastAccepted().Return(preferredID)
 				preferredState.EXPECT().GetTimestamp().Return(preferredTimestamp)
+				preferredState.EXPECT().GetFeeRates().Return(commonfees.Empty, nil)
+				preferredState.EXPECT().GetLastBlockComplexity().Return(commonfees.Empty, nil)
 
 				manager := blkexecutor.NewMockManager(ctrl)
 				manager.EXPECT().Preferred().Return(preferredID)
 				manager.EXPECT().GetStatelessBlock(preferredID).Return(preferredBlock, nil)
-				manager.EXPECT().GetState(preferredID).Return(preferredState, true)
+				manager.EXPECT().GetState(preferredID).Return(preferredState, true).AnyTimes()
 				manager.EXPECT().VerifyUniqueInputs(preferredID, gomock.Any()).Return(nil)
 				// Assert that the created block has the right timestamp
 				manager.EXPECT().NewBlock(gomock.Any()).DoAndReturn(
@@ -383,6 +400,7 @@ func TestBuilderBuildBlock(t *testing.T) {
 
 				inputID := ids.GenerateTestID()
 				unsignedTx := txs.NewMockUnsignedTx(ctrl)
+				unsignedTx.EXPECT().SetBytes(gomock.Any())           // needed for the SetBytes below
 				unsignedTx.EXPECT().Visit(gomock.Any()).Return(nil)  // Pass semantic verification
 				unsignedTx.EXPECT().Visit(gomock.Any()).DoAndReturn( // Pass execution
 					func(visitor txs.Visitor) error {
@@ -394,6 +412,7 @@ func TestBuilderBuildBlock(t *testing.T) {
 				)
 				unsignedTx.EXPECT().SetBytes(gomock.Any()).AnyTimes()
 				tx := &txs.Tx{Unsigned: unsignedTx}
+				tx.SetBytes([]byte{0x0, 0x1}, []byte{0xff, 0xff})
 
 				mempool := mempool.NewMockMempool(ctrl)
 				mempool.EXPECT().Peek().Return(tx, true)
@@ -444,11 +463,13 @@ func TestBuilderBuildBlock(t *testing.T) {
 				preferredState := state.NewMockChain(ctrl)
 				preferredState.EXPECT().GetLastAccepted().Return(preferredID)
 				preferredState.EXPECT().GetTimestamp().Return(preferredTimestamp)
+				preferredState.EXPECT().GetFeeRates().Return(commonfees.Empty, nil)
+				preferredState.EXPECT().GetLastBlockComplexity().Return(commonfees.Empty, nil)
 
 				manager := blkexecutor.NewMockManager(ctrl)
 				manager.EXPECT().Preferred().Return(preferredID)
 				manager.EXPECT().GetStatelessBlock(preferredID).Return(preferredBlock, nil)
-				manager.EXPECT().GetState(preferredID).Return(preferredState, true)
+				manager.EXPECT().GetState(preferredID).Return(preferredState, true).AnyTimes()
 				manager.EXPECT().VerifyUniqueInputs(preferredID, gomock.Any()).Return(nil)
 				// Assert that the created block has the right timestamp
 				manager.EXPECT().NewBlock(gomock.Any()).DoAndReturn(
@@ -460,6 +481,7 @@ func TestBuilderBuildBlock(t *testing.T) {
 
 				inputID := ids.GenerateTestID()
 				unsignedTx := txs.NewMockUnsignedTx(ctrl)
+				unsignedTx.EXPECT().SetBytes(gomock.Any())           // needed for the SetBytes below
 				unsignedTx.EXPECT().Visit(gomock.Any()).Return(nil)  // Pass semantic verification
 				unsignedTx.EXPECT().Visit(gomock.Any()).DoAndReturn( // Pass execution
 					func(visitor txs.Visitor) error {
@@ -471,6 +493,7 @@ func TestBuilderBuildBlock(t *testing.T) {
 				)
 				unsignedTx.EXPECT().SetBytes(gomock.Any()).AnyTimes()
 				tx := &txs.Tx{Unsigned: unsignedTx}
+				tx.SetBytes([]byte{0x0, 0x1}, []byte{0xff, 0xff})
 
 				mempool := mempool.NewMockMempool(ctrl)
 				mempool.EXPECT().Peek().Return(tx, true)
@@ -550,7 +573,7 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 
 	baseDB := versiondb.New(memdb.New())
 
-	state, err := state.New(baseDB, parser, registerer, trackChecksums)
+	state, err := state.New(baseDB, parser, registerer, *backend.Config, trackChecksums)
 	require.NoError(err)
 
 	clk := &mockable.Clock{}

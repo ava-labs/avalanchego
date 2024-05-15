@@ -172,6 +172,12 @@ var _ = e2e.DescribeXChainSerial("[Virtuous Transfer Tx AVAX]", func() {
 					require.Contains(err.Error(), "insufficient funds")
 				})
 
+				// retrieve the unit fees that will be used for the BaseTx
+				nodeURI := e2e.Env.GetRandomNodeURI()
+				xChainClient := avm.NewClient(nodeURI.URI, "X")
+				_, feeRates, err := xChainClient.GetFeeRates(e2e.DefaultContext())
+				require.NoError(err)
+
 				tx, err := wallets[fromIdx].X().IssueBaseTx(
 					[]*avax.TransferableOutput{{
 						Asset: avax.Asset{
@@ -193,7 +199,7 @@ var _ = e2e.DescribeXChainSerial("[Virtuous Transfer Tx AVAX]", func() {
 				feeCfg := config.GetDynamicFeesConfig(true /*isEActive*/)
 				feeCalc := fees.NewDynamicCalculator(
 					xbuilder.Parser.Codec(),
-					commonfees.NewManager(feeCfg.FeeRate),
+					commonfees.NewManager(feeRates),
 					feeCfg.BlockMaxComplexity,
 					tx.Creds,
 				)

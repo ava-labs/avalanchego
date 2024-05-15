@@ -4,7 +4,9 @@
 package fees
 
 import (
+	"encoding/binary"
 	"errors"
+	"fmt"
 	"math"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
@@ -22,6 +24,8 @@ const (
 	computeString    string = "Compute"
 
 	FeeDimensions = 4
+
+	uint64Len = 8
 )
 
 var (
@@ -66,4 +70,37 @@ func Add(lhs, rhs Dimensions) (Dimensions, error) {
 		res[i] = v
 	}
 	return res, nil
+}
+
+// [Compare] returns true only if rhs[i] >= lhs[i] for each dimensions
+// Arrays ordering is not total, so we avoided naming [Compare] as [Less]
+// to discourage improper use
+func Compare(lhs, rhs Dimensions) bool {
+	for i := 0; i < FeeDimensions; i++ {
+		if lhs[i] > rhs[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func (d *Dimensions) Bytes() []byte {
+	res := make([]byte, FeeDimensions*uint64Len)
+	for i := Dimension(0); i < FeeDimensions; i++ {
+		binary.BigEndian.PutUint64(res[i*uint64Len:], d[i])
+	}
+	return res
+}
+
+func (d *Dimensions) FromBytes(b []byte) error {
+	if len(b) != FeeDimensions*uint64Len {
+		return fmt.Errorf("unexpected bytes length: expected %d, actual %d",
+			FeeDimensions*uint64Len,
+			len(b),
+		)
+	}
+	for i := Dimension(0); i < FeeDimensions; i++ {
+		d[i] = binary.BigEndian.Uint64(b[i*uint64Len : (i+1)*uint64Len])
+	}
+	return nil
 }

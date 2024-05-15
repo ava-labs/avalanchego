@@ -7,6 +7,7 @@ import (
 	"context"
 	"math"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -466,7 +467,7 @@ func TestTxAcceptAfterParseTx(t *testing.T) {
 				},
 				Asset: avax.Asset{ID: env.genesisTx.ID()},
 				In: &secp256k1fx.TransferInput{
-					Amt: 499991395,
+					Amt: 499998279,
 					Input: secp256k1fx.Input{
 						SigIndices: []uint32{
 							0,
@@ -740,6 +741,10 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 		require.NoError(env.vm.Shutdown(context.Background()))
 		env.vm.ctx.Lock.Unlock()
 	}()
+
+	// to avoid tests flackiness we fix clock time wrt chain time
+	// so to have stable updated fee rates.
+	env.vm.clock.Set(env.vm.state.GetTimestamp().Add(time.Second))
 
 	genesisTx := getCreateTxFromGenesisTest(t, env.genesisBytes, "AVAX")
 

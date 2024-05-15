@@ -745,7 +745,7 @@ func TestSemanticVerifierBaseTx(t *testing.T) {
 
 			err = tx.Unsigned.Visit(&SemanticVerifier{
 				Backend:            backend,
-				BlkFeeManager:      fees.NewManager(feeCfg.FeeRate),
+				BlkFeeManager:      fees.NewManager(feeCfg.InitialFeeRate),
 				BlockMaxComplexity: feeCfg.BlockMaxComplexity,
 				State:              state,
 				Tx:                 tx,
@@ -1499,7 +1499,7 @@ func TestSemanticVerifierExportTx(t *testing.T) {
 
 			err = tx.Unsigned.Visit(&SemanticVerifier{
 				Backend:            backend,
-				BlkFeeManager:      fees.NewManager(feeCfg.FeeRate),
+				BlkFeeManager:      fees.NewManager(feeCfg.InitialFeeRate),
 				BlockMaxComplexity: feeCfg.BlockMaxComplexity,
 				State:              state,
 				Tx:                 tx,
@@ -1644,7 +1644,7 @@ func TestSemanticVerifierExportTxDifferentSubnet(t *testing.T) {
 
 	err = tx.Unsigned.Visit(&SemanticVerifier{
 		Backend:            backend,
-		BlkFeeManager:      fees.NewManager(feeCfg.FeeRate),
+		BlkFeeManager:      fees.NewManager(feeCfg.InitialFeeRate),
 		BlockMaxComplexity: feeCfg.BlockMaxComplexity,
 		State:              state,
 		Tx:                 tx,
@@ -2182,7 +2182,7 @@ func TestSemanticVerifierImportTx(t *testing.T) {
 
 			err = tx.Unsigned.Visit(&SemanticVerifier{
 				Backend:            backend,
-				BlkFeeManager:      fees.NewManager(feeCfg.FeeRate),
+				BlkFeeManager:      fees.NewManager(feeCfg.InitialFeeRate),
 				BlockMaxComplexity: feeCfg.BlockMaxComplexity,
 				State:              state,
 				Tx:                 tx,
@@ -2644,7 +2644,7 @@ func TestSemanticVerifierOperationTx(t *testing.T) {
 			tx := test.txFunc(require)
 			err := tx.Unsigned.Visit(&SemanticVerifier{
 				Backend:            backend,
-				BlkFeeManager:      fees.NewManager(feeCfg.FeeRate),
+				BlkFeeManager:      fees.NewManager(feeCfg.InitialFeeRate),
 				BlockMaxComplexity: feeCfg.BlockMaxComplexity,
 				State:              state,
 				Tx:                 tx,

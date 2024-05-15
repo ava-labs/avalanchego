@@ -17,8 +17,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm/state"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/executor"
+	"github.com/ava-labs/avalanchego/vms/avm/txs/fees"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/mempool"
-	"github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 var (
@@ -157,18 +157,28 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 		return err
 	}
 
+	preferredID := m.Preferred()
+	preferred, err := m.GetStatelessBlock(preferredID)
+	if err != nil {
+		return err
+	}
+	parentBlkTime := preferred.Timestamp()
+	nextBlkTime := NextBlockTime(preferred.Timestamp(), m.clk)
+
 	stateDiff, err := state.NewDiff(m.lastAccepted, m)
 	if err != nil {
 		return err
 	}
 
 	var (
-		chainTime = m.state.GetTimestamp()
-		isEActive = m.backend.Config.IsEActivated(chainTime)
+		isEActive = m.backend.Config.IsEActivated(parentBlkTime)
 		feesCfg   = config.GetDynamicFeesConfig(isEActive)
 	)
 
-	feeManager := fees.NewManager(feesCfg.FeeRate)
+	feeManager, err := fees.UpdatedFeeManager(m.state, m.backend.Config, parentBlkTime, nextBlkTime)
+	if err != nil {
+		return err
+	}
 
 	err = tx.Unsigned.Visit(&executor.SemanticVerifier{
 		Backend:            m.backend,
