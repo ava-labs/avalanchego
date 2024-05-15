@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/txs/mempool"
 
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 	pmempool "github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 )
 
@@ -111,7 +112,7 @@ func (g *gossipMempool) Add(tx *txs.Tx) error {
 		return err
 	}
 
-	if err := g.Mempool.Add(tx); err != nil {
+	if err := g.Mempool.Add(tx, commonfees.NoTip); err != nil {
 		g.Mempool.MarkDropped(txID, err)
 		return err
 	}

@@ -45,6 +45,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/txs/mempool"
 
 	snowmanblock "github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 	blockbuilder "github.com/ava-labs/avalanchego/vms/platformvm/block/builder"
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
@@ -275,7 +276,7 @@ func (vm *VM) pruneMempool() error {
 	}
 
 	for _, tx := range blockTxs {
-		if err := vm.Builder.Add(tx); err != nil {
+		if err := vm.Builder.Add(tx, commonfees.NoTip); err != nil {
 			vm.ctx.Log.Debug(
 				"failed to reissue tx",
 				zap.Stringer("txID", tx.ID()),

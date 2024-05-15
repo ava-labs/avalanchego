@@ -14,6 +14,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 func newMempool(toEngine chan<- common.Message) (Mempool, error) {
@@ -35,7 +37,7 @@ func TestRequestBuildBlock(t *testing.T) {
 	}
 
 	tx := newTx(0, 32)
-	require.NoError(mempool.Add(tx))
+	require.NoError(mempool.Add(tx, commonfees.NoTip))
 
 	mempool.RequestBuildBlock()
 	mempool.RequestBuildBlock() // Must not deadlock

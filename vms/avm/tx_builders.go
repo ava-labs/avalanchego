@@ -22,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/wallet/chain/x/signer"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 	walletbuilder "github.com/ava-labs/avalanchego/wallet/chain/x/builder"
 )
 
@@ -44,6 +45,7 @@ func buildCreateAssetTx(
 	denomination byte,
 	initialStates map[uint32][]verify.State,
 	kc *secp256k1fx.Keychain,
+	tipPercentage commonfees.TipPercentage, //nolint:unparam
 	changeAddr ids.ShortID,
 ) (*txs.Tx, ids.ShortID, error) {
 	pBuilder, pSigner := builders(backend, kc)
@@ -58,7 +60,7 @@ func buildCreateAssetTx(
 		denomination,
 		initialStates,
 		feeCalc,
-		options(changeAddr, nil /*memo*/)...,
+		options(changeAddr, tipPercentage, nil /*memo*/)...,
 	)
 	if err != nil {
 		return nil, ids.ShortEmpty, fmt.Errorf("failed building base tx: %w", err)
@@ -77,6 +79,7 @@ func buildBaseTx(
 	outs []*avax.TransferableOutput,
 	memo []byte,
 	kc *secp256k1fx.Keychain,
+	tipPercentage commonfees.TipPercentage, //nolint:unparam
 	changeAddr ids.ShortID,
 ) (*txs.Tx, ids.ShortID, error) {
 	pBuilder, pSigner := builders(backend, kc)
@@ -88,7 +91,7 @@ func buildBaseTx(
 	utx, err := pBuilder.NewBaseTx(
 		outs,
 		feeCalc,
-		options(changeAddr, memo)...,
+		options(changeAddr, tipPercentage, memo)...,
 	)
 	if err != nil {
 		return nil, ids.ShortEmpty, fmt.Errorf("failed building base tx: %w", err)
@@ -108,6 +111,7 @@ func mintNFT(
 	payload []byte,
 	owners []*secp256k1fx.OutputOwners,
 	kc *secp256k1fx.Keychain,
+	tipPercentage commonfees.TipPercentage,
 	changeAddr ids.ShortID,
 ) (*txs.Tx, error) {
 	pBuilder, pSigner := builders(backend, kc)
@@ -121,7 +125,7 @@ func mintNFT(
 		payload,
 		owners,
 		feeCalc,
-		options(changeAddr, nil /*memo*/)...,
+		options(changeAddr, tipPercentage, nil /*memo*/)...,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed minting NFTs: %w", err)
@@ -134,6 +138,7 @@ func mintFTs(
 	backend txBuilderBackend,
 	outputs map[ids.ID]*secp256k1fx.TransferOutput,
 	kc *secp256k1fx.Keychain,
+	tipPercentage commonfees.TipPercentage,
 	changeAddr ids.ShortID,
 ) (*txs.Tx, error) {
 	pBuilder, pSigner := builders(backend, kc)
@@ -145,7 +150,7 @@ func mintFTs(
 	utx, err := pBuilder.NewOperationTxMintFT(
 		outputs,
 		feeCalc,
-		options(changeAddr, nil /*memo*/)...,
+		options(changeAddr, tipPercentage, nil /*memo*/)...,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed minting FTs: %w", err)
@@ -158,6 +163,7 @@ func buildOperation(
 	backend txBuilderBackend,
 	ops []*txs.Operation,
 	kc *secp256k1fx.Keychain,
+	tipPercentage commonfees.TipPercentage, //nolint:unparam
 	changeAddr ids.ShortID,
 ) (*txs.Tx, error) {
 	pBuilder, pSigner := builders(backend, kc)
@@ -169,7 +175,7 @@ func buildOperation(
 	utx, err := pBuilder.NewOperationTx(
 		ops,
 		feeCalc,
-		options(changeAddr, nil /*memo*/)...,
+		options(changeAddr, tipPercentage, nil /*memo*/)...,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed building operation tx: %w", err)
@@ -183,6 +189,7 @@ func buildImportTx(
 	sourceChain ids.ID,
 	to ids.ShortID,
 	kc *secp256k1fx.Keychain,
+	tipPercentage commonfees.TipPercentage,
 ) (*txs.Tx, error) {
 	pBuilder, pSigner := builders(backend, kc)
 	feeCalc, err := feeCalculator(backend)
@@ -200,6 +207,7 @@ func buildImportTx(
 		sourceChain,
 		outOwner,
 		feeCalc,
+		options(ids.ShortEmpty, tipPercentage, nil /*memo*/)...,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed building import tx: %w", err)
@@ -215,6 +223,7 @@ func buildExportTx(
 	exportedAssetID ids.ID,
 	exportedAmt uint64,
 	kc *secp256k1fx.Keychain,
+	tipPercentage commonfees.TipPercentage, //nolint:unparam
 	changeAddr ids.ShortID,
 ) (*txs.Tx, ids.ShortID, error) {
 	pBuilder, pSigner := builders(backend, kc)
@@ -239,7 +248,7 @@ func buildExportTx(
 		destinationChain,
 		outputs,
 		feeCalc,
-		options(changeAddr, nil /*memo*/)...,
+		options(changeAddr, tipPercentage, nil /*memo*/)...,
 	)
 	if err != nil {
 		return nil, ids.ShortEmpty, fmt.Errorf("failed building export tx: %w", err)
@@ -289,12 +298,17 @@ func feeCalculator(backend txBuilderBackend) (*fees.Calculator, error) {
 	return feeCalculator, nil
 }
 
-func options(changeAddr ids.ShortID, memo []byte) []common.Option {
-	return common.UnionOptions(
+func options(changeAddr ids.ShortID, tipPercentage commonfees.TipPercentage, memo []byte) []common.Option {
+	ops := common.UnionOptions(
 		[]common.Option{common.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{changeAddr},
 		})},
+		[]common.Option{common.WithTipPercentage(tipPercentage)},
+	)
+
+	return common.UnionOptions(
+		ops,
 		[]common.Option{common.WithMemo(memo)},
 	)
 }

@@ -27,6 +27,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/nftfx"
 	"github.com/ava-labs/avalanchego/vms/propertyfx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 func TestInvalidGenesis(t *testing.T) {
@@ -169,6 +171,7 @@ func TestIssueNFT(t *testing.T) {
 		0,             // denomination
 		initialStates,
 		kc,
+		commonfees.NoTip,
 		key.Address(),
 	)
 	require.NoError(err)
@@ -185,6 +188,7 @@ func TestIssueNFT(t *testing.T) {
 			Addrs:     []ids.ShortID{key.Address()},
 		}},
 		kc,
+		commonfees.NoTip,
 		key.Address(),
 	)
 	require.NoError(err)
@@ -207,6 +211,7 @@ func TestIssueNFT(t *testing.T) {
 		env.service.txBuilderBackend,
 		transferOp,
 		kc,
+		commonfees.NoTip,
 		key.Address(),
 	)
 	require.NoError(err)
@@ -256,6 +261,7 @@ func TestIssueProperty(t *testing.T) {
 		0,             // denomination
 		initialStates,
 		kc,
+		commonfees.NoTip,
 		key.Address(),
 	)
 	require.NoError(err)
@@ -287,6 +293,7 @@ func TestIssueProperty(t *testing.T) {
 		env.service.txBuilderBackend,
 		[]*txs.Operation{mintPropertyOp},
 		kc,
+		commonfees.NoTip,
 		key.Address(),
 	)
 	require.NoError(err)
@@ -307,6 +314,7 @@ func TestIssueProperty(t *testing.T) {
 		env.service.txBuilderBackend,
 		[]*txs.Operation{burnPropertyOp},
 		kc,
+		commonfees.NoTip,
 		key.Address(),
 	)
 	require.NoError(err)
@@ -384,6 +392,7 @@ func TestIssueTxWithAnotherAsset(t *testing.T) {
 		},
 		nil, // memo
 		kc,
+		commonfees.NoTip,
 		key.Address(),
 	)
 	require.NoError(err)
@@ -451,6 +460,7 @@ func TestTxAcceptAfterParseTx(t *testing.T) {
 		}},
 		nil, // memo
 		kc,
+		commonfees.NoTip,
 		key.Address(),
 	)
 	require.NoError(err)
@@ -566,6 +576,7 @@ func TestIssueImportTx(t *testing.T) {
 		constants.PlatformChainID, // source chain
 		key.Address(),
 		kc,
+		commonfees.NoTip,
 	)
 	require.NoError(err)
 
@@ -695,6 +706,7 @@ func TestIssueExportTx(t *testing.T) {
 		avaxID,
 		5000,
 		kc,
+		commonfees.NoTip,
 		changeAddr,
 	)
 	require.NoError(err)
@@ -769,6 +781,7 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 		avaxID,
 		startBalance-expectedFee,
 		kc,
+		commonfees.NoTip,
 		changeAddr,
 	)
 	require.NoError(err)

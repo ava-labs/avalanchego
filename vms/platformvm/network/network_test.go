@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/txs/mempool"
 
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 	pmempool "github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 )
 
@@ -116,7 +117,7 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 				mempool := pmempool.NewMockMempool(ctrl)
 				mempool.EXPECT().Get(gomock.Any()).Return(nil, false)
 				mempool.EXPECT().GetDropReason(gomock.Any()).Return(nil)
-				mempool.EXPECT().Add(gomock.Any()).Return(errTest)
+				mempool.EXPECT().Add(gomock.Any(), commonfees.NoTip).Return(errTest)
 				mempool.EXPECT().MarkDropped(gomock.Any(), gomock.Any())
 				return mempool
 			},
@@ -143,7 +144,7 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 				mempool := pmempool.NewMockMempool(ctrl)
 				mempool.EXPECT().Get(gomock.Any()).Return(nil, false)
 				mempool.EXPECT().GetDropReason(gomock.Any()).Return(nil)
-				mempool.EXPECT().Add(gomock.Any()).Return(nil)
+				mempool.EXPECT().Add(gomock.Any(), commonfees.NoTip).Return(nil)
 				mempool.EXPECT().Len().Return(0)
 				mempool.EXPECT().RequestBuildBlock(false)
 				mempool.EXPECT().Get(gomock.Any()).Return(nil, true).Times(2)

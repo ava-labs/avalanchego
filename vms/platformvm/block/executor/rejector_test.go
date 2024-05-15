@@ -19,6 +19,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 func TestRejectBlock(t *testing.T) {
@@ -139,7 +141,7 @@ func TestRejectBlock(t *testing.T) {
 
 			// Set expected calls on dependencies.
 			for _, tx := range blk.Txs() {
-				mempool.EXPECT().Add(tx).Return(nil).Times(1)
+				mempool.EXPECT().Add(tx, commonfees.NoTip).Return(nil).Times(1)
 			}
 
 			mempool.EXPECT().RequestBuildBlock(false).Times(1)

@@ -14,6 +14,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 func TestVerifyFxUsage(t *testing.T) {
@@ -62,6 +64,7 @@ func TestVerifyFxUsage(t *testing.T) {
 		0,             // denomination
 		initialStates,
 		kc,
+		commonfees.NoTip,
 		key.Address(),
 	)
 	require.NoError(err)
@@ -78,6 +81,7 @@ func TestVerifyFxUsage(t *testing.T) {
 			Addrs:     []ids.ShortID{key.Address()},
 		}},
 		kc,
+		commonfees.NoTip,
 		key.Address(),
 	)
 	require.NoError(err)
@@ -100,6 +104,7 @@ func TestVerifyFxUsage(t *testing.T) {
 		}},
 		nil, // memo
 		kc,
+		commonfees.NoTip,
 		key.Address(),
 	)
 	require.NoError(err)

@@ -277,7 +277,7 @@ func TestManagerVerifyTx(t *testing.T) {
 
 			m := test.managerF(ctrl)
 			tx := test.txF(ctrl)
-			err := m.VerifyTx(tx)
+			_, err := m.VerifyTx(tx)
 			require.ErrorIs(err, test.expectedErr)
 		})
 	}

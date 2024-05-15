@@ -221,7 +221,7 @@ func TestPChainFeeRateIncreaseDueToPeak(t *testing.T) {
 		)
 
 		// at peak the total fee should be no more than 100 Avax.
-		fee, err := m.CalculateFee(childBlkData.complexity)
+		fee, err := m.CalculateFee(childBlkData.complexity, NoTip)
 		require.NoError(err)
 		require.Less(fee, 100*units.Avax, fmt.Sprintf("iteration: %d, total: %d", i, len(blockComplexities)))
 
