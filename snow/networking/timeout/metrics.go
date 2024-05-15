@@ -62,7 +62,7 @@ func (m *metrics) Observe(chainID ids.ID, op message.Op, latency time.Duration) 
 // chainMetrics contains message response time metrics for a chain
 type chainMetrics struct {
 	messages         *prometheus.CounterVec // op
-	messageLatencies *prometheus.CounterVec // op
+	messageLatencies *prometheus.GaugeVec   // op
 }
 
 func newChainMetrics(reg prometheus.Registerer) (*chainMetrics, error) {
@@ -75,8 +75,8 @@ func newChainMetrics(reg prometheus.Registerer) (*chainMetrics, error) {
 			},
 			opLabels,
 		),
-		messageLatencies: prometheus.NewCounterVec(
-			prometheus.CounterOpts{
+		messageLatencies: prometheus.NewGaugeVec(
+			prometheus.GaugeOpts{
 				Namespace: responseNamespace,
 				Name:      "message_latencies",
 				Help:      "message latencies (ns)",

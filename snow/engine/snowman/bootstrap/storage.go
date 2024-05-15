@@ -25,6 +25,7 @@ const (
 	batchWritePeriod      = 64
 	iteratorReleasePeriod = 1024
 	logPeriod             = 5 * time.Second
+	minBlocksToCompact    = 5000
 )
 
 // getMissingBlockIDs returns the ID of the blocks that should be fetched to
@@ -133,6 +134,15 @@ func execute(
 	tree *interval.Tree,
 	lastAcceptedHeight uint64,
 ) error {
+	totalNumberToProcess := tree.Len()
+	if totalNumberToProcess > minBlocksToCompact {
+		log("compacting database before executing blocks...")
+		if err := db.Compact(nil, nil); err != nil {
+			// Not a fatal error, log and move on.
+			log("failed to compact bootstrap database before executing blocks", zap.Error(err))
+		}
+	}
+
 	var (
 		batch                    = db.NewBatch()
 		processedSinceBatchWrite uint
@@ -152,9 +162,8 @@ func execute(
 		iterator                      = interval.GetBlockIterator(db)
 		processedSinceIteratorRelease uint
 
-		startTime            = time.Now()
-		timeOfNextLog        = startTime.Add(logPeriod)
-		totalNumberToProcess = tree.Len()
+		startTime     = time.Now()
+		timeOfNextLog = startTime.Add(logPeriod)
 	)
 	defer func() {
 		iterator.Release()

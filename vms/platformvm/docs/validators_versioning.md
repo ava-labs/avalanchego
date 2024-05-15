@@ -68,7 +68,7 @@ Validator diffs layout is optimized to support iteration. Validator sets are reb
 Note that:
 
 1. `Weight` diffs related to a Subnet are stored contiguously.
-2. Diff height is serialized as `Reverse_Height`. It is stored with big endian format and has its bits flipped too. Big endianess ensures that heights are stored in order, bit flipping ensures that the top-most height is always the first.
+2. Diff height is serialized as `Reverse_Height`. It is stored with big endian format and has its bits flipped too. Big endianness ensures that heights are stored in order, bit flipping ensures that the top-most height is always the first.
 3. `NodeID` is part of the key and `state.ValidatorWeightDiff` is part of the value.
 
 `BLS Public` diffs are stored as follows:

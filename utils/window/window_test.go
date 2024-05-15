@@ -127,7 +127,7 @@ func TestTTLAdd(t *testing.T) {
 	require.Equal(4, oldest)
 }
 
-// TestTTLReadOnly tests that elements are not evicted on Length
+// TestTTLLength tests that elements are not evicted on Length
 func TestTTLLength(t *testing.T) {
 	require := require.New(t)
 
@@ -159,7 +159,7 @@ func TestTTLLength(t *testing.T) {
 	require.Equal(3, window.Length())
 }
 
-// TestTTLReadOnly tests that stale elements are not evicted on calling Oldest
+// TestTTLOldest tests that stale elements are not evicted on calling Oldest
 func TestTTLOldest(t *testing.T) {
 	require := require.New(t)
 

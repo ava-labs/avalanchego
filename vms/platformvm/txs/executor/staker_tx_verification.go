@@ -819,7 +819,6 @@ func verifyAddPermissionlessDelegatorTx(
 		return commonfees.NoTip, err
 	}
 
-	// Verify the flowcheck
 	feesPaid, err := backend.FlowChecker.VerifySpend(
 		tx,
 		chainState,
