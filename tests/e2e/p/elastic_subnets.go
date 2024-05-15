@@ -77,8 +77,8 @@ var _ = e2e.DescribePChain("[Elastic Subnets]", func() {
 					tc.WithDefaultContext(),
 				)
 
-				subnetID = subnetTx.ID()
 				require.NoError(err)
+				subnetID = subnetTx.ID()
 				require.NotEqual(subnetID, constants.PrimaryNetworkID)
 			})
 
