@@ -32,7 +32,6 @@ import (
 	"math"
 	"math/big"
 
-	"github.com/ava-labs/coreth/consensus/misc/eip4844"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/core/vm"
 	"github.com/ava-labs/coreth/params"
@@ -45,9 +44,10 @@ import (
 // ExecutionResult includes all output after executing given evm
 // message no matter the execution itself is successful or not.
 type ExecutionResult struct {
-	UsedGas    uint64 // Total used gas but include the refunded gas
-	Err        error  // Any error encountered during the execution(listed in core/vm/errors.go)
-	ReturnData []byte // Returned data from evm(function result or data supplied with revert opcode)
+	UsedGas     uint64 // Total used gas, not including the refunded gas
+	RefundedGas uint64 // Total gas refunded after execution
+	Err         error  // Any error encountered during the execution(listed in core/vm/errors.go)
+	ReturnData  []byte // Returned data from evm(function result or data supplied with revert opcode)
 }
 
 // Unwrap returns the internal evm error which allows us for further
@@ -306,7 +306,7 @@ func (st *StateTransition) buyGas() error {
 			balanceCheck.Add(balanceCheck, blobBalanceCheck)
 			// Pay for blobGasUsed * actual blob fee
 			blobFee := new(big.Int).SetUint64(blobGas)
-			blobFee.Mul(blobFee, eip4844.CalcBlobFee(*st.evm.Context.ExcessBlobGas))
+			blobFee.Mul(blobFee, st.evm.Context.BlobBaseFee)
 			mgval.Add(mgval, blobFee)
 		}
 	}
@@ -350,11 +350,11 @@ func (st *StateTransition) preCheck() error {
 			return fmt.Errorf("%w: address %v", vmerrs.ErrAddrProhibited, msg.From)
 		}
 	}
-
 	// Make sure that transaction gasFeeCap is greater than the baseFee (post london)
 	if st.evm.ChainConfig().IsApricotPhase3(st.evm.Context.Time) {
 		// Skip the checks if gas fields are zero and baseFee was explicitly disabled (eth_call)
-		if !st.evm.Config.NoBaseFee || msg.GasFeeCap.BitLen() > 0 || msg.GasTipCap.BitLen() > 0 {
+		skipCheck := st.evm.Config.NoBaseFee && msg.GasFeeCap.BitLen() == 0 && msg.GasTipCap.BitLen() == 0
+		if !skipCheck {
 			if l := msg.GasFeeCap.BitLen(); l > 256 {
 				return fmt.Errorf("%w: address %v, maxFeePerGas bit length: %d", ErrFeeCapVeryHigh,
 					msg.From.Hex(), l)
@@ -370,7 +370,7 @@ func (st *StateTransition) preCheck() error {
 			// This will panic if baseFee is nil, but basefee presence is verified
 			// as part of header validation.
 			if msg.GasFeeCap.Cmp(st.evm.Context.BaseFee) < 0 {
-				return fmt.Errorf("%w: address %v, maxFeePerGas: %s baseFee: %s", ErrFeeCapTooLow,
+				return fmt.Errorf("%w: address %v, maxFeePerGas: %s, baseFee: %s", ErrFeeCapTooLow,
 					msg.From.Hex(), msg.GasFeeCap, st.evm.Context.BaseFee)
 			}
 		}
@@ -387,17 +387,21 @@ func (st *StateTransition) preCheck() error {
 			}
 		}
 	}
-
+	// Check that the user is paying at least the current blob fee
 	if st.evm.ChainConfig().IsCancun(st.evm.Context.BlockNumber, st.evm.Context.Time) {
 		if st.blobGasUsed() > 0 {
-			// Check that the user is paying at least the current blob fee
-			blobFee := eip4844.CalcBlobFee(*st.evm.Context.ExcessBlobGas)
-			if st.msg.BlobGasFeeCap.Cmp(blobFee) < 0 {
-				return fmt.Errorf("%w: address %v have %v want %v", ErrBlobFeeCapTooLow, st.msg.From.Hex(), st.msg.BlobGasFeeCap, blobFee)
+			// Skip the checks if gas fields are zero and blobBaseFee was explicitly disabled (eth_call)
+			skipCheck := st.evm.Config.NoBaseFee && msg.BlobGasFeeCap.BitLen() == 0
+			if !skipCheck {
+				// This will panic if blobBaseFee is nil, but blobBaseFee presence
+				// is verified as part of header validation.
+				if msg.BlobGasFeeCap.Cmp(st.evm.Context.BlobBaseFee) < 0 {
+					return fmt.Errorf("%w: address %v blobGasFeeCap: %v, blobBaseFee: %v", ErrBlobFeeCapTooLow,
+						msg.From.Hex(), msg.BlobGasFeeCap, st.evm.Context.BlobBaseFee)
+				}
 			}
 		}
 	}
-
 	return st.buyGas()
 }
 
@@ -477,21 +481,23 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 		st.state.SetNonce(msg.From, st.state.GetNonce(sender.Address())+1)
 		ret, st.gasRemaining, vmerr = st.evm.Call(sender, st.to(), msg.Data, st.gasRemaining, msg.Value)
 	}
-	st.refundGas(rules.IsApricotPhase1)
+	gasRefund := st.refundGas(rules.IsApricotPhase1)
 	st.state.AddBalance(st.evm.Context.Coinbase, new(big.Int).Mul(new(big.Int).SetUint64(st.gasUsed()), msg.GasPrice))
 
 	return &ExecutionResult{
-		UsedGas:    st.gasUsed(),
-		Err:        vmerr,
-		ReturnData: ret,
+		UsedGas:     st.gasUsed(),
+		RefundedGas: gasRefund,
+		Err:         vmerr,
+		ReturnData:  ret,
 	}, nil
 }
 
-func (st *StateTransition) refundGas(apricotPhase1 bool) {
+func (st *StateTransition) refundGas(apricotPhase1 bool) uint64 {
+	var refund uint64
 	// Inspired by: https://gist.github.com/holiman/460f952716a74eeb9ab358bb1836d821#gistcomment-3642048
 	if !apricotPhase1 {
 		// Apply refund counter, capped to half of the used gas.
-		refund := st.gasUsed() / 2
+		refund = st.gasUsed() / 2
 		if refund > st.state.GetRefund() {
 			refund = st.state.GetRefund()
 		}
@@ -505,6 +511,8 @@ func (st *StateTransition) refundGas(apricotPhase1 bool) {
 	// Also return remaining gas to the block gas counter so it is
 	// available for the next transaction.
 	st.gp.AddGas(st.gasRemaining)
+
+	return refund
 }
 
 // gasUsed returns the amount of gas used up by the state transition.

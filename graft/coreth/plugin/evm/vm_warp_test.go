@@ -95,7 +95,7 @@ func TestSendWarpMessage(t *testing.T) {
 	require.Len(receipts[0].Logs, 1)
 	expectedTopics := []common.Hash{
 		warp.WarpABI.Events["SendWarpMessage"].ID,
-		testEthAddrs[0].Hash(),
+		common.BytesToHash(testEthAddrs[0].Bytes()),
 		common.Hash(expectedUnsignedMessage.ID()),
 	}
 	require.Equal(expectedTopics, receipts[0].Logs[0].Topics)

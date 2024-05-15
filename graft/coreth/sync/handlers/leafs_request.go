@@ -366,11 +366,7 @@ func (rb *responseBuilder) verifyRangeProof(keys, vals [][]byte, start []byte, p
 	if len(start) == 0 {
 		start = bytes.Repeat([]byte{0x00}, rb.keyLength)
 	}
-	var end []byte
-	if len(keys) > 0 {
-		end = keys[len(keys)-1]
-	}
-	return trie.VerifyRangeProof(rb.request.Root, start, end, keys, vals, proof)
+	return trie.VerifyRangeProof(rb.request.Root, start, keys, vals, proof)
 }
 
 // iterateVals returns the values contained in [db]

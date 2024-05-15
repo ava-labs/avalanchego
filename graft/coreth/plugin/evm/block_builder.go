@@ -144,7 +144,7 @@ func (b *blockBuilder) awaitSubmittedTxs() {
 	// txSubmitChan is invoked when new transactions are issued as well as on re-orgs which
 	// may orphan transactions that were previously in a preferred block.
 	txSubmitChan := make(chan core.NewTxsEvent)
-	b.txPool.SubscribeNewTxsEvent(txSubmitChan)
+	b.txPool.SubscribeTransactions(txSubmitChan, true)
 
 	b.shutdownWg.Add(1)
 	go b.ctx.Log.RecoverAndPanic(func() {

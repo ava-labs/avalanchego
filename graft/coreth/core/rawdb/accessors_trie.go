@@ -302,6 +302,11 @@ func ReadStateScheme(db ethdb.Reader) string {
 	if len(blob) != 0 {
 		return PathScheme
 	}
+	// The root node might be deleted during the initial snap sync, check
+	// the persistentstent state id then.
+	if id := ReadPersistentStateID(db); id != 0 {
+		return PathScheme
+	}
 	// In a hash-based scheme, the genesis state is consistently stored
 	// on the disk. To assess the scheme of the persistent state, it
 	// suffices to inspect the scheme of the genesis state.
@@ -314,4 +319,39 @@ func ReadStateScheme(db ethdb.Reader) string {
 		return "" // no state in disk
 	}
 	return HashScheme
+}
+
+// ParseStateScheme checks if the specified state scheme is compatible with
+// the stored state.
+//
+//   - If the provided scheme is none, use the scheme consistent with persistent
+//     state, or fallback to hash-based scheme if state is empty.
+//
+//   - If the provided scheme is hash, use hash-based scheme or error out if not
+//     compatible with persistent state scheme.
+//
+//   - If the provided scheme is path: use path-based scheme or error out if not
+//     compatible with persistent state scheme.
+func ParseStateScheme(provided string, disk ethdb.Database) (string, error) {
+	// If state scheme is not specified, use the scheme consistent
+	// with persistent state, or fallback to hash mode if database
+	// is empty.
+	stored := ReadStateScheme(disk)
+	if provided == "" {
+		if stored == "" {
+			// use default scheme for empty database, flip it when
+			// path mode is chosen as default
+			log.Info("State schema set to default", "scheme", "hash")
+			return HashScheme, nil
+		}
+		log.Info("State scheme set to already existing", "scheme", stored)
+		return stored, nil // reuse scheme of persistent scheme
+	}
+	// If state scheme is specified, ensure it's compatible with
+	// persistent state.
+	if stored == "" || provided == stored {
+		log.Info("State scheme set by user", "scheme", provided)
+		return provided, nil
+	}
+	return "", fmt.Errorf("incompatible state scheme, stored: %s, provided: %s", stored, provided)
 }

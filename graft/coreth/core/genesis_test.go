@@ -27,6 +27,7 @@
 package core
 
 import (
+	"bytes"
 	_ "embed"
 	"math/big"
 	"reflect"
@@ -284,4 +285,54 @@ func newDbConfig(scheme string) *trie.Config {
 		return trie.HashDefaults
 	}
 	return &trie.Config{PathDB: pathdb.Defaults}
+}
+
+func TestVerkleGenesisCommit(t *testing.T) {
+	var verkleTime uint64 = 0
+	verkleConfig := &params.ChainConfig{
+		ChainID:             big.NewInt(1),
+		HomesteadBlock:      big.NewInt(0),
+		EIP150Block:         big.NewInt(0),
+		EIP155Block:         big.NewInt(0),
+		EIP158Block:         big.NewInt(0),
+		ByzantiumBlock:      big.NewInt(0),
+		ConstantinopleBlock: big.NewInt(0),
+		PetersburgBlock:     big.NewInt(0),
+		IstanbulBlock:       big.NewInt(0),
+		MuirGlacierBlock:    big.NewInt(0),
+		CancunTime:          &verkleTime,
+		VerkleTime:          &verkleTime,
+	}
+
+	genesis := &Genesis{
+		BaseFee:    big.NewInt(params.ApricotPhase3InitialBaseFee),
+		Config:     verkleConfig,
+		Timestamp:  verkleTime,
+		Difficulty: big.NewInt(0),
+		Alloc: GenesisAlloc{
+			{1}: {Balance: big.NewInt(1), Storage: map[common.Hash]common.Hash{{1}: {1}}},
+		},
+	}
+
+	expected := common.Hex2Bytes("22678ccc2daa04e91013ce47799973bd6c1824f37989d7cea4cbdcd79b39137f")
+	got := genesis.ToBlock().Root().Bytes()
+	if !bytes.Equal(got, expected) {
+		t.Fatalf("invalid genesis state root, expected %x, got %x", expected, got)
+	}
+
+	db := rawdb.NewMemoryDatabase()
+	triedb := trie.NewDatabase(db, &trie.Config{IsVerkle: true, PathDB: pathdb.Defaults})
+	block := genesis.MustCommit(db, triedb)
+	if !bytes.Equal(block.Root().Bytes(), expected) {
+		t.Fatalf("invalid genesis state root, expected %x, got %x", expected, got)
+	}
+
+	// Test that the trie is verkle
+	if !triedb.IsVerkle() {
+		t.Fatalf("expected trie to be verkle")
+	}
+
+	if !rawdb.ExistsAccountTrieNode(db, nil) {
+		t.Fatal("could not find node")
+	}
 }
