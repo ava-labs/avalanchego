@@ -122,6 +122,8 @@ func (it *iter) release() {
 		return
 	}
 
+	// Cloning these values ensures that calling it.Key() or it.Value() after
+	// releasing the iterator will not segfault.
 	it.nextKey = slices.Clone(it.nextKey)
 	it.nextVal = slices.Clone(it.nextVal)
 
