@@ -71,8 +71,8 @@ func (it *iter) Next() bool {
 		return false
 	}
 
-	it.nextKey = slices.Clone(key)
-	it.nextVal = slices.Clone(value)
+	it.nextKey = key
+	it.nextVal = value
 	return true
 }
 
@@ -121,6 +121,9 @@ func (it *iter) release() {
 	if it.closed {
 		return
 	}
+
+	it.nextKey = slices.Clone(it.nextKey)
+	it.nextVal = slices.Clone(it.nextVal)
 
 	// Remove the iterator from the list of open iterators.
 	it.db.openIterators.Remove(it)
