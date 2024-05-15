@@ -26,6 +26,8 @@ const (
 	// pebbleByteOverHead is the number of bytes of constant overhead that
 	// should be added to a batch size per operation.
 	pebbleByteOverHead = 8
+
+	defaultCacheSize = 512 * units.MiB
 )
 
 var (
@@ -33,8 +35,7 @@ var (
 
 	errInvalidOperation = errors.New("invalid operation")
 
-	defaultCacheSize = 512 * units.MiB
-	DefaultConfig    = Config{
+	DefaultConfig = Config{
 		CacheSize:                   defaultCacheSize,
 		BytesPerSync:                512 * units.KiB,
 		WALBytesPerSync:             0, // Default to no background syncing.
@@ -53,7 +54,7 @@ type Database struct {
 }
 
 type Config struct {
-	CacheSize                   int    `json:"cacheSize"`
+	CacheSize                   int64  `json:"cacheSize"`
 	BytesPerSync                int    `json:"bytesPerSync"`
 	WALBytesPerSync             int    `json:"walBytesPerSync"` // 0 means no background syncing
 	MemTableStopWritesThreshold int    `json:"memTableStopWritesThreshold"`
@@ -72,7 +73,7 @@ func New(file string, configBytes []byte, log logging.Logger, _ string, _ promet
 	}
 
 	opts := &pebble.Options{
-		Cache:                       pebble.NewCache(int64(cfg.CacheSize)),
+		Cache:                       pebble.NewCache(cfg.CacheSize),
 		BytesPerSync:                cfg.BytesPerSync,
 		Comparer:                    pebble.DefaultComparer,
 		WALBytesPerSync:             cfg.WALBytesPerSync,
