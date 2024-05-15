@@ -852,9 +852,9 @@ func TestAdvanceTimeTxAfterBanff(t *testing.T) {
 	defer env.ctx.Lock.Unlock()
 	env.clk.Set(defaultGenesisTime) // VM's clock reads the genesis time
 	upgradeTime := env.clk.Time().Add(SyncBound)
-	env.config.BanffTime = upgradeTime
-	env.config.CortinaTime = upgradeTime
-	env.config.DurangoTime = upgradeTime
+	env.config.UpgradeConfig.BanffTime = upgradeTime
+	env.config.UpgradeConfig.CortinaTime = upgradeTime
+	env.config.UpgradeConfig.DurangoTime = upgradeTime
 
 	// Proposed advancing timestamp to the banff timestamp
 	tx, err := newAdvanceTimeTx(t, upgradeTime)
