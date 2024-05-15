@@ -53,13 +53,13 @@ type Database struct {
 }
 
 type Config struct {
-	CacheSize                   int `json:"cacheSize"`
-	BytesPerSync                int `json:"bytesPerSync"`
-	WALBytesPerSync             int `json:"walBytesPerSync"` // 0 means no background syncing
-	MemTableStopWritesThreshold int `json:"memTableStopWritesThreshold"`
-	MemTableSize                int `json:"memTableSize"`
-	MaxOpenFiles                int `json:"maxOpenFiles"`
-	MaxConcurrentCompactions    int `json:"maxConcurrentCompactions"`
+	CacheSize                   int    `json:"cacheSize"`
+	BytesPerSync                int    `json:"bytesPerSync"`
+	WALBytesPerSync             int    `json:"walBytesPerSync"` // 0 means no background syncing
+	MemTableStopWritesThreshold int    `json:"memTableStopWritesThreshold"`
+	MemTableSize                uint64 `json:"memTableSize"`
+	MaxOpenFiles                int    `json:"maxOpenFiles"`
+	MaxConcurrentCompactions    int    `json:"maxConcurrentCompactions"`
 }
 
 // TODO: Add metrics
@@ -77,7 +77,7 @@ func New(file string, configBytes []byte, log logging.Logger, _ string, _ promet
 		Comparer:                    pebble.DefaultComparer,
 		WALBytesPerSync:             cfg.WALBytesPerSync,
 		MemTableStopWritesThreshold: cfg.MemTableStopWritesThreshold,
-		MemTableSize:                uint64(cfg.MemTableSize),
+		MemTableSize:                cfg.MemTableSize,
 		MaxOpenFiles:                cfg.MaxOpenFiles,
 		MaxConcurrentCompactions:    func() int { return cfg.MaxConcurrentCompactions },
 	}
