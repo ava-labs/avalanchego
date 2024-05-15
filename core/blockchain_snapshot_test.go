@@ -34,6 +34,7 @@ import (
 	"fmt"
 	"math/big"
 	"os"
+	"path"
 	"strings"
 	"testing"
 
@@ -59,6 +60,7 @@ type snapshotTestBasic struct {
 
 	// share fields, set in runtime
 	datadir string
+	ancient string
 	db      ethdb.Database
 	genDb   ethdb.Database
 	engine  consensus.Engine
@@ -70,6 +72,7 @@ type snapshotTestBasic struct {
 func (basic *snapshotTestBasic) prepare(t *testing.T) (*BlockChain, []*types.Block) {
 	// Create a temporary persistent database
 	datadir := t.TempDir()
+	ancient := path.Join(datadir, "ancient")
 
 	db, err := rawdb.Open(rawdb.OpenOptions{
 		Directory: datadir,
@@ -127,6 +130,7 @@ func (basic *snapshotTestBasic) prepare(t *testing.T) (*BlockChain, []*types.Blo
 
 	// Set runtime fields
 	basic.datadir = datadir
+	basic.ancient = ancient
 	basic.db = db
 	basic.genDb = genDb
 	basic.engine = engine
@@ -208,6 +212,7 @@ func (basic *snapshotTestBasic) teardown() {
 	basic.db.Close()
 	basic.genDb.Close()
 	os.RemoveAll(basic.datadir)
+	os.RemoveAll(basic.ancient)
 }
 
 // snapshotTest is a test case type for normal snapshot recovery.

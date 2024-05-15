@@ -498,6 +498,8 @@ type ChainConfig struct {
 	DurangoBlockTimestamp *uint64 `json:"durangoBlockTimestamp,omitempty"`
 	// Cancun activates the Cancun upgrade from Ethereum. (nil = no fork, 0 = already activated)
 	CancunTime *uint64 `json:"cancunTime,omitempty"`
+	// Verkle activates the Verkle upgrade from Ethereum. (nil = no fork, 0 = already activated)
+	VerkleTime *uint64 `json:"verkleTime,omitempty"` // Verkle switch time (nil = no fork, 0 = already on verkle)
 
 	UpgradeConfig `json:"-"` // Config specified in upgradeBytes (avalanche network upgrades or enable/disabling precompiles). Skip encoding/decoding directly into ChainConfig.
 }
@@ -679,6 +681,12 @@ func (c *ChainConfig) IsDurango(time uint64) bool {
 // with a timestamp after the Cancun upgrade time.
 func (c *ChainConfig) IsCancun(num *big.Int, time uint64) bool {
 	return utils.IsTimestampForked(c.CancunTime, time)
+}
+
+// IsVerkle returns whether [time] represents a block
+// with a timestamp after the Verkle upgrade time.
+func (c *ChainConfig) IsVerkle(num *big.Int, time uint64) bool {
+	return utils.IsTimestampForked(c.VerkleTime, time)
 }
 
 func (r *Rules) PredicatersExist() bool {

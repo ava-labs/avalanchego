@@ -699,14 +699,11 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 func assertRangeProofIsValid(t *testing.T, request *message.LeafsRequest, response *message.LeafsResponse, expectMore bool) {
 	t.Helper()
 
-	var start, end []byte
+	var start []byte
 	if len(request.Start) == 0 {
 		start = bytes.Repeat([]byte{0x00}, common.HashLength)
 	} else {
 		start = request.Start
-	}
-	if len(response.Keys) > 0 {
-		end = response.Keys[len(response.Vals)-1]
 	}
 
 	var proof ethdb.Database
@@ -721,7 +718,7 @@ func assertRangeProofIsValid(t *testing.T, request *message.LeafsRequest, respon
 		}
 	}
 
-	more, err := trie.VerifyRangeProof(request.Root, start, end, response.Keys, response.Vals, proof)
+	more, err := trie.VerifyRangeProof(request.Root, start, response.Keys, response.Vals, proof)
 	assert.NoError(t, err)
 	assert.Equal(t, expectMore, more)
 }

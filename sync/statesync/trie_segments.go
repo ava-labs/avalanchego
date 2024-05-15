@@ -64,15 +64,15 @@ type trieToSync struct {
 // NewTrieToSync initializes a trieToSync and restores any previously started segments.
 func NewTrieToSync(sync *stateSync, root common.Hash, account common.Hash, syncTask syncTask) (*trieToSync, error) {
 	batch := sync.db.NewBatch() // TODO: migrate state sync to use database schemes.
-	writeFn := func(owner common.Hash, path []byte, hash common.Hash, blob []byte) {
-		rawdb.WriteTrieNode(batch, owner, path, hash, blob, rawdb.HashScheme)
+	writeFn := func(path []byte, hash common.Hash, blob []byte) {
+		rawdb.WriteTrieNode(batch, account, path, hash, blob, rawdb.HashScheme)
 	}
 	trieToSync := &trieToSync{
 		sync:         sync,
 		root:         root,
 		account:      account,
 		batch:        batch,
-		stackTrie:    trie.NewStackTrie(writeFn),
+		stackTrie:    trie.NewStackTrie(&trie.StackTrieOptions{Writer: writeFn}),
 		isMainTrie:   (root == sync.root),
 		task:         syncTask,
 		segmentsDone: make(map[int]struct{}),
@@ -219,10 +219,7 @@ func (t *trieToSync) segmentFinished(ctx context.Context, idx int) error {
 
 	// when the trie is finished, this hashes any remaining nodes in the stack
 	// trie and creates the root
-	actualRoot, err := t.stackTrie.Commit()
-	if err != nil {
-		return err
-	}
+	actualRoot := t.stackTrie.Commit()
 	if actualRoot != t.root {
 		return fmt.Errorf("unexpected root, expected=%s, actual=%s, account=%s", t.root, actualRoot, t.account)
 	}

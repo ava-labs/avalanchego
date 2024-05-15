@@ -39,6 +39,7 @@ import (
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/trie"
+	"github.com/ava-labs/coreth/trie/triedb/pathdb"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/common/math"
@@ -248,11 +249,26 @@ func SetupGenesisBlock(
 	return newcfg, stored, nil
 }
 
-// ToBlock creates the genesis block and writes state of a genesis specification
-// to the given database (or discards it if nil).
+// IsVerkle indicates whether the state is already stored in a verkle
+// tree at genesis time.
+func (g *Genesis) IsVerkle() bool {
+	return g.Config.IsVerkle(new(big.Int).SetUint64(g.Number), g.Timestamp)
+}
+
+// ToBlock returns the genesis block according to genesis specification.
 func (g *Genesis) ToBlock() *types.Block {
 	db := rawdb.NewMemoryDatabase()
-	return g.toBlock(db, trie.NewDatabase(db, nil))
+	return g.toBlock(db, trie.NewDatabase(db, g.trieConfig()))
+}
+
+func (g *Genesis) trieConfig() *trie.Config {
+	if !g.IsVerkle() {
+		return nil
+	}
+	return &trie.Config{
+		PathDB:   pathdb.Defaults,
+		IsVerkle: true,
+	}
 }
 
 // TODO: migrate this function to "flush" for more similarity with upstream.

@@ -150,8 +150,12 @@ func New(
 		"snapshot clean", common.StorageSize(config.SnapshotCache)*1024*1024,
 	)
 
+	scheme, err := rawdb.ParseStateScheme(config.StateScheme, chainDb)
+	if err != nil {
+		return nil, err
+	}
 	// Try to recover offline state pruning only in hash-based.
-	if config.StateScheme == rawdb.HashScheme {
+	if scheme == rawdb.HashScheme {
 		// Note: RecoverPruning must be called to handle the case that we are midway through offline pruning.
 		// If the data directory is changed in between runs preventing RecoverPruning from performing its job correctly,
 		// it may cause DB corruption.
@@ -163,6 +167,10 @@ func New(
 		}
 	}
 
+	networkID := config.NetworkId
+	if networkID == 0 {
+		networkID = config.Genesis.Config.ChainID.Uint64()
+	}
 	eth := &Ethereum{
 		config:            config,
 		gossiper:          gossiper,
@@ -171,7 +179,7 @@ func New(
 		accountManager:    stack.AccountManager(),
 		engine:            dummy.NewFakerWithClock(cb, clock),
 		closeBloomHandler: make(chan struct{}),
-		networkID:         config.NetworkId,
+		networkID:         networkID,
 		etherbase:         config.Miner.Etherbase,
 		bloomRequests:     make(chan chan *bloombits.Retrieval),
 		bloomIndexer:      core.NewBloomIndexer(chainDb, params.BloomBitsBlocks, params.BloomConfirms),
@@ -183,7 +191,7 @@ func New(
 	if bcVersion != nil {
 		dbVer = fmt.Sprintf("%d", *bcVersion)
 	}
-	log.Info("Initialising Ethereum protocol", "network", config.NetworkId, "dbversion", dbVer)
+	log.Info("Initialising Ethereum protocol", "network", networkID, "dbversion", dbVer)
 
 	if !config.SkipBcVersionCheck {
 		if bcVersion != nil && *bcVersion > core.BlockChainVersion {
@@ -218,14 +226,13 @@ func New(
 			TxLookupLimit:                   config.TxLookupLimit,
 			SkipTxIndexing:                  config.SkipTxIndexing,
 			StateHistory:                    config.StateHistory,
-			StateScheme:                     config.StateScheme,
+			StateScheme:                     scheme,
 		}
 	)
 
 	if err := eth.precheckPopulateMissingTries(); err != nil {
 		return nil, err
 	}
-	var err error
 	eth.blockchain, err = core.NewBlockChain(chainDb, cacheConfig, config.Genesis, eth.engine, vmConfig, lastAcceptedHash, config.SkipUpgradeCheck)
 	if err != nil {
 		return nil, err
