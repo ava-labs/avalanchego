@@ -798,7 +798,6 @@ func verifyAddPermissionlessDelegatorTx(
 		return err
 	}
 
-	// Verify the flowcheck
 	if err := backend.FlowChecker.VerifySpend(
 		tx,
 		chainState,

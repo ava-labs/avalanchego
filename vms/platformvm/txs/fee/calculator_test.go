@@ -87,15 +87,6 @@ func TestAddAndRemoveFees(t *testing.T) {
 }
 
 func TestTxFees(t *testing.T) {
-	type feeTests struct {
-		name                string
-		chainTime           time.Time
-		unsignedAndSignedTx func(t *testing.T) (txs.UnsignedTx, *txs.Tx)
-		maxComplexityF      func() fees.Dimensions
-		expectedError       error
-		checksF             func(*testing.T, *calculator)
-	}
-
 	feeTestsDefaultCfg := StaticConfig{
 		TxFee:                         1 * units.Avax,
 		CreateAssetTxFee:              2 * units.Avax,
@@ -118,10 +109,22 @@ func TestTxFees(t *testing.T) {
 		ApricotPhase3Time: latestForkTime.Add(-5 * time.Hour),
 	}
 
-	tests := []feeTests{
+	// chain times needed to have specific upgrades active
+	postEUpgradeTime := upgrades.EUpgradeTime.Add(time.Second)
+	preEUpgradeTime := upgrades.EUpgradeTime.Add(-1 * time.Second)
+	preApricotPhase3Time := upgrades.ApricotPhase3Time.Add(-1 * time.Second)
+
+	tests := []struct {
+		name                string
+		chainTime           time.Time
+		unsignedAndSignedTx func(t *testing.T) (txs.UnsignedTx, *txs.Tx)
+		maxComplexityF      func() fees.Dimensions
+		expectedError       error
+		checksF             func(*testing.T, *calculator)
+	}{
 		{
 			name:                "AddValidatorTx pre EUpgrade",
-			chainTime:           upgrades.EUpgradeTime.Add(-1 * time.Second),
+			chainTime:           preEUpgradeTime,
 			unsignedAndSignedTx: addValidatorTx,
 			checksF: func(t *testing.T, fc *calculator) {
 				require.Equal(t, fc.staticCfg.AddPrimaryNetworkValidatorFee, fc.fee)
@@ -129,7 +132,7 @@ func TestTxFees(t *testing.T) {
 		},
 		{
 			name:                "AddSubnetValidatorTx pre EUpgrade",
-			chainTime:           upgrades.EUpgradeTime.Add(-1 * time.Second),
+			chainTime:           preEUpgradeTime,
 			unsignedAndSignedTx: addSubnetValidatorTx,
 			checksF: func(t *testing.T, fc *calculator) {
 				require.Equal(t, fc.staticCfg.AddSubnetValidatorFee, fc.fee)
@@ -137,7 +140,7 @@ func TestTxFees(t *testing.T) {
 		},
 		{
 			name:                "AddSubnetValidatorTx post EUpgrade, success",
-			chainTime:           upgrades.EUpgradeTime.Add(time.Second),
+			chainTime:           postEUpgradeTime,
 			expectedError:       nil,
 			unsignedAndSignedTx: addSubnetValidatorTx,
 			checksF: func(t *testing.T, fc *calculator) {
@@ -155,7 +158,7 @@ func TestTxFees(t *testing.T) {
 		},
 		{
 			name:      "AddSubnetValidatorTx post EUpgrade, utxos read cap breached",
-			chainTime: upgrades.EUpgradeTime.Add(time.Second),
+			chainTime: postEUpgradeTime,
 			maxComplexityF: func() fees.Dimensions {
 				caps := testBlockMaxComplexity
 				caps[fees.UTXORead] = 90 - 1
@@ -167,7 +170,7 @@ func TestTxFees(t *testing.T) {
 		},
 		{
 			name:                "AddDelegatorTx pre EUpgrade",
-			chainTime:           upgrades.EUpgradeTime.Add(-1 * time.Second),
+			chainTime:           preEUpgradeTime,
 			unsignedAndSignedTx: addDelegatorTx,
 			checksF: func(t *testing.T, fc *calculator) {
 				require.Equal(t, fc.staticCfg.AddPrimaryNetworkDelegatorFee, fc.fee)
@@ -175,7 +178,7 @@ func TestTxFees(t *testing.T) {
 		},
 		{
 			name:                "CreateChainTx pre ApricotPhase3",
-			chainTime:           upgrades.ApricotPhase3Time.Add(-1 * time.Second),
+			chainTime:           preApricotPhase3Time,
 			unsignedAndSignedTx: createChainTx,
 			checksF: func(t *testing.T, fc *calculator) {
 				require.Equal(t, fc.staticCfg.CreateAssetTxFee, fc.fee)
@@ -183,7 +186,7 @@ func TestTxFees(t *testing.T) {
 		},
 		{
 			name:                "CreateChainTx pre EUpgrade",
-			chainTime:           upgrades.EUpgradeTime.Add(-1 * time.Second),
+			chainTime:           preEUpgradeTime,
 			unsignedAndSignedTx: createChainTx,
 			checksF: func(t *testing.T, fc *calculator) {
 				require.Equal(t, fc.staticCfg.CreateBlockchainTxFee, fc.fee)
@@ -191,7 +194,7 @@ func TestTxFees(t *testing.T) {
 		},
 		{
 			name:                "CreateChainTx post EUpgrade, success",
-			chainTime:           upgrades.EUpgradeTime.Add(time.Second),
+			chainTime:           postEUpgradeTime,
 			unsignedAndSignedTx: createChainTx,
 			expectedError:       nil,
 			checksF: func(t *testing.T, fc *calculator) {
@@ -209,7 +212,7 @@ func TestTxFees(t *testing.T) {
 		},
 		{
 			name:                "CreateChainTx post EUpgrade, utxos read cap breached",
-			chainTime:           upgrades.EUpgradeTime.Add(time.Second),
+			chainTime:           postEUpgradeTime,
 			unsignedAndSignedTx: createChainTx,
 			maxComplexityF: func() fees.Dimensions {
 				caps := testBlockMaxComplexity
@@ -221,7 +224,7 @@ func TestTxFees(t *testing.T) {
 		},
 		{
 			name:                "CreateSubnetTx pre ApricotPhase3",
-			chainTime:           upgrades.ApricotPhase3Time.Add(-1 * time.Second),
+			chainTime:           preApricotPhase3Time,
 			unsignedAndSignedTx: createSubnetTx,
 			checksF: func(t *testing.T, fc *calculator) {
 				require.Equal(t, fc.staticCfg.CreateAssetTxFee, fc.fee)
@@ -229,22 +232,22 @@ func TestTxFees(t *testing.T) {
 		},
 		{
 			name:                "CreateSubnetTx pre EUpgrade",
-			chainTime:           upgrades.EUpgradeTime.Add(-1 * time.Second),
+			chainTime:           preEUpgradeTime,
 			unsignedAndSignedTx: createSubnetTx,
 			checksF: func(t *testing.T, fc *calculator) {
 				require.Equal(t, fc.staticCfg.CreateSubnetTxFee, fc.fee)
 			},
 		},
 		{
-			name:                "CreateChainTx post EUpgrade, success",
-			chainTime:           upgrades.EUpgradeTime.Add(time.Second),
-			unsignedAndSignedTx: createChainTx,
+			name:                "CreateSubnetTx post EUpgrade, success",
+			chainTime:           postEUpgradeTime,
+			unsignedAndSignedTx: createSubnetTx,
 			expectedError:       nil,
 			checksF: func(t *testing.T, fc *calculator) {
-				require.Equal(t, 5388*units.MicroAvax, fc.fee)
+				require.Equal(t, 5293*units.MicroAvax, fc.fee)
 				require.Equal(t,
 					fees.Dimensions{
-						692,
+						597,
 						90,
 						172,
 						1000,
@@ -254,9 +257,9 @@ func TestTxFees(t *testing.T) {
 			},
 		},
 		{
-			name:                "CreateChainTx post EUpgrade, utxos read cap breached",
-			chainTime:           upgrades.EUpgradeTime.Add(time.Second),
-			unsignedAndSignedTx: createChainTx,
+			name:                "CreateSubnetTx post EUpgrade, utxos read cap breached",
+			chainTime:           postEUpgradeTime,
+			unsignedAndSignedTx: createSubnetTx,
 			maxComplexityF: func() fees.Dimensions {
 				caps := testBlockMaxComplexity
 				caps[fees.UTXORead] = 90 - 1
@@ -267,7 +270,7 @@ func TestTxFees(t *testing.T) {
 		},
 		{
 			name:                "RemoveSubnetValidatorTx pre EUpgrade",
-			chainTime:           upgrades.EUpgradeTime.Add(-1 * time.Second),
+			chainTime:           preEUpgradeTime,
 			unsignedAndSignedTx: removeSubnetValidatorTx,
 			checksF: func(t *testing.T, fc *calculator) {
 				require.Equal(t, fc.staticCfg.TxFee, fc.fee)
@@ -275,7 +278,7 @@ func TestTxFees(t *testing.T) {
 		},
 		{
 			name:                "RemoveSubnetValidatorTx post EUpgrade, success",
-			chainTime:           upgrades.EUpgradeTime.Add(time.Second),
+			chainTime:           postEUpgradeTime,
 			unsignedAndSignedTx: removeSubnetValidatorTx,
 			expectedError:       nil,
 			checksF: func(t *testing.T, fc *calculator) {
@@ -293,7 +296,7 @@ func TestTxFees(t *testing.T) {
 		},
 		{
 			name:      "RemoveSubnetValidatorTx post EUpgrade, utxos read cap breached",
-			chainTime: upgrades.EUpgradeTime.Add(time.Second),
+			chainTime: postEUpgradeTime,
 			maxComplexityF: func() fees.Dimensions {
 				caps := testBlockMaxComplexity
 				caps[fees.UTXORead] = 90 - 1
@@ -305,7 +308,7 @@ func TestTxFees(t *testing.T) {
 		},
 		{
 			name:                "TransformSubnetTx pre EUpgrade",
-			chainTime:           upgrades.EUpgradeTime.Add(-1 * time.Second),
+			chainTime:           preEUpgradeTime,
 			unsignedAndSignedTx: transformSubnetTx,
 			checksF: func(t *testing.T, fc *calculator) {
 				require.Equal(t, fc.staticCfg.TransformSubnetTxFee, fc.fee)
@@ -313,7 +316,7 @@ func TestTxFees(t *testing.T) {
 		},
 		{
 			name:                "TransformSubnetTx post EUpgrade, success",
-			chainTime:           upgrades.EUpgradeTime.Add(time.Second),
+			chainTime:           postEUpgradeTime,
 			unsignedAndSignedTx: transformSubnetTx,
 			expectedError:       nil,
 			checksF: func(t *testing.T, fc *calculator) {
@@ -331,7 +334,7 @@ func TestTxFees(t *testing.T) {
 		},
 		{
 			name:      "TransformSubnetTx post EUpgrade, utxos read cap breached",
-			chainTime: upgrades.EUpgradeTime.Add(time.Second),
+			chainTime: postEUpgradeTime,
 			maxComplexityF: func() fees.Dimensions {
 				caps := testBlockMaxComplexity
 				caps[fees.UTXORead] = 90 - 1
@@ -343,7 +346,7 @@ func TestTxFees(t *testing.T) {
 		},
 		{
 			name:                "TransferSubnetOwnershipTx pre EUpgrade",
-			chainTime:           upgrades.EUpgradeTime.Add(-1 * time.Second),
+			chainTime:           preEUpgradeTime,
 			unsignedAndSignedTx: transferSubnetOwnershipTx,
 			checksF: func(t *testing.T, fc *calculator) {
 				require.Equal(t, fc.staticCfg.TxFee, fc.fee)
@@ -351,7 +354,7 @@ func TestTxFees(t *testing.T) {
 		},
 		{
 			name:                "TransferSubnetOwnershipTx post EUpgrade, success",
-			chainTime:           upgrades.EUpgradeTime.Add(time.Second),
+			chainTime:           postEUpgradeTime,
 			unsignedAndSignedTx: transferSubnetOwnershipTx,
 			expectedError:       nil,
 			checksF: func(t *testing.T, fc *calculator) {
@@ -369,7 +372,7 @@ func TestTxFees(t *testing.T) {
 		},
 		{
 			name:      "TransferSubnetOwnershipTx post EUpgrade, utxos read cap breached",
-			chainTime: upgrades.EUpgradeTime.Add(time.Second),
+			chainTime: postEUpgradeTime,
 			maxComplexityF: func() fees.Dimensions {
 				caps := testBlockMaxComplexity
 				caps[fees.UTXORead] = 90 - 1
@@ -381,7 +384,7 @@ func TestTxFees(t *testing.T) {
 		},
 		{
 			name:      "AddPermissionlessValidatorTx Primary Network pre EUpgrade",
-			chainTime: upgrades.EUpgradeTime.Add(-1 * time.Second),
+			chainTime: preEUpgradeTime,
 			unsignedAndSignedTx: func(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
 				return addPermissionlessValidatorTx(t, constants.PrimaryNetworkID)
 			},
@@ -391,7 +394,7 @@ func TestTxFees(t *testing.T) {
 		},
 		{
 			name:      "AddPermissionlessValidatorTx Subnet pre EUpgrade",
-			chainTime: upgrades.EUpgradeTime.Add(-1 * time.Second),
+			chainTime: preEUpgradeTime,
 			unsignedAndSignedTx: func(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
 				subnetID := ids.GenerateTestID()
 				require.NotEqual(t, constants.PrimaryNetworkID, subnetID)
@@ -403,7 +406,7 @@ func TestTxFees(t *testing.T) {
 		},
 		{
 			name:      "AddPermissionlessValidatorTx Primary Network post EUpgrade, success",
-			chainTime: upgrades.EUpgradeTime.Add(time.Second),
+			chainTime: postEUpgradeTime,
 			unsignedAndSignedTx: func(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
 				return addPermissionlessValidatorTx(t, constants.PrimaryNetworkID)
 			},
@@ -423,7 +426,7 @@ func TestTxFees(t *testing.T) {
 		},
 		{
 			name:      "AddPermissionlessValidatorTx Subnet post EUpgrade, success",
-			chainTime: upgrades.EUpgradeTime.Add(time.Second),
+			chainTime: postEUpgradeTime,
 			unsignedAndSignedTx: func(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
 				subnetID := ids.GenerateTestID()
 				require.NotEqual(t, constants.PrimaryNetworkID, subnetID)
@@ -445,7 +448,7 @@ func TestTxFees(t *testing.T) {
 		},
 		{
 			name:      "AddPermissionlessValidatorTx post EUpgrade, utxos read cap breached",
-			chainTime: upgrades.EUpgradeTime.Add(time.Second),
+			chainTime: postEUpgradeTime,
 			maxComplexityF: func() fees.Dimensions {
 				caps := testBlockMaxComplexity
 				caps[fees.UTXORead] = 90 - 1
@@ -460,7 +463,7 @@ func TestTxFees(t *testing.T) {
 		},
 		{
 			name:      "AddPermissionlessDelegatorTx Primary Network pre EUpgrade",
-			chainTime: upgrades.EUpgradeTime.Add(-1 * time.Second),
+			chainTime: preEUpgradeTime,
 			unsignedAndSignedTx: func(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
 				return addPermissionlessDelegatorTx(t, constants.PrimaryNetworkID)
 			},
@@ -470,7 +473,7 @@ func TestTxFees(t *testing.T) {
 		},
 		{
 			name:      "AddPermissionlessDelegatorTx pre EUpgrade",
-			chainTime: upgrades.EUpgradeTime.Add(-1 * time.Second),
+			chainTime: preEUpgradeTime,
 			unsignedAndSignedTx: func(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
 				subnetID := ids.GenerateTestID()
 				require.NotEqual(t, constants.PrimaryNetworkID, subnetID)
@@ -482,7 +485,7 @@ func TestTxFees(t *testing.T) {
 		},
 		{
 			name:      "AddPermissionlessDelegatorTx Primary Network post EUpgrade, success",
-			chainTime: upgrades.EUpgradeTime.Add(time.Second),
+			chainTime: postEUpgradeTime,
 			unsignedAndSignedTx: func(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
 				return addPermissionlessDelegatorTx(t, constants.PrimaryNetworkID)
 			},
@@ -502,7 +505,7 @@ func TestTxFees(t *testing.T) {
 		},
 		{
 			name:      "AddPermissionlessDelegatorTx Subnet post EUpgrade, success",
-			chainTime: upgrades.EUpgradeTime.Add(time.Second),
+			chainTime: postEUpgradeTime,
 			unsignedAndSignedTx: func(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
 				return addPermissionlessDelegatorTx(t, constants.PrimaryNetworkID)
 			},
@@ -522,7 +525,7 @@ func TestTxFees(t *testing.T) {
 		},
 		{
 			name:      "AddPermissionlessDelegatorTx Subnet post EUpgrade, utxos read cap breached",
-			chainTime: upgrades.EUpgradeTime.Add(time.Second),
+			chainTime: postEUpgradeTime,
 			maxComplexityF: func() fees.Dimensions {
 				caps := testBlockMaxComplexity
 				caps[fees.UTXORead] = 90 - 1
@@ -538,7 +541,7 @@ func TestTxFees(t *testing.T) {
 		},
 		{
 			name:                "BaseTx pre EUpgrade",
-			chainTime:           upgrades.EUpgradeTime.Add(-1 * time.Second),
+			chainTime:           preEUpgradeTime,
 			unsignedAndSignedTx: baseTx,
 			checksF: func(t *testing.T, fc *calculator) {
 				require.Equal(t, fc.staticCfg.TxFee, fc.fee)
@@ -546,7 +549,7 @@ func TestTxFees(t *testing.T) {
 		},
 		{
 			name:                "BaseTx post EUpgrade, success",
-			chainTime:           upgrades.EUpgradeTime.Add(time.Second),
+			chainTime:           postEUpgradeTime,
 			unsignedAndSignedTx: baseTx,
 			expectedError:       nil,
 			checksF: func(t *testing.T, fc *calculator) {
@@ -564,7 +567,7 @@ func TestTxFees(t *testing.T) {
 		},
 		{
 			name:      "BaseTx post EUpgrade, utxos read cap breached",
-			chainTime: upgrades.EUpgradeTime.Add(time.Second),
+			chainTime: postEUpgradeTime,
 			maxComplexityF: func() fees.Dimensions {
 				caps := testBlockMaxComplexity
 				caps[fees.UTXORead] = 90 - 1
@@ -576,7 +579,7 @@ func TestTxFees(t *testing.T) {
 		},
 		{
 			name:                "ImportTx pre EUpgrade",
-			chainTime:           upgrades.EUpgradeTime.Add(-1 * time.Second),
+			chainTime:           preEUpgradeTime,
 			unsignedAndSignedTx: importTx,
 			checksF: func(t *testing.T, fc *calculator) {
 				require.Equal(t, fc.staticCfg.TxFee, fc.fee)
@@ -584,7 +587,7 @@ func TestTxFees(t *testing.T) {
 		},
 		{
 			name:                "ImportTx post EUpgrade, success",
-			chainTime:           upgrades.EUpgradeTime.Add(time.Second),
+			chainTime:           postEUpgradeTime,
 			unsignedAndSignedTx: importTx,
 			expectedError:       nil,
 			checksF: func(t *testing.T, fc *calculator) {
@@ -602,7 +605,7 @@ func TestTxFees(t *testing.T) {
 		},
 		{
 			name:      "ImportTx post EUpgrade, utxos read cap breached",
-			chainTime: upgrades.EUpgradeTime.Add(time.Second),
+			chainTime: postEUpgradeTime,
 			maxComplexityF: func() fees.Dimensions {
 				caps := testBlockMaxComplexity
 				caps[fees.UTXORead] = 180 - 1
@@ -614,7 +617,7 @@ func TestTxFees(t *testing.T) {
 		},
 		{
 			name:                "ExportTx pre EUpgrade",
-			chainTime:           upgrades.EUpgradeTime.Add(-1 * time.Second),
+			chainTime:           preEUpgradeTime,
 			unsignedAndSignedTx: exportTx,
 			checksF: func(t *testing.T, fc *calculator) {
 				require.Equal(t, fc.staticCfg.TxFee, fc.fee)
@@ -622,7 +625,7 @@ func TestTxFees(t *testing.T) {
 		},
 		{
 			name:                "ExportTx post EUpgrade, success",
-			chainTime:           upgrades.EUpgradeTime.Add(time.Second),
+			chainTime:           postEUpgradeTime,
 			unsignedAndSignedTx: exportTx,
 			expectedError:       nil,
 			checksF: func(t *testing.T, fc *calculator) {
@@ -640,7 +643,7 @@ func TestTxFees(t *testing.T) {
 		},
 		{
 			name:      "ExportTx post EUpgrade, utxos read cap breached",
-			chainTime: upgrades.EUpgradeTime.Add(time.Second),
+			chainTime: postEUpgradeTime,
 			maxComplexityF: func() fees.Dimensions {
 				caps := testBlockMaxComplexity
 				caps[fees.UTXORead] = 90 - 1
@@ -652,7 +655,7 @@ func TestTxFees(t *testing.T) {
 		},
 		{
 			name:      "RewardValidatorTx pre EUpgrade",
-			chainTime: upgrades.EUpgradeTime.Add(-1 * time.Second),
+			chainTime: preEUpgradeTime,
 			unsignedAndSignedTx: func(_ *testing.T) (txs.UnsignedTx, *txs.Tx) {
 				return &txs.RewardValidatorTx{
 					TxID: ids.GenerateTestID(),
@@ -664,7 +667,7 @@ func TestTxFees(t *testing.T) {
 		},
 		{
 			name:      "AdvanceTimeTx pre EUpgrade",
-			chainTime: upgrades.EUpgradeTime.Add(-1 * time.Second),
+			chainTime: preEUpgradeTime,
 			unsignedAndSignedTx: func(_ *testing.T) (txs.UnsignedTx, *txs.Tx) {
 				return &txs.AdvanceTimeTx{
 					Time: uint64(time.Now().Unix()),
