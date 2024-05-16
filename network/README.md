@@ -55,7 +55,7 @@ A peer will then read the full message and attempt to parse it into either a net
 
 Upon connection to a new peer, a handshake is performed between the node attempting to establish the outbound connection to the peer and the peer receiving the inbound connection.
 
-When attempting to establish the connection, the first message that the node sends is a `Handshake` message describing the compatibility of the nodes. If the `Handshake` message is successfully received and the peer decides that it wants a connection with this node, it replies with a `PeerList` message that contains metadata about other peers that allows a node to connect to them. See [Peerlist Gossip](#peerlist-gossip).
+When attempting to establish the connection, the first message that the node sends is a `Handshake` message describing configuration of the node. If the `Handshake` message is successfully received and the peer decides that it will allow a connection with this node, it replies with a `PeerList` message that contains metadata about other peers that allows a node to connect to them. See [PeerList Gossip](#peerlist-gossip).
 
 As an example, nodes that are attempting to connect with an incompatible version of AvalancheGo or a significantly skewed local clock are rejected.
 
@@ -127,10 +127,12 @@ It is expected for Avalanche nodes to allow inbound connections. If a validator 
 
 Avalanche nodes that have identified the `IP:Port` pair of a node they want to connect to will initiate outbound connections to this `IP:Port` pair. If the connection is not able to complete the [Peer Handshake](#peer-handshake), the connection will be re-attempted with an [Exponential Backoff](https://en.wikipedia.org/wiki/Exponential_backoff).
 
-A node should initiate outbound connections to an `IP:Port` pair that is believed to belong to a node that is not connected and meets at least one of the following conditions:
-- The node is in the initial bootstrapper set.
-- The node is in the default bootstrapper set.
-- The node in the current Primary Network validator set.
+A node should initiate outbound connections to an `IP:Port` pair that is believed to belong to another node that is not connected and meets at least one of the following conditions:
+- The peer is in the initial bootstrapper set.
+- The peer is in the default bootstrapper set.
+- The peer is a Primary Network validator.
+- The peer is a validator of a tracked Subnet.
+- The peer is a validator of a Subnet and the local node is a Primary Network validator.
 
 #### IP Authentication
 
@@ -148,7 +150,7 @@ Once connected to an initial set of peers, a node can use these connections to d
 
 Peers are discovered by receiving [`PeerList`](#peerlist) messages during the [Peer Handshake](#peer-handshake). These messages quickly provide a node with knowledge of peers in the network. However, they offer no guarantee that the node will connect to and maintain connections with every peer in the network.
 
-To provide an eventual guarantee that all peers learn of one another, nodes periodically send a [`GetPeerList`](#getpeerlist) message to a randomly selected validator with the node's current [Bloom Filter](#bloom-filter) and `Salt`.
+To provide an eventual guarantee that all peers learn of one another, nodes periodically send a [`GetPeerList`](#getpeerlist) message to a randomly selected Primary Network validator with the node's current [Bloom Filter](#bloom-filter) and `Salt`.
 
 #### Bloom Filter
 
@@ -172,7 +174,7 @@ A `GetPeerList` message contains the Bloom Filter of the currently known peers a
 - The Bloom Filter sent when requesting the `PeerList` message does not contain the node claiming the `IP:Port` pair.
 - The node claiming the `IP:Port` pair is currently connected.
 - The `IP:Port` pair the node shared during the `Handshake` message is the node's most recently known `IP:Port` pair.
-- The node claiming the `IP:Port` pair is either in the default bootstrapper set or is a current Primary Network validator.
+- The node claiming the `IP:Port` pair is either in the default bootstrapper set, is a current Primary Network validator, is a validator of a tracked Subnet, or is a validator of a Subnet and the peer is a Primary Network validator.
 
 #### Example PeerList Gossip
 
