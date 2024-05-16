@@ -65,7 +65,7 @@ func BenchmarkLoadUser(b *testing.B) {
 }
 
 // GetAllUTXOsBenchmark is a helper func to benchmark the GetAllUTXOs depending on the size
-func GetAllUTXOsBenchmark(b *testing.B, utxoCount int) {
+func GetAllUTXOsBenchmark(b *testing.B, utxoCount int, randSrc rand.Source) {
 	require := require.New(b)
 
 	env := setup(b, &envConfig{fork: latest})
@@ -81,7 +81,7 @@ func GetAllUTXOsBenchmark(b *testing.B, utxoCount int) {
 		utxo := &avax.UTXO{
 			UTXOID: avax.UTXOID{
 				TxID:        ids.GenerateTestID(),
-				OutputIndex: rand.Uint32(),
+				OutputIndex: uint32(randSrc.Int63()),
 			},
 			Asset: avax.Asset{ID: env.vm.ctx.AVAXAssetID},
 			Out: &secp256k1fx.TransferOutput{
@@ -129,9 +129,10 @@ func BenchmarkGetUTXOs(b *testing.B) {
 		},
 	}
 
-	for _, count := range tests {
+	for testIdx, count := range tests {
+		randSrc := rand.NewSource(int64(testIdx))
 		b.Run(count.name, func(b *testing.B) {
-			GetAllUTXOsBenchmark(b, count.utxoCount)
+			GetAllUTXOsBenchmark(b, count.utxoCount, randSrc)
 		})
 	}
 }
