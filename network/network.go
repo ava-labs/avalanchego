@@ -482,8 +482,9 @@ func (n *network) AllowConnection(nodeID ids.NodeID) bool {
 }
 
 func (n *network) Track(claimedIPPorts []*ips.ClaimedIPPort) error {
+	iAmAValidator := n.config.Validators.GetWeight(constants.PrimaryNetworkID, n.config.MyNodeID) != 0
 	for _, ip := range claimedIPPorts {
-		if err := n.track(ip); err != nil {
+		if err := n.track(ip, iAmAValidator); err != nil {
 			return err
 		}
 	}
@@ -676,7 +677,7 @@ func (n *network) ManuallyTrack(nodeID ids.NodeID, ip ips.IPPort) {
 	}
 }
 
-func (n *network) track(ip *ips.ClaimedIPPort) error {
+func (n *network) track(ip *ips.ClaimedIPPort, trackAllSubnets bool) error {
 	// To avoid signature verification when the IP isn't needed, we
 	// optimistically filter out IPs. This can result in us not tracking an IP
 	// that we otherwise would have. This case can only happen if the node
@@ -685,7 +686,7 @@ func (n *network) track(ip *ips.ClaimedIPPort) error {
 	//
 	// Note: Avoiding signature verification when the IP isn't needed is a
 	// **significant** performance optimization.
-	if !n.ipTracker.ShouldVerifyIP(ip) {
+	if !n.ipTracker.ShouldVerifyIP(ip, trackAllSubnets) {
 		n.metrics.numUselessPeerListBytes.Add(float64(ip.Size()))
 		return nil
 	}

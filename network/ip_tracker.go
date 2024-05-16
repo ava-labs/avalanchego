@@ -104,16 +104,10 @@ type trackedNode struct {
 }
 
 func (n *trackedNode) wantsConnection() bool {
-	if n == nil {
-		return false
-	}
 	return n.manuallyTracked || n.trackedSubnets.Len() > 0
 }
 
 func (n *trackedNode) canDelete() bool {
-	if n == nil {
-		return true
-	}
 	return !n.manuallyTracked && n.subnets.Len() == 0
 }
 
@@ -133,6 +127,10 @@ type gossipableSubnet struct {
 	// manually configured to be gossiped for this subnet.
 	manuallyGossipable set.Set[ids.NodeID]
 
+	// gossipableIDs contains the nodeIDs of all nodes whose IP could be
+	// gossiped.
+	gossipableIDs set.Set[ids.NodeID]
+
 	// An IP is marked as gossipable if all of the following conditions are met:
 	// - The node is a validator or was manually requested to be gossiped
 	// - The node is connected
@@ -140,7 +138,6 @@ type gossipableSubnet struct {
 	// - The IP the node connected with is its latest IP
 	gossipableIndices map[ids.NodeID]int
 	gossipableIPs     []*ips.ClaimedIPPort
-	gossipableIDs     set.Set[ids.NodeID]
 }
 
 func (s *gossipableSubnet) addGossipableIP(ip *ips.ClaimedIPPort) {
@@ -199,9 +196,6 @@ func (s *gossipableSubnet) getGossipableIPs(
 }
 
 func (s *gossipableSubnet) canDelete() bool {
-	if s == nil {
-		return true
-	}
 	return s.manuallyGossipable.Len() == 0 && s.gossipableIDs.Len() == 0
 }
 
@@ -260,6 +254,7 @@ func (i *ipTracker) ManuallyGossip(subnetID ids.ID, nodeID ids.NodeID) {
 		i.addTrackableID(nodeID, nil)
 	}
 
+	i.addTrackableID(nodeID, &subnetID)
 	i.addGossipableID(nodeID, subnetID, true)
 }
 
@@ -277,14 +272,21 @@ func (i *ipTracker) WantsConnection(nodeID ids.NodeID) bool {
 
 // ShouldVerifyIP is used as an optimization to avoid unnecessary IP
 // verification. It returns true if all of the following conditions are met:
-//  1. The provided IP is from a node whose connection is desired on any subnet.
+//  1. The provided IP is from a node whose connection is desired.
 //  2. This IP is newer than the most recent IP we know of for the node.
-func (i *ipTracker) ShouldVerifyIP(ip *ips.ClaimedIPPort) bool {
+func (i *ipTracker) ShouldVerifyIP(
+	ip *ips.ClaimedIPPort,
+	trackAllSubnets bool,
+) bool {
 	i.lock.RLock()
 	defer i.lock.RUnlock()
 
 	node, ok := i.tracked[ip.NodeID]
 	if !ok {
+		return false
+	}
+
+	if !trackAllSubnets && !node.wantsConnection() {
 		return false
 	}
 
@@ -388,9 +390,6 @@ func (i *ipTracker) removeGossipableIP(nodeID ids.NodeID) {
 		return
 	}
 
-	if primaryNetwork, ok := i.subnet[constants.PrimaryNetworkID]; ok {
-		primaryNetwork.removeGossipableIP(nodeID)
-	}
 	for subnetID := range connectedNode.trackedSubnets {
 		if subnet, ok := i.subnet[subnetID]; ok {
 			subnet.removeGossipableIP(nodeID)
@@ -418,7 +417,7 @@ func (i *ipTracker) addTrackableID(nodeID ids.NodeID, subnetID *ids.ID) {
 		nodeTracker.manuallyTracked = true
 	} else {
 		nodeTracker.subnets.Add(*subnetID)
-		if i.trackedSubnets.Contains(*subnetID) {
+		if *subnetID == constants.PrimaryNetworkID || i.trackedSubnets.Contains(*subnetID) {
 			nodeTracker.trackedSubnets.Add(*subnetID)
 		}
 	}
@@ -457,7 +456,7 @@ func (i *ipTracker) addGossipableID(nodeID ids.NodeID, subnetID ids.ID, manually
 
 	subnet.gossipableIDs.Add(nodeID)
 	node, connected := i.connected[nodeID]
-	if !connected {
+	if !connected || !node.trackedSubnets.Contains(subnetID) {
 		return
 	}
 
@@ -476,6 +475,10 @@ func (i *ipTracker) OnValidatorRemoved(subnetID ids.ID, nodeID ids.NodeID, _ uin
 
 	subnet, ok := i.subnet[subnetID]
 	if !ok {
+		i.log.Error("removing validator from untracked subnet",
+			zap.Stringer("subnetID", subnetID),
+			zap.Stringer("nodeID", nodeID),
+		)
 		return
 	}
 
@@ -493,6 +496,10 @@ func (i *ipTracker) OnValidatorRemoved(subnetID ids.ID, nodeID ids.NodeID, _ uin
 
 	trackedNode, ok := i.tracked[nodeID]
 	if !ok {
+		i.log.Error("removing untracked validator",
+			zap.Stringer("subnetID", subnetID),
+			zap.Stringer("nodeID", nodeID),
+		)
 		return
 	}
 
