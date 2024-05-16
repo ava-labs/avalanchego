@@ -132,7 +132,6 @@ func TestGetTxStatus(t *testing.T) {
 
 	randSrc := rand.NewSource(0)
 
-	// #nosec G404
 	utxo := &avax.UTXO{
 		UTXOID: avax.UTXOID{
 			TxID:        ids.GenerateTestID(),
