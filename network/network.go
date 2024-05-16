@@ -541,6 +541,7 @@ func (n *network) Peers(
 ) []*ips.ClaimedIPPort {
 	areWeAValidator := n.config.Validators.GetWeight(constants.PrimaryNetworkID, n.config.MyNodeID) != 0
 	if !areWeAValidator {
+		// Return IPs for subnets both sides track.
 		return getGossipableIPs(
 			n.ipTracker,
 			trackedSubnets,
@@ -556,6 +557,7 @@ func (n *network) Peers(
 
 	areTheyAValidator := n.config.Validators.GetWeight(constants.PrimaryNetworkID, peerID) != 0
 	if requestAllPeers && areTheyAValidator {
+		// Return IPs for all subnets.
 		return getGossipableIPs(
 			n.ipTracker,
 			n.ipTracker.subnet,
@@ -567,6 +569,7 @@ func (n *network) Peers(
 		)
 	}
 
+	// Return IPs for all the subnets that the peer is tracking.
 	return getGossipableIPs(
 		n.ipTracker,
 		trackedSubnets,
