@@ -72,7 +72,7 @@ func TestGetChainConfigsFromFiles(t *testing.T) {
 			// Create custom configs
 			for key, value := range test.configs {
 				chainDir := filepath.Join(chainsDir, key)
-				setupFile(t, chainDir, chainConfigFileName+".ex", value) //nolint:goconst
+				setupFile(t, chainDir, chainConfigFileName+".ex", value)
 			}
 			for key, value := range test.upgrades {
 				chainDir := filepath.Join(chainsDir, key)
