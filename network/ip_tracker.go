@@ -204,7 +204,7 @@ type ipTracker struct {
 	trackedSubnets    set.Set[ids.ID]
 	log               logging.Logger
 	numTrackedPeers   prometheus.Gauge
-	numGossipableIPs  prometheus.Gauge
+	numGossipableIPs  prometheus.Gauge // IPs are not deduplicated across subnets
 	numTrackedSubnets prometheus.Gauge
 	bloomMetrics      *bloom.Metrics
 
