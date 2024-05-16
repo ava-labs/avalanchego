@@ -76,7 +76,6 @@ func getAllUTXOsBenchmark(b *testing.B, utxoCount int, randSrc rand.Source) {
 
 	addr := ids.GenerateTestShortID()
 
-	// #nosec G404
 	for i := 0; i < utxoCount; i++ {
 		utxo := &avax.UTXO{
 			UTXOID: avax.UTXOID{
