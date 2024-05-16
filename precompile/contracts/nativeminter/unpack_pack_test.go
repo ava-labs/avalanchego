@@ -69,7 +69,7 @@ func TestUnpackMintNativeCoinInput(t *testing.T) {
 			name:           "empty input",
 			input:          []byte{},
 			strictMode:     false,
-			expectedErr:    "attempting to unmarshall an empty string",
+			expectedErr:    "attempting to unmarshal an empty string",
 			expectedOldErr: ErrInvalidLen.Error(),
 		},
 		{
@@ -165,7 +165,7 @@ func OldPackMintNativeCoinInput(address common.Address, amount *big.Int) ([]byte
 	// function selector (4 bytes) + input(hash for address + hash for amount)
 	res := make([]byte, contract.SelectorLen+mintInputLen)
 	err := contract.PackOrderedHashesWithSelector(res, mintSignature, []common.Hash{
-		address.Hash(),
+		common.BytesToHash(address[:]),
 		common.BigToHash(amount),
 	})
 

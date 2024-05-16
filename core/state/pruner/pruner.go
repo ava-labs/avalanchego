@@ -139,12 +139,12 @@ func prune(maindb ethdb.Database, stateBloom *stateBloom, bloomPath string, star
 	// dangling node is the state root is super low. So the dangling nodes in
 	// theory will never ever be visited again.
 	var (
-		count  int
-		size   common.StorageSize
-		pstart = time.Now()
-		logged = time.Now()
-		batch  = maindb.NewBatch()
-		iter   = maindb.NewIterator(nil, nil)
+		skipped, count int
+		size           common.StorageSize
+		pstart         = time.Now()
+		logged         = time.Now()
+		batch          = maindb.NewBatch()
+		iter           = maindb.NewIterator(nil, nil)
 	)
 	// We wrap iter.Release() in an anonymous function so that the [iter]
 	// value captured is the value of [iter] at the end of the function as opposed
@@ -167,6 +167,7 @@ func prune(maindb ethdb.Database, stateBloom *stateBloom, bloomPath string, star
 				checkKey = codeKey
 			}
 			if stateBloom.Contain(checkKey) {
+				skipped += 1
 				continue
 			}
 			count += 1
@@ -184,7 +185,7 @@ func prune(maindb ethdb.Database, stateBloom *stateBloom, bloomPath string, star
 				eta = time.Duration(left/speed) * time.Millisecond
 			}
 			if time.Since(logged) > 8*time.Second {
-				log.Info("Pruning state data", "nodes", count, "size", size,
+				log.Info("Pruning state data", "nodes", count, "skipped", skipped, "size", size,
 					"elapsed", common.PrettyDuration(time.Since(pstart)), "eta", common.PrettyDuration(eta))
 				logged = time.Now()
 			}

@@ -20,7 +20,7 @@ import (
 	"github.com/ava-labs/subnet-evm/params"
 )
 
-// LookupInstructionSet returns the instructionset for the fork configured by
+// LookupInstructionSet returns the instruction set for the fork configured by
 // the rules.
 func LookupInstructionSet(rules params.Rules) (JumpTable, error) {
 	switch {
@@ -46,7 +46,7 @@ func LookupInstructionSet(rules params.Rules) (JumpTable, error) {
 	return newFrontierInstructionSet(), nil
 }
 
-// Stack returns the mininum and maximum stack requirements.
+// Stack returns the minimum and maximum stack requirements.
 func (op *operation) Stack() (int, int) {
 	return op.minStack, op.maxStack
 }

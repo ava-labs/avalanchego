@@ -84,7 +84,7 @@ func packTopic(rule interface{}) (common.Hash, error) {
 		copy(topic[:], hash[:])
 
 	default:
-		// todo(rjl493456442) according solidity documentation, indexed event
+		// todo(rjl493456442) according to solidity documentation, indexed event
 		// parameters that are not value types i.e. arrays and structs are not
 		// stored directly but instead a keccak256-hash of an encoding is stored.
 		//

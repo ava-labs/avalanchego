@@ -89,8 +89,19 @@ func genValueTx(nbytes int) func(int, *BlockGen) {
 		toaddr := common.Address{}
 		data := make([]byte, nbytes)
 		gas, _ := IntrinsicGas(data, nil, false, params.Rules{}) // Disable Istanbul and EIP-2028 for this test
-		signer := types.MakeSigner(gen.config, big.NewInt(int64(i)), gen.header.Time)
-		tx, _ := types.SignTx(types.NewTransaction(gen.TxNonce(benchRootAddr), toaddr, big.NewInt(1), gas, big.NewInt(225000000000), data), signer, benchRootKey)
+		signer := gen.Signer()
+		gasPrice := big.NewInt(0)
+		if gen.header.BaseFee != nil {
+			gasPrice = gen.header.BaseFee
+		}
+		tx, _ := types.SignNewTx(benchRootKey, signer, &types.LegacyTx{
+			Nonce:    gen.TxNonce(benchRootAddr),
+			To:       &toaddr,
+			Value:    big.NewInt(1),
+			Gas:      gas,
+			Data:     data,
+			GasPrice: gasPrice,
+		})
 		gen.AddTx(tx)
 	}
 }
@@ -119,22 +130,26 @@ func genTxRing(naccounts int) func(int, *BlockGen) {
 	return func(i int, gen *BlockGen) {
 		block := gen.PrevBlock(i - 1)
 		gas := block.GasLimit()
-		signer := types.MakeSigner(gen.config, big.NewInt(int64(i)), gen.header.Time)
+		signer := gen.Signer()
 		for {
 			gas -= params.TxGas
 			if gas < params.TxGas {
 				break
 			}
 			to := (from + 1) % naccounts
-			tx := types.NewTransaction(
-				gen.TxNonce(ringAddrs[from]),
-				ringAddrs[to],
-				amount.Sub(amount, fee),
-				params.TxGas,
-				big.NewInt(225000000000),
-				nil,
-			)
-			tx, _ = types.SignTx(tx, signer, ringKeys[from])
+			burn := new(big.Int).SetUint64(params.TxGas)
+			burn.Mul(burn, gen.header.BaseFee)
+			tx, err := types.SignNewTx(ringKeys[from], signer,
+				&types.LegacyTx{
+					Nonce:    gen.TxNonce(ringAddrs[from]),
+					To:       &ringAddrs[to],
+					Value:    amount.Sub(amount, fee),
+					Gas:      params.TxGas,
+					GasPrice: big.NewInt(225000000000),
+				})
+			if err != nil {
+				panic(err)
+			}
 			gen.AddTx(tx)
 			from = to
 		}

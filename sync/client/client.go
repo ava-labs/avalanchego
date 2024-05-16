@@ -161,13 +161,9 @@ func parseLeafsResponse(codec codec.Manager, reqIntf message.Request, data []byt
 		}
 	}
 
-	var (
-		firstKey = leafsRequest.Start
-		lastKey  = leafsRequest.End
-	)
-	// Last key is the last returned key in response
+	firstKey := leafsRequest.Start
 	if len(leafsResponse.Keys) > 0 {
-		lastKey = leafsResponse.Keys[len(leafsResponse.Keys)-1]
+		lastKey := leafsResponse.Keys[len(leafsResponse.Keys)-1]
 
 		if firstKey == nil {
 			firstKey = bytes.Repeat([]byte{0x00}, len(lastKey))
@@ -177,7 +173,7 @@ func parseLeafsResponse(codec codec.Manager, reqIntf message.Request, data []byt
 	// VerifyRangeProof verifies that the key-value pairs included in [leafResponse] are all of the keys within the range from start
 	// to the last key returned.
 	// Also ensures the keys are in monotonically increasing order
-	more, err := trie.VerifyRangeProof(leafsRequest.Root, firstKey, lastKey, leafsResponse.Keys, leafsResponse.Vals, proof)
+	more, err := trie.VerifyRangeProof(leafsRequest.Root, firstKey, leafsResponse.Keys, leafsResponse.Vals, proof)
 	if err != nil {
 		return nil, 0, fmt.Errorf("%s due to %w", errInvalidRangeProof, err)
 	}

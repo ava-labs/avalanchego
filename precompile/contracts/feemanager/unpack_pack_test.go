@@ -86,7 +86,7 @@ func TestPackGetFeeConfigOutput(t *testing.T) {
 			name:           "empty input skip len check",
 			input:          []byte{},
 			skipLenCheck:   true,
-			expectedErr:    "attempting to unmarshall an empty string",
+			expectedErr:    "attempting to unmarshal an empty string",
 			expectedOldErr: ErrInvalidLen.Error(),
 		},
 		{
@@ -249,7 +249,7 @@ func TestPackSetFeeConfigInput(t *testing.T) {
 			name:           "empty input",
 			input:          []byte{},
 			strictMode:     false,
-			expectedErr:    "attempting to unmarshall an empty string",
+			expectedErr:    "attempting to unmarshal an empty string",
 			expectedOldErr: ErrInvalidLen.Error(),
 		},
 		{

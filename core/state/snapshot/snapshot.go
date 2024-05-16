@@ -742,6 +742,13 @@ func diffToDisk(bottom *diffLayer) (*diskLayer, bool, error) {
 	return res, base.genMarker == nil, nil
 }
 
+// Release releases resources
+func (t *Tree) Release() {
+	if dl := t.disklayer(); dl != nil {
+		dl.Release()
+	}
+}
+
 // Rebuild wipes all available snapshot data from the persistent database and
 // discard all caches and diff layers. Afterwards, it starts a new snapshot
 // generator with the given root hash.

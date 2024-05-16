@@ -142,7 +142,7 @@ type Database struct {
 // cachedNode is all the information we know about a single cached trie node
 // in the memory database write layer.
 type cachedNode struct {
-	node      []byte                   // Encoded node blob
+	node      []byte                   // Encoded node blob, immutable
 	parents   uint32                   // Number of live nodes referencing this one
 	external  map[common.Hash]struct{} // The set of external children
 	flushPrev common.Hash              // Previous node in the flush-list
@@ -181,9 +181,9 @@ func New(diskdb ethdb.Database, config *Config, resolver ChildResolver) *Databas
 	}
 }
 
-// insert inserts a simplified trie node into the memory database.
-// All nodes inserted by this function will be reference tracked
-// and in theory should only used for **trie nodes** insertion.
+// insert inserts a trie node into the memory database. All nodes inserted by
+// this function will be reference tracked. This function assumes the lock is
+// already held.
 func (db *Database) insert(hash common.Hash, node []byte) {
 	// If the node's already cached, skip
 	if _, ok := db.dirties[hash]; ok {
@@ -212,9 +212,9 @@ func (db *Database) insert(hash common.Hash, node []byte) {
 	db.dirtiesSize += common.StorageSize(common.HashLength + len(node))
 }
 
-// Node retrieves an encoded cached trie node from memory. If it cannot be found
+// node retrieves an encoded cached trie node from memory. If it cannot be found
 // cached, the method queries the persistent database for the content.
-func (db *Database) Node(hash common.Hash) ([]byte, error) {
+func (db *Database) node(hash common.Hash) ([]byte, error) {
 	// It doesn't make sense to retrieve the metaroot
 	if hash == (common.Hash{}) {
 		return nil, errors.New("not found")
@@ -238,11 +238,14 @@ func (db *Database) Node(hash common.Hash) ([]byte, error) {
 			}
 		}
 	}
-	// Retrieve the node from the dirty cache if available
+	// Retrieve the node from the dirty cache if available.
 	db.lock.RLock()
 	dirty := db.dirties[hash]
 	db.lock.RUnlock()
 
+	// Return the cached node if it's found in the dirty set.
+	// The dirty.node field is immutable and safe to read it
+	// even without lock guard.
 	if dirty != nil {
 		memcacheDirtyHitMeter.Mark(1)
 		memcacheDirtyReadMeter.Mark(int64(len(dirty.node)))
@@ -261,20 +264,6 @@ func (db *Database) Node(hash common.Hash) ([]byte, error) {
 		return enc, nil
 	}
 	return nil, errors.New("not found")
-}
-
-// Nodes retrieves the hashes of all the nodes cached within the memory database.
-// This method is extremely expensive and should only be used to validate internal
-// states in test code.
-func (db *Database) Nodes() []common.Hash {
-	db.lock.RLock()
-	defer db.lock.RUnlock()
-
-	var hashes = make([]common.Hash, 0, len(db.dirties))
-	for hash := range db.dirties {
-		hashes = append(hashes, hash)
-	}
-	return hashes
 }
 
 // Reference adds a new reference from a parent node to a child node.
@@ -562,9 +551,6 @@ func (db *Database) Commit(node common.Hash, report bool) error {
 
 // commit is the private locked version of Commit. This function does not
 // mutate any data, rather it collects all data that should be committed.
-//
-// [callback] will be invoked as soon as it is determined a trie node will be
-// flushed to disk (before it is actually written).
 func (db *Database) commit(hash common.Hash, toFlush []*flushItem) ([]*flushItem, error) {
 	// If the node does not exist, it's a previously committed node
 	node, ok := db.dirties[hash]
@@ -644,7 +630,7 @@ func (db *Database) Initialized(genesisRoot common.Hash) bool {
 func (db *Database) Update(root common.Hash, parent common.Hash, block uint64, nodes *trienode.MergedNodeSet, states *triestate.Set) error {
 	// Ensure the parent state is present and signal a warning if not.
 	if parent != types.EmptyRootHash {
-		if blob, _ := db.Node(parent); len(blob) == 0 {
+		if blob, _ := db.node(parent); len(blob) == 0 {
 			log.Error("parent state is not present")
 		}
 	}
@@ -660,7 +646,7 @@ func (db *Database) Update(root common.Hash, parent common.Hash, block uint64, n
 func (db *Database) UpdateAndReferenceRoot(root common.Hash, parent common.Hash, block uint64, nodes *trienode.MergedNodeSet, states *triestate.Set) error {
 	// Ensure the parent state is present and signal a warning if not.
 	if parent != types.EmptyRootHash {
-		if blob, _ := db.Node(parent); len(blob) == 0 {
+		if blob, _ := db.node(parent); len(blob) == 0 {
 			log.Error("parent state is not present")
 		}
 	}
@@ -748,7 +734,7 @@ func (db *Database) Scheme() string {
 // Reader retrieves a node reader belonging to the given state root.
 // An error will be returned if the requested state is not available.
 func (db *Database) Reader(root common.Hash) (*reader, error) {
-	if _, err := db.Node(root); err != nil {
+	if _, err := db.node(root); err != nil {
 		return nil, fmt.Errorf("state %#x is not available, %v", root, err)
 	}
 	return &reader{db: db}, nil
@@ -759,9 +745,9 @@ type reader struct {
 	db *Database
 }
 
-// Node retrieves the trie node with the given node hash.
-// No error will be returned if the node is not found.
+// Node retrieves the trie node with the given node hash. No error will be
+// returned if the node is not found.
 func (reader *reader) Node(owner common.Hash, path []byte, hash common.Hash) ([]byte, error) {
-	blob, _ := reader.db.Node(hash)
+	blob, _ := reader.db.node(hash)
 	return blob, nil
 }

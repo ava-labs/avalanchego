@@ -40,7 +40,7 @@ var (
 // at [precompileAddr]
 func GetAllowListStatus(state contract.StateDB, precompileAddr common.Address, address common.Address) Role {
 	// Generate the state key for [address]
-	addressKey := address.Hash()
+	addressKey := common.BytesToHash(address.Bytes())
 	return Role(state.GetState(precompileAddr, addressKey))
 }
 
@@ -49,7 +49,7 @@ func GetAllowListStatus(state contract.StateDB, precompileAddr common.Address, a
 // assumes [role] has already been verified as valid.
 func SetAllowListRole(stateDB contract.StateDB, precompileAddr, address common.Address, role Role) {
 	// Generate the state key for [address]
-	addressKey := address.Hash()
+	addressKey := common.BytesToHash(address.Bytes())
 	// Assign [role] to the address
 	// This stores the [role] in the contract storage with address [precompileAddr]
 	// and [addressKey] hash. It means that any reusage of the [addressKey] for different value

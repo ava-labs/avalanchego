@@ -7,9 +7,10 @@ import (
 	"context"
 	"fmt"
 
+	"golang.org/x/exp/slog"
+
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/utils/rpc"
-	"github.com/ethereum/go-ethereum/log"
 )
 
 // Interface compliance
@@ -21,7 +22,7 @@ type Client interface {
 	StopCPUProfiler(ctx context.Context, options ...rpc.Option) error
 	MemoryProfile(ctx context.Context, options ...rpc.Option) error
 	LockProfile(ctx context.Context, options ...rpc.Option) error
-	SetLogLevel(ctx context.Context, level log.Lvl, options ...rpc.Option) error
+	SetLogLevel(ctx context.Context, level slog.Level, options ...rpc.Option) error
 	GetVMConfig(ctx context.Context, options ...rpc.Option) (*Config, error)
 }
 
@@ -60,7 +61,7 @@ func (c *client) LockProfile(ctx context.Context, options ...rpc.Option) error {
 }
 
 // SetLogLevel dynamically sets the log level for the C Chain
-func (c *client) SetLogLevel(ctx context.Context, level log.Lvl, options ...rpc.Option) error {
+func (c *client) SetLogLevel(ctx context.Context, level slog.Level, options ...rpc.Option) error {
 	return c.adminRequester.SendRequest(ctx, "admin.setLogLevel", &SetLogLevelArgs{
 		Level: level.String(),
 	}, &api.EmptyReply{}, options...)

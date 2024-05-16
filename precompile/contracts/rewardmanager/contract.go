@@ -74,7 +74,7 @@ func EnableAllowFeeRecipients(stateDB contract.StateDB) {
 
 // DisableRewardAddress disables rewards and burns them by sending to Blackhole Address.
 func DisableFeeRewards(stateDB contract.StateDB) {
-	stateDB.SetState(ContractAddress, rewardAddressStorageKey, constants.BlackholeAddr.Hash())
+	stateDB.SetState(ContractAddress, rewardAddressStorageKey, common.BytesToHash(constants.BlackholeAddr.Bytes()))
 }
 
 func allowFeeRecipients(accessibleState contract.AccessibleState, caller common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
@@ -169,7 +169,7 @@ func GetStoredRewardAddress(stateDB contract.StateDB) (common.Address, bool) {
 
 // StoredRewardAddress stores the given [val] under rewardAddressStorageKey.
 func StoreRewardAddress(stateDB contract.StateDB, val common.Address) {
-	stateDB.SetState(ContractAddress, rewardAddressStorageKey, val.Hash())
+	stateDB.SetState(ContractAddress, rewardAddressStorageKey, common.BytesToHash(val.Bytes()))
 }
 
 // PackSetRewardAddress packs [addr] of type common.Address into the appropriate arguments for setRewardAddress.

@@ -454,9 +454,9 @@ func assertRewardAddressChanged(
 	topics := logsTopics[0]
 	require.Len(t, topics, 4)
 	require.Equal(t, RewardManagerABI.Events["RewardAddressChanged"].ID, topics[0])
-	require.Equal(t, caller.Hash(), topics[1])
-	require.Equal(t, oldAddress.Hash(), topics[2])
-	require.Equal(t, newAddress.Hash(), topics[3])
+	require.Equal(t, common.BytesToHash(caller[:]), topics[1])
+	require.Equal(t, common.BytesToHash(oldAddress[:]), topics[2])
+	require.Equal(t, common.BytesToHash(newAddress[:]), topics[3])
 	require.Len(t, logsData[0], 0)
 }
 
@@ -470,7 +470,7 @@ func assertRewardsDisabled(
 	topics := logsTopics[0]
 	require.Len(t, topics, 2)
 	require.Equal(t, RewardManagerABI.Events["RewardsDisabled"].ID, topics[0])
-	require.Equal(t, caller.Hash(), topics[1])
+	require.Equal(t, common.BytesToHash(caller[:]), topics[1])
 	require.Len(t, logsData[0], 0)
 }
 
@@ -484,6 +484,6 @@ func assertFeeRecipientsAllowed(
 	topics := logsTopics[0]
 	require.Len(t, topics, 2)
 	require.Equal(t, RewardManagerABI.Events["FeeRecipientsAllowed"].ID, topics[0])
-	require.Equal(t, caller.Hash(), topics[1])
+	require.Equal(t, common.BytesToHash(caller[:]), topics[1])
 	require.Len(t, logsData[0], 0)
 }

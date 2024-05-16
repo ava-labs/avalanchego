@@ -705,8 +705,8 @@ func assertSetRoleEvent(t testing.TB, logsTopics [][]common.Hash, logsData [][]b
 	require.Len(t, topics, 4)
 	require.Equal(t, AllowListABI.Events["RoleSet"].ID, topics[0])
 	require.Equal(t, role.Hash(), topics[1])
-	require.Equal(t, addr.Hash(), topics[2])
-	require.Equal(t, caller.Hash(), topics[3])
+	require.Equal(t, common.BytesToHash(addr[:]), topics[2])
+	require.Equal(t, common.BytesToHash(caller[:]), topics[3])
 	data := logsData[0]
 	require.Equal(t, oldRole.Bytes(), data)
 }

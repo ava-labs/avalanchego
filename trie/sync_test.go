@@ -73,3 +73,25 @@ func makeTestTrie(scheme string) (ethdb.Database, *Database, *StateTrie, map[str
 	trie, _ = NewStateTrie(TrieID(root), triedb)
 	return db, triedb, trie, content
 }
+
+// checkTrieConsistency checks that all nodes in a trie are indeed present.
+func checkTrieConsistency(db ethdb.Database, scheme string, root common.Hash, rawTrie bool) error {
+	ndb := newTestDatabase(db, scheme)
+	var it NodeIterator
+	if rawTrie {
+		trie, err := New(TrieID(root), ndb)
+		if err != nil {
+			return nil // Consider a non existent state consistent
+		}
+		it = trie.MustNodeIterator(nil)
+	} else {
+		trie, err := NewStateTrie(TrieID(root), ndb)
+		if err != nil {
+			return nil // Consider a non existent state consistent
+		}
+		it = trie.MustNodeIterator(nil)
+	}
+	for it.Next(true) {
+	}
+	return it.Error()
+}

@@ -46,6 +46,10 @@ var (
 	// on a backend that doesn't implement AcceptedContractCaller.
 	ErrNoAcceptedState = errors.New("backend does not support accepted state")
 
+	// ErrNoBlockHashState is raised when attempting to perform a block hash action
+	// on a backend that doesn't implement BlockHashContractCaller.
+	ErrNoBlockHashState = errors.New("backend does not support block hash state")
+
 	// ErrNoCodeAfterDeploy is returned by WaitDeployed if contract creation leaves
 	// an empty contract behind.
 	ErrNoCodeAfterDeploy = errors.New("no contract code after deployment")
@@ -72,6 +76,17 @@ type AcceptedContractCaller interface {
 
 	// AcceptedCallContract executes an Ethereum contract call against the accepted state.
 	AcceptedCallContract(ctx context.Context, call interfaces.CallMsg) ([]byte, error)
+}
+
+// BlockHashContractCaller defines methods to perform contract calls on a specific block hash.
+// Call will try to discover this interface when access to a block by hash is requested.
+// If the backend does not support the block hash state, Call returns ErrNoBlockHashState.
+type BlockHashContractCaller interface {
+	// CodeAtHash returns the code of the given account in the state at the specified block hash.
+	CodeAtHash(ctx context.Context, contract common.Address, blockHash common.Hash) ([]byte, error)
+
+	// CallContractAtHash executes an Ethereum contract call against the state at the specified block hash.
+	CallContractAtHash(ctx context.Context, call interfaces.CallMsg, blockHash common.Hash) ([]byte, error)
 }
 
 // ContractTransactor defines the methods needed to allow operating with a contract

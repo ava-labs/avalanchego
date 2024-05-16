@@ -69,10 +69,6 @@ const (
 )
 
 var (
-	// ErrAlreadyKnown is returned if the transactions is already contained
-	// within the pool.
-	ErrAlreadyKnown = errors.New("already known")
-
 	// ErrTxPoolOverflow is returned if the transaction pool is full and can't accept
 	// another remote transaction.
 	ErrTxPoolOverflow = errors.New("txpool is full")
@@ -230,7 +226,6 @@ type LegacyPool struct {
 	gasTip      atomic.Pointer[big.Int]
 	minimumFee  *big.Int
 	txFeed      event.Feed
-	scope       event.SubscriptionScope
 	signer      types.Signer
 	mu          sync.RWMutex
 
@@ -437,9 +432,6 @@ func (pool *LegacyPool) loop() {
 
 // Close terminates the transaction pool.
 func (pool *LegacyPool) Close() error {
-	// Unsubscribe all subscriptions registered from txpool
-	pool.scope.Close()
-
 	close(pool.generalShutdownChan)
 
 	// Terminate the pool reorger and return
@@ -460,10 +452,14 @@ func (pool *LegacyPool) Reset(oldHead, newHead *types.Header) {
 	<-wait
 }
 
-// SubscribeTransactions registers a subscription of NewTxsEvent and
-// starts sending event to the given channel.
-func (pool *LegacyPool) SubscribeTransactions(ch chan<- core.NewTxsEvent) event.Subscription {
-	return pool.scope.Track(pool.txFeed.Subscribe(ch))
+// SubscribeTransactions registers a subscription for new transaction events,
+// supporting feeding only newly seen or also resurrected transactions.
+func (pool *LegacyPool) SubscribeTransactions(ch chan<- core.NewTxsEvent, reorgs bool) event.Subscription {
+	// The legacy pool has a very messed up internal shuffling, so it's kind of
+	// hard to separate newly discovered transaction from resurrected ones. This
+	// is because the new txs are added to the queue, resurrected ones too and
+	// reorgs run lazily, so separating the two would need a marker.
+	return pool.txFeed.Subscribe(ch)
 }
 
 // SetGasTip updates the minimum gas tip required by the transaction pool for a
@@ -603,47 +599,8 @@ func (pool *LegacyPool) PendingWithBaseFee(enforceTips bool, baseFee *big.Int) m
 					Time:      txs[i].Time(),
 					GasFeeCap: txs[i].GasFeeCap(),
 					GasTipCap: txs[i].GasTipCap(),
-				}
-			}
-			pending[addr] = lazies
-		}
-	}
-	return pending
-}
-
-// PendingFrom returns the same set of transactions that would be returned from Pending restricted to only
-// transactions from [addrs].
-func (pool *LegacyPool) PendingFrom(addrs []common.Address, enforceTips bool) map[common.Address][]*txpool.LazyTransaction {
-	pool.mu.Lock()
-	defer pool.mu.Unlock()
-
-	pending := make(map[common.Address][]*txpool.LazyTransaction, len(pool.pending))
-	for _, addr := range addrs {
-		list, ok := pool.pending[addr]
-		if !ok {
-			continue
-		}
-		txs := list.Flatten()
-
-		// If the miner requests tip enforcement, cap the lists now
-		if enforceTips && !pool.locals.contains(addr) {
-			for i, tx := range txs {
-				if tx.EffectiveGasTipIntCmp(pool.gasTip.Load(), pool.priced.urgent.baseFee) < 0 {
-					txs = txs[:i]
-					break
-				}
-			}
-		}
-		if len(txs) > 0 {
-			lazies := make([]*txpool.LazyTransaction, len(txs))
-			for i := 0; i < len(txs); i++ {
-				lazies[i] = &txpool.LazyTransaction{
-					Pool:      pool,
-					Hash:      txs[i].Hash(),
-					Tx:        txs[i],
-					Time:      txs[i].Time(),
-					GasFeeCap: txs[i].GasFeeCap(),
-					GasTipCap: txs[i].GasTipCap(),
+					Gas:       txs[i].Gas(),
+					BlobGas:   txs[i].BlobGas(),
 				}
 			}
 			pending[addr] = lazies
@@ -774,7 +731,7 @@ func (pool *LegacyPool) add(tx *types.Transaction, local bool) (replaced bool, e
 	if pool.all.Get(hash) != nil {
 		log.Trace("Discarding already known transaction", "hash", hash)
 		knownTxMeter.Mark(1)
-		return false, ErrAlreadyKnown
+		return false, txpool.ErrAlreadyKnown
 	}
 	// Make the local flag. If it's from local source or it's from the network but
 	// the sender is marked as local previously, treat it as the local transaction.
@@ -1041,8 +998,7 @@ func (pool *LegacyPool) addLocals(txs []*types.Transaction) []error {
 // addLocal enqueues a single local transaction into the pool if it is valid. This is
 // a convenience wrapper around addLocals.
 func (pool *LegacyPool) addLocal(tx *types.Transaction) error {
-	errs := pool.addLocals([]*types.Transaction{tx})
-	return errs[0]
+	return pool.addLocals([]*types.Transaction{tx})[0]
 }
 
 // addRemotes enqueues a batch of transactions into the pool if they are valid. If the
@@ -1057,8 +1013,7 @@ func (pool *LegacyPool) addRemotes(txs []*types.Transaction) []error {
 // addRemote enqueues a single transaction into the pool if it is valid. This is a convenience
 // wrapper around addRemotes.
 func (pool *LegacyPool) addRemote(tx *types.Transaction) error {
-	errs := pool.addRemotes([]*types.Transaction{tx})
-	return errs[0]
+	return pool.addRemotes([]*types.Transaction{tx})[0]
 }
 
 // addRemotesSync is like addRemotes, but waits for pool reorganization. Tests use this method.
@@ -1088,7 +1043,7 @@ func (pool *LegacyPool) Add(txs []*types.Transaction, local, sync bool) []error 
 	for i, tx := range txs {
 		// If the transaction is known, pre-set the error slot
 		if pool.all.Get(tx.Hash()) != nil {
-			errs[i] = ErrAlreadyKnown
+			errs[i] = txpool.ErrAlreadyKnown
 			knownTxMeter.Mark(1)
 			continue
 		}
@@ -1097,6 +1052,7 @@ func (pool *LegacyPool) Add(txs []*types.Transaction, local, sync bool) []error 
 		// in transactions before obtaining lock
 		if err := pool.validateTxBasics(tx, local); err != nil {
 			errs[i] = err
+			log.Trace("Discarding invalid transaction", "hash", tx.Hash(), "err", err)
 			invalidTxMeter.Mark(1)
 			continue
 		}

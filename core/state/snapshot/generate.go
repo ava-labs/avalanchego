@@ -28,7 +28,6 @@ package snapshot
 
 import (
 	"bytes"
-	"encoding/binary"
 	"fmt"
 	"time"
 
@@ -37,7 +36,6 @@ import (
 	"github.com/ava-labs/subnet-evm/trie"
 	"github.com/ava-labs/subnet-evm/utils"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -47,83 +45,6 @@ const (
 	snapshotCacheNamespace            = "state/snapshot/clean/fastcache" // prefix for detailed stats from the snapshot fastcache
 	snapshotCacheStatsUpdateFrequency = 1000                             // update stats from the snapshot fastcache once per 1000 ops
 )
-
-// generatorStats is a collection of statistics gathered by the snapshot generator
-// for logging purposes.
-type generatorStats struct {
-	wiping   chan struct{}      // Notification channel if wiping is in progress
-	origin   uint64             // Origin prefix where generation started
-	start    time.Time          // Timestamp when generation started
-	accounts uint64             // Number of accounts indexed(generated or recovered)
-	slots    uint64             // Number of storage slots indexed(generated or recovered)
-	storage  common.StorageSize // Total account and storage slot size(generation or recovery)
-}
-
-// Info creates an contextual info-level log with the given message and the context pulled
-// from the internally maintained statistics.
-func (gs *generatorStats) Info(msg string, root common.Hash, marker []byte) {
-	gs.log(log.LvlInfo, msg, root, marker)
-}
-
-// Debug creates an contextual debug-level log with the given message and the context pulled
-// from the internally maintained statistics.
-func (gs *generatorStats) Debug(msg string, root common.Hash, marker []byte) {
-	gs.log(log.LvlDebug, msg, root, marker)
-}
-
-// log creates an contextual log with the given message and the context pulled
-// from the internally maintained statistics.
-func (gs *generatorStats) log(level log.Lvl, msg string, root common.Hash, marker []byte) {
-	var ctx []interface{}
-	if root != (common.Hash{}) {
-		ctx = append(ctx, []interface{}{"root", root}...)
-	}
-	// Figure out whether we're after or within an account
-	switch len(marker) {
-	case common.HashLength:
-		ctx = append(ctx, []interface{}{"at", common.BytesToHash(marker)}...)
-	case 2 * common.HashLength:
-		ctx = append(ctx, []interface{}{
-			"in", common.BytesToHash(marker[:common.HashLength]),
-			"at", common.BytesToHash(marker[common.HashLength:]),
-		}...)
-	}
-	// Add the usual measurements
-	ctx = append(ctx, []interface{}{
-		"accounts", gs.accounts,
-		"slots", gs.slots,
-		"storage", gs.storage,
-		"elapsed", common.PrettyDuration(time.Since(gs.start)),
-	}...)
-	// Calculate the estimated indexing time based on current stats
-	if len(marker) > 0 {
-		if done := binary.BigEndian.Uint64(marker[:8]) - gs.origin; done > 0 {
-			left := math.MaxUint64 - binary.BigEndian.Uint64(marker[:8])
-
-			speed := done/uint64(time.Since(gs.start)/time.Millisecond+1) + 1 // +1s to avoid division by zero
-			ctx = append(ctx, []interface{}{
-				"eta", common.PrettyDuration(time.Duration(left/speed) * time.Millisecond),
-			}...)
-		}
-	}
-
-	switch level {
-	case log.LvlTrace:
-		log.Trace(msg, ctx...)
-	case log.LvlDebug:
-		log.Debug(msg, ctx...)
-	case log.LvlInfo:
-		log.Info(msg, ctx...)
-	case log.LvlWarn:
-		log.Warn(msg, ctx...)
-	case log.LvlError:
-		log.Error(msg, ctx...)
-	case log.LvlCrit:
-		log.Crit(msg, ctx...)
-	default:
-		log.Error(fmt.Sprintf("log with invalid log level %s: %s", level, msg), ctx...)
-	}
-}
 
 // generateSnapshot regenerates a brand new snapshot based on an existing state
 // database and head block asynchronously. The snapshot is returned immediately

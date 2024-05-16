@@ -551,7 +551,7 @@ var bindTests = []struct {
 			eventID = IEventerABI.Events["indexed"].ID
 			require.Len(t, topics, 3)
 			require.Equal(t, eventID, topics[0])
-			require.Equal(t, testAddr.Hash(), topics[1])
+			require.Equal(t, common.BytesToHash(testAddr[:]), topics[1])
 			require.Equal(t, 0, len(data))
 			require.Equal(t, contract.LogGas + 3 * contract.LogTopicGas, GetIndexedEventGasCost())
 
@@ -563,7 +563,7 @@ var bindTests = []struct {
 			eventID = IEventerABI.Events["mixed"].ID
 			require.Len(t, topics, 2)
 			require.Equal(t, eventID, topics[0])
-			require.Equal(t, testAddr.Hash(), topics[1])
+			require.Equal(t, common.BytesToHash(testAddr[:]), topics[1])
 			unpackedMixedData, err := UnpackMixedEventData(data)
 			require.NoError(t, err)
 			require.Equal(t, testMixedData, unpackedMixedData)

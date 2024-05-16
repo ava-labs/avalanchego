@@ -41,6 +41,6 @@
     "gasUsed": "0xa865",
     "currentBaseFee": "0x9",
     "currentExcessBlobGas": "0x0",
-    "currentBlobGasUsed": "0x20000"
+    "blobGasUsed": "0x20000"
   }
 }

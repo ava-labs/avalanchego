@@ -91,6 +91,7 @@ var pledgeData1 = "00000000000000000000000000ce0d46d924cc8437c806721496599fc3ffa
 var mixedCaseData1 = "00000000000000000000000000000000000000000000000000000000000f42400000000000000000000000000000000000000000000000000000020489e8000000000000000000000000000000000000000000000000000000000000000f4241"
 
 func TestEventId(t *testing.T) {
+	t.Parallel()
 	var table = []struct {
 		definition   string
 		expectations map[string]common.Hash
@@ -122,6 +123,7 @@ func TestEventId(t *testing.T) {
 }
 
 func TestEventString(t *testing.T) {
+	t.Parallel()
 	var table = []struct {
 		definition   string
 		expectations map[string]string
@@ -156,6 +158,7 @@ func TestEventString(t *testing.T) {
 
 // TestEventMultiValueWithArrayUnpack verifies that array fields will be counted after parsing array.
 func TestEventMultiValueWithArrayUnpack(t *testing.T) {
+	t.Parallel()
 	definition := `[{"name": "test", "type": "event", "inputs": [{"indexed": false, "name":"value1", "type":"uint8[2]"},{"indexed": false, "name":"value2", "type":"uint8"}]}]`
 	abi, err := JSON(strings.NewReader(definition))
 	require.NoError(t, err)
@@ -171,6 +174,7 @@ func TestEventMultiValueWithArrayUnpack(t *testing.T) {
 }
 
 func TestEventTupleUnpack(t *testing.T) {
+	t.Parallel()
 	type EventTransfer struct {
 		Value *big.Int
 	}
@@ -361,6 +365,7 @@ func unpackTestEventData(dest interface{}, hexData string, jsonEvent []byte, ass
 
 // TestEventUnpackIndexed verifies that indexed field will be skipped by event decoder.
 func TestEventUnpackIndexed(t *testing.T) {
+	t.Parallel()
 	definition := `[{"name": "test", "type": "event", "inputs": [{"indexed": true, "name":"value1", "type":"uint8"},{"indexed": false, "name":"value2", "type":"uint8"}]}]`
 	type testStruct struct {
 		Value1 uint8 // indexed
@@ -378,6 +383,7 @@ func TestEventUnpackIndexed(t *testing.T) {
 
 // TestEventIndexedWithArrayUnpack verifies that decoder will not overflow when static array is indexed input.
 func TestEventIndexedWithArrayUnpack(t *testing.T) {
+	t.Parallel()
 	definition := `[{"name": "test", "type": "event", "inputs": [{"indexed": true, "name":"value1", "type":"uint8[2]"},{"indexed": false, "name":"value2", "type":"string"}]}]`
 	type testStruct struct {
 		Value1 [2]uint8 // indexed

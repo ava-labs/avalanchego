@@ -41,7 +41,8 @@ func TestServerRegisterName(t *testing.T) {
 	server := NewServer(0)
 	service := new(testService)
 
-	if err := server.RegisterName("test", service); err != nil {
+	svcName := "test"
+	if err := server.RegisterName(svcName, service); err != nil {
 		t.Fatalf("%v", err)
 	}
 
@@ -49,12 +50,12 @@ func TestServerRegisterName(t *testing.T) {
 		t.Fatalf("Expected 2 service entries, got %d", len(server.services.services))
 	}
 
-	svc, ok := server.services.services["test"]
+	svc, ok := server.services.services[svcName]
 	if !ok {
-		t.Fatalf("Expected service calc to be registered")
+		t.Fatalf("Expected service %s to be registered", svcName)
 	}
 
-	wantCallbacks := 13
+	wantCallbacks := 14
 	if len(svc.callbacks) != wantCallbacks {
 		t.Errorf("Expected %d callbacks for service 'service', got %d", wantCallbacks, len(svc.callbacks))
 	}
@@ -170,6 +171,7 @@ func TestServerBatchResponseSizeLimit(t *testing.T) {
 		batch  []BatchElem
 		client = DialInProc(server)
 	)
+	defer client.Close()
 	for i := 0; i < 5; i++ {
 		batch = append(batch, BatchElem{
 			Method: "test_echo",
