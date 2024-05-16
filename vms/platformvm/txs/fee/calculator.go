@@ -26,7 +26,7 @@ type Calculator struct {
 }
 
 // [CalculateFee] returns the minimal fee needed to accept [tx], at chain time [time]
-func (c Calculator) CalculateFee(tx txs.UnsignedTx, time time.Time) uint64 {
+func (c *Calculator) CalculateFee(tx txs.UnsignedTx, time time.Time) uint64 {
 	tmp := &calculator{
 		upgrades:  c.upgradeTimes,
 		staticCfg: c.config,
@@ -84,13 +84,13 @@ func (c *calculator) CreateSubnetTx(*txs.CreateSubnetTx) error {
 }
 
 func (c *calculator) AdvanceTimeTx(*txs.AdvanceTimeTx) error {
-	c.fee = 0
-	return nil // no fees
+	c.fee = 0 // no fees
+	return nil
 }
 
 func (c *calculator) RewardValidatorTx(*txs.RewardValidatorTx) error {
-	c.fee = 0
-	return nil // no fees
+	c.fee = 0 // no fees
+	return nil
 }
 
 func (c *calculator) RemoveSubnetValidatorTx(*txs.RemoveSubnetValidatorTx) error {
