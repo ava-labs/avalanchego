@@ -18,9 +18,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
-func newTestIPTracker(t *testing.T, trackedSubnets ...ids.ID) *ipTracker {
+func newTestIPTracker(t *testing.T) *ipTracker {
 	tracker, err := newIPTracker(
-		set.Of(trackedSubnets...),
+		nil,
 		logging.NoLog{},
 		"",
 		prometheus.NewRegistry(),
