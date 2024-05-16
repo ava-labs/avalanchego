@@ -405,6 +405,7 @@ func (i *ipTracker) OnValidatorAdded(subnetID ids.ID, nodeID ids.NodeID, _ *bls.
 	i.addGossipableID(nodeID, subnetID, false)
 }
 
+// If [subnetID] is nil, the nodeID is being manually tracked.
 func (i *ipTracker) addTrackableID(nodeID ids.NodeID, subnetID *ids.ID) {
 	nodeTracker, previouslyTracked := i.tracked[nodeID]
 	if !previouslyTracked {
