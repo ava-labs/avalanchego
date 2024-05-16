@@ -56,26 +56,18 @@ func (b *batch) Write() error {
 		return database.ErrClosed
 	}
 
-	if !b.written {
-		// This batch has not been written to the database yet.
-		if err := updateError(b.batch.Commit(pebble.Sync)); err != nil {
+	if b.written {
+		// pebble doesn't support writing a batch twice so we have to clone the
+		// batch before writing it.
+		newBatch := b.db.pebbleDB.NewBatch()
+		if err := newBatch.Apply(b.batch, nil); err != nil {
 			return err
 		}
-		b.written = true
-		return nil
+		b.batch = newBatch
 	}
 
-	// pebble doesn't support writing a batch twice so we have to clone
-	// [b] and commit the clone.
-	batchClone := b.db.pebbleDB.NewBatch()
-
-	// Copy the batch.
-	if err := batchClone.Apply(b.batch, nil); err != nil {
-		return err
-	}
-
-	// Commit the new batch.
-	return updateError(batchClone.Commit(pebble.Sync))
+	b.written = true
+	return updateError(b.batch.Commit(pebble.Sync))
 }
 
 func (b *batch) Reset() {
