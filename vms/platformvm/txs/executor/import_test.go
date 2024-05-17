@@ -182,7 +182,6 @@ func fundedSharedMemory(
 	peerSharedMemory := m.NewSharedMemory(peerChain)
 
 	for assetID, amt := range assets {
-		// #nosec G404
 		utxo := &avax.UTXO{
 			UTXOID: avax.UTXOID{
 				TxID:        ids.GenerateTestID(),
