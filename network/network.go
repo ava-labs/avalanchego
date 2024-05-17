@@ -540,40 +540,34 @@ func (n *network) Peers(
 	salt []byte,
 ) []*ips.ClaimedIPPort {
 	areWeAValidator := n.config.Validators.GetWeight(constants.PrimaryNetworkID, n.config.MyNodeID) != 0
-	if !areWeAValidator {
-		// Return IPs for subnets both sides track.
-		return getGossipableIPs(
-			n.ipTracker,
-			trackedSubnets,
-			func(subnetID ids.ID) bool {
-				return subnetID == constants.PrimaryNetworkID || n.ipTracker.trackedSubnets.Contains(subnetID)
-			},
-			peerID,
-			knownPeers,
-			salt,
-			int(n.config.PeerListNumValidatorIPs),
-		)
+
+	// Only return IPs for subnets that we are tracking.
+	var allowedSubnets func(ids.ID) bool
+	if areWeAValidator {
+		allowedSubnets = func(ids.ID) bool { return true }
+	} else {
+		allowedSubnets = func(subnetID ids.ID) bool {
+			return subnetID == constants.PrimaryNetworkID || n.ipTracker.trackedSubnets.Contains(subnetID)
+		}
 	}
 
 	areTheyAValidator := n.config.Validators.GetWeight(constants.PrimaryNetworkID, peerID) != 0
-	if requestAllPeers && areTheyAValidator {
+	if areWeAValidator && requestAllPeers && areTheyAValidator {
 		// Return IPs for all subnets.
 		return getGossipableIPs(
 			n.ipTracker,
 			n.ipTracker.subnet,
-			func(ids.ID) bool { return true },
+			allowedSubnets,
 			peerID,
 			knownPeers,
 			salt,
 			int(n.config.PeerListNumValidatorIPs),
 		)
 	}
-
-	// Return IPs for all the subnets that the peer is tracking.
 	return getGossipableIPs(
 		n.ipTracker,
 		trackedSubnets,
-		func(ids.ID) bool { return true },
+		allowedSubnets,
 		peerID,
 		knownPeers,
 		salt,
