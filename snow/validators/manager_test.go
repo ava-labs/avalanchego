@@ -11,7 +11,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
-	"github.com/ava-labs/avalanchego/utils/sampler"
 	"github.com/ava-labs/avalanchego/utils/set"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
@@ -396,7 +395,7 @@ func TestSample(t *testing.T) {
 	require.Equal([]ids.NodeID{nodeID0}, sampled)
 
 	_, err = m.Sample(subnetID, 2)
-	require.ErrorIs(err, sampler.ErrOutOfRange)
+	require.ErrorIs(err, errInsufficientWeight)
 
 	nodeID1 := ids.GenerateTestNodeID()
 	require.NoError(m.AddStaker(subnetID, nodeID1, nil, ids.Empty, math.MaxInt64-1))
