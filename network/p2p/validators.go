@@ -125,8 +125,8 @@ func (v *Validators) Sample(ctx context.Context, limit int) []ids.NodeID {
 
 	uniform.Initialize(uint64(len(v.validatorList)))
 	for len(sampled) < limit {
-		i, err := uniform.Next()
-		if err != nil {
+		i, hasNext := uniform.Next()
+		if !hasNext {
 			break
 		}
 

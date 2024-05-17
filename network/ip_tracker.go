@@ -177,8 +177,8 @@ func (s *gossipableSubnet) getGossipableIPs(
 	uniform.Initialize(uint64(len(s.gossipableIPs)))
 
 	for len(ips) < maxNumIPs {
-		index, err := uniform.Next()
-		if err != nil {
+		index, hasNext := uniform.Next()
+		if !hasNext {
 			return ips
 		}
 
