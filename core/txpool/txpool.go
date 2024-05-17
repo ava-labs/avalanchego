@@ -114,6 +114,7 @@ func New(gasTip *big.Int, chain BlockChain, subpools []SubPool) (*TxPool, error)
 			return nil, err
 		}
 	}
+	pool.gasTip.Store(gasTip)
 
 	// Subscribe to chain head events to trigger subpool resets
 	var (
