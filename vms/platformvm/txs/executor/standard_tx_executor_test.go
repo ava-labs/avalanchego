@@ -6,6 +6,7 @@ package executor
 import (
 	"errors"
 	"math"
+	"math/rand"
 	"testing"
 	"time"
 
@@ -1185,6 +1186,7 @@ func TestDurangoMemoField(t *testing.T) {
 					map[ids.ID]uint64{
 						env.ctx.AVAXAssetID: sourceAmount,
 					},
+					rand.NewSource(0),
 				)
 				env.msm.SharedMemory = sharedMemory
 
