@@ -8,7 +8,7 @@ package sampler
 // indices. So duplicate indices can be returned.
 type WeightedWithoutReplacement interface {
 	Initialize(weights []uint64) error
-	Sample(count int) ([]int, error)
+	Sample(count int) ([]int, bool)
 }
 
 // NewDeterministicWeightedWithoutReplacement returns a new sampler
