@@ -7,7 +7,7 @@ package sampler
 type Uniform interface {
 	Initialize(sampleRange uint64)
 	// Sample returns length numbers in the range [0,sampleRange). If there
-	// aren't enough numbers in the range, false returned. If length is
+	// aren't enough numbers in the range, false is returned. If length is
 	// negative the implementation may panic.
 	Sample(length int) ([]uint64, bool)
 
