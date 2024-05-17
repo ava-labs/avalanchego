@@ -23,7 +23,7 @@ func TLSConfig(cert tls.Certificate, keyLogWriter io.Writer) *tls.Config {
 		//
 		// During our security audit by Quantstamp, this was investigated
 		// and confirmed to be safe and correct.
-		InsecureSkipVerify: true, // #nosec G402
+		InsecureSkipVerify: true, //#nosec G402
 		MinVersion:         tls.VersionTLS13,
 		KeyLogWriter:       keyLogWriter,
 	}
