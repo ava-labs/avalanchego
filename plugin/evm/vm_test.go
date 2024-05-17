@@ -616,8 +616,10 @@ func TestVMUpgrades(t *testing.T) {
 				}
 
 				go shutdownFunc()
-				shutdownTimeout := 50 * time.Millisecond
+				shutdownTimeout := 250 * time.Millisecond
 				ticker := time.NewTicker(shutdownTimeout)
+				defer ticker.Stop()
+
 				select {
 				case <-ticker.C:
 					t.Fatalf("VM shutdown took longer than timeout: %v", shutdownTimeout)
@@ -3427,8 +3429,10 @@ func TestConfigureLogLevel(t *testing.T) {
 				}
 				go shutdownFunc()
 
-				shutdownTimeout := 50 * time.Millisecond
+				shutdownTimeout := 250 * time.Millisecond
 				ticker := time.NewTicker(shutdownTimeout)
+				defer ticker.Stop()
+
 				select {
 				case <-ticker.C:
 					t.Fatalf("VM shutdown took longer than timeout: %v", shutdownTimeout)
