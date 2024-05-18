@@ -32,9 +32,7 @@ fi
 TESTS=${TESTS:-"golangci_lint license_header require_error_is_no_funcs_as_params single_import interface_compliance_nil require_no_error_inline_func"}
 
 function test_golangci_lint {
-  # We use the commit hash (dc2815312726b4f374f5c69a1c183a85990917a7) to reference the specific version (v1.58.1) used in our build process.
-  # This guarantees a known-good and verifiable version. Unlike releases, commits cannot be altered or deleted after they are made, providing a more reliable reference point for our build system.
-  go install -v github.com/golangci/golangci-lint/cmd/golangci-lint@dc2815312726b4f374f5c69a1c183a85990917a7
+  go install -v github.com/golangci/golangci-lint/cmd/golangci-lint@v1.58.1
   golangci-lint run --config .golangci.yml
 }
 
