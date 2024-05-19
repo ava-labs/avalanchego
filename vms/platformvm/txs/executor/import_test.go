@@ -39,7 +39,8 @@ func TestNewImportTx(t *testing.T) {
 	require.NoError(t, err)
 
 	customAssetID := ids.GenerateTestID()
-
+	// generate a constant random source generator.
+	randSrc := rand.NewSource(0)
 	tests := []test{
 		{
 			description:   "can't pay fee",
@@ -52,6 +53,7 @@ func TestNewImportTx(t *testing.T) {
 				map[ids.ID]uint64{
 					env.ctx.AVAXAssetID: env.config.TxFee - 1,
 				},
+				randSrc,
 			),
 			sourceKeys:  []*secp256k1.PrivateKey{sourceKey},
 			expectedErr: builder.ErrInsufficientFunds,
@@ -67,6 +69,7 @@ func TestNewImportTx(t *testing.T) {
 				map[ids.ID]uint64{
 					env.ctx.AVAXAssetID: env.config.TxFee,
 				},
+				randSrc,
 			),
 			sourceKeys:  []*secp256k1.PrivateKey{sourceKey},
 			expectedErr: nil,
@@ -82,6 +85,7 @@ func TestNewImportTx(t *testing.T) {
 				map[ids.ID]uint64{
 					env.ctx.AVAXAssetID: env.config.TxFee,
 				},
+				randSrc,
 			),
 			sourceKeys:  []*secp256k1.PrivateKey{sourceKey},
 			timestamp:   env.config.UpgradeConfig.ApricotPhase5Time,
@@ -99,6 +103,7 @@ func TestNewImportTx(t *testing.T) {
 					env.ctx.AVAXAssetID: env.config.TxFee,
 					customAssetID:       1,
 				},
+				randSrc,
 			),
 			sourceKeys:  []*secp256k1.PrivateKey{sourceKey},
 			timestamp:   env.config.UpgradeConfig.ApricotPhase5Time,
@@ -168,6 +173,7 @@ func fundedSharedMemory(
 	sourceKey *secp256k1.PrivateKey,
 	peerChain ids.ID,
 	assets map[ids.ID]uint64,
+	randSrc rand.Source,
 ) atomic.SharedMemory {
 	fundedSharedMemoryCalls++
 	m := atomic.NewMemory(prefixdb.New([]byte{fundedSharedMemoryCalls}, env.baseDB))
@@ -176,11 +182,10 @@ func fundedSharedMemory(
 	peerSharedMemory := m.NewSharedMemory(peerChain)
 
 	for assetID, amt := range assets {
-		// #nosec G404
 		utxo := &avax.UTXO{
 			UTXOID: avax.UTXOID{
 				TxID:        ids.GenerateTestID(),
-				OutputIndex: rand.Uint32(),
+				OutputIndex: uint32(randSrc.Int63()),
 			},
 			Asset: avax.Asset{ID: assetID},
 			Out: &secp256k1fx.TransferOutput{
