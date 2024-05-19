@@ -13,7 +13,7 @@ This API can be used for measuring node health and debugging.
 The Admin API is disabled by default for security reasons. To run a node with the Admin API
 enabled, use [config flag `--api-admin-enabled=true`](/nodes/configure/avalanchego-config-flags.md#--api-admin-enabled-boolean).
 
-This API set is for a specific node, it is unavailable on the [public server](/tooling/rpc-providers.md).
+This API set is for a specific node, it is unavailable on the [public server](https://docs.avax.network/tooling/rpc-providers).
 
 :::
 

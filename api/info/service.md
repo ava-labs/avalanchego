@@ -257,7 +257,7 @@ curl -X POST --data '{
 Get the ID, the BLS key, and the proof of possession(BLS signature) of this node.
 
 :::info
-This endpoint set is for a specific node, it is unavailable on the [public server](/tooling/rpc-providers.md).
+This endpoint set is for a specific node, it is unavailable on the [public server](https://docs.avax.network/tooling/rpc-providers).
 :::
 
 **Signature:**
@@ -310,7 +310,7 @@ curl -X POST --data '{
 Get the IP of this node.
 
 :::info
-This endpoint set is for a specific node, it is unavailable on the [public server](/tooling/rpc-providers.md).
+This endpoint set is for a specific node, it is unavailable on the [public server](https://docs.avax.network/tooling/rpc-providers).
 :::
 
 **Signature:**
@@ -464,7 +464,7 @@ curl -X POST --data '{
 Get the virtual machines installed on this node.
 
 :::info
-This endpoint set is for a specific node, it is unavailable on the [public server](/tooling/rpc-providers.md).
+This endpoint set is for a specific node, it is unavailable on the [public server](https://docs.avax.network/tooling/rpc-providers).
 :::
 
 **Signature:**

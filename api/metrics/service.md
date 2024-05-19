@@ -11,7 +11,7 @@ The API allows clients to get statistics about a node’s health and performance
 
 :::info
 
-This API set is for a specific node, it is unavailable on the [public server](/tooling/rpc-providers.md).
+This API set is for a specific node, it is unavailable on the [public server](https://docs.avax.network/tooling/rpc-providers).
 
 :::
 
