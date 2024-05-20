@@ -152,6 +152,8 @@ func (s *gossipableSubnet) removeGossipableIP(nodeID ids.NodeID) {
 		return
 	}
 
+	// If we aren't removing the last IP, we need to swap the last IP with the
+	// IP we are removing so that the slice is contiguous.
 	newNumGossipable := len(s.gossipableIPs) - 1
 	if newNumGossipable != indexToRemove {
 		replacementIP := s.gossipableIPs[newNumGossipable]
