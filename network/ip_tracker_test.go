@@ -933,12 +933,18 @@ func TestIPTracker_OnValidatorAdded(t *testing.T) {
 			},
 			subnetID: constants.PrimaryNetworkID,
 			expectedChange: func(tracker *ipTracker) {
+				tracker.numGossipableIPs.Inc()
 				tracker.tracked[ip.NodeID].subnets.Add(constants.PrimaryNetworkID)
 				tracker.tracked[ip.NodeID].trackedSubnets.Add(constants.PrimaryNetworkID)
 				tracker.subnet[constants.PrimaryNetworkID] = &gossipableSubnet{
-					numGossipableIPs:  tracker.numGossipableIPs,
-					gossipableIDs:     set.Of(ip.NodeID),
-					gossipableIndices: make(map[ids.NodeID]int),
+					numGossipableIPs: tracker.numGossipableIPs,
+					gossipableIDs:    set.Of(ip.NodeID),
+					gossipableIndices: map[ids.NodeID]int{
+						ip.NodeID: 0,
+					},
+					gossipableIPs: []*ips.ClaimedIPPort{
+						newerIP,
+					},
 				}
 			},
 		},

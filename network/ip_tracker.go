@@ -477,11 +477,9 @@ func (i *ipTracker) addGossipableID(nodeID ids.NodeID, subnetID ids.ID, manually
 		return
 	}
 
-	if trackedNode, ok := i.tracked[nodeID]; !ok || trackedNode.ip == nil || trackedNode.ip.Timestamp != node.ip.Timestamp {
-		return
+	if trackedNode, ok := i.tracked[nodeID]; ok {
+		subnet.setGossipableIP(trackedNode.ip)
 	}
-
-	subnet.setGossipableIP(node.ip)
 }
 
 func (*ipTracker) OnValidatorWeightChanged(ids.ID, ids.NodeID, uint64, uint64) {}
