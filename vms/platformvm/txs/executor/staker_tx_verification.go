@@ -165,8 +165,7 @@ func verifyAddValidatorTx(
 	}
 
 	// Verify the flowcheck
-	fee := feeCalculator.CalculateFee(tx, currentTimestamp)
-
+	fee := feeCalculator.CalculateFee(tx)
 	if err := backend.FlowChecker.VerifySpend(
 		tx,
 		chainState,
@@ -256,8 +255,7 @@ func verifyAddSubnetValidatorTx(
 	}
 
 	// Verify the flowcheck
-	fee := feeCalculator.CalculateFee(tx, currentTimestamp)
-
+	fee := feeCalculator.CalculateFee(tx)
 	if err := backend.FlowChecker.VerifySpend(
 		tx,
 		chainState,
@@ -334,8 +332,7 @@ func verifyRemoveSubnetValidatorTx(
 	}
 
 	// Verify the flowcheck
-	fee := feeCalculator.CalculateFee(tx, currentTimestamp)
-
+	fee := feeCalculator.CalculateFee(tx)
 	if err := backend.FlowChecker.VerifySpend(
 		tx,
 		chainState,
@@ -452,8 +449,7 @@ func verifyAddDelegatorTx(
 	}
 
 	// Verify the flowcheck
-	fee := feeCalculator.CalculateFee(tx, currentTimestamp)
-
+	fee := feeCalculator.CalculateFee(tx)
 	if err := backend.FlowChecker.VerifySpend(
 		tx,
 		chainState,
@@ -572,8 +568,7 @@ func verifyAddPermissionlessValidatorTx(
 	copy(outs[len(tx.Outs):], tx.StakeOuts)
 
 	// Verify the flowcheck
-	fee := feeCalculator.CalculateFee(tx, currentTimestamp)
-
+	fee := feeCalculator.CalculateFee(tx)
 	if err := backend.FlowChecker.VerifySpend(
 		tx,
 		chainState,
@@ -717,8 +712,7 @@ func verifyAddPermissionlessDelegatorTx(
 	}
 
 	// Verify the flowcheck
-	fee := feeCalculator.CalculateFee(tx, currentTimestamp)
-
+	fee := feeCalculator.CalculateFee(tx)
 	if err := backend.FlowChecker.VerifySpend(
 		tx,
 		chainState,
@@ -747,7 +741,8 @@ func verifyTransferSubnetOwnershipTx(
 	sTx *txs.Tx,
 	tx *txs.TransferSubnetOwnershipTx,
 ) error {
-	if !backend.Config.UpgradeConfig.IsDurangoActivated(chainState.GetTimestamp()) {
+	currentTimestamp := chainState.GetTimestamp()
+	if !backend.Config.UpgradeConfig.IsDurangoActivated(currentTimestamp) {
 		return ErrDurangoUpgradeNotActive
 	}
 
@@ -771,9 +766,7 @@ func verifyTransferSubnetOwnershipTx(
 	}
 
 	// Verify the flowcheck
-	currentTimestamp := chainState.GetTimestamp()
-	fee := feeCalculator.CalculateFee(tx, currentTimestamp)
-
+	fee := feeCalculator.CalculateFee(tx)
 	if err := backend.FlowChecker.VerifySpend(
 		tx,
 		chainState,

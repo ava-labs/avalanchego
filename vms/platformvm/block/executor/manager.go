@@ -143,7 +143,7 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 		return err
 	}
 
-	feeCalculator := fee.NewStaticCalculator(m.txExecutorBackend.Config.StaticFeeConfig, m.txExecutorBackend.Config.UpgradeConfig)
+	feeCalculator := fee.NewStaticCalculator(m.txExecutorBackend.Config.StaticFeeConfig, m.txExecutorBackend.Config.UpgradeConfig, nextBlkTime)
 	return tx.Unsigned.Visit(&executor.StandardTxExecutor{
 		Backend:       m.txExecutorBackend,
 		State:         stateDiff,

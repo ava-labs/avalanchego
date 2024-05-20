@@ -361,7 +361,7 @@ func (v *verifier) proposalBlock(
 	atomicRequests map[ids.ID]*atomic.Requests,
 	onAcceptFunc func(),
 ) error {
-	feeCalculator := fee.NewStaticCalculator(v.txExecutorBackend.Config.StaticFeeConfig, v.txExecutorBackend.Config.UpgradeConfig)
+	feeCalculator := fee.NewStaticCalculator(v.txExecutorBackend.Config.StaticFeeConfig, v.txExecutorBackend.Config.UpgradeConfig, onCommitState.GetTimestamp())
 	txExecutor := executor.ProposalTxExecutor{
 		OnCommitState: onCommitState,
 		OnAbortState:  onAbortState,
@@ -436,7 +436,7 @@ func (v *verifier) processStandardTxs(txs []*txs.Tx, state state.Diff, parentID 
 	error,
 ) {
 	var (
-		feeCalculator = fee.NewStaticCalculator(v.txExecutorBackend.Config.StaticFeeConfig, v.txExecutorBackend.Config.UpgradeConfig)
+		feeCalculator = fee.NewStaticCalculator(v.txExecutorBackend.Config.StaticFeeConfig, v.txExecutorBackend.Config.UpgradeConfig, state.GetTimestamp())
 
 		onAcceptFunc   func()
 		inputs         set.Set[ids.ID]

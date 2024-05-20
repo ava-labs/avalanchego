@@ -333,7 +333,7 @@ func packBlockTxs(
 	}
 
 	var (
-		feeCalculator = fee.NewStaticCalculator(backend.Config.StaticFeeConfig, backend.Config.UpgradeConfig)
+		feeCalculator = fee.NewStaticCalculator(backend.Config.StaticFeeConfig, backend.Config.UpgradeConfig, timestamp)
 
 		blockTxs []*txs.Tx
 		inputs   set.Set[ids.ID]

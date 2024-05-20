@@ -99,7 +99,7 @@ func (e *AtomicTxExecutor) atomicTx(tx txs.UnsignedTx) error {
 	}
 	e.OnAccept = onAccept
 
-	feeCalculator := fee.NewStaticCalculator(e.Backend.Config.StaticFeeConfig, e.Backend.Config.UpgradeConfig)
+	feeCalculator := fee.NewStaticCalculator(e.Backend.Config.StaticFeeConfig, e.Backend.Config.UpgradeConfig, e.OnAccept.GetTimestamp())
 	executor := StandardTxExecutor{
 		Backend:       e.Backend,
 		State:         e.OnAccept,

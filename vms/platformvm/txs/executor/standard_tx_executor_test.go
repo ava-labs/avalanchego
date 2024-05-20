@@ -94,7 +94,7 @@ func TestStandardTxExecutorAddValidatorTxEmptyID(t *testing.T) {
 		stateDiff, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
 
-		feeCalculator := fee.NewStaticCalculator(env.config.StaticFeeConfig, env.config.UpgradeConfig)
+		feeCalculator := fee.NewStaticCalculator(env.config.StaticFeeConfig, env.config.UpgradeConfig, stateDiff.GetTimestamp())
 		executor := StandardTxExecutor{
 			Backend:       &env.backend,
 			State:         stateDiff,
@@ -346,7 +346,7 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 
 			env.config.UpgradeConfig.BanffTime = onAcceptState.GetTimestamp()
 
-			feeCalculator := fee.NewStaticCalculator(env.config.StaticFeeConfig, env.config.UpgradeConfig)
+			feeCalculator := fee.NewStaticCalculator(env.config.StaticFeeConfig, env.config.UpgradeConfig, onAcceptState.GetTimestamp())
 			executor := StandardTxExecutor{
 				Backend:       &env.backend,
 				State:         onAcceptState,
@@ -389,7 +389,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		onAcceptState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
 
-		feeCalculator := fee.NewStaticCalculator(env.config.StaticFeeConfig, env.config.UpgradeConfig)
+		feeCalculator := fee.NewStaticCalculator(env.config.StaticFeeConfig, env.config.UpgradeConfig, onAcceptState.GetTimestamp())
 		executor := StandardTxExecutor{
 			Backend:       &env.backend,
 			State:         onAcceptState,
@@ -422,7 +422,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		onAcceptState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
 
-		feeCalculator := fee.NewStaticCalculator(env.config.StaticFeeConfig, env.config.UpgradeConfig)
+		feeCalculator := fee.NewStaticCalculator(env.config.StaticFeeConfig, env.config.UpgradeConfig, onAcceptState.GetTimestamp())
 		executor := StandardTxExecutor{
 			Backend:       &env.backend,
 			State:         onAcceptState,
@@ -473,7 +473,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		onAcceptState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
 
-		feeCalculator := fee.NewStaticCalculator(env.config.StaticFeeConfig, env.config.UpgradeConfig)
+		feeCalculator := fee.NewStaticCalculator(env.config.StaticFeeConfig, env.config.UpgradeConfig, onAcceptState.GetTimestamp())
 		executor := StandardTxExecutor{
 			Backend:       &env.backend,
 			State:         onAcceptState,
@@ -521,7 +521,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		onAcceptState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
 
-		feeCalculator := fee.NewStaticCalculator(env.config.StaticFeeConfig, env.config.UpgradeConfig)
+		feeCalculator := fee.NewStaticCalculator(env.config.StaticFeeConfig, env.config.UpgradeConfig, onAcceptState.GetTimestamp())
 		executor := StandardTxExecutor{
 			Backend:       &env.backend,
 			State:         onAcceptState,
@@ -552,7 +552,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		onAcceptState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
 
-		feeCalculator := fee.NewStaticCalculator(env.config.StaticFeeConfig, env.config.UpgradeConfig)
+		feeCalculator := fee.NewStaticCalculator(env.config.StaticFeeConfig, env.config.UpgradeConfig, onAcceptState.GetTimestamp())
 		executor := StandardTxExecutor{
 			Backend:       &env.backend,
 			State:         onAcceptState,
@@ -583,7 +583,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		onAcceptState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
 
-		feeCalculator := fee.NewStaticCalculator(env.config.StaticFeeConfig, env.config.UpgradeConfig)
+		feeCalculator := fee.NewStaticCalculator(env.config.StaticFeeConfig, env.config.UpgradeConfig, onAcceptState.GetTimestamp())
 		executor := StandardTxExecutor{
 			Backend:       &env.backend,
 			State:         onAcceptState,
@@ -616,7 +616,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		onAcceptState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
 
-		feeCalculator := fee.NewStaticCalculator(env.config.StaticFeeConfig, env.config.UpgradeConfig)
+		feeCalculator := fee.NewStaticCalculator(env.config.StaticFeeConfig, env.config.UpgradeConfig, onAcceptState.GetTimestamp())
 		executor := StandardTxExecutor{
 			Backend:       &env.backend,
 			State:         onAcceptState,
@@ -680,7 +680,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		onAcceptState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
 
-		feeCalculator := fee.NewStaticCalculator(env.config.StaticFeeConfig, env.config.UpgradeConfig)
+		feeCalculator := fee.NewStaticCalculator(env.config.StaticFeeConfig, env.config.UpgradeConfig, onAcceptState.GetTimestamp())
 		executor := StandardTxExecutor{
 			Backend:       &env.backend,
 			State:         onAcceptState,
@@ -722,7 +722,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		onAcceptState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
 
-		feeCalculator := fee.NewStaticCalculator(env.config.StaticFeeConfig, env.config.UpgradeConfig)
+		feeCalculator := fee.NewStaticCalculator(env.config.StaticFeeConfig, env.config.UpgradeConfig, onAcceptState.GetTimestamp())
 		executor := StandardTxExecutor{
 			Backend:       &env.backend,
 			State:         onAcceptState,
@@ -760,7 +760,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		onAcceptState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
 
-		feeCalculator := fee.NewStaticCalculator(env.config.StaticFeeConfig, env.config.UpgradeConfig)
+		feeCalculator := fee.NewStaticCalculator(env.config.StaticFeeConfig, env.config.UpgradeConfig, onAcceptState.GetTimestamp())
 		executor := StandardTxExecutor{
 			Backend:       &env.backend,
 			State:         onAcceptState,
@@ -796,7 +796,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		onAcceptState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
 
-		feeCalculator := fee.NewStaticCalculator(env.config.StaticFeeConfig, env.config.UpgradeConfig)
+		feeCalculator := fee.NewStaticCalculator(env.config.StaticFeeConfig, env.config.UpgradeConfig, onAcceptState.GetTimestamp())
 		executor := StandardTxExecutor{
 			Backend:       &env.backend,
 			State:         onAcceptState,
@@ -842,7 +842,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		onAcceptState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
 
-		feeCalculator := fee.NewStaticCalculator(env.config.StaticFeeConfig, env.config.UpgradeConfig)
+		feeCalculator := fee.NewStaticCalculator(env.config.StaticFeeConfig, env.config.UpgradeConfig, onAcceptState.GetTimestamp())
 		executor := StandardTxExecutor{
 			Backend:       &env.backend,
 			State:         onAcceptState,
@@ -883,7 +883,7 @@ func TestBanffStandardTxExecutorAddValidator(t *testing.T) {
 		onAcceptState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
 
-		feeCalculator := fee.NewStaticCalculator(env.config.StaticFeeConfig, env.config.UpgradeConfig)
+		feeCalculator := fee.NewStaticCalculator(env.config.StaticFeeConfig, env.config.UpgradeConfig, onAcceptState.GetTimestamp())
 		executor := StandardTxExecutor{
 			Backend:       &env.backend,
 			State:         onAcceptState,
@@ -928,7 +928,7 @@ func TestBanffStandardTxExecutorAddValidator(t *testing.T) {
 		onAcceptState.PutCurrentValidator(staker)
 		onAcceptState.AddTx(tx, status.Committed)
 
-		feeCalculator := fee.NewStaticCalculator(env.config.StaticFeeConfig, env.config.UpgradeConfig)
+		feeCalculator := fee.NewStaticCalculator(env.config.StaticFeeConfig, env.config.UpgradeConfig, onAcceptState.GetTimestamp())
 		executor := StandardTxExecutor{
 			Backend:       &env.backend,
 			State:         onAcceptState,
@@ -970,7 +970,7 @@ func TestBanffStandardTxExecutorAddValidator(t *testing.T) {
 		onAcceptState.PutPendingValidator(staker)
 		onAcceptState.AddTx(tx, status.Committed)
 
-		feeCalculator := fee.NewStaticCalculator(env.config.StaticFeeConfig, env.config.UpgradeConfig)
+		feeCalculator := fee.NewStaticCalculator(env.config.StaticFeeConfig, env.config.UpgradeConfig, onAcceptState.GetTimestamp())
 		executor := StandardTxExecutor{
 			Backend:       &env.backend,
 			State:         onAcceptState,
@@ -1011,7 +1011,7 @@ func TestBanffStandardTxExecutorAddValidator(t *testing.T) {
 			onAcceptState.DeleteUTXO(utxoID)
 		}
 
-		feeCalculator := fee.NewStaticCalculator(env.backend.Config.StaticFeeConfig, env.backend.Config.UpgradeConfig)
+		feeCalculator := fee.NewStaticCalculator(env.backend.Config.StaticFeeConfig, env.backend.Config.UpgradeConfig, onAcceptState.GetTimestamp())
 		executor := StandardTxExecutor{
 			Backend:       &env.backend,
 			FeeCalculator: feeCalculator,
@@ -1111,7 +1111,7 @@ func TestDurangoDisabledTransactions(t *testing.T) {
 
 			tx := tt.buildTx(env)
 
-			feeCalculator := fee.NewStaticCalculator(env.config.StaticFeeConfig, env.config.UpgradeConfig)
+			feeCalculator := fee.NewStaticCalculator(env.config.StaticFeeConfig, env.config.UpgradeConfig, onAcceptState.GetTimestamp())
 			err = tx.Unsigned.Visit(&StandardTxExecutor{
 				Backend:       &env.backend,
 				State:         onAcceptState,
@@ -1309,7 +1309,7 @@ func TestDurangoMemoField(t *testing.T) {
 				onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env)
 				require.NoError(t, err)
 
-				feeCalculator := fee.NewStaticCalculator(env.config.StaticFeeConfig, env.config.UpgradeConfig)
+				feeCalculator := fee.NewStaticCalculator(env.config.StaticFeeConfig, env.config.UpgradeConfig, onAcceptState.GetTimestamp())
 				require.NoError(t, subnetValTx.Unsigned.Visit(&StandardTxExecutor{
 					Backend:       &env.backend,
 					State:         onAcceptState,
@@ -1499,7 +1499,7 @@ func TestDurangoMemoField(t *testing.T) {
 			env.ctx.Lock.Lock()
 			defer env.ctx.Lock.Unlock()
 
-			feeCalculator := fee.NewStaticCalculator(env.config.StaticFeeConfig, env.config.UpgradeConfig)
+			feeCalculator := fee.NewStaticCalculator(env.config.StaticFeeConfig, env.config.UpgradeConfig, env.state.GetTimestamp())
 
 			// Populated memo field should error
 			tx, onAcceptState := tt.setupTest(env, []byte{'m', 'e', 'm', 'o'})
@@ -1634,7 +1634,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
 
 				// Set dependency expectations.
-				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime)
+				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).Times(2)
 				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(env.staker, nil).Times(1)
 				subnetOwner := fx.NewMockOwner(ctrl)
 				env.state.EXPECT().GetSubnetOwner(env.unsignedTx.Subnet).Return(subnetOwner, nil).Times(1)
@@ -1647,7 +1647,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				env.state.EXPECT().AddUTXO(gomock.Any()).Times(len(env.unsignedTx.Outs))
 
 				cfg := defaultTestConfig(t, durango, env.latestForkTime)
-				feeCalculator := fee.NewStaticCalculator(cfg.StaticFeeConfig, cfg.UpgradeConfig)
+				feeCalculator := fee.NewStaticCalculator(cfg.StaticFeeConfig, cfg.UpgradeConfig, env.state.GetTimestamp())
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config:       cfg,
@@ -1674,7 +1674,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				env.state = state.NewMockDiff(ctrl)
 
 				cfg := defaultTestConfig(t, durango, env.latestForkTime)
-				feeCalculator := fee.NewStaticCalculator(cfg.StaticFeeConfig, cfg.UpgradeConfig)
+				feeCalculator := fee.NewStaticCalculator(cfg.StaticFeeConfig, cfg.UpgradeConfig, env.latestForkTime)
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config:       cfg,
@@ -1697,12 +1697,12 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *StandardTxExecutor) {
 				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
 				env.state = state.NewMockDiff(ctrl)
-				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime)
+				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).Times(2)
 				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(nil, database.ErrNotFound)
 				env.state.EXPECT().GetPendingValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(nil, database.ErrNotFound)
 
 				cfg := defaultTestConfig(t, durango, env.latestForkTime)
-				feeCalculator := fee.NewStaticCalculator(cfg.StaticFeeConfig, cfg.UpgradeConfig)
+				feeCalculator := fee.NewStaticCalculator(cfg.StaticFeeConfig, cfg.UpgradeConfig, env.state.GetTimestamp())
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config:       cfg,
@@ -1729,11 +1729,11 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				staker.Priority = txs.SubnetPermissionlessValidatorCurrentPriority
 
 				// Set dependency expectations.
-				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime)
+				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).Times(2)
 				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(&staker, nil).Times(1)
 
 				cfg := defaultTestConfig(t, durango, env.latestForkTime)
-				feeCalculator := fee.NewStaticCalculator(cfg.StaticFeeConfig, cfg.UpgradeConfig)
+				feeCalculator := fee.NewStaticCalculator(cfg.StaticFeeConfig, cfg.UpgradeConfig, env.state.GetTimestamp())
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config:       cfg,
@@ -1758,11 +1758,11 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				// Remove credentials
 				env.tx.Creds = nil
 				env.state = state.NewMockDiff(ctrl)
-				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime)
+				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).Times(2)
 				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(env.staker, nil)
 
 				cfg := defaultTestConfig(t, durango, env.latestForkTime)
-				feeCalculator := fee.NewStaticCalculator(cfg.StaticFeeConfig, cfg.UpgradeConfig)
+				feeCalculator := fee.NewStaticCalculator(cfg.StaticFeeConfig, cfg.UpgradeConfig, env.state.GetTimestamp())
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config:       cfg,
@@ -1785,12 +1785,12 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *StandardTxExecutor) {
 				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
 				env.state = state.NewMockDiff(ctrl)
-				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime)
+				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).Times(2)
 				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(env.staker, nil)
 				env.state.EXPECT().GetSubnetOwner(env.unsignedTx.Subnet).Return(nil, database.ErrNotFound)
 
 				cfg := defaultTestConfig(t, durango, env.latestForkTime)
-				feeCalculator := fee.NewStaticCalculator(cfg.StaticFeeConfig, cfg.UpgradeConfig)
+				feeCalculator := fee.NewStaticCalculator(cfg.StaticFeeConfig, cfg.UpgradeConfig, env.state.GetTimestamp())
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config:       cfg,
@@ -1813,14 +1813,14 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *StandardTxExecutor) {
 				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
 				env.state = state.NewMockDiff(ctrl)
-				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime)
+				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).Times(2)
 				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(env.staker, nil)
 				subnetOwner := fx.NewMockOwner(ctrl)
 				env.state.EXPECT().GetSubnetOwner(env.unsignedTx.Subnet).Return(subnetOwner, nil)
 				env.fx.EXPECT().VerifyPermission(gomock.Any(), env.unsignedTx.SubnetAuth, env.tx.Creds[len(env.tx.Creds)-1], subnetOwner).Return(errTest)
 
 				cfg := defaultTestConfig(t, durango, env.latestForkTime)
-				feeCalculator := fee.NewStaticCalculator(cfg.StaticFeeConfig, cfg.UpgradeConfig)
+				feeCalculator := fee.NewStaticCalculator(cfg.StaticFeeConfig, cfg.UpgradeConfig, env.state.GetTimestamp())
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config:       cfg,
@@ -1843,7 +1843,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *StandardTxExecutor) {
 				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
 				env.state = state.NewMockDiff(ctrl)
-				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime)
+				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).Times(2)
 				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(env.staker, nil)
 				subnetOwner := fx.NewMockOwner(ctrl)
 				env.state.EXPECT().GetSubnetOwner(env.unsignedTx.Subnet).Return(subnetOwner, nil)
@@ -1853,7 +1853,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				).Return(errTest)
 
 				cfg := defaultTestConfig(t, durango, env.latestForkTime)
-				feeCalculator := fee.NewStaticCalculator(cfg.StaticFeeConfig, cfg.UpgradeConfig)
+				feeCalculator := fee.NewStaticCalculator(cfg.StaticFeeConfig, cfg.UpgradeConfig, env.state.GetTimestamp())
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config:       cfg,
@@ -2010,7 +2010,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 				env.state = state.NewMockDiff(ctrl)
 
 				cfg := defaultTestConfig(t, durango, env.latestForkTime)
-				feeCalculator := fee.NewStaticCalculator(cfg.StaticFeeConfig, cfg.UpgradeConfig)
+				feeCalculator := fee.NewStaticCalculator(cfg.StaticFeeConfig, cfg.UpgradeConfig, env.latestForkTime)
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config:       cfg,
@@ -2034,10 +2034,10 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 				env := newValidTransformSubnetTxVerifyEnv(t, ctrl)
 				env.unsignedTx.MaxStakeDuration = math.MaxUint32
 				env.state = state.NewMockDiff(ctrl)
-				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime)
+				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).Times(2)
 
 				cfg := defaultTestConfig(t, durango, env.latestForkTime)
-				feeCalculator := fee.NewStaticCalculator(cfg.StaticFeeConfig, cfg.UpgradeConfig)
+				feeCalculator := fee.NewStaticCalculator(cfg.StaticFeeConfig, cfg.UpgradeConfig, env.state.GetTimestamp())
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config:       cfg,
@@ -2062,12 +2062,12 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 				// Remove credentials
 				env.tx.Creds = nil
 				env.state = state.NewMockDiff(ctrl)
-				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime)
+				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).Times(2)
 
 				cfg := defaultTestConfig(t, durango, env.latestForkTime)
 				cfg.MaxStakeDuration = math.MaxInt64
 
-				feeCalculator := fee.NewStaticCalculator(cfg.StaticFeeConfig, cfg.UpgradeConfig)
+				feeCalculator := fee.NewStaticCalculator(cfg.StaticFeeConfig, cfg.UpgradeConfig, env.state.GetTimestamp())
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config:       cfg,
@@ -2091,7 +2091,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 				env := newValidTransformSubnetTxVerifyEnv(t, ctrl)
 				env.state = state.NewMockDiff(ctrl)
 				subnetOwner := fx.NewMockOwner(ctrl)
-				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime)
+				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).Times(2)
 				env.state.EXPECT().GetSubnetOwner(env.unsignedTx.Subnet).Return(subnetOwner, nil)
 				env.state.EXPECT().GetSubnetTransformation(env.unsignedTx.Subnet).Return(nil, database.ErrNotFound).Times(1)
 				env.fx.EXPECT().VerifyPermission(gomock.Any(), env.unsignedTx.SubnetAuth, env.tx.Creds[len(env.tx.Creds)-1], subnetOwner).Return(nil)
@@ -2102,7 +2102,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 				cfg := defaultTestConfig(t, durango, env.latestForkTime)
 				cfg.MaxStakeDuration = math.MaxInt64
 
-				feeCalculator := fee.NewStaticCalculator(cfg.StaticFeeConfig, cfg.UpgradeConfig)
+				feeCalculator := fee.NewStaticCalculator(cfg.StaticFeeConfig, cfg.UpgradeConfig, env.state.GetTimestamp())
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config:       cfg,
@@ -2127,7 +2127,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 
 				// Set dependency expectations.
 				subnetOwner := fx.NewMockOwner(ctrl)
-				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime)
+				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).Times(2)
 				env.state.EXPECT().GetSubnetOwner(env.unsignedTx.Subnet).Return(subnetOwner, nil).Times(1)
 				env.state.EXPECT().GetSubnetTransformation(env.unsignedTx.Subnet).Return(nil, database.ErrNotFound).Times(1)
 				env.fx.EXPECT().VerifyPermission(env.unsignedTx, env.unsignedTx.SubnetAuth, env.tx.Creds[len(env.tx.Creds)-1], subnetOwner).Return(nil).Times(1)
@@ -2142,7 +2142,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 				cfg := defaultTestConfig(t, durango, env.latestForkTime)
 				cfg.MaxStakeDuration = math.MaxInt64
 
-				feeCalculator := fee.NewStaticCalculator(cfg.StaticFeeConfig, cfg.UpgradeConfig)
+				feeCalculator := fee.NewStaticCalculator(cfg.StaticFeeConfig, cfg.UpgradeConfig, env.state.GetTimestamp())
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config:       cfg,

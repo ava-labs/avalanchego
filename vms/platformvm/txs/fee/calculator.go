@@ -13,24 +13,26 @@ import (
 
 var _ txs.Visitor = (*calculator)(nil)
 
-func NewStaticCalculator(config StaticConfig, upgradeTimes upgrade.Config) *Calculator {
+func NewStaticCalculator(config StaticConfig, upgradeTimes upgrade.Config, chainTime time.Time) *Calculator {
 	return &Calculator{
 		config:       config,
 		upgradeTimes: upgradeTimes,
+		time:         chainTime,
 	}
 }
 
 type Calculator struct {
 	config       StaticConfig
 	upgradeTimes upgrade.Config
+	time         time.Time
 }
 
 // [CalculateFee] returns the minimal fee needed to accept [tx], at chain time [time]
-func (c *Calculator) CalculateFee(tx txs.UnsignedTx, time time.Time) uint64 {
+func (c *Calculator) CalculateFee(tx txs.UnsignedTx) uint64 {
 	tmp := &calculator{
 		upgrades:  c.upgradeTimes,
 		staticCfg: c.config,
-		time:      time,
+		time:      c.time,
 	}
 
 	// this is guaranteed to never return an error

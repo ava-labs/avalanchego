@@ -263,7 +263,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 			onAbortState, err := state.NewDiff(lastAcceptedID, env)
 			require.NoError(err)
 
-			feeCalculator := fee.NewStaticCalculator(env.config.StaticFeeConfig, env.config.UpgradeConfig)
+			feeCalculator := fee.NewStaticCalculator(env.config.StaticFeeConfig, env.config.UpgradeConfig, onCommitState.GetTimestamp())
 			executor := ProposalTxExecutor{
 				OnCommitState: onCommitState,
 				OnAbortState:  onAbortState,
@@ -308,7 +308,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		onAbortState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
 
-		feeCalculator := fee.NewStaticCalculator(env.config.StaticFeeConfig, env.config.UpgradeConfig)
+		feeCalculator := fee.NewStaticCalculator(env.config.StaticFeeConfig, env.config.UpgradeConfig, onCommitState.GetTimestamp())
 		executor := ProposalTxExecutor{
 			OnCommitState: onCommitState,
 			OnAbortState:  onAbortState,
@@ -345,7 +345,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		onAbortState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
 
-		feeCalculator := fee.NewStaticCalculator(env.config.StaticFeeConfig, env.config.UpgradeConfig)
+		feeCalculator := fee.NewStaticCalculator(env.config.StaticFeeConfig, env.config.UpgradeConfig, onCommitState.GetTimestamp())
 		executor := ProposalTxExecutor{
 			OnCommitState: onCommitState,
 			OnAbortState:  onAbortState,
@@ -400,7 +400,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		onAbortState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
 
-		feeCalculator := fee.NewStaticCalculator(env.config.StaticFeeConfig, env.config.UpgradeConfig)
+		feeCalculator := fee.NewStaticCalculator(env.config.StaticFeeConfig, env.config.UpgradeConfig, onCommitState.GetTimestamp())
 		executor := ProposalTxExecutor{
 			OnCommitState: onCommitState,
 			OnAbortState:  onAbortState,
@@ -452,7 +452,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		onAbortState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
 
-		feeCalculator := fee.NewStaticCalculator(env.config.StaticFeeConfig, env.config.UpgradeConfig)
+		feeCalculator := fee.NewStaticCalculator(env.config.StaticFeeConfig, env.config.UpgradeConfig, onCommitState.GetTimestamp())
 		executor := ProposalTxExecutor{
 			OnCommitState: onCommitState,
 			OnAbortState:  onAbortState,
@@ -487,7 +487,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		onAbortState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
 
-		feeCalculator := fee.NewStaticCalculator(env.config.StaticFeeConfig, env.config.UpgradeConfig)
+		feeCalculator := fee.NewStaticCalculator(env.config.StaticFeeConfig, env.config.UpgradeConfig, onCommitState.GetTimestamp())
 		executor := ProposalTxExecutor{
 			OnCommitState: onCommitState,
 			OnAbortState:  onAbortState,
@@ -522,7 +522,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		onAbortState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
 
-		feeCalculator := fee.NewStaticCalculator(env.config.StaticFeeConfig, env.config.UpgradeConfig)
+		feeCalculator := fee.NewStaticCalculator(env.config.StaticFeeConfig, env.config.UpgradeConfig, onCommitState.GetTimestamp())
 		executor := ProposalTxExecutor{
 			OnCommitState: onCommitState,
 			OnAbortState:  onAbortState,
@@ -559,7 +559,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		onAbortState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
 
-		feeCalculator := fee.NewStaticCalculator(env.config.StaticFeeConfig, env.config.UpgradeConfig)
+		feeCalculator := fee.NewStaticCalculator(env.config.StaticFeeConfig, env.config.UpgradeConfig, onCommitState.GetTimestamp())
 		executor := ProposalTxExecutor{
 			OnCommitState: onCommitState,
 			OnAbortState:  onAbortState,
@@ -626,7 +626,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		onAbortState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
 
-		feeCalculator := fee.NewStaticCalculator(env.config.StaticFeeConfig, env.config.UpgradeConfig)
+		feeCalculator := fee.NewStaticCalculator(env.config.StaticFeeConfig, env.config.UpgradeConfig, onCommitState.GetTimestamp())
 		executor := ProposalTxExecutor{
 			OnCommitState: onCommitState,
 			OnAbortState:  onAbortState,
@@ -671,7 +671,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		onAbortState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
 
-		feeCalculator := fee.NewStaticCalculator(env.config.StaticFeeConfig, env.config.UpgradeConfig)
+		feeCalculator := fee.NewStaticCalculator(env.config.StaticFeeConfig, env.config.UpgradeConfig, onCommitState.GetTimestamp())
 		executor := ProposalTxExecutor{
 			OnCommitState: onCommitState,
 			OnAbortState:  onAbortState,
@@ -710,7 +710,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		onAbortState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
 
-		feeCalculator := fee.NewStaticCalculator(env.config.StaticFeeConfig, env.config.UpgradeConfig)
+		feeCalculator := fee.NewStaticCalculator(env.config.StaticFeeConfig, env.config.UpgradeConfig, onCommitState.GetTimestamp())
 		executor := ProposalTxExecutor{
 			OnCommitState: onCommitState,
 			OnAbortState:  onAbortState,
@@ -759,7 +759,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		onAbortState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
 
-		feeCalculator := fee.NewStaticCalculator(env.config.StaticFeeConfig, env.config.UpgradeConfig)
+		feeCalculator := fee.NewStaticCalculator(env.config.StaticFeeConfig, env.config.UpgradeConfig, onCommitState.GetTimestamp())
 		executor := ProposalTxExecutor{
 			OnCommitState: onCommitState,
 			OnAbortState:  onAbortState,
@@ -805,7 +805,7 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 		onAbortState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
 
-		feeCalculator := fee.NewStaticCalculator(env.config.StaticFeeConfig, env.config.UpgradeConfig)
+		feeCalculator := fee.NewStaticCalculator(env.config.StaticFeeConfig, env.config.UpgradeConfig, onCommitState.GetTimestamp())
 		executor := ProposalTxExecutor{
 			OnCommitState: onCommitState,
 			OnAbortState:  onAbortState,
@@ -843,7 +843,7 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 		onAbortState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
 
-		feeCalculator := fee.NewStaticCalculator(env.config.StaticFeeConfig, env.config.UpgradeConfig)
+		feeCalculator := fee.NewStaticCalculator(env.config.StaticFeeConfig, env.config.UpgradeConfig, onCommitState.GetTimestamp())
 		executor := ProposalTxExecutor{
 			OnCommitState: onCommitState,
 			OnAbortState:  onAbortState,
@@ -895,7 +895,7 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 		onAbortState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
 
-		feeCalculator := fee.NewStaticCalculator(env.config.StaticFeeConfig, env.config.UpgradeConfig)
+		feeCalculator := fee.NewStaticCalculator(env.config.StaticFeeConfig, env.config.UpgradeConfig, onCommitState.GetTimestamp())
 		executor := ProposalTxExecutor{
 			OnCommitState: onCommitState,
 			OnAbortState:  onAbortState,
@@ -939,7 +939,7 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 		onAbortState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
 
-		feeCalculator := fee.NewStaticCalculator(env.config.StaticFeeConfig, env.config.UpgradeConfig)
+		feeCalculator := fee.NewStaticCalculator(env.config.StaticFeeConfig, env.config.UpgradeConfig, onCommitState.GetTimestamp())
 		executor := ProposalTxExecutor{
 			OnCommitState: onCommitState,
 			OnAbortState:  onAbortState,
