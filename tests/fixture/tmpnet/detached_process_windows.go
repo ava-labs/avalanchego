@@ -7,6 +7,6 @@ package tmpnet
 
 import "os/exec"
 
-func configureDetachedProcess(cmd *exec.Cmd) {
+func configureDetachedProcess(*exec.Cmd) {
 	panic("tmpnet deployment to windows is not supported")
 }
