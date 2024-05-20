@@ -52,7 +52,7 @@ func WithSampler(sampler Sampler) ClientOption {
 
 // clientOptions holds client-configurable values
 type clientOptions struct {
-	// sampler is used to sample nodes
+	// sampler is used to select nodes to route Client.AppRequestAny to
 	sampler Sampler
 }
 
