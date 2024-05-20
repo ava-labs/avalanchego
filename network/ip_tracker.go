@@ -115,8 +115,8 @@ type connectedNode struct {
 	// trackedSubnets contains all the subnets that this node is syncing,
 	// including the primary network.
 	trackedSubnets set.Set[ids.ID]
-	// ip this node claimed when connecting to use. The IP is not necessarily
-	// the same IP as in mostRecentTrackedIPs.
+	// ip this node claimed when connecting. The IP is not necessarily the same
+	// IP as in the tracked map.
 	ip *ips.ClaimedIPPort
 }
 
@@ -128,7 +128,7 @@ type gossipableSubnet struct {
 	manuallyGossipable set.Set[ids.NodeID]
 
 	// gossipableIDs contains the nodeIDs of all nodes whose IP could be
-	// gossiped.
+	// gossiped. This is a superset of manuallyGossipable.
 	gossipableIDs set.Set[ids.NodeID]
 
 	// An IP is marked as gossipable if all of the following conditions are met:
@@ -196,7 +196,7 @@ func (s *gossipableSubnet) getGossipableIPs(
 }
 
 func (s *gossipableSubnet) canDelete() bool {
-	return s.manuallyGossipable.Len() == 0 && s.gossipableIDs.Len() == 0
+	return s.gossipableIDs.Len() == 0
 }
 
 type ipTracker struct {
@@ -224,7 +224,8 @@ type ipTracker struct {
 	// Connected tracks the information of currently connected peers, including
 	// tracked and untracked nodes.
 	connected map[ids.NodeID]*connectedNode
-	subnet    map[ids.ID]*gossipableSubnet
+	// subnet tracks all the subnets that have at least one gossipable ID.
+	subnet map[ids.ID]*gossipableSubnet
 }
 
 // ManuallyTrack marks the provided nodeID as being desirable to connect to.
@@ -476,7 +477,7 @@ func (i *ipTracker) OnValidatorRemoved(subnetID ids.ID, nodeID ids.NodeID, _ uin
 
 	subnet, ok := i.subnet[subnetID]
 	if !ok {
-		i.log.Error("removing validator from untracked subnet",
+		i.log.Error("attempted removal of validator from untracked subnet",
 			zap.Stringer("subnetID", subnetID),
 			zap.Stringer("nodeID", nodeID),
 		)
@@ -497,7 +498,7 @@ func (i *ipTracker) OnValidatorRemoved(subnetID ids.ID, nodeID ids.NodeID, _ uin
 
 	trackedNode, ok := i.tracked[nodeID]
 	if !ok {
-		i.log.Error("removing untracked validator",
+		i.log.Error("attempted removal of untracked validator",
 			zap.Stringer("subnetID", subnetID),
 			zap.Stringer("nodeID", nodeID),
 		)
