@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 )
 
 // PrivateKey-vmRQiZeXEXYMyJhEiqdC2z5JhuDbxL8ix9UVvjgMu2Er1NepE => P-local1g65uqn6t77p656w64023nh8nd9updzmxyymev2
@@ -36,7 +37,7 @@ var (
 
 	// LocalParams are the params used for local networks
 	LocalParams = Params{
-		TxFeeConfig: TxFeeConfig{
+		StaticConfig: fee.StaticConfig{
 			TxFee:                         units.MilliAvax,
 			CreateAssetTxFee:              units.MilliAvax,
 			CreateSubnetTxFee:             100 * units.MilliAvax,
