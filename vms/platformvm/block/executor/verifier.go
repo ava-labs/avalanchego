@@ -69,20 +69,7 @@ func (v *verifier) BanffProposalBlock(b *block.BanffProposalBlock) error {
 		return err
 	}
 
-	var (
-		isEActive     = v.txExecutorBackend.Config.UpgradeConfig.IsEActivated(nextChainTime)
-		staticFeeCfg  = v.txExecutorBackend.Config.StaticFeeConfig
-		feeCalculator *fee.Calculator
-	)
-
-	if !isEActive {
-		feeCalculator = fee.NewStaticCalculator(staticFeeCfg, v.txExecutorBackend.Config.UpgradeConfig, nextChainTime)
-	} else {
-		feesCfg := config.GetDynamicFeesConfig(isEActive)
-		feesMan := fees.NewManager(feesCfg.FeeRate)
-		feeCalculator = fee.NewDynamicCalculator(staticFeeCfg, feesMan, feesCfg.BlockMaxComplexity)
-	}
-
+	feeCalculator := config.PickFeeCalculator(v.txExecutorBackend.Config, b.Timestamp())
 	inputs, atomicRequests, onAcceptFunc, err := v.processStandardTxs(b.Transactions, feeCalculator, onDecisionState, b.Parent())
 	if err != nil {
 		return err
@@ -137,20 +124,7 @@ func (v *verifier) BanffStandardBlock(b *block.BanffStandardBlock) error {
 		return errBanffStandardBlockWithoutChanges
 	}
 
-	var (
-		isEActive     = v.txExecutorBackend.Config.UpgradeConfig.IsEActivated(b.Timestamp())
-		staticFeeCfg  = v.txExecutorBackend.Config.StaticFeeConfig
-		feeCalculator *fee.Calculator
-	)
-
-	if !isEActive {
-		feeCalculator = fee.NewStaticCalculator(staticFeeCfg, v.txExecutorBackend.Config.UpgradeConfig, b.Timestamp())
-	} else {
-		feesCfg := config.GetDynamicFeesConfig(isEActive)
-		feesMan := fees.NewManager(feesCfg.FeeRate)
-		feeCalculator = fee.NewDynamicCalculator(staticFeeCfg, feesMan, feesCfg.BlockMaxComplexity)
-	}
-
+	feeCalculator := config.PickFeeCalculator(v.txExecutorBackend.Config, b.Timestamp())
 	return v.standardBlock(&b.ApricotStandardBlock, feeCalculator, onAcceptState)
 }
 

@@ -20,7 +20,6 @@ import (
 	"github.com/ava-labs/avalanchego/wallet/chain/p/builder"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
-	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 	vmsigner "github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	walletsigner "github.com/ava-labs/avalanchego/wallet/chain/p/signer"
 )
@@ -379,20 +378,6 @@ func (b *Builder) builders(keys []*secp256k1.PrivateKey) (builder.Builder, walle
 }
 
 func (b *Builder) feeCalculator() *fee.Calculator {
-	var (
-		staticFeeCfg = b.cfg.StaticFeeConfig
-		upgrades     = b.cfg.UpgradeConfig
-		chainTime    = b.state.GetTimestamp()
-		isEActive    = upgrades.IsEActivated(chainTime)
-	)
-
-	var feeCalculator *fee.Calculator
-	if !isEActive {
-		feeCalculator = fee.NewStaticCalculator(staticFeeCfg, upgrades, chainTime)
-	} else {
-		feeCfg := config.GetDynamicFeesConfig(isEActive)
-		feeMan := commonfees.NewManager(feeCfg.FeeRate)
-		feeCalculator = fee.NewDynamicCalculator(staticFeeCfg, feeMan, feeCfg.BlockMaxComplexity)
-	}
-	return feeCalculator
+	chainTime := b.state.GetTimestamp()
+	return config.PickFeeCalculator(b.cfg, chainTime)
 }

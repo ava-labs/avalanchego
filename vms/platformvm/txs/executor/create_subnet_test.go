@@ -12,10 +12,8 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/vms/components/fees"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -78,21 +76,7 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 
 			stateDiff.SetTimestamp(test.time)
 
-			var (
-				chainTime     = stateDiff.GetTimestamp()
-				isEActive     = env.backend.Config.UpgradeConfig.IsEActivated(chainTime)
-				staticFeeCfg  = env.backend.Config.StaticFeeConfig
-				feeCalculator *fee.Calculator
-			)
-
-			if !isEActive {
-				feeCalculator = fee.NewStaticCalculator(staticFeeCfg, env.backend.Config.UpgradeConfig, chainTime)
-			} else {
-				feesCfg := config.GetDynamicFeesConfig(isEActive)
-				feesMan := fees.NewManager(feesCfg.FeeRate)
-				feeCalculator = fee.NewDynamicCalculator(staticFeeCfg, feesMan, feesCfg.BlockMaxComplexity)
-			}
-
+			feeCalculator := config.PickFeeCalculator(env.backend.Config, stateDiff.GetTimestamp())
 			executor := StandardTxExecutor{
 				Backend:       &env.backend,
 				FeeCalculator: feeCalculator,

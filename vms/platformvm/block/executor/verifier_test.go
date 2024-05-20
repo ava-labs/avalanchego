@@ -32,7 +32,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 	"github.com/ava-labs/avalanchego/vms/platformvm/upgrade"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -219,21 +218,7 @@ func TestStandardBlockComplexity(t *testing.T) {
 				onAcceptState, err := state.NewDiffOn(env.state)
 				require.NoError(t, err)
 
-				var (
-					chainTime     = onAcceptState.GetTimestamp()
-					isEActive     = env.backend.Config.UpgradeConfig.IsEActivated(chainTime)
-					staticFeeCfg  = env.backend.Config.StaticFeeConfig
-					feeCalculator *fee.Calculator
-				)
-
-				if !isEActive {
-					feeCalculator = fee.NewStaticCalculator(staticFeeCfg, env.backend.Config.UpgradeConfig, chainTime)
-				} else {
-					feesCfg := config.GetDynamicFeesConfig(isEActive)
-					feesMan := commonfees.NewManager(feesCfg.FeeRate)
-					feeCalculator = fee.NewDynamicCalculator(staticFeeCfg, feesMan, feesCfg.BlockMaxComplexity)
-				}
-
+				feeCalculator := config.PickFeeCalculator(env.backend.Config, onAcceptState.GetTimestamp())
 				require.NoError(t, subnetValTx.Unsigned.Visit(&executor.StandardTxExecutor{
 					Backend:       env.backend,
 					State:         onAcceptState,

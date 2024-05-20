@@ -16,11 +16,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/vms/components/fees"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -49,21 +47,7 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
-	var (
-		chainTime     = stateDiff.GetTimestamp()
-		isEActive     = env.backend.Config.UpgradeConfig.IsEActivated(chainTime)
-		staticFeeCfg  = env.backend.Config.StaticFeeConfig
-		feeCalculator *fee.Calculator
-	)
-
-	if !isEActive {
-		feeCalculator = fee.NewStaticCalculator(staticFeeCfg, env.backend.Config.UpgradeConfig, chainTime)
-	} else {
-		feesCfg := config.GetDynamicFeesConfig(isEActive)
-		feesMan := fees.NewManager(feesCfg.FeeRate)
-		feeCalculator = fee.NewDynamicCalculator(staticFeeCfg, feesMan, feesCfg.BlockMaxComplexity)
-	}
-
+	feeCalculator := config.PickFeeCalculator(env.backend.Config, stateDiff.GetTimestamp())
 	executor := StandardTxExecutor{
 		Backend:       &env.backend,
 		FeeCalculator: feeCalculator,
@@ -103,21 +87,7 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
-	var (
-		chainTime     = stateDiff.GetTimestamp()
-		isEActive     = env.backend.Config.UpgradeConfig.IsEActivated(chainTime)
-		staticFeeCfg  = env.backend.Config.StaticFeeConfig
-		feeCalculator *fee.Calculator
-	)
-
-	if !isEActive {
-		feeCalculator = fee.NewStaticCalculator(staticFeeCfg, env.backend.Config.UpgradeConfig, chainTime)
-	} else {
-		feesCfg := config.GetDynamicFeesConfig(isEActive)
-		feesMan := fees.NewManager(feesCfg.FeeRate)
-		feeCalculator = fee.NewDynamicCalculator(staticFeeCfg, feesMan, feesCfg.BlockMaxComplexity)
-	}
-
+	feeCalculator := config.PickFeeCalculator(env.backend.Config, stateDiff.GetTimestamp())
 	executor := StandardTxExecutor{
 		Backend:       &env.backend,
 		FeeCalculator: feeCalculator,
@@ -151,21 +121,7 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
-	var (
-		chainTime     = stateDiff.GetTimestamp()
-		isEActive     = env.backend.Config.UpgradeConfig.IsEActivated(chainTime)
-		staticFeeCfg  = env.backend.Config.StaticFeeConfig
-		feeCalculator *fee.Calculator
-	)
-
-	if !isEActive {
-		feeCalculator = fee.NewStaticCalculator(staticFeeCfg, env.backend.Config.UpgradeConfig, chainTime)
-	} else {
-		feesCfg := config.GetDynamicFeesConfig(isEActive)
-		feesMan := fees.NewManager(feesCfg.FeeRate)
-		feeCalculator = fee.NewDynamicCalculator(staticFeeCfg, feesMan, feesCfg.BlockMaxComplexity)
-	}
-
+	feeCalculator := config.PickFeeCalculator(env.backend.Config, stateDiff.GetTimestamp())
 	executor := StandardTxExecutor{
 		Backend:       &env.backend,
 		FeeCalculator: feeCalculator,
@@ -196,20 +152,7 @@ func TestCreateChainTxValid(t *testing.T) {
 	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
-	var (
-		chainTime     = stateDiff.GetTimestamp()
-		isEActive     = env.backend.Config.UpgradeConfig.IsEActivated(chainTime)
-		staticFeeCfg  = env.backend.Config.StaticFeeConfig
-		feeCalculator *fee.Calculator
-	)
-
-	if !isEActive {
-		feeCalculator = fee.NewStaticCalculator(staticFeeCfg, env.backend.Config.UpgradeConfig, chainTime)
-	} else {
-		feesCfg := config.GetDynamicFeesConfig(isEActive)
-		feesMan := fees.NewManager(feesCfg.FeeRate)
-		feeCalculator = fee.NewDynamicCalculator(staticFeeCfg, feesMan, feesCfg.BlockMaxComplexity)
-	}
+	feeCalculator := config.PickFeeCalculator(env.backend.Config, stateDiff.GetTimestamp())
 	executor := StandardTxExecutor{
 		Backend:       &env.backend,
 		FeeCalculator: feeCalculator,
@@ -278,20 +221,7 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 
 			stateDiff.SetTimestamp(test.time)
 
-			var (
-				chainTime     = stateDiff.GetTimestamp()
-				isEActive     = env.backend.Config.UpgradeConfig.IsEActivated(chainTime)
-				staticFeeCfg  = env.backend.Config.StaticFeeConfig
-				feeCalculator *fee.Calculator
-			)
-
-			if !isEActive {
-				feeCalculator = fee.NewStaticCalculator(staticFeeCfg, env.backend.Config.UpgradeConfig, chainTime)
-			} else {
-				feesCfg := config.GetDynamicFeesConfig(isEActive)
-				feesMan := fees.NewManager(feesCfg.FeeRate)
-				feeCalculator = fee.NewDynamicCalculator(staticFeeCfg, feesMan, feesCfg.BlockMaxComplexity)
-			}
+			feeCalculator := config.PickFeeCalculator(env.backend.Config, stateDiff.GetTimestamp())
 			executor := StandardTxExecutor{
 				Backend:       &env.backend,
 				FeeCalculator: feeCalculator,

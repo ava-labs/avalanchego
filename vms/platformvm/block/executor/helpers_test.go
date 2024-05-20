@@ -37,7 +37,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/components/fees"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
@@ -300,21 +299,7 @@ func addSubnet(env *environment) {
 		panic(err)
 	}
 
-	var (
-		chainTime     = stateDiff.GetTimestamp()
-		isEActive     = env.backend.Config.UpgradeConfig.IsEActivated(chainTime)
-		staticFeeCfg  = env.backend.Config.StaticFeeConfig
-		feeCalculator *fee.Calculator
-	)
-
-	if !isEActive {
-		feeCalculator = fee.NewStaticCalculator(staticFeeCfg, env.backend.Config.UpgradeConfig, chainTime)
-	} else {
-		feesCfg := config.GetDynamicFeesConfig(isEActive)
-		feesMan := fees.NewManager(feesCfg.FeeRate)
-		feeCalculator = fee.NewDynamicCalculator(staticFeeCfg, feesMan, feesCfg.BlockMaxComplexity)
-	}
-
+	feeCalculator := config.PickFeeCalculator(env.backend.Config, stateDiff.GetTimestamp())
 	executor := executor.StandardTxExecutor{
 		Backend:       env.backend,
 		State:         stateDiff,
