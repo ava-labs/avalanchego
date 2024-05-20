@@ -13,8 +13,8 @@ import (
 
 var _ txs.Visitor = (*calculator)(nil)
 
-func NewStaticCalculator(config StaticConfig, upgradeTimes upgrade.Config) Calculator {
-	return Calculator{
+func NewStaticCalculator(config StaticConfig, upgradeTimes upgrade.Config) *Calculator {
+	return &Calculator{
 		config:       config,
 		upgradeTimes: upgradeTimes,
 	}

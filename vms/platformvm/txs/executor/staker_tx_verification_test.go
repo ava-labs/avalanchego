@@ -22,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -505,13 +506,14 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 			ctrl := gomock.NewController(t)
 
 			var (
-				backend = tt.backendF(ctrl)
-				state   = tt.stateF(ctrl)
-				sTx     = tt.sTxF()
-				tx      = tt.txF()
+				backend       = tt.backendF(ctrl)
+				state         = tt.stateF(ctrl)
+				sTx           = tt.sTxF()
+				tx            = tt.txF()
+				feeCalculator = fee.NewStaticCalculator(backend.Config.StaticFeeConfig, backend.Config.UpgradeConfig)
 			)
 
-			err := verifyAddPermissionlessValidatorTx(backend, state, sTx, tx)
+			err := verifyAddPermissionlessValidatorTx(backend, feeCalculator, state, sTx, tx)
 			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}
