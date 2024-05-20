@@ -17,7 +17,7 @@ import (
 var (
 	_ database.Iterator = (*iter)(nil)
 
-	errCouldntGetValue = errors.New("couldnt get iterator value")
+	errCouldNotGetValue = errors.New("could not get iterator value")
 )
 
 type iter struct {
@@ -63,16 +63,16 @@ func (it *iter) Next() bool {
 		return false
 	}
 
-	it.nextKey = it.iter.Key()
-
-	var err error
-	it.nextVal, err = it.iter.ValueAndErr()
+	key := it.iter.Key()
+	value, err := it.iter.ValueAndErr()
 	if err != nil {
 		it.hasNext = false
-		it.err = fmt.Errorf("%w: %w", errCouldntGetValue, err)
+		it.err = fmt.Errorf("%w: %w", errCouldNotGetValue, err)
 		return false
 	}
 
+	it.nextKey = key
+	it.nextVal = value
 	return true
 }
 
@@ -121,6 +121,11 @@ func (it *iter) release() {
 	if it.closed {
 		return
 	}
+
+	// Cloning these values ensures that calling it.Key() or it.Value() after
+	// releasing the iterator will not segfault.
+	it.nextKey = slices.Clone(it.nextKey)
+	it.nextVal = slices.Clone(it.nextVal)
 
 	// Remove the iterator from the list of open iterators.
 	it.db.openIterators.Remove(it)
