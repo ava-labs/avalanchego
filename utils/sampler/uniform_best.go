@@ -56,7 +56,7 @@ samplerLoop:
 
 		start := s.clock.Time()
 		for i := 0; i < s.benchmarkIterations; i++ {
-			if _, err := sampler.Sample(sampleSize); err != nil {
+			if _, ok := sampler.Sample(sampleSize); !ok {
 				continue samplerLoop
 			}
 		}

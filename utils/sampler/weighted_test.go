@@ -97,8 +97,8 @@ func WeightedOutOfRangeTest(t *testing.T, s Weighted) {
 
 	require.NoError(s.Initialize([]uint64{1}))
 
-	_, err := s.Sample(1)
-	require.ErrorIs(err, ErrOutOfRange)
+	_, ok := s.Sample(1)
+	require.False(ok)
 }
 
 func WeightedSingletonTest(t *testing.T, s Weighted) {
@@ -106,8 +106,8 @@ func WeightedSingletonTest(t *testing.T, s Weighted) {
 
 	require.NoError(s.Initialize([]uint64{1}))
 
-	index, err := s.Sample(0)
-	require.NoError(err)
+	index, ok := s.Sample(0)
+	require.True(ok)
 	require.Zero(index)
 }
 
@@ -116,8 +116,8 @@ func WeightedWithZeroTest(t *testing.T, s Weighted) {
 
 	require.NoError(s.Initialize([]uint64{0, 1}))
 
-	index, err := s.Sample(0)
-	require.NoError(err)
+	index, ok := s.Sample(0)
+	require.True(ok)
 	require.Equal(1, index)
 }
 
@@ -128,8 +128,8 @@ func WeightedDistributionTest(t *testing.T, s Weighted) {
 
 	counts := make([]int, 5)
 	for i := uint64(0); i < 11; i++ {
-		index, err := s.Sample(i)
-		require.NoError(err)
+		index, ok := s.Sample(i)
+		require.True(ok)
 		counts[index]++
 	}
 	require.Equal([]int{1, 1, 2, 3, 4}, counts)

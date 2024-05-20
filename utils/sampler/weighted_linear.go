@@ -68,15 +68,15 @@ func (s *weightedLinear) Initialize(weights []uint64) error {
 	return nil
 }
 
-func (s *weightedLinear) Sample(value uint64) (int, error) {
+func (s *weightedLinear) Sample(value uint64) (int, bool) {
 	if len(s.arr) == 0 || s.arr[len(s.arr)-1].cumulativeWeight <= value {
-		return 0, ErrOutOfRange
+		return 0, false
 	}
 
 	index := 0
 	for {
 		if elem := s.arr[index]; value < elem.cumulativeWeight {
-			return elem.index, nil
+			return elem.index, true
 		}
 		index++
 	}
