@@ -44,7 +44,7 @@ func awaitHealthyNode(ctx context.Context, uri string) error {
 		select {
 		case <-ticker.C:
 		case <-ctx.Done():
-			return fmt.Errorf("node health check cancelled at %s", uri)
+			return fmt.Errorf("node health check cancelled at %s: %w", uri, ctx.Err())
 		}
 	}
 }

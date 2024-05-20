@@ -237,5 +237,5 @@ func getServiceName(index int) string {
 	if index == 0 {
 		return baseName + "-bootstrap-node"
 	}
-	return fmt.Sprintf("%s-node-%d", baseName, index+1)
+	return fmt.Sprintf("%s-node-%d", baseName, index)
 }
