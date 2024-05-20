@@ -30,16 +30,4 @@ type StaticConfig struct {
 
 	// Transaction fee for adding a subnet delegator
 	AddSubnetDelegatorFee uint64
-
-	// The minimum amount of tokens one must bond to be a validator
-	MinValidatorStake uint64
-
-	// The maximum amount of tokens that can be bonded on a validator
-	MaxValidatorStake uint64
-
-	// Minimum stake, in nAVAX, that can be delegated on the primary network
-	MinDelegatorStake uint64
-
-	// Minimum fee that can be charged for delegation
-	MinDelegationFee uint32
 }
