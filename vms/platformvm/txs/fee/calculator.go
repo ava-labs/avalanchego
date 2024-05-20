@@ -26,6 +26,34 @@ var (
 	errFailedComplexityCumulation = errors.New("failed cumulating complexity")
 )
 
+func NewStaticCalculator(cfg StaticConfig, ut upgrade.Config, chainTime time.Time) *Calculator {
+	return &Calculator{
+		c: &calculator{
+			upgrades:  ut,
+			staticCfg: cfg,
+			time:      chainTime,
+		},
+	}
+}
+
+// NewDynamicCalculator must be used post E upgrade activation
+func NewDynamicCalculator(
+	cfg StaticConfig,
+	feeManager *fees.Manager,
+	blockMaxComplexity fees.Dimensions,
+	creds []verify.Verifiable,
+) *Calculator {
+	return &Calculator{
+		c: &calculator{
+			isEActive:          true,
+			staticCfg:          cfg,
+			feeManager:         feeManager,
+			blockMaxComplexity: blockMaxComplexity,
+			credentials:        creds,
+		},
+	}
+}
+
 type Calculator struct {
 	c *calculator
 }
@@ -67,34 +95,6 @@ type calculator struct {
 
 	// outputs of visitor execution
 	fee uint64
-}
-
-func NewStaticCalculator(cfg StaticConfig, ut upgrade.Config, chainTime time.Time) *Calculator {
-	return &Calculator{
-		c: &calculator{
-			upgrades:  ut,
-			staticCfg: cfg,
-			time:      chainTime,
-		},
-	}
-}
-
-// NewDynamicCalculator must be used post E upgrade activation
-func NewDynamicCalculator(
-	cfg StaticConfig,
-	feeManager *fees.Manager,
-	blockMaxComplexity fees.Dimensions,
-	creds []verify.Verifiable,
-) *Calculator {
-	return &Calculator{
-		c: &calculator{
-			isEActive:          true,
-			staticCfg:          cfg,
-			feeManager:         feeManager,
-			blockMaxComplexity: blockMaxComplexity,
-			credentials:        creds,
-		},
-	}
 }
 
 func (c *calculator) AddValidatorTx(*txs.AddValidatorTx) error {
