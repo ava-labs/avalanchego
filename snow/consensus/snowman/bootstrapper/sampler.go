@@ -4,10 +4,14 @@
 package bootstrapper
 
 import (
+	"errors"
+
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/sampler"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
+
+var errUnexpectedSamplerFailure = errors.New("unexpected sampler failure")
 
 // Sample keys from [elements] uniformly by weight without replacement. The
 // returned set will have size less than or equal to [maxSize]. This function
@@ -36,9 +40,9 @@ func Sample[T comparable](elements map[T]uint64, maxSize int) (set.Set[T], error
 	}
 
 	maxSize = int(min(uint64(maxSize), totalWeight))
-	indices, err := sampler.Sample(maxSize)
-	if err != nil {
-		return nil, err
+	indices, ok := sampler.Sample(maxSize)
+	if !ok {
+		return nil, errUnexpectedSamplerFailure
 	}
 
 	sampledElements := set.NewSet[T](maxSize)
