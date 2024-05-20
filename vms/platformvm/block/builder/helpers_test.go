@@ -265,14 +265,26 @@ func addSubnet(t *testing.T, env *environment) {
 	stateDiff, err := state.NewDiff(genesisID, env.blkManager)
 	require.NoError(err)
 
-	chainTime := env.state.GetTimestamp()
-	feeCfg := config.GetDynamicFeesConfig(env.config.UpgradeConfig.IsEActivated(chainTime))
+	var (
+		chainTime     = stateDiff.GetTimestamp()
+		isEActive     = env.backend.Config.UpgradeConfig.IsEActivated(chainTime)
+		staticFeeCfg  = env.backend.Config.StaticFeeConfig
+		feeCalculator *fee.Calculator
+	)
+
+	if !isEActive {
+		feeCalculator = fee.NewStaticCalculator(staticFeeCfg, env.backend.Config.UpgradeConfig, chainTime)
+	} else {
+		feesCfg := config.GetDynamicFeesConfig(isEActive)
+		feesMan := fees.NewManager(feesCfg.FeeRate)
+		feeCalculator = fee.NewDynamicCalculator(staticFeeCfg, feesMan, feesCfg.BlockMaxComplexity)
+	}
+
 	executor := txexecutor.StandardTxExecutor{
-		Backend:            &env.backend,
-		BlkFeeManager:      fees.NewManager(feeCfg.FeeRate),
-		BlockMaxComplexity: feeCfg.BlockMaxComplexity,
-		State:              stateDiff,
-		Tx:                 testSubnet1,
+		Backend:       &env.backend,
+		State:         stateDiff,
+		FeeCalculator: feeCalculator,
+		Tx:            testSubnet1,
 	}
 	require.NoError(testSubnet1.Unsigned.Visit(&executor))
 

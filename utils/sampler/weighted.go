@@ -3,15 +3,11 @@
 
 package sampler
 
-import "errors"
-
-var ErrOutOfRange = errors.New("out of range")
-
 // Weighted defines how to sample a specified valued based on a provided
 // weighted distribution
 type Weighted interface {
 	Initialize(weights []uint64) error
-	Sample(sampleValue uint64) (int, error)
+	Sample(sampleValue uint64) (int, bool)
 }
 
 // NewWeighted returns a new sampler

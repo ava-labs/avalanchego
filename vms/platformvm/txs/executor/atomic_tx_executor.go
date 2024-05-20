@@ -7,11 +7,9 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-
-	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 )
 
 var _ txs.Visitor = (*AtomicTxExecutor)(nil)
@@ -101,13 +99,12 @@ func (e *AtomicTxExecutor) atomicTx(tx txs.UnsignedTx) error {
 	}
 	e.OnAccept = onAccept
 
-	feesCfg := config.GetDynamicFeesConfig(false /*isEActive*/)
+	feeCalculator := fee.NewStaticCalculator(e.Backend.Config.StaticFeeConfig, e.Backend.Config.UpgradeConfig, e.OnAccept.GetTimestamp())
 	executor := StandardTxExecutor{
-		Backend:            e.Backend,
-		BlkFeeManager:      commonfees.NewManager(feesCfg.FeeRate),
-		BlockMaxComplexity: feesCfg.BlockMaxComplexity,
-		State:              e.OnAccept,
-		Tx:                 e.Tx,
+		Backend:       e.Backend,
+		State:         e.OnAccept,
+		FeeCalculator: feeCalculator,
+		Tx:            e.Tx,
 	}
 	err = tx.Visit(&executor)
 	e.Inputs = executor.Inputs

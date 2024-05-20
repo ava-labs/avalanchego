@@ -26,11 +26,11 @@ var (
 	errFailedComplexityCumulation = errors.New("failed cumulating complexity")
 )
 
-func NewStaticCalculator(cfg StaticConfig, ut upgrade.Config, chainTime time.Time) *Calculator {
+func NewStaticCalculator(config StaticConfig, upgradeTimes upgrade.Config, chainTime time.Time) *Calculator {
 	return &Calculator{
 		c: &calculator{
-			upgrades:  ut,
-			staticCfg: cfg,
+			upgrades:  upgradeTimes,
+			staticCfg: config,
 			time:      chainTime,
 		},
 	}
@@ -41,7 +41,6 @@ func NewDynamicCalculator(
 	cfg StaticConfig,
 	feeManager *fees.Manager,
 	blockMaxComplexity fees.Dimensions,
-	creds []verify.Verifiable,
 ) *Calculator {
 	return &Calculator{
 		c: &calculator{
@@ -49,7 +48,7 @@ func NewDynamicCalculator(
 			staticCfg:          cfg,
 			feeManager:         feeManager,
 			blockMaxComplexity: blockMaxComplexity,
-			credentials:        creds,
+			// credentials are set when CalculateFee is called
 		},
 	}
 }
@@ -66,7 +65,8 @@ func (c *Calculator) ResetFee(newFee uint64) {
 	c.c.fee = newFee
 }
 
-func (c *Calculator) ComputeFee(tx txs.UnsignedTx) (uint64, error) {
+func (c *Calculator) ComputeFee(tx txs.UnsignedTx, creds []verify.Verifiable) (uint64, error) {
+	c.c.credentials = creds
 	err := tx.Visit(c.c)
 	return c.c.fee, err
 }
@@ -77,6 +77,13 @@ func (c *Calculator) AddFeesFor(complexity fees.Dimensions) (uint64, error) {
 
 func (c *Calculator) RemoveFeesFor(unitsToRm fees.Dimensions) (uint64, error) {
 	return c.c.removeFeesFor(unitsToRm)
+}
+
+func (c *Calculator) GetCumulatedComplexity() fees.Dimensions {
+	if c.c.feeManager != nil {
+		return c.c.feeManager.GetCumulatedComplexity()
+	}
+	return fees.Empty
 }
 
 type calculator struct {
@@ -165,13 +172,13 @@ func (c *calculator) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 }
 
 func (c *calculator) AdvanceTimeTx(*txs.AdvanceTimeTx) error {
-	c.fee = 0
-	return nil // no fees
+	c.fee = 0 // no fees
+	return nil
 }
 
 func (c *calculator) RewardValidatorTx(*txs.RewardValidatorTx) error {
-	c.fee = 0
-	return nil // no fees
+	c.fee = 0 // no fees
+	return nil
 }
 
 func (c *calculator) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx) error {

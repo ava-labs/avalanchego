@@ -300,14 +300,26 @@ func addSubnet(env *environment) {
 		panic(err)
 	}
 
-	chainTime := env.state.GetTimestamp()
-	feeCfg := config.GetDynamicFeesConfig(env.config.UpgradeConfig.IsEActivated(chainTime))
+	var (
+		chainTime     = stateDiff.GetTimestamp()
+		isEActive     = env.backend.Config.UpgradeConfig.IsEActivated(chainTime)
+		staticFeeCfg  = env.backend.Config.StaticFeeConfig
+		feeCalculator *fee.Calculator
+	)
+
+	if !isEActive {
+		feeCalculator = fee.NewStaticCalculator(staticFeeCfg, env.backend.Config.UpgradeConfig, chainTime)
+	} else {
+		feesCfg := config.GetDynamicFeesConfig(isEActive)
+		feesMan := fees.NewManager(feesCfg.FeeRate)
+		feeCalculator = fee.NewDynamicCalculator(staticFeeCfg, feesMan, feesCfg.BlockMaxComplexity)
+	}
+
 	executor := executor.StandardTxExecutor{
-		Backend:            env.backend,
-		BlkFeeManager:      fees.NewManager(feeCfg.FeeRate),
-		BlockMaxComplexity: feeCfg.BlockMaxComplexity,
-		State:              stateDiff,
-		Tx:                 testSubnet1,
+		Backend:       env.backend,
+		State:         stateDiff,
+		FeeCalculator: feeCalculator,
+		Tx:            testSubnet1,
 	}
 	err = testSubnet1.Unsigned.Visit(&executor)
 	if err != nil {
@@ -575,11 +587,10 @@ func fundedSharedMemory(
 	peerSharedMemory := m.NewSharedMemory(peerChain)
 
 	for assetID, amt := range assets {
-		// #nosec G404
 		utxo := &avax.UTXO{
 			UTXOID: avax.UTXOID{
 				TxID:        ids.GenerateTestID(),
-				OutputIndex: rand.Uint32(),
+				OutputIndex: rand.Uint32(), // #nosec G404
 			},
 			Asset: avax.Asset{ID: assetID},
 			Out: &secp256k1fx.TransferOutput{

@@ -400,8 +400,8 @@ func (i *ipTracker) GetGossipableIPs(
 
 	uniform.Initialize(uint64(len(i.gossipableIPs)))
 	for len(ips) < maxNumIPs {
-		index, err := uniform.Next()
-		if err != nil {
+		index, hasNext := uniform.Next()
+		if !hasNext {
 			return ips
 		}
 

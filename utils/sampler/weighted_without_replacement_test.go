@@ -99,8 +99,8 @@ func WeightedWithoutReplacementOutOfRangeTest(
 
 	require.NoError(s.Initialize([]uint64{1}))
 
-	_, err := s.Sample(2)
-	require.ErrorIs(err, ErrOutOfRange)
+	_, ok := s.Sample(2)
+	require.False(ok)
 }
 
 func WeightedWithoutReplacementEmptyWithoutWeightTest(
@@ -111,8 +111,8 @@ func WeightedWithoutReplacementEmptyWithoutWeightTest(
 
 	require.NoError(s.Initialize(nil))
 
-	indices, err := s.Sample(0)
-	require.NoError(err)
+	indices, ok := s.Sample(0)
+	require.True(ok)
 	require.Empty(indices)
 }
 
@@ -124,8 +124,8 @@ func WeightedWithoutReplacementEmptyTest(
 
 	require.NoError(s.Initialize([]uint64{1}))
 
-	indices, err := s.Sample(0)
-	require.NoError(err)
+	indices, ok := s.Sample(0)
+	require.True(ok)
 	require.Empty(indices)
 }
 
@@ -137,8 +137,8 @@ func WeightedWithoutReplacementSingletonTest(
 
 	require.NoError(s.Initialize([]uint64{1}))
 
-	indices, err := s.Sample(1)
-	require.NoError(err)
+	indices, ok := s.Sample(1)
+	require.True(ok)
 	require.Equal([]int{0}, indices)
 }
 
@@ -150,8 +150,8 @@ func WeightedWithoutReplacementWithZeroTest(
 
 	require.NoError(s.Initialize([]uint64{0, 1}))
 
-	indices, err := s.Sample(1)
-	require.NoError(err)
+	indices, ok := s.Sample(1)
+	require.True(ok)
 	require.Equal([]int{1}, indices)
 }
 
@@ -163,8 +163,8 @@ func WeightedWithoutReplacementDistributionTest(
 
 	require.NoError(s.Initialize([]uint64{1, 1, 2}))
 
-	indices, err := s.Sample(4)
-	require.NoError(err)
+	indices, ok := s.Sample(4)
+	require.True(ok)
 
 	slices.Sort(indices)
 	require.Equal([]int{0, 1, 2, 2}, indices)

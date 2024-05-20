@@ -16,8 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-
-	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 )
 
 const (
@@ -47,8 +46,8 @@ var (
 type ProposalTxExecutor struct {
 	// inputs, to be filled before visitor methods are called
 	*Backend
-	Tx *txs.Tx
-
+	FeeCalculator *fee.Calculator
+	Tx            *txs.Tx
 	// [OnCommitState] is the state used for validation.
 	// [OnCommitState] is modified by this struct's methods to
 	// reflect changes made to the state if the proposal is committed.
@@ -117,6 +116,7 @@ func (e *ProposalTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 
 	onAbortOuts, err := verifyAddValidatorTx(
 		e.Backend,
+		e.FeeCalculator,
 		e.OnCommitState,
 		e.Tx,
 		tx,
@@ -164,8 +164,7 @@ func (e *ProposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 
 	if err := verifyAddSubnetValidatorTx(
 		e.Backend,
-		commonfees.NewManager(commonfees.Empty),
-		commonfees.Max,
+		e.FeeCalculator,
 		e.OnCommitState,
 		e.Tx,
 		tx,
@@ -212,6 +211,7 @@ func (e *ProposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 
 	onAbortOuts, err := verifyAddDelegatorTx(
 		e.Backend,
+		e.FeeCalculator,
 		e.OnCommitState,
 		e.Tx,
 		tx,

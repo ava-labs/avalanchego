@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 )
 
 var (
@@ -68,7 +69,21 @@ func (v *verifier) BanffProposalBlock(b *block.BanffProposalBlock) error {
 		return err
 	}
 
-	inputs, feesMan, atomicRequests, onAcceptFunc, err := v.processStandardTxs(b.Transactions, onDecisionState, b.Parent())
+	var (
+		isEActive     = v.txExecutorBackend.Config.UpgradeConfig.IsEActivated(nextChainTime)
+		staticFeeCfg  = v.txExecutorBackend.Config.StaticFeeConfig
+		feeCalculator *fee.Calculator
+	)
+
+	if !isEActive {
+		feeCalculator = fee.NewStaticCalculator(staticFeeCfg, v.txExecutorBackend.Config.UpgradeConfig, nextChainTime)
+	} else {
+		feesCfg := config.GetDynamicFeesConfig(isEActive)
+		feesMan := fees.NewManager(feesCfg.FeeRate)
+		feeCalculator = fee.NewDynamicCalculator(staticFeeCfg, feesMan, feesCfg.BlockMaxComplexity)
+	}
+
+	inputs, atomicRequests, onAcceptFunc, err := v.processStandardTxs(b.Transactions, feeCalculator, onDecisionState, b.Parent())
 	if err != nil {
 		return err
 	}
@@ -88,7 +103,7 @@ func (v *verifier) BanffProposalBlock(b *block.BanffProposalBlock) error {
 		onDecisionState,
 		onCommitState,
 		onAbortState,
-		feesMan.GetCumulatedComplexity(),
+		feeCalculator,
 		inputs,
 		atomicRequests,
 		onAcceptFunc,
@@ -122,7 +137,21 @@ func (v *verifier) BanffStandardBlock(b *block.BanffStandardBlock) error {
 		return errBanffStandardBlockWithoutChanges
 	}
 
-	return v.standardBlock(&b.ApricotStandardBlock, onAcceptState)
+	var (
+		isEActive     = v.txExecutorBackend.Config.UpgradeConfig.IsEActivated(b.Timestamp())
+		staticFeeCfg  = v.txExecutorBackend.Config.StaticFeeConfig
+		feeCalculator *fee.Calculator
+	)
+
+	if !isEActive {
+		feeCalculator = fee.NewStaticCalculator(staticFeeCfg, v.txExecutorBackend.Config.UpgradeConfig, b.Timestamp())
+	} else {
+		feesCfg := config.GetDynamicFeesConfig(isEActive)
+		feesMan := fees.NewManager(feesCfg.FeeRate)
+		feeCalculator = fee.NewDynamicCalculator(staticFeeCfg, feesMan, feesCfg.BlockMaxComplexity)
+	}
+
+	return v.standardBlock(&b.ApricotStandardBlock, feeCalculator, onAcceptState)
 }
 
 func (v *verifier) ApricotAbortBlock(b *block.ApricotAbortBlock) error {
@@ -154,7 +183,12 @@ func (v *verifier) ApricotProposalBlock(b *block.ApricotProposalBlock) error {
 		return err
 	}
 
-	return v.proposalBlock(b, nil, onCommitState, onAbortState, fees.Empty, nil, nil, nil)
+	var (
+		staticFeesCfg = v.txExecutorBackend.Config.StaticFeeConfig
+		upgrades      = v.txExecutorBackend.Config.UpgradeConfig
+		feeCalculator = fee.NewStaticCalculator(staticFeesCfg, upgrades, onCommitState.GetTimestamp())
+	)
+	return v.proposalBlock(b, nil, onCommitState, onAbortState, feeCalculator, nil, nil, nil)
 }
 
 func (v *verifier) ApricotStandardBlock(b *block.ApricotStandardBlock) error {
@@ -168,7 +202,12 @@ func (v *verifier) ApricotStandardBlock(b *block.ApricotStandardBlock) error {
 		return err
 	}
 
-	return v.standardBlock(b, onAcceptState)
+	var (
+		staticFeesCfg = v.txExecutorBackend.Config.StaticFeeConfig
+		upgrades      = v.txExecutorBackend.Config.UpgradeConfig
+		feeCalculator = fee.NewStaticCalculator(staticFeesCfg, upgrades, onAcceptState.GetTimestamp())
+	)
+	return v.standardBlock(b, feeCalculator, onAcceptState)
 }
 
 func (v *verifier) ApricotAtomicBlock(b *block.ApricotAtomicBlock) error {
@@ -366,7 +405,7 @@ func (v *verifier) proposalBlock(
 	onDecisionState state.Diff,
 	onCommitState state.Diff,
 	onAbortState state.Diff,
-	blockComplexity fees.Dimensions,
+	feeCalculator *fee.Calculator,
 	inputs set.Set[ids.ID],
 	atomicRequests map[ids.ID]*atomic.Requests,
 	onAcceptFunc func(),
@@ -375,6 +414,7 @@ func (v *verifier) proposalBlock(
 		OnCommitState: onCommitState,
 		OnAbortState:  onAbortState,
 		Backend:       v.txExecutorBackend,
+		FeeCalculator: feeCalculator,
 		Tx:            b.Tx,
 	}
 
@@ -406,7 +446,7 @@ func (v *verifier) proposalBlock(
 		// never be modified by an Apricot Abort block and the timestamp will
 		// always be the same as the Banff Proposal Block.
 		timestamp:       onAbortState.GetTimestamp(),
-		blockComplexity: blockComplexity,
+		blockComplexity: feeCalculator.GetCumulatedComplexity(),
 		atomicRequests:  atomicRequests,
 	}
 	return nil
@@ -415,9 +455,10 @@ func (v *verifier) proposalBlock(
 // standardBlock populates the state of this block if [nil] is returned
 func (v *verifier) standardBlock(
 	b *block.ApricotStandardBlock,
+	feeCalculator *fee.Calculator,
 	onAcceptState state.Diff,
 ) error {
-	inputs, feeMan, atomicRequests, onAcceptFunc, err := v.processStandardTxs(b.Transactions, onAcceptState, b.Parent())
+	inputs, atomicRequests, onAcceptFunc, err := v.processStandardTxs(b.Transactions, feeCalculator, onAcceptState, b.Parent())
 	if err != nil {
 		return err
 	}
@@ -432,46 +473,41 @@ func (v *verifier) standardBlock(
 		onAcceptFunc:  onAcceptFunc,
 
 		timestamp:       onAcceptState.GetTimestamp(),
-		blockComplexity: feeMan.GetCumulatedComplexity(),
+		blockComplexity: feeCalculator.GetCumulatedComplexity(),
 		inputs:          inputs,
 		atomicRequests:  atomicRequests,
 	}
 	return nil
 }
 
-func (v *verifier) processStandardTxs(txs []*txs.Tx, state state.Diff, parentID ids.ID) (
+func (v *verifier) processStandardTxs(txs []*txs.Tx, feeCalculator *fee.Calculator, state state.Diff, parentID ids.ID) (
 	set.Set[ids.ID],
-	*fees.Manager,
 	map[ids.ID]*atomic.Requests,
 	func(),
 	error,
 ) {
 	var (
-		isEActive = v.txExecutorBackend.Config.UpgradeConfig.IsEActivated(state.GetTimestamp())
-		feesCfg   = config.GetDynamicFeesConfig(isEActive)
-		feesMan   = fees.NewManager(feesCfg.FeeRate)
-
 		onAcceptFunc   func()
 		inputs         set.Set[ids.ID]
 		funcs          = make([]func(), 0, len(txs))
 		atomicRequests = make(map[ids.ID]*atomic.Requests)
 	)
+
 	for _, tx := range txs {
 		txExecutor := executor.StandardTxExecutor{
-			Backend:            v.txExecutorBackend,
-			BlkFeeManager:      feesMan,
-			BlockMaxComplexity: feesCfg.BlockMaxComplexity,
-			State:              state,
-			Tx:                 tx,
+			Backend:       v.txExecutorBackend,
+			State:         state,
+			FeeCalculator: feeCalculator,
+			Tx:            tx,
 		}
 		if err := tx.Unsigned.Visit(&txExecutor); err != nil {
 			txID := tx.ID()
 			v.MarkDropped(txID, err) // cache tx as dropped
-			return nil, nil, nil, nil, err
+			return nil, nil, nil, err
 		}
 		// ensure it doesn't overlap with current input batch
 		if inputs.Overlaps(txExecutor.Inputs) {
-			return nil, nil, nil, nil, ErrConflictingBlockTxs
+			return nil, nil, nil, ErrConflictingBlockTxs
 		}
 		// Add UTXOs to batch
 		inputs.Union(txExecutor.Inputs)
@@ -495,7 +531,7 @@ func (v *verifier) processStandardTxs(txs []*txs.Tx, state state.Diff, parentID 
 	}
 
 	if err := v.verifyUniqueInputs(parentID, inputs); err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	if numFuncs := len(funcs); numFuncs == 1 {
@@ -508,5 +544,5 @@ func (v *verifier) processStandardTxs(txs []*txs.Tx, state state.Diff, parentID 
 		}
 	}
 
-	return inputs, feesMan, atomicRequests, onAcceptFunc, nil
+	return inputs, atomicRequests, onAcceptFunc, nil
 }

@@ -133,11 +133,12 @@ func TestGetTxStatus(t *testing.T) {
 	sm := m.NewSharedMemory(service.vm.ctx.ChainID)
 	peerSharedMemory := m.NewSharedMemory(service.vm.ctx.XChainID)
 
-	// #nosec G404
+	randSrc := rand.NewSource(0)
+
 	utxo := &avax.UTXO{
 		UTXOID: avax.UTXOID{
 			TxID:        ids.GenerateTestID(),
-			OutputIndex: rand.Uint32(),
+			OutputIndex: uint32(randSrc.Int63()),
 		},
 		Asset: avax.Asset{ID: service.vm.ctx.AVAXAssetID},
 		Out: &secp256k1fx.TransferOutput{
@@ -395,10 +396,10 @@ func TestGetBalance(t *testing.T) {
 			} else {
 				feeCfg := config.GetDynamicFeesConfig(true)
 				feeMan := commonfees.NewManager(feeCfg.FeeRate)
-				feeCalc = fee.NewDynamicCalculator(staticFeeCfg, feeMan, feeCfg.BlockMaxComplexity, testSubnet1.Creds)
+				feeCalc = fee.NewDynamicCalculator(staticFeeCfg, feeMan, feeCfg.BlockMaxComplexity)
 			}
 
-			fee, err := feeCalc.ComputeFee(testSubnet1.Unsigned)
+			fee, err := feeCalc.ComputeFee(testSubnet1.Unsigned, testSubnet1.Creds)
 			require.NoError(err)
 			balance = defaultBalance - fee
 		}

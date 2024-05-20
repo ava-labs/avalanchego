@@ -24,6 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
@@ -334,13 +335,20 @@ func packBlockTxs(
 	}
 
 	var (
-		isEActivated = backend.Config.UpgradeConfig.IsEActivated(timestamp)
-		feeCfg       = config.GetDynamicFeesConfig(isEActivated)
-		feeMan       = fees.NewManager(feeCfg.FeeRate)
-
-		blockTxs []*txs.Tx
-		inputs   set.Set[ids.ID]
+		blockTxs      []*txs.Tx
+		inputs        set.Set[ids.ID]
+		isEActive     = backend.Config.UpgradeConfig.IsEActivated(timestamp)
+		staticFeeCfg  = backend.Config.StaticFeeConfig
+		feeCalculator *fee.Calculator
 	)
+
+	if !isEActive {
+		feeCalculator = fee.NewStaticCalculator(staticFeeCfg, backend.Config.UpgradeConfig, timestamp)
+	} else {
+		feesCfg := config.GetDynamicFeesConfig(isEActive)
+		feesMan := fees.NewManager(feesCfg.FeeRate)
+		feeCalculator = fee.NewDynamicCalculator(staticFeeCfg, feesMan, feesCfg.BlockMaxComplexity)
+	}
 
 	for {
 		tx, exists := mempool.Peek()
@@ -361,11 +369,10 @@ func packBlockTxs(
 		}
 
 		executor := &txexecutor.StandardTxExecutor{
-			Backend:            backend,
-			BlkFeeManager:      feeMan,
-			BlockMaxComplexity: feeCfg.BlockMaxComplexity,
-			State:              txDiff,
-			Tx:                 tx,
+			Backend:       backend,
+			State:         txDiff,
+			FeeCalculator: feeCalculator,
+			Tx:            tx,
 		}
 
 		err = tx.Unsigned.Visit(executor)

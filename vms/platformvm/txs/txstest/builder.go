@@ -392,7 +392,7 @@ func (b *Builder) feeCalculator() *fee.Calculator {
 	} else {
 		feeCfg := config.GetDynamicFeesConfig(isEActive)
 		feeMan := commonfees.NewManager(feeCfg.FeeRate)
-		feeCalculator = fee.NewDynamicCalculator(staticFeeCfg, feeMan, feeCfg.BlockMaxComplexity, nil)
+		feeCalculator = fee.NewDynamicCalculator(staticFeeCfg, feeMan, feeCfg.BlockMaxComplexity)
 	}
 	return feeCalculator
 }

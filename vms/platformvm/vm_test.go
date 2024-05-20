@@ -406,10 +406,10 @@ func TestGenesis(t *testing.T) {
 			} else {
 				feeCfg := config.GetDynamicFeesConfig(upgrades.IsEActivated(chainTime))
 				feeMan := commonfees.NewManager(feeCfg.FeeRate)
-				feeCalc = fee.NewDynamicCalculator(staticFeeCfg, feeMan, feeCfg.BlockMaxComplexity, testSubnet1.Creds)
+				feeCalc = fee.NewDynamicCalculator(staticFeeCfg, feeMan, feeCfg.BlockMaxComplexity)
 			}
 
-			fee, err := feeCalc.ComputeFee(testSubnet1.Unsigned)
+			fee, err := feeCalc.ComputeFee(testSubnet1.Unsigned, testSubnet1.Creds)
 			require.NoError(err)
 			require.Equal(uint64(utxo.Amount)-fee, out.Amount())
 		}
@@ -2111,7 +2111,7 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 	validatorStartTime := latestForkTime.Add(txexecutor.SyncBound).Add(1 * time.Second)
 	validatorEndTime := validatorStartTime.Add(360 * 24 * time.Hour)
 
-	vm, txBuilder, _, _ := defaultVM(t, latestFork)
+	vm, txBuilder, _, _ := defaultVM(t, durango)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
@@ -2402,10 +2402,10 @@ func TestBaseTx(t *testing.T) {
 	} else {
 		feeCfg := config.GetDynamicFeesConfig(upgrades.IsEActivated(chainTime))
 		feeMan := commonfees.NewManager(feeCfg.FeeRate)
-		feeCalc = fee.NewDynamicCalculator(staticFeeCfg, feeMan, feeCfg.BlockMaxComplexity, baseTx.Creds)
+		feeCalc = fee.NewDynamicCalculator(staticFeeCfg, feeMan, feeCfg.BlockMaxComplexity)
 	}
 
-	fee, err := feeCalc.ComputeFee(baseTx.Unsigned)
+	fee, err := feeCalc.ComputeFee(baseTx.Unsigned, baseTx.Creds)
 	require.NoError(err)
 	require.Equal(fee, totalInputAmt-totalOutputAmt)
 	require.Equal(sendAmt, key1OutputAmt)
