@@ -151,7 +151,7 @@ func TestGossiperGossip(t *testing.T) {
 				require.NoError(requestSet.Add(item))
 			}
 
-			requestClient := requestNetwork.NewClient(ids.GenerateTestNodeID(), 0x0)
+			requestClient := requestNetwork.NewClient(0x0)
 
 			require.NoError(err)
 			gossiper := NewPullGossiper[*testTx](
@@ -519,7 +519,7 @@ func TestPushGossiper(t *testing.T) {
 				"",
 			)
 			require.NoError(err)
-			client := network.NewClient(ids.GenerateTestNodeID(), 0)
+			client := network.NewClient(0)
 			validators := p2p.NewValidators(
 				logging.NoLog{},
 				constants.PrimaryNetworkID,

@@ -65,10 +65,12 @@ func New(
 		config.MaxValidatorSetStaleness,
 	)
 	txGossipClient := p2pNetwork.NewClient(
-		nodeID,
 		TxGossipHandlerID,
 		p2p.WithSampler(
-			p2p.RestrictSampler(validators, p2pNetwork.Peers.Has),
+			p2p.NewUniformSampler(
+				p2p.NewPeerSamplingFilter(nodeID),
+				p2p.NewValidatorSamplingFilter(validators),
+			),
 		),
 	)
 	txGossipMetrics, err := gossip.NewMetrics(registerer, "tx")
