@@ -566,10 +566,6 @@ func TestIPTracker_AddIP(t *testing.T) {
 			expectedChange: func(tracker *ipTracker) {
 				tracker.tracked[newerIP.NodeID].ip = newerIP
 				tracker.bloomAdditions[newerIP.NodeID] = 2
-
-				subnet := tracker.subnet[subnetID]
-				delete(subnet.gossipableIndices, newerIP.NodeID)
-				subnet.gossipableIPs = subnet.gossipableIPs[:0]
 			},
 		},
 	}
