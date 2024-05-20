@@ -106,7 +106,6 @@ func (v *Validators) refresh(ctx context.Context) {
 	v.lastUpdated = time.Now()
 }
 
-// TODO write unit tests
 // Top returns the top [percentage] of validators by stake
 func (v *Validators) Top(ctx context.Context, percentage float64) []ids.NodeID {
 	percentage = max(0, min(1, percentage)) // bound percentage inside [0, 1]

@@ -29,6 +29,7 @@ var (
 		Message: "foo",
 	}
 
+	_ Sampler        = (*testSampler)(nil)
 	_ SamplingFilter = (*testFilter)(nil)
 )
 
@@ -484,56 +485,23 @@ func TestAppRequestDuplicateRequestIDs(t *testing.T) {
 }
 
 // AppRequestAny should send a request to a random peer that matches the
-// configured SamplingFilter
+// configured Sampler
 func TestClientAppRequestAny(t *testing.T) {
 	peerID := ids.GenerateTestNodeID()
 
 	tests := []struct {
-		name          string
-		connected     []ids.NodeID
-		filters       []SamplingFilter
-		expectedPeers []ids.NodeID
-		expected      error
+		name     string
+		sampler  *testSampler
+		expected error
 	}{
 		{
-			name:     "no peers - no peers connected",
+			name:     "peer not sampled",
+			sampler:  &testSampler{},
 			expected: ErrNoPeers,
 		},
 		{
-			name:      "no peers - no peers match filter",
-			connected: []ids.NodeID{peerID},
-			filters: []SamplingFilter{
-				testFilter{},
-			},
-			expected: ErrNoPeers,
-		},
-		{
-			name:          "has peers - no filter",
-			connected:     []ids.NodeID{peerID},
-			expectedPeers: []ids.NodeID{peerID},
-		},
-		{
-			name:      "has peers - peer matches filter",
-			connected: []ids.NodeID{peerID},
-			filters: []SamplingFilter{
-				testFilter{
-					nodeIDs: set.Of(peerID),
-				},
-			},
-			expectedPeers: []ids.NodeID{peerID},
-		},
-		{
-			name:      "has peers - peer matches multiple filters",
-			connected: []ids.NodeID{peerID},
-			filters: []SamplingFilter{
-				testFilter{
-					nodeIDs: set.Of(peerID),
-				},
-				testFilter{
-					nodeIDs: set.Of(peerID),
-				},
-			},
-			expectedPeers: []ids.NodeID{peerID},
+			name:    "peer sampled",
+			sampler: &testSampler{nodeID: peerID, ok: true},
 		},
 	}
 
@@ -551,17 +519,14 @@ func TestClientAppRequestAny(t *testing.T) {
 
 			n, err := NewNetwork(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
 			require.NoError(err)
-			for _, peer := range tt.connected {
-				require.NoError(n.Connected(context.Background(), peer, &version.Application{}))
-			}
+			require.NoError(n.Connected(context.Background(), peerID, &version.Application{}))
 
-			client := n.NewClient(1, WithSamplingFilters(tt.filters...))
+			client := n.NewClient(1, WithSampler(tt.sampler))
 
 			err = client.AppRequestAny(context.Background(), []byte("foobar"), nil)
 			require.ErrorIs(err, tt.expected)
-			require.Subset(tt.expectedPeers, sent.List())
 
-			if len(tt.expectedPeers) > 0 {
+			if err == nil {
 				require.Len(sent, 1)
 			} else {
 				require.Empty(sent)
@@ -580,10 +545,19 @@ func TestMultipleClients(t *testing.T) {
 	_ = n.NewClient(0)
 }
 
+type testSampler struct {
+	nodeID ids.NodeID
+	ok     bool
+}
+
+func (t *testSampler) Sample(context.Context, []ids.NodeID) (ids.NodeID, bool) {
+	return t.nodeID, t.ok
+}
+
 type testFilter struct {
 	nodeIDs set.Set[ids.NodeID]
 }
 
-func (t testFilter) Filter(_ context.Context, nodeID ids.NodeID) bool {
+func (t *testFilter) Filter(_ context.Context, nodeID ids.NodeID) bool {
 	return t.nodeIDs.Contains(nodeID)
 }

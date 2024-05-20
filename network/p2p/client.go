@@ -59,13 +59,12 @@ func (c *Client) AppRequestAny(
 	appRequestBytes []byte,
 	onResponse AppResponseCallback,
 ) error {
-	sampled := c.peers.sample(ctx, 1, c.options.samplingFilters...)
-	if len(sampled) != 1 {
+	nodeID, ok := c.peers.sample(ctx, c.options.sampler)
+	if !ok {
 		return ErrNoPeers
 	}
 
-	nodeIDs := set.Of(sampled...)
-	return c.AppRequest(ctx, nodeIDs, appRequestBytes, onResponse)
+	return c.AppRequest(ctx, set.Of(nodeID), appRequestBytes, onResponse)
 }
 
 // AppRequest issues an arbitrary request to a node.

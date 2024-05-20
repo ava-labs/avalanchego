@@ -44,16 +44,14 @@ func (o clientOptionFunc) apply(options *clientOptions) {
 }
 
 // WithSamplingFilters configures Client.AppRequestAny
-func WithSamplingFilters(filters ...SamplingFilter) ClientOption {
+func WithSampler(sampler Sampler) ClientOption {
 	return clientOptionFunc(func(options *clientOptions) {
-		options.samplingFilters = filters
+		options.sampler = sampler
 	})
 }
 
 // clientOptions holds client-configurable values
 type clientOptions struct {
-	// samplingFilters is used to select nodes to route Client.AppRequestAny to
-	samplingFilters []SamplingFilter
 	// sampler is used to sample nodes
 	sampler Sampler
 }
@@ -154,7 +152,9 @@ func (n *Network) Disconnected(_ context.Context, nodeID ids.NodeID) error {
 // NewClient returns a Client that can be used to send messages for the
 // corresponding protocol.
 func (n *Network) NewClient(handlerID uint64, options ...ClientOption) *Client {
-	clientOptions := &clientOptions{}
+	clientOptions := &clientOptions{
+		sampler: NewUniformSampler(),
+	}
 
 	for _, option := range options {
 		option.apply(clientOptions)
@@ -194,6 +194,13 @@ func (p *Peers) remove(nodeID ids.NodeID) {
 	defer p.lock.Unlock()
 
 	p.set.Remove(nodeID)
+}
+
+func (p *Peers) sample(ctx context.Context, sampler Sampler) (ids.NodeID, bool) {
+	p.lock.RLock()
+	defer p.lock.RLock()
+
+	return sampler.Sample(ctx, p.set.Elements)
 }
 
 func (p *Peers) Has(nodeID ids.NodeID) bool {
