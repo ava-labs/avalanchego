@@ -43,6 +43,7 @@ type Network struct {
 func New(
 	log logging.Logger,
 	nodeID ids.NodeID,
+	subnetID ids.ID,
 	vdrs validators.State,
 	parser txs.Parser,
 	txVerifier TxVerifier,
@@ -51,14 +52,7 @@ func New(
 	registerer prometheus.Registerer,
 	config Config,
 ) (*Network, error) {
-	p2pNetwork, err := p2p.NewNetwork(
-		log,
-		appSender,
-		vdrs,
-		config.MaxValidatorSetStaleness,
-		registerer,
-		"p2p",
-	)
+	p2pNetwork, err := p2p.NewNetwork(log, appSender, registerer, "p2p")
 	if err != nil {
 		return nil, err
 	}
@@ -66,12 +60,16 @@ func New(
 	marshaller := &txParser{
 		parser: parser,
 	}
-
+	validators := p2p.NewValidators(
+		log,
+		subnetID,
+		vdrs,
+		config.MaxValidatorSetStaleness,
+	)
 	txGossipClient := p2pNetwork.NewClient(
 		txGossipHandlerID,
-		p2p.WithSamplingFilters(
-			p2p.NewPeerSamplingFilter(nodeID),
-			p2p.NewValidatorSamplingFilter(p2pNetwork.Validators),
+		p2p.WithSampler(
+			p2p.RestrictSampler(validators, p2pNetwork.Peers.Has),
 		),
 	)
 	txGossipMetrics, err := gossip.NewMetrics(registerer, "tx")
@@ -96,7 +94,7 @@ func New(
 	txPushGossiper, err := gossip.NewPushGossiper[*txs.Tx](
 		marshaller,
 		gossipMempool,
-		p2pNetwork.Validators,
+		validators,
 		txGossipClient,
 		txGossipMetrics,
 		gossip.BranchingFactor{
@@ -129,7 +127,7 @@ func New(
 	txPullGossiper = gossip.ValidatorGossiper{
 		Gossiper:   txPullGossiper,
 		NodeID:     nodeID,
-		Validators: p2pNetwork.Validators,
+		Validators: validators,
 	}
 
 	handler := gossip.NewHandler[*txs.Tx](
@@ -149,7 +147,7 @@ func New(
 			),
 			log,
 		),
-		p2pNetwork.Validators,
+		validators,
 		log,
 	)
 

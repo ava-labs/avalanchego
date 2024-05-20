@@ -183,6 +183,7 @@ func (vm *VM) Initialize(
 	vm.Network, err = network.New(
 		chainCtx.Log,
 		chainCtx.NodeID,
+		chainCtx.SubnetID,
 		validators.NewLockedState(
 			&chainCtx.Lock,
 			validatorManager,

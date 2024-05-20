@@ -16,9 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/sampler"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
 )
@@ -64,8 +62,6 @@ type clientOptions struct {
 func NewNetwork(
 	log logging.Logger,
 	sender common.AppSender,
-	validatorState validators.State,
-	maxValidatorSetStaleness time.Duration,
 	registerer prometheus.Registerer,
 	namespace string,
 ) (*Network, error) {
@@ -100,12 +96,6 @@ func NewNetwork(
 		Peers: &Peers{
 			set: set.NewSlice[ids.NodeID](initialPeersSize),
 		},
-		Validators: newValidators(
-			log,
-			constants.PrimaryNetworkID,
-			validatorState,
-			maxValidatorSetStaleness,
-		),
 		log:    log,
 		sender: sender,
 		router: newRouter(log, sender, metrics),
@@ -115,8 +105,7 @@ func NewNetwork(
 // Network exposes networking state and supports building p2p application
 // protocols
 type Network struct {
-	Peers      *Peers
-	Validators *Validators
+	Peers *Peers
 
 	log    logging.Logger
 	sender common.AppSender
@@ -212,46 +201,6 @@ func (p *Peers) Has(nodeID ids.NodeID) bool {
 	defer p.lock.RUnlock()
 
 	return p.set.Contains(nodeID)
-}
-
-// Sample returns a pseudo-random sample of up to limit Peers
-func (p *Peers) sample(
-	ctx context.Context,
-	limit int,
-	filters ...SamplingFilter,
-) []ids.NodeID {
-	p.lock.RLock()
-	defer p.lock.RUnlock()
-
-	uniform := sampler.NewUniform()
-	uniform.Initialize(uint64(len(p.set.Elements)))
-
-	sampled := make([]ids.NodeID, 0, limit)
-	for len(sampled) < limit {
-		i, err := uniform.Next()
-		if err != nil {
-			break
-		}
-
-		nodeID := p.set.Elements[i]
-		if !canSample(ctx, nodeID, filters...) {
-			continue
-		}
-
-		sampled = append(sampled, nodeID)
-	}
-
-	return sampled
-}
-
-func canSample(ctx context.Context, nodeID ids.NodeID, filters ...SamplingFilter) bool {
-	for _, filter := range filters {
-		if !filter.Filter(ctx, nodeID) {
-			return false
-		}
-	}
-
-	return true
 }
 
 func ProtocolPrefix(handlerID uint64) []byte {

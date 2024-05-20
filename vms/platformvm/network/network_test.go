@@ -165,6 +165,7 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 			n, err := New(
 				snowCtx.Log,
 				snowCtx.NodeID,
+				snowCtx.SubnetID,
 				snowCtx.ValidatorState,
 				tt.txVerifier,
 				tt.mempoolFunc(ctrl),

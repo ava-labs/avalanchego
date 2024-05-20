@@ -193,6 +193,7 @@ func newEnvironment(t *testing.T, f fork) *environment { //nolint:unparam
 	res.network, err = network.New(
 		res.backend.Ctx.Log,
 		res.backend.Ctx.NodeID,
+		res.backend.Ctx.SubnetID,
 		res.backend.Ctx.ValidatorState,
 		txVerifier,
 		res.mempool,
