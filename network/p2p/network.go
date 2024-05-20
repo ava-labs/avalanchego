@@ -43,7 +43,7 @@ func (o clientOptionFunc) apply(options *clientOptions) {
 	o(options)
 }
 
-// WithSamplingFilters configures Client.AppRequestAny
+// WithSampler configures Client.AppRequestAny
 func WithSampler(sampler Sampler) ClientOption {
 	return clientOptionFunc(func(options *clientOptions) {
 		options.sampler = sampler
