@@ -9,9 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-var (
-	_ SamplingFilter = (*PeerSamplingFilter)(nil)
-)
+var _ SamplingFilter = (*PeerSamplingFilter)(nil)
 
 // SamplingFilter is used to filter nodes that can be sampled from Peers
 type SamplingFilter interface {
