@@ -198,7 +198,7 @@ func (p *Peers) remove(nodeID ids.NodeID) {
 
 func (p *Peers) sample(ctx context.Context, sampler Sampler) (ids.NodeID, bool) {
 	p.lock.RLock()
-	defer p.lock.RLock()
+	defer p.lock.RUnlock()
 
 	return sampler.Sample(ctx, p.set.Elements)
 }
