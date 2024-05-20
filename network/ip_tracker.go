@@ -167,6 +167,9 @@ func (s *gossipableSubnet) removeGossipableIP(nodeID ids.NodeID) {
 	s.gossipableIPs = s.gossipableIPs[:newNumGossipable]
 }
 
+// [maxNumIPs] applies to the total number of IPs returned, including the IPs
+// initially provided in [ips].
+// [ips] and [nodeIDs] are extended and returned with the additional IPs added.
 func (s *gossipableSubnet) getGossipableIPs(
 	exceptNodeID ids.NodeID,
 	exceptIPs *bloom.ReadFilter,
@@ -174,14 +177,14 @@ func (s *gossipableSubnet) getGossipableIPs(
 	maxNumIPs int,
 	ips []*ips.ClaimedIPPort,
 	nodeIDs set.Set[ids.NodeID],
-) []*ips.ClaimedIPPort {
+) ([]*ips.ClaimedIPPort, set.Set[ids.NodeID]) {
 	uniform := sampler.NewUniform()
 	uniform.Initialize(uint64(len(s.gossipableIPs)))
 
 	for len(ips) < maxNumIPs {
 		index, hasNext := uniform.Next()
 		if !hasNext {
-			return ips
+			return ips, nodeIDs
 		}
 
 		ip := s.gossipableIPs[index]
@@ -194,7 +197,7 @@ func (s *gossipableSubnet) getGossipableIPs(
 		ips = append(ips, ip)
 		nodeIDs.Add(ip.NodeID)
 	}
-	return ips
+	return ips, nodeIDs
 }
 
 func (s *gossipableSubnet) canDelete() bool {
@@ -629,7 +632,7 @@ func getGossipableIPs[T any](
 			continue
 		}
 
-		ips = subnet.getGossipableIPs(
+		ips, nodeIDs = subnet.getGossipableIPs(
 			exceptNodeID,
 			exceptIPs,
 			salt,
