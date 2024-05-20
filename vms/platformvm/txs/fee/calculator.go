@@ -165,13 +165,13 @@ func (c *calculator) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 }
 
 func (c *calculator) AdvanceTimeTx(*txs.AdvanceTimeTx) error {
-	c.fee = 0
-	return nil // no fees
+	c.fee = 0 // no fees
+	return nil
 }
 
 func (c *calculator) RewardValidatorTx(*txs.RewardValidatorTx) error {
-	c.fee = 0
-	return nil // no fees
+	c.fee = 0 // no fees
+	return nil
 }
 
 func (c *calculator) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx) error {
