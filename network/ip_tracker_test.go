@@ -544,13 +544,9 @@ func TestIPTracker_AddIP(t *testing.T) {
 			ip:                        newerIP,
 			expectedUpdatedAndDesired: true,
 			expectedChange: func(tracker *ipTracker) {
-				tracker.numGossipableIPs.Dec()
 				tracker.tracked[newerIP.NodeID].ip = newerIP
 				tracker.bloomAdditions[newerIP.NodeID] = 2
-
-				subnet := tracker.subnet[constants.PrimaryNetworkID]
-				delete(subnet.gossipableIndices, newerIP.NodeID)
-				subnet.gossipableIPs = subnet.gossipableIPs[:0]
+				tracker.subnet[constants.PrimaryNetworkID].gossipableIPs[0] = newerIP
 			},
 		},
 		{
@@ -566,10 +562,6 @@ func TestIPTracker_AddIP(t *testing.T) {
 			expectedChange: func(tracker *ipTracker) {
 				tracker.tracked[newerIP.NodeID].ip = newerIP
 				tracker.bloomAdditions[newerIP.NodeID] = 2
-
-				subnet := tracker.subnet[subnetID]
-				delete(subnet.gossipableIndices, newerIP.NodeID)
-				subnet.gossipableIPs = subnet.gossipableIPs[:0]
 			},
 		},
 	}
@@ -659,9 +651,16 @@ func TestIPTracker_Connected(t *testing.T) {
 			},
 			ip: ip,
 			expectedChange: func(tracker *ipTracker) {
+				tracker.numGossipableIPs.Inc()
 				tracker.connected[ip.NodeID] = &connectedNode{
 					trackedSubnets: set.Of(constants.PrimaryNetworkID),
 					ip:             ip,
+				}
+
+				subnet := tracker.subnet[constants.PrimaryNetworkID]
+				subnet.gossipableIndices[newerIP.NodeID] = 0
+				subnet.gossipableIPs = []*ips.ClaimedIPPort{
+					newerIP,
 				}
 			},
 		},

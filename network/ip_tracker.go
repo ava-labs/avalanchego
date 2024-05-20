@@ -140,7 +140,12 @@ type gossipableSubnet struct {
 	gossipableIPs     []*ips.ClaimedIPPort
 }
 
-func (s *gossipableSubnet) addGossipableIP(ip *ips.ClaimedIPPort) {
+func (s *gossipableSubnet) setGossipableIP(ip *ips.ClaimedIPPort) {
+	if index, ok := s.gossipableIndices[ip.NodeID]; ok {
+		s.gossipableIPs[index] = ip
+		return
+	}
+
 	s.numGossipableIPs.Inc()
 	s.gossipableIndices[ip.NodeID] = len(s.gossipableIPs)
 	s.gossipableIPs = append(s.gossipableIPs, ip)
@@ -307,14 +312,21 @@ func (i *ipTracker) ShouldVerifyIP(
 //     subnet.
 //  2. This IP is newer than the most recent IP we know of for the node.
 //
-// If the previous IP for this node was marked as gossipable, calling this
-// function will remove the previous IP from the gossipable set.
+// If this IP is replacing a gossipable IP, this IP will also be marked as
+// gossipable.
 func (i *ipTracker) AddIP(ip *ips.ClaimedIPPort) bool {
 	i.lock.Lock()
 	defer i.lock.Unlock()
 
 	timestampComparison, trackedNode := i.addIP(ip)
-	return timestampComparison > sameTimestamp && trackedNode.wantsConnection()
+	if timestampComparison <= sameTimestamp {
+		return false
+	}
+
+	if connectedNode, ok := i.connected[ip.NodeID]; ok {
+		i.setGossipableIP(trackedNode.ip, connectedNode.trackedSubnets)
+	}
+	return trackedNode.wantsConnection()
 }
 
 // GetIP returns the most recent IP of the provided nodeID. Returns true if all
@@ -343,14 +355,10 @@ func (i *ipTracker) Connected(ip *ips.ClaimedIPPort, trackedSubnets set.Set[ids.
 		trackedSubnets: trackedSubnets,
 		ip:             ip,
 	}
-	if timestampComparison, _ := i.addIP(ip); timestampComparison < sameTimestamp {
-		return
-	}
 
-	for subnetID := range trackedSubnets {
-		if subnet, ok := i.subnet[subnetID]; ok && subnet.gossipableIDs.Contains(ip.NodeID) {
-			subnet.addGossipableIP(ip)
-		}
+	timestampComparison, trackedNode := i.addIP(ip)
+	if timestampComparison != untrackedTimestamp {
+		i.setGossipableIP(trackedNode.ip, trackedSubnets)
 	}
 }
 
@@ -364,8 +372,6 @@ func (i *ipTracker) addIP(ip *ips.ClaimedIPPort) (int, *trackedNode) {
 		// This is the first IP we've heard from the validator, so it is the
 		// most recent.
 		i.updateMostRecentTrackedIP(node, ip)
-		// Because we didn't previously have an IP, we know we aren't currently
-		// connected to them.
 		return newTimestamp, node
 	}
 
@@ -376,9 +382,17 @@ func (i *ipTracker) addIP(ip *ips.ClaimedIPPort) (int, *trackedNode) {
 		return sameTimestamp, node // This IP is equal to the previously known IP.
 	}
 
+	// This IP is newer than the previously known IP.
 	i.updateMostRecentTrackedIP(node, ip)
-	i.removeGossipableIP(ip.NodeID)
 	return newerTimestamp, node
+}
+
+func (i *ipTracker) setGossipableIP(ip *ips.ClaimedIPPort, trackedSubnets set.Set[ids.ID]) {
+	for subnetID := range trackedSubnets {
+		if subnet, ok := i.subnet[subnetID]; ok && subnet.gossipableIDs.Contains(ip.NodeID) {
+			subnet.setGossipableIP(ip)
+		}
+	}
 }
 
 // Disconnected is called when a connection to the peer is closed.
@@ -386,15 +400,11 @@ func (i *ipTracker) Disconnected(nodeID ids.NodeID) {
 	i.lock.Lock()
 	defer i.lock.Unlock()
 
-	i.removeGossipableIP(nodeID)
-	delete(i.connected, nodeID)
-}
-
-func (i *ipTracker) removeGossipableIP(nodeID ids.NodeID) {
 	connectedNode, ok := i.connected[nodeID]
 	if !ok {
 		return
 	}
+	delete(i.connected, nodeID)
 
 	for subnetID := range connectedNode.trackedSubnets {
 		if subnet, ok := i.subnet[subnetID]; ok {
@@ -471,7 +481,7 @@ func (i *ipTracker) addGossipableID(nodeID ids.NodeID, subnetID ids.ID, manually
 		return
 	}
 
-	subnet.addGossipableIP(node.ip)
+	subnet.setGossipableIP(node.ip)
 }
 
 func (*ipTracker) OnValidatorWeightChanged(ids.ID, ids.NodeID, uint64, uint64) {}
