@@ -173,7 +173,6 @@ A `GetPeerList` message contains the Bloom Filter of the currently known peers a
 `PeerList` messages are expected to contain `IP:Port` pairs that satisfy all of the following constraints:
 - The Bloom Filter sent when requesting the `PeerList` message does not contain the node claiming the `IP:Port` pair.
 - The node claiming the `IP:Port` pair is currently connected.
-- The `IP:Port` pair the node shared during the `Handshake` message is the node's most recently known `IP:Port` pair.
 - The node claiming the `IP:Port` pair is either in the default bootstrapper set, is a current Primary Network validator, is a validator of a tracked Subnet, or is a validator of a Subnet and the peer is a Primary Network validator.
 
 #### Example PeerList Gossip
