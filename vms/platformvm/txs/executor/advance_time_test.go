@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -63,10 +64,12 @@ func TestAdvanceTimeTxUpdatePrimaryNetworkStakers(t *testing.T) {
 	onAbortState, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
+	feeCalculator := config.PickFeeCalculator(env.config, onCommitState.GetTimestamp())
 	executor := ProposalTxExecutor{
 		OnCommitState: onCommitState,
 		OnAbortState:  onAbortState,
 		Backend:       &env.backend,
+		FeeCalculator: feeCalculator,
 		Tx:            tx,
 	}
 	require.NoError(tx.Unsigned.Visit(&executor))
@@ -109,10 +112,12 @@ func TestAdvanceTimeTxTimestampTooEarly(t *testing.T) {
 	onAbortState, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
+	feeCalculator := config.PickFeeCalculator(env.config, onCommitState.GetTimestamp())
 	executor := ProposalTxExecutor{
 		OnCommitState: onCommitState,
 		OnAbortState:  onAbortState,
 		Backend:       &env.backend,
+		FeeCalculator: feeCalculator,
 		Tx:            tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
@@ -144,10 +149,12 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 		onAbortState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
 
+		feeCalculator := config.PickFeeCalculator(env.config, onCommitState.GetTimestamp())
 		executor := ProposalTxExecutor{
 			OnCommitState: onCommitState,
 			OnAbortState:  onAbortState,
 			Backend:       &env.backend,
+			FeeCalculator: feeCalculator,
 			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
@@ -173,10 +180,12 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 		onAbortState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
 
+		feeCalculator := config.PickFeeCalculator(env.config, onCommitState.GetTimestamp())
 		executor := ProposalTxExecutor{
 			OnCommitState: onCommitState,
 			OnAbortState:  onAbortState,
 			Backend:       &env.backend,
+			FeeCalculator: feeCalculator,
 			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
@@ -413,10 +422,12 @@ func TestAdvanceTimeTxUpdateStakers(t *testing.T) {
 				onAbortState, err := state.NewDiff(lastAcceptedID, env)
 				require.NoError(err)
 
+				feeCalculator := config.PickFeeCalculator(env.config, onCommitState.GetTimestamp())
 				executor := ProposalTxExecutor{
 					OnCommitState: onCommitState,
 					OnAbortState:  onAbortState,
 					Backend:       &env.backend,
+					FeeCalculator: feeCalculator,
 					Tx:            tx,
 				}
 				require.NoError(tx.Unsigned.Visit(&executor))
@@ -543,10 +554,12 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 	onAbortState, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
+	feeCalculator := config.PickFeeCalculator(env.config, onCommitState.GetTimestamp())
 	executor := ProposalTxExecutor{
 		OnCommitState: onCommitState,
 		OnAbortState:  onAbortState,
 		Backend:       &env.backend,
+		FeeCalculator: feeCalculator,
 		Tx:            tx,
 	}
 	require.NoError(tx.Unsigned.Visit(&executor))
@@ -620,10 +633,12 @@ func TestTrackedSubnet(t *testing.T) {
 			onAbortState, err := state.NewDiff(lastAcceptedID, env)
 			require.NoError(err)
 
+			feeCalculator := config.PickFeeCalculator(env.config, onCommitState.GetTimestamp())
 			executor := ProposalTxExecutor{
 				OnCommitState: onCommitState,
 				OnAbortState:  onAbortState,
 				Backend:       &env.backend,
+				FeeCalculator: feeCalculator,
 				Tx:            tx,
 			}
 			require.NoError(tx.Unsigned.Visit(&executor))
@@ -668,10 +683,12 @@ func TestAdvanceTimeTxDelegatorStakerWeight(t *testing.T) {
 	onAbortState, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
+	feeCalculator := config.PickFeeCalculator(env.config, onCommitState.GetTimestamp())
 	executor := ProposalTxExecutor{
 		OnCommitState: onCommitState,
 		OnAbortState:  onAbortState,
 		Backend:       &env.backend,
+		FeeCalculator: feeCalculator,
 		Tx:            tx,
 	}
 	require.NoError(tx.Unsigned.Visit(&executor))
@@ -733,6 +750,7 @@ func TestAdvanceTimeTxDelegatorStakerWeight(t *testing.T) {
 		OnCommitState: onCommitState,
 		OnAbortState:  onAbortState,
 		Backend:       &env.backend,
+		FeeCalculator: feeCalculator,
 		Tx:            tx,
 	}
 	require.NoError(tx.Unsigned.Visit(&executor))
@@ -771,10 +789,12 @@ func TestAdvanceTimeTxDelegatorStakers(t *testing.T) {
 	onAbortState, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
+	feeCalculator := config.PickFeeCalculator(env.config, onCommitState.GetTimestamp())
 	executor := ProposalTxExecutor{
 		OnCommitState: onCommitState,
 		OnAbortState:  onAbortState,
 		Backend:       &env.backend,
+		FeeCalculator: feeCalculator,
 		Tx:            tx,
 	}
 	require.NoError(tx.Unsigned.Visit(&executor))
@@ -831,6 +851,7 @@ func TestAdvanceTimeTxDelegatorStakers(t *testing.T) {
 		OnCommitState: onCommitState,
 		OnAbortState:  onAbortState,
 		Backend:       &env.backend,
+		FeeCalculator: feeCalculator,
 		Tx:            tx,
 	}
 	require.NoError(tx.Unsigned.Visit(&executor))
@@ -866,10 +887,12 @@ func TestAdvanceTimeTxAfterBanff(t *testing.T) {
 	onAbortState, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
+	feeCalculator := config.PickFeeCalculator(env.config, onCommitState.GetTimestamp())
 	executor := ProposalTxExecutor{
 		OnCommitState: onCommitState,
 		OnAbortState:  onAbortState,
 		Backend:       &env.backend,
+		FeeCalculator: feeCalculator,
 		Tx:            tx,
 	}
 	err = tx.Unsigned.Visit(&executor)

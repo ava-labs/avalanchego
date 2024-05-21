@@ -12,13 +12,11 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-
-	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
@@ -78,14 +76,12 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 
 			stateDiff.SetTimestamp(test.time)
 
-			chainTime := stateDiff.GetTimestamp()
-			feeCfg := fee.GetDynamicConfig(env.config.UpgradeConfig.IsEActivated(chainTime))
+			feeCalculator := config.PickFeeCalculator(env.backend.Config, stateDiff.GetTimestamp())
 			executor := StandardTxExecutor{
-				Backend:            &env.backend,
-				BlkFeeManager:      commonfees.NewManager(feeCfg.FeeRate),
-				BlockMaxComplexity: feeCfg.BlockMaxComplexity,
-				State:              stateDiff,
-				Tx:                 tx,
+				Backend:       &env.backend,
+				FeeCalculator: feeCalculator,
+				State:         stateDiff,
+				Tx:            tx,
 			}
 			err = tx.Unsigned.Visit(&executor)
 			require.ErrorIs(err, test.expectedErr)

@@ -10,8 +10,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
-
-	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 var _ txs.Visitor = (*AtomicTxExecutor)(nil)
@@ -21,6 +19,7 @@ var _ txs.Visitor = (*AtomicTxExecutor)(nil)
 type AtomicTxExecutor struct {
 	// inputs, to be filled before visitor methods are called
 	*Backend
+	FeeCalculator *fee.Calculator
 	ParentID      ids.ID
 	StateVersions state.Versions
 	Tx            *txs.Tx
@@ -101,13 +100,11 @@ func (e *AtomicTxExecutor) atomicTx(tx txs.UnsignedTx) error {
 	}
 	e.OnAccept = onAccept
 
-	feesCfg := fee.GetDynamicConfig(false /*isEActive*/)
 	executor := StandardTxExecutor{
-		Backend:            e.Backend,
-		BlkFeeManager:      commonfees.NewManager(feesCfg.FeeRate),
-		BlockMaxComplexity: feesCfg.BlockMaxComplexity,
-		State:              e.OnAccept,
-		Tx:                 e.Tx,
+		Backend:       e.Backend,
+		State:         e.OnAccept,
+		FeeCalculator: e.FeeCalculator,
+		Tx:            e.Tx,
 	}
 	err = tx.Visit(&executor)
 	e.Inputs = executor.Inputs

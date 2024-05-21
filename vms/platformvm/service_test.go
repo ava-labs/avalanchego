@@ -35,17 +35,16 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block/builder"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
 	avajson "github.com/ava-labs/avalanchego/utils/json"
-	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 	vmkeystore "github.com/ava-labs/avalanchego/vms/components/keystore"
 	pchainapi "github.com/ava-labs/avalanchego/vms/platformvm/api"
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
@@ -383,22 +382,8 @@ func TestGetBalance(t *testing.T) {
 		if idx == 0 {
 			// we use the first key to fund a subnet creation in [defaultGenesis].
 			// As such we need to account for the subnet creation fee
-			var (
-				chainTime    = service.vm.state.GetTimestamp()
-				staticFeeCfg = service.vm.Config.StaticFeeConfig
-				upgrades     = service.vm.Config.UpgradeConfig
-				feeCalc      *fee.Calculator
-			)
-
-			if !upgrades.IsEActivated(chainTime) {
-				feeCalc = fee.NewStaticCalculator(staticFeeCfg, upgrades, chainTime)
-			} else {
-				feeCfg := fee.GetDynamicConfig(true)
-				feeMan := commonfees.NewManager(feeCfg.FeeRate)
-				feeCalc = fee.NewDynamicCalculator(staticFeeCfg, feeMan, feeCfg.BlockMaxComplexity, testSubnet1.Creds)
-			}
-
-			fee, err := feeCalc.ComputeFee(testSubnet1.Unsigned)
+			feeCalc := config.PickFeeCalculator(&service.vm.Config, service.vm.state.GetTimestamp())
+			fee, err := feeCalc.ComputeFee(testSubnet1.Unsigned, testSubnet1.Creds)
 			require.NoError(err)
 			balance = defaultBalance - fee
 		}

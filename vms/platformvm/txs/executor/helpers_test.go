@@ -47,8 +47,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
-
-	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 const (
@@ -234,14 +232,12 @@ func addSubnet(t *testing.T, env *environment) {
 	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
-	chainTime := env.state.GetTimestamp()
-	feeCfg := fee.GetDynamicConfig(env.config.UpgradeConfig.IsEActivated(chainTime))
+	feeCalculator := config.PickFeeCalculator(env.config, env.state.GetTimestamp())
 	executor := StandardTxExecutor{
-		Backend:            &env.backend,
-		BlkFeeManager:      commonfees.NewManager(feeCfg.FeeRate),
-		BlockMaxComplexity: feeCfg.BlockMaxComplexity,
-		State:              stateDiff,
-		Tx:                 testSubnet1,
+		Backend:       &env.backend,
+		FeeCalculator: feeCalculator,
+		State:         stateDiff,
+		Tx:            testSubnet1,
 	}
 	require.NoError(testSubnet1.Unsigned.Visit(&executor))
 

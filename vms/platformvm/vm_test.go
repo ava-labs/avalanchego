@@ -67,7 +67,6 @@ import (
 	smeng "github.com/ava-labs/avalanchego/snow/engine/snowman"
 	snowgetter "github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
 	timetracker "github.com/ava-labs/avalanchego/snow/networking/tracker"
-	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 	blockbuilder "github.com/ava-labs/avalanchego/vms/platformvm/block/builder"
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
@@ -394,22 +393,8 @@ func TestGenesis(t *testing.T) {
 
 			// we use the first key to fund a subnet creation in [defaultGenesis].
 			// As such we need to account for the subnet creation fee
-			var (
-				chainTime    = vm.state.GetTimestamp()
-				staticFeeCfg = vm.Config.StaticFeeConfig
-				upgrades     = vm.Config.UpgradeConfig
-				feeCalc      *fee.Calculator
-			)
-
-			if !upgrades.IsEActivated(chainTime) {
-				feeCalc = fee.NewStaticCalculator(staticFeeCfg, upgrades, chainTime)
-			} else {
-				feeCfg := fee.GetDynamicConfig(upgrades.IsEActivated(chainTime))
-				feeMan := commonfees.NewManager(feeCfg.FeeRate)
-				feeCalc = fee.NewDynamicCalculator(staticFeeCfg, feeMan, feeCfg.BlockMaxComplexity, testSubnet1.Creds)
-			}
-
-			fee, err := feeCalc.ComputeFee(testSubnet1.Unsigned)
+			feeCalc := config.PickFeeCalculator(&vm.Config, vm.state.GetTimestamp())
+			fee, err := feeCalc.ComputeFee(testSubnet1.Unsigned, testSubnet1.Creds)
 			require.NoError(err)
 			require.Equal(uint64(utxo.Amount)-fee, out.Amount())
 		}
@@ -2111,7 +2096,7 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 	validatorStartTime := latestForkTime.Add(txexecutor.SyncBound).Add(1 * time.Second)
 	validatorEndTime := validatorStartTime.Add(360 * 24 * time.Hour)
 
-	vm, txBuilder, _, _ := defaultVM(t, latestFork)
+	vm, txBuilder, _, _ := defaultVM(t, durango)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
@@ -2390,22 +2375,8 @@ func TestBaseTx(t *testing.T) {
 	}
 	require.Equal(totalOutputAmt, key0OutputAmt+key1OutputAmt+changeAddrOutputAmt)
 
-	var (
-		chainTime    = vm.state.GetTimestamp()
-		staticFeeCfg = vm.Config.StaticFeeConfig
-		upgrades     = vm.Config.UpgradeConfig
-		feeCalc      *fee.Calculator
-	)
-
-	if !upgrades.IsEActivated(chainTime) {
-		feeCalc = fee.NewStaticCalculator(staticFeeCfg, upgrades, chainTime)
-	} else {
-		feeCfg := fee.GetDynamicConfig(upgrades.IsEActivated(chainTime))
-		feeMan := commonfees.NewManager(feeCfg.FeeRate)
-		feeCalc = fee.NewDynamicCalculator(staticFeeCfg, feeMan, feeCfg.BlockMaxComplexity, baseTx.Creds)
-	}
-
-	fee, err := feeCalc.ComputeFee(baseTx.Unsigned)
+	feeCalc := config.PickFeeCalculator(&vm.Config, vm.state.GetTimestamp())
+	fee, err := feeCalc.ComputeFee(baseTx.Unsigned, baseTx.Creds)
 	require.NoError(err)
 	require.Equal(fee, totalInputAmt-totalOutputAmt)
 	require.Equal(sendAmt, key1OutputAmt)
