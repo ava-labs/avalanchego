@@ -195,7 +195,7 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 			env.state.SetTimestamp(test.time) // to duly set fee
 
 			cfg := *env.config
-			cfg.CreateBlockchainTxFee = test.fee
+			cfg.StaticFeeConfig.CreateBlockchainTxFee = test.fee
 			builder := txstest.NewBuilder(env.ctx, &cfg, env.state)
 			tx, err := builder.NewCreateChainTx(
 				testSubnet1.ID(),
