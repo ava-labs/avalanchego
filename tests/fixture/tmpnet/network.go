@@ -801,13 +801,9 @@ func waitForHealthy(ctx context.Context, w io.Writer, nodes []*Node) error {
 	ticker := time.NewTicker(networkHealthCheckInterval)
 	defer ticker.Stop()
 
-	healthyNodes := set.NewSet[ids.NodeID](len(nodes))
-	for healthyNodes.Len() < len(nodes) {
-		for _, node := range nodes {
-			if healthyNodes.Contains(node.NodeID) {
-				continue
-			}
-
+	unhealthyNodes := set.Of(nodes...)
+	for {
+		for node := range unhealthyNodes {
 			healthy, err := node.IsHealthy(ctx)
 			if err != nil && !errors.Is(err, ErrNotRunning) {
 				return err
@@ -816,10 +812,14 @@ func waitForHealthy(ctx context.Context, w io.Writer, nodes []*Node) error {
 				continue
 			}
 
-			healthyNodes.Add(node.NodeID)
+			unhealthyNodes.Remove(node)
 			if _, err := fmt.Fprintf(w, "%s is healthy @ %s\n", node.NodeID, node.URI); err != nil {
 				return err
 			}
+		}
+
+		if unhealthyNodes.Len() == 0 {
+			return nil
 		}
 
 		select {
@@ -828,7 +828,6 @@ func waitForHealthy(ctx context.Context, w io.Writer, nodes []*Node) error {
 		case <-ticker.C:
 		}
 	}
-	return nil
 }
 
 // Retrieves the root dir for tmpnet data.
