@@ -120,9 +120,9 @@ func (n *NetworkUpgrades) IsEUpgrade(time uint64) bool {
 
 func (n *NetworkUpgrades) Description() string {
 	var banner string
-	banner += fmt.Sprintf(" - SubnetEVM Timestamp:           @%-10v (https://github.com/ava-labs/avalanchego/releases/tag/v1.10.0)\n", ptrToString(n.SubnetEVMTimestamp))
+	banner += fmt.Sprintf(" - SubnetEVM Timestamp:          @%-10v (https://github.com/ava-labs/avalanchego/releases/tag/v1.10.0)\n", ptrToString(n.SubnetEVMTimestamp))
 	banner += fmt.Sprintf(" - Durango Timestamp:            @%-10v (https://github.com/ava-labs/avalanchego/releases/tag/v1.11.0)\n", ptrToString(n.DurangoTimestamp))
-	banner += fmt.Sprintf(" - EUpgrade Timestamp:           @%-10v (https://github.com/ava-labs/avalanchego/releases/tag/v1.12.0\n", ptrToString(n.EUpgradeTimestamp))
+	banner += fmt.Sprintf(" - EUpgrade Timestamp:           @%-10v (https://github.com/ava-labs/avalanchego/releases/tag/v1.12.0)\n", ptrToString(n.EUpgradeTimestamp))
 	return banner
 }
 
