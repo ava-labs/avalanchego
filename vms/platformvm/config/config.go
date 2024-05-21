@@ -116,7 +116,7 @@ func PickFeeCalculator(cfg *Config, time time.Time) *fee.Calculator {
 	if !isEActive {
 		feeCalculator = fee.NewStaticCalculator(staticFeeCfg, cfg.UpgradeConfig, time)
 	} else {
-		feesCfg := GetDynamicFeesConfig(isEActive)
+		feesCfg := fee.GetDynamicFeesConfig(isEActive)
 		feesMan := commonfees.NewManager(feesCfg.FeeRate)
 		feeCalculator = fee.NewDynamicCalculator(staticFeeCfg, feesMan, feesCfg.BlockMaxComplexity)
 	}
