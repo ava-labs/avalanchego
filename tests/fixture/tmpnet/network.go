@@ -382,7 +382,7 @@ func (n *Network) Bootstrap(ctx context.Context, w io.Writer) error {
 		// disabled. This allows the creation of initial subnet state without
 		// requiring coordination between multiple nodes.
 
-		if _, err := fmt.Fprintf(w, "Starting a single-node network with sybil protection disabled for quicker subnet creation\n"); err != nil {
+		if _, err := fmt.Fprint(w, "Starting a single-node network with sybil protection disabled for quicker subnet creation\n"); err != nil {
 			return err
 		}
 
