@@ -24,7 +24,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
-	"github.com/ava-labs/avalanchego/utils/linked"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/sampler"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
@@ -105,14 +104,12 @@ type envConfig struct {
 }
 
 type environment struct {
-	genesisBytes  []byte
-	genesisTx     *txs.Tx
-	sharedMemory  *atomic.Memory
-	issuer        chan common.Message
-	vm            *VM
-	txBuilder     *txstest.Builder
-	service       *Service
-	walletService *WalletService
+	genesisBytes []byte
+	genesisTx    *txs.Tx
+	sharedMemory *atomic.Memory
+	issuer       chan common.Message
+	vm           *VM
+	txBuilder    *txstest.Builder
 }
 
 // setup the testing environment
@@ -208,13 +205,6 @@ func setup(tb testing.TB, c *envConfig) *environment {
 		issuer:       issuer,
 		vm:           vm,
 		txBuilder:    txstest.New(vm.ctx, &vm.Config, vm.feeAssetID, backend),
-		service: &Service{
-			vm: vm,
-		},
-		walletService: &WalletService{
-			vm:         vm,
-			pendingTxs: linked.NewHashmap[ids.ID, *txs.Tx](),
-		},
 	}
 
 	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
