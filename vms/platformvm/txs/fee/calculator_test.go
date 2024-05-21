@@ -128,7 +128,7 @@ func TestTxFees(t *testing.T) {
 			chainTime:           preEUpgradeTime,
 			unsignedAndSignedTx: addValidatorTx,
 			checksF: func(t *testing.T, fc *calculator) {
-				require.Equal(t, fc.staticCfg.AddPrimaryNetworkValidatorFee, fc.fee)
+				require.Equal(t, fc.config.AddPrimaryNetworkValidatorFee, fc.fee)
 			},
 		},
 		{
@@ -136,7 +136,7 @@ func TestTxFees(t *testing.T) {
 			chainTime:           preEUpgradeTime,
 			unsignedAndSignedTx: addSubnetValidatorTx,
 			checksF: func(t *testing.T, fc *calculator) {
-				require.Equal(t, fc.staticCfg.AddSubnetValidatorFee, fc.fee)
+				require.Equal(t, fc.config.AddSubnetValidatorFee, fc.fee)
 			},
 		},
 		{
@@ -174,7 +174,7 @@ func TestTxFees(t *testing.T) {
 			chainTime:           preEUpgradeTime,
 			unsignedAndSignedTx: addDelegatorTx,
 			checksF: func(t *testing.T, fc *calculator) {
-				require.Equal(t, fc.staticCfg.AddPrimaryNetworkDelegatorFee, fc.fee)
+				require.Equal(t, fc.config.AddPrimaryNetworkDelegatorFee, fc.fee)
 			},
 		},
 		{
@@ -182,7 +182,7 @@ func TestTxFees(t *testing.T) {
 			chainTime:           preApricotPhase3Time,
 			unsignedAndSignedTx: createChainTx,
 			checksF: func(t *testing.T, fc *calculator) {
-				require.Equal(t, fc.staticCfg.CreateAssetTxFee, fc.fee)
+				require.Equal(t, fc.config.CreateAssetTxFee, fc.fee)
 			},
 		},
 		{
@@ -190,7 +190,7 @@ func TestTxFees(t *testing.T) {
 			chainTime:           preEUpgradeTime,
 			unsignedAndSignedTx: createChainTx,
 			checksF: func(t *testing.T, fc *calculator) {
-				require.Equal(t, fc.staticCfg.CreateBlockchainTxFee, fc.fee)
+				require.Equal(t, fc.config.CreateBlockchainTxFee, fc.fee)
 			},
 		},
 		{
@@ -228,7 +228,7 @@ func TestTxFees(t *testing.T) {
 			chainTime:           preApricotPhase3Time,
 			unsignedAndSignedTx: createSubnetTx,
 			checksF: func(t *testing.T, fc *calculator) {
-				require.Equal(t, fc.staticCfg.CreateAssetTxFee, fc.fee)
+				require.Equal(t, fc.config.CreateAssetTxFee, fc.fee)
 			},
 		},
 		{
@@ -236,7 +236,7 @@ func TestTxFees(t *testing.T) {
 			chainTime:           preEUpgradeTime,
 			unsignedAndSignedTx: createSubnetTx,
 			checksF: func(t *testing.T, fc *calculator) {
-				require.Equal(t, fc.staticCfg.CreateSubnetTxFee, fc.fee)
+				require.Equal(t, fc.config.CreateSubnetTxFee, fc.fee)
 			},
 		},
 		{
@@ -274,7 +274,7 @@ func TestTxFees(t *testing.T) {
 			chainTime:           preEUpgradeTime,
 			unsignedAndSignedTx: removeSubnetValidatorTx,
 			checksF: func(t *testing.T, fc *calculator) {
-				require.Equal(t, fc.staticCfg.TxFee, fc.fee)
+				require.Equal(t, fc.config.TxFee, fc.fee)
 			},
 		},
 		{
@@ -312,7 +312,7 @@ func TestTxFees(t *testing.T) {
 			chainTime:           preEUpgradeTime,
 			unsignedAndSignedTx: transformSubnetTx,
 			checksF: func(t *testing.T, fc *calculator) {
-				require.Equal(t, fc.staticCfg.TransformSubnetTxFee, fc.fee)
+				require.Equal(t, fc.config.TransformSubnetTxFee, fc.fee)
 			},
 		},
 		{
@@ -350,7 +350,7 @@ func TestTxFees(t *testing.T) {
 			chainTime:           preEUpgradeTime,
 			unsignedAndSignedTx: transferSubnetOwnershipTx,
 			checksF: func(t *testing.T, fc *calculator) {
-				require.Equal(t, fc.staticCfg.TxFee, fc.fee)
+				require.Equal(t, fc.config.TxFee, fc.fee)
 			},
 		},
 		{
@@ -390,7 +390,7 @@ func TestTxFees(t *testing.T) {
 				return addPermissionlessValidatorTx(t, constants.PrimaryNetworkID)
 			},
 			checksF: func(t *testing.T, fc *calculator) {
-				require.Equal(t, fc.staticCfg.AddPrimaryNetworkValidatorFee, fc.fee)
+				require.Equal(t, fc.config.AddPrimaryNetworkValidatorFee, fc.fee)
 			},
 		},
 		{
@@ -402,7 +402,7 @@ func TestTxFees(t *testing.T) {
 				return addPermissionlessValidatorTx(t, subnetID)
 			},
 			checksF: func(t *testing.T, fc *calculator) {
-				require.Equal(t, fc.staticCfg.AddSubnetValidatorFee, fc.fee)
+				require.Equal(t, fc.config.AddSubnetValidatorFee, fc.fee)
 			},
 		},
 		{
@@ -469,7 +469,7 @@ func TestTxFees(t *testing.T) {
 				return addPermissionlessDelegatorTx(t, constants.PrimaryNetworkID)
 			},
 			checksF: func(t *testing.T, fc *calculator) {
-				require.Equal(t, fc.staticCfg.AddPrimaryNetworkDelegatorFee, fc.fee)
+				require.Equal(t, fc.config.AddPrimaryNetworkDelegatorFee, fc.fee)
 			},
 		},
 		{
@@ -481,7 +481,7 @@ func TestTxFees(t *testing.T) {
 				return addPermissionlessDelegatorTx(t, subnetID)
 			},
 			checksF: func(t *testing.T, fc *calculator) {
-				require.Equal(t, fc.staticCfg.AddSubnetDelegatorFee, fc.fee)
+				require.Equal(t, fc.config.AddSubnetDelegatorFee, fc.fee)
 			},
 		},
 		{
@@ -545,7 +545,7 @@ func TestTxFees(t *testing.T) {
 			chainTime:           preEUpgradeTime,
 			unsignedAndSignedTx: baseTx,
 			checksF: func(t *testing.T, fc *calculator) {
-				require.Equal(t, fc.staticCfg.TxFee, fc.fee)
+				require.Equal(t, fc.config.TxFee, fc.fee)
 			},
 		},
 		{
@@ -583,7 +583,7 @@ func TestTxFees(t *testing.T) {
 			chainTime:           preEUpgradeTime,
 			unsignedAndSignedTx: importTx,
 			checksF: func(t *testing.T, fc *calculator) {
-				require.Equal(t, fc.staticCfg.TxFee, fc.fee)
+				require.Equal(t, fc.config.TxFee, fc.fee)
 			},
 		},
 		{
@@ -621,7 +621,7 @@ func TestTxFees(t *testing.T) {
 			chainTime:           preEUpgradeTime,
 			unsignedAndSignedTx: exportTx,
 			checksF: func(t *testing.T, fc *calculator) {
-				require.Equal(t, fc.staticCfg.TxFee, fc.fee)
+				require.Equal(t, fc.config.TxFee, fc.fee)
 			},
 		},
 		{
@@ -701,7 +701,7 @@ func TestTxFees(t *testing.T) {
 				// txs like RewardValidatorTx are not signed
 				creds = sTx.Creds
 			}
-			_, _ = fc.ComputeFee(uTx, creds)
+			_, _ = fc.CalculateFee(uTx, creds)
 			tt.checksF(t, fc.c)
 		})
 	}

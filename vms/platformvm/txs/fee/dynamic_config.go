@@ -13,7 +13,6 @@ import (
 	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
-// eUpgradeDynamicFeesConfig to be tuned TODO ABENEGIA
 var (
 	eUpgradeDynamicFeesConfig = commonfees.DynamicFeesConfig{
 		FeeRate: commonfees.Dimensions{

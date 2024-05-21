@@ -82,7 +82,7 @@ const (
 	durango
 	eUpgrade
 
-	latestFork fork = durango
+	latestFork = durango
 
 	defaultWeight uint64 = 10000
 )
@@ -394,7 +394,7 @@ func TestGenesis(t *testing.T) {
 			// we use the first key to fund a subnet creation in [defaultGenesis].
 			// As such we need to account for the subnet creation fee
 			feeCalc := config.PickFeeCalculator(&vm.Config, vm.state.GetTimestamp())
-			fee, err := feeCalc.ComputeFee(testSubnet1.Unsigned, testSubnet1.Creds)
+			fee, err := feeCalc.CalculateFee(testSubnet1.Unsigned, testSubnet1.Creds)
 			require.NoError(err)
 			require.Equal(uint64(utxo.Amount)-fee, out.Amount())
 		}
@@ -2096,7 +2096,7 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 	validatorStartTime := latestForkTime.Add(txexecutor.SyncBound).Add(1 * time.Second)
 	validatorEndTime := validatorStartTime.Add(360 * 24 * time.Hour)
 
-	vm, txBuilder, _, _ := defaultVM(t, durango)
+	vm, txBuilder, _, _ := defaultVM(t, latestFork)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
@@ -2376,7 +2376,7 @@ func TestBaseTx(t *testing.T) {
 	require.Equal(totalOutputAmt, key0OutputAmt+key1OutputAmt+changeAddrOutputAmt)
 
 	feeCalc := config.PickFeeCalculator(&vm.Config, vm.state.GetTimestamp())
-	fee, err := feeCalc.ComputeFee(baseTx.Unsigned, baseTx.Creds)
+	fee, err := feeCalc.CalculateFee(baseTx.Unsigned, baseTx.Creds)
 	require.NoError(err)
 	require.Equal(fee, totalInputAmt-totalOutputAmt)
 	require.Equal(sendAmt, key1OutputAmt)

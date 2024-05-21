@@ -383,7 +383,7 @@ func TestGetBalance(t *testing.T) {
 			// we use the first key to fund a subnet creation in [defaultGenesis].
 			// As such we need to account for the subnet creation fee
 			feeCalc := config.PickFeeCalculator(&service.vm.Config, service.vm.state.GetTimestamp())
-			fee, err := feeCalc.ComputeFee(testSubnet1.Unsigned, testSubnet1.Creds)
+			fee, err := feeCalc.CalculateFee(testSubnet1.Unsigned, testSubnet1.Creds)
 			require.NoError(err)
 			balance = defaultBalance - fee
 		}

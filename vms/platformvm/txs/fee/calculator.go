@@ -29,9 +29,9 @@ var (
 func NewStaticCalculator(config StaticConfig, upgradeTimes upgrade.Config, chainTime time.Time) *Calculator {
 	return &Calculator{
 		c: &calculator{
-			upgrades:  upgradeTimes,
-			staticCfg: config,
-			time:      chainTime,
+			config:       config,
+			upgradeTimes: upgradeTimes,
+			time:         chainTime,
 		},
 	}
 }
@@ -45,7 +45,7 @@ func NewDynamicCalculator(
 	return &Calculator{
 		c: &calculator{
 			isEActive:          true,
-			staticCfg:          cfg,
+			config:             cfg,
 			feeManager:         feeManager,
 			blockMaxComplexity: blockMaxComplexity,
 			// credentials are set when CalculateFee is called
@@ -65,7 +65,7 @@ func (c *Calculator) ResetFee(newFee uint64) {
 	c.c.fee = newFee
 }
 
-func (c *Calculator) ComputeFee(tx txs.UnsignedTx, creds []verify.Verifiable) (uint64, error) {
+func (c *Calculator) CalculateFee(tx txs.UnsignedTx, creds []verify.Verifiable) (uint64, error) {
 	c.c.credentials = creds
 	c.c.fee = 0 // zero fee among different ComputeFee invocations (unlike Complexity which gets cumulated)
 	err := tx.Visit(c.c)
@@ -90,11 +90,11 @@ func (c *Calculator) GetCumulatedComplexity() fees.Dimensions {
 type calculator struct {
 	// setup
 	isEActive bool
-	staticCfg StaticConfig
+	config    StaticConfig
 
 	// Pre E-upgrade inputs
-	upgrades upgrade.Config
-	time     time.Time
+	upgradeTimes upgrade.Config
+	time         time.Time
 
 	// Post E-upgrade inputs
 	feeManager         *fees.Manager
@@ -108,13 +108,13 @@ type calculator struct {
 func (c *calculator) AddValidatorTx(*txs.AddValidatorTx) error {
 	// AddValidatorTx is banned following Durango activation, so we
 	// only return the pre EUpgrade fee here
-	c.fee = c.staticCfg.AddPrimaryNetworkValidatorFee
+	c.fee = c.config.AddPrimaryNetworkValidatorFee
 	return nil
 }
 
 func (c *calculator) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
 	if !c.isEActive {
-		c.fee = c.staticCfg.AddSubnetValidatorFee
+		c.fee = c.config.AddSubnetValidatorFee
 		return nil
 	}
 
@@ -130,16 +130,16 @@ func (c *calculator) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
 func (c *calculator) AddDelegatorTx(*txs.AddDelegatorTx) error {
 	// AddValidatorTx is banned following Durango activation, so we
 	// only return the pre EUpgrade fee here
-	c.fee = c.staticCfg.AddPrimaryNetworkDelegatorFee
+	c.fee = c.config.AddPrimaryNetworkDelegatorFee
 	return nil
 }
 
 func (c *calculator) CreateChainTx(tx *txs.CreateChainTx) error {
 	if !c.isEActive {
-		if c.upgrades.IsApricotPhase3Activated(c.time) {
-			c.fee = c.staticCfg.CreateBlockchainTxFee
+		if c.upgradeTimes.IsApricotPhase3Activated(c.time) {
+			c.fee = c.config.CreateBlockchainTxFee
 		} else {
-			c.fee = c.staticCfg.CreateAssetTxFee
+			c.fee = c.config.CreateAssetTxFee
 		}
 		return nil
 	}
@@ -155,10 +155,10 @@ func (c *calculator) CreateChainTx(tx *txs.CreateChainTx) error {
 
 func (c *calculator) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 	if !c.isEActive {
-		if c.upgrades.IsApricotPhase3Activated(c.time) {
-			c.fee = c.staticCfg.CreateSubnetTxFee
+		if c.upgradeTimes.IsApricotPhase3Activated(c.time) {
+			c.fee = c.config.CreateSubnetTxFee
 		} else {
-			c.fee = c.staticCfg.CreateAssetTxFee
+			c.fee = c.config.CreateAssetTxFee
 		}
 		return nil
 	}
@@ -184,7 +184,7 @@ func (c *calculator) RewardValidatorTx(*txs.RewardValidatorTx) error {
 
 func (c *calculator) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx) error {
 	if !c.isEActive {
-		c.fee = c.staticCfg.TxFee
+		c.fee = c.config.TxFee
 		return nil
 	}
 
@@ -199,7 +199,7 @@ func (c *calculator) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx) er
 
 func (c *calculator) TransformSubnetTx(tx *txs.TransformSubnetTx) error {
 	if !c.isEActive {
-		c.fee = c.staticCfg.TransformSubnetTxFee
+		c.fee = c.config.TransformSubnetTxFee
 		return nil
 	}
 
@@ -214,7 +214,7 @@ func (c *calculator) TransformSubnetTx(tx *txs.TransformSubnetTx) error {
 
 func (c *calculator) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwnershipTx) error {
 	if !c.isEActive {
-		c.fee = c.staticCfg.TxFee
+		c.fee = c.config.TxFee
 		return nil
 	}
 
@@ -230,9 +230,9 @@ func (c *calculator) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwnershipTx
 func (c *calculator) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessValidatorTx) error {
 	if !c.isEActive {
 		if tx.Subnet != constants.PrimaryNetworkID {
-			c.fee = c.staticCfg.AddSubnetValidatorFee
+			c.fee = c.config.AddSubnetValidatorFee
 		} else {
-			c.fee = c.staticCfg.AddPrimaryNetworkValidatorFee
+			c.fee = c.config.AddPrimaryNetworkValidatorFee
 		}
 		return nil
 	}
@@ -253,9 +253,9 @@ func (c *calculator) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessValid
 func (c *calculator) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDelegatorTx) error {
 	if !c.isEActive {
 		if tx.Subnet != constants.PrimaryNetworkID {
-			c.fee = c.staticCfg.AddSubnetDelegatorFee
+			c.fee = c.config.AddSubnetDelegatorFee
 		} else {
-			c.fee = c.staticCfg.AddPrimaryNetworkDelegatorFee
+			c.fee = c.config.AddPrimaryNetworkDelegatorFee
 		}
 		return nil
 	}
@@ -275,7 +275,7 @@ func (c *calculator) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDeleg
 
 func (c *calculator) BaseTx(tx *txs.BaseTx) error {
 	if !c.isEActive {
-		c.fee = c.staticCfg.TxFee
+		c.fee = c.config.TxFee
 		return nil
 	}
 
@@ -290,7 +290,7 @@ func (c *calculator) BaseTx(tx *txs.BaseTx) error {
 
 func (c *calculator) ImportTx(tx *txs.ImportTx) error {
 	if !c.isEActive {
-		c.fee = c.staticCfg.TxFee
+		c.fee = c.config.TxFee
 		return nil
 	}
 
@@ -309,7 +309,7 @@ func (c *calculator) ImportTx(tx *txs.ImportTx) error {
 
 func (c *calculator) ExportTx(tx *txs.ExportTx) error {
 	if !c.isEActive {
-		c.fee = c.staticCfg.TxFee
+		c.fee = c.config.TxFee
 		return nil
 	}
 
