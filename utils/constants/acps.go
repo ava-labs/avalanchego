@@ -11,23 +11,23 @@ var (
 	//
 	// See: https://github.com/orgs/avalanche-foundation/projects/1
 	CurrentACPs = set.Of[uint32](
-		23, // https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/23-p-chain-native-transfers.md
-		24, // https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/24-shanghai-eips.md
-		25, // https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/25-vm-application-errors.md
-		30, // https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/30-avalanche-warp-x-evm.md
-		31, // https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/31-enable-subnet-ownership-transfer.md
-		41, // https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/41-remove-pending-stakers.md
-		62, // https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/62-disable-addvalidatortx-and-adddelegatortx.md
+		23, // https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/23-p-chain-native-transfers/README.md
+		24, // https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/24-shanghai-eips/README.md
+		25, // https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/25-vm-application-errors/README.md
+		30, // https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/30-avalanche-warp-x-evm/README.md
+		31, // https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/31-enable-subnet-ownership-transfer/README.md
+		41, // https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/41-remove-pending-stakers/README.md
+		62, // https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/62-disable-addvalidatortx-and-adddelegatortx/README.md
 	)
 
 	// ScheduledACPs are the ACPs incuded into the next upgrade.
 	ScheduledACPs = set.Of[uint32](
-		23, // https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/23-p-chain-native-transfers.md
-		24, // https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/24-shanghai-eips.md
-		25, // https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/25-vm-application-errors.md
-		30, // https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/30-avalanche-warp-x-evm.md
-		31, // https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/31-enable-subnet-ownership-transfer.md
-		41, // https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/41-remove-pending-stakers.md
-		62, // https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/62-disable-addvalidatortx-and-adddelegatortx.md
+		23, // https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/23-p-chain-native-transfers/README.md
+		24, // https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/24-shanghai-eips/README.md
+		25, // https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/25-vm-application-errors/README.md
+		30, // https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/30-avalanche-warp-x-evm/README.md
+		31, // https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/31-enable-subnet-ownership-transfer/README.md
+		41, // https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/41-remove-pending-stakers/README.md
+		62, // https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/62-disable-addvalidatortx-and-adddelegatortx/README.md
 	)
 )
