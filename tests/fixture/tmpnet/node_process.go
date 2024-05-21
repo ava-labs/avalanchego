@@ -114,11 +114,8 @@ func (p *NodeProcess) Start(w io.Writer) error {
 
 	// All arguments are provided in the flags file
 	cmd := exec.Command(p.node.RuntimeConfig.AvalancheGoPath, "--config-file", p.node.getFlagsPath()) // #nosec G204
-
 	// Ensure process is detached from the parent process so that an error in the parent will not affect the child
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Setsid: true,
-	}
+	configureDetachedProcess(cmd)
 
 	if err := cmd.Start(); err != nil {
 		return err

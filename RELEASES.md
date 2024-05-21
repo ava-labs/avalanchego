@@ -3018,7 +3018,7 @@ This version is backwards compatible to [v1.7.0](https://github.com/ava-labs/ava
 
 ### Networking
 
-- Reduced default peerlist and accepted frontier gossipping
+- Reduced default peerlist and accepted frontier gossiping
 - Increased the default at-large outbound buffer size to 32 MiB
 
 ### Metrics
@@ -3100,7 +3100,7 @@ This version is backwards compatible to [v1.7.0](https://github.com/ava-labs/ava
 - Added `--snow-mixed-query-num-push-vdr` and `--snow-mixed-query-num-push-non-vdr` to allow parameterization of sending push queries
   - By default, non-validators now send only pull queries, not push queries.
   - By default, validators now send both pull queries and push queries upon inserting a container into consensus. Previously, nodes sent only push queries.
-- Added metrics to track the amount of over gossipping of `peerlist` messages
+- Added metrics to track the amount of over gossiping of `peerlist` messages
 - Added custom message queueing support to outbound `Peer` messages
 - Reused `Ping` messages to avoid needless memory allocations
 
