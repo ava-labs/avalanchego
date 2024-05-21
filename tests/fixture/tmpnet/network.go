@@ -364,33 +364,65 @@ func (n *Network) Start(ctx context.Context, w io.Writer, nodesToStart ...*Node)
 
 // Start the network for the first time
 func (n *Network) Bootstrap(ctx context.Context, w io.Writer) error {
-	if len(n.Subnets) == 0 || len(n.Nodes) == 1 {
-		// Start all nodes at once if a staged start is not worth it
+	if len(n.Subnets) == 0 {
+		// Without the need to coordinate subnet configuration,
+		// starting all nodes at once is the simplest option.
 		return n.Start(ctx, w, n.Nodes...)
 	}
 
-	// Reduce the cost of subnet creation for a network of multiple nodes by
-	// creating subnets with a single node with sybil protection
-	// disabled. This allows the creation of initial subnet state without
-	// requiring coordination between multiple nodes.
-
+	// The node that will be used to create subnets bootstrap the network
 	bootstrapNode := n.Nodes[0]
-	if _, err := fmt.Fprintf(w, "Starting a single-node network with %s for quicker subnet creation\n", bootstrapNode.NodeID); err != nil {
-		return err
+
+	// Whether sybil protection will need to be re-enabled after subnet creation
+	reEnableSybilProtection := false
+
+	if len(n.Nodes) > 1 {
+		// Reduce the cost of subnet creation for a network of multiple nodes by
+		// creating subnets with a single node with sybil protection
+		// disabled. This allows the creation of initial subnet state without
+		// requiring coordination between multiple nodes.
+
+		if _, err := fmt.Fprintf(w, "Starting a single-node network with sybil protection disabled for quicker subnet creation\n"); err != nil {
+			return err
+		}
+
+		// Ensure sybil protection is disabled for the bootstrap node.
+		if enabled, err := bootstrapNode.Flags.GetBoolVal(config.SybilProtectionEnabledKey, true); err != nil {
+			return fmt.Errorf("failed to read sybil protection flag: %w", err)
+		} else if enabled {
+			bootstrapNode.Flags[config.SybilProtectionEnabledKey] = false
+			// Ensure sybil protection is reenabled before the node is used to bootstrap the other nodes
+			reEnableSybilProtection = true
+		}
 	}
-	bootstrapNode.Flags[config.SybilProtectionEnabledKey] = false
+
 	if err := n.Start(ctx, w, bootstrapNode); err != nil {
 		return err
 	}
-	if err := n.CreateSubnets(ctx, w); err != nil {
+
+	// Don't restart the node during subnet creation since it will always be restarted afterwards.
+	if err := n.CreateSubnets(ctx, w, false /* restartRequired */); err != nil {
 		return err
 	}
 
-	if _, err := fmt.Fprintf(w, "Restarting %s with sybil protection enabled to serve as bootstrap node\n", bootstrapNode.NodeID); err != nil {
+	if reEnableSybilProtection {
+		if _, err := fmt.Fprintf(w, "Re-enabling sybil protection for %s\n", bootstrapNode.NodeID); err != nil {
+			return err
+		}
+		delete(bootstrapNode.Flags, config.SybilProtectionEnabledKey)
+	}
+
+	if _, err := fmt.Fprintf(w, "Restarting bootstrap node %s\n", bootstrapNode.NodeID); err != nil {
 		return err
 	}
-	delete(bootstrapNode.Flags, config.SybilProtectionEnabledKey)
-	// Avoid using RestartNode since the node won't be able to report healthy until other nodes are started.
+
+	if len(n.Nodes) == 1 {
+		// Ensure the node is restarted to pick up subnet and chain configuration
+		return n.RestartNode(ctx, w, bootstrapNode)
+	}
+
+	// Ensure the bootstrap node is restarted to pick up configuration changes. Avoid using
+	// RestartNode since the node won't be able to report healthy until other nodes are started.
 	if err := bootstrapNode.Stop(ctx); err != nil {
 		return fmt.Errorf("failed to stop node %s: %w", bootstrapNode.NodeID, err)
 	}
@@ -600,8 +632,9 @@ func (n *Network) GetSubnet(name string) *Subnet {
 	return nil
 }
 
-// Ensure that each subnet on the network is created.
-func (n *Network) CreateSubnets(ctx context.Context, w io.Writer) error {
+// Ensure that each subnet on the network is created. If restartRequired is false, node restart
+// to pick up configuration changes becomes the responsibility of the caller.
+func (n *Network) CreateSubnets(ctx context.Context, w io.Writer, restartRequired bool) error {
 	createdSubnets := make([]*Subnet, 0, len(n.Subnets))
 	for _, subnet := range n.Subnets {
 		if len(subnet.ValidatorIDs) == 0 {
@@ -656,9 +689,6 @@ func (n *Network) CreateSubnets(ctx context.Context, w io.Writer) error {
 		return err
 	}
 
-	if _, err := fmt.Fprintln(w, "Restarting node(s) to enable them to track the new subnet(s)"); err != nil {
-		return err
-	}
 	reconfiguredNodes := []*Node{}
 	for _, node := range n.Nodes {
 		existingTrackedSubnets, err := node.Flags.GetStringVal(config.TrackSubnetsKey)
@@ -672,13 +702,20 @@ func (n *Network) CreateSubnets(ctx context.Context, w io.Writer) error {
 		node.Flags[config.TrackSubnetsKey] = trackedSubnets
 		reconfiguredNodes = append(reconfiguredNodes, node)
 	}
-	for _, node := range reconfiguredNodes {
-		if len(node.URI) == 0 {
-			// Only running nodes should be restarted
-			continue
-		}
-		if err := n.RestartNode(ctx, w, node); err != nil {
+
+	if restartRequired {
+		if _, err := fmt.Fprintln(w, "Restarting node(s) to enable them to track the new subnet(s)"); err != nil {
 			return err
+		}
+
+		for _, node := range reconfiguredNodes {
+			if len(node.URI) == 0 {
+				// Only running nodes should be restarted
+				continue
+			}
+			if err := n.RestartNode(ctx, w, node); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -733,21 +770,19 @@ func (n *Network) CreateSubnets(ctx context.Context, w io.Writer) error {
 		}
 	}
 
-	if len(validatorsToRestart) == 0 {
-		return nil
-	}
-
-	if _, err := fmt.Fprintln(w, "Restarting node(s) to pick up chain configuration"); err != nil {
-		return err
-	}
-
-	// Restart nodes to allow configuration for the new chains to take effect
-	for _, node := range n.Nodes {
-		if !validatorsToRestart.Contains(node.NodeID) {
-			continue
-		}
-		if err := n.RestartNode(ctx, w, node); err != nil {
+	if restartRequired && len(validatorsToRestart) > 0 {
+		if _, err := fmt.Fprintln(w, "Restarting node(s) to pick up chain configuration"); err != nil {
 			return err
+		}
+
+		// Restart nodes to allow configuration for the new chains to take effect
+		for _, node := range n.Nodes {
+			if !validatorsToRestart.Contains(node.NodeID) {
+				continue
+			}
+			if err := n.RestartNode(ctx, w, node); err != nil {
+				return err
+			}
 		}
 	}
 

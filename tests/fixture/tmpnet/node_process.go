@@ -136,10 +136,6 @@ func (p *NodeProcess) Start(w io.Writer) error {
 	// A node writes a process context file on start. If the file is not
 	// found in a reasonable amount of time, the node is unlikely to have
 	// started successfully.
-	//
-	// TODO(marun) Consider waiting for the process context only for a
-	// bootstrap node (i.e. len(bootstrapIDs) == 0) to minimize
-	// startup time for larger numbers of nodes.
 	if err := p.waitForProcessContext(context.Background()); err != nil {
 		return fmt.Errorf("failed to start local node: %w", err)
 	}
