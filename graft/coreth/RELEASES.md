@@ -1,5 +1,11 @@
 # Release Notes
 
+## [v0.13.4](https://github.com/ava-labs/coreth/releases/tag/v0.13.4)
+- Update go-ethereum to v1.13.8
+- Bump AvalancheGo to v1.11.6
+- Bump golang version requirement to 1.21.10
+- "timestamp" in logs is changed to "t"
+
 ## [v0.13.3](https://github.com/ava-labs/coreth/releases/tag/v0.13.3)
 - Update go-ethereum to v1.13.2
 - Bump AvalancheGo to v1.11.5
