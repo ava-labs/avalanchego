@@ -203,8 +203,10 @@ func (v *verifier) ApricotAtomicBlock(b *block.ApricotAtomicBlock) error {
 		)
 	}
 
+	feeCalculator := fee.NewStaticCalculator(v.txExecutorBackend.Config.StaticFeeConfig, v.txExecutorBackend.Config.UpgradeConfig, currentTimestamp)
 	atomicExecutor := executor.AtomicTxExecutor{
 		Backend:       v.txExecutorBackend,
+		FeeCalculator: feeCalculator,
 		ParentID:      parentID,
 		StateVersions: v,
 		Tx:            b.Tx,

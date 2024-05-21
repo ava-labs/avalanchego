@@ -104,16 +104,16 @@ func NewEphemeralNode(flags FlagsMap) *Node {
 }
 
 // Initializes the specified number of nodes.
-func NewNodes(count int) ([]*Node, error) {
+func NewNodesOrPanic(count int) []*Node {
 	nodes := make([]*Node, count)
 	for i := range nodes {
 		node := NewNode("")
 		if err := node.EnsureKeys(); err != nil {
-			return nil, err
+			panic(err)
 		}
 		nodes[i] = node
 	}
-	return nodes, nil
+	return nodes
 }
 
 // Reads a node's configuration from the specified directory.
