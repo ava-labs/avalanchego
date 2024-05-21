@@ -42,6 +42,7 @@ type Verifier interface {
 	//
 	// Precondition: [tx] has already been syntactically verified.
 	//
+	// Returns fee paid by the target transaction
 	// Note: [unlockedProduced] is modified by this method.
 	VerifySpend(
 		tx txs.UnsignedTx,
@@ -50,7 +51,7 @@ type Verifier interface {
 		outs []*avax.TransferableOutput,
 		creds []verify.Verifiable,
 		unlockedProduced map[ids.ID]uint64,
-	) error
+	) (uint64, error)
 
 	// Verify that [tx] is semantically valid.
 	// [utxos[i]] is the UTXO being consumed by [ins[i]].
@@ -62,6 +63,7 @@ type Verifier interface {
 	//
 	// Precondition: [tx] has already been syntactically verified.
 	//
+	// Returns fee paid by the target transaction
 	// Note: [unlockedProduced] is modified by this method.
 	VerifySpendUTXOs(
 		tx txs.UnsignedTx,
@@ -70,7 +72,7 @@ type Verifier interface {
 		outs []*avax.TransferableOutput,
 		creds []verify.Verifiable,
 		unlockedProduced map[ids.ID]uint64,
-	) error
+	) (uint64, error)
 }
 
 func NewVerifier(
@@ -98,12 +100,12 @@ func (h *verifier) VerifySpend(
 	outs []*avax.TransferableOutput,
 	creds []verify.Verifiable,
 	unlockedProduced map[ids.ID]uint64,
-) error {
+) (uint64, error) {
 	utxos := make([]*avax.UTXO, len(ins))
 	for index, input := range ins {
 		utxo, err := utxoDB.GetUTXO(input.InputID())
 		if err != nil {
-			return fmt.Errorf(
+			return 0, fmt.Errorf(
 				"failed to read consumed UTXO %s due to: %w",
 				&input.UTXOID,
 				err,
@@ -122,9 +124,9 @@ func (h *verifier) VerifySpendUTXOs(
 	outs []*avax.TransferableOutput,
 	creds []verify.Verifiable,
 	unlockedProduced map[ids.ID]uint64,
-) error {
+) (uint64, error) {
 	if len(ins) != len(creds) {
-		return fmt.Errorf(
+		return 0, fmt.Errorf(
 			"%w: %d inputs != %d credentials",
 			errWrongNumberCredentials,
 			len(ins),
@@ -132,7 +134,7 @@ func (h *verifier) VerifySpendUTXOs(
 		)
 	}
 	if len(ins) != len(utxos) {
-		return fmt.Errorf(
+		return 0, fmt.Errorf(
 			"%w: %d inputs != %d utxos",
 			errWrongNumberUTXOs,
 			len(ins),
@@ -141,9 +143,11 @@ func (h *verifier) VerifySpendUTXOs(
 	}
 	for _, cred := range creds { // Verify credentials are well-formed.
 		if err := cred.Verify(); err != nil {
-			return err
+			return 0, err
 		}
 	}
+
+	requestedFees := unlockedProduced[h.ctx.AVAXAssetID]
 
 	// Time this transaction is being verified
 	now := uint64(h.clk.Time().Unix())
@@ -163,7 +167,7 @@ func (h *verifier) VerifySpendUTXOs(
 		realAssetID := utxo.AssetID()
 		claimedAssetID := input.AssetID()
 		if realAssetID != claimedAssetID {
-			return fmt.Errorf(
+			return 0, fmt.Errorf(
 				"%w: %s != %s",
 				errAssetIDMismatch,
 				claimedAssetID,
@@ -184,11 +188,11 @@ func (h *verifier) VerifySpendUTXOs(
 		// consumes it, is not locked even though [locktime] hasn't passed. This
 		// is invalid.
 		if inner, ok := in.(*stakeable.LockIn); now < locktime && !ok {
-			return errLockedFundsNotMarkedAsLocked
+			return 0, errLockedFundsNotMarkedAsLocked
 		} else if ok {
 			if inner.Locktime != locktime {
 				// This input is locked, but its locktime is wrong
-				return fmt.Errorf(
+				return 0, fmt.Errorf(
 					"%w: %d != %d",
 					errLocktimeMismatch,
 					inner.Locktime,
@@ -200,7 +204,7 @@ func (h *verifier) VerifySpendUTXOs(
 
 		// Verify that this tx's credentials allow [in] to be spent
 		if err := h.fx.VerifyTransfer(tx, in, creds[index], out); err != nil {
-			return fmt.Errorf("failed to verify transfer: %w", err)
+			return 0, fmt.Errorf("failed to verify transfer: %w", err)
 		}
 
 		amount := in.Amount()
@@ -208,7 +212,7 @@ func (h *verifier) VerifySpendUTXOs(
 		if now >= locktime {
 			newUnlockedConsumed, err := math.Add64(unlockedConsumed[realAssetID], amount)
 			if err != nil {
-				return err
+				return 0, err
 			}
 			unlockedConsumed[realAssetID] = newUnlockedConsumed
 			continue
@@ -216,12 +220,12 @@ func (h *verifier) VerifySpendUTXOs(
 
 		owned, ok := out.(fx.Owned)
 		if !ok {
-			return fmt.Errorf("expected fx.Owned but got %T", out)
+			return 0, fmt.Errorf("expected fx.Owned but got %T", out)
 		}
 		owner := owned.Owners()
 		ownerBytes, err := txs.Codec.Marshal(txs.CodecVersion, owner)
 		if err != nil {
-			return fmt.Errorf("couldn't marshal owner: %w", err)
+			return 0, fmt.Errorf("couldn't marshal owner: %w", err)
 		}
 		lockedConsumedAsset, ok := lockedConsumed[realAssetID]
 		if !ok {
@@ -236,7 +240,7 @@ func (h *verifier) VerifySpendUTXOs(
 		}
 		newAmount, err := math.Add64(owners[ownerID], amount)
 		if err != nil {
-			return err
+			return 0, err
 		}
 		owners[ownerID] = newAmount
 	}
@@ -257,7 +261,7 @@ func (h *verifier) VerifySpendUTXOs(
 		if locktime == 0 {
 			newUnlockedProduced, err := math.Add64(unlockedProduced[assetID], amount)
 			if err != nil {
-				return err
+				return 0, err
 			}
 			unlockedProduced[assetID] = newUnlockedProduced
 			continue
@@ -265,12 +269,12 @@ func (h *verifier) VerifySpendUTXOs(
 
 		owned, ok := output.(fx.Owned)
 		if !ok {
-			return fmt.Errorf("expected fx.Owned but got %T", out)
+			return 0, fmt.Errorf("expected fx.Owned but got %T", out)
 		}
 		owner := owned.Owners()
 		ownerBytes, err := txs.Codec.Marshal(txs.CodecVersion, owner)
 		if err != nil {
-			return fmt.Errorf("couldn't marshal owner: %w", err)
+			return 0, fmt.Errorf("couldn't marshal owner: %w", err)
 		}
 		lockedProducedAsset, ok := lockedProduced[assetID]
 		if !ok {
@@ -285,7 +289,7 @@ func (h *verifier) VerifySpendUTXOs(
 		}
 		newAmount, err := math.Add64(owners[ownerID], amount)
 		if err != nil {
-			return err
+			return 0, err
 		}
 		owners[ownerID] = newAmount
 	}
@@ -302,7 +306,7 @@ func (h *verifier) VerifySpendUTXOs(
 					increase := producedAmount - consumedAmount
 					unlockedConsumedAsset := unlockedConsumed[assetID]
 					if increase > unlockedConsumedAsset {
-						return fmt.Errorf(
+						return 0, fmt.Errorf(
 							"%w: %s needs %d more %s for locktime %d",
 							ErrInsufficientLockedFunds,
 							ownerID,
@@ -321,7 +325,7 @@ func (h *verifier) VerifySpendUTXOs(
 		unlockedConsumedAsset := unlockedConsumed[assetID]
 		// More unlocked tokens produced than consumed. Invalid.
 		if unlockedProducedAsset > unlockedConsumedAsset {
-			return fmt.Errorf(
+			return 0, fmt.Errorf(
 				"%w: needs %d more %s",
 				ErrInsufficientUnlockedFunds,
 				unlockedProducedAsset-unlockedConsumedAsset,
@@ -329,5 +333,7 @@ func (h *verifier) VerifySpendUTXOs(
 			)
 		}
 	}
-	return nil
+
+	feePaid := unlockedConsumed[h.ctx.AVAXAssetID] - unlockedProduced[h.ctx.AVAXAssetID] + requestedFees
+	return feePaid, nil
 }

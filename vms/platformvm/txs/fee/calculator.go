@@ -66,6 +66,14 @@ func (c *Calculator) ResetFee(newFee uint64) {
 	c.c.fee = newFee
 }
 
+func (c *Calculator) GetTipPercentage() fees.TipPercentage {
+	return c.c.tipPercentage
+}
+
+func (c *Calculator) ResetTipPercentage(tip fees.TipPercentage) {
+	c.c.tipPercentage = tip
+}
+
 func (c *Calculator) ComputeFee(tx txs.UnsignedTx) (uint64, error) {
 	err := tx.Visit(c.c)
 	return c.c.fee, err
@@ -77,6 +85,26 @@ func (c *Calculator) AddFeesFor(complexity fees.Dimensions) (uint64, error) {
 
 func (c *Calculator) RemoveFeesFor(unitsToRm fees.Dimensions) (uint64, error) {
 	return c.c.removeFeesFor(unitsToRm)
+}
+
+// CalculateTipPercentage calculates and sets the tip percentage, given the fees actually paid
+// and the fees required to accept the target transaction.
+// [CalculateTipPercentage] requires that c.Visit has been called for the target transaction.
+func (c *Calculator) CalculateTipPercentage(feesPaid uint64) error {
+	if feesPaid < c.c.fee {
+		return fmt.Errorf("fees paid are less the required fees: fees paid %v, fees required %v",
+			feesPaid,
+			c.c.fee,
+		)
+	}
+
+	if c.c.fee == 0 {
+		return nil
+	}
+
+	tip := feesPaid - c.c.fee
+	c.c.tipPercentage = fees.TipPercentage(tip * fees.TipDenonimator / c.c.fee)
+	return c.c.tipPercentage.Validate()
 }
 
 type calculator struct {
@@ -92,6 +120,10 @@ type calculator struct {
 	feeManager         *fees.Manager
 	blockMaxComplexity fees.Dimensions
 	credentials        []verify.Verifiable
+
+	// tipPercentage can either be an input (e.g. when building a transaction)
+	// or an output (once a transaction is verified)
+	tipPercentage fees.TipPercentage
 
 	// outputs of visitor execution
 	fee uint64
@@ -387,7 +419,7 @@ func (c *calculator) addFeesFor(complexity fees.Dimensions) (uint64, error) {
 		return 0, fmt.Errorf("%w: breached dimension %d", errFailedComplexityCumulation, dimension)
 	}
 
-	fee, err := c.feeManager.CalculateFee(complexity)
+	fee, err := c.feeManager.CalculateFee(complexity, c.tipPercentage)
 	if err != nil {
 		return 0, fmt.Errorf("%w: %w", errFailedFeeCalculation, err)
 	}
@@ -405,7 +437,7 @@ func (c *calculator) removeFeesFor(unitsToRm fees.Dimensions) (uint64, error) {
 		return 0, fmt.Errorf("failed removing units: %w", err)
 	}
 
-	fee, err := c.feeManager.CalculateFee(unitsToRm)
+	fee, err := c.feeManager.CalculateFee(unitsToRm, c.tipPercentage)
 	if err != nil {
 		return 0, fmt.Errorf("%w: %w", errFailedFeeCalculation, err)
 	}

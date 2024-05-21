@@ -11,6 +11,8 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/set"
+
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 var _ Tx = (*dummyTx)(nil)
@@ -94,10 +96,10 @@ func TestAdd(t *testing.T) {
 			mempool := newMempool()
 
 			for _, tx := range test.initialTxs {
-				require.NoError(mempool.Add(tx))
+				require.NoError(mempool.Add(tx, commonfees.NoTip))
 			}
 
-			err := mempool.Add(test.tx)
+			err := mempool.Add(test.tx, commonfees.NoTip)
 			require.ErrorIs(err, test.err)
 
 			txID := test.tx.ID()
@@ -123,7 +125,7 @@ func TestGet(t *testing.T) {
 	_, exists := mempool.Get(txID)
 	require.False(exists)
 
-	require.NoError(mempool.Add(tx))
+	require.NoError(mempool.Add(tx, commonfees.NoTip))
 
 	returned, exists := mempool.Get(txID)
 	require.True(exists)
@@ -146,8 +148,8 @@ func TestPeek(t *testing.T) {
 	tx0 := newTx(0, 32)
 	tx1 := newTx(1, 32)
 
-	require.NoError(mempool.Add(tx0))
-	require.NoError(mempool.Add(tx1))
+	require.NoError(mempool.Add(tx0, commonfees.NoTip))
+	require.NoError(mempool.Add(tx1, commonfees.NoTip))
 
 	tx, exists := mempool.Peek()
 	require.True(exists)
@@ -179,7 +181,7 @@ func TestRemoveConflict(t *testing.T) {
 	tx := newTx(0, 32)
 	txConflict := newTx(0, 32)
 
-	require.NoError(mempool.Add(tx))
+	require.NoError(mempool.Add(tx, commonfees.NoTip))
 
 	returnedTx, exists := mempool.Peek()
 	require.True(exists)
@@ -208,20 +210,20 @@ func TestIterate(t *testing.T) {
 	require.Empty(iteratedTxs)
 
 	tx0 := newTx(0, 32)
-	require.NoError(mempool.Add(tx0))
+	require.NoError(mempool.Add(tx0, commonfees.NoTip))
 
 	mempool.Iterate(addTxs)
 	require.Equal([]*dummyTx{tx0}, iteratedTxs)
 
 	tx1 := newTx(1, 32)
-	require.NoError(mempool.Add(tx1))
+	require.NoError(mempool.Add(tx1, commonfees.NoTip))
 
 	iteratedTxs = nil
 	mempool.Iterate(addTxs)
 	require.Equal([]*dummyTx{tx0, tx1}, iteratedTxs)
 
 	tx2 := newTx(2, 32)
-	require.NoError(mempool.Add(tx2))
+	require.NoError(mempool.Add(tx2, commonfees.NoTip))
 
 	iteratedTxs = nil
 	mempool.Iterate(addTxs)
@@ -248,7 +250,7 @@ func TestDropped(t *testing.T) {
 	err := mempool.GetDropReason(txID)
 	require.ErrorIs(err, testErr)
 
-	require.NoError(mempool.Add(tx))
+	require.NoError(mempool.Add(tx, commonfees.NoTip))
 	require.NoError(mempool.GetDropReason(txID))
 
 	mempool.MarkDropped(txID, testErr)
@@ -283,7 +285,7 @@ func TestBlockBuilderMaxMempoolSizeHandling(t *testing.T) {
 	// shortcut to simulated almost filled mempool
 	mpool.bytesAvailable = tx.Size() - 1
 
-	err := mpool.Add(tx)
+	err := mpool.Add(tx, commonfees.NoTip)
 	require.ErrorIs(err, ErrMempoolFull)
 
 	// tx should not be marked as dropped if the mempool is full
@@ -294,6 +296,6 @@ func TestBlockBuilderMaxMempoolSizeHandling(t *testing.T) {
 	// shortcut to simulated almost filled mempool
 	mpool.bytesAvailable = tx.Size()
 
-	err = mpool.Add(tx)
+	err = mpool.Add(tx, commonfees.NoTip)
 	require.NoError(err, "should have added tx to mempool")
 }

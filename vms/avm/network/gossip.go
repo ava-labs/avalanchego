@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/txs/mempool"
 
 	xmempool "github.com/ava-labs/avalanchego/vms/avm/txs/mempool"
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 var (
@@ -130,7 +131,7 @@ func (g *gossipMempool) Has(txID ids.ID) bool {
 }
 
 func (g *gossipMempool) AddWithoutVerification(tx *txs.Tx) error {
-	if err := g.Mempool.Add(tx); err != nil {
+	if err := g.Mempool.Add(tx, commonfees.NoTip); err != nil {
 		g.Mempool.MarkDropped(tx.ID(), err)
 		return err
 	}

@@ -48,6 +48,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/upgrade"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
 	walletcommon "github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
@@ -78,6 +79,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 		},
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[0]},
+		commonfees.NoTip,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{changeAddr},
@@ -120,6 +122,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 			Addrs:     []ids.ShortID{changeAddr},
 		},
 		[]*secp256k1.PrivateKey{keys[0], keys[1]},
+		commonfees.NoTip,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{changeAddr},
@@ -164,6 +167,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 			Addrs:     []ids.ShortID{changeAddr},
 		},
 		[]*secp256k1.PrivateKey{keys[0], keys[1], keys[3]},
+		commonfees.NoTip,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{changeAddr},
@@ -198,6 +202,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 			Addrs:     []ids.ShortID{changeAddr},
 		},
 		[]*secp256k1.PrivateKey{keys[0], keys[1], keys[4]},
+		commonfees.NoTip,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{changeAddr},
@@ -278,6 +283,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 				},
 				reward.PercentDenominator,
 				[]*secp256k1.PrivateKey{keys[0], keys[1]},
+				commonfees.NoTip,
 				walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 					Threshold: 1,
 					Addrs:     []ids.ShortID{changeAddr},
@@ -310,6 +316,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 					Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
 				},
 				[]*secp256k1.PrivateKey{keys[0], keys[1]},
+				commonfees.NoTip,
 				walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 					Threshold: 1,
 					Addrs:     []ids.ShortID{changeAddr},
@@ -342,6 +349,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 					Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
 				},
 				[]*secp256k1.PrivateKey{keys[0], keys[1]},
+				commonfees.NoTip,
 				walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 					Threshold: 1,
 					Addrs:     []ids.ShortID{changeAddr},
@@ -374,6 +382,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 					Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
 				},
 				[]*secp256k1.PrivateKey{keys[0], keys[1]},
+				commonfees.NoTip,
 				walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 					Threshold: 1,
 					Addrs:     []ids.ShortID{changeAddr},
@@ -406,6 +415,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 					Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
 				},
 				[]*secp256k1.PrivateKey{keys[0], keys[1]},
+				commonfees.NoTip,
 				walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 					Threshold: 1,
 					Addrs:     []ids.ShortID{changeAddr},
@@ -498,6 +508,7 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 			Addrs:     []ids.ShortID{addr0},
 		},
 		[]*secp256k1.PrivateKey{key0},
+		commonfees.NoTip,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{addr0},
@@ -511,6 +522,7 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 			Addrs:     []ids.ShortID{addr1},
 		},
 		[]*secp256k1.PrivateKey{key1},
+		commonfees.NoTip,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{addr1},
@@ -524,6 +536,7 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 			Addrs:     []ids.ShortID{addr1},
 		},
 		[]*secp256k1.PrivateKey{key1},
+		commonfees.NoTip,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{addr0},
@@ -605,6 +618,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 		},
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[0]},
+		commonfees.NoTip,
 	)
 	require.NoError(err)
 
@@ -817,6 +831,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 		},
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[0]},
+		commonfees.NoTip,
 	)
 	require.NoError(err)
 
@@ -993,6 +1008,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 		},
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[1]},
+		commonfees.NoTip,
 	)
 	require.NoError(err)
 
@@ -1152,6 +1168,7 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 		},
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[0]},
+		commonfees.NoTip,
 	)
 	require.NoError(err)
 
@@ -1277,6 +1294,7 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 		},
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[0], keys[1]},
+		commonfees.NoTip,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{changeAddr},
@@ -1309,6 +1327,7 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 			Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
 		},
 		[]*secp256k1.PrivateKey{keys[0], keys[1]},
+		commonfees.NoTip,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{changeAddr},
@@ -1341,6 +1360,7 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 			Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
 		},
 		[]*secp256k1.PrivateKey{keys[0], keys[1]},
+		commonfees.NoTip,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{changeAddr},
@@ -1386,6 +1406,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionNotTracked(t
 		},
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[0], keys[1]},
+		commonfees.NoTip,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{changeAddr},
@@ -1410,6 +1431,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionNotTracked(t
 			Addrs:     []ids.ShortID{changeAddr},
 		},
 		[]*secp256k1.PrivateKey{keys[0], keys[1]},
+		commonfees.NoTip,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{changeAddr},
@@ -1439,6 +1461,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionNotTracked(t
 			Subnet: createSubnetTx.ID(),
 		},
 		[]*secp256k1.PrivateKey{keys[0], keys[1]},
+		commonfees.NoTip,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{changeAddr},
@@ -1469,6 +1492,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionNotTracked(t
 		nodeID,
 		createSubnetTx.ID(),
 		[]*secp256k1.PrivateKey{keys[0], keys[1]},
+		commonfees.NoTip,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{changeAddr},
@@ -1530,6 +1554,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 		},
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[0], keys[1]},
+		commonfees.NoTip,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{changeAddr},
@@ -1554,6 +1579,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 			Addrs:     []ids.ShortID{changeAddr},
 		},
 		[]*secp256k1.PrivateKey{keys[0], keys[1]},
+		commonfees.NoTip,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{changeAddr},
@@ -1583,6 +1609,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 			Subnet: createSubnetTx.ID(),
 		},
 		[]*secp256k1.PrivateKey{keys[0], keys[1]},
+		commonfees.NoTip,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{changeAddr},
@@ -1605,6 +1632,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 		nodeID,
 		createSubnetTx.ID(),
 		[]*secp256k1.PrivateKey{keys[0], keys[1]},
+		commonfees.NoTip,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{changeAddr},
@@ -1685,6 +1713,7 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 		},
 		reward.PercentDenominator,
 		keys,
+		commonfees.NoTip,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{addr},
@@ -1722,6 +1751,7 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 			Subnet: subnetID,
 		},
 		[]*secp256k1.PrivateKey{keys[0], keys[1]},
+		commonfees.NoTip,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{addr},
@@ -1812,6 +1842,7 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 		},
 		reward.PercentDenominator,
 		keys,
+		commonfees.NoTip,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{addr},
@@ -1927,6 +1958,7 @@ func TestPrimaryNetworkValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 		},
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[0]},
+		commonfees.NoTip,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{addr},
@@ -2004,6 +2036,7 @@ func TestPrimaryNetworkValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 		},
 		reward.PercentDenominator,
 		keys,
+		commonfees.NoTip,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{addr},
@@ -2082,6 +2115,7 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 		},
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[0]},
+		commonfees.NoTip,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{addr},
@@ -2118,6 +2152,7 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 			Subnet: subnetID,
 		},
 		[]*secp256k1.PrivateKey{keys[0], keys[1]},
+		commonfees.NoTip,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{addr},
@@ -2207,6 +2242,7 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 		},
 		reward.PercentDenominator,
 		keys,
+		commonfees.NoTip,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{addr},
@@ -2292,6 +2328,7 @@ func TestSubnetValidatorSetAfterPrimaryNetworkValidatorRemoval(t *testing.T) {
 		},
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[0]},
+		commonfees.NoTip,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{addr},
@@ -2325,6 +2362,7 @@ func TestSubnetValidatorSetAfterPrimaryNetworkValidatorRemoval(t *testing.T) {
 			Subnet: subnetID,
 		},
 		[]*secp256k1.PrivateKey{keys[0], keys[1]},
+		commonfees.NoTip,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{addr},

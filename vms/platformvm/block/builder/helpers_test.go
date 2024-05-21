@@ -184,6 +184,9 @@ func newEnvironment(t *testing.T, f fork) *environment { //nolint:unparam
 
 	res.mempool, err = mempool.New("mempool", registerer, nil)
 	require.NoError(err)
+	if res.config.UpgradeConfig.IsEActivated(res.state.GetTimestamp()) {
+		res.mempool.SetEUpgradeActive()
+	}
 
 	res.blkManager = blockexecutor.NewManager(
 		res.mempool,
@@ -254,6 +257,7 @@ func addSubnet(t *testing.T, env *environment) {
 			},
 		},
 		[]*secp256k1.PrivateKey{preFundedKeys[0]},
+		fees.NoTip,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},

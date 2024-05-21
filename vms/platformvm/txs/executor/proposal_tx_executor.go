@@ -162,7 +162,7 @@ func (e *ProposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 		)
 	}
 
-	if err := verifyAddSubnetValidatorTx(
+	if _, err := verifyAddSubnetValidatorTx(
 		e.Backend,
 		commonfees.NewManager(commonfees.Empty),
 		commonfees.Max,

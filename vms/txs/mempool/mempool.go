@@ -10,10 +10,14 @@ import (
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/heap"
 	"github.com/ava-labs/avalanchego/utils/linked"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/setmap"
 	"github.com/ava-labs/avalanchego/utils/units"
+
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 const (
@@ -45,8 +49,28 @@ type Metrics interface {
 	Update(numTxs, bytesAvailable int)
 }
 
+// TxAndTipPercentage is a helper struct to sort transactions
+// by priority fee once E uprade activates
+type TxAndTipPercentage[T Tx] struct {
+	Tx            T
+	TipPercentage commonfees.TipPercentage
+}
+
+func lessTxAndTipPercent[T Tx](a TxAndTipPercentage[T], b TxAndTipPercentage[T]) bool {
+	switch {
+	case a.TipPercentage < b.TipPercentage:
+		return true
+	case a.TipPercentage > b.TipPercentage:
+		return false
+	default:
+		return a.Tx.ID().Compare(b.Tx.ID()) == -1
+	}
+}
+
 type Mempool[T Tx] interface {
-	Add(tx T) error
+	SetEUpgradeActive()
+
+	Add(tx T, tipPercentage commonfees.TipPercentage) error
 	Get(txID ids.ID) (T, bool)
 	// Remove [txs] and any conflicts of [txs] from the mempool.
 	Remove(txs ...T)
@@ -68,8 +92,17 @@ type Mempool[T Tx] interface {
 }
 
 type mempool[T Tx] struct {
-	lock           sync.RWMutex
-	unissuedTxs    *linked.Hashmap[ids.ID, T]
+	lock sync.RWMutex
+	// TODO: drop [[isEUpgradeActive] once E upgrade is activated
+	isEUpgradeActive utils.Atomic[bool]
+
+	// unissued txs sorted by time they entered the mempool
+	// TODO: drop [unissuedTxs] once E upgrade is activated
+	unissuedTxs *linked.Hashmap[ids.ID, T]
+
+	// Following E upgrade activation, mempool transactions are sorted by tip percentage
+	unissuedTxsByTipPercentage heap.Map[ids.ID, TxAndTipPercentage[T]]
+
 	consumedUTXOs  *setmap.SetMap[ids.ID, ids.ID] // TxID -> Consumed UTXOs
 	bytesAvailable int
 	droppedTxIDs   *cache.LRU[ids.ID, error] // TxID -> Verification error
@@ -81,12 +114,14 @@ func New[T Tx](
 	metrics Metrics,
 ) *mempool[T] {
 	m := &mempool[T]{
-		unissuedTxs:    linked.NewHashmap[ids.ID, T](),
-		consumedUTXOs:  setmap.New[ids.ID, ids.ID](),
-		bytesAvailable: maxMempoolSize,
-		droppedTxIDs:   &cache.LRU[ids.ID, error]{Size: droppedTxIDsCacheSize},
-		metrics:        metrics,
+		unissuedTxs:                linked.NewHashmap[ids.ID, T](),
+		unissuedTxsByTipPercentage: heap.NewMap[ids.ID, TxAndTipPercentage[T]](lessTxAndTipPercent),
+		consumedUTXOs:              setmap.New[ids.ID, ids.ID](),
+		bytesAvailable:             maxMempoolSize,
+		droppedTxIDs:               &cache.LRU[ids.ID, error]{Size: droppedTxIDsCacheSize},
+		metrics:                    metrics,
 	}
+	m.isEUpgradeActive.Set(false)
 	m.updateMetrics()
 
 	return m
@@ -96,13 +131,17 @@ func (m *mempool[T]) updateMetrics() {
 	m.metrics.Update(m.unissuedTxs.Len(), m.bytesAvailable)
 }
 
-func (m *mempool[T]) Add(tx T) error {
+func (m *mempool[T]) SetEUpgradeActive() {
+	m.isEUpgradeActive.Set(true)
+}
+
+func (m *mempool[T]) Add(tx T, tipPercentage commonfees.TipPercentage) error {
 	txID := tx.ID()
 
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	if _, ok := m.unissuedTxs.Get(txID); ok {
+	if _, ok := m.get(txID); ok {
 		return fmt.Errorf("%w: %s", ErrDuplicateTx, txID)
 	}
 
@@ -131,6 +170,10 @@ func (m *mempool[T]) Add(tx T) error {
 
 	m.bytesAvailable -= txSize
 	m.unissuedTxs.Put(txID, tx)
+	m.unissuedTxsByTipPercentage.Push(txID, TxAndTipPercentage[T]{
+		Tx:            tx,
+		TipPercentage: tipPercentage,
+	})
 	m.updateMetrics()
 
 	// Mark these UTXOs as consumed in the mempool
@@ -145,7 +188,15 @@ func (m *mempool[T]) Get(txID ids.ID) (T, bool) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 
-	return m.unissuedTxs.Get(txID)
+	return m.get(txID)
+}
+
+func (m *mempool[T]) get(txID ids.ID) (T, bool) {
+	if !m.isEUpgradeActive.Get() {
+		return m.unissuedTxs.Get(txID)
+	}
+	v, found := m.unissuedTxsByTipPercentage.Get(txID)
+	return v.Tx, found
 }
 
 func (m *mempool[T]) Remove(txs ...T) {
@@ -157,6 +208,7 @@ func (m *mempool[T]) Remove(txs ...T) {
 		// If the transaction is in the mempool, remove it.
 		if _, ok := m.consumedUTXOs.DeleteKey(txID); ok {
 			m.unissuedTxs.Delete(txID)
+			m.unissuedTxsByTipPercentage.Remove(txID)
 			m.bytesAvailable += tx.Size()
 			continue
 		}
@@ -166,6 +218,7 @@ func (m *mempool[T]) Remove(txs ...T) {
 		for _, removed := range m.consumedUTXOs.DeleteOverlapping(inputs) {
 			tx, _ := m.unissuedTxs.Get(removed.Key)
 			m.unissuedTxs.Delete(removed.Key)
+			m.unissuedTxsByTipPercentage.Remove(removed.Key)
 			m.bytesAvailable += tx.Size()
 		}
 	}
@@ -176,7 +229,19 @@ func (m *mempool[T]) Peek() (T, bool) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 
-	_, tx, exists := m.unissuedTxs.Oldest()
+	var (
+		tx     T
+		exists bool
+	)
+
+	if !m.isEUpgradeActive.Get() {
+		_, tx, exists = m.unissuedTxs.Oldest()
+	} else {
+		var v TxAndTipPercentage[T]
+		_, v, exists = m.unissuedTxsByTipPercentage.Peek()
+		tx = v.Tx
+	}
+
 	return tx, exists
 }
 
@@ -184,6 +249,9 @@ func (m *mempool[T]) Iterate(f func(T) bool) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 
+	// TODO: once E upgrade gets activated, replace unissuedTxs
+	// with an array containing txs. We cannot iterate [unissuedTxsByTipPercentage]
+	// but order does not seems relevant for the functions [f] currently used
 	it := m.unissuedTxs.NewIterator()
 	for it.Next() {
 		if !f(it.Value()) {
@@ -200,8 +268,14 @@ func (m *mempool[_]) MarkDropped(txID ids.ID, reason error) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 
-	if _, ok := m.unissuedTxs.Get(txID); ok {
-		return
+	if !m.isEUpgradeActive.Get() {
+		if _, ok := m.unissuedTxs.Get(txID); ok {
+			return
+		}
+	} else {
+		if _, ok := m.unissuedTxsByTipPercentage.Get(txID); ok {
+			return
+		}
 	}
 
 	m.droppedTxIDs.Put(txID, reason)
@@ -216,5 +290,8 @@ func (m *mempool[_]) Len() int {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 
-	return m.unissuedTxs.Len()
+	if !m.isEUpgradeActive.Get() {
+		return m.unissuedTxs.Len()
+	}
+	return m.unissuedTxsByTipPercentage.Len()
 }

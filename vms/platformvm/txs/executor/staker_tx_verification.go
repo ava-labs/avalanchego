@@ -175,7 +175,7 @@ func verifyAddValidatorTx(
 		return nil, err
 	}
 
-	if err := backend.FlowChecker.VerifySpend(
+	if _, err = backend.FlowChecker.VerifySpend(
 		tx,
 		chainState,
 		tx.Ins,
@@ -200,10 +200,10 @@ func verifyAddSubnetValidatorTx(
 	chainState state.Chain,
 	sTx *txs.Tx,
 	tx *txs.AddSubnetValidatorTx,
-) error {
+) (commonfees.TipPercentage, error) {
 	// Verify the tx is well-formed
 	if err := sTx.SyntacticVerify(backend.Ctx); err != nil {
-		return err
+		return commonfees.NoTip, err
 	}
 
 	var (
@@ -213,7 +213,7 @@ func verifyAddSubnetValidatorTx(
 		isEActive        = upgrades.IsEActivated(currentTimestamp)
 	)
 	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
-		return err
+		return commonfees.NoTip, err
 	}
 
 	startTime := currentTimestamp
@@ -225,24 +225,24 @@ func verifyAddSubnetValidatorTx(
 	switch {
 	case duration < backend.Config.MinStakeDuration:
 		// Ensure staking length is not too short
-		return ErrStakeTooShort
+		return commonfees.NoTip, ErrStakeTooShort
 
 	case duration > backend.Config.MaxStakeDuration:
 		// Ensure staking length is not too long
-		return ErrStakeTooLong
+		return commonfees.NoTip, ErrStakeTooLong
 	}
 
 	if !backend.Bootstrapped.Get() {
-		return nil
+		return commonfees.NoTip, nil
 	}
 
 	if err := verifyStakerStartTime(isDurangoActive, currentTimestamp, startTime); err != nil {
-		return err
+		return commonfees.NoTip, err
 	}
 
 	_, err := GetValidator(chainState, tx.SubnetValidator.Subnet, tx.Validator.NodeID)
 	if err == nil {
-		return fmt.Errorf(
+		return commonfees.NoTip, fmt.Errorf(
 			"attempted to issue %w for %s on subnet %s",
 			ErrDuplicateValidator,
 			tx.Validator.NodeID,
@@ -250,7 +250,7 @@ func verifyAddSubnetValidatorTx(
 		)
 	}
 	if err != database.ErrNotFound {
-		return fmt.Errorf(
+		return commonfees.NoTip, fmt.Errorf(
 			"failed to find whether %s is a subnet validator: %w",
 			tx.Validator.NodeID,
 			err,
@@ -258,12 +258,12 @@ func verifyAddSubnetValidatorTx(
 	}
 
 	if err := verifySubnetValidatorPrimaryNetworkRequirements(isDurangoActive, chainState, tx.Validator); err != nil {
-		return err
+		return commonfees.NoTip, err
 	}
 
 	baseTxCreds, err := verifyPoASubnetAuthorization(backend, chainState, sTx, tx.SubnetValidator.Subnet, tx.SubnetAuth)
 	if err != nil {
-		return err
+		return commonfees.NoTip, err
 	}
 
 	// Verify the flowcheck
@@ -279,10 +279,10 @@ func verifyAddSubnetValidatorTx(
 
 	fee, err := feeCalculator.ComputeFee(tx)
 	if err != nil {
-		return err
+		return commonfees.NoTip, err
 	}
 
-	if err := backend.FlowChecker.VerifySpend(
+	feesPaid, err := backend.FlowChecker.VerifySpend(
 		tx,
 		chainState,
 		tx.Ins,
@@ -291,11 +291,18 @@ func verifyAddSubnetValidatorTx(
 		map[ids.ID]uint64{
 			backend.Ctx.AVAXAssetID: fee,
 		},
-	); err != nil {
-		return fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
+	)
+	if err != nil {
+		return commonfees.NoTip, fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
 	}
 
-	return nil
+	if isEActive {
+		if err := feeCalculator.CalculateTipPercentage(feesPaid); err != nil {
+			return commonfees.NoTip, fmt.Errorf("failed estimating fee tip percentage: %w", err)
+		}
+	}
+
+	return feeCalculator.GetTipPercentage(), nil
 }
 
 // Returns the representation of [tx.NodeID] validating [tx.Subnet].
@@ -313,10 +320,10 @@ func verifyRemoveSubnetValidatorTx(
 	chainState state.Chain,
 	sTx *txs.Tx,
 	tx *txs.RemoveSubnetValidatorTx,
-) (*state.Staker, bool, error) {
+) (*state.Staker, bool, commonfees.TipPercentage, error) {
 	// Verify the tx is well-formed
 	if err := sTx.SyntacticVerify(backend.Ctx); err != nil {
-		return nil, false, err
+		return nil, false, commonfees.NoTip, err
 	}
 
 	var (
@@ -326,7 +333,7 @@ func verifyRemoveSubnetValidatorTx(
 		isEActive        = upgrades.IsEActivated(currentTimestamp)
 	)
 	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
-		return nil, false, err
+		return nil, false, commonfees.NoTip, err
 	}
 
 	isCurrentValidator := true
@@ -337,7 +344,7 @@ func verifyRemoveSubnetValidatorTx(
 	}
 	if err != nil {
 		// It isn't a current or pending validator.
-		return nil, false, fmt.Errorf(
+		return nil, false, commonfees.NoTip, fmt.Errorf(
 			"%s %w of %s: %w",
 			tx.NodeID,
 			ErrNotValidator,
@@ -347,17 +354,17 @@ func verifyRemoveSubnetValidatorTx(
 	}
 
 	if !vdr.Priority.IsPermissionedValidator() {
-		return nil, false, ErrRemovePermissionlessValidator
+		return nil, false, commonfees.NoTip, ErrRemovePermissionlessValidator
 	}
 
 	if !backend.Bootstrapped.Get() {
 		// Not bootstrapped yet -- don't need to do full verification.
-		return vdr, isCurrentValidator, nil
+		return vdr, isCurrentValidator, commonfees.NoTip, nil
 	}
 
 	baseTxCreds, err := verifySubnetAuthorization(backend, chainState, sTx, tx.Subnet, tx.SubnetAuth)
 	if err != nil {
-		return nil, false, err
+		return nil, false, commonfees.NoTip, err
 	}
 
 	// Verify the flowcheck
@@ -373,10 +380,10 @@ func verifyRemoveSubnetValidatorTx(
 
 	fee, err := feeCalculator.ComputeFee(tx)
 	if err != nil {
-		return nil, false, err
+		return nil, false, commonfees.NoTip, err
 	}
 
-	if err := backend.FlowChecker.VerifySpend(
+	feesPaid, err := backend.FlowChecker.VerifySpend(
 		tx,
 		chainState,
 		tx.Ins,
@@ -385,11 +392,18 @@ func verifyRemoveSubnetValidatorTx(
 		map[ids.ID]uint64{
 			backend.Ctx.AVAXAssetID: fee,
 		},
-	); err != nil {
-		return nil, false, fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
+	)
+	if err != nil {
+		return nil, false, commonfees.NoTip, fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
 	}
 
-	return vdr, isCurrentValidator, nil
+	if isEActive {
+		if err := feeCalculator.CalculateTipPercentage(feesPaid); err != nil {
+			return nil, false, commonfees.NoTip, fmt.Errorf("failed estimating fee tip percentage: %w", err)
+		}
+	}
+
+	return vdr, isCurrentValidator, feeCalculator.GetTipPercentage(), nil
 }
 
 // verifyAddDelegatorTx carries out the validation for an AddDelegatorTx.
@@ -501,7 +515,7 @@ func verifyAddDelegatorTx(
 		return nil, err
 	}
 
-	if err := backend.FlowChecker.VerifySpend(
+	if _, err := backend.FlowChecker.VerifySpend(
 		tx,
 		chainState,
 		tx.Ins,
@@ -526,10 +540,10 @@ func verifyAddPermissionlessValidatorTx(
 	chainState state.Chain,
 	sTx *txs.Tx,
 	tx *txs.AddPermissionlessValidatorTx,
-) error {
+) (commonfees.TipPercentage, error) {
 	// Verify the tx is well-formed
 	if err := sTx.SyntacticVerify(backend.Ctx); err != nil {
-		return err
+		return commonfees.NoTip, err
 	}
 
 	var (
@@ -539,11 +553,11 @@ func verifyAddPermissionlessValidatorTx(
 		isEActive        = upgrades.IsEActivated(currentTimestamp)
 	)
 	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
-		return err
+		return commonfees.NoTip, err
 	}
 
 	if !backend.Bootstrapped.Get() {
-		return nil
+		return commonfees.NoTip, nil
 	}
 
 	startTime := currentTimestamp
@@ -553,39 +567,39 @@ func verifyAddPermissionlessValidatorTx(
 	duration := tx.EndTime().Sub(startTime)
 
 	if err := verifyStakerStartTime(isDurangoActive, currentTimestamp, startTime); err != nil {
-		return err
+		return commonfees.NoTip, err
 	}
 
 	validatorRules, err := getValidatorRules(backend, chainState, tx.Subnet)
 	if err != nil {
-		return err
+		return commonfees.NoTip, err
 	}
 
 	stakedAssetID := tx.StakeOuts[0].AssetID()
 	switch {
 	case tx.Validator.Wght < validatorRules.minValidatorStake:
 		// Ensure validator is staking at least the minimum amount
-		return ErrWeightTooSmall
+		return commonfees.NoTip, ErrWeightTooSmall
 
 	case tx.Validator.Wght > validatorRules.maxValidatorStake:
 		// Ensure validator isn't staking too much
-		return ErrWeightTooLarge
+		return commonfees.NoTip, ErrWeightTooLarge
 
 	case tx.DelegationShares < validatorRules.minDelegationFee:
 		// Ensure the validator fee is at least the minimum amount
-		return ErrInsufficientDelegationFee
+		return commonfees.NoTip, ErrInsufficientDelegationFee
 
 	case duration < validatorRules.minStakeDuration:
 		// Ensure staking length is not too short
-		return ErrStakeTooShort
+		return commonfees.NoTip, ErrStakeTooShort
 
 	case duration > validatorRules.maxStakeDuration:
 		// Ensure staking length is not too long
-		return ErrStakeTooLong
+		return commonfees.NoTip, ErrStakeTooLong
 
 	case stakedAssetID != validatorRules.assetID:
 		// Wrong assetID used
-		return fmt.Errorf(
+		return commonfees.NoTip, fmt.Errorf(
 			"%w: %s != %s",
 			ErrWrongStakedAssetID,
 			validatorRules.assetID,
@@ -595,7 +609,7 @@ func verifyAddPermissionlessValidatorTx(
 
 	_, err = GetValidator(chainState, tx.Subnet, tx.Validator.NodeID)
 	if err == nil {
-		return fmt.Errorf(
+		return commonfees.NoTip, fmt.Errorf(
 			"%w: %s on %s",
 			ErrDuplicateValidator,
 			tx.Validator.NodeID,
@@ -603,7 +617,7 @@ func verifyAddPermissionlessValidatorTx(
 		)
 	}
 	if err != database.ErrNotFound {
-		return fmt.Errorf(
+		return commonfees.NoTip, fmt.Errorf(
 			"failed to find whether %s is a validator on %s: %w",
 			tx.Validator.NodeID,
 			tx.Subnet,
@@ -613,7 +627,7 @@ func verifyAddPermissionlessValidatorTx(
 
 	if tx.Subnet != constants.PrimaryNetworkID {
 		if err := verifySubnetValidatorPrimaryNetworkRequirements(isDurangoActive, chainState, tx.Validator); err != nil {
-			return err
+			return commonfees.NoTip, err
 		}
 	}
 
@@ -634,10 +648,10 @@ func verifyAddPermissionlessValidatorTx(
 
 	fee, err := feeCalculator.ComputeFee(tx)
 	if err != nil {
-		return err
+		return commonfees.NoTip, err
 	}
 
-	if err := backend.FlowChecker.VerifySpend(
+	feesPaid, err := backend.FlowChecker.VerifySpend(
 		tx,
 		chainState,
 		tx.Ins,
@@ -646,11 +660,18 @@ func verifyAddPermissionlessValidatorTx(
 		map[ids.ID]uint64{
 			backend.Ctx.AVAXAssetID: fee,
 		},
-	); err != nil {
-		return fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
+	)
+	if err != nil {
+		return commonfees.NoTip, fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
 	}
 
-	return nil
+	if isEActive {
+		if err := feeCalculator.CalculateTipPercentage(feesPaid); err != nil {
+			return commonfees.NoTip, fmt.Errorf("failed estimating fee tip percentage: %w", err)
+		}
+	}
+
+	return feeCalculator.GetTipPercentage(), nil
 }
 
 // verifyAddPermissionlessDelegatorTx carries out the validation for an
@@ -662,10 +683,10 @@ func verifyAddPermissionlessDelegatorTx(
 	chainState state.Chain,
 	sTx *txs.Tx,
 	tx *txs.AddPermissionlessDelegatorTx,
-) error {
+) (commonfees.TipPercentage, error) {
 	// Verify the tx is well-formed
 	if err := sTx.SyntacticVerify(backend.Ctx); err != nil {
-		return err
+		return commonfees.NoTip, err
 	}
 
 	var (
@@ -675,11 +696,11 @@ func verifyAddPermissionlessDelegatorTx(
 		isEActive        = upgrades.IsEActivated(currentTimestamp)
 	)
 	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
-		return err
+		return commonfees.NoTip, err
 	}
 
 	if !backend.Bootstrapped.Get() {
-		return nil
+		return commonfees.NoTip, nil
 	}
 
 	var (
@@ -692,31 +713,31 @@ func verifyAddPermissionlessDelegatorTx(
 	duration := endTime.Sub(startTime)
 
 	if err := verifyStakerStartTime(isDurangoActive, currentTimestamp, startTime); err != nil {
-		return err
+		return commonfees.NoTip, err
 	}
 
 	delegatorRules, err := getDelegatorRules(backend, chainState, tx.Subnet)
 	if err != nil {
-		return err
+		return commonfees.NoTip, err
 	}
 
 	stakedAssetID := tx.StakeOuts[0].AssetID()
 	switch {
 	case tx.Validator.Wght < delegatorRules.minDelegatorStake:
 		// Ensure delegator is staking at least the minimum amount
-		return ErrWeightTooSmall
+		return commonfees.NoTip, ErrWeightTooSmall
 
 	case duration < delegatorRules.minStakeDuration:
 		// Ensure staking length is not too short
-		return ErrStakeTooShort
+		return commonfees.NoTip, ErrStakeTooShort
 
 	case duration > delegatorRules.maxStakeDuration:
 		// Ensure staking length is not too long
-		return ErrStakeTooLong
+		return commonfees.NoTip, ErrStakeTooLong
 
 	case stakedAssetID != delegatorRules.assetID:
 		// Wrong assetID used
-		return fmt.Errorf(
+		return commonfees.NoTip, fmt.Errorf(
 			"%w: %s != %s",
 			ErrWrongStakedAssetID,
 			delegatorRules.assetID,
@@ -726,7 +747,7 @@ func verifyAddPermissionlessDelegatorTx(
 
 	validator, err := GetValidator(chainState, tx.Subnet, tx.Validator.NodeID)
 	if err != nil {
-		return fmt.Errorf(
+		return commonfees.NoTip, fmt.Errorf(
 			"failed to fetch the validator for %s on %s: %w",
 			tx.Validator.NodeID,
 			tx.Subnet,
@@ -749,7 +770,7 @@ func verifyAddPermissionlessDelegatorTx(
 		validator.StartTime,
 		validator.EndTime,
 	) {
-		return ErrPeriodMismatch
+		return commonfees.NoTip, ErrPeriodMismatch
 	}
 	overDelegated, err := overDelegated(
 		chainState,
@@ -760,10 +781,10 @@ func verifyAddPermissionlessDelegatorTx(
 		endTime,
 	)
 	if err != nil {
-		return err
+		return commonfees.NoTip, err
 	}
 	if overDelegated {
-		return ErrOverDelegated
+		return commonfees.NoTip, ErrOverDelegated
 	}
 
 	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.StakeOuts))
@@ -778,7 +799,7 @@ func verifyAddPermissionlessDelegatorTx(
 		//            permissioned validator, so we verify this delegator is
 		//            pointing to a permissionless validator.
 		if validator.Priority.IsPermissionedValidator() {
-			return ErrDelegateToPermissionedValidator
+			return commonfees.NoTip, ErrDelegateToPermissionedValidator
 		}
 	}
 
@@ -795,10 +816,10 @@ func verifyAddPermissionlessDelegatorTx(
 
 	fee, err := feeCalculator.ComputeFee(tx)
 	if err != nil {
-		return err
+		return commonfees.NoTip, err
 	}
 
-	if err := backend.FlowChecker.VerifySpend(
+	feesPaid, err := backend.FlowChecker.VerifySpend(
 		tx,
 		chainState,
 		tx.Ins,
@@ -807,11 +828,18 @@ func verifyAddPermissionlessDelegatorTx(
 		map[ids.ID]uint64{
 			backend.Ctx.AVAXAssetID: fee,
 		},
-	); err != nil {
-		return fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
+	)
+	if err != nil {
+		return commonfees.NoTip, fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
 	}
 
-	return nil
+	if isEActive {
+		if err := feeCalculator.CalculateTipPercentage(feesPaid); err != nil {
+			return commonfees.NoTip, fmt.Errorf("failed estimating fee tip percentage: %w", err)
+		}
+	}
+
+	return feeCalculator.GetTipPercentage(), nil
 }
 
 // Returns an error if the given tx is invalid.
@@ -826,7 +854,7 @@ func verifyTransferSubnetOwnershipTx(
 	chainState state.Chain,
 	sTx *txs.Tx,
 	tx *txs.TransferSubnetOwnershipTx,
-) error {
+) (commonfees.TipPercentage, error) {
 	var (
 		currentTimestamp = chainState.GetTimestamp()
 		upgrades         = backend.Config.UpgradeConfig
@@ -835,26 +863,26 @@ func verifyTransferSubnetOwnershipTx(
 	)
 
 	if !isDurangoActive {
-		return ErrDurangoUpgradeNotActive
+		return commonfees.NoTip, ErrDurangoUpgradeNotActive
 	}
 
 	// Verify the tx is well-formed
 	if err := sTx.SyntacticVerify(backend.Ctx); err != nil {
-		return err
+		return commonfees.NoTip, err
 	}
 
 	if err := avax.VerifyMemoFieldLength(tx.Memo, true /*=isDurangoActive*/); err != nil {
-		return err
+		return commonfees.NoTip, err
 	}
 
 	if !backend.Bootstrapped.Get() {
 		// Not bootstrapped yet -- don't need to do full verification.
-		return nil
+		return commonfees.NoTip, nil
 	}
 
 	baseTxCreds, err := verifySubnetAuthorization(backend, chainState, sTx, tx.Subnet, tx.SubnetAuth)
 	if err != nil {
-		return err
+		return commonfees.NoTip, err
 	}
 
 	// Verify the flowcheck
@@ -870,10 +898,10 @@ func verifyTransferSubnetOwnershipTx(
 
 	fee, err := feeCalculator.ComputeFee(tx)
 	if err != nil {
-		return err
+		return commonfees.NoTip, err
 	}
 
-	if err := backend.FlowChecker.VerifySpend(
+	feesPaid, err := backend.FlowChecker.VerifySpend(
 		tx,
 		chainState,
 		tx.Ins,
@@ -882,11 +910,18 @@ func verifyTransferSubnetOwnershipTx(
 		map[ids.ID]uint64{
 			backend.Ctx.AVAXAssetID: fee,
 		},
-	); err != nil {
-		return fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
+	)
+	if err != nil {
+		return commonfees.NoTip, fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
 	}
 
-	return nil
+	if isEActive {
+		if err := feeCalculator.CalculateTipPercentage(feesPaid); err != nil {
+			return commonfees.NoTip, fmt.Errorf("failed estimating fee tip percentage: %w", err)
+		}
+	}
+
+	return feeCalculator.GetTipPercentage(), nil
 }
 
 // Ensure the proposed validator starts after the current time

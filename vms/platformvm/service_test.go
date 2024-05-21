@@ -176,6 +176,7 @@ func TestGetTxStatus(t *testing.T) {
 			Addrs:     []ids.ShortID{ids.ShortEmpty},
 		},
 		[]*secp256k1.PrivateKey{recipientKey},
+		commonfees.NoTip,
 	)
 	require.NoError(err)
 
@@ -227,6 +228,7 @@ func TestGetTx(t *testing.T) {
 					[]ids.ID{},
 					"chain name",
 					[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+					commonfees.NoTip,
 					common.WithChangeOwner(&secp256k1fx.OutputOwners{
 						Threshold: 1,
 						Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
@@ -261,6 +263,7 @@ func TestGetTx(t *testing.T) {
 					rewardsOwner,
 					0,
 					[]*secp256k1.PrivateKey{keys[0]},
+					commonfees.NoTip,
 					common.WithChangeOwner(&secp256k1fx.OutputOwners{
 						Threshold: 1,
 						Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
@@ -285,6 +288,7 @@ func TestGetTx(t *testing.T) {
 						},
 					}},
 					[]*secp256k1.PrivateKey{keys[0]},
+					commonfees.NoTip,
 					common.WithChangeOwner(&secp256k1fx.OutputOwners{
 						Threshold: 1,
 						Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
@@ -498,6 +502,7 @@ func TestGetStake(t *testing.T) {
 			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
 		},
 		[]*secp256k1.PrivateKey{keys[0]},
+		commonfees.NoTip,
 		common.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
@@ -561,6 +566,7 @@ func TestGetStake(t *testing.T) {
 		},
 		0,
 		[]*secp256k1.PrivateKey{keys[0]},
+		commonfees.NoTip,
 		common.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
@@ -646,6 +652,7 @@ func TestGetCurrentValidators(t *testing.T) {
 			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
 		},
 		[]*secp256k1.PrivateKey{keys[0]},
+		commonfees.NoTip,
 		common.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
@@ -782,6 +789,7 @@ func TestGetBlock(t *testing.T) {
 				[]ids.ID{},
 				"chain name",
 				[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+				commonfees.NoTip,
 				common.WithChangeOwner(&secp256k1fx.OutputOwners{
 					Threshold: 1,
 					Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},

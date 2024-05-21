@@ -22,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/wallet/chain/p/builder"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 	vmsigner "github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	walletsigner "github.com/ava-labs/avalanchego/wallet/chain/p/signer"
 )
@@ -51,6 +52,7 @@ func (b *Builder) NewImportTx(
 	chainID ids.ID,
 	to *secp256k1fx.OutputOwners,
 	keys []*secp256k1.PrivateKey,
+	tipPercentage commonfees.TipPercentage,
 	options ...common.Option,
 ) (*txs.Tx, error) {
 	pBuilder, pSigner := b.builders(keys)
@@ -59,11 +61,16 @@ func (b *Builder) NewImportTx(
 		return nil, err
 	}
 
+	ops := common.UnionOptions(
+		options,
+		[]common.Option{common.WithTipPercentage(tipPercentage)},
+	)
+
 	utx, err := pBuilder.NewImportTx(
 		chainID,
 		to,
 		feeCalc,
-		options...,
+		ops...,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed building import tx: %w", err)
@@ -76,6 +83,7 @@ func (b *Builder) NewExportTx(
 	chainID ids.ID,
 	outputs []*avax.TransferableOutput,
 	keys []*secp256k1.PrivateKey,
+	tipPercentage commonfees.TipPercentage,
 	options ...common.Option,
 ) (*txs.Tx, error) {
 	pBuilder, pSigner := b.builders(keys)
@@ -84,11 +92,16 @@ func (b *Builder) NewExportTx(
 		return nil, err
 	}
 
+	ops := common.UnionOptions(
+		options,
+		[]common.Option{common.WithTipPercentage(tipPercentage)},
+	)
+
 	utx, err := pBuilder.NewExportTx(
 		chainID,
 		outputs,
 		feeCalc,
-		options...,
+		ops...,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed building export tx: %w", err)
@@ -104,6 +117,7 @@ func (b *Builder) NewCreateChainTx(
 	fxIDs []ids.ID,
 	chainName string,
 	keys []*secp256k1.PrivateKey,
+	tipPercentage commonfees.TipPercentage,
 	options ...common.Option,
 ) (*txs.Tx, error) {
 	pBuilder, pSigner := b.builders(keys)
@@ -112,6 +126,11 @@ func (b *Builder) NewCreateChainTx(
 		return nil, err
 	}
 
+	ops := common.UnionOptions(
+		options,
+		[]common.Option{common.WithTipPercentage(tipPercentage)},
+	)
+
 	utx, err := pBuilder.NewCreateChainTx(
 		subnetID,
 		genesis,
@@ -119,7 +138,7 @@ func (b *Builder) NewCreateChainTx(
 		fxIDs,
 		chainName,
 		feeCalc,
-		options...,
+		ops...,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed building create chain tx: %w", err)
@@ -131,6 +150,7 @@ func (b *Builder) NewCreateChainTx(
 func (b *Builder) NewCreateSubnetTx(
 	owner *secp256k1fx.OutputOwners,
 	keys []*secp256k1.PrivateKey,
+	tipPercentage commonfees.TipPercentage,
 	options ...common.Option,
 ) (*txs.Tx, error) {
 	pBuilder, pSigner := b.builders(keys)
@@ -139,10 +159,15 @@ func (b *Builder) NewCreateSubnetTx(
 		return nil, err
 	}
 
+	ops := common.UnionOptions(
+		options,
+		[]common.Option{common.WithTipPercentage(tipPercentage)},
+	)
+
 	utx, err := pBuilder.NewCreateSubnetTx(
 		owner,
 		feeCalc,
-		options...,
+		ops...,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed building create subnet tx: %w", err)
@@ -167,6 +192,7 @@ func (b *Builder) NewTransformSubnetTx(
 	maxValidatorWeightFactor byte,
 	uptimeRequirement uint32,
 	keys []*secp256k1.PrivateKey,
+	tipPercentage commonfees.TipPercentage,
 	options ...common.Option,
 ) (*txs.Tx, error) {
 	pBuilder, pSigner := b.builders(keys)
@@ -174,6 +200,11 @@ func (b *Builder) NewTransformSubnetTx(
 	if err != nil {
 		return nil, err
 	}
+
+	ops := common.UnionOptions(
+		options,
+		[]common.Option{common.WithTipPercentage(tipPercentage)},
+	)
 
 	utx, err := pBuilder.NewTransformSubnetTx(
 		subnetID,
@@ -191,7 +222,7 @@ func (b *Builder) NewTransformSubnetTx(
 		maxValidatorWeightFactor,
 		uptimeRequirement,
 		feeCalc,
-		options...,
+		ops...,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed building transform subnet tx: %w", err)
@@ -205,6 +236,7 @@ func (b *Builder) NewAddValidatorTx(
 	rewardsOwner *secp256k1fx.OutputOwners,
 	shares uint32,
 	keys []*secp256k1.PrivateKey,
+	tipPercentage commonfees.TipPercentage,
 	options ...common.Option,
 ) (*txs.Tx, error) {
 	pBuilder, pSigner := b.builders(keys)
@@ -213,12 +245,17 @@ func (b *Builder) NewAddValidatorTx(
 		return nil, err
 	}
 
+	ops := common.UnionOptions(
+		options,
+		[]common.Option{common.WithTipPercentage(tipPercentage)},
+	)
+
 	utx, err := pBuilder.NewAddValidatorTx(
 		vdr,
 		rewardsOwner,
 		shares,
 		feeCalc,
-		options...,
+		ops...,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed building add validator tx: %w", err)
@@ -235,6 +272,7 @@ func (b *Builder) NewAddPermissionlessValidatorTx(
 	delegationRewardsOwner *secp256k1fx.OutputOwners,
 	shares uint32,
 	keys []*secp256k1.PrivateKey,
+	tipPercentage commonfees.TipPercentage,
 	options ...common.Option,
 ) (*txs.Tx, error) {
 	pBuilder, pSigner := b.builders(keys)
@@ -242,6 +280,11 @@ func (b *Builder) NewAddPermissionlessValidatorTx(
 	if err != nil {
 		return nil, err
 	}
+
+	ops := common.UnionOptions(
+		options,
+		[]common.Option{common.WithTipPercentage(tipPercentage)},
+	)
 
 	utx, err := pBuilder.NewAddPermissionlessValidatorTx(
 		vdr,
@@ -251,7 +294,7 @@ func (b *Builder) NewAddPermissionlessValidatorTx(
 		delegationRewardsOwner,
 		shares,
 		feeCalc,
-		options...,
+		ops...,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed building add permissionless validator tx: %w", err)
@@ -264,6 +307,7 @@ func (b *Builder) NewAddDelegatorTx(
 	vdr *txs.Validator,
 	rewardsOwner *secp256k1fx.OutputOwners,
 	keys []*secp256k1.PrivateKey,
+	tipPercentage commonfees.TipPercentage,
 	options ...common.Option,
 ) (*txs.Tx, error) {
 	pBuilder, pSigner := b.builders(keys)
@@ -272,11 +316,16 @@ func (b *Builder) NewAddDelegatorTx(
 		return nil, err
 	}
 
+	ops := common.UnionOptions(
+		options,
+		[]common.Option{common.WithTipPercentage(tipPercentage)},
+	)
+
 	utx, err := pBuilder.NewAddDelegatorTx(
 		vdr,
 		rewardsOwner,
 		feeCalc,
-		options...,
+		ops...,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed building add delegator tx: %w", err)
@@ -290,6 +339,7 @@ func (b *Builder) NewAddPermissionlessDelegatorTx(
 	assetID ids.ID,
 	rewardsOwner *secp256k1fx.OutputOwners,
 	keys []*secp256k1.PrivateKey,
+	tipPercentage commonfees.TipPercentage,
 	options ...common.Option,
 ) (*txs.Tx, error) {
 	pBuilder, pSigner := b.builders(keys)
@@ -298,12 +348,17 @@ func (b *Builder) NewAddPermissionlessDelegatorTx(
 		return nil, err
 	}
 
+	ops := common.UnionOptions(
+		options,
+		[]common.Option{common.WithTipPercentage(tipPercentage)},
+	)
+
 	utx, err := pBuilder.NewAddPermissionlessDelegatorTx(
 		vdr,
 		assetID,
 		rewardsOwner,
 		feeCalc,
-		options...,
+		ops...,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed building add permissionless delegator tx: %w", err)
@@ -315,6 +370,7 @@ func (b *Builder) NewAddPermissionlessDelegatorTx(
 func (b *Builder) NewAddSubnetValidatorTx(
 	vdr *txs.SubnetValidator,
 	keys []*secp256k1.PrivateKey,
+	tipPercentage commonfees.TipPercentage,
 	options ...common.Option,
 ) (*txs.Tx, error) {
 	pBuilder, pSigner := b.builders(keys)
@@ -323,10 +379,15 @@ func (b *Builder) NewAddSubnetValidatorTx(
 		return nil, err
 	}
 
+	ops := common.UnionOptions(
+		options,
+		[]common.Option{common.WithTipPercentage(tipPercentage)},
+	)
+
 	utx, err := pBuilder.NewAddSubnetValidatorTx(
 		vdr,
 		feeCalc,
-		options...,
+		ops...,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed building add subnet validator tx: %w", err)
@@ -339,6 +400,7 @@ func (b *Builder) NewRemoveSubnetValidatorTx(
 	nodeID ids.NodeID,
 	subnetID ids.ID,
 	keys []*secp256k1.PrivateKey,
+	tipPercentage commonfees.TipPercentage,
 	options ...common.Option,
 ) (*txs.Tx, error) {
 	pBuilder, pSigner := b.builders(keys)
@@ -347,11 +409,16 @@ func (b *Builder) NewRemoveSubnetValidatorTx(
 		return nil, err
 	}
 
+	ops := common.UnionOptions(
+		options,
+		[]common.Option{common.WithTipPercentage(tipPercentage)},
+	)
+
 	utx, err := pBuilder.NewRemoveSubnetValidatorTx(
 		nodeID,
 		subnetID,
 		feeCalc,
-		options...,
+		ops...,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed building remove subnet validator tx: %w", err)
@@ -364,6 +431,7 @@ func (b *Builder) NewTransferSubnetOwnershipTx(
 	subnetID ids.ID,
 	owner *secp256k1fx.OutputOwners,
 	keys []*secp256k1.PrivateKey,
+	tipPercentage commonfees.TipPercentage,
 	options ...common.Option,
 ) (*txs.Tx, error) {
 	pBuilder, pSigner := b.builders(keys)
@@ -372,11 +440,16 @@ func (b *Builder) NewTransferSubnetOwnershipTx(
 		return nil, err
 	}
 
+	ops := common.UnionOptions(
+		options,
+		[]common.Option{common.WithTipPercentage(tipPercentage)},
+	)
+
 	utx, err := pBuilder.NewTransferSubnetOwnershipTx(
 		subnetID,
 		owner,
 		feeCalc,
-		options...,
+		ops...,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed building transfer subnet ownership tx: %w", err)
@@ -388,6 +461,7 @@ func (b *Builder) NewTransferSubnetOwnershipTx(
 func (b *Builder) NewBaseTx(
 	outputs []*avax.TransferableOutput,
 	keys []*secp256k1.PrivateKey,
+	tipPercentage commonfees.TipPercentage,
 	options ...common.Option,
 ) (*txs.Tx, error) {
 	pBuilder, pSigner := b.builders(keys)
@@ -396,10 +470,15 @@ func (b *Builder) NewBaseTx(
 		return nil, err
 	}
 
+	ops := common.UnionOptions(
+		options,
+		[]common.Option{common.WithTipPercentage(tipPercentage)},
+	)
+
 	utx, err := pBuilder.NewBaseTx(
 		outputs,
 		feeCalc,
-		options...,
+		ops...,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed building base tx: %w", err)

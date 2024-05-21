@@ -23,6 +23,8 @@ type backend struct {
 	// lastAccepted is the ID of the last block that had Accept() called on it.
 	lastAccepted ids.ID
 
+	preferred ids.ID
+
 	// blkIDToState is a map from a block's ID to the state of the block.
 	// Blocks are put into this map when they are verified.
 	// Proposal blocks are removed from this map when they are rejected
@@ -79,6 +81,16 @@ func (b *backend) GetBlock(blkID ids.ID) (block.Block, error) {
 
 func (b *backend) LastAccepted() ids.ID {
 	return b.lastAccepted
+}
+
+func (b *backend) SetPreference(blkID ids.ID) bool {
+	updated := b.preferred != blkID
+	b.preferred = blkID
+	return updated
+}
+
+func (b *backend) Preferred() ids.ID {
+	return b.preferred
 }
 
 func (b *backend) free(blkID ids.ID) {

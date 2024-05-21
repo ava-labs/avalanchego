@@ -70,6 +70,7 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 			tx, err := builder.NewCreateSubnetTx(
 				&secp256k1fx.OutputOwners{},
 				preFundedKeys,
+				commonfees.NoTip,
 			)
 			require.NoError(err)
 

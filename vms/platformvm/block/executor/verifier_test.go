@@ -80,6 +80,7 @@ func TestStandardBlockComplexity(t *testing.T) {
 					},
 					reward.PercentDenominator,
 					preFundedKeys,
+					commonfees.NoTip,
 				)
 				require.NoError(t, err)
 
@@ -117,6 +118,7 @@ func TestStandardBlockComplexity(t *testing.T) {
 						Addrs:     []ids.ShortID{ids.ShortEmpty},
 					},
 					preFundedKeys,
+					commonfees.NoTip,
 				)
 				require.NoError(t, err)
 
@@ -149,6 +151,7 @@ func TestStandardBlockComplexity(t *testing.T) {
 						Subnet: testSubnet1.TxID,
 					},
 					preFundedKeys,
+					commonfees.NoTip,
 				)
 				require.NoError(t, err)
 
@@ -165,6 +168,7 @@ func TestStandardBlockComplexity(t *testing.T) {
 					[]ids.ID{},           // fxIDs
 					"aaa",                // chain name
 					preFundedKeys,
+					commonfees.NoTip,
 				)
 				require.NoError(t, err)
 				return createChainTx
@@ -179,6 +183,7 @@ func TestStandardBlockComplexity(t *testing.T) {
 						Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
 					},
 					preFundedKeys,
+					commonfees.NoTip,
 				)
 				require.NoError(t, err)
 				return tx
@@ -212,6 +217,7 @@ func TestStandardBlockComplexity(t *testing.T) {
 						Subnet: testSubnet1.ID(),
 					},
 					[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
+					commonfees.NoTip,
 				)
 				require.NoError(t, err)
 
@@ -231,6 +237,7 @@ func TestStandardBlockComplexity(t *testing.T) {
 					primaryValidator.NodeID,
 					testSubnet1.ID(),
 					preFundedKeys,
+					commonfees.NoTip,
 				)
 				require.NoError(t, err)
 
@@ -256,6 +263,7 @@ func TestStandardBlockComplexity(t *testing.T) {
 					1,                         // max validator weight factor
 					80,                        // uptime requirement
 					preFundedKeys,
+					commonfees.NoTip,
 				)
 				require.NoError(t, err)
 
@@ -272,6 +280,7 @@ func TestStandardBlockComplexity(t *testing.T) {
 						Addrs:     []ids.ShortID{ids.ShortEmpty},
 					},
 					preFundedKeys,
+					commonfees.NoTip,
 				)
 				require.NoError(t, err)
 
@@ -309,6 +318,7 @@ func TestStandardBlockComplexity(t *testing.T) {
 						Addrs:     []ids.ShortID{sourceKey.PublicKey().Address()},
 					},
 					preFundedKeys,
+					commonfees.NoTip,
 				)
 				require.NoError(t, err)
 
@@ -334,6 +344,7 @@ func TestStandardBlockComplexity(t *testing.T) {
 						},
 					}},
 					preFundedKeys,
+					commonfees.NoTip,
 				)
 				require.NoError(t, err)
 
@@ -357,6 +368,7 @@ func TestStandardBlockComplexity(t *testing.T) {
 						},
 					},
 					preFundedKeys,
+					commonfees.NoTip,
 				)
 				require.NoError(t, err)
 

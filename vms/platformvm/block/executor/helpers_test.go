@@ -53,6 +53,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 	pvalidators "github.com/ava-labs/avalanchego/vms/platformvm/validators"
 	walletcommon "github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
@@ -224,6 +225,10 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller, f fork) *environment 
 	}
 
 	if ctrl == nil {
+		if res.config.UpgradeConfig.IsEActivated(res.state.GetTimestamp()) {
+			res.mempool.SetEUpgradeActive()
+		}
+
 		res.blkManager = NewManager(
 			res.mempool,
 			metrics,
@@ -233,6 +238,10 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller, f fork) *environment 
 		)
 		addSubnet(res)
 	} else {
+		if res.config.UpgradeConfig.IsEActivated(res.mockedState.GetTimestamp()) {
+			res.mempool.SetEUpgradeActive()
+		}
+
 		res.blkManager = NewManager(
 			res.mempool,
 			metrics,
@@ -285,6 +294,7 @@ func addSubnet(env *environment) {
 			},
 		},
 		[]*secp256k1.PrivateKey{preFundedKeys[0]},
+		commonfees.NoTip,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
@@ -556,6 +566,7 @@ func addPendingValidator(
 		},
 		reward.PercentDenominator,
 		keys,
+		commonfees.NoTip,
 	)
 	if err != nil {
 		return nil, err

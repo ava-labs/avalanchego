@@ -331,6 +331,7 @@ func defaultVM(t *testing.T, f fork) (*VM, *txstest.Builder, database.Database, 
 			},
 		},
 		[]*secp256k1.PrivateKey{keys[0]}, // pays tx fee
+		commonfees.NoTip,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
@@ -472,6 +473,7 @@ func TestAddValidatorCommit(t *testing.T) {
 		},
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[0]},
+		commonfees.NoTip,
 	)
 	require.NoError(err)
 
@@ -520,6 +522,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 		},
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[0]},
+		commonfees.NoTip,
 	)
 	require.NoError(err)
 
@@ -577,6 +580,7 @@ func TestAddValidatorReject(t *testing.T) {
 		},
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[0]},
+		commonfees.NoTip,
 	)
 	require.NoError(err)
 
@@ -637,6 +641,7 @@ func TestAddValidatorInvalidNotReissued(t *testing.T) {
 		},
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[0]},
+		commonfees.NoTip,
 	)
 	require.NoError(err)
 
@@ -674,6 +679,7 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 			Subnet: testSubnet1.ID(),
 		},
 		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+		commonfees.NoTip,
 	)
 	require.NoError(err)
 
@@ -724,6 +730,7 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 			Subnet: testSubnet1.ID(),
 		},
 		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[1], testSubnet1ControlKeys[2]},
+		commonfees.NoTip,
 	)
 	require.NoError(err)
 
@@ -909,6 +916,7 @@ func TestCreateChain(t *testing.T) {
 		nil,
 		"name",
 		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+		commonfees.NoTip,
 	)
 	require.NoError(err)
 
@@ -960,6 +968,7 @@ func TestCreateSubnet(t *testing.T) {
 			},
 		},
 		[]*secp256k1.PrivateKey{keys[0]}, // payer
+		commonfees.NoTip,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
@@ -1010,6 +1019,7 @@ func TestCreateSubnet(t *testing.T) {
 			Subnet: createSubnetTx.ID(),
 		},
 		[]*secp256k1.PrivateKey{keys[0]},
+		commonfees.NoTip,
 	)
 	require.NoError(err)
 
@@ -1075,6 +1085,7 @@ func TestAtomicImport(t *testing.T) {
 			Addrs:     []ids.ShortID{recipientKey.PublicKey().Address()},
 		},
 		[]*secp256k1.PrivateKey{keys[0]},
+		commonfees.NoTip,
 	)
 	require.ErrorIs(err, walletbuilder.ErrInsufficientFunds)
 
@@ -1115,6 +1126,7 @@ func TestAtomicImport(t *testing.T) {
 			Addrs:     []ids.ShortID{recipientKey.PublicKey().Address()},
 		},
 		[]*secp256k1.PrivateKey{recipientKey},
+		commonfees.NoTip,
 	)
 	require.NoError(err)
 
@@ -2149,6 +2161,7 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 		},
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[0]},
+		commonfees.NoTip,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
@@ -2173,6 +2186,7 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 			Addrs:     []ids.ShortID{id},
 		},
 		[]*secp256k1.PrivateKey{keys[0]},
+		commonfees.NoTip,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
@@ -2202,6 +2216,7 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 			Subnet: createSubnetTx.ID(),
 		},
 		[]*secp256k1.PrivateKey{key, keys[1]},
+		commonfees.NoTip,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{keys[1].PublicKey().Address()},
@@ -2213,6 +2228,7 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 		nodeID,
 		createSubnetTx.ID(),
 		[]*secp256k1.PrivateKey{key, keys[2]},
+		commonfees.NoTip,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{keys[2].PublicKey().Address()},
@@ -2255,6 +2271,7 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 			Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
 		},
 		[]*secp256k1.PrivateKey{keys[0]},
+		commonfees.NoTip,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
@@ -2298,6 +2315,7 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 			Addrs:     []ids.ShortID{keys[1].PublicKey().Address()},
 		},
 		[]*secp256k1.PrivateKey{keys[0]},
+		commonfees.NoTip,
 	)
 	require.NoError(err)
 
@@ -2353,6 +2371,7 @@ func TestBaseTx(t *testing.T) {
 			},
 		},
 		[]*secp256k1.PrivateKey{keys[0]},
+		commonfees.NoTip,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{changeAddr},
@@ -2443,6 +2462,7 @@ func TestPruneMempool(t *testing.T) {
 			},
 		},
 		[]*secp256k1.PrivateKey{keys[0]},
+		commonfees.NoTip,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{changeAddr},
@@ -2490,6 +2510,7 @@ func TestPruneMempool(t *testing.T) {
 		},
 		20000,
 		[]*secp256k1.PrivateKey{keys[1]},
+		commonfees.NoTip,
 	)
 	require.NoError(err)
 

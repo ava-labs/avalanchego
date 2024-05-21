@@ -28,6 +28,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/mempool"
+
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 func TestBlockVerify(t *testing.T) {
@@ -843,7 +845,7 @@ func TestBlockReject(t *testing.T) {
 				})
 
 				mempool := mempool.NewMockMempool(ctrl)
-				mempool.EXPECT().Add(validTx).Return(nil) // Only add the one that passes verification
+				mempool.EXPECT().Add(validTx, commonfees.NoTip).Return(nil) // Only add the one that passes verification
 				mempool.EXPECT().RequestBuildBlock()
 
 				lastAcceptedID := ids.GenerateTestID()
@@ -895,8 +897,8 @@ func TestBlockReject(t *testing.T) {
 				})
 
 				mempool := mempool.NewMockMempool(ctrl)
-				mempool.EXPECT().Add(tx1).Return(nil)
-				mempool.EXPECT().Add(tx2).Return(nil)
+				mempool.EXPECT().Add(tx1, commonfees.NoTip).Return(nil)
+				mempool.EXPECT().Add(tx2, commonfees.NoTip).Return(nil)
 				mempool.EXPECT().RequestBuildBlock()
 
 				lastAcceptedID := ids.GenerateTestID()

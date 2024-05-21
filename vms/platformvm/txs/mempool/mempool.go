@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 	txmempool "github.com/ava-labs/avalanchego/vms/txs/mempool"
 )
 
@@ -56,7 +57,7 @@ func New(
 	}, nil
 }
 
-func (m *mempool) Add(tx *txs.Tx) error {
+func (m *mempool) Add(tx *txs.Tx, tipPercentage commonfees.TipPercentage) error {
 	switch tx.Unsigned.(type) {
 	case *txs.AdvanceTimeTx:
 		return ErrCantIssueAdvanceTimeTx
@@ -65,7 +66,7 @@ func (m *mempool) Add(tx *txs.Tx) error {
 	default:
 	}
 
-	return m.Mempool.Add(tx)
+	return m.Mempool.Add(tx, tipPercentage)
 }
 
 func (m *mempool) RequestBuildBlock(emptyBlockPermitted bool) {

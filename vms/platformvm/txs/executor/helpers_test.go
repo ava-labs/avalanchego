@@ -47,6 +47,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
+
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 const (
@@ -222,6 +224,7 @@ func addSubnet(t *testing.T, env *environment) {
 			},
 		},
 		[]*secp256k1.PrivateKey{preFundedKeys[0]},
+		commonfees.NoTip,
 		common.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},

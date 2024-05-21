@@ -48,6 +48,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/upgrade"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	walletcommon "github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
@@ -277,6 +278,7 @@ func addSubnetValidator(vm *VM, data *validatorInputData, subnetID ids.ID) (*sta
 			Subnet: subnetID,
 		},
 		[]*secp256k1.PrivateKey{keys[0], keys[1]},
+		commonfees.NoTip,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{addr},
@@ -325,6 +327,7 @@ func addPrimaryValidatorWithBLSKey(vm *VM, data *validatorInputData) (*state.Sta
 		},
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[0], keys[1]},
+		commonfees.NoTip,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{addr},
@@ -736,6 +739,7 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 			Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
 		},
 		[]*secp256k1.PrivateKey{keys[len(keys)-1]}, // pays tx fee
+		commonfees.NoTip,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},

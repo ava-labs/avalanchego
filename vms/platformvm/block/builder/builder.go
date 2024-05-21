@@ -23,11 +23,12 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
+	"github.com/ava-labs/avalanchego/vms/txs/mempool"
 
 	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
+	pmempool "github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 )
 
 // targetBlockSize is maximum number of transaction bytes to place into a
@@ -44,7 +45,7 @@ var (
 )
 
 type Builder interface {
-	mempool.Mempool
+	pmempool.Mempool
 
 	// StartBlockTimer starts to issue block creation requests to advance the
 	// chain timestamp.
@@ -68,12 +69,12 @@ type Builder interface {
 	// preferred state.
 	//
 	// Note: This function does not call the consensus engine.
-	PackBlockTxs(targetBlockSize int) ([]*txs.Tx, error)
+	PackBlockTxs(targetBlockSize int) ([]mempool.TxAndTipPercentage[*txs.Tx], error)
 }
 
 // builder implements a simple builder to convert txs into valid blocks
 type builder struct {
-	mempool.Mempool
+	pmempool.Mempool
 
 	txExecutorBackend *txexecutor.Backend
 	blkManager        blockexecutor.Manager
@@ -86,7 +87,7 @@ type builder struct {
 }
 
 func New(
-	mempool mempool.Mempool,
+	mempool pmempool.Mempool,
 	txExecutorBackend *txexecutor.Backend,
 	blkManager blockexecutor.Manager,
 ) Builder {
@@ -238,7 +239,7 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 	return b.blkManager.NewBlock(statelessBlk), nil
 }
 
-func (b *builder) PackBlockTxs(targetBlockSize int) ([]*txs.Tx, error) {
+func (b *builder) PackBlockTxs(targetBlockSize int) ([]mempool.TxAndTipPercentage[*txs.Tx], error) {
 	preferredID := b.blkManager.Preferred()
 	preferredState, ok := b.blkManager.GetState(preferredID)
 	if !ok {
@@ -278,6 +279,11 @@ func buildBlock(
 		return nil, fmt.Errorf("failed to pack block txs: %w", err)
 	}
 
+	txs := make([]*txs.Tx, 0, len(blockTxs))
+	for _, v := range blockTxs {
+		txs = append(txs, v.Tx)
+	}
+
 	// Try rewarding stakers whose staking period ends at the new chain time.
 	// This is done first to prioritize advancing the timestamp as quickly as
 	// possible.
@@ -296,12 +302,12 @@ func buildBlock(
 			parentID,
 			height,
 			rewardValidatorTx,
-			blockTxs,
+			txs,
 		)
 	}
 
 	// If there is no reason to build a block, don't.
-	if len(blockTxs) == 0 && !forceAdvanceTime {
+	if len(txs) == 0 && !forceAdvanceTime {
 		builder.txExecutorBackend.Ctx.Log.Debug("no pending txs to issue into a block")
 		return nil, ErrNoPendingBlocks
 	}
@@ -311,19 +317,19 @@ func buildBlock(
 		timestamp,
 		parentID,
 		height,
-		blockTxs,
+		txs,
 	)
 }
 
 func packBlockTxs(
 	parentID ids.ID,
 	parentState state.Chain,
-	mempool mempool.Mempool,
+	mpool pmempool.Mempool,
 	backend *txexecutor.Backend,
 	manager blockexecutor.Manager,
 	timestamp time.Time,
 	remainingSize int,
-) ([]*txs.Tx, error) {
+) ([]mempool.TxAndTipPercentage[*txs.Tx], error) {
 	// retrieve parent block time before moving time forward
 	parentBlkTime := parentState.GetTimestamp()
 
@@ -346,9 +352,17 @@ func packBlockTxs(
 		isEActivated = upgrades.IsEActivated(timestamp)
 		feeCfg       = fee.GetDynamicConfig(isEActivated)
 
-		blockTxs []*txs.Tx
+		blockTxs []mempool.TxAndTipPercentage[*txs.Tx]
 		inputs   set.Set[ids.ID]
 	)
+
+	if isEActivated {
+		// we lazily inform the mempool that the E upgrade has been activated.
+		// Lazily since we don't inform the mempool as soon as the first block
+		// post E upgrade has been accepted; instead we wait for the next block
+		// build.
+		mpool.SetEUpgradeActive()
+	}
 
 	feeMan := commonfees.NewManager(feeRates)
 	if isEActivated {
@@ -368,7 +382,7 @@ func packBlockTxs(
 	}
 
 	for {
-		tx, exists := mempool.Peek()
+		tx, exists := mpool.Peek()
 		if !exists {
 			break
 		}
@@ -382,7 +396,7 @@ func packBlockTxs(
 		if targetSizeReached {
 			break
 		}
-		mempool.Remove(tx)
+		mpool.Remove(tx)
 
 		// Invariant: [tx] has already been syntactically verified.
 
@@ -402,19 +416,19 @@ func packBlockTxs(
 		err = tx.Unsigned.Visit(executor)
 		if err != nil {
 			txID := tx.ID()
-			mempool.MarkDropped(txID, err)
+			mpool.MarkDropped(txID, err)
 			continue
 		}
 
 		if inputs.Overlaps(executor.Inputs) {
 			txID := tx.ID()
-			mempool.MarkDropped(txID, blockexecutor.ErrConflictingBlockTxs)
+			mpool.MarkDropped(txID, blockexecutor.ErrConflictingBlockTxs)
 			continue
 		}
 		err = manager.VerifyUniqueInputs(parentID, executor.Inputs)
 		if err != nil {
 			txID := tx.ID()
-			mempool.MarkDropped(txID, err)
+			mpool.MarkDropped(txID, err)
 			continue
 		}
 		inputs.Union(executor.Inputs)
@@ -428,7 +442,10 @@ func packBlockTxs(
 		if !isEActivated {
 			remainingSize -= txSize
 		}
-		blockTxs = append(blockTxs, tx)
+		blockTxs = append(blockTxs, mempool.TxAndTipPercentage[*txs.Tx]{
+			Tx:            tx,
+			TipPercentage: executor.TipPercentage,
+		})
 	}
 
 	return blockTxs, nil
