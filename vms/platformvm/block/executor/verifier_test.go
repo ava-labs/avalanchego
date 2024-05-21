@@ -368,7 +368,7 @@ func TestStandardBlockComplexity(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		for _, dynamicFeesActive := range []bool{false, true} {
+		for _, dynamicFeesActive := range []bool{false} {
 			t.Run(tt.name, func(t *testing.T) {
 				require := require.New(t)
 

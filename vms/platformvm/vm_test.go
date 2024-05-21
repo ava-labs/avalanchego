@@ -82,7 +82,7 @@ const (
 	durango
 	eUpgrade
 
-	latestFork fork = eUpgrade
+	latestFork fork = durango
 
 	defaultWeight uint64 = 10000
 )

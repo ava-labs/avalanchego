@@ -4,13 +4,11 @@
 package p
 
 import (
-	"slices"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
@@ -18,20 +16,13 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
+	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
-	"github.com/ava-labs/avalanchego/vms/platformvm/upgrade"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/chain/p/builder"
-	"github.com/ava-labs/avalanchego/wallet/chain/p/signer"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
-
-	stdcontext "context"
-	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
-	blssigner "github.com/ava-labs/avalanchego/vms/platformvm/signer"
 )
 
 var (
@@ -54,15 +45,6 @@ var (
 		AddSubnetValidatorFee:         1010 * units.MilliAvax,
 		AddSubnetDelegatorFee:         9 * units.Avax,
 	}
-	testStaticConfig = staticFeesConfigFromContext(testContext)
-
-	testFeeRates = commonfees.Dimensions{
-		1 * units.MicroAvax,
-		2 * units.MicroAvax,
-		3 * units.MicroAvax,
-		4 * units.MicroAvax,
-	}
-	testBlockMaxComplexity = commonfees.Max
 )
 
 // These tests create a tx, then verify that utxos included in the tx are
@@ -80,11 +62,9 @@ func TestBaseTx(t *testing.T) {
 		})
 		backend = NewBackend(testContext, chainUTXOs, nil)
 
-		// builder and signer
+		// builder
 		utxoAddr = utxosKey.Address()
 		builder  = builder.New(set.Of(utxoAddr), testContext, backend)
-		kc       = secp256k1fx.NewKeychain(utxosKey)
-		s        = signer.New(kc, backend)
 
 		// data to build the transaction
 		outputsToMove = []*avax.TransferableOutput{{
@@ -99,58 +79,19 @@ func TestBaseTx(t *testing.T) {
 		}}
 	)
 
-	{ // Post E-Upgrade
-		feeCalc := fee.NewDynamicCalculator(testStaticConfig, commonfees.NewManager(testFeeRates), testBlockMaxComplexity)
-		utx, err := builder.NewBaseTx(
-			outputsToMove,
-			feeCalc,
-		)
-		require.NoError(err)
+	utx, err := builder.NewBaseTx(outputsToMove)
+	require.NoError(err)
 
-		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
-		require.NoError(err)
+	// check UTXOs selection and fee financing
+	ins := utx.Ins
+	outs := utx.Outs
+	require.Len(ins, 2)
+	require.Len(outs, 2)
 
-		fc := fee.NewDynamicCalculator(testStaticConfig, commonfees.NewManager(testFeeRates), testBlockMaxComplexity)
-		fee, err := fc.ComputeFee(utx, tx.Creds)
-		require.NoError(err)
-		require.Equal(9930*units.MicroAvax, fee)
-
-		// check UTXOs selection and fee financing
-		ins := utx.Ins
-		outs := utx.Outs
-		require.Len(ins, 2)
-		require.Len(outs, 2)
-
-		expectedConsumed := fee + outputsToMove[0].Out.Amount()
-		consumed := ins[0].In.Amount() + ins[1].In.Amount() - outs[0].Out.Amount()
-		require.Equal(expectedConsumed, consumed)
-		require.Equal(outputsToMove[0], outs[1])
-	}
-
-	{ // Pre E-Upgrade
-		feeCalc := fee.NewStaticCalculator(testStaticConfig, upgrade.Config{}, time.Time{})
-		utx, err := builder.NewBaseTx(
-			outputsToMove,
-			feeCalc,
-		)
-		require.NoError(err)
-
-		fc := fee.NewStaticCalculator(testStaticConfig, upgrade.Config{}, time.Time{})
-		fee, err := fc.ComputeFee(utx, nil)
-		require.NoError(err)
-		require.Equal(testContext.BaseTxFee, fee)
-
-		// check UTXOs selection and fee financing
-		ins := utx.Ins
-		outs := utx.Outs
-		require.Len(ins, 2)
-		require.Len(outs, 2)
-
-		expectedConsumed := fee + outputsToMove[0].Out.Amount()
-		consumed := ins[0].In.Amount() + ins[1].In.Amount() - outs[0].Out.Amount()
-		require.Equal(expectedConsumed, consumed)
-		require.Equal(outputsToMove[0], outs[1])
-	}
+	expectedConsumed := testContext.BaseTxFee + outputsToMove[0].Out.Amount()
+	consumed := ins[0].In.Amount() + ins[1].In.Amount() - outs[0].Out.Amount()
+	require.Equal(expectedConsumed, consumed)
+	require.Equal(outputsToMove[0], outs[1])
 }
 
 func TestAddSubnetValidatorTx(t *testing.T) {
@@ -158,8 +99,12 @@ func TestAddSubnetValidatorTx(t *testing.T) {
 		require = require.New(t)
 
 		// backend
-		utxosKey       = testKeys[1]
-		utxos          = makeTestUTXOs(utxosKey)
+		utxosKey   = testKeys[1]
+		utxos      = makeTestUTXOs(utxosKey)
+		chainUTXOs = common.NewDeterministicChainUTXOs(require, map[ids.ID][]*avax.UTXO{
+			constants.PlatformChainID: utxos,
+		})
+
 		subnetID       = ids.GenerateTestID()
 		subnetAuthKey  = testKeys[0]
 		subnetAuthAddr = subnetAuthKey.Address()
@@ -167,411 +112,6 @@ func TestAddSubnetValidatorTx(t *testing.T) {
 			Threshold: 1,
 			Addrs:     []ids.ShortID{subnetAuthAddr},
 		}
-
-		chainUTXOs = newDeterministicGenericBackend(
-			require,
-			map[ids.ID][]*avax.UTXO{
-				constants.PlatformChainID: utxos,
-			},
-			map[ids.ID]fx.Owner{
-				subnetID: subnetOwner,
-			},
-		)
-
-		subnets = map[ids.ID]*txs.Tx{
-			subnetID: {
-				Unsigned: &txs.CreateSubnetTx{
-					Owner: subnetOwner,
-				},
-			},
-		}
-		backend = NewBackend(testContext, chainUTXOs, subnets)
-
-		// builder and signer
-		utxoAddr = utxosKey.Address()
-		builder  = builder.New(set.Of(utxoAddr, subnetAuthAddr), testContext, backend)
-		kc       = secp256k1fx.NewKeychain(utxosKey)
-		s        = signer.New(kc, chainUTXOs)
-
-		// data to build the transaction
-		subnetValidator = &txs.SubnetValidator{
-			Validator: txs.Validator{
-				NodeID: ids.GenerateTestNodeID(),
-				End:    uint64(time.Now().Add(time.Hour).Unix()),
-			},
-			Subnet: subnetID,
-		}
-	)
-
-	{ // Post E-Upgrade
-		feeCalc := fee.NewDynamicCalculator(testStaticConfig, commonfees.NewManager(testFeeRates), testBlockMaxComplexity)
-		utx, err := builder.NewAddSubnetValidatorTx(subnetValidator, feeCalc)
-		require.NoError(err)
-
-		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
-		require.NoError(err)
-
-		fc := fee.NewDynamicCalculator(testStaticConfig, commonfees.NewManager(testFeeRates), testBlockMaxComplexity)
-		fee, err := fc.ComputeFee(utx, tx.Creds)
-		require.NoError(err)
-		require.Equal(9765*units.MicroAvax, fee)
-
-		// check UTXOs selection and fee financing
-		ins := utx.Ins
-		outs := utx.Outs
-		require.Len(ins, 2)
-		require.Len(outs, 1)
-
-		expectedConsumed := fee
-		consumed := ins[0].In.Amount() + ins[1].In.Amount() - outs[0].Out.Amount()
-		require.Equal(expectedConsumed, consumed)
-	}
-
-	{ // Pre E-Upgrade
-		feeCalc := fee.NewStaticCalculator(testStaticConfig, upgrade.Config{}, time.Time{})
-		utx, err := builder.NewAddSubnetValidatorTx(subnetValidator, feeCalc)
-		require.NoError(err)
-
-		fc := fee.NewStaticCalculator(testStaticConfig, upgrade.Config{}, time.Time{})
-		fee, err := fc.ComputeFee(utx, nil)
-		require.NoError(err)
-		require.Equal(testContext.AddSubnetValidatorFee, fee)
-
-		// check UTXOs selection and fee financing
-		ins := utx.Ins
-		outs := utx.Outs
-		require.Len(ins, 2)
-		require.Len(outs, 1)
-
-		expectedConsumed := fee
-		consumed := ins[0].In.Amount() + ins[1].In.Amount() - outs[0].Out.Amount()
-		require.Equal(expectedConsumed, consumed)
-	}
-}
-
-func TestRemoveSubnetValidatorTx(t *testing.T) {
-	var (
-		require = require.New(t)
-
-		// backend
-		utxosKey       = testKeys[1]
-		utxos          = makeTestUTXOs(utxosKey)
-		subnetID       = ids.GenerateTestID()
-		subnetAuthKey  = testKeys[0]
-		subnetAuthAddr = subnetAuthKey.Address()
-		subnetOwner    = &secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{subnetAuthAddr},
-		}
-
-		chainUTXOs = newDeterministicGenericBackend(
-			require,
-			map[ids.ID][]*avax.UTXO{
-				constants.PlatformChainID: utxos,
-			},
-			map[ids.ID]fx.Owner{
-				subnetID: subnetOwner,
-			},
-		)
-
-		subnets = map[ids.ID]*txs.Tx{
-			subnetID: {
-				Unsigned: &txs.CreateSubnetTx{
-					Owner: subnetOwner,
-				},
-			},
-		}
-
-		backend = NewBackend(testContext, chainUTXOs, subnets)
-
-		// builder and signer
-		utxoAddr = utxosKey.Address()
-		builder  = builder.New(set.Of(utxoAddr, subnetAuthAddr), testContext, backend)
-		kc       = secp256k1fx.NewKeychain(utxosKey)
-		s        = signer.New(kc, chainUTXOs)
-	)
-
-	{ // Post E-Upgrade
-		feeCalc := fee.NewDynamicCalculator(testStaticConfig, commonfees.NewManager(testFeeRates), testBlockMaxComplexity)
-		utx, err := builder.NewRemoveSubnetValidatorTx(
-			ids.GenerateTestNodeID(),
-			subnetID,
-			feeCalc,
-		)
-		require.NoError(err)
-
-		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
-		require.NoError(err)
-
-		fc := fee.NewDynamicCalculator(testStaticConfig, commonfees.NewManager(testFeeRates), testBlockMaxComplexity)
-		fee, err := fc.ComputeFee(utx, tx.Creds)
-		require.NoError(err)
-		require.Equal(9741*units.MicroAvax, fee)
-
-		// check UTXOs selection and fee financing
-		ins := utx.Ins
-		outs := utx.Outs
-		require.Len(ins, 2)
-		require.Len(outs, 1)
-
-		expectedConsumed := fee
-		consumed := ins[0].In.Amount() + ins[1].In.Amount() - outs[0].Out.Amount()
-		require.Equal(expectedConsumed, consumed)
-	}
-
-	{ // Pre E-Upgrade
-		feeCalc := fee.NewStaticCalculator(testStaticConfig, upgrade.Config{}, time.Time{})
-		utx, err := builder.NewRemoveSubnetValidatorTx(
-			ids.GenerateTestNodeID(),
-			subnetID,
-			feeCalc,
-		)
-		require.NoError(err)
-
-		fc := fee.NewStaticCalculator(testStaticConfig, upgrade.Config{}, time.Time{})
-		fee, err := fc.ComputeFee(utx, nil)
-		require.NoError(err)
-		require.Equal(testContext.BaseTxFee, fee)
-
-		// check UTXOs selection and fee financing
-		ins := utx.Ins
-		outs := utx.Outs
-		require.Len(ins, 1)
-		require.Len(outs, 1)
-
-		expectedConsumed := fee
-		consumed := ins[0].In.Amount() - outs[0].Out.Amount()
-		require.Equal(expectedConsumed, consumed)
-	}
-}
-
-func TestCreateChainTx(t *testing.T) {
-	var (
-		require = require.New(t)
-
-		// backend
-		utxosKey       = testKeys[1]
-		utxos          = makeTestUTXOs(utxosKey)
-		subnetID       = ids.GenerateTestID()
-		subnetAuthKey  = testKeys[0]
-		subnetAuthAddr = subnetAuthKey.Address()
-		subnetOwner    = &secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{subnetAuthAddr},
-		}
-
-		chainUTXOs = newDeterministicGenericBackend(
-			require,
-			map[ids.ID][]*avax.UTXO{
-				constants.PlatformChainID: utxos,
-			},
-			map[ids.ID]fx.Owner{
-				subnetID: subnetOwner,
-			},
-		)
-
-		subnets = map[ids.ID]*txs.Tx{
-			subnetID: {
-				Unsigned: &txs.CreateSubnetTx{
-					Owner: subnetOwner,
-				},
-			},
-		}
-
-		backend = NewBackend(testContext, chainUTXOs, subnets)
-
-		// builder and signer
-		utxoAddr = utxosKey.Address()
-		builder  = builder.New(set.Of(utxoAddr, subnetAuthAddr), testContext, backend)
-		kc       = secp256k1fx.NewKeychain(utxosKey)
-		s        = signer.New(kc, chainUTXOs)
-
-		// data to build the transaction
-		genesisBytes = []byte{'a', 'b', 'c'}
-		vmID         = ids.GenerateTestID()
-		fxIDs        = []ids.ID{ids.GenerateTestID()}
-		chainName    = "dummyChain"
-	)
-
-	{ // Post E-Upgrade
-		feeCalc := fee.NewDynamicCalculator(testStaticConfig, commonfees.NewManager(testFeeRates), testBlockMaxComplexity)
-		utx, err := builder.NewCreateChainTx(
-			subnetID,
-			genesisBytes,
-			vmID,
-			fxIDs,
-			chainName,
-			feeCalc,
-		)
-		require.NoError(err)
-
-		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
-		require.NoError(err)
-
-		fc := fee.NewDynamicCalculator(testStaticConfig, commonfees.NewManager(testFeeRates), testBlockMaxComplexity)
-		fee, err := fc.ComputeFee(utx, tx.Creds)
-		require.NoError(err)
-		require.Equal(9808*units.MicroAvax, fee)
-
-		// check UTXOs selection and fee financing
-		ins := utx.Ins
-		outs := utx.Outs
-		require.Len(ins, 2)
-		require.Len(outs, 1)
-
-		expectedConsumed := fee
-		consumed := ins[0].In.Amount() + ins[1].In.Amount() - outs[0].Out.Amount()
-		require.Equal(expectedConsumed, consumed)
-	}
-
-	{ // Pre E-Upgrade
-		feeCalc := fee.NewStaticCalculator(testStaticConfig, upgrade.Config{}, time.Time{})
-		utx, err := builder.NewCreateChainTx(
-			subnetID,
-			genesisBytes,
-			vmID,
-			fxIDs,
-			chainName,
-			feeCalc,
-		)
-		require.NoError(err)
-
-		fc := fee.NewStaticCalculator(testStaticConfig, upgrade.Config{}, time.Time{})
-		fee, err := fc.ComputeFee(utx, nil)
-		require.NoError(err)
-		require.Equal(testContext.CreateBlockchainTxFee, fee)
-
-		// check UTXOs selection and fee financing
-		ins := utx.Ins
-		outs := utx.Outs
-		require.Len(ins, 1)
-		require.Len(outs, 1)
-
-		expectedConsumed := fee
-		consumed := ins[0].In.Amount() - outs[0].Out.Amount()
-		require.Equal(expectedConsumed, consumed)
-	}
-}
-
-func TestCreateSubnetTx(t *testing.T) {
-	var (
-		require = require.New(t)
-
-		// backend
-		utxosKey       = testKeys[1]
-		utxos          = makeTestUTXOs(utxosKey)
-		subnetID       = ids.GenerateTestID()
-		subnetAuthKey  = testKeys[0]
-		subnetAuthAddr = subnetAuthKey.Address()
-		subnetOwner    = &secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{subnetAuthAddr},
-		}
-
-		chainUTXOs = newDeterministicGenericBackend(
-			require,
-			map[ids.ID][]*avax.UTXO{
-				constants.PlatformChainID: utxos,
-			},
-			map[ids.ID]fx.Owner{
-				subnetID: subnetOwner,
-			},
-		)
-
-		subnets = map[ids.ID]*txs.Tx{
-			subnetID: {
-				Unsigned: &txs.CreateSubnetTx{
-					Owner: subnetOwner,
-				},
-			},
-		}
-
-		backend = NewBackend(testContext, chainUTXOs, subnets)
-
-		// builder and signer
-		utxoAddr = utxosKey.Address()
-		builder  = builder.New(set.Of(utxoAddr, subnetAuthAddr), testContext, backend)
-		kc       = secp256k1fx.NewKeychain(utxosKey)
-		s        = signer.New(kc, chainUTXOs)
-	)
-
-	{ // Post E-Upgrade
-		feeCalc := fee.NewDynamicCalculator(testStaticConfig, commonfees.NewManager(testFeeRates), testBlockMaxComplexity)
-		utx, err := builder.NewCreateSubnetTx(
-			subnetOwner,
-			feeCalc,
-		)
-		require.NoError(err)
-
-		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
-		require.NoError(err)
-
-		fc := fee.NewDynamicCalculator(testStaticConfig, commonfees.NewManager(testFeeRates), testBlockMaxComplexity)
-		fee, err := fc.ComputeFee(utx, tx.Creds)
-		require.NoError(err)
-		require.Equal(9644*units.MicroAvax, fee)
-
-		// check UTXOs selection and fee financing
-		ins := utx.Ins
-		outs := utx.Outs
-		require.Len(ins, 2)
-		require.Len(outs, 1)
-
-		expectedConsumed := fee
-		consumed := ins[0].In.Amount() + ins[1].In.Amount() - outs[0].Out.Amount()
-		require.Equal(expectedConsumed, consumed)
-	}
-
-	{ // Pre E-Upgrade
-		feeCalc := fee.NewStaticCalculator(testStaticConfig, upgrade.Config{}, time.Time{})
-		utx, err := builder.NewCreateSubnetTx(
-			subnetOwner,
-			feeCalc,
-		)
-		require.NoError(err)
-
-		fc := fee.NewStaticCalculator(testStaticConfig, upgrade.Config{}, time.Time{})
-		fee, err := fc.ComputeFee(utx, nil)
-		require.NoError(err)
-		require.Equal(testContext.CreateSubnetTxFee, fee)
-
-		// check UTXOs selection and fee financing
-		ins := utx.Ins
-		outs := utx.Outs
-		require.Len(ins, 1)
-		require.Len(outs, 1)
-
-		expectedConsumed := fee
-		consumed := ins[0].In.Amount() - outs[0].Out.Amount()
-		require.Equal(expectedConsumed, consumed)
-	}
-}
-
-func TestTransferSubnetOwnershipTx(t *testing.T) {
-	var (
-		require = require.New(t)
-
-		// backend
-		utxosKey       = testKeys[1]
-		utxos          = makeTestUTXOs(utxosKey)
-		subnetID       = ids.GenerateTestID()
-		subnetAuthKey  = testKeys[0]
-		subnetAuthAddr = subnetAuthKey.Address()
-		subnetOwner    = &secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{subnetAuthAddr},
-		}
-
-		chainUTXOs = newDeterministicGenericBackend(
-			require,
-			map[ids.ID][]*avax.UTXO{
-				constants.PlatformChainID: utxos,
-			},
-			map[ids.ID]fx.Owner{
-				subnetID: subnetOwner,
-			},
-		)
-
 		subnets = map[ids.ID]*txs.Tx{
 			subnetID: {
 				Unsigned: &txs.CreateSubnetTx{
@@ -585,62 +125,239 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 		// builder
 		utxoAddr = utxosKey.Address()
 		builder  = builder.New(set.Of(utxoAddr, subnetAuthAddr), testContext, backend)
-		kc       = secp256k1fx.NewKeychain(utxosKey)
-		s        = signer.New(kc, chainUTXOs)
+
+		// data to build the transaction
+		subnetValidator = &txs.SubnetValidator{
+			Validator: txs.Validator{
+				NodeID: ids.GenerateTestNodeID(),
+				End:    uint64(time.Now().Add(time.Hour).Unix()),
+			},
+			Subnet: subnetID,
+		}
 	)
 
-	{ // Post E-Upgrade
-		feeCalc := fee.NewDynamicCalculator(testStaticConfig, commonfees.NewManager(testFeeRates), testBlockMaxComplexity)
-		utx, err := builder.NewTransferSubnetOwnershipTx(
-			subnetID,
-			subnetOwner,
-			feeCalc,
-		)
-		require.NoError(err)
+	// build the transaction
+	utx, err := builder.NewAddSubnetValidatorTx(subnetValidator)
+	require.NoError(err)
 
-		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
-		require.NoError(err)
+	// check UTXOs selection and fee financing
+	ins := utx.Ins
+	outs := utx.Outs
+	require.Len(ins, 2)
+	require.Len(outs, 1)
 
-		fc := fee.NewDynamicCalculator(testStaticConfig, commonfees.NewManager(testFeeRates), testBlockMaxComplexity)
-		fee, err := fc.ComputeFee(utx, tx.Creds)
-		require.NoError(err)
-		require.Equal(9761*units.MicroAvax, fee)
+	expectedConsumed := testContext.AddSubnetValidatorFee
+	consumed := ins[0].In.Amount() + ins[1].In.Amount() - outs[0].Out.Amount()
+	require.Equal(expectedConsumed, consumed)
+}
 
-		// check UTXOs selection and fee financing
-		ins := utx.Ins
-		outs := utx.Outs
-		require.Len(ins, 2)
-		require.Len(outs, 1)
+func TestRemoveSubnetValidatorTx(t *testing.T) {
+	var (
+		require = require.New(t)
 
-		expectedConsumed := fee
-		consumed := ins[0].In.Amount() + ins[1].In.Amount() - outs[0].Out.Amount()
-		require.Equal(expectedConsumed, consumed)
-	}
+		// backend
+		utxosKey   = testKeys[1]
+		utxos      = makeTestUTXOs(utxosKey)
+		chainUTXOs = common.NewDeterministicChainUTXOs(require, map[ids.ID][]*avax.UTXO{
+			constants.PlatformChainID: utxos,
+		})
 
-	{ // Pre E-Upgrade
-		feeCalc := fee.NewStaticCalculator(testStaticConfig, upgrade.Config{}, time.Time{})
-		utx, err := builder.NewTransferSubnetOwnershipTx(
-			subnetID,
-			subnetOwner,
-			feeCalc,
-		)
-		require.NoError(err)
+		subnetID       = ids.GenerateTestID()
+		subnetAuthKey  = testKeys[0]
+		subnetAuthAddr = subnetAuthKey.Address()
+		subnetOwner    = &secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{subnetAuthAddr},
+		}
+		subnets = map[ids.ID]*txs.Tx{
+			subnetID: {
+				Unsigned: &txs.CreateSubnetTx{
+					Owner: subnetOwner,
+				},
+			},
+		}
 
-		fc := fee.NewStaticCalculator(testStaticConfig, upgrade.Config{}, time.Time{})
-		fee, err := fc.ComputeFee(utx, nil)
-		require.NoError(err)
-		require.Equal(testContext.BaseTxFee, fee)
+		backend = NewBackend(testContext, chainUTXOs, subnets)
 
-		// check UTXOs selection and fee financing
-		ins := utx.Ins
-		outs := utx.Outs
-		require.Len(ins, 1)
-		require.Len(outs, 1)
+		// builder
+		utxoAddr = utxosKey.Address()
+		builder  = builder.New(set.Of(utxoAddr, subnetAuthAddr), testContext, backend)
+	)
 
-		expectedConsumed := fee
-		consumed := ins[0].In.Amount() - outs[0].Out.Amount()
-		require.Equal(expectedConsumed, consumed)
-	}
+	// build the transaction
+	utx, err := builder.NewRemoveSubnetValidatorTx(
+		ids.GenerateTestNodeID(),
+		subnetID,
+	)
+	require.NoError(err)
+
+	// check UTXOs selection and fee financing
+	ins := utx.Ins
+	outs := utx.Outs
+	require.Len(ins, 1)
+	require.Len(outs, 1)
+
+	expectedConsumed := testContext.BaseTxFee
+	consumed := ins[0].In.Amount() - outs[0].Out.Amount()
+	require.Equal(expectedConsumed, consumed)
+}
+
+func TestCreateChainTx(t *testing.T) {
+	var (
+		require = require.New(t)
+
+		// backend
+		utxosKey   = testKeys[1]
+		utxos      = makeTestUTXOs(utxosKey)
+		chainUTXOs = common.NewDeterministicChainUTXOs(require, map[ids.ID][]*avax.UTXO{
+			constants.PlatformChainID: utxos,
+		})
+
+		subnetID       = ids.GenerateTestID()
+		subnetAuthKey  = testKeys[0]
+		subnetAuthAddr = subnetAuthKey.Address()
+		subnetOwner    = &secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{subnetAuthAddr},
+		}
+		subnets = map[ids.ID]*txs.Tx{
+			subnetID: {
+				Unsigned: &txs.CreateSubnetTx{
+					Owner: subnetOwner,
+				},
+			},
+		}
+
+		backend = NewBackend(testContext, chainUTXOs, subnets)
+
+		utxoAddr = utxosKey.Address()
+		builder  = builder.New(set.Of(utxoAddr, subnetAuthAddr), testContext, backend)
+
+		// data to build the transaction
+		genesisBytes = []byte{'a', 'b', 'c'}
+		vmID         = ids.GenerateTestID()
+		fxIDs        = []ids.ID{ids.GenerateTestID()}
+		chainName    = "dummyChain"
+	)
+
+	// build the transaction
+	utx, err := builder.NewCreateChainTx(
+		subnetID,
+		genesisBytes,
+		vmID,
+		fxIDs,
+		chainName,
+	)
+	require.NoError(err)
+
+	// check UTXOs selection and fee financing
+	ins := utx.Ins
+	outs := utx.Outs
+	require.Len(ins, 1)
+	require.Len(outs, 1)
+
+	expectedConsumed := testContext.CreateBlockchainTxFee
+	consumed := ins[0].In.Amount() - outs[0].Out.Amount()
+	require.Equal(expectedConsumed, consumed)
+}
+
+func TestCreateSubnetTx(t *testing.T) {
+	var (
+		require = require.New(t)
+
+		// backend
+		utxosKey   = testKeys[1]
+		utxos      = makeTestUTXOs(utxosKey)
+		chainUTXOs = common.NewDeterministicChainUTXOs(require, map[ids.ID][]*avax.UTXO{
+			constants.PlatformChainID: utxos,
+		})
+
+		subnetID       = ids.GenerateTestID()
+		subnetAuthKey  = testKeys[0]
+		subnetAuthAddr = subnetAuthKey.Address()
+		subnetOwner    = &secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{subnetAuthAddr},
+		}
+		subnets = map[ids.ID]*txs.Tx{
+			subnetID: {
+				Unsigned: &txs.CreateSubnetTx{
+					Owner: subnetOwner,
+				},
+			},
+		}
+
+		backend = NewBackend(testContext, chainUTXOs, subnets)
+
+		// builder
+		utxoAddr = utxosKey.Address()
+		builder  = builder.New(set.Of(utxoAddr, subnetAuthAddr), testContext, backend)
+	)
+
+	// build the transaction
+	utx, err := builder.NewCreateSubnetTx(subnetOwner)
+	require.NoError(err)
+
+	// check UTXOs selection and fee financing
+	ins := utx.Ins
+	outs := utx.Outs
+	require.Len(ins, 1)
+	require.Len(outs, 1)
+
+	expectedConsumed := testContext.CreateSubnetTxFee
+	consumed := ins[0].In.Amount() - outs[0].Out.Amount()
+	require.Equal(expectedConsumed, consumed)
+}
+
+func TestTransferSubnetOwnershipTx(t *testing.T) {
+	var (
+		require = require.New(t)
+
+		// backend
+		utxosKey   = testKeys[1]
+		utxos      = makeTestUTXOs(utxosKey)
+		chainUTXOs = common.NewDeterministicChainUTXOs(require, map[ids.ID][]*avax.UTXO{
+			constants.PlatformChainID: utxos,
+		})
+
+		subnetID       = ids.GenerateTestID()
+		subnetAuthKey  = testKeys[0]
+		subnetAuthAddr = subnetAuthKey.Address()
+		subnetOwner    = &secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{subnetAuthAddr},
+		}
+		subnets = map[ids.ID]*txs.Tx{
+			subnetID: {
+				Unsigned: &txs.CreateSubnetTx{
+					Owner: subnetOwner,
+				},
+			},
+		}
+
+		backend = NewBackend(testContext, chainUTXOs, subnets)
+
+		// builder
+		utxoAddr = utxosKey.Address()
+		builder  = builder.New(set.Of(utxoAddr, subnetAuthAddr), testContext, backend)
+	)
+
+	// build the transaction
+	utx, err := builder.NewTransferSubnetOwnershipTx(
+		subnetID,
+		subnetOwner,
+	)
+	require.NoError(err)
+
+	// check UTXOs selection and fee financing
+	ins := utx.Ins
+	outs := utx.Outs
+	require.Len(ins, 1)
+	require.Len(outs, 1)
+
+	expectedConsumed := testContext.BaseTxFee
+	consumed := ins[0].In.Amount() - outs[0].Out.Amount()
+	require.Equal(expectedConsumed, consumed)
 }
 
 func TestImportTx(t *testing.T) {
@@ -652,22 +369,16 @@ func TestImportTx(t *testing.T) {
 		utxos         = makeTestUTXOs(utxosKey)
 		sourceChainID = ids.GenerateTestID()
 		importedUTXOs = utxos[:1]
-		chainUTXOs    = newDeterministicGenericBackend(
-			require,
-			map[ids.ID][]*avax.UTXO{
-				constants.PlatformChainID: utxos,
-				sourceChainID:             importedUTXOs,
-			},
-			nil,
-		)
+		chainUTXOs    = common.NewDeterministicChainUTXOs(require, map[ids.ID][]*avax.UTXO{
+			constants.PlatformChainID: utxos,
+			sourceChainID:             importedUTXOs,
+		})
 
 		backend = NewBackend(testContext, chainUTXOs, nil)
 
-		// builder and signer
+		// builder
 		utxoAddr = utxosKey.Address()
 		builder  = builder.New(set.Of(utxoAddr), testContext, backend)
-		kc       = secp256k1fx.NewKeychain(utxosKey)
-		s        = signer.New(kc, chainUTXOs)
 
 		// data to build the transaction
 		importKey = testKeys[0]
@@ -679,62 +390,24 @@ func TestImportTx(t *testing.T) {
 		}
 	)
 
-	{ // Post E-Upgrade
-		feeCalc := fee.NewDynamicCalculator(testStaticConfig, commonfees.NewManager(testFeeRates), testBlockMaxComplexity)
-		utx, err := builder.NewImportTx(
-			sourceChainID,
-			importTo,
-			feeCalc,
-		)
-		require.NoError(err)
+	// build the transaction
+	utx, err := builder.NewImportTx(
+		sourceChainID,
+		importTo,
+	)
+	require.NoError(err)
 
-		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
-		require.NoError(err)
+	// check UTXOs selection and fee financing
+	ins := utx.Ins
+	outs := utx.Outs
+	importedIns := utx.ImportedInputs
+	require.Empty(ins) // we spend the imported input (at least partially)
+	require.Len(importedIns, 1)
+	require.Len(outs, 1)
 
-		fc := fee.NewDynamicCalculator(testStaticConfig, commonfees.NewManager(testFeeRates), testBlockMaxComplexity)
-		fee, err := fc.ComputeFee(utx, tx.Creds)
-		require.NoError(err)
-		require.Equal(14251*units.MicroAvax, fee)
-
-		// check UTXOs selection and fee financing
-		ins := utx.Ins
-		outs := utx.Outs
-		importedIns := utx.ImportedInputs
-		require.Len(ins, 2)
-		require.Len(importedIns, 1)
-		require.Len(outs, 1)
-
-		expectedConsumed := fee
-		consumed := importedIns[0].In.Amount() + ins[0].In.Amount() + ins[1].In.Amount() - outs[0].Out.Amount()
-		require.Equal(expectedConsumed, consumed)
-	}
-
-	{ // Pre E-Upgrade
-		feeCalc := fee.NewStaticCalculator(testStaticConfig, upgrade.Config{}, time.Time{})
-		utx, err := builder.NewImportTx(
-			sourceChainID,
-			importTo,
-			feeCalc,
-		)
-		require.NoError(err)
-
-		fc := fee.NewStaticCalculator(testStaticConfig, upgrade.Config{}, time.Time{})
-		fee, err := fc.ComputeFee(utx, nil)
-		require.NoError(err)
-		require.Equal(testContext.BaseTxFee, fee)
-
-		// check UTXOs selection and fee financing
-		ins := utx.Ins
-		outs := utx.Outs
-		importedIns := utx.ImportedInputs
-		require.Empty(ins)
-		require.Len(importedIns, 1)
-		require.Len(outs, 1)
-
-		expectedConsumed := fee
-		consumed := importedIns[0].In.Amount() - outs[0].Out.Amount()
-		require.Equal(expectedConsumed, consumed)
-	}
+	expectedConsumed := testContext.BaseTxFee
+	consumed := importedIns[0].In.Amount() - outs[0].Out.Amount()
+	require.Equal(expectedConsumed, consumed)
 }
 
 func TestExportTx(t *testing.T) {
@@ -749,11 +422,9 @@ func TestExportTx(t *testing.T) {
 		})
 		backend = NewBackend(testContext, chainUTXOs, nil)
 
-		// builder and signer
+		// builder
 		utxoAddr = utxosKey.Address()
 		builder  = builder.New(set.Of(utxoAddr), testContext, backend)
-		kc       = secp256k1fx.NewKeychain(utxosKey)
-		s        = signer.New(kc, backend)
 
 		// data to build the transaction
 		subnetID        = ids.GenerateTestID()
@@ -769,60 +440,23 @@ func TestExportTx(t *testing.T) {
 		}}
 	)
 
-	{ // Post E-Upgrade
-		feeCalc := fee.NewDynamicCalculator(testStaticConfig, commonfees.NewManager(testFeeRates), testBlockMaxComplexity)
-		utx, err := builder.NewExportTx(
-			subnetID,
-			exportedOutputs,
-			feeCalc,
-		)
-		require.NoError(err)
+	// build the transaction
+	utx, err := builder.NewExportTx(
+		subnetID,
+		exportedOutputs,
+	)
+	require.NoError(err)
 
-		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
-		require.NoError(err)
+	// check UTXOs selection and fee financing
+	ins := utx.Ins
+	outs := utx.Outs
+	require.Len(ins, 2)
+	require.Len(outs, 1)
 
-		fc := fee.NewDynamicCalculator(testStaticConfig, commonfees.NewManager(testFeeRates), testBlockMaxComplexity)
-		fee, err := fc.ComputeFee(utx, tx.Creds)
-		require.NoError(err)
-		require.Equal(9966*units.MicroAvax, fee)
-
-		// check UTXOs selection and fee financing
-		ins := utx.Ins
-		outs := utx.Outs
-		require.Len(ins, 2)
-		require.Len(outs, 1)
-		require.Equal(utx.ExportedOutputs, exportedOutputs)
-
-		expectedConsumed := fee + exportedOutputs[0].Out.Amount()
-		consumed := ins[0].In.Amount() + ins[1].In.Amount() - outs[0].Out.Amount()
-		require.Equal(expectedConsumed, consumed)
-	}
-
-	{ // Pre E-Upgrade
-		feeCalc := fee.NewStaticCalculator(testStaticConfig, upgrade.Config{}, time.Time{})
-		utx, err := builder.NewExportTx(
-			subnetID,
-			exportedOutputs,
-			feeCalc,
-		)
-		require.NoError(err)
-
-		fc := fee.NewStaticCalculator(testStaticConfig, upgrade.Config{}, time.Time{})
-		fee, err := fc.ComputeFee(utx, nil)
-		require.NoError(err)
-		require.Equal(testContext.BaseTxFee, fee)
-
-		// check UTXOs selection and fee financing
-		ins := utx.Ins
-		outs := utx.Outs
-		require.Len(ins, 2)
-		require.Len(outs, 1)
-
-		expectedConsumed := fee + exportedOutputs[0].Out.Amount()
-		consumed := ins[0].In.Amount() + ins[1].In.Amount() - outs[0].Out.Amount()
-		require.Equal(expectedConsumed, consumed)
-		require.Equal(utx.ExportedOutputs, exportedOutputs)
-	}
+	expectedConsumed := testContext.BaseTxFee + exportedOutputs[0].Out.Amount()
+	consumed := ins[0].In.Amount() + ins[1].In.Amount() - outs[0].Out.Amount()
+	require.Equal(expectedConsumed, consumed)
+	require.Equal(utx.ExportedOutputs, exportedOutputs)
 }
 
 func TestTransformSubnetTx(t *testing.T) {
@@ -830,8 +464,12 @@ func TestTransformSubnetTx(t *testing.T) {
 		require = require.New(t)
 
 		// backend
-		utxosKey       = testKeys[1]
-		utxos          = makeTestUTXOs(utxosKey)
+		utxosKey   = testKeys[1]
+		utxos      = makeTestUTXOs(utxosKey)
+		chainUTXOs = common.NewDeterministicChainUTXOs(require, map[ids.ID][]*avax.UTXO{
+			constants.PlatformChainID: utxos,
+		})
+
 		subnetID       = ids.GenerateTestID()
 		subnetAuthKey  = testKeys[0]
 		subnetAuthAddr = subnetAuthKey.Address()
@@ -839,17 +477,6 @@ func TestTransformSubnetTx(t *testing.T) {
 			Threshold: 1,
 			Addrs:     []ids.ShortID{subnetAuthAddr},
 		}
-
-		chainUTXOs = newDeterministicGenericBackend(
-			require,
-			map[ids.ID][]*avax.UTXO{
-				constants.PlatformChainID: utxos,
-			},
-			map[ids.ID]fx.Owner{
-				subnetID: subnetOwner,
-			},
-		)
-
 		subnets = map[ids.ID]*txs.Tx{
 			subnetID: {
 				Unsigned: &txs.CreateSubnetTx{
@@ -860,99 +487,46 @@ func TestTransformSubnetTx(t *testing.T) {
 
 		backend = NewBackend(testContext, chainUTXOs, subnets)
 
-		// builder and signer
+		// builder
 		utxoAddr = utxosKey.Address()
 		builder  = builder.New(set.Of(utxoAddr, subnetAuthAddr), testContext, backend)
-		kc       = secp256k1fx.NewKeychain(utxosKey)
-		s        = signer.New(kc, chainUTXOs)
 
 		// data to build the transaction
 		initialSupply = 40 * units.MegaAvax
 		maxSupply     = 100 * units.MegaAvax
 	)
 
-	{ // Post E-Upgrade
-		feeCalc := fee.NewDynamicCalculator(testStaticConfig, commonfees.NewManager(testFeeRates), testBlockMaxComplexity)
-		utx, err := builder.NewTransformSubnetTx(
-			subnetID,
-			subnetAssetID,
-			initialSupply,                 // initial supply
-			maxSupply,                     // max supply
-			reward.PercentDenominator,     // min consumption rate
-			reward.PercentDenominator,     // max consumption rate
-			1,                             // min validator stake
-			100*units.MegaAvax,            // max validator stake
-			time.Second,                   // min stake duration
-			365*24*time.Hour,              // max stake duration
-			0,                             // min delegation fee
-			1,                             // min delegator stake
-			5,                             // max validator weight factor
-			.80*reward.PercentDenominator, // uptime requirement
-			feeCalc,
-		)
-		require.NoError(err)
+	// build the transaction
+	utx, err := builder.NewTransformSubnetTx(
+		subnetID,
+		subnetAssetID,
+		initialSupply,                 // initial supply
+		maxSupply,                     // max supply
+		reward.PercentDenominator,     // min consumption rate
+		reward.PercentDenominator,     // max consumption rate
+		1,                             // min validator stake
+		100*units.MegaAvax,            // max validator stake
+		time.Second,                   // min stake duration
+		365*24*time.Hour,              // max stake duration
+		0,                             // min delegation fee
+		1,                             // min delegator stake
+		5,                             // max validator weight factor
+		.80*reward.PercentDenominator, // uptime requirement
+	)
+	require.NoError(err)
 
-		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
-		require.NoError(err)
+	// check UTXOs selection and fee financing
+	ins := utx.Ins
+	outs := utx.Outs
+	require.Len(ins, 2)
+	require.Len(outs, 2)
 
-		fc := fee.NewDynamicCalculator(testStaticConfig, commonfees.NewManager(testFeeRates), testBlockMaxComplexity)
-		fee, err := fc.ComputeFee(utx, tx.Creds)
-		require.NoError(err)
-		require.Equal(14763*units.MicroAvax, fee)
-
-		// check UTXOs selection and fee financing
-		ins := utx.Ins
-		outs := utx.Outs
-		require.Len(ins, 3)
-		require.Len(outs, 2)
-
-		expectedConsumedSubnetAsset := maxSupply - initialSupply
-		consumedSubnetAsset := ins[0].In.Amount() - outs[1].Out.Amount()
-		require.Equal(expectedConsumedSubnetAsset, consumedSubnetAsset)
-		expectedConsumed := fee
-		consumed := ins[1].In.Amount() + ins[2].In.Amount() - outs[0].Out.Amount()
-		require.Equal(expectedConsumed, consumed)
-	}
-
-	{ // Pre E-Upgrade
-		feeCalc := fee.NewStaticCalculator(testStaticConfig, upgrade.Config{}, time.Time{})
-		utx, err := builder.NewTransformSubnetTx(
-			subnetID,
-			subnetAssetID,
-			initialSupply,                 // initial supply
-			maxSupply,                     // max supply
-			reward.PercentDenominator,     // min consumption rate
-			reward.PercentDenominator,     // max consumption rate
-			1,                             // min validator stake
-			100*units.MegaAvax,            // max validator stake
-			time.Second,                   // min stake duration
-			365*24*time.Hour,              // max stake duration
-			0,                             // min delegation fee
-			1,                             // min delegator stake
-			5,                             // max validator weight factor
-			.80*reward.PercentDenominator, // uptime requirement
-			feeCalc,
-		)
-		require.NoError(err)
-
-		fc := fee.NewStaticCalculator(testStaticConfig, upgrade.Config{}, time.Time{})
-		fee, err := fc.ComputeFee(utx, nil)
-		require.NoError(err)
-		require.Equal(testContext.TransformSubnetTxFee, fee)
-
-		// check UTXOs selection and fee financing
-		ins := utx.Ins
-		outs := utx.Outs
-		require.Len(ins, 2)
-		require.Len(outs, 2)
-
-		expectedConsumedSubnetAsset := maxSupply - initialSupply
-		consumedSubnetAsset := ins[0].In.Amount() - outs[1].Out.Amount()
-		require.Equal(expectedConsumedSubnetAsset, consumedSubnetAsset)
-		expectedConsumed := fee
-		consumed := ins[1].In.Amount() - outs[0].Out.Amount()
-		require.Equal(expectedConsumed, consumed)
-	}
+	expectedConsumedSubnetAsset := maxSupply - initialSupply
+	consumedSubnetAsset := ins[0].In.Amount() - outs[1].Out.Amount()
+	require.Equal(expectedConsumedSubnetAsset, consumedSubnetAsset)
+	expectedConsumed := testContext.TransformSubnetTxFee
+	consumed := ins[1].In.Amount() - outs[0].Out.Amount()
+	require.Equal(expectedConsumed, consumed)
 }
 
 func TestAddPermissionlessValidatorTx(t *testing.T) {
@@ -972,8 +546,6 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 		rewardKey  = testKeys[0]
 		rewardAddr = rewardKey.Address()
 		builder    = builder.New(set.Of(utxoAddr, rewardAddr), testContext, backend)
-		kc         = secp256k1fx.NewKeychain(utxosKey)
-		s          = signer.New(kc, backend)
 
 		// data to build the transaction
 		validationRewardsOwner = &secp256k1fx.OutputOwners{
@@ -993,94 +565,38 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 	sk, err := bls.NewSecretKey()
 	require.NoError(err)
 
-	{ // Post E-Upgrade
-		feeCalc := fee.NewDynamicCalculator(testStaticConfig, commonfees.NewManager(testFeeRates), testBlockMaxComplexity)
-		utx, err := builder.NewAddPermissionlessValidatorTx(
-			&txs.SubnetValidator{
-				Validator: txs.Validator{
-					NodeID: ids.GenerateTestNodeID(),
-					End:    uint64(time.Now().Add(time.Hour).Unix()),
-					Wght:   2 * units.Avax,
-				},
-				Subnet: constants.PrimaryNetworkID,
+	// build the transaction
+	utx, err := builder.NewAddPermissionlessValidatorTx(
+		&txs.SubnetValidator{
+			Validator: txs.Validator{
+				NodeID: ids.GenerateTestNodeID(),
+				End:    uint64(time.Now().Add(time.Hour).Unix()),
+				Wght:   2 * units.Avax,
 			},
-			blssigner.NewProofOfPossession(sk),
-			avaxAssetID,
-			validationRewardsOwner,
-			delegationRewardsOwner,
-			reward.PercentDenominator,
-			feeCalc,
-		)
-		require.NoError(err)
+			Subnet: constants.PrimaryNetworkID,
+		},
+		signer.NewProofOfPossession(sk),
+		avaxAssetID,
+		validationRewardsOwner,
+		delegationRewardsOwner,
+		reward.PercentDenominator,
+	)
+	require.NoError(err)
 
-		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
-		require.NoError(err)
+	// check UTXOs selection and fee financing
+	ins := utx.Ins
+	staked := utx.StakeOuts
+	outs := utx.Outs
+	require.Len(ins, 4)
+	require.Len(staked, 2)
+	require.Len(outs, 2)
 
-		fc := fee.NewDynamicCalculator(testStaticConfig, commonfees.NewManager(testFeeRates), testBlockMaxComplexity)
-		fee, err := fc.ComputeFee(utx, tx.Creds)
-		require.NoError(err)
-		require.Equal(20404*units.MicroAvax, fee)
-
-		// check UTXOs selection and fee financing
-		ins := utx.Ins
-		staked := utx.StakeOuts
-		outs := utx.Outs
-		require.Len(ins, 4)
-		require.Len(staked, 2)
-		require.Len(outs, 2)
-
-		expectedConsumedSubnetAsset := utx.Validator.Weight()
-		consumedSubnetAsset := staked[0].Out.Amount() + staked[1].Out.Amount()
-		require.Equal(ins[0].In.Amount()+ins[2].In.Amount()-outs[1].Out.Amount(), consumedSubnetAsset)
-		require.Equal(expectedConsumedSubnetAsset, consumedSubnetAsset)
-
-		expectedConsumed := fee
-		consumed := ins[1].In.Amount() + ins[3].In.Amount() - outs[0].Out.Amount()
-		require.Equal(expectedConsumed, consumed)
-	}
-
-	{ // Pre E-Upgrade
-		feeCalc := fee.NewStaticCalculator(testStaticConfig, upgrade.Config{}, time.Time{})
-		utx, err := builder.NewAddPermissionlessValidatorTx(
-			&txs.SubnetValidator{
-				Validator: txs.Validator{
-					NodeID: ids.GenerateTestNodeID(),
-					End:    uint64(time.Now().Add(time.Hour).Unix()),
-					Wght:   2 * units.Avax,
-				},
-				Subnet: constants.PrimaryNetworkID,
-			},
-			blssigner.NewProofOfPossession(sk),
-			avaxAssetID,
-			validationRewardsOwner,
-			delegationRewardsOwner,
-			reward.PercentDenominator,
-			feeCalc,
-		)
-		require.NoError(err)
-
-		fc := fee.NewStaticCalculator(testStaticConfig, upgrade.Config{}, time.Time{})
-		fee, err := fc.ComputeFee(utx, nil)
-		require.NoError(err)
-		require.Equal(testContext.AddPrimaryNetworkValidatorFee, fee)
-
-		// check UTXOs selection and fee financing
-		ins := utx.Ins
-		staked := utx.StakeOuts
-		outs := utx.Outs
-		require.Len(ins, 4)
-		require.Len(staked, 2)
-		require.Len(outs, 2)
-
-		expectedConsumedSubnetAsset := utx.Validator.Weight()
-		consumedSubnetAsset := staked[0].Out.Amount() + staked[1].Out.Amount()
-		require.Equal(ins[0].In.Amount()+ins[2].In.Amount()-outs[1].Out.Amount(), consumedSubnetAsset)
-		require.Equal(expectedConsumedSubnetAsset, consumedSubnetAsset)
-
-		expectedConsumed := fee
-		consumed := ins[1].In.Amount() + ins[3].In.Amount() - outs[0].Out.Amount()
-		require.Equal(expectedConsumed, consumed)
-	}
+	expectedConsumedSubnetAsset := utx.Validator.Weight()
+	consumedSubnetAsset := staked[0].Out.Amount() + staked[1].Out.Amount()
+	require.Equal(expectedConsumedSubnetAsset, consumedSubnetAsset)
+	expectedConsumed := testContext.AddPrimaryNetworkValidatorFee
+	consumed := ins[1].In.Amount() + ins[3].In.Amount() - outs[0].Out.Amount()
+	require.Equal(expectedConsumed, consumed)
 }
 
 func TestAddPermissionlessDelegatorTx(t *testing.T) {
@@ -1095,13 +611,11 @@ func TestAddPermissionlessDelegatorTx(t *testing.T) {
 		})
 		backend = NewBackend(testContext, chainUTXOs, nil)
 
-		// builder and signer
+		// builder
 		utxoAddr   = utxosKey.Address()
 		rewardKey  = testKeys[0]
 		rewardAddr = rewardKey.Address()
 		builder    = builder.New(set.Of(utxoAddr, rewardAddr), testContext, backend)
-		kc         = secp256k1fx.NewKeychain(utxosKey)
-		s          = signer.New(kc, backend)
 
 		// data to build the transaction
 		rewardsOwner = &secp256k1fx.OutputOwners{
@@ -1112,88 +626,35 @@ func TestAddPermissionlessDelegatorTx(t *testing.T) {
 		}
 	)
 
-	{ // Post E-Upgrade
-		feeCalc := fee.NewDynamicCalculator(testStaticConfig, commonfees.NewManager(testFeeRates), testBlockMaxComplexity)
-		utx, err := builder.NewAddPermissionlessDelegatorTx(
-			&txs.SubnetValidator{
-				Validator: txs.Validator{
-					NodeID: ids.GenerateTestNodeID(),
-					End:    uint64(time.Now().Add(time.Hour).Unix()),
-					Wght:   2 * units.Avax,
-				},
-				Subnet: constants.PrimaryNetworkID,
+	// build the transaction
+	utx, err := builder.NewAddPermissionlessDelegatorTx(
+		&txs.SubnetValidator{
+			Validator: txs.Validator{
+				NodeID: ids.GenerateTestNodeID(),
+				End:    uint64(time.Now().Add(time.Hour).Unix()),
+				Wght:   2 * units.Avax,
 			},
-			avaxAssetID,
-			rewardsOwner,
-			feeCalc,
-		)
-		require.NoError(err)
+			Subnet: constants.PrimaryNetworkID,
+		},
+		avaxAssetID,
+		rewardsOwner,
+	)
+	require.NoError(err)
 
-		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
-		require.NoError(err)
+	// check UTXOs selection and fee financing
+	ins := utx.Ins
+	staked := utx.StakeOuts
+	outs := utx.Outs
+	require.Len(ins, 4)
+	require.Len(staked, 2)
+	require.Len(outs, 2)
 
-		fc := fee.NewDynamicCalculator(testStaticConfig, commonfees.NewManager(testFeeRates), testBlockMaxComplexity)
-		fee, err := fc.ComputeFee(utx, tx.Creds)
-		require.NoError(err)
-		require.Equal(20212*units.MicroAvax, fee)
-
-		// check UTXOs selection and fee financing
-		ins := utx.Ins
-		staked := utx.StakeOuts
-		outs := utx.Outs
-		require.Len(ins, 4)
-		require.Len(staked, 2)
-		require.Len(outs, 2)
-
-		expectedConsumedSubnetAsset := utx.Validator.Weight()
-		consumedSubnetAsset := staked[0].Out.Amount() + staked[1].Out.Amount()
-		require.Equal(ins[0].In.Amount()+ins[2].In.Amount()-outs[1].Out.Amount(), consumedSubnetAsset)
-		require.Equal(expectedConsumedSubnetAsset, consumedSubnetAsset)
-
-		expectedConsumed := fee
-		consumed := ins[1].In.Amount() + ins[3].In.Amount() - outs[0].Out.Amount()
-		require.Equal(expectedConsumed, consumed)
-	}
-
-	{ // Pre E-Upgrade
-		feeCalc := fee.NewStaticCalculator(testStaticConfig, upgrade.Config{}, time.Time{})
-		utx, err := builder.NewAddPermissionlessDelegatorTx(
-			&txs.SubnetValidator{
-				Validator: txs.Validator{
-					NodeID: ids.GenerateTestNodeID(),
-					End:    uint64(time.Now().Add(time.Hour).Unix()),
-					Wght:   2 * units.Avax,
-				},
-				Subnet: constants.PrimaryNetworkID,
-			},
-			avaxAssetID,
-			rewardsOwner,
-			feeCalc,
-		)
-		require.NoError(err)
-
-		fc := fee.NewStaticCalculator(testStaticConfig, upgrade.Config{}, time.Time{})
-		fee, err := fc.ComputeFee(utx, nil)
-		require.NoError(err)
-		require.Equal(testContext.AddPrimaryNetworkDelegatorFee, fee)
-
-		// check UTXOs selection and fee financing
-		ins := utx.Ins
-		staked := utx.StakeOuts
-		outs := utx.Outs
-		require.Len(ins, 4)
-		require.Len(staked, 2)
-		require.Len(outs, 2)
-
-		expectedConsumedSubnetAsset := utx.Validator.Weight()
-		consumedSubnetAsset := staked[0].Out.Amount() + staked[1].Out.Amount()
-		require.Equal(ins[0].In.Amount()+ins[2].In.Amount()-outs[1].Out.Amount(), consumedSubnetAsset)
-		require.Equal(expectedConsumedSubnetAsset, consumedSubnetAsset)
-
-		expectedConsumed := fee
-		consumed := ins[1].In.Amount() + ins[3].In.Amount() - outs[0].Out.Amount()
-		require.Equal(expectedConsumed, consumed)
-	}
+	expectedConsumedSubnetAsset := utx.Validator.Weight()
+	consumedSubnetAsset := staked[0].Out.Amount() + staked[1].Out.Amount()
+	require.Equal(expectedConsumedSubnetAsset, consumedSubnetAsset)
+	expectedConsumed := testContext.AddPrimaryNetworkDelegatorFee
+	consumed := ins[1].In.Amount() + ins[3].In.Amount() - outs[0].Out.Amount()
+	require.Equal(expectedConsumed, consumed)
 }
 
 func makeTestUTXOs(utxosKey *secp256k1.PrivateKey) []*avax.UTXO {
@@ -1283,49 +744,4 @@ func makeTestUTXOs(utxosKey *secp256k1.PrivateKey) []*avax.UTXO {
 			},
 		},
 	}
-}
-
-func newDeterministicGenericBackend(
-	require *require.Assertions,
-	utxoSets map[ids.ID][]*avax.UTXO,
-	subnetOwners map[ids.ID]fx.Owner,
-) *testBackend {
-	globalUTXOs := common.NewUTXOs()
-	for subnetID, utxos := range utxoSets {
-		for _, utxo := range utxos {
-			require.NoError(
-				globalUTXOs.AddUTXO(stdcontext.Background(), subnetID, constants.PlatformChainID, utxo),
-			)
-		}
-	}
-	return &testBackend{
-		DeterministicChainUTXOs: common.NewDeterministicChainUTXOs(require, utxoSets),
-		subnetOwners:            subnetOwners,
-	}
-}
-
-type testBackend struct {
-	*common.DeterministicChainUTXOs
-	subnetOwners map[ids.ID]fx.Owner // subnetID --> fx.Owner
-}
-
-func (c *testBackend) UTXOs(ctx stdcontext.Context, sourceChainID ids.ID) ([]*avax.UTXO, error) {
-	utxos, err := c.ChainUTXOs.UTXOs(ctx, sourceChainID)
-	if err != nil {
-		return nil, err
-	}
-
-	slices.SortFunc(utxos, func(a, b *avax.UTXO) int {
-		return a.Compare(&b.UTXOID)
-	})
-	return utxos, nil
-}
-
-func (c *testBackend) GetSubnetOwner(_ stdcontext.Context, subnetID ids.ID) (fx.Owner, error) {
-	owner, found := c.subnetOwners[subnetID]
-	if !found {
-		return nil, database.ErrNotFound
-	}
-
-	return owner, nil
 }

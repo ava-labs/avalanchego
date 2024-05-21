@@ -15,7 +15,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/chain/p/builder"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
@@ -49,12 +48,10 @@ func (b *Builder) NewImportTx(
 	options ...common.Option,
 ) (*txs.Tx, error) {
 	pBuilder, pSigner := b.builders(keys)
-	feeCalc := b.feeCalculator()
 
 	utx, err := pBuilder.NewImportTx(
 		chainID,
 		to,
-		feeCalc,
 		options...,
 	)
 	if err != nil {
@@ -71,12 +68,10 @@ func (b *Builder) NewExportTx(
 	options ...common.Option,
 ) (*txs.Tx, error) {
 	pBuilder, pSigner := b.builders(keys)
-	feeCalc := b.feeCalculator()
 
 	utx, err := pBuilder.NewExportTx(
 		chainID,
 		outputs,
-		feeCalc,
 		options...,
 	)
 	if err != nil {
@@ -96,7 +91,6 @@ func (b *Builder) NewCreateChainTx(
 	options ...common.Option,
 ) (*txs.Tx, error) {
 	pBuilder, pSigner := b.builders(keys)
-	feeCalc := b.feeCalculator()
 
 	utx, err := pBuilder.NewCreateChainTx(
 		subnetID,
@@ -104,7 +98,6 @@ func (b *Builder) NewCreateChainTx(
 		vmID,
 		fxIDs,
 		chainName,
-		feeCalc,
 		options...,
 	)
 	if err != nil {
@@ -120,11 +113,9 @@ func (b *Builder) NewCreateSubnetTx(
 	options ...common.Option,
 ) (*txs.Tx, error) {
 	pBuilder, pSigner := b.builders(keys)
-	feeCalc := b.feeCalculator()
 
 	utx, err := pBuilder.NewCreateSubnetTx(
 		owner,
-		feeCalc,
 		options...,
 	)
 	if err != nil {
@@ -153,7 +144,6 @@ func (b *Builder) NewTransformSubnetTx(
 	options ...common.Option,
 ) (*txs.Tx, error) {
 	pBuilder, pSigner := b.builders(keys)
-	feeCalc := b.feeCalculator()
 
 	utx, err := pBuilder.NewTransformSubnetTx(
 		subnetID,
@@ -170,7 +160,6 @@ func (b *Builder) NewTransformSubnetTx(
 		minDelegatorStake,
 		maxValidatorWeightFactor,
 		uptimeRequirement,
-		feeCalc,
 		options...,
 	)
 	if err != nil {
@@ -188,13 +177,11 @@ func (b *Builder) NewAddValidatorTx(
 	options ...common.Option,
 ) (*txs.Tx, error) {
 	pBuilder, pSigner := b.builders(keys)
-	feeCalc := b.feeCalculator()
 
 	utx, err := pBuilder.NewAddValidatorTx(
 		vdr,
 		rewardsOwner,
 		shares,
-		feeCalc,
 		options...,
 	)
 	if err != nil {
@@ -215,7 +202,6 @@ func (b *Builder) NewAddPermissionlessValidatorTx(
 	options ...common.Option,
 ) (*txs.Tx, error) {
 	pBuilder, pSigner := b.builders(keys)
-	feeCalc := b.feeCalculator()
 
 	utx, err := pBuilder.NewAddPermissionlessValidatorTx(
 		vdr,
@@ -224,7 +210,6 @@ func (b *Builder) NewAddPermissionlessValidatorTx(
 		validationRewardsOwner,
 		delegationRewardsOwner,
 		shares,
-		feeCalc,
 		options...,
 	)
 	if err != nil {
@@ -241,12 +226,10 @@ func (b *Builder) NewAddDelegatorTx(
 	options ...common.Option,
 ) (*txs.Tx, error) {
 	pBuilder, pSigner := b.builders(keys)
-	feeCalc := b.feeCalculator()
 
 	utx, err := pBuilder.NewAddDelegatorTx(
 		vdr,
 		rewardsOwner,
-		feeCalc,
 		options...,
 	)
 	if err != nil {
@@ -264,13 +247,11 @@ func (b *Builder) NewAddPermissionlessDelegatorTx(
 	options ...common.Option,
 ) (*txs.Tx, error) {
 	pBuilder, pSigner := b.builders(keys)
-	feeCalc := b.feeCalculator()
 
 	utx, err := pBuilder.NewAddPermissionlessDelegatorTx(
 		vdr,
 		assetID,
 		rewardsOwner,
-		feeCalc,
 		options...,
 	)
 	if err != nil {
@@ -286,11 +267,9 @@ func (b *Builder) NewAddSubnetValidatorTx(
 	options ...common.Option,
 ) (*txs.Tx, error) {
 	pBuilder, pSigner := b.builders(keys)
-	feeCalc := b.feeCalculator()
 
 	utx, err := pBuilder.NewAddSubnetValidatorTx(
 		vdr,
-		feeCalc,
 		options...,
 	)
 	if err != nil {
@@ -307,12 +286,10 @@ func (b *Builder) NewRemoveSubnetValidatorTx(
 	options ...common.Option,
 ) (*txs.Tx, error) {
 	pBuilder, pSigner := b.builders(keys)
-	feeCalc := b.feeCalculator()
 
 	utx, err := pBuilder.NewRemoveSubnetValidatorTx(
 		nodeID,
 		subnetID,
-		feeCalc,
 		options...,
 	)
 	if err != nil {
@@ -329,12 +306,10 @@ func (b *Builder) NewTransferSubnetOwnershipTx(
 	options ...common.Option,
 ) (*txs.Tx, error) {
 	pBuilder, pSigner := b.builders(keys)
-	feeCalc := b.feeCalculator()
 
 	utx, err := pBuilder.NewTransferSubnetOwnershipTx(
 		subnetID,
 		owner,
-		feeCalc,
 		options...,
 	)
 	if err != nil {
@@ -350,11 +325,9 @@ func (b *Builder) NewBaseTx(
 	options ...common.Option,
 ) (*txs.Tx, error) {
 	pBuilder, pSigner := b.builders(keys)
-	feeCalc := b.feeCalculator()
 
 	utx, err := pBuilder.NewBaseTx(
 		outputs,
-		feeCalc,
 		options...,
 	)
 	if err != nil {
@@ -375,9 +348,4 @@ func (b *Builder) builders(keys []*secp256k1.PrivateKey) (builder.Builder, walle
 	)
 
 	return builder, signer
-}
-
-func (b *Builder) feeCalculator() *fee.Calculator {
-	chainTime := b.state.GetTimestamp()
-	return config.PickFeeCalculator(b.cfg, chainTime)
 }
