@@ -19,6 +19,7 @@ var _ txs.Visitor = (*AtomicTxExecutor)(nil)
 type AtomicTxExecutor struct {
 	// inputs, to be filled before visitor methods are called
 	*Backend
+	FeeCalculator *fee.Calculator
 	ParentID      ids.ID
 	StateVersions state.Versions
 	Tx            *txs.Tx
@@ -99,11 +100,10 @@ func (e *AtomicTxExecutor) atomicTx(tx txs.UnsignedTx) error {
 	}
 	e.OnAccept = onAccept
 
-	feeCalculator := fee.NewStaticCalculator(e.Backend.Config.StaticFeeConfig, e.Backend.Config.UpgradeConfig, e.OnAccept.GetTimestamp())
 	executor := StandardTxExecutor{
 		Backend:       e.Backend,
 		State:         e.OnAccept,
-		FeeCalculator: feeCalculator,
+		FeeCalculator: e.FeeCalculator,
 		Tx:            e.Tx,
 	}
 	err = tx.Visit(&executor)
