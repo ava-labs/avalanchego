@@ -32,7 +32,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
-	"github.com/ava-labs/avalanchego/vms/avm/txs/builder"
+	"github.com/ava-labs/avalanchego/vms/avm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -110,7 +110,7 @@ type environment struct {
 	sharedMemory  *atomic.Memory
 	issuer        chan common.Message
 	vm            *VM
-	txBuilder     *builder.Builder
+	txBuilder     *txstest.Builder
 	service       *Service
 	walletService *WalletService
 }
@@ -200,14 +200,14 @@ func setup(tb testing.TB, c *envConfig) *environment {
 	stopVertexID := ids.GenerateTestID()
 	issuer := make(chan common.Message, 1)
 
-	backend := builder.NewBackend(vm.ctx, vm.state, vm.ctx.SharedMemory, vm.parser.Codec())
+	backend := txstest.NewBackend(vm.ctx, vm.state, vm.ctx.SharedMemory, vm.parser.Codec())
 	env := &environment{
 		genesisBytes: genesisBytes,
 		genesisTx:    getCreateTxFromGenesisTest(tb, genesisBytes, assetName),
 		sharedMemory: m,
 		issuer:       issuer,
 		vm:           vm,
-		txBuilder:    builder.New(vm.ctx, &vm.Config, vm.feeAssetID, backend),
+		txBuilder:    txstest.New(vm.ctx, &vm.Config, vm.feeAssetID, backend),
 		service: &Service{
 			vm: vm,
 		},

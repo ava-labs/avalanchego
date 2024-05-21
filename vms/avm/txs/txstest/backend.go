@@ -1,9 +1,10 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package builder
+package txstest
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
@@ -14,11 +15,16 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/avm/state"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/wallet/chain/x/builder"
+	"github.com/ava-labs/avalanchego/wallet/chain/x/signer"
 )
 
-const maxPageSize uint64 = 1024 // TODO ABENEGIA: remove duplication
+const maxPageSize uint64 = 1024
 
-var _ AVMBuilderBackend = (*Backend)(nil)
+var (
+	_ builder.Backend = (*walletBackendAdapter)(nil)
+	_ signer.Backend  = (*walletBackendAdapter)(nil)
+)
 
 func NewBackend(
 	ctx *snow.Context,
@@ -81,4 +87,17 @@ func (b *Backend) GetUTXO(addrs set.Set[ids.ShortID], chainID, utxoID ids.ID) (*
 		}
 	}
 	return nil, database.ErrNotFound
+}
+
+type walletBackendAdapter struct {
+	b     *Backend
+	addrs set.Set[ids.ShortID]
+}
+
+func (wa *walletBackendAdapter) UTXOs(_ context.Context, sourceChainID ids.ID) ([]*avax.UTXO, error) {
+	return wa.b.UTXOs(wa.addrs, sourceChainID)
+}
+
+func (wa *walletBackendAdapter) GetUTXO(_ context.Context, chainID, utxoID ids.ID) (*avax.UTXO, error) {
+	return wa.b.GetUTXO(wa.addrs, chainID, utxoID)
 }

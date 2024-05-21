@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package builder
+package txstest
 
 import (
 	"context"
@@ -20,7 +20,7 @@ import (
 )
 
 type Builder struct {
-	backend AVMBuilderBackend
+	backend *Backend
 	ctx     *builder.Context
 }
 
@@ -28,7 +28,7 @@ func New(
 	ctx *snow.Context,
 	cfg *config.Config,
 	feeAssetID ids.ID,
-	backend AVMBuilderBackend,
+	backend *Backend,
 ) *Builder {
 	return &Builder{
 		backend: backend,
