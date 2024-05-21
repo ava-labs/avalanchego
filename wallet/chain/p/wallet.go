@@ -12,7 +12,6 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
-	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
@@ -633,7 +632,7 @@ func (w *wallet) feeCalculator(ctx *builder.Context, options ...common.Option) (
 	if !w.isEForkActive {
 		feeCalculator = fee.NewStaticCalculator(w.staticFeesConfig, upgrade.Config{}, time.Time{})
 	} else {
-		feeCfg := config.GetDynamicFeesConfig(w.isEForkActive)
+		feeCfg := fee.GetDynamicFeesConfig(w.isEForkActive)
 		feeMan := commonfees.NewManager(w.feeRates)
 		feeCalculator = fee.NewDynamicCalculator(w.staticFeesConfig, feeMan, feeCfg.BlockMaxComplexity, nil)
 	}
@@ -661,7 +660,7 @@ func (w *wallet) refreshFeesData(ctx *builder.Context, options ...common.Option)
 	w.staticFeesConfig = staticFeesConfigFromContext(ctx)
 
 	w.isEForkActive = !chainTime.Before(eForkTime)
-	feeCfg := config.GetDynamicFeesConfig(w.isEForkActive)
+	feeCfg := fee.GetDynamicFeesConfig(w.isEForkActive)
 	w.feeRates = feeCfg.FeeRate
 	w.blockMaxComplexity = feeCfg.BlockMaxComplexity
 	return nil

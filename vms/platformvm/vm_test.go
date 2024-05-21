@@ -404,7 +404,7 @@ func TestGenesis(t *testing.T) {
 			if !upgrades.IsEActivated(chainTime) {
 				feeCalc = fee.NewStaticCalculator(staticFeeCfg, upgrades, chainTime)
 			} else {
-				feeCfg := config.GetDynamicFeesConfig(upgrades.IsEActivated(chainTime))
+				feeCfg := fee.GetDynamicFeesConfig(upgrades.IsEActivated(chainTime))
 				feeMan := commonfees.NewManager(feeCfg.FeeRate)
 				feeCalc = fee.NewDynamicCalculator(staticFeeCfg, feeMan, feeCfg.BlockMaxComplexity, testSubnet1.Creds)
 			}
@@ -2400,7 +2400,7 @@ func TestBaseTx(t *testing.T) {
 	if !upgrades.IsEActivated(chainTime) {
 		feeCalc = fee.NewStaticCalculator(staticFeeCfg, upgrades, chainTime)
 	} else {
-		feeCfg := config.GetDynamicFeesConfig(upgrades.IsEActivated(chainTime))
+		feeCfg := fee.GetDynamicFeesConfig(upgrades.IsEActivated(chainTime))
 		feeMan := commonfees.NewManager(feeCfg.FeeRate)
 		feeCalc = fee.NewDynamicCalculator(staticFeeCfg, feeMan, feeCfg.BlockMaxComplexity, baseTx.Creds)
 	}

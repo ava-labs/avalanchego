@@ -20,10 +20,10 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/fees"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
-	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
@@ -335,7 +335,7 @@ func packBlockTxs(
 
 	var (
 		isEActivated = backend.Config.UpgradeConfig.IsEActivated(timestamp)
-		feeCfg       = config.GetDynamicFeesConfig(isEActivated)
+		feeCfg       = fee.GetDynamicFeesConfig(isEActivated)
 		feeMan       = fees.NewManager(feeCfg.FeeRate)
 
 		blockTxs []*txs.Tx

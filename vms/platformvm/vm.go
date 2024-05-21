@@ -40,6 +40,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/vms/txs/mempool"
@@ -113,7 +114,7 @@ func (vm *VM) Initialize(
 	}
 	chainCtx.Log.Info("retrieved VM execution config", zap.Reflect("config", execConfig))
 
-	if err := config.ResetDynamicFeesConfig(chainCtx, execConfig.DynamicFeesConfig); err != nil {
+	if err := fee.ResetDynamicFeesConfig(chainCtx, execConfig.DynamicFeesConfig); err != nil {
 		return fmt.Errorf("failed resetting dynamic fees config: %w", err)
 	}
 
