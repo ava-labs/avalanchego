@@ -504,7 +504,7 @@ func (n *Node) initNetworking() error {
 		}
 	}
 	if unknownACPs.Len() > 0 {
-		n.Log.Warn("gossipping unknown ACPs",
+		n.Log.Warn("gossiping unknown ACPs",
 			zap.Reflect("acps", unknownACPs),
 		)
 	}
