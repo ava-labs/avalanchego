@@ -4,7 +4,6 @@
 package pebble
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -44,17 +43,7 @@ var (
 		MaxOpenFiles:                4096,
 		MaxConcurrentCompactions:    1,
 	}
-
-	DefaultConfigBytes []byte
 )
-
-func init() {
-	var err error
-	DefaultConfigBytes, err = json.Marshal(DefaultConfig)
-	if err != nil {
-		panic(err)
-	}
-}
 
 type Database struct {
 	lock          sync.RWMutex
@@ -200,9 +189,10 @@ func (db *Database) Compact(start []byte, end []byte) error {
 	}
 
 	if end == nil {
-		// The database.Database spec treats a nil [limit] as a key after all keys
-		// but pebble treats a nil [limit] as a key before all keys in Compact.
-		// Use the greatest key in the database as the [limit] to get the desired behavior.
+		// The database.Database spec treats a nil [limit] as a key after all
+		// keys but pebble treats a nil [limit] as a key before all keys in
+		// Compact. Use the greatest key in the database as the [limit] to get
+		// the desired behavior.
 		it := db.pebbleDB.NewIter(&pebble.IterOptions{})
 
 		if !it.Last() {
@@ -210,7 +200,7 @@ func (db *Database) Compact(start []byte, end []byte) error {
 			return it.Close()
 		}
 
-		end = it.Key()
+		end = slices.Clone(it.Key())
 		if err := it.Close(); err != nil {
 			return err
 		}
@@ -273,7 +263,7 @@ func keyRange(start, prefix []byte) *pebble.IterOptions {
 		LowerBound: prefix,
 		UpperBound: prefixToUpperBound(prefix),
 	}
-	if bytes.Compare(start, prefix) == 1 {
+	if pebble.DefaultComparer.Compare(start, prefix) == 1 {
 		opt.LowerBound = start
 	}
 	return opt
