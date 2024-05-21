@@ -9,12 +9,6 @@ source "$AVALANCHE_PATH"/scripts/constants.sh
 
 EXCLUDED_TARGETS="| grep -v /mocks | grep -v proto | grep -v tests/e2e | grep -v tests/upgrade"
 
-GOOS=$(go env GOOS)
-if [[ "$GOOS" == "windows" ]]; then
-  # tmpnet and antithesis tests (which depend on tmpnet) are not compatible with windows
-  EXCLUDED_TARGETS="${EXCLUDED_TARGETS} | grep -v tests/fixture | grep -v tests/antithesis"
-fi
-
 TEST_TARGETS="$(eval "go list ./... ${EXCLUDED_TARGETS}")"
 
 # shellcheck disable=SC2086
