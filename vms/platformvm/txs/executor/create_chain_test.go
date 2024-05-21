@@ -50,7 +50,7 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 	require.NoError(err)
 
 	chainTime := env.state.GetTimestamp()
-	feeCfg := fee.GetDynamicFeesConfig(env.config.UpgradeConfig.IsEActivated(chainTime))
+	feeCfg := fee.GetDynamicConfig(env.config.UpgradeConfig.IsEActivated(chainTime))
 	executor := StandardTxExecutor{
 		Backend:            &env.backend,
 		BlkFeeManager:      commonfees.NewManager(feeCfg.FeeRate),
@@ -92,7 +92,7 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 	require.NoError(err)
 
 	chainTime := stateDiff.GetTimestamp()
-	feeCfg := fee.GetDynamicFeesConfig(env.config.UpgradeConfig.IsEActivated(chainTime))
+	feeCfg := fee.GetDynamicConfig(env.config.UpgradeConfig.IsEActivated(chainTime))
 	executor := StandardTxExecutor{
 		Backend:            &env.backend,
 		BlkFeeManager:      commonfees.NewManager(feeCfg.FeeRate),
@@ -128,7 +128,7 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 	require.NoError(err)
 
 	currentTime := stateDiff.GetTimestamp()
-	feeCfg := fee.GetDynamicFeesConfig(env.config.UpgradeConfig.IsEActivated(currentTime))
+	feeCfg := fee.GetDynamicConfig(env.config.UpgradeConfig.IsEActivated(currentTime))
 	executor := StandardTxExecutor{
 		Backend:            &env.backend,
 		BlkFeeManager:      commonfees.NewManager(feeCfg.FeeRate),
@@ -161,7 +161,7 @@ func TestCreateChainTxValid(t *testing.T) {
 	require.NoError(err)
 
 	currentTime := stateDiff.GetTimestamp()
-	feeCfg := fee.GetDynamicFeesConfig(env.config.UpgradeConfig.IsEActivated(currentTime))
+	feeCfg := fee.GetDynamicConfig(env.config.UpgradeConfig.IsEActivated(currentTime))
 	executor := StandardTxExecutor{
 		Backend:            &env.backend,
 		BlkFeeManager:      commonfees.NewManager(feeCfg.FeeRate),
@@ -232,7 +232,7 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 			stateDiff.SetTimestamp(test.time)
 
 			currentTime := stateDiff.GetTimestamp()
-			feeCfg := fee.GetDynamicFeesConfig(env.config.UpgradeConfig.IsEActivated(currentTime))
+			feeCfg := fee.GetDynamicConfig(env.config.UpgradeConfig.IsEActivated(currentTime))
 			executor := StandardTxExecutor{
 				Backend:            &env.backend,
 				BlkFeeManager:      commonfees.NewManager(feeCfg.FeeRate),

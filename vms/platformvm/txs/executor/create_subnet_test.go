@@ -79,7 +79,7 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 			stateDiff.SetTimestamp(test.time)
 
 			chainTime := stateDiff.GetTimestamp()
-			feeCfg := fee.GetDynamicFeesConfig(env.config.UpgradeConfig.IsEActivated(chainTime))
+			feeCfg := fee.GetDynamicConfig(env.config.UpgradeConfig.IsEActivated(chainTime))
 			executor := StandardTxExecutor{
 				Backend:            &env.backend,
 				BlkFeeManager:      commonfees.NewManager(feeCfg.FeeRate),

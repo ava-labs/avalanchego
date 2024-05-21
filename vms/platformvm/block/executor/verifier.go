@@ -448,7 +448,7 @@ func (v *verifier) processStandardTxs(txs []*txs.Tx, state state.Diff, parentID 
 ) {
 	var (
 		isEActive = v.txExecutorBackend.Config.UpgradeConfig.IsEActivated(state.GetTimestamp())
-		feesCfg   = fee.GetDynamicFeesConfig(isEActive)
+		feesCfg   = fee.GetDynamicConfig(isEActive)
 		feesMan   = fees.NewManager(feesCfg.FeeRate)
 
 		onAcceptFunc   func()

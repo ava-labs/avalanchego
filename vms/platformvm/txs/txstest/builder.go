@@ -390,7 +390,7 @@ func (b *Builder) feeCalculator() *fee.Calculator {
 	if !isEActive {
 		feeCalculator = fee.NewStaticCalculator(staticFeeCfg, upgrades, chainTime)
 	} else {
-		feeCfg := fee.GetDynamicFeesConfig(isEActive)
+		feeCfg := fee.GetDynamicConfig(isEActive)
 		feeMan := commonfees.NewManager(feeCfg.FeeRate)
 		feeCalculator = fee.NewDynamicCalculator(staticFeeCfg, feeMan, feeCfg.BlockMaxComplexity, nil)
 	}

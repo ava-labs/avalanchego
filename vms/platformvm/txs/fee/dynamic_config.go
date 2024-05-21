@@ -34,7 +34,7 @@ var (
 	customDynamicFeesConfig *commonfees.DynamicFeesConfig
 )
 
-func GetDynamicFeesConfig(isEActive bool) commonfees.DynamicFeesConfig {
+func GetDynamicConfig(isEActive bool) commonfees.DynamicFeesConfig {
 	if !isEActive {
 		return preEUpgradeDynamicFeesConfig
 	}
@@ -45,7 +45,7 @@ func GetDynamicFeesConfig(isEActive bool) commonfees.DynamicFeesConfig {
 	return eUpgradeDynamicFeesConfig
 }
 
-func ResetDynamicFeesConfig(ctx *snow.Context, customFeesConfig *commonfees.DynamicFeesConfig) error {
+func ResetDynamicConfig(ctx *snow.Context, customFeesConfig *commonfees.DynamicFeesConfig) error {
 	if customFeesConfig == nil {
 		return nil // nothing to do
 	}

@@ -393,7 +393,7 @@ func TestGetBalance(t *testing.T) {
 			if !upgrades.IsEActivated(chainTime) {
 				feeCalc = fee.NewStaticCalculator(staticFeeCfg, upgrades, chainTime)
 			} else {
-				feeCfg := fee.GetDynamicFeesConfig(true)
+				feeCfg := fee.GetDynamicConfig(true)
 				feeMan := commonfees.NewManager(feeCfg.FeeRate)
 				feeCalc = fee.NewDynamicCalculator(staticFeeCfg, feeMan, feeCfg.BlockMaxComplexity, testSubnet1.Creds)
 			}

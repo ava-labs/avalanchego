@@ -114,7 +114,7 @@ func (vm *VM) Initialize(
 	}
 	chainCtx.Log.Info("retrieved VM execution config", zap.Reflect("config", execConfig))
 
-	if err := fee.ResetDynamicFeesConfig(chainCtx, execConfig.DynamicFeesConfig); err != nil {
+	if err := fee.ResetDynamicConfig(chainCtx, execConfig.DynamicFeesConfig); err != nil {
 		return fmt.Errorf("failed resetting dynamic fees config: %w", err)
 	}
 
