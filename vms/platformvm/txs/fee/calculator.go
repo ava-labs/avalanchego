@@ -67,6 +67,7 @@ func (c *Calculator) ResetFee(newFee uint64) {
 
 func (c *Calculator) ComputeFee(tx txs.UnsignedTx, creds []verify.Verifiable) (uint64, error) {
 	c.c.credentials = creds
+	c.c.fee = 0 // zero fee among different ComputeFee invocations (unlike Complexity which gets cumulated)
 	err := tx.Visit(c.c)
 	return c.c.fee, err
 }
@@ -89,11 +90,11 @@ func (c *Calculator) GetCumulatedComplexity() fees.Dimensions {
 type calculator struct {
 	// setup
 	isEActive bool
+	staticCfg StaticConfig
 
 	// Pre E-upgrade inputs
-	upgrades  upgrade.Config
-	staticCfg StaticConfig
-	time      time.Time
+	upgrades upgrade.Config
+	time     time.Time
 
 	// Post E-upgrade inputs
 	feeManager         *fees.Manager
