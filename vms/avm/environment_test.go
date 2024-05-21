@@ -24,6 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
+	"github.com/ava-labs/avalanchego/utils/linked"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/sampler"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
@@ -109,6 +110,7 @@ type environment struct {
 	sharedMemory  *atomic.Memory
 	issuer        chan common.Message
 	vm            *VM
+	txBuilder     *builder.Builder
 	service       *Service
 	walletService *WalletService
 }
@@ -198,34 +200,20 @@ func setup(tb testing.TB, c *envConfig) *environment {
 	stopVertexID := ids.GenerateTestID()
 	issuer := make(chan common.Message, 1)
 
-	var (
-		serviceBackend = newServiceBackend(vm.ctx, vm.state, vm.ctx.SharedMemory, vm.parser.Codec())
-		walletBackend  = NewWalletServiceBackend(vm)
-	)
-
+	backend := builder.NewBackend(vm.ctx, vm.state, vm.ctx.SharedMemory, vm.parser.Codec())
 	env := &environment{
 		genesisBytes: genesisBytes,
 		genesisTx:    getCreateTxFromGenesisTest(tb, genesisBytes, assetName),
 		sharedMemory: m,
 		issuer:       issuer,
 		vm:           vm,
+		txBuilder:    builder.New(vm.ctx, &vm.Config, vm.feeAssetID, backend),
 		service: &Service{
 			vm: vm,
-			builder: builder.New(
-				vm.ctx,
-				&vm.Config,
-				vm.feeAssetID,
-				serviceBackend,
-			),
 		},
 		walletService: &WalletService{
-			walletServiceBackend: walletBackend,
-			builder: builder.New(
-				vm.ctx,
-				&vm.Config,
-				vm.feeAssetID,
-				walletBackend,
-			),
+			vm:         vm,
+			pendingTxs: linked.NewHashmap[ids.ID, *txs.Tx](),
 		},
 	}
 

@@ -1965,7 +1965,7 @@ func newAvaxBaseTxWithOutputs(t *testing.T, env *environment) *txs.Tx {
 	)
 	kc.Add(key)
 
-	tx, err := env.service.builder.BaseTx(
+	tx, err := env.txBuilder.BaseTx(
 		[]*avax.TransferableOutput{{
 			Asset: avax.Asset{ID: env.vm.feeAssetID},
 			Out: &secp256k1fx.TransferOutput{
@@ -1991,7 +1991,7 @@ func newAvaxCreateAssetTxWithOutputs(t *testing.T, env *environment, initialStat
 	)
 	kc.Add(key)
 
-	tx, err := env.service.builder.CreateAssetTx(
+	tx, err := env.txBuilder.CreateAssetTx(
 		"Team Rocket", // name
 		"TR",          // symbol
 		0,             // denomination
@@ -2011,7 +2011,7 @@ func buildTestExportTx(t *testing.T, env *environment, chainID ids.ID) *txs.Tx {
 	)
 	kc.Add(key)
 
-	tx, err := env.service.builder.ExportTx(
+	tx, err := env.txBuilder.ExportTx(
 		chainID,
 		to,
 		env.vm.feeAssetID,
@@ -2103,7 +2103,7 @@ func buildOperationTxWithOp(t *testing.T, env *environment, ops []*txs.Operation
 	)
 	kc.Add(key)
 
-	tx, err := env.service.builder.Operation(
+	tx, err := env.txBuilder.Operation(
 		ops,
 		kc,
 		key.Address(),

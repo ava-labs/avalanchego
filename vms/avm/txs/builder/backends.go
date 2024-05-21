@@ -10,9 +10,13 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/wallet/chain/x/builder"
+	"github.com/ava-labs/avalanchego/wallet/chain/x/signer"
 )
 
-var _ builder.Backend = (*walletBackendAdapter)(nil)
+var (
+	_ builder.Backend = (*walletBackendAdapter)(nil)
+	_ signer.Backend  = (*walletBackendAdapter)(nil)
+)
 
 type AVMBuilderBackend interface {
 	UTXOs(addrs set.Set[ids.ShortID], sourceChainID ids.ID) ([]*avax.UTXO, error)

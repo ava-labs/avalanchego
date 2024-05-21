@@ -160,7 +160,7 @@ func TestIssueNFT(t *testing.T) {
 		},
 	}
 
-	createAssetTx, err := env.service.builder.CreateAssetTx(
+	createAssetTx, err := env.txBuilder.CreateAssetTx(
 		"Team Rocket", // name
 		"TR",          // symbol
 		0,             // denomination
@@ -172,7 +172,7 @@ func TestIssueNFT(t *testing.T) {
 	issueAndAccept(require, env.vm, env.issuer, createAssetTx)
 
 	// Mint the NFT
-	mintNFTTx, err := env.service.builder.MintNFT(
+	mintNFTTx, err := env.txBuilder.MintNFT(
 		createAssetTx.ID(),
 		[]byte{'h', 'e', 'l', 'l', 'o'}, // payload
 		[]*secp256k1fx.OutputOwners{{
@@ -197,7 +197,7 @@ func TestIssueNFT(t *testing.T) {
 	)
 	require.NoError(err)
 
-	transferNFTTx, err := env.service.builder.Operation(
+	transferNFTTx, err := env.txBuilder.Operation(
 		transferOp,
 		kc,
 		key.Address(),
@@ -242,7 +242,7 @@ func TestIssueProperty(t *testing.T) {
 		},
 	}
 
-	createAssetTx, err := env.service.builder.CreateAssetTx(
+	createAssetTx, err := env.txBuilder.CreateAssetTx(
 		"Team Rocket", // name
 		"TR",          // symbol
 		0,             // denomination
@@ -274,7 +274,7 @@ func TestIssueProperty(t *testing.T) {
 		},
 	}
 
-	mintPropertyTx, err := env.service.builder.Operation(
+	mintPropertyTx, err := env.txBuilder.Operation(
 		[]*txs.Operation{mintPropertyOp},
 		kc,
 		key.Address(),
@@ -292,7 +292,7 @@ func TestIssueProperty(t *testing.T) {
 		Op: &propertyfx.BurnOperation{Input: secp256k1fx.Input{}},
 	}
 
-	burnPropertyTx, err := env.service.builder.Operation(
+	burnPropertyTx, err := env.txBuilder.Operation(
 		[]*txs.Operation{burnPropertyOp},
 		kc,
 		key.Address(),
@@ -344,7 +344,7 @@ func TestIssueTxWithAnotherAsset(t *testing.T) {
 	)
 	kc.Add(key)
 
-	tx, err := env.service.builder.BaseTx(
+	tx, err := env.txBuilder.BaseTx(
 		[]*avax.TransferableOutput{
 			{ // fee asset
 				Asset: avax.Asset{ID: feeAssetCreateTx.ID()},
@@ -421,7 +421,7 @@ func TestTxAcceptAfterParseTx(t *testing.T) {
 	)
 	kc.Add(key)
 
-	firstTx, err := env.service.builder.BaseTx(
+	firstTx, err := env.txBuilder.BaseTx(
 		[]*avax.TransferableOutput{{
 			Asset: avax.Asset{ID: env.genesisTx.ID()},
 			Out: &secp256k1fx.TransferOutput{
@@ -542,7 +542,7 @@ func TestIssueImportTx(t *testing.T) {
 		},
 	}))
 
-	tx, err := env.service.builder.ImportTx(
+	tx, err := env.txBuilder.ImportTx(
 		constants.PlatformChainID, // source chain
 		key.Address(),
 		kc,
@@ -663,7 +663,7 @@ func TestIssueExportTx(t *testing.T) {
 
 	kc.Add(key)
 
-	tx, err := env.service.builder.ExportTx(
+	tx, err := env.txBuilder.ExportTx(
 		constants.PlatformChainID,
 		to, // to
 		avaxID,
@@ -729,7 +729,7 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 
 	kc.Add(key)
 
-	tx, err := env.service.builder.ExportTx(
+	tx, err := env.txBuilder.ExportTx(
 		constants.PlatformChainID,
 		to, // to
 		avaxID,
