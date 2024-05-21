@@ -742,6 +742,37 @@ func TestBootstrapperReceiveStaleAncestorsMessage(t *testing.T) {
 	require.Equal(snow.Bootstrapping, config.Ctx.State.Get().State)
 }
 
+func TestBootstrapperRollbackOnSetState(t *testing.T) {
+	require := require.New(t)
+
+	config, _, _, vm := newConfig(t)
+
+	blks := snowmantest.BuildChain(2)
+	initializeVMWithBlockchain(vm, blks)
+
+	blks[1].StatusV = choices.Accepted
+
+	bs, err := New(
+		config,
+		func(context.Context, uint32) error {
+			config.Ctx.State.Set(snow.EngineState{
+				Type:  p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
+				State: snow.NormalOp,
+			})
+			return nil
+		},
+	)
+	require.NoError(err)
+
+	vm.SetStateF = func(context.Context, snow.State) error {
+		blks[1].StatusV = choices.Processing
+		return nil
+	}
+
+	require.NoError(bs.Start(context.Background(), 0))
+	require.Equal(blks[0].HeightV, bs.startingHeight)
+}
+
 func initializeVMWithBlockchain(vm *block.TestVM, blocks []*snowmantest.Block) {
 	vm.CantSetState = false
 	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {

@@ -47,9 +47,13 @@ const (
 	HardHatKeyStr = "56289e99c94b6912bfc12adc093c9b51124f0dc54ac7a766b2bc5ccf558d8027"
 )
 
-// HardhatKey is a legacy used for hardhat testing in subnet-evm
-// TODO(marun) Remove when no longer needed.
-var HardhatKey *secp256k1.PrivateKey
+var (
+	// Key expected to be funded for subnet-evm hardhat testing
+	// TODO(marun) Remove when subnet-evm configures the genesis with this key.
+	HardhatKey *secp256k1.PrivateKey
+
+	errInsufficientNodes = errors.New("network needs at least one node to start")
+)
 
 func init() {
 	hardhatKeyBytes, err := hex.DecodeString(HardHatKeyStr)
@@ -105,6 +109,13 @@ type Network struct {
 	Subnets []*Subnet
 }
 
+func NewDefaultNetwork(owner string) *Network {
+	return &Network{
+		Owner: owner,
+		Nodes: NewNodesOrPanic(DefaultNodeCount),
+	}
+}
+
 // Ensure a real and absolute network dir so that node
 // configuration that embeds the network path will continue to
 // work regardless of symlink and working directory changes.
@@ -123,9 +134,11 @@ func StartNewNetwork(
 	rootNetworkDir string,
 	avalancheGoExecPath string,
 	pluginDir string,
-	nodeCount int,
 ) error {
-	if err := network.EnsureDefaultConfig(w, avalancheGoExecPath, pluginDir, nodeCount); err != nil {
+	if len(network.Nodes) == 0 {
+		return errInsufficientNodes
+	}
+	if err := network.EnsureDefaultConfig(w, avalancheGoExecPath, pluginDir); err != nil {
 		return err
 	}
 	if err := network.Create(rootNetworkDir); err != nil {
@@ -171,7 +184,7 @@ func ReadNetwork(dir string) (*Network, error) {
 }
 
 // Initializes a new network with default configuration.
-func (n *Network) EnsureDefaultConfig(w io.Writer, avalancheGoPath string, pluginDir string, nodeCount int) error {
+func (n *Network) EnsureDefaultConfig(w io.Writer, avalancheGoPath string, pluginDir string) error {
 	if _, err := fmt.Fprintf(w, "Preparing configuration for new network with %s\n", avalancheGoPath); err != nil {
 		return err
 	}
@@ -186,6 +199,11 @@ func (n *Network) EnsureDefaultConfig(w io.Writer, avalancheGoPath string, plugi
 		n.DefaultFlags = FlagsMap{}
 	}
 	n.DefaultFlags.SetDefaults(DefaultFlags())
+
+	if len(n.Nodes) == 1 {
+		// Sybil protection needs to be disabled for a single node network to start
+		n.DefaultFlags[config.SybilProtectionEnabledKey] = false
+	}
 
 	// Only configure the plugin dir with a non-empty value to ensure
 	// the use of the default value (`[datadir]/plugins`) when
@@ -220,15 +238,6 @@ func (n *Network) EnsureDefaultConfig(w io.Writer, avalancheGoPath string, plugi
 	// Ensure runtime is configured
 	if len(n.DefaultRuntimeConfig.AvalancheGoPath) == 0 {
 		n.DefaultRuntimeConfig.AvalancheGoPath = avalancheGoPath
-	}
-
-	// Ensure nodes are created
-	if len(n.Nodes) == 0 {
-		nodes, err := NewNodes(nodeCount)
-		if err != nil {
-			return err
-		}
-		n.Nodes = nodes
 	}
 
 	// Ensure nodes are configured

@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/onsi/gomega"
-	"github.com/stretchr/testify/require"
 
 	// ensure test packages are scanned by ginkgo
 	_ "github.com/ava-labs/avalanchego/tests/e2e/banff"
@@ -38,11 +37,8 @@ func init() {
 var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	// Run only once in the first ginkgo process
 
-	nodes, err := tmpnet.NewNodes(tmpnet.DefaultNodeCount)
-	require.NoError(ginkgo.GinkgoT(), err)
-
+	nodes := tmpnet.NewNodesOrPanic(flagVars.NodeCount())
 	subnets := vms.XSVMSubnets(nodes...)
-
 	return e2e.NewTestEnvironment(
 		flagVars,
 		&tmpnet.Network{

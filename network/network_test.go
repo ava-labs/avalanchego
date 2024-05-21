@@ -6,7 +6,6 @@ package network
 import (
 	"context"
 	"crypto"
-	"crypto/rsa"
 	"net"
 	"sync"
 	"testing"
@@ -166,13 +165,19 @@ func newTestNetwork(t *testing.T, count int) (*testDialer, []*testListener, []id
 	)
 	for i := 0; i < count; i++ {
 		ip, listener := dialer.NewListener()
-		nodeID, tlsCert, tlsConfig := getTLS(t, i)
+
+		tlsCert, err := staking.NewTLSCert()
+		require.NoError(t, err)
+
+		cert, err := staking.ParseCertificate(tlsCert.Leaf.Raw)
+		require.NoError(t, err)
+		nodeID := ids.NodeIDFromCert(cert)
 
 		blsKey, err := bls.NewSecretKey()
 		require.NoError(t, err)
 
 		config := defaultConfig
-		config.TLSConfig = tlsConfig
+		config.TLSConfig = peer.TLSConfig(*tlsCert, nil)
 		config.MyNodeID = nodeID
 		config.MyIPPort = ip
 		config.TLSKey = tlsCert.PrivateKey.(crypto.Signer)
@@ -399,7 +404,14 @@ func TestTrackVerifiesSignatures(t *testing.T) {
 	_, networks, wg := newFullyConnectedTestNetwork(t, []router.InboundHandler{nil})
 
 	network := networks[0]
-	nodeID, tlsCert, _ := getTLS(t, 1)
+
+	tlsCert, err := staking.NewTLSCert()
+	require.NoError(err)
+
+	cert, err := staking.ParseCertificate(tlsCert.Leaf.Raw)
+	require.NoError(err)
+	nodeID := ids.NodeIDFromCert(cert)
+
 	require.NoError(network.config.Validators.AddStaker(constants.PrimaryNetworkID, nodeID, nil, ids.Empty, 1))
 
 	stakingCert, err := staking.ParseCertificate(tlsCert.Leaf.Raw)
@@ -417,7 +429,7 @@ func TestTrackVerifiesSignatures(t *testing.T) {
 		),
 	})
 	// The signature is wrong so this peer tracking info isn't useful.
-	require.ErrorIs(err, rsa.ErrVerification)
+	require.ErrorIs(err, staking.ErrECDSAVerificationFailure)
 
 	network.peersLock.RLock()
 	require.Empty(network.trackedIPs)
