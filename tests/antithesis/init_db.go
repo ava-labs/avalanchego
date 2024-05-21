@@ -37,7 +37,6 @@ func InitBootstrapDB(network *tmpnet.Network, avalancheGoPath string, pluginDir 
 		"",
 		avalancheGoPath,
 		pluginDir,
-		0, // nodeCount is 0 because nodes should already be configured for subnets
 	); err != nil {
 		return fmt.Errorf("failed to start network: %w", err)
 	}

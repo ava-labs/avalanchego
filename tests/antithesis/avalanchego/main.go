@@ -101,8 +101,7 @@ func main() {
 			},
 		}})
 		if err != nil {
-			log.Printf("failed to issue initial funding X-chain baseTx: %s", err)
-			return
+			log.Fatalf("failed to issue initial funding X-chain baseTx: %s", err)
 		}
 		log.Printf("issued initial funding X-chain baseTx %s in %s", baseTx.ID(), time.Since(baseStartTime))
 

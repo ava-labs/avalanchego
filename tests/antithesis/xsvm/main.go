@@ -77,8 +77,7 @@ func main() {
 			},
 		)
 		if err != nil {
-			log.Printf("failed to issue initial funding transfer: %s", err)
-			return
+			log.Fatalf("failed to issue initial funding transfer: %s", err)
 		}
 		log.Printf("issued initial funding transfer %s in %s", transferTxStatus.TxID, time.Since(baseStartTime))
 

@@ -18,14 +18,6 @@ func NewXSVMOrPanic(name string, key *secp256k1.PrivateKey, nodes ...*tmpnet.Nod
 		panic("a subnet must be validated by at least one node")
 	}
 
-	if key == nil {
-		var err error
-		key, err = secp256k1.NewPrivateKey()
-		if err != nil {
-			panic(err)
-		}
-	}
-
 	genesisBytes, err := genesis.Codec.Marshal(genesis.CodecVersion, &genesis.Genesis{
 		Timestamp: time.Now().Unix(),
 		Allocations: []genesis.Allocation{

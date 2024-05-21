@@ -27,10 +27,14 @@ var (
 	subnetBName = "xsvm-b"
 )
 
-func XSVMSubnets(nodes ...*tmpnet.Node) []*tmpnet.Subnet {
+func XSVMSubnetsOrPanic(nodes ...*tmpnet.Node) []*tmpnet.Subnet {
+	key, err := secp256k1.NewPrivateKey()
+	if err != nil {
+		panic(err)
+	}
 	return []*tmpnet.Subnet{
-		subnet.NewXSVMOrPanic(subnetAName, nil /* key, will be generated */, nodes...),
-		subnet.NewXSVMOrPanic(subnetBName, nil /* key, will be generated */, nodes...),
+		subnet.NewXSVMOrPanic(subnetAName, key, nodes...),
+		subnet.NewXSVMOrPanic(subnetBName, key, nodes...),
 	}
 }
 
