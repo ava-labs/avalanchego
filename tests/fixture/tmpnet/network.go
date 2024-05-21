@@ -421,6 +421,10 @@ func (n *Network) Bootstrap(ctx context.Context, w io.Writer) error {
 		return n.RestartNode(ctx, w, bootstrapNode)
 	}
 
+	// TODO(marun) This last restart of the bootstrap node might be unnecessary if:
+	// - sybil protection didn't change
+	// - the node is not a subnet validator
+
 	// Ensure the bootstrap node is restarted to pick up configuration changes. Avoid using
 	// RestartNode since the node won't be able to report healthy until other nodes are started.
 	if err := bootstrapNode.Stop(ctx); err != nil {
