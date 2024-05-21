@@ -27,6 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/json"
+	"github.com/ava-labs/avalanchego/utils/linked"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/version"
@@ -36,7 +37,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm/network"
 	"github.com/ava-labs/avalanchego/vms/avm/state"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
-	"github.com/ava-labs/avalanchego/vms/avm/txs/builder"
 	"github.com/ava-labs/avalanchego/vms/avm/utxo"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/index"
@@ -245,16 +245,8 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	walletServiceBackend := NewWalletServiceBackend(vm)
-	vm.walletService = WalletService{
-		walletServiceBackend: walletServiceBackend,
-		builder: builder.New(
-			vm.ctx,
-			&vm.Config,
-			vm.feeAssetID,
-			walletServiceBackend,
-		),
-	}
+	vm.walletService.vm = vm
+	vm.walletService.pendingTxs = linked.NewHashmap[ids.ID, *txs.Tx]()
 
 	// use no op impl when disabled in config
 	if avmConfig.IndexTransactions {
@@ -347,15 +339,7 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 	rpcServer.RegisterInterceptFunc(vm.metrics.InterceptRequest)
 	rpcServer.RegisterAfterFunc(vm.metrics.AfterRequest)
 	// name this service "avm"
-	if err := rpcServer.RegisterService(&Service{
-		vm: vm,
-		builder: builder.New(
-			vm.ctx,
-			&vm.Config,
-			vm.feeAssetID,
-			newServiceBackend(vm.ctx, vm.state, vm.ctx.SharedMemory, vm.parser.Codec()),
-		),
-	}, "avm"); err != nil {
+	if err := rpcServer.RegisterService(&Service{vm: vm}, "avm"); err != nil {
 		return nil, err
 	}
 
