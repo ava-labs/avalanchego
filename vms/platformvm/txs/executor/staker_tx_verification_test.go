@@ -22,7 +22,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -456,7 +455,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 			expectedErr: ErrFlowCheckFailed,
 		},
 		{
-			name: "success",
+			name: "success pre EUpgrade",
 			backendF: func(ctrl *gomock.Controller) *Backend {
 				bootstrapped := &utils.Atomic[bool]{}
 				bootstrapped.Set(true)
@@ -512,7 +511,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				state         = tt.stateF(ctrl)
 				sTx           = tt.sTxF()
 				tx            = tt.txF()
-				feeCalculator = fee.NewStaticCalculator(backend.Config.StaticFeeConfig, backend.Config.UpgradeConfig, state.GetTimestamp())
+				feeCalculator = config.PickFeeCalculator(backend.Config, state.GetTimestamp())
 			)
 
 			err := verifyAddPermissionlessValidatorTx(backend, feeCalculator, state, sTx, tx)

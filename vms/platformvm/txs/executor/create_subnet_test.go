@@ -12,8 +12,8 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -76,7 +76,7 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 
 			stateDiff.SetTimestamp(test.time)
 
-			feeCalculator := fee.NewStaticCalculator(env.backend.Config.StaticFeeConfig, env.backend.Config.UpgradeConfig, stateDiff.GetTimestamp())
+			feeCalculator := config.PickFeeCalculator(env.backend.Config, stateDiff.GetTimestamp())
 			executor := StandardTxExecutor{
 				Backend:       &env.backend,
 				FeeCalculator: feeCalculator,

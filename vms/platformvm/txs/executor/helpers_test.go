@@ -232,7 +232,7 @@ func addSubnet(t *testing.T, env *environment) {
 	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
-	feeCalculator := fee.NewStaticCalculator(env.backend.Config.StaticFeeConfig, env.backend.Config.UpgradeConfig, env.state.GetTimestamp())
+	feeCalculator := config.PickFeeCalculator(env.config, env.state.GetTimestamp())
 	executor := StandardTxExecutor{
 		Backend:       &env.backend,
 		FeeCalculator: feeCalculator,

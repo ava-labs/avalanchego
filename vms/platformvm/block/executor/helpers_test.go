@@ -5,6 +5,7 @@ package executor
 
 import (
 	"fmt"
+	"math/rand"
 	"testing"
 	"time"
 
@@ -35,6 +36,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
@@ -59,15 +61,14 @@ const (
 	pending stakerStatus = iota
 	current
 
-	defaultWeight = 10000
-	trackChecksum = false
-
 	apricotPhase3 fork = iota
 	apricotPhase5
 	banff
 	cortina
 	durango
 	eUpgrade
+
+	latestFork = eUpgrade
 )
 
 var (
@@ -76,17 +77,24 @@ var (
 	defaultGenesisTime        = time.Date(1997, 1, 1, 0, 0, 0, 0, time.UTC)
 	defaultValidateStartTime  = defaultGenesisTime
 	defaultValidateEndTime    = defaultValidateStartTime.Add(10 * defaultMinStakingDuration)
-	defaultMinValidatorStake  = 5 * units.MilliAvax
-	defaultBalance            = 100 * defaultMinValidatorStake
-	preFundedKeys             = secp256k1.TestKeys()
-	avaxAssetID               = ids.ID{'y', 'e', 'e', 't'}
-	defaultTxFee              = uint64(100)
+
+	defaultMinValidatorStake = 5 * units.MilliAvax
+	defaultMaxValidatorStake = 500 * units.MilliAvax
+	defaultMinDelegatorStake = 1 * units.MilliAvax
+	defaultBalance           = 100 * defaultMinValidatorStake
+	defaultWeight            = defaultBalance / 2
+
+	preFundedKeys = secp256k1.TestKeys()
+	avaxAssetID   = ids.ID{'y', 'e', 'e', 't'}
+	defaultTxFee  = uint64(100)
 
 	genesisBlkID ids.ID
 	testSubnet1  *txs.Tx
 
 	// Node IDs of genesis validators. Initialized in init function
 	genesisNodeIDs []ids.NodeID
+
+	fundedSharedMemoryCalls byte
 )
 
 func init() {
@@ -99,6 +107,10 @@ func init() {
 type stakerStatus uint
 
 type fork uint8
+
+type mutableSharedMemory struct {
+	atomic.SharedMemory
+}
 
 type staker struct {
 	nodeID             ids.NodeID
@@ -125,6 +137,7 @@ type environment struct {
 	clk            *mockable.Clock
 	baseDB         *versiondb.Database
 	ctx            *snow.Context
+	msm            *mutableSharedMemory
 	fx             fx.Fx
 	state          state.State
 	mockedState    *state.MockState
@@ -149,6 +162,12 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller, f fork) *environment 
 	res.ctx = snowtest.Context(t, snowtest.PChainID)
 	res.ctx.AVAXAssetID = avaxAssetID
 	res.ctx.SharedMemory = m.NewSharedMemory(res.ctx.ChainID)
+
+	msm := &mutableSharedMemory{
+		SharedMemory: m.NewSharedMemory(res.ctx.ChainID),
+	}
+	res.ctx.SharedMemory = msm
+	res.msm = msm
 
 	res.fx = defaultFx(res.clk, res.ctx.Log, res.isBootstrapped.Get())
 
@@ -176,6 +195,7 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller, f fork) *environment 
 		)
 
 		// setup expectations strictly needed for environment creation
+		res.mockedState.EXPECT().GetTimestamp().Return(time.Time{}).AnyTimes() // to initialize createSubnet/BlockchainTx fee
 		res.mockedState.EXPECT().GetLastAccepted().Return(genesisBlkID).Times(1)
 	}
 
@@ -279,7 +299,7 @@ func addSubnet(env *environment) {
 		panic(err)
 	}
 
-	feeCalculator := fee.NewStaticCalculator(env.backend.Config.StaticFeeConfig, env.backend.Config.UpgradeConfig, stateDiff.GetTimestamp())
+	feeCalculator := config.PickFeeCalculator(env.backend.Config, stateDiff.GetTimestamp())
 	executor := executor.StandardTxExecutor{
 		Backend:       env.backend,
 		State:         stateDiff,
@@ -293,6 +313,9 @@ func addSubnet(env *environment) {
 
 	stateDiff.AddTx(testSubnet1, status.Committed)
 	if err := stateDiff.Apply(env.state); err != nil {
+		panic(err)
+	}
+	if err := env.state.Commit(); err != nil {
 		panic(err)
 	}
 }
@@ -338,9 +361,9 @@ func defaultConfig(t *testing.T, f fork) *config.Config {
 			CreateSubnetTxFee:     100 * defaultTxFee,
 			CreateBlockchainTxFee: 100 * defaultTxFee,
 		},
-		MinValidatorStake: 5 * units.MilliAvax,
-		MaxValidatorStake: 500 * units.MilliAvax,
-		MinDelegatorStake: 1 * units.MilliAvax,
+		MinValidatorStake: defaultMinValidatorStake,
+		MaxValidatorStake: defaultMaxValidatorStake,
+		MinDelegatorStake: defaultMinDelegatorStake,
 		MinStakeDuration:  defaultMinStakingDuration,
 		MaxStakeDuration:  defaultMaxStakingDuration,
 		RewardConfig: reward.Config{
@@ -531,4 +554,57 @@ func addPendingValidator(
 		return nil, err
 	}
 	return addPendingValidatorTx, nil
+}
+
+// Returns a shared memory where GetDatabase returns a database
+// where [recipientKey] has a balance of [amt]
+func fundedSharedMemory(
+	t *testing.T,
+	env *environment,
+	sourceKey *secp256k1.PrivateKey,
+	peerChain ids.ID,
+	assets map[ids.ID]uint64,
+) atomic.SharedMemory {
+	fundedSharedMemoryCalls++
+	m := atomic.NewMemory(prefixdb.New([]byte{fundedSharedMemoryCalls}, env.baseDB))
+
+	sm := m.NewSharedMemory(env.ctx.ChainID)
+	peerSharedMemory := m.NewSharedMemory(peerChain)
+
+	for assetID, amt := range assets {
+		utxo := &avax.UTXO{
+			UTXOID: avax.UTXOID{
+				TxID:        ids.GenerateTestID(),
+				OutputIndex: rand.Uint32(), // #nosec G404
+			},
+			Asset: avax.Asset{ID: assetID},
+			Out: &secp256k1fx.TransferOutput{
+				Amt: amt,
+				OutputOwners: secp256k1fx.OutputOwners{
+					Locktime:  0,
+					Addrs:     []ids.ShortID{sourceKey.PublicKey().Address()},
+					Threshold: 1,
+				},
+			},
+		}
+		utxoBytes, err := txs.Codec.Marshal(txs.CodecVersion, utxo)
+		require.NoError(t, err)
+
+		inputID := utxo.InputID()
+		require.NoError(t, peerSharedMemory.Apply(map[ids.ID]*atomic.Requests{
+			env.ctx.ChainID: {
+				PutRequests: []*atomic.Element{
+					{
+						Key:   inputID[:],
+						Value: utxoBytes,
+						Traits: [][]byte{
+							sourceKey.PublicKey().Address().Bytes(),
+						},
+					},
+				},
+			},
+		}))
+	}
+
+	return sm
 }

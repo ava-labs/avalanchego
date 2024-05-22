@@ -16,9 +16,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -47,7 +47,7 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
-	feeCalculator := fee.NewStaticCalculator(env.backend.Config.StaticFeeConfig, env.backend.Config.UpgradeConfig, stateDiff.GetTimestamp())
+	feeCalculator := config.PickFeeCalculator(env.backend.Config, stateDiff.GetTimestamp())
 	executor := StandardTxExecutor{
 		Backend:       &env.backend,
 		FeeCalculator: feeCalculator,
@@ -87,7 +87,7 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
-	feeCalculator := fee.NewStaticCalculator(env.backend.Config.StaticFeeConfig, env.backend.Config.UpgradeConfig, stateDiff.GetTimestamp())
+	feeCalculator := config.PickFeeCalculator(env.backend.Config, stateDiff.GetTimestamp())
 	executor := StandardTxExecutor{
 		Backend:       &env.backend,
 		FeeCalculator: feeCalculator,
@@ -102,7 +102,7 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 // its validator set doesn't exist
 func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, banff)
+	env := newEnvironment(t, durango)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
@@ -121,7 +121,7 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
-	feeCalculator := fee.NewStaticCalculator(env.backend.Config.StaticFeeConfig, env.backend.Config.UpgradeConfig, stateDiff.GetTimestamp())
+	feeCalculator := config.PickFeeCalculator(env.backend.Config, stateDiff.GetTimestamp())
 	executor := StandardTxExecutor{
 		Backend:       &env.backend,
 		FeeCalculator: feeCalculator,
@@ -135,7 +135,7 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 // Ensure valid tx passes semanticVerify
 func TestCreateChainTxValid(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, banff)
+	env := newEnvironment(t, durango)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
@@ -152,7 +152,7 @@ func TestCreateChainTxValid(t *testing.T) {
 	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
-	feeCalculator := fee.NewStaticCalculator(env.backend.Config.StaticFeeConfig, env.backend.Config.UpgradeConfig, stateDiff.GetTimestamp())
+	feeCalculator := config.PickFeeCalculator(env.backend.Config, stateDiff.GetTimestamp())
 	executor := StandardTxExecutor{
 		Backend:       &env.backend,
 		FeeCalculator: feeCalculator,
@@ -221,7 +221,7 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 
 			stateDiff.SetTimestamp(test.time)
 
-			feeCalculator := fee.NewStaticCalculator(env.backend.Config.StaticFeeConfig, env.backend.Config.UpgradeConfig, stateDiff.GetTimestamp())
+			feeCalculator := config.PickFeeCalculator(env.backend.Config, stateDiff.GetTimestamp())
 			executor := StandardTxExecutor{
 				Backend:       &env.backend,
 				FeeCalculator: feeCalculator,

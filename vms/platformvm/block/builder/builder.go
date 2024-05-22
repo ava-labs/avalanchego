@@ -19,10 +19,10 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
@@ -333,10 +333,9 @@ func packBlockTxs(
 	}
 
 	var (
-		feeCalculator = fee.NewStaticCalculator(backend.Config.StaticFeeConfig, backend.Config.UpgradeConfig, timestamp)
-
-		blockTxs []*txs.Tx
-		inputs   set.Set[ids.ID]
+		blockTxs      []*txs.Tx
+		inputs        set.Set[ids.ID]
+		feeCalculator = config.PickFeeCalculator(backend.Config, timestamp)
 	)
 
 	for {

@@ -390,7 +390,13 @@ func TestGenesis(t *testing.T) {
 			require.NoError(err)
 
 			require.Equal(utxo.Address, addr)
-			require.Equal(uint64(utxo.Amount)-vm.StaticFeeConfig.CreateSubnetTxFee, out.Amount())
+
+			// we use the first key to fund a subnet creation in [defaultGenesis].
+			// As such we need to account for the subnet creation fee
+			feeCalc := config.PickFeeCalculator(&vm.Config, vm.state.GetTimestamp())
+			fee, err := feeCalc.CalculateFee(testSubnet1.Unsigned, testSubnet1.Creds)
+			require.NoError(err)
+			require.Equal(uint64(utxo.Amount)-fee, out.Amount())
 		}
 	}
 
@@ -1054,7 +1060,6 @@ func TestAtomicImport(t *testing.T) {
 	require.ErrorIs(err, walletbuilder.ErrInsufficientFunds)
 
 	// Provide the avm UTXO
-
 	utxo := &avax.UTXO{
 		UTXOID: utxoID,
 		Asset:  avax.Asset{ID: vm.ctx.AVAXAssetID},
@@ -2370,7 +2375,10 @@ func TestBaseTx(t *testing.T) {
 	}
 	require.Equal(totalOutputAmt, key0OutputAmt+key1OutputAmt+changeAddrOutputAmt)
 
-	require.Equal(vm.StaticFeeConfig.TxFee, totalInputAmt-totalOutputAmt)
+	feeCalc := config.PickFeeCalculator(&vm.Config, vm.state.GetTimestamp())
+	fee, err := feeCalc.CalculateFee(baseTx.Unsigned, baseTx.Creds)
+	require.NoError(err)
+	require.Equal(fee, totalInputAmt-totalOutputAmt)
 	require.Equal(sendAmt, key1OutputAmt)
 
 	vm.ctx.Lock.Unlock()
