@@ -54,7 +54,10 @@ func (b *Builder) CreateAssetTx(
 		symbol,
 		denomination,
 		initialStates,
-		options(changeAddr, nil /*memo*/)...,
+		common.WithChangeOwner(&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{changeAddr},
+		}),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed building base tx: %w", err)
@@ -73,7 +76,13 @@ func (b *Builder) BaseTx(
 
 	utx, err := xBuilder.NewBaseTx(
 		outs,
-		options(changeAddr, memo)...,
+		[]common.Option{
+			common.WithChangeOwner(&secp256k1fx.OutputOwners{
+				Threshold: 1,
+				Addrs:     []ids.ShortID{changeAddr},
+			}),
+			common.WithMemo(memo),
+		}...,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed building base tx: %w", err)
@@ -95,7 +104,10 @@ func (b *Builder) MintNFT(
 		assetID,
 		payload,
 		owners,
-		options(changeAddr, nil /*memo*/)...,
+		common.WithChangeOwner(&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{changeAddr},
+		}),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed minting NFTs: %w", err)
@@ -113,7 +125,10 @@ func (b *Builder) MintFTs(
 
 	utx, err := xBuilder.NewOperationTxMintFT(
 		outputs,
-		options(changeAddr, nil /*memo*/)...,
+		common.WithChangeOwner(&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{changeAddr},
+		}),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed minting FTs: %w", err)
@@ -131,7 +146,10 @@ func (b *Builder) Operation(
 
 	utx, err := xBuilder.NewOperationTx(
 		ops,
-		options(changeAddr, nil /*memo*/)...,
+		common.WithChangeOwner(&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{changeAddr},
+		}),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed building operation tx: %w", err)
@@ -189,7 +207,10 @@ func (b *Builder) ExportTx(
 	utx, err := xBuilder.NewExportTx(
 		destinationChain,
 		outputs,
-		options(changeAddr, nil /*memo*/)...,
+		common.WithChangeOwner(&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{changeAddr},
+		}),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed building export tx: %w", err)
@@ -209,14 +230,4 @@ func (b *Builder) builders(kc *secp256k1fx.Keychain) (builder.Builder, signer.Si
 		signer  = signer.New(kc, wa)
 	)
 	return builder, signer
-}
-
-func options(changeAddr ids.ShortID, memo []byte) []common.Option {
-	return []common.Option{
-		common.WithChangeOwner(&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{changeAddr},
-		}),
-		common.WithMemo(memo),
-	}
 }
