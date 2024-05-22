@@ -4,7 +4,6 @@
 package avm
 
 import (
-	"context"
 	"encoding/json"
 	"strings"
 	"testing"
@@ -54,12 +53,6 @@ func TestServiceIssueTx(t *testing.T) {
 	service := &Service{vm: env.vm}
 	env.vm.ctx.Lock.Unlock()
 
-	defer func() {
-		env.vm.ctx.Lock.Lock()
-		require.NoError(env.vm.Shutdown(context.Background()))
-		env.vm.ctx.Lock.Unlock()
-	}()
-
 	txArgs := &api.FormattedTx{}
 	txReply := &api.JSONTxID{}
 	err := service.IssueTx(nil, txArgs, txReply)
@@ -82,12 +75,6 @@ func TestServiceGetTxStatus(t *testing.T) {
 	})
 	service := &Service{vm: env.vm}
 	env.vm.ctx.Lock.Unlock()
-
-	defer func() {
-		env.vm.ctx.Lock.Lock()
-		require.NoError(env.vm.Shutdown(context.Background()))
-		env.vm.ctx.Lock.Unlock()
-	}()
 
 	statusArgs := &api.JSONTxID{}
 	statusReply := &GetTxStatusReply{}
@@ -119,11 +106,6 @@ func TestServiceGetBalanceStrict(t *testing.T) {
 		fork: latest,
 	})
 	service := &Service{vm: env.vm}
-	defer func() {
-		env.vm.ctx.Lock.Lock()
-		require.NoError(env.vm.Shutdown(context.Background()))
-		env.vm.ctx.Lock.Unlock()
-	}()
 
 	assetID := ids.GenerateTestID()
 	addr := ids.GenerateTestShortID()
@@ -281,11 +263,6 @@ func TestServiceGetTxs(t *testing.T) {
 	var err error
 	env.vm.addressTxsIndexer, err = index.NewIndexer(env.vm.db, env.vm.ctx.Log, "", prometheus.NewRegistry(), false)
 	require.NoError(err)
-	defer func() {
-		env.vm.ctx.Lock.Lock()
-		require.NoError(env.vm.Shutdown(context.Background()))
-		env.vm.ctx.Lock.Unlock()
-	}()
 
 	assetID := ids.GenerateTestID()
 	addr := ids.GenerateTestShortID()
@@ -323,11 +300,6 @@ func TestServiceGetAllBalances(t *testing.T) {
 		fork: latest,
 	})
 	service := &Service{vm: env.vm}
-	defer func() {
-		env.vm.ctx.Lock.Lock()
-		require.NoError(env.vm.Shutdown(context.Background()))
-		env.vm.ctx.Lock.Unlock()
-	}()
 
 	assetID := ids.GenerateTestID()
 	addr := ids.GenerateTestShortID()
@@ -526,12 +498,6 @@ func TestServiceGetTx(t *testing.T) {
 	service := &Service{vm: env.vm}
 	env.vm.ctx.Lock.Unlock()
 
-	defer func() {
-		env.vm.ctx.Lock.Lock()
-		require.NoError(env.vm.Shutdown(context.Background()))
-		env.vm.ctx.Lock.Unlock()
-	}()
-
 	txID := env.genesisTx.ID()
 
 	reply := api.GetTxReply{}
@@ -556,11 +522,6 @@ func TestServiceGetTxJSON_BaseTx(t *testing.T) {
 	})
 	service := &Service{vm: env.vm}
 	env.vm.ctx.Lock.Unlock()
-	defer func() {
-		env.vm.ctx.Lock.Lock()
-		require.NoError(env.vm.Shutdown(context.Background()))
-		env.vm.ctx.Lock.Unlock()
-	}()
 
 	newTx := newAvaxBaseTxWithOutputs(t, env)
 	issueAndAccept(require, env.vm, env.issuer, newTx)
@@ -654,11 +615,6 @@ func TestServiceGetTxJSON_ExportTx(t *testing.T) {
 	})
 	service := &Service{vm: env.vm}
 	env.vm.ctx.Lock.Unlock()
-	defer func() {
-		env.vm.ctx.Lock.Lock()
-		require.NoError(env.vm.Shutdown(context.Background()))
-		env.vm.ctx.Lock.Unlock()
-	}()
 
 	newTx := buildTestExportTx(t, env, env.vm.ctx.CChainID)
 	issueAndAccept(require, env.vm, env.issuer, newTx)
@@ -758,11 +714,6 @@ func TestServiceGetTxJSON_CreateAssetTx(t *testing.T) {
 	})
 	service := &Service{vm: env.vm}
 	env.vm.ctx.Lock.Unlock()
-	defer func() {
-		env.vm.ctx.Lock.Lock()
-		require.NoError(env.vm.Shutdown(context.Background()))
-		env.vm.ctx.Lock.Unlock()
-	}()
 
 	initialStates := map[uint32][]verify.State{
 		uint32(0): {
@@ -956,11 +907,6 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 	})
 	service := &Service{vm: env.vm}
 	env.vm.ctx.Lock.Unlock()
-	defer func() {
-		env.vm.ctx.Lock.Lock()
-		require.NoError(env.vm.Shutdown(context.Background()))
-		env.vm.ctx.Lock.Unlock()
-	}()
 
 	key := keys[0]
 	initialStates := map[uint32][]verify.State{
@@ -1108,11 +1054,6 @@ func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
 	})
 	service := &Service{vm: env.vm}
 	env.vm.ctx.Lock.Unlock()
-	defer func() {
-		env.vm.ctx.Lock.Lock()
-		require.NoError(env.vm.Shutdown(context.Background()))
-		env.vm.ctx.Lock.Unlock()
-	}()
 
 	key := keys[0]
 	initialStates := map[uint32][]verify.State{
@@ -1299,11 +1240,6 @@ func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 	})
 	service := &Service{vm: env.vm}
 	env.vm.ctx.Lock.Unlock()
-	defer func() {
-		env.vm.ctx.Lock.Lock()
-		require.NoError(env.vm.Shutdown(context.Background()))
-		env.vm.ctx.Lock.Unlock()
-	}()
 
 	key := keys[0]
 	initialStates := map[uint32][]verify.State{
@@ -1452,11 +1388,6 @@ func TestServiceGetTxJSON_OperationTxWithMultipleSecpMintOp(t *testing.T) {
 	})
 	service := &Service{vm: env.vm}
 	env.vm.ctx.Lock.Unlock()
-	defer func() {
-		env.vm.ctx.Lock.Lock()
-		require.NoError(env.vm.Shutdown(context.Background()))
-		env.vm.ctx.Lock.Unlock()
-	}()
 
 	key := keys[0]
 	initialStates := map[uint32][]verify.State{
@@ -1649,11 +1580,6 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
 	})
 	service := &Service{vm: env.vm}
 	env.vm.ctx.Lock.Unlock()
-	defer func() {
-		env.vm.ctx.Lock.Lock()
-		require.NoError(env.vm.Shutdown(context.Background()))
-		env.vm.ctx.Lock.Unlock()
-	}()
 
 	key := keys[0]
 	initialStates := map[uint32][]verify.State{
@@ -1794,11 +1720,6 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) 
 	})
 	service := &Service{vm: env.vm}
 	env.vm.ctx.Lock.Unlock()
-	defer func() {
-		env.vm.ctx.Lock.Lock()
-		require.NoError(env.vm.Shutdown(context.Background()))
-		env.vm.ctx.Lock.Unlock()
-	}()
 
 	key := keys[0]
 	initialStates := map[uint32][]verify.State{
@@ -2136,12 +2057,6 @@ func TestServiceGetNilTx(t *testing.T) {
 	service := &Service{vm: env.vm}
 	env.vm.ctx.Lock.Unlock()
 
-	defer func() {
-		env.vm.ctx.Lock.Lock()
-		require.NoError(env.vm.Shutdown(context.Background()))
-		env.vm.ctx.Lock.Unlock()
-	}()
-
 	reply := api.GetTxReply{}
 	err := service.GetTx(nil, &api.GetTxArgs{}, &reply)
 	require.ErrorIs(err, errNilTxID)
@@ -2156,12 +2071,6 @@ func TestServiceGetUnknownTx(t *testing.T) {
 	service := &Service{vm: env.vm}
 	env.vm.ctx.Lock.Unlock()
 
-	defer func() {
-		env.vm.ctx.Lock.Lock()
-		require.NoError(env.vm.Shutdown(context.Background()))
-		env.vm.ctx.Lock.Unlock()
-	}()
-
 	reply := api.GetTxReply{}
 	err := service.GetTx(nil, &api.GetTxArgs{TxID: ids.GenerateTestID()}, &reply)
 	require.ErrorIs(err, database.ErrNotFound)
@@ -2172,11 +2081,7 @@ func TestServiceGetUTXOs(t *testing.T) {
 		fork: latest,
 	})
 	service := &Service{vm: env.vm}
-	defer func() {
-		env.vm.ctx.Lock.Lock()
-		require.NoError(t, env.vm.Shutdown(context.Background()))
-		env.vm.ctx.Lock.Unlock()
-	}()
+	env.vm.ctx.Lock.Unlock()
 
 	rawAddr := ids.GenerateTestShortID()
 	rawEmptyAddr := ids.GenerateTestShortID()
@@ -2247,8 +2152,6 @@ func TestServiceGetUTXOs(t *testing.T) {
 	require.NoError(t, err)
 	xEmptyAddr, err := env.vm.FormatLocalAddress(rawEmptyAddr)
 	require.NoError(t, err)
-
-	env.vm.ctx.Lock.Unlock()
 
 	tests := []struct {
 		label       string
@@ -2432,12 +2335,6 @@ func TestGetAssetDescription(t *testing.T) {
 	service := &Service{vm: env.vm}
 	env.vm.ctx.Lock.Unlock()
 
-	defer func() {
-		env.vm.ctx.Lock.Lock()
-		require.NoError(env.vm.Shutdown(context.Background()))
-		env.vm.ctx.Lock.Unlock()
-	}()
-
 	avaxAssetID := env.genesisTx.ID()
 
 	reply := GetAssetDescriptionReply{}
@@ -2457,12 +2354,6 @@ func TestGetBalance(t *testing.T) {
 	})
 	service := &Service{vm: env.vm}
 	env.vm.ctx.Lock.Unlock()
-
-	defer func() {
-		env.vm.ctx.Lock.Lock()
-		require.NoError(env.vm.Shutdown(context.Background()))
-		env.vm.ctx.Lock.Unlock()
-	}()
 
 	avaxAssetID := env.genesisTx.ID()
 
@@ -2492,12 +2383,6 @@ func TestCreateFixedCapAsset(t *testing.T) {
 			})
 			service := &Service{vm: env.vm}
 			env.vm.ctx.Lock.Unlock()
-
-			defer func() {
-				env.vm.ctx.Lock.Lock()
-				require.NoError(env.vm.Shutdown(context.Background()))
-				env.vm.ctx.Lock.Unlock()
-			}()
 
 			reply := AssetIDChangeAddr{}
 			addrStr, err := env.vm.FormatLocalAddress(keys[0].PublicKey().Address())
@@ -2544,12 +2429,6 @@ func TestCreateVariableCapAsset(t *testing.T) {
 			})
 			service := &Service{vm: env.vm}
 			env.vm.ctx.Lock.Unlock()
-
-			defer func() {
-				env.vm.ctx.Lock.Lock()
-				require.NoError(env.vm.Shutdown(context.Background()))
-				env.vm.ctx.Lock.Unlock()
-			}()
 
 			reply := AssetIDChangeAddr{}
 			minterAddrStr, err := env.vm.FormatLocalAddress(keys[0].PublicKey().Address())
@@ -2638,12 +2517,6 @@ func TestNFTWorkflow(t *testing.T) {
 			})
 			service := &Service{vm: env.vm}
 			env.vm.ctx.Lock.Unlock()
-
-			defer func() {
-				env.vm.ctx.Lock.Lock()
-				require.NoError(env.vm.Shutdown(context.Background()))
-				env.vm.ctx.Lock.Unlock()
-			}()
 
 			fromAddrs, fromAddrsStr := sampleAddrs(t, env.vm.AddressManager, addrs)
 
@@ -2761,12 +2634,6 @@ func TestImportExportKey(t *testing.T) {
 	service := &Service{vm: env.vm}
 	env.vm.ctx.Lock.Unlock()
 
-	defer func() {
-		env.vm.ctx.Lock.Lock()
-		require.NoError(env.vm.Shutdown(context.Background()))
-		env.vm.ctx.Lock.Unlock()
-	}()
-
 	sk, err := secp256k1.NewPrivateKey()
 	require.NoError(err)
 
@@ -2805,12 +2672,6 @@ func TestImportAVMKeyNoDuplicates(t *testing.T) {
 	})
 	service := &Service{vm: env.vm}
 	env.vm.ctx.Lock.Unlock()
-
-	defer func() {
-		env.vm.ctx.Lock.Lock()
-		require.NoError(env.vm.Shutdown(context.Background()))
-		env.vm.ctx.Lock.Unlock()
-	}()
 
 	sk, err := secp256k1.NewPrivateKey()
 	require.NoError(err)
@@ -2857,12 +2718,6 @@ func TestSend(t *testing.T) {
 	})
 	service := &Service{vm: env.vm}
 	env.vm.ctx.Lock.Unlock()
-
-	defer func() {
-		env.vm.ctx.Lock.Lock()
-		require.NoError(env.vm.Shutdown(context.Background()))
-		env.vm.ctx.Lock.Unlock()
-	}()
 
 	assetID := env.genesisTx.ID()
 	addr := keys[0].PublicKey().Address()
@@ -2913,12 +2768,6 @@ func TestSendMultiple(t *testing.T) {
 			})
 			service := &Service{vm: env.vm}
 			env.vm.ctx.Lock.Unlock()
-
-			defer func() {
-				env.vm.ctx.Lock.Lock()
-				require.NoError(env.vm.Shutdown(context.Background()))
-				env.vm.ctx.Lock.Unlock()
-			}()
 
 			assetID := env.genesisTx.ID()
 			addr := keys[0].PublicKey().Address()
@@ -2972,12 +2821,6 @@ func TestCreateAndListAddresses(t *testing.T) {
 	service := &Service{vm: env.vm}
 	env.vm.ctx.Lock.Unlock()
 
-	defer func() {
-		env.vm.ctx.Lock.Lock()
-		require.NoError(env.vm.Shutdown(context.Background()))
-		env.vm.ctx.Lock.Unlock()
-	}()
-
 	createArgs := &api.UserPass{
 		Username: username,
 		Password: password,
@@ -3012,12 +2855,8 @@ func TestImport(t *testing.T) {
 				}},
 			})
 			service := &Service{vm: env.vm}
+			env.vm.ctx.Lock.Unlock()
 
-			defer func() {
-				env.vm.ctx.Lock.Lock()
-				require.NoError(env.vm.Shutdown(context.Background()))
-				env.vm.ctx.Lock.Unlock()
-			}()
 			assetID := env.genesisTx.ID()
 			addr0 := keys[0].PublicKey().Address()
 
@@ -3048,8 +2887,6 @@ func TestImport(t *testing.T) {
 					}},
 				},
 			}))
-
-			env.vm.ctx.Lock.Unlock()
 
 			addrStr, err := env.vm.FormatLocalAddress(keys[0].PublicKey().Address())
 			require.NoError(err)

@@ -4,7 +4,6 @@
 package avm
 
 import (
-	"context"
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -29,10 +28,7 @@ func TestIndexTransaction_Ordered(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{fork: durango})
-	defer func() {
-		require.NoError(env.vm.Shutdown(context.Background()))
-		env.vm.ctx.Lock.Unlock()
-	}()
+	env.vm.ctx.Lock.Unlock()
 
 	key := keys[0]
 	addr := key.PublicKey().Address()
@@ -51,12 +47,7 @@ func TestIndexTransaction_Ordered(t *testing.T) {
 		tx := buildTX(env.vm.ctx.XChainID, utxoID, txAssetID, addr)
 		require.NoError(tx.SignSECP256K1Fx(env.vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}}))
 
-		env.vm.ctx.Lock.Unlock()
-
 		issueAndAccept(require, env.vm, env.issuer, tx)
-
-		env.vm.ctx.Lock.Lock()
-
 		txs = append(txs, tx)
 	}
 
@@ -71,10 +62,7 @@ func TestIndexTransaction_MultipleTransactions(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{fork: durango})
-	defer func() {
-		require.NoError(env.vm.Shutdown(context.Background()))
-		env.vm.ctx.Lock.Unlock()
-	}()
+	env.vm.ctx.Lock.Unlock()
 
 	addressTxMap := map[ids.ShortID]*txs.Tx{}
 	txAssetID := avax.Asset{ID: env.genesisTx.ID()}
@@ -93,13 +81,8 @@ func TestIndexTransaction_MultipleTransactions(t *testing.T) {
 		tx := buildTX(env.vm.ctx.XChainID, utxoID, txAssetID, addr)
 		require.NoError(tx.SignSECP256K1Fx(env.vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}}))
 
-		env.vm.ctx.Lock.Unlock()
-
 		// issue transaction
 		issueAndAccept(require, env.vm, env.issuer, tx)
-
-		env.vm.ctx.Lock.Lock()
-
 		addressTxMap[addr] = tx
 	}
 
@@ -117,10 +100,7 @@ func TestIndexTransaction_MultipleAddresses(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{fork: durango})
-	defer func() {
-		require.NoError(env.vm.Shutdown(context.Background()))
-		env.vm.ctx.Lock.Unlock()
-	}()
+	env.vm.ctx.Lock.Unlock()
 
 	addrs := make([]ids.ShortID, len(keys))
 	for i, key := range keys {
@@ -144,12 +124,7 @@ func TestIndexTransaction_MultipleAddresses(t *testing.T) {
 	tx := buildTX(env.vm.ctx.XChainID, utxoID, txAssetID, addrs...)
 	require.NoError(tx.SignSECP256K1Fx(env.vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}}))
 
-	env.vm.ctx.Lock.Unlock()
-
 	issueAndAccept(require, env.vm, env.issuer, tx)
-
-	env.vm.ctx.Lock.Lock()
-
 	assertIndexedTX(t, env.vm.db, 0, addr, txAssetID.ID, tx.ID())
 	assertLatestIdx(t, env.vm.db, addr, txAssetID.ID, 1)
 }
@@ -158,10 +133,7 @@ func TestIndexer_Read(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{fork: durango})
-	defer func() {
-		require.NoError(env.vm.Shutdown(context.Background()))
-		env.vm.ctx.Lock.Unlock()
-	}()
+	env.vm.ctx.Lock.Unlock()
 
 	// generate test address and asset IDs
 	assetID := ids.GenerateTestID()

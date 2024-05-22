@@ -4,7 +4,6 @@
 package avm
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -36,11 +35,6 @@ func TestWalletService_SendMultiple(t *testing.T) {
 			}
 
 			env.vm.ctx.Lock.Unlock()
-
-			defer func() {
-				require.NoError(env.vm.Shutdown(context.Background()))
-				env.vm.ctx.Lock.Unlock()
-			}()
 
 			assetID := env.genesisTx.ID()
 			addr := keys[0].PublicKey().Address()
@@ -80,8 +74,8 @@ func TestWalletService_SendMultiple(t *testing.T) {
 			buildAndAccept(require, env.vm, env.issuer, reply.TxID)
 
 			env.vm.ctx.Lock.Lock()
-
 			_, err = env.vm.state.GetTx(reply.TxID)
+			env.vm.ctx.Lock.Unlock()
 			require.NoError(err)
 		})
 	}
