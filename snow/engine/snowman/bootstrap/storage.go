@@ -5,6 +5,7 @@ package bootstrap
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -159,22 +160,24 @@ func execute(
 			return nil
 		}
 
-		iterator                      = interval.GetBlockIterator(db)
-		processedSinceIteratorRelease uint
-
 		startTime     = time.Now()
 		timeOfNextLog = startTime.Add(logPeriod)
+		lastHeight    = lastAcceptedHeight
 	)
-	defer func() {
-		iterator.Release()
-	}()
 
 	log("executing blocks",
 		zap.Uint64("numToExecute", totalNumberToProcess),
 	)
 
-	for !haltable.Halted() && iterator.Next() {
-		blkBytes := iterator.Value()
+	for !haltable.Halted() {
+		blkBytes, err := interval.GetBlock(db, lastHeight+1)
+		if errors.Is(err, database.ErrNotFound) {
+			break
+		}
+		if err != nil {
+			return err
+		}
+
 		blk, err := parser.ParseBlock(ctx, blkBytes)
 		if err != nil {
 			return err
@@ -193,24 +196,6 @@ func execute(
 			}
 		}
 
-		// Periodically release and re-grab the database iterator to avoid
-		// keeping a reference to an old database revision.
-		processedSinceIteratorRelease++
-		if processedSinceIteratorRelease >= iteratorReleasePeriod {
-			if err := iterator.Error(); err != nil {
-				return err
-			}
-
-			// The batch must be written here to avoid re-processing a block.
-			if err := writeBatch(); err != nil {
-				return err
-			}
-
-			processedSinceIteratorRelease = 0
-			iterator.Release()
-			iterator = interval.GetBlockIterator(db)
-		}
-
 		if now := time.Now(); now.After(timeOfNextLog) {
 			var (
 				numProcessed = totalNumberToProcess - tree.Len()
@@ -222,10 +207,6 @@ func execute(
 				zap.Duration("eta", eta),
 			)
 			timeOfNextLog = now.Add(logPeriod)
-		}
-
-		if height <= lastAcceptedHeight {
-			continue
 		}
 
 		if err := blk.Verify(ctx); err != nil {
@@ -244,11 +225,10 @@ func execute(
 				err,
 			)
 		}
+
+		lastHeight = height
 	}
 	if err := writeBatch(); err != nil {
-		return err
-	}
-	if err := iterator.Error(); err != nil {
 		return err
 	}
 
