@@ -352,16 +352,7 @@ func packBlockTxs(
 
 	feeMan := commonfees.NewManager(feeRates)
 	if isEActivated {
-		feeRates, err := stateDiff.GetFeeRates()
-		if err != nil {
-			return nil, fmt.Errorf("failed retrieving fee rates: %w", err)
-		}
-		parentBlkComplexity, err := stateDiff.GetLastBlockComplexity()
-		if err != nil {
-			return nil, fmt.Errorf("failed retrieving last block complexity: %w", err)
-		}
-
-		feeMan, err = fee.UpdatedFeeManager(feeRates, parentBlkComplexity, upgrades, parentBlkTime, timestamp)
+		feeMan, err = state.UpdatedFeeManager(stateDiff, upgrades, parentBlkTime)
 		if err != nil {
 			return nil, err
 		}

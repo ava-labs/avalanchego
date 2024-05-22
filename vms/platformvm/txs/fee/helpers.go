@@ -5,12 +5,10 @@ package fee
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/fees"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/upgrade"
 )
 
 func FinanceInput(feeCalc *Calculator, input *avax.TransferableInput) (uint64, error) {
@@ -59,25 +57,4 @@ func FinanceCredential(feeCalc *Calculator, keysCount int) (uint64, error) {
 		return 0, fmt.Errorf("account for input fees: %w", err)
 	}
 	return addedFees, nil
-}
-
-func UpdatedFeeManager(feeRates, parentBlkComplexity fees.Dimensions, upgrades upgrade.Config, parentBlkTime, nextBlkTime time.Time) (*fees.Manager, error) {
-	var (
-		isEActive = upgrades.IsEActivated(parentBlkTime)
-		feeCfg    = GetDynamicConfig(isEActive)
-	)
-
-	feeManager := fees.NewManager(feeRates)
-	if isEActive {
-		if err := feeManager.UpdateFeeRates(
-			feeCfg,
-			parentBlkComplexity,
-			parentBlkTime.Unix(),
-			nextBlkTime.Unix(),
-		); err != nil {
-			return nil, fmt.Errorf("failed updating fee rates, %w", err)
-		}
-	}
-
-	return feeManager, nil
 }

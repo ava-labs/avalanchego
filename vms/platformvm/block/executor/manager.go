@@ -5,7 +5,6 @@ package executor
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -162,15 +161,7 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 
 	feeManager := commonfees.NewManager(feeRates)
 	if isEActive {
-		feeRates, err := stateDiff.GetFeeRates()
-		if err != nil {
-			return fmt.Errorf("failed retrieving fee rates: %w", err)
-		}
-		parentBlkComplexity, err := stateDiff.GetLastBlockComplexity()
-		if err != nil {
-			return fmt.Errorf("failed retrieving last block complexity: %w", err)
-		}
-		feeManager, err = fee.UpdatedFeeManager(feeRates, parentBlkComplexity, upgrades, parentBlkTime, nextBlkTime)
+		feeManager, err = state.UpdatedFeeManager(stateDiff, upgrades, parentBlkTime)
 		if err != nil {
 			return err
 		}

@@ -436,16 +436,14 @@ func (b *Builder) FeeCalculator() (*fee.Calculator, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed calculating next block time: %w", err)
 		}
-		feeRates, err := b.state.GetFeeRates()
-		if err != nil {
-			return nil, fmt.Errorf("failed retrieving fee rates: %w", err)
-		}
-		parentBlkComplexity, err := b.state.GetLastBlockComplexity()
-		if err != nil {
-			return nil, fmt.Errorf("failed retrieving last block complexity: %w", err)
-		}
 
-		feeManager, err := fee.UpdatedFeeManager(feeRates, parentBlkComplexity, b.cfg.UpgradeConfig, chainTime, nextChainTime)
+		diff, err := state.NewDiffOn(b.state)
+		if err != nil {
+			return nil, fmt.Errorf("failed building diff: %w", err)
+		}
+		diff.SetTimestamp(nextChainTime)
+
+		feeManager, err := state.UpdatedFeeManager(diff, b.cfg.UpgradeConfig, chainTime)
 		if err != nil {
 			return nil, err
 		}

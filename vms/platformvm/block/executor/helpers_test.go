@@ -303,20 +303,7 @@ func addSubnet(env *environment) {
 
 	chainTime := env.state.GetTimestamp()
 	upgrades := env.config.UpgradeConfig
-	nextChainTime, _, err := state.NextBlockTime(env.state, env.clk)
-	if err != nil {
-		panic(fmt.Errorf("failed calculating next block time: %w", err))
-	}
-	feeRates, err := env.state.GetFeeRates()
-	if err != nil {
-		panic(fmt.Errorf("failed retrieving fee rates: %w", err))
-	}
-	parentBlkComplexity, err := env.state.GetLastBlockComplexity()
-	if err != nil {
-		panic(fmt.Errorf("failed retrieving last block complexity: %w", err))
-	}
-
-	feeManager, err := fee.UpdatedFeeManager(feeRates, parentBlkComplexity, upgrades, chainTime, nextChainTime)
+	feeManager, err := state.UpdatedFeeManager(stateDiff, upgrades, chainTime)
 	if err != nil {
 		panic(err)
 	}

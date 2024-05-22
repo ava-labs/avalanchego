@@ -36,7 +36,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	avajson "github.com/ava-labs/avalanchego/utils/json"
@@ -1871,15 +1870,9 @@ func (s *Service) GetFeeRates(_ *http.Request, _ *struct{}, reply *GetFeeRatesRe
 	)
 
 	if isEActivated {
-		feeRates, err := onAccept.GetFeeRates()
-		if err != nil {
-			return fmt.Errorf("failed retrieving fee rates: %w", err)
-		}
-		parentBlkComplexity, err := onAccept.GetLastBlockComplexity()
-		if err != nil {
-			return fmt.Errorf("failed retrieving last block complexity: %w", err)
-		}
-		feeManager, err = fee.UpdatedFeeManager(feeRates, parentBlkComplexity, upgrades, currentTimestamp, nextTimestamp)
+		// make sure the diff we update the fee manager from has timestamp duly set
+		onAccept.SetTimestamp(nextTimestamp)
+		feeManager, err = state.UpdatedFeeManager(onAccept, upgrades, currentTimestamp)
 		if err != nil {
 			return err
 		}

@@ -235,14 +235,7 @@ func addSubnet(t *testing.T, env *environment) {
 
 	currentChainTime := env.state.GetTimestamp()
 	upgrades := env.config.UpgradeConfig
-
-	nextChainTime, _, err := state.NextBlockTime(stateDiff, env.clk)
-	require.NoError(err)
-	feeRates, err := stateDiff.GetFeeRates()
-	require.NoError(err)
-	parentBlkComplexity, err := stateDiff.GetLastBlockComplexity()
-	require.NoError(err)
-	feeManager, err := fee.UpdatedFeeManager(feeRates, parentBlkComplexity, upgrades, currentChainTime, nextChainTime)
+	feeManager, err := state.UpdatedFeeManager(stateDiff, upgrades, currentChainTime)
 	require.NoError(err)
 
 	feeCfg := fee.GetDynamicConfig(upgrades.IsEActivated(currentChainTime))

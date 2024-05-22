@@ -9,6 +9,10 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
+	"github.com/ava-labs/avalanchego/vms/platformvm/upgrade"
+
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 func NextBlockTime(state Chain, clk *mockable.Clock) (time.Time, bool, error) {
@@ -67,4 +71,35 @@ func GetNextStakerChangeTime(state Chain) (time.Time, error) {
 	default:
 		return time.Time{}, database.ErrNotFound
 	}
+}
+
+func UpdatedFeeManager(state Chain, upgrades upgrade.Config, parentBlkTime time.Time) (*commonfees.Manager, error) {
+	var (
+		isEActive = upgrades.IsEActivated(parentBlkTime)
+		feeCfg    = fee.GetDynamicConfig(isEActive)
+	)
+
+	feeRates, err := state.GetFeeRates()
+	if err != nil {
+		return nil, fmt.Errorf("failed retrieving fee rates: %w", err)
+	}
+	parentBlkComplexity, err := state.GetLastBlockComplexity()
+	if err != nil {
+		return nil, fmt.Errorf("failed retrieving last block complexity: %w", err)
+	}
+	childBlkTime := state.GetTimestamp()
+
+	feeManager := commonfees.NewManager(feeRates)
+	if isEActive {
+		if err := feeManager.UpdateFeeRates(
+			feeCfg,
+			parentBlkComplexity,
+			parentBlkTime.Unix(),
+			childBlkTime.Unix(),
+		); err != nil {
+			return nil, fmt.Errorf("failed updating fee rates, %w", err)
+		}
+	}
+
+	return feeManager, nil
 }

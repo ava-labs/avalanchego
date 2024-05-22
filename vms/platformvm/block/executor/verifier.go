@@ -78,7 +78,6 @@ func (v *verifier) BanffProposalBlock(b *block.BanffProposalBlock) error {
 		onDecisionState,
 		b.Parent(),
 		parentBlkTime,
-		b.Timestamp(),
 	)
 	if err != nil {
 		return err
@@ -136,7 +135,7 @@ func (v *verifier) BanffStandardBlock(b *block.BanffStandardBlock) error {
 		return errBanffStandardBlockWithoutChanges
 	}
 
-	return v.standardBlock(&b.ApricotStandardBlock, parentBlkTime, b.Timestamp(), onAcceptState)
+	return v.standardBlock(&b.ApricotStandardBlock, parentBlkTime, onAcceptState)
 }
 
 func (v *verifier) ApricotAbortBlock(b *block.ApricotAbortBlock) error {
@@ -182,7 +181,7 @@ func (v *verifier) ApricotStandardBlock(b *block.ApricotStandardBlock) error {
 		return err
 	}
 
-	return v.standardBlock(b, time.Time{}, time.Time{}, onAcceptState)
+	return v.standardBlock(b, time.Time{}, onAcceptState)
 }
 
 func (v *verifier) ApricotAtomicBlock(b *block.ApricotAtomicBlock) error {
@@ -430,7 +429,6 @@ func (v *verifier) proposalBlock(
 func (v *verifier) standardBlock(
 	b *block.ApricotStandardBlock,
 	parentBlkTime time.Time,
-	blkTimestamp time.Time,
 	onAcceptState state.Diff,
 ) error {
 	inputs, feeMan, atomicRequests, onAcceptFunc, err := v.processStandardTxs(
@@ -438,7 +436,6 @@ func (v *verifier) standardBlock(
 		onAcceptState,
 		b.Parent(),
 		parentBlkTime,
-		blkTimestamp,
 	)
 	if err != nil {
 		return err
@@ -463,9 +460,9 @@ func (v *verifier) standardBlock(
 
 func (v *verifier) processStandardTxs(
 	txs []*txs.Tx,
-	state state.Diff,
+	chain state.Diff,
 	parentID ids.ID,
-	parentBlkTime, blkTimestamp time.Time,
+	parentBlkTime time.Time,
 ) (
 	set.Set[ids.ID],
 	*commonfees.Manager,
@@ -473,14 +470,14 @@ func (v *verifier) processStandardTxs(
 	func(),
 	error,
 ) {
-	feeRates, err := state.GetFeeRates()
+	feeRates, err := chain.GetFeeRates()
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
 
 	var (
 		upgrades  = v.txExecutorBackend.Config.UpgradeConfig
-		isEActive = upgrades.IsEActivated(state.GetTimestamp())
+		isEActive = upgrades.IsEActivated(chain.GetTimestamp())
 		feesCfg   = fee.GetDynamicConfig(isEActive)
 
 		onAcceptFunc   func()
@@ -491,15 +488,7 @@ func (v *verifier) processStandardTxs(
 
 	feeMan := commonfees.NewManager(feeRates)
 	if isEActive {
-		feeRates, err := state.GetFeeRates()
-		if err != nil {
-			return nil, nil, nil, nil, fmt.Errorf("failed retrieving fee rates: %w", err)
-		}
-		parentBlkComplexity, err := state.GetLastBlockComplexity()
-		if err != nil {
-			return nil, nil, nil, nil, fmt.Errorf("failed retrieving last block complexity: %w", err)
-		}
-		feeMan, err = fee.UpdatedFeeManager(feeRates, parentBlkComplexity, upgrades, parentBlkTime, blkTimestamp)
+		feeMan, err = state.UpdatedFeeManager(chain, upgrades, parentBlkTime)
 		if err != nil {
 			return nil, nil, nil, nil, err
 		}
@@ -510,7 +499,7 @@ func (v *verifier) processStandardTxs(
 			Backend:            v.txExecutorBackend,
 			BlkFeeManager:      feeMan,
 			BlockMaxComplexity: feesCfg.BlockMaxComplexity,
-			State:              state,
+			State:              chain,
 			Tx:                 tx,
 		}
 		if err := tx.Unsigned.Visit(&txExecutor); err != nil {
@@ -525,7 +514,7 @@ func (v *verifier) processStandardTxs(
 		// Add UTXOs to batch
 		inputs.Union(txExecutor.Inputs)
 
-		state.AddTx(tx, status.Committed)
+		chain.AddTx(tx, status.Committed)
 		if txExecutor.OnAccept != nil {
 			funcs = append(funcs, txExecutor.OnAccept)
 		}
@@ -548,8 +537,8 @@ func (v *verifier) processStandardTxs(
 	}
 
 	if isEActive {
-		state.SetFeeRates(feeMan.GetFeeRates())
-		state.SetLastBlockComplexity(feeMan.GetCumulatedComplexity())
+		chain.SetFeeRates(feeMan.GetFeeRates())
+		chain.SetLastBlockComplexity(feeMan.GetCumulatedComplexity())
 	}
 
 	if numFuncs := len(funcs); numFuncs == 1 {

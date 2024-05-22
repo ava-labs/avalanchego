@@ -51,18 +51,14 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 
 	currentTime := stateDiff.GetTimestamp()
 	upgrades := env.config.UpgradeConfig
-	nextBlkTime, _, err := state.NextBlockTime(stateDiff, env.clk)
-	require.NoError(err)
-
 	feeCfg := fee.GetDynamicConfig(upgrades.IsEActivated(currentTime))
 
-	feeRates, err := stateDiff.GetFeeRates()
+	builderDiff, err := state.NewDiffOn(stateDiff)
 	require.NoError(err)
-
-	parentBlkComplexity, err := stateDiff.GetLastBlockComplexity()
+	nextBlkTime, _, err := state.NextBlockTime(stateDiff, env.clk)
 	require.NoError(err)
-
-	feeMan, err := fee.UpdatedFeeManager(feeRates, parentBlkComplexity, upgrades, currentTime, nextBlkTime)
+	builderDiff.SetTimestamp(nextBlkTime)
+	feeMan, err := state.UpdatedFeeManager(builderDiff, upgrades, currentTime)
 	require.NoError(err)
 
 	executor := StandardTxExecutor{
@@ -107,18 +103,14 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 
 	currentTime := stateDiff.GetTimestamp()
 	upgrades := env.config.UpgradeConfig
-	nextBlkTime, _, err := state.NextBlockTime(stateDiff, env.clk)
-	require.NoError(err)
-
 	feeCfg := fee.GetDynamicConfig(upgrades.IsEActivated(currentTime))
 
-	feeRates, err := stateDiff.GetFeeRates()
+	builderDiff, err := state.NewDiffOn(stateDiff)
 	require.NoError(err)
-
-	parentBlkComplexity, err := stateDiff.GetLastBlockComplexity()
+	nextBlkTime, _, err := state.NextBlockTime(stateDiff, env.clk)
 	require.NoError(err)
-
-	feeMan, err := fee.UpdatedFeeManager(feeRates, parentBlkComplexity, upgrades, currentTime, nextBlkTime)
+	builderDiff.SetTimestamp(nextBlkTime)
+	feeMan, err := state.UpdatedFeeManager(builderDiff, upgrades, currentTime)
 	require.NoError(err)
 
 	executor := StandardTxExecutor{
@@ -157,19 +149,14 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 
 	currentTime := stateDiff.GetTimestamp()
 	upgrades := env.config.UpgradeConfig
-
-	nextBlkTime, _, err := state.NextBlockTime(stateDiff, env.clk)
-	require.NoError(err)
-
 	feeCfg := fee.GetDynamicConfig(upgrades.IsEActivated(currentTime))
 
-	feeRates, err := stateDiff.GetFeeRates()
+	builderDiff, err := state.NewDiffOn(stateDiff)
 	require.NoError(err)
-
-	parentBlkComplexity, err := stateDiff.GetLastBlockComplexity()
+	nextBlkTime, _, err := state.NextBlockTime(stateDiff, env.clk)
 	require.NoError(err)
-
-	feeMan, err := fee.UpdatedFeeManager(feeRates, parentBlkComplexity, upgrades, currentTime, nextBlkTime)
+	builderDiff.SetTimestamp(nextBlkTime)
+	feeMan, err := state.UpdatedFeeManager(builderDiff, upgrades, currentTime)
 	require.NoError(err)
 
 	executor := StandardTxExecutor{
@@ -205,19 +192,14 @@ func TestCreateChainTxValid(t *testing.T) {
 
 	currentTime := stateDiff.GetTimestamp()
 	upgrades := env.config.UpgradeConfig
-
-	nextBlkTime, _, err := state.NextBlockTime(stateDiff, env.clk)
-	require.NoError(err)
-
 	feeCfg := fee.GetDynamicConfig(upgrades.IsEActivated(currentTime))
 
-	feeRates, err := stateDiff.GetFeeRates()
+	builderDiff, err := state.NewDiffOn(stateDiff)
 	require.NoError(err)
-
-	parentBlkComplexity, err := stateDiff.GetLastBlockComplexity()
+	nextBlkTime, _, err := state.NextBlockTime(stateDiff, env.clk)
 	require.NoError(err)
-
-	feeMan, err := fee.UpdatedFeeManager(feeRates, parentBlkComplexity, upgrades, currentTime, nextBlkTime)
+	builderDiff.SetTimestamp(nextBlkTime)
+	feeMan, err := state.UpdatedFeeManager(builderDiff, upgrades, currentTime)
 	require.NoError(err)
 
 	executor := StandardTxExecutor{
