@@ -198,7 +198,7 @@ func (n *Network) EnsureDefaultConfig(w io.Writer, avalancheGoPath string, plugi
 	if n.DefaultFlags == nil {
 		n.DefaultFlags = FlagsMap{}
 	}
-	n.DefaultFlags.SetDefaults(DefaultFlags())
+	n.DefaultFlags.SetDefaults(DefaultTmpnetFlags())
 
 	if len(n.Nodes) == 1 {
 		// Sybil protection needs to be disabled for a single node network to start
@@ -214,8 +214,8 @@ func (n *Network) EnsureDefaultConfig(w io.Writer, avalancheGoPath string, plugi
 		}
 	}
 
-	// Ensure pre-funded keys
-	if len(n.PreFundedKeys) == 0 {
+	// Ensure pre-funded keys if the genesis is not predefined
+	if n.Genesis == nil && len(n.PreFundedKeys) == 0 {
 		keys, err := NewPrivateKeys(DefaultPreFundedKeyCount)
 		if err != nil {
 			return err
@@ -294,7 +294,7 @@ func (n *Network) Create(rootDir string) error {
 		}
 	}
 
-	if n.Genesis == nil {
+	if n.NetworkID == 0 && n.Genesis == nil {
 		// Pre-fund known legacy keys to support ad-hoc testing. Usage of a legacy key will
 		// require knowing the key beforehand rather than retrieving it from the set of pre-funded
 		// keys exposed by a network. Since allocation will not be exclusive, a test using a
@@ -525,8 +525,11 @@ func (n *Network) EnsureNodeConfig(node *Node) error {
 	// Set fields including the network path
 	if len(n.Dir) > 0 {
 		defaultFlags := FlagsMap{
-			config.GenesisFileKey:    n.getGenesisPath(),
 			config.ChainConfigDirKey: n.getChainConfigDir(),
+		}
+
+		if n.Genesis != nil {
+			defaultFlags[config.GenesisFileKey] = n.getGenesisPath()
 		}
 
 		// Only set the subnet dir if it exists or the node won't start.
@@ -540,7 +543,7 @@ func (n *Network) EnsureNodeConfig(node *Node) error {
 		node.Flags.SetDefaults(defaultFlags)
 
 		// Ensure the node's data dir is configured
-		dataDir := node.getDataDir()
+		dataDir := node.GetDataDir()
 		if len(dataDir) == 0 {
 			// NodeID will have been set by EnsureKeys
 			dataDir = filepath.Join(n.Dir, node.NodeID.String())
@@ -636,9 +639,6 @@ func (n *Network) CreateSubnets(ctx context.Context, w io.Writer) error {
 	if len(createdSubnets) == 0 {
 		return nil
 	}
-
-	// Ensure the in-memory subnet state
-	n.Subnets = append(n.Subnets, createdSubnets...)
 
 	// Ensure the pre-funded key changes are persisted to disk
 	if err := n.Write(); err != nil {

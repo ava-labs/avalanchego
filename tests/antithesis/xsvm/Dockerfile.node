@@ -2,6 +2,9 @@
 # to minimize the cost of version changes.
 ARG GO_VERSION
 
+# AVALANCHEGO_NODE_IMAGE needs to identify an existing avalanchego node image and should include the tag
+ARG AVALANCHEGO_NODE_IMAGE
+
 # Antithesis: Getting the Antithesis golang instrumentation library
 FROM docker.io/antithesishq/go-instrumentor AS instrumentor
 
@@ -42,24 +45,17 @@ WORKDIR /avalanchego_instrumented/customer
 RUN go mod download
 RUN ln -s /opt/tmp/.git .git
 
-# Build avalanchego with race detection (-r) enabled.
-RUN ./scripts/build.sh -r
+# Build xsvm VM
+RUN ./scripts/build_xsvm.sh
 
 # ============= Cleanup Stage ================
-FROM debian:11-slim AS execution
+FROM $AVALANCHEGO_NODE_IMAGE AS execution
 
-# Copy identifying information into the container
-COPY --from=builder /build/commit_hash.txt ./commit_hash.txt
-
-# Copy the antithesis dependencies into the container
-RUN mkdir -p /symbols
-COPY --from=builder /avalanchego_instrumented/symbols /symbols
-COPY --from=builder /opt/antithesis/lib/libvoidstar.so /usr/lib/libvoidstar.so
-
-# Use the same path as the uninstrumented node image for consistency
-WORKDIR /avalanchego/build
+# The commit hash and antithesis dependencies should be part of the base image.
 
 # Copy the executable into the container
-COPY --from=builder /avalanchego_instrumented/customer/build/avalanchego ./avalanchego
+RUN mkdir -p /root/.avalanchego/plugins
+COPY --from=builder /avalanchego_instrumented/customer/build/xsvm \
+    /root/.avalanchego/plugins/v3m4wPxaHpvGr8qfMeyK6PRW3idZrPHmYcMTt7oXdK47yurVH
 
-CMD [ "./avalanchego" ]
+# The node image's entrypoint will be reused.
