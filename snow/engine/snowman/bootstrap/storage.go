@@ -23,7 +23,7 @@ import (
 
 const (
 	batchWritePeriod      = 64
-	iteratorReleasePeriod = 50_000
+	iteratorReleasePeriod = 100_000
 	logPeriod             = 5 * time.Second
 	minBlocksToCompact    = 5000
 )
