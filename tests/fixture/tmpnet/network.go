@@ -47,9 +47,13 @@ const (
 	HardHatKeyStr = "56289e99c94b6912bfc12adc093c9b51124f0dc54ac7a766b2bc5ccf558d8027"
 )
 
-// HardhatKey is a legacy used for hardhat testing in subnet-evm
-// TODO(marun) Remove when no longer needed.
-var HardhatKey *secp256k1.PrivateKey
+var (
+	// Key expected to be funded for subnet-evm hardhat testing
+	// TODO(marun) Remove when subnet-evm configures the genesis with this key.
+	HardhatKey *secp256k1.PrivateKey
+
+	errInsufficientNodes = errors.New("network needs at least one node to start")
+)
 
 func init() {
 	hardhatKeyBytes, err := hex.DecodeString(HardHatKeyStr)
@@ -79,8 +83,16 @@ type Network struct {
 	// Path where network configuration and data is stored
 	Dir string
 
+	// Id of the network. If zero, must be set in Genesis.
+	NetworkID uint32
+
 	// Configuration common across nodes
-	Genesis      *genesis.UnparsedConfig
+
+	// Genesis for the network. If nil, NetworkID must be non-zero
+	Genesis *genesis.UnparsedConfig
+
+	// Configuration for primary network chains (P, X, C)
+	// TODO(marun) Rename to PrimaryChainConfigs
 	ChainConfigs map[string]FlagsMap
 
 	// Default configuration to use when creating new nodes
@@ -95,6 +107,13 @@ type Network struct {
 
 	// Subnets that have been enabled on the network
 	Subnets []*Subnet
+}
+
+func NewDefaultNetwork(owner string) *Network {
+	return &Network{
+		Owner: owner,
+		Nodes: NewNodesOrPanic(DefaultNodeCount),
+	}
 }
 
 // Ensure a real and absolute network dir so that node
@@ -115,9 +134,11 @@ func StartNewNetwork(
 	rootNetworkDir string,
 	avalancheGoExecPath string,
 	pluginDir string,
-	nodeCount int,
 ) error {
-	if err := network.EnsureDefaultConfig(w, avalancheGoExecPath, pluginDir, nodeCount); err != nil {
+	if len(network.Nodes) == 0 {
+		return errInsufficientNodes
+	}
+	if err := network.EnsureDefaultConfig(w, avalancheGoExecPath, pluginDir); err != nil {
 		return err
 	}
 	if err := network.Create(rootNetworkDir); err != nil {
@@ -163,7 +184,7 @@ func ReadNetwork(dir string) (*Network, error) {
 }
 
 // Initializes a new network with default configuration.
-func (n *Network) EnsureDefaultConfig(w io.Writer, avalancheGoPath string, pluginDir string, nodeCount int) error {
+func (n *Network) EnsureDefaultConfig(w io.Writer, avalancheGoPath string, pluginDir string) error {
 	if _, err := fmt.Fprintf(w, "Preparing configuration for new network with %s\n", avalancheGoPath); err != nil {
 		return err
 	}
@@ -177,7 +198,12 @@ func (n *Network) EnsureDefaultConfig(w io.Writer, avalancheGoPath string, plugi
 	if n.DefaultFlags == nil {
 		n.DefaultFlags = FlagsMap{}
 	}
-	n.DefaultFlags.SetDefaults(DefaultFlags())
+	n.DefaultFlags.SetDefaults(DefaultTmpnetFlags())
+
+	if len(n.Nodes) == 1 {
+		// Sybil protection needs to be disabled for a single node network to start
+		n.DefaultFlags[config.SybilProtectionEnabledKey] = false
+	}
 
 	// Only configure the plugin dir with a non-empty value to ensure
 	// the use of the default value (`[datadir]/plugins`) when
@@ -188,8 +214,8 @@ func (n *Network) EnsureDefaultConfig(w io.Writer, avalancheGoPath string, plugi
 		}
 	}
 
-	// Ensure pre-funded keys
-	if len(n.PreFundedKeys) == 0 {
+	// Ensure pre-funded keys if the genesis is not predefined
+	if n.Genesis == nil && len(n.PreFundedKeys) == 0 {
 		keys, err := NewPrivateKeys(DefaultPreFundedKeyCount)
 		if err != nil {
 			return err
@@ -212,15 +238,6 @@ func (n *Network) EnsureDefaultConfig(w io.Writer, avalancheGoPath string, plugi
 	// Ensure runtime is configured
 	if len(n.DefaultRuntimeConfig.AvalancheGoPath) == 0 {
 		n.DefaultRuntimeConfig.AvalancheGoPath = avalancheGoPath
-	}
-
-	// Ensure nodes are created
-	if len(n.Nodes) == 0 {
-		nodes, err := NewNodes(nodeCount)
-		if err != nil {
-			return err
-		}
-		n.Nodes = nodes
 	}
 
 	// Ensure nodes are configured
@@ -277,7 +294,7 @@ func (n *Network) Create(rootDir string) error {
 		}
 	}
 
-	if n.Genesis == nil {
+	if n.NetworkID == 0 && n.Genesis == nil {
 		// Pre-fund known legacy keys to support ad-hoc testing. Usage of a legacy key will
 		// require knowing the key beforehand rather than retrieving it from the set of pre-funded
 		// keys exposed by a network. Since allocation will not be exclusive, a test using a
@@ -490,9 +507,13 @@ func (n *Network) EnsureNodeConfig(node *Node) error {
 	node.NetworkOwner = n.Owner
 
 	// Set the network name if available
-	if n.Genesis != nil && n.Genesis.NetworkID > 0 {
+	networkID := n.NetworkID
+	if networkID == 0 && n.Genesis != nil && n.Genesis.NetworkID > 0 {
+		networkID = n.Genesis.NetworkID
+	}
+	if networkID > 0 {
 		// Convert the network id to a string to ensure consistency in JSON round-tripping.
-		flags[config.NetworkNameKey] = strconv.FormatUint(uint64(n.Genesis.NetworkID), 10)
+		flags[config.NetworkNameKey] = strconv.FormatUint(uint64(networkID), 10)
 	}
 
 	if err := node.EnsureKeys(); err != nil {
@@ -504,8 +525,11 @@ func (n *Network) EnsureNodeConfig(node *Node) error {
 	// Set fields including the network path
 	if len(n.Dir) > 0 {
 		defaultFlags := FlagsMap{
-			config.GenesisFileKey:    n.getGenesisPath(),
 			config.ChainConfigDirKey: n.getChainConfigDir(),
+		}
+
+		if n.Genesis != nil {
+			defaultFlags[config.GenesisFileKey] = n.getGenesisPath()
 		}
 
 		// Only set the subnet dir if it exists or the node won't start.
@@ -519,7 +543,7 @@ func (n *Network) EnsureNodeConfig(node *Node) error {
 		node.Flags.SetDefaults(defaultFlags)
 
 		// Ensure the node's data dir is configured
-		dataDir := node.getDataDir()
+		dataDir := node.GetDataDir()
 		if len(dataDir) == 0 {
 			// NodeID will have been set by EnsureKeys
 			dataDir = filepath.Join(n.Dir, node.NodeID.String())
@@ -615,9 +639,6 @@ func (n *Network) CreateSubnets(ctx context.Context, w io.Writer) error {
 	if len(createdSubnets) == 0 {
 		return nil
 	}
-
-	// Ensure the in-memory subnet state
-	n.Subnets = append(n.Subnets, createdSubnets...)
 
 	// Ensure the pre-funded key changes are persisted to disk
 	if err := n.Write(); err != nil {

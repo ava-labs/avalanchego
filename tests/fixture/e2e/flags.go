@@ -19,6 +19,7 @@ type FlagVars struct {
 	reuseNetwork         bool
 	networkShutdownDelay time.Duration
 	stopNetwork          bool
+	nodeCount            int
 }
 
 func (v *FlagVars) AvalancheGoExecPath() string {
@@ -49,6 +50,10 @@ func (v *FlagVars) NetworkShutdownDelay() time.Duration {
 
 func (v *FlagVars) StopNetwork() bool {
 	return v.stopNetwork
+}
+
+func (v *FlagVars) NodeCount() int {
+	return v.nodeCount
 }
 
 func RegisterFlags() *FlagVars {
@@ -88,6 +93,12 @@ func RegisterFlags() *FlagVars {
 		"stop-network",
 		false,
 		"[optional] stop an existing network and exit without executing any tests.",
+	)
+	flag.IntVar(
+		&vars.nodeCount,
+		"node-count",
+		tmpnet.DefaultNodeCount,
+		"number of nodes the network should initially consist of",
 	)
 
 	return &vars

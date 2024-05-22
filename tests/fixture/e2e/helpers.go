@@ -233,7 +233,6 @@ func StartNetwork(
 			DefaultNetworkDir,
 			avalancheGoExecPath,
 			pluginDir,
-			tmpnet.DefaultNodeCount,
 		),
 	)
 

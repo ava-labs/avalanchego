@@ -37,9 +37,7 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 
 	ginkgo.It("should ensure that the gas price is affected by load", func() {
 		ginkgo.By("creating a new private network to ensure isolation from other tests")
-		privateNetwork := &tmpnet.Network{
-			Owner: "avalanchego-e2e-dynamic-fees",
-		}
+		privateNetwork := tmpnet.NewDefaultNetwork("avalanchego-e2e-dynamic-fees")
 		e2e.Env.StartPrivateNetwork(privateNetwork)
 
 		ginkgo.By("allocating a pre-funded key")

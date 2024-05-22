@@ -36,8 +36,7 @@ type ThrottlerHandler struct {
 
 func (t ThrottlerHandler) AppGossip(ctx context.Context, nodeID ids.NodeID, gossipBytes []byte) {
 	if !t.throttler.Handle(nodeID) {
-		t.log.Debug(
-			"dropping message",
+		t.log.Debug("dropping message",
 			zap.Stringer("nodeID", nodeID),
 			zap.String("reason", "throttled"),
 		)
