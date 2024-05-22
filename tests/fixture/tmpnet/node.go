@@ -190,7 +190,7 @@ func (n *Node) readState() error {
 	return n.getRuntime().readState()
 }
 
-func (n *Node) getDataDir() string {
+func (n *Node) GetDataDir() string {
 	return cast.ToString(n.Flags[config.DataDirKey])
 }
 
