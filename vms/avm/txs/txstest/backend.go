@@ -94,10 +94,10 @@ type walletUTXOsAdapter struct {
 	addrs set.Set[ids.ShortID]
 }
 
-func (wa *walletUTXOsAdapter) UTXOs(_ context.Context, sourceChainID ids.ID) ([]*avax.UTXO, error) {
-	return wa.b.UTXOs(wa.addrs, sourceChainID)
+func (w *walletUTXOsAdapter) UTXOs(_ context.Context, sourceChainID ids.ID) ([]*avax.UTXO, error) {
+	return w.b.UTXOs(w.addrs, sourceChainID)
 }
 
-func (wa *walletUTXOsAdapter) GetUTXO(_ context.Context, chainID, utxoID ids.ID) (*avax.UTXO, error) {
-	return wa.b.GetUTXO(wa.addrs, chainID, utxoID)
+func (w *walletUTXOsAdapter) GetUTXO(_ context.Context, chainID, utxoID ids.ID) (*avax.UTXO, error) {
+	return w.b.GetUTXO(w.addrs, chainID, utxoID)
 }

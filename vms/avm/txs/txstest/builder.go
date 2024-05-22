@@ -22,8 +22,8 @@ import (
 )
 
 type Builder struct {
-	backend *utxos
-	ctx     *builder.Context
+	utxos *utxos
+	ctx   *builder.Context
 }
 
 func New(
@@ -33,10 +33,10 @@ func New(
 	feeAssetID ids.ID,
 	state state.State,
 ) *Builder {
-	backend := newBackend(ctx, state, ctx.SharedMemory, codec)
+	utxos := newBackend(ctx, state, ctx.SharedMemory, codec)
 	return &Builder{
-		backend: backend,
-		ctx:     newContext(ctx, cfg, feeAssetID),
+		utxos: utxos,
+		ctx:   newContext(ctx, cfg, feeAssetID),
 	}
 }
 
@@ -204,15 +204,14 @@ func (b *Builder) ExportTx(
 		},
 	}}
 
-	utx, err := xBuilder.NewExportTx(
+	if utx, err := xBuilder.NewExportTx(
 		destinationChain,
 		outputs,
 		common.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{changeAddr},
 		}),
-	)
-	if err != nil {
+	); err != nil {
 		return nil, fmt.Errorf("failed building export tx: %w", err)
 	}
 
@@ -223,7 +222,7 @@ func (b *Builder) builders(kc *secp256k1fx.Keychain) (builder.Builder, signer.Si
 	var (
 		addrs = kc.Addresses()
 		wa    = &walletUTXOsAdapter{
-			b:     b.backend,
+			b:     b.utxos,
 			addrs: addrs,
 		}
 		builder = builder.New(addrs, b.ctx, wa)
