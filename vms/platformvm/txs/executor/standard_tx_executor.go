@@ -82,10 +82,10 @@ func (e *StandardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 	if !isEActive {
 		feeCalculator = fee.NewStaticCalculator(staticFeesCfg, upgrades, currentTimestamp)
 	} else {
-		feeCalculator = fee.NewDynamicCalculator(staticFeesCfg, e.BlkFeeManager, e.BlockMaxComplexity, e.Tx.Creds)
+		feeCalculator = fee.NewDynamicCalculator(staticFeesCfg, e.BlkFeeManager, e.BlockMaxComplexity)
 	}
 
-	fee, err := feeCalculator.ComputeFee(tx)
+	fee, err := feeCalculator.ComputeFee(tx, e.Tx.Creds)
 	if err != nil {
 		return err
 	}
@@ -144,10 +144,10 @@ func (e *StandardTxExecutor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 	if !isEActive {
 		feeCalculator = fee.NewStaticCalculator(staticFeesCfg, upgrades, currentTimestamp)
 	} else {
-		feeCalculator = fee.NewDynamicCalculator(staticFeesCfg, e.BlkFeeManager, e.BlockMaxComplexity, e.Tx.Creds)
+		feeCalculator = fee.NewDynamicCalculator(staticFeesCfg, e.BlkFeeManager, e.BlockMaxComplexity)
 	}
 
-	fee, err := feeCalculator.ComputeFee(tx)
+	fee, err := feeCalculator.ComputeFee(tx, e.Tx.Creds)
 	if err != nil {
 		return err
 	}
@@ -241,10 +241,10 @@ func (e *StandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 		if !isEActive {
 			feeCalculator = fee.NewStaticCalculator(staticFeesCfg, upgrades, currentTimestamp)
 		} else {
-			feeCalculator = fee.NewDynamicCalculator(staticFeesCfg, e.BlkFeeManager, e.BlockMaxComplexity, e.Tx.Creds)
+			feeCalculator = fee.NewDynamicCalculator(staticFeesCfg, e.BlkFeeManager, e.BlockMaxComplexity)
 		}
 
-		fee, err := feeCalculator.ComputeFee(tx)
+		fee, err := feeCalculator.ComputeFee(tx, e.Tx.Creds)
 		if err != nil {
 			return err
 		}
@@ -310,10 +310,10 @@ func (e *StandardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 	if !isEActive {
 		feeCalculator = fee.NewStaticCalculator(staticFeesCfg, upgrades, currentTimestamp)
 	} else {
-		feeCalculator = fee.NewDynamicCalculator(staticFeesCfg, e.BlkFeeManager, e.BlockMaxComplexity, e.Tx.Creds)
+		feeCalculator = fee.NewDynamicCalculator(staticFeesCfg, e.BlkFeeManager, e.BlockMaxComplexity)
 	}
 
-	fee, err := feeCalculator.ComputeFee(tx)
+	fee, err := feeCalculator.ComputeFee(tx, e.Tx.Creds)
 	if err != nil {
 		return err
 	}
@@ -518,10 +518,10 @@ func (e *StandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 	if !isEActive {
 		feeCalculator = fee.NewStaticCalculator(staticFeesCfg, upgrades, currentTimestamp)
 	} else {
-		feeCalculator = fee.NewDynamicCalculator(staticFeesCfg, e.BlkFeeManager, e.BlockMaxComplexity, e.Tx.Creds)
+		feeCalculator = fee.NewDynamicCalculator(staticFeesCfg, e.BlkFeeManager, e.BlockMaxComplexity)
 	}
 
-	fee, err := feeCalculator.ComputeFee(tx)
+	fee, err := feeCalculator.ComputeFee(tx, e.Tx.Creds)
 	if err != nil {
 		return err
 	}
@@ -666,10 +666,10 @@ func (e *StandardTxExecutor) BaseTx(tx *txs.BaseTx) error {
 	if !isEActive {
 		feeCalculator = fee.NewStaticCalculator(staticFeesCfg, upgrades, currentTimestamp)
 	} else {
-		feeCalculator = fee.NewDynamicCalculator(staticFeesCfg, e.BlkFeeManager, e.BlockMaxComplexity, e.Tx.Creds)
+		feeCalculator = fee.NewDynamicCalculator(staticFeesCfg, e.BlkFeeManager, e.BlockMaxComplexity)
 	}
 
-	fee, err := feeCalculator.ComputeFee(tx)
+	fee, err := feeCalculator.ComputeFee(tx, e.Tx.Creds)
 	if err != nil {
 		return err
 	}

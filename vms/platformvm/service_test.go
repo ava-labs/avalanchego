@@ -398,10 +398,10 @@ func TestGetBalance(t *testing.T) {
 
 				feeCfg := fee.GetDynamicConfig(true)
 				feeMan := commonfees.NewManager(feeRates)
-				feeCalc = fee.NewDynamicCalculator(staticFeeCfg, feeMan, feeCfg.BlockMaxComplexity, testSubnet1.Creds)
+				feeCalc = fee.NewDynamicCalculator(staticFeeCfg, feeMan, feeCfg.BlockMaxComplexity)
 			}
 
-			fee, err := feeCalc.ComputeFee(testSubnet1.Unsigned)
+			fee, err := feeCalc.ComputeFee(testSubnet1.Unsigned, testSubnet1.Creds)
 			require.NoError(err)
 			balance = defaultBalance - fee
 		}

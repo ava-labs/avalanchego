@@ -100,7 +100,7 @@ func TestBaseTx(t *testing.T) {
 	)
 
 	{ // Post E-Upgrade
-		feeCalc := fee.NewDynamicCalculator(testStaticConfig, commonfees.NewManager(testFeeRates), testBlockMaxComplexity, nil)
+		feeCalc := fee.NewDynamicCalculator(testStaticConfig, commonfees.NewManager(testFeeRates), testBlockMaxComplexity)
 		utx, err := builder.NewBaseTx(
 			outputsToMove,
 			feeCalc,
@@ -110,8 +110,8 @@ func TestBaseTx(t *testing.T) {
 		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
 
-		fc := fee.NewDynamicCalculator(testStaticConfig, commonfees.NewManager(testFeeRates), testBlockMaxComplexity, tx.Creds)
-		fee, err := fc.ComputeFee(utx)
+		fc := fee.NewDynamicCalculator(testStaticConfig, commonfees.NewManager(testFeeRates), testBlockMaxComplexity)
+		fee, err := fc.ComputeFee(utx, tx.Creds)
 		require.NoError(err)
 		require.Equal(9930*units.MicroAvax, fee)
 
@@ -136,7 +136,7 @@ func TestBaseTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := fee.NewStaticCalculator(testStaticConfig, upgrade.Config{}, time.Time{})
-		fee, err := fc.ComputeFee(utx)
+		fee, err := fc.ComputeFee(utx, nil)
 		require.NoError(err)
 		require.Equal(testContext.BaseTxFee, fee)
 
@@ -204,15 +204,15 @@ func TestAddSubnetValidatorTx(t *testing.T) {
 	)
 
 	{ // Post E-Upgrade
-		feeCalc := fee.NewDynamicCalculator(testStaticConfig, commonfees.NewManager(testFeeRates), testBlockMaxComplexity, nil)
+		feeCalc := fee.NewDynamicCalculator(testStaticConfig, commonfees.NewManager(testFeeRates), testBlockMaxComplexity)
 		utx, err := builder.NewAddSubnetValidatorTx(subnetValidator, feeCalc)
 		require.NoError(err)
 
 		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
 
-		fc := fee.NewDynamicCalculator(testStaticConfig, commonfees.NewManager(testFeeRates), testBlockMaxComplexity, tx.Creds)
-		fee, err := fc.ComputeFee(utx)
+		fc := fee.NewDynamicCalculator(testStaticConfig, commonfees.NewManager(testFeeRates), testBlockMaxComplexity)
+		fee, err := fc.ComputeFee(utx, tx.Creds)
 		require.NoError(err)
 		require.Equal(9765*units.MicroAvax, fee)
 
@@ -233,7 +233,7 @@ func TestAddSubnetValidatorTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := fee.NewStaticCalculator(testStaticConfig, upgrade.Config{}, time.Time{})
-		fee, err := fc.ComputeFee(utx)
+		fee, err := fc.ComputeFee(utx, nil)
 		require.NoError(err)
 		require.Equal(testContext.AddSubnetValidatorFee, fee)
 
@@ -292,7 +292,7 @@ func TestRemoveSubnetValidatorTx(t *testing.T) {
 	)
 
 	{ // Post E-Upgrade
-		feeCalc := fee.NewDynamicCalculator(testStaticConfig, commonfees.NewManager(testFeeRates), testBlockMaxComplexity, nil)
+		feeCalc := fee.NewDynamicCalculator(testStaticConfig, commonfees.NewManager(testFeeRates), testBlockMaxComplexity)
 		utx, err := builder.NewRemoveSubnetValidatorTx(
 			ids.GenerateTestNodeID(),
 			subnetID,
@@ -303,8 +303,8 @@ func TestRemoveSubnetValidatorTx(t *testing.T) {
 		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
 
-		fc := fee.NewDynamicCalculator(testStaticConfig, commonfees.NewManager(testFeeRates), testBlockMaxComplexity, tx.Creds)
-		fee, err := fc.ComputeFee(utx)
+		fc := fee.NewDynamicCalculator(testStaticConfig, commonfees.NewManager(testFeeRates), testBlockMaxComplexity)
+		fee, err := fc.ComputeFee(utx, tx.Creds)
 		require.NoError(err)
 		require.Equal(9741*units.MicroAvax, fee)
 
@@ -329,7 +329,7 @@ func TestRemoveSubnetValidatorTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := fee.NewStaticCalculator(testStaticConfig, upgrade.Config{}, time.Time{})
-		fee, err := fc.ComputeFee(utx)
+		fee, err := fc.ComputeFee(utx, nil)
 		require.NoError(err)
 		require.Equal(testContext.BaseTxFee, fee)
 
@@ -394,7 +394,7 @@ func TestCreateChainTx(t *testing.T) {
 	)
 
 	{ // Post E-Upgrade
-		feeCalc := fee.NewDynamicCalculator(testStaticConfig, commonfees.NewManager(testFeeRates), testBlockMaxComplexity, nil)
+		feeCalc := fee.NewDynamicCalculator(testStaticConfig, commonfees.NewManager(testFeeRates), testBlockMaxComplexity)
 		utx, err := builder.NewCreateChainTx(
 			subnetID,
 			genesisBytes,
@@ -408,8 +408,8 @@ func TestCreateChainTx(t *testing.T) {
 		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
 
-		fc := fee.NewDynamicCalculator(testStaticConfig, commonfees.NewManager(testFeeRates), testBlockMaxComplexity, tx.Creds)
-		fee, err := fc.ComputeFee(utx)
+		fc := fee.NewDynamicCalculator(testStaticConfig, commonfees.NewManager(testFeeRates), testBlockMaxComplexity)
+		fee, err := fc.ComputeFee(utx, tx.Creds)
 		require.NoError(err)
 		require.Equal(9808*units.MicroAvax, fee)
 
@@ -437,7 +437,7 @@ func TestCreateChainTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := fee.NewStaticCalculator(testStaticConfig, upgrade.Config{}, time.Time{})
-		fee, err := fc.ComputeFee(utx)
+		fee, err := fc.ComputeFee(utx, nil)
 		require.NoError(err)
 		require.Equal(testContext.CreateBlockchainTxFee, fee)
 
@@ -496,7 +496,7 @@ func TestCreateSubnetTx(t *testing.T) {
 	)
 
 	{ // Post E-Upgrade
-		feeCalc := fee.NewDynamicCalculator(testStaticConfig, commonfees.NewManager(testFeeRates), testBlockMaxComplexity, nil)
+		feeCalc := fee.NewDynamicCalculator(testStaticConfig, commonfees.NewManager(testFeeRates), testBlockMaxComplexity)
 		utx, err := builder.NewCreateSubnetTx(
 			subnetOwner,
 			feeCalc,
@@ -506,8 +506,8 @@ func TestCreateSubnetTx(t *testing.T) {
 		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
 
-		fc := fee.NewDynamicCalculator(testStaticConfig, commonfees.NewManager(testFeeRates), testBlockMaxComplexity, tx.Creds)
-		fee, err := fc.ComputeFee(utx)
+		fc := fee.NewDynamicCalculator(testStaticConfig, commonfees.NewManager(testFeeRates), testBlockMaxComplexity)
+		fee, err := fc.ComputeFee(utx, tx.Creds)
 		require.NoError(err)
 		require.Equal(9644*units.MicroAvax, fee)
 
@@ -531,7 +531,7 @@ func TestCreateSubnetTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := fee.NewStaticCalculator(testStaticConfig, upgrade.Config{}, time.Time{})
-		fee, err := fc.ComputeFee(utx)
+		fee, err := fc.ComputeFee(utx, nil)
 		require.NoError(err)
 		require.Equal(testContext.CreateSubnetTxFee, fee)
 
@@ -590,7 +590,7 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 	)
 
 	{ // Post E-Upgrade
-		feeCalc := fee.NewDynamicCalculator(testStaticConfig, commonfees.NewManager(testFeeRates), testBlockMaxComplexity, nil)
+		feeCalc := fee.NewDynamicCalculator(testStaticConfig, commonfees.NewManager(testFeeRates), testBlockMaxComplexity)
 		utx, err := builder.NewTransferSubnetOwnershipTx(
 			subnetID,
 			subnetOwner,
@@ -601,8 +601,8 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
 
-		fc := fee.NewDynamicCalculator(testStaticConfig, commonfees.NewManager(testFeeRates), testBlockMaxComplexity, tx.Creds)
-		fee, err := fc.ComputeFee(utx)
+		fc := fee.NewDynamicCalculator(testStaticConfig, commonfees.NewManager(testFeeRates), testBlockMaxComplexity)
+		fee, err := fc.ComputeFee(utx, tx.Creds)
 		require.NoError(err)
 		require.Equal(9761*units.MicroAvax, fee)
 
@@ -627,7 +627,7 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := fee.NewStaticCalculator(testStaticConfig, upgrade.Config{}, time.Time{})
-		fee, err := fc.ComputeFee(utx)
+		fee, err := fc.ComputeFee(utx, nil)
 		require.NoError(err)
 		require.Equal(testContext.BaseTxFee, fee)
 
@@ -680,7 +680,7 @@ func TestImportTx(t *testing.T) {
 	)
 
 	{ // Post E-Upgrade
-		feeCalc := fee.NewDynamicCalculator(testStaticConfig, commonfees.NewManager(testFeeRates), testBlockMaxComplexity, nil)
+		feeCalc := fee.NewDynamicCalculator(testStaticConfig, commonfees.NewManager(testFeeRates), testBlockMaxComplexity)
 		utx, err := builder.NewImportTx(
 			sourceChainID,
 			importTo,
@@ -691,8 +691,8 @@ func TestImportTx(t *testing.T) {
 		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
 
-		fc := fee.NewDynamicCalculator(testStaticConfig, commonfees.NewManager(testFeeRates), testBlockMaxComplexity, tx.Creds)
-		fee, err := fc.ComputeFee(utx)
+		fc := fee.NewDynamicCalculator(testStaticConfig, commonfees.NewManager(testFeeRates), testBlockMaxComplexity)
+		fee, err := fc.ComputeFee(utx, tx.Creds)
 		require.NoError(err)
 		require.Equal(14251*units.MicroAvax, fee)
 
@@ -719,7 +719,7 @@ func TestImportTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := fee.NewStaticCalculator(testStaticConfig, upgrade.Config{}, time.Time{})
-		fee, err := fc.ComputeFee(utx)
+		fee, err := fc.ComputeFee(utx, nil)
 		require.NoError(err)
 		require.Equal(testContext.BaseTxFee, fee)
 
@@ -770,7 +770,7 @@ func TestExportTx(t *testing.T) {
 	)
 
 	{ // Post E-Upgrade
-		feeCalc := fee.NewDynamicCalculator(testStaticConfig, commonfees.NewManager(testFeeRates), testBlockMaxComplexity, nil)
+		feeCalc := fee.NewDynamicCalculator(testStaticConfig, commonfees.NewManager(testFeeRates), testBlockMaxComplexity)
 		utx, err := builder.NewExportTx(
 			subnetID,
 			exportedOutputs,
@@ -781,8 +781,8 @@ func TestExportTx(t *testing.T) {
 		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
 
-		fc := fee.NewDynamicCalculator(testStaticConfig, commonfees.NewManager(testFeeRates), testBlockMaxComplexity, tx.Creds)
-		fee, err := fc.ComputeFee(utx)
+		fc := fee.NewDynamicCalculator(testStaticConfig, commonfees.NewManager(testFeeRates), testBlockMaxComplexity)
+		fee, err := fc.ComputeFee(utx, tx.Creds)
 		require.NoError(err)
 		require.Equal(9966*units.MicroAvax, fee)
 
@@ -808,7 +808,7 @@ func TestExportTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := fee.NewStaticCalculator(testStaticConfig, upgrade.Config{}, time.Time{})
-		fee, err := fc.ComputeFee(utx)
+		fee, err := fc.ComputeFee(utx, nil)
 		require.NoError(err)
 		require.Equal(testContext.BaseTxFee, fee)
 
@@ -872,7 +872,7 @@ func TestTransformSubnetTx(t *testing.T) {
 	)
 
 	{ // Post E-Upgrade
-		feeCalc := fee.NewDynamicCalculator(testStaticConfig, commonfees.NewManager(testFeeRates), testBlockMaxComplexity, nil)
+		feeCalc := fee.NewDynamicCalculator(testStaticConfig, commonfees.NewManager(testFeeRates), testBlockMaxComplexity)
 		utx, err := builder.NewTransformSubnetTx(
 			subnetID,
 			subnetAssetID,
@@ -895,8 +895,8 @@ func TestTransformSubnetTx(t *testing.T) {
 		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
 
-		fc := fee.NewDynamicCalculator(testStaticConfig, commonfees.NewManager(testFeeRates), testBlockMaxComplexity, tx.Creds)
-		fee, err := fc.ComputeFee(utx)
+		fc := fee.NewDynamicCalculator(testStaticConfig, commonfees.NewManager(testFeeRates), testBlockMaxComplexity)
+		fee, err := fc.ComputeFee(utx, tx.Creds)
 		require.NoError(err)
 		require.Equal(14763*units.MicroAvax, fee)
 
@@ -936,7 +936,7 @@ func TestTransformSubnetTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := fee.NewStaticCalculator(testStaticConfig, upgrade.Config{}, time.Time{})
-		fee, err := fc.ComputeFee(utx)
+		fee, err := fc.ComputeFee(utx, nil)
 		require.NoError(err)
 		require.Equal(testContext.TransformSubnetTxFee, fee)
 
@@ -994,7 +994,7 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 	require.NoError(err)
 
 	{ // Post E-Upgrade
-		feeCalc := fee.NewDynamicCalculator(testStaticConfig, commonfees.NewManager(testFeeRates), testBlockMaxComplexity, nil)
+		feeCalc := fee.NewDynamicCalculator(testStaticConfig, commonfees.NewManager(testFeeRates), testBlockMaxComplexity)
 		utx, err := builder.NewAddPermissionlessValidatorTx(
 			&txs.SubnetValidator{
 				Validator: txs.Validator{
@@ -1016,8 +1016,8 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
 
-		fc := fee.NewDynamicCalculator(testStaticConfig, commonfees.NewManager(testFeeRates), testBlockMaxComplexity, tx.Creds)
-		fee, err := fc.ComputeFee(utx)
+		fc := fee.NewDynamicCalculator(testStaticConfig, commonfees.NewManager(testFeeRates), testBlockMaxComplexity)
+		fee, err := fc.ComputeFee(utx, tx.Creds)
 		require.NoError(err)
 		require.Equal(20404*units.MicroAvax, fee)
 
@@ -1060,7 +1060,7 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := fee.NewStaticCalculator(testStaticConfig, upgrade.Config{}, time.Time{})
-		fee, err := fc.ComputeFee(utx)
+		fee, err := fc.ComputeFee(utx, nil)
 		require.NoError(err)
 		require.Equal(testContext.AddPrimaryNetworkValidatorFee, fee)
 
@@ -1113,7 +1113,7 @@ func TestAddPermissionlessDelegatorTx(t *testing.T) {
 	)
 
 	{ // Post E-Upgrade
-		feeCalc := fee.NewDynamicCalculator(testStaticConfig, commonfees.NewManager(testFeeRates), testBlockMaxComplexity, nil)
+		feeCalc := fee.NewDynamicCalculator(testStaticConfig, commonfees.NewManager(testFeeRates), testBlockMaxComplexity)
 		utx, err := builder.NewAddPermissionlessDelegatorTx(
 			&txs.SubnetValidator{
 				Validator: txs.Validator{
@@ -1132,8 +1132,8 @@ func TestAddPermissionlessDelegatorTx(t *testing.T) {
 		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
 
-		fc := fee.NewDynamicCalculator(testStaticConfig, commonfees.NewManager(testFeeRates), testBlockMaxComplexity, tx.Creds)
-		fee, err := fc.ComputeFee(utx)
+		fc := fee.NewDynamicCalculator(testStaticConfig, commonfees.NewManager(testFeeRates), testBlockMaxComplexity)
+		fee, err := fc.ComputeFee(utx, tx.Creds)
 		require.NoError(err)
 		require.Equal(20212*units.MicroAvax, fee)
 
@@ -1173,7 +1173,7 @@ func TestAddPermissionlessDelegatorTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := fee.NewStaticCalculator(testStaticConfig, upgrade.Config{}, time.Time{})
-		fee, err := fc.ComputeFee(utx)
+		fee, err := fc.ComputeFee(utx, nil)
 		require.NoError(err)
 		require.Equal(testContext.AddPrimaryNetworkDelegatorFee, fee)
 

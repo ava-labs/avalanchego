@@ -170,7 +170,7 @@ func verifyAddValidatorTx(
 
 	// Verify the flowcheck
 	feeCalculator := fee.NewStaticCalculator(backend.Config.StaticFeeConfig, upgrades, currentTimestamp)
-	fee, err := feeCalculator.ComputeFee(tx)
+	fee, err := feeCalculator.ComputeFee(tx, sTx.Creds)
 	if err != nil {
 		return nil, err
 	}
@@ -274,10 +274,10 @@ func verifyAddSubnetValidatorTx(
 	if !isEActive {
 		feeCalculator = fee.NewStaticCalculator(staticFeesCfg, upgrades, currentTimestamp)
 	} else {
-		feeCalculator = fee.NewDynamicCalculator(staticFeesCfg, feeManager, maxComplexity, sTx.Creds)
+		feeCalculator = fee.NewDynamicCalculator(staticFeesCfg, feeManager, maxComplexity)
 	}
 
-	fee, err := feeCalculator.ComputeFee(tx)
+	fee, err := feeCalculator.ComputeFee(tx, sTx.Creds)
 	if err != nil {
 		return err
 	}
@@ -368,10 +368,10 @@ func verifyRemoveSubnetValidatorTx(
 	if !isEActive {
 		feeCalculator = fee.NewStaticCalculator(staticFeesCfg, upgrades, currentTimestamp)
 	} else {
-		feeCalculator = fee.NewDynamicCalculator(staticFeesCfg, feeManager, maxComplexity, sTx.Creds)
+		feeCalculator = fee.NewDynamicCalculator(staticFeesCfg, feeManager, maxComplexity)
 	}
 
-	fee, err := feeCalculator.ComputeFee(tx)
+	fee, err := feeCalculator.ComputeFee(tx, sTx.Creds)
 	if err != nil {
 		return nil, false, err
 	}
@@ -496,7 +496,7 @@ func verifyAddDelegatorTx(
 
 	// Verify the flowcheck
 	feeCalculator := fee.NewStaticCalculator(backend.Config.StaticFeeConfig, upgrades, currentTimestamp)
-	fee, err := feeCalculator.ComputeFee(tx)
+	fee, err := feeCalculator.ComputeFee(tx, sTx.Creds)
 	if err != nil {
 		return nil, err
 	}
@@ -629,10 +629,10 @@ func verifyAddPermissionlessValidatorTx(
 	if !isEActive {
 		feeCalculator = fee.NewStaticCalculator(staticFeesCfg, upgrades, currentTimestamp)
 	} else {
-		feeCalculator = fee.NewDynamicCalculator(staticFeesCfg, feeManager, maxComplexity, sTx.Creds)
+		feeCalculator = fee.NewDynamicCalculator(staticFeesCfg, feeManager, maxComplexity)
 	}
 
-	fee, err := feeCalculator.ComputeFee(tx)
+	fee, err := feeCalculator.ComputeFee(tx, sTx.Creds)
 	if err != nil {
 		return err
 	}
@@ -790,10 +790,10 @@ func verifyAddPermissionlessDelegatorTx(
 	if !isEActive {
 		feeCalculator = fee.NewStaticCalculator(staticFeesCfg, upgrades, currentTimestamp)
 	} else {
-		feeCalculator = fee.NewDynamicCalculator(staticFeesCfg, feeManager, maxComplexity, sTx.Creds)
+		feeCalculator = fee.NewDynamicCalculator(staticFeesCfg, feeManager, maxComplexity)
 	}
 
-	fee, err := feeCalculator.ComputeFee(tx)
+	fee, err := feeCalculator.ComputeFee(tx, sTx.Creds)
 	if err != nil {
 		return err
 	}
@@ -865,10 +865,10 @@ func verifyTransferSubnetOwnershipTx(
 	if !isEActive {
 		feeCalculator = fee.NewStaticCalculator(staticFeesCfg, upgrades, currentTimestamp)
 	} else {
-		feeCalculator = fee.NewDynamicCalculator(staticFeesCfg, feeManager, maxComplexity, sTx.Creds)
+		feeCalculator = fee.NewDynamicCalculator(staticFeesCfg, feeManager, maxComplexity)
 	}
 
-	fee, err := feeCalculator.ComputeFee(tx)
+	fee, err := feeCalculator.ComputeFee(tx, sTx.Creds)
 	if err != nil {
 		return err
 	}

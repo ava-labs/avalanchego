@@ -170,8 +170,8 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 
 				// retrieve fees paid for the tx
 				feeCfg := fee.GetDynamicConfig(true /*isEActive*/)
-				feeCalc := fee.NewDynamicCalculator(pChainStaticFees, commonfees.NewManager(nextFeeRates), feeCfg.BlockMaxComplexity, tx.Creds)
-				pChainExportFee, err = feeCalc.ComputeFee(tx.Unsigned)
+				feeCalc := fee.NewDynamicCalculator(pChainStaticFees, commonfees.NewManager(nextFeeRates), feeCfg.BlockMaxComplexity)
+				pChainExportFee, err = feeCalc.ComputeFee(tx.Unsigned, tx.Creds)
 				require.NoError(err)
 			})
 

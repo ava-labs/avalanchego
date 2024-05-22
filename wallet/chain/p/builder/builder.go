@@ -351,7 +351,7 @@ func (b *builder) NewBaseTx(
 	}
 
 	// feesMan cumulates complexity. Let's init it with utx filled so far
-	if _, err := feeCalc.ComputeFee(utx); err != nil {
+	if _, err := feeCalc.ComputeFee(utx, nil); err != nil {
 		return nil, err
 	}
 
@@ -396,7 +396,7 @@ func (b *builder) NewAddValidatorTx(
 	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
 
 	// feesMan cumulates complexity. Let's init it with utx filled so far
-	if _, err := feeCalc.ComputeFee(utx); err != nil {
+	if _, err := feeCalc.ComputeFee(utx, nil); err != nil {
 		return nil, err
 	}
 
@@ -444,7 +444,7 @@ func (b *builder) NewAddSubnetValidatorTx(
 	}
 
 	// feesMan cumulates complexity. Let's init it with utx filled so far
-	if _, err := feeCalc.ComputeFee(utx); err != nil {
+	if _, err := feeCalc.ComputeFee(utx, nil); err != nil {
 		return nil, err
 	}
 
@@ -492,7 +492,7 @@ func (b *builder) NewRemoveSubnetValidatorTx(
 	}
 
 	// feesMan cumulates complexity. Let's init it with utx filled so far
-	if _, err := feeCalc.ComputeFee(utx); err != nil {
+	if _, err := feeCalc.ComputeFee(utx, nil); err != nil {
 		return nil, err
 	}
 
@@ -533,7 +533,7 @@ func (b *builder) NewAddDelegatorTx(
 	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
 
 	// feesMan cumulates complexity. Let's init it with utx filled so far
-	if _, err := feeCalc.ComputeFee(utx); err != nil {
+	if _, err := feeCalc.ComputeFee(utx, nil); err != nil {
 		return nil, err
 	}
 
@@ -591,7 +591,7 @@ func (b *builder) NewCreateChainTx(
 	}
 
 	// feesMan cumulates complexity. Let's init it with utx filled so far
-	if _, err := feeCalc.ComputeFee(utx); err != nil {
+	if _, err := feeCalc.ComputeFee(utx, nil); err != nil {
 		return nil, err
 	}
 
@@ -629,7 +629,7 @@ func (b *builder) NewCreateSubnetTx(
 	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
 
 	// feesMan cumulates complexity. Let's init it with utx filled so far
-	if _, err := feeCalc.ComputeFee(utx); err != nil {
+	if _, err := feeCalc.ComputeFee(utx, nil); err != nil {
 		return nil, err
 	}
 
@@ -679,7 +679,7 @@ func (b *builder) NewTransferSubnetOwnershipTx(
 	}
 
 	// feesMan cumulates complexity. Let's init it with utx filled so far
-	if _, err := feeCalc.ComputeFee(utx); err != nil {
+	if _, err := feeCalc.ComputeFee(utx, nil); err != nil {
 		return nil, err
 	}
 
@@ -788,7 +788,7 @@ func (b *builder) NewImportTx(
 	// 3. Finance fees as much as possible with imported, Avax-denominated UTXOs
 
 	// feesMan cumulates complexity. Let's init it with utx filled so far
-	if _, err := feeCalc.ComputeFee(utx); err != nil {
+	if _, err := feeCalc.ComputeFee(utx, nil); err != nil {
 		return nil, err
 	}
 
@@ -891,7 +891,7 @@ func (b *builder) NewExportTx(
 	}
 
 	// feesMan cumulates complexity. Let's init it with utx filled so far
-	if _, err := feeCalc.ComputeFee(utx); err != nil {
+	if _, err := feeCalc.ComputeFee(utx, nil); err != nil {
 		return nil, err
 	}
 
@@ -967,7 +967,7 @@ func (b *builder) NewTransformSubnetTx(
 	}
 
 	// feesMan cumulates complexity. Let's init it with utx filled so far
-	if _, err := feeCalc.ComputeFee(utx); err != nil {
+	if _, err := feeCalc.ComputeFee(utx, nil); err != nil {
 		return nil, err
 	}
 
@@ -1017,7 +1017,7 @@ func (b *builder) NewAddPermissionlessValidatorTx(
 	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
 
 	// feesMan cumulates complexity. Let's init it with utx filled so far
-	if _, err := feeCalc.ComputeFee(utx); err != nil {
+	if _, err := feeCalc.ComputeFee(utx, nil); err != nil {
 		return nil, err
 	}
 
@@ -1061,7 +1061,7 @@ func (b *builder) NewAddPermissionlessDelegatorTx(
 	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
 
 	// feesMan cumulates complexity. Let's init it with utx filled so far
-	if _, err := feeCalc.ComputeFee(utx); err != nil {
+	if _, err := feeCalc.ComputeFee(utx, nil); err != nil {
 		return nil, err
 	}
 

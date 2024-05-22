@@ -410,10 +410,10 @@ func TestGenesis(t *testing.T) {
 
 				feeCfg := fee.GetDynamicConfig(upgrades.IsEActivated(chainTime))
 				feeMan := commonfees.NewManager(feeRates)
-				feeCalc = fee.NewDynamicCalculator(staticFeeCfg, feeMan, feeCfg.BlockMaxComplexity, testSubnet1.Creds)
+				feeCalc = fee.NewDynamicCalculator(staticFeeCfg, feeMan, feeCfg.BlockMaxComplexity)
 			}
 
-			fee, err := feeCalc.ComputeFee(testSubnet1.Unsigned)
+			fee, err := feeCalc.ComputeFee(testSubnet1.Unsigned, testSubnet1.Creds)
 			require.NoError(err)
 			require.Equal(uint64(utxo.Amount)-fee, out.Amount())
 		}
@@ -2394,10 +2394,10 @@ func TestBaseTx(t *testing.T) {
 	}
 	require.Equal(totalOutputAmt, key0OutputAmt+key1OutputAmt+changeAddrOutputAmt)
 
-	feeCalc, err := txBuilder.FeeCalculator(baseTx.Creds)
+	feeCalc, err := txBuilder.FeeCalculator()
 	require.NoError(err)
 
-	fee, err := feeCalc.ComputeFee(baseTx.Unsigned)
+	fee, err := feeCalc.ComputeFee(baseTx.Unsigned, baseTx.Creds)
 	require.NoError(err)
 	require.Equal(fee, totalInputAmt-totalOutputAmt)
 	require.Equal(sendAmt, key1OutputAmt)

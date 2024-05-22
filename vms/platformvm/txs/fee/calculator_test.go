@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/fees"
+	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
@@ -692,10 +693,15 @@ func TestTxFees(t *testing.T) {
 			if !upgrades.IsEActivated(tt.chainTime) {
 				fc = NewStaticCalculator(feeTestsDefaultCfg, upgrades, tt.chainTime)
 			} else {
-				fc = NewDynamicCalculator(feeTestsDefaultCfg, fees.NewManager(testFeeRates), maxComplexity, sTx.Creds)
+				fc = NewDynamicCalculator(feeTestsDefaultCfg, fees.NewManager(testFeeRates), maxComplexity)
 			}
 
-			_, _ = fc.ComputeFee(uTx)
+			var creds []verify.Verifiable
+			if sTx != nil {
+				// txs like RewardValidatorTx are not signed
+				creds = sTx.Creds
+			}
+			_, _ = fc.ComputeFee(uTx, creds)
 			tt.checksF(t, fc.c)
 		})
 	}
