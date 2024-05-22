@@ -23,7 +23,8 @@ import (
 
 const (
 	batchWritePeriod      = 64
-	iteratorReleasePeriod = 100_000
+	iteratorReleasePeriod = 1024
+	compactionPeriod      = 128
 	logPeriod             = 5 * time.Second
 	minBlocksToCompact    = 5000
 )
@@ -163,6 +164,7 @@ func execute(
 
 		iterator                      = interval.GetBlockIterator(db)
 		processedSinceIteratorRelease uint
+		releasesSinceCompaction       uint
 
 		startTime     = time.Now()
 		timeOfNextLog = startTime.Add(logPeriod)
@@ -212,11 +214,16 @@ func execute(
 			processedSinceIteratorRelease = 0
 			iterator.Release()
 
-			if err := db.Compact(nil, lastProcessedKey); err != nil {
-				// Not a fatal error, log and move on.
-				log("failed to compact bootstrap database before grabbing new iterator",
-					zap.Error(err),
-				)
+			releasesSinceCompaction++
+			if releasesSinceCompaction >= compactionPeriod {
+				if err := db.Compact(nil, lastProcessedKey); err != nil {
+					// Not a fatal error, log and move on.
+					log("failed to compact bootstrap database before grabbing new iterator",
+						zap.Error(err),
+					)
+				}
+
+				releasesSinceCompaction = 0
 			}
 
 			iterator = interval.GetBlockIterator(db)
