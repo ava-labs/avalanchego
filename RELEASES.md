@@ -13,6 +13,13 @@ The plugin version is unchanged at `35` and is compatible with versions `v1.11.3
 - p2p compression metrics changes
 - p2p sent + failed to send + received messages metrics
 - p2p sdk sent + received messages metrics
+- consensus handler message queue metrics
+- consensus handler metrics
+- consensus sender metrics
+- consensus timeout metrics
+- X-chain and P-chain tx metrics
+- P-chain block metrics
+- X-chain and P-chain mempool metrics
 
 ### Configs
 
@@ -22,6 +29,10 @@ The plugin version is unchanged at `35` and is compatible with versions `v1.11.3
 - Fixed memory corruption when accessing keys and values from released pebbledb iterators.
 - Fixed prefixdb compaction when specifying a `nil` limit.
 - Fixed peer connection tracking in the P-chain and C-chain to re-enable tx pull gossip.
+- Fixed negative ETA while fetching blocks after aborting state sync.
+- Fixed C-chain deadlock while executing blocks in bootstrapping after aborting state sync.
+- Fixed C-chain deadlock while executing blocks in bootstrapping after aborting state sync.
+- Fixed performance regression while executing blocks in bootstrapping.
 
 ### What's Changed
 
