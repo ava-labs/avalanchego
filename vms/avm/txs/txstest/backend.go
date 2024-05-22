@@ -22,17 +22,17 @@ import (
 const maxPageSize uint64 = 1024
 
 var (
-	_ builder.Backend = (*walletBackendAdapter)(nil)
-	_ signer.Backend  = (*walletBackendAdapter)(nil)
+	_ builder.Backend = (*walletUTXOsAdapter)(nil)
+	_ signer.Backend  = (*walletUTXOsAdapter)(nil)
 )
 
-func NewBackend(
+func newBackend(
 	ctx *snow.Context,
 	state state.State,
 	sharedMemory atomic.SharedMemory,
 	codec codec.Manager,
-) *Backend {
-	return &Backend{
+) *utxos {
+	return &utxos{
 		xchainID:     ctx.XChainID,
 		state:        state,
 		sharedMemory: sharedMemory,
@@ -40,14 +40,14 @@ func NewBackend(
 	}
 }
 
-type Backend struct {
+type utxos struct {
 	xchainID     ids.ID
 	state        state.State
 	sharedMemory atomic.SharedMemory
 	codec        codec.Manager
 }
 
-func (b *Backend) UTXOs(addrs set.Set[ids.ShortID], sourceChainID ids.ID) ([]*avax.UTXO, error) {
+func (b *utxos) UTXOs(addrs set.Set[ids.ShortID], sourceChainID ids.ID) ([]*avax.UTXO, error) {
 	if sourceChainID == b.xchainID {
 		return avax.GetAllUTXOs(b.state, addrs)
 	}
@@ -64,7 +64,7 @@ func (b *Backend) UTXOs(addrs set.Set[ids.ShortID], sourceChainID ids.ID) ([]*av
 	return atomicUTXOs, err
 }
 
-func (b *Backend) GetUTXO(addrs set.Set[ids.ShortID], chainID, utxoID ids.ID) (*avax.UTXO, error) {
+func (b *utxos) GetUTXO(addrs set.Set[ids.ShortID], chainID, utxoID ids.ID) (*avax.UTXO, error) {
 	if chainID == b.xchainID {
 		return b.state.GetUTXO(utxoID)
 	}
@@ -89,15 +89,15 @@ func (b *Backend) GetUTXO(addrs set.Set[ids.ShortID], chainID, utxoID ids.ID) (*
 	return nil, database.ErrNotFound
 }
 
-type walletBackendAdapter struct {
-	b     *Backend
+type walletUTXOsAdapter struct {
+	b     *utxos
 	addrs set.Set[ids.ShortID]
 }
 
-func (wa *walletBackendAdapter) UTXOs(_ context.Context, sourceChainID ids.ID) ([]*avax.UTXO, error) {
+func (wa *walletUTXOsAdapter) UTXOs(_ context.Context, sourceChainID ids.ID) ([]*avax.UTXO, error) {
 	return wa.b.UTXOs(wa.addrs, sourceChainID)
 }
 
-func (wa *walletBackendAdapter) GetUTXO(_ context.Context, chainID, utxoID ids.ID) (*avax.UTXO, error) {
+func (wa *walletUTXOsAdapter) GetUTXO(_ context.Context, chainID, utxoID ids.ID) (*avax.UTXO, error) {
 	return wa.b.GetUTXO(wa.addrs, chainID, utxoID)
 }

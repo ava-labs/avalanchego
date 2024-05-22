@@ -197,14 +197,13 @@ func setup(tb testing.TB, c *envConfig) *environment {
 	stopVertexID := ids.GenerateTestID()
 	issuer := make(chan common.Message, 1)
 
-	backend := txstest.NewBackend(vm.ctx, vm.state, vm.ctx.SharedMemory, vm.parser.Codec())
 	env := &environment{
 		genesisBytes: genesisBytes,
 		genesisTx:    getCreateTxFromGenesisTest(tb, genesisBytes, assetName),
 		sharedMemory: m,
 		issuer:       issuer,
 		vm:           vm,
-		txBuilder:    txstest.New(vm.ctx, &vm.Config, vm.feeAssetID, backend),
+		txBuilder:    txstest.New(vm.parser.Codec(), vm.ctx, &vm.Config, vm.feeAssetID, vm.state),
 	}
 
 	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))

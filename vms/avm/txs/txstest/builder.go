@@ -7,9 +7,11 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/avm/config"
+	"github.com/ava-labs/avalanchego/vms/avm/state"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -20,16 +22,18 @@ import (
 )
 
 type Builder struct {
-	backend *Backend
+	backend *utxos
 	ctx     *builder.Context
 }
 
 func New(
+	codec codec.Manager,
 	ctx *snow.Context,
 	cfg *config.Config,
 	feeAssetID ids.ID,
-	backend *Backend,
+	state state.State,
 ) *Builder {
+	backend := newBackend(ctx, state, ctx.SharedMemory, codec)
 	return &Builder{
 		backend: backend,
 		ctx:     newContext(ctx, cfg, feeAssetID),
@@ -197,7 +201,7 @@ func (b *Builder) ExportTx(
 func (b *Builder) builders(kc *secp256k1fx.Keychain) (builder.Builder, signer.Signer) {
 	var (
 		addrs = kc.Addresses()
-		wa    = &walletBackendAdapter{
+		wa    = &walletUTXOsAdapter{
 			b:     b.backend,
 			addrs: addrs,
 		}
