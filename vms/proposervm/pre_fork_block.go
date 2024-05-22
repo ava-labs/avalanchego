@@ -5,6 +5,7 @@ package proposervm
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -16,7 +17,11 @@ import (
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
 
-var _ Block = (*preForkBlock)(nil)
+var (
+	_ Block = (*preForkBlock)(nil)
+
+	errChildOfPreForkBlockHasProposer = errors.New("child of pre-fork block has proposer")
+)
 
 type preForkBlock struct {
 	snowman.Block
@@ -167,8 +172,8 @@ func (b *preForkBlock) verifyPostForkChild(ctx context.Context, child *postForkB
 	}
 
 	// Verify the lack of signature on the node
-	if err := child.SignedBlock.Verify(false, b.vm.ctx.ChainID); err != nil {
-		return err
+	if _, hasProposer := child.SignedBlock.Proposer(); hasProposer {
+		return errChildOfPreForkBlockHasProposer
 	}
 
 	// Verify the inner block and track it as verified

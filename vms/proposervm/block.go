@@ -36,6 +36,7 @@ var (
 	errTimeTooAdvanced          = errors.New("time is too far advanced")
 	errProposerWindowNotStarted = errors.New("proposer window hasn't started")
 	errUnexpectedProposer       = errors.New("unexpected proposer for current window")
+	errProposerMismatch         = errors.New("proposer mismatch")
 	errProposersNotActivated    = errors.New("proposers haven't been activated yet")
 	errPChainHeightTooLow       = errors.New("block P-chain height is too low")
 )
@@ -152,9 +153,9 @@ func (p *postForkCommonComponents) Verify(
 			return err
 		}
 
-		// Verify the signature of the node
-		if err := child.SignedBlock.Verify(shouldHaveProposer, p.vm.ctx.ChainID); err != nil {
-			return err
+		_, hasProposer := child.SignedBlock.Proposer()
+		if shouldHaveProposer != hasProposer {
+			return fmt.Errorf("%w: shouldHaveProposer (%v) != hasProposer (%v)", errProposerMismatch, shouldHaveProposer, hasProposer)
 		}
 
 		p.vm.ctx.Log.Debug("verified post-fork block",
@@ -328,9 +329,9 @@ func (p *postForkCommonComponents) verifyPreDurangoBlockDelay(
 	blk *postForkBlock,
 ) (bool, error) {
 	var (
-		blkTimestamp = blk.Timestamp()
-		childHeight  = blk.Height()
-		proposerID   = blk.Proposer()
+		blkTimestamp  = blk.Timestamp()
+		childHeight   = blk.Height()
+		proposerID, _ = blk.Proposer()
 	)
 	minDelay, err := p.vm.Windower.Delay(
 		ctx,
@@ -363,10 +364,10 @@ func (p *postForkCommonComponents) verifyPostDurangoBlockDelay(
 	blk *postForkBlock,
 ) (bool, error) {
 	var (
-		blkTimestamp = blk.Timestamp()
-		blkHeight    = blk.Height()
-		currentSlot  = proposer.TimeToSlot(parentTimestamp, blkTimestamp)
-		proposerID   = blk.Proposer()
+		blkTimestamp  = blk.Timestamp()
+		blkHeight     = blk.Height()
+		currentSlot   = proposer.TimeToSlot(parentTimestamp, blkTimestamp)
+		proposerID, _ = blk.Proposer()
 	)
 
 	expectedProposerID, err := p.vm.Windower.ExpectedProposer(
