@@ -8,6 +8,7 @@ import (
 	"log"
 	"time"
 
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/indexer"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 	"github.com/ava-labs/avalanchego/wallet/chain/x/builder"
@@ -19,6 +20,7 @@ import (
 func main() {
 	var (
 		uri       = primary.LocalAPIURI + "/ext/index/X/block"
+		xChainID  = ids.FromStringOrPanic("2eNy1mUFdmaxXNj1eQHUe7Np4gju9sJsEtWQ4MX3ToiNKuADed")
 		client    = indexer.NewClient(uri)
 		ctx       = context.Background()
 		nextIndex uint64
@@ -31,7 +33,7 @@ func main() {
 			continue
 		}
 
-		proposerVMBlock, err := block.Parse(container.Bytes)
+		proposerVMBlock, err := block.Parse(container.Bytes, xChainID)
 		if err != nil {
 			log.Fatalf("failed to parse proposervm block: %s\n", err)
 		}
