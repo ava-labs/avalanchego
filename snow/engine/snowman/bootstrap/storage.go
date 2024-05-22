@@ -170,19 +170,22 @@ func execute(
 	defer func() {
 		iterator.Release()
 
-		log("compacting database after executing blocks...")
-		if err := db.Compact(nil, nil); err != nil {
-			// Not a fatal error, log and move on.
-			log("failed to compact bootstrap database after executing blocks",
-				zap.Error(err),
-			)
+		halted := haltable.Halted()
+		if !halted {
+			log("compacting database after executing blocks...")
+			if err := db.Compact(nil, nil); err != nil {
+				// Not a fatal error, log and move on.
+				log("failed to compact bootstrap database after executing blocks",
+					zap.Error(err),
+				)
+			}
 		}
 
 		numProcessed := totalNumberToProcess - tree.Len()
 		log("executed blocks",
 			zap.Uint64("numExecuted", numProcessed),
 			zap.Uint64("numToExecute", totalNumberToProcess),
-			zap.Bool("halted", haltable.Halted()),
+			zap.Bool("halted", halted),
 			zap.Duration("duration", time.Since(startTime)),
 		)
 	}()
@@ -226,7 +229,10 @@ func execute(
 
 			processedSinceIteratorRelease = 0
 			iterator.Release()
-			iterator = interval.GetBlockIteratorWithStart(db, height)
+			// We specify the starting key of the iterator so that the
+			// underlying database doesn't need to scan over the, potentially
+			// not yet compacted, blocks we just deleted.
+			iterator = interval.GetBlockIteratorWithStart(db, height+1)
 		}
 
 		if now := time.Now(); now.After(timeOfNextLog) {
