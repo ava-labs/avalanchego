@@ -34,8 +34,6 @@ func TestWalletService_SendMultiple(t *testing.T) {
 				pendingTxs: linked.NewHashmap[ids.ID, *txs.Tx](),
 			}
 
-			env.vm.ctx.Lock.Unlock()
-
 			assetID := env.genesisTx.ID()
 			addr := keys[0].PublicKey().Address()
 

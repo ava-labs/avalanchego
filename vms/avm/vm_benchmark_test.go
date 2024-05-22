@@ -28,7 +28,6 @@ func BenchmarkLoadUser(b *testing.B) {
 				password: password,
 			}},
 		})
-		env.vm.ctx.Lock.Unlock()
 
 		user, err := keystore.NewUserFromKeystore(env.vm.ctx.Keystore, username, password)
 		require.NoError(err)
@@ -65,7 +64,6 @@ func getAllUTXOsBenchmark(b *testing.B, utxoCount int, randSrc rand.Source) {
 	require := require.New(b)
 
 	env := setup(b, &envConfig{fork: latest})
-	env.vm.ctx.Lock.Unlock()
 
 	addr := ids.GenerateTestShortID()
 
