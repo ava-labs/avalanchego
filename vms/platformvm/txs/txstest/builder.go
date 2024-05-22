@@ -421,35 +421,17 @@ func (b *Builder) builders(keys []*secp256k1.PrivateKey) (builder.Builder, walle
 }
 
 func (b *Builder) FeeCalculator() (*fee.Calculator, error) {
-	var (
-		staticFeeCfg = b.cfg.StaticFeeConfig
-		upgrades     = b.cfg.UpgradeConfig
-		chainTime    = b.state.GetTimestamp()
-		isEActive    = upgrades.IsEActivated(chainTime)
-	)
-
-	var feeCalculator *fee.Calculator
-	if !isEActive {
-		feeCalculator = fee.NewStaticCalculator(staticFeeCfg, upgrades, chainTime)
-	} else {
-		nextChainTime, _, err := state.NextBlockTime(b.state, b.clk)
-		if err != nil {
-			return nil, fmt.Errorf("failed calculating next block time: %w", err)
-		}
-
-		diff, err := state.NewDiffOn(b.state)
-		if err != nil {
-			return nil, fmt.Errorf("failed building diff: %w", err)
-		}
-		diff.SetTimestamp(nextChainTime)
-
-		feeManager, err := state.UpdatedFeeManager(diff, b.cfg.UpgradeConfig, chainTime)
-		if err != nil {
-			return nil, err
-		}
-
-		feeCfg := fee.GetDynamicConfig(isEActive)
-		feeCalculator = fee.NewDynamicCalculator(staticFeeCfg, feeManager, feeCfg.BlockMaxComplexity)
+	parentBlkTime := b.state.GetTimestamp()
+	nextBlkTime, _, err := state.NextBlockTime(b.state, b.clk)
+	if err != nil {
+		return nil, fmt.Errorf("failed calculating next block time: %w", err)
 	}
-	return feeCalculator, nil
+
+	diff, err := state.NewDiffOn(b.state)
+	if err != nil {
+		return nil, fmt.Errorf("failed building diff: %w", err)
+	}
+	diff.SetTimestamp(nextBlkTime)
+
+	return state.PickFeeCalculator(b.cfg, diff, parentBlkTime)
 }

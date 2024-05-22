@@ -9,6 +9,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/upgrade"
 
@@ -102,4 +103,26 @@ func UpdatedFeeManager(state Chain, upgrades upgrade.Config, parentBlkTime time.
 	}
 
 	return feeManager, nil
+}
+
+// helper to create either a static or a dynamic fee calculator, depending on the active upgrade
+func PickFeeCalculator(cfg *config.Config, state Chain, parentBlkTime time.Time) (*fee.Calculator, error) {
+	var (
+		childBlkTime  = state.GetTimestamp()
+		isEActive     = cfg.UpgradeConfig.IsEActivated(childBlkTime)
+		staticFeeCfg  = cfg.StaticFeeConfig
+		feeCalculator *fee.Calculator
+	)
+
+	if !isEActive {
+		feeCalculator = fee.NewStaticCalculator(staticFeeCfg, cfg.UpgradeConfig, childBlkTime)
+	} else {
+		feesCfg := fee.GetDynamicConfig(isEActive)
+		feesMan, err := UpdatedFeeManager(state, cfg.UpgradeConfig, parentBlkTime)
+		if err != nil {
+			return nil, fmt.Errorf("failed updating fee manager: %w", err)
+		}
+		feeCalculator = fee.NewDynamicCalculator(staticFeeCfg, feesMan, feesCfg.BlockMaxComplexity)
+	}
+	return feeCalculator, nil
 }
