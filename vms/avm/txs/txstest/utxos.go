@@ -47,14 +47,14 @@ type utxos struct {
 	codec        codec.Manager
 }
 
-func (b *utxos) UTXOs(addrs set.Set[ids.ShortID], sourceChainID ids.ID) ([]*avax.UTXO, error) {
-	if sourceChainID == b.xchainID {
-		return avax.GetAllUTXOs(b.state, addrs)
+func (u *utxos) UTXOs(addrs set.Set[ids.ShortID], sourceChainID ids.ID) ([]*avax.UTXO, error) {
+	if sourceChainID == u.xchainID {
+		return avax.GetAllUTXOs(u.state, addrs)
 	}
 
 	atomicUTXOs, _, _, err := avax.GetAtomicUTXOs(
-		b.sharedMemory,
-		b.codec,
+		u.sharedMemory,
+		u.codec,
 		sourceChainID,
 		addrs,
 		ids.ShortEmpty,
@@ -64,14 +64,14 @@ func (b *utxos) UTXOs(addrs set.Set[ids.ShortID], sourceChainID ids.ID) ([]*avax
 	return atomicUTXOs, err
 }
 
-func (b *utxos) GetUTXO(addrs set.Set[ids.ShortID], chainID, utxoID ids.ID) (*avax.UTXO, error) {
-	if chainID == b.xchainID {
-		return b.state.GetUTXO(utxoID)
+func (u *utxos) GetUTXO(addrs set.Set[ids.ShortID], chainID, utxoID ids.ID) (*avax.UTXO, error) {
+	if chainID == u.xchainID {
+		return u.state.GetUTXO(utxoID)
 	}
 
 	atomicUTXOs, _, _, err := avax.GetAtomicUTXOs(
-		b.sharedMemory,
-		b.codec,
+		u.sharedMemory,
+		u.codec,
 		chainID,
 		addrs,
 		ids.ShortEmpty,
