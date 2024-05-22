@@ -212,11 +212,11 @@ func (b *Builder) builders(kc *secp256k1fx.Keychain) (builder.Builder, signer.Si
 }
 
 func options(changeAddr ids.ShortID, memo []byte) []common.Option {
-	return common.UnionOptions(
-		[]common.Option{common.WithChangeOwner(&secp256k1fx.OutputOwners{
+	return []common.Option{
+		common.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{changeAddr},
-		})},
-		[]common.Option{common.WithMemo(memo)},
-	)
+		}),
+		common.WithMemo(memo),
+	}
 }
