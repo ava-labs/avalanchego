@@ -180,54 +180,50 @@ func (s *utxoState) PutUTXO(utxo *UTXO) error {
 	s.updateChecksum(utxoID)
 
 	s.utxoCache.Put(utxoID, utxo)
-	if err := s.utxoDB.Put(utxoID[:], utxoBytes); err != nil {
-		return err
-	}
+	return s.utxoDB.Put(utxoID[:], utxoBytes)
 
-	addressable, ok := utxo.Out.(Addressable)
-	if !ok {
-		return nil
-	}
+	// addressable, ok := utxo.Out.(Addressable)
+	// if !ok {
+	// 	return nil
+	// }
 
-	addresses := addressable.Addresses()
-	for _, addr := range addresses {
-		indexList := s.getIndexDB(addr)
-		if err := indexList.Put(utxoID[:], nil); err != nil {
-			return err
-		}
-	}
-	return nil
+	// addresses := addressable.Addresses()
+	// for _, addr := range addresses {
+	// 	indexList := s.getIndexDB(addr)
+	// 	if err := indexList.Put(utxoID[:], nil); err != nil {
+	// 		return err
+	// 	}
+	// }
+	// return nil
 }
 
 func (s *utxoState) DeleteUTXO(utxoID ids.ID) error {
-	utxo, err := s.GetUTXO(utxoID)
-	if err == database.ErrNotFound {
-		return nil
-	}
-	if err != nil {
-		return err
-	}
+	// utxo, err := s.GetUTXO(utxoID)
+	// if err == database.ErrNotFound {
+	// 	return nil
+	// }
+	// if err != nil {
+	// 	return err
+	// }
 
 	s.updateChecksum(utxoID)
 
 	s.utxoCache.Put(utxoID, nil)
-	if err := s.utxoDB.Delete(utxoID[:]); err != nil {
-		return err
-	}
+	return s.utxoDB.Delete(utxoID[:])
 
-	addressable, ok := utxo.Out.(Addressable)
-	if !ok {
-		return nil
-	}
+	// addressable, ok := utxo.Out.(Addressable)
+	// if !ok {
+	// 	return nil
+	// }
 
-	addresses := addressable.Addresses()
-	for _, addr := range addresses {
-		indexList := s.getIndexDB(addr)
-		if err := indexList.Delete(utxoID[:]); err != nil {
-			return err
-		}
-	}
-	return nil
+	// addresses := addressable.Addresses()
+	// for _, addr := range addresses {
+	// 	indexList := s.getIndexDB(addr)
+	// 	if err := indexList.Delete(utxoID[:]); err != nil {
+	// 		return err
+	// 	}
+	// }
+	// return nil
 }
 
 func (s *utxoState) UTXOIDs(addr []byte, start ids.ID, limit int) ([]ids.ID, error) {

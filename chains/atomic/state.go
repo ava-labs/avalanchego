@@ -97,18 +97,18 @@ func (s *state) SetValue(e *Element) error {
 		return err
 	}
 
-	for _, trait := range e.Traits {
-		traitDB := prefixdb.New(trait, s.indexDB)
-		traitList := linkeddb.NewDefault(traitDB)
-		if err := traitList.Put(e.Key, nil); err != nil {
-			return err
-		}
-	}
+	// for _, trait := range e.Traits {
+	// 	traitDB := prefixdb.New(trait, s.indexDB)
+	// 	traitList := linkeddb.NewDefault(traitDB)
+	// 	if err := traitList.Put(e.Key, nil); err != nil {
+	// 		return err
+	// 	}
+	// }
 
 	dbElem := dbElement{
 		Present: true,
 		Value:   e.Value,
-		Traits:  e.Traits,
+		// Traits:  e.Traits,
 	}
 
 	valueBytes, err := Codec.Marshal(CodecVersion, &dbElem)
@@ -168,13 +168,13 @@ func (s *state) RemoveValue(key []byte) error {
 	}
 
 	// Remove [key] from the indexDB for each trait that has indexed this key.
-	for _, trait := range value.Traits {
-		traitDB := prefixdb.New(trait, s.indexDB)
-		traitList := linkeddb.NewDefault(traitDB)
-		if err := traitList.Delete(key); err != nil {
-			return err
-		}
-	}
+	// for _, trait := range value.Traits {
+	// 	traitDB := prefixdb.New(trait, s.indexDB)
+	// 	traitList := linkeddb.NewDefault(traitDB)
+	// 	if err := traitList.Delete(key); err != nil {
+	// 		return err
+	// 	}
+	// }
 	return s.valueDB.Delete(key)
 }
 
