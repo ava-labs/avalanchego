@@ -61,12 +61,16 @@ function build_images {
     docker_cmd="${docker_cmd} --build-arg AVALANCHEGO_NODE_IMAGE=antithesis-avalanchego-node:${TAG}"
   fi
 
-  # Build node image first to allow the workload image to use it.
-  ${docker_cmd} -t "${node_image_name}" -f "${node_dockerfile}" "${AVALANCHE_PATH}"
-  if [[ -n "${image_prefix}" ]]; then
-    # Push images with an image prefix since the prefix defines a registry location
+  if [[ -n "${image_prefix}" && -z "${node_only}" ]]; then
+    # Push images with an image prefix since the prefix defines a
+    # registry location, and only if building all images. When
+    # building just the node image the image is only intended to be
+    # used locally.
     docker_cmd="${docker_cmd} --push"
   fi
+
+  # Build node image first to allow the workload image to use it.
+  ${docker_cmd} -t "${node_image_name}" -f "${node_dockerfile}" "${AVALANCHE_PATH}"
 
   if [[ -n "${node_only}" ]]; then
     # Skip building the config and workload images. Supports building the avalanchego
