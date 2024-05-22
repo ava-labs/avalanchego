@@ -75,7 +75,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/upgrade"
 	"github.com/ava-labs/avalanchego/vms/registry"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/runtime"
@@ -1134,25 +1133,15 @@ func (n *Node) initVMs() error {
 				SybilProtectionEnabled:    n.Config.SybilProtectionEnabled,
 				PartialSyncPrimaryNetwork: n.Config.PartialSyncPrimaryNetwork,
 				TrackedSubnets:            n.Config.TrackedSubnets,
-				StaticFeeConfig: fee.StaticConfig{
-					TxFee:                         n.Config.TxFee,
-					CreateAssetTxFee:              n.Config.CreateAssetTxFee,
-					CreateSubnetTxFee:             n.Config.CreateSubnetTxFee,
-					TransformSubnetTxFee:          n.Config.TransformSubnetTxFee,
-					CreateBlockchainTxFee:         n.Config.CreateBlockchainTxFee,
-					AddPrimaryNetworkValidatorFee: n.Config.AddPrimaryNetworkValidatorFee,
-					AddPrimaryNetworkDelegatorFee: n.Config.AddPrimaryNetworkDelegatorFee,
-					AddSubnetValidatorFee:         n.Config.AddSubnetValidatorFee,
-					AddSubnetDelegatorFee:         n.Config.AddSubnetDelegatorFee,
-				},
-				UptimePercentage:  n.Config.UptimeRequirement,
-				MinValidatorStake: n.Config.MinValidatorStake,
-				MaxValidatorStake: n.Config.MaxValidatorStake,
-				MinDelegatorStake: n.Config.MinDelegatorStake,
-				MinDelegationFee:  n.Config.MinDelegationFee,
-				MinStakeDuration:  n.Config.MinStakeDuration,
-				MaxStakeDuration:  n.Config.MaxStakeDuration,
-				RewardConfig:      n.Config.RewardConfig,
+				StaticFeeConfig:           n.Config.StaticConfig,
+				UptimePercentage:          n.Config.UptimeRequirement,
+				MinValidatorStake:         n.Config.MinValidatorStake,
+				MaxValidatorStake:         n.Config.MaxValidatorStake,
+				MinDelegatorStake:         n.Config.MinDelegatorStake,
+				MinDelegationFee:          n.Config.MinDelegationFee,
+				MinStakeDuration:          n.Config.MinStakeDuration,
+				MaxStakeDuration:          n.Config.MaxStakeDuration,
+				RewardConfig:              n.Config.RewardConfig,
 				UpgradeConfig: upgrade.Config{
 					ApricotPhase3Time: version.GetApricotPhase3Time(n.Config.NetworkID),
 					ApricotPhase5Time: version.GetApricotPhase5Time(n.Config.NetworkID),
