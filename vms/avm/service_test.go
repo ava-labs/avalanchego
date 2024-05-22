@@ -918,7 +918,7 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 	issueAndAccept(require, env.vm, env.issuer, createAssetTx)
 
 	op := buildNFTxMintOp(createAssetTx, key, 1, 1)
-	mintNFTTx := buildOperationTxWithOp(t, env, []*txs.Operation{op})
+	mintNFTTx := buildOperationTxWithOps(t, env, op)
 	issueAndAccept(require, env.vm, env.issuer, mintNFTTx)
 
 	reply := api.GetTxReply{}
@@ -1067,7 +1067,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
 
 	mintOp1 := buildNFTxMintOp(createAssetTx, key, 1, 0)
 	mintOp2 := buildNFTxMintOp(createAssetTx, key, 2, 1)
-	mintNFTTx := buildOperationTxWithOp(t, env, []*txs.Operation{mintOp1, mintOp2})
+	mintNFTTx := buildOperationTxWithOps(t, env, mintOp1, mintOp2)
 	issueAndAccept(require, env.vm, env.issuer, mintNFTTx)
 
 	reply := api.GetTxReply{}
@@ -1246,7 +1246,7 @@ func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 	issueAndAccept(require, env.vm, env.issuer, createAssetTx)
 
 	op := buildSecpMintOp(createAssetTx, key, 1)
-	mintSecpOpTx := buildOperationTxWithOp(t, env, []*txs.Operation{op})
+	mintSecpOpTx := buildOperationTxWithOps(t, env, op)
 	issueAndAccept(require, env.vm, env.issuer, mintSecpOpTx)
 
 	reply := api.GetTxReply{}
@@ -1397,7 +1397,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleSecpMintOp(t *testing.T) {
 
 	op1 := buildSecpMintOp(createAssetTx, key, 1)
 	op2 := buildSecpMintOp(createAssetTx, key, 2)
-	mintSecpOpTx := buildOperationTxWithOp(t, env, []*txs.Operation{op1, op2})
+	mintSecpOpTx := buildOperationTxWithOps(t, env, op1, op2)
 	issueAndAccept(require, env.vm, env.issuer, mintSecpOpTx)
 
 	reply := api.GetTxReply{}
@@ -1579,7 +1579,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
 	issueAndAccept(require, env.vm, env.issuer, createAssetTx)
 
 	op := buildPropertyFxMintOp(createAssetTx, key, 1)
-	mintPropertyFxOpTx := buildOperationTxWithOp(t, env, []*txs.Operation{op})
+	mintPropertyFxOpTx := buildOperationTxWithOps(t, env, op)
 	issueAndAccept(require, env.vm, env.issuer, mintPropertyFxOpTx)
 
 	reply := api.GetTxReply{}
@@ -1725,7 +1725,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) 
 
 	op1 := buildPropertyFxMintOp(createAssetTx, key, 1)
 	op2 := buildPropertyFxMintOp(createAssetTx, key, 2)
-	mintPropertyFxOpTx := buildOperationTxWithOp(t, env, []*txs.Operation{op1, op2})
+	mintPropertyFxOpTx := buildOperationTxWithOps(t, env, op1, op2)
 	issueAndAccept(require, env.vm, env.issuer, mintPropertyFxOpTx)
 
 	reply := api.GetTxReply{}
@@ -2014,7 +2014,7 @@ func buildSecpMintOp(createAssetTx *txs.Tx, key *secp256k1.PrivateKey, outputInd
 	}
 }
 
-func buildOperationTxWithOp(t *testing.T, env *environment, ops []*txs.Operation) *txs.Tx {
+func buildOperationTxWithOps(t *testing.T, env *environment, op ...*txs.Operation) *txs.Tx {
 	var (
 		key = keys[0]
 		kc  = secp256k1fx.NewKeychain()
@@ -2022,7 +2022,7 @@ func buildOperationTxWithOp(t *testing.T, env *environment, ops []*txs.Operation
 	kc.Add(key)
 
 	tx, err := env.txBuilder.Operation(
-		ops,
+		op,
 		kc,
 		key.Address(),
 	)
