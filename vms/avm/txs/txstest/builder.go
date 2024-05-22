@@ -33,7 +33,7 @@ func New(
 	feeAssetID ids.ID,
 	state state.State,
 ) *Builder {
-	utxos := newBackend(ctx, state, ctx.SharedMemory, codec)
+	utxos := newUTXOs(ctx, state, ctx.SharedMemory, codec)
 	return &Builder{
 		utxos: utxos,
 		ctx:   newContext(ctx, cfg, feeAssetID),
@@ -76,13 +76,11 @@ func (b *Builder) BaseTx(
 
 	utx, err := xBuilder.NewBaseTx(
 		outs,
-		[]common.Option{
-			common.WithChangeOwner(&secp256k1fx.OutputOwners{
-				Threshold: 1,
-				Addrs:     []ids.ShortID{changeAddr},
-			}),
-			common.WithMemo(memo),
-		}...,
+		common.WithChangeOwner(&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{changeAddr},
+		}),
+		common.WithMemo(memo),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed building base tx: %w", err)
@@ -204,14 +202,15 @@ func (b *Builder) ExportTx(
 		},
 	}}
 
-	if utx, err := xBuilder.NewExportTx(
+	utx, err := xBuilder.NewExportTx(
 		destinationChain,
 		outputs,
 		common.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{changeAddr},
 		}),
-	); err != nil {
+	)
+	if err != nil {
 		return nil, fmt.Errorf("failed building export tx: %w", err)
 	}
 
@@ -222,7 +221,7 @@ func (b *Builder) builders(kc *secp256k1fx.Keychain) (builder.Builder, signer.Si
 	var (
 		addrs = kc.Addresses()
 		wa    = &walletUTXOsAdapter{
-			b:     b.utxos,
+			utxos: b.utxos,
 			addrs: addrs,
 		}
 		builder = builder.New(addrs, b.ctx, wa)

@@ -26,7 +26,7 @@ var (
 	_ signer.Backend  = (*walletUTXOsAdapter)(nil)
 )
 
-func newBackend(
+func newUTXOs(
 	ctx *snow.Context,
 	state state.State,
 	sharedMemory atomic.SharedMemory,
@@ -90,14 +90,14 @@ func (b *utxos) GetUTXO(addrs set.Set[ids.ShortID], chainID, utxoID ids.ID) (*av
 }
 
 type walletUTXOsAdapter struct {
-	b     *utxos
+	utxos *utxos
 	addrs set.Set[ids.ShortID]
 }
 
 func (w *walletUTXOsAdapter) UTXOs(_ context.Context, sourceChainID ids.ID) ([]*avax.UTXO, error) {
-	return w.b.UTXOs(w.addrs, sourceChainID)
+	return w.utxos.UTXOs(w.addrs, sourceChainID)
 }
 
 func (w *walletUTXOsAdapter) GetUTXO(_ context.Context, chainID, utxoID ids.ID) (*avax.UTXO, error) {
-	return w.b.GetUTXO(w.addrs, chainID, utxoID)
+	return w.utxos.GetUTXO(w.addrs, chainID, utxoID)
 }
