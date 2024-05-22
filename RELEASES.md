@@ -4,6 +4,90 @@
 
 This version is backwards compatible to [v1.11.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.11.0). It is optional, but encouraged.
 
+The plugin version is unchanged at `35` and is compatible with versions `v1.11.3-v1.11.5`.
+
+### APIs
+
+- metercacher metrics changes
+- meterdb metrics changes
+- p2p compression metrics changes
+- p2p sent + failed to send + received messages metrics
+- p2p sdk sent + received messages metrics
+
+### Configs
+
+### Fixes
+
+- Fixed panic when running avalanchego in environments with an incorrectly implemented monotonic clock.
+- Fixed memory corruption when accessing keys and values from released pebbledb iterators.
+- Fixed prefixdb compaction when specifying a `nil` limit.
+- Fixed peer connection tracking in the P-chain and C-chain to re-enable tx pull gossip.
+
+### What's Changed
+
+- Consolidate record poll by @aaronbuchwald in https://github.com/ava-labs/avalanchego/pull/2970
+- Update metercacher to use vectors by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2979
+- Reduce p2p sdk metrics by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2980
+- Use vectors in message queue metrics by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2985
+- Use vectors for p2p message metrics by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2983
+- Simplify gossip metrics by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2984
+- Use vectors for message handler metrics by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2987
+- Use vector in message sender by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2988
+- Simplify go version maintenance by @marun in https://github.com/ava-labs/avalanchego/pull/2977
+- Use vector for router latency metrics by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2989
+- Use vectors for accepted tx and block metrics by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2990
+- fix: version application error by @jujube in https://github.com/ava-labs/avalanchego/pull/2995
+- Chore: fix some typos. by @hattizai in https://github.com/ava-labs/avalanchego/pull/2993
+- Cleanup meterdb metrics by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2991
+- Cleanup compression metrics by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2992
+- Fix antithesis image publication by @marun in https://github.com/ava-labs/avalanchego/pull/2998
+- Remove unused `Metadata` struct by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/3001
+- prefixdb: fix bug with Compact nil limit by @a1k0n in https://github.com/ava-labs/avalanchego/pull/3000
+- Update go version to 1.21.10 by @marun in https://github.com/ava-labs/avalanchego/pull/3004
+- vms/txs/mempool: unify avm and platformvm mempool implementations by @lebdron in https://github.com/ava-labs/avalanchego/pull/2994
+- Use gauges for time metrics by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3009
+- Chore: fix typos. by @cocoyeal in https://github.com/ava-labs/avalanchego/pull/3010
+- [antithesis] Refactor existing job to support xsvm test setup by @marun in https://github.com/ava-labs/avalanchego/pull/2976
+- chore: fix some function names by @cartnavoy in https://github.com/ava-labs/avalanchego/pull/3015
+- Mark nodes as connected to the P-chain networking stack by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2981
+- [antithesis] Ensure images with a prefix are pushed by @marun in https://github.com/ava-labs/avalanchego/pull/3016
+- boostrapper: compact blocks before iterating them by @a1k0n in https://github.com/ava-labs/avalanchego/pull/2997
+- Remove pre-Durango networking checks by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3018
+- Repackaged upgrades times into upgrade package by @abi87 in https://github.com/ava-labs/avalanchego/pull/3019
+- Standardize peer logs by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3017
+- Fix pebbledb memory corruption by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3020
+- [vms/avm] fix linter error in benchmark : Use of weak random number generator by @tsachiherman in https://github.com/ava-labs/avalanchego/pull/3023
+- Simplify sampler interface by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3026
+- [build] Update linter version by @tsachiherman in https://github.com/ava-labs/avalanchego/pull/3024
+- fix broken link. by @cocoyeal in https://github.com/ava-labs/avalanchego/pull/3028
+- `gossipping` -> `gossiping` by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/3033
+- [tmpnet] Ensure tmpnet compatibility with windows by @marun in https://github.com/ava-labs/avalanchego/pull/3002
+- Fix negative ETA caused by rollback in vm.SetState by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3036
+- [tmpnet] Enable single node networks by @marun in https://github.com/ava-labs/avalanchego/pull/3003
+- P-chain - introducing fees calculators by @abi87 in https://github.com/ava-labs/avalanchego/pull/2698
+- Change default staking key from RSA 4096 to secp256r1 by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3025
+- Fix ACP links by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/3037
+- Prevent unnecessary bandwidth from activated ACPs by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/3031
+- [antithesis] Add test setup for xsvm by @marun in https://github.com/ava-labs/avalanchego/pull/2982
+
+### New Contributors
+
+- @jujube made their first contribution in https://github.com/ava-labs/avalanchego/pull/2995
+- @hattizai made their first contribution in https://github.com/ava-labs/avalanchego/pull/2993
+- @a1k0n made their first contribution in https://github.com/ava-labs/avalanchego/pull/3000
+- @lebdron made their first contribution in https://github.com/ava-labs/avalanchego/pull/2994
+- @cocoyeal made their first contribution in https://github.com/ava-labs/avalanchego/pull/3010
+- @cartnavoy made their first contribution in https://github.com/ava-labs/avalanchego/pull/3015
+- @tsachiherman made their first contribution in https://github.com/ava-labs/avalanchego/pull/3023
+
+**Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.11.5...v1.11.6-rc.2
+
+**Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.11.5...v1.11.6
+
+## [v1.11.5](https://github.com/ava-labs/avalanchego/releases/tag/v1.11.5)
+
+This version is backwards compatible to [v1.11.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.11.0). It is optional, but encouraged.
+
 The plugin version is unchanged at `35` and is compatible with versions `v1.11.3-v1.11.4`.
 
 ### APIs
