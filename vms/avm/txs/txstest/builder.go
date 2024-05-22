@@ -56,12 +56,7 @@ func (b *Builder) CreateAssetTx(
 		return nil, fmt.Errorf("failed building base tx: %w", err)
 	}
 
-	tx, err := signer.SignUnsigned(context.Background(), xSigner, utx)
-	if err != nil {
-		return nil, err
-	}
-
-	return tx, nil
+	return signer.SignUnsigned(context.Background(), xSigner, utx)
 }
 
 func (b *Builder) BaseTx(
@@ -80,12 +75,7 @@ func (b *Builder) BaseTx(
 		return nil, fmt.Errorf("failed building base tx: %w", err)
 	}
 
-	tx, err := signer.SignUnsigned(context.Background(), xSigner, utx)
-	if err != nil {
-		return nil, err
-	}
-
-	return tx, nil
+	return signer.SignUnsigned(context.Background(), xSigner, utx)
 }
 
 func (b *Builder) MintNFT(
@@ -201,11 +191,7 @@ func (b *Builder) ExportTx(
 		return nil, fmt.Errorf("failed building export tx: %w", err)
 	}
 
-	tx, err := signer.SignUnsigned(context.Background(), xSigner, utx)
-	if err != nil {
-		return nil, err
-	}
-	return tx, nil
+	return signer.SignUnsigned(context.Background(), xSigner, utx)
 }
 
 func (b *Builder) builders(kc *secp256k1fx.Keychain) (builder.Builder, signer.Signer) {
