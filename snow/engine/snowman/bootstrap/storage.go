@@ -139,7 +139,9 @@ func execute(
 		log("compacting database before executing blocks...")
 		if err := db.Compact(nil, nil); err != nil {
 			// Not a fatal error, log and move on.
-			log("failed to compact bootstrap database before executing blocks", zap.Error(err))
+			log("failed to compact bootstrap database before executing blocks",
+				zap.Error(err),
+			)
 		}
 	}
 
@@ -167,6 +169,22 @@ func execute(
 	)
 	defer func() {
 		iterator.Release()
+
+		log("compacting database after executing blocks...")
+		if err := db.Compact(nil, nil); err != nil {
+			// Not a fatal error, log and move on.
+			log("failed to compact bootstrap database after executing blocks",
+				zap.Error(err),
+			)
+		}
+
+		numProcessed := totalNumberToProcess - tree.Len()
+		log("executed blocks",
+			zap.Uint64("numExecuted", numProcessed),
+			zap.Uint64("numToExecute", totalNumberToProcess),
+			zap.Bool("halted", haltable.Halted()),
+			zap.Duration("duration", time.Since(startTime)),
+		)
 	}()
 
 	log("executing blocks",
@@ -208,7 +226,7 @@ func execute(
 
 			processedSinceIteratorRelease = 0
 			iterator.Release()
-			iterator = interval.GetBlockIterator(db)
+			iterator = interval.GetBlockIteratorWithStart(db, height)
 		}
 
 		if now := time.Now(); now.After(timeOfNextLog) {
@@ -248,16 +266,5 @@ func execute(
 	if err := writeBatch(); err != nil {
 		return err
 	}
-	if err := iterator.Error(); err != nil {
-		return err
-	}
-
-	numProcessed := totalNumberToProcess - tree.Len()
-	log("executed blocks",
-		zap.Uint64("numExecuted", numProcessed),
-		zap.Uint64("numToExecute", totalNumberToProcess),
-		zap.Bool("halted", haltable.Halted()),
-		zap.Duration("duration", time.Since(startTime)),
-	)
-	return nil
+	return iterator.Error()
 }
