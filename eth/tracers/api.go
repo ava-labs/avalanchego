@@ -1067,8 +1067,16 @@ func overrideConfig(original *params.ChainConfig, override *params.ChainConfig) 
 		copy.DurangoTimestamp = timestamp
 		canon = false
 	}
+	if timestamp := override.EUpgradeTimestamp; timestamp != nil {
+		copy.EUpgradeTimestamp = timestamp
+		canon = false
+	}
 	if timestamp := override.CancunTime; timestamp != nil {
 		copy.CancunTime = timestamp
+		canon = false
+	}
+	if timestamp := override.VerkleTime; timestamp != nil {
+		copy.VerkleTime = timestamp
 		canon = false
 	}
 
