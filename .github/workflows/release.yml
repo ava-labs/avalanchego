@@ -4,11 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Tag to include in artifact name'
+        description: "Tag to include in artifact name"
         required: true
   push:
     tags:
-     - 'v[0-9]+.[0-9]+.[0-9]+'
+      - "v[0-9]+.[0-9]+.[0-9]+"
 
 jobs:
   release:
@@ -23,7 +23,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '~1.21.9'
+          go-version: "~1.21.10"
           check-latest: true
       - name: Set up arm64 cross compiler
         run: |

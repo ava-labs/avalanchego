@@ -5,11 +5,11 @@ on:
     branches:
       - master
     tags:
-      - '*'
+      - "*"
   pull_request:
 
 env:
-  min_go_version: '~1.21.9'
+  min_go_version: "~1.21.10"
   grafana_url: https://grafana-experimental.avax-dev.network/d/kBQpRdWnk/avalanche-main-dashboard?orgId=1&refresh=10s&var-filter=is_ephemeral_node%7C%3D%7Cfalse&var-filter=gh_repo%7C%3D%7Cava-labs%2Fsubnet-evm&var-filter=gh_run_id%7C%3D%7C${{ github.run_id }}&var-filter=gh_run_attempt%7C%3D%7C${{ github.run_attempt }}
 
 jobs:
@@ -58,7 +58,7 @@ jobs:
         shell: bash
       - run: ./scripts/build_test.sh
         env:
-         TIMEOUT: ${{ env.TIMEOUT }}
+          TIMEOUT: ${{ env.TIMEOUT }}
         shell: bash
       - run: ./scripts/coverage.sh
         shell: bash
