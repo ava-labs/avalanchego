@@ -1,6 +1,8 @@
 # Release Notes
 
 ## [v0.13.4](https://github.com/ava-labs/coreth/releases/tag/v0.13.4)
+- Fixes snapshot use when state sync was explicitly enabled
+- Fixes v0.13.3 locking regression in async snapshot generation
 - Update go-ethereum to v1.13.8
 - Bump AvalancheGo to v1.11.6
 - Bump golang version requirement to 1.21.10
