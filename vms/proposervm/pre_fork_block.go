@@ -12,6 +12,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
@@ -172,7 +173,7 @@ func (b *preForkBlock) verifyPostForkChild(ctx context.Context, child *postForkB
 	}
 
 	// Verify the lack of signature on the node
-	if _, hasProposer := child.SignedBlock.Proposer(); hasProposer {
+	if child.SignedBlock.Proposer() != ids.EmptyNodeID {
 		return errChildOfPreForkBlockHasProposer
 	}
 

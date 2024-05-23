@@ -153,7 +153,7 @@ func (p *postForkCommonComponents) Verify(
 			return err
 		}
 
-		_, hasProposer := child.SignedBlock.Proposer()
+		hasProposer := child.SignedBlock.Proposer() != ids.EmptyNodeID
 		if shouldHaveProposer != hasProposer {
 			return fmt.Errorf("%w: shouldHaveProposer (%v) != hasProposer (%v)", errProposerMismatch, shouldHaveProposer, hasProposer)
 		}
@@ -329,9 +329,9 @@ func (p *postForkCommonComponents) verifyPreDurangoBlockDelay(
 	blk *postForkBlock,
 ) (bool, error) {
 	var (
-		blkTimestamp  = blk.Timestamp()
-		childHeight   = blk.Height()
-		proposerID, _ = blk.Proposer()
+		blkTimestamp = blk.Timestamp()
+		childHeight  = blk.Height()
+		proposerID   = blk.Proposer()
 	)
 	minDelay, err := p.vm.Windower.Delay(
 		ctx,
@@ -364,10 +364,10 @@ func (p *postForkCommonComponents) verifyPostDurangoBlockDelay(
 	blk *postForkBlock,
 ) (bool, error) {
 	var (
-		blkTimestamp  = blk.Timestamp()
-		blkHeight     = blk.Height()
-		currentSlot   = proposer.TimeToSlot(parentTimestamp, blkTimestamp)
-		proposerID, _ = blk.Proposer()
+		blkTimestamp = blk.Timestamp()
+		blkHeight    = blk.Height()
+		currentSlot  = proposer.TimeToSlot(parentTimestamp, blkTimestamp)
+		proposerID   = blk.Proposer()
 	)
 
 	expectedProposerID, err := p.vm.Windower.ExpectedProposer(

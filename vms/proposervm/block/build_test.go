@@ -46,10 +46,7 @@ func TestBuild(t *testing.T) {
 	require.Equal(pChainHeight, builtBlock.PChainHeight())
 	require.Equal(timestamp, builtBlock.Timestamp())
 	require.Equal(innerBlockBytes, builtBlock.Block())
-
-	proppserID, hasProposer := builtBlock.Proposer()
-	require.True(hasProposer)
-	require.Equal(nodeID, proppserID)
+	require.Equal(nodeID, builtBlock.Proposer())
 }
 
 func TestBuildUnsigned(t *testing.T) {
@@ -67,10 +64,7 @@ func TestBuildUnsigned(t *testing.T) {
 	require.Equal(pChainHeight, builtBlock.PChainHeight())
 	require.Equal(timestamp, builtBlock.Timestamp())
 	require.Equal(innerBlockBytes, builtBlock.Block())
-
-	proposer, hasProposer := builtBlock.Proposer()
-	require.False(hasProposer)
-	require.Equal(ids.EmptyNodeID, proposer)
+	require.Equal(ids.EmptyNodeID, builtBlock.Proposer())
 }
 
 func TestBuildHeader(t *testing.T) {

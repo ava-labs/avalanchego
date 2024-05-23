@@ -37,9 +37,9 @@ type SignedBlock interface {
 	PChainHeight() uint64
 	Timestamp() time.Time
 
-	// Proposer returns the ID of the node that proposed this block, or false if
-	// no node signed this block.
-	Proposer() (ids.NodeID, bool)
+	// Proposer returns the ID of the node that proposed this block. If no node
+	// signed this block, [ids.EmptyNodeID] will be returned.
+	Proposer() ids.NodeID
 }
 
 type statelessUnsignedBlock struct {
@@ -131,6 +131,6 @@ func (b *statelessBlock) Timestamp() time.Time {
 	return b.timestamp
 }
 
-func (b *statelessBlock) Proposer() (ids.NodeID, bool) {
-	return b.proposer, b.cert != nil
+func (b *statelessBlock) Proposer() ids.NodeID {
+	return b.proposer
 }
