@@ -35,6 +35,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block/builder"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -75,6 +76,28 @@ var (
 		formatting.JSON, formatting.Hex,
 	}
 )
+
+func testReplayFeeCalculator(cfg *config.Config, state state.Chain) (*fee.Calculator, error) {
+	var (
+		blkTime       = state.GetTimestamp()
+		isEActive     = cfg.UpgradeConfig.IsEActivated(blkTime)
+		staticFeeCfg  = cfg.StaticFeeConfig
+		feeCalculator *fee.Calculator
+	)
+
+	if !isEActive {
+		feeCalculator = fee.NewStaticCalculator(staticFeeCfg, cfg.UpgradeConfig, blkTime)
+	} else {
+		feesCfg := fee.GetDynamicConfig(isEActive)
+		feeRates, err := state.GetFeeRates()
+		if err != nil {
+			return nil, fmt.Errorf("failed retrieving fee rates: %w", err)
+		}
+		feesMan := commonfees.NewManager(feeRates)
+		feeCalculator = fee.NewDynamicCalculator(staticFeeCfg, feesMan, feesCfg.BlockMaxComplexity)
+	}
+	return feeCalculator, nil
+}
 
 func defaultService(t *testing.T) (*Service, *mutableSharedMemory, *txstest.Builder) {
 	vm, txBuilder, _, mutableSharedMemory := defaultVM(t, latestFork)
@@ -383,23 +406,8 @@ func TestGetBalance(t *testing.T) {
 		if idx == 0 {
 			// we use the first key to fund a subnet creation in [defaultGenesis].
 			// As such we need to account for the subnet creation fee
-			var (
-				chainTime    = service.vm.state.GetTimestamp()
-				staticFeeCfg = service.vm.Config.StaticFeeConfig
-				upgrades     = service.vm.Config.UpgradeConfig
-				feeCalc      *fee.Calculator
-			)
-
-			if !upgrades.IsEActivated(chainTime) {
-				feeCalc = fee.NewStaticCalculator(staticFeeCfg, upgrades, chainTime)
-			} else {
-				feeRates, err := service.vm.state.GetFeeRates()
-				require.NoError(err)
-
-				feeCfg := fee.GetDynamicConfig(true)
-				feeMan := commonfees.NewManager(feeRates)
-				feeCalc = fee.NewDynamicCalculator(staticFeeCfg, feeMan, feeCfg.BlockMaxComplexity)
-			}
+			feeCalc, err := testReplayFeeCalculator(&service.vm.Config, service.vm.state)
+			require.NoError(err)
 
 			fee, err := feeCalc.ComputeFee(testSubnet1.Unsigned, testSubnet1.Creds)
 			require.NoError(err)
