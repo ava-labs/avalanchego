@@ -106,6 +106,11 @@ The plugin version is unchanged at `35` and is compatible with versions `v1.11.3
 - Fix ACP links by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/3037
 - Prevent unnecessary bandwidth from activated ACPs by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/3031
 - [antithesis] Add test setup for xsvm by @marun in https://github.com/ava-labs/avalanchego/pull/2982
+- [antithesis] Ensure node image is pushed by @marun in https://github.com/ava-labs/avalanchego/pull/3042
+- Cleanup fee config passing by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3043
+- Fix typo fix by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3044
+- Grab iterator at previously executed height by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3045
+- Verify signatures during Parse by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3046
 
 ### New Contributors
 
