@@ -8,20 +8,46 @@ The plugin version is unchanged at `35` and is compatible with versions `v1.11.3
 
 ### APIs
 
-- metercacher metrics changes
-- meterdb metrics changes
-- p2p compression metrics changes
-- p2p sent + failed to send + received messages metrics
-- p2p sdk sent + received messages metrics
-- consensus handler message queue metrics
-- consensus handler metrics
-- consensus sender metrics
-- consensus timeout metrics
-- X-chain and P-chain tx metrics
-- P-chain block metrics
-- X-chain and P-chain mempool metrics
-
-### Configs
+- Updated cache metrics:
+  - `*_cache_put_sum` was replaced with `*_cache_put_time`
+  - `*_cache_get_sum` was replaced with `*_cache_get_time`
+  - `*_cache_hit` and `*_cache_miss` were removed and `*_cache_get_count` added a `result` label
+- Updated db metrics:
+  - `*_db_{method}_count` were replaced with `*_db_calls` with a `method` label
+  - `*_db_{method}_sum` were replaced with `*_db_duration` with a `method` label
+  - `*_db_{method}_size_count` were deleted
+  - `*_db_{method}_size_sum` were replaced with `*_db_size` with a `method` label
+- Updated p2p message compression metrics:
+  - `avalanche_network_codec_{type}_{op}_{direction}_time_count` were replaced with `avalanche_network_codec_compressed_count` with `direction`, `op`, and `type` labels
+- Updated p2p message metrics:
+  - `avalanche_network_{op}_{io}` were replaced with `avalanche_network_msgs` with `compressed:"false"`, `io`, and `op` labels
+  - `avalanche_network_{op}_{io}_bytes` were replaced with `avalanche_network_msgs_bytes` with `io` and `op` labels
+  - `avalanche_network_{op}_compression_saved_{io}_bytes_sum` were replaced with `avalanche_network_msgs_bytes_saved` with `io` and `op` labels
+  - `avalanche_network_{op}_compression_saved_{io}_bytes_count` were replaced with `avalanche_network_msgs` with `compressed:"true"`, `io`, and `op` labels
+  - `avalanche_network_{op}_failed` were replaced with `avalanche_network_msgs_failed_to_send` with an `op` label
+- Updated p2p sdk message metrics:
+  - `*_p2p_{op}_count` were replaced with `*_p2p_msg_count` with an `op` label
+  - `*_p2p_{op}_time` were replaced with `*_p2p_msg_time` with an `op` label
+- Updated consensus message queue metrics:
+  - `avalanche_{chainID}_handler_unprocessed_msgs_{op}` were replaced with `avalanche_{chainID}_handler_unprocessed_msgs_count` with an `op` label
+- Updated consensus message queue metrics:
+  - `avalanche_{chainID}_handler_unprocessed_msgs_{op}` were replaced with `avalanche_{chainID}_handler_unprocessed_msgs_count` with an `op` label
+  - `avalanche_{chainID}_handler_async_unprocessed_msgs_{op}` were replaced with `avalanche_{chainID}_handler_unprocessed_msgs_count` with an `op` label
+- Updated consensus handler metrics:
+  - `avalanche_{chainID}_handler_{op}_count` were replaced with `avalanche_{chainID}_handler_messages` with an `op` label
+  - `avalanche_{chainID}_handler_{op}_msg_handling_count` was deleted
+  - `avalanche_{chainID}_handler_{op}_msg_handling_sum` were replaced with `avalanche_{chainID}_handler_message_handling_time` with an `op` label
+  - `avalanche_{chainID}_handler_{op}_sum` were replaced with `avalanche_{chainID}_handler_locking_time`
+- Updated consensus sender metrics:
+  - `avalanche_{chainID}_{op}_failed_benched` were replaced with `avalanche_{chainID}_failed_benched` with an `op` label
+- Updated consensus latency metrics:
+  - `avalanche_{chainID}_lat_{op}_count` were replaced with `avalanche_{chainID}_response_messages` with an `op` label
+  - `avalanche_{chainID}_lat_{op}_sum` were replaced with `avalanche_{chainID}_response_message_latencies` with an `op` label
+- Updated X-chain metrics:
+  - `avalanche_X_vm_avalanche_{tx}_txs_accepted` were replaced with `avalanche_X_vm_avalanche_txs_accepted` with a `tx` label
+- Updated P-chain metrics:
+  - `avalanche_P_vm_{tx}_txs_accepted` were replaced with `avalanche_P_vm_txs_accepted` with a `tx` label
+  - `avalanche_P_vm_{blk}_blks_accepted` were replaced with `avalanche_P_vm_blks_accepted` with a `blk` label
 
 ### Fixes
 
@@ -30,7 +56,6 @@ The plugin version is unchanged at `35` and is compatible with versions `v1.11.3
 - Fixed prefixdb compaction when specifying a `nil` limit.
 - Fixed peer connection tracking in the P-chain and C-chain to re-enable tx pull gossip.
 - Fixed negative ETA while fetching blocks after aborting state sync.
-- Fixed C-chain deadlock while executing blocks in bootstrapping after aborting state sync.
 - Fixed C-chain deadlock while executing blocks in bootstrapping after aborting state sync.
 - Fixed performance regression while executing blocks in bootstrapping.
 
