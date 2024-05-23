@@ -51,13 +51,14 @@ The plugin version is unchanged at `35` and is compatible with versions `v1.11.3
 
 ### Fixes
 
-- Fixed performance regression while executing blocks in bootstrapping.
-- Fixed peer connection tracking in the P-chain and C-chain to re-enable tx pull gossip.
-- Fixed C-chain deadlock while executing blocks in bootstrapping after aborting state sync.
-- Fixed negative ETA while fetching blocks after aborting state sync.
-- Fixed panic when running avalanchego in environments with an incorrectly implemented monotonic clock.
-- Fixed memory corruption when accessing keys and values from released pebbledb iterators.
-- Fixed prefixdb compaction when specifying a `nil` limit.
+- Fixed performance regression while executing blocks in bootstrapping
+- Fixed peer connection tracking in the P-chain and C-chain to re-enable tx pull gossip
+- Fixed C-chain deadlock while executing blocks in bootstrapping after aborting state sync
+- Fixed negative ETA while fetching blocks after aborting state sync
+- Fixed C-chain snapshot initialization after state sync
+- Fixed panic when running avalanchego in environments with an incorrectly implemented monotonic clock
+- Fixed memory corruption when accessing keys and values from released pebbledb iterators
+- Fixed prefixdb compaction when specifying a `nil` limit
 
 ### What's Changed
 
