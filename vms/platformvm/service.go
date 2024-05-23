@@ -1851,6 +1851,7 @@ func (s *Service) GetFeeRates(_ *http.Request, _ *struct{}, reply *GetFeeRatesRe
 	}
 	reply.CurrentFeeRates = currentFeeRate
 
+	currentChainTime := onAccept.GetTimestamp()
 	nextTimestamp, _, err := state.NextBlockTime(onAccept, &s.vm.clock)
 	if err != nil {
 		return fmt.Errorf("could not calculate next staker change time: %w", err)
@@ -1862,7 +1863,7 @@ func (s *Service) GetFeeRates(_ *http.Request, _ *struct{}, reply *GetFeeRatesRe
 	}
 	stateDiff.SetTimestamp(nextTimestamp)
 
-	feeCalculator, err := state.PickFeeCalculator(&s.vm.Config, stateDiff, onAccept.GetTimestamp())
+	feeCalculator, err := state.PickFeeCalculator(&s.vm.Config, stateDiff, currentChainTime)
 	if err != nil {
 		return err
 	}
