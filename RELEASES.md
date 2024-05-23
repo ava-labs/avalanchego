@@ -30,8 +30,6 @@ The plugin version is unchanged at `35` and is compatible with versions `v1.11.3
   - `*_p2p_{op}_time` were replaced with `*_p2p_msg_time` with an `op` label
 - Updated consensus message queue metrics:
   - `avalanche_{chainID}_handler_unprocessed_msgs_{op}` were replaced with `avalanche_{chainID}_handler_unprocessed_msgs_count` with an `op` label
-- Updated consensus message queue metrics:
-  - `avalanche_{chainID}_handler_unprocessed_msgs_{op}` were replaced with `avalanche_{chainID}_handler_unprocessed_msgs_count` with an `op` label
   - `avalanche_{chainID}_handler_async_unprocessed_msgs_{op}` were replaced with `avalanche_{chainID}_handler_unprocessed_msgs_count` with an `op` label
 - Updated consensus handler metrics:
   - `avalanche_{chainID}_handler_{op}_count` were replaced with `avalanche_{chainID}_handler_messages` with an `op` label
