@@ -438,14 +438,14 @@ func (b *builder) NewAddSubnetValidatorTx(
 	toStake := map[ids.ID]uint64{}
 	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
 
-	// update fees to account for the auth credentials to be added upon tx signing
-	if _, err = fee.FinanceCredential(feeCalc, len(subnetAuth.SigIndices)); err != nil {
-		return nil, fmt.Errorf("account for credential fees: %w", err)
-	}
-
 	// feesMan cumulates complexity. Let's init it with utx filled so far
 	if _, err := feeCalc.ComputeFee(utx, nil); err != nil {
 		return nil, err
+	}
+
+	// update fees to account for the auth credentials to be added upon tx signing
+	if _, err = fee.FinanceCredential(feeCalc, len(subnetAuth.SigIndices)); err != nil {
+		return nil, fmt.Errorf("account for credential fees: %w", err)
 	}
 
 	inputs, outputs, _, err := b.financeTx(toBurn, toStake, feeCalc, ops)
@@ -486,14 +486,14 @@ func (b *builder) NewRemoveSubnetValidatorTx(
 	toStake := map[ids.ID]uint64{}
 	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
 
-	// update fees to account for the auth credentials to be added upon tx signing
-	if _, err = fee.FinanceCredential(feeCalc, len(subnetAuth.SigIndices)); err != nil {
-		return nil, fmt.Errorf("account for credential fees: %w", err)
-	}
-
 	// feesMan cumulates complexity. Let's init it with utx filled so far
 	if _, err := feeCalc.ComputeFee(utx, nil); err != nil {
 		return nil, err
+	}
+
+	// update fees to account for the auth credentials to be added upon tx signing
+	if _, err = fee.FinanceCredential(feeCalc, len(subnetAuth.SigIndices)); err != nil {
+		return nil, fmt.Errorf("account for credential fees: %w", err)
 	}
 
 	inputs, outputs, _, err := b.financeTx(toBurn, toStake, feeCalc, ops)
@@ -585,14 +585,14 @@ func (b *builder) NewCreateChainTx(
 	toStake := map[ids.ID]uint64{}
 	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
 
-	// update fees to account for the auth credentials to be added upon tx signing
-	if _, err = fee.FinanceCredential(feeCalc, len(subnetAuth.SigIndices)); err != nil {
-		return nil, fmt.Errorf("account for credential fees: %w", err)
-	}
-
 	// feesMan cumulates complexity. Let's init it with utx filled so far
 	if _, err := feeCalc.ComputeFee(utx, nil); err != nil {
 		return nil, err
+	}
+
+	// update fees to account for the auth credentials to be added upon tx signing
+	if _, err = fee.FinanceCredential(feeCalc, len(subnetAuth.SigIndices)); err != nil {
+		return nil, fmt.Errorf("account for credential fees: %w", err)
 	}
 
 	inputs, outputs, _, err := b.financeTx(toBurn, toStake, feeCalc, ops)
@@ -673,14 +673,14 @@ func (b *builder) NewTransferSubnetOwnershipTx(
 	toStake := map[ids.ID]uint64{}
 	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
 
-	// update fees to account for the auth credentials to be added upon tx signing
-	if _, err = fee.FinanceCredential(feeCalc, len(subnetAuth.SigIndices)); err != nil {
-		return nil, fmt.Errorf("account for credential fees: %w", err)
-	}
-
 	// feesMan cumulates complexity. Let's init it with utx filled so far
 	if _, err := feeCalc.ComputeFee(utx, nil); err != nil {
 		return nil, err
+	}
+
+	// update fees to account for the auth credentials to be added upon tx signing
+	if _, err = fee.FinanceCredential(feeCalc, len(subnetAuth.SigIndices)); err != nil {
+		return nil, fmt.Errorf("account for credential fees: %w", err)
 	}
 
 	inputs, outputs, _, err := b.financeTx(toBurn, toStake, feeCalc, ops)
@@ -961,14 +961,14 @@ func (b *builder) NewTransformSubnetTx(
 		assetID: maxSupply - initialSupply,
 	} // fees are calculated in financeTx
 
-	// update fees to account for the auth credentials to be added upon tx signing
-	if _, err = fee.FinanceCredential(feeCalc, len(subnetAuth.SigIndices)); err != nil {
-		return nil, fmt.Errorf("account for credential fees: %w", err)
-	}
-
 	// feesMan cumulates complexity. Let's init it with utx filled so far
 	if _, err := feeCalc.ComputeFee(utx, nil); err != nil {
 		return nil, err
+	}
+
+	// update fees to account for the auth credentials to be added upon tx signing
+	if _, err = fee.FinanceCredential(feeCalc, len(subnetAuth.SigIndices)); err != nil {
+		return nil, fmt.Errorf("account for credential fees: %w", err)
 	}
 
 	inputs, outputs, _, err := b.financeTx(toBurn, toStake, feeCalc, ops)

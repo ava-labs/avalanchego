@@ -300,21 +300,16 @@ func addSubnet(env *environment) {
 	if err != nil {
 		panic(err)
 	}
-
-	chainTime := env.state.GetTimestamp()
-	upgrades := env.config.UpgradeConfig
-	feeManager, err := state.UpdatedFeeManager(stateDiff, upgrades, chainTime)
+	feeCalculator, err := state.PickFeeCalculator(env.backend.Config, stateDiff, stateDiff.GetTimestamp())
 	if err != nil {
 		panic(err)
 	}
 
-	feeCfg := fee.GetDynamicConfig(upgrades.IsEActivated(chainTime))
 	executor := executor.StandardTxExecutor{
-		Backend:            env.backend,
-		BlkFeeManager:      feeManager,
-		BlockMaxComplexity: feeCfg.BlockMaxComplexity,
-		State:              stateDiff,
-		Tx:                 testSubnet1,
+		Backend:       env.backend,
+		State:         stateDiff,
+		FeeCalculator: feeCalculator,
+		Tx:            testSubnet1,
 	}
 	err = testSubnet1.Unsigned.Visit(&executor)
 	if err != nil {

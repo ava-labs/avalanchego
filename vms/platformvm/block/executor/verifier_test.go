@@ -218,10 +218,14 @@ func TestStandardBlockComplexity(t *testing.T) {
 				onAcceptState, err := state.NewDiffOn(env.state)
 				require.NoError(t, err)
 
+				feeCalculator, err := state.PickFeeCalculator(env.backend.Config, onAcceptState, onAcceptState.GetTimestamp())
+				require.NoError(t, err)
+
 				require.NoError(t, subnetValTx.Unsigned.Visit(&executor.StandardTxExecutor{
-					Backend: env.backend,
-					State:   onAcceptState,
-					Tx:      subnetValTx,
+					Backend:       env.backend,
+					State:         onAcceptState,
+					FeeCalculator: feeCalculator,
+					Tx:            subnetValTx,
 				}))
 
 				require.NoError(t, onAcceptState.Apply(env.state))
@@ -677,7 +681,6 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 	// Set expectations for dependencies.
 	timestamp := time.Now()
 	parentState.EXPECT().GetTimestamp().Return(timestamp).Times(1)
-	parentState.EXPECT().GetFeeRates().Return(commonfees.Empty, nil)
 	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
 	mempool.EXPECT().Remove(apricotBlk.Txs()).Times(1)
 
@@ -1172,7 +1175,6 @@ func TestVerifierVisitStandardBlockWithDuplicateInputs(t *testing.T) {
 	timestamp := time.Now()
 	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
 	parentState.EXPECT().GetTimestamp().Return(timestamp).Times(1)
-	parentState.EXPECT().GetFeeRates().Return(commonfees.Empty, nil)
 
 	parentStatelessBlk.EXPECT().Parent().Return(grandParentID).Times(1)
 

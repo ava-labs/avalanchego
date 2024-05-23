@@ -336,11 +336,6 @@ func packBlockTxs(
 		return nil, err
 	}
 
-	feeRates, err := stateDiff.GetFeeRates()
-	if err != nil {
-		return nil, err
-	}
-
 	var (
 		upgrades     = backend.Config.UpgradeConfig
 		isEActivated = upgrades.IsEActivated(timestamp)
@@ -350,12 +345,9 @@ func packBlockTxs(
 		inputs   set.Set[ids.ID]
 	)
 
-	feeMan := commonfees.NewManager(feeRates)
-	if isEActivated {
-		feeMan, err = state.UpdatedFeeManager(stateDiff, upgrades, parentBlkTime)
-		if err != nil {
-			return nil, err
-		}
+	feeCalculator, err := state.PickFeeCalculator(backend.Config, stateDiff, parentBlkTime)
+	if err != nil {
+		return nil, fmt.Errorf("failed picking fee calculator: %w", err)
 	}
 
 	for {
@@ -369,7 +361,7 @@ func packBlockTxs(
 		// pre e upgrade is active, we fill blocks till a target size
 		// post e upgrade is active, we fill blocks till a target complexity
 		targetSizeReached := (!isEActivated && txSize > remainingSize) ||
-			(isEActivated && !commonfees.Compare(feeMan.GetCumulatedComplexity(), feeCfg.BlockTargetComplexityRate))
+			(isEActivated && !commonfees.Compare(feeCalculator.GetCumulatedComplexity(), feeCfg.BlockTargetComplexityRate))
 		if targetSizeReached {
 			break
 		}
@@ -383,11 +375,10 @@ func packBlockTxs(
 		}
 
 		executor := &txexecutor.StandardTxExecutor{
-			Backend:            backend,
-			BlkFeeManager:      feeMan,
-			BlockMaxComplexity: feeCfg.BlockMaxComplexity,
-			State:              txDiff,
-			Tx:                 tx,
+			Backend:       backend,
+			State:         txDiff,
+			FeeCalculator: feeCalculator,
+			Tx:            tx,
 		}
 
 		err = tx.Unsigned.Visit(executor)

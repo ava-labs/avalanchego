@@ -233,18 +233,14 @@ func addSubnet(t *testing.T, env *environment) {
 	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
-	currentChainTime := env.state.GetTimestamp()
-	upgrades := env.config.UpgradeConfig
-	feeManager, err := state.UpdatedFeeManager(stateDiff, upgrades, currentChainTime)
+	feeCalculator, err := state.PickFeeCalculator(env.backend.Config, stateDiff, stateDiff.GetTimestamp())
 	require.NoError(err)
 
-	feeCfg := fee.GetDynamicConfig(upgrades.IsEActivated(currentChainTime))
 	executor := StandardTxExecutor{
-		Backend:            &env.backend,
-		BlkFeeManager:      feeManager,
-		BlockMaxComplexity: feeCfg.BlockMaxComplexity,
-		State:              stateDiff,
-		Tx:                 testSubnet1,
+		Backend:       &env.backend,
+		FeeCalculator: feeCalculator,
+		State:         stateDiff,
+		Tx:            testSubnet1,
 	}
 	require.NoError(testSubnet1.Unsigned.Visit(&executor))
 

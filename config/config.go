@@ -289,6 +289,11 @@ func getNetworkConfig(
 	// peers that we support these upgrades.
 	supportedACPs.Union(constants.ScheduledACPs)
 
+	// To decrease unnecessary network traffic, peers will not be notified of
+	// objection or support of activated ACPs.
+	supportedACPs.Difference(constants.ActivatedACPs)
+	objectedACPs.Difference(constants.ActivatedACPs)
+
 	config := network.Config{
 		ThrottlerConfig: network.ThrottlerConfig{
 			MaxInboundConnsPerSec: maxInboundConnsPerSec,

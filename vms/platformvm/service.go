@@ -1856,29 +1856,17 @@ func (s *Service) GetFeeRates(_ *http.Request, _ *struct{}, reply *GetFeeRatesRe
 		return fmt.Errorf("could not calculate next staker change time: %w", err)
 	}
 
-	upgrades := s.vm.Config.UpgradeConfig
-	isEActivated := upgrades.IsEActivated(nextTimestamp)
-
-	if !isEActivated {
-		reply.NextFeeRates = reply.CurrentFeeRates
-		return nil
+	stateDiff, err := state.NewDiffOn(onAccept)
+	if err != nil {
+		return err
 	}
+	stateDiff.SetTimestamp(nextTimestamp)
 
-	var (
-		currentTimestamp = onAccept.GetTimestamp()
-		feeManager       = commonfees.NewManager(currentFeeRate)
-	)
-
-	if isEActivated {
-		// make sure the diff we update the fee manager from has timestamp duly set
-		onAccept.SetTimestamp(nextTimestamp)
-		feeManager, err = state.UpdatedFeeManager(onAccept, upgrades, currentTimestamp)
-		if err != nil {
-			return err
-		}
+	feeCalculator, err := state.PickFeeCalculator(&s.vm.Config, stateDiff, onAccept.GetTimestamp())
+	if err != nil {
+		return err
 	}
-	reply.NextFeeRates = feeManager.GetFeeRates()
-
+	reply.NextFeeRates = feeCalculator.GetFeeRates()
 	return nil
 }
 

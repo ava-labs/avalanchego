@@ -18,12 +18,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-
-	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 // Ensure Execute fails when there are not enough control sigs
@@ -49,24 +46,21 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
-	currentTime := stateDiff.GetTimestamp()
-	upgrades := env.config.UpgradeConfig
-	feeCfg := fee.GetDynamicConfig(upgrades.IsEActivated(currentTime))
+	parentBlkTime := stateDiff.GetTimestamp()
 
 	builderDiff, err := state.NewDiffOn(stateDiff)
 	require.NoError(err)
 	nextBlkTime, _, err := state.NextBlockTime(stateDiff, env.clk)
 	require.NoError(err)
 	builderDiff.SetTimestamp(nextBlkTime)
-	feeMan, err := state.UpdatedFeeManager(builderDiff, upgrades, currentTime)
-	require.NoError(err)
 
+	feeCalculator, err := state.PickFeeCalculator(env.backend.Config, builderDiff, parentBlkTime)
+	require.NoError(err)
 	executor := StandardTxExecutor{
-		Backend:            &env.backend,
-		BlkFeeManager:      feeMan,
-		BlockMaxComplexity: feeCfg.BlockMaxComplexity,
-		State:              stateDiff,
-		Tx:                 tx,
+		Backend:       &env.backend,
+		FeeCalculator: feeCalculator,
+		State:         stateDiff,
+		Tx:            tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
 	require.ErrorIs(err, errUnauthorizedSubnetModification)
@@ -101,24 +95,21 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
-	currentTime := stateDiff.GetTimestamp()
-	upgrades := env.config.UpgradeConfig
-	feeCfg := fee.GetDynamicConfig(upgrades.IsEActivated(currentTime))
+	parentBlkTime := stateDiff.GetTimestamp()
 
 	builderDiff, err := state.NewDiffOn(stateDiff)
 	require.NoError(err)
 	nextBlkTime, _, err := state.NextBlockTime(stateDiff, env.clk)
 	require.NoError(err)
 	builderDiff.SetTimestamp(nextBlkTime)
-	feeMan, err := state.UpdatedFeeManager(builderDiff, upgrades, currentTime)
-	require.NoError(err)
 
+	feeCalculator, err := state.PickFeeCalculator(env.backend.Config, builderDiff, parentBlkTime)
+	require.NoError(err)
 	executor := StandardTxExecutor{
-		Backend:            &env.backend,
-		BlkFeeManager:      feeMan,
-		BlockMaxComplexity: feeCfg.BlockMaxComplexity,
-		State:              stateDiff,
-		Tx:                 tx,
+		Backend:       &env.backend,
+		FeeCalculator: feeCalculator,
+		State:         stateDiff,
+		Tx:            tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
 	require.ErrorIs(err, errUnauthorizedSubnetModification)
@@ -147,24 +138,22 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
-	currentTime := stateDiff.GetTimestamp()
-	upgrades := env.config.UpgradeConfig
-	feeCfg := fee.GetDynamicConfig(upgrades.IsEActivated(currentTime))
+	parentBlkTime := stateDiff.GetTimestamp()
 
 	builderDiff, err := state.NewDiffOn(stateDiff)
 	require.NoError(err)
 	nextBlkTime, _, err := state.NextBlockTime(stateDiff, env.clk)
 	require.NoError(err)
 	builderDiff.SetTimestamp(nextBlkTime)
-	feeMan, err := state.UpdatedFeeManager(builderDiff, upgrades, currentTime)
+
+	feeCalculator, err := state.PickFeeCalculator(env.backend.Config, builderDiff, parentBlkTime)
 	require.NoError(err)
 
 	executor := StandardTxExecutor{
-		Backend:            &env.backend,
-		BlkFeeManager:      feeMan,
-		BlockMaxComplexity: feeCfg.BlockMaxComplexity,
-		State:              stateDiff,
-		Tx:                 tx,
+		Backend:       &env.backend,
+		FeeCalculator: feeCalculator,
+		State:         stateDiff,
+		Tx:            tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
 	require.ErrorIs(err, database.ErrNotFound)
@@ -190,24 +179,22 @@ func TestCreateChainTxValid(t *testing.T) {
 	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
-	currentTime := stateDiff.GetTimestamp()
-	upgrades := env.config.UpgradeConfig
-	feeCfg := fee.GetDynamicConfig(upgrades.IsEActivated(currentTime))
+	parentBlkTime := stateDiff.GetTimestamp()
 
 	builderDiff, err := state.NewDiffOn(stateDiff)
 	require.NoError(err)
 	nextBlkTime, _, err := state.NextBlockTime(stateDiff, env.clk)
 	require.NoError(err)
 	builderDiff.SetTimestamp(nextBlkTime)
-	feeMan, err := state.UpdatedFeeManager(builderDiff, upgrades, currentTime)
+
+	feeCalculator, err := state.PickFeeCalculator(env.backend.Config, builderDiff, parentBlkTime)
 	require.NoError(err)
 
 	executor := StandardTxExecutor{
-		Backend:            &env.backend,
-		BlkFeeManager:      feeMan,
-		BlockMaxComplexity: feeCfg.BlockMaxComplexity,
-		State:              stateDiff,
-		Tx:                 tx,
+		Backend:       &env.backend,
+		FeeCalculator: feeCalculator,
+		State:         stateDiff,
+		Tx:            tx,
 	}
 	require.NoError(tx.Unsigned.Visit(&executor))
 }
@@ -271,14 +258,14 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 
 			stateDiff.SetTimestamp(test.time)
 
-			currentTime := stateDiff.GetTimestamp()
-			feeCfg := fee.GetDynamicConfig(env.config.UpgradeConfig.IsEActivated(currentTime))
+			feeCalculator, err := state.PickFeeCalculator(env.config, stateDiff, stateDiff.GetTimestamp())
+			require.NoError(err)
+
 			executor := StandardTxExecutor{
-				Backend:            &env.backend,
-				BlkFeeManager:      commonfees.NewManager(feeCfg.InitialFeeRate),
-				BlockMaxComplexity: feeCfg.BlockMaxComplexity,
-				State:              stateDiff,
-				Tx:                 tx,
+				Backend:       &env.backend,
+				FeeCalculator: feeCalculator,
+				State:         stateDiff,
+				Tx:            tx,
 			}
 			err = tx.Unsigned.Visit(&executor)
 			require.ErrorIs(err, test.expectedError)

@@ -34,7 +34,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/vms/components/fees"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
@@ -266,17 +265,14 @@ func addSubnet(t *testing.T, env *environment) {
 	stateDiff, err := state.NewDiff(genesisID, env.blkManager)
 	require.NoError(err)
 
-	feeRates, err := env.state.GetFeeRates()
+	feeCalculator, err := state.PickFeeCalculator(env.backend.Config, stateDiff, stateDiff.GetTimestamp())
 	require.NoError(err)
 
-	chainTime := env.state.GetTimestamp()
-	feeCfg := fee.GetDynamicConfig(env.config.UpgradeConfig.IsEActivated(chainTime))
 	executor := txexecutor.StandardTxExecutor{
-		Backend:            &env.backend,
-		BlkFeeManager:      fees.NewManager(feeRates),
-		BlockMaxComplexity: feeCfg.BlockMaxComplexity,
-		State:              stateDiff,
-		Tx:                 testSubnet1,
+		Backend:       &env.backend,
+		State:         stateDiff,
+		FeeCalculator: feeCalculator,
+		Tx:            testSubnet1,
 	}
 	require.NoError(testSubnet1.Unsigned.Visit(&executor))
 

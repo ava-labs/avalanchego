@@ -14,11 +14,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 	"github.com/ava-labs/avalanchego/vms/platformvm/validators"
-
-	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 var (
@@ -142,37 +139,21 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 	if err != nil {
 		return err
 	}
-
 	_, err = executor.AdvanceTimeTo(m.txExecutorBackend, stateDiff, nextBlkTime)
 	if err != nil {
 		return err
 	}
 
-	feeRates, err := stateDiff.GetFeeRates()
+	feeCalculator, err := state.PickFeeCalculator(m.txExecutorBackend.Config, stateDiff, parentBlkTime)
 	if err != nil {
 		return err
 	}
 
-	var (
-		upgrades  = m.txExecutorBackend.Config.UpgradeConfig
-		isEActive = upgrades.IsEActivated(nextBlkTime)
-		feesCfg   = fee.GetDynamicConfig(isEActive)
-	)
-
-	feeManager := commonfees.NewManager(feeRates)
-	if isEActive {
-		feeManager, err = state.UpdatedFeeManager(stateDiff, upgrades, parentBlkTime)
-		if err != nil {
-			return err
-		}
-	}
-
 	return tx.Unsigned.Visit(&executor.StandardTxExecutor{
-		Backend:            m.txExecutorBackend,
-		BlkFeeManager:      feeManager,
-		BlockMaxComplexity: feesCfg.BlockMaxComplexity,
-		State:              stateDiff,
-		Tx:                 tx,
+		Backend:       m.txExecutorBackend,
+		State:         stateDiff,
+		FeeCalculator: feeCalculator,
+		Tx:            tx,
 	})
 }
 
