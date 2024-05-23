@@ -51,13 +51,13 @@ The plugin version is unchanged at `35` and is compatible with versions `v1.11.3
 
 ### Fixes
 
+- Fixed performance regression while executing blocks in bootstrapping.
+- Fixed peer connection tracking in the P-chain and C-chain to re-enable tx pull gossip.
+- Fixed C-chain deadlock while executing blocks in bootstrapping after aborting state sync.
+- Fixed negative ETA while fetching blocks after aborting state sync.
 - Fixed panic when running avalanchego in environments with an incorrectly implemented monotonic clock.
 - Fixed memory corruption when accessing keys and values from released pebbledb iterators.
 - Fixed prefixdb compaction when specifying a `nil` limit.
-- Fixed peer connection tracking in the P-chain and C-chain to re-enable tx pull gossip.
-- Fixed negative ETA while fetching blocks after aborting state sync.
-- Fixed C-chain deadlock while executing blocks in bootstrapping after aborting state sync.
-- Fixed performance regression while executing blocks in bootstrapping.
 
 ### What's Changed
 
@@ -115,8 +115,6 @@ The plugin version is unchanged at `35` and is compatible with versions `v1.11.3
 - @cocoyeal made their first contribution in https://github.com/ava-labs/avalanchego/pull/3010
 - @cartnavoy made their first contribution in https://github.com/ava-labs/avalanchego/pull/3015
 - @tsachiherman made their first contribution in https://github.com/ava-labs/avalanchego/pull/3023
-
-**Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.11.5...v1.11.6-rc.2
 
 **Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.11.5...v1.11.6
 
