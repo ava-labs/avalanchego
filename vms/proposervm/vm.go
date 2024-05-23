@@ -46,6 +46,8 @@ const (
 
 	checkIndexedFrequency = 10 * time.Second
 	innerBlkCacheSize     = 64 * units.MiB
+
+	metricsNamespace = "proposervm"
 )
 
 var (
@@ -99,6 +101,13 @@ type VM struct {
 
 	// lastAcceptedHeight is set to the last accepted PostForkBlock's height.
 	lastAcceptedHeight uint64
+
+	// lastScheduledBlockBuildingSlot is set by SetPreference before a block was scheduled to be built.
+	// This variable helps us to report the block building and it's slot assigment.
+	lastScheduledBlockBuildingSlot uint64
+
+	// proposerBuildSlotGauge is the metric gauge used when reporting the current slot block build built.
+	proposerBuildSlotGauge prometheus.Gauge
 }
 
 // New performs best when [minBlkDelay] is whole seconds. This is because block
@@ -111,11 +120,12 @@ func New(
 	batchedVM, _ := vm.(block.BatchedChainVM)
 	ssVM, _ := vm.(block.StateSyncableVM)
 	return &VM{
-		ChainVM:        vm,
-		Config:         config,
-		blockBuilderVM: blockBuilderVM,
-		batchedVM:      batchedVM,
-		ssVM:           ssVM,
+		ChainVM:                        vm,
+		Config:                         config,
+		blockBuilderVM:                 blockBuilderVM,
+		batchedVM:                      batchedVM,
+		ssVM:                           ssVM,
+		lastScheduledBlockBuildingSlot: proposer.PreDurangoProposalSlot,
 	}
 }
 
@@ -134,7 +144,8 @@ func (vm *VM) Initialize(
 	//       places.
 	multiGatherer := metrics.NewMultiGatherer()
 	registerer := prometheus.NewRegistry()
-	if err := multiGatherer.Register("proposervm", registerer); err != nil {
+
+	if err := multiGatherer.Register(metricsNamespace, registerer); err != nil {
 		return err
 	}
 
@@ -225,6 +236,17 @@ func (vm *VM) Initialize(
 	default:
 		return err
 	}
+
+	vm.proposerBuildSlotGauge = prometheus.NewGauge(
+		prometheus.GaugeOpts{
+			Namespace: metricsNamespace,
+			Name:      "block_building_slot",
+			Help:      "the post-durango slot in which the block was built",
+		})
+
+	if err = registerer.Register(vm.proposerBuildSlotGauge); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -262,6 +284,11 @@ func (vm *VM) SetState(ctx context.Context, newState snow.State) error {
 }
 
 func (vm *VM) BuildBlock(ctx context.Context) (snowman.Block, error) {
+	// report to the metrics that we're building a block for slot lastScheduledBlockBuildingSlot.
+	if vm.lastScheduledBlockBuildingSlot != proposer.PreDurangoProposalSlot {
+		vm.proposerBuildSlotGauge.Set(float64(vm.lastScheduledBlockBuildingSlot))
+	}
+
 	preferredBlock, err := vm.getBlock(ctx, vm.preferred)
 	if err != nil {
 		vm.ctx.Log.Error("unexpected build block failure",
@@ -310,14 +337,17 @@ func (vm *VM) SetPreference(ctx context.Context, preferred ids.ID) error {
 		childBlockHeight = blk.Height() + 1
 		parentTimestamp  = blk.Timestamp()
 		nextStartTime    time.Time
+		proposalSlot     uint64
 	)
+
 	if vm.IsDurangoActivated(parentTimestamp) {
 		currentTime := vm.Clock.Time().Truncate(time.Second)
+		proposalSlot = proposer.TimeToSlot(parentTimestamp, currentTime)
 		nextStartTime, err = vm.getPostDurangoSlotTime(
 			ctx,
 			childBlockHeight,
 			pChainHeight,
-			proposer.TimeToSlot(parentTimestamp, currentTime),
+			proposalSlot,
 			parentTimestamp,
 		)
 	} else {
@@ -327,6 +357,7 @@ func (vm *VM) SetPreference(ctx context.Context, preferred ids.ID) error {
 			pChainHeight,
 			parentTimestamp,
 		)
+		proposalSlot = proposer.PreDurangoProposalSlot
 	}
 	if err != nil {
 		vm.ctx.Log.Debug("failed to fetch the expected delay",
@@ -339,6 +370,9 @@ func (vm *VM) SetPreference(ctx context.Context, preferred ids.ID) error {
 		// until the P-chain's height has advanced.
 		return nil
 	}
+	// set the building slot, so that we could report that to the metrics while the block is being built.
+	vm.lastScheduledBlockBuildingSlot = proposalSlot
+
 	vm.Scheduler.SetBuildBlockTime(nextStartTime)
 
 	vm.ctx.Log.Debug("set preference",

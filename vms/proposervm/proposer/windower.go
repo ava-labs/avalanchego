@@ -31,6 +31,8 @@ const (
 
 	MaxLookAheadSlots  = 720
 	MaxLookAheadWindow = MaxLookAheadSlots * WindowDuration // 1 hour
+
+	PreDurangoProposalSlot = ^uint64(0)
 )
 
 var (
