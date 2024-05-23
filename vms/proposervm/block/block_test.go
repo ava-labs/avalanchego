@@ -29,10 +29,7 @@ func equal(require *require.Assertions, want, have Block) {
 
 	require.Equal(signedWant.PChainHeight(), signedHave.PChainHeight())
 	require.Equal(signedWant.Timestamp(), signedHave.Timestamp())
-	wantProposer, wantHasProposer := signedWant.Proposer()
-	haveProposer, haveHasProposer := signedHave.Proposer()
-	require.Equal(wantHasProposer, haveHasProposer)
-	require.Equal(wantProposer, haveProposer)
+	require.Equal(signedWant.Proposer(), signedHave.Proposer())
 }
 
 func TestBlockSizeLimit(t *testing.T) {

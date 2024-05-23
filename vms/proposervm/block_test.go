@@ -184,9 +184,7 @@ func TestPreDurangoValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 		require.IsType(&postForkBlock{}, childBlkIntf)
 
 		childBlk := childBlkIntf.(*postForkBlock)
-		proposerID, hasProposer := childBlk.Proposer()
-		require.True(hasProposer) // signed block
-		require.Equal(proVM.ctx.NodeID, proposerID)
+		require.Equal(proVM.ctx.NodeID, childBlk.Proposer()) // signed block
 	}
 
 	{
@@ -200,9 +198,7 @@ func TestPreDurangoValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 		require.IsType(&postForkBlock{}, childBlkIntf)
 
 		childBlk := childBlkIntf.(*postForkBlock)
-		proposerID, hasProposer := childBlk.Proposer()
-		require.False(hasProposer) // unsigned block
-		require.Equal(ids.EmptyNodeID, proposerID)
+		require.Equal(ids.EmptyNodeID, childBlk.Proposer()) // unsigned block
 	}
 
 	{
@@ -217,9 +213,7 @@ func TestPreDurangoValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 		require.IsType(&postForkBlock{}, childBlkIntf)
 
 		childBlk := childBlkIntf.(*postForkBlock)
-		proposerID, hasProposer := childBlk.Proposer()
-		require.False(hasProposer) // unsigned block
-		require.Equal(ids.EmptyNodeID, proposerID)
+		require.Equal(ids.EmptyNodeID, childBlk.Proposer()) // unsigned block
 	}
 
 	{
@@ -233,9 +227,7 @@ func TestPreDurangoValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 		require.IsType(&postForkBlock{}, childBlkIntf)
 
 		childBlk := childBlkIntf.(*postForkBlock)
-		proposerID, hasProposer := childBlk.Proposer()
-		require.False(hasProposer) // unsigned block
-		require.Equal(ids.EmptyNodeID, proposerID)
+		require.Equal(ids.EmptyNodeID, childBlk.Proposer()) // unsigned block
 	}
 }
 
@@ -354,9 +346,7 @@ func TestPreDurangoNonValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 		require.IsType(&postForkBlock{}, childBlkIntf)
 
 		childBlk := childBlkIntf.(*postForkBlock)
-		proposerID, hasProposer := childBlk.Proposer()
-		require.False(hasProposer) // unsigned block
-		require.Equal(ids.EmptyNodeID, proposerID)
+		require.Equal(ids.EmptyNodeID, childBlk.Proposer()) // unsigned block
 	}
 }
 
