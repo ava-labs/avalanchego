@@ -26,6 +26,8 @@ const (
 	// pebbleByteOverHead is the number of bytes of constant overhead that
 	// should be added to a batch size per operation.
 	pebbleByteOverHead = 8
+
+	defaultCacheSize = 512 * units.MiB
 )
 
 var (
@@ -33,8 +35,7 @@ var (
 
 	errInvalidOperation = errors.New("invalid operation")
 
-	defaultCacheSize = 512 * units.MiB
-	DefaultConfig    = Config{
+	DefaultConfig = Config{
 		CacheSize:                   defaultCacheSize,
 		BytesPerSync:                512 * units.KiB,
 		WALBytesPerSync:             0, // Default to no background syncing.
@@ -53,13 +54,13 @@ type Database struct {
 }
 
 type Config struct {
-	CacheSize                   int `json:"cacheSize"`
-	BytesPerSync                int `json:"bytesPerSync"`
-	WALBytesPerSync             int `json:"walBytesPerSync"` // 0 means no background syncing
-	MemTableStopWritesThreshold int `json:"memTableStopWritesThreshold"`
-	MemTableSize                int `json:"memTableSize"`
-	MaxOpenFiles                int `json:"maxOpenFiles"`
-	MaxConcurrentCompactions    int `json:"maxConcurrentCompactions"`
+	CacheSize                   int64  `json:"cacheSize"`
+	BytesPerSync                int    `json:"bytesPerSync"`
+	WALBytesPerSync             int    `json:"walBytesPerSync"` // 0 means no background syncing
+	MemTableStopWritesThreshold int    `json:"memTableStopWritesThreshold"`
+	MemTableSize                uint64 `json:"memTableSize"`
+	MaxOpenFiles                int    `json:"maxOpenFiles"`
+	MaxConcurrentCompactions    int    `json:"maxConcurrentCompactions"`
 }
 
 // TODO: Add metrics
@@ -72,7 +73,7 @@ func New(file string, configBytes []byte, log logging.Logger, _ string, _ promet
 	}
 
 	opts := &pebble.Options{
-		Cache:                       pebble.NewCache(int64(cfg.CacheSize)),
+		Cache:                       pebble.NewCache(cfg.CacheSize),
 		BytesPerSync:                cfg.BytesPerSync,
 		Comparer:                    pebble.DefaultComparer,
 		WALBytesPerSync:             cfg.WALBytesPerSync,
@@ -193,7 +194,10 @@ func (db *Database) Compact(start []byte, end []byte) error {
 		// keys but pebble treats a nil [limit] as a key before all keys in
 		// Compact. Use the greatest key in the database as the [limit] to get
 		// the desired behavior.
-		it := db.pebbleDB.NewIter(&pebble.IterOptions{})
+		it, err := db.pebbleDB.NewIter(&pebble.IterOptions{})
+		if err != nil {
+			return updateError(err)
+		}
 
 		if !it.Last() {
 			// The database is empty.
@@ -238,9 +242,18 @@ func (db *Database) NewIteratorWithStartAndPrefix(start, prefix []byte) database
 		}
 	}
 
+	it, err := db.pebbleDB.NewIter(keyRange(start, prefix))
+	if err != nil {
+		return &iter{
+			db:     db,
+			closed: true,
+			err:    updateError(err),
+		}
+	}
+
 	iter := &iter{
 		db:   db,
-		iter: db.pebbleDB.NewIter(keyRange(start, prefix)),
+		iter: it,
 	}
 	db.openIterators.Add(iter)
 	return iter
