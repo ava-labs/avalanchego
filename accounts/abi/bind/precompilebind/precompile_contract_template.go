@@ -143,7 +143,6 @@ func Set{{.Contract.Type}}AllowListStatus(stateDB contract.StateDB, address comm
 // assumes that [input] does not include selector (omits first 4 func signature bytes)
 func Unpack{{capitalise .Normalized.Name}}Input(input []byte) ({{capitalise .Normalized.Name}}Input, error) {
 	inputStruct := {{capitalise .Normalized.Name}}Input{}
-	// The strict mode in decoding is disabled after Durango. You can re-enable by changing the last argument to true.
 	err := {{$contract.Type}}ABI.UnpackInputIntoInterface(&inputStruct, "{{.Original.Name}}", input, false)
 
 	return inputStruct, err
@@ -160,7 +159,6 @@ func Pack{{.Normalized.Name}}(inputStruct {{capitalise .Normalized.Name}}Input) 
 // Unpack{{capitalise .Normalized.Name}}Input attempts to unpack [input] into the {{$bindedType}} type argument
 // assumes that [input] does not include selector (omits first 4 func signature bytes)
 func Unpack{{capitalise .Normalized.Name}}Input(input []byte)({{$bindedType}}, error) {
-// The strict mode in decoding is disabled after Durango. You can re-enable by changing the last argument to true.
 res, err := {{$contract.Type}}ABI.UnpackInput("{{$method.Original.Name}}", input, false)
 if err != nil {
 	return {{bindtypenew $input.Type $structs}}, err
