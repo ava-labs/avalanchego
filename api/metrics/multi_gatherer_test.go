@@ -4,12 +4,16 @@
 package metrics
 
 import (
+	"errors"
 	"testing"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 
 	dto "github.com/prometheus/client_model/go"
 )
+
+var errTest = errors.New("non-nil error")
 
 func TestMultiGathererEmptyGather(t *testing.T) {
 	require := require.New(t)
@@ -25,7 +29,7 @@ func TestMultiGathererDuplicatedPrefix(t *testing.T) {
 	require := require.New(t)
 
 	g := NewMultiGatherer()
-	og := NewOptionalGatherer()
+	og := prometheus.NewRegistry()
 
 	require.NoError(g.Register("", og))
 
