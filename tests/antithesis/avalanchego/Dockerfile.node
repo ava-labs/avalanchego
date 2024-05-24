@@ -56,6 +56,9 @@ RUN mkdir -p /symbols
 COPY --from=builder /avalanchego_instrumented/symbols /symbols
 COPY --from=builder /opt/antithesis/lib/libvoidstar.so /usr/lib/libvoidstar.so
 
+# Use the same path as the uninstrumented node image for consistency
+WORKDIR /avalanchego/build
+
 # Copy the executable into the container
 COPY --from=builder /avalanchego_instrumented/customer/build/avalanchego ./avalanchego
 

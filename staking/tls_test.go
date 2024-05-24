@@ -29,3 +29,10 @@ func TestMakeKeys(t *testing.T) {
 
 	require.NoError(cert.Leaf.CheckSignature(cert.Leaf.SignatureAlgorithm, msg, sig))
 }
+
+func BenchmarkNewCertAndKeyBytes(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		_, _, err := NewCertAndKeyBytes()
+		require.NoError(b, err)
+	}
+}

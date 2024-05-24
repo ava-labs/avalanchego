@@ -35,23 +35,33 @@ const (
 	defaultConfigFilename = "config.json"
 )
 
-// A set of flags appropriate for testing.
-func DefaultFlags() FlagsMap {
-	// Supply only non-default configuration to ensure that default values will be used.
+// Flags appropriate for networks used for all types of testing.
+func DefaultTestFlags() FlagsMap {
 	return FlagsMap{
 		config.NetworkPeerListPullGossipFreqKey: "250ms",
 		config.NetworkMaxReconnectDelayKey:      "1s",
-		config.PublicIPKey:                      "127.0.0.1",
-		config.HTTPHostKey:                      "127.0.0.1",
-		config.StakingHostKey:                   "127.0.0.1",
 		config.HealthCheckFreqKey:               "2s",
 		config.AdminAPIEnabledKey:               true,
 		config.IndexEnabledKey:                  true,
-		config.LogDisplayLevelKey:               logging.Off.String(), // Display logging not needed since nodes run headless
-		config.LogLevelKey:                      logging.Debug.String(),
-		config.MinStakeDurationKey:              DefaultMinStakeDuration.String(),
-		config.ProposerVMUseCurrentHeightKey:    true,
 	}
+}
+
+// Flags appropriate for tmpnet networks.
+func DefaultTmpnetFlags() FlagsMap {
+	// Supply only non-default configuration to ensure that default values will be used.
+	flags := FlagsMap{
+		// Specific to tmpnet deployment
+		config.PublicIPKey:        "127.0.0.1",
+		config.HTTPHostKey:        "127.0.0.1",
+		config.StakingHostKey:     "127.0.0.1",
+		config.LogDisplayLevelKey: logging.Off.String(), // Display logging not needed since nodes run headless
+		config.LogLevelKey:        logging.Debug.String(),
+		// Specific to e2e testing
+		config.MinStakeDurationKey:           DefaultMinStakeDuration.String(),
+		config.ProposerVMUseCurrentHeightKey: true,
+	}
+	flags.SetDefaults(DefaultTestFlags())
+	return flags
 }
 
 // A set of chain configurations appropriate for testing.

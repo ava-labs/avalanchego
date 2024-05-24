@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/upgrade"
 )
 
@@ -30,6 +31,9 @@ type Config struct {
 	//            calling VM.Initialize.
 	Validators validators.Manager
 
+	// All static fees config active before E-upgrade
+	StaticFeeConfig fee.StaticConfig
+
 	// Provides access to the uptime manager as a thread safe data structure
 	UptimeLockedCalculator uptime.LockedCalculator
 
@@ -41,33 +45,6 @@ type Config struct {
 
 	// Set of subnets that this node is validating
 	TrackedSubnets set.Set[ids.ID]
-
-	// Fee that is burned by every non-state creating transaction
-	TxFee uint64
-
-	// Fee that must be burned by every state creating transaction before AP3
-	CreateAssetTxFee uint64
-
-	// Fee that must be burned by every subnet creating transaction after AP3
-	CreateSubnetTxFee uint64
-
-	// Fee that must be burned by every transform subnet transaction
-	TransformSubnetTxFee uint64
-
-	// Fee that must be burned by every blockchain creating transaction after AP3
-	CreateBlockchainTxFee uint64
-
-	// Transaction fee for adding a primary network validator
-	AddPrimaryNetworkValidatorFee uint64
-
-	// Transaction fee for adding a primary network delegator
-	AddPrimaryNetworkDelegatorFee uint64
-
-	// Transaction fee for adding a subnet validator
-	AddSubnetValidatorFee uint64
-
-	// Transaction fee for adding a subnet delegator
-	AddSubnetDelegatorFee uint64
 
 	// The minimum amount of tokens one must bond to be a validator
 	MinValidatorStake uint64
@@ -104,20 +81,6 @@ type Config struct {
 	// on recently created subnets (without this, users need to wait for
 	// [recentlyAcceptedWindowTTL] to pass for activation to occur).
 	UseCurrentHeight bool
-}
-
-func (c *Config) GetCreateBlockchainTxFee(timestamp time.Time) uint64 {
-	if c.UpgradeConfig.IsApricotPhase3Activated(timestamp) {
-		return c.CreateBlockchainTxFee
-	}
-	return c.CreateAssetTxFee
-}
-
-func (c *Config) GetCreateSubnetTxFee(timestamp time.Time) uint64 {
-	if c.UpgradeConfig.IsApricotPhase3Activated(timestamp) {
-		return c.CreateSubnetTxFee
-	}
-	return c.CreateAssetTxFee
 }
 
 // Create the blockchain described in [tx], but only if this node is a member of

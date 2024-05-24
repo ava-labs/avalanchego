@@ -62,7 +62,7 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 			}
 
 			cfg := *env.config
-			cfg.CreateSubnetTxFee = test.fee
+			cfg.StaticFeeConfig.CreateSubnetTxFee = test.fee
 			builder := txstest.NewBuilder(env.ctx, &cfg, env.state)
 			tx, err := builder.NewCreateSubnetTx(
 				&secp256k1fx.OutputOwners{},
