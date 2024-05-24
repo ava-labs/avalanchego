@@ -96,15 +96,15 @@ func newComposeProject(network *tmpnet.Network, nodeImageName string, workloadIm
 		}
 
 		env := types.Mapping{
-			config.NetworkNameKey:             constants.LocalName,
-			config.LogLevelKey:                logging.Debug.String(),
-			config.LogDisplayLevelKey:         logging.Trace.String(),
-			config.HTTPHostKey:                "0.0.0.0",
-			config.PublicIPKey:                address,
-			config.StakingTLSKeyContentKey:    tlsKey,
-			config.StakingCertContentKey:      tlsCert,
-			config.StakingSignerKeyContentKey: signerKey,
-			config.RPCVMHandshakeTimeoutKey:   "30s",
+			config.NetworkNameKey:                constants.LocalName,
+			config.LogLevelKey:                   logging.Debug.String(),
+			config.LogDisplayLevelKey:            logging.Trace.String(),
+			config.HTTPHostKey:                   "0.0.0.0",
+			config.PublicIPKey:                   address,
+			config.StakingTLSKeyContentKey:       tlsKey,
+			config.StakingCertContentKey:         tlsCert,
+			config.StakingSignerKeyContentKey:    signerKey,
+			config.RPCChainVMHandshakeTimeoutKey: "30s",
 		}
 
 		// Apply configuration appropriate to a test network

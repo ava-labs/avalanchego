@@ -6,4 +6,4 @@ package constants
 import "time"
 
 // Default duration before handshake timeout during bootstrap of an RPC VM.
-const DefaultRPCVMHandshakeTimeout = 5 * time.Second
+const DefaultRPCChainVMHandshakeTimeout = 5 * time.Second

@@ -36,12 +36,12 @@ type VMGetter interface {
 
 // VMGetterConfig defines settings for VMGetter
 type VMGetterConfig struct {
-	FileReader            filesystem.Reader
-	Manager               vms.Manager
-	PluginDirectory       string
-	CPUTracker            resource.ProcessTracker
-	RuntimeTracker        runtime.Tracker
-	RPCVMHandshakeTimeout time.Duration
+	FileReader                 filesystem.Reader
+	Manager                    vms.Manager
+	PluginDirectory            string
+	CPUTracker                 resource.ProcessTracker
+	RuntimeTracker             runtime.Tracker
+	RPCChainVMHandshakeTimeout time.Duration
 }
 
 type vmGetter struct {
@@ -105,7 +105,7 @@ func (getter *vmGetter) Get() (map[ids.ID]vms.Factory, map[ids.ID]vms.Factory, e
 			filepath.Join(getter.config.PluginDirectory, file.Name()),
 			getter.config.CPUTracker,
 			getter.config.RuntimeTracker,
-			getter.config.RPCVMHandshakeTimeout,
+			getter.config.RPCChainVMHandshakeTimeout,
 		)
 	}
 	return registeredVMs, unregisteredVMs, nil

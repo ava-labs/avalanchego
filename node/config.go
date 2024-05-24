@@ -219,5 +219,5 @@ type Config struct {
 
 	// Maximum duration to wait for an RPC VM to complete its
 	// initialization handshake.
-	RPCVMHandshakeTimeout time.Duration `json:"rpcHandshakeTimeout"`
+	RPCChainVMHandshakeTimeout time.Duration `json:"rpcChainVMHandshakeTimeout"`
 }

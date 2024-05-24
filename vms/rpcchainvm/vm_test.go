@@ -132,7 +132,7 @@ func TestRuntimeSubprocessBootstrap(t *testing.T) {
 				Stderr:           logging.NoLog{},
 				Stdout:           logging.NoLog{},
 				Log:              logging.NoLog{},
-				HandshakeTimeout: constants.DefaultRPCVMHandshakeTimeout,
+				HandshakeTimeout: constants.DefaultRPCChainVMHandshakeTimeout,
 			},
 			assertErr: func(require *require.Assertions, err error) {
 				require.NoError(err)
@@ -144,7 +144,7 @@ func TestRuntimeSubprocessBootstrap(t *testing.T) {
 			config: &subprocess.Config{
 				Stdout:           logging.NoLog{},
 				Log:              logging.NoLog{},
-				HandshakeTimeout: constants.DefaultRPCVMHandshakeTimeout,
+				HandshakeTimeout: constants.DefaultRPCChainVMHandshakeTimeout,
 			},
 			assertErr: func(require *require.Assertions, err error) {
 				require.ErrorIs(err, runtime.ErrInvalidConfig)

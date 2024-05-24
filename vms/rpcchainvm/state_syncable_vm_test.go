@@ -285,7 +285,7 @@ func buildClientHelper(require *require.Assertions, testKey string) (*VMClient, 
 			Stderr:           log,
 			Stdout:           io.Discard,
 			Log:              log,
-			HandshakeTimeout: constants.DefaultRPCVMHandshakeTimeout,
+			HandshakeTimeout: constants.DefaultRPCChainVMHandshakeTimeout,
 		},
 	)
 	require.NoError(err)

@@ -200,5 +200,5 @@ const (
 	TracingExporterTypeKey                             = "tracing-exporter-type"
 	TracingHeadersKey                                  = "tracing-headers"
 	ProcessContextFileKey                              = "process-context-file"
-	RPCVMHandshakeTimeoutKey                           = "rpc-vm-handshake-timeout"
+	RPCChainVMHandshakeTimeoutKey                      = "rpcchainvm-handshake-timeout"
 )
