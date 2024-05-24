@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/runtime"
@@ -284,7 +285,7 @@ func buildClientHelper(require *require.Assertions, testKey string) (*VMClient, 
 			Stderr:           log,
 			Stdout:           io.Discard,
 			Log:              log,
-			HandshakeTimeout: runtime.DefaultHandshakeTimeout,
+			HandshakeTimeout: constants.DefaultRPCVMHandshakeTimeout,
 		},
 	)
 	require.NoError(err)

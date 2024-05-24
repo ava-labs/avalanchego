@@ -104,6 +104,7 @@ func newComposeProject(network *tmpnet.Network, nodeImageName string, workloadIm
 			config.StakingTLSKeyContentKey:    tlsKey,
 			config.StakingCertContentKey:      tlsCert,
 			config.StakingSignerKeyContentKey: signerKey,
+			config.RPCVMHandshakeTimeoutKey:   "30s",
 		}
 
 		// Apply configuration appropriate to a test network

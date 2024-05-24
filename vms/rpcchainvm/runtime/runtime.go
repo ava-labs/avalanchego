@@ -13,9 +13,6 @@ const (
 	// Address of the runtime engine server.
 	EngineAddressKey = "AVALANCHE_VM_RUNTIME_ENGINE_ADDR"
 
-	// Duration before handshake timeout during bootstrap.
-	DefaultHandshakeTimeout = 5 * time.Second
-
 	// Duration of time to wait for graceful termination to complete.
 	DefaultGracefulTimeout = 5 * time.Second
 )

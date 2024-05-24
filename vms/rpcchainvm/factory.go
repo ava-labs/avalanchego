@@ -6,6 +6,7 @@ package rpcchainvm
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/resource"
@@ -18,16 +19,23 @@ import (
 var _ vms.Factory = (*factory)(nil)
 
 type factory struct {
-	path           string
-	processTracker resource.ProcessTracker
-	runtimeTracker runtime.Tracker
+	path             string
+	processTracker   resource.ProcessTracker
+	runtimeTracker   runtime.Tracker
+	handshakeTimeout time.Duration
 }
 
-func NewFactory(path string, processTracker resource.ProcessTracker, runtimeTracker runtime.Tracker) vms.Factory {
+func NewFactory(
+	path string,
+	processTracker resource.ProcessTracker,
+	runtimeTracker runtime.Tracker,
+	handshakeTimeout time.Duration,
+) vms.Factory {
 	return &factory{
-		path:           path,
-		processTracker: processTracker,
-		runtimeTracker: runtimeTracker,
+		path:             path,
+		processTracker:   processTracker,
+		runtimeTracker:   runtimeTracker,
+		handshakeTimeout: handshakeTimeout,
 	}
 }
 
@@ -35,7 +43,7 @@ func (f *factory) New(log logging.Logger) (interface{}, error) {
 	config := &subprocess.Config{
 		Stderr:           log,
 		Stdout:           log,
-		HandshakeTimeout: runtime.DefaultHandshakeTimeout,
+		HandshakeTimeout: f.handshakeTimeout,
 		Log:              log,
 	}
 

@@ -17,6 +17,7 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/runtime"
@@ -131,7 +132,7 @@ func TestRuntimeSubprocessBootstrap(t *testing.T) {
 				Stderr:           logging.NoLog{},
 				Stdout:           logging.NoLog{},
 				Log:              logging.NoLog{},
-				HandshakeTimeout: runtime.DefaultHandshakeTimeout,
+				HandshakeTimeout: constants.DefaultRPCVMHandshakeTimeout,
 			},
 			assertErr: func(require *require.Assertions, err error) {
 				require.NoError(err)
@@ -143,7 +144,7 @@ func TestRuntimeSubprocessBootstrap(t *testing.T) {
 			config: &subprocess.Config{
 				Stdout:           logging.NoLog{},
 				Log:              logging.NoLog{},
-				HandshakeTimeout: runtime.DefaultHandshakeTimeout,
+				HandshakeTimeout: constants.DefaultRPCVMHandshakeTimeout,
 			},
 			assertErr: func(require *require.Assertions, err error) {
 				require.ErrorIs(err, runtime.ErrInvalidConfig)

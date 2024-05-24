@@ -216,4 +216,8 @@ type Config struct {
 	// Path to write process context to (including PID, API URI, and
 	// staking address).
 	ProcessContextFilePath string `json:"processContextFilePath"`
+
+	// Maximum duration to wait for an RPC VM to complete its
+	// initialization handshake.
+	RPCVMHandshakeTimeout time.Duration `json:"rpcHandshakeTimeout"`
 }

@@ -1404,6 +1404,8 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 
 	nodeConfig.ProcessContextFilePath = GetExpandedArg(v, ProcessContextFileKey)
 
+	nodeConfig.RPCVMHandshakeTimeout = v.GetDuration(RPCVMHandshakeTimeoutKey)
+
 	nodeConfig.ProvidedFlags = providedFlags(v)
 	return nodeConfig, nil
 }

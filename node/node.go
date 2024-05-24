@@ -1172,11 +1172,12 @@ func (n *Node) initVMs() error {
 	// initialize the vm registry
 	n.VMRegistry = registry.NewVMRegistry(registry.VMRegistryConfig{
 		VMGetter: registry.NewVMGetter(registry.VMGetterConfig{
-			FileReader:      filesystem.NewReader(),
-			Manager:         n.VMManager,
-			PluginDirectory: n.Config.PluginDir,
-			CPUTracker:      n.resourceManager,
-			RuntimeTracker:  n.runtimeManager,
+			FileReader:            filesystem.NewReader(),
+			Manager:               n.VMManager,
+			PluginDirectory:       n.Config.PluginDir,
+			CPUTracker:            n.resourceManager,
+			RuntimeTracker:        n.runtimeManager,
+			RPCVMHandshakeTimeout: n.Config.RPCVMHandshakeTimeout,
 		}),
 		VMManager: n.VMManager,
 	})

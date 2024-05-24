@@ -361,6 +361,9 @@ func addNodeFlags(fs *pflag.FlagSet) {
 	fs.StringToString(TracingHeadersKey, map[string]string{}, "The headers to provide the trace indexer")
 
 	fs.String(ProcessContextFileKey, defaultProcessContextPath, "The path to write process context to (including PID, API URI, and staking address).")
+
+	// RPC Chain VMs
+	fs.Duration(RPCVMHandshakeTimeoutKey, constants.DefaultRPCVMHandshakeTimeout, "Maximum duration to wait for an RPC VM to complete its initialization handshake.")
 }
 
 // BuildFlagSet returns a complete set of flags for avalanchego
