@@ -33,7 +33,7 @@ func newUTXOs(
 	codec codec.Manager,
 ) *utxos {
 	return &utxos{
-		xchainID:     ctx.XChainID,
+		xchainID:     ctx.ChainID,
 		state:        state,
 		sharedMemory: sharedMemory,
 		codec:        codec,
