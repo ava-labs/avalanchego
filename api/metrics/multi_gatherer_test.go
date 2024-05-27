@@ -13,8 +13,6 @@ import (
 	dto "github.com/prometheus/client_model/go"
 )
 
-var errTest = errors.New("non-nil error")
-
 func TestMultiGathererEmptyGather(t *testing.T) {
 	require := require.New(t)
 
@@ -44,6 +42,7 @@ func TestMultiGathererAddedError(t *testing.T) {
 
 	g := NewMultiGatherer()
 
+	errTest := errors.New("non-nil error")
 	tg := &testGatherer{
 		err: errTest,
 	}
