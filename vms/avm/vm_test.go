@@ -354,7 +354,7 @@ func TestVMFormat(t *testing.T) {
 	env := setup(t, &envConfig{
 		fork: latest,
 	})
-	env.vm.ctx.Lock.Unlock()
+	defer env.vm.ctx.Lock.Unlock()
 
 	tests := []struct {
 		in       ids.ShortID
@@ -382,7 +382,7 @@ func TestTxAcceptAfterParseTx(t *testing.T) {
 		fork:          latest,
 		notLinearized: true,
 	})
-	env.vm.ctx.Lock.Unlock()
+	defer env.vm.ctx.Lock.Unlock()
 
 	var (
 		key = keys[0]
@@ -457,7 +457,7 @@ func TestIssueImportTx(t *testing.T) {
 	env := setup(t, &envConfig{
 		fork: durango,
 	})
-	env.vm.ctx.Lock.Unlock()
+	defer env.vm.ctx.Lock.Unlock()
 
 	peerSharedMemory := env.sharedMemory.NewSharedMemory(constants.PlatformChainID)
 
@@ -515,7 +515,12 @@ func TestIssueImportTx(t *testing.T) {
 	)
 	require.NoError(err)
 
+	env.vm.ctx.Lock.Unlock()
+
 	issueAndAccept(require, env.vm, env.issuer, tx)
+
+	env.vm.ctx.Lock.Lock()
+
 	assertIndexedTX(t, env.vm.db, 0, key.PublicKey().Address(), txAssetID.AssetID(), tx.ID())
 	assertLatestIdx(t, env.vm.db, key.PublicKey().Address(), avaxID, 1)
 
@@ -532,7 +537,7 @@ func TestForceAcceptImportTx(t *testing.T) {
 		fork:          durango,
 		notLinearized: true,
 	})
-	env.vm.ctx.Lock.Unlock()
+	defer env.vm.ctx.Lock.Unlock()
 
 	genesisTx := getCreateTxFromGenesisTest(t, env.genesisBytes, "AVAX")
 	avaxID := genesisTx.ID()
@@ -604,7 +609,7 @@ func TestIssueExportTx(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{fork: durango})
-	env.vm.ctx.Lock.Unlock()
+	defer env.vm.ctx.Lock.Unlock()
 
 	genesisTx := getCreateTxFromGenesisTest(t, env.genesisBytes, "AVAX")
 
@@ -641,7 +646,11 @@ func TestIssueExportTx(t *testing.T) {
 	require.NoError(err)
 	require.Empty(utxoBytes)
 
+	env.vm.ctx.Lock.Unlock()
+
 	issueAndAccept(require, env.vm, env.issuer, tx)
+
+	env.vm.ctx.Lock.Lock()
 
 	utxoBytes, _, _, err = peerSharedMemory.Indexed(
 		env.vm.ctx.ChainID,
@@ -662,7 +671,7 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 	env := setup(t, &envConfig{
 		fork: latest,
 	})
-	env.vm.ctx.Lock.Unlock()
+	defer env.vm.ctx.Lock.Unlock()
 
 	genesisTx := getCreateTxFromGenesisTest(t, env.genesisBytes, "AVAX")
 
@@ -703,7 +712,11 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 	_, err = peerSharedMemory.Get(env.vm.ctx.ChainID, [][]byte{utxoID[:]})
 	require.ErrorIs(err, database.ErrNotFound)
 
+	env.vm.ctx.Lock.Unlock()
+
 	issueAndAccept(require, env.vm, env.issuer, tx)
+
+	env.vm.ctx.Lock.Lock()
 
 	_, err = peerSharedMemory.Get(env.vm.ctx.ChainID, [][]byte{utxoID[:]})
 	require.ErrorIs(err, database.ErrNotFound)

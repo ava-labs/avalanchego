@@ -106,7 +106,6 @@ func TestServiceGetBalanceStrict(t *testing.T) {
 		fork: latest,
 	})
 	service := &Service{vm: env.vm}
-	env.vm.ctx.Lock.Unlock()
 
 	assetID := ids.GenerateTestID()
 	addr := ids.GenerateTestShortID()
@@ -132,6 +131,8 @@ func TestServiceGetBalanceStrict(t *testing.T) {
 	// Insert the UTXO
 	env.vm.state.AddUTXO(twoOfTwoUTXO)
 	require.NoError(env.vm.state.Commit())
+
+	env.vm.ctx.Lock.Unlock()
 
 	// Check the balance with IncludePartial set to true
 	balanceArgs := &GetBalanceArgs{
@@ -259,7 +260,6 @@ func TestServiceGetTxs(t *testing.T) {
 		fork: latest,
 	})
 	service := &Service{vm: env.vm}
-	env.vm.ctx.Lock.Unlock()
 
 	var err error
 	env.vm.addressTxsIndexer, err = index.NewIndexer(env.vm.db, env.vm.ctx.Log, "", prometheus.NewRegistry(), false)
@@ -272,6 +272,8 @@ func TestServiceGetTxs(t *testing.T) {
 
 	testTxCount := 25
 	testTxs := initTestTxIndex(t, env.vm.db, addr, assetID, testTxCount)
+
+	env.vm.ctx.Lock.Unlock()
 
 	// get the first page
 	getTxsArgs := &GetAddressTxsArgs{
@@ -299,7 +301,6 @@ func TestServiceGetAllBalances(t *testing.T) {
 		fork: latest,
 	})
 	service := &Service{vm: env.vm}
-	env.vm.ctx.Lock.Unlock()
 
 	assetID := ids.GenerateTestID()
 	addr := ids.GenerateTestShortID()
@@ -324,6 +325,8 @@ func TestServiceGetAllBalances(t *testing.T) {
 	// Insert the UTXO
 	env.vm.state.AddUTXO(twoOfTwoUTXO)
 	require.NoError(env.vm.state.Commit())
+
+	env.vm.ctx.Lock.Unlock()
 
 	// Check the balance with IncludePartial set to true
 	balanceArgs := &GetAllBalancesArgs{
