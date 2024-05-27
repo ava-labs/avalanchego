@@ -174,7 +174,7 @@ func (vm *VM) Initialize(
 	)
 
 	registerer := prometheus.NewRegistry()
-	if err := ctx.Metrics.Register(registerer); err != nil {
+	if err := ctx.Metrics.Register("", registerer); err != nil {
 		return err
 	}
 	vm.registerer = registerer
