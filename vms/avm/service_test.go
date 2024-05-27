@@ -51,6 +51,7 @@ func TestServiceIssueTx(t *testing.T) {
 		fork: latest,
 	})
 	service := &Service{vm: env.vm}
+	env.vm.ctx.Lock.Unlock()
 
 	txArgs := &api.FormattedTx{}
 	txReply := &api.JSONTxID{}
@@ -73,6 +74,7 @@ func TestServiceGetTxStatus(t *testing.T) {
 		fork: latest,
 	})
 	service := &Service{vm: env.vm}
+	env.vm.ctx.Lock.Unlock()
 
 	statusArgs := &api.JSONTxID{}
 	statusReply := &GetTxStatusReply{}
@@ -104,6 +106,7 @@ func TestServiceGetBalanceStrict(t *testing.T) {
 		fork: latest,
 	})
 	service := &Service{vm: env.vm}
+	env.vm.ctx.Lock.Unlock()
 
 	assetID := ids.GenerateTestID()
 	addr := ids.GenerateTestShortID()
@@ -256,6 +259,8 @@ func TestServiceGetTxs(t *testing.T) {
 		fork: latest,
 	})
 	service := &Service{vm: env.vm}
+	env.vm.ctx.Lock.Unlock()
+
 	var err error
 	env.vm.addressTxsIndexer, err = index.NewIndexer(env.vm.db, env.vm.ctx.Log, "", prometheus.NewRegistry(), false)
 	require.NoError(err)
@@ -294,6 +299,7 @@ func TestServiceGetAllBalances(t *testing.T) {
 		fork: latest,
 	})
 	service := &Service{vm: env.vm}
+	env.vm.ctx.Lock.Unlock()
 
 	assetID := ids.GenerateTestID()
 	addr := ids.GenerateTestShortID()
@@ -488,6 +494,7 @@ func TestServiceGetTx(t *testing.T) {
 		fork: latest,
 	})
 	service := &Service{vm: env.vm}
+	env.vm.ctx.Lock.Unlock()
 
 	txID := env.genesisTx.ID()
 
@@ -512,6 +519,7 @@ func TestServiceGetTxJSON_BaseTx(t *testing.T) {
 		fork: latest,
 	})
 	service := &Service{vm: env.vm}
+	env.vm.ctx.Lock.Unlock()
 
 	newTx := newAvaxBaseTxWithOutputs(t, env)
 	issueAndAccept(require, env.vm, env.issuer, newTx)
@@ -604,6 +612,7 @@ func TestServiceGetTxJSON_ExportTx(t *testing.T) {
 		fork: latest,
 	})
 	service := &Service{vm: env.vm}
+	env.vm.ctx.Lock.Unlock()
 
 	newTx := buildTestExportTx(t, env, env.vm.ctx.CChainID)
 	issueAndAccept(require, env.vm, env.issuer, newTx)
@@ -702,6 +711,7 @@ func TestServiceGetTxJSON_CreateAssetTx(t *testing.T) {
 		}},
 	})
 	service := &Service{vm: env.vm}
+	env.vm.ctx.Lock.Unlock()
 
 	initialStates := map[uint32][]verify.State{
 		uint32(0): {
@@ -894,6 +904,7 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 		}},
 	})
 	service := &Service{vm: env.vm}
+	env.vm.ctx.Lock.Unlock()
 
 	key := keys[0]
 	initialStates := map[uint32][]verify.State{
@@ -1040,6 +1051,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
 		}},
 	})
 	service := &Service{vm: env.vm}
+	env.vm.ctx.Lock.Unlock()
 
 	key := keys[0]
 	initialStates := map[uint32][]verify.State{
@@ -1225,6 +1237,7 @@ func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 		}},
 	})
 	service := &Service{vm: env.vm}
+	env.vm.ctx.Lock.Unlock()
 
 	key := keys[0]
 	initialStates := map[uint32][]verify.State{
@@ -1372,6 +1385,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleSecpMintOp(t *testing.T) {
 		}},
 	})
 	service := &Service{vm: env.vm}
+	env.vm.ctx.Lock.Unlock()
 
 	key := keys[0]
 	initialStates := map[uint32][]verify.State{
@@ -1563,6 +1577,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
 		}},
 	})
 	service := &Service{vm: env.vm}
+	env.vm.ctx.Lock.Unlock()
 
 	key := keys[0]
 	initialStates := map[uint32][]verify.State{
@@ -1702,6 +1717,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) 
 		}},
 	})
 	service := &Service{vm: env.vm}
+	env.vm.ctx.Lock.Unlock()
 
 	key := keys[0]
 	initialStates := map[uint32][]verify.State{
@@ -2037,6 +2053,7 @@ func TestServiceGetNilTx(t *testing.T) {
 		fork: latest,
 	})
 	service := &Service{vm: env.vm}
+	env.vm.ctx.Lock.Unlock()
 
 	reply := api.GetTxReply{}
 	err := service.GetTx(nil, &api.GetTxArgs{}, &reply)
@@ -2050,6 +2067,7 @@ func TestServiceGetUnknownTx(t *testing.T) {
 		fork: latest,
 	})
 	service := &Service{vm: env.vm}
+	env.vm.ctx.Lock.Unlock()
 
 	reply := api.GetTxReply{}
 	err := service.GetTx(nil, &api.GetTxArgs{TxID: ids.GenerateTestID()}, &reply)
@@ -2061,6 +2079,7 @@ func TestServiceGetUTXOs(t *testing.T) {
 		fork: latest,
 	})
 	service := &Service{vm: env.vm}
+	env.vm.ctx.Lock.Unlock()
 
 	rawAddr := ids.GenerateTestShortID()
 	rawEmptyAddr := ids.GenerateTestShortID()
@@ -2312,6 +2331,7 @@ func TestGetAssetDescription(t *testing.T) {
 		fork: latest,
 	})
 	service := &Service{vm: env.vm}
+	env.vm.ctx.Lock.Unlock()
 
 	avaxAssetID := env.genesisTx.ID()
 
@@ -2331,6 +2351,7 @@ func TestGetBalance(t *testing.T) {
 		fork: latest,
 	})
 	service := &Service{vm: env.vm}
+	env.vm.ctx.Lock.Unlock()
 
 	avaxAssetID := env.genesisTx.ID()
 
@@ -2359,6 +2380,7 @@ func TestCreateFixedCapAsset(t *testing.T) {
 				}},
 			})
 			service := &Service{vm: env.vm}
+			env.vm.ctx.Lock.Unlock()
 
 			reply := AssetIDChangeAddr{}
 			addrStr, err := env.vm.FormatLocalAddress(keys[0].PublicKey().Address())
@@ -2404,6 +2426,7 @@ func TestCreateVariableCapAsset(t *testing.T) {
 				}},
 			})
 			service := &Service{vm: env.vm}
+			env.vm.ctx.Lock.Unlock()
 
 			reply := AssetIDChangeAddr{}
 			minterAddrStr, err := env.vm.FormatLocalAddress(keys[0].PublicKey().Address())
@@ -2491,6 +2514,7 @@ func TestNFTWorkflow(t *testing.T) {
 				}},
 			})
 			service := &Service{vm: env.vm}
+			env.vm.ctx.Lock.Unlock()
 
 			fromAddrs, fromAddrsStr := sampleAddrs(t, env.vm.AddressManager, addrs)
 
@@ -2606,6 +2630,7 @@ func TestImportExportKey(t *testing.T) {
 		}},
 	})
 	service := &Service{vm: env.vm}
+	env.vm.ctx.Lock.Unlock()
 
 	sk, err := secp256k1.NewPrivateKey()
 	require.NoError(err)
@@ -2644,6 +2669,7 @@ func TestImportAVMKeyNoDuplicates(t *testing.T) {
 		}},
 	})
 	service := &Service{vm: env.vm}
+	env.vm.ctx.Lock.Unlock()
 
 	sk, err := secp256k1.NewPrivateKey()
 	require.NoError(err)
@@ -2689,6 +2715,7 @@ func TestSend(t *testing.T) {
 		}},
 	})
 	service := &Service{vm: env.vm}
+	env.vm.ctx.Lock.Unlock()
 
 	assetID := env.genesisTx.ID()
 	addr := keys[0].PublicKey().Address()
@@ -2738,6 +2765,7 @@ func TestSendMultiple(t *testing.T) {
 				},
 			})
 			service := &Service{vm: env.vm}
+			env.vm.ctx.Lock.Unlock()
 
 			assetID := env.genesisTx.ID()
 			addr := keys[0].PublicKey().Address()
@@ -2789,6 +2817,7 @@ func TestCreateAndListAddresses(t *testing.T) {
 		}},
 	})
 	service := &Service{vm: env.vm}
+	env.vm.ctx.Lock.Unlock()
 
 	createArgs := &api.UserPass{
 		Username: username,
@@ -2824,6 +2853,7 @@ func TestImport(t *testing.T) {
 				}},
 			})
 			service := &Service{vm: env.vm}
+			env.vm.ctx.Lock.Unlock()
 
 			assetID := env.genesisTx.ID()
 			addr0 := keys[0].PublicKey().Address()

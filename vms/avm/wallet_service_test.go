@@ -28,6 +28,7 @@ func TestWalletService_SendMultiple(t *testing.T) {
 					initialKeys: keys,
 				}},
 			})
+			env.vm.ctx.Lock.Unlock()
 
 			walletService := &WalletService{
 				vm:         env.vm,
@@ -71,9 +72,7 @@ func TestWalletService_SendMultiple(t *testing.T) {
 
 			buildAndAccept(require, env.vm, env.issuer, reply.TxID)
 
-			env.vm.ctx.Lock.Lock()
 			_, err = env.vm.state.GetTx(reply.TxID)
-			env.vm.ctx.Lock.Unlock()
 			require.NoError(err)
 		})
 	}

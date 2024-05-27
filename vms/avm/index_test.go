@@ -28,6 +28,7 @@ func TestIndexTransaction_Ordered(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{fork: durango})
+	env.vm.ctx.Lock.Unlock()
 
 	key := keys[0]
 	addr := key.PublicKey().Address()
@@ -61,6 +62,7 @@ func TestIndexTransaction_MultipleTransactions(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{fork: durango})
+	env.vm.ctx.Lock.Unlock()
 
 	addressTxMap := map[ids.ShortID]*txs.Tx{}
 	txAssetID := avax.Asset{ID: env.genesisTx.ID()}
@@ -98,6 +100,7 @@ func TestIndexTransaction_MultipleAddresses(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{fork: durango})
+	env.vm.ctx.Lock.Unlock()
 
 	addrs := make([]ids.ShortID, len(keys))
 	for i, key := range keys {
@@ -130,6 +133,7 @@ func TestIndexer_Read(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{fork: durango})
+	env.vm.ctx.Lock.Unlock()
 
 	// generate test address and asset IDs
 	assetID := ids.GenerateTestID()

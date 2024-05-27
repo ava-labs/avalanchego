@@ -34,6 +34,7 @@ func TestSetsAndGets(t *testing.T) {
 			},
 		}},
 	})
+	env.vm.ctx.Lock.Unlock()
 
 	utxo := &avax.UTXO{
 		UTXOID: avax.UTXOID{
@@ -93,6 +94,7 @@ func TestFundingNoAddresses(t *testing.T) {
 			},
 		}},
 	})
+	env.vm.ctx.Lock.Unlock()
 
 	utxo := &avax.UTXO{
 		UTXOID: avax.UTXOID{
@@ -122,6 +124,7 @@ func TestFundingAddresses(t *testing.T) {
 			},
 		}},
 	})
+	env.vm.ctx.Lock.Unlock()
 
 	utxo := &avax.UTXO{
 		UTXOID: avax.UTXOID{

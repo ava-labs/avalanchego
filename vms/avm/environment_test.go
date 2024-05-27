@@ -218,7 +218,6 @@ func setup(tb testing.TB, c *envConfig) *environment {
 
 	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
 
-	vm.ctx.Lock.Unlock()
 	tb.Cleanup(func() {
 		env.vm.ctx.Lock.Lock()
 		defer env.vm.ctx.Lock.Unlock()

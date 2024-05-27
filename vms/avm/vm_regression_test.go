@@ -19,6 +19,7 @@ func TestVerifyFxUsage(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{fork: latest})
+	env.vm.ctx.Lock.Unlock()
 
 	var (
 		key = keys[0]
