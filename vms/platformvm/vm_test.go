@@ -958,12 +958,12 @@ func TestCreateSubnet(t *testing.T) {
 	require.NoError(err)
 	require.Equal(status.Committed, txStatus)
 
-	subnets, err := vm.state.GetSubnets()
+	subnetIDs, err := vm.state.GetSubnetIDs()
 	require.NoError(err)
 
 	found := false
-	for _, subnet := range subnets {
-		if subnet.ID() == createSubnetTx.ID() {
+	for _, subnetID := range subnetIDs {
+		if subnetID == createSubnetTx.ID() {
 			found = true
 			break
 		}

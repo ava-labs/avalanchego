@@ -134,7 +134,7 @@ type State interface {
 	GetBlockIDAtHeight(height uint64) (ids.ID, error)
 
 	GetRewardUTXOs(txID ids.ID) ([]*avax.UTXO, error)
-	GetSubnets() ([]*txs.Tx, error)
+	GetSubnetIDs() ([]ids.ID, error)
 	GetChains(subnetID ids.ID) ([]*txs.Tx, error)
 
 	// ApplyValidatorWeightDiffs iterates from [startHeight] towards the genesis
@@ -330,10 +330,10 @@ type state struct {
 	utxoDB        database.Database
 	utxoState     avax.UTXOState
 
-	cachedSubnets []*txs.Tx // nil if the subnets haven't been loaded
-	addedSubnets  []*txs.Tx
-	subnetBaseDB  database.Database
-	subnetDB      linkeddb.LinkedDB
+	cachedSubnetIDs []ids.ID // nil if the subnets haven't been loaded
+	addedSubnetIDs  []ids.ID
+	subnetBaseDB    database.Database
+	subnetDB        linkeddb.LinkedDB
 
 	// Subnet ID --> Owner of the subnet
 	subnetOwners     map[ids.ID]fx.Owner
@@ -728,39 +728,39 @@ func (s *state) doneInit() error {
 	return s.singletonDB.Put(InitializedKey, nil)
 }
 
-func (s *state) GetSubnets() ([]*txs.Tx, error) {
-	if s.cachedSubnets != nil {
-		return s.cachedSubnets, nil
+func (s *state) GetSubnetIDs() ([]ids.ID, error) {
+	if s.cachedSubnetIDs != nil {
+		return s.cachedSubnetIDs, nil
 	}
 
 	subnetDBIt := s.subnetDB.NewIterator()
 	defer subnetDBIt.Release()
 
-	txs := []*txs.Tx(nil)
+	subnetIDs := []ids.ID{}
 	for subnetDBIt.Next() {
 		subnetIDBytes := subnetDBIt.Key()
 		subnetID, err := ids.ToID(subnetIDBytes)
 		if err != nil {
 			return nil, err
 		}
-		subnetTx, _, err := s.GetTx(subnetID)
-		if err != nil {
-			return nil, err
-		}
-		txs = append(txs, subnetTx)
+		subnetIDs = append(subnetIDs, subnetID)
 	}
 	if err := subnetDBIt.Error(); err != nil {
 		return nil, err
 	}
-	txs = append(txs, s.addedSubnets...)
-	s.cachedSubnets = txs
-	return txs, nil
+	for _, addedSubnetID := range s.addedSubnetIDs {
+		subnetIDs = append(subnetIDs, addedSubnetID)
+	}
+	s.cachedSubnetIDs = subnetIDs
+	return subnetIDs, nil
 }
 
 func (s *state) AddSubnet(createSubnetTx *txs.Tx) {
-	s.addedSubnets = append(s.addedSubnets, createSubnetTx)
-	if s.cachedSubnets != nil {
-		s.cachedSubnets = append(s.cachedSubnets, createSubnetTx)
+	createSubnetTxID := createSubnetTx.ID()
+
+	s.addedSubnetIDs = append(s.addedSubnetIDs, createSubnetTxID)
+	if s.cachedSubnetIDs != nil {
+		s.cachedSubnetIDs = append(s.cachedSubnetIDs, createSubnetTxID)
 	}
 }
 
@@ -2185,14 +2185,12 @@ func (s *state) writeUTXOs() error {
 }
 
 func (s *state) writeSubnets() error {
-	for _, subnet := range s.addedSubnets {
-		subnetID := subnet.ID()
-
+	for _, subnetID := range s.addedSubnetIDs {
 		if err := s.subnetDB.Put(subnetID[:], nil); err != nil {
 			return fmt.Errorf("failed to write subnet: %w", err)
 		}
 	}
-	s.addedSubnets = nil
+	s.addedSubnetIDs = nil
 	return nil
 }
 

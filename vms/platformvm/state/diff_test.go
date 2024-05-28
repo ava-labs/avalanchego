@@ -260,11 +260,11 @@ func TestDiffSubnet(t *testing.T) {
 	state.AddSubnet(parentStateCreateSubnetTx)
 
 	// Verify parent returns one subnet
-	subnets, err := state.GetSubnets()
+	subnetIDs, err := state.GetSubnetIDs()
 	require.NoError(err)
-	require.Equal([]*txs.Tx{
-		parentStateCreateSubnetTx,
-	}, subnets)
+	require.Equal([]ids.ID{
+		parentStateCreateSubnetTx.ID(),
+	}, subnetIDs)
 
 	states := NewMockVersions(ctrl)
 	lastAcceptedID := ids.GenerateTestID()
@@ -285,12 +285,12 @@ func TestDiffSubnet(t *testing.T) {
 	require.NoError(diff.Apply(state))
 
 	// Verify parent now returns two subnets
-	subnets, err = state.GetSubnets()
+	subnetIDs, err = state.GetSubnetIDs()
 	require.NoError(err)
-	require.Equal([]*txs.Tx{
-		parentStateCreateSubnetTx,
-		createSubnetTx,
-	}, subnets)
+	require.Equal([]ids.ID{
+		parentStateCreateSubnetTx.ID(),
+		createSubnetTx.ID(),
+	}, subnetIDs)
 }
 
 func TestDiffChain(t *testing.T) {

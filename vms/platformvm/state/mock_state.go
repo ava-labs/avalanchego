@@ -1410,6 +1410,21 @@ func (mr *MockStateMockRecorder) GetStatelessBlock(arg0 any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetStatelessBlock", reflect.TypeOf((*MockState)(nil).GetStatelessBlock), arg0)
 }
 
+// GetSubnetIDs mocks base method.
+func (m *MockState) GetSubnetIDs() ([]ids.ID, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetSubnetIDs")
+	ret0, _ := ret[0].([]ids.ID)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetSubnetIDs indicates an expected call of GetSubnetIDs.
+func (mr *MockStateMockRecorder) GetSubnetIDs() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSubnetIDs", reflect.TypeOf((*MockState)(nil).GetSubnetIDs))
+}
+
 // GetSubnetOwner mocks base method.
 func (m *MockState) GetSubnetOwner(arg0 ids.ID) (fx.Owner, error) {
 	m.ctrl.T.Helper()
@@ -1438,21 +1453,6 @@ func (m *MockState) GetSubnetTransformation(arg0 ids.ID) (*txs.Tx, error) {
 func (mr *MockStateMockRecorder) GetSubnetTransformation(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSubnetTransformation", reflect.TypeOf((*MockState)(nil).GetSubnetTransformation), arg0)
-}
-
-// GetSubnets mocks base method.
-func (m *MockState) GetSubnets() ([]*txs.Tx, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetSubnets")
-	ret0, _ := ret[0].([]*txs.Tx)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetSubnets indicates an expected call of GetSubnets.
-func (mr *MockStateMockRecorder) GetSubnets() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSubnets", reflect.TypeOf((*MockState)(nil).GetSubnets))
 }
 
 // GetTimestamp mocks base method.
