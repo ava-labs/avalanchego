@@ -77,12 +77,13 @@ const (
 	defaultChannelSize = 1
 	initialQueueSize   = 3
 
-	chainNamespace        = constants.PlatformName + metric.NamespaceSeparator + "chain"
-	snowmanNamespace      = chainNamespace + metric.NamespaceSeparator + "snowman"
-	avalancheNamespace    = chainNamespace + metric.NamespaceSeparator + "avalanche"
-	proposervmNamespace   = chainNamespace + metric.NamespaceSeparator + "proposervm"
-	meterchainvmNamespace = chainNamespace + metric.NamespaceSeparator + "meterchainvm"
-	meterdagvmNamespace   = chainNamespace + metric.NamespaceSeparator + "meterdagvm"
+	ChainNamespace        = constants.PlatformName + metric.NamespaceSeparator + "chain"
+	handlerNamespace      = ChainNamespace + metric.NamespaceSeparator + "handler"
+	snowmanNamespace      = ChainNamespace + metric.NamespaceSeparator + "snowman"
+	avalancheNamespace    = ChainNamespace + metric.NamespaceSeparator + "avalanche"
+	proposervmNamespace   = ChainNamespace + metric.NamespaceSeparator + "proposervm"
+	meterchainvmNamespace = ChainNamespace + metric.NamespaceSeparator + "meter_chainvm"
+	meterdagvmNamespace   = ChainNamespace + metric.NamespaceSeparator + "meter_dagvm"
 )
 
 var (
@@ -269,16 +270,22 @@ type manager struct {
 	// snowman++ related interface to allow validators retrieval
 	validatorState validators.State
 
+	handlerGatherer      metrics.MultiGatherer            // chainID
 	snowmanGatherer      metrics.MultiGatherer            // chainID
 	avalancheGatherer    metrics.MultiGatherer            // chainID
 	proposervmGatherer   metrics.MultiGatherer            // chainID
-	meterChainVMGatherer metrics.MultiGatherer            // chainID -> isProposervm
+	meterChainVMGatherer metrics.MultiGatherer            // chainID
 	meterDAGVMGatherer   metrics.MultiGatherer            // chainID
 	vmGatherer           map[ids.ID]metrics.MultiGatherer // vmID -> chainID
 }
 
 // New returns a new Manager
 func New(config *ManagerConfig) (Manager, error) {
+	handlerGatherer := metrics.NewLabelGatherer("chain")
+	if err := config.Metrics.Register(handlerNamespace, handlerGatherer); err != nil {
+		return nil, err
+	}
+
 	snowmanGatherer := metrics.NewLabelGatherer("chain")
 	if err := config.Metrics.Register(snowmanNamespace, snowmanGatherer); err != nil {
 		return nil, err
@@ -312,6 +319,7 @@ func New(config *ManagerConfig) (Manager, error) {
 		unblockChainCreatorCh:  make(chan struct{}),
 		chainCreatorShutdownCh: make(chan struct{}),
 
+		handlerGatherer:      handlerGatherer,
 		snowmanGatherer:      snowmanGatherer,
 		avalancheGatherer:    avalancheGatherer,
 		proposervmGatherer:   proposervmGatherer,
@@ -839,6 +847,14 @@ func (m *manager) createAvalancheChain(
 		return nil, fmt.Errorf("error creating peer tracker: %w", err)
 	}
 
+	handlerReg, err := metrics.MakeAndRegister(
+		m.handlerGatherer,
+		primaryAlias,
+	)
+	if err != nil {
+		return nil, err
+	}
+
 	// Asynchronously passes messages from the network to the consensus engine
 	h, err := handler.New(
 		ctx,
@@ -851,6 +867,7 @@ func (m *manager) createAvalancheChain(
 		sb,
 		connectedValidators,
 		peerTracker,
+		handlerReg,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error initializing network handler: %w", err)
@@ -1211,6 +1228,14 @@ func (m *manager) createSnowmanChain(
 		return nil, fmt.Errorf("error creating peer tracker: %w", err)
 	}
 
+	handlerReg, err := metrics.MakeAndRegister(
+		m.handlerGatherer,
+		primaryAlias,
+	)
+	if err != nil {
+		return nil, err
+	}
+
 	// Asynchronously passes messages from the network to the consensus engine
 	h, err := handler.New(
 		ctx,
@@ -1223,6 +1248,7 @@ func (m *manager) createSnowmanChain(
 		sb,
 		connectedValidators,
 		peerTracker,
+		handlerReg,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize message handler: %w", err)
@@ -1505,7 +1531,7 @@ func (m *manager) getOrMakeVMRegisterer(vmID ids.ID, chainAlias string) (metrics
 		}
 
 		err := m.Metrics.Register(
-			metric.AppendNamespace(chainNamespace, vmIDStr),
+			metric.AppendNamespace(ChainNamespace, vmIDStr),
 			vmGatherer,
 		)
 		if err != nil {

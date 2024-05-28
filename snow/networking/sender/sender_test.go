@@ -130,6 +130,7 @@ func TestTimeout(t *testing.T) {
 		subnets.New(ctx.NodeID, subnets.Config{}),
 		commontracker.NewPeers(),
 		p2pTracker,
+		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
 
@@ -404,6 +405,7 @@ func TestReliableMessages(t *testing.T) {
 		subnets.New(ctx.NodeID, subnets.Config{}),
 		commontracker.NewPeers(),
 		p2pTracker,
+		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
 
@@ -558,6 +560,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 		subnets.New(ctx.NodeID, subnets.Config{}),
 		commontracker.NewPeers(),
 		p2pTracker,
+		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
 

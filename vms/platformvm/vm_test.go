@@ -1531,6 +1531,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		subnets.New(ctx.NodeID, subnets.Config{}),
 		tracker.NewPeers(),
 		peerTracker,
+		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
 

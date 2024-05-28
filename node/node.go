@@ -90,6 +90,8 @@ const (
 	httpPortName    = constants.AppName + "-http"
 
 	ipResolutionTimeout = 30 * time.Second
+
+	meterDBNamespace = chains.ChainNamespace + metric.NamespaceSeparator + "handler"
 )
 
 var (
@@ -904,7 +906,7 @@ func (n *Node) initMetrics() error {
 	n.MetricsGatherer = metrics.NewPrefixGatherer()
 	n.MeterDBMetricsGatherer = metrics.NewLabelGatherer("chain")
 	return n.MetricsGatherer.Register(
-		metric.AppendNamespace(constants.PlatformName, "meterdb"),
+		meterDBNamespace,
 		n.MeterDBMetricsGatherer,
 	)
 }

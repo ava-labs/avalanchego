@@ -112,6 +112,7 @@ func TestShutdown(t *testing.T) {
 		subnets.New(chainCtx.NodeID, subnets.Config{}),
 		commontracker.NewPeers(),
 		p2pTracker,
+		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
 
@@ -259,6 +260,7 @@ func TestShutdownTimesOut(t *testing.T) {
 		subnets.New(ctx.NodeID, subnets.Config{}),
 		commontracker.NewPeers(),
 		p2pTracker,
+		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
 
@@ -427,6 +429,7 @@ func TestRouterTimeout(t *testing.T) {
 		subnets.New(ctx.NodeID, subnets.Config{}),
 		commontracker.NewPeers(),
 		p2pTracker,
+		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
 
@@ -1007,6 +1010,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 		sb,
 		commontracker.NewPeers(),
 		p2pTracker,
+		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
 
@@ -1285,6 +1289,7 @@ func TestValidatorOnlyAllowedNodeMessageDrops(t *testing.T) {
 		sb,
 		commontracker.NewPeers(),
 		p2pTracker,
+		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
 
@@ -1623,6 +1628,7 @@ func newChainRouterTest(t *testing.T) (*ChainRouter, *common.EngineTest) {
 		subnets.New(ctx.NodeID, subnets.Config{}),
 		commontracker.NewPeers(),
 		p2pTracker,
+		prometheus.NewRegistry(),
 	)
 	require.NoError(t, err)
 

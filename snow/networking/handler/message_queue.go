@@ -79,6 +79,7 @@ func NewMessageQueue(
 	vdrs validators.Manager,
 	cpuTracker tracker.Tracker,
 	metricsNamespace string,
+	reg prometheus.Registerer,
 ) (MessageQueue, error) {
 	m := &messageQueue{
 		ctx:                   ctx,
@@ -88,7 +89,7 @@ func NewMessageQueue(
 		nodeToUnprocessedMsgs: make(map[ids.NodeID]int),
 		msgAndCtxs:            buffer.NewUnboundedDeque[*msgAndContext](1 /*=initSize*/),
 	}
-	return m, m.metrics.initialize(metricsNamespace, ctx.Registerer)
+	return m, m.metrics.initialize(metricsNamespace, reg)
 }
 
 func (m *messageQueue) Push(ctx context.Context, msg Message) {

@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
@@ -29,7 +30,7 @@ func TestQueue(t *testing.T) {
 	vdr1ID, vdr2ID := ids.GenerateTestNodeID(), ids.GenerateTestNodeID()
 	require.NoError(vdrs.AddStaker(ctx.SubnetID, vdr1ID, nil, ids.Empty, 1))
 	require.NoError(vdrs.AddStaker(ctx.SubnetID, vdr2ID, nil, ids.Empty, 1))
-	mIntf, err := NewMessageQueue(ctx, vdrs, cpuTracker, "")
+	mIntf, err := NewMessageQueue(ctx, vdrs, cpuTracker, "", prometheus.NewRegistry())
 	require.NoError(err)
 	u := mIntf.(*messageQueue)
 	currentTime := time.Now()
