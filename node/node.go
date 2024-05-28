@@ -66,6 +66,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math/meter"
+	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/perms"
 	"github.com/ava-labs/avalanchego/utils/profiler"
 	"github.com/ava-labs/avalanchego/utils/resource"
@@ -180,15 +181,22 @@ func New(
 
 	n.initSharedMemory() // Initialize shared memory
 
+	n.networkRegisterer = prometheus.NewRegistry()
+	err = n.MetricsGatherer.Register(
+		metric.AppendNamespace(constants.PlatformName, "network"),
+		n.networkRegisterer,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't register network metrics: %w", err)
+	}
+
 	// message.Creator is shared between networking, chainManager and the engine.
 	// It must be initiated before networking (initNetworking), chain manager (initChainManager)
 	// and the engine (initChains) but after the metrics (initMetricsAPI)
 	// message.Creator currently record metrics under network namespace
-	n.networkNamespace = "network"
 	n.msgCreator, err = message.NewCreator(
 		n.Log,
-		n.MetricsRegisterer,
-		n.networkNamespace,
+		n.networkRegisterer,
 		n.Config.NetworkConfig.CompressionType,
 		n.Config.NetworkConfig.MaximumInboundMessageTimeout,
 	)
@@ -310,8 +318,8 @@ type Node struct {
 	VertexAcceptorGroup snow.AcceptorGroup
 
 	// Net runs the networking stack
-	networkNamespace string
-	Net              network.Network
+	networkRegisterer *prometheus.Registry
+	Net               network.Network
 
 	// The staking address will optionally be written to a process context
 	// file to enable other nodes to be configured to use this node as a
@@ -584,7 +592,6 @@ func (n *Node) initNetworking() error {
 	}
 
 	// add node configs to network config
-	n.Config.NetworkConfig.Namespace = n.networkNamespace
 	n.Config.NetworkConfig.MyNodeID = n.ID
 	n.Config.NetworkConfig.MyIPPort = dynamicIP
 	n.Config.NetworkConfig.NetworkID = n.Config.NetworkID
@@ -603,7 +610,7 @@ func (n *Node) initNetworking() error {
 	n.Net, err = network.NewNetwork(
 		&n.Config.NetworkConfig,
 		n.msgCreator,
-		n.MetricsRegisterer,
+		n.networkRegisterer,
 		n.Log,
 		listener,
 		dialer.NewDialer(constants.NetworkType, n.Config.NetworkConfig.DialerConfig, n.Log),

@@ -90,7 +90,7 @@ func Context(tb testing.TB, chainID ids.ID) *snow.Context {
 
 		Log:      logging.NoLog{},
 		BCLookup: aliaser,
-		Metrics:  metrics.NewMultiGatherer(),
+		Metrics:  metrics.NewPrefixGatherer(),
 
 		ValidatorState: validatorState,
 		ChainDataDir:   "",
