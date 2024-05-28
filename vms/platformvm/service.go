@@ -545,9 +545,6 @@ func (s *Service) GetSubnets(_ *http.Request, args *GetSubnetsArgs, response *Ge
 			}
 
 			subnetOwner, err := s.vm.state.GetSubnetOwner(subnetID)
-			if err == database.ErrNotFound {
-				continue
-			}
 			if err != nil {
 				return err
 			}
