@@ -903,7 +903,10 @@ func (n *Node) initChains(genesisBytes []byte) error {
 func (n *Node) initMetrics() error {
 	n.MetricsGatherer = metrics.NewPrefixGatherer()
 	n.MeterDBMetricsGatherer = metrics.NewLabelGatherer("chain")
-	return n.MetricsGatherer.Register("meterdb", n.MeterDBMetricsGatherer)
+	return n.MetricsGatherer.Register(
+		metric.AppendNamespace(constants.PlatformName, "meterdb"),
+		n.MeterDBMetricsGatherer,
+	)
 }
 
 func (n *Node) initNAT() {
