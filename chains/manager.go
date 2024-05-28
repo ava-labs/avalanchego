@@ -82,8 +82,8 @@ const (
 	snowmanNamespace      = ChainNamespace + metric.NamespaceSeparator + "snowman"
 	avalancheNamespace    = ChainNamespace + metric.NamespaceSeparator + "avalanche"
 	proposervmNamespace   = ChainNamespace + metric.NamespaceSeparator + "proposervm"
-	meterchainvmNamespace = ChainNamespace + metric.NamespaceSeparator + "meter_chainvm"
-	meterdagvmNamespace   = ChainNamespace + metric.NamespaceSeparator + "meter_dagvm"
+	meterchainvmNamespace = ChainNamespace + metric.NamespaceSeparator + "meterchainvm"
+	meterdagvmNamespace   = ChainNamespace + metric.NamespaceSeparator + "meterdagvm"
 )
 
 var (

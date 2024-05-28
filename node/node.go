@@ -91,7 +91,7 @@ const (
 
 	ipResolutionTimeout = 30 * time.Second
 
-	meterDBNamespace = chains.ChainNamespace + metric.NamespaceSeparator + "handler"
+	meterDBNamespace = chains.ChainNamespace + metric.NamespaceSeparator + "meterdb"
 )
 
 var (
