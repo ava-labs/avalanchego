@@ -264,7 +264,7 @@ type manager struct {
 }
 
 // New returns a new Manager
-func New(config *ManagerConfig) Manager {
+func New(config *ManagerConfig) (Manager, error) {
 	return &manager{
 		Aliaser:                ids.NewAliaser(),
 		ManagerConfig:          *config,
@@ -272,7 +272,7 @@ func New(config *ManagerConfig) Manager {
 		chainsQueue:            buffer.NewUnboundedBlockingDeque[ChainParameters](initialQueueSize),
 		unblockChainCreatorCh:  make(chan struct{}),
 		chainCreatorShutdownCh: make(chan struct{}),
-	}
+	}, nil
 }
 
 // QueueChainCreation queues a chain creation request

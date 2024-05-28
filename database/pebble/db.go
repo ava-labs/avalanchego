@@ -64,7 +64,7 @@ type Config struct {
 }
 
 // TODO: Add metrics
-func New(file string, configBytes []byte, log logging.Logger, _ string, _ prometheus.Registerer) (database.Database, error) {
+func New(file string, configBytes []byte, log logging.Logger, _ prometheus.Registerer) (database.Database, error) {
 	cfg := DefaultConfig
 	if len(configBytes) > 0 {
 		if err := json.Unmarshal(configBytes, &cfg); err != nil {

@@ -61,7 +61,6 @@ func TestShutdown(t *testing.T) {
 			TimeoutHalflife:    5 * time.Minute,
 		},
 		benchlist,
-		"",
 		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
@@ -80,7 +79,6 @@ func TestShutdown(t *testing.T) {
 		set.Set[ids.ID]{},
 		nil,
 		HealthConfig{},
-		"",
 		prometheus.NewRegistry(),
 	))
 
@@ -211,7 +209,6 @@ func TestShutdownTimesOut(t *testing.T) {
 			TimeoutHalflife:    5 * time.Minute,
 		},
 		benchlist,
-		"",
 		metrics,
 	)
 	require.NoError(err)
@@ -231,7 +228,6 @@ func TestShutdownTimesOut(t *testing.T) {
 		set.Set[ids.ID]{},
 		nil,
 		HealthConfig{},
-		"",
 		metrics,
 	))
 
@@ -360,7 +356,6 @@ func TestRouterTimeout(t *testing.T) {
 			TimeoutHalflife:    5 * time.Minute,
 		},
 		benchlist.NewNoBenchlist(),
-		"",
 		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
@@ -380,7 +375,6 @@ func TestRouterTimeout(t *testing.T) {
 		set.Set[ids.ID]{},
 		nil,
 		HealthConfig{},
-		"",
 		prometheus.NewRegistry(),
 	))
 	defer chainRouter.Shutdown(context.Background())
@@ -729,7 +723,6 @@ func TestRouterHonorsRequestedEngine(t *testing.T) {
 			TimeoutHalflife:    5 * time.Minute,
 		},
 		benchlist.NewNoBenchlist(),
-		"",
 		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
@@ -749,7 +742,6 @@ func TestRouterHonorsRequestedEngine(t *testing.T) {
 		set.Set[ids.ID]{},
 		nil,
 		HealthConfig{},
-		"",
 		prometheus.NewRegistry(),
 	))
 	defer chainRouter.Shutdown(context.Background())
@@ -954,7 +946,6 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 			TimeoutHalflife:    5 * time.Minute,
 		},
 		benchlist.NewNoBenchlist(),
-		"",
 		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
@@ -974,7 +965,6 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 		set.Set[ids.ID]{},
 		nil,
 		HealthConfig{},
-		"",
 		prometheus.NewRegistry(),
 	))
 	defer chainRouter.Shutdown(context.Background())
@@ -1115,7 +1105,6 @@ func TestConnectedSubnet(t *testing.T) {
 			TimeoutHalflife:    5 * time.Minute,
 		},
 		benchlist.NewNoBenchlist(),
-		"timeoutManager",
 		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
@@ -1140,7 +1129,6 @@ func TestConnectedSubnet(t *testing.T) {
 		trackedSubnets,
 		nil,
 		HealthConfig{},
-		"",
 		prometheus.NewRegistry(),
 	))
 
@@ -1232,7 +1220,6 @@ func TestValidatorOnlyAllowedNodeMessageDrops(t *testing.T) {
 			TimeoutHalflife:    5 * time.Minute,
 		},
 		benchlist.NewNoBenchlist(),
-		"",
 		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
@@ -1252,7 +1239,6 @@ func TestValidatorOnlyAllowedNodeMessageDrops(t *testing.T) {
 		set.Set[ids.ID]{},
 		nil,
 		HealthConfig{},
-		"",
 		prometheus.NewRegistry(),
 	))
 	defer chainRouter.Shutdown(context.Background())
@@ -1582,7 +1568,6 @@ func newChainRouterTest(t *testing.T) (*ChainRouter, *common.EngineTest) {
 			TimeoutHalflife:    5 * time.Minute,
 		},
 		benchlist.NewNoBenchlist(),
-		"",
 		prometheus.NewRegistry(),
 	)
 	require.NoError(t, err)
@@ -1601,7 +1586,6 @@ func newChainRouterTest(t *testing.T) (*ChainRouter, *common.EngineTest) {
 		set.Set[ids.ID]{},
 		nil,
 		HealthConfig{},
-		"",
 		prometheus.NewRegistry(),
 	))
 

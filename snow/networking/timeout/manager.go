@@ -71,13 +71,11 @@ type Manager interface {
 func NewManager(
 	timeoutConfig *timer.AdaptiveTimeoutConfig,
 	benchlistMgr benchlist.Manager,
-	metricsNamespace string,
-	metricsRegister prometheus.Registerer,
+	reg prometheus.Registerer,
 ) (Manager, error) {
 	tm, err := timer.NewAdaptiveTimeoutManager(
 		timeoutConfig,
-		metricsNamespace,
-		metricsRegister,
+		reg,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't create timeout manager: %w", err)

@@ -362,7 +362,6 @@ type Node struct {
 	DoneShuttingDown sync.WaitGroup
 
 	// Metrics Registerer
-	MetricsRegisterer      *prometheus.Registry
 	MetricsGatherer        metrics.MultiGatherer
 	MeterDBMetricsGatherer metrics.MultiGatherer
 
@@ -730,6 +729,14 @@ func (n *Node) Dispatch() error {
  */
 
 func (n *Node) initDatabase() error {
+	dbReg, err := metrics.MakeAndRegister(
+		n.MetricsGatherer,
+		metric.AppendNamespace(constants.PlatformName, "db"),
+	)
+	if err != nil {
+		return err
+	}
+
 	// start the db
 	switch n.Config.DatabaseConfig.Name {
 	case leveldb.Name:
@@ -737,7 +744,7 @@ func (n *Node) initDatabase() error {
 		// files went to [dbPath]/[networkID]/v1.4.5.
 		dbPath := filepath.Join(n.Config.DatabaseConfig.Path, version.CurrentDatabase.String())
 		var err error
-		n.DB, err = leveldb.New(dbPath, n.Config.DatabaseConfig.Config, n.Log, "db_internal", n.MetricsRegisterer)
+		n.DB, err = leveldb.New(dbPath, n.Config.DatabaseConfig.Config, n.Log, dbReg)
 		if err != nil {
 			return fmt.Errorf("couldn't create leveldb at %s: %w", dbPath, err)
 		}
@@ -746,7 +753,7 @@ func (n *Node) initDatabase() error {
 	case pebble.Name:
 		dbPath := filepath.Join(n.Config.DatabaseConfig.Path, pebble.Name)
 		var err error
-		n.DB, err = pebble.New(dbPath, n.Config.DatabaseConfig.Config, n.Log, "db_internal", n.MetricsRegisterer)
+		n.DB, err = pebble.New(dbPath, n.Config.DatabaseConfig.Config, n.Log, dbReg)
 		if err != nil {
 			return fmt.Errorf("couldn't create pebbledb at %s: %w", dbPath, err)
 		}
@@ -894,9 +901,6 @@ func (n *Node) initChains(genesisBytes []byte) error {
 }
 
 func (n *Node) initMetrics() error {
-	// TODO: Remove
-	n.MetricsRegisterer = prometheus.NewRegistry()
-
 	n.MetricsGatherer = metrics.NewPrefixGatherer()
 	n.MeterDBMetricsGatherer = metrics.NewLabelGatherer("chain")
 	return n.MetricsGatherer.Register("meterdb", n.MeterDBMetricsGatherer)
@@ -988,6 +992,13 @@ func (n *Node) initAPIServer() error {
 	}
 	n.apiURI = fmt.Sprintf("%s://%s", protocol, listener.Addr())
 
+	apiReg, err := metrics.MakeAndRegister(
+		n.MetricsGatherer,
+		metric.AppendNamespace(constants.PlatformName, "api"),
+	)
+	if err != nil {
+		return err
+	}
 	n.APIServer, err = server.New(
 		n.Log,
 		n.LogFactory,
@@ -997,8 +1008,7 @@ func (n *Node) initAPIServer() error {
 		n.ID,
 		n.Config.TraceConfig.Enabled,
 		n.tracer,
-		"api",
-		n.MetricsRegisterer,
+		apiReg,
 		n.Config.HTTPConfig.HTTPConfig,
 		n.Config.HTTPAllowedHosts,
 	)
@@ -1042,11 +1052,18 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		cChainID,
 	)
 
+	requestsReg, err := metrics.MakeAndRegister(
+		n.MetricsGatherer,
+		metric.AppendNamespace(constants.PlatformName, "requests"),
+	)
+	if err != nil {
+		return err
+	}
+
 	n.timeoutManager, err = timeout.NewManager(
 		&n.Config.AdaptiveTimeoutConfig,
 		n.benchlistManager,
-		"requests",
-		n.MetricsRegisterer,
+		requestsReg,
 	)
 	if err != nil {
 		return err
@@ -1064,8 +1081,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		n.Config.TrackedSubnets,
 		n.Shutdown,
 		n.Config.RouterHealthConfig,
-		"requests",
-		n.MetricsRegisterer,
+		requestsReg,
 	)
 	if err != nil {
 		return fmt.Errorf("couldn't initialize chain router: %w", err)
@@ -1075,7 +1091,8 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	if err != nil {
 		return fmt.Errorf("failed to initialize subnets: %w", err)
 	}
-	n.chainManager = chains.New(
+
+	n.chainManager, err = chains.New(
 		&chains.ManagerConfig{
 			SybilProtectionEnabled:                  n.Config.SybilProtectionEnabled,
 			StakingTLSSigner:                        n.StakingTLSSigner,
@@ -1107,6 +1124,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 			ShutdownNodeFunc:                        n.Shutdown,
 			MeterVMEnabled:                          n.Config.MeterVMEnabled,
 			Metrics:                                 n.MetricsGatherer,
+			MeterDBMetrics:                          n.MeterDBMetricsGatherer,
 			SubnetConfigs:                           n.Config.SubnetConfigs,
 			ChainConfigs:                            n.Config.ChainConfigs,
 			FrontierPollFrequency:                   n.Config.FrontierPollFrequency,
@@ -1124,6 +1142,9 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 			Subnets:                                 subnets,
 		},
 	)
+	if err != nil {
+		return err
+	}
 
 	// Notify the API server when new chains are created
 	n.chainManager.AddRegistrant(n.APIServer)
@@ -1245,19 +1266,23 @@ func (n *Node) initMetricsAPI() error {
 		return nil
 	}
 
-	if err := n.MetricsGatherer.Register(constants.PlatformName, n.MetricsRegisterer); err != nil {
+	processReg, err := metrics.MakeAndRegister(
+		n.MetricsGatherer,
+		metric.AppendNamespace(constants.PlatformName, "process"),
+	)
+	if err != nil {
 		return err
 	}
 
 	// Current state of process metrics.
 	processCollector := collectors.NewProcessCollector(collectors.ProcessCollectorOpts{})
-	if err := n.MetricsRegisterer.Register(processCollector); err != nil {
+	if err := processReg.Register(processCollector); err != nil {
 		return err
 	}
 
 	// Go process metrics using debug.GCStats.
 	goCollector := collectors.NewGoCollector()
-	if err := n.MetricsRegisterer.Register(goCollector); err != nil {
+	if err := processReg.Register(goCollector); err != nil {
 		return err
 	}
 
@@ -1374,11 +1399,18 @@ func (n *Node) initInfoAPI() error {
 // initHealthAPI initializes the Health API service
 // Assumes n.Log, n.Net, n.APIServer, n.HTTPLog already initialized
 func (n *Node) initHealthAPI() error {
-	healthChecker, err := health.New(n.Log, n.MetricsRegisterer)
+	healthReg, err := metrics.MakeAndRegister(
+		n.MetricsGatherer,
+		metric.AppendNamespace(constants.PlatformName, "health"),
+	)
 	if err != nil {
 		return err
 	}
-	n.health = healthChecker
+
+	n.health, err = health.New(n.Log, healthReg)
+	if err != nil {
+		return err
+	}
 
 	if !n.Config.HealthAPIEnabled {
 		n.Log.Info("skipping health API initialization because it has been disabled")
@@ -1386,18 +1418,18 @@ func (n *Node) initHealthAPI() error {
 	}
 
 	n.Log.Info("initializing Health API")
-	err = healthChecker.RegisterHealthCheck("network", n.Net, health.ApplicationTag)
+	err = n.health.RegisterHealthCheck("network", n.Net, health.ApplicationTag)
 	if err != nil {
 		return fmt.Errorf("couldn't register network health check: %w", err)
 	}
 
-	err = healthChecker.RegisterHealthCheck("router", n.chainRouter, health.ApplicationTag)
+	err = n.health.RegisterHealthCheck("router", n.chainRouter, health.ApplicationTag)
 	if err != nil {
 		return fmt.Errorf("couldn't register router health check: %w", err)
 	}
 
 	// TODO: add database health to liveness check
-	err = healthChecker.RegisterHealthCheck("database", n.DB, health.ApplicationTag)
+	err = n.health.RegisterHealthCheck("database", n.DB, health.ApplicationTag)
 	if err != nil {
 		return fmt.Errorf("couldn't register database health check: %w", err)
 	}
@@ -1429,7 +1461,7 @@ func (n *Node) initHealthAPI() error {
 		return fmt.Errorf("couldn't register resource health check: %w", err)
 	}
 
-	handler, err := health.NewGetAndPostHandler(n.Log, healthChecker)
+	handler, err := health.NewGetAndPostHandler(n.Log, n.health)
 	if err != nil {
 		return err
 	}
@@ -1444,7 +1476,7 @@ func (n *Node) initHealthAPI() error {
 	}
 
 	err = n.APIServer.AddRoute(
-		health.NewGetHandler(healthChecker.Readiness),
+		health.NewGetHandler(n.health.Readiness),
 		"health",
 		"/readiness",
 	)
@@ -1453,7 +1485,7 @@ func (n *Node) initHealthAPI() error {
 	}
 
 	err = n.APIServer.AddRoute(
-		health.NewGetHandler(healthChecker.Health),
+		health.NewGetHandler(n.health.Health),
 		"health",
 		"/health",
 	)
@@ -1462,7 +1494,7 @@ func (n *Node) initHealthAPI() error {
 	}
 
 	return n.APIServer.AddRoute(
-		health.NewGetHandler(healthChecker.Liveness),
+		health.NewGetHandler(n.health.Liveness),
 		"health",
 		"/liveness",
 	)

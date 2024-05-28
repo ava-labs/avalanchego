@@ -1414,7 +1414,6 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 			TimeoutCoefficient: 1.25,
 		},
 		benchlist,
-		"",
 		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
@@ -1443,7 +1442,6 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		set.Set[ids.ID]{},
 		nil,
 		router.HealthConfig{},
-		"",
 		prometheus.NewRegistry(),
 	))
 
