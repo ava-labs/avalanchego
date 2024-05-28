@@ -748,9 +748,7 @@ func (s *state) GetSubnetIDs() ([]ids.ID, error) {
 	if err := subnetDBIt.Error(); err != nil {
 		return nil, err
 	}
-	for _, addedSubnetID := range s.addedSubnetIDs {
-		subnetIDs = append(subnetIDs, addedSubnetID)
-	}
+	subnetIDs = append(subnetIDs, s.addedSubnetIDs...)
 	s.cachedSubnetIDs = subnetIDs
 	return subnetIDs, nil
 }
