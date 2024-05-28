@@ -11,5 +11,5 @@ graph LR
     A --> H[system_resources]
     A --> I[resource_tracker]
     A --> J[requests]
-    B --> |$chainID|K[$vmID]
+    B -- |$chainID| --> K[$vmID]
 ```
