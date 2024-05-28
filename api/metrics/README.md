@@ -12,7 +12,7 @@ graph LR
     A --> I[resource_tracker]
     A --> J[requests]
     B -- $chainID --> K[$vmID]
-    B -- $chainID, $proposervmSide --> L[meterchainvm]
+    B -- $chainID, $isProposerVM --> L[meterchainvm]
     B -- $chainID --> M[meterdagvm]
     B -- $chainID --> N[proposervm]
 ```
