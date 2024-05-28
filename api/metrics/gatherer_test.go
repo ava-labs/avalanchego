@@ -3,15 +3,7 @@
 
 package metrics
 
-import (
-	dto "github.com/prometheus/client_model/go"
-)
-
-var (
-	hello      = "hello"
-	world      = "world"
-	helloWorld = "hello_world"
-)
+import dto "github.com/prometheus/client_model/go"
 
 type testGatherer struct {
 	mfs []*dto.MetricFamily
