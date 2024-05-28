@@ -1039,7 +1039,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	}
 	xChainID := createAVMTx.ID()
 
-	createEVMTx, err := genesis.VMGenesis(n.Config.GenesisBytes, constants.EVMID)
+	createEVMTx, err := genesis.VMGenesis(n.Config.GenesisBytes, constants.CorethID)
 	if err != nil {
 		return err
 	}
@@ -1202,7 +1202,7 @@ func (n *Node) initVMs() error {
 				EUpgradeTime:     eUpgradeTime,
 			},
 		}),
-		n.VMManager.RegisterFactory(context.TODO(), constants.EVMID, &coreth.Factory{}),
+		n.VMManager.RegisterFactory(context.TODO(), constants.CorethID, &coreth.Factory{}),
 	)
 	if err != nil {
 		return err

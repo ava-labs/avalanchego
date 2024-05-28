@@ -16,4 +16,6 @@ graph LR
     B -- $chainID, $isProposerVM --> M[meterchainvm]
     B -- $chainID --> N[meterdagvm]
     B -- $chainID --> O[proposervm]
+    B -- $chainID --> P[snowman]
+    B -- $chainID --> Q[avalanche]
 ```

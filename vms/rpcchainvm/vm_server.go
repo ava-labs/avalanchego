@@ -225,7 +225,7 @@ func (vm *VMServer) Initialize(ctx context.Context, req *vmpb.InitializeRequest)
 		Keystore:     keystoreClient,
 		SharedMemory: sharedMemoryClient,
 		BCLookup:     bcLookupClient,
-		Metrics:      metrics.NewMultiGatherer(),
+		Metrics:      metrics.NewPrefixGatherer(),
 
 		// Signs warp messages
 		WarpSigner: warpSignerClient,
@@ -566,6 +566,7 @@ func (vm *VMServer) AppGossip(ctx context.Context, req *vmpb.AppGossipMsg) (*emp
 	return &emptypb.Empty{}, vm.vm.AppGossip(ctx, nodeID, req.Msg)
 }
 
+// TODO: FIXME
 func (vm *VMServer) Gather(context.Context, *emptypb.Empty) (*vmpb.GatherResponse, error) {
 	// Gather metrics registered to snow context Gatherer. These
 	// metrics are defined by the underlying vm implementation.

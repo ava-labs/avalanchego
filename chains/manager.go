@@ -13,7 +13,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/api/health"
@@ -53,6 +52,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms"
+	"github.com/ava-labs/avalanchego/vms/example/xsvm"
 	"github.com/ava-labs/avalanchego/vms/fx"
 	"github.com/ava-labs/avalanchego/vms/metervm"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
@@ -76,6 +76,13 @@ import (
 const (
 	defaultChannelSize = 1
 	initialQueueSize   = 3
+
+	chainNamespace        = constants.PlatformName + metric.NamespaceSeparator + "chain"
+	snowmanNamespace      = chainNamespace + metric.NamespaceSeparator + "snowman"
+	avalancheNamespace    = chainNamespace + metric.NamespaceSeparator + "avalanche"
+	proposervmNamespace   = chainNamespace + metric.NamespaceSeparator + "proposervm"
+	meterchainvmNamespace = chainNamespace + metric.NamespaceSeparator + "meterchainvm"
+	meterdagvmNamespace   = chainNamespace + metric.NamespaceSeparator + "meterdagvm"
 )
 
 var (
@@ -261,10 +268,42 @@ type manager struct {
 
 	// snowman++ related interface to allow validators retrieval
 	validatorState validators.State
+
+	snowmanGatherer      metrics.MultiGatherer            // chainID
+	avalancheGatherer    metrics.MultiGatherer            // chainID
+	proposervmGatherer   metrics.MultiGatherer            // chainID
+	meterChainVMGatherer metrics.MultiGatherer            // chainID -> isProposervm
+	meterDAGVMGatherer   metrics.MultiGatherer            // chainID
+	vmGatherer           map[ids.ID]metrics.MultiGatherer // vmID -> chainID
 }
 
 // New returns a new Manager
 func New(config *ManagerConfig) (Manager, error) {
+	snowmanGatherer := metrics.NewLabelGatherer("chain")
+	if err := config.Metrics.Register(snowmanNamespace, snowmanGatherer); err != nil {
+		return nil, err
+	}
+
+	avalancheGatherer := metrics.NewLabelGatherer("chain")
+	if err := config.Metrics.Register(avalancheNamespace, avalancheGatherer); err != nil {
+		return nil, err
+	}
+
+	proposervmGatherer := metrics.NewLabelGatherer("chain")
+	if err := config.Metrics.Register(proposervmNamespace, proposervmGatherer); err != nil {
+		return nil, err
+	}
+
+	meterChainVMGatherer := metrics.NewLabelGatherer("chain")
+	if err := config.Metrics.Register(meterchainvmNamespace, meterChainVMGatherer); err != nil {
+		return nil, err
+	}
+
+	meterDAGVMGatherer := metrics.NewLabelGatherer("chain")
+	if err := config.Metrics.Register(meterdagvmNamespace, meterDAGVMGatherer); err != nil {
+		return nil, err
+	}
+
 	return &manager{
 		Aliaser:                ids.NewAliaser(),
 		ManagerConfig:          *config,
@@ -272,6 +311,13 @@ func New(config *ManagerConfig) (Manager, error) {
 		chainsQueue:            buffer.NewUnboundedBlockingDeque[ChainParameters](initialQueueSize),
 		unblockChainCreatorCh:  make(chan struct{}),
 		chainCreatorShutdownCh: make(chan struct{}),
+
+		snowmanGatherer:      snowmanGatherer,
+		avalancheGatherer:    avalancheGatherer,
+		proposervmGatherer:   proposervmGatherer,
+		meterChainVMGatherer: meterChainVMGatherer,
+		meterDAGVMGatherer:   meterDAGVMGatherer,
+		vmGatherer:           make(map[ids.ID]metrics.MultiGatherer),
 	}, nil
 }
 
@@ -421,25 +467,25 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 		return nil, fmt.Errorf("error while creating chain's log %w", err)
 	}
 
-	consensusMetrics := prometheus.NewRegistry()
-	chainNamespace := metric.AppendNamespace(constants.PlatformName, primaryAlias)
-	if err := m.Metrics.Register(chainNamespace, consensusMetrics); err != nil {
-		return nil, fmt.Errorf("error while registering chain's metrics %w", err)
+	snowmanMetrics, err := metrics.MakeAndRegister(
+		m.snowmanGatherer,
+		primaryAlias,
+	)
+	if err != nil {
+		return nil, err
 	}
 
-	// This converts the prefix for all the Avalanche consensus metrics from
-	// `avalanche_{chainID}_` into `avalanche_{chainID}_avalanche_` so that
-	// there are no conflicts when registering the Snowman consensus metrics.
-	avalancheConsensusMetrics := prometheus.NewRegistry()
-	avalancheDAGNamespace := metric.AppendNamespace(chainNamespace, "avalanche")
-	if err := m.Metrics.Register(avalancheDAGNamespace, avalancheConsensusMetrics); err != nil {
-		return nil, fmt.Errorf("error while registering DAG metrics %w", err)
+	avalancheMetrics, err := metrics.MakeAndRegister(
+		m.avalancheGatherer,
+		primaryAlias,
+	)
+	if err != nil {
+		return nil, err
 	}
 
-	vmMetrics := metrics.NewMultiGatherer()
-	vmNamespace := metric.AppendNamespace(chainNamespace, "vm")
-	if err := m.Metrics.Register(vmNamespace, vmMetrics); err != nil {
-		return nil, fmt.Errorf("error while registering vm's metrics %w", err)
+	vmMetrics, err := m.getOrMakeVMRegisterer(chainParams.VMID, primaryAlias)
+	if err != nil {
+		return nil, err
 	}
 
 	ctx := &snow.ConsensusContext{
@@ -468,8 +514,8 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 		BlockAcceptor:       m.BlockAcceptorGroup,
 		TxAcceptor:          m.TxAcceptorGroup,
 		VertexAcceptor:      m.VertexAcceptorGroup,
-		Registerer:          consensusMetrics,
-		AvalancheRegisterer: avalancheConsensusMetrics,
+		Registerer:          snowmanMetrics,
+		AvalancheRegisterer: avalancheMetrics,
 	}
 
 	// Get a factory for the vm we want to use on our chain
@@ -563,9 +609,10 @@ func (m *manager) createAvalancheChain(
 		State: snow.Initializing,
 	})
 
+	primaryAlias := m.PrimaryAliasOrDefault(ctx.ChainID)
 	meterDBReg, err := metrics.MakeAndRegister(
 		m.MeterDBMetrics,
-		m.PrimaryAliasOrDefault(ctx.ChainID),
+		primaryAlias,
 	)
 	if err != nil {
 		return nil, err
@@ -635,7 +682,15 @@ func (m *manager) createAvalancheChain(
 
 	dagVM := vm
 	if m.MeterVMEnabled {
-		dagVM = metervm.NewVertexVM(dagVM)
+		meterdagvmReg, err := metrics.MakeAndRegister(
+			m.meterDAGVMGatherer,
+			primaryAlias,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		dagVM = metervm.NewVertexVM(dagVM, meterdagvmReg)
 	}
 	if m.TracingEnabled {
 		dagVM = tracedvm.NewVertexVM(dagVM, m.Tracer)
@@ -652,17 +707,6 @@ func (m *manager) createAvalancheChain(
 			CortinaTime: version.GetCortinaTime(ctx.NetworkID),
 		},
 	)
-
-	avalancheRegisterer := metrics.NewMultiGatherer()
-	snowmanRegisterer := metrics.NewMultiGatherer()
-	if err := ctx.Context.Metrics.Register("avalanche", avalancheRegisterer); err != nil {
-		return nil, err
-	}
-	if err := ctx.Context.Metrics.Register("", snowmanRegisterer); err != nil {
-		return nil, err
-	}
-
-	ctx.Context.Metrics = avalancheRegisterer
 
 	// The channel through which a VM may send messages to the consensus engine
 	// VM uses this channel to notify engine that a block is ready to be made
@@ -703,14 +747,20 @@ func (m *manager) createAvalancheChain(
 		zap.Uint64("numHistoricalBlocks", numHistoricalBlocks),
 	)
 
-	chainAlias := m.PrimaryAliasOrDefault(ctx.ChainID)
-
 	// Note: this does not use [dagVM] to ensure we use the [vm]'s height index.
 	untracedVMWrappedInsideProposerVM := NewLinearizeOnInitializeVM(vm)
 
 	var vmWrappedInsideProposerVM block.ChainVM = untracedVMWrappedInsideProposerVM
 	if m.TracingEnabled {
-		vmWrappedInsideProposerVM = tracedvm.NewBlockVM(vmWrappedInsideProposerVM, chainAlias, m.Tracer)
+		vmWrappedInsideProposerVM = tracedvm.NewBlockVM(vmWrappedInsideProposerVM, primaryAlias, m.Tracer)
+	}
+
+	proposervmReg, err := metrics.MakeAndRegister(
+		m.proposervmGatherer,
+		primaryAlias,
+	)
+	if err != nil {
+		return nil, err
 	}
 
 	// Note: vmWrappingProposerVM is the VM that the Snowman engines should be
@@ -725,11 +775,20 @@ func (m *manager) createAvalancheChain(
 			NumHistoricalBlocks: numHistoricalBlocks,
 			StakingLeafSigner:   m.StakingTLSSigner,
 			StakingCertLeaf:     m.StakingTLSCert,
+			Registerer:          proposervmReg,
 		},
 	)
 
 	if m.MeterVMEnabled {
-		vmWrappingProposerVM = metervm.NewBlockVM(vmWrappingProposerVM)
+		meterchainvmReg, err := metrics.MakeAndRegister(
+			m.meterChainVMGatherer,
+			primaryAlias,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		vmWrappingProposerVM = metervm.NewBlockVM(vmWrappingProposerVM, meterchainvmReg)
 	}
 	if m.TracingEnabled {
 		vmWrappingProposerVM = tracedvm.NewBlockVM(vmWrappingProposerVM, "proposervm", m.Tracer)
@@ -742,7 +801,6 @@ func (m *manager) createAvalancheChain(
 		vmToInitialize: vmWrappingProposerVM,
 		vmToLinearize:  untracedVMWrappedInsideProposerVM,
 
-		registerer:   snowmanRegisterer,
 		ctx:          ctx.Context,
 		db:           vmDB,
 		genesisBytes: genesisData,
@@ -930,12 +988,12 @@ func (m *manager) createAvalancheChain(
 	})
 
 	// Register health check for this chain
-	if err := m.Health.RegisterHealthCheck(chainAlias, h, ctx.SubnetID.String()); err != nil {
-		return nil, fmt.Errorf("couldn't add health check for chain %s: %w", chainAlias, err)
+	if err := m.Health.RegisterHealthCheck(primaryAlias, h, ctx.SubnetID.String()); err != nil {
+		return nil, fmt.Errorf("couldn't add health check for chain %s: %w", primaryAlias, err)
 	}
 
 	return &chain{
-		Name:    chainAlias,
+		Name:    primaryAlias,
 		Context: ctx,
 		VM:      dagVM,
 		Handler: h,
@@ -960,9 +1018,10 @@ func (m *manager) createSnowmanChain(
 		State: snow.Initializing,
 	})
 
+	primaryAlias := m.PrimaryAliasOrDefault(ctx.ChainID)
 	meterDBReg, err := metrics.MakeAndRegister(
 		m.MeterDBMetrics,
-		m.PrimaryAliasOrDefault(ctx.ChainID),
+		primaryAlias,
 	)
 	if err != nil {
 		return nil, err
@@ -1069,6 +1128,14 @@ func (m *manager) createSnowmanChain(
 		vm = tracedvm.NewBlockVM(vm, chainAlias, m.Tracer)
 	}
 
+	proposervmReg, err := metrics.MakeAndRegister(
+		m.proposervmGatherer,
+		primaryAlias,
+	)
+	if err != nil {
+		return nil, err
+	}
+
 	vm = proposervm.New(
 		vm,
 		proposervm.Config{
@@ -1079,11 +1146,20 @@ func (m *manager) createSnowmanChain(
 			NumHistoricalBlocks: numHistoricalBlocks,
 			StakingLeafSigner:   m.StakingTLSSigner,
 			StakingCertLeaf:     m.StakingTLSCert,
+			Registerer:          proposervmReg,
 		},
 	)
 
 	if m.MeterVMEnabled {
-		vm = metervm.NewBlockVM(vm)
+		meterchainvmReg, err := metrics.MakeAndRegister(
+			m.meterChainVMGatherer,
+			primaryAlias,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		vm = metervm.NewBlockVM(vm, meterchainvmReg)
 	}
 	if m.TracingEnabled {
 		vm = tracedvm.NewBlockVM(vm, "proposervm", m.Tracer)
@@ -1404,4 +1480,44 @@ func (m *manager) getChainConfig(id ids.ID) (ChainConfig, error) {
 	}
 
 	return ChainConfig{}, nil
+}
+
+func (m *manager) getOrMakeVMRegisterer(vmID ids.ID, chainAlias string) (metrics.MultiGatherer, error) {
+	vmGatherer, ok := m.vmGatherer[vmID]
+	if !ok {
+		vmGatherer = metrics.NewLabelGatherer("chain")
+
+		// TODO: Cleanup vm aliasing
+		var vmIDStr string
+		switch vmID {
+		case constants.PlatformVMID:
+			vmIDStr = "platformvm"
+		case constants.AVMID:
+			vmIDStr = "avm"
+		case constants.CorethID:
+			vmIDStr = "coreth"
+		case constants.SubnetEVMID:
+			vmIDStr = "subnetevm"
+		case xsvm.ID:
+			vmIDStr = "xsvm"
+		default:
+			vmIDStr = vmID.String()
+		}
+
+		err := m.Metrics.Register(
+			metric.AppendNamespace(chainNamespace, vmIDStr),
+			vmGatherer,
+		)
+		if err != nil {
+			return nil, err
+		}
+		m.vmGatherer[vmID] = vmGatherer
+	}
+
+	chainReg := metrics.NewPrefixGatherer()
+	err := vmGatherer.Register(
+		chainAlias,
+		chainReg,
+	)
+	return chainReg, err
 }
