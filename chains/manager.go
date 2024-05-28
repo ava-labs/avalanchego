@@ -831,14 +831,14 @@ func (m *manager) createAvalancheChain(
 	}
 
 	// TODO: FIXME
-	connectedValidators, err := tracker.NewMeteredPeers("", ctx.Registerer)
+	connectedValidators, err := tracker.NewMeteredPeers("", ctx.Registerer) // stake?
 	if err != nil {
 		return nil, fmt.Errorf("error creating peer tracker: %w", err)
 	}
 	vdrs.RegisterSetCallbackListener(ctx.SubnetID, connectedValidators)
 
 	// TODO: FIXME
-	peerTracker, err := p2p.NewPeerTracker(
+	peerTracker, err := p2p.NewPeerTracker( // p2p?
 		ctx.Log,
 		"peer_tracker",
 		ctx.Registerer,

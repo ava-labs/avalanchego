@@ -38,6 +38,7 @@ func (m *metrics) RegisterChain(ctx *snow.ConsensusContext) error {
 	if _, exists := m.chainToMetrics[ctx.ChainID]; exists {
 		return fmt.Errorf("chain %s has already been registered", ctx.ChainID)
 	}
+	// TODO: FIXME
 	cm, err := newChainMetrics(ctx.Registerer)
 	if err != nil {
 		return fmt.Errorf("couldn't create metrics for chain %s: %w", ctx.ChainID, err)
