@@ -117,6 +117,7 @@ func NewBenchlist(
 		duration:               duration,
 		maxPortion:             maxPortion,
 	}
+	// TODO: FIXME
 	if err := benchlist.metrics.Initialize(ctx.Registerer); err != nil {
 		return nil, err
 	}

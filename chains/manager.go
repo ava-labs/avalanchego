@@ -830,12 +830,14 @@ func (m *manager) createAvalancheChain(
 		sampleK = int(bootstrapWeight)
 	}
 
+	// TODO: FIXME
 	connectedValidators, err := tracker.NewMeteredPeers("", ctx.Registerer)
 	if err != nil {
 		return nil, fmt.Errorf("error creating peer tracker: %w", err)
 	}
 	vdrs.RegisterSetCallbackListener(ctx.SubnetID, connectedValidators)
 
+	// TODO: FIXME
 	peerTracker, err := p2p.NewPeerTracker(
 		ctx.Log,
 		"peer_tracker",
@@ -1211,12 +1213,14 @@ func (m *manager) createSnowmanChain(
 		sampleK = int(bootstrapWeight)
 	}
 
+	// TODO: FIXME
 	connectedValidators, err := tracker.NewMeteredPeers("", ctx.Registerer)
 	if err != nil {
 		return nil, fmt.Errorf("error creating peer tracker: %w", err)
 	}
 	vdrs.RegisterSetCallbackListener(ctx.SubnetID, connectedValidators)
 
+	// TODO: FIXME
 	peerTracker, err := p2p.NewPeerTracker(
 		ctx.Log,
 		"peer_tracker",
