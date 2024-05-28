@@ -35,7 +35,7 @@ var (
 	Current = &Semantic{
 		Major: 1,
 		Minor: 0,
-		Patch: 0,
+		Patch: 1,
 	}
 	CurrentApp = &Application{
 		Major: Current.Major,
@@ -48,9 +48,9 @@ var (
 		Patch: 0,
 	}
 	PrevMinimumCompatibleVersion = &Application{
-		Major: 0,
-		Minor: 4,
-		Patch: 9,
+		Major: 1,
+		Minor: 0,
+		Patch: 0,
 	}
 
 	CurrentDatabase = DatabaseVersion1_4_5
