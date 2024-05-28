@@ -161,7 +161,10 @@ func New(
 		return nil, fmt.Errorf("couldn't initialize tracer: %w", err)
 	}
 
-	n.initMetrics()
+	if err := n.initMetrics(); err != nil {
+		return nil, fmt.Errorf("couldn't initialize metrics: %w", err)
+	}
+
 	n.initNAT()
 	if err := n.initAPIServer(); err != nil { // Start the API Server
 		return nil, fmt.Errorf("couldn't initialize API server: %w", err)
@@ -181,13 +184,12 @@ func New(
 
 	n.initSharedMemory() // Initialize shared memory
 
-	n.networkRegisterer = prometheus.NewRegistry()
-	err = n.MetricsGatherer.Register(
+	n.networkRegisterer, err = metrics.MakeAndRegister(
+		n.MetricsGatherer,
 		metric.AppendNamespace(constants.PlatformName, "network"),
-		n.networkRegisterer,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("couldn't register network metrics: %w", err)
+		return nil, err
 	}
 
 	// message.Creator is shared between networking, chainManager and the engine.
@@ -209,7 +211,7 @@ func New(
 		logger.Warn("sybil control is not enforced")
 		n.vdrs = newOverriddenManager(constants.PrimaryNetworkID, n.vdrs)
 	}
-	if err := n.initResourceManager(n.MetricsRegisterer); err != nil {
+	if err := n.initResourceManager(); err != nil {
 		return nil, fmt.Errorf("problem initializing resource manager: %w", err)
 	}
 	n.initCPUTargeter(&config.CPUTargeterConfig)
@@ -360,8 +362,9 @@ type Node struct {
 	DoneShuttingDown sync.WaitGroup
 
 	// Metrics Registerer
-	MetricsRegisterer *prometheus.Registry
-	MetricsGatherer   metrics.MultiGatherer
+	MetricsRegisterer      *prometheus.Registry
+	MetricsGatherer        metrics.MultiGatherer
+	MeterDBMetricsGatherer metrics.MultiGatherer
 
 	VMAliaser ids.Aliaser
 	VMManager vms.Manager
@@ -761,8 +764,15 @@ func (n *Node) initDatabase() error {
 		n.DB = versiondb.New(n.DB)
 	}
 
-	var err error
-	n.DB, err = meterdb.New("db", n.MetricsRegisterer, n.DB)
+	meterDBReg, err := metrics.MakeAndRegister(
+		n.MeterDBMetricsGatherer,
+		"all",
+	)
+	if err != nil {
+		return err
+	}
+
+	n.DB, err = meterdb.New(meterDBReg, n.DB)
 	if err != nil {
 		return err
 	}
@@ -883,9 +893,13 @@ func (n *Node) initChains(genesisBytes []byte) error {
 	return n.chainManager.StartChainCreator(platformChain)
 }
 
-func (n *Node) initMetrics() {
+func (n *Node) initMetrics() error {
+	// TODO: Remove
 	n.MetricsRegisterer = prometheus.NewRegistry()
-	n.MetricsGatherer = metrics.NewMultiGatherer()
+
+	n.MetricsGatherer = metrics.NewPrefixGatherer()
+	n.MeterDBMetricsGatherer = metrics.NewLabelGatherer("chain")
+	return n.MetricsGatherer.Register("meterdb", n.MeterDBMetricsGatherer)
 }
 
 func (n *Node) initNAT() {
@@ -1498,14 +1512,21 @@ func (n *Node) initAPIAliases(genesisBytes []byte) error {
 }
 
 // Initialize [n.resourceManager].
-func (n *Node) initResourceManager(reg prometheus.Registerer) error {
+func (n *Node) initResourceManager() error {
+	systemResourcesRegisterer, err := metrics.MakeAndRegister(
+		n.MetricsGatherer,
+		metric.AppendNamespace(constants.PlatformName, "system_resources"),
+	)
+	if err != nil {
+		return err
+	}
 	resourceManager, err := resource.NewManager(
 		n.Log,
 		n.Config.DatabaseConfig.Path,
 		n.Config.SystemTrackerFrequency,
 		n.Config.SystemTrackerCPUHalflife,
 		n.Config.SystemTrackerDiskHalflife,
-		reg,
+		systemResourcesRegisterer,
 	)
 	if err != nil {
 		return err
@@ -1513,7 +1534,19 @@ func (n *Node) initResourceManager(reg prometheus.Registerer) error {
 	n.resourceManager = resourceManager
 	n.resourceManager.TrackProcess(os.Getpid())
 
-	n.resourceTracker, err = tracker.NewResourceTracker(reg, n.resourceManager, &meter.ContinuousFactory{}, n.Config.SystemTrackerProcessingHalflife)
+	resourceTrackerRegisterer, err := metrics.MakeAndRegister(
+		n.MetricsGatherer,
+		metric.AppendNamespace(constants.PlatformName, "resource_tracker"),
+	)
+	if err != nil {
+		return err
+	}
+	n.resourceTracker, err = tracker.NewResourceTracker(
+		resourceTrackerRegisterer,
+		n.resourceManager,
+		&meter.ContinuousFactory{},
+		n.Config.SystemTrackerProcessingHalflife,
+	)
 	return err
 }
 

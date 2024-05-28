@@ -207,7 +207,9 @@ type ManagerConfig struct {
 	// ShutdownNodeFunc allows the chain manager to issue a request to shutdown the node
 	ShutdownNodeFunc func(exitCode int)
 	MeterVMEnabled   bool // Should each VM be wrapped with a MeterVM
-	Metrics          metrics.MultiGatherer
+
+	Metrics        metrics.MultiGatherer
+	MeterDBMetrics metrics.MultiGatherer
 
 	FrontierPollFrequency   time.Duration
 	ConsensusAppConcurrency int
@@ -561,10 +563,19 @@ func (m *manager) createAvalancheChain(
 		State: snow.Initializing,
 	})
 
-	meterDB, err := meterdb.New("db", ctx.Registerer, m.DB)
+	meterDBReg, err := metrics.MakeAndRegister(
+		m.MeterDBMetrics,
+		m.PrimaryAliasOrDefault(ctx.ChainID),
+	)
 	if err != nil {
 		return nil, err
 	}
+
+	meterDB, err := meterdb.New(meterDBReg, m.DB)
+	if err != nil {
+		return nil, err
+	}
+
 	prefixDB := prefixdb.New(ctx.ChainID[:], meterDB)
 	vmDB := prefixdb.New(VMDBPrefix, prefixDB)
 	vertexDB := prefixdb.New(VertexDBPrefix, prefixDB)
@@ -949,10 +960,19 @@ func (m *manager) createSnowmanChain(
 		State: snow.Initializing,
 	})
 
-	meterDB, err := meterdb.New("db", ctx.Registerer, m.DB)
+	meterDBReg, err := metrics.MakeAndRegister(
+		m.MeterDBMetrics,
+		m.PrimaryAliasOrDefault(ctx.ChainID),
+	)
 	if err != nil {
 		return nil, err
 	}
+
+	meterDB, err := meterdb.New(meterDBReg, m.DB)
+	if err != nil {
+		return nil, err
+	}
+
 	prefixDB := prefixdb.New(ctx.ChainID[:], meterDB)
 	vmDB := prefixdb.New(VMDBPrefix, prefixDB)
 	bootstrappingDB := prefixdb.New(ChainBootstrappingDBPrefix, prefixDB)

@@ -4,6 +4,7 @@
 package metrics
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -37,4 +38,12 @@ func (g *multiGatherer) Gather() ([]*dto.MetricFamily, error) {
 	defer g.lock.RUnlock()
 
 	return g.gatherers.Gather()
+}
+
+func MakeAndRegister(gatherer MultiGatherer, name string) (*prometheus.Registry, error) {
+	reg := prometheus.NewRegistry()
+	if err := gatherer.Register(name, reg); err != nil {
+		return nil, fmt.Errorf("couldn't register %q metrics: %w", name, err)
+	}
+	return reg, nil
 }
