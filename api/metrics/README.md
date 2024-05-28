@@ -5,7 +5,7 @@ graph LR
     A[avalanche] --> B[chain]
     A --> C[network]
     A --> D[api]
-    A --> E[db]
+    A -- $chainID --> E[meterdb]
     A --> F[db]
     A --> G[go]
     A --> H[health]
