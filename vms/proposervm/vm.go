@@ -142,21 +142,16 @@ func (vm *VM) Initialize(
 ) error {
 	// TODO: Add a helper for this metrics override, it is performed in multiple
 	//       places.
-	multiGatherer := metrics.NewMultiGatherer()
 	registerer := prometheus.NewRegistry()
 
-	if err := multiGatherer.Register(metricsNamespace, registerer); err != nil {
+	if err := chainCtx.Metrics.Register(metricsNamespace, registerer); err != nil {
 		return err
 	}
-
-	optionalGatherer := metrics.NewOptionalGatherer()
-	if err := multiGatherer.Register("", optionalGatherer); err != nil {
+	multiGatherer := metrics.NewMultiGatherer()
+	if err := chainCtx.Metrics.Register("", multiGatherer); err != nil {
 		return err
 	}
-	if err := chainCtx.Metrics.Register(multiGatherer); err != nil {
-		return err
-	}
-	chainCtx.Metrics = optionalGatherer
+	chainCtx.Metrics = multiGatherer
 
 	vm.ctx = chainCtx
 	vm.db = versiondb.New(prefixdb.New(dbPrefix, db))

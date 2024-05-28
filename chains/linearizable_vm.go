@@ -29,7 +29,7 @@ type initializeOnLinearizeVM struct {
 	vmToInitialize common.VM
 	vmToLinearize  *linearizeOnInitializeVM
 
-	registerer   metrics.OptionalGatherer
+	registerer   metrics.MultiGatherer
 	ctx          *snow.Context
 	db           database.Database
 	genesisBytes []byte
