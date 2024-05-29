@@ -23,6 +23,8 @@ type MultiGatherer interface {
 }
 
 // Deprecated: Use NewPrefixGatherer instead.
+//
+// TODO: Remove once coreth is updated.
 func NewMultiGatherer() MultiGatherer {
 	return NewPrefixGatherer()
 }
