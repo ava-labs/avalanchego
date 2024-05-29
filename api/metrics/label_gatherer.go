@@ -20,6 +20,8 @@ var (
 	errDuplicateGatherer = errors.New("attempt to register duplicate gatherer")
 )
 
+// NewLabelGatherer returns a new MultiGatherer that merges metrics by adding a
+// new label.
 func NewLabelGatherer(labelName string) MultiGatherer {
 	return &labelGatherer{
 		labelName: labelName,

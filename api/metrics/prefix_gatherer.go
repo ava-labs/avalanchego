@@ -20,6 +20,8 @@ var (
 	errOverlappingNamespaces = errors.New("prefix could create overlapping namespaces")
 )
 
+// NewPrefixGatherer returns a new MultiGatherer that merges metrics by adding a
+// prefix to their names.
 func NewPrefixGatherer() MultiGatherer {
 	return &prefixGatherer{}
 }
@@ -78,7 +80,11 @@ func (g *prefixedGatherer) Gather() ([]*dto.MetricFamily, error) {
 }
 
 // eitherIsPrefix returns true if either [a] is a prefix of [b] or [b] is a
-// prefix of [a]
+// prefix of [a].
+//
+// This function accounts for the usage of the namespace boundary, so "hello" is
+// not considered a prefix of "helloworld". However, "hello" is considered a
+// prefix of "hello_world".
 func eitherIsPrefix(a, b string) bool {
 	if len(a) > len(b) {
 		a, b = b, a
