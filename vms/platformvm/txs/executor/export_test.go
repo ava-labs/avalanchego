@@ -73,7 +73,8 @@ func TestNewExportTx(t *testing.T) {
 
 			stateDiff.SetTimestamp(tt.timestamp)
 
-			feeCalculator := fee.NewStaticCalculator(env.backend.Config.StaticFeeConfig, env.backend.Config.UpgradeConfig, stateDiff.GetTimestamp())
+			cfg := env.config
+			feeCalculator := fee.NewStaticCalculator(cfg.StaticFeeConfig, cfg.UpgradeConfig, stateDiff.GetTimestamp())
 			verifier := StandardTxExecutor{
 				Backend:       &env.backend,
 				FeeCalculator: feeCalculator,

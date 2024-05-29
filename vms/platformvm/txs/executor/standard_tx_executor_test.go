@@ -1011,7 +1011,8 @@ func TestBanffStandardTxExecutorAddValidator(t *testing.T) {
 			onAcceptState.DeleteUTXO(utxoID)
 		}
 
-		feeCalculator := fee.NewStaticCalculator(env.backend.Config.StaticFeeConfig, env.backend.Config.UpgradeConfig, onAcceptState.GetTimestamp())
+		cfg := env.config
+		feeCalculator := fee.NewStaticCalculator(cfg.StaticFeeConfig, cfg.UpgradeConfig, onAcceptState.GetTimestamp())
 		executor := StandardTxExecutor{
 			Backend:       &env.backend,
 			FeeCalculator: feeCalculator,

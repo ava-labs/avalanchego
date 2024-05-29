@@ -47,7 +47,8 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
-	feeCalculator := fee.NewStaticCalculator(env.backend.Config.StaticFeeConfig, env.backend.Config.UpgradeConfig, stateDiff.GetTimestamp())
+	cfg := env.config
+	feeCalculator := fee.NewStaticCalculator(cfg.StaticFeeConfig, cfg.UpgradeConfig, stateDiff.GetTimestamp())
 	executor := StandardTxExecutor{
 		Backend:       &env.backend,
 		FeeCalculator: feeCalculator,
@@ -87,7 +88,8 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
-	feeCalculator := fee.NewStaticCalculator(env.backend.Config.StaticFeeConfig, env.backend.Config.UpgradeConfig, stateDiff.GetTimestamp())
+	cfg := env.config
+	feeCalculator := fee.NewStaticCalculator(cfg.StaticFeeConfig, cfg.UpgradeConfig, stateDiff.GetTimestamp())
 	executor := StandardTxExecutor{
 		Backend:       &env.backend,
 		FeeCalculator: feeCalculator,
@@ -121,7 +123,8 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
-	feeCalculator := fee.NewStaticCalculator(env.backend.Config.StaticFeeConfig, env.backend.Config.UpgradeConfig, stateDiff.GetTimestamp())
+	cfg := env.config
+	feeCalculator := fee.NewStaticCalculator(cfg.StaticFeeConfig, cfg.UpgradeConfig, stateDiff.GetTimestamp())
 	executor := StandardTxExecutor{
 		Backend:       &env.backend,
 		FeeCalculator: feeCalculator,
@@ -152,7 +155,8 @@ func TestCreateChainTxValid(t *testing.T) {
 	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
-	feeCalculator := fee.NewStaticCalculator(env.backend.Config.StaticFeeConfig, env.backend.Config.UpgradeConfig, stateDiff.GetTimestamp())
+	cfg := env.config
+	feeCalculator := fee.NewStaticCalculator(cfg.StaticFeeConfig, cfg.UpgradeConfig, stateDiff.GetTimestamp())
 	executor := StandardTxExecutor{
 		Backend:       &env.backend,
 		FeeCalculator: feeCalculator,
@@ -221,7 +225,7 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 
 			stateDiff.SetTimestamp(test.time)
 
-			feeCalculator := fee.NewStaticCalculator(env.backend.Config.StaticFeeConfig, env.backend.Config.UpgradeConfig, stateDiff.GetTimestamp())
+			feeCalculator := fee.NewStaticCalculator(env.config.StaticFeeConfig, env.config.UpgradeConfig, stateDiff.GetTimestamp())
 			executor := StandardTxExecutor{
 				Backend:       &env.backend,
 				FeeCalculator: feeCalculator,
