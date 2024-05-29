@@ -1175,9 +1175,8 @@ func (m *manager) createSnowmanChain(
 		zap.Uint64("numHistoricalBlocks", numHistoricalBlocks),
 	)
 
-	chainAlias := m.PrimaryAliasOrDefault(ctx.ChainID)
 	if m.TracingEnabled {
-		vm = tracedvm.NewBlockVM(vm, chainAlias, m.Tracer)
+		vm = tracedvm.NewBlockVM(vm, primaryAlias, m.Tracer)
 	}
 
 	proposervmReg, err := metrics.MakeAndRegister(
@@ -1412,12 +1411,12 @@ func (m *manager) createSnowmanChain(
 	})
 
 	// Register health checks
-	if err := m.Health.RegisterHealthCheck(chainAlias, h, ctx.SubnetID.String()); err != nil {
-		return nil, fmt.Errorf("couldn't add health check for chain %s: %w", chainAlias, err)
+	if err := m.Health.RegisterHealthCheck(primaryAlias, h, ctx.SubnetID.String()); err != nil {
+		return nil, fmt.Errorf("couldn't add health check for chain %s: %w", primaryAlias, err)
 	}
 
 	return &chain{
-		Name:    chainAlias,
+		Name:    primaryAlias,
 		Context: ctx,
 		VM:      vm,
 		Handler: h,
