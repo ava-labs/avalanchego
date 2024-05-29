@@ -544,15 +544,23 @@ func (s *Service) GetSubnets(_ *http.Request, args *GetSubnetsArgs, response *Ge
 				continue
 			}
 
-			unsignedTx := subnet.Unsigned.(*txs.CreateSubnetTx)
-			owner := unsignedTx.Owner.(*secp256k1fx.OutputOwners)
-			controlAddrs := []string{}
-			for _, controlKeyID := range owner.Addrs {
+			subnetOwner, err := s.vm.state.GetSubnetOwner(subnetID)
+			if err != nil {
+				return err
+			}
+
+			owner, ok := subnetOwner.(*secp256k1fx.OutputOwners)
+			if !ok {
+				return fmt.Errorf("expected *secp256k1fx.OutputOwners but got %T", subnetOwner)
+			}
+
+			controlAddrs := make([]string, len(owner.Addrs))
+			for i, controlKeyID := range owner.Addrs {
 				addr, err := s.addrManager.FormatLocalAddress(controlKeyID)
 				if err != nil {
 					return fmt.Errorf("problem formatting address: %w", err)
 				}
-				controlAddrs = append(controlAddrs, addr)
+				controlAddrs[i] = addr
 			}
 			response.Subnets[i] = APISubnet{
 				ID:          subnetID,
