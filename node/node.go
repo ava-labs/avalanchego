@@ -323,7 +323,7 @@ type Node struct {
 	VertexAcceptorGroup snow.AcceptorGroup
 
 	// Net runs the networking stack
-	networkRegisterer *prometheus.Registry
+	networkRegisterer prometheus.Registerer
 	Net               network.Network
 
 	// The staking address will optionally be written to a process context

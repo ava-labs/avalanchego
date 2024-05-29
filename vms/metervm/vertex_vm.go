@@ -23,7 +23,7 @@ var (
 
 func NewVertexVM(
 	vm vertex.LinearizableVMWithEngine,
-	reg *prometheus.Registry,
+	reg prometheus.Registerer,
 ) vertex.LinearizableVMWithEngine {
 	return &vertexVM{
 		LinearizableVMWithEngine: vm,
@@ -34,7 +34,7 @@ func NewVertexVM(
 type vertexVM struct {
 	vertex.LinearizableVMWithEngine
 	vertexMetrics
-	registry *prometheus.Registry
+	registry prometheus.Registerer
 	clock    mockable.Clock
 }
 
