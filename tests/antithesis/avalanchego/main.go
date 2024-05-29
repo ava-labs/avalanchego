@@ -6,10 +6,14 @@ package main
 import (
 	"context"
 	"crypto/rand"
+	"fmt"
 	"log"
 	"math/big"
 	"os"
 	"time"
+
+	"github.com/antithesishq/antithesis-sdk-go/assert"
+	"github.com/antithesishq/antithesis-sdk-go/lifecycle"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/genesis"
@@ -127,6 +131,8 @@ func main() {
 			uris:   c.URIs,
 		}
 	}
+
+	lifecycle.SetupComplete(fmt.Sprintf("Initialized %d workers", NumKeys))
 
 	for _, w := range workloads[1:] {
 		go w.run(ctx)
@@ -514,38 +520,54 @@ func (w *workload) makeOwner() secp256k1fx.OutputOwners {
 
 func (w *workload) confirmXChainTx(ctx context.Context, tx *xtxs.Tx) {
 	txID := tx.ID()
+	confirmed := true
 	for _, uri := range w.uris {
 		client := avm.NewClient(uri, "X")
 		status, err := client.ConfirmTx(ctx, txID, 100*time.Millisecond)
 		if err != nil {
 			log.Printf("failed to confirm X-chain transaction %s on %s: %s", txID, uri, err)
-			return
+			confirmed = false
+			break
 		}
 		if status != choices.Accepted {
 			log.Printf("failed to confirm X-chain transaction %s on %s: status == %s", txID, uri, status)
-			return
+			confirmed = false
+			break
 		}
 		log.Printf("confirmed X-chain transaction %s on %s", txID, uri)
 	}
-	log.Printf("confirmed X-chain transaction %s on all nodes", txID)
+	if confirmed {
+		log.Printf("confirmed X-chain transaction %s on all nodes", txID)
+	}
+	assert.Always(confirmed, "X-chain transactions can be confirmed on all nodes", map[string]any{
+		"txID": txID,
+	})
 }
 
 func (w *workload) confirmPChainTx(ctx context.Context, tx *ptxs.Tx) {
 	txID := tx.ID()
+	confirmed := true
 	for _, uri := range w.uris {
 		client := platformvm.NewClient(uri)
 		s, err := client.AwaitTxDecided(ctx, txID, 100*time.Millisecond)
 		if err != nil {
 			log.Printf("failed to confirm P-chain transaction %s on %s: %s", txID, uri, err)
-			return
+			confirmed = false
+			break
 		}
 		if s.Status != status.Committed {
 			log.Printf("failed to confirm P-chain transaction %s on %s: status == %s", txID, uri, s.Status)
-			return
+			confirmed = false
+			break
 		}
 		log.Printf("confirmed P-chain transaction %s on %s", txID, uri)
 	}
-	log.Printf("confirmed P-chain transaction %s on all nodes", txID)
+	if confirmed {
+		log.Printf("confirmed P-chain transaction %s on all nodes", txID)
+	}
+	assert.Always(confirmed, "P-chain transactions can be confirmed on all nodes", map[string]any{
+		"txID": txID,
+	})
 }
 
 func (w *workload) verifyXChainTxConsumedUTXOs(ctx context.Context, tx *xtxs.Tx) {

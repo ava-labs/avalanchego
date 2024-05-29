@@ -6,10 +6,14 @@ package main
 import (
 	"context"
 	"crypto/rand"
+	"fmt"
 	"log"
 	"math/big"
 	"os"
 	"time"
+
+	"github.com/antithesishq/antithesis-sdk-go/assert"
+	"github.com/antithesishq/antithesis-sdk-go/lifecycle"
 
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
@@ -92,6 +96,8 @@ func main() {
 		}
 	}
 
+	lifecycle.SetupComplete(fmt.Sprintf("Initialized %d workers", NumKeys))
+
 	for _, w := range workloads[1:] {
 		go w.run(ctx)
 	}
@@ -157,12 +163,19 @@ func (w *workload) run(ctx context.Context) {
 }
 
 func (w *workload) confirmTransferTx(ctx context.Context, tx *status.TxIssuance) {
+	confirmed := true
 	for _, uri := range w.uris {
 		client := api.NewClient(uri, w.chainID.String())
 		if err := api.WaitForAcceptance(ctx, client, w.key.Address(), tx.Nonce); err != nil {
 			log.Printf("worker %d failed to confirm transaction %s on %s: %s", w.id, tx.TxID, uri, err)
-			return
+			confirmed = false
+			break
 		}
 	}
-	log.Printf("worker %d confirmed transaction %s on all nodes", w.id, tx.TxID)
+	if confirmed {
+		log.Printf("worker %d confirmed transaction %s on all nodes", w.id, tx.TxID)
+	}
+	assert.Always(confirmed, "Transactions can be confirmed on all nodes", map[string]any{
+		"txID": tx.TxID,
+	})
 }
