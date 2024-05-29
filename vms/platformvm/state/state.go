@@ -104,7 +104,7 @@ type Chain interface {
 
 	AddRewardUTXO(txID ids.ID, utxo *avax.UTXO)
 
-	AddSubnet(createSubnetTx *txs.Tx)
+	AddSubnet(createSubnetTxID ids.ID)
 
 	GetSubnetOwner(subnetID ids.ID) (fx.Owner, error)
 	SetSubnetOwner(subnetID ids.ID, owner fx.Owner)
@@ -753,9 +753,7 @@ func (s *state) GetSubnetIDs() ([]ids.ID, error) {
 	return subnetIDs, nil
 }
 
-func (s *state) AddSubnet(createSubnetTx *txs.Tx) {
-	createSubnetTxID := createSubnetTx.ID()
-
+func (s *state) AddSubnet(createSubnetTxID ids.ID) {
 	s.addedSubnetIDs = append(s.addedSubnetIDs, createSubnetTxID)
 	if s.cachedSubnetIDs != nil {
 		s.cachedSubnetIDs = append(s.cachedSubnetIDs, createSubnetTxID)
