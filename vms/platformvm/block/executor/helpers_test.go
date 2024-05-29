@@ -300,7 +300,7 @@ func addSubnet(env *environment) {
 	if err != nil {
 		panic(err)
 	}
-	feeCalculator, err := state.PickFeeCalculator(env.backend.Config, stateDiff, stateDiff.GetTimestamp())
+	feeCalculator, err := state.PickFeeCalculator(env.config, stateDiff, stateDiff.GetTimestamp())
 	if err != nil {
 		panic(err)
 	}

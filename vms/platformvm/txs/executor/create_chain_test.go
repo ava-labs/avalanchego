@@ -54,7 +54,7 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 	require.NoError(err)
 	builderDiff.SetTimestamp(nextBlkTime)
 
-	feeCalculator, err := state.PickFeeCalculator(env.backend.Config, builderDiff, parentBlkTime)
+	feeCalculator, err := state.PickFeeCalculator(env.config, builderDiff, parentBlkTime)
 	require.NoError(err)
 	executor := StandardTxExecutor{
 		Backend:       &env.backend,
@@ -103,7 +103,7 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 	require.NoError(err)
 	builderDiff.SetTimestamp(nextBlkTime)
 
-	feeCalculator, err := state.PickFeeCalculator(env.backend.Config, builderDiff, parentBlkTime)
+	feeCalculator, err := state.PickFeeCalculator(env.config, builderDiff, parentBlkTime)
 	require.NoError(err)
 	executor := StandardTxExecutor{
 		Backend:       &env.backend,
@@ -146,7 +146,7 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 	require.NoError(err)
 	builderDiff.SetTimestamp(nextBlkTime)
 
-	feeCalculator, err := state.PickFeeCalculator(env.backend.Config, builderDiff, parentBlkTime)
+	feeCalculator, err := state.PickFeeCalculator(env.config, builderDiff, parentBlkTime)
 	require.NoError(err)
 
 	executor := StandardTxExecutor{
@@ -187,7 +187,7 @@ func TestCreateChainTxValid(t *testing.T) {
 	require.NoError(err)
 	builderDiff.SetTimestamp(nextBlkTime)
 
-	feeCalculator, err := state.PickFeeCalculator(env.backend.Config, builderDiff, parentBlkTime)
+	feeCalculator, err := state.PickFeeCalculator(env.config, builderDiff, parentBlkTime)
 	require.NoError(err)
 
 	executor := StandardTxExecutor{

@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package main
+package antithesis
 
 import (
 	"errors"
@@ -15,7 +15,8 @@ import (
 )
 
 const (
-	URIsKey = "uris"
+	URIsKey     = "uris"
+	ChainIDsKey = "chain-ids"
 
 	FlagsName = "workload"
 	EnvPrefix = "avawl"
@@ -27,7 +28,8 @@ var (
 )
 
 type Config struct {
-	URIs []string
+	URIs     []string
+	ChainIDs []string
 }
 
 func NewConfig(arguments []string) (*Config, error) {
@@ -37,7 +39,8 @@ func NewConfig(arguments []string) (*Config, error) {
 	}
 
 	c := &Config{
-		URIs: v.GetStringSlice(URIsKey),
+		URIs:     v.GetStringSlice(URIsKey),
+		ChainIDs: v.GetStringSlice(ChainIDsKey),
 	}
 	return c, c.Verify()
 }
@@ -56,6 +59,7 @@ func parseFlags(arguments []string) (*viper.Viper, error) {
 
 	fs := pflag.NewFlagSet(FlagsName, pflag.ContinueOnError)
 	fs.StringSlice(URIsKey, []string{primary.LocalAPIURI}, "URIs of nodes that the workload can communicate with")
+	fs.StringSlice(ChainIDsKey, []string{}, "IDs of chains to target for testing")
 	if err := fs.Parse(arguments[1:]); err != nil {
 		return nil, fmt.Errorf("failed parsing CLI flags: %w", err)
 	}

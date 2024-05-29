@@ -119,7 +119,7 @@ func (vm *VM) Initialize(
 	}
 
 	registerer := prometheus.NewRegistry()
-	if err := chainCtx.Metrics.Register(registerer); err != nil {
+	if err := chainCtx.Metrics.Register("", registerer); err != nil {
 		return err
 	}
 
