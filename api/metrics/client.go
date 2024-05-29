@@ -15,7 +15,7 @@ import (
 	dto "github.com/prometheus/client_model/go"
 )
 
-// Client for requesting metrics from a remote AvalancheGo instance Info API Client
+// Client for requesting metrics from a remote AvalancheGo instance
 type Client struct {
 	uri string
 }
