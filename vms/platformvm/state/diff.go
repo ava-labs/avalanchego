@@ -272,8 +272,8 @@ func (d *diff) GetPendingStakerIterator() (StakerIterator, error) {
 	return d.pendingStakerDiffs.GetStakerIterator(parentIterator), nil
 }
 
-func (d *diff) AddSubnet(createSubnetTxID ids.ID) {
-	d.addedSubnetIDs = append(d.addedSubnetIDs, createSubnetTxID)
+func (d *diff) AddSubnet(subnetID ids.ID) {
+	d.addedSubnetIDs = append(d.addedSubnetIDs, subnetID)
 }
 
 func (d *diff) GetSubnetOwner(subnetID ids.ID) (fx.Owner, error) {
