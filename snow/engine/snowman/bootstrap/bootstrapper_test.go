@@ -76,7 +76,7 @@ func newConfig(t *testing.T) (Config, ids.NodeID, *common.SenderTest, *block.Tes
 
 	require.NoError(startupTracker.Connected(context.Background(), peer, version.CurrentApp))
 
-	snowGetHandler, err := getter.New(vm, sender, ctx.Log, time.Second, 2000, ctx.Registerer)
+	snowGetHandler, err := getter.New(vm, sender, ctx.Log, time.Second, 2000, ctx.SnowmanRegisterer)
 	require.NoError(err)
 
 	peerTracker, err := p2p.NewPeerTracker(
@@ -127,7 +127,7 @@ func TestBootstrapperStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 	startupTracker := tracker.NewStartup(tracker.NewPeers(), startupAlpha)
 	peers.RegisterSetCallbackListener(ctx.SubnetID, startupTracker)
 
-	snowGetHandler, err := getter.New(vm, sender, ctx.Log, time.Second, 2000, ctx.Registerer)
+	snowGetHandler, err := getter.New(vm, sender, ctx.Log, time.Second, 2000, ctx.SnowmanRegisterer)
 	require.NoError(err)
 
 	peerTracker, err := p2p.NewPeerTracker(
@@ -642,7 +642,7 @@ func TestBootstrapNoParseOnNew(t *testing.T) {
 	peers.RegisterSetCallbackListener(ctx.SubnetID, startupTracker)
 	require.NoError(startupTracker.Connected(context.Background(), peer, version.CurrentApp))
 
-	snowGetHandler, err := getter.New(vm, sender, ctx.Log, time.Second, 2000, ctx.Registerer)
+	snowGetHandler, err := getter.New(vm, sender, ctx.Log, time.Second, 2000, ctx.SnowmanRegisterer)
 	require.NoError(err)
 
 	blk1 := snowmantest.BuildChild(snowmantest.Genesis)

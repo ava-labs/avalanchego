@@ -98,7 +98,7 @@ func New(config Config) (*Transitive, error) {
 
 	nonVerifiedCache, err := metercacher.New[ids.ID, snowman.Block](
 		"non_verified_cache",
-		config.Ctx.Registerer,
+		config.Ctx.SnowmanRegisterer,
 		cache.NewSizedLRU[ids.ID, snowman.Block](
 			nonVerifiedCacheSize,
 			cachedBlockSize,
@@ -118,13 +118,13 @@ func New(config Config) (*Transitive, error) {
 	polls, err := poll.NewSet(
 		factory,
 		config.Ctx.Log,
-		config.Ctx.Registerer,
+		config.Ctx.SnowmanRegisterer,
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	metrics, err := newMetrics(config.Ctx.Registerer)
+	metrics, err := newMetrics(config.Ctx.SnowmanRegisterer)
 	if err != nil {
 		return nil, err
 	}

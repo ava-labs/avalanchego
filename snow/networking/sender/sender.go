@@ -79,7 +79,7 @@ func New(
 	var reg prometheus.Registerer
 	switch engineType {
 	case p2p.EngineType_ENGINE_TYPE_SNOWMAN:
-		reg = ctx.Registerer
+		reg = ctx.SnowmanRegisterer
 	case p2p.EngineType_ENGINE_TYPE_AVALANCHE:
 		reg = ctx.AvalancheRegisterer
 	default:

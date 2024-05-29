@@ -833,7 +833,7 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 
 			// Instantiate new registerers to avoid duplicate metrics
 			// registration
-			ctx.Registerer = prometheus.NewRegistry()
+			ctx.SnowmanRegisterer = prometheus.NewRegistry()
 
 			sender, err := New(
 				ctx,
@@ -1051,7 +1051,7 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 
 			// Instantiate new registerers to avoid duplicate metrics
 			// registration
-			ctx.Registerer = prometheus.NewRegistry()
+			ctx.SnowmanRegisterer = prometheus.NewRegistry()
 			ctx.AvalancheRegisterer = prometheus.NewRegistry()
 
 			sender, err := New(
@@ -1218,7 +1218,7 @@ func TestSender_Single_Request(t *testing.T) {
 
 			// Instantiate new registerers to avoid duplicate metrics
 			// registration
-			ctx.Registerer = prometheus.NewRegistry()
+			ctx.SnowmanRegisterer = prometheus.NewRegistry()
 
 			sender, err := New(
 				ctx,

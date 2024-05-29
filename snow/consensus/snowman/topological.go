@@ -111,7 +111,7 @@ func (ts *Topological) Initialize(
 
 	ts.metrics, err = newMetrics(
 		ctx.Log,
-		ctx.Registerer,
+		ctx.SnowmanRegisterer,
 		lastAcceptedHeight,
 		lastAcceptedTime,
 	)

@@ -87,9 +87,6 @@ func newMetrics(
 		}),
 
 		processingBlocks: linked.NewHashmap[ids.ID, processingStart](),
-
-		// e.g.,
-		// "avalanche_X_blks_processing" reports how many blocks are currently processing
 		numProcessing: prometheus.NewGauge(prometheus.GaugeOpts{
 			Name: "blks_processing",
 			Help: "number of currently processing blocks",
@@ -105,12 +102,6 @@ func newMetrics(
 			reg,
 			&errs,
 		),
-		// e.g.,
-		// "avalanche_C_blks_accepted_count" reports how many times "Observe" has been called which is the total number of blocks accepted
-		// "avalanche_C_blks_accepted_sum" reports the cumulative sum of all block acceptance latencies in nanoseconds
-		// "avalanche_C_blks_accepted_sum / avalanche_C_blks_accepted_count" is the average block acceptance latency in nanoseconds
-		// "avalanche_C_blks_accepted_container_size_sum" reports the cumulative sum of all accepted blocks' sizes in bytes
-		// "avalanche_C_blks_accepted_container_size_sum / avalanche_C_blks_accepted_count" is the average accepted block size in bytes
 		latAccepted: metric.NewAveragerWithErrs(
 			"blks_accepted",
 			"time (in ns) from the issuance of a block to its acceptance",
@@ -132,12 +123,6 @@ func newMetrics(
 			reg,
 			&errs,
 		),
-		// e.g.,
-		// "avalanche_P_blks_rejected_count" reports how many times "Observe" has been called which is the total number of blocks rejected
-		// "avalanche_P_blks_rejected_sum" reports the cumulative sum of all block rejection latencies in nanoseconds
-		// "avalanche_P_blks_rejected_sum / avalanche_P_blks_rejected_count" is the average block rejection latency in nanoseconds
-		// "avalanche_P_blks_rejected_container_size_sum" reports the cumulative sum of all rejected blocks' sizes in bytes
-		// "avalanche_P_blks_rejected_container_size_sum / avalanche_P_blks_rejected_count" is the average rejected block size in bytes
 		latRejected: metric.NewAveragerWithErrs(
 			"blks_rejected",
 			"time (in ns) from the issuance of a block to its rejection",

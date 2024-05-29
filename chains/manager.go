@@ -538,7 +538,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 			ChainDataDir:   chainDataDir,
 		},
 		PrimaryAlias:        primaryAlias,
-		Registerer:          snowmanMetrics,
+		SnowmanRegisterer:   snowmanMetrics,
 		AvalancheRegisterer: avalancheMetrics,
 		BlockAcceptor:       m.BlockAcceptorGroup,
 		TxAcceptor:          m.TxAcceptorGroup,
@@ -918,7 +918,7 @@ func (m *manager) createAvalancheChain(
 		ctx.Log,
 		m.BootstrapMaxTimeGetAncestors,
 		m.BootstrapAncestorsMaxContainersSent,
-		ctx.Registerer,
+		ctx.SnowmanRegisterer,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize snow base message handler: %w", err)
@@ -1314,7 +1314,7 @@ func (m *manager) createSnowmanChain(
 		ctx.Log,
 		m.BootstrapMaxTimeGetAncestors,
 		m.BootstrapAncestorsMaxContainersSent,
-		ctx.Registerer,
+		ctx.SnowmanRegisterer,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize snow base message handler: %w", err)

@@ -96,7 +96,7 @@ func buildTestsObjects(
 		ctx.Log,
 		time.Second,
 		2000,
-		ctx.Registerer,
+		ctx.SnowmanRegisterer,
 	)
 	require.NoError(err)
 

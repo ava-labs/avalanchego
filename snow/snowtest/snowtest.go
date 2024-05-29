@@ -41,7 +41,7 @@ func ConsensusContext(ctx *snow.Context) *snow.ConsensusContext {
 	return &snow.ConsensusContext{
 		Context:             ctx,
 		PrimaryAlias:        ctx.ChainID.String(),
-		Registerer:          prometheus.NewRegistry(),
+		SnowmanRegisterer:   prometheus.NewRegistry(),
 		AvalancheRegisterer: prometheus.NewRegistry(),
 		BlockAcceptor:       noOpAcceptor{},
 		TxAcceptor:          noOpAcceptor{},

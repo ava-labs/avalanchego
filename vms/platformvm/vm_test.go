@@ -1485,14 +1485,14 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		consensusCtx.Log,
 		time.Second,
 		2000,
-		consensusCtx.Registerer,
+		consensusCtx.SnowmanRegisterer,
 	)
 	require.NoError(err)
 
 	peerTracker, err := p2p.NewPeerTracker(
 		ctx.Log,
 		"peer_tracker",
-		consensusCtx.Registerer,
+		consensusCtx.SnowmanRegisterer,
 		set.Of(ctx.NodeID),
 		nil,
 	)

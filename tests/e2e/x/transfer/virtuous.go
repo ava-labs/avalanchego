@@ -9,6 +9,7 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -28,9 +29,13 @@ import (
 const (
 	totalRounds = 50
 
-	xBlksProcessingMetric = "avalanche_X_blks_processing"
-	xBlksAcceptedMetric   = "avalanche_X_blks_accepted_count"
+	blksProcessingMetric = "avalanche_chain_snowman_blks_processing"
+	blksAcceptedMetric   = "avalanche_chain_snowman_blks_accepted_count"
 )
+
+var xChainMetricLabels = prometheus.Labels{
+	"chain": "X",
+}
 
 // This test requires that the network not have ongoing blocks and
 // cannot reliably be run in parallel.
@@ -55,7 +60,7 @@ var _ = e2e.DescribeXChainSerial("[Virtuous Transfer Tx AVAX]", func() {
 				require.NoError(err)
 
 				for _, metrics := range allNodeMetrics {
-					xBlksProcessing, ok := tests.GetFirstMetricValue(metrics, xBlksProcessingMetric)
+					xBlksProcessing, ok := tests.GetMetricValue(metrics, blksProcessingMetric, xChainMetricLabels)
 					if !ok || xBlksProcessing > 0 {
 						return false
 					}
@@ -248,13 +253,13 @@ RECEIVER  NEW BALANCE (AFTER) : %21d AVAX
 
 					// +0 since X-chain tx must have been processed and accepted
 					// by now
-					currentXBlksProcessing, _ := tests.GetFirstMetricValue(mm, xBlksProcessingMetric)
-					previousXBlksProcessing, _ := tests.GetFirstMetricValue(prev, xBlksProcessingMetric)
+					currentXBlksProcessing, _ := tests.GetMetricValue(mm, blksProcessingMetric, xChainMetricLabels)
+					previousXBlksProcessing, _ := tests.GetMetricValue(prev, blksProcessingMetric, xChainMetricLabels)
 					require.Equal(currentXBlksProcessing, previousXBlksProcessing)
 
 					// +1 since X-chain tx must have been accepted by now
-					currentXBlksAccepted, _ := tests.GetFirstMetricValue(mm, xBlksAcceptedMetric)
-					previousXBlksAccepted, _ := tests.GetFirstMetricValue(prev, xBlksAcceptedMetric)
+					currentXBlksAccepted, _ := tests.GetMetricValue(mm, blksAcceptedMetric, xChainMetricLabels)
+					previousXBlksAccepted, _ := tests.GetMetricValue(prev, blksAcceptedMetric, xChainMetricLabels)
 					require.Equal(currentXBlksAccepted, previousXBlksAccepted+1)
 
 					metricsBeforeTx[u] = mm
