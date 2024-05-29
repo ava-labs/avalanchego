@@ -45,7 +45,7 @@ type meteredHandler struct {
 }
 
 type metrics struct {
-	msgTime  *prometheus.CounterVec
+	msgTime  *prometheus.GaugeVec
 	msgCount *prometheus.CounterVec
 }
 

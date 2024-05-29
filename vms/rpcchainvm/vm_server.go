@@ -225,7 +225,7 @@ func (vm *VMServer) Initialize(ctx context.Context, req *vmpb.InitializeRequest)
 		Keystore:     keystoreClient,
 		SharedMemory: sharedMemoryClient,
 		BCLookup:     bcLookupClient,
-		Metrics:      metrics.NewOptionalGatherer(),
+		Metrics:      metrics.NewMultiGatherer(),
 
 		// Signs warp messages
 		WarpSigner: warpSignerClient,

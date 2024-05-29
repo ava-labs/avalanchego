@@ -349,8 +349,8 @@ func sampleAddrs(tb testing.TB, addressFormatter avax.AddressManager, addrs []id
 	sampler.Initialize(uint64(len(addrs)))
 
 	numAddrs := 1 + rand.Intn(len(addrs)) // #nosec G404
-	indices, err := sampler.Sample(numAddrs)
-	require.NoError(err)
+	indices, ok := sampler.Sample(numAddrs)
+	require.True(ok)
 	for _, index := range indices {
 		addr := addrs[index]
 		addrStr, err := addressFormatter.FormatLocalAddress(addr)

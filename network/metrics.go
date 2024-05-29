@@ -12,11 +12,13 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/peer"
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 type metrics struct {
+	// trackedSubnets does not include the primary network ID
+	trackedSubnets set.Set[ids.ID]
+
 	numTracked                      prometheus.Gauge
 	numPeers                        prometheus.Gauge
 	numSubnetPeers                  *prometheus.GaugeVec
@@ -41,8 +43,13 @@ type metrics struct {
 	peerConnectedStartTimesSum float64
 }
 
-func newMetrics(namespace string, registerer prometheus.Registerer, initialSubnetIDs set.Set[ids.ID]) (*metrics, error) {
+func newMetrics(
+	namespace string,
+	registerer prometheus.Registerer,
+	trackedSubnets set.Set[ids.ID],
+) (*metrics, error) {
 	m := &metrics{
+		trackedSubnets: trackedSubnets,
 		numPeers: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespace,
 			Name:      "peers",
@@ -169,11 +176,7 @@ func newMetrics(namespace string, registerer prometheus.Registerer, initialSubne
 	)
 
 	// init subnet tracker metrics with tracked subnets
-	for subnetID := range initialSubnetIDs {
-		// no need to track primary network ID
-		if subnetID == constants.PrimaryNetworkID {
-			continue
-		}
+	for subnetID := range trackedSubnets {
 		// initialize to 0
 		subnetIDStr := subnetID.String()
 		m.numSubnetPeers.WithLabelValues(subnetIDStr).Set(0)
@@ -189,8 +192,10 @@ func (m *metrics) markConnected(peer peer.Peer) {
 	m.connected.Inc()
 
 	trackedSubnets := peer.TrackedSubnets()
-	for subnetID := range trackedSubnets {
-		m.numSubnetPeers.WithLabelValues(subnetID.String()).Inc()
+	for subnetID := range m.trackedSubnets {
+		if trackedSubnets.Contains(subnetID) {
+			m.numSubnetPeers.WithLabelValues(subnetID.String()).Inc()
+		}
 	}
 
 	m.lock.Lock()
@@ -206,8 +211,10 @@ func (m *metrics) markDisconnected(peer peer.Peer) {
 	m.disconnected.Inc()
 
 	trackedSubnets := peer.TrackedSubnets()
-	for subnetID := range trackedSubnets {
-		m.numSubnetPeers.WithLabelValues(subnetID.String()).Dec()
+	for subnetID := range m.trackedSubnets {
+		if trackedSubnets.Contains(subnetID) {
+			m.numSubnetPeers.WithLabelValues(subnetID.String()).Dec()
+		}
 	}
 
 	m.lock.Lock()

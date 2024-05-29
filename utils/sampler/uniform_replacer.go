@@ -36,18 +36,18 @@ func (s *uniformReplacer) Initialize(length uint64) {
 	s.drawsCount = 0
 }
 
-func (s *uniformReplacer) Sample(count int) ([]uint64, error) {
+func (s *uniformReplacer) Sample(count int) ([]uint64, bool) {
 	s.Reset()
 
 	results := make([]uint64, count)
 	for i := 0; i < count; i++ {
-		ret, err := s.Next()
-		if err != nil {
-			return nil, err
+		ret, hasNext := s.Next()
+		if !hasNext {
+			return nil, false
 		}
 		results[i] = ret
 	}
-	return results, nil
+	return results, true
 }
 
 func (s *uniformReplacer) Reset() {
@@ -55,9 +55,9 @@ func (s *uniformReplacer) Reset() {
 	s.drawsCount = 0
 }
 
-func (s *uniformReplacer) Next() (uint64, error) {
+func (s *uniformReplacer) Next() (uint64, bool) {
 	if s.drawsCount >= s.length {
-		return 0, ErrOutOfRange
+		return 0, false
 	}
 
 	draw := s.rng.Uint64Inclusive(s.length-1-s.drawsCount) + s.drawsCount
@@ -65,5 +65,5 @@ func (s *uniformReplacer) Next() (uint64, error) {
 	s.drawn[draw] = s.drawn.get(s.drawsCount, s.drawsCount)
 	s.drawsCount++
 
-	return ret, nil
+	return ret, true
 }

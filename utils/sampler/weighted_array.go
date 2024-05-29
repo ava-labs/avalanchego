@@ -81,9 +81,9 @@ func (s *weightedArray) Initialize(weights []uint64) error {
 	return nil
 }
 
-func (s *weightedArray) Sample(value uint64) (int, error) {
+func (s *weightedArray) Sample(value uint64) (int, bool) {
 	if len(s.arr) == 0 || s.arr[len(s.arr)-1].cumulativeWeight <= value {
-		return 0, ErrOutOfRange
+		return 0, false
 	}
 	minIndex := 0
 	maxIndex := len(s.arr) - 1
@@ -98,7 +98,7 @@ func (s *weightedArray) Sample(value uint64) (int, error) {
 		currentElem := s.arr[index]
 		currentWeight := currentElem.cumulativeWeight
 		if previousWeight <= value && value < currentWeight {
-			return currentElem.index, nil
+			return currentElem.index, true
 		}
 
 		if value < previousWeight {

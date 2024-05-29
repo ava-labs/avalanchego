@@ -8,10 +8,10 @@ package sampler
 // indices. So duplicate indices can be returned.
 type WeightedWithoutReplacement interface {
 	Initialize(weights []uint64) error
-	Sample(count int) ([]int, error)
+	Sample(count int) ([]int, bool)
 }
 
-// NewWeightedWithoutReplacement returns a new sampler
+// NewDeterministicWeightedWithoutReplacement returns a new sampler
 func NewDeterministicWeightedWithoutReplacement(source Source) WeightedWithoutReplacement {
 	return &weightedWithoutReplacementGeneric{
 		u: NewDeterministicUniform(source),

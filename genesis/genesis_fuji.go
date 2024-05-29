@@ -10,6 +10,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 )
 
 var (
@@ -18,7 +19,7 @@ var (
 
 	// FujiParams are the params used for the fuji testnet
 	FujiParams = Params{
-		TxFeeConfig: TxFeeConfig{
+		StaticConfig: fee.StaticConfig{
 			TxFee:                         units.MilliAvax,
 			CreateAssetTxFee:              10 * units.MilliAvax,
 			CreateSubnetTxFee:             100 * units.MilliAvax,

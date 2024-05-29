@@ -75,6 +75,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
+	"github.com/ava-labs/avalanchego/vms/platformvm/upgrade"
 	"github.com/ava-labs/avalanchego/vms/registry"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/runtime"
 
@@ -503,7 +504,7 @@ func (n *Node) initNetworking() error {
 		}
 	}
 	if unknownACPs.Len() > 0 {
-		n.Log.Warn("gossipping unknown ACPs",
+		n.Log.Warn("gossiping unknown ACPs",
 			zap.Reflect("acps", unknownACPs),
 		)
 	}
@@ -1126,36 +1127,30 @@ func (n *Node) initVMs() error {
 	err := utils.Err(
 		n.VMManager.RegisterFactory(context.TODO(), constants.PlatformVMID, &platformvm.Factory{
 			Config: platformconfig.Config{
-				Chains:                        n.chainManager,
-				Validators:                    vdrs,
-				UptimeLockedCalculator:        n.uptimeCalculator,
-				SybilProtectionEnabled:        n.Config.SybilProtectionEnabled,
-				PartialSyncPrimaryNetwork:     n.Config.PartialSyncPrimaryNetwork,
-				TrackedSubnets:                n.Config.TrackedSubnets,
-				TxFee:                         n.Config.TxFee,
-				CreateAssetTxFee:              n.Config.CreateAssetTxFee,
-				CreateSubnetTxFee:             n.Config.CreateSubnetTxFee,
-				TransformSubnetTxFee:          n.Config.TransformSubnetTxFee,
-				CreateBlockchainTxFee:         n.Config.CreateBlockchainTxFee,
-				AddPrimaryNetworkValidatorFee: n.Config.AddPrimaryNetworkValidatorFee,
-				AddPrimaryNetworkDelegatorFee: n.Config.AddPrimaryNetworkDelegatorFee,
-				AddSubnetValidatorFee:         n.Config.AddSubnetValidatorFee,
-				AddSubnetDelegatorFee:         n.Config.AddSubnetDelegatorFee,
-				UptimePercentage:              n.Config.UptimeRequirement,
-				MinValidatorStake:             n.Config.MinValidatorStake,
-				MaxValidatorStake:             n.Config.MaxValidatorStake,
-				MinDelegatorStake:             n.Config.MinDelegatorStake,
-				MinDelegationFee:              n.Config.MinDelegationFee,
-				MinStakeDuration:              n.Config.MinStakeDuration,
-				MaxStakeDuration:              n.Config.MaxStakeDuration,
-				RewardConfig:                  n.Config.RewardConfig,
-				ApricotPhase3Time:             version.GetApricotPhase3Time(n.Config.NetworkID),
-				ApricotPhase5Time:             version.GetApricotPhase5Time(n.Config.NetworkID),
-				BanffTime:                     version.GetBanffTime(n.Config.NetworkID),
-				CortinaTime:                   version.GetCortinaTime(n.Config.NetworkID),
-				DurangoTime:                   version.GetDurangoTime(n.Config.NetworkID),
-				EUpgradeTime:                  eUpgradeTime,
-				UseCurrentHeight:              n.Config.UseCurrentHeight,
+				Chains:                    n.chainManager,
+				Validators:                vdrs,
+				UptimeLockedCalculator:    n.uptimeCalculator,
+				SybilProtectionEnabled:    n.Config.SybilProtectionEnabled,
+				PartialSyncPrimaryNetwork: n.Config.PartialSyncPrimaryNetwork,
+				TrackedSubnets:            n.Config.TrackedSubnets,
+				StaticFeeConfig:           n.Config.StaticConfig,
+				UptimePercentage:          n.Config.UptimeRequirement,
+				MinValidatorStake:         n.Config.MinValidatorStake,
+				MaxValidatorStake:         n.Config.MaxValidatorStake,
+				MinDelegatorStake:         n.Config.MinDelegatorStake,
+				MinDelegationFee:          n.Config.MinDelegationFee,
+				MinStakeDuration:          n.Config.MinStakeDuration,
+				MaxStakeDuration:          n.Config.MaxStakeDuration,
+				RewardConfig:              n.Config.RewardConfig,
+				UpgradeConfig: upgrade.Config{
+					ApricotPhase3Time: version.GetApricotPhase3Time(n.Config.NetworkID),
+					ApricotPhase5Time: version.GetApricotPhase5Time(n.Config.NetworkID),
+					BanffTime:         version.GetBanffTime(n.Config.NetworkID),
+					CortinaTime:       version.GetCortinaTime(n.Config.NetworkID),
+					DurangoTime:       version.GetDurangoTime(n.Config.NetworkID),
+					EUpgradeTime:      eUpgradeTime,
+				},
+				UseCurrentHeight: n.Config.UseCurrentHeight,
 			},
 		}),
 		n.VMManager.RegisterFactory(context.TODO(), constants.AVMID, &avm.Factory{

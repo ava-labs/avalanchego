@@ -25,6 +25,7 @@ const (
 	batchWritePeriod      = 64
 	iteratorReleasePeriod = 1024
 	logPeriod             = 5 * time.Second
+	minBlocksToCompact    = 5000
 )
 
 // getMissingBlockIDs returns the ID of the blocks that should be fetched to
@@ -133,6 +134,17 @@ func execute(
 	tree *interval.Tree,
 	lastAcceptedHeight uint64,
 ) error {
+	totalNumberToProcess := tree.Len()
+	if totalNumberToProcess > minBlocksToCompact {
+		log("compacting database before executing blocks...")
+		if err := db.Compact(nil, nil); err != nil {
+			// Not a fatal error, log and move on.
+			log("failed to compact bootstrap database before executing blocks",
+				zap.Error(err),
+			)
+		}
+	}
+
 	var (
 		batch                    = db.NewBatch()
 		processedSinceBatchWrite uint
@@ -152,12 +164,30 @@ func execute(
 		iterator                      = interval.GetBlockIterator(db)
 		processedSinceIteratorRelease uint
 
-		startTime            = time.Now()
-		timeOfNextLog        = startTime.Add(logPeriod)
-		totalNumberToProcess = tree.Len()
+		startTime     = time.Now()
+		timeOfNextLog = startTime.Add(logPeriod)
 	)
 	defer func() {
 		iterator.Release()
+
+		halted := haltable.Halted()
+		if !halted {
+			log("compacting database after executing blocks...")
+			if err := db.Compact(nil, nil); err != nil {
+				// Not a fatal error, log and move on.
+				log("failed to compact bootstrap database after executing blocks",
+					zap.Error(err),
+				)
+			}
+		}
+
+		numProcessed := totalNumberToProcess - tree.Len()
+		log("executed blocks",
+			zap.Uint64("numExecuted", numProcessed),
+			zap.Uint64("numToExecute", totalNumberToProcess),
+			zap.Bool("halted", halted),
+			zap.Duration("duration", time.Since(startTime)),
+		)
 	}()
 
 	log("executing blocks",
@@ -199,7 +229,10 @@ func execute(
 
 			processedSinceIteratorRelease = 0
 			iterator.Release()
-			iterator = interval.GetBlockIterator(db)
+			// We specify the starting key of the iterator so that the
+			// underlying database doesn't need to scan over the, potentially
+			// not yet compacted, blocks we just deleted.
+			iterator = interval.GetBlockIteratorWithStart(db, height+1)
 		}
 
 		if now := time.Now(); now.After(timeOfNextLog) {
@@ -239,16 +272,5 @@ func execute(
 	if err := writeBatch(); err != nil {
 		return err
 	}
-	if err := iterator.Error(); err != nil {
-		return err
-	}
-
-	numProcessed := totalNumberToProcess - tree.Len()
-	log("executed blocks",
-		zap.Uint64("numExecuted", numProcessed),
-		zap.Uint64("numToExecute", totalNumberToProcess),
-		zap.Bool("halted", haltable.Halted()),
-		zap.Duration("duration", time.Since(startTime)),
-	)
-	return nil
+	return iterator.Error()
 }

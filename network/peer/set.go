@@ -124,8 +124,8 @@ func (s *peerSet) Sample(n int, precondition func(Peer) bool) []Peer {
 
 	peers := make([]Peer, 0, n)
 	for len(peers) < n {
-		index, err := sampler.Next()
-		if err != nil {
+		index, hasNext := sampler.Next()
+		if !hasNext {
 			// We have run out of peers to attempt to sample.
 			break
 		}

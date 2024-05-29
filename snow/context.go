@@ -46,7 +46,7 @@ type Context struct {
 	Keystore     keystore.BlockchainKeystore
 	SharedMemory atomic.SharedMemory
 	BCLookup     ids.AliaserReader
-	Metrics      metrics.OptionalGatherer
+	Metrics      metrics.MultiGatherer
 
 	WarpSigner warp.Signer
 
