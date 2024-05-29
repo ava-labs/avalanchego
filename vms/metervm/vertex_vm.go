@@ -50,18 +50,14 @@ func (vm *vertexVM) Initialize(
 		return err
 	}
 
-	optionalGatherer := metrics.NewOptionalGatherer()
 	multiGatherer := metrics.NewMultiGatherer()
-	if err := multiGatherer.Register("metervm", registerer); err != nil {
+	if err := chainCtx.Metrics.Register("metervm", registerer); err != nil {
 		return err
 	}
-	if err := multiGatherer.Register("", optionalGatherer); err != nil {
+	if err := chainCtx.Metrics.Register("", multiGatherer); err != nil {
 		return err
 	}
-	if err := chainCtx.Metrics.Register(multiGatherer); err != nil {
-		return err
-	}
-	chainCtx.Metrics = optionalGatherer
+	chainCtx.Metrics = multiGatherer
 
 	return vm.LinearizableVMWithEngine.Initialize(
 		ctx,

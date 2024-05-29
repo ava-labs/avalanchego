@@ -114,7 +114,7 @@ func (vm *VM) Initialize(
 	chainCtx.Log.Info("using VM execution config", zap.Reflect("config", execConfig))
 
 	registerer := prometheus.NewRegistry()
-	if err := chainCtx.Metrics.Register(registerer); err != nil {
+	if err := chainCtx.Metrics.Register("", registerer); err != nil {
 		return err
 	}
 
