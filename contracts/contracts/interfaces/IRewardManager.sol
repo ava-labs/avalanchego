@@ -1,10 +1,14 @@
 //SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.24;
 import "./IAllowList.sol";
 
 interface IRewardManager is IAllowList {
   // RewardAddressChanged is the event logged whenever reward address is modified
-  event RewardAddressChanged(address indexed sender, address indexed oldRewardAddress, address indexed newRewardAddress);
+  event RewardAddressChanged(
+    address indexed sender,
+    address indexed oldRewardAddress,
+    address indexed newRewardAddress
+  );
 
   // FeeRecipientsAllowed is the event logged whenever fee recipient is modified
   event FeeRecipientsAllowed(address indexed sender);

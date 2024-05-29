@@ -79,7 +79,7 @@ jobs:
       - name: Use Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "18.15"
+          node-version: "20.13"
       - name: NPM Clean Install
         run: npm ci
         working-directory: ./contracts
@@ -121,7 +121,7 @@ jobs:
       - name: Use Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "18.15"
+          node-version: "20.13"
       - name: NPM Clean Install
         run: npm ci
         working-directory: ./contracts

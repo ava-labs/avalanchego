@@ -4,8 +4,8 @@
 import { expect } from "chai"
 import { ethers } from "hardhat"
 import { test } from "./utils"
-import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
-import { Contract } from "ethers"
+import { Contract, Signer } from "ethers"
+import { IFeeManager } from "typechain-types"
 
 const ADMIN_ADDRESS: string = "0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC"
 const FEE_MANAGER = "0x0200000000000000000000000000000000000003"
@@ -21,11 +21,11 @@ describe("ExampleFeeManager", function () {
       .then(factory => factory.deploy())
       .then(contract => {
         this.testContract = contract
-        return contract.deployed().then(() => contract)
+        return contract.waitForDeployment().then(() => contract)
       })
       .then(contract => contract.setUp())
       .then(tx => Promise.all([feeManagerPromise, tx.wait()]))
-      .then(([feeManager]) => feeManager.setAdmin(this.testContract.address))
+      .then(([feeManager]) => feeManager.setAdmin(this.testContract.target))
       .then(tx => tx.wait())
   })
 
@@ -79,10 +79,12 @@ const WAGMI_FEES = {
 }
 
 describe("IFeeManager", function () {
-  let owner: SignerWithAddress
-  let contract: Contract
+  let owner: Signer
+  let ownerAddress: string
+  let contract: IFeeManager
   before(async function () {
     owner = await ethers.getSigner(ADMIN_ADDRESS);
+    ownerAddress = await owner.getAddress()
     contract = await ethers.getContractAt("IFeeManager", FEE_MANAGER, owner)
     // reset to C fees
     let tx = await contract.setFeeConfig(
@@ -98,7 +100,7 @@ describe("IFeeManager", function () {
   });
 
   it("should emit fee config changed event", async function () {
-    await expect(contract.setFeeConfig(
+    let tx = await (contract.setFeeConfig(
       WAGMI_FEES.gasLimit,
        WAGMI_FEES.targetBlockRate,
        WAGMI_FEES.minBaseFee,
@@ -108,9 +110,11 @@ describe("IFeeManager", function () {
        WAGMI_FEES.maxBlockGasCost,
        WAGMI_FEES.blockGasCostStep)
       )
+    let receipt = await tx.wait()
+    await expect(receipt)
       .to.emit(contract, 'FeeConfigChanged')
       .withArgs(
-        owner.address,
+        ownerAddress,
         // old config
         [C_FEES.gasLimit, C_FEES.targetBlockRate, C_FEES.minBaseFee, C_FEES.targetGas, C_FEES.baseFeeChangeDenominator, C_FEES.minBlockGasCost, C_FEES.maxBlockGasCost, C_FEES.blockGasCostStep],
         // new config

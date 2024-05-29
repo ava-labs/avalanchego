@@ -3,9 +3,9 @@
 
 import { ethers } from "hardhat"
 import { test } from "./utils"
-import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { expect } from "chai";
-import { Contract } from "ethers"
+import { Contract, Signer } from "ethers"
+import { IRewardManager } from "typechain-types";
 
 // make sure this is always an admin for reward manager precompile
 const ADMIN_ADDRESS = "0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC"
@@ -17,15 +17,15 @@ describe("ExampleRewardManager", function () {
     const signer = await ethers.getSigner(ADMIN_ADDRESS)
     const rewardManagerPromise = ethers.getContractAt("IRewardManager", REWARD_MANAGER_ADDRESS, signer)
 
-    return ethers.getContractFactory("ExampleRewardManagerTest", { signer })
+    return ethers.getContractFactory("ExampleRewardManagerTest", signer)
       .then(factory => factory.deploy())
       .then(contract => {
         this.testContract = contract
-        return contract.deployed().then(() => contract)
+        return contract.waitForDeployment().then(() => contract)
       })
       .then(contract => contract.setUp())
       .then(tx => Promise.all([rewardManagerPromise, tx.wait()]))
-      .then(([rewardManager]) => rewardManager.setAdmin(this.testContract.address))
+      .then(([rewardManager]) => rewardManager.setAdmin(this.testContract.target))
       .then(tx => tx.wait())
   })
 
@@ -49,29 +49,37 @@ describe("ExampleRewardManager", function () {
 });
 
 describe("IRewardManager", function () {
-  let owner: SignerWithAddress
-  let contract: Contract
+  let owner: Signer
+  let ownerAddress: string
+  let contract: IRewardManager
   before(async function () {
     owner = await ethers.getSigner(ADMIN_ADDRESS);
+    ownerAddress = await owner.getAddress()
     contract = await ethers.getContractAt("IRewardManager", REWARD_MANAGER_ADDRESS, owner)
   });
 
   it("should emit reward address changed event ", async function () {
     let testAddress = "0x0444400000000000000000000000000000000004"
-    await expect(contract.setRewardAddress(testAddress))
-      .to.emit(contract, 'RewardAddressChanged')
-      .withArgs(owner.address, BLACKHOLE_ADDRESS, testAddress)
+    let tx = await contract.setRewardAddress(testAddress)
+    let receipt = await tx.wait()
+    await expect(receipt)
+      .to.be.emit(contract, 'RewardAddressChanged')
+      .withArgs(ownerAddress, BLACKHOLE_ADDRESS, testAddress)
   })
 
   it("should emit fee recipients allowed event ", async function () {
-    await expect(contract.allowFeeRecipients())
-      .to.emit(contract, 'FeeRecipientsAllowed')
-      .withArgs(owner.address)
+    let tx = await contract.allowFeeRecipients()
+    let receipt = await tx.wait()
+    await expect(receipt)
+      .to.be.emit(contract, 'FeeRecipientsAllowed')
+      .withArgs(ownerAddress)
   })
 
   it("should emit rewards disabled event ", async function () {
-    await expect(contract.disableRewards())
-      .to.emit(contract, 'RewardsDisabled')
-      .withArgs(owner.address)
+    let tx = await contract.disableRewards()
+    let receipt = await tx.wait()
+    await expect(receipt)
+      .to.be.emit(contract, 'RewardsDisabled')
+      .withArgs(ownerAddress)
   })
 })

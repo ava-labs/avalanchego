@@ -3,9 +3,9 @@
 
 import { ethers } from "hardhat"
 import { Roles, test } from "./utils"
-import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { expect } from "chai";
-import { Contract } from "ethers"
+import { Contract, Signer } from "ethers"
+import { IAllowList } from "typechain-types";
 
 // make sure this is always an admin for minter precompile
 const ADMIN_ADDRESS = "0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC"
@@ -22,8 +22,8 @@ describe("ExampleTxAllowList", function () {
       .then(contract => {
         this.testContract = contract
         return Promise.all([
-          contract.deployed().then(() => contract),
-          allowListPromise.then(allowList => allowList.setAdmin(contract.address)).then(tx => tx.wait()),
+          contract.waitForDeployment().then(() => contract),
+          allowListPromise.then(allowList => allowList.setAdmin(contract.target)).then(tx => tx.wait()),
         ])
       })
       .then(([contract]) => contract.setUp())
@@ -88,38 +88,48 @@ describe("ExampleTxAllowList", function () {
 })
 
 describe("IAllowList", function () {
-  let owner: SignerWithAddress
-  let contract: Contract
+  let owner: Signer
+  let ownerAddress: string
+  let contract: IAllowList
   before(async function () {
     owner = await ethers.getSigner(ADMIN_ADDRESS);
+    ownerAddress = await owner.getAddress()
     contract = await ethers.getContractAt("IAllowList", TX_ALLOW_LIST_ADDRESS, owner)
   });
 
   it("should emit event after set admin", async function () {
     let testAddress = "0x0111000000000000000000000000000000000001"
-    await expect(contract.setAdmin(testAddress))
+    let tx = await contract.setAdmin(testAddress)
+    let receipt = await tx.wait()
+    await expect(receipt)
       .to.emit(contract, 'RoleSet')
-      .withArgs(Roles.Admin, testAddress, owner.address, Roles.None)
+      .withArgs(Roles.Admin, testAddress, ownerAddress, Roles.None)
   })
 
   it("should emit event after set manager", async function () {
     let testAddress = "0x0222000000000000000000000000000000000002"
-    await expect(contract.setManager(testAddress))
+    let tx = await contract.setManager(testAddress)
+    let receipt = await tx.wait()
+    await expect(receipt)
       .to.emit(contract, 'RoleSet')
-      .withArgs(Roles.Manager, testAddress, owner.address, Roles.None)
+      .withArgs(Roles.Manager, testAddress, ownerAddress, Roles.None)
   })
 
   it("should emit event after set enabled", async function () {
     let testAddress = "0x0333000000000000000000000000000000000003"
-    await expect(contract.setEnabled(testAddress))
+    let tx = await contract.setEnabled(testAddress)
+    let receipt = await tx.wait()
+    await expect(receipt)
       .to.emit(contract, 'RoleSet')
-      .withArgs(Roles.Enabled, testAddress, owner.address, Roles.None)
+      .withArgs(Roles.Enabled, testAddress, ownerAddress, Roles.None)
   })
 
   it("should emit event after set none", async function () {
     let testAddress = "0x0333000000000000000000000000000000000003"
-    await expect(contract.setNone(testAddress))
+    let tx = await contract.setNone(testAddress)
+    let receipt = await tx.wait()
+    await expect(receipt)
       .to.emit(contract, 'RoleSet')
-      .withArgs(Roles.None, testAddress, owner.address, Roles.Enabled)
+      .withArgs(Roles.None, testAddress, ownerAddress, Roles.Enabled)
   })
 })

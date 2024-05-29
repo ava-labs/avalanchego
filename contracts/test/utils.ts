@@ -1,5 +1,5 @@
 import { ethers } from "hardhat"
-import { CallOverrides } from "ethers"
+import { Overrides } from "ethers"
 import assert from "assert"
 
 /*
@@ -40,12 +40,12 @@ import assert from "assert"
 type FnNameOrObject = string | string[] | MethodObject | MethodObject[]
 
 // Limit `from` property to be a `string` instead of `string | Promise<string>`
-type Overrides = CallOverrides & { from?: string }
+type CallOverrides = Overrides & { from?: string }
 
-type MethodObject = { method: string, debug?: boolean, overrides?: Overrides, shouldFail?: boolean }
+type MethodObject = { method: string, debug?: boolean, overrides?: CallOverrides, shouldFail?: boolean }
 
 // This type is after all default values have been applied
-type MethodWithDebugAndOverrides = MethodObject & { debug: boolean, overrides: Overrides, shouldFail: boolean }
+type MethodWithDebugAndOverrides = MethodObject & { debug: boolean, overrides: CallOverrides, shouldFail: boolean }
 
 // `test` is used very similarly to `it` from Mocha
 export const test = (name, fnNameOrObject, overrides = {}) => it(name, buildTestFn(fnNameOrObject, overrides))
@@ -83,7 +83,9 @@ const buildTestFn = (fnNameOrObject: FnNameOrObject, overrides = {}, debug = fal
         : this.testContract
       const tx = await contract[fn.method](fn.overrides).catch(err => {
         if (fn.shouldFail) {
-          if (fn.debug) console.error(`smart contract call failed with error:\n${err}\n`)
+          if (fn.debug){
+             console.error(`smart contract call failed with error:\n${err}\n`)
+          }
 
           return { failed: true }
         }
@@ -101,8 +103,8 @@ const buildTestFn = (fnNameOrObject: FnNameOrObject, overrides = {}, debug = fal
       })
 
       // `txReceipt.status` will be `0` if the transaction failed.
-      // `contract.callStatic.failed()` will return `true` if any of the `DSTest` assertions failed.
-      const failed = txReceipt.status === 0 ? true : await contract.callStatic.failed()
+      // `contract.failed` will return `true` if any of the `DSTest` assertions failed.
+      const failed = txReceipt.status === 0 ? true : await contract.failed.staticCall()
       if (fn.debug || failed) {
         console.log('')
 
@@ -117,11 +119,7 @@ const buildTestFn = (fnNameOrObject: FnNameOrObject, overrides = {}, debug = fal
         console.log('')
       }
 
-      if (fn.shouldFail) {
-        assert(failed, `${fn.method} should have failed`)
-      } else {
-        assert(!failed, `${fn.method} failed`)
-      }
+      assert(!failed, `${fn.method} failed`)
     }), Promise.resolve())
   }
 }

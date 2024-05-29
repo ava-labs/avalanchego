@@ -1,15 +1,10 @@
-import {
-  Contract,
-  ContractFactory
-} from "ethers"
 import { ethers } from "hardhat"
+import { ERC20NativeMinter } from "typechain-types"
 
 const main = async (): Promise<any> => {
-  const Token: ContractFactory = await ethers.getContractFactory("ERC20NativeMinter")
-  const token: Contract = await Token.deploy()
-
-  await token.deployed()
-  console.log(`Token deployed to: ${token.address}`)
+  const token: ERC20NativeMinter  = await ethers.deployContract("ERC20NativeMinter")
+  await token.waitForDeployment()
+  console.log(`Token deployed to: ${token.target}`)
 }
 
 main()

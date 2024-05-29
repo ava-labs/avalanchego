@@ -1,5 +1,5 @@
 //SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.24;
 pragma experimental ABIEncoderV2;
 
 import "../ExampleFeeManager.sol";
@@ -25,6 +25,7 @@ contract ExampleFeeManagerTest is AllowListTest {
     ExampleFeeManager example = new ExampleFeeManager();
 
     assertRole(manager.readAllowList(address(this)), AllowList.Role.Admin);
+    assertRole(manager.readAllowList(address(example)), AllowList.Role.None);
 
     try example.enableWAGMIFees() {
       assertTrue(false, "enableWAGMIFees should fail");

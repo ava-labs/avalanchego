@@ -3,9 +3,9 @@
 
 import { ethers } from "hardhat"
 import { test } from "./utils"
-import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { expect } from "chai";
-import { Contract } from "ethers"
+import { Contract, Signer } from "ethers"
+import { INativeMinter } from "typechain-types";
 
 const ADMIN_ADDRESS: string = "0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC"
 const MINT_PRECOMPILE_ADDRESS = "0x0200000000000000000000000000000000000001"
@@ -19,11 +19,11 @@ describe("ERC20NativeMinter", function () {
       .then(factory => factory.deploy())
       .then(contract => {
         this.testContract = contract
-        return contract.deployed().then(() => contract)
+        return contract.waitForDeployment().then(() => contract)
       })
       .then(contract => contract.setUp())
       .then(tx => Promise.all([nativeMinterPromise, tx.wait()]))
-      .then(([nativeMinter]) => nativeMinter.setAdmin(this.testContract.address))
+      .then(([nativeMinter]) => nativeMinter.setAdmin(this.testContract.target))
       .then(tx => tx.wait())
   })
 
@@ -42,18 +42,22 @@ describe("ERC20NativeMinter", function () {
 
 
 describe("INativeMinter", function () {
-  let owner: SignerWithAddress
-  let contract: Contract
+  let owner: Signer
+  let ownerAddress: string
+  let contract: INativeMinter
   before(async function () {
     owner = await ethers.getSigner(ADMIN_ADDRESS);
+    ownerAddress = await owner.getAddress()
     contract = await ethers.getContractAt("INativeMinter", MINT_PRECOMPILE_ADDRESS, owner)
   });
 
   it("should emit NativeCoinMinted event", async function () {
     let testAddress = "0x0444400000000000000000000000000000000004"
     let amount = 1000
-    await expect(contract.mintNativeCoin(testAddress, amount))
+    let tx = await contract.mintNativeCoin(testAddress, amount)
+    let receipt = await tx.wait()
+    await expect(receipt)
       .to.emit(contract, 'NativeCoinMinted')
-      .withArgs(owner.address, testAddress, amount)
+      .withArgs(ownerAddress, testAddress, amount)
   })
 })

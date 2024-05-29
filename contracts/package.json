@@ -1,13 +1,20 @@
 {
   "name": "@avalabs/subnet-evm-contracts",
   "devDependencies": {
-    "@types/chai": "^4.3.11",
+    "@nomicfoundation/hardhat-chai-matchers": "^2.0.6",
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "@types/chai": "^4.3.16",
     "@types/mocha": "^9.1.1",
+    "@types/node": "^20.12.12",
     "chai": "^4.4.1",
+    "ds-test": "https://github.com/dapphub/ds-test.git",
+    "hardhat": "^2.22.4",
     "prettier": "^3.2.4",
-    "prettier-plugin-solidity": "^1.3.1"
+    "prettier-plugin-solidity": "^1.3.1",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.4.5"
   },
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -19,7 +26,7 @@
   },
   "license": "BSD-3-Clause",
   "scripts": {
-    "build": "rm -rf dist/ && tsc -b && npx hardhat compile",
+    "build": "rm -rf dist/ && npx hardhat compile && tsc -b ",
     "compile": "npx hardhat compile",
     "console": "npx hardhat console",
     "test": "npx hardhat test",
@@ -28,19 +35,11 @@
     "release:prepare": "rm -rf ./dist ./node_modules && npm install && npm run build"
   },
   "dependencies": {
-    "@nomiclabs/hardhat-ethers": "^2.2.3",
-    "@nomiclabs/hardhat-waffle": "^2.0.6",
-    "@types/node": "^16.11.7",
-    "@avalabs/avalanchejs": "^3.17.0",
-    "ethers": "^5.7.2",
-    "hardhat": "2.19.4",
-    "ts-node": "^10.9.2",
-    "typescript": "^5.3.3",
-    "@openzeppelin/contracts": "^4.9.5",
-    "ds-test": "https://github.com/dapphub/ds-test.git"
+    "@avalabs/avalanchejs": "^4.0.5",
+    "@openzeppelin/contracts": "^4.9.6"
   },
   "engines": {
-    "npm": ">6.0.0",
-    "node": ">=18.15.0"
+    "npm": ">7.0.0",
+    "node": ">=20.13.0"
   }
 }

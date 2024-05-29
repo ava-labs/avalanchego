@@ -1,5 +1,5 @@
 //SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "./interfaces/IAllowList.sol";
@@ -19,6 +19,4 @@ contract ExampleDeployerList is AllowList {
 }
 
 // This is an empty contract that can be used to test contract deployment
-contract Example {
-
-}
+contract Example {}

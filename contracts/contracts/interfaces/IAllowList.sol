@@ -1,5 +1,5 @@
 //SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.24;
 
 interface IAllowList {
   event RoleSet(uint256 indexed role, address indexed account, address indexed sender, uint256 oldRole);
