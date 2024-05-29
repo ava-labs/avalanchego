@@ -11,16 +11,16 @@ on:
       - "*"
 
 env:
-  go_version: '~1.20.12'
+  go_version: '~1.21.7'
 
 jobs:
   build-x86_64-binaries-tarball:
     runs-on: ubuntu-20.04
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-      - uses: actions/setup-go@v3
+      - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.go_version }}
           check-latest: true
@@ -36,7 +36,7 @@ jobs:
           sudo apt -y install awscli
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v1
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -66,7 +66,7 @@ jobs:
           RELEASE: "focal"
 
       - name: Save as Github artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: amd64
           path: /tmp/avalanchego/avalanchego-linux-amd64-${{ env.TAG }}.tar.gz
@@ -80,9 +80,9 @@ jobs:
     runs-on: [self-hosted, linux, ARM64, focal]
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-      - uses: actions/setup-go@v3
+      - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.go_version }}
           check-latest: true
@@ -98,7 +98,7 @@ jobs:
           sudo apt -y install awscli
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v1
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -128,7 +128,7 @@ jobs:
           RELEASE: "focal"
 
       - name: Save as Github artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: arm64
           path: /tmp/avalanchego/avalanchego-linux-arm64-${{ env.TAG }}.tar.gz

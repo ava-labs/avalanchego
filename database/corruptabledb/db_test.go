@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-
 	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -18,17 +17,17 @@ import (
 
 var errTest = errors.New("non-nil error")
 
-func TestInterface(t *testing.T) {
-	for _, test := range database.Tests {
-		baseDB := memdb.New()
-		db := New(baseDB)
-		test(t, db)
-	}
-}
-
 func newDB() *Database {
 	baseDB := memdb.New()
 	return New(baseDB)
+}
+
+func TestInterface(t *testing.T) {
+	for name, test := range database.Tests {
+		t.Run(name, func(t *testing.T) {
+			test(t, newDB())
+		})
+	}
 }
 
 func FuzzKeyValue(f *testing.F) {
@@ -101,7 +100,7 @@ func TestIterator(t *testing.T) {
 			name:              "corrupted database; Next",
 			databaseErrBefore: errTest,
 			expectedErr:       errTest,
-			modifyIter:        func(ctrl *gomock.Controller, iter *iterator) {},
+			modifyIter:        func(*gomock.Controller, *iterator) {},
 			op: func(require *require.Assertions, iter *iterator) {
 				require.False(iter.Next())
 			},
@@ -124,7 +123,7 @@ func TestIterator(t *testing.T) {
 			name:              "corrupted database; Error",
 			databaseErrBefore: errTest,
 			expectedErr:       errTest,
-			modifyIter:        func(ctrl *gomock.Controller, iter *iterator) {},
+			modifyIter:        func(*gomock.Controller, *iterator) {},
 			op: func(require *require.Assertions, iter *iterator) {
 				err := iter.Error()
 				require.ErrorIs(err, errTest)
@@ -148,8 +147,8 @@ func TestIterator(t *testing.T) {
 			name:              "corrupted database; Key",
 			databaseErrBefore: errTest,
 			expectedErr:       errTest,
-			modifyIter:        func(ctrl *gomock.Controller, iter *iterator) {},
-			op: func(require *require.Assertions, iter *iterator) {
+			modifyIter:        func(*gomock.Controller, *iterator) {},
+			op: func(_ *require.Assertions, iter *iterator) {
 				_ = iter.Key()
 			},
 		},
@@ -157,8 +156,8 @@ func TestIterator(t *testing.T) {
 			name:              "corrupted database; Value",
 			databaseErrBefore: errTest,
 			expectedErr:       errTest,
-			modifyIter:        func(ctrl *gomock.Controller, iter *iterator) {},
-			op: func(require *require.Assertions, iter *iterator) {
+			modifyIter:        func(*gomock.Controller, *iterator) {},
+			op: func(_ *require.Assertions, iter *iterator) {
 				_ = iter.Value()
 			},
 		},
@@ -166,8 +165,8 @@ func TestIterator(t *testing.T) {
 			name:              "corrupted database; Release",
 			databaseErrBefore: errTest,
 			expectedErr:       errTest,
-			modifyIter:        func(ctrl *gomock.Controller, iter *iterator) {},
-			op: func(require *require.Assertions, iter *iterator) {
+			modifyIter:        func(*gomock.Controller, *iterator) {},
+			op: func(_ *require.Assertions, iter *iterator) {
 				iter.Release()
 			},
 		},

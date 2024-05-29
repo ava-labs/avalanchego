@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-
 	"gonum.org/v1/gonum/mathext/prng"
 )
 
@@ -24,7 +23,7 @@ func TestSnowballGovernance(t *testing.T) {
 		source              = prng.NewMT19937()
 	)
 
-	nBitwise := NewNetwork(params, numColors, source)
+	nBitwise := NewNetwork(SnowballFactory, params, numColors, source)
 
 	source.Seed(seed)
 	for i := 0; i < numRed; i++ {

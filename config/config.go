@@ -55,19 +55,28 @@ const (
 	chainUpgradeFileName = "upgrade"
 	subnetConfigFileExt  = ".json"
 
+	authDeprecationMsg                   = "Auth API is deprecated"
 	ipcDeprecationMsg                    = "IPC API is deprecated"
 	keystoreDeprecationMsg               = "keystore API is deprecated"
 	acceptedFrontierGossipDeprecationMsg = "push-based accepted frontier gossip is deprecated"
+	peerListPushGossipDeprecationMsg     = "push-based peer list gossip is deprecated"
 )
 
 var (
 	// Deprecated key --> deprecation message (i.e. which key replaces it)
 	// TODO: deprecate "BootstrapIDsKey" and "BootstrapIPsKey"
-	deprecatedKeys = map[string]string{
-		IpcAPIEnabledKey:      ipcDeprecationMsg,
-		IpcsChainIDsKey:       ipcDeprecationMsg,
-		IpcsPathKey:           ipcDeprecationMsg,
+	commitThresholdDeprecationMsg = fmt.Sprintf("use --%s instead", SnowCommitThresholdKey)
+	deprecatedKeys                = map[string]string{
+		APIAuthRequiredKey:     authDeprecationMsg,
+		APIAuthPasswordKey:     authDeprecationMsg,
+		APIAuthPasswordFileKey: authDeprecationMsg,
+
+		IpcAPIEnabledKey: ipcDeprecationMsg,
+		IpcsChainIDsKey:  ipcDeprecationMsg,
+		IpcsPathKey:      ipcDeprecationMsg,
+
 		KeystoreAPIEnabledKey: keystoreDeprecationMsg,
+
 		ConsensusGossipAcceptedFrontierValidatorSizeKey:    acceptedFrontierGossipDeprecationMsg,
 		ConsensusGossipAcceptedFrontierNonValidatorSizeKey: acceptedFrontierGossipDeprecationMsg,
 		ConsensusGossipAcceptedFrontierPeerSizeKey:         acceptedFrontierGossipDeprecationMsg,
@@ -75,8 +84,13 @@ var (
 		ConsensusGossipOnAcceptNonValidatorSizeKey:         acceptedFrontierGossipDeprecationMsg,
 		ConsensusGossipOnAcceptPeerSizeKey:                 acceptedFrontierGossipDeprecationMsg,
 
-		SnowRogueCommitThresholdKey:    fmt.Sprintf("use --%s instead", SnowCommitThresholdKey),
-		SnowVirtuousCommitThresholdKey: fmt.Sprintf("use --%s instead", SnowCommitThresholdKey),
+		NetworkPeerListValidatorGossipSizeKey:    peerListPushGossipDeprecationMsg,
+		NetworkPeerListNonValidatorGossipSizeKey: peerListPushGossipDeprecationMsg,
+		NetworkPeerListPeersGossipSizeKey:        peerListPushGossipDeprecationMsg,
+		NetworkPeerListGossipFreqKey:             peerListPushGossipDeprecationMsg,
+
+		SnowRogueCommitThresholdKey:    commitThresholdDeprecationMsg,
+		SnowVirtuousCommitThresholdKey: commitThresholdDeprecationMsg,
 	}
 
 	errConflictingACPOpinion                  = errors.New("supporting and objecting to the same ACP")
@@ -100,6 +114,7 @@ var (
 	errCannotReadDirectory                    = errors.New("cannot read directory")
 	errUnmarshalling                          = errors.New("unmarshalling failed")
 	errFileDoesNotExist                       = errors.New("file does not exist")
+	errGzipDeprecatedMsg                      = errors.New("gzip compression is not supported, use zstd or no compression")
 )
 
 func getConsensusConfig(v *viper.Viper) snowball.Parameters {
@@ -336,6 +351,9 @@ func getNetworkConfig(
 	compressionType, err := compression.TypeFromString(v.GetString(NetworkCompressionTypeKey))
 	if err != nil {
 		return network.Config{}, err
+	}
+	if compressionType == compression.TypeGzip {
+		return network.Config{}, errGzipDeprecatedMsg
 	}
 
 	allowPrivateIPs := !constants.ProductionNetworkIDs.Contains(networkID)
@@ -967,23 +985,6 @@ func getChainAliases(v *viper.Viper) (map[ids.ID][]string, error) {
 	return getAliases(v, "chain aliases", ChainAliasesContentKey, ChainAliasesFileKey)
 }
 
-func getVMAliaser(v *viper.Viper) (ids.Aliaser, error) {
-	vmAliases, err := getVMAliases(v)
-	if err != nil {
-		return nil, err
-	}
-
-	aliser := ids.NewAliaser()
-	for vmID, aliases := range vmAliases {
-		for _, alias := range aliases {
-			if err := aliser.Alias(vmID, alias); err != nil {
-				return nil, err
-			}
-		}
-	}
-	return aliser, nil
-}
-
 // getPathFromDirKey reads flag value from viper instance and then checks the folder existence
 func getPathFromDirKey(v *viper.Viper, configKey string) (string, error) {
 	configDir := GetExpandedArg(v, configKey)
@@ -1374,7 +1375,6 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 	}
 
 	// Router
-	nodeConfig.ConsensusRouter = &router.ChainRouter{}
 	nodeConfig.RouterHealthConfig, err = getRouterHealthConfig(v, healthCheckAveragerHalflife)
 	if err != nil {
 		return node.Config{}, err
@@ -1458,7 +1458,7 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 	}
 
 	// VM Aliases
-	nodeConfig.VMAliaser, err = getVMAliaser(v)
+	nodeConfig.VMAliases, err = getVMAliases(v)
 	if err != nil {
 		return node.Config{}, err
 	}

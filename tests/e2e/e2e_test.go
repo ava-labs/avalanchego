@@ -6,20 +6,20 @@ package e2e_test
 import (
 	"testing"
 
-	ginkgo "github.com/onsi/ginkgo/v2"
-
 	"github.com/onsi/gomega"
-
-	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 
 	// ensure test packages are scanned by ginkgo
 	_ "github.com/ava-labs/avalanchego/tests/e2e/banff"
 	_ "github.com/ava-labs/avalanchego/tests/e2e/c"
 	_ "github.com/ava-labs/avalanchego/tests/e2e/faultinjection"
 	_ "github.com/ava-labs/avalanchego/tests/e2e/p"
-	_ "github.com/ava-labs/avalanchego/tests/e2e/static-handlers"
 	_ "github.com/ava-labs/avalanchego/tests/e2e/x"
 	_ "github.com/ava-labs/avalanchego/tests/e2e/x/transfer"
+
+	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
+	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
+
+	ginkgo "github.com/onsi/ginkgo/v2"
 )
 
 func TestE2E(t *testing.T) {
@@ -35,7 +35,7 @@ func init() {
 
 var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	// Run only once in the first ginkgo process
-	return e2e.NewTestEnvironment(flagVars).Marshal()
+	return e2e.NewTestEnvironment(flagVars, &tmpnet.Network{}).Marshal()
 }, func(envBytes []byte) {
 	// Run in every ginkgo process
 

@@ -10,17 +10,18 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-
 	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
+	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 
@@ -33,10 +34,7 @@ func TestBuildBlockBasic(t *testing.T) {
 
 	env := newEnvironment(t)
 	env.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(shutdownEnvironment(env))
-		env.ctx.Lock.Unlock()
-	}()
+	defer env.ctx.Lock.Unlock()
 
 	// Create a valid transaction
 	tx, err := env.txBuilder.NewCreateChainTx(
@@ -47,6 +45,7 @@ func TestBuildBlockBasic(t *testing.T) {
 		"chain name",
 		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 		ids.ShortEmpty,
+		nil,
 	)
 	require.NoError(err)
 	txID := tx.ID()
@@ -78,10 +77,7 @@ func TestBuildBlockDoesNotBuildWithEmptyMempool(t *testing.T) {
 
 	env := newEnvironment(t)
 	env.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(shutdownEnvironment(env))
-		env.ctx.Lock.Unlock()
-	}()
+	defer env.ctx.Lock.Unlock()
 
 	tx, exists := env.mempool.Peek()
 	require.False(exists)
@@ -98,10 +94,7 @@ func TestBuildBlockShouldReward(t *testing.T) {
 
 	env := newEnvironment(t)
 	env.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(shutdownEnvironment(env))
-		env.ctx.Lock.Unlock()
-	}()
+	defer env.ctx.Lock.Unlock()
 
 	var (
 		now    = env.backend.Clk.Time()
@@ -112,16 +105,21 @@ func TestBuildBlockShouldReward(t *testing.T) {
 		validatorEndTime      = validatorStartTime.Add(360 * 24 * time.Hour)
 	)
 
-	// Create a valid [AddValidatorTx]
-	tx, err := env.txBuilder.NewAddValidatorTx(
+	sk, err := bls.NewSecretKey()
+	require.NoError(err)
+
+	// Create a valid [AddPermissionlessValidatorTx]
+	tx, err := env.txBuilder.NewAddPermissionlessValidatorTx(
 		defaultValidatorStake,
 		uint64(validatorStartTime.Unix()),
 		uint64(validatorEndTime.Unix()),
 		nodeID,
+		signer.NewProofOfPossession(sk),
 		preFundedKeys[0].PublicKey().Address(),
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{preFundedKeys[0]},
 		preFundedKeys[0].PublicKey().Address(),
+		nil,
 	)
 	require.NoError(err)
 	txID := tx.ID()
@@ -163,7 +161,7 @@ func TestBuildBlockShouldReward(t *testing.T) {
 		require.NoError(blk.Verify(context.Background()))
 		require.IsType(&block.BanffProposalBlock{}, blk.(*blockexecutor.Block).Block)
 
-		expectedTx, err := env.txBuilder.NewRewardValidatorTx(staker.TxID)
+		expectedTx, err := NewRewardValidatorTx(env.ctx, staker.TxID)
 		require.NoError(err)
 		require.Equal([]*txs.Tx{expectedTx}, blk.(*blockexecutor.Block).Block.Txs())
 
@@ -198,10 +196,7 @@ func TestBuildBlockAdvanceTime(t *testing.T) {
 
 	env := newEnvironment(t)
 	env.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(shutdownEnvironment(env))
-		env.ctx.Lock.Unlock()
-	}()
+	defer env.ctx.Lock.Unlock()
 
 	var (
 		now      = env.backend.Clk.Time()
@@ -234,10 +229,7 @@ func TestBuildBlockForceAdvanceTime(t *testing.T) {
 
 	env := newEnvironment(t)
 	env.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(shutdownEnvironment(env))
-		env.ctx.Lock.Unlock()
-	}()
+	defer env.ctx.Lock.Unlock()
 
 	// Create a valid transaction
 	tx, err := env.txBuilder.NewCreateChainTx(
@@ -248,6 +240,7 @@ func TestBuildBlockForceAdvanceTime(t *testing.T) {
 		"chain name",
 		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 		ids.ShortEmpty,
+		nil,
 	)
 	require.NoError(err)
 	txID := tx.ID()
@@ -291,10 +284,7 @@ func TestBuildBlockDropExpiredStakerTxs(t *testing.T) {
 
 	env := newEnvironment(t)
 	env.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(shutdownEnvironment(env))
-		env.ctx.Lock.Unlock()
-	}()
+	defer env.ctx.Lock.Unlock()
 
 	// The [StartTime] in a staker tx is only validated pre-Durango.
 	// TODO: Delete this test post-Durango activation.
@@ -318,6 +308,7 @@ func TestBuildBlockDropExpiredStakerTxs(t *testing.T) {
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{preFundedKeys[0]},
 		preFundedKeys[0].PublicKey().Address(),
+		nil,
 	)
 	require.NoError(err)
 	require.NoError(env.mempool.Add(tx1))
@@ -338,6 +329,7 @@ func TestBuildBlockDropExpiredStakerTxs(t *testing.T) {
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{preFundedKeys[1]},
 		preFundedKeys[1].PublicKey().Address(),
+		nil,
 	)
 	require.NoError(err)
 	require.NoError(env.mempool.Add(tx2))
@@ -358,6 +350,7 @@ func TestBuildBlockDropExpiredStakerTxs(t *testing.T) {
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{preFundedKeys[2]},
 		preFundedKeys[2].PublicKey().Address(),
+		nil,
 	)
 	require.NoError(err)
 	require.NoError(env.mempool.Add(tx3))
@@ -397,10 +390,7 @@ func TestBuildBlockInvalidStakingDurations(t *testing.T) {
 
 	env := newEnvironment(t)
 	env.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(shutdownEnvironment(env))
-		env.ctx.Lock.Unlock()
-	}()
+	defer env.ctx.Lock.Unlock()
 
 	// Post-Durango, [StartTime] is no longer validated. Staking durations are
 	// based on the current chain timestamp and must be validated.
@@ -414,15 +404,20 @@ func TestBuildBlockInvalidStakingDurations(t *testing.T) {
 		validatorEndTime = now.Add(env.config.MaxStakeDuration)
 	)
 
-	tx1, err := env.txBuilder.NewAddValidatorTx(
+	sk, err := bls.NewSecretKey()
+	require.NoError(err)
+
+	tx1, err := env.txBuilder.NewAddPermissionlessValidatorTx(
 		defaultValidatorStake,
 		uint64(now.Unix()),
 		uint64(validatorEndTime.Unix()),
 		ids.GenerateTestNodeID(),
+		signer.NewProofOfPossession(sk),
 		preFundedKeys[0].PublicKey().Address(),
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{preFundedKeys[0]},
 		preFundedKeys[0].PublicKey().Address(),
+		nil,
 	)
 	require.NoError(err)
 	require.NoError(env.mempool.Add(tx1))
@@ -433,15 +428,20 @@ func TestBuildBlockInvalidStakingDurations(t *testing.T) {
 	// Add a validator ending past [MaxStakeDuration]
 	validator2EndTime := now.Add(env.config.MaxStakeDuration + time.Second)
 
-	tx2, err := env.txBuilder.NewAddValidatorTx(
+	sk, err = bls.NewSecretKey()
+	require.NoError(err)
+
+	tx2, err := env.txBuilder.NewAddPermissionlessValidatorTx(
 		defaultValidatorStake,
 		uint64(now.Unix()),
 		uint64(validator2EndTime.Unix()),
 		ids.GenerateTestNodeID(),
+		signer.NewProofOfPossession(sk),
 		preFundedKeys[2].PublicKey().Address(),
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{preFundedKeys[2]},
 		preFundedKeys[2].PublicKey().Address(),
+		nil,
 	)
 	require.NoError(err)
 	require.NoError(env.mempool.Add(tx2))
@@ -476,11 +476,7 @@ func TestPreviouslyDroppedTxsCannotBeReAddedToMempool(t *testing.T) {
 
 	env := newEnvironment(t)
 	env.ctx.Lock.Lock()
-	defer func() {
-		env.ctx.Lock.Lock()
-		require.NoError(shutdownEnvironment(env))
-		env.ctx.Lock.Unlock()
-	}()
+	defer env.ctx.Lock.Unlock()
 
 	// Create a valid transaction
 	tx, err := env.txBuilder.NewCreateChainTx(
@@ -491,6 +487,7 @@ func TestPreviouslyDroppedTxsCannotBeReAddedToMempool(t *testing.T) {
 		"chain name",
 		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 		ids.ShortEmpty,
+		nil,
 	)
 	require.NoError(err)
 	txID := tx.ID()
@@ -509,6 +506,7 @@ func TestPreviouslyDroppedTxsCannotBeReAddedToMempool(t *testing.T) {
 	env.ctx.Lock.Unlock()
 	err = env.network.IssueTx(context.Background(), tx)
 	require.ErrorIs(err, errTestingDropped)
+	env.ctx.Lock.Lock()
 	_, ok := env.mempool.Get(txID)
 	require.False(ok)
 
@@ -522,11 +520,9 @@ func TestNoErrorOnUnexpectedSetPreferenceDuringBootstrapping(t *testing.T) {
 
 	env := newEnvironment(t)
 	env.ctx.Lock.Lock()
+	defer env.ctx.Lock.Unlock()
+
 	env.isBootstrapped.Set(false)
-	defer func() {
-		require.NoError(shutdownEnvironment(env))
-		env.ctx.Lock.Unlock()
-	}()
 
 	require.True(env.blkManager.SetPreference(ids.GenerateTestID())) // should not panic
 }

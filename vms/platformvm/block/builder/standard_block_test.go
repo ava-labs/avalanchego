@@ -24,10 +24,7 @@ func TestAtomicTxImports(t *testing.T) {
 
 	env := newEnvironment(t)
 	env.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(shutdownEnvironment(env))
-		env.ctx.Lock.Unlock()
-	}()
+	defer env.ctx.Lock.Unlock()
 
 	utxoID := avax.UTXOID{
 		TxID:        ids.Empty.Prefix(1),
@@ -70,6 +67,7 @@ func TestAtomicTxImports(t *testing.T) {
 		recipientKey.PublicKey().Address(),
 		[]*secp256k1.PrivateKey{recipientKey},
 		ids.ShortEmpty, // change addr
+		nil,
 	)
 	require.NoError(err)
 
@@ -82,5 +80,5 @@ func TestAtomicTxImports(t *testing.T) {
 	_, txStatus, err := env.state.GetTx(tx.ID())
 	require.NoError(err)
 	// Ensure transaction is in the committed state
-	require.Equal(txStatus, status.Committed)
+	require.Equal(status.Committed, txStatus)
 }

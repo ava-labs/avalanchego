@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-
 	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -381,7 +380,7 @@ func TestBlockVerify_BlocksBuiltOnPreForkGenesis(t *testing.T) {
 	postActivationTime := activationTime.Add(time.Second)
 	proVM.Set(postActivationTime)
 
-	coreVM.SetPreferenceF = func(_ context.Context, id ids.ID) error {
+	coreVM.SetPreferenceF = func(context.Context, ids.ID) error {
 		return nil
 	}
 	require.NoError(proVM.SetPreference(context.Background(), preForkChild.ID()))

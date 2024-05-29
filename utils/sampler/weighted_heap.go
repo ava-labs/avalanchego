@@ -4,6 +4,8 @@
 package sampler
 
 import (
+	"cmp"
+
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/math"
 )
@@ -25,10 +27,10 @@ func (e weightedHeapElement) Compare(other weightedHeapElement) int {
 	// By accounting for the initial index of the weights, this results in a
 	// stable sort. We do this rather than using `sort.Stable` because of the
 	// reported change in performance of the sort used.
-	if weightCmp := utils.Compare(other.weight, e.weight); weightCmp != 0 {
+	if weightCmp := cmp.Compare(other.weight, e.weight); weightCmp != 0 {
 		return weightCmp
 	}
-	return utils.Compare(e.index, other.index)
+	return cmp.Compare(e.index, other.index)
 }
 
 // Sampling is performed by executing a search over a tree of elements in the

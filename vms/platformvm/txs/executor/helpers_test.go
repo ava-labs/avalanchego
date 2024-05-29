@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/chains"
@@ -176,6 +175,30 @@ func newEnvironment(t *testing.T, postBanff, postCortina, postDurango bool) *env
 
 	addSubnet(t, env, txBuilder)
 
+	t.Cleanup(func() {
+		env.ctx.Lock.Lock()
+		defer env.ctx.Lock.Unlock()
+
+		require := require.New(t)
+
+		if env.isBootstrapped.Get() {
+			validatorIDs := env.config.Validators.GetValidatorIDs(constants.PrimaryNetworkID)
+
+			require.NoError(env.uptimes.StopTracking(validatorIDs, constants.PrimaryNetworkID))
+
+			for subnetID := range env.config.TrackedSubnets {
+				validatorIDs := env.config.Validators.GetValidatorIDs(subnetID)
+
+				require.NoError(env.uptimes.StopTracking(validatorIDs, subnetID))
+			}
+			env.state.SetHeight(math.MaxUint64)
+			require.NoError(env.state.Commit())
+		}
+
+		require.NoError(env.state.Close())
+		require.NoError(env.baseDB.Close())
+	})
+
 	return env
 }
 
@@ -197,6 +220,7 @@ func addSubnet(
 		},
 		[]*secp256k1.PrivateKey{preFundedKeys[0]},
 		preFundedKeys[0].PublicKey().Address(),
+		nil,
 	)
 	require.NoError(err)
 
@@ -395,31 +419,4 @@ func buildGenesisTest(ctx *snow.Context) []byte {
 	}
 
 	return genesisBytes
-}
-
-func shutdownEnvironment(env *environment) error {
-	if env.isBootstrapped.Get() {
-		validatorIDs := env.config.Validators.GetValidatorIDs(constants.PrimaryNetworkID)
-
-		if err := env.uptimes.StopTracking(validatorIDs, constants.PrimaryNetworkID); err != nil {
-			return err
-		}
-
-		for subnetID := range env.config.TrackedSubnets {
-			validatorIDs := env.config.Validators.GetValidatorIDs(subnetID)
-
-			if err := env.uptimes.StopTracking(validatorIDs, subnetID); err != nil {
-				return err
-			}
-		}
-		env.state.SetHeight( /*height*/ math.MaxUint64)
-		if err := env.state.Commit(); err != nil {
-			return err
-		}
-	}
-
-	return utils.Err(
-		env.state.Close(),
-		env.baseDB.Close(),
-	)
 }

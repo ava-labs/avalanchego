@@ -22,7 +22,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
 
@@ -499,7 +498,7 @@ func TestGetAncestorsAtSnomanPlusPlusFork(t *testing.T) {
 			return nil, nil // unknown blockID
 		}
 
-		endIndex := math.Min(startIndex+maxBlocksNum, len(sortedBlocks))
+		endIndex := min(startIndex+maxBlocksNum, len(sortedBlocks))
 		return sortedBlocks[startIndex:endIndex], nil
 	}
 

@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/chains"
@@ -39,6 +38,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
@@ -56,6 +56,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
+	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -277,13 +278,14 @@ func defaultVM(t *testing.T, fork activeFork) (*VM, database.Database, *mutableS
 		return nil
 	}
 
+	dynamicConfigBytes := []byte(`{"network":{"max-validator-set-staleness":0}}`)
 	require.NoError(vm.Initialize(
 		context.Background(),
 		ctx,
 		chainDB,
 		genesisBytes,
 		nil,
-		nil,
+		dynamicConfigBytes,
 		msgChan,
 		nil,
 		appSender,
@@ -304,6 +306,7 @@ func defaultVM(t *testing.T, fork activeFork) (*VM, database.Database, *mutableS
 		[]ids.ShortID{keys[0].PublicKey().Address(), keys[1].PublicKey().Address(), keys[2].PublicKey().Address()},
 		[]*secp256k1.PrivateKey{keys[0]}, // pays tx fee
 		keys[0].PublicKey().Address(),    // change addr
+		nil,
 	)
 	require.NoError(err)
 	vm.ctx.Lock.Unlock()
@@ -315,6 +318,13 @@ func defaultVM(t *testing.T, fork activeFork) (*VM, database.Database, *mutableS
 	require.NoError(blk.Accept(context.Background()))
 	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
+	t.Cleanup(func() {
+		vm.ctx.Lock.Lock()
+		defer vm.ctx.Lock.Unlock()
+
+		require.NoError(vm.Shutdown(context.Background()))
+	})
+
 	return vm, db, msm
 }
 
@@ -323,10 +333,7 @@ func TestGenesis(t *testing.T) {
 	require := require.New(t)
 	vm, _, _ := defaultVM(t, latestFork)
 	vm.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
-		vm.ctx.Lock.Unlock()
-	}()
+	defer vm.ctx.Lock.Unlock()
 
 	// Ensure the genesis block has been accepted and stored
 	genesisBlockID, err := vm.LastAccepted(context.Background()) // lastAccepted should be ID of genesis block
@@ -379,10 +386,7 @@ func TestAddValidatorCommit(t *testing.T) {
 	require := require.New(t)
 	vm, _, _ := defaultVM(t, latestFork)
 	vm.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
-		vm.ctx.Lock.Unlock()
-	}()
+	defer vm.ctx.Lock.Unlock()
 
 	var (
 		startTime     = vm.clock.Time().Add(txexecutor.SyncBound).Add(1 * time.Second)
@@ -391,16 +395,21 @@ func TestAddValidatorCommit(t *testing.T) {
 		rewardAddress = ids.GenerateTestShortID()
 	)
 
+	sk, err := bls.NewSecretKey()
+	require.NoError(err)
+
 	// create valid tx
-	tx, err := vm.txBuilder.NewAddValidatorTx(
+	tx, err := vm.txBuilder.NewAddPermissionlessValidatorTx(
 		vm.MinValidatorStake,
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
 		nodeID,
+		signer.NewProofOfPossession(sk),
 		rewardAddress,
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[0]},
 		ids.ShortEmpty, // change addr
+		nil,
 	)
 	require.NoError(err)
 
@@ -429,10 +438,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 	require := require.New(t)
 	vm, _, _ := defaultVM(t, cortinaFork)
 	vm.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
-		vm.ctx.Lock.Unlock()
-	}()
+	defer vm.ctx.Lock.Unlock()
 
 	nodeID := ids.GenerateTestNodeID()
 	startTime := defaultGenesisTime.Add(-txexecutor.SyncBound).Add(-1 * time.Second)
@@ -448,6 +454,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[0]},
 		ids.ShortEmpty, // change addr
+		nil,
 	)
 	require.NoError(err)
 
@@ -482,10 +489,7 @@ func TestAddValidatorReject(t *testing.T) {
 	require := require.New(t)
 	vm, _, _ := defaultVM(t, cortinaFork)
 	vm.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
-		vm.ctx.Lock.Unlock()
-	}()
+	defer vm.ctx.Lock.Unlock()
 
 	var (
 		startTime     = vm.clock.Time().Add(txexecutor.SyncBound).Add(1 * time.Second)
@@ -504,6 +508,7 @@ func TestAddValidatorReject(t *testing.T) {
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[0]},
 		ids.ShortEmpty, // change addr
+		nil,
 	)
 	require.NoError(err)
 
@@ -530,11 +535,7 @@ func TestAddValidatorInvalidNotReissued(t *testing.T) {
 	require := require.New(t)
 	vm, _, _ := defaultVM(t, latestFork)
 	vm.ctx.Lock.Lock()
-	defer func() {
-		vm.ctx.Lock.Lock()
-		require.NoError(vm.Shutdown(context.Background()))
-		vm.ctx.Lock.Unlock()
-	}()
+	defer vm.ctx.Lock.Unlock()
 
 	// Use nodeID that is already in the genesis
 	repeatNodeID := genesisNodeIDs[0]
@@ -542,23 +543,29 @@ func TestAddValidatorInvalidNotReissued(t *testing.T) {
 	startTime := latestForkTime.Add(txexecutor.SyncBound).Add(1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
 
+	sk, err := bls.NewSecretKey()
+	require.NoError(err)
+
 	// create valid tx
-	tx, err := vm.txBuilder.NewAddValidatorTx(
+	tx, err := vm.txBuilder.NewAddPermissionlessValidatorTx(
 		vm.MinValidatorStake,
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
 		repeatNodeID,
+		signer.NewProofOfPossession(sk),
 		ids.GenerateTestShortID(),
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[0]},
 		ids.ShortEmpty, // change addr
+		nil,
 	)
 	require.NoError(err)
 
 	// trigger block creation
 	vm.ctx.Lock.Unlock()
 	err = vm.issueTx(context.Background(), tx)
-	require.ErrorIs(err, txexecutor.ErrAlreadyValidator)
+	vm.ctx.Lock.Lock()
+	require.ErrorIs(err, txexecutor.ErrDuplicateValidator)
 }
 
 // Accept proposal to add validator to subnet
@@ -566,10 +573,7 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 	require := require.New(t)
 	vm, _, _ := defaultVM(t, latestFork)
 	vm.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
-		vm.ctx.Lock.Unlock()
-	}()
+	defer vm.ctx.Lock.Unlock()
 
 	var (
 		startTime = vm.clock.Time().Add(txexecutor.SyncBound).Add(1 * time.Second)
@@ -588,6 +592,7 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 		testSubnet1.ID(),
 		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 		ids.ShortEmpty, // change addr
+		nil,
 	)
 	require.NoError(err)
 
@@ -616,10 +621,7 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 	require := require.New(t)
 	vm, _, _ := defaultVM(t, latestFork)
 	vm.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
-		vm.ctx.Lock.Unlock()
-	}()
+	defer vm.ctx.Lock.Unlock()
 
 	var (
 		startTime = vm.clock.Time().Add(txexecutor.SyncBound).Add(1 * time.Second)
@@ -638,6 +640,7 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 		testSubnet1.ID(),
 		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[1], testSubnet1ControlKeys[2]},
 		ids.ShortEmpty, // change addr
+		nil,
 	)
 	require.NoError(err)
 
@@ -665,10 +668,7 @@ func TestRewardValidatorAccept(t *testing.T) {
 	require := require.New(t)
 	vm, _, _ := defaultVM(t, latestFork)
 	vm.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
-		vm.ctx.Lock.Unlock()
-	}()
+	defer vm.ctx.Lock.Unlock()
 
 	// Fast forward clock to time for genesis validators to leave
 	vm.clock.Set(defaultValidateEndTime)
@@ -736,10 +736,7 @@ func TestRewardValidatorReject(t *testing.T) {
 	require := require.New(t)
 	vm, _, _ := defaultVM(t, latestFork)
 	vm.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
-		vm.ctx.Lock.Unlock()
-	}()
+	defer vm.ctx.Lock.Unlock()
 
 	// Fast forward clock to time for genesis validators to leave
 	vm.clock.Set(defaultValidateEndTime)
@@ -809,10 +806,8 @@ func TestUnneededBuildBlock(t *testing.T) {
 	require := require.New(t)
 	vm, _, _ := defaultVM(t, latestFork)
 	vm.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
-		vm.ctx.Lock.Unlock()
-	}()
+	defer vm.ctx.Lock.Unlock()
+
 	_, err := vm.Builder.BuildBlock(context.Background())
 	require.ErrorIs(err, blockbuilder.ErrNoPendingBlocks)
 }
@@ -822,10 +817,7 @@ func TestCreateChain(t *testing.T) {
 	require := require.New(t)
 	vm, _, _ := defaultVM(t, latestFork)
 	vm.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
-		vm.ctx.Lock.Unlock()
-	}()
+	defer vm.ctx.Lock.Unlock()
 
 	tx, err := vm.txBuilder.NewCreateChainTx(
 		testSubnet1.ID(),
@@ -835,6 +827,7 @@ func TestCreateChain(t *testing.T) {
 		"name",
 		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 		ids.ShortEmpty, // change addr
+		nil,
 	)
 	require.NoError(err)
 
@@ -874,10 +867,7 @@ func TestCreateSubnet(t *testing.T) {
 	require := require.New(t)
 	vm, _, _ := defaultVM(t, latestFork)
 	vm.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
-		vm.ctx.Lock.Unlock()
-	}()
+	defer vm.ctx.Lock.Unlock()
 
 	nodeID := genesisNodeIDs[0]
 	createSubnetTx, err := vm.txBuilder.NewCreateSubnetTx(
@@ -888,6 +878,7 @@ func TestCreateSubnet(t *testing.T) {
 		},
 		[]*secp256k1.PrivateKey{keys[0]}, // payer
 		keys[0].PublicKey().Address(),    // change addr
+		nil,
 	)
 	require.NoError(err)
 
@@ -931,6 +922,7 @@ func TestCreateSubnet(t *testing.T) {
 		createSubnetTx.ID(),
 		[]*secp256k1.PrivateKey{keys[0]},
 		ids.ShortEmpty, // change addr
+		nil,
 	)
 	require.NoError(err)
 
@@ -975,10 +967,7 @@ func TestAtomicImport(t *testing.T) {
 	require := require.New(t)
 	vm, baseDB, mutableSharedMemory := defaultVM(t, latestFork)
 	vm.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
-		vm.ctx.Lock.Unlock()
-	}()
+	defer vm.ctx.Lock.Unlock()
 
 	utxoID := avax.UTXOID{
 		TxID:        ids.Empty.Prefix(1),
@@ -997,6 +986,7 @@ func TestAtomicImport(t *testing.T) {
 		recipientKey.PublicKey().Address(),
 		[]*secp256k1.PrivateKey{keys[0]},
 		ids.ShortEmpty, // change addr
+		nil,
 	)
 	require.ErrorIs(err, txbuilder.ErrNoFunds)
 
@@ -1036,6 +1026,7 @@ func TestAtomicImport(t *testing.T) {
 		recipientKey.PublicKey().Address(),
 		[]*secp256k1.PrivateKey{recipientKey},
 		ids.ShortEmpty, // change addr
+		nil,
 	)
 	require.NoError(err)
 
@@ -1064,10 +1055,7 @@ func TestOptimisticAtomicImport(t *testing.T) {
 	require := require.New(t)
 	vm, _, _ := defaultVM(t, apricotPhase3)
 	vm.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
-		vm.ctx.Lock.Unlock()
-	}()
+	defer vm.ctx.Lock.Unlock()
 
 	tx := &txs.Tx{Unsigned: &txs.ImportTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
@@ -1257,8 +1245,8 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	require := require.New(t)
 
 	baseDB := memdb.New()
-	vmDB := prefixdb.New([]byte("vm"), baseDB)
-	bootstrappingDB := prefixdb.New([]byte("bootstrapping"), baseDB)
+	vmDB := prefixdb.New(chains.VMDBPrefix, baseDB)
+	bootstrappingDB := prefixdb.New(chains.ChainBootstrappingDBPrefix, baseDB)
 	blocked, err := queue.NewWithMissing(bootstrappingDB, "", prometheus.NewRegistry())
 	require.NoError(err)
 
@@ -1713,10 +1701,7 @@ func TestUnverifiedParent(t *testing.T) {
 func TestMaxStakeAmount(t *testing.T) {
 	vm, _, _ := defaultVM(t, latestFork)
 	vm.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(t, vm.Shutdown(context.Background()))
-		vm.ctx.Lock.Unlock()
-	}()
+	defer vm.ctx.Lock.Unlock()
 
 	nodeID := genesisNodeIDs[0]
 
@@ -2019,29 +2004,28 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 	validatorEndTime := validatorStartTime.Add(360 * 24 * time.Hour)
 
 	vm, _, _ := defaultVM(t, latestFork)
-
 	vm.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
-
-		vm.ctx.Lock.Unlock()
-	}()
+	defer vm.ctx.Lock.Unlock()
 
 	key, err := secp256k1.NewPrivateKey()
 	require.NoError(err)
 
 	id := key.PublicKey().Address()
 	nodeID := ids.GenerateTestNodeID()
+	sk, err := bls.NewSecretKey()
+	require.NoError(err)
 
-	addValidatorTx, err := vm.txBuilder.NewAddValidatorTx(
+	addValidatorTx, err := vm.txBuilder.NewAddPermissionlessValidatorTx(
 		defaultMaxValidatorStake,
 		uint64(validatorStartTime.Unix()),
 		uint64(validatorEndTime.Unix()),
 		nodeID,
+		signer.NewProofOfPossession(sk),
 		id,
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[0]},
 		keys[0].Address(),
+		nil,
 	)
 	require.NoError(err)
 
@@ -2061,6 +2045,7 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 		[]ids.ShortID{id},
 		[]*secp256k1.PrivateKey{keys[0]},
 		keys[0].Address(),
+		nil,
 	)
 	require.NoError(err)
 
@@ -2083,6 +2068,7 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 		createSubnetTx.ID(),
 		[]*secp256k1.PrivateKey{key, keys[1]},
 		keys[1].Address(),
+		nil,
 	)
 	require.NoError(err)
 
@@ -2091,6 +2077,7 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 		createSubnetTx.ID(),
 		[]*secp256k1.PrivateKey{key, keys[2]},
 		keys[2].Address(),
+		nil,
 	)
 	require.NoError(err)
 
@@ -2120,10 +2107,7 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 	require := require.New(t)
 	vm, _, _ := defaultVM(t, latestFork)
 	vm.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
-		vm.ctx.Lock.Unlock()
-	}()
+	defer vm.ctx.Lock.Unlock()
 
 	// Create a subnet
 	createSubnetTx, err := vm.txBuilder.NewCreateSubnetTx(
@@ -2131,6 +2115,7 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 		[]ids.ShortID{keys[0].PublicKey().Address()},
 		[]*secp256k1.PrivateKey{keys[0]},
 		keys[0].Address(),
+		nil,
 	)
 	require.NoError(err)
 	subnetID := createSubnetTx.ID()
@@ -2166,6 +2151,7 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 		[]ids.ShortID{keys[1].PublicKey().Address()},
 		[]*secp256k1.PrivateKey{keys[0]},
 		ids.ShortEmpty, // change addr
+		nil,
 	)
 	require.NoError(err)
 
@@ -2199,10 +2185,7 @@ func TestBaseTx(t *testing.T) {
 	require := require.New(t)
 	vm, _, _ := defaultVM(t, latestFork)
 	vm.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
-		vm.ctx.Lock.Unlock()
-	}()
+	defer vm.ctx.Lock.Unlock()
 
 	sendAmt := uint64(100000)
 	changeAddr := ids.ShortEmpty
@@ -2217,6 +2200,7 @@ func TestBaseTx(t *testing.T) {
 		},
 		[]*secp256k1.PrivateKey{keys[0]},
 		changeAddr,
+		nil,
 	)
 	require.NoError(err)
 
@@ -2276,10 +2260,7 @@ func TestPruneMempool(t *testing.T) {
 	require := require.New(t)
 	vm, _, _ := defaultVM(t, latestFork)
 	vm.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
-		vm.ctx.Lock.Unlock()
-	}()
+	defer vm.ctx.Lock.Unlock()
 
 	// Create a tx that will be valid regardless of timestamp.
 	sendAmt := uint64(100000)
@@ -2295,6 +2276,7 @@ func TestPruneMempool(t *testing.T) {
 		},
 		[]*secp256k1.PrivateKey{keys[0]},
 		changeAddr,
+		nil,
 	)
 	require.NoError(err)
 
@@ -2313,15 +2295,20 @@ func TestPruneMempool(t *testing.T) {
 		endTime   = startTime.Add(vm.MinStakeDuration)
 	)
 
-	addValidatorTx, err := vm.txBuilder.NewAddValidatorTx(
+	sk, err := bls.NewSecretKey()
+	require.NoError(err)
+
+	addValidatorTx, err := vm.txBuilder.NewAddPermissionlessValidatorTx(
 		defaultMinValidatorStake,
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
 		ids.GenerateTestNodeID(),
+		signer.NewProofOfPossession(sk),
 		keys[2].Address(),
 		20000,
 		[]*secp256k1.PrivateKey{keys[1]},
 		ids.ShortEmpty,
+		nil,
 	)
 	require.NoError(err)
 

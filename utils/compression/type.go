@@ -14,7 +14,7 @@ type Type byte
 
 const (
 	TypeNone Type = iota + 1
-	TypeGzip
+	TypeGzip      // Remove once v1.11.x is out.
 	TypeZstd
 )
 

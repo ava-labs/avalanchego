@@ -10,7 +10,6 @@ import (
 	"net/http"
 
 	"go.uber.org/zap"
-
 	"golang.org/x/exp/maps"
 
 	"github.com/ava-labs/avalanchego/api"

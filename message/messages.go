@@ -9,9 +9,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-
 	"go.uber.org/zap"
-
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -19,7 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/compression"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -134,8 +131,8 @@ func (m *outboundMessage) BytesSavedCompression() int {
 type msgBuilder struct {
 	log logging.Logger
 
+	// TODO: Remove gzip once v1.11.x is out.
 	gzipCompressor            compression.Compressor
-	gzipCompressTimeMetrics   map[Op]metric.Averager
 	gzipDecompressTimeMetrics map[Op]metric.Averager
 
 	zstdCompressor            compression.Compressor
@@ -164,7 +161,6 @@ func newMsgBuilder(
 		log: log,
 
 		gzipCompressor:            gzipCompressor,
-		gzipCompressTimeMetrics:   make(map[Op]metric.Averager, len(ExternalOps)),
 		gzipDecompressTimeMetrics: make(map[Op]metric.Averager, len(ExternalOps)),
 
 		zstdCompressor:            zstdCompressor,
@@ -176,13 +172,6 @@ func newMsgBuilder(
 
 	errs := wrappers.Errs{}
 	for _, op := range ExternalOps {
-		mb.gzipCompressTimeMetrics[op] = metric.NewAveragerWithErrs(
-			namespace,
-			fmt.Sprintf("gzip_%s_compress_time", op),
-			fmt.Sprintf("time (in ns) to compress %s messages with gzip", op),
-			metrics,
-			&errs,
-		)
 		mb.gzipDecompressTimeMetrics[op] = metric.NewAveragerWithErrs(
 			namespace,
 			fmt.Sprintf("gzip_%s_decompress_time", op),
@@ -236,17 +225,6 @@ func (mb *msgBuilder) marshal(
 	switch compressionType {
 	case compression.TypeNone:
 		return uncompressedMsgBytes, 0, op, nil
-	case compression.TypeGzip:
-		compressedBytes, err := mb.gzipCompressor.Compress(uncompressedMsgBytes)
-		if err != nil {
-			return nil, 0, 0, err
-		}
-		compressedMsg = p2p.Message{
-			Message: &p2p.Message_CompressedGzip{
-				CompressedGzip: compressedBytes,
-			},
-		}
-		opToCompressTimeMetrics = mb.gzipCompressTimeMetrics
 	case compression.TypeZstd:
 		compressedBytes, err := mb.zstdCompressor.Compress(uncompressedMsgBytes)
 		if err != nil {
@@ -372,7 +350,7 @@ func (mb *msgBuilder) parseInbound(
 
 	expiration := mockable.MaxTime
 	if deadline, ok := GetDeadline(msg); ok {
-		deadline = math.Min(deadline, mb.maxMessageTimeout)
+		deadline = min(deadline, mb.maxMessageTimeout)
 		expiration = time.Now().Add(deadline)
 	}
 

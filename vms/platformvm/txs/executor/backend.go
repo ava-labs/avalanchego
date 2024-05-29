@@ -20,7 +20,7 @@ type Backend struct {
 	Clk          *mockable.Clock
 	Fx           fx.Fx
 	FlowChecker  utxo.Verifier
-	Uptimes      uptime.Manager
+	Uptimes      uptime.Calculator
 	Rewards      reward.Calculator
 	Bootstrapped *utils.Atomic[bool]
 }

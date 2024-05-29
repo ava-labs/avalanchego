@@ -52,9 +52,7 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 			env := newEnvironment(t, false /*=postBanff*/, false /*=postCortina*/, false /*=postDurango*/)
 			env.config.ApricotPhase3Time = ap3Time
 			env.ctx.Lock.Lock()
-			defer func() {
-				require.NoError(shutdownEnvironment(env))
-			}()
+			defer env.ctx.Lock.Unlock()
 
 			ins, outs, _, signers, err := env.utxosHandler.Spend(env.state, preFundedKeys, 0, test.fee, ids.ShortEmpty)
 			require.NoError(err)

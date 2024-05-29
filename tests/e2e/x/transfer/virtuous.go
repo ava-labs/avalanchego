@@ -9,8 +9,6 @@ import (
 	"math/rand"
 	"time"
 
-	ginkgo "github.com/onsi/ginkgo/v2"
-
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -23,6 +21,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
+
+	ginkgo "github.com/onsi/ginkgo/v2"
 )
 
 const (
@@ -226,14 +226,14 @@ RECEIVER  NEW BALANCE (AFTER) : %21d AVAX
 					xc := avm.NewClient(u, "X")
 					status, err := xc.ConfirmTx(e2e.DefaultContext(), txID, 2*time.Second)
 					require.NoError(err)
-					require.Equal(status, choices.Accepted)
+					require.Equal(choices.Accepted, status)
 				}
 
 				for _, u := range rpcEps {
 					xc := avm.NewClient(u, "X")
 					status, err := xc.ConfirmTx(e2e.DefaultContext(), txID, 2*time.Second)
 					require.NoError(err)
-					require.Equal(status, choices.Accepted)
+					require.Equal(choices.Accepted, status)
 
 					mm, err := tests.GetNodeMetrics(u, allMetrics...)
 					require.NoError(err)

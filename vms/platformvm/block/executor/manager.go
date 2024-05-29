@@ -127,12 +127,34 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 		return ErrChainNotSynced
 	}
 
-	return tx.Unsigned.Visit(&executor.MempoolTxVerifier{
-		Backend:       m.txExecutorBackend,
-		ParentID:      m.preferred,
-		StateVersions: m,
-		Tx:            tx,
+	stateDiff, err := state.NewDiff(m.preferred, m)
+	if err != nil {
+		return err
+	}
+
+	nextBlkTime, _, err := executor.NextBlockTime(stateDiff, m.txExecutorBackend.Clk)
+	if err != nil {
+		return err
+	}
+
+	_, err = executor.AdvanceTimeTo(m.txExecutorBackend, stateDiff, nextBlkTime)
+	if err != nil {
+		return err
+	}
+
+	err = tx.Unsigned.Visit(&executor.StandardTxExecutor{
+		Backend: m.txExecutorBackend,
+		State:   stateDiff,
+		Tx:      tx,
 	})
+	// We ignore [errFutureStakeTime] here because the time will be advanced
+	// when this transaction is issued.
+	//
+	// TODO: Remove this check post-Durango.
+	if errors.Is(err, executor.ErrFutureStakeTime) {
+		return nil
+	}
+	return err
 }
 
 func (m *manager) VerifyUniqueInputs(blkID ids.ID, inputs set.Set[ids.ID]) error {

@@ -4,10 +4,10 @@
 package meterdb
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -15,12 +15,14 @@ import (
 )
 
 func TestInterface(t *testing.T) {
-	for _, test := range database.Tests {
-		baseDB := memdb.New()
-		db, err := New("", prometheus.NewRegistry(), baseDB)
-		require.NoError(t, err)
+	for name, test := range database.Tests {
+		t.Run(name, func(t *testing.T) {
+			baseDB := memdb.New()
+			db, err := New("", prometheus.NewRegistry(), baseDB)
+			require.NoError(t, err)
 
-		test(t, db)
+			test(t, db)
+		})
 	}
 }
 
@@ -46,8 +48,10 @@ func FuzzNewIteratorWithStartAndPrefix(f *testing.F) {
 func BenchmarkInterface(b *testing.B) {
 	for _, size := range database.BenchmarkSizes {
 		keys, values := database.SetupBenchmark(b, size[0], size[1], size[2])
-		for _, bench := range database.Benchmarks {
-			bench(b, newDB(b), "meterdb", keys, values)
+		for name, bench := range database.Benchmarks {
+			b.Run(fmt.Sprintf("meterdb_%d_pairs_%d_keys_%d_values_%s", size[0], size[1], size[2], name), func(b *testing.B) {
+				bench(b, newDB(b), keys, values)
+			})
 		}
 	}
 }

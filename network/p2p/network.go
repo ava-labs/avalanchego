@@ -217,7 +217,7 @@ func (n *Network) NewClient(handlerID uint64, options ...ClientOption) *Client {
 	client := &Client{
 		handlerID:     handlerID,
 		handlerIDStr:  strconv.FormatUint(handlerID, 10),
-		handlerPrefix: binary.AppendUvarint(nil, handlerID),
+		handlerPrefix: ProtocolPrefix(handlerID),
 		sender:        n.sender,
 		router:        n.router,
 		options: &clientOptions{
@@ -280,4 +280,8 @@ type peerSampler struct {
 
 func (p peerSampler) Sample(_ context.Context, limit int) []ids.NodeID {
 	return p.peers.Sample(limit)
+}
+
+func ProtocolPrefix(handlerID uint64) []byte {
+	return binary.AppendUvarint(nil, handlerID)
 }

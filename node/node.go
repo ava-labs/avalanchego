@@ -22,10 +22,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-
 	"go.uber.org/zap"
-
-	coreth "github.com/ava-labs/coreth/plugin/evm"
 
 	"github.com/ava-labs/avalanchego/api/admin"
 	"github.com/ava-labs/avalanchego/api/auth"
@@ -78,19 +75,17 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms"
 	"github.com/ava-labs/avalanchego/vms/avm"
-	"github.com/ava-labs/avalanchego/vms/nftfx"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/propertyfx"
 	"github.com/ava-labs/avalanchego/vms/registry"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/runtime"
-	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	ipcsapi "github.com/ava-labs/avalanchego/api/ipcs"
 	avmconfig "github.com/ava-labs/avalanchego/vms/avm/config"
 	platformconfig "github.com/ava-labs/avalanchego/vms/platformvm/config"
+	coreth "github.com/ava-labs/coreth/plugin/evm"
 )
 
 const (
@@ -148,7 +143,15 @@ func New(
 		return nil, fmt.Errorf("problem creating vm logger: %w", err)
 	}
 
-	n.VMManager = vms.NewManager(n.VMFactoryLog, config.VMAliaser)
+	n.VMAliaser = ids.NewAliaser()
+	for vmID, aliases := range config.VMAliases {
+		for _, alias := range aliases {
+			if err := n.VMAliaser.Alias(vmID, alias); err != nil {
+				return nil, err
+			}
+		}
+	}
+	n.VMManager = vms.NewManager(n.VMFactoryLog, n.VMAliaser)
 
 	if err := n.initBootstrappers(); err != nil { // Configure the bootstrappers
 		return nil, fmt.Errorf("problem initializing node beacons: %w", err)
@@ -158,10 +161,6 @@ func New(
 	n.tracer, err = trace.New(n.Config.TraceConfig)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize tracer: %w", err)
-	}
-
-	if n.Config.TraceConfig.Enabled {
-		n.Config.ConsensusRouter = router.Trace(n.Config.ConsensusRouter, n.tracer)
 	}
 
 	n.initMetrics()
@@ -280,6 +279,8 @@ type Node struct {
 	portMapper *nat.Mapper
 	ipUpdater  dynamicip.Updater
 
+	chainRouter router.Router
+
 	// Profiles the process. Nil if continuous profiling is disabled.
 	profiler profiler.ContinuousProfiler
 
@@ -362,6 +363,7 @@ type Node struct {
 	MetricsRegisterer *prometheus.Registry
 	MetricsGatherer   metrics.MultiGatherer
 
+	VMAliaser ids.Aliaser
 	VMManager vms.Manager
 
 	// VM endpoint registry
@@ -517,14 +519,20 @@ func (n *Node) initNetworking() error {
 
 	tlsConfig := peer.TLSConfig(n.Config.StakingTLSCert, n.tlsKeyLogWriterCloser)
 
+	// Create chain router
+	n.chainRouter = &router.ChainRouter{}
+	if n.Config.TraceConfig.Enabled {
+		n.chainRouter = router.Trace(n.chainRouter, n.tracer)
+	}
+
 	// Configure benchlist
 	n.Config.BenchlistConfig.Validators = n.vdrs
-	n.Config.BenchlistConfig.Benchable = n.Config.ConsensusRouter
+	n.Config.BenchlistConfig.Benchable = n.chainRouter
 	n.benchlistManager = benchlist.NewManager(&n.Config.BenchlistConfig)
 
 	n.uptimeCalculator = uptime.NewLockedCalculator()
 
-	consensusRouter := n.Config.ConsensusRouter
+	consensusRouter := n.chainRouter
 	if !n.Config.SybilProtectionEnabled {
 		// Sybil protection is disabled so we don't have a txID that added us as
 		// a validator. Because each validator needs a txID associated with it,
@@ -1044,11 +1052,10 @@ func (n *Node) initAPIServer() error {
 // Add the default VM aliases
 func (n *Node) addDefaultVMAliases() error {
 	n.Log.Info("adding the default VM aliases")
-	vmAliases := genesis.GetVMAliases()
 
-	for vmID, aliases := range vmAliases {
+	for vmID, aliases := range genesis.VMAliases {
 		for _, alias := range aliases {
-			if err := n.Config.VMAliaser.Alias(vmID, alias); err != nil {
+			if err := n.VMAliaser.Alias(vmID, alias); err != nil {
 				return err
 			}
 		}
@@ -1091,7 +1098,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	go n.Log.RecoverAndPanic(n.timeoutManager.Dispatch)
 
 	// Routes incoming messages from peers to the appropriate chain
-	err = n.Config.ConsensusRouter.Initialize(
+	err = n.chainRouter.Initialize(
 		n.ID,
 		n.Log,
 		n.timeoutManager,
@@ -1108,51 +1115,58 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		return fmt.Errorf("couldn't initialize chain router: %w", err)
 	}
 
-	n.chainManager = chains.New(&chains.ManagerConfig{
-		SybilProtectionEnabled:                  n.Config.SybilProtectionEnabled,
-		StakingTLSCert:                          n.Config.StakingTLSCert,
-		StakingBLSKey:                           n.Config.StakingSigningKey,
-		Log:                                     n.Log,
-		LogFactory:                              n.LogFactory,
-		VMManager:                               n.VMManager,
-		BlockAcceptorGroup:                      n.BlockAcceptorGroup,
-		TxAcceptorGroup:                         n.TxAcceptorGroup,
-		VertexAcceptorGroup:                     n.VertexAcceptorGroup,
-		DB:                                      n.DB,
-		MsgCreator:                              n.msgCreator,
-		Router:                                  n.Config.ConsensusRouter,
-		Net:                                     n.Net,
-		Validators:                              n.vdrs,
-		PartialSyncPrimaryNetwork:               n.Config.PartialSyncPrimaryNetwork,
-		NodeID:                                  n.ID,
-		NetworkID:                               n.Config.NetworkID,
-		Server:                                  n.APIServer,
-		Keystore:                                n.keystore,
-		AtomicMemory:                            n.sharedMemory,
-		AVAXAssetID:                             avaxAssetID,
-		XChainID:                                xChainID,
-		CChainID:                                cChainID,
-		CriticalChains:                          criticalChains,
-		TimeoutManager:                          n.timeoutManager,
-		Health:                                  n.health,
-		ShutdownNodeFunc:                        n.Shutdown,
-		MeterVMEnabled:                          n.Config.MeterVMEnabled,
-		Metrics:                                 n.MetricsGatherer,
-		SubnetConfigs:                           n.Config.SubnetConfigs,
-		ChainConfigs:                            n.Config.ChainConfigs,
-		FrontierPollFrequency:                   n.Config.FrontierPollFrequency,
-		ConsensusAppConcurrency:                 n.Config.ConsensusAppConcurrency,
-		BootstrapMaxTimeGetAncestors:            n.Config.BootstrapMaxTimeGetAncestors,
-		BootstrapAncestorsMaxContainersSent:     n.Config.BootstrapAncestorsMaxContainersSent,
-		BootstrapAncestorsMaxContainersReceived: n.Config.BootstrapAncestorsMaxContainersReceived,
-		ApricotPhase4Time:                       version.GetApricotPhase4Time(n.Config.NetworkID),
-		ApricotPhase4MinPChainHeight:            version.ApricotPhase4MinPChainHeight[n.Config.NetworkID],
-		ResourceTracker:                         n.resourceTracker,
-		StateSyncBeacons:                        n.Config.StateSyncIDs,
-		TracingEnabled:                          n.Config.TraceConfig.Enabled,
-		Tracer:                                  n.tracer,
-		ChainDataDir:                            n.Config.ChainDataDir,
-	})
+	subnets, err := chains.NewSubnets(n.ID, n.Config.SubnetConfigs)
+	if err != nil {
+		return fmt.Errorf("failed to initialize subnets: %w", err)
+	}
+	n.chainManager = chains.New(
+		&chains.ManagerConfig{
+			SybilProtectionEnabled:                  n.Config.SybilProtectionEnabled,
+			StakingTLSCert:                          n.Config.StakingTLSCert,
+			StakingBLSKey:                           n.Config.StakingSigningKey,
+			Log:                                     n.Log,
+			LogFactory:                              n.LogFactory,
+			VMManager:                               n.VMManager,
+			BlockAcceptorGroup:                      n.BlockAcceptorGroup,
+			TxAcceptorGroup:                         n.TxAcceptorGroup,
+			VertexAcceptorGroup:                     n.VertexAcceptorGroup,
+			DB:                                      n.DB,
+			MsgCreator:                              n.msgCreator,
+			Router:                                  n.chainRouter,
+			Net:                                     n.Net,
+			Validators:                              n.vdrs,
+			PartialSyncPrimaryNetwork:               n.Config.PartialSyncPrimaryNetwork,
+			NodeID:                                  n.ID,
+			NetworkID:                               n.Config.NetworkID,
+			Server:                                  n.APIServer,
+			Keystore:                                n.keystore,
+			AtomicMemory:                            n.sharedMemory,
+			AVAXAssetID:                             avaxAssetID,
+			XChainID:                                xChainID,
+			CChainID:                                cChainID,
+			CriticalChains:                          criticalChains,
+			TimeoutManager:                          n.timeoutManager,
+			Health:                                  n.health,
+			ShutdownNodeFunc:                        n.Shutdown,
+			MeterVMEnabled:                          n.Config.MeterVMEnabled,
+			Metrics:                                 n.MetricsGatherer,
+			SubnetConfigs:                           n.Config.SubnetConfigs,
+			ChainConfigs:                            n.Config.ChainConfigs,
+			FrontierPollFrequency:                   n.Config.FrontierPollFrequency,
+			ConsensusAppConcurrency:                 n.Config.ConsensusAppConcurrency,
+			BootstrapMaxTimeGetAncestors:            n.Config.BootstrapMaxTimeGetAncestors,
+			BootstrapAncestorsMaxContainersSent:     n.Config.BootstrapAncestorsMaxContainersSent,
+			BootstrapAncestorsMaxContainersReceived: n.Config.BootstrapAncestorsMaxContainersReceived,
+			ApricotPhase4Time:                       version.GetApricotPhase4Time(n.Config.NetworkID),
+			ApricotPhase4MinPChainHeight:            version.ApricotPhase4MinPChainHeight[n.Config.NetworkID],
+			ResourceTracker:                         n.resourceTracker,
+			StateSyncBeacons:                        n.Config.StateSyncIDs,
+			TracingEnabled:                          n.Config.TraceConfig.Enabled,
+			Tracer:                                  n.tracer,
+			ChainDataDir:                            n.Config.ChainDataDir,
+			Subnets:                                 subnets,
+		},
+	)
 
 	// Notify the API server when new chains are created
 	n.chainManager.AddRegistrant(n.APIServer)
@@ -1172,13 +1186,6 @@ func (n *Node) initVMs() error {
 		vdrs = validators.NewManager()
 	}
 
-	vmRegisterer := registry.NewVMRegisterer(registry.VMRegistererConfig{
-		APIServer:    n.APIServer,
-		Log:          n.Log,
-		VMFactoryLog: n.VMFactoryLog,
-		VMManager:    n.VMManager,
-	})
-
 	durangoTime := version.GetDurangoTime(n.Config.NetworkID)
 	if err := txs.InitCodec(durangoTime); err != nil {
 		return err
@@ -1192,7 +1199,7 @@ func (n *Node) initVMs() error {
 
 	// Register the VMs that Avalanche supports
 	err := utils.Err(
-		vmRegisterer.Register(context.TODO(), constants.PlatformVMID, &platformvm.Factory{
+		n.VMManager.RegisterFactory(context.TODO(), constants.PlatformVMID, &platformvm.Factory{
 			Config: platformconfig.Config{
 				Chains:                        n.chainManager,
 				Validators:                    vdrs,
@@ -1225,17 +1232,14 @@ func (n *Node) initVMs() error {
 				UseCurrentHeight:              n.Config.UseCurrentHeight,
 			},
 		}),
-		vmRegisterer.Register(context.TODO(), constants.AVMID, &avm.Factory{
+		n.VMManager.RegisterFactory(context.TODO(), constants.AVMID, &avm.Factory{
 			Config: avmconfig.Config{
 				TxFee:            n.Config.TxFee,
 				CreateAssetTxFee: n.Config.CreateAssetTxFee,
 				DurangoTime:      durangoTime,
 			},
 		}),
-		vmRegisterer.Register(context.TODO(), constants.EVMID, &coreth.Factory{}),
-		n.VMManager.RegisterFactory(context.TODO(), secp256k1fx.ID, &secp256k1fx.Factory{}),
-		n.VMManager.RegisterFactory(context.TODO(), nftfx.ID, &nftfx.Factory{}),
-		n.VMManager.RegisterFactory(context.TODO(), propertyfx.ID, &propertyfx.Factory{}),
+		n.VMManager.RegisterFactory(context.TODO(), constants.EVMID, &coreth.Factory{}),
 	)
 	if err != nil {
 		return err
@@ -1253,7 +1257,7 @@ func (n *Node) initVMs() error {
 			CPUTracker:      n.resourceManager,
 			RuntimeTracker:  n.runtimeManager,
 		}),
-		VMRegisterer: vmRegisterer,
+		VMManager: n.VMManager,
 	})
 
 	// register any vms that need to be installed as plugins from disk
@@ -1338,6 +1342,7 @@ func (n *Node) initAdminAPI() error {
 	service, err := admin.NewService(
 		admin.Config{
 			Log:          n.Log,
+			DB:           n.DB,
 			ChainManager: n.chainManager,
 			HTTPServer:   n.APIServer,
 			ProfileDir:   n.Config.ProfilerConfig.Dir,
@@ -1444,7 +1449,7 @@ func (n *Node) initHealthAPI() error {
 		return fmt.Errorf("couldn't register network health check: %w", err)
 	}
 
-	err = healthChecker.RegisterHealthCheck("router", n.Config.ConsensusRouter, health.ApplicationTag)
+	err = healthChecker.RegisterHealthCheck("router", n.chainRouter, health.ApplicationTag)
 	if err != nil {
 		return fmt.Errorf("couldn't register router health check: %w", err)
 	}

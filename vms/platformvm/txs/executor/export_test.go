@@ -17,9 +17,7 @@ import (
 func TestNewExportTx(t *testing.T) {
 	env := newEnvironment(t, true /*=postBanff*/, false /*=postCortina*/, false /*=postDurango*/)
 	env.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(t, shutdownEnvironment(env))
-	}()
+	defer env.ctx.Lock.Unlock()
 
 	type test struct {
 		description        string
@@ -56,22 +54,19 @@ func TestNewExportTx(t *testing.T) {
 				to,
 				tt.sourceKeys,
 				ids.ShortEmpty, // Change address
+				nil,
 			)
 			require.NoError(err)
 
-			fakedState, err := state.NewDiff(lastAcceptedID, env)
+			stateDiff, err := state.NewDiff(lastAcceptedID, env)
 			require.NoError(err)
 
-			fakedState.SetTimestamp(tt.timestamp)
+			stateDiff.SetTimestamp(tt.timestamp)
 
-			fakedParent := ids.GenerateTestID()
-			env.SetState(fakedParent, fakedState)
-
-			verifier := MempoolTxVerifier{
-				Backend:       &env.backend,
-				ParentID:      fakedParent,
-				StateVersions: env,
-				Tx:            tx,
+			verifier := StandardTxExecutor{
+				Backend: &env.backend,
+				State:   stateDiff,
+				Tx:      tx,
 			}
 			require.NoError(tx.Unsigned.Visit(&verifier))
 		})

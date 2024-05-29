@@ -3,9 +3,12 @@
 
 package block
 
-import "fmt"
+import (
+	"fmt"
+	"time"
+)
 
-func Parse(bytes []byte) (Block, error) {
+func Parse(bytes []byte, durangoTime time.Time) (Block, error) {
 	var block Block
 	parsedVersion, err := Codec.Unmarshal(bytes, &block)
 	if err != nil {
@@ -14,7 +17,7 @@ func Parse(bytes []byte) (Block, error) {
 	if parsedVersion != CodecVersion {
 		return nil, fmt.Errorf("expected codec version %d but got %d", CodecVersion, parsedVersion)
 	}
-	return block, block.initialize(bytes)
+	return block, block.initialize(bytes, durangoTime)
 }
 
 func ParseHeader(bytes []byte) (Header, error) {

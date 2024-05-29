@@ -9,4 +9,8 @@ updates:
     directory: "/" # Location of package manifests
     schedule:
       interval: "daily"
-    target-branch: "dev"
+    open-pull-requests-limit: 0 # Disable non-security version updates
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly

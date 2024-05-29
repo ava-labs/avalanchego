@@ -7,7 +7,7 @@
 
 package database
 
-import "golang.org/x/exp/slices"
+import "slices"
 
 // Batch is a write-only database that commits changes to its host database
 // when Write is called. A batch cannot be used concurrently.

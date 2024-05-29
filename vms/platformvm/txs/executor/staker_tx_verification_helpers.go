@@ -231,7 +231,7 @@ func GetMaxWeight(
 		if !delegator.NextTime.Before(startTime) {
 			// We have advanced time to be at the inside of the delegation
 			// window. Make sure that the max weight is updated accordingly.
-			currentMax = math.Max(currentMax, currentWeight)
+			currentMax = max(currentMax, currentWeight)
 		}
 
 		var op func(uint64, uint64) (uint64, error)
@@ -248,7 +248,7 @@ func GetMaxWeight(
 	// Because we assume [startTime] < [endTime], we have advanced time to
 	// be at the end of the delegation window. Make sure that the max weight is
 	// updated accordingly.
-	return math.Max(currentMax, currentWeight), nil
+	return max(currentMax, currentWeight), nil
 }
 
 func GetTransformSubnetTx(chain state.Chain, subnetID ids.ID) (*txs.TransformSubnetTx, error) {

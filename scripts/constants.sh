@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
-#
+
+# Ignore warnings about variables appearing unused since this file is not the consumer of the variables it defines.
+# shellcheck disable=SC2034
+
+set -euo pipefail
+
 # Use lower_case variables in the scripts and UPPER_CASE variables for override
 # Use the constants.sh for env overrides
 

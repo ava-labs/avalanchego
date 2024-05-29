@@ -5,10 +5,9 @@ package memdb
 
 import (
 	"context"
+	"slices"
 	"strings"
 	"sync"
-
-	"golang.org/x/exp/slices"
 
 	"github.com/ava-labs/avalanchego/database"
 )

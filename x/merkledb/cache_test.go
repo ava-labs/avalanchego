@@ -200,7 +200,7 @@ func TestOnEvictCacheOnEvictionError(t *testing.T) {
 	require.ErrorIs(err, errTest)
 
 	// Cache has [1,2]
-	require.Equal(evicted, []int{0})
+	require.Equal([]int{0}, evicted)
 	require.Equal(maxSize, cache.fifo.Len())
 	_, ok := cache.Get(0)
 	require.False(ok)
@@ -215,7 +215,7 @@ func TestOnEvictCacheOnEvictionError(t *testing.T) {
 
 	// Should still be empty.
 	require.Zero(cache.fifo.Len())
-	require.Equal(evicted, []int{0, 1, 2})
+	require.Equal([]int{0, 1, 2}, evicted)
 	_, ok = cache.Get(0)
 	require.False(ok)
 	_, ok = cache.Get(1)

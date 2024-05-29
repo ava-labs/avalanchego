@@ -5,10 +5,9 @@ package merkledb
 
 import (
 	"bytes"
+	"slices"
 
 	"github.com/ava-labs/avalanchego/database"
-
-	"golang.org/x/exp/slices"
 )
 
 func (v *view) NewIterator() database.Iterator {

@@ -7,6 +7,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"net"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -29,36 +30,40 @@ type Upgrader interface {
 type tlsServerUpgrader struct {
 	config       *tls.Config
 	invalidCerts prometheus.Counter
+	durangoTime  time.Time
 }
 
-func NewTLSServerUpgrader(config *tls.Config, invalidCerts prometheus.Counter) Upgrader {
+func NewTLSServerUpgrader(config *tls.Config, invalidCerts prometheus.Counter, durangoTime time.Time) Upgrader {
 	return &tlsServerUpgrader{
 		config:       config,
 		invalidCerts: invalidCerts,
+		durangoTime:  durangoTime,
 	}
 }
 
 func (t *tlsServerUpgrader) Upgrade(conn net.Conn) (ids.NodeID, net.Conn, *staking.Certificate, error) {
-	return connToIDAndCert(tls.Server(conn, t.config), t.invalidCerts)
+	return connToIDAndCert(tls.Server(conn, t.config), t.invalidCerts, t.durangoTime)
 }
 
 type tlsClientUpgrader struct {
 	config       *tls.Config
 	invalidCerts prometheus.Counter
+	durangoTime  time.Time
 }
 
-func NewTLSClientUpgrader(config *tls.Config, invalidCerts prometheus.Counter) Upgrader {
+func NewTLSClientUpgrader(config *tls.Config, invalidCerts prometheus.Counter, durangoTime time.Time) Upgrader {
 	return &tlsClientUpgrader{
 		config:       config,
 		invalidCerts: invalidCerts,
+		durangoTime:  durangoTime,
 	}
 }
 
 func (t *tlsClientUpgrader) Upgrade(conn net.Conn) (ids.NodeID, net.Conn, *staking.Certificate, error) {
-	return connToIDAndCert(tls.Client(conn, t.config), t.invalidCerts)
+	return connToIDAndCert(tls.Client(conn, t.config), t.invalidCerts, t.durangoTime)
 }
 
-func connToIDAndCert(conn *tls.Conn, invalidCerts prometheus.Counter) (ids.NodeID, net.Conn, *staking.Certificate, error) {
+func connToIDAndCert(conn *tls.Conn, invalidCerts prometheus.Counter, durangoTime time.Time) (ids.NodeID, net.Conn, *staking.Certificate, error) {
 	if err := conn.Handshake(); err != nil {
 		return ids.EmptyNodeID, nil, nil, err
 	}
@@ -72,17 +77,18 @@ func connToIDAndCert(conn *tls.Conn, invalidCerts prometheus.Counter) (ids.NodeI
 	// Invariant: ParseCertificate is used rather than CertificateFromX509 to
 	// ensure that signature verification can assume the certificate was
 	// parseable according the staking package's parser.
-	peerCert, err := staking.ParseCertificate(tlsCert.Raw)
-	if err != nil {
-		invalidCerts.Inc()
-		return ids.EmptyNodeID, nil, nil, err
+	//
+	// TODO: Remove pre-Durango parsing after v1.11.x has activated.
+	var (
+		peerCert *staking.Certificate
+		err      error
+	)
+	if time.Now().Before(durangoTime) {
+		peerCert, err = staking.ParseCertificate(tlsCert.Raw)
+	} else {
+		peerCert, err = staking.ParseCertificatePermissive(tlsCert.Raw)
 	}
-
-	// We validate the certificate here to attempt to make the validity of the
-	// peer certificate as clear as possible. Specifically, a node running a
-	// prior version using an invalid certificate should not be able to report
-	// healthy.
-	if err := staking.ValidateCertificate(peerCert); err != nil {
+	if err != nil {
 		invalidCerts.Inc()
 		return ids.EmptyNodeID, nil, nil, err
 	}

@@ -9,8 +9,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-var _ NnarySlush = (*nnarySlush)(nil)
-
 func newNnarySlush(choice ids.ID) nnarySlush {
 	return nnarySlush{
 		preference: choice,

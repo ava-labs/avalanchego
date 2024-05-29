@@ -3,8 +3,6 @@
 
 package sampler
 
-import "golang.org/x/exp/maps"
-
 type defaultMap map[uint64]uint64
 
 func (m defaultMap) get(key uint64, defaultVal uint64) uint64 {
@@ -53,7 +51,7 @@ func (s *uniformReplacer) Sample(count int) ([]uint64, error) {
 }
 
 func (s *uniformReplacer) Reset() {
-	maps.Clear(s.drawn)
+	clear(s.drawn)
 	s.drawsCount = 0
 }
 

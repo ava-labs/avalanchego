@@ -11,7 +11,7 @@ fi
 # any version changes here should also be bumped in Dockerfile.buf
 # ref. https://docs.buf.build/installation
 # ref. https://github.com/bufbuild/buf/releases
-BUF_VERSION='1.26.1'
+BUF_VERSION='1.29.0'
 if [[ $(buf --version | cut -f2 -d' ') != "${BUF_VERSION}" ]]; then
   echo "could not find buf ${BUF_VERSION}, is it installed + in PATH?"
   exit 255
@@ -46,23 +46,19 @@ if [ -n "${1:-}" ]; then
 fi
 
 # move to api directory
-cd $TARGET
+cd "$TARGET"
 
 echo "Running protobuf fmt..."
 buf format -w
 
 echo "Running protobuf lint check..."
-buf lint
-
-if [[ $? -ne 0 ]];  then
+if ! buf lint;  then
     echo "ERROR: protobuf linter failed"
     exit 1
 fi
 
 echo "Re-generating protobuf..."
-buf generate
-
-if [[ $? -ne 0 ]];  then
+if ! buf generate;  then
     echo "ERROR: protobuf generation failed"
     exit 1
 fi

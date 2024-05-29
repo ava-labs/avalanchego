@@ -1,0 +1,10 @@
+snow/engine/common/sender.go=StateSummarySender,AcceptedStateSummarySender,FrontierSender,AcceptedSender,FetchSender,AppSender,QuerySender,CrossChainAppSender,NetworkAppSender,Gossiper=snow/engine/common/mock_sender.go
+snow/networking/router/router.go=InternalHandler=snow/networking/router/mock_router.go
+snow/networking/sender/external_sender.go==snow/networking/sender/mock_external_sender.go
+snow/validators/manager.go=SetCallbackListener=snow/validators/mock_manager.go
+vms/avm/block/executor/manager.go==vms/avm/block/executor/mock_manager.go
+vms/avm/txs/tx.go==vms/avm/txs/mock_unsigned_tx.go
+vms/platformvm/block/executor/manager.go==vms/platformvm/block/executor/mock_manager.go
+vms/platformvm/txs/staker_tx.go=ValidatorTx,DelegatorTx,StakerTx,PermissionlessStaker=vms/platformvm/txs/mock_staker_tx.go
+vms/platformvm/txs/unsigned_tx.go==vms/platformvm/txs/mock_unsigned_tx.go
+x/merkledb/db.go=ChangeProofer,RangeProofer,Clearer,Prefetcher=x/merkledb/mock_db.go

@@ -4,8 +4,6 @@
 package metervm
 
 import (
-	"fmt"
-
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/utils/metric"
@@ -16,7 +14,7 @@ func newAverager(namespace, name string, reg prometheus.Registerer, errs *wrappe
 	return metric.NewAveragerWithErrs(
 		namespace,
 		name,
-		fmt.Sprintf("time (in ns) of a %s", name),
+		"time (in ns) of a "+name,
 		reg,
 		errs,
 	)

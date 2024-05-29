@@ -20,23 +20,22 @@ func newResponseHandler() *responseHandler {
 
 // Implements [ResponseHandler].
 // Used to wait for a response after making a synchronous request.
-// responseChan may contain response bytes if the original request has not failed.
+// responseChan contains response bytes if the request succeeded.
 // responseChan is closed in either fail or success scenario.
 type responseHandler struct {
 	// If [OnResponse] is called, the response bytes are sent on this channel.
+	// If [OnFailure] is called, the channel is closed without sending bytes.
 	responseChan chan []byte
-	// Set to true in [OnFailure].
-	failed bool
 }
 
-// OnResponse passes the response bytes to the responseChan and closes the channel
+// OnResponse passes the response bytes to the responseChan and closes the
+// channel.
 func (h *responseHandler) OnResponse(response []byte) {
 	h.responseChan <- response
 	close(h.responseChan)
 }
 
-// OnFailure sets the failed flag to true and closes the channel
+// OnFailure closes the channel.
 func (h *responseHandler) OnFailure() {
-	h.failed = true
 	close(h.responseChan)
 }

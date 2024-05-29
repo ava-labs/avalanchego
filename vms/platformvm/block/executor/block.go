@@ -5,7 +5,6 @@ package executor
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"go.uber.org/zap"
@@ -83,22 +82,18 @@ func (b *Block) Timestamp() time.Time {
 }
 
 func (b *Block) Options(context.Context) ([2]snowman.Block, error) {
-	options := options{}
+	options := options{
+		log:                     b.manager.ctx.Log,
+		primaryUptimePercentage: b.manager.txExecutorBackend.Config.UptimePercentage,
+		uptimes:                 b.manager.txExecutorBackend.Uptimes,
+		state:                   b.manager.backend.state,
+	}
 	if err := b.Block.Visit(&options); err != nil {
 		return [2]snowman.Block{}, err
 	}
 
-	commitBlock := b.manager.NewBlock(options.commitBlock)
-	abortBlock := b.manager.NewBlock(options.abortBlock)
-
-	blkID := b.ID()
-	blkState, ok := b.manager.blkIDToState[blkID]
-	if !ok {
-		return [2]snowman.Block{}, fmt.Errorf("block %s state not found", blkID)
-	}
-
-	if blkState.initiallyPreferCommit {
-		return [2]snowman.Block{commitBlock, abortBlock}, nil
-	}
-	return [2]snowman.Block{abortBlock, commitBlock}, nil
+	return [2]snowman.Block{
+		b.manager.NewBlock(options.preferredBlock),
+		b.manager.NewBlock(options.alternateBlock),
+	}, nil
 }

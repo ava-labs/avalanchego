@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -71,6 +70,7 @@ func TestGossipMempoolAdd(t *testing.T) {
 
 	mempool, err := newGossipMempool(
 		baseMempool,
+		metrics,
 		logging.NoLog{},
 		testVerifier{},
 		parser,
@@ -107,6 +107,7 @@ func TestGossipMempoolAddVerified(t *testing.T) {
 
 	mempool, err := newGossipMempool(
 		baseMempool,
+		metrics,
 		logging.NoLog{},
 		testVerifier{
 			err: errTest, // We shouldn't be attempting to verify the tx in this flow

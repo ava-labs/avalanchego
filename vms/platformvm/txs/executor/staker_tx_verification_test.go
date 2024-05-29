@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-
 	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -139,13 +138,15 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				}
 			},
 			stateF: func(ctrl *gomock.Controller) state.Chain {
-				return nil
+				mockState := state.NewMockChain(ctrl)
+				mockState.EXPECT().GetTimestamp().Return(now) // chain time is after Durango fork activation since now.After(activeForkTime)
+				return mockState
 			},
 			sTxF: func() *txs.Tx {
 				return &verifiedSignedTx
 			},
 			txF: func() *txs.AddPermissionlessValidatorTx {
-				return nil
+				return &txs.AddPermissionlessValidatorTx{}
 			},
 			expectedErr: nil,
 		},

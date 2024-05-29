@@ -348,7 +348,7 @@ func TestPackerUnpackBool(t *testing.T) {
 
 	p := Packer{Bytes: []byte{0x01}, Offset: 0}
 
-	require.Equal(true, p.UnpackBool())
+	require.True(p.UnpackBool())
 	require.False(p.Errored())
 	require.NoError(p.Err)
 	require.Equal(BoolLen, p.Offset)
@@ -358,7 +358,7 @@ func TestPackerUnpackBool(t *testing.T) {
 	require.ErrorIs(p.Err, ErrInsufficientLength)
 
 	p = Packer{Bytes: []byte{0x42}, Offset: 0}
-	require.Equal(false, p.UnpackBool())
+	require.False(p.UnpackBool())
 	require.True(p.Errored())
 	require.ErrorIs(p.Err, errBadBool)
 }

@@ -12,13 +12,10 @@ import (
 	"strings"
 	"time"
 
-	ginkgo "github.com/onsi/ginkgo/v2"
-
-	"github.com/stretchr/testify/require"
-
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/ethclient"
 	"github.com/ava-labs/coreth/interfaces"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests"
@@ -26,6 +23,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
+
+	ginkgo "github.com/onsi/ginkgo/v2"
 )
 
 const (
@@ -34,14 +33,14 @@ const (
 	// contention.
 	DefaultTimeout = 2 * time.Minute
 
-	// Interval appropriate for network operations that should be
-	// retried periodically but not too often.
-	DefaultPollingInterval = 500 * time.Millisecond
+	DefaultPollingInterval = tmpnet.DefaultPollingInterval
 
 	// Setting this env will disable post-test bootstrap
 	// checks. Useful for speeding up iteration during test
 	// development.
 	SkipBootstrapChecksEnvName = "E2E_SKIP_BOOTSTRAP_CHECKS"
+
+	DefaultValidatorStartTimeDiff = tmpnet.DefaultValidatorStartTimeDiff
 
 	DefaultGasLimit = uint64(21000) // Standard gas limit
 
@@ -164,7 +163,7 @@ func SendEthTransaction(ethClient ethclient.Client, signedTx *types.Transaction)
 		return true
 	}, DefaultTimeout, DefaultPollingInterval, "failed to see transaction acceptance before timeout")
 
-	require.Equal(receipt.Status, types.ReceiptStatusSuccessful)
+	require.Equal(types.ReceiptStatusSuccessful, receipt.Status)
 	return receipt
 }
 
@@ -217,13 +216,20 @@ func CheckBootstrapIsPossible(network *tmpnet.Network) {
 }
 
 // Start a temporary network with the provided avalanchego binary.
-func StartNetwork(avalancheGoExecPath string, rootNetworkDir string) *tmpnet.Network {
+func StartNetwork(network *tmpnet.Network, rootNetworkDir string, avalancheGoExecPath string, pluginDir string) {
 	require := require.New(ginkgo.GinkgoT())
 
-	network, err := tmpnet.NewDefaultNetwork(ginkgo.GinkgoWriter, avalancheGoExecPath, tmpnet.DefaultNodeCount)
-	require.NoError(err)
-	require.NoError(network.Create(rootNetworkDir))
-	require.NoError(network.Start(DefaultContext(), ginkgo.GinkgoWriter))
+	require.NoError(
+		tmpnet.StartNewNetwork(
+			DefaultContext(),
+			ginkgo.GinkgoWriter,
+			network,
+			rootNetworkDir,
+			avalancheGoExecPath,
+			pluginDir,
+			tmpnet.DefaultNodeCount,
+		),
+	)
 
 	ginkgo.DeferCleanup(func() {
 		tests.Outf("Shutting down network\n")
@@ -233,6 +239,4 @@ func StartNetwork(avalancheGoExecPath string, rootNetworkDir string) *tmpnet.Net
 	})
 
 	tests.Outf("{{green}}Successfully started network{{/}}\n")
-
-	return network
 }

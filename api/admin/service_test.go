@@ -8,13 +8,16 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-
 	"go.uber.org/mock/gomock"
 
+	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms"
 	"github.com/ava-labs/avalanchego/vms/registry"
+
+	rpcdbpb "github.com/ava-labs/avalanchego/proto/pb/rpcdb"
 )
 
 type loadVMsTest struct {
@@ -64,7 +67,7 @@ func TestLoadVMsSuccess(t *testing.T) {
 		id2: alias2[1:],
 	}
 
-	resources.mockVMRegistry.EXPECT().ReloadWithReadLock(gomock.Any()).Times(1).Return(newVMs, failedVMs, nil)
+	resources.mockVMRegistry.EXPECT().Reload(gomock.Any()).Times(1).Return(newVMs, failedVMs, nil)
 	resources.mockVMManager.EXPECT().Aliases(id1).Times(1).Return(alias1, nil)
 	resources.mockVMManager.EXPECT().Aliases(id2).Times(1).Return(alias2, nil)
 
@@ -81,7 +84,7 @@ func TestLoadVMsReloadFails(t *testing.T) {
 	resources := initLoadVMsTest(t)
 
 	// Reload fails
-	resources.mockVMRegistry.EXPECT().ReloadWithReadLock(gomock.Any()).Times(1).Return(nil, nil, errTest)
+	resources.mockVMRegistry.EXPECT().Reload(gomock.Any()).Times(1).Return(nil, nil, errTest)
 
 	reply := LoadVMsReply{}
 	err := resources.admin.LoadVMs(&http.Request{}, nil, &reply)
@@ -103,11 +106,64 @@ func TestLoadVMsGetAliasesFails(t *testing.T) {
 	// every vm is at least aliased to itself.
 	alias1 := []string{id1.String(), "vm1-alias-1", "vm1-alias-2"}
 
-	resources.mockVMRegistry.EXPECT().ReloadWithReadLock(gomock.Any()).Times(1).Return(newVMs, failedVMs, nil)
+	resources.mockVMRegistry.EXPECT().Reload(gomock.Any()).Times(1).Return(newVMs, failedVMs, nil)
 	resources.mockVMManager.EXPECT().Aliases(id1).Times(1).Return(alias1, nil)
 	resources.mockVMManager.EXPECT().Aliases(id2).Times(1).Return(nil, errTest)
 
 	reply := LoadVMsReply{}
 	err := resources.admin.LoadVMs(&http.Request{}, nil, &reply)
 	require.ErrorIs(err, errTest)
+}
+
+func TestServiceDBGet(t *testing.T) {
+	a := &Admin{Config: Config{
+		Log: logging.NoLog{},
+		DB:  memdb.New(),
+	}}
+
+	helloBytes := []byte("hello")
+	helloHex, err := formatting.Encode(formatting.HexNC, helloBytes)
+	require.NoError(t, err)
+
+	worldBytes := []byte("world")
+	worldHex, err := formatting.Encode(formatting.HexNC, worldBytes)
+	require.NoError(t, err)
+
+	require.NoError(t, a.DB.Put(helloBytes, worldBytes))
+
+	tests := []struct {
+		name              string
+		key               string
+		expectedValue     string
+		expectedErrorCode rpcdbpb.Error
+	}{
+		{
+			name:              "key exists",
+			key:               helloHex,
+			expectedValue:     worldHex,
+			expectedErrorCode: rpcdbpb.Error_ERROR_UNSPECIFIED,
+		},
+		{
+			name:              "key doesn't exist",
+			key:               "",
+			expectedValue:     "",
+			expectedErrorCode: rpcdbpb.Error_ERROR_NOT_FOUND,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
+
+			reply := &DBGetReply{}
+			require.NoError(a.DbGet(
+				nil,
+				&DBGetArgs{
+					Key: test.key,
+				},
+				reply,
+			))
+			require.Equal(test.expectedValue, reply.Value)
+			require.Equal(test.expectedErrorCode, reply.ErrorCode)
+		})
+	}
 }

@@ -471,8 +471,6 @@ func Test_Bits_Len(t *testing.T) {
 }
 
 func Test_Bits_Bytes(t *testing.T) {
-	require := require.New(t)
-
 	type test struct {
 		name string
 		elts []int
@@ -495,6 +493,8 @@ func Test_Bits_Bytes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+
 			b := NewBits(tt.elts...)
 			bytes := b.Bytes()
 			fromBytes := BitsFromBytes(bytes)

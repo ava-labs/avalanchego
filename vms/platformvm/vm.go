@@ -9,13 +9,10 @@ import (
 	"fmt"
 	"math"
 	"net/http"
-	"sync"
 	"time"
 
 	"github.com/gorilla/rpc/v2"
-
 	"github.com/prometheus/client_golang/prometheus"
-
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/cache"
@@ -35,7 +32,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
@@ -96,7 +92,6 @@ type VM struct {
 	onShutdownCtx context.Context
 	// Call [onShutdownCtxCancel] to cancel [onShutdownCtx] during Shutdown()
 	onShutdownCtxCancel context.CancelFunc
-	awaitShutdown       sync.WaitGroup
 
 	// TODO: Remove after v1.11.x is activated
 	pruned utils.Atomic[bool]
@@ -206,7 +201,10 @@ func (vm *VM) Initialize(
 		chainCtx.Log,
 		chainCtx.NodeID,
 		chainCtx.SubnetID,
-		chainCtx.ValidatorState,
+		validators.NewLockedState(
+			&chainCtx.Lock,
+			validatorManager,
+		),
 		txVerifier,
 		mempool,
 		txExecutorBackend.Config.PartialSyncPrimaryNetwork,
@@ -219,17 +217,12 @@ func (vm *VM) Initialize(
 	}
 
 	vm.onShutdownCtx, vm.onShutdownCtxCancel = context.WithCancel(context.Background())
-	vm.awaitShutdown.Add(1)
-	go func() {
-		defer vm.awaitShutdown.Done()
-
-		// Invariant: Gossip must never grab the context lock.
-		vm.Network.Gossip(vm.onShutdownCtx)
-	}()
+	// TODO: Wait for this goroutine to exit during Shutdown once the platformvm
+	// has better control of the context lock.
+	go vm.Network.Gossip(vm.onShutdownCtx)
 
 	vm.Builder = blockbuilder.New(
 		mempool,
-		vm.txBuilder,
 		txExecutorBackend,
 		vm.manager,
 	)
@@ -303,6 +296,9 @@ func (vm *VM) pruneMempool() error {
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
+	// Packing all of the transactions in order performs additional checks that
+	// the MempoolTxVerifier doesn't include. So, evicting transactions from
+	// here is expected to happen occasionally.
 	blockTxs, err := vm.Builder.PackBlockTxs(math.MaxInt)
 	if err != nil {
 		return err
@@ -427,8 +423,6 @@ func (vm *VM) Shutdown(context.Context) error {
 	}
 
 	vm.onShutdownCtxCancel()
-	vm.awaitShutdown.Wait()
-
 	vm.Builder.ShutdownBlockTimer()
 
 	if vm.bootstrapped.Get() {
@@ -506,18 +500,6 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 	return map[string]http.Handler{
 		"": server,
 	}, err
-}
-
-// CreateStaticHandlers returns a map where:
-// * keys are API endpoint extensions
-// * values are API handlers
-func (*VM) CreateStaticHandlers(context.Context) (map[string]http.Handler, error) {
-	server := rpc.NewServer()
-	server.RegisterCodec(json.NewCodec(), "application/json")
-	server.RegisterCodec(json.NewCodec(), "application/json;charset=UTF-8")
-	return map[string]http.Handler{
-		"": server,
-	}, server.RegisterService(&api.StaticService{}, "platform")
 }
 
 func (vm *VM) Connected(_ context.Context, nodeID ids.NodeID, _ *version.Application) error {

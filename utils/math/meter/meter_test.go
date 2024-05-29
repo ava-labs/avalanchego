@@ -66,17 +66,17 @@ func TimeTravelTest(t *testing.T, factory Factory) {
 
 	now = now.Add(halflife - 1)
 	delta := 0.0001
-	require.InDelta(m.Read(now), .5, delta)
+	require.InDelta(.5, m.Read(now), delta)
 
 	m.Dec(now, 1)
 
 	now = now.Add(-halflife)
-	require.InDelta(m.Read(now), .5, delta)
+	require.InDelta(.5, m.Read(now), delta)
 
 	m.Inc(now, 1)
 
 	now = now.Add(halflife / 2)
-	require.InDelta(m.Read(now), .5, delta)
+	require.InDelta(.5, m.Read(now), delta)
 }
 
 func StandardUsageTest(t *testing.T, factory Factory) {
@@ -89,50 +89,50 @@ func StandardUsageTest(t *testing.T, factory Factory) {
 
 	now = now.Add(halflife - 1)
 	delta := 0.0001
-	require.InDelta(m.Read(now), .5, delta)
+	require.InDelta(.5, m.Read(now), delta)
 
 	m.Inc(now, 1)
-	require.InDelta(m.Read(now), .5, delta)
+	require.InDelta(.5, m.Read(now), delta)
 
 	m.Dec(now, 1)
-	require.InDelta(m.Read(now), .5, delta)
+	require.InDelta(.5, m.Read(now), delta)
 
 	m.Dec(now, 1)
 
-	require.InDelta(m.Read(now), .5, delta)
+	require.InDelta(.5, m.Read(now), delta)
 
 	now = now.Add(halflife)
-	require.InDelta(m.Read(now), .25, delta)
+	require.InDelta(.25, m.Read(now), delta)
 
 	m.Inc(now, 1)
 
 	now = now.Add(halflife)
-	require.InDelta(m.Read(now), .625, delta)
+	require.InDelta(.625, m.Read(now), delta)
 
 	now = now.Add(34 * halflife)
-	require.InDelta(m.Read(now), 1, delta)
+	require.InDelta(1, m.Read(now), delta)
 
 	m.Dec(now, 1)
 
 	now = now.Add(34 * halflife)
-	require.InDelta(m.Read(now), 0, delta)
+	require.InDelta(0, m.Read(now), delta)
 
 	m.Inc(now, 1)
 
 	now = now.Add(2 * halflife)
-	require.InDelta(m.Read(now), .75, delta)
+	require.InDelta(.75, m.Read(now), delta)
 
 	// Second start
 	m.Inc(now, 1)
 
 	now = now.Add(34 * halflife)
-	require.InDelta(m.Read(now), 2, delta)
+	require.InDelta(2, m.Read(now), delta)
 
 	// Stop the second CPU
 	m.Dec(now, 1)
 
 	now = now.Add(34 * halflife)
-	require.InDelta(m.Read(now), 1, delta)
+	require.InDelta(1, m.Read(now), delta)
 }
 
 func TestTimeUntil(t *testing.T) {

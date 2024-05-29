@@ -14,7 +14,7 @@ wait_until_healthy () {
   # store the response code here
   response=0
   # while the endpoint doesn't return 200
-  while [ $response -ne 200 ]
+  while [ "$response" -ne 200 ]
   do
     echo "Checking if local node is healthy..."
     # Ignore error in case of ephemeral failure to hit node's API
@@ -22,12 +22,12 @@ wait_until_healthy () {
     echo "got status code $response from health endpoint"
     # check that 3 hours haven't passed
     now=$(date +%s)
-    if [ $now -ge $stop ];
-    then 
+    if [ "$now" -ge "$stop" ];
+    then
       # timeout: exit
       SUCCESS=1
       return
-    fi  
+    fi
     # no timeout yet, wait 30s until retry
     sleep 30
   done
@@ -44,20 +44,20 @@ echo "done existing database files"
 
 #download latest mainnet DB backup
 FILENAME="mainnet-db-daily-"
-DATE=`date +'%m-%d-%Y'`
+DATE=$(date +'%m-%d-%Y')
 DB_FILE="$FILENAME$DATE"
 echo "Copying database file $DB_FILE from S3 to local..."
-aws s3 cp s3://avalanche-db-daily/ /opt/ --no-progress --recursive --exclude "*" --include "$DB_FILE*" 
+aws s3 cp s3://avalanche-db-daily/ /opt/ --no-progress --recursive --exclude "*" --include "$DB_FILE*"
 echo "Done downloading database"
 
 # extract DB
 echo "Extracting database..."
-mkdir -p /var/lib/avalanchego/db 
-tar -zxf /opt/$DB_FILE*-tar.gz -C /var/lib/avalanchego/db 
+mkdir -p /var/lib/avalanchego/db
+tar -zxf /opt/"$DB_FILE"*-tar.gz -C /var/lib/avalanchego/db
 echo "Done extracting database"
 
 echo "Creating Docker network..."
-docker network create controlled-net 
+docker network create controlled-net
 
 echo "Starting Docker container..."
 containerID=$(docker run --name="net_outage_simulation" --memory="12g" --memory-reservation="11g" --cpus="6.0" --net=controlled-net -p 9650:9650 -p 9651:9651 -v /var/lib/avalanchego/db:/db -d avaplatform/avalanchego:latest /avalanchego/build/avalanchego --db-dir /db --http-host=0.0.0.0)
@@ -69,16 +69,16 @@ wait_until_healthy
 if [ $SUCCESS -eq 1 ];
 then
   echo "Timed out waiting for node to become healthy; exiting."
-  exit 1 
+  exit 1
 fi
 
-# To simulate internet outage, we will disable the docker network connection 
+# To simulate internet outage, we will disable the docker network connection
 echo "Disconnecting node from internet..."
-docker network disconnect controlled-net $containerID
+docker network disconnect controlled-net "$containerID"
 echo "Sleeping 60 minutes..."
-sleep 3600 
+sleep 3600
 echo "Reconnecting node to internet..."
-docker network connect controlled-net $containerID
+docker network connect controlled-net "$containerID"
 echo "Reconnected to internet. Waiting until healthy..."
 
 # now repeatedly check the node's health until it returns healthy
@@ -88,12 +88,12 @@ wait_until_healthy
 if [ $SUCCESS -eq 1 ];
 then
   echo "Timed out waiting for node to become healthy after outage; exiting."
-  exit 1 
+  exit 1
 fi
 
 # The node returned healthy, print how long it took
 end=$(date +%s)
 
-DELAY=$(($end - $start))
+DELAY=$((end - start))
 echo "Node became healthy again after complete outage after $DELAY seconds."
 echo "Test completed"

@@ -5,11 +5,8 @@ package tracedvm
 
 import (
 	"context"
-	"fmt"
 
 	"go.opentelemetry.io/otel/attribute"
-
-	oteltrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
@@ -18,6 +15,8 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/trace"
+
+	oteltrace "go.opentelemetry.io/otel/trace"
 )
 
 var (
@@ -71,28 +70,28 @@ func NewBlockVM(vm block.ChainVM, name string, tracer trace.Tracer) block.ChainV
 		buildBlockVM:                  buildBlockVM,
 		batchedVM:                     batchedVM,
 		ssVM:                          ssVM,
-		initializeTag:                 fmt.Sprintf("%s.initialize", name),
-		buildBlockTag:                 fmt.Sprintf("%s.buildBlock", name),
-		parseBlockTag:                 fmt.Sprintf("%s.parseBlock", name),
-		getBlockTag:                   fmt.Sprintf("%s.getBlock", name),
-		setPreferenceTag:              fmt.Sprintf("%s.setPreference", name),
-		lastAcceptedTag:               fmt.Sprintf("%s.lastAccepted", name),
-		verifyTag:                     fmt.Sprintf("%s.verify", name),
-		acceptTag:                     fmt.Sprintf("%s.accept", name),
-		rejectTag:                     fmt.Sprintf("%s.reject", name),
-		optionsTag:                    fmt.Sprintf("%s.options", name),
-		shouldVerifyWithContextTag:    fmt.Sprintf("%s.shouldVerifyWithContext", name),
-		verifyWithContextTag:          fmt.Sprintf("%s.verifyWithContext", name),
-		buildBlockWithContextTag:      fmt.Sprintf("%s.buildBlockWithContext", name),
-		getAncestorsTag:               fmt.Sprintf("%s.getAncestors", name),
-		batchedParseBlockTag:          fmt.Sprintf("%s.batchedParseBlock", name),
-		verifyHeightIndexTag:          fmt.Sprintf("%s.verifyHeightIndex", name),
-		getBlockIDAtHeightTag:         fmt.Sprintf("%s.getBlockIDAtHeight", name),
-		stateSyncEnabledTag:           fmt.Sprintf("%s.stateSyncEnabled", name),
-		getOngoingSyncStateSummaryTag: fmt.Sprintf("%s.getOngoingSyncStateSummary", name),
-		getLastStateSummaryTag:        fmt.Sprintf("%s.getLastStateSummary", name),
-		parseStateSummaryTag:          fmt.Sprintf("%s.parseStateSummary", name),
-		getStateSummaryTag:            fmt.Sprintf("%s.getStateSummary", name),
+		initializeTag:                 name + ".initialize",
+		buildBlockTag:                 name + ".buildBlock",
+		parseBlockTag:                 name + ".parseBlock",
+		getBlockTag:                   name + ".getBlock",
+		setPreferenceTag:              name + ".setPreference",
+		lastAcceptedTag:               name + ".lastAccepted",
+		verifyTag:                     name + ".verify",
+		acceptTag:                     name + ".accept",
+		rejectTag:                     name + ".reject",
+		optionsTag:                    name + ".options",
+		shouldVerifyWithContextTag:    name + ".shouldVerifyWithContext",
+		verifyWithContextTag:          name + ".verifyWithContext",
+		buildBlockWithContextTag:      name + ".buildBlockWithContext",
+		getAncestorsTag:               name + ".getAncestors",
+		batchedParseBlockTag:          name + ".batchedParseBlock",
+		verifyHeightIndexTag:          name + ".verifyHeightIndex",
+		getBlockIDAtHeightTag:         name + ".getBlockIDAtHeight",
+		stateSyncEnabledTag:           name + ".stateSyncEnabled",
+		getOngoingSyncStateSummaryTag: name + ".getOngoingSyncStateSummary",
+		getLastStateSummaryTag:        name + ".getLastStateSummary",
+		parseStateSummaryTag:          name + ".parseStateSummary",
+		getStateSummaryTag:            name + ".getStateSummary",
 		tracer:                        tracer,
 	}
 }

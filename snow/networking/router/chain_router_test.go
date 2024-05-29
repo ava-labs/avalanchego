@@ -10,9 +10,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/stretchr/testify/require"
-
 	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -419,7 +417,7 @@ func TestRouterTimeout(t *testing.T) {
 		return nil
 	}
 	bootstrapper.HaltF = func(context.Context) {}
-	bootstrapper.ShutdownF = func(ctx context.Context) error { return nil }
+	bootstrapper.ShutdownF = func(context.Context) error { return nil }
 
 	bootstrapper.GetStateSummaryFrontierFailedF = func(context.Context, ids.NodeID, uint32) error {
 		defer wg.Done()
@@ -1407,7 +1405,7 @@ func TestAppRequest(t *testing.T) {
 					return nil
 				}
 			} else if tt.inboundMsg.Op() == message.AppResponseOp {
-				engine.AppResponseF = func(ctx context.Context, nodeID ids.NodeID, requestID uint32, msg []byte) error {
+				engine.AppResponseF = func(_ context.Context, nodeID ids.NodeID, requestID uint32, msg []byte) error {
 					defer wg.Done()
 					require.Zero(chainRouter.timedRequests.Len())
 
@@ -1489,7 +1487,7 @@ func TestCrossChainAppRequest(t *testing.T) {
 					return nil
 				}
 			} else if tt.inboundMsg.Op() == message.CrossChainAppResponseOp {
-				engine.CrossChainAppResponseF = func(ctx context.Context, chainID ids.ID, requestID uint32, msg []byte) error {
+				engine.CrossChainAppResponseF = func(_ context.Context, chainID ids.ID, requestID uint32, msg []byte) error {
 					defer wg.Done()
 					require.Zero(chainRouter.timedRequests.Len())
 

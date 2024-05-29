@@ -35,7 +35,10 @@ func BuildUnsigned(
 	if err != nil {
 		return nil, err
 	}
-	return block, block.initialize(bytes)
+
+	// Invariant: The durango timestamp isn't used here because the certificate
+	// is empty.
+	return block, block.initialize(bytes, time.Time{})
 }
 
 func Build(
@@ -121,5 +124,7 @@ func BuildOption(
 	if err != nil {
 		return nil, err
 	}
-	return block, block.initialize(bytes)
+
+	// Invariant: The durango timestamp isn't used.
+	return block, block.initialize(bytes, time.Time{})
 }

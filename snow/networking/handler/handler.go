@@ -12,12 +12,9 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
-
 	"go.uber.org/zap"
-
 	"golang.org/x/sync/errgroup"
 
 	"github.com/ava-labs/avalanchego/api/health"
@@ -29,7 +26,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/subnets"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
@@ -241,7 +237,7 @@ func (h *handler) Start(ctx context.Context, recoverPanic bool) {
 		return
 	}
 
-	detachedCtx := utils.Detach(ctx)
+	detachedCtx := context.WithoutCancel(ctx)
 	dispatchSync := func() {
 		h.dispatchSync(detachedCtx)
 	}

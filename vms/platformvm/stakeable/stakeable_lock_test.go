@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-
 	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -36,7 +35,7 @@ func TestLockOutVerify(t *testing.T) {
 		{
 			name:     "invalid locktime",
 			locktime: 0,
-			transferableOutF: func(ctrl *gomock.Controller) avax.TransferableOut {
+			transferableOutF: func(*gomock.Controller) avax.TransferableOut {
 				return nil
 			},
 			expectedErr: errInvalidLocktime,
@@ -44,7 +43,7 @@ func TestLockOutVerify(t *testing.T) {
 		{
 			name:     "nested",
 			locktime: 1,
-			transferableOutF: func(ctrl *gomock.Controller) avax.TransferableOut {
+			transferableOutF: func(*gomock.Controller) avax.TransferableOut {
 				return &LockOut{}
 			},
 			expectedErr: errNestedStakeableLocks,
@@ -94,7 +93,7 @@ func TestLockInVerify(t *testing.T) {
 		{
 			name:     "invalid locktime",
 			locktime: 0,
-			transferableInF: func(ctrl *gomock.Controller) avax.TransferableIn {
+			transferableInF: func(*gomock.Controller) avax.TransferableIn {
 				return nil
 			},
 			expectedErr: errInvalidLocktime,
@@ -102,7 +101,7 @@ func TestLockInVerify(t *testing.T) {
 		{
 			name:     "nested",
 			locktime: 1,
-			transferableInF: func(ctrl *gomock.Controller) avax.TransferableIn {
+			transferableInF: func(*gomock.Controller) avax.TransferableIn {
 				return &LockIn{}
 			},
 			expectedErr: errNestedStakeableLocks,

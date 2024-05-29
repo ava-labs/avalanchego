@@ -21,7 +21,7 @@ type noOpTracer struct {
 }
 
 func (n noOpTracer) Start(ctx context.Context, spanName string, opts ...trace.SpanStartOption) (context.Context, trace.Span) {
-	return n.t.Start(ctx, spanName, opts...)
+	return n.t.Start(ctx, spanName, opts...) //nolint:spancheck
 }
 
 func (noOpTracer) Close() error {

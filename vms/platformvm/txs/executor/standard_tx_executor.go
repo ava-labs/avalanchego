@@ -54,14 +54,21 @@ func (e *StandardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 		return err
 	}
 
+	var (
+		currentTimestamp = e.State.GetTimestamp()
+		isDurangoActive  = e.Config.IsDurangoActivated(currentTimestamp)
+	)
+	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
+		return err
+	}
+
 	baseTxCreds, err := verifyPoASubnetAuthorization(e.Backend, e.State, e.Tx, tx.SubnetID, tx.SubnetAuth)
 	if err != nil {
 		return err
 	}
 
 	// Verify the flowcheck
-	timestamp := e.State.GetTimestamp()
-	createBlockchainTxFee := e.Config.GetCreateBlockchainTxFee(timestamp)
+	createBlockchainTxFee := e.Config.GetCreateBlockchainTxFee(currentTimestamp)
 	if err := e.FlowChecker.VerifySpend(
 		tx,
 		e.State,
@@ -98,9 +105,16 @@ func (e *StandardTxExecutor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 		return err
 	}
 
+	var (
+		currentTimestamp = e.State.GetTimestamp()
+		isDurangoActive  = e.Config.IsDurangoActivated(currentTimestamp)
+	)
+	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
+		return err
+	}
+
 	// Verify the flowcheck
-	timestamp := e.State.GetTimestamp()
-	createSubnetTxFee := e.Config.GetCreateSubnetTxFee(timestamp)
+	createSubnetTxFee := e.Config.GetCreateSubnetTxFee(currentTimestamp)
 	if err := e.FlowChecker.VerifySpend(
 		tx,
 		e.State,
@@ -128,6 +142,14 @@ func (e *StandardTxExecutor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 
 func (e *StandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 	if err := e.Tx.SyntacticVerify(e.Ctx); err != nil {
+		return err
+	}
+
+	var (
+		currentTimestamp = e.State.GetTimestamp()
+		isDurangoActive  = e.Config.IsDurangoActivated(currentTimestamp)
+	)
+	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
 		return err
 	}
 
@@ -206,6 +228,14 @@ func (e *StandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 
 func (e *StandardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 	if err := e.Tx.SyntacticVerify(e.Ctx); err != nil {
+		return err
+	}
+
+	var (
+		currentTimestamp = e.State.GetTimestamp()
+		isDurangoActive  = e.Config.IsDurangoActivated(currentTimestamp)
+	)
+	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
 		return err
 	}
 
@@ -386,6 +416,14 @@ func (e *StandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 		return err
 	}
 
+	var (
+		currentTimestamp = e.State.GetTimestamp()
+		isDurangoActive  = e.Config.IsDurangoActivated(currentTimestamp)
+	)
+	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
+		return err
+	}
+
 	// Note: math.MaxInt32 * time.Second < math.MaxInt64 - so this can never
 	// overflow.
 	if time.Duration(tx.MaxStakeDuration)*time.Second > e.Backend.Config.MaxStakeDuration {
@@ -509,6 +547,10 @@ func (e *StandardTxExecutor) BaseTx(tx *txs.BaseTx) error {
 
 	// Verify the tx is well-formed
 	if err := e.Tx.SyntacticVerify(e.Ctx); err != nil {
+		return err
+	}
+
+	if err := avax.VerifyMemoFieldLength(tx.Memo, true /*=isDurangoActive*/); err != nil {
 		return err
 	}
 

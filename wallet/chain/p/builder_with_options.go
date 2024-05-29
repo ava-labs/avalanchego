@@ -129,6 +129,18 @@ func (b *builderWithOptions) NewCreateSubnetTx(
 	)
 }
 
+func (b *builderWithOptions) NewTransferSubnetOwnershipTx(
+	subnetID ids.ID,
+	owner *secp256k1fx.OutputOwners,
+	options ...common.Option,
+) (*txs.TransferSubnetOwnershipTx, error) {
+	return b.Builder.NewTransferSubnetOwnershipTx(
+		subnetID,
+		owner,
+		common.UnionOptions(b.options, options)...,
+	)
+}
+
 func (b *builderWithOptions) NewImportTx(
 	sourceChainID ids.ID,
 	to *secp256k1fx.OutputOwners,

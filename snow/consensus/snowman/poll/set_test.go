@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -81,7 +80,7 @@ func TestCreateAndFinishPollOutOfOrder_NewerFinishesFirst(t *testing.T) {
 
 	vdrBag = bag.Of(vdrs...)
 	require.True(s.Add(2, vdrBag))
-	require.Equal(s.Len(), 2)
+	require.Equal(2, s.Len())
 
 	// vote out of order
 	require.Empty(s.Vote(1, vdr1, blkID1))
@@ -118,7 +117,7 @@ func TestCreateAndFinishPollOutOfOrder_OlderFinishesFirst(t *testing.T) {
 
 	vdrBag = bag.Of(vdrs...)
 	require.True(s.Add(2, vdrBag))
-	require.Equal(s.Len(), 2)
+	require.Equal(2, s.Len())
 
 	// vote out of order
 	require.Empty(s.Vote(1, vdr1, blkID1))
@@ -158,7 +157,7 @@ func TestCreateAndFinishPollOutOfOrder_UnfinishedPollsGaps(t *testing.T) {
 
 	vdrBag = bag.Of(vdrs...)
 	require.True(s.Add(3, vdrBag))
-	require.Equal(s.Len(), 3)
+	require.Equal(3, s.Len())
 
 	// vote out of order
 	// 2 finishes first to create a gap of finished poll between two unfinished polls 1 and 3

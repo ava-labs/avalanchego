@@ -8,11 +8,11 @@ import (
 
 	"go.opentelemetry.io/otel/attribute"
 
-	oteltrace "go.opentelemetry.io/otel/trace"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/bag"
+
+	oteltrace "go.opentelemetry.io/otel/trace"
 )
 
 var _ Consensus = (*tracedConsensus)(nil)

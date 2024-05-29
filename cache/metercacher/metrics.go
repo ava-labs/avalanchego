@@ -16,7 +16,7 @@ func newAveragerMetric(namespace, name string, reg prometheus.Registerer, errs *
 	return metric.NewAveragerWithErrs(
 		namespace,
 		name,
-		fmt.Sprintf("time (in ns) of a %s", name),
+		"time (in ns) of a "+name,
 		reg,
 		errs,
 	)

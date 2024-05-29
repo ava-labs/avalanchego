@@ -23,7 +23,7 @@ The minimum recommended hardware specification for nodes connected to Mainnet is
 
 If you plan to build AvalancheGo from source, you will also need the following software:
 
-- [Go](https://golang.org/doc/install) version >= 1.20.12
+- [Go](https://golang.org/doc/install) version >= 1.21.7
 - [gcc](https://gcc.gnu.org/)
 - g++
 
@@ -159,7 +159,7 @@ To regenerate the protobuf go code, run `scripts/protobuf_codegen.sh` from the r
 
 This should only be necessary when upgrading protobuf versions or modifying .proto definition files.
 
-To use this script, you must have [buf](https://docs.buf.build/installation) (v1.26.1), protoc-gen-go (v1.30.0) and protoc-gen-go-grpc (v1.3.0) installed.
+To use this script, you must have [buf](https://docs.buf.build/installation) (v1.29.0), protoc-gen-go (v1.30.0) and protoc-gen-go-grpc (v1.3.0) installed.
 
 To install the buf dependencies:
 

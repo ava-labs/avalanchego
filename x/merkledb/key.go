@@ -4,15 +4,14 @@
 package merkledb
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"unsafe"
 
 	"golang.org/x/exp/maps"
-	"golang.org/x/exp/slices"
-
-	"github.com/ava-labs/avalanchego/utils"
 )
 
 var (
@@ -175,10 +174,10 @@ func (k Key) Less(other Key) bool {
 }
 
 func (k Key) Compare(other Key) int {
-	if valueCmp := utils.Compare(k.value, other.value); valueCmp != 0 {
+	if valueCmp := cmp.Compare(k.value, other.value); valueCmp != 0 {
 		return valueCmp
 	}
-	return utils.Compare(k.length, other.length)
+	return cmp.Compare(k.length, other.length)
 }
 
 // Extend returns a new Key that is the in-order aggregation of Key [k] with [keys]

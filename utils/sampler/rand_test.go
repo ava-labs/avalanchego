@@ -10,9 +10,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-
 	"github.com/thepudds/fzgen/fuzzer"
-
 	"gonum.org/v1/gonum/mathext/prng"
 )
 

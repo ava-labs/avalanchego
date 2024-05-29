@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -29,7 +28,6 @@ func Test_newOutboundBuilder(t *testing.T) {
 
 	for _, compressionType := range []compression.Type{
 		compression.TypeNone,
-		compression.TypeGzip,
 		compression.TypeZstd,
 	} {
 		t.Run(compressionType.String(), func(t *testing.T) {

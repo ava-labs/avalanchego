@@ -9,7 +9,6 @@ import (
 	"net/http"
 
 	"github.com/gorilla/rpc/v2"
-
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -110,10 +109,6 @@ func (vm *VM) Shutdown(context.Context) error {
 
 func (*VM) Version(context.Context) (string, error) {
 	return Version.String(), nil
-}
-
-func (*VM) CreateStaticHandlers(context.Context) (map[string]http.Handler, error) {
-	return nil, nil
 }
 
 func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {

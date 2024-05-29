@@ -10,7 +10,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-
 	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -24,9 +23,8 @@ import (
 var errCustom = errors.New("custom")
 
 type testState struct {
-	client  *Client
-	server  *validators.MockState
-	closeFn func()
+	client *Client
+	server *validators.MockState
 }
 
 func setupState(t testing.TB, ctrl *gomock.Controller) *testState {
@@ -52,11 +50,13 @@ func setupState(t testing.TB, ctrl *gomock.Controller) *testState {
 	require.NoError(err)
 
 	state.client = NewClient(pb.NewValidatorStateClient(conn))
-	state.closeFn = func() {
+
+	t.Cleanup(func() {
 		serverCloser.Stop()
 		_ = conn.Close()
 		_ = listener.Close()
-	}
+	})
+
 	return state
 }
 
@@ -65,7 +65,6 @@ func TestGetMinimumHeight(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	state := setupState(t, ctrl)
-	defer state.closeFn()
 
 	// Happy path
 	expectedHeight := uint64(1337)
@@ -88,7 +87,6 @@ func TestGetCurrentHeight(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	state := setupState(t, ctrl)
-	defer state.closeFn()
 
 	// Happy path
 	expectedHeight := uint64(1337)
@@ -111,7 +109,6 @@ func TestGetSubnetID(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	state := setupState(t, ctrl)
-	defer state.closeFn()
 
 	// Happy path
 	chainID := ids.GenerateTestID()
@@ -135,7 +132,6 @@ func TestGetValidatorSet(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	state := setupState(t, ctrl)
-	defer state.closeFn()
 
 	// Happy path
 	sk0, err := bls.NewSecretKey()
@@ -209,9 +205,6 @@ func benchmarkGetValidatorSet(b *testing.B, vs map[ids.NodeID]*validators.GetVal
 	require := require.New(b)
 	ctrl := gomock.NewController(b)
 	state := setupState(b, ctrl)
-	defer func() {
-		state.closeFn()
-	}()
 
 	height := uint64(1337)
 	subnetID := ids.GenerateTestID()

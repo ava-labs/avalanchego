@@ -11,11 +11,8 @@ import (
 	"os"
 	"time"
 
-	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
-
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
-
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/ava-labs/avalanchego/api/keystore/gkeystore"
@@ -52,6 +49,7 @@ import (
 	validatorstatepb "github.com/ava-labs/avalanchego/proto/pb/validatorstate"
 	vmpb "github.com/ava-labs/avalanchego/proto/pb/vm"
 	warppb "github.com/ava-labs/avalanchego/proto/pb/warp"
+	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 )
 
 var (
@@ -317,32 +315,6 @@ func (vm *VMServer) CreateHandlers(ctx context.Context, _ *emptypb.Empty) (*vmpb
 		return nil, err
 	}
 	resp := &vmpb.CreateHandlersResponse{}
-	for prefix, handler := range handlers {
-		serverListener, err := grpcutils.NewListener()
-		if err != nil {
-			return nil, err
-		}
-		server := grpcutils.NewServer()
-		vm.serverCloser.Add(server)
-		httppb.RegisterHTTPServer(server, ghttp.NewServer(handler))
-
-		// Start HTTP service
-		go grpcutils.Serve(serverListener, server)
-
-		resp.Handlers = append(resp.Handlers, &vmpb.Handler{
-			Prefix:     prefix,
-			ServerAddr: serverListener.Addr().String(),
-		})
-	}
-	return resp, nil
-}
-
-func (vm *VMServer) CreateStaticHandlers(ctx context.Context, _ *emptypb.Empty) (*vmpb.CreateStaticHandlersResponse, error) {
-	handlers, err := vm.vm.CreateStaticHandlers(ctx)
-	if err != nil {
-		return nil, err
-	}
-	resp := &vmpb.CreateStaticHandlersResponse{}
 	for prefix, handler := range handlers {
 		serverListener, err := grpcutils.NewListener()
 		if err != nil {

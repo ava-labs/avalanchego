@@ -17,24 +17,6 @@ var (
 	ErrUnderflow = errors.New("underflow")
 )
 
-func Max[T constraints.Ordered](max T, nums ...T) T {
-	for _, num := range nums {
-		if num > max {
-			max = num
-		}
-	}
-	return max
-}
-
-func Min[T constraints.Ordered](min T, nums ...T) T {
-	for _, num := range nums {
-		if num < min {
-			min = num
-		}
-	}
-	return min
-}
-
 // Add64 returns:
 // 1) a + b
 // 2) If there is overflow, an error
@@ -74,5 +56,5 @@ func Mul64(a, b uint64) (uint64, error) {
 }
 
 func AbsDiff[T constraints.Unsigned](a, b T) T {
-	return Max(a, b) - Min(a, b)
+	return max(a, b) - min(a, b)
 }

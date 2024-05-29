@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
@@ -61,7 +62,7 @@ func newState(
 	metricsNamespace string,
 	metricsRegisterer prometheus.Registerer,
 ) (*state, error) {
-	jobsCacheMetricsNamespace := fmt.Sprintf("%s_jobs_cache", metricsNamespace)
+	jobsCacheMetricsNamespace := metric.AppendNamespace(metricsNamespace, "jobs_cache")
 	jobsCache, err := metercacher.New[ids.ID, Job](
 		jobsCacheMetricsNamespace,
 		metricsRegisterer,

@@ -21,11 +21,10 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
+var fundedSharedMemoryCalls byte
+
 func TestNewImportTx(t *testing.T) {
 	env := newEnvironment(t, false /*=postBanff*/, false /*=postCortina*/, false /*=postDurango*/)
-	defer func() {
-		require.NoError(t, shutdownEnvironment(env))
-	}()
 
 	type test struct {
 		description   string
@@ -39,56 +38,6 @@ func TestNewImportTx(t *testing.T) {
 	sourceKey, err := secp256k1.NewPrivateKey()
 	require.NoError(t, err)
 
-	cnt := new(byte)
-
-	// Returns a shared memory where GetDatabase returns a database
-	// where [recipientKey] has a balance of [amt]
-	fundedSharedMemory := func(peerChain ids.ID, assets map[ids.ID]uint64) atomic.SharedMemory {
-		*cnt++
-		m := atomic.NewMemory(prefixdb.New([]byte{*cnt}, env.baseDB))
-
-		sm := m.NewSharedMemory(env.ctx.ChainID)
-		peerSharedMemory := m.NewSharedMemory(peerChain)
-
-		for assetID, amt := range assets {
-			// #nosec G404
-			utxo := &avax.UTXO{
-				UTXOID: avax.UTXOID{
-					TxID:        ids.GenerateTestID(),
-					OutputIndex: rand.Uint32(),
-				},
-				Asset: avax.Asset{ID: assetID},
-				Out: &secp256k1fx.TransferOutput{
-					Amt: amt,
-					OutputOwners: secp256k1fx.OutputOwners{
-						Locktime:  0,
-						Addrs:     []ids.ShortID{sourceKey.PublicKey().Address()},
-						Threshold: 1,
-					},
-				},
-			}
-			utxoBytes, err := txs.Codec.Marshal(txs.CodecVersion, utxo)
-			require.NoError(t, err)
-
-			inputID := utxo.InputID()
-			require.NoError(t, peerSharedMemory.Apply(map[ids.ID]*atomic.Requests{
-				env.ctx.ChainID: {
-					PutRequests: []*atomic.Element{
-						{
-							Key:   inputID[:],
-							Value: utxoBytes,
-							Traits: [][]byte{
-								sourceKey.PublicKey().Address().Bytes(),
-							},
-						},
-					},
-				},
-			}))
-		}
-
-		return sm
-	}
-
 	customAssetID := ids.GenerateTestID()
 
 	tests := []test{
@@ -96,6 +45,9 @@ func TestNewImportTx(t *testing.T) {
 			description:   "can't pay fee",
 			sourceChainID: env.ctx.XChainID,
 			sharedMemory: fundedSharedMemory(
+				t,
+				env,
+				sourceKey,
 				env.ctx.XChainID,
 				map[ids.ID]uint64{
 					env.ctx.AVAXAssetID: env.config.TxFee - 1,
@@ -108,6 +60,9 @@ func TestNewImportTx(t *testing.T) {
 			description:   "can barely pay fee",
 			sourceChainID: env.ctx.XChainID,
 			sharedMemory: fundedSharedMemory(
+				t,
+				env,
+				sourceKey,
 				env.ctx.XChainID,
 				map[ids.ID]uint64{
 					env.ctx.AVAXAssetID: env.config.TxFee,
@@ -120,6 +75,9 @@ func TestNewImportTx(t *testing.T) {
 			description:   "attempting to import from C-chain",
 			sourceChainID: env.ctx.CChainID,
 			sharedMemory: fundedSharedMemory(
+				t,
+				env,
+				sourceKey,
 				env.ctx.CChainID,
 				map[ids.ID]uint64{
 					env.ctx.AVAXAssetID: env.config.TxFee,
@@ -133,6 +91,9 @@ func TestNewImportTx(t *testing.T) {
 			description:   "attempting to import non-avax from X-chain",
 			sourceChainID: env.ctx.XChainID,
 			sharedMemory: fundedSharedMemory(
+				t,
+				env,
+				sourceKey,
 				env.ctx.XChainID,
 				map[ids.ID]uint64{
 					env.ctx.AVAXAssetID: env.config.TxFee,
@@ -140,7 +101,7 @@ func TestNewImportTx(t *testing.T) {
 				},
 			),
 			sourceKeys:  []*secp256k1.PrivateKey{sourceKey},
-			timestamp:   env.config.BanffTime,
+			timestamp:   env.config.ApricotPhase5Time,
 			expectedErr: nil,
 		},
 	}
@@ -156,6 +117,7 @@ func TestNewImportTx(t *testing.T) {
 				to,
 				tt.sourceKeys,
 				ids.ShortEmpty,
+				nil,
 			)
 			require.ErrorIs(err, tt.expectedErr)
 			if tt.expectedErr != nil {
@@ -182,21 +144,71 @@ func TestNewImportTx(t *testing.T) {
 
 			require.Equal(env.config.TxFee, totalIn-totalOut)
 
-			fakedState, err := state.NewDiff(lastAcceptedID, env)
+			stateDiff, err := state.NewDiff(lastAcceptedID, env)
 			require.NoError(err)
 
-			fakedState.SetTimestamp(tt.timestamp)
+			stateDiff.SetTimestamp(tt.timestamp)
 
-			fakedParent := ids.GenerateTestID()
-			env.SetState(fakedParent, fakedState)
-
-			verifier := MempoolTxVerifier{
-				Backend:       &env.backend,
-				ParentID:      fakedParent,
-				StateVersions: env,
-				Tx:            tx,
+			verifier := StandardTxExecutor{
+				Backend: &env.backend,
+				State:   stateDiff,
+				Tx:      tx,
 			}
 			require.NoError(tx.Unsigned.Visit(&verifier))
 		})
 	}
+}
+
+// Returns a shared memory where GetDatabase returns a database
+// where [recipientKey] has a balance of [amt]
+func fundedSharedMemory(
+	t *testing.T,
+	env *environment,
+	sourceKey *secp256k1.PrivateKey,
+	peerChain ids.ID,
+	assets map[ids.ID]uint64,
+) atomic.SharedMemory {
+	fundedSharedMemoryCalls++
+	m := atomic.NewMemory(prefixdb.New([]byte{fundedSharedMemoryCalls}, env.baseDB))
+
+	sm := m.NewSharedMemory(env.ctx.ChainID)
+	peerSharedMemory := m.NewSharedMemory(peerChain)
+
+	for assetID, amt := range assets {
+		// #nosec G404
+		utxo := &avax.UTXO{
+			UTXOID: avax.UTXOID{
+				TxID:        ids.GenerateTestID(),
+				OutputIndex: rand.Uint32(),
+			},
+			Asset: avax.Asset{ID: assetID},
+			Out: &secp256k1fx.TransferOutput{
+				Amt: amt,
+				OutputOwners: secp256k1fx.OutputOwners{
+					Locktime:  0,
+					Addrs:     []ids.ShortID{sourceKey.PublicKey().Address()},
+					Threshold: 1,
+				},
+			},
+		}
+		utxoBytes, err := txs.Codec.Marshal(txs.CodecVersion, utxo)
+		require.NoError(t, err)
+
+		inputID := utxo.InputID()
+		require.NoError(t, peerSharedMemory.Apply(map[ids.ID]*atomic.Requests{
+			env.ctx.ChainID: {
+				PutRequests: []*atomic.Element{
+					{
+						Key:   inputID[:],
+						Value: utxoBytes,
+						Traits: [][]byte{
+							sourceKey.PublicKey().Address().Bytes(),
+						},
+					},
+				},
+			},
+		}))
+	}
+
+	return sm
 }

@@ -5,7 +5,6 @@ package state
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -15,8 +14,10 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
 
@@ -68,7 +69,7 @@ func NewBlockState(db database.Database) BlockState {
 
 func NewMeteredBlockState(db database.Database, namespace string, metrics prometheus.Registerer) (BlockState, error) {
 	blkCache, err := metercacher.New[ids.ID, *blockWrapper](
-		fmt.Sprintf("%s_block_cache", namespace),
+		metric.AppendNamespace(namespace, "block_cache"),
 		metrics,
 		cache.NewSizedLRU[ids.ID, *blockWrapper](
 			blockCacheSize,
@@ -109,7 +110,11 @@ func (s *blockState) GetBlock(blkID ids.ID) (block.Block, choices.Status, error)
 	}
 
 	// The key was in the database
-	blk, err := block.Parse(blkWrapper.Block)
+	//
+	// Invariant: Blocks stored on disk were previously accepted by this node.
+	// Because the durango activation relaxes TLS cert parsing rules, we assume
+	// it is always activated here.
+	blk, err := block.Parse(blkWrapper.Block, version.DefaultUpgradeTime)
 	if err != nil {
 		return nil, choices.Unknown, err
 	}

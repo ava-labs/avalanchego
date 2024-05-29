@@ -49,7 +49,7 @@ func newBlockMetric(
 ) prometheus.Counter {
 	blockMetric := prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: namespace,
-		Name:      fmt.Sprintf("%s_blks_accepted", blockName),
+		Name:      blockName + "_blks_accepted",
 		Help:      fmt.Sprintf("Number of %s blocks accepted", blockName),
 	})
 	errs.Add(registerer.Register(blockMetric))

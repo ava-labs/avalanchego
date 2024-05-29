@@ -15,19 +15,17 @@ import (
 // Check that funded test keys can be served from an http server to
 // ensure at-most-once allocation when tests are executed in parallel.
 func TestAllocatePreFundedKeys(t *testing.T) {
-	require := require.New(t)
-
 	keys := make([]*secp256k1.PrivateKey, 5)
 	for i := range keys {
 		key, err := secp256k1.NewPrivateKey()
-		require.NoError(err)
+		require.NoError(t, err)
 		keys[i] = key
 	}
 
 	uri, err := ServeTestData(TestData{
 		PreFundedKeys: keys,
 	})
-	require.NoError(err)
+	require.NoError(t, err)
 
 	testCases := []struct {
 		name              string
@@ -63,6 +61,8 @@ func TestAllocatePreFundedKeys(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			require := require.New(t)
+
 			keys, err := AllocatePreFundedKeys(uri, tc.count)
 			require.ErrorIs(err, tc.expectedError)
 

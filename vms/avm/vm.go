@@ -12,9 +12,7 @@ import (
 	"sync"
 
 	"github.com/gorilla/rpc/v2"
-
 	"github.com/prometheus/client_golang/prometheus"
-
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/cache"
@@ -360,17 +358,6 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 		"/wallet": walletServer,
 		"/events": vm.pubsub,
 	}, err
-}
-
-func (*VM) CreateStaticHandlers(context.Context) (map[string]http.Handler, error) {
-	server := rpc.NewServer()
-	codec := json.NewCodec()
-	server.RegisterCodec(codec, "application/json")
-	server.RegisterCodec(codec, "application/json;charset=UTF-8")
-	staticService := CreateStaticService()
-	return map[string]http.Handler{
-		"": server,
-	}, server.RegisterService(staticService, "avm")
 }
 
 /*

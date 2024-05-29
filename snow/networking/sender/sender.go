@@ -8,7 +8,6 @@ import (
 	"fmt"
 
 	"github.com/prometheus/client_golang/prometheus"
-
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -19,7 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
 	"github.com/ava-labs/avalanchego/subnets"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -94,7 +92,7 @@ func New(
 }
 
 func (s *sender) SendGetStateSummaryFrontier(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32) {
-	ctx = utils.Detach(ctx)
+	ctx = context.WithoutCancel(ctx)
 
 	// Note that this timeout duration won't exactly match the one that gets
 	// registered. That's OK.
@@ -175,7 +173,7 @@ func (s *sender) SendGetStateSummaryFrontier(ctx context.Context, nodeIDs set.Se
 }
 
 func (s *sender) SendStateSummaryFrontier(ctx context.Context, nodeID ids.NodeID, requestID uint32, summary []byte) {
-	ctx = utils.Detach(ctx)
+	ctx = context.WithoutCancel(ctx)
 
 	// Sending this message to myself.
 	if nodeID == s.ctx.NodeID {
@@ -235,7 +233,7 @@ func (s *sender) SendStateSummaryFrontier(ctx context.Context, nodeID ids.NodeID
 }
 
 func (s *sender) SendGetAcceptedStateSummary(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, heights []uint64) {
-	ctx = utils.Detach(ctx)
+	ctx = context.WithoutCancel(ctx)
 
 	// Note that this timeout duration won't exactly match the one that gets
 	// registered. That's OK.
@@ -319,7 +317,7 @@ func (s *sender) SendGetAcceptedStateSummary(ctx context.Context, nodeIDs set.Se
 }
 
 func (s *sender) SendAcceptedStateSummary(ctx context.Context, nodeID ids.NodeID, requestID uint32, summaryIDs []ids.ID) {
-	ctx = utils.Detach(ctx)
+	ctx = context.WithoutCancel(ctx)
 
 	if nodeID == s.ctx.NodeID {
 		inMsg := message.InboundAcceptedStateSummary(
@@ -369,7 +367,7 @@ func (s *sender) SendAcceptedStateSummary(ctx context.Context, nodeID ids.NodeID
 }
 
 func (s *sender) SendGetAcceptedFrontier(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32) {
-	ctx = utils.Detach(ctx)
+	ctx = context.WithoutCancel(ctx)
 
 	// Note that this timeout duration won't exactly match the one that gets
 	// registered. That's OK.
@@ -453,7 +451,7 @@ func (s *sender) SendGetAcceptedFrontier(ctx context.Context, nodeIDs set.Set[id
 }
 
 func (s *sender) SendAcceptedFrontier(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID) {
-	ctx = utils.Detach(ctx)
+	ctx = context.WithoutCancel(ctx)
 
 	// Sending this message to myself.
 	if nodeID == s.ctx.NodeID {
@@ -504,7 +502,7 @@ func (s *sender) SendAcceptedFrontier(ctx context.Context, nodeID ids.NodeID, re
 }
 
 func (s *sender) SendGetAccepted(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, containerIDs []ids.ID) {
-	ctx = utils.Detach(ctx)
+	ctx = context.WithoutCancel(ctx)
 
 	// Note that this timeout duration won't exactly match the one that gets
 	// registered. That's OK.
@@ -591,7 +589,7 @@ func (s *sender) SendGetAccepted(ctx context.Context, nodeIDs set.Set[ids.NodeID
 }
 
 func (s *sender) SendAccepted(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) {
-	ctx = utils.Detach(ctx)
+	ctx = context.WithoutCancel(ctx)
 
 	if nodeID == s.ctx.NodeID {
 		inMsg := message.InboundAccepted(
@@ -637,7 +635,7 @@ func (s *sender) SendAccepted(ctx context.Context, nodeID ids.NodeID, requestID 
 }
 
 func (s *sender) SendGetAncestors(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID) {
-	ctx = utils.Detach(ctx)
+	ctx = context.WithoutCancel(ctx)
 
 	// Tell the router to expect a response message or a message notifying
 	// that we won't get a response from this node.
@@ -753,7 +751,7 @@ func (s *sender) SendAncestors(_ context.Context, nodeID ids.NodeID, requestID u
 }
 
 func (s *sender) SendGet(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID) {
-	ctx = utils.Detach(ctx)
+	ctx = context.WithoutCancel(ctx)
 
 	// Tell the router to expect a response message or a message notifying
 	// that we won't get a response from this node.
@@ -885,7 +883,7 @@ func (s *sender) SendPushQuery(
 	container []byte,
 	requestedHeight uint64,
 ) {
-	ctx = utils.Detach(ctx)
+	ctx = context.WithoutCancel(ctx)
 
 	// Tell the router to expect a response message or a message notifying
 	// that we won't get a response from each of these nodes.
@@ -1024,7 +1022,7 @@ func (s *sender) SendPullQuery(
 	containerID ids.ID,
 	requestedHeight uint64,
 ) {
-	ctx = utils.Detach(ctx)
+	ctx = context.WithoutCancel(ctx)
 
 	// Tell the router to expect a response message or a message notifying
 	// that we won't get a response from each of these nodes.
@@ -1153,7 +1151,7 @@ func (s *sender) SendChits(
 	preferredIDAtHeight ids.ID,
 	acceptedID ids.ID,
 ) {
-	ctx = utils.Detach(ctx)
+	ctx = context.WithoutCancel(ctx)
 
 	// If [nodeID] is myself, send this message directly
 	// to my own router rather than sending it over the network
@@ -1207,7 +1205,7 @@ func (s *sender) SendChits(
 }
 
 func (s *sender) SendCrossChainAppRequest(ctx context.Context, chainID ids.ID, requestID uint32, appRequestBytes []byte) error {
-	ctx = utils.Detach(ctx)
+	ctx = context.WithoutCancel(ctx)
 
 	// The failed message is treated as if it was sent by the requested chain
 	failedMsg := message.InternalCrossChainAppError(
@@ -1242,7 +1240,7 @@ func (s *sender) SendCrossChainAppRequest(ctx context.Context, chainID ids.ID, r
 }
 
 func (s *sender) SendCrossChainAppResponse(ctx context.Context, chainID ids.ID, requestID uint32, appResponseBytes []byte) error {
-	ctx = utils.Detach(ctx)
+	ctx = context.WithoutCancel(ctx)
 
 	inMsg := message.InternalCrossChainAppResponse(
 		s.ctx.NodeID,
@@ -1256,7 +1254,7 @@ func (s *sender) SendCrossChainAppResponse(ctx context.Context, chainID ids.ID, 
 }
 
 func (s *sender) SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, appRequestBytes []byte) error {
-	ctx = utils.Detach(ctx)
+	ctx = context.WithoutCancel(ctx)
 
 	// Tell the router to expect a response message or a message notifying
 	// that we won't get a response from each of these nodes.
@@ -1386,7 +1384,7 @@ func (s *sender) SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.NodeID]
 }
 
 func (s *sender) SendAppResponse(ctx context.Context, nodeID ids.NodeID, requestID uint32, appResponseBytes []byte) error {
-	ctx = utils.Detach(ctx)
+	ctx = context.WithoutCancel(ctx)
 
 	if nodeID == s.ctx.NodeID {
 		inMsg := message.InboundAppResponse(

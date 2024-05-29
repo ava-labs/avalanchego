@@ -9,7 +9,6 @@ import (
 	"os"
 
 	"github.com/spf13/pflag"
-
 	"golang.org/x/term"
 
 	"github.com/ava-labs/avalanchego/app"

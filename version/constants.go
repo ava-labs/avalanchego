@@ -15,9 +15,10 @@ import (
 
 const (
 	Client = "avalanchego"
-	// RPCChainVMProtocol should be bumped anytime changes are made which require
-	// the plugin vm to upgrade to latest avalanchego release to be compatible.
-	RPCChainVMProtocol uint = 30
+	// RPCChainVMProtocol should be bumped anytime changes are made which
+	// require the plugin vm to upgrade to latest avalanchego release to be
+	// compatible.
+	RPCChainVMProtocol uint = 31
 )
 
 // These are globals that describe network upgrades and node versions
@@ -25,7 +26,7 @@ var (
 	Current = &Semantic{
 		Major: 1,
 		Minor: 10,
-		Patch: 17,
+		Patch: 19,
 	}
 	CurrentApp = &Application{
 		Name:  Client,
@@ -69,6 +70,16 @@ var (
 
 	DefaultUpgradeTime = time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC)
 
+	ApricotPhase1Times = map[uint32]time.Time{
+		constants.MainnetID: time.Date(2021, time.March, 31, 14, 0, 0, 0, time.UTC),
+		constants.FujiID:    time.Date(2021, time.March, 26, 14, 0, 0, 0, time.UTC),
+	}
+
+	ApricotPhase2Times = map[uint32]time.Time{
+		constants.MainnetID: time.Date(2021, time.May, 10, 11, 0, 0, 0, time.UTC),
+		constants.FujiID:    time.Date(2021, time.May, 5, 14, 0, 0, 0, time.UTC),
+	}
+
 	ApricotPhase3Times = map[uint32]time.Time{
 		constants.MainnetID: time.Date(2021, time.August, 24, 14, 0, 0, 0, time.UTC),
 		constants.FujiID:    time.Date(2021, time.August, 16, 19, 0, 0, 0, time.UTC),
@@ -88,9 +99,19 @@ var (
 		constants.FujiID:    time.Date(2021, time.November, 24, 15, 0, 0, 0, time.UTC),
 	}
 
+	ApricotPhasePre6Times = map[uint32]time.Time{
+		constants.MainnetID: time.Date(2022, time.September, 5, 1, 30, 0, 0, time.UTC),
+		constants.FujiID:    time.Date(2022, time.September, 6, 20, 0, 0, 0, time.UTC),
+	}
+
 	ApricotPhase6Times = map[uint32]time.Time{
 		constants.MainnetID: time.Date(2022, time.September, 6, 20, 0, 0, 0, time.UTC),
 		constants.FujiID:    time.Date(2022, time.September, 6, 20, 0, 0, 0, time.UTC),
+	}
+
+	ApricotPhasePost6Times = map[uint32]time.Time{
+		constants.MainnetID: time.Date(2022, time.September, 7, 3, 0, 0, 0, time.UTC),
+		constants.FujiID:    time.Date(2022, time.September, 7, 6, 0, 0, 0, time.UTC),
 	}
 
 	BanffTimes = map[uint32]time.Time{
@@ -102,7 +123,18 @@ var (
 		constants.MainnetID: time.Date(2023, time.April, 25, 15, 0, 0, 0, time.UTC),
 		constants.FujiID:    time.Date(2023, time.April, 6, 15, 0, 0, 0, time.UTC),
 	}
-	CortinaXChainStopVertexID map[uint32]ids.ID
+	CortinaXChainStopVertexID = map[uint32]ids.ID{
+		// The mainnet stop vertex is well known. It can be verified on any
+		// fully synced node by looking at the parentID of the genesis block.
+		//
+		// Ref: https://subnets.avax.network/x-chain/block/0
+		constants.MainnetID: ids.FromStringOrPanic("jrGWDh5Po9FMj54depyunNixpia5PN4aAYxfmNzU8n752Rjga"),
+		// The fuji stop vertex is well known. It can be verified on any fully
+		// synced node by looking at the parentID of the genesis block.
+		//
+		// Ref: https://subnets-test.avax.network/x-chain/block/0
+		constants.FujiID: ids.FromStringOrPanic("2D1cmbiG36BqQMRyHt4kFhWarmatA1ighSpND3FeFgz3vFVtCZ"),
+	}
 
 	// TODO: update this before release
 	DurangoTimes = map[uint32]time.Time{
@@ -130,29 +162,20 @@ func init() {
 		}
 		RPCChainVMProtocolCompatibility[rpcChainVMProtocol] = versions
 	}
+}
 
-	// The mainnet stop vertex is well known. It can be verified on any fully
-	// synced node by looking at the parentID of the genesis block.
-	//
-	// Ref: https://subnets.avax.network/x-chain/block/0
-	mainnetXChainStopVertexID, err := ids.FromString("jrGWDh5Po9FMj54depyunNixpia5PN4aAYxfmNzU8n752Rjga")
-	if err != nil {
-		panic(err)
+func GetApricotPhase1Time(networkID uint32) time.Time {
+	if upgradeTime, exists := ApricotPhase1Times[networkID]; exists {
+		return upgradeTime
 	}
+	return DefaultUpgradeTime
+}
 
-	// The fuji stop vertex is well known. It can be verified on any fully
-	// synced node by looking at the parentID of the genesis block.
-	//
-	// Ref: https://subnets-test.avax.network/x-chain/block/0
-	fujiXChainStopVertexID, err := ids.FromString("2D1cmbiG36BqQMRyHt4kFhWarmatA1ighSpND3FeFgz3vFVtCZ")
-	if err != nil {
-		panic(err)
+func GetApricotPhase2Time(networkID uint32) time.Time {
+	if upgradeTime, exists := ApricotPhase2Times[networkID]; exists {
+		return upgradeTime
 	}
-
-	CortinaXChainStopVertexID = map[uint32]ids.ID{
-		constants.MainnetID: mainnetXChainStopVertexID,
-		constants.FujiID:    fujiXChainStopVertexID,
-	}
+	return DefaultUpgradeTime
 }
 
 func GetApricotPhase3Time(networkID uint32) time.Time {
@@ -176,8 +199,22 @@ func GetApricotPhase5Time(networkID uint32) time.Time {
 	return DefaultUpgradeTime
 }
 
+func GetApricotPhasePre6Time(networkID uint32) time.Time {
+	if upgradeTime, exists := ApricotPhasePre6Times[networkID]; exists {
+		return upgradeTime
+	}
+	return DefaultUpgradeTime
+}
+
 func GetApricotPhase6Time(networkID uint32) time.Time {
 	if upgradeTime, exists := ApricotPhase6Times[networkID]; exists {
+		return upgradeTime
+	}
+	return DefaultUpgradeTime
+}
+
+func GetApricotPhasePost6Time(networkID uint32) time.Time {
+	if upgradeTime, exists := ApricotPhasePost6Times[networkID]; exists {
 		return upgradeTime
 	}
 	return DefaultUpgradeTime

@@ -5,12 +5,11 @@ package database
 
 import (
 	"math/rand"
+	"slices"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
-
-	"golang.org/x/exp/slices"
 
 	"github.com/ava-labs/avalanchego/utils"
 )

@@ -9,9 +9,8 @@ import (
 	"fmt"
 	"math"
 	"reflect"
+	"slices"
 	"time"
-
-	"golang.org/x/exp/slices"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/utils/set"

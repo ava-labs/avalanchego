@@ -12,7 +12,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/math"
 )
 
 type Config struct {
@@ -67,7 +66,7 @@ func NewConfig(
 		if err != nil {
 			return Config{}, fmt.Errorf("failed to calculate total weight of state sync beacons for subnet %s: %w", ctx.SubnetID, err)
 		}
-		sampleK = int(math.Min(uint64(sampleK), stateSyncingWeight))
+		sampleK = int(min(uint64(sampleK), stateSyncingWeight))
 		alpha = stateSyncingWeight/2 + 1 // must be > 50%
 	}
 	return Config{

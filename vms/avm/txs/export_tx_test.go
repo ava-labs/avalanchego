@@ -118,7 +118,7 @@ func TestExportTxSerialization(t *testing.T) {
 	require.NoError(err)
 
 	require.NoError(tx.Initialize(parser.Codec()))
-	require.Equal(tx.ID().String(), "2PKJE4TrKYpgynBFCpNPpV3GHK7d9QTgrL5mpYG6abHKDvNBG3")
+	require.Equal("2PKJE4TrKYpgynBFCpNPpV3GHK7d9QTgrL5mpYG6abHKDvNBG3", tx.ID().String())
 
 	result := tx.Bytes()
 	require.Equal(expected, result)
@@ -179,7 +179,7 @@ func TestExportTxSerialization(t *testing.T) {
 			{keys[0], keys[0]},
 		},
 	))
-	require.Equal(tx.ID().String(), "2oG52e7Cb7XF1yUzv3pRFndAypgbpswWRcSAKD5SH5VgaiTm5D")
+	require.Equal("2oG52e7Cb7XF1yUzv3pRFndAypgbpswWRcSAKD5SH5VgaiTm5D", tx.ID().String())
 
 	// there are two credentials
 	expected[len(expected)-1] = 0x02

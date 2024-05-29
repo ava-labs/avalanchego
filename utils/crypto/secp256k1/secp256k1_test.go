@@ -8,12 +8,12 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	secp256k1 "github.com/decred/dcrd/dcrec/secp256k1/v4"
-
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/cb58"
 	"github.com/ava-labs/avalanchego/utils/hashing"
+
+	secp256k1 "github.com/decred/dcrd/dcrec/secp256k1/v4"
 )
 
 func TestRecover(t *testing.T) {

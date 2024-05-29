@@ -34,6 +34,7 @@ the following non-test files:
 | node.go           | Node        | Orchestrates and configures nodes              |
 | node_config.go    | Node        | Reads and writes node configuration            |
 | node_process.go   | NodeProcess | Orchestrates node processes                    |
+| subnet.go         | Subnet      | Orchestrates subnets                           |
 | utils.go          |             | Defines shared utility functions               |
 
 ## Usage
@@ -74,15 +75,32 @@ network.
 A temporary network can be managed in code:
 
 ```golang
-network, _ := tmpnet.NewDefaultNetwork(
-    ginkgo.GinkgoWriter,                  // Writer to report progress of initialization
-    "/path/to/avalanchego",               // The path to the binary that nodes will execute
-    5,                                    // Number of initial validating nodes
-)
-_ = network.Create("")                    // Finalize network configuration and write to disk
-_ = network.Start(                        // Start the nodes of the network and wait until they report healthy
+network := &tmpnet.Network{                   // Configure non-default values for the new network
+    DefaultFlags: tmpnet.FlagsMap{
+        config.LogLevelKey: "INFO",           // Change one of the network's defaults
+    },
+    Subnets: []*tmpnet.Subnet{                // Subnets to create on the new network once it is running
+        {
+            Name: "xsvm-a",                   // User-defined name used to reference subnet in code and on disk
+            Chains: []*tmpnet.Chain{
+                {
+                    VMName: "xsvm",           // Name of the VM the chain will run, will be used to derive the name of the VM binary
+                    Genesis: <genesis bytes>, // Genesis bytes used to initialize the custom chain
+                    PreFundedKey: <key>,      // (Optional) A private key that is funded in the genesis bytes
+                },
+            },
+        },
+    },
+}
+
+_ := tmpnet.StartNewNetwork(              // Start the network
     ctx,                                  // Context used to limit duration of waiting for network health
-    ginkgo.GinkgoWriter,                  // Writer to report progress of network start
+    ginkgo.GinkgoWriter,                  // Writer to report progress of initialization
+    network,
+    "",                                   // Empty string uses the default network path (~/tmpnet/networks)
+    "/path/to/avalanchego",               // The path to the binary that nodes will execute
+    "/path/to/plugins",                   // The path nodes will use for plugin binaries (suggested value ~/.avalanchego/plugins)
+    5,                                    // Number of initial validating nodes
 )
 
 uris := network.GetNodeURIs()
@@ -125,11 +143,16 @@ HOME
             │   │   └── ...
             │   └── process.json                         // Node process details (PID, API URI, staking address)
             ├── chains
-            │   └── C
-            │       └── config.json                      // C-Chain config for all nodes
+            │   ├── C
+            │   │   └── config.json                      // C-Chain config for all nodes
+            │   └── raZ51bwfepaSaZ1MNSRNYNs3ZPfj...U7pa3
+            │       └── config.json                      // Custom chain configuration for all nodes
             ├── config.json                              // Common configuration (including defaults and pre-funded keys)
             ├── genesis.json                             // Genesis for all nodes
-            └── network.env                              // Sets network dir env var to simplify network usage
+            ├── network.env                              // Sets network dir env var to simplify network usage
+            └── subnets                                  // Parent directory for subnet definitions
+                ├─ subnet-a.json                         // Configuration for subnet-a and its chain(s)
+                └─ subnet-b.json                         // Configuration for subnet-b and its chain(s)
 ```
 
 ### Common networking configuration
@@ -148,17 +171,19 @@ content will be generated with reasonable defaults if not
 supplied. Each node in the network can override the default by setting
 an explicit value for `--genesis-file` or `--genesis-file-content`.
 
-### C-Chain config
+### Chain configuration
 
-The C-Chain config for a temporary network is stored at
-`[network-dir]/chains/C/config.json` and referenced by default by all
-nodes in the network. The C-Chain config will be generated with
-reasonable defaults if not supplied. Each node in the network can
-override the default by setting an explicit value for
-`--chain-config-dir` and ensuring the C-Chain config file exists at
-`[chain-config-dir]/C/config.json`.
+The chain configuration for a temporary network is stored at
+`[network-dir]/chains/[chain alias or ID]/config.json` and referenced
+by all nodes in the network. The C-Chain config will be generated with
+reasonable defaults if not supplied. X-Chain and P-Chain will use
+implicit defaults. The configuration for custom chains can be provided
+with subnet configuration and will be writen to the appropriate path.
 
-TODO(marun) Enable configuration of X-Chain and P-Chain.
+Each node in the network can override network-level chain
+configuration by setting `--chain-config-dir` to an explicit value and
+ensuring that configuration files for all chains exist at
+`[custom-chain-config-dir]/[chain alias or ID]/config.json`.
 
 ### Network env
 

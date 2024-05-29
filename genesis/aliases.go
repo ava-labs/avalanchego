@@ -15,6 +15,20 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
+var (
+	PChainAliases = []string{"P", "platform"}
+	XChainAliases = []string{"X", "avm"}
+	CChainAliases = []string{"C", "evm"}
+	VMAliases     = map[ids.ID][]string{
+		constants.PlatformVMID: {"platform"},
+		constants.AVMID:        {"avm"},
+		constants.EVMID:        {"evm"},
+		secp256k1fx.ID:         {"secp256k1fx"},
+		nftfx.ID:               {"nftfx"},
+		propertyfx.ID:          {"propertyfx"},
+	}
+)
+
 // Aliases returns the default aliases based on the network ID
 func Aliases(genesisBytes []byte) (map[string][]string, map[ids.ID][]string, error) {
 	apiAliases := map[string][]string{
@@ -26,7 +40,7 @@ func Aliases(genesisBytes []byte) (map[string][]string, map[ids.ID][]string, err
 		},
 	}
 	chainAliases := map[ids.ID][]string{
-		constants.PlatformChainID: {"P", "platform"},
+		constants.PlatformChainID: PChainAliases,
 	}
 
 	genesis, err := genesis.Parse(genesisBytes) // TODO let's not re-create genesis to do aliasing
@@ -45,7 +59,7 @@ func Aliases(genesisBytes []byte) (map[string][]string, map[ids.ID][]string, err
 				path.Join(constants.ChainAliasPrefix, "X"),
 				path.Join(constants.ChainAliasPrefix, "avm"),
 			}
-			chainAliases[chainID] = GetXChainAliases()
+			chainAliases[chainID] = XChainAliases
 		case constants.EVMID:
 			apiAliases[endpoint] = []string{
 				"C",
@@ -53,27 +67,8 @@ func Aliases(genesisBytes []byte) (map[string][]string, map[ids.ID][]string, err
 				path.Join(constants.ChainAliasPrefix, "C"),
 				path.Join(constants.ChainAliasPrefix, "evm"),
 			}
-			chainAliases[chainID] = GetCChainAliases()
+			chainAliases[chainID] = CChainAliases
 		}
 	}
 	return apiAliases, chainAliases, nil
-}
-
-func GetCChainAliases() []string {
-	return []string{"C", "evm"}
-}
-
-func GetXChainAliases() []string {
-	return []string{"X", "avm"}
-}
-
-func GetVMAliases() map[ids.ID][]string {
-	return map[ids.ID][]string{
-		constants.PlatformVMID: {"platform"},
-		constants.AVMID:        {"avm"},
-		constants.EVMID:        {"evm"},
-		secp256k1fx.ID:         {"secp256k1fx"},
-		nftfx.ID:               {"nftfx"},
-		propertyfx.ID:          {"propertyfx"},
-	}
 }

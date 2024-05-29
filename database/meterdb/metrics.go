@@ -15,7 +15,7 @@ import (
 func newSizeMetric(namespace, name string, reg prometheus.Registerer, errs *wrappers.Errs) metric.Averager {
 	return metric.NewAveragerWithErrs(
 		namespace,
-		fmt.Sprintf("%s_size", name),
+		name+"_size",
 		fmt.Sprintf("bytes passed in a %s call", name),
 		reg,
 		errs,
@@ -26,7 +26,7 @@ func newTimeMetric(namespace, name string, reg prometheus.Registerer, errs *wrap
 	return metric.NewAveragerWithErrs(
 		namespace,
 		name,
-		fmt.Sprintf("time (in ns) of a %s", name),
+		"time (in ns) of a "+name,
 		reg,
 		errs,
 	)

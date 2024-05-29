@@ -77,5 +77,5 @@ func TestProposerVMInitializeShouldFailIfInnerVMCantVerifyItsHeightIndex(t *test
 		nil,
 		nil,
 	)
-	require.ErrorIs(customError, err)
+	require.ErrorIs(err, customError)
 }

@@ -5,9 +5,8 @@ package utils
 
 import (
 	"bytes"
-
-	"golang.org/x/exp/constraints"
-	"golang.org/x/exp/slices"
+	"cmp"
+	"slices"
 
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
@@ -53,7 +52,7 @@ func IsSortedAndUnique[T Sortable[T]](s []T) bool {
 }
 
 // Returns true iff the elements in [s] are unique and sorted.
-func IsSortedAndUniqueOrdered[T constraints.Ordered](s []T) bool {
+func IsSortedAndUniqueOrdered[T cmp.Ordered](s []T) bool {
 	for i := 0; i < len(s)-1; i++ {
 		if s[i] >= s[i+1] {
 			return false
@@ -77,22 +76,4 @@ func IsSortedAndUniqueByHash[T ~[]byte](s []T) bool {
 		}
 	}
 	return true
-}
-
-// Compare returns
-//
-//	-1 if x is less than y,
-//	 0 if x equals y,
-//	 1 if x is greater than y.
-//
-// TODO: Remove after updating to go1.21.
-func Compare[T constraints.Ordered](x, y T) int {
-	switch {
-	case x < y:
-		return -1
-	case x > y:
-		return 1
-	default:
-		return 0
-	}
 }
