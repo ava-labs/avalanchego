@@ -1898,9 +1898,8 @@ func newAvaxBaseTxWithOutputs(t *testing.T, env *environment) *txs.Tx {
 		memo      = []byte{1, 2, 3, 4, 5, 6, 7, 8}
 		key       = keys[0]
 		changeKey = keys[1]
-		kc        = secp256k1fx.NewKeychain()
+		kc        = secp256k1fx.NewKeychain(key)
 	)
-	kc.Add(key)
 
 	tx, err := env.txBuilder.BaseTx(
 		[]*avax.TransferableOutput{{
@@ -1924,9 +1923,8 @@ func newAvaxBaseTxWithOutputs(t *testing.T, env *environment) *txs.Tx {
 func newAvaxCreateAssetTxWithOutputs(t *testing.T, env *environment, initialStates map[uint32][]verify.State) *txs.Tx {
 	var (
 		key = keys[0]
-		kc  = secp256k1fx.NewKeychain()
+		kc  = secp256k1fx.NewKeychain(key)
 	)
-	kc.Add(key)
 
 	tx, err := env.txBuilder.CreateAssetTx(
 		"Team Rocket", // name
@@ -1943,10 +1941,9 @@ func newAvaxCreateAssetTxWithOutputs(t *testing.T, env *environment, initialStat
 func buildTestExportTx(t *testing.T, env *environment, chainID ids.ID) *txs.Tx {
 	var (
 		key = keys[0]
-		kc  = secp256k1fx.NewKeychain()
+		kc  = secp256k1fx.NewKeychain(key)
 		to  = key.PublicKey().Address()
 	)
-	kc.Add(key)
 
 	tx, err := env.txBuilder.ExportTx(
 		chainID,
@@ -2036,9 +2033,8 @@ func buildSecpMintOp(createAssetTx *txs.Tx, key *secp256k1.PrivateKey, outputInd
 func buildOperationTxWithOps(t *testing.T, env *environment, op ...*txs.Operation) *txs.Tx {
 	var (
 		key = keys[0]
-		kc  = secp256k1fx.NewKeychain()
+		kc  = secp256k1fx.NewKeychain(key)
 	)
-	kc.Add(key)
 
 	tx, err := env.txBuilder.Operation(
 		op,

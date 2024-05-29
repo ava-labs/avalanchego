@@ -133,9 +133,8 @@ func TestIssueNFT(t *testing.T) {
 
 	var (
 		key = keys[0]
-		kc  = secp256k1fx.NewKeychain()
+		kc  = secp256k1fx.NewKeychain(key)
 	)
-	kc.Add(key)
 
 	// Create the asset
 	initialStates := map[uint32][]verify.State{
@@ -211,9 +210,8 @@ func TestIssueProperty(t *testing.T) {
 
 	var (
 		key = keys[0]
-		kc  = secp256k1fx.NewKeychain()
+		kc  = secp256k1fx.NewKeychain(key)
 	)
-	kc.Add(key)
 
 	// create the asset
 	initialStates := map[uint32][]verify.State{
@@ -312,12 +310,11 @@ func TestIssueTxWithAnotherAsset(t *testing.T) {
 	// send second asset
 	var (
 		key = keys[0]
-		kc  = secp256k1fx.NewKeychain()
+		kc  = secp256k1fx.NewKeychain(key)
 
 		feeAssetCreateTx = getCreateTxFromGenesisTest(t, env.genesisBytes, feeAssetName)
 		createTx         = getCreateTxFromGenesisTest(t, env.genesisBytes, otherAssetName)
 	)
-	kc.Add(key)
 
 	tx, err := env.txBuilder.BaseTx(
 		[]*avax.TransferableOutput{
@@ -386,9 +383,8 @@ func TestTxAcceptAfterParseTx(t *testing.T) {
 
 	var (
 		key = keys[0]
-		kc  = secp256k1fx.NewKeychain()
+		kc  = secp256k1fx.NewKeychain(key)
 	)
-	kc.Add(key)
 
 	firstTx, err := env.txBuilder.BaseTx(
 		[]*avax.TransferableOutput{{
@@ -466,7 +462,7 @@ func TestIssueImportTx(t *testing.T) {
 
 	var (
 		key = keys[0]
-		kc  = secp256k1fx.NewKeychain()
+		kc  = secp256k1fx.NewKeychain(key)
 
 		utxoID = avax.UTXOID{
 			TxID: ids.ID{
@@ -489,7 +485,6 @@ func TestIssueImportTx(t *testing.T) {
 			},
 		}
 	)
-	kc.Add(key)
 
 	// Provide the platform UTXO:
 	utxoBytes, err := env.vm.parser.Codec().Marshal(txs.CodecVersion, importedUtxo)
@@ -616,12 +611,10 @@ func TestIssueExportTx(t *testing.T) {
 	var (
 		avaxID     = genesisTx.ID()
 		key        = keys[0]
-		kc         = secp256k1fx.NewKeychain()
+		kc         = secp256k1fx.NewKeychain(key)
 		to         = key.PublicKey().Address()
 		changeAddr = to
 	)
-
-	kc.Add(key)
 
 	tx, err := env.txBuilder.ExportTx(
 		constants.PlatformChainID,
@@ -679,12 +672,10 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 		avaxID     = genesisTx.ID()
 		assetID    = avax.Asset{ID: avaxID}
 		key        = keys[0]
-		kc         = secp256k1fx.NewKeychain()
+		kc         = secp256k1fx.NewKeychain(key)
 		to         = key.PublicKey().Address()
 		changeAddr = to
 	)
-
-	kc.Add(key)
 
 	tx, err := env.txBuilder.ExportTx(
 		constants.PlatformChainID,

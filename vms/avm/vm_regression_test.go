@@ -23,9 +23,8 @@ func TestVerifyFxUsage(t *testing.T) {
 
 	var (
 		key = keys[0]
-		kc  = secp256k1fx.NewKeychain()
+		kc  = secp256k1fx.NewKeychain(key)
 	)
-	kc.Add(key)
 
 	initialStates := map[uint32][]verify.State{
 		uint32(0): {
