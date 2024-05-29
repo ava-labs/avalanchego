@@ -75,7 +75,7 @@ func (mr *MockChainMockRecorder) AddRewardUTXO(arg0, arg1 any) *gomock.Call {
 }
 
 // AddSubnet mocks base method.
-func (m *MockChain) AddSubnet(arg0 *txs.Tx) {
+func (m *MockChain) AddSubnet(arg0 ids.ID) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "AddSubnet", arg0)
 }
@@ -523,7 +523,7 @@ func (mr *MockDiffMockRecorder) AddRewardUTXO(arg0, arg1 any) *gomock.Call {
 }
 
 // AddSubnet mocks base method.
-func (m *MockDiff) AddSubnet(arg0 *txs.Tx) {
+func (m *MockDiff) AddSubnet(arg0 ids.ID) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "AddSubnet", arg0)
 }
@@ -1009,7 +1009,7 @@ func (mr *MockStateMockRecorder) AddStatelessBlock(arg0 any) *gomock.Call {
 }
 
 // AddSubnet mocks base method.
-func (m *MockState) AddSubnet(arg0 *txs.Tx) {
+func (m *MockState) AddSubnet(arg0 ids.ID) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "AddSubnet", arg0)
 }
