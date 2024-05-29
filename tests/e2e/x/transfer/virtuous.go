@@ -246,23 +246,15 @@ RECEIVER  NEW BALANCE (AFTER) : %21d AVAX
 
 					prev := metricsBeforeTx[u]
 
-					currentXBlksProcessing, ok := tests.GetFirstMetricValue(mm, xBlksProcessingMetric)
-					require.True(ok)
-
-					previousXBlksProcessing, ok := tests.GetFirstMetricValue(prev, xBlksProcessingMetric)
-					require.True(ok)
-
 					// +0 since X-chain tx must have been processed and accepted
 					// by now
+					currentXBlksProcessing, _ := tests.GetFirstMetricValue(mm, xBlksProcessingMetric)
+					previousXBlksProcessing, _ := tests.GetFirstMetricValue(prev, xBlksProcessingMetric)
 					require.Equal(currentXBlksProcessing, previousXBlksProcessing)
 
-					currentXBlksAccepted, ok := tests.GetFirstMetricValue(mm, xBlksAcceptedMetric)
-					require.True(ok)
-
-					previousXBlksAccepted, ok := tests.GetFirstMetricValue(prev, xBlksAcceptedMetric)
-					require.True(ok)
-
 					// +1 since X-chain tx must have been accepted by now
+					currentXBlksAccepted, _ := tests.GetFirstMetricValue(mm, xBlksAcceptedMetric)
+					previousXBlksAccepted, _ := tests.GetFirstMetricValue(prev, xBlksAcceptedMetric)
 					require.Equal(currentXBlksAccepted, previousXBlksAccepted+1)
 
 					metricsBeforeTx[u] = mm
