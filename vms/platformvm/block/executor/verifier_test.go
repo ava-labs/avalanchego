@@ -218,7 +218,7 @@ func TestStandardBlockComplexity(t *testing.T) {
 				onAcceptState, err := state.NewDiffOn(env.state)
 				require.NoError(t, err)
 
-				feeCalculator := config.PickFeeCalculator(env.backend.Config, onAcceptState.GetTimestamp())
+				feeCalculator := config.PickFeeCalculator(env.config, onAcceptState.GetTimestamp())
 				require.NoError(t, subnetValTx.Unsigned.Visit(&executor.StandardTxExecutor{
 					Backend:       env.backend,
 					State:         onAcceptState,

@@ -47,7 +47,7 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
-	feeCalculator := config.PickFeeCalculator(env.backend.Config, stateDiff.GetTimestamp())
+	feeCalculator := config.PickFeeCalculator(env.config, stateDiff.GetTimestamp())
 	executor := StandardTxExecutor{
 		Backend:       &env.backend,
 		FeeCalculator: feeCalculator,
@@ -87,7 +87,7 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
-	feeCalculator := config.PickFeeCalculator(env.backend.Config, stateDiff.GetTimestamp())
+	feeCalculator := config.PickFeeCalculator(env.config, stateDiff.GetTimestamp())
 	executor := StandardTxExecutor{
 		Backend:       &env.backend,
 		FeeCalculator: feeCalculator,
@@ -121,7 +121,7 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
-	feeCalculator := config.PickFeeCalculator(env.backend.Config, stateDiff.GetTimestamp())
+	feeCalculator := config.PickFeeCalculator(env.config, stateDiff.GetTimestamp())
 	executor := StandardTxExecutor{
 		Backend:       &env.backend,
 		FeeCalculator: feeCalculator,
@@ -152,7 +152,7 @@ func TestCreateChainTxValid(t *testing.T) {
 	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
-	feeCalculator := config.PickFeeCalculator(env.backend.Config, stateDiff.GetTimestamp())
+	feeCalculator := config.PickFeeCalculator(env.config, stateDiff.GetTimestamp())
 	executor := StandardTxExecutor{
 		Backend:       &env.backend,
 		FeeCalculator: feeCalculator,
@@ -221,7 +221,7 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 
 			stateDiff.SetTimestamp(test.time)
 
-			feeCalculator := config.PickFeeCalculator(env.backend.Config, stateDiff.GetTimestamp())
+			feeCalculator := config.PickFeeCalculator(env.config, stateDiff.GetTimestamp())
 			executor := StandardTxExecutor{
 				Backend:       &env.backend,
 				FeeCalculator: feeCalculator,

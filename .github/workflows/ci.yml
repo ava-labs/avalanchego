@@ -265,8 +265,8 @@ jobs:
       - name: Check image build
         shell: bash
         run: bash -x scripts/tests.build_image.sh
-  test_build_antithesis_avalanchego_image:
-    name: Antithesis avalanchego build
+  test_build_antithesis_avalanchego_images:
+    name: Build Antithesis avalanchego images
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -275,6 +275,16 @@ jobs:
         run: bash -x scripts/tests.build_antithesis_images.sh
         env:
           TEST_SETUP: avalanchego
+  test_build_antithesis_xsvm_images:
+    name: Build Antithesis xsvm images
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check image build for xsvm test setup
+        shell: bash
+        run: bash -x scripts/tests.build_antithesis_images.sh
+        env:
+          TEST_SETUP: xsvm
   govulncheck:
     runs-on: ubuntu-latest
     name: govulncheck

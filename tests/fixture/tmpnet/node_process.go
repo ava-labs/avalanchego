@@ -122,7 +122,7 @@ func (p *NodeProcess) Start(w io.Writer) error {
 	}
 
 	// Determine appropriate level of node description detail
-	dataDir := p.node.getDataDir()
+	dataDir := p.node.GetDataDir()
 	nodeDescription := fmt.Sprintf("node %q", p.node.NodeID)
 	if p.node.IsEphemeral {
 		nodeDescription = "ephemeral " + nodeDescription
@@ -201,7 +201,7 @@ func (p *NodeProcess) IsHealthy(ctx context.Context) (bool, error) {
 }
 
 func (p *NodeProcess) getProcessContextPath() string {
-	return filepath.Join(p.node.getDataDir(), config.DefaultProcessContextFilename)
+	return filepath.Join(p.node.GetDataDir(), config.DefaultProcessContextFilename)
 }
 
 func (p *NodeProcess) waitForProcessContext(ctx context.Context) error {
@@ -294,7 +294,7 @@ func (p *NodeProcess) writeMonitoringConfig() error {
 	}
 
 	promtailLabels := FlagsMap{
-		"__path__": filepath.Join(p.node.getDataDir(), "logs", "*.log"),
+		"__path__": filepath.Join(p.node.GetDataDir(), "logs", "*.log"),
 	}
 	promtailLabels.SetDefaults(commonLabels)
 	promtailConfig := []FlagsMap{

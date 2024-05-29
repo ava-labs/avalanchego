@@ -38,7 +38,7 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	// Run only once in the first ginkgo process
 
 	nodes := tmpnet.NewNodesOrPanic(flagVars.NodeCount())
-	subnets := vms.XSVMSubnets(nodes...)
+	subnets := vms.XSVMSubnetsOrPanic(nodes...)
 	return e2e.NewTestEnvironment(
 		flagVars,
 		&tmpnet.Network{
