@@ -533,7 +533,7 @@ func (n *Node) initNetworking() error {
 	// Configure benchlist
 	n.Config.BenchlistConfig.Validators = n.vdrs
 	n.Config.BenchlistConfig.Benchable = n.chainRouter
-	n.Config.BenchlistConfig.BenchlistRegisterer = metrics.NewLabelGatherer("chain")
+	n.Config.BenchlistConfig.BenchlistRegisterer = metrics.NewLabelGatherer(chains.ChainLabel)
 
 	err = n.MetricsGatherer.Register(
 		benchlistNamespace,
@@ -915,7 +915,7 @@ func (n *Node) initChains(genesisBytes []byte) error {
 
 func (n *Node) initMetrics() error {
 	n.MetricsGatherer = metrics.NewPrefixGatherer()
-	n.MeterDBMetricsGatherer = metrics.NewLabelGatherer("chain")
+	n.MeterDBMetricsGatherer = metrics.NewLabelGatherer(chains.ChainLabel)
 	return n.MetricsGatherer.Register(
 		meterDBNamespace,
 		n.MeterDBMetricsGatherer,

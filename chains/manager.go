@@ -86,6 +86,8 @@ const (
 	proposervmNamespace   = ChainNamespace + metric.NamespaceSeparator + "proposervm"
 	meterchainvmNamespace = ChainNamespace + metric.NamespaceSeparator + "meterchainvm"
 	meterdagvmNamespace   = ChainNamespace + metric.NamespaceSeparator + "meterdagvm"
+
+	ChainLabel = "chain"
 )
 
 var (
@@ -285,42 +287,42 @@ type manager struct {
 
 // New returns a new Manager
 func New(config *ManagerConfig) (Manager, error) {
-	handlerGatherer := metrics.NewLabelGatherer("chain")
+	handlerGatherer := metrics.NewLabelGatherer(ChainLabel)
 	if err := config.Metrics.Register(handlerNamespace, handlerGatherer); err != nil {
 		return nil, err
 	}
 
-	stakeGatherer := metrics.NewLabelGatherer("chain")
+	stakeGatherer := metrics.NewLabelGatherer(ChainLabel)
 	if err := config.Metrics.Register(stakeNamespace, stakeGatherer); err != nil {
 		return nil, err
 	}
 
-	p2pGatherer := metrics.NewLabelGatherer("chain")
+	p2pGatherer := metrics.NewLabelGatherer(ChainLabel)
 	if err := config.Metrics.Register(p2pNamespace, p2pGatherer); err != nil {
 		return nil, err
 	}
 
-	snowmanGatherer := metrics.NewLabelGatherer("chain")
+	snowmanGatherer := metrics.NewLabelGatherer(ChainLabel)
 	if err := config.Metrics.Register(snowmanNamespace, snowmanGatherer); err != nil {
 		return nil, err
 	}
 
-	avalancheGatherer := metrics.NewLabelGatherer("chain")
+	avalancheGatherer := metrics.NewLabelGatherer(ChainLabel)
 	if err := config.Metrics.Register(avalancheNamespace, avalancheGatherer); err != nil {
 		return nil, err
 	}
 
-	proposervmGatherer := metrics.NewLabelGatherer("chain")
+	proposervmGatherer := metrics.NewLabelGatherer(ChainLabel)
 	if err := config.Metrics.Register(proposervmNamespace, proposervmGatherer); err != nil {
 		return nil, err
 	}
 
-	meterChainVMGatherer := metrics.NewLabelGatherer("chain")
+	meterChainVMGatherer := metrics.NewLabelGatherer(ChainLabel)
 	if err := config.Metrics.Register(meterchainvmNamespace, meterChainVMGatherer); err != nil {
 		return nil, err
 	}
 
-	meterDAGVMGatherer := metrics.NewLabelGatherer("chain")
+	meterDAGVMGatherer := metrics.NewLabelGatherer(ChainLabel)
 	if err := config.Metrics.Register(meterdagvmNamespace, meterDAGVMGatherer); err != nil {
 		return nil, err
 	}
@@ -1560,7 +1562,7 @@ func (m *manager) getChainConfig(id ids.ID) (ChainConfig, error) {
 func (m *manager) getOrMakeVMRegisterer(vmID ids.ID, chainAlias string) (metrics.MultiGatherer, error) {
 	vmGatherer, ok := m.vmGatherer[vmID]
 	if !ok {
-		vmGatherer = metrics.NewLabelGatherer("chain")
+		vmGatherer = metrics.NewLabelGatherer(ChainLabel)
 
 		// TODO: Cleanup vm aliasing
 		var vmIDStr string
