@@ -7,9 +7,9 @@ import (
 	"context"
 	"fmt"
 
-	dto "github.com/prometheus/client_model/go"
-
 	"github.com/ava-labs/avalanchego/api/metrics"
+
+	dto "github.com/prometheus/client_model/go"
 )
 
 // "metric name" -> "metric value"
