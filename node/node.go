@@ -91,7 +91,8 @@ const (
 
 	ipResolutionTimeout = 30 * time.Second
 
-	meterDBNamespace = chains.ChainNamespace + metric.NamespaceSeparator + "meterdb"
+	meterDBNamespace   = chains.ChainNamespace + metric.NamespaceSeparator + "meterdb"
+	benchlistNamespace = chains.ChainNamespace + metric.NamespaceSeparator + "benchlist"
 )
 
 var (
@@ -532,6 +533,16 @@ func (n *Node) initNetworking() error {
 	// Configure benchlist
 	n.Config.BenchlistConfig.Validators = n.vdrs
 	n.Config.BenchlistConfig.Benchable = n.chainRouter
+	n.Config.BenchlistConfig.BenchlistRegisterer = metrics.NewLabelGatherer("chain")
+
+	err = n.MetricsGatherer.Register(
+		benchlistNamespace,
+		n.Config.BenchlistConfig.BenchlistRegisterer,
+	)
+	if err != nil {
+		return err
+	}
+
 	n.benchlistManager = benchlist.NewManager(&n.Config.BenchlistConfig)
 
 	n.uptimeCalculator = uptime.NewLockedCalculator()
@@ -1065,10 +1076,19 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		return err
 	}
 
+	responseReg, err := metrics.MakeAndRegister(
+		n.MetricsGatherer,
+		metric.AppendNamespace(constants.PlatformName, "responses"),
+	)
+	if err != nil {
+		return err
+	}
+
 	n.timeoutManager, err = timeout.NewManager(
 		&n.Config.AdaptiveTimeoutConfig,
 		n.benchlistManager,
 		requestsReg,
+		responseReg,
 	)
 	if err != nil {
 		return err

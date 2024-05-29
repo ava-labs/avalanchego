@@ -132,7 +132,6 @@ type inboundMsgBufferThrottlerMetrics struct {
 func (m *inboundMsgBufferThrottlerMetrics) initialize(reg prometheus.Registerer) error {
 	errs := wrappers.Errs{}
 	m.acquireLatency = metric.NewAveragerWithErrs(
-		"",
 		"buffer_throttler_inbound_acquire_latency",
 		"average time (in ns) to get space on the inbound message buffer",
 		reg,

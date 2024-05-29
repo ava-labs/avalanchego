@@ -1415,6 +1415,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		},
 		benchlist,
 		prometheus.NewRegistry(),
+		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
 

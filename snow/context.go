@@ -65,6 +65,10 @@ type Registerer interface {
 type ConsensusContext struct {
 	*Context
 
+	// PrimaryAlias is the primary alias of the chain this context exists
+	// within.
+	PrimaryAlias string
+
 	// Registers all common and snowman consensus metrics. Unlike the avalanche
 	// consensus engine metrics, we do not prefix the name with the engine name,
 	// as snowman is used for all chains by default.

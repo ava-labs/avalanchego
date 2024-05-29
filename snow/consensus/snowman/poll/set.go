@@ -55,20 +55,17 @@ type set struct {
 func NewSet(
 	factory Factory,
 	log logging.Logger,
-	namespace string,
 	reg prometheus.Registerer,
 ) (Set, error) {
 	numPolls := prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespace,
-		Name:      "polls",
-		Help:      "Number of pending network polls",
+		Name: "polls",
+		Help: "Number of pending network polls",
 	})
 	if err := reg.Register(numPolls); err != nil {
 		return nil, fmt.Errorf("%w: %w", errFailedPollsMetric, err)
 	}
 
 	durPolls, err := metric.NewAverager(
-		namespace,
 		"poll_duration",
 		"time (in ns) this poll took to complete",
 		reg,

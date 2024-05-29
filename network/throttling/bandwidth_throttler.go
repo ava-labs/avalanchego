@@ -68,7 +68,6 @@ func newBandwidthThrottler(
 		limiters:                 make(map[ids.NodeID]*rate.Limiter),
 		metrics: bandwidthThrottlerMetrics{
 			acquireLatency: metric.NewAveragerWithErrs(
-				"",
 				"bandwidth_throttler_inbound_acquire_latency",
 				"average time (in ns) to acquire bytes from the inbound bandwidth throttler",
 				registerer,

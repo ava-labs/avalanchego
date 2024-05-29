@@ -79,6 +79,8 @@ const (
 
 	ChainNamespace        = constants.PlatformName + metric.NamespaceSeparator + "chain"
 	handlerNamespace      = ChainNamespace + metric.NamespaceSeparator + "handler"
+	stakeNamespace        = ChainNamespace + metric.NamespaceSeparator + "stake"
+	p2pNamespace          = ChainNamespace + metric.NamespaceSeparator + "p2p"
 	snowmanNamespace      = ChainNamespace + metric.NamespaceSeparator + "snowman"
 	avalancheNamespace    = ChainNamespace + metric.NamespaceSeparator + "avalanche"
 	proposervmNamespace   = ChainNamespace + metric.NamespaceSeparator + "proposervm"
@@ -271,6 +273,8 @@ type manager struct {
 	validatorState validators.State
 
 	handlerGatherer      metrics.MultiGatherer            // chainID
+	stakeGatherer        metrics.MultiGatherer            // chainID
+	p2pGatherer          metrics.MultiGatherer            // chainID
 	snowmanGatherer      metrics.MultiGatherer            // chainID
 	avalancheGatherer    metrics.MultiGatherer            // chainID
 	proposervmGatherer   metrics.MultiGatherer            // chainID
@@ -283,6 +287,16 @@ type manager struct {
 func New(config *ManagerConfig) (Manager, error) {
 	handlerGatherer := metrics.NewLabelGatherer("chain")
 	if err := config.Metrics.Register(handlerNamespace, handlerGatherer); err != nil {
+		return nil, err
+	}
+
+	stakeGatherer := metrics.NewLabelGatherer("chain")
+	if err := config.Metrics.Register(stakeNamespace, stakeGatherer); err != nil {
+		return nil, err
+	}
+
+	p2pGatherer := metrics.NewLabelGatherer("chain")
+	if err := config.Metrics.Register(p2pNamespace, p2pGatherer); err != nil {
 		return nil, err
 	}
 
@@ -320,6 +334,8 @@ func New(config *ManagerConfig) (Manager, error) {
 		chainCreatorShutdownCh: make(chan struct{}),
 
 		handlerGatherer:      handlerGatherer,
+		stakeGatherer:        stakeGatherer,
+		p2pGatherer:          p2pGatherer,
 		snowmanGatherer:      snowmanGatherer,
 		avalancheGatherer:    avalancheGatherer,
 		proposervmGatherer:   proposervmGatherer,
@@ -519,11 +535,12 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 			ValidatorState: m.validatorState,
 			ChainDataDir:   chainDataDir,
 		},
+		PrimaryAlias:        primaryAlias,
+		Registerer:          snowmanMetrics,
+		AvalancheRegisterer: avalancheMetrics,
 		BlockAcceptor:       m.BlockAcceptorGroup,
 		TxAcceptor:          m.TxAcceptorGroup,
 		VertexAcceptor:      m.VertexAcceptorGroup,
-		Registerer:          snowmanMetrics,
-		AvalancheRegisterer: avalancheMetrics,
 	}
 
 	// Get a factory for the vm we want to use on our chain
@@ -830,18 +847,32 @@ func (m *manager) createAvalancheChain(
 		sampleK = int(bootstrapWeight)
 	}
 
-	// TODO: FIXME
-	connectedValidators, err := tracker.NewMeteredPeers("", ctx.Registerer) // stake?
+	stakeReg, err := metrics.MakeAndRegister(
+		m.stakeGatherer,
+		primaryAlias,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	connectedValidators, err := tracker.NewMeteredPeers(stakeReg)
 	if err != nil {
 		return nil, fmt.Errorf("error creating peer tracker: %w", err)
 	}
 	vdrs.RegisterSetCallbackListener(ctx.SubnetID, connectedValidators)
 
-	// TODO: FIXME
-	peerTracker, err := p2p.NewPeerTracker( // p2p?
+	p2pReg, err := metrics.MakeAndRegister(
+		m.p2pGatherer,
+		primaryAlias,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	peerTracker, err := p2p.NewPeerTracker(
 		ctx.Log,
 		"peer_tracker",
-		ctx.Registerer,
+		p2pReg,
 		set.Of(ctx.NodeID),
 		nil,
 	)
@@ -1213,18 +1244,32 @@ func (m *manager) createSnowmanChain(
 		sampleK = int(bootstrapWeight)
 	}
 
-	// TODO: FIXME
-	connectedValidators, err := tracker.NewMeteredPeers("", ctx.Registerer)
+	stakeReg, err := metrics.MakeAndRegister(
+		m.stakeGatherer,
+		primaryAlias,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	connectedValidators, err := tracker.NewMeteredPeers(stakeReg)
 	if err != nil {
 		return nil, fmt.Errorf("error creating peer tracker: %w", err)
 	}
 	vdrs.RegisterSetCallbackListener(ctx.SubnetID, connectedValidators)
 
-	// TODO: FIXME
+	p2pReg, err := metrics.MakeAndRegister(
+		m.p2pGatherer,
+		primaryAlias,
+	)
+	if err != nil {
+		return nil, err
+	}
+
 	peerTracker, err := p2p.NewPeerTracker(
 		ctx.Log,
 		"peer_tracker",
-		ctx.Registerer,
+		p2pReg,
 		set.Of(ctx.NodeID),
 		nil,
 	)

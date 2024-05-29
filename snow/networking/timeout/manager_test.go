@@ -28,6 +28,7 @@ func TestManagerFire(t *testing.T) {
 		},
 		benchlist,
 		prometheus.NewRegistry(),
+		prometheus.NewRegistry(),
 	)
 	require.NoError(t, err)
 	go manager.Dispatch()

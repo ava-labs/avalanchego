@@ -59,6 +59,7 @@ func TestTimeout(t *testing.T) {
 		},
 		benchlist,
 		prometheus.NewRegistry(),
+		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
 	go tm.Dispatch()
@@ -333,6 +334,7 @@ func TestReliableMessages(t *testing.T) {
 		},
 		benchlist,
 		prometheus.NewRegistry(),
+		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
 
@@ -487,6 +489,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 			TimeoutCoefficient: 1.25,
 		},
 		benchlist,
+		prometheus.NewRegistry(),
 		prometheus.NewRegistry(),
 	)
 	require.NoError(err)

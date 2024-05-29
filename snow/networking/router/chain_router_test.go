@@ -62,6 +62,7 @@ func TestShutdown(t *testing.T) {
 		},
 		benchlist,
 		prometheus.NewRegistry(),
+		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
 
@@ -199,7 +200,6 @@ func TestShutdownTimesOut(t *testing.T) {
 	vdrs := validators.NewManager()
 	require.NoError(vdrs.AddStaker(ctx.SubnetID, ids.GenerateTestNodeID(), nil, ids.Empty, 1))
 	benchlist := benchlist.NewNoBenchlist()
-	metrics := prometheus.NewRegistry()
 	// Ensure that the Ancestors request does not timeout
 	tm, err := timeout.NewManager(
 		&timer.AdaptiveTimeoutConfig{
@@ -210,7 +210,8 @@ func TestShutdownTimesOut(t *testing.T) {
 			TimeoutHalflife:    5 * time.Minute,
 		},
 		benchlist,
-		metrics,
+		prometheus.NewRegistry(),
+		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
 
@@ -229,7 +230,7 @@ func TestShutdownTimesOut(t *testing.T) {
 		set.Set[ids.ID]{},
 		nil,
 		HealthConfig{},
-		metrics,
+		prometheus.NewRegistry(),
 	))
 
 	resourceTracker, err := tracker.NewResourceTracker(
@@ -358,6 +359,7 @@ func TestRouterTimeout(t *testing.T) {
 			TimeoutHalflife:    5 * time.Minute,
 		},
 		benchlist.NewNoBenchlist(),
+		prometheus.NewRegistry(),
 		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
@@ -727,6 +729,7 @@ func TestRouterHonorsRequestedEngine(t *testing.T) {
 		},
 		benchlist.NewNoBenchlist(),
 		prometheus.NewRegistry(),
+		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
 
@@ -950,6 +953,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 		},
 		benchlist.NewNoBenchlist(),
 		prometheus.NewRegistry(),
+		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
 
@@ -1110,6 +1114,7 @@ func TestConnectedSubnet(t *testing.T) {
 		},
 		benchlist.NewNoBenchlist(),
 		prometheus.NewRegistry(),
+		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
 
@@ -1224,6 +1229,7 @@ func TestValidatorOnlyAllowedNodeMessageDrops(t *testing.T) {
 			TimeoutHalflife:    5 * time.Minute,
 		},
 		benchlist.NewNoBenchlist(),
+		prometheus.NewRegistry(),
 		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
@@ -1573,6 +1579,7 @@ func newChainRouterTest(t *testing.T) (*ChainRouter, *common.EngineTest) {
 			TimeoutHalflife:    5 * time.Minute,
 		},
 		benchlist.NewNoBenchlist(),
+		prometheus.NewRegistry(),
 		prometheus.NewRegistry(),
 	)
 	require.NoError(t, err)
