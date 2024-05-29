@@ -91,7 +91,7 @@ func RegisterNodeRun() {
 	})
 }
 
-// RunDefaultHardhatTests runs the hardhat tests in the given [testPath] on the blockchain with [blockchainID]
+// RunHardhatTests runs the hardhat tests in the given [testPath] on the blockchain with [blockchainID]
 // [execPath] is the path where the test command is executed
 func RunHardhatTests(ctx context.Context, blockchainID string, execPath string, testPath string) {
 	chainURI := GetDefaultChainURI(blockchainID)

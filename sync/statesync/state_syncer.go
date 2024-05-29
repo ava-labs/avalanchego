@@ -118,7 +118,7 @@ func (t *stateSync) onStorageTrieFinished(root common.Hash) error {
 	return t.removeTrieInProgress(root)
 }
 
-// onMainTrieFinishes is called after the main trie finishes syncing.
+// onMainTrieFinished is called after the main trie finishes syncing.
 func (t *stateSync) onMainTrieFinished() error {
 	t.codeSyncer.notifyAccountTrieCompleted()
 
