@@ -6,7 +6,6 @@ package main
 import (
 	"context"
 	"crypto/rand"
-	"fmt"
 	"log"
 	"math/big"
 	"os"
@@ -132,7 +131,10 @@ func main() {
 		}
 	}
 
-	lifecycle.SetupComplete(fmt.Sprintf("Initialized %d workers", NumKeys))
+	lifecycle.SetupComplete(map[string]any{
+		"msg":        "initialized workers",
+		"numWorkers": NumKeys,
+	})
 
 	for _, w := range workloads[1:] {
 		go w.run(ctx)
