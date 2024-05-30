@@ -49,43 +49,42 @@ func (m *blockMetrics) Initialize(
 	supportsBlockBuildingWithContext bool,
 	supportsBatchedFetching bool,
 	supportsStateSync bool,
-	namespace string,
 	reg prometheus.Registerer,
 ) error {
 	errs := wrappers.Errs{}
-	m.buildBlock = newAverager(namespace, "build_block", reg, &errs)
-	m.buildBlockErr = newAverager(namespace, "build_block_err", reg, &errs)
-	m.parseBlock = newAverager(namespace, "parse_block", reg, &errs)
-	m.parseBlockErr = newAverager(namespace, "parse_block_err", reg, &errs)
-	m.getBlock = newAverager(namespace, "get_block", reg, &errs)
-	m.getBlockErr = newAverager(namespace, "get_block_err", reg, &errs)
-	m.setPreference = newAverager(namespace, "set_preference", reg, &errs)
-	m.lastAccepted = newAverager(namespace, "last_accepted", reg, &errs)
-	m.verify = newAverager(namespace, "verify", reg, &errs)
-	m.verifyErr = newAverager(namespace, "verify_err", reg, &errs)
-	m.accept = newAverager(namespace, "accept", reg, &errs)
-	m.reject = newAverager(namespace, "reject", reg, &errs)
-	m.shouldVerifyWithContext = newAverager(namespace, "should_verify_with_context", reg, &errs)
-	m.verifyWithContext = newAverager(namespace, "verify_with_context", reg, &errs)
-	m.verifyWithContextErr = newAverager(namespace, "verify_with_context_err", reg, &errs)
-	m.getBlockIDAtHeight = newAverager(namespace, "get_block_id_at_height", reg, &errs)
+	m.buildBlock = newAverager("build_block", reg, &errs)
+	m.buildBlockErr = newAverager("build_block_err", reg, &errs)
+	m.parseBlock = newAverager("parse_block", reg, &errs)
+	m.parseBlockErr = newAverager("parse_block_err", reg, &errs)
+	m.getBlock = newAverager("get_block", reg, &errs)
+	m.getBlockErr = newAverager("get_block_err", reg, &errs)
+	m.setPreference = newAverager("set_preference", reg, &errs)
+	m.lastAccepted = newAverager("last_accepted", reg, &errs)
+	m.verify = newAverager("verify", reg, &errs)
+	m.verifyErr = newAverager("verify_err", reg, &errs)
+	m.accept = newAverager("accept", reg, &errs)
+	m.reject = newAverager("reject", reg, &errs)
+	m.shouldVerifyWithContext = newAverager("should_verify_with_context", reg, &errs)
+	m.verifyWithContext = newAverager("verify_with_context", reg, &errs)
+	m.verifyWithContextErr = newAverager("verify_with_context_err", reg, &errs)
+	m.getBlockIDAtHeight = newAverager("get_block_id_at_height", reg, &errs)
 
 	if supportsBlockBuildingWithContext {
-		m.buildBlockWithContext = newAverager(namespace, "build_block_with_context", reg, &errs)
-		m.buildBlockWithContextErr = newAverager(namespace, "build_block_with_context_err", reg, &errs)
+		m.buildBlockWithContext = newAverager("build_block_with_context", reg, &errs)
+		m.buildBlockWithContextErr = newAverager("build_block_with_context_err", reg, &errs)
 	}
 	if supportsBatchedFetching {
-		m.getAncestors = newAverager(namespace, "get_ancestors", reg, &errs)
-		m.batchedParseBlock = newAverager(namespace, "batched_parse_block", reg, &errs)
+		m.getAncestors = newAverager("get_ancestors", reg, &errs)
+		m.batchedParseBlock = newAverager("batched_parse_block", reg, &errs)
 	}
 	if supportsStateSync {
-		m.stateSyncEnabled = newAverager(namespace, "state_sync_enabled", reg, &errs)
-		m.getOngoingSyncStateSummary = newAverager(namespace, "get_ongoing_state_sync_summary", reg, &errs)
-		m.getLastStateSummary = newAverager(namespace, "get_last_state_summary", reg, &errs)
-		m.parseStateSummary = newAverager(namespace, "parse_state_summary", reg, &errs)
-		m.parseStateSummaryErr = newAverager(namespace, "parse_state_summary_err", reg, &errs)
-		m.getStateSummary = newAverager(namespace, "get_state_summary", reg, &errs)
-		m.getStateSummaryErr = newAverager(namespace, "get_state_summary_err", reg, &errs)
+		m.stateSyncEnabled = newAverager("state_sync_enabled", reg, &errs)
+		m.getOngoingSyncStateSummary = newAverager("get_ongoing_state_sync_summary", reg, &errs)
+		m.getLastStateSummary = newAverager("get_last_state_summary", reg, &errs)
+		m.parseStateSummary = newAverager("parse_state_summary", reg, &errs)
+		m.parseStateSummaryErr = newAverager("parse_state_summary_err", reg, &errs)
+		m.getStateSummary = newAverager("get_state_summary", reg, &errs)
+		m.getStateSummaryErr = newAverager("get_state_summary_err", reg, &errs)
 	}
 	return errs.Err
 }

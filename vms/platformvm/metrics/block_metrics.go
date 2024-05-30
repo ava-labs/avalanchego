@@ -22,11 +22,8 @@ type blockMetrics struct {
 	numBlocks *prometheus.CounterVec
 }
 
-func newBlockMetrics(
-	namespace string,
-	registerer prometheus.Registerer,
-) (*blockMetrics, error) {
-	txMetrics, err := newTxMetrics(namespace, registerer)
+func newBlockMetrics(registerer prometheus.Registerer) (*blockMetrics, error) {
+	txMetrics, err := newTxMetrics(registerer)
 	if err != nil {
 		return nil, err
 	}
@@ -35,9 +32,8 @@ func newBlockMetrics(
 		txMetrics: txMetrics,
 		numBlocks: prometheus.NewCounterVec(
 			prometheus.CounterOpts{
-				Namespace: namespace,
-				Name:      "blks_accepted",
-				Help:      "number of blocks accepted",
+				Name: "blks_accepted",
+				Help: "number of blocks accepted",
 			},
 			blkLabels,
 		),

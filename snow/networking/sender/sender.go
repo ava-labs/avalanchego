@@ -67,9 +67,8 @@ func New(
 		timeouts:   timeouts,
 		failedDueToBench: prometheus.NewCounterVec(
 			prometheus.CounterOpts{
-				Namespace: "",
-				Name:      "failed_benched",
-				Help:      "requests dropped because a node was benched",
+				Name: "failed_benched",
+				Help: "requests dropped because a node was benched",
 			},
 			opLabels,
 		),
