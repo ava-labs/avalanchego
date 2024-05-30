@@ -83,7 +83,7 @@ func New(registerer prometheus.Registerer) (Metrics, error) {
 	}
 
 	errs := wrappers.Errs{Err: err}
-	apiRequestMetrics, err := metric.NewAPIInterceptor("", registerer)
+	apiRequestMetrics, err := metric.NewAPIInterceptor(registerer)
 	errs.Add(err)
 	m.APIInterceptor = apiRequestMetrics
 	errs.Add(
