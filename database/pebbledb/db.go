@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package pebble
+package pebbledb
 
 import (
 	"context"
@@ -21,7 +21,7 @@ import (
 )
 
 const (
-	Name = "pebble"
+	Name = "pebbledb"
 
 	// pebbleByteOverHead is the number of bytes of constant overhead that
 	// should be added to a batch size per operation.
