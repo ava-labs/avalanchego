@@ -11,6 +11,9 @@ import (
 	"os"
 	"time"
 
+	"github.com/antithesishq/antithesis-sdk-go/assert"
+	"github.com/antithesishq/antithesis-sdk-go/lifecycle"
+
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests/antithesis"
@@ -92,6 +95,11 @@ func main() {
 		}
 	}
 
+	lifecycle.SetupComplete(map[string]any{
+		"msg":        "initialized workers",
+		"numWorkers": NumKeys,
+	})
+
 	for _, w := range workloads[1:] {
 		go w.run(ctx)
 	}
@@ -120,6 +128,10 @@ func (w *workload) run(ctx context.Context) {
 		log.Fatalf("failed to fetch balance: %s", err)
 	}
 	log.Printf("worker %d starting with a balance of %d", w.id, balance)
+	assert.Reachable("worker starting", map[string]any{
+		"worker":  w.id,
+		"balance": balance,
+	})
 
 	for {
 		log.Printf("worker %d executing transfer", w.id)
@@ -161,6 +173,12 @@ func (w *workload) confirmTransferTx(ctx context.Context, tx *status.TxIssuance)
 		client := api.NewClient(uri, w.chainID.String())
 		if err := api.WaitForAcceptance(ctx, client, w.key.Address(), tx.Nonce); err != nil {
 			log.Printf("worker %d failed to confirm transaction %s on %s: %s", w.id, tx.TxID, uri, err)
+			assert.Unreachable("failed to confirm transaction", map[string]any{
+				"worker": w.id,
+				"txID":   tx.TxID,
+				"uri":    uri,
+				"err":    err,
+			})
 			return
 		}
 	}

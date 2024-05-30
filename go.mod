@@ -9,6 +9,7 @@ go 1.21.10
 require (
 	github.com/DataDog/zstd v1.5.2
 	github.com/NYTimes/gziphandler v1.1.1
+	github.com/antithesishq/antithesis-sdk-go v0.3.8
 	github.com/ava-labs/coreth v0.13.5-remove-optional-gatherer.2
 	github.com/ava-labs/ledger-avalanche/go v0.0.0-20231102202641-ae2ebdaeac34
 	github.com/btcsuite/btcd/btcutil v1.1.3
@@ -158,7 +159,7 @@ require (
 	go.uber.org/multierr v1.10.0 // indirect
 	golang.org/x/sys v0.18.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
-	golang.org/x/tools v0.16.0 // indirect
+	golang.org/x/tools v0.17.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20240123012728-ef4313101c80 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
