@@ -66,6 +66,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math/meter"
+	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/perms"
 	"github.com/ava-labs/avalanchego/utils/profiler"
 	"github.com/ava-labs/avalanchego/utils/resource"
@@ -89,6 +90,8 @@ const (
 	httpPortName    = constants.AppName + "-http"
 
 	ipResolutionTimeout = 30 * time.Second
+
+	apiNamespace = constants.PlatformName + metric.NamespaceSeparator + "api"
 )
 
 var (
@@ -967,6 +970,14 @@ func (n *Node) initAPIServer() error {
 	}
 	n.apiURI = fmt.Sprintf("%s://%s", protocol, listener.Addr())
 
+	apiRegisterer, err := metrics.MakeAndRegister(
+		n.MetricsGatherer,
+		apiNamespace,
+	)
+	if err != nil {
+		return err
+	}
+
 	n.APIServer, err = server.New(
 		n.Log,
 		n.LogFactory,
@@ -976,8 +987,7 @@ func (n *Node) initAPIServer() error {
 		n.ID,
 		n.Config.TraceConfig.Enabled,
 		n.tracer,
-		"api",
-		n.MetricsRegisterer,
+		apiRegisterer,
 		n.Config.HTTPConfig.HTTPConfig,
 		n.Config.HTTPAllowedHosts,
 	)
