@@ -15,7 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/go-cmd/cmd"
 	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
+	"github.com/stretchr/testify/require"
 )
 
 // RunCommand starts the command [bin] with the given [args] and returns the command to the caller
@@ -51,17 +51,21 @@ func RunCommand(bin string, args ...string) (*cmd.Cmd, error) {
 }
 
 func RegisterPingTest() {
+	require := require.New(ginkgo.GinkgoT())
+
 	ginkgo.It("ping the network", ginkgo.Label("ping"), func() {
 		client := health.NewClient(DefaultLocalNodeURI)
 		healthy, err := client.Readiness(context.Background(), nil)
-		gomega.Expect(err).Should(gomega.BeNil())
-		gomega.Expect(healthy.Healthy).Should(gomega.BeTrue())
+		require.NoError(err)
+		require.True(healthy.Healthy)
 	})
 }
 
 // RegisterNodeRun registers a before suite that starts an AvalancheGo process to use for the e2e tests
 // and an after suite that stops the AvalancheGo process
 func RegisterNodeRun() {
+	require := require.New(ginkgo.GinkgoT())
+
 	// BeforeSuite starts an AvalancheGo process to use for the e2e tests
 	var startCmd *cmd.Cmd
 	_ = ginkgo.BeforeSuite(func() {
@@ -69,23 +73,23 @@ func RegisterNodeRun() {
 		defer cancel()
 
 		wd, err := os.Getwd()
-		gomega.Expect(err).Should(gomega.BeNil())
+		require.NoError(err)
 		log.Info("Starting AvalancheGo node", "wd", wd)
 		cmd, err := RunCommand("./scripts/run.sh")
 		startCmd = cmd
-		gomega.Expect(err).Should(gomega.BeNil())
+		require.NoError(err)
 
 		// Assumes that startCmd will launch a node with HTTP Port at [utils.DefaultLocalNodeURI]
 		healthClient := health.NewClient(DefaultLocalNodeURI)
 		healthy, err := health.AwaitReady(ctx, healthClient, HealthCheckTimeout, nil)
-		gomega.Expect(err).Should(gomega.BeNil())
-		gomega.Expect(healthy).Should(gomega.BeTrue())
+		require.NoError(err)
+		require.True(healthy)
 		log.Info("AvalancheGo node is healthy")
 	})
 
 	ginkgo.AfterSuite(func() {
-		gomega.Expect(startCmd).ShouldNot(gomega.BeNil())
-		gomega.Expect(startCmd.Stop()).Should(gomega.BeNil())
+		require.NotNil(startCmd)
+		require.NoError(startCmd.Stop())
 		// TODO add a new node to bootstrap off of the existing node and ensure it can bootstrap all subnets
 		// created during the test
 	})
@@ -99,6 +103,8 @@ func RunHardhatTests(ctx context.Context, blockchainID string, execPath string, 
 }
 
 func RunHardhatTestsCustomURI(ctx context.Context, chainURI string, execPath string, testPath string) {
+	require := require.New(ginkgo.GinkgoT())
+
 	log.Info(
 		"Executing HardHat tests on blockchain",
 		"testPath", testPath,
@@ -110,10 +116,10 @@ func RunHardhatTestsCustomURI(ctx context.Context, chainURI string, execPath str
 
 	log.Info("Sleeping to wait for test ping", "rpcURI", chainURI)
 	err := os.Setenv("RPC_URI", chainURI)
-	gomega.Expect(err).Should(gomega.BeNil())
+	require.NoError(err)
 	log.Info("Running test command", "cmd", cmd.String())
 
 	out, err := cmd.CombinedOutput()
 	fmt.Printf("\nCombined output:\n\n%s\n", string(out))
-	gomega.Expect(err).Should(gomega.BeNil())
+	require.NoError(err)
 }
