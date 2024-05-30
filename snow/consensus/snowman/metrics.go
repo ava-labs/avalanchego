@@ -87,6 +87,7 @@ func newMetrics(
 		}),
 
 		processingBlocks: linked.NewHashmap[ids.ID, processingStart](),
+
 		numProcessing: prometheus.NewGauge(prometheus.GaugeOpts{
 			Name: "blks_processing",
 			Help: "number of currently processing blocks",

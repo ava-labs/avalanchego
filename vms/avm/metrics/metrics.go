@@ -66,8 +66,8 @@ func (m *metrics) MarkTxAccepted(tx *txs.Tx) error {
 	return tx.Unsigned.Visit(m.txMetrics)
 }
 
-func New(reg prometheus.Registerer) (Metrics, error) {
-	txMetrics, err := newTxMetrics(reg)
+func New(registerer prometheus.Registerer) (Metrics, error) {
+	txMetrics, err := newTxMetrics(registerer)
 	errs := wrappers.Errs{Err: err}
 
 	m := &metrics{txMetrics: txMetrics}
@@ -85,13 +85,13 @@ func New(reg prometheus.Registerer) (Metrics, error) {
 		Help: "Number of times unique txs have not been unique and weren't cached",
 	})
 
-	apiRequestMetric, err := metric.NewAPIInterceptor("", reg)
+	apiRequestMetric, err := metric.NewAPIInterceptor("", registerer)
 	m.APIInterceptor = apiRequestMetric
 	errs.Add(
 		err,
-		reg.Register(m.numTxRefreshes),
-		reg.Register(m.numTxRefreshHits),
-		reg.Register(m.numTxRefreshMisses),
+		registerer.Register(m.numTxRefreshes),
+		registerer.Register(m.numTxRefreshHits),
+		registerer.Register(m.numTxRefreshMisses),
 	)
 	return m, errs.Err
 }

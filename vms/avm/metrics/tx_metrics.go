@@ -21,7 +21,7 @@ type txMetrics struct {
 	numTxs *prometheus.CounterVec
 }
 
-func newTxMetrics(reg prometheus.Registerer) (*txMetrics, error) {
+func newTxMetrics(registerer prometheus.Registerer) (*txMetrics, error) {
 	m := &txMetrics{
 		numTxs: prometheus.NewCounterVec(
 			prometheus.CounterOpts{
@@ -31,7 +31,7 @@ func newTxMetrics(reg prometheus.Registerer) (*txMetrics, error) {
 			txLabels,
 		),
 	}
-	return m, reg.Register(m.numTxs)
+	return m, registerer.Register(m.numTxs)
 }
 
 func (m *txMetrics) BaseTx(*txs.BaseTx) error {
