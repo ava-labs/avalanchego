@@ -455,7 +455,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 		{
 			GenesisData: genesisStr,
 			SubnetID:    constants.PrimaryNetworkID,
-			VMID:        constants.CorethID,
+			VMID:        constants.EVMID,
 			Name:        "C-Chain",
 		},
 	}

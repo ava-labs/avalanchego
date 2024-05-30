@@ -22,7 +22,7 @@ var (
 	VMAliases     = map[ids.ID][]string{
 		constants.PlatformVMID: {"platform"},
 		constants.AVMID:        {"avm"},
-		constants.CorethID:     {"evm"},
+		constants.EVMID:        {"evm"},
 		secp256k1fx.ID:         {"secp256k1fx"},
 		nftfx.ID:               {"nftfx"},
 		propertyfx.ID:          {"propertyfx"},
@@ -60,7 +60,7 @@ func Aliases(genesisBytes []byte) (map[string][]string, map[ids.ID][]string, err
 				path.Join(constants.ChainAliasPrefix, "avm"),
 			}
 			chainAliases[chainID] = XChainAliases
-		case constants.CorethID:
+		case constants.EVMID:
 			apiAliases[endpoint] = []string{
 				"C",
 				"evm",

@@ -1570,7 +1570,7 @@ func (m *manager) getOrMakeVMRegisterer(vmID ids.ID, chainAlias string) (metrics
 			vmIDStr = "platformvm"
 		case constants.AVMID:
 			vmIDStr = "avm"
-		case constants.CorethID:
+		case constants.EVMID:
 			vmIDStr = "coreth"
 		case constants.SubnetEVMID:
 			vmIDStr = "subnetevm"
