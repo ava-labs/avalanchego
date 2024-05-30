@@ -128,6 +128,10 @@ func (w *workload) run(ctx context.Context) {
 		log.Fatalf("failed to fetch balance: %s", err)
 	}
 	log.Printf("worker %d starting with a balance of %d", w.id, balance)
+	assert.Reachable("worker starting", map[string]any{
+		"worker":  w.id,
+		"balance": balance,
+	})
 
 	for {
 		log.Printf("worker %d executing transfer", w.id)
@@ -171,7 +175,7 @@ func (w *workload) confirmTransferTx(ctx context.Context, tx *status.TxIssuance)
 			log.Printf("worker %d failed to confirm transaction %s on %s: %s", w.id, tx.TxID, uri, err)
 			assert.Unreachable("failed to confirm transaction", map[string]any{
 				"worker": w.id,
-				"txid":   tx.TxID,
+				"txID":   tx.TxID,
 				"uri":    uri,
 				"err":    err,
 			})
