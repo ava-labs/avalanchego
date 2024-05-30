@@ -522,54 +522,62 @@ func (w *workload) makeOwner() secp256k1fx.OutputOwners {
 
 func (w *workload) confirmXChainTx(ctx context.Context, tx *xtxs.Tx) {
 	txID := tx.ID()
-	confirmed := true
 	for _, uri := range w.uris {
 		client := avm.NewClient(uri, "X")
 		status, err := client.ConfirmTx(ctx, txID, 100*time.Millisecond)
 		if err != nil {
 			log.Printf("failed to confirm X-chain transaction %s on %s: %s", txID, uri, err)
-			confirmed = false
-			break
+			assert.Unreachable("failed to determine the status of an X-chain transaction", map[string]any{
+				"worker": w.id,
+				"txid":   txID,
+				"uri":    uri,
+				"err":    err,
+			})
+			return
 		}
 		if status != choices.Accepted {
 			log.Printf("failed to confirm X-chain transaction %s on %s: status == %s", txID, uri, status)
-			confirmed = false
-			break
+			assert.Unreachable("failed to confirm an X-chain transaction", map[string]any{
+				"worker": w.id,
+				"txid":   txID,
+				"uri":    uri,
+				"status": status,
+			})
+			return
 		}
 		log.Printf("confirmed X-chain transaction %s on %s", txID, uri)
 	}
-	if confirmed {
-		log.Printf("confirmed X-chain transaction %s on all nodes", txID)
-	}
-	assert.Always(confirmed, "X-chain transactions can be confirmed on all nodes", map[string]any{
-		"txID": txID,
-	})
+	log.Printf("confirmed X-chain transaction %s on all nodes", txID)
 }
 
 func (w *workload) confirmPChainTx(ctx context.Context, tx *ptxs.Tx) {
 	txID := tx.ID()
-	confirmed := true
 	for _, uri := range w.uris {
 		client := platformvm.NewClient(uri)
 		s, err := client.AwaitTxDecided(ctx, txID, 100*time.Millisecond)
 		if err != nil {
-			log.Printf("failed to confirm P-chain transaction %s on %s: %s", txID, uri, err)
-			confirmed = false
-			break
+			log.Printf("failed to determine the status of a P-chain transaction %s on %s: %s", txID, uri, err)
+			assert.Unreachable("failed to determine the status of a P-chain transaction", map[string]any{
+				"worker": w.id,
+				"txid":   txID,
+				"uri":    uri,
+				"err":    err,
+			})
+			return
 		}
 		if s.Status != status.Committed {
 			log.Printf("failed to confirm P-chain transaction %s on %s: status == %s", txID, uri, s.Status)
-			confirmed = false
-			break
+			assert.Unreachable("failed to confirm a P-chain transaction", map[string]any{
+				"worker": w.id,
+				"txid":   txID,
+				"uri":    uri,
+				"status": s.Status,
+			})
+			return
 		}
 		log.Printf("confirmed P-chain transaction %s on %s", txID, uri)
 	}
-	if confirmed {
-		log.Printf("confirmed P-chain transaction %s on all nodes", txID)
-	}
-	assert.Always(confirmed, "P-chain transactions can be confirmed on all nodes", map[string]any{
-		"txID": txID,
-	})
+	log.Printf("confirmed P-chain transaction %s on all nodes", txID)
 }
 
 func (w *workload) verifyXChainTxConsumedUTXOs(ctx context.Context, tx *xtxs.Tx) {
