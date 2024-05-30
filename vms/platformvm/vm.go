@@ -302,12 +302,12 @@ func (vm *VM) initBlockchains() error {
 			}
 		}
 	} else {
-		subnets, err := vm.state.GetSubnets()
+		subnetIDs, err := vm.state.GetSubnetIDs()
 		if err != nil {
 			return err
 		}
-		for _, subnet := range subnets {
-			if err := vm.createSubnet(subnet.ID()); err != nil {
+		for _, subnetID := range subnetIDs {
+			if err := vm.createSubnet(subnetID); err != nil {
 				return err
 			}
 		}

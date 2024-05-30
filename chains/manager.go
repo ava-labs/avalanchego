@@ -52,7 +52,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms"
-	"github.com/ava-labs/avalanchego/vms/example/xsvm"
 	"github.com/ava-labs/avalanchego/vms/fx"
 	"github.com/ava-labs/avalanchego/vms/metervm"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
@@ -1561,27 +1560,10 @@ func (m *manager) getChainConfig(id ids.ID) (ChainConfig, error) {
 func (m *manager) getOrMakeVMRegisterer(vmID ids.ID, chainAlias string) (metrics.MultiGatherer, error) {
 	vmGatherer, ok := m.vmGatherer[vmID]
 	if !ok {
+		vmName := constants.VMName(vmID)
 		vmGatherer = metrics.NewLabelGatherer(ChainLabel)
-
-		// TODO: Cleanup vm aliasing
-		var vmIDStr string
-		switch vmID {
-		case constants.PlatformVMID:
-			vmIDStr = "platformvm"
-		case constants.AVMID:
-			vmIDStr = "avm"
-		case constants.EVMID:
-			vmIDStr = "coreth"
-		case constants.SubnetEVMID:
-			vmIDStr = "subnetevm"
-		case xsvm.ID:
-			vmIDStr = "xsvm"
-		default:
-			vmIDStr = vmID.String()
-		}
-
 		err := m.Metrics.Register(
-			metric.AppendNamespace(ChainNamespace, vmIDStr),
+			metric.AppendNamespace(ChainNamespace, vmName),
 			vmGatherer,
 		)
 		if err != nil {
