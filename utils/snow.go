@@ -26,7 +26,7 @@ func TestSnowContext() *snow.Context {
 		PublicKey:      pk,
 		Log:            logging.NoLog{},
 		BCLookup:       ids.NewAliaser(),
-		Metrics:        metrics.NewOptionalGatherer(),
+		Metrics:        metrics.NewMultiGatherer(),
 		ChainDataDir:   "",
 		ValidatorState: &validators.TestState{},
 	}
