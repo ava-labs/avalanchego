@@ -39,6 +39,13 @@ func GetNodesMetrics(ctx context.Context, nodeURIs []string) (NodesMetrics, erro
 	return metrics, nil
 }
 
+// GetMetricValue returns the value of the specified metric which has the
+// required labels.
+//
+// If multiple metrics match the provided labels, the first metric found is
+// returned.
+//
+// Only Counter and Gauge metrics are supported.
 func GetMetricValue(metrics NodeMetrics, name string, labels prometheus.Labels) (float64, bool) {
 	metricFamily, ok := metrics[name]
 	if !ok {
