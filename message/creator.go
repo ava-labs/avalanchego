@@ -32,7 +32,6 @@ func NewCreator(
 ) (Creator, error) {
 	builder, err := newMsgBuilder(
 		log,
-		"codec",
 		metrics,
 		maxMessageTimeout,
 	)

@@ -6,8 +6,8 @@ package metric
 import "strings"
 
 const (
-	NamespaceSeparator     = "_"
 	NamespaceSeparatorByte = '_'
+	NamespaceSeparator     = string(NamespaceSeparatorByte)
 )
 
 func AppendNamespace(prefix, suffix string) string {

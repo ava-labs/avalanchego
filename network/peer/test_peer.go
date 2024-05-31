@@ -83,9 +83,7 @@ func StartTestPeer(
 		return nil, err
 	}
 
-	metrics, err := NewMetrics(
-		prometheus.NewRegistry(),
-	)
+	metrics, err := NewMetrics(prometheus.NewRegistry())
 	if err != nil {
 		return nil, err
 	}

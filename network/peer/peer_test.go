@@ -62,9 +62,7 @@ func newConfig(t *testing.T) Config {
 	t.Helper()
 	require := require.New(t)
 
-	metrics, err := NewMetrics(
-		prometheus.NewRegistry(),
-	)
+	metrics, err := NewMetrics(prometheus.NewRegistry())
 	require.NoError(err)
 
 	resourceTracker, err := tracker.NewResourceTracker(
