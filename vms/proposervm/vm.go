@@ -102,10 +102,6 @@ type VM struct {
 	// lastAcceptedHeight is set to the last accepted PostForkBlock's height.
 	lastAcceptedHeight uint64
 
-	// lastScheduledBlockBuildingSlot is set by SetPreference before a block was scheduled to be built.
-	// This variable helps us to report the block building and it's slot assigment.
-	lastScheduledBlockBuildingSlot uint64
-
 	// proposerBuildSlotGauge is the metric gauge used when reporting the current slot block build built.
 	proposerBuildSlotGauge prometheus.Gauge
 }
@@ -120,12 +116,11 @@ func New(
 	batchedVM, _ := vm.(block.BatchedChainVM)
 	ssVM, _ := vm.(block.StateSyncableVM)
 	return &VM{
-		ChainVM:                        vm,
-		Config:                         config,
-		blockBuilderVM:                 blockBuilderVM,
-		batchedVM:                      batchedVM,
-		ssVM:                           ssVM,
-		lastScheduledBlockBuildingSlot: proposer.PreDurangoProposalSlot,
+		ChainVM:        vm,
+		Config:         config,
+		blockBuilderVM: blockBuilderVM,
+		batchedVM:      batchedVM,
+		ssVM:           ssVM,
 	}
 }
 
@@ -279,11 +274,6 @@ func (vm *VM) SetState(ctx context.Context, newState snow.State) error {
 }
 
 func (vm *VM) BuildBlock(ctx context.Context) (snowman.Block, error) {
-	// report to the metrics that we're building a block for slot lastScheduledBlockBuildingSlot.
-	if vm.lastScheduledBlockBuildingSlot != proposer.PreDurangoProposalSlot {
-		vm.proposerBuildSlotGauge.Set(float64(vm.lastScheduledBlockBuildingSlot))
-	}
-
 	preferredBlock, err := vm.getBlock(ctx, vm.preferred)
 	if err != nil {
 		vm.ctx.Log.Error("unexpected build block failure",
@@ -328,11 +318,15 @@ func (vm *VM) SetPreference(ctx context.Context, preferred ids.ID) error {
 		return err
 	}
 
+	const (
+		preDurangoProposalSlot = ^uint64(0)
+	)
+
 	var (
 		childBlockHeight = blk.Height() + 1
 		parentTimestamp  = blk.Timestamp()
 		nextStartTime    time.Time
-		proposalSlot     uint64
+		proposalSlot     = preDurangoProposalSlot
 	)
 
 	if vm.IsDurangoActivated(parentTimestamp) {
@@ -352,7 +346,6 @@ func (vm *VM) SetPreference(ctx context.Context, preferred ids.ID) error {
 			pChainHeight,
 			parentTimestamp,
 		)
-		proposalSlot = proposer.PreDurangoProposalSlot
 	}
 	if err != nil {
 		vm.ctx.Log.Debug("failed to fetch the expected delay",
@@ -365,8 +358,12 @@ func (vm *VM) SetPreference(ctx context.Context, preferred ids.ID) error {
 		// until the P-chain's height has advanced.
 		return nil
 	}
-	// set the building slot, so that we could report that to the metrics while the block is being built.
-	vm.lastScheduledBlockBuildingSlot = proposalSlot
+
+	// if we're done bootstrapping, and we have a proposal window slot, report that
+	// to the metrics.
+	if (proposalSlot != preDurangoProposalSlot) && (vm.consensusState == snow.NormalOp) {
+		vm.proposerBuildSlotGauge.Set(float64(proposalSlot))
+	}
 
 	vm.Scheduler.SetBuildBlockTime(nextStartTime)
 
