@@ -32,15 +32,13 @@ func TestNewSetErrorOnPollsMetrics(t *testing.T) {
 
 	factory := NewEarlyTermNoTraversalFactory(1, 1)
 	log := logging.NoLog{}
-	namespace := ""
 	registerer := prometheus.NewRegistry()
 
 	require.NoError(registerer.Register(prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: namespace,
-		Name:      "polls",
+		Name: "polls",
 	})))
 
-	_, err := NewSet(factory, log, namespace, registerer)
+	_, err := NewSet(factory, log, registerer)
 	require.ErrorIs(err, errFailedPollsMetric)
 }
 
@@ -49,15 +47,13 @@ func TestNewSetErrorOnPollDurationMetrics(t *testing.T) {
 
 	factory := NewEarlyTermNoTraversalFactory(1, 1)
 	log := logging.NoLog{}
-	namespace := ""
 	registerer := prometheus.NewRegistry()
 
 	require.NoError(registerer.Register(prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: namespace,
-		Name:      "poll_duration_count",
+		Name: "poll_duration_count",
 	})))
 
-	_, err := NewSet(factory, log, namespace, registerer)
+	_, err := NewSet(factory, log, registerer)
 	require.ErrorIs(err, errFailedPollDurationMetrics)
 }
 
@@ -69,9 +65,8 @@ func TestCreateAndFinishPollOutOfOrder_NewerFinishesFirst(t *testing.T) {
 
 	factory := NewEarlyTermNoTraversalFactory(alpha, alpha)
 	log := logging.NoLog{}
-	namespace := ""
 	registerer := prometheus.NewRegistry()
-	s, err := NewSet(factory, log, namespace, registerer)
+	s, err := NewSet(factory, log, registerer)
 	require.NoError(err)
 
 	// create two polls for the two blocks
@@ -106,9 +101,8 @@ func TestCreateAndFinishPollOutOfOrder_OlderFinishesFirst(t *testing.T) {
 
 	factory := NewEarlyTermNoTraversalFactory(alpha, alpha)
 	log := logging.NoLog{}
-	namespace := ""
 	registerer := prometheus.NewRegistry()
-	s, err := NewSet(factory, log, namespace, registerer)
+	s, err := NewSet(factory, log, registerer)
 	require.NoError(err)
 
 	// create two polls for the two blocks
@@ -143,9 +137,8 @@ func TestCreateAndFinishPollOutOfOrder_UnfinishedPollsGaps(t *testing.T) {
 
 	factory := NewEarlyTermNoTraversalFactory(alpha, alpha)
 	log := logging.NoLog{}
-	namespace := ""
 	registerer := prometheus.NewRegistry()
-	s, err := NewSet(factory, log, namespace, registerer)
+	s, err := NewSet(factory, log, registerer)
 	require.NoError(err)
 
 	// create three polls for the two blocks
@@ -188,9 +181,8 @@ func TestCreateAndFinishSuccessfulPoll(t *testing.T) {
 
 	factory := NewEarlyTermNoTraversalFactory(alpha, alpha)
 	log := logging.NoLog{}
-	namespace := ""
 	registerer := prometheus.NewRegistry()
-	s, err := NewSet(factory, log, namespace, registerer)
+	s, err := NewSet(factory, log, registerer)
 	require.NoError(err)
 
 	require.Zero(s.Len())
@@ -221,9 +213,8 @@ func TestCreateAndFinishFailedPoll(t *testing.T) {
 
 	factory := NewEarlyTermNoTraversalFactory(alpha, alpha)
 	log := logging.NoLog{}
-	namespace := ""
 	registerer := prometheus.NewRegistry()
-	s, err := NewSet(factory, log, namespace, registerer)
+	s, err := NewSet(factory, log, registerer)
 	require.NoError(err)
 
 	require.Zero(s.Len())
@@ -251,9 +242,8 @@ func TestSetString(t *testing.T) {
 
 	factory := NewEarlyTermNoTraversalFactory(alpha, alpha)
 	log := logging.NoLog{}
-	namespace := ""
 	registerer := prometheus.NewRegistry()
-	s, err := NewSet(factory, log, namespace, registerer)
+	s, err := NewSet(factory, log, registerer)
 	require.NoError(err)
 
 	expected := `current polls: (Size = 1)
