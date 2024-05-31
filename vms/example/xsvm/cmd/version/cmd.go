@@ -8,6 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm"
 )
@@ -29,8 +30,8 @@ func Command() *cobra.Command {
 func versionFunc(*cobra.Command, []string) error {
 	fmt.Printf(
 		format,
-		xsvm.Name,
-		xsvm.ID,
+		constants.XSVMName,
+		constants.XSVMID,
 		xsvm.Version,
 		version.RPCChainVMProtocol,
 	)

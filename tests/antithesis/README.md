@@ -49,6 +49,21 @@ In addition, github workflows are suggested to ensure
 `scripts/tests.build_antithesis_images.sh` runs against PRs and
 `scripts/build_antithesis_images.sh` runs against pushes.
 
+### Use of a builder image
+
+To simplify building instrumented (for running in CI) and
+non-instrumented (for running locally) versions of the workload and
+node images, a common builder image is used. If on an amd64 host,
+`tests/antithesis/avalanchego/Dockerfile.builder-instrumented` is used
+to create an instrumented builder. On an arm64 host,
+`tests/antithesis/avalanchego/Dockerfile.builder-uninstrumented` is
+used to create an uninstrumented builder. In both cases, the builder
+image is based on the default golang image and will include the source
+code necessary to build the node and workload binaries. The
+alternative would require duplicating builder setup for instrumented
+and non-instrumented builds for the workload and node images of each
+test setup.
+
 ## Troubleshooting a test setup
 
 ### Running a workload directly
