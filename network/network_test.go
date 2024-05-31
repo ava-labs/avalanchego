@@ -104,7 +104,6 @@ var (
 
 		DialerConfig: defaultDialerConfig,
 
-		Namespace:          "",
 		NetworkID:          49463,
 		MaxClockDifference: time.Minute,
 		PingFrequency:      constants.DefaultPingFrequency,
@@ -196,7 +195,6 @@ func newMessageCreator(t *testing.T) message.Creator {
 	mc, err := message.NewCreator(
 		logging.NoLog{},
 		prometheus.NewRegistry(),
-		"",
 		constants.DefaultNetworkCompressionType,
 		10*time.Second,
 	)

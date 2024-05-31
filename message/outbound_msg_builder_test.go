@@ -20,7 +20,6 @@ func Test_newOutboundBuilder(t *testing.T) {
 
 	mb, err := newMsgBuilder(
 		logging.NoLog{},
-		"test",
 		prometheus.NewRegistry(),
 		10*time.Second,
 	)
