@@ -91,7 +91,8 @@ const (
 
 	ipResolutionTimeout = 30 * time.Second
 
-	apiNamespace = constants.PlatformName + metric.NamespaceSeparator + "api"
+	apiNamespace     = constants.PlatformName + metric.NamespaceSeparator + "api"
+	networkNamespace = constants.PlatformName + metric.NamespaceSeparator + "network"
 )
 
 var (
@@ -187,11 +188,18 @@ func New(
 	// It must be initiated before networking (initNetworking), chain manager (initChainManager)
 	// and the engine (initChains) but after the metrics (initMetricsAPI)
 	// message.Creator currently record metrics under network namespace
-	n.networkNamespace = "network"
+
+	networkRegisterer, err := metrics.MakeAndRegister(
+		n.MetricsGatherer,
+		networkNamespace,
+	)
+	if err != nil {
+		return nil, err
+	}
+
 	n.msgCreator, err = message.NewCreator(
 		n.Log,
-		n.MetricsRegisterer,
-		n.networkNamespace,
+		networkRegisterer,
 		n.Config.NetworkConfig.CompressionType,
 		n.Config.NetworkConfig.MaximumInboundMessageTimeout,
 	)
@@ -209,7 +217,7 @@ func New(
 	}
 	n.initCPUTargeter(&config.CPUTargeterConfig)
 	n.initDiskTargeter(&config.DiskTargeterConfig)
-	if err := n.initNetworking(); err != nil { // Set up networking layer.
+	if err := n.initNetworking(networkRegisterer); err != nil { // Set up networking layer.
 		return nil, fmt.Errorf("problem initializing networking: %w", err)
 	}
 
@@ -313,8 +321,7 @@ type Node struct {
 	VertexAcceptorGroup snow.AcceptorGroup
 
 	// Net runs the networking stack
-	networkNamespace string
-	Net              network.Network
+	Net network.Network
 
 	// The staking address will optionally be written to a process context
 	// file to enable other nodes to be configured to use this node as a
@@ -390,7 +397,7 @@ type Node struct {
 
 // Initialize the networking layer.
 // Assumes [n.vdrs], [n.CPUTracker], and [n.CPUTargeter] have been initialized.
-func (n *Node) initNetworking() error {
+func (n *Node) initNetworking(reg prometheus.Registerer) error {
 	// Providing either loopback address - `::1` for ipv6 and `127.0.0.1` for ipv4 - as the listen
 	// host will avoid the need for a firewall exception on recent MacOS:
 	//
@@ -587,7 +594,6 @@ func (n *Node) initNetworking() error {
 	}
 
 	// add node configs to network config
-	n.Config.NetworkConfig.Namespace = n.networkNamespace
 	n.Config.NetworkConfig.MyNodeID = n.ID
 	n.Config.NetworkConfig.MyIPPort = dynamicIP
 	n.Config.NetworkConfig.NetworkID = n.Config.NetworkID
@@ -606,7 +612,7 @@ func (n *Node) initNetworking() error {
 	n.Net, err = network.NewNetwork(
 		&n.Config.NetworkConfig,
 		n.msgCreator,
-		n.MetricsRegisterer,
+		reg,
 		n.Log,
 		listener,
 		dialer.NewDialer(constants.NetworkType, n.Config.NetworkConfig.DialerConfig, n.Log),
