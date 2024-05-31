@@ -66,7 +66,6 @@ func NewSet(
 	}
 
 	durPolls, err := metric.NewAverager(
-		"",
 		"poll_duration",
 		"time (in ns) this poll took to complete",
 		reg,
