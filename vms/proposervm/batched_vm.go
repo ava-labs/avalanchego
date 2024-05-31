@@ -145,6 +145,7 @@ func (vm *VM) BatchedParseBlock(ctx context.Context, blks [][]byte) ([]snowman.B
 					vm:       vm,
 					innerBlk: innerBlks[innerBlocksIndex],
 					status:   status,
+					slot:     unassignedSlot,
 				},
 			}
 		} else {
@@ -154,6 +155,7 @@ func (vm *VM) BatchedParseBlock(ctx context.Context, blks [][]byte) ([]snowman.B
 					vm:       vm,
 					innerBlk: innerBlks[innerBlocksIndex],
 					status:   status,
+					slot:     unassignedSlot,
 				},
 			}
 		}

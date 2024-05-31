@@ -104,6 +104,9 @@ type VM struct {
 
 	// proposerBuildSlotGauge is the metric gauge used when reporting the current slot block build built.
 	proposerBuildSlotGauge prometheus.Gauge
+
+	// acceptedBlocksSlotHistogram is the metric histogram that is being updated once a block gets accepted with it's corresponding slot.
+	acceptedBlocksSlotHistogram prometheus.Histogram
 }
 
 // New performs best when [minBlkDelay] is whole seconds. This is because block
@@ -237,6 +240,18 @@ func (vm *VM) Initialize(
 	if err = registerer.Register(vm.proposerBuildSlotGauge); err != nil {
 		return err
 	}
+
+	vm.acceptedBlocksSlotHistogram = prometheus.NewHistogram(
+		prometheus.HistogramOpts{
+			Namespace: metricsNamespace,
+			Name:      "accepted_blocks_slot_histogram",
+			Help:      "the post-durango slot in which the block was accepted at",
+			Buckets:   []float64{1.0, 2.0, 3.0},
+		},
+	)
+	if err = registerer.Register(vm.acceptedBlocksSlotHistogram); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -318,15 +333,11 @@ func (vm *VM) SetPreference(ctx context.Context, preferred ids.ID) error {
 		return err
 	}
 
-	const (
-		preDurangoProposalSlot = ^uint64(0)
-	)
-
 	var (
 		childBlockHeight = blk.Height() + 1
 		parentTimestamp  = blk.Timestamp()
 		nextStartTime    time.Time
-		proposalSlot     = preDurangoProposalSlot
+		proposalSlot     = unassignedSlot
 	)
 
 	if vm.IsDurangoActivated(parentTimestamp) {
@@ -359,9 +370,9 @@ func (vm *VM) SetPreference(ctx context.Context, preferred ids.ID) error {
 		return nil
 	}
 
-	// if we're done bootstrapping, and we have a proposal window slot, report that
-	// to the metrics.
-	if (proposalSlot != preDurangoProposalSlot) && (vm.consensusState == snow.NormalOp) {
+	// if we're done bootstrapping, and we have a proposal window slot, update
+	// the metrics accordingly.
+	if (proposalSlot != unassignedSlot) && (vm.consensusState == snow.NormalOp) {
 		vm.proposerBuildSlotGauge.Set(float64(proposalSlot))
 	}
 
@@ -567,6 +578,7 @@ func (vm *VM) parsePostForkBlock(ctx context.Context, b []byte) (PostForkBlock, 
 				vm:       vm,
 				innerBlk: innerBlk,
 				status:   choices.Processing,
+				slot:     unassignedSlot,
 			},
 		}
 	} else {
@@ -576,6 +588,7 @@ func (vm *VM) parsePostForkBlock(ctx context.Context, b []byte) (PostForkBlock, 
 				vm:       vm,
 				innerBlk: innerBlk,
 				status:   choices.Processing,
+				slot:     unassignedSlot,
 			},
 		}
 	}
@@ -621,6 +634,7 @@ func (vm *VM) getPostForkBlock(ctx context.Context, blkID ids.ID) (PostForkBlock
 				vm:       vm,
 				innerBlk: innerBlk,
 				status:   status,
+				slot:     unassignedSlot,
 			},
 		}, nil
 	}
@@ -630,6 +644,7 @@ func (vm *VM) getPostForkBlock(ctx context.Context, blkID ids.ID) (PostForkBlock
 			vm:       vm,
 			innerBlk: innerBlk,
 			status:   status,
+			slot:     unassignedSlot,
 		},
 	}, nil
 }
@@ -757,4 +772,10 @@ func (vm *VM) cacheInnerBlock(outerBlkID ids.ID, innerBlk snowman.Block) {
 	if diff < innerBlkCacheSize {
 		vm.innerBlkCache.Put(outerBlkID, innerBlk)
 	}
+}
+
+// writeAcceptedSlotMetrics use the previosuly stored slot index and add that to the
+// metrics.
+func (vm *VM) writeAcceptedSlotMetrics(slot uint64) {
+	vm.acceptedBlocksSlotHistogram.Observe(float64(slot))
 }

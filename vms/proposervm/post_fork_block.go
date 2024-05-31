@@ -27,7 +27,11 @@ func (b *postForkBlock) Accept(ctx context.Context) error {
 	if err := b.acceptOuterBlk(); err != nil {
 		return err
 	}
-	return b.acceptInnerBlk(ctx)
+	if err := b.acceptInnerBlk(ctx); err != nil {
+		return err
+	}
+	b.writeAcceptedSlotMetrics()
+	return nil
 }
 
 func (b *postForkBlock) acceptOuterBlk() error {
@@ -106,6 +110,7 @@ func (b *postForkBlock) Options(ctx context.Context) ([2]snowman.Block, error) {
 				vm:       b.vm,
 				innerBlk: innerOption,
 				status:   innerOption.Status(),
+				slot:     unassignedSlot,
 			},
 		}
 	}

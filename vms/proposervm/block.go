@@ -24,6 +24,11 @@ import (
 const (
 	// allowable block issuance in the future
 	maxSkew = 10 * time.Second
+
+	// unassignedSlot defines the default value being used for a slot field, before it's being populated
+	// by the actual slot. Given that the slot could be zero, we had to create a non-zero value or define
+	// the variable with other interpertation ( i.e. one-base indexing, for instance )
+	unassignedSlot = ^uint64(0)
 )
 
 var (
@@ -75,6 +80,9 @@ type postForkCommonComponents struct {
 	vm       *VM
 	innerBlk snowman.Block
 	status   choices.Status
+	// slot is used to store the selected slot for this block. It's being used during Accept, and populated
+	// during verifyPostDurangoBlockDelay.
+	slot uint64
 }
 
 // Return the inner block's height
@@ -269,6 +277,7 @@ func (p *postForkCommonComponents) buildChild(
 			vm:       p.vm,
 			innerBlk: innerBlock,
 			status:   choices.Processing,
+			slot:     unassignedSlot,
 		},
 	}
 
@@ -366,15 +375,17 @@ func (p *postForkCommonComponents) verifyPostDurangoBlockDelay(
 	var (
 		blkTimestamp = blk.Timestamp()
 		blkHeight    = blk.Height()
-		currentSlot  = proposer.TimeToSlot(parentTimestamp, blkTimestamp)
 		proposerID   = blk.Proposer()
 	)
+	// populate the slot for the block.
+	p.slot = proposer.TimeToSlot(parentTimestamp, blkTimestamp)
 
+	// find the expected proposer
 	expectedProposerID, err := p.vm.Windower.ExpectedProposer(
 		ctx,
 		blkHeight,
 		parentPChainHeight,
-		currentSlot,
+		p.slot,
 	)
 	switch {
 	case errors.Is(err, proposer.ErrAnyoneCanPropose):
@@ -389,7 +400,7 @@ func (p *postForkCommonComponents) verifyPostDurangoBlockDelay(
 	case expectedProposerID == proposerID:
 		return true, nil // block should be signed
 	default:
-		return false, fmt.Errorf("%w: slot %d expects %s", errUnexpectedProposer, currentSlot, expectedProposerID)
+		return false, fmt.Errorf("%w: slot %d expects %s", errUnexpectedProposer, p.slot, expectedProposerID)
 	}
 }
 
@@ -503,4 +514,12 @@ func (p *postForkCommonComponents) shouldBuildSignedBlockPreDurango(
 	// attempt to re-handle that once it is our turn to build the block.
 	p.vm.notifyInnerBlockReady()
 	return false, fmt.Errorf("%w: delay %s < minDelay %s", errProposerWindowNotStarted, delay, minDelay)
+}
+
+// writeAcceptedSlotMetrics use the previosuly stored slot index and add that to the
+// metrics managed by the vm.
+func (p *postForkCommonComponents) writeAcceptedSlotMetrics() {
+	if p.slot != unassignedSlot {
+		p.vm.writeAcceptedSlotMetrics(p.slot)
+	}
 }
