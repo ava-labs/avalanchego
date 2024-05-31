@@ -118,14 +118,13 @@ func New(config Config) (*Transitive, error) {
 	polls, err := poll.NewSet(
 		factory,
 		config.Ctx.Log,
-		"",
 		config.Ctx.Registerer,
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	metrics, err := newMetrics("", config.Ctx.Registerer)
+	metrics, err := newMetrics(config.Ctx.Registerer)
 	if err != nil {
 		return nil, err
 	}
