@@ -91,12 +91,11 @@ const (
 
 	ipResolutionTimeout = 30 * time.Second
 
-	apiNamespace     = constants.PlatformName + metric.NamespaceSeparator + "api"
-	dbNamespace      = constants.PlatformName + metric.NamespaceSeparator + "db"
-	networkNamespace = constants.PlatformName + metric.NamespaceSeparator + "network"
-
-	meterDBNamespace   = chains.ChainNamespace + metric.NamespaceSeparator + "meterdb"
-	benchlistNamespace = chains.ChainNamespace + metric.NamespaceSeparator + "benchlist"
+	apiNamespace       = constants.PlatformName + metric.NamespaceSeparator + "api"
+	benchlistNamespace = constants.PlatformName + metric.NamespaceSeparator + "benchlist"
+	dbNamespace        = constants.PlatformName + metric.NamespaceSeparator + "db"
+	meterDBNamespace   = constants.PlatformName + metric.NamespaceSeparator + "meterdb"
+	networkNamespace   = constants.PlatformName + metric.NamespaceSeparator + "network"
 )
 
 var (

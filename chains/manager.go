@@ -76,15 +76,14 @@ const (
 	defaultChannelSize = 1
 	initialQueueSize   = 3
 
-	ChainNamespace        = constants.PlatformName + metric.NamespaceSeparator + "chain"
-	handlerNamespace      = ChainNamespace + metric.NamespaceSeparator + "handler"
-	stakeNamespace        = ChainNamespace + metric.NamespaceSeparator + "stake"
-	p2pNamespace          = ChainNamespace + metric.NamespaceSeparator + "p2p"
-	snowmanNamespace      = ChainNamespace + metric.NamespaceSeparator + "snowman"
-	avalancheNamespace    = ChainNamespace + metric.NamespaceSeparator + "avalanche"
-	proposervmNamespace   = ChainNamespace + metric.NamespaceSeparator + "proposervm"
-	meterchainvmNamespace = ChainNamespace + metric.NamespaceSeparator + "meterchainvm"
-	meterdagvmNamespace   = ChainNamespace + metric.NamespaceSeparator + "meterdagvm"
+	handlerNamespace      = constants.PlatformName + metric.NamespaceSeparator + "handler"
+	stakeNamespace        = constants.PlatformName + metric.NamespaceSeparator + "stake"
+	p2pNamespace          = constants.PlatformName + metric.NamespaceSeparator + "p2p"
+	snowmanNamespace      = constants.PlatformName + metric.NamespaceSeparator + "snowman"
+	avalancheNamespace    = constants.PlatformName + metric.NamespaceSeparator + "avalanche"
+	proposervmNamespace   = constants.PlatformName + metric.NamespaceSeparator + "proposervm"
+	meterchainvmNamespace = constants.PlatformName + metric.NamespaceSeparator + "meterchainvm"
+	meterdagvmNamespace   = constants.PlatformName + metric.NamespaceSeparator + "meterdagvm"
 
 	ChainLabel = "chain"
 )
@@ -1563,7 +1562,7 @@ func (m *manager) getOrMakeVMRegisterer(vmID ids.ID, chainAlias string) (metrics
 		vmName := constants.VMName(vmID)
 		vmGatherer = metrics.NewLabelGatherer(ChainLabel)
 		err := m.Metrics.Register(
-			metric.AppendNamespace(ChainNamespace, vmName),
+			vmName,
 			vmGatherer,
 		)
 		if err != nil {
