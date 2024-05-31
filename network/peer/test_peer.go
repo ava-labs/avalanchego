@@ -76,7 +76,6 @@ func StartTestPeer(
 	mc, err := message.NewCreator(
 		logging.NoLog{},
 		prometheus.NewRegistry(),
-		"",
 		constants.DefaultNetworkCompressionType,
 		10*time.Second,
 	)
@@ -84,10 +83,7 @@ func StartTestPeer(
 		return nil, err
 	}
 
-	metrics, err := NewMetrics(
-		"",
-		prometheus.NewRegistry(),
-	)
+	metrics, err := NewMetrics(prometheus.NewRegistry())
 	if err != nil {
 		return nil, err
 	}

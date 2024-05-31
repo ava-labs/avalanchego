@@ -14,30 +14,23 @@ type metrics struct {
 	numFetchedTxs, numAcceptedTxs prometheus.Counter
 }
 
-func (m *metrics) Initialize(
-	namespace string,
-	registerer prometheus.Registerer,
-) error {
+func (m *metrics) Initialize(registerer prometheus.Registerer) error {
 	m.numFetchedVts = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: namespace,
-		Name:      "fetched_vts",
-		Help:      "Number of vertices fetched during bootstrapping",
+		Name: "bs_fetched_vts",
+		Help: "Number of vertices fetched during bootstrapping",
 	})
 	m.numAcceptedVts = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: namespace,
-		Name:      "accepted_vts",
-		Help:      "Number of vertices accepted during bootstrapping",
+		Name: "bs_accepted_vts",
+		Help: "Number of vertices accepted during bootstrapping",
 	})
 
 	m.numFetchedTxs = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: namespace,
-		Name:      "fetched_txs",
-		Help:      "Number of transactions fetched during bootstrapping",
+		Name: "bs_fetched_txs",
+		Help: "Number of transactions fetched during bootstrapping",
 	})
 	m.numAcceptedTxs = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: namespace,
-		Name:      "accepted_txs",
-		Help:      "Number of transactions accepted during bootstrapping",
+		Name: "bs_accepted_txs",
+		Help: "Number of transactions accepted during bootstrapping",
 	})
 
 	return utils.Err(
