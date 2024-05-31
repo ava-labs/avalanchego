@@ -92,6 +92,7 @@ const (
 	ipResolutionTimeout = 30 * time.Second
 
 	apiNamespace     = constants.PlatformName + metric.NamespaceSeparator + "api"
+	dbNamespace      = constants.PlatformName + metric.NamespaceSeparator + "db"
 	networkNamespace = constants.PlatformName + metric.NamespaceSeparator + "network"
 
 	meterDBNamespace   = chains.ChainNamespace + metric.NamespaceSeparator + "meterdb"
@@ -745,9 +746,9 @@ func (n *Node) Dispatch() error {
  */
 
 func (n *Node) initDatabase() error {
-	dbReg, err := metrics.MakeAndRegister(
+	dbRegisterer, err := metrics.MakeAndRegister(
 		n.MetricsGatherer,
-		metric.AppendNamespace(constants.PlatformName, "db"),
+		dbNamespace,
 	)
 	if err != nil {
 		return err
@@ -759,8 +760,7 @@ func (n *Node) initDatabase() error {
 		// Prior to v1.10.15, the only on-disk database was leveldb, and its
 		// files went to [dbPath]/[networkID]/v1.4.5.
 		dbPath := filepath.Join(n.Config.DatabaseConfig.Path, version.CurrentDatabase.String())
-		var err error
-		n.DB, err = leveldb.New(dbPath, n.Config.DatabaseConfig.Config, n.Log, dbReg)
+		n.DB, err = leveldb.New(dbPath, n.Config.DatabaseConfig.Config, n.Log, dbRegisterer)
 		if err != nil {
 			return fmt.Errorf("couldn't create %s at %s: %w", leveldb.Name, dbPath, err)
 		}
@@ -768,8 +768,7 @@ func (n *Node) initDatabase() error {
 		n.DB = memdb.New()
 	case pebbledb.Name:
 		dbPath := filepath.Join(n.Config.DatabaseConfig.Path, "pebble")
-		var err error
-		n.DB, err = pebbledb.New(dbPath, n.Config.DatabaseConfig.Config, n.Log, dbReg)
+		n.DB, err = pebbledb.New(dbPath, n.Config.DatabaseConfig.Config, n.Log, dbRegisterer)
 		if err != nil {
 			return fmt.Errorf("couldn't create %s at %s: %w", pebbledb.Name, dbPath, err)
 		}
