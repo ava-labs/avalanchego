@@ -10,9 +10,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
-func newAverager(namespace, name string, reg prometheus.Registerer, errs *wrappers.Errs) metric.Averager {
+func newAverager(name string, reg prometheus.Registerer, errs *wrappers.Errs) metric.Averager {
 	return metric.NewAveragerWithErrs(
-		namespace,
+		"",
 		name,
 		"time (in ns) of a "+name,
 		reg,

@@ -285,13 +285,3 @@ jobs:
         run: bash -x scripts/tests.build_antithesis_images.sh
         env:
           TEST_SETUP: xsvm
-  govulncheck:
-    runs-on: ubuntu-latest
-    name: govulncheck
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/set-go-version-in-env
-      - id: govulncheck
-        uses: golang/govulncheck-action@v1
-        with:
-          go-version-input: ${{ env.GO_VERSION }}

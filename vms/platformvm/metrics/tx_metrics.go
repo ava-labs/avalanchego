@@ -21,16 +21,12 @@ type txMetrics struct {
 	numTxs *prometheus.CounterVec
 }
 
-func newTxMetrics(
-	namespace string,
-	registerer prometheus.Registerer,
-) (*txMetrics, error) {
+func newTxMetrics(registerer prometheus.Registerer) (*txMetrics, error) {
 	m := &txMetrics{
 		numTxs: prometheus.NewCounterVec(
 			prometheus.CounterOpts{
-				Namespace: namespace,
-				Name:      "txs_accepted",
-				Help:      "number of transactions accepted",
+				Name: "txs_accepted",
+				Help: "number of transactions accepted",
 			},
 			txLabels,
 		),
