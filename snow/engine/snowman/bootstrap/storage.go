@@ -135,7 +135,7 @@ func execute(
 	lastAcceptedHeight uint64,
 ) error {
 	totalNumberToProcess := tree.Len()
-	if totalNumberToProcess > minBlocksToCompact {
+	if totalNumberToProcess >= minBlocksToCompact {
 		log("compacting database before executing blocks...")
 		if err := db.Compact(nil, nil); err != nil {
 			// Not a fatal error, log and move on.
@@ -170,8 +170,11 @@ func execute(
 	defer func() {
 		iterator.Release()
 
-		halted := haltable.Halted()
-		if !halted {
+		var (
+			numProcessed = totalNumberToProcess - tree.Len()
+			halted       = haltable.Halted()
+		)
+		if numProcessed >= minBlocksToCompact && !halted {
 			log("compacting database after executing blocks...")
 			if err := db.Compact(nil, nil); err != nil {
 				// Not a fatal error, log and move on.
@@ -181,7 +184,6 @@ func execute(
 			}
 		}
 
-		numProcessed := totalNumberToProcess - tree.Len()
 		log("executed blocks",
 			zap.Uint64("numExecuted", numProcessed),
 			zap.Uint64("numToExecute", totalNumberToProcess),

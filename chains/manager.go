@@ -753,7 +753,7 @@ func (m *manager) createAvalancheChain(
 		sampleK = int(bootstrapWeight)
 	}
 
-	connectedValidators, err := tracker.NewMeteredPeers("", ctx.Registerer)
+	connectedValidators, err := tracker.NewMeteredPeers(ctx.Registerer)
 	if err != nil {
 		return nil, fmt.Errorf("error creating peer tracker: %w", err)
 	}
@@ -1098,7 +1098,7 @@ func (m *manager) createSnowmanChain(
 		sampleK = int(bootstrapWeight)
 	}
 
-	connectedValidators, err := tracker.NewMeteredPeers("", ctx.Registerer)
+	connectedValidators, err := tracker.NewMeteredPeers(ctx.Registerer)
 	if err != nil {
 		return nil, fmt.Errorf("error creating peer tracker: %w", err)
 	}
