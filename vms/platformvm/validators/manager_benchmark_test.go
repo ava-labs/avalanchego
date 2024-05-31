@@ -49,7 +49,6 @@ func BenchmarkGetValidatorSet(b *testing.B) {
 		b.TempDir(),
 		nil,
 		logging.NoLog{},
-		"",
 		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
