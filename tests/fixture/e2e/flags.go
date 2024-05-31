@@ -18,7 +18,6 @@ type FlagVars struct {
 	networkDir           string
 	reuseNetwork         bool
 	delayNetworkShutdown bool
-	networkShutdownDelay time.Duration
 	stopNetwork          bool
 	nodeCount            int
 }
@@ -47,8 +46,9 @@ func (v *FlagVars) ReuseNetwork() bool {
 
 func (v *FlagVars) NetworkShutdownDelay() time.Duration {
 	if v.delayNetworkShutdown {
-		// Only return a non-zero value if the delay is enabled
-		return v.networkShutdownDelay
+		// Only return a non-zero value if the delay is enabled.  Make sure this value takes
+		// into account the scrape_interval defined in scripts/run_prometheus.sh.
+		return 12 * time.Second
 	}
 	return 0
 }
@@ -91,13 +91,7 @@ func RegisterFlags() *FlagVars {
 		&vars.delayNetworkShutdown,
 		"delay-network-shutdown",
 		false,
-		"[optional] whether to delay network shutdown to allow a final metrics scrape. The duration is set with --network-shutdown-delay.",
-	)
-	flag.DurationVar(
-		&vars.networkShutdownDelay,
-		"network-shutdown-delay",
-		12*time.Second, // Make sure this value takes into account the scrape_interval defined in scripts/run_prometheus.sh
-		"[optional] the duration to wait before shutting down the test network at the end of the test run. A value greater than the scrape interval is suggested.",
+		"[optional] whether to delay network shutdown to allow a final metrics scrape.",
 	)
 	flag.BoolVar(
 		&vars.stopNetwork,
