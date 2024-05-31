@@ -104,7 +104,7 @@ func BenchmarkGetValidatorSet(b *testing.B) {
 	execConfig, err := config.GetExecutionConfig(nil)
 	require.NoError(err)
 
-	metrics, err := metrics.New("", prometheus.NewRegistry())
+	metrics, err := metrics.New(prometheus.NewRegistry())
 	require.NoError(err)
 
 	s, err := state.New(

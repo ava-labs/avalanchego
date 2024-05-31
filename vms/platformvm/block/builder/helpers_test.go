@@ -177,7 +177,7 @@ func newEnvironment(t *testing.T, f fork) *environment { //nolint:unparam
 		return nil
 	}
 
-	metrics, err := metrics.New("", registerer)
+	metrics, err := metrics.New(registerer)
 	require.NoError(err)
 
 	res.mempool, err = mempool.New("mempool", registerer, nil)

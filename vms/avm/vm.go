@@ -182,7 +182,7 @@ func (vm *VM) Initialize(
 	vm.connectedPeers = make(map[ids.NodeID]*version.Application)
 
 	// Initialize metrics as soon as possible
-	vm.metrics, err = metrics.New("", registerer)
+	vm.metrics, err = metrics.New(registerer)
 	if err != nil {
 		return fmt.Errorf("failed to initialize metrics: %w", err)
 	}

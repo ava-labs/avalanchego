@@ -63,7 +63,6 @@ func (vm *blockVM) Initialize(
 		vm.buildBlockVM != nil,
 		vm.batchedVM != nil,
 		vm.ssVM != nil,
-		"",
 		registerer,
 	)
 	if err != nil {

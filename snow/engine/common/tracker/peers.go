@@ -113,21 +113,18 @@ type meteredPeers struct {
 	totalWeight      prometheus.Gauge
 }
 
-func NewMeteredPeers(namespace string, reg prometheus.Registerer) (Peers, error) {
+func NewMeteredPeers(reg prometheus.Registerer) (Peers, error) {
 	percentConnected := prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespace,
-		Name:      "percent_connected",
-		Help:      "Percent of connected stake",
+		Name: "percent_connected",
+		Help: "Percent of connected stake",
 	})
 	totalWeight := prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespace,
-		Name:      "total_weight",
-		Help:      "Total stake",
+		Name: "total_weight",
+		Help: "Total stake",
 	})
 	numValidators := prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespace,
-		Name:      "num_validators",
-		Help:      "Total number of validators",
+		Name: "num_validators",
+		Help: "Total number of validators",
 	})
 	err := utils.Err(
 		reg.Register(percentConnected),
