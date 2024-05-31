@@ -11,6 +11,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -52,7 +53,7 @@ var (
 	// TODO(marun) Remove when subnet-evm configures the genesis with this key.
 	HardhatKey *secp256k1.PrivateKey
 
-	errInsufficientNodes = errors.New("network needs at least one node to start")
+	errInsufficientNodes = errors.New("at least one node is required")
 )
 
 func init() {
@@ -323,13 +324,19 @@ func (n *Network) Create(rootDir string) error {
 }
 
 // Starts the specified nodes
-func (n *Network) Start(ctx context.Context, w io.Writer, nodesToStart ...*Node) error {
+func (n *Network) StartNodes(ctx context.Context, w io.Writer, nodesToStart ...*Node) error {
+	if len(nodesToStart) == 0 {
+		return errInsufficientNodes
+	}
 	nodesToWaitFor := nodesToStart
-	if len(nodesToStart) < len(n.Nodes) && nodesToStart[0] != n.Nodes[0] {
-		// Wait for all nodes to ensure health is logged for the bootstrap node
+	if !slices.Contains(nodesToStart, n.Nodes[0]) {
+		// If starting all nodes except the bootstrap node (because the bootstrap node is already
+		// running), ensure that the health of the bootstrap node will be logged by including it in
+		// the set of nodes to wait for.
 		nodesToWaitFor = n.Nodes
 	} else {
-		// Simplify output by only logging network start for the first node or when all nodes are starting at once
+		// Simplify output by only logging network start when starting all nodes or when starting
+		// the first node by itself to bootstrap subnet creation.
 		if _, err := fmt.Fprintf(w, "Starting network %s (UUID: %s)\n", n.Dir, n.UUID); err != nil {
 			return err
 		}
@@ -367,10 +374,10 @@ func (n *Network) Bootstrap(ctx context.Context, w io.Writer) error {
 	if len(n.Subnets) == 0 {
 		// Without the need to coordinate subnet configuration,
 		// starting all nodes at once is the simplest option.
-		return n.Start(ctx, w, n.Nodes...)
+		return n.StartNodes(ctx, w, n.Nodes...)
 	}
 
-	// The node that will be used to create subnets bootstrap the network
+	// The node that will be used to create subnets and bootstrap the network
 	bootstrapNode := n.Nodes[0]
 
 	// Whether sybil protection will need to be re-enabled after subnet creation
@@ -382,21 +389,22 @@ func (n *Network) Bootstrap(ctx context.Context, w io.Writer) error {
 		// disabled. This allows the creation of initial subnet state without
 		// requiring coordination between multiple nodes.
 
-		if _, err := fmt.Fprint(w, "Starting a single-node network with sybil protection disabled for quicker subnet creation\n"); err != nil {
+		if _, err := fmt.Fprintln(w, "Starting a single-node network with sybil protection disabled for quicker subnet creation"); err != nil {
 			return err
 		}
 
-		// Ensure sybil protection is disabled for the bootstrap node.
-		if enabled, err := bootstrapNode.Flags.GetBoolVal(config.SybilProtectionEnabledKey, true); err != nil {
+		// If sybil protection is enabled, it should be re-enabled before the node is used to bootstrap the other nodes
+		var err error
+		reEnableSybilProtection, err = bootstrapNode.Flags.GetBoolVal(config.SybilProtectionEnabledKey, true)
+		if err != nil {
 			return fmt.Errorf("failed to read sybil protection flag: %w", err)
-		} else if enabled {
-			bootstrapNode.Flags[config.SybilProtectionEnabledKey] = false
-			// Ensure sybil protection is reenabled before the node is used to bootstrap the other nodes
-			reEnableSybilProtection = true
 		}
+
+		// Ensure sybil protection is disabled for the bootstrap node.
+		bootstrapNode.Flags[config.SybilProtectionEnabledKey] = false
 	}
 
-	if err := n.Start(ctx, w, bootstrapNode); err != nil {
+	if err := n.StartNodes(ctx, w, bootstrapNode); err != nil {
 		return err
 	}
 
@@ -434,10 +442,10 @@ func (n *Network) Bootstrap(ctx context.Context, w io.Writer) error {
 		return fmt.Errorf("failed to start node %s: %w", bootstrapNode.NodeID, err)
 	}
 
-	if _, err := fmt.Fprint(w, "Starting remaining nodes...\n"); err != nil {
+	if _, err := fmt.Fprintln(w, "Starting remaining nodes..."); err != nil {
 		return err
 	}
-	return n.Start(ctx, w, n.Nodes[1:]...)
+	return n.StartNodes(ctx, w, n.Nodes[1:]...)
 }
 
 // Starts the provided node after configuring it for the network.
@@ -774,19 +782,21 @@ func (n *Network) CreateSubnets(ctx context.Context, w io.Writer, restartRequire
 		}
 	}
 
-	if restartRequired && len(validatorsToRestart) > 0 {
-		if _, err := fmt.Fprintln(w, "Restarting node(s) to pick up chain configuration"); err != nil {
-			return err
-		}
+	if !restartRequired || len(validatorsToRestart) == 0 {
+		return nil
+	}
 
-		// Restart nodes to allow configuration for the new chains to take effect
-		for _, node := range n.Nodes {
-			if !validatorsToRestart.Contains(node.NodeID) {
-				continue
-			}
-			if err := n.RestartNode(ctx, w, node); err != nil {
-				return err
-			}
+	if _, err := fmt.Fprintln(w, "Restarting node(s) to pick up chain configuration"); err != nil {
+		return err
+	}
+
+	// Restart nodes to allow configuration for the new chains to take effect
+	for _, node := range n.Nodes {
+		if !validatorsToRestart.Contains(node.NodeID) {
+			continue
+		}
+		if err := n.RestartNode(ctx, w, node); err != nil {
+			return err
 		}
 	}
 
