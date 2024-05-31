@@ -5,6 +5,11 @@ package metric
 
 import "strings"
 
+const (
+	NamespaceSeparatorByte = '_'
+	NamespaceSeparator     = string(NamespaceSeparatorByte)
+)
+
 func AppendNamespace(prefix, suffix string) string {
 	switch {
 	case len(prefix) == 0:
@@ -12,6 +17,6 @@ func AppendNamespace(prefix, suffix string) string {
 	case len(suffix) == 0:
 		return prefix
 	default:
-		return strings.Join([]string{prefix, suffix}, "_")
+		return strings.Join([]string{prefix, suffix}, NamespaceSeparator)
 	}
 }
