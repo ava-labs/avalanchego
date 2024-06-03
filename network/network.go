@@ -537,11 +537,11 @@ func (n *network) Peers(
 	knownPeers *bloom.ReadFilter,
 	salt []byte,
 ) []*ips.ClaimedIPPort {
-	areWeAValidator := n.config.Validators.GetWeight(constants.PrimaryNetworkID, n.config.MyNodeID) != 0
+	areWeAPrimaryNetworkValidator := n.config.Validators.GetWeight(constants.PrimaryNetworkID, n.config.MyNodeID) != 0
 
 	// Only return IPs for subnets that we are tracking.
 	var allowedSubnets func(ids.ID) bool
-	if areWeAValidator {
+	if areWeAPrimaryNetworkValidator {
 		allowedSubnets = func(ids.ID) bool { return true }
 	} else {
 		allowedSubnets = func(subnetID ids.ID) bool {
@@ -549,8 +549,8 @@ func (n *network) Peers(
 		}
 	}
 
-	areTheyAValidator := n.config.Validators.GetWeight(constants.PrimaryNetworkID, peerID) != 0
-	if areWeAValidator && requestAllPeers && areTheyAValidator {
+	areTheyAPrimaryNetworkValidator := n.config.Validators.GetWeight(constants.PrimaryNetworkID, peerID) != 0
+	if areWeAPrimaryNetworkValidator && requestAllPeers && areTheyAPrimaryNetworkValidator {
 		// Return IPs for all subnets.
 		return getGossipableIPs(
 			n.ipTracker,
