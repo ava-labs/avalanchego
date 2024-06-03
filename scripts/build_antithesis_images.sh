@@ -74,19 +74,24 @@ function build_images {
     docker_cmd="${docker_cmd} --build-arg AVALANCHEGO_NODE_IMAGE=antithesis-avalanchego-node:${TAG}"
   fi
 
+  if [[ "${test_setup}" == "avalanchego" ]]; then
+    # Build the image that enables compiling golang binaries for the node and workload
+    # image builds. The builder image is intended to enable building instrumented binaries
+    # if built on amd64 and non-instrumented binaries if built on arm64.
+    #
+    # The builder image is not intended to be pushed so it needs to be built in advance of
+    # adding `--push` to docker_cmd. Since it is never prefixed with `[registry]/[repo]`,
+    # attempting to push will result in an error like `unauthorized: access token has
+    # insufficient scopes`.
+    ${docker_cmd} -t "${builder_image_name}" -f "${builder_dockerfile}" "${AVALANCHE_PATH}"
+  fi
+
   if [[ -n "${image_prefix}" && -z "${node_only}" ]]; then
     # Push images with an image prefix since the prefix defines a
     # registry location, and only if building all images. When
     # building just the node image the image is only intended to be
     # used locally.
     docker_cmd="${docker_cmd} --push"
-  fi
-
-  if [[ "${test_setup}" == "avalanchego" ]]; then
-    # Build the image that enables compiling golang binaries for the node and workload
-    # image builds. The builder image is intended to enable building instrumented binaries
-    # if built on amd64 and non-instrumented binaries if built on arm64.
-    ${docker_cmd} -t "${builder_image_name}" -f "${builder_dockerfile}" "${AVALANCHE_PATH}"
   fi
 
   # Build node image first to allow the workload image to use it.
