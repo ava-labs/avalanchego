@@ -98,14 +98,12 @@ func newMetrics(
 			Help: "cumulative size of all accepted blocks",
 		}),
 		pollsAccepted: metric.NewAveragerWithErrs(
-			"",
 			"blks_polls_accepted",
 			"number of polls from the issuance of a block to its acceptance",
 			reg,
 			&errs,
 		),
 		latAccepted: metric.NewAveragerWithErrs(
-			"",
 			"blks_accepted",
 			"time (in ns) from the issuance of a block to its acceptance",
 			reg,
@@ -121,14 +119,12 @@ func newMetrics(
 			Help: "cumulative size of all rejected blocks",
 		}),
 		pollsRejected: metric.NewAveragerWithErrs(
-			"",
 			"blks_polls_rejected",
 			"number of polls from the issuance of a block to its rejection",
 			reg,
 			&errs,
 		),
 		latRejected: metric.NewAveragerWithErrs(
-			"",
 			"blks_rejected",
 			"time (in ns) from the issuance of a block to its rejection",
 			reg,
