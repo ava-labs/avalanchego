@@ -74,7 +74,7 @@ func main() {
 
 			ctx, cancel := context.WithTimeout(context.Background(), networkStartTimeout)
 			defer cancel()
-			err := tmpnet.StartNewNetwork(
+			err := tmpnet.BootstrapNewNetwork(
 				ctx,
 				os.Stdout,
 				network,
