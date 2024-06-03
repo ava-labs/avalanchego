@@ -10,9 +10,12 @@ import (
 	"fmt"
 	"slices"
 	"sync"
+	"sync/atomic"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 	"golang.org/x/exp/maps"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -45,6 +48,7 @@ const (
 	lowPriority priority = iota + 1
 	medPriority
 	highPriority
+	retryPriority
 )
 
 // Signifies that we should sync the range [start, end].
@@ -107,20 +111,28 @@ type Manager struct {
 	syncing   bool
 	closeOnce sync.Once
 	tokenSize int
+
+	stateSyncNodeIdx uint32
+	metrics          SyncMetrics
 }
 
+// TODO remove non-config values out of this struct
 type ManagerConfig struct {
 	DB                    DB
-	Client                Client
+	RangeProofClient      Client
+	ChangeProofClient     Client
 	SimultaneousWorkLimit int
 	Log                   logging.Logger
 	TargetRoot            ids.ID
 	BranchFactor          merkledb.BranchFactor
+	StateSyncNodes        []ids.NodeID //TODO test
 }
 
 func NewManager(config ManagerConfig) (*Manager, error) {
 	switch {
-	case config.Client == nil:
+	case config.RangeProofClient == nil:
+		return nil, ErrNoClientProvided
+	case config.ChangeProofClient == nil:
 		return nil, ErrNoClientProvided
 	case config.DB == nil:
 		return nil, ErrNoDatabaseProvided
@@ -133,12 +145,19 @@ func NewManager(config ManagerConfig) (*Manager, error) {
 		return nil, err
 	}
 
+	//TODO
+	metrics, err := NewMetrics("", prometheus.NewRegistry())
+	if err != nil {
+		return nil, err
+	}
+
 	m := &Manager{
 		config:          config,
 		doneChan:        make(chan struct{}),
 		unprocessedWork: newWorkHeap(),
 		processedWork:   newWorkHeap(),
 		tokenSize:       merkledb.BranchFactorToTokenSize[config.BranchFactor],
+		metrics:         metrics,
 	}
 	m.unprocessedWorkCond.L = &m.workLock
 
@@ -234,38 +253,40 @@ func (m *Manager) close() {
 	})
 }
 
-// Processes [item] by fetching and applying a change or range proof.
-// Assumes [m.workLock] is not held.
+func (m *Manager) finishWorkItem() {
+	m.workLock.Lock()
+	defer m.workLock.Unlock()
+
+	m.processingWorkItems--
+	m.unprocessedWorkCond.Signal()
+}
+
+// Processes [item] by fetching a change or range proof.
 func (m *Manager) doWork(ctx context.Context, work *workItem) {
-	defer func() {
-		m.workLock.Lock()
-		defer m.workLock.Unlock()
-
-		m.processingWorkItems--
-		m.unprocessedWorkCond.Signal()
-	}()
-
 	if work.localRootID == ids.Empty {
 		// the keys in this range have not been downloaded, so get all key/values
-		m.getAndApplyRangeProof(ctx, work)
+		m.requestRangeProof(ctx, work)
 	} else {
 		// the keys in this range have already been downloaded, but the root changed, so get all changes
-		m.getAndApplyChangeProof(ctx, work)
+		m.requestChangeProof(ctx, work)
 	}
 }
 
 // Fetch and apply the change proof given by [work].
 // Assumes [m.workLock] is not held.
-func (m *Manager) getAndApplyChangeProof(ctx context.Context, work *workItem) {
+func (m *Manager) requestChangeProof(ctx context.Context, work *workItem) {
 	targetRootID := m.getTargetRoot()
 
 	if work.localRootID == targetRootID {
 		// Start root is the same as the end root, so we're done.
 		m.completeWorkItem(ctx, work, work.end, targetRootID, nil)
+		m.finishWorkItem()
 		return
 	}
 
 	if targetRootID == ids.Empty {
+		defer m.finishWorkItem()
+
 		// The trie is empty after this change.
 		// Delete all the key-value pairs in the range.
 		if err := m.config.DB.Clear(); err != nil {
@@ -277,34 +298,295 @@ func (m *Manager) getAndApplyChangeProof(ctx context.Context, work *workItem) {
 		return
 	}
 
-	changeOrRangeProof, err := m.config.Client.GetChangeProof(
-		ctx,
-		&pb.SyncGetChangeProofRequest{
-			StartRootHash: work.localRootID[:],
-			EndRootHash:   targetRootID[:],
-			StartKey: &pb.MaybeBytes{
-				Value:     work.start.Value(),
-				IsNothing: work.start.IsNothing(),
-			},
-			EndKey: &pb.MaybeBytes{
-				Value:     work.end.Value(),
-				IsNothing: work.end.IsNothing(),
-			},
-			KeyLimit:   defaultRequestKeyLimit,
-			BytesLimit: defaultRequestByteSizeLimit,
+	request := &pb.SyncGetChangeProofRequest{
+		StartRootHash: work.localRootID[:],
+		EndRootHash:   targetRootID[:],
+		StartKey: &pb.MaybeBytes{
+			Value:     work.start.Value(),
+			IsNothing: work.start.IsNothing(),
 		},
-		m.config.DB,
-	)
+		EndKey: &pb.MaybeBytes{
+			Value:     work.end.Value(),
+			IsNothing: work.end.IsNothing(),
+		},
+		KeyLimit:   defaultRequestKeyLimit,
+		BytesLimit: defaultRequestByteSizeLimit,
+	}
+
+	requestBytes, err := proto.Marshal(request)
 	if err != nil {
 		m.setError(err)
 		return
 	}
 
+	onResponse := func(ctx context.Context, nodeID ids.NodeID, responseBytes []byte, err error) {
+		defer m.finishWorkItem()
+
+		if err := m.handleChangeProofResponse(ctx, targetRootID, work, request, responseBytes, err); err != nil {
+			m.setError(err)
+			return
+		}
+	}
+
+	//TODO try hitting state sync nodes if provided
+	if err := m.config.ChangeProofClient.AppRequestAny(ctx, requestBytes, onResponse); err != nil {
+		m.setError(err)
+		return
+	}
+
+	m.metrics.RequestMade()
+}
+
+// Fetch and apply the range proof given by [work].
+// Assumes [m.workLock] is not held.
+func (m *Manager) requestRangeProof(ctx context.Context, work *workItem) {
+	targetRootID := m.getTargetRoot()
+
+	if targetRootID == ids.Empty {
+		defer m.finishWorkItem()
+
+		if err := m.config.DB.Clear(); err != nil {
+			m.setError(err)
+			return
+		}
+		work.start = maybe.Nothing[[]byte]()
+		m.completeWorkItem(ctx, work, maybe.Nothing[[]byte](), targetRootID, nil)
+		return
+	}
+
+	request := &pb.SyncGetRangeProofRequest{
+		RootHash: targetRootID[:],
+		StartKey: &pb.MaybeBytes{
+			Value:     work.start.Value(),
+			IsNothing: work.start.IsNothing(),
+		},
+		EndKey: &pb.MaybeBytes{
+			Value:     work.end.Value(),
+			IsNothing: work.end.IsNothing(),
+		},
+		KeyLimit:   defaultRequestKeyLimit,
+		BytesLimit: defaultRequestByteSizeLimit,
+	}
+
+	requestBytes, err := proto.Marshal(request)
+	if err != nil {
+		m.setError(err)
+		return
+	}
+
+	onResponse := func(ctx context.Context, nodeID ids.NodeID, responseBytes []byte, appErr error) {
+		defer m.finishWorkItem()
+
+		if err := m.handleRangeProofResponse(ctx, targetRootID, work, request, responseBytes, appErr); err != nil {
+			m.setError(err)
+			return
+		}
+	}
+
+	if len(m.config.StateSyncNodes) == 0 {
+		if err := m.config.RangeProofClient.AppRequestAny(ctx, requestBytes, onResponse); err != nil {
+			m.setError(err)
+			return
+		}
+	} else {
+		// Get the next nodeID to query using the [nodeIdx] offset.
+		// If we're out of nodes, loop back to 0.
+		// We do this try to query a different node each time if possible.
+		nodeIdx := atomic.AddUint32(&m.stateSyncNodeIdx, 1)
+		nodeID := m.config.StateSyncNodes[nodeIdx%uint32(len(m.config.StateSyncNodes))]
+		if err := m.config.RangeProofClient.AppRequest(ctx, set.Of(nodeID), requestBytes, onResponse); err != nil {
+			m.setError(err)
+			return
+		}
+	}
+
+	m.metrics.RequestMade()
+}
+
+// invariant: this function must only return fatal errors
+func (m *Manager) handleRangeProofResponse(
+	ctx context.Context,
+	targetRootID ids.ID,
+	work *workItem,
+	request *pb.SyncGetRangeProofRequest,
+	responseBytes []byte,
+	err error,
+) error {
+	if err != nil {
+		m.metrics.RequestFailed()
+
+		work.priority = retryPriority
+		m.unprocessedWork.Insert(work)
+
+		return nil // swallow errors that come from peers
+	}
+
+	m.metrics.RequestSucceeded()
+
 	select {
 	case <-m.doneChan:
 		// If we're closed, don't apply the proof.
-		return
+		return nil
 	default:
+	}
+
+	if len(responseBytes) > int(request.BytesLimit) {
+		m.config.Log.Debug("dropping response",
+			zap.Error(
+				fmt.Errorf("%w: (%d) > %d)", errTooManyBytes, len(responseBytes), request.BytesLimit),
+			),
+		)
+		return nil
+	}
+
+	var rangeProofProto pb.RangeProof
+	if err := proto.Unmarshal(responseBytes, &rangeProofProto); err != nil {
+		return err
+	}
+
+	var rangeProof merkledb.RangeProof
+	if err := rangeProof.UnmarshalProto(&rangeProofProto); err != nil {
+		return err
+	}
+
+	if err := verifyRangeProof(
+		ctx,
+		&rangeProof,
+		int(request.KeyLimit),
+		maybeBytesToMaybe(request.StartKey),
+		maybeBytesToMaybe(request.EndKey),
+		request.RootHash,
+		m.tokenSize,
+		merkledb.DefaultHasher, //TODO replace w/ config hasher
+	); err != nil {
+		return err
+	}
+
+	largestHandledKey := work.end
+
+	// Replace all the key-value pairs in the DB from start to end with values from the response.
+	if err := m.config.DB.CommitRangeProof(ctx, work.start, work.end, &rangeProof); err != nil {
+		return err
+	}
+
+	if len(rangeProof.KeyValues) > 0 {
+		largestHandledKey = maybe.Some(rangeProof.KeyValues[len(rangeProof.KeyValues)-1].Key)
+	}
+
+	m.completeWorkItem(ctx, work, largestHandledKey, targetRootID, rangeProof.EndProof)
+	return nil
+}
+
+// invariant: this function must only return fatal errors
+func (m *Manager) handleChangeProofResponse(
+	ctx context.Context,
+	targetRootID ids.ID,
+	work *workItem,
+	request *pb.SyncGetChangeProofRequest,
+	responseBytes []byte,
+	err error,
+) error {
+	if err != nil {
+		m.metrics.RequestFailed()
+
+		work.priority = retryPriority
+		m.unprocessedWork.Insert(work)
+
+		return nil // swallow errors that come from peers
+	}
+
+	m.metrics.RequestSucceeded()
+
+	select {
+	case <-m.doneChan:
+		// If we're closed, don't apply the proof.
+		return nil
+	default:
+	}
+
+	if len(responseBytes) > int(request.BytesLimit) {
+		m.config.Log.Debug("dropping response",
+			zap.Error(
+				fmt.Errorf("%w: (%d) > %d)", errTooManyBytes, len(responseBytes), request.BytesLimit),
+			),
+		)
+		return nil
+	}
+
+	var changeProofResp pb.SyncGetChangeProofResponse
+	if err := proto.Unmarshal(responseBytes, &changeProofResp); err != nil {
+		return err
+	}
+
+	startKey := maybeBytesToMaybe(request.StartKey)
+	endKey := maybeBytesToMaybe(request.EndKey)
+
+	var changeOrRangeProof *merkledb.ChangeOrRangeProof
+	switch changeProofResp := changeProofResp.Response.(type) {
+	case *pb.SyncGetChangeProofResponse_ChangeProof:
+		// The server had enough history to send us a change proof
+		var changeProof merkledb.ChangeProof
+		if err := changeProof.UnmarshalProto(changeProofResp.ChangeProof); err != nil {
+			return err
+		}
+
+		// Ensure the response does not contain more than the requested number of leaves
+		// and the start and end roots match the requested roots.
+		if len(changeProof.KeyChanges) > int(request.KeyLimit) {
+			return fmt.Errorf(
+				"%w: (%d) > %d)",
+				errTooManyKeys, len(changeProof.KeyChanges), request.KeyLimit,
+			)
+		}
+
+		endRoot, err := ids.ToID(request.EndRootHash)
+		if err != nil {
+			return err
+		}
+
+		if err := m.config.DB.VerifyChangeProof(
+			ctx,
+			&changeProof,
+			startKey,
+			endKey,
+			endRoot,
+		); err != nil {
+			return fmt.Errorf("%w due to %w", errInvalidChangeProof, err)
+		}
+
+		changeOrRangeProof = &merkledb.ChangeOrRangeProof{
+			ChangeProof: &changeProof,
+		}
+	case *pb.SyncGetChangeProofResponse_RangeProof:
+
+		var rangeProof merkledb.RangeProof
+		if err := rangeProof.UnmarshalProto(changeProofResp.RangeProof); err != nil {
+			return err
+		}
+
+		// The server did not have enough history to send us a change proof
+		// so they sent a range proof instead.
+		if err := verifyRangeProof(
+			ctx,
+			&rangeProof,
+			int(request.KeyLimit),
+			startKey,
+			endKey,
+			request.EndRootHash,
+			m.tokenSize,
+			merkledb.SHA256Hasher, //TODO replace w/ config hasher
+		); err != nil {
+			return err
+		}
+
+		changeOrRangeProof = &merkledb.ChangeOrRangeProof{
+			RangeProof: &rangeProof,
+		}
+	default:
+		return fmt.Errorf(
+			"%w: %T",
+			errUnexpectedChangeProofResponse, changeProofResp,
+		)
 	}
 
 	if changeOrRangeProof.ChangeProof != nil {
@@ -315,13 +597,13 @@ func (m *Manager) getAndApplyChangeProof(ctx context.Context, work *workItem) {
 		if len(changeProof.KeyChanges) > 0 {
 			if err := m.config.DB.CommitChangeProof(ctx, changeProof); err != nil {
 				m.setError(err)
-				return
+				return nil
 			}
 			largestHandledKey = maybe.Some(changeProof.KeyChanges[len(changeProof.KeyChanges)-1].Key)
 		}
 
 		m.completeWorkItem(ctx, work, largestHandledKey, targetRootID, changeProof.EndProof)
-		return
+		return nil
 	}
 
 	// The server responded with a range proof.
@@ -331,69 +613,13 @@ func (m *Manager) getAndApplyChangeProof(ctx context.Context, work *workItem) {
 		// Add all the key-value pairs we got to the database.
 		if err := m.config.DB.CommitRangeProof(ctx, work.start, work.end, rangeProof); err != nil {
 			m.setError(err)
-			return
+			return nil
 		}
 		largestHandledKey = maybe.Some(rangeProof.KeyValues[len(rangeProof.KeyValues)-1].Key)
 	}
 
 	m.completeWorkItem(ctx, work, largestHandledKey, targetRootID, rangeProof.EndProof)
-}
-
-// Fetch and apply the range proof given by [work].
-// Assumes [m.workLock] is not held.
-func (m *Manager) getAndApplyRangeProof(ctx context.Context, work *workItem) {
-	targetRootID := m.getTargetRoot()
-
-	if targetRootID == ids.Empty {
-		if err := m.config.DB.Clear(); err != nil {
-			m.setError(err)
-			return
-		}
-		work.start = maybe.Nothing[[]byte]()
-		m.completeWorkItem(ctx, work, maybe.Nothing[[]byte](), targetRootID, nil)
-		return
-	}
-
-	proof, err := m.config.Client.GetRangeProof(ctx,
-		&pb.SyncGetRangeProofRequest{
-			RootHash: targetRootID[:],
-			StartKey: &pb.MaybeBytes{
-				Value:     work.start.Value(),
-				IsNothing: work.start.IsNothing(),
-			},
-			EndKey: &pb.MaybeBytes{
-				Value:     work.end.Value(),
-				IsNothing: work.end.IsNothing(),
-			},
-			KeyLimit:   defaultRequestKeyLimit,
-			BytesLimit: defaultRequestByteSizeLimit,
-		},
-	)
-	if err != nil {
-		m.setError(err)
-		return
-	}
-
-	select {
-	case <-m.doneChan:
-		// If we're closed, don't apply the proof.
-		return
-	default:
-	}
-
-	largestHandledKey := work.end
-
-	// Replace all the key-value pairs in the DB from start to end with values from the response.
-	if err := m.config.DB.CommitRangeProof(ctx, work.start, work.end, proof); err != nil {
-		m.setError(err)
-		return
-	}
-
-	if len(proof.KeyValues) > 0 {
-		largestHandledKey = maybe.Some(proof.KeyValues[len(proof.KeyValues)-1].Key)
-	}
-
-	m.completeWorkItem(ctx, work, largestHandledKey, targetRootID, proof.EndProof)
+	return nil
 }
 
 // findNextKey returns the start of the key range that should be fetched next

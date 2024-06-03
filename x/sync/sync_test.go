@@ -6,6 +6,7 @@ package sync
 import (
 	"bytes"
 	"context"
+	"errors"
 	"math/rand"
 	"slices"
 	"testing"
@@ -17,58 +18,21 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/network/p2p"
+	"github.com/ava-labs/avalanchego/network/p2p/p2ptest"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/maybe"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/x/merkledb"
-
-	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
-func newCallthroughSyncClient(ctrl *gomock.Controller, db merkledb.MerkleDB) *MockClient {
-	syncClient := NewMockClient(ctrl)
-	syncClient.EXPECT().GetRangeProof(gomock.Any(), gomock.Any()).DoAndReturn(
-		func(_ context.Context, request *pb.SyncGetRangeProofRequest) (*merkledb.RangeProof, error) {
-			return db.GetRangeProof(
-				context.Background(),
-				maybeBytesToMaybe(request.StartKey),
-				maybeBytesToMaybe(request.EndKey),
-				int(request.KeyLimit),
-			)
-		}).AnyTimes()
-	syncClient.EXPECT().GetChangeProof(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
-		func(_ context.Context, request *pb.SyncGetChangeProofRequest, _ DB) (*merkledb.ChangeOrRangeProof, error) {
-			startRoot, err := ids.ToID(request.StartRootHash)
-			if err != nil {
-				return nil, err
-			}
-
-			endRoot, err := ids.ToID(request.EndRootHash)
-			if err != nil {
-				return nil, err
-			}
-
-			changeProof, err := db.GetChangeProof(
-				context.Background(),
-				startRoot,
-				endRoot,
-				maybeBytesToMaybe(request.StartKey),
-				maybeBytesToMaybe(request.EndKey),
-				int(request.KeyLimit),
-			)
-			if err != nil {
-				return nil, err
-			}
-			return &merkledb.ChangeOrRangeProof{
-				ChangeProof: changeProof,
-			}, nil
-		}).AnyTimes()
-	return syncClient
-}
+var (
+	_ p2p.Handler = (*testHandler)(nil)
+	_ Client      = (*testClient)(nil)
+)
 
 func Test_Creation(t *testing.T) {
 	require := require.New(t)
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	db, err := merkledb.New(
 		context.Background(),
@@ -79,8 +43,8 @@ func Test_Creation(t *testing.T) {
 
 	syncer, err := NewManager(ManagerConfig{
 		DB:                    db,
-		Client:                NewMockClient(ctrl),
-		TargetRoot:            ids.Empty,
+		RangeProofClient:      &p2p.Client{},
+		ChangeProofClient:     &p2p.Client{},
 		SimultaneousWorkLimit: 5,
 		Log:                   logging.NoLog{},
 		BranchFactor:          merkledb.BranchFactor16,
@@ -111,9 +75,11 @@ func Test_Completion(t *testing.T) {
 	)
 	require.NoError(err)
 
+	ctx := context.Background()
 	syncer, err := NewManager(ManagerConfig{
 		DB:                    db,
-		Client:                newCallthroughSyncClient(ctrl, emptyDB),
+		RangeProofClient:      p2ptest.NewClient(t, ctx, NewRangeProofHandler(logging.NoLog{}, emptyDB)),
+		ChangeProofClient:     p2ptest.NewClient(t, ctx, NewChangeProofHandler(logging.NoLog{}, emptyDB)),
 		TargetRoot:            emptyRoot,
 		SimultaneousWorkLimit: 5,
 		Log:                   logging.NoLog{},
@@ -216,9 +182,11 @@ func Test_Sync_FindNextKey_InSync(t *testing.T) {
 	)
 	require.NoError(err)
 
+	ctx := context.Background()
 	syncer, err := NewManager(ManagerConfig{
 		DB:                    db,
-		Client:                newCallthroughSyncClient(ctrl, dbToSync),
+		RangeProofClient:      p2ptest.NewClient(t, ctx, NewRangeProofHandler(logging.NoLog{}, dbToSync)),
+		ChangeProofClient:     p2ptest.NewClient(t, ctx, NewChangeProofHandler(logging.NoLog{}, dbToSync)),
 		TargetRoot:            syncRoot,
 		SimultaneousWorkLimit: 5,
 		Log:                   logging.NoLog{},
@@ -294,7 +262,8 @@ func Test_Sync_FindNextKey_Deleted(t *testing.T) {
 
 	syncer, err := NewManager(ManagerConfig{
 		DB:                    db,
-		Client:                NewMockClient(ctrl),
+		RangeProofClient:      &p2p.Client{},
+		ChangeProofClient:     &p2p.Client{},
 		TargetRoot:            syncRoot,
 		SimultaneousWorkLimit: 5,
 		Log:                   logging.NoLog{},
@@ -324,7 +293,6 @@ func Test_Sync_FindNextKey_Deleted(t *testing.T) {
 
 func Test_Sync_FindNextKey_BranchInLocal(t *testing.T) {
 	require := require.New(t)
-	ctrl := gomock.NewController(t)
 
 	db, err := merkledb.New(
 		context.Background(),
@@ -343,7 +311,8 @@ func Test_Sync_FindNextKey_BranchInLocal(t *testing.T) {
 
 	syncer, err := NewManager(ManagerConfig{
 		DB:                    db,
-		Client:                NewMockClient(ctrl),
+		RangeProofClient:      &p2p.Client{},
+		ChangeProofClient:     &p2p.Client{},
 		TargetRoot:            targetRoot,
 		SimultaneousWorkLimit: 5,
 		Log:                   logging.NoLog{},
@@ -359,7 +328,6 @@ func Test_Sync_FindNextKey_BranchInLocal(t *testing.T) {
 
 func Test_Sync_FindNextKey_BranchInReceived(t *testing.T) {
 	require := require.New(t)
-	ctrl := gomock.NewController(t)
 
 	db, err := merkledb.New(
 		context.Background(),
@@ -379,7 +347,8 @@ func Test_Sync_FindNextKey_BranchInReceived(t *testing.T) {
 
 	syncer, err := NewManager(ManagerConfig{
 		DB:                    db,
-		Client:                NewMockClient(ctrl),
+		RangeProofClient:      &p2p.Client{},
+		ChangeProofClient:     &p2p.Client{},
 		TargetRoot:            targetRoot,
 		SimultaneousWorkLimit: 5,
 		Log:                   logging.NoLog{},
@@ -412,9 +381,12 @@ func Test_Sync_FindNextKey_ExtraValues(t *testing.T) {
 		newDefaultDBConfig(),
 	)
 	require.NoError(err)
+
+	ctx := context.Background()
 	syncer, err := NewManager(ManagerConfig{
 		DB:                    db,
-		Client:                newCallthroughSyncClient(ctrl, dbToSync),
+		RangeProofClient:      p2ptest.NewClient(t, ctx, NewRangeProofHandler(logging.NoLog{}, dbToSync)),
+		ChangeProofClient:     p2ptest.NewClient(t, ctx, NewChangeProofHandler(logging.NoLog{}, dbToSync)),
 		TargetRoot:            syncRoot,
 		SimultaneousWorkLimit: 5,
 		Log:                   logging.NoLog{},
@@ -474,9 +446,11 @@ func TestFindNextKeyEmptyEndProof(t *testing.T) {
 	)
 	require.NoError(err)
 
+	ctx := context.Background()
 	syncer, err := NewManager(ManagerConfig{
 		DB:                    db,
-		Client:                NewMockClient(ctrl),
+		RangeProofClient:      &p2p.Client{},
+		ChangeProofClient:     p2ptest.NewClient(t, ctx, NewChangeProofHandler(logging.NoLog{}, db)),
 		TargetRoot:            ids.Empty,
 		SimultaneousWorkLimit: 5,
 		Log:                   logging.NoLog{},
@@ -542,9 +516,12 @@ func Test_Sync_FindNextKey_DifferentChild(t *testing.T) {
 		newDefaultDBConfig(),
 	)
 	require.NoError(err)
+
+	ctx := context.Background()
 	syncer, err := NewManager(ManagerConfig{
 		DB:                    db,
-		Client:                newCallthroughSyncClient(ctrl, dbToSync),
+		RangeProofClient:      p2ptest.NewClient(t, ctx, NewRangeProofHandler(logging.NoLog{}, dbToSync)),
+		ChangeProofClient:     p2ptest.NewClient(t, ctx, NewChangeProofHandler(logging.NoLog{}, dbToSync)),
 		TargetRoot:            syncRoot,
 		SimultaneousWorkLimit: 5,
 		Log:                   logging.NoLog{},
@@ -576,6 +553,7 @@ func Test_Sync_FindNextKey_DifferentChild(t *testing.T) {
 
 // Test findNextKey by computing the expected result in a naive, inefficient
 // way and comparing it to the actual result
+
 func TestFindNextKeyRandom(t *testing.T) {
 	now := time.Now().UnixNano()
 	t.Logf("seed: %d", now)
@@ -767,7 +745,8 @@ func TestFindNextKeyRandom(t *testing.T) {
 		// Get the actual value from the syncer
 		syncer, err := NewManager(ManagerConfig{
 			DB:                    localDB,
-			Client:                NewMockClient(ctrl),
+			RangeProofClient:      &p2p.Client{},
+			ChangeProofClient:     &p2p.Client{},
 			TargetRoot:            ids.GenerateTestID(),
 			SimultaneousWorkLimit: 5,
 			Log:                   logging.NoLog{},
@@ -793,6 +772,8 @@ func TestFindNextKeyRandom(t *testing.T) {
 	}
 }
 
+// Tests that we are able to sync to the correct root and stay up-to-date even
+// if we are seeing transient errors
 func Test_Sync_Result_Correct_Root(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
@@ -812,14 +793,58 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 		newDefaultDBConfig(),
 	)
 	require.NoError(err)
+
+	ctx := context.Background()
+
+	rangeProofHandler := NewRangeProofHandler(logging.NoLog{}, dbToSync)
+	rangeProofClient := p2ptest.NewClient(t, ctx, rangeProofHandler)
+
+	changeProofHandler := NewChangeProofHandler(logging.NoLog{}, dbToSync)
+	changeProofClient := p2ptest.NewClient(t, ctx, changeProofHandler)
+
+	// flake on every other request
+	i := 0
+
+	flakyRangeProofClient := &testClient{
+		AppRequestAnyF: func(ctx context.Context, appResponse []byte, onResponse p2p.AppResponseCallback) error {
+			defer func() {
+				i++
+			}()
+
+			if i%2 == 0 {
+				onResponse(ctx, ids.GenerateTestNodeID(), nil, errors.New("foobar"))
+				return nil
+			}
+
+			return rangeProofClient.AppRequestAny(ctx, appResponse, onResponse)
+		},
+	}
+
+	flakyChangeProofClient := &testClient{
+		AppRequestAnyF: func(ctx context.Context, appResponse []byte, onResponse p2p.AppResponseCallback) error {
+			defer func() {
+				i++
+			}()
+
+			if i%2 == 0 {
+				onResponse(ctx, ids.GenerateTestNodeID(), nil, errors.New("foobar"))
+				return nil
+			}
+
+			return changeProofClient.AppRequestAny(ctx, appResponse, onResponse)
+		},
+	}
+
 	syncer, err := NewManager(ManagerConfig{
 		DB:                    db,
-		Client:                newCallthroughSyncClient(ctrl, dbToSync),
+		RangeProofClient:      flakyRangeProofClient,
+		ChangeProofClient:     flakyChangeProofClient,
 		TargetRoot:            syncRoot,
 		SimultaneousWorkLimit: 5,
 		Log:                   logging.NoLog{},
 		BranchFactor:          merkledb.BranchFactor16,
 	})
+
 	require.NoError(err)
 	require.NotNil(syncer)
 	require.NoError(syncer.Start(context.Background()))
@@ -854,7 +879,6 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 
 func Test_Sync_Result_Correct_Root_With_Sync_Restart(t *testing.T) {
 	require := require.New(t)
-	ctrl := gomock.NewController(t)
 
 	now := time.Now().UnixNano()
 	t.Logf("seed: %d", now)
@@ -871,9 +895,11 @@ func Test_Sync_Result_Correct_Root_With_Sync_Restart(t *testing.T) {
 	)
 	require.NoError(err)
 
+	ctx := context.Background()
 	syncer, err := NewManager(ManagerConfig{
 		DB:                    db,
-		Client:                newCallthroughSyncClient(ctrl, dbToSync),
+		RangeProofClient:      p2ptest.NewClient(t, ctx, NewRangeProofHandler(logging.NoLog{}, dbToSync)),
+		ChangeProofClient:     p2ptest.NewClient(t, ctx, NewChangeProofHandler(logging.NoLog{}, dbToSync)),
 		TargetRoot:            syncRoot,
 		SimultaneousWorkLimit: 5,
 		Log:                   logging.NoLog{},
@@ -899,7 +925,8 @@ func Test_Sync_Result_Correct_Root_With_Sync_Restart(t *testing.T) {
 
 	newSyncer, err := NewManager(ManagerConfig{
 		DB:                    db,
-		Client:                newCallthroughSyncClient(ctrl, dbToSync),
+		RangeProofClient:      p2ptest.NewClient(t, ctx, NewRangeProofHandler(logging.NoLog{}, dbToSync)),
+		ChangeProofClient:     p2ptest.NewClient(t, ctx, NewChangeProofHandler(logging.NoLog{}, dbToSync)),
 		TargetRoot:            syncRoot,
 		SimultaneousWorkLimit: 5,
 		Log:                   logging.NoLog{},
@@ -917,71 +944,8 @@ func Test_Sync_Result_Correct_Root_With_Sync_Restart(t *testing.T) {
 	require.Equal(syncRoot, newRoot)
 }
 
-func Test_Sync_Error_During_Sync(t *testing.T) {
-	require := require.New(t)
-	ctrl := gomock.NewController(t)
-	now := time.Now().UnixNano()
-	t.Logf("seed: %d", now)
-	r := rand.New(rand.NewSource(now)) // #nosec G404
-
-	dbToSync, err := generateTrie(t, r, 100)
-	require.NoError(err)
-
-	syncRoot, err := dbToSync.GetMerkleRoot(context.Background())
-	require.NoError(err)
-
-	db, err := merkledb.New(
-		context.Background(),
-		memdb.New(),
-		newDefaultDBConfig(),
-	)
-	require.NoError(err)
-
-	client := NewMockClient(ctrl)
-	client.EXPECT().GetRangeProof(gomock.Any(), gomock.Any()).DoAndReturn(
-		func(context.Context, *pb.SyncGetRangeProofRequest) (*merkledb.RangeProof, error) {
-			return nil, errInvalidRangeProof
-		},
-	).AnyTimes()
-	client.EXPECT().GetChangeProof(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
-		func(ctx context.Context, request *pb.SyncGetChangeProofRequest, _ DB) (*merkledb.ChangeOrRangeProof, error) {
-			startRoot, err := ids.ToID(request.StartRootHash)
-			require.NoError(err)
-
-			endRoot, err := ids.ToID(request.EndRootHash)
-			require.NoError(err)
-
-			changeProof, err := dbToSync.GetChangeProof(ctx, startRoot, endRoot, maybeBytesToMaybe(request.StartKey), maybeBytesToMaybe(request.EndKey), int(request.KeyLimit))
-			if err != nil {
-				return nil, err
-			}
-
-			return &merkledb.ChangeOrRangeProof{
-				ChangeProof: changeProof,
-			}, nil
-		},
-	).AnyTimes()
-
-	syncer, err := NewManager(ManagerConfig{
-		DB:                    db,
-		Client:                client,
-		TargetRoot:            syncRoot,
-		SimultaneousWorkLimit: 5,
-		Log:                   logging.NoLog{},
-		BranchFactor:          merkledb.BranchFactor16,
-	})
-	require.NoError(err)
-	require.NotNil(syncer)
-
-	require.NoError(syncer.Start(context.Background()))
-
-	err = syncer.Wait(context.Background())
-	require.ErrorIs(err, errInvalidRangeProof)
-}
-
 func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 	require := require.New(t)
-	ctrl := gomock.NewController(t)
 
 	now := time.Now().UnixNano()
 	t.Logf("seed: %d", now)
@@ -1030,39 +994,21 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 	updatedRootChan := make(chan struct{}, 1)
 	updatedRootChan <- struct{}{}
 
-	client := NewMockClient(ctrl)
-	client.EXPECT().GetRangeProof(gomock.Any(), gomock.Any()).DoAndReturn(
-		func(ctx context.Context, request *pb.SyncGetRangeProofRequest) (*merkledb.RangeProof, error) {
-			<-updatedRootChan
-			root, err := ids.ToID(request.RootHash)
-			require.NoError(err)
-			return dbToSync.GetRangeProofAtRoot(ctx, root, maybeBytesToMaybe(request.StartKey), maybeBytesToMaybe(request.EndKey), int(request.KeyLimit))
-		},
-	).AnyTimes()
-	client.EXPECT().GetChangeProof(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
-		func(ctx context.Context, request *pb.SyncGetChangeProofRequest, _ DB) (*merkledb.ChangeOrRangeProof, error) {
-			<-updatedRootChan
+	ctx := context.Background()
+	rangeProofClient := p2ptest.NewClient(t, ctx, &testHandler{
+		handler:         NewRangeProofHandler(logging.NoLog{}, dbToSync),
+		updatedRootChan: updatedRootChan,
+	})
 
-			startRoot, err := ids.ToID(request.StartRootHash)
-			require.NoError(err)
-
-			endRoot, err := ids.ToID(request.EndRootHash)
-			require.NoError(err)
-
-			changeProof, err := dbToSync.GetChangeProof(ctx, startRoot, endRoot, maybeBytesToMaybe(request.StartKey), maybeBytesToMaybe(request.EndKey), int(request.KeyLimit))
-			if err != nil {
-				return nil, err
-			}
-
-			return &merkledb.ChangeOrRangeProof{
-				ChangeProof: changeProof,
-			}, nil
-		},
-	).AnyTimes()
+	changeProofClient := p2ptest.NewClient(t, ctx, &testHandler{
+		handler:         NewChangeProofHandler(logging.NoLog{}, dbToSync),
+		updatedRootChan: updatedRootChan,
+	})
 
 	syncer, err := NewManager(ManagerConfig{
 		DB:                    db,
-		Client:                client,
+		RangeProofClient:      rangeProofClient,
+		ChangeProofClient:     changeProofClient,
 		TargetRoot:            firstSyncRoot,
 		SimultaneousWorkLimit: 5,
 		Log:                   logging.NoLog{},
@@ -1102,7 +1048,8 @@ func Test_Sync_UpdateSyncTarget(t *testing.T) {
 
 	m, err := NewManager(ManagerConfig{
 		DB:                    merkledb.NewMockMerkleDB(ctrl), // Not used
-		Client:                NewMockClient(ctrl),            // Not used
+		RangeProofClient:      &p2p.Client{},
+		ChangeProofClient:     &p2p.Client{},
 		TargetRoot:            ids.Empty,
 		SimultaneousWorkLimit: 5,
 		Log:                   logging.NoLog{},
@@ -1202,4 +1149,36 @@ func generateTrieWithMinKeyLen(t *testing.T, r *rand.Rand, count int, minKeyLen 
 	}
 	slices.SortFunc(allKeys, bytes.Compare)
 	return db, allKeys, batch.Write()
+}
+
+type testHandler struct {
+	p2p.NoOpHandler
+	handler         p2p.Handler
+	updatedRootChan chan struct{}
+}
+
+func (t *testHandler) AppRequest(ctx context.Context, nodeID ids.NodeID, deadline time.Time, requestBytes []byte) ([]byte, error) {
+	<-t.updatedRootChan
+	return t.handler.AppRequest(ctx, nodeID, deadline, requestBytes)
+}
+
+type testClient struct {
+	AppRequestF    func(ctx context.Context, nodeIDs set.Set[ids.NodeID], appResponse []byte, onResponse p2p.AppResponseCallback) error
+	AppRequestAnyF func(ctx context.Context, appResponse []byte, onResponse p2p.AppResponseCallback) error
+}
+
+func (t testClient) AppRequest(ctx context.Context, nodeIDs set.Set[ids.NodeID], appRequestBytes []byte, onResponse p2p.AppResponseCallback) error {
+	if t.AppRequestF == nil {
+		return nil
+	}
+
+	return t.AppRequestF(ctx, nodeIDs, appRequestBytes, onResponse)
+}
+
+func (t testClient) AppRequestAny(ctx context.Context, appRequestBytes []byte, onResponse p2p.AppResponseCallback) error {
+	if t.AppRequestAnyF == nil {
+		return nil
+	}
+
+	return t.AppRequestAnyF(ctx, appRequestBytes, onResponse)
 }
