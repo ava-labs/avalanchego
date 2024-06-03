@@ -14,69 +14,164 @@ import (
 )
 
 func TestLabelGatherer_Gather(t *testing.T) {
-	require := require.New(t)
-
-	gatherer := NewLabelGatherer("smith")
-	require.NotNil(gatherer)
-
-	registerA := prometheus.NewRegistry()
-	require.NoError(gatherer.Register("rick", registerA))
-
-	registerB := prometheus.NewRegistry()
-	require.NoError(gatherer.Register("morty", registerB))
-
-	counterA := prometheus.NewCounter(prometheus.CounterOpts{
-		Name: "counter",
-		Help: "help",
-	})
-	require.NoError(registerA.Register(counterA))
-
-	counterB := prometheus.NewCounter(prometheus.CounterOpts{
-		Name: "counter",
-		Help: "help",
-	})
-	counterB.Inc()
-	require.NoError(registerB.Register(counterB))
-
-	metrics, err := gatherer.Gather()
-	require.NoError(err)
-	require.Equal(
-		[]*dto.MetricFamily{
-			{
-				Name: proto.String("counter"),
-				Help: proto.String("help"),
-				Type: dto.MetricType_COUNTER.Enum(),
-				Metric: []*dto.Metric{
-					{
-						Label: []*dto.LabelPair{
-							{
-								Name:  proto.String("smith"),
-								Value: proto.String("morty"),
-							},
+	const (
+		labelName         = "smith"
+		labelValueA       = "rick"
+		labelValueB       = "morty"
+		customLabelName   = "tag"
+		customLabelValueA = "a"
+		customLabelValueB = "b"
+	)
+	tests := []struct {
+		name            string
+		labelName       string
+		expectedMetrics []*dto.Metric
+		expectErr       bool
+	}{
+		{
+			name:      "no overlap",
+			labelName: customLabelName,
+			expectedMetrics: []*dto.Metric{
+				{
+					Label: []*dto.LabelPair{
+						{
+							Name:  proto.String(labelName),
+							Value: proto.String(labelValueB),
 						},
-						Counter: &dto.Counter{
-							Value: proto.Float64(1),
+						{
+							Name:  proto.String(customLabelName),
+							Value: proto.String(customLabelValueB),
 						},
 					},
-					{
-						Label: []*dto.LabelPair{
-							{
-								Name:  proto.String("smith"),
-								Value: proto.String("rick"),
-							},
+					Counter: &dto.Counter{
+						Value: proto.Float64(1),
+					},
+				},
+				{
+					Label: []*dto.LabelPair{
+						{
+							Name:  proto.String(labelName),
+							Value: proto.String(labelValueA),
 						},
-						Counter: &dto.Counter{
-							Value: proto.Float64(0),
+						{
+							Name:  proto.String(customLabelName),
+							Value: proto.String(customLabelValueA),
 						},
+					},
+					Counter: &dto.Counter{
+						Value: proto.Float64(0),
 					},
 				},
 			},
+			expectErr: false,
 		},
-		metrics,
-	)
+		{
+			name:      "has overlap",
+			labelName: labelName,
+			expectedMetrics: []*dto.Metric{
+				{
+					Label: []*dto.LabelPair{
+						{
+							Name:  proto.String(labelName),
+							Value: proto.String(labelValueB),
+						},
+						{
+							Name:  proto.String(customLabelName),
+							Value: proto.String(customLabelValueB),
+						},
+					},
+					Counter: &dto.Counter{
+						Value: proto.Float64(1),
+					},
+				},
+			},
+			expectErr: true,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
+
+			gatherer := NewLabelGatherer(labelName)
+			require.NotNil(gatherer)
+
+			registerA := prometheus.NewRegistry()
+			require.NoError(gatherer.Register(labelValueA, registerA))
+			{
+				counterA := prometheus.NewCounterVec(
+					counterOpts,
+					[]string{test.labelName},
+				)
+				counterA.With(prometheus.Labels{test.labelName: customLabelValueA})
+				require.NoError(registerA.Register(counterA))
+			}
+
+			registerB := prometheus.NewRegistry()
+			require.NoError(gatherer.Register(labelValueB, registerB))
+			{
+				counterB := prometheus.NewCounterVec(
+					counterOpts,
+					[]string{customLabelName},
+				)
+				counterB.With(prometheus.Labels{customLabelName: customLabelValueB}).Inc()
+				require.NoError(registerB.Register(counterB))
+			}
+
+			metrics, err := gatherer.Gather()
+			if test.expectErr {
+				require.Error(err) //nolint:forbidigo // the error is not exported
+			} else {
+				require.NoError(err)
+			}
+			require.Equal(
+				[]*dto.MetricFamily{
+					{
+						Name:   proto.String(counterOpts.Name),
+						Help:   proto.String(counterOpts.Help),
+						Type:   dto.MetricType_COUNTER.Enum(),
+						Metric: test.expectedMetrics,
+					},
+				},
+				metrics,
+			)
+		})
+	}
 }
 
 func TestLabelGatherer_Register(t *testing.T) {
+	firstLabeledGatherer := &labeledGatherer{
+		labelValue: "first",
+		gatherer:   &testGatherer{},
+	}
+	firstLabelGatherer := func() *labelGatherer {
+		return &labelGatherer{
+			multiGatherer: multiGatherer{
+				names: []string{firstLabeledGatherer.labelValue},
+				gatherers: prometheus.Gatherers{
+					firstLabeledGatherer,
+				},
+			},
+		}
+	}
+	secondLabeledGatherer := &labeledGatherer{
+		labelValue: "second",
+		gatherer: &testGatherer{
+			mfs: []*dto.MetricFamily{{}},
+		},
+	}
+	secondLabelGatherer := &labelGatherer{
+		multiGatherer: multiGatherer{
+			names: []string{
+				firstLabeledGatherer.labelValue,
+				secondLabeledGatherer.labelValue,
+			},
+			gatherers: prometheus.Gatherers{
+				firstLabeledGatherer,
+				secondLabeledGatherer,
+			},
+		},
+	}
+
 	tests := []struct {
 		name                  string
 		labelGatherer         *labelGatherer
@@ -86,88 +181,28 @@ func TestLabelGatherer_Register(t *testing.T) {
 		expectedLabelGatherer *labelGatherer
 	}{
 		{
-			name:          "first registration",
-			labelGatherer: &labelGatherer{},
-			labelValue:    "first",
-			gatherer:      &testGatherer{},
-			expectedErr:   nil,
-			expectedLabelGatherer: &labelGatherer{
-				multiGatherer: multiGatherer{
-					names: []string{"first"},
-					gatherers: prometheus.Gatherers{
-						&labeledGatherer{
-							labelValue: "first",
-							gatherer:   &testGatherer{},
-						},
-					},
-				},
-			},
+			name:                  "first registration",
+			labelGatherer:         &labelGatherer{},
+			labelValue:            "first",
+			gatherer:              firstLabeledGatherer.gatherer,
+			expectedErr:           nil,
+			expectedLabelGatherer: firstLabelGatherer(),
 		},
 		{
-			name: "second registration",
-			labelGatherer: &labelGatherer{
-				multiGatherer: multiGatherer{
-					names: []string{"first"},
-					gatherers: prometheus.Gatherers{
-						&labeledGatherer{
-							labelValue: "first",
-							gatherer:   &testGatherer{},
-						},
-					},
-				},
-			},
-			labelValue: "second",
-			gatherer: &testGatherer{
-				mfs: []*dto.MetricFamily{{}},
-			},
-			expectedErr: nil,
-			expectedLabelGatherer: &labelGatherer{
-				multiGatherer: multiGatherer{
-					names: []string{"first", "second"},
-					gatherers: prometheus.Gatherers{
-						&labeledGatherer{
-							labelValue: "first",
-							gatherer:   &testGatherer{},
-						},
-						&labeledGatherer{
-							labelValue: "second",
-							gatherer: &testGatherer{
-								mfs: []*dto.MetricFamily{{}},
-							},
-						},
-					},
-				},
-			},
+			name:                  "second registration",
+			labelGatherer:         firstLabelGatherer(),
+			labelValue:            "second",
+			gatherer:              secondLabeledGatherer.gatherer,
+			expectedErr:           nil,
+			expectedLabelGatherer: secondLabelGatherer,
 		},
 		{
-			name: "conflicts with previous registration",
-			labelGatherer: &labelGatherer{
-				multiGatherer: multiGatherer{
-					names: []string{"first"},
-					gatherers: prometheus.Gatherers{
-						&labeledGatherer{
-							labelValue: "first",
-							gatherer:   &testGatherer{},
-						},
-					},
-				},
-			},
-			labelValue: "first",
-			gatherer: &testGatherer{
-				mfs: []*dto.MetricFamily{{}},
-			},
-			expectedErr: errDuplicateGatherer,
-			expectedLabelGatherer: &labelGatherer{
-				multiGatherer: multiGatherer{
-					names: []string{"first"},
-					gatherers: prometheus.Gatherers{
-						&labeledGatherer{
-							labelValue: "first",
-							gatherer:   &testGatherer{},
-						},
-					},
-				},
-			},
+			name:                  "conflicts with previous registration",
+			labelGatherer:         firstLabelGatherer(),
+			labelValue:            "first",
+			gatherer:              secondLabeledGatherer.gatherer,
+			expectedErr:           errDuplicateGatherer,
+			expectedLabelGatherer: firstLabelGatherer(),
 		},
 	}
 	for _, test := range tests {

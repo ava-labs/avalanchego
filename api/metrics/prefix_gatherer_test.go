@@ -21,22 +21,18 @@ func TestPrefixGatherer_Gather(t *testing.T) {
 
 	registerA := prometheus.NewRegistry()
 	require.NoError(gatherer.Register("a", registerA))
+	{
+		counterA := prometheus.NewCounter(counterOpts)
+		require.NoError(registerA.Register(counterA))
+	}
 
 	registerB := prometheus.NewRegistry()
 	require.NoError(gatherer.Register("b", registerB))
-
-	counterA := prometheus.NewCounter(prometheus.CounterOpts{
-		Name: "counter",
-		Help: "help",
-	})
-	require.NoError(registerA.Register(counterA))
-
-	counterB := prometheus.NewCounter(prometheus.CounterOpts{
-		Name: "counter",
-		Help: "help",
-	})
-	counterB.Inc()
-	require.NoError(registerB.Register(counterB))
+	{
+		counterB := prometheus.NewCounter(counterOpts)
+		counterB.Inc()
+		require.NoError(registerB.Register(counterB))
+	}
 
 	metrics, err := gatherer.Gather()
 	require.NoError(err)
@@ -44,7 +40,7 @@ func TestPrefixGatherer_Gather(t *testing.T) {
 		[]*dto.MetricFamily{
 			{
 				Name: proto.String("a_counter"),
-				Help: proto.String("help"),
+				Help: proto.String(counterOpts.Help),
 				Type: dto.MetricType_COUNTER.Enum(),
 				Metric: []*dto.Metric{
 					{
@@ -57,7 +53,7 @@ func TestPrefixGatherer_Gather(t *testing.T) {
 			},
 			{
 				Name: proto.String("b_counter"),
-				Help: proto.String("help"),
+				Help: proto.String(counterOpts.Help),
 				Type: dto.MetricType_COUNTER.Enum(),
 				Metric: []*dto.Metric{
 					{
@@ -74,6 +70,41 @@ func TestPrefixGatherer_Gather(t *testing.T) {
 }
 
 func TestPrefixGatherer_Register(t *testing.T) {
+	firstPrefixedGatherer := &prefixedGatherer{
+		prefix:   "first",
+		gatherer: &testGatherer{},
+	}
+	firstPrefixGatherer := func() *prefixGatherer {
+		return &prefixGatherer{
+			multiGatherer: multiGatherer{
+				names: []string{
+					firstPrefixedGatherer.prefix,
+				},
+				gatherers: prometheus.Gatherers{
+					firstPrefixedGatherer,
+				},
+			},
+		}
+	}
+	secondPrefixedGatherer := &prefixedGatherer{
+		prefix: "second",
+		gatherer: &testGatherer{
+			mfs: []*dto.MetricFamily{{}},
+		},
+	}
+	secondPrefixGatherer := &prefixGatherer{
+		multiGatherer: multiGatherer{
+			names: []string{
+				firstPrefixedGatherer.prefix,
+				secondPrefixedGatherer.prefix,
+			},
+			gatherers: prometheus.Gatherers{
+				firstPrefixedGatherer,
+				secondPrefixedGatherer,
+			},
+		},
+	}
+
 	tests := []struct {
 		name                   string
 		prefixGatherer         *prefixGatherer
@@ -83,88 +114,28 @@ func TestPrefixGatherer_Register(t *testing.T) {
 		expectedPrefixGatherer *prefixGatherer
 	}{
 		{
-			name:           "first registration",
-			prefixGatherer: &prefixGatherer{},
-			prefix:         "first",
-			gatherer:       &testGatherer{},
-			expectedErr:    nil,
-			expectedPrefixGatherer: &prefixGatherer{
-				multiGatherer: multiGatherer{
-					names: []string{"first"},
-					gatherers: prometheus.Gatherers{
-						&prefixedGatherer{
-							prefix:   "first",
-							gatherer: &testGatherer{},
-						},
-					},
-				},
-			},
+			name:                   "first registration",
+			prefixGatherer:         &prefixGatherer{},
+			prefix:                 firstPrefixedGatherer.prefix,
+			gatherer:               firstPrefixedGatherer.gatherer,
+			expectedErr:            nil,
+			expectedPrefixGatherer: firstPrefixGatherer(),
 		},
 		{
-			name: "second registration",
-			prefixGatherer: &prefixGatherer{
-				multiGatherer: multiGatherer{
-					names: []string{"first"},
-					gatherers: prometheus.Gatherers{
-						&prefixedGatherer{
-							prefix:   "first",
-							gatherer: &testGatherer{},
-						},
-					},
-				},
-			},
-			prefix: "second",
-			gatherer: &testGatherer{
-				mfs: []*dto.MetricFamily{{}},
-			},
-			expectedErr: nil,
-			expectedPrefixGatherer: &prefixGatherer{
-				multiGatherer: multiGatherer{
-					names: []string{"first", "second"},
-					gatherers: prometheus.Gatherers{
-						&prefixedGatherer{
-							prefix:   "first",
-							gatherer: &testGatherer{},
-						},
-						&prefixedGatherer{
-							prefix: "second",
-							gatherer: &testGatherer{
-								mfs: []*dto.MetricFamily{{}},
-							},
-						},
-					},
-				},
-			},
+			name:                   "second registration",
+			prefixGatherer:         firstPrefixGatherer(),
+			prefix:                 secondPrefixedGatherer.prefix,
+			gatherer:               secondPrefixedGatherer.gatherer,
+			expectedErr:            nil,
+			expectedPrefixGatherer: secondPrefixGatherer,
 		},
 		{
-			name: "conflicts with previous registration",
-			prefixGatherer: &prefixGatherer{
-				multiGatherer: multiGatherer{
-					names: []string{"first"},
-					gatherers: prometheus.Gatherers{
-						&prefixedGatherer{
-							prefix:   "first",
-							gatherer: &testGatherer{},
-						},
-					},
-				},
-			},
-			prefix: "first",
-			gatherer: &testGatherer{
-				mfs: []*dto.MetricFamily{{}},
-			},
-			expectedErr: errDuplicateGatherer,
-			expectedPrefixGatherer: &prefixGatherer{
-				multiGatherer: multiGatherer{
-					names: []string{"first"},
-					gatherers: prometheus.Gatherers{
-						&prefixedGatherer{
-							prefix:   "first",
-							gatherer: &testGatherer{},
-						},
-					},
-				},
-			},
+			name:                   "conflicts with previous registration",
+			prefixGatherer:         firstPrefixGatherer(),
+			prefix:                 firstPrefixedGatherer.prefix,
+			gatherer:               secondPrefixedGatherer.gatherer,
+			expectedErr:            errDuplicateGatherer,
+			expectedPrefixGatherer: firstPrefixGatherer(),
 		},
 	}
 	for _, test := range tests {

@@ -3,7 +3,16 @@
 
 package metrics
 
-import dto "github.com/prometheus/client_model/go"
+import (
+	"github.com/prometheus/client_golang/prometheus"
+
+	dto "github.com/prometheus/client_model/go"
+)
+
+var counterOpts = prometheus.CounterOpts{
+	Name: "counter",
+	Help: "help",
+}
 
 type testGatherer struct {
 	mfs []*dto.MetricFamily
