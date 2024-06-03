@@ -11,8 +11,8 @@ import (
 
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/vms/example/xsvm"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
 
@@ -33,7 +33,7 @@ func main() {
 			},
 		},
 	}
-	vmID := xsvm.ID
+	vmID := constants.XSVMID
 	name := "let there"
 
 	subnetID, err := ids.FromString(subnetIDStr)

@@ -32,7 +32,6 @@ func TestSybilOutboundMsgThrottler(t *testing.T) {
 	require.NoError(vdrs.AddStaker(constants.PrimaryNetworkID, vdr2ID, nil, ids.Empty, 1))
 	throttlerIntf, err := NewSybilOutboundMsgThrottler(
 		logging.NoLog{},
-		"",
 		prometheus.NewRegistry(),
 		vdrs,
 		config,
@@ -174,7 +173,6 @@ func TestSybilOutboundMsgThrottlerMaxNonVdr(t *testing.T) {
 	require.NoError(vdrs.AddStaker(constants.PrimaryNetworkID, vdr1ID, nil, ids.Empty, 1))
 	throttlerIntf, err := NewSybilOutboundMsgThrottler(
 		logging.NoLog{},
-		"",
 		prometheus.NewRegistry(),
 		vdrs,
 		config,
@@ -221,7 +219,6 @@ func TestBypassThrottling(t *testing.T) {
 	require.NoError(vdrs.AddStaker(constants.PrimaryNetworkID, vdr1ID, nil, ids.Empty, 1))
 	throttlerIntf, err := NewSybilOutboundMsgThrottler(
 		logging.NoLog{},
-		"",
 		prometheus.NewRegistry(),
 		vdrs,
 		config,

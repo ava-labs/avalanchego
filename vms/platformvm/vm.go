@@ -114,12 +114,12 @@ func (vm *VM) Initialize(
 	chainCtx.Log.Info("using VM execution config", zap.Reflect("config", execConfig))
 
 	registerer := prometheus.NewRegistry()
-	if err := chainCtx.Metrics.Register(registerer); err != nil {
+	if err := chainCtx.Metrics.Register("", registerer); err != nil {
 		return err
 	}
 
 	// Initialize metrics as soon as possible
-	vm.metrics, err = metrics.New("", registerer)
+	vm.metrics, err = metrics.New(registerer)
 	if err != nil {
 		return fmt.Errorf("failed to initialize metrics: %w", err)
 	}
@@ -302,12 +302,12 @@ func (vm *VM) initBlockchains() error {
 			}
 		}
 	} else {
-		subnets, err := vm.state.GetSubnets()
+		subnetIDs, err := vm.state.GetSubnetIDs()
 		if err != nil {
 			return err
 		}
-		for _, subnet := range subnets {
-			if err := vm.createSubnet(subnet.ID()); err != nil {
+		for _, subnetID := range subnetIDs {
+			if err := vm.createSubnet(subnetID); err != nil {
 				return err
 			}
 		}

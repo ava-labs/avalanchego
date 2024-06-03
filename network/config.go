@@ -110,7 +110,6 @@ type Config struct {
 
 	TLSKeyLogFile string `json:"tlsKeyLogFile"`
 
-	Namespace          string            `json:"namespace"`
 	MyNodeID           ids.NodeID        `json:"myNodeID"`
 	MyIPPort           ips.DynamicIPPort `json:"myIP"`
 	NetworkID          uint32            `json:"networkID"`

@@ -38,104 +38,86 @@ type metrics struct {
 	issued                                *prometheus.CounterVec
 }
 
-func newMetrics(namespace string, reg prometheus.Registerer) (*metrics, error) {
+func newMetrics(reg prometheus.Registerer) (*metrics, error) {
 	errs := wrappers.Errs{}
 	m := &metrics{
 		bootstrapFinished: prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespace,
-			Name:      "bootstrap_finished",
-			Help:      "Whether or not bootstrap process has completed. 1 is success, 0 is fail or ongoing.",
+			Name: "bootstrap_finished",
+			Help: "Whether or not bootstrap process has completed. 1 is success, 0 is fail or ongoing.",
 		}),
 		numRequests: prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespace,
-			Name:      "requests",
-			Help:      "Number of outstanding block requests",
+			Name: "requests",
+			Help: "Number of outstanding block requests",
 		}),
 		numBlocked: prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespace,
-			Name:      "blocked",
-			Help:      "Number of blocks that are pending issuance",
+			Name: "blocked",
+			Help: "Number of blocks that are pending issuance",
 		}),
 		numBlockers: prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespace,
-			Name:      "blockers",
-			Help:      "Number of blocks that are blocking other blocks from being issued because they haven't been issued",
+			Name: "blockers",
+			Help: "Number of blocks that are blocking other blocks from being issued because they haven't been issued",
 		}),
 		numNonVerifieds: prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespace,
-			Name:      "non_verified_blks",
-			Help:      "Number of non-verified blocks in the memory",
+			Name: "non_verified_blks",
+			Help: "Number of non-verified blocks in the memory",
 		}),
 		numBuilt: prometheus.NewCounter(prometheus.CounterOpts{
-			Namespace: namespace,
-			Name:      "blks_built",
-			Help:      "Number of blocks that have been built locally",
+			Name: "blks_built",
+			Help: "Number of blocks that have been built locally",
 		}),
 		numBuildsFailed: prometheus.NewCounter(prometheus.CounterOpts{
-			Namespace: namespace,
-			Name:      "blk_builds_failed",
-			Help:      "Number of BuildBlock calls that have failed",
+			Name: "blk_builds_failed",
+			Help: "Number of BuildBlock calls that have failed",
 		}),
 		numUselessPutBytes: prometheus.NewCounter(prometheus.CounterOpts{
-			Namespace: namespace,
-			Name:      "num_useless_put_bytes",
-			Help:      "Amount of useless bytes received in Put messages",
+			Name: "num_useless_put_bytes",
+			Help: "Amount of useless bytes received in Put messages",
 		}),
 		numUselessPushQueryBytes: prometheus.NewCounter(prometheus.CounterOpts{
-			Namespace: namespace,
-			Name:      "num_useless_push_query_bytes",
-			Help:      "Amount of useless bytes received in PushQuery messages",
+			Name: "num_useless_push_query_bytes",
+			Help: "Amount of useless bytes received in PushQuery messages",
 		}),
 		numMissingAcceptedBlocks: prometheus.NewCounter(prometheus.CounterOpts{
-			Namespace: namespace,
-			Name:      "num_missing_accepted_blocks",
-			Help:      "Number of times an accepted block height was referenced and it wasn't locally available",
+			Name: "num_missing_accepted_blocks",
+			Help: "Number of times an accepted block height was referenced and it wasn't locally available",
 		}),
 		numProcessingAncestorFetchesFailed: prometheus.NewCounter(prometheus.CounterOpts{
-			Namespace: namespace,
-			Name:      "num_processing_ancestor_fetches_failed",
-			Help:      "Number of votes that were dropped due to unknown blocks",
+			Name: "num_processing_ancestor_fetches_failed",
+			Help: "Number of votes that were dropped due to unknown blocks",
 		}),
 		numProcessingAncestorFetchesDropped: prometheus.NewCounter(prometheus.CounterOpts{
-			Namespace: namespace,
-			Name:      "num_processing_ancestor_fetches_dropped",
-			Help:      "Number of votes that were dropped due to decided blocks",
+			Name: "num_processing_ancestor_fetches_dropped",
+			Help: "Number of votes that were dropped due to decided blocks",
 		}),
 		numProcessingAncestorFetchesSucceeded: prometheus.NewCounter(prometheus.CounterOpts{
-			Namespace: namespace,
-			Name:      "num_processing_ancestor_fetches_succeeded",
-			Help:      "Number of votes that were applied to ancestor blocks",
+			Name: "num_processing_ancestor_fetches_succeeded",
+			Help: "Number of votes that were applied to ancestor blocks",
 		}),
 		numProcessingAncestorFetchesUnneeded: prometheus.NewCounter(prometheus.CounterOpts{
-			Namespace: namespace,
-			Name:      "num_processing_ancestor_fetches_unneeded",
-			Help:      "Number of votes that were directly applied to blocks",
+			Name: "num_processing_ancestor_fetches_unneeded",
+			Help: "Number of votes that were directly applied to blocks",
 		}),
 		getAncestorsBlks: metric.NewAveragerWithErrs(
-			namespace,
 			"get_ancestors_blks",
 			"blocks fetched in a call to GetAncestors",
 			reg,
 			&errs,
 		),
 		selectedVoteIndex: metric.NewAveragerWithErrs(
-			namespace,
 			"selected_vote_index",
 			"index of the voteID that was passed into consensus",
 			reg,
 			&errs,
 		),
 		issuerStake: metric.NewAveragerWithErrs(
-			namespace,
 			"issuer_stake",
 			"stake weight of the peer who provided a block that was issued into consensus",
 			reg,
 			&errs,
 		),
 		issued: prometheus.NewCounterVec(prometheus.CounterOpts{
-			Namespace: namespace,
-			Name:      "blks_issued",
-			Help:      "number of blocks that have been issued into consensus by discovery mechanism",
+			Name: "blks_issued",
+			Help: "number of blocks that have been issued into consensus by discovery mechanism",
 		}, []string{"source"}),
 	}
 

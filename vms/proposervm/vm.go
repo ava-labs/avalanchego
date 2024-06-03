@@ -132,20 +132,15 @@ func (vm *VM) Initialize(
 ) error {
 	// TODO: Add a helper for this metrics override, it is performed in multiple
 	//       places.
-	multiGatherer := metrics.NewMultiGatherer()
 	registerer := prometheus.NewRegistry()
-	if err := multiGatherer.Register("proposervm", registerer); err != nil {
+	if err := chainCtx.Metrics.Register("proposervm", registerer); err != nil {
 		return err
 	}
-
-	optionalGatherer := metrics.NewOptionalGatherer()
-	if err := multiGatherer.Register("", optionalGatherer); err != nil {
+	multiGatherer := metrics.NewMultiGatherer()
+	if err := chainCtx.Metrics.Register("", multiGatherer); err != nil {
 		return err
 	}
-	if err := chainCtx.Metrics.Register(multiGatherer); err != nil {
-		return err
-	}
-	chainCtx.Metrics = optionalGatherer
+	chainCtx.Metrics = multiGatherer
 
 	vm.ctx = chainCtx
 	vm.db = versiondb.New(prefixdb.New(dbPrefix, db))
@@ -513,7 +508,7 @@ func (vm *VM) setLastAcceptedMetadata(ctx context.Context) error {
 }
 
 func (vm *VM) parsePostForkBlock(ctx context.Context, b []byte) (PostForkBlock, error) {
-	statelessBlock, err := statelessblock.Parse(b)
+	statelessBlock, err := statelessblock.Parse(b, vm.ctx.ChainID)
 	if err != nil {
 		return nil, err
 	}

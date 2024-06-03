@@ -174,7 +174,7 @@ func (vm *VM) Initialize(
 	)
 
 	registerer := prometheus.NewRegistry()
-	if err := ctx.Metrics.Register(registerer); err != nil {
+	if err := ctx.Metrics.Register("", registerer); err != nil {
 		return err
 	}
 	vm.registerer = registerer
@@ -182,7 +182,7 @@ func (vm *VM) Initialize(
 	vm.connectedPeers = make(map[ids.NodeID]*version.Application)
 
 	// Initialize metrics as soon as possible
-	vm.metrics, err = metrics.New("", registerer)
+	vm.metrics, err = metrics.New(registerer)
 	if err != nil {
 		return fmt.Errorf("failed to initialize metrics: %w", err)
 	}

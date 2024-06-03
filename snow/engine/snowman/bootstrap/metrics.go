@@ -13,17 +13,15 @@ type metrics struct {
 	numFetched, numAccepted prometheus.Counter
 }
 
-func newMetrics(namespace string, registerer prometheus.Registerer) (*metrics, error) {
+func newMetrics(registerer prometheus.Registerer) (*metrics, error) {
 	m := &metrics{
 		numFetched: prometheus.NewCounter(prometheus.CounterOpts{
-			Namespace: namespace,
-			Name:      "fetched",
-			Help:      "Number of blocks fetched during bootstrapping",
+			Name: "bs_fetched",
+			Help: "Number of blocks fetched during bootstrapping",
 		}),
 		numAccepted: prometheus.NewCounter(prometheus.CounterOpts{
-			Namespace: namespace,
-			Name:      "accepted",
-			Help:      "Number of blocks accepted during bootstrapping",
+			Name: "bs_accepted",
+			Help: "Number of blocks accepted during bootstrapping",
 		}),
 	}
 

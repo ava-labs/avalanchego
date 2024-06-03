@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
-	"github.com/ava-labs/avalanchego/vms/example/xsvm"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/genesis"
 )
 
@@ -35,7 +35,7 @@ func NewXSVMOrPanic(name string, key *secp256k1.PrivateKey, nodes ...*tmpnet.Nod
 		Name: name,
 		Chains: []*tmpnet.Chain{
 			{
-				VMID:         xsvm.ID,
+				VMID:         constants.XSVMID,
 				Genesis:      genesisBytes,
 				PreFundedKey: key,
 			},

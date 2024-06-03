@@ -29,6 +29,7 @@ func TestBuild(t *testing.T) {
 	cert, err := staking.ParseCertificate(tlsCert.Leaf.Raw)
 	require.NoError(err)
 	key := tlsCert.PrivateKey.(crypto.Signer)
+	nodeID := ids.NodeIDFromCert(cert)
 
 	builtBlock, err := Build(
 		parentID,
@@ -45,11 +46,7 @@ func TestBuild(t *testing.T) {
 	require.Equal(pChainHeight, builtBlock.PChainHeight())
 	require.Equal(timestamp, builtBlock.Timestamp())
 	require.Equal(innerBlockBytes, builtBlock.Block())
-
-	require.NoError(builtBlock.Verify(true, chainID))
-
-	err = builtBlock.Verify(false, chainID)
-	require.ErrorIs(err, errUnexpectedProposer)
+	require.Equal(nodeID, builtBlock.Proposer())
 }
 
 func TestBuildUnsigned(t *testing.T) {
@@ -68,11 +65,6 @@ func TestBuildUnsigned(t *testing.T) {
 	require.Equal(timestamp, builtBlock.Timestamp())
 	require.Equal(innerBlockBytes, builtBlock.Block())
 	require.Equal(ids.EmptyNodeID, builtBlock.Proposer())
-
-	require.NoError(builtBlock.Verify(false, ids.Empty))
-
-	err = builtBlock.Verify(true, ids.Empty)
-	require.ErrorIs(err, errMissingProposer)
 }
 
 func TestBuildHeader(t *testing.T) {
