@@ -1,0 +1,41 @@
+name: Trigger Antithesis Test Runs
+
+on:
+  workflow_dispatch:
+    inputs:
+      duration:
+        description: 'The duration to run the test for'
+        default: '0.5'
+        required: true
+        type: string
+
+jobs:
+  # TODO(marun) Support test runs against images built from an arbitrary branch to better support ad-hoc testing.
+  Run Antithesis Avalanchego Test Setup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: antithesishq/antithesis-trigger-action@v0.5
+        with:
+          notebook_name: avalanche
+          tenant: avalanche
+          username: ${{ secrets.ANTITHESIS_USERNAME }}
+          password: ${{ secrets.ANTITHESIS_PASSWORD }}
+          github_token: ${{ secrets.GH_PAT }}
+          config_image: antithesis-avalanchego-config@latest
+          images: antithesis-avalanchego-workload@latest;antithesis-avalanchego-node@latest
+          additional_parameters: |-
+            custom.duration=${{ inputs.duration }}
+  Run Antithesis XSVM Test Setup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: antithesishq/antithesis-trigger-action@v0.5
+        with:
+          notebook_name: avalanche
+          tenant: avalanche
+          username: ${{ secrets.ANTITHESIS_USERNAME }}
+          password: ${{ secrets.ANTITHESIS_PASSWORD }}
+          github_token: ${{ secrets.GH_PAT }}
+          config_image: antithesis-xsvm-config@latest
+          images: antithesis-xsvm-workload@latest;antithesis-xsvm-node@latest
+          additional_parameters: |-
+            custom.duration=${{ inputs.duration }}
