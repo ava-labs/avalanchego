@@ -61,6 +61,9 @@ type labeledGatherer struct {
 }
 
 func (g *labeledGatherer) Gather() ([]*dto.MetricFamily, error) {
+	// Gather returns partially filled metrics in the case of an error. So, it
+	// is expected to still return the metrics in the case and error is
+	// returned.
 	metricFamilies, err := g.gatherer.Gather()
 	for _, metricFamily := range metricFamilies {
 		for _, metric := range metricFamily.Metric {
