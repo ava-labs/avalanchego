@@ -18,7 +18,7 @@ func TestInterface(t *testing.T) {
 	for name, test := range database.Tests {
 		t.Run(name, func(t *testing.T) {
 			folder := t.TempDir()
-			db, err := New(folder, nil, logging.NoLog{}, "", prometheus.NewRegistry())
+			db, err := New(folder, nil, logging.NoLog{}, prometheus.NewRegistry())
 			require.NoError(t, err)
 
 			test(t, db)
@@ -30,7 +30,7 @@ func TestInterface(t *testing.T) {
 
 func newDB(t testing.TB) database.Database {
 	folder := t.TempDir()
-	db, err := New(folder, nil, logging.NoLog{}, "", prometheus.NewRegistry())
+	db, err := New(folder, nil, logging.NoLog{}, prometheus.NewRegistry())
 	require.NoError(t, err)
 	return db
 }

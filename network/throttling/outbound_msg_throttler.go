@@ -42,7 +42,6 @@ type outboundMsgThrottler struct {
 
 func NewSybilOutboundMsgThrottler(
 	log logging.Logger,
-	namespace string,
 	registerer prometheus.Registerer,
 	vdrs validators.Manager,
 	config MsgByteThrottlerConfig,
@@ -59,7 +58,7 @@ func NewSybilOutboundMsgThrottler(
 			nodeToAtLargeBytesUsed: make(map[ids.NodeID]uint64),
 		},
 	}
-	return t, t.metrics.initialize(namespace, registerer)
+	return t, t.metrics.initialize(registerer)
 }
 
 func (t *outboundMsgThrottler) Acquire(msg message.OutboundMessage, nodeID ids.NodeID) bool {
@@ -176,31 +175,26 @@ type outboundMsgThrottlerMetrics struct {
 	awaitingRelease       prometheus.Gauge
 }
 
-func (m *outboundMsgThrottlerMetrics) initialize(namespace string, registerer prometheus.Registerer) error {
+func (m *outboundMsgThrottlerMetrics) initialize(registerer prometheus.Registerer) error {
 	m.acquireSuccesses = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: namespace,
-		Name:      "throttler_outbound_acquire_successes",
-		Help:      "Outbound messages not dropped due to rate-limiting",
+		Name: "throttler_outbound_acquire_successes",
+		Help: "Outbound messages not dropped due to rate-limiting",
 	})
 	m.acquireFailures = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: namespace,
-		Name:      "throttler_outbound_acquire_failures",
-		Help:      "Outbound messages dropped due to rate-limiting",
+		Name: "throttler_outbound_acquire_failures",
+		Help: "Outbound messages dropped due to rate-limiting",
 	})
 	m.remainingAtLargeBytes = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespace,
-		Name:      "throttler_outbound_remaining_at_large_bytes",
-		Help:      "Bytes remaining in the at large byte allocation",
+		Name: "throttler_outbound_remaining_at_large_bytes",
+		Help: "Bytes remaining in the at large byte allocation",
 	})
 	m.remainingVdrBytes = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespace,
-		Name:      "throttler_outbound_remaining_validator_bytes",
-		Help:      "Bytes remaining in the validator byte allocation",
+		Name: "throttler_outbound_remaining_validator_bytes",
+		Help: "Bytes remaining in the validator byte allocation",
 	})
 	m.awaitingRelease = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespace,
-		Name:      "throttler_outbound_awaiting_release",
-		Help:      "Number of messages waiting to be sent",
+		Name: "throttler_outbound_awaiting_release",
+		Help: "Number of messages waiting to be sent",
 	})
 	return utils.Err(
 		registerer.Register(m.acquireSuccesses),

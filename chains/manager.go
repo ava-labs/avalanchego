@@ -434,7 +434,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 		return nil, fmt.Errorf("error while registering DAG metrics %w", err)
 	}
 
-	vmMetrics := metrics.NewOptionalGatherer()
+	vmMetrics := metrics.NewMultiGatherer()
 	vmNamespace := metric.AppendNamespace(chainNamespace, "vm")
 	if err := m.Metrics.Register(vmNamespace, vmMetrics); err != nil {
 		return nil, fmt.Errorf("error while registering vm's metrics %w", err)
@@ -642,17 +642,12 @@ func (m *manager) createAvalancheChain(
 		},
 	)
 
-	avalancheRegisterer := metrics.NewOptionalGatherer()
-	snowmanRegisterer := metrics.NewOptionalGatherer()
-
-	registerer := metrics.NewMultiGatherer()
-	if err := registerer.Register("avalanche", avalancheRegisterer); err != nil {
+	avalancheRegisterer := metrics.NewMultiGatherer()
+	snowmanRegisterer := metrics.NewMultiGatherer()
+	if err := ctx.Context.Metrics.Register("avalanche", avalancheRegisterer); err != nil {
 		return nil, err
 	}
-	if err := registerer.Register("", snowmanRegisterer); err != nil {
-		return nil, err
-	}
-	if err := ctx.Context.Metrics.Register(registerer); err != nil {
+	if err := ctx.Context.Metrics.Register("", snowmanRegisterer); err != nil {
 		return nil, err
 	}
 
@@ -758,7 +753,7 @@ func (m *manager) createAvalancheChain(
 		sampleK = int(bootstrapWeight)
 	}
 
-	connectedValidators, err := tracker.NewMeteredPeers("", ctx.Registerer)
+	connectedValidators, err := tracker.NewMeteredPeers(ctx.Registerer)
 	if err != nil {
 		return nil, fmt.Errorf("error creating peer tracker: %w", err)
 	}
@@ -1103,7 +1098,7 @@ func (m *manager) createSnowmanChain(
 		sampleK = int(bootstrapWeight)
 	}
 
-	connectedValidators, err := tracker.NewMeteredPeers("", ctx.Registerer)
+	connectedValidators, err := tracker.NewMeteredPeers(ctx.Registerer)
 	if err != nil {
 		return nil, fmt.Errorf("error creating peer tracker: %w", err)
 	}

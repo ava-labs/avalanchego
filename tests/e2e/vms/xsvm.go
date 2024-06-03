@@ -5,22 +5,19 @@ package vms
 
 import (
 	"fmt"
-	"math"
-	"time"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
+	"github.com/ava-labs/avalanchego/tests/fixture/subnet"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/vms/example/xsvm"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/api"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/cmd/issue/export"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/cmd/issue/importtx"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/cmd/issue/transfer"
-	"github.com/ava-labs/avalanchego/vms/example/xsvm/genesis"
 
 	ginkgo "github.com/onsi/ginkgo/v2"
 )
@@ -30,10 +27,14 @@ var (
 	subnetBName = "xsvm-b"
 )
 
-func XSVMSubnets(nodes ...*tmpnet.Node) []*tmpnet.Subnet {
+func XSVMSubnetsOrPanic(nodes ...*tmpnet.Node) []*tmpnet.Subnet {
+	key, err := secp256k1.NewPrivateKey()
+	if err != nil {
+		panic(err)
+	}
 	return []*tmpnet.Subnet{
-		newXSVMSubnet(subnetAName, nodes...),
-		newXSVMSubnet(subnetBName, nodes...),
+		subnet.NewXSVMOrPanic(subnetAName, key, nodes...),
+		subnet.NewXSVMOrPanic(subnetBName, key, nodes...),
 	}
 }
 
@@ -141,39 +142,3 @@ var _ = ginkgo.Describe("[XSVM]", func() {
 		require.Equal(units.Schmeckle, destinationBalance)
 	})
 })
-
-func newXSVMSubnet(name string, nodes ...*tmpnet.Node) *tmpnet.Subnet {
-	if len(nodes) == 0 {
-		panic("a subnet must be validated by at least one node")
-	}
-
-	key, err := secp256k1.NewPrivateKey()
-	if err != nil {
-		panic(err)
-	}
-
-	genesisBytes, err := genesis.Codec.Marshal(genesis.CodecVersion, &genesis.Genesis{
-		Timestamp: time.Now().Unix(),
-		Allocations: []genesis.Allocation{
-			{
-				Address: key.Address(),
-				Balance: math.MaxUint64,
-			},
-		},
-	})
-	if err != nil {
-		panic(err)
-	}
-
-	return &tmpnet.Subnet{
-		Name: name,
-		Chains: []*tmpnet.Chain{
-			{
-				VMID:         xsvm.ID,
-				Genesis:      genesisBytes,
-				PreFundedKey: key,
-			},
-		},
-		ValidatorIDs: tmpnet.NodesToIDs(nodes...),
-	}
-}

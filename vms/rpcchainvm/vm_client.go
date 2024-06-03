@@ -18,7 +18,6 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/ava-labs/avalanchego/api/keystore/gkeystore"
-	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/chains/atomic/gsharedmemory"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/rpcdb"
@@ -137,15 +136,14 @@ func (vm *VMClient) Initialize(
 
 	// Register metrics
 	registerer := prometheus.NewRegistry()
-	multiGatherer := metrics.NewMultiGatherer()
 	vm.grpcServerMetrics = grpc_prometheus.NewServerMetrics()
 	if err := registerer.Register(vm.grpcServerMetrics); err != nil {
 		return err
 	}
-	if err := multiGatherer.Register("rpcchainvm", registerer); err != nil {
+	if err := chainCtx.Metrics.Register("rpcchainvm", registerer); err != nil {
 		return err
 	}
-	if err := multiGatherer.Register("", vm); err != nil {
+	if err := chainCtx.Metrics.Register("", vm); err != nil {
 		return err
 	}
 
@@ -226,7 +224,7 @@ func (vm *VMClient) Initialize(
 		time:     time,
 	}
 
-	chainState, err := chain.NewMeteredState(
+	vm.State, err = chain.NewMeteredState(
 		registerer,
 		&chain.Config{
 			DecidedCacheSize:      decidedCacheSize,
@@ -241,12 +239,7 @@ func (vm *VMClient) Initialize(
 			BuildBlockWithContext: vm.buildBlockWithContext,
 		},
 	)
-	if err != nil {
-		return err
-	}
-	vm.State = chainState
-
-	return chainCtx.Metrics.Register(multiGatherer)
+	return err
 }
 
 func (vm *VMClient) newDBServer(db database.Database) *grpc.Server {

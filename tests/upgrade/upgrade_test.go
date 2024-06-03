@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
@@ -17,7 +16,6 @@ import (
 )
 
 func TestUpgrade(t *testing.T) {
-	gomega.RegisterFailHandler(ginkgo.Fail)
 	ginkgo.RunSpecs(t, "upgrade test suites")
 }
 
@@ -45,9 +43,7 @@ var _ = ginkgo.Describe("[Upgrade]", func() {
 	require := require.New(ginkgo.GinkgoT())
 
 	ginkgo.It("can upgrade versions", func() {
-		network := &tmpnet.Network{
-			Owner: "avalanchego-upgrade",
-		}
+		network := tmpnet.NewDefaultNetwork("avalanchego-upgrade")
 		e2e.StartNetwork(network, avalancheGoExecPath, "" /* pluginDir */, 0 /* shutdownDelay */, false /* reuseNetwork */)
 
 		ginkgo.By(fmt.Sprintf("restarting all nodes with %q binary", avalancheGoExecPathToUpgradeTo))

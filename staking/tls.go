@@ -5,8 +5,9 @@ package staking
 
 import (
 	"bytes"
+	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rand"
-	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
@@ -115,9 +116,9 @@ func NewTLSCert() (*tls.Certificate, error) {
 // Returns the PEM byte representations of both.
 func NewCertAndKeyBytes() ([]byte, []byte, error) {
 	// Create key to sign cert with
-	key, err := rsa.GenerateKey(rand.Reader, 4096)
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
-		return nil, nil, fmt.Errorf("couldn't generate rsa key: %w", err)
+		return nil, nil, fmt.Errorf("couldn't generate ecdsa key: %w", err)
 	}
 
 	// Create self-signed staking cert
@@ -125,10 +126,10 @@ func NewCertAndKeyBytes() ([]byte, []byte, error) {
 		SerialNumber:          big.NewInt(0),
 		NotBefore:             time.Date(2000, time.January, 0, 0, 0, 0, 0, time.UTC),
 		NotAfter:              time.Now().AddDate(100, 0, 0),
-		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature | x509.KeyUsageDataEncipherment,
+		KeyUsage:              x509.KeyUsageDigitalSignature,
 		BasicConstraintsValid: true,
 	}
-	certBytes, err := x509.CreateCertificate(rand.Reader, certTemplate, certTemplate, &key.PublicKey, key)
+	certBytes, err := x509.CreateCertificate(rand.Reader, certTemplate, certTemplate, key.Public(), key)
 	if err != nil {
 		return nil, nil, fmt.Errorf("couldn't create certificate: %w", err)
 	}

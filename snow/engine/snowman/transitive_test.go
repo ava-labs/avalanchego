@@ -2866,7 +2866,7 @@ func TestGetProcessingAncestor(t *testing.T) {
 		unissuedBlock = snowmantest.BuildChild(issuedBlock)
 	)
 
-	metrics, err := newMetrics("", prometheus.NewRegistry())
+	metrics, err := newMetrics(prometheus.NewRegistry())
 	require.NoError(t, err)
 
 	c := &snowman.Topological{}

@@ -185,7 +185,7 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 			require := require.New(t)
 
 			env := newEnvironment(t, banff)
-			env.config.ApricotPhase3Time = ap3Time
+			env.config.UpgradeConfig.ApricotPhase3Time = ap3Time
 
 			addrs := set.NewSet[ids.ShortID](len(preFundedKeys))
 			for _, key := range preFundedKeys {
@@ -195,7 +195,7 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 			env.state.SetTimestamp(test.time) // to duly set fee
 
 			cfg := *env.config
-			cfg.CreateBlockchainTxFee = test.fee
+			cfg.StaticFeeConfig.CreateBlockchainTxFee = test.fee
 			builder := txstest.NewBuilder(env.ctx, &cfg, env.state)
 			tx, err := builder.NewCreateChainTx(
 				testSubnet1.ID(),
