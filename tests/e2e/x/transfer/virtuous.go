@@ -60,11 +60,7 @@ var _ = e2e.DescribeXChainSerial("[Virtuous Transfer Tx AVAX]", func() {
 				require.NoError(err)
 
 				for _, metrics := range allNodeMetrics {
-<<<<<<< HEAD
 					xBlksProcessing, ok := tests.GetMetricValue(metrics, blksProcessingMetric, xChainMetricLabels)
-=======
-					xBlksProcessing, ok := tests.GetMetricValue(metrics, xBlksProcessingMetric, nil)
->>>>>>> master
 					if !ok || xBlksProcessing > 0 {
 						return false
 					}
