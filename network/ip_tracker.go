@@ -18,7 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/sampler"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
@@ -44,11 +43,9 @@ var _ validators.ManagerCallbackListener = (*ipTracker)(nil)
 func newIPTracker(
 	trackedSubnets set.Set[ids.ID],
 	log logging.Logger,
-	namespace string,
 	registerer prometheus.Registerer,
 ) (*ipTracker, error) {
-	bloomNamespace := metric.AppendNamespace(namespace, "ip_bloom")
-	bloomMetrics, err := bloom.NewMetrics(bloomNamespace, registerer)
+	bloomMetrics, err := bloom.NewMetrics("ip_bloom", registerer)
 	if err != nil {
 		return nil, err
 	}
@@ -56,19 +53,16 @@ func newIPTracker(
 		trackedSubnets: trackedSubnets,
 		log:            log,
 		numTrackedPeers: prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespace,
-			Name:      "tracked_peers",
-			Help:      "number of peers this node is monitoring",
+			Name: "tracked_peers",
+			Help: "number of peers this node is monitoring",
 		}),
 		numGossipableIPs: prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespace,
-			Name:      "gossipable_ips",
-			Help:      "number of IPs this node considers able to be gossiped",
+			Name: "gossipable_ips",
+			Help: "number of IPs this node considers able to be gossiped",
 		}),
 		numTrackedSubnets: prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespace,
-			Name:      "tracked_subnets",
-			Help:      "number of subnets this node is monitoring",
+			Name: "tracked_subnets",
+			Help: "number of subnets this node is monitoring",
 		}),
 		bloomMetrics:   bloomMetrics,
 		tracked:        make(map[ids.NodeID]*trackedNode),

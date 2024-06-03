@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package pebble
+package pebbledb
 
 import (
 	"testing"
@@ -17,7 +17,7 @@ func TestBatch(t *testing.T) {
 	require := require.New(t)
 	dirName := t.TempDir()
 
-	db, err := New(dirName, nil, logging.NoLog{}, "", prometheus.NewRegistry())
+	db, err := New(dirName, nil, logging.NoLog{}, prometheus.NewRegistry())
 	require.NoError(err)
 
 	batchIntf := db.NewBatch()

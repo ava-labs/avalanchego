@@ -544,7 +544,7 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 	state.AddBlock(parentBlk)
 	state.SetLastAccepted(parentBlk.ID())
 
-	metrics, err := metrics.New("", registerer)
+	metrics, err := metrics.New(registerer)
 	require.NoError(err)
 
 	manager := blkexecutor.NewManager(mempool, metrics, state, backend, clk, onAccept)

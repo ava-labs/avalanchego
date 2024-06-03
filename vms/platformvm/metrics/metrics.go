@@ -40,61 +40,50 @@ type Metrics interface {
 	SetTimeUntilSubnetUnstake(subnetID ids.ID, timeUntilUnstake time.Duration)
 }
 
-func New(
-	namespace string,
-	registerer prometheus.Registerer,
-) (Metrics, error) {
-	blockMetrics, err := newBlockMetrics(namespace, registerer)
+func New(registerer prometheus.Registerer) (Metrics, error) {
+	blockMetrics, err := newBlockMetrics(registerer)
 	m := &metrics{
 		blockMetrics: blockMetrics,
 		timeUntilUnstake: prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespace,
-			Name:      "time_until_unstake",
-			Help:      "Time (in ns) until this node leaves the Primary Network's validator set",
+			Name: "time_until_unstake",
+			Help: "Time (in ns) until this node leaves the Primary Network's validator set",
 		}),
 		timeUntilSubnetUnstake: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
-				Namespace: namespace,
-				Name:      "time_until_unstake_subnet",
-				Help:      "Time (in ns) until this node leaves the subnet's validator set",
+				Name: "time_until_unstake_subnet",
+				Help: "Time (in ns) until this node leaves the subnet's validator set",
 			},
 			[]string{"subnetID"},
 		),
 		localStake: prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespace,
-			Name:      "local_staked",
-			Help:      "Amount (in nAVAX) of AVAX staked on this node",
+			Name: "local_staked",
+			Help: "Amount (in nAVAX) of AVAX staked on this node",
 		}),
 		totalStake: prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespace,
-			Name:      "total_staked",
-			Help:      "Amount (in nAVAX) of AVAX staked on the Primary Network",
+			Name: "total_staked",
+			Help: "Amount (in nAVAX) of AVAX staked on the Primary Network",
 		}),
 
 		validatorSetsCached: prometheus.NewCounter(prometheus.CounterOpts{
-			Namespace: namespace,
-			Name:      "validator_sets_cached",
-			Help:      "Total number of validator sets cached",
+			Name: "validator_sets_cached",
+			Help: "Total number of validator sets cached",
 		}),
 		validatorSetsCreated: prometheus.NewCounter(prometheus.CounterOpts{
-			Namespace: namespace,
-			Name:      "validator_sets_created",
-			Help:      "Total number of validator sets created from applying difflayers",
+			Name: "validator_sets_created",
+			Help: "Total number of validator sets created from applying difflayers",
 		}),
 		validatorSetsHeightDiff: prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespace,
-			Name:      "validator_sets_height_diff_sum",
-			Help:      "Total number of validator sets diffs applied for generating validator sets",
+			Name: "validator_sets_height_diff_sum",
+			Help: "Total number of validator sets diffs applied for generating validator sets",
 		}),
 		validatorSetsDuration: prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespace,
-			Name:      "validator_sets_duration_sum",
-			Help:      "Total amount of time generating validator sets in nanoseconds",
+			Name: "validator_sets_duration_sum",
+			Help: "Total amount of time generating validator sets in nanoseconds",
 		}),
 	}
 
 	errs := wrappers.Errs{Err: err}
-	apiRequestMetrics, err := metric.NewAPIInterceptor(namespace, registerer)
+	apiRequestMetrics, err := metric.NewAPIInterceptor(registerer)
 	errs.Add(err)
 	m.APIInterceptor = apiRequestMetrics
 	errs.Add(

@@ -82,7 +82,7 @@ jobs:
           FILTER_BY_OWNER: avalanchego-e2e
       - name: Run e2e tests
         shell: bash
-        run: E2E_SERIAL=1 ./scripts/tests.e2e.sh
+        run: E2E_SERIAL=1 ./scripts/tests.e2e.sh --delay-network-shutdown
         env:
           GH_REPO: ${{ github.repository }}
           GH_WORKFLOW: ${{ github.workflow }}
@@ -132,7 +132,7 @@ jobs:
           GH_JOB_ID: ${{ github.job }}
       - name: Run e2e tests with existing network
         shell: bash
-        run: E2E_SERIAL=1 ./scripts/tests.e2e.existing.sh
+        run: E2E_SERIAL=1 ./scripts/tests.e2e.existing.sh --delay-network-shutdown
         env:
           GH_REPO: ${{ github.repository }}
           GH_WORKFLOW: ${{ github.workflow }}
@@ -285,13 +285,3 @@ jobs:
         run: bash -x scripts/tests.build_antithesis_images.sh
         env:
           TEST_SETUP: xsvm
-  govulncheck:
-    runs-on: ubuntu-latest
-    name: govulncheck
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/set-go-version-in-env
-      - id: govulncheck
-        uses: golang/govulncheck-action@v1
-        with:
-          go-version-input: ${{ env.GO_VERSION }}

@@ -18,7 +18,6 @@ import (
 // See inbound_msg_throttler.go
 
 func newInboundMsgBufferThrottler(
-	namespace string,
 	registerer prometheus.Registerer,
 	maxProcessingMsgsPerNode uint64,
 ) (*inboundMsgBufferThrottler, error) {
@@ -27,7 +26,7 @@ func newInboundMsgBufferThrottler(
 		awaitingAcquire:          make(map[ids.NodeID]chan struct{}),
 		nodeToNumProcessingMsgs:  make(map[ids.NodeID]uint64),
 	}
-	return t, t.metrics.initialize(namespace, registerer)
+	return t, t.metrics.initialize(registerer)
 }
 
 // Rate-limits inbound messages based on the number of
@@ -130,19 +129,17 @@ type inboundMsgBufferThrottlerMetrics struct {
 	awaitingAcquire prometheus.Gauge
 }
 
-func (m *inboundMsgBufferThrottlerMetrics) initialize(namespace string, reg prometheus.Registerer) error {
+func (m *inboundMsgBufferThrottlerMetrics) initialize(reg prometheus.Registerer) error {
 	errs := wrappers.Errs{}
 	m.acquireLatency = metric.NewAveragerWithErrs(
-		namespace,
 		"buffer_throttler_inbound_acquire_latency",
 		"average time (in ns) to get space on the inbound message buffer",
 		reg,
 		&errs,
 	)
 	m.awaitingAcquire = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespace,
-		Name:      "buffer_throttler_inbound_awaiting_acquire",
-		Help:      "Number of inbound messages waiting to take space on the inbound message buffer",
+		Name: "buffer_throttler_inbound_awaiting_acquire",
+		Help: "Number of inbound messages waiting to take space on the inbound message buffer",
 	})
 	errs.Add(
 		reg.Register(m.awaitingAcquire),

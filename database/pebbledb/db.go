@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package pebble
+package pebbledb
 
 import (
 	"context"
@@ -21,7 +21,7 @@ import (
 )
 
 const (
-	Name = "pebble"
+	Name = "pebbledb"
 
 	// pebbleByteOverHead is the number of bytes of constant overhead that
 	// should be added to a batch size per operation.
@@ -64,7 +64,7 @@ type Config struct {
 }
 
 // TODO: Add metrics
-func New(file string, configBytes []byte, log logging.Logger, _ string, _ prometheus.Registerer) (database.Database, error) {
+func New(file string, configBytes []byte, log logging.Logger, _ prometheus.Registerer) (database.Database, error) {
 	cfg := DefaultConfig
 	if len(configBytes) > 0 {
 		if err := json.Unmarshal(configBytes, &cfg); err != nil {
