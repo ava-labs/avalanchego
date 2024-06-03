@@ -4,7 +4,6 @@
 package metrics
 
 import (
-	"cmp"
 	"errors"
 	"fmt"
 	"slices"
@@ -62,32 +61,16 @@ type labeledGatherer struct {
 }
 
 func (g *labeledGatherer) Gather() ([]*dto.MetricFamily, error) {
-	gatheredMetricFamilies, err := g.gatherer.Gather()
-	if err != nil {
-		return nil, err
-	}
-
-	for _, gatheredMetricFamily := range gatheredMetricFamilies {
-		if gatheredMetricFamily == nil {
-			continue
-		}
-
-		metrics := gatheredMetricFamily.Metric[:0]
-		for _, gatheredMetric := range gatheredMetricFamily.Metric {
-			if gatheredMetric == nil {
-				continue
-			}
-
-			gatheredMetric.Label = append(gatheredMetric.Label, &dto.LabelPair{
+	// Gather returns partially filled metrics in the case of an error. So, it
+	// is expected to still return the metrics in the case an error is returned.
+	metricFamilies, err := g.gatherer.Gather()
+	for _, metricFamily := range metricFamilies {
+		for _, metric := range metricFamily.Metric {
+			metric.Label = append(metric.Label, &dto.LabelPair{
 				Name:  &g.labelName,
 				Value: &g.labelValue,
 			})
-			slices.SortFunc(gatheredMetric.Label, func(i, j *dto.LabelPair) int {
-				return cmp.Compare(i.GetName(), j.GetName())
-			})
-			metrics = append(metrics, gatheredMetric)
 		}
-		gatheredMetricFamily.Metric = metrics
 	}
-	return gatheredMetricFamilies, nil
+	return metricFamilies, err
 }

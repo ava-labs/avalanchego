@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/ava-labs/avalanchego/utils/metric"
 
@@ -58,25 +59,16 @@ type prefixedGatherer struct {
 }
 
 func (g *prefixedGatherer) Gather() ([]*dto.MetricFamily, error) {
-	gatheredMetricFamilies, err := g.gatherer.Gather()
-	if err != nil {
-		return nil, err
-	}
-
-	metricFamilies := gatheredMetricFamilies[:0]
-	for _, gatheredMetricFamily := range gatheredMetricFamilies {
-		if gatheredMetricFamily == nil {
-			continue
-		}
-
-		name := metric.AppendNamespace(
+	// Gather returns partially filled metrics in the case of an error. So, it
+	// is expected to still return the metrics in the case an error is returned.
+	metricFamilies, err := g.gatherer.Gather()
+	for _, metricFamily := range metricFamilies {
+		metricFamily.Name = proto.String(metric.AppendNamespace(
 			g.prefix,
-			gatheredMetricFamily.GetName(),
-		)
-		gatheredMetricFamily.Name = &name
-		metricFamilies = append(metricFamilies, gatheredMetricFamily)
+			metricFamily.GetName(),
+		))
 	}
-	return metricFamilies, nil
+	return metricFamilies, err
 }
 
 // eitherIsPrefix returns true if either [a] is a prefix of [b] or [b] is a
