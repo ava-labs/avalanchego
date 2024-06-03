@@ -149,7 +149,6 @@ type msgBuilder struct {
 
 func newMsgBuilder(
 	log logging.Logger,
-	namespace string,
 	metrics prometheus.Registerer,
 	maxMessageTimeout time.Duration,
 ) (*msgBuilder, error) {
@@ -164,17 +163,15 @@ func newMsgBuilder(
 		zstdCompressor: zstdCompressor,
 		count: prometheus.NewCounterVec(
 			prometheus.CounterOpts{
-				Namespace: namespace,
-				Name:      "compressed_count",
-				Help:      "number of compressed messages",
+				Name: "codec_compressed_count",
+				Help: "number of compressed messages",
 			},
 			metricLabels,
 		),
 		duration: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
-				Namespace: namespace,
-				Name:      "compressed_duration",
-				Help:      "time spent handling compressed messages",
+				Name: "codec_compressed_duration",
+				Help: "time spent handling compressed messages",
 			},
 			metricLabels,
 		),

@@ -93,3 +93,11 @@ func sortMetrics(m []*dto.MetricFamily) {
 		return cmp.Compare(*i.Name, *j.Name)
 	})
 }
+
+func MakeAndRegister(gatherer MultiGatherer, name string) (*prometheus.Registry, error) {
+	reg := prometheus.NewRegistry()
+	if err := gatherer.Register(name, reg); err != nil {
+		return nil, fmt.Errorf("couldn't register %q metrics: %w", name, err)
+	}
+	return reg, nil
+}

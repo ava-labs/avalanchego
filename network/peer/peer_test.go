@@ -50,7 +50,6 @@ func newMessageCreator(t *testing.T) message.Creator {
 	mc, err := message.NewCreator(
 		logging.NoLog{},
 		prometheus.NewRegistry(),
-		"",
 		constants.DefaultNetworkCompressionType,
 		10*time.Second,
 	)
@@ -63,10 +62,7 @@ func newConfig(t *testing.T) Config {
 	t.Helper()
 	require := require.New(t)
 
-	metrics, err := NewMetrics(
-		"",
-		prometheus.NewRegistry(),
-	)
+	metrics, err := NewMetrics(prometheus.NewRegistry())
 	require.NoError(err)
 
 	resourceTracker, err := tracker.NewResourceTracker(
