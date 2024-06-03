@@ -98,21 +98,18 @@ func newMetrics(reg prometheus.Registerer) (*metrics, error) {
 			Help: "Number of votes that were directly applied to blocks",
 		}),
 		getAncestorsBlks: metric.NewAveragerWithErrs(
-			"",
 			"get_ancestors_blks",
 			"blocks fetched in a call to GetAncestors",
 			reg,
 			&errs,
 		),
 		selectedVoteIndex: metric.NewAveragerWithErrs(
-			"",
 			"selected_vote_index",
 			"index of the voteID that was passed into consensus",
 			reg,
 			&errs,
 		),
 		issuerStake: metric.NewAveragerWithErrs(
-			"",
 			"issuer_stake",
 			"stake weight of the peer who provided a block that was issued into consensus",
 			reg,
