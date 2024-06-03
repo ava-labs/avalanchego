@@ -55,7 +55,7 @@ var _ = e2e.DescribeXChainSerial("[Virtuous Transfer Tx AVAX]", func() {
 				require.NoError(err)
 
 				for _, metrics := range allNodeMetrics {
-					xBlksProcessing, ok := tests.GetFirstMetricValue(metrics, xBlksProcessingMetric)
+					xBlksProcessing, ok := tests.GetMetricValue(metrics, xBlksProcessingMetric, nil)
 					if !ok || xBlksProcessing > 0 {
 						return false
 					}
@@ -248,13 +248,13 @@ RECEIVER  NEW BALANCE (AFTER) : %21d AVAX
 
 					// +0 since X-chain tx must have been processed and accepted
 					// by now
-					currentXBlksProcessing, _ := tests.GetFirstMetricValue(mm, xBlksProcessingMetric)
-					previousXBlksProcessing, _ := tests.GetFirstMetricValue(prev, xBlksProcessingMetric)
+					currentXBlksProcessing, _ := tests.GetMetricValue(mm, xBlksProcessingMetric, nil)
+					previousXBlksProcessing, _ := tests.GetMetricValue(prev, xBlksProcessingMetric, nil)
 					require.Equal(currentXBlksProcessing, previousXBlksProcessing)
 
 					// +1 since X-chain tx must have been accepted by now
-					currentXBlksAccepted, _ := tests.GetFirstMetricValue(mm, xBlksAcceptedMetric)
-					previousXBlksAccepted, _ := tests.GetFirstMetricValue(prev, xBlksAcceptedMetric)
+					currentXBlksAccepted, _ := tests.GetMetricValue(mm, xBlksAcceptedMetric, nil)
+					previousXBlksAccepted, _ := tests.GetMetricValue(prev, xBlksAcceptedMetric, nil)
 					require.Equal(currentXBlksAccepted, previousXBlksAccepted+1)
 
 					metricsBeforeTx[u] = mm
