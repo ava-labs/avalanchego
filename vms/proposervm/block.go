@@ -27,7 +27,7 @@ const (
 
 	// unassignedSlot defines the default value being used for a slot field, before it's being populated
 	// by the actual slot. Given that the slot could be zero, we had to create a non-zero value or define
-	// the variable with other interpertation ( i.e. one-base indexing, for instance )
+	// the variable with other interpretation ( i.e. one-base indexing, for instance )
 	unassignedSlot = ^uint64(0)
 )
 
@@ -516,7 +516,7 @@ func (p *postForkCommonComponents) shouldBuildSignedBlockPreDurango(
 	return false, fmt.Errorf("%w: delay %s < minDelay %s", errProposerWindowNotStarted, delay, minDelay)
 }
 
-// writeAcceptedSlotMetrics use the previosuly stored slot index and add that to the
+// writeAcceptedSlotMetrics use the previously stored slot index and add that to the
 // metrics managed by the vm.
 func (p *postForkCommonComponents) writeAcceptedSlotMetrics() {
 	if p.slot != unassignedSlot {

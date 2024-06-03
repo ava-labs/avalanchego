@@ -232,7 +232,7 @@ func (vm *VM) Initialize(
 
 	vm.proposerBuildSlotGauge = prometheus.NewGauge(
 		prometheus.GaugeOpts{
-			Namespace: metricsNamespace,
+			Namespace: "",
 			Name:      "block_building_slot",
 			Help:      "the post-durango slot in which the block was built",
 		})
@@ -243,7 +243,7 @@ func (vm *VM) Initialize(
 
 	vm.acceptedBlocksSlotHistogram = prometheus.NewHistogram(
 		prometheus.HistogramOpts{
-			Namespace: metricsNamespace,
+			Namespace: "",
 			Name:      "accepted_blocks_slot_histogram",
 			Help:      "the post-durango slot in which the block was accepted at",
 			Buckets:   []float64{1.0, 2.0, 3.0},
@@ -774,7 +774,7 @@ func (vm *VM) cacheInnerBlock(outerBlkID ids.ID, innerBlk snowman.Block) {
 	}
 }
 
-// writeAcceptedSlotMetrics use the previosuly stored slot index and add that to the
+// writeAcceptedSlotMetrics use the previously stored slot index and add that to the
 // metrics.
 func (vm *VM) writeAcceptedSlotMetrics(slot uint64) {
 	vm.acceptedBlocksSlotHistogram.Observe(float64(slot))
