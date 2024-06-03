@@ -110,7 +110,7 @@ func (b *postForkBlock) Options(ctx context.Context) ([2]snowman.Block, error) {
 				vm:       b.vm,
 				innerBlk: innerOption,
 				status:   innerOption.Status(),
-				slot:     unassignedSlot,
+				slot:     unspecifiedSlotIndex,
 			},
 		}
 	}

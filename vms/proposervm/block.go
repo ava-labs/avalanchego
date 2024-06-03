@@ -25,10 +25,10 @@ const (
 	// allowable block issuance in the future
 	maxSkew = 10 * time.Second
 
-	// unassignedSlot defines the default value being used for a slot field, before it's being populated
-	// by the actual slot. Given that the slot could be zero, we had to create a non-zero value or define
-	// the variable with other interpretation ( i.e. one-base indexing, for instance )
-	unassignedSlot = ^uint64(0)
+	// unspecifiedSlotIndex defines the default value being used for a proposal slot index, prior of being populated
+	// by the actual slot index. Given that the slot index is zero base, we would want to use an "invalid" value as
+	// non-zero.
+	unspecifiedSlotIndex = ^uint64(0)
 )
 
 var (
@@ -277,7 +277,7 @@ func (p *postForkCommonComponents) buildChild(
 			vm:       p.vm,
 			innerBlk: innerBlock,
 			status:   choices.Processing,
-			slot:     unassignedSlot,
+			slot:     unspecifiedSlotIndex,
 		},
 	}
 
@@ -519,7 +519,7 @@ func (p *postForkCommonComponents) shouldBuildSignedBlockPreDurango(
 // writeAcceptedSlotMetrics use the previously stored slot index and add that to the
 // metrics managed by the vm.
 func (p *postForkCommonComponents) writeAcceptedSlotMetrics() {
-	if p.slot != unassignedSlot {
+	if p.slot != unspecifiedSlotIndex {
 		p.vm.writeAcceptedSlotMetrics(p.slot)
 	}
 }

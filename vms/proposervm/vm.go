@@ -337,7 +337,7 @@ func (vm *VM) SetPreference(ctx context.Context, preferred ids.ID) error {
 		childBlockHeight = blk.Height() + 1
 		parentTimestamp  = blk.Timestamp()
 		nextStartTime    time.Time
-		proposalSlot     = unassignedSlot
+		proposalSlot     = unspecifiedSlotIndex
 	)
 
 	if vm.IsDurangoActivated(parentTimestamp) {
@@ -372,7 +372,7 @@ func (vm *VM) SetPreference(ctx context.Context, preferred ids.ID) error {
 
 	// if we're done bootstrapping, and we have a proposal window slot, update
 	// the metrics accordingly.
-	if (proposalSlot != unassignedSlot) && (vm.consensusState == snow.NormalOp) {
+	if (proposalSlot != unspecifiedSlotIndex) && (vm.consensusState == snow.NormalOp) {
 		vm.proposerBuildSlotGauge.Set(float64(proposalSlot))
 	}
 
@@ -578,7 +578,7 @@ func (vm *VM) parsePostForkBlock(ctx context.Context, b []byte) (PostForkBlock, 
 				vm:       vm,
 				innerBlk: innerBlk,
 				status:   choices.Processing,
-				slot:     unassignedSlot,
+				slot:     unspecifiedSlotIndex,
 			},
 		}
 	} else {
@@ -588,7 +588,7 @@ func (vm *VM) parsePostForkBlock(ctx context.Context, b []byte) (PostForkBlock, 
 				vm:       vm,
 				innerBlk: innerBlk,
 				status:   choices.Processing,
-				slot:     unassignedSlot,
+				slot:     unspecifiedSlotIndex,
 			},
 		}
 	}
@@ -634,7 +634,7 @@ func (vm *VM) getPostForkBlock(ctx context.Context, blkID ids.ID) (PostForkBlock
 				vm:       vm,
 				innerBlk: innerBlk,
 				status:   status,
-				slot:     unassignedSlot,
+				slot:     unspecifiedSlotIndex,
 			},
 		}, nil
 	}
@@ -644,7 +644,7 @@ func (vm *VM) getPostForkBlock(ctx context.Context, blkID ids.ID) (PostForkBlock
 			vm:       vm,
 			innerBlk: innerBlk,
 			status:   status,
-			slot:     unassignedSlot,
+			slot:     unspecifiedSlotIndex,
 		},
 	}, nil
 }
