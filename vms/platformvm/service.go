@@ -1845,11 +1845,7 @@ func (s *Service) GetFeeRates(_ *http.Request, _ *struct{}, reply *GetFeeRatesRe
 		return fmt.Errorf("could not retrieve state for block %s", preferredID)
 	}
 
-	currentFeeRate, err := onAccept.GetFeeRates()
-	if err != nil {
-		return err
-	}
-	reply.CurrentFeeRates = currentFeeRate
+	reply.CurrentFeeRates = commonfees.Empty // TODO ABENEGIA: fix this up once algo is changed
 
 	currentChainTime := onAccept.GetTimestamp()
 	nextTimestamp, _, err := state.NextBlockTime(onAccept, &s.vm.clock)

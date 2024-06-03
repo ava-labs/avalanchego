@@ -37,7 +37,6 @@ type diff struct {
 
 	timestamp time.Time
 
-	feeRates          *commonfees.Dimensions
 	lastBlkComplexity *commonfees.Dimensions
 
 	// Subnet ID --> supply of native asset of the subnet
@@ -92,31 +91,6 @@ func NewDiffOn(parentState Chain) (Diff, error) {
 	return NewDiff(ids.Empty, stateGetter{
 		state: parentState,
 	})
-}
-
-func (d *diff) GetFeeRates() (commonfees.Dimensions, error) {
-	if d.feeRates == nil {
-		parentState, ok := d.stateVersions.GetState(d.parentID)
-		if !ok {
-			return commonfees.Empty, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
-		}
-		parentFeeRates, err := parentState.GetFeeRates()
-		if err != nil {
-			return commonfees.Empty, err
-		}
-
-		d.feeRates = new(commonfees.Dimensions)
-		*d.feeRates = parentFeeRates
-	}
-
-	return *d.feeRates, nil
-}
-
-func (d *diff) SetFeeRates(uf commonfees.Dimensions) {
-	if d.feeRates == nil {
-		d.feeRates = new(commonfees.Dimensions)
-	}
-	*d.feeRates = uf
 }
 
 func (d *diff) GetLastBlockComplexity() (commonfees.Dimensions, error) {
@@ -456,9 +430,6 @@ func (d *diff) DeleteUTXO(utxoID ids.ID) {
 
 func (d *diff) Apply(baseState Chain) error {
 	baseState.SetTimestamp(d.timestamp)
-	if d.feeRates != nil {
-		baseState.SetFeeRates(*d.feeRates)
-	}
 	if d.lastBlkComplexity != nil {
 		baseState.SetLastBlockComplexity(*d.lastBlkComplexity)
 	}

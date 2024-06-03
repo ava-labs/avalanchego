@@ -103,17 +103,13 @@ func updatedFeeManager(upgrades upgrade.Config, state Chain, parentBlkTime time.
 		feeCfg    = fee.GetDynamicConfig(isEActive)
 	)
 
-	feeRates, err := state.GetFeeRates()
-	if err != nil {
-		return nil, fmt.Errorf("failed retrieving fee rates: %w", err)
-	}
 	parentBlkComplexity, err := state.GetLastBlockComplexity()
 	if err != nil {
 		return nil, fmt.Errorf("failed retrieving last block complexity: %w", err)
 	}
 	childBlkTime := state.GetTimestamp()
 
-	feeManager := commonfees.NewManager(feeRates)
+	feeManager := commonfees.NewManager(commonfees.Empty) // Fee rate non needed anymore
 	if isEActive {
 		if err := feeManager.UpdateFeeRates(
 			feeCfg,

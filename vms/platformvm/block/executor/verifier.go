@@ -534,7 +534,6 @@ func (v *verifier) processStandardTxs(
 	}
 
 	if v.txExecutorBackend.Config.UpgradeConfig.IsEActivated(state.GetTimestamp()) {
-		state.SetFeeRates(feeCalculator.GetFeeRates())
 		state.SetLastBlockComplexity(feeCalculator.GetCumulatedComplexity())
 	}
 

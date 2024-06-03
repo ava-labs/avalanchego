@@ -42,7 +42,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
@@ -99,9 +98,6 @@ type Chain interface {
 	avax.UTXOAdder
 	avax.UTXOGetter
 	avax.UTXODeleter
-
-	GetFeeRates() (commonfees.Dimensions, error)
-	SetFeeRates(uf commonfees.Dimensions)
 
 	GetLastBlockComplexity() (commonfees.Dimensions, error)
 	SetLastBlockComplexity(windows commonfees.Dimensions)
@@ -365,7 +361,6 @@ type state struct {
 
 	// The persisted fields represent the current database value
 	timestamp, persistedTimestamp         time.Time
-	feeRate                               *commonfees.Dimensions // pointer, to allow customization for test networks
 	lastBlkComplexity                     commonfees.Dimensions
 	currentSupply, persistedCurrentSupply uint64
 	// [lastAccepted] is the most recently accepted block.
@@ -1015,15 +1010,6 @@ func (s *state) GetStartTime(nodeID ids.NodeID, subnetID ids.ID) (time.Time, err
 	return staker.StartTime, nil
 }
 
-func (s *state) GetFeeRates() (commonfees.Dimensions, error) {
-	return *s.feeRate, nil
-}
-
-func (s *state) SetFeeRates(uf commonfees.Dimensions) {
-	feeRates := uf
-	s.feeRate = &feeRates
-}
-
 func (s *state) GetLastBlockComplexity() (commonfees.Dimensions, error) {
 	return s.lastBlkComplexity, nil
 }
@@ -1321,24 +1307,6 @@ func (s *state) loadMetadata() error {
 	}
 	s.persistedTimestamp = timestamp
 	s.SetTimestamp(timestamp)
-
-	s.feeRate = new(commonfees.Dimensions)
-	switch feeRatesBytes, err := s.singletonDB.Get(FeeRatesKey); err {
-	case nil:
-		if err := s.feeRate.FromBytes(feeRatesBytes); err != nil {
-			return err
-		}
-
-	case database.ErrNotFound:
-		// fork introducing dynamic fees may not be active yet,
-		// hence we may have never stored fee rates. Load from config
-		// TODO: remove once fork is active
-		isEActive := s.cfg.UpgradeConfig.IsEActivated(timestamp)
-		*s.feeRate = fee.GetDynamicConfig(isEActive).InitialFeeRate
-
-	default:
-		return err
-	}
 
 	switch lastBlkComplexityBytes, err := s.singletonDB.Get(LastBlkComplexityKey); err {
 	case nil:
@@ -2333,11 +2301,6 @@ func (s *state) writeMetadata() error {
 		s.persistedTimestamp = s.timestamp
 	}
 
-	if s.feeRate != nil {
-		if err := s.singletonDB.Put(FeeRatesKey, s.feeRate.Bytes()); err != nil {
-			return fmt.Errorf("failed to write fee rates: %w", err)
-		}
-	}
 	if err := s.singletonDB.Put(LastBlkComplexityKey, s.lastBlkComplexity.Bytes()); err != nil {
 		return fmt.Errorf("failed to write fee rates: %w", err)
 	}
