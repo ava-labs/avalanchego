@@ -112,6 +112,8 @@ message Handshake {
   // Signature of the peer IP port pair at a provided timestamp with the BLS
   // key.
   bytes ip_bls_sig = 13;
+  // To avoid sending IPs that the client isn't interested in tracking, the
+  // server expects the client to confirm that it is tracking all subnets.
   bool all_subnets = 14;
 }
 

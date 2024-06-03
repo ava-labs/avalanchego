@@ -678,8 +678,10 @@ type Handshake struct {
 	KnownPeers     *BloomFilter `protobuf:"bytes,12,opt,name=known_peers,json=knownPeers,proto3" json:"known_peers,omitempty"`
 	// Signature of the peer IP port pair at a provided timestamp with the BLS
 	// key.
-	IpBlsSig   []byte `protobuf:"bytes,13,opt,name=ip_bls_sig,json=ipBlsSig,proto3" json:"ip_bls_sig,omitempty"`
-	AllSubnets bool   `protobuf:"varint,14,opt,name=all_subnets,json=allSubnets,proto3" json:"all_subnets,omitempty"`
+	IpBlsSig []byte `protobuf:"bytes,13,opt,name=ip_bls_sig,json=ipBlsSig,proto3" json:"ip_bls_sig,omitempty"`
+	// To avoid sending IPs that the client isn't interested in tracking, the
+	// server expects the client to confirm that it is tracking all subnets.
+	AllSubnets bool `protobuf:"varint,14,opt,name=all_subnets,json=allSubnets,proto3" json:"all_subnets,omitempty"`
 }
 
 func (x *Handshake) Reset() {
