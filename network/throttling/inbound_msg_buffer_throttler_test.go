@@ -17,7 +17,7 @@ import (
 // Test inboundMsgBufferThrottler
 func TestMsgBufferThrottler(t *testing.T) {
 	require := require.New(t)
-	throttler, err := newInboundMsgBufferThrottler("", prometheus.NewRegistry(), 3)
+	throttler, err := newInboundMsgBufferThrottler(prometheus.NewRegistry(), 3)
 	require.NoError(err)
 
 	nodeID1, nodeID2 := ids.GenerateTestNodeID(), ids.GenerateTestNodeID()
@@ -69,7 +69,7 @@ func TestMsgBufferThrottler(t *testing.T) {
 // Test inboundMsgBufferThrottler when an acquire is cancelled
 func TestMsgBufferThrottlerContextCancelled(t *testing.T) {
 	require := require.New(t)
-	throttler, err := newInboundMsgBufferThrottler("", prometheus.NewRegistry(), 3)
+	throttler, err := newInboundMsgBufferThrottler(prometheus.NewRegistry(), 3)
 	require.NoError(err)
 
 	vdr1Context, vdr1ContextCancelFunc := context.WithCancel(context.Background())

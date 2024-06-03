@@ -39,55 +39,45 @@ type Metrics struct {
 	BytesSaved *prometheus.GaugeVec   // io + op
 }
 
-func NewMetrics(
-	namespace string,
-	registerer prometheus.Registerer,
-) (*Metrics, error) {
+func NewMetrics(registerer prometheus.Registerer) (*Metrics, error) {
 	m := &Metrics{
 		ClockSkewCount: prometheus.NewCounter(prometheus.CounterOpts{
-			Namespace: namespace,
-			Name:      "clock_skew_count",
-			Help:      "number of handshake timestamps inspected (n)",
+			Name: "clock_skew_count",
+			Help: "number of handshake timestamps inspected (n)",
 		}),
 		ClockSkewSum: prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespace,
-			Name:      "clock_skew_sum",
-			Help:      "sum of (peer timestamp - local timestamp) from handshake messages (s)",
+			Name: "clock_skew_sum",
+			Help: "sum of (peer timestamp - local timestamp) from handshake messages (s)",
 		}),
 		NumFailedToParse: prometheus.NewCounter(prometheus.CounterOpts{
-			Namespace: namespace,
-			Name:      "msgs_failed_to_parse",
-			Help:      "number of received messages that could not be parsed",
+			Name: "msgs_failed_to_parse",
+			Help: "number of received messages that could not be parsed",
 		}),
 		NumSendFailed: prometheus.NewCounterVec(
 			prometheus.CounterOpts{
-				Namespace: namespace,
-				Name:      "msgs_failed_to_send",
-				Help:      "number of messages that failed to be sent",
+				Name: "msgs_failed_to_send",
+				Help: "number of messages that failed to be sent",
 			},
 			opLabels,
 		),
 		Messages: prometheus.NewCounterVec(
 			prometheus.CounterOpts{
-				Namespace: namespace,
-				Name:      "msgs",
-				Help:      "number of handled messages",
+				Name: "msgs",
+				Help: "number of handled messages",
 			},
 			ioOpCompressedLabels,
 		),
 		Bytes: prometheus.NewCounterVec(
 			prometheus.CounterOpts{
-				Namespace: namespace,
-				Name:      "msgs_bytes",
-				Help:      "number of message bytes",
+				Name: "msgs_bytes",
+				Help: "number of message bytes",
 			},
 			ioOpLabels,
 		),
 		BytesSaved: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
-				Namespace: namespace,
-				Name:      "msgs_bytes_saved",
-				Help:      "number of message bytes saved",
+				Name: "msgs_bytes_saved",
+				Help: "number of message bytes saved",
 			},
 			ioOpLabels,
 		),

@@ -108,12 +108,11 @@ func New(
 	nodeID ids.NodeID,
 	tracingEnabled bool,
 	tracer trace.Tracer,
-	namespace string,
 	registerer prometheus.Registerer,
 	httpConfig HTTPConfig,
 	allowedHosts []string,
 ) (Server, error) {
-	m, err := newMetrics(namespace, registerer)
+	m, err := newMetrics(registerer)
 	if err != nil {
 		return nil, err
 	}

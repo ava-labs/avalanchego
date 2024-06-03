@@ -66,7 +66,7 @@ func New(
 		processedCache: &cache.LRU[ids.ID, struct{}]{Size: cacheSize},
 		onFinished:     onFinished,
 	}
-	return b, b.metrics.Initialize("bs", config.Ctx.AvalancheRegisterer)
+	return b, b.metrics.Initialize(config.Ctx.AvalancheRegisterer)
 }
 
 // Note: To align with the Snowman invariant, it should be guaranteed the VM is
