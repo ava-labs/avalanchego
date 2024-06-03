@@ -70,7 +70,6 @@ func TestTimeout(t *testing.T) {
 	mc, err := message.NewCreator(
 		logging.NoLog{},
 		metrics,
-		"dummyNamespace",
 		constants.DefaultNetworkCompressionType,
 		10*time.Second,
 	)
@@ -347,7 +346,6 @@ func TestReliableMessages(t *testing.T) {
 	mc, err := message.NewCreator(
 		logging.NoLog{},
 		metrics,
-		"dummyNamespace",
 		constants.DefaultNetworkCompressionType,
 		10*time.Second,
 	)
@@ -504,7 +502,6 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	mc, err := message.NewCreator(
 		logging.NoLog{},
 		metrics,
-		"dummyNamespace",
 		constants.DefaultNetworkCompressionType,
 		10*time.Second,
 	)

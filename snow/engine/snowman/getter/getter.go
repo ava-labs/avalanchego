@@ -43,8 +43,7 @@ func New(
 
 	var err error
 	gh.getAncestorsBlks, err = metric.NewAverager(
-		"bs",
-		"get_ancestors_blks",
+		"bs_get_ancestors_blks",
 		"blocks fetched in a call to GetAncestors",
 		reg,
 	)

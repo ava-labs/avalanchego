@@ -527,14 +527,13 @@ func (s *Service) GetSubnets(_ *http.Request, args *GetSubnetsArgs, response *Ge
 
 	getAll := len(args.IDs) == 0
 	if getAll {
-		subnets, err := s.vm.state.GetSubnets() // all subnets
+		subnetIDs, err := s.vm.state.GetSubnetIDs() // all subnets
 		if err != nil {
 			return fmt.Errorf("error getting subnets from database: %w", err)
 		}
 
-		response.Subnets = make([]APISubnet, len(subnets)+1)
-		for i, subnet := range subnets {
-			subnetID := subnet.ID()
+		response.Subnets = make([]APISubnet, len(subnetIDs)+1)
+		for i, subnetID := range subnetIDs {
 			if _, err := s.vm.state.GetSubnetTransformation(subnetID); err == nil {
 				response.Subnets[i] = APISubnet{
 					ID:          subnetID,
@@ -544,15 +543,23 @@ func (s *Service) GetSubnets(_ *http.Request, args *GetSubnetsArgs, response *Ge
 				continue
 			}
 
-			unsignedTx := subnet.Unsigned.(*txs.CreateSubnetTx)
-			owner := unsignedTx.Owner.(*secp256k1fx.OutputOwners)
-			controlAddrs := []string{}
-			for _, controlKeyID := range owner.Addrs {
+			subnetOwner, err := s.vm.state.GetSubnetOwner(subnetID)
+			if err != nil {
+				return err
+			}
+
+			owner, ok := subnetOwner.(*secp256k1fx.OutputOwners)
+			if !ok {
+				return fmt.Errorf("expected *secp256k1fx.OutputOwners but got %T", subnetOwner)
+			}
+
+			controlAddrs := make([]string, len(owner.Addrs))
+			for i, controlKeyID := range owner.Addrs {
 				addr, err := s.addrManager.FormatLocalAddress(controlKeyID)
 				if err != nil {
 					return fmt.Errorf("problem formatting address: %w", err)
 				}
-				controlAddrs = append(controlAddrs, addr)
+				controlAddrs[i] = addr
 			}
 			response.Subnets[i] = APISubnet{
 				ID:          subnetID,
@@ -561,7 +568,7 @@ func (s *Service) GetSubnets(_ *http.Request, args *GetSubnetsArgs, response *Ge
 			}
 		}
 		// Include primary network
-		response.Subnets[len(subnets)] = APISubnet{
+		response.Subnets[len(subnetIDs)] = APISubnet{
 			ID:          constants.PrimaryNetworkID,
 			ControlKeys: []string{},
 			Threshold:   avajson.Uint32(0),
@@ -1226,14 +1233,13 @@ func (s *Service) GetBlockchains(_ *http.Request, _ *struct{}, response *GetBloc
 	s.vm.ctx.Lock.Lock()
 	defer s.vm.ctx.Lock.Unlock()
 
-	subnets, err := s.vm.state.GetSubnets()
+	subnetIDs, err := s.vm.state.GetSubnetIDs()
 	if err != nil {
 		return fmt.Errorf("couldn't retrieve subnets: %w", err)
 	}
 
 	response.Blockchains = []APIBlockchain{}
-	for _, subnet := range subnets {
-		subnetID := subnet.ID()
+	for _, subnetID := range subnetIDs {
 		chains, err := s.vm.state.GetChains(subnetID)
 		if err != nil {
 			return fmt.Errorf(

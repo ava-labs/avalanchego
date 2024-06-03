@@ -1,49 +1,16 @@
-# The version is supplied as a build argument rather than hard-coded
-# to minimize the cost of version changes.
-ARG GO_VERSION
+# TAG should identify the builder image
+ARG TAG
 
 # AVALANCHEGO_NODE_IMAGE needs to identify an existing avalanchego node image and should include the tag
 ARG AVALANCHEGO_NODE_IMAGE
 
-# Antithesis: Getting the Antithesis golang instrumentation library
-FROM docker.io/antithesishq/go-instrumentor AS instrumentor
-
 # ============= Compilation Stage ================
-FROM golang:$GO_VERSION-bullseye AS builder
+FROM antithesis-avalanchego-builder:$TAG AS builder
 
-WORKDIR /build
-# Copy and download avalanche dependencies using go mod
-COPY go.mod .
-COPY go.sum .
-RUN go mod download
+# The builder workdir will vary between instrumented and non-instrumented builders
+ARG BUILDER_WORKDIR
 
-# Copy the code into the container
-COPY . .
-
-# Keep the commit hash to easily verify the exact version that is running
-RUN git rev-parse HEAD > ./commit_hash.txt
-
-# Copy the instrumentor and supporting files to their correct locations
-COPY --from=instrumentor /opt/antithesis /opt/antithesis
-COPY --from=instrumentor /opt/antithesis/lib /lib
-
-# Create the destination output directory for the instrumented code
-RUN mkdir -p /avalanchego_instrumented
-
-# Park the .git file in a safe location
-RUN mkdir -p /opt/tmp/
-RUN cp -r .git /opt/tmp/
-
-# Instrument avalanchego
-RUN /opt/antithesis/bin/goinstrumentor \
-    -stderrthreshold=INFO \
-    -antithesis /opt/antithesis/instrumentation \
-    . \
-    /avalanchego_instrumented
-
-WORKDIR /avalanchego_instrumented/customer
-RUN go mod download
-RUN ln -s /opt/tmp/.git .git
+WORKDIR $BUILDER_WORKDIR
 
 # Build xsvm VM
 RUN ./scripts/build_xsvm.sh
@@ -53,9 +20,12 @@ FROM $AVALANCHEGO_NODE_IMAGE AS execution
 
 # The commit hash and antithesis dependencies should be part of the base image.
 
+# The builder workdir will vary between instrumented and non-instrumented builders
+ARG BUILDER_WORKDIR
+
 # Copy the executable into the container
 RUN mkdir -p /root/.avalanchego/plugins
-COPY --from=builder /avalanchego_instrumented/customer/build/xsvm \
+COPY --from=builder $BUILDER_WORKDIR/build/xsvm \
     /root/.avalanchego/plugins/v3m4wPxaHpvGr8qfMeyK6PRW3idZrPHmYcMTt7oXdK47yurVH
 
 # The node image's entrypoint will be reused.
