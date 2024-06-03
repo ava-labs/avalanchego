@@ -46,8 +46,6 @@ const (
 
 	checkIndexedFrequency = 10 * time.Second
 	innerBlkCacheSize     = 64 * units.MiB
-
-	metricsNamespace = "proposervm"
 )
 
 var (
@@ -142,7 +140,7 @@ func (vm *VM) Initialize(
 	//       places.
 	registerer := prometheus.NewRegistry()
 
-	if err := chainCtx.Metrics.Register(metricsNamespace, registerer); err != nil {
+	if err := chainCtx.Metrics.Register("proposervm", registerer); err != nil {
 		return err
 	}
 	multiGatherer := metrics.NewMultiGatherer()
@@ -232,9 +230,8 @@ func (vm *VM) Initialize(
 
 	vm.proposerBuildSlotGauge = prometheus.NewGauge(
 		prometheus.GaugeOpts{
-			Namespace: "",
-			Name:      "block_building_slot",
-			Help:      "the post-durango slot in which the block was built",
+			Name: "block_building_slot",
+			Help: "the post-durango slot in which the block was built",
 		})
 
 	if err = registerer.Register(vm.proposerBuildSlotGauge); err != nil {
@@ -243,10 +240,9 @@ func (vm *VM) Initialize(
 
 	vm.acceptedBlocksSlotHistogram = prometheus.NewHistogram(
 		prometheus.HistogramOpts{
-			Namespace: "",
-			Name:      "accepted_blocks_slot_histogram",
-			Help:      "the post-durango slot in which the block was accepted at",
-			Buckets:   []float64{1.0, 2.0, 3.0},
+			Name:    "accepted_blocks_slot_histogram",
+			Help:    "the post-durango slot in which the block was accepted at",
+			Buckets: []float64{1.0, 2.0, 3.0},
 		},
 	)
 	if err = registerer.Register(vm.acceptedBlocksSlotHistogram); err != nil {
@@ -339,7 +335,6 @@ func (vm *VM) SetPreference(ctx context.Context, preferred ids.ID) error {
 		nextStartTime    time.Time
 		proposalSlot     = unspecifiedSlotIndex
 	)
-
 	if vm.IsDurangoActivated(parentTimestamp) {
 		currentTime := vm.Clock.Time().Truncate(time.Second)
 		proposalSlot = proposer.TimeToSlot(parentTimestamp, currentTime)
