@@ -65,7 +65,6 @@ type metrics struct {
 
 func newMetrics(
 	log logging.Logger,
-	namespace string,
 	reg prometheus.Registerer,
 	lastAcceptedHeight uint64,
 	lastAcceptedTime time.Time,
@@ -75,82 +74,57 @@ func newMetrics(
 		log:                      log,
 		currentMaxVerifiedHeight: lastAcceptedHeight,
 		maxVerifiedHeight: prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespace,
-			Name:      "max_verified_height",
-			Help:      "highest verified height",
+			Name: "max_verified_height",
+			Help: "highest verified height",
 		}),
 		lastAcceptedHeight: prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespace,
-			Name:      "last_accepted_height",
-			Help:      "last height accepted",
+			Name: "last_accepted_height",
+			Help: "last height accepted",
 		}),
 		lastAcceptedTimestamp: prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespace,
-			Name:      "last_accepted_timestamp",
-			Help:      "timestamp of the last accepted block in unix seconds",
+			Name: "last_accepted_timestamp",
+			Help: "timestamp of the last accepted block in unix seconds",
 		}),
 
 		processingBlocks: linked.NewHashmap[ids.ID, processingStart](),
 
-		// e.g.,
-		// "avalanche_X_blks_processing" reports how many blocks are currently processing
 		numProcessing: prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespace,
-			Name:      "blks_processing",
-			Help:      "number of currently processing blocks",
+			Name: "blks_processing",
+			Help: "number of currently processing blocks",
 		}),
 
 		blockSizeAcceptedSum: prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespace,
-			Name:      "blks_accepted_container_size_sum",
-			Help:      "cumulative size of all accepted blocks",
+			Name: "blks_accepted_container_size_sum",
+			Help: "cumulative size of all accepted blocks",
 		}),
 		pollsAccepted: metric.NewAveragerWithErrs(
-			namespace,
 			"blks_polls_accepted",
 			"number of polls from the issuance of a block to its acceptance",
 			reg,
 			&errs,
 		),
-		// e.g.,
-		// "avalanche_C_blks_accepted_count" reports how many times "Observe" has been called which is the total number of blocks accepted
-		// "avalanche_C_blks_accepted_sum" reports the cumulative sum of all block acceptance latencies in nanoseconds
-		// "avalanche_C_blks_accepted_sum / avalanche_C_blks_accepted_count" is the average block acceptance latency in nanoseconds
-		// "avalanche_C_blks_accepted_container_size_sum" reports the cumulative sum of all accepted blocks' sizes in bytes
-		// "avalanche_C_blks_accepted_container_size_sum / avalanche_C_blks_accepted_count" is the average accepted block size in bytes
 		latAccepted: metric.NewAveragerWithErrs(
-			namespace,
 			"blks_accepted",
 			"time (in ns) from the issuance of a block to its acceptance",
 			reg,
 			&errs,
 		),
 		buildLatencyAccepted: prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespace,
-			Name:      "blks_build_accept_latency",
-			Help:      "time (in ns) from the timestamp of a block to the time it was accepted",
+			Name: "blks_build_accept_latency",
+			Help: "time (in ns) from the timestamp of a block to the time it was accepted",
 		}),
 
 		blockSizeRejectedSum: prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespace,
-			Name:      "blks_rejected_container_size_sum",
-			Help:      "cumulative size of all rejected blocks",
+			Name: "blks_rejected_container_size_sum",
+			Help: "cumulative size of all rejected blocks",
 		}),
 		pollsRejected: metric.NewAveragerWithErrs(
-			namespace,
 			"blks_polls_rejected",
 			"number of polls from the issuance of a block to its rejection",
 			reg,
 			&errs,
 		),
-		// e.g.,
-		// "avalanche_P_blks_rejected_count" reports how many times "Observe" has been called which is the total number of blocks rejected
-		// "avalanche_P_blks_rejected_sum" reports the cumulative sum of all block rejection latencies in nanoseconds
-		// "avalanche_P_blks_rejected_sum / avalanche_P_blks_rejected_count" is the average block rejection latency in nanoseconds
-		// "avalanche_P_blks_rejected_container_size_sum" reports the cumulative sum of all rejected blocks' sizes in bytes
-		// "avalanche_P_blks_rejected_container_size_sum / avalanche_P_blks_rejected_count" is the average rejected block size in bytes
 		latRejected: metric.NewAveragerWithErrs(
-			namespace,
 			"blks_rejected",
 			"time (in ns) from the issuance of a block to its rejection",
 			reg,
@@ -158,14 +132,12 @@ func newMetrics(
 		),
 
 		numSuccessfulPolls: prometheus.NewCounter(prometheus.CounterOpts{
-			Namespace: namespace,
-			Name:      "polls_successful",
-			Help:      "number of successful polls",
+			Name: "polls_successful",
+			Help: "number of successful polls",
 		}),
 		numFailedPolls: prometheus.NewCounter(prometheus.CounterOpts{
-			Namespace: namespace,
-			Name:      "polls_failed",
-			Help:      "number of failed polls",
+			Name: "polls_failed",
+			Help: "number of failed polls",
 		}),
 	}
 

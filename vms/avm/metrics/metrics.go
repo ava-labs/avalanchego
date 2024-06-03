@@ -66,32 +66,26 @@ func (m *metrics) MarkTxAccepted(tx *txs.Tx) error {
 	return tx.Unsigned.Visit(m.txMetrics)
 }
 
-func New(
-	namespace string,
-	registerer prometheus.Registerer,
-) (Metrics, error) {
-	txMetrics, err := newTxMetrics(namespace, registerer)
+func New(registerer prometheus.Registerer) (Metrics, error) {
+	txMetrics, err := newTxMetrics(registerer)
 	errs := wrappers.Errs{Err: err}
 
 	m := &metrics{txMetrics: txMetrics}
 
 	m.numTxRefreshes = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: namespace,
-		Name:      "tx_refreshes",
-		Help:      "Number of times unique txs have been refreshed",
+		Name: "tx_refreshes",
+		Help: "Number of times unique txs have been refreshed",
 	})
 	m.numTxRefreshHits = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: namespace,
-		Name:      "tx_refresh_hits",
-		Help:      "Number of times unique txs have not been unique, but were cached",
+		Name: "tx_refresh_hits",
+		Help: "Number of times unique txs have not been unique, but were cached",
 	})
 	m.numTxRefreshMisses = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: namespace,
-		Name:      "tx_refresh_misses",
-		Help:      "Number of times unique txs have not been unique and weren't cached",
+		Name: "tx_refresh_misses",
+		Help: "Number of times unique txs have not been unique and weren't cached",
 	})
 
-	apiRequestMetric, err := metric.NewAPIInterceptor(namespace, registerer)
+	apiRequestMetric, err := metric.NewAPIInterceptor(registerer)
 	m.APIInterceptor = apiRequestMetric
 	errs.Add(
 		err,

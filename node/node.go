@@ -36,7 +36,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/leveldb"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/meterdb"
-	"github.com/ava-labs/avalanchego/database/pebble"
+	"github.com/ava-labs/avalanchego/database/pebbledb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/genesis"
@@ -66,6 +66,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math/meter"
+	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/perms"
 	"github.com/ava-labs/avalanchego/utils/profiler"
 	"github.com/ava-labs/avalanchego/utils/resource"
@@ -89,6 +90,10 @@ const (
 	httpPortName    = constants.AppName + "-http"
 
 	ipResolutionTimeout = 30 * time.Second
+
+	apiNamespace     = constants.PlatformName + metric.NamespaceSeparator + "api"
+	dbNamespace      = constants.PlatformName + metric.NamespaceSeparator + "db_internal"
+	networkNamespace = constants.PlatformName + metric.NamespaceSeparator + "network"
 )
 
 var (
@@ -184,11 +189,18 @@ func New(
 	// It must be initiated before networking (initNetworking), chain manager (initChainManager)
 	// and the engine (initChains) but after the metrics (initMetricsAPI)
 	// message.Creator currently record metrics under network namespace
-	n.networkNamespace = "network"
+
+	networkRegisterer, err := metrics.MakeAndRegister(
+		n.MetricsGatherer,
+		networkNamespace,
+	)
+	if err != nil {
+		return nil, err
+	}
+
 	n.msgCreator, err = message.NewCreator(
 		n.Log,
-		n.MetricsRegisterer,
-		n.networkNamespace,
+		networkRegisterer,
 		n.Config.NetworkConfig.CompressionType,
 		n.Config.NetworkConfig.MaximumInboundMessageTimeout,
 	)
@@ -206,7 +218,7 @@ func New(
 	}
 	n.initCPUTargeter(&config.CPUTargeterConfig)
 	n.initDiskTargeter(&config.DiskTargeterConfig)
-	if err := n.initNetworking(); err != nil { // Set up networking layer.
+	if err := n.initNetworking(networkRegisterer); err != nil { // Set up networking layer.
 		return nil, fmt.Errorf("problem initializing networking: %w", err)
 	}
 
@@ -310,8 +322,7 @@ type Node struct {
 	VertexAcceptorGroup snow.AcceptorGroup
 
 	// Net runs the networking stack
-	networkNamespace string
-	Net              network.Network
+	Net network.Network
 
 	// The staking address will optionally be written to a process context
 	// file to enable other nodes to be configured to use this node as a
@@ -387,7 +398,7 @@ type Node struct {
 
 // Initialize the networking layer.
 // Assumes [n.vdrs], [n.CPUTracker], and [n.CPUTargeter] have been initialized.
-func (n *Node) initNetworking() error {
+func (n *Node) initNetworking(reg prometheus.Registerer) error {
 	// Providing either loopback address - `::1` for ipv6 and `127.0.0.1` for ipv4 - as the listen
 	// host will avoid the need for a firewall exception on recent MacOS:
 	//
@@ -584,7 +595,6 @@ func (n *Node) initNetworking() error {
 	}
 
 	// add node configs to network config
-	n.Config.NetworkConfig.Namespace = n.networkNamespace
 	n.Config.NetworkConfig.MyNodeID = n.ID
 	n.Config.NetworkConfig.MyIPPort = dynamicIP
 	n.Config.NetworkConfig.NetworkID = n.Config.NetworkID
@@ -603,7 +613,7 @@ func (n *Node) initNetworking() error {
 	n.Net, err = network.NewNetwork(
 		&n.Config.NetworkConfig,
 		n.msgCreator,
-		n.MetricsRegisterer,
+		reg,
 		n.Log,
 		listener,
 		dialer.NewDialer(constants.NetworkType, n.Config.NetworkConfig.DialerConfig, n.Log),
@@ -720,25 +730,31 @@ func (n *Node) Dispatch() error {
  */
 
 func (n *Node) initDatabase() error {
+	dbRegisterer, err := metrics.MakeAndRegister(
+		n.MetricsGatherer,
+		dbNamespace,
+	)
+	if err != nil {
+		return err
+	}
+
 	// start the db
 	switch n.Config.DatabaseConfig.Name {
 	case leveldb.Name:
 		// Prior to v1.10.15, the only on-disk database was leveldb, and its
 		// files went to [dbPath]/[networkID]/v1.4.5.
 		dbPath := filepath.Join(n.Config.DatabaseConfig.Path, version.CurrentDatabase.String())
-		var err error
-		n.DB, err = leveldb.New(dbPath, n.Config.DatabaseConfig.Config, n.Log, "db_internal", n.MetricsRegisterer)
+		n.DB, err = leveldb.New(dbPath, n.Config.DatabaseConfig.Config, n.Log, dbRegisterer)
 		if err != nil {
-			return fmt.Errorf("couldn't create leveldb at %s: %w", dbPath, err)
+			return fmt.Errorf("couldn't create %s at %s: %w", leveldb.Name, dbPath, err)
 		}
 	case memdb.Name:
 		n.DB = memdb.New()
-	case pebble.Name:
-		dbPath := filepath.Join(n.Config.DatabaseConfig.Path, pebble.Name)
-		var err error
-		n.DB, err = pebble.New(dbPath, n.Config.DatabaseConfig.Config, n.Log, "db_internal", n.MetricsRegisterer)
+	case pebbledb.Name:
+		dbPath := filepath.Join(n.Config.DatabaseConfig.Path, "pebble")
+		n.DB, err = pebbledb.New(dbPath, n.Config.DatabaseConfig.Config, n.Log, dbRegisterer)
 		if err != nil {
-			return fmt.Errorf("couldn't create pebbledb at %s: %w", dbPath, err)
+			return fmt.Errorf("couldn't create %s at %s: %w", pebbledb.Name, dbPath, err)
 		}
 	default:
 		return fmt.Errorf(
@@ -746,7 +762,7 @@ func (n *Node) initDatabase() error {
 			n.Config.DatabaseConfig.Name,
 			leveldb.Name,
 			memdb.Name,
-			pebble.Name,
+			pebbledb.Name,
 		)
 	}
 
@@ -754,7 +770,6 @@ func (n *Node) initDatabase() error {
 		n.DB = versiondb.New(n.DB)
 	}
 
-	var err error
 	n.DB, err = meterdb.New("db", n.MetricsRegisterer, n.DB)
 	if err != nil {
 		return err
@@ -967,6 +982,14 @@ func (n *Node) initAPIServer() error {
 	}
 	n.apiURI = fmt.Sprintf("%s://%s", protocol, listener.Addr())
 
+	apiRegisterer, err := metrics.MakeAndRegister(
+		n.MetricsGatherer,
+		apiNamespace,
+	)
+	if err != nil {
+		return err
+	}
+
 	n.APIServer, err = server.New(
 		n.Log,
 		n.LogFactory,
@@ -976,8 +999,7 @@ func (n *Node) initAPIServer() error {
 		n.ID,
 		n.Config.TraceConfig.Enabled,
 		n.tracer,
-		"api",
-		n.MetricsRegisterer,
+		apiRegisterer,
 		n.Config.HTTPConfig.HTTPConfig,
 		n.Config.HTTPAllowedHosts,
 	)

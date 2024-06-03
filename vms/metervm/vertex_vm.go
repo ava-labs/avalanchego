@@ -46,7 +46,7 @@ func (vm *vertexVM) Initialize(
 	appSender common.AppSender,
 ) error {
 	registerer := prometheus.NewRegistry()
-	if err := vm.vertexMetrics.Initialize("", registerer); err != nil {
+	if err := vm.vertexMetrics.Initialize(registerer); err != nil {
 		return err
 	}
 

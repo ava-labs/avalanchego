@@ -12,7 +12,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/metric"
 )
 
 var _ InboundMsgThrottler = (*inboundMsgThrottler)(nil)
@@ -54,7 +53,6 @@ type InboundMsgThrottlerConfig struct {
 // Returns a new, sybil-safe inbound message throttler.
 func NewInboundMsgThrottler(
 	log logging.Logger,
-	namespace string,
 	registerer prometheus.Registerer,
 	vdrs validators.Manager,
 	throttlerConfig InboundMsgThrottlerConfig,
@@ -64,7 +62,6 @@ func NewInboundMsgThrottler(
 ) (InboundMsgThrottler, error) {
 	byteThrottler, err := newInboundMsgByteThrottler(
 		log,
-		namespace,
 		registerer,
 		vdrs,
 		throttlerConfig.MsgByteThrottlerConfig,
@@ -73,7 +70,6 @@ func NewInboundMsgThrottler(
 		return nil, err
 	}
 	bufferThrottler, err := newInboundMsgBufferThrottler(
-		namespace,
 		registerer,
 		throttlerConfig.MaxProcessingMsgsPerNode,
 	)
@@ -82,7 +78,6 @@ func NewInboundMsgThrottler(
 	}
 	bandwidthThrottler, err := newBandwidthThrottler(
 		log,
-		namespace,
 		registerer,
 		throttlerConfig.BandwidthThrottlerConfig,
 	)
@@ -90,7 +85,7 @@ func NewInboundMsgThrottler(
 		return nil, err
 	}
 	cpuThrottler, err := NewSystemThrottler(
-		metric.AppendNamespace(namespace, "cpu"),
+		"cpu",
 		registerer,
 		throttlerConfig.CPUThrottlerConfig,
 		resourceTracker.CPUTracker(),
@@ -100,7 +95,7 @@ func NewInboundMsgThrottler(
 		return nil, err
 	}
 	diskThrottler, err := NewSystemThrottler(
-		metric.AppendNamespace(namespace, "disk"),
+		"disk",
 		registerer,
 		throttlerConfig.DiskThrottlerConfig,
 		resourceTracker.DiskTracker(),

@@ -82,7 +82,6 @@ func NewTestNetwork(
 	msgCreator, err := message.NewCreator(
 		logging.NoLog{},
 		metrics,
-		"",
 		constants.DefaultNetworkCompressionType,
 		constants.DefaultNetworkMaximumInboundTimeout,
 	)

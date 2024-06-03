@@ -947,6 +947,7 @@ func TestCreateSubnet(t *testing.T) {
 		}),
 	)
 	require.NoError(err)
+	subnetID := createSubnetTx.ID()
 
 	vm.ctx.Lock.Unlock()
 	require.NoError(vm.issueTxFromRPC(createSubnetTx))
@@ -960,21 +961,13 @@ func TestCreateSubnet(t *testing.T) {
 	require.NoError(blk.Accept(context.Background()))
 	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
-	_, txStatus, err := vm.state.GetTx(createSubnetTx.ID())
+	_, txStatus, err := vm.state.GetTx(subnetID)
 	require.NoError(err)
 	require.Equal(status.Committed, txStatus)
 
-	subnets, err := vm.state.GetSubnets()
+	subnetIDs, err := vm.state.GetSubnetIDs()
 	require.NoError(err)
-
-	found := false
-	for _, subnet := range subnets {
-		if subnet.ID() == createSubnetTx.ID() {
-			found = true
-			break
-		}
-	}
-	require.True(found)
+	require.Contains(subnetIDs, subnetID)
 
 	// Now that we've created a new subnet, add a validator to that subnet
 	startTime := vm.clock.Time().Add(txexecutor.SyncBound).Add(1 * time.Second)
@@ -988,7 +981,7 @@ func TestCreateSubnet(t *testing.T) {
 				End:    uint64(endTime.Unix()),
 				Wght:   defaultWeight,
 			},
-			Subnet: createSubnetTx.ID(),
+			Subnet: subnetID,
 		},
 		[]*secp256k1.PrivateKey{keys[0]},
 	)
@@ -1010,10 +1003,10 @@ func TestCreateSubnet(t *testing.T) {
 	require.NoError(err)
 	require.Equal(status.Committed, txStatus)
 
-	_, err = vm.state.GetPendingValidator(createSubnetTx.ID(), nodeID)
+	_, err = vm.state.GetPendingValidator(subnetID, nodeID)
 	require.ErrorIs(err, database.ErrNotFound)
 
-	_, err = vm.state.GetCurrentValidator(createSubnetTx.ID(), nodeID)
+	_, err = vm.state.GetCurrentValidator(subnetID, nodeID)
 	require.NoError(err)
 
 	// fast forward clock to time validator should stop validating
@@ -1023,10 +1016,10 @@ func TestCreateSubnet(t *testing.T) {
 	require.NoError(blk.Verify(context.Background()))
 	require.NoError(blk.Accept(context.Background())) // remove validator from current validator set
 
-	_, err = vm.state.GetPendingValidator(createSubnetTx.ID(), nodeID)
+	_, err = vm.state.GetPendingValidator(subnetID, nodeID)
 	require.ErrorIs(err, database.ErrNotFound)
 
-	_, err = vm.state.GetCurrentValidator(createSubnetTx.ID(), nodeID)
+	_, err = vm.state.GetCurrentValidator(subnetID, nodeID)
 	require.ErrorIs(err, database.ErrNotFound)
 }
 
@@ -1430,7 +1423,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	chainRouter := &router.ChainRouter{}
 
 	metrics := prometheus.NewRegistry()
-	mc, err := message.NewCreator(logging.NoLog{}, metrics, "dummyNamespace", constants.DefaultNetworkCompressionType, 10*time.Second)
+	mc, err := message.NewCreator(logging.NoLog{}, metrics, constants.DefaultNetworkCompressionType, 10*time.Second)
 	require.NoError(err)
 
 	require.NoError(chainRouter.Initialize(
