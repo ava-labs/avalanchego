@@ -1560,9 +1560,10 @@ func (m *manager) getOrMakeVMRegisterer(vmID ids.ID, chainAlias string) (metrics
 	vmGatherer, ok := m.vmGatherer[vmID]
 	if !ok {
 		vmName := constants.VMName(vmID)
+		vmNamespace := metric.AppendNamespace(constants.PlatformName, vmName)
 		vmGatherer = metrics.NewLabelGatherer(ChainLabel)
 		err := m.Metrics.Register(
-			vmName,
+			vmNamespace,
 			vmGatherer,
 		)
 		if err != nil {
