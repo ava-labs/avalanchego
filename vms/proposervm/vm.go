@@ -240,9 +240,16 @@ func (vm *VM) Initialize(
 
 	vm.acceptedBlocksSlotHistogram = prometheus.NewHistogram(
 		prometheus.HistogramOpts{
-			Name:    "accepted_blocks_slot_histogram",
-			Help:    "the post-durango slot in which the block was accepted at",
-			Buckets: []float64{1.0, 2.0, 3.0},
+			Name: "accepted_blocks_slot_histogram",
+			Help: "the post-durango slot in which the block was accepted at",
+			// define the following ranges:
+			// (-inf, 0]
+			// (0, 1]
+			// (1, 2]
+			// (2, inf)
+			// the usage of ".5" before was to ensure we work around the limitation
+			// of comparing floating point of the same numerical value.
+			Buckets: []float64{0.5, 1.5, 2.5},
 		},
 	)
 	if err = registerer.Register(vm.acceptedBlocksSlotHistogram); err != nil {

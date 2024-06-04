@@ -378,14 +378,14 @@ func (p *postForkCommonComponents) verifyPostDurangoBlockDelay(
 		proposerID   = blk.Proposer()
 	)
 	// populate the slot for the block.
-	p.slot = proposer.TimeToSlot(parentTimestamp, blkTimestamp)
+	blk.slot = proposer.TimeToSlot(parentTimestamp, blkTimestamp)
 
 	// find the expected proposer
 	expectedProposerID, err := p.vm.Windower.ExpectedProposer(
 		ctx,
 		blkHeight,
 		parentPChainHeight,
-		p.slot,
+		blk.slot,
 	)
 	switch {
 	case errors.Is(err, proposer.ErrAnyoneCanPropose):
@@ -400,7 +400,7 @@ func (p *postForkCommonComponents) verifyPostDurangoBlockDelay(
 	case expectedProposerID == proposerID:
 		return true, nil // block should be signed
 	default:
-		return false, fmt.Errorf("%w: slot %d expects %s", errUnexpectedProposer, p.slot, expectedProposerID)
+		return false, fmt.Errorf("%w: slot %d expects %s", errUnexpectedProposer, blk.slot, expectedProposerID)
 	}
 }
 
