@@ -341,18 +341,19 @@ func (vm *VM) SetPreference(ctx context.Context, preferred ids.ID) error {
 		childBlockHeight = blk.Height() + 1
 		parentTimestamp  = blk.Timestamp()
 		nextStartTime    time.Time
-		proposalSlot     = unspecifiedSlotIndex
 	)
 	if vm.IsDurangoActivated(parentTimestamp) {
 		currentTime := vm.Clock.Time().Truncate(time.Second)
-		proposalSlot = proposer.TimeToSlot(parentTimestamp, currentTime)
-		nextStartTime, err = vm.getPostDurangoSlotTime(
+		if nextStartTime, err = vm.getPostDurangoSlotTime(
 			ctx,
 			childBlockHeight,
 			pChainHeight,
-			proposalSlot,
+			proposer.TimeToSlot(parentTimestamp, currentTime),
 			parentTimestamp,
-		)
+		); err == nil {
+			vm.proposerBuildSlotGauge.Set(float64(proposer.TimeToSlot(parentTimestamp, nextStartTime)))
+		}
+
 	} else {
 		nextStartTime, err = vm.getPreDurangoSlotTime(
 			ctx,
@@ -371,12 +372,6 @@ func (vm *VM) SetPreference(ctx context.Context, preferred ids.ID) error {
 		// P-chain height. This will cause building blocks to return an error
 		// until the P-chain's height has advanced.
 		return nil
-	}
-
-	// if we're done bootstrapping, and we have a proposal window slot, update
-	// the metrics accordingly.
-	if (proposalSlot != unspecifiedSlotIndex) && (vm.consensusState == snow.NormalOp) {
-		vm.proposerBuildSlotGauge.Set(float64(proposalSlot))
 	}
 
 	vm.Scheduler.SetBuildBlockTime(nextStartTime)
