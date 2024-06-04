@@ -4,6 +4,33 @@
 
 This version is backwards compatible to [v1.11.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.11.0). It is optional, but encouraged.
 
+The plugin version is unchanged at `35` and is compatible with versions `v1.11.3-v1.11.6`.
+
+### APIs
+
+- Added peer's `trackedSubnets` that are not locally tracked to the response from `info.peers`.
+
+### Configs
+
+- Changed the undocumented `pebble` option for `--db-type` to be `pebbledb` and documented the option.
+
+### Fixes
+
+- Removed repeated DB compaction during bootstrapping that caused a significant regression in bootstrapping times.
+- Fixed C-Chain state-sync crash.
+- Fixed C-Chain state-sync ETA calculation.
+- Fixed Subnet owner reported by `platform.getSubnets` after a subnet's owner was rotated.
+
+### What's Changed
+
+### New Contributors
+
+**Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.11.6...v1.11.7
+
+## [v1.11.6](https://github.com/ava-labs/avalanchego/releases/tag/v1.11.6)
+
+This version is backwards compatible to [v1.11.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.11.0). It is optional, but encouraged.
+
 The plugin version is unchanged at `35` and is compatible with versions `v1.11.3-v1.11.5`.
 
 ### APIs
