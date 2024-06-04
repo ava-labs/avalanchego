@@ -25,9 +25,8 @@ var _ = ginkgo.Describe("[Dynamic Fees]", func() {
 
 	ginkgo.It("should ensure that the dynamic multifees are affected by load", func() {
 		customDynamicFeesConfig := commonfees.DynamicFeesConfig{
-			InitialFeeRate:     commonfees.Dimensions{1, 2, 3, 4},
 			MinFeeRate:         commonfees.Dimensions{1, 1, 1, 1},
-			UpdateCoefficient:  commonfees.Dimensions{5, 2, 2, 3},
+			UpdateDenominators: commonfees.Dimensions{5, 2, 2, 3},
 			BlockMaxComplexity: commonfees.Dimensions{math.MaxUint64, math.MaxUint64, math.MaxUint64, math.MaxUint64},
 
 			// BlockUnitsTarget are set to cause an increase of fees while simple transactions are issued
@@ -68,7 +67,7 @@ var _ = ginkgo.Describe("[Dynamic Fees]", func() {
 		ginkgo.By("checking that initial fee values match with configured ones", func() {
 			currFeeRates, _, err := pChainClient.GetFeeRates(e2e.DefaultContext())
 			require.NoError(err)
-			require.Equal(customDynamicFeesConfig.InitialFeeRate, currFeeRates)
+			require.Equal(customDynamicFeesConfig.MinFeeRate, currFeeRates)
 		})
 
 		ginkgo.By("issue expensive transactions so to increase the fee rates to be paid for accepting the transactons",

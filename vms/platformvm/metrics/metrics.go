@@ -41,8 +41,8 @@ type Metrics interface {
 	// Mark when this node will unstake from a subnet.
 	SetTimeUntilSubnetUnstake(subnetID ids.ID, timeUntilUnstake time.Duration)
 
-	// Mark cumulated complexity of the latest accepted block
-	SetBlockComplexity(commonfees.Dimensions)
+	// Mark cumulated excess complexity
+	SetExcessComplexity(commonfees.Dimensions)
 }
 
 func New(
@@ -198,7 +198,7 @@ func (m *metrics) SetTimeUntilSubnetUnstake(subnetID ids.ID, timeUntilUnstake ti
 	m.timeUntilSubnetUnstake.WithLabelValues(subnetID.String()).Set(float64(timeUntilUnstake))
 }
 
-func (m *metrics) SetBlockComplexity(units commonfees.Dimensions) {
+func (m *metrics) SetExcessComplexity(units commonfees.Dimensions) {
 	m.blockBandwitdhComplexity.Set(float64(units[commonfees.Bandwidth]))
 	m.blockUTXOsReadComplexity.Set(float64(units[commonfees.UTXORead]))
 	m.blockUTXOsWriteComplexity.Set(float64(units[commonfees.UTXOWrite]))

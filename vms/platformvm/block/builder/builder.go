@@ -350,6 +350,15 @@ func packBlockTxs(
 		return nil, fmt.Errorf("failed picking fee calculator: %w", err)
 	}
 
+	targetBlkComplexity, err := commonfees.TargetBlockComplexity(feeCfg, parentBlkTime.Unix(), timestamp.Unix())
+	if err != nil {
+		return nil, fmt.Errorf("failed calculating target block complexity: %w", err)
+	}
+	targetExcessComplexity, err := commonfees.Add(targetBlkComplexity, feeCalculator.GetCurrentExcessComplexity())
+	if err != nil {
+		return nil, fmt.Errorf("failed calculating target excess complexity: %w", err)
+	}
+
 	for {
 		tx, exists := mempool.Peek()
 		if !exists {
@@ -361,7 +370,7 @@ func packBlockTxs(
 		// pre e upgrade is active, we fill blocks till a target size
 		// post e upgrade is active, we fill blocks till a target complexity
 		targetSizeReached := (!isEActivated && txSize > remainingSize) ||
-			(isEActivated && !commonfees.Compare(feeCalculator.GetCumulatedComplexity(), feeCfg.BlockTargetComplexityRate))
+			(isEActivated && !commonfees.Compare(feeCalculator.GetCurrentExcessComplexity(), targetExcessComplexity))
 		if targetSizeReached {
 			break
 		}

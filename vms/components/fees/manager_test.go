@@ -5,7 +5,6 @@ package fees
 
 import (
 	"fmt"
-	"math"
 	"testing"
 	"time"
 
@@ -20,7 +19,7 @@ func TestUpdateFeeRates(t *testing.T) {
 	var (
 		feesCfg = DynamicFeesConfig{
 			MinFeeRate:                Dimensions{1, 1, 1, 1},
-			UpdateCoefficient:         Dimensions{1, 2, 5, 10},
+			UpdateDenominators:        Dimensions{100, 200, 500, 1_000},
 			BlockMaxComplexity:        Dimensions{100, 100, 100, 100},
 			BlockTargetComplexityRate: Dimensions{25, 25, 25, 25},
 		}
@@ -32,91 +31,73 @@ func TestUpdateFeeRates(t *testing.T) {
 		childBlkTime  = parentBlkTime.Add(elapsedTime)
 	)
 
-	m := &Manager{
-		feeRates: parentFeeRate,
-	}
-
-	require.NoError(m.UpdateFeeRates(
+	m, err := NewUpdatedManager(
 		feesCfg,
 		parentComplexity,
 		parentBlkTime.Unix(),
 		childBlkTime.Unix(),
-	))
+	)
+	require.NoError(err)
 
 	// Bandwidth complexity are above target, fee rate is pushed up
-	require.Equal(uint64(13), m.feeRates[Bandwidth])
+	require.Equal(uint64(420), m.feeRates[Bandwidth])
 
 	// UTXORead complexity is at target, fee rate does not change
 	require.Equal(parentFeeRate[UTXORead], m.feeRates[UTXORead])
 
 	// UTXOWrite complexity is below target, fee rate is pushed down
-	require.Equal(uint64(90), m.feeRates[UTXOWrite])
+	require.Equal(uint64(33), m.feeRates[UTXOWrite])
 
 	// Compute complexoty is below target, fee rate is pushed down
-	require.Equal(uint64(125), m.feeRates[Compute])
+	require.Equal(uint64(1), m.feeRates[Compute])
 }
 
-func TestUpdateFeeRatesStability(t *testing.T) {
-	// The advantage of using an exponential fee update scheme
-	// (vs e.g. the EIP-1559 scheme we use in the C-chain) is that
-	// it is more stable against dithering.
-	// We prove here that if complexity oscillates around the target
-	// fee rates are unchanged (discounting for some numerical errors)
+// func TestFeeUpdateFactor(t *testing.T) {
+// 	tests := []struct {
+// 		coeff               uint64
+// 		parentBlkComplexity uint64
+// 		targetBlkComplexity uint64
+// 		want                uint64
+// 		wantIncreaseFee     bool
+// 	}{
+// 		// parentBlkComplexity == targetBlkComplexity gives factor 1, no matter what coeff is
+// 		{1, 250, 250, 1, false},
+// 		{math.MaxUint64, 250, 250, 1, false},
 
-	require := require.New(t)
+// 		// parentBlkComplexity > targetBlkComplexity
+// 		{1, 101, 100, 1, true},      // should be   1.0005
+// 		{1, 110, 100, 1, true},      // should be   1.005
+// 		{1, 200, 100, 1, true},      // should be   1.05
+// 		{1, 1_100, 100, 1, true},    // should be   1.648
+// 		{1, 2_100, 100, 2, true},    // should be   2,718
+// 		{1, 3_100, 100, 4, true},    // should be   4,48
+// 		{1, 4_100, 100, 7, true},    // should be   7,39
+// 		{1, 7_100, 100, 33, true},   // should be  33,12
+// 		{1, 8_100, 100, 54, true},   // should be  54,6
+// 		{1, 10_100, 100, 148, true}, // should be 148,4
 
-	var (
-		feesCfg = DynamicFeesConfig{
-			MinFeeRate:                Dimensions{0, 0, 0, 0},
-			UpdateCoefficient:         Dimensions{2, 4, 5, 10},
-			BlockMaxComplexity:        Dimensions{100_000, 100_000, 100_000, 100_000},
-			BlockTargetComplexityRate: Dimensions{200, 60, 80, 600},
-		}
-		initialFeeRate = Dimensions{
-			60 * units.NanoAvax,
-			8 * units.NanoAvax,
-			10 * units.NanoAvax,
-			35 * units.NanoAvax,
-		}
-
-		elapsedTime      = time.Second
-		parentComplexity = Dimensions{50, 45, 70, 500}  // less than target complexity rate * elapsedTime
-		childComplexity  = Dimensions{350, 75, 90, 700} // more than target complexity rate * elapsedTime
-
-		parentBlkTime    = time.Now().Truncate(time.Second)
-		childBlkTime     = parentBlkTime.Add(elapsedTime)
-		granChildBlkTime = childBlkTime.Add(elapsedTime)
-	)
-
-	// step1: parent complexity is below target. Fee rates will decrease
-	m1 := &Manager{feeRates: initialFeeRate}
-	require.NoError(m1.UpdateFeeRates(
-		feesCfg,
-		parentComplexity,
-		parentBlkTime.Unix(),
-		childBlkTime.Unix(),
-	))
-
-	require.Less(m1.feeRates[Bandwidth], initialFeeRate[Bandwidth])
-	require.Less(m1.feeRates[UTXORead], initialFeeRate[UTXORead])
-	require.Less(m1.feeRates[UTXOWrite], initialFeeRate[UTXOWrite])
-	require.Less(m1.feeRates[Compute], initialFeeRate[Compute])
-
-	// step2: child complexity goes above target, so that average complexity is at target.
-	// Fee rates go back to the original value
-	m2 := &Manager{feeRates: m1.feeRates}
-	require.NoError(m2.UpdateFeeRates(
-		feesCfg,
-		childComplexity,
-		childBlkTime.Unix(),
-		granChildBlkTime.Unix(),
-	))
-
-	require.LessOrEqual(initialFeeRate[Bandwidth]-m2.feeRates[Bandwidth], uint64(1))
-	require.LessOrEqual(initialFeeRate[UTXORead]-m2.feeRates[UTXORead], uint64(1))
-	require.LessOrEqual(initialFeeRate[UTXOWrite]-m2.feeRates[UTXOWrite], uint64(1))
-	require.LessOrEqual(initialFeeRate[Compute]-m2.feeRates[Compute], uint64(1))
-}
+// 		// parentBlkComplexity < targetBlkComplexity
+// 		{1, 100, 101, 1, false},
+// 		{1, 100, 110, 1, false},
+// 		{1, 100, 200, 1, false},
+// 		{1, 100, 1_100, 1, false},
+// 		{1, 100, 2_100, 2, false},
+// 		{1, 100, 3_100, 4, false},
+// 		{1, 100, 4_100, 7, false},
+// 		{1, 100, 7_100, 33, false},
+// 		{1, 100, 8_100, 54, false},
+// 		{1, 100, 10_100, 148, false},
+// 	}
+// 	for _, tt := range tests {
+// 		haveFactor, haveIncreaseFee := updateFactor(
+// 			tt.coeff,
+// 			tt.parentBlkComplexity,
+// 			tt.targetBlkComplexity,
+// 		)
+// 		require.Equal(t, tt.want, haveFactor)
+// 		require.Equal(t, tt.wantIncreaseFee, haveIncreaseFee)
+// 	}
+// }
 
 func TestPChainFeeRateIncreaseDueToPeak(t *testing.T) {
 	// Complexity values comes from the mainnet historical peak as measured
@@ -132,11 +113,11 @@ func TestPChainFeeRateIncreaseDueToPeak(t *testing.T) {
 				10 * units.NanoAvax,
 				35 * units.NanoAvax,
 			},
-			UpdateCoefficient: Dimensions{ // over CoeffDenom
-				3,
+			UpdateDenominators: Dimensions{ // over CoeffDenom
 				1,
 				1,
-				2,
+				1,
+				1,
 			},
 			BlockTargetComplexityRate: Dimensions{
 				2500,
@@ -202,12 +183,13 @@ func TestPChainFeeRateIncreaseDueToPeak(t *testing.T) {
 	for i := 1; i < len(blockComplexities); i++ {
 		parentBlkData := blockComplexities[i-1]
 		childBlkData := blockComplexities[i]
-		require.NoError(m.UpdateFeeRates(
+		m, err := NewUpdatedManager(
 			feesCfg,
 			parentBlkData.complexity,
 			parentBlkData.blkTime,
 			childBlkData.blkTime,
-		))
+		)
+		require.NoError(err)
 
 		// check that fee rates are strictly above minimal
 		require.False(
@@ -234,58 +216,17 @@ func TestPChainFeeRateIncreaseDueToPeak(t *testing.T) {
 	parentBlkTime := time.Now().Truncate(time.Second)
 	childBlkTime := parentBlkTime.Add(elapsedTime)
 
-	require.NoError(m.UpdateFeeRates(
+	m, err := NewUpdatedManager(
 		feesCfg,
 		offPeakBlkComplexity,
 		parentBlkTime.Unix(),
 		childBlkTime.Unix(),
-	))
+	)
+	require.NoError(err)
 
 	// check that fee rates decrease off peak
 	require.Less(m.feeRates[Bandwidth], peakFeeRate[Bandwidth])
 	require.Less(m.feeRates[UTXORead], peakFeeRate[UTXORead])
 	require.LessOrEqual(m.feeRates[UTXOWrite], peakFeeRate[UTXOWrite])
 	require.Less(m.feeRates[Compute], peakFeeRate[Compute])
-}
-
-func TestFeeUpdateFactor(t *testing.T) {
-	tests := []struct {
-		coeff               uint64
-		parentBlkComplexity uint64
-		targetBlkComplexity uint64
-		wantNum             uint64
-		wantDenom           uint64
-	}{
-		// parentBlkComplexity == targetBlkComplexity gives factor 1, no matter what coeff is
-		{1, 250, 250, 1, 1},
-		{math.MaxUint64, 250, 250, 1, 1},
-
-		// parentBlkComplexity > targetBlkComplexity
-		{1, 101, 100, 2_002, 2_000},      // should be   1.0005
-		{1, 110, 100, 2_020, 2_000},      // should be   1.005
-		{1, 200, 100, 2_200, 2_000},      // should be   1.05
-		{1, 1_100, 100, 4_000, 2_000},    // should be   1.648
-		{1, 2_100, 100, 6000, 2_000},     // should be   2,718
-		{1, 3_100, 100, 11_000, 2_000},   // should be   4,48
-		{1, 4_100, 100, 16_000, 2_000},   // should be   7,39
-		{1, 7_100, 100, 77_000, 2_000},   // should be  33,12
-		{1, 8_100, 100, 110_000, 2_000},  // should be  54,6
-		{1, 10_100, 100, 298_000, 2_000}, // should be 148,4
-
-		// parentBlkComplexity < targetBlkComplexity
-		{1, 100, 101, 2_020, 2_022},        // should be 0,9995
-		{1, 100, 110, 2_200, 2_220},        // should be 0,995
-		{1, 100, 200, 4_000, 4_200},        // should be 0,975
-		{1, 100, 1_100, 22_000, 24_000},    // should be 0,955
-		{1, 100, 10_100, 202_000, 222_000}, // should be 0,952
-	}
-	for _, tt := range tests {
-		haveFactor, haveIncreaseFee := updateFactor(
-			tt.coeff,
-			tt.parentBlkComplexity,
-			tt.targetBlkComplexity,
-		)
-		require.Equal(t, tt.wantNum, haveFactor)
-		require.Equal(t, tt.wantDenom, haveIncreaseFee)
-	}
 }

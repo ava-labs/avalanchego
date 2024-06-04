@@ -250,10 +250,10 @@ func (v *verifier) ApricotAtomicBlock(b *block.ApricotAtomicBlock) error {
 
 		onAcceptState: atomicExecutor.OnAccept,
 
-		inputs:          atomicExecutor.Inputs,
-		timestamp:       atomicExecutor.OnAccept.GetTimestamp(),
-		blockComplexity: commonfees.Empty,
-		atomicRequests:  atomicExecutor.AtomicRequests,
+		inputs:           atomicExecutor.Inputs,
+		timestamp:        atomicExecutor.OnAccept.GetTimestamp(),
+		excessComplexity: commonfees.Empty,
+		atomicRequests:   atomicExecutor.AtomicRequests,
 	}
 	return nil
 }
@@ -439,9 +439,9 @@ func (v *verifier) proposalBlock(
 		// It is safe to use [b.onAbortState] here because the timestamp will
 		// never be modified by an Apricot Abort block and the timestamp will
 		// always be the same as the Banff Proposal Block.
-		timestamp:       onAbortState.GetTimestamp(),
-		blockComplexity: feeCalculator.GetCumulatedComplexity(),
-		atomicRequests:  atomicRequests,
+		timestamp:        onAbortState.GetTimestamp(),
+		excessComplexity: feeCalculator.GetCurrentExcessComplexity(),
+		atomicRequests:   atomicRequests,
 	}
 	return nil
 }
@@ -466,10 +466,10 @@ func (v *verifier) standardBlock(
 		onAcceptState: onAcceptState,
 		onAcceptFunc:  onAcceptFunc,
 
-		timestamp:       onAcceptState.GetTimestamp(),
-		blockComplexity: feeCalculator.GetCumulatedComplexity(),
-		inputs:          inputs,
-		atomicRequests:  atomicRequests,
+		timestamp:        onAcceptState.GetTimestamp(),
+		excessComplexity: feeCalculator.GetCurrentExcessComplexity(),
+		inputs:           inputs,
+		atomicRequests:   atomicRequests,
 	}
 	return nil
 }
@@ -534,7 +534,7 @@ func (v *verifier) processStandardTxs(
 	}
 
 	if v.txExecutorBackend.Config.UpgradeConfig.IsEActivated(state.GetTimestamp()) {
-		state.SetLastBlockComplexity(feeCalculator.GetCumulatedComplexity())
+		state.SetExcessComplexity(feeCalculator.GetCurrentExcessComplexity())
 	}
 
 	if numFuncs := len(funcs); numFuncs == 1 {

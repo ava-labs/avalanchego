@@ -258,19 +258,19 @@ func (mr *MockChainMockRecorder) GetDelegateeReward(arg0, arg1 any) *gomock.Call
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDelegateeReward", reflect.TypeOf((*MockChain)(nil).GetDelegateeReward), arg0, arg1)
 }
 
-// GetLastBlockComplexity mocks base method.
-func (m *MockChain) GetLastBlockComplexity() (fees.Dimensions, error) {
+// GetExcessComplexity mocks base method.
+func (m *MockChain) GetExcessComplexity() (fees.Dimensions, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetLastBlockComplexity")
+	ret := m.ctrl.Call(m, "GetExcessComplexity")
 	ret0, _ := ret[0].(fees.Dimensions)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// GetLastBlockComplexity indicates an expected call of GetLastBlockComplexity.
-func (mr *MockChainMockRecorder) GetLastBlockComplexity() *gomock.Call {
+// GetExcessComplexity indicates an expected call of GetExcessComplexity.
+func (mr *MockChainMockRecorder) GetExcessComplexity() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLastBlockComplexity", reflect.TypeOf((*MockChain)(nil).GetLastBlockComplexity))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetExcessComplexity", reflect.TypeOf((*MockChain)(nil).GetExcessComplexity))
 }
 
 // GetPendingDelegatorIterator mocks base method.
@@ -467,16 +467,16 @@ func (mr *MockChainMockRecorder) SetDelegateeReward(arg0, arg1, arg2 any) *gomoc
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetDelegateeReward", reflect.TypeOf((*MockChain)(nil).SetDelegateeReward), arg0, arg1, arg2)
 }
 
-// SetLastBlockComplexity mocks base method.
-func (m *MockChain) SetLastBlockComplexity(arg0 fees.Dimensions) {
+// SetExcessComplexity mocks base method.
+func (m *MockChain) SetExcessComplexity(arg0 fees.Dimensions) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SetLastBlockComplexity", arg0)
+	m.ctrl.Call(m, "SetExcessComplexity", arg0)
 }
 
-// SetLastBlockComplexity indicates an expected call of SetLastBlockComplexity.
-func (mr *MockChainMockRecorder) SetLastBlockComplexity(arg0 any) *gomock.Call {
+// SetExcessComplexity indicates an expected call of SetExcessComplexity.
+func (mr *MockChainMockRecorder) SetExcessComplexity(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetLastBlockComplexity", reflect.TypeOf((*MockChain)(nil).SetLastBlockComplexity), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetExcessComplexity", reflect.TypeOf((*MockChain)(nil).SetExcessComplexity), arg0)
 }
 
 // SetSubnetOwner mocks base method.
@@ -747,19 +747,19 @@ func (mr *MockDiffMockRecorder) GetDelegateeReward(arg0, arg1 any) *gomock.Call 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDelegateeReward", reflect.TypeOf((*MockDiff)(nil).GetDelegateeReward), arg0, arg1)
 }
 
-// GetLastBlockComplexity mocks base method.
-func (m *MockDiff) GetLastBlockComplexity() (fees.Dimensions, error) {
+// GetExcessComplexity mocks base method.
+func (m *MockDiff) GetExcessComplexity() (fees.Dimensions, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetLastBlockComplexity")
+	ret := m.ctrl.Call(m, "GetExcessComplexity")
 	ret0, _ := ret[0].(fees.Dimensions)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// GetLastBlockComplexity indicates an expected call of GetLastBlockComplexity.
-func (mr *MockDiffMockRecorder) GetLastBlockComplexity() *gomock.Call {
+// GetExcessComplexity indicates an expected call of GetExcessComplexity.
+func (mr *MockDiffMockRecorder) GetExcessComplexity() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLastBlockComplexity", reflect.TypeOf((*MockDiff)(nil).GetLastBlockComplexity))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetExcessComplexity", reflect.TypeOf((*MockDiff)(nil).GetExcessComplexity))
 }
 
 // GetPendingDelegatorIterator mocks base method.
@@ -956,16 +956,16 @@ func (mr *MockDiffMockRecorder) SetDelegateeReward(arg0, arg1, arg2 any) *gomock
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetDelegateeReward", reflect.TypeOf((*MockDiff)(nil).SetDelegateeReward), arg0, arg1, arg2)
 }
 
-// SetLastBlockComplexity mocks base method.
-func (m *MockDiff) SetLastBlockComplexity(arg0 fees.Dimensions) {
+// SetExcessComplexity mocks base method.
+func (m *MockDiff) SetExcessComplexity(arg0 fees.Dimensions) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SetLastBlockComplexity", arg0)
+	m.ctrl.Call(m, "SetExcessComplexity", arg0)
 }
 
-// SetLastBlockComplexity indicates an expected call of SetLastBlockComplexity.
-func (mr *MockDiffMockRecorder) SetLastBlockComplexity(arg0 any) *gomock.Call {
+// SetExcessComplexity indicates an expected call of SetExcessComplexity.
+func (mr *MockDiffMockRecorder) SetExcessComplexity(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetLastBlockComplexity", reflect.TypeOf((*MockDiff)(nil).SetLastBlockComplexity), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetExcessComplexity", reflect.TypeOf((*MockDiff)(nil).SetExcessComplexity), arg0)
 }
 
 // SetSubnetOwner mocks base method.
@@ -1361,6 +1361,21 @@ func (mr *MockStateMockRecorder) GetDelegateeReward(arg0, arg1 any) *gomock.Call
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDelegateeReward", reflect.TypeOf((*MockState)(nil).GetDelegateeReward), arg0, arg1)
 }
 
+// GetExcessComplexity mocks base method.
+func (m *MockState) GetExcessComplexity() (fees.Dimensions, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetExcessComplexity")
+	ret0, _ := ret[0].(fees.Dimensions)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetExcessComplexity indicates an expected call of GetExcessComplexity.
+func (mr *MockStateMockRecorder) GetExcessComplexity() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetExcessComplexity", reflect.TypeOf((*MockState)(nil).GetExcessComplexity))
+}
+
 // GetLastAccepted mocks base method.
 func (m *MockState) GetLastAccepted() ids.ID {
 	m.ctrl.T.Helper()
@@ -1373,21 +1388,6 @@ func (m *MockState) GetLastAccepted() ids.ID {
 func (mr *MockStateMockRecorder) GetLastAccepted() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLastAccepted", reflect.TypeOf((*MockState)(nil).GetLastAccepted))
-}
-
-// GetLastBlockComplexity mocks base method.
-func (m *MockState) GetLastBlockComplexity() (fees.Dimensions, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetLastBlockComplexity")
-	ret0, _ := ret[0].(fees.Dimensions)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetLastBlockComplexity indicates an expected call of GetLastBlockComplexity.
-func (mr *MockStateMockRecorder) GetLastBlockComplexity() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLastBlockComplexity", reflect.TypeOf((*MockState)(nil).GetLastBlockComplexity))
 }
 
 // GetPendingDelegatorIterator mocks base method.
@@ -1674,6 +1674,18 @@ func (mr *MockStateMockRecorder) SetDelegateeReward(arg0, arg1, arg2 any) *gomoc
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetDelegateeReward", reflect.TypeOf((*MockState)(nil).SetDelegateeReward), arg0, arg1, arg2)
 }
 
+// SetExcessComplexity mocks base method.
+func (m *MockState) SetExcessComplexity(arg0 fees.Dimensions) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "SetExcessComplexity", arg0)
+}
+
+// SetExcessComplexity indicates an expected call of SetExcessComplexity.
+func (mr *MockStateMockRecorder) SetExcessComplexity(arg0 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetExcessComplexity", reflect.TypeOf((*MockState)(nil).SetExcessComplexity), arg0)
+}
+
 // SetHeight mocks base method.
 func (m *MockState) SetHeight(arg0 uint64) {
 	m.ctrl.T.Helper()
@@ -1696,18 +1708,6 @@ func (m *MockState) SetLastAccepted(arg0 ids.ID) {
 func (mr *MockStateMockRecorder) SetLastAccepted(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetLastAccepted", reflect.TypeOf((*MockState)(nil).SetLastAccepted), arg0)
-}
-
-// SetLastBlockComplexity mocks base method.
-func (m *MockState) SetLastBlockComplexity(arg0 fees.Dimensions) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SetLastBlockComplexity", arg0)
-}
-
-// SetLastBlockComplexity indicates an expected call of SetLastBlockComplexity.
-func (mr *MockStateMockRecorder) SetLastBlockComplexity(arg0 any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetLastBlockComplexity", reflect.TypeOf((*MockState)(nil).SetLastBlockComplexity), arg0)
 }
 
 // SetSubnetOwner mocks base method.

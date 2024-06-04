@@ -37,7 +37,7 @@ type diff struct {
 
 	timestamp time.Time
 
-	lastBlkComplexity *commonfees.Dimensions
+	excessComplexity *commonfees.Dimensions
 
 	// Subnet ID --> supply of native asset of the subnet
 	currentSupply map[ids.ID]uint64
@@ -93,29 +93,29 @@ func NewDiffOn(parentState Chain) (Diff, error) {
 	})
 }
 
-func (d *diff) GetLastBlockComplexity() (commonfees.Dimensions, error) {
-	if d.lastBlkComplexity == nil {
+func (d *diff) GetExcessComplexity() (commonfees.Dimensions, error) {
+	if d.excessComplexity == nil {
 		parentState, ok := d.stateVersions.GetState(d.parentID)
 		if !ok {
 			return commonfees.Empty, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
 		}
-		parentLastComplexity, err := parentState.GetLastBlockComplexity()
+		parentExcessComplexity, err := parentState.GetExcessComplexity()
 		if err != nil {
 			return commonfees.Empty, err
 		}
 
-		d.lastBlkComplexity = new(commonfees.Dimensions)
-		*d.lastBlkComplexity = parentLastComplexity
+		d.excessComplexity = new(commonfees.Dimensions)
+		*d.excessComplexity = parentExcessComplexity
 	}
 
-	return *d.lastBlkComplexity, nil
+	return *d.excessComplexity, nil
 }
 
-func (d *diff) SetLastBlockComplexity(complexity commonfees.Dimensions) {
-	if d.lastBlkComplexity == nil {
-		d.lastBlkComplexity = new(commonfees.Dimensions)
+func (d *diff) SetExcessComplexity(complexity commonfees.Dimensions) {
+	if d.excessComplexity == nil {
+		d.excessComplexity = new(commonfees.Dimensions)
 	}
-	*d.lastBlkComplexity = complexity
+	*d.excessComplexity = complexity
 }
 
 func (d *diff) GetTimestamp() time.Time {
@@ -430,8 +430,8 @@ func (d *diff) DeleteUTXO(utxoID ids.ID) {
 
 func (d *diff) Apply(baseState Chain) error {
 	baseState.SetTimestamp(d.timestamp)
-	if d.lastBlkComplexity != nil {
-		baseState.SetLastBlockComplexity(*d.lastBlkComplexity)
+	if d.excessComplexity != nil {
+		baseState.SetExcessComplexity(*d.excessComplexity)
 	}
 	for subnetID, supply := range d.currentSupply {
 		baseState.SetCurrentSupply(subnetID, supply)

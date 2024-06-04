@@ -99,27 +99,29 @@ func PickFeeCalculator(cfg *config.Config, state Chain, parentBlkTime time.Time)
 
 func updatedFeeManager(upgrades upgrade.Config, state Chain, parentBlkTime time.Time) (*commonfees.Manager, error) {
 	var (
-		isEActive = upgrades.IsEActivated(parentBlkTime)
-		feeCfg    = fee.GetDynamicConfig(isEActive)
+		isEActive  = upgrades.IsEActivated(parentBlkTime)
+		feeCfg     = fee.GetDynamicConfig(isEActive)
+		feeManager *commonfees.Manager
 	)
 
-	parentBlkComplexity, err := state.GetLastBlockComplexity()
-	if err != nil {
-		return nil, fmt.Errorf("failed retrieving last block complexity: %w", err)
-	}
-	childBlkTime := state.GetTimestamp()
-
-	feeManager := commonfees.NewManager(commonfees.Empty) // Fee rate non needed anymore
 	if isEActive {
-		if err := feeManager.UpdateFeeRates(
+		excessComplexity, err := state.GetExcessComplexity()
+		if err != nil {
+			return nil, fmt.Errorf("failed retrieving excess complexity: %w", err)
+		}
+		childBlkTime := state.GetTimestamp()
+
+		feeManager, err = commonfees.NewUpdatedManager(
 			feeCfg,
-			parentBlkComplexity,
+			excessComplexity,
 			parentBlkTime.Unix(),
 			childBlkTime.Unix(),
-		); err != nil {
+		)
+		if err != nil {
 			return nil, fmt.Errorf("failed updating fee rates, %w", err)
 		}
+	} else {
+		feeManager = commonfees.NewManager(commonfees.Empty)
 	}
-
 	return feeManager, nil
 }

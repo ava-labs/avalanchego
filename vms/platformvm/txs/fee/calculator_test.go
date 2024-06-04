@@ -64,25 +64,25 @@ func TestAddAndRemoveFees(t *testing.T) {
 
 	feeDelta, err := fc.AddFeesFor(units)
 	r.NoError(err)
-	r.Equal(units, fc.c.feeManager.GetCumulatedComplexity())
+	r.Equal(units, fc.c.feeManager.GetCurrentExcessComplexity())
 	r.NotZero(feeDelta)
 	r.Equal(feeDelta, fc.c.fee)
 
 	feeDelta2, err := fc.AddFeesFor(units)
 	r.NoError(err)
-	r.Equal(doubleUnits, fc.c.feeManager.GetCumulatedComplexity())
+	r.Equal(doubleUnits, fc.c.feeManager.GetCurrentExcessComplexity())
 	r.Equal(feeDelta, feeDelta2)
 	r.Equal(feeDelta+feeDelta2, fc.c.fee)
 
 	feeDelta3, err := fc.RemoveFeesFor(units)
 	r.NoError(err)
-	r.Equal(units, fc.c.feeManager.GetCumulatedComplexity())
+	r.Equal(units, fc.c.feeManager.GetCurrentExcessComplexity())
 	r.Equal(feeDelta, feeDelta3)
 	r.Equal(feeDelta, fc.c.fee)
 
 	feeDelta4, err := fc.RemoveFeesFor(units)
 	r.NoError(err)
-	r.Zero(fc.c.feeManager.GetCumulatedComplexity())
+	r.Zero(fc.c.feeManager.GetCurrentExcessComplexity())
 	r.Equal(feeDelta, feeDelta4)
 	r.Zero(fc.c.fee)
 }
@@ -153,7 +153,7 @@ func TestTxFees(t *testing.T) {
 						172,
 						1000,
 					},
-					fc.feeManager.GetCumulatedComplexity(),
+					fc.feeManager.GetCurrentExcessComplexity(),
 				)
 			},
 		},
@@ -207,7 +207,7 @@ func TestTxFees(t *testing.T) {
 						172,
 						1000,
 					},
-					fc.feeManager.GetCumulatedComplexity(),
+					fc.feeManager.GetCurrentExcessComplexity(),
 				)
 			},
 		},
@@ -253,7 +253,7 @@ func TestTxFees(t *testing.T) {
 						172,
 						1000,
 					},
-					fc.feeManager.GetCumulatedComplexity(),
+					fc.feeManager.GetCurrentExcessComplexity(),
 				)
 			},
 		},
@@ -291,7 +291,7 @@ func TestTxFees(t *testing.T) {
 						172,
 						1000,
 					},
-					fc.feeManager.GetCumulatedComplexity(),
+					fc.feeManager.GetCurrentExcessComplexity(),
 				)
 			},
 		},
@@ -329,7 +329,7 @@ func TestTxFees(t *testing.T) {
 						172,
 						1000,
 					},
-					fc.feeManager.GetCumulatedComplexity(),
+					fc.feeManager.GetCurrentExcessComplexity(),
 				)
 			},
 		},
@@ -367,7 +367,7 @@ func TestTxFees(t *testing.T) {
 						172,
 						1000,
 					},
-					fc.feeManager.GetCumulatedComplexity(),
+					fc.feeManager.GetCurrentExcessComplexity(),
 				)
 			},
 		},
@@ -421,7 +421,7 @@ func TestTxFees(t *testing.T) {
 						266,
 						1000,
 					},
-					fc.feeManager.GetCumulatedComplexity(),
+					fc.feeManager.GetCurrentExcessComplexity(),
 				)
 			},
 		},
@@ -443,7 +443,7 @@ func TestTxFees(t *testing.T) {
 						266,
 						1000,
 					},
-					fc.feeManager.GetCumulatedComplexity(),
+					fc.feeManager.GetCurrentExcessComplexity(),
 				)
 			},
 		},
@@ -500,7 +500,7 @@ func TestTxFees(t *testing.T) {
 						266,
 						1000,
 					},
-					fc.feeManager.GetCumulatedComplexity(),
+					fc.feeManager.GetCurrentExcessComplexity(),
 				)
 			},
 		},
@@ -520,7 +520,7 @@ func TestTxFees(t *testing.T) {
 						266,
 						1000,
 					},
-					fc.feeManager.GetCumulatedComplexity(),
+					fc.feeManager.GetCurrentExcessComplexity(),
 				)
 			},
 		},
@@ -562,7 +562,7 @@ func TestTxFees(t *testing.T) {
 						172,
 						1000,
 					},
-					fc.feeManager.GetCumulatedComplexity(),
+					fc.feeManager.GetCurrentExcessComplexity(),
 				)
 			},
 		},
@@ -600,7 +600,7 @@ func TestTxFees(t *testing.T) {
 						262,
 						2000,
 					},
-					fc.feeManager.GetCumulatedComplexity(),
+					fc.feeManager.GetCurrentExcessComplexity(),
 				)
 			},
 		},
@@ -638,7 +638,7 @@ func TestTxFees(t *testing.T) {
 						266,
 						1000,
 					},
-					fc.feeManager.GetCumulatedComplexity(),
+					fc.feeManager.GetCurrentExcessComplexity(),
 				)
 			},
 		},

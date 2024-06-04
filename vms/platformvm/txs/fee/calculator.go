@@ -26,7 +26,11 @@ var (
 	errFailedComplexityCumulation = errors.New("failed cumulating complexity")
 )
 
-func NewStaticCalculator(config StaticConfig, upgradeTimes upgrade.Config, chainTime time.Time) *Calculator {
+func NewStaticCalculator(
+	config StaticConfig,
+	upgradeTimes upgrade.Config,
+	chainTime time.Time,
+) *Calculator {
 	return &Calculator{
 		c: &calculator{
 			upgrades:  upgradeTimes,
@@ -87,9 +91,9 @@ func (c *Calculator) GetFeeRates() fees.Dimensions {
 	return fees.Empty
 }
 
-func (c *Calculator) GetCumulatedComplexity() fees.Dimensions {
+func (c *Calculator) GetCurrentExcessComplexity() fees.Dimensions {
 	if c.c.feeManager != nil {
-		return c.c.feeManager.GetCumulatedComplexity()
+		return c.c.feeManager.GetCurrentExcessComplexity()
 	}
 	return fees.Empty
 }

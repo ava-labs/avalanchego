@@ -81,14 +81,14 @@ var (
 	ChainPrefix                   = []byte("chain")
 	SingletonPrefix               = []byte("singleton")
 
-	TimestampKey         = []byte("timestamp")
-	CurrentSupplyKey     = []byte("current supply")
-	LastAcceptedKey      = []byte("last accepted")
-	HeightsIndexedKey    = []byte("heights indexed")
-	FeeRatesKey          = []byte("fee rates")
-	LastBlkComplexityKey = []byte("last complexity")
-	InitializedKey       = []byte("initialized")
-	BlocksReindexedKey   = []byte("blocks reindexed")
+	TimestampKey        = []byte("timestamp")
+	CurrentSupplyKey    = []byte("current supply")
+	LastAcceptedKey     = []byte("last accepted")
+	HeightsIndexedKey   = []byte("heights indexed")
+	FeeRatesKey         = []byte("fee rates")
+	ExcessComplexityKey = []byte("last complexity")
+	InitializedKey      = []byte("initialized")
+	BlocksReindexedKey  = []byte("blocks reindexed")
 )
 
 // Chain collects all methods to manage the state of the chain for block
@@ -99,8 +99,8 @@ type Chain interface {
 	avax.UTXOGetter
 	avax.UTXODeleter
 
-	GetLastBlockComplexity() (commonfees.Dimensions, error)
-	SetLastBlockComplexity(windows commonfees.Dimensions)
+	GetExcessComplexity() (commonfees.Dimensions, error)
+	SetExcessComplexity(commonfees.Dimensions)
 
 	GetTimestamp() time.Time
 	SetTimestamp(tm time.Time)
@@ -361,7 +361,7 @@ type state struct {
 
 	// The persisted fields represent the current database value
 	timestamp, persistedTimestamp         time.Time
-	lastBlkComplexity                     commonfees.Dimensions
+	excessComplexity                      commonfees.Dimensions
 	currentSupply, persistedCurrentSupply uint64
 	// [lastAccepted] is the most recently accepted block.
 	lastAccepted, persistedLastAccepted ids.ID
@@ -1010,12 +1010,12 @@ func (s *state) GetStartTime(nodeID ids.NodeID, subnetID ids.ID) (time.Time, err
 	return staker.StartTime, nil
 }
 
-func (s *state) GetLastBlockComplexity() (commonfees.Dimensions, error) {
-	return s.lastBlkComplexity, nil
+func (s *state) GetExcessComplexity() (commonfees.Dimensions, error) {
+	return s.excessComplexity, nil
 }
 
-func (s *state) SetLastBlockComplexity(complexity commonfees.Dimensions) {
-	s.lastBlkComplexity = complexity
+func (s *state) SetExcessComplexity(complexity commonfees.Dimensions) {
+	s.excessComplexity = complexity
 }
 
 func (s *state) GetTimestamp() time.Time {
@@ -1308,9 +1308,9 @@ func (s *state) loadMetadata() error {
 	s.persistedTimestamp = timestamp
 	s.SetTimestamp(timestamp)
 
-	switch lastBlkComplexityBytes, err := s.singletonDB.Get(LastBlkComplexityKey); err {
+	switch excessComplexityBytes, err := s.singletonDB.Get(ExcessComplexityKey); err {
 	case nil:
-		if err := s.lastBlkComplexity.FromBytes(lastBlkComplexityBytes); err != nil {
+		if err := s.excessComplexity.FromBytes(excessComplexityBytes); err != nil {
 			return err
 		}
 
@@ -1318,7 +1318,7 @@ func (s *state) loadMetadata() error {
 		// fork introducing dynamic fees may not be active yet,
 		// hence we may have never stored fees windows. Set to nil
 		// TODO: remove once fork is active
-		s.lastBlkComplexity = commonfees.Empty
+		s.excessComplexity = commonfees.Empty
 
 	default:
 		return err
@@ -2301,8 +2301,8 @@ func (s *state) writeMetadata() error {
 		s.persistedTimestamp = s.timestamp
 	}
 
-	if err := s.singletonDB.Put(LastBlkComplexityKey, s.lastBlkComplexity.Bytes()); err != nil {
-		return fmt.Errorf("failed to write fee rates: %w", err)
+	if err := s.singletonDB.Put(ExcessComplexityKey, s.excessComplexity.Bytes()); err != nil {
+		return fmt.Errorf("failed to write excess complexity: %w", err)
 	}
 	if s.persistedCurrentSupply != s.currentSupply {
 		if err := database.PutUInt64(s.singletonDB, CurrentSupplyKey, s.currentSupply); err != nil {
