@@ -352,7 +352,6 @@ func (vm *VM) SetPreference(ctx context.Context, preferred ids.ID) error {
 		); err == nil {
 			vm.proposerBuildSlotGauge.Set(float64(proposer.TimeToSlot(parentTimestamp, nextStartTime)))
 		}
-
 	} else {
 		nextStartTime, err = vm.getPreDurangoSlotTime(
 			ctx,
