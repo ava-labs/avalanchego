@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	MaxStringLen  = math.MaxUint16
+	MaxStringLen = math.MaxUint16
 	MinVarintLen = 1
 	MaxVarintLen = 10
 
