@@ -21,10 +21,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version: '~1.21.9'
-          check-latest: true
+      - uses: ./.github/actions/setup-go-for-project
       - run: go version
 
       - name: Install aws cli
@@ -62,7 +59,7 @@ jobs:
         id: setup
         with:
           version: ${{ env.PACKER_VERSION }}
-        
+
       - name: Run `packer init`
         id: init
         run: "packer init ./.github/packer/ubuntu-jammy-x86_64-public-ami.pkr.hcl"

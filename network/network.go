@@ -202,7 +202,6 @@ func NewNetwork(
 
 	inboundMsgThrottler, err := throttling.NewInboundMsgThrottler(
 		log,
-		config.Namespace,
 		metricsRegisterer,
 		config.Validators,
 		config.ThrottlerConfig.InboundMsgThrottlerConfig,
@@ -216,7 +215,6 @@ func NewNetwork(
 
 	outboundMsgThrottler, err := throttling.NewSybilOutboundMsgThrottler(
 		log,
-		config.Namespace,
 		metricsRegisterer,
 		config.Validators,
 		config.ThrottlerConfig.OutboundMsgThrottlerConfig,
@@ -225,26 +223,31 @@ func NewNetwork(
 		return nil, fmt.Errorf("initializing outbound message throttler failed with: %w", err)
 	}
 
-	peerMetrics, err := peer.NewMetrics(log, config.Namespace, metricsRegisterer)
+	peerMetrics, err := peer.NewMetrics(metricsRegisterer)
 	if err != nil {
 		return nil, fmt.Errorf("initializing peer metrics failed with: %w", err)
 	}
 
-	metrics, err := newMetrics(config.Namespace, metricsRegisterer, config.TrackedSubnets)
+	metrics, err := newMetrics(metricsRegisterer, config.TrackedSubnets)
 	if err != nil {
 		return nil, fmt.Errorf("initializing network metrics failed with: %w", err)
 	}
 
-	ipTracker, err := newIPTracker(log, config.Namespace, metricsRegisterer)
+	ipTracker, err := newIPTracker(log, metricsRegisterer)
 	if err != nil {
 		return nil, fmt.Errorf("initializing ip tracker failed with: %w", err)
 	}
-	config.Validators.RegisterCallbackListener(constants.PrimaryNetworkID, ipTracker)
+	config.Validators.RegisterSetCallbackListener(constants.PrimaryNetworkID, ipTracker)
 
 	// Track all default bootstrappers to ensure their current IPs are gossiped
 	// like validator IPs.
 	for _, bootstrapper := range genesis.GetBootstrappers(config.NetworkID) {
-		ipTracker.ManuallyTrack(bootstrapper.ID)
+		ipTracker.ManuallyGossip(bootstrapper.ID)
+	}
+	// Track all recent validators to optimistically connect to them before the
+	// P-chain has finished syncing.
+	for nodeID := range genesis.GetValidators(config.NetworkID) {
+		ipTracker.ManuallyTrack(nodeID)
 	}
 
 	peerConfig := &peer.Config{
@@ -455,8 +458,12 @@ func (n *network) Connected(nodeID ids.NodeID) {
 
 	peerVersion := peer.Version()
 	n.router.Connected(nodeID, peerVersion, constants.PrimaryNetworkID)
-	for subnetID := range peer.TrackedSubnets() {
-		n.router.Connected(nodeID, peerVersion, subnetID)
+
+	trackedSubnets := peer.TrackedSubnets()
+	for subnetID := range n.peerConfig.MySubnets {
+		if trackedSubnets.Contains(subnetID) {
+			n.router.Connected(nodeID, peerVersion, subnetID)
+		}
 	}
 }
 
@@ -689,8 +696,7 @@ func (n *network) getPeers(
 			continue
 		}
 
-		trackedSubnets := peer.TrackedSubnets()
-		if subnetID != constants.PrimaryNetworkID && !trackedSubnets.Contains(subnetID) {
+		if trackedSubnets := peer.TrackedSubnets(); !trackedSubnets.Contains(subnetID) {
 			continue
 		}
 
@@ -726,8 +732,7 @@ func (n *network) samplePeers(
 		numValidatorsToSample+config.NonValidators+config.Peers,
 		func(p peer.Peer) bool {
 			// Only return peers that are tracking [subnetID]
-			trackedSubnets := p.TrackedSubnets()
-			if subnetID != constants.PrimaryNetworkID && !trackedSubnets.Contains(subnetID) {
+			if trackedSubnets := p.TrackedSubnets(); !trackedSubnets.Contains(subnetID) {
 				return false
 			}
 

@@ -6,7 +6,6 @@ package proposer
 import (
 	"context"
 	"errors"
-	"fmt"
 	"math/bits"
 	"time"
 
@@ -37,7 +36,8 @@ const (
 var (
 	_ Windower = (*windower)(nil)
 
-	ErrAnyoneCanPropose = errors.New("anyone can propose")
+	ErrAnyoneCanPropose         = errors.New("anyone can propose")
+	ErrUnexpectedSamplerFailure = errors.New("unexpected sampler failure")
 )
 
 type Windower interface {
@@ -132,9 +132,9 @@ func (w *windower) Proposers(ctx context.Context, blockHeight, pChainHeight uint
 	source.Seed(w.chainSource ^ blockHeight)
 
 	numToSample := int(min(uint64(maxWindows), totalWeight))
-	indices, err := sampler.Sample(numToSample)
-	if err != nil {
-		return nil, err
+	indices, ok := sampler.Sample(numToSample)
+	if !ok {
+		return nil, ErrUnexpectedSamplerFailure
 	}
 
 	nodeIDs := make([]ids.NodeID, numToSample)
@@ -231,7 +231,7 @@ func (w *windower) makeSampler(
 	pChainHeight uint64,
 	source sampler.Source,
 ) (sampler.WeightedWithoutReplacement, []validatorData, error) {
-	// Get the canconical representation of the validator set at the provided
+	// Get the canonical representation of the validator set at the provided
 	// p-chain height.
 	validatorsMap, err := w.state.GetValidatorSet(ctx, pChainHeight, w.subnetID)
 	if err != nil {
@@ -271,9 +271,9 @@ func (w *windower) expectedProposer(
 	// biasing the seed generation. For example, without reversing the slot
 	// height=0 and slot=1 would equal height=1 and slot=0.
 	source.Seed(w.chainSource ^ blockHeight ^ bits.Reverse64(slot))
-	indices, err := sampler.Sample(1)
-	if err != nil {
-		return ids.EmptyNodeID, fmt.Errorf("failed sampling proposers: %w", err)
+	indices, ok := sampler.Sample(1)
+	if !ok {
+		return ids.EmptyNodeID, ErrUnexpectedSamplerFailure
 	}
 	return validators[indices[0]].id, nil
 }

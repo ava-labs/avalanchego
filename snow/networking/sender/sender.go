@@ -22,7 +22,13 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
-var _ common.Sender = (*sender)(nil)
+const opLabel = "op"
+
+var (
+	_ common.Sender = (*sender)(nil)
+
+	opLabels = []string{opLabel}
+)
 
 // sender is a wrapper around an ExternalSender.
 // Messages to this node are put directly into [router] rather than
@@ -37,11 +43,11 @@ type sender struct {
 	router   router.Router
 	timeouts timeout.Manager
 
-	// Request message type --> Counts how many of that request
-	// have failed because the node was benched
-	failedDueToBench map[message.Op]prometheus.Counter
-	engineType       p2p.EngineType
-	subnet           subnets.Subnet
+	// Counts how many request have failed because the node was benched
+	failedDueToBench *prometheus.CounterVec // op
+
+	engineType p2p.EngineType
+	subnet     subnets.Subnet
 }
 
 func New(
@@ -54,40 +60,32 @@ func New(
 	subnet subnets.Subnet,
 ) (common.Sender, error) {
 	s := &sender{
-		ctx:              ctx,
-		msgCreator:       msgCreator,
-		sender:           externalSender,
-		router:           router,
-		timeouts:         timeouts,
-		failedDueToBench: make(map[message.Op]prometheus.Counter, len(message.ConsensusRequestOps)),
-		engineType:       engineType,
-		subnet:           subnet,
-	}
-
-	for _, op := range message.ConsensusRequestOps {
-		counter := prometheus.NewCounter(
+		ctx:        ctx,
+		msgCreator: msgCreator,
+		sender:     externalSender,
+		router:     router,
+		timeouts:   timeouts,
+		failedDueToBench: prometheus.NewCounterVec(
 			prometheus.CounterOpts{
-				Name: fmt.Sprintf("%s_failed_benched", op),
-				Help: fmt.Sprintf("# of times a %s request was not sent because the node was benched", op),
+				Name: "failed_benched",
+				Help: "requests dropped because a node was benched",
 			},
-		)
-
-		switch engineType {
-		case p2p.EngineType_ENGINE_TYPE_SNOWMAN:
-			if err := ctx.Registerer.Register(counter); err != nil {
-				return nil, fmt.Errorf("couldn't register metric for %s: %w", op, err)
-			}
-		case p2p.EngineType_ENGINE_TYPE_AVALANCHE:
-			if err := ctx.AvalancheRegisterer.Register(counter); err != nil {
-				return nil, fmt.Errorf("couldn't register metric for %s: %w", op, err)
-			}
-		default:
-			return nil, fmt.Errorf("unknown engine type %s", engineType)
-		}
-
-		s.failedDueToBench[op] = counter
+			opLabels,
+		),
+		engineType: engineType,
+		subnet:     subnet,
 	}
-	return s, nil
+
+	var reg prometheus.Registerer
+	switch engineType {
+	case p2p.EngineType_ENGINE_TYPE_SNOWMAN:
+		reg = ctx.Registerer
+	case p2p.EngineType_ENGINE_TYPE_AVALANCHE:
+		reg = ctx.AvalancheRegisterer
+	default:
+		return nil, fmt.Errorf("unknown engine type %s", engineType)
+	}
+	return s, reg.Register(s.failedDueToBench)
 }
 
 func (s *sender) SendGetStateSummaryFrontier(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32) {
@@ -665,16 +663,19 @@ func (s *sender) SendGetAncestors(ctx context.Context, nodeID ids.NodeID, reques
 		s.engineType,
 	)
 
-	// Sending a GetAncestors to myself always fails.
+	// Sending a GetAncestors to myself will fail. To avoid constantly sending
+	// myself requests when not connected to any peers, we rely on the timeout
+	// firing to deliver the GetAncestorsFailed message.
 	if nodeID == s.ctx.NodeID {
-		go s.router.HandleInbound(ctx, inMsg)
 		return
 	}
 
 	// [nodeID] may be benched. That is, they've been unresponsive so we don't
 	// even bother sending requests to them. We just have them immediately fail.
 	if s.timeouts.IsBenched(nodeID, s.ctx.ChainID) {
-		s.failedDueToBench[message.GetAncestorsOp].Inc() // update metric
+		s.failedDueToBench.With(prometheus.Labels{
+			opLabel: message.GetAncestorsOp.String(),
+		}).Inc()
 		s.timeouts.RegisterRequestToUnreachableValidator()
 		go s.router.HandleInbound(ctx, inMsg)
 		return
@@ -793,7 +794,9 @@ func (s *sender) SendGet(ctx context.Context, nodeID ids.NodeID, requestID uint3
 	// [nodeID] may be benched. That is, they've been unresponsive so we don't
 	// even bother sending requests to them. We just have them immediately fail.
 	if s.timeouts.IsBenched(nodeID, s.ctx.ChainID) {
-		s.failedDueToBench[message.GetOp].Inc() // update metric
+		s.failedDueToBench.With(prometheus.Labels{
+			opLabel: message.GetOp.String(),
+		}).Inc()
 		s.timeouts.RegisterRequestToUnreachableValidator()
 		go s.router.HandleInbound(ctx, inMsg)
 		return
@@ -947,7 +950,9 @@ func (s *sender) SendPushQuery(
 	// immediately fail.
 	for nodeID := range nodeIDs {
 		if s.timeouts.IsBenched(nodeID, s.ctx.ChainID) {
-			s.failedDueToBench[message.PushQueryOp].Inc() // update metric
+			s.failedDueToBench.With(prometheus.Labels{
+				opLabel: message.PushQueryOp.String(),
+			}).Inc()
 			nodeIDs.Remove(nodeID)
 			s.timeouts.RegisterRequestToUnreachableValidator()
 
@@ -1083,7 +1088,9 @@ func (s *sender) SendPullQuery(
 	// have them immediately fail.
 	for nodeID := range nodeIDs {
 		if s.timeouts.IsBenched(nodeID, s.ctx.ChainID) {
-			s.failedDueToBench[message.PullQueryOp].Inc() // update metric
+			s.failedDueToBench.With(prometheus.Labels{
+				opLabel: message.PullQueryOp.String(),
+			}).Inc()
 			nodeIDs.Remove(nodeID)
 			s.timeouts.RegisterRequestToUnreachableValidator()
 			// Immediately register a failure. Do so asynchronously to avoid
@@ -1330,7 +1337,9 @@ func (s *sender) SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.NodeID]
 	// have them immediately fail.
 	for nodeID := range nodeIDs {
 		if s.timeouts.IsBenched(nodeID, s.ctx.ChainID) {
-			s.failedDueToBench[message.AppRequestOp].Inc() // update metric
+			s.failedDueToBench.With(prometheus.Labels{
+				opLabel: message.AppRequestOp.String(),
+			}).Inc()
 			nodeIDs.Remove(nodeID)
 			s.timeouts.RegisterRequestToUnreachableValidator()
 

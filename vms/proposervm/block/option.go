@@ -37,3 +37,7 @@ func (b *option) initialize(bytes []byte) error {
 	b.bytes = bytes
 	return nil
 }
+
+func (*option) verify(ids.ID) error {
+	return nil
+}

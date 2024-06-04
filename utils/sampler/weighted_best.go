@@ -60,7 +60,7 @@ samplerLoop:
 
 		start := s.clock.Time()
 		for _, sample := range samples {
-			if _, err := sampler.Sample(sample); err != nil {
+			if _, ok := sampler.Sample(sample); !ok {
 				continue samplerLoop
 			}
 		}

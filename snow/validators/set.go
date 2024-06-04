@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"slices"
 	"strings"
 	"sync"
 
@@ -22,18 +23,23 @@ var (
 	errDuplicateValidator   = errors.New("duplicate validator")
 	errMissingValidator     = errors.New("missing validator")
 	errTotalWeightNotUint64 = errors.New("total weight is not a uint64")
+	errInsufficientWeight   = errors.New("insufficient weight")
 )
 
 // newSet returns a new, empty set of validators.
-func newSet() *vdrSet {
+func newSet(subnetID ids.ID, callbackListeners []ManagerCallbackListener) *vdrSet {
 	return &vdrSet{
-		vdrs:        make(map[ids.NodeID]*Validator),
-		sampler:     sampler.NewWeightedWithoutReplacement(),
-		totalWeight: new(big.Int),
+		subnetID:                 subnetID,
+		vdrs:                     make(map[ids.NodeID]*Validator),
+		totalWeight:              new(big.Int),
+		sampler:                  sampler.NewWeightedWithoutReplacement(),
+		managerCallbackListeners: slices.Clone(callbackListeners),
 	}
 }
 
 type vdrSet struct {
+	subnetID ids.ID
+
 	lock        sync.RWMutex
 	vdrs        map[ids.NodeID]*Validator
 	vdrSlice    []*Validator
@@ -43,7 +49,8 @@ type vdrSet struct {
 	samplerInitialized bool
 	sampler            sampler.WeightedWithoutReplacement
 
-	callbackListeners []SetCallbackListener
+	managerCallbackListeners []ManagerCallbackListener
+	setCallbackListeners     []SetCallbackListener
 }
 
 func (s *vdrSet) Add(nodeID ids.NodeID, pk *bls.PublicKey, txID ids.ID, weight uint64) error {
@@ -218,7 +225,7 @@ func (s *vdrSet) HasCallbackRegistered() bool {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 
-	return len(s.callbackListeners) > 0
+	return len(s.setCallbackListeners) > 0
 }
 
 func (s *vdrSet) Map() map[ids.NodeID]*GetValidatorOutput {
@@ -251,9 +258,9 @@ func (s *vdrSet) sample(size int) ([]ids.NodeID, error) {
 		s.samplerInitialized = true
 	}
 
-	indices, err := s.sampler.Sample(size)
-	if err != nil {
-		return nil, err
+	indices, ok := s.sampler.Sample(size)
+	if !ok {
+		return nil, errInsufficientWeight
 	}
 
 	list := make([]ids.NodeID, size)
@@ -305,11 +312,21 @@ func (s *vdrSet) prefixedString(prefix string) string {
 	return sb.String()
 }
 
+func (s *vdrSet) RegisterManagerCallbackListener(callbackListener ManagerCallbackListener) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	s.managerCallbackListeners = append(s.managerCallbackListeners, callbackListener)
+	for _, vdr := range s.vdrSlice {
+		callbackListener.OnValidatorAdded(s.subnetID, vdr.NodeID, vdr.PublicKey, vdr.TxID, vdr.Weight)
+	}
+}
+
 func (s *vdrSet) RegisterCallbackListener(callbackListener SetCallbackListener) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	s.callbackListeners = append(s.callbackListeners, callbackListener)
+	s.setCallbackListeners = append(s.setCallbackListeners, callbackListener)
 	for _, vdr := range s.vdrSlice {
 		callbackListener.OnValidatorAdded(vdr.NodeID, vdr.PublicKey, vdr.TxID, vdr.Weight)
 	}
@@ -317,21 +334,30 @@ func (s *vdrSet) RegisterCallbackListener(callbackListener SetCallbackListener) 
 
 // Assumes [s.lock] is held
 func (s *vdrSet) callWeightChangeCallbacks(node ids.NodeID, oldWeight, newWeight uint64) {
-	for _, callbackListener := range s.callbackListeners {
+	for _, callbackListener := range s.managerCallbackListeners {
+		callbackListener.OnValidatorWeightChanged(s.subnetID, node, oldWeight, newWeight)
+	}
+	for _, callbackListener := range s.setCallbackListeners {
 		callbackListener.OnValidatorWeightChanged(node, oldWeight, newWeight)
 	}
 }
 
 // Assumes [s.lock] is held
 func (s *vdrSet) callValidatorAddedCallbacks(node ids.NodeID, pk *bls.PublicKey, txID ids.ID, weight uint64) {
-	for _, callbackListener := range s.callbackListeners {
+	for _, callbackListener := range s.managerCallbackListeners {
+		callbackListener.OnValidatorAdded(s.subnetID, node, pk, txID, weight)
+	}
+	for _, callbackListener := range s.setCallbackListeners {
 		callbackListener.OnValidatorAdded(node, pk, txID, weight)
 	}
 }
 
 // Assumes [s.lock] is held
 func (s *vdrSet) callValidatorRemovedCallbacks(node ids.NodeID, weight uint64) {
-	for _, callbackListener := range s.callbackListeners {
+	for _, callbackListener := range s.managerCallbackListeners {
+		callbackListener.OnValidatorRemoved(s.subnetID, node, weight)
+	}
+	for _, callbackListener := range s.setCallbackListeners {
 		callbackListener.OnValidatorRemoved(node, weight)
 	}
 }

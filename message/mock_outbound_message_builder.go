@@ -328,18 +328,18 @@ func (mr *MockOutboundMsgBuilderMockRecorder) Ping(arg0, arg1 any) *gomock.Call 
 }
 
 // Pong mocks base method.
-func (m *MockOutboundMsgBuilder) Pong(arg0 uint32, arg1 []*p2p.SubnetUptime) (OutboundMessage, error) {
+func (m *MockOutboundMsgBuilder) Pong() (OutboundMessage, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Pong", arg0, arg1)
+	ret := m.ctrl.Call(m, "Pong")
 	ret0, _ := ret[0].(OutboundMessage)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Pong indicates an expected call of Pong.
-func (mr *MockOutboundMsgBuilderMockRecorder) Pong(arg0, arg1 any) *gomock.Call {
+func (mr *MockOutboundMsgBuilderMockRecorder) Pong() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Pong", reflect.TypeOf((*MockOutboundMsgBuilder)(nil).Pong), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Pong", reflect.TypeOf((*MockOutboundMsgBuilder)(nil).Pong))
 }
 
 // PullQuery mocks base method.

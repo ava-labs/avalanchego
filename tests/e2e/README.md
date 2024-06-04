@@ -57,46 +57,33 @@ packages. `x/transfer/virtuous.go` defines X-Chain transfer tests,
 labeled with `x`, which can be selected by `./tests/e2e/e2e.test
 --ginkgo.label-filter "x"`.
 
-## Testing against an existing network
+## Reusing temporary networks
 
 By default, a new temporary test network will be started before each
 test run and stopped at the end of the run. When developing e2e tests,
-it may be helpful to create a temporary network that can be used
-across multiple test runs. This can increase the speed of iteration by
-removing the requirement to start a new network for every invocation
-of the test under development.
+it may be helpful to reuse temporary networks across multiple test
+runs. This can increase the speed of iteration by removing the
+requirement to start a new network for every invocation of the test
+under development.
 
-To create a temporary network for use across test runs:
+To enable network reuse across test runs, pass `--reuse-network` as an
+argument to the test suite:
 
 ```bash
-# From the root of the avalanchego repo
-
-# Build the tmpnetctl binary
-$ ./scripts/build_tmpnetctl.sh
-
-# Start a new network
-$ ./build/tmpnetctl start-network --avalanchego-path=/path/to/avalanchego
-...
-Started network /home/me/.tmpnet/networks/20240306-152305.924531 (UUID: abaab590-b375-44f6-9ca5-f8a6dc061725)
-
-Configure tmpnetctl and the test suite to target this network by default
-with one of the following statements:
- - source /home/me/.tmpnet/networks/20240306-152305.924531/network.env
- - export TMPNET_NETWORK_DIR=/home/me/.tmpnet/networks/20240306-152305.924531
- - export TMPNET_NETWORK_DIR=/home/me/.tmpnet/networks/latest
-
-# Start a new test run using the existing network
-ginkgo -v ./tests/e2e -- \
-    --avalanchego-path=/path/to/avalanchego \
-    --ginkgo.focus-file=[name of file containing test] \
-    --use-existing-network \
-    --network-dir=/path/to/network
-
-# It is also possible to set the AVALANCHEGO_PATH env var instead of supplying --avalanchego-path
-# and to set TMPNET_NETWORK_DIR instead of supplying --network-dir.
+ginkgo -v ./tests/e2e -- --avalanchego-path=/path/to/avalanchego --reuse-network
 ```
 
-See the tmpnet fixture [README](../fixture/tmpnet/README.md) for more details.
+If a network is not already running the first time the suite runs with
+`--reuse-network`, one will be started automatically and configured
+for reuse by subsequent test runs also supplying `--reuse-network`.
+
+To stop a network configured for reuse, invoke the test suite with the
+`--stop-network` argument. This will stop the network and exit
+immediately without executing any tests:
+
+```bash
+ginkgo -v ./tests/e2e -- --stop-network
+```
 
 ## Skipping bootstrap checks
 

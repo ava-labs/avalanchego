@@ -23,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/profiler"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 )
 
 type APIIndexerConfig struct {
@@ -122,13 +123,13 @@ type DatabaseConfig struct {
 
 // Config contains all of the configurations of an Avalanche node.
 type Config struct {
-	HTTPConfig          `json:"httpConfig"`
-	IPConfig            `json:"ipConfig"`
-	StakingConfig       `json:"stakingConfig"`
-	genesis.TxFeeConfig `json:"txFeeConfig"`
-	StateSyncConfig     `json:"stateSyncConfig"`
-	BootstrapConfig     `json:"bootstrapConfig"`
-	DatabaseConfig      `json:"databaseConfig"`
+	HTTPConfig       `json:"httpConfig"`
+	IPConfig         `json:"ipConfig"`
+	StakingConfig    `json:"stakingConfig"`
+	fee.StaticConfig `json:"txFeeConfig"`
+	StateSyncConfig  `json:"stateSyncConfig"`
+	BootstrapConfig  `json:"bootstrapConfig"`
+	DatabaseConfig   `json:"databaseConfig"`
 
 	// Genesis information
 	GenesisBytes []byte `json:"-"`

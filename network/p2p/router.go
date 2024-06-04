@@ -45,20 +45,24 @@ type meteredHandler struct {
 }
 
 type metrics struct {
-	appRequestTime                  *prometheus.CounterVec
-	appRequestCount                 *prometheus.CounterVec
-	appResponseTime                 *prometheus.CounterVec
-	appResponseCount                *prometheus.CounterVec
-	appRequestFailedTime            *prometheus.CounterVec
-	appRequestFailedCount           *prometheus.CounterVec
-	appGossipTime                   *prometheus.CounterVec
-	appGossipCount                  *prometheus.CounterVec
-	crossChainAppRequestTime        *prometheus.CounterVec
-	crossChainAppRequestCount       *prometheus.CounterVec
-	crossChainAppResponseTime       *prometheus.CounterVec
-	crossChainAppResponseCount      *prometheus.CounterVec
-	crossChainAppRequestFailedTime  *prometheus.CounterVec
-	crossChainAppRequestFailedCount *prometheus.CounterVec
+	msgTime  *prometheus.GaugeVec
+	msgCount *prometheus.CounterVec
+}
+
+func (m *metrics) observe(labels prometheus.Labels, start time.Time) error {
+	metricTime, err := m.msgTime.GetMetricWith(labels)
+	if err != nil {
+		return err
+	}
+
+	metricCount, err := m.msgCount.GetMetricWith(labels)
+	if err != nil {
+		return err
+	}
+
+	metricTime.Add(float64(time.Since(start)))
+	metricCount.Inc()
+	return nil
 }
 
 // router routes incoming application messages to the corresponding registered
@@ -139,24 +143,13 @@ func (r *router) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID ui
 		return err
 	}
 
-	labels := prometheus.Labels{
-		handlerLabel: handlerID,
-	}
-
-	metricCount, err := r.metrics.appRequestCount.GetMetricWith(labels)
-	if err != nil {
-		return err
-	}
-
-	metricTime, err := r.metrics.appRequestTime.GetMetricWith(labels)
-	if err != nil {
-		return err
-	}
-
-	metricCount.Inc()
-	metricTime.Add(float64(time.Since(start)))
-
-	return nil
+	return r.metrics.observe(
+		prometheus.Labels{
+			opLabel:      message.AppRequestOp.String(),
+			handlerLabel: handlerID,
+		},
+		start,
+	)
 }
 
 // AppRequestFailed routes an AppRequestFailed message to the callback
@@ -174,24 +167,13 @@ func (r *router) AppRequestFailed(ctx context.Context, nodeID ids.NodeID, reques
 
 	pending.callback(ctx, nodeID, nil, appErr)
 
-	labels := prometheus.Labels{
-		handlerLabel: pending.handlerID,
-	}
-
-	metricCount, err := r.metrics.appRequestFailedCount.GetMetricWith(labels)
-	if err != nil {
-		return err
-	}
-
-	metricTime, err := r.metrics.appRequestFailedTime.GetMetricWith(labels)
-	if err != nil {
-		return err
-	}
-
-	metricCount.Inc()
-	metricTime.Add(float64(time.Since(start)))
-
-	return nil
+	return r.metrics.observe(
+		prometheus.Labels{
+			opLabel:      message.AppErrorOp.String(),
+			handlerLabel: pending.handlerID,
+		},
+		start,
+	)
 }
 
 // AppResponse routes an AppResponse message to the callback corresponding to
@@ -209,24 +191,13 @@ func (r *router) AppResponse(ctx context.Context, nodeID ids.NodeID, requestID u
 
 	pending.callback(ctx, nodeID, response, nil)
 
-	labels := prometheus.Labels{
-		handlerLabel: pending.handlerID,
-	}
-
-	metricCount, err := r.metrics.appResponseCount.GetMetricWith(labels)
-	if err != nil {
-		return err
-	}
-
-	metricTime, err := r.metrics.appResponseTime.GetMetricWith(labels)
-	if err != nil {
-		return err
-	}
-
-	metricCount.Inc()
-	metricTime.Add(float64(time.Since(start)))
-
-	return nil
+	return r.metrics.observe(
+		prometheus.Labels{
+			opLabel:      message.AppResponseOp.String(),
+			handlerLabel: pending.handlerID,
+		},
+		start,
+	)
 }
 
 // AppGossip routes an AppGossip message to a Handler based on the handler
@@ -248,24 +219,13 @@ func (r *router) AppGossip(ctx context.Context, nodeID ids.NodeID, gossip []byte
 
 	handler.AppGossip(ctx, nodeID, parsedMsg)
 
-	labels := prometheus.Labels{
-		handlerLabel: handlerID,
-	}
-
-	metricCount, err := r.metrics.appGossipCount.GetMetricWith(labels)
-	if err != nil {
-		return err
-	}
-
-	metricTime, err := r.metrics.appGossipTime.GetMetricWith(labels)
-	if err != nil {
-		return err
-	}
-
-	metricCount.Inc()
-	metricTime.Add(float64(time.Since(start)))
-
-	return nil
+	return r.metrics.observe(
+		prometheus.Labels{
+			opLabel:      message.AppGossipOp.String(),
+			handlerLabel: handlerID,
+		},
+		start,
+	)
 }
 
 // CrossChainAppRequest routes a CrossChainAppRequest message to a Handler
@@ -298,24 +258,13 @@ func (r *router) CrossChainAppRequest(
 		return err
 	}
 
-	labels := prometheus.Labels{
-		handlerLabel: handlerID,
-	}
-
-	metricCount, err := r.metrics.crossChainAppRequestCount.GetMetricWith(labels)
-	if err != nil {
-		return err
-	}
-
-	metricTime, err := r.metrics.crossChainAppRequestTime.GetMetricWith(labels)
-	if err != nil {
-		return err
-	}
-
-	metricCount.Inc()
-	metricTime.Add(float64(time.Since(start)))
-
-	return nil
+	return r.metrics.observe(
+		prometheus.Labels{
+			opLabel:      message.CrossChainAppRequestOp.String(),
+			handlerLabel: handlerID,
+		},
+		start,
+	)
 }
 
 // CrossChainAppRequestFailed routes a CrossChainAppRequestFailed message to
@@ -333,24 +282,13 @@ func (r *router) CrossChainAppRequestFailed(ctx context.Context, chainID ids.ID,
 
 	pending.callback(ctx, chainID, nil, appErr)
 
-	labels := prometheus.Labels{
-		handlerLabel: pending.handlerID,
-	}
-
-	metricCount, err := r.metrics.crossChainAppRequestFailedCount.GetMetricWith(labels)
-	if err != nil {
-		return err
-	}
-
-	metricTime, err := r.metrics.crossChainAppRequestFailedTime.GetMetricWith(labels)
-	if err != nil {
-		return err
-	}
-
-	metricCount.Inc()
-	metricTime.Add(float64(time.Since(start)))
-
-	return nil
+	return r.metrics.observe(
+		prometheus.Labels{
+			opLabel:      message.CrossChainAppErrorOp.String(),
+			handlerLabel: pending.handlerID,
+		},
+		start,
+	)
 }
 
 // CrossChainAppResponse routes a CrossChainAppResponse message to the callback
@@ -368,24 +306,13 @@ func (r *router) CrossChainAppResponse(ctx context.Context, chainID ids.ID, requ
 
 	pending.callback(ctx, chainID, response, nil)
 
-	labels := prometheus.Labels{
-		handlerLabel: pending.handlerID,
-	}
-
-	metricCount, err := r.metrics.crossChainAppResponseCount.GetMetricWith(labels)
-	if err != nil {
-		return err
-	}
-
-	metricTime, err := r.metrics.crossChainAppResponseTime.GetMetricWith(labels)
-	if err != nil {
-		return err
-	}
-
-	metricCount.Inc()
-	metricTime.Add(float64(time.Since(start)))
-
-	return nil
+	return r.metrics.observe(
+		prometheus.Labels{
+			opLabel:      message.CrossChainAppResponseOp.String(),
+			handlerLabel: pending.handlerID,
+		},
+		start,
+	)
 }
 
 // Parse parses a gossip or request message and maps it to a corresponding
