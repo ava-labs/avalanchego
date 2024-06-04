@@ -57,7 +57,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
+	"github.com/ava-labs/avalanchego/vms/platformvm/upgrade"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	p2ppb "github.com/ava-labs/avalanchego/proto/pb/p2p"
@@ -244,22 +246,26 @@ func defaultVM(t *testing.T, f fork) (*VM, *txstest.Builder, database.Database, 
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		SybilProtectionEnabled: true,
 		Validators:             validators.NewManager(),
-		TxFee:                  defaultTxFee,
-		CreateSubnetTxFee:      100 * defaultTxFee,
-		TransformSubnetTxFee:   100 * defaultTxFee,
-		CreateBlockchainTxFee:  100 * defaultTxFee,
-		MinValidatorStake:      defaultMinValidatorStake,
-		MaxValidatorStake:      defaultMaxValidatorStake,
-		MinDelegatorStake:      defaultMinDelegatorStake,
-		MinStakeDuration:       defaultMinStakingDuration,
-		MaxStakeDuration:       defaultMaxStakingDuration,
-		RewardConfig:           defaultRewardConfig,
-		ApricotPhase3Time:      apricotPhase3Time,
-		ApricotPhase5Time:      apricotPhase5Time,
-		BanffTime:              banffTime,
-		CortinaTime:            cortinaTime,
-		DurangoTime:            durangoTime,
-		EUpgradeTime:           eUpgradeTime,
+		StaticFeeConfig: fee.StaticConfig{
+			TxFee:                 defaultTxFee,
+			CreateSubnetTxFee:     100 * defaultTxFee,
+			TransformSubnetTxFee:  100 * defaultTxFee,
+			CreateBlockchainTxFee: 100 * defaultTxFee,
+		},
+		MinValidatorStake: defaultMinValidatorStake,
+		MaxValidatorStake: defaultMaxValidatorStake,
+		MinDelegatorStake: defaultMinDelegatorStake,
+		MinStakeDuration:  defaultMinStakingDuration,
+		MaxStakeDuration:  defaultMaxStakingDuration,
+		RewardConfig:      defaultRewardConfig,
+		UpgradeConfig: upgrade.Config{
+			ApricotPhase3Time: apricotPhase3Time,
+			ApricotPhase5Time: apricotPhase5Time,
+			BanffTime:         banffTime,
+			CortinaTime:       cortinaTime,
+			DurangoTime:       durangoTime,
+			EUpgradeTime:      eUpgradeTime,
+		},
 	}}
 
 	db := memdb.New()
@@ -384,7 +390,7 @@ func TestGenesis(t *testing.T) {
 			require.NoError(err)
 
 			require.Equal(utxo.Address, addr)
-			require.Equal(uint64(utxo.Amount)-vm.CreateSubnetTxFee, out.Amount())
+			require.Equal(uint64(utxo.Amount)-vm.StaticFeeConfig.CreateSubnetTxFee, out.Amount())
 		}
 	}
 
@@ -935,6 +941,7 @@ func TestCreateSubnet(t *testing.T) {
 		}),
 	)
 	require.NoError(err)
+	subnetID := createSubnetTx.ID()
 
 	vm.ctx.Lock.Unlock()
 	require.NoError(vm.issueTxFromRPC(createSubnetTx))
@@ -948,21 +955,13 @@ func TestCreateSubnet(t *testing.T) {
 	require.NoError(blk.Accept(context.Background()))
 	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
-	_, txStatus, err := vm.state.GetTx(createSubnetTx.ID())
+	_, txStatus, err := vm.state.GetTx(subnetID)
 	require.NoError(err)
 	require.Equal(status.Committed, txStatus)
 
-	subnets, err := vm.state.GetSubnets()
+	subnetIDs, err := vm.state.GetSubnetIDs()
 	require.NoError(err)
-
-	found := false
-	for _, subnet := range subnets {
-		if subnet.ID() == createSubnetTx.ID() {
-			found = true
-			break
-		}
-	}
-	require.True(found)
+	require.Contains(subnetIDs, subnetID)
 
 	// Now that we've created a new subnet, add a validator to that subnet
 	startTime := vm.clock.Time().Add(txexecutor.SyncBound).Add(1 * time.Second)
@@ -976,7 +975,7 @@ func TestCreateSubnet(t *testing.T) {
 				End:    uint64(endTime.Unix()),
 				Wght:   defaultWeight,
 			},
-			Subnet: createSubnetTx.ID(),
+			Subnet: subnetID,
 		},
 		[]*secp256k1.PrivateKey{keys[0]},
 	)
@@ -998,10 +997,10 @@ func TestCreateSubnet(t *testing.T) {
 	require.NoError(err)
 	require.Equal(status.Committed, txStatus)
 
-	_, err = vm.state.GetPendingValidator(createSubnetTx.ID(), nodeID)
+	_, err = vm.state.GetPendingValidator(subnetID, nodeID)
 	require.ErrorIs(err, database.ErrNotFound)
 
-	_, err = vm.state.GetCurrentValidator(createSubnetTx.ID(), nodeID)
+	_, err = vm.state.GetCurrentValidator(subnetID, nodeID)
 	require.NoError(err)
 
 	// fast forward clock to time validator should stop validating
@@ -1011,10 +1010,10 @@ func TestCreateSubnet(t *testing.T) {
 	require.NoError(blk.Verify(context.Background()))
 	require.NoError(blk.Accept(context.Background())) // remove validator from current validator set
 
-	_, err = vm.state.GetPendingValidator(createSubnetTx.ID(), nodeID)
+	_, err = vm.state.GetPendingValidator(subnetID, nodeID)
 	require.ErrorIs(err, database.ErrNotFound)
 
-	_, err = vm.state.GetCurrentValidator(createSubnetTx.ID(), nodeID)
+	_, err = vm.state.GetCurrentValidator(subnetID, nodeID)
 	require.ErrorIs(err, database.ErrNotFound)
 }
 
@@ -1178,10 +1177,12 @@ func TestRestartFullyAccepted(t *testing.T) {
 		MinStakeDuration:       defaultMinStakingDuration,
 		MaxStakeDuration:       defaultMaxStakingDuration,
 		RewardConfig:           defaultRewardConfig,
-		BanffTime:              latestForkTime,
-		CortinaTime:            latestForkTime,
-		DurangoTime:            latestForkTime,
-		EUpgradeTime:           mockable.MaxTime,
+		UpgradeConfig: upgrade.Config{
+			BanffTime:    latestForkTime,
+			CortinaTime:  latestForkTime,
+			DurangoTime:  latestForkTime,
+			EUpgradeTime: mockable.MaxTime,
+		},
 	}}
 
 	firstCtx := snowtest.Context(t, snowtest.PChainID)
@@ -1266,10 +1267,12 @@ func TestRestartFullyAccepted(t *testing.T) {
 		MinStakeDuration:       defaultMinStakingDuration,
 		MaxStakeDuration:       defaultMaxStakingDuration,
 		RewardConfig:           defaultRewardConfig,
-		BanffTime:              latestForkTime,
-		CortinaTime:            latestForkTime,
-		DurangoTime:            latestForkTime,
-		EUpgradeTime:           mockable.MaxTime,
+		UpgradeConfig: upgrade.Config{
+			BanffTime:    latestForkTime,
+			CortinaTime:  latestForkTime,
+			DurangoTime:  latestForkTime,
+			EUpgradeTime: mockable.MaxTime,
+		},
 	}}
 
 	secondCtx := snowtest.Context(t, snowtest.PChainID)
@@ -1315,10 +1318,12 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		MinStakeDuration:       defaultMinStakingDuration,
 		MaxStakeDuration:       defaultMaxStakingDuration,
 		RewardConfig:           defaultRewardConfig,
-		BanffTime:              latestForkTime,
-		CortinaTime:            latestForkTime,
-		DurangoTime:            latestForkTime,
-		EUpgradeTime:           mockable.MaxTime,
+		UpgradeConfig: upgrade.Config{
+			BanffTime:    latestForkTime,
+			CortinaTime:  latestForkTime,
+			DurangoTime:  latestForkTime,
+			EUpgradeTime: mockable.MaxTime,
+		},
 	}}
 
 	initialClkTime := latestForkTime.Add(time.Second)
@@ -1413,7 +1418,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	chainRouter := &router.ChainRouter{}
 
 	metrics := prometheus.NewRegistry()
-	mc, err := message.NewCreator(logging.NoLog{}, metrics, "dummyNamespace", constants.DefaultNetworkCompressionType, 10*time.Second)
+	mc, err := message.NewCreator(logging.NoLog{}, metrics, constants.DefaultNetworkCompressionType, 10*time.Second)
 	require.NoError(err)
 
 	require.NoError(chainRouter.Initialize(
@@ -1662,10 +1667,12 @@ func TestUnverifiedParent(t *testing.T) {
 		MinStakeDuration:       defaultMinStakingDuration,
 		MaxStakeDuration:       defaultMaxStakingDuration,
 		RewardConfig:           defaultRewardConfig,
-		BanffTime:              latestForkTime,
-		CortinaTime:            latestForkTime,
-		DurangoTime:            latestForkTime,
-		EUpgradeTime:           mockable.MaxTime,
+		UpgradeConfig: upgrade.Config{
+			BanffTime:    latestForkTime,
+			CortinaTime:  latestForkTime,
+			DurangoTime:  latestForkTime,
+			EUpgradeTime: mockable.MaxTime,
+		},
 	}}
 
 	initialClkTime := latestForkTime.Add(time.Second)
@@ -1823,10 +1830,12 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 		RewardConfig:           defaultRewardConfig,
 		Validators:             validators.NewManager(),
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		BanffTime:              latestForkTime,
-		CortinaTime:            latestForkTime,
-		DurangoTime:            latestForkTime,
-		EUpgradeTime:           mockable.MaxTime,
+		UpgradeConfig: upgrade.Config{
+			BanffTime:    latestForkTime,
+			CortinaTime:  latestForkTime,
+			DurangoTime:  latestForkTime,
+			EUpgradeTime: mockable.MaxTime,
+		},
 	}}
 
 	firstCtx := snowtest.Context(t, snowtest.PChainID)
@@ -1872,10 +1881,12 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 		UptimePercentage:       secondUptimePercentage / 100.,
 		Validators:             validators.NewManager(),
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		BanffTime:              latestForkTime,
-		CortinaTime:            latestForkTime,
-		DurangoTime:            latestForkTime,
-		EUpgradeTime:           mockable.MaxTime,
+		UpgradeConfig: upgrade.Config{
+			BanffTime:    latestForkTime,
+			CortinaTime:  latestForkTime,
+			DurangoTime:  latestForkTime,
+			EUpgradeTime: mockable.MaxTime,
+		},
 	}}
 
 	secondCtx := snowtest.Context(t, snowtest.PChainID)
@@ -1972,10 +1983,12 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 		RewardConfig:           defaultRewardConfig,
 		Validators:             validators.NewManager(),
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		BanffTime:              latestForkTime,
-		CortinaTime:            latestForkTime,
-		DurangoTime:            latestForkTime,
-		EUpgradeTime:           mockable.MaxTime,
+		UpgradeConfig: upgrade.Config{
+			BanffTime:    latestForkTime,
+			CortinaTime:  latestForkTime,
+			DurangoTime:  latestForkTime,
+			EUpgradeTime: mockable.MaxTime,
+		},
 	}}
 
 	ctx := snowtest.Context(t, snowtest.PChainID)
@@ -2350,7 +2363,7 @@ func TestBaseTx(t *testing.T) {
 	}
 	require.Equal(totalOutputAmt, key0OutputAmt+key1OutputAmt+changeAddrOutputAmt)
 
-	require.Equal(vm.TxFee, totalInputAmt-totalOutputAmt)
+	require.Equal(vm.StaticFeeConfig.TxFee, totalInputAmt-totalOutputAmt)
 	require.Equal(sendAmt, key1OutputAmt)
 
 	vm.ctx.Lock.Unlock()

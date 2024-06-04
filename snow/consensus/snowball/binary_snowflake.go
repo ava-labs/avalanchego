@@ -7,21 +7,20 @@ import "fmt"
 
 var _ Binary = (*binarySnowflake)(nil)
 
-func newBinarySnowflake(alphaPreference int, alphaConfidence []int, beta []int, choice int) binarySnowflake {
+func newBinarySnowflake(alphaPreference int, terminationConditions []terminationCondition, choice int) binarySnowflake {
 	return binarySnowflake{
-		binarySlush:     newBinarySlush(choice),
-		alphaPreference: alphaPreference,
-		alphaConfidence: alphaConfidence,
-		beta:            beta,
-		confidence:      make([]int, len(alphaConfidence)),
+		binarySlush:           newBinarySlush(choice),
+		alphaPreference:       alphaPreference,
+		terminationConditions: terminationConditions,
+		confidence:            make([]int, len(terminationConditions)),
 	}
 }
 
 // binarySnowflake is the implementation of a binary snowflake instance
 // Invariant:
-// len(alphaConfidence) == len(beta) == len(confidence)
-// alphaConfidence[i] < alphaConfidence[i+1]
-// beta[i] < beta[i+1]
+// len(terminationConditions) == len(confidence)
+// terminationConditions[i].alphaConfidence < terminationConditions[i+1].alphaConfidence
+// terminationConditions[i].beta <= terminationConditions[i+1].beta
 // confidence[i] >= confidence[i+1] (except after finalizing due to early termination)
 type binarySnowflake struct {
 	// wrap the binary slush logic
@@ -30,17 +29,14 @@ type binarySnowflake struct {
 	// alphaPreference is the threshold required to update the preference
 	alphaPreference int
 
-	// alphaConfidence[i] gives the alphaConfidence threshold required to increment
-	// confidence[i]
-	alphaConfidence []int
-
-	// beta[i] gives the number of consecutive polls reaching alphaConfidence[i]
-	// required to finalize.
-	beta []int
+	// terminationConditions gives the ascending ordered list of alphaConfidence values
+	// required to increment the corresponding confidence counter.
+	// The corresponding beta values give the threshold required to finalize this instance.
+	terminationConditions []terminationCondition
 
 	// confidence is the number of consecutive succcessful polls for a given
 	// alphaConfidence threshold.
-	// This instance finalizes when confidence[i] >= beta[i] for any i
+	// This instance finalizes when confidence[i] >= terminationConditions[i].beta for any i
 	confidence []int
 
 	// finalized prevents the state from changing after the required number of
@@ -65,11 +61,11 @@ func (sf *binarySnowflake) RecordPoll(count, choice int) {
 		clear(sf.confidence)
 	}
 
-	for i, alphaConfidence := range sf.alphaConfidence {
+	for i, terminationCondition := range sf.terminationConditions {
 		// If I did not reach this alpha threshold, I did not
 		// reach any more alpha thresholds.
 		// Clear the remaining confidence counters.
-		if count < alphaConfidence {
+		if count < terminationCondition.alphaConfidence {
 			clear(sf.confidence[i:])
 			return
 		}
@@ -77,7 +73,7 @@ func (sf *binarySnowflake) RecordPoll(count, choice int) {
 		// I reached this alpha threshold, increment the confidence counter
 		// and check if I can finalize.
 		sf.confidence[i]++
-		if sf.confidence[i] >= sf.beta[i] {
+		if sf.confidence[i] >= terminationCondition.beta {
 			sf.finalized = true
 			return
 		}

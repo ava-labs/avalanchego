@@ -34,12 +34,11 @@ func (sb *unarySnowball) Extend(choice int) Binary {
 	copy(confidence, sb.confidence)
 	bs := &binarySnowball{
 		binarySnowflake: binarySnowflake{
-			binarySlush:     binarySlush{preference: choice},
-			confidence:      confidence,
-			alphaPreference: sb.alphaPreference,
-			alphaConfidence: sb.alphaConfidence,
-			beta:            sb.beta,
-			finalized:       sb.Finalized(),
+			binarySlush:           binarySlush{preference: choice},
+			confidence:            confidence,
+			alphaPreference:       sb.alphaPreference,
+			terminationConditions: sb.terminationConditions,
+			finalized:             sb.Finalized(),
 		},
 		preference: choice,
 	}

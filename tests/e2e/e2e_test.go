@@ -6,9 +6,6 @@ package e2e_test
 import (
 	"testing"
 
-	"github.com/onsi/gomega"
-	"github.com/stretchr/testify/require"
-
 	// ensure test packages are scanned by ginkgo
 	_ "github.com/ava-labs/avalanchego/tests/e2e/banff"
 	_ "github.com/ava-labs/avalanchego/tests/e2e/c"
@@ -25,7 +22,6 @@ import (
 )
 
 func TestE2E(t *testing.T) {
-	gomega.RegisterFailHandler(ginkgo.Fail)
 	ginkgo.RunSpecs(t, "e2e test suites")
 }
 
@@ -38,11 +34,8 @@ func init() {
 var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	// Run only once in the first ginkgo process
 
-	nodes, err := tmpnet.NewNodes(tmpnet.DefaultNodeCount)
-	require.NoError(ginkgo.GinkgoT(), err)
-
-	subnets := vms.XSVMSubnets(nodes...)
-
+	nodes := tmpnet.NewNodesOrPanic(flagVars.NodeCount())
+	subnets := vms.XSVMSubnetsOrPanic(nodes...)
 	return e2e.NewTestEnvironment(
 		flagVars,
 		&tmpnet.Network{

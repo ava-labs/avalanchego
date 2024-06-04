@@ -23,28 +23,28 @@ func (s *uniformResample) Initialize(length uint64) {
 	s.drawn = make(map[uint64]struct{})
 }
 
-func (s *uniformResample) Sample(count int) ([]uint64, error) {
+func (s *uniformResample) Sample(count int) ([]uint64, bool) {
 	s.Reset()
 
 	results := make([]uint64, count)
 	for i := 0; i < count; i++ {
-		ret, err := s.Next()
-		if err != nil {
-			return nil, err
+		ret, hasNext := s.Next()
+		if !hasNext {
+			return nil, false
 		}
 		results[i] = ret
 	}
-	return results, nil
+	return results, true
 }
 
 func (s *uniformResample) Reset() {
 	clear(s.drawn)
 }
 
-func (s *uniformResample) Next() (uint64, error) {
+func (s *uniformResample) Next() (uint64, bool) {
 	i := uint64(len(s.drawn))
 	if i >= s.length {
-		return 0, ErrOutOfRange
+		return 0, false
 	}
 
 	for {
@@ -53,6 +53,6 @@ func (s *uniformResample) Next() (uint64, error) {
 			continue
 		}
 		s.drawn[draw] = struct{}{}
-		return draw, nil
+		return draw, true
 	}
 }

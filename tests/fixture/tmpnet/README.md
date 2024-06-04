@@ -49,7 +49,7 @@ A temporary network can be managed by the `tmpnetctl` cli tool:
 # Build the tmpnetctl binary
 $ ./scripts/build_tmpnetctl.sh
 
-# Start a new network
+# Start a new network. Possible to specify the number of nodes (> 1) with --node-count.
 $ ./build/tmpnetctl start-network --avalanchego-path=/path/to/avalanchego
 ...
 Started network /home/me/.tmpnet/networks/20240306-152305.924531 (UUID: abaab590-b375-44f6-9ca5-f8a6dc061725)
@@ -87,6 +87,7 @@ network := &tmpnet.Network{                   // Configure non-default values fo
     DefaultFlags: tmpnet.FlagsMap{
         config.LogLevelKey: "INFO",           // Change one of the network's defaults
     },
+    Nodes: tmpnet.NewNodesOrPanic(5),           // Number of initial validating nodes
     Subnets: []*tmpnet.Subnet{                // Subnets to create on the new network once it is running
         {
             Name: "xsvm-a",                   // User-defined name used to reference subnet in code and on disk
@@ -97,6 +98,7 @@ network := &tmpnet.Network{                   // Configure non-default values fo
                     PreFundedKey: <key>,      // (Optional) A private key that is funded in the genesis bytes
                 },
             },
+            ValidatorIDs: <node ids>,         // The IDs of nodes that validate the subnet
         },
     },
 }
@@ -108,7 +110,6 @@ _ := tmpnet.StartNewNetwork(              // Start the network
     "",                                   // Empty string uses the default network path (~/tmpnet/networks)
     "/path/to/avalanchego",               // The path to the binary that nodes will execute
     "/path/to/plugins",                   // The path nodes will use for plugin binaries (suggested value ~/.avalanchego/plugins)
-    5,                                    // Number of initial validating nodes
 )
 
 uris := network.GetNodeURIs()

@@ -4,48 +4,55 @@
 package metercacher
 
 import (
+	"time"
+
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/cache"
-	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
 
 var _ cache.Cacher[struct{}, struct{}] = (*Cache[struct{}, struct{}])(nil)
 
 type Cache[K comparable, V any] struct {
-	metrics
 	cache.Cacher[K, V]
 
-	clock mockable.Clock
+	metrics *metrics
 }
 
 func New[K comparable, V any](
 	namespace string,
 	registerer prometheus.Registerer,
 	cache cache.Cacher[K, V],
-) (cache.Cacher[K, V], error) {
-	meterCache := &Cache[K, V]{Cacher: cache}
-	return meterCache, meterCache.metrics.Initialize(namespace, registerer)
+) (*Cache[K, V], error) {
+	metrics, err := newMetrics(namespace, registerer)
+	return &Cache[K, V]{
+		Cacher:  cache,
+		metrics: metrics,
+	}, err
 }
 
 func (c *Cache[K, V]) Put(key K, value V) {
-	start := c.clock.Time()
+	start := time.Now()
 	c.Cacher.Put(key, value)
-	end := c.clock.Time()
-	c.put.Observe(float64(end.Sub(start)))
-	c.len.Set(float64(c.Cacher.Len()))
-	c.portionFilled.Set(c.Cacher.PortionFilled())
+	putDuration := time.Since(start)
+
+	c.metrics.putCount.Inc()
+	c.metrics.putTime.Add(float64(putDuration))
+	c.metrics.len.Set(float64(c.Cacher.Len()))
+	c.metrics.portionFilled.Set(c.Cacher.PortionFilled())
 }
 
 func (c *Cache[K, V]) Get(key K) (V, bool) {
-	start := c.clock.Time()
+	start := time.Now()
 	value, has := c.Cacher.Get(key)
-	end := c.clock.Time()
-	c.get.Observe(float64(end.Sub(start)))
+	getDuration := time.Since(start)
+
 	if has {
-		c.hit.Inc()
+		c.metrics.getCount.With(hitLabels).Inc()
+		c.metrics.getTime.With(hitLabels).Add(float64(getDuration))
 	} else {
-		c.miss.Inc()
+		c.metrics.getCount.With(missLabels).Inc()
+		c.metrics.getTime.With(missLabels).Add(float64(getDuration))
 	}
 
 	return value, has
@@ -53,12 +60,14 @@ func (c *Cache[K, V]) Get(key K) (V, bool) {
 
 func (c *Cache[K, _]) Evict(key K) {
 	c.Cacher.Evict(key)
-	c.len.Set(float64(c.Cacher.Len()))
-	c.portionFilled.Set(c.Cacher.PortionFilled())
+
+	c.metrics.len.Set(float64(c.Cacher.Len()))
+	c.metrics.portionFilled.Set(c.Cacher.PortionFilled())
 }
 
 func (c *Cache[_, _]) Flush() {
 	c.Cacher.Flush()
-	c.len.Set(float64(c.Cacher.Len()))
-	c.portionFilled.Set(c.Cacher.PortionFilled())
+
+	c.metrics.len.Set(float64(c.Cacher.Len()))
+	c.metrics.portionFilled.Set(c.Cacher.PortionFilled())
 }
