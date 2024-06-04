@@ -140,7 +140,6 @@ func (vm *VM) Initialize(
 	// TODO: Add a helper for this metrics override, it is performed in multiple
 	//       places.
 	registerer := prometheus.NewRegistry()
-
 	if err := chainCtx.Metrics.Register("proposervm", registerer); err != nil {
 		return err
 	}
@@ -373,7 +372,6 @@ func (vm *VM) SetPreference(ctx context.Context, preferred ids.ID) error {
 		// until the P-chain's height has advanced.
 		return nil
 	}
-
 	vm.Scheduler.SetBuildBlockTime(nextStartTime)
 
 	vm.ctx.Log.Debug("set preference",
