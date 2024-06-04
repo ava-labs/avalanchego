@@ -3,7 +3,10 @@
 
 package snowball
 
-import "fmt"
+import (
+	"fmt"
+	"slices"
+)
 
 var _ Unary = (*unarySnowflake)(nil)
 
@@ -74,11 +77,9 @@ func (sf *unarySnowflake) Finalized() bool {
 }
 
 func (sf *unarySnowflake) Extend(choice int) Binary {
-	confidence := make([]int, len(sf.confidence))
-	copy(confidence, sf.confidence)
 	return &binarySnowflake{
 		binarySlush:           binarySlush{preference: choice},
-		confidence:            confidence,
+		confidence:            slices.Clone(sf.confidence),
 		alphaPreference:       sf.alphaPreference,
 		terminationConditions: sf.terminationConditions,
 		finalized:             sf.finalized,
@@ -87,9 +88,7 @@ func (sf *unarySnowflake) Extend(choice int) Binary {
 
 func (sf *unarySnowflake) Clone() Unary {
 	newSnowflake := *sf
-	// Copy the confidence slice
-	newSnowflake.confidence = make([]int, len(sf.confidence))
-	copy(newSnowflake.confidence, sf.confidence)
+	newSnowflake.confidence = slices.Clone(sf.confidence)
 	return &newSnowflake
 }
 
