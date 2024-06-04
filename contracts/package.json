@@ -14,7 +14,7 @@
     "ts-node": "^10.9.2",
     "typescript": "^5.4.5"
   },
-  "version": "1.2.1",
+  "version": "1.2.2",
   "description": "",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -26,13 +26,13 @@
   },
   "license": "BSD-3-Clause",
   "scripts": {
-    "build": "rm -rf dist/ && npx hardhat compile && tsc -b ",
+    "build": "rm -rf dist/ && npx hardhat compile && npx tsc -b ",
     "compile": "npx hardhat compile",
     "console": "npx hardhat console",
     "test": "npx hardhat test",
     "lint": "prettier --list-different 'contracts/**/*.sol'",
     "prepublish": "npm run build",
-    "release:prepare": "rm -rf ./dist ./node_modules && npm install && npm run build"
+    "release:prepare": "rm -rf ./node_modules && npm install && npm run build"
   },
   "dependencies": {
     "@avalabs/avalanchejs": "^4.0.5",
