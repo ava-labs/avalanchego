@@ -10,7 +10,9 @@ import (
 )
 
 const (
-	MaxStringLen = math.MaxUint16
+	MaxStringLen  = math.MaxUint16
+	MinVarintLen = 1
+	MaxVarintLen = 10
 
 	// ByteLen is the number of bytes per byte...
 	ByteLen = 1
@@ -139,6 +141,42 @@ func (p *Packer) UnpackLong() uint64 {
 
 	val := binary.BigEndian.Uint64(p.Bytes[p.Offset:])
 	p.Offset += LongLen
+	return val
+}
+
+func (p *Packer) PackUvarInt(v uint64) {
+	buf := binary.AppendUvarint(nil, v)
+	p.PackFixedBytes(buf)
+}
+
+func (p *Packer) UnpackUvarInt() uint64 {
+	p.checkSpace(MinVarintLen)
+	if p.Errored() {
+		return 0
+	}
+	val, bytesRead := binary.Uvarint(p.Bytes)
+	if bytesRead <= 0 {
+		p.Add(errInvalidInput)
+	}
+	p.Bytes = p.Bytes[bytesRead:]
+	return val
+}
+
+func (p *Packer) PackVarInt(v int64) {
+	buf := binary.AppendVarint(nil, v)
+	p.PackFixedBytes(buf)
+}
+
+func (p *Packer) UnpackVarInt(required bool) int64 {
+	p.checkSpace(MinVarintLen)
+	if p.Errored() {
+		return 0
+	}
+	val, bytesRead := binary.Varint(p.Bytes)
+	if required && bytesRead <= 0 {
+		p.Add(errInvalidInput)
+	}
+	p.Bytes = p.Bytes[bytesRead:]
 	return val
 }
 
