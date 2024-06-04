@@ -520,6 +520,6 @@ func (p *postForkCommonComponents) shouldBuildSignedBlockPreDurango(
 // metrics managed by the vm.
 func (p *postForkCommonComponents) writeAcceptedSlotMetrics() {
 	if p.slot != unspecifiedSlotIndex {
-		p.vm.writeAcceptedSlotMetrics(p.slot)
+		p.vm.acceptedBlocksSlotHistogram.Observe(float64(p.slot))
 	}
 }

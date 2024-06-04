@@ -104,6 +104,7 @@ type VM struct {
 	proposerBuildSlotGauge prometheus.Gauge
 
 	// acceptedBlocksSlotHistogram is the metric histogram that is being updated once a block gets accepted with it's corresponding slot.
+	// note that this histogram is being updated by postForkCommonComponents.writeAcceptedSlotMetrics.
 	acceptedBlocksSlotHistogram prometheus.Histogram
 }
 
@@ -774,10 +775,4 @@ func (vm *VM) cacheInnerBlock(outerBlkID ids.ID, innerBlk snowman.Block) {
 	if diff < innerBlkCacheSize {
 		vm.innerBlkCache.Put(outerBlkID, innerBlk)
 	}
-}
-
-// writeAcceptedSlotMetrics use the previously stored slot index and add that to the
-// metrics.
-func (vm *VM) writeAcceptedSlotMetrics(slot uint64) {
-	vm.acceptedBlocksSlotHistogram.Observe(float64(slot))
 }
