@@ -7,9 +7,9 @@ import "fmt"
 
 var _ Unary = (*unarySnowball)(nil)
 
-func newUnarySnowball(alphaPreference int, alphaConfidence []int, beta []int) unarySnowball {
+func newUnarySnowball(alphaPreference int, terminationConditions []terminationCondition) unarySnowball {
 	return unarySnowball{
-		unarySnowflake: newUnarySnowflake(alphaPreference, alphaConfidence, beta),
+		unarySnowflake: newUnarySnowflake(alphaPreference, terminationConditions),
 	}
 }
 

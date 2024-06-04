@@ -16,11 +16,15 @@ func TestBinarySnowflake(t *testing.T) {
 	red := 1
 
 	alphaPreference, alphaConfidence := 1, 2
-	alphaConfidences := []int{alphaConfidence}
 	beta := 2
-	betas := []int{beta}
+	terminationConditions := []terminationCondition{
+		{
+			alphaConfidence: alphaConfidence,
+			beta:            beta,
+		},
+	}
 
-	sf := newBinarySnowflake(alphaPreference, alphaConfidences, betas, red)
+	sf := newBinarySnowflake(alphaPreference, terminationConditions, red)
 
 	require.Equal(red, sf.Preference())
 	require.False(sf.Finalized())

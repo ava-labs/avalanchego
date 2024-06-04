@@ -16,11 +16,15 @@ func TestBinarySnowball(t *testing.T) {
 	blue := 1
 
 	alphaPreference, alphaConfidence := 2, 3
-	alphaConfidences := []int{alphaConfidence}
 	beta := 2
-	betas := []int{beta}
+	terminationConditions := []terminationCondition{
+		{
+			alphaConfidence: alphaConfidence,
+			beta:            beta,
+		},
+	}
 
-	sb := newBinarySnowball(alphaPreference, alphaConfidences, betas, red)
+	sb := newBinarySnowball(alphaPreference, terminationConditions, red)
 	require.Equal(red, sb.Preference())
 	require.False(sb.Finalized())
 
@@ -48,11 +52,15 @@ func TestBinarySnowballRecordPollPreference(t *testing.T) {
 	blue := 1
 
 	alphaPreference, alphaConfidence := 1, 2
-	alphaConfidences := []int{alphaConfidence}
 	beta := 2
-	betas := []int{beta}
+	terminationConditions := []terminationCondition{
+		{
+			alphaConfidence: alphaConfidence,
+			beta:            beta,
+		},
+	}
 
-	sb := newBinarySnowball(alphaPreference, alphaConfidences, betas, red)
+	sb := newBinarySnowball(alphaPreference, terminationConditions, red)
 	require.Equal(red, sb.Preference())
 	require.False(sb.Finalized())
 
@@ -87,11 +95,15 @@ func TestBinarySnowballRecordUnsuccessfulPoll(t *testing.T) {
 	blue := 1
 
 	alphaPreference, alphaConfidence := 1, 2
-	alphaConfidences := []int{alphaConfidence}
 	beta := 2
-	betas := []int{beta}
+	terminationConditions := []terminationCondition{
+		{
+			alphaConfidence: alphaConfidence,
+			beta:            beta,
+		},
+	}
 
-	sb := newBinarySnowball(alphaPreference, alphaConfidences, betas, red)
+	sb := newBinarySnowball(alphaPreference, terminationConditions, red)
 	require.Equal(red, sb.Preference())
 	require.False(sb.Finalized())
 
@@ -120,11 +132,15 @@ func TestBinarySnowballAcceptWeirdColor(t *testing.T) {
 	red := 1
 
 	alphaPreference, alphaConfidence := 1, 2
-	alphaConfidences := []int{alphaConfidence}
 	beta := 2
-	betas := []int{beta}
+	terminationConditions := []terminationCondition{
+		{
+			alphaConfidence: alphaConfidence,
+			beta:            beta,
+		},
+	}
 
-	sb := newBinarySnowball(alphaPreference, alphaConfidences, betas, red)
+	sb := newBinarySnowball(alphaPreference, terminationConditions, red)
 
 	require.Equal(red, sb.Preference())
 	require.False(sb.Finalized())
@@ -163,11 +179,15 @@ func TestBinarySnowballLockColor(t *testing.T) {
 	blue := 1
 
 	alphaPreference, alphaConfidence := 1, 2
-	alphaConfidences := []int{alphaConfidence}
 	beta := 1
-	betas := []int{beta}
+	terminationConditions := []terminationCondition{
+		{
+			alphaConfidence: alphaConfidence,
+			beta:            beta,
+		},
+	}
 
-	sb := newBinarySnowball(alphaPreference, alphaConfidences, betas, red)
+	sb := newBinarySnowball(alphaPreference, terminationConditions, red)
 
 	sb.RecordPoll(alphaConfidence, red)
 
