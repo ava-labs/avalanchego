@@ -1365,11 +1365,8 @@ func ErrorOnAddDecidedBlockTest(t *testing.T, factory Factory) {
 		snowmantest.GenesisTimestamp,
 	))
 
-	block := snowmantest.BuildChild(snowmantest.Genesis)
-	require.NoError(block.Accept(context.Background()))
-
-	err := sm.Add(block)
-	require.ErrorIs(err, errDuplicateAdd)
+	err := sm.Add(snowmantest.Genesis)
+	require.ErrorIs(err, errUnknownParentBlock)
 }
 
 func gatherCounterGauge(t *testing.T, reg *prometheus.Registry) map[string]float64 {
