@@ -581,8 +581,8 @@ func (vm *VM) parsePostForkBlock(ctx context.Context, b []byte) (PostForkBlock, 
 				vm:       vm,
 				innerBlk: innerBlk,
 				status:   choices.Processing,
-				slot:     unspecifiedSlotIndex,
 			},
+			slot: unspecifiedSlotIndex,
 		}
 	} else {
 		blk = &postForkOption{
@@ -591,7 +591,6 @@ func (vm *VM) parsePostForkBlock(ctx context.Context, b []byte) (PostForkBlock, 
 				vm:       vm,
 				innerBlk: innerBlk,
 				status:   choices.Processing,
-				slot:     unspecifiedSlotIndex,
 			},
 		}
 	}
@@ -637,8 +636,8 @@ func (vm *VM) getPostForkBlock(ctx context.Context, blkID ids.ID) (PostForkBlock
 				vm:       vm,
 				innerBlk: innerBlk,
 				status:   status,
-				slot:     unspecifiedSlotIndex,
 			},
+			slot: unspecifiedSlotIndex,
 		}, nil
 	}
 	return &postForkOption{
@@ -647,7 +646,6 @@ func (vm *VM) getPostForkBlock(ctx context.Context, blkID ids.ID) (PostForkBlock
 			vm:       vm,
 			innerBlk: innerBlk,
 			status:   status,
-			slot:     unspecifiedSlotIndex,
 		},
 	}, nil
 }

@@ -17,6 +17,10 @@ var _ PostForkBlock = (*postForkBlock)(nil)
 type postForkBlock struct {
 	block.SignedBlock
 	postForkCommonComponents
+
+	// slot is used to store the selected slot for this block. It's being used during Accept, and populated
+	// during verifyPostDurangoBlockDelay.
+	slot uint64
 }
 
 // Accept:
@@ -30,7 +34,9 @@ func (b *postForkBlock) Accept(ctx context.Context) error {
 	if err := b.acceptInnerBlk(ctx); err != nil {
 		return err
 	}
-	b.writeAcceptedSlotMetrics()
+	if b.slot != unspecifiedSlotIndex {
+		b.vm.acceptedBlocksSlotHistogram.Observe(float64(b.slot))
+	}
 	return nil
 }
 
@@ -110,7 +116,6 @@ func (b *postForkBlock) Options(ctx context.Context) ([2]snowman.Block, error) {
 				vm:       b.vm,
 				innerBlk: innerOption,
 				status:   innerOption.Status(),
-				slot:     unspecifiedSlotIndex,
 			},
 		}
 	}

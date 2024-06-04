@@ -80,9 +80,6 @@ type postForkCommonComponents struct {
 	vm       *VM
 	innerBlk snowman.Block
 	status   choices.Status
-	// slot is used to store the selected slot for this block. It's being used during Accept, and populated
-	// during verifyPostDurangoBlockDelay.
-	slot uint64
 }
 
 // Return the inner block's height
@@ -277,8 +274,8 @@ func (p *postForkCommonComponents) buildChild(
 			vm:       p.vm,
 			innerBlk: innerBlock,
 			status:   choices.Processing,
-			slot:     unspecifiedSlotIndex,
 		},
+		slot: unspecifiedSlotIndex,
 	}
 
 	p.vm.ctx.Log.Info("built block",
@@ -463,6 +460,11 @@ func (p *postForkCommonComponents) shouldBuildSignedBlockPostDurango(
 		)
 		return false, err
 	}
+
+	// report the build slot to the metrics.
+	p.vm.proposerBuildSlotGauge.Set(float64(currentSlot + 1))
+
+	// set the scheduler to let us know when the next block need to be built.
 	p.vm.Scheduler.SetBuildBlockTime(nextStartTime)
 
 	// In case the inner VM only issued one pendingTxs message, we should
@@ -514,12 +516,4 @@ func (p *postForkCommonComponents) shouldBuildSignedBlockPreDurango(
 	// attempt to re-handle that once it is our turn to build the block.
 	p.vm.notifyInnerBlockReady()
 	return false, fmt.Errorf("%w: delay %s < minDelay %s", errProposerWindowNotStarted, delay, minDelay)
-}
-
-// writeAcceptedSlotMetrics use the previously stored slot index and add that to the
-// metrics managed by the vm.
-func (p *postForkCommonComponents) writeAcceptedSlotMetrics() {
-	if p.slot != unspecifiedSlotIndex {
-		p.vm.acceptedBlocksSlotHistogram.Observe(float64(p.slot))
-	}
 }

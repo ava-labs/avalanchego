@@ -35,11 +35,7 @@ func (b *postForkOption) Accept(ctx context.Context) error {
 	if err := b.acceptOuterBlk(); err != nil {
 		return err
 	}
-	if err := b.acceptInnerBlk(ctx); err != nil {
-		return err
-	}
-	b.writeAcceptedSlotMetrics()
-	return nil
+	return b.acceptInnerBlk(ctx)
 }
 
 func (b *postForkOption) acceptOuterBlk() error {
