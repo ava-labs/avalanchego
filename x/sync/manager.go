@@ -245,15 +245,10 @@ func (m *Manager) doWork(ctx context.Context, work *workItem) {
 		m.unprocessedWorkCond.Signal()
 	}()
 
-	if work.localRootID == ids.Empty {
-		// the keys in this range have not been downloaded, so get all key/values
-		m.getAndApplyRangeProof(ctx, work)
-	} else {
-		// the keys in this range have already been downloaded, but the root changed, so get all changes
-		m.getAndApplyChangeProof(ctx, work)
-	}
+	m.getAndApplyChangeProof(ctx, work)
 }
 
+// TODO handle range proof case
 // Fetch and apply the change proof given by [work].
 // Assumes [m.workLock] is not held.
 func (m *Manager) getAndApplyChangeProof(ctx context.Context, work *workItem) {
@@ -277,7 +272,7 @@ func (m *Manager) getAndApplyChangeProof(ctx context.Context, work *workItem) {
 		return
 	}
 
-	changeOrRangeProof, err := m.config.Client.GetChangeProof(
+	changeProof, err := m.config.Client.GetChangeProof(
 		ctx,
 		&pb.SyncGetChangeProofRequest{
 			StartRootHash: work.localRootID[:],
@@ -307,93 +302,17 @@ func (m *Manager) getAndApplyChangeProof(ctx context.Context, work *workItem) {
 	default:
 	}
 
-	if changeOrRangeProof.ChangeProof != nil {
-		// The server had sufficient history to respond with a change proof.
-		changeProof := changeOrRangeProof.ChangeProof
-		largestHandledKey := work.end
-		// if the proof wasn't empty, apply changes to the sync DB
-		if len(changeProof.KeyChanges) > 0 {
-			if err := m.config.DB.CommitChangeProof(ctx, changeProof); err != nil {
-				m.setError(err)
-				return
-			}
-			largestHandledKey = maybe.Some(changeProof.KeyChanges[len(changeProof.KeyChanges)-1].Key)
-		}
-
-		m.completeWorkItem(ctx, work, largestHandledKey, targetRootID, changeProof.EndProof)
-		return
-	}
-
-	// The server responded with a range proof.
-	rangeProof := changeOrRangeProof.RangeProof
 	largestHandledKey := work.end
-	if len(rangeProof.KeyValues) > 0 {
-		// Add all the key-value pairs we got to the database.
-		if err := m.config.DB.CommitRangeProof(ctx, work.start, work.end, rangeProof); err != nil {
+	// if the proof wasn't empty, apply changes to the sync DB
+	if len(changeProof.KeyChanges) > 0 {
+		if err := m.config.DB.CommitChangeProof(ctx, changeProof); err != nil {
 			m.setError(err)
 			return
 		}
-		largestHandledKey = maybe.Some(rangeProof.KeyValues[len(rangeProof.KeyValues)-1].Key)
+		largestHandledKey = maybe.Some(changeProof.KeyChanges[len(changeProof.KeyChanges)-1].Key)
 	}
 
-	m.completeWorkItem(ctx, work, largestHandledKey, targetRootID, rangeProof.EndProof)
-}
-
-// Fetch and apply the range proof given by [work].
-// Assumes [m.workLock] is not held.
-func (m *Manager) getAndApplyRangeProof(ctx context.Context, work *workItem) {
-	targetRootID := m.getTargetRoot()
-
-	if targetRootID == ids.Empty {
-		if err := m.config.DB.Clear(); err != nil {
-			m.setError(err)
-			return
-		}
-		work.start = maybe.Nothing[[]byte]()
-		m.completeWorkItem(ctx, work, maybe.Nothing[[]byte](), targetRootID, nil)
-		return
-	}
-
-	proof, err := m.config.Client.GetRangeProof(ctx,
-		&pb.SyncGetRangeProofRequest{
-			RootHash: targetRootID[:],
-			StartKey: &pb.MaybeBytes{
-				Value:     work.start.Value(),
-				IsNothing: work.start.IsNothing(),
-			},
-			EndKey: &pb.MaybeBytes{
-				Value:     work.end.Value(),
-				IsNothing: work.end.IsNothing(),
-			},
-			KeyLimit:   defaultRequestKeyLimit,
-			BytesLimit: defaultRequestByteSizeLimit,
-		},
-	)
-	if err != nil {
-		m.setError(err)
-		return
-	}
-
-	select {
-	case <-m.doneChan:
-		// If we're closed, don't apply the proof.
-		return
-	default:
-	}
-
-	largestHandledKey := work.end
-
-	// Replace all the key-value pairs in the DB from start to end with values from the response.
-	if err := m.config.DB.CommitRangeProof(ctx, work.start, work.end, proof); err != nil {
-		m.setError(err)
-		return
-	}
-
-	if len(proof.KeyValues) > 0 {
-		largestHandledKey = maybe.Some(proof.KeyValues[len(proof.KeyValues)-1].Key)
-	}
-
-	m.completeWorkItem(ctx, work, largestHandledKey, targetRootID, proof.EndProof)
+	m.completeWorkItem(ctx, work, largestHandledKey, targetRootID, changeProof.EndProof)
 }
 
 // findNextKey returns the start of the key range that should be fetched next

@@ -16,7 +16,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/maybe"
 	"github.com/ava-labs/avalanchego/x/merkledb"
 
 	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
@@ -44,14 +43,6 @@ var (
 // to fulfill state sync requests.
 // Repeatedly retries failed requests until the context is canceled.
 type Client interface {
-	// GetRangeProof synchronously sends the given request
-	// and returns the parsed response.
-	// This method verifies the range proof before returning it.
-	GetRangeProof(
-		ctx context.Context,
-		request *pb.SyncGetRangeProofRequest,
-	) (*merkledb.RangeProof, error)
-
 	// GetChangeProof synchronously sends the given request
 	// and returns the parsed response.
 	// This method verifies the change proof / range proof
@@ -62,7 +53,7 @@ type Client interface {
 		ctx context.Context,
 		request *pb.SyncGetChangeProofRequest,
 		verificationDB DB,
-	) (*merkledb.ChangeOrRangeProof, error)
+	) (*merkledb.ChangeProof, error)
 }
 
 type client struct {
@@ -110,8 +101,8 @@ func (c *client) GetChangeProof(
 	ctx context.Context,
 	req *pb.SyncGetChangeProofRequest,
 	db DB,
-) (*merkledb.ChangeOrRangeProof, error) {
-	parseFn := func(ctx context.Context, responseBytes []byte) (*merkledb.ChangeOrRangeProof, error) {
+) (*merkledb.ChangeProof, error) {
+	parseFn := func(ctx context.Context, responseBytes []byte) (*merkledb.ChangeProof, error) {
 		if len(responseBytes) > int(req.BytesLimit) {
 			return nil, fmt.Errorf("%w: (%d) > %d)", errTooManyBytes, len(responseBytes), req.BytesLimit)
 		}
@@ -124,174 +115,42 @@ func (c *client) GetChangeProof(
 		startKey := maybeBytesToMaybe(req.StartKey)
 		endKey := maybeBytesToMaybe(req.EndKey)
 
-		switch changeProofResp := changeProofResp.Response.(type) {
-		case *pb.SyncGetChangeProofResponse_ChangeProof:
-			// The server had enough history to send us a change proof
-			var changeProof merkledb.ChangeProof
-			if err := changeProof.UnmarshalProto(changeProofResp.ChangeProof); err != nil {
-				return nil, err
-			}
-
-			// Ensure the response does not contain more than the requested number of leaves
-			// and the start and end roots match the requested roots.
-			if len(changeProof.KeyChanges) > int(req.KeyLimit) {
-				return nil, fmt.Errorf(
-					"%w: (%d) > %d)",
-					errTooManyKeys, len(changeProof.KeyChanges), req.KeyLimit,
-				)
-			}
-
-			endRoot, err := ids.ToID(req.EndRootHash)
-			if err != nil {
-				return nil, err
-			}
-
-			if err := db.VerifyChangeProof(
-				ctx,
-				&changeProof,
-				startKey,
-				endKey,
-				endRoot,
-			); err != nil {
-				return nil, fmt.Errorf("%w due to %w", errInvalidChangeProof, err)
-			}
-
-			return &merkledb.ChangeOrRangeProof{
-				ChangeProof: &changeProof,
-			}, nil
-		case *pb.SyncGetChangeProofResponse_RangeProof:
-
-			var rangeProof merkledb.RangeProof
-			if err := rangeProof.UnmarshalProto(changeProofResp.RangeProof); err != nil {
-				return nil, err
-			}
-
-			// The server did not have enough history to send us a change proof
-			// so they sent a range proof instead.
-			err := verifyRangeProof(
-				ctx,
-				&rangeProof,
-				int(req.KeyLimit),
-				startKey,
-				endKey,
-				req.EndRootHash,
-				c.tokenSize,
-				c.hasher,
-			)
-			if err != nil {
-				return nil, err
-			}
-
-			return &merkledb.ChangeOrRangeProof{
-				RangeProof: &rangeProof,
-			}, nil
-		default:
-			return nil, fmt.Errorf(
-				"%w: %T",
-				errUnexpectedChangeProofResponse, changeProofResp,
-			)
+		changeProof := merkledb.ChangeProof{}
+		if err := changeProof.UnmarshalProto(changeProofResp.ChangeProof); err != nil {
+			return nil, err
 		}
-	}
 
-	reqBytes, err := proto.Marshal(&pb.Request{
-		Message: &pb.Request_ChangeProofRequest{
-			ChangeProofRequest: req,
-		},
-	})
-	if err != nil {
-		return nil, err
-	}
-	return getAndParse(ctx, c, reqBytes, parseFn)
-}
-
-// Verify [rangeProof] is a valid range proof for keys in [start, end] for
-// root [rootBytes]. Returns [errTooManyKeys] if the response contains more
-// than [keyLimit] keys.
-func verifyRangeProof(
-	ctx context.Context,
-	rangeProof *merkledb.RangeProof,
-	keyLimit int,
-	start maybe.Maybe[[]byte],
-	end maybe.Maybe[[]byte],
-	rootBytes []byte,
-	tokenSize int,
-	hasher merkledb.Hasher,
-) error {
-	root, err := ids.ToID(rootBytes)
-	if err != nil {
-		return err
-	}
-
-	// Ensure the response does not contain more than the maximum requested number of leaves.
-	if len(rangeProof.KeyValues) > keyLimit {
-		return fmt.Errorf(
-			"%w: (%d) > %d)",
-			errTooManyKeys, len(rangeProof.KeyValues), keyLimit,
-		)
-	}
-
-	if err := rangeProof.Verify(
-		ctx,
-		start,
-		end,
-		root,
-		tokenSize,
-		hasher,
-	); err != nil {
-		return fmt.Errorf("%w due to %w", errInvalidRangeProof, err)
-	}
-	return nil
-}
-
-// GetRangeProof synchronously retrieves the range proof given by [req].
-// Upon failure, retries until the context is expired.
-// The returned range proof is verified.
-func (c *client) GetRangeProof(
-	ctx context.Context,
-	req *pb.SyncGetRangeProofRequest,
-) (*merkledb.RangeProof, error) {
-	parseFn := func(ctx context.Context, responseBytes []byte) (*merkledb.RangeProof, error) {
-		if len(responseBytes) > int(req.BytesLimit) {
+		// Ensure the response does not contain more than the requested number of leaves
+		// and the start and end roots match the requested roots.
+		if len(changeProof.KeyChanges) > int(req.KeyLimit) {
 			return nil, fmt.Errorf(
 				"%w: (%d) > %d)",
-				errTooManyBytes, len(responseBytes), req.BytesLimit,
+				errTooManyKeys, len(changeProof.KeyChanges), req.KeyLimit,
 			)
 		}
 
-		var rangeProofProto pb.RangeProof
-		if err := proto.Unmarshal(responseBytes, &rangeProofProto); err != nil {
+		endRoot, err := ids.ToID(req.EndRootHash)
+		if err != nil {
 			return nil, err
 		}
 
-		var rangeProof merkledb.RangeProof
-		if err := rangeProof.UnmarshalProto(&rangeProofProto); err != nil {
-			return nil, err
-		}
-
-		if err := verifyRangeProof(
+		if err := db.VerifyChangeProof(
 			ctx,
-			&rangeProof,
-			int(req.KeyLimit),
-			maybeBytesToMaybe(req.StartKey),
-			maybeBytesToMaybe(req.EndKey),
-			req.RootHash,
-			c.tokenSize,
-			c.hasher,
+			&changeProof,
+			startKey,
+			endKey,
+			endRoot,
 		); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("%w due to %w", errInvalidChangeProof, err)
 		}
-		return &rangeProof, nil
+
+		return &changeProof, nil
 	}
 
-	reqBytes, err := proto.Marshal(&pb.Request{
-		Message: &pb.Request_RangeProofRequest{
-			RangeProofRequest: req,
-		},
-	})
+	reqBytes, err := proto.Marshal(req)
 	if err != nil {
 		return nil, err
 	}
-
 	return getAndParse(ctx, c, reqBytes, parseFn)
 }
 

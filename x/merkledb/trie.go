@@ -69,13 +69,6 @@ type Trie interface {
 	// database.ErrNotFound if the key is not present
 	GetValues(ctx context.Context, keys [][]byte) ([][]byte, []error)
 
-	// GetRangeProof returns a proof of up to [maxLength] key-value pairs with
-	// keys in range [start, end].
-	// If [start] is Nothing, there's no lower bound on the range.
-	// If [end] is Nothing, there's no upper bound on the range.
-	// Returns ErrEmptyProof if the trie is empty.
-	GetRangeProof(ctx context.Context, start maybe.Maybe[[]byte], end maybe.Maybe[[]byte], maxLength int) (*RangeProof, error)
-
 	// NewView returns a new view on top of this Trie where the passed changes
 	// have been applied.
 	NewView(
@@ -200,7 +193,7 @@ func getRangeProof(
 	start maybe.Maybe[[]byte],
 	end maybe.Maybe[[]byte],
 	maxLength int,
-) (*RangeProof, error) {
+) (*ChangeProof, error) {
 	switch {
 	case start.HasValue() && end.HasValue() && bytes.Compare(start.Value(), end.Value()) == 1:
 		return nil, ErrStartAfterEnd
@@ -210,15 +203,15 @@ func getRangeProof(
 		return nil, ErrEmptyProof
 	}
 
-	result := RangeProof{
-		KeyValues: make([]KeyValue, 0, initKeyValuesSize),
+	result := ChangeProof{
+		KeyChanges: make([]KeyChange, 0, initKeyValuesSize),
 	}
 	it := t.NewIteratorWithStart(start.Value())
-	for it.Next() && len(result.KeyValues) < maxLength && (end.IsNothing() || bytes.Compare(it.Key(), end.Value()) <= 0) {
+	for it.Next() && len(result.KeyChanges) < maxLength && (end.IsNothing() || bytes.Compare(it.Key(), end.Value()) <= 0) {
 		// clone the value to prevent editing of the values stored within the trie
-		result.KeyValues = append(result.KeyValues, KeyValue{
+		result.KeyChanges = append(result.KeyChanges, KeyChange{
 			Key:   it.Key(),
-			Value: slices.Clone(it.Value()),
+			Value: maybe.Some(slices.Clone(it.Value())),
 		})
 	}
 	it.Release()
@@ -233,8 +226,8 @@ func getRangeProof(
 		endProof *Proof
 		err      error
 	)
-	if len(result.KeyValues) > 0 {
-		greatestKey := result.KeyValues[len(result.KeyValues)-1].Key
+	if len(result.KeyChanges) > 0 {
+		greatestKey := result.KeyChanges[len(result.KeyChanges)-1].Key
 		endProof, err = getProof(t, greatestKey)
 		if err != nil {
 			return nil, err

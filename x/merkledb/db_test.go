@@ -314,6 +314,7 @@ func Test_MerkleDB_Invalidate_Siblings_On_Commit(t *testing.T) {
 	require.False(viewToCommit.(*view).isInvalid())
 }
 
+// TODO how do we handle this case?
 func Test_MerkleDB_CommitRangeProof_DeletesValuesInRange(t *testing.T) {
 	require := require.New(t)
 
@@ -326,17 +327,19 @@ func Test_MerkleDB_CommitRangeProof_DeletesValuesInRange(t *testing.T) {
 	startRoot, err := db.GetMerkleRoot(context.Background())
 	require.NoError(err)
 
-	// Get an empty proof
-	proof, err := db.GetRangeProof(
+	// Request a change proof with no initial root
+	proof, err := db.GetChangeProof(
 		context.Background(),
+		ids.Empty,
+		ids.Empty,
 		maybe.Nothing[[]byte](),
 		maybe.Some([]byte("key3")),
 		10,
 	)
 	require.NoError(err)
 
-	// confirm there are no key.values in the proof
-	require.Empty(proof.KeyValues)
+	// confirm there are no key changes in the proof
+	require.Empty(proof.KeyChanges)
 
 	// add values to be deleted by proof commit
 	batch := db.NewBatch()
@@ -346,7 +349,8 @@ func Test_MerkleDB_CommitRangeProof_DeletesValuesInRange(t *testing.T) {
 	require.NoError(batch.Write())
 
 	// despite having no key/values in it, committing this proof should delete key1-key3.
-	require.NoError(db.CommitRangeProof(context.Background(), maybe.Nothing[[]byte](), maybe.Some([]byte("key3")), proof))
+	//require.NoError(db.CommitRangeProof(context.Background(), maybe.Nothing[[]byte](), maybe.Some([]byte("key3")), proof))
+	require.NoError(db.CommitChangeProof(context.Background(), proof))
 
 	afterCommitRoot, err := db.GetMerkleRoot(context.Background())
 	require.NoError(err)

@@ -26,8 +26,6 @@ const (
 	DB_GetChangeProof_FullMethodName    = "/sync.DB/GetChangeProof"
 	DB_VerifyChangeProof_FullMethodName = "/sync.DB/VerifyChangeProof"
 	DB_CommitChangeProof_FullMethodName = "/sync.DB/CommitChangeProof"
-	DB_GetRangeProof_FullMethodName     = "/sync.DB/GetRangeProof"
-	DB_CommitRangeProof_FullMethodName  = "/sync.DB/CommitRangeProof"
 )
 
 // DBClient is the client API for DB service.
@@ -40,8 +38,6 @@ type DBClient interface {
 	GetChangeProof(ctx context.Context, in *GetChangeProofRequest, opts ...grpc.CallOption) (*GetChangeProofResponse, error)
 	VerifyChangeProof(ctx context.Context, in *VerifyChangeProofRequest, opts ...grpc.CallOption) (*VerifyChangeProofResponse, error)
 	CommitChangeProof(ctx context.Context, in *CommitChangeProofRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
-	GetRangeProof(ctx context.Context, in *GetRangeProofRequest, opts ...grpc.CallOption) (*GetRangeProofResponse, error)
-	CommitRangeProof(ctx context.Context, in *CommitRangeProofRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type dBClient struct {
@@ -106,24 +102,6 @@ func (c *dBClient) CommitChangeProof(ctx context.Context, in *CommitChangeProofR
 	return out, nil
 }
 
-func (c *dBClient) GetRangeProof(ctx context.Context, in *GetRangeProofRequest, opts ...grpc.CallOption) (*GetRangeProofResponse, error) {
-	out := new(GetRangeProofResponse)
-	err := c.cc.Invoke(ctx, DB_GetRangeProof_FullMethodName, in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *dBClient) CommitRangeProof(ctx context.Context, in *CommitRangeProofRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
-	out := new(emptypb.Empty)
-	err := c.cc.Invoke(ctx, DB_CommitRangeProof_FullMethodName, in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 // DBServer is the server API for DB service.
 // All implementations must embed UnimplementedDBServer
 // for forward compatibility
@@ -134,8 +112,6 @@ type DBServer interface {
 	GetChangeProof(context.Context, *GetChangeProofRequest) (*GetChangeProofResponse, error)
 	VerifyChangeProof(context.Context, *VerifyChangeProofRequest) (*VerifyChangeProofResponse, error)
 	CommitChangeProof(context.Context, *CommitChangeProofRequest) (*emptypb.Empty, error)
-	GetRangeProof(context.Context, *GetRangeProofRequest) (*GetRangeProofResponse, error)
-	CommitRangeProof(context.Context, *CommitRangeProofRequest) (*emptypb.Empty, error)
 	mustEmbedUnimplementedDBServer()
 }
 
@@ -160,12 +136,6 @@ func (UnimplementedDBServer) VerifyChangeProof(context.Context, *VerifyChangePro
 }
 func (UnimplementedDBServer) CommitChangeProof(context.Context, *CommitChangeProofRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CommitChangeProof not implemented")
-}
-func (UnimplementedDBServer) GetRangeProof(context.Context, *GetRangeProofRequest) (*GetRangeProofResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetRangeProof not implemented")
-}
-func (UnimplementedDBServer) CommitRangeProof(context.Context, *CommitRangeProofRequest) (*emptypb.Empty, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method CommitRangeProof not implemented")
 }
 func (UnimplementedDBServer) mustEmbedUnimplementedDBServer() {}
 
@@ -288,42 +258,6 @@ func _DB_CommitChangeProof_Handler(srv interface{}, ctx context.Context, dec fun
 	return interceptor(ctx, in, info, handler)
 }
 
-func _DB_GetRangeProof_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetRangeProofRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(DBServer).GetRangeProof(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: DB_GetRangeProof_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(DBServer).GetRangeProof(ctx, req.(*GetRangeProofRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _DB_CommitRangeProof_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(CommitRangeProofRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(DBServer).CommitRangeProof(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: DB_CommitRangeProof_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(DBServer).CommitRangeProof(ctx, req.(*CommitRangeProofRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 // DB_ServiceDesc is the grpc.ServiceDesc for DB service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -354,14 +288,6 @@ var DB_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CommitChangeProof",
 			Handler:    _DB_CommitChangeProof_Handler,
-		},
-		{
-			MethodName: "GetRangeProof",
-			Handler:    _DB_GetRangeProof_Handler,
-		},
-		{
-			MethodName: "CommitRangeProof",
-			Handler:    _DB_CommitRangeProof_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

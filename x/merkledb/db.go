@@ -107,28 +107,6 @@ type ChangeProofer interface {
 	CommitChangeProof(ctx context.Context, proof *ChangeProof) error
 }
 
-type RangeProofer interface {
-	// GetRangeProofAtRoot returns a proof for the key/value pairs in this trie within the range
-	// [start, end] when the root of the trie was [rootID].
-	// If [start] is Nothing, there's no lower bound on the range.
-	// If [end] is Nothing, there's no upper bound on the range.
-	// Returns ErrEmptyProof if [rootID] is ids.Empty.
-	// Note that [rootID] == ids.Empty means the trie is empty
-	// (i.e. we don't need a range proof.)
-	GetRangeProofAtRoot(
-		ctx context.Context,
-		rootID ids.ID,
-		start maybe.Maybe[[]byte],
-		end maybe.Maybe[[]byte],
-		maxLength int,
-	) (*RangeProof, error)
-
-	// CommitRangeProof commits the key/value pairs within the [proof] to the db.
-	// [start] is the smallest possible key in the range this [proof] covers.
-	// [end] is the largest possible key in the range this [proof] covers.
-	CommitRangeProof(ctx context.Context, start, end maybe.Maybe[[]byte], proof *RangeProof) error
-}
-
 type Clearer interface {
 	// Deletes all key/value pairs from the database
 	// and clears the change history.
@@ -155,7 +133,6 @@ type MerkleDB interface {
 	MerkleRootGetter
 	ProofGetter
 	ChangeProofer
-	RangeProofer
 	Prefetcher
 }
 
@@ -395,6 +372,7 @@ func (db *merkleDB) rebuild(ctx context.Context, cacheSize int) error {
 	return db.Compact(nil, nil)
 }
 
+// TODO how do we delete old keys?
 func (db *merkleDB) CommitChangeProof(ctx context.Context, proof *ChangeProof) error {
 	db.commitLock.Lock()
 	defer db.commitLock.Unlock()
@@ -415,48 +393,6 @@ func (db *merkleDB) CommitChangeProof(ctx context.Context, proof *ChangeProof) e
 	if err != nil {
 		return err
 	}
-	return view.commitToDB(ctx)
-}
-
-func (db *merkleDB) CommitRangeProof(ctx context.Context, start, end maybe.Maybe[[]byte], proof *RangeProof) error {
-	db.commitLock.Lock()
-	defer db.commitLock.Unlock()
-
-	if db.closed {
-		return database.ErrClosed
-	}
-
-	ops := make([]database.BatchOp, len(proof.KeyValues))
-	keys := set.NewSet[string](len(proof.KeyValues))
-	for i, kv := range proof.KeyValues {
-		keys.Add(string(kv.Key))
-		ops[i] = database.BatchOp{
-			Key:   kv.Key,
-			Value: kv.Value,
-		}
-	}
-
-	largestKey := end
-	if len(proof.KeyValues) > 0 {
-		largestKey = maybe.Some(proof.KeyValues[len(proof.KeyValues)-1].Key)
-	}
-	keysToDelete, err := db.getKeysNotInSet(start, largestKey, keys)
-	if err != nil {
-		return err
-	}
-	for _, keyToDelete := range keysToDelete {
-		ops = append(ops, database.BatchOp{
-			Key:    keyToDelete,
-			Delete: true,
-		})
-	}
-
-	// Don't need to lock [view] because nobody else has a reference to it.
-	view, err := newView(db, db, ViewChanges{BatchOps: ops})
-	if err != nil {
-		return err
-	}
-
 	return view.commitToDB(ctx)
 }
 
@@ -656,53 +592,35 @@ func (db *merkleDB) GetProof(ctx context.Context, key []byte) (*Proof, error) {
 	return getProof(db, key)
 }
 
-func (db *merkleDB) GetRangeProof(
-	ctx context.Context,
-	start maybe.Maybe[[]byte],
-	end maybe.Maybe[[]byte],
-	maxLength int,
-) (*RangeProof, error) {
-	db.commitLock.RLock()
-	defer db.commitLock.RUnlock()
-
-	_, span := db.infoTracer.Start(ctx, "MerkleDB.GetRangeProof")
-	defer span.End()
-
-	if db.closed {
-		return nil, database.ErrClosed
-	}
-
-	return getRangeProof(db, start, end, maxLength)
-}
-
-func (db *merkleDB) GetRangeProofAtRoot(
-	ctx context.Context,
-	rootID ids.ID,
-	start maybe.Maybe[[]byte],
-	end maybe.Maybe[[]byte],
-	maxLength int,
-) (*RangeProof, error) {
-	db.commitLock.RLock()
-	defer db.commitLock.RUnlock()
-
-	_, span := db.infoTracer.Start(ctx, "MerkleDB.GetRangeProofAtRoot")
-	defer span.End()
-
-	switch {
-	case db.closed:
-		return nil, database.ErrClosed
-	case maxLength <= 0:
-		return nil, fmt.Errorf("%w but was %d", ErrInvalidMaxLength, maxLength)
-	case rootID == ids.Empty:
-		return nil, ErrEmptyProof
-	}
-
-	historicalTrie, err := db.getTrieAtRootForRange(rootID, start, end)
-	if err != nil {
-		return nil, err
-	}
-	return getRangeProof(historicalTrie, start, end, maxLength)
-}
+// TODO GetChangeProofAtRoot
+//func (db *merkleDB) GetRangeProofAtRoot(
+//	ctx context.Context,
+//	rootID ids.ID,
+//	start maybe.Maybe[[]byte],
+//	end maybe.Maybe[[]byte],
+//	maxLength int,
+//) (*RangeProof, error) {
+//	db.commitLock.RLock()
+//	defer db.commitLock.RUnlock()
+//
+//	_, span := db.infoTracer.Start(ctx, "MerkleDB.GetRangeProofAtRoot")
+//	defer span.End()
+//
+//	switch {
+//	case db.closed:
+//		return nil, database.ErrClosed
+//	case maxLength <= 0:
+//		return nil, fmt.Errorf("%w but was %d", ErrInvalidMaxLength, maxLength)
+//	case rootID == ids.Empty:
+//		return nil, ErrEmptyProof
+//	}
+//
+//	historicalTrie, err := db.getTrieAtRootForRange(rootID, start, end)
+//	if err != nil {
+//		return nil, err
+//	}
+//	return getRangeProof(historicalTrie, start, end, maxLength)
+//}
 
 func (db *merkleDB) GetChangeProof(
 	ctx context.Context,
@@ -715,20 +633,22 @@ func (db *merkleDB) GetChangeProof(
 	_, span := db.infoTracer.Start(ctx, "MerkleDB.GetChangeProof")
 	defer span.End()
 
-	switch {
-	case start.HasValue() && end.HasValue() && bytes.Compare(start.Value(), end.Value()) == 1:
-		return nil, ErrStartAfterEnd
-	case startRootID == endRootID:
-		return nil, errSameRoot
-	case endRootID == ids.Empty:
-		return nil, ErrEmptyProof
-	}
-
 	db.commitLock.RLock()
 	defer db.commitLock.RUnlock()
 
 	if db.closed {
 		return nil, database.ErrClosed
+	}
+
+	switch {
+	case start.HasValue() && end.HasValue() && bytes.Compare(start.Value(), end.Value()) == 1:
+		return nil, ErrStartAfterEnd
+	case startRootID == ids.Empty && endRootID == ids.Empty:
+		return getRangeProof(db, start, end, maxLength)
+	case startRootID == endRootID:
+		return nil, errSameRoot
+	case endRootID == ids.Empty:
+		return nil, ErrEmptyProof
 	}
 
 	changes, err := db.history.getValueChanges(startRootID, endRootID, start, end, maxLength)

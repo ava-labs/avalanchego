@@ -450,31 +450,6 @@ func (v *view) GetProof(ctx context.Context, key []byte) (*Proof, error) {
 	return result, nil
 }
 
-// GetRangeProof returns a range proof for (at least part of) the key range [start, end].
-// The returned proof's [KeyValues] has at most [maxLength] values.
-// [maxLength] must be > 0.
-func (v *view) GetRangeProof(
-	ctx context.Context,
-	start maybe.Maybe[[]byte],
-	end maybe.Maybe[[]byte],
-	maxLength int,
-) (*RangeProof, error) {
-	_, span := v.db.infoTracer.Start(ctx, "MerkleDB.view.GetRangeProof")
-	defer span.End()
-
-	if err := v.applyValueChanges(ctx); err != nil {
-		return nil, err
-	}
-	result, err := getRangeProof(v, start, end, maxLength)
-	if err != nil {
-		return nil, err
-	}
-	if v.isInvalid() {
-		return nil, ErrInvalid
-	}
-	return result, nil
-}
-
 // CommitToDB commits changes from this view to the underlying DB.
 func (v *view) CommitToDB(ctx context.Context) error {
 	ctx, span := v.db.infoTracer.Start(ctx, "MerkleDB.view.CommitToDB")

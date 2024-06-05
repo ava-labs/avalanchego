@@ -10,5 +10,4 @@ type DB interface {
 	merkledb.MerkleRootGetter
 	merkledb.ProofGetter
 	merkledb.ChangeProofer
-	merkledb.RangeProofer
 }
