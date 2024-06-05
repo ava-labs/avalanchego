@@ -1,5 +1,57 @@
 # Release Notes
 
+## [v1.11.7](https://github.com/ava-labs/avalanchego/releases/tag/v1.11.7)
+
+This version is backwards compatible to [v1.11.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.11.0). It is optional, but encouraged.
+
+The plugin version is unchanged at `35` and is compatible with versions `v1.11.3-v1.11.6`.
+
+### APIs
+
+- Added peer's `trackedSubnets` that are not locally tracked to the response from `info.peers`
+
+### Configs
+
+- Changed the undocumented `pebble` option for `--db-type` to be `pebbledb` and documented the option
+
+### Fixes
+
+- Removed repeated DB compaction during bootstrapping that caused a significant regression in bootstrapping times
+- Fixed C-Chain state-sync crash
+- Fixed C-Chain state-sync ETA calculation
+- Fixed Subnet owner reported by `platform.getSubnets` after a subnet's owner was rotated
+
+### What's Changed
+
+- Expose canonical warp formatting function by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3049
+- Remove subnet filter from Peer.TrackedSubnets() by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2975
+- Remove optional gatherer by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3052
+- [vms/platformvm] Return the correct owner in `platform.GetSubnets` after transfer by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/3054
+- Add metrics client by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3057
+- [vms/platformvm] Replace `GetSubnets` with `GetSubnetIDs` in `State` by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/3055
+- Implement `constants.VMName` by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3058
+- [testing] Remove superfluous gomega dep by @marun in https://github.com/ava-labs/avalanchego/pull/3063
+- [antithesis] Enable workload instrumentation by @marun in https://github.com/ava-labs/avalanchego/pull/3059
+- Add pebbledb to docs by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3061
+- [ci] Remove perpetually failing govulncheck job by @marun in https://github.com/ava-labs/avalanchego/pull/3069
+- Remove api namespace by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3066
+- Remove unused metrics namespaces by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3062
+- Only compact after executing a large number of blocks by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3065
+- Remove network namespace by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3067
+- Remove db namespace by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3068
+- Remove averager metrics namespace by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3072
+- chore: fix function name by @stellrust in https://github.com/ava-labs/avalanchego/pull/3075
+- Select metric by label in e2e tests by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3073
+- [tmpnet] Bootstrap subnets with a single node by @marun in https://github.com/ava-labs/avalanchego/pull/3005
+- [antithesis] Skip push for builder image by @marun in https://github.com/ava-labs/avalanchego/pull/3070
+- Implement label gatherer by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3074
+
+### New Contributors
+
+- @stellrust made their first contribution in https://github.com/ava-labs/avalanchego/pull/3075
+
+**Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.11.6...v1.11.7
+
 ## [v1.11.6](https://github.com/ava-labs/avalanchego/releases/tag/v1.11.6)
 
 This version is backwards compatible to [v1.11.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.11.0). It is optional, but encouraged.
