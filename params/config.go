@@ -630,16 +630,22 @@ func ptrToString(val *uint64) string {
 	return fmt.Sprintf("%d", *val)
 }
 
+type EthRules struct {
+	IsHomestead, IsEIP150, IsEIP155, IsEIP158               bool
+	IsByzantium, IsConstantinople, IsPetersburg, IsIstanbul bool
+	IsCancun                                                bool
+}
+
 // Rules wraps ChainConfig and is merely syntactic sugar or can be used for functions
 // that do not have or require information about the block.
 //
 // Rules is a one time interface meaning that it shouldn't be used in between transition
 // phases.
 type Rules struct {
-	ChainID                                                 *big.Int
-	IsHomestead, IsEIP150, IsEIP155, IsEIP158               bool
-	IsByzantium, IsConstantinople, IsPetersburg, IsIstanbul bool
-	IsCancun                                                bool
+	ChainID *big.Int
+
+	// Rules for Ethereum releases
+	EthRules
 
 	// Rules for Avalanche releases
 	AvalancheRules
@@ -670,16 +676,18 @@ func (c *ChainConfig) rules(num *big.Int, timestamp uint64) Rules {
 		chainID = new(big.Int)
 	}
 	return Rules{
-		ChainID:          new(big.Int).Set(chainID),
-		IsHomestead:      c.IsHomestead(num),
-		IsEIP150:         c.IsEIP150(num),
-		IsEIP155:         c.IsEIP155(num),
-		IsEIP158:         c.IsEIP158(num),
-		IsByzantium:      c.IsByzantium(num),
-		IsConstantinople: c.IsConstantinople(num),
-		IsPetersburg:     c.IsPetersburg(num),
-		IsIstanbul:       c.IsIstanbul(num),
-		IsCancun:         c.IsCancun(num, timestamp),
+		ChainID: new(big.Int).Set(chainID),
+		EthRules: EthRules{
+			IsHomestead:      c.IsHomestead(num),
+			IsEIP150:         c.IsEIP150(num),
+			IsEIP155:         c.IsEIP155(num),
+			IsEIP158:         c.IsEIP158(num),
+			IsByzantium:      c.IsByzantium(num),
+			IsConstantinople: c.IsConstantinople(num),
+			IsPetersburg:     c.IsPetersburg(num),
+			IsIstanbul:       c.IsIstanbul(num),
+			IsCancun:         c.IsCancun(num, timestamp),
+		},
 	}
 }
 

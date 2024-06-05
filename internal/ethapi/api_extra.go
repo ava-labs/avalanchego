@@ -122,6 +122,7 @@ func (s *BlockChainAPI) FeeConfig(ctx context.Context, blockNrOrHash *rpc.BlockN
 }
 
 // GetActivePrecompilesAt returns the active precompile configs at the given block timestamp.
+// DEPRECATED: Use GetActiveRulesAt instead.
 func (s *BlockChainAPI) GetActivePrecompilesAt(ctx context.Context, blockTimestamp *uint64) params.Precompiles {
 	var timestamp uint64
 	if blockTimestamp == nil {
@@ -133,12 +134,37 @@ func (s *BlockChainAPI) GetActivePrecompilesAt(ctx context.Context, blockTimesta
 	return s.b.ChainConfig().EnabledStatefulPrecompiles(timestamp)
 }
 
-func (s *BlockChainAPI) GetActiveRulesAt(ctx context.Context, blockTimestamp *uint64) params.Rules {
+type ActivePrecompilesResult struct {
+	Timestamp uint64 `json:"timestamp"`
+}
+
+type ActiveRulesResult struct {
+	EthRules          params.EthRules                    `json:"ethRules"`
+	AvalancheRules    params.AvalancheRules              `json:"avalancheRules"`
+	ActivePrecompiles map[string]ActivePrecompilesResult `json:"precompiles"`
+}
+
+// GetActiveRulesAt returns the active rules at the given block timestamp.
+func (s *BlockChainAPI) GetActiveRulesAt(ctx context.Context, blockTimestamp *uint64) ActiveRulesResult {
 	var timestamp uint64
 	if blockTimestamp == nil {
 		timestamp = s.b.CurrentHeader().Time
 	} else {
 		timestamp = *blockTimestamp
 	}
-	return s.b.ChainConfig().Rules(common.Big0, timestamp)
+	rules := s.b.ChainConfig().Rules(common.Big0, timestamp)
+	res := ActiveRulesResult{
+		EthRules:       rules.EthRules,
+		AvalancheRules: rules.AvalancheRules,
+	}
+	res.ActivePrecompiles = make(map[string]ActivePrecompilesResult)
+	for _, precompileConfig := range rules.ActivePrecompiles {
+		if precompileConfig.Timestamp() == nil {
+			continue
+		}
+		res.ActivePrecompiles[precompileConfig.Key()] = ActivePrecompilesResult{
+			Timestamp: *precompileConfig.Timestamp(),
+		}
+	}
+	return res
 }
