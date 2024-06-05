@@ -91,11 +91,17 @@ const (
 
 	ipResolutionTimeout = 30 * time.Second
 
-	apiNamespace       = constants.PlatformName + metric.NamespaceSeparator + "api"
-	benchlistNamespace = constants.PlatformName + metric.NamespaceSeparator + "benchlist"
-	dbNamespace        = constants.PlatformName + metric.NamespaceSeparator + "db"
-	meterDBNamespace   = constants.PlatformName + metric.NamespaceSeparator + "meterdb"
-	networkNamespace   = constants.PlatformName + metric.NamespaceSeparator + "network"
+	apiNamespace             = constants.PlatformName + metric.NamespaceSeparator + "api"
+	benchlistNamespace       = constants.PlatformName + metric.NamespaceSeparator + "benchlist"
+	dbNamespace              = constants.PlatformName + metric.NamespaceSeparator + "db"
+	healthNamespace          = constants.PlatformName + metric.NamespaceSeparator + "health"
+	meterDBNamespace         = constants.PlatformName + metric.NamespaceSeparator + "meterdb"
+	networkNamespace         = constants.PlatformName + metric.NamespaceSeparator + "network"
+	processNamespace         = constants.PlatformName + metric.NamespaceSeparator + "process"
+	requestsNamespace        = constants.PlatformName + metric.NamespaceSeparator + "requests"
+	resourceTrackerNamespace = constants.PlatformName + metric.NamespaceSeparator + "resource_tracker"
+	responsesNamespace       = constants.PlatformName + metric.NamespaceSeparator + "responses"
+	systemResourcesNamespace = constants.PlatformName + metric.NamespaceSeparator + "system_resources"
 )
 
 var (
@@ -1072,7 +1078,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 
 	requestsReg, err := metrics.MakeAndRegister(
 		n.MetricsGatherer,
-		metric.AppendNamespace(constants.PlatformName, "requests"),
+		requestsNamespace,
 	)
 	if err != nil {
 		return err
@@ -1080,7 +1086,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 
 	responseReg, err := metrics.MakeAndRegister(
 		n.MetricsGatherer,
-		metric.AppendNamespace(constants.PlatformName, "responses"),
+		responsesNamespace,
 	)
 	if err != nil {
 		return err
@@ -1295,7 +1301,7 @@ func (n *Node) initMetricsAPI() error {
 
 	processReg, err := metrics.MakeAndRegister(
 		n.MetricsGatherer,
-		metric.AppendNamespace(constants.PlatformName, "process"),
+		processNamespace,
 	)
 	if err != nil {
 		return err
@@ -1428,7 +1434,7 @@ func (n *Node) initInfoAPI() error {
 func (n *Node) initHealthAPI() error {
 	healthReg, err := metrics.MakeAndRegister(
 		n.MetricsGatherer,
-		metric.AppendNamespace(constants.PlatformName, "health"),
+		healthNamespace,
 	)
 	if err != nil {
 		return err
@@ -1574,7 +1580,7 @@ func (n *Node) initAPIAliases(genesisBytes []byte) error {
 func (n *Node) initResourceManager() error {
 	systemResourcesRegisterer, err := metrics.MakeAndRegister(
 		n.MetricsGatherer,
-		metric.AppendNamespace(constants.PlatformName, "system_resources"),
+		systemResourcesNamespace,
 	)
 	if err != nil {
 		return err
@@ -1595,7 +1601,7 @@ func (n *Node) initResourceManager() error {
 
 	resourceTrackerRegisterer, err := metrics.MakeAndRegister(
 		n.MetricsGatherer,
-		metric.AppendNamespace(constants.PlatformName, "resource_tracker"),
+		resourceTrackerNamespace,
 	)
 	if err != nil {
 		return err
