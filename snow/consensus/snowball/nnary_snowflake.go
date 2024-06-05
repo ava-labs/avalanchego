@@ -66,12 +66,12 @@ func (sf *nnarySnowflake) RecordPoll(count int, choice ids.ID) {
 		return
 	}
 
-	// If I need to change my preference, record the new preference
-	// and reset all my confidence counters.
+	// If I am changing my preference, reset confidence counters
+	// before recording a successful poll on the slush instance.
 	if choice != sf.Preference() {
 		clear(sf.confidence)
-		sf.nnarySlush.RecordSuccessfulPoll(choice)
 	}
+	sf.nnarySlush.RecordSuccessfulPoll(choice)
 
 	for i, terminationCondition := range sf.terminationConditions {
 		// If I did not reach this alpha threshold, I did not
