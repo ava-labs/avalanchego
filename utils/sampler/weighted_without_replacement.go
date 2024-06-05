@@ -26,13 +26,3 @@ func NewWeightedWithoutReplacement() WeightedWithoutReplacement {
 		w: NewWeighted(),
 	}
 }
-
-// NewBestWeightedWithoutReplacement returns a new sampler
-func NewBestWeightedWithoutReplacement(
-	expectedSampleSize int,
-) WeightedWithoutReplacement {
-	return &weightedWithoutReplacementGeneric{
-		u: NewBestUniform(expectedSampleSize),
-		w: NewWeighted(),
-	}
-}
