@@ -99,6 +99,7 @@ func TestTimeout(t *testing.T) {
 		tm,
 		p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
 		subnets.New(ctx.NodeID, subnets.Config{}),
+		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
 
@@ -375,6 +376,7 @@ func TestReliableMessages(t *testing.T) {
 		tm,
 		p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
 		subnets.New(ctx.NodeID, subnets.Config{}),
+		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
 
@@ -531,6 +533,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 		tm,
 		p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
 		subnets.New(ctx.NodeID, subnets.Config{}),
+		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
 
@@ -833,7 +836,7 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 
 			// Instantiate new registerers to avoid duplicate metrics
 			// registration
-			ctx.SnowmanRegisterer = prometheus.NewRegistry()
+			ctx.Registerer = prometheus.NewRegistry()
 
 			sender, err := New(
 				ctx,
@@ -843,6 +846,7 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 				timeoutManager,
 				p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
 				subnets.New(ctx.NodeID, subnets.Config{}),
+				prometheus.NewRegistry(),
 			)
 			require.NoError(err)
 
@@ -1049,11 +1053,6 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 				router         = router.NewMockRouter(ctrl)
 			)
 
-			// Instantiate new registerers to avoid duplicate metrics
-			// registration
-			ctx.SnowmanRegisterer = prometheus.NewRegistry()
-			ctx.AvalancheRegisterer = prometheus.NewRegistry()
-
 			sender, err := New(
 				ctx,
 				msgCreator,
@@ -1062,6 +1061,7 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 				timeoutManager,
 				p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
 				subnets.New(ctx.NodeID, subnets.Config{}),
+				prometheus.NewRegistry(),
 			)
 			require.NoError(err)
 
@@ -1218,7 +1218,7 @@ func TestSender_Single_Request(t *testing.T) {
 
 			// Instantiate new registerers to avoid duplicate metrics
 			// registration
-			ctx.SnowmanRegisterer = prometheus.NewRegistry()
+			ctx.Registerer = prometheus.NewRegistry()
 
 			sender, err := New(
 				ctx,
@@ -1228,6 +1228,7 @@ func TestSender_Single_Request(t *testing.T) {
 				timeoutManager,
 				engineType,
 				subnets.New(ctx.NodeID, subnets.Config{}),
+				prometheus.NewRegistry(),
 			)
 			require.NoError(err)
 

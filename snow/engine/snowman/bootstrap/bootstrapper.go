@@ -116,7 +116,7 @@ type Bootstrapper struct {
 }
 
 func New(config Config, onFinished func(ctx context.Context, lastReqID uint32) error) (*Bootstrapper, error) {
-	metrics, err := newMetrics(config.Ctx.SnowmanRegisterer)
+	metrics, err := newMetrics(config.Ctx.Registerer)
 	return &Bootstrapper{
 		Config:                      config,
 		metrics:                     metrics,

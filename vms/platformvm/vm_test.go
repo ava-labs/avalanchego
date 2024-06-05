@@ -1446,6 +1446,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		timeoutManager,
 		p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
 		subnets.New(consensusCtx.NodeID, subnets.Config{}),
+		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
 
@@ -1473,14 +1474,14 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		consensusCtx.Log,
 		time.Second,
 		2000,
-		consensusCtx.SnowmanRegisterer,
+		consensusCtx.Registerer,
 	)
 	require.NoError(err)
 
 	peerTracker, err := p2p.NewPeerTracker(
 		ctx.Log,
 		"peer_tracker",
-		consensusCtx.SnowmanRegisterer,
+		consensusCtx.Registerer,
 		set.Of(ctx.NodeID),
 		nil,
 	)

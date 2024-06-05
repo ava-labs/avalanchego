@@ -499,14 +499,6 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 		return nil, err
 	}
 
-	avalancheMetrics, err := metrics.MakeAndRegister(
-		m.avalancheGatherer,
-		primaryAlias,
-	)
-	if err != nil {
-		return nil, err
-	}
-
 	vmMetrics, err := m.getOrMakeVMRegisterer(chainParams.VMID, primaryAlias)
 	if err != nil {
 		return nil, err
@@ -535,12 +527,11 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 			ValidatorState: m.validatorState,
 			ChainDataDir:   chainDataDir,
 		},
-		PrimaryAlias:        primaryAlias,
-		SnowmanRegisterer:   snowmanMetrics,
-		AvalancheRegisterer: avalancheMetrics,
-		BlockAcceptor:       m.BlockAcceptorGroup,
-		TxAcceptor:          m.TxAcceptorGroup,
-		VertexAcceptor:      m.VertexAcceptorGroup,
+		PrimaryAlias:   primaryAlias,
+		Registerer:     snowmanMetrics,
+		BlockAcceptor:  m.BlockAcceptorGroup,
+		TxAcceptor:     m.TxAcceptorGroup,
+		VertexAcceptor: m.VertexAcceptorGroup,
 	}
 
 	// Get a factory for the vm we want to use on our chain
@@ -655,11 +646,19 @@ func (m *manager) createAvalancheChain(
 	txBootstrappingDB := prefixdb.New(TxBootstrappingDBPrefix, prefixDB)
 	blockBootstrappingDB := prefixdb.New(BlockBootstrappingDBPrefix, prefixDB)
 
-	vtxBlocker, err := queue.NewWithMissing(vertexBootstrappingDB, "vtx", ctx.AvalancheRegisterer)
+	avalancheMetrics, err := metrics.MakeAndRegister(
+		m.avalancheGatherer,
+		primaryAlias,
+	)
 	if err != nil {
 		return nil, err
 	}
-	txBlocker, err := queue.New(txBootstrappingDB, "tx", ctx.AvalancheRegisterer)
+
+	vtxBlocker, err := queue.NewWithMissing(vertexBootstrappingDB, "vtx", avalancheMetrics)
+	if err != nil {
+		return nil, err
+	}
+	txBlocker, err := queue.New(txBootstrappingDB, "tx", avalancheMetrics)
 	if err != nil {
 		return nil, err
 	}
@@ -673,6 +672,7 @@ func (m *manager) createAvalancheChain(
 		m.TimeoutManager,
 		p2ppb.EngineType_ENGINE_TYPE_AVALANCHE,
 		sb,
+		avalancheMetrics,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize avalanche sender: %w", err)
@@ -691,6 +691,7 @@ func (m *manager) createAvalancheChain(
 		m.TimeoutManager,
 		p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
 		sb,
+		ctx.Registerer,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize avalanche sender: %w", err)
@@ -916,7 +917,7 @@ func (m *manager) createAvalancheChain(
 		ctx.Log,
 		m.BootstrapMaxTimeGetAncestors,
 		m.BootstrapAncestorsMaxContainersSent,
-		ctx.SnowmanRegisterer,
+		ctx.Registerer,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize snow base message handler: %w", err)
@@ -983,7 +984,7 @@ func (m *manager) createAvalancheChain(
 		ctx.Log,
 		m.BootstrapMaxTimeGetAncestors,
 		m.BootstrapAncestorsMaxContainersSent,
-		ctx.AvalancheRegisterer,
+		avalancheMetrics,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize avalanche base message handler: %w", err)
@@ -1015,6 +1016,7 @@ func (m *manager) createAvalancheChain(
 	avalancheBootstrapper, err := avbootstrap.New(
 		avalancheBootstrapperConfig,
 		snowmanBootstrapper.Start,
+		avalancheMetrics,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error initializing avalanche bootstrapper: %w", err)
@@ -1095,6 +1097,7 @@ func (m *manager) createSnowmanChain(
 		m.TimeoutManager,
 		p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
 		sb,
+		ctx.Registerer,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize sender: %w", err)
@@ -1312,7 +1315,7 @@ func (m *manager) createSnowmanChain(
 		ctx.Log,
 		m.BootstrapMaxTimeGetAncestors,
 		m.BootstrapAncestorsMaxContainersSent,
-		ctx.SnowmanRegisterer,
+		ctx.Registerer,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize snow base message handler: %w", err)

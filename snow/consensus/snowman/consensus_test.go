@@ -507,7 +507,7 @@ func RecordPollSplitVoteNoChangeTest(t *testing.T, factory Factory) {
 	snowCtx := snowtest.Context(t, snowtest.CChainID)
 	ctx := snowtest.ConsensusContext(snowCtx)
 	registerer := prometheus.NewRegistry()
-	ctx.SnowmanRegisterer = registerer
+	ctx.Registerer = registerer
 
 	params := snowball.Parameters{
 		K:                     2,
@@ -1115,7 +1115,7 @@ func MetricsProcessingErrorTest(t *testing.T, factory Factory) {
 		Name: "blks_processing",
 	})
 
-	require.NoError(ctx.SnowmanRegisterer.Register(numProcessing))
+	require.NoError(ctx.Registerer.Register(numProcessing))
 
 	err := sm.Initialize(
 		ctx,
@@ -1149,7 +1149,7 @@ func MetricsAcceptedErrorTest(t *testing.T, factory Factory) {
 		Name: "blks_accepted_count",
 	})
 
-	require.NoError(ctx.SnowmanRegisterer.Register(numAccepted))
+	require.NoError(ctx.Registerer.Register(numAccepted))
 
 	err := sm.Initialize(
 		ctx,
@@ -1183,7 +1183,7 @@ func MetricsRejectedErrorTest(t *testing.T, factory Factory) {
 		Name: "blks_rejected_count",
 	})
 
-	require.NoError(ctx.SnowmanRegisterer.Register(numRejected))
+	require.NoError(ctx.Registerer.Register(numRejected))
 
 	err := sm.Initialize(
 		ctx,

@@ -103,7 +103,7 @@ func setup(t *testing.T, config Config) (ids.NodeID, validators.Manager, *common
 		config.Ctx.Log,
 		time.Second,
 		2000,
-		config.Ctx.SnowmanRegisterer,
+		config.Ctx.Registerer,
 	)
 	require.NoError(err)
 	config.AllGetsServer = snowGetHandler

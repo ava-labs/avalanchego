@@ -69,10 +69,8 @@ type ConsensusContext struct {
 	// within.
 	PrimaryAlias string
 
-	// Registers all snowman consensus metrics.
-	SnowmanRegisterer Registerer
-	// Registers all avalanche consensus metrics.
-	AvalancheRegisterer Registerer
+	// Registers all consensus metrics.
+	Registerer Registerer
 
 	// BlockAcceptor is the callback that will be fired whenever a VM is
 	// notified that their block was accepted.
