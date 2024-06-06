@@ -166,11 +166,25 @@ func New(
 		return nil, fmt.Errorf("initializing handler metrics errored with: %w", err)
 	}
 	cpuTracker := resourceTracker.CPUTracker()
-	h.syncMessageQueue, err = NewMessageQueue(h.ctx, h.validators, cpuTracker, "sync", reg)
+	h.syncMessageQueue, err = NewMessageQueue(
+		h.ctx.Log,
+		h.ctx.SubnetID,
+		h.validators,
+		cpuTracker,
+		"sync",
+		reg,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("initializing sync message queue errored with: %w", err)
 	}
-	h.asyncMessageQueue, err = NewMessageQueue(h.ctx, h.validators, cpuTracker, "async", reg)
+	h.asyncMessageQueue, err = NewMessageQueue(
+		h.ctx.Log,
+		h.ctx.SubnetID,
+		h.validators,
+		cpuTracker,
+		"async",
+		reg,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("initializing async message queue errored with: %w", err)
 	}
