@@ -12,6 +12,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/tests"
@@ -34,7 +35,7 @@ const (
 )
 
 var xChainMetricLabels = prometheus.Labels{
-	"chain": "X",
+	chains.ChainLabel: "X",
 }
 
 // This test requires that the network not have ongoing blocks and
