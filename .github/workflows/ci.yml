@@ -28,7 +28,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-12, ubuntu-20.04, ubuntu-22.04, windows-2022, [self-hosted, linux, ARM64, focal], [self-hosted, linux, ARM64, jammy]]
+        os: [macos-12, ubuntu-20.04, ubuntu-22.04, windows-2022, custom-arm64-focal, custom-arm64-jammy]
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-go-for-project-v3
