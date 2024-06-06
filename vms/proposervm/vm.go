@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/cache"
@@ -31,7 +32,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/proposervm/scheduler"
 	"github.com/ava-labs/avalanchego/vms/proposervm/state"
 	"github.com/ava-labs/avalanchego/vms/proposervm/tree"
-	"github.com/prometheus/client_golang/prometheus"
 
 	statelessblock "github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
