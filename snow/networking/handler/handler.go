@@ -140,6 +140,7 @@ func New(
 	subnet subnets.Subnet,
 	peerTracker commontracker.Peers,
 	p2pTracker *p2p.PeerTracker,
+	reg prometheus.Registerer,
 ) (Handler, error) {
 	h := &handler{
 		ctx:             ctx,
@@ -160,7 +161,7 @@ func New(
 
 	var err error
 
-	h.metrics, err = newMetrics("handler", h.ctx.Registerer)
+	h.metrics, err = newMetrics(reg)
 	if err != nil {
 		return nil, fmt.Errorf("initializing handler metrics errored with: %w", err)
 	}
@@ -170,8 +171,8 @@ func New(
 		h.ctx.SubnetID,
 		h.validators,
 		cpuTracker,
-		"handler",
-		h.ctx.Registerer,
+		"sync",
+		reg,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("initializing sync message queue errored with: %w", err)
@@ -181,8 +182,8 @@ func New(
 		h.ctx.SubnetID,
 		h.validators,
 		cpuTracker,
-		"handler_async",
-		h.ctx.Registerer,
+		"async",
+		reg,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("initializing async message queue errored with: %w", err)

@@ -13,7 +13,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/api/health"
@@ -74,8 +73,19 @@ import (
 )
 
 const (
+	ChainLabel = "chain"
+
 	defaultChannelSize = 1
 	initialQueueSize   = 3
+
+	avalancheNamespace    = constants.PlatformName + metric.NamespaceSeparator + "avalanche"
+	handlerNamespace      = constants.PlatformName + metric.NamespaceSeparator + "handler"
+	meterchainvmNamespace = constants.PlatformName + metric.NamespaceSeparator + "meterchainvm"
+	meterdagvmNamespace   = constants.PlatformName + metric.NamespaceSeparator + "meterdagvm"
+	proposervmNamespace   = constants.PlatformName + metric.NamespaceSeparator + "proposervm"
+	p2pNamespace          = constants.PlatformName + metric.NamespaceSeparator + "p2p"
+	snowmanNamespace      = constants.PlatformName + metric.NamespaceSeparator + "snowman"
+	stakeNamespace        = constants.PlatformName + metric.NamespaceSeparator + "stake"
 )
 
 var (
@@ -207,7 +217,9 @@ type ManagerConfig struct {
 	// ShutdownNodeFunc allows the chain manager to issue a request to shutdown the node
 	ShutdownNodeFunc func(exitCode int)
 	MeterVMEnabled   bool // Should each VM be wrapped with a MeterVM
-	Metrics          metrics.MultiGatherer
+
+	Metrics        metrics.MultiGatherer
+	MeterDBMetrics metrics.MultiGatherer
 
 	FrontierPollFrequency   time.Duration
 	ConsensusAppConcurrency int
@@ -259,10 +271,60 @@ type manager struct {
 
 	// snowman++ related interface to allow validators retrieval
 	validatorState validators.State
+
+	avalancheGatherer    metrics.MultiGatherer            // chainID
+	handlerGatherer      metrics.MultiGatherer            // chainID
+	meterChainVMGatherer metrics.MultiGatherer            // chainID
+	meterDAGVMGatherer   metrics.MultiGatherer            // chainID
+	proposervmGatherer   metrics.MultiGatherer            // chainID
+	p2pGatherer          metrics.MultiGatherer            // chainID
+	snowmanGatherer      metrics.MultiGatherer            // chainID
+	stakeGatherer        metrics.MultiGatherer            // chainID
+	vmGatherer           map[ids.ID]metrics.MultiGatherer // vmID -> chainID
 }
 
 // New returns a new Manager
-func New(config *ManagerConfig) Manager {
+func New(config *ManagerConfig) (Manager, error) {
+	avalancheGatherer := metrics.NewLabelGatherer(ChainLabel)
+	if err := config.Metrics.Register(avalancheNamespace, avalancheGatherer); err != nil {
+		return nil, err
+	}
+
+	handlerGatherer := metrics.NewLabelGatherer(ChainLabel)
+	if err := config.Metrics.Register(handlerNamespace, handlerGatherer); err != nil {
+		return nil, err
+	}
+
+	meterChainVMGatherer := metrics.NewLabelGatherer(ChainLabel)
+	if err := config.Metrics.Register(meterchainvmNamespace, meterChainVMGatherer); err != nil {
+		return nil, err
+	}
+
+	meterDAGVMGatherer := metrics.NewLabelGatherer(ChainLabel)
+	if err := config.Metrics.Register(meterdagvmNamespace, meterDAGVMGatherer); err != nil {
+		return nil, err
+	}
+
+	proposervmGatherer := metrics.NewLabelGatherer(ChainLabel)
+	if err := config.Metrics.Register(proposervmNamespace, proposervmGatherer); err != nil {
+		return nil, err
+	}
+
+	p2pGatherer := metrics.NewLabelGatherer(ChainLabel)
+	if err := config.Metrics.Register(p2pNamespace, p2pGatherer); err != nil {
+		return nil, err
+	}
+
+	snowmanGatherer := metrics.NewLabelGatherer(ChainLabel)
+	if err := config.Metrics.Register(snowmanNamespace, snowmanGatherer); err != nil {
+		return nil, err
+	}
+
+	stakeGatherer := metrics.NewLabelGatherer(ChainLabel)
+	if err := config.Metrics.Register(stakeNamespace, stakeGatherer); err != nil {
+		return nil, err
+	}
+
 	return &manager{
 		Aliaser:                ids.NewAliaser(),
 		ManagerConfig:          *config,
@@ -270,7 +332,17 @@ func New(config *ManagerConfig) Manager {
 		chainsQueue:            buffer.NewUnboundedBlockingDeque[ChainParameters](initialQueueSize),
 		unblockChainCreatorCh:  make(chan struct{}),
 		chainCreatorShutdownCh: make(chan struct{}),
-	}
+
+		avalancheGatherer:    avalancheGatherer,
+		handlerGatherer:      handlerGatherer,
+		meterChainVMGatherer: meterChainVMGatherer,
+		meterDAGVMGatherer:   meterDAGVMGatherer,
+		proposervmGatherer:   proposervmGatherer,
+		p2pGatherer:          p2pGatherer,
+		snowmanGatherer:      snowmanGatherer,
+		stakeGatherer:        stakeGatherer,
+		vmGatherer:           make(map[ids.ID]metrics.MultiGatherer),
+	}, nil
 }
 
 // QueueChainCreation queues a chain creation request
@@ -419,16 +491,17 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 		return nil, fmt.Errorf("error while creating chain's log %w", err)
 	}
 
-	consensusMetrics := prometheus.NewRegistry()
-	chainNamespace := metric.AppendNamespace(constants.PlatformName, primaryAlias)
-	if err := m.Metrics.Register(chainNamespace, consensusMetrics); err != nil {
-		return nil, fmt.Errorf("error while registering chain's metrics %w", err)
+	snowmanMetrics, err := metrics.MakeAndRegister(
+		m.snowmanGatherer,
+		primaryAlias,
+	)
+	if err != nil {
+		return nil, err
 	}
 
-	vmMetrics := metrics.NewMultiGatherer()
-	vmNamespace := metric.AppendNamespace(chainNamespace, "vm")
-	if err := m.Metrics.Register(vmNamespace, vmMetrics); err != nil {
-		return nil, fmt.Errorf("error while registering vm's metrics %w", err)
+	vmMetrics, err := m.getOrMakeVMRegisterer(chainParams.VMID, primaryAlias)
+	if err != nil {
+		return nil, err
 	}
 
 	ctx := &snow.ConsensusContext{
@@ -454,10 +527,11 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 			ValidatorState: m.validatorState,
 			ChainDataDir:   chainDataDir,
 		},
+		PrimaryAlias:   primaryAlias,
+		Registerer:     snowmanMetrics,
 		BlockAcceptor:  m.BlockAcceptorGroup,
 		TxAcceptor:     m.TxAcceptorGroup,
 		VertexAcceptor: m.VertexAcceptorGroup,
-		Registerer:     consensusMetrics,
 	}
 
 	// Get a factory for the vm we want to use on our chain
@@ -551,10 +625,20 @@ func (m *manager) createAvalancheChain(
 		State: snow.Initializing,
 	})
 
-	meterDB, err := meterdb.New("db", ctx.Registerer, m.DB)
+	primaryAlias := m.PrimaryAliasOrDefault(ctx.ChainID)
+	meterDBReg, err := metrics.MakeAndRegister(
+		m.MeterDBMetrics,
+		primaryAlias,
+	)
 	if err != nil {
 		return nil, err
 	}
+
+	meterDB, err := meterdb.New(meterDBReg, m.DB)
+	if err != nil {
+		return nil, err
+	}
+
 	prefixDB := prefixdb.New(ctx.ChainID[:], meterDB)
 	vmDB := prefixdb.New(VMDBPrefix, prefixDB)
 	vertexDB := prefixdb.New(VertexDBPrefix, prefixDB)
@@ -562,22 +646,19 @@ func (m *manager) createAvalancheChain(
 	txBootstrappingDB := prefixdb.New(TxBootstrappingDBPrefix, prefixDB)
 	blockBootstrappingDB := prefixdb.New(BlockBootstrappingDBPrefix, prefixDB)
 
-	// This converts the prefix for all the Avalanche consensus metrics from
-	// `avalanche_{chainID}_` into `avalanche_{chainID}_avalanche_` so that
-	// there are no conflicts when registering the Snowman consensus metrics.
-	avalancheConsensusMetrics := prometheus.NewRegistry()
-	primaryAlias := m.PrimaryAliasOrDefault(ctx.ChainID)
-	chainNamespace := metric.AppendNamespace(constants.PlatformName, primaryAlias)
-	avalancheDAGNamespace := metric.AppendNamespace(chainNamespace, "avalanche")
-	if err := m.Metrics.Register(avalancheDAGNamespace, avalancheConsensusMetrics); err != nil {
-		return nil, fmt.Errorf("error while registering DAG metrics %w", err)
-	}
-
-	vtxBlocker, err := queue.NewWithMissing(vertexBootstrappingDB, "vtx", avalancheConsensusMetrics)
+	avalancheMetrics, err := metrics.MakeAndRegister(
+		m.avalancheGatherer,
+		primaryAlias,
+	)
 	if err != nil {
 		return nil, err
 	}
-	txBlocker, err := queue.New(txBootstrappingDB, "tx", avalancheConsensusMetrics)
+
+	vtxBlocker, err := queue.NewWithMissing(vertexBootstrappingDB, "vtx", avalancheMetrics)
+	if err != nil {
+		return nil, err
+	}
+	txBlocker, err := queue.New(txBootstrappingDB, "tx", avalancheMetrics)
 	if err != nil {
 		return nil, err
 	}
@@ -591,7 +672,7 @@ func (m *manager) createAvalancheChain(
 		m.TimeoutManager,
 		p2ppb.EngineType_ENGINE_TYPE_AVALANCHE,
 		sb,
-		avalancheConsensusMetrics,
+		avalancheMetrics,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize avalanche sender: %w", err)
@@ -627,7 +708,15 @@ func (m *manager) createAvalancheChain(
 
 	dagVM := vm
 	if m.MeterVMEnabled {
-		dagVM = metervm.NewVertexVM(dagVM)
+		meterdagvmReg, err := metrics.MakeAndRegister(
+			m.meterDAGVMGatherer,
+			primaryAlias,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		dagVM = metervm.NewVertexVM(dagVM, meterdagvmReg)
 	}
 	if m.TracingEnabled {
 		dagVM = tracedvm.NewVertexVM(dagVM, m.Tracer)
@@ -644,17 +733,6 @@ func (m *manager) createAvalancheChain(
 			CortinaTime: version.GetCortinaTime(ctx.NetworkID),
 		},
 	)
-
-	avalancheRegisterer := metrics.NewMultiGatherer()
-	snowmanRegisterer := metrics.NewMultiGatherer()
-	if err := ctx.Context.Metrics.Register("avalanche", avalancheRegisterer); err != nil {
-		return nil, err
-	}
-	if err := ctx.Context.Metrics.Register("", snowmanRegisterer); err != nil {
-		return nil, err
-	}
-
-	ctx.Context.Metrics = avalancheRegisterer
 
 	// The channel through which a VM may send messages to the consensus engine
 	// VM uses this channel to notify engine that a block is ready to be made
@@ -695,14 +773,20 @@ func (m *manager) createAvalancheChain(
 		zap.Uint64("numHistoricalBlocks", numHistoricalBlocks),
 	)
 
-	chainAlias := m.PrimaryAliasOrDefault(ctx.ChainID)
-
 	// Note: this does not use [dagVM] to ensure we use the [vm]'s height index.
 	untracedVMWrappedInsideProposerVM := NewLinearizeOnInitializeVM(vm)
 
 	var vmWrappedInsideProposerVM block.ChainVM = untracedVMWrappedInsideProposerVM
 	if m.TracingEnabled {
-		vmWrappedInsideProposerVM = tracedvm.NewBlockVM(vmWrappedInsideProposerVM, chainAlias, m.Tracer)
+		vmWrappedInsideProposerVM = tracedvm.NewBlockVM(vmWrappedInsideProposerVM, primaryAlias, m.Tracer)
+	}
+
+	proposervmReg, err := metrics.MakeAndRegister(
+		m.proposervmGatherer,
+		primaryAlias,
+	)
+	if err != nil {
+		return nil, err
 	}
 
 	// Note: vmWrappingProposerVM is the VM that the Snowman engines should be
@@ -717,11 +801,20 @@ func (m *manager) createAvalancheChain(
 			NumHistoricalBlocks: numHistoricalBlocks,
 			StakingLeafSigner:   m.StakingTLSSigner,
 			StakingCertLeaf:     m.StakingTLSCert,
+			Registerer:          proposervmReg,
 		},
 	)
 
 	if m.MeterVMEnabled {
-		vmWrappingProposerVM = metervm.NewBlockVM(vmWrappingProposerVM)
+		meterchainvmReg, err := metrics.MakeAndRegister(
+			m.meterChainVMGatherer,
+			primaryAlias,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		vmWrappingProposerVM = metervm.NewBlockVM(vmWrappingProposerVM, meterchainvmReg)
 	}
 	if m.TracingEnabled {
 		vmWrappingProposerVM = tracedvm.NewBlockVM(vmWrappingProposerVM, "proposervm", m.Tracer)
@@ -734,7 +827,6 @@ func (m *manager) createAvalancheChain(
 		vmToInitialize: vmWrappingProposerVM,
 		vmToLinearize:  untracedVMWrappedInsideProposerVM,
 
-		registerer:   snowmanRegisterer,
 		ctx:          ctx.Context,
 		db:           vmDB,
 		genesisBytes: genesisData,
@@ -756,21 +848,45 @@ func (m *manager) createAvalancheChain(
 		sampleK = int(bootstrapWeight)
 	}
 
-	connectedValidators, err := tracker.NewMeteredPeers(ctx.Registerer)
+	stakeReg, err := metrics.MakeAndRegister(
+		m.stakeGatherer,
+		primaryAlias,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	connectedValidators, err := tracker.NewMeteredPeers(stakeReg)
 	if err != nil {
 		return nil, fmt.Errorf("error creating peer tracker: %w", err)
 	}
 	vdrs.RegisterSetCallbackListener(ctx.SubnetID, connectedValidators)
 
+	p2pReg, err := metrics.MakeAndRegister(
+		m.p2pGatherer,
+		primaryAlias,
+	)
+	if err != nil {
+		return nil, err
+	}
+
 	peerTracker, err := p2p.NewPeerTracker(
 		ctx.Log,
 		"peer_tracker",
-		ctx.Registerer,
+		p2pReg,
 		set.Of(ctx.NodeID),
 		nil,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error creating peer tracker: %w", err)
+	}
+
+	handlerReg, err := metrics.MakeAndRegister(
+		m.handlerGatherer,
+		primaryAlias,
+	)
+	if err != nil {
+		return nil, err
 	}
 
 	// Asynchronously passes messages from the network to the consensus engine
@@ -785,6 +901,7 @@ func (m *manager) createAvalancheChain(
 		sb,
 		connectedValidators,
 		peerTracker,
+		handlerReg,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error initializing network handler: %w", err)
@@ -867,7 +984,7 @@ func (m *manager) createAvalancheChain(
 		ctx.Log,
 		m.BootstrapMaxTimeGetAncestors,
 		m.BootstrapAncestorsMaxContainersSent,
-		avalancheConsensusMetrics,
+		avalancheMetrics,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize avalanche base message handler: %w", err)
@@ -899,7 +1016,7 @@ func (m *manager) createAvalancheChain(
 	avalancheBootstrapper, err := avbootstrap.New(
 		avalancheBootstrapperConfig,
 		snowmanBootstrapper.Start,
-		avalancheConsensusMetrics,
+		avalancheMetrics,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error initializing avalanche bootstrapper: %w", err)
@@ -923,12 +1040,12 @@ func (m *manager) createAvalancheChain(
 	})
 
 	// Register health check for this chain
-	if err := m.Health.RegisterHealthCheck(chainAlias, h, ctx.SubnetID.String()); err != nil {
-		return nil, fmt.Errorf("couldn't add health check for chain %s: %w", chainAlias, err)
+	if err := m.Health.RegisterHealthCheck(primaryAlias, h, ctx.SubnetID.String()); err != nil {
+		return nil, fmt.Errorf("couldn't add health check for chain %s: %w", primaryAlias, err)
 	}
 
 	return &chain{
-		Name:    chainAlias,
+		Name:    primaryAlias,
 		Context: ctx,
 		VM:      dagVM,
 		Handler: h,
@@ -953,10 +1070,20 @@ func (m *manager) createSnowmanChain(
 		State: snow.Initializing,
 	})
 
-	meterDB, err := meterdb.New("db", ctx.Registerer, m.DB)
+	primaryAlias := m.PrimaryAliasOrDefault(ctx.ChainID)
+	meterDBReg, err := metrics.MakeAndRegister(
+		m.MeterDBMetrics,
+		primaryAlias,
+	)
 	if err != nil {
 		return nil, err
 	}
+
+	meterDB, err := meterdb.New(meterDBReg, m.DB)
+	if err != nil {
+		return nil, err
+	}
+
 	prefixDB := prefixdb.New(ctx.ChainID[:], meterDB)
 	vmDB := prefixdb.New(VMDBPrefix, prefixDB)
 	bootstrappingDB := prefixdb.New(ChainBootstrappingDBPrefix, prefixDB)
@@ -1049,9 +1176,16 @@ func (m *manager) createSnowmanChain(
 		zap.Uint64("numHistoricalBlocks", numHistoricalBlocks),
 	)
 
-	chainAlias := m.PrimaryAliasOrDefault(ctx.ChainID)
 	if m.TracingEnabled {
-		vm = tracedvm.NewBlockVM(vm, chainAlias, m.Tracer)
+		vm = tracedvm.NewBlockVM(vm, primaryAlias, m.Tracer)
+	}
+
+	proposervmReg, err := metrics.MakeAndRegister(
+		m.proposervmGatherer,
+		primaryAlias,
+	)
+	if err != nil {
+		return nil, err
 	}
 
 	vm = proposervm.New(
@@ -1064,11 +1198,20 @@ func (m *manager) createSnowmanChain(
 			NumHistoricalBlocks: numHistoricalBlocks,
 			StakingLeafSigner:   m.StakingTLSSigner,
 			StakingCertLeaf:     m.StakingTLSCert,
+			Registerer:          proposervmReg,
 		},
 	)
 
 	if m.MeterVMEnabled {
-		vm = metervm.NewBlockVM(vm)
+		meterchainvmReg, err := metrics.MakeAndRegister(
+			m.meterChainVMGatherer,
+			primaryAlias,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		vm = metervm.NewBlockVM(vm, meterchainvmReg)
 	}
 	if m.TracingEnabled {
 		vm = tracedvm.NewBlockVM(vm, "proposervm", m.Tracer)
@@ -1103,21 +1246,45 @@ func (m *manager) createSnowmanChain(
 		sampleK = int(bootstrapWeight)
 	}
 
-	connectedValidators, err := tracker.NewMeteredPeers(ctx.Registerer)
+	stakeReg, err := metrics.MakeAndRegister(
+		m.stakeGatherer,
+		primaryAlias,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	connectedValidators, err := tracker.NewMeteredPeers(stakeReg)
 	if err != nil {
 		return nil, fmt.Errorf("error creating peer tracker: %w", err)
 	}
 	vdrs.RegisterSetCallbackListener(ctx.SubnetID, connectedValidators)
 
+	p2pReg, err := metrics.MakeAndRegister(
+		m.p2pGatherer,
+		primaryAlias,
+	)
+	if err != nil {
+		return nil, err
+	}
+
 	peerTracker, err := p2p.NewPeerTracker(
 		ctx.Log,
 		"peer_tracker",
-		ctx.Registerer,
+		p2pReg,
 		set.Of(ctx.NodeID),
 		nil,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error creating peer tracker: %w", err)
+	}
+
+	handlerReg, err := metrics.MakeAndRegister(
+		m.handlerGatherer,
+		primaryAlias,
+	)
+	if err != nil {
+		return nil, err
 	}
 
 	// Asynchronously passes messages from the network to the consensus engine
@@ -1132,6 +1299,7 @@ func (m *manager) createSnowmanChain(
 		sb,
 		connectedValidators,
 		peerTracker,
+		handlerReg,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize message handler: %w", err)
@@ -1244,12 +1412,12 @@ func (m *manager) createSnowmanChain(
 	})
 
 	// Register health checks
-	if err := m.Health.RegisterHealthCheck(chainAlias, h, ctx.SubnetID.String()); err != nil {
-		return nil, fmt.Errorf("couldn't add health check for chain %s: %w", chainAlias, err)
+	if err := m.Health.RegisterHealthCheck(primaryAlias, h, ctx.SubnetID.String()); err != nil {
+		return nil, fmt.Errorf("couldn't add health check for chain %s: %w", primaryAlias, err)
 	}
 
 	return &chain{
-		Name:    chainAlias,
+		Name:    primaryAlias,
 		Context: ctx,
 		VM:      vm,
 		Handler: h,
@@ -1389,4 +1557,28 @@ func (m *manager) getChainConfig(id ids.ID) (ChainConfig, error) {
 	}
 
 	return ChainConfig{}, nil
+}
+
+func (m *manager) getOrMakeVMRegisterer(vmID ids.ID, chainAlias string) (metrics.MultiGatherer, error) {
+	vmGatherer, ok := m.vmGatherer[vmID]
+	if !ok {
+		vmName := constants.VMName(vmID)
+		vmNamespace := metric.AppendNamespace(constants.PlatformName, vmName)
+		vmGatherer = metrics.NewLabelGatherer(ChainLabel)
+		err := m.Metrics.Register(
+			vmNamespace,
+			vmGatherer,
+		)
+		if err != nil {
+			return nil, err
+		}
+		m.vmGatherer[vmID] = vmGatherer
+	}
+
+	chainReg := metrics.NewPrefixGatherer()
+	err := vmGatherer.Register(
+		chainAlias,
+		chainReg,
+	)
+	return chainReg, err
 }

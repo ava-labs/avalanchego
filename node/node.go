@@ -91,9 +91,17 @@ const (
 
 	ipResolutionTimeout = 30 * time.Second
 
-	apiNamespace     = constants.PlatformName + metric.NamespaceSeparator + "api"
-	dbNamespace      = constants.PlatformName + metric.NamespaceSeparator + "db_internal"
-	networkNamespace = constants.PlatformName + metric.NamespaceSeparator + "network"
+	apiNamespace             = constants.PlatformName + metric.NamespaceSeparator + "api"
+	benchlistNamespace       = constants.PlatformName + metric.NamespaceSeparator + "benchlist"
+	dbNamespace              = constants.PlatformName + metric.NamespaceSeparator + "db"
+	healthNamespace          = constants.PlatformName + metric.NamespaceSeparator + "health"
+	meterDBNamespace         = constants.PlatformName + metric.NamespaceSeparator + "meterdb"
+	networkNamespace         = constants.PlatformName + metric.NamespaceSeparator + "network"
+	processNamespace         = constants.PlatformName + metric.NamespaceSeparator + "process"
+	requestsNamespace        = constants.PlatformName + metric.NamespaceSeparator + "requests"
+	resourceTrackerNamespace = constants.PlatformName + metric.NamespaceSeparator + "resource_tracker"
+	responsesNamespace       = constants.PlatformName + metric.NamespaceSeparator + "responses"
+	systemResourcesNamespace = constants.PlatformName + metric.NamespaceSeparator + "system_resources"
 )
 
 var (
@@ -165,7 +173,10 @@ func New(
 		return nil, fmt.Errorf("couldn't initialize tracer: %w", err)
 	}
 
-	n.initMetrics()
+	if err := n.initMetrics(); err != nil {
+		return nil, fmt.Errorf("couldn't initialize metrics: %w", err)
+	}
+
 	n.initNAT()
 	if err := n.initAPIServer(); err != nil { // Start the API Server
 		return nil, fmt.Errorf("couldn't initialize API server: %w", err)
@@ -213,7 +224,7 @@ func New(
 		logger.Warn("sybil control is not enforced")
 		n.vdrs = newOverriddenManager(constants.PrimaryNetworkID, n.vdrs)
 	}
-	if err := n.initResourceManager(n.MetricsRegisterer); err != nil {
+	if err := n.initResourceManager(); err != nil {
 		return nil, fmt.Errorf("problem initializing resource manager: %w", err)
 	}
 	n.initCPUTargeter(&config.CPUTargeterConfig)
@@ -363,8 +374,8 @@ type Node struct {
 	DoneShuttingDown sync.WaitGroup
 
 	// Metrics Registerer
-	MetricsRegisterer *prometheus.Registry
-	MetricsGatherer   metrics.MultiGatherer
+	MetricsGatherer        metrics.MultiGatherer
+	MeterDBMetricsGatherer metrics.MultiGatherer
 
 	VMAliaser ids.Aliaser
 	VMManager vms.Manager
@@ -531,6 +542,16 @@ func (n *Node) initNetworking(reg prometheus.Registerer) error {
 	// Configure benchlist
 	n.Config.BenchlistConfig.Validators = n.vdrs
 	n.Config.BenchlistConfig.Benchable = n.chainRouter
+	n.Config.BenchlistConfig.BenchlistRegisterer = metrics.NewLabelGatherer(chains.ChainLabel)
+
+	err = n.MetricsGatherer.Register(
+		benchlistNamespace,
+		n.Config.BenchlistConfig.BenchlistRegisterer,
+	)
+	if err != nil {
+		return err
+	}
+
 	n.benchlistManager = benchlist.NewManager(&n.Config.BenchlistConfig)
 
 	n.uptimeCalculator = uptime.NewLockedCalculator()
@@ -770,7 +791,15 @@ func (n *Node) initDatabase() error {
 		n.DB = versiondb.New(n.DB)
 	}
 
-	n.DB, err = meterdb.New("db", n.MetricsRegisterer, n.DB)
+	meterDBReg, err := metrics.MakeAndRegister(
+		n.MeterDBMetricsGatherer,
+		"all",
+	)
+	if err != nil {
+		return err
+	}
+
+	n.DB, err = meterdb.New(meterDBReg, n.DB)
 	if err != nil {
 		return err
 	}
@@ -891,9 +920,13 @@ func (n *Node) initChains(genesisBytes []byte) error {
 	return n.chainManager.StartChainCreator(platformChain)
 }
 
-func (n *Node) initMetrics() {
-	n.MetricsRegisterer = prometheus.NewRegistry()
-	n.MetricsGatherer = metrics.NewMultiGatherer()
+func (n *Node) initMetrics() error {
+	n.MetricsGatherer = metrics.NewPrefixGatherer()
+	n.MeterDBMetricsGatherer = metrics.NewLabelGatherer(chains.ChainLabel)
+	return n.MetricsGatherer.Register(
+		meterDBNamespace,
+		n.MeterDBMetricsGatherer,
+	)
 }
 
 func (n *Node) initNAT() {
@@ -1043,11 +1076,27 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		cChainID,
 	)
 
+	requestsReg, err := metrics.MakeAndRegister(
+		n.MetricsGatherer,
+		requestsNamespace,
+	)
+	if err != nil {
+		return err
+	}
+
+	responseReg, err := metrics.MakeAndRegister(
+		n.MetricsGatherer,
+		responsesNamespace,
+	)
+	if err != nil {
+		return err
+	}
+
 	n.timeoutManager, err = timeout.NewManager(
 		&n.Config.AdaptiveTimeoutConfig,
 		n.benchlistManager,
-		"requests",
-		n.MetricsRegisterer,
+		requestsReg,
+		responseReg,
 	)
 	if err != nil {
 		return err
@@ -1065,8 +1114,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		n.Config.TrackedSubnets,
 		n.Shutdown,
 		n.Config.RouterHealthConfig,
-		"requests",
-		n.MetricsRegisterer,
+		requestsReg,
 	)
 	if err != nil {
 		return fmt.Errorf("couldn't initialize chain router: %w", err)
@@ -1076,7 +1124,8 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	if err != nil {
 		return fmt.Errorf("failed to initialize subnets: %w", err)
 	}
-	n.chainManager = chains.New(
+
+	n.chainManager, err = chains.New(
 		&chains.ManagerConfig{
 			SybilProtectionEnabled:                  n.Config.SybilProtectionEnabled,
 			StakingTLSSigner:                        n.StakingTLSSigner,
@@ -1108,6 +1157,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 			ShutdownNodeFunc:                        n.Shutdown,
 			MeterVMEnabled:                          n.Config.MeterVMEnabled,
 			Metrics:                                 n.MetricsGatherer,
+			MeterDBMetrics:                          n.MeterDBMetricsGatherer,
 			SubnetConfigs:                           n.Config.SubnetConfigs,
 			ChainConfigs:                            n.Config.ChainConfigs,
 			FrontierPollFrequency:                   n.Config.FrontierPollFrequency,
@@ -1125,6 +1175,9 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 			Subnets:                                 subnets,
 		},
 	)
+	if err != nil {
+		return err
+	}
 
 	// Notify the API server when new chains are created
 	n.chainManager.AddRegistrant(n.APIServer)
@@ -1246,19 +1299,23 @@ func (n *Node) initMetricsAPI() error {
 		return nil
 	}
 
-	if err := n.MetricsGatherer.Register(constants.PlatformName, n.MetricsRegisterer); err != nil {
+	processReg, err := metrics.MakeAndRegister(
+		n.MetricsGatherer,
+		processNamespace,
+	)
+	if err != nil {
 		return err
 	}
 
 	// Current state of process metrics.
 	processCollector := collectors.NewProcessCollector(collectors.ProcessCollectorOpts{})
-	if err := n.MetricsRegisterer.Register(processCollector); err != nil {
+	if err := processReg.Register(processCollector); err != nil {
 		return err
 	}
 
 	// Go process metrics using debug.GCStats.
 	goCollector := collectors.NewGoCollector()
-	if err := n.MetricsRegisterer.Register(goCollector); err != nil {
+	if err := processReg.Register(goCollector); err != nil {
 		return err
 	}
 
@@ -1375,11 +1432,18 @@ func (n *Node) initInfoAPI() error {
 // initHealthAPI initializes the Health API service
 // Assumes n.Log, n.Net, n.APIServer, n.HTTPLog already initialized
 func (n *Node) initHealthAPI() error {
-	healthChecker, err := health.New(n.Log, n.MetricsRegisterer)
+	healthReg, err := metrics.MakeAndRegister(
+		n.MetricsGatherer,
+		healthNamespace,
+	)
 	if err != nil {
 		return err
 	}
-	n.health = healthChecker
+
+	n.health, err = health.New(n.Log, healthReg)
+	if err != nil {
+		return err
+	}
 
 	if !n.Config.HealthAPIEnabled {
 		n.Log.Info("skipping health API initialization because it has been disabled")
@@ -1387,18 +1451,18 @@ func (n *Node) initHealthAPI() error {
 	}
 
 	n.Log.Info("initializing Health API")
-	err = healthChecker.RegisterHealthCheck("network", n.Net, health.ApplicationTag)
+	err = n.health.RegisterHealthCheck("network", n.Net, health.ApplicationTag)
 	if err != nil {
 		return fmt.Errorf("couldn't register network health check: %w", err)
 	}
 
-	err = healthChecker.RegisterHealthCheck("router", n.chainRouter, health.ApplicationTag)
+	err = n.health.RegisterHealthCheck("router", n.chainRouter, health.ApplicationTag)
 	if err != nil {
 		return fmt.Errorf("couldn't register router health check: %w", err)
 	}
 
 	// TODO: add database health to liveness check
-	err = healthChecker.RegisterHealthCheck("database", n.DB, health.ApplicationTag)
+	err = n.health.RegisterHealthCheck("database", n.DB, health.ApplicationTag)
 	if err != nil {
 		return fmt.Errorf("couldn't register database health check: %w", err)
 	}
@@ -1430,7 +1494,7 @@ func (n *Node) initHealthAPI() error {
 		return fmt.Errorf("couldn't register resource health check: %w", err)
 	}
 
-	handler, err := health.NewGetAndPostHandler(n.Log, healthChecker)
+	handler, err := health.NewGetAndPostHandler(n.Log, n.health)
 	if err != nil {
 		return err
 	}
@@ -1445,7 +1509,7 @@ func (n *Node) initHealthAPI() error {
 	}
 
 	err = n.APIServer.AddRoute(
-		health.NewGetHandler(healthChecker.Readiness),
+		health.NewGetHandler(n.health.Readiness),
 		"health",
 		"/readiness",
 	)
@@ -1454,7 +1518,7 @@ func (n *Node) initHealthAPI() error {
 	}
 
 	err = n.APIServer.AddRoute(
-		health.NewGetHandler(healthChecker.Health),
+		health.NewGetHandler(n.health.Health),
 		"health",
 		"/health",
 	)
@@ -1463,7 +1527,7 @@ func (n *Node) initHealthAPI() error {
 	}
 
 	return n.APIServer.AddRoute(
-		health.NewGetHandler(healthChecker.Liveness),
+		health.NewGetHandler(n.health.Liveness),
 		"health",
 		"/liveness",
 	)
@@ -1513,14 +1577,21 @@ func (n *Node) initAPIAliases(genesisBytes []byte) error {
 }
 
 // Initialize [n.resourceManager].
-func (n *Node) initResourceManager(reg prometheus.Registerer) error {
+func (n *Node) initResourceManager() error {
+	systemResourcesRegisterer, err := metrics.MakeAndRegister(
+		n.MetricsGatherer,
+		systemResourcesNamespace,
+	)
+	if err != nil {
+		return err
+	}
 	resourceManager, err := resource.NewManager(
 		n.Log,
 		n.Config.DatabaseConfig.Path,
 		n.Config.SystemTrackerFrequency,
 		n.Config.SystemTrackerCPUHalflife,
 		n.Config.SystemTrackerDiskHalflife,
-		reg,
+		systemResourcesRegisterer,
 	)
 	if err != nil {
 		return err
@@ -1528,7 +1599,19 @@ func (n *Node) initResourceManager(reg prometheus.Registerer) error {
 	n.resourceManager = resourceManager
 	n.resourceManager.TrackProcess(os.Getpid())
 
-	n.resourceTracker, err = tracker.NewResourceTracker(reg, n.resourceManager, &meter.ContinuousFactory{}, n.Config.SystemTrackerProcessingHalflife)
+	resourceTrackerRegisterer, err := metrics.MakeAndRegister(
+		n.MetricsGatherer,
+		resourceTrackerNamespace,
+	)
+	if err != nil {
+		return err
+	}
+	n.resourceTracker, err = tracker.NewResourceTracker(
+		resourceTrackerRegisterer,
+		n.resourceManager,
+		&meter.ContinuousFactory{},
+		n.Config.SystemTrackerProcessingHalflife,
+	)
 	return err
 }
 

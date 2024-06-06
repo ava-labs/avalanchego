@@ -65,6 +65,10 @@ type Registerer interface {
 type ConsensusContext struct {
 	*Context
 
+	// PrimaryAlias is the primary alias of the chain this context exists
+	// within.
+	PrimaryAlias string
+
 	// Registers all consensus metrics.
 	Registerer Registerer
 
