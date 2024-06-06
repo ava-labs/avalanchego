@@ -41,7 +41,7 @@ jobs:
         if: matrix.os == 'custom-arm64-focal'
         run: |
           sudo apt update
-          sudo apt -y install build-essentials
+          sudo apt -y install build-essential
       - name: build_test
         shell: bash
         run: ./scripts/build_test.sh
