@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func UnarySnowballStateTest(t *testing.T, sb *unarySnowball, expectedPreferenceStrength, expectedConfidence int, expectedFinalized bool) {
+func UnarySnowballStateTest(t *testing.T, sb *unarySnowball, expectedPreferenceStrength int, expectedConfidence []int, expectedFinalized bool) {
 	require := require.New(t)
 
 	require.Equal(expectedPreferenceStrength, sb.preferenceStrength)
@@ -26,25 +26,25 @@ func TestUnarySnowball(t *testing.T) {
 	sb := newUnarySnowball(alphaPreference, alphaConfidence, beta)
 
 	sb.RecordPoll(alphaConfidence)
-	UnarySnowballStateTest(t, &sb, 1, 1, false)
+	UnarySnowballStateTest(t, &sb, 1, []int{1}, false)
 
 	sb.RecordPoll(alphaPreference)
-	UnarySnowballStateTest(t, &sb, 2, 0, false)
+	UnarySnowballStateTest(t, &sb, 2, []int{0}, false)
 
 	sb.RecordPoll(alphaConfidence)
-	UnarySnowballStateTest(t, &sb, 3, 1, false)
+	UnarySnowballStateTest(t, &sb, 3, []int{1}, false)
 
 	sb.RecordUnsuccessfulPoll()
-	UnarySnowballStateTest(t, &sb, 3, 0, false)
+	UnarySnowballStateTest(t, &sb, 3, []int{0}, false)
 
 	sb.RecordPoll(alphaConfidence)
-	UnarySnowballStateTest(t, &sb, 4, 1, false)
+	UnarySnowballStateTest(t, &sb, 4, []int{1}, false)
 
 	sbCloneIntf := sb.Clone()
 	require.IsType(&unarySnowball{}, sbCloneIntf)
 	sbClone := sbCloneIntf.(*unarySnowball)
 
-	UnarySnowballStateTest(t, sbClone, 4, 1, false)
+	UnarySnowballStateTest(t, sbClone, 4, []int{1}, false)
 
 	binarySnowball := sbClone.Extend(0)
 
