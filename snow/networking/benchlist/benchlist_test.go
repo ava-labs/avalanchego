@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -49,6 +50,7 @@ func TestBenchlistAdd(t *testing.T) {
 		minimumFailingDuration,
 		duration,
 		maxPortion,
+		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
 	b := benchIntf.(*benchlist)
@@ -173,6 +175,7 @@ func TestBenchlistMaxStake(t *testing.T) {
 		minimumFailingDuration,
 		duration,
 		maxPortion,
+		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
 	b := benchIntf.(*benchlist)
@@ -295,6 +298,7 @@ func TestBenchlistRemove(t *testing.T) {
 		minimumFailingDuration,
 		duration,
 		maxPortion,
+		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
 	b := benchIntf.(*benchlist)

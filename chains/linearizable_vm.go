@@ -6,7 +6,6 @@ package chains
 import (
 	"context"
 
-	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -29,7 +28,6 @@ type initializeOnLinearizeVM struct {
 	vmToInitialize common.VM
 	vmToLinearize  *linearizeOnInitializeVM
 
-	registerer   metrics.MultiGatherer
 	ctx          *snow.Context
 	db           database.Database
 	genesisBytes []byte
@@ -42,7 +40,6 @@ type initializeOnLinearizeVM struct {
 
 func (vm *initializeOnLinearizeVM) Linearize(ctx context.Context, stopVertexID ids.ID) error {
 	vm.vmToLinearize.stopVertexID = stopVertexID
-	vm.ctx.Metrics = vm.registerer
 	return vm.vmToInitialize.Initialize(
 		ctx,
 		vm.ctx,

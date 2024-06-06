@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/cache"
@@ -47,6 +48,7 @@ var _ common.BootstrapableEngine = (*bootstrapper)(nil)
 func New(
 	config Config,
 	onFinished func(ctx context.Context, lastReqID uint32) error,
+	reg prometheus.Registerer,
 ) (common.BootstrapableEngine, error) {
 	b := &bootstrapper{
 		Config: config,
@@ -66,7 +68,7 @@ func New(
 		processedCache: &cache.LRU[ids.ID, struct{}]{Size: cacheSize},
 		onFinished:     onFinished,
 	}
-	return b, b.metrics.Initialize(config.Ctx.AvalancheRegisterer)
+	return b, b.metrics.Initialize(reg)
 }
 
 // Note: To align with the Snowman invariant, it should be guaranteed the VM is

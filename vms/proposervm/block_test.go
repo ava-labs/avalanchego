@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
@@ -74,6 +75,7 @@ func TestPostForkCommonComponents_buildChild(t *testing.T) {
 			DurangoTime:       time.Unix(0, 0),
 			StakingCertLeaf:   &staking.Certificate{},
 			StakingLeafSigner: pk,
+			Registerer:        prometheus.NewRegistry(),
 		},
 		ChainVM:        innerVM,
 		blockBuilderVM: innerBlockBuilderVM,
@@ -386,6 +388,7 @@ func TestPostDurangoBuildChildResetScheduler(t *testing.T) {
 			DurangoTime:       time.Unix(0, 0),
 			StakingCertLeaf:   &staking.Certificate{},
 			StakingLeafSigner: pk,
+			Registerer:        prometheus.NewRegistry(),
 		},
 		ChainVM: block.NewMockChainVM(ctrl),
 		ctx: &snow.Context{
@@ -393,8 +396,9 @@ func TestPostDurangoBuildChildResetScheduler(t *testing.T) {
 			ValidatorState: vdrState,
 			Log:            logging.NoLog{},
 		},
-		Windower:  windower,
-		Scheduler: scheduler,
+		Windower:               windower,
+		Scheduler:              scheduler,
+		proposerBuildSlotGauge: prometheus.NewGauge(prometheus.GaugeOpts{}),
 	}
 	vm.Clock.Set(now)
 

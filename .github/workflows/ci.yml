@@ -28,7 +28,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-12, ubuntu-20.04, ubuntu-22.04, windows-2022, [self-hosted, linux, ARM64, focal], [self-hosted, linux, ARM64, jammy]]
+        os: [macos-12, ubuntu-20.04, ubuntu-22.04, windows-2022, custom-arm64-focal, custom-arm64-jammy]
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-go-for-project-v3
@@ -36,6 +36,12 @@ jobs:
         shell: bash
         if: matrix.os == 'windows-2022'
         run: echo "TIMEOUT=240s" >> $GITHUB_ENV
+      - name: Install build dependencies not available by default on custom-arm64-focal runners
+        shell: bash
+        if: matrix.os == 'custom-arm64-focal'
+        run: |
+          sudo apt update
+          sudo apt -y install build-essential
       - name: build_test
         shell: bash
         run: ./scripts/build_test.sh
@@ -82,7 +88,7 @@ jobs:
           FILTER_BY_OWNER: avalanchego-e2e
       - name: Run e2e tests
         shell: bash
-        run: E2E_SERIAL=1 ./scripts/tests.e2e.sh
+        run: E2E_SERIAL=1 ./scripts/tests.e2e.sh --delay-network-shutdown
         env:
           GH_REPO: ${{ github.repository }}
           GH_WORKFLOW: ${{ github.workflow }}
@@ -132,7 +138,7 @@ jobs:
           GH_JOB_ID: ${{ github.job }}
       - name: Run e2e tests with existing network
         shell: bash
-        run: E2E_SERIAL=1 ./scripts/tests.e2e.existing.sh
+        run: E2E_SERIAL=1 ./scripts/tests.e2e.existing.sh --delay-network-shutdown
         env:
           GH_REPO: ${{ github.repository }}
           GH_WORKFLOW: ${{ github.workflow }}
