@@ -16,7 +16,6 @@ import (
 	"sync"
 	"time"
 
-	avalanchegoMetrics "github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/prometheus/client_golang/prometheus"
@@ -104,6 +103,7 @@ const (
 
 	// Prefixes for metrics gatherers
 	ethMetricsPrefix        = "eth"
+	sdkMetricsPrefix        = "sdk"
 	chainStateMetricsPrefix = "chain_state"
 
 	// p2p app protocols
@@ -229,8 +229,7 @@ type VM struct {
 	validators *p2p.Validators
 
 	// Metrics
-	multiGatherer avalanchegoMetrics.MultiGatherer
-	sdkMetrics    *prometheus.Registry
+	sdkMetrics *prometheus.Registry
 
 	bootstrapped bool
 
@@ -513,22 +512,16 @@ func (vm *VM) Initialize(
 
 func (vm *VM) initializeMetrics() error {
 	vm.sdkMetrics = prometheus.NewRegistry()
-	vm.multiGatherer = avalanchegoMetrics.NewMultiGatherer()
-	// If metrics are enabled, register the default metrics regitry
-	if metrics.Enabled {
-		gatherer := subnetEVMPrometheus.Gatherer(metrics.DefaultRegistry)
-		if err := vm.multiGatherer.Register(ethMetricsPrefix, gatherer); err != nil {
-			return err
-		}
-		if err := vm.multiGatherer.Register("sdk", vm.sdkMetrics); err != nil {
-			return err
-		}
-		// Register [multiGatherer] after registerers have been registered to it
-		if err := vm.ctx.Metrics.Register(vm.multiGatherer); err != nil {
-			return err
-		}
+	// If metrics are enabled, register the default metrics registry
+	if !metrics.Enabled {
+		return nil
 	}
-	return nil
+
+	gatherer := subnetEVMPrometheus.Gatherer(metrics.DefaultRegistry)
+	if err := vm.ctx.Metrics.Register(ethMetricsPrefix, gatherer); err != nil {
+		return err
+	}
+	return vm.ctx.Metrics.Register(sdkMetricsPrefix, vm.sdkMetrics)
 }
 
 func (vm *VM) initializeChain(lastAcceptedHash common.Hash, ethConfig ethconfig.Config) error {
@@ -652,7 +645,11 @@ func (vm *VM) initChainState(lastAcceptedBlock *types.Block) error {
 	}
 	vm.State = state
 
-	return vm.multiGatherer.Register(chainStateMetricsPrefix, chainStateRegisterer)
+	if !metrics.Enabled {
+		return nil
+	}
+
+	return vm.ctx.Metrics.Register(chainStateMetricsPrefix, chainStateRegisterer)
 }
 
 func (vm *VM) SetState(_ context.Context, state snow.State) error {

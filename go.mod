@@ -1,10 +1,10 @@
 module github.com/ava-labs/subnet-evm
 
-go 1.21.10
+go 1.21.11
 
 require (
 	github.com/VictoriaMetrics/fastcache v1.12.1
-	github.com/ava-labs/avalanchego v1.11.6
+	github.com/ava-labs/avalanchego v1.11.7
 	github.com/cespare/cp v0.1.0
 	github.com/crate-crypto/go-ipa v0.0.0-20231025140028-3c0104f4b233
 	github.com/davecgh/go-spew v1.1.1
@@ -54,7 +54,7 @@ require (
 require (
 	github.com/DataDog/zstd v1.5.2 // indirect
 	github.com/NYTimes/gziphandler v1.1.1 // indirect
-	github.com/ava-labs/coreth v0.13.4-rc.0 // indirect
+	github.com/ava-labs/coreth v0.13.5-rc.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bits-and-blooms/bitset v1.10.0 // indirect
 	github.com/btcsuite/btcd/btcec/v2 v2.3.2 // indirect
@@ -135,7 +135,7 @@ require (
 	go.uber.org/zap v1.26.0 // indirect
 	golang.org/x/net v0.23.0 // indirect
 	golang.org/x/term v0.18.0 // indirect
-	golang.org/x/tools v0.16.0 // indirect
+	golang.org/x/tools v0.17.0 // indirect
 	gonum.org/v1/gonum v0.11.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20240123012728-ef4313101c80 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240123012728-ef4313101c80 // indirect
