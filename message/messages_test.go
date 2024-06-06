@@ -25,7 +25,6 @@ func TestMessage(t *testing.T) {
 
 	mb, err := newMsgBuilder(
 		logging.NoLog{},
-		"test",
 		prometheus.NewRegistry(),
 		5*time.Second,
 	)
@@ -67,13 +66,11 @@ func TestMessage(t *testing.T) {
 			bytesSaved:       false,
 		},
 		{
-			desc: "pong message with no compression no subnet uptimes",
+			desc: "pong message with no compression",
 			op:   PongOp,
 			msg: &p2p.Message{
 				Message: &p2p.Message_Pong{
-					Pong: &p2p.Pong{
-						Uptime: 100,
-					},
+					Pong: &p2p.Pong{},
 				},
 			},
 			compressionType:  compression.TypeNone,
@@ -86,26 +83,6 @@ func TestMessage(t *testing.T) {
 			msg: &p2p.Message{
 				Message: &p2p.Message_Ping{
 					Ping: &p2p.Ping{
-						SubnetUptimes: []*p2p.SubnetUptime{
-							{
-								SubnetId: testID[:],
-								Uptime:   100,
-							},
-						},
-					},
-				},
-			},
-			compressionType:  compression.TypeNone,
-			bypassThrottling: true,
-			bytesSaved:       false,
-		},
-		{
-			desc: "pong message with no compression and subnet uptimes",
-			op:   PongOp,
-			msg: &p2p.Message{
-				Message: &p2p.Message_Pong{
-					Pong: &p2p.Pong{
-						Uptime: 100,
 						SubnetUptimes: []*p2p.SubnetUptime{
 							{
 								SubnetId: testID[:],
@@ -690,7 +667,6 @@ func TestInboundMessageToString(t *testing.T) {
 
 	mb, err := newMsgBuilder(
 		logging.NoLog{},
-		"test",
 		prometheus.NewRegistry(),
 		5*time.Second,
 	)
@@ -699,9 +675,7 @@ func TestInboundMessageToString(t *testing.T) {
 	// msg that will become the tested InboundMessage
 	msg := &p2p.Message{
 		Message: &p2p.Message_Pong{
-			Pong: &p2p.Pong{
-				Uptime: 100,
-			},
+			Pong: &p2p.Pong{},
 		},
 	}
 	msgBytes, err := proto.Marshal(msg)
@@ -710,7 +684,7 @@ func TestInboundMessageToString(t *testing.T) {
 	inboundMsg, err := mb.parseInbound(msgBytes, ids.EmptyNodeID, func() {})
 	require.NoError(err)
 
-	require.Equal("NodeID-111111111111111111116DBWJs Op: pong Message: uptime:100", inboundMsg.String())
+	require.Equal("NodeID-111111111111111111116DBWJs Op: pong Message: ", inboundMsg.String())
 
 	internalMsg := InternalGetStateSummaryFrontierFailed(ids.EmptyNodeID, ids.Empty, 1)
 	require.Equal("NodeID-111111111111111111116DBWJs Op: get_state_summary_frontier_failed Message: ChainID: 11111111111111111111111111111111LpoYY RequestID: 1", internalMsg.String())
@@ -723,7 +697,6 @@ func TestEmptyInboundMessage(t *testing.T) {
 
 	mb, err := newMsgBuilder(
 		logging.NoLog{},
-		"test",
 		prometheus.NewRegistry(),
 		5*time.Second,
 	)
@@ -744,7 +717,6 @@ func TestNilInboundMessage(t *testing.T) {
 
 	mb, err := newMsgBuilder(
 		logging.NoLog{},
-		"test",
 		prometheus.NewRegistry(),
 		5*time.Second,
 	)

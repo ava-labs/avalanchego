@@ -45,6 +45,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/proposervm"
 )
 
@@ -59,12 +60,8 @@ const (
 var (
 	// Deprecated key --> deprecation message (i.e. which key replaces it)
 	// TODO: deprecate "BootstrapIDsKey" and "BootstrapIPsKey"
-	commitThresholdDeprecationMsg = fmt.Sprintf("use --%s instead", SnowCommitThresholdKey)
-	deprecatedKeys                = map[string]string{
+	deprecatedKeys = map[string]string{
 		KeystoreAPIEnabledKey: keystoreDeprecationMsg,
-
-		SnowRogueCommitThresholdKey:    commitThresholdDeprecationMsg,
-		SnowVirtuousCommitThresholdKey: commitThresholdDeprecationMsg,
 	}
 
 	errConflictingACPOpinion                  = errors.New("supporting and objecting to the same ACP")
@@ -95,8 +92,7 @@ func getConsensusConfig(v *viper.Viper) snowball.Parameters {
 		K:                     v.GetInt(SnowSampleSizeKey),
 		AlphaPreference:       v.GetInt(SnowPreferenceQuorumSizeKey),
 		AlphaConfidence:       v.GetInt(SnowConfidenceQuorumSizeKey),
-		BetaVirtuous:          v.GetInt(SnowCommitThresholdKey),
-		BetaRogue:             v.GetInt(SnowCommitThresholdKey),
+		Beta:                  v.GetInt(SnowCommitThresholdKey),
 		ConcurrentRepolls:     v.GetInt(SnowConcurrentRepollsKey),
 		OptimalProcessing:     v.GetInt(SnowOptimalProcessingKey),
 		MaxOutstandingItems:   v.GetInt(SnowMaxProcessingKey),
@@ -105,10 +101,6 @@ func getConsensusConfig(v *viper.Viper) snowball.Parameters {
 	if v.IsSet(SnowQuorumSizeKey) {
 		p.AlphaPreference = v.GetInt(SnowQuorumSizeKey)
 		p.AlphaConfidence = p.AlphaPreference
-	}
-	if v.IsSet(SnowRogueCommitThresholdKey) {
-		p.BetaVirtuous = v.GetInt(SnowRogueCommitThresholdKey)
-		p.BetaRogue = v.GetInt(SnowRogueCommitThresholdKey)
 	}
 	return p
 }
@@ -296,6 +288,11 @@ func getNetworkConfig(
 	// Because this node version has scheduled these ACPs, we should notify
 	// peers that we support these upgrades.
 	supportedACPs.Union(constants.ScheduledACPs)
+
+	// To decrease unnecessary network traffic, peers will not be notified of
+	// objection or support of activated ACPs.
+	supportedACPs.Difference(constants.ActivatedACPs)
+	objectedACPs.Difference(constants.ActivatedACPs)
 
 	config := network.Config{
 		ThrottlerConfig: network.ThrottlerConfig{
@@ -767,9 +764,9 @@ func getStakingConfig(v *viper.Viper, networkID uint32) (node.StakingConfig, err
 	return config, nil
 }
 
-func getTxFeeConfig(v *viper.Viper, networkID uint32) genesis.TxFeeConfig {
+func getTxFeeConfig(v *viper.Viper, networkID uint32) fee.StaticConfig {
 	if networkID != constants.MainnetID && networkID != constants.FujiID {
-		return genesis.TxFeeConfig{
+		return fee.StaticConfig{
 			TxFee:                         v.GetUint64(TxFeeKey),
 			CreateAssetTxFee:              v.GetUint64(CreateAssetTxFeeKey),
 			CreateSubnetTxFee:             v.GetUint64(CreateSubnetTxFeeKey),
@@ -949,7 +946,7 @@ func getChainConfigs(v *viper.Viper) (map[string]chains.ChainConfig, error) {
 	return getChainConfigsFromDir(v)
 }
 
-// ReadsChainConfigs reads chain config files from static directories and returns map with contents,
+// readChainConfigPath reads chain config files from static directories and returns map with contents,
 // if successful.
 func readChainConfigPath(chainConfigPath string) (map[string]chains.ChainConfig, error) {
 	chainDirs, err := filepath.Glob(filepath.Join(chainConfigPath, "*"))
@@ -987,7 +984,7 @@ func readChainConfigPath(chainConfigPath string) (map[string]chains.ChainConfig,
 	return chainConfigMap, nil
 }
 
-// getSubnetConfigsFromFlags reads subnet configs from the correct place
+// getSubnetConfigs reads subnet configs from the correct place
 // (flag or file) and returns a non-nil map.
 func getSubnetConfigs(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]subnets.Config, error) {
 	if v.IsSet(SubnetConfigContentKey) {
@@ -1334,7 +1331,7 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 	nodeConfig.FdLimit = v.GetUint64(FdLimitKey)
 
 	// Tx Fee
-	nodeConfig.TxFeeConfig = getTxFeeConfig(v, nodeConfig.NetworkID)
+	nodeConfig.StaticConfig = getTxFeeConfig(v, nodeConfig.NetworkID)
 
 	// Genesis Data
 	genesisStakingCfg := nodeConfig.StakingConfig.StakingConfig

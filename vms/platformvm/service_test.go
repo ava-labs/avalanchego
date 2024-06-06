@@ -38,6 +38,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
@@ -131,11 +132,12 @@ func TestGetTxStatus(t *testing.T) {
 	sm := m.NewSharedMemory(service.vm.ctx.ChainID)
 	peerSharedMemory := m.NewSharedMemory(service.vm.ctx.XChainID)
 
-	// #nosec G404
+	randSrc := rand.NewSource(0)
+
 	utxo := &avax.UTXO{
 		UTXOID: avax.UTXOID{
 			TxID:        ids.GenerateTestID(),
-			OutputIndex: rand.Uint32(),
+			OutputIndex: uint32(randSrc.Int63()),
 		},
 		Asset: avax.Asset{ID: service.vm.ctx.AVAXAssetID},
 		Out: &secp256k1fx.TransferOutput{
@@ -374,6 +376,11 @@ func TestGetBalance(t *testing.T) {
 	require := require.New(t)
 	service, _, _ := defaultService(t)
 
+	var (
+		feeCalc         = fee.NewStaticCalculator(service.vm.Config.StaticFeeConfig, service.vm.Config.UpgradeConfig)
+		createSubnetFee = feeCalc.CalculateFee(&txs.CreateSubnetTx{}, service.vm.clock.Time())
+	)
+
 	// Ensure GetStake is correct for each of the genesis validators
 	genesis, _ := defaultGenesis(t, service.vm.ctx.AVAXAssetID)
 	for idx, utxo := range genesis.UTXOs {
@@ -389,7 +396,7 @@ func TestGetBalance(t *testing.T) {
 		if idx == 0 {
 			// we use the first key to fund a subnet creation in [defaultGenesis].
 			// As such we need to account for the subnet creation fee
-			balance = defaultBalance - service.vm.Config.GetCreateSubnetTxFee(service.vm.clock.Time())
+			balance = defaultBalance - createSubnetFee
 		}
 		require.Equal(avajson.Uint64(balance), reply.Balance)
 		require.Equal(avajson.Uint64(balance), reply.Unlocked)
@@ -762,7 +769,8 @@ func TestGetBlock(t *testing.T) {
 			require := require.New(t)
 			service, _, factory := defaultService(t)
 			service.vm.ctx.Lock.Lock()
-			service.vm.Config.CreateAssetTxFee = 100 * defaultTxFee
+
+			service.vm.StaticFeeConfig.CreateAssetTxFee = 100 * defaultTxFee
 
 			builder, signer := factory.MakeWallet(testSubnet1ControlKeys[0], testSubnet1ControlKeys[1])
 			utx, err := builder.NewCreateChainTx(
@@ -1047,4 +1055,54 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 			require.Equal(json.RawMessage(expectedJSON), reply.Block)
 		})
 	}
+}
+
+func TestServiceGetSubnets(t *testing.T) {
+	require := require.New(t)
+	service, _, _ := defaultService(t)
+
+	testSubnet1ID := testSubnet1.ID()
+
+	var response GetSubnetsResponse
+	require.NoError(service.GetSubnets(nil, &GetSubnetsArgs{}, &response))
+	require.Equal([]APISubnet{
+		{
+			ID: testSubnet1ID,
+			ControlKeys: []string{
+				"P-testing1d6kkj0qh4wcmus3tk59npwt3rluc6en72ngurd",
+				"P-testing17fpqs358de5lgu7a5ftpw2t8axf0pm33983krk",
+				"P-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e",
+			},
+			Threshold: 2,
+		},
+		{
+			ID:          constants.PrimaryNetworkID,
+			ControlKeys: []string{},
+			Threshold:   0,
+		},
+	}, response.Subnets)
+
+	newOwnerIDStr := "P-testing1t73fa4p4dypa4s3kgufuvr6hmprjclw66mgqgm"
+	newOwnerID, err := service.addrManager.ParseLocalAddress(newOwnerIDStr)
+	require.NoError(err)
+	service.vm.state.SetSubnetOwner(testSubnet1ID, &secp256k1fx.OutputOwners{
+		Addrs:     []ids.ShortID{newOwnerID},
+		Threshold: 1,
+	})
+
+	require.NoError(service.GetSubnets(nil, &GetSubnetsArgs{}, &response))
+	require.Equal([]APISubnet{
+		{
+			ID: testSubnet1ID,
+			ControlKeys: []string{
+				newOwnerIDStr,
+			},
+			Threshold: 1,
+		},
+		{
+			ID:          constants.PrimaryNetworkID,
+			ControlKeys: []string{},
+			Threshold:   0,
+		},
+	}, response.Subnets)
 }

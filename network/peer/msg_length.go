@@ -16,7 +16,6 @@ var (
 	errMaxMessageLengthExceeded = errors.New("maximum message length exceeded")
 )
 
-// Assumes the specified [msgLen] will never >= 1<<31.
 func writeMsgLen(msgLen uint32, maxMsgLen uint32) ([wrappers.IntLen]byte, error) {
 	if msgLen > maxMsgLen {
 		return [wrappers.IntLen]byte{}, fmt.Errorf(
@@ -33,7 +32,6 @@ func writeMsgLen(msgLen uint32, maxMsgLen uint32) ([wrappers.IntLen]byte, error)
 	return b, nil
 }
 
-// Assumes the read [msgLen] will never >= 1<<31.
 func readMsgLen(b []byte, maxMsgLen uint32) (uint32, error) {
 	if len(b) != wrappers.IntLen {
 		return 0, fmt.Errorf(

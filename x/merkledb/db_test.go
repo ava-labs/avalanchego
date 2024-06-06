@@ -41,6 +41,7 @@ func newDB(ctx context.Context, db database.Database, config Config) (*merkleDB,
 func newDefaultConfig() Config {
 	return Config{
 		BranchFactor:                BranchFactor16,
+		Hasher:                      DefaultHasher,
 		RootGenConcurrency:          0,
 		HistoryLength:               defaultHistoryLength,
 		ValueNodeCacheSize:          units.MiB,
@@ -964,6 +965,7 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest, token
 				end,
 				root,
 				tokenSize,
+				db.hasher,
 			))
 		case opGenerateChangeProof:
 			root, err := db.GetMerkleRoot(context.Background())

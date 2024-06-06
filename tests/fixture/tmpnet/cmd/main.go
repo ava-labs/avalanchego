@@ -66,6 +66,7 @@ func main() {
 
 			network := &tmpnet.Network{
 				Owner: networkOwner,
+				Nodes: tmpnet.NewNodesOrPanic(int(nodeCount)),
 			}
 
 			// Extreme upper bound, should never take this long
@@ -73,14 +74,13 @@ func main() {
 
 			ctx, cancel := context.WithTimeout(context.Background(), networkStartTimeout)
 			defer cancel()
-			err := tmpnet.StartNewNetwork(
+			err := tmpnet.BootstrapNewNetwork(
 				ctx,
 				os.Stdout,
 				network,
 				rootDir,
 				avalancheGoPath,
 				pluginDir,
-				int(nodeCount),
 			)
 			if err != nil {
 				return err

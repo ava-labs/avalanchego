@@ -39,12 +39,11 @@ func (noOpAcceptor) Accept(*snow.ConsensusContext, ids.ID, []byte) error {
 
 func ConsensusContext(ctx *snow.Context) *snow.ConsensusContext {
 	return &snow.ConsensusContext{
-		Context:             ctx,
-		Registerer:          prometheus.NewRegistry(),
-		AvalancheRegisterer: prometheus.NewRegistry(),
-		BlockAcceptor:       noOpAcceptor{},
-		TxAcceptor:          noOpAcceptor{},
-		VertexAcceptor:      noOpAcceptor{},
+		Context:        ctx,
+		Registerer:     prometheus.NewRegistry(),
+		BlockAcceptor:  noOpAcceptor{},
+		TxAcceptor:     noOpAcceptor{},
+		VertexAcceptor: noOpAcceptor{},
 	}
 }
 
@@ -90,7 +89,7 @@ func Context(tb testing.TB, chainID ids.ID) *snow.Context {
 
 		Log:      logging.NoLog{},
 		BCLookup: aliaser,
-		Metrics:  metrics.NewOptionalGatherer(),
+		Metrics:  metrics.NewMultiGatherer(),
 
 		ValidatorState: validatorState,
 		ChainDataDir:   "",

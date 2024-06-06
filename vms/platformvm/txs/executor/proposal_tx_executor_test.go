@@ -242,7 +242,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 		t.Run(tt.description, func(t *testing.T) {
 			require := require.New(t)
 			env := newEnvironment(t, apricotPhase5)
-			env.config.ApricotPhase3Time = tt.AP3Time
+			env.config.UpgradeConfig.ApricotPhase3Time = tt.AP3Time
 
 			builder, signer := env.factory.MakeWallet(tt.feeKeys...)
 			utx, err := builder.NewAddDelegatorTx(

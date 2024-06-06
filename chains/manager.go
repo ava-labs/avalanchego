@@ -27,7 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/network"
-	"github.com/ava-labs/avalanchego/proto/pb/p2p"
+	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/bootstrap/queue"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/state"
@@ -62,6 +62,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/vms/tracedvm"
 
+	p2ppb "github.com/ava-labs/avalanchego/proto/pb/p2p"
 	smcon "github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	aveng "github.com/ava-labs/avalanchego/snow/engine/avalanche"
 	avbootstrap "github.com/ava-labs/avalanchego/snow/engine/avalanche/bootstrap"
@@ -424,16 +425,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 		return nil, fmt.Errorf("error while registering chain's metrics %w", err)
 	}
 
-	// This converts the prefix for all the Avalanche consensus metrics from
-	// `avalanche_{chainID}_` into `avalanche_{chainID}_avalanche_` so that
-	// there are no conflicts when registering the Snowman consensus metrics.
-	avalancheConsensusMetrics := prometheus.NewRegistry()
-	avalancheDAGNamespace := metric.AppendNamespace(chainNamespace, "avalanche")
-	if err := m.Metrics.Register(avalancheDAGNamespace, avalancheConsensusMetrics); err != nil {
-		return nil, fmt.Errorf("error while registering DAG metrics %w", err)
-	}
-
-	vmMetrics := metrics.NewOptionalGatherer()
+	vmMetrics := metrics.NewMultiGatherer()
 	vmNamespace := metric.AppendNamespace(chainNamespace, "vm")
 	if err := m.Metrics.Register(vmNamespace, vmMetrics); err != nil {
 		return nil, fmt.Errorf("error while registering vm's metrics %w", err)
@@ -462,11 +454,10 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 			ValidatorState: m.validatorState,
 			ChainDataDir:   chainDataDir,
 		},
-		BlockAcceptor:       m.BlockAcceptorGroup,
-		TxAcceptor:          m.TxAcceptorGroup,
-		VertexAcceptor:      m.VertexAcceptorGroup,
-		Registerer:          consensusMetrics,
-		AvalancheRegisterer: avalancheConsensusMetrics,
+		BlockAcceptor:  m.BlockAcceptorGroup,
+		TxAcceptor:     m.TxAcceptorGroup,
+		VertexAcceptor: m.VertexAcceptorGroup,
+		Registerer:     consensusMetrics,
 	}
 
 	// Get a factory for the vm we want to use on our chain
@@ -556,7 +547,7 @@ func (m *manager) createAvalancheChain(
 	defer ctx.Lock.Unlock()
 
 	ctx.State.Set(snow.EngineState{
-		Type:  p2p.EngineType_ENGINE_TYPE_AVALANCHE,
+		Type:  p2ppb.EngineType_ENGINE_TYPE_AVALANCHE,
 		State: snow.Initializing,
 	})
 
@@ -571,11 +562,22 @@ func (m *manager) createAvalancheChain(
 	txBootstrappingDB := prefixdb.New(TxBootstrappingDBPrefix, prefixDB)
 	blockBootstrappingDB := prefixdb.New(BlockBootstrappingDBPrefix, prefixDB)
 
-	vtxBlocker, err := queue.NewWithMissing(vertexBootstrappingDB, "vtx", ctx.AvalancheRegisterer)
+	// This converts the prefix for all the Avalanche consensus metrics from
+	// `avalanche_{chainID}_` into `avalanche_{chainID}_avalanche_` so that
+	// there are no conflicts when registering the Snowman consensus metrics.
+	avalancheConsensusMetrics := prometheus.NewRegistry()
+	primaryAlias := m.PrimaryAliasOrDefault(ctx.ChainID)
+	chainNamespace := metric.AppendNamespace(constants.PlatformName, primaryAlias)
+	avalancheDAGNamespace := metric.AppendNamespace(chainNamespace, "avalanche")
+	if err := m.Metrics.Register(avalancheDAGNamespace, avalancheConsensusMetrics); err != nil {
+		return nil, fmt.Errorf("error while registering DAG metrics %w", err)
+	}
+
+	vtxBlocker, err := queue.NewWithMissing(vertexBootstrappingDB, "vtx", avalancheConsensusMetrics)
 	if err != nil {
 		return nil, err
 	}
-	txBlocker, err := queue.New(txBootstrappingDB, "tx", ctx.AvalancheRegisterer)
+	txBlocker, err := queue.New(txBootstrappingDB, "tx", avalancheConsensusMetrics)
 	if err != nil {
 		return nil, err
 	}
@@ -587,8 +589,9 @@ func (m *manager) createAvalancheChain(
 		m.Net,
 		m.ManagerConfig.Router,
 		m.TimeoutManager,
-		p2p.EngineType_ENGINE_TYPE_AVALANCHE,
+		p2ppb.EngineType_ENGINE_TYPE_AVALANCHE,
 		sb,
+		avalancheConsensusMetrics,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize avalanche sender: %w", err)
@@ -605,8 +608,9 @@ func (m *manager) createAvalancheChain(
 		m.Net,
 		m.ManagerConfig.Router,
 		m.TimeoutManager,
-		p2p.EngineType_ENGINE_TYPE_SNOWMAN,
+		p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
 		sb,
+		ctx.Registerer,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize avalanche sender: %w", err)
@@ -641,17 +645,12 @@ func (m *manager) createAvalancheChain(
 		},
 	)
 
-	avalancheRegisterer := metrics.NewOptionalGatherer()
-	snowmanRegisterer := metrics.NewOptionalGatherer()
-
-	registerer := metrics.NewMultiGatherer()
-	if err := registerer.Register("avalanche", avalancheRegisterer); err != nil {
+	avalancheRegisterer := metrics.NewMultiGatherer()
+	snowmanRegisterer := metrics.NewMultiGatherer()
+	if err := ctx.Context.Metrics.Register("avalanche", avalancheRegisterer); err != nil {
 		return nil, err
 	}
-	if err := registerer.Register("", snowmanRegisterer); err != nil {
-		return nil, err
-	}
-	if err := ctx.Context.Metrics.Register(registerer); err != nil {
+	if err := ctx.Context.Metrics.Register("", snowmanRegisterer); err != nil {
 		return nil, err
 	}
 
@@ -757,11 +756,22 @@ func (m *manager) createAvalancheChain(
 		sampleK = int(bootstrapWeight)
 	}
 
-	connectedValidators, err := tracker.NewMeteredPeers("", ctx.Registerer)
+	connectedValidators, err := tracker.NewMeteredPeers(ctx.Registerer)
 	if err != nil {
 		return nil, fmt.Errorf("error creating peer tracker: %w", err)
 	}
-	vdrs.RegisterCallbackListener(ctx.SubnetID, connectedValidators)
+	vdrs.RegisterSetCallbackListener(ctx.SubnetID, connectedValidators)
+
+	peerTracker, err := p2p.NewPeerTracker(
+		ctx.Log,
+		"peer_tracker",
+		ctx.Registerer,
+		set.Of(ctx.NodeID),
+		nil,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("error creating peer tracker: %w", err)
+	}
 
 	// Asynchronously passes messages from the network to the consensus engine
 	h, err := handler.New(
@@ -774,6 +784,7 @@ func (m *manager) createAvalancheChain(
 		validators.UnhandledSubnetConnector, // avalanche chains don't use subnet connector
 		sb,
 		connectedValidators,
+		peerTracker,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error initializing network handler: %w", err)
@@ -781,7 +792,7 @@ func (m *manager) createAvalancheChain(
 
 	connectedBeacons := tracker.NewPeers()
 	startupTracker := tracker.NewStartup(connectedBeacons, (3*bootstrapWeight+3)/4)
-	vdrs.RegisterCallbackListener(ctx.SubnetID, startupTracker)
+	vdrs.RegisterSetCallbackListener(ctx.SubnetID, startupTracker)
 
 	snowGetHandler, err := snowgetter.New(
 		vmWrappingProposerVM,
@@ -832,6 +843,7 @@ func (m *manager) createAvalancheChain(
 		Sender:                         snowmanMessageSender,
 		BootstrapTracker:               sb,
 		Timer:                          h,
+		PeerTracker:                    peerTracker,
 		AncestorsMaxContainersReceived: m.BootstrapAncestorsMaxContainersReceived,
 		DB:                             blockBootstrappingDB,
 		VM:                             vmWrappingProposerVM,
@@ -855,7 +867,7 @@ func (m *manager) createAvalancheChain(
 		ctx.Log,
 		m.BootstrapMaxTimeGetAncestors,
 		m.BootstrapAncestorsMaxContainersSent,
-		ctx.AvalancheRegisterer,
+		avalancheConsensusMetrics,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize avalanche base message handler: %w", err)
@@ -871,9 +883,9 @@ func (m *manager) createAvalancheChain(
 	avalancheBootstrapperConfig := avbootstrap.Config{
 		AllGetsServer:                  avaGetHandler,
 		Ctx:                            ctx,
-		Beacons:                        vdrs,
 		StartupTracker:                 startupTracker,
 		Sender:                         avalancheMessageSender,
+		PeerTracker:                    peerTracker,
 		AncestorsMaxContainersReceived: m.BootstrapAncestorsMaxContainersReceived,
 		VtxBlocked:                     vtxBlocker,
 		TxBlocked:                      txBlocker,
@@ -887,6 +899,7 @@ func (m *manager) createAvalancheChain(
 	avalancheBootstrapper, err := avbootstrap.New(
 		avalancheBootstrapperConfig,
 		snowmanBootstrapper.Start,
+		avalancheConsensusMetrics,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error initializing avalanche bootstrapper: %w", err)
@@ -936,7 +949,7 @@ func (m *manager) createSnowmanChain(
 	defer ctx.Lock.Unlock()
 
 	ctx.State.Set(snow.EngineState{
-		Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
+		Type:  p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
 		State: snow.Initializing,
 	})
 
@@ -955,8 +968,9 @@ func (m *manager) createSnowmanChain(
 		m.Net,
 		m.ManagerConfig.Router,
 		m.TimeoutManager,
-		p2p.EngineType_ENGINE_TYPE_SNOWMAN,
+		p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
 		sb,
+		ctx.Registerer,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize sender: %w", err)
@@ -1089,11 +1103,22 @@ func (m *manager) createSnowmanChain(
 		sampleK = int(bootstrapWeight)
 	}
 
-	connectedValidators, err := tracker.NewMeteredPeers("", ctx.Registerer)
+	connectedValidators, err := tracker.NewMeteredPeers(ctx.Registerer)
 	if err != nil {
 		return nil, fmt.Errorf("error creating peer tracker: %w", err)
 	}
-	vdrs.RegisterCallbackListener(ctx.SubnetID, connectedValidators)
+	vdrs.RegisterSetCallbackListener(ctx.SubnetID, connectedValidators)
+
+	peerTracker, err := p2p.NewPeerTracker(
+		ctx.Log,
+		"peer_tracker",
+		ctx.Registerer,
+		set.Of(ctx.NodeID),
+		nil,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("error creating peer tracker: %w", err)
+	}
 
 	// Asynchronously passes messages from the network to the consensus engine
 	h, err := handler.New(
@@ -1106,6 +1131,7 @@ func (m *manager) createSnowmanChain(
 		subnetConnector,
 		sb,
 		connectedValidators,
+		peerTracker,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize message handler: %w", err)
@@ -1113,7 +1139,7 @@ func (m *manager) createSnowmanChain(
 
 	connectedBeacons := tracker.NewPeers()
 	startupTracker := tracker.NewStartup(connectedBeacons, (3*bootstrapWeight+3)/4)
-	beacons.RegisterCallbackListener(ctx.SubnetID, startupTracker)
+	beacons.RegisterSetCallbackListener(ctx.SubnetID, startupTracker)
 
 	snowGetHandler, err := snowgetter.New(
 		vm,
@@ -1165,6 +1191,7 @@ func (m *manager) createSnowmanChain(
 		Sender:                         messageSender,
 		BootstrapTracker:               sb,
 		Timer:                          h,
+		PeerTracker:                    peerTracker,
 		AncestorsMaxContainersReceived: m.BootstrapAncestorsMaxContainersReceived,
 		DB:                             bootstrappingDB,
 		VM:                             vm,
