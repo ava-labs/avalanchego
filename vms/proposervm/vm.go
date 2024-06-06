@@ -31,6 +31,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/proposervm/scheduler"
 	"github.com/ava-labs/avalanchego/vms/proposervm/state"
 	"github.com/ava-labs/avalanchego/vms/proposervm/tree"
+	"github.com/prometheus/client_golang/prometheus"
 
 	statelessblock "github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
@@ -234,8 +235,8 @@ func (vm *VM) Initialize(
 	})
 
 	return utils.Err(
-		registerer.Register(vm.proposerBuildSlotGauge),
-		registerer.Register(vm.acceptedBlocksSlotHistogram),
+		vm.Config.Registerer.Register(vm.proposerBuildSlotGauge),
+		vm.Config.Registerer.Register(vm.acceptedBlocksSlotHistogram),
 	)
 }
 
