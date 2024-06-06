@@ -241,7 +241,7 @@ func (vm *VM) Initialize(
 
 	vm.acceptedBlocksSlotHistogram = prometheus.NewHistogram(
 		prometheus.HistogramOpts{
-			Name: "accepted_blocks_slot_histogram",
+			Name: "accepted_blocks_slot",
 			Help: "the post-durango slot in which the block was accepted at",
 			// define the following ranges:
 			// (-inf, 0]
