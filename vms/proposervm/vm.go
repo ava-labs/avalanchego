@@ -100,7 +100,8 @@ type VM struct {
 	// lastAcceptedHeight is set to the last accepted PostForkBlock's height.
 	lastAcceptedHeight uint64
 
-	// proposerBuildSlotGauge is the metric gauge used when reporting the current slot block build built.
+	// proposerBuildSlotGauge reports the slot index when this node may attempt
+	// to build a block.
 	proposerBuildSlotGauge prometheus.Gauge
 
 	// acceptedBlocksSlotHistogram is the metric histogram that is being updated once a block gets accepted with it's corresponding slot.
