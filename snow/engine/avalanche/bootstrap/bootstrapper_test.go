@@ -76,10 +76,10 @@ func newConfig(t *testing.T) (Config, ids.NodeID, *common.SenderTest, *vertex.Te
 	peer := ids.GenerateTestNodeID()
 	require.NoError(vdrs.AddStaker(constants.PrimaryNetworkID, peer, nil, ids.Empty, 1))
 
-	vtxBlocker, err := queue.NewWithMissing(prefixdb.New([]byte("vtx"), db), "vtx", ctx.AvalancheRegisterer)
+	vtxBlocker, err := queue.NewWithMissing(prefixdb.New([]byte("vtx"), db), "vtx", prometheus.NewRegistry())
 	require.NoError(err)
 
-	txBlocker, err := queue.New(prefixdb.New([]byte("tx"), db), "tx", ctx.AvalancheRegisterer)
+	txBlocker, err := queue.New(prefixdb.New([]byte("tx"), db), "tx", prometheus.NewRegistry())
 	require.NoError(err)
 
 	peerTracker := tracker.NewPeers()
@@ -88,7 +88,7 @@ func newConfig(t *testing.T) (Config, ids.NodeID, *common.SenderTest, *vertex.Te
 	startupTracker := tracker.NewStartup(peerTracker, totalWeight/2+1)
 	vdrs.RegisterSetCallbackListener(constants.PrimaryNetworkID, startupTracker)
 
-	avaGetHandler, err := getter.New(manager, sender, ctx.Log, time.Second, 2000, ctx.AvalancheRegisterer)
+	avaGetHandler, err := getter.New(manager, sender, ctx.Log, time.Second, 2000, prometheus.NewRegistry())
 	require.NoError(err)
 
 	p2pTracker, err := p2p.NewPeerTracker(
@@ -172,6 +172,7 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 			})
 			return nil
 		},
+		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
 
@@ -278,6 +279,7 @@ func TestBootstrapperByzantineResponses(t *testing.T) {
 			})
 			return nil
 		},
+		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
 
@@ -444,6 +446,7 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 			})
 			return nil
 		},
+		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
 
@@ -567,6 +570,7 @@ func TestBootstrapperIncompleteAncestors(t *testing.T) {
 			})
 			return nil
 		},
+		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
 
