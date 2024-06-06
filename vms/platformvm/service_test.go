@@ -169,7 +169,7 @@ func TestGetTxStatus(t *testing.T) {
 
 	mutableSharedMemory.SharedMemory = sm
 
-	builder, signer := factory.MakeWallet(recipientKey)
+	builder, signer := factory.NewWallet(recipientKey)
 	utx, err := builder.NewImportTx(
 		service.vm.ctx.XChainID,
 		&secp256k1fx.OutputOwners{
@@ -222,7 +222,7 @@ func TestGetTx(t *testing.T) {
 		{
 			"standard block",
 			func(_ *Service, factory *txstest.WalletFactory) (*txs.Tx, error) {
-				builder, signer := factory.MakeWallet(testSubnet1ControlKeys[0], testSubnet1ControlKeys[1])
+				builder, signer := factory.NewWallet(testSubnet1ControlKeys[0], testSubnet1ControlKeys[1])
 				utx, err := builder.NewCreateChainTx(
 					testSubnet1.ID(),
 					[]byte{},
@@ -249,7 +249,7 @@ func TestGetTx(t *testing.T) {
 					Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
 				}
 
-				builder, txSigner := factory.MakeWallet(keys[0])
+				builder, txSigner := factory.NewWallet(keys[0])
 				utx, err := builder.NewAddPermissionlessValidatorTx(
 					&txs.SubnetValidator{
 						Validator: txs.Validator{
@@ -277,7 +277,7 @@ func TestGetTx(t *testing.T) {
 		{
 			"atomic block",
 			func(service *Service, factory *txstest.WalletFactory) (*txs.Tx, error) {
-				builder, signer := factory.MakeWallet(keys[0])
+				builder, signer := factory.NewWallet(keys[0])
 				utx, err := builder.NewExportTx(
 					service.vm.ctx.XChainID,
 					[]*avax.TransferableOutput{{
@@ -479,7 +479,7 @@ func TestGetStake(t *testing.T) {
 	delegatorNodeID := genesisNodeIDs[0]
 	delegatorStartTime := defaultValidateStartTime
 	delegatorEndTime := defaultGenesisTime.Add(defaultMinStakingDuration)
-	builder, signer := factory.MakeWallet(keys[0])
+	builder, signer := factory.NewWallet(keys[0])
 	utx, err := builder.NewAddDelegatorTx(
 		&txs.Validator{
 			NodeID: delegatorNodeID,
@@ -630,7 +630,7 @@ func TestGetCurrentValidators(t *testing.T) {
 
 	service.vm.ctx.Lock.Lock()
 
-	builder, signer := factory.MakeWallet(keys[0])
+	builder, signer := factory.NewWallet(keys[0])
 	utx, err := builder.NewAddDelegatorTx(
 		&txs.Validator{
 			NodeID: validatorNodeID,
@@ -772,7 +772,7 @@ func TestGetBlock(t *testing.T) {
 
 			service.vm.StaticFeeConfig.CreateAssetTxFee = 100 * defaultTxFee
 
-			builder, signer := factory.MakeWallet(testSubnet1ControlKeys[0], testSubnet1ControlKeys[1])
+			builder, signer := factory.NewWallet(testSubnet1ControlKeys[0], testSubnet1ControlKeys[1])
 			utx, err := builder.NewCreateChainTx(
 				testSubnet1.ID(),
 				[]byte{},

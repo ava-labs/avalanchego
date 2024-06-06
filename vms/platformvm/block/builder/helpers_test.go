@@ -236,7 +236,7 @@ func newEnvironment(t *testing.T, f fork) *environment { //nolint:unparam
 func addSubnet(t *testing.T, env *environment) {
 	require := require.New(t)
 
-	builder, signer := env.factory.MakeWallet(preFundedKeys[0])
+	builder, signer := env.factory.NewWallet(preFundedKeys[0])
 	utx, err := builder.NewCreateSubnetTx(
 		&secp256k1fx.OutputOwners{
 			Threshold: 2,

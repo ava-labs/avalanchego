@@ -124,7 +124,7 @@ func TestNewImportTx(t *testing.T) {
 
 			env.msm.SharedMemory = tt.sharedMemory
 
-			builder, signer := env.factory.MakeWallet(tt.sourceKeys...)
+			builder, signer := env.factory.NewWallet(tt.sourceKeys...)
 			utx, err := builder.NewImportTx(
 				tt.sourceChainID,
 				to,

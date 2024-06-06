@@ -31,7 +31,7 @@ type WalletFactory struct {
 	state state.State
 }
 
-func (w *WalletFactory) MakeWallet(keys ...*secp256k1.PrivateKey) (builder.Builder, signer.Signer) {
+func (w *WalletFactory) NewWallet(keys ...*secp256k1.PrivateKey) (builder.Builder, signer.Signer) {
 	var (
 		kc      = secp256k1fx.NewKeychain(keys...)
 		addrs   = kc.Addresses()

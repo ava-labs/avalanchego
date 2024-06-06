@@ -63,7 +63,7 @@ func TestAtomicTxImports(t *testing.T) {
 		}}},
 	}))
 
-	builder, signer := env.factory.MakeWallet(recipientKey)
+	builder, signer := env.factory.NewWallet(recipientKey)
 	utx, err := builder.NewImportTx(
 		env.ctx.XChainID,
 		&secp256k1fx.OutputOwners{
