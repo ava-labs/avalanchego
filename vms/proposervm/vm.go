@@ -232,7 +232,7 @@ func (vm *VM) Initialize(
 	vm.proposerBuildSlotGauge = prometheus.NewGauge(
 		prometheus.GaugeOpts{
 			Name: "block_building_slot",
-			Help: "the post-durango slot in which the block was built",
+			Help: "the slot that this node may attempt to build a block",
 		})
 
 	if err = registerer.Register(vm.proposerBuildSlotGauge); err != nil {
