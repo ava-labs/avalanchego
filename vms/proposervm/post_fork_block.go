@@ -21,7 +21,7 @@ type postForkBlock struct {
 	// slot of the proposer that produced this block.
 	// It is populated in verifyPostDurangoBlockDelay.
 	// It is used to report metrics during Accept.
-	slot uint64
+	slot *uint64
 }
 
 // Accept:
@@ -35,8 +35,8 @@ func (b *postForkBlock) Accept(ctx context.Context) error {
 	if err := b.acceptInnerBlk(ctx); err != nil {
 		return err
 	}
-	if b.slot != unspecifiedSlotIndex {
-		b.vm.acceptedBlocksSlotHistogram.Observe(float64(b.slot))
+	if b.slot != nil {
+		b.vm.acceptedBlocksSlotHistogram.Observe(float64(*b.slot))
 	}
 	return nil
 }

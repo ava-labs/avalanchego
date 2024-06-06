@@ -573,7 +573,6 @@ func (vm *VM) parsePostForkBlock(ctx context.Context, b []byte) (PostForkBlock, 
 				innerBlk: innerBlk,
 				status:   choices.Processing,
 			},
-			slot: unspecifiedSlotIndex,
 		}
 	} else {
 		blk = &postForkOption{
@@ -628,7 +627,6 @@ func (vm *VM) getPostForkBlock(ctx context.Context, blkID ids.ID) (PostForkBlock
 				innerBlk: innerBlk,
 				status:   status,
 			},
-			slot: unspecifiedSlotIndex,
 		}, nil
 	}
 	return &postForkOption{

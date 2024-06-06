@@ -7,7 +7,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math"
 	"time"
 
 	"go.uber.org/zap"
@@ -25,12 +24,6 @@ import (
 const (
 	// allowable block issuance in the future
 	maxSkew = 10 * time.Second
-
-	// unspecifiedSlotIndex is the default value used for a proposal slot index,
-	// prior of being populated by the actual slot index.
-	// Because the slot index is zero based, we use a non-zero value to signal
-	// that the value hasn't been populated.
-	unspecifiedSlotIndex = math.MaxUint64
 )
 
 var (
@@ -277,7 +270,6 @@ func (p *postForkCommonComponents) buildChild(
 			innerBlk: innerBlock,
 			status:   choices.Processing,
 		},
-		slot: unspecifiedSlotIndex,
 	}
 
 	p.vm.ctx.Log.Info("built block",
@@ -377,14 +369,15 @@ func (p *postForkCommonComponents) verifyPostDurangoBlockDelay(
 		proposerID   = blk.Proposer()
 	)
 	// populate the slot for the block.
-	blk.slot = proposer.TimeToSlot(parentTimestamp, blkTimestamp)
+	blk.slot = new(uint64)
+	*blk.slot = proposer.TimeToSlot(parentTimestamp, blkTimestamp)
 
 	// find the expected proposer
 	expectedProposerID, err := p.vm.Windower.ExpectedProposer(
 		ctx,
 		blkHeight,
 		parentPChainHeight,
-		blk.slot,
+		*blk.slot,
 	)
 	switch {
 	case errors.Is(err, proposer.ErrAnyoneCanPropose):

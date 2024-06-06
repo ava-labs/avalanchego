@@ -248,7 +248,6 @@ func (b *preForkBlock) buildChild(ctx context.Context) (Block, error) {
 			innerBlk: innerBlock,
 			status:   choices.Processing,
 		},
-		slot: unspecifiedSlotIndex,
 	}
 
 	b.vm.ctx.Log.Info("built block",
