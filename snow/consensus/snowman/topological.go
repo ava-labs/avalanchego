@@ -21,6 +21,7 @@ import (
 
 var (
 	errDuplicateAdd            = errors.New("duplicate block add")
+	errUnknownParentBlock      = errors.New("unknown parent block")
 	errTooManyProcessingBlocks = errors.New("too many processing blocks")
 	errBlockProcessingTooLong  = errors.New("block processing too long")
 
@@ -137,7 +138,7 @@ func (ts *Topological) NumProcessing() int {
 	return len(ts.blocks) - 1
 }
 
-func (ts *Topological) Add(ctx context.Context, blk Block) error {
+func (ts *Topological) Add(blk Block) error {
 	blkID := blk.ID()
 	height := blk.Height()
 	ts.ctx.Log.Verbo("adding block",
@@ -145,12 +146,8 @@ func (ts *Topological) Add(ctx context.Context, blk Block) error {
 		zap.Uint64("height", height),
 	)
 
-	// Make sure a block is not inserted twice. This enforces the invariant that
-	// blocks are always added in topological order. Essentially, a block that
-	// is being added should never have a child that was already added.
-	// Additionally, this prevents any edge cases that may occur due to adding
-	// different blocks with the same ID.
-	if ts.Decided(blk) || ts.Processing(blkID) {
+	// Make sure a block is not inserted twice.
+	if ts.Processing(blkID) {
 		return errDuplicateAdd
 	}
 
@@ -160,20 +157,7 @@ func (ts *Topological) Add(ctx context.Context, blk Block) error {
 	parentID := blk.Parent()
 	parentNode, ok := ts.blocks[parentID]
 	if !ok {
-		ts.ctx.Log.Verbo("block ancestor is missing, being rejected",
-			zap.Stringer("blkID", blkID),
-			zap.Uint64("height", height),
-			zap.Stringer("parentID", parentID),
-		)
-
-		// If the ancestor is missing, this means the ancestor must have already
-		// been pruned. Therefore, the dependent should be transitively
-		// rejected.
-		if err := blk.Reject(ctx); err != nil {
-			return err
-		}
-		ts.metrics.Rejected(blkID, ts.pollNumber, len(blk.Bytes()))
-		return nil
+		return errUnknownParentBlock
 	}
 
 	// add the block as a child of its parent, and add the block to the tree
