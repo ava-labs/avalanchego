@@ -1079,8 +1079,6 @@ func TestNonCanonicalAccept(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	vm1.eth.APIBackend.SetAllowUnfinalizedQueries(true)
-
 	blkBHeight := vm1BlkB.Height()
 	blkBHash := vm1BlkB.(*chain.BlockWrapper).Block.(*Block).ethBlock.Hash()
 	if b := vm1.blockChain.GetBlockByNumber(blkBHeight); b.Hash() != blkBHash {
@@ -1249,8 +1247,6 @@ func TestStickyPreference(t *testing.T) {
 	if err := vm1.SetPreference(context.Background(), vm1BlkB.ID()); err != nil {
 		t.Fatal(err)
 	}
-
-	vm1.eth.APIBackend.SetAllowUnfinalizedQueries(true)
 
 	blkBHeight := vm1BlkB.Height()
 	blkBHash := vm1BlkB.(*chain.BlockWrapper).Block.(*Block).ethBlock.Hash()
