@@ -25,9 +25,10 @@ const (
 	// allowable block issuance in the future
 	maxSkew = 10 * time.Second
 
-	// unspecifiedSlotIndex defines the default value being used for a proposal slot index, prior of being populated
-	// by the actual slot index. Given that the slot index is zero base, we would want to use an "invalid" value as
-	// non-zero.
+	// unspecifiedSlotIndex is the default value used for a proposal slot index,
+	// prior of being populated by the actual slot index.
+	// Because the slot index is zero based, we use a non-zero value to signal
+	// that the value hasn't been populated.
 	unspecifiedSlotIndex = ^uint64(0)
 )
 
