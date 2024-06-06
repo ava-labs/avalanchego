@@ -4,13 +4,13 @@ module github.com/ava-labs/avalanchego
 // CONTRIBUTING.md
 // README.md
 // go.mod (here)
-go 1.21.10
+go 1.21.11
 
 require (
 	github.com/DataDog/zstd v1.5.2
 	github.com/NYTimes/gziphandler v1.1.1
 	github.com/antithesishq/antithesis-sdk-go v0.3.8
-	github.com/ava-labs/coreth v0.13.5-remove-optional-gatherer.2
+	github.com/ava-labs/coreth v0.13.5-rc.0
 	github.com/ava-labs/ledger-avalanche/go v0.0.0-20231102202641-ae2ebdaeac34
 	github.com/btcsuite/btcd/btcutil v1.1.3
 	github.com/cockroachdb/pebble v0.0.0-20230928194634-aa077af62593

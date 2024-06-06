@@ -425,15 +425,6 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 		return nil, fmt.Errorf("error while registering chain's metrics %w", err)
 	}
 
-	// This converts the prefix for all the Avalanche consensus metrics from
-	// `avalanche_{chainID}_` into `avalanche_{chainID}_avalanche_` so that
-	// there are no conflicts when registering the Snowman consensus metrics.
-	avalancheConsensusMetrics := prometheus.NewRegistry()
-	avalancheDAGNamespace := metric.AppendNamespace(chainNamespace, "avalanche")
-	if err := m.Metrics.Register(avalancheDAGNamespace, avalancheConsensusMetrics); err != nil {
-		return nil, fmt.Errorf("error while registering DAG metrics %w", err)
-	}
-
 	vmMetrics := metrics.NewMultiGatherer()
 	vmNamespace := metric.AppendNamespace(chainNamespace, "vm")
 	if err := m.Metrics.Register(vmNamespace, vmMetrics); err != nil {
@@ -463,11 +454,10 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 			ValidatorState: m.validatorState,
 			ChainDataDir:   chainDataDir,
 		},
-		BlockAcceptor:       m.BlockAcceptorGroup,
-		TxAcceptor:          m.TxAcceptorGroup,
-		VertexAcceptor:      m.VertexAcceptorGroup,
-		Registerer:          consensusMetrics,
-		AvalancheRegisterer: avalancheConsensusMetrics,
+		BlockAcceptor:  m.BlockAcceptorGroup,
+		TxAcceptor:     m.TxAcceptorGroup,
+		VertexAcceptor: m.VertexAcceptorGroup,
+		Registerer:     consensusMetrics,
 	}
 
 	// Get a factory for the vm we want to use on our chain
@@ -572,11 +562,22 @@ func (m *manager) createAvalancheChain(
 	txBootstrappingDB := prefixdb.New(TxBootstrappingDBPrefix, prefixDB)
 	blockBootstrappingDB := prefixdb.New(BlockBootstrappingDBPrefix, prefixDB)
 
-	vtxBlocker, err := queue.NewWithMissing(vertexBootstrappingDB, "vtx", ctx.AvalancheRegisterer)
+	// This converts the prefix for all the Avalanche consensus metrics from
+	// `avalanche_{chainID}_` into `avalanche_{chainID}_avalanche_` so that
+	// there are no conflicts when registering the Snowman consensus metrics.
+	avalancheConsensusMetrics := prometheus.NewRegistry()
+	primaryAlias := m.PrimaryAliasOrDefault(ctx.ChainID)
+	chainNamespace := metric.AppendNamespace(constants.PlatformName, primaryAlias)
+	avalancheDAGNamespace := metric.AppendNamespace(chainNamespace, "avalanche")
+	if err := m.Metrics.Register(avalancheDAGNamespace, avalancheConsensusMetrics); err != nil {
+		return nil, fmt.Errorf("error while registering DAG metrics %w", err)
+	}
+
+	vtxBlocker, err := queue.NewWithMissing(vertexBootstrappingDB, "vtx", avalancheConsensusMetrics)
 	if err != nil {
 		return nil, err
 	}
-	txBlocker, err := queue.New(txBootstrappingDB, "tx", ctx.AvalancheRegisterer)
+	txBlocker, err := queue.New(txBootstrappingDB, "tx", avalancheConsensusMetrics)
 	if err != nil {
 		return nil, err
 	}
@@ -590,6 +591,7 @@ func (m *manager) createAvalancheChain(
 		m.TimeoutManager,
 		p2ppb.EngineType_ENGINE_TYPE_AVALANCHE,
 		sb,
+		avalancheConsensusMetrics,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize avalanche sender: %w", err)
@@ -608,6 +610,7 @@ func (m *manager) createAvalancheChain(
 		m.TimeoutManager,
 		p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
 		sb,
+		ctx.Registerer,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize avalanche sender: %w", err)
@@ -864,7 +867,7 @@ func (m *manager) createAvalancheChain(
 		ctx.Log,
 		m.BootstrapMaxTimeGetAncestors,
 		m.BootstrapAncestorsMaxContainersSent,
-		ctx.AvalancheRegisterer,
+		avalancheConsensusMetrics,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize avalanche base message handler: %w", err)
@@ -896,6 +899,7 @@ func (m *manager) createAvalancheChain(
 	avalancheBootstrapper, err := avbootstrap.New(
 		avalancheBootstrapperConfig,
 		snowmanBootstrapper.Start,
+		avalancheConsensusMetrics,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error initializing avalanche bootstrapper: %w", err)
@@ -966,6 +970,7 @@ func (m *manager) createSnowmanChain(
 		m.TimeoutManager,
 		p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
 		sb,
+		ctx.Registerer,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize sender: %w", err)
