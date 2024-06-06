@@ -18,8 +18,9 @@ type postForkBlock struct {
 	block.SignedBlock
 	postForkCommonComponents
 
-	// slot is used to store the selected slot for this block. It's being used during Accept, and populated
-	// during verifyPostDurangoBlockDelay.
+	// slot of the proposer that produced this block.
+	// It is populated in verifyPostDurangoBlockDelay.
+	// It is used to report metrics during Accept.
 	slot uint64
 }
 
