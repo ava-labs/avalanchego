@@ -73,19 +73,19 @@ import (
 )
 
 const (
+	ChainLabel = "chain"
+
 	defaultChannelSize = 1
 	initialQueueSize   = 3
 
-	handlerNamespace      = constants.PlatformName + metric.NamespaceSeparator + "handler"
-	stakeNamespace        = constants.PlatformName + metric.NamespaceSeparator + "stake"
-	p2pNamespace          = constants.PlatformName + metric.NamespaceSeparator + "p2p"
-	snowmanNamespace      = constants.PlatformName + metric.NamespaceSeparator + "snowman"
 	avalancheNamespace    = constants.PlatformName + metric.NamespaceSeparator + "avalanche"
-	proposervmNamespace   = constants.PlatformName + metric.NamespaceSeparator + "proposervm"
+	handlerNamespace      = constants.PlatformName + metric.NamespaceSeparator + "handler"
 	meterchainvmNamespace = constants.PlatformName + metric.NamespaceSeparator + "meterchainvm"
 	meterdagvmNamespace   = constants.PlatformName + metric.NamespaceSeparator + "meterdagvm"
-
-	ChainLabel = "chain"
+	proposervmNamespace   = constants.PlatformName + metric.NamespaceSeparator + "proposervm"
+	p2pNamespace          = constants.PlatformName + metric.NamespaceSeparator + "p2p"
+	snowmanNamespace      = constants.PlatformName + metric.NamespaceSeparator + "snowman"
+	stakeNamespace        = constants.PlatformName + metric.NamespaceSeparator + "stake"
 )
 
 var (
@@ -272,46 +272,26 @@ type manager struct {
 	// snowman++ related interface to allow validators retrieval
 	validatorState validators.State
 
-	handlerGatherer      metrics.MultiGatherer            // chainID
-	stakeGatherer        metrics.MultiGatherer            // chainID
-	p2pGatherer          metrics.MultiGatherer            // chainID
-	snowmanGatherer      metrics.MultiGatherer            // chainID
 	avalancheGatherer    metrics.MultiGatherer            // chainID
-	proposervmGatherer   metrics.MultiGatherer            // chainID
+	handlerGatherer      metrics.MultiGatherer            // chainID
 	meterChainVMGatherer metrics.MultiGatherer            // chainID
 	meterDAGVMGatherer   metrics.MultiGatherer            // chainID
+	proposervmGatherer   metrics.MultiGatherer            // chainID
+	p2pGatherer          metrics.MultiGatherer            // chainID
+	snowmanGatherer      metrics.MultiGatherer            // chainID
+	stakeGatherer        metrics.MultiGatherer            // chainID
 	vmGatherer           map[ids.ID]metrics.MultiGatherer // vmID -> chainID
 }
 
 // New returns a new Manager
 func New(config *ManagerConfig) (Manager, error) {
-	handlerGatherer := metrics.NewLabelGatherer(ChainLabel)
-	if err := config.Metrics.Register(handlerNamespace, handlerGatherer); err != nil {
-		return nil, err
-	}
-
-	stakeGatherer := metrics.NewLabelGatherer(ChainLabel)
-	if err := config.Metrics.Register(stakeNamespace, stakeGatherer); err != nil {
-		return nil, err
-	}
-
-	p2pGatherer := metrics.NewLabelGatherer(ChainLabel)
-	if err := config.Metrics.Register(p2pNamespace, p2pGatherer); err != nil {
-		return nil, err
-	}
-
-	snowmanGatherer := metrics.NewLabelGatherer(ChainLabel)
-	if err := config.Metrics.Register(snowmanNamespace, snowmanGatherer); err != nil {
-		return nil, err
-	}
-
 	avalancheGatherer := metrics.NewLabelGatherer(ChainLabel)
 	if err := config.Metrics.Register(avalancheNamespace, avalancheGatherer); err != nil {
 		return nil, err
 	}
 
-	proposervmGatherer := metrics.NewLabelGatherer(ChainLabel)
-	if err := config.Metrics.Register(proposervmNamespace, proposervmGatherer); err != nil {
+	handlerGatherer := metrics.NewLabelGatherer(ChainLabel)
+	if err := config.Metrics.Register(handlerNamespace, handlerGatherer); err != nil {
 		return nil, err
 	}
 
@@ -325,6 +305,26 @@ func New(config *ManagerConfig) (Manager, error) {
 		return nil, err
 	}
 
+	proposervmGatherer := metrics.NewLabelGatherer(ChainLabel)
+	if err := config.Metrics.Register(proposervmNamespace, proposervmGatherer); err != nil {
+		return nil, err
+	}
+
+	p2pGatherer := metrics.NewLabelGatherer(ChainLabel)
+	if err := config.Metrics.Register(p2pNamespace, p2pGatherer); err != nil {
+		return nil, err
+	}
+
+	snowmanGatherer := metrics.NewLabelGatherer(ChainLabel)
+	if err := config.Metrics.Register(snowmanNamespace, snowmanGatherer); err != nil {
+		return nil, err
+	}
+
+	stakeGatherer := metrics.NewLabelGatherer(ChainLabel)
+	if err := config.Metrics.Register(stakeNamespace, stakeGatherer); err != nil {
+		return nil, err
+	}
+
 	return &manager{
 		Aliaser:                ids.NewAliaser(),
 		ManagerConfig:          *config,
@@ -333,14 +333,14 @@ func New(config *ManagerConfig) (Manager, error) {
 		unblockChainCreatorCh:  make(chan struct{}),
 		chainCreatorShutdownCh: make(chan struct{}),
 
-		handlerGatherer:      handlerGatherer,
-		stakeGatherer:        stakeGatherer,
-		p2pGatherer:          p2pGatherer,
-		snowmanGatherer:      snowmanGatherer,
 		avalancheGatherer:    avalancheGatherer,
-		proposervmGatherer:   proposervmGatherer,
+		handlerGatherer:      handlerGatherer,
 		meterChainVMGatherer: meterChainVMGatherer,
 		meterDAGVMGatherer:   meterDAGVMGatherer,
+		proposervmGatherer:   proposervmGatherer,
+		p2pGatherer:          p2pGatherer,
+		snowmanGatherer:      snowmanGatherer,
+		stakeGatherer:        stakeGatherer,
 		vmGatherer:           make(map[ids.ID]metrics.MultiGatherer),
 	}, nil
 }
