@@ -210,7 +210,7 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 			cfg.StaticFeeConfig.CreateBlockchainTxFee = test.fee
 			factory := txstest.NewWalletFactory(env.ctx, &cfg, env.state)
 			builder, signer := factory.MakeWallet(preFundedKeys...)
-			tx, err := builder.NewCreateChainTx(
+			utx, err := builder.NewCreateChainTx(
 				testSubnet1.ID(),
 				nil,
 				ids.GenerateTestID(),
