@@ -1116,7 +1116,7 @@ func (t *Transitive) addUnverifiedBlockToConsensus(
 		zap.Stringer("blkID", blkID),
 		zap.Uint64("height", blkHeight),
 	)
-	return true, t.Consensus.Add(ctx, &memoryBlock{
+	return true, t.Consensus.Add(&memoryBlock{
 		Block:   blk,
 		metrics: t.metrics,
 		tree:    t.nonVerifieds,
