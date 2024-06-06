@@ -104,8 +104,8 @@ type VM struct {
 	// to build a block.
 	proposerBuildSlotGauge prometheus.Gauge
 
-	// acceptedBlocksSlotHistogram is the metric histogram that is being updated once a block gets accepted with it's corresponding slot.
-	// note that this histogram is being updated by postForkCommonComponents.writeAcceptedSlotMetrics.
+	// acceptedBlocksSlotHistogram reports the slots that accepted blocks were
+	// proposed in.
 	acceptedBlocksSlotHistogram prometheus.Histogram
 }
 
