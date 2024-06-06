@@ -396,8 +396,9 @@ func TestPostDurangoBuildChildResetScheduler(t *testing.T) {
 			ValidatorState: vdrState,
 			Log:            logging.NoLog{},
 		},
-		Windower:  windower,
-		Scheduler: scheduler,
+		Windower:               windower,
+		Scheduler:              scheduler,
+		proposerBuildSlotGauge: prometheus.NewGauge(prometheus.GaugeOpts{}),
 	}
 	vm.Clock.Set(now)
 
