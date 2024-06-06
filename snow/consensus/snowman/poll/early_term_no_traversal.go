@@ -5,23 +5,68 @@ package poll
 
 import (
 	"fmt"
+	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/bag"
+	"github.com/ava-labs/avalanchego/utils/metric"
 )
 
 type earlyTermNoTraversalFactory struct {
 	alphaPreference int
 	alphaConfidence int
+	durPolls        []metric.Averager
 }
 
 // NewEarlyTermNoTraversalFactory returns a factory that returns polls with
 // early termination, without doing DAG traversals
-func NewEarlyTermNoTraversalFactory(alphaPreference int, alphaConfidence int) Factory {
-	return &earlyTermNoTraversalFactory{
+func NewEarlyTermNoTraversalFactory(
+	alphaPreference int,
+	alphaConfidence int,
+	reg prometheus.Registerer,
+) (Factory, error) {
+	f := &earlyTermNoTraversalFactory{
 		alphaPreference: alphaPreference,
 		alphaConfidence: alphaConfidence,
 	}
+
+	durPolls1, err := metric.NewAverager(
+		"poll_duration_case_1",
+		"time (in ns) this poll took to complete",
+		reg,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", errFailedPollDurationMetrics, err)
+	}
+	durPolls2, err := metric.NewAverager(
+		"poll_duration_case_2",
+		"time (in ns) this poll took to complete",
+		reg,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", errFailedPollDurationMetrics, err)
+	}
+	durPolls3, err := metric.NewAverager(
+		"poll_duration_case_3",
+		"time (in ns) this poll took to complete",
+		reg,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", errFailedPollDurationMetrics, err)
+	}
+	durPolls4, err := metric.NewAverager(
+		"poll_duration_case_4",
+		"time (in ns) this poll took to complete",
+		reg,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", errFailedPollDurationMetrics, err)
+	}
+	f.durPolls = []metric.Averager{durPolls1, durPolls2, durPolls3, durPolls4}
+
+	return f, nil
 }
 
 func (f *earlyTermNoTraversalFactory) New(vdrs bag.Bag[ids.NodeID]) Poll {
@@ -29,6 +74,8 @@ func (f *earlyTermNoTraversalFactory) New(vdrs bag.Bag[ids.NodeID]) Poll {
 		polled:          vdrs,
 		alphaPreference: f.alphaPreference,
 		alphaConfidence: f.alphaConfidence,
+		durPolls:        f.durPolls,
+		start:           time.Now(),
 	}
 }
 
@@ -40,6 +87,10 @@ type earlyTermNoTraversalPoll struct {
 	polled          bag.Bag[ids.NodeID]
 	alphaPreference int
 	alphaConfidence int
+
+	durPolls []metric.Averager
+	start    time.Time
+	finished bool
 }
 
 // Vote registers a response for this poll
@@ -67,20 +118,39 @@ func (p *earlyTermNoTraversalPoll) Drop(vdr ids.NodeID) {
 //     transitive voting.
 //  4. A single element has achieved an alphaConfidence majority.
 func (p *earlyTermNoTraversalPoll) Finished() bool {
+	if p.finished {
+		return true
+	}
+
 	remaining := p.polled.Len()
 	if remaining == 0 {
+		p.finished = true
+		p.durPolls[0].Observe(float64(time.Since(p.start).Nanoseconds()))
 		return true // Case 1
 	}
 
 	received := p.votes.Len()
 	maxPossibleVotes := received + remaining
 	if maxPossibleVotes < p.alphaPreference {
+		p.finished = true
+		p.durPolls[1].Observe(float64(time.Since(p.start).Nanoseconds()))
 		return true // Case 2
 	}
 
 	_, freq := p.votes.Mode()
-	return freq >= p.alphaPreference && maxPossibleVotes < p.alphaConfidence || // Case 3
-		freq >= p.alphaConfidence // Case 4
+	if freq >= p.alphaPreference && maxPossibleVotes < p.alphaConfidence {
+		p.finished = true
+		p.durPolls[2].Observe(float64(time.Since(p.start).Nanoseconds()))
+		return true // Case 3
+	}
+
+	if freq >= p.alphaConfidence {
+		p.finished = true
+		p.durPolls[3].Observe(float64(time.Since(p.start).Nanoseconds()))
+		return true // Case 4
+	}
+
+	return false
 }
 
 // Result returns the result of this poll
