@@ -35,6 +35,7 @@ type Config struct {
 	// Block certificate
 	StakingCertLeaf *staking.Certificate
 
+	// Registerer for prometheus metrics
 	Registerer prometheus.Registerer
 }
 
