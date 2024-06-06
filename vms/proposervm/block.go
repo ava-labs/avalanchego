@@ -29,7 +29,7 @@ const (
 	// prior of being populated by the actual slot index.
 	// Because the slot index is zero based, we use a non-zero value to signal
 	// that the value hasn't been populated.
-	unspecifiedSlotIndex = ^uint64(0)
+	unspecifiedSlotIndex = math.MaxUint64
 )
 
 var (
