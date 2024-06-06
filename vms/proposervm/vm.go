@@ -24,6 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
@@ -235,10 +236,6 @@ func (vm *VM) Initialize(
 			Help: "the slot that this node may attempt to build a block",
 		})
 
-	if err = registerer.Register(vm.proposerBuildSlotGauge); err != nil {
-		return err
-	}
-
 	vm.acceptedBlocksSlotHistogram = prometheus.NewHistogram(
 		prometheus.HistogramOpts{
 			Name: "accepted_blocks_slot",
@@ -253,10 +250,11 @@ func (vm *VM) Initialize(
 			Buckets: []float64{0.5, 1.5, 2.5},
 		},
 	)
-	if err = registerer.Register(vm.acceptedBlocksSlotHistogram); err != nil {
-		return err
-	}
-	return nil
+
+	return utils.Err(
+		registerer.Register(vm.proposerBuildSlotGauge),
+		registerer.Register(vm.acceptedBlocksSlotHistogram),
+	)
 }
 
 // shutdown ops then propagate shutdown to innerVM
