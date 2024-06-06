@@ -7,6 +7,8 @@ import (
 	"crypto"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/ava-labs/avalanchego/staking"
 )
 
@@ -32,6 +34,9 @@ type Config struct {
 
 	// Block certificate
 	StakingCertLeaf *staking.Certificate
+
+	// Registerer for prometheus metrics
+	Registerer prometheus.Registerer
 }
 
 func (c *Config) IsDurangoActivated(timestamp time.Time) bool {

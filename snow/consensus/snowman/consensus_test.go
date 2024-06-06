@@ -1369,7 +1369,7 @@ func ErrorOnAddDecidedBlockTest(t *testing.T, factory Factory) {
 	require.ErrorIs(err, errUnknownParentBlock)
 }
 
-func gatherCounterGauge(t *testing.T, reg *prometheus.Registry) map[string]float64 {
+func gatherCounterGauge(t *testing.T, reg prometheus.Gatherer) map[string]float64 {
 	ms, err := reg.Gather()
 	require.NoError(t, err)
 	mss := make(map[string]float64)

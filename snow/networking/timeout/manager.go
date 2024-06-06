@@ -71,27 +71,33 @@ type Manager interface {
 func NewManager(
 	timeoutConfig *timer.AdaptiveTimeoutConfig,
 	benchlistMgr benchlist.Manager,
-	metricsNamespace string,
-	metricsRegister prometheus.Registerer,
+	requestReg prometheus.Registerer,
+	responseReg prometheus.Registerer,
 ) (Manager, error) {
 	tm, err := timer.NewAdaptiveTimeoutManager(
 		timeoutConfig,
-		metricsNamespace,
-		metricsRegister,
+		requestReg,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't create timeout manager: %w", err)
 	}
+
+	m, err := newTimeoutMetrics(responseReg)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't create timeout metrics: %w", err)
+	}
+
 	return &manager{
-		benchlistMgr: benchlistMgr,
 		tm:           tm,
+		benchlistMgr: benchlistMgr,
+		metrics:      m,
 	}, nil
 }
 
 type manager struct {
 	tm           timer.AdaptiveTimeoutManager
 	benchlistMgr benchlist.Manager
-	metrics      metrics
+	metrics      *timeoutMetrics
 	stopOnce     sync.Once
 }
 

@@ -9,10 +9,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 
-	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/cache/metercacher"
 	"github.com/ava-labs/avalanchego/database"
@@ -130,21 +128,9 @@ func (vm *VM) Initialize(
 	fxs []*common.Fx,
 	appSender common.AppSender,
 ) error {
-	// TODO: Add a helper for this metrics override, it is performed in multiple
-	//       places.
-	registerer := prometheus.NewRegistry()
-	if err := chainCtx.Metrics.Register("proposervm", registerer); err != nil {
-		return err
-	}
-	multiGatherer := metrics.NewMultiGatherer()
-	if err := chainCtx.Metrics.Register("", multiGatherer); err != nil {
-		return err
-	}
-	chainCtx.Metrics = multiGatherer
-
 	vm.ctx = chainCtx
 	vm.db = versiondb.New(prefixdb.New(dbPrefix, db))
-	baseState, err := state.NewMetered(vm.db, "state", registerer)
+	baseState, err := state.NewMetered(vm.db, "state", vm.Config.Registerer)
 	if err != nil {
 		return err
 	}
@@ -153,7 +139,7 @@ func (vm *VM) Initialize(
 	vm.Tree = tree.New()
 	innerBlkCache, err := metercacher.New(
 		"inner_block_cache",
-		registerer,
+		vm.Config.Registerer,
 		cache.NewSizedLRU(
 			innerBlkCacheSize,
 			cachedBlockSize,
