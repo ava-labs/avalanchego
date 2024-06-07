@@ -65,9 +65,9 @@ var _ = ginkgo.Describe("[Dynamic Fees]", func() {
 		tests.Outf("{{blue}} P-chain balance before P->X export: %d {{/}}\n", pStartBalance)
 
 		ginkgo.By("checking that initial fee values match with configured ones", func() {
-			currFeeRates, _, err := pChainClient.GetFeeRates(e2e.DefaultContext())
+			nextFeeRates, err := pChainClient.GetNextFeeRates(e2e.DefaultContext())
 			require.NoError(err)
-			require.Equal(customDynamicFeesConfig.MinFeeRate, currFeeRates)
+			require.Equal(customDynamicFeesConfig.MinFeeRate, nextFeeRates)
 		})
 
 		ginkgo.By("issue expensive transactions so to increase the fee rates to be paid for accepting the transactons",
@@ -90,9 +90,9 @@ var _ = ginkgo.Describe("[Dynamic Fees]", func() {
 					subnetID = subnetTx.ID()
 				})
 
-				currFeeRates, _, err := pChainClient.GetFeeRates(e2e.DefaultContext())
+				nextFeeRates, err := pChainClient.GetNextFeeRates(e2e.DefaultContext())
 				require.NoError(err)
-				tests.Outf("{{blue}} current fee rates: %v {{/}}\n", currFeeRates)
+				tests.Outf("{{blue}} next fee rates: %v {{/}}\n", nextFeeRates)
 
 				ginkgo.By("repeatedly change the permissioned subnet owner to increase fee rates", func() {
 					txsCount := 10
@@ -111,30 +111,30 @@ var _ = ginkgo.Describe("[Dynamic Fees]", func() {
 						)
 						require.NoError(err)
 
-						updatedFeeRates, _, err := pChainClient.GetFeeRates(e2e.DefaultContext())
+						updatedFeeRates, err := pChainClient.GetNextFeeRates(e2e.DefaultContext())
 						require.NoError(err)
 						tests.Outf("{{blue}} current fee rates: %v {{/}}\n", updatedFeeRates)
 
 						ginkgo.By("check that fee rates components have increased")
 						require.True(
-							commonfees.Compare(currFeeRates, updatedFeeRates),
-							fmt.Sprintf("previous fee rates %v, current fee rates %v", currFeeRates, updatedFeeRates),
+							commonfees.Compare(nextFeeRates, updatedFeeRates),
+							fmt.Sprintf("previous fee rates %v, current fee rates %v", nextFeeRates, updatedFeeRates),
 						)
-						currFeeRates = updatedFeeRates
+						nextFeeRates = updatedFeeRates
 					}
 				})
 
 				ginkgo.By("wait for the fee rates to decrease", func() {
-					initialFeeRates := currFeeRates
+					initialFeeRates := nextFeeRates
 					e2e.Eventually(func() bool {
 						var err error
-						_, currFeeRates, err = pChainClient.GetFeeRates(e2e.DefaultContext())
+						nextFeeRates, err = pChainClient.GetNextFeeRates(e2e.DefaultContext())
 						require.NoError(err)
-						tests.Outf("{{blue}} next fee rates: %v {{/}}\n", currFeeRates)
+						tests.Outf("{{blue}} next fee rates: %v {{/}}\n", nextFeeRates)
 
 						ratesStrictlyLower := false
 						for i := 0; i < len(initialFeeRates); i++ {
-							if currFeeRates[i] < initialFeeRates[i] {
+							if nextFeeRates[i] < initialFeeRates[i] {
 								ratesStrictlyLower = true
 								break
 							}
@@ -142,7 +142,7 @@ var _ = ginkgo.Describe("[Dynamic Fees]", func() {
 
 						return ratesStrictlyLower
 					}, e2e.DefaultTimeout, e2e.DefaultPollingInterval, "failed to see gas price decrease before timeout")
-					tests.Outf("\n{{blue}}fee rates have decreased to %v{{/}}\n", currFeeRates)
+					tests.Outf("\n{{blue}}fee rates have decreased to %v{{/}}\n", nextFeeRates)
 				})
 			},
 		)

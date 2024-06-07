@@ -1825,15 +1825,14 @@ func (s *Service) GetBlockByHeight(_ *http.Request, args *api.GetBlockByHeightAr
 
 // GetFeeRatesReply is the response from GetFeeRates
 type GetFeeRatesReply struct {
-	CurrentFeeRates commonfees.Dimensions `json:"currentFeeRates"`
-	NextFeeRates    commonfees.Dimensions `json:"nextFeeRates"`
+	NextFeeRates commonfees.Dimensions `json:"nextFeeRates"`
 }
 
-// GetTimestamp returns the current timestamp on chain.
-func (s *Service) GetFeeRates(_ *http.Request, _ *struct{}, reply *GetFeeRatesReply) error {
+// GetNextFeeRates returns the next fee rates that a transaction must pay to be accepted now
+func (s *Service) GetNextFeeRates(_ *http.Request, _ *struct{}, reply *GetFeeRatesReply) error {
 	s.vm.ctx.Log.Debug("API called",
 		zap.String("service", "platform"),
-		zap.String("method", "getFeeRates"),
+		zap.String("method", "getNextFeeRates"),
 	)
 
 	s.vm.ctx.Lock.Lock()
@@ -1844,8 +1843,6 @@ func (s *Service) GetFeeRates(_ *http.Request, _ *struct{}, reply *GetFeeRatesRe
 	if !ok {
 		return fmt.Errorf("could not retrieve state for block %s", preferredID)
 	}
-
-	reply.CurrentFeeRates = commonfees.Empty // TODO ABENEGIA: fix this up once algo is changed
 
 	currentChainTime := onAccept.GetTimestamp()
 	nextTimestamp, _, err := state.NextBlockTime(onAccept, &s.vm.clock)

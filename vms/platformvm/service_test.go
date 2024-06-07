@@ -1069,30 +1069,43 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 	}
 }
 
-// TODO ABENEGIA: unlock once fee rate algo is being fixed
-// func TestGetFeeRates(t *testing.T) {
-// 	require := require.New(t)
-// 	service, _, _ := defaultService(t)
+func TestGetFeeRates(t *testing.T) {
+	require := require.New(t)
+	service, _, _ := defaultService(t)
 
-// 	reply := GetFeeRatesReply{}
-// 	require.NoError(service.GetFeeRates(nil, nil, &reply))
+	now := time.Now().Truncate(time.Second)
+	service.vm.clock.Set(now)
+	feeCfg := fee.GetDynamicConfig(true /*isEActive*/)
 
-// 	service.vm.ctx.Lock.Lock()
+	//  initially minimal fees
+	reply0 := GetFeeRatesReply{}
+	require.NoError(service.GetNextFeeRates(nil, nil, &reply0))
+	require.Equal(feeCfg.MinFeeRate, reply0.NextFeeRates)
 
-// 	feeRates, err := service.vm.state.GetFeeRates()
-// 	require.NoError(err)
-// 	require.Equal(feeRates, reply.CurrentFeeRates)
+	// let cumulated complexity go above target. Fee rates will go up
+	service.vm.ctx.Lock.Lock()
+	elapsedTime := time.Second
+	var targetComplexity commonfees.Dimensions
+	for i := commonfees.Dimension(0); i < commonfees.FeeDimensions; i++ {
+		targetComplexity[i] = feeCfg.BlockTargetComplexityRate[i] * uint64(elapsedTime/time.Second)
+	}
+	complexity, err := commonfees.Add(targetComplexity, commonfees.Dimensions{10, 20, 30, 40})
+	require.NoError(err)
+	service.vm.state.SetExcessComplexity(complexity)
+	service.vm.ctx.Lock.Unlock()
 
-// 	updatedFeeRates := commonfees.Dimensions{
-// 		123,
-// 		456,
-// 		789,
-// 		1011,
-// 	}
-// 	service.vm.state.SetFeeRates(updatedFeeRates)
+	reply1 := GetFeeRatesReply{}
+	require.NoError(service.GetNextFeeRates(nil, nil, &reply1))
+	highFeeRates := reply1.NextFeeRates
+	require.True(commonfees.Compare(highFeeRates, feeCfg.MinFeeRate))
 
-// 	service.vm.ctx.Lock.Unlock()
+	// let time tick. Fee rates will go down
+	service.vm.ctx.Lock.Lock()
+	now = now.Add(3 * time.Second)
+	service.vm.clock.Set(now)
+	service.vm.ctx.Lock.Unlock()
 
-// 	require.NoError(service.GetFeeRates(nil, nil, &reply))
-// 	require.Equal(updatedFeeRates, reply.CurrentFeeRates)
-// }
+	reply2 := GetFeeRatesReply{}
+	require.NoError(service.GetNextFeeRates(nil, nil, &reply2))
+	require.True(commonfees.Compare(highFeeRates, reply2.NextFeeRates))
+}

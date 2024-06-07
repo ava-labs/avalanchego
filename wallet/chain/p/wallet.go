@@ -662,7 +662,7 @@ func (w *wallet) refreshFeesData(ctx *builder.Context, options ...common.Option)
 
 	w.staticFeesConfig = staticFeesConfigFromContext(ctx)
 
-	_, w.nextFeeRates, err = w.client.GetFeeRates(opsCtx)
+	w.nextFeeRates, err = w.client.GetNextFeeRates(opsCtx)
 	if err != nil {
 		return err
 	}
