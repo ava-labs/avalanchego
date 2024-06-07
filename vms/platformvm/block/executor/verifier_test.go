@@ -17,7 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
-	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
@@ -35,8 +34,10 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 	"github.com/ava-labs/avalanchego/vms/platformvm/upgrade"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
 	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
+	walletsigner "github.com/ava-labs/avalanchego/wallet/chain/p/signer"
 )
 
 // Check that complexity of standard blocks is duly calculated once block is verified
@@ -59,7 +60,8 @@ func TestStandardBlockComplexity(t *testing.T) {
 				sk, err := bls.NewSecretKey()
 				require.NoError(t, err)
 
-				tx, err := env.txBuilder.NewAddPermissionlessValidatorTx(
+				builder, s, feeCalc := env.factory.NewWallet(preFundedKeys...)
+				utx, err := builder.NewAddPermissionlessValidatorTx(
 					&txs.SubnetValidator{
 						Validator: txs.Validator{
 							NodeID: nodeID,
@@ -79,8 +81,16 @@ func TestStandardBlockComplexity(t *testing.T) {
 						Addrs:     []ids.ShortID{ids.ShortEmpty},
 					},
 					reward.PercentDenominator,
-					preFundedKeys,
+					feeCalc,
+					common.WithChangeOwner(&secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs: []ids.ShortID{
+							preFundedKeys[0].PublicKey().Address(),
+						},
+					}),
 				)
+				require.NoError(t, err)
+				tx, err := walletsigner.SignUnsigned(context.Background(), s, utx)
 				require.NoError(t, err)
 
 				return tx
@@ -102,7 +112,8 @@ func TestStandardBlockComplexity(t *testing.T) {
 				}
 				it.Release()
 
-				tx, err := env.txBuilder.NewAddPermissionlessDelegatorTx(
+				builder, signer, feeCalc := env.factory.NewWallet(preFundedKeys...)
+				utx, err := builder.NewAddPermissionlessDelegatorTx(
 					&txs.SubnetValidator{
 						Validator: txs.Validator{
 							NodeID: primaryValidator.NodeID,
@@ -116,8 +127,16 @@ func TestStandardBlockComplexity(t *testing.T) {
 						Threshold: 1,
 						Addrs:     []ids.ShortID{ids.ShortEmpty},
 					},
-					preFundedKeys,
+					feeCalc,
+					common.WithChangeOwner(&secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs: []ids.ShortID{
+							preFundedKeys[0].PublicKey().Address(),
+						},
+					}),
 				)
+				require.NoError(t, err)
+				tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
 				require.NoError(t, err)
 
 				return tx
@@ -139,7 +158,8 @@ func TestStandardBlockComplexity(t *testing.T) {
 				}
 				it.Release()
 
-				tx, err := env.txBuilder.NewAddSubnetValidatorTx(
+				builder, signer, feeCalc := env.factory.NewWallet(preFundedKeys...)
+				utx, err := builder.NewAddSubnetValidatorTx(
 					&txs.SubnetValidator{
 						Validator: txs.Validator{
 							NodeID: primaryValidator.NodeID,
@@ -148,8 +168,16 @@ func TestStandardBlockComplexity(t *testing.T) {
 						},
 						Subnet: testSubnet1.TxID,
 					},
-					preFundedKeys,
+					feeCalc,
+					common.WithChangeOwner(&secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs: []ids.ShortID{
+							preFundedKeys[0].PublicKey().Address(),
+						},
+					}),
 				)
+				require.NoError(t, err)
+				tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
 				require.NoError(t, err)
 
 				return tx
@@ -158,28 +186,46 @@ func TestStandardBlockComplexity(t *testing.T) {
 		{
 			name: "CreateChainTx",
 			setupTest: func(env *environment) *txs.Tx {
-				createChainTx, err := env.txBuilder.NewCreateChainTx(
+				builder, signer, feeCalc := env.factory.NewWallet(preFundedKeys...)
+				utx, err := builder.NewCreateChainTx(
 					testSubnet1.TxID,
 					[]byte{},             // genesisData
 					ids.GenerateTestID(), // vmID
 					[]ids.ID{},           // fxIDs
 					"aaa",                // chain name
-					preFundedKeys,
+					feeCalc,
+					common.WithChangeOwner(&secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs: []ids.ShortID{
+							preFundedKeys[0].PublicKey().Address(),
+						},
+					}),
 				)
 				require.NoError(t, err)
-				return createChainTx
+				tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
+				require.NoError(t, err)
+				return tx
 			},
 		},
 		{
 			name: "CreateSubnetTx",
 			setupTest: func(env *environment) *txs.Tx {
-				tx, err := env.txBuilder.NewCreateSubnetTx(
+				builder, signer, feeCalc := env.factory.NewWallet(preFundedKeys...)
+				utx, err := builder.NewCreateSubnetTx(
 					&secp256k1fx.OutputOwners{
 						Threshold: 1,
 						Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
 					},
-					preFundedKeys,
+					feeCalc,
+					common.WithChangeOwner(&secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs: []ids.ShortID{
+							preFundedKeys[0].PublicKey().Address(),
+						},
+					}),
 				)
+				require.NoError(t, err)
+				tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
 				require.NoError(t, err)
 				return tx
 			},
@@ -201,7 +247,9 @@ func TestStandardBlockComplexity(t *testing.T) {
 				it.Release()
 
 				endTime := primaryValidator.EndTime
-				subnetValTx, err := env.txBuilder.NewAddSubnetValidatorTx(
+
+				builder, signer, feeCalc := env.factory.NewWallet(preFundedKeys...)
+				uSubnetValTx, err := builder.NewAddSubnetValidatorTx(
 					&txs.SubnetValidator{
 						Validator: txs.Validator{
 							NodeID: primaryValidator.NodeID,
@@ -211,8 +259,16 @@ func TestStandardBlockComplexity(t *testing.T) {
 						},
 						Subnet: testSubnet1.ID(),
 					},
-					[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
+					feeCalc,
+					common.WithChangeOwner(&secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs: []ids.ShortID{
+							preFundedKeys[0].PublicKey().Address(),
+						},
+					}),
 				)
+				require.NoError(t, err)
+				subnetValTx, err := walletsigner.SignUnsigned(context.Background(), signer, uSubnetValTx)
 				require.NoError(t, err)
 
 				onAcceptState, err := state.NewDiffOn(env.state)
@@ -229,11 +285,19 @@ func TestStandardBlockComplexity(t *testing.T) {
 				require.NoError(t, onAcceptState.Apply(env.state))
 				require.NoError(t, env.state.Commit())
 
-				tx, err := env.txBuilder.NewRemoveSubnetValidatorTx(
+				utx, err := builder.NewRemoveSubnetValidatorTx(
 					primaryValidator.NodeID,
 					testSubnet1.ID(),
-					preFundedKeys,
+					feeCalc,
+					common.WithChangeOwner(&secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs: []ids.ShortID{
+							preFundedKeys[0].PublicKey().Address(),
+						},
+					}),
 				)
+				require.NoError(t, err)
+				tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
 				require.NoError(t, err)
 
 				return tx
@@ -242,7 +306,8 @@ func TestStandardBlockComplexity(t *testing.T) {
 		{
 			name: "TransformSubnetTx",
 			setupTest: func(env *environment) *txs.Tx {
-				tx, err := env.txBuilder.NewTransformSubnetTx(
+				builder, signer, feeCalc := env.factory.NewWallet(preFundedKeys...)
+				utx, err := builder.NewTransformSubnetTx(
 					testSubnet1.TxID,          // subnetID
 					ids.GenerateTestID(),      // assetID
 					10,                        // initial supply
@@ -257,24 +322,40 @@ func TestStandardBlockComplexity(t *testing.T) {
 					10,                        // min delegator stake
 					1,                         // max validator weight factor
 					80,                        // uptime requirement
-					preFundedKeys,
+					feeCalc,
+					common.WithChangeOwner(&secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs: []ids.ShortID{
+							preFundedKeys[0].PublicKey().Address(),
+						},
+					}),
 				)
 				require.NoError(t, err)
-
+				tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
+				require.NoError(t, err)
 				return tx
 			},
 		},
 		{
 			name: "TransferSubnetOwnershipTx",
 			setupTest: func(env *environment) *txs.Tx {
-				tx, err := env.txBuilder.NewTransferSubnetOwnershipTx(
+				builder, signer, feeCalc := env.factory.NewWallet(preFundedKeys...)
+				utx, err := builder.NewTransferSubnetOwnershipTx(
 					testSubnet1.TxID,
 					&secp256k1fx.OutputOwners{
 						Threshold: 1,
 						Addrs:     []ids.ShortID{ids.ShortEmpty},
 					},
-					preFundedKeys,
+					feeCalc,
+					common.WithChangeOwner(&secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs: []ids.ShortID{
+							preFundedKeys[0].PublicKey().Address(),
+						},
+					}),
 				)
+				require.NoError(t, err)
+				tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
 				require.NoError(t, err)
 
 				return tx
@@ -303,15 +384,24 @@ func TestStandardBlockComplexity(t *testing.T) {
 				)
 				env.msm.SharedMemory = sharedMemory
 
-				tx, err := env.txBuilder.NewImportTx(
+				builder, signer, feeCalc := env.factory.NewWallet(preFundedKeys...)
+				utx, err := builder.NewImportTx(
 					sourceChain,
 					&secp256k1fx.OutputOwners{
 						Locktime:  0,
 						Threshold: 1,
 						Addrs:     []ids.ShortID{sourceKey.PublicKey().Address()},
 					},
-					preFundedKeys,
+					feeCalc,
+					common.WithChangeOwner(&secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs: []ids.ShortID{
+							preFundedKeys[0].PublicKey().Address(),
+						},
+					}),
 				)
+				require.NoError(t, err)
+				tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
 				require.NoError(t, err)
 
 				// reactivate checks
@@ -322,7 +412,8 @@ func TestStandardBlockComplexity(t *testing.T) {
 		{
 			name: "ExportTx",
 			setupTest: func(env *environment) *txs.Tx {
-				tx, err := env.txBuilder.NewExportTx(
+				builder, signer, feeCalc := env.factory.NewWallet(preFundedKeys...)
+				utx, err := builder.NewExportTx(
 					env.ctx.XChainID,
 					[]*avax.TransferableOutput{{
 						Asset: avax.Asset{ID: env.ctx.AVAXAssetID},
@@ -335,8 +426,16 @@ func TestStandardBlockComplexity(t *testing.T) {
 							},
 						},
 					}},
-					preFundedKeys,
+					feeCalc,
+					common.WithChangeOwner(&secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs: []ids.ShortID{
+							preFundedKeys[0].PublicKey().Address(),
+						},
+					}),
 				)
+				require.NoError(t, err)
+				tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
 				require.NoError(t, err)
 
 				return tx
@@ -345,7 +444,8 @@ func TestStandardBlockComplexity(t *testing.T) {
 		{
 			name: "BaseTx",
 			setupTest: func(env *environment) *txs.Tx {
-				tx, err := env.txBuilder.NewBaseTx(
+				builder, signer, feeCalc := env.factory.NewWallet(preFundedKeys...)
+				utx, err := builder.NewBaseTx(
 					[]*avax.TransferableOutput{
 						{
 							Asset: avax.Asset{ID: env.ctx.AVAXAssetID},
@@ -358,10 +458,17 @@ func TestStandardBlockComplexity(t *testing.T) {
 							},
 						},
 					},
-					preFundedKeys,
+					feeCalc,
+					common.WithChangeOwner(&secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs: []ids.ShortID{
+							preFundedKeys[0].PublicKey().Address(),
+						},
+					}),
 				)
 				require.NoError(t, err)
-
+				tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
+				require.NoError(t, err)
 				return tx
 			},
 		},

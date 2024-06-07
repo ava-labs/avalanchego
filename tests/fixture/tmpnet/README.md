@@ -103,7 +103,7 @@ network := &tmpnet.Network{                   // Configure non-default values fo
     },
 }
 
-_ := tmpnet.StartNewNetwork(              // Start the network
+_ := tmpnet.BootstrapNewNetwork(          // Bootstrap the network
     ctx,                                  // Context used to limit duration of waiting for network health
     ginkgo.GinkgoWriter,                  // Writer to report progress of initialization
     network,

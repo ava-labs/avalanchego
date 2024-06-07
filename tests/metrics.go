@@ -7,6 +7,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/ava-labs/avalanchego/api/metrics"
 
 	dto "github.com/prometheus/client_model/go"
@@ -37,19 +39,45 @@ func GetNodesMetrics(ctx context.Context, nodeURIs []string) (NodesMetrics, erro
 	return metrics, nil
 }
 
-func GetFirstMetricValue(metrics NodeMetrics, name string) (float64, bool) {
+// GetMetricValue returns the value of the specified metric which has the
+// required labels.
+//
+// If multiple metrics match the provided labels, the first metric found is
+// returned.
+//
+// Only Counter and Gauge metrics are supported.
+func GetMetricValue(metrics NodeMetrics, name string, labels prometheus.Labels) (float64, bool) {
 	metricFamily, ok := metrics[name]
-	if !ok || len(metricFamily.Metric) < 1 {
+	if !ok {
 		return 0, false
 	}
 
-	metric := metricFamily.Metric[0]
-	switch {
-	case metric.Gauge != nil:
-		return metric.Gauge.GetValue(), true
-	case metric.Counter != nil:
-		return metric.Counter.GetValue(), true
-	default:
-		return 0, false
+	for _, metric := range metricFamily.Metric {
+		if !labelsMatch(metric, labels) {
+			continue
+		}
+
+		switch {
+		case metric.Gauge != nil:
+			return metric.Gauge.GetValue(), true
+		case metric.Counter != nil:
+			return metric.Counter.GetValue(), true
+		}
 	}
+	return 0, false
+}
+
+func labelsMatch(metric *dto.Metric, labels prometheus.Labels) bool {
+	var found int
+	for _, label := range metric.Label {
+		expectedValue, ok := labels[label.GetName()]
+		if !ok {
+			continue
+		}
+		if label.GetValue() != expectedValue {
+			return false
+		}
+		found++
+	}
+	return found == len(labels)
 }

@@ -86,24 +86,20 @@ func New(registerer prometheus.Registerer) (Metrics, error) {
 			Help: "Total amount of time generating validator sets in nanoseconds",
 		}),
 		blockBandwitdhComplexity: prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespace,
-			Name:      "block_bandwidth_complexity",
-			Help:      "Cumulated bandwidth complexity over last accepted block",
+			Name: "block_bandwidth_complexity",
+			Help: "Cumulated bandwidth complexity over last accepted block",
 		}),
 		blockUTXOsReadComplexity: prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespace,
-			Name:      "block_utxos_read_complexity",
-			Help:      "Cumulated utxos read complexity over last accepted block",
+			Name: "block_utxos_read_complexity",
+			Help: "Cumulated utxos read complexity over last accepted block",
 		}),
 		blockUTXOsWriteComplexity: prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespace,
-			Name:      "block_utxos_write_complexity",
-			Help:      "Cumulated utxos write complexity over last accepted block",
+			Name: "block_utxos_write_complexity",
+			Help: "Cumulated utxos write complexity over last accepted block",
 		}),
 		blockComputeComplexity: prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespace,
-			Name:      "block_compute_complexity",
-			Help:      "Cumulated compute complexity over last accepted block",
+			Name: "block_compute_complexity",
+			Help: "Cumulated compute complexity over last accepted block",
 		}),
 	}
 

@@ -12,9 +12,9 @@ import (
 	"time"
 
 	"github.com/gorilla/rpc/v2"
-	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 
+	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
@@ -35,7 +35,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
-	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/network"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
@@ -48,6 +47,7 @@ import (
 	snowmanblock "github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	blockbuilder "github.com/ava-labs/avalanchego/vms/platformvm/block/builder"
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
+	platformvmmetrics "github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	pmempool "github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 	pvalidators "github.com/ava-labs/avalanchego/vms/platformvm/validators"
@@ -66,7 +66,7 @@ type VM struct {
 	*network.Network
 	validators.State
 
-	metrics metrics.Metrics
+	metrics platformvmmetrics.Metrics
 
 	// Used to get time. Useful for faking time during tests.
 	clock mockable.Clock
@@ -118,13 +118,13 @@ func (vm *VM) Initialize(
 		return fmt.Errorf("failed resetting dynamic fees config: %w", err)
 	}
 
-	registerer := prometheus.NewRegistry()
-	if err := chainCtx.Metrics.Register("", registerer); err != nil {
+	registerer, err := metrics.MakeAndRegister(chainCtx.Metrics, "")
+	if err != nil {
 		return err
 	}
 
 	// Initialize metrics as soon as possible
-	vm.metrics, err = metrics.New(registerer)
+	vm.metrics, err = platformvmmetrics.New(registerer)
 	if err != nil {
 		return fmt.Errorf("failed to initialize metrics: %w", err)
 	}

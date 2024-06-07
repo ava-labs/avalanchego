@@ -4,6 +4,7 @@
 package executor
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -13,7 +14,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -23,6 +23,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	walletsigner "github.com/ava-labs/avalanchego/wallet/chain/p/signer"
 )
 
 func newRewardValidatorTx(t testing.TB, txID ids.ID) (*txs.Tx, error) {
@@ -248,7 +250,8 @@ func TestRewardDelegatorTxExecuteOnCommitPreDelegateeDeferral(t *testing.T) {
 	vdrEndTime := uint64(defaultValidateStartTime.Add(2 * defaultMinStakingDuration).Unix())
 	vdrNodeID := ids.GenerateTestNodeID()
 
-	vdrTx, err := env.txBuilder.NewAddValidatorTx(
+	builder, signer, feeCalc := env.factory.NewWallet(preFundedKeys[0])
+	uVdrTx, err := builder.NewAddValidatorTx(
 		&txs.Validator{
 			NodeID: vdrNodeID,
 			Start:  vdrStartTime,
@@ -260,14 +263,16 @@ func TestRewardDelegatorTxExecuteOnCommitPreDelegateeDeferral(t *testing.T) {
 			Addrs:     []ids.ShortID{vdrRewardAddress},
 		},
 		reward.PercentDenominator/4,
-		[]*secp256k1.PrivateKey{preFundedKeys[0]},
+		feeCalc,
 	)
+	require.NoError(err)
+	vdrTx, err := walletsigner.SignUnsigned(context.Background(), signer, uVdrTx)
 	require.NoError(err)
 
 	delStartTime := vdrStartTime
 	delEndTime := vdrEndTime
 
-	delTx, err := env.txBuilder.NewAddDelegatorTx(
+	uDelTx, err := builder.NewAddDelegatorTx(
 		&txs.Validator{
 			NodeID: vdrNodeID,
 			Start:  delStartTime,
@@ -278,8 +283,10 @@ func TestRewardDelegatorTxExecuteOnCommitPreDelegateeDeferral(t *testing.T) {
 			Threshold: 1,
 			Addrs:     []ids.ShortID{delRewardAddress},
 		},
-		[]*secp256k1.PrivateKey{preFundedKeys[0]},
+		feeCalc,
 	)
+	require.NoError(err)
+	delTx, err := walletsigner.SignUnsigned(context.Background(), signer, uDelTx)
 	require.NoError(err)
 
 	addValTx := vdrTx.Unsigned.(*txs.AddValidatorTx)
@@ -379,7 +386,8 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 	vdrEndTime := uint64(defaultValidateStartTime.Add(2 * defaultMinStakingDuration).Unix())
 	vdrNodeID := ids.GenerateTestNodeID()
 
-	vdrTx, err := env.txBuilder.NewAddValidatorTx(
+	builder, signer, feeCalc := env.factory.NewWallet(preFundedKeys[0])
+	uVdrTx, err := builder.NewAddValidatorTx(
 		&txs.Validator{
 			NodeID: vdrNodeID,
 			Start:  vdrStartTime,
@@ -391,14 +399,16 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 			Addrs:     []ids.ShortID{vdrRewardAddress},
 		},
 		reward.PercentDenominator/4,
-		[]*secp256k1.PrivateKey{preFundedKeys[0]},
+		feeCalc,
 	)
+	require.NoError(err)
+	vdrTx, err := walletsigner.SignUnsigned(context.Background(), signer, uVdrTx)
 	require.NoError(err)
 
 	delStartTime := vdrStartTime
 	delEndTime := vdrEndTime
 
-	delTx, err := env.txBuilder.NewAddDelegatorTx(
+	uDelTx, err := builder.NewAddDelegatorTx(
 		&txs.Validator{
 			NodeID: vdrNodeID,
 			Start:  delStartTime,
@@ -409,8 +419,10 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 			Threshold: 1,
 			Addrs:     []ids.ShortID{delRewardAddress},
 		},
-		[]*secp256k1.PrivateKey{preFundedKeys[0]},
+		feeCalc,
 	)
+	require.NoError(err)
+	delTx, err := walletsigner.SignUnsigned(context.Background(), signer, uDelTx)
 	require.NoError(err)
 
 	addValTx := vdrTx.Unsigned.(*txs.AddValidatorTx)
@@ -606,7 +618,8 @@ func TestRewardDelegatorTxAndValidatorTxExecuteOnCommitPostDelegateeDeferral(t *
 	vdrEndTime := uint64(defaultValidateStartTime.Add(2 * defaultMinStakingDuration).Unix())
 	vdrNodeID := ids.GenerateTestNodeID()
 
-	vdrTx, err := env.txBuilder.NewAddValidatorTx(
+	builder, signer, feeCalc := env.factory.NewWallet(preFundedKeys[0])
+	uVdrTx, err := builder.NewAddValidatorTx(
 		&txs.Validator{
 			NodeID: vdrNodeID,
 			Start:  vdrStartTime,
@@ -618,14 +631,16 @@ func TestRewardDelegatorTxAndValidatorTxExecuteOnCommitPostDelegateeDeferral(t *
 			Addrs:     []ids.ShortID{vdrRewardAddress},
 		},
 		reward.PercentDenominator/4,
-		[]*secp256k1.PrivateKey{preFundedKeys[0]},
+		feeCalc,
 	)
+	require.NoError(err)
+	vdrTx, err := walletsigner.SignUnsigned(context.Background(), signer, uVdrTx)
 	require.NoError(err)
 
 	delStartTime := vdrStartTime
 	delEndTime := vdrEndTime
 
-	delTx, err := env.txBuilder.NewAddDelegatorTx(
+	uDelTx, err := builder.NewAddDelegatorTx(
 		&txs.Validator{
 			NodeID: vdrNodeID,
 			Start:  delStartTime,
@@ -636,8 +651,10 @@ func TestRewardDelegatorTxAndValidatorTxExecuteOnCommitPostDelegateeDeferral(t *
 			Threshold: 1,
 			Addrs:     []ids.ShortID{delRewardAddress},
 		},
-		[]*secp256k1.PrivateKey{preFundedKeys[0]},
+		feeCalc,
 	)
+	require.NoError(err)
+	delTx, err := walletsigner.SignUnsigned(context.Background(), signer, uDelTx)
 	require.NoError(err)
 
 	addValTx := vdrTx.Unsigned.(*txs.AddValidatorTx)
@@ -779,7 +796,8 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	vdrEndTime := uint64(defaultValidateStartTime.Add(2 * defaultMinStakingDuration).Unix())
 	vdrNodeID := ids.GenerateTestNodeID()
 
-	vdrTx, err := env.txBuilder.NewAddValidatorTx(
+	builder, signer, feeCalc := env.factory.NewWallet(preFundedKeys[0])
+	uVdrTx, err := builder.NewAddValidatorTx(
 		&txs.Validator{
 			NodeID: vdrNodeID,
 			Start:  vdrStartTime,
@@ -791,13 +809,16 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 			Addrs:     []ids.ShortID{vdrRewardAddress},
 		},
 		reward.PercentDenominator/4,
-		[]*secp256k1.PrivateKey{preFundedKeys[0]},
+		feeCalc,
 	)
+	require.NoError(err)
+	vdrTx, err := walletsigner.SignUnsigned(context.Background(), signer, uVdrTx)
 	require.NoError(err)
 
 	delStartTime := vdrStartTime
 	delEndTime := vdrEndTime
-	delTx, err := env.txBuilder.NewAddDelegatorTx(
+
+	uDelTx, err := builder.NewAddDelegatorTx(
 		&txs.Validator{
 			NodeID: vdrNodeID,
 			Start:  delStartTime,
@@ -808,8 +829,10 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 			Threshold: 1,
 			Addrs:     []ids.ShortID{delRewardAddress},
 		},
-		[]*secp256k1.PrivateKey{preFundedKeys[0]},
+		feeCalc,
 	)
+	require.NoError(err)
+	delTx, err := walletsigner.SignUnsigned(context.Background(), signer, uDelTx)
 	require.NoError(err)
 
 	addValTx := vdrTx.Unsigned.(*txs.AddValidatorTx)

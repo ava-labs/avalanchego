@@ -71,10 +71,12 @@ jobs:
           rm -rf /tmp/avalanchego
 
   build-arm64-binaries-tarball:
-    runs-on: [self-hosted, linux, ARM64, focal]
+    runs-on: custom-arm64-focal
 
     steps:
       - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/install-focal-deps
 
       - uses: ./.github/actions/setup-go-for-project-v3
 
