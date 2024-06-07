@@ -35,6 +35,10 @@ func (c *DynamicFeesConfig) Validate() error {
 				c.BlockMaxComplexity[i],
 			)
 		}
+
+		if c.UpdateDenominators[i] == 0 {
+			return fmt.Errorf("dimension %d, update denominator cannot be zero", i)
+		}
 	}
 
 	return nil

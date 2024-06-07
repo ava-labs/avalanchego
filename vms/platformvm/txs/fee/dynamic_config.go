@@ -79,6 +79,9 @@ func ResetDynamicConfig(ctx *snow.Context, customFeesConfig *commonfees.DynamicF
 	if ctx.NetworkID == constants.MainnetID || ctx.NetworkID == constants.FujiID {
 		return fmt.Errorf("forbidden resetting dynamic fee rates config for network %s", constants.NetworkName(ctx.NetworkID))
 	}
+	if err := customFeesConfig.Validate(); err != nil {
+		return fmt.Errorf("custom fee config fails validation: %w", err)
+	}
 
 	customDynamicFeesConfig = customFeesConfig
 	return nil
