@@ -77,6 +77,7 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 		subnets.New(ctx.NodeID, subnets.Config{}),
 		commontracker.NewPeers(),
 		peerTracker,
+		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
 	handler := handlerIntf.(*handler)
@@ -183,6 +184,7 @@ func TestHandlerClosesOnError(t *testing.T) {
 		subnets.New(ctx.NodeID, subnets.Config{}),
 		commontracker.NewPeers(),
 		peerTracker,
+		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
 	handler := handlerIntf.(*handler)
@@ -285,6 +287,7 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 		subnets.New(ctx.NodeID, subnets.Config{}),
 		commontracker.NewPeers(),
 		peerTracker,
+		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
 	handler := handlerIntf.(*handler)
@@ -375,6 +378,7 @@ func TestHandlerDispatchInternal(t *testing.T) {
 		subnets.New(ctx.NodeID, subnets.Config{}),
 		commontracker.NewPeers(),
 		peerTracker,
+		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
 
@@ -460,6 +464,7 @@ func TestHandlerSubnetConnector(t *testing.T) {
 		subnets.New(ctx.NodeID, subnets.Config{}),
 		commontracker.NewPeers(),
 		peerTracker,
+		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
 
@@ -641,6 +646,7 @@ func TestDynamicEngineTypeDispatch(t *testing.T) {
 				subnets.New(ids.EmptyNodeID, subnets.Config{}),
 				commontracker.NewPeers(),
 				peerTracker,
+				prometheus.NewRegistry(),
 			)
 			require.NoError(err)
 
@@ -723,6 +729,7 @@ func TestHandlerStartError(t *testing.T) {
 		subnets.New(ctx.NodeID, subnets.Config{}),
 		commontracker.NewPeers(),
 		peerTracker,
+		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
 

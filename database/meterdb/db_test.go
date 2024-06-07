@@ -18,7 +18,7 @@ func TestInterface(t *testing.T) {
 	for name, test := range database.Tests {
 		t.Run(name, func(t *testing.T) {
 			baseDB := memdb.New()
-			db, err := New("", prometheus.NewRegistry(), baseDB)
+			db, err := New(prometheus.NewRegistry(), baseDB)
 			require.NoError(t, err)
 
 			test(t, db)
@@ -28,7 +28,7 @@ func TestInterface(t *testing.T) {
 
 func newDB(t testing.TB) database.Database {
 	baseDB := memdb.New()
-	db, err := New("", prometheus.NewRegistry(), baseDB)
+	db, err := New(prometheus.NewRegistry(), baseDB)
 	require.NoError(t, err)
 	return db
 }

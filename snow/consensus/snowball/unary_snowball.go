@@ -3,7 +3,10 @@
 
 package snowball
 
-import "fmt"
+import (
+	"fmt"
+	"slices"
+)
 
 var _ Unary = (*unarySnowball)(nil)
 
@@ -32,12 +35,11 @@ func (sb *unarySnowball) RecordPoll(count int) {
 func (sb *unarySnowball) Extend(choice int) Binary {
 	bs := &binarySnowball{
 		binarySnowflake: binarySnowflake{
-			binarySlush:     binarySlush{preference: choice},
-			confidence:      sb.confidence,
-			alphaPreference: sb.alphaPreference,
-			alphaConfidence: sb.alphaConfidence,
-			beta:            sb.beta,
-			finalized:       sb.Finalized(),
+			binarySlush:           binarySlush{preference: choice},
+			confidence:            slices.Clone(sb.confidence),
+			alphaPreference:       sb.alphaPreference,
+			terminationConditions: sb.terminationConditions,
+			finalized:             sb.Finalized(),
 		},
 		preference: choice,
 	}
@@ -47,6 +49,7 @@ func (sb *unarySnowball) Extend(choice int) Binary {
 
 func (sb *unarySnowball) Clone() Unary {
 	newSnowball := *sb
+	newSnowball.confidence = slices.Clone(sb.confidence)
 	return &newSnowball
 }
 
