@@ -30,7 +30,7 @@ func GetBootstrapVolumePath(targetPath string) (string, error) {
 func InitBootstrapDB(network *tmpnet.Network, avalancheGoPath string, pluginDir string, destPath string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*2)
 	defer cancel()
-	if err := tmpnet.StartNewNetwork(
+	if err := tmpnet.BootstrapNewNetwork(
 		ctx,
 		os.Stdout,
 		network,
@@ -38,7 +38,7 @@ func InitBootstrapDB(network *tmpnet.Network, avalancheGoPath string, pluginDir 
 		avalancheGoPath,
 		pluginDir,
 	); err != nil {
-		return fmt.Errorf("failed to start network: %w", err)
+		return fmt.Errorf("failed to bootstrap network: %w", err)
 	}
 	// Since the goal is to initialize the DB, we can stop the network after it has been started successfully
 	if err := network.Stop(ctx); err != nil {

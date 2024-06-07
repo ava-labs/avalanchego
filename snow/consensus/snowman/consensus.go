@@ -31,9 +31,13 @@ type Consensus interface {
 	// Returns the number of blocks processing
 	NumProcessing() int
 
-	// Adds a new decision. Assumes the dependency has already been added.
+	// Add a new block.
+	//
+	// Add should not be called multiple times with the same block.
+	// The parent block should either be the last accepted block or processing.
+	//
 	// Returns if a critical error has occurred.
-	Add(context.Context, Block) error
+	Add(Block) error
 
 	// Decided returns true if the block has been decided.
 	Decided(Block) bool

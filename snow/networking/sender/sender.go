@@ -5,7 +5,6 @@ package sender
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
@@ -58,6 +57,7 @@ func New(
 	timeouts timeout.Manager,
 	engineType p2p.EngineType,
 	subnet subnets.Subnet,
+	reg prometheus.Registerer,
 ) (common.Sender, error) {
 	s := &sender{
 		ctx:        ctx,
@@ -74,16 +74,6 @@ func New(
 		),
 		engineType: engineType,
 		subnet:     subnet,
-	}
-
-	var reg prometheus.Registerer
-	switch engineType {
-	case p2p.EngineType_ENGINE_TYPE_SNOWMAN:
-		reg = ctx.Registerer
-	case p2p.EngineType_ENGINE_TYPE_AVALANCHE:
-		reg = ctx.AvalancheRegisterer
-	default:
-		return nil, fmt.Errorf("unknown engine type %s", engineType)
 	}
 	return s, reg.Register(s.failedDueToBench)
 }

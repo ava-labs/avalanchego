@@ -4,6 +4,7 @@
 package executor
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"testing"
@@ -47,6 +48,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
+
+	walletsigner "github.com/ava-labs/avalanchego/wallet/chain/p/signer"
 )
 
 const (
@@ -105,7 +108,7 @@ type environment struct {
 	states         map[ids.ID]state.Chain
 	uptimes        uptime.Manager
 	utxosHandler   utxo.Verifier
-	txBuilder      *txstest.Builder
+	factory        *txstest.WalletFactory
 	backend        Backend
 }
 
@@ -144,11 +147,7 @@ func newEnvironment(t *testing.T, f fork) *environment {
 	uptimes := uptime.NewManager(baseState, clk)
 	utxosVerifier := utxo.NewVerifier(ctx, clk, fx)
 
-	txBuilder := txstest.NewBuilder(
-		ctx,
-		config,
-		baseState,
-	)
+	factory := txstest.NewWalletFactory(ctx, config, baseState)
 
 	backend := Backend{
 		Config:       config,
@@ -173,7 +172,7 @@ func newEnvironment(t *testing.T, f fork) *environment {
 		states:         make(map[ids.ID]state.Chain),
 		uptimes:        uptimes,
 		utxosHandler:   utxosVerifier,
-		txBuilder:      txBuilder,
+		factory:        factory,
 		backend:        backend,
 	}
 
@@ -209,9 +208,8 @@ func newEnvironment(t *testing.T, f fork) *environment {
 func addSubnet(t *testing.T, env *environment) {
 	require := require.New(t)
 
-	// Create a subnet
-	var err error
-	testSubnet1, err = env.txBuilder.NewCreateSubnetTx(
+	builder, signer := env.factory.NewWallet(preFundedKeys[0])
+	utx, err := builder.NewCreateSubnetTx(
 		&secp256k1fx.OutputOwners{
 			Threshold: 2,
 			Addrs: []ids.ShortID{
@@ -220,15 +218,15 @@ func addSubnet(t *testing.T, env *environment) {
 				preFundedKeys[2].PublicKey().Address(),
 			},
 		},
-		[]*secp256k1.PrivateKey{preFundedKeys[0]},
 		common.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
 		}),
 	)
 	require.NoError(err)
+	testSubnet1, err = walletsigner.SignUnsigned(context.Background(), signer, utx)
+	require.NoError(err)
 
-	// store it
 	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
