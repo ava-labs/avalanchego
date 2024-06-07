@@ -88,14 +88,14 @@ func TestUnarySnowflakeErrorDriven(t *testing.T) {
 	for i, terminationCondition := range terminationConditions {
 		sf := newUnarySnowflake(alphaPreference, terminationConditions)
 
-		for poll := 1; poll <= terminationCondition.beta; poll++ {
+		for poll := 0; poll < terminationCondition.beta; poll++ {
 			sf.RecordPoll(terminationCondition.alphaConfidence)
 
 			expectedConfidences := make([]int, len(terminationConditions))
 			for j := 0; j < i+1; j++ {
-				expectedConfidences[j] = poll
+				expectedConfidences[j] = poll + 1
 			}
-			UnarySnowflakeStateTest(t, &sf, expectedConfidences, poll >= terminationCondition.beta)
+			UnarySnowflakeStateTest(t, &sf, expectedConfidences, poll+1 >= terminationCondition.beta)
 		}
 	}
 }
