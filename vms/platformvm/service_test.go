@@ -77,7 +77,7 @@ var (
 	}
 )
 
-func testReplayFeeCalculator(cfg *config.Config, state state.Chain) *fee.Calculator {
+func testReplayFeeCalculator(cfg *config.Config, parentBlkTime time.Time, state state.Chain) (*fee.Calculator, error) {
 	var (
 		blkTime       = state.GetTimestamp()
 		isEActive     = cfg.UpgradeConfig.IsEActivated(blkTime)
@@ -89,14 +89,18 @@ func testReplayFeeCalculator(cfg *config.Config, state state.Chain) *fee.Calcula
 		feeCalculator = fee.NewStaticCalculator(staticFeeCfg, cfg.UpgradeConfig, blkTime)
 	} else {
 		feesCfg := fee.GetDynamicConfig(isEActive)
-		// feeRates, err := state.GetFeeRates()
-		// if err != nil {
-		// 	return nil, fmt.Errorf("failed retrieving fee rates: %w", err)
-		// }
-		feesMan := commonfees.NewManager(commonfees.Empty /*feeRates*/) // TODO ABENEGIA: fix once fee algo is fixed
+		excessComplexity, err := state.GetExcessComplexity()
+		if err != nil {
+			return nil, fmt.Errorf("failed retrieving excess complexity: %w", err)
+		}
+		feeCfg := fee.GetDynamicConfig(isEActive)
+		feesMan, err := commonfees.NewUpdatedManager(feeCfg, excessComplexity, parentBlkTime.Unix(), blkTime.Unix())
+		if err != nil {
+			return nil, fmt.Errorf("failed updating fee manager: %w", err)
+		}
 		feeCalculator = fee.NewDynamicCalculator(staticFeeCfg, feesMan, feesCfg.BlockMaxComplexity)
 	}
-	return feeCalculator
+	return feeCalculator, nil
 }
 
 func defaultService(t *testing.T) (*Service, *mutableSharedMemory, *txstest.Builder) {
@@ -406,7 +410,8 @@ func TestGetBalance(t *testing.T) {
 		if idx == 0 {
 			// we use the first key to fund a subnet creation in [defaultGenesis].
 			// As such we need to account for the subnet creation fee
-			feeCalc := testReplayFeeCalculator(&service.vm.Config, service.vm.state)
+			feeCalc, err := testReplayFeeCalculator(&service.vm.Config, defaultGenesisTime, service.vm.state)
+			require.NoError(err)
 			fee, err := feeCalc.ComputeFee(testSubnet1.Unsigned, testSubnet1.Creds)
 			require.NoError(err)
 			balance = defaultBalance - fee

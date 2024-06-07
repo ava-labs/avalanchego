@@ -53,7 +53,7 @@ func TargetBlockComplexity(feesConfig DynamicFeesConfig, parentBlkTime, childBlk
 	res := Empty
 
 	if childBlkTime < parentBlkTime {
-		return Empty, fmt.Errorf("unexpected block times, parentBlkTim %v, childBlkTime %v", parentBlkTime, childBlkTime)
+		return res, fmt.Errorf("unexpected block times, parentBlkTim %v, childBlkTime %v", parentBlkTime, childBlkTime)
 	}
 
 	elapsedTime := uint64(childBlkTime - parentBlkTime)

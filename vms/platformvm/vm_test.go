@@ -358,7 +358,7 @@ func defaultVM(t *testing.T, f fork) (*VM, *txstest.Builder, database.Database, 
 // Ensure genesis state is parsed from bytes and stored correctly
 func TestGenesis(t *testing.T) {
 	require := require.New(t)
-	vm, _, _, _ := defaultVM(t, latestFork)
+	vm, _, _, _ := defaultVM(t, durango)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
@@ -394,7 +394,8 @@ func TestGenesis(t *testing.T) {
 
 			// we use the first key to fund a subnet creation in [defaultGenesis].
 			// As such we need to account for the subnet creation fee
-			feeCalc := testReplayFeeCalculator(&vm.Config, vm.state)
+			feeCalc, err := testReplayFeeCalculator(&vm.Config, defaultGenesisTime, vm.state)
+			require.NoError(err)
 			fee, err := feeCalc.ComputeFee(testSubnet1.Unsigned, testSubnet1.Creds)
 			require.NoError(err)
 			require.Equal(uint64(utxo.Amount)-fee, out.Amount())

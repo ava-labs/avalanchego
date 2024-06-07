@@ -27,13 +27,13 @@ func init() {
 
 var (
 	eUpgradeDynamicFeesConfig = commonfees.DynamicFeesConfig{
-		MinFeeRate: commonfees.Dimensions{ // 3/4 of InitialFees
+		MinFeeRate: commonfees.Dimensions{
 			60 * units.NanoAvax,
 			8 * units.NanoAvax,
 			10 * units.NanoAvax,
 			35 * units.NanoAvax,
 		},
-		UpdateDenominators: commonfees.Dimensions{ // over fees.CoeffDenom
+		UpdateDenominators: commonfees.Dimensions{
 			50_000,
 			50_000,
 			50_000,
