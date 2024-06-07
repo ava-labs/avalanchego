@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func UnarySnowflakeStateTest(t *testing.T, sf *unarySnowflake, expectedConfidence int, expectedFinalized bool) {
+func UnarySnowflakeStateTest(t *testing.T, sf *unarySnowflake, expectedConfidence []int, expectedFinalized bool) {
 	require := require.New(t)
 
 	require.Equal(expectedConfidence, sf.confidence)
@@ -25,19 +25,19 @@ func TestUnarySnowflake(t *testing.T) {
 	sf := newUnarySnowflake(alphaPreference, alphaConfidence, beta)
 
 	sf.RecordPoll(alphaConfidence)
-	UnarySnowflakeStateTest(t, &sf, 1, false)
+	UnarySnowflakeStateTest(t, &sf, []int{1}, false)
 
 	sf.RecordUnsuccessfulPoll()
-	UnarySnowflakeStateTest(t, &sf, 0, false)
+	UnarySnowflakeStateTest(t, &sf, []int{0}, false)
 
 	sf.RecordPoll(alphaConfidence)
-	UnarySnowflakeStateTest(t, &sf, 1, false)
+	UnarySnowflakeStateTest(t, &sf, []int{1}, false)
 
 	sfCloneIntf := sf.Clone()
 	require.IsType(&unarySnowflake{}, sfCloneIntf)
 	sfClone := sfCloneIntf.(*unarySnowflake)
 
-	UnarySnowflakeStateTest(t, sfClone, 1, false)
+	UnarySnowflakeStateTest(t, sfClone, []int{1}, false)
 
 	binarySnowflake := sfClone.Extend(0)
 
@@ -53,11 +53,11 @@ func TestUnarySnowflake(t *testing.T) {
 	require.True(binarySnowflake.Finalized())
 
 	sf.RecordPoll(alphaConfidence)
-	UnarySnowflakeStateTest(t, &sf, 2, true)
+	UnarySnowflakeStateTest(t, &sf, []int{2}, true)
 
 	sf.RecordUnsuccessfulPoll()
-	UnarySnowflakeStateTest(t, &sf, 0, true)
+	UnarySnowflakeStateTest(t, &sf, []int{0}, true)
 
 	sf.RecordPoll(alphaConfidence)
-	UnarySnowflakeStateTest(t, &sf, 1, true)
+	UnarySnowflakeStateTest(t, &sf, []int{1}, true)
 }

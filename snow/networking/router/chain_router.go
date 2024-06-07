@@ -101,8 +101,7 @@ func (cr *ChainRouter) Initialize(
 	trackedSubnets set.Set[ids.ID],
 	onFatal func(exitCode int),
 	healthConfig HealthConfig,
-	metricsNamespace string,
-	metricsRegisterer prometheus.Registerer,
+	reg prometheus.Registerer,
 ) error {
 	cr.log = log
 	cr.chainHandlers = make(map[ids.ID]handler.Handler)
@@ -126,7 +125,7 @@ func (cr *ChainRouter) Initialize(
 	cr.peers[nodeID] = myself
 
 	// Register metrics
-	rMetrics, err := newRouterMetrics(metricsNamespace, metricsRegisterer)
+	rMetrics, err := newRouterMetrics(reg)
 	if err != nil {
 		return err
 	}

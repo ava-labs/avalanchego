@@ -1085,10 +1085,13 @@ func TestServiceGetSubnets(t *testing.T) {
 	newOwnerIDStr := "P-testing1t73fa4p4dypa4s3kgufuvr6hmprjclw66mgqgm"
 	newOwnerID, err := service.addrManager.ParseLocalAddress(newOwnerIDStr)
 	require.NoError(err)
+
+	service.vm.ctx.Lock.Lock()
 	service.vm.state.SetSubnetOwner(testSubnet1ID, &secp256k1fx.OutputOwners{
 		Addrs:     []ids.ShortID{newOwnerID},
 		Threshold: 1,
 	})
+	service.vm.ctx.Lock.Unlock()
 
 	require.NoError(service.GetSubnets(nil, &GetSubnetsArgs{}, &response))
 	require.Equal([]APISubnet{

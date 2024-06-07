@@ -12,7 +12,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 
-	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/cache/metercacher"
 	"github.com/ava-labs/avalanchego/database"
@@ -24,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
@@ -99,6 +99,14 @@ type VM struct {
 
 	// lastAcceptedHeight is set to the last accepted PostForkBlock's height.
 	lastAcceptedHeight uint64
+
+	// proposerBuildSlotGauge reports the slot index when this node may attempt
+	// to build a block.
+	proposerBuildSlotGauge prometheus.Gauge
+
+	// acceptedBlocksSlotHistogram reports the slots that accepted blocks were
+	// proposed in.
+	acceptedBlocksSlotHistogram prometheus.Histogram
 }
 
 // New performs best when [minBlkDelay] is whole seconds. This is because block
@@ -130,21 +138,9 @@ func (vm *VM) Initialize(
 	fxs []*common.Fx,
 	appSender common.AppSender,
 ) error {
-	// TODO: Add a helper for this metrics override, it is performed in multiple
-	//       places.
-	registerer := prometheus.NewRegistry()
-	if err := chainCtx.Metrics.Register("proposervm", registerer); err != nil {
-		return err
-	}
-	multiGatherer := metrics.NewMultiGatherer()
-	if err := chainCtx.Metrics.Register("", multiGatherer); err != nil {
-		return err
-	}
-	chainCtx.Metrics = multiGatherer
-
 	vm.ctx = chainCtx
 	vm.db = versiondb.New(prefixdb.New(dbPrefix, db))
-	baseState, err := state.NewMetered(vm.db, "state", registerer)
+	baseState, err := state.NewMetered(vm.db, "state", vm.Config.Registerer)
 	if err != nil {
 		return err
 	}
@@ -153,7 +149,7 @@ func (vm *VM) Initialize(
 	vm.Tree = tree.New()
 	innerBlkCache, err := metercacher.New(
 		"inner_block_cache",
-		registerer,
+		vm.Config.Registerer,
 		cache.NewSizedLRU(
 			innerBlkCacheSize,
 			cachedBlockSize,
@@ -220,7 +216,28 @@ func (vm *VM) Initialize(
 	default:
 		return err
 	}
-	return nil
+
+	vm.proposerBuildSlotGauge = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "block_building_slot",
+		Help: "the slot that this node may attempt to build a block",
+	})
+	vm.acceptedBlocksSlotHistogram = prometheus.NewHistogram(prometheus.HistogramOpts{
+		Name: "accepted_blocks_slot",
+		Help: "the slot accepted blocks were proposed in",
+		// define the following ranges:
+		// (-inf, 0]
+		// (0, 1]
+		// (1, 2]
+		// (2, inf)
+		// the usage of ".5" before was to ensure we work around the limitation
+		// of comparing floating point of the same numerical value.
+		Buckets: []float64{0.5, 1.5, 2.5},
+	})
+
+	return utils.Err(
+		vm.Config.Registerer.Register(vm.proposerBuildSlotGauge),
+		vm.Config.Registerer.Register(vm.acceptedBlocksSlotHistogram),
+	)
 }
 
 // shutdown ops then propagate shutdown to innerVM
@@ -308,13 +325,15 @@ func (vm *VM) SetPreference(ctx context.Context, preferred ids.ID) error {
 	)
 	if vm.IsDurangoActivated(parentTimestamp) {
 		currentTime := vm.Clock.Time().Truncate(time.Second)
-		nextStartTime, err = vm.getPostDurangoSlotTime(
+		if nextStartTime, err = vm.getPostDurangoSlotTime(
 			ctx,
 			childBlockHeight,
 			pChainHeight,
 			proposer.TimeToSlot(parentTimestamp, currentTime),
 			parentTimestamp,
-		)
+		); err == nil {
+			vm.proposerBuildSlotGauge.Set(float64(proposer.TimeToSlot(parentTimestamp, nextStartTime)))
+		}
 	} else {
 		nextStartTime, err = vm.getPreDurangoSlotTime(
 			ctx,
