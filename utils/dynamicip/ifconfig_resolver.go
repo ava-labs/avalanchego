@@ -10,6 +10,8 @@ import (
 	"net/http"
 	"net/netip"
 	"strings"
+
+	"github.com/ava-labs/avalanchego/utils/ips"
 )
 
 var _ Resolver = (*ifConfigResolver)(nil)
@@ -38,5 +40,5 @@ func (r *ifConfigResolver) Resolve(ctx context.Context) (netip.Addr, error) {
 	}
 
 	ipStr := strings.TrimSpace(string(ipBytes))
-	return netip.ParseAddr(ipStr)
+	return ips.ParseAddr(ipStr)
 }

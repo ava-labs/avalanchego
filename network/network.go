@@ -541,6 +541,8 @@ func (n *network) Dispatch() error {
 			continue
 		}
 
+		var _ net.TCPAddr
+
 		// Note: listener.Accept is rate limited outside of this package, so a
 		// peer can not just arbitrarily spin up goroutines here.
 		go func() {
@@ -549,7 +551,7 @@ func (n *network) Dispatch() error {
 			// call this function inside the go-routine, rather than the main
 			// accept loop.
 			remoteAddr := conn.RemoteAddr().String()
-			ip, err := netip.ParseAddrPort(remoteAddr)
+			ip, err := ips.ParseAddrPort(remoteAddr)
 			if err != nil {
 				n.peerConfig.Log.Error("failed to parse remote address",
 					zap.String("peerIP", remoteAddr),

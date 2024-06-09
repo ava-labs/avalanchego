@@ -28,10 +28,10 @@ func Lookup(hostname string) (netip.Addr, error) {
 	for _, ip := range ips {
 		ipv4 := ip.To4()
 		if ipv4 != nil {
-			addr, _ := FromSlice(ipv4)
+			addr, _ := AddrFromSlice(ipv4)
 			return addr, nil
 		}
 	}
-	addr, _ := FromSlice(ips[0])
+	addr, _ := AddrFromSlice(ips[0])
 	return addr, nil
 }

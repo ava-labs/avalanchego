@@ -43,7 +43,7 @@ func (r *openDNSResolver) Resolve(ctx context.Context) (netip.Addr, error) {
 		return netip.Addr{}, err
 	}
 	for _, ip := range resolvedIPs {
-		if addr, ok := ips.FromSlice(ip); ok {
+		if addr, ok := ips.AddrFromSlice(ip); ok {
 			return addr, nil
 		}
 	}

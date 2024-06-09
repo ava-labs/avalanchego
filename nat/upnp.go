@@ -13,6 +13,8 @@ import (
 	"github.com/huin/goupnp"
 	"github.com/huin/goupnp/dcps/internetgateway1"
 	"github.com/huin/goupnp/dcps/internetgateway2"
+
+	"github.com/ava-labs/avalanchego/utils/ips"
 )
 
 const (
@@ -117,7 +119,7 @@ func (r *upnpRouter) ExternalIP() (netip.Addr, error) {
 	if err != nil {
 		return netip.Addr{}, err
 	}
-	return netip.ParseAddr(str)
+	return ips.ParseAddr(str)
 }
 
 func (r *upnpRouter) MapPort(

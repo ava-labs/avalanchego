@@ -438,7 +438,7 @@ func (n *Node) initNetworking(reg prometheus.Registerer) error {
 
 	// Record the bound address to enable inclusion in process context file.
 	n.stakingAddress = listener.Addr().String()
-	stakingAddrPort, err := netip.ParseAddrPort(n.stakingAddress)
+	stakingAddrPort, err := ips.ParseAddrPort(n.stakingAddress)
 	if err != nil {
 		return err
 	}
@@ -450,7 +450,7 @@ func (n *Node) initNetworking(reg prometheus.Registerer) error {
 	switch {
 	case n.Config.PublicIP != "":
 		// Use the specified public IP.
-		publicAddr, err = netip.ParseAddr(n.Config.PublicIP)
+		publicAddr, err = ips.ParseAddr(n.Config.PublicIP)
 		if err != nil {
 			return fmt.Errorf("invalid public IP address %q: %w", n.Config.PublicIP, err)
 		}
@@ -991,7 +991,7 @@ func (n *Node) initAPIServer() error {
 	}
 
 	addrStr := listener.Addr().String()
-	addrPort, err := netip.ParseAddrPort(addrStr)
+	addrPort, err := ips.ParseAddrPort(addrStr)
 	if err != nil {
 		return err
 	}

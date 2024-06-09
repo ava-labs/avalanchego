@@ -284,7 +284,7 @@ func (p *peer) Info() Info {
 		primaryUptime = 0
 	}
 
-	ip, _ := netip.ParseAddrPort(p.conn.RemoteAddr().String())
+	ip, _ := ips.ParseAddrPort(p.conn.RemoteAddr().String())
 	return Info{
 		IP:                    ip,
 		PublicIP:              p.ip.AddrPort,
@@ -1035,7 +1035,7 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 		}
 	}
 
-	addr, ok := ips.FromSlice(msg.IpAddr)
+	addr, ok := ips.AddrFromSlice(msg.IpAddr)
 	if !ok {
 		p.Log.Debug(malformedMessageLog,
 			zap.Stringer("nodeID", p.id),
@@ -1223,7 +1223,7 @@ func (p *peer) handlePeerList(msg *p2p.PeerList) {
 			return
 		}
 
-		addr, ok := ips.FromSlice(claimedIPPort.IpAddr)
+		addr, ok := ips.AddrFromSlice(claimedIPPort.IpAddr)
 		if !ok {
 			p.Log.Debug(malformedMessageLog,
 				zap.Stringer("nodeID", p.id),
