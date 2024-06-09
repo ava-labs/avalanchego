@@ -419,8 +419,8 @@ func TestTrackVerifiesSignatures(t *testing.T) {
 	err = network.Track([]*ips.ClaimedIPPort{
 		ips.NewClaimedIPPort(
 			stakingCert,
-			netip.AddrPortFrom(netip.AddrFrom4(
-				[4]byte{123, 132, 123, 123}),
+			netip.AddrPortFrom(
+				netip.AddrFrom4([4]byte{123, 132, 123, 123}),
 				10000,
 			),
 			1000, // timestamp
