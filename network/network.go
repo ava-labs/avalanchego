@@ -541,8 +541,6 @@ func (n *network) Dispatch() error {
 			continue
 		}
 
-		var _ net.TCPAddr
-
 		// Note: listener.Accept is rate limited outside of this package, so a
 		// peer can not just arbitrarily spin up goroutines here.
 		go func() {
