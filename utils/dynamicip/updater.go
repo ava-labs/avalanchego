@@ -98,6 +98,7 @@ func (u *updater) Dispatch(log logging.Logger) {
 					zap.Stringer("oldIP", oldAddr),
 					zap.Stringer("newIP", newAddr),
 				)
+				oldAddr = newAddr
 			}
 		case <-u.rootCtx.Done():
 			return
