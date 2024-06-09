@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math"
 	"net"
+	"net/netip"
 	"time"
 
 	"github.com/huin/goupnp"
@@ -111,17 +112,12 @@ func (r *upnpRouter) localIP() (net.IP, error) {
 	return nil, fmt.Errorf("couldn't find the local address in the same network as %s", deviceIP)
 }
 
-func (r *upnpRouter) ExternalIP() (net.IP, error) {
+func (r *upnpRouter) ExternalIP() (netip.Addr, error) {
 	str, err := r.client.GetExternalIPAddress()
 	if err != nil {
-		return nil, err
+		return netip.Addr{}, err
 	}
-
-	ip := net.ParseIP(str)
-	if ip == nil {
-		return nil, fmt.Errorf("invalid IP %s", str)
-	}
-	return ip, nil
+	return netip.ParseAddr(str)
 }
 
 func (r *upnpRouter) MapPort(

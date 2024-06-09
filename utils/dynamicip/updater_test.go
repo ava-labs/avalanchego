@@ -5,42 +5,51 @@ package dynamicip
 
 import (
 	"context"
-	"net"
+	"net/netip"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/utils/ips"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 var _ Resolver = (*mockResolver)(nil)
 
 type mockResolver struct {
-	onResolve func(context.Context) (net.IP, error)
+	onResolve func(context.Context) (netip.Addr, error)
 }
 
-func (r *mockResolver) Resolve(ctx context.Context) (net.IP, error) {
+func (r *mockResolver) Resolve(ctx context.Context) (netip.Addr, error) {
 	return r.onResolve(ctx)
 }
 
 func TestNewUpdater(t *testing.T) {
 	require := require.New(t)
-	originalIP := net.IPv4zero
-	originalPort := 9651
-	dynamicIP := ips.NewDynamicIPPort(originalIP, uint16(originalPort))
-	newIP := net.IPv4(1, 2, 3, 4)
+
+	const (
+		port            = 9651
+		updateFrequency = time.Millisecond
+		stopTimeout     = 5 * time.Second
+	)
+
+	var (
+		originalAddr        = netip.IPv4Unspecified()
+		originalAddrPort    = netip.AddrPortFrom(originalAddr, port)
+		newAddr             = netip.AddrFrom4([4]byte{1, 2, 3, 4})
+		expectedNewAddrPort = netip.AddrPortFrom(newAddr, port)
+		dynamicIP           = utils.NewAtomic(originalAddrPort)
+	)
 	resolver := &mockResolver{
-		onResolve: func(context.Context) (net.IP, error) {
-			return newIP, nil
+		onResolve: func(context.Context) (netip.Addr, error) {
+			return newAddr, nil
 		},
 	}
-	updateFreq := time.Millisecond
 	updaterIntf := NewUpdater(
 		dynamicIP,
 		resolver,
-		updateFreq,
+		updateFrequency,
 	)
 
 	// Assert NewUpdater returns expected type
@@ -53,28 +62,23 @@ func TestNewUpdater(t *testing.T) {
 	require.NotNil(updater.rootCtx)
 	require.NotNil(updater.rootCtxCancel)
 	require.NotNil(updater.doneChan)
-	require.Equal(updateFreq, updater.updateFreq)
+	require.Equal(updateFrequency, updater.updateFreq)
 
 	// Start updating the IP address
-	go updaterIntf.Dispatch(logging.NoLog{})
+	go updater.Dispatch(logging.NoLog{})
 
 	// Assert that the IP is updated within 5s.
-	expectedIP := ips.IPPort{
-		IP:   newIP,
-		Port: uint16(originalPort),
-	}
 	require.Eventually(
 		func() bool {
-			return expectedIP.Equal(dynamicIP.IPPort())
+			return dynamicIP.Get() == expectedNewAddrPort
 		},
 		5*time.Second,
-		updateFreq,
+		updateFrequency,
 	)
 
 	// Make sure stopChan and doneChan are closed when stop is called
-	updaterIntf.Stop()
+	updater.Stop()
 
-	stopTimeout := 5 * time.Second
 	ctx, cancel := context.WithTimeout(context.Background(), stopTimeout)
 	defer cancel()
 	select {

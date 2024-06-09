@@ -7,6 +7,7 @@ import (
 	"context"
 	"crypto"
 	"net"
+	"net/netip"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -19,9 +20,9 @@ import (
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/staking"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
-	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math/meter"
 	"github.com/ava-labs/avalanchego/utils/resource"
@@ -47,7 +48,7 @@ const maxMessageToSend = 1024
 //     peer.
 func StartTestPeer(
 	ctx context.Context,
-	ip ips.IPPort,
+	ip netip.AddrPort,
 	networkID uint32,
 	router router.InboundHandler,
 ) (Peer, error) {
@@ -98,7 +99,6 @@ func StartTestPeer(
 		return nil, err
 	}
 
-	signerIP := ips.NewDynamicIPPort(net.IPv6zero, 1)
 	tlsKey := tlsCert.PrivateKey.(crypto.Signer)
 	blsKey, err := bls.NewSecretKey()
 	if err != nil {
@@ -123,7 +123,14 @@ func StartTestPeer(
 			MaxClockDifference:   time.Minute,
 			ResourceTracker:      resourceTracker,
 			UptimeCalculator:     uptime.NoOpCalculator,
-			IPSigner:             NewIPSigner(signerIP, tlsKey, blsKey),
+			IPSigner: NewIPSigner(
+				utils.NewAtomic(netip.AddrPortFrom(
+					netip.IPv6Loopback(),
+					1,
+				)),
+				tlsKey,
+				blsKey,
+			),
 		},
 		conn,
 		cert,
