@@ -5,10 +5,9 @@ package network
 
 import (
 	"math/rand"
+	"net/netip"
 	"sync"
 	"time"
-
-	"github.com/ava-labs/avalanchego/utils/ips"
 )
 
 func init() {
@@ -19,20 +18,20 @@ type trackedIP struct {
 	delayLock sync.RWMutex
 	delay     time.Duration
 
-	ip ips.IPPort
+	ip netip.AddrPort
 
 	stopTrackingOnce sync.Once
 	onStopTracking   chan struct{}
 }
 
-func newTrackedIP(ip ips.IPPort) *trackedIP {
+func newTrackedIP(ip netip.AddrPort) *trackedIP {
 	return &trackedIP{
 		ip:             ip,
 		onStopTracking: make(chan struct{}),
 	}
 }
 
-func (ip *trackedIP) trackNewIP(newIP ips.IPPort) *trackedIP {
+func (ip *trackedIP) trackNewIP(newIP netip.AddrPort) *trackedIP {
 	ip.stopTracking()
 	return &trackedIP{
 		delay:          ip.getDelay(),

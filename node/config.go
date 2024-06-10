@@ -5,6 +5,7 @@ package node
 
 import (
 	"crypto/tls"
+	"net/netip"
 	"time"
 
 	"github.com/ava-labs/avalanchego/api/server"
@@ -18,7 +19,6 @@ import (
 	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
-	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/profiler"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -85,8 +85,8 @@ type StakingConfig struct {
 }
 
 type StateSyncConfig struct {
-	StateSyncIDs []ids.NodeID `json:"stateSyncIDs"`
-	StateSyncIPs []ips.IPPort `json:"stateSyncIPs"`
+	StateSyncIDs []ids.NodeID     `json:"stateSyncIDs"`
+	StateSyncIPs []netip.AddrPort `json:"stateSyncIPs"`
 }
 
 type BootstrapConfig struct {

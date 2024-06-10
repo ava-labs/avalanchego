@@ -5,7 +5,7 @@ package peer
 
 import (
 	"crypto"
-	"net"
+	"net/netip"
 	"testing"
 	"time"
 
@@ -13,7 +13,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
-	"github.com/ava-labs/avalanchego/utils/ips"
 )
 
 func TestSignedIpVerify(t *testing.T) {
@@ -31,6 +30,10 @@ func TestSignedIpVerify(t *testing.T) {
 	require.NoError(t, err)
 
 	now := time.Now()
+	addrPort := netip.AddrPortFrom(
+		netip.AddrFrom4([4]byte{1, 2, 3, 4}),
+		1,
+	)
 
 	type test struct {
 		name         string
@@ -49,10 +52,7 @@ func TestSignedIpVerify(t *testing.T) {
 			blsSigner:    blsKey1,
 			expectedCert: cert1,
 			ip: UnsignedIP{
-				IPPort: ips.IPPort{
-					IP:   net.IPv4(1, 2, 3, 4),
-					Port: 1,
-				},
+				AddrPort:  addrPort,
 				Timestamp: uint64(now.Unix()) - 1,
 			},
 			maxTimestamp: now,
@@ -64,10 +64,7 @@ func TestSignedIpVerify(t *testing.T) {
 			blsSigner:    blsKey1,
 			expectedCert: cert1,
 			ip: UnsignedIP{
-				IPPort: ips.IPPort{
-					IP:   net.IPv4(1, 2, 3, 4),
-					Port: 1,
-				},
+				AddrPort:  addrPort,
 				Timestamp: uint64(now.Unix()),
 			},
 			maxTimestamp: now,
@@ -79,10 +76,7 @@ func TestSignedIpVerify(t *testing.T) {
 			blsSigner:    blsKey1,
 			expectedCert: cert1,
 			ip: UnsignedIP{
-				IPPort: ips.IPPort{
-					IP:   net.IPv4(1, 2, 3, 4),
-					Port: 1,
-				},
+				AddrPort:  addrPort,
 				Timestamp: uint64(now.Unix()) + 1,
 			},
 			maxTimestamp: now,
@@ -94,10 +88,6 @@ func TestSignedIpVerify(t *testing.T) {
 			blsSigner:    blsKey1,
 			expectedCert: cert2, // note this isn't cert1
 			ip: UnsignedIP{
-				IPPort: ips.IPPort{
-					IP:   net.IPv4(1, 2, 3, 4),
-					Port: 1,
-				},
 				Timestamp: uint64(now.Unix()),
 			},
 			maxTimestamp: now,
