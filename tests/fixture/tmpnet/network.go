@@ -11,6 +11,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -52,7 +53,7 @@ var (
 	// TODO(marun) Remove when subnet-evm configures the genesis with this key.
 	HardhatKey *secp256k1.PrivateKey
 
-	errInsufficientNodes = errors.New("network needs at least one node to start")
+	errInsufficientNodes = errors.New("at least one node is required")
 )
 
 func init() {
@@ -127,7 +128,7 @@ func toCanonicalDir(dir string) (string, error) {
 	return filepath.EvalSymlinks(absDir)
 }
 
-func StartNewNetwork(
+func BootstrapNewNetwork(
 	ctx context.Context,
 	w io.Writer,
 	network *Network,
@@ -144,10 +145,7 @@ func StartNewNetwork(
 	if err := network.Create(rootNetworkDir); err != nil {
 		return err
 	}
-	if err := network.Start(ctx, w); err != nil {
-		return err
-	}
-	return network.CreateSubnets(ctx, w)
+	return network.Bootstrap(ctx, w)
 }
 
 // Stops the nodes of the network configured in the provided directory.
@@ -325,26 +323,39 @@ func (n *Network) Create(rootDir string) error {
 	return n.Write()
 }
 
-// Starts all nodes in the network
-func (n *Network) Start(ctx context.Context, w io.Writer) error {
-	if _, err := fmt.Fprintf(w, "Starting network %s (UUID: %s)\n", n.Dir, n.UUID); err != nil {
-		return err
+// Starts the specified nodes
+func (n *Network) StartNodes(ctx context.Context, w io.Writer, nodesToStart ...*Node) error {
+	if len(nodesToStart) == 0 {
+		return errInsufficientNodes
+	}
+	nodesToWaitFor := nodesToStart
+	if !slices.Contains(nodesToStart, n.Nodes[0]) {
+		// If starting all nodes except the bootstrap node (because the bootstrap node is already
+		// running), ensure that the health of the bootstrap node will be logged by including it in
+		// the set of nodes to wait for.
+		nodesToWaitFor = n.Nodes
+	} else {
+		// Simplify output by only logging network start when starting all nodes or when starting
+		// the first node by itself to bootstrap subnet creation.
+		if _, err := fmt.Fprintf(w, "Starting network %s (UUID: %s)\n", n.Dir, n.UUID); err != nil {
+			return err
+		}
 	}
 
 	// Record the time before nodes are started to ensure visibility of subsequently collected metrics via the emitted link
 	startTime := time.Now()
 
 	// Configure the networking for each node and start
-	for _, node := range n.Nodes {
+	for _, node := range nodesToStart {
 		if err := n.StartNode(ctx, w, node); err != nil {
 			return err
 		}
 	}
 
-	if _, err := fmt.Fprint(w, "Waiting for all nodes to report healthy...\n\n"); err != nil {
+	if _, err := fmt.Fprint(w, "Waiting for nodes to report healthy...\n\n"); err != nil {
 		return err
 	}
-	if err := n.WaitForHealthy(ctx, w); err != nil {
+	if err := waitForHealthy(ctx, w, nodesToWaitFor); err != nil {
 		return err
 	}
 	if _, err := fmt.Fprintf(w, "\nStarted network %s (UUID: %s)\n", n.Dir, n.UUID); err != nil {
@@ -356,6 +367,85 @@ func (n *Network) Start(ctx context.Context, w io.Writer) error {
 	}
 
 	return nil
+}
+
+// Start the network for the first time
+func (n *Network) Bootstrap(ctx context.Context, w io.Writer) error {
+	if len(n.Subnets) == 0 {
+		// Without the need to coordinate subnet configuration,
+		// starting all nodes at once is the simplest option.
+		return n.StartNodes(ctx, w, n.Nodes...)
+	}
+
+	// The node that will be used to create subnets and bootstrap the network
+	bootstrapNode := n.Nodes[0]
+
+	// Whether sybil protection will need to be re-enabled after subnet creation
+	reEnableSybilProtection := false
+
+	if len(n.Nodes) > 1 {
+		// Reduce the cost of subnet creation for a network of multiple nodes by
+		// creating subnets with a single node with sybil protection
+		// disabled. This allows the creation of initial subnet state without
+		// requiring coordination between multiple nodes.
+
+		if _, err := fmt.Fprintln(w, "Starting a single-node network with sybil protection disabled for quicker subnet creation"); err != nil {
+			return err
+		}
+
+		// If sybil protection is enabled, it should be re-enabled before the node is used to bootstrap the other nodes
+		var err error
+		reEnableSybilProtection, err = bootstrapNode.Flags.GetBoolVal(config.SybilProtectionEnabledKey, true)
+		if err != nil {
+			return fmt.Errorf("failed to read sybil protection flag: %w", err)
+		}
+
+		// Ensure sybil protection is disabled for the bootstrap node.
+		bootstrapNode.Flags[config.SybilProtectionEnabledKey] = false
+	}
+
+	if err := n.StartNodes(ctx, w, bootstrapNode); err != nil {
+		return err
+	}
+
+	// Don't restart the node during subnet creation since it will always be restarted afterwards.
+	if err := n.CreateSubnets(ctx, w, false /* restartRequired */); err != nil {
+		return err
+	}
+
+	if reEnableSybilProtection {
+		if _, err := fmt.Fprintf(w, "Re-enabling sybil protection for %s\n", bootstrapNode.NodeID); err != nil {
+			return err
+		}
+		delete(bootstrapNode.Flags, config.SybilProtectionEnabledKey)
+	}
+
+	if _, err := fmt.Fprintf(w, "Restarting bootstrap node %s\n", bootstrapNode.NodeID); err != nil {
+		return err
+	}
+
+	if len(n.Nodes) == 1 {
+		// Ensure the node is restarted to pick up subnet and chain configuration
+		return n.RestartNode(ctx, w, bootstrapNode)
+	}
+
+	// TODO(marun) This last restart of the bootstrap node might be unnecessary if:
+	// - sybil protection didn't change
+	// - the node is not a subnet validator
+
+	// Ensure the bootstrap node is restarted to pick up configuration changes. Avoid using
+	// RestartNode since the node won't be able to report healthy until other nodes are started.
+	if err := bootstrapNode.Stop(ctx); err != nil {
+		return fmt.Errorf("failed to stop node %s: %w", bootstrapNode.NodeID, err)
+	}
+	if err := n.StartNode(ctx, w, bootstrapNode); err != nil {
+		return fmt.Errorf("failed to start node %s: %w", bootstrapNode.NodeID, err)
+	}
+
+	if _, err := fmt.Fprintln(w, "Starting remaining nodes..."); err != nil {
+		return err
+	}
+	return n.StartNodes(ctx, w, n.Nodes[1:]...)
 }
 
 // Starts the provided node after configuring it for the network.
@@ -413,41 +503,6 @@ func (n *Network) RestartNode(ctx context.Context, w io.Writer, node *Node) erro
 		return err
 	}
 	return WaitForHealthy(ctx, node)
-}
-
-// Waits until all nodes in the network are healthy.
-func (n *Network) WaitForHealthy(ctx context.Context, w io.Writer) error {
-	ticker := time.NewTicker(networkHealthCheckInterval)
-	defer ticker.Stop()
-
-	healthyNodes := set.NewSet[ids.NodeID](len(n.Nodes))
-	for healthyNodes.Len() < len(n.Nodes) {
-		for _, node := range n.Nodes {
-			if healthyNodes.Contains(node.NodeID) {
-				continue
-			}
-
-			healthy, err := node.IsHealthy(ctx)
-			if err != nil && !errors.Is(err, ErrNotRunning) {
-				return err
-			}
-			if !healthy {
-				continue
-			}
-
-			healthyNodes.Add(node.NodeID)
-			if _, err := fmt.Fprintf(w, "%s is healthy @ %s\n", node.NodeID, node.URI); err != nil {
-				return err
-			}
-		}
-
-		select {
-		case <-ctx.Done():
-			return fmt.Errorf("failed to see all nodes healthy before timeout: %w", ctx.Err())
-		case <-ticker.C:
-		}
-	}
-	return nil
 }
 
 // Stops all nodes in the network.
@@ -589,8 +644,9 @@ func (n *Network) GetSubnet(name string) *Subnet {
 	return nil
 }
 
-// Ensure that each subnet on the network is created.
-func (n *Network) CreateSubnets(ctx context.Context, w io.Writer) error {
+// Ensure that each subnet on the network is created. If restartRequired is false, node restart
+// to pick up configuration changes becomes the responsibility of the caller.
+func (n *Network) CreateSubnets(ctx context.Context, w io.Writer, restartRequired bool) error {
 	createdSubnets := make([]*Subnet, 0, len(n.Subnets))
 	for _, subnet := range n.Subnets {
 		if len(subnet.ValidatorIDs) == 0 {
@@ -645,9 +701,6 @@ func (n *Network) CreateSubnets(ctx context.Context, w io.Writer) error {
 		return err
 	}
 
-	if _, err := fmt.Fprintln(w, "Restarting node(s) to enable them to track the new subnet(s)"); err != nil {
-		return err
-	}
 	reconfiguredNodes := []*Node{}
 	for _, node := range n.Nodes {
 		existingTrackedSubnets, err := node.Flags.GetStringVal(config.TrackSubnetsKey)
@@ -661,9 +714,20 @@ func (n *Network) CreateSubnets(ctx context.Context, w io.Writer) error {
 		node.Flags[config.TrackSubnetsKey] = trackedSubnets
 		reconfiguredNodes = append(reconfiguredNodes, node)
 	}
-	for _, node := range reconfiguredNodes {
-		if err := n.RestartNode(ctx, w, node); err != nil {
+
+	if restartRequired {
+		if _, err := fmt.Fprintln(w, "Restarting node(s) to enable them to track the new subnet(s)"); err != nil {
 			return err
+		}
+
+		for _, node := range reconfiguredNodes {
+			if len(node.URI) == 0 {
+				// Only running nodes should be restarted
+				continue
+			}
+			if err := n.RestartNode(ctx, w, node); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -718,7 +782,7 @@ func (n *Network) CreateSubnets(ctx context.Context, w io.Writer) error {
 		}
 	}
 
-	if len(validatorsToRestart) == 0 {
+	if !restartRequired || len(validatorsToRestart) == 0 {
 		return nil
 	}
 
@@ -779,6 +843,40 @@ func (n *Network) getBootstrapIPsAndIDs(skippedNode *Node) ([]string, []string, 
 	}
 
 	return bootstrapIPs, bootstrapIDs, nil
+}
+
+// Waits until the provided nodes are healthy.
+func waitForHealthy(ctx context.Context, w io.Writer, nodes []*Node) error {
+	ticker := time.NewTicker(networkHealthCheckInterval)
+	defer ticker.Stop()
+
+	unhealthyNodes := set.Of(nodes...)
+	for {
+		for node := range unhealthyNodes {
+			healthy, err := node.IsHealthy(ctx)
+			if err != nil && !errors.Is(err, ErrNotRunning) {
+				return err
+			}
+			if !healthy {
+				continue
+			}
+
+			unhealthyNodes.Remove(node)
+			if _, err := fmt.Fprintf(w, "%s is healthy @ %s\n", node.NodeID, node.URI); err != nil {
+				return err
+			}
+		}
+
+		if unhealthyNodes.Len() == 0 {
+			return nil
+		}
+
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("failed to see all nodes healthy before timeout: %w", ctx.Err())
+		case <-ticker.C:
+		}
+	}
 }
 
 // Retrieves the root dir for tmpnet data.

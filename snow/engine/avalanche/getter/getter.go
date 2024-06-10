@@ -44,8 +44,7 @@ func New(
 
 	var err error
 	gh.getAncestorsVtxs, err = metric.NewAverager(
-		"bs",
-		"get_ancestors_vtxs",
+		"bs_get_ancestors_vtxs",
 		"vertices fetched in a call to GetAncestors",
 		reg,
 	)

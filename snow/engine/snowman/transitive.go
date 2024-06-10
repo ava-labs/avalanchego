@@ -118,14 +118,13 @@ func New(config Config) (*Transitive, error) {
 	polls, err := poll.NewSet(
 		factory,
 		config.Ctx.Log,
-		"",
 		config.Ctx.Registerer,
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	metrics, err := newMetrics("", config.Ctx.Registerer)
+	metrics, err := newMetrics(config.Ctx.Registerer)
 	if err != nil {
 		return nil, err
 	}
@@ -1117,7 +1116,7 @@ func (t *Transitive) addUnverifiedBlockToConsensus(
 		zap.Stringer("blkID", blkID),
 		zap.Uint64("height", blkHeight),
 	)
-	return true, t.Consensus.Add(ctx, &memoryBlock{
+	return true, t.Consensus.Add(&memoryBlock{
 		Block:   blk,
 		metrics: t.metrics,
 		tree:    t.nonVerifieds,

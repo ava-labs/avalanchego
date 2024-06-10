@@ -4,7 +4,6 @@
 package timeout
 
 import (
-	"fmt"
 	"sync"
 	"time"
 
@@ -17,83 +16,61 @@ import (
 )
 
 const (
-	responseNamespace = "response"
-	opLabel           = "op"
+	chainLabel = "chain"
+	opLabel    = "op"
 )
 
-var opLabels = []string{opLabel}
+var opLabels = []string{chainLabel, opLabel}
 
-type metrics struct {
-	lock           sync.Mutex
-	chainToMetrics map[ids.ID]*chainMetrics
+type timeoutMetrics struct {
+	messages         *prometheus.CounterVec // chain + op
+	messageLatencies *prometheus.GaugeVec   // chain + op
+
+	lock           sync.RWMutex
+	chainIDToAlias map[ids.ID]string
 }
 
-func (m *metrics) RegisterChain(ctx *snow.ConsensusContext) error {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-
-	if m.chainToMetrics == nil {
-		m.chainToMetrics = map[ids.ID]*chainMetrics{}
-	}
-	if _, exists := m.chainToMetrics[ctx.ChainID]; exists {
-		return fmt.Errorf("chain %s has already been registered", ctx.ChainID)
-	}
-	cm, err := newChainMetrics(ctx.Registerer)
-	if err != nil {
-		return fmt.Errorf("couldn't create metrics for chain %s: %w", ctx.ChainID, err)
-	}
-	m.chainToMetrics[ctx.ChainID] = cm
-	return nil
-}
-
-// Record that a response of type [op] took [latency]
-func (m *metrics) Observe(chainID ids.ID, op message.Op, latency time.Duration) {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-
-	cm, exists := m.chainToMetrics[chainID]
-	if !exists {
-		// TODO should this log an error?
-		return
-	}
-	cm.observe(op, latency)
-}
-
-// chainMetrics contains message response time metrics for a chain
-type chainMetrics struct {
-	messages         *prometheus.CounterVec // op
-	messageLatencies *prometheus.GaugeVec   // op
-}
-
-func newChainMetrics(reg prometheus.Registerer) (*chainMetrics, error) {
-	cm := &chainMetrics{
+func newTimeoutMetrics(reg prometheus.Registerer) (*timeoutMetrics, error) {
+	m := &timeoutMetrics{
 		messages: prometheus.NewCounterVec(
 			prometheus.CounterOpts{
-				Namespace: responseNamespace,
-				Name:      "messages",
-				Help:      "number of responses",
+				Name: "messages",
+				Help: "number of responses",
 			},
 			opLabels,
 		),
 		messageLatencies: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
-				Namespace: responseNamespace,
-				Name:      "message_latencies",
-				Help:      "message latencies (ns)",
+				Name: "message_latencies",
+				Help: "message latencies (ns)",
 			},
 			opLabels,
 		),
+		chainIDToAlias: make(map[ids.ID]string),
 	}
-	return cm, utils.Err(
-		reg.Register(cm.messages),
-		reg.Register(cm.messageLatencies),
+	return m, utils.Err(
+		reg.Register(m.messages),
+		reg.Register(m.messageLatencies),
 	)
 }
 
-func (cm *chainMetrics) observe(op message.Op, latency time.Duration) {
+func (m *timeoutMetrics) RegisterChain(ctx *snow.ConsensusContext) error {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	m.chainIDToAlias[ctx.ChainID] = ctx.PrimaryAlias
+	return nil
+}
+
+// Record that a response of type [op] took [latency]
+func (m *timeoutMetrics) Observe(chainID ids.ID, op message.Op, latency time.Duration) {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+
 	labels := prometheus.Labels{
-		opLabel: op.String(),
+		chainLabel: m.chainIDToAlias[chainID],
+		opLabel:    op.String(),
 	}
-	cm.messages.With(labels).Inc()
-	cm.messageLatencies.With(labels).Add(float64(latency))
+	m.messages.With(labels).Inc()
+	m.messageLatencies.With(labels).Add(float64(latency))
 }

@@ -29,16 +29,6 @@ func Trace(consensus Consensus, tracer trace.Tracer) Consensus {
 	}
 }
 
-func (c *tracedConsensus) Add(ctx context.Context, blk Block) error {
-	ctx, span := c.tracer.Start(ctx, "tracedConsensus.Add", oteltrace.WithAttributes(
-		attribute.Stringer("blkID", blk.ID()),
-		attribute.Int64("height", int64(blk.Height())),
-	))
-	defer span.End()
-
-	return c.Consensus.Add(ctx, blk)
-}
-
 func (c *tracedConsensus) RecordPoll(ctx context.Context, votes bag.Bag[ids.ID]) error {
 	ctx, span := c.tracer.Start(ctx, "tracedConsensus.RecordPoll", oteltrace.WithAttributes(
 		attribute.Int("numVotes", votes.Len()),

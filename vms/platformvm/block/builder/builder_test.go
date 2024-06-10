@@ -16,7 +16,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
-	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
@@ -29,6 +28,7 @@ import (
 
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
+	walletsigner "github.com/ava-labs/avalanchego/wallet/chain/p/signer"
 )
 
 func TestBuildBlockBasic(t *testing.T) {
@@ -39,14 +39,16 @@ func TestBuildBlockBasic(t *testing.T) {
 	defer env.ctx.Lock.Unlock()
 
 	// Create a valid transaction
-	tx, err := env.txBuilder.NewCreateChainTx(
+	builder, signer := env.factory.NewWallet(testSubnet1ControlKeys[0], testSubnet1ControlKeys[1])
+	utx, err := builder.NewCreateChainTx(
 		testSubnet1.ID(),
 		nil,
 		constants.AVMID,
 		nil,
 		"chain name",
-		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 	)
+	require.NoError(err)
+	tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
 	require.NoError(err)
 	txID := tx.ID()
 
@@ -109,7 +111,8 @@ func TestBuildBlockShouldReward(t *testing.T) {
 	require.NoError(err)
 
 	// Create a valid [AddPermissionlessValidatorTx]
-	tx, err := env.txBuilder.NewAddPermissionlessValidatorTx(
+	builder, txSigner := env.factory.NewWallet(preFundedKeys[0])
+	utx, err := builder.NewAddPermissionlessValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
 				NodeID: nodeID,
@@ -130,12 +133,13 @@ func TestBuildBlockShouldReward(t *testing.T) {
 			Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
 		},
 		reward.PercentDenominator,
-		[]*secp256k1.PrivateKey{preFundedKeys[0]},
 		common.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
 		}),
 	)
+	require.NoError(err)
+	tx, err := walletsigner.SignUnsigned(context.Background(), txSigner, utx)
 	require.NoError(err)
 	txID := tx.ID()
 
@@ -247,14 +251,16 @@ func TestBuildBlockForceAdvanceTime(t *testing.T) {
 	defer env.ctx.Lock.Unlock()
 
 	// Create a valid transaction
-	tx, err := env.txBuilder.NewCreateChainTx(
+	builder, signer := env.factory.NewWallet(testSubnet1ControlKeys[0], testSubnet1ControlKeys[1])
+	utx, err := builder.NewCreateChainTx(
 		testSubnet1.ID(),
 		nil,
 		constants.AVMID,
 		nil,
 		"chain name",
-		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 	)
+	require.NoError(err)
+	tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
 	require.NoError(err)
 	txID := tx.ID()
 
@@ -314,7 +320,8 @@ func TestBuildBlockInvalidStakingDurations(t *testing.T) {
 	sk, err := bls.NewSecretKey()
 	require.NoError(err)
 
-	tx1, err := env.txBuilder.NewAddPermissionlessValidatorTx(
+	builder1, signer1 := env.factory.NewWallet(preFundedKeys[0])
+	utx1, err := builder1.NewAddPermissionlessValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
 				NodeID: ids.GenerateTestNodeID(),
@@ -335,12 +342,13 @@ func TestBuildBlockInvalidStakingDurations(t *testing.T) {
 			Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
 		},
 		reward.PercentDenominator,
-		[]*secp256k1.PrivateKey{preFundedKeys[0]},
 		common.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
 		}),
 	)
+	require.NoError(err)
+	tx1, err := walletsigner.SignUnsigned(context.Background(), signer1, utx1)
 	require.NoError(err)
 	require.NoError(env.mempool.Add(tx1))
 	tx1ID := tx1.ID()
@@ -353,7 +361,8 @@ func TestBuildBlockInvalidStakingDurations(t *testing.T) {
 	sk, err = bls.NewSecretKey()
 	require.NoError(err)
 
-	tx2, err := env.txBuilder.NewAddPermissionlessValidatorTx(
+	builder2, signer2 := env.factory.NewWallet(preFundedKeys[2])
+	utx2, err := builder2.NewAddPermissionlessValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
 				NodeID: ids.GenerateTestNodeID(),
@@ -374,12 +383,13 @@ func TestBuildBlockInvalidStakingDurations(t *testing.T) {
 			Addrs:     []ids.ShortID{preFundedKeys[2].PublicKey().Address()},
 		},
 		reward.PercentDenominator,
-		[]*secp256k1.PrivateKey{preFundedKeys[2]},
 		common.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{preFundedKeys[2].PublicKey().Address()},
 		}),
 	)
+	require.NoError(err)
+	tx2, err := walletsigner.SignUnsigned(context.Background(), signer2, utx2)
 	require.NoError(err)
 	require.NoError(env.mempool.Add(tx2))
 	tx2ID := tx2.ID()
@@ -416,14 +426,16 @@ func TestPreviouslyDroppedTxsCannotBeReAddedToMempool(t *testing.T) {
 	defer env.ctx.Lock.Unlock()
 
 	// Create a valid transaction
-	tx, err := env.txBuilder.NewCreateChainTx(
+	builder, signer := env.factory.NewWallet(testSubnet1ControlKeys[0], testSubnet1ControlKeys[1])
+	utx, err := builder.NewCreateChainTx(
 		testSubnet1.ID(),
 		nil,
 		constants.AVMID,
 		nil,
 		"chain name",
-		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 	)
+	require.NoError(err)
+	tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
 	require.NoError(err)
 	txID := tx.ID()
 

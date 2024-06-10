@@ -43,7 +43,7 @@ type diff struct {
 	modifiedDelegateeRewards map[ids.ID]map[ids.NodeID]uint64
 	pendingStakerDiffs       diffStakers
 
-	addedSubnets []*txs.Tx
+	addedSubnetIDs []ids.ID
 	// Subnet ID --> Owner of the subnet
 	subnetOwners map[ids.ID]fx.Owner
 	// Subnet ID --> Tx that transforms the subnet
@@ -272,8 +272,8 @@ func (d *diff) GetPendingStakerIterator() (StakerIterator, error) {
 	return d.pendingStakerDiffs.GetStakerIterator(parentIterator), nil
 }
 
-func (d *diff) AddSubnet(createSubnetTx *txs.Tx) {
-	d.addedSubnets = append(d.addedSubnets, createSubnetTx)
+func (d *diff) AddSubnet(subnetID ids.ID) {
+	d.addedSubnetIDs = append(d.addedSubnetIDs, subnetID)
 }
 
 func (d *diff) GetSubnetOwner(subnetID ids.ID) (fx.Owner, error) {
@@ -451,8 +451,8 @@ func (d *diff) Apply(baseState Chain) error {
 			}
 		}
 	}
-	for _, subnet := range d.addedSubnets {
-		baseState.AddSubnet(subnet)
+	for _, subnetID := range d.addedSubnetIDs {
+		baseState.AddSubnet(subnetID)
 	}
 	for _, tx := range d.transformedSubnets {
 		baseState.AddSubnetTransformation(tx)

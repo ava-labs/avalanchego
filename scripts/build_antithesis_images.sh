@@ -41,24 +41,49 @@ function build_images {
   local node_image_name="${base_image_name}-node:${TAG}"
   local workload_image_name="${base_image_name}-workload:${TAG}"
   local config_image_name="${base_image_name}-config:${TAG}"
+  # The same builder image is used to build node and workload images for all test
+  # setups. It is not intended to be pushed.
+  local builder_image_name="antithesis-avalanchego-builder:${TAG}"
 
   # Define dockerfiles
   local base_dockerfile="${AVALANCHE_PATH}/tests/antithesis/${test_setup}/Dockerfile"
+  local builder_dockerfile="${base_dockerfile}.builder-instrumented"
   local node_dockerfile="${base_dockerfile}.node"
+  # Working directory for instrumented builds
+  local builder_workdir="/avalanchego_instrumented/customer"
   if [[ "$(go env GOARCH)" == "arm64" ]]; then
-    # Antithesis instrumentation is only supported on amd64. On apple silicon (arm64), the
-    # uninstrumented Dockerfile will be used to build the node image to enable local test
-    # development.
+    # Antithesis instrumentation is only supported on amd64. On apple silicon (arm64),
+    # uninstrumented Dockerfiles will be used to enable local test development.
+    builder_dockerfile="${base_dockerfile}.builder-uninstrumented"
     node_dockerfile="${uninstrumented_node_dockerfile}"
+    # Working directory for uninstrumented builds
+    builder_workdir="/build"
   fi
 
   # Define default build command
-  local docker_cmd="docker buildx build --build-arg GO_VERSION=${GO_VERSION} --build-arg NODE_IMAGE=${node_image_name}"
+  local docker_cmd="docker buildx build\
+ --build-arg GO_VERSION=${GO_VERSION}\
+ --build-arg NODE_IMAGE=${node_image_name}\
+ --build-arg BUILDER_IMAGE=${builder_image_name}\
+ --build-arg BUILDER_WORKDIR=${builder_workdir}\
+ --build-arg TAG=${TAG}"
 
   if [[ "${test_setup}" == "xsvm" ]]; then
     # The xsvm node image is built on the avalanchego node image, which is assumed to have already been
     # built. The image name doesn't include the image prefix because it is not intended to be pushed.
     docker_cmd="${docker_cmd} --build-arg AVALANCHEGO_NODE_IMAGE=antithesis-avalanchego-node:${TAG}"
+  fi
+
+  if [[ "${test_setup}" == "avalanchego" ]]; then
+    # Build the image that enables compiling golang binaries for the node and workload
+    # image builds. The builder image is intended to enable building instrumented binaries
+    # if built on amd64 and non-instrumented binaries if built on arm64.
+    #
+    # The builder image is not intended to be pushed so it needs to be built in advance of
+    # adding `--push` to docker_cmd. Since it is never prefixed with `[registry]/[repo]`,
+    # attempting to push will result in an error like `unauthorized: access token has
+    # insufficient scopes`.
+    ${docker_cmd} -t "${builder_image_name}" -f "${builder_dockerfile}" "${AVALANCHE_PATH}"
   fi
 
   if [[ -n "${image_prefix}" && -z "${node_only}" ]]; then

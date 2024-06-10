@@ -369,6 +369,10 @@ func (n *Node) EnsureNodeID() error {
 // labeling of metrics.
 func (n *Node) SaveAPIPort() error {
 	hostPort := strings.TrimPrefix(n.URI, "http://")
+	if len(hostPort) == 0 {
+		// Without an API URI there is nothing to save
+		return nil
+	}
 	_, port, err := net.SplitHostPort(hostPort)
 	if err != nil {
 		return err

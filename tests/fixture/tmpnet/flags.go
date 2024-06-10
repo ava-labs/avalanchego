@@ -55,6 +55,20 @@ func (f FlagsMap) GetStringVal(key string) (string, error) {
 	return val, nil
 }
 
+// GetBoolVal simplifies retrieving a map value as a bool.
+func (f FlagsMap) GetBoolVal(key string, defaultVal bool) (bool, error) {
+	rawVal, ok := f[key]
+	if !ok {
+		return defaultVal, nil
+	}
+
+	val, err := cast.ToBoolE(rawVal)
+	if err != nil {
+		return false, fmt.Errorf("failed to cast value for %q: %w", key, err)
+	}
+	return val, nil
+}
+
 // Write simplifies writing a FlagsMap to the provided path. The
 // description is used in error messages.
 func (f FlagsMap) Write(path string, description string) error {

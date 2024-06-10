@@ -61,7 +61,7 @@ func TestShutdown(t *testing.T) {
 			TimeoutHalflife:    5 * time.Minute,
 		},
 		benchlist,
-		"",
+		prometheus.NewRegistry(),
 		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
@@ -80,7 +80,6 @@ func TestShutdown(t *testing.T) {
 		set.Set[ids.ID]{},
 		nil,
 		HealthConfig{},
-		"",
 		prometheus.NewRegistry(),
 	))
 
@@ -114,6 +113,7 @@ func TestShutdown(t *testing.T) {
 		subnets.New(chainCtx.NodeID, subnets.Config{}),
 		commontracker.NewPeers(),
 		p2pTracker,
+		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
 
@@ -200,7 +200,6 @@ func TestShutdownTimesOut(t *testing.T) {
 	vdrs := validators.NewManager()
 	require.NoError(vdrs.AddStaker(ctx.SubnetID, ids.GenerateTestNodeID(), nil, ids.Empty, 1))
 	benchlist := benchlist.NewNoBenchlist()
-	metrics := prometheus.NewRegistry()
 	// Ensure that the Ancestors request does not timeout
 	tm, err := timeout.NewManager(
 		&timer.AdaptiveTimeoutConfig{
@@ -211,8 +210,8 @@ func TestShutdownTimesOut(t *testing.T) {
 			TimeoutHalflife:    5 * time.Minute,
 		},
 		benchlist,
-		"",
-		metrics,
+		prometheus.NewRegistry(),
+		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
 
@@ -231,8 +230,7 @@ func TestShutdownTimesOut(t *testing.T) {
 		set.Set[ids.ID]{},
 		nil,
 		HealthConfig{},
-		"",
-		metrics,
+		prometheus.NewRegistry(),
 	))
 
 	resourceTracker, err := tracker.NewResourceTracker(
@@ -263,6 +261,7 @@ func TestShutdownTimesOut(t *testing.T) {
 		subnets.New(ctx.NodeID, subnets.Config{}),
 		commontracker.NewPeers(),
 		p2pTracker,
+		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
 
@@ -360,7 +359,7 @@ func TestRouterTimeout(t *testing.T) {
 			TimeoutHalflife:    5 * time.Minute,
 		},
 		benchlist.NewNoBenchlist(),
-		"",
+		prometheus.NewRegistry(),
 		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
@@ -380,7 +379,6 @@ func TestRouterTimeout(t *testing.T) {
 		set.Set[ids.ID]{},
 		nil,
 		HealthConfig{},
-		"",
 		prometheus.NewRegistry(),
 	))
 	defer chainRouter.Shutdown(context.Background())
@@ -433,6 +431,7 @@ func TestRouterTimeout(t *testing.T) {
 		subnets.New(ctx.NodeID, subnets.Config{}),
 		commontracker.NewPeers(),
 		p2pTracker,
+		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
 
@@ -729,7 +728,7 @@ func TestRouterHonorsRequestedEngine(t *testing.T) {
 			TimeoutHalflife:    5 * time.Minute,
 		},
 		benchlist.NewNoBenchlist(),
-		"",
+		prometheus.NewRegistry(),
 		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
@@ -749,7 +748,6 @@ func TestRouterHonorsRequestedEngine(t *testing.T) {
 		set.Set[ids.ID]{},
 		nil,
 		HealthConfig{},
-		"",
 		prometheus.NewRegistry(),
 	))
 	defer chainRouter.Shutdown(context.Background())
@@ -954,7 +952,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 			TimeoutHalflife:    5 * time.Minute,
 		},
 		benchlist.NewNoBenchlist(),
-		"",
+		prometheus.NewRegistry(),
 		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
@@ -974,7 +972,6 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 		set.Set[ids.ID]{},
 		nil,
 		HealthConfig{},
-		"",
 		prometheus.NewRegistry(),
 	))
 	defer chainRouter.Shutdown(context.Background())
@@ -1017,6 +1014,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 		sb,
 		commontracker.NewPeers(),
 		p2pTracker,
+		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
 
@@ -1115,7 +1113,7 @@ func TestConnectedSubnet(t *testing.T) {
 			TimeoutHalflife:    5 * time.Minute,
 		},
 		benchlist.NewNoBenchlist(),
-		"timeoutManager",
+		prometheus.NewRegistry(),
 		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
@@ -1140,7 +1138,6 @@ func TestConnectedSubnet(t *testing.T) {
 		trackedSubnets,
 		nil,
 		HealthConfig{},
-		"",
 		prometheus.NewRegistry(),
 	))
 
@@ -1232,7 +1229,7 @@ func TestValidatorOnlyAllowedNodeMessageDrops(t *testing.T) {
 			TimeoutHalflife:    5 * time.Minute,
 		},
 		benchlist.NewNoBenchlist(),
-		"",
+		prometheus.NewRegistry(),
 		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
@@ -1252,7 +1249,6 @@ func TestValidatorOnlyAllowedNodeMessageDrops(t *testing.T) {
 		set.Set[ids.ID]{},
 		nil,
 		HealthConfig{},
-		"",
 		prometheus.NewRegistry(),
 	))
 	defer chainRouter.Shutdown(context.Background())
@@ -1299,6 +1295,7 @@ func TestValidatorOnlyAllowedNodeMessageDrops(t *testing.T) {
 		sb,
 		commontracker.NewPeers(),
 		p2pTracker,
+		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
 
@@ -1582,7 +1579,7 @@ func newChainRouterTest(t *testing.T) (*ChainRouter, *common.EngineTest) {
 			TimeoutHalflife:    5 * time.Minute,
 		},
 		benchlist.NewNoBenchlist(),
-		"",
+		prometheus.NewRegistry(),
 		prometheus.NewRegistry(),
 	)
 	require.NoError(t, err)
@@ -1601,7 +1598,6 @@ func newChainRouterTest(t *testing.T) (*ChainRouter, *common.EngineTest) {
 		set.Set[ids.ID]{},
 		nil,
 		HealthConfig{},
-		"",
 		prometheus.NewRegistry(),
 	))
 
@@ -1639,6 +1635,7 @@ func newChainRouterTest(t *testing.T) (*ChainRouter, *common.EngineTest) {
 		subnets.New(ctx.NodeID, subnets.Config{}),
 		commontracker.NewPeers(),
 		p2pTracker,
+		prometheus.NewRegistry(),
 	)
 	require.NoError(t, err)
 
