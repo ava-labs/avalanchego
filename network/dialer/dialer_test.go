@@ -48,11 +48,6 @@ func TestDialerCancelDial(t *testing.T) {
 	listenedAddrPort, err := netip.ParseAddrPort(l.Addr().String())
 	require.NoError(err)
 
-	myAddrPort := netip.AddrPortFrom(
-		listenAddrPort.Addr(),
-		listenedAddrPort.Port(),
-	)
-
 	// Create a dialer
 	dialer := NewDialer(
 		"tcp",
@@ -66,11 +61,11 @@ func TestDialerCancelDial(t *testing.T) {
 	// Make an outgoing connection with a cancelled context
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	_, err = dialer.Dial(ctx, myAddrPort)
+	_, err = dialer.Dial(ctx, listenedAddrPort)
 	require.ErrorIs(err, context.Canceled)
 
 	// Make an outgoing connection with a non-cancelled context
-	conn, err := dialer.Dial(context.Background(), myAddrPort)
+	conn, err := dialer.Dial(context.Background(), listenedAddrPort)
 	require.NoError(err)
 	_ = conn.Close()
 
