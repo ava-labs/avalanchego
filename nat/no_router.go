@@ -6,6 +6,7 @@ package nat
 import (
 	"errors"
 	"net"
+	"net/netip"
 	"time"
 )
 
@@ -19,7 +20,7 @@ var (
 const googleDNSServer = "8.8.8.8:80"
 
 type noRouter struct {
-	ip    net.IP
+	ip    netip.Addr
 	ipErr error
 }
 
@@ -35,26 +36,30 @@ func (noRouter) UnmapPort(uint16, uint16) error {
 	return nil
 }
 
-func (r noRouter) ExternalIP() (net.IP, error) {
+func (r noRouter) ExternalIP() (netip.Addr, error) {
 	return r.ip, r.ipErr
 }
 
-func getOutboundIP() (net.IP, error) {
+func getOutboundIP() (netip.Addr, error) {
 	conn, err := net.Dial("udp", googleDNSServer)
 	if err != nil {
-		return nil, err
+		return netip.Addr{}, err
 	}
 
-	addr := conn.LocalAddr()
+	localAddr := conn.LocalAddr()
 	if err := conn.Close(); err != nil {
-		return nil, err
+		return netip.Addr{}, err
 	}
 
-	udpAddr, ok := addr.(*net.UDPAddr)
+	udpAddr, ok := localAddr.(*net.UDPAddr)
 	if !ok {
-		return nil, errFetchingIP
+		return netip.Addr{}, errFetchingIP
 	}
-	return udpAddr.IP, nil
+	addr := udpAddr.AddrPort().Addr()
+	if addr.Is4In6() {
+		addr = addr.Unmap()
+	}
+	return addr, nil
 }
 
 // NewNoRouter returns a router that assumes the network is public

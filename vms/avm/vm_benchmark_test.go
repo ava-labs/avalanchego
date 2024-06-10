@@ -4,7 +4,6 @@
 package avm
 
 import (
-	"context"
 	"fmt"
 	"math/rand"
 	"testing"
@@ -29,10 +28,7 @@ func BenchmarkLoadUser(b *testing.B) {
 				password: password,
 			}},
 		})
-		defer func() {
-			require.NoError(env.vm.Shutdown(context.Background()))
-			env.vm.ctx.Lock.Unlock()
-		}()
+		defer env.vm.ctx.Lock.Unlock()
 
 		user, err := keystore.NewUserFromKeystore(env.vm.ctx.Keystore, username, password)
 		require.NoError(err)
@@ -69,10 +65,7 @@ func getAllUTXOsBenchmark(b *testing.B, utxoCount int, randSrc rand.Source) {
 	require := require.New(b)
 
 	env := setup(b, &envConfig{fork: latest})
-	defer func() {
-		require.NoError(env.vm.Shutdown(context.Background()))
-		env.vm.ctx.Lock.Unlock()
-	}()
+	defer env.vm.ctx.Lock.Unlock()
 
 	addr := ids.GenerateTestShortID()
 

@@ -7,9 +7,11 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
+	"net/netip"
 	"strings"
+
+	"github.com/ava-labs/avalanchego/utils/ips"
 )
 
 var _ Resolver = (*ifConfigResolver)(nil)
@@ -19,29 +21,24 @@ type ifConfigResolver struct {
 	url string
 }
 
-func (r *ifConfigResolver) Resolve(ctx context.Context) (net.IP, error) {
+func (r *ifConfigResolver) Resolve(ctx context.Context) (netip.Addr, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, r.url, nil)
 	if err != nil {
-		return nil, err
+		return netip.Addr{}, err
 	}
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return nil, err
+		return netip.Addr{}, err
 	}
 	defer resp.Body.Close()
 
 	ipBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		// Drop any error to report the original error
-		return nil, fmt.Errorf("failed to read response from %q: %w", r.url, err)
+		return netip.Addr{}, fmt.Errorf("failed to read response from %q: %w", r.url, err)
 	}
 
-	ipStr := string(ipBytes)
-	ipStr = strings.TrimSpace(ipStr)
-	ipResolved := net.ParseIP(ipStr)
-	if ipResolved == nil {
-		return nil, fmt.Errorf("couldn't parse IP from %q", ipStr)
-	}
-	return ipResolved, nil
+	ipStr := strings.TrimSpace(string(ipBytes))
+	return ips.ParseAddr(ipStr)
 }

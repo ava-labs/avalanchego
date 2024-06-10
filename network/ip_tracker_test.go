@@ -25,7 +25,7 @@ func newTestIPTracker(t *testing.T) *ipTracker {
 func newerTestIP(ip *ips.ClaimedIPPort) *ips.ClaimedIPPort {
 	return ips.NewClaimedIPPort(
 		ip.Cert,
-		ip.IPPort,
+		ip.AddrPort,
 		ip.Timestamp+1,
 		ip.Signature,
 	)

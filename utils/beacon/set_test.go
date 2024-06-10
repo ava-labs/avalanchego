@@ -4,13 +4,12 @@
 package beacon
 
 import (
-	"net"
+	"net/netip"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/ips"
 )
 
 func TestSet(t *testing.T) {
@@ -20,18 +19,18 @@ func TestSet(t *testing.T) {
 	id1 := ids.BuildTestNodeID([]byte{1})
 	id2 := ids.BuildTestNodeID([]byte{2})
 
-	ip0 := ips.IPPort{
-		IP:   net.IPv4zero,
-		Port: 0,
-	}
-	ip1 := ips.IPPort{
-		IP:   net.IPv4zero,
-		Port: 1,
-	}
-	ip2 := ips.IPPort{
-		IP:   net.IPv4zero,
-		Port: 2,
-	}
+	ip0 := netip.AddrPortFrom(
+		netip.IPv4Unspecified(),
+		0,
+	)
+	ip1 := netip.AddrPortFrom(
+		netip.IPv4Unspecified(),
+		1,
+	)
+	ip2 := netip.AddrPortFrom(
+		netip.IPv4Unspecified(),
+		2,
+	)
 
 	b0 := New(id0, ip0)
 	b1 := New(id1, ip1)
