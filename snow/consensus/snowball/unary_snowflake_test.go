@@ -68,104 +68,38 @@ func TestUnarySnowflake(t *testing.T) {
 	UnarySnowflakeStateTest(t, &sf, []int{1}, true)
 }
 
-func TestUnarySnowflakeErrorDriven(t *testing.T) {
-	alphaPreference := 3
-	terminationConditions := []terminationCondition{
-		{
-			alphaConfidence: 3,
-			beta:            3,
-		},
-		{
-			alphaConfidence: 4,
-			beta:            2,
-		},
-		{
-			alphaConfidence: 5,
-			beta:            1,
-		},
+type unarySnowflakeTest struct {
+	require *require.Assertions
+
+	unarySnowflake
+}
+
+func newUnarySnowflakeTest(t *testing.T, alphaPreference int, terminationConditions []terminationCondition) snowflakeTest[struct{}] {
+	require := require.New(t)
+
+	return &unarySnowflakeTest{
+		require:        require,
+		unarySnowflake: newUnarySnowflake(alphaPreference, terminationConditions),
 	}
+}
 
-	for i, terminationCondition := range terminationConditions {
-		sf := newUnarySnowflake(alphaPreference, terminationConditions)
+func (sf *unarySnowflakeTest) RecordPoll(count int, _ struct{}) {
+	sf.unarySnowflake.RecordPoll(count)
+}
 
-		for poll := 0; poll < terminationCondition.beta; poll++ {
-			sf.RecordPoll(terminationCondition.alphaConfidence)
+func (sf *unarySnowflakeTest) Assert(expectedConfidences []int, expectedFinalized bool, _ struct{}) {
+	sf.require.Equal(expectedConfidences, sf.unarySnowflake.confidence)
+	sf.require.Equal(expectedFinalized, sf.Finalized())
+}
 
-			expectedConfidences := make([]int, len(terminationConditions))
-			for j := 0; j < i+1; j++ {
-				expectedConfidences[j] = poll + 1
-			}
-			UnarySnowflakeStateTest(t, &sf, expectedConfidences, poll+1 >= terminationCondition.beta)
-		}
-	}
+func TestUnarySnowflakeTerminateInBetaPolls(t *testing.T) {
+	executeErrorDrivenTerminatesInBetaPolls(t, newUnarySnowflakeTest, struct{}{})
 }
 
 func TestUnarySnowflakeErrorDrivenReset(t *testing.T) {
-	alphaPreference := 3
-	terminationConditions := []terminationCondition{
-		{
-			alphaConfidence: 3,
-			beta:            4,
-		},
-		{
-			alphaConfidence: 4,
-			beta:            3,
-		},
-		{
-			alphaConfidence: 5,
-			beta:            2,
-		},
-	}
-
-	for i, terminationCondition := range terminationConditions {
-		sf := newUnarySnowflake(alphaPreference, terminationConditions)
-
-		// Accumulate confidence up to 1 less than beta, reset, and confirm
-		// expected behavior from fresh state.
-		for poll := 0; poll < terminationCondition.beta-1; poll++ {
-			sf.RecordPoll(terminationCondition.alphaConfidence)
-		}
-		sf.RecordUnsuccessfulPoll()
-		zeroConfidence := make([]int, len(terminationConditions))
-		UnarySnowflakeStateTest(t, &sf, zeroConfidence, false)
-
-		for poll := 0; poll < terminationCondition.beta; poll++ {
-			sf.RecordPoll(terminationCondition.alphaConfidence)
-
-			expectedConfidences := make([]int, len(terminationConditions))
-			for j := 0; j < i+1; j++ {
-				expectedConfidences[j] = poll + 1
-			}
-			UnarySnowflakeStateTest(t, &sf, expectedConfidences, poll+1 >= terminationCondition.beta)
-		}
-	}
+	executeErrorDrivenReset(t, newUnarySnowflakeTest, struct{}{})
 }
 
 func TestUnarySnowflakeErrorDrivenResetHighestAlphaConfidence(t *testing.T) {
-	alphaPreference := 3
-	terminationConditions := []terminationCondition{
-		{
-			alphaConfidence: 3,
-			beta:            4,
-		},
-		{
-			alphaConfidence: 4,
-			beta:            3,
-		},
-		{
-			alphaConfidence: 5,
-			beta:            2,
-		},
-	}
-
-	sf := newUnarySnowflake(alphaPreference, terminationConditions)
-
-	sf.RecordPoll(5)
-	UnarySnowflakeStateTest(t, &sf, []int{1, 1, 1}, false)
-	sf.RecordPoll(4)
-	UnarySnowflakeStateTest(t, &sf, []int{2, 2, 0}, false)
-	sf.RecordPoll(3)
-	UnarySnowflakeStateTest(t, &sf, []int{3, 0, 0}, false)
-	sf.RecordPoll(5)
-	UnarySnowflakeStateTest(t, &sf, []int{4, 0, 0}, true)
+	executeErrorDrivenResetHighestAlphaConfidence(t, newUnarySnowflakeTest, struct{}{})
 }

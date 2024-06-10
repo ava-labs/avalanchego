@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/avalanchego/ids"
 )
 
 func TestNnarySnowflake(t *testing.T) {
@@ -115,4 +117,45 @@ func TestVirtuousNnarySnowflake(t *testing.T) {
 	sb.RecordPoll(alphaConfidence, Red)
 	require.Equal(Red, sb.Preference())
 	require.True(sb.Finalized())
+}
+
+type nnarySnowflakeTest struct {
+	require *require.Assertions
+
+	nnarySnowflake
+}
+
+func newNnarySnowflakeTest(t *testing.T, alphaPreference int, terminationConditions []terminationCondition) snowflakeTest[ids.ID] {
+	require := require.New(t)
+
+	return &nnarySnowflakeTest{
+		require:        require,
+		nnarySnowflake: newNnarySnowflake(alphaPreference, terminationConditions, Red),
+	}
+}
+
+func (sf *nnarySnowflakeTest) RecordPoll(count int, choice ids.ID) {
+	sf.nnarySnowflake.RecordPoll(count, choice)
+}
+
+func (sf *nnarySnowflakeTest) Assert(expectedConfidences []int, expectedFinalized bool, expectedPreference ids.ID) {
+	sf.require.Equal(expectedPreference, sf.Preference())
+	sf.require.Equal(expectedConfidences, sf.nnarySnowflake.confidence)
+	sf.require.Equal(expectedFinalized, sf.Finalized())
+}
+
+func TestNnarySnowflakeTerminateInBetaPolls(t *testing.T) {
+	executeErrorDrivenTerminatesInBetaPolls(t, newNnarySnowflakeTest, Red)
+}
+
+func TestNnarySnowflakeErrorDrivenReset(t *testing.T) {
+	executeErrorDrivenReset(t, newNnarySnowflakeTest, Red)
+}
+
+func TestNnarySnowflakeErrorDrivenResetHighestAlphaConfidence(t *testing.T) {
+	executeErrorDrivenResetHighestAlphaConfidence(t, newNnarySnowflakeTest, Red)
+}
+
+func TestNnarySnowflakeErrorDrivenSwitchChoices(t *testing.T) {
+	executeErrorDrivenSwitchChoices(t, newNnarySnowflakeTest, Red, Blue)
 }

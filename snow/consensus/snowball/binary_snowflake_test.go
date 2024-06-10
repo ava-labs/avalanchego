@@ -56,3 +56,44 @@ func TestBinarySnowflake(t *testing.T) {
 	require.Equal(blue, sf.Preference())
 	require.True(sf.Finalized())
 }
+
+type binarySnowflakeTest struct {
+	require *require.Assertions
+
+	binarySnowflake
+}
+
+func newBinarySnowflakeTest(t *testing.T, alphaPreference int, terminationConditions []terminationCondition) snowflakeTest[int] {
+	require := require.New(t)
+
+	return &binarySnowflakeTest{
+		require:         require,
+		binarySnowflake: newBinarySnowflake(alphaPreference, terminationConditions, 0),
+	}
+}
+
+func (sf *binarySnowflakeTest) RecordPoll(count int, choice int) {
+	sf.binarySnowflake.RecordPoll(count, choice)
+}
+
+func (sf *binarySnowflakeTest) Assert(expectedConfidences []int, expectedFinalized bool, expectedPreference int) {
+	sf.require.Equal(expectedPreference, sf.Preference())
+	sf.require.Equal(expectedConfidences, sf.binarySnowflake.confidence)
+	sf.require.Equal(expectedFinalized, sf.Finalized())
+}
+
+func TestBinarySnowflakeTerminateInBetaPolls(t *testing.T) {
+	executeErrorDrivenTerminatesInBetaPolls(t, newBinarySnowflakeTest, 0)
+}
+
+func TestBinarySnowflakeErrorDrivenReset(t *testing.T) {
+	executeErrorDrivenReset(t, newBinarySnowflakeTest, 0)
+}
+
+func TestBinarySnowflakeErrorDrivenResetHighestAlphaConfidence(t *testing.T) {
+	executeErrorDrivenResetHighestAlphaConfidence(t, newBinarySnowflakeTest, 0)
+}
+
+func TestBinarySnowflakeErrorDrivenSwitchChoices(t *testing.T) {
+	executeErrorDrivenSwitchChoices(t, newBinarySnowflakeTest, 0, 1)
+}
