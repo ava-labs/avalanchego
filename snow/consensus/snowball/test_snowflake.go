@@ -10,15 +10,15 @@ const alphaPreference = 3
 var terminationConditions = []terminationCondition{
 	{
 		alphaConfidence: 3,
-		beta:            3,
+		beta:            4,
 	},
 	{
 		alphaConfidence: 4,
-		beta:            2,
+		beta:            3,
 	},
 	{
 		alphaConfidence: 5,
-		beta:            1,
+		beta:            2,
 	},
 }
 
