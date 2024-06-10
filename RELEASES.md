@@ -1,5 +1,19 @@
 # Release Notes
 
+## [v1.11.8](https://github.com/ava-labs/avalanchego/releases/tag/v1.11.8)
+
+This version is backwards compatible to [v1.11.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.11.0). It is optional, but encouraged.
+
+The plugin version is unchanged at `35` and is compatible with versions `v1.11.3-v1.11.7`.
+
+### APIs
+
+- Redesigned metrics to use labels rather than custom namespaces.
+
+### What's Changed
+
+**Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.11.7...v1.11.8
+
 ## [v1.11.7](https://github.com/ava-labs/avalanchego/releases/tag/v1.11.7)
 
 This version is backwards compatible to [v1.11.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.11.0). It is optional, but encouraged.
