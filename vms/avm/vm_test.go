@@ -138,7 +138,7 @@ func TestIssueNFT(t *testing.T) {
 
 	// Create the asset
 	initialStates := map[uint32][]verify.State{
-		uint32(1): {
+		1: {
 			&nftfx.MintOutput{
 				GroupID: 1,
 				OutputOwners: secp256k1fx.OutputOwners{
@@ -215,7 +215,7 @@ func TestIssueProperty(t *testing.T) {
 
 	// create the asset
 	initialStates := map[uint32][]verify.State{
-		uint32(2): {
+		2: {
 			&propertyfx.MintOutput{
 				OutputOwners: secp256k1fx.OutputOwners{
 					Threshold: 1,

@@ -27,7 +27,7 @@ func TestVerifyFxUsage(t *testing.T) {
 	)
 
 	initialStates := map[uint32][]verify.State{
-		uint32(0): {
+		0: {
 			&secp256k1fx.TransferOutput{
 				Amt: 1,
 				OutputOwners: secp256k1fx.OutputOwners{
@@ -36,7 +36,7 @@ func TestVerifyFxUsage(t *testing.T) {
 				},
 			},
 		},
-		uint32(1): {
+		1: {
 			&nftfx.MintOutput{
 				GroupID: 1,
 				OutputOwners: secp256k1fx.OutputOwners{

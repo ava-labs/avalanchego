@@ -746,7 +746,7 @@ func TestServiceGetTxJSON_CreateAssetTx(t *testing.T) {
 				},
 			},
 		},
-		uint32(2): {
+		2: {
 			&propertyfx.MintOutput{
 				OutputOwners: secp256k1fx.OutputOwners{
 					Threshold: 1,
@@ -1249,7 +1249,7 @@ func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 
 	key := keys[0]
 	initialStates := map[uint32][]verify.State{
-		uint32(0): {
+		0: {
 			&nftfx.MintOutput{
 				OutputOwners: secp256k1fx.OutputOwners{
 					Threshold: 1,
@@ -1589,7 +1589,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
 
 	key := keys[0]
 	initialStates := map[uint32][]verify.State{
-		uint32(2): {
+		2: {
 			&propertyfx.MintOutput{
 				OutputOwners: secp256k1fx.OutputOwners{
 					Threshold: 1,
@@ -1729,7 +1729,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) 
 
 	key := keys[0]
 	initialStates := map[uint32][]verify.State{
-		uint32(2): {
+		2: {
 			&propertyfx.MintOutput{
 				OutputOwners: secp256k1fx.OutputOwners{
 					Threshold: 1,
