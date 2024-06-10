@@ -232,7 +232,7 @@ func TestDiffLayerExternalInvalidationPartialFlatten(t *testing.T) {
 	}
 }
 
-// TestPostCapBasicDataAccess tests some functionality regarding capping/flattening.
+// TestPostFlattenBasicDataAccess tests some functionality regarding capping/flattening.
 func TestPostFlattenBasicDataAccess(t *testing.T) {
 	// setAccount is a helper to construct a random account entry and assign it to
 	// an account slot in a snapshot
