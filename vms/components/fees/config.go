@@ -12,8 +12,7 @@ type DynamicFeesConfig struct {
 	MinFeeRate Dimensions `json:"minimal-fee-rate"`
 
 	// UpdateDenominators contains, per each fee dimension, the
-	// exponential update coefficient. Setting an entry to 0 makes
-	// the corresponding fee rate constant.
+	// exponential normalization coefficient.
 	UpdateDenominators Dimensions `json:"update-denominator"`
 
 	// BlockTargetComplexityRate contains, per each fee dimension, the
