@@ -717,7 +717,7 @@ func TestServiceGetTxJSON_CreateAssetTx(t *testing.T) {
 	env.vm.ctx.Lock.Unlock()
 
 	initialStates := map[uint32][]verify.State{
-		uint32(0): {
+		0: {
 			&nftfx.MintOutput{
 				OutputOwners: secp256k1fx.OutputOwners{
 					Threshold: 1,
@@ -730,7 +730,7 @@ func TestServiceGetTxJSON_CreateAssetTx(t *testing.T) {
 				},
 			},
 		},
-		uint32(1): {
+		1: {
 			&nftfx.MintOutput{
 				GroupID: 1,
 				OutputOwners: secp256k1fx.OutputOwners{
@@ -916,7 +916,7 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 
 	key := keys[0]
 	initialStates := map[uint32][]verify.State{
-		uint32(1): {
+		1: {
 			&nftfx.MintOutput{
 				GroupID: 1,
 				OutputOwners: secp256k1fx.OutputOwners{
@@ -1063,7 +1063,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
 
 	key := keys[0]
 	initialStates := map[uint32][]verify.State{
-		uint32(0): {
+		0: {
 			&nftfx.MintOutput{
 				GroupID: 0,
 				OutputOwners: secp256k1fx.OutputOwners{
@@ -1072,7 +1072,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
 				},
 			},
 		},
-		uint32(1): {
+		1: {
 			&nftfx.MintOutput{
 				GroupID: 1,
 				OutputOwners: secp256k1fx.OutputOwners{
@@ -1397,7 +1397,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleSecpMintOp(t *testing.T) {
 
 	key := keys[0]
 	initialStates := map[uint32][]verify.State{
-		uint32(0): {
+		0: {
 			&secp256k1fx.MintOutput{
 				OutputOwners: secp256k1fx.OutputOwners{
 					Threshold: 1,
@@ -1405,7 +1405,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleSecpMintOp(t *testing.T) {
 				},
 			},
 		},
-		uint32(1): {
+		1: {
 			&secp256k1fx.MintOutput{
 				OutputOwners: secp256k1fx.OutputOwners{
 					Threshold: 1,
