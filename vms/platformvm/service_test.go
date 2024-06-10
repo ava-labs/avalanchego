@@ -1163,9 +1163,11 @@ func TestGetFeeRates(t *testing.T) {
 	require := require.New(t)
 	service, _, _ := defaultService(t)
 
+	service.vm.ctx.Lock.Lock()
 	now := time.Now().Truncate(time.Second)
 	service.vm.clock.Set(now)
 	feeCfg := fee.GetDynamicConfig(true /*isEActive*/)
+	service.vm.ctx.Lock.Unlock()
 
 	//  initially minimal fees
 	reply0 := GetFeeRatesReply{}
