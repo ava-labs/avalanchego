@@ -3,9 +3,7 @@
 
 package snowball
 
-import (
-	"testing"
-)
+import "testing"
 
 const alphaPreference = 3
 
