@@ -81,7 +81,7 @@ func WriteSyncSegment(db ethdb.KeyValueWriter, root common.Hash, start []byte) e
 	return db.Put(packSyncSegmentKey(root, start), []byte{0x01})
 }
 
-// ClearSegment removes segment markers for root from db
+// ClearSyncSegments removes segment markers for root from db
 func ClearSyncSegments(db ethdb.KeyValueStore, root common.Hash) error {
 	segmentsPrefix := make([]byte, len(syncSegmentsPrefix)+common.HashLength)
 	copy(segmentsPrefix, syncSegmentsPrefix)
