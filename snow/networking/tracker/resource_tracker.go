@@ -218,7 +218,7 @@ func NewResourceTracker(
 		meters:          linked.NewHashmap[ids.NodeID, meter.Meter](),
 	}
 	var err error
-	t.metrics, err = newCPUTrackerMetrics("resource_tracker", reg)
+	t.metrics, err = newCPUTrackerMetrics(reg)
 	if err != nil {
 		return nil, fmt.Errorf("initializing resourceTracker metrics errored with: %w", err)
 	}
@@ -293,32 +293,27 @@ type trackerMetrics struct {
 	diskSpaceAvailable   prometheus.Gauge
 }
 
-func newCPUTrackerMetrics(namespace string, reg prometheus.Registerer) (*trackerMetrics, error) {
+func newCPUTrackerMetrics(reg prometheus.Registerer) (*trackerMetrics, error) {
 	m := &trackerMetrics{
 		processingTimeMetric: prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespace,
-			Name:      "processing_time",
-			Help:      "Tracked processing time over all nodes. Value expected to be in [0, number of CPU cores], but can go higher due to IO bound processes and thread multiplexing",
+			Name: "processing_time",
+			Help: "Tracked processing time over all nodes. Value expected to be in [0, number of CPU cores], but can go higher due to IO bound processes and thread multiplexing",
 		}),
 		cpuMetric: prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespace,
-			Name:      "cpu_usage",
-			Help:      "CPU usage tracked by the resource manager. Value should be in [0, number of CPU cores]",
+			Name: "cpu_usage",
+			Help: "CPU usage tracked by the resource manager. Value should be in [0, number of CPU cores]",
 		}),
 		diskReadsMetric: prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespace,
-			Name:      "disk_reads",
-			Help:      "Disk reads (bytes/sec) tracked by the resource manager",
+			Name: "disk_reads",
+			Help: "Disk reads (bytes/sec) tracked by the resource manager",
 		}),
 		diskWritesMetric: prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespace,
-			Name:      "disk_writes",
-			Help:      "Disk writes (bytes/sec) tracked by the resource manager",
+			Name: "disk_writes",
+			Help: "Disk writes (bytes/sec) tracked by the resource manager",
 		}),
 		diskSpaceAvailable: prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespace,
-			Name:      "disk_available_space",
-			Help:      "Available space remaining (bytes) on the database volume",
+			Name: "disk_available_space",
+			Help: "Available space remaining (bytes) on the database volume",
 		}),
 	}
 	err := utils.Err(

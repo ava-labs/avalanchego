@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package pebble
+package pebbledb
 
 import (
 	"fmt"
@@ -16,7 +16,7 @@ import (
 
 func newDB(t testing.TB) *Database {
 	folder := t.TempDir()
-	db, err := New(folder, nil, logging.NoLog{}, "pebble", prometheus.NewRegistry())
+	db, err := New(folder, nil, logging.NoLog{}, prometheus.NewRegistry())
 	require.NoError(t, err)
 	return db.(*Database)
 }

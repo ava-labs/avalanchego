@@ -17,45 +17,40 @@ type metrics struct {
 	numDiskWritesBytes *prometheus.GaugeVec
 }
 
-func newMetrics(namespace string, registerer prometheus.Registerer) (*metrics, error) {
+func newMetrics(registerer prometheus.Registerer) (*metrics, error) {
 	m := &metrics{
 		numCPUCycles: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
-				Namespace: namespace,
-				Name:      "num_cpu_cycles",
-				Help:      "Total number of CPU cycles",
+				Name: "num_cpu_cycles",
+				Help: "Total number of CPU cycles",
 			},
 			[]string{"processID"},
 		),
 		numDiskReads: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
-				Namespace: namespace,
-				Name:      "num_disk_reads",
-				Help:      "Total number of disk reads",
+				Name: "num_disk_reads",
+				Help: "Total number of disk reads",
 			},
 			[]string{"processID"},
 		),
 		numDiskReadBytes: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
-				Namespace: namespace,
-				Name:      "num_disk_read_bytes",
-				Help:      "Total number of disk read bytes",
+				Name: "num_disk_read_bytes",
+				Help: "Total number of disk read bytes",
 			},
 			[]string{"processID"},
 		),
 		numDiskWrites: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
-				Namespace: namespace,
-				Name:      "num_disk_writes",
-				Help:      "Total number of disk writes",
+				Name: "num_disk_writes",
+				Help: "Total number of disk writes",
 			},
 			[]string{"processID"},
 		),
 		numDiskWritesBytes: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
-				Namespace: namespace,
-				Name:      "num_disk_write_bytes",
-				Help:      "Total number of disk write bytes",
+				Name: "num_disk_write_bytes",
+				Help: "Total number of disk write bytes",
 			},
 			[]string{"processID"},
 		),

@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -65,6 +66,7 @@ func helperBuildStateSyncTestObjects(t *testing.T) (*fullVM, *VM) {
 			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
 			StakingLeafSigner:   pTestSigner,
 			StakingCertLeaf:     pTestCert,
+			Registerer:          prometheus.NewRegistry(),
 		},
 	)
 

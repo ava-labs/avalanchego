@@ -23,7 +23,6 @@ func Test_newMsgBuilder(t *testing.T) {
 
 	mb, err := newMsgBuilder(
 		logging.NoLog{},
-		"test",
 		prometheus.NewRegistry(),
 		10*time.Second,
 	)
@@ -393,7 +392,6 @@ func TestAppError(t *testing.T) {
 
 	mb, err := newMsgBuilder(
 		logging.NoLog{},
-		"",
 		prometheus.NewRegistry(),
 		time.Second,
 	)

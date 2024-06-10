@@ -4,6 +4,7 @@
 package executor
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -14,6 +15,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	walletsigner "github.com/ava-labs/avalanchego/wallet/chain/p/signer"
 )
 
 func TestNewExportTx(t *testing.T) {
@@ -50,7 +53,10 @@ func TestNewExportTx(t *testing.T) {
 		t.Run(tt.description, func(t *testing.T) {
 			require := require.New(t)
 
-			tx, err := env.txBuilder.NewExportTx(
+			builder, signer, feeCalc, err := env.factory.NewWallet(tt.sourceKeys...)
+			require.NoError(err)
+
+			utx, err := builder.NewExportTx(
 				tt.destinationChainID,
 				[]*avax.TransferableOutput{{
 					Asset: avax.Asset{ID: env.ctx.AVAXAssetID},
@@ -63,8 +69,10 @@ func TestNewExportTx(t *testing.T) {
 						},
 					},
 				}},
-				tt.sourceKeys,
+				feeCalc,
 			)
+			require.NoError(err)
+			tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
 			require.NoError(err)
 
 			stateDiff, err := state.NewDiff(lastAcceptedID, env)
@@ -72,12 +80,9 @@ func TestNewExportTx(t *testing.T) {
 
 			stateDiff.SetTimestamp(tt.timestamp)
 
-			feeCalculator, err := state.PickFeeCalculator(env.config, stateDiff, stateDiff.GetTimestamp())
-			require.NoError(err)
-
 			verifier := StandardTxExecutor{
 				Backend:       &env.backend,
-				FeeCalculator: feeCalculator,
+				FeeCalculator: feeCalc,
 				State:         stateDiff,
 				Tx:            tx,
 			}

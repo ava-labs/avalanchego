@@ -62,117 +62,99 @@ type metrics struct {
 	priorStats, currentStats *leveldb.DBStats
 }
 
-func newMetrics(namespace string, reg prometheus.Registerer) (metrics, error) {
+func newMetrics(reg prometheus.Registerer) (metrics, error) {
 	m := metrics{
 		writesDelayedCount: prometheus.NewCounter(prometheus.CounterOpts{
-			Namespace: namespace,
-			Name:      "writes_delayed",
-			Help:      "number of cumulative writes that have been delayed due to compaction",
+			Name: "writes_delayed",
+			Help: "number of cumulative writes that have been delayed due to compaction",
 		}),
 		writesDelayedDuration: prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespace,
-			Name:      "writes_delayed_duration",
-			Help:      "amount of time (in ns) that writes have been delayed due to compaction",
+			Name: "writes_delayed_duration",
+			Help: "amount of time (in ns) that writes have been delayed due to compaction",
 		}),
 		writeIsDelayed: prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespace,
-			Name:      "write_delayed",
-			Help:      "1 if there is currently a write that is being delayed due to compaction",
+			Name: "write_delayed",
+			Help: "1 if there is currently a write that is being delayed due to compaction",
 		}),
 
 		aliveSnapshots: prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespace,
-			Name:      "alive_snapshots",
-			Help:      "number of currently alive snapshots",
+			Name: "alive_snapshots",
+			Help: "number of currently alive snapshots",
 		}),
 		aliveIterators: prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespace,
-			Name:      "alive_iterators",
-			Help:      "number of currently alive iterators",
+			Name: "alive_iterators",
+			Help: "number of currently alive iterators",
 		}),
 
 		ioWrite: prometheus.NewCounter(prometheus.CounterOpts{
-			Namespace: namespace,
-			Name:      "io_write",
-			Help:      "cumulative amount of io write during compaction",
+			Name: "io_write",
+			Help: "cumulative amount of io write during compaction",
 		}),
 		ioRead: prometheus.NewCounter(prometheus.CounterOpts{
-			Namespace: namespace,
-			Name:      "io_read",
-			Help:      "cumulative amount of io read during compaction",
+			Name: "io_read",
+			Help: "cumulative amount of io read during compaction",
 		}),
 
 		blockCacheSize: prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespace,
-			Name:      "block_cache_size",
-			Help:      "total size of cached blocks",
+			Name: "block_cache_size",
+			Help: "total size of cached blocks",
 		}),
 		openTables: prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespace,
-			Name:      "open_tables",
-			Help:      "number of currently opened tables",
+			Name: "open_tables",
+			Help: "number of currently opened tables",
 		}),
 
 		levelTableCount: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
-				Namespace: namespace,
-				Name:      "table_count",
-				Help:      "number of tables allocated by level",
+				Name: "table_count",
+				Help: "number of tables allocated by level",
 			},
 			levelLabels,
 		),
 		levelSize: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
-				Namespace: namespace,
-				Name:      "size",
-				Help:      "amount of bytes allocated by level",
+				Name: "size",
+				Help: "amount of bytes allocated by level",
 			},
 			levelLabels,
 		),
 		levelDuration: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
-				Namespace: namespace,
-				Name:      "duration",
-				Help:      "amount of time (in ns) spent in compaction by level",
+				Name: "duration",
+				Help: "amount of time (in ns) spent in compaction by level",
 			},
 			levelLabels,
 		),
 		levelReads: prometheus.NewCounterVec(
 			prometheus.CounterOpts{
-				Namespace: namespace,
-				Name:      "reads",
-				Help:      "amount of bytes read during compaction by level",
+				Name: "reads",
+				Help: "amount of bytes read during compaction by level",
 			},
 			levelLabels,
 		),
 		levelWrites: prometheus.NewCounterVec(
 			prometheus.CounterOpts{
-				Namespace: namespace,
-				Name:      "writes",
-				Help:      "amount of bytes written during compaction by level",
+				Name: "writes",
+				Help: "amount of bytes written during compaction by level",
 			},
 			levelLabels,
 		),
 
 		memCompactions: prometheus.NewCounter(prometheus.CounterOpts{
-			Namespace: namespace,
-			Name:      "mem_comps",
-			Help:      "total number of memory compactions performed",
+			Name: "mem_comps",
+			Help: "total number of memory compactions performed",
 		}),
 		level0Compactions: prometheus.NewCounter(prometheus.CounterOpts{
-			Namespace: namespace,
-			Name:      "level_0_comps",
-			Help:      "total number of level 0 compactions performed",
+			Name: "level_0_comps",
+			Help: "total number of level 0 compactions performed",
 		}),
 		nonLevel0Compactions: prometheus.NewCounter(prometheus.CounterOpts{
-			Namespace: namespace,
-			Name:      "non_level_0_comps",
-			Help:      "total number of non-level 0 compactions performed",
+			Name: "non_level_0_comps",
+			Help: "total number of non-level 0 compactions performed",
 		}),
 		seekCompactions: prometheus.NewCounter(prometheus.CounterOpts{
-			Namespace: namespace,
-			Name:      "seek_comps",
-			Help:      "total number of seek compactions performed",
+			Name: "seek_comps",
+			Help: "total number of seek compactions performed",
 		}),
 
 		priorStats:   &leveldb.DBStats{},

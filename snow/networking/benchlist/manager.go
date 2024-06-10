@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -39,12 +40,13 @@ type Manager interface {
 
 // Config defines the configuration for a benchlist
 type Config struct {
-	Benchable              Benchable          `json:"-"`
-	Validators             validators.Manager `json:"-"`
-	Threshold              int                `json:"threshold"`
-	MinimumFailingDuration time.Duration      `json:"minimumFailingDuration"`
-	Duration               time.Duration      `json:"duration"`
-	MaxPortion             float64            `json:"maxPortion"`
+	Benchable              Benchable             `json:"-"`
+	Validators             validators.Manager    `json:"-"`
+	BenchlistRegisterer    metrics.MultiGatherer `json:"-"`
+	Threshold              int                   `json:"threshold"`
+	MinimumFailingDuration time.Duration         `json:"minimumFailingDuration"`
+	Duration               time.Duration         `json:"duration"`
+	MaxPortion             float64               `json:"maxPortion"`
 }
 
 type manager struct {
@@ -108,6 +110,14 @@ func (m *manager) RegisterChain(ctx *snow.ConsensusContext) error {
 		return nil
 	}
 
+	reg, err := metrics.MakeAndRegister(
+		m.config.BenchlistRegisterer,
+		ctx.PrimaryAlias,
+	)
+	if err != nil {
+		return err
+	}
+
 	benchlist, err := NewBenchlist(
 		ctx,
 		m.config.Benchable,
@@ -116,6 +126,7 @@ func (m *manager) RegisterChain(ctx *snow.ConsensusContext) error {
 		m.config.MinimumFailingDuration,
 		m.config.Duration,
 		m.config.MaxPortion,
+		reg,
 	)
 	if err != nil {
 		return err

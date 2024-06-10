@@ -92,8 +92,7 @@ type adaptiveTimeoutManager struct {
 
 func NewAdaptiveTimeoutManager(
 	config *AdaptiveTimeoutConfig,
-	metricsNamespace string,
-	metricsRegister prometheus.Registerer,
+	reg prometheus.Registerer,
 ) (AdaptiveTimeoutManager, error) {
 	switch {
 	case config.InitialTimeout > config.MaximumTimeout:
@@ -108,24 +107,20 @@ func NewAdaptiveTimeoutManager(
 
 	tm := &adaptiveTimeoutManager{
 		networkTimeoutMetric: prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace: metricsNamespace,
-			Name:      "current_timeout",
-			Help:      "Duration of current network timeout in nanoseconds",
+			Name: "current_timeout",
+			Help: "Duration of current network timeout in nanoseconds",
 		}),
 		avgLatency: prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace: metricsNamespace,
-			Name:      "average_latency",
-			Help:      "Average network latency in nanoseconds",
+			Name: "average_latency",
+			Help: "Average network latency in nanoseconds",
 		}),
 		numTimeouts: prometheus.NewCounter(prometheus.CounterOpts{
-			Namespace: metricsNamespace,
-			Name:      "timeouts",
-			Help:      "Number of timed out requests",
+			Name: "timeouts",
+			Help: "Number of timed out requests",
 		}),
 		numPendingTimeouts: prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace: metricsNamespace,
-			Name:      "pending_timeouts",
-			Help:      "Number of pending timeouts",
+			Name: "pending_timeouts",
+			Help: "Number of pending timeouts",
 		}),
 		minimumTimeout:     config.MinimumTimeout,
 		maximumTimeout:     config.MaximumTimeout,
@@ -139,10 +134,10 @@ func NewAdaptiveTimeoutManager(
 	tm.averager = math.NewAverager(float64(config.InitialTimeout), config.TimeoutHalflife, tm.clock.Time())
 
 	err := utils.Err(
-		metricsRegister.Register(tm.networkTimeoutMetric),
-		metricsRegister.Register(tm.avgLatency),
-		metricsRegister.Register(tm.numTimeouts),
-		metricsRegister.Register(tm.numPendingTimeouts),
+		reg.Register(tm.networkTimeoutMetric),
+		reg.Register(tm.avgLatency),
+		reg.Register(tm.numTimeouts),
+		reg.Register(tm.numPendingTimeouts),
 	)
 	return tm, err
 }

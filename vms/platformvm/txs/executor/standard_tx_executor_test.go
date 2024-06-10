@@ -4,6 +4,7 @@
 package executor
 
 import (
+	"context"
 	"errors"
 	"math"
 	"math/rand"
@@ -36,6 +37,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
+
+	walletsigner "github.com/ava-labs/avalanchego/wallet/chain/p/signer"
 )
 
 // This tests that the math performed during TransformSubnetTx execution can
@@ -74,7 +77,10 @@ func TestStandardTxExecutorAddValidatorTxEmptyID(t *testing.T) {
 		// Case: Empty validator node ID after banff
 		env.config.UpgradeConfig.BanffTime = test.banffTime
 
-		tx, err := env.txBuilder.NewAddValidatorTx( // create the tx
+		builder, signer, feeCalc, err := env.factory.NewWallet(preFundedKeys[0])
+		require.NoError(err)
+
+		utx, err := builder.NewAddValidatorTx(
 			&txs.Validator{
 				NodeID: ids.EmptyNodeID,
 				Start:  uint64(startTime.Unix()),
@@ -86,8 +92,10 @@ func TestStandardTxExecutorAddValidatorTxEmptyID(t *testing.T) {
 				Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
 			},
 			reward.PercentDenominator,
-			[]*secp256k1.PrivateKey{preFundedKeys[0]},
+			feeCalc,
 		)
+		require.NoError(err)
+		tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
 		require.NoError(err)
 
 		stateDiff, err := state.NewDiff(lastAcceptedID, env)
@@ -120,7 +128,9 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 	addMinStakeValidator := func(env *environment) {
 		require := require.New(t)
 
-		tx, err := env.txBuilder.NewAddValidatorTx(
+		builder, signer, feeCalc, err := env.factory.NewWallet(preFundedKeys[0])
+		require.NoError(err)
+		utx, err := builder.NewAddValidatorTx(
 			&txs.Validator{
 				NodeID: newValidatorID,
 				Start:  uint64(newValidatorStartTime.Unix()),
@@ -131,9 +141,11 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 				Threshold: 1,
 				Addrs:     []ids.ShortID{rewardAddress},
 			},
-			reward.PercentDenominator, // Shares
-			[]*secp256k1.PrivateKey{preFundedKeys[0]},
+			reward.PercentDenominator,
+			feeCalc,
 		)
+		require.NoError(err)
+		tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
 		require.NoError(err)
 
 		addValTx := tx.Unsigned.(*txs.AddValidatorTx)
@@ -156,7 +168,9 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 	addMaxStakeValidator := func(env *environment) {
 		require := require.New(t)
 
-		tx, err := env.txBuilder.NewAddValidatorTx(
+		builder, signer, feeCalc, err := env.factory.NewWallet(preFundedKeys[0])
+		require.NoError(err)
+		utx, err := builder.NewAddValidatorTx(
 			&txs.Validator{
 				NodeID: newValidatorID,
 				Start:  uint64(newValidatorStartTime.Unix()),
@@ -167,9 +181,11 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 				Threshold: 1,
 				Addrs:     []ids.ShortID{rewardAddress},
 			},
-			reward.PercentDenominator, // Shared
-			[]*secp256k1.PrivateKey{preFundedKeys[0]},
+			reward.PercentDenominator,
+			feeCalc,
 		)
+		require.NoError(err)
+		tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
 		require.NoError(err)
 
 		addValTx := tx.Unsigned.(*txs.AddValidatorTx)
@@ -322,7 +338,10 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 			env := newEnvironment(t, apricotPhase5)
 			env.config.UpgradeConfig.ApricotPhase3Time = tt.AP3Time
 
-			tx, err := env.txBuilder.NewAddDelegatorTx(
+			builder, signer, feeCalc, err := env.factory.NewWallet(tt.feeKeys...)
+			require.NoError(err)
+
+			utx, err := builder.NewAddDelegatorTx(
 				&txs.Validator{
 					NodeID: tt.nodeID,
 					Start:  uint64(tt.startTime.Unix()),
@@ -333,8 +352,10 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 					Threshold: 1,
 					Addrs:     []ids.ShortID{rewardAddress},
 				},
-				tt.feeKeys,
+				feeCalc,
 			)
+			require.NoError(err)
+			tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
 			require.NoError(err)
 
 			if tt.setup != nil {
@@ -373,7 +394,9 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		// but stops validating subnet after stops validating primary network
 		// (note that keys[0] is a genesis validator)
 		startTime := defaultValidateStartTime.Add(time.Second)
-		tx, err := env.txBuilder.NewAddSubnetValidatorTx(
+		builder, signer, feeCalc, err := env.factory.NewWallet(testSubnet1ControlKeys[0], testSubnet1ControlKeys[1])
+		require.NoError(err)
+		utx, err := builder.NewAddSubnetValidatorTx(
 			&txs.SubnetValidator{
 				Validator: txs.Validator{
 					NodeID: nodeID,
@@ -383,8 +406,10 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 				},
 				Subnet: testSubnet1.ID(),
 			},
-			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+			feeCalc,
 		)
+		require.NoError(err)
+		tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
 		require.NoError(err)
 
 		onAcceptState, err := state.NewDiff(lastAcceptedID, env)
@@ -407,7 +432,9 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		// and proposed subnet validation period is subset of
 		// primary network validation period
 		// (note that keys[0] is a genesis validator)
-		tx, err := env.txBuilder.NewAddSubnetValidatorTx(
+		builder, signer, feeCalc, err := env.factory.NewWallet(testSubnet1ControlKeys[0], testSubnet1ControlKeys[1])
+		require.NoError(err)
+		utx, err := builder.NewAddSubnetValidatorTx(
 			&txs.SubnetValidator{
 				Validator: txs.Validator{
 					NodeID: nodeID,
@@ -417,8 +444,10 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 				},
 				Subnet: testSubnet1.ID(),
 			},
-			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+			feeCalc,
 		)
+		require.NoError(err)
+		tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
 		require.NoError(err)
 
 		onAcceptState, err := state.NewDiff(lastAcceptedID, env)
@@ -441,7 +470,9 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 	dsStartTime := defaultGenesisTime.Add(10 * time.Second)
 	dsEndTime := dsStartTime.Add(5 * defaultMinStakingDuration)
 
-	addDSTx, err := env.txBuilder.NewAddValidatorTx(
+	builder, signer, feeCalc, err := env.factory.NewWallet(preFundedKeys[0])
+	require.NoError(err)
+	utx, err := builder.NewAddValidatorTx(
 		&txs.Validator{
 			NodeID: pendingDSValidatorID,
 			Start:  uint64(dsStartTime.Unix()),
@@ -452,14 +483,18 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 			Threshold: 1,
 			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
 		},
-		reward.PercentDenominator, // shares
-		[]*secp256k1.PrivateKey{preFundedKeys[0]},
+		reward.PercentDenominator,
+		feeCalc,
 	)
+	require.NoError(err)
+	addDSTx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
 	require.NoError(err)
 
 	{
 		// Case: Proposed validator isn't in pending or current validator sets
-		tx, err := env.txBuilder.NewAddSubnetValidatorTx(
+		builder, signer, feeCalc, err := env.factory.NewWallet(testSubnet1ControlKeys[0], testSubnet1ControlKeys[1])
+		require.NoError(err)
+		utx, err := builder.NewAddSubnetValidatorTx(
 			&txs.SubnetValidator{
 				Validator: txs.Validator{
 					NodeID: pendingDSValidatorID,
@@ -469,8 +504,10 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 				},
 				Subnet: testSubnet1.ID(),
 			},
-			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+			feeCalc,
 		)
+		require.NoError(err)
+		tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
 		require.NoError(err)
 
 		onAcceptState, err := state.NewDiff(lastAcceptedID, env)
@@ -508,7 +545,9 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 	{
 		// Case: Proposed validator is pending validator of primary network
 		// but starts validating subnet before primary network
-		tx, err := env.txBuilder.NewAddSubnetValidatorTx(
+		builder, signer, feeCalc, err := env.factory.NewWallet(testSubnet1ControlKeys[0], testSubnet1ControlKeys[1])
+		require.NoError(err)
+		utx, err := builder.NewAddSubnetValidatorTx(
 			&txs.SubnetValidator{
 				Validator: txs.Validator{
 					NodeID: pendingDSValidatorID,
@@ -518,8 +557,10 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 				},
 				Subnet: testSubnet1.ID(),
 			},
-			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+			feeCalc,
 		)
+		require.NoError(err)
+		tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
 		require.NoError(err)
 
 		onAcceptState, err := state.NewDiff(lastAcceptedID, env)
@@ -540,7 +581,9 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 	{
 		// Case: Proposed validator is pending validator of primary network
 		// but stops validating subnet after primary network
-		tx, err := env.txBuilder.NewAddSubnetValidatorTx(
+		builder, signer, feeCalc, err := env.factory.NewWallet(testSubnet1ControlKeys[0], testSubnet1ControlKeys[1])
+		require.NoError(err)
+		utx, err := builder.NewAddSubnetValidatorTx(
 			&txs.SubnetValidator{
 				Validator: txs.Validator{
 					NodeID: pendingDSValidatorID,
@@ -550,8 +593,10 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 				},
 				Subnet: testSubnet1.ID(),
 			},
-			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+			feeCalc,
 		)
+		require.NoError(err)
+		tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
 		require.NoError(err)
 
 		onAcceptState, err := state.NewDiff(lastAcceptedID, env)
@@ -572,7 +617,9 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 	{
 		// Case: Proposed validator is pending validator of primary network and
 		// period validating subnet is subset of time validating primary network
-		tx, err := env.txBuilder.NewAddSubnetValidatorTx(
+		builder, signer, feeCalc, err := env.factory.NewWallet(testSubnet1ControlKeys[0], testSubnet1ControlKeys[1])
+		require.NoError(err)
+		utx, err := builder.NewAddSubnetValidatorTx(
 			&txs.SubnetValidator{
 				Validator: txs.Validator{
 					NodeID: pendingDSValidatorID,
@@ -582,8 +629,10 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 				},
 				Subnet: testSubnet1.ID(),
 			},
-			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+			feeCalc,
 		)
+		require.NoError(err)
+		tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
 		require.NoError(err)
 
 		onAcceptState, err := state.NewDiff(lastAcceptedID, env)
@@ -606,7 +655,10 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 	env.state.SetTimestamp(newTimestamp)
 
 	{
-		tx, err := env.txBuilder.NewAddSubnetValidatorTx(
+		builder, signer, feeCalc, err := env.factory.NewWallet(testSubnet1ControlKeys[0], testSubnet1ControlKeys[1])
+		require.NoError(err)
+
+		utx, err := builder.NewAddSubnetValidatorTx(
 			&txs.SubnetValidator{
 				Validator: txs.Validator{
 					NodeID: nodeID,
@@ -616,8 +668,10 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 				},
 				Subnet: testSubnet1.ID(),
 			},
-			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+			feeCalc,
 		)
+		require.NoError(err)
+		tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
 		require.NoError(err)
 
 		onAcceptState, err := state.NewDiff(lastAcceptedID, env)
@@ -640,7 +694,10 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 
 	// Case: Proposed validator already validating the subnet
 	// First, add validator as validator of subnet
-	subnetTx, err := env.txBuilder.NewAddSubnetValidatorTx(
+	builder, signer, feeCalc, err = env.factory.NewWallet(testSubnet1ControlKeys[0], testSubnet1ControlKeys[1])
+	require.NoError(err)
+
+	uSubnetTx, err := builder.NewAddSubnetValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
 				NodeID: nodeID,
@@ -650,8 +707,10 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 			},
 			Subnet: testSubnet1.ID(),
 		},
-		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+		feeCalc,
 	)
+	require.NoError(err)
+	subnetTx, err := walletsigner.SignUnsigned(context.Background(), signer, uSubnetTx)
 	require.NoError(err)
 
 	addSubnetValTx := subnetTx.Unsigned.(*txs.AddSubnetValidatorTx)
@@ -671,7 +730,10 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 	{
 		// Node with ID nodeIDKey.PublicKey().Address() now validating subnet with ID testSubnet1.ID
 		startTime := defaultValidateStartTime.Add(time.Second)
-		duplicateSubnetTx, err := env.txBuilder.NewAddSubnetValidatorTx(
+		builder, signer, feeCalc, err := env.factory.NewWallet(testSubnet1ControlKeys[0], testSubnet1ControlKeys[1])
+		require.NoError(err)
+
+		utx, err := builder.NewAddSubnetValidatorTx(
 			&txs.SubnetValidator{
 				Validator: txs.Validator{
 					NodeID: nodeID,
@@ -681,8 +743,10 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 				},
 				Subnet: testSubnet1.ID(),
 			},
-			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+			feeCalc,
 		)
+		require.NoError(err)
+		tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
 		require.NoError(err)
 
 		onAcceptState, err := state.NewDiff(lastAcceptedID, env)
@@ -694,9 +758,9 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 			Backend:       &env.backend,
 			State:         onAcceptState,
 			FeeCalculator: feeCalculator,
-			Tx:            duplicateSubnetTx,
+			Tx:            tx,
 		}
-		err = duplicateSubnetTx.Unsigned.Visit(&executor)
+		err = tx.Unsigned.Visit(&executor)
 		require.ErrorIs(err, ErrDuplicateValidator)
 	}
 
@@ -707,7 +771,10 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 	{
 		// Case: Duplicate signatures
 		startTime := defaultValidateStartTime.Add(time.Second)
-		tx, err := env.txBuilder.NewAddSubnetValidatorTx(
+		builder, signer, feeCalc, err := env.factory.NewWallet(testSubnet1ControlKeys[0], testSubnet1ControlKeys[1], testSubnet1ControlKeys[2])
+		require.NoError(err)
+
+		utx, err := builder.NewAddSubnetValidatorTx(
 			&txs.SubnetValidator{
 				Validator: txs.Validator{
 					NodeID: nodeID,
@@ -717,8 +784,10 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 				},
 				Subnet: testSubnet1.ID(),
 			},
-			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1], testSubnet1ControlKeys[2]},
+			feeCalc,
 		)
+		require.NoError(err)
+		tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
 		require.NoError(err)
 
 		// Duplicate a signature
@@ -746,7 +815,10 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 	{
 		// Case: Too few signatures
 		startTime := defaultValidateStartTime.Add(time.Second)
-		tx, err := env.txBuilder.NewAddSubnetValidatorTx(
+		builder, signer, feeCalc, err := env.factory.NewWallet(testSubnet1ControlKeys[0], testSubnet1ControlKeys[2])
+		require.NoError(err)
+
+		utx, err := builder.NewAddSubnetValidatorTx(
 			&txs.SubnetValidator{
 				Validator: txs.Validator{
 					NodeID: nodeID,
@@ -756,8 +828,10 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 				},
 				Subnet: testSubnet1.ID(),
 			},
-			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[2]},
+			feeCalc,
 		)
+		require.NoError(err)
+		tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
 		require.NoError(err)
 
 		// Remove a signature
@@ -785,7 +859,10 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 	{
 		// Case: Control Signature from invalid key (keys[3] is not a control key)
 		startTime := defaultValidateStartTime.Add(time.Second)
-		tx, err := env.txBuilder.NewAddSubnetValidatorTx(
+		builder, signer, feeCalc, err := env.factory.NewWallet(testSubnet1ControlKeys[0], preFundedKeys[1])
+		require.NoError(err)
+
+		utx, err := builder.NewAddSubnetValidatorTx(
 			&txs.SubnetValidator{
 				Validator: txs.Validator{
 					NodeID: nodeID,
@@ -795,8 +872,10 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 				},
 				Subnet: testSubnet1.ID(),
 			},
-			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], preFundedKeys[1]},
+			feeCalc,
 		)
+		require.NoError(err)
+		tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
 		require.NoError(err)
 
 		// Replace a valid signature with one from keys[3]
@@ -823,7 +902,10 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		// Case: Proposed validator in pending validator set for subnet
 		// First, add validator to pending validator set of subnet
 		startTime := defaultValidateStartTime.Add(time.Second)
-		tx, err := env.txBuilder.NewAddSubnetValidatorTx(
+		builder, signer, feeCalc, err := env.factory.NewWallet(testSubnet1ControlKeys[0], testSubnet1ControlKeys[1])
+		require.NoError(err)
+
+		utx, err := builder.NewAddSubnetValidatorTx(
 			&txs.SubnetValidator{
 				Validator: txs.Validator{
 					NodeID: nodeID,
@@ -833,8 +915,10 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 				},
 				Subnet: testSubnet1.ID(),
 			},
-			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+			feeCalc,
 		)
+		require.NoError(err)
+		tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
 		require.NoError(err)
 
 		addSubnetValTx := subnetTx.Unsigned.(*txs.AddSubnetValidatorTx)
@@ -877,7 +961,9 @@ func TestBanffStandardTxExecutorAddValidator(t *testing.T) {
 
 	{
 		// Case: Validator's start time too early
-		tx, err := env.txBuilder.NewAddValidatorTx(
+		builder, signer, feeCalc, err := env.factory.NewWallet(preFundedKeys[0])
+		require.NoError(err)
+		utx, err := builder.NewAddValidatorTx(
 			&txs.Validator{
 				NodeID: nodeID,
 				Start:  uint64(defaultValidateStartTime.Unix()) - 1,
@@ -889,8 +975,10 @@ func TestBanffStandardTxExecutorAddValidator(t *testing.T) {
 				Addrs:     []ids.ShortID{ids.ShortEmpty},
 			},
 			reward.PercentDenominator,
-			[]*secp256k1.PrivateKey{preFundedKeys[0]},
+			feeCalc,
 		)
+		require.NoError(err)
+		tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
 		require.NoError(err)
 
 		onAcceptState, err := state.NewDiff(lastAcceptedID, env)
@@ -911,7 +999,9 @@ func TestBanffStandardTxExecutorAddValidator(t *testing.T) {
 	{
 		// Case: Validator in current validator set of primary network
 		startTime := defaultValidateStartTime.Add(1 * time.Second)
-		tx, err := env.txBuilder.NewAddValidatorTx(
+		builder, signer, feeCalc, err := env.factory.NewWallet(preFundedKeys[0])
+		require.NoError(err)
+		utx, err := builder.NewAddValidatorTx(
 			&txs.Validator{
 				NodeID: nodeID,
 				Start:  uint64(startTime.Unix()),
@@ -922,9 +1012,11 @@ func TestBanffStandardTxExecutorAddValidator(t *testing.T) {
 				Threshold: 1,
 				Addrs:     []ids.ShortID{ids.ShortEmpty},
 			},
-			reward.PercentDenominator, // shares
-			[]*secp256k1.PrivateKey{preFundedKeys[0]},
+			reward.PercentDenominator,
+			feeCalc,
 		)
+		require.NoError(err)
+		tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
 		require.NoError(err)
 
 		addValTx := tx.Unsigned.(*txs.AddValidatorTx)
@@ -957,7 +1049,9 @@ func TestBanffStandardTxExecutorAddValidator(t *testing.T) {
 	{
 		// Case: Validator in pending validator set of primary network
 		startTime := defaultValidateStartTime.Add(1 * time.Second)
-		tx, err := env.txBuilder.NewAddValidatorTx(
+		builder, signer, feeCalc, err := env.factory.NewWallet(preFundedKeys[0])
+		require.NoError(err)
+		utx, err := builder.NewAddValidatorTx(
 			&txs.Validator{
 				NodeID: nodeID,
 				Start:  uint64(startTime.Unix()),
@@ -968,9 +1062,11 @@ func TestBanffStandardTxExecutorAddValidator(t *testing.T) {
 				Threshold: 1,
 				Addrs:     []ids.ShortID{ids.ShortEmpty},
 			},
-			reward.PercentDenominator, // shares
-			[]*secp256k1.PrivateKey{preFundedKeys[0]},
+			reward.PercentDenominator,
+			feeCalc,
 		)
+		require.NoError(err)
+		tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
 		require.NoError(err)
 
 		staker, err := state.NewPendingStaker(
@@ -1000,7 +1096,9 @@ func TestBanffStandardTxExecutorAddValidator(t *testing.T) {
 	{
 		// Case: Validator doesn't have enough tokens to cover stake amount
 		startTime := defaultValidateStartTime.Add(1 * time.Second)
-		tx, err := env.txBuilder.NewAddValidatorTx( // create the tx
+		builder, signer, feeCalc, err := env.factory.NewWallet(preFundedKeys[0])
+		require.NoError(err)
+		utx, err := builder.NewAddValidatorTx(
 			&txs.Validator{
 				NodeID: nodeID,
 				Start:  uint64(startTime.Unix()),
@@ -1012,8 +1110,10 @@ func TestBanffStandardTxExecutorAddValidator(t *testing.T) {
 				Addrs:     []ids.ShortID{ids.ShortEmpty},
 			},
 			reward.PercentDenominator,
-			[]*secp256k1.PrivateKey{preFundedKeys[0]},
+			feeCalc,
 		)
+		require.NoError(err)
+		tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
 		require.NoError(err)
 
 		// Remove all UTXOs owned by preFundedKeys[0]
@@ -1058,7 +1158,9 @@ func TestDurangoDisabledTransactions(t *testing.T) {
 					endTime   = chainTime.Add(defaultMaxStakingDuration)
 				)
 
-				tx, err := env.txBuilder.NewAddValidatorTx(
+				builder, signer, feeCalc, err := env.factory.NewWallet(preFundedKeys...)
+				require.NoError(t, err)
+				utx, err := builder.NewAddValidatorTx(
 					&txs.Validator{
 						NodeID: nodeID,
 						Start:  0,
@@ -1069,9 +1171,11 @@ func TestDurangoDisabledTransactions(t *testing.T) {
 						Threshold: 1,
 						Addrs:     []ids.ShortID{ids.ShortEmpty},
 					},
-					reward.PercentDenominator, // shares
-					preFundedKeys,
+					reward.PercentDenominator,
+					feeCalc,
 				)
+				require.NoError(t, err)
+				tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
 				require.NoError(t, err)
 
 				return tx
@@ -1094,7 +1198,9 @@ func TestDurangoDisabledTransactions(t *testing.T) {
 				}
 				it.Release()
 
-				tx, err := env.txBuilder.NewAddDelegatorTx(
+				builder, signer, feeCalc, err := env.factory.NewWallet(preFundedKeys...)
+				require.NoError(t, err)
+				utx, err := builder.NewAddDelegatorTx(
 					&txs.Validator{
 						NodeID: primaryValidator.NodeID,
 						Start:  0,
@@ -1105,8 +1211,10 @@ func TestDurangoDisabledTransactions(t *testing.T) {
 						Threshold: 1,
 						Addrs:     []ids.ShortID{ids.ShortEmpty},
 					},
-					preFundedKeys,
+					feeCalc,
 				)
+				require.NoError(t, err)
+				tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
 				require.NoError(t, err)
 
 				return tx
@@ -1165,7 +1273,9 @@ func TestDurangoMemoField(t *testing.T) {
 				}
 				it.Release()
 
-				tx, err := env.txBuilder.NewAddSubnetValidatorTx(
+				builder, signer, feeCalc, err := env.factory.NewWallet(preFundedKeys...)
+				require.NoError(t, err)
+				utx, err := builder.NewAddSubnetValidatorTx(
 					&txs.SubnetValidator{
 						Validator: txs.Validator{
 							NodeID: primaryValidator.NodeID,
@@ -1175,9 +1285,11 @@ func TestDurangoMemoField(t *testing.T) {
 						},
 						Subnet: testSubnet1.TxID,
 					},
-					preFundedKeys,
+					feeCalc,
 					common.WithMemo(memoField),
 				)
+				require.NoError(t, err)
+				tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
 				require.NoError(t, err)
 
 				onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env)
@@ -1188,15 +1300,19 @@ func TestDurangoMemoField(t *testing.T) {
 		{
 			name: "CreateChainTx",
 			setupTest: func(env *environment, memoField []byte) (*txs.Tx, state.Diff) {
-				tx, err := env.txBuilder.NewCreateChainTx(
+				builder, signer, feeCalc, err := env.factory.NewWallet(preFundedKeys...)
+				require.NoError(t, err)
+				utx, err := builder.NewCreateChainTx(
 					testSubnet1.TxID,
-					[]byte{},             // genesisData
-					ids.GenerateTestID(), // vmID
-					[]ids.ID{},           // fxIDs
-					"aaa",                // chain name
-					preFundedKeys,
+					[]byte{},
+					ids.GenerateTestID(),
+					[]ids.ID{},
+					"aaa",
+					feeCalc,
 					common.WithMemo(memoField),
 				)
+				require.NoError(t, err)
+				tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
 				require.NoError(t, err)
 
 				onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env)
@@ -1208,14 +1324,18 @@ func TestDurangoMemoField(t *testing.T) {
 		{
 			name: "CreateSubnetTx",
 			setupTest: func(env *environment, memoField []byte) (*txs.Tx, state.Diff) {
-				tx, err := env.txBuilder.NewCreateSubnetTx(
+				builder, signer, feeCalc, err := env.factory.NewWallet(preFundedKeys...)
+				require.NoError(t, err)
+				utx, err := builder.NewCreateSubnetTx(
 					&secp256k1fx.OutputOwners{
 						Threshold: 1,
 						Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
 					},
-					preFundedKeys,
+					feeCalc,
 					common.WithMemo(memoField),
 				)
+				require.NoError(t, err)
+				tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
 				require.NoError(t, err)
 
 				onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env)
@@ -1248,16 +1368,20 @@ func TestDurangoMemoField(t *testing.T) {
 				)
 				env.msm.SharedMemory = sharedMemory
 
-				tx, err := env.txBuilder.NewImportTx(
+				builder, signer, feeCalc, err := env.factory.NewWallet(preFundedKeys...)
+				require.NoError(t, err)
+				utx, err := builder.NewImportTx(
 					sourceChain,
 					&secp256k1fx.OutputOwners{
 						Locktime:  0,
 						Threshold: 1,
 						Addrs:     []ids.ShortID{sourceKey.PublicKey().Address()},
 					},
-					preFundedKeys,
+					feeCalc,
 					common.WithMemo(memoField),
 				)
+				require.NoError(t, err)
+				tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
 				require.NoError(t, err)
 
 				onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env)
@@ -1269,7 +1393,9 @@ func TestDurangoMemoField(t *testing.T) {
 		{
 			name: "ExportTx",
 			setupTest: func(env *environment, memoField []byte) (*txs.Tx, state.Diff) {
-				tx, err := env.txBuilder.NewExportTx(
+				builder, signer, feeCalc, err := env.factory.NewWallet(preFundedKeys...)
+				require.NoError(t, err)
+				utx, err := builder.NewExportTx(
 					env.ctx.XChainID,
 					[]*avax.TransferableOutput{{
 						Asset: avax.Asset{ID: env.ctx.AVAXAssetID},
@@ -1282,9 +1408,11 @@ func TestDurangoMemoField(t *testing.T) {
 							},
 						},
 					}},
-					preFundedKeys,
+					feeCalc,
 					common.WithMemo(memoField),
 				)
+				require.NoError(t, err)
+				tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
 				require.NoError(t, err)
 
 				onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env)
@@ -1310,7 +1438,10 @@ func TestDurangoMemoField(t *testing.T) {
 				it.Release()
 
 				endTime := primaryValidator.EndTime
-				subnetValTx, err := env.txBuilder.NewAddSubnetValidatorTx(
+				builder, signer, feeCalc, err := env.factory.NewWallet(testSubnet1ControlKeys[0], testSubnet1ControlKeys[1])
+				require.NoError(t, err)
+
+				utx, err := builder.NewAddSubnetValidatorTx(
 					&txs.SubnetValidator{
 						Validator: txs.Validator{
 							NodeID: primaryValidator.NodeID,
@@ -1320,8 +1451,10 @@ func TestDurangoMemoField(t *testing.T) {
 						},
 						Subnet: testSubnet1.ID(),
 					},
-					[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+					feeCalc,
 				)
+				require.NoError(t, err)
+				subnetValTx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
 				require.NoError(t, err)
 
 				onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env)
@@ -1336,20 +1469,28 @@ func TestDurangoMemoField(t *testing.T) {
 					Tx:            subnetValTx,
 				}))
 
-				tx, err := env.txBuilder.NewRemoveSubnetValidatorTx(
+				builder, signer, feeCalc, err = env.factory.NewWallet(preFundedKeys...)
+				require.NoError(t, err)
+
+				utx2, err := builder.NewRemoveSubnetValidatorTx(
 					primaryValidator.NodeID,
 					testSubnet1.ID(),
-					preFundedKeys,
+					feeCalc,
 					common.WithMemo(memoField),
 				)
 				require.NoError(t, err)
+				tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx2)
+				require.NoError(t, err)
+
 				return tx, onAcceptState
 			},
 		},
 		{
 			name: "TransformSubnetTx",
 			setupTest: func(env *environment, memoField []byte) (*txs.Tx, state.Diff) {
-				tx, err := env.txBuilder.NewTransformSubnetTx(
+				builder, signer, feeCalc, err := env.factory.NewWallet(preFundedKeys...)
+				require.NoError(t, err)
+				utx, err := builder.NewTransformSubnetTx(
 					testSubnet1.TxID,          // subnetID
 					ids.GenerateTestID(),      // assetID
 					10,                        // initial supply
@@ -1364,9 +1505,11 @@ func TestDurangoMemoField(t *testing.T) {
 					10,                        // min delegator stake
 					1,                         // max validator weight factor
 					80,                        // uptime requirement
-					preFundedKeys,
+					feeCalc,
 					common.WithMemo(memoField),
 				)
+				require.NoError(t, err)
+				tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
 				require.NoError(t, err)
 
 				onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env)
@@ -1386,7 +1529,10 @@ func TestDurangoMemoField(t *testing.T) {
 				sk, err := bls.NewSecretKey()
 				require.NoError(t, err)
 
-				tx, err := env.txBuilder.NewAddPermissionlessValidatorTx(
+				builder, txSigner, feeCalc, err := env.factory.NewWallet(preFundedKeys...)
+				require.NoError(t, err)
+
+				utx, err := builder.NewAddPermissionlessValidatorTx(
 					&txs.SubnetValidator{
 						Validator: txs.Validator{
 							NodeID: nodeID,
@@ -1407,9 +1553,11 @@ func TestDurangoMemoField(t *testing.T) {
 						Addrs:     []ids.ShortID{ids.ShortEmpty},
 					},
 					reward.PercentDenominator,
-					preFundedKeys,
+					feeCalc,
 					common.WithMemo(memoField),
 				)
+				require.NoError(t, err)
+				tx, err := walletsigner.SignUnsigned(context.Background(), txSigner, utx)
 				require.NoError(t, err)
 
 				onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env)
@@ -1434,7 +1582,9 @@ func TestDurangoMemoField(t *testing.T) {
 				}
 				it.Release()
 
-				tx, err := env.txBuilder.NewAddPermissionlessDelegatorTx(
+				builder, signer, feeCalc, err := env.factory.NewWallet(preFundedKeys...)
+				require.NoError(t, err)
+				utx, err := builder.NewAddPermissionlessDelegatorTx(
 					&txs.SubnetValidator{
 						Validator: txs.Validator{
 							NodeID: primaryValidator.NodeID,
@@ -1449,9 +1599,11 @@ func TestDurangoMemoField(t *testing.T) {
 						Threshold: 1,
 						Addrs:     []ids.ShortID{ids.ShortEmpty},
 					},
-					preFundedKeys,
+					feeCalc,
 					common.WithMemo(memoField),
 				)
+				require.NoError(t, err)
+				tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
 				require.NoError(t, err)
 
 				onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env)
@@ -1463,15 +1615,19 @@ func TestDurangoMemoField(t *testing.T) {
 		{
 			name: "TransferSubnetOwnershipTx",
 			setupTest: func(env *environment, memoField []byte) (*txs.Tx, state.Diff) {
-				tx, err := env.txBuilder.NewTransferSubnetOwnershipTx(
+				builder, signer, feeCalc, err := env.factory.NewWallet(preFundedKeys...)
+				require.NoError(t, err)
+				utx, err := builder.NewTransferSubnetOwnershipTx(
 					testSubnet1.TxID,
 					&secp256k1fx.OutputOwners{
 						Threshold: 1,
 						Addrs:     []ids.ShortID{ids.ShortEmpty},
 					},
-					preFundedKeys,
+					feeCalc,
 					common.WithMemo(memoField),
 				)
+				require.NoError(t, err)
+				tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
 				require.NoError(t, err)
 
 				onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env)
@@ -1483,7 +1639,9 @@ func TestDurangoMemoField(t *testing.T) {
 		{
 			name: "BaseTx",
 			setupTest: func(env *environment, memoField []byte) (*txs.Tx, state.Diff) {
-				tx, err := env.txBuilder.NewBaseTx(
+				builder, signer, feeCalc, err := env.factory.NewWallet(preFundedKeys...)
+				require.NoError(t, err)
+				utx, err := builder.NewBaseTx(
 					[]*avax.TransferableOutput{
 						{
 							Asset: avax.Asset{ID: env.ctx.AVAXAssetID},
@@ -1496,9 +1654,11 @@ func TestDurangoMemoField(t *testing.T) {
 							},
 						},
 					},
-					preFundedKeys,
+					feeCalc,
 					common.WithMemo(memoField),
 				)
+				require.NoError(t, err)
+				tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
 				require.NoError(t, err)
 
 				onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env)

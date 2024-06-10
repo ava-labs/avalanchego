@@ -4,34 +4,26 @@
 package txstest
 
 import (
-	"context"
 	"fmt"
-	"time"
 
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
-	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/chain/p/builder"
-	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
-
-	vmsigner "github.com/ava-labs/avalanchego/vms/platformvm/signer"
-	walletsigner "github.com/ava-labs/avalanchego/wallet/chain/p/signer"
+	"github.com/ava-labs/avalanchego/wallet/chain/p/signer"
 )
 
-func NewBuilder(
+func NewWalletFactory(
 	ctx *snow.Context,
 	cfg *config.Config,
 	clk *mockable.Clock,
 	state state.State,
-) *Builder {
-	return &Builder{
+) *WalletFactory {
+	return &WalletFactory{
 		ctx:   ctx,
 		cfg:   cfg,
 		clk:   clk,
@@ -39,399 +31,40 @@ func NewBuilder(
 	}
 }
 
-type Builder struct {
+type WalletFactory struct {
 	ctx   *snow.Context
 	cfg   *config.Config
 	clk   *mockable.Clock
 	state state.State
 }
 
-func (b *Builder) NewImportTx(
-	chainID ids.ID,
-	to *secp256k1fx.OutputOwners,
-	keys []*secp256k1.PrivateKey,
-	options ...common.Option,
-) (*txs.Tx, error) {
-	pBuilder, pSigner := b.builders(keys)
-	feeCalc, err := b.FeeCalculator()
-	if err != nil {
-		return nil, err
-	}
-
-	utx, err := pBuilder.NewImportTx(
-		chainID,
-		to,
-		feeCalc,
-		options...,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed building import tx: %w", err)
-	}
-
-	return walletsigner.SignUnsigned(context.Background(), pSigner, utx)
-}
-
-func (b *Builder) NewExportTx(
-	chainID ids.ID,
-	outputs []*avax.TransferableOutput,
-	keys []*secp256k1.PrivateKey,
-	options ...common.Option,
-) (*txs.Tx, error) {
-	pBuilder, pSigner := b.builders(keys)
-	feeCalc, err := b.FeeCalculator()
-	if err != nil {
-		return nil, err
-	}
-
-	utx, err := pBuilder.NewExportTx(
-		chainID,
-		outputs,
-		feeCalc,
-		options...,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed building export tx: %w", err)
-	}
-
-	return walletsigner.SignUnsigned(context.Background(), pSigner, utx)
-}
-
-func (b *Builder) NewCreateChainTx(
-	subnetID ids.ID,
-	genesis []byte,
-	vmID ids.ID,
-	fxIDs []ids.ID,
-	chainName string,
-	keys []*secp256k1.PrivateKey,
-	options ...common.Option,
-) (*txs.Tx, error) {
-	pBuilder, pSigner := b.builders(keys)
-	feeCalc, err := b.FeeCalculator()
-	if err != nil {
-		return nil, err
-	}
-
-	utx, err := pBuilder.NewCreateChainTx(
-		subnetID,
-		genesis,
-		vmID,
-		fxIDs,
-		chainName,
-		feeCalc,
-		options...,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed building create chain tx: %w", err)
-	}
-
-	return walletsigner.SignUnsigned(context.Background(), pSigner, utx)
-}
-
-func (b *Builder) NewCreateSubnetTx(
-	owner *secp256k1fx.OutputOwners,
-	keys []*secp256k1.PrivateKey,
-	options ...common.Option,
-) (*txs.Tx, error) {
-	pBuilder, pSigner := b.builders(keys)
-	feeCalc, err := b.FeeCalculator()
-	if err != nil {
-		return nil, err
-	}
-
-	utx, err := pBuilder.NewCreateSubnetTx(
-		owner,
-		feeCalc,
-		options...,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed building create subnet tx: %w", err)
-	}
-
-	return walletsigner.SignUnsigned(context.Background(), pSigner, utx)
-}
-
-func (b *Builder) NewTransformSubnetTx(
-	subnetID ids.ID,
-	assetID ids.ID,
-	initialSupply uint64,
-	maxSupply uint64,
-	minConsumptionRate uint64,
-	maxConsumptionRate uint64,
-	minValidatorStake uint64,
-	maxValidatorStake uint64,
-	minStakeDuration time.Duration,
-	maxStakeDuration time.Duration,
-	minDelegationFee uint32,
-	minDelegatorStake uint64,
-	maxValidatorWeightFactor byte,
-	uptimeRequirement uint32,
-	keys []*secp256k1.PrivateKey,
-	options ...common.Option,
-) (*txs.Tx, error) {
-	pBuilder, pSigner := b.builders(keys)
-	feeCalc, err := b.FeeCalculator()
-	if err != nil {
-		return nil, err
-	}
-
-	utx, err := pBuilder.NewTransformSubnetTx(
-		subnetID,
-		assetID,
-		initialSupply,
-		maxSupply,
-		minConsumptionRate,
-		maxConsumptionRate,
-		minValidatorStake,
-		maxValidatorStake,
-		minStakeDuration,
-		maxStakeDuration,
-		minDelegationFee,
-		minDelegatorStake,
-		maxValidatorWeightFactor,
-		uptimeRequirement,
-		feeCalc,
-		options...,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed building transform subnet tx: %w", err)
-	}
-
-	return walletsigner.SignUnsigned(context.Background(), pSigner, utx)
-}
-
-func (b *Builder) NewAddValidatorTx(
-	vdr *txs.Validator,
-	rewardsOwner *secp256k1fx.OutputOwners,
-	shares uint32,
-	keys []*secp256k1.PrivateKey,
-	options ...common.Option,
-) (*txs.Tx, error) {
-	pBuilder, pSigner := b.builders(keys)
-	feeCalc, err := b.FeeCalculator()
-	if err != nil {
-		return nil, err
-	}
-
-	utx, err := pBuilder.NewAddValidatorTx(
-		vdr,
-		rewardsOwner,
-		shares,
-		feeCalc,
-		options...,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed building add validator tx: %w", err)
-	}
-
-	return walletsigner.SignUnsigned(context.Background(), pSigner, utx)
-}
-
-func (b *Builder) NewAddPermissionlessValidatorTx(
-	vdr *txs.SubnetValidator,
-	signer vmsigner.Signer,
-	assetID ids.ID,
-	validationRewardsOwner *secp256k1fx.OutputOwners,
-	delegationRewardsOwner *secp256k1fx.OutputOwners,
-	shares uint32,
-	keys []*secp256k1.PrivateKey,
-	options ...common.Option,
-) (*txs.Tx, error) {
-	pBuilder, pSigner := b.builders(keys)
-	feeCalc, err := b.FeeCalculator()
-	if err != nil {
-		return nil, err
-	}
-
-	utx, err := pBuilder.NewAddPermissionlessValidatorTx(
-		vdr,
-		signer,
-		assetID,
-		validationRewardsOwner,
-		delegationRewardsOwner,
-		shares,
-		feeCalc,
-		options...,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed building add permissionless validator tx: %w", err)
-	}
-
-	return walletsigner.SignUnsigned(context.Background(), pSigner, utx)
-}
-
-func (b *Builder) NewAddDelegatorTx(
-	vdr *txs.Validator,
-	rewardsOwner *secp256k1fx.OutputOwners,
-	keys []*secp256k1.PrivateKey,
-	options ...common.Option,
-) (*txs.Tx, error) {
-	pBuilder, pSigner := b.builders(keys)
-	feeCalc, err := b.FeeCalculator()
-	if err != nil {
-		return nil, err
-	}
-
-	utx, err := pBuilder.NewAddDelegatorTx(
-		vdr,
-		rewardsOwner,
-		feeCalc,
-		options...,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed building add delegator tx: %w", err)
-	}
-
-	return walletsigner.SignUnsigned(context.Background(), pSigner, utx)
-}
-
-func (b *Builder) NewAddPermissionlessDelegatorTx(
-	vdr *txs.SubnetValidator,
-	assetID ids.ID,
-	rewardsOwner *secp256k1fx.OutputOwners,
-	keys []*secp256k1.PrivateKey,
-	options ...common.Option,
-) (*txs.Tx, error) {
-	pBuilder, pSigner := b.builders(keys)
-	feeCalc, err := b.FeeCalculator()
-	if err != nil {
-		return nil, err
-	}
-
-	utx, err := pBuilder.NewAddPermissionlessDelegatorTx(
-		vdr,
-		assetID,
-		rewardsOwner,
-		feeCalc,
-		options...,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed building add permissionless delegator tx: %w", err)
-	}
-
-	return walletsigner.SignUnsigned(context.Background(), pSigner, utx)
-}
-
-func (b *Builder) NewAddSubnetValidatorTx(
-	vdr *txs.SubnetValidator,
-	keys []*secp256k1.PrivateKey,
-	options ...common.Option,
-) (*txs.Tx, error) {
-	pBuilder, pSigner := b.builders(keys)
-	feeCalc, err := b.FeeCalculator()
-	if err != nil {
-		return nil, err
-	}
-
-	utx, err := pBuilder.NewAddSubnetValidatorTx(
-		vdr,
-		feeCalc,
-		options...,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed building add subnet validator tx: %w", err)
-	}
-
-	return walletsigner.SignUnsigned(context.Background(), pSigner, utx)
-}
-
-func (b *Builder) NewRemoveSubnetValidatorTx(
-	nodeID ids.NodeID,
-	subnetID ids.ID,
-	keys []*secp256k1.PrivateKey,
-	options ...common.Option,
-) (*txs.Tx, error) {
-	pBuilder, pSigner := b.builders(keys)
-	feeCalc, err := b.FeeCalculator()
-	if err != nil {
-		return nil, err
-	}
-
-	utx, err := pBuilder.NewRemoveSubnetValidatorTx(
-		nodeID,
-		subnetID,
-		feeCalc,
-		options...,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed building remove subnet validator tx: %w", err)
-	}
-
-	return walletsigner.SignUnsigned(context.Background(), pSigner, utx)
-}
-
-func (b *Builder) NewTransferSubnetOwnershipTx(
-	subnetID ids.ID,
-	owner *secp256k1fx.OutputOwners,
-	keys []*secp256k1.PrivateKey,
-	options ...common.Option,
-) (*txs.Tx, error) {
-	pBuilder, pSigner := b.builders(keys)
-	feeCalc, err := b.FeeCalculator()
-	if err != nil {
-		return nil, err
-	}
-
-	utx, err := pBuilder.NewTransferSubnetOwnershipTx(
-		subnetID,
-		owner,
-		feeCalc,
-		options...,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed building transfer subnet ownership tx: %w", err)
-	}
-
-	return walletsigner.SignUnsigned(context.Background(), pSigner, utx)
-}
-
-func (b *Builder) NewBaseTx(
-	outputs []*avax.TransferableOutput,
-	keys []*secp256k1.PrivateKey,
-	options ...common.Option,
-) (*txs.Tx, error) {
-	pBuilder, pSigner := b.builders(keys)
-	feeCalc, err := b.FeeCalculator()
-	if err != nil {
-		return nil, err
-	}
-
-	utx, err := pBuilder.NewBaseTx(
-		outputs,
-		feeCalc,
-		options...,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed building base tx: %w", err)
-	}
-
-	return walletsigner.SignUnsigned(context.Background(), pSigner, utx)
-}
-
-func (b *Builder) builders(keys []*secp256k1.PrivateKey) (builder.Builder, walletsigner.Signer) {
+func (w *WalletFactory) NewWallet(keys ...*secp256k1.PrivateKey) (builder.Builder, signer.Signer, *fee.Calculator, error) {
 	var (
 		kc      = secp256k1fx.NewKeychain(keys...)
 		addrs   = kc.Addresses()
-		backend = newBackend(addrs, b.state, b.ctx.SharedMemory)
-		context = newContext(b.ctx, b.cfg, b.state.GetTimestamp())
-		builder = builder.New(addrs, context, backend)
-		signer  = walletsigner.New(kc, backend)
+		backend = newBackend(addrs, w.state, w.ctx.SharedMemory)
+		context = newContext(w.ctx, w.cfg, w.state.GetTimestamp())
+
+		builder      = builder.New(addrs, context, backend)
+		signer       = signer.New(kc, backend)
+		feeCalc, err = w.FeeCalculator()
 	)
 
-	return builder, signer
+	return builder, signer, feeCalc, err
 }
 
-func (b *Builder) FeeCalculator() (*fee.Calculator, error) {
-	parentBlkTime := b.state.GetTimestamp()
-	nextBlkTime, _, err := state.NextBlockTime(b.state, b.clk)
+func (w *WalletFactory) FeeCalculator() (*fee.Calculator, error) {
+	parentBlkTime := w.state.GetTimestamp()
+	nextBlkTime, _, err := state.NextBlockTime(w.state, w.clk)
 	if err != nil {
 		return nil, fmt.Errorf("failed calculating next block time: %w", err)
 	}
 
-	diff, err := state.NewDiffOn(b.state)
+	diff, err := state.NewDiffOn(w.state)
 	if err != nil {
 		return nil, fmt.Errorf("failed building diff: %w", err)
 	}
 	diff.SetTimestamp(nextBlkTime)
 
-	return state.PickFeeCalculator(b.cfg, diff, parentBlkTime)
+	return state.PickFeeCalculator(w.cfg, diff, parentBlkTime)
 }
