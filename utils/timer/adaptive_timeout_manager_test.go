@@ -83,7 +83,7 @@ func TestAdaptiveTimeoutManagerInit(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		_, err := NewAdaptiveTimeoutManager(&test.config, "", prometheus.NewRegistry())
+		_, err := NewAdaptiveTimeoutManager(&test.config, prometheus.NewRegistry())
 		require.ErrorIs(t, err, test.expectedErr)
 	}
 }
@@ -97,7 +97,6 @@ func TestAdaptiveTimeoutManager(t *testing.T) {
 			TimeoutHalflife:    5 * time.Minute,
 			TimeoutCoefficient: 1.25,
 		},
-		"",
 		prometheus.NewRegistry(),
 	)
 	require.NoError(t, err)

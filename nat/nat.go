@@ -4,13 +4,13 @@
 package nat
 
 import (
-	"net"
+	"net/netip"
 	"sync"
 	"time"
 
 	"go.uber.org/zap"
 
-	"github.com/ava-labs/avalanchego/utils/ips"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
@@ -29,7 +29,7 @@ type Router interface {
 	// Undo a port mapping
 	UnmapPort(intPort, extPort uint16) error
 	// Return our external IP
-	ExternalIP() (net.IP, error)
+	ExternalIP() (netip.Addr, error)
 }
 
 // GetRouter returns a router on the current network.
@@ -63,7 +63,13 @@ func NewPortMapper(log logging.Logger, r Router) *Mapper {
 
 // Map external port [extPort] (exposed to the internet) to internal port [intPort] (where our process is listening)
 // and set [ip]. Does this every [updateTime]. [ip] may be nil.
-func (m *Mapper) Map(intPort, extPort uint16, desc string, ip ips.DynamicIPPort, updateTime time.Duration) {
+func (m *Mapper) Map(
+	intPort uint16,
+	extPort uint16,
+	desc string,
+	ip *utils.Atomic[netip.AddrPort],
+	updateTime time.Duration,
+) {
 	if !m.r.SupportsNAT() {
 		return
 	}
@@ -110,7 +116,13 @@ func (m *Mapper) retryMapPort(intPort, extPort uint16, desc string, timeout time
 
 // keepPortMapping runs in the background to keep a port mapped. It renews the mapping from [extPort]
 // to [intPort]] every [updateTime]. Updates [ip] every [updateTime].
-func (m *Mapper) keepPortMapping(intPort, extPort uint16, desc string, ip ips.DynamicIPPort, updateTime time.Duration) {
+func (m *Mapper) keepPortMapping(
+	intPort uint16,
+	extPort uint16,
+	desc string,
+	ip *utils.Atomic[netip.AddrPort],
+	updateTime time.Duration,
+) {
 	updateTimer := time.NewTimer(updateTime)
 
 	defer func(extPort uint16) {
@@ -150,22 +162,25 @@ func (m *Mapper) keepPortMapping(intPort, extPort uint16, desc string, ip ips.Dy
 	}
 }
 
-func (m *Mapper) updateIP(ip ips.DynamicIPPort) {
+func (m *Mapper) updateIP(ip *utils.Atomic[netip.AddrPort]) {
 	if ip == nil {
 		return
 	}
-	newIP, err := m.r.ExternalIP()
+	newAddr, err := m.r.ExternalIP()
 	if err != nil {
 		m.log.Error("failed to get external IP",
 			zap.Error(err),
 		)
 		return
 	}
-	oldIP := ip.IPPort().IP
-	ip.SetIP(newIP)
-	if !oldIP.Equal(newIP) {
+	oldAddrPort := ip.Get()
+	oldAddr := oldAddrPort.Addr()
+	if newAddr != oldAddr {
+		port := oldAddrPort.Port()
+		ip.Set(netip.AddrPortFrom(newAddr, port))
 		m.log.Info("external IP updated",
-			zap.Stringer("newIP", newIP),
+			zap.Stringer("oldIP", oldAddr),
+			zap.Stringer("newIP", newAddr),
 		)
 	}
 }

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"math"
 	"net"
+	"net/netip"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -77,7 +78,7 @@ type Network interface {
 
 	// Attempt to connect to this IP. The network will never stop attempting to
 	// connect to this ID.
-	ManuallyTrack(nodeID ids.NodeID, ip ips.IPPort)
+	ManuallyTrack(nodeID ids.NodeID, ip netip.AddrPort)
 
 	// PeerInfo returns information about peers. If [nodeIDs] is empty, returns
 	// info about all peers that have finished the handshake. Otherwise, returns
@@ -448,7 +449,7 @@ func (n *network) Connected(nodeID ids.NodeID) {
 	peerIP := peer.IP()
 	newIP := ips.NewClaimedIPPort(
 		peer.Cert(),
-		peerIP.IPPort,
+		peerIP.AddrPort,
 		peerIP.Timestamp,
 		peerIP.TLSSignature,
 	)
@@ -548,7 +549,7 @@ func (n *network) Dispatch() error {
 			// call this function inside the go-routine, rather than the main
 			// accept loop.
 			remoteAddr := conn.RemoteAddr().String()
-			ip, err := ips.ToIPPort(remoteAddr)
+			ip, err := ips.ParseAddrPort(remoteAddr)
 			if err != nil {
 				n.peerConfig.Log.Error("failed to parse remote address",
 					zap.String("peerIP", remoteAddr),
@@ -597,7 +598,7 @@ func (n *network) Dispatch() error {
 	return errs.Err
 }
 
-func (n *network) ManuallyTrack(nodeID ids.NodeID, ip ips.IPPort) {
+func (n *network) ManuallyTrack(nodeID ids.NodeID, ip netip.AddrPort) {
 	n.ipTracker.ManuallyTrack(nodeID)
 
 	n.peersLock.Lock()
@@ -637,7 +638,7 @@ func (n *network) track(ip *ips.ClaimedIPPort) error {
 	// lock.
 	signedIP := peer.SignedIP{
 		UnsignedIP: peer.UnsignedIP{
-			IPPort:    ip.IPPort,
+			AddrPort:  ip.AddrPort,
 			Timestamp: ip.Timestamp,
 		},
 		TLSSignature: ip.Signature,
@@ -663,9 +664,9 @@ func (n *network) track(ip *ips.ClaimedIPPort) error {
 	tracked, isTracked := n.trackedIPs[ip.NodeID]
 	if isTracked {
 		// Stop tracking the old IP and start tracking the new one.
-		tracked = tracked.trackNewIP(ip.IPPort)
+		tracked = tracked.trackNewIP(ip.AddrPort)
 	} else {
-		tracked = newTrackedIP(ip.IPPort)
+		tracked = newTrackedIP(ip.AddrPort)
 	}
 	n.trackedIPs[ip.NodeID] = tracked
 	n.dial(ip.NodeID, tracked)
@@ -798,7 +799,7 @@ func (n *network) disconnectedFromConnected(peer peer.Peer, nodeID ids.NodeID) {
 
 	// The peer that is disconnecting from us finished the handshake
 	if ip, wantsConnection := n.ipTracker.GetIP(nodeID); wantsConnection {
-		tracked := newTrackedIP(ip.IPPort)
+		tracked := newTrackedIP(ip.AddrPort)
 		n.trackedIPs[nodeID] = tracked
 		n.dial(nodeID, tracked)
 	}
@@ -898,7 +899,7 @@ func (n *network) dial(nodeID ids.NodeID, ip *trackedIP) {
 			// nodeID leaves the validator set. This is why we continue the loop
 			// rather than returning even though we will never initiate an
 			// outbound connection with this IP.
-			if !n.config.AllowPrivateIPs && ip.ip.IP.IsPrivate() {
+			if !n.config.AllowPrivateIPs && !ips.IsPublic(ip.ip.Addr()) {
 				n.peerConfig.Log.Verbo("skipping connection dial",
 					zap.String("reason", "outbound connections to private IPs are prohibited"),
 					zap.Stringer("nodeID", nodeID),

@@ -72,9 +72,9 @@ type VMServer struct {
 
 	allowShutdown *utils.Atomic[bool]
 
-	processMetrics prometheus.Gatherer
-	db             database.Database
-	log            logging.Logger
+	metrics prometheus.Gatherer
+	db      database.Database
+	log     logging.Logger
 
 	serverCloser grpcutils.ServerCloser
 	connCloser   wrappers.Closer
@@ -125,28 +125,47 @@ func (vm *VMServer) Initialize(ctx context.Context, req *vmpb.InitializeRequest)
 		return nil, err
 	}
 
-	registerer := prometheus.NewRegistry()
+	pluginMetrics := metrics.NewPrefixGatherer()
+	vm.metrics = pluginMetrics
+
+	processMetrics, err := metrics.MakeAndRegister(
+		pluginMetrics,
+		"process",
+	)
+	if err != nil {
+		return nil, err
+	}
 
 	// Current state of process metrics
 	processCollector := collectors.NewProcessCollector(collectors.ProcessCollectorOpts{})
-	if err := registerer.Register(processCollector); err != nil {
+	if err := processMetrics.Register(processCollector); err != nil {
 		return nil, err
 	}
 
 	// Go process metrics using debug.GCStats
 	goCollector := collectors.NewGoCollector()
-	if err := registerer.Register(goCollector); err != nil {
+	if err := processMetrics.Register(goCollector); err != nil {
+		return nil, err
+	}
+
+	grpcMetrics, err := metrics.MakeAndRegister(
+		pluginMetrics,
+		"grpc",
+	)
+	if err != nil {
 		return nil, err
 	}
 
 	// gRPC client metrics
 	grpcClientMetrics := grpc_prometheus.NewClientMetrics()
-	if err := registerer.Register(grpcClientMetrics); err != nil {
+	if err := grpcMetrics.Register(grpcClientMetrics); err != nil {
 		return nil, err
 	}
 
-	// Register metrics for each Go plugin processes
-	vm.processMetrics = registerer
+	vmMetrics := metrics.NewPrefixGatherer()
+	if err := pluginMetrics.Register("vm", vmMetrics); err != nil {
+		return nil, err
+	}
 
 	// Dial the database
 	dbClientConn, err := grpcutils.Dial(
@@ -225,7 +244,7 @@ func (vm *VMServer) Initialize(ctx context.Context, req *vmpb.InitializeRequest)
 		Keystore:     keystoreClient,
 		SharedMemory: sharedMemoryClient,
 		BCLookup:     bcLookupClient,
-		Metrics:      metrics.NewMultiGatherer(),
+		Metrics:      vmMetrics,
 
 		// Signs warp messages
 		WarpSigner: warpSignerClient,
@@ -567,22 +586,8 @@ func (vm *VMServer) AppGossip(ctx context.Context, req *vmpb.AppGossipMsg) (*emp
 }
 
 func (vm *VMServer) Gather(context.Context, *emptypb.Empty) (*vmpb.GatherResponse, error) {
-	// Gather metrics registered to snow context Gatherer. These
-	// metrics are defined by the underlying vm implementation.
-	mfs, err := vm.ctx.Metrics.Gather()
-	if err != nil {
-		return nil, err
-	}
-
-	// Gather metrics registered by rpcchainvm server Gatherer. These
-	// metrics are collected for each Go plugin process.
-	pluginMetrics, err := vm.processMetrics.Gather()
-	if err != nil {
-		return nil, err
-	}
-	mfs = append(mfs, pluginMetrics...)
-
-	return &vmpb.GatherResponse{MetricFamilies: mfs}, err
+	metrics, err := vm.metrics.Gather()
+	return &vmpb.GatherResponse{MetricFamilies: metrics}, err
 }
 
 func (vm *VMServer) GetAncestors(ctx context.Context, req *vmpb.GetAncestorsRequest) (*vmpb.GetAncestorsResponse, error) {
