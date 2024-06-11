@@ -49,8 +49,8 @@ var (
 	errInvalidBounds        = errors.New("start key is greater than end key")
 	errInvalidRootHash      = fmt.Errorf("root hash must have length %d", hashing.HashLen)
 
-	_ p2p.Handler = (*GetChangeProofHandler)(nil)
-	_ p2p.Handler = (*GetRangeProofHandler)(nil)
+	_ p2p.Handler = (*SyncGetChangeProofHandler)(nil)
+	_ p2p.Handler = (*SyncGetRangeProofHandler)(nil)
 )
 
 func maybeBytesToMaybe(mb *pb.MaybeBytes) maybe.Maybe[[]byte] {
@@ -60,30 +60,30 @@ func maybeBytesToMaybe(mb *pb.MaybeBytes) maybe.Maybe[[]byte] {
 	return maybe.Nothing[[]byte]()
 }
 
-func NewGetChangeProofHandler(log logging.Logger, db DB) *GetChangeProofHandler {
-	return &GetChangeProofHandler{
+func NewSyncGetChangeProofHandler(log logging.Logger, db DB) *SyncGetChangeProofHandler {
+	return &SyncGetChangeProofHandler{
 		log: log,
 		db:  db,
 	}
 }
 
-type GetChangeProofHandler struct {
+type SyncGetChangeProofHandler struct {
 	log logging.Logger
 	db  DB
 }
 
-func (*GetChangeProofHandler) AppGossip(context.Context, ids.NodeID, []byte) {}
+func (*SyncGetChangeProofHandler) AppGossip(context.Context, ids.NodeID, []byte) {}
 
-func (g *GetChangeProofHandler) AppRequest(ctx context.Context, _ ids.NodeID, _ time.Time, requestBytes []byte) ([]byte, *common.AppError) {
-	req := &pb.SyncGetChangeProofRequest{}
-	if err := proto.Unmarshal(requestBytes, req); err != nil {
+func (s *SyncGetChangeProofHandler) AppRequest(ctx context.Context, _ ids.NodeID, _ time.Time, requestBytes []byte) ([]byte, *common.AppError) {
+	request := &pb.SyncGetChangeProofRequest{}
+	if err := proto.Unmarshal(requestBytes, request); err != nil {
 		return nil, &common.AppError{
 			Code:    p2p.ErrUnexpected.Code,
 			Message: fmt.Sprintf("failed to unmarshal request: %s", err),
 		}
 	}
 
-	if err := validateChangeProofRequest(req); err != nil {
+	if err := validateChangeProofRequest(request); err != nil {
 		return nil, &common.AppError{
 			Code:    p2p.ErrUnexpected.Code,
 			Message: fmt.Sprintf("invalid request: %s", err),
@@ -92,13 +92,13 @@ func (g *GetChangeProofHandler) AppRequest(ctx context.Context, _ ids.NodeID, _ 
 
 	// override limits if they exceed caps
 	var (
-		keyLimit   = min(req.KeyLimit, maxKeyValuesLimit)
-		bytesLimit = min(int(req.BytesLimit), maxByteSizeLimit)
-		start      = maybeBytesToMaybe(req.StartKey)
-		end        = maybeBytesToMaybe(req.EndKey)
+		keyLimit   = min(request.KeyLimit, maxKeyValuesLimit)
+		bytesLimit = min(int(request.BytesLimit), maxByteSizeLimit)
+		start      = maybeBytesToMaybe(request.StartKey)
+		end        = maybeBytesToMaybe(request.EndKey)
 	)
 
-	startRoot, err := ids.ToID(req.StartRootHash)
+	startRoot, err := ids.ToID(request.StartRootHash)
 	if err != nil {
 		return nil, &common.AppError{
 			Code:    p2p.ErrUnexpected.Code,
@@ -106,7 +106,7 @@ func (g *GetChangeProofHandler) AppRequest(ctx context.Context, _ ids.NodeID, _ 
 		}
 	}
 
-	endRoot, err := ids.ToID(req.EndRootHash)
+	endRoot, err := ids.ToID(request.EndRootHash)
 	if err != nil {
 		return nil, &common.AppError{
 			Code:    p2p.ErrUnexpected.Code,
@@ -120,7 +120,6 @@ func (g *GetChangeProofHandler) AppRequest(ctx context.Context, _ ids.NodeID, _ 
 			if !errors.Is(err, merkledb.ErrInsufficientHistory) {
 				// We should only fail to get a change proof if we have insufficient history.
 				// Other errors are unexpected.
-				// TODO define custom errors
 				return nil, &common.AppError{
 					Code:    p2p.ErrUnexpected.Code,
 					Message: fmt.Sprintf("failed to get change proof: %s", err),
@@ -141,11 +140,11 @@ func (g *GetChangeProofHandler) AppRequest(ctx context.Context, _ ids.NodeID, _ 
 				ctx,
 				g.db,
 				&pb.SyncGetRangeProofRequest{
-					RootHash:   req.EndRootHash,
-					StartKey:   req.StartKey,
-					EndKey:     req.EndKey,
-					KeyLimit:   req.KeyLimit,
-					BytesLimit: req.BytesLimit,
+					RootHash:   request.EndRootHash,
+					StartKey:   request.StartKey,
+					EndKey:     request.EndKey,
+					KeyLimit:   request.KeyLimit,
+					BytesLimit: request.BytesLimit,
 				},
 				func(rangeProof *merkledb.RangeProof) ([]byte, error) {
 					return proto.Marshal(&pb.SyncGetChangeProofResponse{
@@ -192,30 +191,34 @@ func (g *GetChangeProofHandler) AppRequest(ctx context.Context, _ ids.NodeID, _ 
 	}
 }
 
-func NewGetRangeProofHandler(log logging.Logger, db DB) *GetRangeProofHandler {
-	return &GetRangeProofHandler{
+func (*SyncGetChangeProofHandler) CrossChainAppRequest(context.Context, ids.ID, time.Time, []byte) ([]byte, error) {
+	return nil, nil
+}
+
+func NewSyncGetRangeProofHandler(log logging.Logger, db DB) *SyncGetRangeProofHandler {
+	return &SyncGetRangeProofHandler{
 		log: log,
 		db:  db,
 	}
 }
 
-type GetRangeProofHandler struct {
+type SyncGetRangeProofHandler struct {
 	log logging.Logger
 	db  DB
 }
 
-func (*GetRangeProofHandler) AppGossip(context.Context, ids.NodeID, []byte) {}
+func (*SyncGetRangeProofHandler) AppGossip(context.Context, ids.NodeID, []byte) {}
 
-func (g *GetRangeProofHandler) AppRequest(ctx context.Context, _ ids.NodeID, _ time.Time, requestBytes []byte) ([]byte, *common.AppError) {
-	req := &pb.SyncGetRangeProofRequest{}
-	if err := proto.Unmarshal(requestBytes, req); err != nil {
+func (s *SyncGetRangeProofHandler) AppRequest(ctx context.Context, _ ids.NodeID, _ time.Time, requestBytes []byte) ([]byte, *common.AppError) {
+	request := &pb.SyncGetRangeProofRequest{}
+	if err := proto.Unmarshal(requestBytes, request); err != nil {
 		return nil, &common.AppError{
 			Code:    p2p.ErrUnexpected.Code,
 			Message: fmt.Sprintf("failed to unmarshal request: %s", err),
 		}
 	}
 
-	if err := validateRangeProofRequest(req); err != nil {
+	if err := validateRangeProofRequest(request); err != nil {
 		return nil, &common.AppError{
 			Code:    p2p.ErrUnexpected.Code,
 			Message: fmt.Sprintf("invalid range proof request: %s", err),
@@ -223,13 +226,13 @@ func (g *GetRangeProofHandler) AppRequest(ctx context.Context, _ ids.NodeID, _ t
 	}
 
 	// override limits if they exceed caps
-	req.KeyLimit = min(req.KeyLimit, maxKeyValuesLimit)
-	req.BytesLimit = min(req.BytesLimit, maxByteSizeLimit)
+	request.KeyLimit = min(request.KeyLimit, maxKeyValuesLimit)
+	request.BytesLimit = min(request.BytesLimit, maxByteSizeLimit)
 
 	proofBytes, err := getRangeProof(
 		ctx,
-		g.db,
-		req,
+		s.db,
+		request,
 		func(rangeProof *merkledb.RangeProof) ([]byte, error) {
 			return proto.Marshal(rangeProof.ToProto())
 		},
@@ -242,6 +245,10 @@ func (g *GetRangeProofHandler) AppRequest(ctx context.Context, _ ids.NodeID, _ t
 	}
 
 	return proofBytes, nil
+}
+
+func (*SyncGetRangeProofHandler) CrossChainAppRequest(context.Context, ids.ID, time.Time, []byte) ([]byte, error) {
+	return nil, nil
 }
 
 // Get the range proof specified by [req].

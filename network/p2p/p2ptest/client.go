@@ -21,25 +21,19 @@ import (
 
 // NewClient generates a client-server pair and returns the client used to
 // communicate with a server with the specified handler
-func NewClient(
-	t *testing.T,
-	ctx context.Context,
-	handler p2p.Handler,
-	clientNodeID ids.NodeID,
-	serverNodeID ids.NodeID,
-) *p2p.Client {
+func NewClient(t *testing.T, rootCtx context.Context, handler p2p.Handler) *p2p.Client {
 	clientSender := &enginetest.Sender{}
 	serverSender := &enginetest.Sender{}
 
+	clientNodeID := ids.GenerateTestNodeID()
 	clientNetwork, err := p2p.NewNetwork(logging.NoLog{}, clientSender, prometheus.NewRegistry(), "")
 	require.NoError(t, err)
 
+	serverNodeID := ids.GenerateTestNodeID()
 	serverNetwork, err := p2p.NewNetwork(logging.NoLog{}, serverSender, prometheus.NewRegistry(), "")
 	require.NoError(t, err)
 
 	clientSender.SendAppGossipF = func(ctx context.Context, _ common.SendConfig, gossipBytes []byte) error {
-		// Send the request asynchronously to avoid deadlock when the server
-		// sends the response back to the client
 		go func() {
 			require.NoError(t, serverNetwork.AppGossip(ctx, clientNodeID, gossipBytes))
 		}()
@@ -58,8 +52,6 @@ func NewClient(
 	}
 
 	serverSender.SendAppResponseF = func(ctx context.Context, _ ids.NodeID, requestID uint32, responseBytes []byte) error {
-		// Send the request asynchronously to avoid deadlock when the server
-		// sends the response back to the client
 		go func() {
 			require.NoError(t, clientNetwork.AppResponse(ctx, serverNodeID, requestID, responseBytes))
 		}()
@@ -68,8 +60,6 @@ func NewClient(
 	}
 
 	serverSender.SendAppErrorF = func(ctx context.Context, _ ids.NodeID, requestID uint32, errorCode int32, errorMessage string) error {
-		// Send the request asynchronously to avoid deadlock when the server
-		// sends the response back to the client
 		go func() {
 			require.NoError(t, clientNetwork.AppRequestFailed(ctx, serverNodeID, requestID, &common.AppError{
 				Code:    errorCode,
@@ -80,10 +70,10 @@ func NewClient(
 		return nil
 	}
 
-	require.NoError(t, clientNetwork.Connected(ctx, clientNodeID, nil))
-	require.NoError(t, clientNetwork.Connected(ctx, serverNodeID, nil))
-	require.NoError(t, serverNetwork.Connected(ctx, clientNodeID, nil))
-	require.NoError(t, serverNetwork.Connected(ctx, serverNodeID, nil))
+	require.NoError(t, clientNetwork.Connected(rootCtx, clientNodeID, nil))
+	require.NoError(t, clientNetwork.Connected(rootCtx, serverNodeID, nil))
+	require.NoError(t, serverNetwork.Connected(rootCtx, clientNodeID, nil))
+	require.NoError(t, serverNetwork.Connected(rootCtx, serverNodeID, nil))
 
 	require.NoError(t, serverNetwork.AddHandler(0, handler))
 	return clientNetwork.NewClient(0)

@@ -41,7 +41,7 @@ var (
 	ErrAlreadyStarted                = errors.New("cannot start a Manager that has already been started")
 	ErrAlreadyClosed                 = errors.New("Manager is closed")
 	ErrNoRangeProofClientProvided    = errors.New("range proof client is a required field of the sync config")
-	ErrNoChangeProofClientProvided   = errors.New("change proof client is a required field of the sync config")
+	ErrNoChangeProofClientProvided   = errors.New("change proofclient is a required field of the sync config")
 	ErrNoDatabaseProvided            = errors.New("sync database is a required field of the sync config")
 	ErrNoLogProvided                 = errors.New("log is a required field of the sync config")
 	ErrZeroWorkLimit                 = errors.New("simultaneous work limit must be greater than 0")
@@ -305,12 +305,7 @@ func (m *Manager) doWork(ctx context.Context, work *workItem) {
 		return
 	}
 
-	select {
-	case <-ctx.Done():
-		m.finishWorkItem()
-		return
-	case <-time.After(waitTime):
-	}
+	<-time.After(waitTime)
 
 	if work.localRootID == ids.Empty {
 		// the keys in this range have not been downloaded, so get all key/values
@@ -373,8 +368,7 @@ func (m *Manager) requestChangeProof(ctx context.Context, work *workItem) {
 		defer m.finishWorkItem()
 
 		if err := m.handleChangeProofResponse(ctx, targetRootID, work, request, responseBytes, err); err != nil {
-			// TODO log responses
-			m.config.Log.Debug("dropping response", zap.Error(err), zap.Stringer("request", request))
+			m.config.Log.Debug("dropping response", zap.Error(err))
 			m.retryWork(work)
 			return
 		}
@@ -431,8 +425,7 @@ func (m *Manager) requestRangeProof(ctx context.Context, work *workItem) {
 		defer m.finishWorkItem()
 
 		if err := m.handleRangeProofResponse(ctx, targetRootID, work, request, responseBytes, appErr); err != nil {
-			// TODO log responses
-			m.config.Log.Debug("dropping response", zap.Error(err), zap.Stringer("request", request))
+			m.config.Log.Debug("dropping response", zap.Error(err))
 			m.retryWork(work)
 			return
 		}
@@ -468,11 +461,10 @@ func (m *Manager) retryWork(work *workItem) {
 	m.workLock.Lock()
 	m.unprocessedWork.Insert(work)
 	m.workLock.Unlock()
-	m.unprocessedWorkCond.Signal()
 }
 
 // Returns an error if we should drop the response
-func (m *Manager) shouldHandleResponse(
+func (m *Manager) handleResponse(
 	bytesLimit uint32,
 	responseBytes []byte,
 	err error,
@@ -507,7 +499,7 @@ func (m *Manager) handleRangeProofResponse(
 	responseBytes []byte,
 	err error,
 ) error {
-	if err := m.shouldHandleResponse(request.BytesLimit, responseBytes, err); err != nil {
+	if err := m.handleResponse(request.BytesLimit, responseBytes, err); err != nil {
 		return err
 	}
 
@@ -558,7 +550,7 @@ func (m *Manager) handleChangeProofResponse(
 	responseBytes []byte,
 	err error,
 ) error {
-	if err := m.shouldHandleResponse(request.BytesLimit, responseBytes, err); err != nil {
+	if err := m.handleResponse(request.BytesLimit, responseBytes, err); err != nil {
 		return err
 	}
 
@@ -614,6 +606,7 @@ func (m *Manager) handleChangeProofResponse(
 
 		m.completeWorkItem(ctx, work, largestHandledKey, targetRootID, changeProof.EndProof)
 	case *pb.SyncGetChangeProofResponse_RangeProof:
+
 		var rangeProof merkledb.RangeProof
 		if err := rangeProof.UnmarshalProto(changeProofResp.RangeProof); err != nil {
 			return err
