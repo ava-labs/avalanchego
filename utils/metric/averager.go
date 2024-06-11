@@ -23,23 +23,21 @@ type averager struct {
 	sum   prometheus.Gauge
 }
 
-func NewAverager(namespace, name, desc string, reg prometheus.Registerer) (Averager, error) {
+func NewAverager(name, desc string, reg prometheus.Registerer) (Averager, error) {
 	errs := wrappers.Errs{}
-	a := NewAveragerWithErrs(namespace, name, desc, reg, &errs)
+	a := NewAveragerWithErrs(name, desc, reg, &errs)
 	return a, errs.Err
 }
 
-func NewAveragerWithErrs(namespace, name, desc string, reg prometheus.Registerer, errs *wrappers.Errs) Averager {
+func NewAveragerWithErrs(name, desc string, reg prometheus.Registerer, errs *wrappers.Errs) Averager {
 	a := averager{
 		count: prometheus.NewCounter(prometheus.CounterOpts{
-			Namespace: namespace,
-			Name:      name + "_count",
-			Help:      "Total # of observations of " + desc,
+			Name: AppendNamespace(name, "count"),
+			Help: "Total # of observations of " + desc,
 		}),
 		sum: prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespace,
-			Name:      name + "_sum",
-			Help:      "Sum of " + desc,
+			Name: AppendNamespace(name, "sum"),
+			Help: "Sum of " + desc,
 		}),
 	}
 

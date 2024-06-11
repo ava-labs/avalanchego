@@ -17,7 +17,7 @@ import (
 )
 
 func newTestIPTracker(t *testing.T) *ipTracker {
-	tracker, err := newIPTracker(logging.NoLog{}, "", prometheus.NewRegistry())
+	tracker, err := newIPTracker(logging.NoLog{}, prometheus.NewRegistry())
 	require.NoError(t, err)
 	return tracker
 }
@@ -25,7 +25,7 @@ func newTestIPTracker(t *testing.T) *ipTracker {
 func newerTestIP(ip *ips.ClaimedIPPort) *ips.ClaimedIPPort {
 	return ips.NewClaimedIPPort(
 		ip.Cert,
-		ip.IPPort,
+		ip.AddrPort,
 		ip.Timestamp+1,
 		ip.Signature,
 	)

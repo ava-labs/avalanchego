@@ -11,11 +11,14 @@ import (
 	"os"
 	"time"
 
-	"github.com/ava-labs/avalanchego/api/health"
+	"github.com/antithesishq/antithesis-sdk-go/assert"
+	"github.com/antithesishq/antithesis-sdk-go/lifecycle"
+
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/tests/antithesis"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -38,13 +41,15 @@ import (
 const NumKeys = 5
 
 func main() {
-	c, err := NewConfig(os.Args)
+	c, err := antithesis.NewConfig(os.Args)
 	if err != nil {
 		log.Fatalf("invalid config: %s", err)
 	}
 
 	ctx := context.Background()
-	awaitHealthyNodes(ctx, c.URIs)
+	if err := antithesis.AwaitHealthyNodes(ctx, c.URIs); err != nil {
+		log.Fatalf("failed to await healthy nodes: %s", err)
+	}
 
 	kc := secp256k1fx.NewKeychain(genesis.EWOQKey)
 	walletSyncStartTime := time.Now()
@@ -99,8 +104,7 @@ func main() {
 			},
 		}})
 		if err != nil {
-			log.Printf("failed to issue initial funding X-chain baseTx: %s", err)
-			return
+			log.Fatalf("failed to issue initial funding X-chain baseTx: %s", err)
 		}
 		log.Printf("issued initial funding X-chain baseTx %s in %s", baseTx.ID(), time.Since(baseStartTime))
 
@@ -127,43 +131,15 @@ func main() {
 		}
 	}
 
+	lifecycle.SetupComplete(map[string]any{
+		"msg":        "initialized workers",
+		"numWorkers": NumKeys,
+	})
+
 	for _, w := range workloads[1:] {
 		go w.run(ctx)
 	}
 	genesisWorkload.run(ctx)
-}
-
-func awaitHealthyNodes(ctx context.Context, uris []string) {
-	for _, uri := range uris {
-		awaitHealthyNode(ctx, uri)
-	}
-	log.Println("all nodes reported healthy")
-}
-
-func awaitHealthyNode(ctx context.Context, uri string) {
-	client := health.NewClient(uri)
-	ticker := time.NewTicker(100 * time.Millisecond)
-	defer ticker.Stop()
-
-	log.Printf("awaiting node health at %s", uri)
-	for {
-		res, err := client.Health(ctx, nil)
-		switch {
-		case err != nil:
-			log.Printf("node couldn't be reached at %s", uri)
-		case res.Healthy:
-			log.Printf("node reported healthy at %s", uri)
-			return
-		default:
-			log.Printf("node reported unhealthy at %s", uri)
-		}
-
-		select {
-		case <-ticker.C:
-		case <-ctx.Done():
-			log.Printf("node health check cancelled at %s", uri)
-		}
-	}
 }
 
 type workload struct {
@@ -200,6 +176,11 @@ func (w *workload) run(ctx context.Context) {
 		pAVAX       = pBalances[avaxAssetID]
 	)
 	log.Printf("wallet starting with %d X-chain nAVAX and %d P-chain nAVAX", xAVAX, pAVAX)
+	assert.Reachable("wallet starting", map[string]any{
+		"worker":   w.id,
+		"xBalance": xAVAX,
+		"pBalance": pAVAX,
+	})
 
 	for {
 		val, err := rand.Int(rand.Reader, big.NewInt(5))
@@ -244,6 +225,10 @@ func (w *workload) issueXChainBaseTx(ctx context.Context) {
 	balances, err := xBuilder.GetFTBalance()
 	if err != nil {
 		log.Printf("failed to fetch X-chain balances: %s", err)
+		assert.Unreachable("failed to fetch X-chain balances", map[string]any{
+			"worker": w.id,
+			"err":    err,
+		})
 		return
 	}
 
@@ -278,6 +263,10 @@ func (w *workload) issueXChainBaseTx(ctx context.Context) {
 	)
 	if err != nil {
 		log.Printf("failed to issue X-chain baseTx: %s", err)
+		assert.Unreachable("failed to issue X-chain baseTx", map[string]any{
+			"worker": w.id,
+			"err":    err,
+		})
 		return
 	}
 	log.Printf("issued new X-chain baseTx %s in %s", baseTx.ID(), time.Since(baseStartTime))
@@ -294,6 +283,10 @@ func (w *workload) issueXChainCreateAssetTx(ctx context.Context) {
 	balances, err := xBuilder.GetFTBalance()
 	if err != nil {
 		log.Printf("failed to fetch X-chain balances: %s", err)
+		assert.Unreachable("failed to fetch X-chain balances", map[string]any{
+			"worker": w.id,
+			"err":    err,
+		})
 		return
 	}
 
@@ -327,6 +320,10 @@ func (w *workload) issueXChainCreateAssetTx(ctx context.Context) {
 	)
 	if err != nil {
 		log.Printf("failed to issue X-chain create asset transaction: %s", err)
+		assert.Unreachable("failed to issue X-chain create asset transaction", map[string]any{
+			"worker": w.id,
+			"err":    err,
+		})
 		return
 	}
 	log.Printf("created new X-chain asset %s in %s", createAssetTx.ID(), time.Since(createAssetStartTime))
@@ -343,6 +340,10 @@ func (w *workload) issueXChainOperationTx(ctx context.Context) {
 	balances, err := xBuilder.GetFTBalance()
 	if err != nil {
 		log.Printf("failed to fetch X-chain balances: %s", err)
+		assert.Unreachable("failed to fetch X-chain balances", map[string]any{
+			"worker": w.id,
+			"err":    err,
+		})
 		return
 	}
 
@@ -377,6 +378,10 @@ func (w *workload) issueXChainOperationTx(ctx context.Context) {
 	)
 	if err != nil {
 		log.Printf("failed to issue X-chain create asset transaction: %s", err)
+		assert.Unreachable("failed to issue X-chain create asset transaction", map[string]any{
+			"worker": w.id,
+			"err":    err,
+		})
 		return
 	}
 	log.Printf("created new X-chain asset %s in %s", createAssetTx.ID(), time.Since(createAssetStartTime))
@@ -388,6 +393,10 @@ func (w *workload) issueXChainOperationTx(ctx context.Context) {
 	)
 	if err != nil {
 		log.Printf("failed to issue X-chain operation transaction: %s", err)
+		assert.Unreachable("failed to issue X-chain operation transaction", map[string]any{
+			"worker": w.id,
+			"err":    err,
+		})
 		return
 	}
 	log.Printf("issued X-chain operation tx %s in %s", operationTx.ID(), time.Since(operationStartTime))
@@ -407,6 +416,10 @@ func (w *workload) issueXToPTransfer(ctx context.Context) {
 	balances, err := xBuilder.GetFTBalance()
 	if err != nil {
 		log.Printf("failed to fetch X-chain balances: %s", err)
+		assert.Unreachable("failed to fetch X-chain balances", map[string]any{
+			"worker": w.id,
+			"err":    err,
+		})
 		return
 	}
 
@@ -443,6 +456,10 @@ func (w *workload) issueXToPTransfer(ctx context.Context) {
 	)
 	if err != nil {
 		log.Printf("failed to issue X-chain export transaction: %s", err)
+		assert.Unreachable("failed to issue X-chain export transaction", map[string]any{
+			"worker": w.id,
+			"err":    err,
+		})
 		return
 	}
 	log.Printf("created X-chain export transaction %s in %s", exportTx.ID(), time.Since(exportStartTime))
@@ -457,6 +474,10 @@ func (w *workload) issueXToPTransfer(ctx context.Context) {
 	)
 	if err != nil {
 		log.Printf("failed to issue P-chain import transaction: %s", err)
+		assert.Unreachable("failed to issue P-chain import transaction", map[string]any{
+			"worker": w.id,
+			"err":    err,
+		})
 		return
 	}
 	log.Printf("created P-chain import transaction %s in %s", importTx.ID(), time.Since(importStartTime))
@@ -477,6 +498,10 @@ func (w *workload) issuePToXTransfer(ctx context.Context) {
 	balances, err := pBuilder.GetBalance()
 	if err != nil {
 		log.Printf("failed to fetch P-chain balances: %s", err)
+		assert.Unreachable("failed to fetch P-chain balances", map[string]any{
+			"worker": w.id,
+			"err":    err,
+		})
 		return
 	}
 
@@ -513,6 +538,10 @@ func (w *workload) issuePToXTransfer(ctx context.Context) {
 	)
 	if err != nil {
 		log.Printf("failed to issue P-chain export transaction: %s", err)
+		assert.Unreachable("failed to issue P-chain export transaction", map[string]any{
+			"worker": w.id,
+			"err":    err,
+		})
 		return
 	}
 	log.Printf("created P-chain export transaction %s in %s", exportTx.ID(), time.Since(exportStartTime))
@@ -524,6 +553,10 @@ func (w *workload) issuePToXTransfer(ctx context.Context) {
 	)
 	if err != nil {
 		log.Printf("failed to issue X-chain import transaction: %s", err)
+		assert.Unreachable("failed to issue X-chain import transaction", map[string]any{
+			"worker": w.id,
+			"err":    err,
+		})
 		return
 	}
 	log.Printf("created X-chain import transaction %s in %s", importTx.ID(), time.Since(importStartTime))
@@ -551,10 +584,22 @@ func (w *workload) confirmXChainTx(ctx context.Context, tx *xtxs.Tx) {
 		status, err := client.ConfirmTx(ctx, txID, 100*time.Millisecond)
 		if err != nil {
 			log.Printf("failed to confirm X-chain transaction %s on %s: %s", txID, uri, err)
+			assert.Unreachable("failed to determine the status of an X-chain transaction", map[string]any{
+				"worker": w.id,
+				"txID":   txID,
+				"uri":    uri,
+				"err":    err,
+			})
 			return
 		}
 		if status != choices.Accepted {
 			log.Printf("failed to confirm X-chain transaction %s on %s: status == %s", txID, uri, status)
+			assert.Unreachable("failed to confirm an X-chain transaction", map[string]any{
+				"worker": w.id,
+				"txID":   txID,
+				"uri":    uri,
+				"status": status,
+			})
 			return
 		}
 		log.Printf("confirmed X-chain transaction %s on %s", txID, uri)
@@ -568,11 +613,23 @@ func (w *workload) confirmPChainTx(ctx context.Context, tx *ptxs.Tx) {
 		client := platformvm.NewClient(uri)
 		s, err := client.AwaitTxDecided(ctx, txID, 100*time.Millisecond)
 		if err != nil {
-			log.Printf("failed to confirm P-chain transaction %s on %s: %s", txID, uri, err)
+			log.Printf("failed to determine the status of a P-chain transaction %s on %s: %s", txID, uri, err)
+			assert.Unreachable("failed to determine the status of a P-chain transaction", map[string]any{
+				"worker": w.id,
+				"txID":   txID,
+				"uri":    uri,
+				"err":    err,
+			})
 			return
 		}
 		if s.Status != status.Committed {
 			log.Printf("failed to confirm P-chain transaction %s on %s: status == %s", txID, uri, s.Status)
+			assert.Unreachable("failed to confirm a P-chain transaction", map[string]any{
+				"worker": w.id,
+				"txID":   txID,
+				"uri":    uri,
+				"status": s.Status,
+			})
 			return
 		}
 		log.Printf("confirmed P-chain transaction %s on %s", txID, uri)
@@ -598,6 +655,12 @@ func (w *workload) verifyXChainTxConsumedUTXOs(ctx context.Context, tx *xtxs.Tx)
 		)
 		if err != nil {
 			log.Printf("failed to fetch X-chain UTXOs on %s: %s", uri, err)
+			assert.Unreachable("failed to fetch X-chain UTXOs", map[string]any{
+				"worker": w.id,
+				"txID":   txID,
+				"uri":    uri,
+				"err":    err,
+			})
 			return
 		}
 
@@ -606,6 +669,13 @@ func (w *workload) verifyXChainTxConsumedUTXOs(ctx context.Context, tx *xtxs.Tx)
 			_, err := utxos.GetUTXO(ctx, chainID, chainID, input)
 			if err != database.ErrNotFound {
 				log.Printf("failed to verify that X-chain UTXO %s was deleted on %s after %s", input, uri, txID)
+				assert.Unreachable("failed to verify that X-chain UTXO was deleted", map[string]any{
+					"worker": w.id,
+					"uri":    uri,
+					"txID":   txID,
+					"utxoID": input,
+					"err":    err,
+				})
 				return
 			}
 		}
@@ -631,6 +701,12 @@ func (w *workload) verifyPChainTxConsumedUTXOs(ctx context.Context, tx *ptxs.Tx)
 		)
 		if err != nil {
 			log.Printf("failed to fetch P-chain UTXOs on %s: %s", uri, err)
+			assert.Unreachable("failed to fetch P-chain UTXOs", map[string]any{
+				"worker": w.id,
+				"uri":    uri,
+				"txID":   txID,
+				"err":    err,
+			})
 			return
 		}
 
@@ -639,6 +715,13 @@ func (w *workload) verifyPChainTxConsumedUTXOs(ctx context.Context, tx *ptxs.Tx)
 			_, err := utxos.GetUTXO(ctx, constants.PlatformChainID, constants.PlatformChainID, input)
 			if err != database.ErrNotFound {
 				log.Printf("failed to verify that P-chain UTXO %s was deleted on %s after %s", input, uri, txID)
+				assert.Unreachable("failed to verify that P-chain UTXO was deleted", map[string]any{
+					"worker": w.id,
+					"uri":    uri,
+					"txID":   txID,
+					"utxoID": input,
+					"err":    err,
+				})
 				return
 			}
 		}

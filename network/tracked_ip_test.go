@@ -4,11 +4,61 @@
 package network
 
 import (
+	"net/netip"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/avalanchego/staking"
+	"github.com/ava-labs/avalanchego/utils/ips"
 )
+
+var (
+	ip      *ips.ClaimedIPPort
+	otherIP *ips.ClaimedIPPort
+
+	defaultLoopbackAddrPort = netip.AddrPortFrom(
+		netip.AddrFrom4([4]byte{127, 0, 0, 1}),
+		9651,
+	)
+)
+
+func init() {
+	{
+		cert, err := staking.NewTLSCert()
+		if err != nil {
+			panic(err)
+		}
+		stakingCert, err := staking.ParseCertificate(cert.Leaf.Raw)
+		if err != nil {
+			panic(err)
+		}
+		ip = ips.NewClaimedIPPort(
+			stakingCert,
+			defaultLoopbackAddrPort,
+			1,   // timestamp
+			nil, // signature
+		)
+	}
+
+	{
+		cert, err := staking.NewTLSCert()
+		if err != nil {
+			panic(err)
+		}
+		stakingCert, err := staking.ParseCertificate(cert.Leaf.Raw)
+		if err != nil {
+			panic(err)
+		}
+		otherIP = ips.NewClaimedIPPort(
+			stakingCert,
+			defaultLoopbackAddrPort,
+			1,   // timestamp
+			nil, // signature
+		)
+	}
+}
 
 func TestTrackedIP(t *testing.T) {
 	require := require.New(t)

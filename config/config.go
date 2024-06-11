@@ -45,6 +45,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/proposervm"
 )
 
@@ -288,6 +289,11 @@ func getNetworkConfig(
 	// peers that we support these upgrades.
 	supportedACPs.Union(constants.ScheduledACPs)
 
+	// To decrease unnecessary network traffic, peers will not be notified of
+	// objection or support of activated ACPs.
+	supportedACPs.Difference(constants.ActivatedACPs)
+	objectedACPs.Difference(constants.ActivatedACPs)
+
 	config := network.Config{
 		ThrottlerConfig: network.ThrottlerConfig{
 			MaxInboundConnsPerSec: maxInboundConnsPerSec,
@@ -444,7 +450,7 @@ func getStateSyncConfig(v *viper.Viper) (node.StateSyncConfig, error) {
 		if ip == "" {
 			continue
 		}
-		addr, err := ips.ToIPPort(ip)
+		addr, err := ips.ParseAddrPort(ip)
 		if err != nil {
 			return node.StateSyncConfig{}, fmt.Errorf("couldn't parse state sync ip %s: %w", ip, err)
 		}
@@ -501,14 +507,13 @@ func getBootstrapConfig(v *viper.Viper, networkID uint32) (node.BootstrapConfig,
 		if ip == "" {
 			continue
 		}
-
-		addr, err := ips.ToIPPort(ip)
+		addr, err := ips.ParseAddrPort(ip)
 		if err != nil {
 			return node.BootstrapConfig{}, fmt.Errorf("couldn't parse bootstrap ip %s: %w", ip, err)
 		}
 		config.Bootstrappers = append(config.Bootstrappers, genesis.Bootstrapper{
 			// ID is populated below
-			IP: ips.IPDesc(addr),
+			IP: addr,
 		})
 	}
 
@@ -519,7 +524,6 @@ func getBootstrapConfig(v *viper.Viper, networkID uint32) (node.BootstrapConfig,
 		if id == "" {
 			continue
 		}
-
 		nodeID, err := ids.NodeIDFromString(id)
 		if err != nil {
 			return node.BootstrapConfig{}, fmt.Errorf("couldn't parse bootstrap peer id %s: %w", id, err)
@@ -758,9 +762,9 @@ func getStakingConfig(v *viper.Viper, networkID uint32) (node.StakingConfig, err
 	return config, nil
 }
 
-func getTxFeeConfig(v *viper.Viper, networkID uint32) genesis.TxFeeConfig {
+func getTxFeeConfig(v *viper.Viper, networkID uint32) fee.StaticConfig {
 	if networkID != constants.MainnetID && networkID != constants.FujiID {
-		return genesis.TxFeeConfig{
+		return fee.StaticConfig{
 			TxFee:                         v.GetUint64(TxFeeKey),
 			CreateAssetTxFee:              v.GetUint64(CreateAssetTxFeeKey),
 			CreateSubnetTxFee:             v.GetUint64(CreateSubnetTxFeeKey),
@@ -1325,7 +1329,7 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 	nodeConfig.FdLimit = v.GetUint64(FdLimitKey)
 
 	// Tx Fee
-	nodeConfig.TxFeeConfig = getTxFeeConfig(v, nodeConfig.NetworkID)
+	nodeConfig.StaticConfig = getTxFeeConfig(v, nodeConfig.NetworkID)
 
 	// Genesis Data
 	genesisStakingCfg := nodeConfig.StakingConfig.StakingConfig

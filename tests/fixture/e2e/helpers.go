@@ -226,14 +226,13 @@ func StartNetwork(
 	require := require.New(ginkgo.GinkgoT())
 
 	require.NoError(
-		tmpnet.StartNewNetwork(
+		tmpnet.BootstrapNewNetwork(
 			DefaultContext(),
 			ginkgo.GinkgoWriter,
 			network,
 			DefaultNetworkDir,
 			avalancheGoExecPath,
 			pluginDir,
-			tmpnet.DefaultNodeCount,
 		),
 	)
 

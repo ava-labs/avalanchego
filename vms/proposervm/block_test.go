@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
@@ -74,6 +75,7 @@ func TestPostForkCommonComponents_buildChild(t *testing.T) {
 			DurangoTime:       time.Unix(0, 0),
 			StakingCertLeaf:   &staking.Certificate{},
 			StakingLeafSigner: pk,
+			Registerer:        prometheus.NewRegistry(),
 		},
 		ChainVM:        innerVM,
 		blockBuilderVM: innerBlockBuilderVM,
@@ -179,10 +181,12 @@ func TestPreDurangoValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 		localTime := parentBlk.Timestamp().Add(proposer.MaxVerifyDelay - time.Second)
 		proVM.Set(localTime)
 
-		childBlk, err := proVM.BuildBlock(ctx)
+		childBlkIntf, err := proVM.BuildBlock(ctx)
 		require.NoError(err)
-		require.IsType(&postForkBlock{}, childBlk)
-		require.Equal(proVM.ctx.NodeID, childBlk.(*postForkBlock).Proposer()) // signed block
+		require.IsType(&postForkBlock{}, childBlkIntf)
+
+		childBlk := childBlkIntf.(*postForkBlock)
+		require.Equal(proVM.ctx.NodeID, childBlk.Proposer()) // signed block
 	}
 
 	{
@@ -191,34 +195,41 @@ func TestPreDurangoValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 		localTime := parentBlk.Timestamp().Add(proposer.MaxVerifyDelay)
 		proVM.Set(localTime)
 
-		childBlk, err := proVM.BuildBlock(ctx)
+		childBlkIntf, err := proVM.BuildBlock(ctx)
 		require.NoError(err)
-		require.IsType(&postForkBlock{}, childBlk)
-		require.Equal(ids.EmptyNodeID, childBlk.(*postForkBlock).Proposer()) // signed block
+		require.IsType(&postForkBlock{}, childBlkIntf)
+
+		childBlk := childBlkIntf.(*postForkBlock)
+		require.Equal(ids.EmptyNodeID, childBlk.Proposer()) // unsigned block
 	}
 
 	{
-		// Set local clock among MaxVerifyDelay and MaxBuildDelay from parent timestamp
-		// Check that child block is unsigned
+		// Set local clock between MaxVerifyDelay and MaxBuildDelay from parent
+		// timestamp.
+		// Check that child block is unsigned.
 		localTime := parentBlk.Timestamp().Add((proposer.MaxVerifyDelay + proposer.MaxBuildDelay) / 2)
 		proVM.Set(localTime)
 
-		childBlk, err := proVM.BuildBlock(ctx)
+		childBlkIntf, err := proVM.BuildBlock(ctx)
 		require.NoError(err)
-		require.IsType(&postForkBlock{}, childBlk)
-		require.Equal(ids.EmptyNodeID, childBlk.(*postForkBlock).Proposer()) // unsigned so no proposer
+		require.IsType(&postForkBlock{}, childBlkIntf)
+
+		childBlk := childBlkIntf.(*postForkBlock)
+		require.Equal(ids.EmptyNodeID, childBlk.Proposer()) // unsigned block
 	}
 
 	{
-		// Set local clock after MaxBuildDelay from parent timestamp
-		// Check that child block is unsigned
+		// Set local clock after MaxBuildDelay from parent timestamp.
+		// Check that child block is unsigned.
 		localTime := parentBlk.Timestamp().Add(proposer.MaxBuildDelay)
 		proVM.Set(localTime)
 
-		childBlk, err := proVM.BuildBlock(ctx)
+		childBlkIntf, err := proVM.BuildBlock(ctx)
 		require.NoError(err)
-		require.IsType(&postForkBlock{}, childBlk)
-		require.Equal(ids.EmptyNodeID, childBlk.(*postForkBlock).Proposer()) // unsigned so no proposer
+		require.IsType(&postForkBlock{}, childBlkIntf)
+
+		childBlk := childBlkIntf.(*postForkBlock)
+		require.Equal(ids.EmptyNodeID, childBlk.Proposer()) // unsigned block
 	}
 }
 
@@ -332,10 +343,12 @@ func TestPreDurangoNonValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 		localTime := parentBlk.Timestamp().Add(proposer.MaxBuildDelay)
 		proVM.Set(localTime)
 
-		childBlk, err := proVM.BuildBlock(ctx)
+		childBlkIntf, err := proVM.BuildBlock(ctx)
 		require.NoError(err)
-		require.IsType(&postForkBlock{}, childBlk)
-		require.Equal(ids.EmptyNodeID, childBlk.(*postForkBlock).Proposer()) // unsigned so no proposer
+		require.IsType(&postForkBlock{}, childBlkIntf)
+
+		childBlk := childBlkIntf.(*postForkBlock)
+		require.Equal(ids.EmptyNodeID, childBlk.Proposer()) // unsigned block
 	}
 }
 
@@ -375,6 +388,7 @@ func TestPostDurangoBuildChildResetScheduler(t *testing.T) {
 			DurangoTime:       time.Unix(0, 0),
 			StakingCertLeaf:   &staking.Certificate{},
 			StakingLeafSigner: pk,
+			Registerer:        prometheus.NewRegistry(),
 		},
 		ChainVM: block.NewMockChainVM(ctrl),
 		ctx: &snow.Context{
@@ -382,8 +396,9 @@ func TestPostDurangoBuildChildResetScheduler(t *testing.T) {
 			ValidatorState: vdrState,
 			Log:            logging.NoLog{},
 		},
-		Windower:  windower,
-		Scheduler: scheduler,
+		Windower:               windower,
+		Scheduler:              scheduler,
+		proposerBuildSlotGauge: prometheus.NewGauge(prometheus.GaugeOpts{}),
 	}
 	vm.Clock.Set(now)
 

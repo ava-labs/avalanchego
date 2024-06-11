@@ -94,7 +94,7 @@ func NewManager(
 	diskHalflife time.Duration,
 	metricsRegisterer prometheus.Registerer,
 ) (Manager, error) {
-	processMetrics, err := newMetrics("system_resources", metricsRegisterer)
+	processMetrics, err := newMetrics(metricsRegisterer)
 	if err != nil {
 		return nil, err
 	}

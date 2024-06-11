@@ -104,16 +104,16 @@ func NewEphemeralNode(flags FlagsMap) *Node {
 }
 
 // Initializes the specified number of nodes.
-func NewNodes(count int) ([]*Node, error) {
+func NewNodesOrPanic(count int) []*Node {
 	nodes := make([]*Node, count)
 	for i := range nodes {
 		node := NewNode("")
 		if err := node.EnsureKeys(); err != nil {
-			return nil, err
+			panic(err)
 		}
 		nodes[i] = node
 	}
-	return nodes, nil
+	return nodes
 }
 
 // Reads a node's configuration from the specified directory.
@@ -190,7 +190,7 @@ func (n *Node) readState() error {
 	return n.getRuntime().readState()
 }
 
-func (n *Node) getDataDir() string {
+func (n *Node) GetDataDir() string {
 	return cast.ToString(n.Flags[config.DataDirKey])
 }
 
@@ -369,6 +369,10 @@ func (n *Node) EnsureNodeID() error {
 // labeling of metrics.
 func (n *Node) SaveAPIPort() error {
 	hostPort := strings.TrimPrefix(n.URI, "http://")
+	if len(hostPort) == 0 {
+		// Without an API URI there is nothing to save
+		return nil
+	}
 	_, port, err := net.SplitHostPort(hostPort)
 	if err != nil {
 		return err

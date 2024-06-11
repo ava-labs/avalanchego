@@ -28,9 +28,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-12, ubuntu-20.04, ubuntu-22.04, windows-2022, [self-hosted, linux, ARM64, focal], [self-hosted, linux, ARM64, jammy]]
+        os: [macos-12, ubuntu-20.04, ubuntu-22.04, windows-2022, custom-arm64-focal, custom-arm64-jammy]
     steps:
       - uses: actions/checkout@v4
+      - uses: ./.github/actions/install-focal-deps
+        if: matrix.os == 'custom-arm64-focal'
       - uses: ./.github/actions/setup-go-for-project-v3
       - name: Set timeout on Windows # Windows UT run slower and need a longer timeout
         shell: bash
@@ -82,7 +84,7 @@ jobs:
           FILTER_BY_OWNER: avalanchego-e2e
       - name: Run e2e tests
         shell: bash
-        run: E2E_SERIAL=1 ./scripts/tests.e2e.sh
+        run: E2E_SERIAL=1 ./scripts/tests.e2e.sh --delay-network-shutdown
         env:
           GH_REPO: ${{ github.repository }}
           GH_WORKFLOW: ${{ github.workflow }}
@@ -132,7 +134,7 @@ jobs:
           GH_JOB_ID: ${{ github.job }}
       - name: Run e2e tests with existing network
         shell: bash
-        run: E2E_SERIAL=1 ./scripts/tests.e2e.existing.sh
+        run: E2E_SERIAL=1 ./scripts/tests.e2e.existing.sh --delay-network-shutdown
         env:
           GH_REPO: ${{ github.repository }}
           GH_WORKFLOW: ${{ github.workflow }}
@@ -265,8 +267,8 @@ jobs:
       - name: Check image build
         shell: bash
         run: bash -x scripts/tests.build_image.sh
-  test_build_antithesis_avalanchego_image:
-    name: Antithesis avalanchego build
+  test_build_antithesis_avalanchego_images:
+    name: Build Antithesis avalanchego images
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -275,13 +277,13 @@ jobs:
         run: bash -x scripts/tests.build_antithesis_images.sh
         env:
           TEST_SETUP: avalanchego
-  govulncheck:
+  test_build_antithesis_xsvm_images:
+    name: Build Antithesis xsvm images
     runs-on: ubuntu-latest
-    name: govulncheck
     steps:
       - uses: actions/checkout@v4
-      - uses: ./.github/actions/set-go-version-in-env
-      - id: govulncheck
-        uses: golang/govulncheck-action@v1
-        with:
-          go-version-input: ${{ env.GO_VERSION }}
+      - name: Check image build for xsvm test setup
+        shell: bash
+        run: bash -x scripts/tests.build_antithesis_images.sh
+        env:
+          TEST_SETUP: xsvm
