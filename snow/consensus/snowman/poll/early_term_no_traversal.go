@@ -44,13 +44,6 @@ var (
 	}
 )
 
-type earlyTermNoTraversalFactory struct {
-	alphaPreference int
-	alphaConfidence int
-
-	metrics *earlyTermNoTraversalMetrics
-}
-
 type earlyTermNoTraversalMetrics struct {
 	durPolls               *prometheus.GaugeVec
 	durExhaustedPolls      prometheus.Gauge
@@ -67,14 +60,14 @@ type earlyTermNoTraversalMetrics struct {
 
 func newEarlyTermNoTraversalMetrics(reg prometheus.Registerer) (*earlyTermNoTraversalMetrics, error) {
 	pollCountVec := prometheus.NewCounterVec(prometheus.CounterOpts{
-		Name: "count",
+		Name: "poll_count",
 		Help: "Total # of terminated polls by reason",
 	}, earlyTermCaseLabels)
 	if err := reg.Register(pollCountVec); err != nil {
 		return nil, fmt.Errorf("%w: %w", errPollCountVectorMetrics, err)
 	}
 	durPollsVec := prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Name: "count",
+		Name: "poll_duration",
 		Help: "time (in ns) polls took to complete by reason",
 	}, earlyTermCaseLabels)
 	if err := reg.Register(durPollsVec); err != nil {
@@ -113,6 +106,13 @@ func (m *earlyTermNoTraversalMetrics) observeEarlyAlphaPref(duration time.Durati
 func (m *earlyTermNoTraversalMetrics) observeEarlyAlphaConf(duration time.Duration) {
 	m.durEarlyAlphaConfPolls.Add(float64(duration.Nanoseconds()))
 	m.countEarlyAlphaConfPolls.Inc()
+}
+
+type earlyTermNoTraversalFactory struct {
+	alphaPreference int
+	alphaConfidence int
+
+	metrics *earlyTermNoTraversalMetrics
 }
 
 // NewEarlyTermNoTraversalFactory returns a factory that returns polls with
