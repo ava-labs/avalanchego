@@ -101,4 +101,9 @@ func executeErrorDrivenSwitchChoices[T comparable](t *testing.T, newSnowflakeTes
 
 	sfTest.RecordPoll(3, choice1)
 	sfTest.AssertEqual([]int{1, 0, 0}, false, choice1)
+
+	sfTest.RecordPoll(5, choice1)
+	sfTest.AssertEqual([]int{2, 1, 1}, false, choice1)
+	sfTest.RecordPoll(5, choice1)
+	sfTest.AssertEqual([]int{3, 2, 2}, true, choice1)
 }
