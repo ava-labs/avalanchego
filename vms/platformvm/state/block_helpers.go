@@ -11,7 +11,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
-	"github.com/ava-labs/avalanchego/vms/platformvm/upgrade"
 
 	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
@@ -88,7 +87,7 @@ func PickFeeCalculator(cfg *config.Config, state Chain, parentBlkTime time.Time)
 		feeCalculator = fee.NewStaticCalculator(staticFeeCfg, cfg.UpgradeConfig, childBlkTime)
 	} else {
 		feesCfg := fee.GetDynamicConfig(isEActive)
-		feesMan, err := updatedFeeManager(cfg.UpgradeConfig, state, parentBlkTime)
+		feesMan, err := updatedFeeManager(isEActive, state, parentBlkTime)
 		if err != nil {
 			return nil, fmt.Errorf("failed updating fee manager: %w", err)
 		}
@@ -97,19 +96,15 @@ func PickFeeCalculator(cfg *config.Config, state Chain, parentBlkTime time.Time)
 	return feeCalculator, nil
 }
 
-func updatedFeeManager(upgrades upgrade.Config, state Chain, parentBlkTime time.Time) (*commonfees.Manager, error) {
-	var (
-		isEActive  = upgrades.IsEActivated(parentBlkTime)
-		feeCfg     = fee.GetDynamicConfig(isEActive)
-		feeManager *commonfees.Manager
-	)
-
+func updatedFeeManager(isEActive bool, state Chain, parentBlkTime time.Time) (*commonfees.Manager, error) {
+	var feeManager *commonfees.Manager
 	if isEActive {
 		excessComplexity, err := state.GetExcessComplexity()
 		if err != nil {
 			return nil, fmt.Errorf("failed retrieving excess complexity: %w", err)
 		}
 		childBlkTime := state.GetTimestamp()
+		feeCfg := fee.GetDynamicConfig(isEActive)
 
 		feeManager, err = commonfees.NewUpdatedManager(
 			feeCfg,
