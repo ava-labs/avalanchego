@@ -6,6 +6,7 @@ package ips
 import (
 	"errors"
 	"net"
+	"net/netip"
 )
 
 var errNoIPsFound = errors.New("no IPs found")
@@ -15,20 +16,22 @@ var errNoIPsFound = errors.New("no IPs found")
 // pick any of the IPs.
 //
 // Note: IPv4 is preferred because `net.Listen` prefers IPv4.
-func Lookup(hostname string) (net.IP, error) {
+func Lookup(hostname string) (netip.Addr, error) {
 	ips, err := net.LookupIP(hostname)
 	if err != nil {
-		return nil, err
+		return netip.Addr{}, err
 	}
 	if len(ips) == 0 {
-		return nil, errNoIPsFound
+		return netip.Addr{}, errNoIPsFound
 	}
 
 	for _, ip := range ips {
 		ipv4 := ip.To4()
 		if ipv4 != nil {
-			return ipv4, nil
+			addr, _ := AddrFromSlice(ipv4)
+			return addr, nil
 		}
 	}
-	return ips[0], nil
+	addr, _ := AddrFromSlice(ips[0])
+	return addr, nil
 }

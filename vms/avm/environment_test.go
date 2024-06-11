@@ -24,7 +24,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
-	"github.com/ava-labs/avalanchego/utils/linked"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/sampler"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
@@ -32,6 +31,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
+	"github.com/ava-labs/avalanchego/vms/avm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -77,12 +77,6 @@ var (
 
 	keys  = secp256k1.TestKeys()[:3] // TODO: Remove [:3]
 	addrs []ids.ShortID              // addrs[i] corresponds to keys[i]
-
-	noFeesTestConfig = &config.Config{
-		EUpgradeTime:     mockable.MaxTime,
-		TxFee:            0,
-		CreateAssetTxFee: 0,
-	}
 )
 
 func init() {
@@ -110,13 +104,12 @@ type envConfig struct {
 }
 
 type environment struct {
-	genesisBytes  []byte
-	genesisTx     *txs.Tx
-	sharedMemory  *atomic.Memory
-	issuer        chan common.Message
-	vm            *VM
-	service       *Service
-	walletService *WalletService
+	genesisBytes []byte
+	genesisTx    *txs.Tx
+	sharedMemory *atomic.Memory
+	issuer       chan common.Message
+	vm           *VM
+	txBuilder    *txstest.Builder
 }
 
 // setup the testing environment
@@ -210,13 +203,7 @@ func setup(tb testing.TB, c *envConfig) *environment {
 		sharedMemory: m,
 		issuer:       issuer,
 		vm:           vm,
-		service: &Service{
-			vm: vm,
-		},
-		walletService: &WalletService{
-			vm:         vm,
-			pendingTxs: linked.NewHashmap[ids.ID, *txs.Tx](),
-		},
+		txBuilder:    txstest.New(vm.parser.Codec(), vm.ctx, &vm.Config, vm.feeAssetID, vm.state),
 	}
 
 	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
@@ -230,6 +217,14 @@ func setup(tb testing.TB, c *envConfig) *environment {
 	}
 
 	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
+
+	tb.Cleanup(func() {
+		env.vm.ctx.Lock.Lock()
+		defer env.vm.ctx.Lock.Unlock()
+
+		require.NoError(env.vm.Shutdown(context.Background()))
+	})
+
 	return env
 }
 
