@@ -5,6 +5,7 @@ package p2ptest
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -32,7 +33,6 @@ func TestNewClient_AppGossip(t *testing.T) {
 	<-appGossipChan
 }
 
-// TODO add error case tests when AppErrors are supported
 func TestNewClient_AppRequest(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -47,13 +47,13 @@ func TestNewClient_AppRequest(t *testing.T) {
 				return client.AppRequest(ctx, set.Of(ids.GenerateTestNodeID()), []byte("foo"), onResponse)
 			},
 		},
-		//{
-		//	name:   "AppRequest - error",
-		//	appErr: errors.New("foobar"),
-		//	appRequestF: func(ctx context.Context, client *p2p.Client, onResponse p2p.AppResponseCallback) error {
-		//		return client.AppRequest(ctx, set.Of(ids.GenerateTestNodeID()), []byte("foo"), onResponse)
-		//	},
-		//},
+		{
+			name:   "AppRequest - error",
+			appErr: errors.New("foobar"),
+			appRequestF: func(ctx context.Context, client *p2p.Client, onResponse p2p.AppResponseCallback) error {
+				return client.AppRequest(ctx, set.Of(ids.GenerateTestNodeID()), []byte("foo"), onResponse)
+			},
+		},
 		{
 			name:        "AppRequestAny - response",
 			appResponse: []byte("foobar"),
@@ -61,17 +61,22 @@ func TestNewClient_AppRequest(t *testing.T) {
 				return client.AppRequestAny(ctx, []byte("foo"), onResponse)
 			},
 		},
-		//{
-		//	name:   "AppRequestAny - error",
-		//	appErr: errors.New("foobar"),
-		//	appRequestF: func(ctx context.Context, client *p2p.Client, onResponse p2p.AppResponseCallback) error {
-		//		return client.AppRequestAny(ctx, []byte("foo"), onResponse)
-		//	},
-		//},
+		{
+			name:   "AppRequestAny - error",
+			appErr: errors.New("foobar"),
+			appRequestF: func(ctx context.Context, client *p2p.Client, onResponse p2p.AppResponseCallback) error {
+				return client.AppRequestAny(ctx, []byte("foo"), onResponse)
+			},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// TODO remove when AppErrors are supported
+			if tt.appErr != nil {
+				t.Skip("sending app errors not supported yet")
+			}
+
 			require := require.New(t)
 			ctx := context.Background()
 
