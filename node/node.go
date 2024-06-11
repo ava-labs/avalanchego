@@ -13,6 +13,7 @@ import (
 	"io"
 	"io/fs"
 	"net"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -437,20 +438,26 @@ func (n *Node) initNetworking(reg prometheus.Registerer) error {
 
 	// Record the bound address to enable inclusion in process context file.
 	n.stakingAddress = listener.Addr().String()
-	ipPort, err := ips.ToIPPort(n.stakingAddress)
+	stakingAddrPort, err := ips.ParseAddrPort(n.stakingAddress)
 	if err != nil {
 		return err
 	}
 
-	var dynamicIP ips.DynamicIPPort
+	var (
+		publicAddr netip.Addr
+		atomicIP   *utils.Atomic[netip.AddrPort]
+	)
 	switch {
 	case n.Config.PublicIP != "":
 		// Use the specified public IP.
-		ipPort.IP = net.ParseIP(n.Config.PublicIP)
-		if ipPort.IP == nil {
-			return fmt.Errorf("invalid IP Address: %s", n.Config.PublicIP)
+		publicAddr, err = ips.ParseAddr(n.Config.PublicIP)
+		if err != nil {
+			return fmt.Errorf("invalid public IP address %q: %w", n.Config.PublicIP, err)
 		}
-		dynamicIP = ips.NewDynamicIPPort(ipPort.IP, ipPort.Port)
+		atomicIP = utils.NewAtomic(netip.AddrPortFrom(
+			publicAddr,
+			stakingAddrPort.Port(),
+		))
 		n.ipUpdater = dynamicip.NewNoUpdater()
 	case n.Config.PublicIPResolutionService != "":
 		// Use dynamic IP resolution.
@@ -461,40 +468,46 @@ func (n *Node) initNetworking(reg prometheus.Registerer) error {
 
 		// Use that to resolve our public IP.
 		ctx, cancel := context.WithTimeout(context.Background(), ipResolutionTimeout)
-		ipPort.IP, err = resolver.Resolve(ctx)
+		publicAddr, err = resolver.Resolve(ctx)
 		cancel()
 		if err != nil {
 			return fmt.Errorf("couldn't resolve public IP: %w", err)
 		}
-		dynamicIP = ips.NewDynamicIPPort(ipPort.IP, ipPort.Port)
-		n.ipUpdater = dynamicip.NewUpdater(dynamicIP, resolver, n.Config.PublicIPResolutionFreq)
+		atomicIP = utils.NewAtomic(netip.AddrPortFrom(
+			publicAddr,
+			stakingAddrPort.Port(),
+		))
+		n.ipUpdater = dynamicip.NewUpdater(atomicIP, resolver, n.Config.PublicIPResolutionFreq)
 	default:
-		ipPort.IP, err = n.router.ExternalIP()
+		publicAddr, err = n.router.ExternalIP()
 		if err != nil {
 			return fmt.Errorf("public IP / IP resolution service not given and failed to resolve IP with NAT: %w", err)
 		}
-		dynamicIP = ips.NewDynamicIPPort(ipPort.IP, ipPort.Port)
+		atomicIP = utils.NewAtomic(netip.AddrPortFrom(
+			publicAddr,
+			stakingAddrPort.Port(),
+		))
 		n.ipUpdater = dynamicip.NewNoUpdater()
 	}
 
-	if ipPort.IP.IsLoopback() || ipPort.IP.IsPrivate() {
+	if !ips.IsPublic(publicAddr) {
 		n.Log.Warn("P2P IP is private, you will not be publicly discoverable",
-			zap.Stringer("ip", ipPort),
+			zap.Stringer("ip", publicAddr),
 		)
 	}
 
 	// Regularly update our public IP and port mappings.
 	n.portMapper.Map(
-		ipPort.Port,
-		ipPort.Port,
+		stakingAddrPort.Port(),
+		stakingAddrPort.Port(),
 		stakingPortName,
-		dynamicIP,
+		atomicIP,
 		n.Config.PublicIPResolutionFreq,
 	)
 	go n.ipUpdater.Dispatch(n.Log)
 
 	n.Log.Info("initializing networking",
-		zap.Stringer("ip", ipPort),
+		zap.Stringer("ip", atomicIP.Get()),
 	)
 
 	tlsKey, ok := n.Config.StakingTLSCert.PrivateKey.(crypto.Signer)
@@ -617,7 +630,7 @@ func (n *Node) initNetworking(reg prometheus.Registerer) error {
 
 	// add node configs to network config
 	n.Config.NetworkConfig.MyNodeID = n.ID
-	n.Config.NetworkConfig.MyIPPort = dynamicIP
+	n.Config.NetworkConfig.MyIPPort = atomicIP
 	n.Config.NetworkConfig.NetworkID = n.Config.NetworkID
 	n.Config.NetworkConfig.Validators = n.vdrs
 	n.Config.NetworkConfig.Beacons = n.bootstrappers
@@ -709,7 +722,7 @@ func (n *Node) Dispatch() error {
 
 	// Add bootstrap nodes to the peer network
 	for _, bootstrapper := range n.Config.Bootstrappers {
-		n.Net.ManuallyTrack(bootstrapper.ID, ips.IPPort(bootstrapper.IP))
+		n.Net.ManuallyTrack(bootstrapper.ID, bootstrapper.IP)
 	}
 
 	// Start P2P connections
@@ -962,7 +975,7 @@ func (n *Node) initAPIServer() error {
 			)
 			return err
 		}
-		hostIsPublic = !ip.IsLoopback() && !ip.IsPrivate()
+		hostIsPublic = ips.IsPublic(ip)
 
 		n.Log.Debug("finished HTTP host lookup",
 			zap.String("host", n.Config.HTTPHost),
@@ -977,8 +990,8 @@ func (n *Node) initAPIServer() error {
 		return err
 	}
 
-	addr := listener.Addr().String()
-	ipPort, err := ips.ToIPPort(addr)
+	addrStr := listener.Addr().String()
+	addrPort, err := ips.ParseAddrPort(addrStr)
 	if err != nil {
 		return err
 	}
@@ -991,8 +1004,8 @@ func (n *Node) initAPIServer() error {
 		)
 
 		n.portMapper.Map(
-			ipPort.Port,
-			ipPort.Port,
+			addrPort.Port(),
+			addrPort.Port(),
 			httpPortName,
 			nil,
 			n.Config.PublicIPResolutionFreq,

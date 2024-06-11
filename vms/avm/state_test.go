@@ -4,7 +4,6 @@
 package avm
 
 import (
-	"context"
 	"math"
 	"testing"
 
@@ -35,10 +34,7 @@ func TestSetsAndGets(t *testing.T) {
 			},
 		}},
 	})
-	defer func() {
-		require.NoError(env.vm.Shutdown(context.Background()))
-		env.vm.ctx.Lock.Unlock()
-	}()
+	defer env.vm.ctx.Lock.Unlock()
 
 	utxo := &avax.UTXO{
 		UTXOID: avax.UTXOID{
@@ -98,10 +94,7 @@ func TestFundingNoAddresses(t *testing.T) {
 			},
 		}},
 	})
-	defer func() {
-		require.NoError(t, env.vm.Shutdown(context.Background()))
-		env.vm.ctx.Lock.Unlock()
-	}()
+	defer env.vm.ctx.Lock.Unlock()
 
 	utxo := &avax.UTXO{
 		UTXOID: avax.UTXOID{
@@ -131,10 +124,7 @@ func TestFundingAddresses(t *testing.T) {
 			},
 		}},
 	})
-	defer func() {
-		require.NoError(env.vm.Shutdown(context.Background()))
-		env.vm.ctx.Lock.Unlock()
-	}()
+	defer env.vm.ctx.Lock.Unlock()
 
 	utxo := &avax.UTXO{
 		UTXOID: avax.UTXOID{

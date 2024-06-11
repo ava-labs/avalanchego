@@ -7,6 +7,9 @@ import (
 	"context"
 	"errors"
 	"net"
+	"net/netip"
+
+	"github.com/ava-labs/avalanchego/utils/ips"
 )
 
 const openDNSUrl = "resolver1.opendns.com:53"
@@ -34,13 +37,15 @@ func newOpenDNSResolver() Resolver {
 	}
 }
 
-func (r *openDNSResolver) Resolve(ctx context.Context) (net.IP, error) {
-	ips, err := r.resolver.LookupIP(ctx, "ip", "myip.opendns.com")
+func (r *openDNSResolver) Resolve(ctx context.Context) (netip.Addr, error) {
+	resolvedIPs, err := r.resolver.LookupIP(ctx, "ip", "myip.opendns.com")
 	if err != nil {
-		return nil, err
+		return netip.Addr{}, err
 	}
-	if len(ips) == 0 {
-		return nil, errOpenDNSNoIP
+	for _, ip := range resolvedIPs {
+		if addr, ok := ips.AddrFromSlice(ip); ok {
+			return addr, nil
+		}
 	}
-	return ips[0], nil
+	return netip.Addr{}, errOpenDNSNoIP
 }

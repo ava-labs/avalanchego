@@ -73,6 +73,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+      - uses: ./.github/actions/install-focal-deps
       - uses: ./.github/actions/setup-go-for-project-v3
       - run: go version
 

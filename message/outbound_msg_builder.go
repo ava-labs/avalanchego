@@ -4,6 +4,7 @@
 package message
 
 import (
+	"net/netip"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -21,7 +22,7 @@ type OutboundMsgBuilder interface {
 	Handshake(
 		networkID uint32,
 		myTime uint64,
-		ip ips.IPPort,
+		ip netip.AddrPort,
 		client string,
 		major uint32,
 		minor uint32,
@@ -228,7 +229,7 @@ func (b *outMsgBuilder) Pong() (OutboundMessage, error) {
 func (b *outMsgBuilder) Handshake(
 	networkID uint32,
 	myTime uint64,
-	ip ips.IPPort,
+	ip netip.AddrPort,
 	client string,
 	major uint32,
 	minor uint32,
@@ -244,14 +245,16 @@ func (b *outMsgBuilder) Handshake(
 ) (OutboundMessage, error) {
 	subnetIDBytes := make([][]byte, len(trackedSubnets))
 	encodeIDs(trackedSubnets, subnetIDBytes)
+	// TODO: Use .AsSlice() after v1.12.x activates.
+	addr := ip.Addr().As16()
 	return b.builder.createOutbound(
 		&p2p.Message{
 			Message: &p2p.Message_Handshake{
 				Handshake: &p2p.Handshake{
 					NetworkId:      networkID,
 					MyTime:         myTime,
-					IpAddr:         ip.IP.To16(),
-					IpPort:         uint32(ip.Port),
+					IpAddr:         addr[:],
+					IpPort:         uint32(ip.Port()),
 					IpSigningTime:  ipSigningTime,
 					IpNodeIdSig:    ipNodeIDSig,
 					TrackedSubnets: subnetIDBytes,
@@ -299,10 +302,12 @@ func (b *outMsgBuilder) GetPeerList(
 func (b *outMsgBuilder) PeerList(peers []*ips.ClaimedIPPort, bypassThrottling bool) (OutboundMessage, error) {
 	claimIPPorts := make([]*p2p.ClaimedIpPort, len(peers))
 	for i, p := range peers {
+		// TODO: Use .AsSlice() after v1.12.x activates.
+		ip := p.AddrPort.Addr().As16()
 		claimIPPorts[i] = &p2p.ClaimedIpPort{
 			X509Certificate: p.Cert.Raw,
-			IpAddr:          p.IPPort.IP.To16(),
-			IpPort:          uint32(p.IPPort.Port),
+			IpAddr:          ip[:],
+			IpPort:          uint32(p.AddrPort.Port()),
 			Timestamp:       p.Timestamp,
 			Signature:       p.Signature,
 			TxId:            ids.Empty[:],

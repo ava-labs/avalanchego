@@ -1,0 +1,16 @@
+# This action installs dependencies missing from the default
+# focal image used by arm64 github workers.
+#
+# TODO(marun): Find an image with the required dependencies already installed.
+
+name: 'Install focal arm64 dependencies'
+description: 'Installs the dependencies required to build avalanchego on an arm64 github worker running Ubuntu 20.04 (focal)'
+
+runs:
+  using: composite
+  steps:
+    - name: Install build-essential
+      run: |
+        sudo apt update
+        sudo apt -y install build-essential
+      shell: bash

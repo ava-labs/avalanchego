@@ -6,14 +6,12 @@ package dialer
 import (
 	"context"
 	"net"
-	"strconv"
-	"strings"
+	"net/netip"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
@@ -22,7 +20,11 @@ import (
 func TestDialerCancelDial(t *testing.T) {
 	require := require.New(t)
 
-	l, err := net.Listen("tcp", "127.0.0.1:")
+	listenAddrPort := netip.AddrPortFrom(
+		netip.AddrFrom4([4]byte{127, 0, 0, 1}),
+		0,
+	)
+	l, err := net.Listen("tcp", listenAddrPort.String())
 	require.NoError(err)
 
 	done := make(chan struct{})
@@ -43,12 +45,8 @@ func TestDialerCancelDial(t *testing.T) {
 		}
 	}()
 
-	port, err := strconv.Atoi(strings.Split(l.Addr().String(), ":")[1])
+	listenedAddrPort, err := netip.ParseAddrPort(l.Addr().String())
 	require.NoError(err)
-	myIP := ips.IPPort{
-		IP:   net.ParseIP("127.0.0.1"),
-		Port: uint16(port),
-	}
 
 	// Create a dialer
 	dialer := NewDialer(
@@ -63,11 +61,11 @@ func TestDialerCancelDial(t *testing.T) {
 	// Make an outgoing connection with a cancelled context
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	_, err = dialer.Dial(ctx, myIP)
+	_, err = dialer.Dial(ctx, listenedAddrPort)
 	require.ErrorIs(err, context.Canceled)
 
 	// Make an outgoing connection with a non-cancelled context
-	conn, err := dialer.Dial(context.Background(), myIP)
+	conn, err := dialer.Dial(context.Background(), listenedAddrPort)
 	require.NoError(err)
 	_ = conn.Close()
 
