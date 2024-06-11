@@ -20,7 +20,7 @@ import (
 
 // NewClient generates a client-server pair and returns the client used to
 // communicate with a server with the specified handler
-// TODO timeouts should fire cilent callback
+// TODO timeouts should fire client callback
 func NewClient(t *testing.T, rootCtx context.Context, handler p2p.Handler) *p2p.Client {
 	clientSender := &common.SenderTest{}
 	serverSender := &common.SenderTest{}
