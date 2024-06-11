@@ -605,7 +605,7 @@ func (w *workload) verifyXChainTxConsumedUTXOs(ctx context.Context, tx *xtxs.Tx)
 		inputs := tx.Unsigned.InputIDs()
 		for input := range inputs {
 			_, err := utxos.GetUTXO(ctx, chainID, chainID, input)
-			if err != nil && err != database.ErrNotFound {
+			if err != database.ErrNotFound {
 				log.Printf("failed to verify that X-chain UTXO %s was deleted on %s after %s", input, uri, txID)
 				assert.Unreachable("failed to verify that X-chain UTXO was deleted", map[string]any{
 					"worker": w.id,
@@ -645,7 +645,7 @@ func (w *workload) verifyPChainTxConsumedUTXOs(ctx context.Context, tx *ptxs.Tx)
 		inputs := tx.Unsigned.InputIDs()
 		for input := range inputs {
 			_, err := utxos.GetUTXO(ctx, constants.PlatformChainID, constants.PlatformChainID, input)
-			if err != nil && err != database.ErrNotFound {
+			if err != database.ErrNotFound {
 				log.Printf("failed to verify that P-chain UTXO %s was deleted on %s after %s", input, uri, txID)
 				assert.Unreachable("failed to verify that P-chain UTXO was deleted", map[string]any{
 					"worker": w.id,
