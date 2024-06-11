@@ -6,7 +6,7 @@ package nat
 import (
 	"errors"
 	"math"
-	"net"
+	"net/netip"
 	"time"
 
 	"github.com/jackpal/gateway"
@@ -66,12 +66,12 @@ func (r *pmpRouter) UnmapPort(internalPort uint16, _ uint16) error {
 	return err
 }
 
-func (r *pmpRouter) ExternalIP() (net.IP, error) {
+func (r *pmpRouter) ExternalIP() (netip.Addr, error) {
 	response, err := r.client.GetExternalAddress()
 	if err != nil {
-		return nil, err
+		return netip.Addr{}, err
 	}
-	return response.ExternalIPAddress[:], nil
+	return netip.AddrFrom4(response.ExternalIPAddress), nil
 }
 
 func getPMPRouter() *pmpRouter {

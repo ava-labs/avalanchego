@@ -4,23 +4,24 @@
 package beacon
 
 import (
+	"net/netip"
+
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/ips"
 )
 
 var _ Beacon = (*beacon)(nil)
 
 type Beacon interface {
 	ID() ids.NodeID
-	IP() ips.IPPort
+	IP() netip.AddrPort
 }
 
 type beacon struct {
 	id ids.NodeID
-	ip ips.IPPort
+	ip netip.AddrPort
 }
 
-func New(id ids.NodeID, ip ips.IPPort) Beacon {
+func New(id ids.NodeID, ip netip.AddrPort) Beacon {
 	return &beacon{
 		id: id,
 		ip: ip,
@@ -31,6 +32,6 @@ func (b *beacon) ID() ids.NodeID {
 	return b.id
 }
 
-func (b *beacon) IP() ips.IPPort {
+func (b *beacon) IP() netip.AddrPort {
 	return b.ip
 }
