@@ -34,9 +34,7 @@ func NewClient(t *testing.T, rootCtx context.Context, handler p2p.Handler) *p2p.
 	require.NoError(t, err)
 
 	clientSender.SendAppGossipF = func(ctx context.Context, _ common.SendConfig, gossipBytes []byte) error {
-		go func() {
-			require.NoError(t, serverNetwork.AppGossip(ctx, clientNodeID, gossipBytes))
-		}()
+		require.NoError(t, serverNetwork.AppGossip(ctx, clientNodeID, gossipBytes))
 
 		return nil
 	}
