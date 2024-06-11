@@ -23,7 +23,7 @@ func TestNewClient_AppGossip(t *testing.T) {
 
 	appGossipChan := make(chan struct{})
 	testHandler := p2p.TestHandler{
-		AppGossipF: func(ctx context.Context, nodeID ids.NodeID, gossipBytes []byte) {
+		AppGossipF: func(context.Context, ids.NodeID, []byte) {
 			close(appGossipChan)
 		},
 	}

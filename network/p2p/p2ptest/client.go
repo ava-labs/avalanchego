@@ -40,7 +40,7 @@ func NewClient(t *testing.T, rootCtx context.Context, handler p2p.Handler) *p2p.
 		return nil
 	}
 
-	clientSender.SendAppRequestF = func(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, requestBytes []byte) error {
+	clientSender.SendAppRequestF = func(ctx context.Context, _ set.Set[ids.NodeID], requestID uint32, requestBytes []byte) error {
 		// Send the request asynchronously to avoid deadlock when the server
 		// sends the response back to the client
 		go func() {
@@ -50,7 +50,7 @@ func NewClient(t *testing.T, rootCtx context.Context, handler p2p.Handler) *p2p.
 		return nil
 	}
 
-	serverSender.SendAppResponseF = func(ctx context.Context, nodeID ids.NodeID, requestID uint32, responseBytes []byte) error {
+	serverSender.SendAppResponseF = func(ctx context.Context, _ ids.NodeID, requestID uint32, responseBytes []byte) error {
 		return clientNetwork.AppResponse(ctx, serverNodeID, requestID, responseBytes)
 	}
 
