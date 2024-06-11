@@ -87,14 +87,10 @@ func (sf *unarySnowflakeTest) AssertEqual(expectedConfidences []int, expectedFin
 	sf.require.Equal(expectedFinalized, sf.Finalized())
 }
 
-func TestUnarySnowflakeTerminateInBetaPolls(t *testing.T) {
-	executeErrorDrivenTerminatesInBetaPolls(t, newUnarySnowflakeTest, struct{}{})
-}
-
-func TestUnarySnowflakeErrorDrivenReset(t *testing.T) {
-	executeErrorDrivenReset(t, newUnarySnowflakeTest, struct{}{})
-}
-
-func TestUnarySnowflakeErrorDrivenResetHighestAlphaConfidence(t *testing.T) {
-	executeErrorDrivenResetHighestAlphaConfidence(t, newUnarySnowflakeTest, struct{}{})
+func TestUnarySnowflakeErrorDriven(t *testing.T) {
+	for _, test := range getErrorDrivenSnowflakeSingleChoiceSuite[struct{}]() {
+		t.Run(test.name, func(t *testing.T) {
+			test.f(t, newUnarySnowflakeTest, struct{}{})
+		})
+	}
 }

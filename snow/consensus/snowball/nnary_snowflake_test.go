@@ -129,18 +129,18 @@ func (sf *nnarySnowflakeTest) AssertEqual(expectedConfidences []int, expectedFin
 	sf.require.Equal(expectedFinalized, sf.Finalized())
 }
 
-func TestNnarySnowflakeTerminateInBetaPolls(t *testing.T) {
-	executeErrorDrivenTerminatesInBetaPolls(t, newNnarySnowflakeTest, Red)
+func TestNnarySnowflakeErrorDrivenSingleChoice(t *testing.T) {
+	for _, test := range getErrorDrivenSnowflakeSingleChoiceSuite[ids.ID]() {
+		t.Run(test.name, func(t *testing.T) {
+			test.f(t, newNnarySnowflakeTest, Red)
+		})
+	}
 }
 
-func TestNnarySnowflakeErrorDrivenReset(t *testing.T) {
-	executeErrorDrivenReset(t, newNnarySnowflakeTest, Red)
-}
-
-func TestNnarySnowflakeErrorDrivenResetHighestAlphaConfidence(t *testing.T) {
-	executeErrorDrivenResetHighestAlphaConfidence(t, newNnarySnowflakeTest, Red)
-}
-
-func TestNnarySnowflakeErrorDrivenSwitchChoices(t *testing.T) {
-	executeErrorDrivenSwitchChoices(t, newNnarySnowflakeTest, Red, Blue)
+func TestNnarySnowflakeErrorDrivenMultiChoice(t *testing.T) {
+	for _, test := range getErrorDrivenSnowflakeMultiChoiceSuite[ids.ID]() {
+		t.Run(test.name, func(t *testing.T) {
+			test.f(t, newNnarySnowflakeTest, Red, Green)
+		})
+	}
 }

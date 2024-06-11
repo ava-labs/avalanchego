@@ -84,6 +84,28 @@ func executeErrorDrivenResetHighestAlphaConfidence[T comparable](t *testing.T, n
 	sfTest.AssertEqual([]int{4, 0, 0}, true, choice)
 }
 
+type snowflakeTestSingleChoice[T comparable] struct {
+	name string
+	f    func(*testing.T, snowflakeTestConstructor[T], T)
+}
+
+func getErrorDrivenSnowflakeSingleChoiceSuite[T comparable]() []snowflakeTestSingleChoice[T] {
+	return []snowflakeTestSingleChoice[T]{
+		{
+			name: "TerminateInBetaPolls",
+			f:    executeErrorDrivenTerminatesInBetaPolls[T],
+		},
+		{
+			name: "Reset",
+			f:    executeErrorDrivenReset[T],
+		},
+		{
+			name: "ResetHighestAlphaConfidence",
+			f:    executeErrorDrivenResetHighestAlphaConfidence[T],
+		},
+	}
+}
+
 func executeErrorDrivenSwitchChoices[T comparable](t *testing.T, newSnowflakeTest snowflakeTestConstructor[T], choice0, choice1 T) {
 	sfTest := newSnowflakeTest(t, alphaPreference, terminationConditions)
 
@@ -106,4 +128,18 @@ func executeErrorDrivenSwitchChoices[T comparable](t *testing.T, newSnowflakeTes
 	sfTest.AssertEqual([]int{2, 1, 1}, false, choice1)
 	sfTest.RecordPoll(5, choice1)
 	sfTest.AssertEqual([]int{3, 2, 2}, true, choice1)
+}
+
+type snowflakeTestMultiChoice[T comparable] struct {
+	name string
+	f    func(*testing.T, snowflakeTestConstructor[T], T, T)
+}
+
+func getErrorDrivenSnowflakeMultiChoiceSuite[T comparable]() []snowflakeTestMultiChoice[T] {
+	return []snowflakeTestMultiChoice[T]{
+		{
+			name: "SwitchChoices",
+			f:    executeErrorDrivenSwitchChoices[T],
+		},
+	}
 }

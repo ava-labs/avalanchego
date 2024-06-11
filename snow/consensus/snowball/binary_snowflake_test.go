@@ -77,18 +77,18 @@ func (sf *binarySnowflakeTest) AssertEqual(expectedConfidences []int, expectedFi
 	sf.require.Equal(expectedFinalized, sf.Finalized())
 }
 
-func TestBinarySnowflakeTerminateInBetaPolls(t *testing.T) {
-	executeErrorDrivenTerminatesInBetaPolls(t, newBinarySnowflakeTest, 0)
+func TestBinarySnowflakeErrorDrivenSingleChoice(t *testing.T) {
+	for _, test := range getErrorDrivenSnowflakeSingleChoiceSuite[int]() {
+		t.Run(test.name, func(t *testing.T) {
+			test.f(t, newBinarySnowflakeTest, 0)
+		})
+	}
 }
 
-func TestBinarySnowflakeErrorDrivenReset(t *testing.T) {
-	executeErrorDrivenReset(t, newBinarySnowflakeTest, 0)
-}
-
-func TestBinarySnowflakeErrorDrivenResetHighestAlphaConfidence(t *testing.T) {
-	executeErrorDrivenResetHighestAlphaConfidence(t, newBinarySnowflakeTest, 0)
-}
-
-func TestBinarySnowflakeErrorDrivenSwitchChoices(t *testing.T) {
-	executeErrorDrivenSwitchChoices(t, newBinarySnowflakeTest, 0, 1)
+func TestBinarySnowflakeErrorDrivenMultiChoice(t *testing.T) {
+	for _, test := range getErrorDrivenSnowflakeMultiChoiceSuite[int]() {
+		t.Run(test.name, func(t *testing.T) {
+			test.f(t, newBinarySnowflakeTest, 0, 1)
+		})
+	}
 }
