@@ -17,12 +17,7 @@ func TestBinarySnowball(t *testing.T) {
 
 	alphaPreference, alphaConfidence := 2, 3
 	beta := 2
-	terminationConditions := []terminationCondition{
-		{
-			alphaConfidence: alphaConfidence,
-			beta:            beta,
-		},
-	}
+	terminationConditions := newSingleTerminationCondition(alphaConfidence, beta)
 
 	sb := newBinarySnowball(alphaPreference, terminationConditions, red)
 	require.Equal(red, sb.Preference())
@@ -53,12 +48,7 @@ func TestBinarySnowballRecordPollPreference(t *testing.T) {
 
 	alphaPreference, alphaConfidence := 1, 2
 	beta := 2
-	terminationConditions := []terminationCondition{
-		{
-			alphaConfidence: alphaConfidence,
-			beta:            beta,
-		},
-	}
+	terminationConditions := newSingleTerminationCondition(alphaConfidence, beta)
 
 	sb := newBinarySnowball(alphaPreference, terminationConditions, red)
 	require.Equal(red, sb.Preference())
@@ -96,12 +86,7 @@ func TestBinarySnowballRecordUnsuccessfulPoll(t *testing.T) {
 
 	alphaPreference, alphaConfidence := 1, 2
 	beta := 2
-	terminationConditions := []terminationCondition{
-		{
-			alphaConfidence: alphaConfidence,
-			beta:            beta,
-		},
-	}
+	terminationConditions := newSingleTerminationCondition(alphaConfidence, beta)
 
 	sb := newBinarySnowball(alphaPreference, terminationConditions, red)
 	require.Equal(red, sb.Preference())
@@ -133,12 +118,7 @@ func TestBinarySnowballAcceptWeirdColor(t *testing.T) {
 
 	alphaPreference, alphaConfidence := 1, 2
 	beta := 2
-	terminationConditions := []terminationCondition{
-		{
-			alphaConfidence: alphaConfidence,
-			beta:            beta,
-		},
-	}
+	terminationConditions := newSingleTerminationCondition(alphaConfidence, beta)
 
 	sb := newBinarySnowball(alphaPreference, terminationConditions, red)
 
@@ -180,12 +160,7 @@ func TestBinarySnowballLockColor(t *testing.T) {
 
 	alphaPreference, alphaConfidence := 1, 2
 	beta := 1
-	terminationConditions := []terminationCondition{
-		{
-			alphaConfidence: alphaConfidence,
-			beta:            beta,
-		},
-	}
+	terminationConditions := newSingleTerminationCondition(alphaConfidence, beta)
 
 	sb := newBinarySnowball(alphaPreference, terminationConditions, red)
 

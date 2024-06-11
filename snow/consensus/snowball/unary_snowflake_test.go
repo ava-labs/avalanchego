@@ -21,12 +21,7 @@ func TestUnarySnowflake(t *testing.T) {
 
 	alphaPreference, alphaConfidence := 1, 2
 	beta := 2
-	terminationConditions := []terminationCondition{
-		{
-			alphaConfidence: alphaConfidence,
-			beta:            beta,
-		},
-	}
+	terminationConditions := newSingleTerminationCondition(alphaConfidence, beta)
 
 	sf := newUnarySnowflake(alphaPreference, terminationConditions)
 

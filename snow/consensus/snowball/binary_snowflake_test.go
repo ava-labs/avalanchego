@@ -17,12 +17,7 @@ func TestBinarySnowflake(t *testing.T) {
 
 	alphaPreference, alphaConfidence := 1, 2
 	beta := 2
-	terminationConditions := []terminationCondition{
-		{
-			alphaConfidence: alphaConfidence,
-			beta:            beta,
-		},
-	}
+	terminationConditions := newSingleTerminationCondition(alphaConfidence, beta)
 
 	sf := newBinarySnowflake(alphaPreference, terminationConditions, red)
 
