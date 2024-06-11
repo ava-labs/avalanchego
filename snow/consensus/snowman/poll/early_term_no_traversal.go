@@ -4,6 +4,7 @@
 package poll
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -11,13 +12,107 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/bag"
-	"github.com/ava-labs/avalanchego/utils/metric"
+)
+
+var (
+	errPollDurationVectorMetrics = errors.New("failed to register poll_duration vector metrics")
+	errPollCountVectorMetrics    = errors.New("failed to register poll_count vector metrics")
+
+	terminationReason    = "reason"
+	exhaustedReason      = "exhausted"
+	earlyFailReason      = "early_fail"
+	earlyAlphaPrefReason = "early_alpha_pref"
+	earlyAlphaConfReason = "early_alpha_conf"
+	earlyTermCaseLabels  = []string{
+		exhaustedReason,
+		earlyFailReason,
+		earlyAlphaPrefReason,
+		earlyAlphaConfReason,
+	}
+
+	exhaustedLabel = prometheus.Labels{
+		terminationReason: exhaustedReason,
+	}
+	earlyFailLabel = prometheus.Labels{
+		terminationReason: earlyFailReason,
+	}
+	earlyAlphaPrefLabel = prometheus.Labels{
+		terminationReason: earlyAlphaPrefReason,
+	}
+	earlyAlphaConfLabel = prometheus.Labels{
+		terminationReason: earlyAlphaConfReason,
+	}
 )
 
 type earlyTermNoTraversalFactory struct {
 	alphaPreference int
 	alphaConfidence int
-	durPolls        []metric.Averager
+
+	metrics *earlyTermNoTraversalMetrics
+}
+
+type earlyTermNoTraversalMetrics struct {
+	durPolls               *prometheus.GaugeVec
+	durExhaustedPolls      prometheus.Gauge
+	durEarlyFailPolls      prometheus.Gauge
+	durEarlyAlphaPrefPolls prometheus.Gauge
+	durEarlyAlphaConfPolls prometheus.Gauge
+
+	countPolls               *prometheus.CounterVec
+	countExhaustedPolls      prometheus.Counter
+	countEarlyFailPolls      prometheus.Counter
+	countEarlyAlphaPrefPolls prometheus.Counter
+	countEarlyAlphaConfPolls prometheus.Counter
+}
+
+func newEarlyTermNoTraversalMetrics(reg prometheus.Registerer) (*earlyTermNoTraversalMetrics, error) {
+	pollCountVec := prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "count",
+		Help: "Total # of terminated polls by reason",
+	}, earlyTermCaseLabels)
+	if err := reg.Register(pollCountVec); err != nil {
+		return nil, fmt.Errorf("%w: %w", errPollCountVectorMetrics, err)
+	}
+	durPollsVec := prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "count",
+		Help: "time (in ns) polls took to complete by reason",
+	}, earlyTermCaseLabels)
+	if err := reg.Register(durPollsVec); err != nil {
+		return nil, fmt.Errorf("%w: %w", errPollDurationVectorMetrics, err)
+	}
+
+	return &earlyTermNoTraversalMetrics{
+		durPolls:                 durPollsVec,
+		durExhaustedPolls:        durPollsVec.With(exhaustedLabel),
+		durEarlyFailPolls:        durPollsVec.With(earlyFailLabel),
+		durEarlyAlphaPrefPolls:   durPollsVec.With(earlyAlphaPrefLabel),
+		durEarlyAlphaConfPolls:   durPollsVec.With(earlyAlphaConfLabel),
+		countPolls:               pollCountVec,
+		countExhaustedPolls:      pollCountVec.With(exhaustedLabel),
+		countEarlyFailPolls:      pollCountVec.With(earlyFailLabel),
+		countEarlyAlphaPrefPolls: pollCountVec.With(earlyAlphaPrefLabel),
+		countEarlyAlphaConfPolls: pollCountVec.With(earlyAlphaConfLabel),
+	}, nil
+}
+
+func (m *earlyTermNoTraversalMetrics) observeExhausted(duration time.Duration) {
+	m.durExhaustedPolls.Add(float64(duration.Nanoseconds()))
+	m.countExhaustedPolls.Inc()
+}
+
+func (m *earlyTermNoTraversalMetrics) observeEarlyFail(duration time.Duration) {
+	m.durEarlyFailPolls.Add(float64(duration.Nanoseconds()))
+	m.countEarlyFailPolls.Inc()
+}
+
+func (m *earlyTermNoTraversalMetrics) observeEarlyAlphaPref(duration time.Duration) {
+	m.durEarlyAlphaPrefPolls.Add(float64(duration.Nanoseconds()))
+	m.countEarlyAlphaPrefPolls.Inc()
+}
+
+func (m *earlyTermNoTraversalMetrics) observeEarlyAlphaConf(duration time.Duration) {
+	m.durEarlyAlphaConfPolls.Add(float64(duration.Nanoseconds()))
+	m.countEarlyAlphaConfPolls.Inc()
 }
 
 // NewEarlyTermNoTraversalFactory returns a factory that returns polls with
@@ -27,46 +122,16 @@ func NewEarlyTermNoTraversalFactory(
 	alphaConfidence int,
 	reg prometheus.Registerer,
 ) (Factory, error) {
-	f := &earlyTermNoTraversalFactory{
+	metrics, err := newEarlyTermNoTraversalMetrics(reg)
+	if err != nil {
+		return nil, err
+	}
+
+	return &earlyTermNoTraversalFactory{
 		alphaPreference: alphaPreference,
 		alphaConfidence: alphaConfidence,
-	}
-
-	durPolls1, err := metric.NewAverager(
-		"poll_duration_case_1",
-		"time (in ns) this poll took to complete",
-		reg,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("%w: %w", errFailedPollDurationMetrics, err)
-	}
-	durPolls2, err := metric.NewAverager(
-		"poll_duration_case_2",
-		"time (in ns) this poll took to complete",
-		reg,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("%w: %w", errFailedPollDurationMetrics, err)
-	}
-	durPolls3, err := metric.NewAverager(
-		"poll_duration_case_3",
-		"time (in ns) this poll took to complete",
-		reg,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("%w: %w", errFailedPollDurationMetrics, err)
-	}
-	durPolls4, err := metric.NewAverager(
-		"poll_duration_case_4",
-		"time (in ns) this poll took to complete",
-		reg,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("%w: %w", errFailedPollDurationMetrics, err)
-	}
-	f.durPolls = []metric.Averager{durPolls1, durPolls2, durPolls3, durPolls4}
-
-	return f, nil
+		metrics:         metrics,
+	}, nil
 }
 
 func (f *earlyTermNoTraversalFactory) New(vdrs bag.Bag[ids.NodeID]) Poll {
@@ -74,7 +139,7 @@ func (f *earlyTermNoTraversalFactory) New(vdrs bag.Bag[ids.NodeID]) Poll {
 		polled:          vdrs,
 		alphaPreference: f.alphaPreference,
 		alphaConfidence: f.alphaConfidence,
-		durPolls:        f.durPolls,
+		metrics:         f.metrics,
 		start:           time.Now(),
 	}
 }
@@ -88,7 +153,7 @@ type earlyTermNoTraversalPoll struct {
 	alphaPreference int
 	alphaConfidence int
 
-	durPolls []metric.Averager
+	metrics  *earlyTermNoTraversalMetrics
 	start    time.Time
 	finished bool
 }
@@ -125,7 +190,7 @@ func (p *earlyTermNoTraversalPoll) Finished() bool {
 	remaining := p.polled.Len()
 	if remaining == 0 {
 		p.finished = true
-		p.durPolls[0].Observe(float64(time.Since(p.start).Nanoseconds()))
+		p.metrics.observeExhausted(time.Since(p.start))
 		return true // Case 1
 	}
 
@@ -133,20 +198,20 @@ func (p *earlyTermNoTraversalPoll) Finished() bool {
 	maxPossibleVotes := received + remaining
 	if maxPossibleVotes < p.alphaPreference {
 		p.finished = true
-		p.durPolls[1].Observe(float64(time.Since(p.start).Nanoseconds()))
+		p.metrics.observeEarlyFail(time.Since(p.start))
 		return true // Case 2
 	}
 
 	_, freq := p.votes.Mode()
 	if freq >= p.alphaPreference && maxPossibleVotes < p.alphaConfidence {
 		p.finished = true
-		p.durPolls[2].Observe(float64(time.Since(p.start).Nanoseconds()))
+		p.metrics.observeEarlyAlphaPref(time.Since(p.start))
 		return true // Case 3
 	}
 
 	if freq >= p.alphaConfidence {
 		p.finished = true
-		p.durPolls[3].Observe(float64(time.Since(p.start).Nanoseconds()))
+		p.metrics.observeEarlyAlphaConf(time.Since(p.start))
 		return true // Case 4
 	}
 
