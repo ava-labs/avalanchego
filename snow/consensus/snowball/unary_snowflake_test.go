@@ -82,7 +82,7 @@ func (sf *unarySnowflakeTest) RecordPoll(count int, _ struct{}) {
 	sf.unarySnowflake.RecordPoll(count)
 }
 
-func (sf *unarySnowflakeTest) Assert(expectedConfidences []int, expectedFinalized bool, _ struct{}) {
+func (sf *unarySnowflakeTest) AssertEqual(expectedConfidences []int, expectedFinalized bool, _ struct{}) {
 	sf.require.Equal(expectedConfidences, sf.unarySnowflake.confidence)
 	sf.require.Equal(expectedFinalized, sf.Finalized())
 }

@@ -71,7 +71,7 @@ func (sf *binarySnowflakeTest) RecordPoll(count int, choice int) {
 	sf.binarySnowflake.RecordPoll(count, choice)
 }
 
-func (sf *binarySnowflakeTest) Assert(expectedConfidences []int, expectedFinalized bool, expectedPreference int) {
+func (sf *binarySnowflakeTest) AssertEqual(expectedConfidences []int, expectedFinalized bool, expectedPreference int) {
 	sf.require.Equal(expectedPreference, sf.Preference())
 	sf.require.Equal(expectedConfidences, sf.binarySnowflake.confidence)
 	sf.require.Equal(expectedFinalized, sf.Finalized())

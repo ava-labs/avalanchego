@@ -123,7 +123,7 @@ func (sf *nnarySnowflakeTest) RecordPoll(count int, choice ids.ID) {
 	sf.nnarySnowflake.RecordPoll(count, choice)
 }
 
-func (sf *nnarySnowflakeTest) Assert(expectedConfidences []int, expectedFinalized bool, expectedPreference ids.ID) {
+func (sf *nnarySnowflakeTest) AssertEqual(expectedConfidences []int, expectedFinalized bool, expectedPreference ids.ID) {
 	sf.require.Equal(expectedPreference, sf.Preference())
 	sf.require.Equal(expectedConfidences, sf.nnarySnowflake.confidence)
 	sf.require.Equal(expectedFinalized, sf.Finalized())
