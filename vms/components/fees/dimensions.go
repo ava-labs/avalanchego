@@ -27,6 +27,8 @@ const (
 var (
 	errUnknownDimension = errors.New("unknown dimension")
 
+	ZeroGas = Gas(0)
+
 	Empty = Dimensions{}
 	Max   = Dimensions{
 		math.MaxUint64,
@@ -44,7 +46,11 @@ var (
 )
 
 type (
-	Dimension  int
+	Dimension int
+
+	GasPrice uint64
+	Gas      uint64
+
 	Dimensions [FeeDimensions]uint64
 )
 
@@ -66,4 +72,19 @@ func Add(lhs, rhs Dimensions) (Dimensions, error) {
 		res[i] = v
 	}
 	return res, nil
+}
+
+func ScalarProd(lhs, rhs Dimensions) (Gas, error) {
+	var res uint64
+	for i := 0; i < FeeDimensions; i++ {
+		v, err := safemath.Mul64(lhs[i], rhs[i])
+		if err != nil {
+			return ZeroGas, err
+		}
+		res, err = safemath.Add64(res, v)
+		if err != nil {
+			return ZeroGas, err
+		}
+	}
+	return Gas(res), nil
 }

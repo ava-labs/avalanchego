@@ -232,10 +232,10 @@ func (v *verifier) ApricotAtomicBlock(b *block.ApricotAtomicBlock) error {
 
 		onAcceptState: atomicExecutor.OnAccept,
 
-		inputs:          atomicExecutor.Inputs,
-		timestamp:       atomicExecutor.OnAccept.GetTimestamp(),
-		blockComplexity: fees.Empty,
-		atomicRequests:  atomicExecutor.AtomicRequests,
+		inputs:         atomicExecutor.Inputs,
+		timestamp:      atomicExecutor.OnAccept.GetTimestamp(),
+		blockGas:       fees.ZeroGas,
+		atomicRequests: atomicExecutor.AtomicRequests,
 	}
 	return nil
 }
@@ -421,9 +421,9 @@ func (v *verifier) proposalBlock(
 		// It is safe to use [b.onAbortState] here because the timestamp will
 		// never be modified by an Apricot Abort block and the timestamp will
 		// always be the same as the Banff Proposal Block.
-		timestamp:       onAbortState.GetTimestamp(),
-		blockComplexity: feeCalculator.GetCumulatedComplexity(),
-		atomicRequests:  atomicRequests,
+		timestamp:      onAbortState.GetTimestamp(),
+		blockGas:       feeCalculator.GetGas(),
+		atomicRequests: atomicRequests,
 	}
 	return nil
 }
@@ -448,10 +448,10 @@ func (v *verifier) standardBlock(
 		onAcceptState: onAcceptState,
 		onAcceptFunc:  onAcceptFunc,
 
-		timestamp:       onAcceptState.GetTimestamp(),
-		blockComplexity: feeCalculator.GetCumulatedComplexity(),
-		inputs:          inputs,
-		atomicRequests:  atomicRequests,
+		timestamp:      onAcceptState.GetTimestamp(),
+		blockGas:       feeCalculator.GetGas(),
+		inputs:         inputs,
+		atomicRequests: atomicRequests,
 	}
 	return nil
 }

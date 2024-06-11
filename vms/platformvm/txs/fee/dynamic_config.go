@@ -6,6 +6,7 @@ package fee
 import (
 	"errors"
 	"fmt"
+	"math"
 
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -18,14 +19,14 @@ var (
 	errDynamicFeeConfigNotAvailable = errors.New("dynamic fee config not available")
 
 	eUpgradeDynamicFeesConfig = commonfees.DynamicFeesConfig{
-		FeeRate: commonfees.Dimensions{
-			1 * units.NanoAvax,
-			2 * units.NanoAvax,
-			3 * units.NanoAvax,
-			4 * units.NanoAvax,
+		GasPrice: commonfees.GasPrice(10 * units.NanoAvax),
+		FeeDimensionWeights: commonfees.Dimensions{
+			1000,
+			1000,
+			1000,
+			1,
 		},
-
-		BlockMaxComplexity: commonfees.Max,
+		TempBlockMaxGas: commonfees.Gas(math.MaxUint64),
 	}
 
 	customDynamicFeesConfig *commonfees.DynamicFeesConfig

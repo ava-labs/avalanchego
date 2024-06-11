@@ -159,7 +159,7 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 				feeCfg, err := fee.GetDynamicConfig(true /*isEActive*/)
 				require.NoError(err)
 
-				feeCalc := fee.NewDynamicCalculator(commonfees.NewManager(feeCfg.FeeRate), feeCfg.BlockMaxComplexity)
+				feeCalc := fee.NewDynamicCalculator(commonfees.NewManager(feeCfg.GasPrice), feeCfg.TempBlockMaxGas)
 				pChainExportFee, err = feeCalc.ComputeFee(tx.Unsigned, tx.Creds)
 				require.NoError(err)
 			})

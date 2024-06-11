@@ -4,89 +4,66 @@
 package fees
 
 import (
+	"errors"
 	"fmt"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
-type Manager struct {
-	// Avax denominated fee rates, i.e. fees per unit of complexity.
-	feeRates Dimensions
+var errGasBoundBreached = errors.New("gas bound breached")
 
-	// cumulatedComplexity helps aggregating the units of complexity consumed
+type Manager struct {
+	// Avax denominated gas price, i.e. fee per unit of complexity.
+	gasPrice GasPrice
+
+	// cumulatedGas helps aggregating the gas consumed
 	// by a block so that we can verify it's not too big/build it properly.
-	cumulatedComplexity Dimensions
+	cumulatedGas Gas
 }
 
-func NewManager(feeRate Dimensions) *Manager {
+func NewManager(gasPrice GasPrice) *Manager {
 	return &Manager{
-		feeRates: feeRate,
+		gasPrice: gasPrice,
 	}
 }
 
-func (m *Manager) GetFeeRates() Dimensions {
-	return m.feeRates
+func (m *Manager) GetGasPrice() GasPrice {
+	return m.gasPrice
 }
 
-func (m *Manager) GetCumulatedComplexity() Dimensions {
-	return m.cumulatedComplexity
+func (m *Manager) GetGas() Gas {
+	return m.cumulatedGas
 }
 
 // CalculateFee must be a stateless method
-func (m *Manager) CalculateFee(units Dimensions) (uint64, error) {
-	fee := uint64(0)
-
-	for i := Dimension(0); i < FeeDimensions; i++ {
-		contribution, err := safemath.Mul64(m.feeRates[i], units[i])
-		if err != nil {
-			return 0, err
-		}
-		fee, err = safemath.Add64(contribution, fee)
-		if err != nil {
-			return 0, err
-		}
-	}
-	return fee, nil
+func (m *Manager) CalculateFee(g Gas) (uint64, error) {
+	return safemath.Mul64(uint64(m.gasPrice), uint64(g))
 }
 
 // CumulateComplexity tries to cumulate the consumed complexity [units]. Before
 // actually cumulating them, it checks whether the result would breach [bounds].
 // If so, it returns the first dimension to breach bounds.
-func (m *Manager) CumulateComplexity(units, bounds Dimensions) (bool, Dimension) {
+func (m *Manager) CumulateComplexity(gas, bound Gas) error {
 	// Ensure we can consume (don't want partial update of values)
-	for i := Dimension(0); i < FeeDimensions; i++ {
-		consumed, err := safemath.Add64(m.cumulatedComplexity[i], units[i])
-		if err != nil {
-			return true, i
-		}
-		if consumed > bounds[i] {
-			return true, i
-		}
+	consumed, err := safemath.Add64(uint64(m.gasPrice), uint64(gas))
+	if err != nil {
+		return fmt.Errorf("%w: %w", errGasBoundBreached, err)
+	}
+	if Gas(consumed) > bound {
+		return errGasBoundBreached
 	}
 
-	// Commit to consumption
-	for i := Dimension(0); i < FeeDimensions; i++ {
-		consumed, err := safemath.Add64(m.cumulatedComplexity[i], units[i])
-		if err != nil {
-			return true, i
-		}
-		m.cumulatedComplexity[i] = consumed
-	}
-	return false, 0
+	m.cumulatedGas = Gas(consumed)
+	return nil
 }
 
 // Sometimes, e.g. while building a tx, we'd like freedom to speculatively add complexity
 // and to remove it later on. [RemoveComplexity] grants this freedom
-func (m *Manager) RemoveComplexity(unitsToRm Dimensions) error {
-	var revertedUnits Dimensions
-	for i := Dimension(0); i < FeeDimensions; i++ {
-		prev, err := safemath.Sub(m.cumulatedComplexity[i], unitsToRm[i])
-		if err != nil {
-			return fmt.Errorf("%w: dimension %d", err, i)
-		}
-		revertedUnits[i] = prev
+func (m *Manager) RemoveComplexity(gasToRm Gas) error {
+	revertedGas, err := safemath.Sub(m.cumulatedGas, gasToRm)
+	if err != nil {
+		return fmt.Errorf("%w: current Gas %d, gas to revert %d", err, m.cumulatedGas, gasToRm)
 	}
-
-	m.cumulatedComplexity = revertedUnits
+	m.cumulatedGas = revertedGas
 	return nil
 }

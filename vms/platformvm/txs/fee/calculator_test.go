@@ -28,18 +28,9 @@ import (
 )
 
 var (
-	testFeeRates = fees.Dimensions{
-		1 * units.MicroAvax,
-		2 * units.MicroAvax,
-		3 * units.MicroAvax,
-		4 * units.MicroAvax,
-	}
-	testBlockMaxComplexity = fees.Dimensions{
-		3000,
-		3500,
-		1000,
-		2000,
-	}
+	testGasPrice = fees.GasPrice(10 * units.NanoAvax)
+
+	testBlockMaxGas = fees.Gas(100_000)
 
 	preFundedKeys             = secp256k1.TestKeys()
 	feeTestSigners            = [][]*secp256k1.PrivateKey{preFundedKeys}
@@ -51,9 +42,9 @@ func TestAddAndRemoveFees(t *testing.T) {
 
 	fc := &Calculator{
 		c: &calculator{
-			isEActive:          true,
-			feeManager:         fees.NewManager(testFeeRates),
-			blockMaxComplexity: testBlockMaxComplexity,
+			isEActive:  true,
+			feeManager: fees.NewManager(testGasPrice),
+			maxGas:     testBlockMaxGas,
 		},
 	}
 
@@ -64,25 +55,25 @@ func TestAddAndRemoveFees(t *testing.T) {
 
 	feeDelta, err := fc.AddFeesFor(units)
 	r.NoError(err)
-	r.Equal(units, fc.c.feeManager.GetCumulatedComplexity())
+	r.Equal(units, fc.c.feeManager.GetGas())
 	r.NotZero(feeDelta)
 	r.Equal(feeDelta, fc.c.fee)
 
 	feeDelta2, err := fc.AddFeesFor(units)
 	r.NoError(err)
-	r.Equal(doubleUnits, fc.c.feeManager.GetCumulatedComplexity())
+	r.Equal(doubleUnits, fc.c.feeManager.GetGas())
 	r.Equal(feeDelta, feeDelta2)
 	r.Equal(feeDelta+feeDelta2, fc.c.fee)
 
 	feeDelta3, err := fc.RemoveFeesFor(units)
 	r.NoError(err)
-	r.Equal(units, fc.c.feeManager.GetCumulatedComplexity())
+	r.Equal(units, fc.c.feeManager.GetGas())
 	r.Equal(feeDelta, feeDelta3)
 	r.Equal(feeDelta, fc.c.fee)
 
 	feeDelta4, err := fc.RemoveFeesFor(units)
 	r.NoError(err)
-	r.Zero(fc.c.feeManager.GetCumulatedComplexity())
+	r.Zero(fc.c.feeManager.GetGas())
 	r.Equal(feeDelta, feeDelta4)
 	r.Zero(fc.c.fee)
 }
@@ -119,7 +110,7 @@ func TestTxFees(t *testing.T) {
 		name                string
 		chainTime           time.Time
 		unsignedAndSignedTx func(t *testing.T) (txs.UnsignedTx, *txs.Tx)
-		maxComplexityF      func() fees.Dimensions
+		maxGasF             func() fees.Gas
 		expectedError       error
 		checksF             func(*testing.T, *calculator)
 	}{
@@ -153,17 +144,15 @@ func TestTxFees(t *testing.T) {
 						172,
 						1000,
 					},
-					fc.feeManager.GetCumulatedComplexity(),
+					fc.feeManager.GetGas(),
 				)
 			},
 		},
 		{
 			name:      "AddSubnetValidatorTx post EUpgrade, utxos read cap breached",
 			chainTime: postEUpgradeTime,
-			maxComplexityF: func() fees.Dimensions {
-				caps := testBlockMaxComplexity
-				caps[fees.UTXORead] = 90 - 1
-				return caps
+			maxGasF: func() fees.Gas {
+				return testBlockMaxGas - 1
 			},
 			unsignedAndSignedTx: addSubnetValidatorTx,
 			expectedError:       errFailedComplexityCumulation,
@@ -207,7 +196,7 @@ func TestTxFees(t *testing.T) {
 						172,
 						1000,
 					},
-					fc.feeManager.GetCumulatedComplexity(),
+					fc.feeManager.GetGas(),
 				)
 			},
 		},
@@ -215,10 +204,8 @@ func TestTxFees(t *testing.T) {
 			name:                "CreateChainTx post EUpgrade, utxos read cap breached",
 			chainTime:           postEUpgradeTime,
 			unsignedAndSignedTx: createChainTx,
-			maxComplexityF: func() fees.Dimensions {
-				caps := testBlockMaxComplexity
-				caps[fees.UTXORead] = 90 - 1
-				return caps
+			maxGasF: func() fees.Gas {
+				return testBlockMaxGas - 1
 			},
 			expectedError: errFailedComplexityCumulation,
 			checksF:       func(*testing.T, *calculator) {},
@@ -253,7 +240,7 @@ func TestTxFees(t *testing.T) {
 						172,
 						1000,
 					},
-					fc.feeManager.GetCumulatedComplexity(),
+					fc.feeManager.GetGas(),
 				)
 			},
 		},
@@ -261,10 +248,8 @@ func TestTxFees(t *testing.T) {
 			name:                "CreateSubnetTx post EUpgrade, utxos read cap breached",
 			chainTime:           postEUpgradeTime,
 			unsignedAndSignedTx: createSubnetTx,
-			maxComplexityF: func() fees.Dimensions {
-				caps := testBlockMaxComplexity
-				caps[fees.UTXORead] = 90 - 1
-				return caps
+			maxGasF: func() fees.Gas {
+				return testBlockMaxGas - 1
 			},
 			expectedError: errFailedComplexityCumulation,
 			checksF:       func(*testing.T, *calculator) {},
@@ -291,17 +276,15 @@ func TestTxFees(t *testing.T) {
 						172,
 						1000,
 					},
-					fc.feeManager.GetCumulatedComplexity(),
+					fc.feeManager.GetGas(),
 				)
 			},
 		},
 		{
 			name:      "RemoveSubnetValidatorTx post EUpgrade, utxos read cap breached",
 			chainTime: postEUpgradeTime,
-			maxComplexityF: func() fees.Dimensions {
-				caps := testBlockMaxComplexity
-				caps[fees.UTXORead] = 90 - 1
-				return caps
+			maxGasF: func() fees.Gas {
+				return testBlockMaxGas - 1
 			},
 			unsignedAndSignedTx: removeSubnetValidatorTx,
 			expectedError:       errFailedComplexityCumulation,
@@ -329,17 +312,15 @@ func TestTxFees(t *testing.T) {
 						172,
 						1000,
 					},
-					fc.feeManager.GetCumulatedComplexity(),
+					fc.feeManager.GetGas(),
 				)
 			},
 		},
 		{
 			name:      "TransformSubnetTx post EUpgrade, utxos read cap breached",
 			chainTime: postEUpgradeTime,
-			maxComplexityF: func() fees.Dimensions {
-				caps := testBlockMaxComplexity
-				caps[fees.UTXORead] = 90 - 1
-				return caps
+			maxGasF: func() fees.Gas {
+				return testBlockMaxGas - 1
 			},
 			unsignedAndSignedTx: transformSubnetTx,
 			expectedError:       errFailedComplexityCumulation,
@@ -367,17 +348,15 @@ func TestTxFees(t *testing.T) {
 						172,
 						1000,
 					},
-					fc.feeManager.GetCumulatedComplexity(),
+					fc.feeManager.GetGas(),
 				)
 			},
 		},
 		{
 			name:      "TransferSubnetOwnershipTx post EUpgrade, utxos read cap breached",
 			chainTime: postEUpgradeTime,
-			maxComplexityF: func() fees.Dimensions {
-				caps := testBlockMaxComplexity
-				caps[fees.UTXORead] = 90 - 1
-				return caps
+			maxGasF: func() fees.Gas {
+				return testBlockMaxGas - 1
 			},
 			unsignedAndSignedTx: transferSubnetOwnershipTx,
 			expectedError:       errFailedComplexityCumulation,
@@ -421,7 +400,7 @@ func TestTxFees(t *testing.T) {
 						266,
 						1000,
 					},
-					fc.feeManager.GetCumulatedComplexity(),
+					fc.feeManager.GetGas(),
 				)
 			},
 		},
@@ -443,17 +422,15 @@ func TestTxFees(t *testing.T) {
 						266,
 						1000,
 					},
-					fc.feeManager.GetCumulatedComplexity(),
+					fc.feeManager.GetGas(),
 				)
 			},
 		},
 		{
 			name:      "AddPermissionlessValidatorTx post EUpgrade, utxos read cap breached",
 			chainTime: postEUpgradeTime,
-			maxComplexityF: func() fees.Dimensions {
-				caps := testBlockMaxComplexity
-				caps[fees.UTXORead] = 90 - 1
-				return caps
+			maxGasF: func() fees.Gas {
+				return testBlockMaxGas - 1
 			},
 			unsignedAndSignedTx: func(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
 				subnetID := ids.GenerateTestID()
@@ -500,7 +477,7 @@ func TestTxFees(t *testing.T) {
 						266,
 						1000,
 					},
-					fc.feeManager.GetCumulatedComplexity(),
+					fc.feeManager.GetGas(),
 				)
 			},
 		},
@@ -520,17 +497,15 @@ func TestTxFees(t *testing.T) {
 						266,
 						1000,
 					},
-					fc.feeManager.GetCumulatedComplexity(),
+					fc.feeManager.GetGas(),
 				)
 			},
 		},
 		{
 			name:      "AddPermissionlessDelegatorTx Subnet post EUpgrade, utxos read cap breached",
 			chainTime: postEUpgradeTime,
-			maxComplexityF: func() fees.Dimensions {
-				caps := testBlockMaxComplexity
-				caps[fees.UTXORead] = 90 - 1
-				return caps
+			maxGasF: func() fees.Gas {
+				return testBlockMaxGas - 1
 			},
 			unsignedAndSignedTx: func(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
 				subnetID := ids.GenerateTestID()
@@ -562,17 +537,15 @@ func TestTxFees(t *testing.T) {
 						172,
 						1000,
 					},
-					fc.feeManager.GetCumulatedComplexity(),
+					fc.feeManager.GetGas(),
 				)
 			},
 		},
 		{
 			name:      "BaseTx post EUpgrade, utxos read cap breached",
 			chainTime: postEUpgradeTime,
-			maxComplexityF: func() fees.Dimensions {
-				caps := testBlockMaxComplexity
-				caps[fees.UTXORead] = 90 - 1
-				return caps
+			maxGasF: func() fees.Gas {
+				return testBlockMaxGas - 1
 			},
 			unsignedAndSignedTx: baseTx,
 			expectedError:       errFailedComplexityCumulation,
@@ -600,17 +573,15 @@ func TestTxFees(t *testing.T) {
 						262,
 						2000,
 					},
-					fc.feeManager.GetCumulatedComplexity(),
+					fc.feeManager.GetGas(),
 				)
 			},
 		},
 		{
 			name:      "ImportTx post EUpgrade, utxos read cap breached",
 			chainTime: postEUpgradeTime,
-			maxComplexityF: func() fees.Dimensions {
-				caps := testBlockMaxComplexity
-				caps[fees.UTXORead] = 180 - 1
-				return caps
+			maxGasF: func() fees.Gas {
+				return testBlockMaxGas - 1
 			},
 			unsignedAndSignedTx: importTx,
 			expectedError:       errFailedComplexityCumulation,
@@ -638,17 +609,15 @@ func TestTxFees(t *testing.T) {
 						266,
 						1000,
 					},
-					fc.feeManager.GetCumulatedComplexity(),
+					fc.feeManager.GetGas(),
 				)
 			},
 		},
 		{
 			name:      "ExportTx post EUpgrade, utxos read cap breached",
 			chainTime: postEUpgradeTime,
-			maxComplexityF: func() fees.Dimensions {
-				caps := testBlockMaxComplexity
-				caps[fees.UTXORead] = 90 - 1
-				return caps
+			maxGasF: func() fees.Gas {
+				return testBlockMaxGas - 1
 			},
 			unsignedAndSignedTx: exportTx,
 			expectedError:       errFailedComplexityCumulation,
@@ -682,9 +651,9 @@ func TestTxFees(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			maxComplexity := testBlockMaxComplexity
-			if tt.maxComplexityF != nil {
-				maxComplexity = tt.maxComplexityF()
+			maxComplexity := testBlockMaxGas
+			if tt.maxGasF != nil {
+				maxComplexity = tt.maxGasF()
 			}
 
 			uTx, sTx := tt.unsignedAndSignedTx(t)
@@ -693,7 +662,7 @@ func TestTxFees(t *testing.T) {
 			if !upgrades.IsEActivated(tt.chainTime) {
 				fc = NewStaticCalculator(feeTestsDefaultCfg, upgrades, tt.chainTime)
 			} else {
-				fc = NewDynamicCalculator(fees.NewManager(testFeeRates), maxComplexity)
+				fc = NewDynamicCalculator(fees.NewManager(testGasPrice), maxComplexity)
 			}
 
 			var creds []verify.Verifiable

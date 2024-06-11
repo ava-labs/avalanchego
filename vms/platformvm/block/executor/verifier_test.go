@@ -512,9 +512,9 @@ func TestStandardBlockComplexity(t *testing.T) {
 				require.True(found)
 
 				if dynamicFeesActive {
-					require.NotEqual(commonfees.Empty, blkState.blockComplexity)
+					require.NotEqual(commonfees.Empty, blkState.blockGas)
 				} else {
-					require.Equal(commonfees.Empty, blkState.blockComplexity)
+					require.Equal(commonfees.Empty, blkState.blockGas)
 				}
 			})
 		}

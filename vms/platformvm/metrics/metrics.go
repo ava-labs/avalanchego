@@ -42,7 +42,7 @@ type Metrics interface {
 	SetTimeUntilSubnetUnstake(subnetID ids.ID, timeUntilUnstake time.Duration)
 
 	// Mark cumulated complexity of the latest accepted block
-	SetBlockComplexity(commonfees.Dimensions)
+	SetBlockGas(commonfees.Gas)
 }
 
 func New(registerer prometheus.Registerer) (Metrics, error) {
@@ -85,21 +85,9 @@ func New(registerer prometheus.Registerer) (Metrics, error) {
 			Name: "validator_sets_duration_sum",
 			Help: "Total amount of time generating validator sets in nanoseconds",
 		}),
-		blockBandwitdhComplexity: prometheus.NewGauge(prometheus.GaugeOpts{
-			Name: "block_bandwidth_complexity",
-			Help: "Cumulated bandwidth complexity over last accepted block",
-		}),
-		blockUTXOsReadComplexity: prometheus.NewGauge(prometheus.GaugeOpts{
-			Name: "block_utxos_read_complexity",
-			Help: "Cumulated utxos read complexity over last accepted block",
-		}),
-		blockUTXOsWriteComplexity: prometheus.NewGauge(prometheus.GaugeOpts{
-			Name: "block_utxos_write_complexity",
-			Help: "Cumulated utxos write complexity over last accepted block",
-		}),
-		blockComputeComplexity: prometheus.NewGauge(prometheus.GaugeOpts{
-			Name: "block_compute_complexity",
-			Help: "Cumulated compute complexity over last accepted block",
+		blockGas: prometheus.NewGauge(prometheus.GaugeOpts{
+			Name: "block_gas",
+			Help: "Cumulated gas over last accepted block",
 		}),
 	}
 
@@ -117,10 +105,7 @@ func New(registerer prometheus.Registerer) (Metrics, error) {
 		registerer.Register(m.validatorSetsCached),
 		registerer.Register(m.validatorSetsHeightDiff),
 		registerer.Register(m.validatorSetsDuration),
-		registerer.Register(m.blockBandwitdhComplexity),
-		registerer.Register(m.blockUTXOsReadComplexity),
-		registerer.Register(m.blockUTXOsWriteComplexity),
-		registerer.Register(m.blockComputeComplexity),
+		registerer.Register(m.blockGas),
 	)
 
 	return m, errs.Err
@@ -141,10 +126,7 @@ type metrics struct {
 	validatorSetsHeightDiff prometheus.Gauge
 	validatorSetsDuration   prometheus.Gauge
 
-	blockBandwitdhComplexity  prometheus.Gauge
-	blockUTXOsReadComplexity  prometheus.Gauge
-	blockUTXOsWriteComplexity prometheus.Gauge
-	blockComputeComplexity    prometheus.Gauge
+	blockGas prometheus.Gauge
 }
 
 func (m *metrics) MarkAccepted(b block.Block) error {
@@ -183,9 +165,6 @@ func (m *metrics) SetTimeUntilSubnetUnstake(subnetID ids.ID, timeUntilUnstake ti
 	m.timeUntilSubnetUnstake.WithLabelValues(subnetID.String()).Set(float64(timeUntilUnstake))
 }
 
-func (m *metrics) SetBlockComplexity(units commonfees.Dimensions) {
-	m.blockBandwitdhComplexity.Set(float64(units[commonfees.Bandwidth]))
-	m.blockUTXOsReadComplexity.Set(float64(units[commonfees.UTXORead]))
-	m.blockUTXOsWriteComplexity.Set(float64(units[commonfees.UTXOWrite]))
-	m.blockComputeComplexity.Set(float64(units[commonfees.Compute]))
+func (m *metrics) SetBlockGas(g commonfees.Gas) {
+	m.blockGas.Set(float64(g))
 }

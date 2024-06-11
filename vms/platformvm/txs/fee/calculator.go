@@ -39,13 +39,13 @@ func NewStaticCalculator(config StaticConfig, upgradeTimes upgrade.Config, chain
 // NewDynamicCalculator must be used post E upgrade activation
 func NewDynamicCalculator(
 	feeManager *fees.Manager,
-	blockMaxComplexity fees.Dimensions,
+	maxGas fees.Gas,
 ) *Calculator {
 	return &Calculator{
 		c: &calculator{
-			isEActive:          true,
-			feeManager:         feeManager,
-			blockMaxComplexity: blockMaxComplexity,
+			isEActive:  true,
+			feeManager: feeManager,
+			maxGas:     maxGas,
 			// credentials are set when CalculateFee is called
 		},
 	}
@@ -78,11 +78,11 @@ func (c *Calculator) RemoveFeesFor(unitsToRm fees.Dimensions) (uint64, error) {
 	return c.c.removeFeesFor(unitsToRm)
 }
 
-func (c *Calculator) GetCumulatedComplexity() fees.Dimensions {
+func (c *Calculator) GetGas() fees.Gas {
 	if c.c.feeManager != nil {
-		return c.c.feeManager.GetCumulatedComplexity()
+		return c.c.feeManager.GetGas()
 	}
-	return fees.Empty
+	return 0
 }
 
 type calculator struct {
@@ -95,9 +95,9 @@ type calculator struct {
 	time     time.Time
 
 	// Post E-upgrade inputs
-	feeManager         *fees.Manager
-	blockMaxComplexity fees.Dimensions
-	credentials        []verify.Verifiable
+	feeManager  *fees.Manager
+	maxGas      fees.Gas
+	credentials []verify.Verifiable
 
 	// outputs of visitor execution
 	fee uint64
@@ -392,12 +392,19 @@ func (c *calculator) addFeesFor(complexity fees.Dimensions) (uint64, error) {
 		return 0, nil
 	}
 
-	boundBreached, dimension := c.feeManager.CumulateComplexity(complexity, c.blockMaxComplexity)
-	if boundBreached {
-		return 0, fmt.Errorf("%w: breached dimension %d", errFailedComplexityCumulation, dimension)
+	feeCfg, err := GetDynamicConfig(c.isEActive)
+	if err != nil {
+		return 0, fmt.Errorf("failed adding fees: %w", err)
+	}
+	txGas, err := fees.ScalarProd(complexity, feeCfg.FeeDimensionWeights)
+	if err != nil {
+		return 0, fmt.Errorf("failed adding fees: %w", err)
 	}
 
-	fee, err := c.feeManager.CalculateFee(complexity)
+	if err := c.feeManager.CumulateComplexity(txGas, c.maxGas); err != nil {
+		return 0, fmt.Errorf("failed cumulating complexity: %w", err)
+	}
+	fee, err := c.feeManager.CalculateFee(txGas)
 	if err != nil {
 		return 0, fmt.Errorf("%w: %w", errFailedFeeCalculation, err)
 	}
@@ -411,11 +418,19 @@ func (c *calculator) removeFeesFor(unitsToRm fees.Dimensions) (uint64, error) {
 		return 0, nil
 	}
 
-	if err := c.feeManager.RemoveComplexity(unitsToRm); err != nil {
-		return 0, fmt.Errorf("failed removing units: %w", err)
+	feeCfg, err := GetDynamicConfig(c.isEActive)
+	if err != nil {
+		return 0, fmt.Errorf("failed adding fees: %w", err)
+	}
+	txGas, err := fees.ScalarProd(unitsToRm, feeCfg.FeeDimensionWeights)
+	if err != nil {
+		return 0, fmt.Errorf("failed adding fees: %w", err)
 	}
 
-	fee, err := c.feeManager.CalculateFee(unitsToRm)
+	if err := c.feeManager.RemoveComplexity(txGas); err != nil {
+		return 0, fmt.Errorf("failed removing units: %w", err)
+	}
+	fee, err := c.feeManager.CalculateFee(txGas)
 	if err != nil {
 		return 0, fmt.Errorf("%w: %w", errFailedFeeCalculation, err)
 	}

@@ -4,12 +4,11 @@
 package fees
 
 type DynamicFeesConfig struct {
-	// FeeRate contains, per each fee dimension, the fee rate,
-	// i.e. the fee per unit of complexity. Fee rates are
-	// valid as soon as fork introducing dynamic fees activates.
-	FeeRate Dimensions `json:"fee-rate"`
+	GasPrice GasPrice `json:"gas-price"`
 
-	// BlockMaxComplexity contains, per each fee dimension, the
-	// maximal complexity a valid block can host.
-	BlockMaxComplexity Dimensions `json:"block-max-complexity"`
+	// weights to merge fees dimensions complexities into a single gas value
+	FeeDimensionWeights Dimensions `json:"fee-dimension-weights"`
+
+	// TODO ABENEGIA: replace with leaky bucket implementation
+	TempBlockMaxGas Gas
 }
