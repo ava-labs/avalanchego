@@ -22,15 +22,6 @@ var terminationConditions = []terminationCondition{
 	},
 }
 
-func newSingleTerminationCondition(alphaConfidence int, beta int) []terminationCondition {
-	return []terminationCondition{
-		{
-			alphaConfidence: alphaConfidence,
-			beta:            beta,
-		},
-	}
-}
-
 type snowflakeTestConstructor[T comparable] func(t *testing.T, alphaPreference int, terminationConditions []terminationCondition) snowflakeTest[T]
 
 type snowflakeTest[T comparable] interface {
