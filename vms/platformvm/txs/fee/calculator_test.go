@@ -693,7 +693,7 @@ func TestTxFees(t *testing.T) {
 			if !upgrades.IsEActivated(tt.chainTime) {
 				fc = NewStaticCalculator(feeTestsDefaultCfg, upgrades, tt.chainTime)
 			} else {
-				fc = NewDynamicCalculator(feeTestsDefaultCfg, fees.NewManager(testFeeRates), maxComplexity)
+				fc = NewDynamicCalculator(fees.NewManager(testFeeRates), maxComplexity)
 			}
 
 			var creds []verify.Verifiable

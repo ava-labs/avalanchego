@@ -76,8 +76,8 @@ var (
 	}
 )
 
-func defaultService(t *testing.T) (*Service, *mutableSharedMemory, *txstest.WalletFactory) {
-	vm, factory, _, mutableSharedMemory := defaultVM(t, latestFork)
+func defaultService(t *testing.T, f fork) (*Service, *mutableSharedMemory, *txstest.WalletFactory) {
+	vm, factory, _, mutableSharedMemory := defaultVM(t, f)
 
 	return &Service{
 		vm:          vm,
@@ -91,7 +91,7 @@ func defaultService(t *testing.T) (*Service, *mutableSharedMemory, *txstest.Wall
 func TestExportKey(t *testing.T) {
 	require := require.New(t)
 
-	service, _, _ := defaultService(t)
+	service, _, _ := defaultService(t, latestFork)
 	service.vm.ctx.Lock.Lock()
 
 	ks := keystore.New(logging.NoLog{}, memdb.New())
@@ -121,7 +121,7 @@ func TestExportKey(t *testing.T) {
 // Test issuing a tx and accepted
 func TestGetTxStatus(t *testing.T) {
 	require := require.New(t)
-	service, mutableSharedMemory, factory := defaultService(t)
+	service, mutableSharedMemory, factory := defaultService(t, latestFork)
 	service.vm.ctx.Lock.Lock()
 
 	recipientKey, err := secp256k1.NewPrivateKey()
@@ -314,7 +314,7 @@ func TestGetTx(t *testing.T) {
 			)
 			t.Run(testName, func(t *testing.T) {
 				require := require.New(t)
-				service, _, txBuilder := defaultService(t)
+				service, _, txBuilder := defaultService(t, latestFork)
 				service.vm.ctx.Lock.Lock()
 
 				tx, err := test.createTx(service, txBuilder)
@@ -378,7 +378,7 @@ func TestGetTx(t *testing.T) {
 
 func TestGetBalance(t *testing.T) {
 	require := require.New(t)
-	service, _, _ := defaultService(t)
+	service, _, _ := defaultService(t, latestFork)
 
 	// Ensure GetStake is correct for each of the genesis validators
 	genesis, _ := defaultGenesis(t, service.vm.ctx.AVAXAssetID)
@@ -409,7 +409,7 @@ func TestGetBalance(t *testing.T) {
 
 func TestGetStake(t *testing.T) {
 	require := require.New(t)
-	service, _, factory := defaultService(t)
+	service, _, factory := defaultService(t, durango)
 
 	// Ensure GetStake is correct for each of the genesis validators
 	genesis, _ := defaultGenesis(t, service.vm.ctx.AVAXAssetID)
@@ -600,7 +600,7 @@ func TestGetStake(t *testing.T) {
 
 func TestGetCurrentValidators(t *testing.T) {
 	require := require.New(t)
-	service, _, factory := defaultService(t)
+	service, _, factory := defaultService(t, durango)
 
 	genesis, _ := defaultGenesis(t, service.vm.ctx.AVAXAssetID)
 
@@ -736,7 +736,7 @@ func TestGetCurrentValidators(t *testing.T) {
 
 func TestGetTimestamp(t *testing.T) {
 	require := require.New(t)
-	service, _, _ := defaultService(t)
+	service, _, _ := defaultService(t, latestFork)
 
 	reply := GetTimestampReply{}
 	require.NoError(service.GetTimestamp(nil, nil, &reply))
@@ -772,7 +772,7 @@ func TestGetBlock(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
-			service, _, factory := defaultService(t)
+			service, _, factory := defaultService(t, latestFork)
 			service.vm.ctx.Lock.Lock()
 
 			service.vm.StaticFeeConfig.CreateAssetTxFee = 100 * defaultTxFee
@@ -1065,7 +1065,7 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 
 func TestServiceGetSubnets(t *testing.T) {
 	require := require.New(t)
-	service, _, _ := defaultService(t)
+	service, _, _ := defaultService(t, latestFork)
 
 	testSubnet1ID := testSubnet1.ID()
 

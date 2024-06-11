@@ -38,14 +38,12 @@ func NewStaticCalculator(config StaticConfig, upgradeTimes upgrade.Config, chain
 
 // NewDynamicCalculator must be used post E upgrade activation
 func NewDynamicCalculator(
-	cfg StaticConfig,
 	feeManager *fees.Manager,
 	blockMaxComplexity fees.Dimensions,
 ) *Calculator {
 	return &Calculator{
 		c: &calculator{
 			isEActive:          true,
-			staticCfg:          cfg,
 			feeManager:         feeManager,
 			blockMaxComplexity: blockMaxComplexity,
 			// credentials are set when CalculateFee is called
@@ -106,10 +104,12 @@ type calculator struct {
 }
 
 func (c *calculator) AddValidatorTx(*txs.AddValidatorTx) error {
-	// AddValidatorTx is banned following Durango activation, so we
-	// only return the pre EUpgrade fee here
-	c.fee = c.staticCfg.AddPrimaryNetworkValidatorFee
-	return nil
+	// AddValidatorTx is banned following Durango activation
+	if !c.isEActive {
+		c.fee = c.staticCfg.AddPrimaryNetworkValidatorFee
+		return nil
+	}
+	return errFailedFeeCalculation
 }
 
 func (c *calculator) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
@@ -128,10 +128,12 @@ func (c *calculator) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
 }
 
 func (c *calculator) AddDelegatorTx(*txs.AddDelegatorTx) error {
-	// AddValidatorTx is banned following Durango activation, so we
-	// only return the pre EUpgrade fee here
-	c.fee = c.staticCfg.AddPrimaryNetworkDelegatorFee
-	return nil
+	// AddDelegatorTx is banned following Durango activation
+	if !c.isEActive {
+		c.fee = c.staticCfg.AddPrimaryNetworkDelegatorFee
+		return nil
+	}
+	return errFailedFeeCalculation
 }
 
 func (c *calculator) CreateChainTx(tx *txs.CreateChainTx) error {

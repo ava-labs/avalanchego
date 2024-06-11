@@ -109,16 +109,15 @@ func (c *Config) CreateChain(chainID ids.ID, tx *txs.CreateChainTx) {
 func PickFeeCalculator(cfg *Config, time time.Time) *fee.Calculator {
 	var (
 		isEActive     = cfg.UpgradeConfig.IsEActivated(time)
-		staticFeeCfg  = cfg.StaticFeeConfig
 		feeCalculator *fee.Calculator
 	)
 
 	if !isEActive {
-		feeCalculator = fee.NewStaticCalculator(staticFeeCfg, cfg.UpgradeConfig, time)
+		feeCalculator = fee.NewStaticCalculator(cfg.StaticFeeConfig, cfg.UpgradeConfig, time)
 	} else {
 		feesCfg := fee.GetDynamicConfig(isEActive)
 		feesMan := commonfees.NewManager(feesCfg.FeeRate)
-		feeCalculator = fee.NewDynamicCalculator(staticFeeCfg, feesMan, feesCfg.BlockMaxComplexity)
+		feeCalculator = fee.NewDynamicCalculator(feesMan, feesCfg.BlockMaxComplexity)
 	}
 	return feeCalculator
 }
