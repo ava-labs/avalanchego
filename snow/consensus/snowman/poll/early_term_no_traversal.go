@@ -23,12 +23,6 @@ var (
 	earlyFailReason      = "early_fail"
 	earlyAlphaPrefReason = "early_alpha_pref"
 	earlyAlphaConfReason = "early_alpha_conf"
-	earlyTermCaseLabels  = []string{
-		exhaustedReason,
-		earlyFailReason,
-		earlyAlphaPrefReason,
-		earlyAlphaConfReason,
-	}
 
 	exhaustedLabel = prometheus.Labels{
 		terminationReason: exhaustedReason,
