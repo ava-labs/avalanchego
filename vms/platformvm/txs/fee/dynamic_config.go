@@ -4,6 +4,7 @@
 package fee
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/snow"
@@ -13,8 +14,9 @@ import (
 	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
-// eUpgradeDynamicFeesConfig to be tuned TODO ABENEGIA
 var (
+	errDynamicFeeConfigNotAvailable = errors.New("dynamic fee config not available")
+
 	eUpgradeDynamicFeesConfig = commonfees.DynamicFeesConfig{
 		FeeRate: commonfees.Dimensions{
 			1 * units.NanoAvax,
@@ -26,23 +28,18 @@ var (
 		BlockMaxComplexity: commonfees.Max,
 	}
 
-	preEUpgradeDynamicFeesConfig = commonfees.DynamicFeesConfig{
-		FeeRate:            commonfees.Empty,
-		BlockMaxComplexity: commonfees.Max,
-	}
-
 	customDynamicFeesConfig *commonfees.DynamicFeesConfig
 )
 
-func GetDynamicConfig(isEActive bool) commonfees.DynamicFeesConfig {
+func GetDynamicConfig(isEActive bool) (commonfees.DynamicFeesConfig, error) {
 	if !isEActive {
-		return preEUpgradeDynamicFeesConfig
+		return commonfees.DynamicFeesConfig{}, errDynamicFeeConfigNotAvailable
 	}
 
 	if customDynamicFeesConfig != nil {
-		return *customDynamicFeesConfig
+		return *customDynamicFeesConfig, nil
 	}
-	return eUpgradeDynamicFeesConfig
+	return eUpgradeDynamicFeesConfig, nil
 }
 
 func ResetDynamicConfig(ctx *snow.Context, customFeesConfig *commonfees.DynamicFeesConfig) error {
