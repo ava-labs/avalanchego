@@ -62,14 +62,14 @@ func newEarlyTermNoTraversalMetrics(reg prometheus.Registerer) (*earlyTermNoTrav
 	pollCountVec := prometheus.NewCounterVec(prometheus.CounterOpts{
 		Name: "poll_count",
 		Help: "Total # of terminated polls by reason",
-	}, earlyTermCaseLabels)
+	}, []string{terminationReason})
 	if err := reg.Register(pollCountVec); err != nil {
 		return nil, fmt.Errorf("%w: %w", errPollCountVectorMetrics, err)
 	}
 	durPollsVec := prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Name: "poll_duration",
 		Help: "time (in ns) polls took to complete by reason",
-	}, earlyTermCaseLabels)
+	}, []string{terminationReason})
 	if err := reg.Register(durPollsVec); err != nil {
 		return nil, fmt.Errorf("%w: %w", errPollDurationVectorMetrics, err)
 	}
