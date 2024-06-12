@@ -23,9 +23,7 @@ import (
 	ginkgo "github.com/onsi/ginkgo/v2"
 )
 
-const (
-	pollingInterval = 50 * time.Millisecond
-)
+const pollingInterval = 50 * time.Millisecond
 
 var (
 	subnetAName = "xsvm-a"
