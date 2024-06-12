@@ -45,7 +45,7 @@ func (m *Manager) CalculateFee(g Gas) (uint64, error) {
 // If so, it returns the first dimension to breach bounds.
 func (m *Manager) CumulateComplexity(gas, bound Gas) error {
 	// Ensure we can consume (don't want partial update of values)
-	consumed, err := safemath.Add64(uint64(m.gasPrice), uint64(gas))
+	consumed, err := safemath.Add64(uint64(m.cumulatedGas), uint64(gas))
 	if err != nil {
 		return fmt.Errorf("%w: %w", errGasBoundBreached, err)
 	}

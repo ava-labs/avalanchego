@@ -108,7 +108,7 @@ func TestBaseTx(t *testing.T) {
 		fc := fee.NewDynamicCalculator(commonfees.NewManager(testGasPrice), testBlockMaxGas)
 		fee, err := fc.ComputeFee(utx, tx.Creds)
 		require.NoError(err)
-		require.Equal(9930*units.MicroAvax, fee)
+		require.Equal(30_620*units.MicroAvax, fee)
 
 		// check UTXOs selection and fee financing
 		ins := utx.Ins
@@ -209,7 +209,7 @@ func TestAddSubnetValidatorTx(t *testing.T) {
 		fc := fee.NewDynamicCalculator(commonfees.NewManager(testGasPrice), testBlockMaxGas)
 		fee, err := fc.ComputeFee(utx, tx.Creds)
 		require.NoError(err)
-		require.Equal(9765*units.MicroAvax, fee)
+		require.Equal(30_610*units.MicroAvax, fee)
 
 		// check UTXOs selection and fee financing
 		ins := utx.Ins
@@ -301,7 +301,7 @@ func TestRemoveSubnetValidatorTx(t *testing.T) {
 		fc := fee.NewDynamicCalculator(commonfees.NewManager(testGasPrice), testBlockMaxGas)
 		fee, err := fc.ComputeFee(utx, tx.Creds)
 		require.NoError(err)
-		require.Equal(9741*units.MicroAvax, fee)
+		require.Equal(30_370*units.MicroAvax, fee)
 
 		// check UTXOs selection and fee financing
 		ins := utx.Ins
@@ -406,7 +406,7 @@ func TestCreateChainTx(t *testing.T) {
 		fc := fee.NewDynamicCalculator(commonfees.NewManager(testGasPrice), testBlockMaxGas)
 		fee, err := fc.ComputeFee(utx, tx.Creds)
 		require.NoError(err)
-		require.Equal(9808*units.MicroAvax, fee)
+		require.Equal(31_040*units.MicroAvax, fee)
 
 		// check UTXOs selection and fee financing
 		ins := utx.Ins
@@ -504,7 +504,7 @@ func TestCreateSubnetTx(t *testing.T) {
 		fc := fee.NewDynamicCalculator(commonfees.NewManager(testGasPrice), testBlockMaxGas)
 		fee, err := fc.ComputeFee(utx, tx.Creds)
 		require.NoError(err)
-		require.Equal(9644*units.MicroAvax, fee)
+		require.Equal(29_400*units.MicroAvax, fee)
 
 		// check UTXOs selection and fee financing
 		ins := utx.Ins
@@ -599,7 +599,7 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 		fc := fee.NewDynamicCalculator(commonfees.NewManager(testGasPrice), testBlockMaxGas)
 		fee, err := fc.ComputeFee(utx, tx.Creds)
 		require.NoError(err)
-		require.Equal(9761*units.MicroAvax, fee)
+		require.Equal(30_570*units.MicroAvax, fee)
 
 		// check UTXOs selection and fee financing
 		ins := utx.Ins
@@ -689,7 +689,7 @@ func TestImportTx(t *testing.T) {
 		fc := fee.NewDynamicCalculator(commonfees.NewManager(testGasPrice), testBlockMaxGas)
 		fee, err := fc.ComputeFee(utx, tx.Creds)
 		require.NoError(err)
-		require.Equal(14251*units.MicroAvax, fee)
+		require.Equal(42_770*units.MicroAvax, fee)
 
 		// check UTXOs selection and fee financing
 		ins := utx.Ins
@@ -779,7 +779,7 @@ func TestExportTx(t *testing.T) {
 		fc := fee.NewDynamicCalculator(commonfees.NewManager(testGasPrice), testBlockMaxGas)
 		fee, err := fc.ComputeFee(utx, tx.Creds)
 		require.NoError(err)
-		require.Equal(9966*units.MicroAvax, fee)
+		require.Equal(30_980*units.MicroAvax, fee)
 
 		// check UTXOs selection and fee financing
 		ins := utx.Ins
@@ -893,7 +893,7 @@ func TestTransformSubnetTx(t *testing.T) {
 		fc := fee.NewDynamicCalculator(commonfees.NewManager(testGasPrice), testBlockMaxGas)
 		fee, err := fc.ComputeFee(utx, tx.Creds)
 		require.NoError(err)
-		require.Equal(14763*units.MicroAvax, fee)
+		require.Equal(46_250*units.MicroAvax, fee)
 
 		// check UTXOs selection and fee financing
 		ins := utx.Ins
@@ -1014,7 +1014,7 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 		fc := fee.NewDynamicCalculator(commonfees.NewManager(testGasPrice), testBlockMaxGas)
 		fee, err := fc.ComputeFee(utx, tx.Creds)
 		require.NoError(err)
-		require.Equal(20404*units.MicroAvax, fee)
+		require.Equal(65_240*units.MicroAvax, fee)
 
 		// check UTXOs selection and fee financing
 		ins := utx.Ins
@@ -1130,7 +1130,7 @@ func TestAddPermissionlessDelegatorTx(t *testing.T) {
 		fc := fee.NewDynamicCalculator(commonfees.NewManager(testGasPrice), testBlockMaxGas)
 		fee, err := fc.ComputeFee(utx, tx.Creds)
 		require.NoError(err)
-		require.Equal(20212*units.MicroAvax, fee)
+		require.Equal(63_320*units.MicroAvax, fee)
 
 		// check UTXOs selection and fee financing
 		ins := utx.Ins

@@ -49,25 +49,26 @@ func TestAddAndRemoveFees(t *testing.T) {
 	}
 
 	var (
-		units       = fees.Dimensions{1, 2, 3, 4}
-		doubleUnits = fees.Dimensions{2, 4, 6, 8}
+		units     = fees.Dimensions{1, 2, 3, 4}
+		gas       = fees.Gas(10)
+		doubleGas = fees.Gas(20)
 	)
 
 	feeDelta, err := fc.AddFeesFor(units)
 	r.NoError(err)
-	r.Equal(units, fc.c.feeManager.GetGas())
+	r.Equal(gas, fc.c.feeManager.GetGas())
 	r.NotZero(feeDelta)
 	r.Equal(feeDelta, fc.c.fee)
 
 	feeDelta2, err := fc.AddFeesFor(units)
 	r.NoError(err)
-	r.Equal(doubleUnits, fc.c.feeManager.GetGas())
+	r.Equal(doubleGas, fc.c.feeManager.GetGas())
 	r.Equal(feeDelta, feeDelta2)
 	r.Equal(feeDelta+feeDelta2, fc.c.fee)
 
 	feeDelta3, err := fc.RemoveFeesFor(units)
 	r.NoError(err)
-	r.Equal(units, fc.c.feeManager.GetGas())
+	r.Equal(gas, fc.c.feeManager.GetGas())
 	r.Equal(feeDelta, feeDelta3)
 	r.Equal(feeDelta, fc.c.fee)
 
@@ -136,16 +137,8 @@ func TestTxFees(t *testing.T) {
 			expectedError:       nil,
 			unsignedAndSignedTx: addSubnetValidatorTx,
 			checksF: func(t *testing.T, fc *calculator) {
-				require.Equal(t, 5345*units.MicroAvax, fc.fee)
-				require.Equal(t,
-					fees.Dimensions{
-						649,
-						90,
-						172,
-						1000,
-					},
-					fc.feeManager.GetGas(),
-				)
+				require.Equal(t, 19_110*units.NanoAvax, fc.fee)
+				require.Equal(t, fees.Gas(1911), fc.feeManager.GetGas())
 			},
 		},
 		{
@@ -188,16 +181,8 @@ func TestTxFees(t *testing.T) {
 			unsignedAndSignedTx: createChainTx,
 			expectedError:       nil,
 			checksF: func(t *testing.T, fc *calculator) {
-				require.Equal(t, 5388*units.MicroAvax, fc.fee)
-				require.Equal(t,
-					fees.Dimensions{
-						692,
-						90,
-						172,
-						1000,
-					},
-					fc.feeManager.GetGas(),
-				)
+				require.Equal(t, 19_540*units.NanoAvax, fc.fee)
+				require.Equal(t, fees.Gas(1_954), fc.feeManager.GetGas())
 			},
 		},
 		{
@@ -232,16 +217,8 @@ func TestTxFees(t *testing.T) {
 			unsignedAndSignedTx: createSubnetTx,
 			expectedError:       nil,
 			checksF: func(t *testing.T, fc *calculator) {
-				require.Equal(t, 5293*units.MicroAvax, fc.fee)
-				require.Equal(t,
-					fees.Dimensions{
-						597,
-						90,
-						172,
-						1000,
-					},
-					fc.feeManager.GetGas(),
-				)
+				require.Equal(t, 18_590*units.NanoAvax, fc.fee)
+				require.Equal(t, fees.Gas(1_859), fc.feeManager.GetGas())
 			},
 		},
 		{
@@ -268,16 +245,8 @@ func TestTxFees(t *testing.T) {
 			unsignedAndSignedTx: removeSubnetValidatorTx,
 			expectedError:       nil,
 			checksF: func(t *testing.T, fc *calculator) {
-				require.Equal(t, 5321*units.MicroAvax, fc.fee)
-				require.Equal(t,
-					fees.Dimensions{
-						625,
-						90,
-						172,
-						1000,
-					},
-					fc.feeManager.GetGas(),
-				)
+				require.Equal(t, 18_870*units.NanoAvax, fc.fee)
+				require.Equal(t, fees.Gas(1_887), fc.feeManager.GetGas())
 			},
 		},
 		{
@@ -304,16 +273,8 @@ func TestTxFees(t *testing.T) {
 			unsignedAndSignedTx: transformSubnetTx,
 			expectedError:       nil,
 			checksF: func(t *testing.T, fc *calculator) {
-				require.Equal(t, 5406*units.MicroAvax, fc.fee)
-				require.Equal(t,
-					fees.Dimensions{
-						710,
-						90,
-						172,
-						1000,
-					},
-					fc.feeManager.GetGas(),
-				)
+				require.Equal(t, 19_720*units.NanoAvax, fc.fee)
+				require.Equal(t, fees.Gas(1_972), fc.feeManager.GetGas())
 			},
 		},
 		{
@@ -340,16 +301,8 @@ func TestTxFees(t *testing.T) {
 			unsignedAndSignedTx: transferSubnetOwnershipTx,
 			expectedError:       nil,
 			checksF: func(t *testing.T, fc *calculator) {
-				require.Equal(t, 5337*units.MicroAvax, fc.fee)
-				require.Equal(t,
-					fees.Dimensions{
-						641,
-						90,
-						172,
-						1000,
-					},
-					fc.feeManager.GetGas(),
-				)
+				require.Equal(t, 19_030*units.NanoAvax, fc.fee)
+				require.Equal(t, fees.Gas(1_903), fc.feeManager.GetGas())
 			},
 		},
 		{
@@ -392,16 +345,8 @@ func TestTxFees(t *testing.T) {
 			},
 			expectedError: nil,
 			checksF: func(t *testing.T, fc *calculator) {
-				require.Equal(t, 5939*units.MicroAvax, fc.fee)
-				require.Equal(t,
-					fees.Dimensions{
-						961,
-						90,
-						266,
-						1000,
-					},
-					fc.feeManager.GetGas(),
-				)
+				require.Equal(t, 23_170*units.NanoAvax, fc.fee)
+				require.Equal(t, fees.Gas(2_317), fc.feeManager.GetGas())
 			},
 		},
 		{
@@ -414,16 +359,8 @@ func TestTxFees(t *testing.T) {
 			},
 			expectedError: nil,
 			checksF: func(t *testing.T, fc *calculator) {
-				require.Equal(t, 5939*units.MicroAvax, fc.fee)
-				require.Equal(t,
-					fees.Dimensions{
-						961,
-						90,
-						266,
-						1000,
-					},
-					fc.feeManager.GetGas(),
-				)
+				require.Equal(t, 23_170*units.NanoAvax, fc.fee)
+				require.Equal(t, fees.Gas(2_317), fc.feeManager.GetGas())
 			},
 		},
 		{
@@ -469,16 +406,8 @@ func TestTxFees(t *testing.T) {
 			},
 			expectedError: nil,
 			checksF: func(t *testing.T, fc *calculator) {
-				require.Equal(t, 5747*units.MicroAvax, fc.fee)
-				require.Equal(t,
-					fees.Dimensions{
-						769,
-						90,
-						266,
-						1000,
-					},
-					fc.feeManager.GetGas(),
-				)
+				require.Equal(t, 21_250*units.NanoAvax, fc.fee)
+				require.Equal(t, fees.Gas(2_125), fc.feeManager.GetGas())
 			},
 		},
 		{
@@ -489,16 +418,8 @@ func TestTxFees(t *testing.T) {
 			},
 			expectedError: nil,
 			checksF: func(t *testing.T, fc *calculator) {
-				require.Equal(t, 5747*units.MicroAvax, fc.fee)
-				require.Equal(t,
-					fees.Dimensions{
-						769,
-						90,
-						266,
-						1000,
-					},
-					fc.feeManager.GetGas(),
-				)
+				require.Equal(t, 21_250*units.NanoAvax, fc.fee)
+				require.Equal(t, fees.Gas(2_125), fc.feeManager.GetGas())
 			},
 		},
 		{
@@ -529,16 +450,8 @@ func TestTxFees(t *testing.T) {
 			unsignedAndSignedTx: baseTx,
 			expectedError:       nil,
 			checksF: func(t *testing.T, fc *calculator) {
-				require.Equal(t, 5253*units.MicroAvax, fc.fee)
-				require.Equal(t,
-					fees.Dimensions{
-						557,
-						90,
-						172,
-						1000,
-					},
-					fc.feeManager.GetGas(),
-				)
+				require.Equal(t, 18_190*units.NanoAvax, fc.fee)
+				require.Equal(t, fees.Gas(1_819), fc.feeManager.GetGas())
 			},
 		},
 		{
@@ -565,16 +478,8 @@ func TestTxFees(t *testing.T) {
 			unsignedAndSignedTx: importTx,
 			expectedError:       nil,
 			checksF: func(t *testing.T, fc *calculator) {
-				require.Equal(t, 9827*units.MicroAvax, fc.fee)
-				require.Equal(t,
-					fees.Dimensions{
-						681,
-						180,
-						262,
-						2000,
-					},
-					fc.feeManager.GetGas(),
-				)
+				require.Equal(t, 31_230*units.NanoAvax, fc.fee)
+				require.Equal(t, fees.Gas(3_123), fc.feeManager.GetGas())
 			},
 		},
 		{
@@ -601,16 +506,8 @@ func TestTxFees(t *testing.T) {
 			unsignedAndSignedTx: exportTx,
 			expectedError:       nil,
 			checksF: func(t *testing.T, fc *calculator) {
-				require.Equal(t, 5663*units.MicroAvax, fc.fee)
-				require.Equal(t,
-					fees.Dimensions{
-						685,
-						90,
-						266,
-						1000,
-					},
-					fc.feeManager.GetGas(),
-				)
+				require.Equal(t, 20_410*units.NanoAvax, fc.fee)
+				require.Equal(t, fees.Gas(2_041), fc.feeManager.GetGas())
 			},
 		},
 		{

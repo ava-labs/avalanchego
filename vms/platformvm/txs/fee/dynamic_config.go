@@ -19,14 +19,9 @@ var (
 	errDynamicFeeConfigNotAvailable = errors.New("dynamic fee config not available")
 
 	eUpgradeDynamicFeesConfig = commonfees.DynamicFeesConfig{
-		GasPrice: commonfees.GasPrice(10 * units.NanoAvax),
-		FeeDimensionWeights: commonfees.Dimensions{
-			1000,
-			1000,
-			1000,
-			1,
-		},
-		TempBlockMaxGas: commonfees.Gas(math.MaxUint64),
+		GasPrice:            commonfees.GasPrice(10 * units.NanoAvax),
+		FeeDimensionWeights: commonfees.Dimensions{1, 1, 1, 1},
+		TempBlockMaxGas:     commonfees.Gas(math.MaxUint64),
 	}
 
 	customDynamicFeesConfig *commonfees.DynamicFeesConfig
