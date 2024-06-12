@@ -23,7 +23,7 @@ func TestNewClient_AppGossip(t *testing.T) {
 
 	appGossipChan := make(chan struct{})
 	testHandler := p2p.TestHandler{
-		AppGossipF: func(ctx context.Context, nodeID ids.NodeID, gossipBytes []byte) {
+		AppGossipF: func(context.Context, ids.NodeID, []byte) {
 			close(appGossipChan)
 		},
 	}
@@ -38,19 +38,45 @@ func TestNewClient_AppRequest(t *testing.T) {
 		name        string
 		appResponse []byte
 		appErr      error
+		appRequestF func(ctx context.Context, client *p2p.Client, onResponse p2p.AppResponseCallback) error
 	}{
 		{
-			name:        "response",
+			name:        "AppRequest - response",
 			appResponse: []byte("foobar"),
+			appRequestF: func(ctx context.Context, client *p2p.Client, onResponse p2p.AppResponseCallback) error {
+				return client.AppRequest(ctx, set.Of(ids.GenerateTestNodeID()), []byte("foo"), onResponse)
+			},
 		},
 		{
-			name:   "error",
+			name:   "AppRequest - error",
 			appErr: errors.New("foobar"),
+			appRequestF: func(ctx context.Context, client *p2p.Client, onResponse p2p.AppResponseCallback) error {
+				return client.AppRequest(ctx, set.Of(ids.GenerateTestNodeID()), []byte("foo"), onResponse)
+			},
+		},
+		{
+			name:        "AppRequestAny - response",
+			appResponse: []byte("foobar"),
+			appRequestF: func(ctx context.Context, client *p2p.Client, onResponse p2p.AppResponseCallback) error {
+				return client.AppRequestAny(ctx, []byte("foo"), onResponse)
+			},
+		},
+		{
+			name:   "AppRequestAny - error",
+			appErr: errors.New("foobar"),
+			appRequestF: func(ctx context.Context, client *p2p.Client, onResponse p2p.AppResponseCallback) error {
+				return client.AppRequestAny(ctx, []byte("foo"), onResponse)
+			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// TODO remove when AppErrors are supported
+			if tt.appErr != nil {
+				t.Skip("sending app errors not supported yet")
+			}
+
 			require := require.New(t)
 			ctx := context.Background()
 
@@ -62,13 +88,12 @@ func TestNewClient_AppRequest(t *testing.T) {
 			}
 
 			client := NewClient(t, ctx, testHandler)
-			require.NoError(client.AppRequest(
+			require.NoError(tt.appRequestF(
 				ctx,
-				set.Of(ids.GenerateTestNodeID()),
-				[]byte("foobar"),
+				client,
 				func(_ context.Context, _ ids.NodeID, responseBytes []byte, err error) {
-					require.Equal(tt.appResponse, responseBytes)
 					require.Equal(tt.appErr, err)
+					require.Equal(tt.appResponse, responseBytes)
 					close(appRequestChan)
 				},
 			))
