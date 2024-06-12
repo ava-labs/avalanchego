@@ -99,4 +99,5 @@ func (m *timeoutMetrics) Observe(chainID ids.ID, op message.Op, latency time.Dur
 	}
 	m.messages.With(labels).Inc()
 	m.messageLatencies.With(labels).Add(float64(latency))
+	m.messageLatenciesHistogram.With(labels).Observe(float64(latency))
 }
