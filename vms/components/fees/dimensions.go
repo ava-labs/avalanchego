@@ -5,7 +5,6 @@ package fees
 
 import (
 	"errors"
-	"math"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
@@ -28,14 +27,7 @@ var (
 	errUnknownDimension = errors.New("unknown dimension")
 
 	ZeroGas = Gas(0)
-
-	Empty = Dimensions{}
-	Max   = Dimensions{
-		math.MaxUint64,
-		math.MaxUint64,
-		math.MaxUint64,
-		math.MaxUint64,
-	}
+	Empty   = Dimensions{}
 
 	DimensionStrings = []string{
 		bandwidthString,
@@ -46,11 +38,10 @@ var (
 )
 
 type (
-	Dimension int
-
 	GasPrice uint64
 	Gas      uint64
 
+	Dimension  int
 	Dimensions [FeeDimensions]uint64
 )
 
