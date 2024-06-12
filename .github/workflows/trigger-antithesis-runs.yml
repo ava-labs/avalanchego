@@ -25,6 +25,7 @@ jobs:
           images: antithesis-avalanchego-workload@latest;antithesis-avalanchego-node@latest
           additional_parameters: |-
             custom.duration=${{ inputs.duration }}
+            antithesis.report.recipients=${{ secrets.ANTITHESIS_RECIPIENTS }}
   Run Antithesis XSVM Test Setup:
     runs-on: ubuntu-latest
     steps:
@@ -39,3 +40,4 @@ jobs:
           images: antithesis-xsvm-workload@latest;antithesis-xsvm-node@latest
           additional_parameters: |-
             custom.duration=${{ inputs.duration }}
+            antithesis.report.recipients=${{ secrets.ANTITHESIS_RECIPIENTS }}
