@@ -39,13 +39,11 @@ var (
 )
 
 type earlyTermNoTraversalMetrics struct {
-	durPolls               *prometheus.GaugeVec
 	durExhaustedPolls      prometheus.Gauge
 	durEarlyFailPolls      prometheus.Gauge
 	durEarlyAlphaPrefPolls prometheus.Gauge
 	durEarlyAlphaConfPolls prometheus.Gauge
 
-	countPolls               *prometheus.CounterVec
 	countExhaustedPolls      prometheus.Counter
 	countEarlyFailPolls      prometheus.Counter
 	countEarlyAlphaPrefPolls prometheus.Counter
@@ -69,12 +67,10 @@ func newEarlyTermNoTraversalMetrics(reg prometheus.Registerer) (*earlyTermNoTrav
 	}
 
 	return &earlyTermNoTraversalMetrics{
-		durPolls:                 durPollsVec,
 		durExhaustedPolls:        durPollsVec.With(exhaustedLabel),
 		durEarlyFailPolls:        durPollsVec.With(earlyFailLabel),
 		durEarlyAlphaPrefPolls:   durPollsVec.With(earlyAlphaPrefLabel),
 		durEarlyAlphaConfPolls:   durPollsVec.With(earlyAlphaConfLabel),
-		countPolls:               pollCountVec,
 		countExhaustedPolls:      pollCountVec.With(exhaustedLabel),
 		countEarlyFailPolls:      pollCountVec.With(earlyFailLabel),
 		countEarlyAlphaPrefPolls: pollCountVec.With(earlyAlphaPrefLabel),
