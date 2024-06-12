@@ -20,7 +20,7 @@ jobs:
           tenant: avalanche
           username: ${{ secrets.ANTITHESIS_USERNAME }}
           password: ${{ secrets.ANTITHESIS_PASSWORD }}
-          github_token: ${{ secrets.GH_PAT }}
+          github_token: ${{ secrets.ANTITHESIS_GH_PAT }}
           config_image: antithesis-avalanchego-config@latest
           images: antithesis-avalanchego-workload@latest;antithesis-avalanchego-node@latest
           additional_parameters: |-
@@ -35,7 +35,7 @@ jobs:
           tenant: avalanche
           username: ${{ secrets.ANTITHESIS_USERNAME }}
           password: ${{ secrets.ANTITHESIS_PASSWORD }}
-          github_token: ${{ secrets.GH_PAT }}
+          github_token: ${{ secrets.ANTITHESIS_GH_PAT }}
           config_image: antithesis-xsvm-config@latest
           images: antithesis-xsvm-workload@latest;antithesis-xsvm-node@latest
           additional_parameters: |-
