@@ -132,6 +132,8 @@ can be performed against master or an arbitrary branch:
    `image_tag` (`latest`) is used by scheduled test runs, so consider
    supplying a different value to avoid interferring with the results
    of the scheduled runs.
+ - Wait for the publication job to complete successfully so that the
+   images are available to be tested against.
  - Select the [Trigger Antithesis Test Runs](https://github.com/ava-labs/avalanchego/actions/workflows/trigger-antithesis-runs.yml)
    workflow on the left.
  - Find the 'Run workflow' drop-down on the right and trigger the
