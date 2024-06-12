@@ -4,6 +4,7 @@
 package c
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"math/big"
@@ -16,7 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
-	stdcontext "context"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 )
 
@@ -32,11 +32,10 @@ type Backend interface {
 	BuilderBackend
 	SignerBackend
 
-	AcceptAtomicTx(ctx stdcontext.Context, tx *evm.Tx) error
+	AcceptAtomicTx(ctx context.Context, tx *evm.Tx) error
 }
 
 type backend struct {
-	Context
 	common.ChainUTXOs
 
 	accountsLock sync.RWMutex
@@ -49,18 +48,16 @@ type Account struct {
 }
 
 func NewBackend(
-	ctx Context,
 	utxos common.ChainUTXOs,
 	accounts map[ethcommon.Address]*Account,
 ) Backend {
 	return &backend{
-		Context:    ctx,
 		ChainUTXOs: utxos,
 		accounts:   accounts,
 	}
 }
 
-func (b *backend) AcceptAtomicTx(ctx stdcontext.Context, tx *evm.Tx) error {
+func (b *backend) AcceptAtomicTx(ctx context.Context, tx *evm.Tx) error {
 	switch tx := tx.UnsignedAtomicTx.(type) {
 	case *evm.UnsignedImportTx:
 		for _, input := range tx.ImportedInputs {
@@ -131,7 +128,7 @@ func (b *backend) AcceptAtomicTx(ctx stdcontext.Context, tx *evm.Tx) error {
 	return nil
 }
 
-func (b *backend) Balance(_ stdcontext.Context, addr ethcommon.Address) (*big.Int, error) {
+func (b *backend) Balance(_ context.Context, addr ethcommon.Address) (*big.Int, error) {
 	b.accountsLock.RLock()
 	defer b.accountsLock.RUnlock()
 
@@ -142,7 +139,7 @@ func (b *backend) Balance(_ stdcontext.Context, addr ethcommon.Address) (*big.In
 	return account.Balance, nil
 }
 
-func (b *backend) Nonce(_ stdcontext.Context, addr ethcommon.Address) (uint64, error) {
+func (b *backend) Nonce(_ context.Context, addr ethcommon.Address) (uint64, error) {
 	b.accountsLock.RLock()
 	defer b.accountsLock.RUnlock()
 
