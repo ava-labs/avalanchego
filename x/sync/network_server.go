@@ -72,7 +72,6 @@ type SyncGetChangeProofHandler struct {
 	db  DB
 }
 
-// AppGossip is not implemented
 func (*SyncGetChangeProofHandler) AppGossip(context.Context, ids.NodeID, []byte) {
 	return
 }
@@ -173,7 +172,6 @@ func (s *SyncGetChangeProofHandler) AppRequest(ctx context.Context, nodeID ids.N
 	return nil, fmt.Errorf("failed to generate proof: %w", ErrMinProofSizeIsTooLarge)
 }
 
-// CrossChainAppRequest is not implemented
 func (*SyncGetChangeProofHandler) CrossChainAppRequest(context.Context, ids.ID, time.Time, []byte) ([]byte, error) {
 	return nil, nil
 }
