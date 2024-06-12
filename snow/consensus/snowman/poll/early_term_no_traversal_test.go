@@ -12,14 +12,19 @@ import (
 	"github.com/ava-labs/avalanchego/utils/bag"
 )
 
+func newEarlyTermNoTraversalTestFactory(require *require.Assertions, alpha int) Factory {
+	factory, err := NewEarlyTermNoTraversalFactory(alpha, alpha, prometheus.NewRegistry())
+	require.NoError(err)
+	return factory
+}
+
 func TestEarlyTermNoTraversalResults(t *testing.T) {
 	require := require.New(t)
 
 	vdrs := bag.Of(vdr1) // k = 1
 	alpha := 1
 
-	factory, err := NewEarlyTermNoTraversalFactory(alpha, alpha, prometheus.NewRegistry())
-	require.NoError(err)
+	factory := newEarlyTermNoTraversalTestFactory(require, alpha)
 	poll := factory.New(vdrs)
 
 	poll.Vote(vdr1, blkID1)
@@ -38,8 +43,7 @@ func TestEarlyTermNoTraversalString(t *testing.T) {
 	vdrs := bag.Of(vdr1, vdr2) // k = 2
 	alpha := 2
 
-	factory, err := NewEarlyTermNoTraversalFactory(alpha, alpha, prometheus.NewRegistry())
-	require.NoError(err)
+	factory := newEarlyTermNoTraversalTestFactory(require, alpha)
 	poll := factory.New(vdrs)
 
 	poll.Vote(vdr1, blkID1)
@@ -57,8 +61,7 @@ func TestEarlyTermNoTraversalDropsDuplicatedVotes(t *testing.T) {
 	vdrs := bag.Of(vdr1, vdr2) // k = 2
 	alpha := 2
 
-	factory, err := NewEarlyTermNoTraversalFactory(alpha, alpha, prometheus.NewRegistry())
-	require.NoError(err)
+	factory := newEarlyTermNoTraversalTestFactory(require, alpha)
 	poll := factory.New(vdrs)
 
 	poll.Vote(vdr1, blkID1)
@@ -78,8 +81,7 @@ func TestEarlyTermNoTraversalTerminatesEarlyWithoutAlphaPreference(t *testing.T)
 	vdrs := bag.Of(vdr1, vdr2, vdr3) // k = 3
 	alpha := 2
 
-	factory, err := NewEarlyTermNoTraversalFactory(alpha, alpha, prometheus.NewRegistry())
-	require.NoError(err)
+	factory := newEarlyTermNoTraversalTestFactory(require, alpha)
 	poll := factory.New(vdrs)
 
 	poll.Drop(vdr1)
@@ -147,8 +149,7 @@ func TestEarlyTermNoTraversalForSharedAncestor(t *testing.T) {
 	vdrs := bag.Of(vdr1, vdr2, vdr3, vdr4) // k = 4
 	alpha := 4
 
-	factory, err := NewEarlyTermNoTraversalFactory(alpha, alpha, prometheus.NewRegistry())
-	require.NoError(err)
+	factory := newEarlyTermNoTraversalTestFactory(require, alpha)
 	poll := factory.New(vdrs)
 
 	poll.Vote(vdr1, blkID2)
@@ -170,8 +171,7 @@ func TestEarlyTermNoTraversalWithWeightedResponses(t *testing.T) {
 	vdrs := bag.Of(vdr1, vdr2, vdr2) // k = 3
 	alpha := 2
 
-	factory, err := NewEarlyTermNoTraversalFactory(alpha, alpha, prometheus.NewRegistry())
-	require.NoError(err)
+	factory := newEarlyTermNoTraversalTestFactory(require, alpha)
 	poll := factory.New(vdrs)
 
 	poll.Vote(vdr2, blkID1)
@@ -190,8 +190,7 @@ func TestEarlyTermNoTraversalDropWithWeightedResponses(t *testing.T) {
 	vdrs := bag.Of(vdr1, vdr2, vdr2) // k = 3
 	alpha := 2
 
-	factory, err := NewEarlyTermNoTraversalFactory(alpha, alpha, prometheus.NewRegistry())
-	require.NoError(err)
+	factory := newEarlyTermNoTraversalTestFactory(require, alpha)
 	poll := factory.New(vdrs)
 
 	poll.Drop(vdr2)
