@@ -4,6 +4,7 @@
 package fee
 
 import (
+	"errors"
 	"testing"
 	"time"
 
@@ -35,6 +36,8 @@ var (
 	preFundedKeys             = secp256k1.TestKeys()
 	feeTestSigners            = [][]*secp256k1.PrivateKey{preFundedKeys}
 	feeTestDefaultStakeWeight = uint64(2024)
+
+	errFailedComplexityCumulation = errors.New("failed cumulating complexity")
 )
 
 func TestAddAndRemoveFees(t *testing.T) {

@@ -22,11 +22,14 @@ import (
 var (
 	_ txs.Visitor = (*calculator)(nil)
 
-	errFailedFeeCalculation       = errors.New("failed fee calculation")
-	errFailedComplexityCumulation = errors.New("failed cumulating complexity")
+	errFailedFeeCalculation = errors.New("failed fee calculation")
 )
 
-func NewStaticCalculator(config StaticConfig, upgradeTimes upgrade.Config, chainTime time.Time) *Calculator {
+func NewStaticCalculator(
+	config StaticConfig,
+	upgradeTimes upgrade.Config,
+	chainTime time.Time,
+) *Calculator {
 	return &Calculator{
 		c: &calculator{
 			upgrades:  upgradeTimes,
