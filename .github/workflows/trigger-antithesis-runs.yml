@@ -8,9 +8,19 @@ on:
         default: '0.5'
         required: true
         type: string
+      recipients:
+        description: 'Email recipients to send the test report to'
+        default: ${{ secrets.ANTITHESIS_RECIPIENTS }}
+        required: true
+        type: string
+      image_tag:
+        description: 'The image tag to target'
+        default: latest
+        required: true
+        type: string
+
 
 jobs:
-  # TODO(marun) Support test runs against images built from an arbitrary branch to better support ad-hoc testing.
   Run Antithesis Avalanchego Test Setup:
     runs-on: ubuntu-latest
     steps:
@@ -21,9 +31,9 @@ jobs:
           username: ${{ secrets.ANTITHESIS_USERNAME }}
           password: ${{ secrets.ANTITHESIS_PASSWORD }}
           github_token: ${{ secrets.ANTITHESIS_GH_PAT }}
-          config_image: antithesis-avalanchego-config@latest
-          images: antithesis-avalanchego-workload@latest;antithesis-avalanchego-node@latest
-          email_recipients: ${{ secrets.ANTITHESIS_RECIPIENTS }}
+          config_image: antithesis-avalanchego-config@${{ inputs.image_tag }}
+          images: antithesis-avalanchego-workload@${{ inputs.image_tag }};antithesis-avalanchego-node@${{ inputs.image_tag }}
+          email_recipients: ${{ inputs.recipients }}
           additional_parameters: |-
             custom.duration=${{ inputs.duration }}
   Run Antithesis XSVM Test Setup:
@@ -36,8 +46,8 @@ jobs:
           username: ${{ secrets.ANTITHESIS_USERNAME }}
           password: ${{ secrets.ANTITHESIS_PASSWORD }}
           github_token: ${{ secrets.ANTITHESIS_GH_PAT }}
-          config_image: antithesis-xsvm-config@latest
-          images: antithesis-xsvm-workload@latest;antithesis-xsvm-node@latest
-          email_recipients: ${{ secrets.ANTITHESIS_RECIPIENTS }}
+          config_image: antithesis-xsvm-config@${{ inputs.image_tag }}
+          images: antithesis-xsvm-workload@${{ inputs.image_tag }};antithesis-xsvm-node@${{ inputs.image_tag }}
+          email_recipients: ${{ inputs.recipients }}
           additional_parameters: |-
             custom.duration=${{ inputs.duration }}
