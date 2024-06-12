@@ -1,3 +1,6 @@
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package sync
 
 import (
@@ -16,33 +19,33 @@ import (
 	"github.com/ava-labs/avalanchego/x/merkledb"
 )
 
-var _ p2p.Handler = (*ChangeProofHandler)(nil)
+var _ p2p.Handler = (*SyncGetChangeProofHandler)(nil)
 
-func NewChangeProofHandler(log logging.Logger, db DB) *ChangeProofHandler {
-	return &ChangeProofHandler{
+func NewSyncGetChangeProofHandler(log logging.Logger, db DB) *SyncGetChangeProofHandler {
+	return &SyncGetChangeProofHandler{
 		log: log,
 		db:  db,
 	}
 }
 
-type ChangeProofHandler struct {
+type SyncGetChangeProofHandler struct {
 	log logging.Logger
 	db  DB
 }
 
 // AppGossip is not implemented
-func (*ChangeProofHandler) AppGossip(context.Context, ids.NodeID, []byte) {
+func (*SyncGetChangeProofHandler) AppGossip(context.Context, ids.NodeID, []byte) {
 	return
 }
 
-func (c *ChangeProofHandler) AppRequest(ctx context.Context, nodeID ids.NodeID, _ time.Time, requestBytes []byte) ([]byte, error) {
+func (s *SyncGetChangeProofHandler) AppRequest(ctx context.Context, nodeID ids.NodeID, _ time.Time, requestBytes []byte) ([]byte, error) {
 	request := &pb.SyncGetChangeProofRequest{}
 	if err := proto.Unmarshal(requestBytes, request); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal request: %w", err)
 	}
 
 	if err := validateChangeProofRequest(request); err != nil {
-		c.log.Debug(
+		s.log.Debug(
 			"dropping invalid change proof request",
 			zap.Stringer("nodeID", nodeID),
 			zap.Stringer("request", request),
@@ -70,7 +73,7 @@ func (c *ChangeProofHandler) AppRequest(ctx context.Context, nodeID ids.NodeID, 
 	}
 
 	for keyLimit > 0 {
-		changeProof, err := c.db.GetChangeProof(ctx, startRoot, endRoot, start, end, int(keyLimit))
+		changeProof, err := s.db.GetChangeProof(ctx, startRoot, endRoot, start, end, int(keyLimit))
 		if err != nil {
 			if !errors.Is(err, merkledb.ErrInsufficientHistory) {
 				// We should only fail to get a change proof if we have insufficient history.
@@ -87,7 +90,7 @@ func (c *ChangeProofHandler) AppRequest(ctx context.Context, nodeID ids.NodeID, 
 			// Generate a range proof for the end root ID instead.
 			proofBytes, err := getRangeProof(
 				ctx,
-				c.db,
+				s.db,
 				&pb.SyncGetRangeProofRequest{
 					RootHash:   request.EndRootHash,
 					StartKey:   request.StartKey,
@@ -132,6 +135,6 @@ func (c *ChangeProofHandler) AppRequest(ctx context.Context, nodeID ids.NodeID, 
 }
 
 // CrossChainAppRequest is not implemented
-func (*ChangeProofHandler) CrossChainAppRequest(context.Context, ids.ID, time.Time, []byte) ([]byte, error) {
+func (*SyncGetChangeProofHandler) CrossChainAppRequest(context.Context, ids.ID, time.Time, []byte) ([]byte, error) {
 	return nil, nil
 }

@@ -114,7 +114,7 @@ func Test_Server_GetRangeProof(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 
-			handler := NewRangeProofHandler(logging.NoLog{}, smallTrieDB)
+			handler := NewSyncGetRangeProofHandler(logging.NoLog{}, smallTrieDB)
 			requestBytes, err := proto.Marshal(test.request)
 			require.NoError(err)
 			responseBytes, err := handler.AppRequest(context.Background(), test.nodeID, time.Time{}, requestBytes)

@@ -373,7 +373,7 @@ func newDefaultDBConfig() merkledb.Config {
 //		sender = common.NewMockSender(ctrl)
 //
 //		// Serves the change proof.
-//		server = NewChangeProofHandler(logging.NoLog{}, serverDB)
+//		server = NewSyncGetChangeProofHandler(logging.NoLog{}, serverDB)
 //
 //		clientNodeID, serverNodeID = ids.GenerateTestNodeID(), ids.GenerateTestNodeID()
 //

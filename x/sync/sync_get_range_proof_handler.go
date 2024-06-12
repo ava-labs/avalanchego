@@ -16,7 +16,7 @@ import (
 
 var _ p2p.Handler = (*SyncGetRangeProofHandler)(nil)
 
-func NewRangeProofHandler(log logging.Logger, db DB) *SyncGetRangeProofHandler {
+func NewSyncGetRangeProofHandler(log logging.Logger, db DB) *SyncGetRangeProofHandler {
 	return &SyncGetRangeProofHandler{
 		log: log,
 		db:  db,
