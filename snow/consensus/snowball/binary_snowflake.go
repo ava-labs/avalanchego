@@ -7,17 +7,12 @@ import "fmt"
 
 var _ Binary = (*binarySnowflake)(nil)
 
-func newBinarySnowflake(alphaPreference, alphaConfidence, beta, choice int) binarySnowflake {
+func newBinarySnowflake(alphaPreference int, terminationConditions []terminationCondition, choice int) binarySnowflake {
 	return binarySnowflake{
-		binarySlush:     newBinarySlush(choice),
-		alphaPreference: alphaPreference,
-		terminationConditions: []terminationCondition{
-			{
-				alphaConfidence: alphaConfidence,
-				beta:            beta,
-			},
-		},
-		confidence: make([]int, 1),
+		binarySlush:           newBinarySlush(choice),
+		alphaPreference:       alphaPreference,
+		terminationConditions: terminationConditions,
+		confidence:            make([]int, len(terminationConditions)),
 	}
 }
 
@@ -94,8 +89,8 @@ func (sf *binarySnowflake) Finalized() bool {
 }
 
 func (sf *binarySnowflake) String() string {
-	return fmt.Sprintf("SF(Confidence = %d, Finalized = %v, %s)",
-		sf.confidence[0],
+	return fmt.Sprintf("SF(Confidence = %v, Finalized = %v, %s)",
+		sf.confidence,
 		sf.finalized,
 		&sf.binarySlush)
 }
