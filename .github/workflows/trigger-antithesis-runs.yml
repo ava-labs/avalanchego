@@ -23,9 +23,9 @@ jobs:
           github_token: ${{ secrets.ANTITHESIS_GH_PAT }}
           config_image: antithesis-avalanchego-config@latest
           images: antithesis-avalanchego-workload@latest;antithesis-avalanchego-node@latest
+          email_recipients: ${{ secrets.ANTITHESIS_RECIPIENTS }}
           additional_parameters: |-
             custom.duration=${{ inputs.duration }}
-            antithesis.report.recipients=${{ secrets.ANTITHESIS_RECIPIENTS }}
   Run Antithesis XSVM Test Setup:
     runs-on: ubuntu-latest
     steps:
@@ -38,6 +38,6 @@ jobs:
           github_token: ${{ secrets.ANTITHESIS_GH_PAT }}
           config_image: antithesis-xsvm-config@latest
           images: antithesis-xsvm-workload@latest;antithesis-xsvm-node@latest
+          email_recipients: ${{ secrets.ANTITHESIS_RECIPIENTS }}
           additional_parameters: |-
             custom.duration=${{ inputs.duration }}
-            antithesis.report.recipients=${{ secrets.ANTITHESIS_RECIPIENTS }}
