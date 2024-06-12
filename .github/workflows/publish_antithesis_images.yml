@@ -2,6 +2,12 @@ name: Publish Antithesis Images
 
 on:
   workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'The tag to apply to published images'
+        default: latest
+        required: true
+        type: string
   push:
     branches:
       - master
@@ -29,12 +35,12 @@ jobs:
       run: bash -x ./scripts/build_antithesis_images.sh
       env:
         IMAGE_PREFIX: ${{ env.REGISTRY }}/${{ env.REPOSITORY }}
-        TAG: latest
+        TAG: ${{ github.events.inputs.image_tag || latest }}
         TEST_SETUP: avalanchego
 
     - name: Build and push images for xsvm test setup
       run: bash -x ./scripts/build_antithesis_images.sh
       env:
         IMAGE_PREFIX: ${{ env.REGISTRY }}/${{ env.REPOSITORY }}
-        TAG: latest
+        TAG: ${{ github.events.inputs.image_tag || latest }}
         TEST_SETUP: xsvm
