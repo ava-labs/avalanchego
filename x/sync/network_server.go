@@ -8,10 +8,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
+
+	"go.uber.org/zap"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/maybe"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/x/merkledb"
@@ -42,6 +48,9 @@ var (
 	errInvalidEndKey        = errors.New("end key is Nothing but has value")
 	errInvalidBounds        = errors.New("start key is greater than end key")
 	errInvalidRootHash      = fmt.Errorf("root hash must have length %d", hashing.HashLen)
+
+	_ p2p.Handler = (*SyncGetChangeProofHandler)(nil)
+	_ p2p.Handler = (*SyncGetRangeProofHandler)(nil)
 )
 
 func maybeBytesToMaybe(mb *pb.MaybeBytes) maybe.Maybe[[]byte] {
@@ -49,6 +58,173 @@ func maybeBytesToMaybe(mb *pb.MaybeBytes) maybe.Maybe[[]byte] {
 		return maybe.Some(mb.Value)
 	}
 	return maybe.Nothing[[]byte]()
+}
+
+var _ p2p.Handler = (*SyncGetChangeProofHandler)(nil)
+
+func NewSyncGetChangeProofHandler(log logging.Logger, db DB) *SyncGetChangeProofHandler {
+	return &SyncGetChangeProofHandler{
+		log: log,
+		db:  db,
+	}
+}
+
+type SyncGetChangeProofHandler struct {
+	log logging.Logger
+	db  DB
+}
+
+// AppGossip is not implemented
+func (*SyncGetChangeProofHandler) AppGossip(context.Context, ids.NodeID, []byte) {
+	return
+}
+
+func (s *SyncGetChangeProofHandler) AppRequest(ctx context.Context, nodeID ids.NodeID, _ time.Time, requestBytes []byte) ([]byte, error) {
+	request := &pb.SyncGetChangeProofRequest{}
+	if err := proto.Unmarshal(requestBytes, request); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal request: %w", err)
+	}
+
+	if err := validateChangeProofRequest(request); err != nil {
+		s.log.Debug(
+			"dropping invalid change proof request",
+			zap.Stringer("nodeID", nodeID),
+			zap.Stringer("request", request),
+			zap.Error(err),
+		)
+		return nil, fmt.Errorf("invalid request: %w", err)
+	}
+
+	// override limits if they exceed caps
+	var (
+		keyLimit   = min(request.KeyLimit, maxKeyValuesLimit)
+		bytesLimit = min(int(request.BytesLimit), maxByteSizeLimit)
+		start      = maybeBytesToMaybe(request.StartKey)
+		end        = maybeBytesToMaybe(request.EndKey)
+	)
+
+	startRoot, err := ids.ToID(request.StartRootHash)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse start root hash: %w", err)
+	}
+
+	endRoot, err := ids.ToID(request.EndRootHash)
+	if err != nil {
+		return nil, err
+	}
+
+	for keyLimit > 0 {
+		changeProof, err := s.db.GetChangeProof(ctx, startRoot, endRoot, start, end, int(keyLimit))
+		if err != nil {
+			if !errors.Is(err, merkledb.ErrInsufficientHistory) {
+				// We should only fail to get a change proof if we have insufficient history.
+				// Other errors are unexpected.
+				return nil, fmt.Errorf("failed to get change proof: %w", err)
+			}
+			if errors.Is(err, merkledb.ErrNoEndRoot) {
+				// [s.db] doesn't have [endRoot] in its history.
+				// We can't generate a change/range proof. Drop this request.
+				return nil, fmt.Errorf("failed to get change proof: %w", err)
+			}
+
+			// [s.db] doesn't have sufficient history to generate change proof.
+			// Generate a range proof for the end root ID instead.
+			proofBytes, err := getRangeProof(
+				ctx,
+				s.db,
+				&pb.SyncGetRangeProofRequest{
+					RootHash:   request.EndRootHash,
+					StartKey:   request.StartKey,
+					EndKey:     request.EndKey,
+					KeyLimit:   request.KeyLimit,
+					BytesLimit: request.BytesLimit,
+				},
+				func(rangeProof *merkledb.RangeProof) ([]byte, error) {
+					return proto.Marshal(&pb.SyncGetChangeProofResponse{
+						Response: &pb.SyncGetChangeProofResponse_RangeProof{
+							RangeProof: rangeProof.ToProto(),
+						},
+					})
+				},
+			)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get range proof: %w", err)
+			}
+
+			return proofBytes, nil
+		}
+
+		// We generated a change proof. See if it's small enough.
+		proofBytes, err := proto.Marshal(&pb.SyncGetChangeProofResponse{
+			Response: &pb.SyncGetChangeProofResponse_ChangeProof{
+				ChangeProof: changeProof.ToProto(),
+			},
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal change proof: %w", err)
+		}
+
+		if len(proofBytes) < bytesLimit {
+			return proofBytes, nil
+		}
+
+		// The proof was too large. Try to shrink it.
+		keyLimit = uint32(len(changeProof.KeyChanges)) / 2
+	}
+
+	return nil, fmt.Errorf("failed to generate proof: %w", ErrMinProofSizeIsTooLarge)
+}
+
+// CrossChainAppRequest is not implemented
+func (*SyncGetChangeProofHandler) CrossChainAppRequest(context.Context, ids.ID, time.Time, []byte) ([]byte, error) {
+	return nil, nil
+}
+
+func NewSyncGetRangeProofHandler(log logging.Logger, db DB) *SyncGetRangeProofHandler {
+	return &SyncGetRangeProofHandler{
+		log: log,
+		db:  db,
+	}
+}
+
+type SyncGetRangeProofHandler struct {
+	log logging.Logger
+	db  DB
+}
+
+func (*SyncGetRangeProofHandler) AppGossip(context.Context, ids.NodeID, []byte) {}
+
+func (s *SyncGetRangeProofHandler) AppRequest(ctx context.Context, _ ids.NodeID, _ time.Time, requestBytes []byte) ([]byte, error) {
+	request := &pb.SyncGetRangeProofRequest{}
+	if err := proto.Unmarshal(requestBytes, request); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal request: %w", err)
+	}
+
+	if err := validateRangeProofRequest(request); err != nil {
+		return nil, fmt.Errorf("invalid range proof request: %w", err)
+	}
+
+	// override limits if they exceed caps
+	request.KeyLimit = min(request.KeyLimit, maxKeyValuesLimit)
+	request.BytesLimit = min(request.BytesLimit, maxByteSizeLimit)
+
+	proofBytes, err := getRangeProof(
+		ctx,
+		s.db,
+		request,
+		func(rangeProof *merkledb.RangeProof) ([]byte, error) {
+			return proto.Marshal(rangeProof.ToProto())
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get range proof: %w", err)
+	}
+
+	return proofBytes, nil
+}
+
+func (*SyncGetRangeProofHandler) CrossChainAppRequest(context.Context, ids.ID, time.Time, []byte) ([]byte, error) {
+	return nil, nil
 }
 
 // Get the range proof specified by [req].
