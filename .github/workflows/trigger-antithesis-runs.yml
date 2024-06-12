@@ -19,7 +19,6 @@ on:
         required: true
         type: string
 
-
 jobs:
   Run Antithesis Avalanchego Test Setup:
     runs-on: ubuntu-latest
@@ -31,11 +30,11 @@ jobs:
           username: ${{ secrets.ANTITHESIS_USERNAME }}
           password: ${{ secrets.ANTITHESIS_PASSWORD }}
           github_token: ${{ secrets.ANTITHESIS_GH_PAT }}
-          config_image: antithesis-avalanchego-config@${{ inputs.image_tag }}
-          images: antithesis-avalanchego-workload@${{ inputs.image_tag }};antithesis-avalanchego-node@${{ inputs.image_tag }}
-          email_recipients: ${{ inputs.recipients }}
+          config_image: antithesis-avalanchego-config@${{ github.events.inputs.image_tag }}
+          images: antithesis-avalanchego-workload@${{ github.events.inputs.image_tag }};antithesis-avalanchego-node@${{ github.events.inputs.image_tag }}
+          email_recipients: ${{ github.events.inputs.recipients }}
           additional_parameters: |-
-            custom.duration=${{ inputs.duration }}
+            custom.duration=${{ github.events.inputs.duration }}
   Run Antithesis XSVM Test Setup:
     runs-on: ubuntu-latest
     steps:
@@ -46,8 +45,8 @@ jobs:
           username: ${{ secrets.ANTITHESIS_USERNAME }}
           password: ${{ secrets.ANTITHESIS_PASSWORD }}
           github_token: ${{ secrets.ANTITHESIS_GH_PAT }}
-          config_image: antithesis-xsvm-config@${{ inputs.image_tag }}
-          images: antithesis-xsvm-workload@${{ inputs.image_tag }};antithesis-xsvm-node@${{ inputs.image_tag }}
-          email_recipients: ${{ inputs.recipients }}
+          config_image: antithesis-xsvm-config@${{ github.events.inputs.image_tag }}
+          images: antithesis-xsvm-workload@${{ github.events.inputs.image_tag }};antithesis-xsvm-node@${{ github.events.inputs.image_tag }}
+          email_recipients: ${{ github.events.inputs.recipients }}
           additional_parameters: |-
-            custom.duration=${{ inputs.duration }}
+            custom.duration=${{ github.events.inputs.duration }}
