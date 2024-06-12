@@ -60,8 +60,6 @@ func maybeBytesToMaybe(mb *pb.MaybeBytes) maybe.Maybe[[]byte] {
 	return maybe.Nothing[[]byte]()
 }
 
-var _ p2p.Handler = (*SyncGetChangeProofHandler)(nil)
-
 func NewSyncGetChangeProofHandler(log logging.Logger, db DB) *SyncGetChangeProofHandler {
 	return &SyncGetChangeProofHandler{
 		log: log,
@@ -110,7 +108,7 @@ func (s *SyncGetChangeProofHandler) AppRequest(ctx context.Context, nodeID ids.N
 
 	endRoot, err := ids.ToID(request.EndRootHash)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to parse end root hash: %w", err)
 	}
 
 	for keyLimit > 0 {
