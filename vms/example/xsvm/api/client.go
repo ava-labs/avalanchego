@@ -17,8 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
 
-const defaultPollingInterval = 50 * time.Millisecond
-
 // Client defines the xsvm API client.
 type Client interface {
 	Network(
@@ -245,21 +243,20 @@ func (c *client) Message(
 	return resp.Message, resp.Signature, resp.Message.Initialize()
 }
 
-func WaitForAcceptance(
+func AwaitTxAccepted(
 	ctx context.Context,
 	c Client,
 	address ids.ShortID,
 	nonce uint64,
+	freq time.Duration,
 	options ...rpc.Option,
 ) error {
-	ticker := time.NewTicker(defaultPollingInterval)
+	ticker := time.NewTicker(freq)
 	defer ticker.Stop()
+
 	for {
 		currentNonce, err := c.Nonce(ctx, address, options...)
-		if err != nil {
-			return err
-		}
-		if currentNonce > nonce {
+		if err == nil && currentNonce > nonce {
 			// The nonce increasing indicates the acceptance of a transaction
 			// issued with the specified nonce.
 			return nil

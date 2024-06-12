@@ -5,6 +5,7 @@ package vms
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -20,6 +21,10 @@ import (
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/cmd/issue/transfer"
 
 	ginkgo "github.com/onsi/ginkgo/v2"
+)
+
+const (
+	pollingInterval = 50 * time.Millisecond
 )
 
 var (
@@ -85,11 +90,12 @@ var _ = ginkgo.Describe("[XSVM]", func() {
 
 		ginkgo.By("checking that the export transaction has been accepted on all nodes")
 		for _, node := range network.Nodes[1:] {
-			require.NoError(api.WaitForAcceptance(
+			require.NoError(api.AwaitTxAccepted(
 				e2e.DefaultContext(),
 				api.NewClient(node.URI, sourceChain.ChainID.String()),
 				sourceChain.PreFundedKey.Address(),
 				exportTxStatus.Nonce,
+				pollingInterval,
 			))
 		}
 

@@ -17,7 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/tests/antithesis"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
@@ -27,7 +26,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
-	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/propertyfx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
@@ -581,24 +579,13 @@ func (w *workload) confirmXChainTx(ctx context.Context, tx *xtxs.Tx) {
 	txID := tx.ID()
 	for _, uri := range w.uris {
 		client := avm.NewClient(uri, "X")
-		status, err := client.ConfirmTx(ctx, txID, 100*time.Millisecond)
-		if err != nil {
+		if err := avm.AwaitTxAccepted(client, ctx, txID, 100*time.Millisecond); err != nil {
 			log.Printf("failed to confirm X-chain transaction %s on %s: %s", txID, uri, err)
 			assert.Unreachable("failed to determine the status of an X-chain transaction", map[string]any{
 				"worker": w.id,
 				"txID":   txID,
 				"uri":    uri,
 				"err":    err,
-			})
-			return
-		}
-		if status != choices.Accepted {
-			log.Printf("failed to confirm X-chain transaction %s on %s: status == %s", txID, uri, status)
-			assert.Unreachable("failed to confirm an X-chain transaction", map[string]any{
-				"worker": w.id,
-				"txID":   txID,
-				"uri":    uri,
-				"status": status,
 			})
 			return
 		}
@@ -611,24 +598,13 @@ func (w *workload) confirmPChainTx(ctx context.Context, tx *ptxs.Tx) {
 	txID := tx.ID()
 	for _, uri := range w.uris {
 		client := platformvm.NewClient(uri)
-		s, err := client.AwaitTxDecided(ctx, txID, 100*time.Millisecond)
-		if err != nil {
+		if err := platformvm.AwaitTxAccepted(client, ctx, txID, 100*time.Millisecond); err != nil {
 			log.Printf("failed to determine the status of a P-chain transaction %s on %s: %s", txID, uri, err)
 			assert.Unreachable("failed to determine the status of a P-chain transaction", map[string]any{
 				"worker": w.id,
 				"txID":   txID,
 				"uri":    uri,
 				"err":    err,
-			})
-			return
-		}
-		if s.Status != status.Committed {
-			log.Printf("failed to confirm P-chain transaction %s on %s: status == %s", txID, uri, s.Status)
-			assert.Unreachable("failed to confirm a P-chain transaction", map[string]any{
-				"worker": w.id,
-				"txID":   txID,
-				"uri":    uri,
-				"status": s.Status,
 			})
 			return
 		}
