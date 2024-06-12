@@ -23,8 +23,9 @@ const (
 var opLabels = []string{chainLabel, opLabel}
 
 type timeoutMetrics struct {
-	messages         *prometheus.CounterVec // chain + op
-	messageLatencies *prometheus.GaugeVec   // chain + op
+	messages                  *prometheus.CounterVec   // chain + op
+	messageLatencies          *prometheus.GaugeVec     // chain + op
+	messageLatenciesHistogram *prometheus.HistogramVec // chain + op
 
 	lock           sync.RWMutex
 	chainIDToAlias map[ids.ID]string
@@ -47,10 +48,35 @@ func newTimeoutMetrics(reg prometheus.Registerer) (*timeoutMetrics, error) {
 			opLabels,
 		),
 		chainIDToAlias: make(map[ids.ID]string),
+		messageLatenciesHistogram: prometheus.NewHistogramVec(
+			prometheus.HistogramOpts{
+				Name: "message_latencies_histogram",
+				Help: "message latencies histogram (ns)",
+				Buckets: []float64{
+					float64(10 * time.Millisecond),
+					float64(50 * time.Millisecond),
+					float64(100 * time.Millisecond),
+					float64(150 * time.Millisecond),
+					float64(200 * time.Millisecond),
+					float64(250 * time.Millisecond),
+					float64(300 * time.Millisecond),
+					float64(350 * time.Millisecond),
+					float64(400 * time.Millisecond),
+					float64(450 * time.Millisecond),
+					float64(500 * time.Millisecond),
+					float64(750 * time.Millisecond),
+					float64(time.Second),
+					float64(1500 * time.Millisecond),
+					float64(2 * time.Second),
+				},
+			},
+			opLabels,
+		),
 	}
 	return m, utils.Err(
 		reg.Register(m.messages),
 		reg.Register(m.messageLatencies),
+		reg.Register(m.messageLatenciesHistogram),
 	)
 }
 
