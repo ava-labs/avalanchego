@@ -128,13 +128,16 @@ can be performed against master or an arbitrary branch:
    Images](https://github.com/ava-labs/avalanchego/actions/workflows/publish_antithesis_images.yml)
    workflow on the left.
  - Find the 'Run workflow' drop-down on the right and trigger the
-   workflow. The default value for `image_tag` (`latest`) is used by
-   scheduled test runs, so consider supplying a different value to
-   avoid interferring with the results of the scheduled runs.
+   workflow against the desired branch. The default value for
+   `image_tag` (`latest`) is used by scheduled test runs, so consider
+   supplying a different value to avoid interferring with the results
+   of the scheduled runs.
  - Select the [Trigger Antithesis Test Runs](https://github.com/ava-labs/avalanchego/actions/workflows/trigger-antithesis-runs.yml)
    workflow on the left.
  - Find the 'Run workflow' drop-down on the right and trigger the
-   workflow. Make sure to supply the same `image_tag` that was
+   workflow against the desired branch. The branch only determines the
+   CI configuration (the images have already been built), so master is
+   probably fine. Make sure to supply the same `image_tag` that was
    provided to the publishing workflow and consider setting
    `recipients` to your own email rather than sending the test report
    to everyone on the regular distribution list.
