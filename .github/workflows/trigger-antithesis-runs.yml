@@ -1,6 +1,7 @@
 name: Trigger Antithesis Test Runs
 
 on:
+  # TODO(marun) Add a schedule to execute regularly
   workflow_dispatch:
     inputs:
       duration:
