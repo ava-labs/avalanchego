@@ -6,10 +6,17 @@ package poll
 import (
 	"testing"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/utils/bag"
 )
+
+func newEarlyTermNoTraversalTestFactory(require *require.Assertions, alpha int) Factory {
+	factory, err := NewEarlyTermNoTraversalFactory(alpha, alpha, prometheus.NewRegistry())
+	require.NoError(err)
+	return factory
+}
 
 func TestEarlyTermNoTraversalResults(t *testing.T) {
 	require := require.New(t)
@@ -17,7 +24,7 @@ func TestEarlyTermNoTraversalResults(t *testing.T) {
 	vdrs := bag.Of(vdr1) // k = 1
 	alpha := 1
 
-	factory := NewEarlyTermNoTraversalFactory(alpha, alpha)
+	factory := newEarlyTermNoTraversalTestFactory(require, alpha)
 	poll := factory.New(vdrs)
 
 	poll.Vote(vdr1, blkID1)
@@ -31,10 +38,12 @@ func TestEarlyTermNoTraversalResults(t *testing.T) {
 }
 
 func TestEarlyTermNoTraversalString(t *testing.T) {
+	require := require.New(t)
+
 	vdrs := bag.Of(vdr1, vdr2) // k = 2
 	alpha := 2
 
-	factory := NewEarlyTermNoTraversalFactory(alpha, alpha)
+	factory := newEarlyTermNoTraversalTestFactory(require, alpha)
 	poll := factory.New(vdrs)
 
 	poll.Vote(vdr1, blkID1)
@@ -43,7 +52,7 @@ func TestEarlyTermNoTraversalString(t *testing.T) {
     NodeID-BaMPFdqMUQ46BV8iRcwbVfsam55kMqcp: 1
 received Bag[ids.ID]: (Size = 1)
     SYXsAycDPUu4z2ZksJD5fh5nTDcH3vCFHnpcVye5XuJ2jArg: 1`
-	require.Equal(t, expected, poll.String())
+	require.Equal(expected, poll.String())
 }
 
 func TestEarlyTermNoTraversalDropsDuplicatedVotes(t *testing.T) {
@@ -52,7 +61,7 @@ func TestEarlyTermNoTraversalDropsDuplicatedVotes(t *testing.T) {
 	vdrs := bag.Of(vdr1, vdr2) // k = 2
 	alpha := 2
 
-	factory := NewEarlyTermNoTraversalFactory(alpha, alpha)
+	factory := newEarlyTermNoTraversalTestFactory(require, alpha)
 	poll := factory.New(vdrs)
 
 	poll.Vote(vdr1, blkID1)
@@ -72,7 +81,7 @@ func TestEarlyTermNoTraversalTerminatesEarlyWithoutAlphaPreference(t *testing.T)
 	vdrs := bag.Of(vdr1, vdr2, vdr3) // k = 3
 	alpha := 2
 
-	factory := NewEarlyTermNoTraversalFactory(alpha, alpha)
+	factory := newEarlyTermNoTraversalTestFactory(require, alpha)
 	poll := factory.New(vdrs)
 
 	poll.Drop(vdr1)
@@ -90,7 +99,8 @@ func TestEarlyTermNoTraversalTerminatesEarlyWithAlphaPreference(t *testing.T) {
 	alphaPreference := 3
 	alphaConfidence := 5
 
-	factory := NewEarlyTermNoTraversalFactory(alphaPreference, alphaConfidence)
+	factory, err := NewEarlyTermNoTraversalFactory(alphaPreference, alphaConfidence, prometheus.NewRegistry())
+	require.NoError(err)
 	poll := factory.New(vdrs)
 
 	poll.Vote(vdr1, blkID1)
@@ -114,7 +124,8 @@ func TestEarlyTermNoTraversalTerminatesEarlyWithAlphaConfidence(t *testing.T) {
 	alphaPreference := 3
 	alphaConfidence := 3
 
-	factory := NewEarlyTermNoTraversalFactory(alphaPreference, alphaConfidence)
+	factory, err := NewEarlyTermNoTraversalFactory(alphaPreference, alphaConfidence, prometheus.NewRegistry())
+	require.NoError(err)
 	poll := factory.New(vdrs)
 
 	poll.Vote(vdr1, blkID1)
@@ -138,7 +149,7 @@ func TestEarlyTermNoTraversalForSharedAncestor(t *testing.T) {
 	vdrs := bag.Of(vdr1, vdr2, vdr3, vdr4) // k = 4
 	alpha := 4
 
-	factory := NewEarlyTermNoTraversalFactory(alpha, alpha)
+	factory := newEarlyTermNoTraversalTestFactory(require, alpha)
 	poll := factory.New(vdrs)
 
 	poll.Vote(vdr1, blkID2)
@@ -160,7 +171,7 @@ func TestEarlyTermNoTraversalWithWeightedResponses(t *testing.T) {
 	vdrs := bag.Of(vdr1, vdr2, vdr2) // k = 3
 	alpha := 2
 
-	factory := NewEarlyTermNoTraversalFactory(alpha, alpha)
+	factory := newEarlyTermNoTraversalTestFactory(require, alpha)
 	poll := factory.New(vdrs)
 
 	poll.Vote(vdr2, blkID1)
@@ -174,12 +185,14 @@ func TestEarlyTermNoTraversalWithWeightedResponses(t *testing.T) {
 }
 
 func TestEarlyTermNoTraversalDropWithWeightedResponses(t *testing.T) {
+	require := require.New(t)
+
 	vdrs := bag.Of(vdr1, vdr2, vdr2) // k = 3
 	alpha := 2
 
-	factory := NewEarlyTermNoTraversalFactory(alpha, alpha)
+	factory := newEarlyTermNoTraversalTestFactory(require, alpha)
 	poll := factory.New(vdrs)
 
 	poll.Drop(vdr2)
-	require.True(t, poll.Finished())
+	require.True(poll.Finished())
 }
