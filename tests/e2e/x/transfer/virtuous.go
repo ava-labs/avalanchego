@@ -114,7 +114,9 @@ var _ = e2e.DescribeXChainSerial("[Virtuous Transfer Tx AVAX]", func() {
 				)
 				require.NoError(err)
 				for _, uri := range rpcEps {
-					tests.Outf("{{green}}metrics at %q:{{/}} %v\n", uri, metricsBeforeTx[uri])
+					for _, metric := range []string{blksProcessingMetric, blksAcceptedMetric} {
+						tests.Outf("{{green}}%s at %q:{{/}} %v\n", metric, uri, metricsBeforeTx[uri][metric])
+					}
 				}
 
 				testBalances := make([]uint64, 0)
