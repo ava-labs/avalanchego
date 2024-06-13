@@ -4,6 +4,7 @@ set -euo pipefail
 
 # e.g.,
 # ./scripts/build_image.sh                                           # Build local single-arch image
+# SKIP_BUILD_RACE=1 ./scripts/build_image.sh                         # Build local single-arch image but skip building -r image
 # DOCKER_IMAGE=myavalanchego ./scripts/build_image.sh                # Build local single arch image with a custom image name
 # DOCKER_IMAGE=avaplatform/avalanchego ./scripts/build_image.sh      # Build and push multi-arch image to docker hub
 # DOCKER_IMAGE=localhost:5001/avalanchego ./scripts/build_image.sh   # Build and push multi-arch image to private registry
@@ -25,10 +26,12 @@ set -euo pipefail
 # Directory above this script
 AVALANCHE_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd )
 
+SKIP_BUILD_RACE="${SKIP_BUILD_RACE:-}"
+
 # Load the constants
 source "$AVALANCHE_PATH"/scripts/constants.sh
 
-if [[ $image_tag == *"-r" ]]; then
+if [[ -z "${SKIP_BUILD_RACE}" && $image_tag == *"-r" ]]; then
   echo "Branch name must not end in '-r'"
   exit 1
 fi
@@ -84,9 +87,11 @@ echo "Building Docker Image with tags: $DOCKER_IMAGE:$commit_hash , $DOCKER_IMAG
 ${DOCKER_CMD} -t "$DOCKER_IMAGE:$commit_hash" -t "$DOCKER_IMAGE:$image_tag" \
               "$AVALANCHE_PATH" -f "$AVALANCHE_PATH/Dockerfile"
 
-echo "Building Docker Image with tags: $DOCKER_IMAGE:$commit_hash-r , $DOCKER_IMAGE:$image_tag-r"
-${DOCKER_CMD} --build-arg="RACE_FLAG=-r" -t "$DOCKER_IMAGE:$commit_hash-r" -t "$DOCKER_IMAGE:$image_tag-r" \
-              "$AVALANCHE_PATH" -f "$AVALANCHE_PATH/Dockerfile"
+if [[ -z "${SKIP_BUILD_RACE}" ]]; then
+   echo "Building Docker Image with tags: $DOCKER_IMAGE:$commit_hash-r , $DOCKER_IMAGE:$image_tag-r"
+   ${DOCKER_CMD} --build-arg="RACE_FLAG=-r" -t "$DOCKER_IMAGE:$commit_hash-r" -t "$DOCKER_IMAGE:$image_tag-r" \
+                 "$AVALANCHE_PATH" -f "$AVALANCHE_PATH/Dockerfile"
+fi
 
 # Only tag the latest image for the master branch when images are pushed to a registry
 if [[ "${DOCKER_IMAGE}" == *"/"* && $image_tag == "master" ]]; then
