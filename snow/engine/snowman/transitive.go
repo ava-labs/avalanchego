@@ -1018,14 +1018,14 @@ func (t *Transitive) deliver(
 
 	// If the block is now preferred, query the network for its preferences
 	// with this new block.
-	if t.Consensus.IsPreferred(blk) {
+	if t.Consensus.IsPreferred(blkID) {
 		t.sendQuery(ctx, blkID, blk.Bytes(), push)
 	}
 
 	t.blocked.Fulfill(ctx, blkID)
 	for _, blk := range added {
 		blkID := blk.ID()
-		if t.Consensus.IsPreferred(blk) {
+		if t.Consensus.IsPreferred(blkID) {
 			t.sendQuery(ctx, blkID, blk.Bytes(), push)
 		}
 
