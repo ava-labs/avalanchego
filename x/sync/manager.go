@@ -11,6 +11,7 @@ import (
 	"slices"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
@@ -264,6 +265,9 @@ func (m *Manager) finishWorkItem() {
 
 // Processes [item] by fetching a change or range proof.
 func (m *Manager) doWork(ctx context.Context, work *workItem) {
+	backoff := calculateBackoff(work.attempt)
+	<-time.After(backoff)
+
 	if work.localRootID == ids.Empty {
 		// the keys in this range have not been downloaded, so get all key/values
 		m.requestRangeProof(ctx, work)
