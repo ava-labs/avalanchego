@@ -16,8 +16,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/upgrade"
-
-	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 // Struct collecting all foundational parameters of PlatformVM
@@ -103,21 +101,4 @@ func (c *Config) CreateChain(chainID ids.ID, tx *txs.CreateChainTx) {
 	}
 
 	c.Chains.QueueChainCreation(chainParams)
-}
-
-// helper to create either a static or a dynamic fee calculator, depending on the active upgrade
-func PickFeeCalculator(cfg *Config, time time.Time) *fee.Calculator {
-	var (
-		isEActive     = cfg.UpgradeConfig.IsEActivated(time)
-		feeCalculator *fee.Calculator
-	)
-
-	if !isEActive {
-		feeCalculator = fee.NewStaticCalculator(cfg.StaticFeeConfig, cfg.UpgradeConfig, time)
-	} else {
-		feesCfg, _ := fee.GetDynamicConfig(isEActive)
-		feesMan := commonfees.NewManager(feesCfg.GasPrice)
-		feeCalculator = fee.NewDynamicCalculator(feesMan, feesCfg.TempBlockMaxGas)
-	}
-	return feeCalculator
 }

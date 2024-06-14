@@ -45,5 +45,5 @@ func (w *WalletFactory) NewWallet(keys ...*secp256k1.PrivateKey) (builder.Builde
 
 func (w *WalletFactory) feeCalculator() *fee.Calculator {
 	chainTime := w.state.GetTimestamp()
-	return config.PickFeeCalculator(w.cfg, chainTime)
+	return state.PickFeeCalculator(w.cfg, chainTime)
 }

@@ -260,7 +260,7 @@ func addSubnet(t *testing.T, env *environment) {
 	stateDiff, err := state.NewDiff(genesisID, env.blkManager)
 	require.NoError(err)
 
-	feeCalculator := config.PickFeeCalculator(env.config, stateDiff.GetTimestamp())
+	feeCalculator := state.PickFeeCalculator(env.config, stateDiff.GetTimestamp())
 	executor := txexecutor.StandardTxExecutor{
 		Backend:       &env.backend,
 		State:         stateDiff,

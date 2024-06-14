@@ -508,13 +508,13 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 
 			var (
 				backend       = tt.backendF(ctrl)
-				state         = tt.stateF(ctrl)
+				chain         = tt.stateF(ctrl)
 				sTx           = tt.sTxF()
 				tx            = tt.txF()
-				feeCalculator = config.PickFeeCalculator(backend.Config, state.GetTimestamp())
+				feeCalculator = state.PickFeeCalculator(backend.Config, chain.GetTimestamp())
 			)
 
-			err := verifyAddPermissionlessValidatorTx(backend, feeCalculator, state, sTx, tx)
+			err := verifyAddPermissionlessValidatorTx(backend, feeCalculator, chain, sTx, tx)
 			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}

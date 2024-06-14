@@ -12,7 +12,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/fees"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
-	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -69,7 +68,7 @@ func (v *verifier) BanffProposalBlock(b *block.BanffProposalBlock) error {
 		return err
 	}
 
-	feeCalculator := config.PickFeeCalculator(v.txExecutorBackend.Config, b.Timestamp())
+	feeCalculator := state.PickFeeCalculator(v.txExecutorBackend.Config, b.Timestamp())
 	inputs, atomicRequests, onAcceptFunc, err := v.processStandardTxs(b.Transactions, feeCalculator, onDecisionState, b.Parent())
 	if err != nil {
 		return err
@@ -124,7 +123,7 @@ func (v *verifier) BanffStandardBlock(b *block.BanffStandardBlock) error {
 		return errBanffStandardBlockWithoutChanges
 	}
 
-	feeCalculator := config.PickFeeCalculator(v.txExecutorBackend.Config, b.Timestamp())
+	feeCalculator := state.PickFeeCalculator(v.txExecutorBackend.Config, b.Timestamp())
 	return v.standardBlock(&b.ApricotStandardBlock, feeCalculator, onAcceptState)
 }
 
@@ -285,7 +284,7 @@ func (v *verifier) banffNonOptionBlock(b block.BanffBlock) error {
 		)
 	}
 
-	nextStakerChangeTime, err := executor.GetNextStakerChangeTime(parentState)
+	nextStakerChangeTime, err := state.GetNextStakerChangeTime(parentState)
 	if err != nil {
 		return fmt.Errorf("could not verify block timestamp: %w", err)
 	}
