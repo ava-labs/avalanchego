@@ -7,9 +7,9 @@ import (
 	"context"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 
+	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
@@ -61,18 +61,18 @@ type health struct {
 	liveness  *worker
 }
 
-func New(log logging.Logger, registerer prometheus.Registerer) (Health, error) {
-	readinessWorker, err := newWorker(log, "readiness", registerer)
+func New(log logging.Logger, g metrics.MultiGatherer) (Health, error) {
+	readinessWorker, err := newWorker(log, "readiness", g)
 	if err != nil {
 		return nil, err
 	}
 
-	healthWorker, err := newWorker(log, "health", registerer)
+	healthWorker, err := newWorker(log, "health", g)
 	if err != nil {
 		return nil, err
 	}
 
-	livenessWorker, err := newWorker(log, "liveness", registerer)
+	livenessWorker, err := newWorker(log, "liveness", g)
 	return &health{
 		log:       log,
 		readiness: readinessWorker,

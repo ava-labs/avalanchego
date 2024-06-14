@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
@@ -54,7 +54,7 @@ func TestDuplicatedRegistations(t *testing.T) {
 		return "", nil
 	})
 
-	h, err := New(logging.NoLog{}, prometheus.NewRegistry())
+	h, err := New(logging.NoLog{}, metrics.NewPrefixGatherer())
 	require.NoError(err)
 
 	require.NoError(h.RegisterReadinessCheck("check", check))
@@ -77,7 +77,7 @@ func TestDefaultFailing(t *testing.T) {
 		return "", nil
 	})
 
-	h, err := New(logging.NoLog{}, prometheus.NewRegistry())
+	h, err := New(logging.NoLog{}, metrics.NewPrefixGatherer())
 	require.NoError(err)
 
 	{
@@ -118,7 +118,7 @@ func TestPassingChecks(t *testing.T) {
 		return "", nil
 	})
 
-	h, err := New(logging.NoLog{}, prometheus.NewRegistry())
+	h, err := New(logging.NoLog{}, metrics.NewPrefixGatherer())
 	require.NoError(err)
 
 	require.NoError(h.RegisterReadinessCheck("check", check))
@@ -182,7 +182,7 @@ func TestPassingThenFailingChecks(t *testing.T) {
 		return "", nil
 	})
 
-	h, err := New(logging.NoLog{}, prometheus.NewRegistry())
+	h, err := New(logging.NoLog{}, metrics.NewPrefixGatherer())
 	require.NoError(err)
 
 	require.NoError(h.RegisterReadinessCheck("check", check))
@@ -229,7 +229,7 @@ func TestPassingThenFailingChecks(t *testing.T) {
 func TestDeadlockRegression(t *testing.T) {
 	require := require.New(t)
 
-	h, err := New(logging.NoLog{}, prometheus.NewRegistry())
+	h, err := New(logging.NoLog{}, metrics.NewPrefixGatherer())
 	require.NoError(err)
 
 	var lock sync.Mutex
@@ -259,7 +259,7 @@ func TestTags(t *testing.T) {
 		return "", nil
 	})
 
-	h, err := New(logging.NoLog{}, prometheus.NewRegistry())
+	h, err := New(logging.NoLog{}, metrics.NewPrefixGatherer())
 	require.NoError(err)
 	require.NoError(h.RegisterHealthCheck("check1", check))
 	require.NoError(h.RegisterHealthCheck("check2", check, "tag1"))

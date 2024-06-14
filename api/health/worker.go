@@ -15,6 +15,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 
+	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -28,11 +29,11 @@ var (
 )
 
 type worker struct {
-	log        logging.Logger
-	namespace  string
-	metrics    *metrics
-	checksLock sync.RWMutex
-	checks     map[string]*taggedChecker
+	log           logging.Logger
+	name          string
+	failingChecks *prometheus.GaugeVec
+	checksLock    sync.RWMutex
+	checks        map[string]*taggedChecker
 
 	resultsLock                 sync.RWMutex
 	results                     map[string]Result
@@ -53,19 +54,33 @@ type taggedChecker struct {
 
 func newWorker(
 	log logging.Logger,
-	namespace string,
-	registerer prometheus.Registerer,
+	name string,
+	g metrics.MultiGatherer,
 ) (*worker, error) {
-	metrics, err := newMetrics(namespace, registerer)
+	reg, err := metrics.MakeAndRegister(g, name)
+	if err != nil {
+		return nil, err
+	}
+
+	failingChecks := prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "checks_failing",
+			Help: "number of currently failing health checks",
+		},
+		[]string{"tag"},
+	)
+	failingChecks.WithLabelValues(AllTag).Set(0)
+	failingChecks.WithLabelValues(ApplicationTag).Set(0)
+
 	return &worker{
-		log:       log,
-		namespace: namespace,
-		metrics:   metrics,
-		checks:    make(map[string]*taggedChecker),
-		results:   make(map[string]Result),
-		closer:    make(chan struct{}),
-		tags:      make(map[string]set.Set[string]),
-	}, err
+		log:           log,
+		name:          name,
+		failingChecks: failingChecks,
+		checks:        make(map[string]*taggedChecker),
+		results:       make(map[string]Result),
+		closer:        make(chan struct{}),
+		tags:          make(map[string]set.Set[string]),
+	}, reg.Register(failingChecks)
 }
 
 func (w *worker) RegisterCheck(name string, check Checker, tags ...string) error {
@@ -107,7 +122,7 @@ func (w *worker) RegisterCheck(name string, check Checker, tags ...string) error
 
 	// Whenever a new check is added - it is failing
 	w.log.Info("registered new check and initialized its state to failing",
-		zap.String("namespace", w.namespace),
+		zap.String("name", w.name),
 		zap.String("name", name),
 		zap.Strings("tags", tags),
 	)
@@ -244,7 +259,7 @@ func (w *worker) runCheck(ctx context.Context, wg *sync.WaitGroup, name string, 
 
 		if prevResult.Error == nil {
 			w.log.Warn("check started failing",
-				zap.String("namespace", w.namespace),
+				zap.String("name", w.name),
 				zap.String("name", name),
 				zap.Strings("tags", check.tags),
 				zap.Error(err),
@@ -253,7 +268,7 @@ func (w *worker) runCheck(ctx context.Context, wg *sync.WaitGroup, name string, 
 		}
 	} else if prevResult.Error != nil {
 		w.log.Info("check started passing",
-			zap.String("namespace", w.namespace),
+			zap.String("name", w.name),
 			zap.String("name", name),
 			zap.Strings("tags", check.tags),
 		)
@@ -271,7 +286,7 @@ func (w *worker) updateMetrics(tc *taggedChecker, healthy bool, register bool) {
 	if tc.isApplicationCheck {
 		// Note: [w.tags] will include AllTag.
 		for tag := range w.tags {
-			gauge := w.metrics.failingChecks.WithLabelValues(tag)
+			gauge := w.failingChecks.WithLabelValues(tag)
 			if healthy {
 				gauge.Dec()
 			} else {
@@ -285,7 +300,7 @@ func (w *worker) updateMetrics(tc *taggedChecker, healthy bool, register bool) {
 		}
 	} else {
 		for _, tag := range tc.tags {
-			gauge := w.metrics.failingChecks.WithLabelValues(tag)
+			gauge := w.failingChecks.WithLabelValues(tag)
 			if healthy {
 				gauge.Dec()
 			} else {
@@ -297,7 +312,7 @@ func (w *worker) updateMetrics(tc *taggedChecker, healthy bool, register bool) {
 				}
 			}
 		}
-		gauge := w.metrics.failingChecks.WithLabelValues(AllTag)
+		gauge := w.failingChecks.WithLabelValues(AllTag)
 		if healthy {
 			gauge.Dec()
 		} else {

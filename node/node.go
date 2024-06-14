@@ -1445,15 +1445,13 @@ func (n *Node) initInfoAPI() error {
 // initHealthAPI initializes the Health API service
 // Assumes n.Log, n.Net, n.APIServer, n.HTTPLog already initialized
 func (n *Node) initHealthAPI() error {
-	healthReg, err := metrics.MakeAndRegister(
-		n.MetricsGatherer,
-		healthNamespace,
-	)
+	healthMultiGatherer := metrics.NewLabelGatherer("check")
+	err := n.MetricsGatherer.Register(healthNamespace, healthMultiGatherer)
 	if err != nil {
 		return err
 	}
 
-	n.health, err = health.New(n.Log, healthReg)
+	n.health, err = health.New(n.Log, healthMultiGatherer)
 	if err != nil {
 		return err
 	}

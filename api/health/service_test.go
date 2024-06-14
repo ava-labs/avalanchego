@@ -8,9 +8,9 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
@@ -22,7 +22,7 @@ func TestServiceResponses(t *testing.T) {
 		return "", nil
 	})
 
-	h, err := New(logging.NoLog{}, prometheus.NewRegistry())
+	h, err := New(logging.NoLog{}, metrics.NewPrefixGatherer())
 	require.NoError(err)
 
 	s := &Service{
@@ -158,7 +158,7 @@ func TestServiceTagResponse(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 
-			h, err := New(logging.NoLog{}, prometheus.NewRegistry())
+			h, err := New(logging.NoLog{}, metrics.NewPrefixGatherer())
 			require.NoError(err)
 			require.NoError(test.register(h, "check1", check))
 			require.NoError(test.register(h, "check2", check, subnetID1.String()))
