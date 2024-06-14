@@ -45,9 +45,9 @@ type Consensus interface {
 	// Processing returns true if the block ID is currently processing.
 	Processing(ids.ID) bool
 
-	// IsPreferred returns true if the block is currently on the preferred
-	// chain.
-	IsPreferred(Block) bool
+	// IsPreferred returns true if the block ID is preferred. Only the last
+	// accepted block and processing blocks are considered preferred.
+	IsPreferred(ids.ID) bool
 
 	// Returns the ID and height of the last accepted decision.
 	LastAccepted() (ids.ID, uint64)
