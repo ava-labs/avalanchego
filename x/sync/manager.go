@@ -63,6 +63,7 @@ type workItem struct {
 	priority    priority
 	localRootID ids.ID
 	attempt     int
+	queueTime   time.Time
 }
 
 // requestFailed handles overflow
@@ -74,12 +75,13 @@ func (w *workItem) requestFailed() {
 	}
 }
 
-func newWorkItem(localRootID ids.ID, start maybe.Maybe[[]byte], end maybe.Maybe[[]byte], priority priority) *workItem {
+func newWorkItem(localRootID ids.ID, start maybe.Maybe[[]byte], end maybe.Maybe[[]byte], priority priority, queueTime time.Time) *workItem {
 	return &workItem{
 		localRootID: localRootID,
 		start:       start,
 		end:         end,
 		priority:    priority,
+		queueTime:   queueTime,
 	}
 }
 
@@ -187,7 +189,7 @@ func (m *Manager) Start(ctx context.Context) error {
 
 	// Add work item to fetch the entire key range.
 	// Note that this will be the first work item to be processed.
-	m.unprocessedWork.Insert(newWorkItem(ids.Empty, maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), lowPriority))
+	m.unprocessedWork.Insert(newWorkItem(ids.Empty, maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), lowPriority, time.Now()))
 
 	m.syncing = true
 	ctx, m.cancelCtx = context.WithCancel(ctx)
@@ -274,8 +276,12 @@ func (m *Manager) finishWorkItem() {
 
 // Processes [item] by fetching a change or range proof.
 func (m *Manager) doWork(ctx context.Context, work *workItem) {
+	// Backoff for failed requests accounting for time this job has already
+	// spent waiting in the request queue
 	backoff := calculateBackoff(work.attempt)
-	<-time.After(backoff)
+	if waitTime := backoff - time.Since(work.queueTime); waitTime > 0 {
+		<-time.After(waitTime)
+	}
 
 	if work.localRootID == ids.Empty {
 		// the keys in this range have not been downloaded, so get all key/values
@@ -430,6 +436,7 @@ func (m *Manager) handleRangeProofResponse(
 		m.metrics.RequestFailed()
 
 		work.priority = retryPriority
+		work.queueTime = time.Now()
 		work.requestFailed()
 		m.unprocessedWork.Insert(work)
 
@@ -505,6 +512,7 @@ func (m *Manager) handleChangeProofResponse(
 		m.metrics.RequestFailed()
 
 		work.priority = retryPriority
+		work.queueTime = time.Now()
 		work.requestFailed()
 		m.unprocessedWork.Insert(work)
 
@@ -937,7 +945,7 @@ func (m *Manager) completeWorkItem(ctx context.Context, work *workItem, largestH
 			largestHandledKey = work.end
 		} else {
 			// the full range wasn't completed, so enqueue a new work item for the range [nextStartKey, workItem.end]
-			m.enqueueWork(newWorkItem(work.localRootID, nextStartKey, work.end, work.priority))
+			m.enqueueWork(newWorkItem(work.localRootID, nextStartKey, work.end, work.priority, time.Now()))
 			largestHandledKey = nextStartKey
 		}
 	}
@@ -950,12 +958,12 @@ func (m *Manager) completeWorkItem(ctx context.Context, work *workItem, largestH
 	stale := m.config.TargetRoot != rootID
 	if stale {
 		// the root has changed, so reinsert with high priority
-		m.enqueueWork(newWorkItem(rootID, work.start, largestHandledKey, highPriority))
+		m.enqueueWork(newWorkItem(rootID, work.start, largestHandledKey, highPriority, time.Now()))
 	} else {
 		m.workLock.Lock()
 		defer m.workLock.Unlock()
 
-		m.processedWork.MergeInsert(newWorkItem(rootID, work.start, largestHandledKey, work.priority))
+		m.processedWork.MergeInsert(newWorkItem(rootID, work.start, largestHandledKey, work.priority, time.Now()))
 	}
 
 	// completed the range [work.start, lastKey], log and record in the completed work heap
@@ -1000,8 +1008,8 @@ func (m *Manager) enqueueWork(work *workItem) {
 
 	// first item gets higher priority than the second to encourage finished ranges to grow
 	// rather than start a new range that is not contiguous with existing completed ranges
-	first := newWorkItem(work.localRootID, work.start, mid, medPriority)
-	second := newWorkItem(work.localRootID, mid, work.end, lowPriority)
+	first := newWorkItem(work.localRootID, work.start, mid, medPriority, time.Now())
+	second := newWorkItem(work.localRootID, mid, work.end, lowPriority, time.Now())
 
 	m.unprocessedWork.Insert(first)
 	m.unprocessedWork.Insert(second)
