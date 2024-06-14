@@ -92,7 +92,7 @@ func calculateBackoff(attempt int) time.Duration {
 	}
 
 	retryWait := initialRetryWait * time.Duration(math.Pow(retryWaitFactor, float64(attempt)))
-	if retryWait > maxRetryWait || retryWait < 0 { // Handle overflows with negative check.
+	if retryWait > maxRetryWait {
 		retryWait = maxRetryWait
 	}
 

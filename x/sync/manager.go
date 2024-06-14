@@ -65,6 +65,15 @@ type workItem struct {
 	attempt     int
 }
 
+// requestFailed handles overflow
+func (w *workItem) requestFailed() {
+	attempt := w.attempt + 1
+
+	if attempt > w.attempt {
+		w.attempt = attempt
+	}
+}
+
 func newWorkItem(localRootID ids.ID, start maybe.Maybe[[]byte], end maybe.Maybe[[]byte], priority priority) *workItem {
 	return &workItem{
 		localRootID: localRootID,
@@ -421,7 +430,7 @@ func (m *Manager) handleRangeProofResponse(
 		m.metrics.RequestFailed()
 
 		work.priority = retryPriority
-		work.attempt++
+		work.requestFailed()
 		m.unprocessedWork.Insert(work)
 
 		return nil // swallow errors that come from peers
@@ -496,7 +505,7 @@ func (m *Manager) handleChangeProofResponse(
 		m.metrics.RequestFailed()
 
 		work.priority = retryPriority
-		work.attempt++
+		work.requestFailed()
 		m.unprocessedWork.Insert(work)
 
 		return nil // swallow errors that come from peers
