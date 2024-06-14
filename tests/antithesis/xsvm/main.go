@@ -25,7 +25,10 @@ import (
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/cmd/issue/transfer"
 )
 
-const NumKeys = 5
+const (
+	NumKeys         = 5
+	PollingInterval = 50 * time.Millisecond
+)
 
 func main() {
 	c, err := antithesis.NewConfig(os.Args)
@@ -171,7 +174,7 @@ func (w *workload) run(ctx context.Context) {
 func (w *workload) confirmTransferTx(ctx context.Context, tx *status.TxIssuance) {
 	for _, uri := range w.uris {
 		client := api.NewClient(uri, w.chainID.String())
-		if err := api.WaitForAcceptance(ctx, client, w.key.Address(), tx.Nonce); err != nil {
+		if err := api.AwaitTxAccepted(ctx, client, w.key.Address(), tx.Nonce, PollingInterval); err != nil {
 			log.Printf("worker %d failed to confirm transaction %s on %s: %s", w.id, tx.TxID, uri, err)
 			assert.Unreachable("failed to confirm transaction", map[string]any{
 				"worker": w.id,
