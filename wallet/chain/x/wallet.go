@@ -4,8 +4,6 @@
 package x
 
 import (
-	"errors"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/avm"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
@@ -17,11 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
 
-var (
-	ErrNotAccepted = errors.New("not accepted")
-
-	_ Wallet = (*wallet)(nil)
-)
+var _ Wallet = (*wallet)(nil)
 
 type Wallet interface {
 	// Builder returns the builder that will be used to create the transactions.
