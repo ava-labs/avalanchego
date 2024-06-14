@@ -4,7 +4,7 @@
 package c
 
 import (
-	"context"
+	"errors"
 	"math/big"
 	"time"
 
@@ -12,14 +12,17 @@ import (
 	"github.com/ava-labs/coreth/plugin/evm"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/rpc"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
 )
 
-var _ Wallet = (*wallet)(nil)
+var (
+	_ Wallet = (*wallet)(nil)
+
+	errNotCommitted = errors.New("not committed")
+)
 
 type Wallet interface {
 	// Builder returns the builder that will be used to create the transactions.
@@ -162,11 +165,31 @@ func (w *wallet) IssueAtomicTx(
 		return w.Backend.AcceptAtomicTx(ctx, tx)
 	}
 
-	if err := awaitTxAccepted(w.avaxClient, ctx, txID, ops.PollFrequency()); err != nil {
-		return err
-	}
+	pollFrequency := ops.PollFrequency()
+	ticker := time.NewTicker(pollFrequency)
+	defer ticker.Stop()
 
-	return w.Backend.AcceptAtomicTx(ctx, tx)
+	for {
+		status, err := w.avaxClient.GetAtomicTxStatus(ctx, txID)
+		if err != nil {
+			return err
+		}
+
+		switch status {
+		case evm.Accepted:
+			return w.Backend.AcceptAtomicTx(ctx, tx)
+		case evm.Dropped, evm.Unknown:
+			return errNotCommitted
+		}
+
+		// The tx is Processing.
+
+		select {
+		case <-ticker.C:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
 }
 
 func (w *wallet) baseFee(options []common.Option) (*big.Int, error) {
@@ -178,29 +201,4 @@ func (w *wallet) baseFee(options []common.Option) (*big.Int, error) {
 
 	ctx := ops.Context()
 	return w.ethClient.EstimateBaseFee(ctx)
-}
-
-// TODO: Upstream this function into coreth.
-func awaitTxAccepted(
-	c evm.Client,
-	ctx context.Context,
-	txID ids.ID,
-	freq time.Duration,
-	options ...rpc.Option,
-) error {
-	ticker := time.NewTicker(freq)
-	defer ticker.Stop()
-
-	for {
-		status, err := c.GetAtomicTxStatus(ctx, txID, options...)
-		if err == nil && status == evm.Accepted {
-			return nil
-		}
-
-		select {
-		case <-ticker.C:
-		case <-ctx.Done():
-			return ctx.Err()
-		}
-	}
 }
