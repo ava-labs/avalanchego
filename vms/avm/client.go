@@ -758,13 +758,15 @@ func AwaitTxAccepted(
 
 	for {
 		status, err := c.GetTxStatus(ctx, txID, options...)
-		if err == nil {
-			switch status {
-			case choices.Accepted:
-				return nil
-			case choices.Rejected:
-				return ErrRejected
-			}
+		if err != nil {
+			return err
+		}
+
+		switch status {
+		case choices.Accepted:
+			return nil
+		case choices.Rejected:
+			return ErrRejected
 		}
 
 		select {

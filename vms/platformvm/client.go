@@ -527,11 +527,13 @@ func AwaitTxAccepted(
 
 	for {
 		res, err := c.GetTxStatus(ctx, txID, options...)
-		if err == nil {
-			switch res.Status {
-			case status.Committed, status.Aborted:
-				return nil
-			}
+		if err != nil {
+			return err
+		}
+
+		switch res.Status {
+		case status.Committed, status.Aborted:
+			return nil
 		}
 
 		select {

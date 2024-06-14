@@ -193,7 +193,11 @@ func awaitTxAccepted(
 
 	for {
 		status, err := c.GetAtomicTxStatus(ctx, txID, options...)
-		if err == nil && status == evm.Accepted {
+		if err != nil {
+			return err
+		}
+
+		if status == evm.Accepted {
 			return nil
 		}
 

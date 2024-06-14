@@ -71,7 +71,7 @@ func Export(ctx context.Context, config *Config) (*status.TxIssuance, error) {
 		return nil, err
 	}
 
-	if err := api.AwaitTxAccepted(ctx, client, address, nonce, 50*time.Millisecond); err != nil {
+	if err := api.AwaitTxAccepted(ctx, client, address, nonce, api.DefaultPollingInterval); err != nil {
 		return nil, err
 	}
 
