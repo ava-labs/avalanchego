@@ -146,7 +146,7 @@ type ManagerConfig struct {
 	Metrics prometheus.Registerer
 }
 
-func NewManager(config ManagerConfig) (*Manager, error) {
+func NewManager(config ManagerConfig, registerer prometheus.Registerer) (*Manager, error) {
 	switch {
 	case config.RangeProofClient == nil:
 		return nil, ErrNoRangeProofClientProvided
@@ -167,7 +167,7 @@ func NewManager(config ManagerConfig) (*Manager, error) {
 		config.Hasher = merkledb.DefaultHasher
 	}
 
-	metrics, err := NewMetrics("sync", config.Metrics)
+	metrics, err := NewMetrics("sync", registerer)
 	if err != nil {
 		return nil, err
 	}
