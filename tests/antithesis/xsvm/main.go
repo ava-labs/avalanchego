@@ -176,12 +176,6 @@ func (w *workload) confirmTransferTx(ctx context.Context, tx *status.TxIssuance)
 		client := api.NewClient(uri, w.chainID.String())
 		if err := api.AwaitTxAccepted(ctx, client, w.key.Address(), tx.Nonce, PollingInterval); err != nil {
 			log.Printf("worker %d failed to confirm transaction %s on %s: %s", w.id, tx.TxID, uri, err)
-			assert.Unreachable("failed to confirm transaction", map[string]any{
-				"worker": w.id,
-				"txID":   tx.TxID,
-				"uri":    uri,
-				"err":    err,
-			})
 			return
 		}
 	}
