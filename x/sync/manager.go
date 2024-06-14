@@ -423,6 +423,48 @@ func (m *Manager) requestRangeProof(ctx context.Context, work *workItem) {
 	m.metrics.RequestMade()
 }
 
+// Returns if we should process responseBytes
+func (m *Manager) handleResponse(
+	work *workItem,
+	bytesLimit uint32,
+	responseBytes []byte,
+	err error,
+) bool {
+	if err != nil {
+		m.metrics.RequestFailed()
+
+		work.priority = retryPriority
+		work.queueTime = time.Now()
+		work.requestFailed()
+		m.unprocessedWork.Insert(work)
+
+		return false
+	}
+
+	m.metrics.RequestSucceeded()
+
+	select {
+	case <-m.doneChan:
+		// If we're closed, don't apply the proof.
+		return false
+	default:
+	}
+
+	if len(responseBytes) > int(bytesLimit) {
+		m.config.Log.Debug(
+			"dropping response",
+			zap.Error(fmt.Errorf("%w: (%d) > %d)",
+				errTooManyBytes,
+				len(responseBytes),
+				bytesLimit,
+			)),
+		)
+		return false
+	}
+
+	return true
+}
+
 // invariant: this function must only return fatal errors
 func (m *Manager) handleRangeProofResponse(
 	ctx context.Context,
@@ -432,32 +474,7 @@ func (m *Manager) handleRangeProofResponse(
 	responseBytes []byte,
 	err error,
 ) error {
-	if err != nil {
-		m.metrics.RequestFailed()
-
-		work.priority = retryPriority
-		work.queueTime = time.Now()
-		work.requestFailed()
-		m.unprocessedWork.Insert(work)
-
-		return nil // swallow errors that come from peers
-	}
-
-	m.metrics.RequestSucceeded()
-
-	select {
-	case <-m.doneChan:
-		// If we're closed, don't apply the proof.
-		return nil
-	default:
-	}
-
-	if len(responseBytes) > int(request.BytesLimit) {
-		m.config.Log.Debug("dropping response",
-			zap.Error(
-				fmt.Errorf("%w: (%d) > %d)", errTooManyBytes, len(responseBytes), request.BytesLimit),
-			),
-		)
+	if !m.handleResponse(work, request.BytesLimit, responseBytes, err) {
 		return nil
 	}
 
@@ -508,32 +525,7 @@ func (m *Manager) handleChangeProofResponse(
 	responseBytes []byte,
 	err error,
 ) error {
-	if err != nil {
-		m.metrics.RequestFailed()
-
-		work.priority = retryPriority
-		work.queueTime = time.Now()
-		work.requestFailed()
-		m.unprocessedWork.Insert(work)
-
-		return nil // swallow errors that come from peers
-	}
-
-	m.metrics.RequestSucceeded()
-
-	select {
-	case <-m.doneChan:
-		// If we're closed, don't apply the proof.
-		return nil
-	default:
-	}
-
-	if len(responseBytes) > int(request.BytesLimit) {
-		m.config.Log.Debug("dropping response",
-			zap.Error(
-				fmt.Errorf("%w: (%d) > %d)", errTooManyBytes, len(responseBytes), request.BytesLimit),
-			),
-		)
+	if !m.handleResponse(work, request.BytesLimit, responseBytes, err) {
 		return nil
 	}
 
