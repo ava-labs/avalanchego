@@ -40,9 +40,9 @@ import (
 	walletsigner "github.com/ava-labs/avalanchego/wallet/chain/p/signer"
 )
 
-// Check that complexity of standard blocks is duly calculated once block is verified
+// Check that gas consumed by a standard blocks is duly calculated once block is verified
 // Only transactions active post E upgrade are considered and tested pre and post E upgrade.
-func TestStandardBlockComplexity(t *testing.T) {
+func TestStandardBlockGas(t *testing.T) {
 	type test struct {
 		name      string
 		setupTest func(env *environment) *txs.Tx
@@ -60,7 +60,8 @@ func TestStandardBlockComplexity(t *testing.T) {
 				sk, err := bls.NewSecretKey()
 				require.NoError(t, err)
 
-				builder, s, feeCalc := env.factory.NewWallet(preFundedKeys...)
+				builder, s, feeCalc, err := env.factory.NewWallet(preFundedKeys...)
+				require.NoError(t, err)
 				utx, err := builder.NewAddPermissionlessValidatorTx(
 					&txs.SubnetValidator{
 						Validator: txs.Validator{
@@ -112,7 +113,8 @@ func TestStandardBlockComplexity(t *testing.T) {
 				}
 				it.Release()
 
-				builder, signer, feeCalc := env.factory.NewWallet(preFundedKeys...)
+				builder, signer, feeCalc, err := env.factory.NewWallet(preFundedKeys...)
+				require.NoError(t, err)
 				utx, err := builder.NewAddPermissionlessDelegatorTx(
 					&txs.SubnetValidator{
 						Validator: txs.Validator{
@@ -158,7 +160,8 @@ func TestStandardBlockComplexity(t *testing.T) {
 				}
 				it.Release()
 
-				builder, signer, feeCalc := env.factory.NewWallet(preFundedKeys...)
+				builder, signer, feeCalc, err := env.factory.NewWallet(preFundedKeys...)
+				require.NoError(t, err)
 				utx, err := builder.NewAddSubnetValidatorTx(
 					&txs.SubnetValidator{
 						Validator: txs.Validator{
@@ -186,7 +189,8 @@ func TestStandardBlockComplexity(t *testing.T) {
 		{
 			name: "CreateChainTx",
 			setupTest: func(env *environment) *txs.Tx {
-				builder, signer, feeCalc := env.factory.NewWallet(preFundedKeys...)
+				builder, signer, feeCalc, err := env.factory.NewWallet(preFundedKeys...)
+				require.NoError(t, err)
 				utx, err := builder.NewCreateChainTx(
 					testSubnet1.TxID,
 					[]byte{},             // genesisData
@@ -210,7 +214,8 @@ func TestStandardBlockComplexity(t *testing.T) {
 		{
 			name: "CreateSubnetTx",
 			setupTest: func(env *environment) *txs.Tx {
-				builder, signer, feeCalc := env.factory.NewWallet(preFundedKeys...)
+				builder, signer, feeCalc, err := env.factory.NewWallet(preFundedKeys...)
+				require.NoError(t, err)
 				utx, err := builder.NewCreateSubnetTx(
 					&secp256k1fx.OutputOwners{
 						Threshold: 1,
@@ -248,7 +253,8 @@ func TestStandardBlockComplexity(t *testing.T) {
 
 				endTime := primaryValidator.EndTime
 
-				builder, signer, feeCalc := env.factory.NewWallet(preFundedKeys...)
+				builder, signer, feeCalc, err := env.factory.NewWallet(preFundedKeys...)
+				require.NoError(t, err)
 				uSubnetValTx, err := builder.NewAddSubnetValidatorTx(
 					&txs.SubnetValidator{
 						Validator: txs.Validator{
@@ -274,7 +280,9 @@ func TestStandardBlockComplexity(t *testing.T) {
 				onAcceptState, err := state.NewDiffOn(env.state)
 				require.NoError(t, err)
 
-				feeCalculator := state.PickFeeCalculator(env.config, onAcceptState.GetTimestamp())
+				feeCalculator, err := state.PickFeeCalculator(env.config, onAcceptState, onAcceptState.GetTimestamp())
+				require.NoError(t, err)
+
 				require.NoError(t, subnetValTx.Unsigned.Visit(&executor.StandardTxExecutor{
 					Backend:       env.backend,
 					State:         onAcceptState,
@@ -306,7 +314,8 @@ func TestStandardBlockComplexity(t *testing.T) {
 		{
 			name: "TransformSubnetTx",
 			setupTest: func(env *environment) *txs.Tx {
-				builder, signer, feeCalc := env.factory.NewWallet(preFundedKeys...)
+				builder, signer, feeCalc, err := env.factory.NewWallet(preFundedKeys...)
+				require.NoError(t, err)
 				utx, err := builder.NewTransformSubnetTx(
 					testSubnet1.TxID,          // subnetID
 					ids.GenerateTestID(),      // assetID
@@ -339,7 +348,8 @@ func TestStandardBlockComplexity(t *testing.T) {
 		{
 			name: "TransferSubnetOwnershipTx",
 			setupTest: func(env *environment) *txs.Tx {
-				builder, signer, feeCalc := env.factory.NewWallet(preFundedKeys...)
+				builder, signer, feeCalc, err := env.factory.NewWallet(preFundedKeys...)
+				require.NoError(t, err)
 				utx, err := builder.NewTransferSubnetOwnershipTx(
 					testSubnet1.TxID,
 					&secp256k1fx.OutputOwners{
@@ -384,7 +394,8 @@ func TestStandardBlockComplexity(t *testing.T) {
 				)
 				env.msm.SharedMemory = sharedMemory
 
-				builder, signer, feeCalc := env.factory.NewWallet(preFundedKeys...)
+				builder, signer, feeCalc, err := env.factory.NewWallet(preFundedKeys...)
+				require.NoError(t, err)
 				utx, err := builder.NewImportTx(
 					sourceChain,
 					&secp256k1fx.OutputOwners{
@@ -412,7 +423,8 @@ func TestStandardBlockComplexity(t *testing.T) {
 		{
 			name: "ExportTx",
 			setupTest: func(env *environment) *txs.Tx {
-				builder, signer, feeCalc := env.factory.NewWallet(preFundedKeys...)
+				builder, signer, feeCalc, err := env.factory.NewWallet(preFundedKeys...)
+				require.NoError(t, err)
 				utx, err := builder.NewExportTx(
 					env.ctx.XChainID,
 					[]*avax.TransferableOutput{{
@@ -444,7 +456,8 @@ func TestStandardBlockComplexity(t *testing.T) {
 		{
 			name: "BaseTx",
 			setupTest: func(env *environment) *txs.Tx {
-				builder, signer, feeCalc := env.factory.NewWallet(preFundedKeys...)
+				builder, signer, feeCalc, err := env.factory.NewWallet(preFundedKeys...)
+				require.NoError(t, err)
 				utx, err := builder.NewBaseTx(
 					[]*avax.TransferableOutput{
 						{
@@ -533,6 +546,7 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 	timestamp := time.Now()
 	// One call for each of onCommitState and onAbortState.
 	parentOnAcceptState.EXPECT().GetTimestamp().Return(timestamp).Times(2)
+	parentOnAcceptState.EXPECT().GetCurrentGasCap().Return(commonfees.Gas(1_000_000), nil)
 
 	backend := &backend{
 		lastAccepted: parentID,
@@ -785,8 +799,9 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 
 	// Set expectations for dependencies.
 	timestamp := time.Now()
-	parentState.EXPECT().GetTimestamp().Return(timestamp).Times(1)
-	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
+	parentState.EXPECT().GetTimestamp().Return(timestamp)
+	parentState.EXPECT().GetCurrentGasCap().Return(commonfees.Gas(1_000_000), nil)
+	parentStatelessBlk.EXPECT().Height().Return(uint64(1))
 	mempool.EXPECT().Remove(apricotBlk.Txs()).Times(1)
 
 	blk := manager.NewBlock(apricotBlk)
@@ -1278,8 +1293,10 @@ func TestVerifierVisitStandardBlockWithDuplicateInputs(t *testing.T) {
 
 	// Set expectations for dependencies.
 	timestamp := time.Now()
-	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
-	parentState.EXPECT().GetTimestamp().Return(timestamp).Times(1)
+	parentStatelessBlk.EXPECT().Height().Return(uint64(1))
+	parentState.EXPECT().GetTimestamp().Return(timestamp)
+	parentState.EXPECT().GetCurrentGasCap().Return(commonfees.Gas(1_000_000), nil)
+
 	parentStatelessBlk.EXPECT().Parent().Return(grandParentID).Times(1)
 
 	err = verifier.ApricotStandardBlock(blk)

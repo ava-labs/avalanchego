@@ -6,7 +6,6 @@ package fee
 import (
 	"errors"
 	"fmt"
-	"math"
 
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -15,17 +14,26 @@ import (
 	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
+const TempGasCap = commonfees.Gas(1_000_000) // TODO ABENEGIA: temp const to be replaced with API call
+
 var (
 	errDynamicFeeConfigNotAvailable = errors.New("dynamic fee config not available")
 
 	eUpgradeDynamicFeesConfig = commonfees.DynamicFeesConfig{
 		GasPrice:            commonfees.GasPrice(10 * units.NanoAvax),
 		FeeDimensionWeights: commonfees.Dimensions{1, 1, 1, 1},
-		TempBlockMaxGas:     commonfees.Gas(math.MaxUint64),
+		MaxGasPerSecond:     commonfees.Gas(1_000_000),
+		LeakGasCoeff:        commonfees.Gas(1),
 	}
 
 	customDynamicFeesConfig *commonfees.DynamicFeesConfig
 )
+
+func init() {
+	if err := eUpgradeDynamicFeesConfig.Validate(); err != nil {
+		panic(err)
+	}
+}
 
 func GetDynamicConfig(isEActive bool) (commonfees.DynamicFeesConfig, error) {
 	if !isEActive {
@@ -44,6 +52,9 @@ func ResetDynamicConfig(ctx *snow.Context, customFeesConfig *commonfees.DynamicF
 	}
 	if ctx.NetworkID == constants.MainnetID || ctx.NetworkID == constants.FujiID {
 		return fmt.Errorf("forbidden resetting dynamic fee rates config for network %s", constants.NetworkName(ctx.NetworkID))
+	}
+	if err := customFeesConfig.Validate(); err != nil {
+		return fmt.Errorf("invalid custom fee config: %w", err)
 	}
 
 	customDynamicFeesConfig = customFeesConfig

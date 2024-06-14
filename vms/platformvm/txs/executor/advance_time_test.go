@@ -66,7 +66,9 @@ func TestAdvanceTimeTxUpdatePrimaryNetworkStakers(t *testing.T) {
 	onAbortState, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
-	feeCalculator := state.PickFeeCalculator(env.config, onCommitState.GetTimestamp())
+	feeCalculator, err := state.PickFeeCalculator(env.config, onCommitState, onCommitState.GetTimestamp())
+	require.NoError(err)
+
 	executor := ProposalTxExecutor{
 		OnCommitState: onCommitState,
 		OnAbortState:  onAbortState,
@@ -114,7 +116,9 @@ func TestAdvanceTimeTxTimestampTooEarly(t *testing.T) {
 	onAbortState, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
-	feeCalculator := state.PickFeeCalculator(env.config, onCommitState.GetTimestamp())
+	feeCalculator, err := state.PickFeeCalculator(env.config, onCommitState, onCommitState.GetTimestamp())
+	require.NoError(err)
+
 	executor := ProposalTxExecutor{
 		OnCommitState: onCommitState,
 		OnAbortState:  onAbortState,
@@ -151,7 +155,9 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 		onAbortState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
 
-		feeCalculator := state.PickFeeCalculator(env.config, onCommitState.GetTimestamp())
+		feeCalculator, err := state.PickFeeCalculator(env.config, onCommitState, onCommitState.GetTimestamp())
+		require.NoError(err)
+
 		executor := ProposalTxExecutor{
 			OnCommitState: onCommitState,
 			OnAbortState:  onAbortState,
@@ -182,7 +188,9 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 		onAbortState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
 
-		feeCalculator := state.PickFeeCalculator(env.config, onCommitState.GetTimestamp())
+		feeCalculator, err := state.PickFeeCalculator(env.config, onCommitState, onCommitState.GetTimestamp())
+		require.NoError(err)
+
 		executor := ProposalTxExecutor{
 			OnCommitState: onCommitState,
 			OnAbortState:  onAbortState,
@@ -387,7 +395,9 @@ func TestAdvanceTimeTxUpdateStakers(t *testing.T) {
 			}
 
 			for _, staker := range test.subnetStakers {
-				builder, signer, feeCalc := env.factory.NewWallet(preFundedKeys[0], preFundedKeys[1])
+				builder, signer, feeCalc, err := env.factory.NewWallet(preFundedKeys[0], preFundedKeys[1])
+				require.NoError(err)
+
 				utx, err := builder.NewAddSubnetValidatorTx(
 					&txs.SubnetValidator{
 						Validator: txs.Validator{
@@ -427,7 +437,9 @@ func TestAdvanceTimeTxUpdateStakers(t *testing.T) {
 				onAbortState, err := state.NewDiff(lastAcceptedID, env)
 				require.NoError(err)
 
-				feeCalculator := state.PickFeeCalculator(env.config, onCommitState.GetTimestamp())
+				feeCalculator, err := state.PickFeeCalculator(env.config, onCommitState, onCommitState.GetTimestamp())
+				require.NoError(err)
+
 				executor := ProposalTxExecutor{
 					OnCommitState: onCommitState,
 					OnAbortState:  onAbortState,
@@ -490,7 +502,9 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 	subnetVdr1StartTime := defaultValidateStartTime
 	subnetVdr1EndTime := defaultValidateStartTime.Add(defaultMinStakingDuration)
 
-	builder, signer, feeCalc := env.factory.NewWallet(preFundedKeys[0], preFundedKeys[1])
+	builder, signer, feeCalc, err := env.factory.NewWallet(preFundedKeys[0], preFundedKeys[1])
+	require.NoError(err)
+
 	utx, err := builder.NewAddSubnetValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
@@ -565,7 +579,9 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 	onAbortState, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
-	feeCalculator := state.PickFeeCalculator(env.config, onCommitState.GetTimestamp())
+	feeCalculator, err := state.PickFeeCalculator(env.config, onCommitState, onCommitState.GetTimestamp())
+	require.NoError(err)
+
 	executor := ProposalTxExecutor{
 		OnCommitState: onCommitState,
 		OnAbortState:  onAbortState,
@@ -608,7 +624,8 @@ func TestTrackedSubnet(t *testing.T) {
 
 			subnetVdr1StartTime := defaultValidateStartTime.Add(1 * time.Minute)
 			subnetVdr1EndTime := defaultValidateStartTime.Add(10 * defaultMinStakingDuration).Add(1 * time.Minute)
-			builder, signer, feeCalc := env.factory.NewWallet(preFundedKeys[0], preFundedKeys[1])
+			builder, signer, feeCalc, err := env.factory.NewWallet(preFundedKeys[0], preFundedKeys[1])
+			require.NoError(err)
 			utx, err := builder.NewAddSubnetValidatorTx(
 				&txs.SubnetValidator{
 					Validator: txs.Validator{
@@ -647,7 +664,9 @@ func TestTrackedSubnet(t *testing.T) {
 			onAbortState, err := state.NewDiff(lastAcceptedID, env)
 			require.NoError(err)
 
-			feeCalculator := state.PickFeeCalculator(env.config, onCommitState.GetTimestamp())
+			feeCalculator, err := state.PickFeeCalculator(env.config, onCommitState, onCommitState.GetTimestamp())
+			require.NoError(err)
+
 			executor := ProposalTxExecutor{
 				OnCommitState: onCommitState,
 				OnAbortState:  onAbortState,
@@ -697,7 +716,9 @@ func TestAdvanceTimeTxDelegatorStakerWeight(t *testing.T) {
 	onAbortState, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
-	feeCalculator := state.PickFeeCalculator(env.config, onCommitState.GetTimestamp())
+	feeCalculator, err := state.PickFeeCalculator(env.config, onCommitState, onCommitState.GetTimestamp())
+	require.NoError(err)
+
 	executor := ProposalTxExecutor{
 		OnCommitState: onCommitState,
 		OnAbortState:  onAbortState,
@@ -720,7 +741,9 @@ func TestAdvanceTimeTxDelegatorStakerWeight(t *testing.T) {
 	pendingDelegatorStartTime := pendingValidatorStartTime.Add(1 * time.Second)
 	pendingDelegatorEndTime := pendingDelegatorStartTime.Add(1 * time.Second)
 
-	builder, signer, feeCalc := env.factory.NewWallet(preFundedKeys[0], preFundedKeys[1], preFundedKeys[4])
+	builder, signer, feeCalc, err := env.factory.NewWallet(preFundedKeys[0], preFundedKeys[1], preFundedKeys[4])
+	require.NoError(err)
+
 	utx, err := builder.NewAddDelegatorTx(
 		&txs.Validator{
 			NodeID: nodeID,
@@ -802,7 +825,9 @@ func TestAdvanceTimeTxDelegatorStakers(t *testing.T) {
 	onAbortState, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
-	feeCalculator := state.PickFeeCalculator(env.config, onCommitState.GetTimestamp())
+	feeCalculator, err := state.PickFeeCalculator(env.config, onCommitState, onCommitState.GetTimestamp())
+	require.NoError(err)
+
 	executor := ProposalTxExecutor{
 		OnCommitState: onCommitState,
 		OnAbortState:  onAbortState,
@@ -824,7 +849,8 @@ func TestAdvanceTimeTxDelegatorStakers(t *testing.T) {
 	// Add delegator
 	pendingDelegatorStartTime := pendingValidatorStartTime.Add(1 * time.Second)
 	pendingDelegatorEndTime := pendingDelegatorStartTime.Add(defaultMinStakingDuration)
-	builder, signer, feeCalc := env.factory.NewWallet(preFundedKeys[0], preFundedKeys[1], preFundedKeys[4])
+	builder, signer, feeCalc, err := env.factory.NewWallet(preFundedKeys[0], preFundedKeys[1], preFundedKeys[4])
+	require.NoError(err)
 	utx, err := builder.NewAddDelegatorTx(
 		&txs.Validator{
 			NodeID: nodeID,
@@ -903,7 +929,9 @@ func TestAdvanceTimeTxAfterBanff(t *testing.T) {
 	onAbortState, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
-	feeCalculator := state.PickFeeCalculator(env.config, onCommitState.GetTimestamp())
+	feeCalculator, err := state.PickFeeCalculator(env.config, onCommitState, onCommitState.GetTimestamp())
+	require.NoError(err)
+
 	executor := ProposalTxExecutor{
 		OnCommitState: onCommitState,
 		OnAbortState:  onAbortState,
@@ -946,7 +974,11 @@ func addPendingValidator(
 	nodeID ids.NodeID,
 	keys []*secp256k1.PrivateKey,
 ) (*txs.Tx, error) {
-	builder, signer, feeCalc := env.factory.NewWallet(keys...)
+	builder, signer, feeCalc, err := env.factory.NewWallet(keys...)
+	if err != nil {
+		return nil, err
+	}
+
 	utx, err := builder.NewAddValidatorTx(
 		&txs.Validator{
 			NodeID: nodeID,

@@ -314,13 +314,16 @@ func defaultVM(t *testing.T, f fork) (*VM, *txstest.WalletFactory, database.Data
 	factory := txstest.NewWalletFactory(
 		ctx,
 		&vm.Config,
+		&vm.clock,
 		vm.state,
 	)
 
 	// Create a subnet and store it in testSubnet1
 	// Note: following Banff activation, block acceptance will move
 	// chain time ahead
-	builder, signer, feeCalc := factory.NewWallet(keys[0])
+	builder, signer, feeCalc, err := factory.NewWallet(keys[0])
+	require.NoError(err)
+
 	utx, err := builder.NewCreateSubnetTx(
 		&secp256k1fx.OutputOwners{
 			Threshold: 2,
@@ -362,7 +365,7 @@ func defaultVM(t *testing.T, f fork) (*VM, *txstest.WalletFactory, database.Data
 // Ensure genesis state is parsed from bytes and stored correctly
 func TestGenesis(t *testing.T) {
 	require := require.New(t)
-	vm, _, _, _ := defaultVM(t, latestFork)
+	vm, _, _, _ := defaultVM(t, durango)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
@@ -398,7 +401,8 @@ func TestGenesis(t *testing.T) {
 
 			// we use the first key to fund a subnet creation in [defaultGenesis].
 			// As such we need to account for the subnet creation fee
-			feeCalc := state.PickFeeCalculator(&vm.Config, vm.state.GetTimestamp())
+			feeCalc, err := testReplayFeeCalculator(&vm.Config, defaultGenesisTime, vm.state)
+			require.NoError(err)
 			fee, err := feeCalc.ComputeFee(testSubnet1.Unsigned, testSubnet1.Creds)
 			require.NoError(err)
 			require.Equal(uint64(utxo.Amount)-fee, out.Amount())
@@ -436,7 +440,9 @@ func TestAddValidatorCommit(t *testing.T) {
 	require.NoError(err)
 
 	// create valid tx
-	builder, txSigner, feeCalc := factory.NewWallet(keys[0])
+	builder, txSigner, feeCalc, err := factory.NewWallet(keys[0])
+	require.NoError(err)
+
 	utx, err := builder.NewAddPermissionlessValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
@@ -496,7 +502,8 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 	endTime := startTime.Add(defaultMinStakingDuration)
 
 	// create invalid tx
-	builder, txSigner, feeCalc := factory.NewWallet(keys[0])
+	builder, txSigner, feeCalc, err := factory.NewWallet(keys[0])
+	require.NoError(err)
 	utx, err := builder.NewAddValidatorTx(
 		&txs.Validator{
 			NodeID: nodeID,
@@ -556,7 +563,8 @@ func TestAddValidatorReject(t *testing.T) {
 	)
 
 	// create valid tx
-	builder, txSigner, feeCalc := factory.NewWallet(keys[0])
+	builder, txSigner, feeCalc, err := factory.NewWallet(keys[0])
+	require.NoError(err)
 	utx, err := builder.NewAddValidatorTx(
 		&txs.Validator{
 			NodeID: nodeID,
@@ -610,7 +618,8 @@ func TestAddValidatorInvalidNotReissued(t *testing.T) {
 	require.NoError(err)
 
 	// create valid tx
-	builder, txSigner, feeCalc := factory.NewWallet(keys[0])
+	builder, txSigner, feeCalc, err := factory.NewWallet(keys[0])
+	require.NoError(err)
 	utx, err := builder.NewAddPermissionlessValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
@@ -661,7 +670,9 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 	// create valid tx
 	// note that [startTime, endTime] is a subset of time that keys[0]
 	// validates primary network ([defaultValidateStartTime, defaultValidateEndTime])
-	builder, txSigner, feeCalc := factory.NewWallet(testSubnet1ControlKeys[0], testSubnet1ControlKeys[1])
+	builder, txSigner, feeCalc, err := factory.NewWallet(testSubnet1ControlKeys[0], testSubnet1ControlKeys[1])
+	require.NoError(err)
+
 	utx, err := builder.NewAddSubnetValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
@@ -714,7 +725,9 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 	// create valid tx
 	// note that [startTime, endTime] is a subset of time that keys[0]
 	// validates primary network ([defaultValidateStartTime, defaultValidateEndTime])
-	builder, txSigner, feeCalc := factory.NewWallet(testSubnet1ControlKeys[1], testSubnet1ControlKeys[2])
+	builder, txSigner, feeCalc, err := factory.NewWallet(testSubnet1ControlKeys[1], testSubnet1ControlKeys[2])
+	require.NoError(err)
+
 	utx, err := builder.NewAddSubnetValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
@@ -906,7 +919,9 @@ func TestCreateChain(t *testing.T) {
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
-	builder, txSigner, feeCalc := factory.NewWallet(testSubnet1ControlKeys[0], testSubnet1ControlKeys[1])
+	builder, txSigner, feeCalc, err := factory.NewWallet(testSubnet1ControlKeys[0], testSubnet1ControlKeys[1])
+	require.NoError(err)
+
 	utx, err := builder.NewCreateChainTx(
 		testSubnet1.ID(),
 		nil,
@@ -957,7 +972,8 @@ func TestCreateSubnet(t *testing.T) {
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
-	builder, txSigner, feeCalc := factory.NewWallet(keys[0])
+	builder, txSigner, feeCalc, err := factory.NewWallet(keys[0])
+	require.NoError(err)
 	uCreateSubnetTx, err := builder.NewCreateSubnetTx(
 		&secp256k1fx.OutputOwners{
 			Threshold: 1,
@@ -1073,8 +1089,10 @@ func TestAtomicImport(t *testing.T) {
 	mutableSharedMemory.SharedMemory = m.NewSharedMemory(vm.ctx.ChainID)
 	peerSharedMemory := m.NewSharedMemory(vm.ctx.XChainID)
 
-	builder, _, feeCalc := factory.NewWallet(keys[0])
-	_, err := builder.NewImportTx(
+	builder, _, feeCalc, err := factory.NewWallet(keys[0])
+	require.NoError(err)
+
+	_, err = builder.NewImportTx(
 		vm.ctx.XChainID,
 		&secp256k1fx.OutputOwners{
 			Threshold: 1,
@@ -1114,7 +1132,9 @@ func TestAtomicImport(t *testing.T) {
 		},
 	}))
 
-	builder, txSigner, feeCalc := factory.NewWallet(recipientKey)
+	builder, txSigner, feeCalc, err := factory.NewWallet(recipientKey)
+	require.NoError(err)
+
 	utx, err := builder.NewImportTx(
 		vm.ctx.XChainID,
 		&secp256k1fx.OutputOwners{
@@ -2137,7 +2157,8 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 	sk, err := bls.NewSecretKey()
 	require.NoError(err)
 
-	builder, txSigner, feeCalc := factory.NewWallet(keys[0])
+	builder, txSigner, feeCalc, err := factory.NewWallet(keys[0])
+	require.NoError(err)
 	uAddValTx, err := builder.NewAddPermissionlessValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
@@ -2206,7 +2227,9 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 	require.NoError(createSubnetBlock.Accept(context.Background()))
 	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
-	builder, txSigner, feeCalc = factory.NewWallet(key, keys[1])
+	builder, txSigner, feeCalc, err = factory.NewWallet(key, keys[1])
+	require.NoError(err)
+
 	uAddSubnetValTx, err := builder.NewAddSubnetValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
@@ -2227,7 +2250,9 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 	addSubnetValidatorTx, err := walletsigner.SignUnsigned(context.Background(), txSigner, uAddSubnetValTx)
 	require.NoError(err)
 
-	builder, txSigner, feeCalc = factory.NewWallet(key, keys[2])
+	builder, txSigner, feeCalc, err = factory.NewWallet(key, keys[2])
+	require.NoError(err)
+
 	uRemoveSubnetValTx, err := builder.NewRemoveSubnetValidatorTx(
 		nodeID,
 		createSubnetTx.ID(),
@@ -2269,7 +2294,8 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
-	builder, txSigner, feeCalc := factory.NewWallet(keys[0])
+	builder, txSigner, feeCalc, err := factory.NewWallet(keys[0])
+	require.NoError(err)
 	uCreateSubnetTx, err := builder.NewCreateSubnetTx(
 		&secp256k1fx.OutputOwners{
 			Threshold: 1,
@@ -2360,10 +2386,11 @@ func TestBaseTx(t *testing.T) {
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
-	sendAmt := uint64(100000)
+	sendAmt := uint64(100_000)
 	changeAddr := ids.ShortEmpty
 
-	builder, txSigner, feeCalc := factory.NewWallet(keys[0])
+	builder, txSigner, feeCalc, err := factory.NewWallet(keys[0])
+	require.NoError(err)
 	utx, err := builder.NewBaseTx(
 		[]*avax.TransferableOutput{
 			{
@@ -2423,7 +2450,9 @@ func TestBaseTx(t *testing.T) {
 	}
 	require.Equal(totalOutputAmt, key0OutputAmt+key1OutputAmt+changeAddrOutputAmt)
 
-	feeCalc = state.PickFeeCalculator(&vm.Config, vm.state.GetTimestamp())
+	feeCalc, err = state.PickFeeCalculator(&vm.Config, vm.state, vm.state.GetTimestamp())
+	require.NoError(err)
+
 	fee, err := feeCalc.ComputeFee(baseTx.Unsigned, baseTx.Creds)
 	require.NoError(err)
 	require.Equal(fee, totalInputAmt-totalOutputAmt)
@@ -2446,7 +2475,7 @@ func TestBaseTx(t *testing.T) {
 
 func TestPruneMempool(t *testing.T) {
 	require := require.New(t)
-	vm, factory, _, _ := defaultVM(t, latestFork)
+	vm, factory, _, _ := defaultVM(t, durango)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
@@ -2454,7 +2483,8 @@ func TestPruneMempool(t *testing.T) {
 	sendAmt := uint64(100000)
 	changeAddr := ids.ShortEmpty
 
-	builder, txSigner, feeCalc := factory.NewWallet(keys[0])
+	builder, txSigner, feeCalc, err := factory.NewWallet(keys[0])
+	require.NoError(err)
 	utx, err := builder.NewBaseTx(
 		[]*avax.TransferableOutput{
 			{
@@ -2498,7 +2528,9 @@ func TestPruneMempool(t *testing.T) {
 	sk, err := bls.NewSecretKey()
 	require.NoError(err)
 
-	builder, txSigner, feeCalc = factory.NewWallet(keys[1])
+	builder, txSigner, feeCalc, err = factory.NewWallet(keys[1])
+	require.NoError(err)
+
 	uAddValTx, err := builder.NewAddPermissionlessValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{

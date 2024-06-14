@@ -34,15 +34,18 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
 	avajson "github.com/ava-labs/avalanchego/utils/json"
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 	vmkeystore "github.com/ava-labs/avalanchego/vms/components/keystore"
 	pchainapi "github.com/ava-labs/avalanchego/vms/platformvm/api"
 	blockbuilder "github.com/ava-labs/avalanchego/vms/platformvm/block/builder"
@@ -75,8 +78,36 @@ var (
 	}
 )
 
-func defaultService(t *testing.T, f fork) (*Service, *mutableSharedMemory, *txstest.WalletFactory) {
-	vm, factory, _, mutableSharedMemory := defaultVM(t, f)
+func testReplayFeeCalculator(cfg *config.Config, parentBlkTime time.Time, state state.Chain) (*fee.Calculator, error) {
+	var (
+		childBlkTime = state.GetTimestamp()
+		isEActive    = cfg.UpgradeConfig.IsEActivated(childBlkTime)
+
+		feeCalculator *fee.Calculator
+	)
+
+	if !isEActive {
+		feeCalculator = fee.NewStaticCalculator(cfg.StaticFeeConfig, cfg.UpgradeConfig, childBlkTime)
+	} else {
+		feesCfg, err := fee.GetDynamicConfig(isEActive)
+		if err != nil {
+			return nil, fmt.Errorf("failed retrieving dynamic fees config: %w", err)
+		}
+		currentGasCap, err := state.GetCurrentGasCap()
+		if err != nil {
+			return nil, fmt.Errorf("failed retrieving gas cap: %w", err)
+		}
+
+		elapsedTime := childBlkTime.Unix() - parentBlkTime.Unix()
+		maxGas := commonfees.MaxGas(feesCfg, currentGasCap, uint64(elapsedTime))
+		feesMan := commonfees.NewManager(feesCfg.GasPrice)
+		feeCalculator = fee.NewDynamicCalculator(feesMan, maxGas)
+	}
+	return feeCalculator, nil
+}
+
+func defaultService(t *testing.T) (*Service, *mutableSharedMemory, *txstest.WalletFactory) {
+	vm, factory, _, mutableSharedMemory := defaultVM(t, latestFork)
 
 	return &Service{
 		vm:          vm,
@@ -90,7 +121,7 @@ func defaultService(t *testing.T, f fork) (*Service, *mutableSharedMemory, *txst
 func TestExportKey(t *testing.T) {
 	require := require.New(t)
 
-	service, _, _ := defaultService(t, latestFork)
+	service, _, _ := defaultService(t)
 	service.vm.ctx.Lock.Lock()
 
 	ks := keystore.New(logging.NoLog{}, memdb.New())
@@ -120,7 +151,7 @@ func TestExportKey(t *testing.T) {
 // Test issuing a tx and accepted
 func TestGetTxStatus(t *testing.T) {
 	require := require.New(t)
-	service, mutableSharedMemory, factory := defaultService(t, latestFork)
+	service, mutableSharedMemory, factory := defaultService(t)
 	service.vm.ctx.Lock.Lock()
 
 	recipientKey, err := secp256k1.NewPrivateKey()
@@ -168,7 +199,9 @@ func TestGetTxStatus(t *testing.T) {
 
 	mutableSharedMemory.SharedMemory = sm
 
-	builder, signer, feeCalc := factory.NewWallet(recipientKey)
+	builder, signer, feeCalc, err := factory.NewWallet(recipientKey)
+	require.NoError(err)
+
 	utx, err := builder.NewImportTx(
 		service.vm.ctx.XChainID,
 		&secp256k1fx.OutputOwners{
@@ -222,7 +255,9 @@ func TestGetTx(t *testing.T) {
 		{
 			"standard block",
 			func(_ *Service, factory *txstest.WalletFactory) (*txs.Tx, error) {
-				builder, signer, feeCalc := factory.NewWallet(testSubnet1ControlKeys[0], testSubnet1ControlKeys[1])
+				builder, signer, feeCalc, err := factory.NewWallet(testSubnet1ControlKeys[0], testSubnet1ControlKeys[1])
+				require.NoError(t, err)
+
 				utx, err := builder.NewCreateChainTx(
 					testSubnet1.ID(),
 					[]byte{},
@@ -250,7 +285,9 @@ func TestGetTx(t *testing.T) {
 					Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
 				}
 
-				builder, txSigner, feeCalc := factory.NewWallet(keys[0])
+				builder, txSigner, feeCalc, err := factory.NewWallet(keys[0])
+				require.NoError(t, err)
+
 				utx, err := builder.NewAddPermissionlessValidatorTx(
 					&txs.SubnetValidator{
 						Validator: txs.Validator{
@@ -279,7 +316,9 @@ func TestGetTx(t *testing.T) {
 		{
 			"atomic block",
 			func(service *Service, factory *txstest.WalletFactory) (*txs.Tx, error) {
-				builder, signer, feeCalc := factory.NewWallet(keys[0])
+				builder, signer, feeCalc, err := factory.NewWallet(keys[0])
+				require.NoError(t, err)
+
 				utx, err := builder.NewExportTx(
 					service.vm.ctx.XChainID,
 					[]*avax.TransferableOutput{{
@@ -313,7 +352,7 @@ func TestGetTx(t *testing.T) {
 			)
 			t.Run(testName, func(t *testing.T) {
 				require := require.New(t)
-				service, _, txBuilder := defaultService(t, latestFork)
+				service, _, txBuilder := defaultService(t)
 				service.vm.ctx.Lock.Lock()
 
 				tx, err := test.createTx(service, txBuilder)
@@ -377,7 +416,7 @@ func TestGetTx(t *testing.T) {
 
 func TestGetBalance(t *testing.T) {
 	require := require.New(t)
-	service, _, _ := defaultService(t, latestFork)
+	service, _, _ := defaultService(t)
 
 	// Ensure GetStake is correct for each of the genesis validators
 	genesis, _ := defaultGenesis(t, service.vm.ctx.AVAXAssetID)
@@ -394,7 +433,8 @@ func TestGetBalance(t *testing.T) {
 		if idx == 0 {
 			// we use the first key to fund a subnet creation in [defaultGenesis].
 			// As such we need to account for the subnet creation fee
-			feeCalc := state.PickFeeCalculator(&service.vm.Config, service.vm.state.GetTimestamp())
+			feeCalc, err := testReplayFeeCalculator(&service.vm.Config, defaultGenesisTime, service.vm.state)
+			require.NoError(err)
 			fee, err := feeCalc.ComputeFee(testSubnet1.Unsigned, testSubnet1.Creds)
 			require.NoError(err)
 			balance = defaultBalance - fee
@@ -408,7 +448,7 @@ func TestGetBalance(t *testing.T) {
 
 func TestGetStake(t *testing.T) {
 	require := require.New(t)
-	service, _, factory := defaultService(t, durango)
+	service, _, factory := defaultService(t)
 
 	// Ensure GetStake is correct for each of the genesis validators
 	genesis, _ := defaultGenesis(t, service.vm.ctx.AVAXAssetID)
@@ -480,14 +520,20 @@ func TestGetStake(t *testing.T) {
 	delegatorNodeID := genesisNodeIDs[0]
 	delegatorStartTime := defaultValidateStartTime
 	delegatorEndTime := defaultGenesisTime.Add(defaultMinStakingDuration)
-	builder, signer, feeCalc := factory.NewWallet(keys[0])
-	utx, err := builder.NewAddDelegatorTx(
-		&txs.Validator{
-			NodeID: delegatorNodeID,
-			Start:  uint64(delegatorStartTime.Unix()),
-			End:    uint64(delegatorEndTime.Unix()),
-			Wght:   stakeAmount,
+	builder, sign, feeCalc, err := factory.NewWallet(keys[0])
+	require.NoError(err)
+
+	utx, err := builder.NewAddPermissionlessDelegatorTx(
+		&txs.SubnetValidator{
+			Validator: txs.Validator{
+				NodeID: delegatorNodeID,
+				Start:  uint64(delegatorStartTime.Unix()),
+				End:    uint64(delegatorEndTime.Unix()),
+				Wght:   stakeAmount,
+			},
+			Subnet: constants.PrimaryNetworkID,
 		},
+		service.vm.ctx.AVAXAssetID,
 		&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
@@ -499,10 +545,10 @@ func TestGetStake(t *testing.T) {
 		}),
 	)
 	require.NoError(err)
-	tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
+	tx, err := walletsigner.SignUnsigned(context.Background(), sign, utx)
 	require.NoError(err)
 
-	addDelTx := tx.Unsigned.(*txs.AddDelegatorTx)
+	addDelTx := tx.Unsigned.(*txs.AddPermissionlessDelegatorTx)
 	staker, err := state.NewCurrentStaker(
 		tx.ID(),
 		addDelTx,
@@ -542,15 +588,26 @@ func TestGetStake(t *testing.T) {
 
 	// Make sure this works for pending stakers
 	// Add a pending staker
+	sk, err := bls.NewSecretKey()
+	require.NoError(err)
 	stakeAmount = service.vm.MinValidatorStake + 54321
 	pendingStakerNodeID := ids.GenerateTestNodeID()
 	pendingStakerEndTime := uint64(defaultGenesisTime.Add(defaultMinStakingDuration).Unix())
-	utx2, err := builder.NewAddValidatorTx(
-		&txs.Validator{
-			NodeID: pendingStakerNodeID,
-			Start:  uint64(defaultGenesisTime.Unix()),
-			End:    pendingStakerEndTime,
-			Wght:   stakeAmount,
+	utx2, err := builder.NewAddPermissionlessValidatorTx(
+		&txs.SubnetValidator{
+			Validator: txs.Validator{
+				NodeID: pendingStakerNodeID,
+				Start:  uint64(defaultGenesisTime.Unix()),
+				End:    pendingStakerEndTime,
+				Wght:   stakeAmount,
+			},
+			Subnet: constants.PlatformChainID,
+		},
+		signer.NewProofOfPossession(sk),
+		service.vm.ctx.AVAXAssetID,
+		&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
 		},
 		&secp256k1fx.OutputOwners{
 			Threshold: 1,
@@ -564,12 +621,12 @@ func TestGetStake(t *testing.T) {
 		}),
 	)
 	require.NoError(err)
-	tx, err = walletsigner.SignUnsigned(context.Background(), signer, utx2)
+	tx, err = walletsigner.SignUnsigned(context.Background(), sign, utx2)
 	require.NoError(err)
 
 	staker, err = state.NewPendingStaker(
 		tx.ID(),
-		tx.Unsigned.(*txs.AddValidatorTx),
+		tx.Unsigned.(*txs.AddPermissionlessValidatorTx),
 	)
 	require.NoError(err)
 
@@ -599,7 +656,7 @@ func TestGetStake(t *testing.T) {
 
 func TestGetCurrentValidators(t *testing.T) {
 	require := require.New(t)
-	service, _, factory := defaultService(t, durango)
+	service, _, factory := defaultService(t)
 
 	genesis, _ := defaultGenesis(t, service.vm.ctx.AVAXAssetID)
 
@@ -633,14 +690,20 @@ func TestGetCurrentValidators(t *testing.T) {
 
 	service.vm.ctx.Lock.Lock()
 
-	builder, signer, feeCalc := factory.NewWallet(keys[0])
-	utx, err := builder.NewAddDelegatorTx(
-		&txs.Validator{
-			NodeID: validatorNodeID,
-			Start:  uint64(delegatorStartTime.Unix()),
-			End:    uint64(delegatorEndTime.Unix()),
-			Wght:   stakeAmount,
+	builder, signer, feeCalc, err := factory.NewWallet(keys[0])
+	require.NoError(err)
+
+	utx, err := builder.NewAddPermissionlessDelegatorTx(
+		&txs.SubnetValidator{
+			Validator: txs.Validator{
+				NodeID: validatorNodeID,
+				Start:  uint64(delegatorStartTime.Unix()),
+				End:    uint64(delegatorEndTime.Unix()),
+				Wght:   stakeAmount,
+			},
+			Subnet: constants.PrimaryNetworkID,
 		},
+		service.vm.ctx.AVAXAssetID,
 		&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
@@ -655,7 +718,7 @@ func TestGetCurrentValidators(t *testing.T) {
 	delTx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
 	require.NoError(err)
 
-	addDelTx := delTx.Unsigned.(*txs.AddDelegatorTx)
+	addDelTx := delTx.Unsigned.(*txs.AddPermissionlessDelegatorTx)
 	staker, err := state.NewCurrentStaker(
 		delTx.ID(),
 		addDelTx,
@@ -735,7 +798,7 @@ func TestGetCurrentValidators(t *testing.T) {
 
 func TestGetTimestamp(t *testing.T) {
 	require := require.New(t)
-	service, _, _ := defaultService(t, latestFork)
+	service, _, _ := defaultService(t)
 
 	reply := GetTimestampReply{}
 	require.NoError(service.GetTimestamp(nil, nil, &reply))
@@ -771,12 +834,14 @@ func TestGetBlock(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
-			service, _, factory := defaultService(t, latestFork)
+			service, _, factory := defaultService(t)
 			service.vm.ctx.Lock.Lock()
 
 			service.vm.StaticFeeConfig.CreateAssetTxFee = 100 * defaultTxFee
 
-			builder, signer, feeCalc := factory.NewWallet(testSubnet1ControlKeys[0], testSubnet1ControlKeys[1])
+			builder, signer, feeCalc, err := factory.NewWallet(testSubnet1ControlKeys[0], testSubnet1ControlKeys[1])
+			require.NoError(err)
+
 			utx, err := builder.NewCreateChainTx(
 				testSubnet1.ID(),
 				[]byte{},
@@ -1064,7 +1129,7 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 
 func TestServiceGetSubnets(t *testing.T) {
 	require := require.New(t)
-	service, _, _ := defaultService(t, latestFork)
+	service, _, _ := defaultService(t)
 
 	testSubnet1ID := testSubnet1.ID()
 

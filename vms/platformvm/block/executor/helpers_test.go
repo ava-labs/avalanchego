@@ -182,6 +182,7 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller, f fork) *environment 
 		res.factory = txstest.NewWalletFactory(
 			res.ctx,
 			res.config,
+			res.clk,
 			res.state,
 		)
 	} else {
@@ -192,6 +193,7 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller, f fork) *environment 
 		res.factory = txstest.NewWalletFactory(
 			res.ctx,
 			res.config,
+			res.clk,
 			res.mockedState,
 		)
 
@@ -272,7 +274,11 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller, f fork) *environment 
 }
 
 func addSubnet(env *environment) {
-	builder, signer, feeCalc := env.factory.NewWallet(preFundedKeys[0])
+	builder, signer, feeCalc, err := env.factory.NewWallet(preFundedKeys[0])
+	if err != nil {
+		panic(err)
+	}
+
 	utx, err := builder.NewCreateSubnetTx(
 		&secp256k1fx.OutputOwners{
 			Threshold: 2,
@@ -301,8 +307,11 @@ func addSubnet(env *environment) {
 	if err != nil {
 		panic(err)
 	}
+	feeCalculator, err := state.PickFeeCalculator(env.config, stateDiff, stateDiff.GetTimestamp())
+	if err != nil {
+		panic(err)
+	}
 
-	feeCalculator := state.PickFeeCalculator(env.config, stateDiff.GetTimestamp())
 	executor := executor.StandardTxExecutor{
 		Backend:       env.backend,
 		State:         stateDiff,
@@ -523,7 +532,11 @@ func addPendingValidator(
 	rewardAddress ids.ShortID,
 	keys []*secp256k1.PrivateKey,
 ) (*txs.Tx, error) {
-	builder, signer, feeCalc := env.factory.NewWallet(keys...)
+	builder, signer, feeCalc, err := env.factory.NewWallet(keys...)
+	if err != nil {
+		return nil, err
+	}
+
 	utx, err := builder.NewAddValidatorTx(
 		&txs.Validator{
 			NodeID: nodeID,

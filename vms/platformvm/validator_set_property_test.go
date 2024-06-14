@@ -258,8 +258,12 @@ func takeValidatorsSnapshotAtCurrentHeight(vm *VM, validatorsSetByHeightAndSubne
 }
 
 func addSubnetValidator(vm *VM, data *validatorInputData, subnetID ids.ID) (*state.Staker, error) {
-	factory := txstest.NewWalletFactory(vm.ctx, &vm.Config, vm.state)
-	builder, signer, feeCalc := factory.NewWallet(keys[0], keys[1])
+	factory := txstest.NewWalletFactory(vm.ctx, &vm.Config, &vm.clock, vm.state)
+	builder, signer, feeCalc, err := factory.NewWallet(keys[0], keys[1])
+	if err != nil {
+		return nil, err
+	}
+
 	utx, err := builder.NewAddSubnetValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
@@ -294,8 +298,12 @@ func addPrimaryValidatorWithBLSKey(vm *VM, data *validatorInputData) (*state.Sta
 		return nil, fmt.Errorf("failed to generate BLS key: %w", err)
 	}
 
-	factory := txstest.NewWalletFactory(vm.ctx, &vm.Config, vm.state)
-	builder, txSigner, feeCalc := factory.NewWallet(keys[0], keys[1])
+	factory := txstest.NewWalletFactory(vm.ctx, &vm.Config, &vm.clock, vm.state)
+	builder, txSigner, feeCalc, err := factory.NewWallet(keys[0], keys[1])
+	if err != nil {
+		return nil, err
+	}
+
 	utx, err := builder.NewAddPermissionlessValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
@@ -720,8 +728,12 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 	// Create a subnet and store it in testSubnet1
 	// Note: following Banff activation, block acceptance will move
 	// chain time ahead
-	factory := txstest.NewWalletFactory(vm.ctx, &vm.Config, vm.state)
-	builder, signer, feeCalc := factory.NewWallet(keys[len(keys)-1])
+	factory := txstest.NewWalletFactory(vm.ctx, &vm.Config, &vm.clock, vm.state)
+	builder, signer, feeCalc, err := factory.NewWallet(keys[len(keys)-1])
+	if err != nil {
+		return nil, ids.Empty, err
+	}
+
 	utx, err := builder.NewCreateSubnetTx(
 		&secp256k1fx.OutputOwners{
 			Threshold: 1,

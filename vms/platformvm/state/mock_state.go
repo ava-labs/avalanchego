@@ -20,6 +20,7 @@ import (
 	validators "github.com/ava-labs/avalanchego/snow/validators"
 	logging "github.com/ava-labs/avalanchego/utils/logging"
 	avax "github.com/ava-labs/avalanchego/vms/components/avax"
+	fees "github.com/ava-labs/avalanchego/vms/components/fees"
 	block "github.com/ava-labs/avalanchego/vms/platformvm/block"
 	fx "github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	status "github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -195,6 +196,21 @@ func (m *MockChain) GetCurrentDelegatorIterator(arg0 ids.ID, arg1 ids.NodeID) (S
 func (mr *MockChainMockRecorder) GetCurrentDelegatorIterator(arg0, arg1 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCurrentDelegatorIterator", reflect.TypeOf((*MockChain)(nil).GetCurrentDelegatorIterator), arg0, arg1)
+}
+
+// GetCurrentGasCap mocks base method.
+func (m *MockChain) GetCurrentGasCap() (fees.Gas, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetCurrentGasCap")
+	ret0, _ := ret[0].(fees.Gas)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetCurrentGasCap indicates an expected call of GetCurrentGasCap.
+func (mr *MockChainMockRecorder) GetCurrentGasCap() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCurrentGasCap", reflect.TypeOf((*MockChain)(nil).GetCurrentGasCap))
 }
 
 // GetCurrentStakerIterator mocks base method.
@@ -423,6 +439,18 @@ func (m *MockChain) PutPendingValidator(arg0 *Staker) {
 func (mr *MockChainMockRecorder) PutPendingValidator(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutPendingValidator", reflect.TypeOf((*MockChain)(nil).PutPendingValidator), arg0)
+}
+
+// SetCurrentGasCap mocks base method.
+func (m *MockChain) SetCurrentGasCap(arg0 fees.Gas) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "SetCurrentGasCap", arg0)
+}
+
+// SetCurrentGasCap indicates an expected call of SetCurrentGasCap.
+func (mr *MockChainMockRecorder) SetCurrentGasCap(arg0 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetCurrentGasCap", reflect.TypeOf((*MockChain)(nil).SetCurrentGasCap), arg0)
 }
 
 // SetCurrentSupply mocks base method.
@@ -659,6 +687,21 @@ func (mr *MockDiffMockRecorder) GetCurrentDelegatorIterator(arg0, arg1 any) *gom
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCurrentDelegatorIterator", reflect.TypeOf((*MockDiff)(nil).GetCurrentDelegatorIterator), arg0, arg1)
 }
 
+// GetCurrentGasCap mocks base method.
+func (m *MockDiff) GetCurrentGasCap() (fees.Gas, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetCurrentGasCap")
+	ret0, _ := ret[0].(fees.Gas)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetCurrentGasCap indicates an expected call of GetCurrentGasCap.
+func (mr *MockDiffMockRecorder) GetCurrentGasCap() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCurrentGasCap", reflect.TypeOf((*MockDiff)(nil).GetCurrentGasCap))
+}
+
 // GetCurrentStakerIterator mocks base method.
 func (m *MockDiff) GetCurrentStakerIterator() (StakerIterator, error) {
 	m.ctrl.T.Helper()
@@ -885,6 +928,18 @@ func (m *MockDiff) PutPendingValidator(arg0 *Staker) {
 func (mr *MockDiffMockRecorder) PutPendingValidator(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutPendingValidator", reflect.TypeOf((*MockDiff)(nil).PutPendingValidator), arg0)
+}
+
+// SetCurrentGasCap mocks base method.
+func (m *MockDiff) SetCurrentGasCap(arg0 fees.Gas) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "SetCurrentGasCap", arg0)
+}
+
+// SetCurrentGasCap indicates an expected call of SetCurrentGasCap.
+func (mr *MockDiffMockRecorder) SetCurrentGasCap(arg0 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetCurrentGasCap", reflect.TypeOf((*MockDiff)(nil).SetCurrentGasCap), arg0)
 }
 
 // SetCurrentSupply mocks base method.
@@ -1246,6 +1301,21 @@ func (mr *MockStateMockRecorder) GetCurrentDelegatorIterator(arg0, arg1 any) *go
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCurrentDelegatorIterator", reflect.TypeOf((*MockState)(nil).GetCurrentDelegatorIterator), arg0, arg1)
 }
 
+// GetCurrentGasCap mocks base method.
+func (m *MockState) GetCurrentGasCap() (fees.Gas, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetCurrentGasCap")
+	ret0, _ := ret[0].(fees.Gas)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetCurrentGasCap indicates an expected call of GetCurrentGasCap.
+func (mr *MockStateMockRecorder) GetCurrentGasCap() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCurrentGasCap", reflect.TypeOf((*MockState)(nil).GetCurrentGasCap))
+}
+
 // GetCurrentStakerIterator mocks base method.
 func (m *MockState) GetCurrentStakerIterator() (StakerIterator, error) {
 	m.ctrl.T.Helper()
@@ -1576,6 +1646,18 @@ func (m *MockState) ReindexBlocks(arg0 sync.Locker, arg1 logging.Logger) error {
 func (mr *MockStateMockRecorder) ReindexBlocks(arg0, arg1 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReindexBlocks", reflect.TypeOf((*MockState)(nil).ReindexBlocks), arg0, arg1)
+}
+
+// SetCurrentGasCap mocks base method.
+func (m *MockState) SetCurrentGasCap(arg0 fees.Gas) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "SetCurrentGasCap", arg0)
+}
+
+// SetCurrentGasCap indicates an expected call of SetCurrentGasCap.
+func (mr *MockStateMockRecorder) SetCurrentGasCap(arg0 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetCurrentGasCap", reflect.TypeOf((*MockState)(nil).SetCurrentGasCap), arg0)
 }
 
 // SetCurrentSupply mocks base method.

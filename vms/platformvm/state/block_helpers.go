@@ -74,18 +74,31 @@ func GetNextStakerChangeTime(state Chain) (time.Time, error) {
 }
 
 // [PickFeeCalculator] creates either a static or a dynamic fee calculator, depending on the active upgrade
-func PickFeeCalculator(cfg *config.Config, time time.Time) *fee.Calculator {
+// [PickFeeCalculator] does not mnodify [state]
+func PickFeeCalculator(cfg *config.Config, state Chain, parentBlkTime time.Time) (*fee.Calculator, error) {
 	var (
-		isEActive     = cfg.UpgradeConfig.IsEActivated(time)
+		childBlkTime = state.GetTimestamp()
+		isEActive    = cfg.UpgradeConfig.IsEActivated(childBlkTime)
+
 		feeCalculator *fee.Calculator
 	)
 
 	if !isEActive {
-		feeCalculator = fee.NewStaticCalculator(cfg.StaticFeeConfig, cfg.UpgradeConfig, time)
+		feeCalculator = fee.NewStaticCalculator(cfg.StaticFeeConfig, cfg.UpgradeConfig, childBlkTime)
 	} else {
-		feesCfg, _ := fee.GetDynamicConfig(isEActive)
+		feesCfg, err := fee.GetDynamicConfig(isEActive)
+		if err != nil {
+			return nil, fmt.Errorf("failed retrieving dynamic fees config: %w", err)
+		}
+		currentGasCap, err := state.GetCurrentGasCap()
+		if err != nil {
+			return nil, fmt.Errorf("failed retrieving gas cap: %w", err)
+		}
+
+		elapsedTime := childBlkTime.Unix() - parentBlkTime.Unix()
+		maxGas := commonfees.MaxGas(feesCfg, currentGasCap, uint64(elapsedTime))
 		feesMan := commonfees.NewManager(feesCfg.GasPrice)
-		feeCalculator = fee.NewDynamicCalculator(feesMan, feesCfg.TempBlockMaxGas)
+		feeCalculator = fee.NewDynamicCalculator(feesMan, maxGas)
 	}
-	return feeCalculator
+	return feeCalculator, nil
 }
