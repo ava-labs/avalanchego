@@ -25,8 +25,6 @@ var (
 )
 
 type Wallet interface {
-	Context
-
 	// Builder returns the builder that will be used to create the transactions.
 	Builder() Builder
 
