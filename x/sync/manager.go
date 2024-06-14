@@ -61,6 +61,7 @@ type workItem struct {
 	end         maybe.Maybe[[]byte]
 	priority    priority
 	localRootID ids.ID
+	attempt     int
 }
 
 func newWorkItem(localRootID ids.ID, start maybe.Maybe[[]byte], end maybe.Maybe[[]byte], priority priority) *workItem {
@@ -416,6 +417,7 @@ func (m *Manager) handleRangeProofResponse(
 		m.metrics.RequestFailed()
 
 		work.priority = retryPriority
+		work.attempt++
 		m.unprocessedWork.Insert(work)
 
 		return nil // swallow errors that come from peers
@@ -490,6 +492,7 @@ func (m *Manager) handleChangeProofResponse(
 		m.metrics.RequestFailed()
 
 		work.priority = retryPriority
+		work.attempt++
 		m.unprocessedWork.Insert(work)
 
 		return nil // swallow errors that come from peers

@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -83,4 +84,17 @@ func verifyRangeProof(
 		return fmt.Errorf("%w due to %w", errInvalidRangeProof, err)
 	}
 	return nil
+}
+
+func calculateBackoff(attempt int) time.Duration {
+	if attempt == 0 {
+		return 0
+	}
+
+	retryWait := initialRetryWait * time.Duration(math.Pow(retryWaitFactor, float64(attempt)))
+	if retryWait > maxRetryWait || retryWait < 0 { // Handle overflows with negative check.
+		retryWait = maxRetryWait
+	}
+
+	return retryWait
 }
