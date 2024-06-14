@@ -127,3 +127,12 @@ type terminationCondition struct {
 	alphaConfidence int
 	beta            int
 }
+
+func newSingleTerminationCondition(alphaConfidence int, beta int) []terminationCondition {
+	return []terminationCondition{
+		{
+			alphaConfidence: alphaConfidence,
+			beta:            beta,
+		},
+	}
+}
