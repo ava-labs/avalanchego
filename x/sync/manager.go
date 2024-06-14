@@ -19,6 +19,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/maybe"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -33,13 +34,14 @@ const (
 )
 
 var (
-	ErrAlreadyStarted             = errors.New("cannot start a Manager that has already been started")
-	ErrAlreadyClosed              = errors.New("Manager is closed")
-	ErrNoClientProvided           = errors.New("client is a required field of the sync config")
-	ErrNoDatabaseProvided         = errors.New("sync database is a required field of the sync config")
-	ErrNoLogProvided              = errors.New("log is a required field of the sync config")
-	ErrZeroWorkLimit              = errors.New("simultaneous work limit must be greater than 0")
-	ErrFinishedWithUnexpectedRoot = errors.New("finished syncing with an unexpected root")
+	ErrAlreadyStarted              = errors.New("cannot start a Manager that has already been started")
+	ErrAlreadyClosed               = errors.New("Manager is closed")
+	ErrNoRangeProofClientProvided  = errors.New("range proof client is a required field of the sync config")
+	ErrNoChangeProofClientProvided = errors.New("change proofclient is a required field of the sync config")
+	ErrNoDatabaseProvided          = errors.New("sync database is a required field of the sync config")
+	ErrNoLogProvided               = errors.New("log is a required field of the sync config")
+	ErrZeroWorkLimit               = errors.New("simultaneous work limit must be greater than 0")
+	ErrFinishedWithUnexpectedRoot  = errors.New("finished syncing with an unexpected root")
 )
 
 type priority byte
@@ -138,15 +140,18 @@ type ManagerConfig struct {
 	Log                   logging.Logger
 	TargetRoot            ids.ID
 	BranchFactor          merkledb.BranchFactor
-	StateSyncNodes        []ids.NodeID //TODO test
+	StateSyncNodes        []ids.NodeID
+	// If not specified, [merkledb.DefaultHasher] will be used.
+	Hasher  merkledb.Hasher
+	Metrics prometheus.Registerer
 }
 
 func NewManager(config ManagerConfig) (*Manager, error) {
 	switch {
 	case config.RangeProofClient == nil:
-		return nil, ErrNoClientProvided
+		return nil, ErrNoRangeProofClientProvided
 	case config.ChangeProofClient == nil:
-		return nil, ErrNoClientProvided
+		return nil, ErrNoChangeProofClientProvided
 	case config.DB == nil:
 		return nil, ErrNoDatabaseProvided
 	case config.Log == nil:
@@ -158,8 +163,11 @@ func NewManager(config ManagerConfig) (*Manager, error) {
 		return nil, err
 	}
 
-	//TODO
-	metrics, err := NewMetrics("", prometheus.NewRegistry())
+	if config.Hasher == nil {
+		config.Hasher = merkledb.DefaultHasher
+	}
+
+	metrics, err := NewMetrics("sync", config.Metrics)
 	if err != nil {
 		return nil, err
 	}
@@ -348,8 +356,7 @@ func (m *Manager) requestChangeProof(ctx context.Context, work *workItem) {
 		}
 	}
 
-	//TODO try hitting state sync nodes if provided
-	if err := m.config.ChangeProofClient.AppRequestAny(ctx, requestBytes, onResponse); err != nil {
+	if err := m.sendRequest(ctx, m.config.ChangeProofClient, requestBytes, onResponse); err != nil {
 		m.setError(err)
 		return
 	}
@@ -403,24 +410,25 @@ func (m *Manager) requestRangeProof(ctx context.Context, work *workItem) {
 		}
 	}
 
-	if len(m.config.StateSyncNodes) == 0 {
-		if err := m.config.RangeProofClient.AppRequestAny(ctx, requestBytes, onResponse); err != nil {
-			m.setError(err)
-			return
-		}
-	} else {
-		// Get the next nodeID to query using the [nodeIdx] offset.
-		// If we're out of nodes, loop back to 0.
-		// We do this try to query a different node each time if possible.
-		nodeIdx := atomic.AddUint32(&m.stateSyncNodeIdx, 1)
-		nodeID := m.config.StateSyncNodes[nodeIdx%uint32(len(m.config.StateSyncNodes))]
-		if err := m.config.RangeProofClient.AppRequest(ctx, set.Of(nodeID), requestBytes, onResponse); err != nil {
-			m.setError(err)
-			return
-		}
+	if err := m.sendRequest(ctx, m.config.RangeProofClient, requestBytes, onResponse); err != nil {
+		m.setError(err)
+		return
 	}
 
 	m.metrics.RequestMade()
+}
+
+func (m *Manager) sendRequest(ctx context.Context, client Client, requestBytes []byte, onResponse p2p.AppResponseCallback) error {
+	if len(m.config.StateSyncNodes) == 0 {
+		return client.AppRequestAny(ctx, requestBytes, onResponse)
+	}
+
+	// Get the next nodeID to query using the [nodeIdx] offset.
+	// If we're out of nodes, loop back to 0.
+	// We do this try to query a different node each time if possible.
+	nodeIdx := atomic.AddUint32(&m.stateSyncNodeIdx, 1)
+	nodeID := m.config.StateSyncNodes[nodeIdx%uint32(len(m.config.StateSyncNodes))]
+	return client.AppRequest(ctx, set.Of(nodeID), requestBytes, onResponse)
 }
 
 // Returns if we should process responseBytes
@@ -496,7 +504,7 @@ func (m *Manager) handleRangeProofResponse(
 		maybeBytesToMaybe(request.EndKey),
 		request.RootHash,
 		m.tokenSize,
-		merkledb.DefaultHasher, //TODO replace w/ config hasher
+		m.config.Hasher,
 	); err != nil {
 		return err
 	}
