@@ -7,7 +7,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"math"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
@@ -31,13 +30,9 @@ const (
 var (
 	errUnknownDimension = errors.New("unknown dimension")
 
-	Empty = Dimensions{}
-	Max   = Dimensions{
-		math.MaxUint64,
-		math.MaxUint64,
-		math.MaxUint64,
-		math.MaxUint64,
-	}
+	ZeroGas      = Gas(0)
+	ZeroGasPrice = GasPrice(0)
+	Empty        = Dimensions{}
 
 	DimensionStrings = []string{
 		bandwidthString,
@@ -48,6 +43,9 @@ var (
 )
 
 type (
+	GasPrice uint64
+	Gas      uint64
+
 	Dimension  int
 	Dimensions [FeeDimensions]uint64
 )
@@ -70,6 +68,21 @@ func Add(lhs, rhs Dimensions) (Dimensions, error) {
 		res[i] = v
 	}
 	return res, nil
+}
+
+func ScalarProd(lhs, rhs Dimensions) (Gas, error) {
+	var res uint64
+	for i := 0; i < FeeDimensions; i++ {
+		v, err := safemath.Mul64(lhs[i], rhs[i])
+		if err != nil {
+			return ZeroGas, err
+		}
+		res, err = safemath.Add64(res, v)
+		if err != nil {
+			return ZeroGas, err
+		}
+	}
+	return Gas(res), nil
 }
 
 // [Compare] returns true only if rhs[i] >= lhs[i] for each dimensions

@@ -1829,16 +1829,16 @@ func (s *Service) GetBlockByHeight(_ *http.Request, args *api.GetBlockByHeightAr
 	return err
 }
 
-// GetFeeRatesReply is the response from GetFeeRates
-type GetFeeRatesReply struct {
-	NextFeeRates commonfees.Dimensions `json:"nextFeeRates"`
+// GetGasPriceReply is the response from GetFeeRates
+type GetGasPriceReply struct {
+	NextGasPrice commonfees.GasPrice `json:"nextGasPrice"`
 }
 
 // GetNextFeeRates returns the next fee rates that a transaction must pay to be accepted now
-func (s *Service) GetNextFeeRates(_ *http.Request, _ *struct{}, reply *GetFeeRatesReply) error {
+func (s *Service) GetNextGasPrice(_ *http.Request, _ *struct{}, reply *GetGasPriceReply) error {
 	s.vm.ctx.Log.Debug("API called",
 		zap.String("service", "platform"),
-		zap.String("method", "getNextFeeRates"),
+		zap.String("method", "getNextGasPrice"),
 	)
 
 	s.vm.ctx.Lock.Lock()
@@ -1866,7 +1866,7 @@ func (s *Service) GetNextFeeRates(_ *http.Request, _ *struct{}, reply *GetFeeRat
 	if err != nil {
 		return err
 	}
-	reply.NextFeeRates = feeCalculator.GetFeeRates()
+	reply.NextGasPrice = feeCalculator.GetGasPrice()
 	return nil
 }
 

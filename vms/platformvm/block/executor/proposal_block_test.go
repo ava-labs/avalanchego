@@ -29,6 +29,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 	walletsigner "github.com/ava-labs/avalanchego/wallet/chain/p/signer"
 	walletcommon "github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
@@ -88,6 +89,7 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 
 	// setup state to validate proposal block transaction
 	onParentAccept.EXPECT().GetTimestamp().Return(chainTime).AnyTimes()
+	onParentAccept.EXPECT().GetCurrentGasCap().Return(commonfees.Gas(1_000_000), nil)
 
 	currentStakersIt := state.NewMockStakerIterator(ctrl)
 	currentStakersIt.EXPECT().Next().Return(true)
@@ -160,6 +162,7 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 
 	onParentAccept := state.NewMockDiff(ctrl)
 	onParentAccept.EXPECT().GetTimestamp().Return(parentTime).AnyTimes()
+	onParentAccept.EXPECT().GetCurrentGasCap().Return(commonfees.Gas(1_000_000), nil).AnyTimes()
 	onParentAccept.EXPECT().GetCurrentSupply(constants.PrimaryNetworkID).Return(uint64(1000), nil).AnyTimes()
 
 	env.blkManager.(*manager).blkIDToState[parentID] = &blockState{

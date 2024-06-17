@@ -5,7 +5,6 @@ package p
 
 import (
 	"fmt"
-	"math"
 
 	"github.com/stretchr/testify/require"
 
@@ -25,12 +24,11 @@ var _ = ginkgo.Describe("[Dynamic Fees]", func() {
 
 	ginkgo.It("should ensure that the dynamic multifees are affected by load", func() {
 		customDynamicFeesConfig := commonfees.DynamicFeesConfig{
-			MinFeeRate:         commonfees.Dimensions{1, 1, 1, 1},
-			UpdateDenominators: commonfees.Dimensions{5, 2, 2, 3},
-			BlockMaxComplexity: commonfees.Dimensions{math.MaxUint64, math.MaxUint64, math.MaxUint64, math.MaxUint64},
+			MinGasPrice:       commonfees.GasPrice(1),
+			UpdateDenominator: commonfees.Gas(5),
 
 			// BlockUnitsTarget are set to cause an increase of fees while simple transactions are issued
-			BlockTargetComplexityRate: commonfees.Dimensions{120, 30, 60, 300},
+			GasTargetRate: commonfees.Gas(120),
 		}
 
 		ginkgo.By("creating a new private network to ensure isolation from other tests")
@@ -65,9 +63,9 @@ var _ = ginkgo.Describe("[Dynamic Fees]", func() {
 		tests.Outf("{{blue}} P-chain balance before P->X export: %d {{/}}\n", pStartBalance)
 
 		ginkgo.By("checking that initial fee values match with configured ones", func() {
-			nextFeeRates, err := pChainClient.GetNextFeeRates(e2e.DefaultContext())
+			nextFeeRates, err := pChainClient.GetNextGasPrice(e2e.DefaultContext())
 			require.NoError(err)
-			require.Equal(customDynamicFeesConfig.MinFeeRate, nextFeeRates)
+			require.Equal(customDynamicFeesConfig.MinGasPrice, nextFeeRates)
 		})
 
 		ginkgo.By("issue expensive transactions so to increase the fee rates to be paid for accepting the transactons",
@@ -90,7 +88,7 @@ var _ = ginkgo.Describe("[Dynamic Fees]", func() {
 					subnetID = subnetTx.ID()
 				})
 
-				nextFeeRates, err := pChainClient.GetNextFeeRates(e2e.DefaultContext())
+				nextFeeRates, err := pChainClient.GetNextGasPrice(e2e.DefaultContext())
 				require.NoError(err)
 				tests.Outf("{{blue}} next fee rates: %v {{/}}\n", nextFeeRates)
 
@@ -111,13 +109,12 @@ var _ = ginkgo.Describe("[Dynamic Fees]", func() {
 						)
 						require.NoError(err)
 
-						updatedFeeRates, err := pChainClient.GetNextFeeRates(e2e.DefaultContext())
+						updatedFeeRates, err := pChainClient.GetNextGasPrice(e2e.DefaultContext())
 						require.NoError(err)
 						tests.Outf("{{blue}} current fee rates: %v {{/}}\n", updatedFeeRates)
 
 						ginkgo.By("check that fee rates components have increased")
-						require.True(
-							commonfees.Compare(nextFeeRates, updatedFeeRates),
+						require.GreaterOrEqual(nextFeeRates, updatedFeeRates,
 							fmt.Sprintf("previous fee rates %v, current fee rates %v", nextFeeRates, updatedFeeRates),
 						)
 						nextFeeRates = updatedFeeRates
@@ -128,19 +125,10 @@ var _ = ginkgo.Describe("[Dynamic Fees]", func() {
 					initialFeeRates := nextFeeRates
 					e2e.Eventually(func() bool {
 						var err error
-						nextFeeRates, err = pChainClient.GetNextFeeRates(e2e.DefaultContext())
+						nextFeeRates, err = pChainClient.GetNextGasPrice(e2e.DefaultContext())
 						require.NoError(err)
 						tests.Outf("{{blue}} next fee rates: %v {{/}}\n", nextFeeRates)
-
-						ratesStrictlyLower := false
-						for i := 0; i < len(initialFeeRates); i++ {
-							if nextFeeRates[i] < initialFeeRates[i] {
-								ratesStrictlyLower = true
-								break
-							}
-						}
-
-						return ratesStrictlyLower
+						return nextFeeRates < initialFeeRates
 					}, e2e.DefaultTimeout, e2e.DefaultPollingInterval, "failed to see gas price decrease before timeout")
 					tests.Outf("\n{{blue}}fee rates have decreased to %v{{/}}\n", nextFeeRates)
 				})

@@ -30,8 +30,9 @@ type blockState struct {
 	onAcceptState state.Diff
 	onAcceptFunc  func()
 
-	inputs           set.Set[ids.ID]
-	timestamp        time.Time
-	excessComplexity commonfees.Dimensions
-	atomicRequests   map[ids.ID]*atomic.Requests
+	inputs         set.Set[ids.ID]
+	timestamp      time.Time
+	blockGas       commonfees.Gas
+	excessGas      commonfees.Gas
+	atomicRequests map[ids.ID]*atomic.Requests
 }

@@ -80,26 +80,35 @@ var (
 
 func testReplayFeeCalculator(cfg *config.Config, parentBlkTime time.Time, state state.Chain) (*fee.Calculator, error) {
 	var (
-		blkTime       = state.GetTimestamp()
-		isEActive     = cfg.UpgradeConfig.IsEActivated(blkTime)
-		staticFeeCfg  = cfg.StaticFeeConfig
+		childBlkTime = state.GetTimestamp()
+		isEActive    = cfg.UpgradeConfig.IsEActivated(childBlkTime)
+
 		feeCalculator *fee.Calculator
 	)
 
 	if !isEActive {
-		feeCalculator = fee.NewStaticCalculator(staticFeeCfg, cfg.UpgradeConfig, blkTime)
+		feeCalculator = fee.NewStaticCalculator(cfg.StaticFeeConfig, cfg.UpgradeConfig, childBlkTime)
 	} else {
-		feesCfg := fee.GetDynamicConfig(isEActive)
+		feesCfg, err := fee.GetDynamicConfig(isEActive)
+		if err != nil {
+			return nil, fmt.Errorf("failed retrieving dynamic fees config: %w", err)
+		}
+		currentGasCap, err := state.GetCurrentGasCap()
+		if err != nil {
+			return nil, fmt.Errorf("failed retrieving gas cap: %w", err)
+		}
 		excessComplexity, err := state.GetExcessComplexity()
 		if err != nil {
 			return nil, fmt.Errorf("failed retrieving excess complexity: %w", err)
 		}
-		feeCfg := fee.GetDynamicConfig(isEActive)
-		feesMan, err := commonfees.NewUpdatedManager(feeCfg, excessComplexity, parentBlkTime.Unix(), blkTime.Unix())
+
+		elapsedTime := childBlkTime.Unix() - parentBlkTime.Unix()
+		maxGas := commonfees.MaxGas(feesCfg, currentGasCap, uint64(elapsedTime))
+		feesMan, err := commonfees.NewUpdatedManager(feesCfg, excessComplexity, parentBlkTime.Unix(), childBlkTime.Unix())
 		if err != nil {
 			return nil, fmt.Errorf("failed updating fee manager: %w", err)
 		}
-		feeCalculator = fee.NewDynamicCalculator(staticFeeCfg, feesMan, feesCfg.BlockMaxComplexity)
+		feeCalculator = fee.NewDynamicCalculator(feesMan, maxGas)
 	}
 	return feeCalculator, nil
 }
@@ -518,16 +527,20 @@ func TestGetStake(t *testing.T) {
 	delegatorNodeID := genesisNodeIDs[0]
 	delegatorStartTime := defaultValidateStartTime
 	delegatorEndTime := defaultGenesisTime.Add(defaultMinStakingDuration)
-	builder, signer, feeCalc, err := factory.NewWallet(keys[0])
+	builder, sign, feeCalc, err := factory.NewWallet(keys[0])
 	require.NoError(err)
 
-	utx, err := builder.NewAddDelegatorTx(
-		&txs.Validator{
-			NodeID: delegatorNodeID,
-			Start:  uint64(delegatorStartTime.Unix()),
-			End:    uint64(delegatorEndTime.Unix()),
-			Wght:   stakeAmount,
+	utx, err := builder.NewAddPermissionlessDelegatorTx(
+		&txs.SubnetValidator{
+			Validator: txs.Validator{
+				NodeID: delegatorNodeID,
+				Start:  uint64(delegatorStartTime.Unix()),
+				End:    uint64(delegatorEndTime.Unix()),
+				Wght:   stakeAmount,
+			},
+			Subnet: constants.PrimaryNetworkID,
 		},
+		service.vm.ctx.AVAXAssetID,
 		&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
@@ -539,10 +552,10 @@ func TestGetStake(t *testing.T) {
 		}),
 	)
 	require.NoError(err)
-	tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
+	tx, err := walletsigner.SignUnsigned(context.Background(), sign, utx)
 	require.NoError(err)
 
-	addDelTx := tx.Unsigned.(*txs.AddDelegatorTx)
+	addDelTx := tx.Unsigned.(*txs.AddPermissionlessDelegatorTx)
 	staker, err := state.NewCurrentStaker(
 		tx.ID(),
 		addDelTx,
@@ -582,15 +595,26 @@ func TestGetStake(t *testing.T) {
 
 	// Make sure this works for pending stakers
 	// Add a pending staker
+	sk, err := bls.NewSecretKey()
+	require.NoError(err)
 	stakeAmount = service.vm.MinValidatorStake + 54321
 	pendingStakerNodeID := ids.GenerateTestNodeID()
 	pendingStakerEndTime := uint64(defaultGenesisTime.Add(defaultMinStakingDuration).Unix())
-	utx2, err := builder.NewAddValidatorTx(
-		&txs.Validator{
-			NodeID: pendingStakerNodeID,
-			Start:  uint64(defaultGenesisTime.Unix()),
-			End:    pendingStakerEndTime,
-			Wght:   stakeAmount,
+	utx2, err := builder.NewAddPermissionlessValidatorTx(
+		&txs.SubnetValidator{
+			Validator: txs.Validator{
+				NodeID: pendingStakerNodeID,
+				Start:  uint64(defaultGenesisTime.Unix()),
+				End:    pendingStakerEndTime,
+				Wght:   stakeAmount,
+			},
+			Subnet: constants.PlatformChainID,
+		},
+		signer.NewProofOfPossession(sk),
+		service.vm.ctx.AVAXAssetID,
+		&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
 		},
 		&secp256k1fx.OutputOwners{
 			Threshold: 1,
@@ -604,12 +628,12 @@ func TestGetStake(t *testing.T) {
 		}),
 	)
 	require.NoError(err)
-	tx, err = walletsigner.SignUnsigned(context.Background(), signer, utx2)
+	tx, err = walletsigner.SignUnsigned(context.Background(), sign, utx2)
 	require.NoError(err)
 
 	staker, err = state.NewPendingStaker(
 		tx.ID(),
-		tx.Unsigned.(*txs.AddValidatorTx),
+		tx.Unsigned.(*txs.AddPermissionlessValidatorTx),
 	)
 	require.NoError(err)
 
@@ -676,13 +700,17 @@ func TestGetCurrentValidators(t *testing.T) {
 	builder, signer, feeCalc, err := factory.NewWallet(keys[0])
 	require.NoError(err)
 
-	utx, err := builder.NewAddDelegatorTx(
-		&txs.Validator{
-			NodeID: validatorNodeID,
-			Start:  uint64(delegatorStartTime.Unix()),
-			End:    uint64(delegatorEndTime.Unix()),
-			Wght:   stakeAmount,
+	utx, err := builder.NewAddPermissionlessDelegatorTx(
+		&txs.SubnetValidator{
+			Validator: txs.Validator{
+				NodeID: validatorNodeID,
+				Start:  uint64(delegatorStartTime.Unix()),
+				End:    uint64(delegatorEndTime.Unix()),
+				Wght:   stakeAmount,
+			},
+			Subnet: constants.PrimaryNetworkID,
 		},
+		service.vm.ctx.AVAXAssetID,
 		&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
@@ -697,7 +725,7 @@ func TestGetCurrentValidators(t *testing.T) {
 	delTx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
 	require.NoError(err)
 
-	addDelTx := delTx.Unsigned.(*txs.AddDelegatorTx)
+	addDelTx := delTx.Unsigned.(*txs.AddPermissionlessDelegatorTx)
 	staker, err := state.NewCurrentStaker(
 		delTx.ID(),
 		addDelTx,
@@ -1166,30 +1194,27 @@ func TestGetFeeRates(t *testing.T) {
 	service.vm.ctx.Lock.Lock()
 	now := time.Now().Truncate(time.Second)
 	service.vm.clock.Set(now)
-	feeCfg := fee.GetDynamicConfig(true /*isEActive*/)
+	feeCfg, err := fee.GetDynamicConfig(true /*isEActive*/)
+	require.NoError(err)
 	service.vm.ctx.Lock.Unlock()
 
 	//  initially minimal fees
-	reply0 := GetFeeRatesReply{}
-	require.NoError(service.GetNextFeeRates(nil, nil, &reply0))
-	require.Equal(feeCfg.MinFeeRate, reply0.NextFeeRates)
+	reply0 := GetGasPriceReply{}
+	require.NoError(service.GetNextGasPrice(nil, nil, &reply0))
+	require.Equal(feeCfg.MinGasPrice, reply0.NextGasPrice)
 
 	// let cumulated complexity go above target. Fee rates will go up
 	service.vm.ctx.Lock.Lock()
 	elapsedTime := time.Second
-	var targetComplexity commonfees.Dimensions
-	for i := commonfees.Dimension(0); i < commonfees.FeeDimensions; i++ {
-		targetComplexity[i] = feeCfg.BlockTargetComplexityRate[i] * uint64(elapsedTime/time.Second)
-	}
-	complexity, err := commonfees.Add(targetComplexity, commonfees.Dimensions{10, 20, 30, 40})
-	require.NoError(err)
-	service.vm.state.SetExcessComplexity(complexity)
+	targetGas := commonfees.Gas(uint64(feeCfg.GasTargetRate) * uint64(elapsedTime/time.Second))
+	gas := targetGas + commonfees.Gas(10)
+	service.vm.state.SetExcessComplexity(gas)
 	service.vm.ctx.Lock.Unlock()
 
-	reply1 := GetFeeRatesReply{}
-	require.NoError(service.GetNextFeeRates(nil, nil, &reply1))
-	highFeeRates := reply1.NextFeeRates
-	require.True(commonfees.Compare(highFeeRates, feeCfg.MinFeeRate))
+	reply1 := GetGasPriceReply{}
+	require.NoError(service.GetNextGasPrice(nil, nil, &reply1))
+	highGasPrice := reply1.NextGasPrice
+	require.Greater(highGasPrice, feeCfg.MinGasPrice)
 
 	// let time tick. Fee rates will go down
 	service.vm.ctx.Lock.Lock()
@@ -1197,7 +1222,7 @@ func TestGetFeeRates(t *testing.T) {
 	service.vm.clock.Set(now)
 	service.vm.ctx.Lock.Unlock()
 
-	reply2 := GetFeeRatesReply{}
-	require.NoError(service.GetNextFeeRates(nil, nil, &reply2))
-	require.True(commonfees.Compare(highFeeRates, reply2.NextFeeRates))
+	reply2 := GetGasPriceReply{}
+	require.NoError(service.GetNextGasPrice(nil, nil, &reply2))
+	require.Less(reply2.NextGasPrice, highGasPrice)
 }

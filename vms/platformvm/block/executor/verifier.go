@@ -10,14 +10,13 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/vms/components/fees"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
-
-	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 var (
@@ -250,10 +249,11 @@ func (v *verifier) ApricotAtomicBlock(b *block.ApricotAtomicBlock) error {
 
 		onAcceptState: atomicExecutor.OnAccept,
 
-		inputs:           atomicExecutor.Inputs,
-		timestamp:        atomicExecutor.OnAccept.GetTimestamp(),
-		excessComplexity: commonfees.Empty,
-		atomicRequests:   atomicExecutor.AtomicRequests,
+		inputs:         atomicExecutor.Inputs,
+		timestamp:      atomicExecutor.OnAccept.GetTimestamp(),
+		blockGas:       fees.ZeroGas,
+		excessGas:      fees.ZeroGas,
+		atomicRequests: atomicExecutor.AtomicRequests,
 	}
 	return nil
 }
@@ -404,6 +404,11 @@ func (v *verifier) proposalBlock(
 	atomicRequests map[ids.ID]*atomic.Requests,
 	onAcceptFunc func(),
 ) error {
+	currentGasCap, err := onCommitState.GetCurrentGasCap()
+	if err != nil {
+		return err
+	}
+
 	txExecutor := executor.ProposalTxExecutor{
 		OnCommitState: onCommitState,
 		OnAbortState:  onAbortState,
@@ -417,6 +422,10 @@ func (v *verifier) proposalBlock(
 		v.MarkDropped(txID, err) // cache tx as dropped
 		return err
 	}
+
+	blkGas := feeCalculator.GetGas()
+	onCommitState.SetCurrentGasCap(currentGasCap + blkGas)
+	onAbortState.SetCurrentGasCap(currentGasCap + blkGas)
 
 	onCommitState.AddTx(b.Tx, status.Committed)
 	onAbortState.AddTx(b.Tx, status.Aborted)
@@ -439,9 +448,10 @@ func (v *verifier) proposalBlock(
 		// It is safe to use [b.onAbortState] here because the timestamp will
 		// never be modified by an Apricot Abort block and the timestamp will
 		// always be the same as the Banff Proposal Block.
-		timestamp:        onAbortState.GetTimestamp(),
-		excessComplexity: feeCalculator.GetCurrentExcessComplexity(),
-		atomicRequests:   atomicRequests,
+		timestamp:      onAbortState.GetTimestamp(),
+		blockGas:       blkGas,
+		excessGas:      feeCalculator.GetCurrentExcessComplexity(),
+		atomicRequests: atomicRequests,
 	}
 	return nil
 }
@@ -452,6 +462,11 @@ func (v *verifier) standardBlock(
 	feeCalculator *fee.Calculator,
 	onAcceptState state.Diff,
 ) error {
+	currentGasCap, err := onAcceptState.GetCurrentGasCap()
+	if err != nil {
+		return err
+	}
+
 	inputs, atomicRequests, onAcceptFunc, err := v.processStandardTxs(b.Transactions, feeCalculator, onAcceptState, b.Parent())
 	if err != nil {
 		return err
@@ -460,16 +475,21 @@ func (v *verifier) standardBlock(
 	v.Mempool.Remove(b.Transactions...)
 
 	blkID := b.ID()
+
+	blkGas := feeCalculator.GetGas()
+	onAcceptState.SetCurrentGasCap(currentGasCap + blkGas)
+
 	v.blkIDToState[blkID] = &blockState{
 		statelessBlock: b,
 
 		onAcceptState: onAcceptState,
 		onAcceptFunc:  onAcceptFunc,
 
-		timestamp:        onAcceptState.GetTimestamp(),
-		excessComplexity: feeCalculator.GetCurrentExcessComplexity(),
-		inputs:           inputs,
-		atomicRequests:   atomicRequests,
+		timestamp:      onAcceptState.GetTimestamp(),
+		blockGas:       blkGas,
+		excessGas:      feeCalculator.GetCurrentExcessComplexity(),
+		inputs:         inputs,
+		atomicRequests: atomicRequests,
 	}
 	return nil
 }

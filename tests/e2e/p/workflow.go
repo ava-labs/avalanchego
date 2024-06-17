@@ -61,16 +61,6 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 			infoClient := info.NewClient(nodeURI.URI)
 			staticFees, err := infoClient.GetTxFee(e2e.DefaultContext())
 			require.NoError(err)
-			pChainStaticFees := fee.StaticConfig{
-				TxFee:                         uint64(staticFees.TxFee),
-				CreateSubnetTxFee:             uint64(staticFees.CreateSubnetTxFee),
-				TransformSubnetTxFee:          uint64(staticFees.TransformSubnetTxFee),
-				CreateBlockchainTxFee:         uint64(staticFees.CreateBlockchainTxFee),
-				AddPrimaryNetworkValidatorFee: uint64(staticFees.AddPrimaryNetworkValidatorFee),
-				AddPrimaryNetworkDelegatorFee: uint64(staticFees.AddPrimaryNetworkDelegatorFee),
-				AddSubnetValidatorFee:         uint64(staticFees.AddSubnetValidatorFee),
-				AddSubnetDelegatorFee:         uint64(staticFees.AddSubnetDelegatorFee),
-			}
 
 			xChainTxFees := uint64(staticFees.TxFee)
 			tests.Outf("{{green}} X-chain TxFee: %d {{/}}\n", xChainTxFees)
@@ -151,7 +141,7 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 
 			pChainExportFee := uint64(0)
 			ginkgo.By("export avax from P to X chain", func() {
-				nextFeeRates, err := pChainClient.GetNextFeeRates(e2e.DefaultContext())
+				nextGasPrice, err := pChainClient.GetNextGasPrice(e2e.DefaultContext())
 				require.NoError(err)
 
 				tx, err := pWallet.IssueExportTx(
@@ -169,8 +159,7 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 				require.NoError(err)
 
 				// retrieve fees paid for the tx
-				feeCfg := fee.GetDynamicConfig(true /*isEActive*/)
-				feeCalc := fee.NewDynamicCalculator(pChainStaticFees, commonfees.NewManager(nextFeeRates), feeCfg.BlockMaxComplexity)
+				feeCalc := fee.NewDynamicCalculator(commonfees.NewManager(nextGasPrice), fee.TempGasCap)
 				pChainExportFee, err = feeCalc.ComputeFee(tx.Unsigned, tx.Creds)
 				require.NoError(err)
 			})

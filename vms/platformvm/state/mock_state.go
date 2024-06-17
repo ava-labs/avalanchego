@@ -198,6 +198,21 @@ func (mr *MockChainMockRecorder) GetCurrentDelegatorIterator(arg0, arg1 any) *go
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCurrentDelegatorIterator", reflect.TypeOf((*MockChain)(nil).GetCurrentDelegatorIterator), arg0, arg1)
 }
 
+// GetCurrentGasCap mocks base method.
+func (m *MockChain) GetCurrentGasCap() (fees.Gas, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetCurrentGasCap")
+	ret0, _ := ret[0].(fees.Gas)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetCurrentGasCap indicates an expected call of GetCurrentGasCap.
+func (mr *MockChainMockRecorder) GetCurrentGasCap() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCurrentGasCap", reflect.TypeOf((*MockChain)(nil).GetCurrentGasCap))
+}
+
 // GetCurrentStakerIterator mocks base method.
 func (m *MockChain) GetCurrentStakerIterator() (StakerIterator, error) {
 	m.ctrl.T.Helper()
@@ -259,10 +274,10 @@ func (mr *MockChainMockRecorder) GetDelegateeReward(arg0, arg1 any) *gomock.Call
 }
 
 // GetExcessComplexity mocks base method.
-func (m *MockChain) GetExcessComplexity() (fees.Dimensions, error) {
+func (m *MockChain) GetExcessComplexity() (fees.Gas, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetExcessComplexity")
-	ret0, _ := ret[0].(fees.Dimensions)
+	ret0, _ := ret[0].(fees.Gas)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -441,6 +456,18 @@ func (mr *MockChainMockRecorder) PutPendingValidator(arg0 any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutPendingValidator", reflect.TypeOf((*MockChain)(nil).PutPendingValidator), arg0)
 }
 
+// SetCurrentGasCap mocks base method.
+func (m *MockChain) SetCurrentGasCap(arg0 fees.Gas) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "SetCurrentGasCap", arg0)
+}
+
+// SetCurrentGasCap indicates an expected call of SetCurrentGasCap.
+func (mr *MockChainMockRecorder) SetCurrentGasCap(arg0 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetCurrentGasCap", reflect.TypeOf((*MockChain)(nil).SetCurrentGasCap), arg0)
+}
+
 // SetCurrentSupply mocks base method.
 func (m *MockChain) SetCurrentSupply(arg0 ids.ID, arg1 uint64) {
 	m.ctrl.T.Helper()
@@ -468,7 +495,7 @@ func (mr *MockChainMockRecorder) SetDelegateeReward(arg0, arg1, arg2 any) *gomoc
 }
 
 // SetExcessComplexity mocks base method.
-func (m *MockChain) SetExcessComplexity(arg0 fees.Dimensions) {
+func (m *MockChain) SetExcessComplexity(arg0 fees.Gas) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "SetExcessComplexity", arg0)
 }
@@ -687,6 +714,21 @@ func (mr *MockDiffMockRecorder) GetCurrentDelegatorIterator(arg0, arg1 any) *gom
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCurrentDelegatorIterator", reflect.TypeOf((*MockDiff)(nil).GetCurrentDelegatorIterator), arg0, arg1)
 }
 
+// GetCurrentGasCap mocks base method.
+func (m *MockDiff) GetCurrentGasCap() (fees.Gas, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetCurrentGasCap")
+	ret0, _ := ret[0].(fees.Gas)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetCurrentGasCap indicates an expected call of GetCurrentGasCap.
+func (mr *MockDiffMockRecorder) GetCurrentGasCap() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCurrentGasCap", reflect.TypeOf((*MockDiff)(nil).GetCurrentGasCap))
+}
+
 // GetCurrentStakerIterator mocks base method.
 func (m *MockDiff) GetCurrentStakerIterator() (StakerIterator, error) {
 	m.ctrl.T.Helper()
@@ -748,10 +790,10 @@ func (mr *MockDiffMockRecorder) GetDelegateeReward(arg0, arg1 any) *gomock.Call 
 }
 
 // GetExcessComplexity mocks base method.
-func (m *MockDiff) GetExcessComplexity() (fees.Dimensions, error) {
+func (m *MockDiff) GetExcessComplexity() (fees.Gas, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetExcessComplexity")
-	ret0, _ := ret[0].(fees.Dimensions)
+	ret0, _ := ret[0].(fees.Gas)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -930,6 +972,18 @@ func (mr *MockDiffMockRecorder) PutPendingValidator(arg0 any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutPendingValidator", reflect.TypeOf((*MockDiff)(nil).PutPendingValidator), arg0)
 }
 
+// SetCurrentGasCap mocks base method.
+func (m *MockDiff) SetCurrentGasCap(arg0 fees.Gas) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "SetCurrentGasCap", arg0)
+}
+
+// SetCurrentGasCap indicates an expected call of SetCurrentGasCap.
+func (mr *MockDiffMockRecorder) SetCurrentGasCap(arg0 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetCurrentGasCap", reflect.TypeOf((*MockDiff)(nil).SetCurrentGasCap), arg0)
+}
+
 // SetCurrentSupply mocks base method.
 func (m *MockDiff) SetCurrentSupply(arg0 ids.ID, arg1 uint64) {
 	m.ctrl.T.Helper()
@@ -957,7 +1011,7 @@ func (mr *MockDiffMockRecorder) SetDelegateeReward(arg0, arg1, arg2 any) *gomock
 }
 
 // SetExcessComplexity mocks base method.
-func (m *MockDiff) SetExcessComplexity(arg0 fees.Dimensions) {
+func (m *MockDiff) SetExcessComplexity(arg0 fees.Gas) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "SetExcessComplexity", arg0)
 }
@@ -1301,6 +1355,21 @@ func (mr *MockStateMockRecorder) GetCurrentDelegatorIterator(arg0, arg1 any) *go
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCurrentDelegatorIterator", reflect.TypeOf((*MockState)(nil).GetCurrentDelegatorIterator), arg0, arg1)
 }
 
+// GetCurrentGasCap mocks base method.
+func (m *MockState) GetCurrentGasCap() (fees.Gas, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetCurrentGasCap")
+	ret0, _ := ret[0].(fees.Gas)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetCurrentGasCap indicates an expected call of GetCurrentGasCap.
+func (mr *MockStateMockRecorder) GetCurrentGasCap() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCurrentGasCap", reflect.TypeOf((*MockState)(nil).GetCurrentGasCap))
+}
+
 // GetCurrentStakerIterator mocks base method.
 func (m *MockState) GetCurrentStakerIterator() (StakerIterator, error) {
 	m.ctrl.T.Helper()
@@ -1362,10 +1431,10 @@ func (mr *MockStateMockRecorder) GetDelegateeReward(arg0, arg1 any) *gomock.Call
 }
 
 // GetExcessComplexity mocks base method.
-func (m *MockState) GetExcessComplexity() (fees.Dimensions, error) {
+func (m *MockState) GetExcessComplexity() (fees.Gas, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetExcessComplexity")
-	ret0, _ := ret[0].(fees.Dimensions)
+	ret0, _ := ret[0].(fees.Gas)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -1648,6 +1717,18 @@ func (mr *MockStateMockRecorder) ReindexBlocks(arg0, arg1 any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReindexBlocks", reflect.TypeOf((*MockState)(nil).ReindexBlocks), arg0, arg1)
 }
 
+// SetCurrentGasCap mocks base method.
+func (m *MockState) SetCurrentGasCap(arg0 fees.Gas) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "SetCurrentGasCap", arg0)
+}
+
+// SetCurrentGasCap indicates an expected call of SetCurrentGasCap.
+func (mr *MockStateMockRecorder) SetCurrentGasCap(arg0 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetCurrentGasCap", reflect.TypeOf((*MockState)(nil).SetCurrentGasCap), arg0)
+}
+
 // SetCurrentSupply mocks base method.
 func (m *MockState) SetCurrentSupply(arg0 ids.ID, arg1 uint64) {
 	m.ctrl.T.Helper()
@@ -1675,7 +1756,7 @@ func (mr *MockStateMockRecorder) SetDelegateeReward(arg0, arg1, arg2 any) *gomoc
 }
 
 // SetExcessComplexity mocks base method.
-func (m *MockState) SetExcessComplexity(arg0 fees.Dimensions) {
+func (m *MockState) SetExcessComplexity(arg0 fees.Gas) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "SetExcessComplexity", arg0)
 }

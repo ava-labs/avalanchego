@@ -40,9 +40,9 @@ import (
 	walletsigner "github.com/ava-labs/avalanchego/wallet/chain/p/signer"
 )
 
-// Check that complexity of standard blocks is duly calculated once block is verified
+// Check that gas consumed by a standard blocks is duly calculated once block is verified
 // Only transactions active post E upgrade are considered and tested pre and post E upgrade.
-func TestStandardBlockComplexity(t *testing.T) {
+func TestStandardBlockGas(t *testing.T) {
 	type test struct {
 		name      string
 		setupTest func(env *environment) *txs.Tx
@@ -525,9 +525,9 @@ func TestStandardBlockComplexity(t *testing.T) {
 				require.True(found)
 
 				if dynamicFeesActive {
-					require.NotEqual(commonfees.Empty, blkState.excessComplexity)
+					require.NotEqual(commonfees.ZeroGas, blkState.blockGas)
 				} else {
-					require.Equal(commonfees.Empty, blkState.excessComplexity)
+					require.Equal(commonfees.ZeroGas, blkState.blockGas)
 				}
 			})
 		}
@@ -546,6 +546,7 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 	timestamp := time.Now()
 	// One call for each of onCommitState and onAbortState.
 	parentOnAcceptState.EXPECT().GetTimestamp().Return(timestamp).Times(2)
+	parentOnAcceptState.EXPECT().GetCurrentGasCap().Return(commonfees.Gas(1_000_000), nil)
 
 	backend := &backend{
 		lastAccepted: parentID,
@@ -798,8 +799,9 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 
 	// Set expectations for dependencies.
 	timestamp := time.Now()
-	parentState.EXPECT().GetTimestamp().Return(timestamp).Times(1)
-	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
+	parentState.EXPECT().GetTimestamp().Return(timestamp)
+	parentState.EXPECT().GetCurrentGasCap().Return(commonfees.Gas(1_000_000), nil)
+	parentStatelessBlk.EXPECT().Height().Return(uint64(1))
 	mempool.EXPECT().Remove(apricotBlk.Txs()).Times(1)
 
 	blk := manager.NewBlock(apricotBlk)
@@ -1291,8 +1293,9 @@ func TestVerifierVisitStandardBlockWithDuplicateInputs(t *testing.T) {
 
 	// Set expectations for dependencies.
 	timestamp := time.Now()
-	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
-	parentState.EXPECT().GetTimestamp().Return(timestamp).Times(1)
+	parentStatelessBlk.EXPECT().Height().Return(uint64(1))
+	parentState.EXPECT().GetTimestamp().Return(timestamp)
+	parentState.EXPECT().GetCurrentGasCap().Return(commonfees.Gas(1_000_000), nil)
 
 	parentStatelessBlk.EXPECT().Parent().Return(grandParentID).Times(1)
 

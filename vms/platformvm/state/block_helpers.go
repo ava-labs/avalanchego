@@ -77,46 +77,49 @@ func GetNextStakerChangeTime(state Chain) (time.Time, error) {
 // [PickFeeCalculator] does not mnodify [state]
 func PickFeeCalculator(cfg *config.Config, state Chain, parentBlkTime time.Time) (*fee.Calculator, error) {
 	var (
-		childBlkTime  = state.GetTimestamp()
-		isEActive     = cfg.UpgradeConfig.IsEActivated(childBlkTime)
-		staticFeeCfg  = cfg.StaticFeeConfig
-		feeCalculator *fee.Calculator
+		childBlkTime = state.GetTimestamp()
+		isEActive    = cfg.UpgradeConfig.IsEActivated(childBlkTime)
 	)
 
 	if !isEActive {
-		feeCalculator = fee.NewStaticCalculator(staticFeeCfg, cfg.UpgradeConfig, childBlkTime)
-	} else {
-		feesCfg := fee.GetDynamicConfig(isEActive)
-		feesMan, err := updatedFeeManager(isEActive, state, parentBlkTime)
-		if err != nil {
-			return nil, fmt.Errorf("failed updating fee manager: %w", err)
-		}
-		feeCalculator = fee.NewDynamicCalculator(staticFeeCfg, feesMan, feesCfg.BlockMaxComplexity)
+		return fee.NewStaticCalculator(cfg.StaticFeeConfig, cfg.UpgradeConfig, childBlkTime), nil
 	}
+
+	feesCfg, err := fee.GetDynamicConfig(isEActive)
+	if err != nil {
+		return nil, fmt.Errorf("failed retrieving dynamic fees config: %w", err)
+	}
+
+	feesMan, err := updatedFeeManager(feesCfg, state, parentBlkTime)
+	if err != nil {
+		return nil, fmt.Errorf("failed updating fee manager: %w", err)
+	}
+
+	currentGasCap, err := state.GetCurrentGasCap()
+	if err != nil {
+		return nil, fmt.Errorf("failed retrieving gas cap: %w", err)
+	}
+
+	elapsedTime := childBlkTime.Unix() - parentBlkTime.Unix()
+	maxGas := commonfees.MaxGas(feesCfg, currentGasCap, uint64(elapsedTime))
+	feeCalculator := fee.NewDynamicCalculator(feesMan, maxGas)
 	return feeCalculator, nil
 }
 
-func updatedFeeManager(isEActive bool, state Chain, parentBlkTime time.Time) (*commonfees.Manager, error) {
-	var feeManager *commonfees.Manager
-	if isEActive {
-		excessComplexity, err := state.GetExcessComplexity()
-		if err != nil {
-			return nil, fmt.Errorf("failed retrieving excess complexity: %w", err)
-		}
-		childBlkTime := state.GetTimestamp()
-		feeCfg := fee.GetDynamicConfig(isEActive)
-
-		feeManager, err = commonfees.NewUpdatedManager(
-			feeCfg,
-			excessComplexity,
-			parentBlkTime.Unix(),
-			childBlkTime.Unix(),
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed updating fee rates, %w", err)
-		}
-	} else {
-		feeManager = commonfees.NewManager(commonfees.Empty)
+func updatedFeeManager(feesCfg commonfees.DynamicFeesConfig, state Chain, parentBlkTime time.Time) (*commonfees.Manager, error) {
+	excessComplexity, err := state.GetExcessComplexity()
+	if err != nil {
+		return nil, fmt.Errorf("failed retrieving excess complexity: %w", err)
+	}
+	childBlkTime := state.GetTimestamp()
+	feeManager, err := commonfees.NewUpdatedManager(
+		feesCfg,
+		excessComplexity,
+		parentBlkTime.Unix(),
+		childBlkTime.Unix(),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed updating fee rates, %w", err)
 	}
 	return feeManager, nil
 }

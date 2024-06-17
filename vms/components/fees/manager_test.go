@@ -14,18 +14,19 @@ import (
 )
 
 var testDynamicFeeCfg = DynamicFeesConfig{
-	MinFeeRate:                Dimensions{60 * units.NanoAvax, 8 * units.NanoAvax, 10 * units.NanoAvax, 35 * units.NanoAvax},
-	UpdateDenominators:        Dimensions{50_000, 50_000, 50_000, 500_000},
-	BlockMaxComplexity:        Dimensions{10_000, 6_000, 8_000, 60_000},
-	BlockTargetComplexityRate: Dimensions{250, 60, 120, 650},
+	MinGasPrice:       GasPrice(60 * units.NanoAvax),
+	UpdateDenominator: Gas(50_000),
+	GasTargetRate:     Gas(250),
+
+	FeeDimensionWeights: Dimensions{1, 1, 1, 1},
 }
 
-func TestUpdateFeeRates(t *testing.T) {
+func TestUpdateGasPrice(t *testing.T) {
 	require := require.New(t)
 
 	var (
-		parentFeeRate       = Dimensions{10, 20, 100, 200}
-		cumulatedComplexity = Dimensions{300, 60, 119, 100}
+		parentGasPrice = GasPrice(10)
+		excessGas      = Gas(300)
 
 		elapsedTime   = time.Second
 		parentBlkTime = time.Now().Truncate(time.Second)
@@ -34,30 +35,21 @@ func TestUpdateFeeRates(t *testing.T) {
 
 	m, err := NewUpdatedManager(
 		testDynamicFeeCfg,
-		cumulatedComplexity,
+		excessGas,
 		parentBlkTime.Unix(),
 		childBlkTime.Unix(),
 	)
 	require.NoError(err)
 
-	// Bandwidth cumulated complexity are above target, fee rate is pushed up
-	require.Greater(m.feeRates[Bandwidth], parentFeeRate[Bandwidth])
-
-	// UTXORead cumulated complexity is at target, fee rate is at the minimum
-	require.Equal(testDynamicFeeCfg.MinFeeRate[UTXORead], m.feeRates[UTXORead])
-
-	// UTXOWrite cumulated complexity is below target, fee rate is at the minimum
-	require.Equal(testDynamicFeeCfg.MinFeeRate[UTXOWrite], m.feeRates[UTXOWrite])
-
-	// Compute cumulated complexity is below target, fee rate is at the minimum
-	require.Equal(testDynamicFeeCfg.MinFeeRate[Compute], m.feeRates[Compute])
+	// Gas above target, gas price is pushed up
+	require.Greater(m.GetGasPrice(), parentGasPrice)
 }
 
 func TestFakeExponential(t *testing.T) {
 	tests := []struct {
-		factor      uint64
-		numerator   uint64
-		denominator uint64
+		factor      GasPrice
+		numerator   Gas
+		denominator Gas
 		want        uint64
 	}{
 		// When numerator == 0 the return value should always equal the value of factor
@@ -83,7 +75,7 @@ func TestFakeExponential(t *testing.T) {
 	}
 }
 
-func TestPChainFeeRateIncreaseDueToPeak(t *testing.T) {
+func TestPChainGasPriceIncreaseDueToPeak(t *testing.T) {
 	// Complexity values comes from the mainnet historical peak as measured
 	// pre E upgrade activation
 
@@ -129,59 +121,61 @@ func TestPChainFeeRateIncreaseDueToPeak(t *testing.T) {
 		// {1615237936, Dimensions{413, 102, 102, 1000}},
 	}
 
-	m := &Manager{
-		feeRates: testDynamicFeeCfg.MinFeeRate,
-	}
-
 	// PEAK INCOMING
-	peakFeeRate := testDynamicFeeCfg.MinFeeRate
+	peakGasPrice := testDynamicFeeCfg.MinGasPrice
 	for i := 1; i < len(blockComplexities); i++ {
 		parentBlkData := blockComplexities[i-1]
 		childBlkData := blockComplexities[i]
+
+		excessGas, err := ScalarProd(testDynamicFeeCfg.FeeDimensionWeights, parentBlkData.complexity)
+		require.NoError(err)
+
 		m, err := NewUpdatedManager(
 			testDynamicFeeCfg,
-			parentBlkData.complexity,
+			excessGas,
 			parentBlkData.blkTime,
 			childBlkData.blkTime,
 		)
 		require.NoError(err)
 
-		// check that fee rates are strictly above minimal
-		require.False(
-			Compare(m.feeRates, testDynamicFeeCfg.MinFeeRate),
-			fmt.Sprintf("failed at %d of %d iteration, \n curr fees %v \n next fees %v",
+		// check that gas price is strictly above minimal
+		require.Greater(m.GetGasPrice(), testDynamicFeeCfg.MinGasPrice,
+			fmt.Sprintf("failed at %d of %d iteration, \n curr gas price %v \n next gas price %v",
 				i,
 				len(blockComplexities),
-				peakFeeRate,
-				m.feeRates,
+				peakGasPrice,
+				m.GetGasPrice(),
 			),
 		)
 
 		// at peak the total fee should be no more than 100 Avax.
-		fee, err := m.CalculateFee(childBlkData.complexity)
+		childGas, err := ScalarProd(testDynamicFeeCfg.FeeDimensionWeights, childBlkData.complexity)
+		require.NoError(err)
+
+		fee, err := m.CalculateFee(childGas)
 		require.NoError(err)
 		require.Less(fee, 100*units.Avax, fmt.Sprintf("iteration: %d, total: %d", i, len(blockComplexities)))
 
-		peakFeeRate = m.feeRates
+		peakGasPrice = m.GetGasPrice()
 	}
 
 	// OFF PEAK
 	offPeakBlkComplexity := Dimensions{1473, 510, 510, 5000}
+	offPeakGas, err := ScalarProd(testDynamicFeeCfg.FeeDimensionWeights, offPeakBlkComplexity)
+	require.NoError(err)
+
 	elapsedTime := time.Unix(1615238881, 0).Sub(time.Unix(1615237936, 0))
 	parentBlkTime := time.Now().Truncate(time.Second)
 	childBlkTime := parentBlkTime.Add(elapsedTime)
 
 	m, err := NewUpdatedManager(
 		testDynamicFeeCfg,
-		offPeakBlkComplexity,
+		offPeakGas,
 		parentBlkTime.Unix(),
 		childBlkTime.Unix(),
 	)
 	require.NoError(err)
 
-	// check that fee rates decrease off peak
-	require.Less(m.feeRates[Bandwidth], peakFeeRate[Bandwidth])
-	require.Less(m.feeRates[UTXORead], peakFeeRate[UTXORead])
-	require.LessOrEqual(m.feeRates[UTXOWrite], peakFeeRate[UTXOWrite])
-	require.Less(m.feeRates[Compute], peakFeeRate[Compute])
+	// check that gas price decreases off peak
+	require.Less(m.GetGasPrice(), peakGasPrice)
 }

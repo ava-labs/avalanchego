@@ -3,42 +3,51 @@
 
 package fees
 
-import "fmt"
+import "errors"
+
+var (
+	errZeroLeakGasCoeff     = errors.New("zero leak gas coefficient")
+	errZerUpdateDenominator = errors.New("update denominator cannot be zero")
+)
 
 type DynamicFeesConfig struct {
-	// MinFeeRate contains, per each fee dimension, the
-	// minimal fee rate, i.e. the fee per unit of complexity,
+	// MinGasPrice contains the minimal gas price
 	// enforced by the dynamic fees algo.
-	MinFeeRate Dimensions `json:"minimal-fee-rate"`
+	MinGasPrice GasPrice `json:"minimal-gas-price"`
 
-	// UpdateDenominators contains, per each fee dimension, the
+	// UpdateDenominator contains the
 	// exponential normalization coefficient.
-	UpdateDenominators Dimensions `json:"update-denominator"`
+	UpdateDenominator Gas `json:"update-denominator"`
 
-	// BlockTargetComplexityRate contains, per each fee dimension, the
-	// preferred block complexity that the dynamic fee algo
-	// strive to converge to, per second.
-	BlockTargetComplexityRate Dimensions `json:"block-target-complexity-rate"`
+	// GasTargetRate contains the preferred gas consumed by a block.
+	// The dynamic fee algo strives to converge to GasTargetRate per second.
+	GasTargetRate Gas `json:"block-target-complexity-rate"`
 
-	// BlockMaxComplexity contains, per each fee dimension, the
-	// maximal complexity a valid P-chain block can host.
-	BlockMaxComplexity Dimensions `json:"block-max-complexity-rate"`
+	// weights to merge fees dimensions complexities into a single gas value
+	FeeDimensionWeights Dimensions `json:"fee-dimension-weights"`
+
+	MaxGasPerSecond Gas
+	LeakGasCoeff    Gas // TODO ABENEGIA: not sure of the unit of measurement here
 }
 
 func (c *DynamicFeesConfig) Validate() error {
-	for i := Dimension(0); i < FeeDimensions; i++ {
-		if c.BlockTargetComplexityRate[i] > c.BlockMaxComplexity[i] {
-			return fmt.Errorf("dimension %d, block target complexity rate %d larger than block max complexity rate %d",
-				i,
-				c.BlockTargetComplexityRate[i],
-				c.BlockMaxComplexity[i],
-			)
-		}
+	if c.UpdateDenominator == 0 {
+		return errZerUpdateDenominator
+	}
 
-		if c.UpdateDenominators[i] == 0 {
-			return fmt.Errorf("dimension %d, update denominator cannot be zero", i)
-		}
+	if c.LeakGasCoeff == 0 {
+		return errZeroLeakGasCoeff
 	}
 
 	return nil
+}
+
+// We cap the maximum gas consumed by time with a leaky bucket approach
+// MaxGas = min (MaxGas + MaxGasPerSecond/LeakGasCoeff*ElapsedTime, MaxGasPerSecond)
+func MaxGas(cfg DynamicFeesConfig, currentGasCapacity Gas, elapsedTime uint64) Gas {
+	if elapsedTime > uint64(cfg.LeakGasCoeff) {
+		return cfg.MaxGasPerSecond
+	}
+
+	return min(cfg.MaxGasPerSecond, currentGasCapacity+cfg.MaxGasPerSecond*Gas(elapsedTime)/cfg.LeakGasCoeff)
 }

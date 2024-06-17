@@ -132,7 +132,6 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 		return err
 	}
 
-	// retrieve parent block time before moving time forward
 	parentBlkTime := stateDiff.GetTimestamp()
 
 	nextBlkTime, _, err := state.NextBlockTime(stateDiff, m.txExecutorBackend.Clk)

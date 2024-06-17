@@ -4,6 +4,7 @@
 package fee
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/snow"
@@ -13,63 +14,38 @@ import (
 	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
-func init() {
-	if customDynamicFeesConfig != nil {
-		if err := customDynamicFeesConfig.Validate(); err != nil {
-			panic(err)
-		}
-	}
-
-	if err := eUpgradeDynamicFeesConfig.Validate(); err != nil {
-		panic(err)
-	}
-}
+const TempGasCap = commonfees.Gas(1_000_000) // TODO ABENEGIA: temp const to be replaced with API call
 
 var (
-	eUpgradeDynamicFeesConfig = commonfees.DynamicFeesConfig{
-		MinFeeRate: commonfees.Dimensions{
-			60 * units.NanoAvax,
-			8 * units.NanoAvax,
-			10 * units.NanoAvax,
-			35 * units.NanoAvax,
-		},
-		UpdateDenominators: commonfees.Dimensions{
-			50_000,
-			50_000,
-			50_000,
-			500_000,
-		},
-		BlockMaxComplexity: commonfees.Dimensions{
-			10_000,
-			6_000,
-			8_000,
-			60_000,
-		},
-		BlockTargetComplexityRate: commonfees.Dimensions{
-			250,
-			60,
-			120,
-			650,
-		},
-	}
+	errDynamicFeeConfigNotAvailable = errors.New("dynamic fee config not available")
 
-	// TODO ABENEGIA: decide if and how to validate preEUpgradeDynamicFeesConfig
-	preEUpgradeDynamicFeesConfig = commonfees.DynamicFeesConfig{
-		BlockMaxComplexity: commonfees.Max,
+	eUpgradeDynamicFeesConfig = commonfees.DynamicFeesConfig{
+		MinGasPrice:         commonfees.GasPrice(10 * units.NanoAvax),
+		UpdateDenominator:   commonfees.Gas(50_000),
+		GasTargetRate:       commonfees.Gas(250),
+		FeeDimensionWeights: commonfees.Dimensions{1, 1, 1, 1},
+		MaxGasPerSecond:     commonfees.Gas(1_000_000),
+		LeakGasCoeff:        commonfees.Gas(1),
 	}
 
 	customDynamicFeesConfig *commonfees.DynamicFeesConfig
 )
 
-func GetDynamicConfig(isEActive bool) commonfees.DynamicFeesConfig {
+func init() {
+	if err := eUpgradeDynamicFeesConfig.Validate(); err != nil {
+		panic(err)
+	}
+}
+
+func GetDynamicConfig(isEActive bool) (commonfees.DynamicFeesConfig, error) {
 	if !isEActive {
-		return preEUpgradeDynamicFeesConfig
+		return commonfees.DynamicFeesConfig{}, errDynamicFeeConfigNotAvailable
 	}
 
 	if customDynamicFeesConfig != nil {
-		return *customDynamicFeesConfig
+		return *customDynamicFeesConfig, nil
 	}
-	return eUpgradeDynamicFeesConfig
+	return eUpgradeDynamicFeesConfig, nil
 }
 
 func ResetDynamicConfig(ctx *snow.Context, customFeesConfig *commonfees.DynamicFeesConfig) error {
@@ -80,7 +56,7 @@ func ResetDynamicConfig(ctx *snow.Context, customFeesConfig *commonfees.DynamicF
 		return fmt.Errorf("forbidden resetting dynamic fee rates config for network %s", constants.NetworkName(ctx.NetworkID))
 	}
 	if err := customFeesConfig.Validate(); err != nil {
-		return fmt.Errorf("custom fee config fails validation: %w", err)
+		return fmt.Errorf("invalid custom fee config: %w", err)
 	}
 
 	customDynamicFeesConfig = customFeesConfig

@@ -133,8 +133,8 @@ type Client interface {
 	GetBlock(ctx context.Context, blockID ids.ID, options ...rpc.Option) ([]byte, error)
 	// GetBlockByHeight returns the block at the given [height].
 	GetBlockByHeight(ctx context.Context, height uint64, options ...rpc.Option) ([]byte, error)
-	// GetNextFeeRates returns the next fee rates that a transaction must pay to be accepted now
-	GetNextFeeRates(ctx context.Context, options ...rpc.Option) (commonfees.Dimensions, error)
+	// GetNextGasPrice returns the gas price that a transaction must pay to be accepted now
+	GetNextGasPrice(ctx context.Context, options ...rpc.Option) (commonfees.GasPrice, error)
 }
 
 // Client implementation for interacting with the P Chain endpoint
@@ -550,8 +550,8 @@ func (c *client) GetBlockByHeight(ctx context.Context, height uint64, options ..
 	return formatting.Decode(res.Encoding, res.Block)
 }
 
-func (c *client) GetNextFeeRates(ctx context.Context, options ...rpc.Option) (commonfees.Dimensions, error) {
-	res := &GetFeeRatesReply{}
-	err := c.requester.SendRequest(ctx, "platform.getFeeRates", struct{}{}, res, options...)
-	return res.NextFeeRates, err
+func (c *client) GetNextGasPrice(ctx context.Context, options ...rpc.Option) (commonfees.GasPrice, error) {
+	res := &GetGasPriceReply{}
+	err := c.requester.SendRequest(ctx, "platform.getNextGasPrice", struct{}{}, res, options...)
+	return res.NextGasPrice, err
 }

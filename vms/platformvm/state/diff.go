@@ -37,7 +37,8 @@ type diff struct {
 
 	timestamp time.Time
 
-	excessComplexity *commonfees.Dimensions
+	excessComplexity *commonfees.Gas
+	currentGasCap    *commonfees.Gas
 
 	// Subnet ID --> supply of native asset of the subnet
 	currentSupply map[ids.ID]uint64
@@ -93,29 +94,54 @@ func NewDiffOn(parentState Chain) (Diff, error) {
 	})
 }
 
-func (d *diff) GetExcessComplexity() (commonfees.Dimensions, error) {
+func (d *diff) GetExcessComplexity() (commonfees.Gas, error) {
 	if d.excessComplexity == nil {
 		parentState, ok := d.stateVersions.GetState(d.parentID)
 		if !ok {
-			return commonfees.Empty, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
+			return commonfees.ZeroGas, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
 		}
 		parentExcessComplexity, err := parentState.GetExcessComplexity()
 		if err != nil {
-			return commonfees.Empty, err
+			return commonfees.ZeroGas, err
 		}
 
-		d.excessComplexity = new(commonfees.Dimensions)
+		d.excessComplexity = new(commonfees.Gas)
 		*d.excessComplexity = parentExcessComplexity
 	}
 
 	return *d.excessComplexity, nil
 }
 
-func (d *diff) SetExcessComplexity(complexity commonfees.Dimensions) {
+func (d *diff) SetExcessComplexity(gas commonfees.Gas) {
 	if d.excessComplexity == nil {
-		d.excessComplexity = new(commonfees.Dimensions)
+		d.excessComplexity = new(commonfees.Gas)
 	}
-	*d.excessComplexity = complexity
+	*d.excessComplexity = gas
+}
+
+func (d *diff) GetCurrentGasCap() (commonfees.Gas, error) {
+	if d.currentGasCap == nil {
+		parentState, ok := d.stateVersions.GetState(d.parentID)
+		if !ok {
+			return commonfees.ZeroGas, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
+		}
+		parentCurrentGasCap, err := parentState.GetCurrentGasCap()
+		if err != nil {
+			return commonfees.ZeroGas, err
+		}
+
+		d.currentGasCap = new(commonfees.Gas)
+		*d.currentGasCap = parentCurrentGasCap
+	}
+
+	return *d.currentGasCap, nil
+}
+
+func (d *diff) SetCurrentGasCap(gasCap commonfees.Gas) {
+	if d.currentGasCap == nil {
+		d.currentGasCap = new(commonfees.Gas)
+	}
+	*d.currentGasCap = gasCap
 }
 
 func (d *diff) GetTimestamp() time.Time {
@@ -432,6 +458,9 @@ func (d *diff) Apply(baseState Chain) error {
 	baseState.SetTimestamp(d.timestamp)
 	if d.excessComplexity != nil {
 		baseState.SetExcessComplexity(*d.excessComplexity)
+	}
+	if d.currentGasCap != nil {
+		baseState.SetCurrentGasCap(*d.currentGasCap)
 	}
 	for subnetID, supply := range d.currentSupply {
 		baseState.SetCurrentSupply(subnetID, supply)
