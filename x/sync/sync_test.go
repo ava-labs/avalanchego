@@ -843,7 +843,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 	require.NoError(syncer.Start(context.Background()))
 
 	// Simulate writes on the server
-	for i := 0; i < 1_000; i++ {
+	for i := 0; i <= 1_000; i++ {
 		addkey := make([]byte, r.Intn(50))
 		_, err = r.Read(addkey)
 		require.NoError(err)
@@ -855,7 +855,13 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 		require.NoError(dbToSync.Put(addkey, val))
 		targetRoot, err := dbToSync.GetMerkleRoot(ctx)
 		require.NoError(err)
-		require.NoError(syncer.UpdateSyncTarget(targetRoot))
+
+		// Simulate client periodically recording root updates
+		// invariant: we must record whatever the final root we're trying to
+		// sync to is for this test
+		if i%10 == 0 {
+			require.NoError(syncer.UpdateSyncTarget(targetRoot))
+		}
 	}
 
 	// Block until all syncing is done
