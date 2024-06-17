@@ -56,6 +56,13 @@ func newWorker(
 	name string,
 	failingChecks *prometheus.GaugeVec,
 ) *worker {
+	// Initialize the number of failing checks to 0 for all checks
+	for _, tag := range []string{AllTag, ApplicationTag} {
+		failingChecks.With(prometheus.Labels{
+			CheckLabel: name,
+			TagLabel:   tag,
+		}).Set(0)
+	}
 	return &worker{
 		log:           log,
 		name:          name,

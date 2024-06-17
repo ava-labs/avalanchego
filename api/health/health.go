@@ -73,15 +73,6 @@ func New(log logging.Logger, registerer prometheus.Registerer) (Health, error) {
 		},
 		[]string{CheckLabel, TagLabel},
 	)
-	// Initialize the number of failing checks to 0 for all checks
-	for _, tag := range []string{AllTag, ApplicationTag} {
-		for _, check := range []string{"readiness", "health", "liveness"} {
-			failingChecks.With(prometheus.Labels{
-				CheckLabel: check,
-				TagLabel:   tag,
-			}).Set(0)
-		}
-	}
 	return &health{
 		log:       log,
 		readiness: newWorker(log, "readiness", failingChecks),
