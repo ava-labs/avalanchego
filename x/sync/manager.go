@@ -444,7 +444,10 @@ func (m *Manager) handleResponse(
 		work.priority = retryPriority
 		work.queueTime = time.Now()
 		work.requestFailed()
+
+		m.workLock.Lock()
 		m.unprocessedWork.Insert(work)
+		m.workLock.Unlock()
 
 		return false
 	}
