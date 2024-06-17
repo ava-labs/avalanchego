@@ -87,9 +87,9 @@ func newIPTracker(
 type trackedNode struct {
 	// manuallyTracked tracks if this node's connection was manually requested.
 	manuallyTracked bool
-	// subnets contains all the subnets that this node is a validator of,
-	// including potentially the primary network.
-	subnets set.Set[ids.ID]
+	// validatedSubnets contains all the subnets that this node is a validator
+	// of, including potentially the primary network.
+	validatedSubnets set.Set[ids.ID]
 	// subnets contains the subset of [subnets] that the local node also tracks,
 	// including potentially the primary network.
 	trackedSubnets set.Set[ids.ID]
@@ -102,7 +102,7 @@ func (n *trackedNode) wantsConnection() bool {
 }
 
 func (n *trackedNode) canDelete() bool {
-	return !n.manuallyTracked && n.subnets.Len() == 0
+	return !n.manuallyTracked && n.validatedSubnets.Len() == 0
 }
 
 type connectedNode struct {
@@ -326,7 +326,7 @@ func (i *ipTracker) AddIP(ip *ips.ClaimedIPPort) bool {
 // GetIP returns the most recent IP of the provided nodeID. Returns true if all
 // of the following conditions are met:
 //  1. There is currently an IP for the provided nodeID.
-//  1. The provided IP is from a node whose connection is desired on a tracked
+//  2. The provided IP is from a node whose connection is desired on a tracked
 //     subnet.
 func (i *ipTracker) GetIP(nodeID ids.NodeID) (*ips.ClaimedIPPort, bool) {
 	i.lock.RLock()
@@ -427,7 +427,7 @@ func (i *ipTracker) addTrackableID(nodeID ids.NodeID, subnetID *ids.ID) {
 	if subnetID == nil {
 		nodeTracker.manuallyTracked = true
 	} else {
-		nodeTracker.subnets.Add(*subnetID)
+		nodeTracker.validatedSubnets.Add(*subnetID)
 		if *subnetID == constants.PrimaryNetworkID || i.trackedSubnets.Contains(*subnetID) {
 			nodeTracker.trackedSubnets.Add(*subnetID)
 		}
@@ -512,7 +512,7 @@ func (i *ipTracker) OnValidatorRemoved(subnetID ids.ID, nodeID ids.NodeID, _ uin
 		return
 	}
 
-	trackedNode.subnets.Remove(subnetID)
+	trackedNode.validatedSubnets.Remove(subnetID)
 	trackedNode.trackedSubnets.Remove(subnetID)
 
 	if trackedNode.canDelete() {
