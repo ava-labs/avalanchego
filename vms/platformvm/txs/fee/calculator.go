@@ -81,25 +81,25 @@ func (c *Calculator) RemoveFeesFor(unitsToRm fees.Dimensions) (uint64, error) {
 	return c.c.removeFeesFor(unitsToRm)
 }
 
-func (c *Calculator) GetGas() fees.Gas {
-	if c.c.feeManager != nil {
-		return c.c.feeManager.GetGas()
-	}
-	return fees.ZeroGas
-}
-
-func (c *Calculator) GetCurrentExcessComplexity() fees.Gas {
-	if c.c.feeManager != nil {
-		return c.c.feeManager.GetCurrentExcessComplexity()
-	}
-	return fees.ZeroGas
-}
-
 func (c *Calculator) GetGasPrice() fees.GasPrice {
 	if c.c.feeManager != nil {
 		return c.c.feeManager.GetGasPrice()
 	}
 	return fees.ZeroGasPrice
+}
+
+func (c *Calculator) GetBlockGas() fees.Gas {
+	if c.c.feeManager != nil {
+		return c.c.feeManager.GetBlockGas()
+	}
+	return fees.ZeroGas
+}
+
+func (c *Calculator) GetExcessGas() fees.Gas {
+	if c.c.feeManager != nil {
+		return c.c.feeManager.GetExcessGas()
+	}
+	return fees.ZeroGas
 }
 
 type calculator struct {
@@ -418,7 +418,7 @@ func (c *calculator) addFeesFor(complexity fees.Dimensions) (uint64, error) {
 		return 0, fmt.Errorf("failed adding fees: %w", err)
 	}
 
-	if err := c.feeManager.CumulateComplexity(txGas, c.maxGas); err != nil {
+	if err := c.feeManager.CumulateGas(txGas, c.maxGas); err != nil {
 		return 0, fmt.Errorf("failed cumulating complexity: %w", err)
 	}
 	fee, err := c.feeManager.CalculateFee(txGas)
@@ -444,7 +444,7 @@ func (c *calculator) removeFeesFor(unitsToRm fees.Dimensions) (uint64, error) {
 		return 0, fmt.Errorf("failed adding fees: %w", err)
 	}
 
-	if err := c.feeManager.RemoveComplexity(txGas); err != nil {
+	if err := c.feeManager.RemoveGas(txGas); err != nil {
 		return 0, fmt.Errorf("failed removing units: %w", err)
 	}
 	fee, err := c.feeManager.CalculateFee(txGas)

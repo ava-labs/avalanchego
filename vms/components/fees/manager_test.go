@@ -50,7 +50,7 @@ func TestFakeExponential(t *testing.T) {
 		factor      GasPrice
 		numerator   Gas
 		denominator Gas
-		want        uint64
+		want        GasPrice
 	}{
 		// When numerator == 0 the return value should always equal the value of factor
 		{1, 0, 1, 1},

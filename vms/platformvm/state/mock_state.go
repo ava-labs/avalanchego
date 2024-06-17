@@ -273,19 +273,19 @@ func (mr *MockChainMockRecorder) GetDelegateeReward(arg0, arg1 any) *gomock.Call
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDelegateeReward", reflect.TypeOf((*MockChain)(nil).GetDelegateeReward), arg0, arg1)
 }
 
-// GetExcessComplexity mocks base method.
-func (m *MockChain) GetExcessComplexity() (fees.Gas, error) {
+// GetExcessGas mocks base method.
+func (m *MockChain) GetExcessGas() (fees.Gas, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetExcessComplexity")
+	ret := m.ctrl.Call(m, "GetExcessGas")
 	ret0, _ := ret[0].(fees.Gas)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// GetExcessComplexity indicates an expected call of GetExcessComplexity.
-func (mr *MockChainMockRecorder) GetExcessComplexity() *gomock.Call {
+// GetExcessGas indicates an expected call of GetExcessGas.
+func (mr *MockChainMockRecorder) GetExcessGas() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetExcessComplexity", reflect.TypeOf((*MockChain)(nil).GetExcessComplexity))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetExcessGas", reflect.TypeOf((*MockChain)(nil).GetExcessGas))
 }
 
 // GetPendingDelegatorIterator mocks base method.
@@ -494,16 +494,16 @@ func (mr *MockChainMockRecorder) SetDelegateeReward(arg0, arg1, arg2 any) *gomoc
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetDelegateeReward", reflect.TypeOf((*MockChain)(nil).SetDelegateeReward), arg0, arg1, arg2)
 }
 
-// SetExcessComplexity mocks base method.
-func (m *MockChain) SetExcessComplexity(arg0 fees.Gas) {
+// SetExcessGas mocks base method.
+func (m *MockChain) SetExcessGas(arg0 fees.Gas) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SetExcessComplexity", arg0)
+	m.ctrl.Call(m, "SetExcessGas", arg0)
 }
 
-// SetExcessComplexity indicates an expected call of SetExcessComplexity.
-func (mr *MockChainMockRecorder) SetExcessComplexity(arg0 any) *gomock.Call {
+// SetExcessGas indicates an expected call of SetExcessGas.
+func (mr *MockChainMockRecorder) SetExcessGas(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetExcessComplexity", reflect.TypeOf((*MockChain)(nil).SetExcessComplexity), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetExcessGas", reflect.TypeOf((*MockChain)(nil).SetExcessGas), arg0)
 }
 
 // SetSubnetOwner mocks base method.
@@ -789,19 +789,19 @@ func (mr *MockDiffMockRecorder) GetDelegateeReward(arg0, arg1 any) *gomock.Call 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDelegateeReward", reflect.TypeOf((*MockDiff)(nil).GetDelegateeReward), arg0, arg1)
 }
 
-// GetExcessComplexity mocks base method.
-func (m *MockDiff) GetExcessComplexity() (fees.Gas, error) {
+// GetExcessGas mocks base method.
+func (m *MockDiff) GetExcessGas() (fees.Gas, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetExcessComplexity")
+	ret := m.ctrl.Call(m, "GetExcessGas")
 	ret0, _ := ret[0].(fees.Gas)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// GetExcessComplexity indicates an expected call of GetExcessComplexity.
-func (mr *MockDiffMockRecorder) GetExcessComplexity() *gomock.Call {
+// GetExcessGas indicates an expected call of GetExcessGas.
+func (mr *MockDiffMockRecorder) GetExcessGas() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetExcessComplexity", reflect.TypeOf((*MockDiff)(nil).GetExcessComplexity))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetExcessGas", reflect.TypeOf((*MockDiff)(nil).GetExcessGas))
 }
 
 // GetPendingDelegatorIterator mocks base method.
@@ -1010,16 +1010,16 @@ func (mr *MockDiffMockRecorder) SetDelegateeReward(arg0, arg1, arg2 any) *gomock
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetDelegateeReward", reflect.TypeOf((*MockDiff)(nil).SetDelegateeReward), arg0, arg1, arg2)
 }
 
-// SetExcessComplexity mocks base method.
-func (m *MockDiff) SetExcessComplexity(arg0 fees.Gas) {
+// SetExcessGas mocks base method.
+func (m *MockDiff) SetExcessGas(arg0 fees.Gas) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SetExcessComplexity", arg0)
+	m.ctrl.Call(m, "SetExcessGas", arg0)
 }
 
-// SetExcessComplexity indicates an expected call of SetExcessComplexity.
-func (mr *MockDiffMockRecorder) SetExcessComplexity(arg0 any) *gomock.Call {
+// SetExcessGas indicates an expected call of SetExcessGas.
+func (mr *MockDiffMockRecorder) SetExcessGas(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetExcessComplexity", reflect.TypeOf((*MockDiff)(nil).SetExcessComplexity), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetExcessGas", reflect.TypeOf((*MockDiff)(nil).SetExcessGas), arg0)
 }
 
 // SetSubnetOwner mocks base method.
@@ -1430,19 +1430,19 @@ func (mr *MockStateMockRecorder) GetDelegateeReward(arg0, arg1 any) *gomock.Call
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDelegateeReward", reflect.TypeOf((*MockState)(nil).GetDelegateeReward), arg0, arg1)
 }
 
-// GetExcessComplexity mocks base method.
-func (m *MockState) GetExcessComplexity() (fees.Gas, error) {
+// GetExcessGas mocks base method.
+func (m *MockState) GetExcessGas() (fees.Gas, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetExcessComplexity")
+	ret := m.ctrl.Call(m, "GetExcessGas")
 	ret0, _ := ret[0].(fees.Gas)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// GetExcessComplexity indicates an expected call of GetExcessComplexity.
-func (mr *MockStateMockRecorder) GetExcessComplexity() *gomock.Call {
+// GetExcessGas indicates an expected call of GetExcessGas.
+func (mr *MockStateMockRecorder) GetExcessGas() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetExcessComplexity", reflect.TypeOf((*MockState)(nil).GetExcessComplexity))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetExcessGas", reflect.TypeOf((*MockState)(nil).GetExcessGas))
 }
 
 // GetLastAccepted mocks base method.
@@ -1755,16 +1755,16 @@ func (mr *MockStateMockRecorder) SetDelegateeReward(arg0, arg1, arg2 any) *gomoc
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetDelegateeReward", reflect.TypeOf((*MockState)(nil).SetDelegateeReward), arg0, arg1, arg2)
 }
 
-// SetExcessComplexity mocks base method.
-func (m *MockState) SetExcessComplexity(arg0 fees.Gas) {
+// SetExcessGas mocks base method.
+func (m *MockState) SetExcessGas(arg0 fees.Gas) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SetExcessComplexity", arg0)
+	m.ctrl.Call(m, "SetExcessGas", arg0)
 }
 
-// SetExcessComplexity indicates an expected call of SetExcessComplexity.
-func (mr *MockStateMockRecorder) SetExcessComplexity(arg0 any) *gomock.Call {
+// SetExcessGas indicates an expected call of SetExcessGas.
+func (mr *MockStateMockRecorder) SetExcessGas(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetExcessComplexity", reflect.TypeOf((*MockState)(nil).SetExcessComplexity), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetExcessGas", reflect.TypeOf((*MockState)(nil).SetExcessGas), arg0)
 }
 
 // SetHeight mocks base method.

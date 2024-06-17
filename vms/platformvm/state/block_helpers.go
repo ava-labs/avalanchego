@@ -74,7 +74,7 @@ func GetNextStakerChangeTime(state Chain) (time.Time, error) {
 }
 
 // [PickFeeCalculator] creates either a static or a dynamic fee calculator, depending on the active upgrade
-// [PickFeeCalculator] does not mnodify [state]
+// [PickFeeCalculator] does not modify [state]
 func PickFeeCalculator(cfg *config.Config, state Chain, parentBlkTime time.Time) (*fee.Calculator, error) {
 	var (
 		childBlkTime = state.GetTimestamp()
@@ -90,7 +90,7 @@ func PickFeeCalculator(cfg *config.Config, state Chain, parentBlkTime time.Time)
 		return nil, fmt.Errorf("failed retrieving dynamic fees config: %w", err)
 	}
 
-	feesMan, err := updatedFeeManager(feesCfg, state, parentBlkTime)
+	feesMan, err := updatedFeeManager(feesCfg, state, parentBlkTime, childBlkTime)
 	if err != nil {
 		return nil, fmt.Errorf("failed updating fee manager: %w", err)
 	}
@@ -100,18 +100,19 @@ func PickFeeCalculator(cfg *config.Config, state Chain, parentBlkTime time.Time)
 		return nil, fmt.Errorf("failed retrieving gas cap: %w", err)
 	}
 
-	elapsedTime := childBlkTime.Unix() - parentBlkTime.Unix()
-	maxGas := commonfees.MaxGas(feesCfg, currentGasCap, uint64(elapsedTime))
-	feeCalculator := fee.NewDynamicCalculator(feesMan, maxGas)
-	return feeCalculator, nil
+	gasCap, err := commonfees.MaxGas(feesCfg, currentGasCap, parentBlkTime, childBlkTime)
+	if err != nil {
+		return nil, fmt.Errorf("failed retrieving gas cap: %w", err)
+	}
+
+	return fee.NewDynamicCalculator(feesMan, gasCap), nil
 }
 
-func updatedFeeManager(feesCfg commonfees.DynamicFeesConfig, state Chain, parentBlkTime time.Time) (*commonfees.Manager, error) {
-	excessComplexity, err := state.GetExcessComplexity()
+func updatedFeeManager(feesCfg commonfees.DynamicFeesConfig, state Chain, parentBlkTime, childBlkTime time.Time) (*commonfees.Manager, error) {
+	excessComplexity, err := state.GetExcessGas()
 	if err != nil {
 		return nil, fmt.Errorf("failed retrieving excess complexity: %w", err)
 	}
-	childBlkTime := state.GetTimestamp()
 	feeManager, err := commonfees.NewUpdatedManager(
 		feesCfg,
 		excessComplexity,

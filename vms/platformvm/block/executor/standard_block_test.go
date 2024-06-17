@@ -58,7 +58,7 @@ func TestApricotStandardBlockTimeVerification(t *testing.T) {
 	env.mockedState.EXPECT().GetLastAccepted().Return(parentID).AnyTimes()
 	env.mockedState.EXPECT().GetTimestamp().Return(chainTime).AnyTimes()
 	onParentAccept.EXPECT().GetTimestamp().Return(chainTime).AnyTimes()
-	onParentAccept.EXPECT().GetExcessComplexity().Return(commonfees.ZeroGas, nil).AnyTimes()
+	onParentAccept.EXPECT().GetExcessGas().Return(commonfees.ZeroGas, nil).AnyTimes()
 	onParentAccept.EXPECT().GetCurrentGasCap().Return(commonfees.ZeroGas, nil).AnyTimes()
 
 	// wrong height
@@ -153,7 +153,7 @@ func TestBanffStandardBlockTimeVerification(t *testing.T) {
 	}
 	utxoID := utxo.InputID()
 	onParentAccept.EXPECT().GetUTXO(utxoID).Return(utxo, nil).AnyTimes()
-	onParentAccept.EXPECT().GetExcessComplexity().Return(commonfees.ZeroGas, nil).AnyTimes()
+	onParentAccept.EXPECT().GetExcessGas().Return(commonfees.ZeroGas, nil).AnyTimes()
 	onParentAccept.EXPECT().GetCurrentGasCap().Return(commonfees.ZeroGas, nil).AnyTimes()
 
 	// Create the tx

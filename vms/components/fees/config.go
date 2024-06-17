@@ -3,7 +3,11 @@
 
 package fees
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+	"time"
+)
 
 var (
 	errZeroLeakGasCoeff     = errors.New("zero leak gas coefficient")
@@ -27,7 +31,7 @@ type DynamicFeesConfig struct {
 	FeeDimensionWeights Dimensions `json:"fee-dimension-weights"`
 
 	MaxGasPerSecond Gas
-	LeakGasCoeff    Gas // TODO ABENEGIA: not sure of the unit of measurement here
+	LeakGasCoeff    Gas // techically the unit of measure if sec^{-1}, but picking Gas reduces casts needed
 }
 
 func (c *DynamicFeesConfig) Validate() error {
@@ -44,10 +48,15 @@ func (c *DynamicFeesConfig) Validate() error {
 
 // We cap the maximum gas consumed by time with a leaky bucket approach
 // MaxGas = min (MaxGas + MaxGasPerSecond/LeakGasCoeff*ElapsedTime, MaxGasPerSecond)
-func MaxGas(cfg DynamicFeesConfig, currentGasCapacity Gas, elapsedTime uint64) Gas {
-	if elapsedTime > uint64(cfg.LeakGasCoeff) {
-		return cfg.MaxGasPerSecond
+func MaxGas(cfg DynamicFeesConfig, currentGasCapacity Gas, parentBlkTime, childBlkTime time.Time) (Gas, error) {
+	if !childBlkTime.After(parentBlkTime) {
+		return ZeroGas, fmt.Errorf("unexpected block times, parentBlkTim %v, childBlkTime %v", parentBlkTime, childBlkTime)
 	}
 
-	return min(cfg.MaxGasPerSecond, currentGasCapacity+cfg.MaxGasPerSecond*Gas(elapsedTime)/cfg.LeakGasCoeff)
+	elapsedTime := uint64(childBlkTime.Unix() - parentBlkTime.Unix())
+	if elapsedTime > uint64(cfg.LeakGasCoeff) {
+		return cfg.MaxGasPerSecond, nil
+	}
+
+	return min(cfg.MaxGasPerSecond, currentGasCapacity+cfg.MaxGasPerSecond*Gas(elapsedTime)/cfg.LeakGasCoeff), nil
 }

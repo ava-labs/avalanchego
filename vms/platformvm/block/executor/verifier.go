@@ -10,13 +10,14 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/vms/components/fees"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
+
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 var (
@@ -251,8 +252,8 @@ func (v *verifier) ApricotAtomicBlock(b *block.ApricotAtomicBlock) error {
 
 		inputs:         atomicExecutor.Inputs,
 		timestamp:      atomicExecutor.OnAccept.GetTimestamp(),
-		blockGas:       fees.ZeroGas,
-		excessGas:      fees.ZeroGas,
+		blockGas:       commonfees.ZeroGas,
+		excessGas:      commonfees.ZeroGas,
 		atomicRequests: atomicExecutor.AtomicRequests,
 	}
 	return nil
@@ -423,9 +424,13 @@ func (v *verifier) proposalBlock(
 		return err
 	}
 
-	blkGas := feeCalculator.GetGas()
-	onCommitState.SetCurrentGasCap(currentGasCap + blkGas)
-	onAbortState.SetCurrentGasCap(currentGasCap + blkGas)
+	blkGas := feeCalculator.GetBlockGas()
+	nextGasCap := commonfees.Gas(0)
+	if currentGasCap > blkGas {
+		nextGasCap = currentGasCap - blkGas
+	}
+	onCommitState.SetCurrentGasCap(nextGasCap)
+	onAbortState.SetCurrentGasCap(nextGasCap)
 
 	onCommitState.AddTx(b.Tx, status.Committed)
 	onAbortState.AddTx(b.Tx, status.Aborted)
@@ -450,7 +455,7 @@ func (v *verifier) proposalBlock(
 		// always be the same as the Banff Proposal Block.
 		timestamp:      onAbortState.GetTimestamp(),
 		blockGas:       blkGas,
-		excessGas:      feeCalculator.GetCurrentExcessComplexity(),
+		excessGas:      feeCalculator.GetExcessGas(),
 		atomicRequests: atomicRequests,
 	}
 	return nil
@@ -476,8 +481,12 @@ func (v *verifier) standardBlock(
 
 	blkID := b.ID()
 
-	blkGas := feeCalculator.GetGas()
-	onAcceptState.SetCurrentGasCap(currentGasCap + blkGas)
+	blkGas := feeCalculator.GetBlockGas()
+	nextGasCap := commonfees.Gas(0)
+	if currentGasCap > blkGas {
+		nextGasCap = currentGasCap - blkGas
+	}
+	onAcceptState.SetCurrentGasCap(nextGasCap)
 
 	v.blkIDToState[blkID] = &blockState{
 		statelessBlock: b,
@@ -487,7 +496,7 @@ func (v *verifier) standardBlock(
 
 		timestamp:      onAcceptState.GetTimestamp(),
 		blockGas:       blkGas,
-		excessGas:      feeCalculator.GetCurrentExcessComplexity(),
+		excessGas:      feeCalculator.GetExcessGas(),
 		inputs:         inputs,
 		atomicRequests: atomicRequests,
 	}
@@ -554,7 +563,7 @@ func (v *verifier) processStandardTxs(
 	}
 
 	if v.txExecutorBackend.Config.UpgradeConfig.IsEActivated(state.GetTimestamp()) {
-		state.SetExcessComplexity(feeCalculator.GetCurrentExcessComplexity())
+		state.SetExcessGas(feeCalculator.GetExcessGas())
 	}
 
 	if numFuncs := len(funcs); numFuncs == 1 {

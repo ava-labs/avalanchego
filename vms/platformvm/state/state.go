@@ -101,8 +101,8 @@ type Chain interface {
 	avax.UTXOGetter
 	avax.UTXODeleter
 
-	GetExcessComplexity() (commonfees.Gas, error)
-	SetExcessComplexity(commonfees.Gas)
+	GetExcessGas() (commonfees.Gas, error)
+	SetExcessGas(commonfees.Gas)
 
 	GetCurrentGasCap() (commonfees.Gas, error)
 	SetCurrentGasCap(commonfees.Gas)
@@ -1012,11 +1012,11 @@ func (s *state) GetStartTime(nodeID ids.NodeID, subnetID ids.ID) (time.Time, err
 	return staker.StartTime, nil
 }
 
-func (s *state) GetExcessComplexity() (commonfees.Gas, error) {
+func (s *state) GetExcessGas() (commonfees.Gas, error) {
 	return s.excessComplexity, nil
 }
 
-func (s *state) SetExcessComplexity(gas commonfees.Gas) {
+func (s *state) SetExcessGas(gas commonfees.Gas) {
 	s.excessComplexity = gas
 }
 

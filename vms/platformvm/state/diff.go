@@ -94,13 +94,13 @@ func NewDiffOn(parentState Chain) (Diff, error) {
 	})
 }
 
-func (d *diff) GetExcessComplexity() (commonfees.Gas, error) {
+func (d *diff) GetExcessGas() (commonfees.Gas, error) {
 	if d.excessComplexity == nil {
 		parentState, ok := d.stateVersions.GetState(d.parentID)
 		if !ok {
 			return commonfees.ZeroGas, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
 		}
-		parentExcessComplexity, err := parentState.GetExcessComplexity()
+		parentExcessComplexity, err := parentState.GetExcessGas()
 		if err != nil {
 			return commonfees.ZeroGas, err
 		}
@@ -112,7 +112,7 @@ func (d *diff) GetExcessComplexity() (commonfees.Gas, error) {
 	return *d.excessComplexity, nil
 }
 
-func (d *diff) SetExcessComplexity(gas commonfees.Gas) {
+func (d *diff) SetExcessGas(gas commonfees.Gas) {
 	if d.excessComplexity == nil {
 		d.excessComplexity = new(commonfees.Gas)
 	}
@@ -457,7 +457,7 @@ func (d *diff) DeleteUTXO(utxoID ids.ID) {
 func (d *diff) Apply(baseState Chain) error {
 	baseState.SetTimestamp(d.timestamp)
 	if d.excessComplexity != nil {
-		baseState.SetExcessComplexity(*d.excessComplexity)
+		baseState.SetExcessGas(*d.excessComplexity)
 	}
 	if d.currentGasCap != nil {
 		baseState.SetCurrentGasCap(*d.currentGasCap)

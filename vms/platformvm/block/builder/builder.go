@@ -25,7 +25,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 
-	safemath "github.com/ava-labs/avalanchego/utils/math"
 	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
@@ -340,28 +339,26 @@ func packBlockTxs(
 	var (
 		upgrades  = backend.Config.UpgradeConfig
 		isEActive = upgrades.IsEActivated(timestamp)
+		targetGas = commonfees.ZeroGas
 
 		blockTxs []*txs.Tx
 		inputs   set.Set[ids.ID]
 	)
-
-	feeCfg, err := fee.GetDynamicConfig(isEActive)
-	if err != nil {
-		return nil, fmt.Errorf("failed retrieving dynamic fees config: %w", err)
-	}
 
 	feeCalculator, err := state.PickFeeCalculator(backend.Config, stateDiff, parentBlkTime)
 	if err != nil {
 		return nil, fmt.Errorf("failed picking fee calculator: %w", err)
 	}
 
-	targetGas, err := commonfees.TargetGas(feeCfg, parentBlkTime.Unix(), timestamp.Unix())
-	if err != nil {
-		return nil, fmt.Errorf("failed calculating target block complexity: %w", err)
-	}
-	targetExcessGas, err := safemath.Add64(uint64(targetGas), uint64(feeCalculator.GetCurrentExcessComplexity()))
-	if err != nil {
-		return nil, fmt.Errorf("failed calculating target excess complexity: %w", err)
+	if isEActive {
+		feeCfg, err := fee.GetDynamicConfig(isEActive)
+		if err != nil {
+			return nil, fmt.Errorf("failed retrieving dynamic fees config: %w", err)
+		}
+		targetGas, err = commonfees.TargetGas(feeCfg, parentBlkTime.Unix(), timestamp.Unix())
+		if err != nil {
+			return nil, fmt.Errorf("failed calculating target block complexity: %w", err)
+		}
 	}
 
 	for {
@@ -373,9 +370,9 @@ func packBlockTxs(
 		txSize := len(tx.Bytes())
 
 		// pre e upgrade is active, we fill blocks till a target size
-		// post e upgrade is active, we fill blocks till a target complexity
+		// post e upgrade is active, we fill blocks till a target gas
 		targetSizeReached := (!isEActive && txSize > remainingSize) ||
-			(isEActive && feeCalculator.GetGas() >= commonfees.Gas(targetExcessGas))
+			(isEActive && feeCalculator.GetBlockGas() >= targetGas)
 		if targetSizeReached {
 			break
 		}

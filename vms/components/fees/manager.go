@@ -18,9 +18,9 @@ type Manager struct {
 	// Avax denominated gas price, i.e. fee per unit of complexity.
 	gasPrice GasPrice
 
-	// cumulatedGas helps aggregating the gas consumed
-	// by a block so that we can verify it's not too big/build it properly.
-	cumulatedGas Gas
+	// blockGas helps aggregating the gas consumed in a single block
+	// so that we can verify it's not too big/build it properly.
+	blockGas Gas
 
 	// currentExcessGas stores current excess gas, cumulated over time
 	// to be updated once a block is accepted with cumulatedGas
@@ -35,25 +35,25 @@ func NewManager(gasPrice GasPrice) *Manager {
 
 func NewUpdatedManager(
 	feesConfig DynamicFeesConfig,
-	excessGas Gas,
+	currentExcessGas Gas,
 	parentBlkTime, childBlkTime int64,
 ) (*Manager, error) {
 	res := &Manager{
-		currentExcessGas: excessGas,
+		currentExcessGas: currentExcessGas,
 	}
 
 	targetGas, err := TargetGas(feesConfig, parentBlkTime, childBlkTime)
 	if err != nil {
-		return nil, fmt.Errorf("failed calculating target block gas: %w", err)
+		return nil, fmt.Errorf("failed calculating target gas: %w", err)
 	}
 
-	if excessGas > targetGas {
-		excessGas -= targetGas
+	if currentExcessGas > targetGas {
+		currentExcessGas -= targetGas
 	} else {
-		excessGas = ZeroGas
+		currentExcessGas = ZeroGas
 	}
 
-	res.gasPrice = fakeExponential(feesConfig.MinGasPrice, excessGas, feesConfig.UpdateDenominator)
+	res.gasPrice = fakeExponential(feesConfig.MinGasPrice, currentExcessGas, feesConfig.UpdateDenominator)
 	return res, nil
 }
 
@@ -74,11 +74,11 @@ func (m *Manager) GetGasPrice() GasPrice {
 	return m.gasPrice
 }
 
-func (m *Manager) GetGas() Gas {
-	return m.cumulatedGas
+func (m *Manager) GetBlockGas() Gas {
+	return m.blockGas
 }
 
-func (m *Manager) GetCurrentExcessComplexity() Gas {
+func (m *Manager) GetExcessGas() Gas {
 	return m.currentExcessGas
 }
 
@@ -87,31 +87,43 @@ func (m *Manager) CalculateFee(g Gas) (uint64, error) {
 	return safemath.Mul64(uint64(m.gasPrice), uint64(g))
 }
 
-// CumulateComplexity tries to cumulate the consumed complexity [units]. Before
-// actually cumulating them, it checks whether the result would breach [bounds].
+// CumulateGas tries to cumulate the consumed gas [units]. Before
+// actually cumulating it, it checks whether the result would breach [bounds].
 // If so, it returns the first dimension to breach bounds.
-func (m *Manager) CumulateComplexity(gas, bound Gas) error {
+func (m *Manager) CumulateGas(gas, bound Gas) error {
 	// Ensure we can consume (don't want partial update of values)
-	consumed, err := safemath.Add64(uint64(m.cumulatedGas), uint64(gas))
+	blkGas, err := safemath.Add64(uint64(m.blockGas), uint64(gas))
 	if err != nil {
 		return fmt.Errorf("%w: %w", errGasBoundBreached, err)
 	}
-	if Gas(consumed) > bound {
+	if Gas(blkGas) > bound {
 		return errGasBoundBreached
 	}
 
-	m.cumulatedGas = Gas(consumed)
+	excessGas, err := safemath.Add64(uint64(m.currentExcessGas), uint64(gas))
+	if err != nil {
+		return fmt.Errorf("%w: %w", errGasBoundBreached, err)
+	}
+
+	m.blockGas = Gas(blkGas)
+	m.currentExcessGas = Gas(excessGas)
 	return nil
 }
 
 // Sometimes, e.g. while building a tx, we'd like freedom to speculatively add complexity
-// and to remove it later on. [RemoveComplexity] grants this freedom
-func (m *Manager) RemoveComplexity(gasToRm Gas) error {
-	revertedGas, err := safemath.Sub(m.cumulatedGas, gasToRm)
+// and to remove it later on. [RemoveGas] grants this freedom
+func (m *Manager) RemoveGas(gasToRm Gas) error {
+	rBlkdGas, err := safemath.Sub(m.blockGas, gasToRm)
 	if err != nil {
-		return fmt.Errorf("%w: current Gas %d, gas to revert %d", err, m.cumulatedGas, gasToRm)
+		return fmt.Errorf("%w: current Gas %d, gas to revert %d", err, m.blockGas, gasToRm)
 	}
-	m.cumulatedGas = revertedGas
+	rExcessGas, err := safemath.Sub(m.currentExcessGas, gasToRm)
+	if err != nil {
+		return fmt.Errorf("%w: current Excess gas %d, gas to revert %d", err, m.currentExcessGas, gasToRm)
+	}
+
+	m.blockGas = rBlkdGas
+	m.currentExcessGas = rExcessGas
 	return nil
 }
 
