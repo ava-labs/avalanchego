@@ -9,10 +9,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func UnarySnowflakeStateTest(t *testing.T, sf *unarySnowflake, expectedConfidence []int, expectedFinalized bool) {
+func UnarySnowflakeStateTest(t *testing.T, sf *unarySnowflake, expectedConfidences []int, expectedFinalized bool) {
 	require := require.New(t)
 
-	require.Equal(expectedConfidence, sf.confidence)
+	require.Equal(expectedConfidences, sf.confidence)
 	require.Equal(expectedFinalized, sf.Finalized())
 }
 
@@ -21,8 +21,9 @@ func TestUnarySnowflake(t *testing.T) {
 
 	alphaPreference, alphaConfidence := 1, 2
 	beta := 2
+	terminationConditions := newSingleTerminationCondition(alphaConfidence, beta)
 
-	sf := newUnarySnowflake(alphaPreference, alphaConfidence, beta)
+	sf := newUnarySnowflake(alphaPreference, terminationConditions)
 
 	sf.RecordPoll(alphaConfidence)
 	UnarySnowflakeStateTest(t, &sf, []int{1}, false)
@@ -60,4 +61,36 @@ func TestUnarySnowflake(t *testing.T) {
 
 	sf.RecordPoll(alphaConfidence)
 	UnarySnowflakeStateTest(t, &sf, []int{1}, true)
+}
+
+type unarySnowflakeTest struct {
+	require *require.Assertions
+
+	unarySnowflake
+}
+
+func newUnarySnowflakeTest(t *testing.T, alphaPreference int, terminationConditions []terminationCondition) snowflakeTest[struct{}] {
+	require := require.New(t)
+
+	return &unarySnowflakeTest{
+		require:        require,
+		unarySnowflake: newUnarySnowflake(alphaPreference, terminationConditions),
+	}
+}
+
+func (sf *unarySnowflakeTest) RecordPoll(count int, _ struct{}) {
+	sf.unarySnowflake.RecordPoll(count)
+}
+
+func (sf *unarySnowflakeTest) AssertEqual(expectedConfidences []int, expectedFinalized bool, _ struct{}) {
+	sf.require.Equal(expectedConfidences, sf.unarySnowflake.confidence)
+	sf.require.Equal(expectedFinalized, sf.Finalized())
+}
+
+func TestUnarySnowflakeErrorDriven(t *testing.T) {
+	for _, test := range getErrorDrivenSnowflakeSingleChoiceSuite[struct{}]() {
+		t.Run(test.name, func(t *testing.T) {
+			test.f(t, newUnarySnowflakeTest, struct{}{})
+		})
+	}
 }

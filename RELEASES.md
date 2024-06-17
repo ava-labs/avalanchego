@@ -1,5 +1,32 @@
 # Release Notes
 
+## [v1.11.8](https://github.com/ava-labs/avalanchego/releases/tag/v1.11.8)
+
+This version is backwards compatible to [v1.11.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.11.0). It is optional, but encouraged.
+
+The plugin version is unchanged at `35` and is compatible with versions `v1.11.3-v1.11.7`.
+
+### APIs
+
+- Redesigned metrics to use labels rather than custom namespaces.
+
+### What's Changed
+
+- Remove avalanche metrics registerer from consensus context by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3087
+- Remove rejection from `consensus.Add` by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3084
+- [vms/platformvm] Rename `txstest.Builder` to `txstest.WalletFactory` by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/2890
+- Small metrics cleanup by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3088
+- Fix race in test by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3089
+- Implement error driven snowflake hardcoded to support a single beta by @aaronbuchwald in https://github.com/ava-labs/avalanchego/pull/2978
+- Replace all chain namespaces with labels by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3053
+- add a metrics gauge for built block slot by @tsachiherman in https://github.com/ava-labs/avalanchego/pull/3048
+- [ci] Switch to gh workers for arm64 by @marun in https://github.com/ava-labs/avalanchego/pull/3090
+- [ci] Ensure focal arm64 builds all have their required dependencies by @marun in https://github.com/ava-labs/avalanchego/pull/3091
+- X-chain - consolidate tx creation in unit tests by @abi87 in https://github.com/ava-labs/avalanchego/pull/2736
+- Use netip.AddrPort rather than ips.IPPort by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3094
+
+**Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.11.7...v1.11.8
+
 ## [v1.11.7](https://github.com/ava-labs/avalanchego/releases/tag/v1.11.7)
 
 This version is backwards compatible to [v1.11.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.11.0). It is optional, but encouraged.

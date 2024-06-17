@@ -5,19 +5,18 @@ package network
 
 import (
 	"net"
-
-	"github.com/ava-labs/avalanchego/utils/ips"
+	"net/netip"
 )
 
 var _ net.Listener = (*testListener)(nil)
 
 type testListener struct {
-	ip      ips.IPPort
+	ip      netip.AddrPort
 	inbound chan net.Conn
 	closed  chan struct{}
 }
 
-func newTestListener(ip ips.IPPort) *testListener {
+func newTestListener(ip netip.AddrPort) *testListener {
 	return &testListener{
 		ip:      ip,
 		inbound: make(chan net.Conn),
@@ -41,7 +40,7 @@ func (l *testListener) Close() error {
 
 func (l *testListener) Addr() net.Addr {
 	return &net.TCPAddr{
-		IP:   l.ip.IP,
-		Port: int(l.ip.Port),
+		IP:   l.ip.Addr().AsSlice(),
+		Port: int(l.ip.Port()),
 	}
 }

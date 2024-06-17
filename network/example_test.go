@@ -16,7 +16,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
@@ -110,7 +109,7 @@ func ExampleNewTestNetwork() {
 	// gossip will enable connecting to all the remaining nodes in the network.
 	bootstrappers := genesis.SampleBootstrappers(constants.FujiID, 5)
 	for _, bootstrapper := range bootstrappers {
-		network.ManuallyTrack(bootstrapper.ID, ips.IPPort(bootstrapper.IP))
+		network.ManuallyTrack(bootstrapper.ID, bootstrapper.IP)
 	}
 
 	// Typically network.StartClose() should be called based on receiving a

@@ -14,8 +14,9 @@ func TestNnarySnowball(t *testing.T) {
 
 	alphaPreference, alphaConfidence := 1, 2
 	beta := 2
+	terminationConditions := newSingleTerminationCondition(alphaConfidence, beta)
 
-	sb := newNnarySnowball(alphaPreference, alphaConfidence, beta, Red)
+	sb := newNnarySnowball(alphaPreference, terminationConditions, Red)
 	sb.Add(Blue)
 	sb.Add(Green)
 
@@ -56,8 +57,9 @@ func TestVirtuousNnarySnowball(t *testing.T) {
 
 	alphaPreference, alphaConfidence := 1, 2
 	beta := 1
+	terminationConditions := newSingleTerminationCondition(alphaConfidence, beta)
 
-	sb := newNnarySnowball(alphaPreference, alphaConfidence, beta, Red)
+	sb := newNnarySnowball(alphaPreference, terminationConditions, Red)
 
 	require.Equal(Red, sb.Preference())
 	require.False(sb.Finalized())
@@ -72,8 +74,9 @@ func TestNarySnowballRecordUnsuccessfulPoll(t *testing.T) {
 
 	alphaPreference, alphaConfidence := 1, 2
 	beta := 2
+	terminationConditions := newSingleTerminationCondition(alphaConfidence, beta)
 
-	sb := newNnarySnowball(alphaPreference, alphaConfidence, beta, Red)
+	sb := newNnarySnowball(alphaPreference, terminationConditions, Red)
 	sb.Add(Blue)
 
 	require.Equal(Red, sb.Preference())
@@ -95,7 +98,7 @@ func TestNarySnowballRecordUnsuccessfulPoll(t *testing.T) {
 	require.Equal(Blue, sb.Preference())
 	require.True(sb.Finalized())
 
-	expected := "SB(Preference = TtF4d2QWbk5vzQGTEPrN48x6vwgAoAmKQ9cbp79inpQmcRKES, PreferenceStrength = 3, SF(Confidence = 2, Finalized = true, SL(Preference = TtF4d2QWbk5vzQGTEPrN48x6vwgAoAmKQ9cbp79inpQmcRKES)))"
+	expected := "SB(Preference = TtF4d2QWbk5vzQGTEPrN48x6vwgAoAmKQ9cbp79inpQmcRKES, PreferenceStrength = 3, SF(Confidence = [2], Finalized = true, SL(Preference = TtF4d2QWbk5vzQGTEPrN48x6vwgAoAmKQ9cbp79inpQmcRKES)))"
 	require.Equal(expected, sb.String())
 
 	for i := 0; i < 4; i++ {
@@ -111,8 +114,9 @@ func TestNarySnowballDifferentSnowflakeColor(t *testing.T) {
 
 	alphaPreference, alphaConfidence := 1, 2
 	beta := 2
+	terminationConditions := newSingleTerminationCondition(alphaConfidence, beta)
 
-	sb := newNnarySnowball(alphaPreference, alphaConfidence, beta, Red)
+	sb := newNnarySnowball(alphaPreference, terminationConditions, Red)
 	sb.Add(Blue)
 
 	require.Equal(Red, sb.Preference())
