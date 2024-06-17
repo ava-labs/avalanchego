@@ -773,8 +773,8 @@ func TestFindNextKeyRandom(t *testing.T) {
 	}
 }
 
-// Tests that we are able to sync to the correct root and stay up-to-date even
-// if we are seeing transient errors
+// Tests that we are able to sync to the correct root while the server is
+// updating
 func Test_Sync_Result_Correct_Root(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
@@ -803,7 +803,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 	changeProofHandler := NewSyncGetChangeProofHandler(logging.NoLog{}, dbToSync)
 	changeProofClient := p2ptest.NewClient(t, ctx, changeProofHandler)
 
-	// flake on every other request
+	// Clients that will randomly simulate server-side flakes
 	flakyRangeProofClient := &testClient{
 		AppRequestAnyF: func(ctx context.Context, appResponse []byte, onResponse p2p.AppResponseCallback) error {
 			if rand.Intn(2) < 1 {
@@ -838,34 +838,36 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 
 	require.NoError(err)
 	require.NotNil(syncer)
+
+	// Start syncing from the server
 	require.NoError(syncer.Start(context.Background()))
 
-	require.NoError(syncer.Wait(context.Background()))
-	require.NoError(syncer.Error())
+	// Simulate writes on the server
+	for i := 0; i < 1_000; i++ {
+		addkey := make([]byte, r.Intn(50))
+		_, err = r.Read(addkey)
+		require.NoError(err)
+		val := make([]byte, r.Intn(50))
+		_, err = r.Read(val)
+		require.NoError(err)
 
-	// new db has fully sync'ed and should be at the same root as the original db
-	newRoot, err := db.GetMerkleRoot(context.Background())
+		// Update the server's root + our sync target
+		require.NoError(dbToSync.Put(addkey, val))
+		targetRoot, err := dbToSync.GetMerkleRoot(ctx)
+		require.NoError(err)
+		require.NoError(syncer.UpdateSyncTarget(targetRoot))
+	}
+
+	// Block until all syncing is done
+	require.NoError(syncer.Wait(ctx))
+
+	// We should have the same resulting root as the server
+	wantRoot, err := dbToSync.GetMerkleRoot(context.Background())
 	require.NoError(err)
-	require.Equal(syncRoot, newRoot)
 
-	// make sure they stay in sync
-	addkey := make([]byte, r.Intn(50))
-	_, err = r.Read(addkey)
+	gotRoot, err := db.GetMerkleRoot(context.Background())
 	require.NoError(err)
-	val := make([]byte, r.Intn(50))
-	_, err = r.Read(val)
-	require.NoError(err)
-
-	require.NoError(db.Put(addkey, val))
-
-	require.NoError(dbToSync.Put(addkey, val))
-
-	syncRoot, err = dbToSync.GetMerkleRoot(context.Background())
-	require.NoError(err)
-
-	newRoot, err = db.GetMerkleRoot(context.Background())
-	require.NoError(err)
-	require.Equal(syncRoot, newRoot)
+	require.Equal(wantRoot, gotRoot)
 }
 
 func Test_Sync_Result_Correct_Root_With_Sync_Restart(t *testing.T) {
