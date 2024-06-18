@@ -47,15 +47,15 @@ func newSchedulerWithJob[T comparable](
 	fulfilled []T,
 	abandoned []T,
 ) *Scheduler[T] {
-	q := NewScheduler[T]()
-	require.NoError(t, q.Schedule(context.Background(), job, dependencies...))
+	s := NewScheduler[T]()
+	require.NoError(t, s.Schedule(context.Background(), job, dependencies...))
 	for _, d := range fulfilled {
-		require.NoError(t, q.Fulfill(context.Background(), d))
+		require.NoError(t, s.Fulfill(context.Background(), d))
 	}
 	for _, d := range abandoned {
-		require.NoError(t, q.Abandon(context.Background(), d))
+		require.NoError(t, s.Abandon(context.Background(), d))
 	}
-	return q
+	return s
 }
 
 func TestScheduler_Schedule(t *testing.T) {
