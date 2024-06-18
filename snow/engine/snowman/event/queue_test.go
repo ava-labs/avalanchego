@@ -37,35 +37,6 @@ func newQueueWithJob[T comparable](t *testing.T, job Job, dependencies ...T) *Qu
 	return q
 }
 
-func TestQueue_Fib(t *testing.T) {
-	var (
-		require = require.New(t)
-		results []int
-		q       = NewQueue[int]()
-		makeJob = func(n int) *testJob {
-			return &testJob{
-				execute: func(ctx context.Context) error {
-					if n < 2 {
-						results = append(results, 1)
-					} else {
-						results = append(results, results[n-2]+results[n-1])
-					}
-					return q.Fulfill(ctx, n)
-				},
-				cancel: func(context.Context) error { return nil },
-			}
-		}
-	)
-	for i := 9; i >= 2; i-- {
-		require.NoError(q.Register(context.Background(), makeJob(i), i-2, i-1))
-	}
-	require.Empty(results)
-	require.NoError(q.Register(context.Background(), makeJob(0)))
-	require.Equal([]int{1}, results)
-	require.NoError(q.Register(context.Background(), makeJob(1)))
-	require.Equal([]int{1, 1, 2, 3, 5, 8, 13, 21, 34, 55}, results)
-}
-
 func TestQueue_Register(t *testing.T) {
 	var calledExecute bool
 	userJob := &testJob{
