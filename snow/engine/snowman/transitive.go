@@ -757,8 +757,7 @@ func (t *Transitive) issueFrom(
 		delete(t.blkReqSourceMetric, req)
 	}
 
-	issued := t.Consensus.Decided(blk) || t.Consensus.Processing(blkID)
-	if !issued {
+	if !t.Consensus.Decided(blk) && !t.Consensus.Processing(blkID) {
 		return false, nil
 	}
 
