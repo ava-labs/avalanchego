@@ -43,12 +43,7 @@ var (
 func TestAddAndRemoveFees(t *testing.T) {
 	r := require.New(t)
 
-	fc := &Calculator{
-		c: &calculator{
-			isEActive:  true,
-			feeManager: fee.NewManager(testGasPrice, testBlockMaxGas),
-		},
-	}
+	fc := NewDynamicCalculator(testGasPrice, testBlockMaxGas)
 
 	var (
 		units     = fee.Dimensions{1, 2, 3, 4}
@@ -58,27 +53,27 @@ func TestAddAndRemoveFees(t *testing.T) {
 
 	feeDelta, err := fc.AddFeesFor(units)
 	r.NoError(err)
-	r.Equal(gas, fc.c.feeManager.GetBlockGas())
+	r.Equal(gas, fc.GetBlockGas())
 	r.NotZero(feeDelta)
-	r.Equal(feeDelta, fc.c.fee)
+	r.Equal(feeDelta, fc.GetFee())
 
 	feeDelta2, err := fc.AddFeesFor(units)
 	r.NoError(err)
-	r.Equal(doubleGas, fc.c.feeManager.GetBlockGas())
+	r.Equal(doubleGas, fc.GetBlockGas())
 	r.Equal(feeDelta, feeDelta2)
-	r.Equal(feeDelta+feeDelta2, fc.c.fee)
+	r.Equal(feeDelta+feeDelta2, fc.GetFee())
 
 	feeDelta3, err := fc.RemoveFeesFor(units)
 	r.NoError(err)
-	r.Equal(gas, fc.c.feeManager.GetBlockGas())
+	r.Equal(gas, fc.GetBlockGas())
 	r.Equal(feeDelta, feeDelta3)
-	r.Equal(feeDelta, fc.c.fee)
+	r.Equal(feeDelta, fc.GetFee())
 
 	feeDelta4, err := fc.RemoveFeesFor(units)
 	r.NoError(err)
-	r.Zero(fc.c.feeManager.GetBlockGas())
+	r.Zero(fc.GetBlockGas())
 	r.Equal(feeDelta, feeDelta4)
-	r.Zero(fc.c.fee)
+	r.Zero(fc.GetFee())
 }
 
 func TestTxFees(t *testing.T) {
@@ -115,22 +110,29 @@ func TestTxFees(t *testing.T) {
 		unsignedAndSignedTx func(t *testing.T) (txs.UnsignedTx, *txs.Tx)
 		gasCapF             func() fee.Gas
 		expectedError       error
-		checksF             func(*testing.T, *calculator)
+		checksF             func(*testing.T, *Calculator)
 	}{
 		{
 			name:                "AddValidatorTx pre EUpgrade",
 			chainTime:           preEUpgradeTime,
 			unsignedAndSignedTx: addValidatorTx,
-			checksF: func(t *testing.T, fc *calculator) {
-				require.Equal(t, fc.staticCfg.AddPrimaryNetworkValidatorFee, fc.fee)
+			checksF: func(t *testing.T, c *Calculator) {
+				require.Equal(t, feeTestsDefaultCfg.AddPrimaryNetworkValidatorFee, c.GetFee())
 			},
+		},
+		{
+			name:                "AddValidatorTx post EUpgrade",
+			chainTime:           postEUpgradeTime,
+			expectedError:       errFailedFeeCalculation,
+			unsignedAndSignedTx: addValidatorTx,
+			checksF:             func(*testing.T, *Calculator) {},
 		},
 		{
 			name:                "AddSubnetValidatorTx pre EUpgrade",
 			chainTime:           preEUpgradeTime,
 			unsignedAndSignedTx: addSubnetValidatorTx,
-			checksF: func(t *testing.T, fc *calculator) {
-				require.Equal(t, fc.staticCfg.AddSubnetValidatorFee, fc.fee)
+			checksF: func(t *testing.T, c *Calculator) {
+				require.Equal(t, feeTestsDefaultCfg.AddSubnetValidatorFee, c.GetFee())
 			},
 		},
 		{
@@ -138,9 +140,9 @@ func TestTxFees(t *testing.T) {
 			chainTime:           postEUpgradeTime,
 			expectedError:       nil,
 			unsignedAndSignedTx: addSubnetValidatorTx,
-			checksF: func(t *testing.T, fc *calculator) {
-				require.Equal(t, 19_110*units.NanoAvax, fc.fee)
-				require.Equal(t, fee.Gas(1911), fc.feeManager.GetBlockGas())
+			checksF: func(t *testing.T, c *Calculator) {
+				require.Equal(t, 19_110*units.NanoAvax, c.GetFee())
+				require.Equal(t, fee.Gas(1911), c.GetBlockGas())
 			},
 		},
 		{
@@ -151,30 +153,37 @@ func TestTxFees(t *testing.T) {
 			},
 			unsignedAndSignedTx: addSubnetValidatorTx,
 			expectedError:       errFailedComplexityCumulation,
-			checksF:             func(*testing.T, *calculator) {},
+			checksF:             func(*testing.T, *Calculator) {},
 		},
 		{
 			name:                "AddDelegatorTx pre EUpgrade",
 			chainTime:           preEUpgradeTime,
 			unsignedAndSignedTx: addDelegatorTx,
-			checksF: func(t *testing.T, fc *calculator) {
-				require.Equal(t, fc.staticCfg.AddPrimaryNetworkDelegatorFee, fc.fee)
+			checksF: func(t *testing.T, c *Calculator) {
+				require.Equal(t, feeTestsDefaultCfg.AddPrimaryNetworkDelegatorFee, c.GetFee())
 			},
+		},
+		{
+			name:                "AddDelegatorTx post EUpgrade",
+			chainTime:           postEUpgradeTime,
+			expectedError:       errFailedFeeCalculation,
+			unsignedAndSignedTx: addDelegatorTx,
+			checksF:             func(*testing.T, *Calculator) {},
 		},
 		{
 			name:                "CreateChainTx pre ApricotPhase3",
 			chainTime:           preApricotPhase3Time,
 			unsignedAndSignedTx: createChainTx,
-			checksF: func(t *testing.T, fc *calculator) {
-				require.Equal(t, fc.staticCfg.CreateAssetTxFee, fc.fee)
+			checksF: func(t *testing.T, c *Calculator) {
+				require.Equal(t, feeTestsDefaultCfg.CreateAssetTxFee, c.GetFee())
 			},
 		},
 		{
 			name:                "CreateChainTx pre EUpgrade",
 			chainTime:           preEUpgradeTime,
 			unsignedAndSignedTx: createChainTx,
-			checksF: func(t *testing.T, fc *calculator) {
-				require.Equal(t, fc.staticCfg.CreateBlockchainTxFee, fc.fee)
+			checksF: func(t *testing.T, c *Calculator) {
+				require.Equal(t, feeTestsDefaultCfg.CreateBlockchainTxFee, c.GetFee())
 			},
 		},
 		{
@@ -182,9 +191,9 @@ func TestTxFees(t *testing.T) {
 			chainTime:           postEUpgradeTime,
 			unsignedAndSignedTx: createChainTx,
 			expectedError:       nil,
-			checksF: func(t *testing.T, fc *calculator) {
-				require.Equal(t, 19_540*units.NanoAvax, fc.fee)
-				require.Equal(t, fee.Gas(1_954), fc.feeManager.GetBlockGas())
+			checksF: func(t *testing.T, c *Calculator) {
+				require.Equal(t, 19_540*units.NanoAvax, c.GetFee())
+				require.Equal(t, fee.Gas(1_954), c.GetBlockGas())
 			},
 		},
 		{
@@ -195,22 +204,22 @@ func TestTxFees(t *testing.T) {
 				return testBlockMaxGas - 1
 			},
 			expectedError: errFailedComplexityCumulation,
-			checksF:       func(*testing.T, *calculator) {},
+			checksF:       func(*testing.T, *Calculator) {},
 		},
 		{
 			name:                "CreateSubnetTx pre ApricotPhase3",
 			chainTime:           preApricotPhase3Time,
 			unsignedAndSignedTx: createSubnetTx,
-			checksF: func(t *testing.T, fc *calculator) {
-				require.Equal(t, fc.staticCfg.CreateAssetTxFee, fc.fee)
+			checksF: func(t *testing.T, c *Calculator) {
+				require.Equal(t, feeTestsDefaultCfg.CreateAssetTxFee, c.GetFee())
 			},
 		},
 		{
 			name:                "CreateSubnetTx pre EUpgrade",
 			chainTime:           preEUpgradeTime,
 			unsignedAndSignedTx: createSubnetTx,
-			checksF: func(t *testing.T, fc *calculator) {
-				require.Equal(t, fc.staticCfg.CreateSubnetTxFee, fc.fee)
+			checksF: func(t *testing.T, c *Calculator) {
+				require.Equal(t, feeTestsDefaultCfg.CreateSubnetTxFee, c.GetFee())
 			},
 		},
 		{
@@ -218,9 +227,9 @@ func TestTxFees(t *testing.T) {
 			chainTime:           postEUpgradeTime,
 			unsignedAndSignedTx: createSubnetTx,
 			expectedError:       nil,
-			checksF: func(t *testing.T, fc *calculator) {
-				require.Equal(t, 18_590*units.NanoAvax, fc.fee)
-				require.Equal(t, fee.Gas(1_859), fc.feeManager.GetBlockGas())
+			checksF: func(t *testing.T, c *Calculator) {
+				require.Equal(t, 18_590*units.NanoAvax, c.GetFee())
+				require.Equal(t, fee.Gas(1_859), c.GetBlockGas())
 			},
 		},
 		{
@@ -231,14 +240,14 @@ func TestTxFees(t *testing.T) {
 				return testBlockMaxGas - 1
 			},
 			expectedError: errFailedComplexityCumulation,
-			checksF:       func(*testing.T, *calculator) {},
+			checksF:       func(*testing.T, *Calculator) {},
 		},
 		{
 			name:                "RemoveSubnetValidatorTx pre EUpgrade",
 			chainTime:           preEUpgradeTime,
 			unsignedAndSignedTx: removeSubnetValidatorTx,
-			checksF: func(t *testing.T, fc *calculator) {
-				require.Equal(t, fc.staticCfg.TxFee, fc.fee)
+			checksF: func(t *testing.T, c *Calculator) {
+				require.Equal(t, feeTestsDefaultCfg.TxFee, c.GetFee())
 			},
 		},
 		{
@@ -246,9 +255,9 @@ func TestTxFees(t *testing.T) {
 			chainTime:           postEUpgradeTime,
 			unsignedAndSignedTx: removeSubnetValidatorTx,
 			expectedError:       nil,
-			checksF: func(t *testing.T, fc *calculator) {
-				require.Equal(t, 18_870*units.NanoAvax, fc.fee)
-				require.Equal(t, fee.Gas(1_887), fc.feeManager.GetBlockGas())
+			checksF: func(t *testing.T, c *Calculator) {
+				require.Equal(t, 18_870*units.NanoAvax, c.GetFee())
+				require.Equal(t, fee.Gas(1_887), c.GetBlockGas())
 			},
 		},
 		{
@@ -259,14 +268,14 @@ func TestTxFees(t *testing.T) {
 			},
 			unsignedAndSignedTx: removeSubnetValidatorTx,
 			expectedError:       errFailedComplexityCumulation,
-			checksF:             func(*testing.T, *calculator) {},
+			checksF:             func(*testing.T, *Calculator) {},
 		},
 		{
 			name:                "TransformSubnetTx pre EUpgrade",
 			chainTime:           preEUpgradeTime,
 			unsignedAndSignedTx: transformSubnetTx,
-			checksF: func(t *testing.T, fc *calculator) {
-				require.Equal(t, fc.staticCfg.TransformSubnetTxFee, fc.fee)
+			checksF: func(t *testing.T, c *Calculator) {
+				require.Equal(t, feeTestsDefaultCfg.TransformSubnetTxFee, c.GetFee())
 			},
 		},
 		{
@@ -274,9 +283,9 @@ func TestTxFees(t *testing.T) {
 			chainTime:           postEUpgradeTime,
 			unsignedAndSignedTx: transformSubnetTx,
 			expectedError:       nil,
-			checksF: func(t *testing.T, fc *calculator) {
-				require.Equal(t, 19_720*units.NanoAvax, fc.fee)
-				require.Equal(t, fee.Gas(1_972), fc.feeManager.GetBlockGas())
+			checksF: func(t *testing.T, c *Calculator) {
+				require.Equal(t, 19_720*units.NanoAvax, c.GetFee())
+				require.Equal(t, fee.Gas(1_972), c.GetBlockGas())
 			},
 		},
 		{
@@ -287,14 +296,14 @@ func TestTxFees(t *testing.T) {
 			},
 			unsignedAndSignedTx: transformSubnetTx,
 			expectedError:       errFailedComplexityCumulation,
-			checksF:             func(*testing.T, *calculator) {},
+			checksF:             func(*testing.T, *Calculator) {},
 		},
 		{
 			name:                "TransferSubnetOwnershipTx pre EUpgrade",
 			chainTime:           preEUpgradeTime,
 			unsignedAndSignedTx: transferSubnetOwnershipTx,
-			checksF: func(t *testing.T, fc *calculator) {
-				require.Equal(t, fc.staticCfg.TxFee, fc.fee)
+			checksF: func(t *testing.T, c *Calculator) {
+				require.Equal(t, feeTestsDefaultCfg.TxFee, c.GetFee())
 			},
 		},
 		{
@@ -302,9 +311,9 @@ func TestTxFees(t *testing.T) {
 			chainTime:           postEUpgradeTime,
 			unsignedAndSignedTx: transferSubnetOwnershipTx,
 			expectedError:       nil,
-			checksF: func(t *testing.T, fc *calculator) {
-				require.Equal(t, 19_030*units.NanoAvax, fc.fee)
-				require.Equal(t, fee.Gas(1_903), fc.feeManager.GetBlockGas())
+			checksF: func(t *testing.T, c *Calculator) {
+				require.Equal(t, 19_030*units.NanoAvax, c.GetFee())
+				require.Equal(t, fee.Gas(1_903), c.GetBlockGas())
 			},
 		},
 		{
@@ -315,7 +324,7 @@ func TestTxFees(t *testing.T) {
 			},
 			unsignedAndSignedTx: transferSubnetOwnershipTx,
 			expectedError:       errFailedComplexityCumulation,
-			checksF:             func(*testing.T, *calculator) {},
+			checksF:             func(*testing.T, *Calculator) {},
 		},
 		{
 			name:      "AddPermissionlessValidatorTx Primary Network pre EUpgrade",
@@ -323,8 +332,8 @@ func TestTxFees(t *testing.T) {
 			unsignedAndSignedTx: func(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
 				return addPermissionlessValidatorTx(t, constants.PrimaryNetworkID)
 			},
-			checksF: func(t *testing.T, fc *calculator) {
-				require.Equal(t, fc.staticCfg.AddPrimaryNetworkValidatorFee, fc.fee)
+			checksF: func(t *testing.T, c *Calculator) {
+				require.Equal(t, feeTestsDefaultCfg.AddPrimaryNetworkValidatorFee, c.GetFee())
 			},
 		},
 		{
@@ -335,8 +344,8 @@ func TestTxFees(t *testing.T) {
 				require.NotEqual(t, constants.PrimaryNetworkID, subnetID)
 				return addPermissionlessValidatorTx(t, subnetID)
 			},
-			checksF: func(t *testing.T, fc *calculator) {
-				require.Equal(t, fc.staticCfg.AddSubnetValidatorFee, fc.fee)
+			checksF: func(t *testing.T, c *Calculator) {
+				require.Equal(t, feeTestsDefaultCfg.AddSubnetValidatorFee, c.GetFee())
 			},
 		},
 		{
@@ -346,9 +355,9 @@ func TestTxFees(t *testing.T) {
 				return addPermissionlessValidatorTx(t, constants.PrimaryNetworkID)
 			},
 			expectedError: nil,
-			checksF: func(t *testing.T, fc *calculator) {
-				require.Equal(t, 23_170*units.NanoAvax, fc.fee)
-				require.Equal(t, fee.Gas(2_317), fc.feeManager.GetBlockGas())
+			checksF: func(t *testing.T, c *Calculator) {
+				require.Equal(t, 23_170*units.NanoAvax, c.GetFee())
+				require.Equal(t, fee.Gas(2_317), c.GetBlockGas())
 			},
 		},
 		{
@@ -360,9 +369,9 @@ func TestTxFees(t *testing.T) {
 				return addPermissionlessValidatorTx(t, subnetID)
 			},
 			expectedError: nil,
-			checksF: func(t *testing.T, fc *calculator) {
-				require.Equal(t, 23_170*units.NanoAvax, fc.fee)
-				require.Equal(t, fee.Gas(2_317), fc.feeManager.GetBlockGas())
+			checksF: func(t *testing.T, c *Calculator) {
+				require.Equal(t, 23_170*units.NanoAvax, c.GetFee())
+				require.Equal(t, fee.Gas(2_317), c.GetBlockGas())
 			},
 		},
 		{
@@ -376,7 +385,7 @@ func TestTxFees(t *testing.T) {
 				return addPermissionlessValidatorTx(t, subnetID)
 			},
 			expectedError: errFailedComplexityCumulation,
-			checksF:       func(*testing.T, *calculator) {},
+			checksF:       func(*testing.T, *Calculator) {},
 		},
 		{
 			name:      "AddPermissionlessDelegatorTx Primary Network pre EUpgrade",
@@ -384,8 +393,8 @@ func TestTxFees(t *testing.T) {
 			unsignedAndSignedTx: func(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
 				return addPermissionlessDelegatorTx(t, constants.PrimaryNetworkID)
 			},
-			checksF: func(t *testing.T, fc *calculator) {
-				require.Equal(t, fc.staticCfg.AddPrimaryNetworkDelegatorFee, fc.fee)
+			checksF: func(t *testing.T, c *Calculator) {
+				require.Equal(t, feeTestsDefaultCfg.AddPrimaryNetworkDelegatorFee, c.GetFee())
 			},
 		},
 		{
@@ -396,8 +405,8 @@ func TestTxFees(t *testing.T) {
 				require.NotEqual(t, constants.PrimaryNetworkID, subnetID)
 				return addPermissionlessDelegatorTx(t, subnetID)
 			},
-			checksF: func(t *testing.T, fc *calculator) {
-				require.Equal(t, fc.staticCfg.AddSubnetDelegatorFee, fc.fee)
+			checksF: func(t *testing.T, c *Calculator) {
+				require.Equal(t, feeTestsDefaultCfg.AddSubnetDelegatorFee, c.GetFee())
 			},
 		},
 		{
@@ -407,9 +416,9 @@ func TestTxFees(t *testing.T) {
 				return addPermissionlessDelegatorTx(t, constants.PrimaryNetworkID)
 			},
 			expectedError: nil,
-			checksF: func(t *testing.T, fc *calculator) {
-				require.Equal(t, 21_250*units.NanoAvax, fc.fee)
-				require.Equal(t, fee.Gas(2_125), fc.feeManager.GetBlockGas())
+			checksF: func(t *testing.T, c *Calculator) {
+				require.Equal(t, 21_250*units.NanoAvax, c.GetFee())
+				require.Equal(t, fee.Gas(2_125), c.GetBlockGas())
 			},
 		},
 		{
@@ -419,9 +428,9 @@ func TestTxFees(t *testing.T) {
 				return addPermissionlessDelegatorTx(t, constants.PrimaryNetworkID)
 			},
 			expectedError: nil,
-			checksF: func(t *testing.T, fc *calculator) {
-				require.Equal(t, 21_250*units.NanoAvax, fc.fee)
-				require.Equal(t, fee.Gas(2_125), fc.feeManager.GetBlockGas())
+			checksF: func(t *testing.T, c *Calculator) {
+				require.Equal(t, 21_250*units.NanoAvax, c.GetFee())
+				require.Equal(t, fee.Gas(2_125), c.GetBlockGas())
 			},
 		},
 		{
@@ -436,14 +445,14 @@ func TestTxFees(t *testing.T) {
 				return addPermissionlessValidatorTx(t, subnetID)
 			},
 			expectedError: errFailedComplexityCumulation,
-			checksF:       func(*testing.T, *calculator) {},
+			checksF:       func(*testing.T, *Calculator) {},
 		},
 		{
 			name:                "BaseTx pre EUpgrade",
 			chainTime:           preEUpgradeTime,
 			unsignedAndSignedTx: baseTx,
-			checksF: func(t *testing.T, fc *calculator) {
-				require.Equal(t, fc.staticCfg.TxFee, fc.fee)
+			checksF: func(t *testing.T, c *Calculator) {
+				require.Equal(t, feeTestsDefaultCfg.TxFee, c.GetFee())
 			},
 		},
 		{
@@ -451,9 +460,9 @@ func TestTxFees(t *testing.T) {
 			chainTime:           postEUpgradeTime,
 			unsignedAndSignedTx: baseTx,
 			expectedError:       nil,
-			checksF: func(t *testing.T, fc *calculator) {
-				require.Equal(t, 18_190*units.NanoAvax, fc.fee)
-				require.Equal(t, fee.Gas(1_819), fc.feeManager.GetBlockGas())
+			checksF: func(t *testing.T, c *Calculator) {
+				require.Equal(t, 18_190*units.NanoAvax, c.GetFee())
+				require.Equal(t, fee.Gas(1_819), c.GetBlockGas())
 			},
 		},
 		{
@@ -464,14 +473,14 @@ func TestTxFees(t *testing.T) {
 			},
 			unsignedAndSignedTx: baseTx,
 			expectedError:       errFailedComplexityCumulation,
-			checksF:             func(*testing.T, *calculator) {},
+			checksF:             func(*testing.T, *Calculator) {},
 		},
 		{
 			name:                "ImportTx pre EUpgrade",
 			chainTime:           preEUpgradeTime,
 			unsignedAndSignedTx: importTx,
-			checksF: func(t *testing.T, fc *calculator) {
-				require.Equal(t, fc.staticCfg.TxFee, fc.fee)
+			checksF: func(t *testing.T, c *Calculator) {
+				require.Equal(t, feeTestsDefaultCfg.TxFee, c.GetFee())
 			},
 		},
 		{
@@ -479,9 +488,9 @@ func TestTxFees(t *testing.T) {
 			chainTime:           postEUpgradeTime,
 			unsignedAndSignedTx: importTx,
 			expectedError:       nil,
-			checksF: func(t *testing.T, fc *calculator) {
-				require.Equal(t, 31_230*units.NanoAvax, fc.fee)
-				require.Equal(t, fee.Gas(3_123), fc.feeManager.GetBlockGas())
+			checksF: func(t *testing.T, c *Calculator) {
+				require.Equal(t, 31_230*units.NanoAvax, c.GetFee())
+				require.Equal(t, fee.Gas(3_123), c.GetBlockGas())
 			},
 		},
 		{
@@ -492,14 +501,14 @@ func TestTxFees(t *testing.T) {
 			},
 			unsignedAndSignedTx: importTx,
 			expectedError:       errFailedComplexityCumulation,
-			checksF:             func(*testing.T, *calculator) {},
+			checksF:             func(*testing.T, *Calculator) {},
 		},
 		{
 			name:                "ExportTx pre EUpgrade",
 			chainTime:           preEUpgradeTime,
 			unsignedAndSignedTx: exportTx,
-			checksF: func(t *testing.T, fc *calculator) {
-				require.Equal(t, fc.staticCfg.TxFee, fc.fee)
+			checksF: func(t *testing.T, c *Calculator) {
+				require.Equal(t, feeTestsDefaultCfg.TxFee, c.GetFee())
 			},
 		},
 		{
@@ -507,9 +516,9 @@ func TestTxFees(t *testing.T) {
 			chainTime:           postEUpgradeTime,
 			unsignedAndSignedTx: exportTx,
 			expectedError:       nil,
-			checksF: func(t *testing.T, fc *calculator) {
-				require.Equal(t, 20_410*units.NanoAvax, fc.fee)
-				require.Equal(t, fee.Gas(2_041), fc.feeManager.GetBlockGas())
+			checksF: func(t *testing.T, c *Calculator) {
+				require.Equal(t, 20_410*units.NanoAvax, c.GetFee())
+				require.Equal(t, fee.Gas(2_041), c.GetBlockGas())
 			},
 		},
 		{
@@ -520,7 +529,7 @@ func TestTxFees(t *testing.T) {
 			},
 			unsignedAndSignedTx: exportTx,
 			expectedError:       errFailedComplexityCumulation,
-			checksF:             func(*testing.T, *calculator) {},
+			checksF:             func(*testing.T, *Calculator) {},
 		},
 		{
 			name:      "RewardValidatorTx pre EUpgrade",
@@ -530,8 +539,20 @@ func TestTxFees(t *testing.T) {
 					TxID: ids.GenerateTestID(),
 				}, nil
 			},
-			checksF: func(t *testing.T, fc *calculator) {
-				require.Equal(t, uint64(0), fc.fee)
+			checksF: func(t *testing.T, c *Calculator) {
+				require.Equal(t, uint64(0), c.GetFee())
+			},
+		},
+		{
+			name:      "RewardValidatorTx post EUpgrade",
+			chainTime: postEUpgradeTime,
+			unsignedAndSignedTx: func(_ *testing.T) (txs.UnsignedTx, *txs.Tx) {
+				return &txs.RewardValidatorTx{
+					TxID: ids.GenerateTestID(),
+				}, nil
+			},
+			checksF: func(t *testing.T, c *Calculator) {
+				require.Equal(t, uint64(0), c.GetFee())
 			},
 		},
 		{
@@ -542,8 +563,20 @@ func TestTxFees(t *testing.T) {
 					Time: uint64(time.Now().Unix()),
 				}, nil
 			},
-			checksF: func(t *testing.T, fc *calculator) {
-				require.Equal(t, uint64(0), fc.fee)
+			checksF: func(t *testing.T, c *Calculator) {
+				require.Equal(t, uint64(0), c.GetFee())
+			},
+		},
+		{
+			name:      "AdvanceTimeTx post EUpgrade",
+			chainTime: postEUpgradeTime,
+			unsignedAndSignedTx: func(_ *testing.T) (txs.UnsignedTx, *txs.Tx) {
+				return &txs.AdvanceTimeTx{
+					Time: uint64(time.Now().Unix()),
+				}, nil
+			},
+			checksF: func(t *testing.T, c *Calculator) {
+				require.Equal(t, uint64(0), c.GetFee())
 			},
 		},
 	}
@@ -557,11 +590,11 @@ func TestTxFees(t *testing.T) {
 
 			uTx, sTx := tt.unsignedAndSignedTx(t)
 
-			var fc *Calculator
+			var c *Calculator
 			if !upgrades.IsEActivated(tt.chainTime) {
-				fc = NewStaticCalculator(feeTestsDefaultCfg, upgrades, tt.chainTime)
+				c = NewStaticCalculator(feeTestsDefaultCfg, upgrades, tt.chainTime)
 			} else {
-				fc = NewDynamicCalculator(testGasPrice, gasCap)
+				c = NewDynamicCalculator(testGasPrice, gasCap)
 			}
 
 			var creds []verify.Verifiable
@@ -569,8 +602,8 @@ func TestTxFees(t *testing.T) {
 				// txs like RewardValidatorTx are not signed
 				creds = sTx.Creds
 			}
-			_, _ = fc.ComputeFee(uTx, creds)
-			tt.checksF(t, fc.c)
+			_, _ = c.ComputeFee(uTx, creds)
+			tt.checksF(t, c)
 		})
 	}
 }
