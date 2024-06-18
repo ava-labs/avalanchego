@@ -26,6 +26,7 @@ awscpu
 *logs/
 
 .vscode*
+workspace.code-workspace
 
 *.pb*
 
@@ -51,3 +52,6 @@ cmd/simulator/simulator
 
 # goreleaser
 dist/
+
+# Outputs of `scripts/diff_against.sh`
+diffs/
