@@ -75,6 +75,7 @@ var (
 	UTXOPrefix                    = []byte("utxo")
 	SubnetPrefix                  = []byte("subnet")
 	SubnetOwnerPrefix             = []byte("subnetOwner")
+	SubnetManagerPrefix           = []byte("subnetManager")
 	TransformedSubnetPrefix       = []byte("transformedSubnet")
 	SupplyPrefix                  = []byte("supply")
 	ChainPrefix                   = []byte("chain")
@@ -108,6 +109,9 @@ type Chain interface {
 
 	GetSubnetOwner(subnetID ids.ID) (fx.Owner, error)
 	SetSubnetOwner(subnetID ids.ID, owner fx.Owner)
+
+	GetSubnetManager(subnetID ids.ID) (ids.ID, []byte, error)
+	SetSubnetManager(subnetID ids.ID, chainID ids.ID, addr []byte)
 
 	GetSubnetTransformation(subnetID ids.ID) (*txs.Tx, error)
 	AddSubnetTransformation(transformSubnetTx *txs.Tx)
@@ -340,6 +344,11 @@ type state struct {
 	subnetOwnerCache cache.Cacher[ids.ID, fxOwnerAndSize] // cache of subnetID -> owner if the entry is nil, it is not in the database
 	subnetOwnerDB    database.Database
 
+	// Subnet ID --> Manager of the subnet
+	subnetManagers     map[ids.ID]chainIDAndAddr            // map of subnetID -> manager of the subnet
+	subnetManagerCache cache.Cacher[ids.ID, chainIDAndAddr] // cache of subnetID -> manager if the entry is nil, it is not in the database
+	subnetManagerDB    database.Database
+
 	transformedSubnets     map[ids.ID]*txs.Tx            // map of subnetID -> transformSubnetTx
 	transformedSubnetCache cache.Cacher[ids.ID, *txs.Tx] // cache of subnetID -> transformSubnetTx if the entry is nil, it is not in the database
 	transformedSubnetDB    database.Database
@@ -407,6 +416,11 @@ type txAndStatus struct {
 type fxOwnerAndSize struct {
 	owner fx.Owner
 	size  int
+}
+
+type chainIDAndAddr struct {
+	chainID ids.ID `serialize:"true"`
+	addr    []byte `serialize:"true"`
 }
 
 func txSize(_ ids.ID, tx *txs.Tx) int {
@@ -548,6 +562,18 @@ func newState(
 		return nil, err
 	}
 
+	subnetManagerDB := prefixdb.New(SubnetManagerPrefix, baseDB)
+	subnetManagerCache, err := metercacher.New[ids.ID, chainIDAndAddr](
+		"subnet_manager_cache",
+		metricsReg,
+		cache.NewSizedLRU[ids.ID, chainIDAndAddr](execCfg.ChainIDAndAddrCacheSize, func(_ ids.ID, f chainIDAndAddr) int {
+			return ids.IDLen + len(f.addr)
+		}),
+	)
+	if err != nil {
+		return nil, err
+	}
+
 	transformedSubnetCache, err := metercacher.New(
 		"transformed_subnet_cache",
 		metricsReg,
@@ -645,6 +671,10 @@ func newState(
 		subnetOwners:     make(map[ids.ID]fx.Owner),
 		subnetOwnerDB:    subnetOwnerDB,
 		subnetOwnerCache: subnetOwnerCache,
+
+		subnetManagers:     make(map[ids.ID]chainIDAndAddr),
+		subnetManagerDB:    subnetManagerDB,
+		subnetManagerCache: subnetManagerCache,
 
 		transformedSubnets:     make(map[ids.ID]*txs.Tx),
 		transformedSubnetCache: transformedSubnetCache,
@@ -807,6 +837,42 @@ func (s *state) GetSubnetOwner(subnetID ids.ID) (fx.Owner, error) {
 
 func (s *state) SetSubnetOwner(subnetID ids.ID, owner fx.Owner) {
 	s.subnetOwners[subnetID] = owner
+}
+
+func (s *state) GetSubnetManager(subnetID ids.ID) (ids.ID, []byte, error) {
+	if chainIDAndAddr, exists := s.subnetManagers[subnetID]; exists {
+		return chainIDAndAddr.chainID, chainIDAndAddr.addr, nil
+	}
+
+	if chainIDAndAddr, cached := s.subnetManagerCache.Get(subnetID); cached {
+		return chainIDAndAddr.chainID, chainIDAndAddr.addr, nil
+	}
+
+	chainIDAndAddrBytes, err := s.subnetManagerDB.Get(subnetID[:])
+	if err == nil {
+		var manager chainIDAndAddr
+		if _, err := block.GenesisCodec.Unmarshal(chainIDAndAddrBytes, &manager); err != nil {
+			return ids.Empty, nil, err
+		}
+		s.subnetManagerCache.Put(subnetID, chainIDAndAddr{
+			chainID: manager.chainID,
+			addr:    manager.addr,
+		})
+		return manager.chainID, manager.addr, nil
+	}
+	if err != database.ErrNotFound {
+		return ids.Empty, nil, err
+	}
+
+	s.SetSubnetManager(subnetID, ids.Empty, []byte{})
+	return ids.Empty, []byte{}, nil
+}
+
+func (s *state) SetSubnetManager(subnetID ids.ID, chainID ids.ID, addr []byte) {
+	s.subnetManagers[subnetID] = chainIDAndAddr{
+		chainID: chainID,
+		addr:    addr,
+	}
 }
 
 func (s *state) GetSubnetTransformation(subnetID ids.ID) (*txs.Tx, error) {

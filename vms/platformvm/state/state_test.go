@@ -1401,6 +1401,28 @@ func TestStateSubnetOwner(t *testing.T) {
 	require.Equal(owner2, owner)
 }
 
+func TestStateSubnetManager(t *testing.T) {
+	require := require.New(t)
+
+	state := newInitializedState(require)
+
+	subnetID := ids.GenerateTestID()
+
+	chainID, addr, err := state.GetSubnetManager(subnetID)
+	require.NoError(err)
+	require.Equal(ids.Empty, chainID)
+	require.Equal([]byte{}, addr)
+
+	expectedChainID := ids.GenerateTestID()
+	expectedAddr := []byte{'a', 'd', 'd', 'r'}
+	state.SetSubnetManager(subnetID, expectedChainID, expectedAddr)
+
+	chainID, addr, err = state.GetSubnetManager(subnetID)
+	require.NoError(err)
+	require.Equal(expectedChainID, chainID)
+	require.Equal(expectedAddr, addr)
+}
+
 func makeBlocks(require *require.Assertions) []block.Block {
 	var blks []block.Block
 	{

@@ -69,6 +69,7 @@ func TestExecutionConfigUnmarshal(t *testing.T) {
 			"chain-db-cache-size": 7,
 			"block-id-cache-size": 8,
 			"fx-owner-cache-size": 9,
+			"chain-id-and-addr-cache-size": 10,
 			"checksums-enabled": true,
 			"mempool-prune-frequency": 60000000000
 		}`)
@@ -102,6 +103,7 @@ func TestExecutionConfigUnmarshal(t *testing.T) {
 			ChainDBCacheSize:             7,
 			BlockIDCacheSize:             8,
 			FxOwnerCacheSize:             9,
+			ChainIDAndAddrCacheSize:      10,
 			ChecksumsEnabled:             true,
 			MempoolPruneFrequency:        time.Minute,
 		}
@@ -128,6 +130,7 @@ func TestExecutionConfigUnmarshal(t *testing.T) {
 			"chain-db-cache-size": 7,
 			"block-id-cache-size": 8,
 			"fx-owner-cache-size": 9,
+			"chain-id-and-addr-cache-size": 10,
 			"checksums-enabled": true
 		}`)
 		ec, err := GetExecutionConfig(b)
@@ -160,6 +163,7 @@ func TestExecutionConfigUnmarshal(t *testing.T) {
 			ChainDBCacheSize:             7,
 			BlockIDCacheSize:             8,
 			FxOwnerCacheSize:             9,
+			ChainIDAndAddrCacheSize:      10,
 			ChecksumsEnabled:             true,
 			MempoolPruneFrequency:        30 * time.Minute,
 		}

@@ -46,6 +46,8 @@ type diff struct {
 	addedSubnetIDs []ids.ID
 	// Subnet ID --> Owner of the subnet
 	subnetOwners map[ids.ID]fx.Owner
+	// Subnet ID --> Manager of the subnet
+	subnetManagers map[ids.ID]chainIDAndAddr
 	// Subnet ID --> Tx that transforms the subnet
 	transformedSubnets map[ids.ID]*txs.Tx
 
@@ -292,6 +294,27 @@ func (d *diff) GetSubnetOwner(subnetID ids.ID) (fx.Owner, error) {
 
 func (d *diff) SetSubnetOwner(subnetID ids.ID, owner fx.Owner) {
 	d.subnetOwners[subnetID] = owner
+}
+
+func (d *diff) GetSubnetManager(subnetID ids.ID) (ids.ID, []byte, error) {
+	manager, exists := d.subnetManagers[subnetID]
+	if exists {
+		return manager.chainID, manager.addr, nil
+	}
+
+	// If the subnet owner was not assigned in this diff, ask the parent state.
+	parentState, ok := d.stateVersions.GetState(d.parentID)
+	if !ok {
+		return ids.Empty, nil, ErrMissingParentState
+	}
+	return parentState.GetSubnetManager(subnetID)
+}
+
+func (d *diff) SetSubnetManager(subnetID ids.ID, chainID ids.ID, addr []byte) {
+	d.subnetManagers[subnetID] = chainIDAndAddr{
+		chainID: chainID,
+		addr:    addr,
+	}
 }
 
 func (d *diff) GetSubnetTransformation(subnetID ids.ID) (*txs.Tx, error) {
