@@ -64,7 +64,7 @@ func (c *Calculator) ResetFee(newFee uint64) {
 
 func (c *Calculator) ComputeFee(tx txs.UnsignedTx, creds []verify.Verifiable) (uint64, error) {
 	c.c.credentials = creds
-	c.c.fee = 0 // zero fee among different ComputeFee invocations (unlike Complexity which gets cumulated)
+	c.c.fee = 0 // zero fee among different ComputeFee invocations (unlike gas which gets cumulated)
 	err := tx.Visit(c.c)
 	return c.c.fee, err
 }
