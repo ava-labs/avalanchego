@@ -5,9 +5,7 @@
 // dependencies.
 package job
 
-import (
-	"context"
-)
+import "context"
 
 // Job is a unit of work that can be executed based on the result of resolving
 // requested dependencies.
