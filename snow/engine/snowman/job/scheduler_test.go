@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package event
+package job
 
 import (
 	"context"
@@ -36,8 +36,13 @@ func (j *testJob) Cancel(ctx context.Context) error {
 	return j.cancel(ctx)
 }
 
-func newQueueWithJob[T comparable](t *testing.T, job Job, shouldCancel bool, dependencies ...T) *Queue[T] {
-	q := NewQueue[T]()
+func newSchedulerWithJob[T comparable](
+	t *testing.T,
+	job Job,
+	shouldCancel bool,
+	dependencies ...T,
+) *Scheduler[T] {
+	q := NewScheduler[T]()
 	require.NoError(t, q.Register(context.Background(), job, dependencies...))
 	if shouldCancel {
 		for _, jobs := range q.dependents {
@@ -49,7 +54,7 @@ func newQueueWithJob[T comparable](t *testing.T, job Job, shouldCancel bool, dep
 	return q
 }
 
-func TestQueue_Register(t *testing.T) {
+func TestScheduler_Register(t *testing.T) {
 	var calledExecute bool
 	userJob := &testJob{
 		execute: func(context.Context) error {
@@ -65,28 +70,28 @@ func TestQueue_Register(t *testing.T) {
 	}
 
 	tests := []struct {
-		name         string
-		queue        *Queue[int]
-		dependencies []int
-		wantExecuted bool
-		wantLen      int
-		wantQueue    *Queue[int]
+		name                string
+		scheduler           *Scheduler[int]
+		dependencies        []int
+		wantExecuted        bool
+		wantNumDependencies int
+		wantScheduler       *Scheduler[int]
 	}{
 		{
-			name:         "no dependencies",
-			queue:        NewQueue[int](),
-			dependencies: nil,
-			wantExecuted: true,
-			wantLen:      0,
-			wantQueue:    NewQueue[int](),
+			name:                "no dependencies",
+			scheduler:           NewScheduler[int](),
+			dependencies:        nil,
+			wantExecuted:        true,
+			wantNumDependencies: 0,
+			wantScheduler:       NewScheduler[int](),
 		},
 		{
-			name:         "one dependency",
-			queue:        NewQueue[int](),
-			dependencies: []int{depToResolve},
-			wantExecuted: false,
-			wantLen:      1,
-			wantQueue: &Queue[int]{
+			name:                "one dependency",
+			scheduler:           NewScheduler[int](),
+			dependencies:        []int{depToResolve},
+			wantExecuted:        false,
+			wantNumDependencies: 1,
+			wantScheduler: &Scheduler[int]{
 				dependents: map[int][]*job[int]{
 					depToResolve: {
 						{
@@ -98,12 +103,12 @@ func TestQueue_Register(t *testing.T) {
 			},
 		},
 		{
-			name:         "two dependencies",
-			queue:        NewQueue[int](),
-			dependencies: []int{depToResolve, depToNeglect},
-			wantExecuted: false,
-			wantLen:      2,
-			wantQueue: &Queue[int]{
+			name:                "two dependencies",
+			scheduler:           NewScheduler[int](),
+			dependencies:        []int{depToResolve, depToNeglect},
+			wantExecuted:        false,
+			wantNumDependencies: 2,
+			wantScheduler: &Scheduler[int]{
 				dependents: map[int][]*job[int]{
 					depToResolve: {
 						{
@@ -121,12 +126,12 @@ func TestQueue_Register(t *testing.T) {
 			},
 		},
 		{
-			name:         "additional dependency",
-			queue:        newQueueWithJob(t, userJob, false, depToResolve),
-			dependencies: []int{depToResolve},
-			wantExecuted: false,
-			wantLen:      1,
-			wantQueue: &Queue[int]{
+			name:                "additional dependency",
+			scheduler:           newSchedulerWithJob(t, userJob, false, depToResolve),
+			dependencies:        []int{depToResolve},
+			wantExecuted:        false,
+			wantNumDependencies: 1,
+			wantScheduler: &Scheduler[int]{
 				dependents: map[int][]*job[int]{
 					depToResolve: {
 						{
@@ -149,15 +154,15 @@ func TestQueue_Register(t *testing.T) {
 			// Reset the variable between tests
 			calledExecute = false
 
-			require.NoError(test.queue.Register(context.Background(), userJob, test.dependencies...))
-			require.Equal(test.wantLen, test.queue.NumDependencies())
+			require.NoError(test.scheduler.Register(context.Background(), userJob, test.dependencies...))
+			require.Equal(test.wantNumDependencies, test.scheduler.NumDependencies())
 			require.Equal(test.wantExecuted, calledExecute)
-			require.Equal(test.wantQueue, test.queue)
+			require.Equal(test.wantScheduler, test.scheduler)
 		})
 	}
 }
 
-func TestQueue_Fulfill(t *testing.T) {
+func TestScheduler_Fulfill(t *testing.T) {
 	var calledExecute bool
 	userJob := &testJob{
 		execute: func(context.Context) error {
@@ -173,40 +178,40 @@ func TestQueue_Fulfill(t *testing.T) {
 	}
 
 	tests := []struct {
-		name        string
-		queue       *Queue[int]
-		wantExecute bool
-		wantQueue   *Queue[int]
+		name          string
+		scheduler     *Scheduler[int]
+		wantExecute   bool
+		wantScheduler *Scheduler[int]
 	}{
 		{
-			name:        "no jobs",
-			queue:       NewQueue[int](),
-			wantExecute: false,
-			wantQueue:   NewQueue[int](),
+			name:          "no jobs",
+			scheduler:     NewScheduler[int](),
+			wantExecute:   false,
+			wantScheduler: NewScheduler[int](),
 		},
 		{
-			name:        "single dependency",
-			queue:       newQueueWithJob(t, userJob, false, depToResolve),
-			wantExecute: true,
-			wantQueue:   NewQueue[int](),
+			name:          "single dependency",
+			scheduler:     newSchedulerWithJob(t, userJob, false, depToResolve),
+			wantExecute:   true,
+			wantScheduler: NewScheduler[int](),
 		},
 		{
-			name:        "non-existent dependency",
-			queue:       newQueueWithJob(t, userJob, false, depToNeglect),
-			wantExecute: false,
-			wantQueue:   newQueueWithJob(t, userJob, false, depToNeglect),
+			name:          "non-existent dependency",
+			scheduler:     newSchedulerWithJob(t, userJob, false, depToNeglect),
+			wantExecute:   false,
+			wantScheduler: newSchedulerWithJob(t, userJob, false, depToNeglect),
 		},
 		{
-			name:        "incomplete dependencies",
-			queue:       newQueueWithJob(t, userJob, false, depToResolve, depToNeglect),
-			wantExecute: false,
-			wantQueue:   newQueueWithJob(t, userJob, false, depToNeglect),
+			name:          "incomplete dependencies",
+			scheduler:     newSchedulerWithJob(t, userJob, false, depToResolve, depToNeglect),
+			wantExecute:   false,
+			wantScheduler: newSchedulerWithJob(t, userJob, false, depToNeglect),
 		},
 		{
-			name:        "duplicate dependency",
-			queue:       newQueueWithJob(t, userJob, false, depToResolve, depToResolve),
-			wantExecute: true,
-			wantQueue:   NewQueue[int](),
+			name:          "duplicate dependency",
+			scheduler:     newSchedulerWithJob(t, userJob, false, depToResolve, depToResolve),
+			wantExecute:   true,
+			wantScheduler: NewScheduler[int](),
 		},
 	}
 	for _, test := range tests {
@@ -216,14 +221,14 @@ func TestQueue_Fulfill(t *testing.T) {
 			// Reset the variable between tests
 			calledExecute = false
 
-			require.NoError(test.queue.Fulfill(context.Background(), depToResolve))
+			require.NoError(test.scheduler.Fulfill(context.Background(), depToResolve))
 			require.Equal(test.wantExecute, calledExecute)
-			require.Equal(test.wantQueue, test.queue)
+			require.Equal(test.wantScheduler, test.scheduler)
 		})
 	}
 }
 
-func TestQueue_Abandon(t *testing.T) {
+func TestScheduler_Abandon(t *testing.T) {
 	var calledCancel bool
 	userJob := &testJob{
 		execute: func(context.Context) error {
@@ -240,39 +245,39 @@ func TestQueue_Abandon(t *testing.T) {
 
 	tests := []struct {
 		name          string
-		queue         *Queue[int]
+		scheduler     *Scheduler[int]
 		wantCancelled bool
-		wantQueue     *Queue[int]
+		wantScheduler *Scheduler[int]
 	}{
 		{
 			name:          "no jobs",
-			queue:         NewQueue[int](),
+			scheduler:     NewScheduler[int](),
 			wantCancelled: false,
-			wantQueue:     NewQueue[int](),
+			wantScheduler: NewScheduler[int](),
 		},
 		{
 			name:          "single dependency",
-			queue:         newQueueWithJob(t, userJob, false, depToResolve),
+			scheduler:     newSchedulerWithJob(t, userJob, false, depToResolve),
 			wantCancelled: true,
-			wantQueue:     NewQueue[int](),
+			wantScheduler: NewScheduler[int](),
 		},
 		{
 			name:          "non-existent dependency",
-			queue:         newQueueWithJob(t, userJob, false, depToNeglect),
+			scheduler:     newSchedulerWithJob(t, userJob, false, depToNeglect),
 			wantCancelled: false,
-			wantQueue:     newQueueWithJob(t, userJob, false, depToNeglect),
+			wantScheduler: newSchedulerWithJob(t, userJob, false, depToNeglect),
 		},
 		{
 			name:          "incomplete dependencies",
-			queue:         newQueueWithJob(t, userJob, false, depToResolve, depToNeglect),
+			scheduler:     newSchedulerWithJob(t, userJob, false, depToResolve, depToNeglect),
 			wantCancelled: false,
-			wantQueue:     newQueueWithJob(t, userJob, true, depToNeglect),
+			wantScheduler: newSchedulerWithJob(t, userJob, true, depToNeglect),
 		},
 		{
 			name:          "duplicate dependency",
-			queue:         newQueueWithJob(t, userJob, false, depToResolve, depToResolve),
+			scheduler:     newSchedulerWithJob(t, userJob, false, depToResolve, depToResolve),
 			wantCancelled: true,
-			wantQueue:     NewQueue[int](),
+			wantScheduler: NewScheduler[int](),
 		},
 	}
 	for _, test := range tests {
@@ -282,9 +287,9 @@ func TestQueue_Abandon(t *testing.T) {
 			// Reset the variable between tests
 			calledCancel = false
 
-			require.NoError(test.queue.Abandon(context.Background(), depToResolve))
+			require.NoError(test.scheduler.Abandon(context.Background(), depToResolve))
 			require.Equal(test.wantCancelled, calledCancel)
-			require.Equal(test.wantQueue, test.queue)
+			require.Equal(test.wantScheduler, test.scheduler)
 		})
 	}
 }

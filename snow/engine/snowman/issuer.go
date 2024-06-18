@@ -10,10 +10,10 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/event"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/job"
 )
 
-var _ event.Job = (*issuer)(nil)
+var _ job.Job = (*issuer)(nil)
 
 // issuer issues [blk] into to consensus after its dependencies are met.
 type issuer struct {

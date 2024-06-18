@@ -1,7 +1,9 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package event
+// Package job provides a Scheduler to manage and execute Jobs with
+// dependencies.
+package job
 
 import (
 	"context"
@@ -9,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
+// Job is a unit of work that can be executed or cancelled.
 type Job interface {
 	Execute(context.Context) error
 	Cancel(context.Context) error
@@ -23,13 +26,17 @@ type job[T comparable] struct {
 	job Job
 }
 
-type Queue[T comparable] struct {
+// Scheduler implements a dependency graph for jobs. Jobs can be registered with
+// dependencies, and once all dependencies are fulfilled, the job will be
+// executed. If any of the dependencies are abandoned, the job will be
+// cancelled.
+type Scheduler[T comparable] struct {
 	// dependents maps a dependency to the jobs that depend on it.
 	dependents map[T][]*job[T]
 }
 
-func NewQueue[T comparable]() *Queue[T] {
-	return &Queue[T]{
+func NewScheduler[T comparable]() *Scheduler[T] {
+	return &Scheduler[T]{
 		dependents: make(map[T][]*job[T]),
 	}
 }
@@ -41,7 +48,7 @@ func NewQueue[T comparable]() *Queue[T] {
 // While registering a job with duplicate dependencies is discouraged, it is
 // allowed and treated similarly to registering the job with the dependencies
 // de-duplicated.
-func (q *Queue[T]) Register(ctx context.Context, userJob Job, dependencies ...T) error {
+func (s *Scheduler[T]) Register(ctx context.Context, userJob Job, dependencies ...T) error {
 	if len(dependencies) == 0 {
 		return userJob.Execute(ctx)
 	}
@@ -51,23 +58,23 @@ func (q *Queue[T]) Register(ctx context.Context, userJob Job, dependencies ...T)
 		job:          userJob,
 	}
 	for _, d := range dependencies {
-		q.dependents[d] = append(q.dependents[d], j)
+		s.dependents[d] = append(s.dependents[d], j)
 	}
 	return nil
 }
 
 // NumDependencies returns the number of dependencies that jobs are currently
 // blocking on.
-func (q *Queue[_]) NumDependencies() int {
-	return len(q.dependents)
+func (s *Scheduler[_]) NumDependencies() int {
+	return len(s.dependents)
 }
 
 // Fulfill a dependency. If all dependencies for a job are fulfilled, the job
 // will be executed.
 //
 // It is safe to call the queue during the execution of a job.
-func (q *Queue[T]) Fulfill(ctx context.Context, dependency T) error {
-	return q.resolveDependency(ctx, dependency, false)
+func (s *Scheduler[T]) Fulfill(ctx context.Context, dependency T) error {
+	return s.resolveDependency(ctx, dependency, false)
 }
 
 // Abandon a dependency. If any dependencies for a job are abandoned, the job
@@ -75,17 +82,17 @@ func (q *Queue[T]) Fulfill(ctx context.Context, dependency T) error {
 // resolved.
 //
 // It is safe to call the queue during the cancelling of a job.
-func (q *Queue[T]) Abandon(ctx context.Context, dependency T) error {
-	return q.resolveDependency(ctx, dependency, true)
+func (s *Scheduler[T]) Abandon(ctx context.Context, dependency T) error {
+	return s.resolveDependency(ctx, dependency, true)
 }
 
-func (q *Queue[T]) resolveDependency(
+func (s *Scheduler[T]) resolveDependency(
 	ctx context.Context,
 	dependency T,
 	shouldCancel bool,
 ) error {
-	jobs := q.dependents[dependency]
-	delete(q.dependents, dependency)
+	jobs := s.dependents[dependency]
+	delete(s.dependents, dependency)
 
 	for _, job := range jobs {
 		// Removing the dependency keeps the queue in a consistent state.

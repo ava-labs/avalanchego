@@ -21,7 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/ancestor"
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/event"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/job"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/bag"
 	"github.com/ava-labs/avalanchego/utils/bimap"
@@ -82,7 +82,7 @@ type Transitive struct {
 
 	// operations that are blocked on a block being issued. This could be
 	// issuing another block, responding to a query, or applying votes to consensus
-	blocked *event.Queue[ids.ID]
+	blocked *job.Scheduler[ids.ID]
 
 	// number of times build block needs to be called once the number of
 	// processing blocks has gone below the optimal number.
@@ -143,7 +143,7 @@ func New(config Config) (*Transitive, error) {
 		nonVerifieds:                ancestor.NewTree(),
 		nonVerifiedCache:            nonVerifiedCache,
 		acceptedFrontiers:           acceptedFrontiers,
-		blocked:                     event.NewQueue[ids.ID](),
+		blocked:                     job.NewScheduler[ids.ID](),
 		polls:                       polls,
 		blkReqs:                     bimap.New[common.Request, ids.ID](),
 		blkReqSourceMetric:          make(map[common.Request]prometheus.Counter),

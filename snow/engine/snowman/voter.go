@@ -9,11 +9,11 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/event"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/job"
 	"github.com/ava-labs/avalanchego/utils/bag"
 )
 
-var _ event.Job = (*voter)(nil)
+var _ job.Job = (*voter)(nil)
 
 // Voter records chits received from [nodeID] once its dependencies are met.
 type voter struct {
