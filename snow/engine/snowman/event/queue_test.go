@@ -35,8 +35,8 @@ func newQueueWithJob[T comparable](t *testing.T, job Job, shouldCancel bool, dep
 	q := NewQueue[T]()
 	require.NoError(t, q.Register(context.Background(), job, dependencies...))
 	if shouldCancel {
-		for _, dependency := range dependencies {
-			for _, j := range q.jobs[dependency] {
+		for _, jobs := range q.jobs {
+			for _, j := range jobs {
 				j.shouldCancel = true
 			}
 		}
