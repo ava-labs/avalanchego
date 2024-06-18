@@ -1201,7 +1201,7 @@ func TestGetFeeRates(t *testing.T) {
 
 	//  initially minimal fees
 	reply0 := GetGasPriceReply{}
-	require.NoError(service.GetNextGasPrice(nil, nil, &reply0))
+	require.NoError(service.GetNextGasData(nil, nil, &reply0))
 	require.Equal(feeCfg.MinGasPrice, reply0.NextGasPrice)
 
 	// let cumulated complexity go above target. Fee rates will go up
@@ -1213,7 +1213,7 @@ func TestGetFeeRates(t *testing.T) {
 	service.vm.ctx.Lock.Unlock()
 
 	reply1 := GetGasPriceReply{}
-	require.NoError(service.GetNextGasPrice(nil, nil, &reply1))
+	require.NoError(service.GetNextGasData(nil, nil, &reply1))
 	highGasPrice := reply1.NextGasPrice
 	require.Greater(highGasPrice, feeCfg.MinGasPrice)
 
@@ -1224,6 +1224,6 @@ func TestGetFeeRates(t *testing.T) {
 	service.vm.ctx.Lock.Unlock()
 
 	reply2 := GetGasPriceReply{}
-	require.NoError(service.GetNextGasPrice(nil, nil, &reply2))
+	require.NoError(service.GetNextGasData(nil, nil, &reply2))
 	require.Less(reply2.NextGasPrice, highGasPrice)
 }

@@ -141,7 +141,7 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 
 			pChainExportFee := uint64(0)
 			ginkgo.By("export avax from P to X chain", func() {
-				nextGasPrice, err := pChainClient.GetNextGasPrice(e2e.DefaultContext())
+				nextGasPrice, _, err := pChainClient.GetNextGasData(e2e.DefaultContext())
 				require.NoError(err)
 
 				tx, err := pWallet.IssueExportTx(

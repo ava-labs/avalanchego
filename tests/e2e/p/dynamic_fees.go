@@ -63,7 +63,7 @@ var _ = ginkgo.Describe("[Dynamic Fees]", func() {
 		tests.Outf("{{blue}} P-chain balance before P->X export: %d {{/}}\n", pStartBalance)
 
 		ginkgo.By("checking that initial fee values match with configured ones", func() {
-			nextFeeRates, err := pChainClient.GetNextGasPrice(e2e.DefaultContext())
+			nextFeeRates, _, err := pChainClient.GetNextGasData(e2e.DefaultContext())
 			require.NoError(err)
 			require.Equal(customDynamicFeesConfig.MinGasPrice, nextFeeRates)
 		})
@@ -88,7 +88,7 @@ var _ = ginkgo.Describe("[Dynamic Fees]", func() {
 					subnetID = subnetTx.ID()
 				})
 
-				nextFeeRates, err := pChainClient.GetNextGasPrice(e2e.DefaultContext())
+				nextFeeRates, _, err := pChainClient.GetNextGasData(e2e.DefaultContext())
 				require.NoError(err)
 				tests.Outf("{{blue}} next fee rates: %v {{/}}\n", nextFeeRates)
 
@@ -109,7 +109,7 @@ var _ = ginkgo.Describe("[Dynamic Fees]", func() {
 						)
 						require.NoError(err)
 
-						updatedFeeRates, err := pChainClient.GetNextGasPrice(e2e.DefaultContext())
+						updatedFeeRates, _, err := pChainClient.GetNextGasData(e2e.DefaultContext())
 						require.NoError(err)
 						tests.Outf("{{blue}} current fee rates: %v {{/}}\n", updatedFeeRates)
 
@@ -125,7 +125,7 @@ var _ = ginkgo.Describe("[Dynamic Fees]", func() {
 					initialFeeRates := nextFeeRates
 					e2e.Eventually(func() bool {
 						var err error
-						nextFeeRates, err = pChainClient.GetNextGasPrice(e2e.DefaultContext())
+						nextFeeRates, _, err = pChainClient.GetNextGasData(e2e.DefaultContext())
 						require.NoError(err)
 						tests.Outf("{{blue}} next fee rates: %v {{/}}\n", nextFeeRates)
 						return nextFeeRates < initialFeeRates

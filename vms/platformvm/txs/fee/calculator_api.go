@@ -47,6 +47,10 @@ func (c *Calculator) GetExcessGas() fee.Gas {
 	return c.b.getExcessGas()
 }
 
+func (c *Calculator) GetGasCap() fee.Gas {
+	return c.b.getGasCap()
+}
+
 // backend is the interfaces that any fee backend must implement
 type backend interface {
 	txs.Visitor
@@ -58,6 +62,7 @@ type backend interface {
 	getGasPrice() fee.GasPrice
 	getBlockGas() fee.Gas
 	getExcessGas() fee.Gas
+	getGasCap() fee.Gas
 	setCredentials(creds []verify.Verifiable)
 	computeFee(tx txs.UnsignedTx, creds []verify.Verifiable) (uint64, error)
 	isEActive() bool

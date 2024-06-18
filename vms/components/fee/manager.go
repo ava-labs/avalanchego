@@ -87,6 +87,10 @@ func (m *Manager) GetExcessGas() Gas {
 	return m.currentExcessGas
 }
 
+func (m *Manager) GetGasCap() Gas {
+	return m.gasCap
+}
+
 // CalculateFee must be a stateless method
 func (m *Manager) CalculateFee(g Gas) (uint64, error) {
 	return safemath.Mul64(uint64(m.gasPrice), uint64(g))

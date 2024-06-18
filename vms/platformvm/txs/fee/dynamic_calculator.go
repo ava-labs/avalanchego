@@ -318,6 +318,8 @@ func (c *dynamicCalculator) getBlockGas() fee.Gas { return c.feeManager.GetBlock
 
 func (c *dynamicCalculator) getExcessGas() fee.Gas { return c.feeManager.GetExcessGas() }
 
+func (c *dynamicCalculator) getGasCap() fee.Gas { return c.feeManager.GetGasCap() }
+
 func (c *dynamicCalculator) setCredentials(creds []verify.Verifiable) {
 	c.credentials = creds
 }
