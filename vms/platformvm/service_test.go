@@ -106,7 +106,7 @@ func testReplayFeeCalculator(cfg *config.Config, parentBlkTime time.Time, state 
 		return nil, fmt.Errorf("failed retrieving gas cap: %w", err)
 	}
 
-	feesMan, err := commonfee.NewUpdatedManager(feesCfg, gasCap, excessComplexity, parentBlkTime.Unix(), childBlkTime.Unix())
+	feesMan, err := commonfee.NewUpdatedManager(feesCfg, gasCap, excessComplexity, parentBlkTime, childBlkTime)
 	if err != nil {
 		return nil, fmt.Errorf("failed updating fee manager: %w", err)
 	}

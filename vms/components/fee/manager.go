@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math"
 	"math/big"
+	"time"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
@@ -40,14 +41,14 @@ func NewManager(gasPrice GasPrice, gasCap Gas) *Manager {
 func NewUpdatedManager(
 	feesConfig DynamicFeesConfig,
 	gasCap, currentExcessGas Gas,
-	parentBlkTime, childBlkTime int64,
+	parentBlkTime, childBlkTime time.Time,
 ) (*Manager, error) {
 	res := &Manager{
 		gasCap:           gasCap,
 		currentExcessGas: currentExcessGas,
 	}
 
-	targetGas, err := TargetGas(feesConfig, parentBlkTime, childBlkTime)
+	targetGas, err := targetGas(feesConfig, parentBlkTime, childBlkTime)
 	if err != nil {
 		return nil, fmt.Errorf("failed calculating target gas: %w", err)
 	}
@@ -62,12 +63,12 @@ func NewUpdatedManager(
 	return res, nil
 }
 
-func TargetGas(feesConfig DynamicFeesConfig, parentBlkTime, childBlkTime int64) (Gas, error) {
-	if childBlkTime < parentBlkTime {
+func targetGas(feesConfig DynamicFeesConfig, parentBlkTime, childBlkTime time.Time) (Gas, error) {
+	if parentBlkTime.Compare(childBlkTime) > 0 {
 		return ZeroGas, fmt.Errorf("unexpected block times, parentBlkTim %v, childBlkTime %v", parentBlkTime, childBlkTime)
 	}
 
-	elapsedTime := uint64(childBlkTime - parentBlkTime)
+	elapsedTime := uint64(childBlkTime.Unix() - parentBlkTime.Unix())
 	targetGas, over := safemath.Mul64(uint64(feesConfig.GasTargetRate), elapsedTime)
 	if over != nil {
 		targetGas = math.MaxUint64

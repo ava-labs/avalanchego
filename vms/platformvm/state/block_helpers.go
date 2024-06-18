@@ -116,8 +116,8 @@ func updatedFeeManager(feesCfg commonfee.DynamicFeesConfig, state Chain, parentB
 		feesCfg,
 		gasCap,
 		excessGas,
-		parentBlkTime.Unix(),
-		childBlkTime.Unix(),
+		parentBlkTime,
+		childBlkTime,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed updating fee rates, %w", err)

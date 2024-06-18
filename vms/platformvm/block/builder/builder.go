@@ -339,7 +339,7 @@ func packBlockTxs(
 	var (
 		upgrades  = backend.Config.UpgradeConfig
 		isEActive = upgrades.IsEActivated(timestamp)
-		targetGas = commonfee.ZeroGas
+		gasCap    = commonfee.ZeroGas
 
 		blockTxs []*txs.Tx
 		inputs   set.Set[ids.ID]
@@ -355,9 +355,13 @@ func packBlockTxs(
 		if err != nil {
 			return nil, fmt.Errorf("failed retrieving dynamic fees config: %w", err)
 		}
-		targetGas, err = commonfee.TargetGas(feeCfg, parentBlkTime.Unix(), timestamp.Unix())
+		currentGasCap, err := stateDiff.GetCurrentGasCap()
 		if err != nil {
-			return nil, fmt.Errorf("failed calculating target block complexity: %w", err)
+			return nil, fmt.Errorf("failed retrieving current gas cap: %w", err)
+		}
+		gasCap, err = commonfee.GasCap(feeCfg, currentGasCap, parentBlkTime, timestamp)
+		if err != nil {
+			return nil, fmt.Errorf("failed calculating next gas cap: %w", err)
 		}
 	}
 
@@ -372,7 +376,7 @@ func packBlockTxs(
 		// pre e upgrade is active, we fill blocks till a target size
 		// post e upgrade is active, we fill blocks till a target gas
 		targetSizeReached := (!isEActive && txSize > remainingSize) ||
-			(isEActive && feeCalculator.GetBlockGas() >= targetGas)
+			(isEActive && feeCalculator.GetBlockGas() >= gasCap)
 		if targetSizeReached {
 			break
 		}

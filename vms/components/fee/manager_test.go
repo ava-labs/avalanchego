@@ -41,8 +41,8 @@ func TestUpdateGasPrice(t *testing.T) {
 		testDynamicFeeCfg,
 		testGasCap,
 		excessGas,
-		parentBlkTime.Unix(),
-		childBlkTime.Unix(),
+		parentBlkTime,
+		childBlkTime,
 	)
 	require.NoError(err)
 
@@ -139,8 +139,8 @@ func TestPChainGasPriceIncreaseDueToPeak(t *testing.T) {
 			testDynamicFeeCfg,
 			testGasCap,
 			excessGas,
-			parentBlkData.blkTime,
-			childBlkData.blkTime,
+			time.Unix(parentBlkData.blkTime, 0),
+			time.Unix(childBlkData.blkTime, 0),
 		)
 		require.NoError(err)
 
@@ -178,8 +178,8 @@ func TestPChainGasPriceIncreaseDueToPeak(t *testing.T) {
 		testDynamicFeeCfg,
 		testGasCap,
 		offPeakGas,
-		parentBlkTime.Unix(),
-		childBlkTime.Unix(),
+		parentBlkTime,
+		childBlkTime,
 	)
 	require.NoError(err)
 
