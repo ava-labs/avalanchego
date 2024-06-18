@@ -13,6 +13,7 @@ import (
 var errGasBoundBreached = errors.New("gas bound breached")
 
 type Manager struct {
+	// gas cap enforced with adding gas via CumulateGas
 	gasCap Gas
 
 	// Avax denominated gas price, i.e. fee per unit of complexity.
@@ -60,8 +61,8 @@ func (m *Manager) CumulateGas(gas Gas) error {
 	return nil
 }
 
-// Sometimes, e.g. while building a tx, we'd like freedom to speculatively add complexity
-// and to remove it later on. [RemoveGas] grants this freedom
+// Sometimes, e.g. while building a tx, we'd like freedom to speculatively
+// add gas and to remove it later on. [RemoveGas] grants this freedom
 func (m *Manager) RemoveGas(gasToRm Gas) error {
 	rBlkdGas, err := safemath.Sub(m.blockGas, gasToRm)
 	if err != nil {

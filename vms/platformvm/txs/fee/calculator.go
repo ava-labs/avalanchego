@@ -77,7 +77,7 @@ func (c *Calculator) RemoveFeesFor(unitsToRm fee.Dimensions) (uint64, error) {
 	return c.c.removeFeesFor(unitsToRm)
 }
 
-func (c *Calculator) GetGas() fee.Gas {
+func (c *Calculator) GetBlockGas() fee.Gas {
 	if c.c.feeManager != nil {
 		return c.c.feeManager.GetBlockGas()
 	}
