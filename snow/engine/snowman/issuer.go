@@ -13,7 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/job"
 )
 
-var _ job.Job = (*issuer)(nil)
+var _ job.Job[ids.ID] = (*issuer)(nil)
 
 // issuer issues [blk] into to consensus after its dependencies are met.
 type issuer struct {
@@ -24,11 +24,14 @@ type issuer struct {
 	issuedMetric prometheus.Counter
 }
 
-func (i *issuer) Execute(ctx context.Context) error {
-	return i.t.deliver(ctx, i.nodeID, i.blk, i.push, i.issuedMetric)
-}
+func (i *issuer) Execute(ctx context.Context, _ []ids.ID, abandoned []ids.ID) error {
+	if len(abandoned) == 0 {
+		// If the parent block wasn't abandoned, this block can be issued.
+		return i.t.deliver(ctx, i.nodeID, i.blk, i.push, i.issuedMetric)
+	}
 
-func (i *issuer) Cancel(ctx context.Context) error {
+	// If the parent block was abandoned, this block should be abandoned as
+	// well.
 	blkID := i.blk.ID()
 	i.t.removeFromPending(i.blk)
 	i.t.addToNonVerifieds(i.blk)
