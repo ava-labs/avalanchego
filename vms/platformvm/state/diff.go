@@ -302,7 +302,7 @@ func (d *diff) GetSubnetManager(subnetID ids.ID) (ids.ID, []byte, error) {
 		return manager.chainID, manager.addr, nil
 	}
 
-	// If the subnet owner was not assigned in this diff, ask the parent state.
+	// If the subnet manager was not assigned in this diff, ask the parent state.
 	parentState, ok := d.stateVersions.GetState(d.parentID)
 	if !ok {
 		return ids.Empty, nil, ErrMissingParentState
