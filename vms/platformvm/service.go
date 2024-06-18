@@ -40,7 +40,7 @@ import (
 
 	avajson "github.com/ava-labs/avalanchego/utils/json"
 	safemath "github.com/ava-labs/avalanchego/utils/math"
-	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
+	commonfee "github.com/ava-labs/avalanchego/vms/components/fee"
 	platformapi "github.com/ava-labs/avalanchego/vms/platformvm/api"
 )
 
@@ -1831,7 +1831,7 @@ func (s *Service) GetBlockByHeight(_ *http.Request, args *api.GetBlockByHeightAr
 
 // GetGasPriceReply is the response from GetFeeRates
 type GetGasPriceReply struct {
-	NextGasPrice commonfees.GasPrice `json:"nextGasPrice"`
+	NextGasPrice commonfee.GasPrice `json:"nextGasPrice"`
 }
 
 // GetNextFeeRates returns the next fee rates that a transaction must pay to be accepted now

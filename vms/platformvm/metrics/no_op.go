@@ -12,7 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 
-	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
+	commonfee "github.com/ava-labs/avalanchego/vms/components/fee"
 )
 
 var Noop Metrics = noopMetrics{}
@@ -53,6 +53,6 @@ func (noopMetrics) SetSubnetPercentConnected(ids.ID, float64) {}
 
 func (noopMetrics) SetPercentConnected(float64) {}
 
-func (noopMetrics) SetExcessComplexity(commonfees.Gas) {}
+func (noopMetrics) SetExcessComplexity(commonfee.Gas) {}
 
-func (noopMetrics) SetBlockGas(commonfees.Gas) {}
+func (noopMetrics) SetBlockGas(commonfee.Gas) {}

@@ -45,7 +45,7 @@ import (
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
 	avajson "github.com/ava-labs/avalanchego/utils/json"
-	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
+	commonfee "github.com/ava-labs/avalanchego/vms/components/fee"
 	vmkeystore "github.com/ava-labs/avalanchego/vms/components/keystore"
 	pchainapi "github.com/ava-labs/avalanchego/vms/platformvm/api"
 	blockbuilder "github.com/ava-labs/avalanchego/vms/platformvm/block/builder"
@@ -101,17 +101,17 @@ func testReplayFeeCalculator(cfg *config.Config, parentBlkTime time.Time, state 
 		return nil, fmt.Errorf("failed retrieving excess complexity: %w", err)
 	}
 
-	gasCap, err := commonfees.GasCap(feesCfg, currentGasCap, parentBlkTime, childBlkTime)
+	gasCap, err := commonfee.GasCap(feesCfg, currentGasCap, parentBlkTime, childBlkTime)
 	if err != nil {
 		return nil, fmt.Errorf("failed retrieving gas cap: %w", err)
 	}
 
-	feesMan, err := commonfees.NewUpdatedManager(feesCfg, excessComplexity, parentBlkTime.Unix(), childBlkTime.Unix())
+	feesMan, err := commonfee.NewUpdatedManager(feesCfg, gasCap, excessComplexity, parentBlkTime.Unix(), childBlkTime.Unix())
 	if err != nil {
 		return nil, fmt.Errorf("failed updating fee manager: %w", err)
 	}
 
-	return fee.NewDynamicCalculator(feesMan, gasCap), nil
+	return fee.NewDynamicCalculator(feesMan), nil
 }
 
 func defaultService(t *testing.T) (*Service, *mutableSharedMemory, *txstest.WalletFactory) {
@@ -1207,8 +1207,8 @@ func TestGetFeeRates(t *testing.T) {
 	// let cumulated complexity go above target. Fee rates will go up
 	service.vm.ctx.Lock.Lock()
 	elapsedTime := time.Second
-	targetGas := commonfees.Gas(uint64(feeCfg.GasTargetRate) * uint64(elapsedTime/time.Second))
-	gas := targetGas + commonfees.Gas(10)
+	targetGas := commonfee.Gas(uint64(feeCfg.GasTargetRate) * uint64(elapsedTime/time.Second))
+	gas := targetGas + commonfee.Gas(10)
 	service.vm.state.SetExcessGas(gas)
 	service.vm.ctx.Lock.Unlock()
 

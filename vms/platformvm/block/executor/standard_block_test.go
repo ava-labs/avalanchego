@@ -24,7 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
-	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
+	commonfee "github.com/ava-labs/avalanchego/vms/components/fee"
 	walletsigner "github.com/ava-labs/avalanchego/wallet/chain/p/signer"
 )
 
@@ -58,8 +58,8 @@ func TestApricotStandardBlockTimeVerification(t *testing.T) {
 	env.mockedState.EXPECT().GetLastAccepted().Return(parentID).AnyTimes()
 	env.mockedState.EXPECT().GetTimestamp().Return(chainTime).AnyTimes()
 	onParentAccept.EXPECT().GetTimestamp().Return(chainTime).AnyTimes()
-	onParentAccept.EXPECT().GetExcessGas().Return(commonfees.ZeroGas, nil).AnyTimes()
-	onParentAccept.EXPECT().GetCurrentGasCap().Return(commonfees.ZeroGas, nil).AnyTimes()
+	onParentAccept.EXPECT().GetExcessGas().Return(commonfee.ZeroGas, nil).AnyTimes()
+	onParentAccept.EXPECT().GetCurrentGasCap().Return(commonfee.ZeroGas, nil).AnyTimes()
 
 	// wrong height
 	apricotChildBlk, err := block.NewApricotStandardBlock(
@@ -153,8 +153,8 @@ func TestBanffStandardBlockTimeVerification(t *testing.T) {
 	}
 	utxoID := utxo.InputID()
 	onParentAccept.EXPECT().GetUTXO(utxoID).Return(utxo, nil).AnyTimes()
-	onParentAccept.EXPECT().GetExcessGas().Return(commonfees.ZeroGas, nil).AnyTimes()
-	onParentAccept.EXPECT().GetCurrentGasCap().Return(commonfees.ZeroGas, nil).AnyTimes()
+	onParentAccept.EXPECT().GetExcessGas().Return(commonfee.ZeroGas, nil).AnyTimes()
+	onParentAccept.EXPECT().GetCurrentGasCap().Return(commonfee.ZeroGas, nil).AnyTimes()
 
 	// Create the tx
 	utx := &txs.CreateSubnetTx{

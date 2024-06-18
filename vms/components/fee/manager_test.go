@@ -1,10 +1,11 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package fees
+package fee
 
 import (
 	"fmt"
+	"math"
 	"testing"
 	"time"
 
@@ -13,13 +14,16 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 )
 
-var testDynamicFeeCfg = DynamicFeesConfig{
-	MinGasPrice:       GasPrice(60 * units.NanoAvax),
-	UpdateDenominator: Gas(50_000),
-	GasTargetRate:     Gas(250),
+var (
+	testDynamicFeeCfg = DynamicFeesConfig{
+		MinGasPrice:       GasPrice(60 * units.NanoAvax),
+		UpdateDenominator: Gas(50_000),
+		GasTargetRate:     Gas(250),
 
-	FeeDimensionWeights: Dimensions{1, 1, 1, 1},
-}
+		FeeDimensionWeights: Dimensions{1, 1, 1, 1},
+	}
+	testGasCap = Gas(math.MaxUint64)
+)
 
 func TestUpdateGasPrice(t *testing.T) {
 	require := require.New(t)
@@ -35,6 +39,7 @@ func TestUpdateGasPrice(t *testing.T) {
 
 	m, err := NewUpdatedManager(
 		testDynamicFeeCfg,
+		testGasCap,
 		excessGas,
 		parentBlkTime.Unix(),
 		childBlkTime.Unix(),
@@ -132,6 +137,7 @@ func TestPChainGasPriceIncreaseDueToPeak(t *testing.T) {
 
 		m, err := NewUpdatedManager(
 			testDynamicFeeCfg,
+			testGasCap,
 			excessGas,
 			parentBlkData.blkTime,
 			childBlkData.blkTime,
@@ -170,6 +176,7 @@ func TestPChainGasPriceIncreaseDueToPeak(t *testing.T) {
 
 	m, err := NewUpdatedManager(
 		testDynamicFeeCfg,
+		testGasCap,
 		offPeakGas,
 		parentBlkTime.Unix(),
 		childBlkTime.Unix(),

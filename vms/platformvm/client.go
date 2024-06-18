@@ -18,7 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/rpc"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 
-	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
+	commonfee "github.com/ava-labs/avalanchego/vms/components/fee"
 )
 
 var _ Client = (*client)(nil)
@@ -134,7 +134,7 @@ type Client interface {
 	// GetBlockByHeight returns the block at the given [height].
 	GetBlockByHeight(ctx context.Context, height uint64, options ...rpc.Option) ([]byte, error)
 	// GetNextGasPrice returns the gas price that a transaction must pay to be accepted now
-	GetNextGasPrice(ctx context.Context, options ...rpc.Option) (commonfees.GasPrice, error)
+	GetNextGasPrice(ctx context.Context, options ...rpc.Option) (commonfee.GasPrice, error)
 }
 
 // Client implementation for interacting with the P Chain endpoint
@@ -550,7 +550,7 @@ func (c *client) GetBlockByHeight(ctx context.Context, height uint64, options ..
 	return formatting.Decode(res.Encoding, res.Block)
 }
 
-func (c *client) GetNextGasPrice(ctx context.Context, options ...rpc.Option) (commonfees.GasPrice, error) {
+func (c *client) GetNextGasPrice(ctx context.Context, options ...rpc.Option) (commonfee.GasPrice, error) {
 	res := &GetGasPriceReply{}
 	err := c.requester.SendRequest(ctx, "platform.getNextGasPrice", struct{}{}, res, options...)
 	return res.NextGasPrice, err

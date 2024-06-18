@@ -15,7 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 
-	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
+	commonfee "github.com/ava-labs/avalanchego/vms/components/fee"
 )
 
 var (
@@ -37,8 +37,8 @@ type diff struct {
 
 	timestamp time.Time
 
-	excessComplexity *commonfees.Gas
-	currentGasCap    *commonfees.Gas
+	excessComplexity *commonfee.Gas
+	currentGasCap    *commonfee.Gas
 
 	// Subnet ID --> supply of native asset of the subnet
 	currentSupply map[ids.ID]uint64
@@ -94,52 +94,52 @@ func NewDiffOn(parentState Chain) (Diff, error) {
 	})
 }
 
-func (d *diff) GetExcessGas() (commonfees.Gas, error) {
+func (d *diff) GetExcessGas() (commonfee.Gas, error) {
 	if d.excessComplexity == nil {
 		parentState, ok := d.stateVersions.GetState(d.parentID)
 		if !ok {
-			return commonfees.ZeroGas, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
+			return commonfee.ZeroGas, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
 		}
 		parentExcessComplexity, err := parentState.GetExcessGas()
 		if err != nil {
-			return commonfees.ZeroGas, err
+			return commonfee.ZeroGas, err
 		}
 
-		d.excessComplexity = new(commonfees.Gas)
+		d.excessComplexity = new(commonfee.Gas)
 		*d.excessComplexity = parentExcessComplexity
 	}
 
 	return *d.excessComplexity, nil
 }
 
-func (d *diff) SetExcessGas(gas commonfees.Gas) {
+func (d *diff) SetExcessGas(gas commonfee.Gas) {
 	if d.excessComplexity == nil {
-		d.excessComplexity = new(commonfees.Gas)
+		d.excessComplexity = new(commonfee.Gas)
 	}
 	*d.excessComplexity = gas
 }
 
-func (d *diff) GetCurrentGasCap() (commonfees.Gas, error) {
+func (d *diff) GetCurrentGasCap() (commonfee.Gas, error) {
 	if d.currentGasCap == nil {
 		parentState, ok := d.stateVersions.GetState(d.parentID)
 		if !ok {
-			return commonfees.ZeroGas, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
+			return commonfee.ZeroGas, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
 		}
 		parentCurrentGasCap, err := parentState.GetCurrentGasCap()
 		if err != nil {
-			return commonfees.ZeroGas, err
+			return commonfee.ZeroGas, err
 		}
 
-		d.currentGasCap = new(commonfees.Gas)
+		d.currentGasCap = new(commonfee.Gas)
 		*d.currentGasCap = parentCurrentGasCap
 	}
 
 	return *d.currentGasCap, nil
 }
 
-func (d *diff) SetCurrentGasCap(gasCap commonfees.Gas) {
+func (d *diff) SetCurrentGasCap(gasCap commonfee.Gas) {
 	if d.currentGasCap == nil {
-		d.currentGasCap = new(commonfees.Gas)
+		d.currentGasCap = new(commonfee.Gas)
 	}
 	*d.currentGasCap = gasCap
 }

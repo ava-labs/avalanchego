@@ -20,7 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/wallet/chain/p/builder"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
-	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
+	commonfee "github.com/ava-labs/avalanchego/vms/components/fee"
 	vmsigner "github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	walletsigner "github.com/ava-labs/avalanchego/wallet/chain/p/signer"
 )
@@ -293,8 +293,8 @@ type wallet struct {
 
 	isEForkActive    bool
 	staticFeesConfig fee.StaticConfig
-	gasPrice         commonfees.GasPrice
-	maxComplexity    commonfees.Gas
+	gasPrice         commonfee.GasPrice
+	maxComplexity    commonfee.Gas
 }
 
 func (w *wallet) Builder() builder.Builder {
@@ -640,11 +640,10 @@ func (w *wallet) feeCalculator(ctx *builder.Context, options ...common.Option) (
 
 	var feeCalculator *fee.Calculator
 	if !w.isEForkActive {
-		feeCalculator = fee.NewStaticCalculator(w.staticFeesConfig, upgrade.Config{}, time.Time{})
-	} else {
-		feeMan := commonfees.NewManager(w.gasPrice)
-		feeCalculator = fee.NewDynamicCalculator(feeMan, fee.TempGasCap)
+		return fee.NewStaticCalculator(w.staticFeesConfig, upgrade.Config{}, time.Time{}), nil
 	}
+
+	feeCalculator = fee.NewDynamicCalculator(commonfee.NewManager(w.gasPrice, fee.TempGasCap))
 	return feeCalculator, nil
 }
 

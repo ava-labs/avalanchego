@@ -15,7 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
-	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
+	commonfee "github.com/ava-labs/avalanchego/vms/components/fee"
 	ginkgo "github.com/onsi/ginkgo/v2"
 )
 
@@ -23,12 +23,12 @@ var _ = ginkgo.Describe("[Dynamic Fees]", func() {
 	require := require.New(ginkgo.GinkgoT())
 
 	ginkgo.It("should ensure that the dynamic multifees are affected by load", func() {
-		customDynamicFeesConfig := commonfees.DynamicFeesConfig{
-			MinGasPrice:       commonfees.GasPrice(1),
-			UpdateDenominator: commonfees.Gas(5),
+		customDynamicFeesConfig := commonfee.DynamicFeesConfig{
+			MinGasPrice:       commonfee.GasPrice(1),
+			UpdateDenominator: commonfee.Gas(5),
 
 			// BlockUnitsTarget are set to cause an increase of fees while simple transactions are issued
-			GasTargetRate: commonfees.Gas(120),
+			GasTargetRate: commonfee.Gas(120),
 		}
 
 		ginkgo.By("creating a new private network to ensure isolation from other tests")

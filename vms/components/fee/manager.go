@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package fees
+package fee
 
 import (
 	"errors"
@@ -15,6 +15,9 @@ import (
 var errGasBoundBreached = errors.New("gas bound breached")
 
 type Manager struct {
+	// gas cap enforced with adding gas via CumulateGas
+	gasCap Gas
+
 	// Avax denominated gas price, i.e. fee per unit of complexity.
 	gasPrice GasPrice
 
@@ -27,18 +30,20 @@ type Manager struct {
 	currentExcessGas Gas
 }
 
-func NewManager(gasPrice GasPrice) *Manager {
+func NewManager(gasPrice GasPrice, gasCap Gas) *Manager {
 	return &Manager{
+		gasCap:   gasCap,
 		gasPrice: gasPrice,
 	}
 }
 
 func NewUpdatedManager(
 	feesConfig DynamicFeesConfig,
-	currentExcessGas Gas,
+	gasCap, currentExcessGas Gas,
 	parentBlkTime, childBlkTime int64,
 ) (*Manager, error) {
 	res := &Manager{
+		gasCap:           gasCap,
 		currentExcessGas: currentExcessGas,
 	}
 
@@ -90,13 +95,13 @@ func (m *Manager) CalculateFee(g Gas) (uint64, error) {
 // CumulateGas tries to cumulate the consumed gas [units]. Before
 // actually cumulating it, it checks whether the result would breach [bounds].
 // If so, it returns the first dimension to breach bounds.
-func (m *Manager) CumulateGas(gas, bound Gas) error {
+func (m *Manager) CumulateGas(gas Gas) error {
 	// Ensure we can consume (don't want partial update of values)
 	blkGas, err := safemath.Add64(uint64(m.blockGas), uint64(gas))
 	if err != nil {
 		return fmt.Errorf("%w: %w", errGasBoundBreached, err)
 	}
-	if Gas(blkGas) > bound {
+	if Gas(blkGas) > m.gasCap {
 		return errGasBoundBreached
 	}
 

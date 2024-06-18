@@ -17,7 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 
-	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
+	commonfee "github.com/ava-labs/avalanchego/vms/components/fee"
 )
 
 var (
@@ -252,8 +252,8 @@ func (v *verifier) ApricotAtomicBlock(b *block.ApricotAtomicBlock) error {
 
 		inputs:         atomicExecutor.Inputs,
 		timestamp:      atomicExecutor.OnAccept.GetTimestamp(),
-		blockGas:       commonfees.ZeroGas,
-		excessGas:      commonfees.ZeroGas,
+		blockGas:       commonfee.ZeroGas,
+		excessGas:      commonfee.ZeroGas,
 		atomicRequests: atomicExecutor.AtomicRequests,
 	}
 	return nil
@@ -425,7 +425,7 @@ func (v *verifier) proposalBlock(
 	}
 
 	blkGas := feeCalculator.GetBlockGas()
-	nextGasCap := commonfees.UpdateGasCap(currentGasCap, blkGas)
+	nextGasCap := commonfee.UpdateGasCap(currentGasCap, blkGas)
 	onCommitState.SetCurrentGasCap(nextGasCap)
 	onAbortState.SetCurrentGasCap(nextGasCap)
 
@@ -479,7 +479,7 @@ func (v *verifier) standardBlock(
 	blkID := b.ID()
 
 	blkGas := feeCalculator.GetBlockGas()
-	nextGasCap := commonfees.UpdateGasCap(currentGasCap, blkGas)
+	nextGasCap := commonfee.UpdateGasCap(currentGasCap, blkGas)
 	onAcceptState.SetCurrentGasCap(nextGasCap)
 
 	v.blkIDToState[blkID] = &blockState{

@@ -12,7 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 
-	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
+	commonfee "github.com/ava-labs/avalanchego/vms/components/fee"
 )
 
 func NextBlockTime(state Chain, clk *mockable.Clock) (time.Time, bool, error) {
@@ -95,27 +95,27 @@ func PickFeeCalculator(cfg *config.Config, state Chain, parentBlkTime time.Time)
 		return nil, fmt.Errorf("failed updating fee manager: %w", err)
 	}
 
+	return fee.NewDynamicCalculator(feesMan), nil
+}
+
+func updatedFeeManager(feesCfg commonfee.DynamicFeesConfig, state Chain, parentBlkTime, childBlkTime time.Time) (*commonfee.Manager, error) {
 	currentGasCap, err := state.GetCurrentGasCap()
 	if err != nil {
 		return nil, fmt.Errorf("failed retrieving gas cap: %w", err)
 	}
-
-	gasCap, err := commonfees.GasCap(feesCfg, currentGasCap, parentBlkTime, childBlkTime)
+	gasCap, err := commonfee.GasCap(feesCfg, currentGasCap, parentBlkTime, childBlkTime)
 	if err != nil {
 		return nil, fmt.Errorf("failed retrieving gas cap: %w", err)
 	}
 
-	return fee.NewDynamicCalculator(feesMan, gasCap), nil
-}
-
-func updatedFeeManager(feesCfg commonfees.DynamicFeesConfig, state Chain, parentBlkTime, childBlkTime time.Time) (*commonfees.Manager, error) {
-	excessComplexity, err := state.GetExcessGas()
+	excessGas, err := state.GetExcessGas()
 	if err != nil {
 		return nil, fmt.Errorf("failed retrieving excess complexity: %w", err)
 	}
-	feeManager, err := commonfees.NewUpdatedManager(
+	feeManager, err := commonfee.NewUpdatedManager(
 		feesCfg,
-		excessComplexity,
+		gasCap,
+		excessGas,
 		parentBlkTime.Unix(),
 		childBlkTime.Unix(),
 	)

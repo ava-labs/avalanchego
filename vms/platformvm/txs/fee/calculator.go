@@ -12,7 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/components/fees"
+	"github.com/ava-labs/avalanchego/vms/components/fee"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/upgrade"
@@ -40,15 +40,11 @@ func NewStaticCalculator(
 }
 
 // NewDynamicCalculator must be used post E upgrade activation
-func NewDynamicCalculator(
-	feeManager *fees.Manager,
-	maxGas fees.Gas,
-) *Calculator {
+func NewDynamicCalculator(feeManager *fee.Manager) *Calculator {
 	return &Calculator{
 		c: &calculator{
 			isEActive:  true,
 			feeManager: feeManager,
-			maxGas:     maxGas,
 			// credentials are set when CalculateFee is called
 		},
 	}
@@ -68,38 +64,38 @@ func (c *Calculator) ResetFee(newFee uint64) {
 
 func (c *Calculator) ComputeFee(tx txs.UnsignedTx, creds []verify.Verifiable) (uint64, error) {
 	c.c.credentials = creds
-	c.c.fee = 0 // zero fee among different ComputeFee invocations (unlike Complexity which gets cumulated)
+	c.c.fee = 0 // zero fee among different ComputeFee invocations (unlike gas which gets cumulated)
 	err := tx.Visit(c.c)
 	return c.c.fee, err
 }
 
-func (c *Calculator) AddFeesFor(complexity fees.Dimensions) (uint64, error) {
+func (c *Calculator) AddFeesFor(complexity fee.Dimensions) (uint64, error) {
 	return c.c.addFeesFor(complexity)
 }
 
-func (c *Calculator) RemoveFeesFor(unitsToRm fees.Dimensions) (uint64, error) {
+func (c *Calculator) RemoveFeesFor(unitsToRm fee.Dimensions) (uint64, error) {
 	return c.c.removeFeesFor(unitsToRm)
 }
 
-func (c *Calculator) GetGasPrice() fees.GasPrice {
+func (c *Calculator) GetGasPrice() fee.GasPrice {
 	if c.c.feeManager != nil {
 		return c.c.feeManager.GetGasPrice()
 	}
-	return fees.ZeroGasPrice
+	return fee.ZeroGasPrice
 }
 
-func (c *Calculator) GetBlockGas() fees.Gas {
+func (c *Calculator) GetBlockGas() fee.Gas {
 	if c.c.feeManager != nil {
 		return c.c.feeManager.GetBlockGas()
 	}
-	return fees.ZeroGas
+	return fee.ZeroGas
 }
 
-func (c *Calculator) GetExcessGas() fees.Gas {
+func (c *Calculator) GetExcessGas() fee.Gas {
 	if c.c.feeManager != nil {
 		return c.c.feeManager.GetExcessGas()
 	}
-	return fees.ZeroGas
+	return fee.ZeroGas
 }
 
 type calculator struct {
@@ -112,8 +108,7 @@ type calculator struct {
 	time     time.Time
 
 	// Post E-upgrade inputs
-	feeManager  *fees.Manager
-	maxGas      fees.Gas
+	feeManager  *fee.Manager
 	credentials []verify.Verifiable
 
 	// outputs of visitor execution
@@ -349,14 +344,14 @@ func (c *calculator) meterTx(
 	uTx txs.UnsignedTx,
 	allOuts []*avax.TransferableOutput,
 	allIns []*avax.TransferableInput,
-) (fees.Dimensions, error) {
-	var complexity fees.Dimensions
+) (fee.Dimensions, error) {
+	var complexity fee.Dimensions
 
 	uTxSize, err := txs.Codec.Size(txs.CodecVersion, uTx)
 	if err != nil {
 		return complexity, fmt.Errorf("couldn't calculate UnsignedTx marshal length: %w", err)
 	}
-	complexity[fees.Bandwidth] = uint64(uTxSize)
+	complexity[fee.Bandwidth] = uint64(uTxSize)
 
 	// meter credentials, one by one. Then account for the extra bytes needed to
 	// serialize a slice of credentials (codec version bytes + slice size bytes)
@@ -365,37 +360,37 @@ func (c *calculator) meterTx(
 		if !ok {
 			return complexity, fmt.Errorf("don't know how to calculate complexity of %T", cred)
 		}
-		credDimensions, err := fees.MeterCredential(txs.Codec, txs.CodecVersion, len(c.Sigs))
+		credDimensions, err := fee.MeterCredential(txs.Codec, txs.CodecVersion, len(c.Sigs))
 		if err != nil {
 			return complexity, fmt.Errorf("failed adding credential %d: %w", i, err)
 		}
-		complexity, err = fees.Add(complexity, credDimensions)
+		complexity, err = fee.Add(complexity, credDimensions)
 		if err != nil {
 			return complexity, fmt.Errorf("failed adding credentials: %w", err)
 		}
 	}
-	complexity[fees.Bandwidth] += wrappers.IntLen // length of the credentials slice
-	complexity[fees.Bandwidth] += codec.VersionSize
+	complexity[fee.Bandwidth] += wrappers.IntLen // length of the credentials slice
+	complexity[fee.Bandwidth] += codec.VersionSize
 
 	for _, in := range allIns {
-		inputDimensions, err := fees.MeterInput(txs.Codec, txs.CodecVersion, in)
+		inputDimensions, err := fee.MeterInput(txs.Codec, txs.CodecVersion, in)
 		if err != nil {
 			return complexity, fmt.Errorf("failed retrieving size of inputs: %w", err)
 		}
-		inputDimensions[fees.Bandwidth] = 0 // inputs bandwidth is already accounted for above, so we zero it
-		complexity, err = fees.Add(complexity, inputDimensions)
+		inputDimensions[fee.Bandwidth] = 0 // inputs bandwidth is already accounted for above, so we zero it
+		complexity, err = fee.Add(complexity, inputDimensions)
 		if err != nil {
 			return complexity, fmt.Errorf("failed adding inputs: %w", err)
 		}
 	}
 
 	for _, out := range allOuts {
-		outputDimensions, err := fees.MeterOutput(txs.Codec, txs.CodecVersion, out)
+		outputDimensions, err := fee.MeterOutput(txs.Codec, txs.CodecVersion, out)
 		if err != nil {
 			return complexity, fmt.Errorf("failed retrieving size of outputs: %w", err)
 		}
-		outputDimensions[fees.Bandwidth] = 0 // outputs bandwidth is already accounted for above, so we zero it
-		complexity, err = fees.Add(complexity, outputDimensions)
+		outputDimensions[fee.Bandwidth] = 0 // outputs bandwidth is already accounted for above, so we zero it
+		complexity, err = fee.Add(complexity, outputDimensions)
 		if err != nil {
 			return complexity, fmt.Errorf("failed adding outputs: %w", err)
 		}
@@ -404,8 +399,8 @@ func (c *calculator) meterTx(
 	return complexity, nil
 }
 
-func (c *calculator) addFeesFor(complexity fees.Dimensions) (uint64, error) {
-	if c.feeManager == nil || complexity == fees.Empty {
+func (c *calculator) addFeesFor(complexity fee.Dimensions) (uint64, error) {
+	if c.feeManager == nil || complexity == fee.Empty {
 		return 0, nil
 	}
 
@@ -413,12 +408,12 @@ func (c *calculator) addFeesFor(complexity fees.Dimensions) (uint64, error) {
 	if err != nil {
 		return 0, fmt.Errorf("failed adding fees: %w", err)
 	}
-	txGas, err := fees.ScalarProd(complexity, feeCfg.FeeDimensionWeights)
+	txGas, err := fee.ScalarProd(complexity, feeCfg.FeeDimensionWeights)
 	if err != nil {
 		return 0, fmt.Errorf("failed adding fees: %w", err)
 	}
 
-	if err := c.feeManager.CumulateGas(txGas, c.maxGas); err != nil {
+	if err := c.feeManager.CumulateGas(txGas); err != nil {
 		return 0, fmt.Errorf("failed cumulating complexity: %w", err)
 	}
 	fee, err := c.feeManager.CalculateFee(txGas)
@@ -430,8 +425,8 @@ func (c *calculator) addFeesFor(complexity fees.Dimensions) (uint64, error) {
 	return fee, nil
 }
 
-func (c *calculator) removeFeesFor(unitsToRm fees.Dimensions) (uint64, error) {
-	if c.feeManager == nil || unitsToRm == fees.Empty {
+func (c *calculator) removeFeesFor(unitsToRm fee.Dimensions) (uint64, error) {
+	if c.feeManager == nil || unitsToRm == fee.Empty {
 		return 0, nil
 	}
 
@@ -439,7 +434,7 @@ func (c *calculator) removeFeesFor(unitsToRm fees.Dimensions) (uint64, error) {
 	if err != nil {
 		return 0, fmt.Errorf("failed adding fees: %w", err)
 	}
-	txGas, err := fees.ScalarProd(unitsToRm, feeCfg.FeeDimensionWeights)
+	txGas, err := fee.ScalarProd(unitsToRm, feeCfg.FeeDimensionWeights)
 	if err != nil {
 		return 0, fmt.Errorf("failed adding fees: %w", err)
 	}

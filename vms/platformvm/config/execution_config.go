@@ -10,7 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm/network"
 
-	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
+	commonfee "github.com/ava-labs/avalanchego/vms/components/fee"
 )
 
 var DefaultExecutionConfig = ExecutionConfig{
@@ -42,7 +42,7 @@ type ExecutionConfig struct {
 	MempoolPruneFrequency        time.Duration  `json:"mempool-prune-frequency"`
 
 	// test nets are allow to configure ad-hoc dynamic fees configuration
-	DynamicFeesConfig *commonfees.DynamicFeesConfig `json:"dynamic-fees-config"`
+	DynamicFeesConfig *commonfee.DynamicFeesConfig `json:"dynamic-fees-config"`
 }
 
 // GetExecutionConfig returns an ExecutionConfig

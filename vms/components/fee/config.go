@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package fees
+package fee
 
 import (
 	"errors"
@@ -49,7 +49,7 @@ func (c *DynamicFeesConfig) Validate() error {
 // We cap the maximum gas consumed by time with a leaky bucket approach
 // GasCap = min (GasCap + MaxGasPerSecond/LeakGasCoeff*ElapsedTime, MaxGasPerSecond)
 func GasCap(cfg DynamicFeesConfig, currentGasCapacity Gas, parentBlkTime, childBlkTime time.Time) (Gas, error) {
-	if !childBlkTime.After(parentBlkTime) {
+	if parentBlkTime.Compare(childBlkTime) > 0 {
 		return ZeroGas, fmt.Errorf("unexpected block times, parentBlkTim %v, childBlkTime %v", parentBlkTime, childBlkTime)
 	}
 

@@ -13,7 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 
-	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
+	commonfee "github.com/ava-labs/avalanchego/vms/components/fee"
 )
 
 var _ Metrics = (*metrics)(nil)
@@ -40,9 +40,10 @@ type Metrics interface {
 	SetTimeUntilUnstake(time.Duration)
 	// Mark when this node will unstake from a subnet.
 	SetTimeUntilSubnetUnstake(subnetID ids.ID, timeUntilUnstake time.Duration)
-
-	SetExcessComplexity(commonfees.Gas)
-	SetBlockGas(commonfees.Gas)
+	// Mark cumulated gas in excess of target gas
+	SetExcessComplexity(commonfee.Gas)
+	// Mark gas cumulated across txs of last accepted block
+	SetBlockGas(commonfee.Gas)
 }
 
 func New(registerer prometheus.Registerer) (Metrics, error) {
@@ -169,10 +170,10 @@ func (m *metrics) SetTimeUntilSubnetUnstake(subnetID ids.ID, timeUntilUnstake ti
 	m.timeUntilSubnetUnstake.WithLabelValues(subnetID.String()).Set(float64(timeUntilUnstake))
 }
 
-func (m *metrics) SetExcessComplexity(g commonfees.Gas) {
+func (m *metrics) SetExcessComplexity(g commonfee.Gas) {
 	m.excessGas.Set(float64(g))
 }
 
-func (m *metrics) SetBlockGas(g commonfees.Gas) {
+func (m *metrics) SetBlockGas(g commonfee.Gas) {
 	m.blockGas.Set(float64(g))
 }

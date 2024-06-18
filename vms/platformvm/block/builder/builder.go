@@ -25,7 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 
-	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
+	commonfee "github.com/ava-labs/avalanchego/vms/components/fee"
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
@@ -339,7 +339,7 @@ func packBlockTxs(
 	var (
 		upgrades  = backend.Config.UpgradeConfig
 		isEActive = upgrades.IsEActivated(timestamp)
-		targetGas = commonfees.ZeroGas
+		targetGas = commonfee.ZeroGas
 
 		blockTxs []*txs.Tx
 		inputs   set.Set[ids.ID]
@@ -355,7 +355,7 @@ func packBlockTxs(
 		if err != nil {
 			return nil, fmt.Errorf("failed retrieving dynamic fees config: %w", err)
 		}
-		targetGas, err = commonfees.TargetGas(feeCfg, parentBlkTime.Unix(), timestamp.Unix())
+		targetGas, err = commonfee.TargetGas(feeCfg, parentBlkTime.Unix(), timestamp.Unix())
 		if err != nil {
 			return nil, fmt.Errorf("failed calculating target block complexity: %w", err)
 		}
