@@ -41,14 +41,15 @@ func NewScheduler[T comparable]() *Scheduler[T] {
 	}
 }
 
-// Register a job that should be executed once all of its dependencies are
-// fulfilled. In order to prevent a memory leak, all dependencies must
-// eventually either be fulfilled or abandoned.
+// Schedule a job to be executed once all of its dependencies are fulfilled.
+//
+// In order to prevent a memory leak, all dependencies must eventually either be
+// fulfilled or abandoned.
 //
 // While registering a job with duplicate dependencies is discouraged, it is
 // allowed and treated similarly to registering the job with the dependencies
 // de-duplicated.
-func (s *Scheduler[T]) Register(ctx context.Context, userJob Job, dependencies ...T) error {
+func (s *Scheduler[T]) Schedule(ctx context.Context, userJob Job, dependencies ...T) error {
 	if len(dependencies) == 0 {
 		return userJob.Execute(ctx)
 	}
