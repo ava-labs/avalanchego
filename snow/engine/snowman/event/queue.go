@@ -5,7 +5,6 @@ package event
 
 import (
 	"context"
-	"math"
 
 	"github.com/ava-labs/avalanchego/utils/set"
 )
@@ -18,6 +17,8 @@ type Job interface {
 type job[T comparable] struct {
 	// If empty, the job is ready to be executed.
 	dependencies set.Set[T]
+	// If true, the job should be cancelled.
+	shouldCancel bool
 	// If nil, the job has already been executed or cancelled.
 	job Job
 }
@@ -66,28 +67,22 @@ func (q *Queue[_]) NumDependencies() int {
 //
 // It is safe to call the queue during the execution of a job.
 func (q *Queue[T]) Fulfill(ctx context.Context, dependency T) error {
-	return q.resolveDependency(ctx, dependency, 0, Job.Execute)
+	return q.resolveDependency(ctx, dependency, false)
 }
 
 // Abandon a dependency. If any dependencies for a job are abandoned, the job
-// will be cancelled.
+// will be cancelled. The job will only be cancelled once all dependencies are
+// resolved.
 //
 // It is safe to call the queue during the cancelling of a job.
 func (q *Queue[T]) Abandon(ctx context.Context, dependency T) error {
-	return q.resolveDependency(ctx, dependency, math.MaxInt, Job.Cancel)
+	return q.resolveDependency(ctx, dependency, true)
 }
 
-// resolveDependency the provided dependency and execute the operation on all of
-// the unexecuted jobs that have no more than [minDependencies].
-//
-// For example, if [minDependencies] is 0, only jobs that have no more
-// outstanding dependencies will be executed. If [minDependencies] is MaxInt,
-// all jobs will be executed.
 func (q *Queue[T]) resolveDependency(
 	ctx context.Context,
 	dependency T,
-	minDependencies int,
-	operation func(Job, context.Context) error,
+	shouldCancel bool,
 ) error {
 	jobs := q.jobs[dependency]
 	delete(q.jobs, dependency)
@@ -96,9 +91,10 @@ func (q *Queue[T]) resolveDependency(
 		// Removing the dependency keeps the queue in a consistent state.
 		// However, it isn't strictly needed.
 		job.dependencies.Remove(dependency)
+		job.shouldCancel = shouldCancel || job.shouldCancel
 
 		userJob := job.job
-		if userJob == nil || job.dependencies.Len() > minDependencies {
+		if userJob == nil || job.dependencies.Len() != 0 {
 			continue
 		}
 
@@ -106,7 +102,13 @@ func (q *Queue[T]) resolveDependency(
 		// with this job again.
 		job.job = nil
 
-		if err := operation(userJob, ctx); err != nil {
+		var err error
+		if job.shouldCancel {
+			err = userJob.Cancel(ctx)
+		} else {
+			err = userJob.Execute(ctx)
+		}
+		if err != nil {
 			return err
 		}
 	}

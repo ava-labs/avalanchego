@@ -31,9 +31,16 @@ func (j *testJob) Cancel(ctx context.Context) error {
 	return j.cancel(ctx)
 }
 
-func newQueueWithJob[T comparable](t *testing.T, job Job, dependencies ...T) *Queue[T] {
+func newQueueWithJob[T comparable](t *testing.T, job Job, shouldCancel bool, dependencies ...T) *Queue[T] {
 	q := NewQueue[T]()
 	require.NoError(t, q.Register(context.Background(), job, dependencies...))
+	if shouldCancel {
+		for _, dependency := range dependencies {
+			for _, j := range q.jobs[dependency] {
+				j.shouldCancel = true
+			}
+		}
+	}
 	return q
 }
 
@@ -183,25 +190,25 @@ func TestQueue_Fulfill(t *testing.T) {
 		},
 		{
 			name:          "single dependency",
-			queue:         newQueueWithJob(t, userJob, 1),
+			queue:         newQueueWithJob(t, userJob, false, 1),
 			shouldExecute: true,
 			expectedQueue: NewQueue[int](),
 		},
 		{
 			name:          "non-existent dependency",
-			queue:         newQueueWithJob(t, userJob, 2),
+			queue:         newQueueWithJob(t, userJob, false, 2),
 			shouldExecute: false,
-			expectedQueue: newQueueWithJob(t, userJob, 2),
+			expectedQueue: newQueueWithJob(t, userJob, false, 2),
 		},
 		{
 			name:          "incomplete dependencies",
-			queue:         newQueueWithJob(t, userJob, 1, 2),
+			queue:         newQueueWithJob(t, userJob, false, 1, 2),
 			shouldExecute: false,
-			expectedQueue: newQueueWithJob(t, userJob, 2),
+			expectedQueue: newQueueWithJob(t, userJob, false, 2),
 		},
 		{
 			name:          "duplicate dependency",
-			queue:         newQueueWithJob(t, userJob, 1, 1),
+			queue:         newQueueWithJob(t, userJob, false, 1, 1),
 			shouldExecute: true,
 			expectedQueue: NewQueue[int](),
 		},
@@ -221,16 +228,16 @@ func TestQueue_Fulfill(t *testing.T) {
 }
 
 func TestQueue_Abandon(t *testing.T) {
-	var calledAbandon bool
+	var calledCancel bool
 	userJob := &testJob{
 		execute: func(context.Context) error {
 			return errUnexpectedInvocation
 		},
 		cancel: func(context.Context) error {
-			if calledAbandon {
+			if calledCancel {
 				return errDuplicateInvocation
 			}
-			calledAbandon = true
+			calledCancel = true
 			return nil
 		},
 	}
@@ -249,25 +256,25 @@ func TestQueue_Abandon(t *testing.T) {
 		},
 		{
 			name:          "single dependency",
-			queue:         newQueueWithJob(t, userJob, 1),
+			queue:         newQueueWithJob(t, userJob, false, 1),
 			shouldCancel:  true,
 			expectedQueue: NewQueue[int](),
 		},
 		{
 			name:          "non-existent dependency",
-			queue:         newQueueWithJob(t, userJob, 2),
+			queue:         newQueueWithJob(t, userJob, false, 2),
 			shouldCancel:  false,
-			expectedQueue: newQueueWithJob(t, userJob, 2),
+			expectedQueue: newQueueWithJob(t, userJob, false, 2),
 		},
 		{
 			name:          "incomplete dependencies",
-			queue:         newQueueWithJob(t, userJob, 1, 2),
-			shouldCancel:  true,
-			expectedQueue: newQueueWithJob(t, nil, 2),
+			queue:         newQueueWithJob(t, userJob, false, 1, 2),
+			shouldCancel:  false,
+			expectedQueue: newQueueWithJob(t, userJob, true, 2),
 		},
 		{
 			name:          "duplicate dependency",
-			queue:         newQueueWithJob(t, userJob, 1, 1),
+			queue:         newQueueWithJob(t, userJob, false, 1, 1),
 			shouldCancel:  true,
 			expectedQueue: NewQueue[int](),
 		},
@@ -277,10 +284,10 @@ func TestQueue_Abandon(t *testing.T) {
 			require := require.New(t)
 
 			// Reset the variable between tests
-			calledAbandon = false
+			calledCancel = false
 
 			require.NoError(test.queue.Abandon(context.Background(), 1))
-			require.Equal(test.shouldCancel, calledAbandon)
+			require.Equal(test.shouldCancel, calledCancel)
 			require.Equal(test.expectedQueue, test.queue)
 		})
 	}
