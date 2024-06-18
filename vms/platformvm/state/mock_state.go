@@ -20,7 +20,7 @@ import (
 	validators "github.com/ava-labs/avalanchego/snow/validators"
 	logging "github.com/ava-labs/avalanchego/utils/logging"
 	avax "github.com/ava-labs/avalanchego/vms/components/avax"
-	fees "github.com/ava-labs/avalanchego/vms/components/fee"
+	fee "github.com/ava-labs/avalanchego/vms/components/fee"
 	block "github.com/ava-labs/avalanchego/vms/platformvm/block"
 	fx "github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	status "github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -199,10 +199,10 @@ func (mr *MockChainMockRecorder) GetCurrentDelegatorIterator(arg0, arg1 any) *go
 }
 
 // GetCurrentGasCap mocks base method.
-func (m *MockChain) GetCurrentGasCap() (fees.Gas, error) {
+func (m *MockChain) GetCurrentGasCap() (fee.Gas, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetCurrentGasCap")
-	ret0, _ := ret[0].(fees.Gas)
+	ret0, _ := ret[0].(fee.Gas)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -442,7 +442,7 @@ func (mr *MockChainMockRecorder) PutPendingValidator(arg0 any) *gomock.Call {
 }
 
 // SetCurrentGasCap mocks base method.
-func (m *MockChain) SetCurrentGasCap(arg0 fees.Gas) {
+func (m *MockChain) SetCurrentGasCap(arg0 fee.Gas) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "SetCurrentGasCap", arg0)
 }
@@ -688,10 +688,10 @@ func (mr *MockDiffMockRecorder) GetCurrentDelegatorIterator(arg0, arg1 any) *gom
 }
 
 // GetCurrentGasCap mocks base method.
-func (m *MockDiff) GetCurrentGasCap() (fees.Gas, error) {
+func (m *MockDiff) GetCurrentGasCap() (fee.Gas, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetCurrentGasCap")
-	ret0, _ := ret[0].(fees.Gas)
+	ret0, _ := ret[0].(fee.Gas)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -931,7 +931,7 @@ func (mr *MockDiffMockRecorder) PutPendingValidator(arg0 any) *gomock.Call {
 }
 
 // SetCurrentGasCap mocks base method.
-func (m *MockDiff) SetCurrentGasCap(arg0 fees.Gas) {
+func (m *MockDiff) SetCurrentGasCap(arg0 fee.Gas) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "SetCurrentGasCap", arg0)
 }
@@ -1302,10 +1302,10 @@ func (mr *MockStateMockRecorder) GetCurrentDelegatorIterator(arg0, arg1 any) *go
 }
 
 // GetCurrentGasCap mocks base method.
-func (m *MockState) GetCurrentGasCap() (fees.Gas, error) {
+func (m *MockState) GetCurrentGasCap() (fee.Gas, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetCurrentGasCap")
-	ret0, _ := ret[0].(fees.Gas)
+	ret0, _ := ret[0].(fee.Gas)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -1649,7 +1649,7 @@ func (mr *MockStateMockRecorder) ReindexBlocks(arg0, arg1 any) *gomock.Call {
 }
 
 // SetCurrentGasCap mocks base method.
-func (m *MockState) SetCurrentGasCap(arg0 fees.Gas) {
+func (m *MockState) SetCurrentGasCap(arg0 fee.Gas) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "SetCurrentGasCap", arg0)
 }
