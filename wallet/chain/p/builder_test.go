@@ -95,7 +95,7 @@ func TestBaseTx(t *testing.T) {
 	)
 
 	{ // Post E-Upgrade
-		feeCalc := fee.NewDynamicCalculator(commonfee.NewManager(testGasPrice), testBlockMaxGas)
+		feeCalc := fee.NewDynamicCalculator(testGasPrice, testBlockMaxGas)
 		utx, err := builder.NewBaseTx(
 			outputsToMove,
 			feeCalc,
@@ -105,7 +105,7 @@ func TestBaseTx(t *testing.T) {
 		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
 
-		fc := fee.NewDynamicCalculator(commonfee.NewManager(testGasPrice), testBlockMaxGas)
+		fc := fee.NewDynamicCalculator(testGasPrice, testBlockMaxGas)
 		fee, err := fc.ComputeFee(utx, tx.Creds)
 		require.NoError(err)
 		require.Equal(30_620*units.MicroAvax, fee)
@@ -199,14 +199,14 @@ func TestAddSubnetValidatorTx(t *testing.T) {
 	)
 
 	{ // Post E-Upgrade
-		feeCalc := fee.NewDynamicCalculator(commonfee.NewManager(testGasPrice), testBlockMaxGas)
+		feeCalc := fee.NewDynamicCalculator(testGasPrice, testBlockMaxGas)
 		utx, err := builder.NewAddSubnetValidatorTx(subnetValidator, feeCalc)
 		require.NoError(err)
 
 		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
 
-		fc := fee.NewDynamicCalculator(commonfee.NewManager(testGasPrice), testBlockMaxGas)
+		fc := fee.NewDynamicCalculator(testGasPrice, testBlockMaxGas)
 		fee, err := fc.ComputeFee(utx, tx.Creds)
 		require.NoError(err)
 		require.Equal(30_610*units.MicroAvax, fee)
@@ -287,7 +287,7 @@ func TestRemoveSubnetValidatorTx(t *testing.T) {
 	)
 
 	{ // Post E-Upgrade
-		feeCalc := fee.NewDynamicCalculator(commonfee.NewManager(testGasPrice), testBlockMaxGas)
+		feeCalc := fee.NewDynamicCalculator(testGasPrice, testBlockMaxGas)
 		utx, err := builder.NewRemoveSubnetValidatorTx(
 			ids.GenerateTestNodeID(),
 			subnetID,
@@ -298,7 +298,7 @@ func TestRemoveSubnetValidatorTx(t *testing.T) {
 		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
 
-		fc := fee.NewDynamicCalculator(commonfee.NewManager(testGasPrice), testBlockMaxGas)
+		fc := fee.NewDynamicCalculator(testGasPrice, testBlockMaxGas)
 		fee, err := fc.ComputeFee(utx, tx.Creds)
 		require.NoError(err)
 		require.Equal(30_370*units.MicroAvax, fee)
@@ -389,7 +389,7 @@ func TestCreateChainTx(t *testing.T) {
 	)
 
 	{ // Post E-Upgrade
-		feeCalc := fee.NewDynamicCalculator(commonfee.NewManager(testGasPrice), testBlockMaxGas)
+		feeCalc := fee.NewDynamicCalculator(testGasPrice, testBlockMaxGas)
 		utx, err := builder.NewCreateChainTx(
 			subnetID,
 			genesisBytes,
@@ -403,7 +403,7 @@ func TestCreateChainTx(t *testing.T) {
 		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
 
-		fc := fee.NewDynamicCalculator(commonfee.NewManager(testGasPrice), testBlockMaxGas)
+		fc := fee.NewDynamicCalculator(testGasPrice, testBlockMaxGas)
 		fee, err := fc.ComputeFee(utx, tx.Creds)
 		require.NoError(err)
 		require.Equal(31_040*units.MicroAvax, fee)
@@ -491,7 +491,7 @@ func TestCreateSubnetTx(t *testing.T) {
 	)
 
 	{ // Post E-Upgrade
-		feeCalc := fee.NewDynamicCalculator(commonfee.NewManager(testGasPrice), testBlockMaxGas)
+		feeCalc := fee.NewDynamicCalculator(testGasPrice, testBlockMaxGas)
 		utx, err := builder.NewCreateSubnetTx(
 			subnetOwner,
 			feeCalc,
@@ -501,7 +501,7 @@ func TestCreateSubnetTx(t *testing.T) {
 		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
 
-		fc := fee.NewDynamicCalculator(commonfee.NewManager(testGasPrice), testBlockMaxGas)
+		fc := fee.NewDynamicCalculator(testGasPrice, testBlockMaxGas)
 		fee, err := fc.ComputeFee(utx, tx.Creds)
 		require.NoError(err)
 		require.Equal(29_400*units.MicroAvax, fee)
@@ -585,7 +585,7 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 	)
 
 	{ // Post E-Upgrade
-		feeCalc := fee.NewDynamicCalculator(commonfee.NewManager(testGasPrice), testBlockMaxGas)
+		feeCalc := fee.NewDynamicCalculator(testGasPrice, testBlockMaxGas)
 		utx, err := builder.NewTransferSubnetOwnershipTx(
 			subnetID,
 			subnetOwner,
@@ -596,7 +596,7 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
 
-		fc := fee.NewDynamicCalculator(commonfee.NewManager(testGasPrice), testBlockMaxGas)
+		fc := fee.NewDynamicCalculator(testGasPrice, testBlockMaxGas)
 		fee, err := fc.ComputeFee(utx, tx.Creds)
 		require.NoError(err)
 		require.Equal(30_570*units.MicroAvax, fee)
@@ -675,7 +675,7 @@ func TestImportTx(t *testing.T) {
 	)
 
 	{ // Post E-Upgrade
-		feeCalc := fee.NewDynamicCalculator(commonfee.NewManager(testGasPrice), testBlockMaxGas)
+		feeCalc := fee.NewDynamicCalculator(testGasPrice, testBlockMaxGas)
 		utx, err := builder.NewImportTx(
 			sourceChainID,
 			importTo,
@@ -686,7 +686,7 @@ func TestImportTx(t *testing.T) {
 		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
 
-		fc := fee.NewDynamicCalculator(commonfee.NewManager(testGasPrice), testBlockMaxGas)
+		fc := fee.NewDynamicCalculator(testGasPrice, testBlockMaxGas)
 		fee, err := fc.ComputeFee(utx, tx.Creds)
 		require.NoError(err)
 		require.Equal(42_770*units.MicroAvax, fee)
@@ -765,7 +765,7 @@ func TestExportTx(t *testing.T) {
 	)
 
 	{ // Post E-Upgrade
-		feeCalc := fee.NewDynamicCalculator(commonfee.NewManager(testGasPrice), testBlockMaxGas)
+		feeCalc := fee.NewDynamicCalculator(testGasPrice, testBlockMaxGas)
 		utx, err := builder.NewExportTx(
 			subnetID,
 			exportedOutputs,
@@ -776,7 +776,7 @@ func TestExportTx(t *testing.T) {
 		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
 
-		fc := fee.NewDynamicCalculator(commonfee.NewManager(testGasPrice), testBlockMaxGas)
+		fc := fee.NewDynamicCalculator(testGasPrice, testBlockMaxGas)
 		fee, err := fc.ComputeFee(utx, tx.Creds)
 		require.NoError(err)
 		require.Equal(30_980*units.MicroAvax, fee)
@@ -867,7 +867,7 @@ func TestTransformSubnetTx(t *testing.T) {
 	)
 
 	{ // Post E-Upgrade
-		feeCalc := fee.NewDynamicCalculator(commonfee.NewManager(testGasPrice), testBlockMaxGas)
+		feeCalc := fee.NewDynamicCalculator(testGasPrice, testBlockMaxGas)
 		utx, err := builder.NewTransformSubnetTx(
 			subnetID,
 			subnetAssetID,
@@ -890,7 +890,7 @@ func TestTransformSubnetTx(t *testing.T) {
 		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
 
-		fc := fee.NewDynamicCalculator(commonfee.NewManager(testGasPrice), testBlockMaxGas)
+		fc := fee.NewDynamicCalculator(testGasPrice, testBlockMaxGas)
 		fee, err := fc.ComputeFee(utx, tx.Creds)
 		require.NoError(err)
 		require.Equal(46_250*units.MicroAvax, fee)
@@ -989,7 +989,7 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 	require.NoError(err)
 
 	{ // Post E-Upgrade
-		feeCalc := fee.NewDynamicCalculator(commonfee.NewManager(testGasPrice), testBlockMaxGas)
+		feeCalc := fee.NewDynamicCalculator(testGasPrice, testBlockMaxGas)
 		utx, err := builder.NewAddPermissionlessValidatorTx(
 			&txs.SubnetValidator{
 				Validator: txs.Validator{
@@ -1011,7 +1011,7 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
 
-		fc := fee.NewDynamicCalculator(commonfee.NewManager(testGasPrice), testBlockMaxGas)
+		fc := fee.NewDynamicCalculator(testGasPrice, testBlockMaxGas)
 		fee, err := fc.ComputeFee(utx, tx.Creds)
 		require.NoError(err)
 		require.Equal(65_240*units.MicroAvax, fee)
@@ -1108,7 +1108,7 @@ func TestAddPermissionlessDelegatorTx(t *testing.T) {
 	)
 
 	{ // Post E-Upgrade
-		feeCalc := fee.NewDynamicCalculator(commonfee.NewManager(testGasPrice), testBlockMaxGas)
+		feeCalc := fee.NewDynamicCalculator(testGasPrice, testBlockMaxGas)
 		utx, err := builder.NewAddPermissionlessDelegatorTx(
 			&txs.SubnetValidator{
 				Validator: txs.Validator{
@@ -1127,7 +1127,7 @@ func TestAddPermissionlessDelegatorTx(t *testing.T) {
 		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
 
-		fc := fee.NewDynamicCalculator(commonfee.NewManager(testGasPrice), testBlockMaxGas)
+		fc := fee.NewDynamicCalculator(testGasPrice, testBlockMaxGas)
 		fee, err := fc.ComputeFee(utx, tx.Creds)
 		require.NoError(err)
 		require.Equal(63_320*units.MicroAvax, fee)

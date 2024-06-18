@@ -40,15 +40,11 @@ func NewStaticCalculator(
 }
 
 // NewDynamicCalculator must be used post E upgrade activation
-func NewDynamicCalculator(
-	feeManager *fee.Manager,
-	maxGas fee.Gas,
-) *Calculator {
+func NewDynamicCalculator(gasPrice fee.GasPrice, gasCap fee.Gas) *Calculator {
 	return &Calculator{
 		c: &calculator{
 			isEActive:  true,
-			feeManager: feeManager,
-			maxGas:     maxGas,
+			feeManager: fee.NewManager(gasPrice, gasCap),
 			// credentials are set when CalculateFee is called
 		},
 	}
@@ -99,7 +95,6 @@ type calculator struct {
 
 	// Post E-upgrade inputs
 	feeManager  *fee.Manager
-	maxGas      fee.Gas
 	credentials []verify.Verifiable
 
 	// outputs of visitor execution
@@ -404,7 +399,7 @@ func (c *calculator) addFeesFor(complexity fee.Dimensions) (uint64, error) {
 		return 0, fmt.Errorf("failed adding fees: %w", err)
 	}
 
-	if err := c.feeManager.CumulateGas(txGas, c.maxGas); err != nil {
+	if err := c.feeManager.CumulateGas(txGas); err != nil {
 		return 0, fmt.Errorf("failed cumulating complexity: %w", err)
 	}
 	fee, err := c.feeManager.CalculateFee(txGas)

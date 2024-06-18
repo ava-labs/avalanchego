@@ -97,7 +97,6 @@ func PickFeeCalculator(cfg *config.Config, state Chain, parentBlkTime time.Time)
 	if err != nil {
 		return nil, fmt.Errorf("failed updating gas cap: %w", err)
 	}
-	feesMan := commonfee.NewManager(feesCfg.GasPrice)
-	feeCalculator := fee.NewDynamicCalculator(feesMan, gasCap)
+	feeCalculator := fee.NewDynamicCalculator(feesCfg.GasPrice, gasCap)
 	return feeCalculator, nil
 }

@@ -23,7 +23,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
-	commonfee "github.com/ava-labs/avalanchego/vms/components/fee"
 	ginkgo "github.com/onsi/ginkgo/v2"
 )
 
@@ -159,7 +158,7 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 				feeCfg, err := fee.GetDynamicConfig(true /*isEActive*/)
 				require.NoError(err)
 
-				feeCalc := fee.NewDynamicCalculator(commonfee.NewManager(feeCfg.GasPrice), fee.TempGasCap)
+				feeCalc := fee.NewDynamicCalculator(feeCfg.GasPrice, fee.TempGasCap)
 				pChainExportFee, err = feeCalc.ComputeFee(tx.Unsigned, tx.Creds)
 				require.NoError(err)
 			})

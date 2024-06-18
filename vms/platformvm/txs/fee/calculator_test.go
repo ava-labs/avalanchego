@@ -46,8 +46,7 @@ func TestAddAndRemoveFees(t *testing.T) {
 	fc := &Calculator{
 		c: &calculator{
 			isEActive:  true,
-			feeManager: fee.NewManager(testGasPrice),
-			maxGas:     testBlockMaxGas,
+			feeManager: fee.NewManager(testGasPrice, testBlockMaxGas),
 		},
 	}
 
@@ -114,7 +113,7 @@ func TestTxFees(t *testing.T) {
 		name                string
 		chainTime           time.Time
 		unsignedAndSignedTx func(t *testing.T) (txs.UnsignedTx, *txs.Tx)
-		maxGasF             func() fee.Gas
+		gasCapF             func() fee.Gas
 		expectedError       error
 		checksF             func(*testing.T, *calculator)
 	}{
@@ -147,7 +146,7 @@ func TestTxFees(t *testing.T) {
 		{
 			name:      "AddSubnetValidatorTx post EUpgrade, utxos read cap breached",
 			chainTime: postEUpgradeTime,
-			maxGasF: func() fee.Gas {
+			gasCapF: func() fee.Gas {
 				return testBlockMaxGas - 1
 			},
 			unsignedAndSignedTx: addSubnetValidatorTx,
@@ -192,7 +191,7 @@ func TestTxFees(t *testing.T) {
 			name:                "CreateChainTx post EUpgrade, utxos read cap breached",
 			chainTime:           postEUpgradeTime,
 			unsignedAndSignedTx: createChainTx,
-			maxGasF: func() fee.Gas {
+			gasCapF: func() fee.Gas {
 				return testBlockMaxGas - 1
 			},
 			expectedError: errFailedComplexityCumulation,
@@ -228,7 +227,7 @@ func TestTxFees(t *testing.T) {
 			name:                "CreateSubnetTx post EUpgrade, utxos read cap breached",
 			chainTime:           postEUpgradeTime,
 			unsignedAndSignedTx: createSubnetTx,
-			maxGasF: func() fee.Gas {
+			gasCapF: func() fee.Gas {
 				return testBlockMaxGas - 1
 			},
 			expectedError: errFailedComplexityCumulation,
@@ -255,7 +254,7 @@ func TestTxFees(t *testing.T) {
 		{
 			name:      "RemoveSubnetValidatorTx post EUpgrade, utxos read cap breached",
 			chainTime: postEUpgradeTime,
-			maxGasF: func() fee.Gas {
+			gasCapF: func() fee.Gas {
 				return testBlockMaxGas - 1
 			},
 			unsignedAndSignedTx: removeSubnetValidatorTx,
@@ -283,7 +282,7 @@ func TestTxFees(t *testing.T) {
 		{
 			name:      "TransformSubnetTx post EUpgrade, utxos read cap breached",
 			chainTime: postEUpgradeTime,
-			maxGasF: func() fee.Gas {
+			gasCapF: func() fee.Gas {
 				return testBlockMaxGas - 1
 			},
 			unsignedAndSignedTx: transformSubnetTx,
@@ -311,7 +310,7 @@ func TestTxFees(t *testing.T) {
 		{
 			name:      "TransferSubnetOwnershipTx post EUpgrade, utxos read cap breached",
 			chainTime: postEUpgradeTime,
-			maxGasF: func() fee.Gas {
+			gasCapF: func() fee.Gas {
 				return testBlockMaxGas - 1
 			},
 			unsignedAndSignedTx: transferSubnetOwnershipTx,
@@ -369,7 +368,7 @@ func TestTxFees(t *testing.T) {
 		{
 			name:      "AddPermissionlessValidatorTx post EUpgrade, utxos read cap breached",
 			chainTime: postEUpgradeTime,
-			maxGasF: func() fee.Gas {
+			gasCapF: func() fee.Gas {
 				return testBlockMaxGas - 1
 			},
 			unsignedAndSignedTx: func(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
@@ -428,7 +427,7 @@ func TestTxFees(t *testing.T) {
 		{
 			name:      "AddPermissionlessDelegatorTx Subnet post EUpgrade, utxos read cap breached",
 			chainTime: postEUpgradeTime,
-			maxGasF: func() fee.Gas {
+			gasCapF: func() fee.Gas {
 				return testBlockMaxGas - 1
 			},
 			unsignedAndSignedTx: func(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
@@ -460,7 +459,7 @@ func TestTxFees(t *testing.T) {
 		{
 			name:      "BaseTx post EUpgrade, utxos read cap breached",
 			chainTime: postEUpgradeTime,
-			maxGasF: func() fee.Gas {
+			gasCapF: func() fee.Gas {
 				return testBlockMaxGas - 1
 			},
 			unsignedAndSignedTx: baseTx,
@@ -488,7 +487,7 @@ func TestTxFees(t *testing.T) {
 		{
 			name:      "ImportTx post EUpgrade, utxos read cap breached",
 			chainTime: postEUpgradeTime,
-			maxGasF: func() fee.Gas {
+			gasCapF: func() fee.Gas {
 				return testBlockMaxGas - 1
 			},
 			unsignedAndSignedTx: importTx,
@@ -516,7 +515,7 @@ func TestTxFees(t *testing.T) {
 		{
 			name:      "ExportTx post EUpgrade, utxos read cap breached",
 			chainTime: postEUpgradeTime,
-			maxGasF: func() fee.Gas {
+			gasCapF: func() fee.Gas {
 				return testBlockMaxGas - 1
 			},
 			unsignedAndSignedTx: exportTx,
@@ -551,9 +550,9 @@ func TestTxFees(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			maxComplexity := testBlockMaxGas
-			if tt.maxGasF != nil {
-				maxComplexity = tt.maxGasF()
+			gasCap := testBlockMaxGas
+			if tt.gasCapF != nil {
+				gasCap = tt.gasCapF()
 			}
 
 			uTx, sTx := tt.unsignedAndSignedTx(t)
@@ -562,7 +561,7 @@ func TestTxFees(t *testing.T) {
 			if !upgrades.IsEActivated(tt.chainTime) {
 				fc = NewStaticCalculator(feeTestsDefaultCfg, upgrades, tt.chainTime)
 			} else {
-				fc = NewDynamicCalculator(fee.NewManager(testGasPrice), maxComplexity)
+				fc = NewDynamicCalculator(testGasPrice, gasCap)
 			}
 
 			var creds []verify.Verifiable

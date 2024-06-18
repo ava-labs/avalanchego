@@ -100,8 +100,7 @@ func testReplayFeeCalculator(cfg *config.Config, parentBlkTime time.Time, state 
 	if err != nil {
 		return nil, fmt.Errorf("failed updating gas cap: %w", err)
 	}
-	feesMan := commonfee.NewManager(feesCfg.GasPrice)
-	return fee.NewDynamicCalculator(feesMan, gasCap), nil
+	return fee.NewDynamicCalculator(feesCfg.GasPrice, gasCap), nil
 }
 
 func defaultService(t *testing.T) (*Service, *mutableSharedMemory, *txstest.WalletFactory) {

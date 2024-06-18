@@ -631,11 +631,10 @@ func (w *wallet) feeCalculator(ctx *builder.Context, options ...common.Option) (
 
 	var feeCalculator *fee.Calculator
 	if !w.isEForkActive {
-		feeCalculator = fee.NewStaticCalculator(w.staticFeesConfig, upgrade.Config{}, time.Time{})
-	} else {
-		feeMan := commonfee.NewManager(w.gasPrice)
-		feeCalculator = fee.NewDynamicCalculator(feeMan, fee.TempGasCap)
+		return fee.NewStaticCalculator(w.staticFeesConfig, upgrade.Config{}, time.Time{}), nil
 	}
+
+	feeCalculator = fee.NewDynamicCalculator(w.gasPrice, fee.TempGasCap)
 	return feeCalculator, nil
 }
 
