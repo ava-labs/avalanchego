@@ -11,9 +11,9 @@ import (
 
 var _ Nnary = (*nnarySnowball)(nil)
 
-func newNnarySnowball(alphaPreference, alphaConfidence, beta int, choice ids.ID) nnarySnowball {
+func newNnarySnowball(alphaPreference int, terminationConditions []terminationCondition, choice ids.ID) nnarySnowball {
 	return nnarySnowball{
-		nnarySnowflake:     newNnarySnowflake(alphaPreference, alphaConfidence, beta, choice),
+		nnarySnowflake:     newNnarySnowflake(alphaPreference, terminationConditions, choice),
 		preference:         choice,
 		preferenceStrength: make(map[ids.ID]int),
 	}
