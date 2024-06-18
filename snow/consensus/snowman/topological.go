@@ -289,6 +289,11 @@ func (ts *Topological) RecordPoll(ctx context.Context, voteBag bag.Bag[ids.ID]) 
 
 	// Runtime = |live set| ; Space = Constant
 	// Traverse from the preferred ID to the last accepted ancestor.
+	//
+	// It is guaranteed that the first decided block we encounter is the last
+	// accepted block because the startBlock is the preferred block. The
+	// preferred block is guaranteed to either be the last accepted block or
+	// extend the accepted chain.
 	for block := startBlock; !block.Decided(); {
 		blkID := block.blk.ID()
 		ts.preferredIDs.Add(blkID)
