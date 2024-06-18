@@ -476,14 +476,14 @@ func (n *network) AllowConnection(nodeID ids.NodeID) bool {
 	if !n.config.RequireValidatorToConnect {
 		return true
 	}
-	_, iAmAValidator := n.config.Validators.GetValidator(constants.PrimaryNetworkID, n.config.MyNodeID)
-	return iAmAValidator || n.ipTracker.WantsConnection(nodeID)
+	_, areWeAPrimaryNetworkAValidator := n.config.Validators.GetValidator(constants.PrimaryNetworkID, n.config.MyNodeID)
+	return areWeAPrimaryNetworkAValidator || n.ipTracker.WantsConnection(nodeID)
 }
 
 func (n *network) Track(claimedIPPorts []*ips.ClaimedIPPort) error {
-	_, iAmAValidator := n.config.Validators.GetValidator(constants.PrimaryNetworkID, n.config.MyNodeID)
+	_, areWeAPrimaryNetworkAValidator := n.config.Validators.GetValidator(constants.PrimaryNetworkID, n.config.MyNodeID)
 	for _, ip := range claimedIPPorts {
-		if err := n.track(ip, iAmAValidator); err != nil {
+		if err := n.track(ip, areWeAPrimaryNetworkAValidator); err != nil {
 			return err
 		}
 	}
@@ -754,9 +754,9 @@ func (n *network) getPeers(
 			continue
 		}
 
-		_, isValidator := n.config.Validators.GetValidator(subnetID, nodeID)
+		_, areTheyAValidator := n.config.Validators.GetValidator(subnetID, nodeID)
 		// check if the peer is allowed to connect to the subnet
-		if !allower.IsAllowed(nodeID, isValidator) {
+		if !allower.IsAllowed(nodeID, areTheyAValidator) {
 			continue
 		}
 
@@ -797,9 +797,9 @@ func (n *network) samplePeers(
 				return false
 			}
 
-			_, isValidator := n.config.Validators.GetValidator(subnetID, peerID)
+			_, areTheyAValidator := n.config.Validators.GetValidator(subnetID, peerID)
 			// check if the peer is allowed to connect to the subnet
-			if !allower.IsAllowed(peerID, isValidator) {
+			if !allower.IsAllowed(peerID, areTheyAValidator) {
 				return false
 			}
 
@@ -808,7 +808,7 @@ func (n *network) samplePeers(
 				return true
 			}
 
-			if isValidator {
+			if areTheyAValidator {
 				numValidatorsToSample--
 				return numValidatorsToSample >= 0
 			}
