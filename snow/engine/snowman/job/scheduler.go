@@ -44,7 +44,7 @@ func NewScheduler[T comparable]() *Scheduler[T] {
 // allowed.
 func (s *Scheduler[T]) Schedule(ctx context.Context, userJob Job[T], dependencies ...T) error {
 	numUnresolved := len(dependencies)
-	if len(dependencies) == 0 {
+	if numUnresolved == 0 {
 		return userJob.Execute(ctx, nil, nil)
 	}
 
