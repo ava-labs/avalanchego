@@ -170,7 +170,7 @@ func TestEngineDropsAttemptToIssueBlockAfterFailedRequest(t *testing.T) {
 	// job blocked on [parent]'s issuance.
 	require.NoError(engine.Put(context.Background(), peerID, 0, child.Bytes()))
 	require.NotNil(request)
-	require.Len(engine.blocked, 1)
+	require.Equal(1, engine.blocked.Len())
 
 	vm.ParseBlockF = func(context.Context, []byte) (snowman.Block, error) {
 		return nil, errUnknownBytes
@@ -179,7 +179,7 @@ func TestEngineDropsAttemptToIssueBlockAfterFailedRequest(t *testing.T) {
 	// Because this request doesn't provide [parent], the [child] job should be
 	// cancelled.
 	require.NoError(engine.Put(context.Background(), request.NodeID, request.RequestID, nil))
-	require.Empty(engine.blocked)
+	require.Zero(engine.blocked.Len())
 }
 
 func TestEngineQuery(t *testing.T) {
@@ -315,7 +315,7 @@ func TestEngineQuery(t *testing.T) {
 	require.NoError(engine.Put(context.Background(), getRequest.NodeID, getRequest.RequestID, child.Bytes()))
 	require.Equal(choices.Accepted, parent.Status())
 	require.Equal(choices.Accepted, child.Status())
-	require.Empty(engine.blocked)
+	require.Zero(engine.blocked.Len())
 }
 
 func TestEngineMultipleQuery(t *testing.T) {
@@ -461,7 +461,7 @@ func TestEngineMultipleQuery(t *testing.T) {
 	require.NoError(te.Chits(context.Background(), vdr2, *queryRequestID, blk0.ID(), blk0.ID(), blk0.ID()))
 
 	require.Equal(choices.Accepted, blk1.Status())
-	require.Empty(te.blocked)
+	require.Zero(te.blocked.Len())
 }
 
 func TestEngineBlockedIssue(t *testing.T) {
@@ -879,12 +879,12 @@ func TestEngineAbandonChit(t *testing.T) {
 
 	// Register a voter dependency on an unknown block.
 	require.NoError(te.Chits(context.Background(), vdr, reqID, fakeBlkID, fakeBlkID, fakeBlkID))
-	require.Len(te.blocked, 1)
+	require.Equal(1, te.blocked.Len())
 
 	sender.CantSendPullQuery = false
 
 	require.NoError(te.GetFailed(context.Background(), vdr, reqID))
-	require.Empty(te.blocked)
+	require.Zero(te.blocked.Len())
 }
 
 func TestEngineAbandonChitWithUnexpectedPutBlock(t *testing.T) {
@@ -932,7 +932,7 @@ func TestEngineAbandonChitWithUnexpectedPutBlock(t *testing.T) {
 
 	// Register a voter dependency on an unknown block.
 	require.NoError(te.Chits(context.Background(), vdr, reqID, fakeBlkID, fakeBlkID, fakeBlkID))
-	require.Len(te.blocked, 1)
+	require.Equal(1, te.blocked.Len())
 
 	sender.CantSendPullQuery = false
 
@@ -944,7 +944,7 @@ func TestEngineAbandonChitWithUnexpectedPutBlock(t *testing.T) {
 	// Respond with an unexpected block and verify that the request is correctly
 	// cleared.
 	require.NoError(te.Put(context.Background(), vdr, reqID, snowmantest.GenesisBytes))
-	require.Empty(te.blocked)
+	require.Zero(te.blocked.Len())
 }
 
 func TestEngineBlockingChitRequest(t *testing.T) {
@@ -988,7 +988,7 @@ func TestEngineBlockingChitRequest(t *testing.T) {
 
 	require.NoError(te.PushQuery(context.Background(), vdr, 0, blockingBlk.Bytes(), 0))
 
-	require.Len(te.blocked, 2)
+	require.Equal(2, te.blocked.Len())
 
 	sender.CantSendPullQuery = false
 
@@ -1000,7 +1000,7 @@ func TestEngineBlockingChitRequest(t *testing.T) {
 		te.metrics.issued.WithLabelValues(unknownSource),
 	))
 
-	require.Empty(te.blocked)
+	require.Zero(te.blocked.Len())
 }
 
 func TestEngineBlockingChitResponse(t *testing.T) {
@@ -1098,7 +1098,7 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 		missingBlk.ID(),
 		blockingBlk.ID(),
 	))
-	require.Len(te.blocked, 2)
+	require.Equal(2, te.blocked.Len())
 
 	queryRequest = nil
 	sender.SendPullQueryF = func(_ context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, blkID ids.ID, requestedHeight uint64) {

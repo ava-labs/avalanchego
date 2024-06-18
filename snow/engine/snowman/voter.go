@@ -9,39 +9,21 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/event"
 	"github.com/ava-labs/avalanchego/utils/bag"
-	"github.com/ava-labs/avalanchego/utils/set"
 )
+
+var _ event.Job = (*voter)(nil)
 
 // Voter records chits received from [vdr] once its dependencies are met.
 type voter struct {
 	t               *Transitive
-	vdr             ids.NodeID
+	nodeID          ids.NodeID
 	requestID       uint32
 	responseOptions []ids.ID
-	deps            set.Set[ids.ID]
 }
 
-func (v *voter) Dependencies() set.Set[ids.ID] {
-	return v.deps
-}
-
-// Mark that a dependency has been met.
-func (v *voter) Fulfill(ctx context.Context, id ids.ID) {
-	v.deps.Remove(id)
-	v.Update(ctx)
-}
-
-// Abandon this attempt to record chits.
-func (v *voter) Abandon(ctx context.Context, id ids.ID) {
-	v.Fulfill(ctx, id)
-}
-
-func (v *voter) Update(ctx context.Context) {
-	if v.deps.Len() != 0 || v.t.errs.Errored() {
-		return
-	}
-
+func (v *voter) Execute(ctx context.Context) error {
 	var (
 		vote       ids.ID
 		shouldVote bool
@@ -60,13 +42,13 @@ func (v *voter) Update(ctx context.Context) {
 	var results []bag.Bag[ids.ID]
 	if shouldVote {
 		v.t.selectedVoteIndex.Observe(float64(voteIndex))
-		results = v.t.polls.Vote(v.requestID, v.vdr, vote)
+		results = v.t.polls.Vote(v.requestID, v.nodeID, vote)
 	} else {
-		results = v.t.polls.Drop(v.requestID, v.vdr)
+		results = v.t.polls.Drop(v.requestID, v.nodeID)
 	}
 
 	if len(results) == 0 {
-		return
+		return nil
 	}
 
 	for _, result := range results {
@@ -75,24 +57,24 @@ func (v *voter) Update(ctx context.Context) {
 			zap.Stringer("result", &result),
 		)
 		if err := v.t.Consensus.RecordPoll(ctx, result); err != nil {
-			v.t.errs.Add(err)
+			return err
 		}
 	}
 
-	if v.t.errs.Errored() {
-		return
-	}
-
 	if err := v.t.VM.SetPreference(ctx, v.t.Consensus.Preference()); err != nil {
-		v.t.errs.Add(err)
-		return
+		return err
 	}
 
 	if v.t.Consensus.NumProcessing() == 0 {
 		v.t.Ctx.Log.Debug("Snowman engine can quiesce")
-		return
+		return nil
 	}
 
 	v.t.Ctx.Log.Debug("Snowman engine can't quiesce")
 	v.t.repoll(ctx)
+	return nil
+}
+
+func (v *voter) Cancel(ctx context.Context) error {
+	return v.Execute(ctx)
 }
