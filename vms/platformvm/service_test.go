@@ -82,28 +82,26 @@ func testReplayFeeCalculator(cfg *config.Config, parentBlkTime time.Time, state 
 	var (
 		childBlkTime = state.GetTimestamp()
 		isEActive    = cfg.UpgradeConfig.IsEActivated(childBlkTime)
-
-		feeCalculator *fee.Calculator
 	)
 
 	if !isEActive {
-		feeCalculator = fee.NewStaticCalculator(cfg.StaticFeeConfig, cfg.UpgradeConfig, childBlkTime)
-	} else {
-		feesCfg, err := fee.GetDynamicConfig(isEActive)
-		if err != nil {
-			return nil, fmt.Errorf("failed retrieving dynamic fees config: %w", err)
-		}
-		currentGasCap, err := state.GetCurrentGasCap()
-		if err != nil {
-			return nil, fmt.Errorf("failed retrieving gas cap: %w", err)
-		}
-
-		elapsedTime := childBlkTime.Unix() - parentBlkTime.Unix()
-		maxGas := commonfees.MaxGas(feesCfg, currentGasCap, uint64(elapsedTime))
-		feesMan := commonfees.NewManager(feesCfg.GasPrice)
-		feeCalculator = fee.NewDynamicCalculator(feesMan, maxGas)
+		return fee.NewStaticCalculator(cfg.StaticFeeConfig, cfg.UpgradeConfig, childBlkTime), nil
 	}
-	return feeCalculator, nil
+
+	feesCfg, err := fee.GetDynamicConfig(isEActive)
+	if err != nil {
+		return nil, fmt.Errorf("failed retrieving dynamic fees config: %w", err)
+	}
+	currentGasCap, err := state.GetCurrentGasCap()
+	if err != nil {
+		return nil, fmt.Errorf("failed retrieving current gas cap: %w", err)
+	}
+	gasCap, err := commonfees.GasCap(feesCfg, currentGasCap, parentBlkTime, childBlkTime)
+	if err != nil {
+		return nil, fmt.Errorf("failed updating gas cap: %w", err)
+	}
+	feesMan := commonfees.NewManager(feesCfg.GasPrice)
+	return fee.NewDynamicCalculator(feesMan, gasCap), nil
 }
 
 func defaultService(t *testing.T) (*Service, *mutableSharedMemory, *txstest.WalletFactory) {

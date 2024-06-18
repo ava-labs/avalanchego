@@ -4,8 +4,6 @@
 package fees
 
 import (
-	"errors"
-
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
@@ -15,26 +13,13 @@ const (
 	UTXOWrite Dimension = 2 // includes delete
 	Compute   Dimension = 3 // signatures checks, tx-specific
 
-	bandwidthString  string = "Bandwidth"
-	utxosReadString  string = "UTXOsRead"
-	utxosWriteString string = "UTXOsWrite"
-	computeString    string = "Compute"
-
 	FeeDimensions = 4
 )
 
 var (
-	errUnknownDimension = errors.New("unknown dimension")
-
-	ZeroGas = Gas(0)
-	Empty   = Dimensions{}
-
-	DimensionStrings = []string{
-		bandwidthString,
-		utxosReadString,
-		utxosWriteString,
-		computeString,
-	}
+	ZeroGas      = Gas(0)
+	ZeroGasPrice = GasPrice(0)
+	Empty        = Dimensions{}
 )
 
 type (
@@ -44,14 +29,6 @@ type (
 	Dimension  int
 	Dimensions [FeeDimensions]uint64
 )
-
-func (d Dimension) String() (string, error) {
-	if d < 0 || d >= FeeDimensions {
-		return "", errUnknownDimension
-	}
-
-	return DimensionStrings[d], nil
-}
 
 func Add(lhs, rhs Dimensions) (Dimensions, error) {
 	var res Dimensions

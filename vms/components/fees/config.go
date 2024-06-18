@@ -3,7 +3,11 @@
 
 package fees
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+	"time"
+)
 
 var errZeroLeakGasCoeff = errors.New("zero leak gas coefficient")
 
@@ -26,11 +30,24 @@ func (c *DynamicFeesConfig) Validate() error {
 }
 
 // We cap the maximum gas consumed by time with a leaky bucket approach
-// MaxGas = min (MaxGas + MaxGasPerSecond/LeakGasCoeff*ElapsedTime, MaxGasPerSecond)
-func MaxGas(cfg DynamicFeesConfig, currentGasCapacity Gas, elapsedTime uint64) Gas {
-	if elapsedTime > uint64(cfg.LeakGasCoeff) {
-		return cfg.MaxGasPerSecond
+// GasCap = min (GasCap + MaxGasPerSecond/LeakGasCoeff*ElapsedTime, MaxGasPerSecond)
+func GasCap(cfg DynamicFeesConfig, currentGasCapacity Gas, parentBlkTime, childBlkTime time.Time) (Gas, error) {
+	if !childBlkTime.After(parentBlkTime) {
+		return ZeroGas, fmt.Errorf("unexpected block times, parentBlkTim %v, childBlkTime %v", parentBlkTime, childBlkTime)
 	}
 
-	return min(cfg.MaxGasPerSecond, currentGasCapacity+cfg.MaxGasPerSecond*Gas(elapsedTime)/cfg.LeakGasCoeff)
+	elapsedTime := uint64(childBlkTime.Unix() - parentBlkTime.Unix())
+	if elapsedTime > uint64(cfg.LeakGasCoeff) {
+		return cfg.MaxGasPerSecond, nil
+	}
+
+	return min(cfg.MaxGasPerSecond, currentGasCapacity+cfg.MaxGasPerSecond*Gas(elapsedTime)/cfg.LeakGasCoeff), nil
+}
+
+func UpdateGasCap(currentGasCap, blkGas Gas) Gas {
+	nextGasCap := Gas(0)
+	if currentGasCap > blkGas {
+		nextGasCap = currentGasCap - blkGas
+	}
+	return nextGasCap
 }

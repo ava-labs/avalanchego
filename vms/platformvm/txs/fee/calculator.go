@@ -83,7 +83,7 @@ func (c *Calculator) RemoveFeesFor(unitsToRm fees.Dimensions) (uint64, error) {
 
 func (c *Calculator) GetGas() fees.Gas {
 	if c.c.feeManager != nil {
-		return c.c.feeManager.GetGas()
+		return c.c.feeManager.GetBlockGas()
 	}
 	return 0
 }
@@ -404,7 +404,7 @@ func (c *calculator) addFeesFor(complexity fees.Dimensions) (uint64, error) {
 		return 0, fmt.Errorf("failed adding fees: %w", err)
 	}
 
-	if err := c.feeManager.CumulateComplexity(txGas, c.maxGas); err != nil {
+	if err := c.feeManager.CumulateGas(txGas, c.maxGas); err != nil {
 		return 0, fmt.Errorf("failed cumulating complexity: %w", err)
 	}
 	fee, err := c.feeManager.CalculateFee(txGas)
@@ -430,7 +430,7 @@ func (c *calculator) removeFeesFor(unitsToRm fees.Dimensions) (uint64, error) {
 		return 0, fmt.Errorf("failed adding fees: %w", err)
 	}
 
-	if err := c.feeManager.RemoveComplexity(txGas); err != nil {
+	if err := c.feeManager.RemoveGas(txGas); err != nil {
 		return 0, fmt.Errorf("failed removing units: %w", err)
 	}
 	fee, err := c.feeManager.CalculateFee(txGas)
