@@ -48,7 +48,7 @@ func newSchedulerWithJob[T comparable](
 	abandoned []T,
 ) *Scheduler[T] {
 	q := NewScheduler[T]()
-	require.NoError(t, q.Register(context.Background(), job, dependencies...))
+	require.NoError(t, q.Schedule(context.Background(), job, dependencies...))
 	for _, d := range fulfilled {
 		require.NoError(t, q.Fulfill(context.Background(), d))
 	}
@@ -58,7 +58,7 @@ func newSchedulerWithJob[T comparable](
 	return q
 }
 
-func TestScheduler_Register(t *testing.T) {
+func TestScheduler_Schedule(t *testing.T) {
 	userJob := &testJob{}
 	tests := []struct {
 		name                string
@@ -155,7 +155,7 @@ func TestScheduler_Register(t *testing.T) {
 			// Reset the variable between tests
 			userJob.reset()
 
-			require.NoError(test.scheduler.Register(context.Background(), userJob, test.dependencies...))
+			require.NoError(test.scheduler.Schedule(context.Background(), userJob, test.dependencies...))
 			require.Equal(test.wantNumDependencies, test.scheduler.NumDependencies())
 			require.Equal(test.wantExecuted, userJob.calledExecute)
 			require.Empty(userJob.fulfilled)

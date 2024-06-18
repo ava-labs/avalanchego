@@ -406,7 +406,7 @@ func (t *Transitive) Chits(ctx context.Context, nodeID ids.NodeID, requestID uin
 		deps = append(deps, preferredIDAtHeight)
 	}
 
-	if err := t.blocked.Register(ctx, v, deps...); err != nil {
+	if err := t.blocked.Schedule(ctx, v, deps...); err != nil {
 		return err
 	}
 	return t.executeDeferredWork(ctx)
@@ -423,7 +423,7 @@ func (t *Transitive) QueryFailed(ctx context.Context, nodeID ids.NodeID, request
 		nodeID:    nodeID,
 		requestID: requestID,
 	}
-	if err := t.blocked.Register(ctx, v); err != nil {
+	if err := t.blocked.Schedule(ctx, v); err != nil {
 		return err
 	}
 	return t.executeDeferredWork(ctx)
@@ -858,7 +858,7 @@ func (t *Transitive) issue(
 		deps = append(deps, parentID)
 	}
 
-	return t.blocked.Register(ctx, i, deps...)
+	return t.blocked.Schedule(ctx, i, deps...)
 }
 
 // Request that [vdr] send us block [blkID]

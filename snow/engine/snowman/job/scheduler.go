@@ -37,14 +37,14 @@ func NewScheduler[T comparable]() *Scheduler[T] {
 	}
 }
 
-// Register a job to be executed once all of its dependencies are resolved.
+// Schedule a job to be executed once all of its dependencies are resolved.
 //
 // In order to prevent a memory leak, all dependencies must eventually either be
 // fulfilled or abandoned.
 //
 // While registering a job with duplicate dependencies is discouraged, it is
 // allowed.
-func (s *Scheduler[T]) Register(ctx context.Context, userJob Job[T], dependencies ...T) error {
+func (s *Scheduler[T]) Schedule(ctx context.Context, userJob Job[T], dependencies ...T) error {
 	numUnresolved := len(dependencies)
 	if len(dependencies) == 0 {
 		return userJob.Execute(ctx, nil, nil)
