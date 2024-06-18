@@ -2857,6 +2857,137 @@ func TestEngineVoteStallRegression(t *testing.T) {
 	require.Equal(choices.Rejected, rejectedChain[0].Status())
 }
 
+// When a voter is registered with multiple dependencies, the engine must not
+// execute the voter until all of the dependencies have been resolved; even if
+// one of the dependencies has been abandoned.
+func TestEngineEarlyTerminateVoterRegression(t *testing.T) {
+	require := require.New(t)
+
+	config := DefaultConfig(t)
+	nodeID := ids.GenerateTestNodeID()
+	require.NoError(config.Validators.AddStaker(config.Ctx.SubnetID, nodeID, nil, ids.Empty, 1))
+
+	sender := &common.SenderTest{
+		T:          t,
+		SendChitsF: func(context.Context, ids.NodeID, uint32, ids.ID, ids.ID, ids.ID) {},
+	}
+	sender.Default(true)
+	config.Sender = sender
+
+	chain := snowmantest.BuildDescendants(snowmantest.Genesis, 3)
+	vm := &block.TestVM{
+		TestVM: common.TestVM{
+			T: t,
+			InitializeF: func(
+				context.Context,
+				*snow.Context,
+				database.Database,
+				[]byte,
+				[]byte,
+				[]byte,
+				chan<- common.Message,
+				[]*common.Fx,
+				common.AppSender,
+			) error {
+				return nil
+			},
+			SetStateF: func(context.Context, snow.State) error {
+				return nil
+			},
+		},
+		ParseBlockF: MakeParseBlockF(
+			[]*snowmantest.Block{snowmantest.Genesis},
+			chain,
+		),
+		GetBlockF: MakeGetBlockF(
+			[]*snowmantest.Block{snowmantest.Genesis},
+		),
+		SetPreferenceF: func(context.Context, ids.ID) error {
+			return nil
+		},
+		LastAcceptedF: MakeLastAcceptedBlockF(
+			snowmantest.Genesis,
+			chain,
+		),
+	}
+	vm.Default(true)
+	config.VM = vm
+
+	engine, err := New(config)
+	require.NoError(err)
+	require.NoError(engine.Start(context.Background(), 0))
+
+	var pollRequestIDs []uint32
+	sender.SendPullQueryF = func(_ context.Context, polledNodeIDs set.Set[ids.NodeID], requestID uint32, _ ids.ID, _ uint64) {
+		require.Equal(set.Of(nodeID), polledNodeIDs)
+		pollRequestIDs = append(pollRequestIDs, requestID)
+	}
+
+	getRequestIDs := make(map[ids.ID]uint32)
+	sender.SendGetF = func(_ context.Context, requestedNodeID ids.NodeID, requestID uint32, blkID ids.ID) {
+		require.Equal(nodeID, requestedNodeID)
+		getRequestIDs[blkID] = requestID
+	}
+
+	// Issue block 0 to trigger poll 0.
+	require.NoError(engine.PushQuery(
+		context.Background(),
+		nodeID,
+		0,
+		chain[0].Bytes(),
+		0,
+	))
+	require.Len(pollRequestIDs, 1)
+	require.Empty(getRequestIDs)
+
+	// Update GetBlock to return, the newly issued, block 0. This is needed to
+	// enable the issuance of block 1.
+	vm.GetBlockF = MakeGetBlockF(
+		[]*snowmantest.Block{snowmantest.Genesis},
+		chain[:1],
+	)
+
+	// Vote for block 2 or block 1 in poll 0. This should trigger Get requests
+	// for both block 2 and block 1.
+	require.NoError(engine.Chits(
+		context.Background(),
+		nodeID,
+		pollRequestIDs[0],
+		chain[2].ID(),
+		chain[1].ID(),
+		snowmantest.GenesisID,
+	))
+	require.Len(pollRequestIDs, 1)
+	require.Contains(getRequestIDs, chain[1].ID())
+	require.Contains(getRequestIDs, chain[2].ID())
+
+	// Mark the request for block 2 as failed. This should not cause the poll to
+	// be applied as there is still an outstanding request for block 1.
+	require.NoError(engine.GetFailed(
+		context.Background(),
+		nodeID,
+		getRequestIDs[chain[2].ID()],
+	))
+	require.Len(pollRequestIDs, 1)
+
+	// Issue block 1. This should cause the poll to be applied to both block 0
+	// and block 1.
+	require.NoError(engine.Put(
+		context.Background(),
+		nodeID,
+		getRequestIDs[chain[1].ID()],
+		chain[1].Bytes(),
+	))
+	// Because Put added a new preferred block to the chain, a new poll will be
+	// created.
+	require.Len(pollRequestIDs, 2)
+	require.Equal(choices.Accepted, chain[0].Status())
+	require.Equal(choices.Accepted, chain[1].Status())
+	// Block 2 still hasn't been issued, so it's status should remain
+	// Processing.
+	require.Equal(choices.Processing, chain[2].Status())
+}
+
 func TestGetProcessingAncestor(t *testing.T) {
 	var (
 		ctx = snowtest.ConsensusContext(
