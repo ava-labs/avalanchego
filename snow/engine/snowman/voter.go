@@ -13,7 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/bag"
 )
 
-var _ job.Job = (*voter)(nil)
+var _ job.Job[ids.ID] = (*voter)(nil)
 
 // Voter records chits received from [nodeID] once its dependencies are met.
 type voter struct {
@@ -23,7 +23,11 @@ type voter struct {
 	responseOptions []ids.ID
 }
 
-func (v *voter) Execute(ctx context.Context) error {
+// The resolution results from the dependencies of the voter aren't explicitly
+// used. The responseOptions are used to determine which block to apply the vote
+// to. The dependencies are only used to optimistically delay the application of
+// the vote until the blocks have been issued.
+func (v *voter) Execute(ctx context.Context, _ []ids.ID, _ []ids.ID) error {
 	var (
 		vote       ids.ID
 		shouldVote bool
@@ -73,8 +77,4 @@ func (v *voter) Execute(ctx context.Context) error {
 	v.t.Ctx.Log.Debug("Snowman engine can't quiesce")
 	v.t.repoll(ctx)
 	return nil
-}
-
-func (v *voter) Cancel(ctx context.Context) error {
-	return v.Execute(ctx)
 }
