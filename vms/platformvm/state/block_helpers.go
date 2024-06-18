@@ -100,7 +100,7 @@ func PickFeeCalculator(cfg *config.Config, state Chain, parentBlkTime time.Time)
 		return nil, fmt.Errorf("failed retrieving gas cap: %w", err)
 	}
 
-	gasCap, err := commonfees.MaxGas(feesCfg, currentGasCap, parentBlkTime, childBlkTime)
+	gasCap, err := commonfees.GasCap(feesCfg, currentGasCap, parentBlkTime, childBlkTime)
 	if err != nil {
 		return nil, fmt.Errorf("failed retrieving gas cap: %w", err)
 	}

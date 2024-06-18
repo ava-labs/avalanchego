@@ -101,7 +101,7 @@ func testReplayFeeCalculator(cfg *config.Config, parentBlkTime time.Time, state 
 		return nil, fmt.Errorf("failed retrieving excess complexity: %w", err)
 	}
 
-	gasCap, err := commonfees.MaxGas(feesCfg, currentGasCap, parentBlkTime, childBlkTime)
+	gasCap, err := commonfees.GasCap(feesCfg, currentGasCap, parentBlkTime, childBlkTime)
 	if err != nil {
 		return nil, fmt.Errorf("failed retrieving gas cap: %w", err)
 	}
