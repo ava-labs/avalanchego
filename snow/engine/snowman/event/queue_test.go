@@ -13,6 +13,11 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
+const (
+	depToResolve = iota
+	depToNeglect
+)
+
 var (
 	errDuplicateInvocation  = errors.New("job already handled")
 	errUnexpectedInvocation = errors.New("job handled unexpectedly")
@@ -35,7 +40,7 @@ func newQueueWithJob[T comparable](t *testing.T, job Job, shouldCancel bool, dep
 	q := NewQueue[T]()
 	require.NoError(t, q.Register(context.Background(), job, dependencies...))
 	if shouldCancel {
-		for _, jobs := range q.jobs {
+		for _, jobs := range q.dependents {
 			for _, j := range jobs {
 				j.shouldCancel = true
 			}
@@ -60,32 +65,32 @@ func TestQueue_Register(t *testing.T) {
 	}
 
 	tests := []struct {
-		name          string
-		queue         *Queue[int]
-		dependencies  []int
-		shouldExecute bool
-		expectedLen   int
-		expectedQueue *Queue[int]
+		name         string
+		queue        *Queue[int]
+		dependencies []int
+		wantExecuted bool
+		wantLen      int
+		wantQueue    *Queue[int]
 	}{
 		{
-			name:          "no dependencies",
-			queue:         NewQueue[int](),
-			dependencies:  nil,
-			shouldExecute: true,
-			expectedLen:   0,
-			expectedQueue: NewQueue[int](),
+			name:         "no dependencies",
+			queue:        NewQueue[int](),
+			dependencies: nil,
+			wantExecuted: true,
+			wantLen:      0,
+			wantQueue:    NewQueue[int](),
 		},
 		{
-			name:          "one dependency",
-			queue:         NewQueue[int](),
-			dependencies:  []int{1},
-			shouldExecute: false,
-			expectedLen:   1,
-			expectedQueue: &Queue[int]{
-				jobs: map[int][]*job[int]{
-					1: {
+			name:         "one dependency",
+			queue:        NewQueue[int](),
+			dependencies: []int{depToResolve},
+			wantExecuted: false,
+			wantLen:      1,
+			wantQueue: &Queue[int]{
+				dependents: map[int][]*job[int]{
+					depToResolve: {
 						{
-							dependencies: set.Of(1),
+							dependencies: set.Of(depToResolve),
 							job:          userJob,
 						},
 					},
@@ -93,22 +98,22 @@ func TestQueue_Register(t *testing.T) {
 			},
 		},
 		{
-			name:          "two dependencies",
-			queue:         NewQueue[int](),
-			dependencies:  []int{1, 2},
-			shouldExecute: false,
-			expectedLen:   2,
-			expectedQueue: &Queue[int]{
-				jobs: map[int][]*job[int]{
-					1: {
+			name:         "two dependencies",
+			queue:        NewQueue[int](),
+			dependencies: []int{depToResolve, depToNeglect},
+			wantExecuted: false,
+			wantLen:      2,
+			wantQueue: &Queue[int]{
+				dependents: map[int][]*job[int]{
+					depToResolve: {
 						{
-							dependencies: set.Of(1, 2),
+							dependencies: set.Of(depToResolve, depToNeglect),
 							job:          userJob,
 						},
 					},
-					2: {
+					depToNeglect: {
 						{
-							dependencies: set.Of(1, 2),
+							dependencies: set.Of(depToResolve, depToNeglect),
 							job:          userJob,
 						},
 					},
@@ -116,29 +121,20 @@ func TestQueue_Register(t *testing.T) {
 			},
 		},
 		{
-			name: "additional dependency",
-			queue: &Queue[int]{
-				jobs: map[int][]*job[int]{
-					1: {
+			name:         "additional dependency",
+			queue:        newQueueWithJob(t, userJob, false, depToResolve),
+			dependencies: []int{depToResolve},
+			wantExecuted: false,
+			wantLen:      1,
+			wantQueue: &Queue[int]{
+				dependents: map[int][]*job[int]{
+					depToResolve: {
 						{
-							dependencies: set.Of(1),
-							job:          userJob,
-						},
-					},
-				},
-			},
-			dependencies:  []int{1},
-			shouldExecute: false,
-			expectedLen:   1,
-			expectedQueue: &Queue[int]{
-				jobs: map[int][]*job[int]{
-					1: {
-						{
-							dependencies: set.Of(1),
+							dependencies: set.Of(depToResolve),
 							job:          userJob,
 						},
 						{
-							dependencies: set.Of(1),
+							dependencies: set.Of(depToResolve),
 							job:          userJob,
 						},
 					},
@@ -154,9 +150,9 @@ func TestQueue_Register(t *testing.T) {
 			calledExecute = false
 
 			require.NoError(test.queue.Register(context.Background(), userJob, test.dependencies...))
-			require.Equal(test.expectedLen, test.queue.NumDependencies())
-			require.Equal(test.shouldExecute, calledExecute)
-			require.Equal(test.expectedQueue, test.queue)
+			require.Equal(test.wantLen, test.queue.NumDependencies())
+			require.Equal(test.wantExecuted, calledExecute)
+			require.Equal(test.wantQueue, test.queue)
 		})
 	}
 }
@@ -177,40 +173,40 @@ func TestQueue_Fulfill(t *testing.T) {
 	}
 
 	tests := []struct {
-		name          string
-		queue         *Queue[int]
-		shouldExecute bool
-		expectedQueue *Queue[int]
+		name        string
+		queue       *Queue[int]
+		wantExecute bool
+		wantQueue   *Queue[int]
 	}{
 		{
-			name:          "no jobs",
-			queue:         NewQueue[int](),
-			shouldExecute: false,
-			expectedQueue: NewQueue[int](),
+			name:        "no jobs",
+			queue:       NewQueue[int](),
+			wantExecute: false,
+			wantQueue:   NewQueue[int](),
 		},
 		{
-			name:          "single dependency",
-			queue:         newQueueWithJob(t, userJob, false, 1),
-			shouldExecute: true,
-			expectedQueue: NewQueue[int](),
+			name:        "single dependency",
+			queue:       newQueueWithJob(t, userJob, false, depToResolve),
+			wantExecute: true,
+			wantQueue:   NewQueue[int](),
 		},
 		{
-			name:          "non-existent dependency",
-			queue:         newQueueWithJob(t, userJob, false, 2),
-			shouldExecute: false,
-			expectedQueue: newQueueWithJob(t, userJob, false, 2),
+			name:        "non-existent dependency",
+			queue:       newQueueWithJob(t, userJob, false, depToNeglect),
+			wantExecute: false,
+			wantQueue:   newQueueWithJob(t, userJob, false, depToNeglect),
 		},
 		{
-			name:          "incomplete dependencies",
-			queue:         newQueueWithJob(t, userJob, false, 1, 2),
-			shouldExecute: false,
-			expectedQueue: newQueueWithJob(t, userJob, false, 2),
+			name:        "incomplete dependencies",
+			queue:       newQueueWithJob(t, userJob, false, depToResolve, depToNeglect),
+			wantExecute: false,
+			wantQueue:   newQueueWithJob(t, userJob, false, depToNeglect),
 		},
 		{
-			name:          "duplicate dependency",
-			queue:         newQueueWithJob(t, userJob, false, 1, 1),
-			shouldExecute: true,
-			expectedQueue: NewQueue[int](),
+			name:        "duplicate dependency",
+			queue:       newQueueWithJob(t, userJob, false, depToResolve, depToResolve),
+			wantExecute: true,
+			wantQueue:   NewQueue[int](),
 		},
 	}
 	for _, test := range tests {
@@ -220,9 +216,9 @@ func TestQueue_Fulfill(t *testing.T) {
 			// Reset the variable between tests
 			calledExecute = false
 
-			require.NoError(test.queue.Fulfill(context.Background(), 1))
-			require.Equal(test.shouldExecute, calledExecute)
-			require.Equal(test.expectedQueue, test.queue)
+			require.NoError(test.queue.Fulfill(context.Background(), depToResolve))
+			require.Equal(test.wantExecute, calledExecute)
+			require.Equal(test.wantQueue, test.queue)
 		})
 	}
 }
@@ -245,38 +241,38 @@ func TestQueue_Abandon(t *testing.T) {
 	tests := []struct {
 		name          string
 		queue         *Queue[int]
-		shouldCancel  bool
-		expectedQueue *Queue[int]
+		wantCancelled bool
+		wantQueue     *Queue[int]
 	}{
 		{
 			name:          "no jobs",
 			queue:         NewQueue[int](),
-			shouldCancel:  false,
-			expectedQueue: NewQueue[int](),
+			wantCancelled: false,
+			wantQueue:     NewQueue[int](),
 		},
 		{
 			name:          "single dependency",
-			queue:         newQueueWithJob(t, userJob, false, 1),
-			shouldCancel:  true,
-			expectedQueue: NewQueue[int](),
+			queue:         newQueueWithJob(t, userJob, false, depToResolve),
+			wantCancelled: true,
+			wantQueue:     NewQueue[int](),
 		},
 		{
 			name:          "non-existent dependency",
-			queue:         newQueueWithJob(t, userJob, false, 2),
-			shouldCancel:  false,
-			expectedQueue: newQueueWithJob(t, userJob, false, 2),
+			queue:         newQueueWithJob(t, userJob, false, depToNeglect),
+			wantCancelled: false,
+			wantQueue:     newQueueWithJob(t, userJob, false, depToNeglect),
 		},
 		{
 			name:          "incomplete dependencies",
-			queue:         newQueueWithJob(t, userJob, false, 1, 2),
-			shouldCancel:  false,
-			expectedQueue: newQueueWithJob(t, userJob, true, 2),
+			queue:         newQueueWithJob(t, userJob, false, depToResolve, depToNeglect),
+			wantCancelled: false,
+			wantQueue:     newQueueWithJob(t, userJob, true, depToNeglect),
 		},
 		{
 			name:          "duplicate dependency",
-			queue:         newQueueWithJob(t, userJob, false, 1, 1),
-			shouldCancel:  true,
-			expectedQueue: NewQueue[int](),
+			queue:         newQueueWithJob(t, userJob, false, depToResolve, depToResolve),
+			wantCancelled: true,
+			wantQueue:     NewQueue[int](),
 		},
 	}
 	for _, test := range tests {
@@ -286,9 +282,9 @@ func TestQueue_Abandon(t *testing.T) {
 			// Reset the variable between tests
 			calledCancel = false
 
-			require.NoError(test.queue.Abandon(context.Background(), 1))
-			require.Equal(test.shouldCancel, calledCancel)
-			require.Equal(test.expectedQueue, test.queue)
+			require.NoError(test.queue.Abandon(context.Background(), depToResolve))
+			require.Equal(test.wantCancelled, calledCancel)
+			require.Equal(test.wantQueue, test.queue)
 		})
 	}
 }

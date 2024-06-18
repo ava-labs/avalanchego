@@ -15,7 +15,7 @@ import (
 
 var _ event.Job = (*voter)(nil)
 
-// Voter records chits received from [vdr] once its dependencies are met.
+// Voter records chits received from [nodeID] once its dependencies are met.
 type voter struct {
 	t               *Transitive
 	nodeID          ids.NodeID

@@ -24,13 +24,13 @@ type job[T comparable] struct {
 }
 
 type Queue[T comparable] struct {
-	// jobs maps a dependency to the jobs that depend on it.
-	jobs map[T][]*job[T]
+	// dependents maps a dependency to the jobs that depend on it.
+	dependents map[T][]*job[T]
 }
 
 func NewQueue[T comparable]() *Queue[T] {
 	return &Queue[T]{
-		jobs: make(map[T][]*job[T]),
+		dependents: make(map[T][]*job[T]),
 	}
 }
 
@@ -50,8 +50,8 @@ func (q *Queue[T]) Register(ctx context.Context, userJob Job, dependencies ...T)
 		dependencies: set.Of(dependencies...),
 		job:          userJob,
 	}
-	for _, dependency := range dependencies {
-		q.jobs[dependency] = append(q.jobs[dependency], j)
+	for _, d := range dependencies {
+		q.dependents[d] = append(q.dependents[d], j)
 	}
 	return nil
 }
@@ -59,7 +59,7 @@ func (q *Queue[T]) Register(ctx context.Context, userJob Job, dependencies ...T)
 // NumDependencies returns the number of dependencies that jobs are currently
 // blocking on.
 func (q *Queue[_]) NumDependencies() int {
-	return len(q.jobs)
+	return len(q.dependents)
 }
 
 // Fulfill a dependency. If all dependencies for a job are fulfilled, the job
@@ -84,8 +84,8 @@ func (q *Queue[T]) resolveDependency(
 	dependency T,
 	shouldCancel bool,
 ) error {
-	jobs := q.jobs[dependency]
-	delete(q.jobs, dependency)
+	jobs := q.dependents[dependency]
+	delete(q.dependents, dependency)
 
 	for _, job := range jobs {
 		// Removing the dependency keeps the queue in a consistent state.
@@ -98,7 +98,7 @@ func (q *Queue[T]) resolveDependency(
 			continue
 		}
 
-		// Mark the job as cancelled so that any reentrant calls do not interact
+		// Mark the job as handled so that any reentrant calls do not interact
 		// with this job again.
 		job.job = nil
 
