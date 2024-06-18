@@ -147,7 +147,7 @@ func TestQueue_Register(t *testing.T) {
 			calledExecute = false
 
 			require.NoError(test.queue.Register(context.Background(), userJob, test.dependencies...))
-			require.Equal(test.expectedLen, test.queue.Len())
+			require.Equal(test.expectedLen, test.queue.NumDependencies())
 			require.Equal(test.shouldExecute, calledExecute)
 			require.Equal(test.expectedQueue, test.queue)
 		})

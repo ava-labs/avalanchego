@@ -562,7 +562,7 @@ func (t *Transitive) executeDeferredWork(ctx context.Context) error {
 
 	t.metrics.numRequests.Set(float64(t.blkReqs.Len()))
 	t.metrics.numBlocked.Set(float64(len(t.pending)))
-	t.metrics.numBlockers.Set(float64(t.blocked.Len()))
+	t.metrics.numBlockers.Set(float64(t.blocked.NumDependencies()))
 	t.metrics.numNonVerifieds.Set(float64(t.nonVerifieds.Len()))
 	return nil
 }
