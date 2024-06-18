@@ -29,6 +29,11 @@ func main() {
 		os.Exit(1)
 	}
 
+	if v.GetBool(config.JSONVersionKey) {
+		fmt.Print(version.JSONString)
+		os.Exit(0)
+	}
+
 	if v.GetBool(config.VersionKey) {
 		fmt.Print(version.String)
 		os.Exit(0)
