@@ -55,7 +55,7 @@ A peer will then read the full message and attempt to parse it into either a net
 
 Upon connection to a new peer, a handshake is performed between the node attempting to establish the outbound connection to the peer and the peer receiving the inbound connection.
 
-When attempting to establish the connection, the first message that the node sends is a `Handshake` message describing configuration of the node. If the `Handshake` message is successfully received and the peer decides that it will allow a connection with this node, it replies with a `PeerList` message that contains metadata about other peers that allows a node to connect to them. See [PeerList Gossip](#peerlist-gossip).
+When attempting to establish the connection, the first message that the node sends is a `Handshake` message describing the configuration of the node. If the `Handshake` message is successfully received and the peer decides that it will allow a connection with this node, it replies with a `PeerList` message that contains metadata about other peers that allows a node to connect to them. See [PeerList Gossip](#peerlist-gossip).
 
 As an example, nodes that are attempting to connect with an incompatible version of AvalancheGo or a significantly skewed local clock are rejected.
 
