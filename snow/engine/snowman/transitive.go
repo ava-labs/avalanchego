@@ -758,7 +758,7 @@ func (t *Transitive) issueFrom(
 		delete(t.blkReqSourceMetric, req)
 	}
 
-	issued := t.Consensus.Decided(blk) || t.Consensus.Processing(blkID)
+	issued := t.isDecided(blk) || t.Consensus.Processing(blkID)
 	if issued {
 		// A dependency should never be waiting on a decided or processing
 		// block. However, if the block was marked as rejected by the VM, the
@@ -794,7 +794,7 @@ func (t *Transitive) issueWithAncestors(
 	}
 
 	// The block was issued into consensus. This is the happy path.
-	if status != choices.Unknown && (t.Consensus.Decided(blk) || t.Consensus.Processing(blkID)) {
+	if status != choices.Unknown && (t.isDecided(blk) || t.Consensus.Processing(blkID)) {
 		return true, nil
 	}
 
@@ -815,7 +815,7 @@ func (t *Transitive) issueWithAncestors(
 // If the block is queued to be added to consensus, then it was issued.
 func (t *Transitive) wasIssued(blk snowman.Block) bool {
 	blkID := blk.ID()
-	return t.Consensus.Decided(blk) || t.Consensus.Processing(blkID) || t.pendingContains(blkID)
+	return t.isDecided(blk) || t.Consensus.Processing(blkID) || t.pendingContains(blkID)
 }
 
 // Issue [blk] to consensus once its ancestors have been issued.
@@ -849,7 +849,7 @@ func (t *Transitive) issue(
 
 	// block on the parent if needed
 	parentID := blk.Parent()
-	if parent, err := t.getBlock(ctx, parentID); err != nil || !(t.Consensus.Decided(parent) || t.Consensus.Processing(parentID)) {
+	if parent, err := t.getBlock(ctx, parentID); err != nil || !(t.isDecided(parent) || t.Consensus.Processing(parentID)) {
 		t.Ctx.Log.Verbo("block waiting for parent to be issued",
 			zap.Stringer("blkID", blkID),
 			zap.Stringer("parentID", parentID),
@@ -958,7 +958,7 @@ func (t *Transitive) deliver(
 	t.removeFromPending(blk)
 
 	blkID := blk.ID()
-	if t.Consensus.Decided(blk) || t.Consensus.Processing(blkID) {
+	if t.isDecided(blk) || t.Consensus.Processing(blkID) {
 		// If [blk] is decided, then it shouldn't be added to consensus.
 		// Similarly, if [blkID] is already in the processing set, it shouldn't
 		// be added to consensus again.
@@ -1073,7 +1073,7 @@ func (t *Transitive) removeFromPending(blk snowman.Block) {
 func (t *Transitive) addToNonVerifieds(blk snowman.Block) {
 	// don't add this blk if it's decided or processing.
 	blkID := blk.ID()
-	if t.Consensus.Decided(blk) || t.Consensus.Processing(blkID) {
+	if t.isDecided(blk) || t.Consensus.Processing(blkID) {
 		return
 	}
 	parentID := blk.Parent()
@@ -1163,7 +1163,7 @@ func (t *Transitive) getProcessingAncestor(ctx context.Context, initialVote ids.
 			return ids.Empty, false
 		}
 
-		if t.Consensus.Decided(blk) {
+		if t.isDecided(blk) {
 			t.Ctx.Log.Debug("dropping vote",
 				zap.String("reason", "bubbled vote already decided"),
 				zap.Stringer("initialVoteID", initialVote),
@@ -1177,4 +1177,16 @@ func (t *Transitive) getProcessingAncestor(ctx context.Context, initialVote ids.
 
 		bubbledVote = blk.Parent()
 	}
+}
+
+// isDecided reports true if the provided block's status is Accepted, Rejected,
+// or if the block's height implies that the block is either Accepted or
+// Rejected.
+func (t *Transitive) isDecided(blk snowman.Block) bool {
+	if blk.Status().Decided() {
+		return true
+	}
+
+	_, lastAcceptedHeight := t.Consensus.LastAccepted()
+	return blk.Height() <= lastAcceptedHeight
 }

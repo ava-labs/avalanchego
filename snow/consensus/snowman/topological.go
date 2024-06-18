@@ -13,7 +13,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/utils/bag"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -180,16 +179,6 @@ func (ts *Topological) Add(blk Block) error {
 		zap.Stringer("parentID", parentID),
 	)
 	return nil
-}
-
-func (ts *Topological) Decided(blk Block) bool {
-	// If the block is decided, then it must have been previously issued.
-	if blk.Status().Decided() {
-		return true
-	}
-	// If the block is marked as fetched, we can check if it has been
-	// transitively rejected.
-	return blk.Status() == choices.Processing && blk.Height() <= ts.lastAcceptedHeight
 }
 
 func (ts *Topological) Processing(blkID ids.ID) bool {
