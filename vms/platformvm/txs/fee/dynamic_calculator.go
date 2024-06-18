@@ -6,108 +6,33 @@ package fee
 import (
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/ava-labs/avalanchego/codec"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/fee"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/upgrade"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 var (
-	_ txs.Visitor = (*calculator)(nil)
+	_ backend = (*dynamicCalculator)(nil)
 
 	errFailedFeeCalculation = errors.New("failed fee calculation")
 )
 
-func NewStaticCalculator(
-	config StaticConfig,
-	upgradeTimes upgrade.Config,
-	chainTime time.Time,
-) *Calculator {
-	return &Calculator{
-		c: &calculator{
-			upgrades:  upgradeTimes,
-			staticCfg: config,
-			time:      chainTime,
-		},
-	}
-}
-
-// NewDynamicCalculator must be used post E upgrade activation
 func NewDynamicCalculator(feeManager *fee.Manager) *Calculator {
 	return &Calculator{
-		c: &calculator{
-			isEActive:  true,
+		b: &dynamicCalculator{
 			feeManager: feeManager,
 			// credentials are set when CalculateFee is called
 		},
 	}
 }
 
-type Calculator struct {
-	c *calculator
-}
-
-func (c *Calculator) GetFee() uint64 {
-	return c.c.fee
-}
-
-func (c *Calculator) ResetFee(newFee uint64) {
-	c.c.fee = newFee
-}
-
-func (c *Calculator) ComputeFee(tx txs.UnsignedTx, creds []verify.Verifiable) (uint64, error) {
-	c.c.credentials = creds
-	c.c.fee = 0 // zero fee among different ComputeFee invocations (unlike gas which gets cumulated)
-	err := tx.Visit(c.c)
-	return c.c.fee, err
-}
-
-func (c *Calculator) AddFeesFor(complexity fee.Dimensions) (uint64, error) {
-	return c.c.addFeesFor(complexity)
-}
-
-func (c *Calculator) RemoveFeesFor(unitsToRm fee.Dimensions) (uint64, error) {
-	return c.c.removeFeesFor(unitsToRm)
-}
-
-func (c *Calculator) GetGasPrice() fee.GasPrice {
-	if c.c.feeManager != nil {
-		return c.c.feeManager.GetGasPrice()
-	}
-	return fee.ZeroGasPrice
-}
-
-func (c *Calculator) GetBlockGas() fee.Gas {
-	if c.c.feeManager != nil {
-		return c.c.feeManager.GetBlockGas()
-	}
-	return fee.ZeroGas
-}
-
-func (c *Calculator) GetExcessGas() fee.Gas {
-	if c.c.feeManager != nil {
-		return c.c.feeManager.GetExcessGas()
-	}
-	return fee.ZeroGas
-}
-
-type calculator struct {
-	// setup
-	isEActive bool
-	staticCfg StaticConfig
-
-	// Pre E-upgrade inputs
-	upgrades upgrade.Config
-	time     time.Time
-
-	// Post E-upgrade inputs
+type dynamicCalculator struct {
+	// inputs
 	feeManager  *fee.Manager
 	credentials []verify.Verifiable
 
@@ -115,21 +40,12 @@ type calculator struct {
 	fee uint64
 }
 
-func (c *calculator) AddValidatorTx(*txs.AddValidatorTx) error {
+func (*dynamicCalculator) AddValidatorTx(*txs.AddValidatorTx) error {
 	// AddValidatorTx is banned following Durango activation
-	if !c.isEActive {
-		c.fee = c.staticCfg.AddPrimaryNetworkValidatorFee
-		return nil
-	}
 	return errFailedFeeCalculation
 }
 
-func (c *calculator) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
-	if !c.isEActive {
-		c.fee = c.staticCfg.AddSubnetValidatorFee
-		return nil
-	}
-
+func (c *dynamicCalculator) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
 	complexity, err := c.meterTx(tx, tx.Outs, tx.Ins)
 	if err != nil {
 		return err
@@ -139,25 +55,12 @@ func (c *calculator) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
 	return err
 }
 
-func (c *calculator) AddDelegatorTx(*txs.AddDelegatorTx) error {
+func (*dynamicCalculator) AddDelegatorTx(*txs.AddDelegatorTx) error {
 	// AddDelegatorTx is banned following Durango activation
-	if !c.isEActive {
-		c.fee = c.staticCfg.AddPrimaryNetworkDelegatorFee
-		return nil
-	}
 	return errFailedFeeCalculation
 }
 
-func (c *calculator) CreateChainTx(tx *txs.CreateChainTx) error {
-	if !c.isEActive {
-		if c.upgrades.IsApricotPhase3Activated(c.time) {
-			c.fee = c.staticCfg.CreateBlockchainTxFee
-		} else {
-			c.fee = c.staticCfg.CreateAssetTxFee
-		}
-		return nil
-	}
-
+func (c *dynamicCalculator) CreateChainTx(tx *txs.CreateChainTx) error {
 	complexity, err := c.meterTx(tx, tx.Outs, tx.Ins)
 	if err != nil {
 		return err
@@ -167,16 +70,7 @@ func (c *calculator) CreateChainTx(tx *txs.CreateChainTx) error {
 	return err
 }
 
-func (c *calculator) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
-	if !c.isEActive {
-		if c.upgrades.IsApricotPhase3Activated(c.time) {
-			c.fee = c.staticCfg.CreateSubnetTxFee
-		} else {
-			c.fee = c.staticCfg.CreateAssetTxFee
-		}
-		return nil
-	}
-
+func (c *dynamicCalculator) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 	complexity, err := c.meterTx(tx, tx.Outs, tx.Ins)
 	if err != nil {
 		return err
@@ -186,22 +80,17 @@ func (c *calculator) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 	return err
 }
 
-func (c *calculator) AdvanceTimeTx(*txs.AdvanceTimeTx) error {
+func (c *dynamicCalculator) AdvanceTimeTx(*txs.AdvanceTimeTx) error {
 	c.fee = 0 // no fees
 	return nil
 }
 
-func (c *calculator) RewardValidatorTx(*txs.RewardValidatorTx) error {
+func (c *dynamicCalculator) RewardValidatorTx(*txs.RewardValidatorTx) error {
 	c.fee = 0 // no fees
 	return nil
 }
 
-func (c *calculator) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx) error {
-	if !c.isEActive {
-		c.fee = c.staticCfg.TxFee
-		return nil
-	}
-
+func (c *dynamicCalculator) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx) error {
 	complexity, err := c.meterTx(tx, tx.Outs, tx.Ins)
 	if err != nil {
 		return err
@@ -211,12 +100,7 @@ func (c *calculator) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx) er
 	return err
 }
 
-func (c *calculator) TransformSubnetTx(tx *txs.TransformSubnetTx) error {
-	if !c.isEActive {
-		c.fee = c.staticCfg.TransformSubnetTxFee
-		return nil
-	}
-
+func (c *dynamicCalculator) TransformSubnetTx(tx *txs.TransformSubnetTx) error {
 	complexity, err := c.meterTx(tx, tx.Outs, tx.Ins)
 	if err != nil {
 		return err
@@ -226,12 +110,7 @@ func (c *calculator) TransformSubnetTx(tx *txs.TransformSubnetTx) error {
 	return err
 }
 
-func (c *calculator) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwnershipTx) error {
-	if !c.isEActive {
-		c.fee = c.staticCfg.TxFee
-		return nil
-	}
-
+func (c *dynamicCalculator) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwnershipTx) error {
 	complexity, err := c.meterTx(tx, tx.Outs, tx.Ins)
 	if err != nil {
 		return err
@@ -241,16 +120,7 @@ func (c *calculator) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwnershipTx
 	return err
 }
 
-func (c *calculator) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessValidatorTx) error {
-	if !c.isEActive {
-		if tx.Subnet != constants.PrimaryNetworkID {
-			c.fee = c.staticCfg.AddSubnetValidatorFee
-		} else {
-			c.fee = c.staticCfg.AddPrimaryNetworkValidatorFee
-		}
-		return nil
-	}
-
+func (c *dynamicCalculator) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessValidatorTx) error {
 	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.StakeOuts))
 	copy(outs, tx.Outs)
 	copy(outs[len(tx.Outs):], tx.StakeOuts)
@@ -264,16 +134,7 @@ func (c *calculator) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessValid
 	return err
 }
 
-func (c *calculator) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDelegatorTx) error {
-	if !c.isEActive {
-		if tx.Subnet != constants.PrimaryNetworkID {
-			c.fee = c.staticCfg.AddSubnetDelegatorFee
-		} else {
-			c.fee = c.staticCfg.AddPrimaryNetworkDelegatorFee
-		}
-		return nil
-	}
-
+func (c *dynamicCalculator) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDelegatorTx) error {
 	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.StakeOuts))
 	copy(outs, tx.Outs)
 	copy(outs[len(tx.Outs):], tx.StakeOuts)
@@ -287,12 +148,7 @@ func (c *calculator) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDeleg
 	return err
 }
 
-func (c *calculator) BaseTx(tx *txs.BaseTx) error {
-	if !c.isEActive {
-		c.fee = c.staticCfg.TxFee
-		return nil
-	}
-
+func (c *dynamicCalculator) BaseTx(tx *txs.BaseTx) error {
 	complexity, err := c.meterTx(tx, tx.Outs, tx.Ins)
 	if err != nil {
 		return err
@@ -302,12 +158,7 @@ func (c *calculator) BaseTx(tx *txs.BaseTx) error {
 	return err
 }
 
-func (c *calculator) ImportTx(tx *txs.ImportTx) error {
-	if !c.isEActive {
-		c.fee = c.staticCfg.TxFee
-		return nil
-	}
-
+func (c *dynamicCalculator) ImportTx(tx *txs.ImportTx) error {
 	ins := make([]*avax.TransferableInput, len(tx.Ins)+len(tx.ImportedInputs))
 	copy(ins, tx.Ins)
 	copy(ins[len(tx.Ins):], tx.ImportedInputs)
@@ -321,12 +172,7 @@ func (c *calculator) ImportTx(tx *txs.ImportTx) error {
 	return err
 }
 
-func (c *calculator) ExportTx(tx *txs.ExportTx) error {
-	if !c.isEActive {
-		c.fee = c.staticCfg.TxFee
-		return nil
-	}
-
+func (c *dynamicCalculator) ExportTx(tx *txs.ExportTx) error {
 	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.ExportedOutputs))
 	copy(outs, tx.Outs)
 	copy(outs[len(tx.Outs):], tx.ExportedOutputs)
@@ -340,7 +186,7 @@ func (c *calculator) ExportTx(tx *txs.ExportTx) error {
 	return err
 }
 
-func (c *calculator) meterTx(
+func (c *dynamicCalculator) meterTx(
 	uTx txs.UnsignedTx,
 	allOuts []*avax.TransferableOutput,
 	allIns []*avax.TransferableInput,
@@ -399,12 +245,12 @@ func (c *calculator) meterTx(
 	return complexity, nil
 }
 
-func (c *calculator) addFeesFor(complexity fee.Dimensions) (uint64, error) {
+func (c *dynamicCalculator) addFeesFor(complexity fee.Dimensions) (uint64, error) {
 	if c.feeManager == nil || complexity == fee.Empty {
 		return 0, nil
 	}
 
-	feeCfg, err := GetDynamicConfig(c.isEActive)
+	feeCfg, err := GetDynamicConfig(true /*isEActive*/)
 	if err != nil {
 		return 0, fmt.Errorf("failed adding fees: %w", err)
 	}
@@ -425,12 +271,12 @@ func (c *calculator) addFeesFor(complexity fee.Dimensions) (uint64, error) {
 	return fee, nil
 }
 
-func (c *calculator) removeFeesFor(unitsToRm fee.Dimensions) (uint64, error) {
+func (c *dynamicCalculator) removeFeesFor(unitsToRm fee.Dimensions) (uint64, error) {
 	if c.feeManager == nil || unitsToRm == fee.Empty {
 		return 0, nil
 	}
 
-	feeCfg, err := GetDynamicConfig(c.isEActive)
+	feeCfg, err := GetDynamicConfig(true /*isEActive*/)
 	if err != nil {
 		return 0, fmt.Errorf("failed adding fees: %w", err)
 	}
@@ -450,3 +296,30 @@ func (c *calculator) removeFeesFor(unitsToRm fee.Dimensions) (uint64, error) {
 	c.fee -= fee
 	return fee, nil
 }
+
+func (c *dynamicCalculator) getFee() uint64 {
+	return c.fee
+}
+
+func (c *dynamicCalculator) resetFee(newFee uint64) {
+	c.fee = newFee
+}
+
+func (c *dynamicCalculator) computeFee(tx txs.UnsignedTx, creds []verify.Verifiable) (uint64, error) {
+	c.setCredentials(creds)
+	c.fee = 0 // zero fee among different ComputeFee invocations (unlike gas which gets cumulated)
+	err := tx.Visit(c)
+	return c.fee, err
+}
+
+func (c *dynamicCalculator) getGasPrice() fee.GasPrice { return c.feeManager.GetGasPrice() }
+
+func (c *dynamicCalculator) getBlockGas() fee.Gas { return c.feeManager.GetBlockGas() }
+
+func (c *dynamicCalculator) getExcessGas() fee.Gas { return c.feeManager.GetExcessGas() }
+
+func (c *dynamicCalculator) setCredentials(creds []verify.Verifiable) {
+	c.credentials = creds
+}
+
+func (*dynamicCalculator) isEActive() bool { return true }
