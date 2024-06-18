@@ -419,8 +419,8 @@ type fxOwnerAndSize struct {
 }
 
 type chainIDAndAddr struct {
-	chainID ids.ID `serialize:"true"`
-	addr    []byte `serialize:"true"`
+	ChainID ids.ID `serialize:"true"`
+	Addr    []byte `serialize:"true"`
 }
 
 func txSize(_ ids.ID, tx *txs.Tx) int {
@@ -567,7 +567,7 @@ func newState(
 		"subnet_manager_cache",
 		metricsReg,
 		cache.NewSizedLRU[ids.ID, chainIDAndAddr](execCfg.ChainIDAndAddrCacheSize, func(_ ids.ID, f chainIDAndAddr) int {
-			return ids.IDLen + len(f.addr)
+			return ids.IDLen + len(f.Addr)
 		}),
 	)
 	if err != nil {
@@ -841,11 +841,11 @@ func (s *state) SetSubnetOwner(subnetID ids.ID, owner fx.Owner) {
 
 func (s *state) GetSubnetManager(subnetID ids.ID) (ids.ID, []byte, error) {
 	if chainIDAndAddr, exists := s.subnetManagers[subnetID]; exists {
-		return chainIDAndAddr.chainID, chainIDAndAddr.addr, nil
+		return chainIDAndAddr.ChainID, chainIDAndAddr.Addr, nil
 	}
 
 	if chainIDAndAddr, cached := s.subnetManagerCache.Get(subnetID); cached {
-		return chainIDAndAddr.chainID, chainIDAndAddr.addr, nil
+		return chainIDAndAddr.ChainID, chainIDAndAddr.Addr, nil
 	}
 
 	chainIDAndAddrBytes, err := s.subnetManagerDB.Get(subnetID[:])
@@ -855,10 +855,10 @@ func (s *state) GetSubnetManager(subnetID ids.ID) (ids.ID, []byte, error) {
 			return ids.Empty, nil, err
 		}
 		s.subnetManagerCache.Put(subnetID, chainIDAndAddr{
-			chainID: manager.chainID,
-			addr:    manager.addr,
+			ChainID: manager.ChainID,
+			Addr:    manager.Addr,
 		})
-		return manager.chainID, manager.addr, nil
+		return manager.ChainID, manager.Addr, nil
 	}
 	if err != database.ErrNotFound {
 		return ids.Empty, nil, err
@@ -870,8 +870,8 @@ func (s *state) GetSubnetManager(subnetID ids.ID) (ids.ID, []byte, error) {
 
 func (s *state) SetSubnetManager(subnetID ids.ID, chainID ids.ID, addr []byte) {
 	s.subnetManagers[subnetID] = chainIDAndAddr{
-		chainID: chainID,
-		addr:    addr,
+		ChainID: chainID,
+		Addr:    addr,
 	}
 }
 
