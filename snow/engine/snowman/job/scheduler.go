@@ -72,7 +72,7 @@ func (s *Scheduler[_]) NumDependencies() int {
 // Fulfill a dependency. If all dependencies for a job are fulfilled, the job
 // will be executed.
 //
-// It is safe to call the queue during the execution of a job.
+// It is safe to call the scheduler during the execution of a job.
 func (s *Scheduler[T]) Fulfill(ctx context.Context, dependency T) error {
 	return s.resolveDependency(ctx, dependency, false)
 }
@@ -81,7 +81,7 @@ func (s *Scheduler[T]) Fulfill(ctx context.Context, dependency T) error {
 // will be cancelled. The job will only be cancelled once all dependencies are
 // resolved.
 //
-// It is safe to call the queue during the cancelling of a job.
+// It is safe to call the scheduler during the cancelling of a job.
 func (s *Scheduler[T]) Abandon(ctx context.Context, dependency T) error {
 	return s.resolveDependency(ctx, dependency, true)
 }
@@ -95,8 +95,6 @@ func (s *Scheduler[T]) resolveDependency(
 	delete(s.dependents, dependency)
 
 	for _, job := range jobs {
-		// Removing the dependency keeps the queue in a consistent state.
-		// However, it isn't strictly needed.
 		job.dependencies.Remove(dependency)
 		job.shouldCancel = shouldCancel || job.shouldCancel
 
