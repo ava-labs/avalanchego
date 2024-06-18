@@ -43,7 +43,6 @@ func requireEqual(t *testing.T, expected, actual *ipTracker) {
 	require.Equal(expected.bloomAdditions, actual.bloomAdditions)
 	require.Equal(expected.maxBloomCount, actual.maxBloomCount)
 	require.Equal(expected.connected, actual.connected)
-	require.Equal(expected.connected, actual.connected)
 	require.Equal(expected.subnet, actual.subnet)
 }
 
