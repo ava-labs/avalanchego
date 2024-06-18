@@ -18,22 +18,32 @@ const (
 	depToNeglect
 )
 
-var (
-	errDuplicateInvocation  = errors.New("job already handled")
-	errUnexpectedInvocation = errors.New("job handled unexpectedly")
-)
+var errDuplicateInvocation = errors.New("job already handled")
 
 type testJob struct {
-	execute func(context.Context) error
-	cancel  func(context.Context) error
+	calledExecute bool
+	calledCancel  bool
 }
 
-func (j *testJob) Execute(ctx context.Context) error {
-	return j.execute(ctx)
+func (j *testJob) Execute(context.Context) error {
+	if j.calledExecute {
+		return errDuplicateInvocation
+	}
+	j.calledExecute = true
+	return nil
 }
 
-func (j *testJob) Cancel(ctx context.Context) error {
-	return j.cancel(ctx)
+func (j *testJob) Cancel(context.Context) error {
+	if j.calledCancel {
+		return errDuplicateInvocation
+	}
+	j.calledCancel = true
+	return nil
+}
+
+func (j *testJob) reset() {
+	j.calledExecute = false
+	j.calledCancel = false
 }
 
 func newSchedulerWithJob[T comparable](
@@ -55,20 +65,7 @@ func newSchedulerWithJob[T comparable](
 }
 
 func TestScheduler_Register(t *testing.T) {
-	var calledExecute bool
-	userJob := &testJob{
-		execute: func(context.Context) error {
-			if calledExecute {
-				return errDuplicateInvocation
-			}
-			calledExecute = true
-			return nil
-		},
-		cancel: func(context.Context) error {
-			return errUnexpectedInvocation
-		},
-	}
-
+	userJob := &testJob{}
 	tests := []struct {
 		name                string
 		scheduler           *Scheduler[int]
@@ -152,31 +149,19 @@ func TestScheduler_Register(t *testing.T) {
 			require := require.New(t)
 
 			// Reset the variable between tests
-			calledExecute = false
+			userJob.reset()
 
 			require.NoError(test.scheduler.Register(context.Background(), userJob, test.dependencies...))
 			require.Equal(test.wantNumDependencies, test.scheduler.NumDependencies())
-			require.Equal(test.wantExecuted, calledExecute)
+			require.Equal(test.wantExecuted, userJob.calledExecute)
+			require.False(userJob.calledCancel)
 			require.Equal(test.wantScheduler, test.scheduler)
 		})
 	}
 }
 
 func TestScheduler_Fulfill(t *testing.T) {
-	var calledExecute bool
-	userJob := &testJob{
-		execute: func(context.Context) error {
-			if calledExecute {
-				return errDuplicateInvocation
-			}
-			calledExecute = true
-			return nil
-		},
-		cancel: func(context.Context) error {
-			return errUnexpectedInvocation
-		},
-	}
-
+	userJob := &testJob{}
 	tests := []struct {
 		name          string
 		scheduler     *Scheduler[int]
@@ -219,30 +204,18 @@ func TestScheduler_Fulfill(t *testing.T) {
 			require := require.New(t)
 
 			// Reset the variable between tests
-			calledExecute = false
+			userJob.reset()
 
 			require.NoError(test.scheduler.Fulfill(context.Background(), depToResolve))
-			require.Equal(test.wantExecute, calledExecute)
+			require.Equal(test.wantExecute, userJob.calledExecute)
+			require.False(userJob.calledCancel)
 			require.Equal(test.wantScheduler, test.scheduler)
 		})
 	}
 }
 
 func TestScheduler_Abandon(t *testing.T) {
-	var calledCancel bool
-	userJob := &testJob{
-		execute: func(context.Context) error {
-			return errUnexpectedInvocation
-		},
-		cancel: func(context.Context) error {
-			if calledCancel {
-				return errDuplicateInvocation
-			}
-			calledCancel = true
-			return nil
-		},
-	}
-
+	userJob := &testJob{}
 	tests := []struct {
 		name          string
 		scheduler     *Scheduler[int]
@@ -285,10 +258,11 @@ func TestScheduler_Abandon(t *testing.T) {
 			require := require.New(t)
 
 			// Reset the variable between tests
-			calledCancel = false
+			userJob.reset()
 
 			require.NoError(test.scheduler.Abandon(context.Background(), depToResolve))
-			require.Equal(test.wantCancelled, calledCancel)
+			require.False(userJob.calledExecute)
+			require.Equal(test.wantCancelled, userJob.calledCancel)
 			require.Equal(test.wantScheduler, test.scheduler)
 		})
 	}
