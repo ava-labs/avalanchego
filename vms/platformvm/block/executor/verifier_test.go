@@ -31,6 +31,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 	"github.com/ava-labs/avalanchego/vms/platformvm/upgrade"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -526,8 +527,17 @@ func TestStandardBlockGas(t *testing.T) {
 
 				if dynamicFeesActive {
 					require.NotEqual(commonfee.ZeroGas, blkState.blockGas)
+
+					gasCap, err := blkState.onAcceptState.GetCurrentGasCap()
+					require.NoError(err)
+					require.Greater(gasCap, commonfee.ZeroGas)
+					require.Less(gasCap, fee.TempGasCap)
 				} else {
 					require.Equal(commonfee.ZeroGas, blkState.blockGas)
+
+					gasCap, err := blkState.onAcceptState.GetCurrentGasCap()
+					require.NoError(err)
+					require.Equal(fee.TempGasCap, gasCap)
 				}
 			})
 		}
