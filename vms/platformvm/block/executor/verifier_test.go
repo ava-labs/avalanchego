@@ -36,7 +36,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
-	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
+	commonfee "github.com/ava-labs/avalanchego/vms/components/fee"
 	walletsigner "github.com/ava-labs/avalanchego/wallet/chain/p/signer"
 )
 
@@ -525,9 +525,9 @@ func TestStandardBlockGas(t *testing.T) {
 				require.True(found)
 
 				if dynamicFeesActive {
-					require.NotEqual(commonfees.ZeroGas, blkState.blockGas)
+					require.NotEqual(commonfee.ZeroGas, blkState.blockGas)
 				} else {
-					require.Equal(commonfees.ZeroGas, blkState.blockGas)
+					require.Equal(commonfee.ZeroGas, blkState.blockGas)
 				}
 			})
 		}
@@ -546,7 +546,7 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 	timestamp := time.Now()
 	// One call for each of onCommitState and onAbortState.
 	parentOnAcceptState.EXPECT().GetTimestamp().Return(timestamp).Times(2)
-	parentOnAcceptState.EXPECT().GetCurrentGasCap().Return(commonfees.Gas(1_000_000), nil)
+	parentOnAcceptState.EXPECT().GetCurrentGasCap().Return(commonfee.Gas(1_000_000), nil)
 
 	backend := &backend{
 		lastAccepted: parentID,
@@ -800,7 +800,7 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 	// Set expectations for dependencies.
 	timestamp := time.Now()
 	parentState.EXPECT().GetTimestamp().Return(timestamp)
-	parentState.EXPECT().GetCurrentGasCap().Return(commonfees.Gas(1_000_000), nil)
+	parentState.EXPECT().GetCurrentGasCap().Return(commonfee.Gas(1_000_000), nil)
 	parentStatelessBlk.EXPECT().Height().Return(uint64(1))
 	mempool.EXPECT().Remove(apricotBlk.Txs()).Times(1)
 
@@ -1295,7 +1295,7 @@ func TestVerifierVisitStandardBlockWithDuplicateInputs(t *testing.T) {
 	timestamp := time.Now()
 	parentStatelessBlk.EXPECT().Height().Return(uint64(1))
 	parentState.EXPECT().GetTimestamp().Return(timestamp)
-	parentState.EXPECT().GetCurrentGasCap().Return(commonfees.Gas(1_000_000), nil)
+	parentState.EXPECT().GetCurrentGasCap().Return(commonfee.Gas(1_000_000), nil)
 
 	parentStatelessBlk.EXPECT().Parent().Return(grandParentID).Times(1)
 

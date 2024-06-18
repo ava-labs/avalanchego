@@ -12,7 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 
-	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
+	commonfee "github.com/ava-labs/avalanchego/vms/components/fee"
 )
 
 func NextBlockTime(state Chain, clk *mockable.Clock) (time.Time, bool, error) {
@@ -93,11 +93,11 @@ func PickFeeCalculator(cfg *config.Config, state Chain, parentBlkTime time.Time)
 	if err != nil {
 		return nil, fmt.Errorf("failed retrieving gas cap: %w", err)
 	}
-	gasCap, err := commonfees.GasCap(feesCfg, currentGasCap, parentBlkTime, childBlkTime)
+	gasCap, err := commonfee.GasCap(feesCfg, currentGasCap, parentBlkTime, childBlkTime)
 	if err != nil {
 		return nil, fmt.Errorf("failed updating gas cap: %w", err)
 	}
-	feesMan := commonfees.NewManager(feesCfg.GasPrice)
+	feesMan := commonfee.NewManager(feesCfg.GasPrice)
 	feeCalculator := fee.NewDynamicCalculator(feesMan, gasCap)
 	return feeCalculator, nil
 }

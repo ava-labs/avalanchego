@@ -7,7 +7,7 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/components/fees"
+	"github.com/ava-labs/avalanchego/vms/components/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
@@ -16,7 +16,7 @@ func FinanceInput(feeCalc *Calculator, input *avax.TransferableInput) (uint64, e
 		return 0, nil // pre E-upgrade we have a fixed fee regardless how complex the input is
 	}
 
-	inDimensions, err := fees.MeterInput(txs.Codec, txs.CodecVersion, input)
+	inDimensions, err := fee.MeterInput(txs.Codec, txs.CodecVersion, input)
 	if err != nil {
 		return 0, fmt.Errorf("failed calculating input size: %w", err)
 	}
@@ -27,18 +27,18 @@ func FinanceInput(feeCalc *Calculator, input *avax.TransferableInput) (uint64, e
 	return addedFees, nil
 }
 
-func FinanceOutput(feeCalc *Calculator, output *avax.TransferableOutput) (uint64, fees.Dimensions, error) {
+func FinanceOutput(feeCalc *Calculator, output *avax.TransferableOutput) (uint64, fee.Dimensions, error) {
 	if !feeCalc.c.isEActive {
-		return 0, fees.Empty, nil // pre E-upgrade we have a fixed fee regardless how complex the output is
+		return 0, fee.Empty, nil // pre E-upgrade we have a fixed fee regardless how complex the output is
 	}
 
-	outDimensions, err := fees.MeterOutput(txs.Codec, txs.CodecVersion, output)
+	outDimensions, err := fee.MeterOutput(txs.Codec, txs.CodecVersion, output)
 	if err != nil {
-		return 0, fees.Empty, fmt.Errorf("failed calculating changeOut size: %w", err)
+		return 0, fee.Empty, fmt.Errorf("failed calculating changeOut size: %w", err)
 	}
 	addedFees, err := feeCalc.AddFeesFor(outDimensions)
 	if err != nil {
-		return 0, fees.Empty, fmt.Errorf("account for stakedOut fees: %w", err)
+		return 0, fee.Empty, fmt.Errorf("account for stakedOut fees: %w", err)
 	}
 	return addedFees, outDimensions, nil
 }
@@ -48,7 +48,7 @@ func FinanceCredential(feeCalc *Calculator, keysCount int) (uint64, error) {
 		return 0, nil // pre E-upgrade we have a fixed fee regardless how complex the credentials are
 	}
 
-	credDimensions, err := fees.MeterCredential(txs.Codec, txs.CodecVersion, keysCount)
+	credDimensions, err := fee.MeterCredential(txs.Codec, txs.CodecVersion, keysCount)
 	if err != nil {
 		return 0, fmt.Errorf("failed calculating input size: %w", err)
 	}

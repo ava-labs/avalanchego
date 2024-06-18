@@ -45,7 +45,7 @@ import (
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
 	avajson "github.com/ava-labs/avalanchego/utils/json"
-	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
+	commonfee "github.com/ava-labs/avalanchego/vms/components/fee"
 	vmkeystore "github.com/ava-labs/avalanchego/vms/components/keystore"
 	pchainapi "github.com/ava-labs/avalanchego/vms/platformvm/api"
 	blockbuilder "github.com/ava-labs/avalanchego/vms/platformvm/block/builder"
@@ -96,11 +96,11 @@ func testReplayFeeCalculator(cfg *config.Config, parentBlkTime time.Time, state 
 	if err != nil {
 		return nil, fmt.Errorf("failed retrieving current gas cap: %w", err)
 	}
-	gasCap, err := commonfees.GasCap(feesCfg, currentGasCap, parentBlkTime, childBlkTime)
+	gasCap, err := commonfee.GasCap(feesCfg, currentGasCap, parentBlkTime, childBlkTime)
 	if err != nil {
 		return nil, fmt.Errorf("failed updating gas cap: %w", err)
 	}
-	feesMan := commonfees.NewManager(feesCfg.GasPrice)
+	feesMan := commonfee.NewManager(feesCfg.GasPrice)
 	return fee.NewDynamicCalculator(feesMan, gasCap), nil
 }
 

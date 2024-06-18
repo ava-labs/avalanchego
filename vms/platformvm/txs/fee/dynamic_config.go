@@ -11,22 +11,22 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/units"
 
-	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
+	commonfee "github.com/ava-labs/avalanchego/vms/components/fee"
 )
 
-const TempGasCap = commonfees.Gas(1_000_000) // TODO ABENEGIA: temp const to be replaced with API call
+const TempGasCap = commonfee.Gas(1_000_000) // TODO ABENEGIA: temp const to be replaced with API call
 
 var (
 	errDynamicFeeConfigNotAvailable = errors.New("dynamic fee config not available")
 
-	eUpgradeDynamicFeesConfig = commonfees.DynamicFeesConfig{
-		GasPrice:            commonfees.GasPrice(10 * units.NanoAvax),
-		FeeDimensionWeights: commonfees.Dimensions{1, 1, 1, 1},
-		MaxGasPerSecond:     commonfees.Gas(1_000_000),
-		LeakGasCoeff:        commonfees.Gas(1),
+	eUpgradeDynamicFeesConfig = commonfee.DynamicFeesConfig{
+		GasPrice:            commonfee.GasPrice(10 * units.NanoAvax),
+		FeeDimensionWeights: commonfee.Dimensions{1, 1, 1, 1},
+		MaxGasPerSecond:     commonfee.Gas(1_000_000),
+		LeakGasCoeff:        commonfee.Gas(1),
 	}
 
-	customDynamicFeesConfig *commonfees.DynamicFeesConfig
+	customDynamicFeesConfig *commonfee.DynamicFeesConfig
 )
 
 func init() {
@@ -35,9 +35,9 @@ func init() {
 	}
 }
 
-func GetDynamicConfig(isEActive bool) (commonfees.DynamicFeesConfig, error) {
+func GetDynamicConfig(isEActive bool) (commonfee.DynamicFeesConfig, error) {
 	if !isEActive {
-		return commonfees.DynamicFeesConfig{}, errDynamicFeeConfigNotAvailable
+		return commonfee.DynamicFeesConfig{}, errDynamicFeeConfigNotAvailable
 	}
 
 	if customDynamicFeesConfig != nil {
@@ -46,7 +46,7 @@ func GetDynamicConfig(isEActive bool) (commonfees.DynamicFeesConfig, error) {
 	return eUpgradeDynamicFeesConfig, nil
 }
 
-func ResetDynamicConfig(ctx *snow.Context, customFeesConfig *commonfees.DynamicFeesConfig) error {
+func ResetDynamicConfig(ctx *snow.Context, customFeesConfig *commonfee.DynamicFeesConfig) error {
 	if customFeesConfig == nil {
 		return nil // nothing to do
 	}

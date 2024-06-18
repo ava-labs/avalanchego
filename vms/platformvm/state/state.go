@@ -45,7 +45,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
-	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
+	commonfee "github.com/ava-labs/avalanchego/vms/components/fee"
 )
 
 const (
@@ -99,8 +99,8 @@ type Chain interface {
 	avax.UTXOGetter
 	avax.UTXODeleter
 
-	GetCurrentGasCap() (commonfees.Gas, error)
-	SetCurrentGasCap(commonfees.Gas)
+	GetCurrentGasCap() (commonfee.Gas, error)
+	SetCurrentGasCap(commonfee.Gas)
 
 	GetTimestamp() time.Time
 	SetTimestamp(tm time.Time)
@@ -361,7 +361,7 @@ type state struct {
 
 	// The persisted fields represent the current database value
 	timestamp, persistedTimestamp         time.Time
-	currentGasCap                         *commonfees.Gas
+	currentGasCap                         *commonfee.Gas
 	currentSupply, persistedCurrentSupply uint64
 	// [lastAccepted] is the most recently accepted block.
 	lastAccepted, persistedLastAccepted ids.ID
@@ -1006,16 +1006,16 @@ func (s *state) GetStartTime(nodeID ids.NodeID, subnetID ids.ID) (time.Time, err
 	return staker.StartTime, nil
 }
 
-func (s *state) GetCurrentGasCap() (commonfees.Gas, error) {
+func (s *state) GetCurrentGasCap() (commonfee.Gas, error) {
 	if s.currentGasCap == nil {
-		return commonfees.ZeroGas, nil
+		return commonfee.ZeroGas, nil
 	}
 	return *s.currentGasCap, nil
 }
 
-func (s *state) SetCurrentGasCap(gasCap commonfees.Gas) {
+func (s *state) SetCurrentGasCap(gasCap commonfee.Gas) {
 	if s.currentGasCap == nil {
-		s.currentGasCap = new(commonfees.Gas)
+		s.currentGasCap = new(commonfee.Gas)
 	}
 	*s.currentGasCap = gasCap
 }
@@ -1316,8 +1316,8 @@ func (s *state) loadMetadata() error {
 		if err != nil {
 			return err
 		}
-		s.currentGasCap = new(commonfees.Gas)
-		*s.currentGasCap = commonfees.Gas(gas)
+		s.currentGasCap = new(commonfee.Gas)
+		*s.currentGasCap = commonfee.Gas(gas)
 
 	case database.ErrNotFound:
 		// fork introducing dynamic fees may not be active yet,
@@ -1327,7 +1327,7 @@ func (s *state) loadMetadata() error {
 		if err != nil {
 			return fmt.Errorf("failed retrieving dynamic fees config: %w", err)
 		}
-		s.currentGasCap = new(commonfees.Gas)
+		s.currentGasCap = new(commonfee.Gas)
 		*s.currentGasCap = feesCfg.MaxGasPerSecond
 
 	default:

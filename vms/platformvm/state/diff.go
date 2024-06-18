@@ -15,7 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 
-	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
+	commonfee "github.com/ava-labs/avalanchego/vms/components/fee"
 )
 
 var (
@@ -37,7 +37,7 @@ type diff struct {
 
 	timestamp time.Time
 
-	currentGasCap *commonfees.Gas
+	currentGasCap *commonfee.Gas
 
 	// Subnet ID --> supply of native asset of the subnet
 	currentSupply map[ids.ID]uint64
@@ -93,27 +93,27 @@ func NewDiffOn(parentState Chain) (Diff, error) {
 	})
 }
 
-func (d *diff) GetCurrentGasCap() (commonfees.Gas, error) {
+func (d *diff) GetCurrentGasCap() (commonfee.Gas, error) {
 	if d.currentGasCap == nil {
 		parentState, ok := d.stateVersions.GetState(d.parentID)
 		if !ok {
-			return commonfees.ZeroGas, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
+			return commonfee.ZeroGas, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
 		}
 		parentCurrentGasCap, err := parentState.GetCurrentGasCap()
 		if err != nil {
-			return commonfees.ZeroGas, err
+			return commonfee.ZeroGas, err
 		}
 
-		d.currentGasCap = new(commonfees.Gas)
+		d.currentGasCap = new(commonfee.Gas)
 		*d.currentGasCap = parentCurrentGasCap
 	}
 
 	return *d.currentGasCap, nil
 }
 
-func (d *diff) SetCurrentGasCap(gasCap commonfees.Gas) {
+func (d *diff) SetCurrentGasCap(gasCap commonfee.Gas) {
 	if d.currentGasCap == nil {
-		d.currentGasCap = new(commonfees.Gas)
+		d.currentGasCap = new(commonfee.Gas)
 	}
 	*d.currentGasCap = gasCap
 }

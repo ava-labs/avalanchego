@@ -18,7 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/components/fees"
+	"github.com/ava-labs/avalanchego/vms/components/fee"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
@@ -29,9 +29,9 @@ import (
 )
 
 var (
-	testGasPrice = fees.GasPrice(10 * units.NanoAvax)
+	testGasPrice = fee.GasPrice(10 * units.NanoAvax)
 
-	testBlockMaxGas = fees.Gas(100_000)
+	testBlockMaxGas = fee.Gas(100_000)
 
 	preFundedKeys             = secp256k1.TestKeys()
 	feeTestSigners            = [][]*secp256k1.PrivateKey{preFundedKeys}
@@ -46,15 +46,15 @@ func TestAddAndRemoveFees(t *testing.T) {
 	fc := &Calculator{
 		c: &calculator{
 			isEActive:  true,
-			feeManager: fees.NewManager(testGasPrice),
+			feeManager: fee.NewManager(testGasPrice),
 			maxGas:     testBlockMaxGas,
 		},
 	}
 
 	var (
-		units     = fees.Dimensions{1, 2, 3, 4}
-		gas       = fees.Gas(10)
-		doubleGas = fees.Gas(20)
+		units     = fee.Dimensions{1, 2, 3, 4}
+		gas       = fee.Gas(10)
+		doubleGas = fee.Gas(20)
 	)
 
 	feeDelta, err := fc.AddFeesFor(units)
@@ -114,7 +114,7 @@ func TestTxFees(t *testing.T) {
 		name                string
 		chainTime           time.Time
 		unsignedAndSignedTx func(t *testing.T) (txs.UnsignedTx, *txs.Tx)
-		maxGasF             func() fees.Gas
+		maxGasF             func() fee.Gas
 		expectedError       error
 		checksF             func(*testing.T, *calculator)
 	}{
@@ -141,13 +141,13 @@ func TestTxFees(t *testing.T) {
 			unsignedAndSignedTx: addSubnetValidatorTx,
 			checksF: func(t *testing.T, fc *calculator) {
 				require.Equal(t, 19_110*units.NanoAvax, fc.fee)
-				require.Equal(t, fees.Gas(1911), fc.feeManager.GetBlockGas())
+				require.Equal(t, fee.Gas(1911), fc.feeManager.GetBlockGas())
 			},
 		},
 		{
 			name:      "AddSubnetValidatorTx post EUpgrade, utxos read cap breached",
 			chainTime: postEUpgradeTime,
-			maxGasF: func() fees.Gas {
+			maxGasF: func() fee.Gas {
 				return testBlockMaxGas - 1
 			},
 			unsignedAndSignedTx: addSubnetValidatorTx,
@@ -185,14 +185,14 @@ func TestTxFees(t *testing.T) {
 			expectedError:       nil,
 			checksF: func(t *testing.T, fc *calculator) {
 				require.Equal(t, 19_540*units.NanoAvax, fc.fee)
-				require.Equal(t, fees.Gas(1_954), fc.feeManager.GetBlockGas())
+				require.Equal(t, fee.Gas(1_954), fc.feeManager.GetBlockGas())
 			},
 		},
 		{
 			name:                "CreateChainTx post EUpgrade, utxos read cap breached",
 			chainTime:           postEUpgradeTime,
 			unsignedAndSignedTx: createChainTx,
-			maxGasF: func() fees.Gas {
+			maxGasF: func() fee.Gas {
 				return testBlockMaxGas - 1
 			},
 			expectedError: errFailedComplexityCumulation,
@@ -221,14 +221,14 @@ func TestTxFees(t *testing.T) {
 			expectedError:       nil,
 			checksF: func(t *testing.T, fc *calculator) {
 				require.Equal(t, 18_590*units.NanoAvax, fc.fee)
-				require.Equal(t, fees.Gas(1_859), fc.feeManager.GetBlockGas())
+				require.Equal(t, fee.Gas(1_859), fc.feeManager.GetBlockGas())
 			},
 		},
 		{
 			name:                "CreateSubnetTx post EUpgrade, utxos read cap breached",
 			chainTime:           postEUpgradeTime,
 			unsignedAndSignedTx: createSubnetTx,
-			maxGasF: func() fees.Gas {
+			maxGasF: func() fee.Gas {
 				return testBlockMaxGas - 1
 			},
 			expectedError: errFailedComplexityCumulation,
@@ -249,13 +249,13 @@ func TestTxFees(t *testing.T) {
 			expectedError:       nil,
 			checksF: func(t *testing.T, fc *calculator) {
 				require.Equal(t, 18_870*units.NanoAvax, fc.fee)
-				require.Equal(t, fees.Gas(1_887), fc.feeManager.GetBlockGas())
+				require.Equal(t, fee.Gas(1_887), fc.feeManager.GetBlockGas())
 			},
 		},
 		{
 			name:      "RemoveSubnetValidatorTx post EUpgrade, utxos read cap breached",
 			chainTime: postEUpgradeTime,
-			maxGasF: func() fees.Gas {
+			maxGasF: func() fee.Gas {
 				return testBlockMaxGas - 1
 			},
 			unsignedAndSignedTx: removeSubnetValidatorTx,
@@ -277,13 +277,13 @@ func TestTxFees(t *testing.T) {
 			expectedError:       nil,
 			checksF: func(t *testing.T, fc *calculator) {
 				require.Equal(t, 19_720*units.NanoAvax, fc.fee)
-				require.Equal(t, fees.Gas(1_972), fc.feeManager.GetBlockGas())
+				require.Equal(t, fee.Gas(1_972), fc.feeManager.GetBlockGas())
 			},
 		},
 		{
 			name:      "TransformSubnetTx post EUpgrade, utxos read cap breached",
 			chainTime: postEUpgradeTime,
-			maxGasF: func() fees.Gas {
+			maxGasF: func() fee.Gas {
 				return testBlockMaxGas - 1
 			},
 			unsignedAndSignedTx: transformSubnetTx,
@@ -305,13 +305,13 @@ func TestTxFees(t *testing.T) {
 			expectedError:       nil,
 			checksF: func(t *testing.T, fc *calculator) {
 				require.Equal(t, 19_030*units.NanoAvax, fc.fee)
-				require.Equal(t, fees.Gas(1_903), fc.feeManager.GetBlockGas())
+				require.Equal(t, fee.Gas(1_903), fc.feeManager.GetBlockGas())
 			},
 		},
 		{
 			name:      "TransferSubnetOwnershipTx post EUpgrade, utxos read cap breached",
 			chainTime: postEUpgradeTime,
-			maxGasF: func() fees.Gas {
+			maxGasF: func() fee.Gas {
 				return testBlockMaxGas - 1
 			},
 			unsignedAndSignedTx: transferSubnetOwnershipTx,
@@ -349,7 +349,7 @@ func TestTxFees(t *testing.T) {
 			expectedError: nil,
 			checksF: func(t *testing.T, fc *calculator) {
 				require.Equal(t, 23_170*units.NanoAvax, fc.fee)
-				require.Equal(t, fees.Gas(2_317), fc.feeManager.GetBlockGas())
+				require.Equal(t, fee.Gas(2_317), fc.feeManager.GetBlockGas())
 			},
 		},
 		{
@@ -363,13 +363,13 @@ func TestTxFees(t *testing.T) {
 			expectedError: nil,
 			checksF: func(t *testing.T, fc *calculator) {
 				require.Equal(t, 23_170*units.NanoAvax, fc.fee)
-				require.Equal(t, fees.Gas(2_317), fc.feeManager.GetBlockGas())
+				require.Equal(t, fee.Gas(2_317), fc.feeManager.GetBlockGas())
 			},
 		},
 		{
 			name:      "AddPermissionlessValidatorTx post EUpgrade, utxos read cap breached",
 			chainTime: postEUpgradeTime,
-			maxGasF: func() fees.Gas {
+			maxGasF: func() fee.Gas {
 				return testBlockMaxGas - 1
 			},
 			unsignedAndSignedTx: func(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
@@ -410,7 +410,7 @@ func TestTxFees(t *testing.T) {
 			expectedError: nil,
 			checksF: func(t *testing.T, fc *calculator) {
 				require.Equal(t, 21_250*units.NanoAvax, fc.fee)
-				require.Equal(t, fees.Gas(2_125), fc.feeManager.GetBlockGas())
+				require.Equal(t, fee.Gas(2_125), fc.feeManager.GetBlockGas())
 			},
 		},
 		{
@@ -422,13 +422,13 @@ func TestTxFees(t *testing.T) {
 			expectedError: nil,
 			checksF: func(t *testing.T, fc *calculator) {
 				require.Equal(t, 21_250*units.NanoAvax, fc.fee)
-				require.Equal(t, fees.Gas(2_125), fc.feeManager.GetBlockGas())
+				require.Equal(t, fee.Gas(2_125), fc.feeManager.GetBlockGas())
 			},
 		},
 		{
 			name:      "AddPermissionlessDelegatorTx Subnet post EUpgrade, utxos read cap breached",
 			chainTime: postEUpgradeTime,
-			maxGasF: func() fees.Gas {
+			maxGasF: func() fee.Gas {
 				return testBlockMaxGas - 1
 			},
 			unsignedAndSignedTx: func(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
@@ -454,13 +454,13 @@ func TestTxFees(t *testing.T) {
 			expectedError:       nil,
 			checksF: func(t *testing.T, fc *calculator) {
 				require.Equal(t, 18_190*units.NanoAvax, fc.fee)
-				require.Equal(t, fees.Gas(1_819), fc.feeManager.GetBlockGas())
+				require.Equal(t, fee.Gas(1_819), fc.feeManager.GetBlockGas())
 			},
 		},
 		{
 			name:      "BaseTx post EUpgrade, utxos read cap breached",
 			chainTime: postEUpgradeTime,
-			maxGasF: func() fees.Gas {
+			maxGasF: func() fee.Gas {
 				return testBlockMaxGas - 1
 			},
 			unsignedAndSignedTx: baseTx,
@@ -482,13 +482,13 @@ func TestTxFees(t *testing.T) {
 			expectedError:       nil,
 			checksF: func(t *testing.T, fc *calculator) {
 				require.Equal(t, 31_230*units.NanoAvax, fc.fee)
-				require.Equal(t, fees.Gas(3_123), fc.feeManager.GetBlockGas())
+				require.Equal(t, fee.Gas(3_123), fc.feeManager.GetBlockGas())
 			},
 		},
 		{
 			name:      "ImportTx post EUpgrade, utxos read cap breached",
 			chainTime: postEUpgradeTime,
-			maxGasF: func() fees.Gas {
+			maxGasF: func() fee.Gas {
 				return testBlockMaxGas - 1
 			},
 			unsignedAndSignedTx: importTx,
@@ -510,13 +510,13 @@ func TestTxFees(t *testing.T) {
 			expectedError:       nil,
 			checksF: func(t *testing.T, fc *calculator) {
 				require.Equal(t, 20_410*units.NanoAvax, fc.fee)
-				require.Equal(t, fees.Gas(2_041), fc.feeManager.GetBlockGas())
+				require.Equal(t, fee.Gas(2_041), fc.feeManager.GetBlockGas())
 			},
 		},
 		{
 			name:      "ExportTx post EUpgrade, utxos read cap breached",
 			chainTime: postEUpgradeTime,
-			maxGasF: func() fees.Gas {
+			maxGasF: func() fee.Gas {
 				return testBlockMaxGas - 1
 			},
 			unsignedAndSignedTx: exportTx,
@@ -562,7 +562,7 @@ func TestTxFees(t *testing.T) {
 			if !upgrades.IsEActivated(tt.chainTime) {
 				fc = NewStaticCalculator(feeTestsDefaultCfg, upgrades, tt.chainTime)
 			} else {
-				fc = NewDynamicCalculator(fees.NewManager(testGasPrice), maxComplexity)
+				fc = NewDynamicCalculator(fee.NewManager(testGasPrice), maxComplexity)
 			}
 
 			var creds []verify.Verifiable
