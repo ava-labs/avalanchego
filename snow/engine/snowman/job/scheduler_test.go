@@ -52,16 +52,16 @@ func newSchedulerWithJob[T comparable](
 	shouldCancel bool,
 	dependencies ...T,
 ) *Scheduler[T] {
-	q := NewScheduler[T]()
-	require.NoError(t, q.Schedule(context.Background(), job, dependencies...))
+	s := NewScheduler[T]()
+	require.NoError(t, s.Schedule(context.Background(), job, dependencies...))
 	if shouldCancel {
-		for _, jobs := range q.dependents {
+		for _, jobs := range s.dependents {
 			for _, j := range jobs {
 				j.shouldCancel = true
 			}
 		}
 	}
-	return q
+	return s
 }
 
 func TestScheduler_Schedule(t *testing.T) {
