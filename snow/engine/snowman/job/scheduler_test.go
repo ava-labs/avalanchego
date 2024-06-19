@@ -61,28 +61,28 @@ func newSchedulerWithJob[T comparable](
 func TestScheduler_Schedule(t *testing.T) {
 	userJob := &testJob{}
 	tests := []struct {
-		name                string
-		scheduler           *Scheduler[int]
-		dependencies        []int
-		wantExecuted        bool
-		wantNumDependencies int
-		wantScheduler       *Scheduler[int]
+		name                    string
+		scheduler               *Scheduler[int]
+		dependencies            []int
+		expectedExecuted        bool
+		expectedNumDependencies int
+		expectedScheduler       *Scheduler[int]
 	}{
 		{
-			name:                "no dependencies",
-			scheduler:           NewScheduler[int](),
-			dependencies:        nil,
-			wantExecuted:        true,
-			wantNumDependencies: 0,
-			wantScheduler:       NewScheduler[int](),
+			name:                    "no dependencies",
+			scheduler:               NewScheduler[int](),
+			dependencies:            nil,
+			expectedExecuted:        true,
+			expectedNumDependencies: 0,
+			expectedScheduler:       NewScheduler[int](),
 		},
 		{
-			name:                "one dependency",
-			scheduler:           NewScheduler[int](),
-			dependencies:        []int{depToResolve},
-			wantExecuted:        false,
-			wantNumDependencies: 1,
-			wantScheduler: &Scheduler[int]{
+			name:                    "one dependency",
+			scheduler:               NewScheduler[int](),
+			dependencies:            []int{depToResolve},
+			expectedExecuted:        false,
+			expectedNumDependencies: 1,
+			expectedScheduler: &Scheduler[int]{
 				dependents: map[int][]*job[int]{
 					depToResolve: {
 						{
@@ -96,12 +96,12 @@ func TestScheduler_Schedule(t *testing.T) {
 			},
 		},
 		{
-			name:                "two dependencies",
-			scheduler:           NewScheduler[int](),
-			dependencies:        []int{depToResolve, depToNeglect},
-			wantExecuted:        false,
-			wantNumDependencies: 2,
-			wantScheduler: &Scheduler[int]{
+			name:                    "two dependencies",
+			scheduler:               NewScheduler[int](),
+			dependencies:            []int{depToResolve, depToNeglect},
+			expectedExecuted:        false,
+			expectedNumDependencies: 2,
+			expectedScheduler: &Scheduler[int]{
 				dependents: map[int][]*job[int]{
 					depToResolve: {
 						{
@@ -123,12 +123,12 @@ func TestScheduler_Schedule(t *testing.T) {
 			},
 		},
 		{
-			name:                "additional dependency",
-			scheduler:           newSchedulerWithJob(t, userJob, []int{depToResolve}, nil, nil),
-			dependencies:        []int{depToResolve},
-			wantExecuted:        false,
-			wantNumDependencies: 1,
-			wantScheduler: &Scheduler[int]{
+			name:                    "additional dependency",
+			scheduler:               newSchedulerWithJob(t, userJob, []int{depToResolve}, nil, nil),
+			dependencies:            []int{depToResolve},
+			expectedExecuted:        false,
+			expectedNumDependencies: 1,
+			expectedScheduler: &Scheduler[int]{
 				dependents: map[int][]*job[int]{
 					depToResolve: {
 						{
@@ -156,11 +156,11 @@ func TestScheduler_Schedule(t *testing.T) {
 			userJob.reset()
 
 			require.NoError(test.scheduler.Schedule(context.Background(), userJob, test.dependencies...))
-			require.Equal(test.wantNumDependencies, test.scheduler.NumDependencies())
-			require.Equal(test.wantExecuted, userJob.calledExecute)
+			require.Equal(test.expectedNumDependencies, test.scheduler.NumDependencies())
+			require.Equal(test.expectedExecuted, userJob.calledExecute)
 			require.Empty(userJob.fulfilled)
 			require.Empty(userJob.abandoned)
-			require.Equal(test.wantScheduler, test.scheduler)
+			require.Equal(test.expectedScheduler, test.scheduler)
 		})
 	}
 }
@@ -168,44 +168,44 @@ func TestScheduler_Schedule(t *testing.T) {
 func TestScheduler_Fulfill(t *testing.T) {
 	userJob := &testJob{}
 	tests := []struct {
-		name          string
-		scheduler     *Scheduler[int]
-		wantExecuted  bool
-		wantFulfilled []int
-		wantAbandoned []int
-		wantScheduler *Scheduler[int]
+		name              string
+		scheduler         *Scheduler[int]
+		expectedExecuted  bool
+		expectedFulfilled []int
+		expectedAbandoned []int
+		expectedScheduler *Scheduler[int]
 	}{
 		{
-			name:          "no jobs",
-			scheduler:     NewScheduler[int](),
-			wantExecuted:  false,
-			wantFulfilled: nil,
-			wantAbandoned: nil,
-			wantScheduler: NewScheduler[int](),
+			name:              "no jobs",
+			scheduler:         NewScheduler[int](),
+			expectedExecuted:  false,
+			expectedFulfilled: nil,
+			expectedAbandoned: nil,
+			expectedScheduler: NewScheduler[int](),
 		},
 		{
-			name:          "single dependency",
-			scheduler:     newSchedulerWithJob(t, userJob, []int{depToResolve}, nil, nil),
-			wantExecuted:  true,
-			wantFulfilled: []int{depToResolve},
-			wantAbandoned: nil,
-			wantScheduler: NewScheduler[int](),
+			name:              "single dependency",
+			scheduler:         newSchedulerWithJob(t, userJob, []int{depToResolve}, nil, nil),
+			expectedExecuted:  true,
+			expectedFulfilled: []int{depToResolve},
+			expectedAbandoned: nil,
+			expectedScheduler: NewScheduler[int](),
 		},
 		{
-			name:          "non-existent dependency",
-			scheduler:     newSchedulerWithJob(t, userJob, []int{depToNeglect}, nil, nil),
-			wantExecuted:  false,
-			wantFulfilled: nil,
-			wantAbandoned: nil,
-			wantScheduler: newSchedulerWithJob(t, userJob, []int{depToNeglect}, nil, nil),
+			name:              "non-existent dependency",
+			scheduler:         newSchedulerWithJob(t, userJob, []int{depToNeglect}, nil, nil),
+			expectedExecuted:  false,
+			expectedFulfilled: nil,
+			expectedAbandoned: nil,
+			expectedScheduler: newSchedulerWithJob(t, userJob, []int{depToNeglect}, nil, nil),
 		},
 		{
-			name:          "incomplete dependencies",
-			scheduler:     newSchedulerWithJob(t, userJob, []int{depToResolve, depToNeglect}, nil, nil),
-			wantExecuted:  false,
-			wantFulfilled: nil,
-			wantAbandoned: nil,
-			wantScheduler: &Scheduler[int]{
+			name:              "incomplete dependencies",
+			scheduler:         newSchedulerWithJob(t, userJob, []int{depToResolve, depToNeglect}, nil, nil),
+			expectedExecuted:  false,
+			expectedFulfilled: nil,
+			expectedAbandoned: nil,
+			expectedScheduler: &Scheduler[int]{
 				dependents: map[int][]*job[int]{
 					depToNeglect: {
 						{
@@ -219,20 +219,20 @@ func TestScheduler_Fulfill(t *testing.T) {
 			},
 		},
 		{
-			name:          "duplicate dependency",
-			scheduler:     newSchedulerWithJob(t, userJob, []int{depToResolve, depToResolve}, nil, nil),
-			wantExecuted:  true,
-			wantFulfilled: []int{depToResolve, depToResolve},
-			wantAbandoned: nil,
-			wantScheduler: NewScheduler[int](),
+			name:              "duplicate dependency",
+			scheduler:         newSchedulerWithJob(t, userJob, []int{depToResolve, depToResolve}, nil, nil),
+			expectedExecuted:  true,
+			expectedFulfilled: []int{depToResolve, depToResolve},
+			expectedAbandoned: nil,
+			expectedScheduler: NewScheduler[int](),
 		},
 		{
-			name:          "previously abandoned",
-			scheduler:     newSchedulerWithJob(t, userJob, []int{depToResolve, depToNeglect}, nil, []int{depToNeglect}),
-			wantExecuted:  true,
-			wantFulfilled: []int{depToResolve},
-			wantAbandoned: []int{depToNeglect},
-			wantScheduler: NewScheduler[int](),
+			name:              "previously abandoned",
+			scheduler:         newSchedulerWithJob(t, userJob, []int{depToResolve, depToNeglect}, nil, []int{depToNeglect}),
+			expectedExecuted:  true,
+			expectedFulfilled: []int{depToResolve},
+			expectedAbandoned: []int{depToNeglect},
+			expectedScheduler: NewScheduler[int](),
 		},
 	}
 	for _, test := range tests {
@@ -243,10 +243,10 @@ func TestScheduler_Fulfill(t *testing.T) {
 			userJob.reset()
 
 			require.NoError(test.scheduler.Fulfill(context.Background(), depToResolve))
-			require.Equal(test.wantExecuted, userJob.calledExecute)
-			require.Equal(test.wantFulfilled, userJob.fulfilled)
-			require.Equal(test.wantAbandoned, userJob.abandoned)
-			require.Equal(test.wantScheduler, test.scheduler)
+			require.Equal(test.expectedExecuted, userJob.calledExecute)
+			require.Equal(test.expectedFulfilled, userJob.fulfilled)
+			require.Equal(test.expectedAbandoned, userJob.abandoned)
+			require.Equal(test.expectedScheduler, test.scheduler)
 		})
 	}
 }
@@ -254,44 +254,44 @@ func TestScheduler_Fulfill(t *testing.T) {
 func TestScheduler_Abandon(t *testing.T) {
 	userJob := &testJob{}
 	tests := []struct {
-		name          string
-		scheduler     *Scheduler[int]
-		wantExecuted  bool
-		wantFulfilled []int
-		wantAbandoned []int
-		wantScheduler *Scheduler[int]
+		name              string
+		scheduler         *Scheduler[int]
+		expectedExecuted  bool
+		expectedFulfilled []int
+		expectedAbandoned []int
+		expectedScheduler *Scheduler[int]
 	}{
 		{
-			name:          "no jobs",
-			scheduler:     NewScheduler[int](),
-			wantExecuted:  false,
-			wantFulfilled: nil,
-			wantAbandoned: nil,
-			wantScheduler: NewScheduler[int](),
+			name:              "no jobs",
+			scheduler:         NewScheduler[int](),
+			expectedExecuted:  false,
+			expectedFulfilled: nil,
+			expectedAbandoned: nil,
+			expectedScheduler: NewScheduler[int](),
 		},
 		{
-			name:          "single dependency",
-			scheduler:     newSchedulerWithJob(t, userJob, []int{depToResolve}, nil, nil),
-			wantExecuted:  true,
-			wantFulfilled: nil,
-			wantAbandoned: []int{depToResolve},
-			wantScheduler: NewScheduler[int](),
+			name:              "single dependency",
+			scheduler:         newSchedulerWithJob(t, userJob, []int{depToResolve}, nil, nil),
+			expectedExecuted:  true,
+			expectedFulfilled: nil,
+			expectedAbandoned: []int{depToResolve},
+			expectedScheduler: NewScheduler[int](),
 		},
 		{
-			name:          "non-existent dependency",
-			scheduler:     newSchedulerWithJob(t, userJob, []int{depToNeglect}, nil, nil),
-			wantExecuted:  false,
-			wantFulfilled: nil,
-			wantAbandoned: nil,
-			wantScheduler: newSchedulerWithJob(t, userJob, []int{depToNeglect}, nil, nil),
+			name:              "non-existent dependency",
+			scheduler:         newSchedulerWithJob(t, userJob, []int{depToNeglect}, nil, nil),
+			expectedExecuted:  false,
+			expectedFulfilled: nil,
+			expectedAbandoned: nil,
+			expectedScheduler: newSchedulerWithJob(t, userJob, []int{depToNeglect}, nil, nil),
 		},
 		{
-			name:          "incomplete dependencies",
-			scheduler:     newSchedulerWithJob(t, userJob, []int{depToResolve, depToNeglect}, nil, nil),
-			wantExecuted:  false,
-			wantFulfilled: nil,
-			wantAbandoned: nil,
-			wantScheduler: &Scheduler[int]{
+			name:              "incomplete dependencies",
+			scheduler:         newSchedulerWithJob(t, userJob, []int{depToResolve, depToNeglect}, nil, nil),
+			expectedExecuted:  false,
+			expectedFulfilled: nil,
+			expectedAbandoned: nil,
+			expectedScheduler: &Scheduler[int]{
 				dependents: map[int][]*job[int]{
 					depToNeglect: {
 						{
@@ -305,20 +305,20 @@ func TestScheduler_Abandon(t *testing.T) {
 			},
 		},
 		{
-			name:          "duplicate dependency",
-			scheduler:     newSchedulerWithJob(t, userJob, []int{depToResolve, depToResolve}, nil, nil),
-			wantExecuted:  true,
-			wantFulfilled: nil,
-			wantAbandoned: []int{depToResolve, depToResolve},
-			wantScheduler: NewScheduler[int](),
+			name:              "duplicate dependency",
+			scheduler:         newSchedulerWithJob(t, userJob, []int{depToResolve, depToResolve}, nil, nil),
+			expectedExecuted:  true,
+			expectedFulfilled: nil,
+			expectedAbandoned: []int{depToResolve, depToResolve},
+			expectedScheduler: NewScheduler[int](),
 		},
 		{
-			name:          "previously fulfilled",
-			scheduler:     newSchedulerWithJob(t, userJob, []int{depToResolve, depToNeglect}, []int{depToNeglect}, nil),
-			wantExecuted:  true,
-			wantFulfilled: []int{depToNeglect},
-			wantAbandoned: []int{depToResolve},
-			wantScheduler: NewScheduler[int](),
+			name:              "previously fulfilled",
+			scheduler:         newSchedulerWithJob(t, userJob, []int{depToResolve, depToNeglect}, []int{depToNeglect}, nil),
+			expectedExecuted:  true,
+			expectedFulfilled: []int{depToNeglect},
+			expectedAbandoned: []int{depToResolve},
+			expectedScheduler: NewScheduler[int](),
 		},
 	}
 	for _, test := range tests {
@@ -329,10 +329,10 @@ func TestScheduler_Abandon(t *testing.T) {
 			userJob.reset()
 
 			require.NoError(test.scheduler.Abandon(context.Background(), depToResolve))
-			require.Equal(test.wantExecuted, userJob.calledExecute)
-			require.Equal(test.wantFulfilled, userJob.fulfilled)
-			require.Equal(test.wantAbandoned, userJob.abandoned)
-			require.Equal(test.wantScheduler, test.scheduler)
+			require.Equal(test.expectedExecuted, userJob.calledExecute)
+			require.Equal(test.expectedFulfilled, userJob.fulfilled)
+			require.Equal(test.expectedAbandoned, userJob.abandoned)
+			require.Equal(test.expectedScheduler, test.scheduler)
 		})
 	}
 }
