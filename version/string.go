@@ -22,8 +22,9 @@ type Versions struct {
 	Application string `json:"application"`
 	Database    string `json:"database"`
 	RPCChainVM  string `json:"rpcchainvm"`
-	Commit      string `json:"commit"`
-	Go          string `json:"go"`
+	// Commit may be empty if GitCommit was not set at compile time
+	Commit string `json:"commit"`
+	Go     string `json:"go"`
 }
 
 func GetVersions() *Versions {
