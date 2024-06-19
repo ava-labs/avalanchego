@@ -957,22 +957,19 @@ func (t *Transitive) deliver(
 	// longer pending
 	t.removeFromPending(blk)
 
-	blkID := blk.ID()
-	if t.isDecided(blk) || t.Consensus.Processing(blkID) {
-		// If [blk] is decided, then it shouldn't be added to consensus.
-		// Similarly, if [blkID] is already in the processing set, it shouldn't
-		// be added to consensus again.
+	var (
+		parentID = blk.Parent()
+		blkID    = blk.ID()
+	)
+	if !t.canIssueChildOn(parentID) {
+		// If the parent isn't processing or the last accepted block, then this
+		// block is effectively rejected.
 		return t.blocked.Abandon(ctx, blkID)
 	}
 
-	parentID := blk.Parent()
-	parent, err := t.getBlock(ctx, parentID)
-	// Because the dependency must have been fulfilled by the time this function
-	// is called - we don't expect [err] to be non-nil. But it is handled for
-	// completeness and future proofing.
-	if err != nil || !(parent.Status() == choices.Accepted || t.Consensus.Processing(parentID)) {
-		// if the parent isn't processing or the last accepted block, then this
-		// block is effectively rejected
+	if t.Consensus.Processing(blkID) {
+		// If [blkID] is already in the processing set, it shouldn't be added to
+		// consensus again.
 		return t.blocked.Abandon(ctx, blkID)
 	}
 
@@ -1180,6 +1177,13 @@ func (t *Transitive) getProcessingAncestor(ctx context.Context, initialVote ids.
 
 		bubbledVote = blk.Parent()
 	}
+}
+
+// canIssueChildOn reports true if the provided parentID is either the last
+// accepted block or is currently processing.
+func (t *Transitive) canIssueChildOn(parentID ids.ID) bool {
+	lastAcceptedID, _ := t.Consensus.LastAccepted()
+	return parentID == lastAcceptedID || t.Consensus.Processing(parentID)
 }
 
 // isDecided reports true if the provided block's status is Accepted, Rejected,
