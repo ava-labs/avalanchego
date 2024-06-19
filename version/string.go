@@ -6,7 +6,6 @@ package version
 import (
 	"fmt"
 	"runtime"
-	"strconv"
 	"strings"
 )
 
@@ -20,7 +19,7 @@ var GitCommit string
 type Versions struct {
 	Application string `json:"application"`
 	Database    string `json:"database"`
-	RPCChainVM  string `json:"rpcchainvm"`
+	RPCChainVM  uint64 `json:"rpcchainvm"`
 	// Commit may be empty if GitCommit was not set at compile time
 	Commit string `json:"commit"`
 	Go     string `json:"go"`
@@ -30,7 +29,7 @@ func GetVersions() *Versions {
 	versions := &Versions{
 		Application: CurrentApp.String(),
 		Database:    CurrentDatabase.String(),
-		RPCChainVM:  strconv.FormatUint(uint64(RPCChainVMProtocol), 10),
+		RPCChainVM:  uint64(RPCChainVMProtocol),
 		Go:          strings.TrimPrefix(runtime.Version(), "go"),
 	}
 	if GitCommit != "" {
@@ -41,7 +40,7 @@ func GetVersions() *Versions {
 
 func (v *Versions) String() string {
 	// This format maintains consistency with previous --version output
-	versionString := fmt.Sprintf("%s [database=%s, rpcchainvm=%s, ", v.Application, v.Database, v.RPCChainVM)
+	versionString := fmt.Sprintf("%s [database=%s, rpcchainvm=%d, ", v.Application, v.Database, v.RPCChainVM)
 	if len(v.Commit) > 0 {
 		versionString += fmt.Sprintf("commit=%s, ", v.Commit)
 	}

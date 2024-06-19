@@ -4,7 +4,6 @@
 package version
 
 import (
-	"encoding/json"
 	"fmt"
 	"testing"
 
@@ -15,11 +14,11 @@ func TestVersionsGetString(t *testing.T) {
 	versions := Versions{
 		Application: "1",
 		Database:    "2",
-		RPCChainVM:  "3",
+		RPCChainVM:  3,
 		Go:          "5",
 	}
 	expectedVersions := fmt.Sprintf(
-		"%s [database=%s, rpcchainvm=%s, go=%s]",
+		"%s [database=%s, rpcchainvm=%d, go=%s]",
 		versions.Application,
 		versions.Database,
 		versions.RPCChainVM,
@@ -29,7 +28,7 @@ func TestVersionsGetString(t *testing.T) {
 
 	versions.Commit = "eafd"
 	expectedVersions = fmt.Sprintf(
-		"%s [database=%s, rpcchainvm=%s, commit=%s, go=%s]",
+		"%s [database=%s, rpcchainvm=%d, commit=%s, go=%s]",
 		versions.Application,
 		versions.Database,
 		versions.RPCChainVM,
