@@ -4,6 +4,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -34,8 +35,14 @@ func main() {
 		os.Exit(1)
 	}
 
-		fmt.Println(version.GetVersions().JSON())
 	if v.GetBool(config.VersionJSONKey) {
+		versions := version.GetVersions()
+		jsonBytes, err := json.MarshalIndent(versions, "", "  ")
+		if err != nil {
+			fmt.Printf("couldn't marshal versions: %s\n", err)
+			os.Exit(1)
+		}
+		fmt.Println(string(jsonBytes))
 		os.Exit(0)
 	}
 

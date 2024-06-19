@@ -4,7 +4,6 @@
 package version
 
 import (
-	"encoding/json"
 	"fmt"
 	"runtime"
 	"strconv"
@@ -47,12 +46,4 @@ func (v *Versions) String() string {
 		versionString += fmt.Sprintf("commit=%s, ", v.Commit)
 	}
 	return versionString + fmt.Sprintf("go=%s]", v.Go)
-}
-
-func (v *Versions) JSON() string {
-	jsonBytes, err := json.MarshalIndent(v, "", "  ")
-	if err != nil {
-		panic(err)
-	}
-	return string(jsonBytes)
 }

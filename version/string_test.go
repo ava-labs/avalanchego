@@ -38,11 +38,3 @@ func TestVersionsGetString(t *testing.T) {
 	)
 	require.Equal(t, expectedVersions, versions.String())
 }
-
-func TestVersionsJSON(t *testing.T) {
-	versions := GetVersions()
-	jsonString := versions.JSON()
-	unmarshalledVersions := &Versions{}
-	require.NoError(t, json.Unmarshal([]byte(jsonString), unmarshalledVersions))
-	require.Equal(t, versions, unmarshalledVersions)
-}
