@@ -7,6 +7,8 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
+	"slices"
 	"testing"
 	"time"
 
@@ -32,11 +34,10 @@ import (
 )
 
 var (
-	errUnknownBlock   = errors.New("unknown block")
-	errUnknownBytes   = errors.New("unknown bytes")
-	errInvalid        = errors.New("invalid")
-	errUnexpectedCall = errors.New("unexpected call")
-	errTest           = errors.New("non-nil test")
+	errUnknownBlock = errors.New("unknown block")
+	errUnknownBytes = errors.New("unknown bytes")
+	errInvalid      = errors.New("invalid")
+	errTest         = errors.New("non-nil test")
 )
 
 func MakeGetBlockF(blks ...[]*snowmantest.Block) func(context.Context, ids.ID) (snowman.Block, error) {
@@ -1676,287 +1677,49 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 	require.True(queried)
 }
 
-func TestEngineReceiveNewRejectedBlock(t *testing.T) {
+func TestEngineDropRejectedBlockOnReceipt(t *testing.T) {
 	require := require.New(t)
 
-	vdr, _, sender, vm, te := setup(t, DefaultConfig(t))
+	nodeID, _, sender, vm, te := setup(t, DefaultConfig(t))
+
+	// Ignore outbound chits
+	sender.SendChitsF = func(context.Context, ids.NodeID, uint32, ids.ID, ids.ID, ids.ID) {}
 
 	acceptedBlk := snowmantest.BuildChild(snowmantest.Genesis)
-	rejectedBlk := snowmantest.BuildChild(snowmantest.Genesis)
-	pendingBlk := snowmantest.BuildChild(rejectedBlk)
-
-	vm.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
-		switch {
-		case bytes.Equal(b, acceptedBlk.Bytes()):
-			return acceptedBlk, nil
-		case bytes.Equal(b, rejectedBlk.Bytes()):
-			return rejectedBlk, nil
-		case bytes.Equal(b, pendingBlk.Bytes()):
-			return pendingBlk, nil
-		default:
-			require.FailNow(errUnknownBlock.Error())
-			return nil, errUnknownBlock
-		}
-	}
-
-	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
-		switch blkID {
-		case snowmantest.GenesisID:
-			return snowmantest.Genesis, nil
-		case acceptedBlk.ID():
-			return acceptedBlk, nil
-		default:
-			return nil, errUnknownBlock
-		}
-	}
-
-	var (
-		asked bool
-		reqID uint32
+	rejectedChain := snowmantest.BuildDescendants(snowmantest.Genesis, 2)
+	vm.ParseBlockF = MakeParseBlockF(
+		[]*snowmantest.Block{
+			snowmantest.Genesis,
+			acceptedBlk,
+		},
+		rejectedChain,
 	)
-	sender.SendPullQueryF = func(_ context.Context, _ set.Set[ids.NodeID], rID uint32, _ ids.ID, _ uint64) {
-		asked = true
-		reqID = rID
+	vm.GetBlockF = MakeGetBlockF([]*snowmantest.Block{
+		snowmantest.Genesis,
+		acceptedBlk,
+	})
+
+	// Track outbound queries
+	var queryRequestIDs []uint32
+	sender.SendPullQueryF = func(_ context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, _ ids.ID, _ uint64) {
+		require.Equal(set.Of(nodeID), nodeIDs)
+		queryRequestIDs = append(queryRequestIDs, requestID)
 	}
 
-	require.NoError(te.Put(context.Background(), vdr, 0, acceptedBlk.Bytes()))
+	// Issue [acceptedBlk] to the engine. This
+	require.NoError(te.PushQuery(context.Background(), nodeID, 0, acceptedBlk.Bytes(), acceptedBlk.Height()))
+	require.Len(queryRequestIDs, 1)
 
-	require.True(asked)
+	// Vote for [acceptedBlk] and cause it to be accepted.
+	require.NoError(te.Chits(context.Background(), nodeID, queryRequestIDs[0], acceptedBlk.ID(), acceptedBlk.ID(), acceptedBlk.ID()))
+	require.Len(queryRequestIDs, 1) // Shouldn't have caused another query
+	require.Equal(choices.Accepted, acceptedBlk.Status())
 
-	require.NoError(te.Chits(context.Background(), vdr, reqID, acceptedBlk.ID(), acceptedBlk.ID(), acceptedBlk.ID()))
-
-	sender.SendPullQueryF = nil
-	asked = false
-
-	sender.SendGetF = func(_ context.Context, _ ids.NodeID, rID uint32, _ ids.ID) {
-		asked = true
-		reqID = rID
-	}
-
-	require.NoError(te.Put(context.Background(), vdr, 0, pendingBlk.Bytes()))
-
-	require.True(asked)
-
-	rejectedBlk.StatusV = choices.Rejected
-
-	require.NoError(te.Put(context.Background(), vdr, reqID, rejectedBlk.Bytes()))
-
+	// Attempt to issue rejectedChain[1] to the engine. This should be dropped
+	// because the engine knows it has rejected it's parent rejectedChain[0].
+	require.NoError(te.PushQuery(context.Background(), nodeID, 0, rejectedChain[1].Bytes(), acceptedBlk.Height()))
+	require.Len(queryRequestIDs, 1) // Shouldn't have caused another query
 	require.Zero(te.blkReqs.Len())
-}
-
-func TestEngineRejectionAmplification(t *testing.T) {
-	require := require.New(t)
-
-	vdr, _, sender, vm, te := setup(t, DefaultConfig(t))
-
-	acceptedBlk := snowmantest.BuildChild(snowmantest.Genesis)
-	rejectedBlk := snowmantest.BuildChild(snowmantest.Genesis)
-	pendingBlk := snowmantest.BuildChild(rejectedBlk)
-
-	vm.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
-		switch {
-		case bytes.Equal(b, acceptedBlk.Bytes()):
-			return acceptedBlk, nil
-		case bytes.Equal(b, rejectedBlk.Bytes()):
-			return rejectedBlk, nil
-		case bytes.Equal(b, pendingBlk.Bytes()):
-			return pendingBlk, nil
-		default:
-			require.FailNow(errUnknownBlock.Error())
-			return nil, errUnknownBlock
-		}
-	}
-
-	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
-		switch blkID {
-		case snowmantest.GenesisID:
-			return snowmantest.Genesis, nil
-		case acceptedBlk.ID():
-			return acceptedBlk, nil
-		default:
-			return nil, errUnknownBlock
-		}
-	}
-
-	var (
-		queried bool
-		reqID   uint32
-	)
-	sender.SendPullQueryF = func(_ context.Context, _ set.Set[ids.NodeID], rID uint32, _ ids.ID, _ uint64) {
-		queried = true
-		reqID = rID
-	}
-
-	require.NoError(te.Put(context.Background(), vdr, 0, acceptedBlk.Bytes()))
-
-	require.True(queried)
-
-	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
-		switch blkID {
-		case snowmantest.GenesisID:
-			return snowmantest.Genesis, nil
-		case acceptedBlk.ID():
-			return acceptedBlk, nil
-		default:
-			return nil, errUnknownBlock
-		}
-	}
-
-	require.NoError(te.Chits(context.Background(), vdr, reqID, acceptedBlk.ID(), acceptedBlk.ID(), acceptedBlk.ID()))
-
-	require.Zero(te.Consensus.NumProcessing())
-
-	queried = false
-	var asked bool
-	sender.SendPullQueryF = func(context.Context, set.Set[ids.NodeID], uint32, ids.ID, uint64) {
-		queried = true
-	}
-	sender.SendGetF = func(_ context.Context, _ ids.NodeID, rID uint32, blkID ids.ID) {
-		asked = true
-		reqID = rID
-
-		require.Equal(rejectedBlk.ID(), blkID)
-	}
-
-	require.NoError(te.Put(context.Background(), vdr, 0, pendingBlk.Bytes()))
-
-	require.False(queried)
-	require.True(asked)
-
-	require.NoError(te.Put(context.Background(), vdr, reqID, rejectedBlk.Bytes()))
-
-	require.False(queried)
-}
-
-// Test that the node will not issue a block into consensus that it knows will
-// be rejected because the parent is rejected.
-func TestEngineTransitiveRejectionAmplificationDueToRejectedParent(t *testing.T) {
-	require := require.New(t)
-
-	vdr, _, sender, vm, te := setup(t, DefaultConfig(t))
-
-	acceptedBlk := snowmantest.BuildChild(snowmantest.Genesis)
-	rejectedBlk := snowmantest.BuildChild(snowmantest.Genesis)
-	pendingBlk := snowmantest.BuildChild(rejectedBlk)
-	pendingBlk.RejectV = errUnexpectedCall
-
-	vm.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
-		switch {
-		case bytes.Equal(b, acceptedBlk.Bytes()):
-			return acceptedBlk, nil
-		case bytes.Equal(b, rejectedBlk.Bytes()):
-			return rejectedBlk, nil
-		case bytes.Equal(b, pendingBlk.Bytes()):
-			return pendingBlk, nil
-		default:
-			require.FailNow(errUnknownBlock.Error())
-			return nil, errUnknownBlock
-		}
-	}
-
-	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
-		switch blkID {
-		case snowmantest.GenesisID:
-			return snowmantest.Genesis, nil
-		case acceptedBlk.ID():
-			return acceptedBlk, nil
-		case rejectedBlk.ID():
-			return rejectedBlk, nil
-		default:
-			return nil, errUnknownBlock
-		}
-	}
-
-	var (
-		queried bool
-		reqID   uint32
-	)
-	sender.SendPullQueryF = func(_ context.Context, _ set.Set[ids.NodeID], rID uint32, _ ids.ID, _ uint64) {
-		queried = true
-		reqID = rID
-	}
-
-	require.NoError(te.Put(context.Background(), vdr, 0, acceptedBlk.Bytes()))
-
-	require.True(queried)
-
-	require.NoError(te.Chits(context.Background(), vdr, reqID, acceptedBlk.ID(), acceptedBlk.ID(), acceptedBlk.ID()))
-
-	require.Zero(te.Consensus.NumProcessing())
-
-	require.NoError(te.Put(context.Background(), vdr, 0, pendingBlk.Bytes()))
-
-	require.Zero(te.Consensus.NumProcessing())
-
-	require.Empty(te.pending)
-}
-
-// Test that the node will not issue a block into consensus that it knows will
-// be rejected because the parent is failing verification.
-func TestEngineTransitiveRejectionAmplificationDueToInvalidParent(t *testing.T) {
-	require := require.New(t)
-
-	vdr, _, sender, vm, te := setup(t, DefaultConfig(t))
-
-	acceptedBlk := snowmantest.BuildChild(snowmantest.Genesis)
-	rejectedBlk := snowmantest.BuildChild(snowmantest.Genesis)
-	rejectedBlk.VerifyV = errUnexpectedCall
-	pendingBlk := snowmantest.BuildChild(rejectedBlk)
-	pendingBlk.VerifyV = errUnexpectedCall
-
-	vm.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
-		switch {
-		case bytes.Equal(b, acceptedBlk.Bytes()):
-			return acceptedBlk, nil
-		case bytes.Equal(b, rejectedBlk.Bytes()):
-			return rejectedBlk, nil
-		case bytes.Equal(b, pendingBlk.Bytes()):
-			return pendingBlk, nil
-		default:
-			require.FailNow(errUnknownBlock.Error())
-			return nil, errUnknownBlock
-		}
-	}
-
-	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
-		switch blkID {
-		case snowmantest.GenesisID:
-			return snowmantest.Genesis, nil
-		default:
-			return nil, errUnknownBlock
-		}
-	}
-
-	var (
-		queried bool
-		reqID   uint32
-	)
-	sender.SendPullQueryF = func(_ context.Context, _ set.Set[ids.NodeID], rID uint32, _ ids.ID, _ uint64) {
-		queried = true
-		reqID = rID
-	}
-
-	require.NoError(te.Put(context.Background(), vdr, 0, acceptedBlk.Bytes()))
-	require.True(queried)
-
-	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
-		switch blkID {
-		case snowmantest.GenesisID:
-			return snowmantest.Genesis, nil
-		case rejectedBlk.ID():
-			return rejectedBlk, nil
-		case acceptedBlk.ID():
-			return acceptedBlk, nil
-		default:
-			return nil, errUnknownBlock
-		}
-	}
-
-	require.NoError(te.Chits(context.Background(), vdr, reqID, acceptedBlk.ID(), acceptedBlk.ID(), acceptedBlk.ID()))
-
-	require.NoError(te.Put(context.Background(), vdr, 0, pendingBlk.Bytes()))
-	require.Zero(te.Consensus.NumProcessing())
-	require.Empty(te.pending)
 }
 
 // Test that the node will not gossip a block that isn't preferred.
@@ -3151,6 +2914,147 @@ func TestGetProcessingAncestor(t *testing.T) {
 			ancestor, found := test.engine.getProcessingAncestor(context.Background(), test.initialVote)
 			require.Equal(test.expectedAncestor, ancestor)
 			require.Equal(test.expectedFound, found)
+		})
+	}
+}
+
+// Test the engine's classification for blocks to either be dropped or try
+// issuance.
+//
+// Full blockchain structure:
+//
+//	    Genesis
+//	   /       \
+//	  0         7
+//	 / \        |
+//	1   4       8
+//	|   |      / \
+//	2   5     9  11
+//	|   |     |
+//	3   6     10
+//
+// Genesis and 0 are accepted.
+// 1 is issued.
+// 5 and 9 are pending.
+//
+// Structure known to engine:
+//
+//	    Genesis
+//	   /
+//	  0
+//	 /
+//	1
+//
+//	    5     9
+func TestShouldIssueBlock(t *testing.T) {
+	var (
+		ctx = snowtest.ConsensusContext(
+			snowtest.Context(t, snowtest.PChainID),
+		)
+		chain0Through3   = snowmantest.BuildDescendants(snowmantest.Genesis, 4)
+		chain4Through6   = snowmantest.BuildDescendants(chain0Through3[0], 3)
+		chain7Through10  = snowmantest.BuildDescendants(snowmantest.Genesis, 4)
+		chain11Through11 = snowmantest.BuildDescendants(chain7Through10[1], 1)
+		blocks           = slices.Concat(chain0Through3, chain4Through6, chain7Through10, chain11Through11)
+	)
+
+	require.NoError(t, blocks[0].Accept(context.Background()))
+
+	c := &snowman.Topological{}
+	require.NoError(t, c.Initialize(
+		ctx,
+		snowball.DefaultParameters,
+		blocks[0].ID(),
+		blocks[0].Height(),
+		blocks[0].Timestamp(),
+	))
+	require.NoError(t, c.Add(blocks[1]))
+
+	engine := &Transitive{
+		Config: Config{
+			Consensus: c,
+		},
+		pending: map[ids.ID]snowman.Block{
+			blocks[5].ID(): blocks[5],
+			blocks[9].ID(): blocks[9],
+		},
+	}
+
+	tests := []struct {
+		name                string
+		block               snowman.Block
+		expectedShouldIssue bool
+	}{
+		{
+			name:                "genesis",
+			block:               snowmantest.Genesis,
+			expectedShouldIssue: false,
+		},
+		{
+			name:                "last accepted",
+			block:               blocks[0],
+			expectedShouldIssue: false,
+		},
+		{
+			name:                "already processing",
+			block:               blocks[1],
+			expectedShouldIssue: false,
+		},
+		{
+			name:                "next block to enqueue for issuance on top of a processing block",
+			block:               blocks[2],
+			expectedShouldIssue: true,
+		},
+		{
+			name:                "block to enqueue for issuance which depends on another block",
+			block:               blocks[3],
+			expectedShouldIssue: true,
+		},
+		{
+			name:                "next block to enqueue for issuance on top of an accepted block",
+			block:               blocks[4],
+			expectedShouldIssue: true,
+		},
+		{
+			name:                "already pending block",
+			block:               blocks[5],
+			expectedShouldIssue: false,
+		},
+		{
+			name:                "block to enqueue on top of a pending block",
+			block:               blocks[6],
+			expectedShouldIssue: true,
+		},
+		{
+			name:                "block was directly rejected",
+			block:               blocks[7],
+			expectedShouldIssue: false,
+		},
+		{
+			name:                "block was transitively rejected",
+			block:               blocks[8],
+			expectedShouldIssue: false,
+		},
+		{
+			name:                "block was transitively rejected but that is not known and was marked as pending",
+			block:               blocks[9],
+			expectedShouldIssue: false,
+		},
+		{
+			name:                "block was transitively rejected but that is not known and is built on top of pending",
+			block:               blocks[10],
+			expectedShouldIssue: true,
+		},
+		{
+			name:                "block was transitively rejected but that is not known",
+			block:               blocks[11],
+			expectedShouldIssue: true,
+		},
+	}
+	for i, test := range tests {
+		t.Run(fmt.Sprintf("%d %s", i-1, test.name), func(t *testing.T) {
+			shouldIssue := engine.shouldIssueBlock(test.block)
+			require.Equal(t, test.expectedShouldIssue, shouldIssue)
 		})
 	}
 }
