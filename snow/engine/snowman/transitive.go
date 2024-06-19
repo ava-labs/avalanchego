@@ -1176,8 +1176,8 @@ func (t *Transitive) getProcessingAncestor(ctx context.Context, initialVote ids.
 	}
 }
 
-// canIssueChildOn reports true if the provided parentID is either the last
-// accepted block or is currently processing.
+// canIssueChildOn reports true if it is valid for a child of parentID to be
+// verified and added to consensus.
 func (t *Transitive) canIssueChildOn(parentID ids.ID) bool {
 	lastAcceptedID, _ := t.Consensus.LastAccepted()
 	return parentID == lastAcceptedID || t.Consensus.Processing(parentID)
