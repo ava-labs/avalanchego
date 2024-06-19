@@ -537,6 +537,7 @@ func (t *Transitive) HealthCheck(ctx context.Context) (interface{}, error) {
 		zap.Uint32("requestID", t.requestID),
 		zap.Stringer("polls", t.polls),
 		zap.Reflect("outstandingBlockRequests", t.blkReqs),
+		zap.Int("numMissingDependencies", t.blocked.NumDependencies()),
 		zap.Int("pendingBuildBlocks", t.pendingBuildBlocks),
 	)
 
@@ -961,15 +962,11 @@ func (t *Transitive) deliver(
 		parentID = blk.Parent()
 		blkID    = blk.ID()
 	)
-	if !t.canIssueChildOn(parentID) {
+	if !t.canIssueChildOn(parentID) || t.Consensus.Processing(blkID) {
 		// If the parent isn't processing or the last accepted block, then this
 		// block is effectively rejected.
-		return t.blocked.Abandon(ctx, blkID)
-	}
-
-	if t.Consensus.Processing(blkID) {
-		// If [blkID] is already in the processing set, it shouldn't be added to
-		// consensus again.
+		// Additionally, if [blkID] is already in the processing set, it
+		// shouldn't be added to consensus again.
 		return t.blocked.Abandon(ctx, blkID)
 	}
 

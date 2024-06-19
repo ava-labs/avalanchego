@@ -35,7 +35,8 @@ func NewScheduler[T comparable]() *Scheduler[T] {
 	}
 }
 
-// Schedule a job to be executed once all of its dependencies are resolved.
+// Schedule a job to be executed once all of its dependencies are resolved. If a
+// job is scheduled with no dependencies, it's executed immediately.
 //
 // In order to prevent a memory leak, all dependencies must eventually either be
 // fulfilled or abandoned.
