@@ -41,7 +41,7 @@ type Metrics interface {
 	// Mark when this node will unstake from a subnet.
 	SetTimeUntilSubnetUnstake(subnetID ids.ID, timeUntilUnstake time.Duration)
 	// Mark cumulated gas in excess of target gas
-	SetExcessComplexity(commonfee.Gas)
+	SetExcessGas(commonfee.Gas)
 	// Mark gas cumulated across txs of last accepted block
 	SetBlockGas(commonfee.Gas)
 }
@@ -170,7 +170,7 @@ func (m *metrics) SetTimeUntilSubnetUnstake(subnetID ids.ID, timeUntilUnstake ti
 	m.timeUntilSubnetUnstake.WithLabelValues(subnetID.String()).Set(float64(timeUntilUnstake))
 }
 
-func (m *metrics) SetExcessComplexity(g commonfee.Gas) {
+func (m *metrics) SetExcessGas(g commonfee.Gas) {
 	m.excessGas.Set(float64(g))
 }
 

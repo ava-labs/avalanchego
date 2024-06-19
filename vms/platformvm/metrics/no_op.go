@@ -53,6 +53,6 @@ func (noopMetrics) SetSubnetPercentConnected(ids.ID, float64) {}
 
 func (noopMetrics) SetPercentConnected(float64) {}
 
-func (noopMetrics) SetExcessComplexity(commonfee.Gas) {}
+func (noopMetrics) SetExcessGas(commonfee.Gas) {}
 
 func (noopMetrics) SetBlockGas(commonfee.Gas) {}

@@ -367,9 +367,6 @@ func (v *verifier) abortBlock(b block.Block) error {
 		statelessBlock: b,
 		onAcceptState:  onAbortState,
 		timestamp:      onAbortState.GetTimestamp(),
-
-		// blockComplexity not set. We'll assign same complexity
-		// as proposal blocks upon acceptance
 	}
 	return nil
 }

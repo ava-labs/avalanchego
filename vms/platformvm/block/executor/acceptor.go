@@ -79,7 +79,7 @@ func (a *acceptor) ApricotAtomicBlock(b *block.ApricotAtomicBlock) error {
 		return fmt.Errorf("%w %s", errMissingBlockState, blkID)
 	}
 
-	a.metrics.SetExcessComplexity(blkState.excessGas)
+	a.metrics.SetExcessGas(blkState.excessGas)
 	a.metrics.SetBlockGas(blkState.blockGas)
 
 	// Update the state to reflect the changes made in [onAcceptState].
@@ -139,7 +139,7 @@ func (a *acceptor) optionBlock(b block.Block, blockType string) error {
 		return err
 	}
 
-	a.metrics.SetExcessComplexity(parentState.excessGas)
+	a.metrics.SetExcessGas(parentState.excessGas)
 	a.metrics.SetBlockGas(parentState.blockGas)
 
 	if err := a.commonAccept(b); err != nil {
@@ -158,7 +158,7 @@ func (a *acceptor) optionBlock(b block.Block, blockType string) error {
 	}
 
 	// we set option complexity at its parent block's one.
-	a.metrics.SetExcessComplexity(parentState.excessGas)
+	a.metrics.SetExcessGas(parentState.excessGas)
 	a.metrics.SetBlockGas(parentState.blockGas)
 
 	if err := blkState.onAcceptState.Apply(a.state); err != nil {
@@ -239,7 +239,7 @@ func (a *acceptor) standardBlock(b block.Block, blockType string) error {
 		return fmt.Errorf("%w %s", errMissingBlockState, blkID)
 	}
 
-	a.metrics.SetExcessComplexity(blkState.excessGas)
+	a.metrics.SetExcessGas(blkState.excessGas)
 	a.metrics.SetBlockGas(blkState.blockGas)
 
 	// Update the state to reflect the changes made in [onAcceptState].
