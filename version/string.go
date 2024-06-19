@@ -16,8 +16,8 @@ var GitCommit string
 
 // Versions contains the versions relevant to a build of avalanchego. In
 // addition to supporting construction of the strings displayed by
-// --version and --json-version, it can be used to unmarshal the output
-// of --json-version.
+// --version and --version-json, it can be used to unmarshal the output
+// of --version-json.
 type Versions struct {
 	Application string `json:"application"`
 	Database    string `json:"database"`

@@ -29,13 +29,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	if v.GetBool(config.JSONVersionKey) && v.GetBool(config.VersionKey) {
+	if v.GetBool(config.VersionJSONKey) && v.GetBool(config.VersionKey) {
 		fmt.Println("can't print both JSON and human readable versions")
 		os.Exit(1)
 	}
 
-	if v.GetBool(config.JSONVersionKey) {
 		fmt.Println(version.GetVersions().JSON())
+	if v.GetBool(config.VersionJSONKey) {
 		os.Exit(0)
 	}
 

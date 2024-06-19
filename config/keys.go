@@ -13,7 +13,7 @@ const (
 	ConfigContentKey                 = "config-file-content"
 	ConfigContentTypeKey             = "config-file-content-type"
 	VersionKey                       = "version"
-	JSONVersionKey                   = "json-version"
+	VersionJSONKey                   = "version-json"
 	GenesisFileKey                   = "genesis-file"
 	GenesisFileContentKey            = "genesis-file-content"
 	NetworkNameKey                   = "network-id"
