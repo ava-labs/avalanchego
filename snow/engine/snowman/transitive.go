@@ -537,6 +537,7 @@ func (t *Transitive) HealthCheck(ctx context.Context) (interface{}, error) {
 		zap.Uint32("requestID", t.requestID),
 		zap.Stringer("polls", t.polls),
 		zap.Reflect("outstandingBlockRequests", t.blkReqs),
+		zap.Int("numMissingDependencies", t.blocked.NumDependencies()),
 		zap.Int("pendingBuildBlocks", t.pendingBuildBlocks),
 	)
 
