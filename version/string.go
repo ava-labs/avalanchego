@@ -11,61 +11,47 @@ import (
 	"strings"
 )
 
-var (
-	// String is displayed when CLI arg --version is used
-	String string
+// GitCommit is set in the build script at compile time
+var GitCommit string
 
-	// String is displayed when CLI arg --json-version is used
-	JSONString string
-
-	// GitCommit is set in the build script at compile time
-	GitCommit string
-)
-
-type namedVersion struct {
-	name    string
-	version string
+// Versions contains the versions relevant to a build of avalanchego. In
+// addition to supporting construction of the strings displayed by
+// --version and --json-version, it can be used to unmarshal the output
+// of --json-version.
+type Versions struct {
+	Application string `json:"application"`
+	Database    string `json:"database"`
+	RPCChainVM  string `json:"rpcchainvm"`
+	Commit      string `json:"commit"`
+	Go          string `json:"go"`
 }
 
-func init() {
-	// Define the ordered set of versions that are common to regular and JSON
-	// output. The order is maintained to ensure consistency with previous
-	// --version output.
-	versions := []namedVersion{
-		{name: "database", version: CurrentDatabase.String()},
-		{name: "rpcchainvm", version: strconv.FormatUint(uint64(RPCChainVMProtocol), 10)},
+func GetVersions() *Versions {
+	versions := &Versions{
+		Application: CurrentApp.String(),
+		Database:    CurrentDatabase.String(),
+		RPCChainVM:  strconv.FormatUint(uint64(RPCChainVMProtocol), 10),
+		Go:          strings.TrimPrefix(runtime.Version(), "go"),
 	}
-
-	// Add git commit if available
 	if GitCommit != "" {
-		versions = append(versions, namedVersion{name: "commit", version: GitCommit})
+		versions.Commit = GitCommit
 	}
+	return versions
+}
 
-	// Add golang version
-	goVersion := runtime.Version()
-	goVersionNumber := strings.TrimPrefix(goVersion, "go")
-	versions = append(versions, namedVersion{name: "go", version: goVersionNumber})
-
-	// Set the value of the regular version string
-	versionPairs := make([]string, len(versions))
-	for i, v := range versions {
-		versionPairs[i] = fmt.Sprintf("%s=%s", v.name, v.version)
-	}
+func (v *Versions) String() string {
 	// This format maintains consistency with previous --version output
-	String = fmt.Sprintf("%s [%s]\n", CurrentApp, strings.Join(versionPairs, ", "))
-
-	// Include the app version as a regular value in the JSON output
-	versions = append(versions, namedVersion{name: "app", version: CurrentApp.String()})
-
-	// Convert versions to a map for more compact JSON output
-	versionMap := make(map[string]string, len(versions))
-	for _, v := range versions {
-		versionMap[v.name] = v.version
+	versionString := fmt.Sprintf("%s [database=%s, rpcchainvm=%s, ", v.Application, v.Database, v.RPCChainVM)
+	if len(v.Commit) > 0 {
+		versionString += fmt.Sprintf("commit=%s, ", v.Commit)
 	}
+	return versionString + fmt.Sprintf("go=%s]", v.Go)
+}
 
-	jsonBytes, err := json.MarshalIndent(versionMap, "", "  ")
+func (v *Versions) JSON() string {
+	jsonBytes, err := json.MarshalIndent(v, "", "  ")
 	if err != nil {
 		panic(err)
 	}
-	JSONString = string(jsonBytes) + "\n"
+	return string(jsonBytes)
 }
