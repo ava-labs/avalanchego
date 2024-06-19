@@ -4,7 +4,6 @@
 package version
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -17,23 +16,7 @@ func TestVersionsGetString(t *testing.T) {
 		RPCChainVM:  3,
 		Go:          "5",
 	}
-	expectedVersions := fmt.Sprintf(
-		"%s [database=%s, rpcchainvm=%d, go=%s]",
-		versions.Application,
-		versions.Database,
-		versions.RPCChainVM,
-		versions.Go,
-	)
-	require.Equal(t, expectedVersions, versions.String())
-
-	versions.Commit = "eafd"
-	expectedVersions = fmt.Sprintf(
-		"%s [database=%s, rpcchainvm=%d, commit=%s, go=%s]",
-		versions.Application,
-		versions.Database,
-		versions.RPCChainVM,
-		versions.Commit,
-		versions.Go,
-	)
-	require.Equal(t, expectedVersions, versions.String())
+	require.Equal(t, "1 [database=2, rpcchainvm=3, go=5]", versions.String())
+	versions.Commit = "4"
+	require.Equal(t, "1 [database=2, rpcchainvm=3, commit=4, go=5]", versions.String())
 }

@@ -26,16 +26,13 @@ type Versions struct {
 }
 
 func GetVersions() *Versions {
-	versions := &Versions{
+	return &Versions{
 		Application: CurrentApp.String(),
 		Database:    CurrentDatabase.String(),
 		RPCChainVM:  uint64(RPCChainVMProtocol),
+		Commit:      GitCommit,
 		Go:          strings.TrimPrefix(runtime.Version(), "go"),
 	}
-	if GitCommit != "" {
-		versions.Commit = GitCommit
-	}
-	return versions
 }
 
 func (v *Versions) String() string {
