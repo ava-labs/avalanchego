@@ -48,7 +48,7 @@ func NewUpdatedManager(
 		currentExcessGas: currentExcessGas,
 	}
 
-	targetGas, err := targetGas(feesConfig, parentBlkTime, childBlkTime)
+	targetGas, err := TargetGas(feesConfig, parentBlkTime, childBlkTime)
 	if err != nil {
 		return nil, fmt.Errorf("failed calculating target gas: %w", err)
 	}
@@ -63,7 +63,7 @@ func NewUpdatedManager(
 	return res, nil
 }
 
-func targetGas(feesConfig DynamicFeesConfig, parentBlkTime, childBlkTime time.Time) (Gas, error) {
+func TargetGas(feesConfig DynamicFeesConfig, parentBlkTime, childBlkTime time.Time) (Gas, error) {
 	if parentBlkTime.Compare(childBlkTime) > 0 {
 		return ZeroGas, fmt.Errorf("unexpected block times, parentBlkTim %v, childBlkTime %v", parentBlkTime, childBlkTime)
 	}

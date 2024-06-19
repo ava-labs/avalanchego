@@ -1193,7 +1193,7 @@ func TestGetFeeRates(t *testing.T) {
 	service, _, _ := defaultService(t)
 
 	service.vm.ctx.Lock.Lock()
-	now := time.Now().Truncate(time.Second)
+	now := service.vm.state.GetTimestamp().Add(time.Second)
 	service.vm.clock.Set(now)
 	feeCfg, err := fee.GetDynamicConfig(true /*isEActive*/)
 	require.NoError(err)
@@ -1204,12 +1204,16 @@ func TestGetFeeRates(t *testing.T) {
 	require.NoError(service.GetNextGasData(nil, nil, &reply0))
 	require.Equal(feeCfg.MinGasPrice, reply0.NextGasPrice)
 
-	// let cumulated complexity go above target. Fee rates will go up
+	// let gas go above target. Gas price will go up
 	service.vm.ctx.Lock.Lock()
-	elapsedTime := time.Second
-	targetGas := commonfee.Gas(uint64(feeCfg.GasTargetRate) * uint64(elapsedTime/time.Second))
-	gas := targetGas + commonfee.Gas(10)
-	service.vm.state.SetExcessGas(gas)
+	chainTime := service.vm.state.GetTimestamp()
+	elapsedTime := 10 * time.Second
+	targetGas, err := commonfee.TargetGas(feeCfg, chainTime, chainTime.Add(elapsedTime))
+	require.NoError(err)
+
+	excessGas, err := service.vm.state.GetExcessGas()
+	require.NoError(err)
+	service.vm.state.SetExcessGas(excessGas + targetGas + commonfee.Gas(20_000))
 	service.vm.ctx.Lock.Unlock()
 
 	reply1 := GetGasPriceReply{}
