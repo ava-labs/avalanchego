@@ -141,7 +141,7 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 
 			pChainExportFee := uint64(0)
 			ginkgo.By("export avax from P to X chain", func() {
-				nextGasPrice, _, err := pChainClient.GetNextGasData(e2e.DefaultContext())
+				nextGasPrice, nextGasCap, err := pChainClient.GetNextGasData(e2e.DefaultContext())
 				require.NoError(err)
 
 				tx, err := pWallet.IssueExportTx(
@@ -159,7 +159,7 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 				require.NoError(err)
 
 				// retrieve fees paid for the tx
-				feeCalc := fee.NewDynamicCalculator(commonfee.NewManager(nextGasPrice, fee.TempGasCap))
+				feeCalc := fee.NewDynamicCalculator(commonfee.NewCalculator(nextGasPrice, nextGasCap))
 				pChainExportFee, err = feeCalc.ComputeFee(tx.Unsigned, tx.Creds)
 				require.NoError(err)
 			})

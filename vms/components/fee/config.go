@@ -30,6 +30,7 @@ type DynamicFeesConfig struct {
 	// weights to merge fees dimensions complexities into a single gas value
 	FeeDimensionWeights Dimensions `json:"fee-dimension-weights"`
 
+	// Leaky bucket parameters to calculate gas cap
 	MaxGasPerSecond Gas
 	LeakGasCoeff    Gas // techically the unit of measure if sec^{-1}, but picking Gas reduces casts needed
 }

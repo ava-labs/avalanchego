@@ -98,7 +98,7 @@ func PickFeeCalculator(cfg *config.Config, state Chain, parentBlkTime time.Time)
 	return fee.NewDynamicCalculator(feesMan), nil
 }
 
-func updatedFeeManager(feesCfg commonfee.DynamicFeesConfig, state Chain, parentBlkTime, childBlkTime time.Time) (*commonfee.Manager, error) {
+func updatedFeeManager(feesCfg commonfee.DynamicFeesConfig, state Chain, parentBlkTime, childBlkTime time.Time) (*commonfee.Calculator, error) {
 	currentGasCap, err := state.GetCurrentGasCap()
 	if err != nil {
 		return nil, fmt.Errorf("failed retrieving gas cap: %w", err)

@@ -204,12 +204,8 @@ func (ts *Topological) Processing(blkID ids.ID) bool {
 	return ok
 }
 
-func (ts *Topological) IsPreferred(blk Block) bool {
-	// If the block is accepted, then it must be transitively preferred.
-	if blk.Status() == choices.Accepted {
-		return true
-	}
-	return ts.preferredIDs.Contains(blk.ID())
+func (ts *Topological) IsPreferred(blkID ids.ID) bool {
+	return blkID == ts.lastAcceptedID || ts.preferredIDs.Contains(blkID)
 }
 
 func (ts *Topological) LastAccepted() (ids.ID, uint64) {

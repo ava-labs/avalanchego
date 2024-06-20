@@ -5,14 +5,12 @@ package p
 
 import (
 	"errors"
-	"fmt"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
-	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/upgrade"
@@ -618,19 +616,11 @@ func (w *wallet) IssueTx(
 		return w.Backend.AcceptTx(ctx, tx)
 	}
 
-	txStatus, err := w.client.AwaitTxDecided(ctx, txID, ops.PollFrequency())
-	if err != nil {
+	if err := platformvm.AwaitTxAccepted(w.client, ctx, txID, ops.PollFrequency()); err != nil {
 		return err
 	}
 
-	if err := w.Backend.AcceptTx(ctx, tx); err != nil {
-		return err
-	}
-
-	if txStatus.Status != status.Committed {
-		return fmt.Errorf("%w: %s", ErrNotCommitted, txStatus.Reason)
-	}
-	return nil
+	return w.Backend.AcceptTx(ctx, tx)
 }
 
 func (w *wallet) feeCalculator(ctx *builder.Context, options ...common.Option) (*fee.Calculator, error) {
@@ -642,7 +632,7 @@ func (w *wallet) feeCalculator(ctx *builder.Context, options ...common.Option) (
 		return fee.NewStaticCalculator(w.staticFeesConfig, upgrade.Config{}, time.Time{}), nil
 	}
 
-	return fee.NewDynamicCalculator(commonfee.NewManager(w.gasPrice, w.gasCap)), nil
+	return fee.NewDynamicCalculator(commonfee.NewCalculator(w.gasPrice, w.gasCap)), nil
 }
 
 func (w *wallet) refreshFeesData(ctx *builder.Context, options ...common.Option) error {

@@ -22,7 +22,7 @@ var (
 	errFailedFeeCalculation = errors.New("failed fee calculation")
 )
 
-func NewDynamicCalculator(feeManager *fee.Manager) *Calculator {
+func NewDynamicCalculator(feeManager *fee.Calculator) *Calculator {
 	return &Calculator{
 		b: &dynamicCalculator{
 			feeManager: feeManager,
@@ -33,7 +33,7 @@ func NewDynamicCalculator(feeManager *fee.Manager) *Calculator {
 
 type dynamicCalculator struct {
 	// inputs
-	feeManager  *fee.Manager
+	feeManager  *fee.Calculator
 	credentials []verify.Verifiable
 
 	// outputs of visitor execution

@@ -43,7 +43,7 @@ var (
 func TestAddAndRemoveFees(t *testing.T) {
 	r := require.New(t)
 
-	fc := NewDynamicCalculator(fee.NewManager(testGasPrice, testBlockMaxGas))
+	fc := NewDynamicCalculator(fee.NewCalculator(testGasPrice, testBlockMaxGas))
 
 	var (
 		units     = fee.Dimensions{1, 2, 3, 4}
@@ -594,7 +594,7 @@ func TestTxFees(t *testing.T) {
 			if !upgrades.IsEActivated(tt.chainTime) {
 				c = NewStaticCalculator(feeTestsDefaultCfg, upgrades, tt.chainTime)
 			} else {
-				c = NewDynamicCalculator(fee.NewManager(testGasPrice, gasCap))
+				c = NewDynamicCalculator(fee.NewCalculator(testGasPrice, gasCap))
 			}
 
 			var creds []verify.Verifiable

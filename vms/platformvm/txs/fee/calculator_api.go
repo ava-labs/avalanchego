@@ -10,7 +10,7 @@ import (
 )
 
 // Calculator is a wrapper to exposed a more user friendly API than txs.Visitor allows
-// calculator is embedded to avoid exposing unnecessary methods
+// backend is not embedded to avoid exposing unnecessary methods
 type Calculator struct {
 	b backend
 }
@@ -49,6 +49,10 @@ func (c *Calculator) GetExcessGas() fee.Gas {
 
 func (c *Calculator) GetGasCap() fee.Gas {
 	return c.b.getGasCap()
+}
+
+func (c *Calculator) IsEActive() bool {
+	return c.b.isEActive()
 }
 
 // backend is the interfaces that any fee backend must implement
