@@ -131,7 +131,8 @@ func (vm *VM) BatchedParseBlock(ctx context.Context, blks [][]byte) ([]snowman.B
 		statelessBlk := statelessBlockDesc.block
 		blkID := statelessBlk.ID()
 
-		_, status, err := vm.State.GetBlock(blkID)
+		status := choices.Accepted
+		_, err := vm.State.GetBlock(blkID)
 		if err == database.ErrNotFound {
 			status = choices.Processing
 		} else if err != nil {
@@ -171,6 +172,5 @@ func (vm *VM) getStatelessBlk(blkID ids.ID) (statelessblock.Block, error) {
 	if currentBlk, exists := vm.verifiedBlocks[blkID]; exists {
 		return currentBlk.getStatelessBlk(), nil
 	}
-	statelessBlock, _, err := vm.State.GetBlock(blkID)
-	return statelessBlock, err
+	return vm.State.GetBlock(blkID)
 }

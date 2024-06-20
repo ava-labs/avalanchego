@@ -591,7 +591,7 @@ func (vm *VM) getPostForkBlock(ctx context.Context, blkID ids.ID) (PostForkBlock
 		return block, nil
 	}
 
-	statelessBlock, status, err := vm.State.GetBlock(blkID)
+	statelessBlock, err := vm.State.GetBlock(blkID)
 	if err != nil {
 		return nil, err
 	}
@@ -608,7 +608,7 @@ func (vm *VM) getPostForkBlock(ctx context.Context, blkID ids.ID) (PostForkBlock
 			postForkCommonComponents: postForkCommonComponents{
 				vm:       vm,
 				innerBlk: innerBlk,
-				status:   status,
+				status:   choices.Accepted,
 			},
 		}, nil
 	}
@@ -617,7 +617,7 @@ func (vm *VM) getPostForkBlock(ctx context.Context, blkID ids.ID) (PostForkBlock
 		postForkCommonComponents: postForkCommonComponents{
 			vm:       vm,
 			innerBlk: innerBlk,
-			status:   status,
+			status:   choices.Accepted,
 		},
 	}, nil
 }
@@ -641,7 +641,7 @@ func (vm *VM) acceptPostForkBlock(blk PostForkBlock) error {
 	if err := vm.State.SetLastAccepted(blkID); err != nil {
 		return err
 	}
-	if err := vm.State.PutBlock(blk.getStatelessBlk(), choices.Accepted); err != nil {
+	if err := vm.State.PutBlock(blk.getStatelessBlk()); err != nil {
 		return err
 	}
 	if err := vm.updateHeightIndex(height, blkID); err != nil {
