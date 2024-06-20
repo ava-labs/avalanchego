@@ -68,10 +68,10 @@ type workItem struct {
 	queueTime   time.Time
 }
 
-// requestFailed handles overflow
 func (w *workItem) requestFailed() {
 	attempt := w.attempt + 1
 
+	// Overflow check
 	if attempt > w.attempt {
 		w.attempt = attempt
 	}
@@ -285,7 +285,7 @@ func (m *Manager) finishWorkItem() {
 // Processes [item] by fetching a change or range proof.
 func (m *Manager) doWork(ctx context.Context, work *workItem) {
 	// Backoff for failed requests accounting for time this job has already
-	// spent waiting in the request queue
+	// spent waiting in the unprocessed queue
 	backoff := calculateBackoff(work.attempt)
 	if waitTime := backoff - time.Since(work.queueTime); waitTime > 0 {
 		<-time.After(waitTime)
@@ -351,7 +351,7 @@ func (m *Manager) requestChangeProof(ctx context.Context, work *workItem) {
 		defer m.finishWorkItem()
 
 		if err := m.handleChangeProofResponse(ctx, targetRootID, work, request, responseBytes, err); err != nil {
-			m.setError(err)
+			m.config.Log.Debug("dropping response", zap.Error(err))
 			return
 		}
 	}
@@ -405,7 +405,7 @@ func (m *Manager) requestRangeProof(ctx context.Context, work *workItem) {
 		defer m.finishWorkItem()
 
 		if err := m.handleRangeProofResponse(ctx, targetRootID, work, request, responseBytes, appErr); err != nil {
-			m.setError(err)
+			m.config.Log.Debug("dropping response", zap.Error(err))
 			return
 		}
 	}
@@ -431,13 +431,13 @@ func (m *Manager) sendRequest(ctx context.Context, client Client, requestBytes [
 	return client.AppRequest(ctx, set.Of(nodeID), requestBytes, onResponse)
 }
 
-// Returns if we should process responseBytes
+// Returns an error if we should drop the response
 func (m *Manager) handleResponse(
 	work *workItem,
 	bytesLimit uint32,
 	responseBytes []byte,
 	err error,
-) bool {
+) error {
 	if err != nil {
 		m.metrics.RequestFailed()
 
@@ -449,7 +449,7 @@ func (m *Manager) handleResponse(
 		m.unprocessedWork.Insert(work)
 		m.workLock.Unlock()
 
-		return false
+		return err
 	}
 
 	m.metrics.RequestSucceeded()
@@ -457,26 +457,17 @@ func (m *Manager) handleResponse(
 	select {
 	case <-m.doneChan:
 		// If we're closed, don't apply the proof.
-		return false
+		return ErrAlreadyClosed
 	default:
 	}
 
 	if len(responseBytes) > int(bytesLimit) {
-		m.config.Log.Debug(
-			"dropping response",
-			zap.Error(fmt.Errorf("%w: (%d) > %d)",
-				errTooManyBytes,
-				len(responseBytes),
-				bytesLimit,
-			)),
-		)
-		return false
+		return fmt.Errorf("%w: (%d) > %d)", errTooManyBytes, len(responseBytes), bytesLimit)
 	}
 
-	return true
+	return nil
 }
 
-// invariant: this function must only return fatal errors
 func (m *Manager) handleRangeProofResponse(
 	ctx context.Context,
 	targetRootID ids.ID,
@@ -485,8 +476,8 @@ func (m *Manager) handleRangeProofResponse(
 	responseBytes []byte,
 	err error,
 ) error {
-	if !m.handleResponse(work, request.BytesLimit, responseBytes, err) {
-		return nil
+	if err := m.handleResponse(work, request.BytesLimit, responseBytes, err); err != nil {
+		return err
 	}
 
 	var rangeProofProto pb.RangeProof
@@ -527,7 +518,6 @@ func (m *Manager) handleRangeProofResponse(
 	return nil
 }
 
-// invariant: this function must only return fatal errors
 func (m *Manager) handleChangeProofResponse(
 	ctx context.Context,
 	targetRootID ids.ID,
@@ -536,8 +526,8 @@ func (m *Manager) handleChangeProofResponse(
 	responseBytes []byte,
 	err error,
 ) error {
-	if !m.handleResponse(work, request.BytesLimit, responseBytes, err) {
-		return nil
+	if err := m.handleResponse(work, request.BytesLimit, responseBytes, err); err != nil {
+		return err
 	}
 
 	var changeProofResp pb.SyncGetChangeProofResponse
