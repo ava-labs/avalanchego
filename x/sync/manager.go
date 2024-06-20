@@ -352,6 +352,7 @@ func (m *Manager) requestChangeProof(ctx context.Context, work *workItem) {
 
 		if err := m.handleChangeProofResponse(ctx, targetRootID, work, request, responseBytes, err); err != nil {
 			m.config.Log.Debug("dropping response", zap.Error(err))
+			m.retryWork(work)
 			return
 		}
 	}
@@ -406,6 +407,7 @@ func (m *Manager) requestRangeProof(ctx context.Context, work *workItem) {
 
 		if err := m.handleRangeProofResponse(ctx, targetRootID, work, request, responseBytes, appErr); err != nil {
 			m.config.Log.Debug("dropping response", zap.Error(err))
+			m.retryWork(work)
 			return
 		}
 	}
@@ -431,29 +433,30 @@ func (m *Manager) sendRequest(ctx context.Context, client Client, requestBytes [
 	return client.AppRequest(ctx, set.Of(nodeID), requestBytes, onResponse)
 }
 
+func (m *Manager) retryWork(work *workItem) {
+	work.priority = retryPriority
+	work.queueTime = time.Now()
+	work.requestFailed()
+
+	m.workLock.Lock()
+	m.unprocessedWork.Insert(work)
+	m.workLock.Unlock()
+}
+
 // Returns an error if we should drop the response
 func (m *Manager) handleResponse(
-	work *workItem,
 	bytesLimit uint32,
 	responseBytes []byte,
 	err error,
 ) error {
 	if err != nil {
 		m.metrics.RequestFailed()
-
-		work.priority = retryPriority
-		work.queueTime = time.Now()
-		work.requestFailed()
-
-		m.workLock.Lock()
-		m.unprocessedWork.Insert(work)
-		m.workLock.Unlock()
-
 		return err
 	}
 
 	m.metrics.RequestSucceeded()
 
+	// TODO can we remove this?
 	select {
 	case <-m.doneChan:
 		// If we're closed, don't apply the proof.
@@ -476,7 +479,7 @@ func (m *Manager) handleRangeProofResponse(
 	responseBytes []byte,
 	err error,
 ) error {
-	if err := m.handleResponse(work, request.BytesLimit, responseBytes, err); err != nil {
+	if err := m.handleResponse(request.BytesLimit, responseBytes, err); err != nil {
 		return err
 	}
 
@@ -507,7 +510,8 @@ func (m *Manager) handleRangeProofResponse(
 
 	// Replace all the key-value pairs in the DB from start to end with values from the response.
 	if err := m.config.DB.CommitRangeProof(ctx, work.start, work.end, &rangeProof); err != nil {
-		return err
+		m.setError(err)
+		return nil
 	}
 
 	if len(rangeProof.KeyValues) > 0 {
@@ -526,7 +530,7 @@ func (m *Manager) handleChangeProofResponse(
 	responseBytes []byte,
 	err error,
 ) error {
-	if err := m.handleResponse(work, request.BytesLimit, responseBytes, err); err != nil {
+	if err := m.handleResponse(request.BytesLimit, responseBytes, err); err != nil {
 		return err
 	}
 

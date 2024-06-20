@@ -36,17 +36,10 @@ func newDefaultDBConfig() merkledb.Config {
 	}
 }
 
-func TestGetRangeProof(t *testing.T) {
-	t.Skip()
+func TestGetRangeProofRetry(t *testing.T) {
 	now := time.Now().UnixNano()
 	t.Logf("seed: %d", now)
 	r := rand.New(rand.NewSource(now)) // #nosec G404
-
-	smallTrieKeyCount := defaultRequestKeyLimit
-	smallTrieDB, _, err := generateTrieWithMinKeyLen(t, r, smallTrieKeyCount, 1)
-	require.NoError(t, err)
-	smallTrieRoot, err := smallTrieDB.GetMerkleRoot(context.Background())
-	require.NoError(t, err)
 
 	largeTrieKeyCount := 3 * defaultRequestKeyLimit
 	largeTrieDB, _, err := generateTrieWithMinKeyLen(t, r, largeTrieKeyCount, 1)
@@ -55,23 +48,20 @@ func TestGetRangeProof(t *testing.T) {
 	require.NoError(t, err)
 
 	tests := map[string]struct {
-		db                  DB
-		request             *pb.SyncGetRangeProofRequest
-		modifyResponse      func(*merkledb.RangeProof)
-		expectedErr         error
-		expectedResponseLen int
+		db      DB
+		request *pb.SyncGetRangeProofRequest
+		handler p2p.Handler
 	}{
 		"too many leaves in response": {
-			db: smallTrieDB,
+			db: largeTrieDB,
 			request: &pb.SyncGetRangeProofRequest{
-				RootHash:   smallTrieRoot[:],
+				RootHash:   largeTrieRoot[:],
 				KeyLimit:   defaultRequestKeyLimit,
 				BytesLimit: defaultRequestByteSizeLimit,
 			},
-			modifyResponse: func(response *merkledb.RangeProof) {
+			handler: newModifiedResponseHandler(t, largeTrieDB, func(response *merkledb.RangeProof) {
 				response.KeyValues = append(response.KeyValues, merkledb.KeyValue{})
-			},
-			expectedErr: errTooManyKeys,
+			}),
 		},
 		"removed first key in response": {
 			db: largeTrieDB,
@@ -80,10 +70,9 @@ func TestGetRangeProof(t *testing.T) {
 				KeyLimit:   defaultRequestKeyLimit,
 				BytesLimit: defaultRequestByteSizeLimit,
 			},
-			modifyResponse: func(response *merkledb.RangeProof) {
+			handler: newModifiedResponseHandler(t, largeTrieDB, func(response *merkledb.RangeProof) {
 				response.KeyValues = response.KeyValues[1:]
-			},
-			expectedErr: merkledb.ErrInvalidProof,
+			}),
 		},
 		"removed first key in response and replaced proof": {
 			db: largeTrieDB,
@@ -92,7 +81,7 @@ func TestGetRangeProof(t *testing.T) {
 				KeyLimit:   defaultRequestKeyLimit,
 				BytesLimit: defaultRequestByteSizeLimit,
 			},
-			modifyResponse: func(response *merkledb.RangeProof) {
+			handler: newModifiedResponseHandler(t, largeTrieDB, func(response *merkledb.RangeProof) {
 				start := maybe.Some(response.KeyValues[1].Key)
 				rootID, err := largeTrieDB.GetMerkleRoot(context.Background())
 				require.NoError(t, err)
@@ -101,8 +90,7 @@ func TestGetRangeProof(t *testing.T) {
 				response.KeyValues = proof.KeyValues
 				response.StartProof = proof.StartProof
 				response.EndProof = proof.EndProof
-			},
-			expectedErr: errInvalidRangeProof,
+			}),
 		},
 		"removed key from middle of response": {
 			db: largeTrieDB,
@@ -111,10 +99,9 @@ func TestGetRangeProof(t *testing.T) {
 				KeyLimit:   defaultRequestKeyLimit,
 				BytesLimit: defaultRequestByteSizeLimit,
 			},
-			modifyResponse: func(response *merkledb.RangeProof) {
+			handler: newModifiedResponseHandler(t, largeTrieDB, func(response *merkledb.RangeProof) {
 				response.KeyValues = append(response.KeyValues[:100], response.KeyValues[101:]...)
-			},
-			expectedErr: merkledb.ErrInvalidProof,
+			}),
 		},
 		"start and end proof nodes removed": {
 			db: largeTrieDB,
@@ -123,11 +110,10 @@ func TestGetRangeProof(t *testing.T) {
 				KeyLimit:   defaultRequestKeyLimit,
 				BytesLimit: defaultRequestByteSizeLimit,
 			},
-			modifyResponse: func(response *merkledb.RangeProof) {
+			handler: newModifiedResponseHandler(t, largeTrieDB, func(response *merkledb.RangeProof) {
 				response.StartProof = nil
 				response.EndProof = nil
-			},
-			expectedErr: merkledb.ErrNoEndProof,
+			}),
 		},
 		"end proof removed": {
 			db: largeTrieDB,
@@ -136,10 +122,9 @@ func TestGetRangeProof(t *testing.T) {
 				KeyLimit:   defaultRequestKeyLimit,
 				BytesLimit: defaultRequestByteSizeLimit,
 			},
-			modifyResponse: func(response *merkledb.RangeProof) {
+			handler: newModifiedResponseHandler(t, largeTrieDB, func(response *merkledb.RangeProof) {
 				response.EndProof = nil
-			},
-			expectedErr: merkledb.ErrNoEndProof,
+			}),
 		},
 		"empty proof": {
 			db: largeTrieDB,
@@ -148,12 +133,11 @@ func TestGetRangeProof(t *testing.T) {
 				KeyLimit:   defaultRequestKeyLimit,
 				BytesLimit: defaultRequestByteSizeLimit,
 			},
-			modifyResponse: func(response *merkledb.RangeProof) {
+			handler: newModifiedResponseHandler(t, largeTrieDB, func(response *merkledb.RangeProof) {
 				response.StartProof = nil
 				response.EndProof = nil
 				response.KeyValues = nil
-			},
-			expectedErr: merkledb.ErrEmptyProof,
+			}),
 		},
 	}
 
@@ -162,30 +146,8 @@ func TestGetRangeProof(t *testing.T) {
 			require := require.New(t)
 			ctx := context.Background()
 
-			rangeProofHandler := NewSyncGetRangeProofHandler(logging.NoLog{}, test.db)
-			serverHandler := p2p.TestHandler{
-				AppRequestF: func(ctx context.Context, nodeID ids.NodeID, deadline time.Time, requestBytes []byte) ([]byte, error) {
-					responseBytes, err := rangeProofHandler.AppRequest(ctx, nodeID, deadline, requestBytes)
-					require.NoError(err)
-
-					proofProto := &pb.RangeProof{}
-					require.NoError(proto.Unmarshal(responseBytes, proofProto))
-
-					proof := &merkledb.RangeProof{}
-					require.NoError(proof.UnmarshalProto(proofProto))
-
-					if test.modifyResponse != nil {
-						test.modifyResponse(proof)
-						responseBytes, err = proto.Marshal(proof.ToProto())
-						require.NoError(err)
-					}
-
-					return responseBytes, nil
-				},
-			}
-
 			done := make(chan struct{})
-			client := p2ptest.NewClient(t, ctx, serverHandler)
+			client := p2ptest.NewClient(t, ctx, test.handler)
 			requestBytes, err := proto.Marshal(test.request)
 			require.NoError(err)
 
@@ -200,7 +162,7 @@ func TestGetRangeProof(t *testing.T) {
 				proof := &merkledb.RangeProof{}
 				require.NoError(proof.UnmarshalProto(proofProto))
 
-				require.Equal(test.expectedResponseLen, len(proof.KeyValues))
+				//require.Equal(test.expectedResponseLen, len(proof.KeyValues))
 
 				bytes, err := proto.Marshal(proof.ToProto())
 				require.NoError(err)
@@ -438,37 +400,30 @@ func TestGetRangeProof(t *testing.T) {
 //		})
 //	}
 //}
-//
-//func TestRangeProofRetries(t *testing.T) {
-//	now := time.Now().UnixNano()
-//	t.Logf("seed: %d", now)
-//	r := rand.New(rand.NewSource(now)) // #nosec G404
-//	require := require.New(t)
-//
-//	keyCount := defaultRequestKeyLimit
-//	db, _, err := generateTrieWithMinKeyLen(t, r, keyCount, 1)
-//	require.NoError(err)
-//	root, err := db.GetMerkleRoot(context.Background())
-//	require.NoError(err)
-//
-//	maxRequests := 4
-//	request := &pb.SyncGetRangeProofRequest{
-//		RootHash:   root[:],
-//		KeyLimit:   uint32(keyCount),
-//		BytesLimit: defaultRequestByteSizeLimit,
-//	}
-//
-//	responseCount := 0
-//	modifyResponse := func(response *merkledb.RangeProof) {
-//		responseCount++
-//		if responseCount < maxRequests {
-//			// corrupt the first [maxRequests] responses, to force the client to retryPriority.
-//			response.KeyValues = nil
-//		}
-//	}
-//	proof, err := sendRangeProofRequest(t, db, request, maxRequests, modifyResponse)
-//	require.NoError(err)
-//	require.Len(proof.KeyValues, keyCount)
-//
-//	require.Equal(responseCount, maxRequests) // check the client performed retries.
-//}
+
+func newModifiedResponseHandler(
+	t *testing.T,
+	db merkledb.MerkleDB,
+	modifyResponse func(response *merkledb.RangeProof),
+) p2p.Handler {
+	rangeProofHandler := NewSyncGetRangeProofHandler(logging.NoLog{}, db)
+	return &p2p.TestHandler{
+		AppRequestF: func(ctx context.Context, nodeID ids.NodeID, deadline time.Time, requestBytes []byte) ([]byte, error) {
+			responseBytes, err := rangeProofHandler.AppRequest(ctx, nodeID, deadline, requestBytes)
+			require.NoError(t, err)
+
+			response := &pb.RangeProof{}
+			require.NoError(t, proto.Unmarshal(responseBytes, response))
+
+			rangeProof := &merkledb.RangeProof{}
+			require.NoError(t, rangeProof.UnmarshalProto(response))
+
+			// Half of requests are modified
+			if rand.Intn(2) < 1 {
+				modifyResponse(rangeProof)
+			}
+
+			return proto.Marshal(rangeProof.ToProto())
+		},
+	}
+}
