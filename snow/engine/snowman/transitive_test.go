@@ -2750,6 +2750,202 @@ func TestEngineEarlyTerminateVoterRegression(t *testing.T) {
 	require.Equal(choices.Processing, chain[2].Status())
 }
 
+// Voting for an unissued cached block that fails verification should not
+// register any dependencies.
+//
+// Full blockchain structure:
+//
+//	  Genesis
+//	 /       \
+//	0         2
+//	|         |
+//	1         3
+//
+// We first issue block 2, and then block 3 fails verification. This causes
+// block 3 to be added to the invalid blocks cache.
+//
+// We then issue block 0, issue block 1, and accept block 0.
+//
+// If we then vote for block 3, the vote should be dropped and trigger a repoll
+// which could then be used to accept block 1.
+func TestEngineRegistersInvalidVoterDependencyRegression(t *testing.T) {
+	require := require.New(t)
+
+	config := DefaultConfig(t)
+	nodeID := ids.GenerateTestNodeID()
+	require.NoError(config.Validators.AddStaker(config.Ctx.SubnetID, nodeID, nil, ids.Empty, 1))
+
+	sender := &common.SenderTest{
+		T:          t,
+		SendChitsF: func(context.Context, ids.NodeID, uint32, ids.ID, ids.ID, ids.ID) {},
+	}
+	sender.Default(true)
+	config.Sender = sender
+
+	var (
+		acceptedChain = snowmantest.BuildDescendants(snowmantest.Genesis, 2)
+		rejectedChain = snowmantest.BuildDescendants(snowmantest.Genesis, 2)
+	)
+	rejectedChain[1].VerifyV = errInvalid
+
+	vm := &block.TestVM{
+		TestVM: common.TestVM{
+			T: t,
+			InitializeF: func(
+				context.Context,
+				*snow.Context,
+				database.Database,
+				[]byte,
+				[]byte,
+				[]byte,
+				chan<- common.Message,
+				[]*common.Fx,
+				common.AppSender,
+			) error {
+				return nil
+			},
+			SetStateF: func(context.Context, snow.State) error {
+				return nil
+			},
+		},
+		ParseBlockF: MakeParseBlockF(
+			[]*snowmantest.Block{snowmantest.Genesis},
+			acceptedChain,
+			rejectedChain,
+		),
+		GetBlockF: MakeGetBlockF(
+			[]*snowmantest.Block{snowmantest.Genesis},
+		),
+		SetPreferenceF: func(context.Context, ids.ID) error {
+			return nil
+		},
+		LastAcceptedF: MakeLastAcceptedBlockF(
+			snowmantest.Genesis,
+			acceptedChain,
+			rejectedChain,
+		),
+	}
+	vm.Default(true)
+	config.VM = vm
+
+	engine, err := New(config)
+	require.NoError(err)
+	require.NoError(engine.Start(context.Background(), 0))
+
+	var pollRequestIDs []uint32
+	sender.SendPullQueryF = func(_ context.Context, polledNodeIDs set.Set[ids.NodeID], requestID uint32, _ ids.ID, _ uint64) {
+		require.Equal(set.Of(nodeID), polledNodeIDs)
+		pollRequestIDs = append(pollRequestIDs, requestID)
+	}
+
+	// Issue rejectedChain[0] to consensus.
+	require.NoError(engine.PushQuery(
+		context.Background(),
+		nodeID,
+		0,
+		rejectedChain[0].Bytes(),
+		0,
+	))
+	require.Len(pollRequestIDs, 1)
+
+	// In order to attempt to issue rejectedChain[1], the engine expects the VM
+	// to be willing to provide rejectedChain[0].
+	vm.GetBlockF = MakeGetBlockF(
+		[]*snowmantest.Block{snowmantest.Genesis},
+		rejectedChain[:1],
+	)
+
+	// Attempt to issue rejectedChain[1] which should add it to the invalid
+	// block cache.
+	require.NoError(engine.PushQuery(
+		context.Background(),
+		nodeID,
+		0,
+		rejectedChain[1].Bytes(),
+		0,
+	))
+	require.Len(pollRequestIDs, 1)
+
+	_, wasCached := engine.nonVerifiedCache.Get(rejectedChain[1].ID())
+	require.True(wasCached)
+
+	// Issue acceptedChain[0] to consensus.
+	require.NoError(engine.PushQuery(
+		context.Background(),
+		nodeID,
+		0,
+		acceptedChain[0].Bytes(),
+		0,
+	))
+	// Because acceptedChain[0] isn't initially preferred, a new poll won't be
+	// created.
+	require.Len(pollRequestIDs, 1)
+
+	// In order to vote for acceptedChain[0], the engine expects the VM to be
+	// willing to provide it.
+	vm.GetBlockF = MakeGetBlockF(
+		[]*snowmantest.Block{snowmantest.Genesis},
+		acceptedChain[:1],
+		rejectedChain[:1],
+	)
+
+	// Accept acceptedChain[0] and reject rejectedChain[0].
+	require.NoError(engine.Chits(
+		context.Background(),
+		nodeID,
+		pollRequestIDs[0],
+		acceptedChain[0].ID(),
+		acceptedChain[0].ID(),
+		snowmantest.GenesisID,
+	))
+	// There are no processing blocks, so no new poll should be created.
+	require.Len(pollRequestIDs, 1)
+	require.Equal(choices.Accepted, acceptedChain[0].Status())
+	require.Equal(choices.Rejected, rejectedChain[0].Status())
+
+	// Issue acceptedChain[1] to consensus.
+	require.NoError(engine.PushQuery(
+		context.Background(),
+		nodeID,
+		0,
+		acceptedChain[1].Bytes(),
+		0,
+	))
+	require.Len(pollRequestIDs, 2)
+
+	// Vote for the transitively rejected rejectedChain[1]. This should cause a
+	// repoll.
+	require.NoError(engine.Chits(
+		context.Background(),
+		nodeID,
+		pollRequestIDs[1],
+		rejectedChain[1].ID(),
+		rejectedChain[1].ID(),
+		snowmantest.GenesisID,
+	))
+	require.Len(pollRequestIDs, 3)
+
+	// In order to vote for acceptedChain[1], the engine expects the VM to be
+	// willing to provide it.
+	vm.GetBlockF = MakeGetBlockF(
+		[]*snowmantest.Block{snowmantest.Genesis},
+		acceptedChain,
+		rejectedChain[:1],
+	)
+
+	// Accept acceptedChain[1].
+	require.NoError(engine.Chits(
+		context.Background(),
+		nodeID,
+		pollRequestIDs[2],
+		acceptedChain[1].ID(),
+		acceptedChain[1].ID(),
+		snowmantest.GenesisID,
+	))
+	require.Len(pollRequestIDs, 3)
+	require.Equal(choices.Accepted, acceptedChain[1].Status())
+}
+
 func TestGetProcessingAncestor(t *testing.T) {
 	var (
 		ctx = snowtest.ConsensusContext(
