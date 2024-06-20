@@ -12,13 +12,17 @@ import (
 var errZeroLeakGasCoeff = errors.New("zero leak gas coefficient")
 
 type DynamicFeesConfig struct {
+	// At this state this is the fixed gas price applied to each block
+	// In the next PRs, gas price will float and this will become the
+	// minimum gas price
 	GasPrice GasPrice `json:"gas-price"`
 
 	// weights to merge fees dimensions complexities into a single gas value
 	FeeDimensionWeights Dimensions `json:"fee-dimension-weights"`
 
+	// Leaky bucket parameters to calculate gas cap
 	MaxGasPerSecond Gas
-	LeakGasCoeff    Gas // TODO ABENEGIA: not sure of the unit of measurement here
+	LeakGasCoeff    Gas // techically the unit of measure if sec^{-1}, but picking Gas reduces casts needed
 }
 
 func (c *DynamicFeesConfig) Validate() error {
