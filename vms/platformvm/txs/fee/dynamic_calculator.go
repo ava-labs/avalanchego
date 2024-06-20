@@ -252,7 +252,7 @@ func (c *dynamicCalculator) meterTx(
 }
 
 func (c *dynamicCalculator) addFeesFor(complexity fee.Dimensions) (uint64, error) {
-	if c.fc == nil || complexity == fee.Empty {
+	if complexity == fee.Empty {
 		return 0, nil
 	}
 
@@ -278,7 +278,7 @@ func (c *dynamicCalculator) addFeesFor(complexity fee.Dimensions) (uint64, error
 }
 
 func (c *dynamicCalculator) removeFeesFor(unitsToRm fee.Dimensions) (uint64, error) {
-	if c.fc == nil || unitsToRm == fee.Empty {
+	if unitsToRm == fee.Empty {
 		return 0, nil
 	}
 
