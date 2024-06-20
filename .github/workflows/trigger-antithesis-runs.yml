@@ -1,0 +1,53 @@
+name: Trigger Antithesis Test Runs
+
+on:
+  # TODO(marun) Add a schedule to execute regularly
+  workflow_dispatch:
+    inputs:
+      duration:
+        description: 'The duration to run the test for'
+        default: '0.5'
+        required: true
+        type: string
+      recipients:
+        description: 'Email recipients to send the test report to'
+        default: ${{ secrets.ANTITHESIS_RECIPIENTS }}
+        required: true
+        type: string
+      image_tag:
+        description: 'The image tag to target'
+        default: latest
+        required: true
+        type: string
+
+jobs:
+  Run Antithesis Avalanchego Test Setup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: antithesishq/antithesis-trigger-action@v0.5
+        with:
+          notebook_name: avalanche
+          tenant: avalanche
+          username: ${{ secrets.ANTITHESIS_USERNAME }}
+          password: ${{ secrets.ANTITHESIS_PASSWORD }}
+          github_token: ${{ secrets.ANTITHESIS_GH_PAT }}
+          config_image: antithesis-avalanchego-config@${{ github.events.inputs.image_tag }}
+          images: antithesis-avalanchego-workload@${{ github.events.inputs.image_tag }};antithesis-avalanchego-node@${{ github.events.inputs.image_tag }}
+          email_recipients: ${{ github.events.inputs.recipients }}
+          additional_parameters: |-
+            custom.duration=${{ github.events.inputs.duration }}
+  Run Antithesis XSVM Test Setup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: antithesishq/antithesis-trigger-action@v0.5
+        with:
+          notebook_name: avalanche
+          tenant: avalanche
+          username: ${{ secrets.ANTITHESIS_USERNAME }}
+          password: ${{ secrets.ANTITHESIS_PASSWORD }}
+          github_token: ${{ secrets.ANTITHESIS_GH_PAT }}
+          config_image: antithesis-xsvm-config@${{ github.events.inputs.image_tag }}
+          images: antithesis-xsvm-workload@${{ github.events.inputs.image_tag }};antithesis-xsvm-node@${{ github.events.inputs.image_tag }}
+          email_recipients: ${{ github.events.inputs.recipients }}
+          additional_parameters: |-
+            custom.duration=${{ github.events.inputs.duration }}

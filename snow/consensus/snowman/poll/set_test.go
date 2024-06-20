@@ -30,7 +30,8 @@ var (
 func TestNewSetErrorOnPollsMetrics(t *testing.T) {
 	require := require.New(t)
 
-	factory := NewEarlyTermNoTraversalFactory(1, 1)
+	alpha := 1
+	factory := newEarlyTermNoTraversalTestFactory(require, alpha)
 	log := logging.NoLog{}
 	registerer := prometheus.NewRegistry()
 
@@ -45,7 +46,8 @@ func TestNewSetErrorOnPollsMetrics(t *testing.T) {
 func TestNewSetErrorOnPollDurationMetrics(t *testing.T) {
 	require := require.New(t)
 
-	factory := NewEarlyTermNoTraversalFactory(1, 1)
+	alpha := 1
+	factory := newEarlyTermNoTraversalTestFactory(require, alpha)
 	log := logging.NoLog{}
 	registerer := prometheus.NewRegistry()
 
@@ -63,7 +65,7 @@ func TestCreateAndFinishPollOutOfOrder_NewerFinishesFirst(t *testing.T) {
 	vdrs := []ids.NodeID{vdr1, vdr2, vdr3} // k = 3
 	alpha := 3
 
-	factory := NewEarlyTermNoTraversalFactory(alpha, alpha)
+	factory := newEarlyTermNoTraversalTestFactory(require, alpha)
 	log := logging.NoLog{}
 	registerer := prometheus.NewRegistry()
 	s, err := NewSet(factory, log, registerer)
@@ -99,7 +101,7 @@ func TestCreateAndFinishPollOutOfOrder_OlderFinishesFirst(t *testing.T) {
 	vdrs := []ids.NodeID{vdr1, vdr2, vdr3} // k = 3
 	alpha := 3
 
-	factory := NewEarlyTermNoTraversalFactory(alpha, alpha)
+	factory := newEarlyTermNoTraversalTestFactory(require, alpha)
 	log := logging.NoLog{}
 	registerer := prometheus.NewRegistry()
 	s, err := NewSet(factory, log, registerer)
@@ -135,7 +137,7 @@ func TestCreateAndFinishPollOutOfOrder_UnfinishedPollsGaps(t *testing.T) {
 	vdrs := []ids.NodeID{vdr1, vdr2, vdr3} // k = 3
 	alpha := 3
 
-	factory := NewEarlyTermNoTraversalFactory(alpha, alpha)
+	factory := newEarlyTermNoTraversalTestFactory(require, alpha)
 	log := logging.NoLog{}
 	registerer := prometheus.NewRegistry()
 	s, err := NewSet(factory, log, registerer)
@@ -179,7 +181,7 @@ func TestCreateAndFinishSuccessfulPoll(t *testing.T) {
 	vdrs := bag.Of(vdr1, vdr2) // k = 2
 	alpha := 2
 
-	factory := NewEarlyTermNoTraversalFactory(alpha, alpha)
+	factory := newEarlyTermNoTraversalTestFactory(require, alpha)
 	log := logging.NoLog{}
 	registerer := prometheus.NewRegistry()
 	s, err := NewSet(factory, log, registerer)
@@ -211,7 +213,7 @@ func TestCreateAndFinishFailedPoll(t *testing.T) {
 	vdrs := bag.Of(vdr1, vdr2) // k = 2
 	alpha := 1
 
-	factory := NewEarlyTermNoTraversalFactory(alpha, alpha)
+	factory := newEarlyTermNoTraversalTestFactory(require, alpha)
 	log := logging.NoLog{}
 	registerer := prometheus.NewRegistry()
 	s, err := NewSet(factory, log, registerer)
@@ -240,7 +242,7 @@ func TestSetString(t *testing.T) {
 	vdrs := bag.Of(vdr1) // k = 1
 	alpha := 1
 
-	factory := NewEarlyTermNoTraversalFactory(alpha, alpha)
+	factory := newEarlyTermNoTraversalTestFactory(require, alpha)
 	log := logging.NoLog{}
 	registerer := prometheus.NewRegistry()
 	s, err := NewSet(factory, log, registerer)

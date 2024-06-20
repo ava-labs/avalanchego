@@ -111,10 +111,14 @@ func New(config Config) (*Transitive, error) {
 	acceptedFrontiers := tracker.NewAccepted()
 	config.Validators.RegisterSetCallbackListener(config.Ctx.SubnetID, acceptedFrontiers)
 
-	factory := poll.NewEarlyTermNoTraversalFactory(
+	factory, err := poll.NewEarlyTermNoTraversalFactory(
 		config.Params.AlphaPreference,
 		config.Params.AlphaConfidence,
+		config.Ctx.Registerer,
 	)
+	if err != nil {
+		return nil, err
+	}
 	polls, err := poll.NewSet(
 		factory,
 		config.Ctx.Log,
@@ -1018,14 +1022,14 @@ func (t *Transitive) deliver(
 
 	// If the block is now preferred, query the network for its preferences
 	// with this new block.
-	if t.Consensus.IsPreferred(blk) {
+	if t.Consensus.IsPreferred(blkID) {
 		t.sendQuery(ctx, blkID, blk.Bytes(), push)
 	}
 
 	t.blocked.Fulfill(ctx, blkID)
 	for _, blk := range added {
 		blkID := blk.ID()
-		if t.Consensus.IsPreferred(blk) {
+		if t.Consensus.IsPreferred(blkID) {
 			t.sendQuery(ctx, blkID, blk.Bytes(), push)
 		}
 

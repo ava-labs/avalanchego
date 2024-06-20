@@ -17,8 +17,9 @@ func TestBinarySnowball(t *testing.T) {
 
 	alphaPreference, alphaConfidence := 2, 3
 	beta := 2
+	terminationConditions := newSingleTerminationCondition(alphaConfidence, beta)
 
-	sb := newBinarySnowball(alphaPreference, alphaConfidence, beta, red)
+	sb := newBinarySnowball(alphaPreference, terminationConditions, red)
 	require.Equal(red, sb.Preference())
 	require.False(sb.Finalized())
 
@@ -47,8 +48,9 @@ func TestBinarySnowballRecordPollPreference(t *testing.T) {
 
 	alphaPreference, alphaConfidence := 1, 2
 	beta := 2
+	terminationConditions := newSingleTerminationCondition(alphaConfidence, beta)
 
-	sb := newBinarySnowball(alphaPreference, alphaConfidence, beta, red)
+	sb := newBinarySnowball(alphaPreference, terminationConditions, red)
 	require.Equal(red, sb.Preference())
 	require.False(sb.Finalized())
 
@@ -72,7 +74,7 @@ func TestBinarySnowballRecordPollPreference(t *testing.T) {
 	require.Equal(red, sb.Preference())
 	require.True(sb.Finalized())
 
-	expected := "SB(Preference = 0, PreferenceStrength[0] = 4, PreferenceStrength[1] = 1, SF(Confidence = 2, Finalized = true, SL(Preference = 0)))"
+	expected := "SB(Preference = 0, PreferenceStrength[0] = 4, PreferenceStrength[1] = 1, SF(Confidence = [2], Finalized = true, SL(Preference = 0)))"
 	require.Equal(expected, sb.String())
 }
 
@@ -84,8 +86,9 @@ func TestBinarySnowballRecordUnsuccessfulPoll(t *testing.T) {
 
 	alphaPreference, alphaConfidence := 1, 2
 	beta := 2
+	terminationConditions := newSingleTerminationCondition(alphaConfidence, beta)
 
-	sb := newBinarySnowball(alphaPreference, alphaConfidence, beta, red)
+	sb := newBinarySnowball(alphaPreference, terminationConditions, red)
 	require.Equal(red, sb.Preference())
 	require.False(sb.Finalized())
 
@@ -103,7 +106,7 @@ func TestBinarySnowballRecordUnsuccessfulPoll(t *testing.T) {
 	require.Equal(blue, sb.Preference())
 	require.True(sb.Finalized())
 
-	expected := "SB(Preference = 1, PreferenceStrength[0] = 0, PreferenceStrength[1] = 3, SF(Confidence = 2, Finalized = true, SL(Preference = 1)))"
+	expected := "SB(Preference = 1, PreferenceStrength[0] = 0, PreferenceStrength[1] = 3, SF(Confidence = [2], Finalized = true, SL(Preference = 1)))"
 	require.Equal(expected, sb.String())
 }
 
@@ -115,8 +118,9 @@ func TestBinarySnowballAcceptWeirdColor(t *testing.T) {
 
 	alphaPreference, alphaConfidence := 1, 2
 	beta := 2
+	terminationConditions := newSingleTerminationCondition(alphaConfidence, beta)
 
-	sb := newBinarySnowball(alphaPreference, alphaConfidence, beta, red)
+	sb := newBinarySnowball(alphaPreference, terminationConditions, red)
 
 	require.Equal(red, sb.Preference())
 	require.False(sb.Finalized())
@@ -144,7 +148,7 @@ func TestBinarySnowballAcceptWeirdColor(t *testing.T) {
 	require.Equal(blue, sb.Preference())
 	require.True(sb.Finalized())
 
-	expected := "SB(Preference = 1, PreferenceStrength[0] = 2, PreferenceStrength[1] = 2, SF(Confidence = 2, Finalized = true, SL(Preference = 0)))"
+	expected := "SB(Preference = 1, PreferenceStrength[0] = 2, PreferenceStrength[1] = 2, SF(Confidence = [2], Finalized = true, SL(Preference = 0)))"
 	require.Equal(expected, sb.String())
 }
 
@@ -156,8 +160,9 @@ func TestBinarySnowballLockColor(t *testing.T) {
 
 	alphaPreference, alphaConfidence := 1, 2
 	beta := 1
+	terminationConditions := newSingleTerminationCondition(alphaConfidence, beta)
 
-	sb := newBinarySnowball(alphaPreference, alphaConfidence, beta, red)
+	sb := newBinarySnowball(alphaPreference, terminationConditions, red)
 
 	sb.RecordPoll(alphaConfidence, red)
 
@@ -175,6 +180,6 @@ func TestBinarySnowballLockColor(t *testing.T) {
 	require.Equal(red, sb.Preference())
 	require.True(sb.Finalized())
 
-	expected := "SB(Preference = 1, PreferenceStrength[0] = 1, PreferenceStrength[1] = 3, SF(Confidence = 1, Finalized = true, SL(Preference = 0)))"
+	expected := "SB(Preference = 1, PreferenceStrength[0] = 1, PreferenceStrength[1] = 3, SF(Confidence = [1], Finalized = true, SL(Preference = 0)))"
 	require.Equal(expected, sb.String())
 }
