@@ -2925,6 +2925,14 @@ func TestEngineRegistersInvalidVoterDependencyRegression(t *testing.T) {
 	))
 	require.Len(pollRequestIDs, 3)
 
+	// In order to vote for acceptedChain[1], the engine expects the VM to be
+	// willing to provide it.
+	vm.GetBlockF = MakeGetBlockF(
+		[]*snowmantest.Block{snowmantest.Genesis},
+		acceptedChain,
+		rejectedChain[:1],
+	)
+
 	// Accept acceptedChain[1].
 	require.NoError(engine.Chits(
 		context.Background(),
