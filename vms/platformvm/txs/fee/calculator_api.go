@@ -10,7 +10,7 @@ import (
 )
 
 // Calculator is a wrapper to exposed a more user friendly API than txs.Visitor allows
-// calculator is embedded to avoid exposing unnecessary methods
+// backend is not embedded to avoid exposing unnecessary methods
 type Calculator struct {
 	b backend
 }
@@ -35,8 +35,20 @@ func (c *Calculator) RemoveFeesFor(unitsToRm fee.Dimensions) (uint64, error) {
 	return c.b.removeFeesFor(unitsToRm)
 }
 
+func (c *Calculator) GetGasPrice() fee.GasPrice {
+	return c.b.getGasPrice()
+}
+
 func (c *Calculator) GetBlockGas() fee.Gas {
 	return c.b.getBlockGas()
+}
+
+func (c *Calculator) GetGasCap() fee.Gas {
+	return c.b.getGasCap()
+}
+
+func (c *Calculator) IsEActive() bool {
+	return c.b.isEActive()
 }
 
 // backend is the interfaces that any fee backend must implement
@@ -47,7 +59,9 @@ type backend interface {
 	resetFee(newFee uint64)
 	addFeesFor(complexity fee.Dimensions) (uint64, error)
 	removeFeesFor(unitsToRm fee.Dimensions) (uint64, error)
+	getGasPrice() fee.GasPrice
 	getBlockGas() fee.Gas
+	getGasCap() fee.Gas
 	setCredentials(creds []verify.Verifiable)
 	computeFee(tx txs.UnsignedTx, creds []verify.Verifiable) (uint64, error)
 	isEActive() bool

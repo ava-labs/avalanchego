@@ -14,8 +14,6 @@ import (
 	commonfee "github.com/ava-labs/avalanchego/vms/components/fee"
 )
 
-const TempGasCap = commonfee.Gas(1_000_000) // TODO ABENEGIA: temp const to be replaced with API call
-
 var (
 	errDynamicFeeConfigNotAvailable = errors.New("dynamic fee config not available")
 

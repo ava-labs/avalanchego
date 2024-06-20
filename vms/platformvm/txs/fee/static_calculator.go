@@ -157,9 +157,11 @@ func (*staticCalculator) removeFeesFor(fee.Dimensions) (uint64, error) {
 	return 0, errComplexityNotPriced
 }
 
-func (*staticCalculator) getBlockGas() fee.Gas {
-	return 0
-}
+func (*staticCalculator) getGasPrice() fee.GasPrice { return 0 }
+
+func (*staticCalculator) getBlockGas() fee.Gas { return 0 }
+
+func (*staticCalculator) getGasCap() fee.Gas { return 0 }
 
 func (*staticCalculator) setCredentials([]verify.Verifiable) {}
 

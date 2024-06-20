@@ -40,6 +40,7 @@ import (
 
 	avajson "github.com/ava-labs/avalanchego/utils/json"
 	safemath "github.com/ava-labs/avalanchego/utils/math"
+	commonfee "github.com/ava-labs/avalanchego/vms/components/fee"
 	platformapi "github.com/ava-labs/avalanchego/vms/platformvm/api"
 )
 
@@ -1826,6 +1827,49 @@ func (s *Service) GetBlockByHeight(_ *http.Request, args *api.GetBlockByHeightAr
 
 	response.Block, err = json.Marshal(result)
 	return err
+}
+
+// GetGasPriceReply is the response from GetFeeRates
+type GetGasPriceReply struct {
+	NextGasPrice commonfee.GasPrice `json:"nextGasPrice"`
+	NextGasCap   commonfee.Gas      `json:"nextGasCap"`
+}
+
+// GetNextFeeRates returns the next fee rates that a transaction must pay to be accepted now
+func (s *Service) GetNextGasData(_ *http.Request, _ *struct{}, reply *GetGasPriceReply) error {
+	s.vm.ctx.Log.Debug("API called",
+		zap.String("service", "platform"),
+		zap.String("method", "getNextGasData"),
+	)
+
+	s.vm.ctx.Lock.Lock()
+	defer s.vm.ctx.Lock.Unlock()
+
+	preferredID := s.vm.manager.Preferred()
+	onAccept, ok := s.vm.manager.GetState(preferredID)
+	if !ok {
+		return fmt.Errorf("could not retrieve state for block %s", preferredID)
+	}
+
+	currentChainTime := onAccept.GetTimestamp()
+	nextTimestamp, _, err := state.NextBlockTime(onAccept, &s.vm.clock)
+	if err != nil {
+		return fmt.Errorf("could not calculate next staker change time: %w", err)
+	}
+
+	stateDiff, err := state.NewDiffOn(onAccept)
+	if err != nil {
+		return err
+	}
+	stateDiff.SetTimestamp(nextTimestamp)
+
+	feeCalculator, err := state.PickFeeCalculator(&s.vm.Config, stateDiff, currentChainTime)
+	if err != nil {
+		return err
+	}
+	reply.NextGasPrice = feeCalculator.GetGasPrice()
+	reply.NextGasCap = feeCalculator.GetGasCap()
+	return nil
 }
 
 func (s *Service) getAPIUptime(staker *state.Staker) (*avajson.Float32, error) {

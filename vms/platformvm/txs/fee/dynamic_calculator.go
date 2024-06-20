@@ -25,7 +25,7 @@ var (
 func NewDynamicCalculator(gasPrice fee.GasPrice, gasCap fee.Gas) *Calculator {
 	return &Calculator{
 		b: &dynamicCalculator{
-			feeManager: fee.NewManager(gasPrice, gasCap),
+			feeManager: fee.NewCalculator(gasPrice, gasCap),
 			// credentials are set when CalculateFee is called
 		},
 	}
@@ -33,7 +33,7 @@ func NewDynamicCalculator(gasPrice fee.GasPrice, gasCap fee.Gas) *Calculator {
 
 type dynamicCalculator struct {
 	// inputs
-	feeManager  *fee.Manager
+	feeManager  *fee.Calculator
 	credentials []verify.Verifiable
 
 	// outputs of visitor execution
@@ -312,11 +312,25 @@ func (c *dynamicCalculator) computeFee(tx txs.UnsignedTx, creds []verify.Verifia
 	return c.fee, err
 }
 
+func (c *dynamicCalculator) getGasPrice() fee.GasPrice {
+	if c.feeManager != nil {
+		return c.feeManager.GetGasPrice()
+	}
+	return fee.ZeroGasPrice
+}
+
 func (c *dynamicCalculator) getBlockGas() fee.Gas {
 	if c.feeManager != nil {
 		return c.feeManager.GetBlockGas()
 	}
-	return 0
+	return fee.ZeroGas
+}
+
+func (c *dynamicCalculator) getGasCap() fee.Gas {
+	if c.feeManager != nil {
+		return c.feeManager.GetGasCap()
+	}
+	return fee.ZeroGas
 }
 
 func (c *dynamicCalculator) setCredentials(creds []verify.Verifiable) {

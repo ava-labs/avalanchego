@@ -531,13 +531,20 @@ func TestStandardBlockGas(t *testing.T) {
 					gasCap, err := blkState.onAcceptState.GetCurrentGasCap()
 					require.NoError(err)
 					require.Greater(gasCap, commonfee.ZeroGas)
-					require.Less(gasCap, fee.TempGasCap)
+
+					feeCfg, err := fee.GetDynamicConfig(dynamicFeesActive)
+					require.NoError(err)
+					require.Less(gasCap, feeCfg.MaxGasPerSecond)
 				} else {
 					require.Equal(commonfee.ZeroGas, blkState.blockGas)
 
+					// GasCap unchanged wrt parent state
+					parentGasCap, err := env.state.GetCurrentGasCap()
+					require.NoError(err)
+
 					gasCap, err := blkState.onAcceptState.GetCurrentGasCap()
 					require.NoError(err)
-					require.Equal(fee.TempGasCap, gasCap)
+					require.Equal(parentGasCap, gasCap)
 				}
 			})
 		}

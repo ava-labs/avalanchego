@@ -12,7 +12,9 @@ import (
 
 var errGasBoundBreached = errors.New("gas bound breached")
 
-type Manager struct {
+// Calculator performs fee-related operations that are share move P-chain and X-chain
+// Calculator is supposed to be embedded with chain specific calculators.
+type Calculator struct {
 	// gas cap enforced with adding gas via CumulateGas
 	gasCap Gas
 
@@ -24,51 +26,55 @@ type Manager struct {
 	blockGas Gas
 }
 
-func NewManager(gasPrice GasPrice, gasCap Gas) *Manager {
-	return &Manager{
+func NewCalculator(gasPrice GasPrice, gasCap Gas) *Calculator {
+	return &Calculator{
 		gasCap:   gasCap,
 		gasPrice: gasPrice,
 	}
 }
 
-func (m *Manager) GetGasPrice() GasPrice {
-	return m.gasPrice
+func (c *Calculator) GetGasPrice() GasPrice {
+	return c.gasPrice
 }
 
-func (m *Manager) GetBlockGas() Gas {
-	return m.blockGas
+func (c *Calculator) GetBlockGas() Gas {
+	return c.blockGas
+}
+
+func (c *Calculator) GetGasCap() Gas {
+	return c.gasCap
 }
 
 // CalculateFee must be a stateless method
-func (m *Manager) CalculateFee(g Gas) (uint64, error) {
-	return safemath.Mul64(uint64(m.gasPrice), uint64(g))
+func (c *Calculator) CalculateFee(g Gas) (uint64, error) {
+	return safemath.Mul64(uint64(c.gasPrice), uint64(g))
 }
 
 // CumulateGas tries to cumulate the consumed gas [units]. Before
 // actually cumulating it, it checks whether the result would breach [bounds].
 // If so, it returns the first dimension to breach bounds.
-func (m *Manager) CumulateGas(gas Gas) error {
+func (c *Calculator) CumulateGas(gas Gas) error {
 	// Ensure we can consume (don't want partial update of values)
-	blkGas, err := safemath.Add64(uint64(m.blockGas), uint64(gas))
+	blkGas, err := safemath.Add64(uint64(c.blockGas), uint64(gas))
 	if err != nil {
 		return fmt.Errorf("%w: %w", errGasBoundBreached, err)
 	}
-	if Gas(blkGas) > m.gasCap {
+	if Gas(blkGas) > c.gasCap {
 		return errGasBoundBreached
 	}
 
-	m.blockGas = Gas(blkGas)
+	c.blockGas = Gas(blkGas)
 	return nil
 }
 
 // Sometimes, e.g. while building a tx, we'd like freedom to speculatively
 // add gas and to remove it later on. [RemoveGas] grants this freedom
-func (m *Manager) RemoveGas(gasToRm Gas) error {
-	rBlkdGas, err := safemath.Sub(m.blockGas, gasToRm)
+func (c *Calculator) RemoveGas(gasToRm Gas) error {
+	rBlkdGas, err := safemath.Sub(c.blockGas, gasToRm)
 	if err != nil {
-		return fmt.Errorf("%w: current Gas %d, gas to revert %d", err, m.blockGas, gasToRm)
+		return fmt.Errorf("%w: current Gas %d, gas to revert %d", err, c.blockGas, gasToRm)
 	}
 
-	m.blockGas = rBlkdGas
+	c.blockGas = rBlkdGas
 	return nil
 }

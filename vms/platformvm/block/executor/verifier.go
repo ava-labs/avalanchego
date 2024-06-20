@@ -424,9 +424,11 @@ func (v *verifier) proposalBlock(
 	}
 
 	blkGas := feeCalculator.GetBlockGas()
-	nextGasCap := commonfee.UpdateGasCap(currentGasCap, blkGas)
-	onCommitState.SetCurrentGasCap(nextGasCap)
-	onAbortState.SetCurrentGasCap(nextGasCap)
+	if feeCalculator.IsEActive() {
+		nextGasCap := commonfee.UpdateGasCap(currentGasCap, blkGas)
+		onCommitState.SetCurrentGasCap(nextGasCap)
+		onAbortState.SetCurrentGasCap(nextGasCap)
+	}
 
 	onCommitState.AddTx(b.Tx, status.Committed)
 	onAbortState.AddTx(b.Tx, status.Aborted)
@@ -477,8 +479,10 @@ func (v *verifier) standardBlock(
 	blkID := b.ID()
 
 	blkGas := feeCalculator.GetBlockGas()
-	nextGasCap := commonfee.UpdateGasCap(currentGasCap, blkGas)
-	onAcceptState.SetCurrentGasCap(nextGasCap)
+	if feeCalculator.IsEActive() {
+		nextGasCap := commonfee.UpdateGasCap(currentGasCap, blkGas)
+		onAcceptState.SetCurrentGasCap(nextGasCap)
+	}
 
 	v.blkIDToState[blkID] = &blockState{
 		statelessBlock: b,
