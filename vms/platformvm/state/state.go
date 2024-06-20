@@ -849,23 +849,23 @@ func (s *state) GetSubnetManager(subnetID ids.ID) (ids.ID, []byte, error) {
 	}
 
 	chainIDAndAddrBytes, err := s.subnetManagerDB.Get(subnetID[:])
-	if err == nil {
-		var manager chainIDAndAddr
-		if _, err := block.GenesisCodec.Unmarshal(chainIDAndAddrBytes, &manager); err != nil {
-			return ids.Empty, nil, err
-		}
-		s.subnetManagerCache.Put(subnetID, chainIDAndAddr{
-			ChainID: manager.ChainID,
-			Addr:    manager.Addr,
-		})
-		return manager.ChainID, manager.Addr, nil
+	if err == database.ErrNotFound {
+		s.SetSubnetManager(subnetID, ids.Empty, []byte{})
+		return ids.Empty, []byte{}, nil
 	}
-	if err != database.ErrNotFound {
+	if err != nil {
 		return ids.Empty, nil, err
 	}
 
-	s.SetSubnetManager(subnetID, ids.Empty, []byte{})
-	return ids.Empty, []byte{}, nil
+	var manager chainIDAndAddr
+	if _, err := block.GenesisCodec.Unmarshal(chainIDAndAddrBytes, &manager); err != nil {
+		return ids.Empty, nil, err
+	}
+	s.subnetManagerCache.Put(subnetID, chainIDAndAddr{
+		ChainID: manager.ChainID,
+		Addr:    manager.Addr,
+	})
+	return manager.ChainID, manager.Addr, nil
 }
 
 func (s *state) SetSubnetManager(subnetID ids.ID, chainID ids.ID, addr []byte) {
