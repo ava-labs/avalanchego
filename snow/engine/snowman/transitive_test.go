@@ -2764,7 +2764,7 @@ func TestEngineEarlyTerminateVoterRegression(t *testing.T) {
 // We first issue block 2, and then block 3 fails verification. This causes
 // block 3 to be added to the invalid blocks cache.
 //
-// We then issue block 0 and block 1. Next, we accept block 0.
+// We then issue block 0, issue block 1, and accept block 0.
 //
 // If we then vote for block 3, the vote should be dropped and trigger a repoll
 // which could then be used to accept block 1.
