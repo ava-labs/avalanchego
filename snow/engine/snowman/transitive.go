@@ -774,7 +774,7 @@ func (t *Transitive) issueWithAncestors(
 ) error {
 	blkID := blk.ID()
 	// issue [blk] and its ancestors into consensus
-	for !t.shouldIssueBlock(blk) {
+	for t.shouldIssueBlock(blk) {
 		err := t.issue(ctx, t.Ctx.NodeID, blk, true, issuedMetric)
 		if err != nil {
 			return err
