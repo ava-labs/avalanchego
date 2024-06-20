@@ -31,7 +31,6 @@ func VerifyInitializedStruct(s interface{}) error {
 		if !isSet {
 			log = fmt.Sprintf("%v%s not set; ", log, structType.Field(i).Name)
 		}
-
 	}
 
 	if len(log) > 0 {
