@@ -22,19 +22,19 @@ var (
 	errFailedFeeCalculation = errors.New("failed fee calculation")
 )
 
-func NewDynamicCalculator(feeManager *fee.Calculator) *Calculator {
+func NewDynamicCalculator(fc *fee.Calculator) *Calculator {
 	return &Calculator{
 		b: &dynamicCalculator{
-			feeManager: feeManager,
-			// credentials are set when CalculateFee is called
+			fc: fc,
+			// credentials are set when computeFee is called
 		},
 	}
 }
 
 type dynamicCalculator struct {
 	// inputs
-	feeManager  *fee.Calculator
-	credentials []verify.Verifiable
+	fc   *fee.Calculator
+	cred []verify.Verifiable
 
 	// outputs of visitor execution
 	fee uint64
@@ -201,7 +201,7 @@ func (c *dynamicCalculator) meterTx(
 
 	// meter credentials, one by one. Then account for the extra bytes needed to
 	// serialize a slice of credentials (codec version bytes + slice size bytes)
-	for i, cred := range c.credentials {
+	for i, cred := range c.cred {
 		c, ok := cred.(*secp256k1fx.Credential)
 		if !ok {
 			return complexity, fmt.Errorf("don't know how to calculate complexity of %T", cred)
@@ -246,7 +246,7 @@ func (c *dynamicCalculator) meterTx(
 }
 
 func (c *dynamicCalculator) addFeesFor(complexity fee.Dimensions) (uint64, error) {
-	if c.feeManager == nil || complexity == fee.Empty {
+	if c.fc == nil || complexity == fee.Empty {
 		return 0, nil
 	}
 
@@ -259,10 +259,10 @@ func (c *dynamicCalculator) addFeesFor(complexity fee.Dimensions) (uint64, error
 		return 0, fmt.Errorf("failed adding fees: %w", err)
 	}
 
-	if err := c.feeManager.CumulateGas(txGas); err != nil {
+	if err := c.fc.CumulateGas(txGas); err != nil {
 		return 0, fmt.Errorf("failed cumulating complexity: %w", err)
 	}
-	fee, err := c.feeManager.CalculateFee(txGas)
+	fee, err := c.fc.CalculateFee(txGas)
 	if err != nil {
 		return 0, fmt.Errorf("%w: %w", errFailedFeeCalculation, err)
 	}
@@ -272,7 +272,7 @@ func (c *dynamicCalculator) addFeesFor(complexity fee.Dimensions) (uint64, error
 }
 
 func (c *dynamicCalculator) removeFeesFor(unitsToRm fee.Dimensions) (uint64, error) {
-	if c.feeManager == nil || unitsToRm == fee.Empty {
+	if c.fc == nil || unitsToRm == fee.Empty {
 		return 0, nil
 	}
 
@@ -285,10 +285,10 @@ func (c *dynamicCalculator) removeFeesFor(unitsToRm fee.Dimensions) (uint64, err
 		return 0, fmt.Errorf("failed adding fees: %w", err)
 	}
 
-	if err := c.feeManager.RemoveGas(txGas); err != nil {
+	if err := c.fc.RemoveGas(txGas); err != nil {
 		return 0, fmt.Errorf("failed removing units: %w", err)
 	}
-	fee, err := c.feeManager.CalculateFee(txGas)
+	fee, err := c.fc.CalculateFee(txGas)
 	if err != nil {
 		return 0, fmt.Errorf("%w: %w", errFailedFeeCalculation, err)
 	}
@@ -312,16 +312,16 @@ func (c *dynamicCalculator) computeFee(tx txs.UnsignedTx, creds []verify.Verifia
 	return c.fee, err
 }
 
-func (c *dynamicCalculator) getGasPrice() fee.GasPrice { return c.feeManager.GetGasPrice() }
+func (c *dynamicCalculator) getGasPrice() fee.GasPrice { return c.fc.GetGasPrice() }
 
-func (c *dynamicCalculator) getBlockGas() fee.Gas { return c.feeManager.GetBlockGas() }
+func (c *dynamicCalculator) getBlockGas() fee.Gas { return c.fc.GetBlockGas() }
 
-func (c *dynamicCalculator) getExcessGas() fee.Gas { return c.feeManager.GetExcessGas() }
+func (c *dynamicCalculator) getExcessGas() fee.Gas { return c.fc.GetExcessGas() }
 
-func (c *dynamicCalculator) getGasCap() fee.Gas { return c.feeManager.GetGasCap() }
+func (c *dynamicCalculator) getGasCap() fee.Gas { return c.fc.GetGasCap() }
 
 func (c *dynamicCalculator) setCredentials(creds []verify.Verifiable) {
-	c.credentials = creds
+	c.cred = creds
 }
 
 func (*dynamicCalculator) isEActive() bool { return true }
