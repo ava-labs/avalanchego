@@ -297,8 +297,7 @@ func (d *diff) SetSubnetOwner(subnetID ids.ID, owner fx.Owner) {
 }
 
 func (d *diff) GetSubnetManager(subnetID ids.ID) (ids.ID, []byte, error) {
-	manager, exists := d.subnetManagers[subnetID]
-	if exists {
+	if manager, exists := d.subnetManagers[subnetID]; exists {
 		return manager.ChainID, manager.Addr, nil
 	}
 
