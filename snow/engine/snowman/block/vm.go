@@ -67,9 +67,10 @@ type Getter interface {
 	//
 	// It is expected that blocks that have been successfully verified should be
 	// returned correctly. It is also expected that blocks that have been
-	// accepted by the consensus engine should be able to be fetched. It is not
-	// required for blocks that have been rejected by the consensus engine to be
-	// able to be fetched.
+	// accepted by the consensus engine should be able to be fetched.
+	//
+	// Blocks that have been rejected by the consensus engine must not be
+	// returned.
 	GetBlock(ctx context.Context, blkID ids.ID) (snowman.Block, error)
 }
 
