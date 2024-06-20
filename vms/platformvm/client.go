@@ -551,6 +551,6 @@ func AwaitTxAccepted(
 
 func (c *client) GetNextGasData(ctx context.Context, options ...rpc.Option) (commonfee.GasPrice, commonfee.Gas, error) {
 	res := &GetGasPriceReply{}
-	err := c.requester.SendRequest(ctx, "platform.getNextGasPrice", struct{}{}, res, options...)
+	err := c.requester.SendRequest(ctx, "platform.getNextGasData", struct{}{}, res, options...)
 	return res.NextGasPrice, res.NextGasCap, err
 }
