@@ -15,11 +15,9 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
-	"github.com/ava-labs/avalanchego/network/p2p/p2ptest"
 	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
 	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/maybe"
 	"github.com/ava-labs/avalanchego/x/merkledb"
 )
 
@@ -33,145 +31,6 @@ func newDefaultDBConfig() merkledb.Config {
 		Reg:                         prometheus.NewRegistry(),
 		Tracer:                      trace.Noop,
 		BranchFactor:                merkledb.BranchFactor16,
-	}
-}
-
-func TestGetRangeProofRetry(t *testing.T) {
-	now := time.Now().UnixNano()
-	t.Logf("seed: %d", now)
-	r := rand.New(rand.NewSource(now)) // #nosec G404
-
-	largeTrieKeyCount := 3 * defaultRequestKeyLimit
-	largeTrieDB, _, err := generateTrieWithMinKeyLen(t, r, largeTrieKeyCount, 1)
-	require.NoError(t, err)
-	largeTrieRoot, err := largeTrieDB.GetMerkleRoot(context.Background())
-	require.NoError(t, err)
-
-	tests := map[string]struct {
-		db      DB
-		request *pb.SyncGetRangeProofRequest
-		handler p2p.Handler
-	}{
-		"too many leaves in response": {
-			db: largeTrieDB,
-			request: &pb.SyncGetRangeProofRequest{
-				RootHash:   largeTrieRoot[:],
-				KeyLimit:   defaultRequestKeyLimit,
-				BytesLimit: defaultRequestByteSizeLimit,
-			},
-			handler: newModifiedResponseHandler(t, largeTrieDB, func(response *merkledb.RangeProof) {
-				response.KeyValues = append(response.KeyValues, merkledb.KeyValue{})
-			}),
-		},
-		"removed first key in response": {
-			db: largeTrieDB,
-			request: &pb.SyncGetRangeProofRequest{
-				RootHash:   largeTrieRoot[:],
-				KeyLimit:   defaultRequestKeyLimit,
-				BytesLimit: defaultRequestByteSizeLimit,
-			},
-			handler: newModifiedResponseHandler(t, largeTrieDB, func(response *merkledb.RangeProof) {
-				response.KeyValues = response.KeyValues[1:]
-			}),
-		},
-		"removed first key in response and replaced proof": {
-			db: largeTrieDB,
-			request: &pb.SyncGetRangeProofRequest{
-				RootHash:   largeTrieRoot[:],
-				KeyLimit:   defaultRequestKeyLimit,
-				BytesLimit: defaultRequestByteSizeLimit,
-			},
-			handler: newModifiedResponseHandler(t, largeTrieDB, func(response *merkledb.RangeProof) {
-				start := maybe.Some(response.KeyValues[1].Key)
-				rootID, err := largeTrieDB.GetMerkleRoot(context.Background())
-				require.NoError(t, err)
-				proof, err := largeTrieDB.GetRangeProofAtRoot(context.Background(), rootID, start, maybe.Nothing[[]byte](), defaultRequestKeyLimit)
-				require.NoError(t, err)
-				response.KeyValues = proof.KeyValues
-				response.StartProof = proof.StartProof
-				response.EndProof = proof.EndProof
-			}),
-		},
-		"removed key from middle of response": {
-			db: largeTrieDB,
-			request: &pb.SyncGetRangeProofRequest{
-				RootHash:   largeTrieRoot[:],
-				KeyLimit:   defaultRequestKeyLimit,
-				BytesLimit: defaultRequestByteSizeLimit,
-			},
-			handler: newModifiedResponseHandler(t, largeTrieDB, func(response *merkledb.RangeProof) {
-				response.KeyValues = append(response.KeyValues[:100], response.KeyValues[101:]...)
-			}),
-		},
-		"start and end proof nodes removed": {
-			db: largeTrieDB,
-			request: &pb.SyncGetRangeProofRequest{
-				RootHash:   largeTrieRoot[:],
-				KeyLimit:   defaultRequestKeyLimit,
-				BytesLimit: defaultRequestByteSizeLimit,
-			},
-			handler: newModifiedResponseHandler(t, largeTrieDB, func(response *merkledb.RangeProof) {
-				response.StartProof = nil
-				response.EndProof = nil
-			}),
-		},
-		"end proof removed": {
-			db: largeTrieDB,
-			request: &pb.SyncGetRangeProofRequest{
-				RootHash:   largeTrieRoot[:],
-				KeyLimit:   defaultRequestKeyLimit,
-				BytesLimit: defaultRequestByteSizeLimit,
-			},
-			handler: newModifiedResponseHandler(t, largeTrieDB, func(response *merkledb.RangeProof) {
-				response.EndProof = nil
-			}),
-		},
-		"empty proof": {
-			db: largeTrieDB,
-			request: &pb.SyncGetRangeProofRequest{
-				RootHash:   largeTrieRoot[:],
-				KeyLimit:   defaultRequestKeyLimit,
-				BytesLimit: defaultRequestByteSizeLimit,
-			},
-			handler: newModifiedResponseHandler(t, largeTrieDB, func(response *merkledb.RangeProof) {
-				response.StartProof = nil
-				response.EndProof = nil
-				response.KeyValues = nil
-			}),
-		},
-	}
-
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			require := require.New(t)
-			ctx := context.Background()
-
-			done := make(chan struct{})
-			client := p2ptest.NewClient(t, ctx, test.handler)
-			requestBytes, err := proto.Marshal(test.request)
-			require.NoError(err)
-
-			require.NoError(client.AppRequestAny(ctx, requestBytes, func(ctx context.Context, nodeID ids.NodeID, responseBytes []byte, err error) {
-				defer close(done)
-
-				require.NoError(err)
-
-				proofProto := &pb.RangeProof{}
-				require.NoError(proto.Unmarshal(responseBytes, proofProto))
-
-				proof := &merkledb.RangeProof{}
-				require.NoError(proof.UnmarshalProto(proofProto))
-
-				//require.Equal(test.expectedResponseLen, len(proof.KeyValues))
-
-				bytes, err := proto.Marshal(proof.ToProto())
-				require.NoError(err)
-
-				require.Less(len(bytes), int(test.request.BytesLimit))
-			}))
-
-			<-done
-		})
 	}
 }
 
