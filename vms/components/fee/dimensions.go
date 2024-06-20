@@ -9,9 +9,9 @@ import (
 
 const (
 	Bandwidth Dimension = 0
-	UTXORead  Dimension = 1
-	UTXOWrite Dimension = 2 // includes delete
-	Compute   Dimension = 3 // signatures checks, tx-specific
+	DBRead    Dimension = 1
+	DBWrite   Dimension = 2 // includes deletes
+	Compute   Dimension = 3
 
 	FeeDimensions = 4
 )
