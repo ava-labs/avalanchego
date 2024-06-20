@@ -1115,7 +1115,7 @@ func applyWeightDiff(
 ) error {
 	vdr, ok := vdrs[nodeID]
 	if !ok {
-		// This node is not in the current validator set.
+		// This node isn't in the current validator set.
 		vdr = &validators.GetValidatorOutput{
 			NodeID: nodeID,
 		}
