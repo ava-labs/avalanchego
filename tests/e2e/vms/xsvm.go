@@ -58,7 +58,6 @@ var _ = ginkgo.Describe("[XSVM]", func() {
 
 		sourceSubnet := network.GetSubnet(subnetAName)
 		require.NotNil(sourceSubnet)
-
 		destinationSubnet := network.GetSubnet(subnetBName)
 		require.NotNil(destinationSubnet)
 
