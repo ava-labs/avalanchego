@@ -308,7 +308,7 @@ func Test_Server_GetChangeProof(t *testing.T) {
 			proofBytes, err := handler.AppRequest(context.Background(), test.nodeID, time.Time{}, requestBytes)
 			require.ErrorIs(err, test.expectedErr)
 
-			var proofResult *pb.SyncGetChangeProofResponse
+			proofResult := &pb.SyncGetChangeProofResponse{}
 			require.NoError(proto.Unmarshal(proofBytes, proofResult))
 
 			if test.proofNil {
