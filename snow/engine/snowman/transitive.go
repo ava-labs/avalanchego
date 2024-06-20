@@ -743,7 +743,7 @@ func (t *Transitive) issueFrom(
 		blk, err = t.getBlock(ctx, blkID)
 
 		// If we don't have this ancestor, request it from [vdr]
-		if err != nil || !blk.Status().Fetched() {
+		if err != nil {
 			t.sendRequest(ctx, nodeID, blkID, issuedMetric)
 			return nil
 		}
