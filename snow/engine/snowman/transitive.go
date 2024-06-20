@@ -684,6 +684,10 @@ func (t *Transitive) buildBlocks(ctx context.Context) error {
 			return err
 		}
 
+		// TODO: Technically this may incorrectly log a warning if the block
+		// that was just built caused votes to be applied such that the block
+		// was rejected or was accepted along with one of it's children. This
+		// should be cleaned up to never produce an invalid warning.
 		if t.canIssueChildOn(blk.ID()) {
 			t.Ctx.Log.Verbo("successfully issued new block from the VM")
 		} else {
