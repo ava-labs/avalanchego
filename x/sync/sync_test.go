@@ -782,7 +782,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 			},
 		},
 		{
-			name: "range proof bad response - too many leaves in response",
+			name: "range proof bad response - removed first key in response",
 			rangeProofClient: func(db merkledb.MerkleDB) Client {
 				handler := newModifiedResponseHandler(t, db, func(response *merkledb.RangeProof) {
 					response.KeyValues = response.KeyValues[min(1, len(response.KeyValues)):]
@@ -796,6 +796,22 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 			rangeProofClient: func(db merkledb.MerkleDB) Client {
 				handler := newModifiedResponseHandler(t, db, func(response *merkledb.RangeProof) {
 					response.KeyValues = response.KeyValues[min(1, len(response.KeyValues)):]
+					response.KeyValues = []merkledb.KeyValue{
+						{
+							Key:   []byte("foo"),
+							Value: []byte("bar"),
+						},
+					}
+					response.StartProof = []merkledb.ProofNode{
+						{
+							Key: merkledb.Key{},
+						},
+					}
+					response.EndProof = []merkledb.ProofNode{
+						{
+							Key: merkledb.Key{},
+						},
+					}
 				})
 
 				return p2ptest.NewClient(t, context.Background(), handler)
