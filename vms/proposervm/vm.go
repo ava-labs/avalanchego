@@ -624,10 +624,29 @@ func (vm *VM) getPostForkBlock(ctx context.Context, blkID ids.ID) (PostForkBlock
 
 func (vm *VM) getPreForkBlock(ctx context.Context, blkID ids.ID) (*preForkBlock, error) {
 	blk, err := vm.ChainVM.GetBlock(ctx, blkID)
-	return &preForkBlock{
+	if err != nil {
+		return nil, err
+	}
+
+	wrappedBlk := &preForkBlock{
 		Block: blk,
 		vm:    vm,
-	}, err
+	}
+
+	forkHeight, err := vm.GetForkHeight()
+	if err == database.ErrNotFound {
+		return wrappedBlk, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	// If the fork occurred earlier than this block, this block was wrapped by a
+	// postForkBlock.
+	if blk.Height() >= forkHeight {
+		return nil, database.ErrNotFound
+	}
+	return wrappedBlk, nil
 }
 
 func (vm *VM) acceptPostForkBlock(blk PostForkBlock) error {

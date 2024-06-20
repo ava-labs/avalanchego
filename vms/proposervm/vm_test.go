@@ -1980,7 +1980,7 @@ func TestVMInnerBlkCache(t *testing.T) {
 
 	// Parse a block.
 	// Not in the VM's state so need to parse it.
-	state.EXPECT().GetBlock(blkNearTip.ID()).Return(blkNearTip, choices.Accepted, nil).Times(2)
+	state.EXPECT().GetBlock(blkNearTip.ID()).Return(blkNearTip, nil).Times(2)
 	// We will ask the inner VM to parse.
 	mockInnerBlkNearTip := snowmantest.NewMockBlock(ctrl)
 	mockInnerBlkNearTip.EXPECT().Height().Return(uint64(1)).Times(2)
@@ -2102,9 +2102,8 @@ func TestVMInnerBlkMarkedAcceptedRegression(t *testing.T) {
 		return innerBlock, nil
 	}
 
-	wrappedInnerBlock, err := proVM.GetBlock(context.Background(), innerBlock.ID())
-	require.NoError(err)
-	require.Equal(choices.Rejected, wrappedInnerBlock.Status())
+	_, err = proVM.GetBlock(context.Background(), innerBlock.ID())
+	require.ErrorIs(err, database.ErrNotFound)
 }
 
 type blockWithVerifyContext struct {
