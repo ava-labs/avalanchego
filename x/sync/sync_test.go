@@ -966,8 +966,6 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 
 				if i%10 == 0 {
 					// Simulate client periodically recording root updates
-					// invariant: we must record whatever the final root we're trying to
-					// sync to is for this test
 					require.NoError(syncer.UpdateSyncTarget(targetRoot))
 				}
 			}
