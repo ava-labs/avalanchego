@@ -216,16 +216,18 @@ func Test_Server_GetChangeProof(t *testing.T) {
 				KeyLimit:      defaultRequestKeyLimit,
 				BytesLimit:    0,
 			},
-			proofNil: true,
+			proofNil:    true,
+			expectedErr: errInvalidBytesLimit,
 		},
 		"keylimit is 0": {
 			request: &pb.SyncGetChangeProofRequest{
 				StartRootHash: startRoot[:],
 				EndRootHash:   endRoot[:],
-				KeyLimit:      defaultRequestKeyLimit,
-				BytesLimit:    0,
+				KeyLimit:      0,
+				BytesLimit:    defaultRequestByteSizeLimit,
 			},
-			proofNil: true,
+			proofNil:    true,
+			expectedErr: errInvalidKeyLimit,
 		},
 		"keys out of order": {
 			request: &pb.SyncGetChangeProofRequest{
@@ -236,7 +238,8 @@ func Test_Server_GetChangeProof(t *testing.T) {
 				StartKey:      &pb.MaybeBytes{Value: []byte{1}},
 				EndKey:        &pb.MaybeBytes{Value: []byte{0}},
 			},
-			proofNil: true,
+			proofNil:    true,
+			expectedErr: errInvalidBounds,
 		},
 		"key limit too large": {
 			request: &pb.SyncGetChangeProofRequest{
@@ -279,6 +282,7 @@ func Test_Server_GetChangeProof(t *testing.T) {
 			},
 			expectedMaxResponseBytes: defaultRequestByteSizeLimit,
 			proofNil:                 true,
+			expectedErr:              merkledb.ErrInsufficientHistory,
 		},
 		"empty proof": {
 			request: &pb.SyncGetChangeProofRequest{
@@ -289,6 +293,7 @@ func Test_Server_GetChangeProof(t *testing.T) {
 			},
 			expectedMaxResponseBytes: defaultRequestByteSizeLimit,
 			proofNil:                 true,
+			expectedErr:              merkledb.ErrEmptyProof,
 		},
 	}
 
@@ -300,25 +305,16 @@ func Test_Server_GetChangeProof(t *testing.T) {
 
 			requestBytes, err := proto.Marshal(test.request)
 			require.NoError(err)
-			responseBytes, err := handler.AppRequest(context.Background(), test.nodeID, time.Time{}, requestBytes)
+			proofBytes, err := handler.AppRequest(context.Background(), test.nodeID, time.Time{}, requestBytes)
 			require.ErrorIs(err, test.expectedErr)
 
-			var response *pb.GetChangeProofResponse
-			require.NoError(proto.Unmarshal(responseBytes, response))
-			//if !test.proofNil {
-			//	var proofProto pb.RangeProof
-			//	require.NoError(proto.Unmarshal(responseBytes, &proofProto))
-			//
-			//	var p merkledb.RangeProof
-			//	require.NoError(p.UnmarshalProto(&proofProto))
-			//	proof = &p
-			//}
-			//
-			//if test.proofNil {
-			//	require.Nil(response)
-			//	return
-			//}
-			require.NotNil(proofResult)
+			var proofResult *pb.SyncGetChangeProofResponse
+			require.NoError(proto.Unmarshal(proofBytes, proofResult))
+
+			if test.proofNil {
+				require.Nil(proofResult)
+				return
+			}
 
 			if test.expectRangeProof {
 				require.NotNil(proofResult.GetRangeProof())
