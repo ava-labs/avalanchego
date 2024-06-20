@@ -1024,15 +1024,18 @@ func (t *Transitive) deliver(
 }
 
 func (t *Transitive) addToNonVerifieds(blk snowman.Block) {
-	// don't add this blk if it's decided or processing.
+	// If this block is processing, we don't need to add it to non-verifieds.
 	blkID := blk.ID()
 	if t.Consensus.Processing(blkID) {
 		return
 	}
 	parentID := blk.Parent()
-	// we might still need this block so we can bubble votes to the parent
-	// only add blocks with parent already in the tree or processing.
-	// decided parents should not be in this map.
+	// We might still need this block so we can bubble votes to the parent.
+	//
+	// If the non-verified set contains the parentID, then we know that the
+	// parent is not decided and therefore blk is not decided.
+	// Similarly, if the parent is processing, then the parent is not decided
+	// and therefore blk is not decided.
 	if t.nonVerifieds.Has(parentID) || t.Consensus.Processing(parentID) {
 		t.nonVerifieds.Add(blkID, parentID)
 		t.nonVerifiedCache.Put(blkID, blk)
