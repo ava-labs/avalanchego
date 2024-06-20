@@ -157,7 +157,6 @@ func (s *state) RemoveValue(key []byte) error {
 		return s.valueDB.Put(key, valueBytes)
 	}
 	if err != nil {
-		// An unexpected error occurred, so we should propagate that error
 		return err
 	}
 
