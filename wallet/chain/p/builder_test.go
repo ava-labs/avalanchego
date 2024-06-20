@@ -30,6 +30,7 @@ import (
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
 	stdcontext "context"
+
 	commonfee "github.com/ava-labs/avalanchego/vms/components/fee"
 	blssigner "github.com/ava-labs/avalanchego/vms/platformvm/signer"
 )
@@ -209,7 +210,7 @@ func TestAddSubnetValidatorTx(t *testing.T) {
 		fc := fee.NewDynamicCalculator(commonfee.NewCalculator(testGasPrice, testBlockMaxGas))
 		fee, err := fc.ComputeFee(utx, tx.Creds)
 		require.NoError(err)
-		require.Equal(30_610*units.MicroAvax, fee)
+		require.Equal(40_610*units.MicroAvax, fee)
 
 		// check UTXOs selection and fee financing
 		ins := utx.Ins
@@ -301,7 +302,7 @@ func TestRemoveSubnetValidatorTx(t *testing.T) {
 		fc := fee.NewDynamicCalculator(commonfee.NewCalculator(testGasPrice, testBlockMaxGas))
 		fee, err := fc.ComputeFee(utx, tx.Creds)
 		require.NoError(err)
-		require.Equal(30_370*units.MicroAvax, fee)
+		require.Equal(40_370*units.MicroAvax, fee)
 
 		// check UTXOs selection and fee financing
 		ins := utx.Ins
@@ -1014,7 +1015,7 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 		fc := fee.NewDynamicCalculator(commonfee.NewCalculator(testGasPrice, testBlockMaxGas))
 		fee, err := fc.ComputeFee(utx, tx.Creds)
 		require.NoError(err)
-		require.Equal(65_240*units.MicroAvax, fee)
+		require.Equal(75_240*units.MicroAvax, fee)
 
 		// check UTXOs selection and fee financing
 		ins := utx.Ins
@@ -1130,7 +1131,7 @@ func TestAddPermissionlessDelegatorTx(t *testing.T) {
 		fc := fee.NewDynamicCalculator(commonfee.NewCalculator(testGasPrice, testBlockMaxGas))
 		fee, err := fc.ComputeFee(utx, tx.Creds)
 		require.NoError(err)
-		require.Equal(63_320*units.MicroAvax, fee)
+		require.Equal(73_320*units.MicroAvax, fee)
 
 		// check UTXOs selection and fee financing
 		ins := utx.Ins

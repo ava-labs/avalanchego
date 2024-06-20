@@ -16,6 +16,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
+const StakerLookupCost uint64 = 1000 // equal to secp256k1fx.CostPerSignature
+
 var (
 	_ backend = (*dynamicCalculator)(nil)
 
@@ -50,6 +52,7 @@ func (c *dynamicCalculator) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) e
 	if err != nil {
 		return err
 	}
+	complexity[fee.Compute] += StakerLookupCost
 
 	_, err = c.addFeesFor(complexity)
 	return err
@@ -95,6 +98,7 @@ func (c *dynamicCalculator) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidato
 	if err != nil {
 		return err
 	}
+	complexity[fee.Compute] += StakerLookupCost
 
 	_, err = c.addFeesFor(complexity)
 	return err
@@ -129,6 +133,7 @@ func (c *dynamicCalculator) AddPermissionlessValidatorTx(tx *txs.AddPermissionle
 	if err != nil {
 		return err
 	}
+	complexity[fee.Compute] += StakerLookupCost
 
 	_, err = c.addFeesFor(complexity)
 	return err
@@ -143,6 +148,7 @@ func (c *dynamicCalculator) AddPermissionlessDelegatorTx(tx *txs.AddPermissionle
 	if err != nil {
 		return err
 	}
+	complexity[fee.Compute] += StakerLookupCost
 
 	_, err = c.addFeesFor(complexity)
 	return err

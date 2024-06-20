@@ -141,8 +141,8 @@ func TestTxFees(t *testing.T) {
 			expectedError:       nil,
 			unsignedAndSignedTx: addSubnetValidatorTx,
 			checksF: func(t *testing.T, c *Calculator) {
-				require.Equal(t, 19_110*units.NanoAvax, c.GetFee())
-				require.Equal(t, fee.Gas(1911), c.GetBlockGas())
+				require.Equal(t, 29_110*units.NanoAvax, c.GetFee())
+				require.Equal(t, fee.Gas(2_911), c.GetBlockGas())
 			},
 		},
 		{
@@ -256,8 +256,8 @@ func TestTxFees(t *testing.T) {
 			unsignedAndSignedTx: removeSubnetValidatorTx,
 			expectedError:       nil,
 			checksF: func(t *testing.T, c *Calculator) {
-				require.Equal(t, 18_870*units.NanoAvax, c.GetFee())
-				require.Equal(t, fee.Gas(1_887), c.GetBlockGas())
+				require.Equal(t, 28_870*units.NanoAvax, c.GetFee())
+				require.Equal(t, fee.Gas(2_887), c.GetBlockGas())
 			},
 		},
 		{
@@ -356,8 +356,8 @@ func TestTxFees(t *testing.T) {
 			},
 			expectedError: nil,
 			checksF: func(t *testing.T, c *Calculator) {
-				require.Equal(t, 23_170*units.NanoAvax, c.GetFee())
-				require.Equal(t, fee.Gas(2_317), c.GetBlockGas())
+				require.Equal(t, 33_170*units.NanoAvax, c.GetFee())
+				require.Equal(t, fee.Gas(3_317), c.GetBlockGas())
 			},
 		},
 		{
@@ -370,8 +370,8 @@ func TestTxFees(t *testing.T) {
 			},
 			expectedError: nil,
 			checksF: func(t *testing.T, c *Calculator) {
-				require.Equal(t, 23_170*units.NanoAvax, c.GetFee())
-				require.Equal(t, fee.Gas(2_317), c.GetBlockGas())
+				require.Equal(t, 33_170*units.NanoAvax, c.GetFee())
+				require.Equal(t, fee.Gas(3_317), c.GetBlockGas())
 			},
 		},
 		{
@@ -417,8 +417,8 @@ func TestTxFees(t *testing.T) {
 			},
 			expectedError: nil,
 			checksF: func(t *testing.T, c *Calculator) {
-				require.Equal(t, 21_250*units.NanoAvax, c.GetFee())
-				require.Equal(t, fee.Gas(2_125), c.GetBlockGas())
+				require.Equal(t, 31_250*units.NanoAvax, c.GetFee())
+				require.Equal(t, fee.Gas(3_125), c.GetBlockGas())
 			},
 		},
 		{
@@ -429,8 +429,8 @@ func TestTxFees(t *testing.T) {
 			},
 			expectedError: nil,
 			checksF: func(t *testing.T, c *Calculator) {
-				require.Equal(t, 21_250*units.NanoAvax, c.GetFee())
-				require.Equal(t, fee.Gas(2_125), c.GetBlockGas())
+				require.Equal(t, 31_250*units.NanoAvax, c.GetFee())
+				require.Equal(t, fee.Gas(3_125), c.GetBlockGas())
 			},
 		},
 		{

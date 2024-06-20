@@ -15,41 +15,39 @@ import (
 )
 
 func MeterInput(c codec.Manager, v uint16, in *avax.TransferableInput) (Dimensions, error) {
-	var complexity Dimensions
 	cost, err := in.In.Cost()
 	if err != nil {
-		return complexity, fmt.Errorf("failed retrieving cost of input %s: %w", in.ID, err)
+		return Empty, fmt.Errorf("failed retrieving cost of input %s: %w", in.ID, err)
 	}
 
 	inSize, err := c.Size(v, in)
 	if err != nil {
-		return complexity, fmt.Errorf("failed retrieving size of input %s: %w", in.ID, err)
+		return Empty, fmt.Errorf("failed retrieving size of input %s: %w", in.ID, err)
 	}
 	uInSize := uint64(inSize)
 
+	complexity := Empty
 	complexity[Bandwidth] += uInSize - codec.VersionSize
-	complexity[UTXORead] += uInSize  // inputs are read
-	complexity[UTXOWrite] += uInSize // inputs are deleted
+	complexity[DBRead] += uInSize  // inputs are read
+	complexity[DBWrite] += uInSize // inputs are deleted
 	complexity[Compute] += cost
 	return complexity, nil
 }
 
 func MeterOutput(c codec.Manager, v uint16, out *avax.TransferableOutput) (Dimensions, error) {
-	var complexity Dimensions
 	outSize, err := c.Size(v, out)
 	if err != nil {
-		return complexity, fmt.Errorf("failed retrieving size of output %s: %w", out.ID, err)
+		return Empty, fmt.Errorf("failed retrieving size of output %s: %w", out.ID, err)
 	}
 	uOutSize := uint64(outSize)
 
+	complexity := Empty
 	complexity[Bandwidth] += uOutSize - codec.VersionSize
-	complexity[UTXOWrite] += uOutSize
+	complexity[DBWrite] += uOutSize
 	return complexity, nil
 }
 
 func MeterCredential(c codec.Manager, v uint16, keysCount int) (Dimensions, error) {
-	var complexity Dimensions
-
 	// Ensure that codec picks interface instead of the pointer to evaluate size.
 	creds := make([]verify.Verifiable, 0, 1)
 	creds = append(creds, &secp256k1fx.Credential{
@@ -58,10 +56,11 @@ func MeterCredential(c codec.Manager, v uint16, keysCount int) (Dimensions, erro
 
 	credSize, err := c.Size(v, creds)
 	if err != nil {
-		return complexity, fmt.Errorf("failed retrieving size of credentials: %w", err)
+		return Empty, fmt.Errorf("failed retrieving size of credentials: %w", err)
 	}
 	credSize -= wrappers.IntLen // length of the slice, we want the single credential
 
+	complexity := Empty
 	complexity[Bandwidth] += uint64(credSize) - codec.VersionSize
 	return complexity, nil
 }
