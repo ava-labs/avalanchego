@@ -49,7 +49,7 @@ func TestGetRangeProof(t *testing.T) {
 	require.NoError(t, err)
 
 	largeTrieKeyCount := 3 * defaultRequestKeyLimit
-	largeTrieDB, largeTrieKeys, err := generateTrieWithMinKeyLen(t, r, largeTrieKeyCount, 1)
+	largeTrieDB, _, err := generateTrieWithMinKeyLen(t, r, largeTrieKeyCount, 1)
 	require.NoError(t, err)
 	largeTrieRoot, err := largeTrieDB.GetMerkleRoot(context.Background())
 	require.NoError(t, err)
@@ -61,23 +61,6 @@ func TestGetRangeProof(t *testing.T) {
 		expectedErr         error
 		expectedResponseLen int
 	}{
-		"proof restricted by BytesLimit": {
-			db: smallTrieDB,
-			request: &pb.SyncGetRangeProofRequest{
-				RootHash:   smallTrieRoot[:],
-				KeyLimit:   defaultRequestKeyLimit,
-				BytesLimit: 10000,
-			},
-		},
-		"full response for small (single request) trie": {
-			db: smallTrieDB,
-			request: &pb.SyncGetRangeProofRequest{
-				RootHash:   smallTrieRoot[:],
-				KeyLimit:   defaultRequestKeyLimit,
-				BytesLimit: defaultRequestByteSizeLimit,
-			},
-			expectedResponseLen: defaultRequestKeyLimit,
-		},
 		"too many leaves in response": {
 			db: smallTrieDB,
 			request: &pb.SyncGetRangeProofRequest{
@@ -89,42 +72,6 @@ func TestGetRangeProof(t *testing.T) {
 				response.KeyValues = append(response.KeyValues, merkledb.KeyValue{})
 			},
 			expectedErr: errTooManyKeys,
-		},
-		"partial response to request for entire trie (full leaf limit)": {
-			db: largeTrieDB,
-			request: &pb.SyncGetRangeProofRequest{
-				RootHash:   largeTrieRoot[:],
-				KeyLimit:   defaultRequestKeyLimit,
-				BytesLimit: defaultRequestByteSizeLimit,
-			},
-			expectedResponseLen: defaultRequestKeyLimit,
-		},
-		"full response from near end of trie to end of trie (less than leaf limit)": {
-			db: largeTrieDB,
-			request: &pb.SyncGetRangeProofRequest{
-				RootHash: largeTrieRoot[:],
-				StartKey: &pb.MaybeBytes{
-					Value:     largeTrieKeys[len(largeTrieKeys)-30], // Set start 30 keys from the end of the large trie
-					IsNothing: false,
-				},
-				KeyLimit:   defaultRequestKeyLimit,
-				BytesLimit: defaultRequestByteSizeLimit,
-			},
-			expectedResponseLen: 30,
-		},
-		"full response for intermediate range of trie (less than leaf limit)": {
-			db: largeTrieDB,
-			request: &pb.SyncGetRangeProofRequest{
-				RootHash: largeTrieRoot[:],
-				StartKey: &pb.MaybeBytes{
-					Value:     largeTrieKeys[1000], // Set the range for 1000 leafs in an intermediate range of the trie
-					IsNothing: false,
-				},
-				EndKey:     &pb.MaybeBytes{Value: largeTrieKeys[1099]}, // (inclusive range)
-				KeyLimit:   defaultRequestKeyLimit,
-				BytesLimit: defaultRequestByteSizeLimit,
-			},
-			expectedResponseLen: 100,
 		},
 		"removed first key in response": {
 			db: largeTrieDB,

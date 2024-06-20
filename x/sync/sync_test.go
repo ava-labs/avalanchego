@@ -14,7 +14,6 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
@@ -56,8 +55,6 @@ func Test_Creation(t *testing.T) {
 
 func Test_Completion(t *testing.T) {
 	require := require.New(t)
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	emptyDB, err := merkledb.New(
 		context.Background(),
@@ -165,8 +162,6 @@ func Test_Midpoint(t *testing.T) {
 
 func Test_Sync_FindNextKey_InSync(t *testing.T) {
 	require := require.New(t)
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	now := time.Now().UnixNano()
 	t.Logf("seed: %d", now)
@@ -246,8 +241,6 @@ func Test_Sync_FindNextKey_InSync(t *testing.T) {
 
 func Test_Sync_FindNextKey_Deleted(t *testing.T) {
 	require := require.New(t)
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	db, err := merkledb.New(
 		context.Background(),
@@ -365,8 +358,6 @@ func Test_Sync_FindNextKey_BranchInReceived(t *testing.T) {
 
 func Test_Sync_FindNextKey_ExtraValues(t *testing.T) {
 	require := require.New(t)
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	now := time.Now().UnixNano()
 	t.Logf("seed: %d", now)
@@ -437,8 +428,6 @@ func TestFindNextKeyEmptyEndProof(t *testing.T) {
 	now := time.Now().UnixNano()
 	t.Logf("seed: %d", now)
 	r := rand.New(rand.NewSource(now)) // #nosec G404
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	db, err := merkledb.New(
 		context.Background(),
@@ -500,8 +489,6 @@ func isPrefix(data []byte, prefix []byte) bool {
 
 func Test_Sync_FindNextKey_DifferentChild(t *testing.T) {
 	require := require.New(t)
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	now := time.Now().UnixNano()
 	t.Logf("seed: %d", now)
@@ -560,8 +547,6 @@ func TestFindNextKeyRandom(t *testing.T) {
 	t.Logf("seed: %d", now)
 	rand := rand.New(rand.NewSource(now)) // #nosec G404
 	require := require.New(t)
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	// Create a "remote" database and "local" database
 	remoteDB, err := merkledb.New(
@@ -777,8 +762,6 @@ func TestFindNextKeyRandom(t *testing.T) {
 // updating
 func Test_Sync_Result_Correct_Root(t *testing.T) {
 	require := require.New(t)
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	now := time.Now().UnixNano()
 	t.Logf("seed: %d", now)
@@ -1043,10 +1026,15 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 
 func Test_Sync_UpdateSyncTarget(t *testing.T) {
 	require := require.New(t)
-	ctrl := gomock.NewController(t)
 
+	db, err := merkledb.New(
+		context.Background(),
+		memdb.New(),
+		newDefaultDBConfig(),
+	)
+	require.NoError(err)
 	m, err := NewManager(ManagerConfig{
-		DB:                    merkledb.NewMockMerkleDB(ctrl), // Not used
+		DB:                    db,
 		RangeProofClient:      &p2p.Client{},
 		ChangeProofClient:     &p2p.Client{},
 		TargetRoot:            ids.Empty,
