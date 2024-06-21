@@ -405,7 +405,7 @@ func (m *Manager) requestRangeProof(ctx context.Context, work *workItem) {
 		return
 	}
 
-	onResponse := func(ctx context.Context, nodeID ids.NodeID, responseBytes []byte, appErr error) {
+	onResponse := func(ctx context.Context, _ ids.NodeID, responseBytes []byte, appErr error) {
 		defer m.finishWorkItem()
 
 		if err := m.handleRangeProofResponse(ctx, targetRootID, work, request, responseBytes, appErr); err != nil {
