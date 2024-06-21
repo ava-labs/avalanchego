@@ -343,6 +343,7 @@ func (m *Manager) requestChangeProof(ctx context.Context, work *workItem) {
 
 	requestBytes, err := proto.Marshal(request)
 	if err != nil {
+		m.finishWorkItem()
 		m.setError(err)
 		return
 	}
@@ -358,6 +359,7 @@ func (m *Manager) requestChangeProof(ctx context.Context, work *workItem) {
 	}
 
 	if err := m.sendRequest(ctx, m.config.ChangeProofClient, requestBytes, onResponse); err != nil {
+		m.finishWorkItem()
 		m.setError(err)
 		return
 	}
@@ -398,6 +400,7 @@ func (m *Manager) requestRangeProof(ctx context.Context, work *workItem) {
 
 	requestBytes, err := proto.Marshal(request)
 	if err != nil {
+		m.finishWorkItem()
 		m.setError(err)
 		return
 	}
@@ -413,6 +416,7 @@ func (m *Manager) requestRangeProof(ctx context.Context, work *workItem) {
 	}
 
 	if err := m.sendRequest(ctx, m.config.RangeProofClient, requestBytes, onResponse); err != nil {
+		m.finishWorkItem()
 		m.setError(err)
 		return
 	}
