@@ -72,9 +72,7 @@ type SyncGetChangeProofHandler struct {
 	db  DB
 }
 
-func (*SyncGetChangeProofHandler) AppGossip(context.Context, ids.NodeID, []byte) {
-	return
-}
+func (*SyncGetChangeProofHandler) AppGossip(context.Context, ids.NodeID, []byte) {}
 
 func (s *SyncGetChangeProofHandler) AppRequest(ctx context.Context, nodeID ids.NodeID, _ time.Time, requestBytes []byte) ([]byte, error) {
 	request := &pb.SyncGetChangeProofRequest{}

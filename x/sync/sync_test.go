@@ -950,7 +950,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 			// Start syncing from the server
 			require.NoError(syncer.Start(ctx))
 
-			//Simulate writes on the server
+			// Simulate writes on the server
 			for i := 0; i <= 1_000; i++ {
 				addkey := make([]byte, r.Intn(50))
 				_, err = r.Read(addkey)

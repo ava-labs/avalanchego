@@ -599,7 +599,7 @@ func (m *Manager) handleChangeProofResponse(
 			endKey,
 			request.EndRootHash,
 			m.tokenSize,
-			merkledb.SHA256Hasher, //TODO replace w/ config hasher
+			m.config.Hasher,
 		); err != nil {
 			return err
 		}
