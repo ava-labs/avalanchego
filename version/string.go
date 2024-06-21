@@ -9,32 +9,37 @@ import (
 	"strings"
 )
 
-var (
-	// String is displayed when CLI arg --version is used
-	String string
+// GitCommit is set in the build script at compile time
+var GitCommit string
 
-	// GitCommit is set in the build script at compile time
-	GitCommit string
-)
+// Versions contains the versions relevant to a build of avalanchego. In
+// addition to supporting construction of the string displayed by
+// --version, it is used to produce the output of --version-json and can
+// be used to unmarshal that output.
+type Versions struct {
+	Application string `json:"application"`
+	Database    string `json:"database"`
+	RPCChainVM  uint64 `json:"rpcchainvm"`
+	// Commit may be empty if GitCommit was not set at compile time
+	Commit string `json:"commit"`
+	Go     string `json:"go"`
+}
 
-func init() {
-	format := "%s [database=%s, rpcchainvm=%d"
-	args := []interface{}{
-		CurrentApp,
-		CurrentDatabase,
-		RPCChainVMProtocol,
+func GetVersions() *Versions {
+	return &Versions{
+		Application: CurrentApp.String(),
+		Database:    CurrentDatabase.String(),
+		RPCChainVM:  uint64(RPCChainVMProtocol),
+		Commit:      GitCommit,
+		Go:          strings.TrimPrefix(runtime.Version(), "go"),
 	}
-	if GitCommit != "" {
-		format += ", commit=%s"
-		args = append(args, GitCommit)
+}
+
+func (v *Versions) String() string {
+	// This format maintains consistency with previous --version output
+	versionString := fmt.Sprintf("%s [database=%s, rpcchainvm=%d, ", v.Application, v.Database, v.RPCChainVM)
+	if len(v.Commit) > 0 {
+		versionString += fmt.Sprintf("commit=%s, ", v.Commit)
 	}
-
-	// add golang version
-	goVersion := runtime.Version()
-	goVersionNumber := strings.TrimPrefix(goVersion, "go")
-	format += ", go=%s"
-	args = append(args, goVersionNumber)
-
-	format += "]\n"
-	String = fmt.Sprintf(format, args...)
+	return versionString + fmt.Sprintf("go=%s]", v.Go)
 }
