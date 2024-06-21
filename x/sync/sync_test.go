@@ -1202,11 +1202,10 @@ func Test_Sync_UpdateSyncTarget(t *testing.T) {
 }
 
 func generateTrie(t *testing.T, r *rand.Rand, count int) (merkledb.MerkleDB, error) {
-	db, _, err := generateTrieWithMinKeyLen(t, r, count, 0)
-	return db, err
+	return generateTrieWithMinKeyLen(t, r, count, 0)
 }
 
-func generateTrieWithMinKeyLen(t *testing.T, r *rand.Rand, count int, minKeyLen int) (merkledb.MerkleDB, [][]byte, error) {
+func generateTrieWithMinKeyLen(t *testing.T, r *rand.Rand, count int, minKeyLen int) (merkledb.MerkleDB, error) {
 	require := require.New(t)
 
 	db, err := merkledb.New(
@@ -1215,7 +1214,7 @@ func generateTrieWithMinKeyLen(t *testing.T, r *rand.Rand, count int, minKeyLen 
 		newDefaultDBConfig(),
 	)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	var (
 		allKeys  [][]byte
@@ -1255,12 +1254,11 @@ func generateTrieWithMinKeyLen(t *testing.T, r *rand.Rand, count int, minKeyLen 
 		allKeys = append(allKeys, key)
 		seenKeys[string(key)] = struct{}{}
 		if err = batch.Put(key, value); err != nil {
-			return db, nil, err
+			return db, err
 		}
 		i++
 	}
-	slices.SortFunc(allKeys, bytes.Compare)
-	return db, allKeys, batch.Write()
+	return db, batch.Write()
 }
 
 type testHandler struct {

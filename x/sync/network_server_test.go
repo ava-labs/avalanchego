@@ -25,7 +25,7 @@ func Test_Server_GetRangeProof(t *testing.T) {
 	t.Logf("seed: %d", now)
 	r := rand.New(rand.NewSource(now)) // #nosec G404
 
-	smallTrieDB, _, err := generateTrieWithMinKeyLen(t, r, defaultRequestKeyLimit, 1)
+	smallTrieDB, err := generateTrieWithMinKeyLen(t, r, defaultRequestKeyLimit, 1)
 	require.NoError(t, err)
 	smallTrieRoot, err := smallTrieDB.GetMerkleRoot(context.Background())
 	require.NoError(t, err)
@@ -157,7 +157,7 @@ func Test_Server_GetChangeProof(t *testing.T) {
 	now := time.Now().UnixNano()
 	t.Logf("seed: %d", now)
 	r := rand.New(rand.NewSource(now)) // #nosec G404
-	trieDB, _, err := generateTrieWithMinKeyLen(t, r, defaultRequestKeyLimit, 1)
+	trieDB, err := generateTrieWithMinKeyLen(t, r, defaultRequestKeyLimit, 1)
 	require.NoError(t, err)
 
 	startRoot, err := trieDB.GetMerkleRoot(context.Background())
