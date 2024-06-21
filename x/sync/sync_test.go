@@ -822,7 +822,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 			rangeProofClient: func(db merkledb.MerkleDB) Client {
 				handler := newModifiedResponseHandler(t, db, func(response *merkledb.RangeProof) {
 					i := rand.Intn(max(1, len(response.KeyValues)) - 1)
-					slices.Delete(response.KeyValues, i, i+1)
+					_ = slices.Delete(response.KeyValues, i, i+1)
 				})
 
 				return p2ptest.NewClient(t, context.Background(), handler)
