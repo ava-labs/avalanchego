@@ -16,6 +16,8 @@ import (
 
 // Errors if all values in a struct are not initialized
 func verifyInitializedStruct(tb testing.TB, s interface{}) {
+	tb.Helper()
+
 	require := require.New(tb)
 
 	structType := reflect.TypeOf(s)
