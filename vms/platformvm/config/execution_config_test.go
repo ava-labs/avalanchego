@@ -60,6 +60,7 @@ func TestExecutionConfigUnmarshal(t *testing.T) {
 
 	t.Run("all values extracted from json", func(t *testing.T) {
 		require := require.New(t)
+
 		expected := &ExecutionConfig{
 			Network: network.Config{
 				MaxValidatorSetStaleness:                    1,
