@@ -14,7 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/network"
 )
 
-// Errors if all values in a struct are not initialized
+// Requires all values in a struct to be initialized
 func verifyInitializedStruct(tb testing.TB, s interface{}) {
 	tb.Helper()
 
