@@ -19,7 +19,7 @@ var (
 type SyncMetrics interface {
 	RequestFailed()
 	RequestMade()
-	RequestSucceeded() //TODO only need one of succeeded/failed
+	RequestSucceeded()
 }
 
 type mockMetrics struct {
