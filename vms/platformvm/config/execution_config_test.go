@@ -5,8 +5,6 @@ package config
 
 import (
 	"encoding/json"
-	"errors"
-	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -17,27 +15,18 @@ import (
 )
 
 // Errors if all values in a struct are not initialized
-func VerifyInitializedStruct(s interface{}) error {
+func verifyInitializedStruct(tb testing.TB, s interface{}) {
+	require := require.New(tb)
+
 	structType := reflect.TypeOf(s)
-	if structType.Kind() != reflect.Struct {
-		return fmt.Errorf("expected struct, got %s", structType.Kind())
-	}
+	require.Equal(reflect.Struct, structType.Kind())
 
 	v := reflect.ValueOf(s)
-	log := ""
 	for i := 0; i < v.NumField(); i++ {
 		field := v.Field(i)
-		isSet := field.IsValid() && !field.IsZero()
-		if !isSet {
-			log = fmt.Sprintf("%v%s not set; ", log, structType.Field(i).Name)
-		}
+		require.True(field.IsValid(), "invalid field: ", structType.Field(i).Name)
+		require.False(field.IsZero(), "zero field: ", structType.Field(i).Name)
 	}
-
-	if len(log) > 0 {
-		return errors.New(log)
-	}
-
-	return nil
 }
 
 func TestExecutionConfigUnmarshal(t *testing.T) {
@@ -101,8 +90,8 @@ func TestExecutionConfigUnmarshal(t *testing.T) {
 			ChecksumsEnabled:             true,
 			MempoolPruneFrequency:        time.Minute,
 		}
-		require.NoError(VerifyInitializedStruct(*expected))
-		require.NoError(VerifyInitializedStruct(expected.Network))
+		verifyInitializedStruct(t, *expected)
+		verifyInitializedStruct(t, expected.Network)
 
 		b, err := json.Marshal(expected)
 		require.NoError(err)
