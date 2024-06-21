@@ -348,7 +348,7 @@ func (m *Manager) requestChangeProof(ctx context.Context, work *workItem) {
 		return
 	}
 
-	onResponse := func(ctx context.Context, nodeID ids.NodeID, responseBytes []byte, err error) {
+	onResponse := func(ctx context.Context, _ ids.NodeID, responseBytes []byte, err error) {
 		defer m.finishWorkItem()
 
 		if err := m.handleChangeProofResponse(ctx, targetRootID, work, request, responseBytes, err); err != nil {
