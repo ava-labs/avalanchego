@@ -19,6 +19,7 @@ import (
 	snowman "github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	block "github.com/ava-labs/avalanchego/vms/proposervm/block"
 	gomock "go.uber.org/mock/gomock"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 )
 
 // MockPostForkBlock is a mock of PostForkBlock interface.
@@ -199,7 +200,7 @@ func (mr *MockPostForkBlockMockRecorder) acceptOuterBlk() *gomock.Call {
 }
 
 // buildChild mocks base method.
-func (m *MockPostForkBlock) buildChild(arg0 context.Context) (Block, error) {
+func (m *MockPostForkBlock) buildChild(arg0 context.Context, _ *bls.SecretKey) (Block, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "buildChild", arg0)
 	ret0, _ := ret[0].(Block)

@@ -9,6 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
 
@@ -155,12 +156,14 @@ func (b *postForkBlock) verifyPostForkOption(ctx context.Context, child *postFor
 }
 
 // Return the child (a *postForkBlock) of this block
-func (b *postForkBlock) buildChild(ctx context.Context) (Block, error) {
+func (b *postForkBlock) buildChild(ctx context.Context, blsSignKey *bls.SecretKey) (Block, error) {
 	return b.postForkCommonComponents.buildChild(
 		ctx,
 		b.ID(),
 		b.Timestamp(),
 		b.PChainHeight(),
+		b.SignedBlock.SignedfParentBlockSig(),
+		blsSignKey,
 	)
 }
 

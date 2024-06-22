@@ -356,6 +356,10 @@ func TestBlockVerify_InvalidPostForkOption(t *testing.T) {
 		snowmantest.GenesisTimestamp,
 		uint64(2000),
 		yBlock.Bytes(),
+		proVM.ctx.ChainID,
+		proVM.ctx.NetworkID,
+		[]byte{}, // parentBlockSig
+		proVM.StakingBLSKey,
 	)
 	require.NoError(err)
 

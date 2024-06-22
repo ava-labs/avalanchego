@@ -40,14 +40,17 @@ type SignedBlock interface {
 	// Proposer returns the ID of the node that proposed this block. If no node
 	// signed this block, [ids.EmptyNodeID] will be returned.
 	Proposer() ids.NodeID
+
+	SignedfParentBlockSig() []byte
 }
 
 type statelessUnsignedBlock struct {
-	ParentID     ids.ID `serialize:"true"`
-	Timestamp    int64  `serialize:"true"`
-	PChainHeight uint64 `serialize:"true"`
-	Certificate  []byte `serialize:"true"`
-	Block        []byte `serialize:"true"`
+	ParentID             ids.ID `serialize:"true"`
+	Timestamp            int64  `serialize:"true"`
+	PChainHeight         uint64 `serialize:"true"`
+	Certificate          []byte `serialize:"true"`
+	Block                []byte `serialize:"true"`
+	SignedParentBlockSig []byte `serialize:"true"`
 }
 
 type statelessBlock struct {
@@ -75,6 +78,10 @@ func (b *statelessBlock) Block() []byte {
 
 func (b *statelessBlock) Bytes() []byte {
 	return b.bytes
+}
+
+func (b *statelessBlock) SignedfParentBlockSig() []byte {
+	return b.StatelessBlock.SignedParentBlockSig
 }
 
 func (b *statelessBlock) initialize(bytes []byte) error {
@@ -133,4 +140,63 @@ func (b *statelessBlock) Timestamp() time.Time {
 
 func (b *statelessBlock) Proposer() ids.NodeID {
 	return b.proposer
+}
+
+// The preBlockSigStatelessUnsignedBlock struct is being used just for serialization
+// so that it would be able to decode/encode canonical correct encoding that would be
+// backward compatible.
+type preBlockSigStatelessUnsignedBlock struct {
+	ParentID     ids.ID `serialize:"true"`
+	Timestamp    int64  `serialize:"true"`
+	PChainHeight uint64 `serialize:"true"`
+	Certificate  []byte `serialize:"true"`
+	Block        []byte `serialize:"true"`
+}
+
+// The preBlockSigStatelessBlock struct is being used just for serialization
+// so that it would be able to decode/encode canonical correct encoding that would be
+// backward compatible.
+type preBlockSigStatelessBlock struct {
+	StatelessBlock preBlockSigStatelessUnsignedBlock `serialize:"true"`
+	Signature      []byte                            `serialize:"true"`
+}
+
+func (b *preBlockSigStatelessBlock) ID() ids.ID {
+	return ids.ID{}
+}
+
+func (b *preBlockSigStatelessBlock) ParentID() ids.ID {
+	return b.StatelessBlock.ParentID
+}
+
+func (b *preBlockSigStatelessBlock) Block() []byte {
+	return b.StatelessBlock.Block
+}
+
+func (b *preBlockSigStatelessBlock) Bytes() []byte {
+	return []byte{}
+}
+
+func (b *preBlockSigStatelessBlock) SignedfParentBlockSig() []byte {
+	return []byte{}
+}
+
+func (b *preBlockSigStatelessBlock) initialize(bytes []byte) error {
+	return nil
+}
+
+func (b *preBlockSigStatelessBlock) verify(chainID ids.ID) error {
+	return nil
+}
+
+func (b *preBlockSigStatelessBlock) PChainHeight() uint64 {
+	return b.StatelessBlock.PChainHeight
+}
+
+func (b *preBlockSigStatelessBlock) Timestamp() time.Time {
+	return time.Time{}
+}
+
+func (b *preBlockSigStatelessBlock) Proposer() ids.NodeID {
+	return ids.NodeID{}
 }

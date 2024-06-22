@@ -10,6 +10,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/staking"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 )
 
 type Config struct {
@@ -37,6 +38,9 @@ type Config struct {
 
 	// Registerer for prometheus metrics
 	Registerer prometheus.Registerer
+
+	// The BLS key associated with the node; used for signing chained signature in order to provide provable randomness.
+	StakingBLSKey *bls.SecretKey
 }
 
 func (c *Config) IsDurangoActivated(timestamp time.Time) bool {

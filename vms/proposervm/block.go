@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 
@@ -57,7 +58,7 @@ type Block interface {
 	verifyPostForkChild(ctx context.Context, child *postForkBlock) error
 	verifyPostForkOption(ctx context.Context, child *postForkOption) error
 
-	buildChild(context.Context) (Block, error)
+	buildChild(context.Context, *bls.SecretKey) (Block, error)
 
 	pChainHeight(context.Context) (uint64, error)
 }
@@ -180,6 +181,8 @@ func (p *postForkCommonComponents) buildChild(
 	parentID ids.ID,
 	parentTimestamp time.Time,
 	parentPChainHeight uint64,
+	parentBlockSig []byte,
+	blsSignKey *bls.SecretKey,
 ) (Block, error) {
 	// Child's timestamp is the later of now and this block's timestamp
 	newTimestamp := p.vm.Time().Truncate(time.Second)
@@ -243,7 +246,10 @@ func (p *postForkCommonComponents) buildChild(
 			p.vm.StakingCertLeaf,
 			innerBlock.Bytes(),
 			p.vm.ctx.ChainID,
+			p.vm.ctx.NetworkID,
 			p.vm.StakingLeafSigner,
+			parentBlockSig,
+			blsSignKey,
 		)
 	} else {
 		statelessChild, err = block.BuildUnsigned(
@@ -251,6 +257,10 @@ func (p *postForkCommonComponents) buildChild(
 			newTimestamp,
 			pChainHeight,
 			innerBlock.Bytes(),
+			p.vm.ctx.ChainID,
+			p.vm.ctx.NetworkID,
+			parentBlockSig,
+			blsSignKey,
 		)
 	}
 	if err != nil {

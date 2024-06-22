@@ -27,8 +27,30 @@ func ParseWithoutVerification(bytes []byte) (Block, error) {
 	if err != nil {
 		return nil, err
 	}
-	if parsedVersion != CodecVersion {
-		return nil, fmt.Errorf("expected codec version %d but got %d", CodecVersion, parsedVersion)
+	switch parsedVersion {
+	case PreBlockSigCodecVersion:
+		switch typedBlock := block.(type) {
+		case *preBlockSigStatelessBlock:
+			// we've received an instance of preBlockSigStatelessBlock, which we need to populate into statelessBlock
+			block = &statelessBlock{
+				StatelessBlock: statelessUnsignedBlock{
+					ParentID:     typedBlock.StatelessBlock.ParentID,
+					Timestamp:    typedBlock.StatelessBlock.Timestamp,
+					PChainHeight: typedBlock.StatelessBlock.PChainHeight,
+					Certificate:  typedBlock.StatelessBlock.Certificate,
+					Block:        typedBlock.StatelessBlock.Block,
+				},
+				Signature: typedBlock.Signature,
+			}
+		case *option:
+			// we're good to go.
+		default:
+			panic(nil)
+		}
+	case CurrentCodecVersion:
+		// great, nothing to do here.
+	default:
+		return nil, fmt.Errorf("expected codec version %d or %d but got %d", CurrentCodecVersion, PreBlockSigCodecVersion, parsedVersion)
 	}
 	return block, block.initialize(bytes)
 }
@@ -39,8 +61,9 @@ func ParseHeader(bytes []byte) (Header, error) {
 	if err != nil {
 		return nil, err
 	}
-	if parsedVersion != CodecVersion {
-		return nil, fmt.Errorf("expected codec version %d but got %d", CodecVersion, parsedVersion)
+
+	if parsedVersion != PreBlockSigCodecVersion {
+		return nil, fmt.Errorf("expected codec version %d but got %d", PreBlockSigCodecVersion, parsedVersion)
 	}
 	header.bytes = bytes
 	return &header, nil

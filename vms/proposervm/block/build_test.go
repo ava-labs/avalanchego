@@ -12,6 +12,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/staking"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 )
 
 func TestBuild(t *testing.T) {
@@ -22,6 +23,10 @@ func TestBuild(t *testing.T) {
 	pChainHeight := uint64(2)
 	innerBlockBytes := []byte{3}
 	chainID := ids.ID{4}
+	networkID := uint32(5)
+	parentBlockSig := []byte{}
+	blsSignKey, err := bls.NewSecretKey()
+	require.NoError(err)
 
 	tlsCert, err := staking.NewTLSCert()
 	require.NoError(err)
@@ -38,7 +43,10 @@ func TestBuild(t *testing.T) {
 		cert,
 		innerBlockBytes,
 		chainID,
+		networkID,
 		key,
+		parentBlockSig,
+		blsSignKey,
 	)
 	require.NoError(err)
 
@@ -54,10 +62,15 @@ func TestBuildUnsigned(t *testing.T) {
 	timestamp := time.Unix(123, 0)
 	pChainHeight := uint64(2)
 	innerBlockBytes := []byte{3}
+	chainID := ids.ID{4}
+	networkID := uint32(5)
+	parentBlockSig := []byte{}
+	blsSignKey, err := bls.NewSecretKey()
 
 	require := require.New(t)
+	require.NoError(err)
 
-	builtBlock, err := BuildUnsigned(parentID, timestamp, pChainHeight, innerBlockBytes)
+	builtBlock, err := BuildUnsigned(parentID, timestamp, pChainHeight, innerBlockBytes, chainID, networkID, parentBlockSig, blsSignKey)
 	require.NoError(err)
 
 	require.Equal(parentID, builtBlock.ParentID())

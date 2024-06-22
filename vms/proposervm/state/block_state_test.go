@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/staking"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
 
@@ -25,6 +26,7 @@ func testBlockState(require *require.Assertions, bs BlockState) {
 	pChainHeight := uint64(2)
 	innerBlockBytes := []byte{3}
 	chainID := ids.ID{4}
+	networkID := uint32(5)
 
 	tlsCert, err := staking.NewTLSCert()
 	require.NoError(err)
@@ -33,6 +35,9 @@ func testBlockState(require *require.Assertions, bs BlockState) {
 	require.NoError(err)
 	key := tlsCert.PrivateKey.(crypto.Signer)
 
+	var parentBlockSig []byte
+	var blsSignKey *bls.SecretKey
+
 	b, err := block.Build(
 		parentID,
 		timestamp,
@@ -40,7 +45,10 @@ func testBlockState(require *require.Assertions, bs BlockState) {
 		cert,
 		innerBlockBytes,
 		chainID,
+		networkID,
 		key,
+		parentBlockSig,
+		blsSignKey,
 	)
 	require.NoError(err)
 

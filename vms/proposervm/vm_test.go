@@ -484,11 +484,14 @@ func TestCoreBlockFailureCauseProposerBlockParseFailure(t *testing.T) {
 	slb, err := statelessblock.Build(
 		proVM.preferred,
 		proVM.Time(),
-		100, // pChainHeight,
+		uint64(100), // pChainHeight,
 		proVM.StakingCertLeaf,
 		innerBlk.Bytes(),
 		proVM.ctx.ChainID,
+		proVM.ctx.NetworkID,
 		proVM.StakingLeafSigner,
+		[]byte{}, // parentBlockSig
+		proVM.StakingBLSKey,
 	)
 	require.NoError(err)
 	proBlk := postForkBlock{
@@ -533,7 +536,10 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 		proVM.StakingCertLeaf,
 		innerBlk.Bytes(),
 		proVM.ctx.ChainID,
+		proVM.ctx.NetworkID,
 		proVM.StakingLeafSigner,
+		[]byte{}, // parentBlockSig
+		proVM.StakingBLSKey,
 	)
 	require.NoError(err)
 	proBlk1 := postForkBlock{
@@ -552,7 +558,10 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 		proVM.StakingCertLeaf,
 		innerBlk.Bytes(),
 		proVM.ctx.ChainID,
+		proVM.ctx.NetworkID,
 		proVM.StakingLeafSigner,
+		[]byte{}, // parentBlockSig
+		proVM.StakingBLSKey,
 	)
 	require.NoError(err)
 	proBlk2 := postForkBlock{
@@ -623,6 +632,10 @@ func TestTwoProBlocksWithSameParentCanBothVerify(t *testing.T) {
 		proVM.Time(),
 		pChainHeight,
 		netcoreBlk.Bytes(),
+		proVM.ctx.ChainID,
+		proVM.ctx.NetworkID,
+		[]byte{}, // parentBlockSig
+		proVM.StakingBLSKey,
 	)
 	require.NoError(err)
 	netProBlk := postForkBlock{
@@ -894,6 +907,10 @@ func TestExpiredBuildBlock(t *testing.T) {
 		proVM.Time(),
 		0,
 		coreBlk.Bytes(),
+		proVM.ctx.ChainID,
+		proVM.ctx.NetworkID,
+		[]byte{}, // parentBlockSig
+		proVM.StakingBLSKey,
 	)
 	require.NoError(err)
 
@@ -990,6 +1007,10 @@ func TestInnerBlockDeduplication(t *testing.T) {
 		coreBlk.Timestamp(),
 		0,
 		coreBlk.Bytes(),
+		proVM.ctx.ChainID,
+		proVM.ctx.NetworkID,
+		[]byte{}, // parentBlockSig
+		proVM.StakingBLSKey,
 	)
 	require.NoError(err)
 	statelessBlock1, err := statelessblock.BuildUnsigned(
@@ -997,6 +1018,10 @@ func TestInnerBlockDeduplication(t *testing.T) {
 		coreBlk.Timestamp(),
 		1,
 		coreBlk.Bytes(),
+		proVM.ctx.ChainID,
+		proVM.ctx.NetworkID,
+		[]byte{}, // parentBlockSig
+		proVM.StakingBLSKey,
 	)
 	require.NoError(err)
 
@@ -1156,6 +1181,10 @@ func TestInnerVMRollback(t *testing.T) {
 		coreBlk.Timestamp(),
 		0,
 		coreBlk.Bytes(),
+		proVM.ctx.ChainID,
+		proVM.ctx.NetworkID,
+		[]byte{}, // parentBlockSig
+		proVM.StakingBLSKey,
 	)
 	require.NoError(err)
 
@@ -1268,6 +1297,10 @@ func TestBuildBlockDuringWindow(t *testing.T) {
 		proVM.Time(),
 		0,
 		coreBlk0.Bytes(),
+		proVM.ctx.ChainID,
+		proVM.ctx.NetworkID,
+		[]byte{}, // parentBlockSig
+		proVM.StakingBLSKey,
 	)
 	require.NoError(err)
 
@@ -1360,6 +1393,10 @@ func TestTwoForks_OneIsAccepted(t *testing.T) {
 		proVM.Time(),
 		defaultPChainHeight,
 		yBlock.Bytes(),
+		proVM.ctx.ChainID,
+		proVM.ctx.NetworkID,
+		[]byte{}, // parentBlockSig
+		proVM.StakingBLSKey,
 	)
 	require.NoError(err)
 
@@ -1429,6 +1466,10 @@ func TestTooFarAdvanced(t *testing.T) {
 		aBlock.Timestamp().Add(maxSkew),
 		defaultPChainHeight,
 		yBlock.Bytes(),
+		proVM.ctx.ChainID,
+		proVM.ctx.NetworkID,
+		[]byte{}, // parentBlockSig
+		proVM.StakingBLSKey,
 	)
 	require.NoError(err)
 
@@ -1449,6 +1490,10 @@ func TestTooFarAdvanced(t *testing.T) {
 		aBlock.Timestamp().Add(proposer.MaxVerifyDelay),
 		defaultPChainHeight,
 		yBlock.Bytes(),
+		proVM.ctx.ChainID,
+		proVM.ctx.NetworkID,
+		[]byte{}, // parentBlockSig
+		proVM.StakingBLSKey,
 	)
 
 	require.NoError(err)
@@ -1699,6 +1744,10 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 		snowmantest.GenesisTimestamp,
 		defaultPChainHeight,
 		yBlock.Bytes(),
+		proVM.ctx.ChainID,
+		proVM.ctx.NetworkID,
+		[]byte{}, // parentBlockSig
+		proVM.StakingBLSKey,
 	)
 	require.NoError(err)
 
@@ -1974,7 +2023,10 @@ func TestVMInnerBlkCache(t *testing.T) {
 		vm.StakingCertLeaf,   // cert
 		blkNearTipInnerBytes, // inner blk bytes
 		vm.ctx.ChainID,       // chain ID
+		vm.ctx.NetworkID,     // network ID
 		vm.StakingLeafSigner, // key
+		[]byte{},             // parentBlockSig
+		vm.StakingBLSKey,     // BLS key
 	)
 	require.NoError(err)
 
@@ -2038,6 +2090,10 @@ func TestVMInnerBlkCacheDeduplicationRegression(t *testing.T) {
 		snowmantest.GenesisTimestamp,
 		defaultPChainHeight,
 		xBlock.Bytes(),
+		proVM.ctx.ChainID,
+		proVM.ctx.NetworkID,
+		[]byte{}, // parentBlockSig
+		proVM.StakingBLSKey,
 	)
 	require.NoError(err)
 

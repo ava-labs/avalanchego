@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/staking"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 )
 
 func TestParse(t *testing.T) {
@@ -22,6 +23,10 @@ func TestParse(t *testing.T) {
 	pChainHeight := uint64(2)
 	innerBlockBytes := []byte{3}
 	chainID := ids.ID{4}
+	networkID := uint32(5)
+	parentBlockSig := []byte{}
+	blsSignKey, err := bls.NewSecretKey()
+	require.NoError(t, err)
 
 	tlsCert, err := staking.NewTLSCert()
 	require.NoError(t, err)
@@ -37,19 +42,22 @@ func TestParse(t *testing.T) {
 		cert,
 		innerBlockBytes,
 		chainID,
+		networkID,
 		key,
+		parentBlockSig,
+		blsSignKey,
 	)
 	require.NoError(t, err)
 
-	unsignedBlock, err := BuildUnsigned(parentID, timestamp, pChainHeight, innerBlockBytes)
+	unsignedBlock, err := BuildUnsigned(parentID, timestamp, pChainHeight, innerBlockBytes, chainID, networkID, parentBlockSig, blsSignKey)
 	require.NoError(t, err)
 
-	signedWithoutCertBlockIntf, err := BuildUnsigned(parentID, timestamp, pChainHeight, innerBlockBytes)
+	signedWithoutCertBlockIntf, err := BuildUnsigned(parentID, timestamp, pChainHeight, innerBlockBytes, chainID, networkID, parentBlockSig, blsSignKey)
 	require.NoError(t, err)
 	signedWithoutCertBlock := signedWithoutCertBlockIntf.(*statelessBlock)
 	signedWithoutCertBlock.Signature = []byte{5}
 
-	signedWithoutCertBlock.bytes, err = Codec.Marshal(CodecVersion, &signedWithoutCertBlockIntf)
+	signedWithoutCertBlock.bytes, err = Codec.Marshal(CurrentCodecVersion, &signedWithoutCertBlockIntf)
 	require.NoError(t, err)
 
 	optionBlock, err := BuildOption(parentID, innerBlockBytes)
@@ -124,7 +132,7 @@ func TestParseBytes(t *testing.T) {
 		},
 		{
 			name:        "gibberish",
-			hex:         "000102030405",
+			hex:         "ff0102030405",
 			expectedErr: codec.ErrUnknownVersion,
 		},
 	}
