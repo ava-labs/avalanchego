@@ -1702,6 +1702,7 @@ func (s *state) write(updateValidators bool, height uint64) error {
 		s.writeUTXOs(),
 		s.writeSubnets(),
 		s.writeSubnetOwners(),
+		s.writeSubnetManagers(),
 		s.writeTransformedSubnets(),
 		s.writeSubnetSupplies(),
 		s.writeChains(),
@@ -2272,6 +2273,29 @@ func (s *state) writeSubnetOwners() error {
 
 		if err := s.subnetOwnerDB.Put(subnetID[:], ownerBytes); err != nil {
 			return fmt.Errorf("failed to write subnet owner: %w", err)
+		}
+	}
+	return nil
+}
+
+func (s *state) writeSubnetManagers() error {
+	for subnetID, manager := range s.subnetManagers {
+		subnetID := subnetID
+		manager := manager
+		delete(s.subnetManagers, subnetID)
+
+		managerBytes, err := block.GenesisCodec.Marshal(block.CodecVersion, &manager)
+		if err != nil {
+			return fmt.Errorf("failed to marshal subnet manager: %w", err)
+		}
+
+		s.subnetManagerCache.Put(subnetID, chainIDAndAddr{
+			ChainID: manager.ChainID,
+			Addr:    manager.Addr,
+		})
+
+		if err := s.subnetManagerDB.Put(subnetID[:], managerBytes); err != nil {
+			return fmt.Errorf("failed to write subnet manager: %w", err)
 		}
 	}
 	return nil
