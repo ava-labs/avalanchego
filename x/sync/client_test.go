@@ -5,7 +5,7 @@ package sync
 
 import (
 	"context"
-	"math/rand"
+	"sync"
 	"testing"
 	"time"
 
@@ -40,6 +40,8 @@ func newModifiedResponseHandler(
 	modifyResponse func(response *merkledb.RangeProof),
 ) p2p.Handler {
 	rangeProofHandler := NewSyncGetRangeProofHandler(logging.NoLog{}, db)
+
+	c := counter{m: 2}
 	return &p2p.TestHandler{
 		AppRequestF: func(ctx context.Context, nodeID ids.NodeID, deadline time.Time, requestBytes []byte) ([]byte, error) {
 			responseBytes, err := rangeProofHandler.AppRequest(ctx, nodeID, deadline, requestBytes)
@@ -52,11 +54,28 @@ func newModifiedResponseHandler(
 			require.NoError(t, rangeProof.UnmarshalProto(response))
 
 			// Half of requests are modified
-			if rand.Intn(2) < 1 {
+			if c.Get() == 0 {
 				modifyResponse(rangeProof)
 			}
 
 			return proto.Marshal(rangeProof.ToProto())
 		},
 	}
+}
+
+type counter struct {
+	i    int
+	m    int
+	lock sync.Mutex
+}
+
+func (c *counter) Get() int {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	tmp := c.i
+	result := tmp % c.m
+
+	c.i++
+	return result
 }

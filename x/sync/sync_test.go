@@ -821,7 +821,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 			name: "range proof bad response - removed key from middle of response",
 			rangeProofClient: func(db merkledb.MerkleDB) Client {
 				handler := newModifiedResponseHandler(t, db, func(response *merkledb.RangeProof) {
-					i := rand.Intn(max(1, len(response.KeyValues)) - 1)
+					i := rand.Intn(max(1, len(response.KeyValues)) - 1) // #nosec G404
 					_ = slices.Delete(response.KeyValues, i, i+1)
 				})
 
@@ -867,9 +867,10 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 				handler := NewSyncGetRangeProofHandler(logging.NoLog{}, db)
 				client := p2ptest.NewClient(t, context.Background(), handler)
 
+				counter := counter{m: 2}
 				return &testClient{
 					AppRequestAnyF: func(ctx context.Context, appResponse []byte, onResponse p2p.AppResponseCallback) error {
-						if rand.Intn(2) < 1 {
+						if counter.Get() == 0 {
 							onResponse(ctx, ids.GenerateTestNodeID(), nil, errors.New("foobar"))
 							return nil
 						}
@@ -885,9 +886,10 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 				handler := NewSyncGetChangeProofHandler(logging.NoLog{}, db)
 				client := p2ptest.NewClient(t, context.Background(), handler)
 
+				counter := counter{m: 2}
 				return &testClient{
 					AppRequestAnyF: func(ctx context.Context, appResponse []byte, onResponse p2p.AppResponseCallback) error {
-						if rand.Intn(2) < 1 {
+						if counter.Get() == 0 {
 							onResponse(ctx, ids.GenerateTestNodeID(), nil, errors.New("foobar"))
 							return nil
 						}
@@ -951,7 +953,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 			require.NoError(syncer.Start(ctx))
 
 			// Simulate writes on the server
-			// TODO more than a single write  when API is less flaky
+			// TODO more than a single write when API is less flaky
 			for i := 0; i <= 1; i++ {
 				addkey := make([]byte, r.Intn(50))
 				_, err = r.Read(addkey)
