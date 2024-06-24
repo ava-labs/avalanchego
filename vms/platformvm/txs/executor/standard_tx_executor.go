@@ -58,7 +58,8 @@ func (e *StandardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 
 	var (
 		currentTimestamp = e.State.GetTimestamp()
-		isDurangoActive  = e.Config.UpgradeConfig.IsDurangoActivated(currentTimestamp)
+		upgrades         = e.Backend.Config.UpgradeConfig
+		isDurangoActive  = upgrades.IsDurangoActivated(currentTimestamp)
 	)
 	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
 		return err
@@ -70,7 +71,10 @@ func (e *StandardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 	}
 
 	// Verify the flowcheck
-	fee := e.FeeCalculator.CalculateFee(tx)
+	fee, err := e.FeeCalculator.CalculateFee(tx, e.Tx.Creds)
+	if err != nil {
+		return err
+	}
 	if err := e.FlowChecker.VerifySpend(
 		tx,
 		e.State,
@@ -109,14 +113,18 @@ func (e *StandardTxExecutor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 
 	var (
 		currentTimestamp = e.State.GetTimestamp()
-		isDurangoActive  = e.Config.UpgradeConfig.IsDurangoActivated(currentTimestamp)
+		upgrades         = e.Backend.Config.UpgradeConfig
+		isDurangoActive  = upgrades.IsDurangoActivated(currentTimestamp)
 	)
 	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
 		return err
 	}
 
 	// Verify the flowcheck
-	fee := e.FeeCalculator.CalculateFee(tx)
+	fee, err := e.FeeCalculator.CalculateFee(tx, e.Tx.Creds)
+	if err != nil {
+		return err
+	}
 	if err := e.FlowChecker.VerifySpend(
 		tx,
 		e.State,
@@ -149,7 +157,8 @@ func (e *StandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 
 	var (
 		currentTimestamp = e.State.GetTimestamp()
-		isDurangoActive  = e.Config.UpgradeConfig.IsDurangoActivated(currentTimestamp)
+		upgrades         = e.Backend.Config.UpgradeConfig
+		isDurangoActive  = upgrades.IsDurangoActivated(currentTimestamp)
 	)
 	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
 		return err
@@ -197,7 +206,10 @@ func (e *StandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 		copy(ins[len(tx.Ins):], tx.ImportedInputs)
 
 		// Verify the flowcheck
-		fee := e.FeeCalculator.CalculateFee(tx)
+		fee, err := e.FeeCalculator.CalculateFee(tx, e.Tx.Creds)
+		if err != nil {
+			return err
+		}
 		if err := e.FlowChecker.VerifySpendUTXOs(
 			tx,
 			utxos,
@@ -237,15 +249,12 @@ func (e *StandardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 
 	var (
 		currentTimestamp = e.State.GetTimestamp()
-		isDurangoActive  = e.Config.UpgradeConfig.IsDurangoActivated(currentTimestamp)
+		upgrades         = e.Backend.Config.UpgradeConfig
+		isDurangoActive  = upgrades.IsDurangoActivated(currentTimestamp)
 	)
 	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
 		return err
 	}
-
-	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.ExportedOutputs))
-	copy(outs, tx.Outs)
-	copy(outs[len(tx.Outs):], tx.ExportedOutputs)
 
 	if e.Bootstrapped.Get() {
 		if err := verify.SameSubnet(context.TODO(), e.Ctx, tx.DestinationChain); err != nil {
@@ -254,7 +263,13 @@ func (e *StandardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 	}
 
 	// Verify the flowcheck
-	fee := e.FeeCalculator.CalculateFee(tx)
+	fee, err := e.FeeCalculator.CalculateFee(tx, e.Tx.Creds)
+	if err != nil {
+		return err
+	}
+	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.ExportedOutputs))
+	copy(outs, tx.Outs)
+	copy(outs[len(tx.Outs):], tx.ExportedOutputs)
 	if err := e.FlowChecker.VerifySpend(
 		tx,
 		e.State,
@@ -405,13 +420,12 @@ func (e *StandardTxExecutor) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidat
 		return err
 	}
 
+	// Invariant: There are no permissioned subnet delegators to remove.
 	if isCurrentValidator {
 		e.State.DeleteCurrentValidator(staker)
 	} else {
 		e.State.DeletePendingValidator(staker)
 	}
-
-	// Invariant: There are no permissioned subnet delegators to remove.
 
 	txID := e.Tx.ID()
 	avax.Consume(e.State, tx.Ins)
@@ -427,7 +441,8 @@ func (e *StandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 
 	var (
 		currentTimestamp = e.State.GetTimestamp()
-		isDurangoActive  = e.Config.UpgradeConfig.IsDurangoActivated(currentTimestamp)
+		upgrades         = e.Backend.Config.UpgradeConfig
+		isDurangoActive  = upgrades.IsDurangoActivated(currentTimestamp)
 	)
 	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
 		return err
@@ -445,7 +460,10 @@ func (e *StandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 	}
 
 	// Verify the flowcheck
-	fee := e.FeeCalculator.CalculateFee(tx)
+	fee, err := e.FeeCalculator.CalculateFee(tx, e.Tx.Creds)
+	if err != nil {
+		return err
+	}
 	totalRewardAmount := tx.MaximumSupply - tx.InitialSupply
 	if err := e.Backend.FlowChecker.VerifySpend(
 		tx,
@@ -555,8 +573,13 @@ func (e *StandardTxExecutor) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwn
 }
 
 func (e *StandardTxExecutor) BaseTx(tx *txs.BaseTx) error {
-	currentTimestamp := e.State.GetTimestamp()
-	if !e.Backend.Config.UpgradeConfig.IsDurangoActivated(currentTimestamp) {
+	var (
+		currentTimestamp = e.State.GetTimestamp()
+		upgrades         = e.Backend.Config.UpgradeConfig
+		IsDurangoActive  = upgrades.IsDurangoActivated(currentTimestamp)
+	)
+
+	if !IsDurangoActive {
 		return ErrDurangoUpgradeNotActive
 	}
 
@@ -570,7 +593,10 @@ func (e *StandardTxExecutor) BaseTx(tx *txs.BaseTx) error {
 	}
 
 	// Verify the flowcheck
-	fee := e.FeeCalculator.CalculateFee(tx)
+	fee, err := e.FeeCalculator.CalculateFee(tx, e.Tx.Creds)
+	if err != nil {
+		return err
+	}
 	if err := e.FlowChecker.VerifySpend(
 		tx,
 		e.State,
@@ -596,12 +622,13 @@ func (e *StandardTxExecutor) BaseTx(tx *txs.BaseTx) error {
 func (e *StandardTxExecutor) putStaker(stakerTx txs.Staker) error {
 	var (
 		chainTime = e.State.GetTimestamp()
+		upgrades  = e.Backend.Config.UpgradeConfig
 		txID      = e.Tx.ID()
 		staker    *state.Staker
 		err       error
 	)
 
-	if !e.Config.UpgradeConfig.IsDurangoActivated(chainTime) {
+	if !upgrades.IsDurangoActivated(chainTime) {
 		// Pre-Durango, stakers set a future [StartTime] and are added to the
 		// pending staker set. They are promoted to the current staker set once
 		// the chain time reaches [StartTime].
