@@ -147,12 +147,7 @@ func (s *state) SetValue(e *Element) error {
 // current engine state.
 func (s *state) RemoveValue(key []byte) error {
 	value, err := s.loadValue(key)
-	if err != nil {
-		if err != database.ErrNotFound {
-			// An unexpected error occurred, so we should propagate that error
-			return err
-		}
-
+	if err == database.ErrNotFound {
 		// The value doesn't exist, so we should optimistically delete it
 		dbElem := dbElement{Present: false}
 		valueBytes, err := Codec.Marshal(CodecVersion, &dbElem)
@@ -160,6 +155,9 @@ func (s *state) RemoveValue(key []byte) error {
 			return err
 		}
 		return s.valueDB.Put(key, valueBytes)
+	}
+	if err != nil {
+		return err
 	}
 
 	// Don't allow the removal of something that was already removed.

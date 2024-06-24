@@ -69,6 +69,7 @@ func deprecateFlags(fs *pflag.FlagSet) error {
 func addProcessFlags(fs *pflag.FlagSet) {
 	// If true, print the version and quit.
 	fs.Bool(VersionKey, false, "If true, print version and quit")
+	fs.Bool(VersionJSONKey, false, "If true, print version in JSON format and quit")
 }
 
 func addNodeFlags(fs *pflag.FlagSet) {
