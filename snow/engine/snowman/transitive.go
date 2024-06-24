@@ -510,13 +510,7 @@ func (t *Transitive) Start(ctx context.Context, startReqID uint32) error {
 
 	preferredChain := make([]snowman.Block, 0)
 	for preferredBlock.Status() == choices.Processing {
-		// During bootstrap our accepted tip can grow, so we should only
-		// re-issue blocks into consensus with a greater height than what
-		// we currently have.
-		if preferredBlock.Height() > lastAccepted.Height() {
-			preferredChain = append(preferredChain, preferredBlock)
-		}
-
+		preferredChain = append(preferredChain, preferredBlock)
 		preferredBlock, err = t.VM.GetBlock(ctx, preferredBlock.Parent())
 		if err != nil {
 			return err
@@ -565,8 +559,9 @@ func (t *Transitive) Start(ctx context.Context, startReqID uint32) error {
 	}
 
 	t.Ctx.Log.Info("starting consensus",
-		zap.Stringer("lastAcceptedBlock", lastAcceptedID),
-		zap.Stringer("preferredBlock", preferredTip),
+		zap.Stringer("lastAcceptedID", lastAcceptedID),
+		zap.Uint64("lastAcceptedHeight", lastAcceptedHeight),
+		zap.Stringer("preferredID", preferredTip),
 	)
 	t.metrics.bootstrapFinished.Set(1)
 
