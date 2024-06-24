@@ -13,6 +13,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/x/merkledb"
@@ -157,37 +158,45 @@ func Test_Server_GetChangeProof(t *testing.T) {
 	now := time.Now().UnixNano()
 	t.Logf("seed: %d", now)
 	r := rand.New(rand.NewSource(now)) // #nosec G404
-	trieDB, err := generateTrieWithMinKeyLen(t, r, defaultRequestKeyLimit, 1)
-	require.NoError(t, err)
 
-	startRoot, err := trieDB.GetMerkleRoot(context.Background())
+	serverDB, err := merkledb.New(
+		context.Background(),
+		memdb.New(),
+		newDefaultDBConfig(),
+	)
+	require.NoError(t, err)
+	startRoot, err := serverDB.GetMerkleRoot(context.Background())
 	require.NoError(t, err)
 
 	// create changes
-	ops := make([]database.BatchOp, 0, 300)
-	for x := 0; x < 300; x++ {
-		key := make([]byte, r.Intn(100))
-		_, err = r.Read(key)
-		require.NoError(t, err)
+	for x := 0; x < defaultRequestKeyLimit/2; x++ {
+		ops := make([]database.BatchOp, 0, 11)
+		// add some key/values
+		for i := 0; i < 10; i++ {
+			key := make([]byte, r.Intn(100))
+			_, err = r.Read(key)
+			require.NoError(t, err)
 
-		val := make([]byte, r.Intn(100))
-		_, err = r.Read(val)
-		require.NoError(t, err)
+			val := make([]byte, r.Intn(100))
+			_, err = r.Read(val)
+			require.NoError(t, err)
 
-		ops = append(ops, database.BatchOp{Key: key, Value: val})
+			ops = append(ops, database.BatchOp{Key: key, Value: val})
+		}
 
+		// delete a key
 		deleteKeyStart := make([]byte, r.Intn(10))
 		_, err = r.Read(deleteKeyStart)
 		require.NoError(t, err)
 
-		it := trieDB.NewIteratorWithStart(deleteKeyStart)
+		it := serverDB.NewIteratorWithStart(deleteKeyStart)
 		if it.Next() {
 			ops = append(ops, database.BatchOp{Key: it.Key(), Delete: true})
 		}
 		require.NoError(t, it.Error())
 		it.Release()
 
-		view, err := trieDB.NewView(
+		view, err := serverDB.NewView(
 			context.Background(),
 			merkledb.ViewChanges{BatchOps: ops},
 		)
@@ -195,7 +204,7 @@ func Test_Server_GetChangeProof(t *testing.T) {
 		require.NoError(t, view.CommitToDB(context.Background()))
 	}
 
-	endRoot, err := trieDB.GetMerkleRoot(context.Background())
+	endRoot, err := serverDB.GetMerkleRoot(context.Background())
 	require.NoError(t, err)
 
 	fakeRootID := ids.GenerateTestID()
@@ -210,6 +219,35 @@ func Test_Server_GetChangeProof(t *testing.T) {
 		proofNil                 bool
 		expectRangeProof         bool // Otherwise expect change proof
 	}{
+		{
+			name: "proof restricted by BytesLimit",
+			request: &pb.SyncGetChangeProofRequest{
+				StartRootHash: startRoot[:],
+				EndRootHash:   endRoot[:],
+				KeyLimit:      defaultRequestKeyLimit,
+				BytesLimit:    10000,
+			},
+		},
+		{
+			name: "full response for small (single request) trie",
+			request: &pb.SyncGetChangeProofRequest{
+				StartRootHash: startRoot[:],
+				EndRootHash:   endRoot[:],
+				KeyLimit:      defaultRequestKeyLimit,
+				BytesLimit:    defaultRequestByteSizeLimit,
+			},
+			expectedResponseLen: defaultRequestKeyLimit,
+		},
+		{
+			name: "partial response to request for entire trie (full leaf limit)",
+			request: &pb.SyncGetChangeProofRequest{
+				StartRootHash: startRoot[:],
+				EndRootHash:   endRoot[:],
+				KeyLimit:      defaultRequestKeyLimit,
+				BytesLimit:    defaultRequestByteSizeLimit,
+			},
+			expectedResponseLen: defaultRequestKeyLimit,
+		},
 		{
 			name: "byteslimit is 0",
 			request: &pb.SyncGetChangeProofRequest{
@@ -310,7 +348,7 @@ func Test_Server_GetChangeProof(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 
-			handler := NewSyncGetChangeProofHandler(logging.NoLog{}, trieDB)
+			handler := NewSyncGetChangeProofHandler(logging.NoLog{}, serverDB)
 
 			requestBytes, err := proto.Marshal(test.request)
 			require.NoError(err)
