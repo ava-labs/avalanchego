@@ -34,7 +34,7 @@ func newDefaultDBConfig() merkledb.Config {
 	}
 }
 
-func newModifiedResponseHandler(
+func newModifiedRangeProofHandler(
 	t *testing.T,
 	db merkledb.MerkleDB,
 	modifyResponse func(response *merkledb.RangeProof),
@@ -50,15 +50,49 @@ func newModifiedResponseHandler(
 			response := &pb.RangeProof{}
 			require.NoError(t, proto.Unmarshal(responseBytes, response))
 
-			rangeProof := &merkledb.RangeProof{}
-			require.NoError(t, rangeProof.UnmarshalProto(response))
+			proof := &merkledb.RangeProof{}
+			require.NoError(t, proof.UnmarshalProto(response))
 
 			// Half of requests are modified
 			if c.Get() == 0 {
-				modifyResponse(rangeProof)
+				modifyResponse(proof)
 			}
 
-			return proto.Marshal(rangeProof.ToProto())
+			return proto.Marshal(proof.ToProto())
+		},
+	}
+}
+
+func newModifiedChangeProofHandler(
+	t *testing.T,
+	db merkledb.MerkleDB,
+	modifyResponse func(response *merkledb.ChangeProof),
+) p2p.Handler {
+	rangeProofHandler := NewSyncGetChangeProofHandler(logging.NoLog{}, db)
+
+	c := counter{m: 2}
+	return &p2p.TestHandler{
+		AppRequestF: func(ctx context.Context, nodeID ids.NodeID, deadline time.Time, requestBytes []byte) ([]byte, error) {
+			responseBytes, err := rangeProofHandler.AppRequest(ctx, nodeID, deadline, requestBytes)
+			require.NoError(t, err)
+
+			response := &pb.SyncGetChangeProofResponse{}
+			require.NoError(t, proto.Unmarshal(responseBytes, response))
+
+			changeProof := response.Response.(*pb.SyncGetChangeProofResponse_ChangeProof)
+			proof := &merkledb.ChangeProof{}
+			require.NoError(t, proof.UnmarshalProto(changeProof.ChangeProof))
+
+			// Half of requests are modified
+			if c.Get() == 0 {
+				modifyResponse(proof)
+			}
+
+			return proto.Marshal(&pb.SyncGetChangeProofResponse{
+				Response: &pb.SyncGetChangeProofResponse_ChangeProof{
+					ChangeProof: proof.ToProto(),
+				},
+			})
 		},
 	}
 }
