@@ -128,7 +128,7 @@ type Manager struct {
 	tokenSize int
 
 	stateSyncNodeIdx uint32
-	metrics          *metrics
+	metrics          SyncMetrics
 }
 
 // TODO remove non-config values out of this struct
@@ -167,7 +167,7 @@ func NewManager(config ManagerConfig, registerer prometheus.Registerer) (*Manage
 		config.Hasher = merkledb.DefaultHasher
 	}
 
-	metrics, err := newMetrics("sync", registerer)
+	metrics, err := NewMetrics("sync", registerer)
 	if err != nil {
 		return nil, err
 	}
