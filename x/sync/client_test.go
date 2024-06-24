@@ -15,10 +15,11 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
-	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
 	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/x/merkledb"
+
+	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
 func newDefaultDBConfig() merkledb.Config {
