@@ -602,7 +602,7 @@ func TestTxFees(t *testing.T) {
 				// txs like RewardValidatorTx are not signed
 				creds = sTx.Creds
 			}
-			_, _ = c.ComputeFee(uTx, creds)
+			_, _ = c.CalculateFee(uTx, creds)
 			tt.checksF(t, c)
 		})
 	}

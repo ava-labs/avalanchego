@@ -143,8 +143,8 @@ func (c *staticCalculator) resetFee(newFee uint64) {
 	c.fee = newFee
 }
 
-func (c *staticCalculator) computeFee(tx txs.UnsignedTx, _ []verify.Verifiable) (uint64, error) {
-	c.fee = 0 // zero fee among different ComputeFee invocations (unlike gas which gets cumulated)
+func (c *staticCalculator) calculateFee(tx txs.UnsignedTx, _ []verify.Verifiable) (uint64, error) {
+	c.fee = 0 // zero fee among different calculateFee invocations (unlike gas which gets cumulated)
 	err := tx.Visit(c)
 	return c.fee, err
 }
