@@ -4,51 +4,10 @@
 package sync
 
 import (
-	"sync"
-
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/utils"
 )
-
-var (
-	_ SyncMetrics = (*mockMetrics)(nil)
-	_ SyncMetrics = (*metrics)(nil)
-)
-
-type SyncMetrics interface {
-	RequestFailed()
-	RequestMade()
-	RequestSucceeded()
-}
-
-type mockMetrics struct {
-	lock              sync.Mutex
-	requestsFailed    int
-	requestsMade      int
-	requestsSucceeded int
-}
-
-func (m *mockMetrics) RequestFailed() {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-
-	m.requestsFailed++
-}
-
-func (m *mockMetrics) RequestMade() {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-
-	m.requestsMade++
-}
-
-func (m *mockMetrics) RequestSucceeded() {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-
-	m.requestsSucceeded++
-}
 
 type metrics struct {
 	requestsFailed    prometheus.Counter
@@ -56,7 +15,7 @@ type metrics struct {
 	requestsSucceeded prometheus.Counter
 }
 
-func NewMetrics(namespace string, reg prometheus.Registerer) (SyncMetrics, error) {
+func newMetrics(namespace string, reg prometheus.Registerer) (*metrics, error) {
 	m := metrics{
 		requestsFailed: prometheus.NewCounter(prometheus.CounterOpts{
 			Namespace: namespace,
