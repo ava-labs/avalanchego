@@ -311,9 +311,9 @@ func (c *dynamicCalculator) resetFee(newFee uint64) {
 	c.fee = newFee
 }
 
-func (c *dynamicCalculator) computeFee(tx txs.UnsignedTx, creds []verify.Verifiable) (uint64, error) {
+func (c *dynamicCalculator) calculateFee(tx txs.UnsignedTx, creds []verify.Verifiable) (uint64, error) {
 	c.setCredentials(creds)
-	c.fee = 0 // zero fee among different ComputeFee invocations (unlike gas which gets cumulated)
+	c.fee = 0 // zero fee among different calculateFee invocations (unlike gas which gets cumulated)
 	err := tx.Visit(c)
 	return c.fee, err
 }

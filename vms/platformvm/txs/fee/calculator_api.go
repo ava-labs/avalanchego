@@ -23,8 +23,8 @@ func (c *Calculator) ResetFee(newFee uint64) {
 	c.b.resetFee(newFee)
 }
 
-func (c *Calculator) ComputeFee(tx txs.UnsignedTx, creds []verify.Verifiable) (uint64, error) {
-	return c.b.computeFee(tx, creds)
+func (c *Calculator) CalculateFee(tx txs.UnsignedTx, creds []verify.Verifiable) (uint64, error) {
+	return c.b.calculateFee(tx, creds)
 }
 
 func (c *Calculator) AddFeesFor(complexity fee.Dimensions) (uint64, error) {
@@ -68,6 +68,6 @@ type backend interface {
 	getExcessGas() fee.Gas
 	getGasCap() fee.Gas
 	setCredentials(creds []verify.Verifiable)
-	computeFee(tx txs.UnsignedTx, creds []verify.Verifiable) (uint64, error)
+	calculateFee(tx txs.UnsignedTx, creds []verify.Verifiable) (uint64, error)
 	isEActive() bool
 }
