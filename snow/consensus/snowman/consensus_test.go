@@ -291,7 +291,6 @@ func StatusOrProcessingPreviouslyAcceptedTest(t *testing.T, factory Factory) {
 
 	require.Equal(choices.Accepted, snowmantest.Genesis.Status())
 	require.False(sm.Processing(snowmantest.Genesis.ID()))
-	require.True(sm.Decided(snowmantest.Genesis))
 	require.True(sm.IsPreferred(snowmantest.Genesis.ID()))
 
 	pref, ok := sm.PreferenceAtHeight(snowmantest.Genesis.Height())
@@ -329,7 +328,6 @@ func StatusOrProcessingPreviouslyRejectedTest(t *testing.T, factory Factory) {
 
 	require.Equal(choices.Rejected, block.Status())
 	require.False(sm.Processing(block.ID()))
-	require.True(sm.Decided(block))
 	require.False(sm.IsPreferred(block.ID()))
 
 	_, ok := sm.PreferenceAtHeight(block.Height())
@@ -365,7 +363,6 @@ func StatusOrProcessingUnissuedTest(t *testing.T, factory Factory) {
 
 	require.Equal(choices.Processing, block.Status())
 	require.False(sm.Processing(block.ID()))
-	require.False(sm.Decided(block))
 	require.False(sm.IsPreferred(block.ID()))
 
 	_, ok := sm.PreferenceAtHeight(block.Height())
@@ -402,7 +399,6 @@ func StatusOrProcessingIssuedTest(t *testing.T, factory Factory) {
 	require.NoError(sm.Add(block))
 	require.Equal(choices.Processing, block.Status())
 	require.True(sm.Processing(block.ID()))
-	require.False(sm.Decided(block))
 	require.True(sm.IsPreferred(block.ID()))
 
 	pref, ok := sm.PreferenceAtHeight(block.Height())
