@@ -1144,7 +1144,7 @@ func (t *Transitive) shouldIssueBlock(blk snowman.Block) bool {
 
 	blkID := blk.ID()
 	_, isPending := t.pending[blkID]
-	return !isPending && // If the block is already enqueued to be issued, don't enqueue it again.
+	return !isPending && // If the block is already pending, don't issue it again.
 		!t.Consensus.Processing(blkID) // If the block was previously issued, don't issue it again.
 }
 
