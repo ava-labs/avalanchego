@@ -221,30 +221,3 @@ sequenceDiagram
     Rick->>Morty: PeerList - Contains Summer
 ```
 This case is suboptimal, because `Rick` told `Morty` about `Summer` multiple times. If this case were to happen consistently, `Rick` may waste a significant amount of bandwidth trying to teach `Morty` about `Summer`.
-
-#### Example PeerList Gossip
-
-The following diagram shows an example of `Morty` repeatedly learning about new peers from `Rick`.
-
-```mermaid
-sequenceDiagram
-    actor Morty
-    actor Rick
-    Note left of Morty: Initialize Bloom Filter
-    Note left of Morty: Bloom: [0, 0, 0]
-    Morty->>Rick: GetPeerList [0, 0, 0]
-    Note right of Rick: Any peers can be sent.
-    Rick->>Morty: PeerList - Peer-1
-    Note left of Morty: Bloom: [1, 0, 0]
-    Morty->>Rick: GetPeerList [1, 0, 0]
-    Note right of Rick: Either Peer-2 or Peer-3 can be sent.
-    Rick->>Morty: PeerList - Peer-3
-    Note left of Morty: Bloom: [1, 0, 1]
-    Morty->>Rick: GetPeerList [1, 0, 1]
-    Note right of Rick: Only Peer-2 can be sent.
-    Rick->>Morty: PeerList - Peer-2
-    Note left of Morty: Bloom: [1, 1, 1]
-    Morty->>Rick: GetPeerList [1, 1, 1]
-    Note right of Rick: There are no more peers left to send!
-    Rick->>Morty: PeerList - Empty
-```
