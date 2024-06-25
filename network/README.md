@@ -204,6 +204,7 @@ sequenceDiagram
     Note right of Rick: Summer is in the bloom filter
     Rick->>Morty: PeerList - Empty
 ```
+This case is ideal, as `Rick` only notifies `Morty` about `Summer` once, and never uses bandwidth for their connection again.
 
 Now we consider the case that `Rick` considers `Summer` [`gossipable`](#gossipable-peers), but `Morty` does not consider `Summer` [`trackable`](#trackable-peers).
 ```mermaid
