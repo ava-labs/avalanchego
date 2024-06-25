@@ -70,10 +70,11 @@ func NewDiff(
 		return nil, fmt.Errorf("%w: %s", ErrMissingParentState, parentID)
 	}
 	return &diff{
-		parentID:      parentID,
-		stateVersions: stateVersions,
-		timestamp:     parentState.GetTimestamp(),
-		subnetOwners:  make(map[ids.ID]fx.Owner),
+		parentID:       parentID,
+		stateVersions:  stateVersions,
+		timestamp:      parentState.GetTimestamp(),
+		subnetOwners:   make(map[ids.ID]fx.Owner),
+		subnetManagers: make(map[ids.ID]chainIDAndAddr),
 	}, nil
 }
 
@@ -501,6 +502,9 @@ func (d *diff) Apply(baseState Chain) error {
 	}
 	for subnetID, owner := range d.subnetOwners {
 		baseState.SetSubnetOwner(subnetID, owner)
+	}
+	for subnetID, manager := range d.subnetManagers {
+		baseState.SetSubnetManager(subnetID, manager.ChainID, manager.Addr)
 	}
 	return nil
 }
