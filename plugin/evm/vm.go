@@ -103,6 +103,7 @@ var (
 	_ block.BuildBlockWithContextChainVM = &VM{}
 	_ block.StateSyncableVM              = &VM{}
 	_ statesyncclient.EthBlockParser     = &VM{}
+	_ secp256k1fx.VM                     = &VM{}
 )
 
 const (
@@ -339,9 +340,6 @@ type VM struct {
 	atomicTxPushGossiper  *gossip.PushGossiper[*GossipAtomicTx]
 	atomicTxPullGossiper  gossip.Gossiper
 }
-
-// Codec implements the secp256k1fx interface
-func (vm *VM) Codec() codec.Manager { return vm.codec }
 
 // CodecRegistry implements the secp256k1fx interface
 func (vm *VM) CodecRegistry() codec.Registry { return vm.baseCodec }
