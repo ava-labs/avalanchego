@@ -140,3 +140,9 @@ func (c *calculator) ExportTx(*txs.ExportTx) error {
 	c.fee = c.staticCfg.TxFee
 	return nil
 }
+
+func (c *calculator) SetSubnetManagerTx(*txs.SetSubnetManagerTx) error {
+	// TODO: This should only be a dynamic fee.
+	c.fee = c.staticCfg.TxFee
+	return nil
+}
