@@ -266,7 +266,7 @@ func (v *verifier) banffNonOptionBlock(b block.BanffBlock) error {
 		)
 	}
 
-	nextStakerChangeTime, err := executor.GetNextStakerChangeTime(parentState)
+	nextStakerChangeTime, err := state.GetNextStakerChangeTime(parentState)
 	if err != nil {
 		return fmt.Errorf("could not verify block timestamp: %w", err)
 	}
