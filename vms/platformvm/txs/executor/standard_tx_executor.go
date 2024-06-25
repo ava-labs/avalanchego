@@ -33,8 +33,9 @@ var (
 type StandardTxExecutor struct {
 	// inputs, to be filled before visitor methods are called
 	*Backend
-	State state.Diff // state is expected to be modified
-	Tx    *txs.Tx
+	State   state.Diff // state is expected to be modified
+	Tx      *txs.Tx
+	Context context.Context
 
 	// outputs of visitor execution
 	OnAccept       func() // may be nil
@@ -558,6 +559,7 @@ func (e *StandardTxExecutor) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwn
 
 func (e *StandardTxExecutor) SetSubnetManagerTx(tx *txs.SetSubnetManagerTx) error {
 	payload, err := verifySetSubnetManagerTx(
+		e.Context,
 		e.Backend,
 		e.State,
 		e.Tx,

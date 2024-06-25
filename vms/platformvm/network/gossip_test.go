@@ -4,6 +4,7 @@
 package network
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -39,6 +40,7 @@ func TestGossipMempoolAddVerificationError(t *testing.T) {
 	mempool.EXPECT().MarkDropped(txID, errFoo)
 
 	gossipMempool, err := newGossipMempool(
+		context.Background(),
 		mempool,
 		prometheus.NewRegistry(),
 		logging.NoLog{},
@@ -73,6 +75,7 @@ func TestGossipMempoolAddError(t *testing.T) {
 	mempool.EXPECT().MarkDropped(txID, errFoo).AnyTimes()
 
 	gossipMempool, err := newGossipMempool(
+		context.Background(),
 		mempool,
 		prometheus.NewRegistry(),
 		logging.NoLog{},
@@ -104,6 +107,7 @@ func TestMempoolDuplicate(t *testing.T) {
 	testMempool.EXPECT().Get(txID).Return(tx, true)
 
 	gossipMempool, err := newGossipMempool(
+		context.Background(),
 		testMempool,
 		prometheus.NewRegistry(),
 		logging.NoLog{},
@@ -139,6 +143,7 @@ func TestGossipAddBloomFilter(t *testing.T) {
 	mempool.EXPECT().RequestBuildBlock(false)
 
 	gossipMempool, err := newGossipMempool(
+		context.Background(),
 		mempool,
 		prometheus.NewRegistry(),
 		logging.NoLog{},

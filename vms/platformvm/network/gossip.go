@@ -66,6 +66,7 @@ func (txMarshaller) UnmarshalGossip(bytes []byte) (*txs.Tx, error) {
 }
 
 func newGossipMempool(
+	ctx context.Context,
 	mempool pmempool.Mempool,
 	registerer prometheus.Registerer,
 	log logging.Logger,
@@ -80,6 +81,7 @@ func newGossipMempool(
 		log:        log,
 		txVerifier: txVerifier,
 		bloom:      bloom,
+		ctx:        ctx,
 	}, err
 }
 
@@ -90,6 +92,7 @@ type gossipMempool struct {
 
 	lock  sync.RWMutex
 	bloom *gossip.BloomFilter
+	ctx   context.Context
 }
 
 func (g *gossipMempool) Add(tx *txs.Tx) error {
@@ -106,7 +109,7 @@ func (g *gossipMempool) Add(tx *txs.Tx) error {
 		return reason
 	}
 
-	if err := g.txVerifier.VerifyTx(tx); err != nil {
+	if err := g.txVerifier.VerifyTx(g.ctx, tx); err != nil {
 		g.Mempool.MarkDropped(txID, err)
 		return err
 	}

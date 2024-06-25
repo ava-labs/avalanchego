@@ -66,7 +66,7 @@ type Builder interface {
 	// preferred state.
 	//
 	// Note: This function does not call the consensus engine.
-	PackBlockTxs(targetBlockSize int) ([]*txs.Tx, error)
+	PackBlockTxs(ctx context.Context, targetBlockSize int) ([]*txs.Tx, error)
 }
 
 // builder implements a simple builder to convert txs into valid blocks
@@ -197,7 +197,7 @@ func (b *builder) ShutdownBlockTimer() {
 // BuildBlock builds a block to be added to consensus.
 // This method removes the transactions from the returned
 // blocks from the mempool.
-func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
+func (b *builder) BuildBlock(ctx context.Context) (snowman.Block, error) {
 	// If there are still transactions in the mempool, then we need to
 	// re-trigger block building.
 	defer b.Mempool.RequestBuildBlock(false /*=emptyBlockPermitted*/)
@@ -222,6 +222,7 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 	}
 
 	statelessBlk, err := buildBlock(
+		ctx,
 		b,
 		preferredID,
 		nextHeight,
@@ -236,7 +237,7 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 	return b.blkManager.NewBlock(statelessBlk), nil
 }
 
-func (b *builder) PackBlockTxs(targetBlockSize int) ([]*txs.Tx, error) {
+func (b *builder) PackBlockTxs(ctx context.Context, targetBlockSize int) ([]*txs.Tx, error) {
 	preferredID := b.blkManager.Preferred()
 	preferredState, ok := b.blkManager.GetState(preferredID)
 	if !ok {
@@ -244,6 +245,7 @@ func (b *builder) PackBlockTxs(targetBlockSize int) ([]*txs.Tx, error) {
 	}
 
 	return packBlockTxs(
+		ctx,
 		preferredID,
 		preferredState,
 		b.Mempool,
@@ -256,6 +258,7 @@ func (b *builder) PackBlockTxs(targetBlockSize int) ([]*txs.Tx, error) {
 
 // [timestamp] is min(max(now, parent timestamp), next staker change time)
 func buildBlock(
+	ctx context.Context,
 	builder *builder,
 	parentID ids.ID,
 	height uint64,
@@ -264,6 +267,7 @@ func buildBlock(
 	parentState state.Chain,
 ) (block.Block, error) {
 	blockTxs, err := packBlockTxs(
+		ctx,
 		parentID,
 		parentState,
 		builder.Mempool,
@@ -314,6 +318,7 @@ func buildBlock(
 }
 
 func packBlockTxs(
+	ctx context.Context,
 	parentID ids.ID,
 	parentState state.Chain,
 	mempool mempool.Mempool,
@@ -358,6 +363,7 @@ func packBlockTxs(
 			Backend: backend,
 			State:   txDiff,
 			Tx:      tx,
+			Context: ctx,
 		}
 
 		err = tx.Unsigned.Visit(executor)

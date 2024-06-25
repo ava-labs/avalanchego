@@ -173,6 +173,7 @@ func (vm *VM) Initialize(
 	}
 
 	vm.manager = blockexecutor.NewManager(
+		ctx,
 		mempool,
 		vm.metrics,
 		vm.state,
@@ -182,6 +183,7 @@ func (vm *VM) Initialize(
 
 	txVerifier := network.NewLockedTxVerifier(&txExecutorBackend.Ctx.Lock, vm.manager)
 	vm.Network, err = network.New(
+		ctx,
 		chainCtx.Log,
 		chainCtx.NodeID,
 		chainCtx.SubnetID,
@@ -269,7 +271,7 @@ func (vm *VM) pruneMempool() error {
 	// Packing all of the transactions in order performs additional checks that
 	// the MempoolTxVerifier doesn't include. So, evicting transactions from
 	// here is expected to happen occasionally.
-	blockTxs, err := vm.Builder.PackBlockTxs(math.MaxInt)
+	blockTxs, err := vm.Builder.PackBlockTxs(vm.onShutdownCtx, math.MaxInt)
 	if err != nil {
 		return err
 	}

@@ -4,6 +4,7 @@
 package executor
 
 import (
+	"context"
 	"errors"
 	"time"
 
@@ -34,6 +35,8 @@ type backend struct {
 	state        state.State
 
 	ctx *snow.Context
+
+	Context context.Context
 }
 
 func (b *backend) GetState(blkID ids.ID) (state.Chain, bool) {

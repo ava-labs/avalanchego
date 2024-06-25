@@ -4,6 +4,7 @@
 package executor
 
 import (
+	"context"
 	"errors"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -39,7 +40,7 @@ type Manager interface {
 
 	// VerifyTx verifies that the transaction can be issued based on the currently
 	// preferred state. This should *not* be used to verify transactions in a block.
-	VerifyTx(tx *txs.Tx) error
+	VerifyTx(ctx context.Context, tx *txs.Tx) error
 
 	// VerifyUniqueInputs verifies that the inputs are not duplicated in the
 	// provided blk or any of its ancestors pinned in memory.
@@ -47,6 +48,7 @@ type Manager interface {
 }
 
 func NewManager(
+	ctx context.Context,
 	mempool mempool.Mempool,
 	metrics metrics.Metrics,
 	s state.State,
@@ -60,6 +62,7 @@ func NewManager(
 		state:        s,
 		ctx:          txExecutorBackend.Ctx,
 		blkIDToState: map[ids.ID]*blockState{},
+		Context:      ctx,
 	}
 
 	return &manager{
@@ -122,7 +125,7 @@ func (m *manager) Preferred() ids.ID {
 	return m.preferred
 }
 
-func (m *manager) VerifyTx(tx *txs.Tx) error {
+func (m *manager) VerifyTx(ctx context.Context, tx *txs.Tx) error {
 	if !m.txExecutorBackend.Bootstrapped.Get() {
 		return ErrChainNotSynced
 	}
@@ -146,6 +149,7 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 		Backend: m.txExecutorBackend,
 		State:   stateDiff,
 		Tx:      tx,
+		Context: ctx,
 	})
 }
 

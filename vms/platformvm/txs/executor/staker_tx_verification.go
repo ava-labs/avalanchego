@@ -819,6 +819,7 @@ func verifyTransferSubnetOwnershipTx(
 // * [sTx]'s creds authorize it to transfer ownership of [tx.Subnet].
 // * The flow checker passes.
 func verifySetSubnetManagerTx(
+	ctx context.Context,
 	backend *Backend,
 	chainState state.Chain,
 	sTx *txs.Tx,
@@ -875,13 +876,13 @@ func verifySetSubnetManagerTx(
 		return nil, ErrSetSubnetManagerPrimaryNetwork
 	}
 
-	height, err := backend.Ctx.ValidatorState.GetCurrentHeight(context.Background())
+	height, err := backend.Ctx.ValidatorState.GetCurrentHeight(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	if err := tx.Message.Signature.Verify(
-		context.Background(),
+		ctx,
 		&tx.Message.UnsignedMessage,
 		backend.Ctx.NetworkID,
 		backend.Ctx.ValidatorState,

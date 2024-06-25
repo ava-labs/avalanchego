@@ -10,6 +10,7 @@
 package executor
 
 import (
+	context "context"
 	reflect "reflect"
 
 	ids "github.com/ava-labs/avalanchego/ids"
@@ -146,17 +147,17 @@ func (mr *MockManagerMockRecorder) SetPreference(blkID any) *gomock.Call {
 }
 
 // VerifyTx mocks base method.
-func (m *MockManager) VerifyTx(tx *txs.Tx) error {
+func (m *MockManager) VerifyTx(ctx context.Context, tx *txs.Tx) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "VerifyTx", tx)
+	ret := m.ctrl.Call(m, "VerifyTx", ctx, tx)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // VerifyTx indicates an expected call of VerifyTx.
-func (mr *MockManagerMockRecorder) VerifyTx(tx any) *gomock.Call {
+func (mr *MockManagerMockRecorder) VerifyTx(ctx, tx any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "VerifyTx", reflect.TypeOf((*MockManager)(nil).VerifyTx), tx)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "VerifyTx", reflect.TypeOf((*MockManager)(nil).VerifyTx), ctx, tx)
 }
 
 // VerifyUniqueInputs mocks base method.

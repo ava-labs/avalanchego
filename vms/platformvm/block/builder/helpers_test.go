@@ -180,6 +180,7 @@ func newEnvironment(t *testing.T, f fork) *environment { //nolint:unparam
 	require.NoError(err)
 
 	res.blkManager = blockexecutor.NewManager(
+		context.Background(),
 		res.mempool,
 		metrics,
 		res.state,
@@ -189,6 +190,7 @@ func newEnvironment(t *testing.T, f fork) *environment { //nolint:unparam
 
 	txVerifier := network.NewLockedTxVerifier(&res.ctx.Lock, res.blkManager)
 	res.network, err = network.New(
+		context.Background(),
 		res.backend.Ctx.Log,
 		res.backend.Ctx.NodeID,
 		res.backend.Ctx.SubnetID,

@@ -204,6 +204,7 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller, f fork) *environment 
 
 	if ctrl == nil {
 		res.blkManager = NewManager(
+			context.Background(),
 			res.mempool,
 			metrics,
 			res.state,
@@ -213,6 +214,7 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller, f fork) *environment 
 		addSubnet(res)
 	} else {
 		res.blkManager = NewManager(
+			context.Background(),
 			res.mempool,
 			metrics,
 			res.mockedState,

@@ -41,6 +41,7 @@ type Network struct {
 }
 
 func New(
+	ctx context.Context,
 	log logging.Logger,
 	nodeID ids.NodeID,
 	subnetID ids.ID,
@@ -75,6 +76,7 @@ func New(
 	}
 
 	gossipMempool, err := newGossipMempool(
+		ctx,
 		mempool,
 		registerer,
 		log,

@@ -51,7 +51,7 @@ type testTxVerifier struct {
 	err error
 }
 
-func (t testTxVerifier) VerifyTx(*txs.Tx) error {
+func (t testTxVerifier) VerifyTx(ctx context.Context, _ *txs.Tx) error {
 	return t.err
 }
 
@@ -165,6 +165,7 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 
 			snowCtx := snowtest.Context(t, ids.Empty)
 			n, err := New(
+				context.Background(),
 				snowCtx.Log,
 				snowCtx.NodeID,
 				snowCtx.SubnetID,

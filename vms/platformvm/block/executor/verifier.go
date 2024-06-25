@@ -443,6 +443,7 @@ func (v *verifier) processStandardTxs(txs []*txs.Tx, state state.Diff, parentID 
 			Backend: v.txExecutorBackend,
 			State:   state,
 			Tx:      tx,
+			Context: v.Context,
 		}
 		if err := tx.Unsigned.Visit(&txExecutor); err != nil {
 			txID := tx.ID()
