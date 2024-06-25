@@ -10,16 +10,11 @@ import (
 
 var _ Unary = (*unarySnowflake)(nil)
 
-func newUnarySnowflake(alphaPreference, alphaConfidence, beta int) unarySnowflake {
+func newUnarySnowflake(alphaPreference int, terminationConditions []terminationCondition) unarySnowflake {
 	return unarySnowflake{
-		alphaPreference: alphaPreference,
-		terminationConditions: []terminationCondition{
-			{
-				alphaConfidence: alphaConfidence,
-				beta:            beta,
-			},
-		},
-		confidence: make([]int, 1),
+		alphaPreference:       alphaPreference,
+		terminationConditions: terminationConditions,
+		confidence:            make([]int, len(terminationConditions)),
 	}
 }
 
@@ -93,7 +88,7 @@ func (sf *unarySnowflake) Clone() Unary {
 }
 
 func (sf *unarySnowflake) String() string {
-	return fmt.Sprintf("SF(Confidence = %d, Finalized = %v)",
-		sf.confidence[0],
+	return fmt.Sprintf("SF(Confidence = %v, Finalized = %v)",
+		sf.confidence,
 		sf.finalized)
 }

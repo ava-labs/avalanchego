@@ -13,7 +13,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/utils/bag"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -127,7 +126,7 @@ func (ts *Topological) Initialize(
 	ts.lastAcceptedID = lastAcceptedID
 	ts.lastAcceptedHeight = lastAcceptedHeight
 	ts.blocks = map[ids.ID]*snowmanBlock{
-		lastAcceptedID: {params: ts.params},
+		lastAcceptedID: {t: ts},
 	}
 	ts.preferredHeights = make(map[uint64]ids.ID)
 	ts.preference = lastAcceptedID
@@ -163,8 +162,8 @@ func (ts *Topological) Add(blk Block) error {
 	// add the block as a child of its parent, and add the block to the tree
 	parentNode.AddChild(blk)
 	ts.blocks[blkID] = &snowmanBlock{
-		params: ts.params,
-		blk:    blk,
+		t:   ts,
+		blk: blk,
 	}
 
 	// If we are extending the preference, this is the new preference
@@ -182,16 +181,6 @@ func (ts *Topological) Add(blk Block) error {
 	return nil
 }
 
-func (ts *Topological) Decided(blk Block) bool {
-	// If the block is decided, then it must have been previously issued.
-	if blk.Status().Decided() {
-		return true
-	}
-	// If the block is marked as fetched, we can check if it has been
-	// transitively rejected.
-	return blk.Status() == choices.Processing && blk.Height() <= ts.lastAcceptedHeight
-}
-
 func (ts *Topological) Processing(blkID ids.ID) bool {
 	// The last accepted block is in the blocks map, so we first must ensure the
 	// requested block isn't the last accepted block.
@@ -204,12 +193,8 @@ func (ts *Topological) Processing(blkID ids.ID) bool {
 	return ok
 }
 
-func (ts *Topological) IsPreferred(blk Block) bool {
-	// If the block is accepted, then it must be transitively preferred.
-	if blk.Status() == choices.Accepted {
-		return true
-	}
-	return ts.preferredIDs.Contains(blk.ID())
+func (ts *Topological) IsPreferred(blkID ids.ID) bool {
+	return blkID == ts.lastAcceptedID || ts.preferredIDs.Contains(blkID)
 }
 
 func (ts *Topological) LastAccepted() (ids.ID, uint64) {
@@ -293,7 +278,12 @@ func (ts *Topological) RecordPoll(ctx context.Context, voteBag bag.Bag[ids.ID]) 
 
 	// Runtime = |live set| ; Space = Constant
 	// Traverse from the preferred ID to the last accepted ancestor.
-	for block := startBlock; !block.Accepted(); {
+	//
+	// It is guaranteed that the first decided block we encounter is the last
+	// accepted block because the startBlock is the preferred block. The
+	// preferred block is guaranteed to either be the last accepted block or
+	// extend the accepted chain.
+	for block := startBlock; !block.Decided(); {
 		blkID := block.blk.ID()
 		ts.preferredIDs.Add(blkID)
 		ts.preferredHeights[block.blk.Height()] = blkID
@@ -364,7 +354,7 @@ func (ts *Topological) calculateInDegree(votes bag.Bag[ids.ID]) {
 		}
 
 		// If the vote is for the last accepted block, the vote is dropped
-		if votedBlock.Accepted() {
+		if votedBlock.Decided() {
 			continue
 		}
 
@@ -388,7 +378,7 @@ func (ts *Topological) calculateInDegree(votes bag.Bag[ids.ID]) {
 
 		// iterate through all the block's ancestors and set up the inDegrees of
 		// the blocks
-		for n := ts.blocks[parentID]; !n.Accepted(); n = ts.blocks[parentID] {
+		for n := ts.blocks[parentID]; !n.Decided(); n = ts.blocks[parentID] {
 			parentID = n.blk.Parent()
 
 			// Increase the inDegree by one
@@ -432,7 +422,7 @@ func (ts *Topological) pushVotes() []votes {
 
 		// If the block is accepted, then we don't need to push votes to the
 		// parent block
-		if block.Accepted() {
+		if block.Decided() {
 			continue
 		}
 

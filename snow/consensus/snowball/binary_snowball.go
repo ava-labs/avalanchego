@@ -7,9 +7,9 @@ import "fmt"
 
 var _ Binary = (*binarySnowball)(nil)
 
-func newBinarySnowball(alphaPreference int, alphaConfidence int, beta int, choice int) binarySnowball {
+func newBinarySnowball(alphaPreference int, terminationConditions []terminationCondition, choice int) binarySnowball {
 	return binarySnowball{
-		binarySnowflake: newBinarySnowflake(alphaPreference, alphaConfidence, beta, choice),
+		binarySnowflake: newBinarySnowflake(alphaPreference, terminationConditions, choice),
 		preference:      choice,
 	}
 }

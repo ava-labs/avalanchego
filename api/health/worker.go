@@ -28,11 +28,11 @@ var (
 )
 
 type worker struct {
-	log        logging.Logger
-	namespace  string
-	metrics    *metrics
-	checksLock sync.RWMutex
-	checks     map[string]*taggedChecker
+	log           logging.Logger
+	name          string
+	failingChecks *prometheus.GaugeVec
+	checksLock    sync.RWMutex
+	checks        map[string]*taggedChecker
 
 	resultsLock                 sync.RWMutex
 	results                     map[string]Result
@@ -53,19 +53,25 @@ type taggedChecker struct {
 
 func newWorker(
 	log logging.Logger,
-	namespace string,
-	registerer prometheus.Registerer,
-) (*worker, error) {
-	metrics, err := newMetrics(namespace, registerer)
+	name string,
+	failingChecks *prometheus.GaugeVec,
+) *worker {
+	// Initialize the number of failing checks to 0 for all checks
+	for _, tag := range []string{AllTag, ApplicationTag} {
+		failingChecks.With(prometheus.Labels{
+			CheckLabel: name,
+			TagLabel:   tag,
+		}).Set(0)
+	}
 	return &worker{
-		log:       log,
-		namespace: namespace,
-		metrics:   metrics,
-		checks:    make(map[string]*taggedChecker),
-		results:   make(map[string]Result),
-		closer:    make(chan struct{}),
-		tags:      make(map[string]set.Set[string]),
-	}, err
+		log:           log,
+		name:          name,
+		failingChecks: failingChecks,
+		checks:        make(map[string]*taggedChecker),
+		results:       make(map[string]Result),
+		closer:        make(chan struct{}),
+		tags:          make(map[string]set.Set[string]),
+	}
 }
 
 func (w *worker) RegisterCheck(name string, check Checker, tags ...string) error {
@@ -107,7 +113,7 @@ func (w *worker) RegisterCheck(name string, check Checker, tags ...string) error
 
 	// Whenever a new check is added - it is failing
 	w.log.Info("registered new check and initialized its state to failing",
-		zap.String("namespace", w.namespace),
+		zap.String("name", w.name),
 		zap.String("name", name),
 		zap.Strings("tags", tags),
 	)
@@ -244,7 +250,7 @@ func (w *worker) runCheck(ctx context.Context, wg *sync.WaitGroup, name string, 
 
 		if prevResult.Error == nil {
 			w.log.Warn("check started failing",
-				zap.String("namespace", w.namespace),
+				zap.String("name", w.name),
 				zap.String("name", name),
 				zap.Strings("tags", check.tags),
 				zap.Error(err),
@@ -253,7 +259,7 @@ func (w *worker) runCheck(ctx context.Context, wg *sync.WaitGroup, name string, 
 		}
 	} else if prevResult.Error != nil {
 		w.log.Info("check started passing",
-			zap.String("namespace", w.namespace),
+			zap.String("name", w.name),
 			zap.String("name", name),
 			zap.Strings("tags", check.tags),
 		)
@@ -271,7 +277,10 @@ func (w *worker) updateMetrics(tc *taggedChecker, healthy bool, register bool) {
 	if tc.isApplicationCheck {
 		// Note: [w.tags] will include AllTag.
 		for tag := range w.tags {
-			gauge := w.metrics.failingChecks.WithLabelValues(tag)
+			gauge := w.failingChecks.With(prometheus.Labels{
+				CheckLabel: w.name,
+				TagLabel:   tag,
+			})
 			if healthy {
 				gauge.Dec()
 			} else {
@@ -285,7 +294,10 @@ func (w *worker) updateMetrics(tc *taggedChecker, healthy bool, register bool) {
 		}
 	} else {
 		for _, tag := range tc.tags {
-			gauge := w.metrics.failingChecks.WithLabelValues(tag)
+			gauge := w.failingChecks.With(prometheus.Labels{
+				CheckLabel: w.name,
+				TagLabel:   tag,
+			})
 			if healthy {
 				gauge.Dec()
 			} else {
@@ -297,7 +309,10 @@ func (w *worker) updateMetrics(tc *taggedChecker, healthy bool, register bool) {
 				}
 			}
 		}
-		gauge := w.metrics.failingChecks.WithLabelValues(AllTag)
+		gauge := w.failingChecks.With(prometheus.Labels{
+			CheckLabel: w.name,
+			TagLabel:   AllTag,
+		})
 		if healthy {
 			gauge.Dec()
 		} else {

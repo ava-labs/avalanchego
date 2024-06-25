@@ -171,7 +171,7 @@ func (b *builder) durationToSleep() (time.Duration, error) {
 		return 0, fmt.Errorf("%w: %s", errMissingPreferredState, preferredID)
 	}
 
-	nextStakerChangeTime, err := txexecutor.GetNextStakerChangeTime(preferredState)
+	nextStakerChangeTime, err := state.GetNextStakerChangeTime(preferredState)
 	if err != nil {
 		return 0, fmt.Errorf("%w of %s: %w", errCalculatingNextStakerTime, preferredID, err)
 	}
@@ -216,7 +216,7 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 		return nil, fmt.Errorf("%w: %s", state.ErrMissingParentState, preferredID)
 	}
 
-	timestamp, timeWasCapped, err := txexecutor.NextBlockTime(preferredState, b.txExecutorBackend.Clk)
+	timestamp, timeWasCapped, err := state.NextBlockTime(preferredState, b.txExecutorBackend.Clk)
 	if err != nil {
 		return nil, fmt.Errorf("could not calculate next staker change time: %w", err)
 	}
