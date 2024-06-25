@@ -188,8 +188,6 @@ A `GetPeerList` message contains the Bloom Filter of the currently known peers a
 
 To avoid persistent network traffic, it must eventually hold that the set of [`gossipable peers`](#gossipable-peers) is a subset of the [`trackable peers`](#trackable-peers) for all nodes in the network.
 
-
-
 For example, say there are 3 nodes: `Rick`, `Morty`, and `Summer`.
 
 First we consider the case that `Rick` and `Morty` consider `Summer` [`gossipable`](#gossipable-peers) and [`trackable`](#trackable-peers), respectively.
@@ -207,11 +205,21 @@ sequenceDiagram
     Rick->>Morty: PeerList - Empty
 ```
 
-1. Node `A` sends a `GetPeerList` message to node `B`.
-2. Node `B` will respond with [`gossipable peers`](#gossipable-peers).
-3. Node `A` will attempt to connect to the peers that it considers [`trackable`](#trackable-peers).
-
-If `B` includes `C` in the `PeerList`, and `A` is not tracking `C`, then `A` would ignore the information about `C`. By ignoring `C`, `A` would not add `C` to its bloom filter. If `A` were to ask `B` for peers again, `B` would then be willing to include `C` again. Thus if `A` is not tracking nodes that `B` considers gossipable, there can be persistent network traffic.
+Now we consider the case that `Rick` considers `Summer` [`gossipable`](#gossipable-peers), but `Morty` does not consider `Summer` [`trackable`](#trackable-peers).
+```mermaid
+sequenceDiagram
+    actor Morty
+    actor Rick
+    Note left of Morty: Not currently tracking Summer
+    Morty->>Rick: GetPeerList
+    Note right of Rick: Summer isn't in the bloom filter
+    Rick->>Morty: PeerList - Contains Summer
+    Note left of Morty: Ignore Summer
+    Morty->>Rick: GetPeerList
+    Note right of Rick: Summer isn't in the bloom filter
+    Rick->>Morty: PeerList - Contains Summer
+```
+This case is suboptimal, because `Rick` told `Morty` about `Summer` multiple times. If this case were to happen consistently, `Rick` may waste a significant amount of bandwidth trying to teach `Morty` about `Summer`.
 
 #### Example PeerList Gossip
 
