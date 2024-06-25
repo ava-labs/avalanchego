@@ -269,7 +269,7 @@ func (e *ProposalTxExecutor) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
 
 	// Only allow timestamp to move forward as far as the time of next staker
 	// set change time
-	nextStakerChangeTime, err := GetNextStakerChangeTime(e.OnCommitState)
+	nextStakerChangeTime, err := state.GetNextStakerChangeTime(e.OnCommitState)
 	if err != nil {
 		return err
 	}
