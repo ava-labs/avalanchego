@@ -564,7 +564,7 @@ func newState(
 	subnetManagerCache, err := metercacher.New[ids.ID, chainIDAndAddr](
 		"subnet_manager_cache",
 		metricsReg,
-		cache.NewSizedLRU[ids.ID, chainIDAndAddr](execCfg.ChainIDAndAddrCacheSize, func(_ ids.ID, f chainIDAndAddr) int {
+		cache.NewSizedLRU[ids.ID, chainIDAndAddr](execCfg.SubnetManagerCacheSize, func(_ ids.ID, f chainIDAndAddr) int {
 			return ids.IDLen + len(f.Addr)
 		}),
 	)
@@ -859,10 +859,7 @@ func (s *state) GetSubnetManager(subnetID ids.ID) (ids.ID, []byte, error) {
 	if _, err := block.GenesisCodec.Unmarshal(chainIDAndAddrBytes, &manager); err != nil {
 		return ids.Empty, nil, err
 	}
-	s.subnetManagerCache.Put(subnetID, chainIDAndAddr{
-		ChainID: manager.ChainID,
-		Addr:    manager.Addr,
-	})
+	s.subnetManagerCache.Put(subnetID, manager)
 	return manager.ChainID, manager.Addr, nil
 }
 
@@ -2289,10 +2286,7 @@ func (s *state) writeSubnetManagers() error {
 			return fmt.Errorf("failed to marshal subnet manager: %w", err)
 		}
 
-		s.subnetManagerCache.Put(subnetID, chainIDAndAddr{
-			ChainID: manager.ChainID,
-			Addr:    manager.Addr,
-		})
+		s.subnetManagerCache.Put(subnetID, manager)
 
 		if err := s.subnetManagerDB.Put(subnetID[:], managerBytes); err != nil {
 			return fmt.Errorf("failed to write subnet manager: %w", err)
