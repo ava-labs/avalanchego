@@ -33,15 +33,15 @@ Peers communicate by enqueuing messages between one another. Each peer on either
 
 ```mermaid
 sequenceDiagram
-    actor Alice
-    actor Bob
+    actor Morty
+    actor Rick
     loop 
-        Alice->>Bob: Write outbound messages
-        Bob->>Alice: Read incoming messages
+        Morty->>Rick: Write outbound messages
+        Rick->>Morty: Read incoming messages
     end
     loop
-        Bob->>Alice: Write outbound messages
-        Alice->>Bob: Read incoming messages
+        Rick->>Morty: Write outbound messages
+        Morty->>Rick: Read incoming messages
     end
 ```
 
@@ -61,44 +61,44 @@ As an example, nodes that are attempting to connect with an incompatible version
 
 ```mermaid
 sequenceDiagram
-    actor Alice
-    actor Bob
-    Note over Alice,Bob: Connection Created
+    actor Morty
+    actor Rick
+    Note over Morty,Rick: Connection Created
     par
-        Alice->>Bob: AvalancheGo v1.0.0
+        Morty->>Rick: AvalancheGo v1.0.0
     and
-        Bob->>Alice: AvalancheGo v1.11.4
+        Rick->>Morty: AvalancheGo v1.11.4
     end
-    Note right of Bob: v1.0.0 is incompatible with v1.11.4.
-    Note left of Alice: v1.11.4 could be compatible with v1.0.0!
+    Note right of Rick: v1.0.0 is incompatible with v1.11.4.
+    Note left of Morty: v1.11.4 could be compatible with v1.0.0!
     par
-        Bob-->>Alice: Disconnect
+        Rick-->>Morty: Disconnect
     and
-        Alice-XBob: Peerlist
+        Morty-XRick: Peerlist
     end
-    Note over Alice,Bob: Handshake Failed
+    Note over Morty,Rick: Handshake Failed
 ```
 
 Nodes that mutually desire the connection will both respond with `PeerList` messages and complete the handshake.
 
 ```mermaid
 sequenceDiagram
-    actor Alice
-    actor Bob
-    Note over Alice,Bob: Connection Created
+    actor Morty
+    actor Rick
+    Note over Morty,Rick: Connection Created
     par
-        Alice->>Bob: AvalancheGo v1.11.0
+        Morty->>Rick: AvalancheGo v1.11.0
     and
-        Bob->>Alice: AvalancheGo v1.11.4
+        Rick->>Morty: AvalancheGo v1.11.4
     end
-    Note right of Bob: v1.11.0 is compatible with v1.11.4!
-    Note left of Alice: v1.11.4 could be compatible with v1.11.0!
+    Note right of Rick: v1.11.0 is compatible with v1.11.4!
+    Note left of Morty: v1.11.4 could be compatible with v1.11.0!
     par
-        Bob->>Alice: Peerlist
+        Rick->>Morty: Peerlist
     and
-        Alice->>Bob: Peerlist
+        Morty->>Rick: Peerlist
     end
-    Note over Alice,Bob: Handshake Complete
+    Note over Morty,Rick: Handshake Complete
 ```
 
 ### Ping-Pong Messages
@@ -107,12 +107,12 @@ Peers periodically send `Ping` messages containing perceived uptime information.
 
 ```mermaid
 sequenceDiagram
-    actor Alice
-    actor Bob
-    Note left of Alice: Send Ping
-    Alice->>Bob: I think your uptime is 95%
-    Note right of Bob: Send Pong
-    Bob->>Alice: ACK
+    actor Morty
+    actor Rick
+    Note left of Morty: Send Ping
+    Morty->>Rick: I think your uptime is 95%
+    Note right of Rick: Send Pong
+    Rick->>Morty: ACK
 ```
 
 ## Peer Discovery
@@ -223,27 +223,27 @@ This case is suboptimal, because `Rick` told `Morty` about `Summer` multiple tim
 
 #### Example PeerList Gossip
 
-The following diagram shows an example of `Alice` repeatedly learning about new peers from `Bob`.
+The following diagram shows an example of `Morty` repeatedly learning about new peers from `Rick`.
 
 ```mermaid
 sequenceDiagram
-    actor Alice
-    actor Bob
-    Note left of Alice: Initialize Bloom Filter
-    Note left of Alice: Bloom: [0, 0, 0]
-    Alice->>Bob: GetPeerList [0, 0, 0]
-    Note right of Bob: Any peers can be sent.
-    Bob->>Alice: PeerList - Peer-1
-    Note left of Alice: Bloom: [1, 0, 0]
-    Alice->>Bob: GetPeerList [1, 0, 0]
-    Note right of Bob: Either Peer-2 or Peer-3 can be sent.
-    Bob->>Alice: PeerList - Peer-3
-    Note left of Alice: Bloom: [1, 0, 1]
-    Alice->>Bob: GetPeerList [1, 0, 1]
-    Note right of Bob: Only Peer-2 can be sent.
-    Bob->>Alice: PeerList - Peer-2
-    Note left of Alice: Bloom: [1, 1, 1]
-    Alice->>Bob: GetPeerList [1, 1, 1]
-    Note right of Bob: There are no more peers left to send!
-    Bob->>Alice: PeerList - Empty
+    actor Morty
+    actor Rick
+    Note left of Morty: Initialize Bloom Filter
+    Note left of Morty: Bloom: [0, 0, 0]
+    Morty->>Rick: GetPeerList [0, 0, 0]
+    Note right of Rick: Any peers can be sent.
+    Rick->>Morty: PeerList - Peer-1
+    Note left of Morty: Bloom: [1, 0, 0]
+    Morty->>Rick: GetPeerList [1, 0, 0]
+    Note right of Rick: Either Peer-2 or Peer-3 can be sent.
+    Rick->>Morty: PeerList - Peer-3
+    Note left of Morty: Bloom: [1, 0, 1]
+    Morty->>Rick: GetPeerList [1, 0, 1]
+    Note right of Rick: Only Peer-2 can be sent.
+    Rick->>Morty: PeerList - Peer-2
+    Note left of Morty: Bloom: [1, 1, 1]
+    Morty->>Rick: GetPeerList [1, 1, 1]
+    Note right of Rick: There are no more peers left to send!
+    Rick->>Morty: PeerList - Empty
 ```
