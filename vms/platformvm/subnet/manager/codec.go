@@ -21,7 +21,7 @@ func init() {
 
 	Codec = codec.NewDefaultManager()
 	errs.Add(
-		c.RegisterType(&SetSubnetValidatorManagerTxWarpMessagePayload{}),
+		c.RegisterType(&SetSubnetManagerTxWarpMessagePayload{}),
 		Codec.RegisterCodec(CodecVersion, c),
 	)
 	if errs.Errored() {

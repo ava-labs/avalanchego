@@ -5,7 +5,7 @@ package manager
 
 import "github.com/ava-labs/avalanchego/ids"
 
-type SetSubnetValidatorManagerTxWarpMessagePayload struct {
+type SetSubnetManagerTxWarpMessagePayload struct {
 	SubnetID ids.ID `serialize:"true" json:"subnetID"`
 	ChainID  ids.ID `serialize:"true" json:"chainID"`
 	Addr     []byte `serialize:"true" json:"address"`

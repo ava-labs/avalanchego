@@ -23,14 +23,14 @@ import (
 	"github.com/ava-labs/avalanchego/vms/types"
 )
 
-func TestSetSubnetValidatorManagerTxWarpMessagePayload(t *testing.T) {
+func TestSetSubnetManagerTxWarpMessagePayload(t *testing.T) {
 	require := require.New(t)
 
 	subnetID := ids.GenerateTestID()
 	subnetManagerChainID := ids.GenerateTestID()
 	subnetManagerAddress := []byte{'a', 'd', 'd', 'r', 'e', 's', 's'}
 
-	payload, err := manager.Codec.Marshal(manager.CodecVersion, &manager.SetSubnetValidatorManagerTxWarpMessagePayload{
+	payload, err := manager.Codec.Marshal(manager.CodecVersion, &manager.SetSubnetManagerTxWarpMessagePayload{
 		SubnetID: subnetID,
 		ChainID:  subnetManagerChainID,
 		Addr:     subnetManagerAddress,
@@ -46,7 +46,7 @@ func TestSetSubnetValidatorManagerTxWarpMessagePayload(t *testing.T) {
 	}, unsignedWarpMsg.Bytes())
 }
 
-func TestSetSubnetValidatorManagerTxSerialization(t *testing.T) {
+func TestSetSubnetManagerTxSerialization(t *testing.T) {
 	require := require.New(t)
 
 	addr := ids.ShortID{
@@ -78,7 +78,7 @@ func TestSetSubnetValidatorManagerTxSerialization(t *testing.T) {
 		0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38,
 	}
 
-	simpleTransferSubnetOwnershipTx := &SetSubnetValidatorManagerTx{
+	simpleTransferSubnetOwnershipTx := &SetSubnetManagerTx{
 		BaseTx: BaseTx{
 			BaseTx: avax.BaseTx{
 				NetworkID:    constants.MainnetID,
@@ -554,10 +554,10 @@ func TestSetSubnetValidatorManagerTxSerialization(t *testing.T) {
 }`, string(unsignedComplexTransferSubnetOwnershipTxJSONBytes))
 }
 
-func TestSetSubnetValidatorManagerTxSyntacticVerify(t *testing.T) {
+func TestSetSubnetManagerTxSyntacticVerify(t *testing.T) {
 	type test struct {
 		name        string
-		txFunc      func(*gomock.Controller) *SetSubnetValidatorManagerTx
+		txFunc      func(*gomock.Controller) *SetSubnetManagerTx
 		expectedErr error
 	}
 
@@ -596,22 +596,22 @@ func TestSetSubnetValidatorManagerTxSyntacticVerify(t *testing.T) {
 	tests := []test{
 		{
 			name: "nil tx",
-			txFunc: func(*gomock.Controller) *SetSubnetValidatorManagerTx {
+			txFunc: func(*gomock.Controller) *SetSubnetManagerTx {
 				return nil
 			},
 			expectedErr: ErrNilTx,
 		},
 		{
 			name: "already verified",
-			txFunc: func(*gomock.Controller) *SetSubnetValidatorManagerTx {
-				return &SetSubnetValidatorManagerTx{BaseTx: verifiedBaseTx}
+			txFunc: func(*gomock.Controller) *SetSubnetManagerTx {
+				return &SetSubnetManagerTx{BaseTx: verifiedBaseTx}
 			},
 			expectedErr: nil,
 		},
 		{
 			name: "invalid BaseTx",
-			txFunc: func(*gomock.Controller) *SetSubnetValidatorManagerTx {
-				return &SetSubnetValidatorManagerTx{
+			txFunc: func(*gomock.Controller) *SetSubnetManagerTx {
+				return &SetSubnetManagerTx{
 					BaseTx: invalidBaseTx,
 				}
 			},

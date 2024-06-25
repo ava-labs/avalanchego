@@ -76,7 +76,7 @@ func (*AtomicTxExecutor) AddPermissionlessDelegatorTx(*txs.AddPermissionlessDele
 	return ErrWrongTxType
 }
 
-func (*AtomicTxExecutor) SetSubnetValidatorManagerTx(*txs.SetSubnetValidatorManagerTx) error {
+func (*AtomicTxExecutor) SetSubnetManagerTx(*txs.SetSubnetManagerTx) error {
 	return ErrWrongTxType
 }
 

@@ -13,13 +13,13 @@ import (
 )
 
 var (
-	_ UnsignedTx = (*SetSubnetValidatorManagerTx)(nil)
+	_ UnsignedTx = (*SetSubnetManagerTx)(nil)
 
 	errCantParsePayload                = errors.New("cannot parse payload")
 	errCantSetManagerForPrimaryNetwork = errors.New("cannot set manager for primary network")
 )
 
-type SetSubnetValidatorManagerTx struct {
+type SetSubnetManagerTx struct {
 	// Metadata, inputs and outputs
 	BaseTx `serialize:"true"`
 	// Warp message should include:
@@ -31,13 +31,13 @@ type SetSubnetValidatorManagerTx struct {
 }
 
 // InitCtx sets the FxID fields in the inputs and outputs of this
-// [SetSubnetValidatorManagerTx]. Also sets the [ctx] to the given [vm.ctx] so
+// [SetSubnetManagerTx]. Also sets the [ctx] to the given [vm.ctx] so
 // that the addresses can be json marshalled into human readable format
-func (tx *SetSubnetValidatorManagerTx) InitCtx(ctx *snow.Context) {
+func (tx *SetSubnetManagerTx) InitCtx(ctx *snow.Context) {
 	tx.BaseTx.InitCtx(ctx)
 }
 
-func (tx *SetSubnetValidatorManagerTx) SyntacticVerify(ctx *snow.Context) error {
+func (tx *SetSubnetManagerTx) SyntacticVerify(ctx *snow.Context) error {
 	switch {
 	case tx == nil:
 		return ErrNilTx
@@ -50,7 +50,7 @@ func (tx *SetSubnetValidatorManagerTx) SyntacticVerify(ctx *snow.Context) error 
 		return err
 	}
 
-	var payload manager.SetSubnetValidatorManagerTxWarpMessagePayload
+	var payload manager.SetSubnetManagerTxWarpMessagePayload
 	_, err := manager.Codec.Unmarshal(tx.Message.Payload, &payload)
 	if err != nil {
 		return errCantParsePayload
@@ -63,6 +63,6 @@ func (tx *SetSubnetValidatorManagerTx) SyntacticVerify(ctx *snow.Context) error 
 	return nil
 }
 
-func (tx *SetSubnetValidatorManagerTx) Visit(visitor Visitor) error {
-	return visitor.SetSubnetValidatorManagerTx(tx)
+func (tx *SetSubnetManagerTx) Visit(visitor Visitor) error {
+	return visitor.SetSubnetManagerTx(tx)
 }

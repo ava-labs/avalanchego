@@ -185,7 +185,7 @@ func (s *visitor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDelegato
 	return sign(s.tx, true, txSigners)
 }
 
-func (s *visitor) SetSubnetValidatorManagerTx(tx *txs.SetSubnetValidatorManagerTx) error {
+func (s *visitor) SetSubnetManagerTx(tx *txs.SetSubnetManagerTx) error {
 	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
 	if err != nil {
 		return err

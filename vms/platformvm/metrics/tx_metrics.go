@@ -132,9 +132,9 @@ func (m *txMetrics) TransferSubnetOwnershipTx(*txs.TransferSubnetOwnershipTx) er
 	return nil
 }
 
-func (m *txMetrics) SetSubnetValidatorManagerTx(*txs.SetSubnetValidatorManagerTx) error {
+func (m *txMetrics) SetSubnetManagerTx(*txs.SetSubnetManagerTx) error {
 	m.numTxs.With(prometheus.Labels{
-		txLabel: "set_subnet_validator_manager",
+		txLabel: "set_subnet_manager",
 	}).Inc()
 	return nil
 }
