@@ -152,6 +152,15 @@ Peers are discovered by receiving [`PeerList`](#peerlist) messages during the [P
 
 To provide an eventual guarantee that all peers learn of one another, nodes periodically send a [`GetPeerList`](#getpeerlist) message to a randomly selected Primary Network validator with the node's current [Bloom Filter](#bloom-filter) and `Salt`.
 
+#### Gossipable Peers
+
+The peers that a node may include into a [`GetPeerList`](#getpeerlist) message are considered `gossipable`.
+
+
+#### Trackable Peers
+
+The peers that a node would attempt to connect to if included in a [`PeerList`](#peerlist) message are considered `trackable`.
+
 #### Bloom Filter
 
 A [Bloom Filter](https://en.wikipedia.org/wiki/Bloom_filter) is used to track which nodes are known.
@@ -174,6 +183,35 @@ A `GetPeerList` message contains the Bloom Filter of the currently known peers a
 - The Bloom Filter sent when requesting the `PeerList` message does not contain the node claiming the `IP:Port` pair.
 - The node claiming the `IP:Port` pair is currently connected.
 - The node claiming the `IP:Port` pair is either in the default bootstrapper set, is a current Primary Network validator, is a validator of a tracked Subnet, or is a validator of a Subnet and the peer is a Primary Network validator.
+
+#### Avoiding Persistent Network Traffic
+
+To avoid persistent network traffic, it must eventually hold that the set of [`gossipable peers`](#gossipable-peers) is a subset of the [`trackable peers`](#trackable-peers) for all nodes in the network.
+
+
+
+For example, say there are 3 nodes: `Rick`, `Morty`, and `Summer`.
+
+First we consider the case that `Rick` and `Morty` consider `Summer` [`gossipable`](#gossipable-peers) and [`trackable`](#trackable-peers), respectively.
+```mermaid
+sequenceDiagram
+    actor Morty
+    actor Rick
+    Note left of Morty: Not currently tracking Summer
+    Morty->>Rick: GetPeerList
+    Note right of Rick: Summer isn't in the bloom filter
+    Rick->>Morty: PeerList containing Summer
+    Note left of Morty: Bloom: [1, 0, 0]
+    Morty->>Rick: GetPeerList
+    Note right of Rick: Summer is in the bloom filter
+    Rick->>Morty: PeerList - Empty
+```
+
+1. Node `A` sends a `GetPeerList` message to node `B`.
+2. Node `B` will respond with [`gossipable peers`](#gossipable-peers).
+3. Node `A` will attempt to connect to the peers that it considers [`trackable`](#trackable-peers).
+
+If `B` includes `C` in the `PeerList`, and `A` is not tracking `C`, then `A` would ignore the information about `C`. By ignoring `C`, `A` would not add `C` to its bloom filter. If `A` were to ask `B` for peers again, `B` would then be willing to include `C` again. Thus if `A` is not tracking nodes that `B` considers gossipable, there can be persistent network traffic.
 
 #### Example PeerList Gossip
 
