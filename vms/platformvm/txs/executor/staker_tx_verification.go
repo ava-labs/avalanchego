@@ -4,6 +4,7 @@
 package executor
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"math"
@@ -14,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
+	"github.com/ava-labs/avalanchego/vms/platformvm/subnet/manager"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 
@@ -43,6 +45,11 @@ var (
 	ErrAddDelegatorTxPostDurango       = errors.New("AddDelegatorTx is not permitted post-Durango")
 	ErrAddValidatorManagedSubnet       = errors.New("AddSubnetValidatorTx cannot be used to add a validator to a Subnet with a manager")
 	ErrRemoveValidatorManagedSubnet    = errors.New("RemoveSubnetValidatorTx cannot be used to add a validator to a Subnet with a manager")
+	ErrEUpgradeNotActive               = errors.New("attempting to use a E-upgrade feature prior to activation")
+	ErrSetSubnetManagerPrimaryNetwork  = errors.New("SetSubnetManagerTx cannot be used on the Primary Network")
+
+	WarpQuorumNumerator   uint64 = 67
+	WarpQuorumDenominator uint64 = 100
 )
 
 // verifySubnetValidatorPrimaryNetworkRequirements verifies the primary
@@ -804,6 +811,88 @@ func verifyTransferSubnetOwnershipTx(
 	}
 
 	return nil
+}
+
+// Returns an error if the given tx is invalid.
+// The transaction is valid if:
+// * [sTx]'s creds authorize it to spend the stated inputs.
+// * [sTx]'s creds authorize it to transfer ownership of [tx.Subnet].
+// * The flow checker passes.
+func verifySetSubnetManagerTx(
+	backend *Backend,
+	chainState state.Chain,
+	sTx *txs.Tx,
+	tx *txs.SetSubnetManagerTx,
+) (*manager.SetSubnetManagerTxWarpMessagePayload, error) {
+	if !backend.Config.UpgradeConfig.IsEActivated(chainState.GetTimestamp()) {
+		return nil, ErrEUpgradeNotActive
+	}
+
+	// Verify the tx is well-formed
+	if err := sTx.SyntacticVerify(backend.Ctx); err != nil {
+		return nil, err
+	}
+
+	if err := avax.VerifyMemoFieldLength(tx.Memo, true /*=isDurangoActive*/); err != nil {
+		return nil, err
+	}
+
+	if !backend.Bootstrapped.Get() {
+		// Not bootstrapped yet -- don't need to do full verification.
+		var payload manager.SetSubnetManagerTxWarpMessagePayload
+		if _, err := manager.Codec.Unmarshal(tx.Message.Payload, &payload); err != nil {
+			// This should never be hit when bootstrapping.
+			return nil, err
+		}
+
+		return &payload, nil
+	}
+
+	// Verify the flowcheck
+	currentTimestamp := chainState.GetTimestamp()
+	feeCalculator := fee.NewStaticCalculator(backend.Config.StaticFeeConfig, backend.Config.UpgradeConfig)
+	fee := feeCalculator.CalculateFee(tx, currentTimestamp)
+
+	if err := backend.FlowChecker.VerifySpend(
+		tx,
+		chainState,
+		tx.Ins,
+		tx.Outs,
+		sTx.Creds,
+		map[ids.ID]uint64{
+			backend.Ctx.AVAXAssetID: fee,
+		},
+	); err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
+	}
+
+	var payload manager.SetSubnetManagerTxWarpMessagePayload
+	if _, err := manager.Codec.Unmarshal(tx.Message.Payload, &payload); err != nil {
+		return nil, err
+	}
+
+	if payload.SubnetID == constants.PrimaryNetworkID {
+		return nil, ErrSetSubnetManagerPrimaryNetwork
+	}
+
+	height, err := backend.Ctx.ValidatorState.GetCurrentHeight(context.Background())
+	if err != nil {
+		return nil, err
+	}
+
+	if err := tx.Message.Signature.Verify(
+		context.Background(),
+		&tx.Message.UnsignedMessage,
+		backend.Ctx.NetworkID,
+		backend.Ctx.ValidatorState,
+		height,
+		WarpQuorumNumerator,
+		WarpQuorumDenominator,
+	); err != nil {
+		return nil, err
+	}
+
+	return &payload, nil
 }
 
 // Ensure the proposed validator starts after the current time

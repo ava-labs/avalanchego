@@ -556,6 +556,25 @@ func (e *StandardTxExecutor) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwn
 	return nil
 }
 
+func (e *StandardTxExecutor) SetSubnetManagerTx(tx *txs.SetSubnetManagerTx) error {
+	payload, err := verifySetSubnetManagerTx(
+		e.Backend,
+		e.State,
+		e.Tx,
+		tx,
+	)
+	if err != nil {
+		return err
+	}
+
+	e.State.SetSubnetManager(payload.SubnetID, payload.ChainID, payload.Addr)
+
+	txID := e.Tx.ID()
+	avax.Consume(e.State, tx.Ins)
+	avax.Produce(e.State, txID, tx.Outs)
+	return nil
+}
+
 func (e *StandardTxExecutor) BaseTx(tx *txs.BaseTx) error {
 	if !e.Backend.Config.UpgradeConfig.IsDurangoActivated(e.State.GetTimestamp()) {
 		return ErrDurangoUpgradeNotActive
