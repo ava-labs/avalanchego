@@ -591,25 +591,22 @@ func TestDiffSubnetManager(t *testing.T) {
 	states.EXPECT().GetState(lastAcceptedID).Return(state, true).AnyTimes()
 
 	var (
-		blankManager = chainIDAndAddr{ids.Empty, []byte{}}
-		newManager   = chainIDAndAddr{ids.GenerateTestID(), []byte{1, 2, 3, 4}}
-		subnetID     = ids.GenerateTestID()
+		newManager = chainIDAndAddr{ids.GenerateTestID(), []byte{1, 2, 3, 4}}
+		subnetID   = ids.GenerateTestID()
 	)
 
-	// Subnet manager should be {ids.Empty, []byte{}} by default
 	chainID, addr, err := state.GetSubnetManager(subnetID)
-	require.NoError(err)
-	require.Equal(blankManager.ChainID, chainID)
-	require.Equal(blankManager.Addr, addr)
+	require.ErrorIs(err, database.ErrNotFound)
+	require.Equal(ids.Empty, chainID)
+	require.Nil(addr)
 
-	// Create diff and verify that subnet owner returns correctly
 	d, err := NewDiff(lastAcceptedID, states)
 	require.NoError(err)
 
 	chainID, addr, err = d.GetSubnetManager(subnetID)
-	require.NoError(err)
-	require.Equal(blankManager.ChainID, chainID)
-	require.Equal(blankManager.Addr, addr)
+	require.ErrorIs(err, database.ErrNotFound)
+	require.Equal(ids.Empty, chainID)
+	require.Nil(addr)
 
 	// Setting a subnet manager should be reflected on diff not state
 	d.SetSubnetManager(subnetID, newManager.ChainID, newManager.Addr)
@@ -619,9 +616,9 @@ func TestDiffSubnetManager(t *testing.T) {
 	require.Equal(newManager.Addr, addr)
 
 	chainID, addr, err = state.GetSubnetManager(subnetID)
-	require.NoError(err)
-	require.Equal(blankManager.ChainID, chainID)
-	require.Equal(blankManager.Addr, addr)
+	require.ErrorIs(err, database.ErrNotFound)
+	require.Equal(ids.Empty, chainID)
+	require.Nil(addr)
 
 	// State should reflect new subnet manager after diff is applied
 	require.NoError(d.Apply(state))

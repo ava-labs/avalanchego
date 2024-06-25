@@ -847,10 +847,6 @@ func (s *state) GetSubnetManager(subnetID ids.ID) (ids.ID, []byte, error) {
 	}
 
 	chainIDAndAddrBytes, err := s.subnetManagerDB.Get(subnetID[:])
-	if err == database.ErrNotFound {
-		s.SetSubnetManager(subnetID, ids.Empty, []byte{})
-		return ids.Empty, []byte{}, nil
-	}
 	if err != nil {
 		return ids.Empty, nil, err
 	}

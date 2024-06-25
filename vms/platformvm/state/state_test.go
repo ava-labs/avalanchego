@@ -1409,9 +1409,9 @@ func TestStateSubnetManager(t *testing.T) {
 	subnetID := ids.GenerateTestID()
 
 	chainID, addr, err := state.GetSubnetManager(subnetID)
-	require.NoError(err)
+	require.ErrorIs(err, database.ErrNotFound)
 	require.Equal(ids.Empty, chainID)
-	require.Equal([]byte{}, addr)
+	require.Nil(addr)
 
 	expectedChainID := ids.GenerateTestID()
 	expectedAddr := []byte{'a', 'd', 'd', 'r'}
