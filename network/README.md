@@ -201,7 +201,7 @@ sequenceDiagram
     Morty->>Rick: GetPeerList
     Note right of Rick: Summer isn't in the bloom filter
     Rick->>Morty: PeerList containing Summer
-    Note left of Morty: Bloom: [1, 0, 0]
+    Note left of Morty: Track Summer and add to bloom filter
     Morty->>Rick: GetPeerList
     Note right of Rick: Summer is in the bloom filter
     Rick->>Morty: PeerList - Empty
