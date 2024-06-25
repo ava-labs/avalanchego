@@ -613,10 +613,9 @@ func (vm *VM) Initialize(
 	// initialize bonus blocks on mainnet
 	var (
 		bonusBlockHeights map[uint64]ids.ID
-		bonusBlockRepair  map[uint64]*types.Block
 	)
 	if vm.chainID.Cmp(params.AvalancheMainnetChainID) == 0 {
-		bonusBlockRepair, bonusBlockHeights, err = readMainnetBonusBlocks()
+		bonusBlockHeights, err = readMainnetBonusBlocks()
 		if err != nil {
 			return fmt.Errorf("failed to read mainnet bonus blocks: %w", err)
 		}
@@ -630,8 +629,8 @@ func (vm *VM) Initialize(
 	if err != nil {
 		return fmt.Errorf("failed to create atomic repository: %w", err)
 	}
-	vm.atomicBackend, _, err = NewAtomicBackendWithBonusBlockRepair(
-		vm.db, vm.ctx.SharedMemory, bonusBlockHeights, bonusBlockRepair,
+	vm.atomicBackend, err = NewAtomicBackend(
+		vm.db, vm.ctx.SharedMemory, bonusBlockHeights,
 		vm.atomicTxRepository, lastAcceptedHeight, lastAcceptedHash,
 		vm.config.CommitInterval,
 	)
@@ -639,14 +638,6 @@ func (vm *VM) Initialize(
 		return fmt.Errorf("failed to create atomic backend: %w", err)
 	}
 	vm.atomicTrie = vm.atomicBackend.AtomicTrie()
-
-	// Run the atomic trie height map repair in the background on mainnet/fuji
-	// TODO: remove after Durango
-	if vm.chainID.Cmp(params.AvalancheMainnetChainID) == 0 ||
-		vm.chainID.Cmp(params.AvalancheFujiChainID) == 0 {
-		_, lastCommitted := vm.atomicTrie.LastCommitted()
-		go vm.atomicTrie.RepairHeightMap(lastCommitted)
-	}
 
 	go vm.ctx.Log.RecoverAndPanic(vm.startContinuousProfiler)
 
