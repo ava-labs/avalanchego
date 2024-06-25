@@ -897,7 +897,8 @@ func TestEUpgradeStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		State:   onAcceptState,
 		Tx:      tx,
 	}
-	require.ErrorIs(tx.Unsigned.Visit(&executor), ErrAddValidatorManagedSubnet)
+	err = tx.Unsigned.Visit(&executor)
+	require.ErrorIs(err, ErrAddValidatorManagedSubnet)
 }
 
 func TestBanffStandardTxExecutorAddValidator(t *testing.T) {
