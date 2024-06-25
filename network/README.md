@@ -16,6 +16,7 @@
       - [Bloom Filter](#bloom-filter)
       - [GetPeerList](#getpeerlist)
       - [PeerList](#peerlist)
+      - [Avoiding Persistent Network Traffic](#avoiding-persistent-network-traffic)
 
 ## Overview
 
