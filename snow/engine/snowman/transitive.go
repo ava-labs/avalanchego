@@ -22,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/ancestor"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/job"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/bag"
@@ -536,7 +537,12 @@ func (t *Transitive) Start(ctx context.Context, startReqID uint32) error {
 
 	// Re-issue all blocks in the preferred chain into consensus
 	for _, preferredBlk := range preferredChain {
-		if err := t.deliver(ctx, t.Ctx.NodeID, preferredBlk, false, issuedMetric); err != nil {
+		if _, err := t.addUnverifiedBlockToConsensus(
+			ctx,
+			t.Ctx.NodeID,
+			preferredBlk,
+			issuedMetric,
+		); err != nil {
 			return err
 		}
 	}
