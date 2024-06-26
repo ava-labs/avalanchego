@@ -100,18 +100,30 @@ func ExampleNewTestNetwork() {
 
 	blsKey, err := bls.NewSecretKey()
 	if err != nil {
-		panic(err)
+		log.Fatal(
+			"failed to create bls key",
+			zap.Error(err),
+		)
+		return
 	}
 
 	metrics := prometheus.NewRegistry()
 	config, err := NewTestNetworkConfig(log, constants.FujiID, tlsCert, blsKey, validators, trackedSubnets, metrics)
 	if err != nil {
-		panic(err)
+		log.Fatal(
+			"failed to create network config",
+			zap.Error(err),
+		)
+		return
 	}
 
 	messageCreator, err := NewTestMessageCreator(log, metrics)
 	if err != nil {
-		panic(err)
+		log.Fatal(
+			"failed to create message creator",
+			zap.Error(err),
+		)
+		return
 	}
 	dialerConfig := NewTestDialerConfig()
 
@@ -124,7 +136,11 @@ func ExampleNewTestNetwork() {
 		metrics,
 	)
 	if err != nil {
-		panic(err)
+		log.Fatal(
+			"failed to create test network",
+			zap.Error(err),
+		)
+		return
 	}
 
 	// We need to initially connect to some nodes in the network before peer
@@ -147,7 +163,8 @@ func ExampleNewTestNetwork() {
 	// Calling network.Dispatch() will block until a fatal error occurs or
 	// network.StartClose() is called.
 	err = network.Dispatch()
-	if err != nil {
-		panic(err)
-	}
+	log.Info(
+		"network exited",
+		zap.Error(err),
+	)
 }
