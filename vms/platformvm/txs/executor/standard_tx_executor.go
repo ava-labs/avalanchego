@@ -25,9 +25,10 @@ import (
 var (
 	_ txs.Visitor = (*StandardTxExecutor)(nil)
 
-	errEmptyNodeID                = errors.New("validator nodeID cannot be empty")
-	errMaxStakeDurationTooLarge   = errors.New("max stake duration must be less than or equal to the global max stake duration")
-	errMissingStartTimePreDurango = errors.New("staker transactions must have a StartTime pre-Durango")
+	errEmptyNodeID                   = errors.New("validator nodeID cannot be empty")
+	errMaxStakeDurationTooLarge      = errors.New("max stake duration must be less than or equal to the global max stake duration")
+	errMissingStartTimePreDurango    = errors.New("staker transactions must have a StartTime pre-Durango")
+	errTransformSubnetTxPostEUpgrade = errors.New("TransformSubnetTx is not permitted post-EUpgrade")
 )
 
 type StandardTxExecutor struct {
@@ -434,6 +435,10 @@ func (e *StandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 	)
 	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
 		return err
+	}
+
+	if e.Config.UpgradeConfig.IsEActivated(currentTimestamp) {
+		return errTransformSubnetTxPostEUpgrade
 	}
 
 	// Note: math.MaxInt32 * time.Second < math.MaxInt64 - so this can never

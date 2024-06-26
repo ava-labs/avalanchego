@@ -1552,6 +1552,54 @@ func TestDurangoMemoField(t *testing.T) {
 	}
 }
 
+// Verifies that [TransformSubnetTx] are disabled post-E
+func TestEUpgradeDisabledTransactions(t *testing.T) {
+	type test struct {
+		name        string
+		buildTx     func(*environment) *txs.Tx
+		expectedErr error
+	}
+
+	tests := []test{
+		{
+			name: "TransformSubnetTx",
+			buildTx: func(env *environment) *txs.Tx {
+				// This is a hacky way of getting a TransformSubnetTx to pass
+				// SyntacticVerify()
+				utx := &txs.TransformSubnetTx{}
+				utx.SyntacticallyVerified = true
+				return &txs.Tx{
+					Unsigned: utx,
+					TxID:     ids.GenerateTestID(),
+				}
+			},
+			expectedErr: errTransformSubnetTxPostEUpgrade,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+
+			env := newEnvironment(t, eUpgrade)
+			env.ctx.Lock.Lock()
+			defer env.ctx.Lock.Unlock()
+
+			onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env)
+			require.NoError(err)
+
+			tx := tt.buildTx(env)
+
+			err = tx.Unsigned.Visit(&StandardTxExecutor{
+				Backend: &env.backend,
+				State:   onAcceptState,
+				Tx:      tx,
+			})
+			require.ErrorIs(err, tt.expectedErr)
+		})
+	}
+}
+
 // Returns a RemoveSubnetValidatorTx that passes syntactic verification.
 // Memo field is empty as required post Durango activation
 func newRemoveSubnetValidatorTx(t *testing.T) (*txs.RemoveSubnetValidatorTx, *txs.Tx) {
