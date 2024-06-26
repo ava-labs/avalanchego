@@ -5,6 +5,7 @@ package info
 
 import (
 	"context"
+	"net/netip"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -19,7 +20,7 @@ var _ Client = (*client)(nil)
 type Client interface {
 	GetNodeVersion(context.Context, ...rpc.Option) (*GetNodeVersionReply, error)
 	GetNodeID(context.Context, ...rpc.Option) (ids.NodeID, *signer.ProofOfPossession, error)
-	GetNodeIP(context.Context, ...rpc.Option) (string, error)
+	GetNodeIP(context.Context, ...rpc.Option) (netip.AddrPort, error)
 	GetNetworkID(context.Context, ...rpc.Option) (uint32, error)
 	GetNetworkName(context.Context, ...rpc.Option) (string, error)
 	GetBlockchainID(context.Context, string, ...rpc.Option) (ids.ID, error)
@@ -54,7 +55,7 @@ func (c *client) GetNodeID(ctx context.Context, options ...rpc.Option) (ids.Node
 	return res.NodeID, res.NodePOP, err
 }
 
-func (c *client) GetNodeIP(ctx context.Context, options ...rpc.Option) (string, error) {
+func (c *client) GetNodeIP(ctx context.Context, options ...rpc.Option) (netip.AddrPort, error) {
 	res := &GetNodeIPReply{}
 	err := c.requester.SendRequest(ctx, "info.getNodeIP", struct{}{}, res, options...)
 	return res.IP, err

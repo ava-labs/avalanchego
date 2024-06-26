@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -555,6 +556,7 @@ func TestOptionTimestampValidity(t *testing.T) {
 			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
 			StakingLeafSigner:   pTestSigner,
 			StakingCertLeaf:     pTestCert,
+			Registerer:          prometheus.NewRegistry(),
 		},
 	)
 

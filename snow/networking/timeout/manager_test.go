@@ -27,7 +27,7 @@ func TestManagerFire(t *testing.T) {
 			TimeoutHalflife:    5 * time.Minute,
 		},
 		benchlist,
-		"",
+		prometheus.NewRegistry(),
 		prometheus.NewRegistry(),
 	)
 	require.NoError(t, err)

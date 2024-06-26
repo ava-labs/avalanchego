@@ -62,7 +62,7 @@ type AVAXState struct {
 	XClient avm.Client
 	XCTX    *xbuilder.Context
 	CClient evm.Client
-	CCTX    c.Context
+	CCTX    *c.Context
 	UTXOs   walletcommon.UTXOs
 }
 
@@ -112,7 +112,7 @@ func FetchState(
 			codec:  xbuilder.Parser.Codec(),
 		},
 		{
-			id:     cCTX.BlockchainID(),
+			id:     cCTX.BlockchainID,
 			client: cClient,
 			codec:  evm.Codec,
 		},

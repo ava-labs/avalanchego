@@ -4,7 +4,6 @@
 package avm
 
 import (
-	"context"
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -28,13 +27,8 @@ import (
 func TestIndexTransaction_Ordered(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{
-		vmStaticConfig: noFeesTestConfig,
-	})
-	defer func() {
-		require.NoError(env.vm.Shutdown(context.Background()))
-		env.vm.ctx.Lock.Unlock()
-	}()
+	env := setup(t, &envConfig{fork: durango})
+	defer env.vm.ctx.Lock.Unlock()
 
 	key := keys[0]
 	addr := key.PublicKey().Address()
@@ -72,13 +66,8 @@ func TestIndexTransaction_Ordered(t *testing.T) {
 func TestIndexTransaction_MultipleTransactions(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{
-		vmStaticConfig: noFeesTestConfig,
-	})
-	defer func() {
-		require.NoError(env.vm.Shutdown(context.Background()))
-		env.vm.ctx.Lock.Unlock()
-	}()
+	env := setup(t, &envConfig{fork: durango})
+	defer env.vm.ctx.Lock.Unlock()
 
 	addressTxMap := map[ids.ShortID]*txs.Tx{}
 	txAssetID := avax.Asset{ID: env.genesisTx.ID()}
@@ -120,13 +109,8 @@ func TestIndexTransaction_MultipleTransactions(t *testing.T) {
 func TestIndexTransaction_MultipleAddresses(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{
-		vmStaticConfig: noFeesTestConfig,
-	})
-	defer func() {
-		require.NoError(env.vm.Shutdown(context.Background()))
-		env.vm.ctx.Lock.Unlock()
-	}()
+	env := setup(t, &envConfig{fork: durango})
+	defer env.vm.ctx.Lock.Unlock()
 
 	addrs := make([]ids.ShortID, len(keys))
 	for i, key := range keys {
@@ -163,13 +147,8 @@ func TestIndexTransaction_MultipleAddresses(t *testing.T) {
 func TestIndexer_Read(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{
-		vmStaticConfig: noFeesTestConfig,
-	})
-	defer func() {
-		require.NoError(env.vm.Shutdown(context.Background()))
-		env.vm.ctx.Lock.Unlock()
-	}()
+	env := setup(t, &envConfig{fork: durango})
+	defer env.vm.ctx.Lock.Unlock()
 
 	// generate test address and asset IDs
 	assetID := ids.GenerateTestID()
@@ -259,7 +238,7 @@ func buildUTXO(utxoID avax.UTXOID, txAssetID avax.Asset, addr ids.ShortID) *avax
 		UTXOID: utxoID,
 		Asset:  txAssetID,
 		Out: &secp256k1fx.TransferOutput{
-			Amt: 1000,
+			Amt: startBalance,
 			OutputOwners: secp256k1fx.OutputOwners{
 				Threshold: 1,
 				Addrs:     []ids.ShortID{addr},
@@ -277,14 +256,14 @@ func buildTX(chainID ids.ID, utxoID avax.UTXOID, txAssetID avax.Asset, address .
 				UTXOID: utxoID,
 				Asset:  txAssetID,
 				In: &secp256k1fx.TransferInput{
-					Amt:   1000,
+					Amt:   startBalance,
 					Input: secp256k1fx.Input{SigIndices: []uint32{0}},
 				},
 			}},
 			Outs: []*avax.TransferableOutput{{
 				Asset: txAssetID,
 				Out: &secp256k1fx.TransferOutput{
-					Amt: 1000,
+					Amt: startBalance - testTxFee,
 					OutputOwners: secp256k1fx.OutputOwners{
 						Threshold: 1,
 						Addrs:     address,

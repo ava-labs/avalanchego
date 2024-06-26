@@ -17,6 +17,11 @@ var _ PostForkBlock = (*postForkBlock)(nil)
 type postForkBlock struct {
 	block.SignedBlock
 	postForkCommonComponents
+
+	// slot of the proposer that produced this block.
+	// It is populated in verifyPostDurangoBlockDelay.
+	// It is used to report metrics during Accept.
+	slot *uint64
 }
 
 // Accept:
@@ -27,7 +32,13 @@ func (b *postForkBlock) Accept(ctx context.Context) error {
 	if err := b.acceptOuterBlk(); err != nil {
 		return err
 	}
-	return b.acceptInnerBlk(ctx)
+	if err := b.acceptInnerBlk(ctx); err != nil {
+		return err
+	}
+	if b.slot != nil {
+		b.vm.acceptedBlocksSlotHistogram.Observe(float64(*b.slot))
+	}
+	return nil
 }
 
 func (b *postForkBlock) acceptOuterBlk() error {

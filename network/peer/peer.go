@@ -10,6 +10,7 @@ import (
 	"io"
 	"math"
 	"net"
+	"net/netip"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -269,11 +270,6 @@ func (p *peer) AwaitReady(ctx context.Context) error {
 }
 
 func (p *peer) Info() Info {
-	publicIPStr := ""
-	if !p.ip.IsZero() {
-		publicIPStr = p.ip.IPPort.String()
-	}
-
 	uptimes := make(map[ids.ID]json.Uint32, p.MySubnets.Len())
 	for subnetID := range p.MySubnets {
 		uptime, exist := p.ObservedUptime(subnetID)
@@ -288,9 +284,10 @@ func (p *peer) Info() Info {
 		primaryUptime = 0
 	}
 
+	ip, _ := ips.ParseAddrPort(p.conn.RemoteAddr().String())
 	return Info{
-		IP:                    p.conn.RemoteAddr().String(),
-		PublicIP:              publicIPStr,
+		IP:                    ip,
+		PublicIP:              p.ip.AddrPort,
 		ID:                    p.id,
 		Version:               p.version.String(),
 		LastSent:              p.LastSent(),
@@ -526,10 +523,10 @@ func (p *peer) writeMessages() {
 		)
 		return
 	}
-	if mySignedIP.Port == 0 {
+	if port := mySignedIP.AddrPort.Port(); port == 0 {
 		p.Log.Error("signed IP has invalid port",
 			zap.Stringer("nodeID", p.id),
-			zap.Uint16("port", mySignedIP.Port),
+			zap.Uint16("port", port),
 		)
 		return
 	}
@@ -540,7 +537,7 @@ func (p *peer) writeMessages() {
 	msg, err := p.MessageCreator.Handshake(
 		p.NetworkID,
 		p.Clock.Unix(),
-		mySignedIP.IPPort,
+		mySignedIP.AddrPort,
 		myVersion.Name,
 		uint32(myVersion.Major),
 		uint32(myVersion.Minor),
@@ -731,7 +728,7 @@ func (p *peer) shouldDisconnect() bool {
 		return true
 	}
 
-	// Avoid unnecessary signature verifications by only verifing the signature
+	// Avoid unnecessary signature verifications by only verifying the signature
 	// once per validation period.
 	p.txIDOfVerifiedBLSKey = vdr.TxID
 	return false
@@ -1038,23 +1035,25 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 		}
 	}
 
-	// "net.IP" type in Golang is 16-byte
-	if ipLen := len(msg.IpAddr); ipLen != net.IPv6len {
+	addr, ok := ips.AddrFromSlice(msg.IpAddr)
+	if !ok {
 		p.Log.Debug(malformedMessageLog,
 			zap.Stringer("nodeID", p.id),
 			zap.Stringer("messageOp", message.HandshakeOp),
 			zap.String("field", "ip"),
-			zap.Int("ipLen", ipLen),
+			zap.Int("ipLen", len(msg.IpAddr)),
 		)
 		p.StartClose()
 		return
 	}
+
+	port := uint16(msg.IpPort)
 	if msg.IpPort == 0 {
 		p.Log.Debug(malformedMessageLog,
 			zap.Stringer("nodeID", p.id),
 			zap.Stringer("messageOp", message.HandshakeOp),
 			zap.String("field", "port"),
-			zap.Uint32("port", msg.IpPort),
+			zap.Uint16("port", port),
 		)
 		p.StartClose()
 		return
@@ -1062,10 +1061,10 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 
 	p.ip = &SignedIP{
 		UnsignedIP: UnsignedIP{
-			IPPort: ips.IPPort{
-				IP:   msg.IpAddr,
-				Port: uint16(msg.IpPort),
-			},
+			AddrPort: netip.AddrPortFrom(
+				addr,
+				port,
+			),
 			Timestamp: msg.IpSigningTime,
 		},
 		TLSSignature: msg.IpNodeIdSig,
@@ -1224,23 +1223,25 @@ func (p *peer) handlePeerList(msg *p2p.PeerList) {
 			return
 		}
 
-		// "net.IP" type in Golang is 16-byte
-		if ipLen := len(claimedIPPort.IpAddr); ipLen != net.IPv6len {
+		addr, ok := ips.AddrFromSlice(claimedIPPort.IpAddr)
+		if !ok {
 			p.Log.Debug(malformedMessageLog,
 				zap.Stringer("nodeID", p.id),
 				zap.Stringer("messageOp", message.PeerListOp),
 				zap.String("field", "ip"),
-				zap.Int("ipLen", ipLen),
+				zap.Int("ipLen", len(claimedIPPort.IpAddr)),
 			)
 			p.StartClose()
 			return
 		}
-		if claimedIPPort.IpPort == 0 {
+
+		port := uint16(claimedIPPort.IpPort)
+		if port == 0 {
 			p.Log.Debug(malformedMessageLog,
 				zap.Stringer("nodeID", p.id),
 				zap.Stringer("messageOp", message.PeerListOp),
 				zap.String("field", "port"),
-				zap.Uint32("port", claimedIPPort.IpPort),
+				zap.Uint16("port", port),
 			)
 			p.StartClose()
 			return
@@ -1248,10 +1249,10 @@ func (p *peer) handlePeerList(msg *p2p.PeerList) {
 
 		discoveredIPs[i] = ips.NewClaimedIPPort(
 			tlsCert,
-			ips.IPPort{
-				IP:   claimedIPPort.IpAddr,
-				Port: uint16(claimedIPPort.IpPort),
-			},
+			netip.AddrPortFrom(
+				addr,
+				port,
+			),
 			claimedIPPort.Timestamp,
 			claimedIPPort.Signature,
 		)

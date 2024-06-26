@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/avalanchego/ids"
 )
 
 func TestNnarySnowflake(t *testing.T) {
@@ -14,8 +16,9 @@ func TestNnarySnowflake(t *testing.T) {
 
 	alphaPreference, alphaConfidence := 1, 2
 	beta := 2
+	terminationConditions := newSingleTerminationCondition(alphaConfidence, beta)
 
-	sf := newNnarySnowflake(alphaPreference, alphaConfidence, beta, Red)
+	sf := newNnarySnowflake(alphaPreference, terminationConditions, Red)
 	sf.Add(Blue)
 	sf.Add(Green)
 
@@ -52,8 +55,9 @@ func TestNnarySnowflakeConfidenceReset(t *testing.T) {
 
 	alphaPreference, alphaConfidence := 1, 2
 	beta := 4
+	terminationConditions := newSingleTerminationCondition(alphaConfidence, beta)
 
-	sf := newNnarySnowflake(alphaPreference, alphaConfidence, beta, Red)
+	sf := newNnarySnowflake(alphaPreference, terminationConditions, Red)
 	sf.Add(Blue)
 	sf.Add(Green)
 
@@ -85,8 +89,9 @@ func TestVirtuousNnarySnowflake(t *testing.T) {
 
 	alphaPreference, alphaConfidence := 1, 2
 	beta := 2
+	terminationConditions := newSingleTerminationCondition(alphaConfidence, beta)
 
-	sb := newNnarySnowflake(alphaPreference, alphaConfidence, beta, Red)
+	sb := newNnarySnowflake(alphaPreference, terminationConditions, Red)
 	require.Equal(Red, sb.Preference())
 	require.False(sb.Finalized())
 
@@ -97,4 +102,45 @@ func TestVirtuousNnarySnowflake(t *testing.T) {
 	sb.RecordPoll(alphaConfidence, Red)
 	require.Equal(Red, sb.Preference())
 	require.True(sb.Finalized())
+}
+
+type nnarySnowflakeTest struct {
+	require *require.Assertions
+
+	nnarySnowflake
+}
+
+func newNnarySnowflakeTest(t *testing.T, alphaPreference int, terminationConditions []terminationCondition) snowflakeTest[ids.ID] {
+	require := require.New(t)
+
+	return &nnarySnowflakeTest{
+		require:        require,
+		nnarySnowflake: newNnarySnowflake(alphaPreference, terminationConditions, Red),
+	}
+}
+
+func (sf *nnarySnowflakeTest) RecordPoll(count int, choice ids.ID) {
+	sf.nnarySnowflake.RecordPoll(count, choice)
+}
+
+func (sf *nnarySnowflakeTest) AssertEqual(expectedConfidences []int, expectedFinalized bool, expectedPreference ids.ID) {
+	sf.require.Equal(expectedPreference, sf.Preference())
+	sf.require.Equal(expectedConfidences, sf.nnarySnowflake.confidence)
+	sf.require.Equal(expectedFinalized, sf.Finalized())
+}
+
+func TestNnarySnowflakeErrorDrivenSingleChoice(t *testing.T) {
+	for _, test := range getErrorDrivenSnowflakeSingleChoiceSuite[ids.ID]() {
+		t.Run(test.name, func(t *testing.T) {
+			test.f(t, newNnarySnowflakeTest, Red)
+		})
+	}
+}
+
+func TestNnarySnowflakeErrorDrivenMultiChoice(t *testing.T) {
+	for _, test := range getErrorDrivenSnowflakeMultiChoiceSuite[ids.ID]() {
+		t.Run(test.name, func(t *testing.T) {
+			test.f(t, newNnarySnowflakeTest, Red, Green)
+		})
+	}
 }

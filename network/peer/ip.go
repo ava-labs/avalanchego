@@ -8,12 +8,13 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
+	"net"
+	"net/netip"
 	"time"
 
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/hashing"
-	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
@@ -26,7 +27,7 @@ var (
 // ensure that the most updated IP claim is tracked by peers for a given
 // validator.
 type UnsignedIP struct {
-	ips.IPPort
+	AddrPort  netip.AddrPort
 	Timestamp uint64
 }
 
@@ -49,9 +50,11 @@ func (ip *UnsignedIP) Sign(tlsSigner crypto.Signer, blsSigner *bls.SecretKey) (*
 
 func (ip *UnsignedIP) bytes() []byte {
 	p := wrappers.Packer{
-		Bytes: make([]byte, ips.IPPortLen+wrappers.LongLen),
+		Bytes: make([]byte, net.IPv6len+wrappers.ShortLen+wrappers.LongLen),
 	}
-	ips.PackIP(&p, ip.IPPort)
+	addrBytes := ip.AddrPort.Addr().As16()
+	p.PackFixedBytes(addrBytes[:])
+	p.PackShort(ip.AddrPort.Port())
 	p.PackLong(ip.Timestamp)
 	return p.Bytes
 }

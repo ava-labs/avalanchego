@@ -8,7 +8,6 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -34,20 +33,25 @@ type blockVM struct {
 	getInitialPreferenceVM block.GetInitialPreferenceVM
 
 	blockMetrics
-	clock mockable.Clock
+	registry prometheus.Registerer
+	clock    mockable.Clock
 }
 
-func NewBlockVM(vm block.ChainVM) block.ChainVM {
+func NewBlockVM(
+	vm block.ChainVM,
+	reg prometheus.Registerer,
+) block.ChainVM {
 	buildBlockVM, _ := vm.(block.BuildBlockWithContextChainVM)
 	batchedVM, _ := vm.(block.BatchedChainVM)
 	ssVM, _ := vm.(block.StateSyncableVM)
 	getInitialPreferenceVM, _ := vm.(block.GetInitialPreferenceVM)
 	return &blockVM{
-		ChainVM:                vm,
-		buildBlockVM:           buildBlockVM,
-		batchedVM:              batchedVM,
-		ssVM:                   ssVM,
-		getInitialPreferenceVM: getInitialPreferenceVM,
+		ChainVM:      vm,
+		buildBlockVM: buildBlockVM,
+		batchedVM:    batchedVM,
+		ssVM:         ssVM,
+    getInitialPreferenceVM: getInitialPreferenceVM,
+		registry:     reg,
 	}
 }
 
@@ -62,25 +66,15 @@ func (vm *blockVM) Initialize(
 	fxs []*common.Fx,
 	appSender common.AppSender,
 ) error {
-	registerer := prometheus.NewRegistry()
 	err := vm.blockMetrics.Initialize(
 		vm.buildBlockVM != nil,
 		vm.batchedVM != nil,
 		vm.ssVM != nil,
-		registerer,
+		vm.registry,
 	)
 	if err != nil {
 		return err
 	}
-
-	multiGatherer := metrics.NewMultiGatherer()
-	if err := chainCtx.Metrics.Register("metervm", registerer); err != nil {
-		return err
-	}
-	if err := chainCtx.Metrics.Register("", multiGatherer); err != nil {
-		return err
-	}
-	chainCtx.Metrics = multiGatherer
 
 	return vm.ChainVM.Initialize(ctx, chainCtx, db, genesisBytes, upgradeBytes, configBytes, toEngine, fxs, appSender)
 }

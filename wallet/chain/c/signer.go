@@ -4,6 +4,7 @@
 package c
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -19,8 +20,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-
-	stdcontext "context"
 )
 
 const version = 0
@@ -45,7 +44,7 @@ type Signer interface {
 	//
 	// If the signer doesn't have the ability to provide a required signature,
 	// the signature slot will be skipped without reporting an error.
-	SignAtomic(ctx stdcontext.Context, tx *evm.Tx) error
+	SignAtomic(ctx context.Context, tx *evm.Tx) error
 }
 
 type EthKeychain interface {
@@ -57,7 +56,7 @@ type EthKeychain interface {
 }
 
 type SignerBackend interface {
-	GetUTXO(ctx stdcontext.Context, chainID, utxoID ids.ID) (*avax.UTXO, error)
+	GetUTXO(ctx context.Context, chainID, utxoID ids.ID) (*avax.UTXO, error)
 }
 
 type txSigner struct {
@@ -74,7 +73,7 @@ func NewSigner(avaxKC keychain.Keychain, ethKC EthKeychain, backend SignerBacken
 	}
 }
 
-func (s *txSigner) SignAtomic(ctx stdcontext.Context, tx *evm.Tx) error {
+func (s *txSigner) SignAtomic(ctx context.Context, tx *evm.Tx) error {
 	switch utx := tx.UnsignedAtomicTx.(type) {
 	case *evm.UnsignedImportTx:
 		signers, err := s.getImportSigners(ctx, utx.SourceChain, utx.ImportedInputs)
@@ -90,7 +89,7 @@ func (s *txSigner) SignAtomic(ctx stdcontext.Context, tx *evm.Tx) error {
 	}
 }
 
-func (s *txSigner) getImportSigners(ctx stdcontext.Context, sourceChainID ids.ID, ins []*avax.TransferableInput) ([][]keychain.Signer, error) {
+func (s *txSigner) getImportSigners(ctx context.Context, sourceChainID ids.ID, ins []*avax.TransferableInput) ([][]keychain.Signer, error) {
 	txSigners := make([][]keychain.Signer, len(ins))
 	for credIndex, transferInput := range ins {
 		input, ok := transferInput.In.(*secp256k1fx.TransferInput)
@@ -152,7 +151,7 @@ func (s *txSigner) getExportSigners(ins []evm.EVMInput) [][]keychain.Signer {
 	return txSigners
 }
 
-func SignUnsignedAtomic(ctx stdcontext.Context, signer Signer, utx evm.UnsignedAtomicTx) (*evm.Tx, error) {
+func SignUnsignedAtomic(ctx context.Context, signer Signer, utx evm.UnsignedAtomicTx) (*evm.Tx, error) {
 	tx := &evm.Tx{UnsignedAtomicTx: utx}
 	return tx, signer.SignAtomic(ctx, tx)
 }

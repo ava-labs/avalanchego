@@ -139,7 +139,7 @@ func Import(ctx context.Context, config *Config) (*status.TxIssuance, error) {
 		return nil, err
 	}
 
-	if err := api.WaitForAcceptance(ctx, client, address, nonce); err != nil {
+	if err := api.AwaitTxAccepted(ctx, client, address, nonce, api.DefaultPollingInterval); err != nil {
 		return nil, err
 	}
 
