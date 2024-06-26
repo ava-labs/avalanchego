@@ -46,12 +46,12 @@ func NewBlockVM(
 	ssVM, _ := vm.(block.StateSyncableVM)
 	getInitialPreferenceVM, _ := vm.(block.GetInitialPreferenceVM)
 	return &blockVM{
-		ChainVM:      vm,
-		buildBlockVM: buildBlockVM,
-		batchedVM:    batchedVM,
-		ssVM:         ssVM,
-    getInitialPreferenceVM: getInitialPreferenceVM,
-		registry:     reg,
+		ChainVM:                vm,
+		buildBlockVM:           buildBlockVM,
+		batchedVM:              batchedVM,
+		ssVM:                   ssVM,
+		getInitialPreferenceVM: getInitialPreferenceVM,
+		registry:               reg,
 	}
 }
 
