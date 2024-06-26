@@ -3300,7 +3300,7 @@ func TestTransitiveStart(t *testing.T) {
 		//		  |
 		//		 *A*
 		//		 / \
-		//	   *B*   C
+		//	   *B*  C
 		//	    |
 		//	   *D*
 		{
@@ -3311,6 +3311,27 @@ func TestTransitiveStart(t *testing.T) {
 				blkD := BuildBlockFromOracle(blkA, choices.Processing, 0)
 
 				return genesisBlk, []snowman.Block{genesisBlk, blkA, blkD}, blkD, []snowman.Block{blkA, blkB, blkD}
+			},
+		},
+		// We should only re-issue the preferred chain if it extends the last
+		// accepted block
+		// option.
+		//		 [G]
+		//		  |
+		//		 *A*
+		//		 / \
+		//	   *B* [C]
+		//	    |
+		//	   *D*
+		{
+			name: "preferred chain - preferred tip branching out of oracle block",
+			setup: func(genesisBlk *snowmantest.Block) (snowman.Block, []snowman.Block, snowman.Block, []snowman.Block) {
+				blkA := BuildBlock(genesisBlk, choices.Accepted)
+				blkB := BuildBlock(blkA, choices.Processing)
+				blkC := BuildBlock(blkA, choices.Accepted)
+				blkD := BuildBlock(blkB, choices.Processing)
+
+				return blkC, []snowman.Block{genesisBlk, blkA, blkB, blkC, blkD}, blkD, nil
 			},
 		},
 	}
