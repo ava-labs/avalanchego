@@ -6,6 +6,7 @@ package network
 import (
 	"context"
 	"os"
+	"testing"
 	"time"
 
 	"go.uber.org/zap"
@@ -129,4 +130,8 @@ func ExampleNewTestNetwork() {
 		"network exited",
 		zap.Error(err),
 	)
+}
+
+func TestFoo(t *testing.T) {
+	ExampleNewTestNetwork()
 }

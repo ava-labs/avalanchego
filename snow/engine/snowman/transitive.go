@@ -533,25 +533,6 @@ func (t *Transitive) Start(ctx context.Context, startReqID uint32) error {
 	}
 
 	issuedMetric := t.metrics.issued.WithLabelValues(builtSource)
-	// to maintain the invariant that oracle blocks are issued in the correct
-	// preferences, we need to handle the case that we are bootstrapping into an oracle block
-	if oracleBlk, ok := lastAccepted.(snowman.OracleBlock); ok {
-		options, err := oracleBlk.Options(ctx)
-		switch {
-		case err == snowman.ErrNotOracle:
-			// if there aren't blocks we need to deliver on startup, we need to set
-			// the preference to the preferred tip
-		case err != nil:
-			return err
-		default:
-			for _, blk := range options {
-				// note that deliver will set the VM's preference
-				if err := t.deliver(ctx, t.Ctx.NodeID, blk, false, issuedMetric); err != nil {
-					return err
-				}
-			}
-		}
-	}
 
 	// Re-issue all blocks in the preferred chain into consensus
 	for _, preferredBlk := range preferredChain {
