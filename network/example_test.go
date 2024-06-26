@@ -129,8 +129,8 @@ func ExampleNewTestNetwork() {
 		)
 		return
 	}
-	dialerConfig := NewTestDialerConfig()
 
+	dialerConfig := NewTestDialerConfig()
 	network, err := NewTestNetwork(
 		log,
 		config,
