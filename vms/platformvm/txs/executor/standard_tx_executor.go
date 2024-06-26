@@ -429,16 +429,14 @@ func (e *StandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 		return err
 	}
 
-	var (
-		currentTimestamp = e.State.GetTimestamp()
-		isDurangoActive  = e.Config.UpgradeConfig.IsDurangoActivated(currentTimestamp)
-	)
-	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
-		return err
-	}
-
+	currentTimestamp := e.State.GetTimestamp()
 	if e.Config.UpgradeConfig.IsEActivated(currentTimestamp) {
 		return errTransformSubnetTxPostEUpgrade
+	}
+
+	isDurangoActive := e.Config.UpgradeConfig.IsDurangoActivated(currentTimestamp)
+	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
+		return err
 	}
 
 	// Note: math.MaxInt32 * time.Second < math.MaxInt64 - so this can never
