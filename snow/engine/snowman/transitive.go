@@ -1110,7 +1110,7 @@ func (t *Transitive) getProcessingAncestor(initialVote ids.ID) (ids.ID, bool) {
 		blk, ok := t.nonVerifiedCache.Get(bubbledVote)
 		if !ok {
 			t.Ctx.Log.Debug("dropping vote",
-				zap.String("reason", "ancestor couldn't be fetched"),
+				zap.String("reason", "ancestor isn't cached"),
 				zap.Stringer("initialVoteID", initialVote),
 				zap.Stringer("bubbledVoteID", bubbledVote),
 			)
