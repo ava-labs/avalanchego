@@ -425,13 +425,13 @@ func (e *StandardTxExecutor) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidat
 }
 
 func (e *StandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error {
-	if err := e.Tx.SyntacticVerify(e.Ctx); err != nil {
-		return err
-	}
-
 	currentTimestamp := e.State.GetTimestamp()
 	if e.Config.UpgradeConfig.IsEActivated(currentTimestamp) {
 		return errTransformSubnetTxPostEUpgrade
+	}
+
+	if err := e.Tx.SyntacticVerify(e.Ctx); err != nil {
+		return err
 	}
 
 	isDurangoActive := e.Config.UpgradeConfig.IsDurangoActivated(currentTimestamp)

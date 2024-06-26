@@ -1552,7 +1552,7 @@ func TestDurangoMemoField(t *testing.T) {
 	}
 }
 
-// Verifies that [TransformSubnetTx] are disabled post-E
+// Verifies that [TransformSubnetTx] is disabled post-E
 func TestEUpgradeDisabledTransactions(t *testing.T) {
 	type test struct {
 		name        string
@@ -1564,13 +1564,8 @@ func TestEUpgradeDisabledTransactions(t *testing.T) {
 		{
 			name: "TransformSubnetTx",
 			buildTx: func(_ *environment) *txs.Tx {
-				// This is a hacky way of getting a TransformSubnetTx to pass
-				// SyntacticVerify()
-				utx := &txs.TransformSubnetTx{}
-				utx.SyntacticallyVerified = true
 				return &txs.Tx{
-					Unsigned: utx,
-					TxID:     ids.GenerateTestID(),
+					Unsigned: &txs.TransformSubnetTx{},
 				}
 			},
 			expectedErr: errTransformSubnetTxPostEUpgrade,
