@@ -73,6 +73,7 @@ func (*noopListener) Addr() net.Addr {
 }
 
 func NewTestNetworkConfig(
+	log logging.Logger,
 	networkID uint32,
 	tlsCert *tls.Certificate,
 	blsKey *bls.SecretKey,
@@ -175,7 +176,7 @@ func NewTestNetworkConfig(
 		PeerWriteBufferSize:          constants.DefaultNetworkPeerWriteBufferSize,
 		ResourceTracker:              resourceTracker,
 		CPUTargeter: tracker.NewTargeter(
-			logging.NoLog{},
+			log,
 			&tracker.TargeterConfig{
 				VdrAlloc:           float64(runtime.NumCPU()),
 				MaxNonVdrUsage:     .8 * float64(runtime.NumCPU()),
@@ -185,7 +186,7 @@ func NewTestNetworkConfig(
 			resourceTracker.CPUTracker(),
 		),
 		DiskTargeter: tracker.NewTargeter(
-			logging.NoLog{},
+			log,
 			&tracker.TargeterConfig{
 				VdrAlloc:           1000 * units.GiB,
 				MaxNonVdrUsage:     1000 * units.GiB,
@@ -197,9 +198,9 @@ func NewTestNetworkConfig(
 	}, nil
 }
 
-func NewTestMessageCreator(metrics prometheus.Registerer) (message.Creator, error) {
+func NewTestMessageCreator(log logging.Logger, metrics prometheus.Registerer) (message.Creator, error) {
 	return message.NewCreator(
-		logging.NoLog{},
+		log,
 		metrics,
 		constants.DefaultNetworkCompressionType,
 		constants.DefaultNetworkMaximumInboundTimeout,

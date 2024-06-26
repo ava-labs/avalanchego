@@ -104,12 +104,12 @@ func ExampleNewTestNetwork() {
 	}
 
 	metrics := prometheus.NewRegistry()
-	config, err := NewTestNetworkConfig(constants.FujiID, tlsCert, blsKey, validators, trackedSubnets, metrics)
+	config, err := NewTestNetworkConfig(log, constants.FujiID, tlsCert, blsKey, validators, trackedSubnets, metrics)
 	if err != nil {
 		panic(err)
 	}
 
-	messageCreator, err := NewTestMessageCreator(metrics)
+	messageCreator, err := NewTestMessageCreator(log, metrics)
 	if err != nil {
 		panic(err)
 	}
