@@ -36,7 +36,7 @@ func (v *voter) Execute(ctx context.Context, _ []ids.ID, _ []ids.ID) error {
 	for i, voteOption := range v.responseOptions {
 		// To prevent any potential deadlocks with undisclosed dependencies,
 		// votes must be bubbled to the nearest valid block
-		vote, shouldVote = v.t.getProcessingAncestor(ctx, voteOption)
+		vote, shouldVote = v.t.getProcessingAncestor(voteOption)
 		if shouldVote {
 			voteIndex = i
 			break
