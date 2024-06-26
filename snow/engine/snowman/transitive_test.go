@@ -3373,23 +3373,23 @@ func TestTransitiveStart(t *testing.T) {
 						// are still processing.
 						if oracleBlk.StatusV == choices.Processing {
 							require.True(te.Consensus.Processing(preference.ID()))
-							require.True(te.Consensus.IsPreferred(preference))
+							require.True(te.Consensus.IsPreferred(preference.ID()))
 							gotPreferredID, ok := te.Consensus.PreferenceAtHeight(preference.Height())
 							require.True(ok)
 							require.Equal(preference.ID(), gotPreferredID)
 						} else {
 							require.False(te.Consensus.Processing(preference.ID()))
-							require.True(te.Consensus.IsPreferred(preference))
+							require.True(te.Consensus.IsPreferred(preference.ID()))
 						}
 
 						options, err := oracleBlk.Options(context.Background())
 						require.NoError(err)
 
 						require.True(te.Consensus.Processing(options[0].ID()))
-						require.True(te.Consensus.IsPreferred(options[0]))
+						require.True(te.Consensus.IsPreferred(options[0].ID()))
 
 						require.True(te.Consensus.Processing(options[1].ID()))
-						require.False(te.Consensus.IsPreferred(options[1]))
+						require.False(te.Consensus.IsPreferred(options[1].ID()))
 
 						wantPreferredOptionID, ok := te.Consensus.PreferenceAtHeight(preference.Height() + 1)
 						require.True(ok)
@@ -3399,7 +3399,7 @@ func TestTransitiveStart(t *testing.T) {
 					}
 
 					require.True(te.Consensus.Processing(preference.ID()))
-					require.True(te.Consensus.IsPreferred(preference))
+					require.True(te.Consensus.IsPreferred(preference.ID()))
 					gotPreferredID, ok := te.Consensus.PreferenceAtHeight(preference.Height())
 					require.True(ok)
 					require.Equal(preference.ID(), gotPreferredID)
