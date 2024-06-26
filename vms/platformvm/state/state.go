@@ -344,7 +344,7 @@ type state struct {
 	subnetOwnerDB    database.Database
 
 	subnetManagers     map[ids.ID]chainIDAndAddr            // map of subnetID -> manager of the subnet
-	subnetManagerCache cache.Cacher[ids.ID, chainIDAndAddr] // cache of subnetID -> manager; if the entry is nil, it is not in the database
+	subnetManagerCache cache.Cacher[ids.ID, chainIDAndAddr] // cache of subnetID -> manager; if the entry is {ids.Empty, nil}, it is not in the database
 	subnetManagerDB    database.Database
 
 	transformedSubnets     map[ids.ID]*txs.Tx            // map of subnetID -> transformSubnetTx
@@ -565,7 +565,7 @@ func newState(
 		"subnet_manager_cache",
 		metricsReg,
 		cache.NewSizedLRU[ids.ID, chainIDAndAddr](execCfg.SubnetManagerCacheSize, func(_ ids.ID, f chainIDAndAddr) int {
-			return ids.IDLen + len(f.Addr)
+			return 2*ids.IDLen + len(f.Addr)
 		}),
 	)
 	if err != nil {
