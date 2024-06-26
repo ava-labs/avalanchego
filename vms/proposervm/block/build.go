@@ -66,8 +66,8 @@ func BuildUnsigned(
 func marshalBlock(block *statelessBlock) ([]byte, error) {
 	if len(block.StatelessBlock.SignedParentBlockSig) == 0 {
 		// create a backward compatible block ( without SignedParentBlockSig ) and use the PreBlockSigCodecVersion encoder for the encoding.
-		var preBlockSigBlock SignedBlock = &preBlockSigStatelessBlock{
-			StatelessBlock: preBlockSigStatelessUnsignedBlock{
+		var preBlockSigBlock SignedBlock = &statelessBlockV0{
+			StatelessBlock: statelessUnsignedBlockV0{
 				ParentID:     block.StatelessBlock.ParentID,
 				Timestamp:    block.StatelessBlock.Timestamp,
 				PChainHeight: block.StatelessBlock.PChainHeight,
@@ -76,10 +76,10 @@ func marshalBlock(block *statelessBlock) ([]byte, error) {
 			},
 		}
 		var blockIntf SignedBlock = preBlockSigBlock
-		return Codec.Marshal(PreBlockSigCodecVersion, &blockIntf)
+		return Codec.Marshal(CodecVersion, &blockIntf)
 	}
 	var blockIntf SignedBlock = block
-	return Codec.Marshal(CurrentCodecVersion, &blockIntf)
+	return Codec.Marshal(CodecVersion, &blockIntf)
 }
 
 func CalculateBootstrappingBlockSig(chainID ids.ID, networkID uint32) [hashing.HashLen]byte {
@@ -201,7 +201,7 @@ func BuildHeader(
 		Body:   bodyID,
 	}
 
-	bytes, err := Codec.Marshal(PreBlockSigCodecVersion, &header)
+	bytes, err := Codec.Marshal(CodecVersion, &header)
 	header.bytes = bytes
 	return &header, err
 }
@@ -218,7 +218,7 @@ func BuildOption(
 		InnerBytes: innerBytes,
 	}
 
-	bytes, err := Codec.Marshal(PreBlockSigCodecVersion, &block)
+	bytes, err := Codec.Marshal(CodecVersion, &block)
 	if err != nil {
 		return nil, err
 	}

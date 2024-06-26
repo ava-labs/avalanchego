@@ -11,10 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 )
 
-const (
-	PreBlockSigCodecVersion = 0
-	CurrentCodecVersion     = 1
-)
+const CodecVersion = 0
 
 var Codec codec.Manager
 
@@ -23,15 +20,13 @@ func init() {
 	// See: [constants.DefaultMaxMessageSize]
 	Codec = codec.NewManager(math.MaxInt)
 
-	lc0 := linearcodec.NewDefault()
-	lc1 := linearcodec.NewDefault()
+	lc := linearcodec.NewDefault()
 
 	err := utils.Err(
-		lc0.RegisterType(&preBlockSigStatelessBlock{}),
-		lc0.RegisterType(&option{}),
-		Codec.RegisterCodec(PreBlockSigCodecVersion, lc0),
-		lc1.RegisterType(&statelessBlock{}),
-		Codec.RegisterCodec(CurrentCodecVersion, lc1),
+		lc.RegisterType(&statelessBlockV0{}),
+		lc.RegisterType(&option{}),
+		lc.RegisterType(&statelessBlock{}),
+		Codec.RegisterCodec(CodecVersion, lc),
 	)
 	if err != nil {
 		panic(err)

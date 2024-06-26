@@ -57,7 +57,7 @@ func TestParse(t *testing.T) {
 	signedWithoutCertBlock := signedWithoutCertBlockIntf.(*statelessBlock)
 	signedWithoutCertBlock.Signature = []byte{5}
 
-	signedWithoutCertBlock.bytes, err = Codec.Marshal(CurrentCodecVersion, &signedWithoutCertBlockIntf)
+	signedWithoutCertBlock.bytes, err = Codec.Marshal(CodecVersion, &signedWithoutCertBlockIntf)
 	require.NoError(t, err)
 
 	optionBlock, err := BuildOption(parentID, innerBlockBytes)

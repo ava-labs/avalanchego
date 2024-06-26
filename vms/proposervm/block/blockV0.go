@@ -4,7 +4,6 @@
 package block
 
 import (
-	"errors"
 	"fmt"
 	"time"
 
@@ -14,49 +13,17 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
-var (
-	_ SignedBlock = (*statelessBlock)(nil)
-
-	errUnexpectedSignature        = errors.New("signature provided when none was expected")
-	errInvalidCertificate         = errors.New("invalid certificate")
-	errInvalidBlockEncodingLength = errors.New("block encoding length must be greater than zero bytes long")
-)
-
-type Block interface {
-	ID() ids.ID
-	ParentID() ids.ID
-	Block() []byte
-	Bytes() []byte
-
-	initialize(bytes []byte) error
-	verify(chainID ids.ID) error
+type statelessUnsignedBlockV0 struct {
+	ParentID     ids.ID `serialize:"true"`
+	Timestamp    int64  `serialize:"true"`
+	PChainHeight uint64 `serialize:"true"`
+	Certificate  []byte `serialize:"true"`
+	Block        []byte `serialize:"true"`
 }
 
-type SignedBlock interface {
-	Block
-
-	PChainHeight() uint64
-	Timestamp() time.Time
-
-	// Proposer returns the ID of the node that proposed this block. If no node
-	// signed this block, [ids.EmptyNodeID] will be returned.
-	Proposer() ids.NodeID
-
-	SignedfParentBlockSig() []byte
-}
-
-type statelessUnsignedBlock struct {
-	ParentID             ids.ID `serialize:"true"`
-	Timestamp            int64  `serialize:"true"`
-	PChainHeight         uint64 `serialize:"true"`
-	Certificate          []byte `serialize:"true"`
-	Block                []byte `serialize:"true"`
-	SignedParentBlockSig []byte `serialize:"true"`
-}
-
-type statelessBlock struct {
-	StatelessBlock statelessUnsignedBlock `serialize:"true"`
-	Signature      []byte                 `serialize:"true"`
+type statelessBlockV0 struct {
+	StatelessBlock statelessUnsignedBlockV0 `serialize:"true"`
+	Signature      []byte                   `serialize:"true"`
 
 	id        ids.ID
 	timestamp time.Time
@@ -65,27 +32,27 @@ type statelessBlock struct {
 	bytes     []byte
 }
 
-func (b *statelessBlock) ID() ids.ID {
+func (b *statelessBlockV0) ID() ids.ID {
 	return b.id
 }
 
-func (b *statelessBlock) ParentID() ids.ID {
+func (b *statelessBlockV0) ParentID() ids.ID {
 	return b.StatelessBlock.ParentID
 }
 
-func (b *statelessBlock) Block() []byte {
+func (b *statelessBlockV0) Block() []byte {
 	return b.StatelessBlock.Block
 }
 
-func (b *statelessBlock) Bytes() []byte {
+func (b *statelessBlockV0) Bytes() []byte {
 	return b.bytes
 }
 
-func (b *statelessBlock) SignedfParentBlockSig() []byte {
-	return b.StatelessBlock.SignedParentBlockSig
+func (b *statelessBlockV0) SignedfParentBlockSig() []byte {
+	return nil
 }
 
-func (b *statelessBlock) initialize(bytes []byte) error {
+func (b *statelessBlockV0) initialize(bytes []byte) error {
 	b.bytes = bytes
 
 	var unsignedBytes []byte
@@ -115,7 +82,7 @@ func (b *statelessBlock) initialize(bytes []byte) error {
 	return nil
 }
 
-func (b *statelessBlock) verify(chainID ids.ID) error {
+func (b *statelessBlockV0) verify(chainID ids.ID) error {
 	if len(b.StatelessBlock.Certificate) == 0 {
 		if len(b.Signature) > 0 {
 			return errUnexpectedSignature
@@ -136,14 +103,14 @@ func (b *statelessBlock) verify(chainID ids.ID) error {
 	)
 }
 
-func (b *statelessBlock) PChainHeight() uint64 {
+func (b *statelessBlockV0) PChainHeight() uint64 {
 	return b.StatelessBlock.PChainHeight
 }
 
-func (b *statelessBlock) Timestamp() time.Time {
+func (b *statelessBlockV0) Timestamp() time.Time {
 	return b.timestamp
 }
 
-func (b *statelessBlock) Proposer() ids.NodeID {
+func (b *statelessBlockV0) Proposer() ids.NodeID {
 	return b.proposer
 }
