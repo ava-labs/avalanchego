@@ -132,7 +132,7 @@ func TestParseBytes(t *testing.T) {
 		},
 		{
 			name:        "gibberish",
-			hex:         "ff0102030405",
+			hex:         "000102030405",
 			expectedErr: codec.ErrUnknownVersion,
 		},
 	}

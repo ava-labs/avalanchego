@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
+// statelessUnsignedBlockV0 is the "old" version of statelessUnsignedBlock, which doesn't contain the VRF signature.
 type statelessUnsignedBlockV0 struct {
 	ParentID     ids.ID `serialize:"true"`
 	Timestamp    int64  `serialize:"true"`
@@ -21,6 +22,7 @@ type statelessUnsignedBlockV0 struct {
 	Block        []byte `serialize:"true"`
 }
 
+// statelessBlockV0 is the "old" version of statelessBlock, which doesn't contain the VRF signature.
 type statelessBlockV0 struct {
 	StatelessBlock statelessUnsignedBlockV0 `serialize:"true"`
 	Signature      []byte                   `serialize:"true"`
@@ -48,24 +50,31 @@ func (b *statelessBlockV0) Bytes() []byte {
 	return b.bytes
 }
 
-func (b *statelessBlockV0) SignedfParentBlockSig() []byte {
+func (b *statelessBlockV0) VRFSig() []byte {
+	return nil
+}
+
+func (b *statelessBlockV0) initializeID() error {
+	var unsignedBytes []byte
+	// The serialized form of the block is the unsignedBytes followed by the
+	// signature, which is prefixed by a uint32. So, we need to strip off the
+	// signature as well as it's length prefix to get the unsigned bytes.
+	lenUnsignedBytes := len(b.bytes) - wrappers.IntLen - len(b.Signature)
+	if lenUnsignedBytes <= 0 {
+		return errInvalidBlockEncodingLength
+	}
+
+	unsignedBytes = b.bytes[:lenUnsignedBytes]
+	b.id = hashing.ComputeHash256Array(unsignedBytes)
 	return nil
 }
 
 func (b *statelessBlockV0) initialize(bytes []byte) error {
 	b.bytes = bytes
 
-	var unsignedBytes []byte
-	// The serialized form of the block is the unsignedBytes followed by the
-	// signature, which is prefixed by a uint32. So, we need to strip off the
-	// signature as well as it's length prefix to get the unsigned bytes.
-	lenUnsignedBytes := len(bytes) - wrappers.IntLen - len(b.Signature)
-	if lenUnsignedBytes <= 0 {
-		return errInvalidBlockEncodingLength
+	if err := b.initializeID(); err != nil {
+		return err
 	}
-
-	unsignedBytes = bytes[:lenUnsignedBytes]
-	b.id = hashing.ComputeHash256Array(unsignedBytes)
 
 	b.timestamp = time.Unix(b.StatelessBlock.Timestamp, 0)
 	if len(b.StatelessBlock.Certificate) == 0 {

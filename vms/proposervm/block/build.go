@@ -13,7 +13,6 @@ import (
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/hashing"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 func BuildUnsigned(
@@ -45,12 +44,12 @@ func BuildUnsigned(
 
 	block := &statelessBlock{
 		StatelessBlock: statelessUnsignedBlock{
-			ParentID:             parentID,
-			Timestamp:            timestamp.Unix(),
-			PChainHeight:         pChainHeight,
-			Certificate:          nil,
-			Block:                blockBytes,
-			SignedParentBlockSig: sigParentBlockSig,
+			ParentID:     parentID,
+			Timestamp:    timestamp.Unix(),
+			PChainHeight: pChainHeight,
+			Certificate:  nil,
+			Block:        blockBytes,
+			VRFSig:       sigParentBlockSig,
 		},
 		timestamp: timestamp,
 	}
@@ -64,7 +63,7 @@ func BuildUnsigned(
 
 // marshalBlock marshal the given block using the ideal encoder.
 func marshalBlock(block *statelessBlock) ([]byte, error) {
-	if len(block.StatelessBlock.SignedParentBlockSig) == 0 {
+	if len(block.StatelessBlock.VRFSig) == 0 {
 		// create a backward compatible block ( without SignedParentBlockSig ) and use the PreBlockSigCodecVersion encoder for the encoding.
 		var preBlockSigBlock SignedBlock = &statelessBlockV0{
 			StatelessBlock: statelessUnsignedBlockV0{
@@ -150,31 +149,32 @@ func Build(
 
 	block := &statelessBlock{
 		StatelessBlock: statelessUnsignedBlock{
-			ParentID:             parentID,
-			Timestamp:            timestamp.Unix(),
-			PChainHeight:         pChainHeight,
-			Certificate:          cert.Raw,
-			Block:                blockBytes,
-			SignedParentBlockSig: sigParentBlockSig,
+			ParentID:     parentID,
+			Timestamp:    timestamp.Unix(),
+			PChainHeight: pChainHeight,
+			Certificate:  cert.Raw,
+			Block:        blockBytes,
+			VRFSig:       sigParentBlockSig,
 		},
 		timestamp: timestamp,
 		cert:      cert,
 		proposer:  ids.NodeIDFromCert(cert),
 	}
 
-	unsignedBytesWithEmptySignature, err := marshalBlock(block)
-	if err != nil {
+	var err error
+
+	// temporary, set the bytes to the marshaled content of the block.
+	// this doesn't include the signature ( yet )
+	if block.bytes, err = marshalBlock(block); err != nil {
 		return nil, err
 	}
 
-	// The serialized form of the block is the unsignedBytes followed by the
-	// signature, which is prefixed by a uint32. Because we are marshalling the
-	// block with an empty signature, we only need to strip off the length
-	// prefix to get the unsigned bytes.
-	lenUnsignedBytes := len(unsignedBytesWithEmptySignature) - wrappers.IntLen
-	unsignedBytes := unsignedBytesWithEmptySignature[:lenUnsignedBytes]
-	block.id = hashing.ComputeHash256Array(unsignedBytes)
+	// calculate the block ID.
+	if err = block.initializeID(); err != nil {
+		return nil, err
+	}
 
+	// use the block ID in order to build the header.
 	header, err := BuildHeader(chainID, parentID, block.id)
 	if err != nil {
 		return nil, err

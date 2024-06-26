@@ -162,7 +162,7 @@ func (b *postForkBlock) buildChild(ctx context.Context, blsSignKey *bls.SecretKe
 		b.ID(),
 		b.Timestamp(),
 		b.PChainHeight(),
-		b.SignedBlock.SignedfParentBlockSig(),
+		b.SignedBlock.VRFSig(),
 		blsSignKey,
 	)
 }

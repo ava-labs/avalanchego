@@ -28,6 +28,7 @@ type Block interface {
 	Block() []byte
 	Bytes() []byte
 
+	initializeID() error
 	initialize(bytes []byte) error
 	verify(chainID ids.ID) error
 }
@@ -42,16 +43,16 @@ type SignedBlock interface {
 	// signed this block, [ids.EmptyNodeID] will be returned.
 	Proposer() ids.NodeID
 
-	SignedfParentBlockSig() []byte
+	VRFSig() []byte
 }
 
 type statelessUnsignedBlock struct {
-	ParentID             ids.ID `serialize:"true"`
-	Timestamp            int64  `serialize:"true"`
-	PChainHeight         uint64 `serialize:"true"`
-	Certificate          []byte `serialize:"true"`
-	Block                []byte `serialize:"true"`
-	SignedParentBlockSig []byte `serialize:"true"`
+	ParentID     ids.ID `serialize:"true"`
+	Timestamp    int64  `serialize:"true"`
+	PChainHeight uint64 `serialize:"true"`
+	Certificate  []byte `serialize:"true"`
+	Block        []byte `serialize:"true"`
+	VRFSig       []byte `serialize:"true"`
 }
 
 type statelessBlock struct {
@@ -81,24 +82,31 @@ func (b *statelessBlock) Bytes() []byte {
 	return b.bytes
 }
 
-func (b *statelessBlock) SignedfParentBlockSig() []byte {
-	return b.StatelessBlock.SignedParentBlockSig
+func (b *statelessBlock) VRFSig() []byte {
+	return b.StatelessBlock.VRFSig
+}
+
+func (b *statelessBlock) initializeID() error {
+	var unsignedBytes []byte
+	// The serialized form of the block is the unsignedBytes followed by the
+	// signature, which is prefixed by a uint32. So, we need to strip off the
+	// signature as well as it's length prefix to get the unsigned bytes.
+	lenUnsignedBytes := len(b.bytes) - wrappers.IntLen - len(b.Signature)
+	if lenUnsignedBytes <= 0 {
+		return errInvalidBlockEncodingLength
+	}
+
+	unsignedBytes = b.bytes[:lenUnsignedBytes]
+	b.id = hashing.ComputeHash256Array(unsignedBytes)
+	return nil
 }
 
 func (b *statelessBlock) initialize(bytes []byte) error {
 	b.bytes = bytes
 
-	var unsignedBytes []byte
-	// The serialized form of the block is the unsignedBytes followed by the
-	// signature, which is prefixed by a uint32. So, we need to strip off the
-	// signature as well as it's length prefix to get the unsigned bytes.
-	lenUnsignedBytes := len(bytes) - wrappers.IntLen - len(b.Signature)
-	if lenUnsignedBytes <= 0 {
-		return errInvalidBlockEncodingLength
+	if err := b.initializeID(); err != nil {
+		return err
 	}
-
-	unsignedBytes = bytes[:lenUnsignedBytes]
-	b.id = hashing.ComputeHash256Array(unsignedBytes)
 
 	b.timestamp = time.Unix(b.StatelessBlock.Timestamp, 0)
 	if len(b.StatelessBlock.Certificate) == 0 {

@@ -32,10 +32,14 @@ func (b *option) Bytes() []byte {
 	return b.bytes
 }
 
-func (b *option) initialize(bytes []byte) error {
-	b.id = hashing.ComputeHash256Array(bytes)
-	b.bytes = bytes
+func (b *option) initializeID() error {
+	b.id = hashing.ComputeHash256Array(b.bytes)
 	return nil
+}
+
+func (b *option) initialize(bytes []byte) error {
+	b.bytes = bytes
+	return b.initializeID()
 }
 
 func (*option) verify(ids.ID) error {
