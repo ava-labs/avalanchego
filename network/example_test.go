@@ -95,7 +95,11 @@ func ExampleNewTestNetwork() {
 
 	tlsCert, err := staking.NewTLSCert()
 	if err != nil {
-		panic(err)
+		log.Fatal(
+			"failed to create tls cert",
+			zap.Error(err),
+		)
+		return
 	}
 
 	blsKey, err := bls.NewSecretKey()
