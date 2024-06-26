@@ -516,16 +516,13 @@ func (t *Transitive) Start(ctx context.Context, startReqID uint32) error {
 	}
 
 	preferredChain := make([]snowman.Block, 0)
-	for preferredBlock.Status() == choices.Processing {
+	for preferredBlock.Height() > lastAccepted.Height() {
 		preferredChain = append(preferredChain, preferredBlock)
 		preferredBlock, err = t.VM.GetBlock(ctx, preferredBlock.Parent())
 		if err != nil {
 			return err
 		}
 	}
-
-	// reverse the preferred chain so the blocks are now in chronological order
-	slices.Reverse(preferredChain)
 
 	// initialize consensus to the last accepted blockID
 	lastAcceptedHeight := lastAccepted.Height()
@@ -535,15 +532,21 @@ func (t *Transitive) Start(ctx context.Context, startReqID uint32) error {
 
 	issuedMetric := t.metrics.issued.WithLabelValues(builtSource)
 
-	// Re-issue all blocks in the preferred chain into consensus
-	for _, preferredBlk := range preferredChain {
-		if _, err := t.addUnverifiedBlockToConsensus(
-			ctx,
-			t.Ctx.NodeID,
-			preferredBlk,
-			issuedMetric,
-		); err != nil {
-			return err
+	// Re-issue all blocks in the preferred chain into consensus if the
+	// preferred chain extends the last accepted block
+	if len(preferredChain) > 0 && preferredChain[0].ID() == lastAcceptedID {
+		// reverse the preferred chain so the blocks are now in chronological order
+		slices.Reverse(preferredChain)
+
+		for _, preferredBlk := range preferredChain {
+			if _, err := t.addUnverifiedBlockToConsensus(
+				ctx,
+				t.Ctx.NodeID,
+				preferredBlk,
+				issuedMetric,
+			); err != nil {
+				return err
+			}
 		}
 	}
 
