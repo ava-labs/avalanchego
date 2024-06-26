@@ -8,6 +8,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/genesis"
@@ -15,7 +16,9 @@ import (
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
@@ -90,19 +93,38 @@ func ExampleNewTestNetwork() {
 		log: log,
 	}
 
+	tlsCert, err := staking.NewTLSCert()
+	if err != nil {
+		panic(err)
+	}
+
+	blsKey, err := bls.NewSecretKey()
+	if err != nil {
+		panic(err)
+	}
+
+	metrics := prometheus.NewRegistry()
+	config, err := NewTestNetworkConfig(constants.FujiID, tlsCert, blsKey, validators, trackedSubnets, metrics)
+	if err != nil {
+		panic(err)
+	}
+
+	messageCreator, err := NewTestMessageCreator(metrics)
+	if err != nil {
+		panic(err)
+	}
+	dialerConfig := NewTestDialerConfig()
+
 	network, err := NewTestNetwork(
 		log,
-		constants.FujiID,
-		validators,
-		trackedSubnets,
+		config,
+		messageCreator,
+		dialerConfig,
 		handler,
+		metrics,
 	)
 	if err != nil {
-		log.Fatal(
-			"failed to create test network",
-			zap.Error(err),
-		)
-		return
+		panic(err)
 	}
 
 	// We need to initially connect to some nodes in the network before peer
@@ -125,8 +147,7 @@ func ExampleNewTestNetwork() {
 	// Calling network.Dispatch() will block until a fatal error occurs or
 	// network.StartClose() is called.
 	err = network.Dispatch()
-	log.Info(
-		"network exited",
-		zap.Error(err),
-	)
+	if err != nil {
+		panic(err)
+	}
 }
