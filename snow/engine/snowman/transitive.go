@@ -649,42 +649,40 @@ func (t *Transitive) buildBlocks(ctx context.Context) error {
 	for t.pendingBuildBlocks > 0 && t.Consensus.NumProcessing() < t.Params.OptimalProcessing {
 		t.pendingBuildBlocks--
 
-		blk, err := t.VM.BuildBlock(ctx)
-		if err != nil {
-			t.Ctx.Log.Debug("failed building block",
-				zap.Error(err),
-			)
-			t.numBuildsFailed.Inc()
-			return nil
-		}
-		t.numBuilt.Inc()
-
-		// The newly created block should be built on top of the preferred block.
-		// Otherwise, the new block doesn't have the best chance of being confirmed.
-		parentID := blk.Parent()
-		if pref := t.Consensus.Preference(); parentID != pref {
-			t.Ctx.Log.Warn("built block with unexpected parent",
-				zap.Stringer("expectedParentID", pref),
-				zap.Stringer("parentID", parentID),
-			)
-		}
-
-		issuedMetric := t.metrics.issued.WithLabelValues(builtSource)
-		if err := t.issueWithAncestors(ctx, blk, issuedMetric); err != nil {
+		if err := t.buildBlock(ctx); err != nil {
 			return err
-		}
-
-		// TODO: Technically this may incorrectly log a warning if the block
-		// that was just built caused votes to be applied such that the block
-		// was rejected or was accepted along with one of its children. This
-		// should be cleaned up to never produce an invalid warning.
-		if t.canIssueChildOn(blk.ID()) {
-			t.Ctx.Log.Verbo("successfully issued new block from the VM")
-		} else {
-			t.Ctx.Log.Warn("block that was just built is not extendable")
 		}
 	}
 	return nil
+}
+
+func (t *Transitive) buildBlock(ctx context.Context) error {
+	blk, err := t.VM.BuildBlock(ctx)
+	if err != nil {
+		t.Ctx.Log.Debug("failed building block",
+			zap.Error(err),
+		)
+		t.numBuildsFailed.Inc()
+		return nil
+	}
+	t.numBuilt.Inc()
+
+	parentID := blk.Parent()
+	if !t.canIssueChildOn(parentID) {
+		t.Ctx.Log.Warn("built block with invalid parent",
+			zap.Stringer("parentID", parentID),
+		)
+		return nil
+	}
+
+	// Remove any outstanding requests for this block
+	blkID := blk.ID()
+	if req, ok := t.blkReqs.DeleteValue(blkID); ok {
+		delete(t.blkReqSourceMetric, req)
+	}
+
+	issuedMetric := t.metrics.issued.WithLabelValues(builtSource)
+	return t.deliver(ctx, t.Ctx.NodeID, blk, true, issuedMetric)
 }
 
 // Issue another poll to the network, asking what it prefers given the block we prefer.
@@ -752,39 +750,6 @@ func (t *Transitive) issueFrom(
 		return t.blocked.Abandon(ctx, blkID)
 	}
 	return nil
-}
-
-// issueWithAncestors attempts to issue the branch ending with [blk] to consensus.
-// Returns true if the block is processing in consensus or is decided.
-// If a dependency is missing and the dependency hasn't been requested, the issuance will be abandoned.
-func (t *Transitive) issueWithAncestors(
-	ctx context.Context,
-	blk snowman.Block,
-	issuedMetric prometheus.Counter,
-) error {
-	blkID := blk.ID()
-	// issue [blk] and its ancestors into consensus
-	for t.shouldIssueBlock(blk) {
-		err := t.issue(ctx, t.Ctx.NodeID, blk, true, issuedMetric)
-		if err != nil {
-			return err
-		}
-		blkID = blk.Parent()
-		blk, err = t.getBlock(ctx, blkID)
-		if err != nil {
-			break
-		}
-	}
-
-	// There's an outstanding request for this block. We can wait for that
-	// request to succeed or fail.
-	if t.blkReqs.HasValue(blkID) {
-		return nil
-	}
-
-	// If the block wasn't already issued, we have no reason to expect that it
-	// will be able to be issued.
-	return t.blocked.Abandon(ctx, blkID)
 }
 
 // Issue [blk] to consensus once its ancestors have been issued.
