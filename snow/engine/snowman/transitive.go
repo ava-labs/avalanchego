@@ -469,7 +469,7 @@ func (t *Transitive) Start(ctx context.Context, startReqID uint32) error {
 		return err
 	}
 
-	lastAccepted, err := t.getBlock(ctx, lastAcceptedID)
+	lastAccepted, err := t.VM.GetBlock(ctx, lastAcceptedID)
 	if err != nil {
 		t.Ctx.Log.Error("failed to get last accepted block",
 			zap.Error(err),
@@ -1087,7 +1087,7 @@ func (t *Transitive) addUnverifiedBlockToConsensus(
 // processing in consensus. If no ancestor could be found, false is returned.
 //
 // Note: If [initialVote] is processing, then [initialVote] will be returned.
-func (t *Transitive) getProcessingAncestor(ctx context.Context, initialVote ids.ID) (ids.ID, bool) {
+func (t *Transitive) getProcessingAncestor(initialVote ids.ID) (ids.ID, bool) {
 	// If [bubbledVote] != [initialVote], it is guaranteed that [bubbledVote] is
 	// in processing. Otherwise, we attempt to iterate through any blocks we
 	// have at our disposal as a best-effort mechanism to find a valid ancestor.
@@ -1106,14 +1106,13 @@ func (t *Transitive) getProcessingAncestor(ctx context.Context, initialVote ids.
 			return bubbledVote, true
 		}
 
-		blk, err := t.getBlock(ctx, bubbledVote)
-		// If we cannot retrieve the block, drop [vote]
-		if err != nil {
+		// If we haven't cached the block, drop [vote].
+		blk, ok := t.nonVerifiedCache.Get(bubbledVote)
+		if !ok {
 			t.Ctx.Log.Debug("dropping vote",
 				zap.String("reason", "ancestor couldn't be fetched"),
 				zap.Stringer("initialVoteID", initialVote),
 				zap.Stringer("bubbledVoteID", bubbledVote),
-				zap.Error(err),
 			)
 			t.numProcessingAncestorFetchesFailed.Inc()
 			return ids.Empty, false
