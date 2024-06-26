@@ -4,6 +4,7 @@
 package executor
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -47,6 +48,7 @@ var (
 	ErrRemoveValidatorManagedSubnet    = errors.New("RemoveSubnetValidatorTx cannot be used to add a validator to a Subnet with a manager")
 	ErrEUpgradeNotActive               = errors.New("attempting to use a E-upgrade feature prior to activation")
 	ErrSetSubnetManagerPrimaryNetwork  = errors.New("SetSubnetManagerTx cannot be used on the Primary Network")
+	ErrInvalidWarpMessageParameters    = errors.New("invalid sourceChainID and sourceAddr")
 
 	WarpQuorumNumerator   uint64 = 67
 	WarpQuorumDenominator uint64 = 100
@@ -874,6 +876,23 @@ func verifySetSubnetManagerTx(
 
 	if payload.SubnetID == constants.PrimaryNetworkID {
 		return nil, ErrSetSubnetManagerPrimaryNetwork
+	}
+
+	// Check that the Subnet exists by fetching its owner.
+	_, err := chainState.GetSubnetOwner(payload.SubnetID)
+	if err != nil {
+		return nil, err
+	}
+
+	chainID, addr, err := chainState.GetSubnetManager(payload.SubnetID)
+	if err != nil {
+		// If there is no Subnet manager, {chainID, addr} must be {ids.Empty, []byte{}}
+		chainID = ids.Empty
+		addr = []byte{}
+	}
+
+	if payload.ChainID != chainID || !bytes.Equal(payload.Addr, addr) {
+		return nil, ErrInvalidWarpMessageParameters
 	}
 
 	height, err := backend.Ctx.ValidatorState.GetCurrentHeight(ctx)
