@@ -1563,7 +1563,7 @@ func TestEUpgradeDisabledTransactions(t *testing.T) {
 	tests := []test{
 		{
 			name: "TransformSubnetTx",
-			buildTx: func(env *environment) *txs.Tx {
+			buildTx: func(_ *environment) *txs.Tx {
 				// This is a hacky way of getting a TransformSubnetTx to pass
 				// SyntacticVerify()
 				utx := &txs.TransformSubnetTx{}
