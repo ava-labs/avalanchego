@@ -409,7 +409,7 @@ func (n *Network) Bootstrap(ctx context.Context, w io.Writer) error {
 	}
 
 	// Don't restart the node during subnet creation since it will always be restarted afterwards.
-	if err := n.CreateSubnets(ctx, w, false /* restartRequired */); err != nil {
+	if err := n.CreateSubnets(ctx, w, bootstrapNode.URI, false /* restartRequired */); err != nil {
 		return err
 	}
 
@@ -646,7 +646,7 @@ func (n *Network) GetSubnet(name string) *Subnet {
 
 // Ensure that each subnet on the network is created. If restartRequired is false, node restart
 // to pick up configuration changes becomes the responsibility of the caller.
-func (n *Network) CreateSubnets(ctx context.Context, w io.Writer, restartRequired bool) error {
+func (n *Network) CreateSubnets(ctx context.Context, w io.Writer, apiURI string, restartRequired bool) error {
 	createdSubnets := make([]*Subnet, 0, len(n.Subnets))
 	for _, subnet := range n.Subnets {
 		if len(subnet.ValidatorIDs) == 0 {
@@ -748,7 +748,7 @@ func (n *Network) CreateSubnets(ctx context.Context, w io.Writer, restartRequire
 			validatorNodes = append(validatorNodes, node)
 		}
 
-		if err := subnet.AddValidators(ctx, w, validatorNodes...); err != nil {
+		if err := subnet.AddValidators(ctx, w, apiURI, validatorNodes...); err != nil {
 			return err
 		}
 	}
