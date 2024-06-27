@@ -67,7 +67,17 @@ func (v *verifier) BanffProposalBlock(b *block.BanffProposalBlock) error {
 		return err
 	}
 
-	inputs, atomicRequests, onAcceptFunc, err := v.processStandardTxs(b.Transactions, onDecisionState, b.Parent())
+	feeCalculator, err := state.PickFeeCalculator(v.txExecutorBackend.Config, onDecisionState)
+	if err != nil {
+		return err
+	}
+
+	inputs, atomicRequests, onAcceptFunc, err := v.processStandardTxs(
+		b.Transactions,
+		feeCalculator,
+		onDecisionState,
+		b.Parent(),
+	)
 	if err != nil {
 		return err
 	}
@@ -87,6 +97,7 @@ func (v *verifier) BanffProposalBlock(b *block.BanffProposalBlock) error {
 		onDecisionState,
 		onCommitState,
 		onAbortState,
+		feeCalculator,
 		inputs,
 		atomicRequests,
 		onAcceptFunc,
@@ -120,7 +131,11 @@ func (v *verifier) BanffStandardBlock(b *block.BanffStandardBlock) error {
 		return errBanffStandardBlockWithoutChanges
 	}
 
-	return v.standardBlock(&b.ApricotStandardBlock, onAcceptState)
+	feeCalculator, err := state.PickFeeCalculator(v.txExecutorBackend.Config, onAcceptState)
+	if err != nil {
+		return err
+	}
+	return v.standardBlock(&b.ApricotStandardBlock, feeCalculator, onAcceptState)
 }
 
 func (v *verifier) ApricotAbortBlock(b *block.ApricotAbortBlock) error {
@@ -152,7 +167,12 @@ func (v *verifier) ApricotProposalBlock(b *block.ApricotProposalBlock) error {
 		return err
 	}
 
-	return v.proposalBlock(b, nil, onCommitState, onAbortState, nil, nil, nil)
+	var (
+		staticFeesCfg = v.txExecutorBackend.Config.StaticFeeConfig
+		upgrades      = v.txExecutorBackend.Config.UpgradeConfig
+		feeCalculator = fee.NewStaticCalculator(staticFeesCfg, upgrades, onCommitState.GetTimestamp())
+	)
+	return v.proposalBlock(b, nil, onCommitState, onAbortState, feeCalculator, nil, nil, nil)
 }
 
 func (v *verifier) ApricotStandardBlock(b *block.ApricotStandardBlock) error {
@@ -166,7 +186,12 @@ func (v *verifier) ApricotStandardBlock(b *block.ApricotStandardBlock) error {
 		return err
 	}
 
-	return v.standardBlock(b, onAcceptState)
+	var (
+		staticFeesCfg = v.txExecutorBackend.Config.StaticFeeConfig
+		upgrades      = v.txExecutorBackend.Config.UpgradeConfig
+		feeCalculator = fee.NewStaticCalculator(staticFeesCfg, upgrades, onAcceptState.GetTimestamp())
+	)
+	return v.standardBlock(b, feeCalculator, onAcceptState)
 }
 
 func (v *verifier) ApricotAtomicBlock(b *block.ApricotAtomicBlock) error {
@@ -332,6 +357,9 @@ func (v *verifier) abortBlock(b block.Block) error {
 		statelessBlock: b,
 		onAcceptState:  onAbortState,
 		timestamp:      onAbortState.GetTimestamp(),
+
+		// blockComplexity not set. We'll assign same complexity
+		// as proposal blocks upon acceptance
 	}
 	return nil
 }
@@ -349,6 +377,9 @@ func (v *verifier) commitBlock(b block.Block) error {
 		statelessBlock: b,
 		onAcceptState:  onCommitState,
 		timestamp:      onCommitState.GetTimestamp(),
+
+		// blockComplexity not set. We'll assign same complexity
+		// as proposal blocks upon acceptance
 	}
 	return nil
 }
@@ -359,11 +390,11 @@ func (v *verifier) proposalBlock(
 	onDecisionState state.Diff,
 	onCommitState state.Diff,
 	onAbortState state.Diff,
+	feeCalculator *fee.Calculator,
 	inputs set.Set[ids.ID],
 	atomicRequests map[ids.ID]*atomic.Requests,
 	onAcceptFunc func(),
 ) error {
-	feeCalculator := fee.NewStaticCalculator(v.txExecutorBackend.Config.StaticFeeConfig, v.txExecutorBackend.Config.UpgradeConfig, onCommitState.GetTimestamp())
 	txExecutor := executor.ProposalTxExecutor{
 		OnCommitState: onCommitState,
 		OnAbortState:  onAbortState,
@@ -408,9 +439,10 @@ func (v *verifier) proposalBlock(
 // standardBlock populates the state of this block if [nil] is returned
 func (v *verifier) standardBlock(
 	b *block.ApricotStandardBlock,
+	feeCalculator *fee.Calculator,
 	onAcceptState state.Diff,
 ) error {
-	inputs, atomicRequests, onAcceptFunc, err := v.processStandardTxs(b.Transactions, onAcceptState, b.Parent())
+	inputs, atomicRequests, onAcceptFunc, err := v.processStandardTxs(b.Transactions, feeCalculator, onAcceptState, b.Parent())
 	if err != nil {
 		return err
 	}
@@ -431,20 +463,19 @@ func (v *verifier) standardBlock(
 	return nil
 }
 
-func (v *verifier) processStandardTxs(txs []*txs.Tx, state state.Diff, parentID ids.ID) (
+func (v *verifier) processStandardTxs(txs []*txs.Tx, feeCalculator *fee.Calculator, state state.Diff, parentID ids.ID) (
 	set.Set[ids.ID],
 	map[ids.ID]*atomic.Requests,
 	func(),
 	error,
 ) {
 	var (
-		feeCalculator = fee.NewStaticCalculator(v.txExecutorBackend.Config.StaticFeeConfig, v.txExecutorBackend.Config.UpgradeConfig, state.GetTimestamp())
-
 		onAcceptFunc   func()
 		inputs         set.Set[ids.ID]
 		funcs          = make([]func(), 0, len(txs))
 		atomicRequests = make(map[ids.ID]*atomic.Requests)
 	)
+
 	for _, tx := range txs {
 		txExecutor := executor.StandardTxExecutor{
 			Backend:       v.txExecutorBackend,

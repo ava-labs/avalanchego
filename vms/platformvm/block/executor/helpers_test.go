@@ -280,9 +280,11 @@ func addSubnet(env *environment) {
 	if err != nil {
 		panic(err)
 	}
+	feeCalculator, err := state.PickFeeCalculator(env.config, stateDiff)
+	if err != nil {
+		panic(err)
+	}
 
-	cfg := env.config
-	feeCalculator := fee.NewStaticCalculator(cfg.StaticFeeConfig, cfg.UpgradeConfig, stateDiff.GetTimestamp())
 	executor := executor.StandardTxExecutor{
 		Backend:       env.backend,
 		State:         stateDiff,
@@ -296,6 +298,9 @@ func addSubnet(env *environment) {
 
 	stateDiff.AddTx(testSubnet1, status.Committed)
 	if err := stateDiff.Apply(env.state); err != nil {
+		panic(err)
+	}
+	if err := env.state.Commit(); err != nil {
 		panic(err)
 	}
 }

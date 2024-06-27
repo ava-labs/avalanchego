@@ -14,7 +14,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 	"github.com/ava-labs/avalanchego/vms/platformvm/validators"
 )
@@ -143,7 +142,11 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 		return err
 	}
 
-	feeCalculator := fee.NewStaticCalculator(m.txExecutorBackend.Config.StaticFeeConfig, m.txExecutorBackend.Config.UpgradeConfig, nextBlkTime)
+	feeCalculator, err := state.PickFeeCalculator(m.txExecutorBackend.Config, stateDiff)
+	if err != nil {
+		return err
+	}
+
 	return tx.Unsigned.Visit(&executor.StandardTxExecutor{
 		Backend:       m.txExecutorBackend,
 		State:         stateDiff,

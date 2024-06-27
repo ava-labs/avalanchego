@@ -22,7 +22,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
@@ -332,13 +331,15 @@ func packBlockTxs(
 		return nil, err
 	}
 
-	var (
-		feeCalculator = fee.NewStaticCalculator(backend.Config.StaticFeeConfig, backend.Config.UpgradeConfig, timestamp)
+	feeCalculator, err := state.PickFeeCalculator(backend.Config, stateDiff)
+	if err != nil {
+		return nil, err
+	}
 
+	var (
 		blockTxs []*txs.Tx
 		inputs   set.Set[ids.ID]
 	)
-
 	for {
 		tx, exists := mempool.Peek()
 		if !exists {

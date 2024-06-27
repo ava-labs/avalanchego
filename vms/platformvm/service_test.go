@@ -38,7 +38,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
@@ -376,10 +375,9 @@ func TestGetBalance(t *testing.T) {
 	require := require.New(t)
 	service, _, _ := defaultService(t)
 
-	var (
-		feeCalc            = fee.NewStaticCalculator(service.vm.Config.StaticFeeConfig, service.vm.Config.UpgradeConfig, service.vm.clock.Time())
-		createSubnetFee, _ = feeCalc.CalculateFee(&txs.CreateSubnetTx{}, nil)
-	)
+	feeCalc, err := state.PickFeeCalculator(&service.vm.Config, service.vm.state)
+	require.NoError(err)
+	createSubnetFee, _ := feeCalc.CalculateFee(&txs.CreateSubnetTx{}, nil)
 
 	// Ensure GetStake is correct for each of the genesis validators
 	genesis, _ := defaultGenesis(t, service.vm.ctx.AVAXAssetID)
