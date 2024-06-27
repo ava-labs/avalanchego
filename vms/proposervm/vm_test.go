@@ -2871,7 +2871,9 @@ func TestOnlyPreferredOptionPersisted(t *testing.T) {
 			},
 		},
 	}
-	vm := New(innerVM, Config{})
+	vm := New(innerVM, Config{
+		Registerer: prometheus.NewRegistry(),
+	})
 
 	blk0 := &snowmantest.Block{}
 
