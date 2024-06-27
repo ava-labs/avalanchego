@@ -2794,7 +2794,9 @@ func TestProposerVMInitialPreference(t *testing.T) {
 			chainCtx := snowtest.Context(t, ids.GenerateTestID())
 			db := memdb.New()
 
-			vm := New(innerVM, Config{})
+			vm := New(innerVM, Config{
+				Registerer: prometheus.NewRegistry(),
+			})
 			require.NoError(vm.Initialize(
 				ctx,
 				chainCtx,
@@ -2814,7 +2816,9 @@ func TestProposerVMInitialPreference(t *testing.T) {
 
 			require.NoError(vm.Shutdown(ctx))
 
-			vm = New(innerVM, Config{})
+			vm = New(innerVM, Config{
+				Registerer: prometheus.NewRegistry(),
+			})
 			require.NoError(vm.Initialize(
 				ctx,
 				chainCtx,
