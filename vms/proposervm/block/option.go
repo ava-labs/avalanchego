@@ -5,6 +5,7 @@ package block
 
 import (
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
@@ -44,4 +45,8 @@ func (b *option) initialize(bytes []byte) error {
 
 func (*option) verify(ids.ID) error {
 	return nil
+}
+
+func (b *option) VerifySignature(pk *bls.PublicKey, parentVRFSig []byte) bool {
+	return true
 }

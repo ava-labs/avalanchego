@@ -10,6 +10,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/staking"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
@@ -27,6 +28,7 @@ type Block interface {
 	ParentID() ids.ID
 	Block() []byte
 	Bytes() []byte
+	VerifySignature(*bls.PublicKey, []byte) bool
 
 	initializeID() error
 	initialize(bytes []byte) error
@@ -154,4 +156,8 @@ func (b *statelessBlock) Timestamp() time.Time {
 
 func (b *statelessBlock) Proposer() ids.NodeID {
 	return b.proposer
+}
+
+func (b *statelessBlock) VerifySignature(pk *bls.PublicKey, parentVRFSig []byte) bool {
+	return pk == nil
 }

@@ -9,6 +9,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/staking"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
@@ -52,6 +53,10 @@ func (b *statelessBlockV0) Bytes() []byte {
 
 func (b *statelessBlockV0) VRFSig() []byte {
 	return nil
+}
+
+func (b *statelessBlockV0) VerifySignature(pk *bls.PublicKey, parentVRFSig []byte) bool {
+	return pk == nil
 }
 
 func (b *statelessBlockV0) initializeID() error {
