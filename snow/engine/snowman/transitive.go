@@ -827,12 +827,10 @@ func (t *Transitive) issue(
 		issuedMetric: issuedMetric,
 	}
 
-	// block on the parent if needed
-	var (
-		parentID = blk.Parent()
-		deps     []ids.ID
-	)
-	if parent, err := t.getBlock(ctx, parentID); err != nil || !(t.isDecided(parent) || t.Consensus.Processing(parentID)) {
+	// We know that shouldIssueBlock(blk) is true. This means that parent is
+	// either the last accepted block or is not decided.
+	var deps []ids.ID
+	if parentID := blk.Parent(); !t.canIssueChildOn(parentID) {
 		t.Ctx.Log.Verbo("block waiting for parent to be issued",
 			zap.Stringer("blkID", blkID),
 			zap.Stringer("parentID", parentID),
