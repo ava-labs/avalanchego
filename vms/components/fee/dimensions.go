@@ -42,10 +42,10 @@ func Add(lhs, rhs Dimensions) (Dimensions, error) {
 	return res, nil
 }
 
-func ScalarProd(lhs, rhs Dimensions) (Gas, error) {
+func ToGas(weights, dimensions Dimensions) (Gas, error) {
 	var res uint64
 	for i := 0; i < FeeDimensions; i++ {
-		v, err := safemath.Mul64(lhs[i], rhs[i])
+		v, err := safemath.Mul64(weights[i], dimensions[i])
 		if err != nil {
 			return ZeroGas, err
 		}

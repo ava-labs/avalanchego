@@ -260,7 +260,7 @@ func (c *dynamicCalculator) addFeesFor(complexity fee.Dimensions) (uint64, error
 	if err != nil {
 		return 0, fmt.Errorf("failed adding fees: %w", err)
 	}
-	txGas, err := fee.ScalarProd(complexity, feeCfg.FeeDimensionWeights)
+	txGas, err := fee.ToGas(feeCfg.FeeDimensionWeights, complexity)
 	if err != nil {
 		return 0, fmt.Errorf("failed adding fees: %w", err)
 	}
@@ -286,7 +286,7 @@ func (c *dynamicCalculator) removeFeesFor(unitsToRm fee.Dimensions) (uint64, err
 	if err != nil {
 		return 0, fmt.Errorf("failed adding fees: %w", err)
 	}
-	txGas, err := fee.ScalarProd(unitsToRm, feeCfg.FeeDimensionWeights)
+	txGas, err := fee.ToGas(feeCfg.FeeDimensionWeights, unitsToRm)
 	if err != nil {
 		return 0, fmt.Errorf("failed adding fees: %w", err)
 	}

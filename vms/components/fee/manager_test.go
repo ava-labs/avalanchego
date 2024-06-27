@@ -132,7 +132,7 @@ func TestPChainGasPriceIncreaseDueToPeak(t *testing.T) {
 		parentBlkData := blockComplexities[i-1]
 		childBlkData := blockComplexities[i]
 
-		excessGas, err := ScalarProd(testDynamicFeeCfg.FeeDimensionWeights, parentBlkData.complexity)
+		excessGas, err := ToGas(testDynamicFeeCfg.FeeDimensionWeights, parentBlkData.complexity)
 		require.NoError(err)
 
 		m, err := NewUpdatedManager(
@@ -155,7 +155,7 @@ func TestPChainGasPriceIncreaseDueToPeak(t *testing.T) {
 		)
 
 		// at peak the total fee should be no more than 100 Avax.
-		childGas, err := ScalarProd(testDynamicFeeCfg.FeeDimensionWeights, childBlkData.complexity)
+		childGas, err := ToGas(testDynamicFeeCfg.FeeDimensionWeights, childBlkData.complexity)
 		require.NoError(err)
 
 		fee, err := m.CalculateFee(childGas)
@@ -167,7 +167,7 @@ func TestPChainGasPriceIncreaseDueToPeak(t *testing.T) {
 
 	// OFF PEAK
 	offPeakBlkComplexity := Dimensions{1473, 510, 510, 5000}
-	offPeakGas, err := ScalarProd(testDynamicFeeCfg.FeeDimensionWeights, offPeakBlkComplexity)
+	offPeakGas, err := ToGas(testDynamicFeeCfg.FeeDimensionWeights, offPeakBlkComplexity)
 	require.NoError(err)
 
 	elapsedTime := time.Unix(1615238881, 0).Sub(time.Unix(1615237936, 0))
