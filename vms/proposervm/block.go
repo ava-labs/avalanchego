@@ -40,6 +40,7 @@ var (
 	errProposerMismatch         = errors.New("proposer mismatch")
 	errProposersNotActivated    = errors.New("proposers haven't been activated yet")
 	errPChainHeightTooLow       = errors.New("block P-chain height is too low")
+	errInvalidVRFSignature      = errors.New("invalid signature")
 )
 
 type Block interface {

@@ -33,7 +33,7 @@ func BuildUnsigned(
 	// signature only if it presents. Otherwise, we'll keep it empty.
 	if len(parentBlockSig) == 0 {
 		// no parent block signature.
-		// in this case, we won't start the signature series but wait until we we have a proposer that have a BLS key ( see BuildSigned ).
+		// in this case, we won't start the signature series but wait until a proposer that have a BLS key propose a block ( see BuildSigned ).
 	} else {
 		// previous block had a valid signature, hash that signature.
 		sigParentBlockSig = hashing.ComputeHash160(parentBlockSig)
@@ -74,8 +74,7 @@ func marshalBlock(block *statelessBlock) ([]byte, error) {
 				Block:        block.StatelessBlock.Block,
 			},
 		}
-		var blockIntf SignedBlock = preBlockSigBlock
-		return Codec.Marshal(CodecVersion, &blockIntf)
+		return Codec.Marshal(CodecVersion, &preBlockSigBlock)
 	}
 	var blockIntf SignedBlock = block
 	return Codec.Marshal(CodecVersion, &blockIntf)

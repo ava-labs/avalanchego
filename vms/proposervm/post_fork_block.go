@@ -132,6 +132,12 @@ func (*postForkBlock) verifyPreForkChild(context.Context, *preForkBlock) error {
 func (b *postForkBlock) verifyPostForkChild(ctx context.Context, child *postForkBlock) error {
 	parentTimestamp := b.Timestamp()
 	parentPChainHeight := b.PChainHeight()
+
+	// verify that the VRFSig was generated correctly.
+	if !b.SignedBlock.VerifySignature(nil, nil) {
+		return errInvalidVRFSignature
+	}
+
 	return b.postForkCommonComponents.Verify(
 		ctx,
 		parentTimestamp,

@@ -51,7 +51,7 @@ func (b *statelessBlockV0) Bytes() []byte {
 	return b.bytes
 }
 
-func (b *statelessBlockV0) VRFSig() []byte {
+func (_ *statelessBlockV0) VRFSig() []byte {
 	return nil
 }
 

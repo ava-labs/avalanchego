@@ -541,12 +541,6 @@ func (vm *VM) parsePostForkBlock(ctx context.Context, b []byte) (PostForkBlock, 
 		return nil, err
 	}
 
-	// verify that the VRFSig was generated correctly.
-	statelessBlock.
-	if !statelessBlock.VerifySignature() {
-		return
-	}
-
 	innerBlkBytes := statelessBlock.Block()
 	innerBlk, err := vm.parseInnerBlock(ctx, blkID, innerBlkBytes)
 	if err != nil {
