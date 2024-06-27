@@ -2600,7 +2600,6 @@ func TestBlockDecision(t *testing.T) {
 			},
 		}
 
-		config := Config{}
 		chainID := ids.GenerateTestID()
 		chainCtx := snowtest.Context(t, chainID)
 		chainCtx.ValidatorState = &validators.TestState{
@@ -2617,7 +2616,9 @@ func TestBlockDecision(t *testing.T) {
 
 		db := memdb.New()
 
-		proposerVM := New(vm, config)
+		proposerVM := New(vm, Config{
+			Registerer: prometheus.NewRegistry(),
+		})
 		require.NoError(proposerVM.Initialize(
 			ctx,
 			chainCtx,
@@ -2656,7 +2657,9 @@ func TestBlockDecision(t *testing.T) {
 		require.NoError(proposerVM.Shutdown(ctx))
 
 		// Restart the VM
-		proposerVM = New(vm, config)
+		proposerVM = New(vm, Config{
+			Registerer: prometheus.NewRegistry(),
+		})
 		require.NoError(proposerVM.Initialize(
 			ctx,
 			chainCtx,
