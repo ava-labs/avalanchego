@@ -257,7 +257,7 @@ func (t *Transitive) Put(ctx context.Context, nodeID ids.NodeID, requestID uint3
 		issuedMetric = t.metrics.issued.WithLabelValues(unknownSource)
 	}
 
-	if t.wasIssued(blk) {
+	if !t.shouldIssueBlock(blk) {
 		t.metrics.numUselessPutBytes.Add(float64(len(blkBytes)))
 	}
 
@@ -335,7 +335,7 @@ func (t *Transitive) PushQuery(ctx context.Context, nodeID ids.NodeID, requestID
 		return nil
 	}
 
-	if t.wasIssued(blk) {
+	if !t.shouldIssueBlock(blk) {
 		t.metrics.numUselessPushQueryBytes.Add(float64(len(blkBytes)))
 	}
 
@@ -737,7 +737,7 @@ func (t *Transitive) issueFrom(
 ) error {
 	// issue [blk] and its ancestors to consensus.
 	blkID := blk.ID()
-	for !t.wasIssued(blk) {
+	for t.shouldIssueBlock(blk) {
 		err := t.issue(ctx, nodeID, blk, false, issuedMetric)
 		if err != nil {
 			return err
@@ -775,7 +775,7 @@ func (t *Transitive) issueWithAncestors(
 ) error {
 	blkID := blk.ID()
 	// issue [blk] and its ancestors into consensus
-	for !t.wasIssued(blk) {
+	for t.shouldIssueBlock(blk) {
 		err := t.issue(ctx, t.Ctx.NodeID, blk, true, issuedMetric)
 		if err != nil {
 			return err
@@ -796,14 +796,6 @@ func (t *Transitive) issueWithAncestors(
 	// If the block wasn't already issued, we have no reason to expect that it
 	// will be able to be issued.
 	return t.blocked.Abandon(ctx, blkID)
-}
-
-// If the block has been decided, then it is marked as having been issued.
-// If the block is processing, then it was issued.
-// If the block is queued to be added to consensus, then it was issued.
-func (t *Transitive) wasIssued(blk snowman.Block) bool {
-	blkID := blk.ID()
-	return t.isDecided(blk) || t.Consensus.Processing(blkID) || t.pendingContains(blkID)
 }
 
 // Issue [blk] to consensus once its ancestors have been issued.
@@ -1044,12 +1036,6 @@ func (t *Transitive) deliver(
 	return nil
 }
 
-// Returns true if the block whose ID is [blkID] is waiting to be issued to consensus
-func (t *Transitive) pendingContains(blkID ids.ID) bool {
-	_, ok := t.pending[blkID]
-	return ok
-}
-
 func (t *Transitive) addToNonVerifieds(blk snowman.Block) {
 	// don't add this blk if it's decided or processing.
 	blkID := blk.ID()
@@ -1157,6 +1143,30 @@ func (t *Transitive) getProcessingAncestor(ctx context.Context, initialVote ids.
 
 		bubbledVote = blk.Parent()
 	}
+}
+
+// shouldIssueBlock returns true if the provided block should be enqueued for
+// issuance. If the block is already decided, already enqueued, or has already
+// been issued, this function will return false.
+func (t *Transitive) shouldIssueBlock(blk snowman.Block) bool {
+	height := blk.Height()
+	lastAcceptedID, lastAcceptedHeight := t.Consensus.LastAccepted()
+	if height <= lastAcceptedHeight {
+		return false // block is either accepted or rejected
+	}
+
+	// This is guaranteed not to underflow because the above check ensures
+	// [height] > 0.
+	parentHeight := height - 1
+	parentID := blk.Parent()
+	if parentHeight == lastAcceptedHeight && parentID != lastAcceptedID {
+		return false // the parent was rejected
+	}
+
+	blkID := blk.ID()
+	_, isPending := t.pending[blkID]
+	return !isPending && // If the block is already pending, don't issue it again.
+		!t.Consensus.Processing(blkID) // If the block was previously issued, don't issue it again.
 }
 
 // canDependOn reports true if it is guaranteed for the provided block ID to
