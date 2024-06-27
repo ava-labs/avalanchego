@@ -104,8 +104,8 @@ type Peer interface {
 	// guaranteed not to be delivered to the peer.
 	Send(ctx context.Context, msg message.OutboundMessage) bool
 
-	// StartSendGetPeerList attempts to send a GetPeerList message to this peer
-	// on this peer's gossip routine. It is not guaranteed that a GetPeerList
+	// StartSendGetPeerList attempts to send a GetPeers message to this peer
+	// on this peer's gossip routine. It is not guaranteed that a GetPeers
 	// will be sent.
 	StartSendGetPeerList()
 
@@ -170,7 +170,7 @@ type peer struct {
 
 	// True if the peer:
 	// * Has sent us a Handshake message
-	// * Has sent us a PeerList message
+	// * Has sent us a Peers message
 	// * Is running a compatible version
 	// Only modified on the connection's reader routine.
 	finishedHandshake utils.Atomic[bool]
@@ -193,7 +193,7 @@ type peer struct {
 	// Must only be accessed atomically
 	lastSent, lastReceived int64
 
-	// getPeerListChan signals that we should attempt to send a GetPeerList to
+	// getPeerListChan signals that we should attempt to send a GetPeers to
 	// this peer
 	getPeerListChan chan struct{}
 }
@@ -643,7 +643,7 @@ func (p *peer) sendNetworkMessages() {
 		select {
 		case <-p.getPeerListChan:
 			knownPeersFilter, knownPeersSalt := p.Config.Network.KnownPeers()
-			msg, err := p.Config.MessageCreator.GetPeerList(knownPeersFilter, knownPeersSalt)
+			msg, err := p.Config.MessageCreator.GetPeers(knownPeersFilter, knownPeersSalt)
 			if err != nil {
 				p.Log.Error(failedToCreateMessageLog,
 					zap.Stringer("nodeID", p.id),
@@ -1117,7 +1117,7 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 
 	// We bypass throttling here to ensure that the handshake message is
 	// acknowledged correctly.
-	peerListMsg, err := p.Config.MessageCreator.PeerList(peerIPs, true /*=bypassThrottling*/)
+	peerListMsg, err := p.Config.MessageCreator.Peers(peerIPs, true /*=bypassThrottling*/)
 	if err != nil {
 		p.Log.Error(failedToCreateMessageLog,
 			zap.Stringer("nodeID", p.id),
@@ -1185,7 +1185,7 @@ func (p *peer) handleGetPeerList(msg *p2p.GetPeerList) {
 
 	// Bypass throttling is disabled here to follow the non-handshake message
 	// sending pattern.
-	peerListMsg, err := p.Config.MessageCreator.PeerList(peerIPs, false /*=bypassThrottling*/)
+	peerListMsg, err := p.Config.MessageCreator.Peers(peerIPs, false /*=bypassThrottling*/)
 	if err != nil {
 		p.Log.Error(failedToCreateMessageLog,
 			zap.Stringer("nodeID", p.id),

@@ -37,12 +37,12 @@ type OutboundMsgBuilder interface {
 		knownPeersSalt []byte,
 	) (OutboundMessage, error)
 
-	GetPeerList(
+	GetPeers(
 		knownPeersFilter []byte,
 		knownPeersSalt []byte,
 	) (OutboundMessage, error)
 
-	PeerList(
+	Peers(
 		peers []*ips.ClaimedIPPort,
 		bypassThrottling bool,
 	) (OutboundMessage, error)
@@ -279,7 +279,7 @@ func (b *outMsgBuilder) Handshake(
 	)
 }
 
-func (b *outMsgBuilder) GetPeerList(
+func (b *outMsgBuilder) GetPeers(
 	knownPeersFilter []byte,
 	knownPeersSalt []byte,
 ) (OutboundMessage, error) {
@@ -299,7 +299,7 @@ func (b *outMsgBuilder) GetPeerList(
 	)
 }
 
-func (b *outMsgBuilder) PeerList(peers []*ips.ClaimedIPPort, bypassThrottling bool) (OutboundMessage, error) {
+func (b *outMsgBuilder) Peers(peers []*ips.ClaimedIPPort, bypassThrottling bool) (OutboundMessage, error) {
 	claimIPPorts := make([]*p2p.ClaimedIpPort, len(peers))
 	for i, p := range peers {
 		// TODO: Use .AsSlice() after v1.12.x activates.

@@ -98,7 +98,7 @@ func newMetrics(
 		}),
 		numUselessPeerListBytes: prometheus.NewCounter(prometheus.CounterOpts{
 			Name: "num_useless_peerlist_bytes",
-			Help: "Amount of useless bytes (i.e. information about nodes we already knew/don't want to connect to) received in PeerList messages",
+			Help: "Amount of useless bytes (i.e. information about nodes we already knew/don't want to connect to) received in Peers messages",
 		}),
 		inboundConnRateLimited: prometheus.NewCounter(prometheus.CounterOpts{
 			Name: "inbound_conn_throttler_rate_limited",
