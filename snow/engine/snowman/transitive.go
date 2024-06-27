@@ -534,7 +534,7 @@ func (t *Transitive) Start(ctx context.Context, startReqID uint32) error {
 
 	// Re-issue all blocks in the preferred chain into consensus if the
 	// preferred chain extends the last accepted block
-	if len(preferredChain) > 0 && preferredChain[0].Parent() == lastAcceptedID {
+	if len(preferredChain) > 0 && preferredChain[len(preferredChain)-1].Parent() == lastAcceptedID {
 		// reverse the preferred chain so the blocks are now in chronological order
 		slices.Reverse(preferredChain)
 
