@@ -709,9 +709,9 @@ func (t *Transitive) repoll(ctx context.Context) {
 	}
 }
 
-// issueFromByID attempts to issue the branch ending with a block [blkID] into consensus.
+// issueFromByID attempts to issue the branch ending with a block [blkID] into
+// consensus.
 // If we do not have [blkID], request it.
-// Returns true if the block is processing in consensus or is decided.
 func (t *Transitive) issueFromByID(
 	ctx context.Context,
 	nodeID ids.NodeID,
@@ -726,9 +726,9 @@ func (t *Transitive) issueFromByID(
 	return t.issueFrom(ctx, nodeID, blk, issuedMetric)
 }
 
-// issueFrom attempts to issue the branch ending with block [blkID] to consensus.
-// Returns true if the block is processing in consensus or is decided.
-// If a dependency is missing, request it from [vdr].
+// issueFrom attempts to issue the branch ending with block [blkID] to
+// consensus.
+// If a dependency is missing, it will be requested it from [nodeID].
 func (t *Transitive) issueFrom(
 	ctx context.Context,
 	nodeID ids.NodeID,
@@ -764,9 +764,10 @@ func (t *Transitive) issueFrom(
 	return nil
 }
 
-// issueWithAncestors attempts to issue the branch ending with [blk] to consensus.
-// Returns true if the block is processing in consensus or is decided.
-// If a dependency is missing and the dependency hasn't been requested, the issuance will be abandoned.
+// issueWithAncestors attempts to issue the branch ending with [blk] to
+// consensus.
+// If a dependency is missing and the dependency hasn't been requested, the
+// issuance will be abandoned.
 func (t *Transitive) issueWithAncestors(
 	ctx context.Context,
 	blk snowman.Block,
