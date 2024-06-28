@@ -421,7 +421,15 @@ func (v *verifier) proposalBlock(
 		return err
 	}
 
-	blkGas := feeCalculator.GetBlockGas()
+	blkGas, err := feeCalculator.GetBlockGas()
+	if err != nil {
+		return err
+	}
+	excessGas, err := feeCalculator.GetExcessGas()
+	if err != nil {
+		return err
+	}
+
 	if feeCalculator.IsEActive() {
 		nextGasCap := commonfee.UpdateGasCap(currentGasCap, blkGas)
 		onCommitState.SetCurrentGasCap(nextGasCap)
@@ -451,7 +459,7 @@ func (v *verifier) proposalBlock(
 		// always be the same as the Banff Proposal Block.
 		timestamp:      onAbortState.GetTimestamp(),
 		blockGas:       blkGas,
-		excessGas:      feeCalculator.GetExcessGas(),
+		excessGas:      excessGas,
 		atomicRequests: atomicRequests,
 	}
 	return nil
@@ -477,7 +485,15 @@ func (v *verifier) standardBlock(
 
 	blkID := b.ID()
 
-	blkGas := feeCalculator.GetBlockGas()
+	blkGas, err := feeCalculator.GetBlockGas()
+	if err != nil {
+		return err
+	}
+	excessGas, err := feeCalculator.GetExcessGas()
+	if err != nil {
+		return err
+	}
+
 	if feeCalculator.IsEActive() {
 		nextGasCap := commonfee.UpdateGasCap(currentGasCap, blkGas)
 		onAcceptState.SetCurrentGasCap(nextGasCap)
@@ -491,7 +507,7 @@ func (v *verifier) standardBlock(
 
 		timestamp:      onAcceptState.GetTimestamp(),
 		blockGas:       blkGas,
-		excessGas:      feeCalculator.GetExcessGas(),
+		excessGas:      excessGas,
 		inputs:         inputs,
 		atomicRequests: atomicRequests,
 	}
@@ -558,7 +574,11 @@ func (v *verifier) processStandardTxs(
 	}
 
 	if v.txExecutorBackend.Config.UpgradeConfig.IsEActivated(state.GetTimestamp()) {
-		state.SetExcessGas(feeCalculator.GetExcessGas())
+		excessGas, err := feeCalculator.GetExcessGas()
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		state.SetExcessGas(excessGas)
 	}
 
 	if numFuncs := len(funcs); numFuncs == 1 {
