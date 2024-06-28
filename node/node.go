@@ -81,9 +81,10 @@ import (
 	"github.com/ava-labs/avalanchego/vms/registry"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/runtime"
 
+	coreth "github.com/ava-labs/coreth/plugin/evm"
+
 	avmconfig "github.com/ava-labs/avalanchego/vms/avm/config"
 	platformconfig "github.com/ava-labs/avalanchego/vms/platformvm/config"
-	coreth "github.com/ava-labs/coreth/plugin/evm"
 )
 
 const (
@@ -604,14 +605,16 @@ func (n *Node) initNetworking(reg prometheus.Registerer) error {
 		}
 	}
 
+	n.onSufficientlyConnected = make(chan struct{})
 	if requiredConns := n.getRequiredConns(); requiredConns > 0 {
-		n.onSufficientlyConnected = make(chan struct{})
 		consensusRouter = &beaconManager{
 			Router:                  consensusRouter,
 			beacons:                 n.bootstrappers,
 			requiredConns:           int64(requiredConns),
 			onSufficientlyConnected: n.onSufficientlyConnected,
 		}
+	} else {
+		close(n.onSufficientlyConnected)
 	}
 
 	// add node configs to network config
@@ -701,26 +704,24 @@ func (n *Node) Dispatch() error {
 		n.Shutdown(1)
 	})
 
-	if requiredConns := n.getRequiredConns(); requiredConns > 0 {
-		// Log a warning if we aren't able to connect to a sufficient portion of
-		// nodes.
-		go func() {
-			timer := time.NewTimer(n.Config.BootstrapBeaconConnectionTimeout)
-			defer timer.Stop()
+	// Log a warning if we aren't able to connect to a sufficient portion of
+	// nodes.
+	go func() {
+		timer := time.NewTimer(n.Config.BootstrapBeaconConnectionTimeout)
+		defer timer.Stop()
 
-			select {
-			case <-timer.C:
-				if n.shuttingDown.Get() {
-					return
-				}
-				n.Log.Warn("failed to connect to bootstrap nodes",
-					zap.Stringer("bootstrappers", n.bootstrappers),
-					zap.Duration("duration", n.Config.BootstrapBeaconConnectionTimeout),
-				)
-			case <-n.onSufficientlyConnected:
+		select {
+		case <-timer.C:
+			if n.shuttingDown.Get() {
+				return
 			}
-		}()
-	}
+			n.Log.Warn("failed to connect to bootstrap nodes",
+				zap.Stringer("bootstrappers", n.bootstrappers),
+				zap.Duration("duration", n.Config.BootstrapBeaconConnectionTimeout),
+			)
+		case <-n.onSufficientlyConnected:
+		}
+	}()
 
 	// Add state sync nodes to the peer network
 	for i, peerIP := range n.Config.StateSyncIPs {
