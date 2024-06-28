@@ -401,7 +401,7 @@ type Node struct {
 	// we rate-limit them.
 	diskTargeter tracker.Targeter
 
-	// Fired when a sufficient amount of bootstrapper nodes are connected to
+	// Closed when a sufficient amount of bootstrap nodes are connected to
 	onSufficientlyConnected chan struct{}
 }
 
