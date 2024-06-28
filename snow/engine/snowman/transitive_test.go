@@ -3371,7 +3371,7 @@ func TestTransitiveStart(t *testing.T) {
 
 			var gotSetPreference *ids.ID
 
-			vm.SetPreferenceF = func(ctx context.Context, blkID ids.ID) error {
+			vm.SetPreferenceF = func(_ context.Context, blkID ids.ID) error {
 				if gotSetPreference != nil {
 					return fmt.Errorf("unexpected call to SetPreference: %s", blkID)
 				}
