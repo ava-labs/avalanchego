@@ -496,7 +496,7 @@ func (t *Transitive) Start(ctx context.Context, startReqID uint32) error {
 		preferredID = lastAcceptedID
 		preferredBlock = lastAccepted
 	} else {
-		preferredID, err := t.getInitialPreferenceVM.GetInitialPreference(ctx)
+		preferredID, err = t.getInitialPreferenceVM.GetInitialPreference(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to get initial preference: %w", err)
 		}
