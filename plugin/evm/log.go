@@ -71,15 +71,20 @@ func (c *CorethLogger) SetLogLevel(level string) error {
 
 // locationTrims are trimmed for display to avoid unwieldy log lines.
 var locationTrims = []string{
-	"coreth/",
+	"coreth",
 }
 
 func trimPrefixes(s string) string {
 	for _, prefix := range locationTrims {
 		idx := strings.LastIndex(s, prefix)
-		if idx >= 0 {
-			s = s[idx+len(prefix):]
+		if idx < 0 {
+			continue
 		}
+		slashIdx := strings.Index(s[idx:], "/")
+		if slashIdx < 0 || slashIdx+idx >= len(s)-1 {
+			continue
+		}
+		s = s[idx+slashIdx+1:]
 	}
 	return s
 }
