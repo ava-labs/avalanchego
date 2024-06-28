@@ -411,6 +411,11 @@ type Node struct {
  ******************************************************************************
  */
 
+func (n *Node) getRequiredConns() int {
+	numBootstrappers := n.bootstrappers.Count(constants.PrimaryNetworkID)
+	return (3*numBootstrappers + 3) / 4
+}
+
 // Initialize the networking layer.
 // Assumes [n.vdrs], [n.CPUTracker], and [n.CPUTargeter] have been initialized.
 func (n *Node) initNetworking(reg prometheus.Registerer) error {
@@ -599,10 +604,7 @@ func (n *Node) initNetworking(reg prometheus.Registerer) error {
 		}
 	}
 
-	numBootstrappers := n.bootstrappers.Count(constants.PrimaryNetworkID)
-	requiredConns := (3*numBootstrappers + 3) / 4
-
-	if requiredConns > 0 {
+	if requiredConns := n.getRequiredConns(); requiredConns > 0 {
 		n.onSufficientlyConnected = make(chan struct{})
 		consensusRouter = &beaconManager{
 			Router:                  consensusRouter,
@@ -699,6 +701,27 @@ func (n *Node) Dispatch() error {
 		n.Shutdown(1)
 	})
 
+	if requiredConns := n.getRequiredConns(); requiredConns > 0 {
+		// Log a warning if we aren't able to connect to a sufficient portion of
+		// nodes.
+		go func() {
+			timer := time.NewTimer(n.Config.BootstrapBeaconConnectionTimeout)
+			defer timer.Stop()
+
+			select {
+			case <-timer.C:
+				if n.shuttingDown.Get() {
+					return
+				}
+				n.Log.Warn("failed to connect to bootstrap nodes",
+					zap.Stringer("bootstrappers", n.bootstrappers),
+					zap.Duration("duration", n.Config.BootstrapBeaconConnectionTimeout),
+				)
+			case <-n.onSufficientlyConnected:
+			}
+		}()
+	}
+
 	// Add state sync nodes to the peer network
 	for i, peerIP := range n.Config.StateSyncIPs {
 		n.Net.ManuallyTrack(n.Config.StateSyncIDs[i], peerIP)
@@ -708,25 +731,6 @@ func (n *Node) Dispatch() error {
 	for _, bootstrapper := range n.Config.Bootstrappers {
 		n.Net.ManuallyTrack(bootstrapper.ID, bootstrapper.IP)
 	}
-
-	// Log a warning if we aren't able to connect to a sufficient portion of
-	// nodes.
-	go func() {
-		timer := time.NewTimer(n.Config.BootstrapBeaconConnectionTimeout)
-		defer timer.Stop()
-
-		select {
-		case <-timer.C:
-			if n.shuttingDown.Get() {
-				return
-			}
-			n.Log.Warn("failed to connect to bootstrap nodes",
-				zap.Stringer("bootstrappers", n.bootstrappers),
-				zap.Duration("duration", n.Config.BootstrapBeaconConnectionTimeout),
-			)
-		case <-n.onSufficientlyConnected:
-		}
-	}()
 
 	// Start P2P connections
 	err := n.Net.Dispatch()
