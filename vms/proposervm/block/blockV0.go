@@ -51,12 +51,12 @@ func (b *statelessBlockV0) Bytes() []byte {
 	return b.bytes
 }
 
-func (_ *statelessBlockV0) VRFSig() []byte {
+func (*statelessBlockV0) VRFSig() []byte {
 	return nil
 }
 
-func (b *statelessBlockV0) VerifySignature(pk *bls.PublicKey, parentVRFSig []byte) bool {
-	return pk == nil
+func (*statelessBlockV0) VerifySignature(pk *bls.PublicKey, parentVRFSig []byte, _ ids.ID, _ uint32) bool {
+	return pk == nil && len(parentVRFSig) == 0
 }
 
 func (b *statelessBlockV0) initializeID() error {

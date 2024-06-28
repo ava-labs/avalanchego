@@ -47,6 +47,6 @@ func (*option) verify(ids.ID) error {
 	return nil
 }
 
-func (b *option) VerifySignature(pk *bls.PublicKey, parentVRFSig []byte) bool {
+func (*option) VerifySignature(_ *bls.PublicKey, _ []byte, _ ids.ID, _ uint32) bool {
 	return true
 }

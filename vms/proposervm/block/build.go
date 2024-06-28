@@ -25,22 +25,7 @@ func BuildUnsigned(
 	parentBlockSig []byte,
 	blsSignKey *bls.SecretKey,
 ) (SignedBlock, error) {
-	var sigParentBlockSig []byte
-
-	sigParentBlockSig = nextBlockSignature(parentBlockSig, blsSignKey, chainID, networkID)
-
-	// if we need to build a block without having a BLS key, we'll be hashing the previous
-	// signature only if it presents. Otherwise, we'll keep it empty.
-	if len(parentBlockSig) == 0 {
-		// no parent block signature.
-		// in this case, we won't start the signature series but wait until a proposer that have a BLS key propose a block ( see BuildSigned ).
-	} else {
-		// previous block had a valid signature, hash that signature.
-		sigParentBlockSig = hashing.ComputeHash160(parentBlockSig)
-
-		// adjust the size of the hash to be as long as the parent signature ( which is a BLS signature length )
-		sigParentBlockSig = sigParentBlockSig[:len(parentBlockSig)]
-	}
+	sigParentBlockSig := nextBlockSignature(parentBlockSig, blsSignKey, chainID, networkID)
 
 	block := &statelessBlock{
 		StatelessBlock: statelessUnsignedBlock{
@@ -61,7 +46,10 @@ func BuildUnsigned(
 	return block, block.initialize(bytes)
 }
 
-// marshalBlock marshal the given block using the ideal encoder.
+// marshalBlock marshal the given statelessBlock by using either the default statelessBlock or
+// coping the exported fields into statelessBlockV0 and then marshaling it.
+// this allows the marsheler to produce encoded blocks that match the old style blocks as long as
+// the VRGSig feature was not enabled.
 func marshalBlock(block *statelessBlock) ([]byte, error) {
 	if len(block.StatelessBlock.VRFSig) == 0 {
 		// create a backward compatible block ( without SignedParentBlockSig ) and use the PreBlockSigCodecVersion encoder for the encoding.
@@ -97,6 +85,24 @@ func CalculateBootstrappingBlockSig(chainID ids.ID, networkID uint32) [hashing.H
 	return hashing.Hash256(buffer)
 }
 
+func nextHashBlockSignature(parentBlockSig []byte) []byte {
+	if len(parentBlockSig) == 0 {
+		return nil
+	}
+	// previous block had a valid signature, hash that signature.
+	sigParentBlockSig := hashing.ComputeHash256(parentBlockSig)
+
+	// as long as the signature length is too short, generate additional hashes.
+	for len(sigParentBlockSig) < len(parentBlockSig) {
+		sigParentBlockSig = append(sigParentBlockSig, hashing.ComputeHash256(sigParentBlockSig)...)
+	}
+
+	// adjust the size of the hash to be as long as the parent signature ( which is a BLS signature length )
+	sigParentBlockSig = sigParentBlockSig[:len(parentBlockSig)]
+
+	return sigParentBlockSig
+}
+
 func nextBlockSignature(parentBlockSig []byte, blsSignKey *bls.SecretKey, chainID ids.ID, networkID uint32) []byte {
 	if blsSignKey == nil {
 		// if we need to build a block without having a BLS key, we'll be hashing the previous
@@ -106,18 +112,7 @@ func nextBlockSignature(parentBlockSig []byte, blsSignKey *bls.SecretKey, chainI
 			return []byte{}
 		}
 
-		// previous block had a valid signature, hash that signature.
-		sigParentBlockSig := hashing.ComputeHash256(parentBlockSig)
-
-		// as long as the signature length is too short, generate additional hashes.
-		for len(sigParentBlockSig) < len(parentBlockSig) {
-			sigParentBlockSig = append(sigParentBlockSig, hashing.ComputeHash256(sigParentBlockSig)...)
-		}
-
-		// adjust the size of the hash to be as long as the parent signature ( which is a BLS signature length )
-		sigParentBlockSig = sigParentBlockSig[:len(parentBlockSig)]
-
-		return sigParentBlockSig
+		return nextHashBlockSignature(parentBlockSig)
 	}
 
 	// we have bls key

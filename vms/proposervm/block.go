@@ -225,6 +225,14 @@ func (p *postForkCommonComponents) buildChild(
 		return nil, err
 	}
 
+	// if the VRFSig haven't yet been activated, empty the parentBlockSig and blsSignKey.
+	// this would cause the newly generated block to have no VRFSig, which aligns with
+	// pre-VRFSig blocks.
+	if !p.vm.IsVRFSigActivated(newTimestamp) {
+		parentBlockSig = nil
+		blsSignKey = nil
+	}
+
 	var innerBlock snowman.Block
 	if p.vm.blockBuilderVM != nil {
 		innerBlock, err = p.vm.blockBuilderVM.BuildBlockWithContext(ctx, &smblock.Context{

@@ -133,9 +133,32 @@ func (b *postForkBlock) verifyPostForkChild(ctx context.Context, child *postFork
 	parentTimestamp := b.Timestamp()
 	parentPChainHeight := b.PChainHeight()
 
-	// verify that the VRFSig was generated correctly.
-	if !b.SignedBlock.VerifySignature(nil, nil) {
-		return errInvalidVRFSignature
+	if b.vm.Config.IsVRFSigActivated(child.Timestamp()) {
+		// get the validators set.
+		validatorSet, err := b.vm.ctx.ValidatorState.GetValidatorSet(ctx, child.PChainHeight(), child.vm.ctx.SubnetID)
+		if err != nil {
+			return err
+		}
+
+		// find out the proposer for this block.
+		childProposer := child.SignedBlock.Proposer()
+
+		// get the validator for this proposer
+		childValidator := validatorSet[childProposer]
+		if childValidator == nil {
+			return errProposersNotActivated
+		}
+
+		// verify that the VRFSig was generated correctly.
+		if !child.SignedBlock.VerifySignature(childValidator.PublicKey, b.SignedBlock.VRFSig(), b.vm.ctx.ChainID, b.vm.ctx.NetworkID) {
+			return errInvalidVRFSignature
+		}
+	} else {
+		// !b.vm.Config.IsVRFSigActivated(child.Timestamp())
+		// if the VRFSig has yet to be activated, verify that the VRF signature isn't there.
+		if len(child.SignedBlock.VRFSig()) != 0 {
+			return errInvalidVRFSignature
+		}
 	}
 
 	return b.postForkCommonComponents.Verify(

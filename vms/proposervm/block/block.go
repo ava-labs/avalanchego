@@ -4,6 +4,7 @@
 package block
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"time"
@@ -28,7 +29,7 @@ type Block interface {
 	ParentID() ids.ID
 	Block() []byte
 	Bytes() []byte
-	VerifySignature(*bls.PublicKey, []byte) bool
+	VerifySignature(*bls.PublicKey, []byte, ids.ID, uint32) bool
 
 	initializeID() error
 	initialize(bytes []byte) error
@@ -158,6 +159,29 @@ func (b *statelessBlock) Proposer() ids.NodeID {
 	return b.proposer
 }
 
-func (b *statelessBlock) VerifySignature(pk *bls.PublicKey, parentVRFSig []byte) bool {
-	return pk == nil
+func (b *statelessBlock) VerifySignature(pk *bls.PublicKey, parentVRFSig []byte, chainID ids.ID, networkID uint32) bool {
+	if pk == nil {
+		// proposer doesn't have a BLS key.
+		if len(parentVRFSig) == 0 {
+			// parent block had no VRF Signature.
+			// in this case, we verify that the current signature is empty.
+			return len(b.StatelessBlock.VRFSig) == 0
+		}
+		// parent block had VRF Signature.
+		expectedSignature := nextHashBlockSignature(parentVRFSig)
+		return bytes.Equal(expectedSignature, b.StatelessBlock.VRFSig)
+	}
+
+	var sig bls.Signature
+	if sig.Deserialize(b.StatelessBlock.VRFSig) == nil {
+		return false
+	}
+
+	// proposer does have a BLS key.
+	if len(parentVRFSig) == 0 {
+		// parent block had no VRF Signature.
+		msgHash := CalculateBootstrappingBlockSig(chainID, networkID)
+		return bls.Verify(pk, &sig, msgHash[:])
+	}
+	return bls.Verify(pk, &sig, parentVRFSig[:])
 }
