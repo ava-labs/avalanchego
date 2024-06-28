@@ -69,7 +69,7 @@ func marshalBlock(block *statelessBlock) ([]byte, error) {
 	return Codec.Marshal(CodecVersion, &blockIntf)
 }
 
-func CalculateBootstrappingBlockSig(chainID ids.ID, networkID uint32) [hashing.HashLen]byte {
+func calculateBootstrappingBlockSig(chainID ids.ID, networkID uint32) [hashing.HashLen]byte {
 	// build the hash of the following struct:
 	// +-----------------------+----------+------------+
 	// |  prefix :             | [8]byte  | "rng-root" |
@@ -119,7 +119,7 @@ func nextBlockSignature(parentBlockSig []byte, blsSignKey *bls.SecretKey, chainI
 	// we have bls key
 	var signMsg []byte
 	if parentBlockSig == nil {
-		msgHash := CalculateBootstrappingBlockSig(chainID, networkID)
+		msgHash := calculateBootstrappingBlockSig(chainID, networkID)
 		signMsg = msgHash[:]
 	} else {
 		signMsg = parentBlockSig

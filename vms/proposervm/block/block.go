@@ -180,7 +180,7 @@ func (b *statelessBlock) VerifySignature(pk *bls.PublicKey, parentVRFSig []byte,
 	// proposer does have a BLS key.
 	if len(parentVRFSig) == 0 {
 		// parent block had no VRF Signature.
-		msgHash := CalculateBootstrappingBlockSig(chainID, networkID)
+		msgHash := calculateBootstrappingBlockSig(chainID, networkID)
 		return bls.Verify(pk, &sig, msgHash[:])
 	}
 	return bls.Verify(pk, &sig, parentVRFSig)
