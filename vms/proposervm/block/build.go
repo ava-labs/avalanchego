@@ -52,15 +52,16 @@ func BuildUnsigned(
 // the VRGSig feature was not enabled.
 func marshalBlock(block *statelessBlock) ([]byte, error) {
 	if len(block.StatelessBlock.VRFSig) == 0 {
-		// create a backward compatible block ( without SignedParentBlockSig ) and use the PreBlockSigCodecVersion encoder for the encoding.
+		// create a backward compatible block ( without VRFSig ) and use the statelessBlockV0 encoder for the encoding.
 		var preBlockSigBlock SignedBlock = &statelessBlockV0{
 			StatelessBlock: statelessUnsignedBlockV0{
 				ParentID:     block.StatelessBlock.ParentID,
 				Timestamp:    block.StatelessBlock.Timestamp,
 				PChainHeight: block.StatelessBlock.PChainHeight,
-				Certificate:  nil,
+				Certificate:  block.StatelessBlock.Certificate,
 				Block:        block.StatelessBlock.Block,
 			},
+			Signature: block.Signature,
 		}
 		return Codec.Marshal(CodecVersion, &preBlockSigBlock)
 	}

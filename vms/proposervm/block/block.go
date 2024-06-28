@@ -183,5 +183,5 @@ func (b *statelessBlock) VerifySignature(pk *bls.PublicKey, parentVRFSig []byte,
 		msgHash := CalculateBootstrappingBlockSig(chainID, networkID)
 		return bls.Verify(pk, &sig, msgHash[:])
 	}
-	return bls.Verify(pk, &sig, parentVRFSig[:])
+	return bls.Verify(pk, &sig, parentVRFSig)
 }

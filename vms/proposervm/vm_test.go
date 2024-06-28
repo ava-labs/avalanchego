@@ -2372,7 +2372,14 @@ func TestHistoricalBlockDeletion(t *testing.T) {
 			return defaultPChainHeight, nil
 		},
 		GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
-			return nil, nil
+			m := map[ids.NodeID]*validators.GetValidatorOutput{
+				ids.NodeIDFromCert(pTestCert): {
+					NodeID:    ids.NodeIDFromCert(pTestCert),
+					PublicKey: nil,
+					Weight:    1,
+				},
+			}
+			return m, nil
 		},
 	}
 
