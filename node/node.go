@@ -411,11 +411,6 @@ type Node struct {
  ******************************************************************************
  */
 
-func (n *Node) getRequiredConns() int {
-	numBootstrappers := n.bootstrappers.Count(constants.PrimaryNetworkID)
-	return (3*numBootstrappers + 3) / 4
-}
-
 // Initialize the networking layer.
 // Assumes [n.vdrs], [n.CPUTracker], and [n.CPUTargeter] have been initialized.
 func (n *Node) initNetworking(reg prometheus.Registerer) error {
@@ -605,7 +600,10 @@ func (n *Node) initNetworking(reg prometheus.Registerer) error {
 	}
 
 	n.onSufficientlyConnected = make(chan struct{})
-	if requiredConns := n.getRequiredConns(); requiredConns > 0 {
+	numBootstrappers := n.bootstrappers.Count(constants.PrimaryNetworkID)
+	requiredConns := (3*numBootstrappers + 3) / 4
+
+	if requiredConns > 0 {
 		consensusRouter = &beaconManager{
 			Router:                  consensusRouter,
 			beacons:                 n.bootstrappers,
