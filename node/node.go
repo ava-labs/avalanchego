@@ -400,6 +400,9 @@ type Node struct {
 	// Specifies how much disk usage each peer can cause before
 	// we rate-limit them.
 	diskTargeter tracker.Targeter
+
+	// Fired when a sufficient amount of bootstrapper nodes are connected to
+	onSufficientlyConnected chan struct{}
 }
 
 /*
@@ -600,32 +603,13 @@ func (n *Node) initNetworking(reg prometheus.Registerer) error {
 	requiredConns := (3*numBootstrappers + 3) / 4
 
 	if requiredConns > 0 {
-		onSufficientlyConnected := make(chan struct{})
+		n.onSufficientlyConnected = make(chan struct{})
 		consensusRouter = &beaconManager{
 			Router:                  consensusRouter,
 			beacons:                 n.bootstrappers,
 			requiredConns:           int64(requiredConns),
-			onSufficientlyConnected: onSufficientlyConnected,
+			onSufficientlyConnected: n.onSufficientlyConnected,
 		}
-
-		// Log a warning if we aren't able to connect to a sufficient portion of
-		// nodes.
-		go func() {
-			timer := time.NewTimer(n.Config.BootstrapBeaconConnectionTimeout)
-			defer timer.Stop()
-
-			select {
-			case <-timer.C:
-				if n.shuttingDown.Get() {
-					return
-				}
-				n.Log.Warn("failed to connect to bootstrap nodes",
-					zap.Stringer("bootstrappers", n.bootstrappers),
-					zap.Duration("duration", n.Config.BootstrapBeaconConnectionTimeout),
-				)
-			case <-onSufficientlyConnected:
-			}
-		}()
 	}
 
 	// add node configs to network config
@@ -724,6 +708,25 @@ func (n *Node) Dispatch() error {
 	for _, bootstrapper := range n.Config.Bootstrappers {
 		n.Net.ManuallyTrack(bootstrapper.ID, bootstrapper.IP)
 	}
+
+	// Log a warning if we aren't able to connect to a sufficient portion of
+	// nodes.
+	go func() {
+		timer := time.NewTimer(n.Config.BootstrapBeaconConnectionTimeout)
+		defer timer.Stop()
+
+		select {
+		case <-timer.C:
+			if n.shuttingDown.Get() {
+				return
+			}
+			n.Log.Warn("failed to connect to bootstrap nodes",
+				zap.Stringer("bootstrappers", n.bootstrappers),
+				zap.Duration("duration", n.Config.BootstrapBeaconConnectionTimeout),
+			)
+		case <-n.onSufficientlyConnected:
+		}
+	}()
 
 	// Start P2P connections
 	err := n.Net.Dispatch()
