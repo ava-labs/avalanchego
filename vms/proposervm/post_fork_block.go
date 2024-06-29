@@ -155,6 +155,12 @@ func (b *postForkBlock) verifyPostForkChild(ctx context.Context, child *postFork
 			if !child.SignedBlock.VerifySignature(childValidator.PublicKey, b.SignedBlock.VRFSig(), b.vm.ctx.ChainID, b.vm.ctx.NetworkID) {
 				return errInvalidVRFSignature
 			}
+		} else {
+			// in case it's an unsigned block, we would need to verify the hash.
+			// verify that the VRFSig was generated correctly.
+			if !child.SignedBlock.VerifySignature(nil, b.SignedBlock.VRFSig(), b.vm.ctx.ChainID, b.vm.ctx.NetworkID) {
+				return errInvalidVRFSignature
+			}
 		}
 	} else if len(child.SignedBlock.VRFSig()) != 0 {
 		// !b.vm.Config.IsVRFSigActivated(child.Timestamp())
