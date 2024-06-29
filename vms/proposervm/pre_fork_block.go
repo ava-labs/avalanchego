@@ -237,10 +237,7 @@ func (b *preForkBlock) buildChild(ctx context.Context, blsSignKey *bls.SecretKey
 		newTimestamp,
 		pChainHeight,
 		innerBlock.Bytes(),
-		b.vm.ctx.ChainID,
-		b.vm.ctx.NetworkID,
 		[]byte{}, // TODO : verify me
-		blsSignKey,
 	)
 	if err != nil {
 		return nil, err

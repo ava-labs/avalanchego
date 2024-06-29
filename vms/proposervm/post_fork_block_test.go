@@ -156,10 +156,7 @@ func TestBlockVerify_PostForkBlock_PreDurango_ParentChecks(t *testing.T) {
 			proVM.Time(),
 			pChainHeight,
 			childCoreBlk.Bytes(),
-			proVM.ctx.ChainID,
-			proVM.ctx.NetworkID,
 			[]byte{}, // parentBlockSig
-			proVM.StakingBLSKey,
 		)
 		require.NoError(err)
 		childBlk.SignedBlock = childSlb
@@ -175,10 +172,7 @@ func TestBlockVerify_PostForkBlock_PreDurango_ParentChecks(t *testing.T) {
 			proVM.Time(),
 			pChainHeight,
 			childCoreBlk.Bytes(),
-			proVM.ctx.ChainID,
-			proVM.ctx.NetworkID,
 			[]byte{}, // parentBlockSig
-			proVM.StakingBLSKey,
 		)
 		require.NoError(err)
 		childBlk.SignedBlock = childSlb
@@ -479,10 +473,7 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 			atSubWindowEnd,
 			pChainHeight,
 			childCoreBlk.Bytes(),
-			proVM.ctx.ChainID,
-			proVM.ctx.NetworkID,
 			[]byte{}, // parentBlockSig
-			proVM.StakingBLSKey,
 		)
 		require.NoError(err)
 		childBlk.SignedBlock = childSlb
@@ -786,10 +777,7 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 			nextTime,
 			parentBlkPChainHeight-1,
 			childCoreBlk.Bytes(),
-			proVM.ctx.ChainID,
-			proVM.ctx.NetworkID,
 			[]byte{}, // parentBlockSig
-			proVM.StakingBLSKey,
 		)
 		require.NoError(err)
 		childBlk.SignedBlock = childSlb
@@ -805,10 +793,7 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 			nextTime,
 			parentBlkPChainHeight,
 			childCoreBlk.Bytes(),
-			proVM.ctx.ChainID,
-			proVM.ctx.NetworkID,
 			[]byte{}, // parentBlockSig
-			proVM.StakingBLSKey,
 		)
 		require.NoError(err)
 		childBlk.SignedBlock = childSlb
@@ -823,10 +808,7 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 			nextTime,
 			parentBlkPChainHeight+1,
 			childCoreBlk.Bytes(),
-			proVM.ctx.ChainID,
-			proVM.ctx.NetworkID,
 			[]byte{}, // parentBlockSig
-			proVM.StakingBLSKey,
 		)
 		require.NoError(err)
 		childBlk.SignedBlock = childSlb
@@ -842,10 +824,7 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 			nextTime,
 			currPChainHeight,
 			childCoreBlk.Bytes(),
-			proVM.ctx.ChainID,
-			proVM.ctx.NetworkID,
 			[]byte{}, // parentBlockSig
-			proVM.StakingBLSKey,
 		)
 		require.NoError(err)
 		childBlk.SignedBlock = childSlb
@@ -860,10 +839,7 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 			nextTime,
 			currPChainHeight*2,
 			childCoreBlk.Bytes(),
-			proVM.ctx.ChainID,
-			proVM.ctx.NetworkID,
 			[]byte{}, // parentBlockSig
-			proVM.StakingBLSKey,
 		)
 		require.NoError(err)
 		childBlk.SignedBlock = childSlb
@@ -1198,10 +1174,7 @@ func TestBlockVerify_PostForkBlock_PChainTooLow(t *testing.T) {
 		snowmantest.GenesisTimestamp,
 		4,
 		coreBlk.Bytes(),
-		proVM.ctx.ChainID,
-		proVM.ctx.NetworkID,
 		[]byte{}, // parentBlockSig
-		proVM.StakingBLSKey,
 	)
 	require.NoError(err)
 

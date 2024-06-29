@@ -62,15 +62,11 @@ func TestBuildUnsigned(t *testing.T) {
 	timestamp := time.Unix(123, 0)
 	pChainHeight := uint64(2)
 	innerBlockBytes := []byte{3}
-	chainID := ids.ID{4}
-	networkID := uint32(5)
 	parentBlockSig := []byte{}
-	blsSignKey, err := bls.NewSecretKey()
 
 	require := require.New(t)
-	require.NoError(err)
 
-	builtBlock, err := BuildUnsigned(parentID, timestamp, pChainHeight, innerBlockBytes, chainID, networkID, parentBlockSig, blsSignKey)
+	builtBlock, err := BuildUnsigned(parentID, timestamp, pChainHeight, innerBlockBytes, parentBlockSig)
 	require.NoError(err)
 
 	require.Equal(parentID, builtBlock.ParentID())

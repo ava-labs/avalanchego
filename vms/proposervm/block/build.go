@@ -20,12 +20,11 @@ func BuildUnsigned(
 	timestamp time.Time,
 	pChainHeight uint64,
 	blockBytes []byte,
-	chainID ids.ID,
-	networkID uint32,
 	parentBlockSig []byte,
-	blsSignKey *bls.SecretKey,
 ) (SignedBlock, error) {
-	sigParentBlockSig := nextBlockSignature(parentBlockSig, blsSignKey, chainID, networkID)
+	// in this case, we can't sign with BLS key, since we're not going to include the Certificate, which is required
+	// for the signature validation. Instead, we'll just hash the previous
+	sigParentBlockSig := nextHashBlockSignature(parentBlockSig)
 
 	block := &statelessBlock{
 		StatelessBlock: statelessUnsignedBlock{

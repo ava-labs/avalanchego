@@ -24,7 +24,7 @@ func TestParse(t *testing.T) {
 	innerBlockBytes := []byte{3}
 	chainID := ids.ID{4}
 	networkID := uint32(5)
-	parentBlockSig := []byte{}
+	parentBlockSig := []byte{1, 2, 3}
 	blsSignKey, err := bls.NewSecretKey()
 	require.NoError(t, err)
 
@@ -49,10 +49,10 @@ func TestParse(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	unsignedBlock, err := BuildUnsigned(parentID, timestamp, pChainHeight, innerBlockBytes, chainID, networkID, parentBlockSig, blsSignKey)
+	unsignedBlock, err := BuildUnsigned(parentID, timestamp, pChainHeight, innerBlockBytes, parentBlockSig)
 	require.NoError(t, err)
 
-	signedWithoutCertBlockIntf, err := BuildUnsigned(parentID, timestamp, pChainHeight, innerBlockBytes, chainID, networkID, parentBlockSig, blsSignKey)
+	signedWithoutCertBlockIntf, err := BuildUnsigned(parentID, timestamp, pChainHeight, innerBlockBytes, parentBlockSig)
 	require.NoError(t, err)
 	signedWithoutCertBlock := signedWithoutCertBlockIntf.(*statelessBlock)
 	signedWithoutCertBlock.Signature = []byte{5}

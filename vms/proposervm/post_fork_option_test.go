@@ -475,10 +475,7 @@ func TestOptionTimestampValidity(t *testing.T) {
 		oracleBlkTime,
 		0,
 		coreOracleBlk.Bytes(),
-		proVM.ctx.ChainID,
-		proVM.ctx.NetworkID,
 		[]byte{}, // parentBlockSig
-		proVM.StakingBLSKey,
 	)
 	require.NoError(err)
 
