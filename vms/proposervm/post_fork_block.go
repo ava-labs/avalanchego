@@ -133,10 +133,24 @@ func (b *postForkBlock) verifyPostForkChild(ctx context.Context, child *postFork
 	parentTimestamp := b.Timestamp()
 	parentPChainHeight := b.PChainHeight()
 
+	if err := b.verifyVRFSig(ctx, child); err != nil {
+		return err
+	}
+
+	return b.postForkCommonComponents.Verify(
+		ctx,
+		parentTimestamp,
+		parentPChainHeight,
+		child,
+	)
+}
+
+func (b *postForkBlock) verifyVRFSig(ctx context.Context, child *postForkBlock) error {
 	if b.vm.Config.IsVRFSigActivated(child.Timestamp()) {
 		// find out the proposer for this block.
 		childProposer := child.SignedBlock.Proposer()
 
+		var proposerPublicKey *bls.PublicKey
 		// if there is a known proposer. ( i.e. block was signed )
 		if childProposer != ids.EmptyNodeID {
 			// get the validators set.
@@ -151,29 +165,20 @@ func (b *postForkBlock) verifyPostForkChild(ctx context.Context, child *postFork
 				return errProposersNotActivated
 			}
 
-			// verify that the VRFSig was generated correctly.
-			if !child.SignedBlock.VerifySignature(childValidator.PublicKey, b.SignedBlock.VRFSig(), b.vm.ctx.ChainID, b.vm.ctx.NetworkID) {
-				return errInvalidVRFSignature
-			}
-		} else {
-			// in case it's an unsigned block, we would need to verify the hash.
-			// verify that the VRFSig was generated correctly.
-			if !child.SignedBlock.VerifySignature(nil, b.SignedBlock.VRFSig(), b.vm.ctx.ChainID, b.vm.ctx.NetworkID) {
-				return errInvalidVRFSignature
-			}
+			proposerPublicKey = childValidator.PublicKey
+
+		}
+		// verify that the VRFSig was generated correctly.
+		// ( this works for both signed and unsigned blocks ).
+		if !child.SignedBlock.VerifySignature(proposerPublicKey, b.SignedBlock.VRFSig(), b.vm.ctx.ChainID, b.vm.ctx.NetworkID) {
+			return errInvalidVRFSignature
 		}
 	} else if len(child.SignedBlock.VRFSig()) != 0 {
 		// !b.vm.Config.IsVRFSigActivated(child.Timestamp())
 		// if the VRFSig has yet to be activated, verify that the VRF signature isn't there.
 		return errInvalidVRFSignature
 	}
-
-	return b.postForkCommonComponents.Verify(
-		ctx,
-		parentTimestamp,
-		parentPChainHeight,
-		child,
-	)
+	return nil
 }
 
 func (b *postForkBlock) verifyPostForkOption(ctx context.Context, child *postForkOption) error {
