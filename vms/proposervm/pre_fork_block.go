@@ -186,7 +186,7 @@ func (*preForkBlock) verifyPostForkOption(context.Context, *postForkOption) erro
 	return errUnexpectedBlockType
 }
 
-func (b *preForkBlock) buildChild(ctx context.Context, blsSignKey *bls.SecretKey) (Block, error) {
+func (b *preForkBlock) buildChild(ctx context.Context, _ *bls.SecretKey) (Block, error) {
 	parentTimestamp := b.Timestamp()
 	if parentTimestamp.Before(b.vm.ActivationTime) {
 		// The chain hasn't forked yet

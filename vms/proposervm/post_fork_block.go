@@ -166,7 +166,6 @@ func (b *postForkBlock) verifyVRFSig(ctx context.Context, child *postForkBlock) 
 			}
 
 			proposerPublicKey = childValidator.PublicKey
-
 		}
 		// verify that the VRFSig was generated correctly.
 		// ( this works for both signed and unsigned blocks ).
