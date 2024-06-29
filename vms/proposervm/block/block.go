@@ -22,6 +22,7 @@ var (
 	errUnexpectedSignature        = errors.New("signature provided when none was expected")
 	errInvalidCertificate         = errors.New("invalid certificate")
 	errInvalidBlockEncodingLength = errors.New("block encoding length must be greater than zero bytes long")
+	errFailedToParseVRFSignature  = errors.New("failed to parse VRF signature")
 )
 
 type Block interface {
@@ -67,6 +68,7 @@ type statelessBlock struct {
 	cert      *staking.Certificate
 	proposer  ids.NodeID
 	bytes     []byte
+	vrfSig    *bls.Signature
 }
 
 func (b *statelessBlock) ID() ids.ID {
@@ -123,6 +125,12 @@ func (b *statelessBlock) initialize(bytes []byte) error {
 	}
 
 	b.proposer = ids.NodeIDFromCert(b.cert)
+
+	var sig bls.Signature
+	if sig.Deserialize(b.StatelessBlock.VRFSig) == nil {
+		return errFailedToParseVRFSignature
+	}
+	b.vrfSig = &sig
 	return nil
 }
 
@@ -172,16 +180,11 @@ func (b *statelessBlock) VerifySignature(pk *bls.PublicKey, parentVRFSig []byte,
 		return bytes.Equal(expectedSignature, b.StatelessBlock.VRFSig)
 	}
 
-	var sig bls.Signature
-	if sig.Deserialize(b.StatelessBlock.VRFSig) == nil {
-		return false
-	}
-
 	// proposer does have a BLS key.
 	if len(parentVRFSig) == 0 {
 		// parent block had no VRF Signature.
 		msgHash := calculateBootstrappingBlockSig(chainID, networkID)
-		return bls.Verify(pk, &sig, msgHash[:])
+		return bls.Verify(pk, b.vrfSig, msgHash[:])
 	}
-	return bls.Verify(pk, &sig, parentVRFSig)
+	return bls.Verify(pk, b.vrfSig, parentVRFSig)
 }
