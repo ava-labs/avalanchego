@@ -159,6 +159,6 @@ func (vm *VM) getStatelessBlk(blkID ids.ID) (statelessblock.Block, error) {
 	if currentBlk, exists := vm.verifiedBlocks[blkID]; exists {
 		return currentBlk.getStatelessBlk(), nil
 	}
-	statelessBlock, _, err := vm.State.GetBlock(blkID)
+	statelessBlock, err := vm.State.GetBlock(blkID)
 	return statelessBlock, err
 }
