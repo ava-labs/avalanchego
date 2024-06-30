@@ -23,7 +23,10 @@ import (
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 )
 
-var errDuplicateVerify = errors.New("duplicate verify")
+var (
+	errDuplicateVerify          = errors.New("duplicate verify")
+	errUnexpectedBlockRejection = errors.New("unexpected block rejection")
+)
 
 // ProposerBlock Option interface tests section
 func TestOracle_PostForkBlock_ImplementsInterface(t *testing.T) {
@@ -74,7 +77,6 @@ func TestOracle_PostForkBlock_ImplementsInterface(t *testing.T) {
 		postForkCommonComponents: postForkCommonComponents{
 			vm:       proVM,
 			innerBlk: innerOracleBlk,
-			status:   choices.Processing,
 		},
 	}
 
@@ -139,7 +141,6 @@ func TestBlockVerify_PostForkBlock_PreDurango_ParentChecks(t *testing.T) {
 		postForkCommonComponents: postForkCommonComponents{
 			vm:       proVM,
 			innerBlk: childCoreBlk,
-			status:   choices.Processing,
 		},
 	}
 
@@ -229,7 +230,6 @@ func TestBlockVerify_PostForkBlock_PostDurango_ParentChecks(t *testing.T) {
 		postForkCommonComponents: postForkCommonComponents{
 			vm:       proVM,
 			innerBlk: childCoreBlk,
-			status:   choices.Processing,
 		},
 	}
 
@@ -351,7 +351,6 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 		postForkCommonComponents: postForkCommonComponents{
 			vm:       proVM,
 			innerBlk: childCoreBlk,
-			status:   choices.Processing,
 		},
 	}
 
@@ -540,7 +539,6 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 		postForkCommonComponents: postForkCommonComponents{
 			vm:       proVM,
 			innerBlk: childCoreBlk,
-			status:   choices.Processing,
 		},
 	}
 
@@ -724,7 +722,6 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 		postForkCommonComponents: postForkCommonComponents{
 			vm:       proVM,
 			innerBlk: childCoreBlk,
-			status:   choices.Processing,
 		},
 	}
 
@@ -977,6 +974,7 @@ func TestBlockReject_PostForkBlock_InnerBlockIsNotRejected(t *testing.T) {
 	}()
 
 	coreBlk := snowmantest.BuildChild(snowmantest.Genesis)
+	coreBlk.RejectV = errUnexpectedBlockRejection
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return coreBlk, nil
 	}
@@ -987,9 +985,6 @@ func TestBlockReject_PostForkBlock_InnerBlockIsNotRejected(t *testing.T) {
 	proBlk := sb.(*postForkBlock)
 
 	require.NoError(proBlk.Reject(context.Background()))
-
-	require.Equal(choices.Rejected, proBlk.Status())
-	require.NotEqual(choices.Rejected, proBlk.innerBlk.Status())
 }
 
 func TestBlockVerify_PostForkBlock_ShouldBePostForkOption(t *testing.T) {
