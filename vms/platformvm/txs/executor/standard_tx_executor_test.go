@@ -863,6 +863,44 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 	}
 }
 
+func TestEUpgradeStandardTxExecutorAddSubnetValidator(t *testing.T) {
+	require := require.New(t)
+	env := newEnvironment(t, eUpgrade)
+	env.ctx.Lock.Lock()
+	defer env.ctx.Lock.Unlock()
+
+	nodeID := genesisNodeIDs[0]
+
+	builder, signer := env.factory.NewWallet(testSubnet1ControlKeys[0], testSubnet1ControlKeys[1])
+	utx, err := builder.NewAddSubnetValidatorTx(
+		&txs.SubnetValidator{
+			Validator: txs.Validator{
+				NodeID: nodeID,
+				Start:  uint64(defaultValidateStartTime.Unix() + 1),
+				End:    uint64(defaultValidateEndTime.Unix()),
+				Wght:   defaultWeight,
+			},
+			Subnet: testSubnet1.ID(),
+		},
+	)
+	require.NoError(err)
+	tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
+	require.NoError(err)
+
+	onAcceptState, err := state.NewDiff(lastAcceptedID, env)
+	require.NoError(err)
+
+	onAcceptState.SetSubnetManager(testSubnet1.ID(), ids.GenerateTestID(), []byte{'a', 'd', 'd', 'r', 'e', 's', 's'})
+
+	executor := StandardTxExecutor{
+		Backend: &env.backend,
+		State:   onAcceptState,
+		Tx:      tx,
+	}
+	err = tx.Unsigned.Visit(&executor)
+	require.ErrorIs(err, ErrAddValidatorManagedSubnet)
+}
+
 func TestBanffStandardTxExecutorAddValidator(t *testing.T) {
 	require := require.New(t)
 	env := newEnvironment(t, banff)
@@ -1867,6 +1905,27 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				return env.unsignedTx, e
 			},
 			expectedErr: ErrFlowCheckFailed,
+		},
+		{
+			name: "attempted to remove subnet validator after subnet manager is set",
+			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *StandardTxExecutor) {
+				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
+				env.state = state.NewMockDiff(ctrl)
+				env.state.EXPECT().GetSubnetManager(env.unsignedTx.Subnet).Return(ids.GenerateTestID(), []byte{'a', 'd', 'd', 'r', 'e', 's', 's'}, nil)
+				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime)
+				e := &StandardTxExecutor{
+					Backend: &Backend{
+						Config:       defaultTestConfig(t, eUpgrade, env.latestForkTime),
+						Bootstrapped: &utils.Atomic[bool]{},
+						Ctx:          &snow.Context{},
+					},
+					Tx:    env.tx,
+					State: env.state,
+				}
+				e.Bootstrapped.Set(true)
+				return env.unsignedTx, e
+			},
+			expectedErr: ErrRemoveValidatorManagedSubnet,
 		},
 	}
 
