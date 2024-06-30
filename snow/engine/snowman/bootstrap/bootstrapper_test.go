@@ -155,9 +155,9 @@ func TestBootstrapperStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 	}
 
 	vm.CantLastAccepted = false
-	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
-		return snowmantest.GenesisID, nil
-	}
+	vm.LastAcceptedF = snowmantest.MakeLastAcceptedBlockF(
+		[]*snowmantest.Block{snowmantest.Genesis},
+	)
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		require.Equal(snowmantest.GenesisID, blkID)
 		return snowmantest.Genesis, nil
@@ -775,20 +775,9 @@ func TestBootstrapperRollbackOnSetState(t *testing.T) {
 
 func initializeVMWithBlockchain(vm *block.TestVM, blocks []*snowmantest.Block) {
 	vm.CantSetState = false
-	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
-		var (
-			lastAcceptedID     ids.ID
-			lastAcceptedHeight uint64
-		)
-		for _, blk := range blocks {
-			height := blk.Height()
-			if blk.Status() == choices.Accepted && height >= lastAcceptedHeight {
-				lastAcceptedID = blk.ID()
-				lastAcceptedHeight = height
-			}
-		}
-		return lastAcceptedID, nil
-	}
+	vm.LastAcceptedF = snowmantest.MakeLastAcceptedBlockF(
+		blocks,
+	)
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		for _, blk := range blocks {
 			if blk.Status() == choices.Accepted && blk.ID() == blkID {

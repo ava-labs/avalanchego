@@ -65,22 +65,6 @@ func MakeParseBlockF(blks ...[]*snowmantest.Block) func(context.Context, []byte)
 	}
 }
 
-func MakeLastAcceptedBlockF(defaultBlk *snowmantest.Block, blks ...[]*snowmantest.Block) func(context.Context) (ids.ID, error) {
-	return func(_ context.Context) (ids.ID, error) {
-		highestHeight := defaultBlk.Height()
-		highestID := defaultBlk.ID()
-		for _, blkSet := range blks {
-			for _, blk := range blkSet {
-				if blk.Status() == choices.Accepted && blk.Height() > highestHeight {
-					highestHeight = blk.Height()
-					highestID = blk.ID()
-				}
-			}
-		}
-		return highestID, nil
-	}
-}
-
 func setup(t *testing.T, config Config) (ids.NodeID, validators.Manager, *common.SenderTest, *block.TestVM, *Transitive) {
 	require := require.New(t)
 
@@ -112,10 +96,9 @@ func setup(t *testing.T, config Config) (ids.NodeID, validators.Manager, *common
 	vm.CantSetState = false
 	vm.CantSetPreference = false
 
-	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
-		return snowmantest.GenesisID, nil
-	}
-
+	vm.LastAcceptedF = snowmantest.MakeLastAcceptedBlockF(
+		[]*snowmantest.Block{snowmantest.Genesis},
+	)
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case snowmantest.GenesisID:
@@ -356,9 +339,9 @@ func TestEngineMultipleQuery(t *testing.T) {
 	vm.CantSetState = false
 	vm.CantSetPreference = false
 
-	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
-		return snowmantest.GenesisID, nil
-	}
+	vm.LastAcceptedF = snowmantest.MakeLastAcceptedBlockF(
+		[]*snowmantest.Block{snowmantest.Genesis},
+	)
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		require.Equal(snowmantest.GenesisID, blkID)
 		return snowmantest.Genesis, nil
@@ -680,9 +663,9 @@ func TestVoteCanceling(t *testing.T) {
 	vm.CantSetState = false
 	vm.CantSetPreference = false
 
-	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
-		return snowmantest.GenesisID, nil
-	}
+	vm.LastAcceptedF = snowmantest.MakeLastAcceptedBlockF(
+		[]*snowmantest.Block{snowmantest.Genesis},
+	)
 	vm.GetBlockF = func(_ context.Context, id ids.ID) (snowman.Block, error) {
 		require.Equal(snowmantest.GenesisID, id)
 		return snowmantest.Genesis, nil
@@ -743,9 +726,9 @@ func TestEngineNoQuery(t *testing.T) {
 
 	vm := &block.TestVM{}
 	vm.T = t
-	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
-		return snowmantest.GenesisID, nil
-	}
+	vm.LastAcceptedF = snowmantest.MakeLastAcceptedBlockF(
+		[]*snowmantest.Block{snowmantest.Genesis},
+	)
 
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		if blkID == snowmantest.GenesisID {
@@ -783,9 +766,9 @@ func TestEngineNoRepollQuery(t *testing.T) {
 
 	vm := &block.TestVM{}
 	vm.T = t
-	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
-		return snowmantest.GenesisID, nil
-	}
+	vm.LastAcceptedF = snowmantest.MakeLastAcceptedBlockF(
+		[]*snowmantest.Block{snowmantest.Genesis},
+	)
 
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		if blkID == snowmantest.GenesisID {
@@ -1234,9 +1217,9 @@ func TestEngineGossip(t *testing.T) {
 
 	nodeID, _, sender, vm, te := setup(t, DefaultConfig(t))
 
-	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
-		return snowmantest.GenesisID, nil
-	}
+	vm.LastAcceptedF = snowmantest.MakeLastAcceptedBlockF(
+		[]*snowmantest.Block{snowmantest.Genesis},
+	)
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		require.Equal(snowmantest.GenesisID, blkID)
 		return snowmantest.Genesis, nil
@@ -1430,9 +1413,9 @@ func TestEngineAggressivePolling(t *testing.T) {
 	vm.CantSetState = false
 	vm.CantSetPreference = false
 
-	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
-		return snowmantest.GenesisID, nil
-	}
+	vm.LastAcceptedF = snowmantest.MakeLastAcceptedBlockF(
+		[]*snowmantest.Block{snowmantest.Genesis},
+	)
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		require.Equal(snowmantest.GenesisID, blkID)
 		return snowmantest.Genesis, nil
@@ -1518,9 +1501,9 @@ func TestEngineDoubleChit(t *testing.T) {
 	vm.CantSetState = false
 	vm.CantSetPreference = false
 
-	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
-		return snowmantest.GenesisID, nil
-	}
+	vm.LastAcceptedF = snowmantest.MakeLastAcceptedBlockF(
+		[]*snowmantest.Block{snowmantest.Genesis},
+	)
 	vm.GetBlockF = func(_ context.Context, id ids.ID) (snowman.Block, error) {
 		require.Equal(snowmantest.GenesisID, id)
 		return snowmantest.Genesis, nil
@@ -1604,9 +1587,9 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 	vm.CantSetState = false
 	vm.CantSetPreference = false
 
-	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
-		return snowmantest.GenesisID, nil
-	}
+	vm.LastAcceptedF = snowmantest.MakeLastAcceptedBlockF(
+		[]*snowmantest.Block{snowmantest.Genesis},
+	)
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		require.Equal(snowmantest.GenesisID, blkID)
 		return snowmantest.Genesis, nil
@@ -2189,9 +2172,9 @@ func TestEngineApplyAcceptedFrontierInQueryFailed(t *testing.T) {
 	vm.CantSetState = false
 	vm.CantSetPreference = false
 
-	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
-		return snowmantest.GenesisID, nil
-	}
+	vm.LastAcceptedF = snowmantest.MakeLastAcceptedBlockF(
+		[]*snowmantest.Block{snowmantest.Genesis},
+	)
 	vm.GetBlockF = func(_ context.Context, id ids.ID) (snowman.Block, error) {
 		require.Equal(snowmantest.GenesisID, id)
 		return snowmantest.Genesis, nil
@@ -2283,9 +2266,9 @@ func TestEngineRepollsMisconfiguredSubnet(t *testing.T) {
 	vm.CantSetState = false
 	vm.CantSetPreference = false
 
-	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
-		return snowmantest.GenesisID, nil
-	}
+	vm.LastAcceptedF = snowmantest.MakeLastAcceptedBlockF(
+		[]*snowmantest.Block{snowmantest.Genesis},
+	)
 	vm.GetBlockF = func(_ context.Context, id ids.ID) (snowman.Block, error) {
 		require.Equal(snowmantest.GenesisID, id)
 		return snowmantest.Genesis, nil
@@ -2451,8 +2434,8 @@ func TestEngineVoteStallRegression(t *testing.T) {
 		SetPreferenceF: func(context.Context, ids.ID) error {
 			return nil
 		},
-		LastAcceptedF: MakeLastAcceptedBlockF(
-			snowmantest.Genesis,
+		LastAcceptedF: snowmantest.MakeLastAcceptedBlockF(
+			[]*snowmantest.Block{snowmantest.Genesis},
 			acceptedChain,
 		),
 	}
@@ -2667,8 +2650,8 @@ func TestEngineEarlyTerminateVoterRegression(t *testing.T) {
 		SetPreferenceF: func(context.Context, ids.ID) error {
 			return nil
 		},
-		LastAcceptedF: MakeLastAcceptedBlockF(
-			snowmantest.Genesis,
+		LastAcceptedF: snowmantest.MakeLastAcceptedBlockF(
+			[]*snowmantest.Block{snowmantest.Genesis},
 			chain,
 		),
 	}
@@ -2819,8 +2802,8 @@ func TestEngineRegistersInvalidVoterDependencyRegression(t *testing.T) {
 		SetPreferenceF: func(context.Context, ids.ID) error {
 			return nil
 		},
-		LastAcceptedF: MakeLastAcceptedBlockF(
-			snowmantest.Genesis,
+		LastAcceptedF: snowmantest.MakeLastAcceptedBlockF(
+			[]*snowmantest.Block{snowmantest.Genesis},
 			acceptedChain,
 			rejectedChain,
 		),

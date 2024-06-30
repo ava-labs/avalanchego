@@ -56,7 +56,7 @@ func TestOracle_PostForkBlock_ImplementsInterface(t *testing.T) {
 	innerTestBlock := snowmantest.BuildChild(snowmantest.Genesis)
 	innerOracleBlk := &TestOptionsBlock{
 		Block: *innerTestBlock,
-		opts: [2]snowman.Block{
+		opts: [2]*snowmantest.Block{
 			snowmantest.BuildChild(innerTestBlock),
 			snowmantest.BuildChild(innerTestBlock),
 		},
@@ -657,7 +657,7 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 		Block: *innerTestBlock,
 	}
 	preferredOracleBlkChild := snowmantest.BuildChild(innerTestBlock)
-	oracleCoreBlk.opts = [2]snowman.Block{
+	oracleCoreBlk.opts = [2]*snowmantest.Block{
 		preferredOracleBlkChild,
 		snowmantest.BuildChild(innerTestBlock),
 	}
@@ -907,12 +907,12 @@ func TestBlockAccept_PostForkBlock_SetsLastAcceptedBlock(t *testing.T) {
 	// test
 	require.NoError(builtBlk.Accept(context.Background()))
 
-	coreVM.LastAcceptedF = func(context.Context) (ids.ID, error) {
-		if coreBlk.Status() == choices.Accepted {
-			return coreBlk.ID(), nil
-		}
-		return snowmantest.GenesisID, nil
-	}
+	coreVM.LastAcceptedF = snowmantest.MakeLastAcceptedBlockF(
+		[]*snowmantest.Block{
+			snowmantest.Genesis,
+			coreBlk,
+		},
+	)
 	acceptedID, err := proVM.LastAccepted(context.Background())
 	require.NoError(err)
 	require.Equal(builtBlk.ID(), acceptedID)
@@ -1003,7 +1003,7 @@ func TestBlockVerify_PostForkBlock_ShouldBePostForkOption(t *testing.T) {
 	coreTestBlk := snowmantest.BuildChild(snowmantest.Genesis)
 	oracleCoreBlk := &TestOptionsBlock{
 		Block: *coreTestBlk,
-		opts: [2]snowman.Block{
+		opts: [2]*snowmantest.Block{
 			snowmantest.BuildChild(coreTestBlk),
 			snowmantest.BuildChild(coreTestBlk),
 		},
