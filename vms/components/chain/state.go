@@ -78,28 +78,15 @@ type Config struct {
 	GetBlockIDAtHeight    func(context.Context, uint64) (ids.ID, error)
 }
 
-// Block is an interface wrapping the normal snowman.Block interface to be used in
-// association with passing in a non-nil function to GetBlockIDAtHeight
-type Block interface {
-	snowman.Block
-
-	SetStatus(choices.Status)
-}
-
 // produceGetStatus creates a getStatus function that infers the status of a block by using a function
 // passed in from the VM that gets the block ID at a specific height. It is assumed that for any height
 // less than or equal to the last accepted block, getBlockIDAtHeight returns the accepted blockID at
 // the requested height.
 func produceGetStatus(s *State, getBlockIDAtHeight func(context.Context, uint64) (ids.ID, error)) func(context.Context, snowman.Block) (choices.Status, error) {
 	return func(ctx context.Context, blk snowman.Block) (choices.Status, error) {
-		internalBlk, ok := blk.(Block)
-		if !ok {
-			return choices.Unknown, fmt.Errorf("expected block to match chain Block interface but found block of type %T", blk)
-		}
 		lastAcceptedHeight := s.lastAcceptedBlock.Height()
-		blkHeight := internalBlk.Height()
+		blkHeight := blk.Height()
 		if blkHeight > lastAcceptedHeight {
-			internalBlk.SetStatus(choices.Processing)
 			return choices.Processing, nil
 		}
 
@@ -107,16 +94,13 @@ func produceGetStatus(s *State, getBlockIDAtHeight func(context.Context, uint64)
 		switch err {
 		case nil:
 			if acceptedID == blk.ID() {
-				internalBlk.SetStatus(choices.Accepted)
 				return choices.Accepted, nil
 			}
-			internalBlk.SetStatus(choices.Rejected)
 			return choices.Rejected, nil
 		case database.ErrNotFound:
 			// Not found can happen if chain history is missing. In this case,
 			// the block may have been accepted or rejected, it isn't possible
 			// to know here.
-			internalBlk.SetStatus(choices.Processing)
 			return choices.Processing, nil
 		default:
 			return choices.Unknown, fmt.Errorf("%w: failed to get accepted blkID at height %d", err, blkHeight)
@@ -131,13 +115,7 @@ func (s *State) initialize(config *Config) {
 	s.buildBlockWithContext = config.BuildBlockWithContext
 	s.unmarshalBlock = config.UnmarshalBlock
 	s.batchedUnmarshalBlock = config.BatchedUnmarshalBlock
-	if config.GetBlockIDAtHeight == nil {
-		s.getStatus = func(_ context.Context, blk snowman.Block) (choices.Status, error) {
-			return blk.Status(), nil
-		}
-	} else {
-		s.getStatus = produceGetStatus(s, config.GetBlockIDAtHeight)
-	}
+	s.getStatus = produceGetStatus(s, config.GetBlockIDAtHeight)
 	s.lastAcceptedBlock = &BlockWrapper{
 		Block: config.LastAcceptedBlock,
 		state: s,
