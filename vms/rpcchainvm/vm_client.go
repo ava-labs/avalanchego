@@ -240,7 +240,6 @@ func (vm *VMClient) Initialize(
 			BatchedUnmarshalBlock: vm.batchedParseBlock,
 			BuildBlock:            vm.buildBlock,
 			BuildBlockWithContext: vm.buildBlockWithContext,
-			GetBlockIDAtHeight:    vm.GetBlockIDAtHeight,
 		},
 	)
 	return err
