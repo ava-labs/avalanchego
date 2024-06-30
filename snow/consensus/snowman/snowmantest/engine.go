@@ -7,7 +7,7 @@ import (
 	"context"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 )
 
 func MakeLastAcceptedBlockF(blks ...[]*Block) func(context.Context) (ids.ID, error) {
@@ -18,8 +18,12 @@ func MakeLastAcceptedBlockF(blks ...[]*Block) func(context.Context) (ids.ID, err
 		)
 		for _, blks := range blks {
 			for _, blk := range blks {
-				if blk.Status() == choices.Accepted && blk.Height() >= highestHeight {
-					highestHeight = blk.Height()
+				if blk.Status != snowtest.Accepted {
+					continue
+				}
+
+				if height := blk.Height(); height >= highestHeight {
+					highestHeight = height
 					highestID = blk.ID()
 				}
 			}

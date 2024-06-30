@@ -14,9 +14,9 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
@@ -953,7 +953,7 @@ func TestBlockAccept_PostForkBlock_TwoProBlocksWithSameCoreBlock_OneIsAccepted(t
 
 	// set proBlk1 as preferred
 	require.NoError(proBlk1.Accept(context.Background()))
-	require.Equal(choices.Accepted, coreBlk.Status())
+	require.Equal(snowtest.Accepted, coreBlk.Status)
 
 	acceptedID, err := proVM.LastAccepted(context.Background())
 	require.NoError(err)

@@ -15,10 +15,10 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
@@ -473,7 +473,7 @@ func TestBlockReject_PreForkBlock_InnerBlockIsRejected(t *testing.T) {
 	proBlk := sb.(*preForkBlock)
 
 	require.NoError(proBlk.Reject(context.Background()))
-	require.Equal(choices.Rejected, coreBlk.Status())
+	require.Equal(snowtest.Rejected, coreBlk.Status)
 }
 
 func TestBlockVerify_ForkBlockIsOracleBlock(t *testing.T) {

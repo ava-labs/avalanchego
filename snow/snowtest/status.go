@@ -3,7 +3,7 @@
 
 package snowtest
 
-type Status uint32
+type Status int
 
 // [Undecided] means the operation hasn't been decided yet
 // [Accepted] means the operation was accepted

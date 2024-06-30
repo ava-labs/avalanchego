@@ -1195,7 +1195,7 @@ func TestInnerVMRollback(t *testing.T) {
 
 	// Restart the node and have the inner VM rollback state.
 	require.NoError(proVM.Shutdown(context.Background()))
-	coreBlk.StatusV = choices.Processing
+	coreBlk.Status = snowtest.Undecided
 
 	proVM = New(
 		coreVM,
@@ -1382,14 +1382,14 @@ func TestTwoForks_OneIsAccepted(t *testing.T) {
 	require.Equal(yBlock.ID(), zBlock.Parent())
 	require.Equal(bBlock.ID(), cBlock.Parent())
 
-	require.NotEqual(choices.Rejected, yBlock.Status())
+	require.NotEqual(snowtest.Rejected, yBlock.Status)
 
 	// accept A
 	require.NoError(aBlock.Accept(context.Background()))
 
-	require.Equal(choices.Accepted, xBlock.Status())
-	require.Equal(choices.Rejected, yBlock.Status())
-	require.Equal(choices.Rejected, zBlock.Status())
+	require.Equal(snowtest.Accepted, xBlock.Status)
+	require.Equal(snowtest.Rejected, yBlock.Status)
+	require.Equal(snowtest.Rejected, zBlock.Status)
 }
 
 func TestTooFarAdvanced(t *testing.T) {
@@ -1508,7 +1508,7 @@ func TestTwoOptions_OneIsAccepted(t *testing.T) {
 	require.NoError(bBlock.Accept(context.Background()))
 
 	// the other pre-fork option should be rejected
-	require.Equal(choices.Rejected, xBlock.opts[1].Status())
+	require.Equal(snowtest.Rejected, xBlock.opts[1].Status)
 }
 
 // Ensure that given the chance, built blocks will reference a lagged P-chain
@@ -2036,15 +2036,15 @@ func TestVMInnerBlkCacheDeduplicationRegression(t *testing.T) {
 	require.NoError(aBlock.Accept(context.Background()))
 	require.NoError(bBlock.Reject(context.Background()))
 
-	require.Equal(choices.Accepted, xBlock.Status())
+	require.Equal(snowtest.Accepted, xBlock.Status)
 
-	require.Equal(choices.Accepted, xBlockCopy.Status())
+	require.Equal(snowtest.Accepted, xBlockCopy.Status)
 
 	cachedXBlock, ok := proVM.innerBlkCache.Get(bBlock.ID())
 	require.True(ok)
 	require.Equal(
 		choices.Accepted,
-		cachedXBlock.(*snowmantest.Block).Status(),
+		cachedXBlock.(*snowmantest.Block).Status,
 	)
 }
 

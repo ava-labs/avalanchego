@@ -14,9 +14,9 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
@@ -34,9 +34,9 @@ func NewTestBlock(i uint64, parentID ids.ID) *snowmantest.Block {
 	b := []byte{byte(i)}
 	id := hashing.ComputeHash256Array(b)
 	return &snowmantest.Block{
-		TestDecidable: choices.TestDecidable{
-			IDV:     id,
-			StatusV: choices.Unknown,
+		Decidable: snowtest.Decidable{
+			IDV:    id,
+			Status: -1,
 		},
 		HeightV: i,
 		ParentV: parentID,
@@ -71,7 +71,7 @@ func createInternalBlockFuncs(blks []*snowmantest.Block) (
 
 	getBlock := func(_ context.Context, id ids.ID) (snowman.Block, error) {
 		blk, ok := blkMap[id]
-		if !ok || !blk.Status().Fetched() {
+		if !ok || blk.Status < 0 {
 			return nil, database.ErrNotFound
 		}
 
@@ -83,8 +83,8 @@ func createInternalBlockFuncs(blks []*snowmantest.Block) (
 		if !ok {
 			return nil, fmt.Errorf("%w: %x", errUnexpectedBlockBytes, b)
 		}
-		if blk.Status() == choices.Unknown {
-			blk.SetStatus(choices.Processing)
+		if blk.Status < 0 {
+			blk.Status = snowtest.Undecided
 		}
 		blkMap[blk.ID()] = blk
 
@@ -119,7 +119,7 @@ func checkProcessingBlock(t *testing.T, s *State, blk snowman.Block) {
 // checkDecidedBlock asserts that [blk] is returned with the correct status by ParseBlock
 // and GetBlock.
 // expectedStatus should be either Accepted or Rejected.
-func checkDecidedBlock(t *testing.T, s *State, blk snowman.Block, expectedStatus choices.Status, cached bool) {
+func checkDecidedBlock(t *testing.T, s *State, blk snowman.Block, expectedStatus snowtest.Status, cached bool) {
 	require := require.New(t)
 
 	require.IsType(&BlockWrapper{}, blk)
@@ -153,11 +153,11 @@ func checkDecidedBlock(t *testing.T, s *State, blk snowman.Block, expectedStatus
 }
 
 func checkAcceptedBlock(t *testing.T, s *State, blk snowman.Block, cached bool) {
-	checkDecidedBlock(t, s, blk, choices.Accepted, cached)
+	checkDecidedBlock(t, s, blk, snowtest.Accepted, cached)
 }
 
 func checkRejectedBlock(t *testing.T, s *State, blk snowman.Block, cached bool) {
-	checkDecidedBlock(t, s, blk, choices.Rejected, cached)
+	checkDecidedBlock(t, s, blk, snowtest.Rejected, cached)
 }
 
 func TestState(t *testing.T) {
@@ -165,7 +165,7 @@ func TestState(t *testing.T) {
 
 	testBlks := NewTestBlocks(3)
 	genesisBlock := testBlks[0]
-	genesisBlock.SetStatus(choices.Accepted)
+	genesisBlock.Status = snowtest.Accepted
 	blk1 := testBlks[1]
 	blk2 := testBlks[2]
 	// Need to create a block with a different bytes and hash here
@@ -248,13 +248,13 @@ func TestBuildBlock(t *testing.T) {
 
 	testBlks := NewTestBlocks(2)
 	genesisBlock := testBlks[0]
-	genesisBlock.SetStatus(choices.Accepted)
+	genesisBlock.Status = snowtest.Accepted
 	blk1 := testBlks[1]
 
 	getBlock, parseBlock := createInternalBlockFuncs(testBlks)
 	buildBlock := func(context.Context) (snowman.Block, error) {
 		// Once the block is built, mark it as processing
-		blk1.SetStatus(choices.Processing)
+		blk1.Status = snowtest.Undecided
 		return blk1, nil
 	}
 
@@ -288,7 +288,7 @@ func TestStateDecideBlock(t *testing.T) {
 
 	testBlks := NewTestBlocks(4)
 	genesisBlock := testBlks[0]
-	genesisBlock.SetStatus(choices.Accepted)
+	genesisBlock.Status = snowtest.Accepted
 	badAcceptBlk := testBlks[1]
 	badAcceptBlk.AcceptV = errAccept
 	badVerifyBlk := testBlks[2]
@@ -343,7 +343,7 @@ func TestStateParent(t *testing.T) {
 
 	testBlks := NewTestBlocks(3)
 	genesisBlock := testBlks[0]
-	genesisBlock.SetStatus(choices.Accepted)
+	genesisBlock.Status = snowtest.Accepted
 	blk1 := testBlks[1]
 	blk2 := testBlks[2]
 
@@ -385,7 +385,7 @@ func TestGetBlockInternal(t *testing.T) {
 	require := require.New(t)
 	testBlks := NewTestBlocks(1)
 	genesisBlock := testBlks[0]
-	genesisBlock.SetStatus(choices.Accepted)
+	genesisBlock.Status = snowtest.Accepted
 
 	getBlock, parseBlock := createInternalBlockFuncs(testBlks)
 	chainState := NewState(&Config{
@@ -415,7 +415,7 @@ func TestGetBlockError(t *testing.T) {
 
 	testBlks := NewTestBlocks(2)
 	genesisBlock := testBlks[0]
-	genesisBlock.SetStatus(choices.Accepted)
+	genesisBlock.Status = snowtest.Accepted
 	blk1 := testBlks[1]
 
 	getBlock, parseBlock := createInternalBlockFuncs(testBlks)
@@ -440,9 +440,9 @@ func TestGetBlockError(t *testing.T) {
 	_, err := chainState.GetBlock(context.Background(), blk1.ID())
 	require.ErrorIs(err, database.ErrNotFound)
 
-	// Update the status to Processing, so that it will be returned by the internal get block
-	// function.
-	blk1.SetStatus(choices.Processing)
+	// Update the status to Undecided, so that it will be returned by the
+	// internal get block function.
+	blk1.Status = snowtest.Undecided
 	blk, err := chainState.GetBlock(context.Background(), blk1.ID())
 	require.NoError(err)
 	require.Equal(blk1.ID(), blk.ID())
@@ -452,7 +452,7 @@ func TestGetBlockError(t *testing.T) {
 func TestParseBlockError(t *testing.T) {
 	testBlks := NewTestBlocks(1)
 	genesisBlock := testBlks[0]
-	genesisBlock.SetStatus(choices.Accepted)
+	genesisBlock.Status = snowtest.Accepted
 
 	getBlock, parseBlock := createInternalBlockFuncs(testBlks)
 	chainState := NewState(&Config{
@@ -473,7 +473,7 @@ func TestParseBlockError(t *testing.T) {
 func TestBuildBlockError(t *testing.T) {
 	testBlks := NewTestBlocks(1)
 	genesisBlock := testBlks[0]
-	genesisBlock.SetStatus(choices.Accepted)
+	genesisBlock.Status = snowtest.Accepted
 
 	getBlock, parseBlock := createInternalBlockFuncs(testBlks)
 	chainState := NewState(&Config{
@@ -498,7 +498,7 @@ func TestMeteredCache(t *testing.T) {
 
 	testBlks := NewTestBlocks(1)
 	genesisBlock := testBlks[0]
-	genesisBlock.SetStatus(choices.Accepted)
+	genesisBlock.Status = snowtest.Accepted
 
 	getBlock, parseBlock := createInternalBlockFuncs(testBlks)
 	config := &Config{
@@ -523,7 +523,7 @@ func TestStateBytesToIDCache(t *testing.T) {
 
 	testBlks := NewTestBlocks(3)
 	genesisBlock := testBlks[0]
-	genesisBlock.SetStatus(choices.Accepted)
+	genesisBlock.Status = snowtest.Accepted
 	blk1 := testBlks[1]
 	blk2 := testBlks[2]
 
@@ -576,7 +576,7 @@ func TestSetLastAcceptedBlock(t *testing.T) {
 
 	testBlks := NewTestBlocks(1)
 	genesisBlock := testBlks[0]
-	genesisBlock.SetStatus(choices.Accepted)
+	genesisBlock.Status = snowtest.Accepted
 
 	postSetBlk1ParentID := hashing.ComputeHash256Array([]byte{byte(199)})
 	postSetBlk1 := NewTestBlock(200, postSetBlk1ParentID)
@@ -625,14 +625,14 @@ func TestSetLastAcceptedBlockWithProcessingBlocksErrors(t *testing.T) {
 
 	testBlks := NewTestBlocks(5)
 	genesisBlock := testBlks[0]
-	genesisBlock.SetStatus(choices.Accepted)
+	genesisBlock.Status = snowtest.Accepted
 	blk1 := testBlks[1]
 	resetBlk := testBlks[4]
 
 	getBlock, parseBlock := createInternalBlockFuncs(testBlks)
 	buildBlock := func(context.Context) (snowman.Block, error) {
-		// Once the block is built, mark it as processing
-		blk1.SetStatus(choices.Processing)
+		// Once the block is built, mark it as undecided
+		genesisBlock.Status = snowtest.Undecided
 		return blk1, nil
 	}
 
@@ -665,10 +665,10 @@ func TestStateParseTransitivelyAcceptedBlock(t *testing.T) {
 
 	testBlks := NewTestBlocks(3)
 	genesisBlock := testBlks[0]
-	genesisBlock.SetStatus(choices.Accepted)
+	genesisBlock.Status = snowtest.Accepted
 	blk1 := testBlks[1]
 	blk2 := testBlks[2]
-	blk2.SetStatus(choices.Accepted)
+	blk2.Status = snowtest.Accepted
 
 	getBlock, parseBlock := createInternalBlockFuncs(testBlks)
 	chainState := NewState(&Config{
@@ -692,7 +692,7 @@ func TestIsProcessing(t *testing.T) {
 
 	testBlks := NewTestBlocks(2)
 	genesisBlock := testBlks[0]
-	genesisBlock.SetStatus(choices.Accepted)
+	genesisBlock.Status = snowtest.Accepted
 	blk1 := testBlks[1]
 
 	getBlock, parseBlock := createInternalBlockFuncs(testBlks)

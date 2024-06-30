@@ -15,10 +15,10 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
 
@@ -350,7 +350,7 @@ func TestBlockReject_InnerBlockIsNotRejected(t *testing.T) {
 
 	// reject oracle block
 	require.NoError(builtBlk.Reject(context.Background()))
-	require.NotEqual(choices.Rejected, oracleCoreBlk.Status())
+	require.NotEqual(snowtest.Rejected, oracleCoreBlk.Status)
 
 	// reject an option
 	require.IsType(&postForkBlock{}, builtBlk)
@@ -359,7 +359,7 @@ func TestBlockReject_InnerBlockIsNotRejected(t *testing.T) {
 	require.NoError(err)
 
 	require.NoError(opts[0].Reject(context.Background()))
-	require.NotEqual(choices.Rejected, oracleCoreBlk.opts[0].Status())
+	require.NotEqual(snowtest.Rejected, oracleCoreBlk.opts[0].Status)
 }
 
 func TestBlockVerify_PostForkOption_ParentIsNotOracleWithError(t *testing.T) {
