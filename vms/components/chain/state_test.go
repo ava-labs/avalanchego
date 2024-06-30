@@ -119,7 +119,7 @@ func checkProcessingBlock(t *testing.T, s *State, blk snowman.Block) {
 // checkDecidedBlock asserts that [blk] is returned with the correct status by ParseBlock
 // and GetBlock.
 // expectedStatus should be either Accepted or Rejected.
-func checkDecidedBlock(t *testing.T, s *State, blk snowman.Block, expectedStatus snowtest.Status, cached bool) {
+func checkDecidedBlock(t *testing.T, s *State, blk snowman.Block, cached bool) {
 	require := require.New(t)
 
 	require.IsType(&BlockWrapper{}, blk)
@@ -150,14 +150,6 @@ func checkDecidedBlock(t *testing.T, s *State, blk snowman.Block, expectedStatus
 	// Since ParseBlock should have triggered a cache hit, assert that the block is identical
 	// to the parsed block.
 	require.Equal(parsedBlk, getBlk)
-}
-
-func checkAcceptedBlock(t *testing.T, s *State, blk snowman.Block, cached bool) {
-	checkDecidedBlock(t, s, blk, snowtest.Accepted, cached)
-}
-
-func checkRejectedBlock(t *testing.T, s *State, blk snowman.Block, cached bool) {
-	checkDecidedBlock(t, s, blk, snowtest.Rejected, cached)
 }
 
 func TestState(t *testing.T) {
@@ -237,10 +229,10 @@ func TestState(t *testing.T) {
 
 	// Flush the caches to ensure decided blocks are handled correctly on cache misses.
 	chainState.Flush()
-	checkAcceptedBlock(t, chainState, wrappedGenesisBlk, false)
-	checkAcceptedBlock(t, chainState, parsedBlk1, false)
-	checkAcceptedBlock(t, chainState, parsedBlk2, false)
-	checkRejectedBlock(t, chainState, parsedBlk3, false)
+	checkDecidedBlock(t, chainState, wrappedGenesisBlk, false)
+	checkDecidedBlock(t, chainState, parsedBlk1, false)
+	checkDecidedBlock(t, chainState, parsedBlk2, false)
+	checkDecidedBlock(t, chainState, parsedBlk3, false)
 }
 
 func TestBuildBlock(t *testing.T) {
@@ -280,7 +272,7 @@ func TestBuildBlock(t *testing.T) {
 
 	require.NoError(builtBlk.Accept(context.Background()))
 
-	checkAcceptedBlock(t, chainState, builtBlk, true)
+	checkDecidedBlock(t, chainState, builtBlk, true)
 }
 
 func TestStateDecideBlock(t *testing.T) {
@@ -373,7 +365,7 @@ func TestStateParent(t *testing.T) {
 	genesisBlkParentID := parsedBlk1.Parent()
 	genesisBlkParent, err := chainState.GetBlock(context.Background(), genesisBlkParentID)
 	require.NoError(err)
-	checkAcceptedBlock(t, chainState, genesisBlkParent, true)
+	checkDecidedBlock(t, chainState, genesisBlkParent, true)
 
 	parentBlk1ID := parsedBlk2.Parent()
 	parentBlk1, err := chainState.GetBlock(context.Background(), parentBlk1ID)
@@ -617,7 +609,7 @@ func TestSetLastAcceptedBlock(t *testing.T) {
 	require.Equal(postSetBlk2.ID(), lastAcceptedID)
 	require.Equal(postSetBlk2.ID(), chainState.LastAcceptedBlock().ID())
 
-	checkAcceptedBlock(t, chainState, parsedpostSetBlk2, false)
+	checkDecidedBlock(t, chainState, parsedpostSetBlk2, false)
 }
 
 func TestSetLastAcceptedBlockWithProcessingBlocksErrors(t *testing.T) {
