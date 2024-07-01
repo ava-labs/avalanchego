@@ -7,10 +7,6 @@ import (
 	"context"
 	"time"
 
-	"go.uber.org/zap"
-
-	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 )
@@ -42,39 +38,6 @@ func (b *Block) Accept(context.Context) error {
 
 func (b *Block) Reject(context.Context) error {
 	return b.Visit(b.manager.rejector)
-}
-
-func (b *Block) Status() choices.Status {
-	blkID := b.ID()
-	// If this block is an accepted Proposal block with no accepted children, it
-	// will be in [blkIDToState], but we should return accepted, not processing,
-	// so we do this check.
-	if b.manager.lastAccepted == blkID {
-		return choices.Accepted
-	}
-	// Check if the block is in memory. If so, it's processing.
-	if _, ok := b.manager.blkIDToState[blkID]; ok {
-		return choices.Processing
-	}
-	// Block isn't in memory. Check in the database.
-	_, err := b.manager.state.GetStatelessBlock(blkID)
-	switch err {
-	case nil:
-		return choices.Accepted
-
-	case database.ErrNotFound:
-		// choices.Unknown means we don't have the bytes of the block.
-		// In this case, we do, so we return choices.Processing.
-		return choices.Processing
-
-	default:
-		// TODO: correctly report this error to the consensus engine.
-		b.manager.ctx.Log.Error(
-			"dropping unhandled database error",
-			zap.Error(err),
-		)
-		return choices.Processing
-	}
 }
 
 func (b *Block) Timestamp() time.Time {

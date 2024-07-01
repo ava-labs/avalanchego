@@ -10,7 +10,6 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
 
@@ -25,7 +24,7 @@ type postForkOption struct {
 }
 
 func (b *postForkOption) Timestamp() time.Time {
-	if b.Status() == choices.Accepted {
+	if b.Height() <= b.vm.lastAcceptedHeight {
 		return b.vm.lastAcceptedTime
 	}
 	return b.timestamp
@@ -39,9 +38,6 @@ func (b *postForkOption) Accept(ctx context.Context) error {
 }
 
 func (b *postForkOption) acceptOuterBlk() error {
-	// Update in-memory references
-	b.status = choices.Accepted
-
 	return b.vm.acceptPostForkBlock(b)
 }
 
@@ -56,15 +52,7 @@ func (b *postForkOption) Reject(context.Context) error {
 	// in the proposer block that causing this block to be rejected.
 
 	delete(b.vm.verifiedBlocks, b.ID())
-	b.status = choices.Rejected
 	return nil
-}
-
-func (b *postForkOption) Status() choices.Status {
-	if b.status == choices.Accepted && b.Height() > b.vm.lastAcceptedHeight {
-		return choices.Processing
-	}
-	return b.status
 }
 
 func (b *postForkOption) Parent() ids.ID {
@@ -132,10 +120,6 @@ func (b *postForkOption) pChainHeight(ctx context.Context) (uint64, error) {
 		return 0, err
 	}
 	return parent.pChainHeight(ctx)
-}
-
-func (b *postForkOption) setStatus(status choices.Status) {
-	b.status = status
 }
 
 func (b *postForkOption) getStatelessBlk() block.Block {

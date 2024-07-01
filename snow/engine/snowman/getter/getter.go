@@ -11,7 +11,6 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -148,10 +147,34 @@ func (gh *getter) GetAcceptedFrontier(ctx context.Context, nodeID ids.NodeID, re
 }
 
 func (gh *getter) GetAccepted(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs set.Set[ids.ID]) error {
+	lastAcceptedID, err := gh.vm.LastAccepted(ctx)
+	if err != nil {
+		return err
+	}
+	lastAccepted, err := gh.vm.GetBlock(ctx, lastAcceptedID)
+	if err != nil {
+		return err
+	}
+	lastAcceptedHeight := lastAccepted.Height()
+
 	acceptedIDs := make([]ids.ID, 0, containerIDs.Len())
 	for blkID := range containerIDs {
 		blk, err := gh.vm.GetBlock(ctx, blkID)
-		if err == nil && blk.Status() == choices.Accepted {
+		if err != nil {
+			continue
+		}
+
+		height := blk.Height()
+		if height > lastAcceptedHeight {
+			continue
+		}
+
+		acceptedBlkID, err := gh.vm.GetBlockIDAtHeight(ctx, height)
+		if err != nil {
+			continue
+		}
+
+		if blkID == acceptedBlkID {
 			acceptedIDs = append(acceptedIDs, blkID)
 		}
 	}

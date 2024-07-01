@@ -18,7 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
@@ -65,22 +64,6 @@ func MakeParseBlockF(blks ...[]*snowmantest.Block) func(context.Context, []byte)
 	}
 }
 
-func MakeLastAcceptedBlockF(defaultBlk *snowmantest.Block, blks ...[]*snowmantest.Block) func(context.Context) (ids.ID, error) {
-	return func(_ context.Context) (ids.ID, error) {
-		highestHeight := defaultBlk.Height()
-		highestID := defaultBlk.ID()
-		for _, blkSet := range blks {
-			for _, blk := range blkSet {
-				if blk.Status() == choices.Accepted && blk.Height() > highestHeight {
-					highestHeight = blk.Height()
-					highestID = blk.ID()
-				}
-			}
-		}
-		return highestID, nil
-	}
-}
-
 func setup(t *testing.T, config Config) (ids.NodeID, validators.Manager, *common.SenderTest, *block.TestVM, *Transitive) {
 	require := require.New(t)
 
@@ -112,10 +95,9 @@ func setup(t *testing.T, config Config) (ids.NodeID, validators.Manager, *common
 	vm.CantSetState = false
 	vm.CantSetPreference = false
 
-	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
-		return snowmantest.GenesisID, nil
-	}
-
+	vm.LastAcceptedF = snowmantest.MakeLastAcceptedBlockF(
+		[]*snowmantest.Block{snowmantest.Genesis},
+	)
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case snowmantest.GenesisID:
@@ -313,8 +295,8 @@ func TestEngineQuery(t *testing.T) {
 	// apply the votes received during the poll for [parent]. Applying the votes
 	// should cause both [parent] and [child] to be accepted.
 	require.NoError(engine.Put(context.Background(), getRequest.NodeID, getRequest.RequestID, child.Bytes()))
-	require.Equal(choices.Accepted, parent.Status())
-	require.Equal(choices.Accepted, child.Status())
+	require.Equal(snowtest.Accepted, parent.Status)
+	require.Equal(snowtest.Accepted, child.Status)
 	require.Zero(engine.blocked.NumDependencies())
 }
 
@@ -356,9 +338,9 @@ func TestEngineMultipleQuery(t *testing.T) {
 	vm.CantSetState = false
 	vm.CantSetPreference = false
 
-	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
-		return snowmantest.GenesisID, nil
-	}
+	vm.LastAcceptedF = snowmantest.MakeLastAcceptedBlockF(
+		[]*snowmantest.Block{snowmantest.Genesis},
+	)
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		require.Equal(snowmantest.GenesisID, blkID)
 		return snowmantest.Genesis, nil
@@ -460,7 +442,7 @@ func TestEngineMultipleQuery(t *testing.T) {
 	// Should be dropped because the query was already filled
 	require.NoError(te.Chits(context.Background(), vdr2, *queryRequestID, blk0.ID(), blk0.ID(), blk0.ID()))
 
-	require.Equal(choices.Accepted, blk1.Status())
+	require.Equal(snowtest.Accepted, blk1.Status)
 	require.Zero(te.blocked.NumDependencies())
 }
 
@@ -680,9 +662,9 @@ func TestVoteCanceling(t *testing.T) {
 	vm.CantSetState = false
 	vm.CantSetPreference = false
 
-	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
-		return snowmantest.GenesisID, nil
-	}
+	vm.LastAcceptedF = snowmantest.MakeLastAcceptedBlockF(
+		[]*snowmantest.Block{snowmantest.Genesis},
+	)
 	vm.GetBlockF = func(_ context.Context, id ids.ID) (snowman.Block, error) {
 		require.Equal(snowmantest.GenesisID, id)
 		return snowmantest.Genesis, nil
@@ -743,9 +725,9 @@ func TestEngineNoQuery(t *testing.T) {
 
 	vm := &block.TestVM{}
 	vm.T = t
-	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
-		return snowmantest.GenesisID, nil
-	}
+	vm.LastAcceptedF = snowmantest.MakeLastAcceptedBlockF(
+		[]*snowmantest.Block{snowmantest.Genesis},
+	)
 
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		if blkID == snowmantest.GenesisID {
@@ -783,9 +765,9 @@ func TestEngineNoRepollQuery(t *testing.T) {
 
 	vm := &block.TestVM{}
 	vm.T = t
-	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
-		return snowmantest.GenesisID, nil
-	}
+	vm.LastAcceptedF = snowmantest.MakeLastAcceptedBlockF(
+		[]*snowmantest.Block{snowmantest.Genesis},
+	)
 
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		if blkID == snowmantest.GenesisID {
@@ -1135,9 +1117,9 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 		getRequest.RequestID,
 		missingBlk.Bytes(),
 	))
-	require.Equal(choices.Accepted, missingBlk.Status())
-	require.Equal(choices.Accepted, blockingBlk.Status())
-	require.Equal(choices.Rejected, issuedBlk.Status())
+	require.Equal(snowtest.Accepted, missingBlk.Status)
+	require.Equal(snowtest.Accepted, blockingBlk.Status)
+	require.Equal(snowtest.Rejected, issuedBlk.Status)
 }
 
 func TestEngineRetryFetch(t *testing.T) {
@@ -1226,7 +1208,7 @@ func TestEngineUndeclaredDependencyDeadlock(t *testing.T) {
 	))
 	require.NoError(te.Chits(context.Background(), vdr, *reqID, invalidBlkID, invalidBlkID, invalidBlkID))
 
-	require.Equal(choices.Accepted, validBlk.Status())
+	require.Equal(snowtest.Accepted, validBlk.Status)
 }
 
 func TestEngineGossip(t *testing.T) {
@@ -1234,9 +1216,9 @@ func TestEngineGossip(t *testing.T) {
 
 	nodeID, _, sender, vm, te := setup(t, DefaultConfig(t))
 
-	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
-		return snowmantest.GenesisID, nil
-	}
+	vm.LastAcceptedF = snowmantest.MakeLastAcceptedBlockF(
+		[]*snowmantest.Block{snowmantest.Genesis},
+	)
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		require.Equal(snowmantest.GenesisID, blkID)
 		return snowmantest.Genesis, nil
@@ -1430,9 +1412,9 @@ func TestEngineAggressivePolling(t *testing.T) {
 	vm.CantSetState = false
 	vm.CantSetPreference = false
 
-	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
-		return snowmantest.GenesisID, nil
-	}
+	vm.LastAcceptedF = snowmantest.MakeLastAcceptedBlockF(
+		[]*snowmantest.Block{snowmantest.Genesis},
+	)
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		require.Equal(snowmantest.GenesisID, blkID)
 		return snowmantest.Genesis, nil
@@ -1518,9 +1500,9 @@ func TestEngineDoubleChit(t *testing.T) {
 	vm.CantSetState = false
 	vm.CantSetPreference = false
 
-	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
-		return snowmantest.GenesisID, nil
-	}
+	vm.LastAcceptedF = snowmantest.MakeLastAcceptedBlockF(
+		[]*snowmantest.Block{snowmantest.Genesis},
+	)
 	vm.GetBlockF = func(_ context.Context, id ids.ID) (snowman.Block, error) {
 		require.Equal(snowmantest.GenesisID, id)
 		return snowmantest.Genesis, nil
@@ -1565,16 +1547,16 @@ func TestEngineDoubleChit(t *testing.T) {
 		return nil, errUnknownBlock
 	}
 
-	require.Equal(choices.Processing, blk.Status())
+	require.Equal(snowtest.Undecided, blk.Status)
 
 	require.NoError(te.Chits(context.Background(), vdr0, *queryRequestID, blk.ID(), blk.ID(), blk.ID()))
-	require.Equal(choices.Processing, blk.Status())
+	require.Equal(snowtest.Undecided, blk.Status)
 
 	require.NoError(te.Chits(context.Background(), vdr0, *queryRequestID, blk.ID(), blk.ID(), blk.ID()))
-	require.Equal(choices.Processing, blk.Status())
+	require.Equal(snowtest.Undecided, blk.Status)
 
 	require.NoError(te.Chits(context.Background(), vdr1, *queryRequestID, blk.ID(), blk.ID(), blk.ID()))
-	require.Equal(choices.Accepted, blk.Status())
+	require.Equal(snowtest.Accepted, blk.Status)
 }
 
 func TestEngineBuildBlockLimit(t *testing.T) {
@@ -1604,9 +1586,9 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 	vm.CantSetState = false
 	vm.CantSetPreference = false
 
-	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
-		return snowmantest.GenesisID, nil
-	}
+	vm.LastAcceptedF = snowmantest.MakeLastAcceptedBlockF(
+		[]*snowmantest.Block{snowmantest.Genesis},
+	)
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		require.Equal(snowmantest.GenesisID, blkID)
 		return snowmantest.Genesis, nil
@@ -1712,7 +1694,7 @@ func TestEngineDropRejectedBlockOnReceipt(t *testing.T) {
 	// Vote for [acceptedBlk] and cause it to be accepted.
 	require.NoError(te.Chits(context.Background(), nodeID, queryRequestIDs[0], acceptedBlk.ID(), acceptedBlk.ID(), acceptedBlk.ID()))
 	require.Len(queryRequestIDs, 1) // Shouldn't have caused another query
-	require.Equal(choices.Accepted, acceptedBlk.Status())
+	require.Equal(snowtest.Accepted, acceptedBlk.Status)
 
 	// Attempt to issue rejectedChain[1] to the engine. This should be dropped
 	// because the engine knows it has rejected it's parent rejectedChain[0].
@@ -1883,8 +1865,8 @@ func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 	require.NoError(te.Put(context.Background(), *reqVdr, *sendReqID, blk2.Bytes()))
 
 	// The vote should be bubbled through [blk2], such that [blk1] gets marked as Accepted.
-	require.Equal(choices.Accepted, blk1.Status())
-	require.Equal(choices.Processing, blk2.Status())
+	require.Equal(snowtest.Accepted, blk1.Status)
+	require.Equal(snowtest.Undecided, blk2.Status)
 
 	// Now that [blk1] has been marked as Accepted, [blk2] can pass verification.
 	blk2.VerifyV = nil
@@ -1917,7 +1899,7 @@ func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 
 	// After a single vote for [blk2], it should be marked as accepted.
 	require.NoError(te.Chits(context.Background(), vdr, *queryRequestID, blk2.ID(), blk1.ID(), blk2.ID()))
-	require.Equal(choices.Accepted, blk2.Status())
+	require.Equal(snowtest.Accepted, blk2.Status)
 }
 
 // Test that in the following scenario, if block B fails verification, votes
@@ -2040,7 +2022,7 @@ func TestEngineBubbleVotesThroughInvalidChain(t *testing.T) {
 
 	// The vote should be bubbled through [blk3] and [blk2] such that [blk1]
 	// gets marked as Accepted.
-	require.Equal(choices.Accepted, blk1.Status())
+	require.Equal(snowtest.Accepted, blk1.Status)
 }
 
 func TestEngineBuildBlockWithCachedNonVerifiedParent(t *testing.T) {
@@ -2138,8 +2120,8 @@ func TestEngineBuildBlockWithCachedNonVerifiedParent(t *testing.T) {
 
 	// Assert that the blocks' statuses are correct.
 	// The evicted [parentBlkA] shouldn't be changed.
-	require.Equal(choices.Processing, parentBlkA.Status())
-	require.Equal(choices.Accepted, parentBlkB.Status())
+	require.Equal(snowtest.Undecided, parentBlkA.Status)
+	require.Equal(snowtest.Accepted, parentBlkB.Status)
 
 	vm.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return childBlk, nil
@@ -2189,9 +2171,9 @@ func TestEngineApplyAcceptedFrontierInQueryFailed(t *testing.T) {
 	vm.CantSetState = false
 	vm.CantSetPreference = false
 
-	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
-		return snowmantest.GenesisID, nil
-	}
+	vm.LastAcceptedF = snowmantest.MakeLastAcceptedBlockF(
+		[]*snowmantest.Block{snowmantest.Genesis},
+	)
 	vm.GetBlockF = func(_ context.Context, id ids.ID) (snowman.Block, error) {
 		require.Equal(snowmantest.GenesisID, id)
 		return snowmantest.Genesis, nil
@@ -2232,7 +2214,7 @@ func TestEngineApplyAcceptedFrontierInQueryFailed(t *testing.T) {
 		return nil, errUnknownBlock
 	}
 
-	require.Equal(choices.Processing, blk.Status())
+	require.Equal(snowtest.Undecided, blk.Status)
 
 	sender.SendPullQueryF = func(_ context.Context, inVdrs set.Set[ids.NodeID], requestID uint32, blkID ids.ID, requestedHeight uint64) {
 		*queryRequestID = requestID
@@ -2243,11 +2225,11 @@ func TestEngineApplyAcceptedFrontierInQueryFailed(t *testing.T) {
 
 	require.NoError(te.Chits(context.Background(), vdr, *queryRequestID, blk.ID(), blk.ID(), blk.ID()))
 
-	require.Equal(choices.Processing, blk.Status())
+	require.Equal(snowtest.Undecided, blk.Status)
 
 	require.NoError(te.QueryFailed(context.Background(), vdr, *queryRequestID))
 
-	require.Equal(choices.Accepted, blk.Status())
+	require.Equal(snowtest.Accepted, blk.Status)
 }
 
 func TestEngineRepollsMisconfiguredSubnet(t *testing.T) {
@@ -2283,9 +2265,9 @@ func TestEngineRepollsMisconfiguredSubnet(t *testing.T) {
 	vm.CantSetState = false
 	vm.CantSetPreference = false
 
-	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
-		return snowmantest.GenesisID, nil
-	}
+	vm.LastAcceptedF = snowmantest.MakeLastAcceptedBlockF(
+		[]*snowmantest.Block{snowmantest.Genesis},
+	)
 	vm.GetBlockF = func(_ context.Context, id ids.ID) (snowman.Block, error) {
 		require.Equal(snowmantest.GenesisID, id)
 		return snowmantest.Genesis, nil
@@ -2347,7 +2329,7 @@ func TestEngineRepollsMisconfiguredSubnet(t *testing.T) {
 	// Voting for the block that was issued during the period when the validator
 	// set was misconfigured should result in it being accepted successfully.
 	require.NoError(te.Chits(context.Background(), vdr, queryRequestID, blk.ID(), blk.ID(), blk.ID()))
-	require.Equal(choices.Accepted, blk.Status())
+	require.Equal(snowtest.Accepted, blk.Status)
 }
 
 // Full blockchain structure:
@@ -2451,8 +2433,8 @@ func TestEngineVoteStallRegression(t *testing.T) {
 		SetPreferenceF: func(context.Context, ids.ID) error {
 			return nil
 		},
-		LastAcceptedF: MakeLastAcceptedBlockF(
-			snowmantest.Genesis,
+		LastAcceptedF: snowmantest.MakeLastAcceptedBlockF(
+			[]*snowmantest.Block{snowmantest.Genesis},
 			acceptedChain,
 		),
 	}
@@ -2595,10 +2577,10 @@ func TestEngineVoteStallRegression(t *testing.T) {
 		getBlock3Request.RequestID,
 		rejectedChain[0].Bytes(),
 	))
-	require.Equal(choices.Accepted, acceptedChain[0].Status())
-	require.Equal(choices.Accepted, acceptedChain[1].Status())
-	require.Equal(choices.Processing, acceptedChain[2].Status())
-	require.Equal(choices.Rejected, rejectedChain[0].Status())
+	require.Equal(snowtest.Accepted, acceptedChain[0].Status)
+	require.Equal(snowtest.Accepted, acceptedChain[1].Status)
+	require.Equal(snowtest.Undecided, acceptedChain[2].Status)
+	require.Equal(snowtest.Rejected, rejectedChain[0].Status)
 
 	// Then engine should issue as many queries as needed to confirm block 2.
 	for i := 2; i < len(pollRequestIDs); i++ {
@@ -2613,10 +2595,10 @@ func TestEngineVoteStallRegression(t *testing.T) {
 			))
 		}
 	}
-	require.Equal(choices.Accepted, acceptedChain[0].Status())
-	require.Equal(choices.Accepted, acceptedChain[1].Status())
-	require.Equal(choices.Accepted, acceptedChain[2].Status())
-	require.Equal(choices.Rejected, rejectedChain[0].Status())
+	require.Equal(snowtest.Accepted, acceptedChain[0].Status)
+	require.Equal(snowtest.Accepted, acceptedChain[1].Status)
+	require.Equal(snowtest.Accepted, acceptedChain[2].Status)
+	require.Equal(snowtest.Rejected, rejectedChain[0].Status)
 }
 
 // When a voter is registered with multiple dependencies, the engine must not
@@ -2667,8 +2649,8 @@ func TestEngineEarlyTerminateVoterRegression(t *testing.T) {
 		SetPreferenceF: func(context.Context, ids.ID) error {
 			return nil
 		},
-		LastAcceptedF: MakeLastAcceptedBlockF(
-			snowmantest.Genesis,
+		LastAcceptedF: snowmantest.MakeLastAcceptedBlockF(
+			[]*snowmantest.Block{snowmantest.Genesis},
 			chain,
 		),
 	}
@@ -2743,11 +2725,10 @@ func TestEngineEarlyTerminateVoterRegression(t *testing.T) {
 	// Because Put added a new preferred block to the chain, a new poll will be
 	// created.
 	require.Len(pollRequestIDs, 2)
-	require.Equal(choices.Accepted, chain[0].Status())
-	require.Equal(choices.Accepted, chain[1].Status())
-	// Block 2 still hasn't been issued, so it's status should remain
-	// Processing.
-	require.Equal(choices.Processing, chain[2].Status())
+	require.Equal(snowtest.Accepted, chain[0].Status)
+	require.Equal(snowtest.Accepted, chain[1].Status)
+	// Block 2 still hasn't been issued, so it's status should remain Undecided.
+	require.Equal(snowtest.Undecided, chain[2].Status)
 }
 
 // Voting for an unissued cached block that fails verification should not
@@ -2819,8 +2800,8 @@ func TestEngineRegistersInvalidVoterDependencyRegression(t *testing.T) {
 		SetPreferenceF: func(context.Context, ids.ID) error {
 			return nil
 		},
-		LastAcceptedF: MakeLastAcceptedBlockF(
-			snowmantest.Genesis,
+		LastAcceptedF: snowmantest.MakeLastAcceptedBlockF(
+			[]*snowmantest.Block{snowmantest.Genesis},
 			acceptedChain,
 			rejectedChain,
 		),
@@ -2900,8 +2881,8 @@ func TestEngineRegistersInvalidVoterDependencyRegression(t *testing.T) {
 	))
 	// There are no processing blocks, so no new poll should be created.
 	require.Len(pollRequestIDs, 1)
-	require.Equal(choices.Accepted, acceptedChain[0].Status())
-	require.Equal(choices.Rejected, rejectedChain[0].Status())
+	require.Equal(snowtest.Accepted, acceptedChain[0].Status)
+	require.Equal(snowtest.Rejected, rejectedChain[0].Status)
 
 	// Issue acceptedChain[1] to consensus.
 	require.NoError(engine.PushQuery(
@@ -2943,7 +2924,7 @@ func TestEngineRegistersInvalidVoterDependencyRegression(t *testing.T) {
 		snowmantest.GenesisID,
 	))
 	require.Len(pollRequestIDs, 3)
-	require.Equal(choices.Accepted, acceptedChain[1].Status())
+	require.Equal(snowtest.Accepted, acceptedChain[1].Status)
 }
 
 func TestGetProcessingAncestor(t *testing.T) {

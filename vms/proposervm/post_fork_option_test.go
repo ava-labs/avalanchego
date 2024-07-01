@@ -15,10 +15,10 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
 
@@ -26,12 +26,12 @@ var _ snowman.OracleBlock = (*TestOptionsBlock)(nil)
 
 type TestOptionsBlock struct {
 	snowmantest.Block
-	opts    [2]snowman.Block
+	opts    [2]*snowmantest.Block
 	optsErr error
 }
 
 func (tob TestOptionsBlock) Options(context.Context) ([2]snowman.Block, error) {
-	return tob.opts, tob.optsErr
+	return [2]snowman.Block{tob.opts[0], tob.opts[1]}, tob.optsErr
 }
 
 // ProposerBlock.Verify tests section
@@ -52,7 +52,7 @@ func TestBlockVerify_PostForkOption_ParentChecks(t *testing.T) {
 	preferredBlk := snowmantest.BuildChild(coreTestBlk)
 	oracleCoreBlk := &TestOptionsBlock{
 		Block: *coreTestBlk,
-		opts: [2]snowman.Block{
+		opts: [2]*snowmantest.Block{
 			preferredBlk,
 			snowmantest.BuildChild(coreTestBlk),
 		},
@@ -142,7 +142,7 @@ func TestBlockVerify_PostForkOption_CoreBlockVerifyIsCalledOnce(t *testing.T) {
 	coreOpt1 := snowmantest.BuildChild(coreTestBlk)
 	oracleCoreBlk := &TestOptionsBlock{
 		Block: *coreTestBlk,
-		opts: [2]snowman.Block{
+		opts: [2]*snowmantest.Block{
 			coreOpt0,
 			coreOpt1,
 		},
@@ -222,7 +222,7 @@ func TestBlockAccept_PostForkOption_SetsLastAcceptedBlock(t *testing.T) {
 	coreTestBlk := snowmantest.BuildChild(snowmantest.Genesis)
 	oracleCoreBlk := &TestOptionsBlock{
 		Block: *coreTestBlk,
-		opts: [2]snowman.Block{
+		opts: [2]*snowmantest.Block{
 			snowmantest.BuildChild(coreTestBlk),
 			snowmantest.BuildChild(coreTestBlk),
 		},
@@ -266,12 +266,13 @@ func TestBlockAccept_PostForkOption_SetsLastAcceptedBlock(t *testing.T) {
 	// accept oracle block
 	require.NoError(parentBlk.Accept(context.Background()))
 
-	coreVM.LastAcceptedF = func(context.Context) (ids.ID, error) {
-		if oracleCoreBlk.Status() == choices.Accepted {
-			return oracleCoreBlk.ID(), nil
-		}
-		return snowmantest.GenesisID, nil
-	}
+	coreVM.LastAcceptedF = snowmantest.MakeLastAcceptedBlockF(
+		[]*snowmantest.Block{
+			snowmantest.Genesis,
+			&oracleCoreBlk.Block,
+		},
+		oracleCoreBlk.opts[:],
+	)
 	acceptedID, err := proVM.LastAccepted(context.Background())
 	require.NoError(err)
 	require.Equal(parentBlk.ID(), acceptedID)
@@ -284,12 +285,6 @@ func TestBlockAccept_PostForkOption_SetsLastAcceptedBlock(t *testing.T) {
 
 	require.NoError(opts[0].Accept(context.Background()))
 
-	coreVM.LastAcceptedF = func(context.Context) (ids.ID, error) {
-		if oracleCoreBlk.opts[0].Status() == choices.Accepted {
-			return oracleCoreBlk.opts[0].ID(), nil
-		}
-		return oracleCoreBlk.ID(), nil
-	}
 	acceptedID, err = proVM.LastAccepted(context.Background())
 	require.NoError(err)
 	require.Equal(opts[0].ID(), acceptedID)
@@ -312,7 +307,7 @@ func TestBlockReject_InnerBlockIsNotRejected(t *testing.T) {
 	coreTestBlk := snowmantest.BuildChild(snowmantest.Genesis)
 	oracleCoreBlk := &TestOptionsBlock{
 		Block: *coreTestBlk,
-		opts: [2]snowman.Block{
+		opts: [2]*snowmantest.Block{
 			snowmantest.BuildChild(coreTestBlk),
 			snowmantest.BuildChild(coreTestBlk),
 		},
@@ -355,12 +350,7 @@ func TestBlockReject_InnerBlockIsNotRejected(t *testing.T) {
 
 	// reject oracle block
 	require.NoError(builtBlk.Reject(context.Background()))
-	require.IsType(&postForkBlock{}, builtBlk)
-	proBlk := builtBlk.(*postForkBlock)
-
-	require.Equal(choices.Rejected, proBlk.Status())
-
-	require.NotEqual(choices.Rejected, proBlk.innerBlk.Status())
+	require.NotEqual(snowtest.Rejected, oracleCoreBlk.Status)
 
 	// reject an option
 	require.IsType(&postForkBlock{}, builtBlk)
@@ -369,12 +359,7 @@ func TestBlockReject_InnerBlockIsNotRejected(t *testing.T) {
 	require.NoError(err)
 
 	require.NoError(opts[0].Reject(context.Background()))
-	require.IsType(&postForkOption{}, opts[0])
-	proOpt := opts[0].(*postForkOption)
-
-	require.Equal(choices.Rejected, proOpt.Status())
-
-	require.NotEqual(choices.Rejected, proOpt.innerBlk.Status())
+	require.NotEqual(snowtest.Rejected, oracleCoreBlk.opts[0].Status)
 }
 
 func TestBlockVerify_PostForkOption_ParentIsNotOracleWithError(t *testing.T) {
@@ -463,7 +448,7 @@ func TestOptionTimestampValidity(t *testing.T) {
 	coreTestBlk := snowmantest.BuildChild(snowmantest.Genesis)
 	coreOracleBlk := &TestOptionsBlock{
 		Block: *coreTestBlk,
-		opts: [2]snowman.Block{
+		opts: [2]*snowmantest.Block{
 			snowmantest.BuildChild(coreTestBlk),
 			snowmantest.BuildChild(coreTestBlk),
 		},
@@ -617,7 +602,7 @@ func TestOptionTimestampValidity(t *testing.T) {
 	statefulOptionBlock, err := proVM.ParseBlock(context.Background(), option.Bytes())
 	require.NoError(err)
 
-	require.Equal(choices.Accepted, statefulOptionBlock.Status())
+	require.LessOrEqual(statefulOptionBlock.Height(), proVM.lastAcceptedHeight)
 
 	coreVM.GetBlockF = func(context.Context, ids.ID) (snowman.Block, error) {
 		require.FailNow("called GetBlock when unable to handle the error")

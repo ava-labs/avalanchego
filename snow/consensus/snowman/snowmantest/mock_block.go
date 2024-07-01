@@ -15,7 +15,6 @@ import (
 	time "time"
 
 	ids "github.com/ava-labs/avalanchego/ids"
-	choices "github.com/ava-labs/avalanchego/snow/choices"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -124,20 +123,6 @@ func (m *MockBlock) Reject(arg0 context.Context) error {
 func (mr *MockBlockMockRecorder) Reject(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Reject", reflect.TypeOf((*MockBlock)(nil).Reject), arg0)
-}
-
-// Status mocks base method.
-func (m *MockBlock) Status() choices.Status {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Status")
-	ret0, _ := ret[0].(choices.Status)
-	return ret0
-}
-
-// Status indicates an expected call of Status.
-func (mr *MockBlockMockRecorder) Status() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Status", reflect.TypeOf((*MockBlock)(nil).Status))
 }
 
 // Timestamp mocks base method.

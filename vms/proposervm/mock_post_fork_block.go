@@ -15,7 +15,6 @@ import (
 	time "time"
 
 	ids "github.com/ava-labs/avalanchego/ids"
-	choices "github.com/ava-labs/avalanchego/snow/choices"
 	snowman "github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	block "github.com/ava-labs/avalanchego/vms/proposervm/block"
 	gomock "go.uber.org/mock/gomock"
@@ -126,20 +125,6 @@ func (m *MockPostForkBlock) Reject(arg0 context.Context) error {
 func (mr *MockPostForkBlockMockRecorder) Reject(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Reject", reflect.TypeOf((*MockPostForkBlock)(nil).Reject), arg0)
-}
-
-// Status mocks base method.
-func (m *MockPostForkBlock) Status() choices.Status {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Status")
-	ret0, _ := ret[0].(choices.Status)
-	return ret0
-}
-
-// Status indicates an expected call of Status.
-func (mr *MockPostForkBlockMockRecorder) Status() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Status", reflect.TypeOf((*MockPostForkBlock)(nil).Status))
 }
 
 // Timestamp mocks base method.
@@ -266,18 +251,6 @@ func (m *MockPostForkBlock) setInnerBlk(arg0 snowman.Block) {
 func (mr *MockPostForkBlockMockRecorder) setInnerBlk(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "setInnerBlk", reflect.TypeOf((*MockPostForkBlock)(nil).setInnerBlk), arg0)
-}
-
-// setStatus mocks base method.
-func (m *MockPostForkBlock) setStatus(arg0 choices.Status) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "setStatus", arg0)
-}
-
-// setStatus indicates an expected call of setStatus.
-func (mr *MockPostForkBlockMockRecorder) setStatus(arg0 any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "setStatus", reflect.TypeOf((*MockPostForkBlock)(nil).setStatus), arg0)
 }
 
 // verifyPostForkChild mocks base method.

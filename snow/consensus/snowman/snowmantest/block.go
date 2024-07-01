@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils"
 )
 
@@ -30,9 +30,9 @@ var (
 func BuildChild(parent *Block) *Block {
 	blkID := ids.GenerateTestID()
 	return &Block{
-		TestDecidable: choices.TestDecidable{
-			IDV:     blkID,
-			StatusV: choices.Processing,
+		Decidable: snowtest.Decidable{
+			IDV:    blkID,
+			Status: snowtest.Undecided,
 		},
 		ParentV:    parent.ID(),
 		HeightV:    parent.Height() + 1,
@@ -47,9 +47,9 @@ func BuildChain(length int) []*Block {
 	}
 
 	genesis := &Block{
-		TestDecidable: choices.TestDecidable{
-			IDV:     GenesisID,
-			StatusV: choices.Accepted,
+		Decidable: snowtest.Decidable{
+			IDV:    GenesisID,
+			Status: snowtest.Accepted,
 		},
 		HeightV:    GenesisHeight,
 		TimestampV: GenesisTimestamp,
@@ -68,7 +68,7 @@ func BuildDescendants(parent *Block, length int) []*Block {
 }
 
 type Block struct {
-	choices.TestDecidable
+	snowtest.Decidable
 
 	ParentV    ids.ID
 	HeightV    uint64

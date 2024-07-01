@@ -7,7 +7,6 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/state"
 
 	xsblock "github.com/ava-labs/avalanchego/vms/example/xsvm/block"
@@ -32,8 +31,9 @@ type chain struct {
 	// chain state as driven by the consensus engine
 	chainState snow.State
 
-	lastAccepted   ids.ID
-	verifiedBlocks map[ids.ID]*block
+	lastAcceptedID     ids.ID
+	lastAcceptedHeight uint64
+	verifiedBlocks     map[ids.ID]*block
 }
 
 func New(ctx *snow.Context, db database.Database) (Chain, error) {
@@ -46,12 +46,17 @@ func New(ctx *snow.Context, db database.Database) (Chain, error) {
 	}
 
 	c := &chain{
-		chainContext:  ctx,
-		acceptedState: db,
-		lastAccepted:  lastAcceptedID,
+		chainContext:   ctx,
+		acceptedState:  db,
+		lastAcceptedID: lastAcceptedID,
 	}
 
 	lastAccepted, err := c.getBlock(lastAcceptedID)
+	if err != nil {
+		return nil, err
+	}
+
+	c.lastAcceptedHeight = lastAccepted.Height()
 	c.verifiedBlocks = map[ids.ID]*block{
 		lastAcceptedID: lastAccepted,
 	}
@@ -59,7 +64,7 @@ func New(ctx *snow.Context, db database.Database) (Chain, error) {
 }
 
 func (c *chain) LastAccepted() ids.ID {
-	return c.lastAccepted
+	return c.lastAcceptedID
 }
 
 func (c *chain) SetChainState(state snow.State) {
@@ -111,7 +116,6 @@ func (c *chain) getBlock(blkID ids.ID) (*block, error) {
 		Stateless: stateless,
 		chain:     c,
 		id:        blkID,
-		status:    choices.Accepted,
 		bytes:     blkBytes,
 	}, nil
 }

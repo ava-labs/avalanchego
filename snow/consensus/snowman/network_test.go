@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
@@ -28,9 +27,9 @@ func NewNetwork(params snowball.Parameters, numColors int, rngSource sampler.Sou
 	n := &Network{
 		params: params,
 		colors: []*snowmantest.Block{{
-			TestDecidable: choices.TestDecidable{
-				IDV:     ids.Empty.Prefix(rngSource.Uint64()),
-				StatusV: choices.Processing,
+			Decidable: snowtest.Decidable{
+				IDV:    ids.Empty.Prefix(rngSource.Uint64()),
+				Status: snowtest.Undecided,
 			},
 			ParentV: snowmantest.GenesisID,
 			HeightV: snowmantest.GenesisHeight + 1,
@@ -44,9 +43,9 @@ func NewNetwork(params snowball.Parameters, numColors int, rngSource sampler.Sou
 		dependencyInd, _ := s.Next()
 		dependency := n.colors[dependencyInd]
 		n.colors = append(n.colors, &snowmantest.Block{
-			TestDecidable: choices.TestDecidable{
-				IDV:     ids.Empty.Prefix(rngSource.Uint64()),
-				StatusV: choices.Processing,
+			Decidable: snowtest.Decidable{
+				IDV:    ids.Empty.Prefix(rngSource.Uint64()),
+				Status: snowtest.Undecided,
 			},
 			ParentV: dependency.IDV,
 			HeightV: dependency.HeightV + 1,
@@ -82,9 +81,9 @@ func (n *Network) AddNode(t testing.TB, sm Consensus) error {
 			myDep = blk.Parent()
 		}
 		myBlock := &snowmantest.Block{
-			TestDecidable: choices.TestDecidable{
-				IDV:     blk.ID(),
-				StatusV: blk.Status(),
+			Decidable: snowtest.Decidable{
+				IDV:    blk.ID(),
+				Status: blk.Status,
 			},
 			ParentV: myDep,
 			HeightV: blk.Height(),
