@@ -9,14 +9,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 func TestValidatorsSample(t *testing.T) {
@@ -34,6 +33,7 @@ func TestValidatorsSample(t *testing.T) {
 		getCurrentHeightErr error
 
 		validators         []ids.NodeID
+		allowed            set.Set[ids.NodeID]
 		getValidatorSetErr error
 
 		// superset of possible values in the result
@@ -55,6 +55,7 @@ func TestValidatorsSample(t *testing.T) {
 					limit:      2,
 					height:     1,
 					validators: []ids.NodeID{nodeID1, nodeID3},
+					allowed:    set.Of(nodeID1),
 					expected:   []ids.NodeID{nodeID1},
 				},
 			},
@@ -70,6 +71,7 @@ func TestValidatorsSample(t *testing.T) {
 					limit:      2,
 					height:     1,
 					validators: []ids.NodeID{nodeID1},
+					allowed:    set.Of(nodeID1),
 					expected:   []ids.NodeID{nodeID1},
 				},
 			},
@@ -85,6 +87,7 @@ func TestValidatorsSample(t *testing.T) {
 					limit:      1,
 					height:     1,
 					validators: []ids.NodeID{nodeID1},
+					allowed:    set.Of(nodeID1),
 					expected:   []ids.NodeID{nodeID1},
 				},
 			},
@@ -100,6 +103,7 @@ func TestValidatorsSample(t *testing.T) {
 					limit:      1,
 					height:     1,
 					validators: []ids.NodeID{nodeID1, nodeID2},
+					allowed:    set.Of(nodeID1, nodeID2),
 					expected:   []ids.NodeID{nodeID1, nodeID2},
 				},
 			},
@@ -113,6 +117,7 @@ func TestValidatorsSample(t *testing.T) {
 					limit:      1,
 					height:     1,
 					validators: []ids.NodeID{nodeID1},
+					allowed:    set.Of(nodeID1),
 					expected:   []ids.NodeID{nodeID1},
 				},
 			},
@@ -126,6 +131,7 @@ func TestValidatorsSample(t *testing.T) {
 					time:       time.Time{}.Add(time.Hour),
 					height:     1,
 					validators: []ids.NodeID{nodeID1},
+					allowed:    set.Of(nodeID1),
 					expected:   []ids.NodeID{nodeID1},
 				},
 			},
@@ -151,6 +157,7 @@ func TestValidatorsSample(t *testing.T) {
 					time:       time.Time{}.Add(time.Second),
 					height:     1,
 					validators: []ids.NodeID{nodeID1},
+					allowed:    set.Of(nodeID1),
 					expected:   []ids.NodeID{nodeID1},
 				},
 				{
@@ -195,17 +202,12 @@ func TestValidatorsSample(t *testing.T) {
 			}
 			gomock.InOrder(calls...)
 
-			network, err := NewNetwork(logging.NoLog{}, &common.FakeSender{}, prometheus.NewRegistry(), "")
-			require.NoError(err)
-
-			ctx := context.Background()
-			require.NoError(network.Connected(ctx, nodeID1, nil))
-			require.NoError(network.Connected(ctx, nodeID2, nil))
-
-			v := NewValidators(network.Peers, network.log, subnetID, mockValidators, tt.maxStaleness)
+			v := NewValidators(logging.NoLog{}, subnetID, mockValidators, tt.maxStaleness)
 			for _, call := range tt.calls {
 				v.lastUpdated = call.time
-				sampled := v.Sample(ctx, call.limit)
+
+				ctx := context.Background()
+				sampled := v.Sample(ctx, call.allowed.Contains, call.limit)
 				require.LessOrEqual(len(sampled), call.limit)
 				require.Subset(call.expected, sampled)
 			}
@@ -315,14 +317,8 @@ func TestValidatorsTop(t *testing.T) {
 			mockValidators.EXPECT().GetCurrentHeight(gomock.Any()).Return(uint64(1), nil)
 			mockValidators.EXPECT().GetValidatorSet(gomock.Any(), uint64(1), subnetID).Return(validatorSet, nil)
 
-			network, err := NewNetwork(logging.NoLog{}, &common.FakeSender{}, prometheus.NewRegistry(), "")
-			require.NoError(err)
-
+			v := NewValidators(logging.NoLog{}, subnetID, mockValidators, time.Second)
 			ctx := context.Background()
-			require.NoError(network.Connected(ctx, nodeID1, nil))
-			require.NoError(network.Connected(ctx, nodeID2, nil))
-
-			v := NewValidators(network.Peers, network.log, subnetID, mockValidators, time.Second)
 			nodeIDs := v.Top(ctx, test.percentage)
 			require.Equal(test.expected, nodeIDs)
 		})

@@ -35,14 +35,12 @@ type ValidatorSubset interface {
 }
 
 func NewValidators(
-	peers *Peers,
 	log logging.Logger,
 	subnetID ids.ID,
 	validators validators.State,
 	maxValidatorSetStaleness time.Duration,
 ) *Validators {
 	return &Validators{
-		peers:                    peers,
 		log:                      log,
 		subnetID:                 subnetID,
 		validators:               validators,
@@ -52,7 +50,6 @@ func NewValidators(
 
 // Validators contains a set of nodes that are staking.
 type Validators struct {
-	peers                    *Peers
 	log                      logging.Logger
 	subnetID                 ids.ID
 	validators               validators.State
@@ -111,8 +108,13 @@ func (v *Validators) refresh(ctx context.Context) {
 	v.lastUpdated = time.Now()
 }
 
-// Sample returns a random sample of connected validators
-func (v *Validators) Sample(ctx context.Context, limit int) []ids.NodeID {
+// Sample returns a random sample of connected validators whose nodeID can be
+// returned.
+func (v *Validators) Sample(
+	ctx context.Context,
+	canReturn func(ids.NodeID) bool,
+	limit int,
+) []ids.NodeID {
 	v.lock.Lock()
 	defer v.lock.Unlock()
 
@@ -131,7 +133,7 @@ func (v *Validators) Sample(ctx context.Context, limit int) []ids.NodeID {
 		}
 
 		nodeID := v.validatorList[i].nodeID
-		if !v.peers.has(nodeID) {
+		if !canReturn(nodeID) {
 			continue
 		}
 
@@ -176,5 +178,5 @@ func (v *Validators) Has(ctx context.Context, nodeID ids.NodeID) bool {
 
 	v.refresh(ctx)
 
-	return v.peers.has(nodeID) && v.validatorSet.Contains(nodeID)
+	return v.validatorSet.Contains(nodeID)
 }

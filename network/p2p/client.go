@@ -42,6 +42,7 @@ type CrossChainAppResponseCallback func(
 )
 
 type Client struct {
+	self          ids.NodeID
 	handlerID     uint64
 	handlerIDStr  string
 	handlerPrefix []byte
@@ -58,7 +59,7 @@ func (c *Client) AppRequestAny(
 	appRequestBytes []byte,
 	onResponse AppResponseCallback,
 ) error {
-	sampled := c.options.nodeSampler.Sample(ctx, 1)
+	sampled := c.options.nodeSampler.Sample(ctx, c.isNotSelf, 1)
 	if len(sampled) != 1 {
 		return ErrNoPeers
 	}
@@ -190,6 +191,10 @@ func (c *Client) CrossChainAppRequest(
 	c.router.requestID += 2
 
 	return nil
+}
+
+func (c *Client) isNotSelf(nodeID ids.NodeID) bool {
+	return c.self != nodeID
 }
 
 // PrefixMessage prefixes the original message with the protocol identifier.
