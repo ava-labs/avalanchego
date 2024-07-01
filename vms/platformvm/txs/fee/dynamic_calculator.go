@@ -255,20 +255,10 @@ func (c *dynamicCalculator) addFeesFor(complexity fee.Dimensions) (uint64, error
 	if complexity == fee.Empty {
 		return 0, nil
 	}
-
-	feeCfg, err := GetDynamicConfig(true /*isEActive*/)
-	if err != nil {
-		return 0, fmt.Errorf("failed adding fees: %w", err)
-	}
-	txGas, err := fee.ToGas(feeCfg.FeeDimensionWeights, complexity)
-	if err != nil {
-		return 0, fmt.Errorf("failed adding fees: %w", err)
-	}
-
-	if err := c.fc.CumulateGas(txGas); err != nil {
+	if err := c.fc.CumulateComplexity(complexity); err != nil {
 		return 0, fmt.Errorf("failed cumulating complexity: %w", err)
 	}
-	fee, err := c.fc.CalculateFee(txGas)
+	fee, err := c.fc.CalculateFee(complexity)
 	if err != nil {
 		return 0, fmt.Errorf("%w: %w", errFailedFeeCalculation, err)
 	}
@@ -281,20 +271,10 @@ func (c *dynamicCalculator) removeFeesFor(unitsToRm fee.Dimensions) (uint64, err
 	if unitsToRm == fee.Empty {
 		return 0, nil
 	}
-
-	feeCfg, err := GetDynamicConfig(true /*isEActive*/)
-	if err != nil {
-		return 0, fmt.Errorf("failed adding fees: %w", err)
-	}
-	txGas, err := fee.ToGas(feeCfg.FeeDimensionWeights, unitsToRm)
-	if err != nil {
-		return 0, fmt.Errorf("failed adding fees: %w", err)
-	}
-
-	if err := c.fc.RemoveGas(txGas); err != nil {
+	if err := c.fc.RemoveComplexity(unitsToRm); err != nil {
 		return 0, fmt.Errorf("failed removing units: %w", err)
 	}
-	fee, err := c.fc.CalculateFee(txGas)
+	fee, err := c.fc.CalculateFee(unitsToRm)
 	if err != nil {
 		return 0, fmt.Errorf("%w: %w", errFailedFeeCalculation, err)
 	}
@@ -320,9 +300,9 @@ func (c *dynamicCalculator) calculateFee(tx txs.UnsignedTx, creds []verify.Verif
 
 func (c *dynamicCalculator) getGasPrice() fee.GasPrice { return c.fc.GetGasPrice() }
 
-func (c *dynamicCalculator) getBlockGas() fee.Gas { return c.fc.GetBlockGas() }
+func (c *dynamicCalculator) getBlockGas() (fee.Gas, error) { return c.fc.GetBlockGas() }
 
-func (c *dynamicCalculator) getExcessGas() fee.Gas { return c.fc.GetExcessGas() }
+func (c *dynamicCalculator) getExcessGas() (fee.Gas, error) { return c.fc.GetExcessGas() }
 
 func (c *dynamicCalculator) getGasCap() fee.Gas { return c.fc.GetGasCap() }
 

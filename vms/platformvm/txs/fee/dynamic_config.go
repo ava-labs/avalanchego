@@ -15,7 +15,7 @@ import (
 )
 
 var (
-	errDynamicFeeConfigNotAvailable = errors.New("dynamic fee config not available")
+	ErrDynamicFeeConfigNotAvailable = errors.New("dynamic fee config not available")
 
 	eUpgradeDynamicFeesConfig = commonfee.DynamicFeesConfig{
 		MinGasPrice:         commonfee.GasPrice(10 * units.NanoAvax),
@@ -37,7 +37,7 @@ func init() {
 
 func GetDynamicConfig(isEActive bool) (commonfee.DynamicFeesConfig, error) {
 	if !isEActive {
-		return commonfee.DynamicFeesConfig{}, errDynamicFeeConfigNotAvailable
+		return commonfee.DynamicFeesConfig{}, ErrDynamicFeeConfigNotAvailable
 	}
 
 	if customDynamicFeesConfig != nil {

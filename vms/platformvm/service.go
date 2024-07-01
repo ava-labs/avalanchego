@@ -36,6 +36,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	avajson "github.com/ava-labs/avalanchego/utils/json"
@@ -1827,6 +1828,36 @@ func (s *Service) GetBlockByHeight(_ *http.Request, args *api.GetBlockByHeightAr
 
 	response.Block, err = json.Marshal(result)
 	return err
+}
+
+// DynamicFeesConfigReply is the response from GetDynamicFeeConfig
+type DynamicFeesConfigReply struct {
+	commonfee.DynamicFeesConfig `json:"nextGasPrice"`
+}
+
+// GetNextFeeRates returns the next fee rates that a transaction must pay to be accepted now
+func (s *Service) GetDynamicFeeConfig(_ *http.Request, _ *struct{}, reply *DynamicFeesConfigReply) error {
+	s.vm.ctx.Log.Debug("API called",
+		zap.String("service", "platform"),
+		zap.String("method", "getDynamicFeeConfig"),
+	)
+
+	s.vm.ctx.Lock.Lock()
+	defer s.vm.ctx.Lock.Unlock()
+
+	chainTime := s.vm.state.GetTimestamp()
+	isEActive := s.vm.Config.UpgradeConfig.IsEActivated(chainTime)
+	cfg, err := fee.GetDynamicConfig(isEActive)
+	switch err {
+	case fee.ErrDynamicFeeConfigNotAvailable:
+		reply.DynamicFeesConfig = commonfee.DynamicFeesConfig{}
+		return nil
+	case nil:
+		reply.DynamicFeesConfig = cfg
+		return nil
+	default:
+		return err
+	}
 }
 
 // GetGasPriceReply is the response from GetFeeRates

@@ -39,11 +39,11 @@ func (c *Calculator) GetGasPrice() fee.GasPrice {
 	return c.b.getGasPrice()
 }
 
-func (c *Calculator) GetBlockGas() fee.Gas {
+func (c *Calculator) GetBlockGas() (fee.Gas, error) {
 	return c.b.getBlockGas()
 }
 
-func (c *Calculator) GetExcessGas() fee.Gas {
+func (c *Calculator) GetExcessGas() (fee.Gas, error) {
 	return c.b.getExcessGas()
 }
 
@@ -64,8 +64,8 @@ type backend interface {
 	addFeesFor(complexity fee.Dimensions) (uint64, error)
 	removeFeesFor(unitsToRm fee.Dimensions) (uint64, error)
 	getGasPrice() fee.GasPrice
-	getBlockGas() fee.Gas
-	getExcessGas() fee.Gas
+	getBlockGas() (fee.Gas, error)
+	getExcessGas() (fee.Gas, error)
 	getGasCap() fee.Gas
 	setCredentials(creds []verify.Verifiable)
 	calculateFee(tx txs.UnsignedTx, creds []verify.Verifiable) (uint64, error)

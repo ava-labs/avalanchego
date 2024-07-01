@@ -155,10 +155,7 @@ func TestPChainGasPriceIncreaseDueToPeak(t *testing.T) {
 		)
 
 		// at peak the total fee should be no more than 100 Avax.
-		childGas, err := ToGas(testDynamicFeeCfg.FeeDimensionWeights, childBlkData.complexity)
-		require.NoError(err)
-
-		fee, err := m.CalculateFee(childGas)
+		fee, err := m.CalculateFee(childBlkData.complexity)
 		require.NoError(err)
 		require.Less(fee, 100*units.Avax, fmt.Sprintf("iteration: %d, total: %d", i, len(blockComplexities)))
 

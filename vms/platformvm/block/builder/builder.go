@@ -375,10 +375,18 @@ func packBlockTxs(
 
 		// pre e upgrade is active, we fill blocks till a target size
 		// post e upgrade is active, we fill blocks till a target gas
-		targetSizeReached := (!isEActive && txSize > remainingSize) ||
-			(isEActive && feeCalculator.GetBlockGas() >= gasCap)
-		if targetSizeReached {
-			break
+		if !isEActive {
+			if txSize > remainingSize {
+				break
+			}
+		} else {
+			blkGas, err := feeCalculator.GetBlockGas()
+			if err != nil {
+				return nil, err
+			}
+			if blkGas >= gasCap {
+				break
+			}
 		}
 		mempool.Remove(tx)
 

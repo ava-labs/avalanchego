@@ -1223,7 +1223,7 @@ func TestGetFeeRates(t *testing.T) {
 
 	// let time tick. Fee rates will go down
 	service.vm.ctx.Lock.Lock()
-	now = now.Add(3 * time.Second)
+	now = now.Add(10 * time.Second)
 	service.vm.clock.Set(now)
 	service.vm.ctx.Lock.Unlock()
 

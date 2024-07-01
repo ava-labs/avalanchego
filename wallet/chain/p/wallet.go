@@ -291,6 +291,7 @@ type wallet struct {
 
 	isEForkActive    bool
 	staticFeesConfig fee.StaticConfig
+	feeCfg           commonfee.DynamicFeesConfig
 	gasPrice         commonfee.GasPrice
 	gasCap           commonfee.Gas
 }
@@ -632,7 +633,7 @@ func (w *wallet) feeCalculator(ctx *builder.Context, options ...common.Option) (
 		return fee.NewStaticCalculator(w.staticFeesConfig, upgrade.Config{}, time.Time{}), nil
 	}
 
-	return fee.NewDynamicCalculator(commonfee.NewCalculator(w.gasPrice, w.gasCap)), nil
+	return fee.NewDynamicCalculator(commonfee.NewCalculator(w.feeCfg.FeeDimensionWeights, w.gasPrice, w.gasCap)), nil
 }
 
 func (w *wallet) refreshFeesData(ctx *builder.Context, options ...common.Option) error {
@@ -646,7 +647,15 @@ func (w *wallet) refreshFeesData(ctx *builder.Context, options ...common.Option)
 		return err
 	}
 	eUpgradeTime := version.GetEUpgradeTime(w.builder.Context().NetworkID)
-	w.isEForkActive = !chainTime.Before(eUpgradeTime)
+	isEForkActive := !chainTime.Before(eUpgradeTime)
+
+	if !w.isEForkActive && isEForkActive {
+		w.feeCfg, err = w.client.GetDynamicFeeConfig(opsCtx)
+		if err != nil {
+			return err
+		}
+	}
+	w.isEForkActive = isEForkActive
 
 	if !w.isEForkActive {
 		w.staticFeesConfig = staticFeesConfigFromContext(ctx)
