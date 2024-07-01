@@ -15,7 +15,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman/poll"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -660,15 +659,6 @@ func (t *Transitive) buildBlocks(ctx context.Context) error {
 		}
 		t.numBuilt.Inc()
 
-		// a newly created block is expected to be processing. If this check
-		// fails, there is potentially an error in the VM this engine is running
-		if status := blk.Status(); status != choices.Processing {
-			t.Ctx.Log.Warn("attempting to issue block with unexpected status",
-				zap.Stringer("expectedStatus", choices.Processing),
-				zap.Stringer("status", status),
-			)
-		}
-
 		// The newly created block should be built on top of the preferred block.
 		// Otherwise, the new block doesn't have the best chance of being confirmed.
 		parentID := blk.Parent()
@@ -1035,15 +1025,18 @@ func (t *Transitive) deliver(
 }
 
 func (t *Transitive) addToNonVerifieds(blk snowman.Block) {
-	// don't add this blk if it's decided or processing.
+	// If this block is processing, we don't need to add it to non-verifieds.
 	blkID := blk.ID()
-	if t.isDecided(blk) || t.Consensus.Processing(blkID) {
+	if t.Consensus.Processing(blkID) {
 		return
 	}
 	parentID := blk.Parent()
-	// we might still need this block so we can bubble votes to the parent
-	// only add blocks with parent already in the tree or processing.
-	// decided parents should not be in this map.
+	// We might still need this block so we can bubble votes to the parent.
+	//
+	// If the non-verified set contains the parentID, then we know that the
+	// parent is not decided and therefore blk is not decided.
+	// Similarly, if the parent is processing, then the parent is not decided
+	// and therefore blk is not decided.
 	if t.nonVerifieds.Has(parentID) || t.Consensus.Processing(parentID) {
 		t.nonVerifieds.Add(blkID, parentID)
 		t.nonVerifiedCache.Put(blkID, blk)
@@ -1132,7 +1125,6 @@ func (t *Transitive) getProcessingAncestor(ctx context.Context, initialVote ids.
 				zap.String("reason", "bubbled vote already decided"),
 				zap.Stringer("initialVoteID", initialVote),
 				zap.Stringer("bubbledVoteID", bubbledVote),
-				zap.Stringer("status", blk.Status()),
 				zap.Uint64("height", blk.Height()),
 			)
 			t.numProcessingAncestorFetchesDropped.Inc()
@@ -1147,18 +1139,8 @@ func (t *Transitive) getProcessingAncestor(ctx context.Context, initialVote ids.
 // issuance. If the block is already decided, already enqueued, or has already
 // been issued, this function will return false.
 func (t *Transitive) shouldIssueBlock(blk snowman.Block) bool {
-	height := blk.Height()
-	lastAcceptedID, lastAcceptedHeight := t.Consensus.LastAccepted()
-	if height <= lastAcceptedHeight {
-		return false // block is either accepted or rejected
-	}
-
-	// This is guaranteed not to underflow because the above check ensures
-	// [height] > 0.
-	parentHeight := height - 1
-	parentID := blk.Parent()
-	if parentHeight == lastAcceptedHeight && parentID != lastAcceptedID {
-		return false // the parent was rejected
+	if t.isDecided(blk) {
+		return false
 	}
 
 	blkID := blk.ID()
@@ -1181,14 +1163,18 @@ func (t *Transitive) canIssueChildOn(parentID ids.ID) bool {
 	return parentID == lastAcceptedID || t.Consensus.Processing(parentID)
 }
 
-// isDecided reports true if the provided block's status is Accepted, Rejected,
-// or if the block's height implies that the block is either Accepted or
-// Rejected.
+// isDecided reports true if the provided block's height implies that the block
+// is either Accepted or Rejected.
 func (t *Transitive) isDecided(blk snowman.Block) bool {
-	if blk.Status().Decided() {
-		return true
+	height := blk.Height()
+	lastAcceptedID, lastAcceptedHeight := t.Consensus.LastAccepted()
+	if height <= lastAcceptedHeight {
+		return true // block is either accepted or rejected
 	}
 
-	_, lastAcceptedHeight := t.Consensus.LastAccepted()
-	return blk.Height() <= lastAcceptedHeight
+	// This is guaranteed not to underflow because the above check ensures
+	// [height] > 0.
+	parentHeight := height - 1
+	parentID := blk.Parent()
+	return parentHeight == lastAcceptedHeight && parentID != lastAcceptedID // the parent was rejected
 }
