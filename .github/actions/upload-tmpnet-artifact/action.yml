@@ -1,0 +1,20 @@
+name: 'Upload an artifact of tmpnet data'
+description: 'Upload an artifact of data in the ~/.tmpnet path'
+
+inputs:
+  name:
+    description: "the name of the artifact to upload"
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Upload tmpnet data
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ inputs.name }}
+        path: |
+          ~/.tmpnet/networks
+          ~/.tmpnet/prometheus/prometheus.log
+          ~/.tmpnet/promtail/promtail.log
+        if-no-files-found: error
