@@ -19,10 +19,15 @@ const (
 
 // WaitForHealthy blocks until Node.IsHealthy returns true or an error (including context timeout) is observed.
 func WaitForHealthy(ctx context.Context, node *Node) error {
+	return WaitForHealthyWithInterval(ctx, node, DefaultNodeTickerInterval)
+}
+
+// WaitForHealthy blocks until Node.IsHealthy returns true or an error (including context timeout) is observed.
+func WaitForHealthyWithInterval(ctx context.Context, node *Node, interval time.Duration) error {
 	if _, ok := ctx.Deadline(); !ok {
 		return fmt.Errorf("unable to wait for health for node %q with a context without a deadline", node.NodeID)
 	}
-	ticker := time.NewTicker(DefaultNodeTickerInterval)
+	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
 	for {

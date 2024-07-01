@@ -1,0 +1,26 @@
+name: 'Check Bootstrap (testnet,state-sync)'
+
+on:
+  # TODO(marun) Add a schedule
+  workflow_dispatch:
+
+  # TODO(marun) For testing only - remove before merge
+  pull_request:
+
+jobs:
+  check_bootstrap_testnet_state_sync:
+    name: Check Bootstrap (testnet,state-sync)
+    runs-on: avalanche-avalanchego
+    timeout-minutes: 4320 # 3 days
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+    - name: Check bootstrap (testnet,state-sync)
+      uses: ./.github/actions/check-bootstrap
+      with:
+        network_id: 5 # testnet
+        state_sync_enabled: true
+        prometheus_id: ${{ secrets.PROMETHEUS_ID || '' }}
+        prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
+        loki_id: ${{ secrets.LOKI_ID || '' }}
+        loki_password: ${{ secrets.LOKI_PASSWORD || '' }}

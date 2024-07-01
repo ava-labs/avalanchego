@@ -46,20 +46,27 @@ func DefaultTestFlags() FlagsMap {
 	}
 }
 
+// Flags appropriate for networks that aren't intended to be publicly accessible.
+func DefaultLocalhostFlags() FlagsMap {
+	return FlagsMap{
+		config.PublicIPKey:    "127.0.0.1",
+		config.HTTPHostKey:    "127.0.0.1",
+		config.StakingHostKey: "127.0.0.1",
+	}
+}
+
 // Flags appropriate for tmpnet networks.
 func DefaultTmpnetFlags() FlagsMap {
 	// Supply only non-default configuration to ensure that default values will be used.
 	flags := FlagsMap{
 		// Specific to tmpnet deployment
-		config.PublicIPKey:        "127.0.0.1",
-		config.HTTPHostKey:        "127.0.0.1",
-		config.StakingHostKey:     "127.0.0.1",
 		config.LogDisplayLevelKey: logging.Off.String(), // Display logging not needed since nodes run headless
 		config.LogLevelKey:        logging.Debug.String(),
 		// Specific to e2e testing
 		config.MinStakeDurationKey:           DefaultMinStakeDuration.String(),
 		config.ProposerVMUseCurrentHeightKey: true,
 	}
+	flags.SetDefaults(DefaultLocalhostFlags())
 	flags.SetDefaults(DefaultTestFlags())
 	return flags
 }
