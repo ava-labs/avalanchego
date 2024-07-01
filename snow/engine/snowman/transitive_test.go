@@ -28,6 +28,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
 )
@@ -38,6 +39,48 @@ var (
 	errInvalid      = errors.New("invalid")
 	errTest         = errors.New("non-nil test")
 )
+
+// TODO improve block setup code
+func BuildOracleBlock(
+	parent *snowmantest.Block,
+	oracleStatus choices.Status,
+	optionStatus choices.Status,
+) *snowman.TestOracleBlock {
+	oracleBlk := BuildBlock(parent, oracleStatus)
+
+	return &snowman.TestOracleBlock{
+		Block: oracleBlk,
+		OptionsV: [2]snowman.Block{
+			BuildBlock(oracleBlk, optionStatus),
+			BuildBlock(oracleBlk, optionStatus),
+		},
+	}
+}
+
+// option must be [0, 1]
+func BuildBlockFromOracle(parent *snowman.TestOracleBlock, status choices.Status, option int) *snowmantest.Block {
+	return &snowmantest.Block{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: status,
+		},
+		ParentV: parent.OptionsV[option].ID(),
+		HeightV: parent.OptionsV[option].Height() + 1,
+		BytesV:  utils.RandomBytes(32),
+	}
+}
+
+func BuildBlock(parent *snowmantest.Block, status choices.Status) *snowmantest.Block {
+	return &snowmantest.Block{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: status,
+		},
+		ParentV: parent.ID(),
+		HeightV: parent.Height() + 1,
+		BytesV:  utils.RandomBytes(32),
+	}
+}
 
 func MakeGetBlockF(blks ...[]*snowmantest.Block) func(context.Context, ids.ID) (snowman.Block, error) {
 	return func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
@@ -3109,6 +3152,262 @@ func TestGetProcessingAncestor(t *testing.T) {
 			ancestor, found := test.engine.getProcessingAncestor(context.Background(), test.initialVote)
 			require.Equal(test.expectedAncestor, ancestor)
 			require.Equal(test.expectedFound, found)
+		})
+	}
+}
+
+// Tests that upon Start consensus is initialized with the last accepted block
+// and any previously processing preferred blocks are issued to consensus
+func TestTransitiveStart(t *testing.T) {
+	tests := []struct {
+		name  string
+		setup func(genesisBlk *snowmantest.Block) (
+			lastAccepted snowman.Block, // last accepted block
+			blks []snowman.Block, // All blocks the VM knows about
+			initialPreference snowman.Block, // initial consensus preference
+			wantSetPreferenceID ids.ID, // The preference the VM is set to by consensus
+			wantProcessingBlks []snowman.Block, // Blocks that should be processing in consensus after starting
+		)
+	}{
+		//		 [G]
+		{
+			name: "no blocks in preferred chain",
+			setup: func(genesisBlk *snowmantest.Block) (snowman.Block, []snowman.Block, snowman.Block, ids.ID, []snowman.Block) {
+				return genesisBlk, []snowman.Block{genesisBlk}, nil, genesisBlk.IDV, nil
+			},
+		},
+		//		  G
+		//		  |
+		//		  A
+		//		 / \
+		//	    B  *C*
+		//	    |
+		//	   [D]
+		{
+			name: "preferred chain before last accepted",
+			setup: func(genesisBlk *snowmantest.Block) (snowman.Block, []snowman.Block, snowman.Block, ids.ID, []snowman.Block) {
+				blkA := BuildBlock(genesisBlk, choices.Accepted)
+				blkB := BuildBlock(blkA, choices.Accepted)
+				blkC := BuildBlock(blkA, choices.Processing)
+				blkD := BuildBlock(blkB, choices.Accepted)
+
+				return blkD, []snowman.Block{genesisBlk, blkA, blkB, blkC, blkD}, blkC, blkD.IDV, nil
+			},
+		},
+		//		  G
+		//		  |
+		//		  A
+		//		 / \
+		//	    B  *C*
+		//	    |
+		//	   [D]
+		{
+			name: "preferred chain before last accepted - option block",
+			setup: func(genesisBlk *snowmantest.Block) (snowman.Block, []snowman.Block, snowman.Block, ids.ID, []snowman.Block) {
+				blkA := BuildOracleBlock(genesisBlk, choices.Accepted, choices.Processing)
+				blkC := blkA.OptionsV[1]
+				blkD := BuildBlockFromOracle(blkA, choices.Accepted, 0)
+
+				return blkD, []snowman.Block{genesisBlk, blkA, blkD}, blkC, blkD.IDV, nil
+			},
+		},
+		//		 [G]
+		//		  |
+		//		 *A*
+		{
+			name: "preferred chain after last accepted",
+			setup: func(genesisBlk *snowmantest.Block) (snowman.Block, []snowman.Block, snowman.Block, ids.ID, []snowman.Block) {
+				blkA := BuildBlock(genesisBlk, choices.Processing)
+
+				return genesisBlk, []snowman.Block{genesisBlk, blkA}, blkA, blkA.IDV, []snowman.Block{blkA}
+			},
+		},
+		//		 [G]
+		//		  |
+		//		 *A*
+		//		  |
+		//		 *B*
+		//		  |
+		//		 *C*
+		{
+			name: "preferred chain after last accepted - multiple blocks",
+			setup: func(genesisBlk *snowmantest.Block) (snowman.Block, []snowman.Block, snowman.Block, ids.ID, []snowman.Block) {
+				blkA := BuildBlock(genesisBlk, choices.Processing)
+				blkB := BuildBlock(blkA, choices.Processing)
+				blkC := BuildBlock(blkB, choices.Processing)
+
+				return genesisBlk, []snowman.Block{genesisBlk, blkA, blkB, blkC}, blkC, blkC.IDV, []snowman.Block{blkA, blkB, blkC}
+			},
+		},
+		//		 [G]
+		//		  |
+		//		 *A*
+		//		 / \
+		//	   *B*  C
+		{
+			name: "preferred chain after last accepted - oracle block",
+			setup: func(genesisBlk *snowmantest.Block) (snowman.Block, []snowman.Block, snowman.Block, ids.ID, []snowman.Block) {
+				blkA := BuildOracleBlock(genesisBlk, choices.Processing, choices.Processing)
+				blkB := blkA.OptionsV[0]
+
+				return genesisBlk, []snowman.Block{genesisBlk, blkA}, blkB, blkB.ID(), []snowman.Block{blkA, blkB}
+			},
+		},
+		// We should only store A -> B -> D because C is not the preferred
+		// option.
+		//		 [G]
+		//		  |
+		//		 *A*
+		//		 / \
+		//	   *B*  C
+		//	    |
+		//	   *D*
+		{
+			name: "preferred chain - preferred tip branching out of oracle block",
+			setup: func(genesisBlk *snowmantest.Block) (snowman.Block, []snowman.Block, snowman.Block, ids.ID, []snowman.Block) {
+				blkA := BuildOracleBlock(genesisBlk, choices.Processing, choices.Processing)
+				blkB := blkA.OptionsV[0]
+				blkD := BuildBlockFromOracle(blkA, choices.Processing, 0)
+
+				return genesisBlk, []snowman.Block{genesisBlk, blkA, blkD}, blkD, blkD.IDV, []snowman.Block{blkA, blkB, blkD}
+			},
+		},
+		// We should only re-issue the preferred chain if it extends the last
+		// accepted block
+		// option.
+		//		 [G]
+		//		  |
+		//		 *A*
+		//		 / \
+		//	   *B* [C]
+		//	    |
+		//	   *D*
+		{
+			name: "preferred chain - preferred tip branching out of oracle block",
+			setup: func(genesisBlk *snowmantest.Block) (snowman.Block, []snowman.Block, snowman.Block, ids.ID, []snowman.Block) {
+				blkA := BuildBlock(genesisBlk, choices.Accepted)
+				blkB := BuildBlock(blkA, choices.Processing)
+				blkC := BuildBlock(blkA, choices.Accepted)
+				blkD := BuildBlock(blkB, choices.Processing)
+
+				return blkC, []snowman.Block{genesisBlk, blkA, blkB, blkC, blkD}, blkD, blkD.IDV, nil
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+
+			cfg := DefaultConfig(t)
+			vals := validators.NewManager()
+			cfg.Validators = vals
+
+			sender := &common.SenderTest{T: t}
+			cfg.Sender = sender
+			sender.Default(true)
+
+			vm := &TestGetInitialPreferenceVM{
+				TestVM: &block.TestVM{},
+			}
+			vm.T = t
+			vm.Default(true)
+			vm.CantSetState = false
+			cfg.VM = vm
+
+			snowGetHandler, err := getter.New(
+				vm,
+				sender,
+				cfg.Ctx.Log,
+				time.Second,
+				2000,
+				cfg.Ctx.Registerer,
+			)
+			require.NoError(err)
+			cfg.AllGetsServer = snowGetHandler
+
+			genesisBlk := snowmantest.Genesis
+			lastAccepted, blks, initialPreference, wantSetPreferenceID, wantProcessingBlks := tt.setup(genesisBlk)
+			vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
+				return lastAccepted.ID(), nil
+			}
+
+			vm.GetInitialPreferenceF = func(context.Context) (ids.ID, error) {
+				if initialPreference != nil {
+					return initialPreference.ID(), nil
+				}
+
+				return lastAccepted.ID(), nil
+			}
+
+			vmBlockDB := map[ids.ID]snowman.Block{}
+			for _, blk := range blks {
+				vmBlockDB[blk.ID()] = blk
+
+				// If this is an oracle block, persist the children
+				oracleBlk, ok := blk.(snowman.OracleBlock)
+				if !ok {
+					continue
+				}
+
+				options, err := oracleBlk.Options(context.Background())
+				require.NoError(err)
+
+				vmBlockDB[options[0].ID()] = options[0]
+				vmBlockDB[options[1].ID()] = options[1]
+			}
+
+			vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
+				gotBlk, ok := vmBlockDB[blkID]
+				if !ok {
+					return nil, errUnknownBlock
+				}
+
+				return gotBlk, nil
+			}
+
+			te, err := New(cfg)
+			require.NoError(err)
+
+			var gotSetPreference *ids.ID
+
+			vm.SetPreferenceF = func(_ context.Context, blkID ids.ID) error {
+				if gotSetPreference != nil {
+					return fmt.Errorf("unexpected call to SetPreference: %s", blkID)
+				}
+
+				if blkID != wantSetPreferenceID {
+					return fmt.Errorf("unexpected preference: %s (wanted: %s)", blkID, wantSetPreferenceID)
+				}
+
+				gotSetPreference = &blkID
+				return nil
+			}
+
+			require.NoError(te.Start(context.Background(), 0))
+
+			// Consensus should be initialized with the last accepted block
+			gotLastAccepted, lastAcceptedHeight := te.Consensus.LastAccepted()
+			require.Equal(lastAccepted.ID(), gotLastAccepted)
+			require.Equal(lastAccepted.Height(), lastAcceptedHeight)
+
+			// Any previously preferred blocks should be re-issued into
+			// consensus
+			for _, blk := range wantProcessingBlks {
+				require.True(te.Consensus.Processing(blk.ID()))
+				require.True(te.Consensus.IsPreferred(blk.ID()))
+				gotPreferredID, ok := te.Consensus.PreferenceAtHeight(blk.Height())
+				require.True(ok)
+				require.Equal(blk.ID(), gotPreferredID)
+			}
+
+			require.Equal(len(wantProcessingBlks), te.Consensus.NumProcessing())
+
+			if len(wantProcessingBlks) > 0 {
+				// We should prefer the block in our preferred chain with the
+				// largest height
+				require.Equal(wantProcessingBlks[len(wantProcessingBlks)-1].ID(), te.Consensus.Preference())
+			}
 		})
 	}
 }

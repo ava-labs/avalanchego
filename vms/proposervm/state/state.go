@@ -4,10 +4,16 @@
 package state
 
 import (
+	"fmt"
+
 	"github.com/prometheus/client_golang/prometheus"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 var (
@@ -20,24 +26,29 @@ type State interface {
 	ChainState
 	BlockState
 	HeightIndex
+	ProcessingBlockIndex
 }
 
 type state struct {
 	ChainState
 	BlockState
 	HeightIndex
+	processingBlockIndex
 }
 
-func New(db *versiondb.Database) State {
+func New(db *versiondb.Database) (State, error) {
 	chainDB := prefixdb.New(chainStatePrefix, db)
 	blockDB := prefixdb.New(blockStatePrefix, db)
 	heightDB := prefixdb.New(heightIndexPrefix, db)
 
-	return &state{
-		ChainState:  NewChainState(chainDB),
-		BlockState:  NewBlockState(blockDB),
-		HeightIndex: NewHeightIndex(heightDB, db),
+	s := &state{
+		ChainState:           NewChainState(chainDB),
+		BlockState:           NewBlockState(blockDB),
+		HeightIndex:          NewHeightIndex(heightDB, db),
+		processingBlockIndex: newProcessingBlockIndex(db),
 	}
+
+	return s, s.pruneProcessingBlocks(db)
 }
 
 func NewMetered(db *versiondb.Database, namespace string, metrics prometheus.Registerer) (State, error) {
@@ -50,9 +61,67 @@ func NewMetered(db *versiondb.Database, namespace string, metrics prometheus.Reg
 		return nil, err
 	}
 
-	return &state{
-		ChainState:  NewChainState(chainDB),
-		BlockState:  blockState,
-		HeightIndex: NewHeightIndex(heightDB, db),
-	}, nil
+	s := &state{
+		ChainState:           NewChainState(chainDB),
+		BlockState:           blockState,
+		HeightIndex:          NewHeightIndex(heightDB, db),
+		processingBlockIndex: newProcessingBlockIndex(db),
+	}
+
+	return s, s.pruneProcessingBlocks(db)
+}
+
+func (s *state) pruneProcessingBlocks(db *versiondb.Database) error {
+	preferredID, err := s.ChainState.GetPreference()
+	switch {
+	case err == database.ErrNotFound:
+		return nil
+	case err != nil:
+		return fmt.Errorf("failed to get preference: %w", err)
+	}
+
+	// Prune all processing blocks that are not in the preferred chain
+	preferredBlkIDs := set.Set[ids.ID]{}
+	preferredBlk, status, err := s.BlockState.GetBlock(preferredID)
+	if err != nil {
+		return fmt.Errorf("failed to get preferred chain tip %s: %w", preferredID, err)
+	}
+
+	for status == choices.Processing {
+		preferredBlkIDs.Add(preferredBlk.ID())
+
+		parentID := preferredBlk.ParentID()
+		preferredBlk, status, err = s.BlockState.GetBlock(parentID)
+		if err != nil {
+			return fmt.Errorf("failed to get block in preferred chain %s: %w", parentID, err)
+		}
+	}
+
+	iter := s.processingBlockIndex.db.NewIterator()
+	defer iter.Release()
+
+	for iter.Next() {
+		blkID, err := ids.ToID(iter.Key())
+		if err != nil {
+			return fmt.Errorf("failed to parse processing block id: %w", err)
+		}
+
+		if preferredBlkIDs.Contains(blkID) {
+			continue
+		}
+
+		if err := s.processingBlockIndex.DeleteProcessingBlock(blkID); err != nil {
+			return fmt.Errorf("failed to delete processing block %s from index: %w", blkID, err)
+		}
+
+		if err := s.BlockState.DeleteBlock(blkID); err != nil {
+			return fmt.Errorf("failed to delete processing block %s: %w", blkID, err)
+		}
+	}
+
+	if err := iter.Error(); err != nil {
+		return err
+	}
+
+	return db.Commit()
 }

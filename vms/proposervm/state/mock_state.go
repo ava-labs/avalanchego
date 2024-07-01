@@ -83,6 +83,20 @@ func (mr *MockStateMockRecorder) DeleteLastAccepted() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteLastAccepted", reflect.TypeOf((*MockState)(nil).DeleteLastAccepted))
 }
 
+// DeleteProcessingBlock mocks base method.
+func (m *MockState) DeleteProcessingBlock(arg0 ids.ID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteProcessingBlock", arg0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteProcessingBlock indicates an expected call of DeleteProcessingBlock.
+func (mr *MockStateMockRecorder) DeleteProcessingBlock(arg0 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteProcessingBlock", reflect.TypeOf((*MockState)(nil).DeleteProcessingBlock), arg0)
+}
+
 // GetBlock mocks base method.
 func (m *MockState) GetBlock(arg0 ids.ID) (block.Block, choices.Status, error) {
 	m.ctrl.T.Helper()
@@ -159,6 +173,36 @@ func (mr *MockStateMockRecorder) GetMinimumHeight() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMinimumHeight", reflect.TypeOf((*MockState)(nil).GetMinimumHeight))
 }
 
+// GetPreference mocks base method.
+func (m *MockState) GetPreference() (ids.ID, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetPreference")
+	ret0, _ := ret[0].(ids.ID)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetPreference indicates an expected call of GetPreference.
+func (mr *MockStateMockRecorder) GetPreference() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPreference", reflect.TypeOf((*MockState)(nil).GetPreference))
+}
+
+// HasProcessingBlock mocks base method.
+func (m *MockState) HasProcessingBlock(arg0 ids.ID) (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "HasProcessingBlock", arg0)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// HasProcessingBlock indicates an expected call of HasProcessingBlock.
+func (mr *MockStateMockRecorder) HasProcessingBlock(arg0 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HasProcessingBlock", reflect.TypeOf((*MockState)(nil).HasProcessingBlock), arg0)
+}
+
 // PutBlock mocks base method.
 func (m *MockState) PutBlock(arg0 block.Block, arg1 choices.Status) error {
 	m.ctrl.T.Helper()
@@ -171,6 +215,20 @@ func (m *MockState) PutBlock(arg0 block.Block, arg1 choices.Status) error {
 func (mr *MockStateMockRecorder) PutBlock(arg0, arg1 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutBlock", reflect.TypeOf((*MockState)(nil).PutBlock), arg0, arg1)
+}
+
+// PutProcessingBlock mocks base method.
+func (m *MockState) PutProcessingBlock(arg0 ids.ID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PutProcessingBlock", arg0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// PutProcessingBlock indicates an expected call of PutProcessingBlock.
+func (mr *MockStateMockRecorder) PutProcessingBlock(arg0 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutProcessingBlock", reflect.TypeOf((*MockState)(nil).PutProcessingBlock), arg0)
 }
 
 // SetBlockIDAtHeight mocks base method.
@@ -213,4 +271,18 @@ func (m *MockState) SetLastAccepted(arg0 ids.ID) error {
 func (mr *MockStateMockRecorder) SetLastAccepted(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetLastAccepted", reflect.TypeOf((*MockState)(nil).SetLastAccepted), arg0)
+}
+
+// SetPreference mocks base method.
+func (m *MockState) SetPreference(arg0 ids.ID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetPreference", arg0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SetPreference indicates an expected call of SetPreference.
+func (mr *MockStateMockRecorder) SetPreference(arg0 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetPreference", reflect.TypeOf((*MockState)(nil).SetPreference), arg0)
 }

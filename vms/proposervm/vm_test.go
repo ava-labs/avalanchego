@@ -1706,6 +1706,7 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 		SignedBlock: ySlb,
 		postForkCommonComponents: postForkCommonComponents{
 			vm:       proVM,
+			outerBlk: ySlb,
 			innerBlk: yBlock,
 			status:   choices.Processing,
 		},
@@ -1940,7 +1941,7 @@ func TestVMInnerBlkCache(t *testing.T) {
 	{
 		innerBlk := snowmantest.NewMockBlock(ctrl)
 		innerBlkID := ids.GenerateTestID()
-		innerVM.EXPECT().LastAccepted(gomock.Any()).Return(innerBlkID, nil)
+		innerVM.EXPECT().LastAccepted(gomock.Any()).Return(innerBlkID, nil).Times(2)
 		innerVM.EXPECT().GetBlock(gomock.Any(), innerBlkID).Return(innerBlk, nil)
 	}
 
@@ -2154,7 +2155,7 @@ func TestVM_VerifyBlockWithContext(t *testing.T) {
 	{
 		innerBlk := snowmantest.NewMockBlock(ctrl)
 		innerBlkID := ids.GenerateTestID()
-		innerVM.EXPECT().LastAccepted(gomock.Any()).Return(innerBlkID, nil)
+		innerVM.EXPECT().LastAccepted(gomock.Any()).Return(innerBlkID, nil).Times(2)
 		innerVM.EXPECT().GetBlock(gomock.Any(), innerBlkID).Return(innerBlk, nil)
 	}
 
@@ -2176,6 +2177,12 @@ func TestVM_VerifyBlockWithContext(t *testing.T) {
 		require.NoError(vm.Shutdown(context.Background()))
 	}()
 
+	signedBlk, err := statelessblock.BuildUnsigned(ids.GenerateTestID(), time.Time{}, 0, []byte("foobar"))
+	require.NoError(err)
+	statelessBlk := postForkBlock{
+		SignedBlock: signedBlk,
+	}
+
 	{
 		pChainHeight := uint64(0)
 		innerBlk := blockWithVerifyContext{
@@ -2196,6 +2203,7 @@ func TestVM_VerifyBlockWithContext(t *testing.T) {
 		blk.EXPECT().getInnerBlk().Return(innerBlk).AnyTimes()
 		blkID := ids.GenerateTestID()
 		blk.EXPECT().ID().Return(blkID).AnyTimes()
+		blk.EXPECT().getStatelessBlk().Return(statelessBlk).Times(2)
 
 		require.NoError(vm.verifyAndRecordInnerBlk(
 			context.Background(),
@@ -2238,6 +2246,7 @@ func TestVM_VerifyBlockWithContext(t *testing.T) {
 		blk.EXPECT().getInnerBlk().Return(innerBlk).AnyTimes()
 		blkID := ids.GenerateTestID()
 		blk.EXPECT().ID().Return(blkID).AnyTimes()
+		blk.EXPECT().getStatelessBlk().Return(statelessBlk)
 		require.NoError(vm.verifyAndRecordInnerBlk(
 			context.Background(),
 			&block.Context{
@@ -2260,6 +2269,7 @@ func TestVM_VerifyBlockWithContext(t *testing.T) {
 		blk.EXPECT().getInnerBlk().Return(innerBlk).AnyTimes()
 		blkID := ids.GenerateTestID()
 		blk.EXPECT().ID().Return(blkID).AnyTimes()
+		blk.EXPECT().getStatelessBlk().Return(statelessBlk)
 		require.NoError(vm.verifyAndRecordInnerBlk(context.Background(), nil, blk))
 	}
 }
@@ -2508,4 +2518,466 @@ func TestHistoricalBlockDeletion(t *testing.T) {
 
 	issueBlock()
 	requireNumHeights(newNumHistoricalBlocks)
+}
+
+// Tests end-to-end flow for block preferences. Blocks should be persisted upon
+// verification and deleted upon accept/reject.
+func TestBlockDecision(t *testing.T) {
+	innerGenesisBlk := &snowmantest.Block{
+		TestDecidable: choices.TestDecidable{
+			StatusV: choices.Accepted,
+		},
+		HeightV: 0,
+		BytesV:  []byte("genesis"),
+	}
+	innerBuiltBlk := &snowmantest.Block{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		HeightV: 1,
+		BytesV:  []byte("block 1"),
+	}
+
+	tests := []struct {
+		name   string
+		reject bool
+	}{
+		{
+			name: "accept",
+		},
+		{
+			name:   "reject",
+			reject: true,
+		},
+	}
+
+	for _, tt := range tests {
+		require := require.New(t)
+		ctx := context.Background()
+
+		vm := &block.TestVM{
+			TestVM: common.TestVM{
+				InitializeF: func(
+					context.Context,
+					*snow.Context,
+					database.Database,
+					[]byte,
+					[]byte,
+					[]byte,
+					chan<- common.Message,
+					[]*common.Fx,
+					common.AppSender,
+				) error {
+					return nil
+				},
+			},
+			BuildBlockF: func(context.Context) (snowman.Block, error) {
+				return innerBuiltBlk, nil
+			},
+			LastAcceptedF: func(context.Context) (ids.ID, error) {
+				return innerGenesisBlk.ID(), nil
+			},
+			GetBlockF: func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
+				switch blkID {
+				case innerGenesisBlk.ID():
+					return innerGenesisBlk, nil
+				case innerBuiltBlk.ID():
+					return innerBuiltBlk, nil
+				default:
+					return nil, fmt.Errorf("%w: %s", database.ErrNotFound, blkID)
+				}
+			},
+			ParseBlockF: func(_ context.Context, blkBytes []byte) (snowman.Block, error) {
+				switch {
+				case bytes.Equal(blkBytes, innerGenesisBlk.Bytes()):
+					return innerGenesisBlk, nil
+				case bytes.Equal(blkBytes, innerBuiltBlk.Bytes()):
+					return innerBuiltBlk, nil
+				default:
+					return nil, errors.New("unexpected block")
+				}
+			},
+		}
+
+		chainID := ids.GenerateTestID()
+		chainCtx := snowtest.Context(t, chainID)
+		chainCtx.ValidatorState = &validators.TestState{
+			GetMinimumHeightF: func(context.Context) (uint64, error) {
+				return 0, nil
+			},
+			GetCurrentHeightF: func(context.Context) (uint64, error) {
+				return 0, nil
+			},
+			GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+				return map[ids.NodeID]*validators.GetValidatorOutput{}, nil
+			},
+		}
+
+		db := memdb.New()
+
+		proposerVM := New(vm, Config{
+			Registerer: prometheus.NewRegistry(),
+		})
+		require.NoError(proposerVM.Initialize(
+			ctx,
+			chainCtx,
+			db,
+			[]byte("genesis"),
+			[]byte("upgrade"),
+			[]byte("config"),
+			nil,
+			nil,
+			nil,
+		))
+
+		genesisBlk, err := statelessblock.BuildUnsigned(
+			ids.Empty,
+			time.Time{},
+			0,
+			innerGenesisBlk.Bytes(),
+		)
+		require.NoError(err)
+		require.NoError(proposerVM.PutBlock(genesisBlk, choices.Accepted))
+		require.NoError(proposerVM.SetPreference(ctx, genesisBlk.ID()))
+		require.NoError(proposerVM.SetState(ctx, snow.NormalOp))
+
+		builtBlk, err := proposerVM.BuildBlock(ctx)
+		require.NoError(err)
+
+		require.NoError(builtBlk.Verify(ctx))
+		gotBlk, err := proposerVM.GetBlock(ctx, builtBlk.ID())
+		require.NoError(err)
+		require.Equal(choices.Processing, gotBlk.Status())
+
+		ok, err := proposerVM.HasProcessingBlock(builtBlk.ID())
+		require.NoError(err)
+		require.True(ok)
+
+		require.NoError(proposerVM.Shutdown(ctx))
+
+		// Restart the VM
+		proposerVM = New(vm, Config{
+			Registerer: prometheus.NewRegistry(),
+		})
+		require.NoError(proposerVM.Initialize(
+			ctx,
+			chainCtx,
+			db,
+			[]byte("genesis"),
+			[]byte("upgrade"),
+			[]byte("config"),
+			nil,
+			nil,
+			nil,
+		))
+
+		builtBlk, err = proposerVM.BuildBlock(ctx)
+		require.NoError(err)
+
+		require.NoError(builtBlk.Verify(ctx))
+		gotBlk, err = proposerVM.GetBlock(ctx, builtBlk.ID())
+		require.NoError(err)
+		require.Equal(choices.Processing, gotBlk.Status())
+
+		if tt.reject {
+			require.NoError(builtBlk.Reject(ctx))
+		} else {
+			require.NoError(builtBlk.Accept(ctx))
+		}
+
+		ok, err = proposerVM.HasProcessingBlock(builtBlk.ID())
+		require.NoError(err)
+		require.False(ok)
+
+		if tt.reject {
+			require.NoError(builtBlk.Reject(ctx))
+			_, err = proposerVM.GetBlock(ctx, builtBlk.ID())
+			require.ErrorIs(err, database.ErrNotFound)
+		} else {
+			require.NoError(builtBlk.Accept(ctx))
+			gotBlk, err = proposerVM.GetBlock(ctx, builtBlk.ID())
+			require.NoError(err, nil)
+			require.Equal(choices.Accepted, gotBlk.Status())
+		}
+
+		require.NoError(proposerVM.Shutdown(ctx))
+	}
+}
+
+// The VM should set its initial preference to its previous preference
+func TestProposerVMInitialPreference(t *testing.T) {
+	cert, err := staking.NewTLSCert()
+	require.NoError(t, err)
+	stakingCert, err := staking.ParseCertificate(cert.Leaf.Raw)
+	require.NoError(t, err)
+	signer := cert.PrivateKey.(crypto.Signer)
+
+	// Create a blockchain with one accepted block and one processing block
+	//	   [0]
+	//		|
+	//	  *[1]*
+	blk0, err := statelessblock.Build(
+		ids.GenerateTestID(),
+		time.Time{},
+		0,
+		stakingCert,
+		[]byte{0},
+		ids.Empty,
+		signer,
+	)
+	require.NoError(t, err)
+
+	blk1, err := statelessblock.Build(
+		blk0.ID(),
+		time.Time{},
+		0,
+		stakingCert,
+		[]byte{0},
+		ids.Empty,
+		signer,
+	)
+	require.NoError(t, err)
+
+	tests := []struct {
+		name                    string
+		lastAccepted            statelessblock.Block
+		initialPreference       statelessblock.Block
+		initialPreferenceStatus choices.Status
+		wantInitialPreferenceID ids.ID
+	}{
+		{
+			// If there is no prior preference we should default to the last
+			// accepted block
+			name:                    "previous preference is last accepted",
+			lastAccepted:            blk0,
+			initialPreference:       blk0,
+			initialPreferenceStatus: choices.Accepted,
+			wantInitialPreferenceID: blk0.ID(),
+		},
+		{
+			// If there is a prior preference we should prefer it
+			name:                    "previous preference is not last accepted",
+			lastAccepted:            blk0,
+			initialPreference:       blk1,
+			initialPreferenceStatus: choices.Processing,
+			wantInitialPreferenceID: blk1.ID(),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+			ctx := context.Background()
+
+			innerVM := &block.TestVM{
+				TestVM: common.TestVM{
+					InitializeF: func(
+						context.Context,
+						*snow.Context,
+						database.Database,
+						[]byte,
+						[]byte,
+						[]byte,
+						chan<- common.Message,
+						[]*common.Fx,
+						common.AppSender,
+					) error {
+						return nil
+					},
+				},
+				LastAcceptedF: func(context.Context) (ids.ID, error) {
+					return tt.lastAccepted.ID(), nil
+				},
+				GetBlockF: func(context.Context, ids.ID) (snowman.Block, error) {
+					return nil, nil
+				},
+			}
+
+			chainCtx := snowtest.Context(t, ids.GenerateTestID())
+			db := memdb.New()
+
+			vm := New(innerVM, Config{
+				Registerer: prometheus.NewRegistry(),
+			})
+			require.NoError(vm.Initialize(
+				ctx,
+				chainCtx,
+				db,
+				nil,
+				nil,
+				nil,
+				make(chan common.Message),
+				nil,
+				&common.SenderTest{},
+			))
+
+			require.NoError(vm.State.PutBlock(tt.lastAccepted, choices.Accepted))
+
+			require.NoError(vm.State.PutBlock(tt.initialPreference, tt.initialPreferenceStatus))
+			require.NoError(vm.State.SetPreference(tt.initialPreference.ID()))
+
+			require.NoError(vm.Shutdown(ctx))
+
+			vm = New(innerVM, Config{
+				Registerer: prometheus.NewRegistry(),
+			})
+			require.NoError(vm.Initialize(
+				ctx,
+				chainCtx,
+				db,
+				nil,
+				nil,
+				nil,
+				make(chan common.Message),
+				nil,
+				&common.SenderTest{},
+			))
+
+			got, err := vm.GetInitialPreference(ctx)
+			require.NoError(err)
+			require.Equal(tt.wantInitialPreferenceID, got)
+
+			require.NoError(vm.Shutdown(ctx))
+		})
+	}
+}
+
+func TestOnlyPreferredOptionPersisted(t *testing.T) {
+	require := require.New(t)
+	ctx := context.Background()
+
+	chainCtx := snowtest.Context(t, ids.GenerateTestID())
+	chainCtx.ValidatorState = &validators.TestState{
+		GetCurrentHeightF: func(context.Context) (uint64, error) {
+			return 0, nil
+		},
+	}
+
+	innerVM := &block.TestVM{
+		TestVM: common.TestVM{
+			InitializeF: func(
+				context.Context,
+				*snow.Context,
+				database.Database,
+				[]byte,
+				[]byte,
+				[]byte,
+				chan<- common.Message,
+				[]*common.Fx,
+				common.AppSender,
+			) error {
+				return nil
+			},
+		},
+	}
+	vm := New(innerVM, Config{
+		Registerer: prometheus.NewRegistry(),
+	})
+
+	blk0 := &snowmantest.Block{}
+
+	outerBlk1, err := statelessblock.BuildUnsigned(
+		blk0.ID(),
+		time.Time{},
+		0,
+		[]byte("foobar"),
+	)
+	require.NoError(err)
+
+	innerBlk1 := &snowman.TestOracleBlock{
+		Block: &snowmantest.Block{
+			TestDecidable: choices.TestDecidable{
+				IDV:     ids.GenerateTestID(),
+				StatusV: choices.Processing,
+			},
+			ParentV: blk0.ID(),
+			HeightV: blk0.HeightV + 1,
+			BytesV:  []byte{0},
+		},
+	}
+
+	innerBlk1.OptionsV = [2]snowman.Block{
+		&snowmantest.Block{
+			TestDecidable: choices.TestDecidable{
+				IDV:     ids.GenerateTestID(),
+				StatusV: choices.Processing,
+			},
+			ParentV: innerBlk1.IDV,
+			HeightV: innerBlk1.HeightV + 1,
+			BytesV:  []byte{1},
+		},
+		&snowmantest.Block{
+			TestDecidable: choices.TestDecidable{
+				IDV:     ids.GenerateTestID(),
+				StatusV: choices.Processing,
+			},
+			ParentV: innerBlk1.IDV,
+			HeightV: innerBlk1.HeightV + 1,
+			BytesV:  []byte{2},
+		},
+	}
+
+	blk1 := &postForkBlock{
+		SignedBlock: outerBlk1,
+		postForkCommonComponents: postForkCommonComponents{
+			vm:       vm,
+			outerBlk: outerBlk1,
+			innerBlk: innerBlk1,
+			status:   choices.Processing,
+		},
+	}
+
+	innerVM.LastAcceptedF = func(context.Context) (ids.ID, error) {
+		return blk0.ID(), nil
+	}
+
+	innerVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
+		switch blkID {
+		case blk0.ID():
+			return blk0, nil
+		default:
+			return nil, errors.New("unexpected block")
+		}
+	}
+
+	db := memdb.New()
+	require.NoError(vm.Initialize(
+		ctx,
+		chainCtx,
+		db,
+		nil,
+		nil,
+		nil,
+		make(chan common.Message),
+		nil,
+		&common.SenderTest{},
+	))
+
+	require.NoError(blk1.Verify(ctx))
+
+	options, err := blk1.Options(ctx)
+	require.NoError(err)
+	optionBlk0 := options[0]
+	optionBlk1 := options[1]
+
+	require.NoError(optionBlk0.Verify(ctx))
+	require.NoError(optionBlk1.Verify(ctx))
+
+	// invariant: we prefer the first option
+	require.NoError(vm.SetPreference(ctx, optionBlk0.ID()))
+
+	// invariant: we only store the preferred chain
+	require.True(vm.HasProcessingBlock(blk1.ID()))
+	require.True(vm.HasProcessingBlock(optionBlk0.ID()))
+	require.False(vm.HasProcessingBlock(optionBlk1.ID()))
+
+	// changing preferences should still persist the correct chain
+	require.NoError(vm.SetPreference(ctx, optionBlk1.ID()))
+
+	require.True(vm.HasProcessingBlock(blk1.ID()))
+	require.False(vm.HasProcessingBlock(optionBlk0.ID()))
+	require.True(vm.HasProcessingBlock(optionBlk1.ID()))
+
+	require.NoError(vm.Shutdown(ctx))
 }

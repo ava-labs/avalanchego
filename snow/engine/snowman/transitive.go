@@ -6,6 +6,7 @@ package snowman
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
@@ -20,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/ancestor"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/job"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/bag"
@@ -54,7 +56,8 @@ type Transitive struct {
 	common.AppHandler
 	validators.Connector
 
-	requestID uint32
+	getInitialPreferenceVM block.GetInitialPreferenceVM
+	requestID              uint32
 
 	// track outstanding preference requests
 	polls poll.Set
@@ -128,6 +131,7 @@ func New(config Config) (*Transitive, error) {
 		return nil, err
 	}
 
+	getInitialPreferenceVM, _ := config.VM.(block.GetInitialPreferenceVM)
 	return &Transitive{
 		Config:                      config,
 		metrics:                     metrics,
@@ -138,6 +142,7 @@ func New(config Config) (*Transitive, error) {
 		AncestorsHandler:            common.NewNoOpAncestorsHandler(config.Ctx.Log),
 		AppHandler:                  config.VM,
 		Connector:                   config.VM,
+		getInitialPreferenceVM:      getInitialPreferenceVM,
 		pending:                     make(map[ids.ID]snowman.Block),
 		nonVerifieds:                ancestor.NewTree(),
 		nonVerifiedCache:            nonVerifiedCache,
@@ -477,41 +482,79 @@ func (t *Transitive) Start(ctx context.Context, startReqID uint32) error {
 		return err
 	}
 
+	var (
+		preferredID    ids.ID
+		preferredBlock snowman.Block
+	)
+
+	// Default to using the last accepted block if the VM does not define its
+	// own initial preferred block.
+	if t.getInitialPreferenceVM == nil {
+		preferredID = lastAcceptedID
+		preferredBlock = lastAccepted
+	} else {
+		preferredID, err = t.getInitialPreferenceVM.GetInitialPreference(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to get initial preference: %w", err)
+		}
+
+		preferredBlock, err = t.VM.GetBlock(ctx, preferredID)
+		if err != nil {
+			return fmt.Errorf("failed to get initial preferred block: %w", err)
+		}
+	}
+
+	// Check if the initial setup is more recent than the last accepted
+	// block. This can occur if we shut down while a set of blocks was still
+	// processing in consensus.
+	preferredTip := lastAcceptedID
+	if preferredBlock.Height() > lastAccepted.Height() {
+		preferredTip = preferredID
+	}
+
+	preferredChain := make([]snowman.Block, 0)
+	for preferredBlock.Height() > lastAccepted.Height() {
+		preferredChain = append(preferredChain, preferredBlock)
+		preferredBlock, err = t.VM.GetBlock(ctx, preferredBlock.Parent())
+		if err != nil {
+			return err
+		}
+	}
+
 	// initialize consensus to the last accepted blockID
 	lastAcceptedHeight := lastAccepted.Height()
 	if err := t.Consensus.Initialize(t.Ctx, t.Params, lastAcceptedID, lastAcceptedHeight, lastAccepted.Timestamp()); err != nil {
 		return err
 	}
 
-	// to maintain the invariant that oracle blocks are issued in the correct
-	// preferences, we need to handle the case that we are bootstrapping into an oracle block
-	if oracleBlk, ok := lastAccepted.(snowman.OracleBlock); ok {
-		options, err := oracleBlk.Options(ctx)
-		switch {
-		case err == snowman.ErrNotOracle:
-			// if there aren't blocks we need to deliver on startup, we need to set
-			// the preference to the last accepted block
-			if err := t.VM.SetPreference(ctx, lastAcceptedID); err != nil {
+	issuedMetric := t.metrics.issued.WithLabelValues(builtSource)
+
+	// Re-issue all blocks in the preferred chain into consensus if the
+	// preferred chain extends the last accepted block
+	if len(preferredChain) > 0 && preferredChain[len(preferredChain)-1].Parent() == lastAcceptedID {
+		// reverse the preferred chain so the blocks are now in chronological order
+		slices.Reverse(preferredChain)
+
+		for _, preferredBlk := range preferredChain {
+			if _, err := t.addUnverifiedBlockToConsensus(
+				ctx,
+				t.Ctx.NodeID,
+				preferredBlk,
+				issuedMetric,
+			); err != nil {
 				return err
 			}
-		case err != nil:
-			return err
-		default:
-			issuedMetric := t.metrics.issued.WithLabelValues(builtSource)
-			for _, blk := range options {
-				// note that deliver will set the VM's preference
-				if err := t.deliver(ctx, t.Ctx.NodeID, blk, false, issuedMetric); err != nil {
-					return err
-				}
-			}
 		}
-	} else if err := t.VM.SetPreference(ctx, lastAcceptedID); err != nil {
+	}
+
+	if err := t.VM.SetPreference(ctx, preferredTip); err != nil {
 		return err
 	}
 
 	t.Ctx.Log.Info("starting consensus",
 		zap.Stringer("lastAcceptedID", lastAcceptedID),
 		zap.Uint64("lastAcceptedHeight", lastAcceptedHeight),
+		zap.Stringer("preferredID", preferredTip),
 	)
 	t.metrics.bootstrapFinished.Set(1)
 
