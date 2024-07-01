@@ -80,10 +80,14 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 
 			stateDiff.SetTimestamp(test.time)
 
+			feeCalculator, err := state.PickFeeCalculator(env.config, stateDiff)
+			require.NoError(err)
+
 			executor := StandardTxExecutor{
-				Backend: &env.backend,
-				State:   stateDiff,
-				Tx:      tx,
+				Backend:       &env.backend,
+				FeeCalculator: feeCalculator,
+				State:         stateDiff,
+				Tx:            tx,
 			}
 			err = tx.Unsigned.Visit(&executor)
 			require.ErrorIs(err, test.expectedErr)

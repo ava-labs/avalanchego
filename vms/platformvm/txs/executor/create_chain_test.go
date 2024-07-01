@@ -50,11 +50,14 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 
 	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
+	feeCalculator, err := state.PickFeeCalculator(env.config, stateDiff)
+	require.NoError(err)
 
 	executor := StandardTxExecutor{
-		Backend: &env.backend,
-		State:   stateDiff,
-		Tx:      tx,
+		Backend:       &env.backend,
+		FeeCalculator: feeCalculator,
+		State:         stateDiff,
+		Tx:            tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
 	require.ErrorIs(err, errUnauthorizedSubnetModification)
@@ -91,10 +94,13 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
+	feeCalculator, err := state.PickFeeCalculator(env.config, stateDiff)
+	require.NoError(err)
 	executor := StandardTxExecutor{
-		Backend: &env.backend,
-		State:   stateDiff,
-		Tx:      tx,
+		Backend:       &env.backend,
+		FeeCalculator: feeCalculator,
+		State:         stateDiff,
+		Tx:            tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
 	require.ErrorIs(err, errUnauthorizedSubnetModification)
@@ -125,10 +131,16 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
+	builderDiff, err := state.NewDiffOn(stateDiff)
+	require.NoError(err)
+	feeCalculator, err := state.PickFeeCalculator(env.config, builderDiff)
+	require.NoError(err)
+
 	executor := StandardTxExecutor{
-		Backend: &env.backend,
-		State:   stateDiff,
-		Tx:      tx,
+		Backend:       &env.backend,
+		FeeCalculator: feeCalculator,
+		State:         stateDiff,
+		Tx:            tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
 	require.ErrorIs(err, database.ErrNotFound)
@@ -156,10 +168,16 @@ func TestCreateChainTxValid(t *testing.T) {
 	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
+	builderDiff, err := state.NewDiffOn(stateDiff)
+	require.NoError(err)
+	feeCalculator, err := state.PickFeeCalculator(env.config, builderDiff)
+	require.NoError(err)
+
 	executor := StandardTxExecutor{
-		Backend: &env.backend,
-		State:   stateDiff,
-		Tx:      tx,
+		Backend:       &env.backend,
+		FeeCalculator: feeCalculator,
+		State:         stateDiff,
+		Tx:            tx,
 	}
 	require.NoError(tx.Unsigned.Visit(&executor))
 }
@@ -226,10 +244,14 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 
 			stateDiff.SetTimestamp(test.time)
 
+			feeCalculator, err := state.PickFeeCalculator(env.config, stateDiff)
+			require.NoError(err)
+
 			executor := StandardTxExecutor{
-				Backend: &env.backend,
-				State:   stateDiff,
-				Tx:      tx,
+				Backend:       &env.backend,
+				FeeCalculator: feeCalculator,
+				State:         stateDiff,
+				Tx:            tx,
 			}
 			err = tx.Unsigned.Visit(&executor)
 			require.ErrorIs(err, test.expectedError)
