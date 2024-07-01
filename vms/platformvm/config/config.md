@@ -224,3 +224,9 @@ Time of the E network upgrade
 _Boolean_
 
 UseCurrentHeight forces `GetMinimumHeight` to return the current height of the P-Chain instead of the oldest block in the `recentlyAccepted` window. This config is particularly useful for triggering proposervm activation on recently created Subnets (without this, users need to wait for `recentlyAcceptedWindowTTL` to pass for activation to occur).
+
+### `VRFSigTime`
+
+_Time_
+
+Time of the VRFSig network upgrade

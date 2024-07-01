@@ -802,6 +802,8 @@ func (m *manager) createAvalancheChain(
 			StakingLeafSigner:   m.StakingTLSSigner,
 			StakingCertLeaf:     m.StakingTLSCert,
 			Registerer:          proposervmReg,
+			StakingBLSKey:       m.StakingBLSKey,
+			VRFSigTime:          version.GetVRFSigTime(m.NetworkID),
 		},
 	)
 
@@ -1199,6 +1201,7 @@ func (m *manager) createSnowmanChain(
 			StakingLeafSigner:   m.StakingTLSSigner,
 			StakingCertLeaf:     m.StakingTLSCert,
 			Registerer:          proposervmReg,
+			VRFSigTime:          version.GetVRFSigTime(m.NetworkID),
 		},
 	)
 

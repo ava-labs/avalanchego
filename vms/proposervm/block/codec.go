@@ -22,8 +22,9 @@ func init() {
 	Codec = codec.NewManager(math.MaxInt)
 
 	err := utils.Err(
-		lc.RegisterType(&statelessBlock{}),
+		lc.RegisterType(&statelessBlockV0{}),
 		lc.RegisterType(&option{}),
+		lc.RegisterType(&statelessBlock{}),
 		Codec.RegisterCodec(CodecVersion, lc),
 	)
 	if err != nil {

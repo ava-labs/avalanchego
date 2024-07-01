@@ -9,6 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
 
@@ -131,12 +132,52 @@ func (*postForkBlock) verifyPreForkChild(context.Context, *preForkBlock) error {
 func (b *postForkBlock) verifyPostForkChild(ctx context.Context, child *postForkBlock) error {
 	parentTimestamp := b.Timestamp()
 	parentPChainHeight := b.PChainHeight()
+
+	if err := b.verifyVRFSig(ctx, child); err != nil {
+		return err
+	}
+
 	return b.postForkCommonComponents.Verify(
 		ctx,
 		parentTimestamp,
 		parentPChainHeight,
 		child,
 	)
+}
+
+func (b *postForkBlock) verifyVRFSig(ctx context.Context, child *postForkBlock) error {
+	if b.vm.Config.IsVRFSigActivated(child.Timestamp()) {
+		// find out the proposer for this block.
+		childProposer := child.SignedBlock.Proposer()
+
+		var proposerPublicKey *bls.PublicKey
+		// if there is a known proposer. ( i.e. block was signed )
+		if childProposer != ids.EmptyNodeID {
+			// get the validators set.
+			validatorSet, err := b.vm.ctx.ValidatorState.GetValidatorSet(ctx, child.PChainHeight(), child.vm.ctx.SubnetID)
+			if err != nil {
+				return err
+			}
+
+			// get the validator for this proposer
+			childValidator := validatorSet[childProposer]
+			if childValidator == nil {
+				return errProposersNotActivated
+			}
+
+			proposerPublicKey = childValidator.PublicKey
+		}
+		// verify that the VRFSig was generated correctly.
+		// ( this works for both signed and unsigned blocks ).
+		if !child.SignedBlock.VerifySignature(proposerPublicKey, b.SignedBlock.VRFSig(), b.vm.ctx.ChainID, b.vm.ctx.NetworkID) {
+			return errInvalidVRFSignature
+		}
+	} else if len(child.SignedBlock.VRFSig()) != 0 {
+		// !b.vm.Config.IsVRFSigActivated(child.Timestamp())
+		// if the VRFSig has yet to be activated, verify that the VRF signature isn't there.
+		return errInvalidVRFSignature
+	}
+	return nil
 }
 
 func (b *postForkBlock) verifyPostForkOption(ctx context.Context, child *postForkOption) error {
@@ -155,12 +196,14 @@ func (b *postForkBlock) verifyPostForkOption(ctx context.Context, child *postFor
 }
 
 // Return the child (a *postForkBlock) of this block
-func (b *postForkBlock) buildChild(ctx context.Context) (Block, error) {
+func (b *postForkBlock) buildChild(ctx context.Context, blsSignKey *bls.SecretKey) (Block, error) {
 	return b.postForkCommonComponents.buildChild(
 		ctx,
 		b.ID(),
 		b.Timestamp(),
 		b.PChainHeight(),
+		b.SignedBlock.VRFSig(),
+		blsSignKey,
 	)
 }
 

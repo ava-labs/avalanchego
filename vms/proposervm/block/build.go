@@ -6,12 +6,13 @@ package block
 import (
 	"crypto"
 	"crypto/rand"
+	"encoding/binary"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/staking"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/hashing"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 func BuildUnsigned(
@@ -19,24 +20,124 @@ func BuildUnsigned(
 	timestamp time.Time,
 	pChainHeight uint64,
 	blockBytes []byte,
+	blockVrfSig []byte,
 ) (SignedBlock, error) {
-	var block SignedBlock = &statelessBlock{
+	block := &statelessBlock{
 		StatelessBlock: statelessUnsignedBlock{
 			ParentID:     parentID,
 			Timestamp:    timestamp.Unix(),
 			PChainHeight: pChainHeight,
 			Certificate:  nil,
 			Block:        blockBytes,
+			VRFSig:       blockVrfSig,
 		},
 		timestamp: timestamp,
 	}
-
-	bytes, err := Codec.Marshal(CodecVersion, &block)
+	bytes, err := marshalBlock(block)
 	if err != nil {
 		return nil, err
 	}
 
 	return block, block.initialize(bytes)
+}
+
+func CalculateVRFOut(vrfSig []byte) []byte {
+	// build the hash of the following struct:
+	// +-------------------------+----------+------------+
+	// |  prefix :               | [8]byte  | "rng-derv" |
+	// +-------------------------+----------+------------+
+	// |  vrfSig :               | [48]byte |  48 bytes  |
+	// +-------------------------+----------+------------+
+	if len(vrfSig) != 48 {
+		return nil
+	}
+	buffer := make([]byte, 8+48)
+	copy(buffer, "rng-derv")
+	copy(buffer[8:], vrfSig[:])
+	outHash := hashing.Hash256(buffer)
+	return outHash[:]
+}
+
+// marshalBlock marshal the given statelessBlock by using either the default statelessBlock or
+// coping the exported fields into statelessBlockV0 and then marshaling it.
+// this allows the marsheler to produce encoded blocks that match the old style blocks as long as
+// the VRGSig feature was not enabled.
+func marshalBlock(block *statelessBlock) ([]byte, error) {
+	if len(block.StatelessBlock.VRFSig) == 0 {
+		// create a backward compatible block ( without VRFSig ) and use the statelessBlockV0 encoder for the encoding.
+		var preBlockSigBlock SignedBlock = &statelessBlockV0{
+			StatelessBlock: statelessUnsignedBlockV0{
+				ParentID:     block.StatelessBlock.ParentID,
+				Timestamp:    block.StatelessBlock.Timestamp,
+				PChainHeight: block.StatelessBlock.PChainHeight,
+				Certificate:  block.StatelessBlock.Certificate,
+				Block:        block.StatelessBlock.Block,
+			},
+			Signature: block.Signature,
+		}
+		return Codec.Marshal(CodecVersion, &preBlockSigBlock)
+	}
+	var blockIntf SignedBlock = block
+	return Codec.Marshal(CodecVersion, &blockIntf)
+}
+
+func calculateBootstrappingBlockSig(chainID ids.ID, networkID uint32) [hashing.HashLen]byte {
+	// build the hash of the following struct:
+	// +-----------------------+----------+------------+
+	// |  prefix :             | [8]byte  | "rng-root" |
+	// +-----------------------+----------+------------+
+	// |  chainID :            | [32]byte |  32 bytes  |
+	// +-----------------------+----------+------------+
+	// |  networkID:           | uint32   |  4 bytes   |
+	// +-----------------------+----------+------------+
+
+	buffer := make([]byte, 44)
+	copy(buffer, "rng-root")
+	copy(buffer[8:], chainID[:])
+	binary.LittleEndian.PutUint32(buffer[40:], networkID)
+	return hashing.Hash256(buffer)
+}
+
+func NextHashBlockSignature(parentBlockSig []byte) []byte {
+	if len(parentBlockSig) == 0 {
+		return nil
+	}
+	// previous block had a valid signature, hash that signature.
+	sigParentBlockSig := hashing.ComputeHash256(parentBlockSig)
+
+	// as long as the signature length is too short, generate additional hashes.
+	for len(sigParentBlockSig) < len(parentBlockSig) {
+		sigParentBlockSig = append(sigParentBlockSig, hashing.ComputeHash256(sigParentBlockSig)...)
+	}
+
+	// adjust the size of the hash to be as long as the parent signature ( which is a BLS signature length )
+	sigParentBlockSig = sigParentBlockSig[:len(parentBlockSig)]
+
+	return sigParentBlockSig
+}
+
+func NextBlockVRFSig(parentBlockSig []byte, blsSignKey *bls.SecretKey, chainID ids.ID, networkID uint32) []byte {
+	if blsSignKey == nil {
+		// if we need to build a block without having a BLS key, we'll be hashing the previous
+		// signature only if it presents. Otherwise, we'll keep it empty.
+		if len(parentBlockSig) == 0 {
+			// no parent block signature.
+			return []byte{}
+		}
+
+		return NextHashBlockSignature(parentBlockSig)
+	}
+
+	// we have bls key
+	var signMsg []byte
+	if parentBlockSig == nil {
+		msgHash := calculateBootstrappingBlockSig(chainID, networkID)
+		signMsg = msgHash[:]
+	} else {
+		signMsg = parentBlockSig
+	}
+
+	return bls.Sign(blsSignKey, signMsg).Serialize()
 }
 
 func Build(
@@ -47,6 +148,7 @@ func Build(
 	blockBytes []byte,
 	chainID ids.ID,
 	key crypto.Signer,
+	blockVrfSig []byte,
 ) (SignedBlock, error) {
 	block := &statelessBlock{
 		StatelessBlock: statelessUnsignedBlock{
@@ -55,26 +157,27 @@ func Build(
 			PChainHeight: pChainHeight,
 			Certificate:  cert.Raw,
 			Block:        blockBytes,
+			VRFSig:       blockVrfSig,
 		},
 		timestamp: timestamp,
 		cert:      cert,
 		proposer:  ids.NodeIDFromCert(cert),
 	}
-	var blockIntf SignedBlock = block
 
-	unsignedBytesWithEmptySignature, err := Codec.Marshal(CodecVersion, &blockIntf)
-	if err != nil {
+	var err error
+
+	// temporary, set the bytes to the marshaled content of the block.
+	// this doesn't include the signature ( yet )
+	if block.bytes, err = marshalBlock(block); err != nil {
 		return nil, err
 	}
 
-	// The serialized form of the block is the unsignedBytes followed by the
-	// signature, which is prefixed by a uint32. Because we are marshalling the
-	// block with an empty signature, we only need to strip off the length
-	// prefix to get the unsigned bytes.
-	lenUnsignedBytes := len(unsignedBytesWithEmptySignature) - wrappers.IntLen
-	unsignedBytes := unsignedBytesWithEmptySignature[:lenUnsignedBytes]
-	block.id = hashing.ComputeHash256Array(unsignedBytes)
+	// calculate the block ID.
+	if err = block.initializeID(); err != nil {
+		return nil, err
+	}
 
+	// use the block ID in order to build the header.
 	header, err := BuildHeader(chainID, parentID, block.id)
 	if err != nil {
 		return nil, err
@@ -86,7 +189,7 @@ func Build(
 		return nil, err
 	}
 
-	block.bytes, err = Codec.Marshal(CodecVersion, &blockIntf)
+	block.bytes, err = marshalBlock(block)
 	return block, err
 }
 

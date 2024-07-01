@@ -5,6 +5,7 @@ package block
 
 import (
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
@@ -32,12 +33,20 @@ func (b *option) Bytes() []byte {
 	return b.bytes
 }
 
-func (b *option) initialize(bytes []byte) error {
-	b.id = hashing.ComputeHash256Array(bytes)
-	b.bytes = bytes
+func (b *option) initializeID() error {
+	b.id = hashing.ComputeHash256Array(b.bytes)
 	return nil
+}
+
+func (b *option) initialize(bytes []byte) error {
+	b.bytes = bytes
+	return b.initializeID()
 }
 
 func (*option) verify(ids.ID) error {
 	return nil
+}
+
+func (*option) VerifySignature(_ *bls.PublicKey, _ []byte, _ ids.ID, _ uint32) bool {
+	return true
 }

@@ -475,6 +475,7 @@ func TestOptionTimestampValidity(t *testing.T) {
 		oracleBlkTime,
 		0,
 		coreOracleBlk.Bytes(),
+		[]byte{}, // parentBlockSig
 	)
 	require.NoError(err)
 

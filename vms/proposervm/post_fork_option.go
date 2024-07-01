@@ -11,6 +11,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
 
@@ -106,7 +107,7 @@ func (*postForkOption) verifyPostForkOption(context.Context, *postForkOption) er
 	return errUnexpectedBlockType
 }
 
-func (b *postForkOption) buildChild(ctx context.Context) (Block, error) {
+func (b *postForkOption) buildChild(ctx context.Context, blsSignKey *bls.SecretKey) (Block, error) {
 	parentID := b.ID()
 	parentPChainHeight, err := b.pChainHeight(ctx)
 	if err != nil {
@@ -122,6 +123,8 @@ func (b *postForkOption) buildChild(ctx context.Context) (Block, error) {
 		parentID,
 		b.Timestamp(),
 		parentPChainHeight,
+		[]byte{}, // TODO : verify me.
+		blsSignKey,
 	)
 }
 

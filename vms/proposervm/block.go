@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 
@@ -39,6 +40,7 @@ var (
 	errProposerMismatch         = errors.New("proposer mismatch")
 	errProposersNotActivated    = errors.New("proposers haven't been activated yet")
 	errPChainHeightTooLow       = errors.New("block P-chain height is too low")
+	errInvalidVRFSignature      = errors.New("invalid signature")
 )
 
 type Block interface {
@@ -57,7 +59,7 @@ type Block interface {
 	verifyPostForkChild(ctx context.Context, child *postForkBlock) error
 	verifyPostForkOption(ctx context.Context, child *postForkOption) error
 
-	buildChild(context.Context) (Block, error)
+	buildChild(context.Context, *bls.SecretKey) (Block, error)
 
 	pChainHeight(context.Context) (uint64, error)
 }
@@ -169,6 +171,7 @@ func (p *postForkCommonComponents) Verify(
 		ctx,
 		&smblock.Context{
 			PChainHeight: parentPChainHeight,
+			// todo : use block.CalculateVRFOut(child.VRFOut())
 		},
 		child,
 	)
@@ -180,6 +183,8 @@ func (p *postForkCommonComponents) buildChild(
 	parentID ids.ID,
 	parentTimestamp time.Time,
 	parentPChainHeight uint64,
+	parentBlockSig []byte,
+	blsSignKey *bls.SecretKey,
 ) (Block, error) {
 	// Child's timestamp is the later of now and this block's timestamp
 	newTimestamp := p.vm.Time().Truncate(time.Second)
@@ -221,10 +226,27 @@ func (p *postForkCommonComponents) buildChild(
 		return nil, err
 	}
 
+	var statelessChild block.SignedBlock
+	var childBlockVrfSig []byte
+	// if the VRFSig haven't yet been activated, empty the parentBlockSig and blsSignKey.
+	// this would cause the newly generated block to have no VRFSig, which aligns with
+	// pre-VRFSig blocks.
+	if !p.vm.IsVRFSigActivated(newTimestamp) {
+		parentBlockSig = nil
+		blsSignKey = nil
+	} else if shouldBuildSignedBlock {
+		childBlockVrfSig = block.NextBlockVRFSig(parentBlockSig, blsSignKey, p.vm.ctx.ChainID, p.vm.ctx.NetworkID)
+	} else {
+		// in this case, we can't sign with BLS key, since we're not going to include the Certificate, which is required
+		// for the signature validation. Instead, we'll just hash the previous
+		childBlockVrfSig = block.NextHashBlockSignature(parentBlockSig)
+	}
+
 	var innerBlock snowman.Block
 	if p.vm.blockBuilderVM != nil {
 		innerBlock, err = p.vm.blockBuilderVM.BuildBlockWithContext(ctx, &smblock.Context{
 			PChainHeight: parentPChainHeight,
+			// todo : add block.CalculateVRFOut(childBlockVrfSig)
 		})
 	} else {
 		innerBlock, err = p.vm.ChainVM.BuildBlock(ctx)
@@ -234,7 +256,6 @@ func (p *postForkCommonComponents) buildChild(
 	}
 
 	// Build the child
-	var statelessChild block.SignedBlock
 	if shouldBuildSignedBlock {
 		statelessChild, err = block.Build(
 			parentID,
@@ -244,6 +265,7 @@ func (p *postForkCommonComponents) buildChild(
 			innerBlock.Bytes(),
 			p.vm.ctx.ChainID,
 			p.vm.StakingLeafSigner,
+			childBlockVrfSig,
 		)
 	} else {
 		statelessChild, err = block.BuildUnsigned(
@@ -251,6 +273,7 @@ func (p *postForkCommonComponents) buildChild(
 			newTimestamp,
 			pChainHeight,
 			innerBlock.Bytes(),
+			childBlockVrfSig,
 		)
 	}
 	if err != nil {

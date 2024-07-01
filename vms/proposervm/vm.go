@@ -283,8 +283,7 @@ func (vm *VM) BuildBlock(ctx context.Context) (snowman.Block, error) {
 		)
 		return nil, err
 	}
-
-	return preferredBlock.buildChild(ctx)
+	return preferredBlock.buildChild(ctx, vm.Config.StakingBLSKey)
 }
 
 func (vm *VM) ParseBlock(ctx context.Context, b []byte) (snowman.Block, error) {

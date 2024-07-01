@@ -484,11 +484,16 @@ func TestCoreBlockFailureCauseProposerBlockParseFailure(t *testing.T) {
 	slb, err := statelessblock.Build(
 		proVM.preferred,
 		proVM.Time(),
-		100, // pChainHeight,
+		uint64(100), // pChainHeight,
 		proVM.StakingCertLeaf,
 		innerBlk.Bytes(),
 		proVM.ctx.ChainID,
 		proVM.StakingLeafSigner,
+		statelessblock.NextBlockVRFSig(
+			[]byte{}, // parentBlockSig
+			proVM.StakingBLSKey,
+			proVM.ctx.ChainID,
+			proVM.ctx.NetworkID),
 	)
 	require.NoError(err)
 	proBlk := postForkBlock{
@@ -534,6 +539,11 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 		innerBlk.Bytes(),
 		proVM.ctx.ChainID,
 		proVM.StakingLeafSigner,
+		statelessblock.NextBlockVRFSig(
+			[]byte{}, // parentBlockSig
+			proVM.StakingBLSKey,
+			proVM.ctx.ChainID,
+			proVM.ctx.NetworkID),
 	)
 	require.NoError(err)
 	proBlk1 := postForkBlock{
@@ -553,6 +563,11 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 		innerBlk.Bytes(),
 		proVM.ctx.ChainID,
 		proVM.StakingLeafSigner,
+		statelessblock.NextBlockVRFSig(
+			[]byte{}, // parentBlockSig
+			proVM.StakingBLSKey,
+			proVM.ctx.ChainID,
+			proVM.ctx.NetworkID),
 	)
 	require.NoError(err)
 	proBlk2 := postForkBlock{
@@ -623,6 +638,7 @@ func TestTwoProBlocksWithSameParentCanBothVerify(t *testing.T) {
 		proVM.Time(),
 		pChainHeight,
 		netcoreBlk.Bytes(),
+		[]byte{}, // parentBlockSig
 	)
 	require.NoError(err)
 	netProBlk := postForkBlock{
@@ -894,6 +910,7 @@ func TestExpiredBuildBlock(t *testing.T) {
 		proVM.Time(),
 		0,
 		coreBlk.Bytes(),
+		[]byte{}, // parentBlockSig
 	)
 	require.NoError(err)
 
@@ -990,6 +1007,7 @@ func TestInnerBlockDeduplication(t *testing.T) {
 		coreBlk.Timestamp(),
 		0,
 		coreBlk.Bytes(),
+		[]byte{}, // parentBlockSig
 	)
 	require.NoError(err)
 	statelessBlock1, err := statelessblock.BuildUnsigned(
@@ -997,6 +1015,7 @@ func TestInnerBlockDeduplication(t *testing.T) {
 		coreBlk.Timestamp(),
 		1,
 		coreBlk.Bytes(),
+		[]byte{}, // parentBlockSig
 	)
 	require.NoError(err)
 
@@ -1156,6 +1175,7 @@ func TestInnerVMRollback(t *testing.T) {
 		coreBlk.Timestamp(),
 		0,
 		coreBlk.Bytes(),
+		[]byte{}, // parentBlockSig
 	)
 	require.NoError(err)
 
@@ -1268,6 +1288,7 @@ func TestBuildBlockDuringWindow(t *testing.T) {
 		proVM.Time(),
 		0,
 		coreBlk0.Bytes(),
+		[]byte{}, // parentBlockSig
 	)
 	require.NoError(err)
 
@@ -1360,6 +1381,7 @@ func TestTwoForks_OneIsAccepted(t *testing.T) {
 		proVM.Time(),
 		defaultPChainHeight,
 		yBlock.Bytes(),
+		[]byte{}, // parentBlockSig
 	)
 	require.NoError(err)
 
@@ -1429,6 +1451,7 @@ func TestTooFarAdvanced(t *testing.T) {
 		aBlock.Timestamp().Add(maxSkew),
 		defaultPChainHeight,
 		yBlock.Bytes(),
+		[]byte{}, // parentBlockSig
 	)
 	require.NoError(err)
 
@@ -1449,6 +1472,7 @@ func TestTooFarAdvanced(t *testing.T) {
 		aBlock.Timestamp().Add(proposer.MaxVerifyDelay),
 		defaultPChainHeight,
 		yBlock.Bytes(),
+		[]byte{}, // parentBlockSig
 	)
 
 	require.NoError(err)
@@ -1699,6 +1723,7 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 		snowmantest.GenesisTimestamp,
 		defaultPChainHeight,
 		yBlock.Bytes(),
+		[]byte{}, // parentBlockSig
 	)
 	require.NoError(err)
 
@@ -1975,6 +2000,11 @@ func TestVMInnerBlkCache(t *testing.T) {
 		blkNearTipInnerBytes, // inner blk bytes
 		vm.ctx.ChainID,       // chain ID
 		vm.StakingLeafSigner, // key
+		statelessblock.NextBlockVRFSig(
+			[]byte{}, // parentBlockSig
+			vm.StakingBLSKey,
+			vm.ctx.ChainID,
+			vm.ctx.NetworkID),
 	)
 	require.NoError(err)
 
@@ -2038,6 +2068,7 @@ func TestVMInnerBlkCacheDeduplicationRegression(t *testing.T) {
 		snowmantest.GenesisTimestamp,
 		defaultPChainHeight,
 		xBlock.Bytes(),
+		[]byte{}, // parentBlockSig
 	)
 	require.NoError(err)
 
@@ -2316,7 +2347,14 @@ func TestHistoricalBlockDeletion(t *testing.T) {
 			return defaultPChainHeight, nil
 		},
 		GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
-			return nil, nil
+			m := map[ids.NodeID]*validators.GetValidatorOutput{
+				ids.NodeIDFromCert(pTestCert): {
+					NodeID:    ids.NodeIDFromCert(pTestCert),
+					PublicKey: nil,
+					Weight:    1,
+				},
+			}
+			return m, nil
 		},
 	}
 
