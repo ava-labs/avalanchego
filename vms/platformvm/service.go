@@ -29,9 +29,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/keystore"
-	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
-	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -69,16 +67,7 @@ var (
 type Service struct {
 	vm                    *VM
 	addrManager           avax.AddressManager
-	stakerAttributesCache *cache.LRU[ids.ID, *stakerAttributes]
-}
-
-// All attributes are optional and may not be filled for each stakerTx.
-type stakerAttributes struct {
-	shares                 uint32
-	rewardsOwner           fx.Owner
-	validationRewardsOwner fx.Owner
-	delegationRewardsOwner fx.Owner
-	proofOfPossession      *signer.ProofOfPossession
+	stakerAttributesCache *cache.LRU[ids.ID, *state.StakerRewardAttributes]
 }
 
 // GetHeight returns the height of the last accepted block
@@ -698,42 +687,17 @@ type GetCurrentValidatorsReply struct {
 	Validators []interface{} `json:"validators"`
 }
 
-func (s *Service) loadStakerTxAttributes(txID ids.ID) (*stakerAttributes, error) {
-	// Lookup tx from the cache first.
+func (s *Service) loadStakerTxAttributes(txID ids.ID) (*state.StakerRewardAttributes, error) {
+	// Lookup attributes from the cache first.
 	attr, found := s.stakerAttributesCache.Get(txID)
 	if found {
 		return attr, nil
 	}
 
-	// Tx not available in cache; pull it from disk and populate the cache.
-	tx, _, err := s.vm.state.GetTx(txID)
+	// attributes not available in cache; pull them from disk and populate the cache.
+	attr, err := s.vm.state.GetStakerRewardAttributes(txID)
 	if err != nil {
 		return nil, err
-	}
-
-	switch stakerTx := tx.Unsigned.(type) {
-	case txs.ValidatorTx:
-		var pop *signer.ProofOfPossession
-		if staker, ok := stakerTx.(*txs.AddPermissionlessValidatorTx); ok {
-			if s, ok := staker.Signer.(*signer.ProofOfPossession); ok {
-				pop = s
-			}
-		}
-
-		attr = &stakerAttributes{
-			shares:                 stakerTx.Shares(),
-			validationRewardsOwner: stakerTx.ValidationRewardsOwner(),
-			delegationRewardsOwner: stakerTx.DelegationRewardsOwner(),
-			proofOfPossession:      pop,
-		}
-
-	case txs.DelegatorTx:
-		attr = &stakerAttributes{
-			rewardsOwner: stakerTx.RewardsOwner(),
-		}
-
-	default:
-		return nil, fmt.Errorf("unexpected staker tx type %T", tx.Unsigned)
 	}
 
 	s.stakerAttributesCache.Put(txID, attr)
@@ -828,7 +792,7 @@ func (s *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentValidato
 				return err
 			}
 
-			shares := attr.shares
+			shares := attr.Shares
 			delegationFee := avajson.Float32(100 * float32(shares) / float32(reward.PercentDenominator))
 
 			uptime, err := s.getAPIUptime(currentStaker)
@@ -841,14 +805,14 @@ func (s *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentValidato
 				validationRewardOwner *platformapi.Owner
 				delegationRewardOwner *platformapi.Owner
 			)
-			validationOwner, ok := attr.validationRewardsOwner.(*secp256k1fx.OutputOwners)
+			validationOwner, ok := attr.ValidationRewardsOwner.(*secp256k1fx.OutputOwners)
 			if ok {
 				validationRewardOwner, err = s.getAPIOwner(validationOwner)
 				if err != nil {
 					return err
 				}
 			}
-			delegationOwner, ok := attr.delegationRewardsOwner.(*secp256k1fx.OutputOwners)
+			delegationOwner, ok := attr.DelegationRewardsOwner.(*secp256k1fx.OutputOwners)
 			if ok {
 				delegationRewardOwner, err = s.getAPIOwner(delegationOwner)
 				if err != nil {
@@ -866,7 +830,7 @@ func (s *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentValidato
 				ValidationRewardOwner:  validationRewardOwner,
 				DelegationRewardOwner:  delegationRewardOwner,
 				DelegationFee:          delegationFee,
-				Signer:                 attr.proofOfPossession,
+				Signer:                 attr.ProofOfPossession,
 			}
 			reply.Validators = append(reply.Validators, vdr)
 
@@ -879,7 +843,7 @@ func (s *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentValidato
 				if err != nil {
 					return err
 				}
-				owner, ok := attr.rewardsOwner.(*secp256k1fx.OutputOwners)
+				owner, ok := attr.RewardsOwner.(*secp256k1fx.OutputOwners)
 				if ok {
 					rewardOwner, err = s.getAPIOwner(owner)
 					if err != nil {
@@ -1088,17 +1052,12 @@ func (s *Service) GetBlockchainStatus(r *http.Request, args *GetBlockchainStatus
 }
 
 func (s *Service) nodeValidates(blockchainID ids.ID) bool {
-	chainTx, _, err := s.vm.state.GetTx(blockchainID)
+	subnetID, err := s.vm.state.GetChainSubnet(blockchainID)
 	if err != nil {
 		return false
 	}
 
-	chain, ok := chainTx.Unsigned.(*txs.CreateChainTx)
-	if !ok {
-		return false
-	}
-
-	_, isValidator := s.vm.Validators.GetValidator(chain.SubnetID, s.vm.ctx.NodeID)
+	_, isValidator := s.vm.Validators.GetValidator(subnetID, s.vm.ctx.NodeID)
 	return isValidator
 }
 
@@ -1115,15 +1074,14 @@ func (s *Service) chainExists(ctx context.Context, blockID ids.ID, chainID ids.I
 		}
 	}
 
-	tx, _, err := state.GetTx(chainID)
-	if err == database.ErrNotFound {
+	switch _, err := state.GetChainSubnet(chainID); {
+	case err == nil:
+		return true, nil
+	case errors.Is(err, database.ErrNotFound):
 		return false, nil
-	}
-	if err != nil {
+	default:
 		return false, err
 	}
-	_, ok = tx.Unsigned.(*txs.CreateChainTx)
-	return ok, nil
 }
 
 // ValidatedByArgs is the arguments for calling ValidatedBy
@@ -1467,12 +1425,12 @@ func (s *Service) GetStake(_ *http.Request, args *GetStakeArgs, response *GetSta
 			continue
 		}
 
-		tx, _, err := s.vm.state.GetTx(staker.TxID)
+		stakerRewardAttributes, err := s.vm.state.GetStakerRewardAttributes(staker.TxID)
 		if err != nil {
 			return err
 		}
 
-		stakedOuts = append(stakedOuts, getStakeHelper(tx, addrs, totalAmountStaked)...)
+		stakedOuts = append(stakedOuts, getStakeHelper(stakerRewardAttributes.Stake, addrs, totalAmountStaked)...)
 	}
 
 	pendingStakerIterator, err := s.vm.state.GetPendingStakerIterator()
@@ -1488,12 +1446,12 @@ func (s *Service) GetStake(_ *http.Request, args *GetStakeArgs, response *GetSta
 			continue
 		}
 
-		tx, _, err := s.vm.state.GetTx(staker.TxID)
+		stakerRewardAttributes, err := s.vm.state.GetStakerRewardAttributes(staker.TxID)
 		if err != nil {
 			return err
 		}
 
-		stakedOuts = append(stakedOuts, getStakeHelper(tx, addrs, totalAmountStaked)...)
+		stakedOuts = append(stakedOuts, getStakeHelper(stakerRewardAttributes.Stake, addrs, totalAmountStaked)...)
 	}
 
 	response.Stakeds = newJSONBalanceMap(totalAmountStaked)
@@ -1860,17 +1818,11 @@ func (s *Service) getAPIOwner(owner *secp256k1fx.OutputOwners) (*platformapi.Own
 	return apiOwner, nil
 }
 
-// Takes in a staker and a set of addresses
+// Takes in a slice of reward attributes and a set of addresses
 // Returns:
 // 1) The total amount staked by addresses in [addrs]
 // 2) The staked outputs
-func getStakeHelper(tx *txs.Tx, addrs set.Set[ids.ShortID], totalAmountStaked map[ids.ID]uint64) []avax.TransferableOutput {
-	staker, ok := tx.Unsigned.(txs.PermissionlessStaker)
-	if !ok {
-		return nil
-	}
-
-	stake := staker.Stake()
+func getStakeHelper(stake []*avax.TransferableOutput, addrs set.Set[ids.ShortID], totalAmountStaked map[ids.ID]uint64) []avax.TransferableOutput {
 	stakedOuts := make([]avax.TransferableOutput, 0, len(stake))
 	// Go through all of the staked outputs
 	for _, output := range stake {
