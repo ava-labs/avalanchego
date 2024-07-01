@@ -55,16 +55,21 @@ func Remove(lhs, rhs Dimensions) (Dimensions, error) {
 }
 
 func ToGas(weights, dimensions Dimensions) (Gas, error) {
-	var res uint64
+	gas, _, err := toGasWithReminder(weights, dimensions, ZeroGas)
+	return gas, err
+}
+
+func toGasWithReminder(weights, dimensions Dimensions, gasReminder Gas) (Gas, Gas, error) {
+	res := uint64(gasReminder)
 	for i := 0; i < FeeDimensions; i++ {
 		v, err := safemath.Mul64(weights[i], dimensions[i])
 		if err != nil {
-			return ZeroGas, err
+			return ZeroGas, ZeroGas, err
 		}
 		res, err = safemath.Add64(res, v)
 		if err != nil {
-			return ZeroGas, err
+			return ZeroGas, ZeroGas, err
 		}
 	}
-	return Gas(res), nil
+	return Gas(res) / 10, Gas(res) % 10, nil
 }

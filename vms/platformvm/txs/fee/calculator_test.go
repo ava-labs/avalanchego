@@ -47,8 +47,8 @@ func TestAddAndRemoveFees(t *testing.T) {
 
 	var (
 		units     = fee.Dimensions{1, 2, 3, 4}
-		gas       = fee.Gas(10)
-		doubleGas = fee.Gas(20)
+		gas       = fee.Gas(1)
+		doubleGas = fee.Gas(2)
 	)
 
 	feeDelta, err := fc.AddFeesFor(units)
@@ -148,10 +148,10 @@ func TestTxFees(t *testing.T) {
 			expectedError:       nil,
 			unsignedAndSignedTx: addSubnetValidatorTx,
 			checksF: func(t *testing.T, c *Calculator) {
-				require.Equal(t, 29_110*units.NanoAvax, c.GetFee())
+				require.Equal(t, 2_910*units.NanoAvax, c.GetFee())
 				haveGas, err := c.GetBlockGas()
 				require.NoError(t, err)
-				require.Equal(t, fee.Gas(2_911), haveGas)
+				require.Equal(t, fee.Gas(291), haveGas)
 			},
 		},
 		{
@@ -201,10 +201,10 @@ func TestTxFees(t *testing.T) {
 			unsignedAndSignedTx: createChainTx,
 			expectedError:       nil,
 			checksF: func(t *testing.T, c *Calculator) {
-				require.Equal(t, 19_540*units.NanoAvax, c.GetFee())
+				require.Equal(t, 1_950*units.NanoAvax, c.GetFee())
 				haveGas, err := c.GetBlockGas()
 				require.NoError(t, err)
-				require.Equal(t, fee.Gas(1_954), haveGas)
+				require.Equal(t, fee.Gas(195), haveGas)
 			},
 		},
 		{
@@ -239,10 +239,10 @@ func TestTxFees(t *testing.T) {
 			unsignedAndSignedTx: createSubnetTx,
 			expectedError:       nil,
 			checksF: func(t *testing.T, c *Calculator) {
-				require.Equal(t, 18_590*units.NanoAvax, c.GetFee())
+				require.Equal(t, 1_850*units.NanoAvax, c.GetFee())
 				haveGas, err := c.GetBlockGas()
 				require.NoError(t, err)
-				require.Equal(t, fee.Gas(1_859), haveGas)
+				require.Equal(t, fee.Gas(185), haveGas)
 			},
 		},
 		{
@@ -269,10 +269,10 @@ func TestTxFees(t *testing.T) {
 			unsignedAndSignedTx: removeSubnetValidatorTx,
 			expectedError:       nil,
 			checksF: func(t *testing.T, c *Calculator) {
-				require.Equal(t, 28_870*units.NanoAvax, c.GetFee())
+				require.Equal(t, 2_880*units.NanoAvax, c.GetFee())
 				haveGas, err := c.GetBlockGas()
 				require.NoError(t, err)
-				require.Equal(t, fee.Gas(2_887), haveGas)
+				require.Equal(t, fee.Gas(288), haveGas)
 			},
 		},
 		{
@@ -299,10 +299,10 @@ func TestTxFees(t *testing.T) {
 			unsignedAndSignedTx: transformSubnetTx,
 			expectedError:       nil,
 			checksF: func(t *testing.T, c *Calculator) {
-				require.Equal(t, 19_720*units.NanoAvax, c.GetFee())
+				require.Equal(t, 1_970*units.NanoAvax, c.GetFee())
 				haveGas, err := c.GetBlockGas()
 				require.NoError(t, err)
-				require.Equal(t, fee.Gas(1_972), haveGas)
+				require.Equal(t, fee.Gas(197), haveGas)
 			},
 		},
 		{
@@ -329,10 +329,10 @@ func TestTxFees(t *testing.T) {
 			unsignedAndSignedTx: transferSubnetOwnershipTx,
 			expectedError:       nil,
 			checksF: func(t *testing.T, c *Calculator) {
-				require.Equal(t, 19_030*units.NanoAvax, c.GetFee())
+				require.Equal(t, 1_900*units.NanoAvax, c.GetFee())
 				haveGas, err := c.GetBlockGas()
 				require.NoError(t, err)
-				require.Equal(t, fee.Gas(1_903), haveGas)
+				require.Equal(t, fee.Gas(190), haveGas)
 			},
 		},
 		{
@@ -375,10 +375,10 @@ func TestTxFees(t *testing.T) {
 			},
 			expectedError: nil,
 			checksF: func(t *testing.T, c *Calculator) {
-				require.Equal(t, 33_170*units.NanoAvax, c.GetFee())
+				require.Equal(t, 3_310*units.NanoAvax, c.GetFee())
 				haveGas, err := c.GetBlockGas()
 				require.NoError(t, err)
-				require.Equal(t, fee.Gas(3_317), haveGas)
+				require.Equal(t, fee.Gas(331), haveGas)
 			},
 		},
 		{
@@ -391,10 +391,10 @@ func TestTxFees(t *testing.T) {
 			},
 			expectedError: nil,
 			checksF: func(t *testing.T, c *Calculator) {
-				require.Equal(t, 33_170*units.NanoAvax, c.GetFee())
+				require.Equal(t, 3_310*units.NanoAvax, c.GetFee())
 				haveGas, err := c.GetBlockGas()
 				require.NoError(t, err)
-				require.Equal(t, fee.Gas(3_317), haveGas)
+				require.Equal(t, fee.Gas(331), haveGas)
 			},
 		},
 		{
@@ -440,10 +440,10 @@ func TestTxFees(t *testing.T) {
 			},
 			expectedError: nil,
 			checksF: func(t *testing.T, c *Calculator) {
-				require.Equal(t, 31_250*units.NanoAvax, c.GetFee())
+				require.Equal(t, 3_120*units.NanoAvax, c.GetFee())
 				haveGas, err := c.GetBlockGas()
 				require.NoError(t, err)
-				require.Equal(t, fee.Gas(3_125), haveGas)
+				require.Equal(t, fee.Gas(312), haveGas)
 			},
 		},
 		{
@@ -454,10 +454,10 @@ func TestTxFees(t *testing.T) {
 			},
 			expectedError: nil,
 			checksF: func(t *testing.T, c *Calculator) {
-				require.Equal(t, 31_250*units.NanoAvax, c.GetFee())
+				require.Equal(t, 3_120*units.NanoAvax, c.GetFee())
 				haveGas, err := c.GetBlockGas()
 				require.NoError(t, err)
-				require.Equal(t, fee.Gas(3_125), haveGas)
+				require.Equal(t, fee.Gas(312), haveGas)
 			},
 		},
 		{
@@ -488,10 +488,10 @@ func TestTxFees(t *testing.T) {
 			unsignedAndSignedTx: baseTx,
 			expectedError:       nil,
 			checksF: func(t *testing.T, c *Calculator) {
-				require.Equal(t, 18_190*units.NanoAvax, c.GetFee())
+				require.Equal(t, 1_810*units.NanoAvax, c.GetFee())
 				haveGas, err := c.GetBlockGas()
 				require.NoError(t, err)
-				require.Equal(t, fee.Gas(1_819), haveGas)
+				require.Equal(t, fee.Gas(181), haveGas)
 			},
 		},
 		{
@@ -518,10 +518,10 @@ func TestTxFees(t *testing.T) {
 			unsignedAndSignedTx: importTx,
 			expectedError:       nil,
 			checksF: func(t *testing.T, c *Calculator) {
-				require.Equal(t, 31_230*units.NanoAvax, c.GetFee())
+				require.Equal(t, 3_120*units.NanoAvax, c.GetFee())
 				haveGas, err := c.GetBlockGas()
 				require.NoError(t, err)
-				require.Equal(t, fee.Gas(3_123), haveGas)
+				require.Equal(t, fee.Gas(312), haveGas)
 			},
 		},
 		{
@@ -548,10 +548,10 @@ func TestTxFees(t *testing.T) {
 			unsignedAndSignedTx: exportTx,
 			expectedError:       nil,
 			checksF: func(t *testing.T, c *Calculator) {
-				require.Equal(t, 20_410*units.NanoAvax, c.GetFee())
+				require.Equal(t, 2_040*units.NanoAvax, c.GetFee())
 				haveGas, err := c.GetBlockGas()
 				require.NoError(t, err)
-				require.Equal(t, fee.Gas(2_041), haveGas)
+				require.Equal(t, fee.Gas(204), haveGas)
 			},
 		},
 		{

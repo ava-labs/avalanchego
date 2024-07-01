@@ -31,6 +31,8 @@ type Calculator struct {
 	// so that we can verify it's not too big/build it properly.
 	blkComplexity Dimensions
 
+	gasReminder Gas
+
 	// currentExcessGas stores current excess gas, cumulated over time
 	// to be updated once a block is accepted with cumulatedGas
 	currentExcessGas Gas
@@ -110,10 +112,11 @@ func (c *Calculator) GetExcessGas() (Gas, error) {
 
 // CalculateFee must be a stateless method
 func (c *Calculator) CalculateFee(complexity Dimensions) (uint64, error) {
-	gas, err := ToGas(c.feeWeights, complexity)
+	gas, reminder, err := toGasWithReminder(c.feeWeights, complexity, c.gasReminder)
 	if err != nil {
 		return 0, err
 	}
+	c.gasReminder = reminder
 
 	return safemath.Mul64(uint64(c.gasPrice), uint64(gas))
 }
