@@ -38,22 +38,6 @@ func ComputeHash256(buf []byte) []byte {
 	return arr[:]
 }
 
-// ComputeHash256Ranges computes a cryptographically strong 256 bit hash of the input
-// byte slice in the ranges specified.
-// Example:
-// ComputeHash256Ranges({1, 2, 4, 8, 16}, {{1, 2}, {3, 5}}) is equivalent to
-// ComputeHash256({2, 8, 16}).
-func ComputeHash256Ranges(buf []byte, ranges [][2]int) []byte {
-	hashBuilder := sha256.New()
-	for _, r := range ranges {
-		_, err := hashBuilder.Write(buf[r[0]:r[1]])
-		if err != nil {
-			panic(err)
-		}
-	}
-	return hashBuilder.Sum(nil)
-}
-
 // ComputeHash160Array computes a cryptographically strong 160 bit hash of the
 // input byte slice.
 func ComputeHash160Array(buf []byte) Hash160 {

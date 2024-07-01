@@ -17,13 +17,6 @@ import (
 	tspb "google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func Errorf(code int, tmpl string, args ...interface{}) error {
-	return GetGRPCErrorFromHTTPResponse(&httppb.HandleSimpleHTTPResponse{
-		Code: int32(code),
-		Body: []byte(fmt.Sprintf(tmpl, args...)),
-	})
-}
-
 // GetGRPCErrorFromHTTPResponse takes an HandleSimpleHTTPResponse as input and returns a gRPC error.
 func GetGRPCErrorFromHTTPResponse(resp *httppb.HandleSimpleHTTPResponse) error {
 	a, err := anypb.New(resp)

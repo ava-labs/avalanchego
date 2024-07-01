@@ -29,10 +29,6 @@ var (
 				rng: globalRNG,
 			},
 		},
-		{
-			name:    "best",
-			sampler: NewBestUniform(30),
-		},
 	}
 	uniformTests = []struct {
 		name string
