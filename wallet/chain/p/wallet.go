@@ -316,6 +316,7 @@ func (w *wallet) IssueBaseTx(
 	if err != nil {
 		return nil, err
 	}
+
 	return w.IssueUnsignedTx(utx, options...)
 }
 
@@ -350,6 +351,7 @@ func (w *wallet) IssueAddSubnetValidatorTx(
 	if err != nil {
 		return nil, err
 	}
+
 	return w.IssueUnsignedTx(utx, options...)
 }
 
@@ -367,6 +369,7 @@ func (w *wallet) IssueRemoveSubnetValidatorTx(
 	if err != nil {
 		return nil, err
 	}
+
 	return w.IssueUnsignedTx(utx, options...)
 }
 
@@ -404,6 +407,7 @@ func (w *wallet) IssueCreateChainTx(
 	if err != nil {
 		return nil, err
 	}
+
 	return w.IssueUnsignedTx(utx, options...)
 }
 
@@ -454,6 +458,7 @@ func (w *wallet) IssueImportTx(
 	if err != nil {
 		return nil, err
 	}
+
 	return w.IssueUnsignedTx(utx, options...)
 }
 
@@ -471,6 +476,7 @@ func (w *wallet) IssueExportTx(
 	if err != nil {
 		return nil, err
 	}
+
 	return w.IssueUnsignedTx(utx, options...)
 }
 
@@ -517,6 +523,7 @@ func (w *wallet) IssueTransformSubnetTx(
 	if err != nil {
 		return nil, err
 	}
+
 	return w.IssueUnsignedTx(utx, options...)
 }
 
@@ -547,6 +554,7 @@ func (w *wallet) IssueAddPermissionlessValidatorTx(
 	if err != nil {
 		return nil, err
 	}
+
 	return w.IssueUnsignedTx(utx, options...)
 }
 
@@ -571,6 +579,7 @@ func (w *wallet) IssueAddPermissionlessDelegatorTx(
 	if err != nil {
 		return nil, err
 	}
+
 	return w.IssueUnsignedTx(utx, options...)
 }
 
@@ -623,7 +632,7 @@ func (w *wallet) feeCalculator(ctx *builder.Context, options ...common.Option) (
 		return fee.NewStaticCalculator(w.staticFeesConfig, upgrade.Config{}, time.Time{}), nil
 	}
 
-	return fee.NewDynamicCalculator(w.gasPrice, w.gasCap), nil
+	return fee.NewDynamicCalculator(commonfee.NewCalculator(w.gasPrice, w.gasCap)), nil
 }
 
 func (w *wallet) refreshFeesData(ctx *builder.Context, options ...common.Option) error {

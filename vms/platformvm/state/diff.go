@@ -37,7 +37,8 @@ type diff struct {
 
 	timestamp time.Time
 
-	currentGasCap *commonfee.Gas
+	excessComplexity *commonfee.Gas
+	currentGasCap    *commonfee.Gas
 
 	// Subnet ID --> supply of native asset of the subnet
 	currentSupply map[ids.ID]uint64
@@ -91,6 +92,31 @@ func NewDiffOn(parentState Chain) (Diff, error) {
 	return NewDiff(ids.Empty, stateGetter{
 		state: parentState,
 	})
+}
+
+func (d *diff) GetExcessGas() (commonfee.Gas, error) {
+	if d.excessComplexity == nil {
+		parentState, ok := d.stateVersions.GetState(d.parentID)
+		if !ok {
+			return commonfee.ZeroGas, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
+		}
+		parentExcessComplexity, err := parentState.GetExcessGas()
+		if err != nil {
+			return commonfee.ZeroGas, err
+		}
+
+		d.excessComplexity = new(commonfee.Gas)
+		*d.excessComplexity = parentExcessComplexity
+	}
+
+	return *d.excessComplexity, nil
+}
+
+func (d *diff) SetExcessGas(gas commonfee.Gas) {
+	if d.excessComplexity == nil {
+		d.excessComplexity = new(commonfee.Gas)
+	}
+	*d.excessComplexity = gas
 }
 
 func (d *diff) GetCurrentGasCap() (commonfee.Gas, error) {
@@ -430,6 +456,9 @@ func (d *diff) DeleteUTXO(utxoID ids.ID) {
 
 func (d *diff) Apply(baseState Chain) error {
 	baseState.SetTimestamp(d.timestamp)
+	if d.excessComplexity != nil {
+		baseState.SetExcessGas(*d.excessComplexity)
+	}
 	if d.currentGasCap != nil {
 		baseState.SetCurrentGasCap(*d.currentGasCap)
 	}

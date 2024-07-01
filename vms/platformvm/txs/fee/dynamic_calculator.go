@@ -24,10 +24,10 @@ var (
 	errFailedFeeCalculation = errors.New("failed fee calculation")
 )
 
-func NewDynamicCalculator(gasPrice fee.GasPrice, gasCap fee.Gas) *Calculator {
+func NewDynamicCalculator(fc *fee.Calculator) *Calculator {
 	return &Calculator{
 		b: &dynamicCalculator{
-			fc: fee.NewCalculator(gasPrice, gasCap),
+			fc: fc,
 			// credentials are set when computeFee is called
 		},
 	}
@@ -260,7 +260,7 @@ func (c *dynamicCalculator) addFeesFor(complexity fee.Dimensions) (uint64, error
 	if err != nil {
 		return 0, fmt.Errorf("failed adding fees: %w", err)
 	}
-	txGas, err := fee.ScalarProd(complexity, feeCfg.FeeDimensionWeights)
+	txGas, err := fee.ToGas(feeCfg.FeeDimensionWeights, complexity)
 	if err != nil {
 		return 0, fmt.Errorf("failed adding fees: %w", err)
 	}
@@ -286,7 +286,7 @@ func (c *dynamicCalculator) removeFeesFor(unitsToRm fee.Dimensions) (uint64, err
 	if err != nil {
 		return 0, fmt.Errorf("failed adding fees: %w", err)
 	}
-	txGas, err := fee.ScalarProd(unitsToRm, feeCfg.FeeDimensionWeights)
+	txGas, err := fee.ToGas(feeCfg.FeeDimensionWeights, unitsToRm)
 	if err != nil {
 		return 0, fmt.Errorf("failed adding fees: %w", err)
 	}
@@ -321,6 +321,8 @@ func (c *dynamicCalculator) calculateFee(tx txs.UnsignedTx, creds []verify.Verif
 func (c *dynamicCalculator) getGasPrice() fee.GasPrice { return c.fc.GetGasPrice() }
 
 func (c *dynamicCalculator) getBlockGas() fee.Gas { return c.fc.GetBlockGas() }
+
+func (c *dynamicCalculator) getExcessGas() fee.Gas { return c.fc.GetExcessGas() }
 
 func (c *dynamicCalculator) getGasCap() fee.Gas { return c.fc.GetGasCap() }
 

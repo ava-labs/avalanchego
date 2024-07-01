@@ -22,8 +22,10 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 
+	commonfee "github.com/ava-labs/avalanchego/vms/components/fee"
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
@@ -322,6 +324,9 @@ func packBlockTxs(
 	timestamp time.Time,
 	remainingSize int,
 ) ([]*txs.Tx, error) {
+	// retrieve parent block time before moving time forward
+	parentBlkTime := parentState.GetTimestamp()
+
 	stateDiff, err := state.NewDiffOn(parentState)
 	if err != nil {
 		return nil, err
@@ -331,22 +336,48 @@ func packBlockTxs(
 		return nil, err
 	}
 
-	feeCalculator, err := state.PickFeeCalculator(backend.Config, stateDiff, parentState.GetTimestamp())
-	if err != nil {
-		return nil, err
-	}
-
 	var (
+		upgrades  = backend.Config.UpgradeConfig
+		isEActive = upgrades.IsEActivated(timestamp)
+		gasCap    = commonfee.ZeroGas
+
 		blockTxs []*txs.Tx
 		inputs   set.Set[ids.ID]
 	)
+
+	feeCalculator, err := state.PickFeeCalculator(backend.Config, stateDiff, parentBlkTime)
+	if err != nil {
+		return nil, fmt.Errorf("failed picking fee calculator: %w", err)
+	}
+
+	if isEActive {
+		feeCfg, err := fee.GetDynamicConfig(isEActive)
+		if err != nil {
+			return nil, fmt.Errorf("failed retrieving dynamic fees config: %w", err)
+		}
+		currentGasCap, err := stateDiff.GetCurrentGasCap()
+		if err != nil {
+			return nil, fmt.Errorf("failed retrieving current gas cap: %w", err)
+		}
+		gasCap, err = commonfee.GasCap(feeCfg, currentGasCap, parentBlkTime, timestamp)
+		if err != nil {
+			return nil, fmt.Errorf("failed calculating next gas cap: %w", err)
+		}
+	}
+
 	for {
 		tx, exists := mempool.Peek()
 		if !exists {
 			break
 		}
+
 		txSize := len(tx.Bytes())
-		if txSize > remainingSize {
+
+		// pre e upgrade is active, we fill blocks till a target size
+		// post e upgrade is active, we fill blocks till a target gas
+		targetSizeReached := (!isEActive && txSize > remainingSize) ||
+			(isEActive && feeCalculator.GetBlockGas() >= gasCap)
+		if targetSizeReached {
 			break
 		}
 		mempool.Remove(tx)
@@ -391,7 +422,9 @@ func packBlockTxs(
 			return nil, err
 		}
 
-		remainingSize -= txSize
+		if !isEActive {
+			remainingSize -= txSize
+		}
 		blockTxs = append(blockTxs, tx)
 	}
 

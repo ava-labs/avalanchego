@@ -43,6 +43,10 @@ func (c *Calculator) GetBlockGas() fee.Gas {
 	return c.b.getBlockGas()
 }
 
+func (c *Calculator) GetExcessGas() fee.Gas {
+	return c.b.getExcessGas()
+}
+
 func (c *Calculator) GetGasCap() fee.Gas {
 	return c.b.getGasCap()
 }
@@ -61,6 +65,7 @@ type backend interface {
 	removeFeesFor(unitsToRm fee.Dimensions) (uint64, error)
 	getGasPrice() fee.GasPrice
 	getBlockGas() fee.Gas
+	getExcessGas() fee.Gas
 	getGasCap() fee.Gas
 	setCredentials(creds []verify.Verifiable)
 	calculateFee(tx txs.UnsignedTx, creds []verify.Verifiable) (uint64, error)

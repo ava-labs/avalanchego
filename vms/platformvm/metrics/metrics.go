@@ -40,6 +40,8 @@ type Metrics interface {
 	SetTimeUntilUnstake(time.Duration)
 	// Mark when this node will unstake from a subnet.
 	SetTimeUntilSubnetUnstake(subnetID ids.ID, timeUntilUnstake time.Duration)
+	// Mark cumulated gas in excess of target gas
+	SetExcessGas(commonfee.Gas)
 	// Mark gas cumulated across txs of last accepted block
 	SetBlockGas(commonfee.Gas)
 }
@@ -84,6 +86,10 @@ func New(registerer prometheus.Registerer) (Metrics, error) {
 			Name: "validator_sets_duration_sum",
 			Help: "Total amount of time generating validator sets in nanoseconds",
 		}),
+		excessGas: prometheus.NewGauge(prometheus.GaugeOpts{
+			Name: "cumulated_excess_gas",
+			Help: "Cumulated excess gas",
+		}),
 		blockGas: prometheus.NewGauge(prometheus.GaugeOpts{
 			Name: "block_gas",
 			Help: "Cumulated gas over last accepted block",
@@ -125,7 +131,7 @@ type metrics struct {
 	validatorSetsHeightDiff prometheus.Gauge
 	validatorSetsDuration   prometheus.Gauge
 
-	blockGas prometheus.Gauge
+	excessGas, blockGas prometheus.Gauge
 }
 
 func (m *metrics) MarkAccepted(b block.Block) error {
@@ -162,6 +168,10 @@ func (m *metrics) SetTimeUntilUnstake(timeUntilUnstake time.Duration) {
 
 func (m *metrics) SetTimeUntilSubnetUnstake(subnetID ids.ID, timeUntilUnstake time.Duration) {
 	m.timeUntilSubnetUnstake.WithLabelValues(subnetID.String()).Set(float64(timeUntilUnstake))
+}
+
+func (m *metrics) SetExcessGas(g commonfee.Gas) {
+	m.excessGas.Set(float64(g))
 }
 
 func (m *metrics) SetBlockGas(g commonfee.Gas) {

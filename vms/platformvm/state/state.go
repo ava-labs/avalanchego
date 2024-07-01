@@ -82,13 +82,15 @@ var (
 	ChainPrefix                   = []byte("chain")
 	SingletonPrefix               = []byte("singleton")
 
-	TimestampKey       = []byte("timestamp")
-	CurrentSupplyKey   = []byte("current supply")
-	LastAcceptedKey    = []byte("last accepted")
-	HeightsIndexedKey  = []byte("heights indexed")
-	CurrentGasCapKey   = []byte("gas cap")
-	InitializedKey     = []byte("initialized")
-	BlocksReindexedKey = []byte("blocks reindexed")
+	TimestampKey        = []byte("timestamp")
+	CurrentSupplyKey    = []byte("current supply")
+	LastAcceptedKey     = []byte("last accepted")
+	HeightsIndexedKey   = []byte("heights indexed")
+	FeeRatesKey         = []byte("fee rates")
+	ExcessComplexityKey = []byte("excess complexity")
+	CurrentGasCapKey    = []byte("gas cap")
+	InitializedKey      = []byte("initialized")
+	BlocksReindexedKey  = []byte("blocks reindexed")
 )
 
 // Chain collects all methods to manage the state of the chain for block
@@ -98,6 +100,9 @@ type Chain interface {
 	avax.UTXOAdder
 	avax.UTXOGetter
 	avax.UTXODeleter
+
+	GetExcessGas() (commonfee.Gas, error)
+	SetExcessGas(commonfee.Gas)
 
 	GetCurrentGasCap() (commonfee.Gas, error)
 	SetCurrentGasCap(commonfee.Gas)
@@ -360,6 +365,7 @@ type state struct {
 
 	// The persisted fields represent the current database value
 	timestamp, persistedTimestamp         time.Time
+	excessComplexity                      commonfee.Gas
 	currentGasCap                         *commonfee.Gas
 	currentSupply, persistedCurrentSupply uint64
 	// [lastAccepted] is the most recently accepted block.
@@ -1005,6 +1011,14 @@ func (s *state) GetStartTime(nodeID ids.NodeID, subnetID ids.ID) (time.Time, err
 	return staker.StartTime, nil
 }
 
+func (s *state) GetExcessGas() (commonfee.Gas, error) {
+	return s.excessComplexity, nil
+}
+
+func (s *state) SetExcessGas(gas commonfee.Gas) {
+	s.excessComplexity = gas
+}
+
 func (s *state) GetCurrentGasCap() (commonfee.Gas, error) {
 	if s.currentGasCap == nil {
 		return commonfee.ZeroGas, nil
@@ -1308,6 +1322,23 @@ func (s *state) loadMetadata() error {
 	}
 	s.persistedTimestamp = timestamp
 	s.SetTimestamp(timestamp)
+
+	switch excessComplexityBytes, err := s.singletonDB.Get(ExcessComplexityKey); err {
+	case nil:
+		gas, err := database.ParseUInt64(excessComplexityBytes)
+		if err != nil {
+			return err
+		}
+		s.excessComplexity = commonfee.Gas(gas)
+
+	case database.ErrNotFound:
+		// fork introducing dynamic fees may not be active yet,
+		// hence we may have never stored fees windows. Set to nil
+		// TODO: remove once fork is active
+		s.excessComplexity = commonfee.ZeroGas
+	default:
+		return err
+	}
 
 	switch currentGasCapBytes, err := s.singletonDB.Get(CurrentGasCapKey); err {
 	case nil:
@@ -2306,6 +2337,10 @@ func (s *state) writeMetadata() error {
 			return fmt.Errorf("failed to write timestamp: %w", err)
 		}
 		s.persistedTimestamp = s.timestamp
+	}
+
+	if err := database.PutUInt64(s.singletonDB, ExcessComplexityKey, uint64(s.excessComplexity)); err != nil {
+		return fmt.Errorf("failed to write current excess gas: %w", err)
 	}
 
 	if s.currentGasCap != nil {

@@ -253,6 +253,7 @@ func (v *verifier) ApricotAtomicBlock(b *block.ApricotAtomicBlock) error {
 		inputs:         atomicExecutor.Inputs,
 		timestamp:      atomicExecutor.OnAccept.GetTimestamp(),
 		blockGas:       commonfee.ZeroGas,
+		excessGas:      commonfee.ZeroGas,
 		atomicRequests: atomicExecutor.AtomicRequests,
 	}
 	return nil
@@ -366,9 +367,6 @@ func (v *verifier) abortBlock(b block.Block) error {
 		statelessBlock: b,
 		onAcceptState:  onAbortState,
 		timestamp:      onAbortState.GetTimestamp(),
-
-		// blockComplexity not set. We'll assign same complexity
-		// as proposal blocks upon acceptance
 	}
 	return nil
 }
@@ -453,6 +451,7 @@ func (v *verifier) proposalBlock(
 		// always be the same as the Banff Proposal Block.
 		timestamp:      onAbortState.GetTimestamp(),
 		blockGas:       blkGas,
+		excessGas:      feeCalculator.GetExcessGas(),
 		atomicRequests: atomicRequests,
 	}
 	return nil
@@ -492,13 +491,19 @@ func (v *verifier) standardBlock(
 
 		timestamp:      onAcceptState.GetTimestamp(),
 		blockGas:       blkGas,
+		excessGas:      feeCalculator.GetExcessGas(),
 		inputs:         inputs,
 		atomicRequests: atomicRequests,
 	}
 	return nil
 }
 
-func (v *verifier) processStandardTxs(txs []*txs.Tx, feeCalculator *fee.Calculator, state state.Diff, parentID ids.ID) (
+func (v *verifier) processStandardTxs(
+	txs []*txs.Tx,
+	feeCalculator *fee.Calculator,
+	state state.Diff,
+	parentID ids.ID,
+) (
 	set.Set[ids.ID],
 	map[ids.ID]*atomic.Requests,
 	func(),
@@ -550,6 +555,10 @@ func (v *verifier) processStandardTxs(txs []*txs.Tx, feeCalculator *fee.Calculat
 
 	if err := v.verifyUniqueInputs(parentID, inputs); err != nil {
 		return nil, nil, nil, err
+	}
+
+	if v.txExecutorBackend.Config.UpgradeConfig.IsEActivated(state.GetTimestamp()) {
+		state.SetExcessGas(feeCalculator.GetExcessGas())
 	}
 
 	if numFuncs := len(funcs); numFuncs == 1 {

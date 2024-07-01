@@ -89,14 +89,38 @@ func PickFeeCalculator(cfg *config.Config, state Chain, parentBlkTime time.Time)
 	if err != nil {
 		return nil, fmt.Errorf("failed retrieving dynamic fees config: %w", err)
 	}
+
+	feesMan, err := updatedFeeManager(feesCfg, state, parentBlkTime, childBlkTime)
+	if err != nil {
+		return nil, fmt.Errorf("failed updating fee manager: %w", err)
+	}
+
+	return fee.NewDynamicCalculator(feesMan), nil
+}
+
+func updatedFeeManager(feesCfg commonfee.DynamicFeesConfig, state Chain, parentBlkTime, childBlkTime time.Time) (*commonfee.Calculator, error) {
 	currentGasCap, err := state.GetCurrentGasCap()
 	if err != nil {
 		return nil, fmt.Errorf("failed retrieving gas cap: %w", err)
 	}
 	gasCap, err := commonfee.GasCap(feesCfg, currentGasCap, parentBlkTime, childBlkTime)
 	if err != nil {
-		return nil, fmt.Errorf("failed updating gas cap: %w", err)
+		return nil, fmt.Errorf("failed retrieving gas cap: %w", err)
 	}
-	feeCalculator := fee.NewDynamicCalculator(feesCfg.GasPrice, gasCap)
-	return feeCalculator, nil
+
+	excessGas, err := state.GetExcessGas()
+	if err != nil {
+		return nil, fmt.Errorf("failed retrieving excess complexity: %w", err)
+	}
+	feeManager, err := commonfee.NewUpdatedManager(
+		feesCfg,
+		gasCap,
+		excessGas,
+		parentBlkTime,
+		childBlkTime,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed updating fee rates, %w", err)
+	}
+	return feeManager, nil
 }

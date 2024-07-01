@@ -33,5 +33,6 @@ type blockState struct {
 	inputs         set.Set[ids.ID]
 	timestamp      time.Time
 	blockGas       commonfee.Gas
+	excessGas      commonfee.Gas
 	atomicRequests map[ids.ID]*atomic.Requests
 }
