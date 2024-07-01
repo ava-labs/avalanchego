@@ -24,7 +24,7 @@ var _ = ginkgo.Describe("[Banff]", func() {
 
 	ginkgo.It("can send custom assets X->P and P->X",
 		func() {
-			keychain := e2e.Env.NewKeychain(1)
+			keychain := e2e.Env.NewKeychain()
 			wallet := e2e.NewWallet(keychain, e2e.Env.GetRandomNodeURI())
 
 			// Get the P-chain and the X-chain wallets

@@ -31,7 +31,7 @@ var _ = e2e.DescribePChain("[Validator Sets]", func() {
 		network := e2e.Env.GetNetwork()
 
 		ginkgo.By("creating wallet with a funded key to source delegated funds from")
-		keychain := e2e.Env.NewKeychain(1)
+		keychain := e2e.Env.NewKeychain()
 		nodeURI := e2e.Env.GetRandomNodeURI()
 		baseWallet := e2e.NewWallet(keychain, nodeURI)
 		pWallet := baseWallet.P()
