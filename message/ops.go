@@ -212,9 +212,9 @@ func (op Op) String() string {
 	case HandshakeOp:
 		return "handshake"
 	case GetPeerListOp:
-		return "get_peerlist"
+		return "get_peers"
 	case PeerListOp:
-		return "peerlist"
+		return "peers"
 	// State sync
 	case GetStateSummaryFrontierOp:
 		return "get_state_summary_frontier"
