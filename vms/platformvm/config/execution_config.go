@@ -9,6 +9,8 @@ import (
 
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm/network"
+
+	commonfee "github.com/ava-labs/avalanchego/vms/components/fee"
 )
 
 var DefaultExecutionConfig = ExecutionConfig{
@@ -38,6 +40,9 @@ type ExecutionConfig struct {
 	FxOwnerCacheSize             int            `json:"fx-owner-cache-size"`
 	ChecksumsEnabled             bool           `json:"checksums-enabled"`
 	MempoolPruneFrequency        time.Duration  `json:"mempool-prune-frequency"`
+
+	// test nets are allow to configure ad-hoc dynamic fees configuration
+	DynamicFeesConfig *commonfee.DynamicFeesConfig `json:"dynamic-fees-config"`
 }
 
 // GetExecutionConfig returns an ExecutionConfig

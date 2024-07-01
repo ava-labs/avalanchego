@@ -4,15 +4,21 @@
 package fee
 
 import (
+	"errors"
 	"time"
 
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/vms/components/fee"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/upgrade"
 )
 
-var _ backend = (*staticCalculator)(nil)
+var (
+	_ backend = (*staticCalculator)(nil)
+
+	errComplexityNotPriced = errors.New("complexity not priced")
+)
 
 func NewStaticCalculator(
 	config StaticConfig,
@@ -129,8 +135,34 @@ func (c *staticCalculator) ExportTx(*txs.ExportTx) error {
 	return nil
 }
 
+func (c *staticCalculator) getFee() uint64 {
+	return c.fee
+}
+
+func (c *staticCalculator) resetFee(newFee uint64) {
+	c.fee = newFee
+}
+
 func (c *staticCalculator) calculateFee(tx txs.UnsignedTx, _ []verify.Verifiable) (uint64, error) {
 	c.fee = 0 // zero fee among different calculateFee invocations (unlike gas which gets cumulated)
 	err := tx.Visit(c)
 	return c.fee, err
 }
+
+func (*staticCalculator) addFeesFor(fee.Dimensions) (uint64, error) {
+	return 0, errComplexityNotPriced
+}
+
+func (*staticCalculator) removeFeesFor(fee.Dimensions) (uint64, error) {
+	return 0, errComplexityNotPriced
+}
+
+func (*staticCalculator) getGasPrice() fee.GasPrice { return 0 }
+
+func (*staticCalculator) getBlockGas() fee.Gas { return 0 }
+
+func (*staticCalculator) getGasCap() fee.Gas { return 0 }
+
+func (*staticCalculator) setCredentials([]verify.Verifiable) {}
+
+func (*staticCalculator) isEActive() bool { return false }

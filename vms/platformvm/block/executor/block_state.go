@@ -11,6 +11,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
+
+	commonfee "github.com/ava-labs/avalanchego/vms/components/fee"
 )
 
 type proposalBlockState struct {
@@ -30,5 +32,6 @@ type blockState struct {
 
 	inputs         set.Set[ids.ID]
 	timestamp      time.Time
+	blockGas       commonfee.Gas
 	atomicRequests map[ids.ID]*atomic.Requests
 }

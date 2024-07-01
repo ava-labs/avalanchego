@@ -16,6 +16,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
+
+	commonfee "github.com/ava-labs/avalanchego/vms/components/fee"
 )
 
 var (
@@ -61,13 +63,16 @@ func (v *verifier) BanffProposalBlock(b *block.BanffProposalBlock) error {
 		return err
 	}
 
+	// retrieve parent block time before moving time forward
+	parentBlkTime := onDecisionState.GetTimestamp()
+
 	// Advance the time to [nextChainTime].
 	nextChainTime := b.Timestamp()
 	if _, err := executor.AdvanceTimeTo(v.txExecutorBackend, onDecisionState, nextChainTime); err != nil {
 		return err
 	}
 
-	feeCalculator, err := state.PickFeeCalculator(v.txExecutorBackend.Config, onDecisionState)
+	feeCalculator, err := state.PickFeeCalculator(v.txExecutorBackend.Config, onDecisionState, parentBlkTime)
 	if err != nil {
 		return err
 	}
@@ -115,6 +120,9 @@ func (v *verifier) BanffStandardBlock(b *block.BanffStandardBlock) error {
 		return err
 	}
 
+	// retrieve parent block time before moving time forward
+	parentBlkTime := onAcceptState.GetTimestamp()
+
 	// Advance the time to [b.Timestamp()].
 	changed, err := executor.AdvanceTimeTo(
 		v.txExecutorBackend,
@@ -131,7 +139,7 @@ func (v *verifier) BanffStandardBlock(b *block.BanffStandardBlock) error {
 		return errBanffStandardBlockWithoutChanges
 	}
 
-	feeCalculator, err := state.PickFeeCalculator(v.txExecutorBackend.Config, onAcceptState)
+	feeCalculator, err := state.PickFeeCalculator(v.txExecutorBackend.Config, onAcceptState, parentBlkTime)
 	if err != nil {
 		return err
 	}
@@ -244,6 +252,7 @@ func (v *verifier) ApricotAtomicBlock(b *block.ApricotAtomicBlock) error {
 
 		inputs:         atomicExecutor.Inputs,
 		timestamp:      atomicExecutor.OnAccept.GetTimestamp(),
+		blockGas:       commonfee.ZeroGas,
 		atomicRequests: atomicExecutor.AtomicRequests,
 	}
 	return nil
@@ -395,6 +404,11 @@ func (v *verifier) proposalBlock(
 	atomicRequests map[ids.ID]*atomic.Requests,
 	onAcceptFunc func(),
 ) error {
+	currentGasCap, err := onCommitState.GetCurrentGasCap()
+	if err != nil {
+		return err
+	}
+
 	txExecutor := executor.ProposalTxExecutor{
 		OnCommitState: onCommitState,
 		OnAbortState:  onAbortState,
@@ -407,6 +421,13 @@ func (v *verifier) proposalBlock(
 		txID := b.Tx.ID()
 		v.MarkDropped(txID, err) // cache tx as dropped
 		return err
+	}
+
+	blkGas := feeCalculator.GetBlockGas()
+	if feeCalculator.IsEActive() {
+		nextGasCap := commonfee.UpdateGasCap(currentGasCap, blkGas)
+		onCommitState.SetCurrentGasCap(nextGasCap)
+		onAbortState.SetCurrentGasCap(nextGasCap)
 	}
 
 	onCommitState.AddTx(b.Tx, status.Committed)
@@ -431,6 +452,7 @@ func (v *verifier) proposalBlock(
 		// never be modified by an Apricot Abort block and the timestamp will
 		// always be the same as the Banff Proposal Block.
 		timestamp:      onAbortState.GetTimestamp(),
+		blockGas:       blkGas,
 		atomicRequests: atomicRequests,
 	}
 	return nil
@@ -442,6 +464,11 @@ func (v *verifier) standardBlock(
 	feeCalculator *fee.Calculator,
 	onAcceptState state.Diff,
 ) error {
+	currentGasCap, err := onAcceptState.GetCurrentGasCap()
+	if err != nil {
+		return err
+	}
+
 	inputs, atomicRequests, onAcceptFunc, err := v.processStandardTxs(b.Transactions, feeCalculator, onAcceptState, b.Parent())
 	if err != nil {
 		return err
@@ -450,6 +477,13 @@ func (v *verifier) standardBlock(
 	v.Mempool.Remove(b.Transactions...)
 
 	blkID := b.ID()
+
+	blkGas := feeCalculator.GetBlockGas()
+	if feeCalculator.IsEActive() {
+		nextGasCap := commonfee.UpdateGasCap(currentGasCap, blkGas)
+		onAcceptState.SetCurrentGasCap(nextGasCap)
+	}
+
 	v.blkIDToState[blkID] = &blockState{
 		statelessBlock: b,
 
@@ -457,6 +491,7 @@ func (v *verifier) standardBlock(
 		onAcceptFunc:  onAcceptFunc,
 
 		timestamp:      onAcceptState.GetTimestamp(),
+		blockGas:       blkGas,
 		inputs:         inputs,
 		atomicRequests: atomicRequests,
 	}

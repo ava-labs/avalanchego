@@ -14,6 +14,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+
+	commonfee "github.com/ava-labs/avalanchego/vms/components/fee"
 )
 
 var (
@@ -34,6 +36,8 @@ type diff struct {
 	stateVersions Versions
 
 	timestamp time.Time
+
+	currentGasCap *commonfee.Gas
 
 	// Subnet ID --> supply of native asset of the subnet
 	currentSupply map[ids.ID]uint64
@@ -87,6 +91,31 @@ func NewDiffOn(parentState Chain) (Diff, error) {
 	return NewDiff(ids.Empty, stateGetter{
 		state: parentState,
 	})
+}
+
+func (d *diff) GetCurrentGasCap() (commonfee.Gas, error) {
+	if d.currentGasCap == nil {
+		parentState, ok := d.stateVersions.GetState(d.parentID)
+		if !ok {
+			return commonfee.ZeroGas, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
+		}
+		parentCurrentGasCap, err := parentState.GetCurrentGasCap()
+		if err != nil {
+			return commonfee.ZeroGas, err
+		}
+
+		d.currentGasCap = new(commonfee.Gas)
+		*d.currentGasCap = parentCurrentGasCap
+	}
+
+	return *d.currentGasCap, nil
+}
+
+func (d *diff) SetCurrentGasCap(gasCap commonfee.Gas) {
+	if d.currentGasCap == nil {
+		d.currentGasCap = new(commonfee.Gas)
+	}
+	*d.currentGasCap = gasCap
 }
 
 func (d *diff) GetTimestamp() time.Time {
@@ -401,6 +430,9 @@ func (d *diff) DeleteUTXO(utxoID ids.ID) {
 
 func (d *diff) Apply(baseState Chain) error {
 	baseState.SetTimestamp(d.timestamp)
+	if d.currentGasCap != nil {
+		baseState.SetCurrentGasCap(*d.currentGasCap)
+	}
 	for subnetID, supply := range d.currentSupply {
 		baseState.SetCurrentSupply(subnetID, supply)
 	}

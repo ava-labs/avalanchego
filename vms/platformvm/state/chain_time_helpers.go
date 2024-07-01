@@ -11,6 +11,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
+
+	commonfee "github.com/ava-labs/avalanchego/vms/components/fee"
 )
 
 func NextBlockTime(state Chain, clk *mockable.Clock) (time.Time, bool, error) {
@@ -73,7 +75,28 @@ func GetNextStakerChangeTime(state Chain) (time.Time, error) {
 
 // [PickFeeCalculator] creates either a static or a dynamic fee calculator, depending on the active upgrade
 // [PickFeeCalculator] does not modify [state]
-func PickFeeCalculator(cfg *config.Config, state Chain) (*fee.Calculator, error) {
-	childBlkTime := state.GetTimestamp()
-	return fee.NewStaticCalculator(cfg.StaticFeeConfig, cfg.UpgradeConfig, childBlkTime), nil
+func PickFeeCalculator(cfg *config.Config, state Chain, parentBlkTime time.Time) (*fee.Calculator, error) {
+	var (
+		childBlkTime = state.GetTimestamp()
+		isEActive    = cfg.UpgradeConfig.IsEActivated(childBlkTime)
+	)
+
+	if !isEActive {
+		return fee.NewStaticCalculator(cfg.StaticFeeConfig, cfg.UpgradeConfig, childBlkTime), nil
+	}
+
+	feesCfg, err := fee.GetDynamicConfig(isEActive)
+	if err != nil {
+		return nil, fmt.Errorf("failed retrieving dynamic fees config: %w", err)
+	}
+	currentGasCap, err := state.GetCurrentGasCap()
+	if err != nil {
+		return nil, fmt.Errorf("failed retrieving gas cap: %w", err)
+	}
+	gasCap, err := commonfee.GasCap(feesCfg, currentGasCap, parentBlkTime, childBlkTime)
+	if err != nil {
+		return nil, fmt.Errorf("failed updating gas cap: %w", err)
+	}
+	feeCalculator := fee.NewDynamicCalculator(feesCfg.GasPrice, gasCap)
+	return feeCalculator, nil
 }

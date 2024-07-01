@@ -42,8 +42,10 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
+	commonfee "github.com/ava-labs/avalanchego/vms/components/fee"
 )
 
 const (
@@ -84,6 +86,7 @@ var (
 	CurrentSupplyKey   = []byte("current supply")
 	LastAcceptedKey    = []byte("last accepted")
 	HeightsIndexedKey  = []byte("heights indexed")
+	CurrentGasCapKey   = []byte("gas cap")
 	InitializedKey     = []byte("initialized")
 	BlocksReindexedKey = []byte("blocks reindexed")
 )
@@ -95,6 +98,9 @@ type Chain interface {
 	avax.UTXOAdder
 	avax.UTXOGetter
 	avax.UTXODeleter
+
+	GetCurrentGasCap() (commonfee.Gas, error)
+	SetCurrentGasCap(commonfee.Gas)
 
 	GetTimestamp() time.Time
 	SetTimestamp(tm time.Time)
@@ -354,6 +360,7 @@ type state struct {
 
 	// The persisted fields represent the current database value
 	timestamp, persistedTimestamp         time.Time
+	currentGasCap                         *commonfee.Gas
 	currentSupply, persistedCurrentSupply uint64
 	// [lastAccepted] is the most recently accepted block.
 	lastAccepted, persistedLastAccepted ids.ID
@@ -998,6 +1005,20 @@ func (s *state) GetStartTime(nodeID ids.NodeID, subnetID ids.ID) (time.Time, err
 	return staker.StartTime, nil
 }
 
+func (s *state) GetCurrentGasCap() (commonfee.Gas, error) {
+	if s.currentGasCap == nil {
+		return commonfee.ZeroGas, nil
+	}
+	return *s.currentGasCap, nil
+}
+
+func (s *state) SetCurrentGasCap(gasCap commonfee.Gas) {
+	if s.currentGasCap == nil {
+		s.currentGasCap = new(commonfee.Gas)
+	}
+	*s.currentGasCap = gasCap
+}
+
 func (s *state) GetTimestamp() time.Time {
 	return s.timestamp
 }
@@ -1287,6 +1308,30 @@ func (s *state) loadMetadata() error {
 	}
 	s.persistedTimestamp = timestamp
 	s.SetTimestamp(timestamp)
+
+	switch currentGasCapBytes, err := s.singletonDB.Get(CurrentGasCapKey); err {
+	case nil:
+		gas, err := database.ParseUInt64(currentGasCapBytes)
+		if err != nil {
+			return err
+		}
+		s.currentGasCap = new(commonfee.Gas)
+		*s.currentGasCap = commonfee.Gas(gas)
+
+	case database.ErrNotFound:
+		// fork introducing dynamic fees may not be active yet,
+		// hence we may have never stored fees windows. Set to nil
+		// TODO: remove once fork is active
+		feesCfg, err := fee.GetDynamicConfig(true /*isEActive*/)
+		if err != nil {
+			return fmt.Errorf("failed retrieving dynamic fees config: %w", err)
+		}
+		s.currentGasCap = new(commonfee.Gas)
+		*s.currentGasCap = feesCfg.MaxGasPerSecond
+
+	default:
+		return err
+	}
 
 	currentSupply, err := database.GetUInt64(s.singletonDB, CurrentSupplyKey)
 	if err != nil {
@@ -2262,6 +2307,13 @@ func (s *state) writeMetadata() error {
 		}
 		s.persistedTimestamp = s.timestamp
 	}
+
+	if s.currentGasCap != nil {
+		if err := database.PutUInt64(s.singletonDB, CurrentGasCapKey, uint64(*s.currentGasCap)); err != nil {
+			return fmt.Errorf("failed to write current gas cap: %w", err)
+		}
+	}
+
 	if s.persistedCurrentSupply != s.currentSupply {
 		if err := database.PutUInt64(s.singletonDB, CurrentSupplyKey, s.currentSupply); err != nil {
 			return fmt.Errorf("failed to write current supply: %w", err)

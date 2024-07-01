@@ -24,6 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
+	commonfee "github.com/ava-labs/avalanchego/vms/components/fee"
 	walletsigner "github.com/ava-labs/avalanchego/wallet/chain/p/signer"
 )
 
@@ -57,6 +58,7 @@ func TestApricotStandardBlockTimeVerification(t *testing.T) {
 	env.mockedState.EXPECT().GetLastAccepted().Return(parentID).AnyTimes()
 	env.mockedState.EXPECT().GetTimestamp().Return(chainTime).AnyTimes()
 	onParentAccept.EXPECT().GetTimestamp().Return(chainTime).AnyTimes()
+	onParentAccept.EXPECT().GetCurrentGasCap().Return(commonfee.ZeroGas, nil).AnyTimes()
 
 	// wrong height
 	apricotChildBlk, err := block.NewApricotStandardBlock(
@@ -150,6 +152,7 @@ func TestBanffStandardBlockTimeVerification(t *testing.T) {
 	}
 	utxoID := utxo.InputID()
 	onParentAccept.EXPECT().GetUTXO(utxoID).Return(utxo, nil).AnyTimes()
+	onParentAccept.EXPECT().GetCurrentGasCap().Return(commonfee.ZeroGas, nil).AnyTimes()
 
 	// Create the tx
 	utx := &txs.CreateSubnetTx{
@@ -510,7 +513,8 @@ func TestBanffStandardBlockUpdateStakers(t *testing.T) {
 			}
 
 			for _, staker := range test.subnetStakers {
-				builder, signer := env.factory.NewWallet(preFundedKeys[0], preFundedKeys[1])
+				builder, signer, feeCalc, err := env.factory.NewWallet(preFundedKeys[0], preFundedKeys[1])
+				require.NoError(err)
 				utx, err := builder.NewAddSubnetValidatorTx(
 					&txs.SubnetValidator{
 						Validator: txs.Validator{
@@ -521,6 +525,7 @@ func TestBanffStandardBlockUpdateStakers(t *testing.T) {
 						},
 						Subnet: subnetID,
 					},
+					feeCalc,
 				)
 				require.NoError(err)
 				tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
@@ -604,7 +609,8 @@ func TestBanffStandardBlockRemoveSubnetValidator(t *testing.T) {
 	subnetValidatorNodeID := genesisNodeIDs[0]
 	subnetVdr1StartTime := defaultValidateStartTime
 	subnetVdr1EndTime := defaultValidateStartTime.Add(defaultMinStakingDuration)
-	builder, signer := env.factory.NewWallet(preFundedKeys[0], preFundedKeys[1])
+	builder, signer, feeCalc, err := env.factory.NewWallet(preFundedKeys[0], preFundedKeys[1])
+	require.NoError(err)
 	utx, err := builder.NewAddSubnetValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
@@ -615,6 +621,7 @@ func TestBanffStandardBlockRemoveSubnetValidator(t *testing.T) {
 			},
 			Subnet: subnetID,
 		},
+		feeCalc,
 	)
 	require.NoError(err)
 	tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
@@ -647,6 +654,7 @@ func TestBanffStandardBlockRemoveSubnetValidator(t *testing.T) {
 			},
 			Subnet: subnetID,
 		},
+		feeCalc,
 	)
 	require.NoError(err)
 	tx, err = walletsigner.SignUnsigned(context.Background(), signer, utx)
@@ -710,7 +718,8 @@ func TestBanffStandardBlockTrackedSubnet(t *testing.T) {
 			subnetValidatorNodeID := genesisNodeIDs[0]
 			subnetVdr1StartTime := defaultGenesisTime.Add(1 * time.Minute)
 			subnetVdr1EndTime := defaultGenesisTime.Add(10 * defaultMinStakingDuration).Add(1 * time.Minute)
-			builder, signer := env.factory.NewWallet(preFundedKeys[0], preFundedKeys[1])
+			builder, signer, feeCalc, err := env.factory.NewWallet(preFundedKeys[0], preFundedKeys[1])
+			require.NoError(err)
 			utx, err := builder.NewAddSubnetValidatorTx(
 				&txs.SubnetValidator{
 					Validator: txs.Validator{
@@ -721,6 +730,7 @@ func TestBanffStandardBlockTrackedSubnet(t *testing.T) {
 					},
 					Subnet: subnetID,
 				},
+				feeCalc,
 			)
 			require.NoError(err)
 			tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
@@ -805,7 +815,8 @@ func TestBanffStandardBlockDelegatorStakerWeight(t *testing.T) {
 	pendingDelegatorStartTime := pendingValidatorStartTime.Add(1 * time.Second)
 	pendingDelegatorEndTime := pendingDelegatorStartTime.Add(1 * time.Second)
 
-	builder, signer := env.factory.NewWallet(preFundedKeys[0], preFundedKeys[1], preFundedKeys[4])
+	builder, signer, feeCalc, err := env.factory.NewWallet(preFundedKeys[0], preFundedKeys[1], preFundedKeys[4])
+	require.NoError(err)
 	utx, err := builder.NewAddDelegatorTx(
 		&txs.Validator{
 			NodeID: nodeID,
@@ -817,6 +828,7 @@ func TestBanffStandardBlockDelegatorStakerWeight(t *testing.T) {
 			Threshold: 1,
 			Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
 		},
+		feeCalc,
 	)
 	require.NoError(err)
 	addDelegatorTx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)

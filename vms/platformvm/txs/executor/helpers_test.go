@@ -147,7 +147,7 @@ func newEnvironment(t *testing.T, f fork) *environment {
 	uptimes := uptime.NewManager(baseState, clk)
 	utxosVerifier := utxo.NewVerifier(ctx, clk, fx)
 
-	factory := txstest.NewWalletFactory(ctx, config, baseState)
+	factory := txstest.NewWalletFactory(ctx, config, clk, baseState)
 
 	backend := Backend{
 		Config:       config,
@@ -208,7 +208,9 @@ func newEnvironment(t *testing.T, f fork) *environment {
 func addSubnet(t *testing.T, env *environment) {
 	require := require.New(t)
 
-	builder, signer := env.factory.NewWallet(preFundedKeys[0])
+	builder, signer, feeCalc, err := env.factory.NewWallet(preFundedKeys[0])
+	require.NoError(err)
+
 	utx, err := builder.NewCreateSubnetTx(
 		&secp256k1fx.OutputOwners{
 			Threshold: 2,
@@ -218,6 +220,7 @@ func addSubnet(t *testing.T, env *environment) {
 				preFundedKeys[2].PublicKey().Address(),
 			},
 		},
+		feeCalc,
 		common.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
@@ -230,12 +233,9 @@ func addSubnet(t *testing.T, env *environment) {
 	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
-	feeCalculator, err := state.PickFeeCalculator(env.config, env.state)
-	require.NoError(err)
-
 	executor := StandardTxExecutor{
 		Backend:       &env.backend,
-		FeeCalculator: feeCalculator,
+		FeeCalculator: feeCalc,
 		State:         stateDiff,
 		Tx:            testSubnet1,
 	}

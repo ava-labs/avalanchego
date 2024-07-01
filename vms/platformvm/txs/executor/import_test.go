@@ -124,10 +124,13 @@ func TestNewImportTx(t *testing.T) {
 
 			env.msm.SharedMemory = tt.sharedMemory
 
-			builder, signer := env.factory.NewWallet(tt.sourceKeys...)
+			builder, signer, feeCalc, err := env.factory.NewWallet(tt.sourceKeys...)
+			require.NoError(err)
+
 			utx, err := builder.NewImportTx(
 				tt.sourceChainID,
 				to,
+				feeCalc,
 			)
 			require.ErrorIs(err, tt.expectedErr)
 			if tt.expectedErr != nil {
@@ -160,7 +163,7 @@ func TestNewImportTx(t *testing.T) {
 
 			stateDiff.SetTimestamp(tt.timestamp)
 
-			feeCalculator, err := state.PickFeeCalculator(env.config, stateDiff)
+			feeCalculator, err := state.PickFeeCalculator(env.config, stateDiff, stateDiff.GetTimestamp())
 			require.NoError(err)
 
 			verifier := StandardTxExecutor{

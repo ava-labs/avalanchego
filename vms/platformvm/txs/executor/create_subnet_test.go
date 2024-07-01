@@ -66,10 +66,13 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 
 			cfg := *env.config
 			cfg.StaticFeeConfig.CreateSubnetTxFee = test.fee
-			factory := txstest.NewWalletFactory(env.ctx, &cfg, env.state)
-			builder, signer := factory.NewWallet(preFundedKeys...)
+			factory := txstest.NewWalletFactory(env.ctx, &cfg, env.clk, env.state)
+			builder, signer, feeCalc, err := factory.NewWallet(preFundedKeys...)
+			require.NoError(err)
+
 			utx, err := builder.NewCreateSubnetTx(
 				&secp256k1fx.OutputOwners{},
+				feeCalc,
 			)
 			require.NoError(err)
 			tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
@@ -80,7 +83,7 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 
 			stateDiff.SetTimestamp(test.time)
 
-			feeCalculator, err := state.PickFeeCalculator(env.config, stateDiff)
+			feeCalculator, err := state.PickFeeCalculator(env.config, stateDiff, stateDiff.GetTimestamp())
 			require.NoError(err)
 
 			executor := StandardTxExecutor{

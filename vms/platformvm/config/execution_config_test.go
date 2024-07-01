@@ -12,6 +12,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/vms/platformvm/network"
+
+	commonfee "github.com/ava-labs/avalanchego/vms/components/fee"
 )
 
 // Requires all values in a struct to be initialized
@@ -91,6 +93,12 @@ func TestExecutionConfigUnmarshal(t *testing.T) {
 			FxOwnerCacheSize:             9,
 			ChecksumsEnabled:             true,
 			MempoolPruneFrequency:        time.Minute,
+			DynamicFeesConfig: &commonfee.DynamicFeesConfig{
+				GasPrice:            commonfee.GasPrice(1234),
+				FeeDimensionWeights: commonfee.Dimensions{1, 2, 3, 4},
+				MaxGasPerSecond:     commonfee.Gas(12),
+				LeakGasCoeff:        commonfee.Gas(34),
+			},
 		}
 		verifyInitializedStruct(t, *expected)
 		verifyInitializedStruct(t, expected.Network)

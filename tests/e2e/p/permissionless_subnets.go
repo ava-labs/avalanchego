@@ -61,9 +61,9 @@ var _ = e2e.DescribePChain("[Permissionless Subnets]", func() {
 					owner,
 					e2e.WithDefaultContext(),
 				)
-
-				subnetID = subnetTx.ID()
 				require.NoError(err)
+				subnetID = subnetTx.ID()
+
 				require.NotEqual(subnetID, constants.PrimaryNetworkID)
 			})
 
