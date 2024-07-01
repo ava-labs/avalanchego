@@ -36,6 +36,7 @@ func TestBuild(t *testing.T) {
 	key := tlsCert.PrivateKey.(crypto.Signer)
 	nodeID := ids.NodeIDFromCert(cert)
 
+	vrfSig := NextBlockVRFSig(parentBlockSig, blsSignKey, chainID, networkID)
 	builtBlock, err := Build(
 		parentID,
 		timestamp,
@@ -43,10 +44,8 @@ func TestBuild(t *testing.T) {
 		cert,
 		innerBlockBytes,
 		chainID,
-		networkID,
 		key,
-		parentBlockSig,
-		blsSignKey,
+		vrfSig,
 	)
 	require.NoError(err)
 

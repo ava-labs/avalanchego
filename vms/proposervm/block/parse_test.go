@@ -35,6 +35,8 @@ func TestParse(t *testing.T) {
 	require.NoError(t, err)
 	key := tlsCert.PrivateKey.(crypto.Signer)
 
+	vrfSig := NextBlockVRFSig(parentBlockSig, blsSignKey, chainID, networkID)
+
 	signedBlock, err := Build(
 		parentID,
 		timestamp,
@@ -42,10 +44,8 @@ func TestParse(t *testing.T) {
 		cert,
 		innerBlockBytes,
 		chainID,
-		networkID,
 		key,
-		parentBlockSig,
-		blsSignKey,
+		vrfSig,
 	)
 	require.NoError(t, err)
 

@@ -179,10 +179,12 @@ func TestStateSyncGetOngoingSyncStateSummary(t *testing.T) {
 		vm.StakingCertLeaf,
 		innerBlk.Bytes(),
 		vm.ctx.ChainID,
-		vm.ctx.NetworkID,
 		vm.StakingLeafSigner,
-		[]byte{}, // parentBlockSig
-		vm.StakingBLSKey,
+		statelessblock.NextBlockVRFSig(
+			[]byte{}, // parentBlockSig
+			vm.StakingBLSKey,
+			vm.ctx.ChainID,
+			vm.ctx.NetworkID),
 	)
 	require.NoError(err)
 	proBlk := &postForkBlock{
@@ -266,10 +268,12 @@ func TestStateSyncGetLastStateSummary(t *testing.T) {
 		vm.StakingCertLeaf,
 		innerBlk.Bytes(),
 		vm.ctx.ChainID,
-		vm.ctx.NetworkID,
 		vm.StakingLeafSigner,
-		[]byte{}, // parentBlockSig
-		vm.StakingBLSKey,
+		statelessblock.NextBlockVRFSig(
+			[]byte{}, // parentBlockSig
+			vm.StakingBLSKey,
+			vm.ctx.ChainID,
+			vm.ctx.NetworkID),
 	)
 	require.NoError(err)
 	proBlk := &postForkBlock{
@@ -356,10 +360,12 @@ func TestStateSyncGetStateSummary(t *testing.T) {
 		vm.StakingCertLeaf,
 		innerBlk.Bytes(),
 		vm.ctx.ChainID,
-		vm.ctx.NetworkID,
 		vm.StakingLeafSigner,
-		[]byte{}, // parentBlockSig
-		vm.StakingBLSKey,
+		statelessblock.NextBlockVRFSig(
+			[]byte{}, // parentBlockSig
+			vm.StakingBLSKey,
+			vm.ctx.ChainID,
+			vm.ctx.NetworkID),
 	)
 	require.NoError(err)
 	proBlk := &postForkBlock{
@@ -431,10 +437,12 @@ func TestParseStateSummary(t *testing.T) {
 		vm.StakingCertLeaf,
 		innerBlk.Bytes(),
 		vm.ctx.ChainID,
-		vm.ctx.NetworkID,
 		vm.StakingLeafSigner,
-		[]byte{}, // parentBlockSig
-		vm.StakingBLSKey,
+		statelessblock.NextBlockVRFSig(
+			[]byte{}, // parentBlockSig
+			vm.StakingBLSKey,
+			vm.ctx.ChainID,
+			vm.ctx.NetworkID),
 	)
 	require.NoError(err)
 	proBlk := &postForkBlock{
@@ -488,10 +496,12 @@ func TestStateSummaryAccept(t *testing.T) {
 		vm.StakingCertLeaf,
 		innerBlk.Bytes(),
 		vm.ctx.ChainID,
-		vm.ctx.NetworkID,
 		vm.StakingLeafSigner,
-		[]byte{}, // parentBlockSig
-		vm.StakingBLSKey,
+		statelessblock.NextBlockVRFSig(
+			[]byte{}, // parentBlockSig
+			vm.StakingBLSKey,
+			vm.ctx.ChainID,
+			vm.ctx.NetworkID),
 	)
 	require.NoError(err)
 
@@ -570,10 +580,12 @@ func TestStateSummaryAcceptOlderBlock(t *testing.T) {
 		vm.StakingCertLeaf,
 		innerBlk.Bytes(),
 		vm.ctx.ChainID,
-		vm.ctx.NetworkID,
 		vm.StakingLeafSigner,
-		[]byte{}, // parentBlockSig
-		vm.StakingBLSKey,
+		statelessblock.NextBlockVRFSig(
+			[]byte{}, // parentBlockSig
+			vm.StakingBLSKey,
+			vm.ctx.ChainID,
+			vm.ctx.NetworkID),
 	)
 	require.NoError(err)
 	proBlk := &postForkBlock{

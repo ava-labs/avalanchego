@@ -30,6 +30,7 @@ type Block interface {
 	ParentID() ids.ID
 	Block() []byte
 	Bytes() []byte
+	// VerifySignature validates the correctness of the VRF signature.
 	VerifySignature(*bls.PublicKey, []byte, ids.ID, uint32) bool
 
 	initializeID() error
@@ -176,7 +177,7 @@ func (b *statelessBlock) VerifySignature(pk *bls.PublicKey, parentVRFSig []byte,
 			return len(b.StatelessBlock.VRFSig) == 0
 		}
 		// parent block had VRF Signature.
-		expectedSignature := nextHashBlockSignature(parentVRFSig)
+		expectedSignature := NextHashBlockSignature(parentVRFSig)
 		return bytes.Equal(expectedSignature, b.StatelessBlock.VRFSig)
 	}
 

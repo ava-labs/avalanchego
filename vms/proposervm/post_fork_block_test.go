@@ -66,10 +66,12 @@ func TestOracle_PostForkBlock_ImplementsInterface(t *testing.T) {
 		proVM.StakingCertLeaf,
 		innerOracleBlk.Bytes(),
 		proVM.ctx.ChainID,
-		proVM.ctx.NetworkID,
 		proVM.StakingLeafSigner,
-		[]byte{}, // parentBlockSig
-		proVM.StakingBLSKey,
+		block.NextBlockVRFSig(
+			[]byte{}, // parentBlockSig
+			proVM.StakingBLSKey,
+			proVM.ctx.ChainID,
+			proVM.ctx.NetworkID),
 	)
 	require.NoError(err)
 	proBlk = postForkBlock{
@@ -249,10 +251,12 @@ func TestBlockVerify_PostForkBlock_PostDurango_ParentChecks(t *testing.T) {
 			proVM.StakingCertLeaf,
 			childCoreBlk.Bytes(),
 			proVM.ctx.ChainID,
-			proVM.ctx.NetworkID,
 			proVM.StakingLeafSigner,
-			[]byte{}, // parentBlockSig
-			proVM.StakingBLSKey,
+			block.NextBlockVRFSig(
+				[]byte{}, // parentBlockSig
+				proVM.StakingBLSKey,
+				proVM.ctx.ChainID,
+				proVM.ctx.NetworkID),
 		)
 		require.NoError(err)
 		childBlk.SignedBlock = childSlb
@@ -270,10 +274,12 @@ func TestBlockVerify_PostForkBlock_PostDurango_ParentChecks(t *testing.T) {
 			proVM.StakingCertLeaf,
 			childCoreBlk.Bytes(),
 			proVM.ctx.ChainID,
-			proVM.ctx.NetworkID,
 			proVM.StakingLeafSigner,
-			[]byte{}, // parentBlockSig
-			proVM.StakingBLSKey,
+			block.NextBlockVRFSig(
+				[]byte{}, // parentBlockSig
+				proVM.StakingBLSKey,
+				proVM.ctx.ChainID,
+				proVM.ctx.NetworkID),
 		)
 
 		require.NoError(err)
@@ -378,10 +384,12 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 			proVM.StakingCertLeaf,
 			childCoreBlk.Bytes(),
 			proVM.ctx.ChainID,
-			proVM.ctx.NetworkID,
 			proVM.StakingLeafSigner,
-			[]byte{}, // parentBlockSig
-			proVM.StakingBLSKey,
+			block.NextBlockVRFSig(
+				[]byte{}, // parentBlockSig
+				proVM.StakingBLSKey,
+				proVM.ctx.ChainID,
+				proVM.ctx.NetworkID),
 		)
 		require.NoError(err)
 		childBlk.SignedBlock = childSlb
@@ -405,10 +413,12 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 			proVM.StakingCertLeaf,
 			childCoreBlk.Bytes(),
 			proVM.ctx.ChainID,
-			proVM.ctx.NetworkID,
 			proVM.StakingLeafSigner,
-			[]byte{}, // parentBlockSig
-			proVM.StakingBLSKey,
+			block.NextBlockVRFSig(
+				[]byte{}, // parentBlockSig
+				proVM.StakingBLSKey,
+				proVM.ctx.ChainID,
+				proVM.ctx.NetworkID),
 		)
 		require.NoError(err)
 		childBlk.SignedBlock = childSlb
@@ -429,10 +439,12 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 			proVM.StakingCertLeaf,
 			childCoreBlk.Bytes(),
 			proVM.ctx.ChainID,
-			proVM.ctx.NetworkID,
 			proVM.StakingLeafSigner,
-			[]byte{}, // parentBlockSig
-			proVM.StakingBLSKey,
+			block.NextBlockVRFSig(
+				[]byte{}, // parentBlockSig
+				proVM.StakingBLSKey,
+				proVM.ctx.ChainID,
+				proVM.ctx.NetworkID),
 		)
 		require.NoError(err)
 		childBlk.SignedBlock = childSlb
@@ -452,10 +464,12 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 			proVM.StakingCertLeaf,
 			childCoreBlk.Bytes(),
 			proVM.ctx.ChainID,
-			proVM.ctx.NetworkID,
 			proVM.StakingLeafSigner,
-			[]byte{}, // parentBlockSig
-			proVM.StakingBLSKey,
+			block.NextBlockVRFSig(
+				[]byte{}, // parentBlockSig
+				proVM.StakingBLSKey,
+				proVM.ctx.ChainID,
+				proVM.ctx.NetworkID),
 		)
 		require.NoError(err)
 		childBlk.SignedBlock = childSlb
@@ -492,10 +506,12 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 			proVM.StakingCertLeaf,
 			childCoreBlk.Bytes(),
 			proVM.ctx.ChainID,
-			proVM.ctx.NetworkID,
 			proVM.StakingLeafSigner,
-			[]byte{}, // parentBlockSig
-			proVM.StakingBLSKey,
+			block.NextBlockVRFSig(
+				[]byte{}, // parentBlockSig
+				proVM.StakingBLSKey,
+				proVM.ctx.ChainID,
+				proVM.ctx.NetworkID),
 		)
 		require.NoError(err)
 		childBlk.SignedBlock = childSlb
@@ -580,10 +596,12 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 			proVM.StakingCertLeaf,
 			childCoreBlk.Bytes(),
 			proVM.ctx.ChainID,
-			proVM.ctx.NetworkID,
 			proVM.StakingLeafSigner,
-			[]byte{}, // parentBlockSig
-			proVM.StakingBLSKey,
+			block.NextBlockVRFSig(
+				[]byte{}, // parentBlockSig
+				proVM.StakingBLSKey,
+				proVM.ctx.ChainID,
+				proVM.ctx.NetworkID),
 		)
 		require.NoError(err)
 		childBlk.SignedBlock = childSlb
@@ -601,10 +619,12 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 			proVM.StakingCertLeaf,
 			childCoreBlk.Bytes(),
 			proVM.ctx.ChainID,
-			proVM.ctx.NetworkID,
 			proVM.StakingLeafSigner,
-			[]byte{}, // parentBlockSig
-			proVM.StakingBLSKey,
+			block.NextBlockVRFSig(
+				[]byte{}, // parentBlockSig
+				proVM.StakingBLSKey,
+				proVM.ctx.ChainID,
+				proVM.ctx.NetworkID),
 		)
 		require.NoError(err)
 		childBlk.SignedBlock = childSlb
@@ -621,10 +641,12 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 			proVM.StakingCertLeaf,
 			childCoreBlk.Bytes(),
 			proVM.ctx.ChainID,
-			proVM.ctx.NetworkID,
 			proVM.StakingLeafSigner,
-			[]byte{}, // parentBlockSig
-			proVM.StakingBLSKey,
+			block.NextBlockVRFSig(
+				[]byte{}, // parentBlockSig
+				proVM.StakingBLSKey,
+				proVM.ctx.ChainID,
+				proVM.ctx.NetworkID),
 		)
 		require.NoError(err)
 		childBlk.SignedBlock = childSlb
@@ -642,10 +664,12 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 			proVM.StakingCertLeaf,
 			childCoreBlk.Bytes(),
 			proVM.ctx.ChainID,
-			proVM.ctx.NetworkID,
 			proVM.StakingLeafSigner,
-			[]byte{}, // parentBlockSig
-			proVM.StakingBLSKey,
+			block.NextBlockVRFSig(
+				[]byte{}, // parentBlockSig
+				proVM.StakingBLSKey,
+				proVM.ctx.ChainID,
+				proVM.ctx.NetworkID),
 		)
 		require.NoError(err)
 		childBlk.SignedBlock = childSlb
@@ -662,10 +686,12 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 			proVM.StakingCertLeaf,
 			childCoreBlk.Bytes(),
 			proVM.ctx.ChainID,
-			proVM.ctx.NetworkID,
 			proVM.StakingLeafSigner,
-			[]byte{}, // parentBlockSig
-			proVM.StakingBLSKey,
+			block.NextBlockVRFSig(
+				[]byte{}, // parentBlockSig
+				proVM.StakingBLSKey,
+				proVM.ctx.ChainID,
+				proVM.ctx.NetworkID),
 		)
 		require.NoError(err)
 		childBlk.SignedBlock = childSlb
@@ -1118,10 +1144,12 @@ func TestBlockVerify_PostForkBlock_ShouldBePostForkOption(t *testing.T) {
 		proVM.StakingCertLeaf,
 		oracleCoreBlk.opts[0].Bytes(),
 		proVM.ctx.ChainID,
-		proVM.ctx.NetworkID,
 		proVM.StakingLeafSigner,
-		[]byte{}, // parentBlockSig
-		proVM.StakingBLSKey,
+		block.NextBlockVRFSig(
+			[]byte{}, // parentBlockSig
+			proVM.StakingBLSKey,
+			proVM.ctx.ChainID,
+			proVM.ctx.NetworkID),
 	)
 	require.NoError(err)
 

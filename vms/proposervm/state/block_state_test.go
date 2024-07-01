@@ -45,10 +45,12 @@ func testBlockState(require *require.Assertions, bs BlockState) {
 		cert,
 		innerBlockBytes,
 		chainID,
-		networkID,
 		key,
-		parentBlockSig,
-		blsSignKey,
+		block.NextBlockVRFSig(
+			parentBlockSig,
+			blsSignKey,
+			chainID,
+			networkID),
 	)
 	require.NoError(err)
 

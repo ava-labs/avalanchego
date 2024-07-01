@@ -488,10 +488,12 @@ func TestCoreBlockFailureCauseProposerBlockParseFailure(t *testing.T) {
 		proVM.StakingCertLeaf,
 		innerBlk.Bytes(),
 		proVM.ctx.ChainID,
-		proVM.ctx.NetworkID,
 		proVM.StakingLeafSigner,
-		[]byte{}, // parentBlockSig
-		proVM.StakingBLSKey,
+		statelessblock.NextBlockVRFSig(
+			[]byte{}, // parentBlockSig
+			proVM.StakingBLSKey,
+			proVM.ctx.ChainID,
+			proVM.ctx.NetworkID),
 	)
 	require.NoError(err)
 	proBlk := postForkBlock{
@@ -536,10 +538,12 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 		proVM.StakingCertLeaf,
 		innerBlk.Bytes(),
 		proVM.ctx.ChainID,
-		proVM.ctx.NetworkID,
 		proVM.StakingLeafSigner,
-		[]byte{}, // parentBlockSig
-		proVM.StakingBLSKey,
+		statelessblock.NextBlockVRFSig(
+			[]byte{}, // parentBlockSig
+			proVM.StakingBLSKey,
+			proVM.ctx.ChainID,
+			proVM.ctx.NetworkID),
 	)
 	require.NoError(err)
 	proBlk1 := postForkBlock{
@@ -558,10 +562,12 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 		proVM.StakingCertLeaf,
 		innerBlk.Bytes(),
 		proVM.ctx.ChainID,
-		proVM.ctx.NetworkID,
 		proVM.StakingLeafSigner,
-		[]byte{}, // parentBlockSig
-		proVM.StakingBLSKey,
+		statelessblock.NextBlockVRFSig(
+			[]byte{}, // parentBlockSig
+			proVM.StakingBLSKey,
+			proVM.ctx.ChainID,
+			proVM.ctx.NetworkID),
 	)
 	require.NoError(err)
 	proBlk2 := postForkBlock{
@@ -1993,10 +1999,12 @@ func TestVMInnerBlkCache(t *testing.T) {
 		vm.StakingCertLeaf,   // cert
 		blkNearTipInnerBytes, // inner blk bytes
 		vm.ctx.ChainID,       // chain ID
-		vm.ctx.NetworkID,     // network ID
 		vm.StakingLeafSigner, // key
-		[]byte{},             // parentBlockSig
-		vm.StakingBLSKey,     // BLS key
+		statelessblock.NextBlockVRFSig(
+			[]byte{}, // parentBlockSig
+			vm.StakingBLSKey,
+			vm.ctx.ChainID,
+			vm.ctx.NetworkID),
 	)
 	require.NoError(err)
 

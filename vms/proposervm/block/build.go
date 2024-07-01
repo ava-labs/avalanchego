@@ -20,12 +20,8 @@ func BuildUnsigned(
 	timestamp time.Time,
 	pChainHeight uint64,
 	blockBytes []byte,
-	parentBlockSig []byte,
+	blockVrfSig []byte,
 ) (SignedBlock, error) {
-	// in this case, we can't sign with BLS key, since we're not going to include the Certificate, which is required
-	// for the signature validation. Instead, we'll just hash the previous
-	sigParentBlockSig := nextHashBlockSignature(parentBlockSig)
-
 	block := &statelessBlock{
 		StatelessBlock: statelessUnsignedBlock{
 			ParentID:     parentID,
@@ -33,7 +29,7 @@ func BuildUnsigned(
 			PChainHeight: pChainHeight,
 			Certificate:  nil,
 			Block:        blockBytes,
-			VRFSig:       sigParentBlockSig,
+			VRFSig:       blockVrfSig,
 		},
 		timestamp: timestamp,
 	}
@@ -85,7 +81,7 @@ func calculateBootstrappingBlockSig(chainID ids.ID, networkID uint32) [hashing.H
 	return hashing.Hash256(buffer)
 }
 
-func nextHashBlockSignature(parentBlockSig []byte) []byte {
+func NextHashBlockSignature(parentBlockSig []byte) []byte {
 	if len(parentBlockSig) == 0 {
 		return nil
 	}
@@ -103,7 +99,7 @@ func nextHashBlockSignature(parentBlockSig []byte) []byte {
 	return sigParentBlockSig
 }
 
-func nextBlockSignature(parentBlockSig []byte, blsSignKey *bls.SecretKey, chainID ids.ID, networkID uint32) []byte {
+func NextBlockVRFSig(parentBlockSig []byte, blsSignKey *bls.SecretKey, chainID ids.ID, networkID uint32) []byte {
 	if blsSignKey == nil {
 		// if we need to build a block without having a BLS key, we'll be hashing the previous
 		// signature only if it presents. Otherwise, we'll keep it empty.
@@ -112,7 +108,7 @@ func nextBlockSignature(parentBlockSig []byte, blsSignKey *bls.SecretKey, chainI
 			return []byte{}
 		}
 
-		return nextHashBlockSignature(parentBlockSig)
+		return NextHashBlockSignature(parentBlockSig)
 	}
 
 	// we have bls key
@@ -134,13 +130,9 @@ func Build(
 	cert *staking.Certificate,
 	blockBytes []byte,
 	chainID ids.ID,
-	networkID uint32,
 	key crypto.Signer,
-	parentBlockSig []byte,
-	blsSignKey *bls.SecretKey,
+	blockVrfSig []byte,
 ) (SignedBlock, error) {
-	sigParentBlockSig := nextBlockSignature(parentBlockSig, blsSignKey, chainID, networkID)
-
 	block := &statelessBlock{
 		StatelessBlock: statelessUnsignedBlock{
 			ParentID:     parentID,
@@ -148,7 +140,7 @@ func Build(
 			PChainHeight: pChainHeight,
 			Certificate:  cert.Raw,
 			Block:        blockBytes,
-			VRFSig:       sigParentBlockSig,
+			VRFSig:       blockVrfSig,
 		},
 		timestamp: timestamp,
 		cert:      cert,
