@@ -400,6 +400,9 @@ type Node struct {
 	// Specifies how much disk usage each peer can cause before
 	// we rate-limit them.
 	diskTargeter tracker.Targeter
+
+	// Closed when a sufficient amount of bootstrap nodes are connected to
+	onSufficientlyConnected chan struct{}
 }
 
 /*
@@ -596,36 +599,19 @@ func (n *Node) initNetworking(reg prometheus.Registerer) error {
 		}
 	}
 
+	n.onSufficientlyConnected = make(chan struct{})
 	numBootstrappers := n.bootstrappers.Count(constants.PrimaryNetworkID)
 	requiredConns := (3*numBootstrappers + 3) / 4
 
 	if requiredConns > 0 {
-		onSufficientlyConnected := make(chan struct{})
 		consensusRouter = &beaconManager{
 			Router:                  consensusRouter,
 			beacons:                 n.bootstrappers,
 			requiredConns:           int64(requiredConns),
-			onSufficientlyConnected: onSufficientlyConnected,
+			onSufficientlyConnected: n.onSufficientlyConnected,
 		}
-
-		// Log a warning if we aren't able to connect to a sufficient portion of
-		// nodes.
-		go func() {
-			timer := time.NewTimer(n.Config.BootstrapBeaconConnectionTimeout)
-			defer timer.Stop()
-
-			select {
-			case <-timer.C:
-				if n.shuttingDown.Get() {
-					return
-				}
-				n.Log.Warn("failed to connect to bootstrap nodes",
-					zap.Stringer("bootstrappers", n.bootstrappers),
-					zap.Duration("duration", n.Config.BootstrapBeaconConnectionTimeout),
-				)
-			case <-onSufficientlyConnected:
-			}
-		}()
+	} else {
+		close(n.onSufficientlyConnected)
 	}
 
 	// add node configs to network config
@@ -714,6 +700,25 @@ func (n *Node) Dispatch() error {
 		// If node is already shutting down, this does nothing.
 		n.Shutdown(1)
 	})
+
+	// Log a warning if we aren't able to connect to a sufficient portion of
+	// nodes.
+	go func() {
+		timer := time.NewTimer(n.Config.BootstrapBeaconConnectionTimeout)
+		defer timer.Stop()
+
+		select {
+		case <-timer.C:
+			if n.shuttingDown.Get() {
+				return
+			}
+			n.Log.Warn("failed to connect to bootstrap nodes",
+				zap.Stringer("bootstrappers", n.bootstrappers),
+				zap.Duration("duration", n.Config.BootstrapBeaconConnectionTimeout),
+			)
+		case <-n.onSufficientlyConnected:
+		}
+	}()
 
 	// Add state sync nodes to the peer network
 	for i, peerIP := range n.Config.StateSyncIPs {
