@@ -171,6 +171,7 @@ func (p *postForkCommonComponents) Verify(
 		ctx,
 		&smblock.Context{
 			PChainHeight: parentPChainHeight,
+			// todo : use block.CalculateVRFOut(child.VRFOut())
 		},
 		child,
 	)
@@ -245,7 +246,7 @@ func (p *postForkCommonComponents) buildChild(
 	if p.vm.blockBuilderVM != nil {
 		innerBlock, err = p.vm.blockBuilderVM.BuildBlockWithContext(ctx, &smblock.Context{
 			PChainHeight: parentPChainHeight,
-			// todo : add vrfout = hash(childBlockVrfSig)
+			// todo : add block.CalculateVRFOut(childBlockVrfSig)
 		})
 	} else {
 		innerBlock, err = p.vm.ChainVM.BuildBlock(ctx)
@@ -255,7 +256,6 @@ func (p *postForkCommonComponents) buildChild(
 	}
 
 	// Build the child
-
 	if shouldBuildSignedBlock {
 		statelessChild, err = block.Build(
 			parentID,

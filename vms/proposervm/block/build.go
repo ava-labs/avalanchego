@@ -41,6 +41,23 @@ func BuildUnsigned(
 	return block, block.initialize(bytes)
 }
 
+func CalculateVRFOut(vrfSig []byte) []byte {
+	// build the hash of the following struct:
+	// +-------------------------+----------+------------+
+	// |  prefix :               | [8]byte  | "rng-derv" |
+	// +-------------------------+----------+------------+
+	// |  vrfSig :               | [48]byte |  48 bytes  |
+	// +-------------------------+----------+------------+
+	if len(vrfSig) != 48 {
+		return nil
+	}
+	buffer := make([]byte, 8+48)
+	copy(buffer, "rng-derv")
+	copy(buffer[8:], vrfSig[:])
+	outHash := hashing.Hash256(buffer)
+	return outHash[:]
+}
+
 // marshalBlock marshal the given statelessBlock by using either the default statelessBlock or
 // coping the exported fields into statelessBlockV0 and then marshaling it.
 // this allows the marsheler to produce encoded blocks that match the old style blocks as long as
