@@ -1,0 +1,20 @@
+name: 'Check State Sync Bootstrap for Testnet'
+
+on:
+  # TODO(marun) Add a schedule
+  workflow_dispatch:
+
+jobs:
+  check_bootstrap_testnet_state_sync:
+    runs-on: bootstrap-testnet-state-sync
+    timeout-minutes: 4320 # 3 days
+    steps:
+    - name: Check state sync bootstrap for testnet
+      uses: ./.github/actions/check-bootstrap
+      with:
+        network_id: 5
+        state_sync_enabled: true
+        prometheus_id: ${{ secrets.PROMETHEUS_ID || '' }}
+        prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
+        loki_id: ${{ secrets.LOKI_ID || '' }}
+        loki_password: ${{ secrets.LOKI_PASSWORD || '' }}

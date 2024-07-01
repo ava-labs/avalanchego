@@ -236,8 +236,14 @@ func (n *Node) SetNetworkingConfig(bootstrapIDs []string, bootstrapIPs []string)
 		// Default to dynamic port allocation
 		n.Flags[config.StakingPortKey] = 0
 	}
-	n.Flags[config.BootstrapIDsKey] = strings.Join(bootstrapIDs, ",")
-	n.Flags[config.BootstrapIPsKey] = strings.Join(bootstrapIPs, ",")
+	if len(bootstrapIDs) == 0 {
+		// bootstrap-* should not be provided if bootstrapping from mainnet or testnet
+		delete(n.Flags, config.BootstrapIDsKey)
+		delete(n.Flags, config.BootstrapIPsKey)
+	} else {
+		n.Flags[config.BootstrapIDsKey] = strings.Join(bootstrapIDs, ",")
+		n.Flags[config.BootstrapIPsKey] = strings.Join(bootstrapIPs, ",")
+	}
 }
 
 // Ensures staking and signing keys are generated if not already present and
