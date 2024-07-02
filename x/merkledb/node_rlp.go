@@ -51,7 +51,12 @@ func (n *node) encodeRLPWithShortNode(parent *node) []byte {
 
 	// add the short node if needed
 	compressedKey := toNibbles(n.compressedKey(parent))
-	return shortNodeIfNeeded(compressedKey, w.ToBytes(), n.isValueNode())
+	bytes := shortNodeIfNeeded(compressedKey, w.ToBytes(), n.isValueNode())
+
+	if len(bytes) < 32 {
+		return bytes
+	}
+	return hashData(bytes)
 }
 
 func (n *node) compressedKey(parent *node) Key {
@@ -134,6 +139,9 @@ func shortNodeIfNeeded(compressedKey []byte, val []byte, isValueNode bool) []byt
 	case isValueNode:
 		_, _ = w.Write(val)
 	case len(val) > 0:
+		if len(val) >= 32 {
+			val = hashData(val)
+		}
 		hashNodeIfNeeded(w, val)
 	default:
 		_, _ = w.Write(rlp.EmptyString)
@@ -147,7 +155,7 @@ func hashNodeIfNeeded(w rlp.EncoderBuffer, val []byte) {
 		_, _ = w.Write(val)
 		return
 	}
-	w.WriteBytes(hashData(val))
+	w.WriteBytes(val)
 }
 
 func hashData(data []byte) []byte {
@@ -162,7 +170,10 @@ func hashData(data []byte) []byte {
 
 func rlpToAltID(b []byte) ids.ID {
 	var result ids.ID
-	hash := hashData(b)
+	hash := b
+	if len(b) < 32 {
+		hash = hashData(b)
+	}
 	copy(result[:], hash)
 	return result
 }
