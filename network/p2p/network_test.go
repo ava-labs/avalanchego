@@ -5,7 +5,6 @@ package p2p
 
 import (
 	"context"
-	"sync"
 	"testing"
 	"time"
 
@@ -424,10 +423,10 @@ func TestAppRequestMessageForUnregisteredHandler(t *testing.T) {
 			wantNodeID := ids.GenerateTestNodeID()
 			wantRequestID := uint32(111)
 
-			wg := &sync.WaitGroup{}
+			done := make(chan struct{})
 			sender := &common.SenderTest{}
 			sender.SendAppErrorF = func(_ context.Context, nodeID ids.NodeID, requestID uint32, errorCode int32, errorMessage string) error {
-				defer wg.Done()
+				defer close(done)
 
 				require.Equal(wantNodeID, nodeID)
 				require.Equal(wantRequestID, requestID)
@@ -440,9 +439,8 @@ func TestAppRequestMessageForUnregisteredHandler(t *testing.T) {
 			require.NoError(err)
 			require.NoError(network.AddHandler(handlerID, handler))
 
-			wg.Add(1)
 			require.NoError(network.AppRequest(ctx, wantNodeID, wantRequestID, time.Time{}, tt.msg))
-			wg.Wait()
+			<-done
 		})
 	}
 }
@@ -482,10 +480,10 @@ func TestCrossChainAppRequestMessageForUnregisteredHandler(t *testing.T) {
 			wantChainID := ids.GenerateTestID()
 			wantRequestID := uint32(111)
 
-			wg := &sync.WaitGroup{}
+			done := make(chan struct{})
 			sender := &common.SenderTest{}
 			sender.SendCrossChainAppErrorF = func(_ context.Context, chainID ids.ID, requestID uint32, errorCode int32, errorMessage string) {
-				defer wg.Done()
+				defer close(done)
 
 				require.Equal(wantChainID, chainID)
 				require.Equal(wantRequestID, requestID)
@@ -497,9 +495,8 @@ func TestCrossChainAppRequestMessageForUnregisteredHandler(t *testing.T) {
 			require.NoError(err)
 			require.NoError(network.AddHandler(handlerID, handler))
 
-			wg.Add(1)
 			require.NoError(network.CrossChainAppRequest(ctx, wantChainID, wantRequestID, time.Time{}, tt.msg))
-			wg.Wait()
+			<-done
 		})
 	}
 }
@@ -521,10 +518,10 @@ func TestAppError(t *testing.T) {
 	wantNodeID := ids.GenerateTestNodeID()
 	wantRequestID := uint32(111)
 
-	wg := &sync.WaitGroup{}
+	done := make(chan struct{})
 	sender := &common.SenderTest{}
 	sender.SendAppErrorF = func(_ context.Context, nodeID ids.NodeID, requestID uint32, errorCode int32, errorMessage string) error {
-		defer wg.Done()
+		defer close(done)
 
 		require.Equal(wantNodeID, nodeID)
 		require.Equal(wantRequestID, requestID)
@@ -538,9 +535,8 @@ func TestAppError(t *testing.T) {
 	require.NoError(network.AddHandler(handlerID, handler))
 	msg := PrefixMessage(ProtocolPrefix(handlerID), []byte("message"))
 
-	wg.Add(1)
 	require.NoError(network.AppRequest(ctx, wantNodeID, wantRequestID, time.Time{}, msg))
-	wg.Wait()
+	<-done
 }
 
 // A handler that errors should send a CrossChainAppError to the requesting peer
@@ -560,10 +556,10 @@ func TestCrossChainAppError(t *testing.T) {
 	wantChainID := ids.GenerateTestID()
 	wantRequestID := uint32(111)
 
-	wg := &sync.WaitGroup{}
+	done := make(chan struct{})
 	sender := &common.SenderTest{}
 	sender.SendCrossChainAppErrorF = func(_ context.Context, chainID ids.ID, requestID uint32, errorCode int32, errorMessage string) {
-		defer wg.Done()
+		defer close(done)
 
 		require.Equal(wantChainID, chainID)
 		require.Equal(wantRequestID, requestID)
@@ -575,9 +571,8 @@ func TestCrossChainAppError(t *testing.T) {
 	require.NoError(network.AddHandler(handlerID, handler))
 	msg := PrefixMessage(ProtocolPrefix(handlerID), []byte("message"))
 
-	wg.Add(1)
 	require.NoError(network.CrossChainAppRequest(ctx, wantChainID, wantRequestID, time.Time{}, msg))
-	wg.Wait()
+	<-done
 }
 
 // A response or timeout for a request we never made should return an error
