@@ -128,14 +128,15 @@ func (r *router) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID ui
 	start := time.Now()
 	parsedMsg, handler, handlerID, ok := r.parse(request)
 	if !ok {
-		r.log.Debug("failed to process message",
+		r.log.Debug("received message for unregistered handler",
 			zap.Stringer("messageOp", message.AppRequestOp),
 			zap.Stringer("nodeID", nodeID),
 			zap.Uint32("requestID", requestID),
 			zap.Time("deadline", deadline),
 			zap.Binary("message", request),
 		)
-		return nil
+
+		return r.sender.SendAppError(ctx, nodeID, requestID, ErrUnregisteredHandler.Code, ErrUnregisteredHandler.Message)
 	}
 
 	// call the corresponding handler and send back a response to nodeID
