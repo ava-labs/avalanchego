@@ -42,7 +42,7 @@ func (*sha256Hasher) HashOrEmbedNode(n, parent *node) ([]byte, ids.ID) {
 
 // This method is performance critical. It is not expected to perform any memory
 // allocations.
-func (*sha256Hasher) HashNode(n, parent *node) ids.ID {
+func (*sha256Hasher) HashNode(n, _ *node) ids.ID {
 	var (
 		// sha.Write always returns nil, so we ignore its return values.
 		sha  = sha256.New()
