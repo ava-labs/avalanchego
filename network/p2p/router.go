@@ -245,15 +245,14 @@ func (r *router) CrossChainAppRequest(
 	start := time.Now()
 	parsedMsg, handler, handlerID, ok := r.parse(msg)
 	if !ok {
-		r.log.Debug("received message for unregistered handler",
+		r.log.Debug("failed to process message",
 			zap.Stringer("messageOp", message.CrossChainAppRequestOp),
 			zap.Stringer("chainID", chainID),
 			zap.Uint32("requestID", requestID),
 			zap.Time("deadline", deadline),
 			zap.Binary("message", msg),
 		)
-
-		return r.sender.SendCrossChainAppError(ctx, chainID, requestID, ErrUnregisteredHandler.Code, ErrUnregisteredHandler.Message)
+		return nil
 	}
 
 	if err := handler.CrossChainAppRequest(ctx, chainID, requestID, deadline, parsedMsg); err != nil {

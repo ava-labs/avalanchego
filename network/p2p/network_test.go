@@ -49,7 +49,7 @@ func TestMessageRouting(t *testing.T) {
 			require.Equal(wantMsg, msg)
 			return nil, nil
 		},
-		CrossChainAppRequestF: func(_ context.Context, chainID ids.ID, _ time.Time, msg []byte) ([]byte, *common.AppError) {
+		CrossChainAppRequestF: func(_ context.Context, chainID ids.ID, _ time.Time, msg []byte) ([]byte, error) {
 			crossChainAppRequestCalled = true
 			require.Equal(wantChainID, chainID)
 			require.Equal(wantMsg, msg)
@@ -471,7 +471,7 @@ func TestCrossChainAppRequestMessageForUnregisteredHandler(t *testing.T) {
 			require := require.New(t)
 			ctx := context.Background()
 			handler := &TestHandler{
-				CrossChainAppRequestF: func(context.Context, ids.ID, time.Time, []byte) ([]byte, *common.AppError) {
+				CrossChainAppRequestF: func(context.Context, ids.ID, time.Time, []byte) ([]byte, error) {
 					require.Fail("should not be called")
 					return nil, nil
 				},
@@ -539,42 +539,6 @@ func TestAppError(t *testing.T) {
 	<-done
 }
 
-// A handler that errors should send a CrossChainAppError to the requesting peer
-func TestCrossChainAppError(t *testing.T) {
-	require := require.New(t)
-	ctx := context.Background()
-	appError := &common.AppError{
-		Code:    123,
-		Message: "foo",
-	}
-	handler := &TestHandler{
-		CrossChainAppRequestF: func(context.Context, ids.ID, time.Time, []byte) ([]byte, *common.AppError) {
-			return nil, appError
-		},
-	}
-
-	wantChainID := ids.GenerateTestID()
-	wantRequestID := uint32(111)
-
-	done := make(chan struct{})
-	sender := &common.SenderTest{}
-	sender.SendCrossChainAppErrorF = func(_ context.Context, chainID ids.ID, requestID uint32, errorCode int32, errorMessage string) {
-		defer close(done)
-
-		require.Equal(wantChainID, chainID)
-		require.Equal(wantRequestID, requestID)
-		require.Equal(appError.Code, errorCode)
-		require.Equal(appError.Message, errorMessage)
-	}
-	network, err := NewNetwork(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
-	require.NoError(err)
-	require.NoError(network.AddHandler(handlerID, handler))
-	msg := PrefixMessage(ProtocolPrefix(handlerID), []byte("message"))
-
-	require.NoError(network.CrossChainAppRequest(ctx, wantChainID, wantRequestID, time.Time{}, msg))
-	<-done
-}
-
 // A response or timeout for a request we never made should return an error
 func TestResponseForUnrequestedRequest(t *testing.T) {
 	tests := []struct {
@@ -607,7 +571,7 @@ func TestResponseForUnrequestedRequest(t *testing.T) {
 					require.Fail("should not be called")
 					return nil, nil
 				},
-				CrossChainAppRequestF: func(context.Context, ids.ID, time.Time, []byte) ([]byte, *common.AppError) {
+				CrossChainAppRequestF: func(context.Context, ids.ID, time.Time, []byte) ([]byte, error) {
 					require.Fail("should not be called")
 					return nil, nil
 				},
