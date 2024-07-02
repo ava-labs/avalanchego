@@ -43,7 +43,7 @@ var sha256HashNodeTests = []struct {
 			n := newNode(Key{})
 			childNode := newNode(ToKey([]byte{255}))
 			childNode.setValue(SHA256Hasher, maybe.Some([]byte("value1")))
-			n.addChildWithID(childNode, 4, nil, SHA256Hasher.HashNode(childNode))
+			n.addChildWithID(childNode, 4, nil, SHA256Hasher.HashNode(childNode, n))
 			return n
 		}(),
 		expectedHash: "YfJRufqUKBv9ez6xZx6ogpnfDnw9fDsyebhYDaoaH57D3vRu3",
@@ -59,8 +59,8 @@ var sha256HashNodeTests = []struct {
 			childNode2 := newNode(ToKey([]byte{237}))
 			childNode2.setValue(SHA256Hasher, maybe.Some([]byte("value2")))
 
-			n.addChildWithID(childNode1, 4, nil, SHA256Hasher.HashNode(childNode1))
-			n.addChildWithID(childNode2, 4, nil, SHA256Hasher.HashNode(childNode2))
+			n.addChildWithID(childNode1, 4, nil, SHA256Hasher.HashNode(childNode1, n))
+			n.addChildWithID(childNode2, 4, nil, SHA256Hasher.HashNode(childNode2, n))
 			return n
 		}(),
 		expectedHash: "YVmbx5MZtSKuYhzvHnCqGrswQcxmozAkv7xE1vTA2EiGpWUkv",
@@ -74,7 +74,7 @@ var sha256HashNodeTests = []struct {
 				childNode := newNode(ToKey([]byte{i << 4}))
 				childNode.setValue(SHA256Hasher, maybe.Some([]byte("some value")))
 
-				n.addChildWithID(childNode, 4, nil, SHA256Hasher.HashNode(childNode))
+				n.addChildWithID(childNode, 4, nil, SHA256Hasher.HashNode(childNode, n))
 			}
 			return n
 		}(),
@@ -127,8 +127,8 @@ func Fuzz_SHA256_HashNode(f *testing.F) {
 				}
 
 				// Hash hv multiple times
-				hash1 := SHA256Hasher.HashNode(hv)
-				hash2 := SHA256Hasher.HashNode(hv)
+				hash1 := SHA256Hasher.HashNode(hv, nil)
+				hash2 := SHA256Hasher.HashNode(hv, nil)
 
 				// Make sure they're the same
 				require.Equal(hash1, hash2)
@@ -140,7 +140,7 @@ func Fuzz_SHA256_HashNode(f *testing.F) {
 func Test_SHA256_HashNode(t *testing.T) {
 	for _, test := range sha256HashNodeTests {
 		t.Run(test.name, func(t *testing.T) {
-			hash := SHA256Hasher.HashNode(test.n)
+			hash := SHA256Hasher.HashNode(test.n, nil)
 			require.Equal(t, test.expectedHash, hash.String())
 		})
 	}
@@ -150,7 +150,7 @@ func Benchmark_SHA256_HashNode(b *testing.B) {
 	for _, benchmark := range sha256HashNodeTests {
 		b.Run(benchmark.name, func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
-				SHA256Hasher.HashNode(benchmark.n)
+				SHA256Hasher.HashNode(benchmark.n, nil)
 			}
 		})
 	}

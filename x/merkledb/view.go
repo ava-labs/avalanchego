@@ -284,7 +284,7 @@ func (v *view) hashChangedNodes(ctx context.Context) {
 	// If there are no children, we can avoid allocating [keyBuffer].
 	root := v.root.Value()
 	if len(root.children) == 0 {
-		v.changes.rootID = v.db.hasher.HashNode(root)
+		v.changes.rootID = v.db.hasher.HashNode(root, nil)
 		v.db.metrics.HashCalculated()
 		return
 	}
@@ -292,7 +292,7 @@ func (v *view) hashChangedNodes(ctx context.Context) {
 	// Allocate [keyBuffer] and populate it with the root node's key.
 	keyBuffer := v.db.hashNodesKeyPool.Acquire()
 	keyBuffer = v.setKeyBuffer(root, keyBuffer)
-	_, v.changes.rootID, keyBuffer = v.hashChangedNode(root, keyBuffer)
+	_, v.changes.rootID, keyBuffer = v.hashChangedNode(root, nil, keyBuffer)
 	v.db.hashNodesKeyPool.Release(keyBuffer)
 }
 
@@ -305,7 +305,7 @@ func (v *view) hashChangedNodes(ctx context.Context) {
 //
 // Invariant: [keyBuffer] must be populated with [n]'s key and have sufficient
 // length to contain any of [n]'s child keys.
-func (v *view) hashChangedNode(n *node, keyBuffer []byte) ([]byte, ids.ID, []byte) {
+func (v *view) hashChangedNode(n, parent *node, keyBuffer []byte) ([]byte, ids.ID, []byte) {
 	var (
 		// childBuffer is allocated on the stack.
 		childBuffer = make([]byte, 1)
@@ -371,7 +371,7 @@ func (v *view) hashChangedNode(n *node, keyBuffer []byte) ([]byte, ids.ID, []byt
 		// If there are no children of the childNode, we can avoid constructing
 		// the buffer for the child keys.
 		if len(childNode.children) == 0 {
-			childEntry.embed, childEntry.id = v.db.hasher.HashOrEmbedNode(childNode)
+			childEntry.embed, childEntry.id = v.db.hasher.HashOrEmbedNode(childNode, n)
 			v.db.metrics.HashCalculated()
 			continue
 		}
@@ -381,7 +381,7 @@ func (v *view) hashChangedNode(n *node, keyBuffer []byte) ([]byte, ids.ID, []byt
 			wg.Add(1)
 			go func(wg *sync.WaitGroup, childEntry *child, childNode *node, childKeyBuffer []byte) {
 				childKeyBuffer = v.setKeyBuffer(childNode, childKeyBuffer)
-				childEntry.embed, childEntry.id, childKeyBuffer = v.hashChangedNode(childNode, childKeyBuffer)
+				childEntry.embed, childEntry.id, childKeyBuffer = v.hashChangedNode(childNode, n, childKeyBuffer)
 				v.db.hashNodesKeyPool.Release(childKeyBuffer)
 				wg.Done()
 			}(wg.wg, childEntry, childNode, childKeyBuffer)
@@ -391,7 +391,7 @@ func (v *view) hashChangedNode(n *node, keyBuffer []byte) ([]byte, ids.ID, []byt
 			// We can skip copying the key here because [keyBuffer] is already
 			// constructed to be childNode's key.
 			keyBuffer = v.setLengthForChildren(childNode, keyBuffer)
-			childEntry.embed, childEntry.id, keyBuffer = v.hashChangedNode(childNode, keyBuffer)
+			childEntry.embed, childEntry.id, keyBuffer = v.hashChangedNode(childNode, n, keyBuffer)
 		}
 	}
 
@@ -400,7 +400,7 @@ func (v *view) hashChangedNode(n *node, keyBuffer []byte) ([]byte, ids.ID, []byt
 
 	// The IDs [n]'s descendants are up to date so we can calculate [n]'s ID.
 	v.db.metrics.HashCalculated()
-	embed, id := v.db.hasher.HashOrEmbedNode(n)
+	embed, id := v.db.hasher.HashOrEmbedNode(n, parent)
 	return embed, id, keyBuffer
 }
 
@@ -784,7 +784,7 @@ func (v *view) insert(
 			commonPrefixLength      = getLengthOfCommonPrefix(oldRoot.key, key, 0 /*offset*/, v.tokenSize)
 			commonPrefix            = oldRoot.key.Take(commonPrefixLength)
 			newRoot                 = newNode(commonPrefix)
-			oldRootEmbed, oldRootID = v.db.hasher.HashOrEmbedNode(oldRoot)
+			oldRootEmbed, oldRootID = v.db.hasher.HashOrEmbedNode(oldRoot, nil)
 		)
 		v.db.metrics.HashCalculated()
 

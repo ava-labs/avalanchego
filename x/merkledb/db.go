@@ -1255,7 +1255,7 @@ func (db *merkleDB) initializeRoot() error {
 		}
 	}
 
-	db.rootID = db.hasher.HashNode(root)
+	db.rootID = db.hasher.HashNode(root, nil)
 	db.metrics.HashCalculated()
 
 	db.root = maybe.Some(root)
