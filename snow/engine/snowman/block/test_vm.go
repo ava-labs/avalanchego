@@ -100,7 +100,7 @@ func (vm *TestVM) LastAccepted(ctx context.Context) (ids.ID, error) {
 	if vm.CantLastAccepted && vm.T != nil {
 		require.FailNow(vm.T, errLastAccepted.Error())
 	}
-	return ids.ID{}, errLastAccepted
+	return ids.Empty, errLastAccepted
 }
 
 func (vm *TestVM) GetBlockIDAtHeight(ctx context.Context, height uint64) (ids.ID, error) {

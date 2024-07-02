@@ -17,7 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/bloom"
 	"github.com/ava-labs/avalanchego/utils/buffer"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -150,7 +149,7 @@ func NewMetrics(
 			typeLabels,
 		),
 	}
-	err := utils.Err(
+	err := errors.Join(
 		metrics.Register(m.count),
 		metrics.Register(m.bytes),
 		metrics.Register(m.tracking),

@@ -4,11 +4,11 @@
 package state
 
 import (
+	"errors"
 	"math"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
-	"github.com/ava-labs/avalanchego/utils"
 )
 
 const (
@@ -26,7 +26,7 @@ func init() {
 	c1 := linearcodec.New([]string{CodecVersion0Tag, CodecVersion1Tag})
 	MetadataCodec = codec.NewManager(math.MaxInt32)
 
-	err := utils.Err(
+	err := errors.Join(
 		MetadataCodec.RegisterCodec(CodecVersion0, c0),
 		MetadataCodec.RegisterCodec(CodecVersion1, c1),
 	)

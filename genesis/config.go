@@ -177,7 +177,7 @@ func init() {
 	unparsedFujiConfig := UnparsedConfig{}
 	unparsedLocalConfig := UnparsedConfig{}
 
-	err := utils.Err(
+	err := errors.Join(
 		json.Unmarshal(mainnetGenesisConfigJSON, &unparsedMainnetConfig),
 		json.Unmarshal(fujiGenesisConfigJSON, &unparsedFujiConfig),
 		json.Unmarshal(localGenesisConfigJSON, &unparsedLocalConfig),
