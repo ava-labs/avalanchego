@@ -94,40 +94,6 @@ func getDelegatorRules(
 	}, nil
 }
 
-// GetNextStakerChangeTime returns the next time a staker will be either added
-// or removed to/from the current validator set.
-func GetNextStakerChangeTime(state state.Chain) (time.Time, error) {
-	currentStakerIterator, err := state.GetCurrentStakerIterator()
-	if err != nil {
-		return time.Time{}, err
-	}
-	defer currentStakerIterator.Release()
-
-	pendingStakerIterator, err := state.GetPendingStakerIterator()
-	if err != nil {
-		return time.Time{}, err
-	}
-	defer pendingStakerIterator.Release()
-
-	hasCurrentStaker := currentStakerIterator.Next()
-	hasPendingStaker := pendingStakerIterator.Next()
-	switch {
-	case hasCurrentStaker && hasPendingStaker:
-		nextCurrentTime := currentStakerIterator.Value().NextTime
-		nextPendingTime := pendingStakerIterator.Value().NextTime
-		if nextCurrentTime.Before(nextPendingTime) {
-			return nextCurrentTime, nil
-		}
-		return nextPendingTime, nil
-	case hasCurrentStaker:
-		return currentStakerIterator.Value().NextTime, nil
-	case hasPendingStaker:
-		return pendingStakerIterator.Value().NextTime, nil
-	default:
-		return time.Time{}, database.ErrNotFound
-	}
-}
-
 // GetValidator returns information about the given validator, which may be a
 // current validator or pending validator.
 func GetValidator(state state.Chain, subnetID ids.ID, nodeID ids.NodeID) (*state.Staker, error) {

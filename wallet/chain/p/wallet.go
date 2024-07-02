@@ -5,37 +5,34 @@ package p
 
 import (
 	"errors"
-	"fmt"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
-	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
-	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/wallet/chain/p/builder"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
+
+	vmsigner "github.com/ava-labs/avalanchego/vms/platformvm/signer"
+	walletsigner "github.com/ava-labs/avalanchego/wallet/chain/p/signer"
 )
 
 var (
-	errNotCommitted = errors.New("not committed")
+	ErrNotCommitted = errors.New("not committed")
 
 	_ Wallet = (*wallet)(nil)
 )
 
 type Wallet interface {
-	Context
-
 	// Builder returns the builder that will be used to create the transactions.
-	Builder() Builder
+	Builder() builder.Builder
 
 	// Signer returns the signer that will be used to sign the transactions.
-	Signer() Signer
+	Signer() walletsigner.Signer
 
 	// IssueBaseTx creates, signs, and issues a new simple value transfer.
-	// Because the P-chain doesn't intend for balance transfers to occur, this
-	// method is expensive and abuses the creation of subnets.
 	//
 	// - [outputs] specifies all the recipients and amounts that should be sent
 	//   from this transaction.
@@ -221,7 +218,7 @@ type Wallet interface {
 	//   the delegation reward will be sent to the validator's [rewardsOwner].
 	IssueAddPermissionlessValidatorTx(
 		vdr *txs.SubnetValidator,
-		signer signer.Signer,
+		signer vmsigner.Signer,
 		assetID ids.ID,
 		validationRewardsOwner *secp256k1fx.OutputOwners,
 		delegationRewardsOwner *secp256k1fx.OutputOwners,
@@ -258,8 +255,8 @@ type Wallet interface {
 }
 
 func NewWallet(
-	builder Builder,
-	signer Signer,
+	builder builder.Builder,
+	signer walletsigner.Signer,
 	client platformvm.Client,
 	backend Backend,
 ) Wallet {
@@ -273,16 +270,16 @@ func NewWallet(
 
 type wallet struct {
 	Backend
-	builder Builder
-	signer  Signer
+	builder builder.Builder
+	signer  walletsigner.Signer
 	client  platformvm.Client
 }
 
-func (w *wallet) Builder() Builder {
+func (w *wallet) Builder() builder.Builder {
 	return w.builder
 }
 
-func (w *wallet) Signer() Signer {
+func (w *wallet) Signer() walletsigner.Signer {
 	return w.signer
 }
 
@@ -449,7 +446,7 @@ func (w *wallet) IssueTransformSubnetTx(
 
 func (w *wallet) IssueAddPermissionlessValidatorTx(
 	vdr *txs.SubnetValidator,
-	signer signer.Signer,
+	signer vmsigner.Signer,
 	assetID ids.ID,
 	validationRewardsOwner *secp256k1fx.OutputOwners,
 	delegationRewardsOwner *secp256k1fx.OutputOwners,
@@ -495,7 +492,7 @@ func (w *wallet) IssueUnsignedTx(
 ) (*txs.Tx, error) {
 	ops := common.NewOptions(options)
 	ctx := ops.Context()
-	tx, err := SignUnsigned(ctx, w.signer, utx)
+	tx, err := walletsigner.SignUnsigned(ctx, w.signer, utx)
 	if err != nil {
 		return nil, err
 	}
@@ -522,17 +519,9 @@ func (w *wallet) IssueTx(
 		return w.Backend.AcceptTx(ctx, tx)
 	}
 
-	txStatus, err := w.client.AwaitTxDecided(ctx, txID, ops.PollFrequency())
-	if err != nil {
+	if err := platformvm.AwaitTxAccepted(w.client, ctx, txID, ops.PollFrequency()); err != nil {
 		return err
 	}
 
-	if err := w.Backend.AcceptTx(ctx, tx); err != nil {
-		return err
-	}
-
-	if txStatus.Status != status.Committed {
-		return fmt.Errorf("%w: %s", errNotCommitted, txStatus.Reason)
-	}
-	return nil
+	return w.Backend.AcceptTx(ctx, tx)
 }

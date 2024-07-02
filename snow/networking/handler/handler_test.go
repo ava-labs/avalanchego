@@ -16,17 +16,20 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
-	"github.com/ava-labs/avalanchego/proto/pb/p2p"
+	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/subnets"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math/meter"
 	"github.com/ava-labs/avalanchego/utils/resource"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/version"
 
+	p2ppb "github.com/ava-labs/avalanchego/proto/pb/p2p"
 	commontracker "github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 )
 
@@ -53,6 +56,16 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 		time.Second,
 	)
 	require.NoError(err)
+
+	peerTracker, err := p2p.NewPeerTracker(
+		logging.NoLog{},
+		"",
+		prometheus.NewRegistry(),
+		nil,
+		version.CurrentApp,
+	)
+	require.NoError(err)
+
 	handlerIntf, err := New(
 		ctx,
 		vdrs,
@@ -63,6 +76,8 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 		validators.UnhandledSubnetConnector,
 		subnets.New(ctx.NodeID, subnets.Config{}),
 		commontracker.NewPeers(),
+		peerTracker,
+		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
 	handler := handlerIntf.(*handler)
@@ -90,7 +105,7 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 		},
 	})
 	ctx.State.Set(snow.EngineState{
-		Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
+		Type:  p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
 		State: snow.Bootstrapping, // assumed bootstrap is ongoing
 	})
 
@@ -101,8 +116,8 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	reqID := uint32(1)
 	chainID := ids.ID{}
 	msg := Message{
-		InboundMessage: message.InboundGetAcceptedFrontier(chainID, reqID, 0*time.Second, nodeID, p2p.EngineType_ENGINE_TYPE_SNOWMAN),
-		EngineType:     p2p.EngineType_ENGINE_TYPE_SNOWMAN,
+		InboundMessage: message.InboundGetAcceptedFrontier(chainID, reqID, 0*time.Second, nodeID),
+		EngineType:     p2ppb.EngineType_ENGINE_TYPE_UNSPECIFIED,
 	}
 	handler.Push(context.Background(), msg)
 
@@ -111,8 +126,8 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 
 	reqID++
 	msg = Message{
-		InboundMessage: message.InboundGetAccepted(chainID, reqID, 1*time.Second, nil, nodeID, p2p.EngineType_ENGINE_TYPE_SNOWMAN),
-		EngineType:     p2p.EngineType_ENGINE_TYPE_SNOWMAN,
+		InboundMessage: message.InboundGetAccepted(chainID, reqID, 1*time.Second, nil, nodeID),
+		EngineType:     p2ppb.EngineType_ENGINE_TYPE_UNSPECIFIED,
 	}
 	handler.Push(context.Background(), msg)
 
@@ -148,6 +163,16 @@ func TestHandlerClosesOnError(t *testing.T) {
 		time.Second,
 	)
 	require.NoError(err)
+
+	peerTracker, err := p2p.NewPeerTracker(
+		logging.NoLog{},
+		"",
+		prometheus.NewRegistry(),
+		nil,
+		version.CurrentApp,
+	)
+	require.NoError(err)
+
 	handlerIntf, err := New(
 		ctx,
 		vdrs,
@@ -158,6 +183,8 @@ func TestHandlerClosesOnError(t *testing.T) {
 		validators.UnhandledSubnetConnector,
 		subnets.New(ctx.NodeID, subnets.Config{}),
 		commontracker.NewPeers(),
+		peerTracker,
+		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
 	handler := handlerIntf.(*handler)
@@ -196,7 +223,7 @@ func TestHandlerClosesOnError(t *testing.T) {
 	// assume bootstrapping is ongoing so that InboundGetAcceptedFrontier
 	// should normally be handled
 	ctx.State.Set(snow.EngineState{
-		Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
+		Type:  p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
 		State: snow.Bootstrapping,
 	})
 
@@ -210,8 +237,8 @@ func TestHandlerClosesOnError(t *testing.T) {
 	reqID := uint32(1)
 	deadline := time.Nanosecond
 	msg := Message{
-		InboundMessage: message.InboundGetAcceptedFrontier(ids.ID{}, reqID, deadline, nodeID, 0),
-		EngineType:     p2p.EngineType_ENGINE_TYPE_UNSPECIFIED,
+		InboundMessage: message.InboundGetAcceptedFrontier(ids.ID{}, reqID, deadline, nodeID),
+		EngineType:     p2ppb.EngineType_ENGINE_TYPE_UNSPECIFIED,
 	}
 	handler.Push(context.Background(), msg)
 
@@ -239,6 +266,16 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 		time.Second,
 	)
 	require.NoError(err)
+
+	peerTracker, err := p2p.NewPeerTracker(
+		logging.NoLog{},
+		"",
+		prometheus.NewRegistry(),
+		nil,
+		version.CurrentApp,
+	)
+	require.NoError(err)
+
 	handlerIntf, err := New(
 		ctx,
 		vdrs,
@@ -249,6 +286,8 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 		validators.UnhandledSubnetConnector,
 		subnets.New(ctx.NodeID, subnets.Config{}),
 		commontracker.NewPeers(),
+		peerTracker,
+		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
 	handler := handlerIntf.(*handler)
@@ -274,7 +313,7 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 		},
 	})
 	ctx.State.Set(snow.EngineState{
-		Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
+		Type:  p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
 		State: snow.Bootstrapping, // assumed bootstrap is ongoing
 	})
 
@@ -288,8 +327,8 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 	chainID := ids.Empty
 	reqID := uint32(1)
 	inInboundMessage := Message{
-		InboundMessage: message.InternalGetFailed(nodeID, chainID, reqID, p2p.EngineType_ENGINE_TYPE_SNOWMAN),
-		EngineType:     p2p.EngineType_ENGINE_TYPE_SNOWMAN,
+		InboundMessage: message.InternalGetFailed(nodeID, chainID, reqID),
+		EngineType:     p2ppb.EngineType_ENGINE_TYPE_UNSPECIFIED,
 	}
 	handler.Push(context.Background(), inInboundMessage)
 
@@ -318,6 +357,16 @@ func TestHandlerDispatchInternal(t *testing.T) {
 		time.Second,
 	)
 	require.NoError(err)
+
+	peerTracker, err := p2p.NewPeerTracker(
+		logging.NoLog{},
+		"",
+		prometheus.NewRegistry(),
+		nil,
+		version.CurrentApp,
+	)
+	require.NoError(err)
+
 	handler, err := New(
 		ctx,
 		vdrs,
@@ -328,6 +377,8 @@ func TestHandlerDispatchInternal(t *testing.T) {
 		validators.UnhandledSubnetConnector,
 		subnets.New(ctx.NodeID, subnets.Config{}),
 		commontracker.NewPeers(),
+		peerTracker,
+		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
 
@@ -358,7 +409,7 @@ func TestHandlerDispatchInternal(t *testing.T) {
 	})
 
 	ctx.State.Set(snow.EngineState{
-		Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
+		Type:  p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
 		State: snow.NormalOp, // assumed bootstrap is done
 	})
 
@@ -393,6 +444,15 @@ func TestHandlerSubnetConnector(t *testing.T) {
 	nodeID := ids.GenerateTestNodeID()
 	subnetID := ids.GenerateTestID()
 
+	peerTracker, err := p2p.NewPeerTracker(
+		logging.NoLog{},
+		"",
+		prometheus.NewRegistry(),
+		nil,
+		version.CurrentApp,
+	)
+	require.NoError(err)
+
 	handler, err := New(
 		ctx,
 		vdrs,
@@ -403,6 +463,8 @@ func TestHandlerSubnetConnector(t *testing.T) {
 		connector,
 		subnets.New(ctx.NodeID, subnets.Config{}),
 		commontracker.NewPeers(),
+		peerTracker,
+		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
 
@@ -426,7 +488,7 @@ func TestHandlerSubnetConnector(t *testing.T) {
 		},
 	})
 	ctx.State.Set(snow.EngineState{
-		Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
+		Type:  p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
 		State: snow.NormalOp, // assumed bootstrap is done
 	})
 
@@ -448,7 +510,7 @@ func TestHandlerSubnetConnector(t *testing.T) {
 
 	subnetInboundMessage := Message{
 		InboundMessage: message.InternalConnectedSubnet(nodeID, subnetID),
-		EngineType:     p2p.EngineType_ENGINE_TYPE_UNSPECIFIED,
+		EngineType:     p2ppb.EngineType_ENGINE_TYPE_UNSPECIFIED,
 	}
 	handler.Push(context.Background(), subnetInboundMessage)
 }
@@ -457,8 +519,8 @@ func TestHandlerSubnetConnector(t *testing.T) {
 func TestDynamicEngineTypeDispatch(t *testing.T) {
 	tests := []struct {
 		name                string
-		currentEngineType   p2p.EngineType
-		requestedEngineType p2p.EngineType
+		currentEngineType   p2ppb.EngineType
+		requestedEngineType p2ppb.EngineType
 		setup               func(
 			h Handler,
 			b common.BootstrapableEngine,
@@ -467,8 +529,8 @@ func TestDynamicEngineTypeDispatch(t *testing.T) {
 	}{
 		{
 			name:                "current - avalanche, requested - unspecified",
-			currentEngineType:   p2p.EngineType_ENGINE_TYPE_AVALANCHE,
-			requestedEngineType: p2p.EngineType_ENGINE_TYPE_UNSPECIFIED,
+			currentEngineType:   p2ppb.EngineType_ENGINE_TYPE_AVALANCHE,
+			requestedEngineType: p2ppb.EngineType_ENGINE_TYPE_UNSPECIFIED,
 			setup: func(h Handler, b common.BootstrapableEngine, e common.Engine) {
 				h.SetEngineManager(&EngineManager{
 					Avalanche: &Engine{
@@ -482,8 +544,8 @@ func TestDynamicEngineTypeDispatch(t *testing.T) {
 		},
 		{
 			name:                "current - avalanche, requested - avalanche",
-			currentEngineType:   p2p.EngineType_ENGINE_TYPE_AVALANCHE,
-			requestedEngineType: p2p.EngineType_ENGINE_TYPE_AVALANCHE,
+			currentEngineType:   p2ppb.EngineType_ENGINE_TYPE_AVALANCHE,
+			requestedEngineType: p2ppb.EngineType_ENGINE_TYPE_AVALANCHE,
 			setup: func(h Handler, b common.BootstrapableEngine, e common.Engine) {
 				h.SetEngineManager(&EngineManager{
 					Avalanche: &Engine{
@@ -497,8 +559,8 @@ func TestDynamicEngineTypeDispatch(t *testing.T) {
 		},
 		{
 			name:                "current - snowman, requested - unspecified",
-			currentEngineType:   p2p.EngineType_ENGINE_TYPE_SNOWMAN,
-			requestedEngineType: p2p.EngineType_ENGINE_TYPE_UNSPECIFIED,
+			currentEngineType:   p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
+			requestedEngineType: p2ppb.EngineType_ENGINE_TYPE_UNSPECIFIED,
 			setup: func(h Handler, b common.BootstrapableEngine, e common.Engine) {
 				h.SetEngineManager(&EngineManager{
 					Avalanche: nil,
@@ -512,8 +574,8 @@ func TestDynamicEngineTypeDispatch(t *testing.T) {
 		},
 		{
 			name:                "current - snowman, requested - avalanche",
-			currentEngineType:   p2p.EngineType_ENGINE_TYPE_SNOWMAN,
-			requestedEngineType: p2p.EngineType_ENGINE_TYPE_AVALANCHE,
+			currentEngineType:   p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
+			requestedEngineType: p2ppb.EngineType_ENGINE_TYPE_AVALANCHE,
 			setup: func(h Handler, b common.BootstrapableEngine, e common.Engine) {
 				h.SetEngineManager(&EngineManager{
 					Avalanche: &Engine{
@@ -531,8 +593,8 @@ func TestDynamicEngineTypeDispatch(t *testing.T) {
 		},
 		{
 			name:                "current - snowman, requested - snowman",
-			currentEngineType:   p2p.EngineType_ENGINE_TYPE_SNOWMAN,
-			requestedEngineType: p2p.EngineType_ENGINE_TYPE_SNOWMAN,
+			currentEngineType:   p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
+			requestedEngineType: p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
 			setup: func(h Handler, b common.BootstrapableEngine, e common.Engine) {
 				h.SetEngineManager(&EngineManager{
 					Avalanche: nil,
@@ -563,6 +625,16 @@ func TestDynamicEngineTypeDispatch(t *testing.T) {
 				time.Second,
 			)
 			require.NoError(err)
+
+			peerTracker, err := p2p.NewPeerTracker(
+				logging.NoLog{},
+				"",
+				prometheus.NewRegistry(),
+				nil,
+				version.CurrentApp,
+			)
+			require.NoError(err)
+
 			handler, err := New(
 				ctx,
 				vdrs,
@@ -573,6 +645,8 @@ func TestDynamicEngineTypeDispatch(t *testing.T) {
 				validators.UnhandledSubnetConnector,
 				subnets.New(ids.EmptyNodeID, subnets.Config{}),
 				commontracker.NewPeers(),
+				peerTracker,
+				prometheus.NewRegistry(),
 			)
 			require.NoError(err)
 
@@ -635,6 +709,15 @@ func TestHandlerStartError(t *testing.T) {
 	)
 	require.NoError(err)
 
+	peerTracker, err := p2p.NewPeerTracker(
+		logging.NoLog{},
+		"",
+		prometheus.NewRegistry(),
+		nil,
+		version.CurrentApp,
+	)
+	require.NoError(err)
+
 	handler, err := New(
 		ctx,
 		validators.NewManager(),
@@ -645,6 +728,8 @@ func TestHandlerStartError(t *testing.T) {
 		nil,
 		subnets.New(ctx.NodeID, subnets.Config{}),
 		commontracker.NewPeers(),
+		peerTracker,
+		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
 
@@ -652,7 +737,7 @@ func TestHandlerStartError(t *testing.T) {
 	// handler to shutdown.
 	handler.SetEngineManager(&EngineManager{})
 	ctx.State.Set(snow.EngineState{
-		Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
+		Type:  p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
 		State: snow.Initializing,
 	})
 	handler.Start(context.Background(), false)

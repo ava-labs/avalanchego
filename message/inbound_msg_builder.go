@@ -117,16 +117,14 @@ func InboundGetAcceptedFrontier(
 	requestID uint32,
 	deadline time.Duration,
 	nodeID ids.NodeID,
-	engineType p2p.EngineType,
 ) InboundMessage {
 	return &inboundMessage{
 		nodeID: nodeID,
 		op:     GetAcceptedFrontierOp,
 		message: &p2p.GetAcceptedFrontier{
-			ChainId:    chainID[:],
-			RequestId:  requestID,
-			Deadline:   uint64(deadline),
-			EngineType: engineType,
+			ChainId:   chainID[:],
+			RequestId: requestID,
+			Deadline:  uint64(deadline),
 		},
 		expiration: time.Now().Add(deadline),
 	}
@@ -156,7 +154,6 @@ func InboundGetAccepted(
 	deadline time.Duration,
 	containerIDs []ids.ID,
 	nodeID ids.NodeID,
-	engineType p2p.EngineType,
 ) InboundMessage {
 	containerIDBytes := make([][]byte, len(containerIDs))
 	encodeIDs(containerIDs, containerIDBytes)
@@ -168,7 +165,6 @@ func InboundGetAccepted(
 			RequestId:    requestID,
 			Deadline:     uint64(deadline),
 			ContainerIds: containerIDBytes,
-			EngineType:   engineType,
 		},
 		expiration: time.Now().Add(deadline),
 	}
@@ -201,7 +197,6 @@ func InboundPushQuery(
 	container []byte,
 	requestedHeight uint64,
 	nodeID ids.NodeID,
-	engineType p2p.EngineType,
 ) InboundMessage {
 	return &inboundMessage{
 		nodeID: nodeID,
@@ -212,7 +207,6 @@ func InboundPushQuery(
 			Deadline:        uint64(deadline),
 			Container:       container,
 			RequestedHeight: requestedHeight,
-			EngineType:      engineType,
 		},
 		expiration: time.Now().Add(deadline),
 	}
@@ -225,7 +219,6 @@ func InboundPullQuery(
 	containerID ids.ID,
 	requestedHeight uint64,
 	nodeID ids.NodeID,
-	engineType p2p.EngineType,
 ) InboundMessage {
 	return &inboundMessage{
 		nodeID: nodeID,
@@ -236,7 +229,6 @@ func InboundPullQuery(
 			Deadline:        uint64(deadline),
 			ContainerId:     containerID[:],
 			RequestedHeight: requestedHeight,
-			EngineType:      engineType,
 		},
 		expiration: time.Now().Add(deadline),
 	}

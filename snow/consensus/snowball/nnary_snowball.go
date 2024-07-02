@@ -11,9 +11,9 @@ import (
 
 var _ Nnary = (*nnarySnowball)(nil)
 
-func newNnarySnowball(betaVirtuous, betaRogue int, choice ids.ID) nnarySnowball {
+func newNnarySnowball(alphaPreference int, terminationConditions []terminationCondition, choice ids.ID) nnarySnowball {
 	return nnarySnowball{
-		nnarySnowflake:     newNnarySnowflake(betaVirtuous, betaRogue, choice),
+		nnarySnowflake:     newNnarySnowflake(alphaPreference, terminationConditions, choice),
 		preference:         choice,
 		preferenceStrength: make(map[ids.ID]int),
 	}
@@ -47,27 +47,20 @@ func (sb *nnarySnowball) Preference() ids.ID {
 	return sb.preference
 }
 
-func (sb *nnarySnowball) RecordSuccessfulPoll(choice ids.ID) {
-	sb.increasePreferenceStrength(choice)
-	sb.nnarySnowflake.RecordSuccessfulPoll(choice)
-}
+func (sb *nnarySnowball) RecordPoll(count int, choice ids.ID) {
+	if count >= sb.alphaPreference {
+		preferenceStrength := sb.preferenceStrength[choice] + 1
+		sb.preferenceStrength[choice] = preferenceStrength
 
-func (sb *nnarySnowball) RecordPollPreference(choice ids.ID) {
-	sb.increasePreferenceStrength(choice)
-	sb.nnarySnowflake.RecordPollPreference(choice)
+		if preferenceStrength > sb.maxPreferenceStrength {
+			sb.preference = choice
+			sb.maxPreferenceStrength = preferenceStrength
+		}
+	}
+	sb.nnarySnowflake.RecordPoll(count, choice)
 }
 
 func (sb *nnarySnowball) String() string {
 	return fmt.Sprintf("SB(Preference = %s, PreferenceStrength = %d, %s)",
 		sb.preference, sb.maxPreferenceStrength, &sb.nnarySnowflake)
-}
-
-func (sb *nnarySnowball) increasePreferenceStrength(choice ids.ID) {
-	preferenceStrength := sb.preferenceStrength[choice] + 1
-	sb.preferenceStrength[choice] = preferenceStrength
-
-	if preferenceStrength > sb.maxPreferenceStrength {
-		sb.preference = choice
-		sb.maxPreferenceStrength = preferenceStrength
-	}
 }

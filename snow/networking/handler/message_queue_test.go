@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
@@ -15,23 +16,27 @@ import (
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
-	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
-
-const engineType = p2p.EngineType_ENGINE_TYPE_SNOWMAN
 
 func TestQueue(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	require := require.New(t)
 	cpuTracker := tracker.NewMockTracker(ctrl)
-	snowCtx := snowtest.Context(t, snowtest.CChainID)
-	ctx := snowtest.ConsensusContext(snowCtx)
 	vdrs := validators.NewManager()
 	vdr1ID, vdr2ID := ids.GenerateTestNodeID(), ids.GenerateTestNodeID()
-	require.NoError(vdrs.AddStaker(ctx.SubnetID, vdr1ID, nil, ids.Empty, 1))
-	require.NoError(vdrs.AddStaker(ctx.SubnetID, vdr2ID, nil, ids.Empty, 1))
-	mIntf, err := NewMessageQueue(ctx, vdrs, cpuTracker, "", message.SynchronousOps)
+	require.NoError(vdrs.AddStaker(constants.PrimaryNetworkID, vdr1ID, nil, ids.Empty, 1))
+	require.NoError(vdrs.AddStaker(constants.PrimaryNetworkID, vdr2ID, nil, ids.Empty, 1))
+	mIntf, err := NewMessageQueue(
+		logging.NoLog{},
+		constants.PrimaryNetworkID,
+		vdrs,
+		cpuTracker,
+		"",
+		prometheus.NewRegistry(),
+	)
 	require.NoError(err)
 	u := mIntf.(*messageQueue)
 	currentTime := time.Now()
@@ -45,9 +50,8 @@ func TestQueue(t *testing.T) {
 			ids.GenerateTestID(),
 			0,
 			vdr1ID,
-			engineType,
 		),
-		EngineType: engineType,
+		EngineType: p2p.EngineType_ENGINE_TYPE_UNSPECIFIED,
 	}
 
 	// Push then pop should work regardless of usage when there are no other
@@ -105,9 +109,8 @@ func TestQueue(t *testing.T) {
 			ids.GenerateTestID(),
 			0,
 			vdr2ID,
-			engineType,
 		),
-		EngineType: engineType,
+		EngineType: p2p.EngineType_ENGINE_TYPE_UNSPECIFIED,
 	}
 
 	// Push msg2 from vdr2ID
@@ -132,12 +135,12 @@ func TestQueue(t *testing.T) {
 	// Non-validators should be able to put messages onto [u]
 	nonVdrNodeID1, nonVdrNodeID2 := ids.GenerateTestNodeID(), ids.GenerateTestNodeID()
 	msg3 := Message{
-		InboundMessage: message.InboundPullQuery(ids.Empty, 0, 0, ids.Empty, 0, nonVdrNodeID1, engineType),
-		EngineType:     engineType,
+		InboundMessage: message.InboundPullQuery(ids.Empty, 0, 0, ids.Empty, 0, nonVdrNodeID1),
+		EngineType:     p2p.EngineType_ENGINE_TYPE_UNSPECIFIED,
 	}
 	msg4 := Message{
-		InboundMessage: message.InboundPushQuery(ids.Empty, 0, 0, nil, 0, nonVdrNodeID2, engineType),
-		EngineType:     engineType,
+		InboundMessage: message.InboundPushQuery(ids.Empty, 0, 0, nil, 0, nonVdrNodeID2),
+		EngineType:     p2p.EngineType_ENGINE_TYPE_UNSPECIFIED,
 	}
 	u.Push(context.Background(), msg3)
 	u.Push(context.Background(), msg4)

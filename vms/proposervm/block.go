@@ -36,6 +36,7 @@ var (
 	errTimeTooAdvanced          = errors.New("time is too far advanced")
 	errProposerWindowNotStarted = errors.New("proposer window hasn't started")
 	errUnexpectedProposer       = errors.New("unexpected proposer for current window")
+	errProposerMismatch         = errors.New("proposer mismatch")
 	errProposersNotActivated    = errors.New("proposers haven't been activated yet")
 	errPChainHeightTooLow       = errors.New("block P-chain height is too low")
 )
@@ -152,9 +153,9 @@ func (p *postForkCommonComponents) Verify(
 			return err
 		}
 
-		// Verify the signature of the node
-		if err := child.SignedBlock.Verify(shouldHaveProposer, p.vm.ctx.ChainID); err != nil {
-			return err
+		hasProposer := child.SignedBlock.Proposer() != ids.EmptyNodeID
+		if shouldHaveProposer != hasProposer {
+			return fmt.Errorf("%w: shouldHaveProposer (%v) != hasProposer (%v)", errProposerMismatch, shouldHaveProposer, hasProposer)
 		}
 
 		p.vm.ctx.Log.Debug("verified post-fork block",
@@ -275,6 +276,7 @@ func (p *postForkCommonComponents) buildChild(
 		zap.Stringer("blkID", child.ID()),
 		zap.Stringer("innerBlkID", innerBlock.ID()),
 		zap.Uint64("height", child.Height()),
+		zap.Uint64("pChainHeight", pChainHeight),
 		zap.Time("parentTimestamp", parentTimestamp),
 		zap.Time("blockTimestamp", newTimestamp),
 	)
@@ -367,7 +369,10 @@ func (p *postForkCommonComponents) verifyPostDurangoBlockDelay(
 		currentSlot  = proposer.TimeToSlot(parentTimestamp, blkTimestamp)
 		proposerID   = blk.Proposer()
 	)
+	// populate the slot for the block.
+	blk.slot = &currentSlot
 
+	// find the expected proposer
 	expectedProposerID, err := p.vm.Windower.ExpectedProposer(
 		ctx,
 		blkHeight,
@@ -450,6 +455,11 @@ func (p *postForkCommonComponents) shouldBuildSignedBlockPostDurango(
 		)
 		return false, err
 	}
+
+	// report the build slot to the metrics.
+	p.vm.proposerBuildSlotGauge.Set(float64(proposer.TimeToSlot(parentTimestamp, nextStartTime)))
+
+	// set the scheduler to let us know when the next block need to be built.
 	p.vm.Scheduler.SetBuildBlockTime(nextStartTime)
 
 	// In case the inner VM only issued one pendingTxs message, we should

@@ -9,10 +9,11 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -28,9 +29,13 @@ import (
 const (
 	totalRounds = 50
 
-	metricBlksProcessing = "avalanche_X_blks_processing"
-	metricBlksAccepted   = "avalanche_X_blks_accepted_count"
+	blksProcessingMetric = "avalanche_snowman_blks_processing"
+	blksAcceptedMetric   = "avalanche_snowman_blks_accepted_count"
 )
+
+var xChainMetricLabels = prometheus.Labels{
+	chains.ChainLabel: "X",
+}
 
 // This test requires that the network not have ongoing blocks and
 // cannot reliably be run in parallel.
@@ -48,10 +53,15 @@ var _ = e2e.DescribeXChainSerial("[Virtuous Transfer Tx AVAX]", func() {
 			// test avoids the case of a previous test having initiated block
 			// processing but not having completed it.
 			e2e.Eventually(func() bool {
-				allNodeMetrics, err := tests.GetNodesMetrics(rpcEps, metricBlksProcessing)
+				allNodeMetrics, err := tests.GetNodesMetrics(
+					e2e.DefaultContext(),
+					rpcEps,
+				)
 				require.NoError(err)
+
 				for _, metrics := range allNodeMetrics {
-					if metrics[metricBlksProcessing] > 0 {
+					xBlksProcessing, ok := tests.GetMetricValue(metrics, blksProcessingMetric, xChainMetricLabels)
+					if !ok || xBlksProcessing > 0 {
 						return false
 					}
 				}
@@ -61,11 +71,6 @@ var _ = e2e.DescribeXChainSerial("[Virtuous Transfer Tx AVAX]", func() {
 				e2e.DefaultPollingInterval,
 				"The cluster is generating ongoing blocks. Is this test being run in parallel?",
 			)
-
-			allMetrics := []string{
-				metricBlksProcessing,
-				metricBlksAccepted,
-			}
 
 			// Ensure the same set of 10 keys is used for all tests
 			// by retrieving them outside of runFunc.
@@ -84,7 +89,10 @@ var _ = e2e.DescribeXChainSerial("[Virtuous Transfer Tx AVAX]", func() {
 
 				keychain := secp256k1fx.NewKeychain(testKeys...)
 				baseWallet := e2e.NewWallet(keychain, e2e.Env.GetRandomNodeURI())
-				avaxAssetID := baseWallet.X().AVAXAssetID()
+				xWallet := baseWallet.X()
+				xBuilder := xWallet.Builder()
+				xContext := xBuilder.Context()
+				avaxAssetID := xContext.AVAXAssetID
 
 				wallets := make([]primary.Wallet, len(testKeys))
 				shortAddrs := make([]ids.ShortID, len(testKeys))
@@ -99,10 +107,15 @@ var _ = e2e.DescribeXChainSerial("[Virtuous Transfer Tx AVAX]", func() {
 					)
 				}
 
-				metricsBeforeTx, err := tests.GetNodesMetrics(rpcEps, allMetrics...)
+				metricsBeforeTx, err := tests.GetNodesMetrics(
+					e2e.DefaultContext(),
+					rpcEps,
+				)
 				require.NoError(err)
 				for _, uri := range rpcEps {
-					tests.Outf("{{green}}metrics at %q:{{/}} %v\n", uri, metricsBeforeTx[uri])
+					for _, metric := range []string{blksProcessingMetric, blksAcceptedMetric} {
+						tests.Outf("{{green}}%s at %q:{{/}} %v\n", metric, uri, metricsBeforeTx[uri][metric])
+					}
 				}
 
 				testBalances := make([]uint64, 0)
@@ -146,7 +159,7 @@ var _ = e2e.DescribeXChainSerial("[Virtuous Transfer Tx AVAX]", func() {
 
 				amountToTransfer := senderOrigBal / 10
 
-				senderNewBal := senderOrigBal - amountToTransfer - baseWallet.X().BaseTxFee()
+				senderNewBal := senderOrigBal - amountToTransfer - xContext.BaseTxFee
 				receiverNewBal := receiverOrigBal + amountToTransfer
 
 				ginkgo.By("X-Chain transfer with wrong amount must fail", func() {
@@ -224,28 +237,28 @@ RECEIVER  NEW BALANCE (AFTER) : %21d AVAX
 				txID := tx.ID()
 				for _, u := range rpcEps {
 					xc := avm.NewClient(u, "X")
-					status, err := xc.ConfirmTx(e2e.DefaultContext(), txID, 2*time.Second)
-					require.NoError(err)
-					require.Equal(choices.Accepted, status)
+					require.NoError(avm.AwaitTxAccepted(xc, e2e.DefaultContext(), txID, 2*time.Second))
 				}
 
 				for _, u := range rpcEps {
 					xc := avm.NewClient(u, "X")
-					status, err := xc.ConfirmTx(e2e.DefaultContext(), txID, 2*time.Second)
-					require.NoError(err)
-					require.Equal(choices.Accepted, status)
+					require.NoError(avm.AwaitTxAccepted(xc, e2e.DefaultContext(), txID, 2*time.Second))
 
-					mm, err := tests.GetNodeMetrics(u, allMetrics...)
+					mm, err := tests.GetNodeMetrics(e2e.DefaultContext(), u)
 					require.NoError(err)
 
 					prev := metricsBeforeTx[u]
 
 					// +0 since X-chain tx must have been processed and accepted
 					// by now
-					require.Equal(mm[metricBlksProcessing], prev[metricBlksProcessing])
+					currentXBlksProcessing, _ := tests.GetMetricValue(mm, blksProcessingMetric, xChainMetricLabels)
+					previousXBlksProcessing, _ := tests.GetMetricValue(prev, blksProcessingMetric, xChainMetricLabels)
+					require.Equal(currentXBlksProcessing, previousXBlksProcessing)
 
 					// +1 since X-chain tx must have been accepted by now
-					require.Equal(mm[metricBlksAccepted], prev[metricBlksAccepted]+1)
+					currentXBlksAccepted, _ := tests.GetMetricValue(mm, blksAcceptedMetric, xChainMetricLabels)
+					previousXBlksAccepted, _ := tests.GetMetricValue(prev, blksAcceptedMetric, xChainMetricLabels)
+					require.Equal(currentXBlksAccepted, previousXBlksAccepted+1)
 
 					metricsBeforeTx[u] = mm
 				}

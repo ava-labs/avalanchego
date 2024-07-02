@@ -9,12 +9,10 @@ import (
 	"sync"
 )
 
-const LegacyAppName = "avalanche"
-
 var (
 	errDifferentMajor = errors.New("different major version")
 
-	_ fmt.Stringer = (*Semantic)(nil)
+	_ fmt.Stringer = (*Application)(nil)
 )
 
 type Application struct {

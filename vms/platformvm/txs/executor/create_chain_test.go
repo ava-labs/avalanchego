@@ -4,6 +4,7 @@
 package executor
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -14,12 +15,15 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	walletsigner "github.com/ava-labs/avalanchego/wallet/chain/p/signer"
 )
 
 // Ensure Execute fails when there are not enough control sigs
@@ -29,16 +33,16 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
-	tx, err := env.txBuilder.NewCreateChainTx(
+	builder, signer := env.factory.NewWallet(preFundedKeys[0], preFundedKeys[1])
+	utx, err := builder.NewCreateChainTx(
 		testSubnet1.ID(),
 		nil,
 		constants.AVMID,
 		nil,
 		"chain name",
-		[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
-		ids.ShortEmpty,
-		nil,
 	)
+	require.NoError(err)
+	tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
 	require.NoError(err)
 
 	// Remove a signature
@@ -63,16 +67,16 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
-	tx, err := env.txBuilder.NewCreateChainTx(
+	builder, signer := env.factory.NewWallet(testSubnet1ControlKeys[0], testSubnet1ControlKeys[1])
+	utx, err := builder.NewCreateChainTx(
 		testSubnet1.ID(),
 		nil,
 		constants.AVMID,
 		nil,
 		"chain name",
-		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
-		ids.ShortEmpty,
-		nil,
 	)
+	require.NoError(err)
+	tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
 	require.NoError(err)
 
 	// Generate new, random key to sign tx with
@@ -104,16 +108,16 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
-	tx, err := env.txBuilder.NewCreateChainTx(
+	builder, signer := env.factory.NewWallet(testSubnet1ControlKeys[0], testSubnet1ControlKeys[1])
+	utx, err := builder.NewCreateChainTx(
 		testSubnet1.ID(),
 		nil,
 		constants.AVMID,
 		nil,
 		"chain name",
-		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
-		ids.ShortEmpty,
-		nil,
 	)
+	require.NoError(err)
+	tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
 	require.NoError(err)
 
 	tx.Unsigned.(*txs.CreateChainTx).SubnetID = ids.GenerateTestID()
@@ -137,16 +141,16 @@ func TestCreateChainTxValid(t *testing.T) {
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
-	tx, err := env.txBuilder.NewCreateChainTx(
+	builder, signer := env.factory.NewWallet(testSubnet1ControlKeys[0], testSubnet1ControlKeys[1])
+	utx, err := builder.NewCreateChainTx(
 		testSubnet1.ID(),
 		nil,
 		constants.AVMID,
 		nil,
 		"chain name",
-		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
-		ids.ShortEmpty,
-		nil,
 	)
+	require.NoError(err)
+	tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
 	require.NoError(err)
 
 	stateDiff, err := state.NewDiff(lastAcceptedID, env)
@@ -192,31 +196,30 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 			require := require.New(t)
 
 			env := newEnvironment(t, banff)
-			env.config.ApricotPhase3Time = ap3Time
+			env.config.UpgradeConfig.ApricotPhase3Time = ap3Time
 
-			ins, outs, _, signers, err := env.utxosHandler.Spend(env.state, preFundedKeys, 0, test.fee, ids.ShortEmpty)
-			require.NoError(err)
-
-			subnetAuth, subnetSigners, err := env.utxosHandler.Authorize(env.state, testSubnet1.ID(), preFundedKeys)
-			require.NoError(err)
-
-			signers = append(signers, subnetSigners)
-
-			// Create the tx
-
-			utx := &txs.CreateChainTx{
-				BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-					NetworkID:    env.ctx.NetworkID,
-					BlockchainID: env.ctx.ChainID,
-					Ins:          ins,
-					Outs:         outs,
-				}},
-				SubnetID:   testSubnet1.ID(),
-				VMID:       constants.AVMID,
-				SubnetAuth: subnetAuth,
+			addrs := set.NewSet[ids.ShortID](len(preFundedKeys))
+			for _, key := range preFundedKeys {
+				addrs.Add(key.Address())
 			}
-			tx := &txs.Tx{Unsigned: utx}
-			require.NoError(tx.Sign(txs.Codec, signers))
+
+			env.state.SetTimestamp(test.time) // to duly set fee
+
+			cfg := *env.config
+
+			cfg.StaticFeeConfig.CreateBlockchainTxFee = test.fee
+			factory := txstest.NewWalletFactory(env.ctx, &cfg, env.state)
+			builder, signer := factory.NewWallet(preFundedKeys...)
+			utx, err := builder.NewCreateChainTx(
+				testSubnet1.ID(),
+				nil,
+				ids.GenerateTestID(),
+				nil,
+				"",
+			)
+			require.NoError(err)
+			tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
+			require.NoError(err)
 
 			stateDiff, err := state.NewDiff(lastAcceptedID, env)
 			require.NoError(err)

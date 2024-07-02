@@ -42,7 +42,11 @@ var _ = e2e.DescribeXChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 
 		ginkgo.By("defining common configuration")
 		recipientEthAddress := evm.GetEthAddress(recipientKey)
-		avaxAssetID := xWallet.AVAXAssetID()
+		xBuilder := xWallet.Builder()
+		xContext := xBuilder.Context()
+		cBuilder := cWallet.Builder()
+		cContext := cBuilder.Context()
+		avaxAssetID := xContext.AVAXAssetID
 		// Use the same owner for sending to X-Chain and importing funds to P-Chain
 		recipientOwner := secp256k1fx.OutputOwners{
 			Threshold: 1,
@@ -94,7 +98,7 @@ var _ = e2e.DescribeXChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 
 		ginkgo.By("exporting AVAX from the X-Chain to the C-Chain", func() {
 			_, err := xWallet.IssueExportTx(
-				cWallet.BlockchainID(),
+				cContext.BlockchainID,
 				exportOutputs,
 				e2e.WithDefaultContext(),
 			)
@@ -106,7 +110,7 @@ var _ = e2e.DescribeXChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 
 		ginkgo.By("importing AVAX from the X-Chain to the C-Chain", func() {
 			_, err := cWallet.IssueImportTx(
-				xWallet.BlockchainID(),
+				xContext.BlockchainID,
 				recipientEthAddress,
 				e2e.WithDefaultContext(),
 				e2e.WithSuggestedGasPrice(ethClient),
@@ -132,7 +136,7 @@ var _ = e2e.DescribeXChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 
 		ginkgo.By("importing AVAX from the X-Chain to the P-Chain", func() {
 			_, err := pWallet.IssueImportTx(
-				xWallet.BlockchainID(),
+				xContext.BlockchainID,
 				&recipientOwner,
 				e2e.WithDefaultContext(),
 			)

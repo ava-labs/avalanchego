@@ -18,13 +18,13 @@ import (
 type FlagsMap map[string]interface{}
 
 // Utility function simplifying construction of a FlagsMap from a file.
-func ReadFlagsMap(path string, description string) (*FlagsMap, error) {
+func ReadFlagsMap(path string, description string) (FlagsMap, error) {
 	bytes, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read %s: %w", description, err)
 	}
-	flagsMap := &FlagsMap{}
-	if err := json.Unmarshal(bytes, flagsMap); err != nil {
+	flagsMap := FlagsMap{}
+	if err := json.Unmarshal(bytes, &flagsMap); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal %s: %w", description, err)
 	}
 	return flagsMap, nil
@@ -51,6 +51,20 @@ func (f FlagsMap) GetStringVal(key string) (string, error) {
 	val, err := cast.ToStringE(rawVal)
 	if err != nil {
 		return "", fmt.Errorf("failed to cast value for %q: %w", key, err)
+	}
+	return val, nil
+}
+
+// GetBoolVal simplifies retrieving a map value as a bool.
+func (f FlagsMap) GetBoolVal(key string, defaultVal bool) (bool, error) {
+	rawVal, ok := f[key]
+	if !ok {
+		return defaultVal, nil
+	}
+
+	val, err := cast.ToBoolE(rawVal)
+	if err != nil {
+		return false, fmt.Errorf("failed to cast value for %q: %w", key, err)
 	}
 	return val, nil
 }

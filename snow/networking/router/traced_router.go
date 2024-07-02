@@ -47,8 +47,7 @@ func (r *tracedRouter) Initialize(
 	trackedSubnets set.Set[ids.ID],
 	onFatal func(exitCode int),
 	healthConfig HealthConfig,
-	metricsNamespace string,
-	metricsRegisterer prometheus.Registerer,
+	reg prometheus.Registerer,
 ) error {
 	return r.router.Initialize(
 		nodeID,
@@ -60,8 +59,7 @@ func (r *tracedRouter) Initialize(
 		trackedSubnets,
 		onFatal,
 		healthConfig,
-		metricsNamespace,
-		metricsRegisterer,
+		reg,
 	)
 }
 

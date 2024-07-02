@@ -5,7 +5,6 @@ package builder
 
 import (
 	"context"
-	"fmt"
 	"testing"
 	"time"
 
@@ -35,7 +34,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
@@ -45,14 +43,18 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
+	"github.com/ava-labs/avalanchego/vms/platformvm/upgrade"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
-	txbuilder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	pvalidators "github.com/ava-labs/avalanchego/vms/platformvm/validators"
+	walletsigner "github.com/ava-labs/avalanchego/wallet/chain/p/signer"
+	walletcommon "github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
 
 const (
@@ -64,6 +66,7 @@ const (
 	banff
 	cortina
 	durango
+	eUpgrade
 
 	latestFork = durango
 )
@@ -103,7 +106,7 @@ type environment struct {
 	Builder
 	blkManager blockexecutor.Manager
 	mempool    mempool.Mempool
-	network    network.Network
+	network    *network.Network
 	sender     *common.SenderTest
 
 	isBootstrapped *utils.Atomic[bool]
@@ -114,10 +117,9 @@ type environment struct {
 	msm            *mutableSharedMemory
 	fx             fx.Fx
 	state          state.State
-	atomicUTXOs    avax.AtomicUTXOManager
 	uptimes        uptime.Manager
-	utxosHandler   utxo.Handler
-	txBuilder      txbuilder.Builder
+	utxosVerifier  utxo.Verifier
+	factory        *txstest.WalletFactory
 	backend        txexecutor.Backend
 }
 
@@ -149,19 +151,9 @@ func newEnvironment(t *testing.T, f fork) *environment { //nolint:unparam
 	rewardsCalc := reward.NewCalculator(res.config.RewardConfig)
 	res.state = defaultState(t, res.config, res.ctx, res.baseDB, rewardsCalc)
 
-	res.atomicUTXOs = avax.NewAtomicUTXOManager(res.ctx.SharedMemory, txs.Codec)
 	res.uptimes = uptime.NewManager(res.state, res.clk)
-	res.utxosHandler = utxo.NewHandler(res.ctx, res.clk, res.fx)
-
-	res.txBuilder = txbuilder.New(
-		res.ctx,
-		res.config,
-		res.clk,
-		res.fx,
-		res.state,
-		res.atomicUTXOs,
-		res.utxosHandler,
-	)
+	res.utxosVerifier = utxo.NewVerifier(res.ctx, res.clk, res.fx)
+	res.factory = txstest.NewWalletFactory(res.ctx, res.config, res.state)
 
 	genesisID := res.state.GetLastAccepted()
 	res.backend = txexecutor.Backend{
@@ -170,18 +162,18 @@ func newEnvironment(t *testing.T, f fork) *environment { //nolint:unparam
 		Clk:          res.clk,
 		Bootstrapped: res.isBootstrapped,
 		Fx:           res.fx,
-		FlowChecker:  res.utxosHandler,
+		FlowChecker:  res.utxosVerifier,
 		Uptimes:      res.uptimes,
 		Rewards:      rewardsCalc,
 	}
 
 	registerer := prometheus.NewRegistry()
 	res.sender = &common.SenderTest{T: t}
-	res.sender.SendAppGossipF = func(context.Context, []byte) error {
+	res.sender.SendAppGossipF = func(context.Context, common.SendConfig, []byte) error {
 		return nil
 	}
 
-	metrics, err := metrics.New("", registerer)
+	metrics, err := metrics.New(registerer)
 	require.NoError(err)
 
 	res.mempool, err = mempool.New("mempool", registerer, nil)
@@ -244,22 +236,25 @@ func newEnvironment(t *testing.T, f fork) *environment { //nolint:unparam
 func addSubnet(t *testing.T, env *environment) {
 	require := require.New(t)
 
-	// Create a subnet
-	var err error
-	testSubnet1, err = env.txBuilder.NewCreateSubnetTx(
-		2, // threshold; 2 sigs from keys[0], keys[1], keys[2] needed to add validator to this subnet
-		[]ids.ShortID{ // control keys
-			preFundedKeys[0].PublicKey().Address(),
-			preFundedKeys[1].PublicKey().Address(),
-			preFundedKeys[2].PublicKey().Address(),
+	builder, signer := env.factory.NewWallet(preFundedKeys[0])
+	utx, err := builder.NewCreateSubnetTx(
+		&secp256k1fx.OutputOwners{
+			Threshold: 2,
+			Addrs: []ids.ShortID{
+				preFundedKeys[0].PublicKey().Address(),
+				preFundedKeys[1].PublicKey().Address(),
+				preFundedKeys[2].PublicKey().Address(),
+			},
 		},
-		[]*secp256k1.PrivateKey{preFundedKeys[0]},
-		preFundedKeys[0].PublicKey().Address(),
-		nil,
+		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
+		}),
 	)
 	require.NoError(err)
+	testSubnet1, err = walletsigner.SignUnsigned(context.Background(), signer, utx)
+	require.NoError(err)
 
-	// store it
 	genesisID := env.state.GetLastAccepted()
 	stateDiff, err := state.NewDiff(genesisID, env.blkManager)
 	require.NoError(err)
@@ -305,57 +300,59 @@ func defaultState(
 }
 
 func defaultConfig(t *testing.T, f fork) *config.Config {
-	var (
-		apricotPhase3Time = mockable.MaxTime
-		apricotPhase5Time = mockable.MaxTime
-		banffTime         = mockable.MaxTime
-		cortinaTime       = mockable.MaxTime
-		durangoTime       = mockable.MaxTime
-	)
-
-	switch f {
-	case durango:
-		durangoTime = time.Time{} // neglecting fork ordering for this package's tests
-		fallthrough
-	case cortina:
-		cortinaTime = time.Time{} // neglecting fork ordering for this package's tests
-		fallthrough
-	case banff:
-		banffTime = time.Time{} // neglecting fork ordering for this package's tests
-		fallthrough
-	case apricotPhase5:
-		apricotPhase5Time = defaultValidateEndTime
-		fallthrough
-	case apricotPhase3:
-		apricotPhase3Time = defaultValidateEndTime
-	default:
-		require.NoError(t, fmt.Errorf("unhandled fork %d", f))
-	}
-
-	return &config.Config{
+	c := &config.Config{
 		Chains:                 chains.TestManager,
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		Validators:             validators.NewManager(),
-		TxFee:                  defaultTxFee,
-		CreateSubnetTxFee:      100 * defaultTxFee,
-		CreateBlockchainTxFee:  100 * defaultTxFee,
-		MinValidatorStake:      5 * units.MilliAvax,
-		MaxValidatorStake:      500 * units.MilliAvax,
-		MinDelegatorStake:      1 * units.MilliAvax,
-		MinStakeDuration:       defaultMinStakingDuration,
-		MaxStakeDuration:       defaultMaxStakingDuration,
+		StaticFeeConfig: fee.StaticConfig{
+			TxFee:                 defaultTxFee,
+			CreateSubnetTxFee:     100 * defaultTxFee,
+			CreateBlockchainTxFee: 100 * defaultTxFee,
+		},
+		MinValidatorStake: 5 * units.MilliAvax,
+		MaxValidatorStake: 500 * units.MilliAvax,
+		MinDelegatorStake: 1 * units.MilliAvax,
+		MinStakeDuration:  defaultMinStakingDuration,
+		MaxStakeDuration:  defaultMaxStakingDuration,
 		RewardConfig: reward.Config{
 			MaxConsumptionRate: .12 * reward.PercentDenominator,
 			MinConsumptionRate: .10 * reward.PercentDenominator,
 			MintingPeriod:      365 * 24 * time.Hour,
 			SupplyCap:          720 * units.MegaAvax,
 		},
-		ApricotPhase3Time: apricotPhase3Time,
-		ApricotPhase5Time: apricotPhase5Time,
-		BanffTime:         banffTime,
-		CortinaTime:       cortinaTime,
-		DurangoTime:       durangoTime,
+		UpgradeConfig: upgrade.Config{
+			ApricotPhase3Time: mockable.MaxTime,
+			ApricotPhase5Time: mockable.MaxTime,
+			BanffTime:         mockable.MaxTime,
+			CortinaTime:       mockable.MaxTime,
+			DurangoTime:       mockable.MaxTime,
+			EUpgradeTime:      mockable.MaxTime,
+		},
 	}
+
+	switch f {
+	case eUpgrade:
+		c.UpgradeConfig.EUpgradeTime = time.Time{} // neglecting fork ordering this for package tests
+		fallthrough
+	case durango:
+		c.UpgradeConfig.DurangoTime = time.Time{} // neglecting fork ordering for this package's tests
+		fallthrough
+	case cortina:
+		c.UpgradeConfig.CortinaTime = time.Time{} // neglecting fork ordering for this package's tests
+		fallthrough
+	case banff:
+		c.UpgradeConfig.BanffTime = time.Time{} // neglecting fork ordering for this package's tests
+		fallthrough
+	case apricotPhase5:
+		c.UpgradeConfig.ApricotPhase5Time = defaultValidateEndTime
+		fallthrough
+	case apricotPhase3:
+		c.UpgradeConfig.ApricotPhase3Time = defaultValidateEndTime
+	default:
+		require.FailNow(t, "unhandled fork", f)
+	}
+
+	return c
 }
 
 func defaultClock() *mockable.Clock {
@@ -387,7 +384,7 @@ func defaultFx(t *testing.T, clk *mockable.Clock, log logging.Logger, isBootstra
 	require := require.New(t)
 
 	fxVMInt := &fxVMInt{
-		registry: linearcodec.NewDefault(time.Time{}),
+		registry: linearcodec.NewDefault(),
 		clk:      clk,
 		log:      log,
 	}

@@ -7,7 +7,7 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
+	"github.com/ava-labs/avalanchego/utils/linked"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
@@ -18,7 +18,7 @@ type onEvictCache[K comparable, V any] struct {
 	lock        sync.RWMutex
 	maxSize     int
 	currentSize int
-	fifo        linkedhashmap.LinkedHashmap[K, V]
+	fifo        *linked.Hashmap[K, V]
 	size        func(K, V) int
 	// Must not call any method that grabs [c.lock]
 	// because this would cause a deadlock.
@@ -33,7 +33,7 @@ func newOnEvictCache[K comparable, V any](
 ) onEvictCache[K, V] {
 	return onEvictCache[K, V]{
 		maxSize:    maxSize,
-		fifo:       linkedhashmap.New[K, V](),
+		fifo:       linked.NewHashmap[K, V](),
 		size:       size,
 		onEviction: onEviction,
 	}
@@ -65,15 +65,14 @@ func (c *onEvictCache[K, V]) Put(key K, value V) error {
 }
 
 // Flush removes all elements from the cache.
-// Returns the last non-nil error during [c.onEviction], if any.
-// If [c.onEviction] errors, it will still be called for any
-// subsequent elements and the cache will still be emptied.
+//
+// Returns the first non-nil error returned by [c.onEviction], if any.
+//
+// If [c.onEviction] errors, it will still be called for any subsequent elements
+// and the cache will still be emptied.
 func (c *onEvictCache[K, V]) Flush() error {
 	c.lock.Lock()
-	defer func() {
-		c.fifo = linkedhashmap.New[K, V]()
-		c.lock.Unlock()
-	}()
+	defer c.lock.Unlock()
 
 	return c.resize(0)
 }

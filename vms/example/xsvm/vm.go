@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/api"
@@ -124,7 +125,7 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 	)
 	return map[string]http.Handler{
 		"": server,
-	}, server.RegisterService(api, Name)
+	}, server.RegisterService(api, constants.XSVMName)
 }
 
 func (*VM) HealthCheck(context.Context) (interface{}, error) {
@@ -166,10 +167,6 @@ func (vm *VM) LastAccepted(context.Context) (ids.ID, error) {
 
 func (vm *VM) BuildBlockWithContext(ctx context.Context, blockContext *smblock.Context) (snowman.Block, error) {
 	return vm.builder.BuildBlock(ctx, blockContext)
-}
-
-func (*VM) VerifyHeightIndex(context.Context) error {
-	return nil
 }
 
 func (vm *VM) GetBlockIDAtHeight(_ context.Context, height uint64) (ids.ID, error) {

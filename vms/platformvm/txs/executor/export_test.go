@@ -4,6 +4,7 @@
 package executor
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -11,7 +12,11 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	walletsigner "github.com/ava-labs/avalanchego/wallet/chain/p/signer"
 )
 
 func TestNewExportTx(t *testing.T) {
@@ -39,7 +44,7 @@ func TestNewExportTx(t *testing.T) {
 			description:        "P->C export",
 			destinationChainID: env.ctx.CChainID,
 			sourceKeys:         []*secp256k1.PrivateKey{sourceKey},
-			timestamp:          env.config.ApricotPhase5Time,
+			timestamp:          env.config.UpgradeConfig.ApricotPhase5Time,
 		},
 	}
 
@@ -48,14 +53,23 @@ func TestNewExportTx(t *testing.T) {
 		t.Run(tt.description, func(t *testing.T) {
 			require := require.New(t)
 
-			tx, err := env.txBuilder.NewExportTx(
-				defaultBalance-defaultTxFee, // Amount of tokens to export
+			builder, signer := env.factory.NewWallet(tt.sourceKeys...)
+			utx, err := builder.NewExportTx(
 				tt.destinationChainID,
-				to,
-				tt.sourceKeys,
-				ids.ShortEmpty, // Change address
-				nil,
+				[]*avax.TransferableOutput{{
+					Asset: avax.Asset{ID: env.ctx.AVAXAssetID},
+					Out: &secp256k1fx.TransferOutput{
+						Amt: defaultBalance - defaultTxFee,
+						OutputOwners: secp256k1fx.OutputOwners{
+							Locktime:  0,
+							Threshold: 1,
+							Addrs:     []ids.ShortID{to},
+						},
+					},
+				}},
 			)
+			require.NoError(err)
+			tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
 			require.NoError(err)
 
 			stateDiff, err := state.NewDiff(lastAcceptedID, env)

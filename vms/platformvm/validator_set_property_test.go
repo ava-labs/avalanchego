@@ -30,7 +30,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
-	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/json"
@@ -43,9 +42,15 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
+	"github.com/ava-labs/avalanchego/vms/platformvm/upgrade"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
+	walletsigner "github.com/ava-labs/avalanchego/wallet/chain/p/signer"
+	walletcommon "github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
 
 const (
@@ -253,21 +258,31 @@ func takeValidatorsSnapshotAtCurrentHeight(vm *VM, validatorsSetByHeightAndSubne
 }
 
 func addSubnetValidator(vm *VM, data *validatorInputData, subnetID ids.ID) (*state.Staker, error) {
-	addr := keys[0].PublicKey().Address()
-	signedTx, err := vm.txBuilder.NewAddSubnetValidatorTx(
-		vm.Config.MinValidatorStake,
-		uint64(data.startTime.Unix()),
-		uint64(data.endTime.Unix()),
-		data.nodeID,
-		subnetID,
-		[]*secp256k1.PrivateKey{keys[0], keys[1]},
-		addr,
-		nil,
+	factory := txstest.NewWalletFactory(vm.ctx, &vm.Config, vm.state)
+	builder, signer := factory.NewWallet(keys[0], keys[1])
+	utx, err := builder.NewAddSubnetValidatorTx(
+		&txs.SubnetValidator{
+			Validator: txs.Validator{
+				NodeID: data.nodeID,
+				Start:  uint64(data.startTime.Unix()),
+				End:    uint64(data.endTime.Unix()),
+				Wght:   vm.Config.MinValidatorStake,
+			},
+			Subnet: subnetID,
+		},
+		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+		}),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("could not create AddSubnetValidatorTx: %w", err)
+		return nil, fmt.Errorf("could not build AddSubnetValidatorTx: %w", err)
 	}
-	return internalAddValidator(vm, signedTx)
+	tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
+	if err != nil {
+		return nil, fmt.Errorf("could not sign AddSubnetValidatorTx: %w", err)
+	}
+	return internalAddValidator(vm, tx)
 }
 
 func addPrimaryValidatorWithBLSKey(vm *VM, data *validatorInputData) (*state.Staker, error) {
@@ -278,27 +293,47 @@ func addPrimaryValidatorWithBLSKey(vm *VM, data *validatorInputData) (*state.Sta
 		return nil, fmt.Errorf("failed to generate BLS key: %w", err)
 	}
 
-	signedTx, err := vm.txBuilder.NewAddPermissionlessValidatorTx(
-		vm.Config.MinValidatorStake,
-		uint64(data.startTime.Unix()),
-		uint64(data.endTime.Unix()),
-		data.nodeID,
+	factory := txstest.NewWalletFactory(vm.ctx, &vm.Config, vm.state)
+	builder, txSigner := factory.NewWallet(keys[0], keys[1])
+	utx, err := builder.NewAddPermissionlessValidatorTx(
+		&txs.SubnetValidator{
+			Validator: txs.Validator{
+				NodeID: data.nodeID,
+				Start:  uint64(data.startTime.Unix()),
+				End:    uint64(data.endTime.Unix()),
+				Wght:   vm.Config.MinValidatorStake,
+			},
+			Subnet: constants.PrimaryNetworkID,
+		},
 		signer.NewProofOfPossession(sk),
-		addr,
+		vm.ctx.AVAXAssetID,
+		&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{addr},
+		},
+		&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{addr},
+		},
 		reward.PercentDenominator,
-		[]*secp256k1.PrivateKey{keys[0], keys[1]},
-		addr,
-		nil,
+		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{addr},
+		}),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("could not create AddPermissionlessValidatorTx: %w", err)
+		return nil, fmt.Errorf("could not build AddPermissionlessValidatorTx: %w", err)
 	}
-	return internalAddValidator(vm, signedTx)
+	tx, err := walletsigner.SignUnsigned(context.Background(), txSigner, utx)
+	if err != nil {
+		return nil, fmt.Errorf("could not sign AddPermissionlessValidatorTx: %w", err)
+	}
+	return internalAddValidator(vm, tx)
 }
 
 func internalAddValidator(vm *VM, signedTx *txs.Tx) (*state.Staker, error) {
 	vm.ctx.Lock.Unlock()
-	err := vm.issueTx(context.Background(), signedTx)
+	err := vm.issueTxFromRPC(signedTx)
 	vm.ctx.Lock.Lock()
 
 	if err != nil {
@@ -615,20 +650,25 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		SybilProtectionEnabled: true,
 		Validators:             validators.NewManager(),
-		TxFee:                  defaultTxFee,
-		CreateSubnetTxFee:      100 * defaultTxFee,
-		TransformSubnetTxFee:   100 * defaultTxFee,
-		CreateBlockchainTxFee:  100 * defaultTxFee,
-		MinValidatorStake:      defaultMinValidatorStake,
-		MaxValidatorStake:      defaultMaxValidatorStake,
-		MinDelegatorStake:      defaultMinDelegatorStake,
-		MinStakeDuration:       defaultMinStakingDuration,
-		MaxStakeDuration:       defaultMaxStakingDuration,
-		RewardConfig:           defaultRewardConfig,
-		ApricotPhase3Time:      forkTime,
-		ApricotPhase5Time:      forkTime,
-		BanffTime:              forkTime,
-		CortinaTime:            forkTime,
+		StaticFeeConfig: fee.StaticConfig{
+			TxFee:                 defaultTxFee,
+			CreateSubnetTxFee:     100 * defaultTxFee,
+			TransformSubnetTxFee:  100 * defaultTxFee,
+			CreateBlockchainTxFee: 100 * defaultTxFee,
+		},
+		MinValidatorStake: defaultMinValidatorStake,
+		MaxValidatorStake: defaultMaxValidatorStake,
+		MinDelegatorStake: defaultMinDelegatorStake,
+		MinStakeDuration:  defaultMinStakingDuration,
+		MaxStakeDuration:  defaultMaxStakingDuration,
+		RewardConfig:      defaultRewardConfig,
+		UpgradeConfig: upgrade.Config{
+			ApricotPhase3Time: forkTime,
+			ApricotPhase5Time: forkTime,
+			BanffTime:         forkTime,
+			CortinaTime:       forkTime,
+			EUpgradeTime:      mockable.MaxTime,
+		},
 	}}
 	vm.clock.Set(forkTime.Add(time.Second))
 
@@ -646,7 +686,7 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 	defer ctx.Lock.Unlock()
 	appSender := &common.SenderTest{}
 	appSender.CantSendAppGossip = true
-	appSender.SendAppGossipF = func(context.Context, []byte) error {
+	appSender.SendAppGossipF = func(context.Context, common.SendConfig, []byte) error {
 		return nil
 	}
 
@@ -678,18 +718,27 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 	// Create a subnet and store it in testSubnet1
 	// Note: following Banff activation, block acceptance will move
 	// chain time ahead
-	testSubnet1, err = vm.txBuilder.NewCreateSubnetTx(
-		1, // threshold
-		[]ids.ShortID{keys[0].PublicKey().Address()},
-		[]*secp256k1.PrivateKey{keys[len(keys)-1]}, // pays tx fee
-		keys[0].PublicKey().Address(),              // change addr
-		nil,
+	factory := txstest.NewWalletFactory(vm.ctx, &vm.Config, vm.state)
+	builder, signer := factory.NewWallet(keys[len(keys)-1])
+	utx, err := builder.NewCreateSubnetTx(
+		&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+		},
+		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+		}),
 	)
 	if err != nil {
 		return nil, ids.Empty, err
 	}
+	testSubnet1, err = walletsigner.SignUnsigned(context.Background(), signer, utx)
+	if err != nil {
+		return nil, ids.Empty, err
+	}
 	vm.ctx.Lock.Unlock()
-	err = vm.issueTx(context.Background(), testSubnet1)
+	err = vm.issueTxFromRPC(testSubnet1)
 	vm.ctx.Lock.Lock()
 	if err != nil {
 		return nil, ids.Empty, err

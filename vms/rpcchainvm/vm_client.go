@@ -136,16 +136,19 @@ func (vm *VMClient) Initialize(
 	}
 
 	// Register metrics
-	registerer := prometheus.NewRegistry()
-	multiGatherer := metrics.NewMultiGatherer()
+	serverReg, err := metrics.MakeAndRegister(
+		chainCtx.Metrics,
+		"rpcchainvm",
+	)
+	if err != nil {
+		return err
+	}
 	vm.grpcServerMetrics = grpc_prometheus.NewServerMetrics()
-	if err := registerer.Register(vm.grpcServerMetrics); err != nil {
+	if err := serverReg.Register(vm.grpcServerMetrics); err != nil {
 		return err
 	}
-	if err := multiGatherer.Register("rpcchainvm", registerer); err != nil {
-		return err
-	}
-	if err := multiGatherer.Register("", vm); err != nil {
+
+	if err := chainCtx.Metrics.Register("plugin", vm); err != nil {
 		return err
 	}
 
@@ -185,7 +188,7 @@ func (vm *VMClient) Initialize(
 		SubnetId:     chainCtx.SubnetID[:],
 		ChainId:      chainCtx.ChainID[:],
 		NodeId:       chainCtx.NodeID.Bytes(),
-		PublicKey:    bls.PublicKeyToBytes(chainCtx.PublicKey),
+		PublicKey:    bls.PublicKeyToCompressedBytes(chainCtx.PublicKey),
 		XChainId:     chainCtx.XChainID[:],
 		CChainId:     chainCtx.CChainID[:],
 		AvaxAssetId:  chainCtx.AVAXAssetID[:],
@@ -226,8 +229,8 @@ func (vm *VMClient) Initialize(
 		time:     time,
 	}
 
-	chainState, err := chain.NewMeteredState(
-		registerer,
+	vm.State, err = chain.NewMeteredState(
+		serverReg,
 		&chain.Config{
 			DecidedCacheSize:      decidedCacheSize,
 			MissingCacheSize:      missingCacheSize,
@@ -241,12 +244,7 @@ func (vm *VMClient) Initialize(
 			BuildBlockWithContext: vm.buildBlockWithContext,
 		},
 	)
-	if err != nil {
-		return err
-	}
-	vm.State = chainState
-
-	return chainCtx.Metrics.Register(multiGatherer)
+	return err
 }
 
 func (vm *VMClient) newDBServer(db database.Database) *grpc.Server {
@@ -665,14 +663,6 @@ func (vm *VMClient) batchedParseBlock(ctx context.Context, blksBytes [][]byte) (
 	}
 
 	return res, nil
-}
-
-func (vm *VMClient) VerifyHeightIndex(ctx context.Context) error {
-	resp, err := vm.client.VerifyHeightIndex(ctx, &emptypb.Empty{})
-	if err != nil {
-		return err
-	}
-	return errEnumToError[resp.Err]
 }
 
 func (vm *VMClient) GetBlockIDAtHeight(ctx context.Context, height uint64) (ids.ID, error) {

@@ -10,39 +10,24 @@ import (
 )
 
 type metrics struct {
-	numFetched, numDropped, numAccepted prometheus.Counter
-	fetchETA                            prometheus.Gauge
+	numFetched, numAccepted prometheus.Counter
 }
 
-func newMetrics(namespace string, registerer prometheus.Registerer) (*metrics, error) {
+func newMetrics(registerer prometheus.Registerer) (*metrics, error) {
 	m := &metrics{
 		numFetched: prometheus.NewCounter(prometheus.CounterOpts{
-			Namespace: namespace,
-			Name:      "fetched",
-			Help:      "Number of blocks fetched during bootstrapping",
-		}),
-		numDropped: prometheus.NewCounter(prometheus.CounterOpts{
-			Namespace: namespace,
-			Name:      "dropped",
-			Help:      "Number of blocks dropped during bootstrapping",
+			Name: "bs_fetched",
+			Help: "Number of blocks fetched during bootstrapping",
 		}),
 		numAccepted: prometheus.NewCounter(prometheus.CounterOpts{
-			Namespace: namespace,
-			Name:      "accepted",
-			Help:      "Number of blocks accepted during bootstrapping",
-		}),
-		fetchETA: prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespace,
-			Name:      "eta_fetching_complete",
-			Help:      "ETA in nanoseconds until fetching phase of bootstrapping finishes",
+			Name: "bs_accepted",
+			Help: "Number of blocks accepted during bootstrapping",
 		}),
 	}
 
 	err := utils.Err(
 		registerer.Register(m.numFetched),
-		registerer.Register(m.numDropped),
 		registerer.Register(m.numAccepted),
-		registerer.Register(m.fetchETA),
 	)
 	return m, err
 }

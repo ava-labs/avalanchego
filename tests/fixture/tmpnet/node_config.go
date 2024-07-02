@@ -18,7 +18,7 @@ import (
 // (reading/writing configuration) and node.go (orchestration).
 
 func (n *Node) getFlagsPath() string {
-	return filepath.Join(n.getDataDir(), "flags.json")
+	return filepath.Join(n.GetDataDir(), "flags.json")
 }
 
 func (n *Node) readFlags() error {
@@ -46,7 +46,7 @@ func (n *Node) writeFlags() error {
 }
 
 func (n *Node) getConfigPath() string {
-	return filepath.Join(n.getDataDir(), defaultConfigFilename)
+	return filepath.Join(n.GetDataDir(), defaultConfigFilename)
 }
 
 func (n *Node) readConfig() error {
@@ -61,12 +61,16 @@ func (n *Node) readConfig() error {
 }
 
 type serializedNodeConfig struct {
+	NetworkUUID   string
+	NetworkOwner  string
 	IsEphemeral   bool
 	RuntimeConfig *NodeRuntimeConfig
 }
 
 func (n *Node) writeConfig() error {
 	config := serializedNodeConfig{
+		NetworkUUID:   n.NetworkUUID,
+		NetworkOwner:  n.NetworkOwner,
 		IsEphemeral:   n.IsEphemeral,
 		RuntimeConfig: n.RuntimeConfig,
 	}
@@ -91,7 +95,7 @@ func (n *Node) Read() error {
 }
 
 func (n *Node) Write() error {
-	if err := os.MkdirAll(n.getDataDir(), perms.ReadWriteExecute); err != nil {
+	if err := os.MkdirAll(n.GetDataDir(), perms.ReadWriteExecute); err != nil {
 		return fmt.Errorf("failed to create node dir: %w", err)
 	}
 
@@ -102,7 +106,7 @@ func (n *Node) Write() error {
 }
 
 func (n *Node) writeMetricsSnapshot(data []byte) error {
-	metricsDir := filepath.Join(n.getDataDir(), "metrics")
+	metricsDir := filepath.Join(n.GetDataDir(), "metrics")
 	if err := os.MkdirAll(metricsDir, perms.ReadWriteExecute); err != nil {
 		return fmt.Errorf("failed to create metrics dir: %w", err)
 	}

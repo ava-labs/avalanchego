@@ -121,8 +121,8 @@ func Eventually(condition func() bool, waitFor time.Duration, tick time.Duration
 func AddEphemeralNode(network *tmpnet.Network, flags tmpnet.FlagsMap) *tmpnet.Node {
 	require := require.New(ginkgo.GinkgoT())
 
-	node, err := network.AddEphemeralNode(DefaultContext(), ginkgo.GinkgoWriter, flags)
-	require.NoError(err)
+	node := tmpnet.NewEphemeralNode(flags)
+	require.NoError(network.StartNode(DefaultContext(), ginkgo.GinkgoWriter, node))
 
 	ginkgo.DeferCleanup(func() {
 		tests.Outf("shutting down ephemeral node %q\n", node.NodeID)
@@ -199,10 +199,10 @@ func CheckBootstrapIsPossible(network *tmpnet.Network) {
 	ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
 	defer cancel()
 
-	node, err := network.AddEphemeralNode(ctx, ginkgo.GinkgoWriter, tmpnet.FlagsMap{})
-	// AddEphemeralNode will initiate node stop if an error is encountered during start,
+	node := tmpnet.NewEphemeralNode(tmpnet.FlagsMap{})
+	require.NoError(network.StartNode(ctx, ginkgo.GinkgoWriter, node))
+	// StartNode will initiate node stop if an error is encountered during start,
 	// so no further cleanup effort is required if an error is seen here.
-	require.NoError(err)
 
 	// Ensure the node is always stopped at the end of the check
 	defer func() {
@@ -216,27 +216,52 @@ func CheckBootstrapIsPossible(network *tmpnet.Network) {
 }
 
 // Start a temporary network with the provided avalanchego binary.
-func StartNetwork(network *tmpnet.Network, rootNetworkDir string, avalancheGoExecPath string, pluginDir string) {
+func StartNetwork(
+	network *tmpnet.Network,
+	avalancheGoExecPath string,
+	pluginDir string,
+	shutdownDelay time.Duration,
+	reuseNetwork bool,
+) {
 	require := require.New(ginkgo.GinkgoT())
 
 	require.NoError(
-		tmpnet.StartNewNetwork(
+		tmpnet.BootstrapNewNetwork(
 			DefaultContext(),
 			ginkgo.GinkgoWriter,
 			network,
-			rootNetworkDir,
+			DefaultNetworkDir,
 			avalancheGoExecPath,
 			pluginDir,
-			tmpnet.DefaultNodeCount,
 		),
 	)
 
+	tests.Outf("{{green}}Successfully started network{{/}}\n")
+
+	symlinkPath, err := tmpnet.GetReusableNetworkPathForOwner(network.Owner)
+	require.NoError(err)
+
+	if reuseNetwork {
+		// Symlink the path of the created network to the default owner path (e.g. latest_avalanchego-e2e)
+		// to enable easy discovery for reuse.
+		require.NoError(os.Symlink(network.Dir, symlinkPath))
+		tests.Outf("{{green}}Symlinked %s to %s to enable reuse{{/}}\n", network.Dir, symlinkPath)
+	}
+
 	ginkgo.DeferCleanup(func() {
+		if reuseNetwork {
+			tests.Outf("{{yellow}}Skipping shutdown for network %s (symlinked to %s) to enable reuse{{/}}\n", network.Dir, symlinkPath)
+			return
+		}
+
+		if shutdownDelay > 0 {
+			tests.Outf("Waiting %s before network shutdown to ensure final metrics scrape\n", shutdownDelay)
+			time.Sleep(shutdownDelay)
+		}
+
 		tests.Outf("Shutting down network\n")
 		ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
 		defer cancel()
 		require.NoError(network.Stop(ctx))
 	})
-
-	tests.Outf("{{green}}Successfully started network{{/}}\n")
 }

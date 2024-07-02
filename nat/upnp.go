@@ -7,11 +7,14 @@ import (
 	"fmt"
 	"math"
 	"net"
+	"net/netip"
 	"time"
 
 	"github.com/huin/goupnp"
 	"github.com/huin/goupnp/dcps/internetgateway1"
 	"github.com/huin/goupnp/dcps/internetgateway2"
+
+	"github.com/ava-labs/avalanchego/utils/ips"
 )
 
 const (
@@ -111,17 +114,12 @@ func (r *upnpRouter) localIP() (net.IP, error) {
 	return nil, fmt.Errorf("couldn't find the local address in the same network as %s", deviceIP)
 }
 
-func (r *upnpRouter) ExternalIP() (net.IP, error) {
+func (r *upnpRouter) ExternalIP() (netip.Addr, error) {
 	str, err := r.client.GetExternalIPAddress()
 	if err != nil {
-		return nil, err
+		return netip.Addr{}, err
 	}
-
-	ip := net.ParseIP(str)
-	if ip == nil {
-		return nil, fmt.Errorf("invalid IP %s", str)
-	}
-	return ip, nil
+	return ips.ParseAddr(str)
 }
 
 func (r *upnpRouter) MapPort(
@@ -161,7 +159,7 @@ func getUPnPClient(client goupnp.ServiceClient) upnpClient {
 	}
 }
 
-// discover() tries to find  gateway device
+// discover() tries to find gateway device
 func discover(target string) *upnpRouter {
 	devs, err := goupnp.DiscoverDevices(target)
 	if err != nil {

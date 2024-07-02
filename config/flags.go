@@ -15,7 +15,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database/leveldb"
 	"github.com/ava-labs/avalanchego/database/memdb"
-	"github.com/ava-labs/avalanchego/database/pebble"
+	"github.com/ava-labs/avalanchego/database/pebbledb"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/trace"
@@ -69,6 +69,7 @@ func deprecateFlags(fs *pflag.FlagSet) error {
 func addProcessFlags(fs *pflag.FlagSet) {
 	// If true, print the version and quit.
 	fs.Bool(VersionKey, false, "If true, print version and quit")
+	fs.Bool(VersionJSONKey, false, "If true, print version in JSON format and quit")
 }
 
 func addNodeFlags(fs *pflag.FlagSet) {
@@ -109,7 +110,7 @@ func addNodeFlags(fs *pflag.FlagSet) {
 	fs.Uint64(AddSubnetDelegatorFeeKey, genesis.LocalParams.AddSubnetDelegatorFee, "Transaction fee, in nAVAX, for transactions that add new subnet delegators")
 
 	// Database
-	fs.String(DBTypeKey, leveldb.Name, fmt.Sprintf("Database type to use. Must be one of {%s, %s, %s}", leveldb.Name, memdb.Name, pebble.Name))
+	fs.String(DBTypeKey, leveldb.Name, fmt.Sprintf("Database type to use. Must be one of {%s, %s, %s}", leveldb.Name, memdb.Name, pebbledb.Name))
 	fs.Bool(DBReadOnlyKey, false, "If true, database writes are to memory and never persisted. May still initialize database directory/files on disk if they don't exist")
 	fs.String(DBPathKey, defaultDBDir, "Path to database directory")
 	fs.String(DBConfigFileKey, "", fmt.Sprintf("Path to database config file. Ignored if %s is specified", DBConfigContentKey))
@@ -128,10 +129,6 @@ func addNodeFlags(fs *pflag.FlagSet) {
 
 	// Peer List Gossip
 	fs.Uint(NetworkPeerListNumValidatorIPsKey, constants.DefaultNetworkPeerListNumValidatorIPs, "Number of validator IPs to gossip to other nodes")
-	fs.Uint(NetworkPeerListValidatorGossipSizeKey, constants.DefaultNetworkPeerListValidatorGossipSize, "Number of validators that the node will gossip peer list to")
-	fs.Uint(NetworkPeerListNonValidatorGossipSizeKey, constants.DefaultNetworkPeerListNonValidatorGossipSize, "Number of non-validators that the node will gossip peer list to")
-	fs.Uint(NetworkPeerListPeersGossipSizeKey, constants.DefaultNetworkPeerListPeersGossipSize, "Number of total peers (including non-validators and validators) that the node will gossip peer list to")
-	fs.Duration(NetworkPeerListGossipFreqKey, constants.DefaultNetworkPeerListGossipFreq, "Frequency to gossip peers to other nodes")
 	fs.Duration(NetworkPeerListPullGossipFreqKey, constants.DefaultNetworkPeerListPullGossipFreq, "Frequency to request peers from other nodes")
 	fs.Duration(NetworkPeerListBloomResetFreqKey, constants.DefaultNetworkPeerListBloomResetFreq, "Frequency to recalculate the bloom filter used to request new peers from other nodes")
 
@@ -187,15 +184,6 @@ func addNodeFlags(fs *pflag.FlagSet) {
 	fs.Uint(ConsensusAppConcurrencyKey, constants.DefaultConsensusAppConcurrency, "Maximum number of goroutines to use when handling App messages on a chain")
 	fs.Duration(ConsensusShutdownTimeoutKey, constants.DefaultConsensusShutdownTimeout, "Timeout before killing an unresponsive chain")
 	fs.Duration(ConsensusFrontierPollFrequencyKey, constants.DefaultFrontierPollFrequency, "Frequency of polling for new consensus frontiers")
-	fs.Uint(ConsensusGossipAcceptedFrontierValidatorSizeKey, constants.DefaultConsensusGossipAcceptedFrontierValidatorSize, "Number of validators to gossip to when gossiping accepted frontier")
-	fs.Uint(ConsensusGossipAcceptedFrontierNonValidatorSizeKey, constants.DefaultConsensusGossipAcceptedFrontierNonValidatorSize, "Number of non-validators to gossip to when gossiping accepted frontier")
-	fs.Uint(ConsensusGossipAcceptedFrontierPeerSizeKey, constants.DefaultConsensusGossipAcceptedFrontierPeerSize, "Number of peers to gossip to when gossiping accepted frontier")
-	fs.Uint(ConsensusGossipOnAcceptValidatorSizeKey, constants.DefaultConsensusGossipOnAcceptValidatorSize, "Number of validators to gossip to each accepted container to")
-	fs.Uint(ConsensusGossipOnAcceptNonValidatorSizeKey, constants.DefaultConsensusGossipOnAcceptNonValidatorSize, "Number of non-validators to gossip to each accepted container to")
-	fs.Uint(ConsensusGossipOnAcceptPeerSizeKey, constants.DefaultConsensusGossipOnAcceptPeerSize, "Number of peers to gossip to each accepted container to")
-	fs.Uint(AppGossipValidatorSizeKey, constants.DefaultAppGossipValidatorSize, "Number of validators to gossip an AppGossip message to")
-	fs.Uint(AppGossipNonValidatorSizeKey, constants.DefaultAppGossipNonValidatorSize, "Number of non-validators to gossip an AppGossip message to")
-	fs.Uint(AppGossipPeerSizeKey, constants.DefaultAppGossipPeerSize, "Number of peers (which may be validators or non-validators) to gossip an AppGossip message to")
 
 	// Inbound Throttling
 	fs.Uint64(InboundThrottlerAtLargeAllocSizeKey, constants.DefaultInboundThrottlerAtLargeAllocSize, "Size, in bytes, of at-large byte allocation in inbound message throttler")
@@ -228,11 +216,6 @@ func addNodeFlags(fs *pflag.FlagSet) {
 	fs.Duration(HTTPReadHeaderTimeoutKey, 30*time.Second, fmt.Sprintf("Maximum duration to read request headers. The connection's read deadline is reset after reading the headers. If %s is zero, the value of %s is used. If both are zero, there is no timeout.", HTTPReadHeaderTimeoutKey, HTTPReadTimeoutKey))
 	fs.Duration(HTTPWriteTimeoutKey, 30*time.Second, "Maximum duration before timing out writes of the response. It is reset whenever a new request's header is read. A zero or negative value means there will be no timeout.")
 	fs.Duration(HTTPIdleTimeoutKey, 120*time.Second, fmt.Sprintf("Maximum duration to wait for the next request when keep-alives are enabled. If %s is zero, the value of %s is used. If both are zero, there is no timeout.", HTTPIdleTimeoutKey, HTTPReadTimeoutKey))
-	fs.Bool(APIAuthRequiredKey, false, "Require authorization token to call HTTP APIs")
-	fs.String(APIAuthPasswordFileKey, "",
-		fmt.Sprintf("Password file used to initially create/validate API authorization tokens. Ignored if %s is specified. Leading and trailing whitespace is removed from the password. Can be changed via API call",
-			APIAuthPasswordKey))
-	fs.String(APIAuthPasswordKey, "", "Specifies password for API authorization tokens")
 
 	// Enable/Disable APIs
 	fs.Bool(AdminAPIEnabledKey, false, "If true, this node exposes the Admin API")
@@ -240,7 +223,6 @@ func addNodeFlags(fs *pflag.FlagSet) {
 	fs.Bool(KeystoreAPIEnabledKey, false, "If true, this node exposes the Keystore API")
 	fs.Bool(MetricsAPIEnabledKey, true, "If true, this node exposes the Metrics API")
 	fs.Bool(HealthAPIEnabledKey, true, "If true, this node exposes the Health API")
-	fs.Bool(IpcAPIEnabledKey, false, "If true, IPCs can be opened")
 
 	// Health Checks
 	fs.Duration(HealthCheckFreqKey, 30*time.Second, "Time between health checks")
@@ -310,10 +292,7 @@ func addNodeFlags(fs *pflag.FlagSet) {
 	fs.Int(SnowPreferenceQuorumSizeKey, snowball.DefaultParameters.AlphaPreference, fmt.Sprintf("Threshold of nodes required to update this node's preference in a network poll. Ignored if %s is provided", SnowQuorumSizeKey))
 	fs.Int(SnowConfidenceQuorumSizeKey, snowball.DefaultParameters.AlphaConfidence, fmt.Sprintf("Threshold of nodes required to increase this node's confidence in a network poll. Ignored if %s is provided", SnowQuorumSizeKey))
 
-	fs.Int(SnowCommitThresholdKey, snowball.DefaultParameters.BetaRogue, "Beta value to use for transactions")
-	// TODO: Remove these once enough time has passed with SnowCommitThresholdKey
-	fs.Int(SnowVirtuousCommitThresholdKey, snowball.DefaultParameters.BetaVirtuous, "This flag is temporarily ignored due to the X-chain linearization")
-	fs.Int(SnowRogueCommitThresholdKey, snowball.DefaultParameters.BetaRogue, "Beta value to use for rogue transactions")
+	fs.Int(SnowCommitThresholdKey, snowball.DefaultParameters.Beta, "Beta value to use for consensus")
 
 	fs.Int(SnowConcurrentRepollsKey, snowball.DefaultParameters.ConcurrentRepolls, "Minimum number of concurrent polls for finalizing consensus")
 	fs.Int(SnowOptimalProcessingKey, snowball.DefaultParameters.OptimalProcessing, "Optimal number of processing containers in consensus")
@@ -326,10 +305,6 @@ func addNodeFlags(fs *pflag.FlagSet) {
 	// Metrics
 	fs.Bool(MeterVMsEnabledKey, true, "Enable Meter VMs to track VM performance with more granularity")
 	fs.Duration(UptimeMetricFreqKey, 30*time.Second, "Frequency of renewing this node's average uptime metric")
-
-	// IPC
-	fs.String(IpcsChainIDsKey, "", "Comma separated list of chain ids to add to the IPC engine. Example: 11111111111111111111111111111111LpoYY,4R5p2RXDGLqaifZE4hHWH9owe34pfoBULn1DrQTWivjg8o4aH")
-	fs.String(IpcsPathKey, "", "The directory (Unix) or named pipe name prefix (Windows) for IPC sockets")
 
 	// Indexer
 	fs.Bool(IndexEnabledKey, false, "If true, index all accepted containers and transactions and expose them via an API")

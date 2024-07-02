@@ -125,17 +125,17 @@ func (mr *MockRouterMockRecorder) HealthCheck(arg0 any) *gomock.Call {
 }
 
 // Initialize mocks base method.
-func (m *MockRouter) Initialize(nodeID ids.NodeID, log logging.Logger, timeouts timeout.Manager, shutdownTimeout time.Duration, criticalChains set.Set[ids.ID], sybilProtectionEnabled bool, trackedSubnets set.Set[ids.ID], onFatal func(int), healthConfig HealthConfig, metricsNamespace string, metricsRegisterer prometheus.Registerer) error {
+func (m *MockRouter) Initialize(nodeID ids.NodeID, log logging.Logger, timeouts timeout.Manager, shutdownTimeout time.Duration, criticalChains set.Set[ids.ID], sybilProtectionEnabled bool, trackedSubnets set.Set[ids.ID], onFatal func(int), healthConfig HealthConfig, reg prometheus.Registerer) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Initialize", nodeID, log, timeouts, shutdownTimeout, criticalChains, sybilProtectionEnabled, trackedSubnets, onFatal, healthConfig, metricsNamespace, metricsRegisterer)
+	ret := m.ctrl.Call(m, "Initialize", nodeID, log, timeouts, shutdownTimeout, criticalChains, sybilProtectionEnabled, trackedSubnets, onFatal, healthConfig, reg)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Initialize indicates an expected call of Initialize.
-func (mr *MockRouterMockRecorder) Initialize(nodeID, log, timeouts, shutdownTimeout, criticalChains, sybilProtectionEnabled, trackedSubnets, onFatal, healthConfig, metricsNamespace, metricsRegisterer any) *gomock.Call {
+func (mr *MockRouterMockRecorder) Initialize(nodeID, log, timeouts, shutdownTimeout, criticalChains, sybilProtectionEnabled, trackedSubnets, onFatal, healthConfig, reg any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Initialize", reflect.TypeOf((*MockRouter)(nil).Initialize), nodeID, log, timeouts, shutdownTimeout, criticalChains, sybilProtectionEnabled, trackedSubnets, onFatal, healthConfig, metricsNamespace, metricsRegisterer)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Initialize", reflect.TypeOf((*MockRouter)(nil).Initialize), nodeID, log, timeouts, shutdownTimeout, criticalChains, sybilProtectionEnabled, trackedSubnets, onFatal, healthConfig, reg)
 }
 
 // RegisterRequest mocks base method.

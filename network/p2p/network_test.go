@@ -69,7 +69,13 @@ func TestMessageRouting(t *testing.T) {
 	require.NoError(network.AddHandler(1, testHandler))
 	client := network.NewClient(1)
 
-	require.NoError(client.AppGossip(ctx, wantMsg))
+	require.NoError(client.AppGossip(
+		ctx,
+		common.SendConfig{
+			Peers: 1,
+		},
+		wantMsg,
+	))
 	require.NoError(network.AppGossip(ctx, wantNodeID, <-sender.SentAppGossip))
 	require.True(appGossipCalled)
 
@@ -90,7 +96,6 @@ func TestClientPrefixesMessages(t *testing.T) {
 	sender := common.FakeSender{
 		SentAppRequest:           make(chan []byte, 1),
 		SentAppGossip:            make(chan []byte, 1),
-		SentAppGossipSpecific:    make(chan []byte, 1),
 		SentCrossChainAppRequest: make(chan []byte, 1),
 	}
 
@@ -130,13 +135,14 @@ func TestClientPrefixesMessages(t *testing.T) {
 	require.Equal(handlerPrefix, gotCrossChainAppRequest[0])
 	require.Equal(want, gotCrossChainAppRequest[1:])
 
-	require.NoError(client.AppGossip(ctx, want))
+	require.NoError(client.AppGossip(
+		ctx,
+		common.SendConfig{
+			Peers: 1,
+		},
+		want,
+	))
 	gotAppGossip := <-sender.SentAppGossip
-	require.Equal(handlerPrefix, gotAppGossip[0])
-	require.Equal(want, gotAppGossip[1:])
-
-	require.NoError(client.AppGossipSpecific(ctx, set.Of(ids.EmptyNodeID), want))
-	gotAppGossip = <-sender.SentAppGossipSpecific
 	require.Equal(handlerPrefix, gotAppGossip[0])
 	require.Equal(want, gotAppGossip[1:])
 }
@@ -168,6 +174,48 @@ func TestAppRequestResponse(t *testing.T) {
 	want := []byte("request")
 	require.NoError(client.AppRequest(ctx, set.Of(wantNodeID), want, callback))
 	got := <-sender.SentAppRequest
+	require.Equal(handlerPrefix, got[0])
+	require.Equal(want, got[1:])
+
+	require.NoError(network.AppResponse(ctx, wantNodeID, 1, wantResponse))
+	<-done
+}
+
+// Tests that the Client does not provide a cancelled context to the AppSender.
+func TestAppRequestCancelledContext(t *testing.T) {
+	require := require.New(t)
+	ctx := context.Background()
+
+	sentMessages := make(chan []byte, 1)
+	sender := &common.SenderTest{
+		SendAppRequestF: func(ctx context.Context, _ set.Set[ids.NodeID], _ uint32, msgBytes []byte) error {
+			require.NoError(ctx.Err())
+			sentMessages <- msgBytes
+			return nil
+		},
+	}
+	network, err := NewNetwork(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
+	require.NoError(err)
+	client := network.NewClient(handlerID)
+
+	wantResponse := []byte("response")
+	wantNodeID := ids.GenerateTestNodeID()
+	done := make(chan struct{})
+
+	callback := func(_ context.Context, gotNodeID ids.NodeID, gotResponse []byte, err error) {
+		require.Equal(wantNodeID, gotNodeID)
+		require.NoError(err)
+		require.Equal(wantResponse, gotResponse)
+
+		close(done)
+	}
+
+	cancelledCtx, cancel := context.WithCancel(ctx)
+	cancel()
+
+	want := []byte("request")
+	require.NoError(client.AppRequest(cancelledCtx, set.Of(wantNodeID), want, callback))
+	got := <-sentMessages
 	require.Equal(handlerPrefix, got[0])
 	require.Equal(want, got[1:])
 
@@ -231,6 +279,44 @@ func TestCrossChainAppRequestResponse(t *testing.T) {
 
 	require.NoError(client.CrossChainAppRequest(ctx, wantChainID, []byte("request"), callback))
 	<-sender.SentCrossChainAppRequest
+
+	require.NoError(network.CrossChainAppResponse(ctx, wantChainID, 1, wantResponse))
+	<-done
+}
+
+// Tests that the Client does not provide a cancelled context to the AppSender.
+func TestCrossChainAppRequestCancelledContext(t *testing.T) {
+	require := require.New(t)
+	ctx := context.Background()
+
+	sentMessages := make(chan []byte, 1)
+	sender := &common.SenderTest{
+		SendCrossChainAppRequestF: func(ctx context.Context, _ ids.ID, _ uint32, msgBytes []byte) {
+			require.NoError(ctx.Err())
+			sentMessages <- msgBytes
+		},
+	}
+	network, err := NewNetwork(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
+	require.NoError(err)
+	client := network.NewClient(handlerID)
+
+	cancelledCtx, cancel := context.WithCancel(ctx)
+	cancel()
+
+	wantChainID := ids.GenerateTestID()
+	wantResponse := []byte("response")
+	done := make(chan struct{})
+
+	callback := func(_ context.Context, gotChainID ids.ID, gotResponse []byte, err error) {
+		require.Equal(wantChainID, gotChainID)
+		require.NoError(err)
+		require.Equal(wantResponse, gotResponse)
+
+		close(done)
+	}
+
+	require.NoError(client.CrossChainAppRequest(cancelledCtx, wantChainID, []byte("request"), callback))
+	<-sentMessages
 
 	require.NoError(network.CrossChainAppResponse(ctx, wantChainID, 1, wantResponse))
 	<-done
@@ -736,7 +822,10 @@ func TestNodeSamplerClientOption(t *testing.T) {
 					},
 					GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
 						return map[ids.NodeID]*validators.GetValidatorOutput{
-							nodeID1: nil,
+							nodeID1: {
+								NodeID: nodeID1,
+								Weight: 1,
+							},
 						}, nil
 					},
 				}
@@ -756,7 +845,10 @@ func TestNodeSamplerClientOption(t *testing.T) {
 					},
 					GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
 						return map[ids.NodeID]*validators.GetValidatorOutput{
-							nodeID1: nil,
+							nodeID1: {
+								NodeID: nodeID1,
+								Weight: 1,
+							},
 						}, nil
 					},
 				}

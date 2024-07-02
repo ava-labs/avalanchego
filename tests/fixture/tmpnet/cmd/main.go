@@ -49,6 +49,7 @@ func main() {
 
 	var (
 		rootDir         string
+		networkOwner    string
 		avalancheGoPath string
 		pluginDir       string
 		nodeCount       uint8
@@ -63,21 +64,23 @@ func main() {
 
 			// Root dir will be defaulted on start if not provided
 
-			network := &tmpnet.Network{}
+			network := &tmpnet.Network{
+				Owner: networkOwner,
+				Nodes: tmpnet.NewNodesOrPanic(int(nodeCount)),
+			}
 
 			// Extreme upper bound, should never take this long
 			networkStartTimeout := 2 * time.Minute
 
 			ctx, cancel := context.WithTimeout(context.Background(), networkStartTimeout)
 			defer cancel()
-			err := tmpnet.StartNewNetwork(
+			err := tmpnet.BootstrapNewNetwork(
 				ctx,
 				os.Stdout,
 				network,
 				rootDir,
 				avalancheGoPath,
 				pluginDir,
-				int(nodeCount),
 			)
 			if err != nil {
 				return err
@@ -94,7 +97,7 @@ func main() {
 				return err
 			}
 
-			fmt.Fprintf(os.Stdout, "\nConfigure tmpnetctl to target this network by default with one of the following statements:\n")
+			fmt.Fprintln(os.Stdout, "\nConfigure tmpnetctl to target this network by default with one of the following statements:")
 			fmt.Fprintf(os.Stdout, " - source %s\n", network.EnvFilePath())
 			fmt.Fprintf(os.Stdout, " - %s\n", network.EnvFileContents())
 			fmt.Fprintf(os.Stdout, " - export %s=%s\n", tmpnet.NetworkDirEnvName, latestSymlinkPath)
@@ -106,6 +109,7 @@ func main() {
 	startNetworkCmd.PersistentFlags().StringVar(&avalancheGoPath, "avalanchego-path", os.Getenv(tmpnet.AvalancheGoPathEnvName), "The path to an avalanchego binary")
 	startNetworkCmd.PersistentFlags().StringVar(&pluginDir, "plugin-dir", os.ExpandEnv("$HOME/.avalanchego/plugins"), "[optional] the dir containing VM plugins")
 	startNetworkCmd.PersistentFlags().Uint8Var(&nodeCount, "node-count", tmpnet.DefaultNodeCount, "Number of nodes the network should initially consist of")
+	startNetworkCmd.PersistentFlags().StringVar(&networkOwner, "network-owner", "", "The string identifying the intended owner of the network")
 	rootCmd.AddCommand(startNetworkCmd)
 
 	stopNetworkCmd := &cobra.Command{

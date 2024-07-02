@@ -15,7 +15,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"go.opentelemetry.io/otel/attribute"
 	"golang.org/x/exp/maps"
-	"golang.org/x/sync/semaphore"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
@@ -41,12 +40,23 @@ const (
 var (
 	_ MerkleDB = (*merkleDB)(nil)
 
-	codec = newCodec()
-
 	metadataPrefix         = []byte{0}
 	valueNodePrefix        = []byte{1}
 	intermediateNodePrefix = []byte{2}
 
+	// cleanShutdownKey is used to flag that the database did (or did not)
+	// previously shutdown correctly.
+	//
+	// If this key has value [hadCleanShutdown] it must be true that all
+	// intermediate nodes of the trie are correctly populated on disk and that
+	// the [rootDBKey] has the correct key for the root node.
+	//
+	// If this key has value [didNotHaveCleanShutdown] the intermediate nodes of
+	// the trie may not be correct and the [rootDBKey] may not exist or point to
+	// a node that node longer exists.
+	//
+	// Regardless of the value of [cleanShutdownKey], the value nodes must
+	// always be persisted correctly.
 	cleanShutdownKey        = []byte(string(metadataPrefix) + "cleanShutdown")
 	rootDBKey               = []byte(string(metadataPrefix) + "root")
 	hadCleanShutdown        = []byte{1}
@@ -153,6 +163,11 @@ type Config struct {
 	// BranchFactor determines the number of children each node can have.
 	BranchFactor BranchFactor
 
+	// Hasher defines the hash function to use when hashing the trie.
+	//
+	// If not specified, [DefaultHasher] will be used.
+	Hasher Hasher
+
 	// RootGenConcurrency is the number of goroutines to use when
 	// generating a new state root.
 	//
@@ -204,7 +219,7 @@ type merkleDB struct {
 	// True iff the db has been closed.
 	closed bool
 
-	metrics merkleMetrics
+	metrics metrics
 
 	debugTracer trace.Tracer
 	infoTracer  trace.Tracer
@@ -218,16 +233,19 @@ type merkleDB struct {
 	// Valid children of this trie.
 	childViews []*view
 
-	// calculateNodeIDsSema controls the number of goroutines inside
-	// [calculateNodeIDsHelper] at any given time.
-	calculateNodeIDsSema *semaphore.Weighted
+	// hashNodesKeyPool controls the number of goroutines that are created
+	// inside [hashChangedNode] at any given time and provides slices for the
+	// keys needed while hashing.
+	hashNodesKeyPool *bytesPool
 
 	tokenSize int
+
+	hasher Hasher
 }
 
 // New returns a new merkle database.
 func New(ctx context.Context, db database.Database, config Config) (MerkleDB, error) {
-	metrics, err := newMetrics("merkleDB", config.Reg)
+	metrics, err := newMetrics("merkledb", config.Reg)
 	if err != nil {
 		return nil, err
 	}
@@ -238,24 +256,25 @@ func newDatabase(
 	ctx context.Context,
 	db database.Database,
 	config Config,
-	metrics merkleMetrics,
+	metrics metrics,
 ) (*merkleDB, error) {
 	if err := config.BranchFactor.Valid(); err != nil {
 		return nil, err
 	}
 
-	rootGenConcurrency := uint(runtime.NumCPU())
-	if config.RootGenConcurrency != 0 {
-		rootGenConcurrency = config.RootGenConcurrency
+	hasher := config.Hasher
+	if hasher == nil {
+		hasher = DefaultHasher
 	}
 
-	// Share a sync.Pool of []byte between the intermediateNodeDB and valueNodeDB
-	// to reduce memory allocations.
-	bufferPool := &sync.Pool{
-		New: func() interface{} {
-			return make([]byte, 0, defaultBufferLength)
-		},
+	rootGenConcurrency := runtime.NumCPU()
+	if config.RootGenConcurrency != 0 {
+		rootGenConcurrency = int(config.RootGenConcurrency)
 	}
+
+	// Share a bytes pool between the intermediateNodeDB and valueNodeDB to
+	// reduce memory allocations.
+	bufferPool := utils.NewBytesPool()
 
 	trieDB := &merkleDB{
 		metrics: metrics,
@@ -267,21 +286,43 @@ func newDatabase(
 			int(config.IntermediateNodeCacheSize),
 			int(config.IntermediateWriteBufferSize),
 			int(config.IntermediateWriteBatchSize),
-			BranchFactorToTokenSize[config.BranchFactor]),
-		valueNodeDB: newValueNodeDB(db,
+			BranchFactorToTokenSize[config.BranchFactor],
+			hasher,
+		),
+		valueNodeDB: newValueNodeDB(
+			db,
 			bufferPool,
 			metrics,
-			int(config.ValueNodeCacheSize)),
-		history:              newTrieHistory(int(config.HistoryLength)),
-		debugTracer:          getTracerIfEnabled(config.TraceLevel, DebugTrace, config.Tracer),
-		infoTracer:           getTracerIfEnabled(config.TraceLevel, InfoTrace, config.Tracer),
-		childViews:           make([]*view, 0, defaultPreallocationSize),
-		calculateNodeIDsSema: semaphore.NewWeighted(int64(rootGenConcurrency)),
-		tokenSize:            BranchFactorToTokenSize[config.BranchFactor],
+			int(config.ValueNodeCacheSize),
+			hasher,
+		),
+		history:          newTrieHistory(int(config.HistoryLength)),
+		debugTracer:      getTracerIfEnabled(config.TraceLevel, DebugTrace, config.Tracer),
+		infoTracer:       getTracerIfEnabled(config.TraceLevel, InfoTrace, config.Tracer),
+		childViews:       make([]*view, 0, defaultPreallocationSize),
+		hashNodesKeyPool: newBytesPool(rootGenConcurrency),
+		tokenSize:        BranchFactorToTokenSize[config.BranchFactor],
+		hasher:           hasher,
 	}
 
-	if err := trieDB.initializeRoot(); err != nil {
+	shutdownType, err := trieDB.baseDB.Get(cleanShutdownKey)
+	switch err {
+	case nil:
+	case database.ErrNotFound:
+		// If the marker wasn't found then the DB is being created for the first
+		// time and there is nothing to do.
+		shutdownType = hadCleanShutdown
+	default:
 		return nil, err
+	}
+	if bytes.Equal(shutdownType, didNotHaveCleanShutdown) {
+		if err := trieDB.rebuild(ctx, int(config.ValueNodeCacheSize)); err != nil {
+			return nil, err
+		}
+	} else {
+		if err := trieDB.initializeRoot(); err != nil {
+			return nil, err
+		}
 	}
 
 	// add current root to history (has no changes)
@@ -293,21 +334,6 @@ func newDatabase(
 		values: map[Key]*change[maybe.Maybe[[]byte]]{},
 		nodes:  map[Key]*change[*node]{},
 	})
-
-	shutdownType, err := trieDB.baseDB.Get(cleanShutdownKey)
-	switch err {
-	case nil:
-		if bytes.Equal(shutdownType, didNotHaveCleanShutdown) {
-			if err := trieDB.rebuild(ctx, int(config.ValueNodeCacheSize)); err != nil {
-				return nil, err
-			}
-		}
-	case database.ErrNotFound:
-		// If the marker wasn't found then the DB is being created for the first
-		// time and there is nothing to do.
-	default:
-		return nil, err
-	}
 
 	// mark that the db has not yet been cleanly closed
 	err = trieDB.baseDB.Put(cleanShutdownKey, didNotHaveCleanShutdown)
@@ -462,8 +488,26 @@ func (db *merkleDB) Close() error {
 		return err
 	}
 
-	// Successfully wrote intermediate nodes.
-	return db.baseDB.Put(cleanShutdownKey, hadCleanShutdown)
+	var (
+		batch = db.baseDB.NewBatch()
+		err   error
+	)
+	// Write the root key
+	if db.root.IsNothing() {
+		err = batch.Delete(rootDBKey)
+	} else {
+		rootKey := encodeKey(db.root.Value().key)
+		err = batch.Put(rootDBKey, rootKey)
+	}
+	if err != nil {
+		return err
+	}
+
+	// Write the clean shutdown marker
+	if err := batch.Put(cleanShutdownKey, hadCleanShutdown); err != nil {
+		return err
+	}
+	return batch.Write()
 }
 
 func (db *merkleDB) PrefetchPaths(keys [][]byte) error {
@@ -779,7 +823,7 @@ func (db *merkleDB) NewView(
 		return nil, database.ErrClosed
 	}
 
-	newView, err := newView(db, db, changes)
+	view, err := newView(db, db, changes)
 	if err != nil {
 		return nil, err
 	}
@@ -788,8 +832,8 @@ func (db *merkleDB) NewView(
 	db.lock.Lock()
 	defer db.lock.Unlock()
 
-	db.childViews = append(db.childViews, newView)
-	return newView, nil
+	db.childViews = append(db.childViews, view)
+	return view, nil
 }
 
 func (db *merkleDB) Has(k []byte) (bool, error) {
@@ -902,10 +946,10 @@ func (db *merkleDB) commitBatch(ops []database.BatchOp) error {
 	return view.commitToDB(context.Background())
 }
 
-// commitChanges commits the changes in [trieToCommit] to [db].
+// commitView commits the changes in [trieToCommit] to [db].
 // Assumes [trieToCommit]'s node IDs have been calculated.
 // Assumes [db.commitLock] is held.
-func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *view) error {
+func (db *merkleDB) commitView(ctx context.Context, trieToCommit *view) error {
 	db.lock.Lock()
 	defer db.lock.Unlock()
 
@@ -923,7 +967,7 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *view) error
 	}
 
 	changes := trieToCommit.changes
-	_, span := db.infoTracer.Start(ctx, "MerkleDB.commitChanges", oteltrace.WithAttributes(
+	_, span := db.infoTracer.Start(ctx, "MerkleDB.commitView", oteltrace.WithAttributes(
 		attribute.Int("nodesChanged", len(changes.nodes)),
 		attribute.Int("valuesChanged", len(changes.values)),
 	))
@@ -939,39 +983,12 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *view) error
 		return nil
 	}
 
-	currentValueNodeBatch := db.valueNodeDB.NewBatch()
-	_, nodesSpan := db.infoTracer.Start(ctx, "MerkleDB.commitChanges.writeNodes")
-	for key, nodeChange := range changes.nodes {
-		shouldAddIntermediate := nodeChange.after != nil && !nodeChange.after.hasValue()
-		shouldDeleteIntermediate := !shouldAddIntermediate && nodeChange.before != nil && !nodeChange.before.hasValue()
-
-		shouldAddValue := nodeChange.after != nil && nodeChange.after.hasValue()
-		shouldDeleteValue := !shouldAddValue && nodeChange.before != nil && nodeChange.before.hasValue()
-
-		if shouldAddIntermediate {
-			if err := db.intermediateNodeDB.Put(key, nodeChange.after); err != nil {
-				nodesSpan.End()
-				return err
-			}
-		} else if shouldDeleteIntermediate {
-			if err := db.intermediateNodeDB.Delete(key); err != nil {
-				nodesSpan.End()
-				return err
-			}
-		}
-
-		if shouldAddValue {
-			currentValueNodeBatch.Put(key, nodeChange.after)
-		} else if shouldDeleteValue {
-			currentValueNodeBatch.Delete(key)
-		}
+	valueNodeBatch := db.baseDB.NewBatch()
+	if err := db.applyChanges(ctx, valueNodeBatch, changes); err != nil {
+		return err
 	}
-	nodesSpan.End()
 
-	_, commitSpan := db.infoTracer.Start(ctx, "MerkleDB.commitChanges.valueNodeDBCommit")
-	err := currentValueNodeBatch.Write()
-	commitSpan.End()
-	if err != nil {
+	if err := db.commitValueChanges(ctx, valueNodeBatch); err != nil {
 		return err
 	}
 
@@ -980,16 +997,12 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *view) error
 	// Update root in database.
 	db.root = changes.rootChange.after
 	db.rootID = changes.rootID
-
-	if db.root.IsNothing() {
-		return db.baseDB.Delete(rootDBKey)
-	}
-
-	rootKey := codec.encodeKey(db.root.Value().key)
-	return db.baseDB.Put(rootDBKey, rootKey)
+	return nil
 }
 
-// moveChildViewsToDB removes any child views from the trieToCommit and moves them to the db
+// moveChildViewsToDB removes any child views from the trieToCommit and moves
+// them to the db.
+//
 // assumes [db.lock] is held
 func (db *merkleDB) moveChildViewsToDB(trieToCommit *view) {
 	trieToCommit.validityTrackingLock.Lock()
@@ -1000,6 +1013,53 @@ func (db *merkleDB) moveChildViewsToDB(trieToCommit *view) {
 		db.childViews = append(db.childViews, childView)
 	}
 	trieToCommit.childViews = make([]*view, 0, defaultPreallocationSize)
+}
+
+// applyChanges takes the [changes] and applies them to [db.intermediateNodeDB]
+// and [valueNodeBatch].
+//
+// assumes [db.lock] is held
+func (db *merkleDB) applyChanges(ctx context.Context, valueNodeBatch database.KeyValueWriterDeleter, changes *changeSummary) error {
+	_, span := db.infoTracer.Start(ctx, "MerkleDB.applyChanges")
+	defer span.End()
+
+	for key, nodeChange := range changes.nodes {
+		shouldAddIntermediate := nodeChange.after != nil && !nodeChange.after.hasValue()
+		shouldDeleteIntermediate := !shouldAddIntermediate && nodeChange.before != nil && !nodeChange.before.hasValue()
+
+		shouldAddValue := nodeChange.after != nil && nodeChange.after.hasValue()
+		shouldDeleteValue := !shouldAddValue && nodeChange.before != nil && nodeChange.before.hasValue()
+
+		if shouldAddIntermediate {
+			if err := db.intermediateNodeDB.Put(key, nodeChange.after); err != nil {
+				return err
+			}
+		} else if shouldDeleteIntermediate {
+			if err := db.intermediateNodeDB.Delete(key); err != nil {
+				return err
+			}
+		}
+
+		if shouldAddValue {
+			if err := db.valueNodeDB.Write(valueNodeBatch, key, nodeChange.after); err != nil {
+				return err
+			}
+		} else if shouldDeleteValue {
+			if err := db.valueNodeDB.Write(valueNodeBatch, key, nil); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// commitValueChanges is a thin wrapper around [valueNodeBatch.Write()] to
+// provide tracing.
+func (db *merkleDB) commitValueChanges(ctx context.Context, valueNodeBatch database.Batch) error {
+	_, span := db.infoTracer.Start(ctx, "MerkleDB.commitValueChanges")
+	defer span.End()
+
+	return valueNodeBatch.Write()
 }
 
 // CommitToDB is a no-op for db since it is already in sync with itself.
@@ -1168,23 +1228,21 @@ func (db *merkleDB) invalidateChildrenExcept(exception *view) {
 // Otherwise leave [db.root] as Nothing.
 func (db *merkleDB) initializeRoot() error {
 	rootKeyBytes, err := db.baseDB.Get(rootDBKey)
+	if errors.Is(err, database.ErrNotFound) {
+		return nil // Root isn't on disk.
+	}
 	if err != nil {
-		if !errors.Is(err, database.ErrNotFound) {
-			return err
-		}
-		// Root isn't on disk.
-		return nil
+		return err
 	}
 
 	// Root is on disk.
-	rootKey, err := codec.decodeKey(rootKeyBytes)
+	rootKey, err := decodeKey(rootKeyBytes)
 	if err != nil {
 		return err
 	}
 
 	// First, see if root is an intermediate node.
-	var root *node
-	root, err = db.getEditableNode(rootKey, false /* hasValue */)
+	root, err := db.getEditableNode(rootKey, false /* hasValue */)
 	if err != nil {
 		if !errors.Is(err, database.ErrNotFound) {
 			return err
@@ -1197,7 +1255,9 @@ func (db *merkleDB) initializeRoot() error {
 		}
 	}
 
-	db.rootID = root.calculateID(db.metrics)
+	db.rootID = db.hasher.HashNode(root)
+	db.metrics.HashCalculated()
+
 	db.root = maybe.Some(root)
 	return nil
 }
@@ -1319,31 +1379,15 @@ func (db *merkleDB) getTokenSize() int {
 }
 
 // Returns [key] prefixed by [prefix].
-// The returned []byte is taken from [bufferPool] and
-// should be returned to it when the caller is done with it.
-func addPrefixToKey(bufferPool *sync.Pool, prefix []byte, key []byte) []byte {
+// The returned *[]byte is taken from [bufferPool] and should be returned to it
+// when the caller is done with it.
+func addPrefixToKey(bufferPool *utils.BytesPool, prefix []byte, key []byte) *[]byte {
 	prefixLen := len(prefix)
 	keyLen := prefixLen + len(key)
-	prefixedKey := getBufferFromPool(bufferPool, keyLen)
-	copy(prefixedKey, prefix)
-	copy(prefixedKey[prefixLen:], key)
+	prefixedKey := bufferPool.Get(keyLen)
+	copy(*prefixedKey, prefix)
+	copy((*prefixedKey)[prefixLen:], key)
 	return prefixedKey
-}
-
-// Returns a []byte from [bufferPool] with length exactly [size].
-// The []byte is not guaranteed to be zeroed.
-func getBufferFromPool(bufferPool *sync.Pool, size int) []byte {
-	buffer := bufferPool.Get().([]byte)
-	if cap(buffer) >= size {
-		// The [] byte we got from the pool is big enough to hold the prefixed key
-		buffer = buffer[:size]
-	} else {
-		// The []byte from the pool wasn't big enough.
-		// Put it back and allocate a new, bigger one
-		bufferPool.Put(buffer)
-		buffer = make([]byte, size)
-	}
-	return buffer
 }
 
 // cacheEntrySize returns a rough approximation of the memory consumed by storing the key and node.
@@ -1351,5 +1395,5 @@ func cacheEntrySize(key Key, n *node) int {
 	if n == nil {
 		return cacheEntryOverHead + len(key.Bytes())
 	}
-	return cacheEntryOverHead + len(key.Bytes()) + codec.encodedDBNodeSize(&n.dbNode)
+	return cacheEntryOverHead + len(key.Bytes()) + encodedDBNodeSize(&n.dbNode)
 }

@@ -148,8 +148,8 @@ func TestGetCanonicalValidatorSet(t *testing.T) {
 			require.Len(vdrs, len(tt.expectedVdrs))
 			for i, expectedVdr := range tt.expectedVdrs {
 				gotVdr := vdrs[i]
-				expectedPKBytes := bls.PublicKeyToBytes(expectedVdr.PublicKey)
-				gotPKBytes := bls.PublicKeyToBytes(gotVdr.PublicKey)
+				expectedPKBytes := bls.PublicKeyToCompressedBytes(expectedVdr.PublicKey)
+				gotPKBytes := bls.PublicKeyToCompressedBytes(gotVdr.PublicKey)
 				require.Equal(expectedPKBytes, gotPKBytes)
 				require.Equal(expectedVdr.PublicKeyBytes, gotVdr.PublicKeyBytes)
 				require.Equal(expectedVdr.Weight, gotVdr.Weight)
@@ -165,7 +165,7 @@ func TestFilterValidators(t *testing.T) {
 	pk0 := bls.PublicFromSecretKey(sk0)
 	vdr0 := &Validator{
 		PublicKey:      pk0,
-		PublicKeyBytes: bls.SerializePublicKey(pk0),
+		PublicKeyBytes: bls.PublicKeyToUncompressedBytes(pk0),
 		Weight:         1,
 	}
 
@@ -174,7 +174,7 @@ func TestFilterValidators(t *testing.T) {
 	pk1 := bls.PublicFromSecretKey(sk1)
 	vdr1 := &Validator{
 		PublicKey:      pk1,
-		PublicKeyBytes: bls.SerializePublicKey(pk1),
+		PublicKeyBytes: bls.PublicKeyToUncompressedBytes(pk1),
 		Weight:         2,
 	}
 

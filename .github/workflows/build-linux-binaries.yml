@@ -10,9 +10,6 @@ on:
     tags:
       - "*"
 
-env:
-  go_version: '~1.21.7'
-
 jobs:
   build-x86_64-binaries-tarball:
     runs-on: ubuntu-20.04
@@ -20,10 +17,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.go_version }}
-          check-latest: true
+      - uses: ./.github/actions/setup-go-for-project
 
       - run: go version
 
@@ -46,14 +40,14 @@ jobs:
         if: "${{ github.event.inputs.tag == '' }}"
         id: get_tag_from_git
         run: |
-          echo "TAG=${GITHUB_REF/refs\/tags\//}" >> $GITHUB_ENV
+          echo "TAG=${GITHUB_REF/refs\/tags\//}" >> "$GITHUB_ENV"
         shell: bash
 
       - name: Try to get tag from workflow dispatch
         if: "${{ github.event.inputs.tag != '' }}"
         id: get_tag_from_workflow
         run: |
-          echo "TAG=${{ github.event.inputs.tag }}" >> $GITHUB_ENV
+          echo "TAG=${{ github.event.inputs.tag }}" >> "$GITHUB_ENV"
         shell: bash
 
       - name: Create tgz package structure and upload to S3
@@ -77,15 +71,14 @@ jobs:
           rm -rf /tmp/avalanchego
 
   build-arm64-binaries-tarball:
-    runs-on: [self-hosted, linux, ARM64, focal]
+    runs-on: custom-arm64-focal
 
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-go@v3
-        with:
-          go-version: ${{ env.go_version }}
-          check-latest: true
+      - uses: ./.github/actions/install-focal-deps
+
+      - uses: ./.github/actions/setup-go-for-project-v3
 
       - run: go version
 
@@ -108,14 +101,14 @@ jobs:
         if: "${{ github.event.inputs.tag == '' }}"
         id: get_tag_from_git
         run: |
-          echo "TAG=${GITHUB_REF/refs\/tags\//}" >> $GITHUB_ENV
+          echo "TAG=${GITHUB_REF/refs\/tags\//}" >> "$GITHUB_ENV"
         shell: bash
 
       - name: Try to get tag from workflow dispatch
         if: "${{ github.event.inputs.tag != '' }}"
         id: get_tag_from_workflow
         run: |
-          echo "TAG=${{ github.event.inputs.tag }}" >> $GITHUB_ENV
+          echo "TAG=${{ github.event.inputs.tag }}" >> "$GITHUB_ENV"
         shell: bash
 
       - name: Create tgz package structure and upload to S3

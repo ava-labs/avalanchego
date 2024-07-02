@@ -7,11 +7,8 @@ import (
 	"slices"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/maybe"
 )
-
-const HashLength = 32
 
 // Representation of a node stored in the database.
 type dbNode struct {
@@ -43,9 +40,9 @@ func newNode(key Key) *node {
 }
 
 // Parse [nodeBytes] to a node and set its key to [key].
-func parseNode(key Key, nodeBytes []byte) (*node, error) {
+func parseNode(hasher Hasher, key Key, nodeBytes []byte) (*node, error) {
 	n := dbNode{}
-	if err := codec.decodeDBNode(nodeBytes, &n); err != nil {
+	if err := decodeDBNode(nodeBytes, &n); err != nil {
 		return nil, err
 	}
 	result := &node{
@@ -53,7 +50,7 @@ func parseNode(key Key, nodeBytes []byte) (*node, error) {
 		key:    key,
 	}
 
-	result.setValueDigest()
+	result.setValueDigest(hasher)
 	return result, nil
 }
 
@@ -64,27 +61,21 @@ func (n *node) hasValue() bool {
 
 // Returns the byte representation of this node.
 func (n *node) bytes() []byte {
-	return codec.encodeDBNode(&n.dbNode)
-}
-
-// Returns and caches the ID of this node.
-func (n *node) calculateID(metrics merkleMetrics) ids.ID {
-	metrics.HashCalculated()
-	bytes := codec.encodeHashValues(n)
-	return hashing.ComputeHash256Array(bytes)
+	return encodeDBNode(&n.dbNode)
 }
 
 // Set [n]'s value to [val].
-func (n *node) setValue(val maybe.Maybe[[]byte]) {
+func (n *node) setValue(hasher Hasher, val maybe.Maybe[[]byte]) {
 	n.value = val
-	n.setValueDigest()
+	n.setValueDigest(hasher)
 }
 
-func (n *node) setValueDigest() {
+func (n *node) setValueDigest(hasher Hasher) {
 	if n.value.IsNothing() || len(n.value.Value()) < HashLength {
 		n.valueDigest = n.value
 	} else {
-		n.valueDigest = maybe.Some(hashing.ComputeHash256(n.value.Value()))
+		hash := hasher.HashValue(n.value.Value())
+		n.valueDigest = maybe.Some(hash[:])
 	}
 }
 

@@ -75,7 +75,7 @@ func (mr *MockChainMockRecorder) AddRewardUTXO(arg0, arg1 any) *gomock.Call {
 }
 
 // AddSubnet mocks base method.
-func (m *MockChain) AddSubnet(arg0 *txs.Tx) {
+func (m *MockChain) AddSubnet(arg0 ids.ID) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "AddSubnet", arg0)
 }
@@ -523,7 +523,7 @@ func (mr *MockDiffMockRecorder) AddRewardUTXO(arg0, arg1 any) *gomock.Call {
 }
 
 // AddSubnet mocks base method.
-func (m *MockDiff) AddSubnet(arg0 *txs.Tx) {
+func (m *MockDiff) AddSubnet(arg0 ids.ID) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "AddSubnet", arg0)
 }
@@ -1009,7 +1009,7 @@ func (mr *MockStateMockRecorder) AddStatelessBlock(arg0 any) *gomock.Call {
 }
 
 // AddSubnet mocks base method.
-func (m *MockState) AddSubnet(arg0 *txs.Tx) {
+func (m *MockState) AddSubnet(arg0 ids.ID) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "AddSubnet", arg0)
 }
@@ -1410,6 +1410,21 @@ func (mr *MockStateMockRecorder) GetStatelessBlock(arg0 any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetStatelessBlock", reflect.TypeOf((*MockState)(nil).GetStatelessBlock), arg0)
 }
 
+// GetSubnetIDs mocks base method.
+func (m *MockState) GetSubnetIDs() ([]ids.ID, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetSubnetIDs")
+	ret0, _ := ret[0].([]ids.ID)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetSubnetIDs indicates an expected call of GetSubnetIDs.
+func (mr *MockStateMockRecorder) GetSubnetIDs() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSubnetIDs", reflect.TypeOf((*MockState)(nil).GetSubnetIDs))
+}
+
 // GetSubnetOwner mocks base method.
 func (m *MockState) GetSubnetOwner(arg0 ids.ID) (fx.Owner, error) {
 	m.ctrl.T.Helper()
@@ -1438,21 +1453,6 @@ func (m *MockState) GetSubnetTransformation(arg0 ids.ID) (*txs.Tx, error) {
 func (mr *MockStateMockRecorder) GetSubnetTransformation(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSubnetTransformation", reflect.TypeOf((*MockState)(nil).GetSubnetTransformation), arg0)
-}
-
-// GetSubnets mocks base method.
-func (m *MockState) GetSubnets() ([]*txs.Tx, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetSubnets")
-	ret0, _ := ret[0].([]*txs.Tx)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetSubnets indicates an expected call of GetSubnets.
-func (mr *MockStateMockRecorder) GetSubnets() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSubnets", reflect.TypeOf((*MockState)(nil).GetSubnets))
 }
 
 // GetTimestamp mocks base method.
@@ -1516,20 +1516,6 @@ func (mr *MockStateMockRecorder) GetUptime(arg0, arg1 any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUptime", reflect.TypeOf((*MockState)(nil).GetUptime), arg0, arg1)
 }
 
-// PruneAndIndex mocks base method.
-func (m *MockState) PruneAndIndex(arg0 sync.Locker, arg1 logging.Logger) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "PruneAndIndex", arg0, arg1)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// PruneAndIndex indicates an expected call of PruneAndIndex.
-func (mr *MockStateMockRecorder) PruneAndIndex(arg0, arg1 any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PruneAndIndex", reflect.TypeOf((*MockState)(nil).PruneAndIndex), arg0, arg1)
-}
-
 // PutCurrentDelegator mocks base method.
 func (m *MockState) PutCurrentDelegator(arg0 *Staker) {
 	m.ctrl.T.Helper()
@@ -1576,6 +1562,20 @@ func (m *MockState) PutPendingValidator(arg0 *Staker) {
 func (mr *MockStateMockRecorder) PutPendingValidator(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutPendingValidator", reflect.TypeOf((*MockState)(nil).PutPendingValidator), arg0)
+}
+
+// ReindexBlocks mocks base method.
+func (m *MockState) ReindexBlocks(arg0 sync.Locker, arg1 logging.Logger) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ReindexBlocks", arg0, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ReindexBlocks indicates an expected call of ReindexBlocks.
+func (mr *MockStateMockRecorder) ReindexBlocks(arg0, arg1 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReindexBlocks", reflect.TypeOf((*MockState)(nil).ReindexBlocks), arg0, arg1)
 }
 
 // SetCurrentSupply mocks base method.
@@ -1664,21 +1664,6 @@ func (m *MockState) SetUptime(arg0 ids.NodeID, arg1 ids.ID, arg2 time.Duration, 
 func (mr *MockStateMockRecorder) SetUptime(arg0, arg1, arg2, arg3 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetUptime", reflect.TypeOf((*MockState)(nil).SetUptime), arg0, arg1, arg2, arg3)
-}
-
-// ShouldPrune mocks base method.
-func (m *MockState) ShouldPrune() (bool, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ShouldPrune")
-	ret0, _ := ret[0].(bool)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// ShouldPrune indicates an expected call of ShouldPrune.
-func (mr *MockStateMockRecorder) ShouldPrune() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ShouldPrune", reflect.TypeOf((*MockState)(nil).ShouldPrune))
 }
 
 // UTXOIDs mocks base method.

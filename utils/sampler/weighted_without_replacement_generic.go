@@ -25,19 +25,20 @@ func (s *weightedWithoutReplacementGeneric) Initialize(weights []uint64) error {
 	return s.w.Initialize(weights)
 }
 
-func (s *weightedWithoutReplacementGeneric) Sample(count int) ([]int, error) {
+func (s *weightedWithoutReplacementGeneric) Sample(count int) ([]int, bool) {
 	s.u.Reset()
 
 	indices := make([]int, count)
 	for i := 0; i < count; i++ {
-		weight, err := s.u.Next()
-		if err != nil {
-			return nil, err
+		weight, ok := s.u.Next()
+		if !ok {
+			return nil, false
 		}
-		indices[i], err = s.w.Sample(weight)
-		if err != nil {
-			return nil, err
+
+		indices[i], ok = s.w.Sample(weight)
+		if !ok {
+			return nil, false
 		}
 	}
-	return indices, nil
+	return indices, true
 }

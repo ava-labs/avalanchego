@@ -4,6 +4,8 @@
 package config
 
 import (
+	"encoding/json"
+	"reflect"
 	"testing"
 	"time"
 
@@ -11,6 +13,23 @@ import (
 
 	"github.com/ava-labs/avalanchego/vms/platformvm/network"
 )
+
+// Requires all values in a struct to be initialized
+func verifyInitializedStruct(tb testing.TB, s interface{}) {
+	tb.Helper()
+
+	require := require.New(tb)
+
+	structType := reflect.TypeOf(s)
+	require.Equal(reflect.Struct, structType.Kind())
+
+	v := reflect.ValueOf(s)
+	for i := 0; i < v.NumField(); i++ {
+		field := v.Field(i)
+		require.True(field.IsValid(), "invalid field: ", structType.Field(i).Name)
+		require.False(field.IsZero(), "zero field: ", structType.Field(i).Name)
+	}
+}
 
 func TestExecutionConfigUnmarshal(t *testing.T) {
 	t.Run("default values from empty json", func(t *testing.T) {
@@ -41,44 +60,26 @@ func TestExecutionConfigUnmarshal(t *testing.T) {
 
 	t.Run("all values extracted from json", func(t *testing.T) {
 		require := require.New(t)
-		b := []byte(`{
-			"network": {
-				"max-validator-set-staleness": 1,
-				"target-gossip-size": 2,
-				"pull-gossip-poll-size": 3,
-				"pull-gossip-frequency": 4,
-				"pull-gossip-throttling-period": 5,
-				"pull-gossip-throttling-limit": 6,
-				"expected-bloom-filter-elements":7,
-				"expected-bloom-filter-false-positive-probability": 8,
-				"max-bloom-filter-false-positive-probability": 9,
-				"legacy-push-gossip-cache-size": 10
-			},
-			"block-cache-size": 1,
-			"tx-cache-size": 2,
-			"transformed-subnet-tx-cache-size": 3,
-			"reward-utxos-cache-size": 5,
-			"chain-cache-size": 6,
-			"chain-db-cache-size": 7,
-			"block-id-cache-size": 8,
-			"fx-owner-cache-size": 9,
-			"checksums-enabled": true,
-			"mempool-prune-frequency": 60000000000
-		}`)
-		ec, err := GetExecutionConfig(b)
-		require.NoError(err)
+
 		expected := &ExecutionConfig{
 			Network: network.Config{
 				MaxValidatorSetStaleness:                    1,
 				TargetGossipSize:                            2,
-				PullGossipPollSize:                          3,
-				PullGossipFrequency:                         4,
-				PullGossipThrottlingPeriod:                  5,
-				PullGossipThrottlingLimit:                   6,
-				ExpectedBloomFilterElements:                 7,
-				ExpectedBloomFilterFalsePositiveProbability: 8,
-				MaxBloomFilterFalsePositiveProbability:      9,
-				LegacyPushGossipCacheSize:                   10,
+				PushGossipPercentStake:                      .3,
+				PushGossipNumValidators:                     4,
+				PushGossipNumPeers:                          5,
+				PushRegossipNumValidators:                   6,
+				PushRegossipNumPeers:                        7,
+				PushGossipDiscardedCacheSize:                8,
+				PushGossipMaxRegossipFrequency:              9,
+				PushGossipFrequency:                         10,
+				PullGossipPollSize:                          11,
+				PullGossipFrequency:                         12,
+				PullGossipThrottlingPeriod:                  13,
+				PullGossipThrottlingLimit:                   14,
+				ExpectedBloomFilterElements:                 15,
+				ExpectedBloomFilterFalsePositiveProbability: 16,
+				MaxBloomFilterFalsePositiveProbability:      17,
 			},
 			BlockCacheSize:               1,
 			TxCacheSize:                  2,
@@ -91,55 +92,14 @@ func TestExecutionConfigUnmarshal(t *testing.T) {
 			ChecksumsEnabled:             true,
 			MempoolPruneFrequency:        time.Minute,
 		}
-		require.Equal(expected, ec)
-	})
+		verifyInitializedStruct(t, *expected)
+		verifyInitializedStruct(t, expected.Network)
 
-	t.Run("default values applied correctly", func(t *testing.T) {
-		require := require.New(t)
-		b := []byte(`{
-			"network": {
-				"max-validator-set-staleness": 1,
-				"target-gossip-size": 2,
-				"pull-gossip-poll-size": 3,
-				"pull-gossip-frequency": 4,
-				"pull-gossip-throttling-period": 5
-			},
-			"block-cache-size": 1,
-			"tx-cache-size": 2,
-			"transformed-subnet-tx-cache-size": 3,
-			"reward-utxos-cache-size": 5,
-			"chain-cache-size": 6,
-			"chain-db-cache-size": 7,
-			"block-id-cache-size": 8,
-			"fx-owner-cache-size": 9,
-			"checksums-enabled": true
-		}`)
-		ec, err := GetExecutionConfig(b)
+		b, err := json.Marshal(expected)
 		require.NoError(err)
-		expected := &ExecutionConfig{
-			Network: network.Config{
-				MaxValidatorSetStaleness:                    1,
-				TargetGossipSize:                            2,
-				PullGossipPollSize:                          3,
-				PullGossipFrequency:                         4,
-				PullGossipThrottlingPeriod:                  5,
-				PullGossipThrottlingLimit:                   DefaultExecutionConfig.Network.PullGossipThrottlingLimit,
-				ExpectedBloomFilterElements:                 DefaultExecutionConfig.Network.ExpectedBloomFilterElements,
-				ExpectedBloomFilterFalsePositiveProbability: DefaultExecutionConfig.Network.ExpectedBloomFilterFalsePositiveProbability,
-				MaxBloomFilterFalsePositiveProbability:      DefaultExecutionConfig.Network.MaxBloomFilterFalsePositiveProbability,
-				LegacyPushGossipCacheSize:                   DefaultExecutionConfig.Network.LegacyPushGossipCacheSize,
-			},
-			BlockCacheSize:               1,
-			TxCacheSize:                  2,
-			TransformedSubnetTxCacheSize: 3,
-			RewardUTXOsCacheSize:         5,
-			ChainCacheSize:               6,
-			ChainDBCacheSize:             7,
-			BlockIDCacheSize:             8,
-			FxOwnerCacheSize:             9,
-			ChecksumsEnabled:             true,
-			MempoolPruneFrequency:        30 * time.Minute,
-		}
-		require.Equal(expected, ec)
+
+		actual, err := GetExecutionConfig(b)
+		require.NoError(err)
+		require.Equal(expected, actual)
 	})
 }

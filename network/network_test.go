@@ -6,8 +6,7 @@ package network
 import (
 	"context"
 	"crypto"
-	"crypto/rsa"
-	"net"
+	"net/netip"
 	"sync"
 	"testing"
 	"time"
@@ -20,13 +19,14 @@ import (
 	"github.com/ava-labs/avalanchego/network/dialer"
 	"github.com/ava-labs/avalanchego/network/peer"
 	"github.com/ava-labs/avalanchego/network/throttling"
-	"github.com/ava-labs/avalanchego/proto/pb/p2p"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/subnets"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/ips"
@@ -49,13 +49,9 @@ var (
 		SendFailRateHalflife:         time.Second,
 	}
 	defaultPeerListGossipConfig = PeerListGossipConfig{
-		PeerListNumValidatorIPs:        100,
-		PeerListValidatorGossipSize:    100,
-		PeerListNonValidatorGossipSize: 100,
-		PeerListPeersGossipSize:        100,
-		PeerListGossipFreq:             time.Second,
-		PeerListPullGossipFreq:         time.Second,
-		PeerListBloomResetFreq:         constants.DefaultNetworkPeerListBloomResetFreq,
+		PeerListNumValidatorIPs: 100,
+		PeerListPullGossipFreq:  time.Second,
+		PeerListBloomResetFreq:  constants.DefaultNetworkPeerListBloomResetFreq,
 	}
 	defaultTimeoutConfig = TimeoutConfig{
 		PingPongTimeout:      30 * time.Second,
@@ -109,7 +105,6 @@ var (
 
 		DialerConfig: defaultDialerConfig,
 
-		Namespace:          "",
 		NetworkID:          49463,
 		MaxClockDifference: time.Minute,
 		PingFrequency:      constants.DefaultPingFrequency,
@@ -170,15 +165,21 @@ func newTestNetwork(t *testing.T, count int) (*testDialer, []*testListener, []id
 	)
 	for i := 0; i < count; i++ {
 		ip, listener := dialer.NewListener()
-		nodeID, tlsCert, tlsConfig := getTLS(t, i)
+
+		tlsCert, err := staking.NewTLSCert()
+		require.NoError(t, err)
+
+		cert, err := staking.ParseCertificate(tlsCert.Leaf.Raw)
+		require.NoError(t, err)
+		nodeID := ids.NodeIDFromCert(cert)
 
 		blsKey, err := bls.NewSecretKey()
 		require.NoError(t, err)
 
 		config := defaultConfig
-		config.TLSConfig = tlsConfig
+		config.TLSConfig = peer.TLSConfig(*tlsCert, nil)
 		config.MyNodeID = nodeID
-		config.MyIPPort = ip
+		config.MyIPPort = utils.NewAtomic(ip)
 		config.TLSKey = tlsCert.PrivateKey.(crypto.Signer)
 		config.BLSKey = blsKey
 
@@ -195,7 +196,6 @@ func newMessageCreator(t *testing.T) message.Creator {
 	mc, err := message.NewCreator(
 		logging.NoLog{},
 		prometheus.NewRegistry(),
-		"",
 		constants.DefaultNetworkCompressionType,
 		10*time.Second,
 	)
@@ -280,7 +280,7 @@ func newFullyConnectedTestNetwork(t *testing.T, handlers []router.InboundHandler
 	for i, net := range networks {
 		if i != 0 {
 			config := configs[0]
-			net.ManuallyTrack(config.MyNodeID, config.MyIPPort.IPPort())
+			net.ManuallyTrack(config.MyNodeID, config.MyIPPort.Get())
 		}
 
 		go func(net Network) {
@@ -327,11 +327,18 @@ func TestSend(t *testing.T) {
 	net0 := networks[0]
 
 	mc := newMessageCreator(t)
-	outboundGetMsg, err := mc.Get(ids.Empty, 1, time.Second, ids.Empty, p2p.EngineType_ENGINE_TYPE_SNOWMAN)
+	outboundGetMsg, err := mc.Get(ids.Empty, 1, time.Second, ids.Empty)
 	require.NoError(err)
 
 	toSend := set.Of(nodeIDs[1])
-	sentTo := net0.Send(outboundGetMsg, toSend, constants.PrimaryNetworkID, subnets.NoOpAllower)
+	sentTo := net0.Send(
+		outboundGetMsg,
+		common.SendConfig{
+			NodeIDs: toSend,
+		},
+		constants.PrimaryNetworkID,
+		subnets.NoOpAllower,
+	)
 	require.Equal(toSend, sentTo)
 
 	inboundGetMsg := <-received
@@ -343,7 +350,7 @@ func TestSend(t *testing.T) {
 	wg.Wait()
 }
 
-func TestSendAndGossipWithFilter(t *testing.T) {
+func TestSendWithFilter(t *testing.T) {
 	require := require.New(t)
 
 	received := make(chan message.InboundMessage)
@@ -365,24 +372,23 @@ func TestSendAndGossipWithFilter(t *testing.T) {
 	net0 := networks[0]
 
 	mc := newMessageCreator(t)
-	outboundGetMsg, err := mc.Get(ids.Empty, 1, time.Second, ids.Empty, p2p.EngineType_ENGINE_TYPE_SNOWMAN)
+	outboundGetMsg, err := mc.Get(ids.Empty, 1, time.Second, ids.Empty)
 	require.NoError(err)
 
 	toSend := set.Of(nodeIDs...)
 	validNodeID := nodeIDs[1]
-	sentTo := net0.Send(outboundGetMsg, toSend, constants.PrimaryNetworkID, newNodeIDConnector(validNodeID))
+	sentTo := net0.Send(
+		outboundGetMsg,
+		common.SendConfig{
+			NodeIDs: toSend,
+		},
+		constants.PrimaryNetworkID,
+		newNodeIDConnector(validNodeID),
+	)
 	require.Len(sentTo, 1)
 	require.Contains(sentTo, validNodeID)
 
 	inboundGetMsg := <-received
-	require.Equal(message.GetOp, inboundGetMsg.Op())
-
-	// Test Gossip now
-	sentTo = net0.Gossip(outboundGetMsg, constants.PrimaryNetworkID, 0, 0, len(nodeIDs), newNodeIDConnector(validNodeID))
-	require.Len(sentTo, 1)
-	require.Contains(sentTo, validNodeID)
-
-	inboundGetMsg = <-received
 	require.Equal(message.GetOp, inboundGetMsg.Op())
 
 	for _, net := range networks {
@@ -397,22 +403,32 @@ func TestTrackVerifiesSignatures(t *testing.T) {
 	_, networks, wg := newFullyConnectedTestNetwork(t, []router.InboundHandler{nil})
 
 	network := networks[0]
-	nodeID, tlsCert, _ := getTLS(t, 1)
+
+	tlsCert, err := staking.NewTLSCert()
+	require.NoError(err)
+
+	cert, err := staking.ParseCertificate(tlsCert.Leaf.Raw)
+	require.NoError(err)
+	nodeID := ids.NodeIDFromCert(cert)
+
 	require.NoError(network.config.Validators.AddStaker(constants.PrimaryNetworkID, nodeID, nil, ids.Empty, 1))
 
-	err := network.Track([]*ips.ClaimedIPPort{
+	stakingCert, err := staking.ParseCertificate(tlsCert.Leaf.Raw)
+	require.NoError(err)
+
+	err = network.Track([]*ips.ClaimedIPPort{
 		ips.NewClaimedIPPort(
-			staking.CertificateFromX509(tlsCert.Leaf),
-			ips.IPPort{
-				IP:   net.IPv4(123, 132, 123, 123),
-				Port: 10000,
-			},
+			stakingCert,
+			netip.AddrPortFrom(
+				netip.AddrFrom4([4]byte{123, 132, 123, 123}),
+				10000,
+			),
 			1000, // timestamp
 			nil,  // signature
 		),
 	})
 	// The signature is wrong so this peer tracking info isn't useful.
-	require.ErrorIs(err, rsa.ErrVerification)
+	require.ErrorIs(err, staking.ErrECDSAVerificationFailure)
 
 	network.peersLock.RLock()
 	require.Empty(network.trackedIPs)
@@ -472,7 +488,7 @@ func TestTrackDoesNotDialPrivateIPs(t *testing.T) {
 	for i, net := range networks {
 		if i != 0 {
 			config := configs[0]
-			net.ManuallyTrack(config.MyNodeID, config.MyIPPort.IPPort())
+			net.ManuallyTrack(config.MyNodeID, config.MyIPPort.Get())
 		}
 
 		go func(net Network) {
@@ -555,15 +571,17 @@ func TestDialDeletesNonValidators(t *testing.T) {
 	wg.Add(len(networks))
 	for i, net := range networks {
 		if i != 0 {
-			err := net.Track([]*ips.ClaimedIPPort{
+			stakingCert, err := staking.ParseCertificate(config.TLSConfig.Certificates[0].Leaf.Raw)
+			require.NoError(err)
+
+			require.NoError(net.Track([]*ips.ClaimedIPPort{
 				ips.NewClaimedIPPort(
-					staking.CertificateFromX509(config.TLSConfig.Certificates[0].Leaf),
-					ip.IPPort,
+					stakingCert,
+					ip.AddrPort,
 					ip.Timestamp,
 					ip.TLSSignature,
 				),
-			})
-			require.NoError(err)
+			}))
 		}
 
 		go func(net Network) {
@@ -611,23 +629,23 @@ func TestDialContext(t *testing.T) {
 		neverDialedNodeID = ids.GenerateTestNodeID()
 		dialedNodeID      = ids.GenerateTestNodeID()
 
-		dynamicNeverDialedIP, neverDialedListener = dialer.NewListener()
-		dynamicDialedIP, dialedListener           = dialer.NewListener()
+		neverDialedIP, neverDialedListener = dialer.NewListener()
+		dialedIP, dialedListener           = dialer.NewListener()
 
-		neverDialedIP = &trackedIP{
-			ip: dynamicNeverDialedIP.IPPort(),
+		neverDialedTrackedIP = &trackedIP{
+			ip: neverDialedIP,
 		}
-		dialedIP = &trackedIP{
-			ip: dynamicDialedIP.IPPort(),
+		dialedTrackedIP = &trackedIP{
+			ip: dialedIP,
 		}
 	)
 
-	network.ManuallyTrack(neverDialedNodeID, neverDialedIP.ip)
-	network.ManuallyTrack(dialedNodeID, dialedIP.ip)
+	network.ManuallyTrack(neverDialedNodeID, neverDialedIP)
+	network.ManuallyTrack(dialedNodeID, dialedIP)
 
 	// Sanity check that when a non-cancelled context is given,
 	// we actually dial the peer.
-	network.dial(dialedNodeID, dialedIP)
+	network.dial(dialedNodeID, dialedTrackedIP)
 
 	gotDialedIPConn := make(chan struct{})
 	go func() {
@@ -639,7 +657,7 @@ func TestDialContext(t *testing.T) {
 	// Asset that when [n.onCloseCtx] is cancelled, dial returns immediately.
 	// That is, [neverDialedListener] doesn't accept a connection.
 	network.onCloseCtxCancel()
-	network.dial(neverDialedNodeID, neverDialedIP)
+	network.dial(neverDialedNodeID, neverDialedTrackedIP)
 
 	gotNeverDialedIPConn := make(chan struct{})
 	go func() {
@@ -701,7 +719,7 @@ func TestAllowConnectionAsAValidator(t *testing.T) {
 	for i, net := range networks {
 		if i != 0 {
 			config := configs[0]
-			net.ManuallyTrack(config.MyNodeID, config.MyIPPort.IPPort())
+			net.ManuallyTrack(config.MyNodeID, config.MyIPPort.Get())
 		}
 
 		go func(net Network) {

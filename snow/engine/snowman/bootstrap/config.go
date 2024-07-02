@@ -4,9 +4,10 @@
 package bootstrap
 
 import (
+	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
 	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -24,16 +25,16 @@ type Config struct {
 	BootstrapTracker common.BootstrapTracker
 	Timer            common.Timer
 
+	// PeerTracker manages the set of nodes that we fetch the next block from.
+	PeerTracker *p2p.PeerTracker
+
 	// This node will only consider the first [AncestorsMaxContainersReceived]
 	// containers in an ancestors message it receives.
 	AncestorsMaxContainersReceived int
 
-	// Blocked tracks operations that are blocked on blocks
-	//
-	// It should be guaranteed that `MissingIDs` should contain all IDs
-	// referenced by the `MissingDependencies` that have not already been added
-	// to the queue.
-	Blocked *queue.JobsWithMissing
+	// Database used to track the fetched, but not yet executed, blocks during
+	// bootstrapping.
+	DB database.Database
 
 	VM block.ChainVM
 

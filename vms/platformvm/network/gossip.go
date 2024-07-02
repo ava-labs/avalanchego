@@ -17,7 +17,9 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
+	"github.com/ava-labs/avalanchego/vms/txs/mempool"
+
+	pmempool "github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 )
 
 var (
@@ -65,7 +67,7 @@ func (txMarshaller) UnmarshalGossip(bytes []byte) (*txs.Tx, error) {
 }
 
 func newGossipMempool(
-	mempool mempool.Mempool,
+	mempool pmempool.Mempool,
 	registerer prometheus.Registerer,
 	log logging.Logger,
 	txVerifier TxVerifier,
@@ -83,7 +85,7 @@ func newGossipMempool(
 }
 
 type gossipMempool struct {
-	mempool.Mempool
+	pmempool.Mempool
 	log        logging.Logger
 	txVerifier TxVerifier
 
@@ -134,6 +136,11 @@ func (g *gossipMempool) Add(tx *txs.Tx) error {
 
 	g.Mempool.RequestBuildBlock(false)
 	return nil
+}
+
+func (g *gossipMempool) Has(txID ids.ID) bool {
+	_, ok := g.Mempool.Get(txID)
+	return ok
 }
 
 func (g *gossipMempool) GetFilter() (bloom []byte, salt []byte) {

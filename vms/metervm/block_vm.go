@@ -8,7 +8,6 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -32,10 +31,14 @@ type blockVM struct {
 	ssVM         block.StateSyncableVM
 
 	blockMetrics
-	clock mockable.Clock
+	registry prometheus.Registerer
+	clock    mockable.Clock
 }
 
-func NewBlockVM(vm block.ChainVM) block.ChainVM {
+func NewBlockVM(
+	vm block.ChainVM,
+	reg prometheus.Registerer,
+) block.ChainVM {
 	buildBlockVM, _ := vm.(block.BuildBlockWithContextChainVM)
 	batchedVM, _ := vm.(block.BatchedChainVM)
 	ssVM, _ := vm.(block.StateSyncableVM)
@@ -44,6 +47,7 @@ func NewBlockVM(vm block.ChainVM) block.ChainVM {
 		buildBlockVM: buildBlockVM,
 		batchedVM:    batchedVM,
 		ssVM:         ssVM,
+		registry:     reg,
 	}
 }
 
@@ -58,30 +62,15 @@ func (vm *blockVM) Initialize(
 	fxs []*common.Fx,
 	appSender common.AppSender,
 ) error {
-	registerer := prometheus.NewRegistry()
 	err := vm.blockMetrics.Initialize(
 		vm.buildBlockVM != nil,
 		vm.batchedVM != nil,
 		vm.ssVM != nil,
-		"",
-		registerer,
+		vm.registry,
 	)
 	if err != nil {
 		return err
 	}
-
-	optionalGatherer := metrics.NewOptionalGatherer()
-	multiGatherer := metrics.NewMultiGatherer()
-	if err := multiGatherer.Register("metervm", registerer); err != nil {
-		return err
-	}
-	if err := multiGatherer.Register("", optionalGatherer); err != nil {
-		return err
-	}
-	if err := chainCtx.Metrics.Register(multiGatherer); err != nil {
-		return err
-	}
-	chainCtx.Metrics = optionalGatherer
 
 	return vm.ChainVM.Initialize(ctx, chainCtx, db, genesisBytes, upgradeBytes, configBytes, toEngine, fxs, appSender)
 }
@@ -148,14 +137,6 @@ func (vm *blockVM) LastAccepted(ctx context.Context) (ids.ID, error) {
 	end := vm.clock.Time()
 	vm.blockMetrics.lastAccepted.Observe(float64(end.Sub(start)))
 	return lastAcceptedID, err
-}
-
-func (vm *blockVM) VerifyHeightIndex(ctx context.Context) error {
-	start := vm.clock.Time()
-	err := vm.ChainVM.VerifyHeightIndex(ctx)
-	end := vm.clock.Time()
-	vm.blockMetrics.verifyHeightIndex.Observe(float64(end.Sub(start)))
-	return err
 }
 
 func (vm *blockVM) GetBlockIDAtHeight(ctx context.Context, height uint64) (ids.ID, error) {

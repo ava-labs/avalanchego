@@ -13,23 +13,23 @@ var (
 type snowballFactory struct{}
 
 func (snowballFactory) NewNnary(params Parameters, choice ids.ID) Nnary {
-	sb := newNnarySnowball(params.BetaVirtuous, params.BetaRogue, choice)
+	sb := newNnarySnowball(params.AlphaPreference, newSingleTerminationCondition(params.AlphaConfidence, params.Beta), choice)
 	return &sb
 }
 
 func (snowballFactory) NewUnary(params Parameters) Unary {
-	sb := newUnarySnowball(params.BetaVirtuous)
+	sb := newUnarySnowball(params.AlphaPreference, newSingleTerminationCondition(params.AlphaConfidence, params.Beta))
 	return &sb
 }
 
 type snowflakeFactory struct{}
 
 func (snowflakeFactory) NewNnary(params Parameters, choice ids.ID) Nnary {
-	sf := newNnarySnowflake(params.BetaVirtuous, params.BetaRogue, choice)
+	sf := newNnarySnowflake(params.AlphaPreference, newSingleTerminationCondition(params.AlphaConfidence, params.Beta), choice)
 	return &sf
 }
 
 func (snowflakeFactory) NewUnary(params Parameters) Unary {
-	sf := newUnarySnowflake(params.BetaVirtuous)
+	sf := newUnarySnowflake(params.AlphaPreference, newSingleTerminationCondition(params.AlphaConfidence, params.Beta))
 	return &sf
 }

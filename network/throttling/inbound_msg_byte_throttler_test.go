@@ -30,7 +30,6 @@ func TestInboundMsgByteThrottlerCancelContextDeadlock(t *testing.T) {
 
 	throttler, err := newInboundMsgByteThrottler(
 		logging.NoLog{},
-		"",
 		prometheus.NewRegistry(),
 		vdrs,
 		config,
@@ -60,7 +59,6 @@ func TestInboundMsgByteThrottlerCancelContext(t *testing.T) {
 
 	throttler, err := newInboundMsgByteThrottler(
 		logging.NoLog{},
-		"",
 		prometheus.NewRegistry(),
 		vdrs,
 		config,
@@ -118,7 +116,6 @@ func TestInboundMsgByteThrottler(t *testing.T) {
 
 	throttler, err := newInboundMsgByteThrottler(
 		logging.NoLog{},
-		"",
 		prometheus.NewRegistry(),
 		vdrs,
 		config,
@@ -333,7 +330,6 @@ func TestSybilMsgThrottlerMaxNonVdr(t *testing.T) {
 	require.NoError(vdrs.AddStaker(constants.PrimaryNetworkID, vdr1ID, nil, ids.Empty, 1))
 	throttler, err := newInboundMsgByteThrottler(
 		logging.NoLog{},
-		"",
 		prometheus.NewRegistry(),
 		vdrs,
 		config,
@@ -384,7 +380,6 @@ func TestMsgThrottlerNextMsg(t *testing.T) {
 	maxBytes := maxVdrBytes
 	throttler, err := newInboundMsgByteThrottler(
 		logging.NoLog{},
-		"",
 		prometheus.NewRegistry(),
 		vdrs,
 		config,
@@ -422,13 +417,16 @@ func TestMsgThrottlerNextMsg(t *testing.T) {
 
 	// Release 1 byte
 	throttler.release(&msgMetadata{msgSize: 1}, vdr1ID)
+
 	// Byte should have gone toward next validator message
+	throttler.lock.Lock()
 	require.Equal(2, throttler.waitingToAcquire.Len())
 	require.Contains(throttler.nodeToWaitingMsgID, vdr1ID)
 	firstMsgID := throttler.nodeToWaitingMsgID[vdr1ID]
 	firstMsg, exists := throttler.waitingToAcquire.Get(firstMsgID)
 	require.True(exists)
 	require.Equal(maxBytes-2, firstMsg.bytesNeeded)
+	throttler.lock.Unlock()
 
 	select {
 	case <-doneVdr:
