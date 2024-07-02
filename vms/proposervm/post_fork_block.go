@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
 
+// compile time check to ensure that postForkBlock implements PostForkBlock
 var _ PostForkBlock = (*postForkBlock)(nil)
 
 type postForkBlock struct {
@@ -196,14 +197,14 @@ func (b *postForkBlock) verifyPostForkOption(ctx context.Context, child *postFor
 }
 
 // Return the child (a *postForkBlock) of this block
-func (b *postForkBlock) buildChild(ctx context.Context, blsSignKey *bls.SecretKey) (Block, error) {
+func (b *postForkBlock) buildChild(ctx context.Context) (Block, error) {
 	return b.postForkCommonComponents.buildChild(
 		ctx,
 		b.ID(),
 		b.Timestamp(),
 		b.PChainHeight(),
 		b.SignedBlock.VRFSig(),
-		blsSignKey,
+		b.vm.Config.StakingBLSKey,
 	)
 }
 

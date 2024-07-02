@@ -15,7 +15,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
 
@@ -186,7 +185,7 @@ func (*preForkBlock) verifyPostForkOption(context.Context, *postForkOption) erro
 	return errUnexpectedBlockType
 }
 
-func (b *preForkBlock) buildChild(ctx context.Context, _ *bls.SecretKey) (Block, error) {
+func (b *preForkBlock) buildChild(ctx context.Context) (Block, error) {
 	parentTimestamp := b.Timestamp()
 	if parentTimestamp.Before(b.vm.ActivationTime) {
 		// The chain hasn't forked yet

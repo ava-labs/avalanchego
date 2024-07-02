@@ -53,7 +53,7 @@ func CalculateVRFOut(vrfSig []byte) []byte {
 	}
 	buffer := make([]byte, 8+48)
 	copy(buffer, "rng-derv")
-	copy(buffer[8:], vrfSig[:])
+	copy(buffer[8:], vrfSig)
 	outHash := hashing.Hash256(buffer)
 	return outHash[:]
 }

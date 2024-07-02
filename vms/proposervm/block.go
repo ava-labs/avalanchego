@@ -59,7 +59,7 @@ type Block interface {
 	verifyPostForkChild(ctx context.Context, child *postForkBlock) error
 	verifyPostForkOption(ctx context.Context, child *postForkOption) error
 
-	buildChild(context.Context, *bls.SecretKey) (Block, error)
+	buildChild(context.Context) (Block, error)
 
 	pChainHeight(context.Context) (uint64, error)
 }
