@@ -4,12 +4,11 @@
 package leveldb
 
 import (
+	"errors"
 	"strconv"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/syndtr/goleveldb/leveldb"
-
-	"github.com/ava-labs/avalanchego/utils"
 )
 
 var levelLabels = []string{"level"}
@@ -161,7 +160,7 @@ func newMetrics(reg prometheus.Registerer) (metrics, error) {
 		currentStats: &leveldb.DBStats{},
 	}
 
-	err := utils.Err(
+	err := errors.Join(
 		reg.Register(m.writesDelayedCount),
 		reg.Register(m.writesDelayedDuration),
 		reg.Register(m.writeIsDelayed),

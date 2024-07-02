@@ -5,6 +5,7 @@ package throttling
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -13,7 +14,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
 
@@ -80,7 +80,7 @@ func newSystemThrottlerMetrics(namespace string, reg prometheus.Registerer) (*sy
 			Help:      "Number of nodes we're waiting to read a message from because their usage is too high",
 		}),
 	}
-	err := utils.Err(
+	err := errors.Join(
 		reg.Register(m.totalWaits),
 		reg.Register(m.totalNoWaits),
 		reg.Register(m.awaitingAcquire),
