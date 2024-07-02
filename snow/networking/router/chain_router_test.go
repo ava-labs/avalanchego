@@ -435,7 +435,7 @@ func TestShutdownTimesOut(t *testing.T) {
 	shutdownFinished := make(chan struct{}, 1)
 
 	go func() {
-		chainID := ids.ID{}
+		chainID := ids.Empty
 		msg := handler.Message{
 			InboundMessage: message.InboundPullQuery(chainID, 1, time.Hour, ids.GenerateTestID(), 0, nodeID),
 			EngineType:     p2ppb.EngineType_ENGINE_TYPE_UNSPECIFIED,
