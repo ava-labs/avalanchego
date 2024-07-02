@@ -17,7 +17,7 @@ import (
 
 const (
 	VRF_OUT_PREFIX      = "rng-derv"
-	VRG_RNG_ROOT_PREFIX = "rng-root"
+	VRF_RNG_ROOT_PREFIX = "rng-root"
 )
 
 func BuildUnsigned(
@@ -67,7 +67,7 @@ func CalculateVRFOut(vrfSig []byte) []byte {
 // marshalBlock marshal the given statelessBlock by using either the default statelessBlock or
 // coping the exported fields into statelessBlockV0 and then marshaling it.
 // this allows the marsheler to produce encoded blocks that match the old style blocks as long as
-// the VRGSig feature was not enabled.
+// the VRFSig feature was not enabled.
 func marshalBlock(block *statelessBlock) ([]byte, error) {
 	if len(block.StatelessBlock.VRFSig) == 0 {
 		// create a backward compatible block ( without VRFSig ) and use the statelessBlockV0 encoder for the encoding.
@@ -97,10 +97,10 @@ func calculateBootstrappingBlockSig(chainID ids.ID, networkID uint32) [hashing.H
 	// |  networkID:           | uint32   |  4 bytes   |
 	// +-----------------------+----------+------------+
 
-	buffer := make([]byte, len(VRG_RNG_ROOT_PREFIX)+ids.IDLen+4)
-	copy(buffer, VRG_RNG_ROOT_PREFIX)
-	copy(buffer[len(VRG_RNG_ROOT_PREFIX):], chainID[:])
-	binary.LittleEndian.PutUint32(buffer[len(VRG_RNG_ROOT_PREFIX)+ids.IDLen:], networkID)
+	buffer := make([]byte, len(VRF_RNG_ROOT_PREFIX)+ids.IDLen+4)
+	copy(buffer, VRF_RNG_ROOT_PREFIX)
+	copy(buffer[len(VRF_RNG_ROOT_PREFIX):], chainID[:])
+	binary.LittleEndian.PutUint32(buffer[len(VRF_RNG_ROOT_PREFIX)+ids.IDLen:], networkID)
 	return hashing.ComputeHash256Array(buffer)
 }
 
