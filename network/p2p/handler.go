@@ -30,7 +30,8 @@ type Handler interface {
 		gossipBytes []byte,
 	)
 	// AppRequest is called when handling an AppRequest message.
-	// Returns the bytes for the response corresponding to [requestBytes]
+	// Sends a response with the response corresponding to [requestBytes] or
+	// an application-defined error.
 	AppRequest(
 		ctx context.Context,
 		nodeID ids.NodeID,
