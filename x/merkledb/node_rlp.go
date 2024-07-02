@@ -40,6 +40,12 @@ func (n *node) isAccountNode() bool {
 
 // encodeRLPWithShortNode encodes the node into RLP format (adds a short node if needed)
 func (n *node) encodeRLPWithShortNode(parent *node) []byte {
+	// there is 1 child and no value, this is only possible for the root node
+	if len(n.children) == 1 && n.value.IsNothing() {
+		for _, child := range n.children {
+			return child.rlp // only 1 iteration
+		}
+	}
 	w := rlp.NewEncoderBuffer(nil)
 	n.encodeRLP(w)
 
@@ -84,16 +90,6 @@ func (n *node) encodeRLP(w rlp.EncoderBuffer) {
 			w.WriteBytes(n.value.Value())
 		} else {
 			_, _ = w.Write(rlp.EmptyString)
-		}
-		return
-	}
-
-	// case 2: there is 1 child and no value
-	// this is only possible for the root node
-	if len(n.children) == 1 && n.value.IsNothing() {
-		for _, child := range n.children {
-			_, _ = w.Write(child.rlp)
-			break // should only be 1 iteration
 		}
 		return
 	}
