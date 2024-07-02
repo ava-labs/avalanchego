@@ -65,7 +65,7 @@ func (b *statelessBlockV0) initializeID() error {
 	// signature, which is prefixed by a uint32. So, we need to strip off the
 	// signature as well as it's length prefix to get the unsigned bytes.
 	lenUnsignedBytes := len(b.bytes) - wrappers.IntLen - len(b.Signature)
-	if lenUnsignedBytes <= 0 {
+	if lenUnsignedBytes < 0 {
 		return errInvalidBlockEncodingLength
 	}
 

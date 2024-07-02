@@ -15,6 +15,11 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
+const (
+	VRF_OUT_PREFIX      = "rng-derv"
+	VRG_RNG_ROOT_PREFIX = "rng-root"
+)
+
 func BuildUnsigned(
 	parentID ids.ID,
 	timestamp time.Time,
@@ -46,15 +51,16 @@ func CalculateVRFOut(vrfSig []byte) []byte {
 	// +-------------------------+----------+------------+
 	// |  prefix :               | [8]byte  | "rng-derv" |
 	// +-------------------------+----------+------------+
-	// |  vrfSig :               | [48]byte |  48 bytes  |
+	// |  vrfSig :               | [96]byte |  96 bytes  |
 	// +-------------------------+----------+------------+
-	if len(vrfSig) != 48 {
+	if len(vrfSig) != bls.SignatureLen {
 		return nil
 	}
-	buffer := make([]byte, 8+48)
-	copy(buffer, "rng-derv")
-	copy(buffer[8:], vrfSig)
-	outHash := hashing.Hash256(buffer)
+
+	buffer := make([]byte, len(VRF_OUT_PREFIX)+bls.SignatureLen)
+	copy(buffer, VRF_OUT_PREFIX)
+	copy(buffer[len(VRF_OUT_PREFIX):], vrfSig)
+	outHash := hashing.ComputeHash256Array(buffer)
 	return outHash[:]
 }
 
@@ -91,11 +97,11 @@ func calculateBootstrappingBlockSig(chainID ids.ID, networkID uint32) [hashing.H
 	// |  networkID:           | uint32   |  4 bytes   |
 	// +-----------------------+----------+------------+
 
-	buffer := make([]byte, 44)
-	copy(buffer, "rng-root")
-	copy(buffer[8:], chainID[:])
-	binary.LittleEndian.PutUint32(buffer[40:], networkID)
-	return hashing.Hash256(buffer)
+	buffer := make([]byte, len(VRG_RNG_ROOT_PREFIX)+ids.IDLen+4)
+	copy(buffer, VRG_RNG_ROOT_PREFIX)
+	copy(buffer[len(VRG_RNG_ROOT_PREFIX):], chainID[:])
+	binary.LittleEndian.PutUint32(buffer[len(VRG_RNG_ROOT_PREFIX)+ids.IDLen:], networkID)
+	return hashing.ComputeHash256Array(buffer)
 }
 
 func NextHashBlockSignature(parentBlockSig []byte) []byte {
@@ -137,7 +143,7 @@ func NextBlockVRFSig(parentBlockSig []byte, blsSignKey *bls.SecretKey, chainID i
 		signMsg = parentBlockSig
 	}
 
-	return bls.Sign(blsSignKey, signMsg).Serialize()
+	return bls.SignatureToBytes(bls.Sign(blsSignKey, signMsg))
 }
 
 func Build(

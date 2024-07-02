@@ -226,7 +226,6 @@ func (p *postForkCommonComponents) buildChild(
 		return nil, err
 	}
 
-	var statelessChild block.SignedBlock
 	var childBlockVrfSig []byte
 	// if the VRFSig haven't yet been activated, empty the parentBlockSig and blsSignKey.
 	// this would cause the newly generated block to have no VRFSig, which aligns with
@@ -256,6 +255,7 @@ func (p *postForkCommonComponents) buildChild(
 	}
 
 	// Build the child
+	var statelessChild block.SignedBlock
 	if shouldBuildSignedBlock {
 		statelessChild, err = block.Build(
 			parentID,

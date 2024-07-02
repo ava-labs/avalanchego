@@ -30,8 +30,6 @@ type Block interface {
 	ParentID() ids.ID
 	Block() []byte
 	Bytes() []byte
-	// VerifySignature validates the correctness of the VRF signature.
-	VerifySignature(*bls.PublicKey, []byte, ids.ID, uint32) bool
 
 	initializeID() error
 	initialize(bytes []byte) error
@@ -49,6 +47,9 @@ type SignedBlock interface {
 	Proposer() ids.NodeID
 
 	VRFSig() []byte
+
+	// VerifySignature validates the correctness of the VRF signature.
+	VerifySignature(*bls.PublicKey, []byte, ids.ID, uint32) bool
 }
 
 type statelessUnsignedBlock struct {
@@ -98,7 +99,7 @@ func (b *statelessBlock) initializeID() error {
 	// signature, which is prefixed by a uint32. So, we need to strip off the
 	// signature as well as it's length prefix to get the unsigned bytes.
 	lenUnsignedBytes := len(b.bytes) - wrappers.IntLen - len(b.Signature)
-	if lenUnsignedBytes <= 0 {
+	if lenUnsignedBytes < 0 {
 		return errInvalidBlockEncodingLength
 	}
 
@@ -127,11 +128,11 @@ func (b *statelessBlock) initialize(bytes []byte) error {
 
 	b.proposer = ids.NodeIDFromCert(b.cert)
 
-	var sig bls.Signature
-	if sig.Deserialize(b.StatelessBlock.VRFSig) == nil {
-		return errFailedToParseVRFSignature
+	b.vrfSig, err = bls.SignatureFromBytes(b.StatelessBlock.VRFSig)
+	if err != nil {
+		return fmt.Errorf("%w: %w", errFailedToParseVRFSignature, err)
 	}
-	b.vrfSig = &sig
+
 	return nil
 }
 
