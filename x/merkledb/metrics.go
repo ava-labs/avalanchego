@@ -4,6 +4,7 @@
 package merkledb
 
 import (
+	"errors"
 	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
