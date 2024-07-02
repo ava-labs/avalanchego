@@ -238,3 +238,12 @@ func (n *Network) readSubnets() error {
 	n.Subnets = subnets
 	return nil
 }
+
+func (n *Network) WriteSubnets() error {
+    for _, subnet := range n.Subnets {
+            if err := subnet.Write(n.getSubnetDir(), n.getChainConfigDir()); err != nil {
+                    return fmt.Errorf("failed to write subnet: %w", err)
+            }
+    }
+    return nil
+}
