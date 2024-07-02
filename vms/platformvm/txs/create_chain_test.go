@@ -59,7 +59,7 @@ func TestUnsignedCreateChainTxVerify(t *testing.T) {
 			chainName:   "yeet",
 			keys:        []*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 			setup: func(tx *CreateChainTx) *CreateChainTx {
-				tx.VMID = ids.ID{}
+				tx.VMID = ids.Empty
 				return tx
 			},
 			expectedErr: errInvalidVMID,
