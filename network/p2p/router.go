@@ -210,7 +210,7 @@ func (r *router) AppGossip(ctx context.Context, nodeID ids.NodeID, gossip []byte
 	start := time.Now()
 	parsedMsg, handler, handlerID, ok := r.parse(gossip)
 	if !ok {
-		r.log.Debug("failed to process message",
+		r.log.Debug("received message for unregistered handler",
 			zap.Stringer("messageOp", message.AppGossipOp),
 			zap.Stringer("nodeID", nodeID),
 			zap.Binary("message", gossip),
@@ -245,7 +245,7 @@ func (r *router) CrossChainAppRequest(
 	start := time.Now()
 	parsedMsg, handler, handlerID, ok := r.parse(msg)
 	if !ok {
-		r.log.Debug("failed to process message",
+		r.log.Debug("received message for unregistered handler",
 			zap.Stringer("messageOp", message.CrossChainAppRequestOp),
 			zap.Stringer("chainID", chainID),
 			zap.Uint32("requestID", requestID),
