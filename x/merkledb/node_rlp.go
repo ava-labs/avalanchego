@@ -26,9 +26,7 @@ func (n *node) isValueNode() bool {
 }
 
 func (n *node) calculateRLP(parent *node) {
-	w := rlp.NewEncoderBuffer(nil)
-	n.encodeRLPWithShortNode(w, parent)
-	n.rlp = w.ToBytes()
+	n.rlp = n.encodeRLPWithShortNode(parent)
 }
 
 func (n *node) isAccountNode() bool {
@@ -41,14 +39,13 @@ func (n *node) isAccountNode() bool {
 }
 
 // encodeRLPWithShortNode encodes the node into RLP format (adds a short node if needed)
-func (n *node) encodeRLPWithShortNode(w rlp.EncoderBuffer, parent *node) {
-	w0 := rlp.NewEncoderBuffer(nil)
-	n.encodeRLP(w0)
+func (n *node) encodeRLPWithShortNode(parent *node) []byte {
+	w := rlp.NewEncoderBuffer(nil)
+	n.encodeRLP(w)
 
 	// add the short node if needed
-	rlp := shortNodeIfNeeded(
-		toNibbles(n.compressedKey(parent)), w0.ToBytes(), n.isValueNode())
-	_, _ = w.Write(rlp)
+	compressedKey := toNibbles(n.compressedKey(parent))
+	return shortNodeIfNeeded(compressedKey, w.ToBytes(), n.isValueNode())
 }
 
 func (n *node) compressedKey(parent *node) Key {
