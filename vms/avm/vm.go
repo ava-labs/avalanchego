@@ -641,7 +641,7 @@ func (vm *VM) lookupAssetID(asset string) (ids.ID, error) {
 	if assetID, err := ids.FromString(asset); err == nil {
 		return assetID, nil
 	}
-	return ids.ID{}, fmt.Errorf("asset '%s' not found", asset)
+	return ids.Empty, fmt.Errorf("asset '%s' not found", asset)
 }
 
 // Invariant: onAccept is called when [tx] is being marked as accepted, but
