@@ -29,7 +29,7 @@ var CacherTests = []struct {
 func TestBasic(t *testing.T, cache Cacher[ids.ID, int64]) {
 	require := require.New(t)
 
-	id1 := ids.ID{1}
+	id1 := ids.GenerateTestID()
 	_, found := cache.Get(id1)
 	require.False(found)
 
@@ -49,7 +49,7 @@ func TestBasic(t *testing.T, cache Cacher[ids.ID, int64]) {
 	require.True(found)
 	require.Equal(expectedValue1, value)
 
-	id2 := ids.ID{2}
+	id2 := ids.GenerateTestID()
 
 	expectedValue2 := int64(2)
 	cache.Put(id2, expectedValue2)

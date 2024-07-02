@@ -17,11 +17,11 @@ import (
 )
 
 func TestParse(t *testing.T) {
-	parentID := ids.ID{1}
+	parentID := ids.GenerateTestID()
 	timestamp := time.Unix(123, 0)
 	pChainHeight := uint64(2)
 	innerBlockBytes := []byte{3}
-	chainID := ids.ID{4}
+	chainID := ids.GenerateTestID()
 
 	tlsCert, err := staking.NewTLSCert()
 	require.NoError(t, err)
@@ -70,7 +70,7 @@ func TestParse(t *testing.T) {
 		{
 			name:        "invalid chainID",
 			block:       signedBlock,
-			chainID:     ids.ID{5},
+			chainID:     ids.GenerateTestID(),
 			expectedErr: staking.ErrECDSAVerificationFailure,
 		},
 		{
@@ -144,9 +144,9 @@ func TestParseBytes(t *testing.T) {
 func TestParseHeader(t *testing.T) {
 	require := require.New(t)
 
-	chainID := ids.ID{1}
-	parentID := ids.ID{2}
-	bodyID := ids.ID{3}
+	chainID := ids.GenerateTestID()
+	parentID := ids.GenerateTestID()
+	bodyID := ids.GenerateTestID()
 
 	builtHeader, err := BuildHeader(
 		chainID,

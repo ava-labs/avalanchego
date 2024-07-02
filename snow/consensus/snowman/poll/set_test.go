@@ -15,10 +15,10 @@ import (
 )
 
 var (
-	blkID1 = ids.ID{1}
-	blkID2 = ids.ID{2}
-	blkID3 = ids.ID{3}
-	blkID4 = ids.ID{4}
+	blkID1 = ids.GenerateTestID()
+	blkID2 = ids.GenerateTestID()
+	blkID3 = ids.GenerateTestID()
+	blkID4 = ids.GenerateTestID()
 
 	vdr1 = ids.BuildTestNodeID([]byte{0x01})
 	vdr2 = ids.BuildTestNodeID([]byte{0x02})

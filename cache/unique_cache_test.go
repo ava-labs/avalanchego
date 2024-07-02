@@ -29,13 +29,16 @@ func TestEvictableLRU(t *testing.T) {
 
 	cache := EvictableLRU[ids.ID, *evictable[ids.ID]]{}
 
-	expectedValue1 := &evictable[ids.ID]{id: ids.GenerateTestID()}
+	id1 := ids.GenerateTestID()
+	id2 := ids.GenerateTestID()
+
+	expectedValue1 := &evictable[ids.ID]{id: id1}
 	require.Equal(expectedValue1, cache.Deduplicate(expectedValue1))
 	require.Zero(expectedValue1.evicted)
 	require.Equal(expectedValue1, cache.Deduplicate(expectedValue1))
 	require.Zero(expectedValue1.evicted)
 
-	expectedValue2 := &evictable[ids.ID]{id: ids.GenerateTestID()}
+	expectedValue2 := &evictable[ids.ID]{id: id2}
 	returnedValue := cache.Deduplicate(expectedValue2)
 	require.Equal(expectedValue2, returnedValue)
 	require.Equal(1, expectedValue1.evicted)
@@ -43,7 +46,7 @@ func TestEvictableLRU(t *testing.T) {
 
 	cache.Size = 2
 
-	expectedValue3 := &evictable[ids.ID]{id: ids.GenerateTestID()}
+	expectedValue3 := &evictable[ids.ID]{id: id2}
 	returnedValue = cache.Deduplicate(expectedValue3)
 	require.Equal(expectedValue2, returnedValue)
 	require.Equal(1, expectedValue1.evicted)

@@ -67,7 +67,7 @@ func TestUniqueVertexCacheHit(t *testing.T) {
 	require := require.New(t)
 
 	testTx := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
-		IDV: ids.ID{1},
+		IDV: ids.GenerateTestID(),
 	}}
 
 	s := newTestSerializer(t, func(_ context.Context, b []byte) (snowstorm.Tx, error) {
@@ -75,13 +75,12 @@ func TestUniqueVertexCacheHit(t *testing.T) {
 		return testTx, nil
 	})
 
-	id := ids.ID{2}
+	id := ids.GenerateTestID()
 	parentID := ids.GenerateTestID()
 	parentIDs := []ids.ID{parentID}
-	chainID := ids.ID{} // Same as chainID of serializer
 	height := uint64(1)
 	vtx, err := vertex.Build( // regular, non-stop vertex
-		chainID,
+		s.ChainID,
 		height,
 		parentIDs,
 		[][]byte{{0}},

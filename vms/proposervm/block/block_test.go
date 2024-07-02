@@ -35,7 +35,7 @@ func equal(require *require.Assertions, want, have Block) {
 func TestBlockSizeLimit(t *testing.T) {
 	require := require.New(t)
 
-	parentID := ids.ID{1}
+	parentID := ids.GenerateTestID()
 	timestamp := time.Unix(123, 0)
 	pChainHeight := uint64(2)
 	innerBlockBytes := bytes.Repeat([]byte{0}, 270*units.KiB)
