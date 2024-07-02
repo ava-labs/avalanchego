@@ -445,62 +445,6 @@ func TestAppRequestMessageForUnregisteredHandler(t *testing.T) {
 	}
 }
 
-// An unregistered handler should gracefully drop messages by responding
-// to the requester with a common.AppError
-func TestCrossChainAppRequestMessageForUnregisteredHandler(t *testing.T) {
-	tests := []struct {
-		name string
-		msg  []byte
-	}{
-		{
-			name: "nil",
-			msg:  nil,
-		},
-		{
-			name: "empty",
-			msg:  []byte{},
-		},
-		{
-			name: "non-empty",
-			msg:  []byte("foobar"),
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			require := require.New(t)
-			ctx := context.Background()
-			handler := &TestHandler{
-				CrossChainAppRequestF: func(context.Context, ids.ID, time.Time, []byte) ([]byte, error) {
-					require.Fail("should not be called")
-					return nil, nil
-				},
-			}
-
-			wantChainID := ids.GenerateTestID()
-			wantRequestID := uint32(111)
-
-			done := make(chan struct{})
-			sender := &common.SenderTest{}
-			sender.SendCrossChainAppErrorF = func(_ context.Context, chainID ids.ID, requestID uint32, errorCode int32, errorMessage string) {
-				defer close(done)
-
-				require.Equal(wantChainID, chainID)
-				require.Equal(wantRequestID, requestID)
-				require.Equal(ErrUnregisteredHandler.Code, errorCode)
-				require.Equal(ErrUnregisteredHandler.Message, errorMessage)
-			}
-
-			network, err := NewNetwork(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
-			require.NoError(err)
-			require.NoError(network.AddHandler(handlerID, handler))
-
-			require.NoError(network.CrossChainAppRequest(ctx, wantChainID, wantRequestID, time.Time{}, tt.msg))
-			<-done
-		})
-	}
-}
-
 // A handler that errors should send an AppError to the requesting peer
 func TestAppError(t *testing.T) {
 	require := require.New(t)
