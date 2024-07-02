@@ -13,3 +13,16 @@ const (
 	Accepted
 	Rejected
 )
+
+func (s Status) String() string {
+	switch s {
+	case Undecided:
+		return "Undecided"
+	case Accepted:
+		return "Accepted"
+	case Rejected:
+		return "Rejected"
+	default:
+		return "Unknown"
+	}
+}
