@@ -76,7 +76,7 @@ func TestUniqueVertexCacheHit(t *testing.T) {
 	})
 
 	id := ids.ID{2}
-	parentID := ids.ID{'p', 'a', 'r', 'e', 'n', 't'}
+	parentID := ids.GenerateTestID()
 	parentIDs := []ids.ID{parentID}
 	chainID := ids.ID{} // Same as chainID of serializer
 	height := uint64(1)

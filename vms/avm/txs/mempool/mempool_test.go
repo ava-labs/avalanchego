@@ -55,7 +55,7 @@ func newTx(index uint32, size int) *txs.Tx {
 	tx := &txs.Tx{Unsigned: &txs.BaseTx{BaseTx: avax.BaseTx{
 		Ins: []*avax.TransferableInput{{
 			UTXOID: avax.UTXOID{
-				TxID:        ids.ID{'t', 'x', 'I', 'D'},
+				TxID:        ids.GenerateTestID(),
 				OutputIndex: index,
 			},
 		}},

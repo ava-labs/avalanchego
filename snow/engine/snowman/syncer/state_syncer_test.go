@@ -1262,7 +1262,7 @@ func TestStateSyncIsStoppedIfEnoughVotesAreCastedWithNoClearMajority(t *testing.
 				context.Background(),
 				voterID,
 				reqID,
-				set.Of(ids.ID{'u', 'n', 'k', 'n', 'o', 'w', 'n', 'I', 'D'}),
+				set.Of(ids.GenerateTestID()),
 			))
 			votingWeightStake += beacons.GetWeight(ctx.SubnetID, voterID)
 		}

@@ -6,6 +6,7 @@ package block
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -123,13 +124,15 @@ func TestBanffBlockSerialization(t *testing.T) {
 func TestBanffProposalBlockJSON(t *testing.T) {
 	require := require.New(t)
 
+	prntID := ids.GenerateTestID()
+	blockID := ids.GenerateTestID()
 	simpleBanffProposalBlock := &BanffProposalBlock{
 		Time: 123456,
 		ApricotProposalBlock: ApricotProposalBlock{
 			CommonBlock: CommonBlock{
-				PrntID:  ids.ID{'p', 'a', 'r', 'e', 'n', 't', 'I', 'D'},
+				PrntID:  prntID,
 				Hght:    1337,
-				BlockID: ids.ID{'b', 'l', 'o', 'c', 'k', 'I', 'D'},
+				BlockID: blockID,
 			},
 			Tx: &txs.Tx{
 				Unsigned: &txs.AdvanceTimeTx{
@@ -142,12 +145,12 @@ func TestBanffProposalBlockJSON(t *testing.T) {
 	simpleBanffProposalBlockBytes, err := json.MarshalIndent(simpleBanffProposalBlock, "", "\t")
 	require.NoError(err)
 
-	require.Equal(`{
+	expectedSimpleBanffProposalBlockString := `{
 	"time": 123456,
 	"txs": null,
-	"parentID": "rVcYrvnGXdoJBeYQRm5ZNaCGHeVyqcHHJu8Yd89kJcef6V5Eg",
+	"parentID": "EXPECTED_PARENT_ID",
 	"height": 1337,
-	"id": "kM6h4d2UKYEDzQXm7KNqyeBJLjhb42J24m4L4WACB5didf3pk",
+	"id": "EXPECTED_ID",
 	"tx": {
 		"unsignedTx": {
 			"time": 123457
@@ -155,7 +158,10 @@ func TestBanffProposalBlockJSON(t *testing.T) {
 		"credentials": null,
 		"id": "11111111111111111111111111111111LpoYY"
 	}
-}`, string(simpleBanffProposalBlockBytes))
+}`
+	expectedSimpleBanffProposalBlockString = strings.Replace(expectedSimpleBanffProposalBlockString, "EXPECTED_PARENT_ID", prntID.String(), 1)
+	expectedSimpleBanffProposalBlockString = strings.Replace(expectedSimpleBanffProposalBlockString, "EXPECTED_ID", blockID.String(), 1)
+	require.Equal(expectedSimpleBanffProposalBlockString, string(simpleBanffProposalBlockBytes))
 
 	complexBanffProposalBlock := simpleBanffProposalBlock
 	complexBanffProposalBlock.Transactions = []*txs.Tx{
@@ -186,7 +192,7 @@ func TestBanffProposalBlockJSON(t *testing.T) {
 	complexBanffProposalBlockBytes, err := json.MarshalIndent(complexBanffProposalBlock, "", "\t")
 	require.NoError(err)
 
-	require.Equal(`{
+	expectedComplexBanffProposalBlockString := `{
 	"time": 123456,
 	"txs": [
 		{
@@ -212,9 +218,9 @@ func TestBanffProposalBlockJSON(t *testing.T) {
 			"id": "11111111111111111111111111111111LpoYY"
 		}
 	],
-	"parentID": "rVcYrvnGXdoJBeYQRm5ZNaCGHeVyqcHHJu8Yd89kJcef6V5Eg",
+	"parentID": "EXPECTED_PARENT_ID",
 	"height": 1337,
-	"id": "kM6h4d2UKYEDzQXm7KNqyeBJLjhb42J24m4L4WACB5didf3pk",
+	"id": "EXPECTED_ID",
 	"tx": {
 		"unsignedTx": {
 			"time": 123457
@@ -222,5 +228,8 @@ func TestBanffProposalBlockJSON(t *testing.T) {
 		"credentials": null,
 		"id": "11111111111111111111111111111111LpoYY"
 	}
-}`, string(complexBanffProposalBlockBytes))
+}`
+	expectedComplexBanffProposalBlockString = strings.Replace(expectedComplexBanffProposalBlockString, "EXPECTED_PARENT_ID", prntID.String(), 1)
+	expectedComplexBanffProposalBlockString = strings.Replace(expectedComplexBanffProposalBlockString, "EXPECTED_ID", blockID.String(), 1)
+	require.Equal(expectedComplexBanffProposalBlockString, string(complexBanffProposalBlockBytes))
 }

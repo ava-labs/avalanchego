@@ -64,9 +64,9 @@ func TestBasic(t *testing.T, cache Cacher[ids.ID, int64]) {
 func TestEviction(t *testing.T, cache Cacher[ids.ID, int64]) {
 	require := require.New(t)
 
-	id1 := ids.ID{1}
-	id2 := ids.ID{2}
-	id3 := ids.ID{3}
+	id1 := ids.GenerateTestID()
+	id2 := ids.GenerateTestID()
+	id3 := ids.GenerateTestID()
 
 	expectedValue1 := int64(1)
 	expectedValue2 := int64(2)

@@ -30,7 +30,7 @@ var (
 	_ block.ChainVM         = fullVM{}
 	_ block.StateSyncableVM = fullVM{}
 
-	unknownSummaryID = ids.ID{'g', 'a', 'r', 'b', 'a', 'g', 'e'}
+	unknownSummaryID = ids.GenerateTestID()
 
 	summaryBytes = []byte{'s', 'u', 'm', 'm', 'a', 'r', 'y'}
 	summaryID    ids.ID

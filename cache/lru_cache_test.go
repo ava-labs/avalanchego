@@ -27,8 +27,8 @@ func TestLRUResize(t *testing.T) {
 	require := require.New(t)
 	cache := LRU[ids.ID, int64]{Size: 2}
 
-	id1 := ids.ID{1}
-	id2 := ids.ID{2}
+	id1 := ids.GenerateTestID()
+	id2 := ids.GenerateTestID()
 
 	expectedVal1 := int64(1)
 	expectedVal2 := int64(2)
