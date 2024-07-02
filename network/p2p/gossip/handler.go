@@ -81,12 +81,9 @@ func (h Handler[T]) AppRequest(_ context.Context, _ ids.NodeID, _ time.Time, req
 		return nil, p2p.ErrUnexpected
 	}
 
-	bytes, err := MarshalAppResponse(gossipBytes)
-	if err != nil {
-		return nil, p2p.ErrUnexpected
-	}
-
-	return bytes, nil
+  if err := MarshalAppResponse(gossipBytes); err != nil {
+    return nil, p2p.ErrUnexpected 
+  }
 }
 
 func (h Handler[_]) AppGossip(_ context.Context, nodeID ids.NodeID, gossipBytes []byte) {

@@ -290,7 +290,6 @@ func defaultVM(t *testing.T, f fork) (*VM, *txstest.WalletFactory, database.Data
 	appSender.CantSendAppGossip = true
 	appSender.SendAppGossipF = func(context.Context, common.SendConfig, []byte) error {
 		return nil
-	}
 	appSender.SendAppErrorF = func(context.Context, ids.NodeID, uint32, int32, string) error {
 		return nil
 	}
