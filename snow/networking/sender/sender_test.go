@@ -215,17 +215,6 @@ func TestTimeout(t *testing.T) {
 		return nil
 	}
 
-	bootstrapper.CrossChainAppRequestFailedF = func(ctx context.Context, chainID ids.ID, _ uint32, _ *common.AppError) error {
-		require.NoError(ctx.Err())
-
-		failedLock.Lock()
-		defer failedLock.Unlock()
-
-		failedChains.Add(chainID)
-		wg.Done()
-		return nil
-	}
-
 	sendAll := func() {
 		{
 			nodeIDs := set.Of(ids.GenerateTestNodeID())
@@ -289,13 +278,6 @@ func TestTimeout(t *testing.T) {
 			wg.Add(1)
 			requestID++
 			require.NoError(sender.SendAppRequest(cancelledCtx, nodeIDs, requestID, nil))
-		}
-		{
-			chainID := ids.GenerateTestID()
-			chains.Add(chainID)
-			wg.Add(1)
-			requestID++
-			require.NoError(sender.SendCrossChainAppRequest(cancelledCtx, chainID, requestID, nil))
 		}
 	}
 

@@ -39,6 +39,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/messenger"
 
+	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
+
 	aliasreaderpb "github.com/ava-labs/avalanchego/proto/pb/aliasreader"
 	appsenderpb "github.com/ava-labs/avalanchego/proto/pb/appsender"
 	httppb "github.com/ava-labs/avalanchego/proto/pb/http"
@@ -49,7 +51,6 @@ import (
 	validatorstatepb "github.com/ava-labs/avalanchego/proto/pb/validatorstate"
 	vmpb "github.com/ava-labs/avalanchego/proto/pb/vm"
 	warppb "github.com/ava-labs/avalanchego/proto/pb/warp"
-	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 )
 
 var (
@@ -509,39 +510,6 @@ func (vm *VMServer) Version(ctx context.Context, _ *emptypb.Empty) (*vmpb.Versio
 	return &vmpb.VersionResponse{
 		Version: version,
 	}, err
-}
-
-func (vm *VMServer) CrossChainAppRequest(ctx context.Context, msg *vmpb.CrossChainAppRequestMsg) (*emptypb.Empty, error) {
-	chainID, err := ids.ToID(msg.ChainId)
-	if err != nil {
-		return nil, err
-	}
-	deadline, err := grpcutils.TimestampAsTime(msg.Deadline)
-	if err != nil {
-		return nil, err
-	}
-	return &emptypb.Empty{}, vm.vm.CrossChainAppRequest(ctx, chainID, msg.RequestId, deadline, msg.Request)
-}
-
-func (vm *VMServer) CrossChainAppRequestFailed(ctx context.Context, msg *vmpb.CrossChainAppRequestFailedMsg) (*emptypb.Empty, error) {
-	chainID, err := ids.ToID(msg.ChainId)
-	if err != nil {
-		return nil, err
-	}
-
-	appErr := &common.AppError{
-		Code:    msg.ErrorCode,
-		Message: msg.ErrorMessage,
-	}
-	return &emptypb.Empty{}, vm.vm.CrossChainAppRequestFailed(ctx, chainID, msg.RequestId, appErr)
-}
-
-func (vm *VMServer) CrossChainAppResponse(ctx context.Context, msg *vmpb.CrossChainAppResponseMsg) (*emptypb.Empty, error) {
-	chainID, err := ids.ToID(msg.ChainId)
-	if err != nil {
-		return nil, err
-	}
-	return &emptypb.Empty{}, vm.vm.CrossChainAppResponse(ctx, chainID, msg.RequestId, msg.Response)
 }
 
 func (vm *VMServer) AppRequest(ctx context.Context, req *vmpb.AppRequestMsg) (*emptypb.Empty, error) {

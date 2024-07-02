@@ -34,8 +34,7 @@ type SenderTest struct {
 	CantSendGet, CantSendGetAncestors, CantSendPut, CantSendAncestors,
 	CantSendPullQuery, CantSendPushQuery, CantSendChits,
 	CantSendAppRequest, CantSendAppResponse, CantSendAppError,
-	CantSendAppGossip,
-	CantSendCrossChainAppRequest, CantSendCrossChainAppResponse, CantSendCrossChainAppError bool
+	CantSendAppGossip bool
 
 	SendGetStateSummaryFrontierF func(context.Context, set.Set[ids.NodeID], uint32)
 	SendStateSummaryFrontierF    func(context.Context, ids.NodeID, uint32, []byte)
@@ -56,9 +55,6 @@ type SenderTest struct {
 	SendAppResponseF             func(context.Context, ids.NodeID, uint32, []byte) error
 	SendAppErrorF                func(context.Context, ids.NodeID, uint32, int32, string) error
 	SendAppGossipF               func(context.Context, SendConfig, []byte) error
-	SendCrossChainAppRequestF    func(context.Context, ids.ID, uint32, []byte)
-	SendCrossChainAppResponseF   func(context.Context, ids.ID, uint32, []byte)
-	SendCrossChainAppErrorF      func(context.Context, ids.ID, uint32, int32, string)
 }
 
 // Default set the default callable value to [cant]
@@ -81,8 +77,6 @@ func (s *SenderTest) Default(cant bool) {
 	s.CantSendAppRequest = cant
 	s.CantSendAppResponse = cant
 	s.CantSendAppGossip = cant
-	s.CantSendCrossChainAppRequest = cant
-	s.CantSendCrossChainAppResponse = cant
 }
 
 // SendGetStateSummaryFrontier calls SendGetStateSummaryFrontierF if it was
@@ -250,42 +244,6 @@ func (s *SenderTest) SendChits(ctx context.Context, vdr ids.NodeID, requestID ui
 	}
 }
 
-// SendCrossChainAppRequest calls SendCrossChainAppRequestF if it was
-// initialized. If it wasn't initialized and this function shouldn't be called
-// and testing was initialized, then testing will fail.
-func (s *SenderTest) SendCrossChainAppRequest(ctx context.Context, chainID ids.ID, requestID uint32, appRequestBytes []byte) error {
-	if s.SendCrossChainAppRequestF != nil {
-		s.SendCrossChainAppRequestF(ctx, chainID, requestID, appRequestBytes)
-	} else if s.CantSendCrossChainAppRequest && s.T != nil {
-		require.FailNow(s.T, "Unexpectedly called SendCrossChainAppRequest")
-	}
-	return nil
-}
-
-// SendCrossChainAppResponse calls SendCrossChainAppResponseF if it was
-// initialized. If it wasn't initialized and this function shouldn't be called
-// and testing was initialized, then testing will fail.
-func (s *SenderTest) SendCrossChainAppResponse(ctx context.Context, chainID ids.ID, requestID uint32, appResponseBytes []byte) error {
-	if s.SendCrossChainAppResponseF != nil {
-		s.SendCrossChainAppResponseF(ctx, chainID, requestID, appResponseBytes)
-	} else if s.CantSendCrossChainAppResponse && s.T != nil {
-		require.FailNow(s.T, "Unexpectedly called SendCrossChainAppResponse")
-	}
-	return nil
-}
-
-// SendCrossChainAppError calls SendCrossChainAppErrorF if it was
-// initialized. If it wasn't initialized and this function shouldn't be called
-// and testing was initialized, then testing will fail.
-func (s *SenderTest) SendCrossChainAppError(ctx context.Context, chainID ids.ID, requestID uint32, errorCode int32, errorMessage string) error {
-	if s.SendCrossChainAppErrorF != nil {
-		s.SendCrossChainAppErrorF(ctx, chainID, requestID, errorCode, errorMessage)
-	} else if s.CantSendCrossChainAppError && s.T != nil {
-		require.FailNow(s.T, "Unexpectedly called SendCrossChainAppError")
-	}
-	return nil
-}
-
 // SendAppRequest calls SendAppRequestF if it was initialized. If it wasn't
 // initialized and this function shouldn't be called and testing was
 // initialized, then testing will fail.
@@ -345,10 +303,9 @@ func (s *SenderTest) SendAppGossip(
 // FakeSender is used for testing
 type FakeSender struct {
 	SentAppRequest, SentAppResponse,
-	SentAppGossip,
-	SentCrossChainAppRequest, SentCrossChainAppResponse chan []byte
+	SentAppGossip chan []byte
 
-	SentAppError, SentCrossChainAppError chan *AppError
+	SentAppError chan *AppError
 }
 
 func (f FakeSender) SendAppRequest(_ context.Context, _ set.Set[ids.NodeID], _ uint32, bytes []byte) error {
@@ -387,35 +344,5 @@ func (f FakeSender) SendAppGossip(_ context.Context, _ SendConfig, bytes []byte)
 	}
 
 	f.SentAppGossip <- bytes
-	return nil
-}
-
-func (f FakeSender) SendCrossChainAppRequest(_ context.Context, _ ids.ID, _ uint32, bytes []byte) error {
-	if f.SentCrossChainAppRequest == nil {
-		return nil
-	}
-
-	f.SentCrossChainAppRequest <- bytes
-	return nil
-}
-
-func (f FakeSender) SendCrossChainAppResponse(_ context.Context, _ ids.ID, _ uint32, bytes []byte) error {
-	if f.SentCrossChainAppResponse == nil {
-		return nil
-	}
-
-	f.SentCrossChainAppResponse <- bytes
-	return nil
-}
-
-func (f FakeSender) SendCrossChainAppError(_ context.Context, _ ids.ID, _ uint32, errorCode int32, errorMessage string) error {
-	if f.SentCrossChainAppError == nil {
-		return nil
-	}
-
-	f.SentCrossChainAppError <- &AppError{
-		Code:    errorCode,
-		Message: errorMessage,
-	}
 	return nil
 }

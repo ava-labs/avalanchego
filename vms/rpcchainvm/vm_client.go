@@ -43,6 +43,10 @@ import (
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/messenger"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/runtime"
 
+	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
+	dto "github.com/prometheus/client_model/go"
+	healthpb "google.golang.org/grpc/health/grpc_health_v1"
+
 	aliasreaderpb "github.com/ava-labs/avalanchego/proto/pb/aliasreader"
 	appsenderpb "github.com/ava-labs/avalanchego/proto/pb/appsender"
 	httppb "github.com/ava-labs/avalanchego/proto/pb/http"
@@ -53,9 +57,6 @@ import (
 	validatorstatepb "github.com/ava-labs/avalanchego/proto/pb/validatorstate"
 	vmpb "github.com/ava-labs/avalanchego/proto/pb/vm"
 	warppb "github.com/ava-labs/avalanchego/proto/pb/warp"
-	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
-	dto "github.com/prometheus/client_model/go"
-	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 )
 
 // TODO: Enable these to be configured by the user
@@ -503,43 +504,6 @@ func (vm *VMClient) Version(ctx context.Context) (string, error) {
 		return "", err
 	}
 	return resp.Version, nil
-}
-
-func (vm *VMClient) CrossChainAppRequest(ctx context.Context, chainID ids.ID, requestID uint32, deadline time.Time, request []byte) error {
-	_, err := vm.client.CrossChainAppRequest(
-		ctx,
-		&vmpb.CrossChainAppRequestMsg{
-			ChainId:   chainID[:],
-			RequestId: requestID,
-			Deadline:  grpcutils.TimestampFromTime(deadline),
-			Request:   request,
-		},
-	)
-	return err
-}
-
-func (vm *VMClient) CrossChainAppRequestFailed(ctx context.Context, chainID ids.ID, requestID uint32, appErr *common.AppError) error {
-	msg := &vmpb.CrossChainAppRequestFailedMsg{
-		ChainId:      chainID[:],
-		RequestId:    requestID,
-		ErrorCode:    appErr.Code,
-		ErrorMessage: appErr.Message,
-	}
-
-	_, err := vm.client.CrossChainAppRequestFailed(ctx, msg)
-	return err
-}
-
-func (vm *VMClient) CrossChainAppResponse(ctx context.Context, chainID ids.ID, requestID uint32, response []byte) error {
-	_, err := vm.client.CrossChainAppResponse(
-		ctx,
-		&vmpb.CrossChainAppResponseMsg{
-			ChainId:   chainID[:],
-			RequestId: requestID,
-			Response:  response,
-		},
-	)
-	return err
 }
 
 func (vm *VMClient) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, deadline time.Time, request []byte) error {

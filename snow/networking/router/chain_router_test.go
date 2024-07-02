@@ -503,8 +503,7 @@ func TestRouterTimeout(t *testing.T) {
 		calledGetAncestorsFailed,
 		calledGetFailed,
 		calledQueryFailed,
-		calledAppRequestFailed,
-		calledCrossChainAppRequestFailed bool
+		calledAppRequestFailed bool
 
 		wg = sync.WaitGroup{}
 	)
@@ -600,11 +599,6 @@ func TestRouterTimeout(t *testing.T) {
 	bootstrapper.AppRequestFailedF = func(context.Context, ids.NodeID, uint32, *common.AppError) error {
 		defer wg.Done()
 		calledAppRequestFailed = true
-		return nil
-	}
-	bootstrapper.CrossChainAppRequestFailedF = func(context.Context, ids.ID, uint32, *common.AppError) error {
-		defer wg.Done()
-		calledCrossChainAppRequestFailed = true
 		return nil
 	}
 	ctx.State.Set(snow.EngineState{
@@ -787,28 +781,6 @@ func TestRouterTimeout(t *testing.T) {
 		)
 	}
 
-	{
-		wg.Add(1)
-		requestID++
-		chainRouter.RegisterRequest(
-			context.Background(),
-			nodeID,
-			ctx.ChainID,
-			ctx.ChainID,
-			requestID,
-			message.CrossChainAppResponseOp,
-			message.InternalCrossChainAppError(
-				nodeID,
-				ctx.ChainID,
-				ctx.ChainID,
-				requestID,
-				common.ErrTimeout.Code,
-				common.ErrTimeout.Message,
-			),
-			p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
-		)
-	}
-
 	wg.Wait()
 
 	chainRouter.lock.Lock()
@@ -822,7 +794,6 @@ func TestRouterTimeout(t *testing.T) {
 	require.True(calledGetFailed)
 	require.True(calledQueryFailed)
 	require.True(calledAppRequestFailed)
-	require.True(calledCrossChainAppRequestFailed)
 }
 
 func TestRouterHonorsRequestedEngine(t *testing.T) {
@@ -1008,18 +979,6 @@ func TestRouterClearTimeouts(t *testing.T) {
 			responseOp:  message.AppResponseOp,
 			responseMsg: message.InboundAppError(ids.EmptyNodeID, ids.Empty, requestID, 1234, "custom error"),
 			timeoutMsg:  message.InboundAppError(ids.EmptyNodeID, ids.Empty, requestID, 123, "error"),
-		},
-		{
-			name:        "CrossChainAppResponse",
-			responseOp:  message.CrossChainAppResponseOp,
-			responseMsg: message.InternalCrossChainAppResponse(ids.EmptyNodeID, ids.Empty, ids.Empty, requestID, []byte("responseMsg")),
-			timeoutMsg:  message.InternalCrossChainAppError(ids.EmptyNodeID, ids.Empty, ids.Empty, requestID, 123, "error"),
-		},
-		{
-			name:        "CrossChainAppError",
-			responseOp:  message.CrossChainAppResponseOp,
-			responseMsg: message.InternalCrossChainAppError(ids.EmptyNodeID, ids.Empty, ids.Empty, requestID, 1234, "custom error"),
-			timeoutMsg:  message.InternalCrossChainAppError(ids.EmptyNodeID, ids.Empty, ids.Empty, requestID, 123, "error"),
 		},
 	}
 
@@ -1569,94 +1528,6 @@ func TestAppRequest(t *testing.T) {
 					chainRouter.lock.Unlock()
 
 					require.Equal(ids.EmptyNodeID, nodeID)
-					require.Equal(wantRequestID, requestID)
-					require.Equal(wantResponse, msg)
-
-					return nil
-				}
-			}
-
-			ctx := context.Background()
-			chainRouter.RegisterRequest(ctx, ids.EmptyNodeID, ids.Empty, ids.Empty, wantRequestID, tt.responseOp, tt.timeoutMsg, engineType)
-			chainRouter.lock.Lock()
-			require.Equal(1, chainRouter.timedRequests.Len())
-			chainRouter.lock.Unlock()
-
-			if tt.inboundMsg != nil {
-				chainRouter.HandleInbound(ctx, tt.inboundMsg)
-			}
-
-			wg.Wait()
-		})
-	}
-}
-
-// Tests that a response, peer error, or a timeout clears the timeout and calls
-// the handler
-func TestCrossChainAppRequest(t *testing.T) {
-	wantRequestID := uint32(123)
-	wantResponse := []byte("response")
-
-	errFoo := common.AppError{
-		Code:    456,
-		Message: "foo",
-	}
-
-	tests := []struct {
-		name       string
-		responseOp message.Op
-		timeoutMsg message.InboundMessage
-		inboundMsg message.InboundMessage
-	}{
-		{
-			name:       "CrossChainAppRequest - chain response",
-			responseOp: message.CrossChainAppResponseOp,
-			timeoutMsg: message.InternalCrossChainAppError(ids.EmptyNodeID, ids.Empty, ids.Empty, wantRequestID, errFoo.Code, errFoo.Message),
-			inboundMsg: message.InternalCrossChainAppResponse(ids.EmptyNodeID, ids.Empty, ids.Empty, wantRequestID, wantResponse),
-		},
-		{
-			name:       "CrossChainAppRequest - chain error",
-			responseOp: message.CrossChainAppResponseOp,
-			timeoutMsg: message.InternalCrossChainAppError(ids.EmptyNodeID, ids.Empty, ids.Empty, wantRequestID, errFoo.Code, errFoo.Message),
-			inboundMsg: message.InternalCrossChainAppError(ids.EmptyNodeID, ids.Empty, ids.Empty, wantRequestID, errFoo.Code, errFoo.Message),
-		},
-		{
-			name:       "CrossChainAppRequest - timeout",
-			responseOp: message.CrossChainAppResponseOp,
-			timeoutMsg: message.InternalCrossChainAppError(ids.EmptyNodeID, ids.Empty, ids.Empty, wantRequestID, errFoo.Code, errFoo.Message),
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			require := require.New(t)
-
-			wg := &sync.WaitGroup{}
-			chainRouter, engine := newChainRouterTest(t)
-
-			wg.Add(1)
-			if tt.inboundMsg == nil || tt.inboundMsg.Op() == message.CrossChainAppErrorOp {
-				engine.CrossChainAppRequestFailedF = func(_ context.Context, chainID ids.ID, requestID uint32, appErr *common.AppError) error {
-					defer wg.Done()
-					chainRouter.lock.Lock()
-					require.Zero(chainRouter.timedRequests.Len())
-					chainRouter.lock.Unlock()
-
-					require.Equal(ids.Empty, chainID)
-					require.Equal(wantRequestID, requestID)
-					require.Equal(errFoo.Code, appErr.Code)
-					require.Equal(errFoo.Message, appErr.Message)
-
-					return nil
-				}
-			} else if tt.inboundMsg.Op() == message.CrossChainAppResponseOp {
-				engine.CrossChainAppResponseF = func(_ context.Context, chainID ids.ID, requestID uint32, msg []byte) error {
-					defer wg.Done()
-					chainRouter.lock.Lock()
-					require.Zero(chainRouter.timedRequests.Len())
-					chainRouter.lock.Unlock()
-
-					require.Equal(ids.Empty, chainID)
 					require.Equal(wantRequestID, requestID)
 					require.Equal(wantResponse, msg)
 
