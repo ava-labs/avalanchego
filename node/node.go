@@ -81,10 +81,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/registry"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/runtime"
 
-	coreth "github.com/ava-labs/coreth/plugin/evm"
-
 	avmconfig "github.com/ava-labs/avalanchego/vms/avm/config"
 	platformconfig "github.com/ava-labs/avalanchego/vms/platformvm/config"
+	coreth "github.com/ava-labs/coreth/plugin/evm"
 )
 
 const (
