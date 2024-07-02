@@ -47,7 +47,7 @@ func TestUnknownUniqueVertexErrors(t *testing.T) {
 
 	uVtx := &uniqueVertex{
 		serializer: s,
-		id:         ids.ID{},
+		id:         ids.Empty,
 	}
 
 	status := uVtx.Status()
@@ -78,7 +78,7 @@ func TestUniqueVertexCacheHit(t *testing.T) {
 	id := ids.ID{2}
 	parentID := ids.ID{'p', 'a', 'r', 'e', 'n', 't'}
 	parentIDs := []ids.ID{parentID}
-	chainID := ids.ID{} // Same as chainID of serializer
+	chainID := ids.Empty // Same as chainID of serializer
 	height := uint64(1)
 	vtx, err := vertex.Build( // regular, non-stop vertex
 		chainID,
@@ -153,7 +153,7 @@ func TestUniqueVertexCacheMiss(t *testing.T) {
 
 	parentID := uvtxParent.ID()
 	parentIDs := []ids.ID{parentID}
-	chainID := ids.ID{}
+	chainID := ids.Empty
 	height := uint64(1)
 	innerVertex, err := vertex.Build( // regular, non-stop vertex
 		chainID,
@@ -323,14 +323,14 @@ func newTestUniqueVertex(
 	)
 	if !stopVertex {
 		vtx, err = vertex.Build(
-			ids.ID{},
+			ids.Empty,
 			uint64(1),
 			parentIDs,
 			txs,
 		)
 	} else {
 		vtx, err = vertex.BuildStopVertex(
-			ids.ID{},
+			ids.Empty,
 			uint64(1),
 			parentIDs,
 		)
