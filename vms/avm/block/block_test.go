@@ -98,7 +98,7 @@ func createTestTxs(cm codec.Manager) ([]*txs.Tx, error) {
 			}},
 			Ins: []*avax.TransferableInput{{
 				UTXOID: avax.UTXOID{
-					TxID:        ids.ID{'t', 'x', 'I', 'D'},
+					TxID:        ids.GenerateTestID(),
 					OutputIndex: 1,
 				},
 				Asset: avax.Asset{ID: assetID},

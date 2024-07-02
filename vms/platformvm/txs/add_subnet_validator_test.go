@@ -40,20 +40,21 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	require.ErrorIs(err, ErrNilTx)
 
 	validatorWeight := uint64(2022)
-	subnetID := ids.ID{'s', 'u', 'b', 'n', 'e', 't', 'I', 'D'}
+	assetID := ids.GenerateTestID()
+	subnetID := ids.GenerateTestID()
 	inputs := []*avax.TransferableInput{{
 		UTXOID: avax.UTXOID{
-			TxID:        ids.ID{'t', 'x', 'I', 'D'},
+			TxID:        ids.GenerateTestID(),
 			OutputIndex: 2,
 		},
-		Asset: avax.Asset{ID: ids.ID{'a', 's', 's', 'e', 't'}},
+		Asset: avax.Asset{ID: assetID},
 		In: &secp256k1fx.TransferInput{
 			Amt:   uint64(5678),
 			Input: secp256k1fx.Input{SigIndices: []uint32{0}},
 		},
 	}}
 	outputs := []*avax.TransferableOutput{{
-		Asset: avax.Asset{ID: ids.ID{'a', 's', 's', 'e', 't'}},
+		Asset: avax.Asset{ID: assetID},
 		Out: &secp256k1fx.TransferOutput{
 			Amt: uint64(1234),
 			OutputOwners: secp256k1fx.OutputOwners{
@@ -150,21 +151,22 @@ func TestAddSubnetValidatorMarshal(t *testing.T) {
 	)
 
 	// create a valid tx
+	assetID := ids.GenerateTestID()
 	validatorWeight := uint64(2022)
-	subnetID := ids.ID{'s', 'u', 'b', 'n', 'e', 't', 'I', 'D'}
+	subnetID := ids.GenerateTestID()
 	inputs := []*avax.TransferableInput{{
 		UTXOID: avax.UTXOID{
-			TxID:        ids.ID{'t', 'x', 'I', 'D'},
+			TxID:        ids.GenerateTestID(),
 			OutputIndex: 2,
 		},
-		Asset: avax.Asset{ID: ids.ID{'a', 's', 's', 'e', 't'}},
+		Asset: avax.Asset{ID: assetID},
 		In: &secp256k1fx.TransferInput{
 			Amt:   uint64(5678),
 			Input: secp256k1fx.Input{SigIndices: []uint32{0}},
 		},
 	}}
 	outputs := []*avax.TransferableOutput{{
-		Asset: avax.Asset{ID: ids.ID{'a', 's', 's', 'e', 't'}},
+		Asset: avax.Asset{ID: assetID},
 		Out: &secp256k1fx.TransferOutput{
 			Amt: uint64(1234),
 			OutputOwners: secp256k1fx.OutputOwners{

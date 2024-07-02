@@ -896,7 +896,7 @@ func TestCreateChain(t *testing.T) {
 	utx, err := builder.NewCreateChainTx(
 		testSubnet1.ID(),
 		nil,
-		ids.ID{'t', 'e', 's', 't', 'v', 'm'},
+		ids.GenerateTestID(),
 		nil,
 		"name",
 	)
