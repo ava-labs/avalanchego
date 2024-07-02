@@ -23,7 +23,6 @@ type child struct {
 	compressedKey Key
 	id            ids.ID
 	rlp           []byte
-	isValueNode   bool
 	hasValue      bool
 }
 
@@ -114,7 +113,6 @@ func (n *node) addChild(childNode *node, tokenSize int) {
 		&child{
 			compressedKey: childNode.key.Skip(n.key.length + tokenSize),
 			rlp:           childNode.rlp,
-			isValueNode:   childNode.isValueNode(),
 			hasValue:      childNode.hasValue(),
 		},
 	)
@@ -153,7 +151,6 @@ func (n *node) clone() *node {
 			id:            existing.id,
 			rlp:           existing.rlp,
 			hasValue:      existing.hasValue,
-			isValueNode:   existing.isValueNode,
 		}
 	}
 	return result

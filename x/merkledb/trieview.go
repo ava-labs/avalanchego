@@ -331,7 +331,6 @@ func (t *trieView) calculateNodeIDsHelper(n *node, parent *node) ids.ID {
 		}
 		n.onNodeChanged()
 		childEntry.hasValue = childNodeChange.after.hasValue()
-		childEntry.isValueNode = childNodeChange.after.isValueNode()
 
 		// Try updating the child and its descendants in a goroutine.
 		if ok := t.db.calculateNodeIDsSema.TryAcquire(1); ok {
@@ -782,7 +781,6 @@ func (t *trieView) compressNodePath(parent, node *node) error {
 			compressedKey: childKey.Skip(parent.key.length + t.tokenSize),
 			id:            childEntry.id,
 			rlp:           childEntry.rlp,
-			isValueNode:   childEntry.isValueNode,
 			hasValue:      childEntry.hasValue,
 		})
 	return t.recordNodeChange(parent)
@@ -933,7 +931,6 @@ func (t *trieView) insert(
 			compressedKey: existingChildEntry.compressedKey.Skip(commonPrefixLength + t.tokenSize),
 			id:            existingChildEntry.id,
 			rlp:           existingChildEntry.rlp,
-			isValueNode:   existingChildEntry.isValueNode,
 			hasValue:      existingChildEntry.hasValue,
 		})
 
