@@ -10,24 +10,24 @@ import (
 	"golang.org/x/crypto/sha3"
 )
 
-const tokenSize = 4
+const rlpTokenSize = 4
 
 func toNibbles(key Key) []byte {
-	nibbles := make([]byte, key.Length()/tokenSize)
+	nibbles := make([]byte, key.Length()/rlpTokenSize)
 	for i := 0; i < len(nibbles); i++ {
-		nibbles[i] = key.Token(i*tokenSize, tokenSize)
+		nibbles[i] = key.Token(i*rlpTokenSize, rlpTokenSize)
 	}
 	return nibbles
 }
 
 func (n *node) isValueNode() bool {
 	isLeaf := len(n.children) == 0 && !n.value.IsNothing()
-	return isLeaf || n.isAccountNode()
+	return isLeaf // || n.isAccountNode()
 }
 
-func (n *node) calculateRLP() {
+func (n *node) calculateRLP(parent *node) {
 	w := rlp.NewEncoderBuffer(nil)
-	n.encodeRLP(w)
+	n.encodeRLPWithShortNode(w, parent)
 	n.rlp = w.ToBytes()
 }
 
@@ -40,9 +40,47 @@ func (n *node) isAccountNode() bool {
 	return isAccount
 }
 
+// encodeRLPWithShortNode encodes the node into RLP format (adds a short node if needed)
+func (n *node) encodeRLPWithShortNode(w rlp.EncoderBuffer, parent *node) {
+	w0 := rlp.NewEncoderBuffer(nil)
+	n.encodeRLP(w0)
+
+	// add the short node if needed
+	rlp := shortNodeIfNeeded(
+		toNibbles(n.compressedKey(parent)), w0.ToBytes(), n.isValueNode())
+	_, _ = w.Write(rlp)
+}
+
+func (n *node) compressedKey(parent *node) Key {
+	if parent == nil {
+		return Key{} // root has no compressed key
+	}
+
+	// case: the parent has only 1 child and no value,
+	// this is only possible for the root node
+	if len(parent.children) == 1 && parent.value.IsNothing() {
+		for idx, child := range parent.children {
+			compressedKey := ToToken(idx, rlpTokenSize).Extend(child.compressedKey)
+			return compressedKey // should only be 1 iteration
+		}
+	}
+
+	if len(parent.children) > 1 || len(parent.children) == 1 && !parent.value.IsNothing() {
+		// find the expected child slot for this node
+		idx := n.key.Token(parent.key.Length(), rlpTokenSize)
+		child, ok := parent.children[idx]
+		if !ok {
+			panic("unexpected case: child not found at expected index")
+		}
+		return child.compressedKey
+	}
+
+	panic("unexpected case")
+}
+
 func (n *node) encodeRLP(w rlp.EncoderBuffer) {
 	// case 1: there are no children
-	if len(n.children) == 0 || n.isAccountNode() {
+	if len(n.children) == 0 { // || n.isAccountNode() {
 		// the case where there is no value corresponds to an empty trie
 		// the case with a value correspond to value nodes in ethereum representation.
 		if !n.value.IsNothing() {
@@ -56,11 +94,8 @@ func (n *node) encodeRLP(w rlp.EncoderBuffer) {
 	// case 2: there is 1 child and no value
 	// this is only possible for the root node
 	if len(n.children) == 1 && n.value.IsNothing() {
-		for idx, child := range n.children {
-			compressedKey := ToToken(idx, tokenSize).Extend(child.compressedKey)
-			nibbles := toNibbles(compressedKey)
-			rlp := shortNodeIfNeeded(nibbles, child.rlp, child.isValueNode)
-			_, _ = w.Write(rlp)
+		for _, child := range n.children {
+			_, _ = w.Write(child.rlp)
 			break // should only be 1 iteration
 		}
 		return
@@ -71,9 +106,7 @@ func (n *node) encodeRLP(w rlp.EncoderBuffer) {
 		offset := w.List()
 		for i := byte(0); i < 16; i++ {
 			if child, ok := n.children[i]; ok {
-				nibbles := toNibbles(child.compressedKey)
-				rlp := shortNodeIfNeeded(nibbles, child.rlp, child.isValueNode)
-				hashNodeIfNeeded(w, rlp)
+				hashNodeIfNeeded(w, child.rlp)
 			} else {
 				_, _ = w.Write(rlp.EmptyString)
 			}

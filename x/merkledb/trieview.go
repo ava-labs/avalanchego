@@ -296,7 +296,7 @@ func (t *trieView) calculateNodeIDs(ctx context.Context) error {
 			return
 		}
 		_ = t.db.calculateNodeIDsSema.Acquire(context.Background(), 1)
-		t.changes.rootID = t.calculateNodeIDsHelper(root)
+		t.changes.rootID = t.calculateNodeIDsHelper(root, nil)
 		t.db.calculateNodeIDsSema.Release(1)
 
 		// If the sentinel node is not the root, the trie's root is the sentinel node's only child
@@ -317,7 +317,7 @@ func (t *trieView) calculateNodeIDs(ctx context.Context) error {
 
 // Calculates the ID of all descendants of [n] which need to be recalculated,
 // and then calculates the ID of [n] itself.
-func (t *trieView) calculateNodeIDsHelper(n *node) ids.ID {
+func (t *trieView) calculateNodeIDsHelper(n *node, parent *node) ids.ID {
 	// We use [wg] to wait until all descendants of [n] have been updated.
 	var wg sync.WaitGroup
 
@@ -337,14 +337,14 @@ func (t *trieView) calculateNodeIDsHelper(n *node) ids.ID {
 		if ok := t.db.calculateNodeIDsSema.TryAcquire(1); ok {
 			wg.Add(1)
 			go func() {
-				childEntry.id = t.calculateNodeIDsHelper(childNodeChange.after)
+				childEntry.id = t.calculateNodeIDsHelper(childNodeChange.after, n)
 				childEntry.rlp = childNodeChange.after.rlp
 				t.db.calculateNodeIDsSema.Release(1)
 				wg.Done()
 			}()
 		} else {
 			// We're at the goroutine limit; do the work in this goroutine.
-			childEntry.id = t.calculateNodeIDsHelper(childNodeChange.after)
+			childEntry.id = t.calculateNodeIDsHelper(childNodeChange.after, n)
 			childEntry.rlp = childNodeChange.after.rlp
 		}
 	}
@@ -353,7 +353,9 @@ func (t *trieView) calculateNodeIDsHelper(n *node) ids.ID {
 	wg.Wait()
 
 	// Calculate the RLP of [n] at the same time as its ID.
-	n.calculateRLP()
+	if t.tokenSize == rlpTokenSize {
+		n.calculateRLP(parent)
+	}
 
 	// The IDs [n]'s descendants are up to date so we can calculate [n]'s ID.
 	return n.calculateID(t.db.metrics)
@@ -618,8 +620,8 @@ func (t *trieView) GetAltMerkleRoot(ctx context.Context) (ids.ID, error) {
 	if err != nil {
 		return ids.Empty, err
 	}
-	if hashRoot.rlp == nil {
-		hashRoot.calculateRLP()
+	if hashRoot.rlp == nil && t.tokenSize == rlpTokenSize {
+		hashRoot.calculateRLP(nil)
 	}
 	return rlpToAltID(hashRoot.rlp), nil
 }
