@@ -4,6 +4,7 @@
 package tx
 
 import (
+	"errors"
 	"math"
 
 	"github.com/ava-labs/avalanchego/codec"
