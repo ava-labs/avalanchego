@@ -1,5 +1,10 @@
 # Release Notes
 
+## [v0.13.6](https://github.com/ava-labs/coreth/releases/tag/v0.13.6)
+- rpc: truncate call error data logs
+- logging: remove path prefix (up to coreth@version/) from logged file names.
+- cleanup: removes pre-Durango scripts
+
 ## [v0.13.5](https://github.com/ava-labs/coreth/releases/tag/v0.13.5)
 - Bump AvalancheGo to v1.11.7
 - Bump golang version requirement to 1.21.11
