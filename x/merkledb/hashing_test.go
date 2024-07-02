@@ -43,7 +43,7 @@ var sha256HashNodeTests = []struct {
 			n := newNode(Key{})
 			childNode := newNode(ToKey([]byte{255}))
 			childNode.setValue(SHA256Hasher, maybe.Some([]byte("value1")))
-			n.addChildWithID(childNode, 4, SHA256Hasher.HashNode(childNode))
+			n.addChildWithID(childNode, 4, nil, SHA256Hasher.HashNode(childNode))
 			return n
 		}(),
 		expectedHash: "YfJRufqUKBv9ez6xZx6ogpnfDnw9fDsyebhYDaoaH57D3vRu3",
@@ -59,8 +59,8 @@ var sha256HashNodeTests = []struct {
 			childNode2 := newNode(ToKey([]byte{237}))
 			childNode2.setValue(SHA256Hasher, maybe.Some([]byte("value2")))
 
-			n.addChildWithID(childNode1, 4, SHA256Hasher.HashNode(childNode1))
-			n.addChildWithID(childNode2, 4, SHA256Hasher.HashNode(childNode2))
+			n.addChildWithID(childNode1, 4, nil, SHA256Hasher.HashNode(childNode1))
+			n.addChildWithID(childNode2, 4, nil, SHA256Hasher.HashNode(childNode2))
 			return n
 		}(),
 		expectedHash: "YVmbx5MZtSKuYhzvHnCqGrswQcxmozAkv7xE1vTA2EiGpWUkv",
@@ -74,7 +74,7 @@ var sha256HashNodeTests = []struct {
 				childNode := newNode(ToKey([]byte{i << 4}))
 				childNode.setValue(SHA256Hasher, maybe.Some([]byte("some value")))
 
-				n.addChildWithID(childNode, 4, SHA256Hasher.HashNode(childNode))
+				n.addChildWithID(childNode, 4, nil, SHA256Hasher.HashNode(childNode))
 			}
 			return n
 		}(),

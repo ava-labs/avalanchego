@@ -25,11 +25,20 @@ var (
 type Hasher interface {
 	// Returns the canonical hash of the non-nil [node].
 	HashNode(node *node) ids.ID
+
+	// Returns the canonical hash of the non-nil [node]. If the node is short,
+	// this method will return the node's bytes along with the hash.
+	HashOrEmbedNode(node *node) ([]byte, ids.ID)
+
 	// Returns the canonical hash of [value].
 	HashValue(value []byte) ids.ID
 }
 
 type sha256Hasher struct{}
+
+func (*sha256Hasher) HashOrEmbedNode(n *node) ([]byte, ids.ID) {
+	return nil, SHA256Hasher.HashNode(n)
+}
 
 // This method is performance critical. It is not expected to perform any memory
 // allocations.

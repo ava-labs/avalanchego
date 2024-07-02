@@ -106,7 +106,10 @@ func encodeDBNode(n *dbNode) []byte {
 		entry := n.children[index]
 		w.Uvarint(uint64(index))
 		w.Key(entry.compressedKey)
-		w.ID(entry.id)
+		w.Bytes(entry.embed)
+		if len(entry.embed) == 0 {
+			w.ID(entry.id)
+		}
 		w.Bool(entry.hasValue)
 	}
 
@@ -197,9 +200,17 @@ func decodeDBNode(b []byte, n *dbNode) error {
 		if err != nil {
 			return err
 		}
-		childID, err := r.ID()
+		embed, err := r.Bytes()
 		if err != nil {
 			return err
+		}
+		var childID ids.ID
+		if len(embed) == 0 {
+			childID, err = r.ID()
+			if err != nil {
+				return err
+			}
+			embed = nil
 		}
 		hasValue, err := r.Bool()
 		if err != nil {
@@ -207,6 +218,7 @@ func decodeDBNode(b []byte, n *dbNode) error {
 		}
 		n.children[byte(index)] = &child{
 			compressedKey: compressedKey,
+			embed:         embed,
 			id:            childID,
 			hasValue:      hasValue,
 		}

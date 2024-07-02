@@ -292,7 +292,7 @@ func (v *view) hashChangedNodes(ctx context.Context) {
 	// Allocate [keyBuffer] and populate it with the root node's key.
 	keyBuffer := v.db.hashNodesKeyPool.Acquire()
 	keyBuffer = v.setKeyBuffer(root, keyBuffer)
-	v.changes.rootID, keyBuffer = v.hashChangedNode(root, keyBuffer)
+	_, v.changes.rootID, keyBuffer = v.hashChangedNode(root, keyBuffer)
 	v.db.hashNodesKeyPool.Release(keyBuffer)
 }
 
@@ -305,7 +305,7 @@ func (v *view) hashChangedNodes(ctx context.Context) {
 //
 // Invariant: [keyBuffer] must be populated with [n]'s key and have sufficient
 // length to contain any of [n]'s child keys.
-func (v *view) hashChangedNode(n *node, keyBuffer []byte) (ids.ID, []byte) {
+func (v *view) hashChangedNode(n *node, keyBuffer []byte) ([]byte, ids.ID, []byte) {
 	var (
 		// childBuffer is allocated on the stack.
 		childBuffer = make([]byte, 1)
@@ -371,7 +371,7 @@ func (v *view) hashChangedNode(n *node, keyBuffer []byte) (ids.ID, []byte) {
 		// If there are no children of the childNode, we can avoid constructing
 		// the buffer for the child keys.
 		if len(childNode.children) == 0 {
-			childEntry.id = v.db.hasher.HashNode(childNode)
+			childEntry.embed, childEntry.id = v.db.hasher.HashOrEmbedNode(childNode)
 			v.db.metrics.HashCalculated()
 			continue
 		}
@@ -381,7 +381,7 @@ func (v *view) hashChangedNode(n *node, keyBuffer []byte) (ids.ID, []byte) {
 			wg.Add(1)
 			go func(wg *sync.WaitGroup, childEntry *child, childNode *node, childKeyBuffer []byte) {
 				childKeyBuffer = v.setKeyBuffer(childNode, childKeyBuffer)
-				childEntry.id, childKeyBuffer = v.hashChangedNode(childNode, childKeyBuffer)
+				childEntry.embed, childEntry.id, childKeyBuffer = v.hashChangedNode(childNode, childKeyBuffer)
 				v.db.hashNodesKeyPool.Release(childKeyBuffer)
 				wg.Done()
 			}(wg.wg, childEntry, childNode, childKeyBuffer)
@@ -391,7 +391,7 @@ func (v *view) hashChangedNode(n *node, keyBuffer []byte) (ids.ID, []byte) {
 			// We can skip copying the key here because [keyBuffer] is already
 			// constructed to be childNode's key.
 			keyBuffer = v.setLengthForChildren(childNode, keyBuffer)
-			childEntry.id, keyBuffer = v.hashChangedNode(childNode, keyBuffer)
+			childEntry.embed, childEntry.id, keyBuffer = v.hashChangedNode(childNode, keyBuffer)
 		}
 	}
 
@@ -400,7 +400,8 @@ func (v *view) hashChangedNode(n *node, keyBuffer []byte) (ids.ID, []byte) {
 
 	// The IDs [n]'s descendants are up to date so we can calculate [n]'s ID.
 	v.db.metrics.HashCalculated()
-	return v.db.hasher.HashNode(n), keyBuffer
+	embed, id := v.db.hasher.HashOrEmbedNode(n)
+	return embed, id, keyBuffer
 }
 
 // setKeyBuffer expands [keyBuffer] to have sufficient size for any of [n]'s
@@ -720,6 +721,7 @@ func (v *view) compressNodePath(parent, n *node) error {
 		&child{
 			compressedKey: childKey.Skip(parent.key.length + v.tokenSize),
 			id:            childEntry.id,
+			embed:         childEntry.embed,
 			hasValue:      childEntry.hasValue,
 		})
 	return v.recordNodeChange(parent)
@@ -778,11 +780,11 @@ func (v *view) insert(
 	if closestNode == nil {
 		// [v.root.key] isn't a prefix of [key].
 		var (
-			oldRoot            = v.root.Value()
-			commonPrefixLength = getLengthOfCommonPrefix(oldRoot.key, key, 0 /*offset*/, v.tokenSize)
-			commonPrefix       = oldRoot.key.Take(commonPrefixLength)
-			newRoot            = newNode(commonPrefix)
-			oldRootID          = v.db.hasher.HashNode(oldRoot)
+			oldRoot                 = v.root.Value()
+			commonPrefixLength      = getLengthOfCommonPrefix(oldRoot.key, key, 0 /*offset*/, v.tokenSize)
+			commonPrefix            = oldRoot.key.Take(commonPrefixLength)
+			newRoot                 = newNode(commonPrefix)
+			oldRootEmbed, oldRootID = v.db.hasher.HashOrEmbedNode(oldRoot)
 		)
 		v.db.metrics.HashCalculated()
 
@@ -792,7 +794,7 @@ func (v *view) insert(
 		// [oldRootID] shouldn't need to be calculated here.
 		// Either oldRootID should already be calculated or will be calculated at the end with the other nodes
 		// Initialize the v.changes.rootID during newView and then use that here instead of oldRootID
-		newRoot.addChildWithID(oldRoot, v.tokenSize, oldRootID)
+		newRoot.addChildWithID(oldRoot, v.tokenSize, oldRootEmbed, oldRootID)
 		if err := v.recordNewNode(newRoot); err != nil {
 			return nil, err
 		}
@@ -868,6 +870,7 @@ func (v *view) insert(
 		&child{
 			compressedKey: existingChildEntry.compressedKey.Skip(commonPrefixLength + v.tokenSize),
 			id:            existingChildEntry.id,
+			embed:         existingChildEntry.embed,
 			hasValue:      existingChildEntry.hasValue,
 		})
 
