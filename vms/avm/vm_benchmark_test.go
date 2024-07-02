@@ -60,7 +60,7 @@ func BenchmarkLoadUser(b *testing.B) {
 	}
 }
 
-// GetAllUTXOsBenchmark is a helper func to benchmark the GetAllUTXOs depending on the size
+// getAllUTXOsBenchmark is a helper func to benchmark the GetAllUTXOs depending on the size
 func getAllUTXOsBenchmark(b *testing.B, utxoCount int, randSrc rand.Source) {
 	require := require.New(b)
 

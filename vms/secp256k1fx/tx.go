@@ -13,7 +13,7 @@ var _ UnsignedTx = (*TestTx)(nil)
 // TestTx is a minimal implementation of a Tx
 type TestTx struct{ UnsignedBytes []byte }
 
-// UnsignedBytes returns Bytes
+// Bytes returns UnsignedBytes
 func (tx *TestTx) Bytes() []byte {
 	return tx.UnsignedBytes
 }
