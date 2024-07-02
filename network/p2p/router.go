@@ -128,6 +128,9 @@ func (r *router) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID ui
 	start := time.Now()
 	parsedMsg, handler, handlerID, ok := r.parse(request)
 	if !ok {
+		// Send an error back to the requesting peer. Invalid requests that we
+		// cannot parse a handler id for are handled the same way as requests
+		// for which we do not have a registered handler.
 		r.log.Debug("received message for unregistered handler",
 			zap.Stringer("messageOp", message.AppRequestOp),
 			zap.Stringer("nodeID", nodeID),
