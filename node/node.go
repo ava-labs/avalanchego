@@ -81,9 +81,10 @@ import (
 	"github.com/ava-labs/avalanchego/vms/registry"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/runtime"
 
+	coreth "github.com/ava-labs/coreth/plugin/evm"
+
 	avmconfig "github.com/ava-labs/avalanchego/vms/avm/config"
 	platformconfig "github.com/ava-labs/avalanchego/vms/platformvm/config"
-	coreth "github.com/ava-labs/coreth/plugin/evm"
 )
 
 const (
@@ -1217,7 +1218,7 @@ func (n *Node) initVMs() error {
 
 	// Register the VMs that Avalanche supports
 	eUpgradeTime := version.GetEUpgradeTime(n.Config.NetworkID)
-	err := utils.Err(
+	err := errors.Join(
 		n.VMManager.RegisterFactory(context.TODO(), constants.PlatformVMID, &platformvm.Factory{
 			Config: platformconfig.Config{
 				Chains:                    n.chainManager,
