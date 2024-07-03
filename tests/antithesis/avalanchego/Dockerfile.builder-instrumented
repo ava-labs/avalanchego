@@ -17,6 +17,9 @@ RUN go mod download
 # Copy the code into the container
 COPY . .
 
+# runtime/cgo requires installing gcc-multilib
+apt-get update && apt-get install -y gcc-multilib
+
 # Ensure pre-existing builds are not available for inclusion in the final image
 RUN [ -d ./build ] && rm -rf ./build/* || true
 
