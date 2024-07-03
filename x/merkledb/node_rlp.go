@@ -23,7 +23,7 @@ func (n *node) isValueNode() bool {
 	return isLeaf // || n.isAccountNode()
 }
 
-func (n *child) rlp() []byte {
+func (n *child) rlpOrHash() []byte {
 	if len(n.embed) > 0 {
 		return n.embed
 	}
@@ -90,7 +90,7 @@ func (n *node) encodeRLP(w rlp.EncoderBuffer) {
 		offset := w.List()
 		for i := byte(0); i < 16; i++ {
 			if child, ok := n.children[i]; ok {
-				hashNodeIfNeeded(w, child.rlp())
+				hashNodeIfNeeded(w, child.rlpOrHash())
 			} else {
 				_, _ = w.Write(rlp.EmptyString)
 			}
