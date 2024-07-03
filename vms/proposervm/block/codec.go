@@ -4,11 +4,11 @@
 package block
 
 import (
+	"errors"
 	"math"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
-	"github.com/ava-labs/avalanchego/utils"
 )
 
 const CodecVersion = 0
@@ -21,7 +21,7 @@ func init() {
 	// See: [constants.DefaultMaxMessageSize]
 	Codec = codec.NewManager(math.MaxInt)
 
-	err := utils.Err(
+	err := errors.Join(
 		lc.RegisterType(&statelessBlock{}),
 		lc.RegisterType(&option{}),
 		Codec.RegisterCodec(CodecVersion, lc),

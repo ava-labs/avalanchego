@@ -4,11 +4,11 @@
 package block
 
 import (
+	"errors"
 	"math"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
@@ -55,7 +55,7 @@ func init() {
 // subpackage-level codecs were introduced, each handling serialization of
 // specific types.
 func RegisterApricotBlockTypes(targetCodec codec.Registry) error {
-	return utils.Err(
+	return errors.Join(
 		targetCodec.RegisterType(&ApricotProposalBlock{}),
 		targetCodec.RegisterType(&ApricotAbortBlock{}),
 		targetCodec.RegisterType(&ApricotCommitBlock{}),
@@ -65,7 +65,7 @@ func RegisterApricotBlockTypes(targetCodec codec.Registry) error {
 }
 
 func RegisterBanffBlockTypes(targetCodec codec.Registry) error {
-	return utils.Err(
+	return errors.Join(
 		targetCodec.RegisterType(&BanffProposalBlock{}),
 		targetCodec.RegisterType(&BanffAbortBlock{}),
 		targetCodec.RegisterType(&BanffCommitBlock{}),

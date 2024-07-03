@@ -13,7 +13,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/compression"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -178,7 +177,7 @@ func newMsgBuilder(
 
 		maxMessageTimeout: maxMessageTimeout,
 	}
-	return mb, utils.Err(
+	return mb, errors.Join(
 		metrics.Register(mb.count),
 		metrics.Register(mb.duration),
 	)

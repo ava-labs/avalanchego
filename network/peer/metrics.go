@@ -4,12 +4,12 @@
 package peer
 
 import (
+	"errors"
 	"strconv"
 
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/message"
-	"github.com/ava-labs/avalanchego/utils"
 )
 
 const (
@@ -82,7 +82,7 @@ func NewMetrics(registerer prometheus.Registerer) (*Metrics, error) {
 			ioOpLabels,
 		),
 	}
-	return m, utils.Err(
+	return m, errors.Join(
 		registerer.Register(m.ClockSkewCount),
 		registerer.Register(m.ClockSkewSum),
 		registerer.Register(m.NumFailedToParse),

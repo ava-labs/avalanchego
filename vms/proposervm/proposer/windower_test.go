@@ -123,11 +123,11 @@ func TestDelayChangeByChain(t *testing.T) {
 	source := rand.NewSource(int64(0))
 	rng := rand.New(source) // #nosec G404
 
-	chainID0 := ids.ID{}
+	chainID0 := ids.Empty
 	_, err := rng.Read(chainID0[:])
 	require.NoError(err)
 
-	chainID1 := ids.ID{}
+	chainID1 := ids.Empty
 	_, err = rng.Read(chainID1[:])
 	require.NoError(err)
 
@@ -196,11 +196,11 @@ func TestExpectedProposerChangeByChain(t *testing.T) {
 	source := rand.NewSource(int64(0))
 	rng := rand.New(source) // #nosec G404
 
-	chainID0 := ids.ID{}
+	chainID0 := ids.Empty
 	_, err := rng.Read(chainID0[:])
 	require.NoError(err)
 
-	chainID1 := ids.ID{}
+	chainID1 := ids.Empty
 	_, err = rng.Read(chainID1[:])
 	require.NoError(err)
 

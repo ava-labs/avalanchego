@@ -15,7 +15,6 @@ import (
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
@@ -99,7 +98,7 @@ func newIndex(
 
 // Close this index
 func (i *index) Close() error {
-	return utils.Err(
+	return errors.Join(
 		i.indexToContainer.Close(),
 		i.containerToIndex.Close(),
 		i.vDB.Close(),

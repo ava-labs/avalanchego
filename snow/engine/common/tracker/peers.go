@@ -5,13 +5,13 @@ package tracker
 
 import (
 	"context"
+	"errors"
 	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
@@ -126,7 +126,7 @@ func NewMeteredPeers(reg prometheus.Registerer) (Peers, error) {
 		Name: "num_validators",
 		Help: "Total number of validators",
 	})
-	err := utils.Err(
+	err := errors.Join(
 		reg.Register(percentConnected),
 		reg.Register(totalWeight),
 		reg.Register(numValidators),

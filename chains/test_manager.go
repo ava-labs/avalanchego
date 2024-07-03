@@ -42,7 +42,7 @@ func (testManager) StartChainCreator(ChainParameters) error {
 }
 
 func (testManager) SubnetID(ids.ID) (ids.ID, error) {
-	return ids.ID{}, nil
+	return ids.Empty, nil
 }
 
 func (testManager) IsBootstrapped(ids.ID) bool {
