@@ -16,8 +16,8 @@ import (
 )
 
 const (
-	VRF_OUT_PREFIX      = "rng-derv"
-	VRF_RNG_ROOT_PREFIX = "rng-root"
+	vrfOutPrefix     = "rng-derv"
+	vrfRngRootPrefix = "rng-root"
 )
 
 func BuildUnsigned(
@@ -57,9 +57,9 @@ func CalculateVRFOut(vrfSig []byte) []byte {
 		return nil
 	}
 
-	buffer := make([]byte, len(VRF_OUT_PREFIX)+bls.SignatureLen)
-	copy(buffer, VRF_OUT_PREFIX)
-	copy(buffer[len(VRF_OUT_PREFIX):], vrfSig)
+	buffer := make([]byte, len(vrfOutPrefix)+bls.SignatureLen)
+	copy(buffer, vrfOutPrefix)
+	copy(buffer[len(vrfOutPrefix):], vrfSig)
 	outHash := hashing.ComputeHash256Array(buffer)
 	return outHash[:]
 }
@@ -97,10 +97,10 @@ func calculateBootstrappingBlockSig(chainID ids.ID, networkID uint32) [hashing.H
 	// |  networkID:           | uint32   |  4 bytes   |
 	// +-----------------------+----------+------------+
 
-	buffer := make([]byte, len(VRF_RNG_ROOT_PREFIX)+ids.IDLen+4)
-	copy(buffer, VRF_RNG_ROOT_PREFIX)
-	copy(buffer[len(VRF_RNG_ROOT_PREFIX):], chainID[:])
-	binary.LittleEndian.PutUint32(buffer[len(VRF_RNG_ROOT_PREFIX)+ids.IDLen:], networkID)
+	buffer := make([]byte, len(vrfRngRootPrefix)+ids.IDLen+4)
+	copy(buffer, vrfRngRootPrefix)
+	copy(buffer[len(vrfRngRootPrefix):], chainID[:])
+	binary.LittleEndian.PutUint32(buffer[len(vrfRngRootPrefix)+ids.IDLen:], networkID)
 	return hashing.ComputeHash256Array(buffer)
 }
 

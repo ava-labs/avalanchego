@@ -17,6 +17,7 @@ import (
 )
 
 var (
+	// compile time check to ensure statelessBlock implements SignedBlock
 	_ SignedBlock = (*statelessBlock)(nil)
 
 	errUnexpectedSignature        = errors.New("signature provided when none was expected")

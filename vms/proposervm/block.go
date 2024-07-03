@@ -227,18 +227,15 @@ func (p *postForkCommonComponents) buildChild(
 	}
 
 	var childBlockVrfSig []byte
-	// if the VRFSig haven't yet been activated, empty the parentBlockSig and blsSignKey.
-	// this would cause the newly generated block to have no VRFSig, which aligns with
-	// pre-VRFSig blocks.
-	if !p.vm.IsVRFSigActivated(newTimestamp) {
-		parentBlockSig = nil
-		blsSignKey = nil
-	} else if shouldBuildSignedBlock {
-		childBlockVrfSig = block.NextBlockVRFSig(parentBlockSig, blsSignKey, p.vm.ctx.ChainID, p.vm.ctx.NetworkID)
-	} else {
-		// in this case, we can't sign with BLS key, since we're not going to include the Certificate, which is required
-		// for the signature validation. Instead, we'll just hash the previous
-		childBlockVrfSig = block.NextHashBlockSignature(parentBlockSig)
+	// do we have the VRFSig activated ? if so, figure out the child block vrf signature.
+	if p.vm.IsVRFSigActivated(newTimestamp) {
+		if shouldBuildSignedBlock {
+			childBlockVrfSig = block.NextBlockVRFSig(parentBlockSig, blsSignKey, p.vm.ctx.ChainID, p.vm.ctx.NetworkID)
+		} else {
+			// in this case, we can't sign with BLS key, since we're not going to include the Certificate, which is required
+			// for the signature validation. Instead, we'll just hash the previous
+			childBlockVrfSig = block.NextHashBlockSignature(parentBlockSig)
+		}
 	}
 
 	var innerBlock snowman.Block
