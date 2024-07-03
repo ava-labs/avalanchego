@@ -1571,7 +1571,7 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 		},
 		GetBlockIDAtHeightF: func(_ context.Context, height uint64) (ids.ID, error) {
 			if height >= uint64(len(coreHeights)) {
-				return ids.ID{}, errTooHigh
+				return ids.Empty, errTooHigh
 			}
 			return coreHeights[height], nil
 		},
@@ -1743,7 +1743,7 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 		},
 		GetBlockIDAtHeightF: func(_ context.Context, height uint64) (ids.ID, error) {
 			if height >= uint64(len(coreHeights)) {
-				return ids.ID{}, errTooHigh
+				return ids.Empty, errTooHigh
 			}
 			return coreHeights[height], nil
 		},
@@ -2299,7 +2299,7 @@ func TestHistoricalBlockDeletion(t *testing.T) {
 		},
 		GetBlockIDAtHeightF: func(_ context.Context, height uint64) (ids.ID, error) {
 			if height >= uint64(len(acceptedBlocks)) {
-				return ids.ID{}, errTooHigh
+				return ids.Empty, errTooHigh
 			}
 			return acceptedBlocks[height].ID(), nil
 		},

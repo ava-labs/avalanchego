@@ -5,6 +5,7 @@ package queue
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -15,7 +16,6 @@ import (
 	"github.com/ava-labs/avalanchego/database/linkeddb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
@@ -153,7 +153,7 @@ func (s *state) Clear() error {
 		return err
 	}
 
-	return utils.Err(
+	return errors.Join(
 		runJobsIter.Error(),
 		jobsIter.Error(),
 		depsIter.Error(),

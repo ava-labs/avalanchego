@@ -5,13 +5,12 @@ package metric
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"time"
 
 	"github.com/gorilla/rpc/v2"
 	"github.com/prometheus/client_golang/prometheus"
-
-	"github.com/ava-labs/avalanchego/utils"
 )
 
 type APIInterceptor interface {
@@ -51,7 +50,7 @@ func NewAPIInterceptor(registerer prometheus.Registerer) (APIInterceptor, error)
 		[]string{"method"},
 	)
 
-	err := utils.Err(
+	err := errors.Join(
 		registerer.Register(requestDurationCount),
 		registerer.Register(requestDurationSum),
 		registerer.Register(requestErrors),

@@ -60,7 +60,7 @@ func (b *builderWithOptions) GetImportableBalance(
 
 func (b *builderWithOptions) NewBaseTx(
 	outputs []*avax.TransferableOutput,
-	feeCalc *fee.Calculator,
+	feeCalc fee.Calculator,
 	options ...common.Option,
 ) (*txs.BaseTx, error) {
 	return b.builder.NewBaseTx(
@@ -74,7 +74,7 @@ func (b *builderWithOptions) NewAddValidatorTx(
 	vdr *txs.Validator,
 	rewardsOwner *secp256k1fx.OutputOwners,
 	shares uint32,
-	feeCalc *fee.Calculator,
+	feeCalc fee.Calculator,
 	options ...common.Option,
 ) (*txs.AddValidatorTx, error) {
 	return b.builder.NewAddValidatorTx(
@@ -88,7 +88,7 @@ func (b *builderWithOptions) NewAddValidatorTx(
 
 func (b *builderWithOptions) NewAddSubnetValidatorTx(
 	vdr *txs.SubnetValidator,
-	feeCalc *fee.Calculator,
+	feeCalc fee.Calculator,
 	options ...common.Option,
 ) (*txs.AddSubnetValidatorTx, error) {
 	return b.builder.NewAddSubnetValidatorTx(
@@ -101,7 +101,7 @@ func (b *builderWithOptions) NewAddSubnetValidatorTx(
 func (b *builderWithOptions) NewRemoveSubnetValidatorTx(
 	nodeID ids.NodeID,
 	subnetID ids.ID,
-	feeCalc *fee.Calculator,
+	feeCalc fee.Calculator,
 	options ...common.Option,
 ) (*txs.RemoveSubnetValidatorTx, error) {
 	return b.builder.NewRemoveSubnetValidatorTx(
@@ -115,7 +115,7 @@ func (b *builderWithOptions) NewRemoveSubnetValidatorTx(
 func (b *builderWithOptions) NewAddDelegatorTx(
 	vdr *txs.Validator,
 	rewardsOwner *secp256k1fx.OutputOwners,
-	feeCalc *fee.Calculator,
+	feeCalc fee.Calculator,
 	options ...common.Option,
 ) (*txs.AddDelegatorTx, error) {
 	return b.builder.NewAddDelegatorTx(
@@ -132,7 +132,7 @@ func (b *builderWithOptions) NewCreateChainTx(
 	vmID ids.ID,
 	fxIDs []ids.ID,
 	chainName string,
-	feeCalc *fee.Calculator,
+	feeCalc fee.Calculator,
 	options ...common.Option,
 ) (*txs.CreateChainTx, error) {
 	return b.builder.NewCreateChainTx(
@@ -148,7 +148,7 @@ func (b *builderWithOptions) NewCreateChainTx(
 
 func (b *builderWithOptions) NewCreateSubnetTx(
 	owner *secp256k1fx.OutputOwners,
-	feeCalc *fee.Calculator,
+	feeCalc fee.Calculator,
 	options ...common.Option,
 ) (*txs.CreateSubnetTx, error) {
 	return b.builder.NewCreateSubnetTx(
@@ -161,7 +161,7 @@ func (b *builderWithOptions) NewCreateSubnetTx(
 func (b *builderWithOptions) NewTransferSubnetOwnershipTx(
 	subnetID ids.ID,
 	owner *secp256k1fx.OutputOwners,
-	feeCalc *fee.Calculator,
+	feeCalc fee.Calculator,
 	options ...common.Option,
 ) (*txs.TransferSubnetOwnershipTx, error) {
 	return b.builder.NewTransferSubnetOwnershipTx(
@@ -175,7 +175,7 @@ func (b *builderWithOptions) NewTransferSubnetOwnershipTx(
 func (b *builderWithOptions) NewImportTx(
 	sourceChainID ids.ID,
 	to *secp256k1fx.OutputOwners,
-	feeCalc *fee.Calculator,
+	feeCalc fee.Calculator,
 	options ...common.Option,
 ) (*txs.ImportTx, error) {
 	return b.builder.NewImportTx(
@@ -189,7 +189,7 @@ func (b *builderWithOptions) NewImportTx(
 func (b *builderWithOptions) NewExportTx(
 	chainID ids.ID,
 	outputs []*avax.TransferableOutput,
-	feeCalc *fee.Calculator,
+	feeCalc fee.Calculator,
 	options ...common.Option,
 ) (*txs.ExportTx, error) {
 	return b.builder.NewExportTx(
@@ -215,7 +215,7 @@ func (b *builderWithOptions) NewTransformSubnetTx(
 	minDelegatorStake uint64,
 	maxValidatorWeightFactor byte,
 	uptimeRequirement uint32,
-	feeCalc *fee.Calculator,
+	feeCalc fee.Calculator,
 	options ...common.Option,
 ) (*txs.TransformSubnetTx, error) {
 	return b.builder.NewTransformSubnetTx(
@@ -245,7 +245,7 @@ func (b *builderWithOptions) NewAddPermissionlessValidatorTx(
 	validationRewardsOwner *secp256k1fx.OutputOwners,
 	delegationRewardsOwner *secp256k1fx.OutputOwners,
 	shares uint32,
-	feeCalc *fee.Calculator,
+	feeCalc fee.Calculator,
 	options ...common.Option,
 ) (*txs.AddPermissionlessValidatorTx, error) {
 	return b.builder.NewAddPermissionlessValidatorTx(
@@ -264,7 +264,7 @@ func (b *builderWithOptions) NewAddPermissionlessDelegatorTx(
 	vdr *txs.SubnetValidator,
 	assetID ids.ID,
 	rewardsOwner *secp256k1fx.OutputOwners,
-	feeCalc *fee.Calculator,
+	feeCalc fee.Calculator,
 	options ...common.Option,
 ) (*txs.AddPermissionlessDelegatorTx, error) {
 	return b.builder.NewAddPermissionlessDelegatorTx(

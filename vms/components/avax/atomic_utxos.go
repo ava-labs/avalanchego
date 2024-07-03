@@ -47,7 +47,7 @@ func GetAtomicUTXOs(
 		limit,
 	)
 	if err != nil {
-		return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("error fetching atomic UTXOs: %w", err)
+		return nil, ids.ShortID{}, ids.Empty, fmt.Errorf("error fetching atomic UTXOs: %w", err)
 	}
 
 	lastAddrID, err := ids.ToShortID(lastAddr)
@@ -63,7 +63,7 @@ func GetAtomicUTXOs(
 	for i, utxoBytes := range allUTXOBytes {
 		utxo := &UTXO{}
 		if _, err := codec.Unmarshal(utxoBytes, utxo); err != nil {
-			return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("error parsing UTXO: %w", err)
+			return nil, ids.ShortID{}, ids.Empty, fmt.Errorf("error parsing UTXO: %w", err)
 		}
 		utxos[i] = utxo
 	}

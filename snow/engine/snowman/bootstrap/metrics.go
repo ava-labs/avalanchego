@@ -4,9 +4,9 @@
 package bootstrap
 
 import (
-	"github.com/prometheus/client_golang/prometheus"
+	"errors"
 
-	"github.com/ava-labs/avalanchego/utils"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 type metrics struct {
@@ -25,7 +25,7 @@ func newMetrics(registerer prometheus.Registerer) (*metrics, error) {
 		}),
 	}
 
-	err := utils.Err(
+	err := errors.Join(
 		registerer.Register(m.numFetched),
 		registerer.Register(m.numAccepted),
 	)
