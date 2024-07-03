@@ -4,8 +4,9 @@
 package merkledb
 
 import (
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ethereum/go-ethereum/rlp"
+
+	"github.com/ava-labs/avalanchego/ids"
 )
 
 var _ Hasher = (*rlpHasher)(nil)
