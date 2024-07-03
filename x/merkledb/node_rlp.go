@@ -154,6 +154,9 @@ func hashData(data []byte) []byte {
 	return hasher.Sum(nil)
 }
 
+// These utility functions were taken from go-etherum:
+// https://github.com/ethereum/go-ethereum/blob/v1.13.8/trie/encoding.go
+
 func hexToCompact(hex []byte) []byte {
 	terminator := byte(0)
 	if hasTerm(hex) {
