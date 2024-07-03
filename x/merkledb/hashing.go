@@ -32,6 +32,8 @@ type Hasher interface {
 
 	// Returns the canonical hash of [value].
 	HashValue(value []byte) ids.ID
+
+	EmptyRoot() ids.ID
 }
 
 type sha256Hasher struct{}
@@ -105,4 +107,8 @@ func (*sha256Hasher) HashValue(value []byte) ids.ID {
 	var hash ids.ID
 	sha.Sum(hash[:0])
 	return hash
+}
+
+func (*sha256Hasher) EmptyRoot() ids.ID {
+	return ids.Empty
 }

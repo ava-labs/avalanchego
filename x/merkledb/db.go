@@ -344,7 +344,7 @@ func newDatabase(
 // TODO: make this more efficient by only clearing out the stale portions of the trie.
 func (db *merkleDB) rebuild(ctx context.Context, cacheSize int) error {
 	db.root = maybe.Nothing[*node]()
-	db.rootID = ids.Empty
+	db.rootID = db.hasher.EmptyRoot()
 
 	// Delete intermediate nodes.
 	if err := database.ClearPrefix(db.baseDB, intermediateNodePrefix, rebuildIntermediateDeletionWriteSize); err != nil {
@@ -980,6 +980,8 @@ func (db *merkleDB) commitView(ctx context.Context, trieToCommit *view) error {
 	db.moveChildViewsToDB(trieToCommit)
 
 	if len(changes.nodes) == 0 {
+		db.root = changes.rootChange.after
+		db.rootID = changes.rootID
 		return nil
 	}
 
@@ -1229,6 +1231,7 @@ func (db *merkleDB) invalidateChildrenExcept(exception *view) {
 func (db *merkleDB) initializeRoot() error {
 	rootKeyBytes, err := db.baseDB.Get(rootDBKey)
 	if errors.Is(err, database.ErrNotFound) {
+		db.rootID = db.hasher.EmptyRoot()
 		return nil // Root isn't on disk.
 	}
 	if err != nil {

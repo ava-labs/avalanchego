@@ -277,7 +277,7 @@ func (v *view) hashChangedNodes(ctx context.Context) {
 	defer span.End()
 
 	if v.root.IsNothing() {
-		v.changes.rootID = ids.Empty
+		v.changes.rootID = v.db.hasher.EmptyRoot()
 		return
 	}
 
