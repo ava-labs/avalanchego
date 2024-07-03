@@ -224,7 +224,7 @@ func (s *State) GetBlock(ctx context.Context, blkID ids.ID) (snowman.Block, erro
 
 	// Since this block is not in consensus, addBlockOutsideConsensus
 	// is called to add [blk] to the correct cache.
-	return s.addBlockOutsideConsensus(ctx, blk)
+	return s.addBlockOutsideConsensus(blk)
 }
 
 // getCachedBlock checks the caches for [blkID] by priority. Returning
@@ -290,7 +290,7 @@ func (s *State) ParseBlock(ctx context.Context, b []byte) (snowman.Block, error)
 
 	// Since this block is not in consensus, addBlockOutsideConsensus
 	// is called to add [blk] to the correct cache.
-	return s.addBlockOutsideConsensus(ctx, blk)
+	return s.addBlockOutsideConsensus(blk)
 }
 
 // BatchedParseBlock implements part of the block.BatchedChainVM interface. In
@@ -365,7 +365,7 @@ func (s *State) BatchedParseBlock(ctx context.Context, blksBytes [][]byte) ([]sn
 		}
 
 		s.missingBlocks.Evict(blkID)
-		wrappedBlk, err := s.addBlockOutsideConsensus(ctx, blk)
+		wrappedBlk, err := s.addBlockOutsideConsensus(blk)
 		if err != nil {
 			return nil, err
 		}
@@ -387,7 +387,7 @@ func (s *State) BuildBlockWithContext(ctx context.Context, blockCtx *block.Conte
 		return nil, err
 	}
 
-	return s.deduplicate(ctx, blk)
+	return s.deduplicate(blk)
 }
 
 // BuildBlock attempts to build a new internal Block, wraps it, and adds it
@@ -398,10 +398,10 @@ func (s *State) BuildBlock(ctx context.Context) (snowman.Block, error) {
 		return nil, err
 	}
 
-	return s.deduplicate(ctx, blk)
+	return s.deduplicate(blk)
 }
 
-func (s *State) deduplicate(ctx context.Context, blk snowman.Block) (snowman.Block, error) {
+func (s *State) deduplicate(blk snowman.Block) (snowman.Block, error) {
 	blkID := blk.ID()
 	// Defensive: buildBlock should not return a block that has already been verified.
 	// If it does, make sure to return the existing reference to the block.
@@ -413,7 +413,7 @@ func (s *State) deduplicate(ctx context.Context, blk snowman.Block) (snowman.Blo
 	s.missingBlocks.Evict(blkID)
 
 	// wrap the returned block and add it to the correct cache
-	return s.addBlockOutsideConsensus(ctx, blk)
+	return s.addBlockOutsideConsensus(blk)
 }
 
 // addBlockOutsideConsensus adds [blk] to the correct cache and returns
@@ -421,7 +421,7 @@ func (s *State) deduplicate(ctx context.Context, blk snowman.Block) (snowman.Blo
 // assumes [blk] is a known, non-wrapped block that is not currently
 // in consensus. [blk] could be either decided or a block that has not yet
 // been verified and added to consensus.
-func (s *State) addBlockOutsideConsensus(ctx context.Context, blk snowman.Block) (snowman.Block, error) {
+func (s *State) addBlockOutsideConsensus(blk snowman.Block) (snowman.Block, error) {
 	wrappedBlk := &BlockWrapper{
 		Block: blk,
 		state: s,
