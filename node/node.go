@@ -1217,7 +1217,7 @@ func (n *Node) initVMs() error {
 
 	// Register the VMs that Avalanche supports
 	eUpgradeTime := version.GetEUpgradeTime(n.Config.NetworkID)
-	err := utils.Err(
+	err := errors.Join(
 		n.VMManager.RegisterFactory(context.TODO(), constants.PlatformVMID, &platformvm.Factory{
 			Config: platformconfig.Config{
 				Chains:                    n.chainManager,

@@ -6,7 +6,6 @@ package propertyfx
 import (
 	"errors"
 
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -32,7 +31,7 @@ func (fx *Fx) Initialize(vmIntf interface{}) error {
 	log.Debug("initializing nft fx")
 
 	c := fx.VM.CodecRegistry()
-	return utils.Err(
+	return errors.Join(
 		c.RegisterType(&MintOutput{}),
 		c.RegisterType(&OwnedOutput{}),
 		c.RegisterType(&MintOperation{}),
