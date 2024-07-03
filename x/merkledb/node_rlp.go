@@ -23,10 +23,6 @@ func (n *node) isValueNode() bool {
 	return isLeaf // || n.isAccountNode()
 }
 
-func (n *node) calculateRLP(parent *node) {
-	n.encodeRLPWithShortNode(parent)
-}
-
 func (n *child) rlp() []byte {
 	if len(n.embed) > 0 {
 		return n.embed
@@ -34,6 +30,7 @@ func (n *child) rlp() []byte {
 	return n.id[:]
 }
 
+//nolint:unused
 func (n *node) isAccountNode() bool {
 	keyLen := n.key.Length() / 8
 	isAccount := keyLen == 32
