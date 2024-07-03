@@ -757,7 +757,7 @@ func (n *Network) CreateSubnets(ctx context.Context, w io.Writer, apiURI string,
 	pChainClient := platformvm.NewClient(n.Nodes[0].URI)
 	validatorsToRestart := set.Set[ids.NodeID]{}
 	for _, subnet := range createdSubnets {
-		if err := waitForActiveValidators(ctx, w, pChainClient, subnet); err != nil {
+		if err := WaitForActiveValidators(ctx, w, pChainClient, subnet); err != nil {
 			return err
 		}
 
