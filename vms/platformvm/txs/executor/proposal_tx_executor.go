@@ -46,7 +46,7 @@ var (
 type ProposalTxExecutor struct {
 	// inputs, to be filled before visitor methods are called
 	*Backend
-	FeeCalculator *fee.Calculator
+	FeeCalculator fee.Calculator
 	Tx            *txs.Tx
 	// [OnCommitState] is the state used for validation.
 	// [OnCommitState] is modified by this struct's methods to

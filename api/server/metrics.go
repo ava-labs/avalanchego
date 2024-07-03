@@ -4,12 +4,11 @@
 package server
 
 import (
+	"errors"
 	"net/http"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-
-	"github.com/ava-labs/avalanchego/utils"
 )
 
 type metrics struct {
@@ -43,7 +42,7 @@ func newMetrics(registerer prometheus.Registerer) (*metrics, error) {
 		),
 	}
 
-	err := utils.Err(
+	err := errors.Join(
 		registerer.Register(m.numProcessing),
 		registerer.Register(m.numCalls),
 		registerer.Register(m.totalDuration),

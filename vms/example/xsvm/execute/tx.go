@@ -11,7 +11,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/state"
@@ -56,7 +55,7 @@ func (t *Tx) Transfer(tf *tx.Transfer) error {
 		return errWrongChainID
 	}
 
-	return utils.Err(
+	return errors.Join(
 		state.IncrementNonce(t.Database, t.Sender, tf.Nonce),
 		state.DecreaseBalance(t.Database, t.Sender, tf.ChainID, t.TransferFee),
 		state.DecreaseBalance(t.Database, t.Sender, tf.AssetID, tf.Amount),

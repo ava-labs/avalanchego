@@ -399,7 +399,7 @@ func (v *verifier) proposalBlock(
 	onDecisionState state.Diff,
 	onCommitState state.Diff,
 	onAbortState state.Diff,
-	feeCalculator *fee.Calculator,
+	feeCalculator fee.Calculator,
 	inputs set.Set[ids.ID],
 	atomicRequests map[ids.ID]*atomic.Requests,
 	onAcceptFunc func(),
@@ -461,7 +461,7 @@ func (v *verifier) proposalBlock(
 // standardBlock populates the state of this block if [nil] is returned
 func (v *verifier) standardBlock(
 	b *block.ApricotStandardBlock,
-	feeCalculator *fee.Calculator,
+	feeCalculator fee.Calculator,
 	onAcceptState state.Diff,
 ) error {
 	currentGasCap, err := onAcceptState.GetCurrentGasCap()
@@ -498,7 +498,7 @@ func (v *verifier) standardBlock(
 	return nil
 }
 
-func (v *verifier) processStandardTxs(txs []*txs.Tx, feeCalculator *fee.Calculator, state state.Diff, parentID ids.ID) (
+func (v *verifier) processStandardTxs(txs []*txs.Tx, feeCalculator fee.Calculator, state state.Diff, parentID ids.ID) (
 	set.Set[ids.ID],
 	map[ids.ID]*atomic.Requests,
 	func(),

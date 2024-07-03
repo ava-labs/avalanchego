@@ -4,6 +4,7 @@
 package network
 
 import (
+	"errors"
 	"sync"
 	"time"
 
@@ -11,7 +12,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/peer"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
@@ -135,7 +135,7 @@ func newMetrics(
 		peerConnectedStartTimes: make(map[ids.NodeID]float64),
 	}
 
-	err := utils.Err(
+	err := errors.Join(
 		registerer.Register(m.numTracked),
 		registerer.Register(m.numPeers),
 		registerer.Register(m.numSubnetPeers),

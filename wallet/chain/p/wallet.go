@@ -614,7 +614,7 @@ func (w *wallet) IssueTx(
 	return w.Backend.AcceptTx(ctx, tx)
 }
 
-func (w *wallet) feeCalculator(ctx *builder.Context, options ...common.Option) (*fee.Calculator, error) {
+func (w *wallet) feeCalculator(ctx *builder.Context, options ...common.Option) (fee.Calculator, error) {
 	if err := w.refreshFeesData(ctx, options...); err != nil {
 		return nil, err
 	}
