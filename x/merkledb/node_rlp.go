@@ -74,10 +74,9 @@ func (n *node) compressedKey(parent *node) Key {
 }
 
 func (n *node) encodeRLP(w rlp.EncoderBuffer) {
-	// case 1: there are no children
 	if len(n.children) == 0 { // || n.isAccountNode() {
-		// the case where there is no value corresponds to an empty trie
 		// the case with a value correspond to value nodes in ethereum representation.
+		// the case where there is no value corresponds to an empty trie
 		if !n.value.IsNothing() {
 			w.WriteBytes(n.value.Value())
 		} else {
@@ -86,7 +85,7 @@ func (n *node) encodeRLP(w rlp.EncoderBuffer) {
 		return
 	}
 
-	// case 3: there is multiple children
+	// branch node (has more than 1 child or 1 child with a value)
 	if len(n.children) > 1 || len(n.children) == 1 && !n.value.IsNothing() {
 		offset := w.List()
 		for i := byte(0); i < 16; i++ {
