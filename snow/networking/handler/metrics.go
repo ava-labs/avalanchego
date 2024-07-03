@@ -4,9 +4,9 @@
 package handler
 
 import (
-	"github.com/prometheus/client_golang/prometheus"
+	"errors"
 
-	"github.com/ava-labs/avalanchego/utils"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 type metrics struct {
@@ -44,7 +44,7 @@ func newMetrics(reg prometheus.Registerer) (*metrics, error) {
 			Help: "time spent acquiring the context lock",
 		}),
 	}
-	return m, utils.Err(
+	return m, errors.Join(
 		reg.Register(m.expired),
 		reg.Register(m.messages),
 		reg.Register(m.messageHandlingTime),

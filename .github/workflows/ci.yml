@@ -37,7 +37,7 @@ jobs:
       - name: Set timeout on Windows # Windows UT run slower and need a longer timeout
         shell: bash
         if: matrix.os == 'windows-2022'
-        run: echo "TIMEOUT=240s" >> $GITHUB_ENV
+        run: echo "TIMEOUT=240s" >> "$GITHUB_ENV"
       - name: build_test
         shell: bash
         run: ./scripts/build_test.sh
@@ -213,6 +213,9 @@ jobs:
       - name: Run shellcheck
         shell: bash
         run: scripts/shellcheck.sh
+      - name: Run actionlint
+        shell: bash
+        run: scripts/actionlint.sh
   buf-lint:
     name: Protobuf Lint
     runs-on: ubuntu-latest
