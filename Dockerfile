@@ -22,7 +22,6 @@ RUN if [ "$TARGETPLATFORM" = "linux/arm64" ] && [ "$BUILDPLATFORM" != "linux/arm
     apt-get update && apt-get install -y gcc-x86-64-linux-gnu && \
     echo "export CC=x86_64-linux-gnu-gcc" > ./build_env.sh \
     ; else \
-    apt-get update && apt-get install -y gcc-multilib && \
     echo "export CC=gcc" > ./build_env.sh \
     ; fi
 
