@@ -40,15 +40,8 @@ func childSize(index byte, childEntry *child) int {
 	// * child ID
 	// * child key
 	// * bool indicating whether the child has a value
-	idSize := ids.IDLen
-	if len(childEntry.embed) > 0 {
-		idSize = bytesSize(childEntry.embed)
-	}
+	idSize := ids.IDLen + uintSize(uint64(len(childEntry.embed))) + len(childEntry.embed)
 	return uintSize(uint64(index)) + idSize + keySize(childEntry.compressedKey) + boolLen
-}
-
-func bytesSize(value []byte) int {
-	return uintSize(uint64(len(value))) + len(value)
 }
 
 // based on the implementation of encodeUint which uses binary.PutUvarint
