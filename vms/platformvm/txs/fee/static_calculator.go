@@ -7,24 +7,24 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/upgrade"
 )
 
-var _ backend = (*staticCalculator)(nil)
+var (
+	_ Calculator  = (*staticCalculator)(nil)
+	_ txs.Visitor = (*staticCalculator)(nil)
+)
 
 func NewStaticCalculator(
 	config StaticConfig,
 	upgradeTimes upgrade.Config,
 	chainTime time.Time,
-) *Calculator {
-	return &Calculator{
-		b: &staticCalculator{
-			upgrades:  upgradeTimes,
-			staticCfg: config,
-			time:      chainTime,
-		},
+) Calculator {
+	return &staticCalculator{
+		upgrades:  upgradeTimes,
+		staticCfg: config,
+		time:      chainTime,
 	}
 }
 
@@ -36,6 +36,12 @@ type staticCalculator struct {
 
 	// outputs of visitor execution
 	fee uint64
+}
+
+func (c *staticCalculator) CalculateFee(tx *txs.Tx) (uint64, error) {
+	c.fee = 0 // zero fee among different calculateFee invocations (unlike gas which gets cumulated)
+	err := tx.Unsigned.Visit(c)
+	return c.fee, err
 }
 
 func (c *staticCalculator) AddValidatorTx(*txs.AddValidatorTx) error {
@@ -127,10 +133,4 @@ func (c *staticCalculator) ImportTx(*txs.ImportTx) error {
 func (c *staticCalculator) ExportTx(*txs.ExportTx) error {
 	c.fee = c.staticCfg.TxFee
 	return nil
-}
-
-func (c *staticCalculator) calculateFee(tx txs.UnsignedTx, _ []verify.Verifiable) (uint64, error) {
-	c.fee = 0 // zero fee among different calculateFee invocations (unlike gas which gets cumulated)
-	err := tx.Visit(c)
-	return c.fee, err
 }
