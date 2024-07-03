@@ -4,9 +4,10 @@
 package handler
 
 import (
+	"errors"
+
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/metric"
 )
 
@@ -44,7 +45,7 @@ func (m *messageQueueMetrics) initialize(
 		Help:      "times a message has been deferred due to excessive CPU usage",
 	})
 
-	return utils.Err(
+	return errors.Join(
 		metricsRegisterer.Register(m.count),
 		metricsRegisterer.Register(m.nodesWithMessages),
 		metricsRegisterer.Register(m.numExcessiveCPU),
