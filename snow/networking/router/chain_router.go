@@ -31,6 +31,7 @@ import (
 var (
 	errUnknownChain  = errors.New("received message for unknown chain")
 	errUnallowedNode = errors.New("received message from non-allowed node")
+	errClosing       = errors.New("router is closing")
 
 	_ Router              = (*ChainRouter)(nil)
 	_ benchlist.Benchable = (*ChainRouter)(nil)
@@ -63,6 +64,7 @@ type ChainRouter struct {
 	clock         mockable.Clock
 	log           logging.Logger
 	lock          sync.Mutex
+	closing       bool
 	chainHandlers map[ids.ID]handler.Handler
 
 	// It is only safe to call [RegisterResponse] with the router lock held. Any
@@ -154,6 +156,18 @@ func (cr *ChainRouter) RegisterRequest(
 	engineType p2p.EngineType,
 ) {
 	cr.lock.Lock()
+	if cr.closing {
+		cr.log.Debug("dropping request",
+			zap.Stringer("nodeID", nodeID),
+			zap.Stringer("requestingChainID", requestingChainID),
+			zap.Stringer("respondingChainID", respondingChainID),
+			zap.Uint32("requestID", requestID),
+			zap.Stringer("messageOp", op),
+			zap.Error(errClosing),
+		)
+		cr.lock.Unlock()
+		return
+	}
 	// When we receive a response message type (Chits, Put, Accepted, etc.)
 	// we validate that we actually sent the corresponding request.
 	// Give this request a unique ID so we can do that validation.
@@ -243,6 +257,17 @@ func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 
 	cr.lock.Lock()
 	defer cr.lock.Unlock()
+
+	if cr.closing {
+		cr.log.Debug("dropping message",
+			zap.Stringer("messageOp", op),
+			zap.Stringer("nodeID", nodeID),
+			zap.Stringer("chainID", destinationChainID),
+			zap.Error(errClosing),
+		)
+		msg.OnFinishedHandling()
+		return
+	}
 
 	// Get the chain, if it exists
 	chain, exists := cr.chainHandlers[destinationChainID]
@@ -356,6 +381,7 @@ func (cr *ChainRouter) Shutdown(ctx context.Context) {
 	cr.lock.Lock()
 	prevChains := cr.chainHandlers
 	cr.chainHandlers = map[ids.ID]handler.Handler{}
+	cr.closing = true
 	cr.lock.Unlock()
 
 	for _, chain := range prevChains {
@@ -388,6 +414,13 @@ func (cr *ChainRouter) AddChain(ctx context.Context, chain handler.Handler) {
 	defer cr.lock.Unlock()
 
 	chainID := chain.Context().ChainID
+	if cr.closing {
+		cr.log.Debug("dropping add chain request",
+			zap.Stringer("chainID", chainID),
+			zap.Error(errClosing),
+		)
+		return
+	}
 	cr.log.Debug("registering chain with chain router",
 		zap.Stringer("chainID", chainID),
 	)
@@ -446,6 +479,14 @@ func (cr *ChainRouter) Connected(nodeID ids.NodeID, nodeVersion *version.Applica
 	cr.lock.Lock()
 	defer cr.lock.Unlock()
 
+	if cr.closing {
+		cr.log.Debug("dropping connected message",
+			zap.Stringer("nodeID", nodeID),
+			zap.Error(errClosing),
+		)
+		return
+	}
+
 	connectedPeer, exists := cr.peers[nodeID]
 	if !exists {
 		connectedPeer = &peer{
@@ -493,6 +534,14 @@ func (cr *ChainRouter) Disconnected(nodeID ids.NodeID) {
 	cr.lock.Lock()
 	defer cr.lock.Unlock()
 
+	if cr.closing {
+		cr.log.Debug("dropping disconnected message",
+			zap.Stringer("nodeID", nodeID),
+			zap.Error(errClosing),
+		)
+		return
+	}
+
 	peer := cr.peers[nodeID]
 	delete(cr.peers, nodeID)
 	if _, benched := cr.benched[nodeID]; benched {
@@ -521,6 +570,15 @@ func (cr *ChainRouter) Disconnected(nodeID ids.NodeID) {
 func (cr *ChainRouter) Benched(chainID ids.ID, nodeID ids.NodeID) {
 	cr.lock.Lock()
 	defer cr.lock.Unlock()
+
+	if cr.closing {
+		cr.log.Debug("dropping benched message",
+			zap.Stringer("nodeID", nodeID),
+			zap.Stringer("chainID", chainID),
+			zap.Error(errClosing),
+		)
+		return
+	}
 
 	benchedChains, exists := cr.benched[nodeID]
 	benchedChains.Add(chainID)
@@ -553,6 +611,15 @@ func (cr *ChainRouter) Benched(chainID ids.ID, nodeID ids.NodeID) {
 func (cr *ChainRouter) Unbenched(chainID ids.ID, nodeID ids.NodeID) {
 	cr.lock.Lock()
 	defer cr.lock.Unlock()
+
+	if cr.closing {
+		cr.log.Debug("dropping unbenched message",
+			zap.Stringer("nodeID", nodeID),
+			zap.Stringer("chainID", chainID),
+			zap.Error(errClosing),
+		)
+		return
+	}
 
 	benchedChains := cr.benched[nodeID]
 	benchedChains.Remove(chainID)

@@ -102,7 +102,7 @@ func createInternalBlockFuncs(blks []*snowmantest.Block) (
 			}
 		}
 
-		return ids.ID{}, database.ErrNotFound
+		return ids.Empty, database.ErrNotFound
 	}
 
 	return getBlock, parseBlk, getAcceptedBlockIDAtHeight

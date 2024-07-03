@@ -5,6 +5,7 @@ package queue
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -16,7 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer"
 )
@@ -424,7 +424,7 @@ func (jm *JobsWithMissing) cleanRunnableStack(ctx context.Context) error {
 		}
 	}
 
-	return utils.Err(
+	return errors.Join(
 		runnableJobsIter.Error(),
 		jm.Commit(),
 	)
