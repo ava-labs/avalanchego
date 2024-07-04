@@ -798,18 +798,18 @@ func (b *builder) NewImportTx(
 		}
 	}
 
-	switch importedAVAX := importedAmounts[avaxAssetID]; {
-	case importedAVAX == feeCalc.GetFee():
+	switch importedAVAX, currentFee := importedAmounts[avaxAssetID], feeCalc.GetFee(); {
+	case importedAVAX == currentFee:
 		// imported inputs match exactly the fees to be paid
 		avax.SortTransferableOutputs(utx.Outs, txs.Codec) // sort imported outputs
 		return utx, b.initCtx(utx)
 
-	case importedAVAX < feeCalc.GetFee():
+	case importedAVAX < currentFee:
 		// imported inputs can partially pay fees
-		feeCalc.ResetFee(feeCalc.GetFee() - importedAmounts[avaxAssetID])
+		feeCalc.ResetFee(currentFee - importedAVAX)
 
 	default:
-		// imported inputs may be enough to pay taxes by themselves
+		// imported inputs may be enough to pay fees by themselves
 		changeOut := &avax.TransferableOutput{
 			Asset: avax.Asset{ID: avaxAssetID},
 			Out: &secp256k1fx.TransferOutput{
@@ -823,14 +823,14 @@ func (b *builder) NewImportTx(
 			return nil, fmt.Errorf("account for output fees: %w", err)
 		}
 
-		switch fee := feeCalc.GetFee(); {
-		case fee < importedAVAX:
-			changeOut.Out.(*secp256k1fx.TransferOutput).Amt = importedAVAX - fee
+		switch currentFee := feeCalc.GetFee(); {
+		case currentFee < importedAVAX:
+			changeOut.Out.(*secp256k1fx.TransferOutput).Amt = importedAVAX - currentFee
 			utx.Outs = append(utx.Outs, changeOut)
 			avax.SortTransferableOutputs(utx.Outs, txs.Codec) // sort imported outputs
 			return utx, b.initCtx(utx)
 
-		case fee == importedAVAX:
+		case currentFee == importedAVAX:
 			// imported fees pays exactly the tx cost. We don't include the outputs
 			avax.SortTransferableOutputs(utx.Outs, txs.Codec) // sort imported outputs
 			return utx, b.initCtx(utx)
@@ -841,7 +841,7 @@ func (b *builder) NewImportTx(
 			if _, err := feeCalc.RemoveFeesFor(outDimensions); err != nil {
 				return nil, fmt.Errorf("failed reverting change output: %w", err)
 			}
-			feeCalc.ResetFee(fee - importedAVAX)
+			feeCalc.ResetFee(currentFee - importedAVAX)
 		}
 	}
 
