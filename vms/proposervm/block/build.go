@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 const (
@@ -27,7 +28,7 @@ func BuildUnsigned(
 	blockBytes []byte,
 	blockVrfSig []byte,
 ) (SignedBlock, error) {
-	block := &statelessBlock{
+	block := &statelessBlock[statelessUnsignedBlock]{
 		StatelessBlock: statelessUnsignedBlock{
 			ParentID:     parentID,
 			Timestamp:    timestamp.Unix(),
@@ -64,14 +65,29 @@ func CalculateVRFOut(vrfSig []byte) []byte {
 	return outHash[:]
 }
 
+func initializeID(bytes []byte, signature []byte) (ids.ID, error) {
+	var unsignedBytes []byte
+	// The serialized form of the block is the unsignedBytes followed by the
+	// signature, which is prefixed by a uint32. So, we need to strip off the
+	// signature as well as it's length prefix to get the unsigned bytes.
+	lenUnsignedBytes := len(bytes) - wrappers.IntLen - len(signature)
+
+	if lenUnsignedBytes < 0 {
+		return ids.Empty, errInvalidBlockEncodingLength
+	}
+
+	unsignedBytes = bytes[:lenUnsignedBytes]
+	return hashing.ComputeHash256Array(unsignedBytes), nil
+}
+
 // marshalBlock marshal the given statelessBlock by using either the default statelessBlock or
 // coping the exported fields into statelessBlockV0 and then marshaling it.
 // this allows the marsheler to produce encoded blocks that match the old style blocks as long as
 // the VRFSig feature was not enabled.
-func marshalBlock(block *statelessBlock) ([]byte, error) {
+func marshalBlock(block *statelessBlock[statelessUnsignedBlock]) ([]byte, error) {
 	if len(block.StatelessBlock.VRFSig) == 0 {
 		// create a backward compatible block ( without VRFSig ) and use the statelessBlockV0 encoder for the encoding.
-		var preBlockSigBlock SignedBlock = &statelessBlockV0{
+		var preBlockSigBlock SignedBlock = &statelessBlock[statelessUnsignedBlockV0]{
 			StatelessBlock: statelessUnsignedBlockV0{
 				ParentID:     block.StatelessBlock.ParentID,
 				Timestamp:    block.StatelessBlock.Timestamp,
@@ -156,7 +172,7 @@ func Build(
 	key crypto.Signer,
 	blockVrfSig []byte,
 ) (SignedBlock, error) {
-	block := &statelessBlock{
+	block := &statelessBlock[statelessUnsignedBlock]{
 		StatelessBlock: statelessUnsignedBlock{
 			ParentID:     parentID,
 			Timestamp:    timestamp.Unix(),
@@ -172,14 +188,15 @@ func Build(
 
 	var err error
 
+	var blkBytes []byte
 	// temporary, set the bytes to the marshaled content of the block.
 	// this doesn't include the signature ( yet )
-	if block.bytes, err = marshalBlock(block); err != nil {
+	if blkBytes, err = marshalBlock(block); err != nil {
 		return nil, err
 	}
 
 	// calculate the block ID.
-	if err = block.initializeID(); err != nil {
+	if block.id, err = initializeID(blkBytes, nil); err != nil {
 		return nil, err
 	}
 
