@@ -444,7 +444,7 @@ func (b *builder) NewAddSubnetValidatorTx(
 	}
 
 	// update fees to account for the auth credentials to be added upon tx signing
-	if _, err = FinanceCredential(feeCalc, len(subnetAuth.SigIndices)); err != nil {
+	if _, err = financeCredential(feeCalc, len(subnetAuth.SigIndices)); err != nil {
 		return nil, fmt.Errorf("account for credential fees: %w", err)
 	}
 
@@ -492,7 +492,7 @@ func (b *builder) NewRemoveSubnetValidatorTx(
 	}
 
 	// update fees to account for the auth credentials to be added upon tx signing
-	if _, err = FinanceCredential(feeCalc, len(subnetAuth.SigIndices)); err != nil {
+	if _, err = financeCredential(feeCalc, len(subnetAuth.SigIndices)); err != nil {
 		return nil, fmt.Errorf("account for credential fees: %w", err)
 	}
 
@@ -591,7 +591,7 @@ func (b *builder) NewCreateChainTx(
 	}
 
 	// update fees to account for the auth credentials to be added upon tx signing
-	if _, err = FinanceCredential(feeCalc, len(subnetAuth.SigIndices)); err != nil {
+	if _, err = financeCredential(feeCalc, len(subnetAuth.SigIndices)); err != nil {
 		return nil, fmt.Errorf("account for credential fees: %w", err)
 	}
 
@@ -679,7 +679,7 @@ func (b *builder) NewTransferSubnetOwnershipTx(
 	}
 
 	// update fees to account for the auth credentials to be added upon tx signing
-	if _, err = FinanceCredential(feeCalc, len(subnetAuth.SigIndices)); err != nil {
+	if _, err = financeCredential(feeCalc, len(subnetAuth.SigIndices)); err != nil {
 		return nil, fmt.Errorf("account for credential fees: %w", err)
 	}
 
@@ -793,7 +793,7 @@ func (b *builder) NewImportTx(
 	}
 
 	for _, sigIndices := range importedSigIndices {
-		if _, err = FinanceCredential(feeCalc, len(sigIndices)); err != nil {
+		if _, err = financeCredential(feeCalc, len(sigIndices)); err != nil {
 			return nil, fmt.Errorf("account for credential fees: %w", err)
 		}
 	}
@@ -818,7 +818,7 @@ func (b *builder) NewImportTx(
 		}
 
 		// update fees to target given the extra output added
-		_, outDimensions, err := FinanceOutput(feeCalc, changeOut)
+		_, outDimensions, err := financeOutput(feeCalc, changeOut)
 		if err != nil {
 			return nil, fmt.Errorf("account for output fees: %w", err)
 		}
@@ -967,7 +967,7 @@ func (b *builder) NewTransformSubnetTx(
 	}
 
 	// update fees to account for the auth credentials to be added upon tx signing
-	if _, err = FinanceCredential(feeCalc, len(subnetAuth.SigIndices)); err != nil {
+	if _, err = financeCredential(feeCalc, len(subnetAuth.SigIndices)); err != nil {
 		return nil, fmt.Errorf("account for credential fees: %w", err)
 	}
 
@@ -1235,13 +1235,13 @@ func (b *builder) financeTx(
 			},
 		}
 
-		addedFees, err := FinanceInput(feeCalc, input)
+		addedFees, err := financeInput(feeCalc, input)
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("account for input fees: %w", err)
 		}
 		amountsToBurn[avaxAssetID] += addedFees
 
-		addedFees, err = FinanceCredential(feeCalc, len(inputSigIndices))
+		addedFees, err = financeCredential(feeCalc, len(inputSigIndices))
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("account for input fees: %w", err)
 		}
@@ -1267,7 +1267,7 @@ func (b *builder) financeTx(
 			},
 		}
 
-		addedFees, _, err = FinanceOutput(feeCalc, stakeOut)
+		addedFees, _, err = financeOutput(feeCalc, stakeOut)
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("account for output fees: %w", err)
 		}
@@ -1290,7 +1290,7 @@ func (b *builder) financeTx(
 			}
 
 			// update fees to account for the change output
-			addedFees, _, err = FinanceOutput(feeCalc, changeOut)
+			addedFees, _, err = financeOutput(feeCalc, changeOut)
 			if err != nil {
 				return nil, nil, nil, fmt.Errorf("account for output fees: %w", err)
 			}
@@ -1342,13 +1342,13 @@ func (b *builder) financeTx(
 			},
 		}
 
-		addedFees, err := FinanceInput(feeCalc, input)
+		addedFees, err := financeInput(feeCalc, input)
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("account for input fees: %w", err)
 		}
 		amountsToBurn[avaxAssetID] += addedFees
 
-		addedFees, err = FinanceCredential(feeCalc, len(inputSigIndices))
+		addedFees, err = financeCredential(feeCalc, len(inputSigIndices))
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("account for credential fees: %w", err)
 		}
@@ -1374,7 +1374,7 @@ func (b *builder) financeTx(
 
 			stakeOutputs = append(stakeOutputs, stakeOut)
 
-			addedFees, _, err = FinanceOutput(feeCalc, stakeOut)
+			addedFees, _, err = financeOutput(feeCalc, stakeOut)
 			if err != nil {
 				return nil, nil, nil, fmt.Errorf("account for output fees: %w", err)
 			}
@@ -1398,7 +1398,7 @@ func (b *builder) financeTx(
 			}
 
 			// update fees to account for the change output
-			addedFees, _, err = FinanceOutput(feeCalc, changeOut)
+			addedFees, _, err = financeOutput(feeCalc, changeOut)
 			if err != nil {
 				return nil, nil, nil, fmt.Errorf("account for output fees: %w", err)
 			}
