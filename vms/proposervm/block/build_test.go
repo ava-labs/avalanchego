@@ -24,7 +24,7 @@ func TestBuild(t *testing.T) {
 	innerBlockBytes := []byte{3}
 	chainID := ids.ID{4}
 	networkID := uint32(5)
-	parentBlockSig := []byte{}
+	var parentBlockSig SignedBlock
 	blsSignKey, err := bls.NewSecretKey()
 	require.NoError(err)
 

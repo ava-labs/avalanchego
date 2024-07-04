@@ -98,7 +98,7 @@ func TestPostForkCommonComponents_buildChild(t *testing.T) {
 		parentID,
 		parentTimestamp,
 		pChainHeight-1,
-		[]byte{}, // parentBlockSig
+		nil, // parentBlockSig
 		vm.StakingBLSKey,
 	)
 	require.NoError(err)
@@ -429,7 +429,7 @@ func TestPostDurangoBuildChildResetScheduler(t *testing.T) {
 			parentID,
 			parentTimestamp,
 			pChainHeight-1,
-			[]byte{}, // parentBlockSig
+			nil, // parentBlockSig
 			vm.StakingBLSKey,
 		)
 		require.ErrorIs(err, errUnexpectedProposer)

@@ -288,7 +288,7 @@ func TestBlockVerify_BlocksBuiltOnPreForkGenesis(t *testing.T) {
 		proVM.ctx.ChainID,
 		proVM.StakingLeafSigner,
 		statelessblock.NextBlockVRFSig(
-			[]byte{}, // parentBlockSig
+			nil, // parentBlockSig
 			proVM.StakingBLSKey,
 			proVM.ctx.ChainID,
 			proVM.ctx.NetworkID),
@@ -621,7 +621,7 @@ func TestBlockVerify_ForkBlockIsOracleBlockButChildrenAreSigned(t *testing.T) {
 		proVM.ctx.ChainID,
 		proVM.StakingLeafSigner,
 		statelessblock.NextBlockVRFSig(
-			[]byte{}, // parentBlockSig
+			nil, // parentBlockSig
 			proVM.StakingBLSKey,
 			proVM.ctx.ChainID,
 			proVM.ctx.NetworkID),

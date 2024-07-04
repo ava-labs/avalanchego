@@ -181,7 +181,7 @@ func TestStateSyncGetOngoingSyncStateSummary(t *testing.T) {
 		vm.ctx.ChainID,
 		vm.StakingLeafSigner,
 		statelessblock.NextBlockVRFSig(
-			[]byte{}, // parentBlockSig
+			nil, // parentBlockSig
 			vm.StakingBLSKey,
 			vm.ctx.ChainID,
 			vm.ctx.NetworkID),
@@ -270,7 +270,7 @@ func TestStateSyncGetLastStateSummary(t *testing.T) {
 		vm.ctx.ChainID,
 		vm.StakingLeafSigner,
 		statelessblock.NextBlockVRFSig(
-			[]byte{}, // parentBlockSig
+			nil, // parentBlockSig
 			vm.StakingBLSKey,
 			vm.ctx.ChainID,
 			vm.ctx.NetworkID),
@@ -362,7 +362,7 @@ func TestStateSyncGetStateSummary(t *testing.T) {
 		vm.ctx.ChainID,
 		vm.StakingLeafSigner,
 		statelessblock.NextBlockVRFSig(
-			[]byte{}, // parentBlockSig
+			nil, // parentBlockSig
 			vm.StakingBLSKey,
 			vm.ctx.ChainID,
 			vm.ctx.NetworkID),
@@ -439,7 +439,7 @@ func TestParseStateSummary(t *testing.T) {
 		vm.ctx.ChainID,
 		vm.StakingLeafSigner,
 		statelessblock.NextBlockVRFSig(
-			[]byte{}, // parentBlockSig
+			nil, // parentBlockSig
 			vm.StakingBLSKey,
 			vm.ctx.ChainID,
 			vm.ctx.NetworkID),
@@ -498,7 +498,7 @@ func TestStateSummaryAccept(t *testing.T) {
 		vm.ctx.ChainID,
 		vm.StakingLeafSigner,
 		statelessblock.NextBlockVRFSig(
-			[]byte{}, // parentBlockSig
+			nil, // parentBlockSig
 			vm.StakingBLSKey,
 			vm.ctx.ChainID,
 			vm.ctx.NetworkID),
@@ -582,7 +582,7 @@ func TestStateSummaryAcceptOlderBlock(t *testing.T) {
 		vm.ctx.ChainID,
 		vm.StakingLeafSigner,
 		statelessblock.NextBlockVRFSig(
-			[]byte{}, // parentBlockSig
+			nil, // parentBlockSig
 			vm.StakingBLSKey,
 			vm.ctx.ChainID,
 			vm.ctx.NetworkID),

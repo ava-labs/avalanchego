@@ -14,19 +14,10 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
-// statelessUnsignedBlockV0 is the "old" version of statelessUnsignedBlock, which doesn't contain the VRF signature.
-type statelessUnsignedBlockV0 struct {
-	ParentID     ids.ID `serialize:"true"`
-	Timestamp    int64  `serialize:"true"`
-	PChainHeight uint64 `serialize:"true"`
-	Certificate  []byte `serialize:"true"`
-	Block        []byte `serialize:"true"`
-}
-
 // statelessBlockV0 is the "old" version of statelessBlock, which doesn't contain the VRF signature.
 type statelessBlockV0 struct {
-	StatelessBlock statelessUnsignedBlockV0 `serialize:"true"`
-	Signature      []byte                   `serialize:"true"`
+	StatelessBlock statelessUnsignedBlock `serialize:"true"`
+	Signature      []byte                 `serialize:"true"`
 
 	id        ids.ID
 	timestamp time.Time
@@ -51,12 +42,16 @@ func (b *statelessBlockV0) Bytes() []byte {
 	return b.bytes
 }
 
-func (*statelessBlockV0) VRFSig() []byte {
+func (b *statelessBlockV0) HasVRFSig() bool {
+	return false
+}
+
+func (b *statelessBlockV0) vrfSigBytes() []byte {
 	return nil
 }
 
-func (*statelessBlockV0) VerifySignature(pk *bls.PublicKey, parentVRFSig []byte, _ ids.ID, _ uint32) bool {
-	return pk == nil && len(parentVRFSig) == 0
+func (*statelessBlockV0) VerifySignature(pk *bls.PublicKey, parentBlock SignedBlock, _ ids.ID, _ uint32) bool {
+	return pk == nil && !parentBlock.HasVRFSig()
 }
 
 func (b *statelessBlockV0) initializeID() error {

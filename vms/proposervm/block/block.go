@@ -47,10 +47,12 @@ type SignedBlock interface {
 	// signed this block, [ids.EmptyNodeID] will be returned.
 	Proposer() ids.NodeID
 
-	VRFSig() []byte
+	HasVRFSig() bool
 
-	// VerifySignature validates the correctness of the VRF signature.
-	VerifySignature(*bls.PublicKey, []byte, ids.ID, uint32) bool
+	// VerifySignature validates the correctness of the VRF signature against the parent's signed block.
+	VerifySignature(*bls.PublicKey, SignedBlock, ids.ID, uint32) bool
+
+	vrfSigBytes() []byte
 }
 
 type statelessUnsignedBlock struct {
@@ -59,11 +61,11 @@ type statelessUnsignedBlock struct {
 	PChainHeight uint64 `serialize:"true"`
 	Certificate  []byte `serialize:"true"`
 	Block        []byte `serialize:"true"`
-	VRFSig       []byte `serialize:"true"`
 }
 
 type statelessBlock struct {
 	StatelessBlock statelessUnsignedBlock `serialize:"true"`
+	VRFSig         []byte                 `serialize:"true"`
 	Signature      []byte                 `serialize:"true"`
 
 	id        ids.ID
@@ -72,6 +74,17 @@ type statelessBlock struct {
 	proposer  ids.NodeID
 	bytes     []byte
 	vrfSig    *bls.Signature
+}
+
+func (b *statelessBlock) vrfSigBytes() []byte {
+	if b == nil {
+		return nil
+	}
+	return b.VRFSig
+}
+
+func (b *statelessBlock) HasVRFSig() bool {
+	return len(b.VRFSig) > 0
 }
 
 func (b *statelessBlock) ID() ids.ID {
@@ -90,16 +103,12 @@ func (b *statelessBlock) Bytes() []byte {
 	return b.bytes
 }
 
-func (b *statelessBlock) VRFSig() []byte {
-	return b.StatelessBlock.VRFSig
-}
-
 func (b *statelessBlock) initializeID() error {
 	var unsignedBytes []byte
 	// The serialized form of the block is the unsignedBytes followed by the
 	// signature, which is prefixed by a uint32. So, we need to strip off the
 	// signature as well as it's length prefix to get the unsigned bytes.
-	lenUnsignedBytes := len(b.bytes) - wrappers.IntLen - len(b.Signature)
+	lenUnsignedBytes := len(b.bytes) - wrappers.IntLen - len(b.Signature) - wrappers.IntLen - len(b.VRFSig)
 	if lenUnsignedBytes < 0 {
 		return errInvalidBlockEncodingLength
 	}
@@ -129,7 +138,7 @@ func (b *statelessBlock) initialize(bytes []byte) error {
 
 	b.proposer = ids.NodeIDFromCert(b.cert)
 
-	b.vrfSig, err = bls.SignatureFromBytes(b.StatelessBlock.VRFSig)
+	b.vrfSig, err = bls.SignatureFromBytes(b.VRFSig)
 	if err != nil {
 		return fmt.Errorf("%w: %w", errFailedToParseVRFSignature, err)
 	}
@@ -170,17 +179,18 @@ func (b *statelessBlock) Proposer() ids.NodeID {
 	return b.proposer
 }
 
-func (b *statelessBlock) VerifySignature(pk *bls.PublicKey, parentVRFSig []byte, chainID ids.ID, networkID uint32) bool {
+func (b *statelessBlock) VerifySignature(pk *bls.PublicKey, parentBlock SignedBlock, chainID ids.ID, networkID uint32) bool {
+	parentVRFSig := parentBlock.vrfSigBytes()
 	if pk == nil {
 		// proposer doesn't have a BLS key.
 		if len(parentVRFSig) == 0 {
 			// parent block had no VRF Signature.
 			// in this case, we verify that the current signature is empty.
-			return len(b.StatelessBlock.VRFSig) == 0
+			return len(b.VRFSig) == 0
 		}
 		// parent block had VRF Signature.
-		expectedSignature := NextHashBlockSignature(parentVRFSig)
-		return bytes.Equal(expectedSignature, b.StatelessBlock.VRFSig)
+		expectedSignature := NextHashBlockSignature(parentBlock)
+		return bytes.Equal(expectedSignature, b.VRFSig)
 	}
 
 	// proposer does have a BLS key.

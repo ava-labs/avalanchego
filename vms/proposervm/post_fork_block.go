@@ -170,10 +170,10 @@ func (b *postForkBlock) verifyVRFSig(ctx context.Context, child *postForkBlock) 
 		}
 		// verify that the VRFSig was generated correctly.
 		// ( this works for both signed and unsigned blocks ).
-		if !child.SignedBlock.VerifySignature(proposerPublicKey, b.SignedBlock.VRFSig(), b.vm.ctx.ChainID, b.vm.ctx.NetworkID) {
+		if !child.SignedBlock.VerifySignature(proposerPublicKey, b.SignedBlock, b.vm.ctx.ChainID, b.vm.ctx.NetworkID) {
 			return errInvalidVRFSignature
 		}
-	} else if len(child.SignedBlock.VRFSig()) != 0 {
+	} else if child.SignedBlock.HasVRFSig() {
 		// !b.vm.Config.IsVRFSigActivated(child.Timestamp())
 		// if the VRFSig has yet to be activated, verify that the VRF signature isn't there.
 		return errInvalidVRFSignature
@@ -203,7 +203,7 @@ func (b *postForkBlock) buildChild(ctx context.Context) (Block, error) {
 		b.ID(),
 		b.Timestamp(),
 		b.PChainHeight(),
-		b.SignedBlock.VRFSig(),
+		b.SignedBlock,
 		b.vm.Config.StakingBLSKey,
 	)
 }

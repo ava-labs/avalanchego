@@ -5,9 +5,11 @@ package block
 
 import (
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
+
+// compile time check to ensure option implements Block
+var _ Block = (*option)(nil)
 
 type option struct {
 	PrntID     ids.ID `serialize:"true"`
@@ -45,8 +47,4 @@ func (b *option) initialize(bytes []byte) error {
 
 func (*option) verify(ids.ID) error {
 	return nil
-}
-
-func (*option) VerifySignature(_ *bls.PublicKey, _ []byte, _ ids.ID, _ uint32) bool {
-	return true
 }

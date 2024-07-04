@@ -183,7 +183,7 @@ func (p *postForkCommonComponents) buildChild(
 	parentID ids.ID,
 	parentTimestamp time.Time,
 	parentPChainHeight uint64,
-	parentBlockSig []byte,
+	parentBlock block.SignedBlock,
 	blsSignKey *bls.SecretKey,
 ) (Block, error) {
 	// Child's timestamp is the later of now and this block's timestamp
@@ -230,11 +230,11 @@ func (p *postForkCommonComponents) buildChild(
 	// do we have the VRFSig activated ? if so, figure out the child block vrf signature.
 	if p.vm.IsVRFSigActivated(newTimestamp) {
 		if shouldBuildSignedBlock {
-			childBlockVrfSig = block.NextBlockVRFSig(parentBlockSig, blsSignKey, p.vm.ctx.ChainID, p.vm.ctx.NetworkID)
+			childBlockVrfSig = block.NextBlockVRFSig(parentBlock, blsSignKey, p.vm.ctx.ChainID, p.vm.ctx.NetworkID)
 		} else {
 			// in this case, we can't sign with BLS key, since we're not going to include the Certificate, which is required
 			// for the signature validation. Instead, we'll just hash the previous
-			childBlockVrfSig = block.NextHashBlockSignature(parentBlockSig)
+			childBlockVrfSig = block.NextHashBlockSignature(parentBlock)
 		}
 	}
 

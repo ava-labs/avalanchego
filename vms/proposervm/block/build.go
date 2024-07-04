@@ -34,8 +34,8 @@ func BuildUnsigned(
 			PChainHeight: pChainHeight,
 			Certificate:  nil,
 			Block:        blockBytes,
-			VRFSig:       blockVrfSig,
 		},
+		VRFSig:    blockVrfSig,
 		timestamp: timestamp,
 	}
 	bytes, err := marshalBlock(block)
@@ -69,10 +69,10 @@ func CalculateVRFOut(vrfSig []byte) []byte {
 // this allows the marsheler to produce encoded blocks that match the old style blocks as long as
 // the VRFSig feature was not enabled.
 func marshalBlock(block *statelessBlock) ([]byte, error) {
-	if len(block.StatelessBlock.VRFSig) == 0 {
+	if len(block.VRFSig) == 0 {
 		// create a backward compatible block ( without VRFSig ) and use the statelessBlockV0 encoder for the encoding.
 		var preBlockSigBlock SignedBlock = &statelessBlockV0{
-			StatelessBlock: statelessUnsignedBlockV0{
+			StatelessBlock: statelessUnsignedBlock{
 				ParentID:     block.StatelessBlock.ParentID,
 				Timestamp:    block.StatelessBlock.Timestamp,
 				PChainHeight: block.StatelessBlock.PChainHeight,
@@ -104,7 +104,12 @@ func calculateBootstrappingBlockSig(chainID ids.ID, networkID uint32) [hashing.H
 	return hashing.ComputeHash256Array(buffer)
 }
 
-func NextHashBlockSignature(parentBlockSig []byte) []byte {
+func NextHashBlockSignature(parentBlock SignedBlock) []byte {
+	var parentBlockSig []byte
+	if parentBlock != nil {
+		parentBlockSig = parentBlock.vrfSigBytes()
+	}
+
 	if len(parentBlockSig) == 0 {
 		return nil
 	}
@@ -122,7 +127,11 @@ func NextHashBlockSignature(parentBlockSig []byte) []byte {
 	return sigParentBlockSig
 }
 
-func NextBlockVRFSig(parentBlockSig []byte, blsSignKey *bls.SecretKey, chainID ids.ID, networkID uint32) []byte {
+func NextBlockVRFSig(parentBlock SignedBlock, blsSignKey *bls.SecretKey, chainID ids.ID, networkID uint32) []byte {
+	var parentBlockSig []byte
+	if parentBlock != nil {
+		parentBlockSig = parentBlock.vrfSigBytes()
+	}
 	if blsSignKey == nil {
 		// if we need to build a block without having a BLS key, we'll be hashing the previous
 		// signature only if it presents. Otherwise, we'll keep it empty.
@@ -131,7 +140,7 @@ func NextBlockVRFSig(parentBlockSig []byte, blsSignKey *bls.SecretKey, chainID i
 			return []byte{}
 		}
 
-		return NextHashBlockSignature(parentBlockSig)
+		return NextHashBlockSignature(parentBlock)
 	}
 
 	// we have bls key
@@ -163,8 +172,8 @@ func Build(
 			PChainHeight: pChainHeight,
 			Certificate:  cert.Raw,
 			Block:        blockBytes,
-			VRFSig:       blockVrfSig,
 		},
+		VRFSig:    blockVrfSig,
 		timestamp: timestamp,
 		cert:      cert,
 		proposer:  ids.NodeIDFromCert(cert),

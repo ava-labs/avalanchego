@@ -490,7 +490,7 @@ func TestCoreBlockFailureCauseProposerBlockParseFailure(t *testing.T) {
 		proVM.ctx.ChainID,
 		proVM.StakingLeafSigner,
 		statelessblock.NextBlockVRFSig(
-			[]byte{}, // parentBlockSig
+			nil, // parentBlockSig
 			proVM.StakingBLSKey,
 			proVM.ctx.ChainID,
 			proVM.ctx.NetworkID),
@@ -540,7 +540,7 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 		proVM.ctx.ChainID,
 		proVM.StakingLeafSigner,
 		statelessblock.NextBlockVRFSig(
-			[]byte{}, // parentBlockSig
+			nil, // parentBlockSig
 			proVM.StakingBLSKey,
 			proVM.ctx.ChainID,
 			proVM.ctx.NetworkID),
@@ -564,7 +564,7 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 		proVM.ctx.ChainID,
 		proVM.StakingLeafSigner,
 		statelessblock.NextBlockVRFSig(
-			[]byte{}, // parentBlockSig
+			nil, // parentBlockSig
 			proVM.StakingBLSKey,
 			proVM.ctx.ChainID,
 			proVM.ctx.NetworkID),
@@ -638,7 +638,7 @@ func TestTwoProBlocksWithSameParentCanBothVerify(t *testing.T) {
 		proVM.Time(),
 		pChainHeight,
 		netcoreBlk.Bytes(),
-		[]byte{}, // parentBlockSig
+		nil, // parentBlockSig
 	)
 	require.NoError(err)
 	netProBlk := postForkBlock{
@@ -910,7 +910,7 @@ func TestExpiredBuildBlock(t *testing.T) {
 		proVM.Time(),
 		0,
 		coreBlk.Bytes(),
-		[]byte{}, // parentBlockSig
+		nil, // parentBlockSig
 	)
 	require.NoError(err)
 
@@ -1007,7 +1007,7 @@ func TestInnerBlockDeduplication(t *testing.T) {
 		coreBlk.Timestamp(),
 		0,
 		coreBlk.Bytes(),
-		[]byte{}, // parentBlockSig
+		nil, // parentBlockSig
 	)
 	require.NoError(err)
 	statelessBlock1, err := statelessblock.BuildUnsigned(
@@ -1015,7 +1015,7 @@ func TestInnerBlockDeduplication(t *testing.T) {
 		coreBlk.Timestamp(),
 		1,
 		coreBlk.Bytes(),
-		[]byte{}, // parentBlockSig
+		nil, // parentBlockSig
 	)
 	require.NoError(err)
 
@@ -1175,7 +1175,7 @@ func TestInnerVMRollback(t *testing.T) {
 		coreBlk.Timestamp(),
 		0,
 		coreBlk.Bytes(),
-		[]byte{}, // parentBlockSig
+		nil, // parentBlockSig
 	)
 	require.NoError(err)
 
@@ -1288,7 +1288,7 @@ func TestBuildBlockDuringWindow(t *testing.T) {
 		proVM.Time(),
 		0,
 		coreBlk0.Bytes(),
-		[]byte{}, // parentBlockSig
+		nil, // parentBlockSig
 	)
 	require.NoError(err)
 
@@ -1381,7 +1381,7 @@ func TestTwoForks_OneIsAccepted(t *testing.T) {
 		proVM.Time(),
 		defaultPChainHeight,
 		yBlock.Bytes(),
-		[]byte{}, // parentBlockSig
+		nil, // parentBlockSig
 	)
 	require.NoError(err)
 
@@ -1451,7 +1451,7 @@ func TestTooFarAdvanced(t *testing.T) {
 		aBlock.Timestamp().Add(maxSkew),
 		defaultPChainHeight,
 		yBlock.Bytes(),
-		[]byte{}, // parentBlockSig
+		nil, // parentBlockSig
 	)
 	require.NoError(err)
 
@@ -1472,7 +1472,7 @@ func TestTooFarAdvanced(t *testing.T) {
 		aBlock.Timestamp().Add(proposer.MaxVerifyDelay),
 		defaultPChainHeight,
 		yBlock.Bytes(),
-		[]byte{}, // parentBlockSig
+		nil, // parentBlockSig
 	)
 
 	require.NoError(err)
@@ -1723,7 +1723,7 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 		snowmantest.GenesisTimestamp,
 		defaultPChainHeight,
 		yBlock.Bytes(),
-		[]byte{}, // parentBlockSig
+		nil, // parentBlockSig
 	)
 	require.NoError(err)
 
@@ -2001,7 +2001,7 @@ func TestVMInnerBlkCache(t *testing.T) {
 		vm.ctx.ChainID,       // chain ID
 		vm.StakingLeafSigner, // key
 		statelessblock.NextBlockVRFSig(
-			[]byte{}, // parentBlockSig
+			nil, // parentBlockSig
 			vm.StakingBLSKey,
 			vm.ctx.ChainID,
 			vm.ctx.NetworkID),
@@ -2068,7 +2068,7 @@ func TestVMInnerBlkCacheDeduplicationRegression(t *testing.T) {
 		snowmantest.GenesisTimestamp,
 		defaultPChainHeight,
 		xBlock.Bytes(),
-		[]byte{}, // parentBlockSig
+		nil, // parentBlockSig
 	)
 	require.NoError(err)
 

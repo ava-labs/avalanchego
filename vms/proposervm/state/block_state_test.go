@@ -35,7 +35,7 @@ func testBlockState(require *require.Assertions, bs BlockState) {
 	require.NoError(err)
 	key := tlsCert.PrivateKey.(crypto.Signer)
 
-	var parentBlockSig []byte
+	var parentBlock block.SignedBlock
 	var blsSignKey *bls.SecretKey
 
 	b, err := block.Build(
@@ -47,7 +47,7 @@ func testBlockState(require *require.Assertions, bs BlockState) {
 		chainID,
 		key,
 		block.NextBlockVRFSig(
-			parentBlockSig,
+			parentBlock,
 			blsSignKey,
 			chainID,
 			networkID),
