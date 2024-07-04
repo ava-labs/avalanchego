@@ -87,7 +87,8 @@ function test_interface_compliance_nil {
 }
 
 function test_import_testing_only_in_tests {
-  NON_TEST_GO_FILES=$( find -iname '*.go' ! -iname '*_test.go' | sort );
+  ROOT=$( git rev-parse --show-toplevel )
+  NON_TEST_GO_FILES=$( find "${ROOT}" -iname '*.go' ! -iname '*_test.go' | sort );
   IMPORT_TESTING=$( echo "${NON_TEST_GO_FILES}" | xargs grep -lP '^\s*(import\s+)?"testing"');
   TAGGED_AS_TEST=$( echo "${NON_TEST_GO_FILES}" | xargs grep -lP '^\/\/go:build\s+(.+(,|\s+))?test[,\s]?');
 
