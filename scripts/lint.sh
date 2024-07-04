@@ -86,6 +86,24 @@ function test_interface_compliance_nil {
   fi
 }
 
+function test_import_testing_only_in_tests {
+  NON_TEST_GO_FILES=$( find -iname '*.go' ! -iname '*_test.go' | sort );
+  IMPORT_TESTING=$( echo "${NON_TEST_GO_FILES}" | xargs grep -lP '^\s*(import\s+)?"testing"');
+  TAGGED_AS_TEST=$( echo "${NON_TEST_GO_FILES}" | xargs grep -lP '^\/\/go:build\s+(.+(,|\s+))?test[,\s]?');
+
+  # -3 suppresses files that import "testing" and have the "test" build tag
+  # -2 suppresses files that are tagged despite not importing "testing"
+  UNTAGGED=$( comm -23 <( echo "${IMPORT_TESTING}" ) <( echo "${TAGGED_AS_TEST}" ) );
+  if [ -z "${UNTAGGED}" ];
+  then
+    return 0;
+  fi
+
+  echo "Non-test Go files importing \"testing\" MUST have '//go:build test' tag:";
+  echo "${UNTAGGED}";
+  return 1;
+}
+
 function run {
   local test="${1}"
   shift 1
