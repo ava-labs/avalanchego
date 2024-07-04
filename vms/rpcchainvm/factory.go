@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/resource"
 	"github.com/ava-labs/avalanchego/vms"
@@ -18,16 +19,23 @@ import (
 var _ vms.Factory = (*factory)(nil)
 
 type factory struct {
-	path           string
-	processTracker resource.ProcessTracker
-	runtimeTracker runtime.Tracker
+	path            string
+	processTracker  resource.ProcessTracker
+	runtimeTracker  runtime.Tracker
+	metricsGatherer metrics.MultiGatherer
 }
 
-func NewFactory(path string, processTracker resource.ProcessTracker, runtimeTracker runtime.Tracker) vms.Factory {
+func NewFactory(
+	path string,
+	processTracker resource.ProcessTracker,
+	runtimeTracker runtime.Tracker,
+	metricsGatherer metrics.MultiGatherer,
+) vms.Factory {
 	return &factory{
-		path:           path,
-		processTracker: processTracker,
-		runtimeTracker: runtimeTracker,
+		path:            path,
+		processTracker:  processTracker,
+		runtimeTracker:  runtimeTracker,
+		metricsGatherer: metricsGatherer,
 	}
 }
 
@@ -59,10 +67,7 @@ func (f *factory) New(log logging.Logger) (interface{}, error) {
 		return nil, err
 	}
 
-	vm := NewClient(clientConn)
-	vm.SetProcess(stopper, status.Pid, f.processTracker)
-
+	f.processTracker.TrackProcess(status.Pid)
 	f.runtimeTracker.TrackRuntime(stopper)
-
-	return vm, nil
+	return NewClient(clientConn, stopper, status.Pid, f.processTracker, f.metricsGatherer), nil
 }
