@@ -102,6 +102,7 @@ const (
 	requestsNamespace        = constants.PlatformName + metric.NamespaceSeparator + "requests"
 	resourceTrackerNamespace = constants.PlatformName + metric.NamespaceSeparator + "resource_tracker"
 	responsesNamespace       = constants.PlatformName + metric.NamespaceSeparator + "responses"
+	rpcchainvmNamespace      = constants.PlatformName + metric.NamespaceSeparator + "rpcchainvm"
 	systemResourcesNamespace = constants.PlatformName + metric.NamespaceSeparator + "system_resources"
 )
 
@@ -1262,6 +1263,11 @@ func (n *Node) initVMs() error {
 	// initialize vm runtime manager
 	n.runtimeManager = runtime.NewManager()
 
+	rpcchainvmMetricsGatherer := metrics.NewLabelGatherer(chains.ChainLabel)
+	if err := n.MetricsGatherer.Register(rpcchainvmNamespace, rpcchainvmMetricsGatherer); err != nil {
+		return err
+	}
+
 	// initialize the vm registry
 	n.VMRegistry = registry.NewVMRegistry(registry.VMRegistryConfig{
 		VMGetter: registry.NewVMGetter(registry.VMGetterConfig{
@@ -1270,6 +1276,7 @@ func (n *Node) initVMs() error {
 			PluginDirectory: n.Config.PluginDir,
 			CPUTracker:      n.resourceManager,
 			RuntimeTracker:  n.runtimeManager,
+			MetricsGatherer: rpcchainvmMetricsGatherer,
 		}),
 		VMManager: n.VMManager,
 	})
