@@ -413,7 +413,7 @@ func (vm *VM) Shutdown(context.Context) error {
 		}
 	}
 
-	return utils.Err(
+	return errors.Join(
 		vm.state.Close(),
 		vm.db.Close(),
 	)

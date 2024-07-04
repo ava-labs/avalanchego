@@ -21,7 +21,8 @@ on:
         type: string
 
 jobs:
-  Run Antithesis Avalanchego Test Setup:
+  antithesis_avalanchego:
+    name: Run Antithesis Avalanchego Test Setup
     runs-on: ubuntu-latest
     steps:
       - uses: antithesishq/antithesis-trigger-action@v0.5
@@ -31,12 +32,13 @@ jobs:
           username: ${{ secrets.ANTITHESIS_USERNAME }}
           password: ${{ secrets.ANTITHESIS_PASSWORD }}
           github_token: ${{ secrets.ANTITHESIS_GH_PAT }}
-          config_image: antithesis-avalanchego-config@${{ github.events.inputs.image_tag }}
-          images: antithesis-avalanchego-workload@${{ github.events.inputs.image_tag }};antithesis-avalanchego-node@${{ github.events.inputs.image_tag }}
-          email_recipients: ${{ github.events.inputs.recipients }}
+          config_image: antithesis-avalanchego-config@${{ github.event.inputs.image_tag || 'latest' }}
+          images: antithesis-avalanchego-workload@${{ github.event.inputs.image_tag || 'latest' }};antithesis-avalanchego-node@${{ github.event.inputs.image_tag || 'latest' }}
+          email_recipients: ${{ github.event.inputs.recipients || secrets.ANTITHESIS_RECIPIENTS }}
           additional_parameters: |-
-            custom.duration=${{ github.events.inputs.duration }}
-  Run Antithesis XSVM Test Setup:
+            custom.duration=${{ github.event.inputs.duration || '0.5' }}
+  antithesis_xsvm:
+    name: Run Antithesis XSVM Test Setup
     runs-on: ubuntu-latest
     steps:
       - uses: antithesishq/antithesis-trigger-action@v0.5
@@ -46,8 +48,8 @@ jobs:
           username: ${{ secrets.ANTITHESIS_USERNAME }}
           password: ${{ secrets.ANTITHESIS_PASSWORD }}
           github_token: ${{ secrets.ANTITHESIS_GH_PAT }}
-          config_image: antithesis-xsvm-config@${{ github.events.inputs.image_tag }}
-          images: antithesis-xsvm-workload@${{ github.events.inputs.image_tag }};antithesis-xsvm-node@${{ github.events.inputs.image_tag }}
-          email_recipients: ${{ github.events.inputs.recipients }}
+          config_image: antithesis-xsvm-config@${{ github.event.inputs.image_tag || 'latest' }}
+          images: antithesis-xsvm-workload@${{ github.event.inputs.image_tag || 'latest' }};antithesis-xsvm-node@${{ github.event.inputs.image_tag || 'latest' }}
+          email_recipients: ${{ github.event.inputs.recipients || secrets.ANTITHESIS_RECIPIENTS }}
           additional_parameters: |-
-            custom.duration=${{ github.events.inputs.duration }}
+            custom.duration=${{ github.event.inputs.duration || '0.5' }}

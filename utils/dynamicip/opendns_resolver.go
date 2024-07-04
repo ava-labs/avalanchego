@@ -20,7 +20,7 @@ var (
 	_ Resolver = (*openDNSResolver)(nil)
 )
 
-// IFConfigResolves resolves our public IP using openDNS
+// openDNSResolver resolves our public IP using openDNS
 type openDNSResolver struct {
 	resolver *net.Resolver
 }

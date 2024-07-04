@@ -4,6 +4,7 @@
 package timeout
 
 import (
+	"errors"
 	"sync"
 	"time"
 
@@ -12,7 +13,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/utils"
 )
 
 const (
@@ -48,7 +48,7 @@ func newTimeoutMetrics(reg prometheus.Registerer) (*timeoutMetrics, error) {
 		),
 		chainIDToAlias: make(map[ids.ID]string),
 	}
-	return m, utils.Err(
+	return m, errors.Join(
 		reg.Register(m.messages),
 		reg.Register(m.messageLatencies),
 	)

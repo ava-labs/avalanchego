@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
+	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
@@ -261,7 +262,7 @@ func lastAcceptedBlockPostStateSummaryAcceptTestPlugin(t *testing.T, loadExpecta
 	return ssVM
 }
 
-func buildClientHelper(require *require.Assertions, testKey string) (*VMClient, runtime.Stopper) {
+func buildClientHelper(require *require.Assertions, testKey string) *VMClient {
 	process := helperProcess(testKey)
 
 	log := logging.NewLogger(
@@ -292,7 +293,7 @@ func buildClientHelper(require *require.Assertions, testKey string) (*VMClient, 
 	clientConn, err := grpcutils.Dial(status.Addr)
 	require.NoError(err)
 
-	return NewClient(clientConn), stopper
+	return NewClient(clientConn, stopper, status.Pid, nil, metrics.NewPrefixGatherer())
 }
 
 func TestStateSyncEnabled(t *testing.T) {
@@ -300,8 +301,8 @@ func TestStateSyncEnabled(t *testing.T) {
 	testKey := stateSyncEnabledTestKey
 
 	// Create and start the plugin
-	vm, stopper := buildClientHelper(require, testKey)
-	defer stopper.Stop(context.Background())
+	vm := buildClientHelper(require, testKey)
+	defer vm.runtime.Stop(context.Background())
 
 	// test state sync not implemented
 	// Note that enabled == false is returned rather than
@@ -331,8 +332,8 @@ func TestGetOngoingSyncStateSummary(t *testing.T) {
 	testKey := getOngoingSyncStateSummaryTestKey
 
 	// Create and start the plugin
-	vm, stopper := buildClientHelper(require, testKey)
-	defer stopper.Stop(context.Background())
+	vm := buildClientHelper(require, testKey)
+	defer vm.runtime.Stop(context.Background())
 
 	// test unimplemented case; this is just a guard
 	_, err := vm.GetOngoingSyncStateSummary(context.Background())
@@ -356,8 +357,8 @@ func TestGetLastStateSummary(t *testing.T) {
 	testKey := getLastStateSummaryTestKey
 
 	// Create and start the plugin
-	vm, stopper := buildClientHelper(require, testKey)
-	defer stopper.Stop(context.Background())
+	vm := buildClientHelper(require, testKey)
+	defer vm.runtime.Stop(context.Background())
 
 	// test unimplemented case; this is just a guard
 	_, err := vm.GetLastStateSummary(context.Background())
@@ -381,8 +382,8 @@ func TestParseStateSummary(t *testing.T) {
 	testKey := parseStateSummaryTestKey
 
 	// Create and start the plugin
-	vm, stopper := buildClientHelper(require, testKey)
-	defer stopper.Stop(context.Background())
+	vm := buildClientHelper(require, testKey)
+	defer vm.runtime.Stop(context.Background())
 
 	// test unimplemented case; this is just a guard
 	_, err := vm.ParseStateSummary(context.Background(), mockedSummary.Bytes())
@@ -410,8 +411,8 @@ func TestGetStateSummary(t *testing.T) {
 	testKey := getStateSummaryTestKey
 
 	// Create and start the plugin
-	vm, stopper := buildClientHelper(require, testKey)
-	defer stopper.Stop(context.Background())
+	vm := buildClientHelper(require, testKey)
+	defer vm.runtime.Stop(context.Background())
 
 	// test unimplemented case; this is just a guard
 	_, err := vm.GetStateSummary(context.Background(), mockedSummary.Height())
@@ -435,8 +436,8 @@ func TestAcceptStateSummary(t *testing.T) {
 	testKey := acceptStateSummaryTestKey
 
 	// Create and start the plugin
-	vm, stopper := buildClientHelper(require, testKey)
-	defer stopper.Stop(context.Background())
+	vm := buildClientHelper(require, testKey)
+	defer vm.runtime.Stop(context.Background())
 
 	// retrieve the summary first
 	summary, err := vm.GetStateSummary(context.Background(), mockedSummary.Height())
@@ -465,8 +466,8 @@ func TestLastAcceptedBlockPostStateSummaryAccept(t *testing.T) {
 	testKey := lastAcceptedBlockPostStateSummaryAcceptTestKey
 
 	// Create and start the plugin
-	vm, stopper := buildClientHelper(require, testKey)
-	defer stopper.Stop(context.Background())
+	vm := buildClientHelper(require, testKey)
+	defer vm.runtime.Stop(context.Background())
 
 	// Step 1: initialize VM and check initial LastAcceptedBlock
 	ctx := snowtest.Context(t, snowtest.CChainID)

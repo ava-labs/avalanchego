@@ -1,5 +1,65 @@
 # Release Notes
 
+## [v1.11.9](https://github.com/ava-labs/avalanchego/releases/tag/v1.11.9)
+
+This version is backwards compatible to [v1.11.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.11.0). It is optional, but encouraged.
+
+The plugin version is unchanged at `35` and is compatible with versions `v1.11.3-v1.11.8`.
+
+### APIs
+
+- Updated health metrics to use labels rather than namespaces
+- Added consensus poll termination metrics
+
+### Configs
+
+- Added `--version-json` flag to output version information in json format
+
+### Fixes
+
+- Fixed incorrect WARN log that could previously be emitted during start on nodes with slower disks
+- Fixed incorrect ERROR log that could previously be emitted if a peer tracking a subnet connects during shutdown
+- Fixed ledger dependency on erased commit
+- Fixed protobuf dependency to resolve compilation issues in some cases
+- Fixed C-chain filename logging
+
+### What's Changed
+
+- Error driven snowflake multi counter by @aaronbuchwald in https://github.com/ava-labs/avalanchego/pull/3092
+- [antithesis] Add ci jobs to trigger test runs by @marun in https://github.com/ava-labs/avalanchego/pull/3076
+- bump ledger-avalanche dependency to current main branch by @felipemadero in https://github.com/ava-labs/avalanchego/pull/3115
+- [antithesis] Fix image publication job by quoting default tag value by @marun in https://github.com/ava-labs/avalanchego/pull/3112
+- [e2e] Fix excessively verbose output from virtuous test by @marun in https://github.com/ava-labs/avalanchego/pull/3116
+- Remove .Status() from .IsPreferred() by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3111
+- Add early termination metrics case by case by @aaronbuchwald in https://github.com/ava-labs/avalanchego/pull/3093
+- Update C-chain wallet context by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3118
+- Standardize wallet tx acceptance polling by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3110
+- [antithesis] Remove assertions incompatible with fault injection by @marun in https://github.com/ava-labs/avalanchego/pull/3104
+- Use health labels by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3122
+- Remove `Decided` from the `Consensus` interface by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3123
+- Remove .Status() from .Accepted() by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3124
+- Refactor `event.Blocker` into `job.Scheduler` by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3125
+- Remove block lookup from `deliver` by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3130
+- [chains/atomic] Remove a nested if statement by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/3135
+- [vms/platformvm] Minor grammer fixes in `state` struct code comments by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/3136
+- bump protobuf (fixes some build issues) by @darioush in https://github.com/ava-labs/avalanchego/pull/3142
+- Emit version in JSON format for --json-version by @marun in https://github.com/ava-labs/avalanchego/pull/3129
+- Repackaged NextBlockTime and GetNextStakerChangeTime by @abi87 in https://github.com/ava-labs/avalanchego/pull/3134
+- [vms/platformvm] Cleanup execution config tests by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/3137
+- [tmpnet] Enable bootstrap of subnets with disjoint validator sets by @marun in https://github.com/ava-labs/avalanchego/pull/3138
+- Simplify dependency registration by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3139
+- Replace `wasIssued` with `shouldIssueBlock` by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3131
+- Remove parent lookup from issue by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3132
+- Remove status usage from consensus by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3140
+- Fix bootstrapping warn log by @joshua-kim in https://github.com/ava-labs/avalanchego/pull/3156
+- chore: fix some comment by @hattizai in https://github.com/ava-labs/avalanchego/pull/3144
+- [ci] Add actionlint job by @marun in https://github.com/ava-labs/avalanchego/pull/3160
+- check router is closing in requests by @ceyonur in https://github.com/ava-labs/avalanchego/pull/3157
+- Use `ids.Empty` instead of `ids.ID{}` by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/3166
+- Replace usage of utils.Err with errors.Join by @joshua-kim in https://github.com/ava-labs/avalanchego/pull/3167
+
+**Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.11.8...v1.11.9
+
 ## [v1.11.8](https://github.com/ava-labs/avalanchego/releases/tag/v1.11.8)
 
 This version is backwards compatible to [v1.11.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.11.0). It is optional, but encouraged.
