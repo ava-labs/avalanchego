@@ -4,10 +4,7 @@
 package x
 
 import (
-	"errors"
-
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/vms/avm"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -18,11 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
 
-var (
-	ErrNotAccepted = errors.New("not accepted")
-
-	_ Wallet = (*wallet)(nil)
-)
+var _ Wallet = (*wallet)(nil)
 
 type Wallet interface {
 	// Builder returns the builder that will be used to create the transactions.
@@ -313,17 +306,9 @@ func (w *wallet) IssueTx(
 		return w.backend.AcceptTx(ctx, tx)
 	}
 
-	txStatus, err := w.client.ConfirmTx(ctx, txID, ops.PollFrequency())
-	if err != nil {
+	if err := avm.AwaitTxAccepted(w.client, ctx, txID, ops.PollFrequency()); err != nil {
 		return err
 	}
 
-	if err := w.backend.AcceptTx(ctx, tx); err != nil {
-		return err
-	}
-
-	if txStatus != choices.Accepted {
-		return ErrNotAccepted
-	}
-	return nil
+	return w.backend.AcceptTx(ctx, tx)
 }

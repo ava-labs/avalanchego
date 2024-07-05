@@ -4,6 +4,9 @@
 package ips
 
 import (
+	"net"
+	"net/netip"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils/hashing"
@@ -12,7 +15,7 @@ import (
 
 const (
 	// Certificate length, signature length, IP, timestamp, tx ID
-	baseIPCertDescLen = 2*wrappers.IntLen + IPPortLen + wrappers.LongLen + ids.IDLen
+	baseIPCertDescLen = 2*wrappers.IntLen + net.IPv6len + wrappers.ShortLen + wrappers.LongLen + ids.IDLen
 	preimageLen       = ids.IDLen + wrappers.LongLen
 )
 
@@ -22,7 +25,7 @@ type ClaimedIPPort struct {
 	// The peer's certificate.
 	Cert *staking.Certificate
 	// The peer's claimed IP and port.
-	IPPort IPPort
+	AddrPort netip.AddrPort
 	// The time the peer claimed to own this IP and port.
 	Timestamp uint64
 	// [Cert]'s signature over the IPPort and timestamp.
@@ -38,13 +41,13 @@ type ClaimedIPPort struct {
 
 func NewClaimedIPPort(
 	cert *staking.Certificate,
-	ipPort IPPort,
+	ipPort netip.AddrPort,
 	timestamp uint64,
 	signature []byte,
 ) *ClaimedIPPort {
 	ip := &ClaimedIPPort{
 		Cert:      cert,
-		IPPort:    ipPort,
+		AddrPort:  ipPort,
 		Timestamp: timestamp,
 		Signature: signature,
 		NodeID:    ids.NodeIDFromCert(cert),

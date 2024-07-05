@@ -18,6 +18,7 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/ava-labs/avalanchego/api/keystore/gkeystore"
+	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/chains/atomic/gsharedmemory"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/rpcdb"
@@ -84,10 +85,11 @@ var (
 // VMClient is an implementation of a VM that talks over RPC.
 type VMClient struct {
 	*chain.State
-	client         vmpb.VMClient
-	runtime        runtime.Stopper
-	pid            int
-	processTracker resource.ProcessTracker
+	client          vmpb.VMClient
+	runtime         runtime.Stopper
+	pid             int
+	processTracker  resource.ProcessTracker
+	metricsGatherer metrics.MultiGatherer
 
 	messenger            *messenger.Server
 	keystore             *gkeystore.Server
@@ -104,19 +106,21 @@ type VMClient struct {
 }
 
 // NewClient returns a VM connected to a remote VM
-func NewClient(clientConn *grpc.ClientConn) *VMClient {
+func NewClient(
+	clientConn *grpc.ClientConn,
+	runtime runtime.Stopper,
+	pid int,
+	processTracker resource.ProcessTracker,
+	metricsGatherer metrics.MultiGatherer,
+) *VMClient {
 	return &VMClient{
-		client: vmpb.NewVMClient(clientConn),
-		conns:  []*grpc.ClientConn{clientConn},
+		client:          vmpb.NewVMClient(clientConn),
+		runtime:         runtime,
+		pid:             pid,
+		processTracker:  processTracker,
+		metricsGatherer: metricsGatherer,
+		conns:           []*grpc.ClientConn{clientConn},
 	}
-}
-
-// SetProcess gives ownership of the server process to the client.
-func (vm *VMClient) SetProcess(runtime runtime.Stopper, pid int, processTracker resource.ProcessTracker) {
-	vm.runtime = runtime
-	vm.processTracker = processTracker
-	vm.pid = pid
-	processTracker.TrackProcess(vm.pid)
 }
 
 func (vm *VMClient) Initialize(
@@ -134,15 +138,25 @@ func (vm *VMClient) Initialize(
 		return errUnsupportedFXs
 	}
 
+	primaryAlias, err := chainCtx.BCLookup.PrimaryAlias(chainCtx.ChainID)
+	if err != nil {
+		// If fetching the alias fails, we default to the chain's ID
+		primaryAlias = chainCtx.ChainID.String()
+	}
+
 	// Register metrics
-	registerer := prometheus.NewRegistry()
+	serverReg, err := metrics.MakeAndRegister(
+		vm.metricsGatherer,
+		primaryAlias,
+	)
+	if err != nil {
+		return err
+	}
 	vm.grpcServerMetrics = grpc_prometheus.NewServerMetrics()
-	if err := registerer.Register(vm.grpcServerMetrics); err != nil {
+	if err := serverReg.Register(vm.grpcServerMetrics); err != nil {
 		return err
 	}
-	if err := chainCtx.Metrics.Register("rpcchainvm", registerer); err != nil {
-		return err
-	}
+
 	if err := chainCtx.Metrics.Register("", vm); err != nil {
 		return err
 	}
@@ -225,7 +239,7 @@ func (vm *VMClient) Initialize(
 	}
 
 	vm.State, err = chain.NewMeteredState(
-		registerer,
+		serverReg,
 		&chain.Config{
 			DecidedCacheSize:      decidedCacheSize,
 			MissingCacheSize:      missingCacheSize,

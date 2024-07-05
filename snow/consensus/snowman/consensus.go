@@ -31,19 +31,20 @@ type Consensus interface {
 	// Returns the number of blocks processing
 	NumProcessing() int
 
-	// Adds a new decision. Assumes the dependency has already been added.
+	// Add a new block.
+	//
+	// Add should not be called multiple times with the same block.
+	// The parent block should either be the last accepted block or processing.
+	//
 	// Returns if a critical error has occurred.
-	Add(context.Context, Block) error
-
-	// Decided returns true if the block has been decided.
-	Decided(Block) bool
+	Add(Block) error
 
 	// Processing returns true if the block ID is currently processing.
 	Processing(ids.ID) bool
 
-	// IsPreferred returns true if the block is currently on the preferred
-	// chain.
-	IsPreferred(Block) bool
+	// IsPreferred returns true if the block ID is preferred. Only the last
+	// accepted block and processing blocks are considered preferred.
+	IsPreferred(ids.ID) bool
 
 	// Returns the ID and height of the last accepted decision.
 	LastAccepted() (ids.ID, uint64)

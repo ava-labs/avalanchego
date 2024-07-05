@@ -61,7 +61,7 @@ func TestShutdown(t *testing.T) {
 			TimeoutHalflife:    5 * time.Minute,
 		},
 		benchlist,
-		"",
+		prometheus.NewRegistry(),
 		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
@@ -80,7 +80,6 @@ func TestShutdown(t *testing.T) {
 		set.Set[ids.ID]{},
 		nil,
 		HealthConfig{},
-		"",
 		prometheus.NewRegistry(),
 	))
 
@@ -114,6 +113,7 @@ func TestShutdown(t *testing.T) {
 		subnets.New(chainCtx.NodeID, subnets.Config{}),
 		commontracker.NewPeers(),
 		p2pTracker,
+		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
 
@@ -191,6 +191,117 @@ func TestShutdown(t *testing.T) {
 	require.Less(shutdownDuration, 250*time.Millisecond)
 }
 
+func TestConnectedAfterShutdownErrorLogRegression(t *testing.T) {
+	require := require.New(t)
+
+	snowCtx := snowtest.Context(t, snowtest.PChainID)
+	chainCtx := snowtest.ConsensusContext(snowCtx)
+
+	chainRouter := ChainRouter{}
+	require.NoError(chainRouter.Initialize(
+		ids.EmptyNodeID,
+		logging.NoWarn{}, // If an error log is emitted, the test will fail
+		nil,
+		time.Second,
+		set.Set[ids.ID]{},
+		true,
+		set.Set[ids.ID]{},
+		nil,
+		HealthConfig{},
+		prometheus.NewRegistry(),
+	))
+
+	resourceTracker, err := tracker.NewResourceTracker(
+		prometheus.NewRegistry(),
+		resource.NoUsage,
+		meter.ContinuousFactory{},
+		time.Second,
+	)
+	require.NoError(err)
+
+	p2pTracker, err := p2p.NewPeerTracker(
+		logging.NoLog{},
+		"",
+		prometheus.NewRegistry(),
+		nil,
+		version.CurrentApp,
+	)
+	require.NoError(err)
+
+	h, err := handler.New(
+		chainCtx,
+		nil,
+		nil,
+		time.Second,
+		testThreadPoolSize,
+		resourceTracker,
+		validators.UnhandledSubnetConnector,
+		subnets.New(chainCtx.NodeID, subnets.Config{}),
+		commontracker.NewPeers(),
+		p2pTracker,
+		prometheus.NewRegistry(),
+	)
+	require.NoError(err)
+
+	engine := common.EngineTest{
+		T: t,
+		StartF: func(context.Context, uint32) error {
+			return nil
+		},
+		ContextF: func() *snow.ConsensusContext {
+			return chainCtx
+		},
+		HaltF: func(context.Context) {},
+		ShutdownF: func(context.Context) error {
+			return nil
+		},
+		ConnectedF: func(context.Context, ids.NodeID, *version.Application) error {
+			return nil
+		},
+	}
+	engine.Default(true)
+	engine.CantGossip = false
+
+	bootstrapper := &common.BootstrapperTest{
+		EngineTest: engine,
+		CantClear:  true,
+	}
+
+	h.SetEngineManager(&handler.EngineManager{
+		Avalanche: &handler.Engine{
+			StateSyncer:  nil,
+			Bootstrapper: bootstrapper,
+			Consensus:    &engine,
+		},
+		Snowman: &handler.Engine{
+			StateSyncer:  nil,
+			Bootstrapper: bootstrapper,
+			Consensus:    &engine,
+		},
+	})
+	chainCtx.State.Set(snow.EngineState{
+		Type:  engineType,
+		State: snow.NormalOp, // assumed bootstrapping is done
+	})
+
+	chainRouter.AddChain(context.Background(), h)
+
+	h.Start(context.Background(), false)
+
+	chainRouter.Shutdown(context.Background())
+
+	shutdownDuration, err := h.AwaitStopped(context.Background())
+	require.NoError(err)
+	require.GreaterOrEqual(shutdownDuration, time.Duration(0))
+
+	// Calling connected after shutdown should result in an error log.
+	chainRouter.Connected(
+		ids.GenerateTestNodeID(),
+		version.CurrentApp,
+		ids.GenerateTestID(),
+	)
+}
+
 func TestShutdownTimesOut(t *testing.T) {
 	require := require.New(t)
 
@@ -200,7 +311,6 @@ func TestShutdownTimesOut(t *testing.T) {
 	vdrs := validators.NewManager()
 	require.NoError(vdrs.AddStaker(ctx.SubnetID, ids.GenerateTestNodeID(), nil, ids.Empty, 1))
 	benchlist := benchlist.NewNoBenchlist()
-	metrics := prometheus.NewRegistry()
 	// Ensure that the Ancestors request does not timeout
 	tm, err := timeout.NewManager(
 		&timer.AdaptiveTimeoutConfig{
@@ -211,8 +321,8 @@ func TestShutdownTimesOut(t *testing.T) {
 			TimeoutHalflife:    5 * time.Minute,
 		},
 		benchlist,
-		"",
-		metrics,
+		prometheus.NewRegistry(),
+		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
 
@@ -231,8 +341,7 @@ func TestShutdownTimesOut(t *testing.T) {
 		set.Set[ids.ID]{},
 		nil,
 		HealthConfig{},
-		"",
-		metrics,
+		prometheus.NewRegistry(),
 	))
 
 	resourceTracker, err := tracker.NewResourceTracker(
@@ -263,6 +372,7 @@ func TestShutdownTimesOut(t *testing.T) {
 		subnets.New(ctx.NodeID, subnets.Config{}),
 		commontracker.NewPeers(),
 		p2pTracker,
+		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
 
@@ -325,7 +435,7 @@ func TestShutdownTimesOut(t *testing.T) {
 	shutdownFinished := make(chan struct{}, 1)
 
 	go func() {
-		chainID := ids.ID{}
+		chainID := ids.Empty
 		msg := handler.Message{
 			InboundMessage: message.InboundPullQuery(chainID, 1, time.Hour, ids.GenerateTestID(), 0, nodeID),
 			EngineType:     p2ppb.EngineType_ENGINE_TYPE_UNSPECIFIED,
@@ -360,7 +470,7 @@ func TestRouterTimeout(t *testing.T) {
 			TimeoutHalflife:    5 * time.Minute,
 		},
 		benchlist.NewNoBenchlist(),
-		"",
+		prometheus.NewRegistry(),
 		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
@@ -380,7 +490,6 @@ func TestRouterTimeout(t *testing.T) {
 		set.Set[ids.ID]{},
 		nil,
 		HealthConfig{},
-		"",
 		prometheus.NewRegistry(),
 	))
 	defer chainRouter.Shutdown(context.Background())
@@ -433,6 +542,7 @@ func TestRouterTimeout(t *testing.T) {
 		subnets.New(ctx.NodeID, subnets.Config{}),
 		commontracker.NewPeers(),
 		p2pTracker,
+		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
 
@@ -729,7 +839,7 @@ func TestRouterHonorsRequestedEngine(t *testing.T) {
 			TimeoutHalflife:    5 * time.Minute,
 		},
 		benchlist.NewNoBenchlist(),
-		"",
+		prometheus.NewRegistry(),
 		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
@@ -749,7 +859,6 @@ func TestRouterHonorsRequestedEngine(t *testing.T) {
 		set.Set[ids.ID]{},
 		nil,
 		HealthConfig{},
-		"",
 		prometheus.NewRegistry(),
 	))
 	defer chainRouter.Shutdown(context.Background())
@@ -954,7 +1063,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 			TimeoutHalflife:    5 * time.Minute,
 		},
 		benchlist.NewNoBenchlist(),
-		"",
+		prometheus.NewRegistry(),
 		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
@@ -974,7 +1083,6 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 		set.Set[ids.ID]{},
 		nil,
 		HealthConfig{},
-		"",
 		prometheus.NewRegistry(),
 	))
 	defer chainRouter.Shutdown(context.Background())
@@ -1017,6 +1125,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 		sb,
 		commontracker.NewPeers(),
 		p2pTracker,
+		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
 
@@ -1115,7 +1224,7 @@ func TestConnectedSubnet(t *testing.T) {
 			TimeoutHalflife:    5 * time.Minute,
 		},
 		benchlist.NewNoBenchlist(),
-		"timeoutManager",
+		prometheus.NewRegistry(),
 		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
@@ -1140,7 +1249,6 @@ func TestConnectedSubnet(t *testing.T) {
 		trackedSubnets,
 		nil,
 		HealthConfig{},
-		"",
 		prometheus.NewRegistry(),
 	))
 
@@ -1232,7 +1340,7 @@ func TestValidatorOnlyAllowedNodeMessageDrops(t *testing.T) {
 			TimeoutHalflife:    5 * time.Minute,
 		},
 		benchlist.NewNoBenchlist(),
-		"",
+		prometheus.NewRegistry(),
 		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
@@ -1252,7 +1360,6 @@ func TestValidatorOnlyAllowedNodeMessageDrops(t *testing.T) {
 		set.Set[ids.ID]{},
 		nil,
 		HealthConfig{},
-		"",
 		prometheus.NewRegistry(),
 	))
 	defer chainRouter.Shutdown(context.Background())
@@ -1299,6 +1406,7 @@ func TestValidatorOnlyAllowedNodeMessageDrops(t *testing.T) {
 		sb,
 		commontracker.NewPeers(),
 		p2pTracker,
+		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
 
@@ -1582,7 +1690,7 @@ func newChainRouterTest(t *testing.T) (*ChainRouter, *common.EngineTest) {
 			TimeoutHalflife:    5 * time.Minute,
 		},
 		benchlist.NewNoBenchlist(),
-		"",
+		prometheus.NewRegistry(),
 		prometheus.NewRegistry(),
 	)
 	require.NoError(t, err)
@@ -1601,7 +1709,6 @@ func newChainRouterTest(t *testing.T) (*ChainRouter, *common.EngineTest) {
 		set.Set[ids.ID]{},
 		nil,
 		HealthConfig{},
-		"",
 		prometheus.NewRegistry(),
 	))
 
@@ -1639,6 +1746,7 @@ func newChainRouterTest(t *testing.T) (*ChainRouter, *common.EngineTest) {
 		subnets.New(ctx.NodeID, subnets.Config{}),
 		commontracker.NewPeers(),
 		p2pTracker,
+		prometheus.NewRegistry(),
 	)
 	require.NoError(t, err)
 

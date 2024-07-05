@@ -5,11 +5,12 @@ package dynamicip
 
 import (
 	"context"
+	"net/netip"
 	"time"
 
 	"go.uber.org/zap"
 
-	"github.com/ava-labs/avalanchego/utils/ips"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
@@ -30,7 +31,7 @@ type Updater interface {
 
 type updater struct {
 	// The IP we periodically modify.
-	dynamicIP ips.DynamicIPPort
+	dynamicIP *utils.Atomic[netip.AddrPort]
 	// Used to find out what our public IP is.
 	resolver Resolver
 	// The parent of all contexts passed into resolver.Resolve().
@@ -49,7 +50,7 @@ type updater struct {
 // every [updateFreq]. Uses [resolver] to find
 // out what our public IP is.
 func NewUpdater(
-	dynamicIP ips.DynamicIPPort,
+	dynamicIP *utils.Atomic[netip.AddrPort],
 	resolver Resolver,
 	updateFreq time.Duration,
 ) Updater {
@@ -73,13 +74,16 @@ func (u *updater) Dispatch(log logging.Logger) {
 		close(u.doneChan)
 	}()
 
+	var (
+		initialAddrPort = u.dynamicIP.Get()
+		oldAddr         = initialAddrPort.Addr()
+		port            = initialAddrPort.Port()
+	)
 	for {
 		select {
 		case <-ticker.C:
-			oldIP := u.dynamicIP.IPPort().IP
-
 			ctx, cancel := context.WithTimeout(u.rootCtx, ipResolutionTimeout)
-			newIP, err := u.resolver.Resolve(ctx)
+			newAddr, err := u.resolver.Resolve(ctx)
 			cancel()
 			if err != nil {
 				log.Warn("couldn't resolve public IP. If this machine's IP recently changed, it may be sharing the wrong public IP with peers",
@@ -88,11 +92,13 @@ func (u *updater) Dispatch(log logging.Logger) {
 				continue
 			}
 
-			if !newIP.Equal(oldIP) {
-				u.dynamicIP.SetIP(newIP)
+			if newAddr != oldAddr {
+				u.dynamicIP.Set(netip.AddrPortFrom(newAddr, port))
 				log.Info("updated public IP",
-					zap.Stringer("newIP", newIP),
+					zap.Stringer("oldIP", oldAddr),
+					zap.Stringer("newIP", newAddr),
 				)
+				oldAddr = newAddr
 			}
 		case <-u.rootCtx.Done():
 			return

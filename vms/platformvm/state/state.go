@@ -26,7 +26,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/hashing"
@@ -288,11 +287,11 @@ type state struct {
 	currentHeight uint64
 
 	addedBlockIDs map[uint64]ids.ID            // map of height -> blockID
-	blockIDCache  cache.Cacher[uint64, ids.ID] // cache of height -> blockID. If the entry is ids.Empty, it is not in the database
+	blockIDCache  cache.Cacher[uint64, ids.ID] // cache of height -> blockID; if the entry is ids.Empty, it is not in the database
 	blockIDDB     database.Database
 
 	addedBlocks map[ids.ID]block.Block            // map of blockID -> Block
-	blockCache  cache.Cacher[ids.ID, block.Block] // cache of blockID -> Block. If the entry is nil, it is not in the database
+	blockCache  cache.Cacher[ids.ID, block.Block] // cache of blockID -> Block; if the entry is nil, it is not in the database
 	blockDB     database.Database
 
 	validatorsDB                 database.Database
@@ -319,14 +318,14 @@ type state struct {
 	validatorPublicKeyDiffsDB database.Database
 
 	addedTxs map[ids.ID]*txAndStatus            // map of txID -> {*txs.Tx, Status}
-	txCache  cache.Cacher[ids.ID, *txAndStatus] // txID -> {*txs.Tx, Status}. If the entry is nil, it isn't in the database
+	txCache  cache.Cacher[ids.ID, *txAndStatus] // txID -> {*txs.Tx, Status}; if the entry is nil, it is not in the database
 	txDB     database.Database
 
 	addedRewardUTXOs map[ids.ID][]*avax.UTXO            // map of txID -> []*UTXO
 	rewardUTXOsCache cache.Cacher[ids.ID, []*avax.UTXO] // txID -> []*UTXO
 	rewardUTXODB     database.Database
 
-	modifiedUTXOs map[ids.ID]*avax.UTXO // map of modified UTXOID -> *UTXO if the UTXO is nil, it has been removed
+	modifiedUTXOs map[ids.ID]*avax.UTXO // map of modified UTXOID -> *UTXO; if the UTXO is nil, it has been removed
 	utxoDB        database.Database
 	utxoState     avax.UTXOState
 
@@ -335,17 +334,16 @@ type state struct {
 	subnetBaseDB    database.Database
 	subnetDB        linkeddb.LinkedDB
 
-	// Subnet ID --> Owner of the subnet
-	subnetOwners     map[ids.ID]fx.Owner
-	subnetOwnerCache cache.Cacher[ids.ID, fxOwnerAndSize] // cache of subnetID -> owner if the entry is nil, it is not in the database
+	subnetOwners     map[ids.ID]fx.Owner                  // map of subnetID -> owner
+	subnetOwnerCache cache.Cacher[ids.ID, fxOwnerAndSize] // cache of subnetID -> owner; if the entry is nil, it is not in the database
 	subnetOwnerDB    database.Database
 
 	transformedSubnets     map[ids.ID]*txs.Tx            // map of subnetID -> transformSubnetTx
-	transformedSubnetCache cache.Cacher[ids.ID, *txs.Tx] // cache of subnetID -> transformSubnetTx if the entry is nil, it is not in the database
+	transformedSubnetCache cache.Cacher[ids.ID, *txs.Tx] // cache of subnetID -> transformSubnetTx; if the entry is nil, it is not in the database
 	transformedSubnetDB    database.Database
 
 	modifiedSupplies map[ids.ID]uint64             // map of subnetID -> current supply
-	supplyCache      cache.Cacher[ids.ID, *uint64] // cache of subnetID -> current supply if the entry is nil, it is not in the database
+	supplyCache      cache.Cacher[ids.ID, *uint64] // cache of subnetID -> current supply; if the entry is nil, it is not in the database
 	supplyDB         database.Database
 
 	addedChains  map[ids.ID][]*txs.Tx                    // maps subnetID -> the newly added chains to the subnet
@@ -1273,7 +1271,7 @@ func (s *state) syncGenesis(genesisBlk block.Block, genesis *genesis.Genesis) er
 
 // Load pulls data previously stored on disk that is expected to be in memory.
 func (s *state) load() error {
-	return utils.Err(
+	return errors.Join(
 		s.loadMetadata(),
 		s.loadCurrentValidators(),
 		s.loadPendingValidators(),
@@ -1494,7 +1492,7 @@ func (s *state) loadCurrentValidators() error {
 		}
 	}
 
-	return utils.Err(
+	return errors.Join(
 		validatorIt.Error(),
 		subnetValidatorIt.Error(),
 		delegatorIt.Error(),
@@ -1578,7 +1576,7 @@ func (s *state) loadPendingValidators() error {
 		}
 	}
 
-	return utils.Err(
+	return errors.Join(
 		validatorIt.Error(),
 		subnetValidatorIt.Error(),
 		delegatorIt.Error(),
@@ -1628,7 +1626,7 @@ func (s *state) write(updateValidators bool, height uint64) error {
 		codecVersion = CodecVersion0
 	}
 
-	return utils.Err(
+	return errors.Join(
 		s.writeBlocks(),
 		s.writeCurrentStakers(updateValidators, height, codecVersion),
 		s.writePendingStakers(),
@@ -1646,7 +1644,7 @@ func (s *state) write(updateValidators bool, height uint64) error {
 }
 
 func (s *state) Close() error {
-	return utils.Err(
+	return errors.Join(
 		s.pendingSubnetValidatorBaseDB.Close(),
 		s.pendingSubnetDelegatorBaseDB.Close(),
 		s.pendingDelegatorBaseDB.Close(),
@@ -2384,7 +2382,7 @@ func (s *state) ReindexBlocks(lock sync.Locker, log logging.Logger) error {
 			// attempt to commit to disk while a block is concurrently being
 			// accepted.
 			lock.Lock()
-			err := utils.Err(
+			err := errors.Join(
 				s.Commit(),
 				blockIterator.Error(),
 			)
