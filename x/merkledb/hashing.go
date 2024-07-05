@@ -6,6 +6,7 @@ package merkledb
 import (
 	"crypto/sha256"
 	"encoding/binary"
+	"fmt"
 	"slices"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -22,18 +23,61 @@ var (
 	DefaultHasher = SHA256Hasher
 )
 
+type SerializableID interface {
+	fmt.Stringer
+	ID() ids.ID
+	Encode(writer *codecWriter)
+	EncodeBytes() []byte
+	Len() int
+}
+
+type serializeable struct {
+	id ids.ID
+}
+
+func (_ *serializeable) Len() int                   { return ids.IDLen }
+func (s *serializeable) ID() ids.ID                 { return s.id }
+func (s *serializeable) Encode(writer *codecWriter) { writer.ID(s.id) }
+func (s *serializeable) EncodeBytes() []byte        { return s.id[:] }
+func (s *serializeable) String() string             { return s.id.String() }
+
 type Hasher interface {
 	// Returns the canonical hash of the non-nil [node].
-	HashNode(node *node) ids.ID
+	HashNode(node *node) SerializableID
 	// Returns the canonical hash of [value].
 	HashValue(value []byte) ids.ID
+	// Returns the ID of the serialized object
+	Decode(reader *codecReader) (SerializableID, error)
+	DecodeBytes(b []byte) (SerializableID, error)
+	// Returns the serializeable ID of the empty object
+	Empty() SerializableID
 }
 
 type sha256Hasher struct{}
 
+func (*sha256Hasher) Decode(reader *codecReader) (SerializableID, error) {
+	id, err := reader.ID()
+	if err != nil {
+		return nil, err
+	}
+	return &serializeable{id}, nil
+}
+
+func (*sha256Hasher) DecodeBytes(b []byte) (SerializableID, error) {
+	id, err := ids.ToID(b)
+	if err != nil {
+		return nil, err
+	}
+	return &serializeable{id}, nil
+}
+
+func (*sha256Hasher) Empty() SerializableID {
+	return &serializeable{ids.Empty}
+}
+
 // This method is performance critical. It is not expected to perform any memory
 // allocations.
-func (*sha256Hasher) HashNode(n *node) ids.ID {
+func (*sha256Hasher) HashNode(n *node) SerializableID {
 	var (
 		// sha.Write always returns nil, so we ignore its return values.
 		sha  = sha256.New()
@@ -67,7 +111,8 @@ func (*sha256Hasher) HashNode(n *node) ids.ID {
 		for _, index := range keys {
 			entry := n.children[index]
 			_, _ = sha.Write(binary.AppendUvarint(emptyHashBuffer, uint64(index)))
-			_, _ = sha.Write(entry.id[:])
+			id := entry.id.ID()
+			_, _ = sha.Write(id[:])
 		}
 	}
 
@@ -83,7 +128,7 @@ func (*sha256Hasher) HashNode(n *node) ids.ID {
 	_, _ = sha.Write(binary.AppendUvarint(emptyHashBuffer, uint64(n.key.length)))
 	_, _ = sha.Write(n.key.Bytes())
 	sha.Sum(emptyHashBuffer)
-	return hash
+	return &serializeable{hash}
 }
 
 // This method is performance critical. It is not expected to perform any memory

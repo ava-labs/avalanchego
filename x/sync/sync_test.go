@@ -683,9 +683,12 @@ func TestFindNextKeyRandom(t *testing.T) {
 		remoteKeyIDs := []keyAndID{}
 		for _, node := range remoteProof.EndProof {
 			for childIdx, childID := range node.Children {
+				id, err := merkledb.DefaultHasher.DecodeBytes(childID)
+				require.NoError(err)
+
 				remoteKeyIDs = append(remoteKeyIDs, keyAndID{
 					key: node.Key.Extend(merkledb.ToToken(childIdx, merkledb.BranchFactorToTokenSize[config.BranchFactor])),
-					id:  childID,
+					id:  id.ID(),
 				})
 			}
 		}
@@ -694,9 +697,12 @@ func TestFindNextKeyRandom(t *testing.T) {
 		localKeyIDs := []keyAndID{}
 		for _, node := range localProof.Path {
 			for childIdx, childID := range node.Children {
+				id, err := merkledb.DefaultHasher.DecodeBytes(childID)
+				require.NoError(err)
+
 				localKeyIDs = append(localKeyIDs, keyAndID{
 					key: node.Key.Extend(merkledb.ToToken(childIdx, merkledb.BranchFactorToTokenSize[config.BranchFactor])),
-					id:  childID,
+					id:  id.ID(),
 				})
 			}
 		}

@@ -458,10 +458,11 @@ func (m *Manager) findNextKey(
 
 	// Add sentinel node back into the localProofNodes, if it is missing.
 	// Required to ensure that a common node exists in both proofs
+	// TODO: should pass the hasher through the config
 	if len(localProofNodes) > 0 && localProofNodes[0].Key.Length() != 0 {
 		sentinel := merkledb.ProofNode{
-			Children: map[byte]ids.ID{
-				localProofNodes[0].Key.Token(0, m.tokenSize): ids.Empty,
+			Children: map[byte][]byte{
+				localProofNodes[0].Key.Token(0, m.tokenSize): merkledb.DefaultHasher.Empty().EncodeBytes(),
 			},
 		}
 		localProofNodes = append([]merkledb.ProofNode{sentinel}, localProofNodes...)
@@ -469,10 +470,11 @@ func (m *Manager) findNextKey(
 
 	// Add sentinel node back into the endProof, if it is missing.
 	// Required to ensure that a common node exists in both proofs
+	// TODO: should pass the hasher through the config
 	if len(endProof) > 0 && endProof[0].Key.Length() != 0 {
 		sentinel := merkledb.ProofNode{
-			Children: map[byte]ids.ID{
-				endProof[0].Key.Token(0, m.tokenSize): ids.Empty,
+			Children: map[byte][]byte{
+				endProof[0].Key.Token(0, m.tokenSize): merkledb.DefaultHasher.Empty().EncodeBytes(),
 			},
 		}
 		endProof = append([]merkledb.ProofNode{sentinel}, endProof...)
@@ -858,7 +860,7 @@ func findChildDifference(node1, node2 *merkledb.ProofNode, startIndex int) (byte
 	sortedChildIndices := maps.Keys(childIndices)
 	slices.Sort(sortedChildIndices)
 	var (
-		child1, child2 ids.ID
+		child1, child2 []byte
 		ok1, ok2       bool
 	)
 	for _, childIndex := range sortedChildIndices {
@@ -870,7 +872,7 @@ func findChildDifference(node1, node2 *merkledb.ProofNode, startIndex int) (byte
 		}
 		// if one node has a child and the other doesn't or the children ids don't match,
 		// return the current child index as the first difference
-		if (ok1 || ok2) && child1 != child2 {
+		if (ok1 || ok2) && !bytes.Equal(child1, child2) {
 			return childIndex, true
 		}
 	}

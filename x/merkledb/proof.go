@@ -56,7 +56,7 @@ type ProofNode struct {
 	// The value in this node if its length < [HashLen].
 	// The hash of the value in this node otherwise.
 	ValueOrHash maybe.Maybe[[]byte]
-	Children    map[byte]ids.ID
+	Children    map[byte][]byte
 }
 
 // ToProto converts the ProofNode into the protobuf version of a proof node
@@ -96,16 +96,12 @@ func (node *ProofNode) UnmarshalProto(pbNode *pb.ProofNode) error {
 		return ErrInvalidKeyLength
 	}
 	node.Key = ToKey(pbNode.Key.Value).Take(int(pbNode.Key.Length))
-	node.Children = make(map[byte]ids.ID, len(pbNode.Children))
+	node.Children = make(map[byte][]byte, len(pbNode.Children))
 	for childIndex, childIDBytes := range pbNode.Children {
 		if childIndex > math.MaxUint8 {
 			return errChildIndexTooLarge
 		}
-		childID, err := ids.ToID(childIDBytes)
-		if err != nil {
-			return err
-		}
-		node.Children[byte(childIndex)] = childID
+		node.Children[byte(childIndex)] = childIDBytes
 	}
 
 	if !pbNode.ValueOrHash.IsNothing {
@@ -854,13 +850,17 @@ func addPathInfo(
 			childKey := key.Extend(ToToken(index, v.tokenSize), compressedKey)
 			if (shouldInsertLeftChildren && childKey.Less(insertChildrenLessThan.Value())) ||
 				(shouldInsertRightChildren && childKey.Greater(insertChildrenGreaterThan.Value())) {
+				id, err := v.db.hasher.DecodeBytes(childID)
+				if err != nil {
+					return fmt.Errorf("failed to decode child ID: %w", err)
+				}
 				// We don't set the [hasValue] field of the child but that's OK.
 				// We only need the compressed key and ID to be correct so that the
 				// calculated hash is correct.
 				n.setChildEntry(
 					index,
 					&child{
-						id:            childID,
+						id:            id,
 						compressedKey: compressedKey,
 					})
 			}

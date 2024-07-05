@@ -6,7 +6,6 @@ package merkledb
 import (
 	"slices"
 
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/maybe"
 )
 
@@ -18,7 +17,7 @@ type dbNode struct {
 
 type child struct {
 	compressedKey Key
-	id            ids.ID
+	id            SerializableID
 	hasValue      bool
 }
 
@@ -42,7 +41,7 @@ func newNode(key Key) *node {
 // Parse [nodeBytes] to a node and set its key to [key].
 func parseNode(hasher Hasher, key Key, nodeBytes []byte) (*node, error) {
 	n := dbNode{}
-	if err := decodeDBNode(nodeBytes, &n); err != nil {
+	if err := decodeDBNode(hasher, nodeBytes, &n); err != nil {
 		return nil, err
 	}
 	result := &node{
@@ -82,11 +81,7 @@ func (n *node) setValueDigest(hasher Hasher) {
 // Adds [child] as a child of [n].
 // Assumes [child]'s key is valid as a child of [n].
 // That is, [n.key] is a prefix of [child.key].
-func (n *node) addChild(childNode *node, tokenSize int) {
-	n.addChildWithID(childNode, tokenSize, ids.Empty)
-}
-
-func (n *node) addChildWithID(childNode *node, tokenSize int, childID ids.ID) {
+func (n *node) addChildWithID(childNode *node, tokenSize int, childID SerializableID) {
 	n.setChildEntry(
 		childNode.key.Token(n.key.length, tokenSize),
 		&child{
@@ -134,11 +129,11 @@ func (n *node) clone() *node {
 func (n *node) asProofNode() ProofNode {
 	pn := ProofNode{
 		Key:         n.key,
-		Children:    make(map[byte]ids.ID, len(n.children)),
+		Children:    make(map[byte][]byte, len(n.children)),
 		ValueOrHash: maybe.Bind(n.valueDigest, slices.Clone[[]byte]),
 	}
 	for index, entry := range n.children {
-		pn.Children[index] = entry.id
+		pn.Children[index] = entry.id.EncodeBytes()
 	}
 	return pn
 }

@@ -1299,23 +1299,6 @@ func TestProofNodeUnmarshalProtoInvalidMaybe(t *testing.T) {
 	require.ErrorIs(t, err, ErrInvalidMaybe)
 }
 
-func TestProofNodeUnmarshalProtoInvalidChildBytes(t *testing.T) {
-	now := time.Now().UnixNano()
-	t.Logf("seed: %d", now)
-	rand := rand.New(rand.NewSource(now)) // #nosec G404
-
-	node := newRandomProofNode(rand)
-	protoNode := node.ToProto()
-
-	protoNode.Children = map[uint32][]byte{
-		1: []byte("not 32 bytes"),
-	}
-
-	var unmarshaledNode ProofNode
-	err := unmarshaledNode.UnmarshalProto(protoNode)
-	require.ErrorIs(t, err, hashing.ErrInvalidHashLen)
-}
-
 func TestProofNodeUnmarshalProtoInvalidChildIndex(t *testing.T) {
 	now := time.Now().UnixNano()
 	t.Logf("seed: %d", now)

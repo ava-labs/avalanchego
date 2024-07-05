@@ -284,7 +284,7 @@ func (v *view) hashChangedNodes(ctx context.Context) {
 	// If there are no children, we can avoid allocating [keyBuffer].
 	root := v.root.Value()
 	if len(root.children) == 0 {
-		v.changes.rootID = v.db.hasher.HashNode(root)
+		v.changes.rootID = v.db.hasher.HashNode(root).ID()
 		v.db.metrics.HashCalculated()
 		return
 	}
@@ -292,7 +292,9 @@ func (v *view) hashChangedNodes(ctx context.Context) {
 	// Allocate [keyBuffer] and populate it with the root node's key.
 	keyBuffer := v.db.hashNodesKeyPool.Acquire()
 	keyBuffer = v.setKeyBuffer(root, keyBuffer)
-	v.changes.rootID, keyBuffer = v.hashChangedNode(root, keyBuffer)
+	var rootID SerializableID
+	rootID, keyBuffer = v.hashChangedNode(root, keyBuffer)
+	v.changes.rootID = rootID.ID()
 	v.db.hashNodesKeyPool.Release(keyBuffer)
 }
 
@@ -305,7 +307,7 @@ func (v *view) hashChangedNodes(ctx context.Context) {
 //
 // Invariant: [keyBuffer] must be populated with [n]'s key and have sufficient
 // length to contain any of [n]'s child keys.
-func (v *view) hashChangedNode(n *node, keyBuffer []byte) (ids.ID, []byte) {
+func (v *view) hashChangedNode(n *node, keyBuffer []byte) (SerializableID, []byte) {
 	var (
 		// childBuffer is allocated on the stack.
 		childBuffer = make([]byte, 1)
@@ -817,7 +819,7 @@ func (v *view) insert(
 		// there are no existing nodes along the key [key], so create a new node to insert [value]
 		newNode := newNode(key)
 		newNode.setValue(v.db.hasher, value)
-		closestNode.addChild(newNode, v.tokenSize)
+		closestNode.addChildWithID(newNode, v.tokenSize, v.db.hasher.Empty())
 		return newNode, v.recordNewNode(newNode)
 	}
 
@@ -844,7 +846,7 @@ func (v *view) insert(
 	}
 
 	branchNode := newNode(key.Take(closestNode.key.length + v.tokenSize + commonPrefixLength))
-	closestNode.addChild(branchNode, v.tokenSize)
+	closestNode.addChildWithID(branchNode, v.tokenSize, v.db.hasher.Empty())
 	nodeWithValue := branchNode
 
 	if key.length == branchNode.key.length {
@@ -855,7 +857,7 @@ func (v *view) insert(
 		// create a new node and add the value to it
 		newNode := newNode(key)
 		newNode.setValue(v.db.hasher, value)
-		branchNode.addChild(newNode, v.tokenSize)
+		branchNode.addChildWithID(newNode, v.tokenSize, v.db.hasher.Empty())
 		if err := v.recordNewNode(newNode); err != nil {
 			return nil, err
 		}
