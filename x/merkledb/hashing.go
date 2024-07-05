@@ -35,7 +35,7 @@ type serializeable struct {
 	id ids.ID
 }
 
-func (_ *serializeable) Len() int                   { return ids.IDLen }
+func (*serializeable) Len() int                     { return ids.IDLen }
 func (s *serializeable) ID() ids.ID                 { return s.id }
 func (s *serializeable) Encode(writer *codecWriter) { writer.ID(s.id) }
 func (s *serializeable) EncodeBytes() []byte        { return s.id[:] }
