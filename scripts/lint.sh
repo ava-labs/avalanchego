@@ -94,7 +94,7 @@ function test_import_testing_only_in_tests {
   IMPORT_TESTIFY=$( echo "${NON_TEST_GO_FILES}" | xargs grep -l '"github.com/stretchr/testify');
   # TODO(arr4n): send a PR to add support for build tags in `mockgen` and then enable this.
   # IMPORT_GOMOCK=$( echo "${NON_TEST_GO_FILES}" | xargs grep -l '"go.uber.org/mock');
-  HAVE_TEST_LOGIC=$( printf "${IMPORT_TESTING}\n${IMPORT_TESTIFY}" );
+  HAVE_TEST_LOGIC=$( printf "%s\n%s" "${IMPORT_TESTING}" "${IMPORT_TESTIFY}" );
 
   TAGGED_AS_TEST=$( echo "${NON_TEST_GO_FILES}" | xargs grep -lP '^\/\/go:build\s+(.+(,|\s+))?test[,\s]?');
 
