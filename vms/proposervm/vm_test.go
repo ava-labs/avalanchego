@@ -1177,7 +1177,7 @@ func TestInnerVMRollback(t *testing.T) {
 
 	proVM.Clock.Set(statelessBlock.Timestamp())
 
-	lastAcceptedID, err := proVM.GetLastAccepted()
+	lastAcceptedID, err := proVM.LastAccepted(context.Background())
 	require.NoError(err)
 	require.Equal(snowmantest.GenesisID, lastAcceptedID)
 
@@ -1188,7 +1188,7 @@ func TestInnerVMRollback(t *testing.T) {
 	require.NoError(proVM.SetPreference(context.Background(), parsedBlock.ID()))
 	require.NoError(parsedBlock.Accept(context.Background()))
 
-	lastAcceptedID, err = proVM.GetLastAccepted()
+	lastAcceptedID, err = proVM.LastAccepted(context.Background())
 	require.NoError(err)
 	require.Equal(parsedBlock.ID(), lastAcceptedID)
 
