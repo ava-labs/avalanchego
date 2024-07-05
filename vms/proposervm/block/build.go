@@ -138,25 +138,25 @@ func NextHashBlockSignature(parentBlockSig []byte) []byte {
 	return sigParentBlockSig
 }
 
-func NextBlockVRFSig(parentBlockSig []byte, blsSignKey *bls.SecretKey, chainID ids.ID, networkID uint32) []byte {
+func NextBlockVRFSig(parentBlockVRFSig []byte, blsSignKey *bls.SecretKey, chainID ids.ID, networkID uint32) []byte {
 	if blsSignKey == nil {
 		// if we need to build a block without having a BLS key, we'll be hashing the previous
 		// signature only if it presents. Otherwise, we'll keep it empty.
-		if len(parentBlockSig) == 0 {
+		if len(parentBlockVRFSig) == 0 {
 			// no parent block signature.
 			return []byte{}
 		}
 
-		return NextHashBlockSignature(parentBlockSig)
+		return NextHashBlockSignature(parentBlockVRFSig)
 	}
 
 	// we have bls key
 	var signMsg []byte
-	if parentBlockSig == nil {
+	if len(parentBlockVRFSig) == 0 {
 		msgHash := calculateBootstrappingBlockSig(chainID, networkID)
 		signMsg = msgHash[:]
 	} else {
-		signMsg = parentBlockSig
+		signMsg = parentBlockVRFSig
 	}
 
 	return bls.SignatureToBytes(bls.Sign(blsSignKey, signMsg))

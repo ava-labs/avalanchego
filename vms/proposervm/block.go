@@ -40,7 +40,8 @@ var (
 	errProposerMismatch         = errors.New("proposer mismatch")
 	errProposersNotActivated    = errors.New("proposers haven't been activated yet")
 	errPChainHeightTooLow       = errors.New("block P-chain height is too low")
-	errInvalidVRFSignature      = errors.New("invalid signature")
+	errInvalidVRFSignature      = errors.New("invalid VRF signature")
+	errVRFSignaturePresents     = errors.New("unexpected VRF signature presents")
 )
 
 type Block interface {
@@ -183,7 +184,7 @@ func (p *postForkCommonComponents) buildChild(
 	parentID ids.ID,
 	parentTimestamp time.Time,
 	parentPChainHeight uint64,
-	parentBlockSig []byte,
+	parentBlockVRFSig []byte,
 	blsSignKey *bls.SecretKey,
 ) (Block, error) {
 	// Child's timestamp is the later of now and this block's timestamp
@@ -230,11 +231,11 @@ func (p *postForkCommonComponents) buildChild(
 	// do we have the VRFSig activated ? if so, figure out the child block vrf signature.
 	if p.vm.IsVRFSigActivated(newTimestamp) {
 		if shouldBuildSignedBlock {
-			childBlockVrfSig = block.NextBlockVRFSig(parentBlockSig, blsSignKey, p.vm.ctx.ChainID, p.vm.ctx.NetworkID)
+			childBlockVrfSig = block.NextBlockVRFSig(parentBlockVRFSig, blsSignKey, p.vm.ctx.ChainID, p.vm.ctx.NetworkID)
 		} else {
 			// in this case, we can't sign with BLS key, since we're not going to include the Certificate, which is required
 			// for the signature validation. Instead, we'll just hash the previous
-			childBlockVrfSig = block.NextHashBlockSignature(parentBlockSig)
+			childBlockVrfSig = block.NextHashBlockSignature(parentBlockVRFSig)
 		}
 	}
 

@@ -147,35 +147,35 @@ func (b *postForkBlock) verifyPostForkChild(ctx context.Context, child *postFork
 }
 
 func (b *postForkBlock) verifyVRFSig(ctx context.Context, child *postForkBlock) error {
-	if b.vm.Config.IsVRFSigActivated(child.Timestamp()) {
-		// find out the proposer for this block.
-		childProposer := child.SignedBlock.Proposer()
-
-		var proposerPublicKey *bls.PublicKey
-		// if there is a known proposer. ( i.e. block was signed )
-		if childProposer != ids.EmptyNodeID {
-			// get the validators set.
-			validatorSet, err := b.vm.ctx.ValidatorState.GetValidatorSet(ctx, child.PChainHeight(), child.vm.ctx.SubnetID)
-			if err != nil {
-				return err
-			}
-
-			// get the validator for this proposer
-			childValidator := validatorSet[childProposer]
-			if childValidator == nil {
-				return errProposersNotActivated
-			}
-
-			proposerPublicKey = childValidator.PublicKey
-		}
-		// verify that the VRFSig was generated correctly.
-		// ( this works for both signed and unsigned blocks ).
-		if !child.SignedBlock.VerifySignature(proposerPublicKey, b.SignedBlock.VRFSig(), b.vm.ctx.ChainID, b.vm.ctx.NetworkID) {
-			return errInvalidVRFSignature
-		}
-	} else if len(child.SignedBlock.VRFSig()) != 0 {
-		// !b.vm.Config.IsVRFSigActivated(child.Timestamp())
+	if !b.vm.Config.IsVRFSigActivated(child.Timestamp()) {
 		// if the VRFSig has yet to be activated, verify that the VRF signature isn't there.
+		if len(child.SignedBlock.VRFSig()) != 0 {
+			return errVRFSignaturePresents
+		}
+		return nil
+	}
+
+	var proposerPublicKey *bls.PublicKey
+	// find out the proposer for this block.
+	// if there is a known proposer. ( i.e. block was signed )
+	if childProposer := child.SignedBlock.Proposer(); childProposer != ids.EmptyNodeID {
+		// get the validators set.
+		validatorSet, err := b.vm.ctx.ValidatorState.GetValidatorSet(ctx, child.PChainHeight(), child.vm.ctx.SubnetID)
+		if err != nil {
+			return err
+		}
+
+		// get the validator for this proposer
+		childValidator := validatorSet[childProposer]
+		if childValidator == nil {
+			return errProposersNotActivated
+		}
+
+		proposerPublicKey = childValidator.PublicKey
+	}
+	// verify that the VRFSig was generated correctly.
+	// ( this works for both signed and unsigned blocks ).
+	if !child.SignedBlock.VerifySignature(proposerPublicKey, b.SignedBlock.VRFSig(), b.vm.ctx.ChainID, b.vm.ctx.NetworkID) {
 		return errInvalidVRFSignature
 	}
 	return nil

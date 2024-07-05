@@ -43,7 +43,7 @@ type Config struct {
 	StakingBLSKey *bls.SecretKey
 
 	// VRFSig activation time
-	VRFSigTime time.Time
+	VRFSigActivationTime time.Time
 }
 
 func (c *Config) IsDurangoActivated(timestamp time.Time) bool {
@@ -51,5 +51,5 @@ func (c *Config) IsDurangoActivated(timestamp time.Time) bool {
 }
 
 func (c *Config) IsVRFSigActivated(timestamp time.Time) bool {
-	return !timestamp.Before(c.VRFSigTime)
+	return !timestamp.Before(c.VRFSigActivationTime)
 }
