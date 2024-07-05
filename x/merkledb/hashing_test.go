@@ -102,7 +102,7 @@ func Fuzz_SHA256_HashNode(f *testing.F) {
 
 					children[byte(i)] = &child{
 						compressedKey: ToKey(compressedKeyBytes),
-						id:            &serializeable{ids.GenerateTestID()},
+						id:            serializeable(ids.GenerateTestID()),
 						hasValue:      r.Intn(2) == 1, // #nosec G404
 					}
 				}
