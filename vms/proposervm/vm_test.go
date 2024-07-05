@@ -21,7 +21,6 @@ import (
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -32,7 +31,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
-	"github.com/ava-labs/avalanchego/vms/proposervm/state"
 
 	statelessblock "github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
@@ -1060,60 +1058,61 @@ func TestInnerVMRollback(t *testing.T) {
 
 	valState := &validators.TestState{
 		T: t,
+		GetCurrentHeightF: func(context.Context) (uint64, error) {
+			return defaultPChainHeight, nil
+		},
+		GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+			nodeID := ids.BuildTestNodeID([]byte{1})
+			return map[ids.NodeID]*validators.GetValidatorOutput{
+				nodeID: {
+					NodeID: nodeID,
+					Weight: 100,
+				},
+			}, nil
+		},
 	}
-	valState.GetCurrentHeightF = func(context.Context) (uint64, error) {
-		return defaultPChainHeight, nil
-	}
-	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
-		nodeID := ids.BuildTestNodeID([]byte{1})
-		return map[ids.NodeID]*validators.GetValidatorOutput{
-			nodeID: {
-				NodeID: nodeID,
-				Weight: 100,
+
+	coreVM := &block.TestVM{
+		TestVM: common.TestVM{
+			T: t,
+			InitializeF: func(
+				context.Context,
+				*snow.Context,
+				database.Database,
+				[]byte,
+				[]byte,
+				[]byte,
+				chan<- common.Message,
+				[]*common.Fx,
+				common.AppSender,
+			) error {
+				return nil
 			},
-		}, nil
-	}
-
-	coreVM := &block.TestVM{}
-	coreVM.T = t
-
-	coreVM.LastAcceptedF = snowmantest.MakeLastAcceptedBlockF(
-		[]*snowmantest.Block{snowmantest.Genesis},
-	)
-	coreVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
-		switch blkID {
-		case snowmantest.GenesisID:
-			return snowmantest.Genesis, nil
-		default:
-			return nil, errUnknownBlock
-		}
-	}
-	coreVM.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
-		switch {
-		case bytes.Equal(b, snowmantest.GenesisBytes):
-			return snowmantest.Genesis, nil
-		default:
-			return nil, errUnknownBlock
-		}
+		},
+		ParseBlockF: func(_ context.Context, b []byte) (snowman.Block, error) {
+			switch {
+			case bytes.Equal(b, snowmantest.GenesisBytes):
+				return snowmantest.Genesis, nil
+			default:
+				return nil, errUnknownBlock
+			}
+		},
+		GetBlockF: func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
+			switch blkID {
+			case snowmantest.GenesisID:
+				return snowmantest.Genesis, nil
+			default:
+				return nil, errUnknownBlock
+			}
+		},
+		LastAcceptedF: snowmantest.MakeLastAcceptedBlockF(
+			[]*snowmantest.Block{snowmantest.Genesis},
+		),
 	}
 
 	ctx := snowtest.Context(t, snowtest.CChainID)
 	ctx.NodeID = ids.NodeIDFromCert(pTestCert)
 	ctx.ValidatorState = valState
-
-	coreVM.InitializeF = func(
-		context.Context,
-		*snow.Context,
-		database.Database,
-		[]byte,
-		[]byte,
-		[]byte,
-		chan<- common.Message,
-		[]*common.Fx,
-		common.AppSender,
-	) error {
-		return nil
-	}
 
 	db := memdb.New()
 
@@ -1943,9 +1942,6 @@ func TestVMInnerBlkCache(t *testing.T) {
 		require.NoError(vm.Shutdown(context.Background()))
 	}()
 
-	state := state.NewMockState(ctrl) // mock state
-	vm.State = state
-
 	// Create a block near the tip (0).
 	blkNearTipInnerBytes := []byte{1}
 	blkNearTip, err := statelessblock.Build(
@@ -1959,9 +1955,6 @@ func TestVMInnerBlkCache(t *testing.T) {
 	)
 	require.NoError(err)
 
-	// Parse a block.
-	// Not in the VM's state so need to parse it.
-	state.EXPECT().GetBlock(blkNearTip.ID()).Return(blkNearTip, choices.Accepted, nil).Times(2)
 	// We will ask the inner VM to parse.
 	mockInnerBlkNearTip := snowmantest.NewMockBlock(ctrl)
 	mockInnerBlkNearTip.EXPECT().Height().Return(uint64(1)).Times(2)
@@ -1991,61 +1984,6 @@ func TestVMInnerBlkCache(t *testing.T) {
 
 	_, ok = vm.innerBlkCache.Get(blkNearTip.ID())
 	require.False(ok)
-}
-
-func TestVMInnerBlkCacheDeduplicationRegression(t *testing.T) {
-	require := require.New(t)
-	var (
-		activationTime = time.Unix(0, 0)
-		durangoTime    = activationTime
-	)
-	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
-	defer func() {
-		require.NoError(proVM.Shutdown(context.Background()))
-	}()
-
-	// create pre-fork block X and post-fork block A
-	xBlock := snowmantest.BuildChild(snowmantest.Genesis)
-
-	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
-		return xBlock, nil
-	}
-	aBlock, err := proVM.BuildBlock(context.Background())
-	require.NoError(err)
-	coreVM.BuildBlockF = nil
-
-	bStatelessBlock, err := statelessblock.BuildUnsigned(
-		snowmantest.GenesisID,
-		snowmantest.GenesisTimestamp,
-		defaultPChainHeight,
-		xBlock.Bytes(),
-	)
-	require.NoError(err)
-
-	xBlockCopy := *xBlock
-	coreVM.ParseBlockF = func(context.Context, []byte) (snowman.Block, error) {
-		return &xBlockCopy, nil
-	}
-
-	bBlockBytes := bStatelessBlock.Bytes()
-	bBlock, err := proVM.ParseBlock(context.Background(), bBlockBytes)
-	require.NoError(err)
-
-	require.NoError(aBlock.Verify(context.Background()))
-	require.NoError(bBlock.Verify(context.Background()))
-	require.NoError(aBlock.Accept(context.Background()))
-	require.NoError(bBlock.Reject(context.Background()))
-
-	require.Equal(snowtest.Accepted, xBlock.Status)
-
-	require.Equal(snowtest.Accepted, xBlockCopy.Status)
-
-	cachedXBlock, ok := proVM.innerBlkCache.Get(bBlock.ID())
-	require.True(ok)
-	require.Equal(
-		choices.Accepted,
-		cachedXBlock.(*snowmantest.Block).Status,
-	)
 }
 
 type blockWithVerifyContext struct {
