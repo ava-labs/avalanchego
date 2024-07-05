@@ -40,14 +40,14 @@ jobs:
         if: "${{ github.event.inputs.tag == '' }}"
         id: get_tag_from_git
         run: |
-          echo "TAG=${GITHUB_REF/refs\/tags\//}" >> $GITHUB_ENV
+          echo "TAG=${GITHUB_REF/refs\/tags\//}" >> "$GITHUB_ENV"
         shell: bash
 
       - name: Try to get tag from workflow dispatch
         if: "${{ github.event.inputs.tag != '' }}"
         id: get_tag_from_workflow
         run: |
-          echo "TAG=${{ github.event.inputs.tag }}" >> $GITHUB_ENV
+          echo "TAG=${{ github.event.inputs.tag }}" >> "$GITHUB_ENV"
         shell: bash
 
       - name: Create tgz package structure and upload to S3
@@ -101,14 +101,14 @@ jobs:
         if: "${{ github.event.inputs.tag == '' }}"
         id: get_tag_from_git
         run: |
-          echo "TAG=${GITHUB_REF/refs\/tags\//}" >> $GITHUB_ENV
+          echo "TAG=${GITHUB_REF/refs\/tags\//}" >> "$GITHUB_ENV"
         shell: bash
 
       - name: Try to get tag from workflow dispatch
         if: "${{ github.event.inputs.tag != '' }}"
         id: get_tag_from_workflow
         run: |
-          echo "TAG=${{ github.event.inputs.tag }}" >> $GITHUB_ENV
+          echo "TAG=${{ github.event.inputs.tag }}" >> "$GITHUB_ENV"
         shell: bash
 
       - name: Create tgz package structure and upload to S3

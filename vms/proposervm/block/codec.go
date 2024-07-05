@@ -21,7 +21,7 @@ func init() {
 	// See: [constants.DefaultMaxMessageSize]
 	Codec = codec.NewManager(math.MaxInt)
 
-	err := utils.Err(
+	err := utils.Join(
 		lc.RegisterType(&statelessBlock[statelessUnsignedBlockV0]{}),
 		lc.RegisterType(&statelessBlock[statelessUnsignedBlock]{}),
 		lc.RegisterType(&option{}),

@@ -23,7 +23,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
@@ -234,7 +233,7 @@ func (vm *VM) Initialize(
 		Buckets: []float64{0.5, 1.5, 2.5},
 	})
 
-	return utils.Err(
+	return errors.Join(
 		vm.Config.Registerer.Register(vm.proposerBuildSlotGauge),
 		vm.Config.Registerer.Register(vm.acceptedBlocksSlotHistogram),
 	)

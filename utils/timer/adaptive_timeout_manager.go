@@ -12,7 +12,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/heap"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
@@ -133,7 +132,7 @@ func NewAdaptiveTimeoutManager(
 	tm.timer = NewTimer(tm.timeout)
 	tm.averager = math.NewAverager(float64(config.InitialTimeout), config.TimeoutHalflife, tm.clock.Time())
 
-	err := utils.Err(
+	err := errors.Join(
 		reg.Register(tm.networkTimeoutMetric),
 		reg.Register(tm.avgLatency),
 		reg.Register(tm.numTimeouts),

@@ -11,6 +11,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/bloom"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
@@ -43,10 +44,10 @@ type Handler[T Gossipable] struct {
 	targetResponseSize int
 }
 
-func (h Handler[T]) AppRequest(_ context.Context, _ ids.NodeID, _ time.Time, requestBytes []byte) ([]byte, error) {
+func (h Handler[T]) AppRequest(_ context.Context, _ ids.NodeID, _ time.Time, requestBytes []byte) ([]byte, *common.AppError) {
 	filter, salt, err := ParseAppRequest(requestBytes)
 	if err != nil {
-		return nil, err
+		return nil, p2p.ErrUnexpected
 	}
 
 	responseSize := 0
@@ -73,14 +74,19 @@ func (h Handler[T]) AppRequest(_ context.Context, _ ids.NodeID, _ time.Time, req
 		return responseSize <= h.targetResponseSize
 	})
 	if err != nil {
-		return nil, err
+		return nil, p2p.ErrUnexpected
 	}
 
 	if err := h.metrics.observeMessage(sentPullLabels, len(gossipBytes), responseSize); err != nil {
-		return nil, err
+		return nil, p2p.ErrUnexpected
 	}
 
-	return MarshalAppResponse(gossipBytes)
+	response, err := MarshalAppResponse(gossipBytes)
+	if err != nil {
+		return nil, p2p.ErrUnexpected
+	}
+
+	return response, nil
 }
 
 func (h Handler[_]) AppGossip(_ context.Context, nodeID ids.NodeID, gossipBytes []byte) {
