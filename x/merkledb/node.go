@@ -18,6 +18,7 @@ type dbNode struct {
 
 type child struct {
 	compressedKey Key
+	embed         []byte
 	id            ids.ID
 	hasValue      bool
 }
@@ -83,15 +84,16 @@ func (n *node) setValueDigest(hasher Hasher) {
 // Assumes [child]'s key is valid as a child of [n].
 // That is, [n.key] is a prefix of [child.key].
 func (n *node) addChild(childNode *node, tokenSize int) {
-	n.addChildWithID(childNode, tokenSize, ids.Empty)
+	n.addChildWithID(childNode, tokenSize, nil, ids.Empty)
 }
 
-func (n *node) addChildWithID(childNode *node, tokenSize int, childID ids.ID) {
+func (n *node) addChildWithID(childNode *node, tokenSize int, childEmbed []byte, childID ids.ID) {
 	n.setChildEntry(
 		childNode.key.Token(n.key.length, tokenSize),
 		&child{
 			compressedKey: childNode.key.Skip(n.key.length + tokenSize),
 			id:            childID,
+			embed:         childEmbed,
 			hasValue:      childNode.hasValue(),
 		},
 	)
@@ -123,6 +125,7 @@ func (n *node) clone() *node {
 	for key, existing := range n.children {
 		result.children[key] = &child{
 			compressedKey: existing.compressedKey,
+			embed:         existing.embed,
 			id:            existing.id,
 			hasValue:      existing.hasValue,
 		}

@@ -40,7 +40,8 @@ func childSize(index byte, childEntry *child) int {
 	// * child ID
 	// * child key
 	// * bool indicating whether the child has a value
-	return uintSize(uint64(index)) + ids.IDLen + keySize(childEntry.compressedKey) + boolLen
+	idSize := ids.IDLen + uintSize(uint64(len(childEntry.embed))) + len(childEntry.embed)
+	return uintSize(uint64(index)) + idSize + keySize(childEntry.compressedKey) + boolLen
 }
 
 // based on the implementation of encodeUint which uses binary.PutUvarint
@@ -106,7 +107,10 @@ func encodeDBNode(n *dbNode) []byte {
 		entry := n.children[index]
 		w.Uvarint(uint64(index))
 		w.Key(entry.compressedKey)
-		w.ID(entry.id)
+		w.Bytes(entry.embed)
+		if len(entry.embed) == 0 {
+			w.ID(entry.id)
+		}
 		w.Bool(entry.hasValue)
 	}
 
@@ -197,9 +201,17 @@ func decodeDBNode(b []byte, n *dbNode) error {
 		if err != nil {
 			return err
 		}
-		childID, err := r.ID()
+		embed, err := r.Bytes()
 		if err != nil {
 			return err
+		}
+		var childID ids.ID
+		if len(embed) == 0 {
+			childID, err = r.ID()
+			if err != nil {
+				return err
+			}
+			embed = nil
 		}
 		hasValue, err := r.Bool()
 		if err != nil {
@@ -207,6 +219,7 @@ func decodeDBNode(b []byte, n *dbNode) error {
 		}
 		n.children[byte(index)] = &child{
 			compressedKey: compressedKey,
+			embed:         embed,
 			id:            childID,
 			hasValue:      hasValue,
 		}

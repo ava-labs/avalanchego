@@ -54,6 +54,11 @@ func newDefaultConfig() Config {
 	}
 }
 
+func (c Config) WithHasher(hasher Hasher) Config {
+	c.Hasher = hasher
+	return c
+}
+
 func Test_MerkleDB_Get_Safety(t *testing.T) {
 	require := require.New(t)
 
