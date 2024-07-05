@@ -1,6 +1,8 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
+//go:build test
+
 // Implements tests for the banff network upgrade.
 package banff
 
