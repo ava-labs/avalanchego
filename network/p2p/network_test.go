@@ -43,7 +43,7 @@ func TestMessageRouting(t *testing.T) {
 			require.Equal(wantNodeID, nodeID)
 			require.Equal(wantMsg, msg)
 		},
-		AppRequestF: func(_ context.Context, nodeID ids.NodeID, _ time.Time, msg []byte) ([]byte, error) {
+		AppRequestF: func(_ context.Context, nodeID ids.NodeID, _ time.Time, msg []byte) ([]byte, *common.AppError) {
 			appRequestCalled = true
 			require.Equal(wantNodeID, nodeID)
 			require.Equal(wantMsg, msg)
@@ -352,7 +352,7 @@ func TestCrossChainAppRequestFailed(t *testing.T) {
 }
 
 // Messages for unregistered handlers should be dropped gracefully
-func TestMessageForUnregisteredHandler(t *testing.T) {
+func TestAppGossipMessageForUnregisteredHandler(t *testing.T) {
 	tests := []struct {
 		name string
 		msg  []byte
@@ -379,24 +379,108 @@ func TestMessageForUnregisteredHandler(t *testing.T) {
 				AppGossipF: func(context.Context, ids.NodeID, []byte) {
 					require.Fail("should not be called")
 				},
-				AppRequestF: func(context.Context, ids.NodeID, time.Time, []byte) ([]byte, error) {
-					require.Fail("should not be called")
-					return nil, nil
-				},
-				CrossChainAppRequestF: func(context.Context, ids.ID, time.Time, []byte) ([]byte, error) {
-					require.Fail("should not be called")
-					return nil, nil
-				},
 			}
 			network, err := NewNetwork(logging.NoLog{}, nil, prometheus.NewRegistry(), "")
 			require.NoError(err)
 			require.NoError(network.AddHandler(handlerID, handler))
-
-			require.NoError(network.AppRequest(ctx, ids.EmptyNodeID, 0, time.Time{}, tt.msg))
 			require.NoError(network.AppGossip(ctx, ids.EmptyNodeID, tt.msg))
-			require.NoError(network.CrossChainAppRequest(ctx, ids.Empty, 0, time.Time{}, tt.msg))
 		})
 	}
+}
+
+// An unregistered handler should gracefully drop messages by responding
+// to the requester with a common.AppError
+func TestAppRequestMessageForUnregisteredHandler(t *testing.T) {
+	tests := []struct {
+		name string
+		msg  []byte
+	}{
+		{
+			name: "nil",
+			msg:  nil,
+		},
+		{
+			name: "empty",
+			msg:  []byte{},
+		},
+		{
+			name: "non-empty",
+			msg:  []byte("foobar"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+			ctx := context.Background()
+			handler := &TestHandler{
+				AppRequestF: func(context.Context, ids.NodeID, time.Time, []byte) ([]byte, *common.AppError) {
+					require.Fail("should not be called")
+					return nil, nil
+				},
+			}
+
+			wantNodeID := ids.GenerateTestNodeID()
+			wantRequestID := uint32(111)
+
+			done := make(chan struct{})
+			sender := &common.SenderTest{}
+			sender.SendAppErrorF = func(_ context.Context, nodeID ids.NodeID, requestID uint32, errorCode int32, errorMessage string) error {
+				defer close(done)
+
+				require.Equal(wantNodeID, nodeID)
+				require.Equal(wantRequestID, requestID)
+				require.Equal(ErrUnregisteredHandler.Code, errorCode)
+				require.Equal(ErrUnregisteredHandler.Message, errorMessage)
+
+				return nil
+			}
+			network, err := NewNetwork(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
+			require.NoError(err)
+			require.NoError(network.AddHandler(handlerID, handler))
+
+			require.NoError(network.AppRequest(ctx, wantNodeID, wantRequestID, time.Time{}, tt.msg))
+			<-done
+		})
+	}
+}
+
+// A handler that errors should send an AppError to the requesting peer
+func TestAppError(t *testing.T) {
+	require := require.New(t)
+	ctx := context.Background()
+	appError := &common.AppError{
+		Code:    123,
+		Message: "foo",
+	}
+	handler := &TestHandler{
+		AppRequestF: func(context.Context, ids.NodeID, time.Time, []byte) ([]byte, *common.AppError) {
+			return nil, appError
+		},
+	}
+
+	wantNodeID := ids.GenerateTestNodeID()
+	wantRequestID := uint32(111)
+
+	done := make(chan struct{})
+	sender := &common.SenderTest{}
+	sender.SendAppErrorF = func(_ context.Context, nodeID ids.NodeID, requestID uint32, errorCode int32, errorMessage string) error {
+		defer close(done)
+
+		require.Equal(wantNodeID, nodeID)
+		require.Equal(wantRequestID, requestID)
+		require.Equal(appError.Code, errorCode)
+		require.Equal(appError.Message, errorMessage)
+
+		return nil
+	}
+	network, err := NewNetwork(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
+	require.NoError(err)
+	require.NoError(network.AddHandler(handlerID, handler))
+	msg := PrefixMessage(ProtocolPrefix(handlerID), []byte("message"))
+
+	require.NoError(network.AppRequest(ctx, wantNodeID, wantRequestID, time.Time{}, msg))
+	<-done
 }
 
 // A response or timeout for a request we never made should return an error
@@ -427,7 +511,7 @@ func TestResponseForUnrequestedRequest(t *testing.T) {
 				AppGossipF: func(context.Context, ids.NodeID, []byte) {
 					require.Fail("should not be called")
 				},
-				AppRequestF: func(context.Context, ids.NodeID, time.Time, []byte) ([]byte, error) {
+				AppRequestF: func(context.Context, ids.NodeID, time.Time, []byte) ([]byte, *common.AppError) {
 					require.Fail("should not be called")
 					return nil, nil
 				},
