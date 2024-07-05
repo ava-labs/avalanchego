@@ -23,8 +23,8 @@ func init() {
 
 	err := errors.Join(
 		lc.RegisterType(&statelessBlock[statelessUnsignedBlockV0]{}),
-		lc.RegisterType(&statelessBlock[statelessUnsignedBlock]{}),
 		lc.RegisterType(&option{}),
+		lc.RegisterType(&statelessBlock[statelessUnsignedBlock]{}),
 		Codec.RegisterCodec(CodecVersion, lc),
 	)
 	if err != nil {
