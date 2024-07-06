@@ -101,11 +101,13 @@ func (b *block) Accept(context.Context) error {
 	b.chain.lastAcceptedID = b.id
 	b.chain.lastAcceptedHeight = b.Height()
 	delete(b.chain.verifiedBlocks, b.ParentID)
+	b.state = nil
 	return nil
 }
 
 func (b *block) Reject(context.Context) error {
 	delete(b.chain.verifiedBlocks, b.id)
+	b.state = nil
 
 	// TODO: push transactions back into the mempool
 	return nil
@@ -171,12 +173,8 @@ func (b *block) State() (database.Database, error) {
 		return b.chain.acceptedState, nil
 	}
 
-	// States of accepted blocks other than the lastAccepted are undefined.
-	if b.Height() <= b.chain.lastAcceptedHeight {
-		return nil, errMissingState
-	}
-
-	// We should not be calling State on an unverified block.
+	// If this block isn't processing, then the child should never have had
+	// verify called on it.
 	if b.state == nil {
 		return nil, errParentNotVerified
 	}
