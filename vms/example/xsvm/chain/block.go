@@ -28,7 +28,6 @@ var (
 	errMissingParent         = errors.New("missing parent block")
 	errMissingChild          = errors.New("missing child block")
 	errParentNotVerified     = errors.New("parent block has not been verified")
-	errMissingState          = errors.New("missing state")
 	errFutureTimestamp       = errors.New("future timestamp")
 	errTimestampBeforeParent = errors.New("timestamp before parent")
 	errWrongHeight           = errors.New("wrong height")
