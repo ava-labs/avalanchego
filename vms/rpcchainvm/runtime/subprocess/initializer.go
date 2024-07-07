@@ -37,7 +37,7 @@ func newInitializer(path string) *initializer {
 func (i *initializer) Initialize(_ context.Context, protocolVersion uint, vmAddr string) error {
 	i.once.Do(func() {
 		if version.RPCChainVMProtocol != protocolVersion {
-			i.err = fmt.Errorf("%w. AvalancheGo version %s implements RPCChainVM protocol version %d. The VM (%s) implements RPCChainVM protocol version %d. Please make sure that there is an exact match of the protocol versions. This can be achieved by updating your VM or running an older/newer version of AvalancheGo. Please be advised that some virtual machines may not yet support the latest RPCChainVM protocol version",
+			i.err = fmt.Errorf("%w. AvalancheGo version %s implements RPCChainVM protocol version %d. The VM located at %s implements RPCChainVM protocol version %d. Please make sure that there is an exact match of the protocol versions. This can be achieved by updating your VM or running an older/newer version of AvalancheGo. Please be advised that some virtual machines may not yet support the latest RPCChainVM protocol version",
 				runtime.ErrProtocolVersionMismatch,
 				version.Current,
 				version.RPCChainVMProtocol,
