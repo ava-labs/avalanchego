@@ -97,5 +97,5 @@ func TestInitializerError(t *testing.T) {
 	require.Equal(t, expectedError.Error(), err.Error())
 
 	// Verify the underlying wrapped error.
-	require.Equal(t, runtime.ErrProtocolVersionMismatch, err.(*errProtocolVersionMismatchDetails).Unwrap())
+	require.ErrorIs(t, err, runtime.ErrProtocolVersionMismatch)
 }
