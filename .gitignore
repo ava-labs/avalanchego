@@ -24,8 +24,6 @@ tmp/
 
 *logs/
 
-.vscode*
-
 *.pb*
 
 db*
