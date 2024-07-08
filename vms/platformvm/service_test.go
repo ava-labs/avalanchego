@@ -78,7 +78,7 @@ var (
 	}
 )
 
-func testReplayFeeCalculator(cfg *config.Config, parentBlkTime time.Time, state state.Chain) (*fee.Calculator, error) {
+func testReplayFeeCalculator(cfg *config.Config, parentBlkTime time.Time, state state.Chain) (fee.Calculator, error) {
 	var (
 		childBlkTime = state.GetTimestamp()
 		isEActive    = cfg.UpgradeConfig.IsEActivated(childBlkTime)
@@ -443,7 +443,7 @@ func TestGetBalance(t *testing.T) {
 			// As such we need to account for the subnet creation fee
 			feeCalc, err := testReplayFeeCalculator(&service.vm.Config, defaultGenesisTime, service.vm.state)
 			require.NoError(err)
-			fee, err := feeCalc.CalculateFee(testSubnet1.Unsigned, testSubnet1.Creds)
+			fee, err := feeCalc.CalculateFee(&txs.Tx{Unsigned: testSubnet1.Unsigned, Creds: testSubnet1.Creds})
 			require.NoError(err)
 			balance = defaultBalance - fee
 		}

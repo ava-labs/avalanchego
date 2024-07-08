@@ -38,7 +38,7 @@ type WalletFactory struct {
 	state state.State
 }
 
-func (w *WalletFactory) NewWallet(keys ...*secp256k1.PrivateKey) (builder.Builder, signer.Signer, *fee.Calculator, error) {
+func (w *WalletFactory) NewWallet(keys ...*secp256k1.PrivateKey) (builder.Builder, signer.Signer, fee.Calculator, error) {
 	var (
 		kc      = secp256k1fx.NewKeychain(keys...)
 		addrs   = kc.Addresses()
@@ -53,7 +53,7 @@ func (w *WalletFactory) NewWallet(keys ...*secp256k1.PrivateKey) (builder.Builde
 	return builder, signer, feeCalc, err
 }
 
-func (w *WalletFactory) FeeCalculator() (*fee.Calculator, error) {
+func (w *WalletFactory) FeeCalculator() (fee.Calculator, error) {
 	parentBlkTime := w.state.GetTimestamp()
 	nextBlkTime, _, err := state.NextBlockTime(w.state, w.clk)
 	if err != nil {

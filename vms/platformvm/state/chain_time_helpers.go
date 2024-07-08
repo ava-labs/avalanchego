@@ -75,7 +75,7 @@ func GetNextStakerChangeTime(state Chain) (time.Time, error) {
 
 // [PickFeeCalculator] creates either a static or a dynamic fee calculator, depending on the active upgrade
 // [PickFeeCalculator] does not modify [state]
-func PickFeeCalculator(cfg *config.Config, state Chain, parentBlkTime time.Time) (*fee.Calculator, error) {
+func PickFeeCalculator(cfg *config.Config, state Chain, parentBlkTime time.Time) (fee.Calculator, error) {
 	var (
 		childBlkTime = state.GetTimestamp()
 		isEActive    = cfg.UpgradeConfig.IsEActivated(childBlkTime)

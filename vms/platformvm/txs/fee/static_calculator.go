@@ -15,7 +15,8 @@ import (
 )
 
 var (
-	_ backend = (*staticCalculator)(nil)
+	_ Calculator  = (*staticCalculator)(nil)
+	_ txs.Visitor = (*staticCalculator)(nil)
 
 	errComplexityNotPriced = errors.New("complexity not priced")
 )
@@ -24,13 +25,11 @@ func NewStaticCalculator(
 	config StaticConfig,
 	upgradeTimes upgrade.Config,
 	chainTime time.Time,
-) *Calculator {
-	return &Calculator{
-		b: &staticCalculator{
-			upgrades:  upgradeTimes,
-			staticCfg: config,
-			time:      chainTime,
-		},
+) Calculator {
+	return &staticCalculator{
+		upgrades:  upgradeTimes,
+		staticCfg: config,
+		time:      chainTime,
 	}
 }
 
@@ -43,6 +42,40 @@ type staticCalculator struct {
 	// outputs of visitor execution
 	fee uint64
 }
+
+func (c *staticCalculator) CalculateFee(tx *txs.Tx) (uint64, error) {
+	c.fee = 0 // zero fee among different calculateFee invocations (unlike gas which gets cumulated)
+	err := tx.Unsigned.Visit(c)
+	return c.fee, err
+}
+
+func (c *staticCalculator) GetFee() uint64 {
+	return c.fee
+}
+
+func (c *staticCalculator) ResetFee(newFee uint64) {
+	c.fee = newFee
+}
+
+func (*staticCalculator) AddFeesFor(fee.Dimensions) (uint64, error) {
+	return 0, errComplexityNotPriced
+}
+
+func (*staticCalculator) RemoveFeesFor(fee.Dimensions) (uint64, error) {
+	return 0, errComplexityNotPriced
+}
+
+func (*staticCalculator) GetGasPrice() fee.GasPrice { return fee.ZeroGasPrice }
+
+func (*staticCalculator) GetBlockGas() (fee.Gas, error) { return fee.ZeroGas, nil }
+
+func (*staticCalculator) GetExcessGas() (fee.Gas, error) { return fee.ZeroGas, nil }
+
+func (*staticCalculator) GetGasCap() fee.Gas { return fee.ZeroGas }
+
+func (*staticCalculator) setCredentials([]verify.Verifiable) {}
+
+func (*staticCalculator) IsEActive() bool { return false }
 
 func (c *staticCalculator) AddValidatorTx(*txs.AddValidatorTx) error {
 	c.fee = c.staticCfg.AddPrimaryNetworkValidatorFee
@@ -134,37 +167,3 @@ func (c *staticCalculator) ExportTx(*txs.ExportTx) error {
 	c.fee = c.staticCfg.TxFee
 	return nil
 }
-
-func (c *staticCalculator) getFee() uint64 {
-	return c.fee
-}
-
-func (c *staticCalculator) resetFee(newFee uint64) {
-	c.fee = newFee
-}
-
-func (c *staticCalculator) calculateFee(tx txs.UnsignedTx, _ []verify.Verifiable) (uint64, error) {
-	c.fee = 0 // zero fee among different calculateFee invocations (unlike gas which gets cumulated)
-	err := tx.Visit(c)
-	return c.fee, err
-}
-
-func (*staticCalculator) addFeesFor(fee.Dimensions) (uint64, error) {
-	return 0, errComplexityNotPriced
-}
-
-func (*staticCalculator) removeFeesFor(fee.Dimensions) (uint64, error) {
-	return 0, errComplexityNotPriced
-}
-
-func (*staticCalculator) getGasPrice() fee.GasPrice { return fee.ZeroGasPrice }
-
-func (*staticCalculator) getBlockGas() (fee.Gas, error) { return fee.ZeroGas, nil }
-
-func (*staticCalculator) getExcessGas() (fee.Gas, error) { return fee.ZeroGas, nil }
-
-func (*staticCalculator) getGasCap() fee.Gas { return fee.ZeroGas }
-
-func (*staticCalculator) setCredentials([]verify.Verifiable) {}
-
-func (*staticCalculator) isEActive() bool { return false }

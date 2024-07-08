@@ -63,7 +63,7 @@ type Builder interface {
 	//   from this transaction.
 	NewBaseTx(
 		outputs []*avax.TransferableOutput,
-		feeCalc *fee.Calculator,
+		feeCalc fee.Calculator,
 		options ...common.Option,
 	) (*txs.BaseTx, error)
 
@@ -80,7 +80,7 @@ type Builder interface {
 		vdr *txs.Validator,
 		rewardsOwner *secp256k1fx.OutputOwners,
 		shares uint32,
-		feeCalc *fee.Calculator,
+		feeCalc fee.Calculator,
 		options ...common.Option,
 	) (*txs.AddValidatorTx, error)
 
@@ -90,7 +90,7 @@ type Builder interface {
 	//   startTime, endTime, sampling weight, nodeID, and subnetID.
 	NewAddSubnetValidatorTx(
 		vdr *txs.SubnetValidator,
-		feeCalc *fee.Calculator,
+		feeCalc fee.Calculator,
 		options ...common.Option,
 	) (*txs.AddSubnetValidatorTx, error)
 
@@ -99,7 +99,7 @@ type Builder interface {
 	NewRemoveSubnetValidatorTx(
 		nodeID ids.NodeID,
 		subnetID ids.ID,
-		feeCalc *fee.Calculator,
+		feeCalc fee.Calculator,
 		options ...common.Option,
 	) (*txs.RemoveSubnetValidatorTx, error)
 
@@ -113,7 +113,7 @@ type Builder interface {
 	NewAddDelegatorTx(
 		vdr *txs.Validator,
 		rewardsOwner *secp256k1fx.OutputOwners,
-		feeCalc *fee.Calculator,
+		feeCalc fee.Calculator,
 		options ...common.Option,
 	) (*txs.AddDelegatorTx, error)
 
@@ -131,7 +131,7 @@ type Builder interface {
 		vmID ids.ID,
 		fxIDs []ids.ID,
 		chainName string,
-		feeCalc *fee.Calculator,
+		feeCalc fee.Calculator,
 		options ...common.Option,
 	) (*txs.CreateChainTx, error)
 
@@ -141,7 +141,7 @@ type Builder interface {
 	//   validators to the subnet.
 	NewCreateSubnetTx(
 		owner *secp256k1fx.OutputOwners,
-		feeCalc *fee.Calculator,
+		feeCalc fee.Calculator,
 		options ...common.Option,
 	) (*txs.CreateSubnetTx, error)
 
@@ -153,7 +153,7 @@ type Builder interface {
 	NewTransferSubnetOwnershipTx(
 		subnetID ids.ID,
 		owner *secp256k1fx.OutputOwners,
-		feeCalc *fee.Calculator,
+		feeCalc fee.Calculator,
 		options ...common.Option,
 	) (*txs.TransferSubnetOwnershipTx, error)
 
@@ -165,7 +165,7 @@ type Builder interface {
 	NewImportTx(
 		chainID ids.ID,
 		to *secp256k1fx.OutputOwners,
-		feeCalc *fee.Calculator,
+		feeCalc fee.Calculator,
 		options ...common.Option,
 	) (*txs.ImportTx, error)
 
@@ -177,7 +177,7 @@ type Builder interface {
 	NewExportTx(
 		chainID ids.ID,
 		outputs []*avax.TransferableOutput,
-		feeCalc *fee.Calculator,
+		feeCalc fee.Calculator,
 		options ...common.Option,
 	) (*txs.ExportTx, error)
 
@@ -226,7 +226,7 @@ type Builder interface {
 		minDelegatorStake uint64,
 		maxValidatorWeightFactor byte,
 		uptimeRequirement uint32,
-		feeCalc *fee.Calculator,
+		feeCalc fee.Calculator,
 		options ...common.Option,
 	) (*txs.TransformSubnetTx, error)
 
@@ -252,7 +252,7 @@ type Builder interface {
 		validationRewardsOwner *secp256k1fx.OutputOwners,
 		delegationRewardsOwner *secp256k1fx.OutputOwners,
 		shares uint32,
-		feeCalc *fee.Calculator,
+		feeCalc fee.Calculator,
 		options ...common.Option,
 	) (*txs.AddPermissionlessValidatorTx, error)
 
@@ -268,7 +268,7 @@ type Builder interface {
 		vdr *txs.SubnetValidator,
 		assetID ids.ID,
 		rewardsOwner *secp256k1fx.OutputOwners,
-		feeCalc *fee.Calculator,
+		feeCalc fee.Calculator,
 		options ...common.Option,
 	) (*txs.AddPermissionlessDelegatorTx, error)
 }
@@ -323,7 +323,7 @@ func (b *builder) GetImportableBalance(
 
 func (b *builder) NewBaseTx(
 	outputs []*avax.TransferableOutput,
-	feeCalc *fee.Calculator,
+	feeCalc fee.Calculator,
 	options ...common.Option,
 ) (*txs.BaseTx, error) {
 	// 1. Build core transaction without utxos
@@ -351,7 +351,7 @@ func (b *builder) NewBaseTx(
 	}
 
 	// feesMan cumulates complexity. Let's init it with utx filled so far
-	if _, err := feeCalc.CalculateFee(utx, nil); err != nil {
+	if _, err := feeCalc.CalculateFee(&txs.Tx{Unsigned: utx, Creds: nil}); err != nil {
 		return nil, err
 	}
 
@@ -372,7 +372,7 @@ func (b *builder) NewAddValidatorTx(
 	vdr *txs.Validator,
 	rewardsOwner *secp256k1fx.OutputOwners,
 	shares uint32,
-	feeCalc *fee.Calculator,
+	feeCalc fee.Calculator,
 	options ...common.Option,
 ) (*txs.AddValidatorTx, error) {
 	ops := common.NewOptions(options)
@@ -396,7 +396,7 @@ func (b *builder) NewAddValidatorTx(
 	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
 
 	// feesMan cumulates complexity. Let's init it with utx filled so far
-	if _, err := feeCalc.CalculateFee(utx, nil); err != nil {
+	if _, err := feeCalc.CalculateFee(&txs.Tx{Unsigned: utx, Creds: nil}); err != nil {
 		return nil, err
 	}
 
@@ -414,7 +414,7 @@ func (b *builder) NewAddValidatorTx(
 
 func (b *builder) NewAddSubnetValidatorTx(
 	vdr *txs.SubnetValidator,
-	feeCalc *fee.Calculator,
+	feeCalc fee.Calculator,
 	options ...common.Option,
 ) (*txs.AddSubnetValidatorTx, error) {
 	ops := common.NewOptions(options)
@@ -439,7 +439,7 @@ func (b *builder) NewAddSubnetValidatorTx(
 	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
 
 	// feesMan cumulates complexity. Let's init it with utx filled so far
-	if _, err := feeCalc.CalculateFee(utx, nil); err != nil {
+	if _, err := feeCalc.CalculateFee(&txs.Tx{Unsigned: utx, Creds: nil}); err != nil {
 		return nil, err
 	}
 
@@ -462,7 +462,7 @@ func (b *builder) NewAddSubnetValidatorTx(
 func (b *builder) NewRemoveSubnetValidatorTx(
 	nodeID ids.NodeID,
 	subnetID ids.ID,
-	feeCalc *fee.Calculator,
+	feeCalc fee.Calculator,
 	options ...common.Option,
 ) (*txs.RemoveSubnetValidatorTx, error) {
 	ops := common.NewOptions(options)
@@ -487,7 +487,7 @@ func (b *builder) NewRemoveSubnetValidatorTx(
 	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
 
 	// feesMan cumulates complexity. Let's init it with utx filled so far
-	if _, err := feeCalc.CalculateFee(utx, nil); err != nil {
+	if _, err := feeCalc.CalculateFee(&txs.Tx{Unsigned: utx, Creds: nil}); err != nil {
 		return nil, err
 	}
 
@@ -510,7 +510,7 @@ func (b *builder) NewRemoveSubnetValidatorTx(
 func (b *builder) NewAddDelegatorTx(
 	vdr *txs.Validator,
 	rewardsOwner *secp256k1fx.OutputOwners,
-	feeCalc *fee.Calculator,
+	feeCalc fee.Calculator,
 	options ...common.Option,
 ) (*txs.AddDelegatorTx, error) {
 	ops := common.NewOptions(options)
@@ -533,7 +533,7 @@ func (b *builder) NewAddDelegatorTx(
 	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
 
 	// feesMan cumulates complexity. Let's init it with utx filled so far
-	if _, err := feeCalc.CalculateFee(utx, nil); err != nil {
+	if _, err := feeCalc.CalculateFee(&txs.Tx{Unsigned: utx, Creds: nil}); err != nil {
 		return nil, err
 	}
 
@@ -555,7 +555,7 @@ func (b *builder) NewCreateChainTx(
 	vmID ids.ID,
 	fxIDs []ids.ID,
 	chainName string,
-	feeCalc *fee.Calculator,
+	feeCalc fee.Calculator,
 	options ...common.Option,
 ) (*txs.CreateChainTx, error) {
 	// 1. Build core transaction without utxos
@@ -586,7 +586,7 @@ func (b *builder) NewCreateChainTx(
 	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
 
 	// feesMan cumulates complexity. Let's init it with utx filled so far
-	if _, err := feeCalc.CalculateFee(utx, nil); err != nil {
+	if _, err := feeCalc.CalculateFee(&txs.Tx{Unsigned: utx, Creds: nil}); err != nil {
 		return nil, err
 	}
 
@@ -608,7 +608,7 @@ func (b *builder) NewCreateChainTx(
 
 func (b *builder) NewCreateSubnetTx(
 	owner *secp256k1fx.OutputOwners,
-	feeCalc *fee.Calculator,
+	feeCalc fee.Calculator,
 	options ...common.Option,
 ) (*txs.CreateSubnetTx, error) {
 	// 1. Build core transaction without utxos
@@ -629,7 +629,7 @@ func (b *builder) NewCreateSubnetTx(
 	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
 
 	// feesMan cumulates complexity. Let's init it with utx filled so far
-	if _, err := feeCalc.CalculateFee(utx, nil); err != nil {
+	if _, err := feeCalc.CalculateFee(&txs.Tx{Unsigned: utx, Creds: nil}); err != nil {
 		return nil, err
 	}
 
@@ -647,7 +647,7 @@ func (b *builder) NewCreateSubnetTx(
 func (b *builder) NewTransferSubnetOwnershipTx(
 	subnetID ids.ID,
 	owner *secp256k1fx.OutputOwners,
-	feeCalc *fee.Calculator,
+	feeCalc fee.Calculator,
 	options ...common.Option,
 ) (*txs.TransferSubnetOwnershipTx, error) {
 	// 1. Build core transaction without utxos
@@ -674,7 +674,7 @@ func (b *builder) NewTransferSubnetOwnershipTx(
 	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
 
 	// feesMan cumulates complexity. Let's init it with utx filled so far
-	if _, err := feeCalc.CalculateFee(utx, nil); err != nil {
+	if _, err := feeCalc.CalculateFee(&txs.Tx{Unsigned: utx, Creds: nil}); err != nil {
 		return nil, err
 	}
 
@@ -697,7 +697,7 @@ func (b *builder) NewTransferSubnetOwnershipTx(
 func (b *builder) NewImportTx(
 	sourceChainID ids.ID,
 	to *secp256k1fx.OutputOwners,
-	feeCalc *fee.Calculator,
+	feeCalc fee.Calculator,
 	options ...common.Option,
 ) (*txs.ImportTx, error) {
 	ops := common.NewOptions(options)
@@ -788,7 +788,7 @@ func (b *builder) NewImportTx(
 	// 3. Finance fees as much as possible with imported, Avax-denominated UTXOs
 
 	// feesMan cumulates complexity. Let's init it with utx filled so far
-	if _, err := feeCalc.CalculateFee(utx, nil); err != nil {
+	if _, err := feeCalc.CalculateFee(&txs.Tx{Unsigned: utx, Creds: nil}); err != nil {
 		return nil, err
 	}
 
@@ -861,7 +861,7 @@ func (b *builder) NewImportTx(
 func (b *builder) NewExportTx(
 	chainID ids.ID,
 	outputs []*avax.TransferableOutput,
-	feeCalc *fee.Calculator,
+	feeCalc fee.Calculator,
 	options ...common.Option,
 ) (*txs.ExportTx, error) {
 	// 1. Build core transaction without utxos
@@ -891,7 +891,7 @@ func (b *builder) NewExportTx(
 	}
 
 	// feesMan cumulates complexity. Let's init it with utx filled so far
-	if _, err := feeCalc.CalculateFee(utx, nil); err != nil {
+	if _, err := feeCalc.CalculateFee(&txs.Tx{Unsigned: utx, Creds: nil}); err != nil {
 		return nil, err
 	}
 
@@ -921,7 +921,7 @@ func (b *builder) NewTransformSubnetTx(
 	minDelegatorStake uint64,
 	maxValidatorWeightFactor byte,
 	uptimeRequirement uint32,
-	feeCalc *fee.Calculator,
+	feeCalc fee.Calculator,
 	options ...common.Option,
 ) (*txs.TransformSubnetTx, error) {
 	// 1. Build core transaction without utxos
@@ -962,7 +962,7 @@ func (b *builder) NewTransformSubnetTx(
 	} // fees are calculated in financeTx
 
 	// feesMan cumulates complexity. Let's init it with utx filled so far
-	if _, err := feeCalc.CalculateFee(utx, nil); err != nil {
+	if _, err := feeCalc.CalculateFee(&txs.Tx{Unsigned: utx, Creds: nil}); err != nil {
 		return nil, err
 	}
 
@@ -989,7 +989,7 @@ func (b *builder) NewAddPermissionlessValidatorTx(
 	validationRewardsOwner *secp256k1fx.OutputOwners,
 	delegationRewardsOwner *secp256k1fx.OutputOwners,
 	shares uint32,
-	feeCalc *fee.Calculator,
+	feeCalc fee.Calculator,
 	options ...common.Option,
 ) (*txs.AddPermissionlessValidatorTx, error) {
 	ops := common.NewOptions(options)
@@ -1017,7 +1017,7 @@ func (b *builder) NewAddPermissionlessValidatorTx(
 	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
 
 	// feesMan cumulates complexity. Let's init it with utx filled so far
-	if _, err := feeCalc.CalculateFee(utx, nil); err != nil {
+	if _, err := feeCalc.CalculateFee(&txs.Tx{Unsigned: utx, Creds: nil}); err != nil {
 		return nil, err
 	}
 
@@ -1037,7 +1037,7 @@ func (b *builder) NewAddPermissionlessDelegatorTx(
 	vdr *txs.SubnetValidator,
 	assetID ids.ID,
 	rewardsOwner *secp256k1fx.OutputOwners,
-	feeCalc *fee.Calculator,
+	feeCalc fee.Calculator,
 	options ...common.Option,
 ) (*txs.AddPermissionlessDelegatorTx, error) {
 	ops := common.NewOptions(options)
@@ -1061,7 +1061,7 @@ func (b *builder) NewAddPermissionlessDelegatorTx(
 	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
 
 	// feesMan cumulates complexity. Let's init it with utx filled so far
-	if _, err := feeCalc.CalculateFee(utx, nil); err != nil {
+	if _, err := feeCalc.CalculateFee(&txs.Tx{Unsigned: utx, Creds: nil}); err != nil {
 		return nil, err
 	}
 
@@ -1139,7 +1139,7 @@ func (b *builder) getBalance(
 func (b *builder) financeTx(
 	amountsToBurn map[ids.ID]uint64,
 	amountsToStake map[ids.ID]uint64,
-	feeCalc *fee.Calculator,
+	feeCalc fee.Calculator,
 	options *common.Options,
 ) (
 	inputs []*avax.TransferableInput,

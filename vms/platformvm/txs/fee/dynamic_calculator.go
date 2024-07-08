@@ -19,17 +19,16 @@ import (
 const StakerLookupCost uint64 = 1000 // equal to secp256k1fx.CostPerSignature
 
 var (
-	_ backend = (*dynamicCalculator)(nil)
+	_ Calculator  = (*dynamicCalculator)(nil)
+	_ txs.Visitor = (*staticCalculator)(nil)
 
 	errFailedFeeCalculation = errors.New("failed fee calculation")
 )
 
-func NewDynamicCalculator(fc *fee.Calculator) *Calculator {
-	return &Calculator{
-		b: &dynamicCalculator{
-			fc: fc,
-			// credentials are set when computeFee is called
-		},
+func NewDynamicCalculator(fc *fee.Calculator) Calculator {
+	return &dynamicCalculator{
+		fc: fc,
+		// credentials are set when computeFee is called
 	}
 }
 
@@ -41,6 +40,65 @@ type dynamicCalculator struct {
 	// outputs of visitor execution
 	fee uint64
 }
+
+func (c *dynamicCalculator) CalculateFee(tx *txs.Tx) (uint64, error) {
+	c.setCredentials(tx.Creds)
+	c.fee = 0 // zero fee among different calculateFee invocations (unlike gas which gets cumulated)
+	err := tx.Unsigned.Visit(c)
+	return c.fee, err
+}
+
+func (c *dynamicCalculator) AddFeesFor(complexity fee.Dimensions) (uint64, error) {
+	if complexity == fee.Empty {
+		return 0, nil
+	}
+	if err := c.fc.CumulateComplexity(complexity); err != nil {
+		return 0, fmt.Errorf("failed cumulating complexity: %w", err)
+	}
+	fee, err := c.fc.CalculateFee(complexity)
+	if err != nil {
+		return 0, fmt.Errorf("%w: %w", errFailedFeeCalculation, err)
+	}
+
+	c.fee += fee
+	return fee, nil
+}
+
+func (c *dynamicCalculator) RemoveFeesFor(unitsToRm fee.Dimensions) (uint64, error) {
+	if unitsToRm == fee.Empty {
+		return 0, nil
+	}
+	if err := c.fc.RemoveComplexity(unitsToRm); err != nil {
+		return 0, fmt.Errorf("failed removing units: %w", err)
+	}
+	fee, err := c.fc.CalculateFee(unitsToRm)
+	if err != nil {
+		return 0, fmt.Errorf("%w: %w", errFailedFeeCalculation, err)
+	}
+
+	c.fee -= fee
+	return fee, nil
+}
+
+func (c *dynamicCalculator) GetFee() uint64 { return c.fee }
+
+func (c *dynamicCalculator) ResetFee(newFee uint64) {
+	c.fee = newFee
+}
+
+func (c *dynamicCalculator) GetGasPrice() fee.GasPrice { return c.fc.GetGasPrice() }
+
+func (c *dynamicCalculator) GetBlockGas() (fee.Gas, error) { return c.fc.GetBlockGas() }
+
+func (c *dynamicCalculator) GetExcessGas() (fee.Gas, error) { return c.fc.GetExcessGas() }
+
+func (c *dynamicCalculator) GetGasCap() fee.Gas { return c.fc.GetGasCap() }
+
+func (c *dynamicCalculator) setCredentials(creds []verify.Verifiable) {
+	c.cred = creds
+}
+
+func (*dynamicCalculator) IsEActive() bool { return true }
 
 func (*dynamicCalculator) AddValidatorTx(*txs.AddValidatorTx) error {
 	// AddValidatorTx is banned following Durango activation
@@ -54,7 +112,7 @@ func (c *dynamicCalculator) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) e
 	}
 	complexity[fee.Compute] += StakerLookupCost
 
-	_, err = c.addFeesFor(complexity)
+	_, err = c.AddFeesFor(complexity)
 	return err
 }
 
@@ -69,7 +127,7 @@ func (c *dynamicCalculator) CreateChainTx(tx *txs.CreateChainTx) error {
 		return err
 	}
 
-	_, err = c.addFeesFor(complexity)
+	_, err = c.AddFeesFor(complexity)
 	return err
 }
 
@@ -79,7 +137,7 @@ func (c *dynamicCalculator) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 		return err
 	}
 
-	_, err = c.addFeesFor(complexity)
+	_, err = c.AddFeesFor(complexity)
 	return err
 }
 
@@ -100,7 +158,7 @@ func (c *dynamicCalculator) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidato
 	}
 	complexity[fee.Compute] += StakerLookupCost
 
-	_, err = c.addFeesFor(complexity)
+	_, err = c.AddFeesFor(complexity)
 	return err
 }
 
@@ -110,7 +168,7 @@ func (c *dynamicCalculator) TransformSubnetTx(tx *txs.TransformSubnetTx) error {
 		return err
 	}
 
-	_, err = c.addFeesFor(complexity)
+	_, err = c.AddFeesFor(complexity)
 	return err
 }
 
@@ -120,7 +178,7 @@ func (c *dynamicCalculator) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwne
 		return err
 	}
 
-	_, err = c.addFeesFor(complexity)
+	_, err = c.AddFeesFor(complexity)
 	return err
 }
 
@@ -135,7 +193,7 @@ func (c *dynamicCalculator) AddPermissionlessValidatorTx(tx *txs.AddPermissionle
 	}
 	complexity[fee.Compute] += StakerLookupCost
 
-	_, err = c.addFeesFor(complexity)
+	_, err = c.AddFeesFor(complexity)
 	return err
 }
 
@@ -150,7 +208,7 @@ func (c *dynamicCalculator) AddPermissionlessDelegatorTx(tx *txs.AddPermissionle
 	}
 	complexity[fee.Compute] += StakerLookupCost
 
-	_, err = c.addFeesFor(complexity)
+	_, err = c.AddFeesFor(complexity)
 	return err
 }
 
@@ -160,7 +218,7 @@ func (c *dynamicCalculator) BaseTx(tx *txs.BaseTx) error {
 		return err
 	}
 
-	_, err = c.addFeesFor(complexity)
+	_, err = c.AddFeesFor(complexity)
 	return err
 }
 
@@ -174,7 +232,7 @@ func (c *dynamicCalculator) ImportTx(tx *txs.ImportTx) error {
 		return err
 	}
 
-	_, err = c.addFeesFor(complexity)
+	_, err = c.AddFeesFor(complexity)
 	return err
 }
 
@@ -188,7 +246,7 @@ func (c *dynamicCalculator) ExportTx(tx *txs.ExportTx) error {
 		return err
 	}
 
-	_, err = c.addFeesFor(complexity)
+	_, err = c.AddFeesFor(complexity)
 	return err
 }
 
@@ -250,64 +308,3 @@ func (c *dynamicCalculator) meterTx(
 
 	return complexity, nil
 }
-
-func (c *dynamicCalculator) addFeesFor(complexity fee.Dimensions) (uint64, error) {
-	if complexity == fee.Empty {
-		return 0, nil
-	}
-	if err := c.fc.CumulateComplexity(complexity); err != nil {
-		return 0, fmt.Errorf("failed cumulating complexity: %w", err)
-	}
-	fee, err := c.fc.CalculateFee(complexity)
-	if err != nil {
-		return 0, fmt.Errorf("%w: %w", errFailedFeeCalculation, err)
-	}
-
-	c.fee += fee
-	return fee, nil
-}
-
-func (c *dynamicCalculator) removeFeesFor(unitsToRm fee.Dimensions) (uint64, error) {
-	if unitsToRm == fee.Empty {
-		return 0, nil
-	}
-	if err := c.fc.RemoveComplexity(unitsToRm); err != nil {
-		return 0, fmt.Errorf("failed removing units: %w", err)
-	}
-	fee, err := c.fc.CalculateFee(unitsToRm)
-	if err != nil {
-		return 0, fmt.Errorf("%w: %w", errFailedFeeCalculation, err)
-	}
-
-	c.fee -= fee
-	return fee, nil
-}
-
-func (c *dynamicCalculator) getFee() uint64 {
-	return c.fee
-}
-
-func (c *dynamicCalculator) resetFee(newFee uint64) {
-	c.fee = newFee
-}
-
-func (c *dynamicCalculator) calculateFee(tx txs.UnsignedTx, creds []verify.Verifiable) (uint64, error) {
-	c.setCredentials(creds)
-	c.fee = 0 // zero fee among different calculateFee invocations (unlike gas which gets cumulated)
-	err := tx.Visit(c)
-	return c.fee, err
-}
-
-func (c *dynamicCalculator) getGasPrice() fee.GasPrice { return c.fc.GetGasPrice() }
-
-func (c *dynamicCalculator) getBlockGas() (fee.Gas, error) { return c.fc.GetBlockGas() }
-
-func (c *dynamicCalculator) getExcessGas() (fee.Gas, error) { return c.fc.GetExcessGas() }
-
-func (c *dynamicCalculator) getGasCap() fee.Gas { return c.fc.GetGasCap() }
-
-func (c *dynamicCalculator) setCredentials(creds []verify.Verifiable) {
-	c.cred = creds
-}
-
-func (*dynamicCalculator) isEActive() bool { return true }

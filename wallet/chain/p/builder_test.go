@@ -107,7 +107,7 @@ func TestBaseTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := fee.NewDynamicCalculator(commonfee.NewCalculator(testFeeWeights, testGasPrice, testBlockMaxGas))
-		fee, err := fc.CalculateFee(utx, tx.Creds)
+		fee, err := fc.CalculateFee(tx)
 		require.NoError(err)
 		require.Equal(3_060*units.MicroAvax, fee)
 
@@ -132,7 +132,7 @@ func TestBaseTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := fee.NewStaticCalculator(testStaticConfig, upgrade.Config{}, time.Time{})
-		fee, err := fc.CalculateFee(utx, nil)
+		fee, err := fc.CalculateFee(&txs.Tx{Unsigned: utx, Creds: nil})
 		require.NoError(err)
 		require.Equal(testContext.BaseTxFee, fee)
 
@@ -208,7 +208,7 @@ func TestAddSubnetValidatorTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := fee.NewDynamicCalculator(commonfee.NewCalculator(testFeeWeights, testGasPrice, testBlockMaxGas))
-		fee, err := fc.CalculateFee(utx, tx.Creds)
+		fee, err := fc.CalculateFee(tx)
 		require.NoError(err)
 		require.Equal(4_060*units.MicroAvax, fee)
 
@@ -229,7 +229,7 @@ func TestAddSubnetValidatorTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := fee.NewStaticCalculator(testStaticConfig, upgrade.Config{}, time.Time{})
-		fee, err := fc.CalculateFee(utx, nil)
+		fee, err := fc.CalculateFee(&txs.Tx{Unsigned: utx, Creds: nil})
 		require.NoError(err)
 		require.Equal(testContext.AddSubnetValidatorFee, fee)
 
@@ -300,7 +300,7 @@ func TestRemoveSubnetValidatorTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := fee.NewDynamicCalculator(commonfee.NewCalculator(testFeeWeights, testGasPrice, testBlockMaxGas))
-		fee, err := fc.CalculateFee(utx, tx.Creds)
+		fee, err := fc.CalculateFee(tx)
 		require.NoError(err)
 		require.Equal(4_030*units.MicroAvax, fee)
 
@@ -325,7 +325,7 @@ func TestRemoveSubnetValidatorTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := fee.NewStaticCalculator(testStaticConfig, upgrade.Config{}, time.Time{})
-		fee, err := fc.CalculateFee(utx, nil)
+		fee, err := fc.CalculateFee(&txs.Tx{Unsigned: utx, Creds: nil})
 		require.NoError(err)
 		require.Equal(testContext.BaseTxFee, fee)
 
@@ -405,7 +405,7 @@ func TestCreateChainTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := fee.NewDynamicCalculator(commonfee.NewCalculator(testFeeWeights, testGasPrice, testBlockMaxGas))
-		fee, err := fc.CalculateFee(utx, tx.Creds)
+		fee, err := fc.CalculateFee(tx)
 		require.NoError(err)
 		require.Equal(1_760*units.MicroAvax, fee)
 
@@ -433,7 +433,7 @@ func TestCreateChainTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := fee.NewStaticCalculator(testStaticConfig, upgrade.Config{}, time.Time{})
-		fee, err := fc.CalculateFee(utx, nil)
+		fee, err := fc.CalculateFee(&txs.Tx{Unsigned: utx, Creds: nil})
 		require.NoError(err)
 		require.Equal(testContext.CreateBlockchainTxFee, fee)
 
@@ -503,7 +503,7 @@ func TestCreateSubnetTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := fee.NewDynamicCalculator(commonfee.NewCalculator(testFeeWeights, testGasPrice, testBlockMaxGas))
-		fee, err := fc.CalculateFee(utx, tx.Creds)
+		fee, err := fc.CalculateFee(tx)
 		require.NoError(err)
 		require.Equal(1_590*units.MicroAvax, fee)
 
@@ -527,7 +527,7 @@ func TestCreateSubnetTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := fee.NewStaticCalculator(testStaticConfig, upgrade.Config{}, time.Time{})
-		fee, err := fc.CalculateFee(utx, nil)
+		fee, err := fc.CalculateFee(&txs.Tx{Unsigned: utx, Creds: nil})
 		require.NoError(err)
 		require.Equal(testContext.CreateSubnetTxFee, fee)
 
@@ -598,7 +598,7 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := fee.NewDynamicCalculator(commonfee.NewCalculator(testFeeWeights, testGasPrice, testBlockMaxGas))
-		fee, err := fc.CalculateFee(utx, tx.Creds)
+		fee, err := fc.CalculateFee(tx)
 		require.NoError(err)
 		require.Equal(1_710*units.MicroAvax, fee)
 
@@ -623,7 +623,7 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := fee.NewStaticCalculator(testStaticConfig, upgrade.Config{}, time.Time{})
-		fee, err := fc.CalculateFee(utx, nil)
+		fee, err := fc.CalculateFee(&txs.Tx{Unsigned: utx, Creds: nil})
 		require.NoError(err)
 		require.Equal(testContext.BaseTxFee, fee)
 
@@ -688,7 +688,7 @@ func TestImportTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := fee.NewDynamicCalculator(commonfee.NewCalculator(testFeeWeights, testGasPrice, testBlockMaxGas))
-		fee, err := fc.CalculateFee(utx, tx.Creds)
+		fee, err := fc.CalculateFee(tx)
 		require.NoError(err)
 		require.Equal(1_590*units.MicroAvax, fee)
 
@@ -715,7 +715,7 @@ func TestImportTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := fee.NewStaticCalculator(testStaticConfig, upgrade.Config{}, time.Time{})
-		fee, err := fc.CalculateFee(utx, nil)
+		fee, err := fc.CalculateFee(&txs.Tx{Unsigned: utx, Creds: nil})
 		require.NoError(err)
 		require.Equal(testContext.BaseTxFee, fee)
 
@@ -778,7 +778,7 @@ func TestExportTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := fee.NewDynamicCalculator(commonfee.NewCalculator(testFeeWeights, testGasPrice, testBlockMaxGas))
-		fee, err := fc.CalculateFee(utx, tx.Creds)
+		fee, err := fc.CalculateFee(tx)
 		require.NoError(err)
 		require.Equal(3_090*units.MicroAvax, fee)
 
@@ -804,7 +804,7 @@ func TestExportTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := fee.NewStaticCalculator(testStaticConfig, upgrade.Config{}, time.Time{})
-		fee, err := fc.CalculateFee(utx, nil)
+		fee, err := fc.CalculateFee(&txs.Tx{Unsigned: utx, Creds: nil})
 		require.NoError(err)
 		require.Equal(testContext.BaseTxFee, fee)
 
@@ -892,7 +892,7 @@ func TestTransformSubnetTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := fee.NewDynamicCalculator(commonfee.NewCalculator(testFeeWeights, testGasPrice, testBlockMaxGas))
-		fee, err := fc.CalculateFee(utx, tx.Creds)
+		fee, err := fc.CalculateFee(tx)
 		require.NoError(err)
 		require.Equal(4_620*units.MicroAvax, fee)
 
@@ -932,7 +932,7 @@ func TestTransformSubnetTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := fee.NewStaticCalculator(testStaticConfig, upgrade.Config{}, time.Time{})
-		fee, err := fc.CalculateFee(utx, nil)
+		fee, err := fc.CalculateFee(&txs.Tx{Unsigned: utx, Creds: nil})
 		require.NoError(err)
 		require.Equal(testContext.TransformSubnetTxFee, fee)
 
@@ -1013,7 +1013,7 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := fee.NewDynamicCalculator(commonfee.NewCalculator(testFeeWeights, testGasPrice, testBlockMaxGas))
-		fee, err := fc.CalculateFee(utx, tx.Creds)
+		fee, err := fc.CalculateFee(tx)
 		require.NoError(err)
 		require.Equal(7_520*units.MicroAvax, fee)
 
@@ -1056,7 +1056,7 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := fee.NewStaticCalculator(testStaticConfig, upgrade.Config{}, time.Time{})
-		fee, err := fc.CalculateFee(utx, nil)
+		fee, err := fc.CalculateFee(&txs.Tx{Unsigned: utx, Creds: nil})
 		require.NoError(err)
 		require.Equal(testContext.AddPrimaryNetworkValidatorFee, fee)
 
@@ -1129,7 +1129,7 @@ func TestAddPermissionlessDelegatorTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := fee.NewDynamicCalculator(commonfee.NewCalculator(testFeeWeights, testGasPrice, testBlockMaxGas))
-		fee, err := fc.CalculateFee(utx, tx.Creds)
+		fee, err := fc.CalculateFee(tx)
 		require.NoError(err)
 		require.Equal(7_330*units.MicroAvax, fee)
 
@@ -1169,7 +1169,7 @@ func TestAddPermissionlessDelegatorTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := fee.NewStaticCalculator(testStaticConfig, upgrade.Config{}, time.Time{})
-		fee, err := fc.CalculateFee(utx, nil)
+		fee, err := fc.CalculateFee(&txs.Tx{Unsigned: utx, Creds: nil})
 		require.NoError(err)
 		require.Equal(testContext.AddPrimaryNetworkDelegatorFee, fee)
 

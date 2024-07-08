@@ -403,7 +403,7 @@ func TestGenesis(t *testing.T) {
 			// As such we need to account for the subnet creation fee
 			feeCalc, err := testReplayFeeCalculator(&vm.Config, defaultGenesisTime, vm.state)
 			require.NoError(err)
-			fee, err := feeCalc.CalculateFee(testSubnet1.Unsigned, testSubnet1.Creds)
+			fee, err := feeCalc.CalculateFee(&txs.Tx{Unsigned: testSubnet1.Unsigned, Creds: testSubnet1.Creds})
 			require.NoError(err)
 			require.Equal(uint64(utxo.Amount)-fee, out.Amount())
 		}
@@ -2453,7 +2453,7 @@ func TestBaseTx(t *testing.T) {
 	feeCalc, err = state.PickFeeCalculator(&vm.Config, vm.state, vm.state.GetTimestamp())
 	require.NoError(err)
 
-	fee, err := feeCalc.CalculateFee(baseTx.Unsigned, baseTx.Creds)
+	fee, err := feeCalc.CalculateFee(baseTx)
 	require.NoError(err)
 	require.Equal(fee, totalInputAmt-totalOutputAmt)
 	require.Equal(sendAmt, key1OutputAmt)

@@ -4,9 +4,9 @@
 package mempool
 
 import (
-	"github.com/prometheus/client_golang/prometheus"
+	"errors"
 
-	"github.com/ava-labs/avalanchego/utils"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 var _ Metrics = (*metrics)(nil)
@@ -30,7 +30,7 @@ func NewMetrics(namespace string, registerer prometheus.Registerer) (*metrics, e
 		}),
 	}
 
-	err := utils.Err(
+	err := errors.Join(
 		registerer.Register(m.numTxs),
 		registerer.Register(m.bytesAvailableMetric),
 	)

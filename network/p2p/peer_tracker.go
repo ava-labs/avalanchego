@@ -4,6 +4,7 @@
 package p2p
 
 import (
+	"errors"
 	"math"
 	"math/rand"
 	"sync"
@@ -13,7 +14,6 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/heap"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -113,7 +113,7 @@ func NewPeerTracker(
 		},
 	}
 
-	err := utils.Err(
+	err := errors.Join(
 		registerer.Register(t.metrics.numTrackedPeers),
 		registerer.Register(t.metrics.numResponsivePeers),
 		registerer.Register(t.metrics.averageBandwidth),
