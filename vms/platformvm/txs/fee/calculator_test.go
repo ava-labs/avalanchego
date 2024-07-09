@@ -40,48 +40,48 @@ var (
 	errFailedComplexityCumulation = errors.New("failed cumulating complexity")
 )
 
-// func TestAddAndRemoveFees(t *testing.T) {
-// 	r := require.New(t)
+func TestAddAndRemoveFees(t *testing.T) {
+	r := require.New(t)
 
-// 	fc := NewDynamicCalculator(fee.NewCalculator(testFeeWeights, testGasPrice, testBlockMaxGas))
+	fc := NewDynamicCalculator(fee.NewCalculator(testFeeWeights, testGasPrice, testBlockMaxGas))
 
-// 	var (
-// 		units     = fee.Dimensions{1, 2, 3, 4}
-// 		gas       = fee.Gas(1)
-// 		doubleGas = fee.Gas(2)
-// 	)
+	var (
+		units     = fee.Dimensions{1, 2, 3, 4}
+		gas       = fee.Gas(1)
+		doubleGas = fee.Gas(2)
+	)
 
-// 	feeDelta, err := fc.AddFeesFor(units)
-// 	r.NoError(err)
+	feeDelta, err := fc.AddFeesFor(units)
+	r.NoError(err)
 
-// 	haveGas, err := fc.GetBlockGas()
-// 	r.NoError(err)
-// 	r.Equal(gas, haveGas)
-// 	r.NotZero(feeDelta)
-// 	r.Equal(feeDelta, fc.GetFee())
+	haveGas, err := fc.GetBlockGas()
+	r.NoError(err)
+	r.Equal(gas, haveGas)
+	r.NotZero(feeDelta)
+	r.Equal(feeDelta, fc.GetFee())
 
-// 	feeDelta2, err := fc.AddFeesFor(units)
-// 	r.NoError(err)
-// 	haveGas, err = fc.GetBlockGas()
-// 	r.NoError(err)
-// 	r.Equal(doubleGas, haveGas)
-// 	r.Equal(feeDelta, feeDelta2)
-// 	r.Equal(feeDelta+feeDelta2, fc.GetFee())
+	feeDelta2, err := fc.AddFeesFor(units)
+	r.NoError(err)
+	haveGas, err = fc.GetBlockGas()
+	r.NoError(err)
+	r.Equal(doubleGas, haveGas)
+	r.Equal(feeDelta, feeDelta2)
+	r.Equal(feeDelta+feeDelta2, fc.GetFee())
 
-// 	feeDelta3, err := fc.RemoveFeesFor(units)
-// 	r.NoError(err)
-// 	haveGas, err = fc.GetBlockGas()
-// 	r.NoError(err)
-// 	r.Equal(gas, haveGas)
-// 	r.Equal(feeDelta, feeDelta3)
-// 	r.Equal(feeDelta, fc.GetFee())
+	feeDelta3, err := fc.RemoveFeesFor(units)
+	r.NoError(err)
+	haveGas, err = fc.GetBlockGas()
+	r.NoError(err)
+	r.Equal(gas, haveGas)
+	r.Equal(feeDelta, feeDelta3)
+	r.Equal(feeDelta, fc.GetFee())
 
-// 	feeDelta4, err := fc.RemoveFeesFor(units)
-// 	r.NoError(err)
-// 	r.Zero(fc.GetBlockGas())
-// 	r.Equal(feeDelta, feeDelta4)
-// 	r.Zero(fc.GetFee())
-// }
+	feeDelta4, err := fc.RemoveFeesFor(units)
+	r.NoError(err)
+	r.Zero(fc.GetBlockGas())
+	r.Equal(feeDelta, feeDelta4)
+	r.Zero(fc.GetFee())
+}
 
 func TestTxFees(t *testing.T) {
 	feeTestsDefaultCfg := StaticConfig{
