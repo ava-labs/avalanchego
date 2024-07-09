@@ -13,10 +13,7 @@ import (
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
-var (
-	errGasBoundBreached                   = errors.New("gas bound breached")
-	errRequestedGasBlockWhileProcessingTx = errors.New("requested gas block while processing tx")
-)
+var errGasBoundBreached = errors.New("gas bound breached")
 
 // Calculator performs fee-related operations that are share move P-chain and X-chain
 // Calculator is supposed to be embedded with chain specific calculators.
@@ -30,9 +27,9 @@ type Calculator struct {
 	// Avax denominated gas price, i.e. fee per unit of complexity.
 	gasPrice GasPrice
 
-	// blkGas helps aggregating the gas consumed in a single block
+	// cumulatedGas helps aggregating the gas consumed in a single block
 	// so that we can verify it's not too big/build it properly.
-	blkGas Gas
+	cumulatedGas Gas
 
 	// latestTxComplexity tracks complexity of latest tx being processed.
 	// latestTxComplexity is especially helpful while building a tx.
@@ -95,10 +92,11 @@ func (c *Calculator) GetGasPrice() GasPrice {
 }
 
 func (c *Calculator) GetBlockGas() (Gas, error) {
-	if c.latestTxComplexity != Empty {
-		return ZeroGas, errRequestedGasBlockWhileProcessingTx
+	txGas, err := ToGas(c.feeWeights, c.latestTxComplexity)
+	if err != nil {
+		return ZeroGas, err
 	}
-	return c.blkGas, nil
+	return c.cumulatedGas + txGas, nil
 }
 
 func (c *Calculator) GetGasCap() Gas {
@@ -106,7 +104,7 @@ func (c *Calculator) GetGasCap() Gas {
 }
 
 func (c *Calculator) GetExcessGas() (Gas, error) {
-	g, err := safemath.Add64(uint64(c.currentExcessGas), uint64(c.blkGas))
+	g, err := safemath.Add64(uint64(c.currentExcessGas), uint64(c.cumulatedGas))
 	if err != nil {
 		return ZeroGas, err
 	}
@@ -131,7 +129,7 @@ func (c *Calculator) CumulateComplexity(complexity Dimensions) error {
 func (c *Calculator) RemoveComplexity(complexity Dimensions) error {
 	rc, err := Remove(c.latestTxComplexity, complexity)
 	if err != nil {
-		return fmt.Errorf("%w: current Gas %d, gas to revert %d", err, c.blkGas, complexity)
+		return fmt.Errorf("%w: current Gas %d, gas to revert %d", err, c.cumulatedGas, complexity)
 	}
 	c.latestTxComplexity = rc
 	return nil
@@ -143,7 +141,7 @@ func (c *Calculator) DoneWithLatestTx() error {
 	if err != nil {
 		return err
 	}
-	c.blkGas += txGas
+	c.cumulatedGas += txGas
 	c.latestTxComplexity = Empty
 	return nil
 }
