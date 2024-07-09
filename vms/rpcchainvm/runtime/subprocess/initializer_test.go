@@ -12,9 +12,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const (
+	vmLocation = "vm-location-path"
+)
+
 // TestInitializerSuccess tests the successful initialization flow.
 func TestInitializerSuccess(t *testing.T) {
-	initializer := newInitializer("abc")
+	initializer := newInitializer(vmLocation)
 	const vmAddr = "vmAddr"
 	err := initializer.Initialize(context.Background(), version.RPCChainVMProtocol, vmAddr)
 
@@ -32,22 +36,20 @@ func TestInitializerSuccess(t *testing.T) {
 // TestInitializerFail tests that initialization fails for unexpected versions.
 func TestInitializerFail(t *testing.T) {
 	for v := uint(0); v < version.RPCChainVMProtocol*10; v++ {
-		initializer := newInitializer("abc")
+		initializer := newInitializer(vmLocation)
 		err := initializer.Initialize(context.Background(), v, "vmAddr")
 
 		// Check for successful initialization only with the expected version.
 		if v == version.RPCChainVMProtocol {
 			require.NoError(t, err)
 		} else {
-			require.Error(t, err, "expected error for unexpected version")
+			require.ErrorIs(t, err, runtime.ErrProtocolVersionMismatch, "expected error for unexpected version")
 		}
 	}
 }
 
 // TestInitializerPersistance tests that initialization errors are persisted.
 func TestInitializerPersistance(t *testing.T) {
-	vmLocation := "vm-location-path"
-
 	// Positive test: Successful re-initialization after error.
 	initializer := newInitializer(vmLocation)
 	err := initializer.Initialize(context.Background(), version.RPCChainVMProtocol, "vmAddr")
@@ -58,40 +60,36 @@ func TestInitializerPersistance(t *testing.T) {
 	// Negative test: Failing re-initialization after error with specific error type.
 	initializer = newInitializer(vmLocation)
 	err = initializer.Initialize(context.Background(), uint(0), "vmAddr")
-	require.Error(t, err)
+	require.ErrorIs(t, err, runtime.ErrProtocolVersionMismatch)
 
 	// Verify the specific error type and its details.
 	expectedError := &errProtocolVersionMismatchDetails{
 		current:                         version.Current,
 		rpcChainVMProtocolVer:           version.RPCChainVMProtocol,
 		vmLocation:                      vmLocation,
-		vmLocationRpcChainVMProtocolVer: 0,
+		vmLocationRPCChainVMProtocolVer: 0,
 	}
 	require.Equal(t, expectedError, err)
 	require.Equal(t, expectedError.Error(), err.Error())
 
-	// Verify the underlying wrapped error.
-	require.Equal(t, runtime.ErrProtocolVersionMismatch, err.(*errProtocolVersionMismatchDetails).Unwrap())
-
 	// Subsequent initialization with the expected version should also fail due to persisted error.
 	err = initializer.Initialize(context.Background(), version.RPCChainVMProtocol, "vmAddr")
-	require.Error(t, err)
+	require.ErrorIs(t, err, runtime.ErrProtocolVersionMismatch)
 	require.Equal(t, expectedError, err)
 }
 
 // TestInitializerError tests that the expected error type and details are returned on initialization failure.
 func TestInitializerError(t *testing.T) {
-	vmLocation := "vm-location-path"
 	initializer := newInitializer(vmLocation)
 	err := initializer.Initialize(context.Background(), uint(0), "vmAddr")
-	require.Error(t, err)
+	require.ErrorIs(t, err, runtime.ErrProtocolVersionMismatch)
 
 	// Verify the specific error type and its details.
 	expectedError := &errProtocolVersionMismatchDetails{
 		current:                         version.Current,
 		rpcChainVMProtocolVer:           version.RPCChainVMProtocol,
 		vmLocation:                      vmLocation,
-		vmLocationRpcChainVMProtocolVer: 0,
+		vmLocationRPCChainVMProtocolVer: 0,
 	}
 	require.Equal(t, expectedError, err)
 	require.Equal(t, expectedError.Error(), err.Error())

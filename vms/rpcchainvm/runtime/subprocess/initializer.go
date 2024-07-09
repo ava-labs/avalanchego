@@ -41,7 +41,7 @@ func (i *initializer) Initialize(_ context.Context, protocolVersion uint, vmAddr
 				current:                         version.Current,
 				rpcChainVMProtocolVer:           version.RPCChainVMProtocol,
 				vmLocation:                      i.path,
-				vmLocationRpcChainVMProtocolVer: protocolVersion,
+				vmLocationRPCChainVMProtocolVer: protocolVersion,
 			}
 		}
 		i.vmAddr = vmAddr
@@ -54,10 +54,10 @@ type errProtocolVersionMismatchDetails struct {
 	current                         *version.Semantic
 	rpcChainVMProtocolVer           uint
 	vmLocation                      string
-	vmLocationRpcChainVMProtocolVer uint
+	vmLocationRPCChainVMProtocolVer uint
 }
 
-func (e *errProtocolVersionMismatchDetails) Unwrap() error {
+func (*errProtocolVersionMismatchDetails) Unwrap() error {
 	return runtime.ErrProtocolVersionMismatch
 }
 
@@ -67,6 +67,6 @@ func (e *errProtocolVersionMismatchDetails) Error() string {
 		e.current,
 		e.rpcChainVMProtocolVer,
 		e.vmLocation,
-		e.vmLocationRpcChainVMProtocolVer,
+		e.vmLocationRPCChainVMProtocolVer,
 	)
 }
