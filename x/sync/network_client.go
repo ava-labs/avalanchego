@@ -69,7 +69,7 @@ type NetworkClient interface {
 	// If [nodeID] is this node's ID, this is a no-op.
 	Connected(context.Context, ids.NodeID, *version.Application) error
 
-	// Removes given [nodeID] from the peer list.
+	// Removes given [nodeID] from the peers.
 	Disconnected(context.Context, ids.NodeID) error
 }
 

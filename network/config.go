@@ -54,18 +54,18 @@ type HealthConfig struct {
 	SendFailRateHalflife time.Duration `json:"sendFailRateHalflife"`
 }
 
-type PeerListGossipConfig struct {
-	// PeerListNumValidatorIPs is the number of validator IPs to gossip in every
+type PeersGossipConfig struct {
+	// PeersNumValidatorIPs is the number of validator IPs to gossip in every
 	// gossip event.
-	PeerListNumValidatorIPs uint32 `json:"peerListNumValidatorIPs"`
+	PeersNumValidatorIPs uint32 `json:"peersNumValidatorIPs"`
 
-	// PeerListPullGossipFreq is the frequency that this node will attempt to
+	// PeersPullGossipFreq is the frequency that this node will attempt to
 	// request signed IPs from its peers.
-	PeerListPullGossipFreq time.Duration `json:"peerListPullGossipFreq"`
+	PeersPullGossipFreq time.Duration `json:"peersPullGossipFreq"`
 
-	// PeerListBloomResetFreq is how frequently this node will recalculate the
+	// PeersBloomResetFreq is how frequently this node will recalculate the
 	// IP tracker's bloom filter.
-	PeerListBloomResetFreq time.Duration `json:"peerListBloomResetFreq"`
+	PeersBloomResetFreq time.Duration `json:"peersBloomResetFreq"`
 }
 
 type TimeoutConfig struct {
@@ -97,11 +97,11 @@ type ThrottlerConfig struct {
 }
 
 type Config struct {
-	HealthConfig         `json:"healthConfig"`
-	PeerListGossipConfig `json:"peerListGossipConfig"`
-	TimeoutConfig        `json:"timeoutConfigs"`
-	DelayConfig          `json:"delayConfig"`
-	ThrottlerConfig      ThrottlerConfig `json:"throttlerConfig"`
+	HealthConfig      `json:"healthConfig"`
+	PeersGossipConfig `json:"peersGossipConfig"`
+	TimeoutConfig     `json:"timeoutConfigs"`
+	DelayConfig       `json:"delayConfig"`
+	ThrottlerConfig   ThrottlerConfig `json:"throttlerConfig"`
 
 	ProxyEnabled           bool          `json:"proxyEnabled"`
 	ProxyReadHeaderTimeout time.Duration `json:"proxyReadHeaderTimeout"`

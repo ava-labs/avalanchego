@@ -353,10 +353,10 @@ func getNetworkConfig(
 			ReadHandshakeTimeout: v.GetDuration(NetworkReadHandshakeTimeoutKey),
 		},
 
-		PeerListGossipConfig: network.PeerListGossipConfig{
-			PeerListNumValidatorIPs: v.GetUint32(NetworkPeerListNumValidatorIPsKey),
-			PeerListPullGossipFreq:  v.GetDuration(NetworkPeerListPullGossipFreqKey),
-			PeerListBloomResetFreq:  v.GetDuration(NetworkPeerListBloomResetFreqKey),
+		PeersGossipConfig: network.PeersGossipConfig{
+			PeersNumValidatorIPs: v.GetUint32(NetworkPeersNumValidatorIPsKey),
+			PeersPullGossipFreq:  v.GetDuration(NetworkPeersPullGossipFreqKey),
+			PeersBloomResetFreq:  v.GetDuration(NetworkPeersBloomResetFreqKey),
 		},
 
 		DelayConfig: network.DelayConfig{
@@ -390,10 +390,10 @@ func getNetworkConfig(
 		return network.Config{}, fmt.Errorf("%s must be in [0,1]", NetworkHealthMaxPortionSendQueueFillKey)
 	case config.DialerConfig.ConnectionTimeout < 0:
 		return network.Config{}, fmt.Errorf("%q must be >= 0", NetworkOutboundConnectionTimeoutKey)
-	case config.PeerListPullGossipFreq < 0:
-		return network.Config{}, fmt.Errorf("%s must be >= 0", NetworkPeerListPullGossipFreqKey)
-	case config.PeerListBloomResetFreq < 0:
-		return network.Config{}, fmt.Errorf("%s must be >= 0", NetworkPeerListBloomResetFreqKey)
+	case config.PeersPullGossipFreq < 0:
+		return network.Config{}, fmt.Errorf("%s must be >= 0", NetworkPeersPullGossipFreqKey)
+	case config.PeersBloomResetFreq < 0:
+		return network.Config{}, fmt.Errorf("%s must be >= 0", NetworkPeersBloomResetFreqKey)
 	case config.ThrottlerConfig.InboundMsgThrottlerConfig.CPUThrottlerConfig.MaxRecheckDelay < constants.MinInboundThrottlerMaxRecheckDelay:
 		return network.Config{}, fmt.Errorf("%s must be >= %d", InboundThrottlerCPUMaxRecheckDelayKey, constants.MinInboundThrottlerMaxRecheckDelay)
 	case config.ThrottlerConfig.InboundMsgThrottlerConfig.DiskThrottlerConfig.MaxRecheckDelay < constants.MinInboundThrottlerMaxRecheckDelay:

@@ -119,10 +119,10 @@ func TestMessage(t *testing.T) {
 		},
 		{
 			desc: "get_peer_list message with no compression",
-			op:   GetPeerListOp,
+			op:   GetPeersOp,
 			msg: &p2p.Message{
-				Message: &p2p.Message_GetPeerList{
-					GetPeerList: &p2p.GetPeerList{
+				Message: &p2p.Message_GetPeers{
+					GetPeers: &p2p.GetPeers{
 						KnownPeers: &p2p.BloomFilter{
 							Filter: make([]byte, 2048),
 							Salt:   make([]byte, 32),
@@ -136,10 +136,10 @@ func TestMessage(t *testing.T) {
 		},
 		{
 			desc: "get_peer_list message with zstd compression",
-			op:   GetPeerListOp,
+			op:   GetPeersOp,
 			msg: &p2p.Message{
-				Message: &p2p.Message_GetPeerList{
-					GetPeerList: &p2p.GetPeerList{
+				Message: &p2p.Message_GetPeers{
+					GetPeers: &p2p.GetPeers{
 						KnownPeers: &p2p.BloomFilter{
 							Filter: make([]byte, 2048),
 							Salt:   make([]byte, 32),
@@ -153,10 +153,10 @@ func TestMessage(t *testing.T) {
 		},
 		{
 			desc: "peer_list message with no compression",
-			op:   PeerListOp,
+			op:   PeersOp,
 			msg: &p2p.Message{
-				Message: &p2p.Message_PeerList_{
-					PeerList_: &p2p.PeerList{
+				Message: &p2p.Message_Peers_{
+					Peers_: &p2p.Peers{
 						ClaimedIpPorts: []*p2p.ClaimedIpPort{
 							{
 								X509Certificate: testTLSCert.Certificate[0],
@@ -175,10 +175,10 @@ func TestMessage(t *testing.T) {
 		},
 		{
 			desc: "peer_list message with zstd compression",
-			op:   PeerListOp,
+			op:   PeersOp,
 			msg: &p2p.Message{
-				Message: &p2p.Message_PeerList_{
-					PeerList_: &p2p.PeerList{
+				Message: &p2p.Message_Peers_{
+					Peers_: &p2p.Peers{
 						ClaimedIpPorts: []*p2p.ClaimedIpPort{
 							{
 								X509Certificate: testTLSCert.Certificate[0],

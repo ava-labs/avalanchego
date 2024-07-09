@@ -517,7 +517,7 @@ func (n *network) Peers(except ids.NodeID, knownPeers *bloom.ReadFilter, salt []
 		except,
 		knownPeers,
 		salt,
-		int(n.config.PeerListNumValidatorIPs),
+		int(n.config.PeersNumValidatorIPs),
 	)
 }
 
@@ -630,7 +630,7 @@ func (n *network) track(ip *ips.ClaimedIPPort) error {
 	// Note: Avoiding signature verification when the IP isn't needed is a
 	// **significant** performance optimization.
 	if !n.ipTracker.ShouldVerifyIP(ip) {
-		n.metrics.numUselessPeerListBytes.Add(float64(ip.Size()))
+		n.metrics.numUselessPeersBytes.Add(float64(ip.Size()))
 		return nil
 	}
 
@@ -1154,11 +1154,11 @@ func (n *network) NodeUptime(subnetID ids.ID) (UptimeResult, error) {
 }
 
 func (n *network) runTimers() {
-	pullGossipPeerlists := time.NewTicker(n.config.PeerListPullGossipFreq)
-	resetPeerListBloom := time.NewTicker(n.config.PeerListBloomResetFreq)
+	pullGossipPeerlists := time.NewTicker(n.config.PeersPullGossipFreq)
+	resetPeersBloom := time.NewTicker(n.config.PeersBloomResetFreq)
 	updateUptimes := time.NewTicker(n.config.UptimeMetricFreq)
 	defer func() {
-		resetPeerListBloom.Stop()
+		resetPeersBloom.Stop()
 		updateUptimes.Stop()
 	}()
 
@@ -1168,7 +1168,7 @@ func (n *network) runTimers() {
 			return
 		case <-pullGossipPeerlists.C:
 			n.pullGossipPeerLists()
-		case <-resetPeerListBloom.C:
+		case <-resetPeersBloom.C:
 			if err := n.ipTracker.ResetBloom(); err != nil {
 				n.peerConfig.Log.Error("failed to reset ip tracker bloom filter",
 					zap.Error(err),
@@ -1213,7 +1213,7 @@ func (n *network) pullGossipPeerLists() {
 	)
 
 	for _, p := range peers {
-		p.StartSendGetPeerList()
+		p.StartSendGetPeers()
 	}
 }
 

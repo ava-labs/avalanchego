@@ -127,10 +127,10 @@ func addNodeFlags(fs *pflag.FlagSet) {
 	fs.Bool(LogRotaterCompressEnabledKey, false, "Enables the compression of rotated log files through gzip.")
 	fs.Bool(LogDisableDisplayPluginLogsKey, false, "Disables displaying plugin logs in stdout.")
 
-	// Peer List Gossip
-	fs.Uint(NetworkPeerListNumValidatorIPsKey, constants.DefaultNetworkPeerListNumValidatorIPs, "Number of validator IPs to gossip to other nodes")
-	fs.Duration(NetworkPeerListPullGossipFreqKey, constants.DefaultNetworkPeerListPullGossipFreq, "Frequency to request peers from other nodes")
-	fs.Duration(NetworkPeerListBloomResetFreqKey, constants.DefaultNetworkPeerListBloomResetFreq, "Frequency to recalculate the bloom filter used to request new peers from other nodes")
+	// Peers Gossip
+	fs.Uint(NetworkPeersNumValidatorIPsKey, constants.DefaultNetworkPeersNumValidatorIPs, "Number of validator IPs to gossip to other nodes")
+	fs.Duration(NetworkPeersPullGossipFreqKey, constants.DefaultNetworkPeersPullGossipFreq, "Frequency to request peers from other nodes")
+	fs.Duration(NetworkPeersBloomResetFreqKey, constants.DefaultNetworkPeersBloomResetFreq, "Frequency to recalculate the bloom filter used to request new peers from other nodes")
 
 	// Public IP Resolution
 	fs.String(PublicIPKey, "", "Public IP of this node for P2P communication")

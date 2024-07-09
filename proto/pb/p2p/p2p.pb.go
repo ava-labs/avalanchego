@@ -88,8 +88,8 @@ type Message struct {
 	//	*Message_Ping
 	//	*Message_Pong
 	//	*Message_Handshake
-	//	*Message_GetPeerList
-	//	*Message_PeerList_
+	//	*Message_GetPeers
+	//	*Message_Peers_
 	//	*Message_GetStateSummaryFrontier
 	//	*Message_StateSummaryFrontier_
 	//	*Message_GetAcceptedStateSummary
@@ -179,16 +179,16 @@ func (x *Message) GetHandshake() *Handshake {
 	return nil
 }
 
-func (x *Message) GetGetPeerList() *GetPeerList {
-	if x, ok := x.GetMessage().(*Message_GetPeerList); ok {
-		return x.GetPeerList
+func (x *Message) GetGetPeers() *GetPeers {
+	if x, ok := x.GetMessage().(*Message_GetPeers); ok {
+		return x.GetPeers
 	}
 	return nil
 }
 
-func (x *Message) GetPeerList_() *PeerList {
-	if x, ok := x.GetMessage().(*Message_PeerList_); ok {
-		return x.PeerList_
+func (x *Message) GetPeers_() *Peers {
+	if x, ok := x.GetMessage().(*Message_Peers_); ok {
+		return x.Peers_
 	}
 	return nil
 }
@@ -350,12 +350,12 @@ type Message_Handshake struct {
 	Handshake *Handshake `protobuf:"bytes,13,opt,name=handshake,proto3,oneof"`
 }
 
-type Message_GetPeerList struct {
-	GetPeerList *GetPeerList `protobuf:"bytes,35,opt,name=get_peer_list,json=getPeerList,proto3,oneof"`
+type Message_GetPeers struct {
+	GetPeers *GetPeers `protobuf:"bytes,35,opt,name=get_peer_list,json=getPeers,proto3,oneof"`
 }
 
-type Message_PeerList_ struct {
-	PeerList_ *PeerList `protobuf:"bytes,14,opt,name=peer_list,json=peerList,proto3,oneof"`
+type Message_Peers_ struct {
+	Peers_ *Peers `protobuf:"bytes,14,opt,name=peer_list,json=peers,proto3,oneof"`
 }
 
 type Message_GetStateSummaryFrontier struct {
@@ -446,9 +446,9 @@ func (*Message_Pong) isMessage_Message() {}
 
 func (*Message_Handshake) isMessage_Message() {}
 
-func (*Message_GetPeerList) isMessage_Message() {}
+func (*Message_GetPeers) isMessage_Message() {}
 
-func (*Message_PeerList_) isMessage_Message() {}
+func (*Message_Peers_) isMessage_Message() {}
 
 func (*Message_GetStateSummaryFrontier) isMessage_Message() {}
 
@@ -648,7 +648,7 @@ func (*Pong) Descriptor() ([]byte, []int) {
 // Handshake is the first outbound message sent to a peer when a connection is
 // established to start the p2p handshake.
 //
-// Peers must respond to a Handshake message with a PeerList message to allow the
+// Peers must respond to a Handshake message with a Peers message to allow the
 // peer to connect to other peers in the network.
 //
 // Peers should drop connections to peers with incompatible versions.
@@ -1021,13 +1021,13 @@ func (x *ClaimedIpPort) GetTxId() []byte {
 	return nil
 }
 
-// GetPeerList contains a bloom filter of the currently known validator IPs.
+// GetPeers contains a bloom filter of the currently known validator IPs.
 //
-// GetPeerList must not be responded to until finishing the handshake. After the
-// handshake is completed, GetPeerlist messages should be responded to with a
-// Peerlist message containing validators that are not present in the bloom
+// GetPeers must not be responded to until finishing the handshake. After the
+// handshake is completed, GetPeers messages should be responded to with a
+// Peers message containing validators that are not present in the bloom
 // filter.
-type GetPeerList struct {
+type GetPeers struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
@@ -1035,8 +1035,8 @@ type GetPeerList struct {
 	KnownPeers *BloomFilter `protobuf:"bytes,1,opt,name=known_peers,json=knownPeers,proto3" json:"known_peers,omitempty"`
 }
 
-func (x *GetPeerList) Reset() {
-	*x = GetPeerList{}
+func (x *GetPeers) Reset() {
+	*x = GetPeers{}
 	if protoimpl.UnsafeEnabled {
 		mi := &file_p2p_p2p_proto_msgTypes[8]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -1044,13 +1044,13 @@ func (x *GetPeerList) Reset() {
 	}
 }
 
-func (x *GetPeerList) String() string {
+func (x *GetPeers) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*GetPeerList) ProtoMessage() {}
+func (*GetPeers) ProtoMessage() {}
 
-func (x *GetPeerList) ProtoReflect() protoreflect.Message {
+func (x *GetPeers) ProtoReflect() protoreflect.Message {
 	mi := &file_p2p_p2p_proto_msgTypes[8]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -1062,28 +1062,28 @@ func (x *GetPeerList) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use GetPeerList.ProtoReflect.Descriptor instead.
-func (*GetPeerList) Descriptor() ([]byte, []int) {
+// Deprecated: Use GetPeers.ProtoReflect.Descriptor instead.
+func (*GetPeers) Descriptor() ([]byte, []int) {
 	return file_p2p_p2p_proto_rawDescGZIP(), []int{8}
 }
 
-func (x *GetPeerList) GetKnownPeers() *BloomFilter {
+func (x *GetPeers) GetKnownPeers() *BloomFilter {
 	if x != nil {
 		return x.KnownPeers
 	}
 	return nil
 }
 
-// PeerList contains network-level metadata for a set of validators.
+// Peers contains network-level metadata for a set of validators.
 //
-// PeerList must be sent in response to an inbound Handshake message from a
-// remote peer a peer wants to connect to. Once a PeerList is received after
+// Peers must be sent in response to an inbound Handshake message from a
+// remote peer a peer wants to connect to. Once a Peers is received after
 // a Handshake message, the p2p handshake is complete and the connection is
 // established.
 //
-// PeerList should be sent in response to a GetPeerlist message if the handshake
+// Peers should be sent in response to a GetPeers message if the handshake
 // has been completed.
-type PeerList struct {
+type Peers struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
@@ -1091,8 +1091,8 @@ type PeerList struct {
 	ClaimedIpPorts []*ClaimedIpPort `protobuf:"bytes,1,rep,name=claimed_ip_ports,json=claimedIpPorts,proto3" json:"claimed_ip_ports,omitempty"`
 }
 
-func (x *PeerList) Reset() {
-	*x = PeerList{}
+func (x *Peers) Reset() {
+	*x = Peers{}
 	if protoimpl.UnsafeEnabled {
 		mi := &file_p2p_p2p_proto_msgTypes[9]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -1100,13 +1100,13 @@ func (x *PeerList) Reset() {
 	}
 }
 
-func (x *PeerList) String() string {
+func (x *Peers) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*PeerList) ProtoMessage() {}
+func (*Peers) ProtoMessage() {}
 
-func (x *PeerList) ProtoReflect() protoreflect.Message {
+func (x *Peers) ProtoReflect() protoreflect.Message {
 	mi := &file_p2p_p2p_proto_msgTypes[9]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -1118,12 +1118,12 @@ func (x *PeerList) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use PeerList.ProtoReflect.Descriptor instead.
-func (*PeerList) Descriptor() ([]byte, []int) {
+// Deprecated: Use Peers.ProtoReflect.Descriptor instead.
+func (*Peers) Descriptor() ([]byte, []int) {
 	return file_p2p_p2p_proto_rawDescGZIP(), []int{9}
 }
 
-func (x *PeerList) GetClaimedIpPorts() []*ClaimedIpPort {
+func (x *Peers) GetClaimedIpPorts() []*ClaimedIpPort {
 	if x != nil {
 		return x.ClaimedIpPorts
 	}
@@ -2889,8 +2889,8 @@ var file_p2p_p2p_proto_goTypes = []interface{}{
 	(*Client)(nil),                  // 6: p2p.Client
 	(*BloomFilter)(nil),             // 7: p2p.BloomFilter
 	(*ClaimedIpPort)(nil),           // 8: p2p.ClaimedIpPort
-	(*GetPeerList)(nil),             // 9: p2p.GetPeerList
-	(*PeerList)(nil),                // 10: p2p.PeerList
+	(*GetPeers)(nil),                // 9: p2p.GetPeers
+	(*Peers)(nil),                   // 10: p2p.Peers
 	(*GetStateSummaryFrontier)(nil), // 11: p2p.GetStateSummaryFrontier
 	(*StateSummaryFrontier)(nil),    // 12: p2p.StateSummaryFrontier
 	(*GetAcceptedStateSummary)(nil), // 13: p2p.GetAcceptedStateSummary
@@ -2915,8 +2915,8 @@ var file_p2p_p2p_proto_depIdxs = []int32{
 	2,  // 0: p2p.Message.ping:type_name -> p2p.Ping
 	4,  // 1: p2p.Message.pong:type_name -> p2p.Pong
 	5,  // 2: p2p.Message.handshake:type_name -> p2p.Handshake
-	9,  // 3: p2p.Message.get_peer_list:type_name -> p2p.GetPeerList
-	10, // 4: p2p.Message.peer_list:type_name -> p2p.PeerList
+	9,  // 3: p2p.Message.get_peer_list:type_name -> p2p.GetPeers
+	10, // 4: p2p.Message.peer_list:type_name -> p2p.Peers
 	11, // 5: p2p.Message.get_state_summary_frontier:type_name -> p2p.GetStateSummaryFrontier
 	12, // 6: p2p.Message.state_summary_frontier:type_name -> p2p.StateSummaryFrontier
 	13, // 7: p2p.Message.get_accepted_state_summary:type_name -> p2p.GetAcceptedStateSummary
@@ -2939,8 +2939,8 @@ var file_p2p_p2p_proto_depIdxs = []int32{
 	3,  // 24: p2p.Ping.subnet_uptimes:type_name -> p2p.SubnetUptime
 	6,  // 25: p2p.Handshake.client:type_name -> p2p.Client
 	7,  // 26: p2p.Handshake.known_peers:type_name -> p2p.BloomFilter
-	7,  // 27: p2p.GetPeerList.known_peers:type_name -> p2p.BloomFilter
-	8,  // 28: p2p.PeerList.claimed_ip_ports:type_name -> p2p.ClaimedIpPort
+	7,  // 27: p2p.GetPeers.known_peers:type_name -> p2p.BloomFilter
+	8,  // 28: p2p.Peers.claimed_ip_ports:type_name -> p2p.ClaimedIpPort
 	0,  // 29: p2p.GetAncestors.engine_type:type_name -> p2p.EngineType
 	30, // [30:30] is the sub-list for method output_type
 	30, // [30:30] is the sub-list for method input_type
@@ -3052,7 +3052,7 @@ func file_p2p_p2p_proto_init() {
 			}
 		}
 		file_p2p_p2p_proto_msgTypes[8].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*GetPeerList); i {
+			switch v := v.(*GetPeers); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -3064,7 +3064,7 @@ func file_p2p_p2p_proto_init() {
 			}
 		}
 		file_p2p_p2p_proto_msgTypes[9].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*PeerList); i {
+			switch v := v.(*Peers); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -3309,8 +3309,8 @@ func file_p2p_p2p_proto_init() {
 		(*Message_Ping)(nil),
 		(*Message_Pong)(nil),
 		(*Message_Handshake)(nil),
-		(*Message_GetPeerList)(nil),
-		(*Message_PeerList_)(nil),
+		(*Message_GetPeers)(nil),
+		(*Message_Peers_)(nil),
 		(*Message_GetStateSummaryFrontier)(nil),
 		(*Message_StateSummaryFrontier_)(nil),
 		(*Message_GetAcceptedStateSummary)(nil),

@@ -104,10 +104,10 @@ type Peer interface {
 	// guaranteed not to be delivered to the peer.
 	Send(ctx context.Context, msg message.OutboundMessage) bool
 
-	// StartSendGetPeerList attempts to send a GetPeerList message to this peer
-	// on this peer's gossip routine. It is not guaranteed that a GetPeerList
+	// StartSendGetPeers attempts to send a GetPeers message to this peer
+	// on this peer's gossip routine. It is not guaranteed that a GetPeers
 	// will be sent.
-	StartSendGetPeerList()
+	StartSendGetPeers()
 
 	// StartClose will begin shutting down the peer. It will not block.
 	StartClose()
@@ -170,7 +170,7 @@ type peer struct {
 
 	// True if the peer:
 	// * Has sent us a Handshake message
-	// * Has sent us a PeerList message
+	// * Has sent us a Peers message
 	// * Is running a compatible version
 	// Only modified on the connection's reader routine.
 	finishedHandshake utils.Atomic[bool]
@@ -193,9 +193,9 @@ type peer struct {
 	// Must only be accessed atomically
 	lastSent, lastReceived int64
 
-	// getPeerListChan signals that we should attempt to send a GetPeerList to
+	// getPeersChan signals that we should attempt to send a GetPeers to
 	// this peer
-	getPeerListChan chan struct{}
+	getPeersChan chan struct{}
 }
 
 // Start a new peer instance.
@@ -222,7 +222,7 @@ func Start(
 		onClosingCtxCancel: onClosingCtxCancel,
 		onClosed:           make(chan struct{}),
 		observedUptimes:    make(map[ids.ID]uint32),
-		getPeerListChan:    make(chan struct{}, 1),
+		getPeersChan:       make(chan struct{}, 1),
 	}
 
 	go p.readMessages()
@@ -324,9 +324,9 @@ func (p *peer) Send(ctx context.Context, msg message.OutboundMessage) bool {
 	return p.messageQueue.Push(ctx, msg)
 }
 
-func (p *peer) StartSendGetPeerList() {
+func (p *peer) StartSendGetPeers() {
 	select {
-	case p.getPeerListChan <- struct{}{}:
+	case p.getPeersChan <- struct{}{}:
 	default:
 	}
 }
@@ -641,13 +641,13 @@ func (p *peer) sendNetworkMessages() {
 
 	for {
 		select {
-		case <-p.getPeerListChan:
+		case <-p.getPeersChan:
 			knownPeersFilter, knownPeersSalt := p.Config.Network.KnownPeers()
-			msg, err := p.Config.MessageCreator.GetPeerList(knownPeersFilter, knownPeersSalt)
+			msg, err := p.Config.MessageCreator.GetPeers(knownPeersFilter, knownPeersSalt)
 			if err != nil {
 				p.Log.Error(failedToCreateMessageLog,
 					zap.Stringer("nodeID", p.id),
-					zap.Stringer("messageOp", message.GetPeerListOp),
+					zap.Stringer("messageOp", message.GetPeersOp),
 					zap.Error(err),
 				)
 				return
@@ -748,12 +748,12 @@ func (p *peer) handle(msg message.InboundMessage) {
 		p.handleHandshake(m)
 		msg.OnFinishedHandling()
 		return
-	case *p2p.GetPeerList:
-		p.handleGetPeerList(m)
+	case *p2p.GetPeers:
+		p.handleGetPeers(m)
 		msg.OnFinishedHandling()
 		return
-	case *p2p.PeerList:
-		p.handlePeerList(m)
+	case *p2p.Peers:
+		p.handlePeers(m)
 		msg.OnFinishedHandling()
 		return
 	}
@@ -1117,34 +1117,34 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 
 	// We bypass throttling here to ensure that the handshake message is
 	// acknowledged correctly.
-	peerListMsg, err := p.Config.MessageCreator.PeerList(peerIPs, true /*=bypassThrottling*/)
+	peersMsg, err := p.Config.MessageCreator.Peers(peerIPs, true /*=bypassThrottling*/)
 	if err != nil {
 		p.Log.Error(failedToCreateMessageLog,
 			zap.Stringer("nodeID", p.id),
-			zap.Stringer("messageOp", message.PeerListOp),
+			zap.Stringer("messageOp", message.PeersOp),
 			zap.Error(err),
 		)
 		p.StartClose()
 		return
 	}
 
-	if !p.Send(p.onClosingCtx, peerListMsg) {
+	if !p.Send(p.onClosingCtx, peersMsg) {
 		// Because throttling was marked to be bypassed with this message,
 		// sending should only fail if the peer has started closing.
 		p.Log.Debug("failed to send reliable message",
 			zap.Stringer("nodeID", p.id),
-			zap.Stringer("messageOp", message.PeerListOp),
+			zap.Stringer("messageOp", message.PeersOp),
 			zap.Error(p.onClosingCtx.Err()),
 		)
 		p.StartClose()
 	}
 }
 
-func (p *peer) handleGetPeerList(msg *p2p.GetPeerList) {
+func (p *peer) handleGetPeers(msg *p2p.GetPeers) {
 	if !p.finishedHandshake.Get() {
 		p.Log.Debug(malformedMessageLog,
 			zap.Stringer("nodeID", p.id),
-			zap.Stringer("messageOp", message.GetPeerListOp),
+			zap.Stringer("messageOp", message.GetPeersOp),
 			zap.String("reason", "not finished handshake"),
 		)
 		return
@@ -1155,7 +1155,7 @@ func (p *peer) handleGetPeerList(msg *p2p.GetPeerList) {
 	if err != nil {
 		p.Log.Debug(malformedMessageLog,
 			zap.Stringer("nodeID", p.id),
-			zap.Stringer("messageOp", message.GetPeerListOp),
+			zap.Stringer("messageOp", message.GetPeersOp),
 			zap.String("field", "knownPeers.filter"),
 			zap.Error(err),
 		)
@@ -1167,7 +1167,7 @@ func (p *peer) handleGetPeerList(msg *p2p.GetPeerList) {
 	if saltLen := len(salt); saltLen > maxBloomSaltLen {
 		p.Log.Debug(malformedMessageLog,
 			zap.Stringer("nodeID", p.id),
-			zap.Stringer("messageOp", message.GetPeerListOp),
+			zap.Stringer("messageOp", message.GetPeersOp),
 			zap.String("field", "knownPeers.salt"),
 			zap.Int("saltLen", saltLen),
 		)
@@ -1177,7 +1177,7 @@ func (p *peer) handleGetPeerList(msg *p2p.GetPeerList) {
 
 	peerIPs := p.Network.Peers(p.id, filter, salt)
 	if len(peerIPs) == 0 {
-		p.Log.Debug("skipping sending of empty peer list",
+		p.Log.Debug("skipping sending of empty peers",
 			zap.Stringer("nodeID", p.id),
 		)
 		return
@@ -1185,20 +1185,20 @@ func (p *peer) handleGetPeerList(msg *p2p.GetPeerList) {
 
 	// Bypass throttling is disabled here to follow the non-handshake message
 	// sending pattern.
-	peerListMsg, err := p.Config.MessageCreator.PeerList(peerIPs, false /*=bypassThrottling*/)
+	peersMsg, err := p.Config.MessageCreator.Peers(peerIPs, false /*=bypassThrottling*/)
 	if err != nil {
 		p.Log.Error(failedToCreateMessageLog,
 			zap.Stringer("nodeID", p.id),
-			zap.Stringer("messageOp", message.PeerListOp),
+			zap.Stringer("messageOp", message.PeersOp),
 			zap.Error(err),
 		)
 		return
 	}
 
-	p.Send(p.onClosingCtx, peerListMsg)
+	p.Send(p.onClosingCtx, peersMsg)
 }
 
-func (p *peer) handlePeerList(msg *p2p.PeerList) {
+func (p *peer) handlePeers(msg *p2p.Peers) {
 	if !p.finishedHandshake.Get() {
 		if !p.gotHandshake.Get() {
 			return
@@ -1215,7 +1215,7 @@ func (p *peer) handlePeerList(msg *p2p.PeerList) {
 		if err != nil {
 			p.Log.Debug(malformedMessageLog,
 				zap.Stringer("nodeID", p.id),
-				zap.Stringer("messageOp", message.PeerListOp),
+				zap.Stringer("messageOp", message.PeersOp),
 				zap.String("field", "cert"),
 				zap.Error(err),
 			)
@@ -1227,7 +1227,7 @@ func (p *peer) handlePeerList(msg *p2p.PeerList) {
 		if !ok {
 			p.Log.Debug(malformedMessageLog,
 				zap.Stringer("nodeID", p.id),
-				zap.Stringer("messageOp", message.PeerListOp),
+				zap.Stringer("messageOp", message.PeersOp),
 				zap.String("field", "ip"),
 				zap.Int("ipLen", len(claimedIPPort.IpAddr)),
 			)
@@ -1239,7 +1239,7 @@ func (p *peer) handlePeerList(msg *p2p.PeerList) {
 		if port == 0 {
 			p.Log.Debug(malformedMessageLog,
 				zap.Stringer("nodeID", p.id),
-				zap.Stringer("messageOp", message.PeerListOp),
+				zap.Stringer("messageOp", message.PeersOp),
 				zap.String("field", "port"),
 				zap.Uint16("port", port),
 			)
@@ -1261,7 +1261,7 @@ func (p *peer) handlePeerList(msg *p2p.PeerList) {
 	if err := p.Network.Track(discoveredIPs); err != nil {
 		p.Log.Debug(malformedMessageLog,
 			zap.Stringer("nodeID", p.id),
-			zap.Stringer("messageOp", message.PeerListOp),
+			zap.Stringer("messageOp", message.PeersOp),
 			zap.String("field", "claimedIP"),
 			zap.Error(err),
 		)
