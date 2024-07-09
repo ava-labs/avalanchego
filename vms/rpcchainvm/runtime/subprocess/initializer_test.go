@@ -7,9 +7,10 @@ import (
 	"context"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/runtime"
-	"github.com/stretchr/testify/require"
 )
 
 const (
@@ -20,10 +21,9 @@ const (
 func TestInitializerSuccess(t *testing.T) {
 	initializer := newInitializer(vmLocation)
 	const vmAddr = "vmAddr"
-	err := initializer.Initialize(context.Background(), version.RPCChainVMProtocol, vmAddr)
 
 	// Check for no errors during initialization with the expected version.
-	require.NoError(t, err)
+	require.NoError(t, initializer.Initialize(context.Background(), version.RPCChainVMProtocol, vmAddr))
 
 	// Verify that vmAddr is set correctly.
 	require.Equal(t, vmAddr, initializer.vmAddr)
@@ -52,14 +52,13 @@ func TestInitializerFail(t *testing.T) {
 func TestInitializerPersistance(t *testing.T) {
 	// Positive test: Successful re-initialization after error.
 	initializer := newInitializer(vmLocation)
-	err := initializer.Initialize(context.Background(), version.RPCChainVMProtocol, "vmAddr")
-	require.NoError(t, err)
-	err = initializer.Initialize(context.Background(), uint(0), "vmAddr") // This should succeed because the error was already persisted.
-	require.NoError(t, err)
+
+	require.NoError(t, initializer.Initialize(context.Background(), version.RPCChainVMProtocol, "vmAddr"))
+	require.NoError(t, initializer.Initialize(context.Background(), uint(0), "vmAddr")) // This should succeed because the error was already persisted.
 
 	// Negative test: Failing re-initialization after error with specific error type.
 	initializer = newInitializer(vmLocation)
-	err = initializer.Initialize(context.Background(), uint(0), "vmAddr")
+	err := initializer.Initialize(context.Background(), uint(0), "vmAddr")
 	require.ErrorIs(t, err, runtime.ErrProtocolVersionMismatch)
 
 	// Verify the specific error type and its details.
