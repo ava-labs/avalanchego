@@ -76,6 +76,14 @@ func GetNextStakerChangeTime(state Chain) (time.Time, error) {
 // [PickFeeCalculator] creates either a static or a dynamic fee calculator, depending on the active upgrade
 // [PickFeeCalculator] does not modify [state]
 func PickFeeCalculator(cfg *config.Config, state Chain, parentBlkTime time.Time) (fee.Calculator, error) {
+	return pickFeeCalculator(cfg, state, parentBlkTime, false)
+}
+
+func PickBuildingFeeCalculator(cfg *config.Config, state Chain, parentBlkTime time.Time) (fee.Calculator, error) {
+	return pickFeeCalculator(cfg, state, parentBlkTime, true)
+}
+
+func pickFeeCalculator(cfg *config.Config, state Chain, parentBlkTime time.Time, building bool) (fee.Calculator, error) {
 	var (
 		childBlkTime = state.GetTimestamp()
 		isEActive    = cfg.UpgradeConfig.IsEActivated(childBlkTime)
@@ -95,7 +103,10 @@ func PickFeeCalculator(cfg *config.Config, state Chain, parentBlkTime time.Time)
 		return nil, fmt.Errorf("failed updating fee manager: %w", err)
 	}
 
-	return fee.NewDynamicCalculator(feesMan), nil
+	if !building {
+		return fee.NewDynamicCalculator(feesMan), nil
+	}
+	return fee.NewBuildingDynamicCalculator(feesMan), nil
 }
 
 func updatedFeeManager(feesCfg commonfee.DynamicFeesConfig, state Chain, parentBlkTime, childBlkTime time.Time) (*commonfee.Calculator, error) {

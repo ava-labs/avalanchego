@@ -633,7 +633,7 @@ func (w *wallet) feeCalculator(ctx *builder.Context, options ...common.Option) (
 		return fee.NewStaticCalculator(w.staticFeesConfig, upgrade.Config{}, time.Time{}), nil
 	}
 
-	return fee.NewDynamicCalculator(commonfee.NewCalculator(w.feeCfg.FeeDimensionWeights, w.gasPrice, w.gasCap)), nil
+	return fee.NewBuildingDynamicCalculator(commonfee.NewCalculator(w.feeCfg.FeeDimensionWeights, w.gasPrice, w.gasCap)), nil
 }
 
 func (w *wallet) refreshFeesData(ctx *builder.Context, options ...common.Option) error {

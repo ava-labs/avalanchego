@@ -27,15 +27,25 @@ var (
 
 func NewDynamicCalculator(fc *fee.Calculator) Calculator {
 	return &dynamicCalculator{
-		fc: fc,
+		fc:    fc,
+		close: true,
+		// credentials are set when computeFee is called
+	}
+}
+
+func NewBuildingDynamicCalculator(fc *fee.Calculator) Calculator {
+	return &dynamicCalculator{
+		fc:    fc,
+		close: false,
 		// credentials are set when computeFee is called
 	}
 }
 
 type dynamicCalculator struct {
 	// inputs
-	fc   *fee.Calculator
-	cred []verify.Verifiable
+	fc    *fee.Calculator
+	cred  []verify.Verifiable
+	close bool
 
 	// outputs of visitor execution
 	fee uint64
@@ -45,6 +55,9 @@ func (c *dynamicCalculator) CalculateFee(tx *txs.Tx) (uint64, error) {
 	c.setCredentials(tx.Creds)
 	c.fee = 0 // zero fee among different calculateFee invocations (unlike gas which gets cumulated)
 	err := tx.Unsigned.Visit(c)
+	if c.close {
+		err = errors.Join(err, c.fc.DoneWithLatestTx())
+	}
 	return c.fee, err
 }
 
@@ -55,13 +68,14 @@ func (c *dynamicCalculator) AddFeesFor(complexity fee.Dimensions) (uint64, error
 	if err := c.fc.CumulateComplexity(complexity); err != nil {
 		return 0, fmt.Errorf("failed cumulating complexity: %w", err)
 	}
-	fee, err := c.fc.CalculateFee(complexity)
+	fee, err := c.fc.GetLatestTxFee()
 	if err != nil {
 		return 0, fmt.Errorf("%w: %w", errFailedFeeCalculation, err)
 	}
 
-	c.fee += fee
-	return fee, nil
+	extraFee := fee - c.fee
+	c.fee = fee
+	return extraFee, nil
 }
 
 func (c *dynamicCalculator) RemoveFeesFor(unitsToRm fee.Dimensions) (uint64, error) {
@@ -71,13 +85,14 @@ func (c *dynamicCalculator) RemoveFeesFor(unitsToRm fee.Dimensions) (uint64, err
 	if err := c.fc.RemoveComplexity(unitsToRm); err != nil {
 		return 0, fmt.Errorf("failed removing units: %w", err)
 	}
-	fee, err := c.fc.CalculateFee(unitsToRm)
+	fee, err := c.fc.GetLatestTxFee()
 	if err != nil {
 		return 0, fmt.Errorf("%w: %w", errFailedFeeCalculation, err)
 	}
 
-	c.fee -= fee
-	return fee, nil
+	removedFee := c.fee - fee
+	c.fee = fee
+	return removedFee, nil
 }
 
 func (c *dynamicCalculator) GetFee() uint64 { return c.fee }

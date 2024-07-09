@@ -13,7 +13,7 @@ import (
 	commonfee "github.com/ava-labs/avalanchego/vms/components/fee"
 )
 
-func FinanceInput(feeCalc fee.Calculator, input *avax.TransferableInput) (uint64, error) {
+func financeInput(feeCalc fee.Calculator, input *avax.TransferableInput) (uint64, error) {
 	if !feeCalc.IsEActive() {
 		return 0, nil // pre E-upgrade we have a fixed fee regardless how complex the input is
 	}
@@ -29,7 +29,7 @@ func FinanceInput(feeCalc fee.Calculator, input *avax.TransferableInput) (uint64
 	return addedFees, nil
 }
 
-func FinanceOutput(feeCalc fee.Calculator, output *avax.TransferableOutput) (uint64, commonfee.Dimensions, error) {
+func financeOutput(feeCalc fee.Calculator, output *avax.TransferableOutput) (uint64, commonfee.Dimensions, error) {
 	if !feeCalc.IsEActive() {
 		return 0, commonfee.Empty, nil // pre E-upgrade we have a fixed fee regardless how complex the output is
 	}
@@ -45,7 +45,7 @@ func FinanceOutput(feeCalc fee.Calculator, output *avax.TransferableOutput) (uin
 	return addedFees, outDimensions, nil
 }
 
-func FinanceCredential(feeCalc fee.Calculator, keysCount int) (uint64, error) {
+func financeCredential(feeCalc fee.Calculator, keysCount int) (uint64, error) {
 	if !feeCalc.IsEActive() {
 		return 0, nil // pre E-upgrade we have a fixed fee regardless how complex the credentials are
 	}

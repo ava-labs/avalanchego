@@ -96,7 +96,7 @@ func TestBaseTx(t *testing.T) {
 	)
 
 	{ // Post E-Upgrade
-		feeCalc := fee.NewDynamicCalculator(commonfee.NewCalculator(testFeeWeights, testGasPrice, testBlockMaxGas))
+		feeCalc := fee.NewBuildingDynamicCalculator(commonfee.NewCalculator(testFeeWeights, testGasPrice, testBlockMaxGas))
 		utx, err := builder.NewBaseTx(
 			outputsToMove,
 			feeCalc,
@@ -200,7 +200,7 @@ func TestAddSubnetValidatorTx(t *testing.T) {
 	)
 
 	{ // Post E-Upgrade
-		feeCalc := fee.NewDynamicCalculator(commonfee.NewCalculator(testFeeWeights, testGasPrice, testBlockMaxGas))
+		feeCalc := fee.NewBuildingDynamicCalculator(commonfee.NewCalculator(testFeeWeights, testGasPrice, testBlockMaxGas))
 		utx, err := builder.NewAddSubnetValidatorTx(subnetValidator, feeCalc)
 		require.NoError(err)
 
@@ -288,7 +288,7 @@ func TestRemoveSubnetValidatorTx(t *testing.T) {
 	)
 
 	{ // Post E-Upgrade
-		feeCalc := fee.NewDynamicCalculator(commonfee.NewCalculator(testFeeWeights, testGasPrice, testBlockMaxGas))
+		feeCalc := fee.NewBuildingDynamicCalculator(commonfee.NewCalculator(testFeeWeights, testGasPrice, testBlockMaxGas))
 		utx, err := builder.NewRemoveSubnetValidatorTx(
 			ids.GenerateTestNodeID(),
 			subnetID,
@@ -390,7 +390,7 @@ func TestCreateChainTx(t *testing.T) {
 	)
 
 	{ // Post E-Upgrade
-		feeCalc := fee.NewDynamicCalculator(commonfee.NewCalculator(testFeeWeights, testGasPrice, testBlockMaxGas))
+		feeCalc := fee.NewBuildingDynamicCalculator(commonfee.NewCalculator(testFeeWeights, testGasPrice, testBlockMaxGas))
 		utx, err := builder.NewCreateChainTx(
 			subnetID,
 			genesisBytes,
@@ -492,7 +492,7 @@ func TestCreateSubnetTx(t *testing.T) {
 	)
 
 	{ // Post E-Upgrade
-		feeCalc := fee.NewDynamicCalculator(commonfee.NewCalculator(testFeeWeights, testGasPrice, testBlockMaxGas))
+		feeCalc := fee.NewBuildingDynamicCalculator(commonfee.NewCalculator(testFeeWeights, testGasPrice, testBlockMaxGas))
 		utx, err := builder.NewCreateSubnetTx(
 			subnetOwner,
 			feeCalc,
@@ -586,7 +586,7 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 	)
 
 	{ // Post E-Upgrade
-		feeCalc := fee.NewDynamicCalculator(commonfee.NewCalculator(testFeeWeights, testGasPrice, testBlockMaxGas))
+		feeCalc := fee.NewBuildingDynamicCalculator(commonfee.NewCalculator(testFeeWeights, testGasPrice, testBlockMaxGas))
 		utx, err := builder.NewTransferSubnetOwnershipTx(
 			subnetID,
 			subnetOwner,
@@ -676,7 +676,7 @@ func TestImportTx(t *testing.T) {
 	)
 
 	{ // Post E-Upgrade
-		feeCalc := fee.NewDynamicCalculator(commonfee.NewCalculator(testFeeWeights, testGasPrice, testBlockMaxGas))
+		feeCalc := fee.NewBuildingDynamicCalculator(commonfee.NewCalculator(testFeeWeights, testGasPrice, testBlockMaxGas))
 		utx, err := builder.NewImportTx(
 			sourceChainID,
 			importTo,
@@ -766,7 +766,7 @@ func TestExportTx(t *testing.T) {
 	)
 
 	{ // Post E-Upgrade
-		feeCalc := fee.NewDynamicCalculator(commonfee.NewCalculator(testFeeWeights, testGasPrice, testBlockMaxGas))
+		feeCalc := fee.NewBuildingDynamicCalculator(commonfee.NewCalculator(testFeeWeights, testGasPrice, testBlockMaxGas))
 		utx, err := builder.NewExportTx(
 			subnetID,
 			exportedOutputs,
@@ -868,7 +868,7 @@ func TestTransformSubnetTx(t *testing.T) {
 	)
 
 	{ // Post E-Upgrade
-		feeCalc := fee.NewDynamicCalculator(commonfee.NewCalculator(testFeeWeights, testGasPrice, testBlockMaxGas))
+		feeCalc := fee.NewBuildingDynamicCalculator(commonfee.NewCalculator(testFeeWeights, testGasPrice, testBlockMaxGas))
 		utx, err := builder.NewTransformSubnetTx(
 			subnetID,
 			subnetAssetID,
@@ -990,7 +990,7 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 	require.NoError(err)
 
 	{ // Post E-Upgrade
-		feeCalc := fee.NewDynamicCalculator(commonfee.NewCalculator(testFeeWeights, testGasPrice, testBlockMaxGas))
+		feeCalc := fee.NewBuildingDynamicCalculator(commonfee.NewCalculator(testFeeWeights, testGasPrice, testBlockMaxGas))
 		utx, err := builder.NewAddPermissionlessValidatorTx(
 			&txs.SubnetValidator{
 				Validator: txs.Validator{
@@ -1109,7 +1109,7 @@ func TestAddPermissionlessDelegatorTx(t *testing.T) {
 	)
 
 	{ // Post E-Upgrade
-		feeCalc := fee.NewDynamicCalculator(commonfee.NewCalculator(testFeeWeights, testGasPrice, testBlockMaxGas))
+		feeCalc := fee.NewBuildingDynamicCalculator(commonfee.NewCalculator(testFeeWeights, testGasPrice, testBlockMaxGas))
 		utx, err := builder.NewAddPermissionlessDelegatorTx(
 			&txs.SubnetValidator{
 				Validator: txs.Validator{

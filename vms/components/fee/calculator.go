@@ -13,7 +13,10 @@ import (
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
-var errGasBoundBreached = errors.New("gas bound breached")
+var (
+	errGasBoundBreached                   = errors.New("gas bound breached")
+	errRequestedGasBlockWhileProcessingTx = errors.New("requested gas block while processing tx")
+)
 
 // Calculator performs fee-related operations that are share move P-chain and X-chain
 // Calculator is supposed to be embedded with chain specific calculators.
@@ -27,11 +30,13 @@ type Calculator struct {
 	// Avax denominated gas price, i.e. fee per unit of complexity.
 	gasPrice GasPrice
 
-	// blkComplexity helps aggregating the gas consumed in a single block
+	// blkGas helps aggregating the gas consumed in a single block
 	// so that we can verify it's not too big/build it properly.
-	blkComplexity Dimensions
+	blkGas Gas
 
-	gasReminder Gas
+	// latestTxComplexity tracks complexity of latest tx being processed.
+	// latestTxComplexity is especially helpful while building a tx.
+	latestTxComplexity Dimensions
 
 	// currentExcessGas stores current excess gas, cumulated over time
 	// to be updated once a block is accepted with cumulatedGas
@@ -90,7 +95,10 @@ func (c *Calculator) GetGasPrice() GasPrice {
 }
 
 func (c *Calculator) GetBlockGas() (Gas, error) {
-	return ToGas(c.feeWeights, c.blkComplexity)
+	if c.latestTxComplexity != Empty {
+		return ZeroGas, errRequestedGasBlockWhileProcessingTx
+	}
+	return c.blkGas, nil
 }
 
 func (c *Calculator) GetGasCap() Gas {
@@ -98,27 +106,11 @@ func (c *Calculator) GetGasCap() Gas {
 }
 
 func (c *Calculator) GetExcessGas() (Gas, error) {
-	blkGas, err := c.GetBlockGas()
-	if err != nil {
-		return ZeroGas, err
-	}
-
-	g, err := safemath.Add64(uint64(c.currentExcessGas), uint64(blkGas))
+	g, err := safemath.Add64(uint64(c.currentExcessGas), uint64(c.blkGas))
 	if err != nil {
 		return ZeroGas, err
 	}
 	return Gas(g), nil
-}
-
-// CalculateFee must be a stateless method
-func (c *Calculator) CalculateFee(complexity Dimensions) (uint64, error) {
-	gas, reminder, err := toGasWithReminder(c.feeWeights, complexity, c.gasReminder)
-	if err != nil {
-		return 0, err
-	}
-	c.gasReminder = reminder
-
-	return safemath.Mul64(uint64(c.gasPrice), uint64(gas))
 }
 
 // CumulateComplexity tries to cumulate the consumed gas [units]. Before
@@ -126,23 +118,43 @@ func (c *Calculator) CalculateFee(complexity Dimensions) (uint64, error) {
 // If so, it returns the first dimension to breach bounds.
 func (c *Calculator) CumulateComplexity(complexity Dimensions) error {
 	// Ensure we can consume (don't want partial update of values)
-	blkComplexity, err := Add(c.blkComplexity, complexity)
+	uc, err := Add(c.latestTxComplexity, complexity)
 	if err != nil {
 		return fmt.Errorf("%w: %w", errGasBoundBreached, err)
 	}
-	c.blkComplexity = blkComplexity
+	c.latestTxComplexity = uc
 	return nil
 }
 
 // Sometimes, e.g. while building a tx, we'd like freedom to speculatively add complexity
 // and to remove it later on. [RemoveGas] grants this freedom
 func (c *Calculator) RemoveComplexity(complexity Dimensions) error {
-	rBlkdComplexity, err := Remove(c.blkComplexity, complexity)
+	rc, err := Remove(c.latestTxComplexity, complexity)
 	if err != nil {
-		return fmt.Errorf("%w: current Gas %d, gas to revert %d", err, c.blkComplexity, complexity)
+		return fmt.Errorf("%w: current Gas %d, gas to revert %d", err, c.blkGas, complexity)
 	}
-	c.blkComplexity = rBlkdComplexity
+	c.latestTxComplexity = rc
 	return nil
+}
+
+// DoneWithLatestTx should be invoked one a tx has been fully processed, before moving to the next one
+func (c *Calculator) DoneWithLatestTx() error {
+	txGas, err := ToGas(c.feeWeights, c.latestTxComplexity)
+	if err != nil {
+		return err
+	}
+	c.blkGas += txGas
+	c.latestTxComplexity = Empty
+	return nil
+}
+
+// CalculateFee must be a stateless method
+func (c *Calculator) GetLatestTxFee() (uint64, error) {
+	gas, err := ToGas(c.feeWeights, c.latestTxComplexity)
+	if err != nil {
+		return 0, err
+	}
+	return safemath.Mul64(uint64(c.gasPrice), uint64(gas))
 }
 
 // fakeExponential approximates factor * e ** (numerator / denominator) using
