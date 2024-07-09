@@ -27,25 +27,26 @@ var (
 
 func NewDynamicCalculator(fc *fee.Calculator) Calculator {
 	return &dynamicCalculator{
-		fc:    fc,
-		close: true,
+		fc:         fc,
+		buildingTx: false,
 		// credentials are set when computeFee is called
 	}
 }
 
 func NewBuildingDynamicCalculator(fc *fee.Calculator) Calculator {
 	return &dynamicCalculator{
-		fc:    fc,
-		close: false,
+		fc:         fc,
+		buildingTx: true,
 		// credentials are set when computeFee is called
 	}
 }
 
 type dynamicCalculator struct {
 	// inputs
-	fc    *fee.Calculator
-	cred  []verify.Verifiable
-	close bool
+	fc   *fee.Calculator
+	cred []verify.Verifiable
+
+	buildingTx bool
 
 	// outputs of visitor execution
 	fee uint64
@@ -55,7 +56,7 @@ func (c *dynamicCalculator) CalculateFee(tx *txs.Tx) (uint64, error) {
 	c.setCredentials(tx.Creds)
 	c.fee = 0 // zero fee among different calculateFee invocations (unlike gas which gets cumulated)
 	err := tx.Unsigned.Visit(c)
-	if c.close {
+	if !c.buildingTx {
 		err = errors.Join(err, c.fc.DoneWithLatestTx())
 	}
 	return c.fee, err

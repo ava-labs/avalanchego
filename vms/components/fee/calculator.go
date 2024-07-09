@@ -120,6 +120,14 @@ func (c *Calculator) CumulateComplexity(complexity Dimensions) error {
 	if err != nil {
 		return fmt.Errorf("%w: %w", errGasBoundBreached, err)
 	}
+	totalGas, err := c.GetBlockGas()
+	if err != nil {
+		return fmt.Errorf("%w: %w", errGasBoundBreached, err)
+	}
+	if totalGas > c.gasCap {
+		return fmt.Errorf("%w: %w", errGasBoundBreached, err)
+	}
+
 	c.latestTxComplexity = uc
 	return nil
 }
