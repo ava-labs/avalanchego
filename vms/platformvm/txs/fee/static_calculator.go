@@ -67,9 +67,9 @@ func (*staticCalculator) RemoveFeesFor(fee.Dimensions) (uint64, error) {
 
 func (*staticCalculator) GetGasPrice() fee.GasPrice { return fee.ZeroGasPrice }
 
-func (*staticCalculator) GetBlockGas() fee.Gas { return fee.ZeroGas }
+func (*staticCalculator) GetBlockGas() (fee.Gas, error) { return fee.ZeroGas, nil }
 
-func (*staticCalculator) GetExcessGas() fee.Gas { return fee.ZeroGas }
+func (*staticCalculator) GetExcessGas() (fee.Gas, error) { return fee.ZeroGas, nil }
 
 func (*staticCalculator) GetGasCap() fee.Gas { return fee.ZeroGas }
 

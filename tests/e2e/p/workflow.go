@@ -59,6 +59,11 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 			tests.Outf("{{green}} minimal validator stake: %d {{/}}\n", minValStake)
 			tests.Outf("{{green}} minimal delegator stake: %d {{/}}\n", minDelStake)
 
+			tests.Outf("{{blue}} fetching minimal stake amounts {{/}}\n")
+			feeCfg, err := pChainClient.GetDynamicFeeConfig(e2e.DefaultContext())
+			require.NoError(err)
+			tests.Outf("{{green}} fee config: %v {{/}}\n", feeCfg)
+
 			tests.Outf("{{blue}} fetching X-chain tx fee {{/}}\n")
 			infoClient := info.NewClient(nodeURI.URI)
 			staticFees, err := infoClient.GetTxFee(e2e.DefaultContext())
@@ -161,7 +166,7 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 				require.NoError(err)
 
 				// retrieve fees paid for the tx
-				feeCalc := fee.NewDynamicCalculator(commonfee.NewCalculator(nextGasPrice, nextGasCap))
+				feeCalc := fee.NewDynamicCalculator(commonfee.NewCalculator(feeCfg.FeeDimensionWeights, nextGasPrice, nextGasCap))
 				pChainExportFee, err = feeCalc.CalculateFee(tx)
 				require.NoError(err)
 			})
