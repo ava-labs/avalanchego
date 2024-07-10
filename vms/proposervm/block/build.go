@@ -125,17 +125,7 @@ func NextHashBlockSignature(parentBlockSig []byte) []byte {
 		return nil
 	}
 	// previous block had a valid signature, hash that signature.
-	sigParentBlockSig := hashing.ComputeHash256(parentBlockSig)
-
-	// as long as the signature length is too short, generate additional hashes.
-	for len(sigParentBlockSig) < len(parentBlockSig) {
-		sigParentBlockSig = append(sigParentBlockSig, hashing.ComputeHash256(sigParentBlockSig)...)
-	}
-
-	// adjust the size of the hash to be as long as the parent signature ( which is a BLS signature length )
-	sigParentBlockSig = sigParentBlockSig[:len(parentBlockSig)]
-
-	return sigParentBlockSig
+	return hashing.ComputeHash256(parentBlockSig)
 }
 
 func NextBlockVRFSig(parentBlockVRFSig []byte, blsSignKey *bls.SecretKey, chainID ids.ID, networkID uint32) []byte {

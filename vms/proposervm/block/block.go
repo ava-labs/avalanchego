@@ -73,7 +73,7 @@ type statelessUnsignedBlock struct {
 }
 
 type unsignedBlockTypes interface {
-	interface{ statelessUnsignedBlockV0 } | interface{ statelessUnsignedBlock }
+	statelessUnsignedBlockV0 | statelessUnsignedBlock
 }
 
 type statelessBlock[T unsignedBlockTypes] struct {
@@ -212,7 +212,10 @@ func (b *statelessBlock[T]) initialize(bytes []byte) error {
 
 	b.proposer = ids.NodeIDFromCert(b.cert)
 
-	if vrfBytes := b.VRFSig(); len(vrfBytes) > 0 {
+	// The following ensures that we would initialize the vrfSig member only when
+	// the provided signature is 96 bytes long. That supports both statelessUnsignedBlockV0 & statelessUnsignedBlock
+	// variations, as well as optional 32-byte hashes stored in the VRFSig.
+	if vrfBytes := b.VRFSig(); len(vrfBytes) == bls.SignatureLen {
 		b.vrfSig, err = bls.SignatureFromBytes(vrfBytes)
 		if err != nil {
 			return fmt.Errorf("%w: %w", errFailedToParseVRFSignature, err)

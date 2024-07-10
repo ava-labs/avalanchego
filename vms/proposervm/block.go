@@ -234,7 +234,7 @@ func (p *postForkCommonComponents) buildChild(
 			childBlockVrfSig = block.NextBlockVRFSig(parentBlockVRFSig, blsSignKey, p.vm.ctx.ChainID, p.vm.ctx.NetworkID)
 		} else {
 			// in this case, we can't sign with BLS key, since we're not going to include the Certificate, which is required
-			// for the signature validation. Instead, we'll just hash the previous
+			// for the signature validation. Instead, we'll just hash the parent block VRF signature.
 			childBlockVrfSig = block.NextHashBlockSignature(parentBlockVRFSig)
 		}
 	}
