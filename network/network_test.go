@@ -48,7 +48,7 @@ var (
 		MaxSendFailRate:              .1,
 		SendFailRateHalflife:         time.Second,
 	}
-	defaultPeersGossipConfig = PeersGossipConfig{
+	defaultPeerGossipConfig = PeerGossipConfig{
 		PeersNumValidatorIPs: 100,
 		PeersPullGossipFreq:  time.Second,
 		PeersBloomResetFreq:  constants.DefaultNetworkPeersBloomResetFreq,
@@ -97,11 +97,11 @@ var (
 	}
 
 	defaultConfig = Config{
-		HealthConfig:      defaultHealthConfig,
-		PeersGossipConfig: defaultPeersGossipConfig,
-		TimeoutConfig:     defaultTimeoutConfig,
-		DelayConfig:       defaultDelayConfig,
-		ThrottlerConfig:   defaultThrottlerConfig,
+		HealthConfig:     defaultHealthConfig,
+		PeerGossipConfig: defaultPeerGossipConfig,
+		TimeoutConfig:    defaultTimeoutConfig,
+		DelayConfig:      defaultDelayConfig,
+		ThrottlerConfig:  defaultThrottlerConfig,
 
 		DialerConfig: defaultDialerConfig,
 

@@ -54,7 +54,7 @@ type HealthConfig struct {
 	SendFailRateHalflife time.Duration `json:"sendFailRateHalflife"`
 }
 
-type PeersGossipConfig struct {
+type PeerGossipConfig struct {
 	// PeersNumValidatorIPs is the number of validator IPs to gossip in every
 	// gossip event.
 	PeersNumValidatorIPs uint32 `json:"peersNumValidatorIPs"`
@@ -97,11 +97,11 @@ type ThrottlerConfig struct {
 }
 
 type Config struct {
-	HealthConfig      `json:"healthConfig"`
-	PeersGossipConfig `json:"peersGossipConfig"`
-	TimeoutConfig     `json:"timeoutConfigs"`
-	DelayConfig       `json:"delayConfig"`
-	ThrottlerConfig   ThrottlerConfig `json:"throttlerConfig"`
+	HealthConfig     `json:"healthConfig"`
+	PeerGossipConfig `json:"peerGossipConfig"`
+	TimeoutConfig    `json:"timeoutConfigs"`
+	DelayConfig      `json:"delayConfig"`
+	ThrottlerConfig  ThrottlerConfig `json:"throttlerConfig"`
 
 	ProxyEnabled           bool          `json:"proxyEnabled"`
 	ProxyReadHeaderTimeout time.Duration `json:"proxyReadHeaderTimeout"`

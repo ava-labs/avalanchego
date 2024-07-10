@@ -353,7 +353,7 @@ func getNetworkConfig(
 			ReadHandshakeTimeout: v.GetDuration(NetworkReadHandshakeTimeoutKey),
 		},
 
-		PeersGossipConfig: network.PeersGossipConfig{
+		PeerGossipConfig: network.PeerGossipConfig{
 			PeersNumValidatorIPs: v.GetUint32(NetworkPeersNumValidatorIPsKey),
 			PeersPullGossipFreq:  v.GetDuration(NetworkPeersPullGossipFreqKey),
 			PeersBloomResetFreq:  v.GetDuration(NetworkPeersBloomResetFreqKey),
