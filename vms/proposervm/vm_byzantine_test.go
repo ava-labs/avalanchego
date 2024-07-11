@@ -73,6 +73,157 @@ func TestInvalidByzantineProposerParent(t *testing.T) {
 	require.ErrorIs(err, errUnknownBlock)
 }
 
+// Ensure that a byzantine node issuing an invalid PreForkBlock (Y or Z) when
+// the parent block (X) is issued into a PostForkBlock (A) will be marked as
+// invalid correctly.
+//
+//	    G
+//	  / |
+//	A - X
+//	   / \
+//	  Y   Z
+func TestInvalidByzantineProposerOracleParent(t *testing.T) {
+	require := require.New(t)
+
+	var (
+		activationTime = time.Unix(0, 0)
+		durangoTime    = activationTime
+	)
+	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+	proVM.Set(snowmantest.GenesisTimestamp)
+	defer func() {
+		require.NoError(proVM.Shutdown(context.Background()))
+	}()
+
+	xTestBlock := snowmantest.BuildChild(snowmantest.Genesis)
+	xBlock := &TestOptionsBlock{
+		Block: *xTestBlock,
+		opts: [2]*snowmantest.Block{
+			snowmantest.BuildChild(xTestBlock),
+			snowmantest.BuildChild(xTestBlock),
+		},
+	}
+
+	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
+		return xBlock, nil
+	}
+	coreVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
+		switch blkID {
+		case snowmantest.GenesisID:
+			return snowmantest.Genesis, nil
+		case xBlock.ID():
+			return xBlock, nil
+		case xBlock.opts[0].ID():
+			return xBlock.opts[0], nil
+		case xBlock.opts[1].ID():
+			return xBlock.opts[1], nil
+		default:
+			return nil, database.ErrNotFound
+		}
+	}
+	coreVM.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
+		switch {
+		case bytes.Equal(b, snowmantest.GenesisBytes):
+			return snowmantest.Genesis, nil
+		case bytes.Equal(b, xBlock.Bytes()):
+			return xBlock, nil
+		case bytes.Equal(b, xBlock.opts[0].Bytes()):
+			return xBlock.opts[0], nil
+		case bytes.Equal(b, xBlock.opts[1].Bytes()):
+			return xBlock.opts[1], nil
+		default:
+			return nil, errUnknownBlock
+		}
+	}
+
+	aBlockIntf, err := proVM.BuildBlock(context.Background())
+	require.NoError(err)
+
+	require.IsType(&postForkBlock{}, aBlockIntf)
+	aBlock := aBlockIntf.(*postForkBlock)
+	opts, err := aBlock.Options(context.Background())
+	require.NoError(err)
+
+	require.NoError(aBlock.Verify(context.Background()))
+	require.NoError(opts[0].Verify(context.Background()))
+	require.NoError(opts[1].Verify(context.Background()))
+
+	wrappedXBlock, err := proVM.ParseBlock(context.Background(), xBlock.Bytes())
+	require.NoError(err)
+
+	// This should never be invoked by the consensus engine. However, it is
+	// enforced to fail verification as a failsafe.
+	err = wrappedXBlock.Verify(context.Background())
+	require.ErrorIs(err, errUnexpectedBlockType)
+}
+
+// Ensure that a byzantine node issuing an invalid PostForkBlock (B) when the
+// parent block (X) is issued into a PostForkBlock (A) will be marked as invalid
+// correctly.
+//
+//	    G
+//	  / |
+//	A - X
+//	  / |
+//	B - Y
+func TestInvalidByzantineProposerPreForkParent(t *testing.T) {
+	require := require.New(t)
+
+	var (
+		activationTime = time.Unix(0, 0)
+		durangoTime    = activationTime
+	)
+	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+	defer func() {
+		require.NoError(proVM.Shutdown(context.Background()))
+	}()
+
+	xBlock := snowmantest.BuildChild(snowmantest.Genesis)
+	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
+		return xBlock, nil
+	}
+
+	yBlock := snowmantest.BuildChild(xBlock)
+	coreVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
+		switch blkID {
+		case snowmantest.GenesisID:
+			return snowmantest.Genesis, nil
+		case xBlock.ID():
+			return xBlock, nil
+		case yBlock.ID():
+			return yBlock, nil
+		default:
+			return nil, errUnknownBlock
+		}
+	}
+	coreVM.ParseBlockF = func(_ context.Context, blockBytes []byte) (snowman.Block, error) {
+		switch {
+		case bytes.Equal(blockBytes, snowmantest.GenesisBytes):
+			return snowmantest.Genesis, nil
+		case bytes.Equal(blockBytes, xBlock.Bytes()):
+			return xBlock, nil
+		case bytes.Equal(blockBytes, yBlock.Bytes()):
+			return yBlock, nil
+		default:
+			return nil, errUnknownBlock
+		}
+	}
+
+	aBlock, err := proVM.BuildBlock(context.Background())
+	require.NoError(err)
+	coreVM.BuildBlockF = nil
+
+	require.NoError(aBlock.Verify(context.Background()))
+
+	wrappedXBlock, err := proVM.ParseBlock(context.Background(), xBlock.Bytes())
+	require.NoError(err)
+
+	// This should never be invoked by the consensus engine. However, it is
+	// enforced to fail verification as a failsafe.
+	err = wrappedXBlock.Verify(context.Background())
+	require.ErrorIs(err, errUnexpectedBlockType)
+}
+
 // Ensure that a byzantine node issuing an invalid OptionBlock (B) which
 // contains core block (Y) whose parent (G) doesn't match (B)'s parent (A)'s
 // inner block (X) will be marked as invalid correctly.
