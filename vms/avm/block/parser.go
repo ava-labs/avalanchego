@@ -4,10 +4,10 @@
 package block
 
 import (
+	"errors"
 	"reflect"
 
 	"github.com/ava-labs/avalanchego/codec"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
@@ -38,7 +38,7 @@ func NewParser(fxs []fxs.Fx) (Parser, error) {
 	c := p.CodecRegistry()
 	gc := p.GenesisCodecRegistry()
 
-	err = utils.Err(
+	err = errors.Join(
 		c.RegisterType(&StandardBlock{}),
 		gc.RegisterType(&StandardBlock{}),
 	)
@@ -60,7 +60,7 @@ func NewCustomParser(
 	c := p.CodecRegistry()
 	gc := p.GenesisCodecRegistry()
 
-	err = utils.Err(
+	err = errors.Join(
 		c.RegisterType(&StandardBlock{}),
 		gc.RegisterType(&StandardBlock{}),
 	)

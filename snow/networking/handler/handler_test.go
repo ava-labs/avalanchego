@@ -114,7 +114,7 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 
 	nodeID := ids.EmptyNodeID
 	reqID := uint32(1)
-	chainID := ids.ID{}
+	chainID := ids.Empty
 	msg := Message{
 		InboundMessage: message.InboundGetAcceptedFrontier(chainID, reqID, 0*time.Second, nodeID),
 		EngineType:     p2ppb.EngineType_ENGINE_TYPE_UNSPECIFIED,
@@ -237,7 +237,7 @@ func TestHandlerClosesOnError(t *testing.T) {
 	reqID := uint32(1)
 	deadline := time.Nanosecond
 	msg := Message{
-		InboundMessage: message.InboundGetAcceptedFrontier(ids.ID{}, reqID, deadline, nodeID),
+		InboundMessage: message.InboundGetAcceptedFrontier(ids.Empty, reqID, deadline, nodeID),
 		EngineType:     p2ppb.EngineType_ENGINE_TYPE_UNSPECIFIED,
 	}
 	handler.Push(context.Background(), msg)

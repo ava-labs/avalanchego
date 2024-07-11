@@ -29,7 +29,7 @@ func (c *Client) Lookup(alias string) (ids.ID, error) {
 		Alias: alias,
 	})
 	if err != nil {
-		return ids.ID{}, err
+		return ids.Empty, err
 	}
 	return ids.ToID(resp.Id)
 }
