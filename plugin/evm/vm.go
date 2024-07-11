@@ -937,20 +937,21 @@ func (vm *VM) VerifyHeightIndex(context.Context) error {
 	return nil
 }
 
-// GetBlockAtHeight returns the canonical block at [blkHeight].
-// If [blkHeight] is less than the height of the last accepted block, this will return
-// the block accepted at that height. Otherwise, it may return a blkID that has not yet
-// been accepted.
-// Note: the engine assumes that if a block is not found at [blkHeight], then
-// [database.ErrNotFound] will be returned. This indicates that the VM has state synced
-// and does not have all historical blocks available.
-func (vm *VM) GetBlockIDAtHeight(_ context.Context, blkHeight uint64) (ids.ID, error) {
-	ethBlock := vm.blockChain.GetBlockByNumber(blkHeight)
-	if ethBlock == nil {
+// GetBlockAtHeight returns the canonical block at [height].
+// Note: the engine assumes that if a block is not found at [height], then
+// [database.ErrNotFound] will be returned. This indicates that the VM has state
+// synced and does not have all historical blocks available.
+func (vm *VM) GetBlockIDAtHeight(_ context.Context, height uint64) (ids.ID, error) {
+	lastAcceptedBlock := vm.LastAcceptedBlock()
+	if lastAcceptedBlock.Height() < height {
 		return ids.ID{}, database.ErrNotFound
 	}
 
-	return ids.ID(ethBlock.Hash()), nil
+	hash := vm.blockChain.GetCanonicalHash(height)
+	if hash == (common.Hash{}) {
+		return ids.ID{}, database.ErrNotFound
+	}
+	return ids.ID(hash), nil
 }
 
 func (vm *VM) Version(context.Context) (string, error) {

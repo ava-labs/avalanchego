@@ -1004,6 +1004,10 @@ func TestNonCanonicalAccept(t *testing.T) {
 		t.Fatalf("Expected status of built block to be %s, but found %s", choices.Processing, status)
 	}
 
+	if _, err := vm1.GetBlockIDAtHeight(context.Background(), vm1BlkA.Height()); err != database.ErrNotFound {
+		t.Fatalf("Expected unaccepted block not to be indexed by height, but found %s", err)
+	}
+
 	if err := vm1.SetPreference(context.Background(), vm1BlkA.ID()); err != nil {
 		t.Fatal(err)
 	}
@@ -1018,6 +1022,9 @@ func TestNonCanonicalAccept(t *testing.T) {
 	if status := vm2BlkA.Status(); status != choices.Processing {
 		t.Fatalf("Expected status of block on VM2 to be %s, but found %s", choices.Processing, status)
 	}
+	if _, err := vm2.GetBlockIDAtHeight(context.Background(), vm2BlkA.Height()); err != database.ErrNotFound {
+		t.Fatalf("Expected unaccepted block not to be indexed by height, but found %s", err)
+	}
 	if err := vm2.SetPreference(context.Background(), vm2BlkA.ID()); err != nil {
 		t.Fatal(err)
 	}
@@ -1025,8 +1032,18 @@ func TestNonCanonicalAccept(t *testing.T) {
 	if err := vm1BlkA.Accept(context.Background()); err != nil {
 		t.Fatalf("VM1 failed to accept block: %s", err)
 	}
+	if blkID, err := vm1.GetBlockIDAtHeight(context.Background(), vm1BlkA.Height()); err != nil {
+		t.Fatalf("Height lookuped failed on accepted block: %s", err)
+	} else if blkID != vm1BlkA.ID() {
+		t.Fatalf("Expected accepted block to be indexed by height, but found %s", blkID)
+	}
 	if err := vm2BlkA.Accept(context.Background()); err != nil {
 		t.Fatalf("VM2 failed to accept block: %s", err)
+	}
+	if blkID, err := vm2.GetBlockIDAtHeight(context.Background(), vm2BlkA.Height()); err != nil {
+		t.Fatalf("Height lookuped failed on accepted block: %s", err)
+	} else if blkID != vm2BlkA.ID() {
+		t.Fatalf("Expected accepted block to be indexed by height, but found %s", blkID)
 	}
 
 	newHead := <-newTxPoolHeadChan1
@@ -1075,6 +1092,10 @@ func TestNonCanonicalAccept(t *testing.T) {
 		t.Fatalf("Expected status of built block to be %s, but found %s", choices.Processing, status)
 	}
 
+	if _, err := vm1.GetBlockIDAtHeight(context.Background(), vm1BlkB.Height()); err != database.ErrNotFound {
+		t.Fatalf("Expected unaccepted block not to be indexed by height, but found %s", err)
+	}
+
 	if err := vm1.SetPreference(context.Background(), vm1BlkB.ID()); err != nil {
 		t.Fatal(err)
 	}
@@ -1107,8 +1128,18 @@ func TestNonCanonicalAccept(t *testing.T) {
 		t.Fatalf("Block failed verification on VM1: %s", err)
 	}
 
+	if _, err := vm1.GetBlockIDAtHeight(context.Background(), vm1BlkC.Height()); err != database.ErrNotFound {
+		t.Fatalf("Expected unaccepted block not to be indexed by height, but found %s", err)
+	}
+
 	if err := vm1BlkC.Accept(context.Background()); err != nil {
 		t.Fatalf("VM1 failed to accept block: %s", err)
+	}
+
+	if blkID, err := vm1.GetBlockIDAtHeight(context.Background(), vm1BlkC.Height()); err != nil {
+		t.Fatalf("Height lookuped failed on accepted block: %s", err)
+	} else if blkID != vm1BlkC.ID() {
+		t.Fatalf("Expected accepted block to be indexed by height, but found %s", blkID)
 	}
 
 	blkCHash := vm1BlkC.(*chain.BlockWrapper).Block.(*Block).ethBlock.Hash()
