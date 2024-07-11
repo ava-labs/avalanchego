@@ -17,8 +17,8 @@ func MakeLastAcceptedBlockF(blks ...[]*Block) func(context.Context) (ids.ID, err
 			highestHeight uint64
 			highestID     ids.ID
 		)
-		for _, blks := range blks {
-			for _, blk := range blks {
+		for _, blkSlice := range blks {
+			for _, blk := range blkSlice {
 				if blk.Status != snowtest.Accepted {
 					continue
 				}
@@ -35,8 +35,8 @@ func MakeLastAcceptedBlockF(blks ...[]*Block) func(context.Context) (ids.ID, err
 
 func MakeGetBlockIDAtHeightF(blks ...[]*Block) func(context.Context, uint64) (ids.ID, error) {
 	return func(_ context.Context, height uint64) (ids.ID, error) {
-		for _, blks := range blks {
-			for _, blk := range blks {
+		for _, blkSlice := range blks {
+			for _, blk := range blkSlice {
 				if blk.Status != snowtest.Accepted {
 					continue
 				}
