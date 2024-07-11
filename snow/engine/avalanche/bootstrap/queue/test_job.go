@@ -1,6 +1,8 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
+//go:build test
+
 package queue
 
 import (
@@ -51,7 +53,7 @@ func (j *TestJob) ID() ids.ID {
 	if j.CantID && j.T != nil {
 		require.FailNow(j.T, "Unexpectedly called ID")
 	}
-	return ids.ID{}
+	return ids.Empty
 }
 
 func (j *TestJob) MissingDependencies(ctx context.Context) (set.Set[ids.ID], error) {

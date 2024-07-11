@@ -66,17 +66,17 @@ func (a *addressManager) ParseLocalAddress(addrStr string) (ids.ShortID, error) 
 func (a *addressManager) ParseAddress(addrStr string) (ids.ID, ids.ShortID, error) {
 	chainIDAlias, hrp, addrBytes, err := address.Parse(addrStr)
 	if err != nil {
-		return ids.ID{}, ids.ShortID{}, err
+		return ids.Empty, ids.ShortID{}, err
 	}
 
 	chainID, err := a.ctx.BCLookup.Lookup(chainIDAlias)
 	if err != nil {
-		return ids.ID{}, ids.ShortID{}, err
+		return ids.Empty, ids.ShortID{}, err
 	}
 
 	expectedHRP := constants.GetHRP(a.ctx.NetworkID)
 	if hrp != expectedHRP {
-		return ids.ID{}, ids.ShortID{}, fmt.Errorf(
+		return ids.Empty, ids.ShortID{}, fmt.Errorf(
 			"expected hrp %q but got %q",
 			expectedHRP,
 			hrp,
@@ -85,7 +85,7 @@ func (a *addressManager) ParseAddress(addrStr string) (ids.ID, ids.ShortID, erro
 
 	addr, err := ids.ToShortID(addrBytes)
 	if err != nil {
-		return ids.ID{}, ids.ShortID{}, err
+		return ids.Empty, ids.ShortID{}, err
 	}
 	return chainID, addr, nil
 }
