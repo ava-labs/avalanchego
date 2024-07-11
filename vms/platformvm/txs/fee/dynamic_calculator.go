@@ -63,15 +63,9 @@ func (c *dynamicCalculator) CalculateFee(tx *txs.Tx) (uint64, error) {
 }
 
 func (c *dynamicCalculator) AddFeesFor(complexity fee.Dimensions) (uint64, error) {
-	if complexity == fee.Empty {
-		return 0, nil
-	}
-	if err := c.fc.CumulateComplexity(complexity); err != nil {
-		return 0, fmt.Errorf("failed cumulating complexity: %w", err)
-	}
-	fee, err := c.fc.GetLatestTxFee()
+	fee, err := c.fc.AddFeesFor(complexity)
 	if err != nil {
-		return 0, fmt.Errorf("%w: %w", errFailedFeeCalculation, err)
+		return 0, fmt.Errorf("failed cumulating complexity: %w", err)
 	}
 
 	extraFee := fee - c.fee
@@ -80,15 +74,9 @@ func (c *dynamicCalculator) AddFeesFor(complexity fee.Dimensions) (uint64, error
 }
 
 func (c *dynamicCalculator) RemoveFeesFor(unitsToRm fee.Dimensions) (uint64, error) {
-	if unitsToRm == fee.Empty {
-		return 0, nil
-	}
-	if err := c.fc.RemoveComplexity(unitsToRm); err != nil {
-		return 0, fmt.Errorf("failed removing units: %w", err)
-	}
-	fee, err := c.fc.GetLatestTxFee()
+	fee, err := c.fc.RemoveFeesFor(unitsToRm)
 	if err != nil {
-		return 0, fmt.Errorf("%w: %w", errFailedFeeCalculation, err)
+		return 0, fmt.Errorf("failed removing complexity: %w", err)
 	}
 
 	removedFee := c.fee - fee

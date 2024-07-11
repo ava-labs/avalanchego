@@ -25,6 +25,38 @@ var (
 	testGasCap = Gas(math.MaxUint64)
 )
 
+func TestAddAndRemoveFees(t *testing.T) {
+	r := require.New(t)
+
+	var (
+		fc = NewCalculator(testDynamicFeeCfg.FeeDimensionWeights, testDynamicFeeCfg.MinGasPrice, testGasCap)
+
+		complexity = Dimensions{1, 2, 3, 4}
+	)
+
+	fee0, err := fc.GetLatestTxFee()
+	r.NoError(err)
+	r.Zero(fee0)
+	r.NoError(fc.DoneWithLatestTx())
+	gas, err := fc.GetBlockGas()
+	r.NoError(err)
+	r.Zero(gas)
+
+	fee1, err := fc.AddFeesFor(complexity)
+	r.NoError(err)
+	r.Greater(fee1, fee0)
+	gas, err = fc.GetBlockGas()
+	r.NoError(err)
+	r.NotZero(gas)
+
+	rFee, err := fc.RemoveFeesFor(complexity)
+	r.NoError(err)
+	r.Equal(rFee, fee0)
+	gas, err = fc.GetBlockGas()
+	r.NoError(err)
+	r.Zero(gas)
+}
+
 func TestUpdateGasPrice(t *testing.T) {
 	require := require.New(t)
 
@@ -157,8 +189,7 @@ func TestPChainGasPriceIncreaseDueToPeak(t *testing.T) {
 		)
 
 		// at peak the total fee should be no more than 100 Avax.
-		require.NoError(m.CumulateComplexity(childBlkData.complexity))
-		fee, err := m.GetLatestTxFee()
+		fee, err := m.AddFeesFor(childBlkData.complexity)
 		require.NoError(err)
 		require.Less(fee, 100*units.Avax, fmt.Sprintf("iteration: %d, total: %d", i, len(blockComplexities)))
 

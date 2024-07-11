@@ -111,36 +111,45 @@ func (c *Calculator) GetExcessGas() (Gas, error) {
 	return Gas(g), nil
 }
 
-// CumulateComplexity tries to cumulate the consumed gas [units]. Before
-// actually cumulating it, it checks whether the result would breach [bounds].
-// If so, it returns the first dimension to breach bounds.
-func (c *Calculator) CumulateComplexity(complexity Dimensions) error {
+// AddFeesFor updates latest tx complexity. It should be called once when tx is being verified
+// and may be called multiple times when tx is being built (and tx components are added in time).
+// AddFeesFor checks that gas cap is not breached. It also returns the updated tx fee for convenience.
+func (c *Calculator) AddFeesFor(complexity Dimensions) (uint64, error) {
+	if complexity == Empty {
+		return c.GetLatestTxFee()
+	}
+
 	// Ensure we can consume (don't want partial update of values)
 	uc, err := Add(c.latestTxComplexity, complexity)
 	if err != nil {
-		return fmt.Errorf("%w: %w", errGasBoundBreached, err)
+		return 0, fmt.Errorf("%w: %w", errGasBoundBreached, err)
 	}
+	c.latestTxComplexity = uc
+
 	totalGas, err := c.GetBlockGas()
 	if err != nil {
-		return fmt.Errorf("%w: %w", errGasBoundBreached, err)
+		return 0, fmt.Errorf("%w: %w", errGasBoundBreached, err)
 	}
 	if totalGas > c.gasCap {
-		return fmt.Errorf("%w: %w", errGasBoundBreached, err)
+		return 0, fmt.Errorf("%w: %w", errGasBoundBreached, err)
 	}
 
-	c.latestTxComplexity = uc
-	return nil
+	return c.GetLatestTxFee()
 }
 
 // Sometimes, e.g. while building a tx, we'd like freedom to speculatively add complexity
-// and to remove it later on. [RemoveGas] grants this freedom
-func (c *Calculator) RemoveComplexity(complexity Dimensions) error {
+// and to remove it later on. [RemoveFeesFor] grants this freedom
+func (c *Calculator) RemoveFeesFor(complexity Dimensions) (uint64, error) {
+	if complexity == Empty {
+		return c.GetLatestTxFee()
+	}
+
 	rc, err := Remove(c.latestTxComplexity, complexity)
 	if err != nil {
-		return fmt.Errorf("%w: current Gas %d, gas to revert %d", err, c.cumulatedGas, complexity)
+		return 0, fmt.Errorf("%w: current Gas %d, gas to revert %d", err, c.cumulatedGas, complexity)
 	}
 	c.latestTxComplexity = rc
-	return nil
+	return c.GetLatestTxFee()
 }
 
 // DoneWithLatestTx should be invoked one a tx has been fully processed, before moving to the next one
