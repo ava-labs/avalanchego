@@ -48,9 +48,10 @@ const (
 )
 
 var (
-	_ block.ChainVM         = (*VM)(nil)
-	_ block.BatchedChainVM  = (*VM)(nil)
-	_ block.StateSyncableVM = (*VM)(nil)
+	_ block.ChainVM                = (*VM)(nil)
+	_ block.BatchedChainVM         = (*VM)(nil)
+	_ block.StateSyncableVM        = (*VM)(nil)
+	_ block.GetInitialPreferenceVM = (*VM)(nil)
 
 	dbPrefix = []byte("proposervm")
 )
@@ -85,11 +86,12 @@ type VM struct {
 	// Only contains post-fork blocks near the tip so that the cache doesn't get
 	// filled with random blocks every time this node parses blocks while
 	// processing a GetAncestors message from a bootstrapping node.
-	innerBlkCache  cache.Cacher[ids.ID, snowman.Block]
-	preferred      ids.ID
-	consensusState snow.State
-	context        context.Context
-	onShutdown     func()
+	innerBlkCache     cache.Cacher[ids.ID, snowman.Block]
+	preferred         ids.ID
+	initialPreference ids.ID
+	consensusState    snow.State
+	context           context.Context
+	onShutdown        func()
 
 	// lastAcceptedTime is set to the last accepted PostForkBlock's timestamp
 	// if the last accepted block has been a PostForkOption block since having
@@ -187,6 +189,22 @@ func (vm *VM) Initialize(
 	if err != nil {
 		return err
 	}
+
+	initialPreference, err := vm.State.GetPreference()
+	if errors.Is(err, database.ErrNotFound) {
+		// If we don't have a previous accepted tip then default to the last
+		// accepted block
+		// TODO only perform one lookup for the last accepted block in
+		// Initialize
+		initialPreference, err = vm.LastAccepted(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to get last accepted block: %w", err)
+		}
+	} else if err != nil {
+		return fmt.Errorf("failed to get last preference: %w", err)
+	}
+
+	vm.initialPreference = initialPreference
 
 	if err := vm.repairAcceptedChainByHeight(ctx); err != nil {
 		return err
@@ -297,6 +315,10 @@ func (vm *VM) GetBlock(ctx context.Context, id ids.ID) (snowman.Block, error) {
 	return vm.getBlock(ctx, id)
 }
 
+func (vm *VM) GetInitialPreference(context.Context) (ids.ID, error) {
+	return vm.initialPreference, nil
+}
+
 func (vm *VM) SetPreference(ctx context.Context, preferred ids.ID) error {
 	if vm.preferred == preferred {
 		return nil
@@ -305,7 +327,52 @@ func (vm *VM) SetPreference(ctx context.Context, preferred ids.ID) error {
 
 	blk, err := vm.getPostForkBlock(ctx, preferred)
 	if err != nil {
-		return vm.ChainVM.SetPreference(ctx, preferred)
+		// This is before the ProposerVM fork
+		if err := vm.ChainVM.SetPreference(ctx, preferred); err != nil {
+			return err
+		}
+
+		return vm.db.Commit()
+	}
+
+	// Persist consensus preferences if the ProposerVM fork is activated.
+	if err := vm.State.SetPreference(preferred); err != nil {
+		return err
+	}
+
+	// If this is an option block, we need to update our persisted preference
+	optionBlk, ok := blk.(*postForkOption)
+	if ok {
+		// If we prefer an option block, we need to delete its sibling from the
+		// processing block index
+		parentBlk, err := vm.getPostForkBlock(ctx, optionBlk.ParentID())
+		if err != nil {
+			return fmt.Errorf("failed to get parent block: %w", err)
+		}
+
+		oracleBlk, ok := parentBlk.(*postForkBlock)
+		if !ok {
+			return fmt.Errorf(
+				"parent %s of option block %s is not an oracle block",
+				optionBlk.ParentID(),
+				optionBlk.ID(),
+			)
+		}
+
+		siblingOptionBlk, err := getSiblingOption(ctx, optionBlk.ID(), oracleBlk)
+		if err != nil {
+			return err
+		}
+
+		// Remove our sibling from the index and insert the newly preferred
+		// option
+		if err := vm.State.DeleteProcessingBlock(siblingOptionBlk.ID()); err != nil {
+			return err
+		}
+
+		if err := vm.State.PutProcessingBlock(optionBlk.ID()); err != nil {
+			return err
+		}
 	}
 
 	if err := vm.ChainVM.SetPreference(ctx, blk.getInnerBlk().ID()); err != nil {
@@ -354,12 +421,33 @@ func (vm *VM) SetPreference(ctx context.Context, preferred ids.ID) error {
 	}
 	vm.Scheduler.SetBuildBlockTime(nextStartTime)
 
+	if err := vm.db.Commit(); err != nil {
+		return err
+	}
+
 	vm.ctx.Log.Debug("set preference",
 		zap.Stringer("blkID", blk.ID()),
 		zap.Time("blockTimestamp", parentTimestamp),
 		zap.Time("nextStartTime", nextStartTime),
 	)
 	return nil
+}
+
+func getSiblingOption(
+	ctx context.Context,
+	blkID ids.ID,
+	block snowman.OracleBlock,
+) (snowman.Block, error) {
+	options, err := block.Options(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if blkID == options[0].ID() {
+		return options[1], nil
+	}
+
+	return options[0], nil
 }
 
 func (vm *VM) getPreDurangoSlotTime(
@@ -552,6 +640,7 @@ func (vm *VM) parsePostForkBlock(ctx context.Context, b []byte) (PostForkBlock, 
 			SignedBlock: statelessSignedBlock,
 			postForkCommonComponents: postForkCommonComponents{
 				vm:       vm,
+				outerBlk: statelessSignedBlock,
 				innerBlk: innerBlk,
 				status:   choices.Processing,
 			},
@@ -561,6 +650,7 @@ func (vm *VM) parsePostForkBlock(ctx context.Context, b []byte) (PostForkBlock, 
 			Block: statelessBlock,
 			postForkCommonComponents: postForkCommonComponents{
 				vm:       vm,
+				outerBlk: statelessSignedBlock,
 				innerBlk: innerBlk,
 				status:   choices.Processing,
 			},
@@ -606,6 +696,7 @@ func (vm *VM) getPostForkBlock(ctx context.Context, blkID ids.ID) (PostForkBlock
 			SignedBlock: statelessSignedBlock,
 			postForkCommonComponents: postForkCommonComponents{
 				vm:       vm,
+				outerBlk: statelessSignedBlock,
 				innerBlk: innerBlk,
 				status:   status,
 			},
@@ -615,6 +706,7 @@ func (vm *VM) getPostForkBlock(ctx context.Context, blkID ids.ID) (PostForkBlock
 		Block: statelessBlock,
 		postForkCommonComponents: postForkCommonComponents{
 			vm:       vm,
+			outerBlk: statelessBlock,
 			innerBlk: innerBlk,
 			status:   status,
 		},
@@ -641,6 +733,9 @@ func (vm *VM) acceptPostForkBlock(blk PostForkBlock) error {
 		return err
 	}
 	if err := vm.State.PutBlock(blk.getStatelessBlk(), choices.Accepted); err != nil {
+		return err
+	}
+	if err := vm.State.DeleteProcessingBlock(blkID); err != nil {
 		return err
 	}
 	if err := vm.updateHeightIndex(height, blkID); err != nil {
@@ -690,6 +785,18 @@ func (vm *VM) verifyAndRecordInnerBlk(ctx context.Context, blockCtx *block.Conte
 		err = innerBlk.Verify(ctx)
 	}
 	if err != nil {
+		return err
+	}
+
+	if err := vm.State.PutProcessingBlock(postFork.ID()); err != nil {
+		return err
+	}
+
+	if err := vm.State.PutBlock(postFork.getStatelessBlk(), choices.Processing); err != nil {
+		return err
+	}
+
+	if err := vm.db.Commit(); err != nil {
 		return err
 	}
 

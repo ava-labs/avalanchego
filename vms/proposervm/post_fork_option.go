@@ -51,15 +51,6 @@ func (b *postForkOption) acceptInnerBlk(ctx context.Context) error {
 	return b.vm.Tree.Accept(ctx, b.innerBlk)
 }
 
-func (b *postForkOption) Reject(context.Context) error {
-	// we do not reject the inner block here because that block may be contained
-	// in the proposer block that causing this block to be rejected.
-
-	delete(b.vm.verifiedBlocks, b.ID())
-	b.status = choices.Rejected
-	return nil
-}
-
 func (b *postForkOption) Status() choices.Status {
 	if b.status == choices.Accepted && b.Height() > b.vm.lastAcceptedHeight {
 		return choices.Processing
