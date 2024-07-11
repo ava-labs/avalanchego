@@ -19,9 +19,9 @@ var (
 
 	eUpgradeDynamicFeesConfig = commonfee.DynamicFeesConfig{
 		MinGasPrice:         commonfee.GasPrice(10 * units.NanoAvax),
-		UpdateDenominator:   commonfee.Gas(50_000),
-		GasTargetRate:       commonfee.Gas(250),
-		FeeDimensionWeights: commonfee.Dimensions{1, 1, 1, 1},
+		UpdateDenominator:   commonfee.Gas(100_000),
+		GasTargetRate:       commonfee.Gas(2_500),
+		FeeDimensionWeights: commonfee.Dimensions{6, 10, 10, 1},
 		MaxGasPerSecond:     commonfee.Gas(1_000_000),
 		LeakGasCoeff:        commonfee.Gas(1),
 	}

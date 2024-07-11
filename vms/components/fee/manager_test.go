@@ -16,11 +16,11 @@ import (
 
 var (
 	testDynamicFeeCfg = DynamicFeesConfig{
-		MinGasPrice:       GasPrice(60 * units.NanoAvax),
-		UpdateDenominator: Gas(50_000),
-		GasTargetRate:     Gas(250),
+		MinGasPrice:       GasPrice(10 * units.NanoAvax),
+		UpdateDenominator: Gas(100_000),
+		GasTargetRate:     Gas(2_500),
 
-		FeeDimensionWeights: Dimensions{1, 1, 1, 1},
+		FeeDimensionWeights: Dimensions{6, 10, 10, 1},
 	}
 	testGasCap = Gas(math.MaxUint64)
 )
@@ -30,7 +30,7 @@ func TestUpdateGasPrice(t *testing.T) {
 
 	var (
 		parentGasPrice = GasPrice(10)
-		excessGas      = Gas(300)
+		excessGas      = Gas(15_000)
 
 		elapsedTime   = time.Second
 		parentBlkTime = time.Now().Truncate(time.Second)
@@ -112,28 +112,28 @@ func TestPChainGasPriceIncreaseDueToPeak(t *testing.T) {
 		{1615237936, Dimensions{34064, 13056, 13056, 128000}},
 		{1615237936, Dimensions{34064, 13056, 13056, 128000}},
 		{1615237936, Dimensions{34064, 13056, 13056, 128000}},
-		// {1615237936, Dimensions{820, 360, 442, 4000}},
-		// {1615237936, Dimensions{34064, 13056, 13056, 128000}},
-		// {1615237936, Dimensions{34064, 13056, 13056, 128000}},
-		// {1615237936, Dimensions{34064, 13056, 13056, 128000}},
-		// {1615237936, Dimensions{34064, 13056, 13056, 128000}},
-		// {1615237936, Dimensions{34064, 13056, 13056, 128000}},
-		// {1615237936, Dimensions{34064, 13056, 13056, 128000}},
-		// {1615237936, Dimensions{34064, 13056, 13056, 128000}},
-		// {1615237936, Dimensions{34064, 13056, 13056, 128000}},
-		// {1615237936, Dimensions{3589, 1326, 1326, 13000}},
-		// {1615237936, Dimensions{550, 180, 180, 2000}},
-		// {1615237936, Dimensions{413, 102, 102, 1000}},
+		{1615237936, Dimensions{820, 360, 442, 4000}},
+		{1615237936, Dimensions{34064, 13056, 13056, 128000}},
+		{1615237936, Dimensions{34064, 13056, 13056, 128000}},
+		{1615237936, Dimensions{34064, 13056, 13056, 128000}},
+		{1615237936, Dimensions{34064, 13056, 13056, 128000}},
+		{1615237936, Dimensions{34064, 13056, 13056, 128000}},
+		{1615237936, Dimensions{34064, 13056, 13056, 128000}},
+		{1615237936, Dimensions{34064, 13056, 13056, 128000}},
+		{1615237936, Dimensions{34064, 13056, 13056, 128000}},
+		{1615237936, Dimensions{3589, 1326, 1326, 13000}},
+		{1615237936, Dimensions{550, 180, 180, 2000}},
+		{1615237936, Dimensions{413, 102, 102, 1000}},
 	}
 
 	// PEAK INCOMING
 	peakGasPrice := testDynamicFeeCfg.MinGasPrice
+	excessGas, err := ToGas(testDynamicFeeCfg.FeeDimensionWeights, blockComplexities[0].complexity)
+	require.NoError(err)
+
 	for i := 1; i < len(blockComplexities); i++ {
 		parentBlkData := blockComplexities[i-1]
 		childBlkData := blockComplexities[i]
-
-		excessGas, err := ToGas(testDynamicFeeCfg.FeeDimensionWeights, parentBlkData.complexity)
-		require.NoError(err)
 
 		m, err := NewUpdatedManager(
 			testDynamicFeeCfg,
@@ -145,12 +145,13 @@ func TestPChainGasPriceIncreaseDueToPeak(t *testing.T) {
 		require.NoError(err)
 
 		// check that gas price is strictly above minimal
-		require.Greater(m.GetGasPrice(), testDynamicFeeCfg.MinGasPrice,
-			fmt.Sprintf("failed at %d of %d iteration, \n curr gas price %v \n next gas price %v",
+		require.Greater(m.GetGasPrice(), peakGasPrice,
+			fmt.Sprintf("failed at %d of %d iteration, \n curr gas price %v \n next gas price %v \n dimensions %v",
 				i,
 				len(blockComplexities),
 				peakGasPrice,
 				m.GetGasPrice(),
+				childBlkData,
 			),
 		)
 
@@ -160,6 +161,8 @@ func TestPChainGasPriceIncreaseDueToPeak(t *testing.T) {
 		require.NoError(err)
 		require.Less(fee, 100*units.Avax, fmt.Sprintf("iteration: %d, total: %d", i, len(blockComplexities)))
 		require.NoError(m.DoneWithLatestTx())
+		excessGas, err = m.GetExcessGas()
+		require.NoError(err)
 
 		peakGasPrice = m.GetGasPrice()
 	}
