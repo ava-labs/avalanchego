@@ -12,6 +12,7 @@ import (
 var (
 	errZeroLeakGasCoeff     = errors.New("zero leak gas coefficient")
 	errZerUpdateDenominator = errors.New("update denominator cannot be zero")
+	errUnexpectedBlockTimes = errors.New("unexpected block times")
 )
 
 type DynamicFeesConfig struct {
@@ -31,8 +32,8 @@ type DynamicFeesConfig struct {
 	FeeDimensionWeights Dimensions `json:"fee-dimension-weights"`
 
 	// Leaky bucket parameters to calculate gas cap
-	MaxGasPerSecond Gas
-	LeakGasCoeff    Gas // techically the unit of measure if sec^{-1}, but picking Gas reduces casts needed
+	MaxGasPerSecond Gas // techically the unit of measure is Gas/sec, but picking Gas reduces casts needed
+	LeakGasCoeff    Gas // techically the unit of measure is sec^{-1}, but picking Gas reduces casts needed
 }
 
 func (c *DynamicFeesConfig) Validate() error {
@@ -51,7 +52,7 @@ func (c *DynamicFeesConfig) Validate() error {
 // GasCap = min (GasCap + MaxGasPerSecond/LeakGasCoeff*ElapsedTime, MaxGasPerSecond)
 func GasCap(cfg DynamicFeesConfig, currentGasCapacity Gas, parentBlkTime, childBlkTime time.Time) (Gas, error) {
 	if parentBlkTime.Compare(childBlkTime) > 0 {
-		return ZeroGas, fmt.Errorf("unexpected block times, parentBlkTim %v, childBlkTime %v", parentBlkTime, childBlkTime)
+		return ZeroGas, fmt.Errorf("%w, parentBlkTim %v, childBlkTime %v", errUnexpectedBlockTimes, parentBlkTime, childBlkTime)
 	}
 
 	elapsedTime := uint64(childBlkTime.Unix() - parentBlkTime.Unix())
