@@ -20,6 +20,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
+const Unknown snowtest.Status = -1
+
 var (
 	errCantBuildBlock       = errors.New("can't build new block")
 	errVerify               = errors.New("verify failed")
@@ -36,7 +38,7 @@ func NewTestBlock(i uint64, parentID ids.ID) *snowmantest.Block {
 	return &snowmantest.Block{
 		Decidable: snowtest.Decidable{
 			IDV:    id,
-			Status: -1,
+			Status: Unknown,
 		},
 		HeightV: i,
 		ParentV: parentID,
@@ -71,7 +73,7 @@ func createInternalBlockFuncs(blks []*snowmantest.Block) (
 
 	getBlock := func(_ context.Context, id ids.ID) (snowman.Block, error) {
 		blk, ok := blkMap[id]
-		if !ok || blk.Status < 0 {
+		if !ok || blk.Status == Unknown {
 			return nil, database.ErrNotFound
 		}
 
@@ -83,7 +85,7 @@ func createInternalBlockFuncs(blks []*snowmantest.Block) (
 		if !ok {
 			return nil, fmt.Errorf("%w: %x", errUnexpectedBlockBytes, b)
 		}
-		if blk.Status < 0 {
+		if blk.Status == Unknown {
 			blk.Status = snowtest.Undecided
 		}
 		blkMap[blk.ID()] = blk
