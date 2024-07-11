@@ -20,7 +20,11 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
-const Unknown snowtest.Status = -1
+const (
+	Unknown snowtest.Status = -1
+
+	defaultBlockCacheSize = 256
+)
 
 var (
 	errCantBuildBlock       = errors.New("can't build new block")
@@ -169,10 +173,10 @@ func TestState(t *testing.T) {
 
 	getBlock, parseBlock := createInternalBlockFuncs(testBlks)
 	chainState := NewState(&Config{
-		DecidedCacheSize:    256,
-		MissingCacheSize:    256,
-		UnverifiedCacheSize: 256,
-		BytesToIDCacheSize:  256,
+		DecidedCacheSize:    defaultBlockCacheSize,
+		MissingCacheSize:    defaultBlockCacheSize,
+		UnverifiedCacheSize: defaultBlockCacheSize,
+		BytesToIDCacheSize:  defaultBlockCacheSize,
 		LastAcceptedBlock:   genesisBlock,
 		GetBlock:            getBlock,
 		UnmarshalBlock:      parseBlock,
@@ -253,10 +257,10 @@ func TestBuildBlock(t *testing.T) {
 	}
 
 	chainState := NewState(&Config{
-		DecidedCacheSize:    256,
-		MissingCacheSize:    256,
-		UnverifiedCacheSize: 256,
-		BytesToIDCacheSize:  256,
+		DecidedCacheSize:    defaultBlockCacheSize,
+		MissingCacheSize:    defaultBlockCacheSize,
+		UnverifiedCacheSize: defaultBlockCacheSize,
+		BytesToIDCacheSize:  defaultBlockCacheSize,
 		LastAcceptedBlock:   genesisBlock,
 		GetBlock:            getBlock,
 		UnmarshalBlock:      parseBlock,
@@ -291,10 +295,10 @@ func TestStateDecideBlock(t *testing.T) {
 	badRejectBlk.RejectV = errReject
 	getBlock, parseBlock := createInternalBlockFuncs(testBlks)
 	chainState := NewState(&Config{
-		DecidedCacheSize:    256,
-		MissingCacheSize:    256,
-		UnverifiedCacheSize: 256,
-		BytesToIDCacheSize:  256,
+		DecidedCacheSize:    defaultBlockCacheSize,
+		MissingCacheSize:    defaultBlockCacheSize,
+		UnverifiedCacheSize: defaultBlockCacheSize,
+		BytesToIDCacheSize:  defaultBlockCacheSize,
 		LastAcceptedBlock:   genesisBlock,
 		GetBlock:            getBlock,
 		UnmarshalBlock:      parseBlock,
@@ -343,10 +347,10 @@ func TestStateParent(t *testing.T) {
 
 	getBlock, parseBlock := createInternalBlockFuncs(testBlks)
 	chainState := NewState(&Config{
-		DecidedCacheSize:    256,
-		MissingCacheSize:    256,
-		UnverifiedCacheSize: 256,
-		BytesToIDCacheSize:  256,
+		DecidedCacheSize:    defaultBlockCacheSize,
+		MissingCacheSize:    defaultBlockCacheSize,
+		UnverifiedCacheSize: defaultBlockCacheSize,
+		BytesToIDCacheSize:  defaultBlockCacheSize,
 		LastAcceptedBlock:   genesisBlock,
 		GetBlock:            getBlock,
 		UnmarshalBlock:      parseBlock,
@@ -383,10 +387,10 @@ func TestGetBlockInternal(t *testing.T) {
 
 	getBlock, parseBlock := createInternalBlockFuncs(testBlks)
 	chainState := NewState(&Config{
-		DecidedCacheSize:    256,
-		MissingCacheSize:    256,
-		UnverifiedCacheSize: 256,
-		BytesToIDCacheSize:  256,
+		DecidedCacheSize:    defaultBlockCacheSize,
+		MissingCacheSize:    defaultBlockCacheSize,
+		UnverifiedCacheSize: defaultBlockCacheSize,
+		BytesToIDCacheSize:  defaultBlockCacheSize,
 		LastAcceptedBlock:   genesisBlock,
 		GetBlock:            getBlock,
 		UnmarshalBlock:      parseBlock,
@@ -421,10 +425,10 @@ func TestGetBlockError(t *testing.T) {
 		return blk, nil
 	}
 	chainState := NewState(&Config{
-		DecidedCacheSize:    256,
-		MissingCacheSize:    256,
-		UnverifiedCacheSize: 256,
-		BytesToIDCacheSize:  256,
+		DecidedCacheSize:    defaultBlockCacheSize,
+		MissingCacheSize:    defaultBlockCacheSize,
+		UnverifiedCacheSize: defaultBlockCacheSize,
+		BytesToIDCacheSize:  defaultBlockCacheSize,
 		LastAcceptedBlock:   genesisBlock,
 		GetBlock:            wrappedGetBlock,
 		UnmarshalBlock:      parseBlock,
@@ -450,10 +454,10 @@ func TestParseBlockError(t *testing.T) {
 
 	getBlock, parseBlock := createInternalBlockFuncs(testBlks)
 	chainState := NewState(&Config{
-		DecidedCacheSize:    256,
-		MissingCacheSize:    256,
-		UnverifiedCacheSize: 256,
-		BytesToIDCacheSize:  256,
+		DecidedCacheSize:    defaultBlockCacheSize,
+		MissingCacheSize:    defaultBlockCacheSize,
+		UnverifiedCacheSize: defaultBlockCacheSize,
+		BytesToIDCacheSize:  defaultBlockCacheSize,
 		LastAcceptedBlock:   genesisBlock,
 		GetBlock:            getBlock,
 		UnmarshalBlock:      parseBlock,
@@ -471,10 +475,10 @@ func TestBuildBlockError(t *testing.T) {
 
 	getBlock, parseBlock := createInternalBlockFuncs(testBlks)
 	chainState := NewState(&Config{
-		DecidedCacheSize:    256,
-		MissingCacheSize:    256,
-		UnverifiedCacheSize: 256,
-		BytesToIDCacheSize:  256,
+		DecidedCacheSize:    defaultBlockCacheSize,
+		MissingCacheSize:    defaultBlockCacheSize,
+		UnverifiedCacheSize: defaultBlockCacheSize,
+		BytesToIDCacheSize:  defaultBlockCacheSize,
 		LastAcceptedBlock:   genesisBlock,
 		GetBlock:            getBlock,
 		UnmarshalBlock:      parseBlock,
@@ -496,10 +500,10 @@ func TestMeteredCache(t *testing.T) {
 
 	getBlock, parseBlock := createInternalBlockFuncs(testBlks)
 	config := &Config{
-		DecidedCacheSize:    256,
-		MissingCacheSize:    256,
-		UnverifiedCacheSize: 256,
-		BytesToIDCacheSize:  256,
+		DecidedCacheSize:    defaultBlockCacheSize,
+		MissingCacheSize:    defaultBlockCacheSize,
+		UnverifiedCacheSize: defaultBlockCacheSize,
+		BytesToIDCacheSize:  defaultBlockCacheSize,
 		LastAcceptedBlock:   genesisBlock,
 		GetBlock:            getBlock,
 		UnmarshalBlock:      parseBlock,
@@ -581,10 +585,10 @@ func TestSetLastAcceptedBlock(t *testing.T) {
 
 	getBlock, parseBlock := createInternalBlockFuncs(testBlks)
 	chainState := NewState(&Config{
-		DecidedCacheSize:    256,
-		MissingCacheSize:    256,
-		UnverifiedCacheSize: 256,
-		BytesToIDCacheSize:  256,
+		DecidedCacheSize:    defaultBlockCacheSize,
+		MissingCacheSize:    defaultBlockCacheSize,
+		UnverifiedCacheSize: defaultBlockCacheSize,
+		BytesToIDCacheSize:  defaultBlockCacheSize,
 		LastAcceptedBlock:   genesisBlock,
 		GetBlock:            getBlock,
 		UnmarshalBlock:      parseBlock,
@@ -631,10 +635,10 @@ func TestSetLastAcceptedBlockWithProcessingBlocksErrors(t *testing.T) {
 	}
 
 	chainState := NewState(&Config{
-		DecidedCacheSize:    256,
-		MissingCacheSize:    256,
-		UnverifiedCacheSize: 256,
-		BytesToIDCacheSize:  256,
+		DecidedCacheSize:    defaultBlockCacheSize,
+		MissingCacheSize:    defaultBlockCacheSize,
+		UnverifiedCacheSize: defaultBlockCacheSize,
+		BytesToIDCacheSize:  defaultBlockCacheSize,
 		LastAcceptedBlock:   genesisBlock,
 		GetBlock:            getBlock,
 		UnmarshalBlock:      parseBlock,
@@ -666,10 +670,10 @@ func TestStateParseTransitivelyAcceptedBlock(t *testing.T) {
 
 	getBlock, parseBlock := createInternalBlockFuncs(testBlks)
 	chainState := NewState(&Config{
-		DecidedCacheSize:    256,
-		MissingCacheSize:    256,
-		UnverifiedCacheSize: 256,
-		BytesToIDCacheSize:  256,
+		DecidedCacheSize:    defaultBlockCacheSize,
+		MissingCacheSize:    defaultBlockCacheSize,
+		UnverifiedCacheSize: defaultBlockCacheSize,
+		BytesToIDCacheSize:  defaultBlockCacheSize,
 		LastAcceptedBlock:   blk2,
 		GetBlock:            getBlock,
 		UnmarshalBlock:      parseBlock,
@@ -691,10 +695,10 @@ func TestIsProcessing(t *testing.T) {
 
 	getBlock, parseBlock := createInternalBlockFuncs(testBlks)
 	chainState := NewState(&Config{
-		DecidedCacheSize:    256,
-		MissingCacheSize:    256,
-		UnverifiedCacheSize: 256,
-		BytesToIDCacheSize:  256,
+		DecidedCacheSize:    defaultBlockCacheSize,
+		MissingCacheSize:    defaultBlockCacheSize,
+		UnverifiedCacheSize: defaultBlockCacheSize,
+		BytesToIDCacheSize:  defaultBlockCacheSize,
 		LastAcceptedBlock:   genesisBlock,
 		GetBlock:            getBlock,
 		UnmarshalBlock:      parseBlock,
