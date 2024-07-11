@@ -1,22 +1,22 @@
-name: 'Check Bootstrap (testnet,state-sync)'
+name: 'Check Bootstrap (mainnet,full-sync)'
 
 on:
   # TODO(marun) Add a schedule
   workflow_dispatch:
 
 jobs:
-  check_bootstrap_testnet_state_sync:
-    name: Check Bootstrap (testnet,state-sync)
+  check_bootstrap_mainnet_full_sync:
+    name: Check Bootstrap (mainnet,full-sync)
     runs-on: avalanche-avalanchego
     timeout-minutes: 4320 # 3 days
     steps:
     - name: Checkout Repository
       uses: actions/checkout@v4
-    - name: Check bootstrap (testnet,state-sync)
+    - name: Check bootstrap (mainnet,full-sync)
       uses: ./.github/actions/check-bootstrap
       with:
-        network_id: 5 # testnet
-        state_sync_enabled: true
+        network_id: 1 # mainnet
+        state_sync_enabled: false
         prometheus_id: ${{ secrets.PROMETHEUS_ID || '' }}
         prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
         loki_id: ${{ secrets.LOKI_ID || '' }}

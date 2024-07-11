@@ -94,7 +94,7 @@ func checkBootstrap(avalanchegoPath string, networkID uint32, stateSyncEnabled b
 
 	log.Print("Waiting for node to indicate bootstrap complete by reporting healthy\n")
 
-	// Avoid checking too often to avoid log spam
+	// Avoid checking too often to prevent log spam
 	healthCheckInterval := 1 * time.Minute
 
 	ctx, cancel = context.WithTimeout(context.Background(), maxDuration)
@@ -102,5 +102,8 @@ func checkBootstrap(avalanchegoPath string, networkID uint32, stateSyncEnabled b
 	if err := tmpnet.WaitForHealthyWithInterval(ctx, node, healthCheckInterval); err != nil {
 		return fmt.Errorf("node failed to become healthy before timeout: %w", err)
 	}
+
+	log.Print("Bootstrap completed successfully!\n")
+
 	return nil
 }
