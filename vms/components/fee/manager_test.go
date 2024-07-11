@@ -87,43 +87,44 @@ func TestPChainGasPriceIncreaseDueToPeak(t *testing.T) {
 	require := require.New(t)
 
 	// See mainnet P-chain block 2LJVD1rfEfaJtTwRggFXaUXhME4t5WYGhYP9Aj7eTYqGsfknuC its descendants
+	peakTime := int64(1615237936)
 	blockComplexities := []struct {
 		blkTime    int64
 		complexity Dimensions
 	}{
-		{1615237936, Dimensions{28234, 10812, 10812, 106000}},
-		{1615237936, Dimensions{17634, 6732, 6732, 66000}},
-		{1615237936, Dimensions{12334, 4692, 4692, 46000}},
-		{1615237936, Dimensions{5709, 2142, 2142, 21000}},
-		{1615237936, Dimensions{15514, 5916, 5916, 58000}},
-		{1615237936, Dimensions{12069, 4590, 4590, 45000}},
-		{1615237936, Dimensions{8359, 3162, 3162, 31000}},
-		{1615237936, Dimensions{5444, 2040, 2040, 20000}},
-		{1615237936, Dimensions{1734, 612, 612, 6000}},
-		{1615237936, Dimensions{5974, 2244, 2244, 22000}},
-		{1615237936, Dimensions{3059, 1122, 1122, 11000}},
-		{1615237936, Dimensions{7034, 2652, 2652, 26000}},
-		{1615237936, Dimensions{7564, 2856, 2856, 28000}},
-		{1615237936, Dimensions{34064, 13056, 13056, 128000}},
-		{1615237936, Dimensions{34064, 13056, 13056, 128000}},
-		{1615237936, Dimensions{34064, 13056, 13056, 128000}},
-		{1615237936, Dimensions{34064, 13056, 13056, 128000}},
-		{1615237936, Dimensions{34064, 13056, 13056, 128000}},
-		{1615237936, Dimensions{34064, 13056, 13056, 128000}},
-		{1615237936, Dimensions{34064, 13056, 13056, 128000}},
-		{1615237936, Dimensions{34064, 13056, 13056, 128000}},
-		{1615237936, Dimensions{820, 360, 442, 4000}},
-		{1615237936, Dimensions{34064, 13056, 13056, 128000}},
-		{1615237936, Dimensions{34064, 13056, 13056, 128000}},
-		{1615237936, Dimensions{34064, 13056, 13056, 128000}},
-		{1615237936, Dimensions{34064, 13056, 13056, 128000}},
-		{1615237936, Dimensions{34064, 13056, 13056, 128000}},
-		{1615237936, Dimensions{34064, 13056, 13056, 128000}},
-		{1615237936, Dimensions{34064, 13056, 13056, 128000}},
-		{1615237936, Dimensions{34064, 13056, 13056, 128000}},
-		{1615237936, Dimensions{3589, 1326, 1326, 13000}},
-		{1615237936, Dimensions{550, 180, 180, 2000}},
-		{1615237936, Dimensions{413, 102, 102, 1000}},
+		{peakTime, Dimensions{28234, 10812, 10812, 106000}},
+		{peakTime, Dimensions{17634, 6732, 6732, 66000}},
+		{peakTime, Dimensions{12334, 4692, 4692, 46000}},
+		{peakTime, Dimensions{5709, 2142, 2142, 21000}},
+		{peakTime, Dimensions{15514, 5916, 5916, 58000}},
+		{peakTime, Dimensions{12069, 4590, 4590, 45000}},
+		{peakTime, Dimensions{8359, 3162, 3162, 31000}},
+		{peakTime, Dimensions{5444, 2040, 2040, 20000}},
+		{peakTime, Dimensions{1734, 612, 612, 6000}},
+		{peakTime, Dimensions{5974, 2244, 2244, 22000}},
+		{peakTime, Dimensions{3059, 1122, 1122, 11000}},
+		{peakTime, Dimensions{7034, 2652, 2652, 26000}},
+		{peakTime, Dimensions{7564, 2856, 2856, 28000}},
+		{peakTime, Dimensions{34064, 13056, 13056, 128000}},
+		{peakTime, Dimensions{34064, 13056, 13056, 128000}},
+		{peakTime, Dimensions{34064, 13056, 13056, 128000}},
+		{peakTime, Dimensions{34064, 13056, 13056, 128000}},
+		{peakTime, Dimensions{34064, 13056, 13056, 128000}},
+		{peakTime, Dimensions{34064, 13056, 13056, 128000}},
+		{peakTime, Dimensions{34064, 13056, 13056, 128000}},
+		{peakTime, Dimensions{34064, 13056, 13056, 128000}},
+		{peakTime, Dimensions{820, 360, 442, 4000}},
+		{peakTime, Dimensions{34064, 13056, 13056, 128000}},
+		{peakTime, Dimensions{34064, 13056, 13056, 128000}},
+		{peakTime, Dimensions{34064, 13056, 13056, 128000}},
+		{peakTime, Dimensions{34064, 13056, 13056, 128000}},
+		{peakTime, Dimensions{34064, 13056, 13056, 128000}},
+		{peakTime, Dimensions{34064, 13056, 13056, 128000}},
+		{peakTime, Dimensions{34064, 13056, 13056, 128000}},
+		{peakTime, Dimensions{34064, 13056, 13056, 128000}},
+		{peakTime, Dimensions{3589, 1326, 1326, 13000}},
+		{peakTime, Dimensions{550, 180, 180, 2000}},
+		{peakTime, Dimensions{413, 102, 102, 1000}},
 	}
 
 	// PEAK INCOMING
@@ -144,7 +145,7 @@ func TestPChainGasPriceIncreaseDueToPeak(t *testing.T) {
 		)
 		require.NoError(err)
 
-		// check that gas price is strictly above minimal
+		// check that gas price is strictly increasing (since all block have the same timestamp)
 		require.Greater(m.GetGasPrice(), peakGasPrice,
 			fmt.Sprintf("failed at %d of %d iteration, \n curr gas price %v \n next gas price %v \n dimensions %v",
 				i,
@@ -160,19 +161,21 @@ func TestPChainGasPriceIncreaseDueToPeak(t *testing.T) {
 		fee, err := m.GetLatestTxFee()
 		require.NoError(err)
 		require.Less(fee, 100*units.Avax, fmt.Sprintf("iteration: %d, total: %d", i, len(blockComplexities)))
+
+		// update quantities for next block
 		require.NoError(m.DoneWithLatestTx())
 		excessGas, err = m.GetExcessGas()
 		require.NoError(err)
-
 		peakGasPrice = m.GetGasPrice()
 	}
 
 	// OFF PEAK
+	offPeakTime := int64(1615238881)
 	offPeakBlkComplexity := Dimensions{1473, 510, 510, 5000}
 	offPeakGas, err := ToGas(testDynamicFeeCfg.FeeDimensionWeights, offPeakBlkComplexity)
 	require.NoError(err)
 
-	elapsedTime := time.Unix(1615238881, 0).Sub(time.Unix(1615237936, 0))
+	elapsedTime := time.Unix(offPeakTime, 0).Sub(time.Unix(peakTime, 0))
 	parentBlkTime := time.Now().Truncate(time.Second)
 	childBlkTime := parentBlkTime.Add(elapsedTime)
 
