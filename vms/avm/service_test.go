@@ -6,7 +6,7 @@ package avm
 import (
 	"context"
 	"encoding/json"
-	"strings"
+	"fmt"
 	"testing"
 	"time"
 
@@ -570,10 +570,13 @@ func TestServiceGetTxJSON_BaseTx(t *testing.T) {
 	replyTxBytes, err := json.MarshalIndent(reply.Tx, "", "\t")
 	require.NoError(err)
 
-	expectedReplyTxString := `{
+	sigStr, err := formatting.Encode(formatting.HexNC, newTx.Creds[0].Credential.(*secp256k1fx.Credential).Sigs[0][:])
+	require.NoError(err)
+
+	expectedReplyTxString := fmt.Sprintf(`{
 	"unsignedTx": {
 		"networkID": 10,
-		"blockchainID": "PLACEHOLDER_BLOCKCHAIN_ID",
+		"blockchainID": %q,
 		"outputs": [
 			{
 				"assetID": "tvLKci3hNoCX4NijS6TfiT6XJJY3gGKd2git6SSVTG5J8Nfby",
@@ -621,22 +624,13 @@ func TestServiceGetTxJSON_BaseTx(t *testing.T) {
 			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 			"credential": {
 				"signatures": [
-					"PLACEHOLDER_SIGNATURE"
+					%q
 				]
 			}
 		}
 	],
-	"id": "PLACEHOLDER_TX_ID"
-}`
-
-	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_TX_ID", newTx.ID().String(), 1)
-	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_BLOCKCHAIN_ID", newTx.Unsigned.(*txs.BaseTx).BlockchainID.String(), 1)
-
-	sigStr, err := formatting.Encode(formatting.HexNC, newTx.Creds[0].Credential.(*secp256k1fx.Credential).Sigs[0][:])
-	require.NoError(err)
-
-	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_SIGNATURE", sigStr, 1)
-
+	"id": %q
+}`, newTx.Unsigned.(*txs.BaseTx).BlockchainID, sigStr, newTx.ID())
 	require.Equal(expectedReplyTxString, string(replyTxBytes))
 }
 
@@ -666,10 +660,13 @@ func TestServiceGetTxJSON_ExportTx(t *testing.T) {
 	replyTxBytes, err := json.MarshalIndent(reply.Tx, "", "\t")
 	require.NoError(err)
 
-	expectedReplyTxString := `{
+	sigStr, err := formatting.Encode(formatting.HexNC, newTx.Creds[0].Credential.(*secp256k1fx.Credential).Sigs[0][:])
+	require.NoError(err)
+
+	expectedReplyTxString := fmt.Sprintf(`{
 	"unsignedTx": {
 		"networkID": 10,
-		"blockchainID": "PLACEHOLDER_BLOCKCHAIN_ID",
+		"blockchainID": %q,
 		"outputs": [
 			{
 				"assetID": "tvLKci3hNoCX4NijS6TfiT6XJJY3gGKd2git6SSVTG5J8Nfby",
@@ -720,22 +717,13 @@ func TestServiceGetTxJSON_ExportTx(t *testing.T) {
 			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 			"credential": {
 				"signatures": [
-					"PLACEHOLDER_SIGNATURE"
+					%q
 				]
 			}
 		}
 	],
-	"id": "PLACEHOLDER_TX_ID"
-}`
-
-	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_TX_ID", newTx.ID().String(), 1)
-	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_BLOCKCHAIN_ID", newTx.Unsigned.(*txs.ExportTx).BlockchainID.String(), 1)
-
-	sigStr, err := formatting.Encode(formatting.HexNC, newTx.Creds[0].Credential.(*secp256k1fx.Credential).Sigs[0][:])
-	require.NoError(err)
-
-	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_SIGNATURE", sigStr, 1)
-
+	"id": %q
+}`, newTx.Unsigned.(*txs.ExportTx).BlockchainID, sigStr, newTx.ID())
 	require.Equal(expectedReplyTxString, string(replyTxBytes))
 }
 
@@ -757,7 +745,7 @@ func TestServiceGetTxJSON_CreateAssetTx(t *testing.T) {
 	}()
 
 	initialStates := map[uint32][]verify.State{
-		uint32(0): {
+		0: {
 			&nftfx.MintOutput{
 				OutputOwners: secp256k1fx.OutputOwners{
 					Threshold: 1,
@@ -770,7 +758,7 @@ func TestServiceGetTxJSON_CreateAssetTx(t *testing.T) {
 				},
 			},
 		},
-		uint32(1): {
+		1: {
 			&nftfx.MintOutput{
 				GroupID: 1,
 				OutputOwners: secp256k1fx.OutputOwners{
@@ -786,7 +774,7 @@ func TestServiceGetTxJSON_CreateAssetTx(t *testing.T) {
 				},
 			},
 		},
-		uint32(2): {
+		2: {
 			&propertyfx.MintOutput{
 				OutputOwners: secp256k1fx.OutputOwners{
 					Threshold: 1,
@@ -815,10 +803,13 @@ func TestServiceGetTxJSON_CreateAssetTx(t *testing.T) {
 	replyTxBytes, err := json.MarshalIndent(reply.Tx, "", "\t")
 	require.NoError(err)
 
-	expectedReplyTxString := `{
+	sigStr, err := formatting.Encode(formatting.HexNC, createAssetTx.Creds[0].Credential.(*secp256k1fx.Credential).Sigs[0][:])
+	require.NoError(err)
+
+	expectedReplyTxString := fmt.Sprintf(`{
 	"unsignedTx": {
 		"networkID": 10,
-		"blockchainID": "PLACEHOLDER_BLOCKCHAIN_ID",
+		"blockchainID": %q,
 		"outputs": [
 			{
 				"assetID": "tvLKci3hNoCX4NijS6TfiT6XJJY3gGKd2git6SSVTG5J8Nfby",
@@ -922,16 +913,13 @@ func TestServiceGetTxJSON_CreateAssetTx(t *testing.T) {
 			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 			"credential": {
 				"signatures": [
-					"0x11df1cb82f9a5e3b3ced9167654330e7782832c1189a04bb6b6207f7a69b979d55e5e3819744e4a13255ca724697c6a4ecab8cc9e8464cd2ec574e5b4bda1e2701"
+					%q
 				]
 			}
 		}
 	],
-	"id": "PLACEHOLDER_TX_ID"
-}`
-
-	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_TX_ID", createAssetTx.ID().String(), 1)
-	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_BLOCKCHAIN_ID", createAssetTx.Unsigned.(*txs.CreateAssetTx).BlockchainID.String(), 1)
+	"id": %q
+}`, createAssetTx.Unsigned.(*txs.CreateAssetTx).BlockchainID, sigStr, createAssetTx.ID().String())
 
 	require.Equal(expectedReplyTxString, string(replyTxBytes))
 }
@@ -955,7 +943,7 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 
 	key := keys[0]
 	initialStates := map[uint32][]verify.State{
-		uint32(1): {
+		1: {
 			&nftfx.MintOutput{
 				GroupID: 1,
 				OutputOwners: secp256k1fx.OutputOwners{
@@ -990,10 +978,14 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 	replyTxBytes, err := json.MarshalIndent(reply.Tx, "", "\t")
 	require.NoError(err)
 
-	expectedReplyTxString := `{
+	sigStr, err := formatting.Encode(formatting.HexNC, mintNFTTx.Creds[1].Credential.(*nftfx.Credential).Sigs[0][:])
+	require.NoError(err)
+
+	args := []any{mintNFTTx.Unsigned.(*txs.OperationTx).BlockchainID, sigStr, mintNFTTx.ID(), createAssetTx.ID()}
+	expectedReplyTxString := fmt.Sprintf(`{
 	"unsignedTx": {
 		"networkID": 10,
-		"blockchainID": "PLACEHOLDER_BLOCKCHAIN_ID",
+		"blockchainID": %[1]q,
 		"outputs": [
 			{
 				"assetID": "tvLKci3hNoCX4NijS6TfiT6XJJY3gGKd2git6SSVTG5J8Nfby",
@@ -1025,10 +1017,10 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 		"memo": "0x",
 		"operations": [
 			{
-				"assetID": "PLACEHOLDER_CREATE_ASSET_TX_ID",
+				"assetID": %[4]q,
 				"inputIDs": [
 					{
-						"txID": "PLACEHOLDER_CREATE_ASSET_TX_ID",
+						"txID": %[4]q,
 						"outputIndex": 1
 					}
 				],
@@ -1059,7 +1051,7 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 			"credential": {
 				"signatures": [
-					"0xfb55fa51ca44aa974c03b5a612beba10e68ac01861f98dc31ff096013ba42dac05991bf05750ad38a283e3d5fbbbb4ac1efe4e9bc578272e5acf9a50927676ab00"
+					%[2]q
 				]
 			}
 		},
@@ -1067,22 +1059,13 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 			"fxID": "qd2U4HDWUvMrVUeTcCHp6xH3Qpnn1XbU5MDdnBoiifFqvgXwT",
 			"credential": {
 				"signatures": [
-					"0xfb55fa51ca44aa974c03b5a612beba10e68ac01861f98dc31ff096013ba42dac05991bf05750ad38a283e3d5fbbbb4ac1efe4e9bc578272e5acf9a50927676ab00"
+					%[2]q
 				]
 			}
 		}
 	],
-	"id": "PLACEHOLDER_TX_ID"
-}`
-
-	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_CREATE_ASSET_TX_ID", createAssetTx.ID().String(), 2)
-	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_TX_ID", mintNFTTx.ID().String(), 1)
-	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_BLOCKCHAIN_ID", mintNFTTx.Unsigned.(*txs.OperationTx).BlockchainID.String(), 1)
-
-	sigStr, err := formatting.Encode(formatting.HexNC, mintNFTTx.Creds[1].Credential.(*nftfx.Credential).Sigs[0][:])
-	require.NoError(err)
-
-	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_SIGNATURE", sigStr, 1)
+	"id": %[3]q
+}`, args...)
 
 	require.Equal(expectedReplyTxString, string(replyTxBytes))
 }
@@ -1106,7 +1089,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
 
 	key := keys[0]
 	initialStates := map[uint32][]verify.State{
-		uint32(0): {
+		0: {
 			&nftfx.MintOutput{
 				GroupID: 0,
 				OutputOwners: secp256k1fx.OutputOwners{
@@ -1115,7 +1098,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
 				},
 			},
 		},
-		uint32(1): {
+		1: {
 			&nftfx.MintOutput{
 				GroupID: 1,
 				OutputOwners: secp256k1fx.OutputOwners{
@@ -1144,10 +1127,14 @@ func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
 	replyTxBytes, err := json.MarshalIndent(reply.Tx, "", "\t")
 	require.NoError(err)
 
-	expectedReplyTxString := `{
+	sigStr, err := formatting.Encode(formatting.HexNC, mintNFTTx.Creds[1].Credential.(*nftfx.Credential).Sigs[0][:])
+	require.NoError(err)
+
+	args := []any{mintNFTTx.Unsigned.(*txs.OperationTx).BlockchainID, sigStr, mintNFTTx.ID(), createAssetTx.ID()}
+	expectedReplyTxString := fmt.Sprintf(`{
 	"unsignedTx": {
 		"networkID": 10,
-		"blockchainID": "PLACEHOLDER_BLOCKCHAIN_ID",
+		"blockchainID": %[1]q,
 		"outputs": [
 			{
 				"assetID": "tvLKci3hNoCX4NijS6TfiT6XJJY3gGKd2git6SSVTG5J8Nfby",
@@ -1179,10 +1166,10 @@ func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
 		"memo": "0x",
 		"operations": [
 			{
-				"assetID": "PLACEHOLDER_CREATE_ASSET_TX_ID",
+				"assetID": %[4]q,
 				"inputIDs": [
 					{
-						"txID": "PLACEHOLDER_CREATE_ASSET_TX_ID",
+						"txID": %[4]q,
 						"outputIndex": 1
 					}
 				],
@@ -1207,10 +1194,10 @@ func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
 				}
 			},
 			{
-				"assetID": "PLACEHOLDER_CREATE_ASSET_TX_ID",
+				"assetID": %[4]q,
 				"inputIDs": [
 					{
-						"txID": "PLACEHOLDER_CREATE_ASSET_TX_ID",
+						"txID": %[4]q,
 						"outputIndex": 2
 					}
 				],
@@ -1241,7 +1228,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
 			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 			"credential": {
 				"signatures": [
-					"PLACEHOLDER_SIGNATURE"
+					%[2]q
 				]
 			}
 		},
@@ -1257,22 +1244,13 @@ func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
 			"fxID": "qd2U4HDWUvMrVUeTcCHp6xH3Qpnn1XbU5MDdnBoiifFqvgXwT",
 			"credential": {
 				"signatures": [
-					"PLACEHOLDER_SIGNATURE"
+					%[2]q
 				]
 			}
 		}
 	],
-	"id": "PLACEHOLDER_TX_ID"
-}`
-
-	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_CREATE_ASSET_TX_ID", createAssetTx.ID().String(), 4)
-	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_TX_ID", mintNFTTx.ID().String(), 1)
-	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_BLOCKCHAIN_ID", mintNFTTx.Unsigned.(*txs.OperationTx).BlockchainID.String(), 1)
-
-	sigStr, err := formatting.Encode(formatting.HexNC, mintNFTTx.Creds[1].Credential.(*nftfx.Credential).Sigs[0][:])
-	require.NoError(err)
-
-	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_SIGNATURE", sigStr, 2)
+	"id": %[3]q
+}`, args...)
 
 	require.Equal(expectedReplyTxString, string(replyTxBytes))
 }
@@ -1296,7 +1274,7 @@ func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 
 	key := keys[0]
 	initialStates := map[uint32][]verify.State{
-		uint32(0): {
+		0: {
 			&nftfx.MintOutput{
 				OutputOwners: secp256k1fx.OutputOwners{
 					Threshold: 1,
@@ -1328,10 +1306,14 @@ func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 	replyTxBytes, err := json.MarshalIndent(reply.Tx, "", "\t")
 	require.NoError(err)
 
-	expectedReplyTxString := `{
+	sigStr, err := formatting.Encode(formatting.HexNC, mintSecpOpTx.Creds[0].Credential.(*secp256k1fx.Credential).Sigs[0][:])
+	require.NoError(err)
+
+	args := []any{mintSecpOpTx.Unsigned.(*txs.OperationTx).BlockchainID, sigStr, mintSecpOpTx.ID(), createAssetTx.ID()}
+	expectedReplyTxString := fmt.Sprintf(`{
 	"unsignedTx": {
 		"networkID": 10,
-		"blockchainID": "PLACEHOLDER_BLOCKCHAIN_ID",
+		"blockchainID": %[1]q,
 		"outputs": [
 			{
 				"assetID": "tvLKci3hNoCX4NijS6TfiT6XJJY3gGKd2git6SSVTG5J8Nfby",
@@ -1363,10 +1345,10 @@ func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 		"memo": "0x",
 		"operations": [
 			{
-				"assetID": "PLACEHOLDER_CREATE_ASSET_TX_ID",
+				"assetID": %[4]q,
 				"inputIDs": [
 					{
-						"txID": "PLACEHOLDER_CREATE_ASSET_TX_ID",
+						"txID": %[4]q,
 						"outputIndex": 1
 					}
 				],
@@ -1401,7 +1383,7 @@ func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 			"credential": {
 				"signatures": [
-					"PLACEHOLDER_SIGNATURE"
+					%[2]q
 				]
 			}
 		},
@@ -1409,22 +1391,13 @@ func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 			"credential": {
 				"signatures": [
-					"0x79237564e745b0c0ccefaaf50902a98badb144645fedd898f0b8d3a5dac73013305b7e9d26dcfed97c56b05bca850c4e5fbb829da42a07c0bc6fb294efaf8a7101"
+					%[2]q
 				]
 			}
 		}
 	],
-	"id": "PLACEHOLDER_TX_ID"
-}`
-
-	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_CREATE_ASSET_TX_ID", createAssetTx.ID().String(), 2)
-	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_TX_ID", mintSecpOpTx.ID().String(), 1)
-	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_BLOCKCHAIN_ID", mintSecpOpTx.Unsigned.(*txs.OperationTx).BlockchainID.String(), 1)
-
-	sigStr, err := formatting.Encode(formatting.HexNC, mintSecpOpTx.Creds[0].Credential.(*secp256k1fx.Credential).Sigs[0][:])
-	require.NoError(err)
-
-	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_SIGNATURE", sigStr, 1)
+	"id": %[3]q
+}`, args...)
 
 	require.Equal(expectedReplyTxString, string(replyTxBytes))
 }
@@ -1448,7 +1421,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleSecpMintOp(t *testing.T) {
 
 	key := keys[0]
 	initialStates := map[uint32][]verify.State{
-		uint32(0): {
+		0: {
 			&secp256k1fx.MintOutput{
 				OutputOwners: secp256k1fx.OutputOwners{
 					Threshold: 1,
@@ -1456,7 +1429,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleSecpMintOp(t *testing.T) {
 				},
 			},
 		},
-		uint32(1): {
+		1: {
 			&secp256k1fx.MintOutput{
 				OutputOwners: secp256k1fx.OutputOwners{
 					Threshold: 1,
@@ -1484,10 +1457,14 @@ func TestServiceGetTxJSON_OperationTxWithMultipleSecpMintOp(t *testing.T) {
 	replyTxBytes, err := json.MarshalIndent(reply.Tx, "", "\t")
 	require.NoError(err)
 
-	expectedReplyTxString := `{
+	sigStr, err := formatting.Encode(formatting.HexNC, mintSecpOpTx.Creds[0].Credential.(*secp256k1fx.Credential).Sigs[0][:])
+	require.NoError(err)
+
+	args := []any{mintSecpOpTx.Unsigned.(*txs.OperationTx).BlockchainID, sigStr, mintSecpOpTx.ID(), createAssetTx.ID()}
+	expectedReplyTxString := fmt.Sprintf(`{
 	"unsignedTx": {
 		"networkID": 10,
-		"blockchainID": "PLACEHOLDER_BLOCKCHAIN_ID",
+		"blockchainID": %[1]q,
 		"outputs": [
 			{
 				"assetID": "tvLKci3hNoCX4NijS6TfiT6XJJY3gGKd2git6SSVTG5J8Nfby",
@@ -1519,10 +1496,10 @@ func TestServiceGetTxJSON_OperationTxWithMultipleSecpMintOp(t *testing.T) {
 		"memo": "0x",
 		"operations": [
 			{
-				"assetID": "PLACEHOLDER_CREATE_ASSET_TX_ID",
+				"assetID": %[4]q,
 				"inputIDs": [
 					{
-						"txID": "PLACEHOLDER_CREATE_ASSET_TX_ID",
+						"txID": %[4]q,
 						"outputIndex": 1
 					}
 				],
@@ -1551,10 +1528,10 @@ func TestServiceGetTxJSON_OperationTxWithMultipleSecpMintOp(t *testing.T) {
 				}
 			},
 			{
-				"assetID": "PLACEHOLDER_CREATE_ASSET_TX_ID",
+				"assetID": %[4]q,
 				"inputIDs": [
 					{
-						"txID": "PLACEHOLDER_CREATE_ASSET_TX_ID",
+						"txID": %[4]q,
 						"outputIndex": 2
 					}
 				],
@@ -1589,7 +1566,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleSecpMintOp(t *testing.T) {
 			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 			"credential": {
 				"signatures": [
-					"PLACEHOLDER_SIGNATURE"
+					%[2]q
 				]
 			}
 		},
@@ -1597,7 +1574,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleSecpMintOp(t *testing.T) {
 			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 			"credential": {
 				"signatures": [
-					"PLACEHOLDER_SIGNATURE"
+					%[2]q
 				]
 			}
 		},
@@ -1605,22 +1582,13 @@ func TestServiceGetTxJSON_OperationTxWithMultipleSecpMintOp(t *testing.T) {
 			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 			"credential": {
 				"signatures": [
-					"0x06e33ad8322d6e670f8e923ace1a55606c5547527a1232d269f857a3388209a813c8aed7f87296ba04f033ed8e83a9dc4b7a3d9dd50c3b1d8b154e5bf34854b901"
+					%[2]q
 				]
 			}
 		}
 	],
-	"id": "PLACEHOLDER_TX_ID"
-}`
-
-	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_CREATE_ASSET_TX_ID", createAssetTx.ID().String(), 4)
-	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_TX_ID", mintSecpOpTx.ID().String(), 1)
-	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_BLOCKCHAIN_ID", mintSecpOpTx.Unsigned.(*txs.OperationTx).BlockchainID.String(), 1)
-
-	sigStr, err := formatting.Encode(formatting.HexNC, mintSecpOpTx.Creds[0].Credential.(*secp256k1fx.Credential).Sigs[0][:])
-	require.NoError(err)
-
-	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_SIGNATURE", sigStr, 2)
+	"id": %[3]q
+}`, args...)
 
 	require.Equal(expectedReplyTxString, string(replyTxBytes))
 }
@@ -1644,7 +1612,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
 
 	key := keys[0]
 	initialStates := map[uint32][]verify.State{
-		uint32(2): {
+		2: {
 			&propertyfx.MintOutput{
 				OutputOwners: secp256k1fx.OutputOwners{
 					Threshold: 1,
@@ -1671,10 +1639,14 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
 	replyTxBytes, err := json.MarshalIndent(reply.Tx, "", "\t")
 	require.NoError(err)
 
-	expectedReplyTxString := `{
+	sigStr, err := formatting.Encode(formatting.HexNC, mintPropertyFxOpTx.Creds[1].Credential.(*propertyfx.Credential).Sigs[0][:])
+	require.NoError(err)
+
+	args := []any{mintPropertyFxOpTx.Unsigned.(*txs.OperationTx).BlockchainID, sigStr, mintPropertyFxOpTx.ID(), createAssetTx.ID()}
+	expectedReplyTxString := fmt.Sprintf(`{
 	"unsignedTx": {
 		"networkID": 10,
-		"blockchainID": "PLACEHOLDER_BLOCKCHAIN_ID",
+		"blockchainID": %[1]q,
 		"outputs": [
 			{
 				"assetID": "tvLKci3hNoCX4NijS6TfiT6XJJY3gGKd2git6SSVTG5J8Nfby",
@@ -1706,10 +1678,10 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
 		"memo": "0x",
 		"operations": [
 			{
-				"assetID": "PLACEHOLDER_CREATE_ASSET_TX_ID",
+				"assetID": %[4]q,
 				"inputIDs": [
 					{
-						"txID": "PLACEHOLDER_CREATE_ASSET_TX_ID",
+						"txID": %[4]q,
 						"outputIndex": 1
 					}
 				],
@@ -1741,7 +1713,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
 			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 			"credential": {
 				"signatures": [
-					"0xd9b773c483a938dd9bacffa82f5da5b17892d991189556b27665eb115989769a5fa8ae3eebe4fb463898ff4b1a0c536fc0f4b054e560d9cfde97b6e931e6099b00"
+					%[2]q
 				]
 			}
 		},
@@ -1749,22 +1721,13 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
 			"fxID": "rXJsCSEYXg2TehWxCEEGj6JU2PWKTkd6cBdNLjoe2SpsKD9cy",
 			"credential": {
 				"signatures": [
-					"PLACEHOLDER_SIGNATURE"
+					%[2]q
 				]
 			}
 		}
 	],
-	"id": "PLACEHOLDER_TX_ID"
-}`
-
-	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_CREATE_ASSET_TX_ID", createAssetTx.ID().String(), 2)
-	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_TX_ID", mintPropertyFxOpTx.ID().String(), 1)
-	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_BLOCKCHAIN_ID", mintPropertyFxOpTx.Unsigned.(*txs.OperationTx).BlockchainID.String(), 1)
-
-	sigStr, err := formatting.Encode(formatting.HexNC, mintPropertyFxOpTx.Creds[1].Credential.(*propertyfx.Credential).Sigs[0][:])
-	require.NoError(err)
-
-	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_SIGNATURE", sigStr, 1)
+	"id": %[3]q
+}`, args...)
 
 	require.Equal(expectedReplyTxString, string(replyTxBytes))
 }
@@ -1788,7 +1751,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) 
 
 	key := keys[0]
 	initialStates := map[uint32][]verify.State{
-		uint32(2): {
+		2: {
 			&propertyfx.MintOutput{
 				OutputOwners: secp256k1fx.OutputOwners{
 					Threshold: 1,
@@ -1822,10 +1785,14 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) 
 	replyTxBytes, err := json.MarshalIndent(reply.Tx, "", "\t")
 	require.NoError(err)
 
-	expectedReplyTxString := `{
+	sigStr, err := formatting.Encode(formatting.HexNC, mintPropertyFxOpTx.Creds[1].Credential.(*propertyfx.Credential).Sigs[0][:])
+	require.NoError(err)
+
+	args := []any{mintPropertyFxOpTx.Unsigned.(*txs.OperationTx).BlockchainID, sigStr, mintPropertyFxOpTx.ID(), createAssetTx.ID()}
+	expectedReplyTxString := fmt.Sprintf(`{
 	"unsignedTx": {
 		"networkID": 10,
-		"blockchainID": "PLACEHOLDER_BLOCKCHAIN_ID",
+		"blockchainID": %[1]q,
 		"outputs": [
 			{
 				"assetID": "tvLKci3hNoCX4NijS6TfiT6XJJY3gGKd2git6SSVTG5J8Nfby",
@@ -1857,10 +1824,10 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) 
 		"memo": "0x",
 		"operations": [
 			{
-				"assetID": "PLACEHOLDER_CREATE_ASSET_TX_ID",
+				"assetID": %[4]q,
 				"inputIDs": [
 					{
-						"txID": "PLACEHOLDER_CREATE_ASSET_TX_ID",
+						"txID": %[4]q,
 						"outputIndex": 1
 					}
 				],
@@ -1886,10 +1853,10 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) 
 				}
 			},
 			{
-				"assetID": "PLACEHOLDER_CREATE_ASSET_TX_ID",
+				"assetID": %[4]q,
 				"inputIDs": [
 					{
-						"txID": "PLACEHOLDER_CREATE_ASSET_TX_ID",
+						"txID": %[4]q,
 						"outputIndex": 2
 					}
 				],
@@ -1921,7 +1888,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) 
 			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 			"credential": {
 				"signatures": [
-					"0x10bab49817c5bdd16927979ec334ee7f162f9a5795cb0b01a9e183f7323d411e044ff7155a37a54ce7d928e0c80a120ed04707b067297ef16e80d7b14b4f321101"
+					%[2]q
 				]
 			}
 		},
@@ -1929,7 +1896,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) 
 			"fxID": "rXJsCSEYXg2TehWxCEEGj6JU2PWKTkd6cBdNLjoe2SpsKD9cy",
 			"credential": {
 				"signatures": [
-					"PLACEHOLDER_SIGNATURE"
+					%[2]q
 				]
 			}
 		},
@@ -1937,22 +1904,13 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) 
 			"fxID": "rXJsCSEYXg2TehWxCEEGj6JU2PWKTkd6cBdNLjoe2SpsKD9cy",
 			"credential": {
 				"signatures": [
-					"PLACEHOLDER_SIGNATURE"
+					%[2]q
 				]
 			}
 		}
 	],
-	"id": "PLACEHOLDER_TX_ID"
-}`
-
-	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_CREATE_ASSET_TX_ID", createAssetTx.ID().String(), 4)
-	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_TX_ID", mintPropertyFxOpTx.ID().String(), 1)
-	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_BLOCKCHAIN_ID", mintPropertyFxOpTx.Unsigned.(*txs.OperationTx).BlockchainID.String(), 1)
-
-	sigStr, err := formatting.Encode(formatting.HexNC, mintPropertyFxOpTx.Creds[1].Credential.(*propertyfx.Credential).Sigs[0][:])
-	require.NoError(err)
-
-	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_SIGNATURE", sigStr, 2)
+	"id": %[3]q
+}`, args...)
 
 	require.Equal(expectedReplyTxString, string(replyTxBytes))
 }
