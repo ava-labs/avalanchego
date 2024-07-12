@@ -1332,7 +1332,7 @@ func (s *state) loadMetadata() error {
 
 	case database.ErrNotFound:
 		// fork introducing dynamic fees may not be active yet,
-		// hence we may have never stored fees windows. Set to nil
+		// hence we may have never stored excess complexity. Set to zero
 		// TODO: remove once fork is active
 		s.excessComplexity = commonfee.ZeroGas
 	default:
@@ -1350,7 +1350,7 @@ func (s *state) loadMetadata() error {
 
 	case database.ErrNotFound:
 		// fork introducing dynamic fees may not be active yet,
-		// hence we may have never stored fees windows. Set to nil
+		// hence we may have never stored gas cap. Set to max
 		// TODO: remove once fork is active
 		feesCfg, err := fee.GetDynamicConfig(true /*isEActive*/)
 		if err != nil {

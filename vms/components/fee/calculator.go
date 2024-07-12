@@ -24,7 +24,7 @@ type Calculator struct {
 	// gas cap enforced with adding gas via CumulateGas
 	gasCap Gas
 
-	// Avax denominated gas price, i.e. fee per unit of complexity.
+	// Avax denominated gas price, i.e. fee per unit of gas.
 	gasPrice GasPrice
 
 	// cumulatedGas helps aggregating the gas consumed in a single block
