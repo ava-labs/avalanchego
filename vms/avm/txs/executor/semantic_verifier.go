@@ -11,7 +11,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/avm/state"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
-	"github.com/ava-labs/avalanchego/vms/avm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
@@ -32,15 +31,36 @@ type SemanticVerifier struct {
 }
 
 func (v *SemanticVerifier) BaseTx(tx *txs.BaseTx) error {
-	return v.verifyBaseTx(tx, nil, nil)
+	for i, in := range tx.Ins {
+		// Note: Verification of the length of [t.tx.Creds] happens during
+		// syntactic verification, which happens before semantic verification.
+		cred := v.Tx.Creds[i].Credential
+		if err := v.verifyTransfer(tx, in, cred); err != nil {
+			return err
+		}
+	}
+
+	for _, out := range tx.Outs {
+		fxIndex, err := v.getFx(out.Out)
+		if err != nil {
+			return err
+		}
+
+		assetID := out.AssetID()
+		if err := v.verifyFxUsage(fxIndex, assetID); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (v *SemanticVerifier) CreateAssetTx(tx *txs.CreateAssetTx) error {
-	return v.verifyBaseTx(&tx.BaseTx, nil, nil)
+	return v.BaseTx(&tx.BaseTx)
 }
 
 func (v *SemanticVerifier) OperationTx(tx *txs.OperationTx) error {
-	if err := v.verifyBaseTx(&tx.BaseTx, nil, nil); err != nil {
+	if err := v.BaseTx(&tx.BaseTx); err != nil {
 		return err
 	}
 
@@ -61,7 +81,7 @@ func (v *SemanticVerifier) OperationTx(tx *txs.OperationTx) error {
 }
 
 func (v *SemanticVerifier) ImportTx(tx *txs.ImportTx) error {
-	if err := v.verifyBaseTx(&tx.BaseTx, tx.ImportedIns, nil); err != nil {
+	if err := v.BaseTx(&tx.BaseTx); err != nil {
 		return err
 	}
 
@@ -102,7 +122,7 @@ func (v *SemanticVerifier) ImportTx(tx *txs.ImportTx) error {
 }
 
 func (v *SemanticVerifier) ExportTx(tx *txs.ExportTx) error {
-	if err := v.verifyBaseTx(&tx.BaseTx, nil, tx.ExportedOuts); err != nil {
+	if err := v.BaseTx(&tx.BaseTx); err != nil {
 		return err
 	}
 
@@ -123,52 +143,6 @@ func (v *SemanticVerifier) ExportTx(tx *txs.ExportTx) error {
 			return err
 		}
 	}
-	return nil
-}
-
-func (v *SemanticVerifier) verifyBaseTx(
-	tx *txs.BaseTx,
-	importedIns []*avax.TransferableInput,
-	exportedOuts []*avax.TransferableOutput,
-) error {
-	feeCalculator := fee.NewStaticCalculator(v.Backend.Config.StaticConfig)
-	fee, err := feeCalculator.CalculateFee(&txs.Tx{Unsigned: tx})
-	if err != nil {
-		return err
-	}
-
-	err = avax.VerifyTx(
-		fee,
-		v.FeeAssetID,
-		[][]*avax.TransferableInput{tx.Ins, importedIns},
-		[][]*avax.TransferableOutput{tx.Outs, exportedOuts},
-		v.Codec,
-	)
-	if err != nil {
-		return err
-	}
-
-	for i, in := range tx.Ins {
-		// Note: Verification of the length of [t.tx.Creds] happens during
-		// syntactic verification, which happens before semantic verification.
-		cred := v.Tx.Creds[i].Credential
-		if err := v.verifyTransfer(tx, in, cred); err != nil {
-			return err
-		}
-	}
-
-	for _, out := range tx.Outs {
-		fxIndex, err := v.getFx(out.Out)
-		if err != nil {
-			return err
-		}
-
-		assetID := out.AssetID()
-		if err := v.verifyFxUsage(fxIndex, assetID); err != nil {
-			return err
-		}
-	}
-
 	return nil
 }
 

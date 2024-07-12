@@ -13,6 +13,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
+	"github.com/ava-labs/avalanchego/vms/avm/txs/fee"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
 )
 
 const (
@@ -50,7 +52,7 @@ type SyntacticVerifier struct {
 }
 
 func (v *SyntacticVerifier) BaseTx(tx *txs.BaseTx) error {
-	if err := tx.BaseTx.Verify(v.Ctx); err != nil {
+	if err := v.verifyBaseTx(tx, nil, nil); err != nil {
 		return err
 	}
 
@@ -102,7 +104,7 @@ func (v *SyntacticVerifier) CreateAssetTx(tx *txs.CreateAssetTx) error {
 		}
 	}
 
-	if err := tx.BaseTx.BaseTx.Verify(v.Ctx); err != nil {
+	if err := v.verifyBaseTx(&tx.BaseTx, nil, nil); err != nil {
 		return err
 	}
 
@@ -139,7 +141,7 @@ func (v *SyntacticVerifier) OperationTx(tx *txs.OperationTx) error {
 		return errNoOperations
 	}
 
-	if err := tx.BaseTx.BaseTx.Verify(v.Ctx); err != nil {
+	if err := v.verifyBaseTx(&tx.BaseTx, nil, nil); err != nil {
 		return err
 	}
 
@@ -188,7 +190,7 @@ func (v *SyntacticVerifier) ImportTx(tx *txs.ImportTx) error {
 		return errNoImportInputs
 	}
 
-	if err := tx.BaseTx.BaseTx.Verify(v.Ctx); err != nil {
+	if err := v.verifyBaseTx(&tx.BaseTx, tx.ImportedIns, nil); err != nil {
 		return err
 	}
 
@@ -216,7 +218,7 @@ func (v *SyntacticVerifier) ExportTx(tx *txs.ExportTx) error {
 		return errNoExportOutputs
 	}
 
-	if err := tx.BaseTx.BaseTx.Verify(v.Ctx); err != nil {
+	if err := v.verifyBaseTx(&tx.BaseTx, nil, tx.ExportedOuts); err != nil {
 		return err
 	}
 
@@ -237,4 +239,28 @@ func (v *SyntacticVerifier) ExportTx(tx *txs.ExportTx) error {
 	}
 
 	return nil
+}
+
+func (v *SyntacticVerifier) verifyBaseTx(
+	bTx *txs.BaseTx,
+	importedIns []*avax.TransferableInput,
+	exportedOuts []*avax.TransferableOutput,
+) error {
+	if err := bTx.BaseTx.Verify(v.Ctx); err != nil {
+		return err
+	}
+
+	feeCalculator := fee.NewStaticCalculator(v.Backend.Config.StaticConfig)
+	fee, err := feeCalculator.CalculateFee(v.Tx)
+	if err != nil {
+		return err
+	}
+
+	return avax.VerifyTx(
+		fee,
+		v.FeeAssetID,
+		[][]*avax.TransferableInput{bTx.Ins, importedIns},
+		[][]*avax.TransferableOutput{bTx.Outs, exportedOuts},
+		v.Codec,
+	)
 }
