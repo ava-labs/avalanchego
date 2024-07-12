@@ -22,8 +22,8 @@ var (
 		UpdateDenominator:   commonfee.Gas(100_000),
 		GasTargetRate:       commonfee.Gas(2_500),
 		FeeDimensionWeights: commonfee.Dimensions{6, 10, 10, 1},
-		MaxGasPerSecond:     commonfee.Gas(1_000_000),
-		LeakGasCoeff:        commonfee.Gas(1),
+		MaxGasPerSecond:     commonfee.Gas(500_000),
+		LeakGasCoeff:        commonfee.Gas(5),
 	}
 
 	customDynamicFeesConfig *commonfee.DynamicFeesConfig
