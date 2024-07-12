@@ -5,12 +5,12 @@ package meterdb
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/utils"
 )
 
 const methodLabel = "method"
@@ -125,7 +125,7 @@ func New(
 			methodLabels,
 		),
 	}
-	return meterDB, utils.Err(
+	return meterDB, errors.Join(
 		reg.Register(meterDB.calls),
 		reg.Register(meterDB.duration),
 		reg.Register(meterDB.size),
