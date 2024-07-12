@@ -19,9 +19,6 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  grafana_url: https://grafana-experimental.avax-dev.network/d/kBQpRdWnk/avalanche-main-dashboard?orgId=1&refresh=10s&var-filter=is_ephemeral_node%7C%3D%7Cfalse&var-filter=gh_repo%7C%3D%7Cava-labs%2Favalanchego&var-filter=gh_run_id%7C%3D%7C${{ github.run_id }}&var-filter=gh_run_attempt%7C%3D%7C${{ github.run_attempt }}
-
 jobs:
   Unit:
     runs-on: ${{ matrix.os }}
@@ -59,49 +56,19 @@ jobs:
       - name: Build AvalancheGo Binary
         shell: bash
         run: ./scripts/build.sh -r
-      - name: Start prometheus
-        # Only run for the original repo; a forked repo won't have access to the monitoring credentials
-        if: (github.event_name != 'pull_request') || (github.event.pull_request.head.repo.full_name == github.repository)
-        shell: bash
-        run: bash -x ./scripts/run_prometheus.sh
-        env:
-          PROMETHEUS_ID: ${{ secrets.PROMETHEUS_ID }}
-          PROMETHEUS_PASSWORD: ${{ secrets.PROMETHEUS_PASSWORD }}
-      - name: Start promtail
-        if: (github.event_name != 'pull_request') || (github.event.pull_request.head.repo.full_name == github.repository)
-        shell: bash
-        run: bash -x ./scripts/run_promtail.sh
-        env:
-          LOKI_ID: ${{ secrets.LOKI_ID }}
-          LOKI_PASSWORD: ${{ secrets.LOKI_PASSWORD }}
-      - name: Notify of metrics availability
-        if: (github.event_name != 'pull_request') || (github.event.pull_request.head.repo.full_name == github.repository)
-        shell: bash
-        run: .github/workflows/notify-metrics-availability.sh
-        env:
-          GRAFANA_URL: ${{ env.grafana_url }}
-          GH_JOB_ID: ${{ github.job }}
-          FILTER_BY_OWNER: avalanchego-e2e
       - name: Run e2e tests
-        shell: bash
-        run: E2E_SERIAL=1 ./scripts/tests.e2e.sh --delay-network-shutdown
-        env:
-          GH_REPO: ${{ github.repository }}
-          GH_WORKFLOW: ${{ github.workflow }}
-          GH_RUN_ID: ${{ github.run_id }}
-          GH_RUN_NUMBER: ${{ github.run_number }}
-          GH_RUN_ATTEMPT: ${{ github.run_attempt }}
-          GH_JOB_ID: ${{ github.job }}
+        uses: ./.github/actions/run-monitored-tmpnet-cmd
+        with:
+          run: E2E_SERIAL=1 ./scripts/tests.e2e.sh --delay-network-shutdown
+          prometheus_id: ${{ secrets.PROMETHEUS_ID || '' }}
+          prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
+          loki_id: ${{ secrets.LOKI_ID || '' }}
+          loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
       - name: Upload tmpnet network dir
-        uses: actions/upload-artifact@v4
+        uses: ./.github/actions/upload-tmpnet-artifact
         if: always()
         with:
           name: e2e-tmpnet-data
-          path: |
-            ~/.tmpnet/networks
-            ~/.tmpnet/prometheus/prometheus.log
-            ~/.tmpnet/promtail/promtail.log
-          if-no-files-found: error
   e2e_existing_network:
     runs-on: ubuntu-latest
     steps:
@@ -110,48 +77,19 @@ jobs:
       - name: Build AvalancheGo Binary
         shell: bash
         run: ./scripts/build.sh -r
-      - name: Start prometheus
-        # Only run for the original repo; a forked repo won't have access to the monitoring credentials
-        if: (github.event_name != 'pull_request') || (github.event.pull_request.head.repo.full_name == github.repository)
-        shell: bash
-        run: bash -x ./scripts/run_prometheus.sh
-        env:
-          PROMETHEUS_ID: ${{ secrets.PROMETHEUS_ID }}
-          PROMETHEUS_PASSWORD: ${{ secrets.PROMETHEUS_PASSWORD }}
-      - name: Start promtail
-        if: (github.event_name != 'pull_request') || (github.event.pull_request.head.repo.full_name == github.repository)
-        shell: bash
-        run: bash -x ./scripts/run_promtail.sh
-        env:
-          LOKI_ID: ${{ secrets.LOKI_ID }}
-          LOKI_PASSWORD: ${{ secrets.LOKI_PASSWORD }}
-      - name: Notify of metrics availability
-        if: (github.event_name != 'pull_request') || (github.event.pull_request.head.repo.full_name == github.repository)
-        shell: bash
-        run: .github/workflows/notify-metrics-availability.sh
-        env:
-          GRAFANA_URL: ${{ env.grafana_url }}
-          GH_JOB_ID: ${{ github.job }}
       - name: Run e2e tests with existing network
-        shell: bash
-        run: E2E_SERIAL=1 ./scripts/tests.e2e.existing.sh --delay-network-shutdown
-        env:
-          GH_REPO: ${{ github.repository }}
-          GH_WORKFLOW: ${{ github.workflow }}
-          GH_RUN_ID: ${{ github.run_id }}
-          GH_RUN_NUMBER: ${{ github.run_number }}
-          GH_RUN_ATTEMPT: ${{ github.run_attempt }}
-          GH_JOB_ID: ${{ github.job }}
+        uses: ./.github/actions/run-monitored-tmpnet-cmd
+        with:
+          run: E2E_SERIAL=1 ./scripts/tests.e2e.existing.sh --delay-network-shutdown
+          prometheus_id: ${{ secrets.PROMETHEUS_ID || '' }}
+          prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
+          loki_id: ${{ secrets.LOKI_ID || '' }}
+          loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
       - name: Upload tmpnet network dir
-        uses: actions/upload-artifact@v4
+        uses: ./.github/actions/upload-tmpnet-artifact
         if: always()
         with:
           name: e2e-existing-network-tmpnet-data
-          path: |
-            ~/.tmpnet/networks
-            ~/.tmpnet/prometheus/prometheus.log
-            ~/.tmpnet/promtail/promtail.log
-          if-no-files-found: error
   Upgrade:
     runs-on: ubuntu-latest
     steps:
@@ -160,48 +98,20 @@ jobs:
       - name: Build AvalancheGo Binary
         shell: bash
         run: ./scripts/build.sh
-      - name: Start prometheus
-        # Only run for the original repo; a forked repo won't have access to the monitoring credentials
-        if: (github.event_name != 'pull_request') || (github.event.pull_request.head.repo.full_name == github.repository)
-        shell: bash
-        run: bash -x ./scripts/run_prometheus.sh
-        env:
-          PROMETHEUS_ID: ${{ secrets.PROMETHEUS_ID }}
-          PROMETHEUS_PASSWORD: ${{ secrets.PROMETHEUS_PASSWORD }}
-      - name: Start promtail
-        if: (github.event_name != 'pull_request') || (github.event.pull_request.head.repo.full_name == github.repository)
-        shell: bash
-        run: bash -x ./scripts/run_promtail.sh
-        env:
-          LOKI_ID: ${{ secrets.LOKI_ID }}
-          LOKI_PASSWORD: ${{ secrets.LOKI_PASSWORD }}
-      - name: Notify of metrics availability
-        if: (github.event_name != 'pull_request') || (github.event.pull_request.head.repo.full_name == github.repository)
-        shell: bash
-        run: .github/workflows/notify-metrics-availability.sh
-        env:
-          GRAFANA_URL: ${{ env.grafana_url }}
-          GH_JOB_ID: ${{ github.job }}
       - name: Run e2e tests
-        shell: bash
-        run: ./scripts/tests.upgrade.sh
-        env:
-          GH_REPO: ${{ github.repository }}
-          GH_WORKFLOW: ${{ github.workflow }}
-          GH_RUN_ID: ${{ github.run_id }}
-          GH_RUN_NUMBER: ${{ github.run_number }}
-          GH_RUN_ATTEMPT: ${{ github.run_attempt }}
-          GH_JOB_ID: ${{ github.job }}
+        uses: ./.github/actions/run-monitored-tmpnet-cmd
+        with:
+          run: ./scripts/tests.upgrade.sh
+          filter_by_owner: avalanchego-e2e
+          prometheus_id: ${{ secrets.PROMETHEUS_ID || '' }}
+          prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
+          loki_id: ${{ secrets.LOKI_ID || '' }}
+          loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
       - name: Upload tmpnet network dir
-        uses: actions/upload-artifact@v4
+        uses: ./.github/actions/upload-tmpnet-artifact
         if: always()
         with:
           name: upgrade-tmpnet-data
-          path: |
-            ~/.tmpnet/networks
-            ~/.tmpnet/prometheus/prometheus.log
-            ~/.tmpnet/promtail/promtail.log
-          if-no-files-found: error
   Lint:
     runs-on: ubuntu-latest
     steps:
