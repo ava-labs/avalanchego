@@ -6,12 +6,12 @@ package config
 import (
 	"time"
 
-	"github.com/ava-labs/avalanchego/vms/avm/txs/fees"
+	"github.com/ava-labs/avalanchego/vms/avm/txs/fee"
 )
 
 // Struct collecting all the foundational parameters of the AVM
 type Config struct {
-	fees.StaticConfig
+	fee.StaticConfig
 
 	// Time of the E network upgrade
 	EUpgradeTime time.Time

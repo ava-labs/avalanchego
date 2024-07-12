@@ -31,7 +31,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
-	"github.com/ava-labs/avalanchego/vms/avm/txs/fees"
+	"github.com/ava-labs/avalanchego/vms/avm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
@@ -231,7 +231,7 @@ func setup(tb testing.TB, c *envConfig) *environment {
 
 func staticConfig(tb testing.TB, f fork) config.Config {
 	c := config.Config{
-		StaticConfig: fees.StaticConfig{
+		StaticConfig: fee.StaticConfig{
 			TxFee:            testTxFee,
 			CreateAssetTxFee: testTxFee,
 		},

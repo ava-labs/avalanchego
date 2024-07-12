@@ -11,7 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/avm/state"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
-	"github.com/ava-labs/avalanchego/vms/avm/txs/fees"
+	"github.com/ava-labs/avalanchego/vms/avm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
@@ -131,7 +131,7 @@ func (v *SemanticVerifier) verifyBaseTx(
 	importedIns []*avax.TransferableInput,
 	exportedOuts []*avax.TransferableOutput,
 ) error {
-	feeCalculator := fees.NewStaticCalculator(v.Backend.Config.StaticConfig)
+	feeCalculator := fee.NewStaticCalculator(v.Backend.Config.StaticConfig)
 	fee, err := feeCalculator.CalculateFee(&txs.Tx{Unsigned: tx})
 	if err != nil {
 		return err
