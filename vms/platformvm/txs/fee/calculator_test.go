@@ -19,7 +19,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/fee"
-	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
@@ -112,41 +111,41 @@ func TestTxFees(t *testing.T) {
 	preApricotPhase3Time := upgrades.ApricotPhase3Time.Add(-1 * time.Second)
 
 	tests := []struct {
-		name                string
-		chainTime           time.Time
-		unsignedAndSignedTx func(t *testing.T) (txs.UnsignedTx, *txs.Tx)
-		gasCapF             func() fee.Gas
-		expectedError       error
-		checksF             func(*testing.T, Calculator)
+		name          string
+		chainTime     time.Time
+		signedTxF     func(t *testing.T) *txs.Tx
+		gasCapF       func() fee.Gas
+		expectedError error
+		checksF       func(*testing.T, Calculator)
 	}{
 		{
-			name:                "AddValidatorTx pre EUpgrade",
-			chainTime:           preEUpgradeTime,
-			unsignedAndSignedTx: addValidatorTx,
+			name:      "AddValidatorTx pre EUpgrade",
+			chainTime: preEUpgradeTime,
+			signedTxF: addValidatorTx,
 			checksF: func(t *testing.T, c Calculator) {
 				require.Equal(t, feeTestsDefaultCfg.AddPrimaryNetworkValidatorFee, c.GetFee())
 			},
 		},
 		{
-			name:                "AddValidatorTx post EUpgrade",
-			chainTime:           postEUpgradeTime,
-			expectedError:       errFailedFeeCalculation,
-			unsignedAndSignedTx: addValidatorTx,
-			checksF:             func(*testing.T, Calculator) {},
+			name:          "AddValidatorTx post EUpgrade",
+			chainTime:     postEUpgradeTime,
+			expectedError: errFailedFeeCalculation,
+			signedTxF:     addValidatorTx,
+			checksF:       func(*testing.T, Calculator) {},
 		},
 		{
-			name:                "AddSubnetValidatorTx pre EUpgrade",
-			chainTime:           preEUpgradeTime,
-			unsignedAndSignedTx: addSubnetValidatorTx,
+			name:      "AddSubnetValidatorTx pre EUpgrade",
+			chainTime: preEUpgradeTime,
+			signedTxF: addSubnetValidatorTx,
 			checksF: func(t *testing.T, c Calculator) {
 				require.Equal(t, feeTestsDefaultCfg.AddSubnetValidatorFee, c.GetFee())
 			},
 		},
 		{
-			name:                "AddSubnetValidatorTx post EUpgrade, success",
-			chainTime:           postEUpgradeTime,
-			expectedError:       nil,
-			unsignedAndSignedTx: addSubnetValidatorTx,
+			name:          "AddSubnetValidatorTx post EUpgrade, success",
+			chainTime:     postEUpgradeTime,
+			expectedError: nil,
+			signedTxF:     addSubnetValidatorTx,
 			checksF: func(t *testing.T, c Calculator) {
 				require.Equal(t, 2_910*units.NanoAvax, c.GetFee())
 				haveGas, err := c.GetBlockGas()
@@ -160,46 +159,46 @@ func TestTxFees(t *testing.T) {
 			gasCapF: func() fee.Gas {
 				return testBlockMaxGas - 1
 			},
-			unsignedAndSignedTx: addSubnetValidatorTx,
-			expectedError:       errFailedComplexityCumulation,
-			checksF:             func(*testing.T, Calculator) {},
+			signedTxF:     addSubnetValidatorTx,
+			expectedError: errFailedComplexityCumulation,
+			checksF:       func(*testing.T, Calculator) {},
 		},
 		{
-			name:                "AddDelegatorTx pre EUpgrade",
-			chainTime:           preEUpgradeTime,
-			unsignedAndSignedTx: addDelegatorTx,
+			name:      "AddDelegatorTx pre EUpgrade",
+			chainTime: preEUpgradeTime,
+			signedTxF: addDelegatorTx,
 			checksF: func(t *testing.T, c Calculator) {
 				require.Equal(t, feeTestsDefaultCfg.AddPrimaryNetworkDelegatorFee, c.GetFee())
 			},
 		},
 		{
-			name:                "AddDelegatorTx post EUpgrade",
-			chainTime:           postEUpgradeTime,
-			expectedError:       errFailedFeeCalculation,
-			unsignedAndSignedTx: addDelegatorTx,
-			checksF:             func(*testing.T, Calculator) {},
+			name:          "AddDelegatorTx post EUpgrade",
+			chainTime:     postEUpgradeTime,
+			expectedError: errFailedFeeCalculation,
+			signedTxF:     addDelegatorTx,
+			checksF:       func(*testing.T, Calculator) {},
 		},
 		{
-			name:                "CreateChainTx pre ApricotPhase3",
-			chainTime:           preApricotPhase3Time,
-			unsignedAndSignedTx: createChainTx,
+			name:      "CreateChainTx pre ApricotPhase3",
+			chainTime: preApricotPhase3Time,
+			signedTxF: createChainTx,
 			checksF: func(t *testing.T, c Calculator) {
 				require.Equal(t, feeTestsDefaultCfg.CreateAssetTxFee, c.GetFee())
 			},
 		},
 		{
-			name:                "CreateChainTx pre EUpgrade",
-			chainTime:           preEUpgradeTime,
-			unsignedAndSignedTx: createChainTx,
+			name:      "CreateChainTx pre EUpgrade",
+			chainTime: preEUpgradeTime,
+			signedTxF: createChainTx,
 			checksF: func(t *testing.T, c Calculator) {
 				require.Equal(t, feeTestsDefaultCfg.CreateBlockchainTxFee, c.GetFee())
 			},
 		},
 		{
-			name:                "CreateChainTx post EUpgrade, success",
-			chainTime:           postEUpgradeTime,
-			unsignedAndSignedTx: createChainTx,
-			expectedError:       nil,
+			name:          "CreateChainTx post EUpgrade, success",
+			chainTime:     postEUpgradeTime,
+			signedTxF:     createChainTx,
+			expectedError: nil,
 			checksF: func(t *testing.T, c Calculator) {
 				require.Equal(t, 1_950*units.NanoAvax, c.GetFee())
 				haveGas, err := c.GetBlockGas()
@@ -208,9 +207,9 @@ func TestTxFees(t *testing.T) {
 			},
 		},
 		{
-			name:                "CreateChainTx post EUpgrade, utxos read cap breached",
-			chainTime:           postEUpgradeTime,
-			unsignedAndSignedTx: createChainTx,
+			name:      "CreateChainTx post EUpgrade, utxos read cap breached",
+			chainTime: postEUpgradeTime,
+			signedTxF: createChainTx,
 			gasCapF: func() fee.Gas {
 				return testBlockMaxGas - 1
 			},
@@ -218,26 +217,26 @@ func TestTxFees(t *testing.T) {
 			checksF:       func(*testing.T, Calculator) {},
 		},
 		{
-			name:                "CreateSubnetTx pre ApricotPhase3",
-			chainTime:           preApricotPhase3Time,
-			unsignedAndSignedTx: createSubnetTx,
+			name:      "CreateSubnetTx pre ApricotPhase3",
+			chainTime: preApricotPhase3Time,
+			signedTxF: createSubnetTx,
 			checksF: func(t *testing.T, c Calculator) {
 				require.Equal(t, feeTestsDefaultCfg.CreateAssetTxFee, c.GetFee())
 			},
 		},
 		{
-			name:                "CreateSubnetTx pre EUpgrade",
-			chainTime:           preEUpgradeTime,
-			unsignedAndSignedTx: createSubnetTx,
+			name:      "CreateSubnetTx pre EUpgrade",
+			chainTime: preEUpgradeTime,
+			signedTxF: createSubnetTx,
 			checksF: func(t *testing.T, c Calculator) {
 				require.Equal(t, feeTestsDefaultCfg.CreateSubnetTxFee, c.GetFee())
 			},
 		},
 		{
-			name:                "CreateSubnetTx post EUpgrade, success",
-			chainTime:           postEUpgradeTime,
-			unsignedAndSignedTx: createSubnetTx,
-			expectedError:       nil,
+			name:          "CreateSubnetTx post EUpgrade, success",
+			chainTime:     postEUpgradeTime,
+			signedTxF:     createSubnetTx,
+			expectedError: nil,
 			checksF: func(t *testing.T, c Calculator) {
 				require.Equal(t, 1_850*units.NanoAvax, c.GetFee())
 				haveGas, err := c.GetBlockGas()
@@ -246,9 +245,9 @@ func TestTxFees(t *testing.T) {
 			},
 		},
 		{
-			name:                "CreateSubnetTx post EUpgrade, utxos read cap breached",
-			chainTime:           postEUpgradeTime,
-			unsignedAndSignedTx: createSubnetTx,
+			name:      "CreateSubnetTx post EUpgrade, utxos read cap breached",
+			chainTime: postEUpgradeTime,
+			signedTxF: createSubnetTx,
 			gasCapF: func() fee.Gas {
 				return testBlockMaxGas - 1
 			},
@@ -256,18 +255,18 @@ func TestTxFees(t *testing.T) {
 			checksF:       func(*testing.T, Calculator) {},
 		},
 		{
-			name:                "RemoveSubnetValidatorTx pre EUpgrade",
-			chainTime:           preEUpgradeTime,
-			unsignedAndSignedTx: removeSubnetValidatorTx,
+			name:      "RemoveSubnetValidatorTx pre EUpgrade",
+			chainTime: preEUpgradeTime,
+			signedTxF: removeSubnetValidatorTx,
 			checksF: func(t *testing.T, c Calculator) {
 				require.Equal(t, feeTestsDefaultCfg.TxFee, c.GetFee())
 			},
 		},
 		{
-			name:                "RemoveSubnetValidatorTx post EUpgrade, success",
-			chainTime:           postEUpgradeTime,
-			unsignedAndSignedTx: removeSubnetValidatorTx,
-			expectedError:       nil,
+			name:          "RemoveSubnetValidatorTx post EUpgrade, success",
+			chainTime:     postEUpgradeTime,
+			signedTxF:     removeSubnetValidatorTx,
+			expectedError: nil,
 			checksF: func(t *testing.T, c Calculator) {
 				require.Equal(t, 2_880*units.NanoAvax, c.GetFee())
 				haveGas, err := c.GetBlockGas()
@@ -281,23 +280,23 @@ func TestTxFees(t *testing.T) {
 			gasCapF: func() fee.Gas {
 				return testBlockMaxGas - 1
 			},
-			unsignedAndSignedTx: removeSubnetValidatorTx,
-			expectedError:       errFailedComplexityCumulation,
-			checksF:             func(*testing.T, Calculator) {},
+			signedTxF:     removeSubnetValidatorTx,
+			expectedError: errFailedComplexityCumulation,
+			checksF:       func(*testing.T, Calculator) {},
 		},
 		{
-			name:                "TransformSubnetTx pre EUpgrade",
-			chainTime:           preEUpgradeTime,
-			unsignedAndSignedTx: transformSubnetTx,
+			name:      "TransformSubnetTx pre EUpgrade",
+			chainTime: preEUpgradeTime,
+			signedTxF: transformSubnetTx,
 			checksF: func(t *testing.T, c Calculator) {
 				require.Equal(t, feeTestsDefaultCfg.TransformSubnetTxFee, c.GetFee())
 			},
 		},
 		{
-			name:                "TransformSubnetTx post EUpgrade, success",
-			chainTime:           postEUpgradeTime,
-			unsignedAndSignedTx: transformSubnetTx,
-			expectedError:       nil,
+			name:          "TransformSubnetTx post EUpgrade, success",
+			chainTime:     postEUpgradeTime,
+			signedTxF:     transformSubnetTx,
+			expectedError: nil,
 			checksF: func(t *testing.T, c Calculator) {
 				require.Equal(t, 1_970*units.NanoAvax, c.GetFee())
 				haveGas, err := c.GetBlockGas()
@@ -311,23 +310,23 @@ func TestTxFees(t *testing.T) {
 			gasCapF: func() fee.Gas {
 				return testBlockMaxGas - 1
 			},
-			unsignedAndSignedTx: transformSubnetTx,
-			expectedError:       errFailedComplexityCumulation,
-			checksF:             func(*testing.T, Calculator) {},
+			signedTxF:     transformSubnetTx,
+			expectedError: errFailedComplexityCumulation,
+			checksF:       func(*testing.T, Calculator) {},
 		},
 		{
-			name:                "TransferSubnetOwnershipTx pre EUpgrade",
-			chainTime:           preEUpgradeTime,
-			unsignedAndSignedTx: transferSubnetOwnershipTx,
+			name:      "TransferSubnetOwnershipTx pre EUpgrade",
+			chainTime: preEUpgradeTime,
+			signedTxF: transferSubnetOwnershipTx,
 			checksF: func(t *testing.T, c Calculator) {
 				require.Equal(t, feeTestsDefaultCfg.TxFee, c.GetFee())
 			},
 		},
 		{
-			name:                "TransferSubnetOwnershipTx post EUpgrade, success",
-			chainTime:           postEUpgradeTime,
-			unsignedAndSignedTx: transferSubnetOwnershipTx,
-			expectedError:       nil,
+			name:          "TransferSubnetOwnershipTx post EUpgrade, success",
+			chainTime:     postEUpgradeTime,
+			signedTxF:     transferSubnetOwnershipTx,
+			expectedError: nil,
 			checksF: func(t *testing.T, c Calculator) {
 				require.Equal(t, 1_900*units.NanoAvax, c.GetFee())
 				haveGas, err := c.GetBlockGas()
@@ -341,14 +340,14 @@ func TestTxFees(t *testing.T) {
 			gasCapF: func() fee.Gas {
 				return testBlockMaxGas - 1
 			},
-			unsignedAndSignedTx: transferSubnetOwnershipTx,
-			expectedError:       errFailedComplexityCumulation,
-			checksF:             func(*testing.T, Calculator) {},
+			signedTxF:     transferSubnetOwnershipTx,
+			expectedError: errFailedComplexityCumulation,
+			checksF:       func(*testing.T, Calculator) {},
 		},
 		{
 			name:      "AddPermissionlessValidatorTx Primary Network pre EUpgrade",
 			chainTime: preEUpgradeTime,
-			unsignedAndSignedTx: func(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
+			signedTxF: func(t *testing.T) *txs.Tx {
 				return addPermissionlessValidatorTx(t, constants.PrimaryNetworkID)
 			},
 			checksF: func(t *testing.T, c Calculator) {
@@ -358,7 +357,7 @@ func TestTxFees(t *testing.T) {
 		{
 			name:      "AddPermissionlessValidatorTx Subnet pre EUpgrade",
 			chainTime: preEUpgradeTime,
-			unsignedAndSignedTx: func(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
+			signedTxF: func(t *testing.T) *txs.Tx {
 				subnetID := ids.GenerateTestID()
 				require.NotEqual(t, constants.PrimaryNetworkID, subnetID)
 				return addPermissionlessValidatorTx(t, subnetID)
@@ -370,7 +369,7 @@ func TestTxFees(t *testing.T) {
 		{
 			name:      "AddPermissionlessValidatorTx Primary Network post EUpgrade, success",
 			chainTime: postEUpgradeTime,
-			unsignedAndSignedTx: func(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
+			signedTxF: func(t *testing.T) *txs.Tx {
 				return addPermissionlessValidatorTx(t, constants.PrimaryNetworkID)
 			},
 			expectedError: nil,
@@ -384,7 +383,7 @@ func TestTxFees(t *testing.T) {
 		{
 			name:      "AddPermissionlessValidatorTx Subnet post EUpgrade, success",
 			chainTime: postEUpgradeTime,
-			unsignedAndSignedTx: func(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
+			signedTxF: func(t *testing.T) *txs.Tx {
 				subnetID := ids.GenerateTestID()
 				require.NotEqual(t, constants.PrimaryNetworkID, subnetID)
 				return addPermissionlessValidatorTx(t, subnetID)
@@ -403,7 +402,7 @@ func TestTxFees(t *testing.T) {
 			gasCapF: func() fee.Gas {
 				return testBlockMaxGas - 1
 			},
-			unsignedAndSignedTx: func(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
+			signedTxF: func(t *testing.T) *txs.Tx {
 				subnetID := ids.GenerateTestID()
 				return addPermissionlessValidatorTx(t, subnetID)
 			},
@@ -413,7 +412,7 @@ func TestTxFees(t *testing.T) {
 		{
 			name:      "AddPermissionlessDelegatorTx Primary Network pre EUpgrade",
 			chainTime: preEUpgradeTime,
-			unsignedAndSignedTx: func(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
+			signedTxF: func(t *testing.T) *txs.Tx {
 				return addPermissionlessDelegatorTx(t, constants.PrimaryNetworkID)
 			},
 			checksF: func(t *testing.T, c Calculator) {
@@ -423,7 +422,7 @@ func TestTxFees(t *testing.T) {
 		{
 			name:      "AddPermissionlessDelegatorTx pre EUpgrade",
 			chainTime: preEUpgradeTime,
-			unsignedAndSignedTx: func(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
+			signedTxF: func(t *testing.T) *txs.Tx {
 				subnetID := ids.GenerateTestID()
 				require.NotEqual(t, constants.PrimaryNetworkID, subnetID)
 				return addPermissionlessDelegatorTx(t, subnetID)
@@ -435,7 +434,7 @@ func TestTxFees(t *testing.T) {
 		{
 			name:      "AddPermissionlessDelegatorTx Primary Network post EUpgrade, success",
 			chainTime: postEUpgradeTime,
-			unsignedAndSignedTx: func(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
+			signedTxF: func(t *testing.T) *txs.Tx {
 				return addPermissionlessDelegatorTx(t, constants.PrimaryNetworkID)
 			},
 			expectedError: nil,
@@ -449,7 +448,7 @@ func TestTxFees(t *testing.T) {
 		{
 			name:      "AddPermissionlessDelegatorTx Subnet post EUpgrade, success",
 			chainTime: postEUpgradeTime,
-			unsignedAndSignedTx: func(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
+			signedTxF: func(t *testing.T) *txs.Tx {
 				return addPermissionlessDelegatorTx(t, constants.PrimaryNetworkID)
 			},
 			expectedError: nil,
@@ -466,7 +465,7 @@ func TestTxFees(t *testing.T) {
 			gasCapF: func() fee.Gas {
 				return testBlockMaxGas - 1
 			},
-			unsignedAndSignedTx: func(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
+			signedTxF: func(t *testing.T) *txs.Tx {
 				subnetID := ids.GenerateTestID()
 				require.NotEqual(t, constants.PrimaryNetworkID, subnetID)
 				return addPermissionlessValidatorTx(t, subnetID)
@@ -475,18 +474,18 @@ func TestTxFees(t *testing.T) {
 			checksF:       func(*testing.T, Calculator) {},
 		},
 		{
-			name:                "BaseTx pre EUpgrade",
-			chainTime:           preEUpgradeTime,
-			unsignedAndSignedTx: baseTx,
+			name:      "BaseTx pre EUpgrade",
+			chainTime: preEUpgradeTime,
+			signedTxF: baseTx,
 			checksF: func(t *testing.T, c Calculator) {
 				require.Equal(t, feeTestsDefaultCfg.TxFee, c.GetFee())
 			},
 		},
 		{
-			name:                "BaseTx post EUpgrade, success",
-			chainTime:           postEUpgradeTime,
-			unsignedAndSignedTx: baseTx,
-			expectedError:       nil,
+			name:          "BaseTx post EUpgrade, success",
+			chainTime:     postEUpgradeTime,
+			signedTxF:     baseTx,
+			expectedError: nil,
 			checksF: func(t *testing.T, c Calculator) {
 				require.Equal(t, 1_810*units.NanoAvax, c.GetFee())
 				haveGas, err := c.GetBlockGas()
@@ -500,23 +499,23 @@ func TestTxFees(t *testing.T) {
 			gasCapF: func() fee.Gas {
 				return testBlockMaxGas - 1
 			},
-			unsignedAndSignedTx: baseTx,
-			expectedError:       errFailedComplexityCumulation,
-			checksF:             func(*testing.T, Calculator) {},
+			signedTxF:     baseTx,
+			expectedError: errFailedComplexityCumulation,
+			checksF:       func(*testing.T, Calculator) {},
 		},
 		{
-			name:                "ImportTx pre EUpgrade",
-			chainTime:           preEUpgradeTime,
-			unsignedAndSignedTx: importTx,
+			name:      "ImportTx pre EUpgrade",
+			chainTime: preEUpgradeTime,
+			signedTxF: importTx,
 			checksF: func(t *testing.T, c Calculator) {
 				require.Equal(t, feeTestsDefaultCfg.TxFee, c.GetFee())
 			},
 		},
 		{
-			name:                "ImportTx post EUpgrade, success",
-			chainTime:           postEUpgradeTime,
-			unsignedAndSignedTx: importTx,
-			expectedError:       nil,
+			name:          "ImportTx post EUpgrade, success",
+			chainTime:     postEUpgradeTime,
+			signedTxF:     importTx,
+			expectedError: nil,
 			checksF: func(t *testing.T, c Calculator) {
 				require.Equal(t, 3_120*units.NanoAvax, c.GetFee())
 				haveGas, err := c.GetBlockGas()
@@ -530,23 +529,23 @@ func TestTxFees(t *testing.T) {
 			gasCapF: func() fee.Gas {
 				return testBlockMaxGas - 1
 			},
-			unsignedAndSignedTx: importTx,
-			expectedError:       errFailedComplexityCumulation,
-			checksF:             func(*testing.T, Calculator) {},
+			signedTxF:     importTx,
+			expectedError: errFailedComplexityCumulation,
+			checksF:       func(*testing.T, Calculator) {},
 		},
 		{
-			name:                "ExportTx pre EUpgrade",
-			chainTime:           preEUpgradeTime,
-			unsignedAndSignedTx: exportTx,
+			name:      "ExportTx pre EUpgrade",
+			chainTime: preEUpgradeTime,
+			signedTxF: exportTx,
 			checksF: func(t *testing.T, c Calculator) {
 				require.Equal(t, feeTestsDefaultCfg.TxFee, c.GetFee())
 			},
 		},
 		{
-			name:                "ExportTx post EUpgrade, success",
-			chainTime:           postEUpgradeTime,
-			unsignedAndSignedTx: exportTx,
-			expectedError:       nil,
+			name:          "ExportTx post EUpgrade, success",
+			chainTime:     postEUpgradeTime,
+			signedTxF:     exportTx,
+			expectedError: nil,
 			checksF: func(t *testing.T, c Calculator) {
 				require.Equal(t, 2_040*units.NanoAvax, c.GetFee())
 				haveGas, err := c.GetBlockGas()
@@ -560,17 +559,19 @@ func TestTxFees(t *testing.T) {
 			gasCapF: func() fee.Gas {
 				return testBlockMaxGas - 1
 			},
-			unsignedAndSignedTx: exportTx,
-			expectedError:       errFailedComplexityCumulation,
-			checksF:             func(*testing.T, Calculator) {},
+			signedTxF:     exportTx,
+			expectedError: errFailedComplexityCumulation,
+			checksF:       func(*testing.T, Calculator) {},
 		},
 		{
 			name:      "RewardValidatorTx pre EUpgrade",
 			chainTime: preEUpgradeTime,
-			unsignedAndSignedTx: func(_ *testing.T) (txs.UnsignedTx, *txs.Tx) {
-				return &txs.RewardValidatorTx{
-					TxID: ids.GenerateTestID(),
-				}, nil
+			signedTxF: func(_ *testing.T) *txs.Tx {
+				return &txs.Tx{
+					Unsigned: &txs.RewardValidatorTx{
+						TxID: ids.GenerateTestID(),
+					},
+				}
 			},
 			checksF: func(t *testing.T, c Calculator) {
 				require.Equal(t, uint64(0), c.GetFee())
@@ -579,10 +580,12 @@ func TestTxFees(t *testing.T) {
 		{
 			name:      "RewardValidatorTx post EUpgrade",
 			chainTime: postEUpgradeTime,
-			unsignedAndSignedTx: func(_ *testing.T) (txs.UnsignedTx, *txs.Tx) {
-				return &txs.RewardValidatorTx{
-					TxID: ids.GenerateTestID(),
-				}, nil
+			signedTxF: func(_ *testing.T) *txs.Tx {
+				return &txs.Tx{
+					Unsigned: &txs.RewardValidatorTx{
+						TxID: ids.GenerateTestID(),
+					},
+				}
 			},
 			checksF: func(t *testing.T, c Calculator) {
 				require.Equal(t, uint64(0), c.GetFee())
@@ -591,10 +594,12 @@ func TestTxFees(t *testing.T) {
 		{
 			name:      "AdvanceTimeTx pre EUpgrade",
 			chainTime: preEUpgradeTime,
-			unsignedAndSignedTx: func(_ *testing.T) (txs.UnsignedTx, *txs.Tx) {
-				return &txs.AdvanceTimeTx{
-					Time: uint64(time.Now().Unix()),
-				}, nil
+			signedTxF: func(_ *testing.T) *txs.Tx {
+				return &txs.Tx{
+					Unsigned: &txs.AdvanceTimeTx{
+						Time: uint64(time.Now().Unix()),
+					},
+				}
 			},
 			checksF: func(t *testing.T, c Calculator) {
 				require.Equal(t, uint64(0), c.GetFee())
@@ -603,10 +608,12 @@ func TestTxFees(t *testing.T) {
 		{
 			name:      "AdvanceTimeTx post EUpgrade",
 			chainTime: postEUpgradeTime,
-			unsignedAndSignedTx: func(_ *testing.T) (txs.UnsignedTx, *txs.Tx) {
-				return &txs.AdvanceTimeTx{
-					Time: uint64(time.Now().Unix()),
-				}, nil
+			signedTxF: func(_ *testing.T) *txs.Tx {
+				return &txs.Tx{
+					Unsigned: &txs.AdvanceTimeTx{
+						Time: uint64(time.Now().Unix()),
+					},
+				}
 			},
 			checksF: func(t *testing.T, c Calculator) {
 				require.Equal(t, uint64(0), c.GetFee())
@@ -621,8 +628,6 @@ func TestTxFees(t *testing.T) {
 				gasCap = tt.gasCapF()
 			}
 
-			uTx, sTx := tt.unsignedAndSignedTx(t)
-
 			var c Calculator
 			if !upgrades.IsEActivated(tt.chainTime) {
 				c = NewStaticCalculator(feeTestsDefaultCfg, upgrades, tt.chainTime)
@@ -630,18 +635,14 @@ func TestTxFees(t *testing.T) {
 				c = NewDynamicCalculator(fee.NewCalculator(testFeeWeights, testGasPrice, gasCap))
 			}
 
-			var creds []verify.Verifiable
-			if sTx != nil {
-				// txs like RewardValidatorTx are not signed
-				creds = sTx.Creds
-			}
-			_, _ = c.CalculateFee(&txs.Tx{Unsigned: uTx, Creds: creds})
+			sTx := tt.signedTxF(t)
+			_, _ = c.CalculateFee(sTx)
 			tt.checksF(t, c)
 		})
 	}
 }
 
-func addValidatorTx(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
+func addValidatorTx(t *testing.T) *txs.Tx {
 	r := require.New(t)
 
 	defaultCtx := snowtest.Context(t, snowtest.PChainID)
@@ -666,10 +667,10 @@ func addValidatorTx(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
 	sTx, err := txs.NewSigned(uTx, txs.Codec, feeTestSigners)
 	r.NoError(err)
 
-	return uTx, sTx
+	return sTx
 }
 
-func addSubnetValidatorTx(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
+func addSubnetValidatorTx(t *testing.T) *txs.Tx {
 	r := require.New(t)
 
 	defaultCtx := snowtest.Context(t, snowtest.PChainID)
@@ -691,10 +692,10 @@ func addSubnetValidatorTx(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
 	}
 	sTx, err := txs.NewSigned(uTx, txs.Codec, feeTestSigners)
 	r.NoError(err)
-	return uTx, sTx
+	return sTx
 }
 
-func addDelegatorTx(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
+func addDelegatorTx(t *testing.T) *txs.Tx {
 	r := require.New(t)
 
 	defaultCtx := snowtest.Context(t, snowtest.PChainID)
@@ -717,10 +718,10 @@ func addDelegatorTx(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
 	}
 	sTx, err := txs.NewSigned(uTx, txs.Codec, feeTestSigners)
 	r.NoError(err)
-	return uTx, sTx
+	return sTx
 }
 
-func createChainTx(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
+func createChainTx(t *testing.T) *txs.Tx {
 	r := require.New(t)
 
 	defaultCtx := snowtest.Context(t, snowtest.PChainID)
@@ -737,10 +738,10 @@ func createChainTx(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
 	}
 	sTx, err := txs.NewSigned(uTx, txs.Codec, feeTestSigners)
 	r.NoError(err)
-	return uTx, sTx
+	return sTx
 }
 
-func createSubnetTx(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
+func createSubnetTx(t *testing.T) *txs.Tx {
 	r := require.New(t)
 
 	defaultCtx := snowtest.Context(t, snowtest.PChainID)
@@ -755,10 +756,10 @@ func createSubnetTx(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
 	}
 	sTx, err := txs.NewSigned(uTx, txs.Codec, feeTestSigners)
 	r.NoError(err)
-	return uTx, sTx
+	return sTx
 }
 
-func removeSubnetValidatorTx(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
+func removeSubnetValidatorTx(t *testing.T) *txs.Tx {
 	r := require.New(t)
 
 	defaultCtx := snowtest.Context(t, snowtest.PChainID)
@@ -772,10 +773,10 @@ func removeSubnetValidatorTx(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
 	}
 	sTx, err := txs.NewSigned(uTx, txs.Codec, feeTestSigners)
 	r.NoError(err)
-	return uTx, sTx
+	return sTx
 }
 
-func transformSubnetTx(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
+func transformSubnetTx(t *testing.T) *txs.Tx {
 	r := require.New(t)
 
 	defaultCtx := snowtest.Context(t, snowtest.PChainID)
@@ -801,10 +802,10 @@ func transformSubnetTx(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
 	}
 	sTx, err := txs.NewSigned(uTx, txs.Codec, feeTestSigners)
 	r.NoError(err)
-	return uTx, sTx
+	return sTx
 }
 
-func transferSubnetOwnershipTx(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
+func transferSubnetOwnershipTx(t *testing.T) *txs.Tx {
 	r := require.New(t)
 
 	defaultCtx := snowtest.Context(t, snowtest.PChainID)
@@ -826,10 +827,10 @@ func transferSubnetOwnershipTx(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
 	}
 	sTx, err := txs.NewSigned(uTx, txs.Codec, feeTestSigners)
 	r.NoError(err)
-	return uTx, sTx
+	return sTx
 }
 
-func addPermissionlessValidatorTx(t *testing.T, subnetID ids.ID) (txs.UnsignedTx, *txs.Tx) {
+func addPermissionlessValidatorTx(t *testing.T, subnetID ids.ID) *txs.Tx {
 	r := require.New(t)
 
 	defaultCtx := snowtest.Context(t, snowtest.PChainID)
@@ -860,10 +861,10 @@ func addPermissionlessValidatorTx(t *testing.T, subnetID ids.ID) (txs.UnsignedTx
 	}
 	sTx, err := txs.NewSigned(uTx, txs.Codec, feeTestSigners)
 	r.NoError(err)
-	return uTx, sTx
+	return sTx
 }
 
-func addPermissionlessDelegatorTx(t *testing.T, subnetID ids.ID) (txs.UnsignedTx, *txs.Tx) {
+func addPermissionlessDelegatorTx(t *testing.T, subnetID ids.ID) *txs.Tx {
 	r := require.New(t)
 
 	defaultCtx := snowtest.Context(t, snowtest.PChainID)
@@ -889,10 +890,10 @@ func addPermissionlessDelegatorTx(t *testing.T, subnetID ids.ID) (txs.UnsignedTx
 	}
 	sTx, err := txs.NewSigned(uTx, txs.Codec, feeTestSigners)
 	r.NoError(err)
-	return uTx, sTx
+	return sTx
 }
 
-func baseTx(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
+func baseTx(t *testing.T) *txs.Tx {
 	r := require.New(t)
 
 	defaultCtx := snowtest.Context(t, snowtest.PChainID)
@@ -901,10 +902,10 @@ func baseTx(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
 	uTx := &baseTx
 	sTx, err := txs.NewSigned(uTx, txs.Codec, feeTestSigners)
 	r.NoError(err)
-	return uTx, sTx
+	return sTx
 }
 
-func importTx(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
+func importTx(t *testing.T) *txs.Tx {
 	r := require.New(t)
 
 	defaultCtx := snowtest.Context(t, snowtest.PChainID)
@@ -927,10 +928,10 @@ func importTx(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
 	}
 	sTx, err := txs.NewSigned(uTx, txs.Codec, feeTestSigners)
 	r.NoError(err)
-	return uTx, sTx
+	return sTx
 }
 
-func exportTx(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
+func exportTx(t *testing.T) *txs.Tx {
 	r := require.New(t)
 
 	defaultCtx := snowtest.Context(t, snowtest.PChainID)
@@ -943,7 +944,7 @@ func exportTx(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
 	}
 	sTx, err := txs.NewSigned(uTx, txs.Codec, feeTestSigners)
 	r.NoError(err)
-	return uTx, sTx
+	return sTx
 }
 
 func txsCreationHelpers(defaultCtx *snow.Context) (
