@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
+	"github.com/ava-labs/avalanchego/vms/avm/txs/fees"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -25,9 +26,11 @@ import (
 var (
 	keys      = secp256k1.TestKeys()
 	feeConfig = config.Config{
-		TxFee:            2,
-		CreateAssetTxFee: 3,
-		EUpgradeTime:     mockable.MaxTime,
+		StaticConfig: fees.StaticConfig{
+			TxFee:            2,
+			CreateAssetTxFee: 3,
+		},
+		EUpgradeTime: mockable.MaxTime,
 	}
 )
 

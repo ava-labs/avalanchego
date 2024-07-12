@@ -3,15 +3,15 @@
 
 package config
 
-import "time"
+import (
+	"time"
+
+	"github.com/ava-labs/avalanchego/vms/avm/txs/fees"
+)
 
 // Struct collecting all the foundational parameters of the AVM
 type Config struct {
-	// Fee that is burned by every non-asset creating transaction
-	TxFee uint64
-
-	// Fee that must be burned by every asset creating transaction
-	CreateAssetTxFee uint64
+	fees.StaticConfig
 
 	// Time of the E network upgrade
 	EUpgradeTime time.Time

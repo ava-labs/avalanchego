@@ -75,6 +75,7 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms"
 	"github.com/ava-labs/avalanchego/vms/avm"
+	"github.com/ava-labs/avalanchego/vms/avm/txs/fees"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/upgrade"
@@ -1249,9 +1250,11 @@ func (n *Node) initVMs() error {
 		}),
 		n.VMManager.RegisterFactory(context.TODO(), constants.AVMID, &avm.Factory{
 			Config: avmconfig.Config{
-				TxFee:            n.Config.TxFee,
-				CreateAssetTxFee: n.Config.CreateAssetTxFee,
-				EUpgradeTime:     eUpgradeTime,
+				StaticConfig: fees.StaticConfig{
+					TxFee:            n.Config.TxFee,
+					CreateAssetTxFee: n.Config.CreateAssetTxFee,
+				},
+				EUpgradeTime: eUpgradeTime,
 			},
 		}),
 		n.VMManager.RegisterFactory(context.TODO(), constants.EVMID, &coreth.Factory{}),

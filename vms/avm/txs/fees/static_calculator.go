@@ -3,17 +3,14 @@
 
 package fees
 
-import (
-	"github.com/ava-labs/avalanchego/vms/avm/config"
-	"github.com/ava-labs/avalanchego/vms/avm/txs"
-)
+import "github.com/ava-labs/avalanchego/vms/avm/txs"
 
 var (
 	_ Calculator  = (*staticCalculator)(nil)
 	_ txs.Visitor = (*staticCalculator)(nil)
 )
 
-func NewStaticCalculator(c *config.Config) Calculator {
+func NewStaticCalculator(c StaticConfig) Calculator {
 	return &staticCalculator{staticCfg: c}
 }
 
@@ -25,7 +22,7 @@ func (c *staticCalculator) CalculateFee(tx *txs.Tx) (uint64, error) {
 
 type staticCalculator struct {
 	// inputs
-	staticCfg *config.Config
+	staticCfg StaticConfig
 
 	// outputs of visitor execution
 	fee uint64

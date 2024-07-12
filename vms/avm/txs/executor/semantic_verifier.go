@@ -131,7 +131,7 @@ func (v *SemanticVerifier) verifyBaseTx(
 	importedIns []*avax.TransferableInput,
 	exportedOuts []*avax.TransferableOutput,
 ) error {
-	feeCalculator := fees.NewStaticCalculator(v.Backend.Config)
+	feeCalculator := fees.NewStaticCalculator(v.Backend.Config.StaticConfig)
 	fee, err := feeCalculator.CalculateFee(&txs.Tx{Unsigned: tx})
 	if err != nil {
 		return err
