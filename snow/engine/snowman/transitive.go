@@ -71,9 +71,10 @@ type Transitive struct {
 	nonVerifieds ancestor.Tree
 
 	// Block ID --> Block.
-	// A block is put into this cache if it was not able to be issued. A block
-	// fails to be issued if verification on the block or one of its ancestors
-	// occurs.
+	//
+	// A block is put into this cache if its ancestry was fetched, but the block
+	// was not able to be issued. A block may fail to be issued if verification
+	// on the block or one of its ancestors returns an error.
 	nonVerifiedCache cache.Cacher[ids.ID, snowman.Block]
 
 	// acceptedFrontiers of the other validators of this chain
