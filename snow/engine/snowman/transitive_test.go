@@ -2866,7 +2866,7 @@ func TestEngineRegistersInvalidVoterDependencyRegression(t *testing.T) {
 	))
 	require.Len(pollRequestIDs, 1)
 
-	_, wasCached := engine.nonVerifiedCache.Get(rejectedChain[1].ID())
+	_, wasCached := engine.unverifiedBlockCache.Get(rejectedChain[1].ID())
 	require.True(wasCached)
 
 	// Issue acceptedChain[0] to consensus.
@@ -3047,9 +3047,9 @@ func TestGetProcessingAncestor(t *testing.T) {
 					Ctx:       ctx,
 					Consensus: consensus,
 				},
-				metrics:          metrics,
-				nonVerifieds:     test.nonVerifieds,
-				nonVerifiedCache: test.nonVerifiedCache,
+				metrics:                metrics,
+				unverifiedIDToAncestor: test.nonVerifieds,
+				unverifiedBlockCache:   test.nonVerifiedCache,
 			}
 
 			ancestor, found := engine.getProcessingAncestor(test.initialVote)

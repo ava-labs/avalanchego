@@ -68,14 +68,14 @@ type Transitive struct {
 	pending map[ids.ID]snowman.Block
 
 	// Block ID --> Parent ID
-	nonVerifieds ancestor.Tree
+	unverifiedIDToAncestor ancestor.Tree
 
 	// Block ID --> Block.
 	//
 	// A block is put into this cache if its ancestry was fetched, but the block
 	// was not able to be issued. A block may fail to be issued if verification
 	// on the block or one of its ancestors returns an error.
-	nonVerifiedCache cache.Cacher[ids.ID, snowman.Block]
+	unverifiedBlockCache cache.Cacher[ids.ID, snowman.Block]
 
 	// acceptedFrontiers of the other validators of this chain
 	acceptedFrontiers tracker.Accepted
@@ -140,8 +140,8 @@ func New(config Config) (*Transitive, error) {
 		AppHandler:                  config.VM,
 		Connector:                   config.VM,
 		pending:                     make(map[ids.ID]snowman.Block),
-		nonVerifieds:                ancestor.NewTree(),
-		nonVerifiedCache:            nonVerifiedCache,
+		unverifiedIDToAncestor:      ancestor.NewTree(),
+		unverifiedBlockCache:        nonVerifiedCache,
 		acceptedFrontiers:           acceptedFrontiers,
 		blocked:                     job.NewScheduler[ids.ID](),
 		polls:                       polls,
@@ -562,7 +562,7 @@ func (t *Transitive) executeDeferredWork(ctx context.Context) error {
 	t.metrics.numRequests.Set(float64(t.blkReqs.Len()))
 	t.metrics.numBlocked.Set(float64(len(t.pending)))
 	t.metrics.numBlockers.Set(float64(t.blocked.NumDependencies()))
-	t.metrics.numNonVerifieds.Set(float64(t.nonVerifieds.Len()))
+	t.metrics.numNonVerifieds.Set(float64(t.unverifiedIDToAncestor.Len()))
 	return nil
 }
 
@@ -570,7 +570,7 @@ func (t *Transitive) getBlock(ctx context.Context, blkID ids.ID) (snowman.Block,
 	if blk, ok := t.pending[blkID]; ok {
 		return blk, nil
 	}
-	if blk, ok := t.nonVerifiedCache.Get(blkID); ok {
+	if blk, ok := t.unverifiedBlockCache.Get(blkID); ok {
 		return blk, nil
 	}
 
@@ -1025,7 +1025,7 @@ func (t *Transitive) deliver(
 	return nil
 }
 
-func (t *Transitive) addToNonVerifieds(blk snowman.Block) {
+func (t *Transitive) markAsUnverified(blk snowman.Block) {
 	// If this block is processing, we don't need to add it to non-verifieds.
 	blkID := blk.ID()
 	if t.Consensus.Processing(blkID) {
@@ -1038,9 +1038,9 @@ func (t *Transitive) addToNonVerifieds(blk snowman.Block) {
 	// parent is not decided and therefore blk is not decided.
 	// Similarly, if the parent is processing, then the parent is not decided
 	// and therefore blk is not decided.
-	if t.nonVerifieds.Has(parentID) || t.Consensus.Processing(parentID) {
-		t.nonVerifieds.Add(blkID, parentID)
-		t.nonVerifiedCache.Put(blkID, blk)
+	if t.unverifiedIDToAncestor.Has(parentID) || t.Consensus.Processing(parentID) {
+		t.unverifiedIDToAncestor.Add(blkID, parentID)
+		t.unverifiedBlockCache.Put(blkID, blk)
 	}
 }
 
@@ -1065,13 +1065,13 @@ func (t *Transitive) addUnverifiedBlockToConsensus(
 		)
 
 		// if verify fails, then all descendants are also invalid
-		t.addToNonVerifieds(blk)
+		t.markAsUnverified(blk)
 		return false, nil
 	}
 
 	issuedMetric.Inc()
-	t.nonVerifieds.Remove(blkID)
-	t.nonVerifiedCache.Evict(blkID)
+	t.unverifiedIDToAncestor.Remove(blkID)
+	t.unverifiedBlockCache.Evict(blkID)
 	t.metrics.issuerStake.Observe(float64(t.Validators.GetWeight(t.Ctx.SubnetID, nodeID)))
 	t.Ctx.Log.Verbo("adding block to consensus",
 		zap.Stringer("nodeID", nodeID),
@@ -1081,7 +1081,7 @@ func (t *Transitive) addUnverifiedBlockToConsensus(
 	return true, t.Consensus.Add(&memoryBlock{
 		Block:   blk,
 		metrics: t.metrics,
-		tree:    t.nonVerifieds,
+		tree:    t.unverifiedIDToAncestor,
 	})
 }
 
@@ -1093,7 +1093,7 @@ func (t *Transitive) getProcessingAncestor(initialVote ids.ID) (ids.ID, bool) {
 	// If [bubbledVote] != [initialVote], it is guaranteed that [bubbledVote] is
 	// in processing. Otherwise, we attempt to iterate through any blocks we
 	// have at our disposal as a best-effort mechanism to find a valid ancestor.
-	bubbledVote := t.nonVerifieds.GetAncestor(initialVote)
+	bubbledVote := t.unverifiedIDToAncestor.GetAncestor(initialVote)
 	for {
 		if t.Consensus.Processing(bubbledVote) {
 			t.Ctx.Log.Verbo("applying vote",
@@ -1109,7 +1109,7 @@ func (t *Transitive) getProcessingAncestor(initialVote ids.ID) (ids.ID, bool) {
 		}
 
 		// If we haven't cached the block, drop [vote].
-		blk, ok := t.nonVerifiedCache.Get(bubbledVote)
+		blk, ok := t.unverifiedBlockCache.Get(bubbledVote)
 		if !ok {
 			t.Ctx.Log.Debug("dropping vote",
 				zap.String("reason", "ancestor isn't cached"),
