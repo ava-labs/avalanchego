@@ -5,13 +5,12 @@ package metric
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"time"
 
 	"github.com/gorilla/rpc/v2"
 	"github.com/prometheus/client_golang/prometheus"
-
-	"github.com/ava-labs/avalanchego/utils"
 )
 
 type APIInterceptor interface {
@@ -29,32 +28,29 @@ type apiInterceptor struct {
 	requestErrors        *prometheus.CounterVec
 }
 
-func NewAPIInterceptor(namespace string, registerer prometheus.Registerer) (APIInterceptor, error) {
+func NewAPIInterceptor(registerer prometheus.Registerer) (APIInterceptor, error) {
 	requestDurationCount := prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Namespace: namespace,
-			Name:      "request_duration_count",
-			Help:      "Number of times this type of request was made",
+			Name: "request_duration_count",
+			Help: "Number of times this type of request was made",
 		},
 		[]string{"method"},
 	)
 	requestDurationSum := prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
-			Namespace: namespace,
-			Name:      "request_duration_sum",
-			Help:      "Amount of time in nanoseconds that has been spent handling this type of request",
+			Name: "request_duration_sum",
+			Help: "Amount of time in nanoseconds that has been spent handling this type of request",
 		},
 		[]string{"method"},
 	)
 	requestErrors := prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Namespace: namespace,
-			Name:      "request_error_count",
+			Name: "request_error_count",
 		},
 		[]string{"method"},
 	)
 
-	err := utils.Err(
+	err := errors.Join(
 		registerer.Register(requestDurationCount),
 		registerer.Register(requestDurationSum),
 		registerer.Register(requestErrors),

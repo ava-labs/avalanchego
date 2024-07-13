@@ -3,9 +3,25 @@
 
 package block
 
-import "fmt"
+import (
+	"fmt"
 
-func Parse(bytes []byte) (Block, error) {
+	"github.com/ava-labs/avalanchego/ids"
+)
+
+// Parse a block and verify that the signature attached to the block is valid
+// for the certificate provided in the block.
+func Parse(bytes []byte, chainID ids.ID) (Block, error) {
+	block, err := ParseWithoutVerification(bytes)
+	if err != nil {
+		return nil, err
+	}
+	return block, block.verify(chainID)
+}
+
+// ParseWithoutVerification parses a block without verifying that the signature
+// on the block is correct.
+func ParseWithoutVerification(bytes []byte) (Block, error) {
 	var block Block
 	parsedVersion, err := Codec.Unmarshal(bytes, &block)
 	if err != nil {

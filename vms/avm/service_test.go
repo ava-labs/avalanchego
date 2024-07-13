@@ -33,7 +33,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/state"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
-	"github.com/ava-labs/avalanchego/vms/avm/txs/fees"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/index"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -42,15 +41,12 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	avajson "github.com/ava-labs/avalanchego/utils/json"
-	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 func TestServiceIssueTx(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{
-		fork: latest,
-	})
+	env := setup(t, &envConfig{fork: latest})
 	env.vm.ctx.Lock.Unlock()
 
 	txArgs := &api.FormattedTx{}
@@ -70,9 +66,7 @@ func TestServiceIssueTx(t *testing.T) {
 func TestServiceGetTxStatus(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{
-		fork: latest,
-	})
+	env := setup(t, &envConfig{fork: latest})
 	env.vm.ctx.Lock.Unlock()
 
 	statusArgs := &api.JSONTxID{}
@@ -101,9 +95,7 @@ func TestServiceGetTxStatus(t *testing.T) {
 func TestServiceGetBalanceStrict(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{
-		fork: latest,
-	})
+	env := setup(t, &envConfig{fork: latest})
 
 	assetID := ids.GenerateTestID()
 	addr := ids.GenerateTestShortID()
@@ -254,9 +246,8 @@ func TestServiceGetBalanceStrict(t *testing.T) {
 
 func TestServiceGetTxs(t *testing.T) {
 	require := require.New(t)
-	env := setup(t, &envConfig{
-		fork: latest,
-	})
+	env := setup(t, &envConfig{fork: latest})
+
 	var err error
 	env.vm.addressTxsIndexer, err = index.NewIndexer(env.vm.db, env.vm.ctx.Log, "", prometheus.NewRegistry(), false)
 	require.NoError(err)
@@ -293,9 +284,7 @@ func TestServiceGetTxs(t *testing.T) {
 func TestServiceGetAllBalances(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{
-		fork: latest,
-	})
+	env := setup(t, &envConfig{fork: latest})
 
 	assetID := ids.GenerateTestID()
 	addr := ids.GenerateTestShortID()
@@ -488,9 +477,7 @@ func TestServiceGetAllBalances(t *testing.T) {
 func TestServiceGetTx(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{
-		fork: latest,
-	})
+	env := setup(t, &envConfig{fork: latest})
 	env.vm.ctx.Lock.Unlock()
 
 	txID := env.genesisTx.ID()
@@ -512,9 +499,7 @@ func TestServiceGetTx(t *testing.T) {
 func TestServiceGetTxJSON_BaseTx(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{
-		fork: latest,
-	})
+	env := setup(t, &envConfig{fork: latest})
 	env.vm.ctx.Lock.Unlock()
 
 	newTx := newAvaxBaseTxWithOutputs(t, env)
@@ -598,9 +583,7 @@ func TestServiceGetTxJSON_BaseTx(t *testing.T) {
 func TestServiceGetTxJSON_ExportTx(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{
-		fork: latest,
-	})
+	env := setup(t, &envConfig{fork: latest})
 	env.vm.ctx.Lock.Unlock()
 
 	newTx := buildTestExportTx(t, env, env.vm.ctx.CChainID)
@@ -1178,7 +1161,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
 			"fxID": "qd2U4HDWUvMrVUeTcCHp6xH3Qpnn1XbU5MDdnBoiifFqvgXwT",
 			"credential": {
 				"signatures": [
-					"0x1bdb2512fa35d42023ac640f9e7f70d66f3a8262107fdbf9ef2c8d98a0f4444072f2be6bc7b8a2962c4cc9fe78b375ee9166f8c9410abc2318cbb55e7e97046500"
+					%[2]q
 				]
 			}
 		},
@@ -1842,11 +1825,9 @@ func newAvaxBaseTxWithOutputs(t *testing.T, env *environment) *txs.Tx {
 		memo      = []byte{1, 2, 3, 4, 5, 6, 7, 8}
 		key       = keys[0]
 		changeKey = keys[1]
-		kc        = secp256k1fx.NewKeychain()
+		kc        = secp256k1fx.NewKeychain(key)
 	)
-	kc.Add(key)
 
-	env.service.txBuilderBackend.ResetAddresses(kc.Addresses())
 	tx, _, err := buildBaseTx(
 		env.service.txBuilderBackend,
 		[]*avax.TransferableOutput{{
@@ -1870,9 +1851,8 @@ func newAvaxBaseTxWithOutputs(t *testing.T, env *environment) *txs.Tx {
 func newAvaxCreateAssetTxWithOutputs(t *testing.T, env *environment, initialStates map[uint32][]verify.State) *txs.Tx {
 	var (
 		key = keys[0]
-		kc  = secp256k1fx.NewKeychain()
+		kc  = secp256k1fx.NewKeychain(key)
 	)
-	kc.Add(key)
 
 	tx, _, err := buildCreateAssetTx(
 		env.service.txBuilderBackend,
@@ -1890,12 +1870,10 @@ func newAvaxCreateAssetTxWithOutputs(t *testing.T, env *environment, initialStat
 func buildTestExportTx(t *testing.T, env *environment, chainID ids.ID) *txs.Tx {
 	var (
 		key = keys[0]
-		kc  = secp256k1fx.NewKeychain()
+		kc  = secp256k1fx.NewKeychain(key)
 		to  = key.PublicKey().Address()
 	)
-	kc.Add(key)
 
-	env.service.txBuilderBackend.ResetAddresses(kc.Addresses())
 	tx, _, err := buildExportTx(
 		env.service.txBuilderBackend,
 		chainID,
@@ -1985,11 +1963,9 @@ func buildSecpMintOp(createAssetTx *txs.Tx, key *secp256k1.PrivateKey, outputInd
 func buildOperationTxWithOp(t *testing.T, env *environment, ops []*txs.Operation) *txs.Tx {
 	var (
 		key = keys[0]
-		kc  = secp256k1fx.NewKeychain()
+		kc  = secp256k1fx.NewKeychain(key)
 	)
-	kc.Add(key)
 
-	env.service.txBuilderBackend.ResetAddresses(kc.Addresses())
 	tx, err := buildOperation(
 		env.service.txBuilderBackend,
 		ops,
@@ -2003,9 +1979,7 @@ func buildOperationTxWithOp(t *testing.T, env *environment, ops []*txs.Operation
 func TestServiceGetNilTx(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{
-		fork: latest,
-	})
+	env := setup(t, &envConfig{fork: latest})
 	env.vm.ctx.Lock.Unlock()
 
 	reply := api.GetTxReply{}
@@ -2016,9 +1990,7 @@ func TestServiceGetNilTx(t *testing.T) {
 func TestServiceGetUnknownTx(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{
-		fork: latest,
-	})
+	env := setup(t, &envConfig{fork: latest})
 	env.vm.ctx.Lock.Unlock()
 
 	reply := api.GetTxReply{}
@@ -2027,9 +1999,7 @@ func TestServiceGetUnknownTx(t *testing.T) {
 }
 
 func TestServiceGetUTXOs(t *testing.T) {
-	env := setup(t, &envConfig{
-		fork: latest,
-	})
+	env := setup(t, &envConfig{fork: latest})
 	env.vm.ctx.Lock.Unlock()
 
 	rawAddr := ids.GenerateTestShortID()
@@ -2278,9 +2248,7 @@ func TestServiceGetUTXOs(t *testing.T) {
 func TestGetAssetDescription(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{
-		fork: latest,
-	})
+	env := setup(t, &envConfig{fork: latest})
 	env.vm.ctx.Lock.Unlock()
 
 	avaxAssetID := env.genesisTx.ID()
@@ -2297,9 +2265,7 @@ func TestGetAssetDescription(t *testing.T) {
 func TestGetBalance(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{
-		fork: latest,
-	})
+	env := setup(t, &envConfig{fork: latest})
 	env.vm.ctx.Lock.Unlock()
 
 	avaxAssetID := env.genesisTx.ID()
@@ -2527,25 +2493,11 @@ func TestNFTWorkflow(t *testing.T) {
 			require.Len(txs, 1)
 			createAssetTx := txs[0]
 
-			var (
-				isEActive = env.vm.Config.IsEActivated(env.vm.state.GetTimestamp())
+			feeCalc, err := state.PickFeeCalculator(&env.vm.Config, env.vm.parser.Codec(), env.vm.state, env.vm.state.GetTimestamp())
+			require.NoError(err)
 
-				feeCalc *fees.Calculator
-			)
-			if !isEActive {
-				feeCalc = fees.NewStaticCalculator(&env.vm.Config)
-			} else {
-				feesCfg := config.GetDynamicFeesConfig(isEActive)
-				feeCalc = fees.NewDynamicCalculator(
-					env.service.txBuilderBackend.codec,
-					commonfees.NewManager(feesCfg.FeeRate),
-					feesCfg.BlockMaxComplexity,
-					createAssetTx.Creds,
-				)
-			}
-
-			require.NoError(createAssetTx.Unsigned.Visit(feeCalc))
-			expectedFee := feeCalc.Fee
+			expectedFee, err := feeCalc.CalculateFee(createAssetTx)
+			require.NoError(err)
 
 			fromAddrsStartBalance := startBalance * uint64(len(fromAddrs))
 			require.Equal(fromAddrsStartBalance-expectedFee, fromAddrsTotalBalance)
@@ -2822,6 +2774,7 @@ func TestImport(t *testing.T) {
 					initialKeys: keys,
 				}},
 			})
+			env.vm.ctx.Lock.Unlock()
 
 			assetID := env.genesisTx.ID()
 			addr0 := keys[0].PublicKey().Address()
@@ -2853,8 +2806,6 @@ func TestImport(t *testing.T) {
 					}},
 				},
 			}))
-
-			env.vm.ctx.Lock.Unlock()
 
 			addrStr, err := env.vm.FormatLocalAddress(keys[0].PublicKey().Address())
 			require.NoError(err)

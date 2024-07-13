@@ -114,9 +114,7 @@ func TestFxInitializationFailure(t *testing.T) {
 func TestIssueTx(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{
-		fork: latest,
-	})
+	env := setup(t, &envConfig{fork: latest})
 	env.vm.ctx.Lock.Unlock()
 
 	tx := newTx(t, env.genesisBytes, env.vm.ctx.ChainID, env.vm.parser, "AVAX")
@@ -127,20 +125,17 @@ func TestIssueTx(t *testing.T) {
 func TestIssueNFT(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{
-		fork: latest,
-	})
+	env := setup(t, &envConfig{fork: latest})
 	env.vm.ctx.Lock.Unlock()
 
 	var (
 		key = keys[0]
-		kc  = secp256k1fx.NewKeychain()
+		kc  = secp256k1fx.NewKeychain(key)
 	)
-	kc.Add(key)
 
 	// Create the asset
 	initialStates := map[uint32][]verify.State{
-		uint32(1): {
+		1: {
 			&nftfx.MintOutput{
 				GroupID: 1,
 				OutputOwners: secp256k1fx.OutputOwners{
@@ -164,7 +159,6 @@ func TestIssueNFT(t *testing.T) {
 	issueAndAccept(require, env.vm, env.issuer, createAssetTx)
 
 	// Mint the NFT
-	env.service.txBuilderBackend.ResetAddresses(kc.Addresses())
 	mintNFTTx, err := mintNFT(
 		env.service.txBuilderBackend,
 		createAssetTx.ID(),
@@ -191,7 +185,6 @@ func TestIssueNFT(t *testing.T) {
 	)
 	require.NoError(err)
 
-	env.service.txBuilderBackend.ResetAddresses(kc.Addresses())
 	transferNFTTx, err := buildOperation(
 		env.service.txBuilderBackend,
 		transferOp,
@@ -217,13 +210,12 @@ func TestIssueProperty(t *testing.T) {
 
 	var (
 		key = keys[0]
-		kc  = secp256k1fx.NewKeychain()
+		kc  = secp256k1fx.NewKeychain(key)
 	)
-	kc.Add(key)
 
 	// create the asset
 	initialStates := map[uint32][]verify.State{
-		uint32(2): {
+		2: {
 			&propertyfx.MintOutput{
 				OutputOwners: secp256k1fx.OutputOwners{
 					Threshold: 1,
@@ -266,7 +258,6 @@ func TestIssueProperty(t *testing.T) {
 		},
 	}
 
-	env.service.txBuilderBackend.ResetAddresses(kc.Addresses())
 	mintPropertyTx, err := buildOperation(
 		env.service.txBuilderBackend,
 		[]*txs.Operation{mintPropertyOp},
@@ -286,7 +277,6 @@ func TestIssueProperty(t *testing.T) {
 		Op: &propertyfx.BurnOperation{Input: secp256k1fx.Input{}},
 	}
 
-	env.service.txBuilderBackend.ResetAddresses(kc.Addresses())
 	burnPropertyTx, err := buildOperation(
 		env.service.txBuilderBackend,
 		[]*txs.Operation{burnPropertyOp},
@@ -323,14 +313,11 @@ func TestIssueTxWithAnotherAsset(t *testing.T) {
 	// send second asset
 	var (
 		key = keys[0]
-		kc  = secp256k1fx.NewKeychain()
+		kc  = secp256k1fx.NewKeychain(key)
 
 		feeAssetCreateTx = getCreateTxFromGenesisTest(t, env.genesisBytes, feeAssetName)
 		createTx         = getCreateTxFromGenesisTest(t, env.genesisBytes, otherAssetName)
 	)
-	kc.Add(key)
-
-	env.service.txBuilderBackend.ResetAddresses(kc.Addresses())
 	expectedFee := 100 * units.MicroAvax
 	tx, _, err := buildBaseTx(
 		env.service.txBuilderBackend,
@@ -365,9 +352,7 @@ func TestIssueTxWithAnotherAsset(t *testing.T) {
 }
 
 func TestVMFormat(t *testing.T) {
-	env := setup(t, &envConfig{
-		fork: latest,
-	})
+	env := setup(t, &envConfig{fork: latest})
 	defer env.vm.ctx.Lock.Unlock()
 
 	tests := []struct {
@@ -400,11 +385,9 @@ func TestTxAcceptAfterParseTx(t *testing.T) {
 
 	var (
 		key = keys[0]
-		kc  = secp256k1fx.NewKeychain()
+		kc  = secp256k1fx.NewKeychain(key)
 	)
-	kc.Add(key)
 
-	env.service.txBuilderBackend.ResetAddresses(kc.Addresses())
 	firstTx, _, err := buildBaseTx(
 		env.service.txBuilderBackend,
 		[]*avax.TransferableOutput{{
@@ -470,9 +453,7 @@ func TestTxAcceptAfterParseTx(t *testing.T) {
 func TestIssueImportTx(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{
-		fork: latest,
-	})
+	env := setup(t, &envConfig{fork: latest})
 	defer env.vm.ctx.Lock.Unlock()
 
 	peerSharedMemory := env.sharedMemory.NewSharedMemory(constants.PlatformChainID)
@@ -481,8 +462,8 @@ func TestIssueImportTx(t *testing.T) {
 
 	var (
 		key     = keys[0]
-		keyAddr = key.PublicKey().Address()
-		kc      = secp256k1fx.NewKeychain()
+		kc      = secp256k1fx.NewKeychain(key)
+		keyAddr = key.Address()
 
 		utxoID = avax.UTXOID{
 			TxID: ids.ID{
@@ -506,7 +487,6 @@ func TestIssueImportTx(t *testing.T) {
 			},
 		}
 	)
-	kc.Add(key)
 
 	// Provide the platform UTXO:
 	utxoBytes, err := env.vm.parser.Codec().Marshal(txs.CodecVersion, importedUtxo)
@@ -525,7 +505,6 @@ func TestIssueImportTx(t *testing.T) {
 		},
 	}))
 
-	env.service.txBuilderBackend.ResetAddresses(kc.Addresses())
 	tx, err := buildImportTx(
 		env.service.txBuilderBackend,
 		constants.PlatformChainID, // source chain
@@ -629,9 +608,7 @@ func TestImportTxNotState(t *testing.T) {
 func TestIssueExportTx(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{
-		fork: latest,
-	})
+	env := setup(t, &envConfig{fork: latest})
 	defer env.vm.ctx.Lock.Unlock()
 
 	genesisTx := getCreateTxFromGenesisTest(t, env.genesisBytes, "AVAX")
@@ -639,14 +616,11 @@ func TestIssueExportTx(t *testing.T) {
 	var (
 		avaxID     = genesisTx.ID()
 		key        = keys[0]
-		kc         = secp256k1fx.NewKeychain()
+		kc         = secp256k1fx.NewKeychain(key)
 		to         = key.PublicKey().Address()
 		changeAddr = to
 	)
 
-	kc.Add(key)
-
-	env.service.txBuilderBackend.ResetAddresses(kc.Addresses())
 	tx, _, err := buildExportTx(
 		env.service.txBuilderBackend,
 		constants.PlatformChainID,
@@ -693,9 +667,7 @@ func TestIssueExportTx(t *testing.T) {
 func TestClearForceAcceptedExportTx(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{
-		fork: latest,
-	})
+	env := setup(t, &envConfig{fork: latest})
 	defer env.vm.ctx.Lock.Unlock()
 
 	genesisTx := getCreateTxFromGenesisTest(t, env.genesisBytes, "AVAX")
@@ -704,14 +676,10 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 		avaxID     = genesisTx.ID()
 		assetID    = avax.Asset{ID: avaxID}
 		key        = keys[0]
-		kc         = secp256k1fx.NewKeychain()
+		kc         = secp256k1fx.NewKeychain(key)
 		to         = key.PublicKey().Address()
 		changeAddr = to
 	)
-
-	kc.Add(key)
-
-	env.service.txBuilderBackend.ResetAddresses(kc.Addresses())
 
 	expectedFee := uint64(7975)
 	tx, _, err := buildExportTx(

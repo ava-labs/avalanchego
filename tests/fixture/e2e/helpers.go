@@ -1,6 +1,8 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
+//go:build test
+
 package e2e
 
 import (
@@ -226,14 +228,13 @@ func StartNetwork(
 	require := require.New(ginkgo.GinkgoT())
 
 	require.NoError(
-		tmpnet.StartNewNetwork(
+		tmpnet.BootstrapNewNetwork(
 			DefaultContext(),
 			ginkgo.GinkgoWriter,
 			network,
 			DefaultNetworkDir,
 			avalancheGoExecPath,
 			pluginDir,
-			tmpnet.DefaultNodeCount,
 		),
 	)
 

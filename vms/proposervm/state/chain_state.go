@@ -52,11 +52,11 @@ func (s *chainState) GetLastAccepted() (ids.ID, error) {
 	}
 	lastAcceptedBytes, err := s.db.Get(lastAcceptedKey)
 	if err != nil {
-		return ids.ID{}, err
+		return ids.Empty, err
 	}
 	lastAccepted, err := ids.ToID(lastAcceptedBytes)
 	if err != nil {
-		return ids.ID{}, err
+		return ids.Empty, err
 	}
 	s.lastAccepted = lastAccepted
 	return lastAccepted, nil

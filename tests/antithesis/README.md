@@ -8,11 +8,14 @@ enables discovery and reproduction of anomalous behavior.
 
 ## Package details
 
-| Filename     | Purpose                                                                           |
-|:-------------|:----------------------------------------------------------------------------------|
-| compose.go   | Enables generation of Docker Compose project files for antithesis testing.        |
-| avalanchego/ | Contains resources supporting antithesis testing of avalanchego's primary chains. |
-
+| Filename       | Purpose                                                                            |
+|:---------------|:-----------------------------------------------------------------------------------|
+| compose.go     | Generates Docker Compose project file and initial database for antithesis testing. |
+| config.go      | Defines common flags for the workload binary.                                      |
+| init_db.go     | Initializes initial db state for subnet testing.                                   |
+| node_health.go | Helper to check node health.                                                       |
+| avalanchego/   | Defines an antithesis test setup for avalanchego's primary chains.                 |
+| xsvm/          | Defines an antithesis test setup for the xsvm VM.                                  |
 
 ## Instrumentation
 
@@ -45,3 +48,98 @@ a test setup:
 In addition, github workflows are suggested to ensure
 `scripts/tests.build_antithesis_images.sh` runs against PRs and
 `scripts/build_antithesis_images.sh` runs against pushes.
+
+### Use of a builder image
+
+To simplify building instrumented (for running in CI) and
+non-instrumented (for running locally) versions of the workload and
+node images, a common builder image is used. If on an amd64 host,
+`tests/antithesis/avalanchego/Dockerfile.builder-instrumented` is used
+to create an instrumented builder. On an arm64 host,
+`tests/antithesis/avalanchego/Dockerfile.builder-uninstrumented` is
+used to create an uninstrumented builder. In both cases, the builder
+image is based on the default golang image and will include the source
+code necessary to build the node and workload binaries. The
+alternative would require duplicating builder setup for instrumented
+and non-instrumented builds for the workload and node images of each
+test setup.
+
+## Troubleshooting a test setup
+
+### Running a workload directly
+
+The workload of the 'avalanchego' test setup can be invoked against an
+arbitrary network:
+
+```bash
+$ AVAWL_URIS="http://10.0.20.3:9650 http://10.0.20.4:9650" go run ./tests/antithesis/avalanchego
+```
+
+The workload of a subnet test setup like 'xsvm' additionally requires
+a network with a configured chain for the xsvm VM and the ID for that
+chain needs to be provided to the workload:
+
+```bash
+$ AVAWL_URIS=... CHAIN_IDS="2S9ypz...AzMj9" go run ./tests/antithesis/xsvm
+```
+
+### Running a workload with docker-compose
+
+Running the test script for a given test setup with the `DEBUG` flag
+set will avoid cleaning up the the temporary directory where the
+docker-compose setup is written to. This will allow manual invocation of
+docker-compose to see the log output of the workload.
+
+```bash
+$ DEBUG=1 ./scripts/tests.build_antithesis_images.sh
+```
+
+After the test script has terminated, the name of the temporary
+directory will appear in the output of the script:
+
+```
+...
+using temporary directory /tmp/tmp.E6eHdDr4ln as the docker-compose path"
+...
+```
+
+Running compose from the temporary directory will ensure the workload
+output appears on stdout for inspection:
+
+```bash
+$ cd [temporary directory]
+
+# Start the compose project
+$ docker-compose up
+
+# Cleanup the compose project
+$ docker-compose down --volumes
+```
+
+## Manually triggering an Antithesis test run
+
+When making changes to a test setup, it may be useful to manually
+trigger an Antithesis test run outside of the normal schedule. This
+can be performed against master or an arbitrary branch:
+
+ - Navigate to the ['Actions' tab of the avalanchego
+   repo](https://github.com/ava-labs/avalanchego/actions).
+ - Select the [Publish Antithesis
+   Images](https://github.com/ava-labs/avalanchego/actions/workflows/publish_antithesis_images.yml)
+   workflow on the left.
+ - Find the 'Run workflow' drop-down on the right and trigger the
+   workflow against the desired branch. The default value for
+   `image_tag` (`latest`) is used by scheduled test runs, so consider
+   supplying a different value to avoid interferring with the results
+   of the scheduled runs.
+ - Wait for the publication job to complete successfully so that the
+   images are available to be tested against.
+ - Select the [Trigger Antithesis Test Runs](https://github.com/ava-labs/avalanchego/actions/workflows/trigger-antithesis-runs.yml)
+   workflow on the left.
+ - Find the 'Run workflow' drop-down on the right and trigger the
+   workflow against the desired branch. The branch only determines the
+   CI configuration (the images have already been built), so master is
+   probably fine. Make sure to supply the same `image_tag` that was
+   provided to the publishing workflow and consider setting
+   `recipients` to your own email rather than sending the test report
+   to everyone on the regular distribution list.

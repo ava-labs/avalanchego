@@ -13,6 +13,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm/block"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+
+	commonfee "github.com/ava-labs/avalanchego/vms/components/fee"
 )
 
 var (
@@ -38,8 +40,9 @@ type diff struct {
 	addedBlockIDs map[uint64]ids.ID      // map of height -> blockID
 	addedBlocks   map[ids.ID]block.Block // map of blockID -> block
 
-	lastAccepted ids.ID
-	timestamp    time.Time
+	lastAccepted  ids.ID
+	timestamp     time.Time
+	currentGasCap *commonfee.Gas
 }
 
 func NewDiff(
@@ -161,6 +164,31 @@ func (d *diff) SetTimestamp(t time.Time) {
 	d.timestamp = t
 }
 
+func (d *diff) GetCurrentGasCap() (commonfee.Gas, error) {
+	if d.currentGasCap == nil {
+		parentState, ok := d.stateVersions.GetState(d.parentID)
+		if !ok {
+			return commonfee.ZeroGas, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
+		}
+		parentCurrentGasCap, err := parentState.GetCurrentGasCap()
+		if err != nil {
+			return commonfee.ZeroGas, err
+		}
+
+		d.currentGasCap = new(commonfee.Gas)
+		*d.currentGasCap = parentCurrentGasCap
+	}
+
+	return *d.currentGasCap, nil
+}
+
+func (d *diff) SetCurrentGasCap(gasCap commonfee.Gas) {
+	if d.currentGasCap == nil {
+		d.currentGasCap = new(commonfee.Gas)
+	}
+	*d.currentGasCap = gasCap
+}
+
 func (d *diff) Apply(state Chain) {
 	for utxoID, utxo := range d.modifiedUTXOs {
 		if utxo != nil {
@@ -180,4 +208,7 @@ func (d *diff) Apply(state Chain) {
 
 	state.SetLastAccepted(d.lastAccepted)
 	state.SetTimestamp(d.timestamp)
+	if d.currentGasCap != nil {
+		state.SetCurrentGasCap(*d.currentGasCap)
+	}
 }

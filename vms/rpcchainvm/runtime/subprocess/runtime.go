@@ -64,7 +64,7 @@ func Bootstrap(
 		return nil, nil, fmt.Errorf("%w: stderr and stdout required", runtime.ErrInvalidConfig)
 	}
 
-	intitializer := newInitializer()
+	intitializer := newInitializer(cmd.Path)
 
 	server := grpcutils.NewServer()
 	defer server.GracefulStop()

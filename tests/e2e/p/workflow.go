@@ -1,6 +1,8 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
+//go:build test
+
 package p
 
 import (
@@ -16,15 +18,15 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/vms/avm/config"
-	"github.com/ava-labs/avalanchego/vms/avm/txs/fees"
+	"github.com/ava-labs/avalanchego/vms/avm"
+	"github.com/ava-labs/avalanchego/vms/avm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
-	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
+	commonfee "github.com/ava-labs/avalanchego/vms/components/fee"
 	xbuilder "github.com/ava-labs/avalanchego/wallet/chain/x/builder"
 	ginkgo "github.com/onsi/ginkgo/v2"
 )
@@ -52,6 +54,7 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 			xBuilder := xWallet.Builder()
 			xContext := xBuilder.Context()
 			pChainClient := platformvm.NewClient(nodeURI.URI)
+			xChainClient := avm.NewClient(nodeURI.URI, "X")
 
 			tests.Outf("{{blue}} fetching minimal stake amounts {{/}}\n")
 			minValStake, minDelStake, err := pChainClient.GetMinStake(e2e.DefaultContext(), constants.PlatformChainID)
@@ -65,6 +68,10 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 			require.NoError(err)
 			pChainTxFees := uint64(staticFees.TxFee)
 			tests.Outf("{{green}} P-chain TxFee: %d {{/}}\n", pChainTxFees)
+
+			feeCfg, err := xChainClient.GetDynamicFeeConfig(e2e.DefaultContext())
+			require.NoError(err)
+			tests.Outf("{{green}} fee config: %v {{/}}\n", feeCfg)
 
 			// amount to transfer from P to X chain
 			toTransfer := 1 * units.Avax
@@ -179,6 +186,9 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 
 			xChainExportFee := uint64(0)
 			ginkgo.By("import avax from P into X chain", func() {
+				nextGasPrice, nextGasCap, err := xChainClient.GetNextGasData(e2e.DefaultContext())
+				require.NoError(err)
+
 				tx, err := xWallet.IssueImportTx(
 					constants.PlatformChainID,
 					&outputOwner,
@@ -186,16 +196,11 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 				)
 				require.NoError(err)
 
-				// retrieve fees paid for the tx
-				feeCfg := config.GetDynamicFeesConfig(true /*isEActive*/)
-				feeCalc := fees.NewDynamicCalculator(
-					xbuilder.Parser.Codec(),
-					commonfees.NewManager(feeCfg.FeeRate),
-					feeCfg.BlockMaxComplexity,
-					tx.Creds,
-				)
-				require.NoError(tx.Unsigned.Visit(feeCalc))
-				xChainExportFee = feeCalc.Fee
+				// retrieve fee paid for the tx
+				commonCalc := commonfee.NewCalculator(feeCfg.FeeDimensionWeights, nextGasPrice, nextGasCap)
+				feeCalc := fee.NewDynamicCalculator(commonCalc, xbuilder.Parser.Codec())
+				xChainExportFee, err = feeCalc.CalculateFee(tx)
+				require.NoError(err)
 			})
 
 			// check balances post import

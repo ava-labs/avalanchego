@@ -85,10 +85,11 @@ var (
 // VMClient is an implementation of a VM that talks over RPC.
 type VMClient struct {
 	*chain.State
-	client         vmpb.VMClient
-	runtime        runtime.Stopper
-	pid            int
-	processTracker resource.ProcessTracker
+	client          vmpb.VMClient
+	runtime         runtime.Stopper
+	pid             int
+	processTracker  resource.ProcessTracker
+	metricsGatherer metrics.MultiGatherer
 
 	messenger            *messenger.Server
 	keystore             *gkeystore.Server
@@ -105,19 +106,21 @@ type VMClient struct {
 }
 
 // NewClient returns a VM connected to a remote VM
-func NewClient(clientConn *grpc.ClientConn) *VMClient {
+func NewClient(
+	clientConn *grpc.ClientConn,
+	runtime runtime.Stopper,
+	pid int,
+	processTracker resource.ProcessTracker,
+	metricsGatherer metrics.MultiGatherer,
+) *VMClient {
 	return &VMClient{
-		client: vmpb.NewVMClient(clientConn),
-		conns:  []*grpc.ClientConn{clientConn},
+		client:          vmpb.NewVMClient(clientConn),
+		runtime:         runtime,
+		pid:             pid,
+		processTracker:  processTracker,
+		metricsGatherer: metricsGatherer,
+		conns:           []*grpc.ClientConn{clientConn},
 	}
-}
-
-// SetProcess gives ownership of the server process to the client.
-func (vm *VMClient) SetProcess(runtime runtime.Stopper, pid int, processTracker resource.ProcessTracker) {
-	vm.runtime = runtime
-	vm.processTracker = processTracker
-	vm.pid = pid
-	processTracker.TrackProcess(vm.pid)
 }
 
 func (vm *VMClient) Initialize(
@@ -135,17 +138,26 @@ func (vm *VMClient) Initialize(
 		return errUnsupportedFXs
 	}
 
+	primaryAlias, err := chainCtx.BCLookup.PrimaryAlias(chainCtx.ChainID)
+	if err != nil {
+		// If fetching the alias fails, we default to the chain's ID
+		primaryAlias = chainCtx.ChainID.String()
+	}
+
 	// Register metrics
-	registerer := prometheus.NewRegistry()
-	multiGatherer := metrics.NewMultiGatherer()
+	serverReg, err := metrics.MakeAndRegister(
+		vm.metricsGatherer,
+		primaryAlias,
+	)
+	if err != nil {
+		return err
+	}
 	vm.grpcServerMetrics = grpc_prometheus.NewServerMetrics()
-	if err := registerer.Register(vm.grpcServerMetrics); err != nil {
+	if err := serverReg.Register(vm.grpcServerMetrics); err != nil {
 		return err
 	}
-	if err := multiGatherer.Register("rpcchainvm", registerer); err != nil {
-		return err
-	}
-	if err := multiGatherer.Register("", vm); err != nil {
+
+	if err := chainCtx.Metrics.Register("", vm); err != nil {
 		return err
 	}
 
@@ -226,8 +238,8 @@ func (vm *VMClient) Initialize(
 		time:     time,
 	}
 
-	chainState, err := chain.NewMeteredState(
-		registerer,
+	vm.State, err = chain.NewMeteredState(
+		serverReg,
 		&chain.Config{
 			DecidedCacheSize:      decidedCacheSize,
 			MissingCacheSize:      missingCacheSize,
@@ -241,12 +253,7 @@ func (vm *VMClient) Initialize(
 			BuildBlockWithContext: vm.buildBlockWithContext,
 		},
 	)
-	if err != nil {
-		return err
-	}
-	vm.State = chainState
-
-	return chainCtx.Metrics.Register(multiGatherer)
+	return err
 }
 
 func (vm *VMClient) newDBServer(db database.Database) *grpc.Server {

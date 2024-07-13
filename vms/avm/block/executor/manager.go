@@ -12,13 +12,11 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/avm/block"
-	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/metrics"
 	"github.com/ava-labs/avalanchego/vms/avm/state"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/mempool"
-	"github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 var (
@@ -161,21 +159,20 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 	if err != nil {
 		return err
 	}
+	chainTime := m.state.GetTimestamp()
+	nextTimestamp := state.NextBlockTime(chainTime, m.clk)
+	stateDiff.SetTimestamp(nextTimestamp)
 
-	var (
-		chainTime = m.state.GetTimestamp()
-		isEActive = m.backend.Config.IsEActivated(chainTime)
-		feesCfg   = config.GetDynamicFeesConfig(isEActive)
-	)
-
-	feeManager := fees.NewManager(feesCfg.FeeRate)
+	feeCalc, err := state.PickFeeCalculator(m.backend.Config, m.backend.Codec, stateDiff, chainTime)
+	if err != nil {
+		return err
+	}
 
 	err = tx.Unsigned.Visit(&executor.SemanticVerifier{
-		Backend:            m.backend,
-		BlkFeeManager:      feeManager,
-		BlockMaxComplexity: feesCfg.BlockMaxComplexity,
-		State:              stateDiff,
-		Tx:                 tx,
+		Backend:       m.backend,
+		FeeCalculator: feeCalc,
+		State:         stateDiff,
+		Tx:            tx,
 	})
 	if err != nil {
 		return err

@@ -1,6 +1,8 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
+//go:build test
+
 package p
 
 import (
@@ -60,6 +62,8 @@ var _ = e2e.DescribePChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 		xContext := xBuilder.Context()
 		pBuilder := pWallet.Builder()
 		pContext := pBuilder.Context()
+		cBuilder := cWallet.Builder()
+		cContext := cBuilder.Context()
 
 		ginkgo.By("defining common configuration")
 		recipientEthAddress := evm.GetEthAddress(recipientKey)
@@ -186,7 +190,7 @@ var _ = e2e.DescribePChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 
 		ginkgo.By("exporting AVAX from the P-Chain to the C-Chain", func() {
 			_, err := pWallet.IssueExportTx(
-				cWallet.BlockchainID(),
+				cContext.BlockchainID,
 				exportOutputs,
 				e2e.WithDefaultContext(),
 			)

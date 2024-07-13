@@ -5,6 +5,7 @@ package network
 
 import (
 	"crypto/rand"
+	"errors"
 	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -12,12 +13,10 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/bloom"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/sampler"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
@@ -42,25 +41,21 @@ var _ validators.SetCallbackListener = (*ipTracker)(nil)
 
 func newIPTracker(
 	log logging.Logger,
-	namespace string,
 	registerer prometheus.Registerer,
 ) (*ipTracker, error) {
-	bloomNamespace := metric.AppendNamespace(namespace, "ip_bloom")
-	bloomMetrics, err := bloom.NewMetrics(bloomNamespace, registerer)
+	bloomMetrics, err := bloom.NewMetrics("ip_bloom", registerer)
 	if err != nil {
 		return nil, err
 	}
 	tracker := &ipTracker{
 		log: log,
 		numTrackedIPs: prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespace,
-			Name:      "tracked_ips",
-			Help:      "Number of IPs this node is willing to dial",
+			Name: "tracked_ips",
+			Help: "Number of IPs this node is willing to dial",
 		}),
 		numGossipableIPs: prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespace,
-			Name:      "gossipable_ips",
-			Help:      "Number of IPs this node is willing to gossip",
+			Name: "gossipable_ips",
+			Help: "Number of IPs this node is willing to gossip",
 		}),
 		bloomMetrics:         bloomMetrics,
 		mostRecentTrackedIPs: make(map[ids.NodeID]*ips.ClaimedIPPort),
@@ -68,7 +63,7 @@ func newIPTracker(
 		connected:            make(map[ids.NodeID]*ips.ClaimedIPPort),
 		gossipableIndices:    make(map[ids.NodeID]int),
 	}
-	err = utils.Err(
+	err = errors.Join(
 		registerer.Register(tracker.numTrackedIPs),
 		registerer.Register(tracker.numGossipableIPs),
 	)
@@ -400,8 +395,8 @@ func (i *ipTracker) GetGossipableIPs(
 
 	uniform.Initialize(uint64(len(i.gossipableIPs)))
 	for len(ips) < maxNumIPs {
-		index, err := uniform.Next()
-		if err != nil {
+		index, hasNext := uniform.Next()
+		if !hasNext {
 			return ips
 		}
 

@@ -15,7 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
-	"github.com/ava-labs/avalanchego/vms/avm/txs/fees"
+	"github.com/ava-labs/avalanchego/vms/avm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
@@ -23,7 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
-	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
+	commonfee "github.com/ava-labs/avalanchego/vms/components/fee"
 )
 
 var (
@@ -67,7 +67,7 @@ type Builder interface {
 	//   from this transaction.
 	NewBaseTx(
 		outputs []*avax.TransferableOutput,
-		feeCalc *fees.Calculator,
+		feeCalc fee.Calculator,
 		options ...common.Option,
 	) (*txs.BaseTx, error)
 
@@ -85,7 +85,7 @@ type Builder interface {
 		symbol string,
 		denomination byte,
 		initialState map[uint32][]verify.State,
-		feeCalc *fees.Calculator,
+		feeCalc fee.Calculator,
 		options ...common.Option,
 	) (*txs.CreateAssetTx, error)
 
@@ -95,7 +95,7 @@ type Builder interface {
 	// - [operations] specifies the state changes to perform.
 	NewOperationTx(
 		operations []*txs.Operation,
-		feeCalc *fees.Calculator,
+		feeCalc fee.Calculator,
 		options ...common.Option,
 	) (*txs.OperationTx, error)
 
@@ -106,7 +106,7 @@ type Builder interface {
 	//   asset.
 	NewOperationTxMintFT(
 		outputs map[ids.ID]*secp256k1fx.TransferOutput,
-		feeCalc *fees.Calculator,
+		feeCalc fee.Calculator,
 		options ...common.Option,
 	) (*txs.OperationTx, error)
 
@@ -120,7 +120,7 @@ type Builder interface {
 		assetID ids.ID,
 		payload []byte,
 		owners []*secp256k1fx.OutputOwners,
-		feeCalc *fees.Calculator,
+		feeCalc fee.Calculator,
 		options ...common.Option,
 	) (*txs.OperationTx, error)
 
@@ -132,7 +132,7 @@ type Builder interface {
 	NewOperationTxMintProperty(
 		assetID ids.ID,
 		owner *secp256k1fx.OutputOwners,
-		feeCalc *fees.Calculator,
+		feeCalc fee.Calculator,
 		options ...common.Option,
 	) (*txs.OperationTx, error)
 
@@ -142,7 +142,7 @@ type Builder interface {
 	// - [assetID] specifies the asset to burn the property of.
 	NewOperationTxBurnProperty(
 		assetID ids.ID,
-		feeCalc *fees.Calculator,
+		feeCalc fee.Calculator,
 		options ...common.Option,
 	) (*txs.OperationTx, error)
 
@@ -154,7 +154,7 @@ type Builder interface {
 	NewImportTx(
 		chainID ids.ID,
 		to *secp256k1fx.OutputOwners,
-		feeCalc *fees.Calculator,
+		feeCalc fee.Calculator,
 		options ...common.Option,
 	) (*txs.ImportTx, error)
 
@@ -166,7 +166,7 @@ type Builder interface {
 	NewExportTx(
 		chainID ids.ID,
 		outputs []*avax.TransferableOutput,
-		feeCalc *fees.Calculator,
+		feeCalc fee.Calculator,
 		options ...common.Option,
 	) (*txs.ExportTx, error)
 }
@@ -220,7 +220,7 @@ func (b *builder) GetImportableBalance(
 
 func (b *builder) NewBaseTx(
 	outputs []*avax.TransferableOutput,
-	feeCalc *fees.Calculator,
+	feeCalc fee.Calculator,
 	options ...common.Option,
 ) (*txs.BaseTx, error) {
 	// 1. Build core transaction without utxos
@@ -236,7 +236,7 @@ func (b *builder) NewBaseTx(
 	}
 
 	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
-	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
+	toBurn := map[ids.ID]uint64{} // fee are calculated in financeTx
 	for _, out := range outputs {
 		assetID := out.AssetID()
 		amountToBurn, err := math.Add64(toBurn[assetID], out.Out.Amount())
@@ -246,8 +246,8 @@ func (b *builder) NewBaseTx(
 		toBurn[assetID] = amountToBurn
 	}
 
-	// feesMan cumulates consumed units. Let's init it with utx filled so far
-	if err := feeCalc.BaseTx(utx); err != nil {
+	// feesMan cumulates complexity. Let's init it with utx filled so far
+	if _, err := feeCalc.CalculateFee(&txs.Tx{Unsigned: utx, Creds: nil}); err != nil {
 		return nil, err
 	}
 
@@ -269,7 +269,7 @@ func (b *builder) NewCreateAssetTx(
 	symbol string,
 	denomination byte,
 	initialState map[uint32][]verify.State,
-	feeCalc *fees.Calculator,
+	feeCalc fee.Calculator,
 	options ...common.Option,
 ) (*txs.CreateAssetTx, error) {
 	// 1. Build core transaction without utxos
@@ -301,10 +301,10 @@ func (b *builder) NewCreateAssetTx(
 	}
 
 	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
-	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
+	toBurn := map[ids.ID]uint64{} // fee are calculated in financeTx
 
 	// feesMan cumulates consumed units. Let's init it with utx filled so far
-	if err := feeCalc.CreateAssetTx(utx); err != nil {
+	if _, err := feeCalc.CalculateFee(&txs.Tx{Unsigned: utx}); err != nil {
 		return nil, err
 	}
 
@@ -321,7 +321,7 @@ func (b *builder) NewCreateAssetTx(
 
 func (b *builder) NewOperationTx(
 	operations []*txs.Operation,
-	feeCalc *fees.Calculator,
+	feeCalc fee.Calculator,
 	options ...common.Option,
 ) (*txs.OperationTx, error) {
 	// 1. Build core transaction without utxos
@@ -339,10 +339,10 @@ func (b *builder) NewOperationTx(
 	}
 
 	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
-	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
+	toBurn := map[ids.ID]uint64{} // fee are calculated in financeTx
 
 	// feesMan cumulates consumed units. Let's init it with utx filled so far
-	if err := feeCalc.OperationTx(utx); err != nil {
+	if _, err := feeCalc.CalculateFee(&txs.Tx{Unsigned: utx}); err != nil {
 		return nil, err
 	}
 
@@ -359,7 +359,7 @@ func (b *builder) NewOperationTx(
 
 func (b *builder) NewOperationTxMintFT(
 	outputs map[ids.ID]*secp256k1fx.TransferOutput,
-	feeCalc *fees.Calculator,
+	feeCalc fee.Calculator,
 	options ...common.Option,
 ) (*txs.OperationTx, error) {
 	ops := common.NewOptions(options)
@@ -374,7 +374,7 @@ func (b *builder) NewOperationTxMintNFT(
 	assetID ids.ID,
 	payload []byte,
 	owners []*secp256k1fx.OutputOwners,
-	feeCalc *fees.Calculator,
+	feeCalc fee.Calculator,
 	options ...common.Option,
 ) (*txs.OperationTx, error) {
 	ops := common.NewOptions(options)
@@ -388,7 +388,7 @@ func (b *builder) NewOperationTxMintNFT(
 func (b *builder) NewOperationTxMintProperty(
 	assetID ids.ID,
 	owner *secp256k1fx.OutputOwners,
-	feeCalc *fees.Calculator,
+	feeCalc fee.Calculator,
 	options ...common.Option,
 ) (*txs.OperationTx, error) {
 	ops := common.NewOptions(options)
@@ -401,7 +401,7 @@ func (b *builder) NewOperationTxMintProperty(
 
 func (b *builder) NewOperationTxBurnProperty(
 	assetID ids.ID,
-	feeCalc *fees.Calculator,
+	feeCalc fee.Calculator,
 	options ...common.Option,
 ) (*txs.OperationTx, error) {
 	ops := common.NewOptions(options)
@@ -413,9 +413,9 @@ func (b *builder) NewOperationTxBurnProperty(
 }
 
 func (b *builder) NewImportTx(
-	chainID ids.ID,
+	sourceChainID ids.ID,
 	to *secp256k1fx.OutputOwners,
-	feeCalc *fees.Calculator,
+	feeCalc fee.Calculator,
 	options ...common.Option,
 ) (*txs.ImportTx, error) {
 	ops := common.NewOptions(options)
@@ -426,11 +426,11 @@ func (b *builder) NewImportTx(
 			BlockchainID: b.context.BlockchainID,
 			Memo:         ops.Memo(),
 		}},
-		SourceChain: chainID,
+		SourceChain: sourceChainID,
 	}
 
 	// 2. Add imported inputs first
-	utxos, err := b.backend.UTXOs(ops.Context(), chainID)
+	utxos, err := b.backend.UTXOs(ops.Context(), sourceChainID)
 	if err != nil {
 		return nil, err
 	}
@@ -491,7 +491,7 @@ func (b *builder) NewImportTx(
 	// 3. Add an output for all non-avax denominated inputs.
 	for assetID, amount := range importedAmounts {
 		if assetID == avaxAssetID {
-			// Avax-denominated inputs may be used to fully or partially pay fees,
+			// Avax-denominated inputs may be used to fully or partially pay fee,
 			// so we'll handle them later on.
 			continue
 		}
@@ -506,70 +506,70 @@ func (b *builder) NewImportTx(
 		}) // we'll sort them later on
 	}
 
-	// 3. Finance fees as much as possible with imported, Avax-denominated UTXOs
+	// 3. Finance fee as much as possible with imported, Avax-denominated UTXOs
 
 	// feesMan cumulates consumed units. Let's init it with utx filled so far
-	if err := feeCalc.ImportTx(utx); err != nil {
+	if _, err := feeCalc.CalculateFee(&txs.Tx{Unsigned: utx}); err != nil {
 		return nil, err
 	}
 
 	for _, sigIndices := range importedSigIndices {
-		if _, err = fees.FinanceCredential(feeCalc, Parser.Codec(), len(sigIndices)); err != nil {
-			return nil, fmt.Errorf("account for credential fees: %w", err)
+		if _, err = financeCredential(feeCalc, Parser.Codec(), len(sigIndices)); err != nil {
+			return nil, fmt.Errorf("account for credential fee: %w", err)
 		}
 	}
 
-	switch importedAVAX := importedAmounts[avaxAssetID]; {
-	case importedAVAX == feeCalc.Fee:
-		// imported inputs match exactly the fees to be paid
+	switch importedAVAX, fee := importedAmounts[avaxAssetID], feeCalc.GetFee(); {
+	case importedAVAX == fee:
+		// imported inputs match exactly the fee to be paid
 		avax.SortTransferableOutputs(utx.Outs, Parser.Codec()) // sort imported outputs
 		return utx, b.initCtx(utx)
 
-	case importedAVAX < feeCalc.Fee:
-		// imported inputs can partially pay fees
-		feeCalc.Fee -= importedAmounts[avaxAssetID]
+	case importedAVAX < fee:
+		// imported inputs can partially pay fee
+		feeCalc.ResetFee(fee - importedAmounts[avaxAssetID])
 
 	default:
 		// imported inputs may be enough to pay taxes by themselves
 		changeOut := &avax.TransferableOutput{
 			Asset: avax.Asset{ID: avaxAssetID},
 			Out: &secp256k1fx.TransferOutput{
-				OutputOwners: *to, // we set amount after considering own fees
+				OutputOwners: *to, // we set amount after considering own fee
 			},
 		}
 
-		outDimensions, err := commonfees.MeterOutput(Parser.Codec(), txs.CodecVersion, changeOut)
+		outDimensions, err := commonfee.MeterOutput(Parser.Codec(), txs.CodecVersion, changeOut)
 		if err != nil {
 			return nil, fmt.Errorf("failed calculating output size: %w", err)
 		}
 
-		if feeCalc.IsEActive {
-			// update fees to target given the extra output added
+		if feeCalc.IsEActive() {
+			// update fee to target given the extra output added
 			if _, err := feeCalc.AddFeesFor(outDimensions); err != nil {
-				return nil, fmt.Errorf("account for output fees: %w", err)
+				return nil, fmt.Errorf("account for output fee: %w", err)
 			}
 		}
 
-		switch {
-		case feeCalc.Fee < importedAVAX:
-			changeOut.Out.(*secp256k1fx.TransferOutput).Amt = importedAVAX - feeCalc.Fee
+		switch fee := feeCalc.GetFee(); {
+		case fee < importedAVAX:
+			changeOut.Out.(*secp256k1fx.TransferOutput).Amt = importedAVAX - fee
 			utx.Outs = append(utx.Outs, changeOut)
 			avax.SortTransferableOutputs(utx.Outs, Parser.Codec()) // sort imported outputs
 			return utx, b.initCtx(utx)
 
-		case feeCalc.Fee == importedAVAX:
-			// imported fees pays exactly the tx cost. We don't include the outputs
+		case fee == importedAVAX:
+			// imported fee pays exactly the tx cost. We don't include the outputs
 			avax.SortTransferableOutputs(utx.Outs, Parser.Codec()) // sort imported outputs
 			return utx, b.initCtx(utx)
 
 		default:
-			if feeCalc.IsEActive {
-				// imported avax are not enough to pay fees
+			if feeCalc.IsEActive() {
+				// imported avax are not enough to pay fee
 				// Drop the changeOut and finance the tx
 				if _, err := feeCalc.RemoveFeesFor(outDimensions); err != nil {
 					return nil, fmt.Errorf("failed reverting change output: %w", err)
 				}
-				feeCalc.Fee -= importedAVAX
+				feeCalc.ResetFee(fee - importedAVAX)
 			}
 		}
 	}
@@ -589,7 +589,7 @@ func (b *builder) NewImportTx(
 func (b *builder) NewExportTx(
 	chainID ids.ID,
 	outputs []*avax.TransferableOutput,
-	feeCalc *fees.Calculator,
+	feeCalc fee.Calculator,
 	options ...common.Option,
 ) (*txs.ExportTx, error) {
 	// 1. Build core transaction without utxos
@@ -607,7 +607,7 @@ func (b *builder) NewExportTx(
 	}
 
 	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
-	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
+	toBurn := map[ids.ID]uint64{} // fee are calculated in financeTx
 	for _, out := range outputs {
 		assetID := out.AssetID()
 		amountToBurn, err := math.Add64(toBurn[assetID], out.Out.Amount())
@@ -618,7 +618,7 @@ func (b *builder) NewExportTx(
 	}
 
 	// feesMan cumulates consumed units. Let's init it with utx filled so far
-	if err := feeCalc.ExportTx(utx); err != nil {
+	if _, err := feeCalc.CalculateFee(&txs.Tx{Unsigned: utx}); err != nil {
 		return nil, err
 	}
 
@@ -675,7 +675,7 @@ func (b *builder) getBalance(
 
 func (b *builder) financeTx(
 	amountsToBurn map[ids.ID]uint64,
-	feeCalc *fees.Calculator,
+	feeCalc fee.Calculator,
 	options *common.Options,
 ) (
 	inputs []*avax.TransferableInput,
@@ -688,8 +688,8 @@ func (b *builder) financeTx(
 		return nil, nil, err
 	}
 
-	// we can only pay fees in avax, so we sort avax-denominated UTXOs last
-	// to maximize probability of being able to pay fees.
+	// we can only pay fee in avax, so we sort avax-denominated UTXOs last
+	// to maximize probability of being able to pay fee.
 	slices.SortFunc(utxos, func(lhs, rhs *avax.UTXO) int {
 		switch {
 		case lhs.Asset.AssetID() == avaxAssetID && rhs.Asset.AssetID() != avaxAssetID:
@@ -713,7 +713,7 @@ func (b *builder) financeTx(
 		Addrs:     []ids.ShortID{addr},
 	})
 
-	amountsToBurn[avaxAssetID] += feeCalc.Fee
+	amountsToBurn[avaxAssetID] += feeCalc.GetFee()
 
 	// Iterate over the unlocked UTXOs
 	for _, utxo := range utxos {
@@ -750,15 +750,15 @@ func (b *builder) financeTx(
 			},
 		}
 
-		addedFees, err := fees.FinanceInput(feeCalc, Parser.Codec(), input)
+		addedFees, err := financeInput(feeCalc, Parser.Codec(), input)
 		if err != nil {
-			return nil, nil, fmt.Errorf("account for input fees: %w", err)
+			return nil, nil, fmt.Errorf("account for input fee: %w", err)
 		}
 		amountsToBurn[avaxAssetID] += addedFees
 
-		addedFees, err = fees.FinanceCredential(feeCalc, Parser.Codec(), len(inputSigIndices))
+		addedFees, err = financeCredential(feeCalc, Parser.Codec(), len(inputSigIndices))
 		if err != nil {
-			return nil, nil, fmt.Errorf("account for credential fees: %w", err)
+			return nil, nil, fmt.Errorf("account for credential fee: %w", err)
 		}
 		amountsToBurn[avaxAssetID] += addedFees
 
@@ -773,7 +773,7 @@ func (b *builder) financeTx(
 
 		// Burn any value that should be burned
 		if remainingAmount := out.Amt - amountToBurn; remainingAmount > 0 {
-			// This input had extra value, so some of it must be returned, once fees are removed
+			// This input had extra value, so some of it must be returned, once fee are removed
 			changeOut := &avax.TransferableOutput{
 				Asset: utxo.Asset,
 				Out: &secp256k1fx.TransferOutput{
@@ -781,10 +781,10 @@ func (b *builder) financeTx(
 				},
 			}
 
-			// update fees to account for the change output
-			addedFees, _, err = fees.FinanceOutput(feeCalc, Parser.Codec(), changeOut)
+			// update fee to account for the change output
+			addedFees, _, err = financeOutput(feeCalc, Parser.Codec(), changeOut)
 			if err != nil {
-				return nil, nil, fmt.Errorf("account for output fees: %w", err)
+				return nil, nil, fmt.Errorf("account for output fee: %w", err)
 			}
 
 			if assetID != avaxAssetID {
@@ -825,7 +825,7 @@ func mintFTs(
 	backend Backend,
 	context *Context,
 	outputs map[ids.ID]*secp256k1fx.TransferOutput,
-	feeCalc *fees.Calculator,
+	feeCalc fee.Calculator,
 	options *common.Options,
 ) (
 	operations []*txs.Operation,
@@ -870,8 +870,8 @@ func mintFTs(
 			},
 		})
 
-		if _, err = fees.FinanceCredential(feeCalc, Parser.Codec(), len(inputSigIndices)); err != nil {
-			return nil, fmt.Errorf("account for credential fees: %w", err)
+		if _, err = financeCredential(feeCalc, Parser.Codec(), len(inputSigIndices)); err != nil {
+			return nil, fmt.Errorf("account for credential fee: %w", err)
 		}
 
 		// remove the asset from the required outputs to mint
@@ -896,7 +896,7 @@ func mintNFTs(
 	assetID ids.ID,
 	payload []byte,
 	owners []*secp256k1fx.OutputOwners,
-	feeCalc *fees.Calculator,
+	feeCalc fee.Calculator,
 	options *common.Options,
 ) (
 	operations []*txs.Operation,
@@ -943,8 +943,8 @@ func mintNFTs(
 			},
 		})
 
-		if _, err = fees.FinanceCredential(feeCalc, Parser.Codec(), len(inputSigIndices)); err != nil {
-			return nil, fmt.Errorf("account for credential fees: %w", err)
+		if _, err = financeCredential(feeCalc, Parser.Codec(), len(inputSigIndices)); err != nil {
+			return nil, fmt.Errorf("account for credential fee: %w", err)
 		}
 
 		return operations, nil
@@ -962,7 +962,7 @@ func mintProperty(
 	context *Context,
 	assetID ids.ID,
 	owner *secp256k1fx.OutputOwners,
-	feeCalc *fees.Calculator,
+	feeCalc fee.Calculator,
 	options *common.Options,
 ) (
 	operations []*txs.Operation,
@@ -1010,8 +1010,8 @@ func mintProperty(
 			},
 		})
 
-		if _, err = fees.FinanceCredential(feeCalc, Parser.Codec(), len(inputSigIndices)); err != nil {
-			return nil, fmt.Errorf("account for credential fees: %w", err)
+		if _, err = financeCredential(feeCalc, Parser.Codec(), len(inputSigIndices)); err != nil {
+			return nil, fmt.Errorf("account for credential fee: %w", err)
 		}
 
 		return operations, nil
@@ -1028,7 +1028,7 @@ func burnProperty(
 	backend Backend,
 	context *Context,
 	assetID ids.ID,
-	feeCalc *fees.Calculator,
+	feeCalc fee.Calculator,
 	options *common.Options,
 ) (
 	operations []*txs.Operation,
@@ -1072,8 +1072,8 @@ func burnProperty(
 			},
 		})
 
-		if _, err = fees.FinanceCredential(feeCalc, Parser.Codec(), len(inputSigIndices)); err != nil {
-			return nil, fmt.Errorf("account for credential fees: %w", err)
+		if _, err = financeCredential(feeCalc, Parser.Codec(), len(inputSigIndices)); err != nil {
+			return nil, fmt.Errorf("account for credential fee: %w", err)
 		}
 	}
 	if len(operations) == 0 {

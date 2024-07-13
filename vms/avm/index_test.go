@@ -5,6 +5,7 @@ package avm
 
 import (
 	"testing"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
@@ -27,9 +28,7 @@ import (
 func TestIndexTransaction_Ordered(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{
-		fork: eUpgrade,
-	})
+	env := setup(t, &envConfig{fork: eUpgrade})
 	defer env.vm.ctx.Lock.Unlock()
 
 	key := keys[0]
@@ -53,6 +52,9 @@ func TestIndexTransaction_Ordered(t *testing.T) {
 
 		issueAndAccept(require, env.vm, env.issuer, tx)
 
+		// make sure at least a second pass to avoid hitting gas cap
+		env.vm.clock.Set(env.vm.clock.Time().Add(time.Second))
+
 		env.vm.ctx.Lock.Lock()
 
 		txs = append(txs, tx)
@@ -68,9 +70,7 @@ func TestIndexTransaction_Ordered(t *testing.T) {
 func TestIndexTransaction_MultipleTransactions(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{
-		fork: eUpgrade,
-	})
+	env := setup(t, &envConfig{fork: eUpgrade})
 	defer env.vm.ctx.Lock.Unlock()
 
 	addressTxMap := map[ids.ShortID]*txs.Tx{}
@@ -95,6 +95,9 @@ func TestIndexTransaction_MultipleTransactions(t *testing.T) {
 		// issue transaction
 		issueAndAccept(require, env.vm, env.issuer, tx)
 
+		// make sure at least a second pass to avoid hitting gas cap
+		env.vm.clock.Set(env.vm.clock.Time().Add(time.Second))
+
 		env.vm.ctx.Lock.Lock()
 
 		addressTxMap[addr] = tx
@@ -113,9 +116,7 @@ func TestIndexTransaction_MultipleTransactions(t *testing.T) {
 func TestIndexTransaction_MultipleAddresses(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{
-		fork: eUpgrade,
-	})
+	env := setup(t, &envConfig{fork: eUpgrade})
 	defer env.vm.ctx.Lock.Unlock()
 
 	addrs := make([]ids.ShortID, len(keys))
@@ -153,9 +154,7 @@ func TestIndexTransaction_MultipleAddresses(t *testing.T) {
 func TestIndexer_Read(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{
-		fork: eUpgrade,
-	})
+	env := setup(t, &envConfig{fork: eUpgrade})
 	defer env.vm.ctx.Lock.Unlock()
 
 	// generate test address and asset IDs

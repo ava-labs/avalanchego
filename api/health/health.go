@@ -14,6 +14,10 @@ import (
 )
 
 const (
+	// CheckLabel is the label used to differentiate between health checks.
+	CheckLabel = "check"
+	// TagLabel is the label used to differentiate between health check tags.
+	TagLabel = "tag"
 	// AllTag is automatically added to every registered check.
 	AllTag = "all"
 	// ApplicationTag checks will act as if they specified every tag that has
@@ -62,23 +66,19 @@ type health struct {
 }
 
 func New(log logging.Logger, registerer prometheus.Registerer) (Health, error) {
-	readinessWorker, err := newWorker(log, "readiness", registerer)
-	if err != nil {
-		return nil, err
-	}
-
-	healthWorker, err := newWorker(log, "health", registerer)
-	if err != nil {
-		return nil, err
-	}
-
-	livenessWorker, err := newWorker(log, "liveness", registerer)
+	failingChecks := prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "checks_failing",
+			Help: "number of currently failing health checks",
+		},
+		[]string{CheckLabel, TagLabel},
+	)
 	return &health{
 		log:       log,
-		readiness: readinessWorker,
-		health:    healthWorker,
-		liveness:  livenessWorker,
-	}, err
+		readiness: newWorker(log, "readiness", failingChecks),
+		health:    newWorker(log, "health", failingChecks),
+		liveness:  newWorker(log, "liveness", failingChecks),
+	}, registerer.Register(failingChecks)
 }
 
 func (h *health) RegisterReadinessCheck(name string, checker Checker, tags ...string) error {

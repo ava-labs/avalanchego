@@ -1,0 +1,11 @@
+{
+    "gopls": {
+        "build.buildFlags": [
+            // Context: https://github.com/ava-labs/avalanchego/pull/3173
+            // Without this tag, the language server won't build the test-only
+            // code in non-_test.go files.
+            "--tags='test'",
+        ],
+    },
+    "go.testTags": "test",
+}

@@ -6,7 +6,7 @@ package builder
 import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
-	"github.com/ava-labs/avalanchego/vms/avm/txs/fees"
+	"github.com/ava-labs/avalanchego/vms/avm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -58,7 +58,7 @@ func (b *builderWithOptions) GetImportableBalance(
 
 func (b *builderWithOptions) NewBaseTx(
 	outputs []*avax.TransferableOutput,
-	feeCalc *fees.Calculator,
+	feeCalc fee.Calculator,
 	options ...common.Option,
 ) (*txs.BaseTx, error) {
 	return b.builder.NewBaseTx(
@@ -73,7 +73,7 @@ func (b *builderWithOptions) NewCreateAssetTx(
 	symbol string,
 	denomination byte,
 	initialState map[uint32][]verify.State,
-	feeCalc *fees.Calculator,
+	feeCalc fee.Calculator,
 	options ...common.Option,
 ) (*txs.CreateAssetTx, error) {
 	return b.builder.NewCreateAssetTx(
@@ -88,7 +88,7 @@ func (b *builderWithOptions) NewCreateAssetTx(
 
 func (b *builderWithOptions) NewOperationTx(
 	operations []*txs.Operation,
-	feeCalc *fees.Calculator,
+	feeCalc fee.Calculator,
 	options ...common.Option,
 ) (*txs.OperationTx, error) {
 	return b.builder.NewOperationTx(
@@ -100,7 +100,7 @@ func (b *builderWithOptions) NewOperationTx(
 
 func (b *builderWithOptions) NewOperationTxMintFT(
 	outputs map[ids.ID]*secp256k1fx.TransferOutput,
-	feeCalc *fees.Calculator,
+	feeCalc fee.Calculator,
 	options ...common.Option,
 ) (*txs.OperationTx, error) {
 	return b.builder.NewOperationTxMintFT(
@@ -114,7 +114,7 @@ func (b *builderWithOptions) NewOperationTxMintNFT(
 	assetID ids.ID,
 	payload []byte,
 	owners []*secp256k1fx.OutputOwners,
-	feeCalc *fees.Calculator,
+	feeCalc fee.Calculator,
 	options ...common.Option,
 ) (*txs.OperationTx, error) {
 	return b.builder.NewOperationTxMintNFT(
@@ -129,7 +129,7 @@ func (b *builderWithOptions) NewOperationTxMintNFT(
 func (b *builderWithOptions) NewOperationTxMintProperty(
 	assetID ids.ID,
 	owner *secp256k1fx.OutputOwners,
-	feeCalc *fees.Calculator,
+	feeCalc fee.Calculator,
 	options ...common.Option,
 ) (*txs.OperationTx, error) {
 	return b.builder.NewOperationTxMintProperty(
@@ -142,7 +142,7 @@ func (b *builderWithOptions) NewOperationTxMintProperty(
 
 func (b *builderWithOptions) NewOperationTxBurnProperty(
 	assetID ids.ID,
-	feeCalc *fees.Calculator,
+	feeCalc fee.Calculator,
 	options ...common.Option,
 ) (*txs.OperationTx, error) {
 	return b.builder.NewOperationTxBurnProperty(
@@ -155,7 +155,7 @@ func (b *builderWithOptions) NewOperationTxBurnProperty(
 func (b *builderWithOptions) NewImportTx(
 	chainID ids.ID,
 	to *secp256k1fx.OutputOwners,
-	feeCalc *fees.Calculator,
+	feeCalc fee.Calculator,
 	options ...common.Option,
 ) (*txs.ImportTx, error) {
 	return b.builder.NewImportTx(
@@ -169,7 +169,7 @@ func (b *builderWithOptions) NewImportTx(
 func (b *builderWithOptions) NewExportTx(
 	chainID ids.ID,
 	outputs []*avax.TransferableOutput,
-	feeCalc *fees.Calculator,
+	feeCalc fee.Calculator,
 	options ...common.Option,
 ) (*txs.ExportTx, error) {
 	return b.builder.NewExportTx(

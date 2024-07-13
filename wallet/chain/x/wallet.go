@@ -4,16 +4,13 @@
 package x
 
 import (
-	"errors"
+	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
-	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/avm"
-	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
-	"github.com/ava-labs/avalanchego/vms/avm/txs/fees"
+	"github.com/ava-labs/avalanchego/vms/avm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -21,14 +18,10 @@ import (
 	"github.com/ava-labs/avalanchego/wallet/chain/x/signer"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
-	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
+	commonfee "github.com/ava-labs/avalanchego/vms/components/fee"
 )
 
-var (
-	ErrNotAccepted = errors.New("not accepted")
-
-	_ Wallet = (*wallet)(nil)
-)
+var _ Wallet = (*wallet)(nil)
 
 type Wallet interface {
 	// Builder returns the builder that will be used to create the transactions.
@@ -170,9 +163,11 @@ type wallet struct {
 	signer  signer.Signer
 	client  avm.Client
 
-	isEForkActive                bool
-	staticFeesConfig             *config.Config
-	feeRates, blockMaxComplexity commonfees.Dimensions
+	isEUpgradeActive bool
+	staticFeesConfig fee.StaticConfig
+	feeCfg           commonfee.DynamicFeesConfig
+	gasPrice         commonfee.GasPrice
+	gasCap           commonfee.Gas
 }
 
 func (w *wallet) Builder() builder.Builder {
@@ -187,7 +182,10 @@ func (w *wallet) IssueBaseTx(
 	outputs []*avax.TransferableOutput,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	feeCalc := w.feeCalculator(w.builder.Context(), options...)
+	feeCalc, err := w.feeCalculator(w.builder.Context(), options...)
+	if err != nil {
+		return nil, fmt.Errorf("failed building fee calculator: %w", err)
+	}
 
 	utx, err := w.builder.NewBaseTx(outputs, feeCalc, options...)
 	if err != nil {
@@ -203,7 +201,10 @@ func (w *wallet) IssueCreateAssetTx(
 	initialState map[uint32][]verify.State,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	feeCalc := w.feeCalculator(w.builder.Context(), options...)
+	feeCalc, err := w.feeCalculator(w.builder.Context(), options...)
+	if err != nil {
+		return nil, fmt.Errorf("failed building fee calculator: %w", err)
+	}
 
 	utx, err := w.builder.NewCreateAssetTx(name, symbol, denomination, initialState, feeCalc, options...)
 	if err != nil {
@@ -216,7 +217,10 @@ func (w *wallet) IssueOperationTx(
 	operations []*txs.Operation,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	feeCalc := w.feeCalculator(w.builder.Context(), options...)
+	feeCalc, err := w.feeCalculator(w.builder.Context(), options...)
+	if err != nil {
+		return nil, fmt.Errorf("failed building fee calculator: %w", err)
+	}
 
 	utx, err := w.builder.NewOperationTx(operations, feeCalc, options...)
 	if err != nil {
@@ -229,7 +233,10 @@ func (w *wallet) IssueOperationTxMintFT(
 	outputs map[ids.ID]*secp256k1fx.TransferOutput,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	feeCalc := w.feeCalculator(w.builder.Context(), options...)
+	feeCalc, err := w.feeCalculator(w.builder.Context(), options...)
+	if err != nil {
+		return nil, fmt.Errorf("failed building fee calculator: %w", err)
+	}
 
 	utx, err := w.builder.NewOperationTxMintFT(outputs, feeCalc, options...)
 	if err != nil {
@@ -244,7 +251,10 @@ func (w *wallet) IssueOperationTxMintNFT(
 	owners []*secp256k1fx.OutputOwners,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	feeCalc := w.feeCalculator(w.builder.Context(), options...)
+	feeCalc, err := w.feeCalculator(w.builder.Context(), options...)
+	if err != nil {
+		return nil, fmt.Errorf("failed building fee calculator: %w", err)
+	}
 
 	utx, err := w.builder.NewOperationTxMintNFT(assetID, payload, owners, feeCalc, options...)
 	if err != nil {
@@ -258,7 +268,10 @@ func (w *wallet) IssueOperationTxMintProperty(
 	owner *secp256k1fx.OutputOwners,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	feeCalc := w.feeCalculator(w.builder.Context(), options...)
+	feeCalc, err := w.feeCalculator(w.builder.Context(), options...)
+	if err != nil {
+		return nil, fmt.Errorf("failed building fee calculator: %w", err)
+	}
 
 	utx, err := w.builder.NewOperationTxMintProperty(assetID, owner, feeCalc, options...)
 	if err != nil {
@@ -271,7 +284,10 @@ func (w *wallet) IssueOperationTxBurnProperty(
 	assetID ids.ID,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	feeCalc := w.feeCalculator(w.builder.Context(), options...)
+	feeCalc, err := w.feeCalculator(w.builder.Context(), options...)
+	if err != nil {
+		return nil, fmt.Errorf("failed building fee calculator: %w", err)
+	}
 
 	utx, err := w.builder.NewOperationTxBurnProperty(assetID, feeCalc, options...)
 	if err != nil {
@@ -285,7 +301,10 @@ func (w *wallet) IssueImportTx(
 	to *secp256k1fx.OutputOwners,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	feeCalc := w.feeCalculator(w.builder.Context(), options...)
+	feeCalc, err := w.feeCalculator(w.builder.Context(), options...)
+	if err != nil {
+		return nil, fmt.Errorf("failed building fee calculator: %w", err)
+	}
 
 	utx, err := w.builder.NewImportTx(chainID, to, feeCalc, options...)
 	if err != nil {
@@ -299,7 +318,10 @@ func (w *wallet) IssueExportTx(
 	outputs []*avax.TransferableOutput,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	feeCalc := w.feeCalculator(w.builder.Context(), options...)
+	feeCalc, err := w.feeCalculator(w.builder.Context(), options...)
+	if err != nil {
+		return nil, fmt.Errorf("failed building fee calculator: %w", err)
+	}
 
 	utx, err := w.builder.NewExportTx(chainID, outputs, feeCalc, options...)
 	if err != nil {
@@ -341,60 +363,61 @@ func (w *wallet) IssueTx(
 		return w.backend.AcceptTx(ctx, tx)
 	}
 
-	txStatus, err := w.client.ConfirmTx(ctx, txID, ops.PollFrequency())
+	if err := avm.AwaitTxAccepted(w.client, ctx, txID, ops.PollFrequency()); err != nil {
+		return err
+	}
+
+	return w.backend.AcceptTx(ctx, tx)
+}
+
+func (w *wallet) feeCalculator(ctx *builder.Context, options ...common.Option) (fee.Calculator, error) {
+	if err := w.refreshFeesData(ctx, options...); err != nil {
+		return nil, err
+	}
+
+	if !w.isEUpgradeActive {
+		return fee.NewStaticCalculator(w.staticFeesConfig), nil
+	}
+
+	commonCalc := commonfee.NewCalculator(w.feeCfg.FeeDimensionWeights, w.gasPrice, w.gasCap)
+	feeCalc := fee.NewDynamicCalculator(commonCalc, builder.Parser.Codec())
+	return feeCalc, nil
+}
+
+func (w *wallet) refreshFeesData(ctx *builder.Context, options ...common.Option) error {
+	var (
+		ops    = common.NewOptions(options)
+		opsCtx = ops.Context()
+	)
+
+	chainTime, err := w.client.GetTimestamp(opsCtx)
 	if err != nil {
 		return err
 	}
-
-	if err := w.backend.AcceptTx(ctx, tx); err != nil {
-		return err
-	}
-
-	if txStatus != choices.Accepted {
-		return ErrNotAccepted
-	}
-	return nil
-}
-
-func (w *wallet) feeCalculator(ctx *builder.Context, options ...common.Option) *fees.Calculator {
-	w.refreshFeesData(ctx, options...)
-
-	var feeCalculator *fees.Calculator
-	if !w.isEForkActive {
-		feeCalculator = fees.NewStaticCalculator(w.staticFeesConfig)
-	} else {
-		feeCfg := config.GetDynamicFeesConfig(w.isEForkActive)
-		feeMan := commonfees.NewManager(w.feeRates)
-		feeCalculator = fees.NewDynamicCalculator(builder.Parser.Codec(), feeMan, feeCfg.BlockMaxComplexity, nil)
-	}
-	return feeCalculator
-}
-
-func (w *wallet) refreshFeesData(ctx *builder.Context, _ ...common.Option) {
-	if w.isEForkActive {
-		// E fork enables dinamic fees and it is active
-		// not need to recheck
-		return
-	}
-
 	eUpgradeTime := version.GetEUpgradeTime(w.builder.Context().NetworkID)
+	isEUpgradeActive := !chainTime.Before(eUpgradeTime)
 
-	w.staticFeesConfig = staticFeesConfigFromContext(ctx)
-
-	// TODO ABENEGIA: consider introducing this method in X-chain as well
-	// chainTime, err := w.client.GetTimestamp(ctx)
-	// if err != nil {
-	// 	return err
-	// }
-	chainTime := mockable.MaxTime // assume fork is already active
-	w.isEForkActive = !chainTime.Before(eUpgradeTime)
-	feeCfg := config.GetDynamicFeesConfig(w.isEForkActive)
-	w.feeRates = feeCfg.FeeRate
-	w.blockMaxComplexity = feeCfg.BlockMaxComplexity
+	// update static and dynamic fees configs if needed
+	switch {
+	case !isEUpgradeActive:
+		w.staticFeesConfig = staticFeesConfigFromContext(ctx)
+		w.isEUpgradeActive = isEUpgradeActive
+		return nil
+	case !w.isEUpgradeActive && isEUpgradeActive:
+		w.feeCfg, err = w.client.GetDynamicFeeConfig(opsCtx)
+		if err != nil {
+			return err
+		}
+		w.isEUpgradeActive = isEUpgradeActive
+	default:
+		// nothing to do
+	}
+	w.gasPrice, w.gasCap, err = w.client.GetNextGasData(opsCtx)
+	return err
 }
 
-func staticFeesConfigFromContext(ctx *builder.Context) *config.Config {
-	return &config.Config{
+func staticFeesConfigFromContext(ctx *builder.Context) fee.StaticConfig {
+	return fee.StaticConfig{
 		TxFee:            ctx.BaseTxFee,
 		CreateAssetTxFee: ctx.CreateAssetTxFee,
 	}

@@ -28,8 +28,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
 	"github.com/ava-labs/avalanchego/vms/avm/state"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
+	"github.com/ava-labs/avalanchego/vms/avm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/components/fees"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
 	"github.com/ava-labs/avalanchego/vms/propertyfx"
@@ -39,9 +39,11 @@ import (
 )
 
 var feeConfig = config.Config{
-	TxFee:            2 * units.MilliAvax,
-	CreateAssetTxFee: 3 * units.MilliAvax,
-	EUpgradeTime:     time.Time{},
+	StaticConfig: fee.StaticConfig{
+		TxFee:            2 * units.MilliAvax,
+		CreateAssetTxFee: 3 * units.MilliAvax,
+	},
+	EUpgradeTime: time.Time{},
 }
 
 func TestSemanticVerifierBaseTx(t *testing.T) {
@@ -738,17 +740,17 @@ func TestSemanticVerifierBaseTx(t *testing.T) {
 			require := require.New(t)
 			ctrl := gomock.NewController(t)
 
-			state := test.stateFunc(ctrl)
+			chain := test.stateFunc(ctrl)
 			tx := test.txFunc(require)
 
-			feeCfg := config.GetDynamicFeesConfig(true /*isEActive*/)
+			feeCalc, err := state.PickFeeCalculator(&feeConfig, parser.Codec(), chain, chain.GetTimestamp())
+			require.NoError(err)
 
 			err = tx.Unsigned.Visit(&SemanticVerifier{
-				Backend:            backend,
-				BlkFeeManager:      fees.NewManager(feeCfg.FeeRate),
-				BlockMaxComplexity: feeCfg.BlockMaxComplexity,
-				State:              state,
-				Tx:                 tx,
+				Backend:       backend,
+				FeeCalculator: feeCalc,
+				State:         chain,
+				Tx:            tx,
 			})
 			require.ErrorIs(err, test.err)
 		})
@@ -1492,17 +1494,17 @@ func TestSemanticVerifierExportTx(t *testing.T) {
 			require := require.New(t)
 			ctrl := gomock.NewController(t)
 
-			state := test.stateFunc(ctrl)
+			chain := test.stateFunc(ctrl)
 			tx := test.txFunc(require)
 
-			feeCfg := config.GetDynamicFeesConfig(true /*isEActive*/)
+			feeCalc, err := state.PickFeeCalculator(&feeConfig, parser.Codec(), chain, chain.GetTimestamp())
+			require.NoError(err)
 
 			err = tx.Unsigned.Visit(&SemanticVerifier{
-				Backend:            backend,
-				BlkFeeManager:      fees.NewManager(feeCfg.FeeRate),
-				BlockMaxComplexity: feeCfg.BlockMaxComplexity,
-				State:              state,
-				Tx:                 tx,
+				Backend:       backend,
+				FeeCalculator: feeCalc,
+				State:         chain,
+				Tx:            tx,
 			})
 			require.ErrorIs(err, test.err)
 		})
@@ -1624,11 +1626,10 @@ func TestSemanticVerifierExportTxDifferentSubnet(t *testing.T) {
 		Unsigned: &unsignedCreateAssetTx,
 	}
 
-	state := state.NewMockChain(ctrl)
-
-	state.EXPECT().GetTimestamp().Return(time.Now().Truncate(time.Second))
-	state.EXPECT().GetUTXO(utxoID.InputID()).Return(&utxo, nil)
-	state.EXPECT().GetTx(asset.ID).Return(&createAssetTx, nil).Times(2)
+	chain := state.NewMockChain(ctrl)
+	chain.EXPECT().GetTimestamp().Return(time.Now().Truncate(time.Second))
+	chain.EXPECT().GetUTXO(utxoID.InputID()).Return(&utxo, nil)
+	chain.EXPECT().GetTx(asset.ID).Return(&createAssetTx, nil).Times(2)
 
 	tx := &txs.Tx{
 		Unsigned: &exportTx,
@@ -1640,14 +1641,14 @@ func TestSemanticVerifierExportTxDifferentSubnet(t *testing.T) {
 		},
 	))
 
-	feeCfg := config.GetDynamicFeesConfig(true /*isEActive*/)
+	feeCalc, err := state.PickFeeCalculator(&feeConfig, parser.Codec(), chain, chain.GetTimestamp())
+	require.NoError(err)
 
 	err = tx.Unsigned.Visit(&SemanticVerifier{
-		Backend:            backend,
-		BlkFeeManager:      fees.NewManager(feeCfg.FeeRate),
-		BlockMaxComplexity: feeCfg.BlockMaxComplexity,
-		State:              state,
-		Tx:                 tx,
+		Backend:       backend,
+		FeeCalculator: feeCalc,
+		State:         chain,
+		Tx:            tx,
 	})
 	require.ErrorIs(err, verify.ErrMismatchedSubnetIDs)
 }
@@ -2175,17 +2176,17 @@ func TestSemanticVerifierImportTx(t *testing.T) {
 			require := require.New(t)
 			ctrl := gomock.NewController(t)
 
-			state := test.stateFunc(ctrl)
+			chain := test.stateFunc(ctrl)
 			tx := test.txFunc(require)
 
-			feeCfg := config.GetDynamicFeesConfig(true /*isEActive*/)
+			feeCalc, err := state.PickFeeCalculator(&feeConfig, parser.Codec(), chain, chain.GetTimestamp())
+			require.NoError(err)
 
 			err = tx.Unsigned.Visit(&SemanticVerifier{
-				Backend:            backend,
-				BlkFeeManager:      fees.NewManager(feeCfg.FeeRate),
-				BlockMaxComplexity: feeCfg.BlockMaxComplexity,
-				State:              state,
-				Tx:                 tx,
+				Backend:       backend,
+				FeeCalculator: feeCalc,
+				State:         chain,
+				Tx:            tx,
 			})
 			require.ErrorIs(err, test.expectedErr)
 		})
@@ -2638,16 +2639,17 @@ func TestSemanticVerifierOperationTx(t *testing.T) {
 			require := require.New(t)
 			ctrl := gomock.NewController(t)
 
-			feeCfg := config.GetDynamicFeesConfig(true /*isEActive*/)
-
-			state := test.stateFunc(ctrl)
+			chain := test.stateFunc(ctrl)
 			tx := test.txFunc(require)
-			err := tx.Unsigned.Visit(&SemanticVerifier{
-				Backend:            backend,
-				BlkFeeManager:      fees.NewManager(feeCfg.FeeRate),
-				BlockMaxComplexity: feeCfg.BlockMaxComplexity,
-				State:              state,
-				Tx:                 tx,
+
+			feeCalc, err := state.PickFeeCalculator(&feeConfig, parser.Codec(), chain, chain.GetTimestamp())
+			require.NoError(err)
+
+			err = tx.Unsigned.Visit(&SemanticVerifier{
+				Backend:       backend,
+				FeeCalculator: feeCalc,
+				State:         chain,
+				Tx:            tx,
 			})
 			require.ErrorIs(err, test.expectedErr)
 		})

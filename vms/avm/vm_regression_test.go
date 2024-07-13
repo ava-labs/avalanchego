@@ -23,12 +23,11 @@ func TestVerifyFxUsage(t *testing.T) {
 
 	var (
 		key = keys[0]
-		kc  = secp256k1fx.NewKeychain()
+		kc  = secp256k1fx.NewKeychain(key)
 	)
-	kc.Add(key)
 
 	initialStates := map[uint32][]verify.State{
-		uint32(0): {
+		0: {
 			&secp256k1fx.TransferOutput{
 				Amt: 1,
 				OutputOwners: secp256k1fx.OutputOwners{
@@ -37,7 +36,7 @@ func TestVerifyFxUsage(t *testing.T) {
 				},
 			},
 		},
-		uint32(1): {
+		1: {
 			&nftfx.MintOutput{
 				GroupID: 1,
 				OutputOwners: secp256k1fx.OutputOwners{
@@ -62,7 +61,6 @@ func TestVerifyFxUsage(t *testing.T) {
 	issueAndAccept(require, env.vm, env.issuer, createAssetTx)
 
 	// Mint the NFT
-	env.service.txBuilderBackend.ResetAddresses(kc.Addresses())
 	mintNFTTx, err := mintNFT(
 		env.service.txBuilderBackend,
 		createAssetTx.ID(),
@@ -79,7 +77,6 @@ func TestVerifyFxUsage(t *testing.T) {
 
 	// move the NFT
 	to := keys[2].PublicKey().Address()
-	env.service.txBuilderBackend.ResetAddresses(kc.Addresses())
 	spendTx, _, err := buildBaseTx(
 		env.service.txBuilderBackend,
 		[]*avax.TransferableOutput{{

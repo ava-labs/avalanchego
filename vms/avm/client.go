@@ -5,6 +5,7 @@ package avm
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -17,9 +18,15 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/rpc"
+
+	commonfee "github.com/ava-labs/avalanchego/vms/components/fee"
 )
 
-var _ Client = (*client)(nil)
+var (
+	_ Client = (*client)(nil)
+
+	ErrRejected = errors.New("rejected")
+)
 
 // Client for interacting with an AVM (X-Chain) instance
 type Client interface {
@@ -35,12 +42,6 @@ type Client interface {
 	// Deprecated: GetTxStatus only returns Accepted or Unknown, GetTx should be
 	// used instead to determine if the tx was accepted.
 	GetTxStatus(ctx context.Context, txID ids.ID, options ...rpc.Option) (choices.Status, error)
-	// ConfirmTx attempts to confirm [txID] by repeatedly checking its status.
-	// Note: ConfirmTx will block until either the context is done or the client
-	//       returns a decided status.
-	// TODO: Move this function off of the Client interface into a utility
-	// function.
-	ConfirmTx(ctx context.Context, txID ids.ID, freq time.Duration, options ...rpc.Option) (choices.Status, error)
 	// GetTx returns the byte representation of [txID]
 	GetTx(ctx context.Context, txID ids.ID, options ...rpc.Option) ([]byte, error)
 	// GetUTXOs returns the byte representation of the UTXOs controlled by [addrs]
@@ -214,6 +215,14 @@ type Client interface {
 		assetID string,
 		options ...rpc.Option,
 	) (ids.ID, error)
+
+	// GetTimestamp returns the current chain timestamp
+	GetTimestamp(ctx context.Context, options ...rpc.Option) (time.Time, error)
+	// GetDynamicFeeConfig returns DynamicFeesConfig
+	GetDynamicFeeConfig(ctx context.Context, options ...rpc.Option) (commonfee.DynamicFeesConfig, error)
+	// GetNextGasData returns the gas price that a transaction must pay to be accepted now
+	// and the gas cap, i.e. the maximum gas a transactions can consume
+	GetNextGasData(ctx context.Context, options ...rpc.Option) (commonfee.GasPrice, commonfee.Gas, error)
 }
 
 // implementation for an AVM client for interacting with avm [chain]
@@ -267,7 +276,7 @@ func (c *client) GetHeight(ctx context.Context, options ...rpc.Option) (uint64, 
 func (c *client) IssueTx(ctx context.Context, txBytes []byte, options ...rpc.Option) (ids.ID, error) {
 	txStr, err := formatting.Encode(formatting.Hex, txBytes)
 	if err != nil {
-		return ids.ID{}, err
+		return ids.Empty, err
 	}
 	res := &api.JSONTxID{}
 	err = c.requester.SendRequest(ctx, "avm.issueTx", &api.FormattedTx{
@@ -283,26 +292,6 @@ func (c *client) GetTxStatus(ctx context.Context, txID ids.ID, options ...rpc.Op
 		TxID: txID,
 	}, res, options...)
 	return res.Status, err
-}
-
-func (c *client) ConfirmTx(ctx context.Context, txID ids.ID, freq time.Duration, options ...rpc.Option) (choices.Status, error) {
-	ticker := time.NewTicker(freq)
-	defer ticker.Stop()
-
-	for {
-		status, err := c.GetTxStatus(ctx, txID, options...)
-		if err == nil {
-			if status.Decided() {
-				return status, nil
-			}
-		}
-
-		select {
-		case <-ticker.C:
-		case <-ctx.Done():
-			return status, ctx.Err()
-		}
-	}
 }
 
 func (c *client) GetTx(ctx context.Context, txID ids.ID, options ...rpc.Option) ([]byte, error) {
@@ -714,7 +703,7 @@ func (c *client) MintNFT(
 ) (ids.ID, error) {
 	payloadStr, err := formatting.Encode(formatting.Hex, payload)
 	if err != nil {
-		return ids.ID{}, err
+		return ids.Empty, err
 	}
 	res := &api.JSONTxID{}
 	err = c.requester.SendRequest(ctx, "avm.mintNFT", &MintNFTArgs{
@@ -765,4 +754,53 @@ func (c *client) Export(
 		AssetID:     assetID,
 	}, res, options...)
 	return res.TxID, err
+}
+
+func AwaitTxAccepted(
+	c Client,
+	ctx context.Context,
+	txID ids.ID,
+	freq time.Duration,
+	options ...rpc.Option,
+) error {
+	ticker := time.NewTicker(freq)
+	defer ticker.Stop()
+
+	for {
+		status, err := c.GetTxStatus(ctx, txID, options...)
+		if err != nil {
+			return err
+		}
+
+		switch status {
+		case choices.Accepted:
+			return nil
+		case choices.Rejected:
+			return ErrRejected
+		}
+
+		select {
+		case <-ticker.C:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+}
+
+func (c *client) GetTimestamp(ctx context.Context, options ...rpc.Option) (time.Time, error) {
+	res := &GetTimestampReply{}
+	err := c.requester.SendRequest(ctx, "platform.getTimestamp", struct{}{}, res, options...)
+	return res.Timestamp, err
+}
+
+func (c *client) GetDynamicFeeConfig(ctx context.Context, options ...rpc.Option) (commonfee.DynamicFeesConfig, error) {
+	res := &DynamicFeesConfigReply{}
+	err := c.requester.SendRequest(ctx, "platform.getDynamicFeeConfig", struct{}{}, res, options...)
+	return res.DynamicFeesConfig, err
+}
+
+func (c *client) GetNextGasData(ctx context.Context, options ...rpc.Option) (commonfee.GasPrice, commonfee.Gas, error) {
+	res := &GetGasPriceReply{}
+	err := c.requester.SendRequest(ctx, "platform.getNextGasData", struct{}{}, res, options...)
+	return res.NextGasPrice, res.NextGasCap, err
 }

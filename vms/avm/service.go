@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"math"
 	"net/http"
+	"time"
 
 	"go.uber.org/zap"
 
@@ -21,7 +22,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/vms/avm/state"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
+	"github.com/ava-labs/avalanchego/vms/avm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/keystore"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -30,6 +33,7 @@ import (
 
 	avajson "github.com/ava-labs/avalanchego/utils/json"
 	safemath "github.com/ava-labs/avalanchego/utils/math"
+	commonfee "github.com/ava-labs/avalanchego/vms/components/fee"
 )
 
 const (
@@ -1698,4 +1702,85 @@ func (s *Service) buildExport(args *ExportArgs) (*txs.Tx, ids.ShortID, error) {
 		kc,
 		changeAddr,
 	)
+}
+
+// GetTimestampReply is the response from GetTimestamp
+type GetTimestampReply struct {
+	// Current timestamp
+	Timestamp time.Time `json:"timestamp"`
+}
+
+// GetTimestamp returns the current timestamp on chain.
+func (s *Service) GetTimestamp(_ *http.Request, _ *struct{}, reply *GetTimestampReply) error {
+	s.vm.ctx.Log.Debug("API called",
+		zap.String("service", "platform"),
+		zap.String("method", "getTimestamp"),
+	)
+
+	s.vm.ctx.Lock.Lock()
+	defer s.vm.ctx.Lock.Unlock()
+
+	reply.Timestamp = s.vm.state.GetTimestamp()
+	return nil
+}
+
+// DynamicFeesConfigReply is the response from GetDynamicFeeConfig
+type DynamicFeesConfigReply struct {
+	commonfee.DynamicFeesConfig `json:"nextGasPrice"`
+}
+
+// GetNextFeeRates returns the next fee rates that a transaction must pay to be accepted now
+func (s *Service) GetDynamicFeeConfig(_ *http.Request, _ *struct{}, reply *DynamicFeesConfigReply) error {
+	s.vm.ctx.Log.Debug("API called",
+		zap.String("service", "platform"),
+		zap.String("method", "getDynamicFeeConfig"),
+	)
+
+	s.vm.ctx.Lock.Lock()
+	defer s.vm.ctx.Lock.Unlock()
+
+	chainTime := s.vm.state.GetTimestamp()
+	isEActive := s.vm.Config.IsEActivated(chainTime)
+	cfg, err := fee.GetDynamicConfig(isEActive)
+	switch err {
+	case fee.ErrDynamicFeeConfigNotAvailable:
+		reply.DynamicFeesConfig = commonfee.DynamicFeesConfig{}
+		return nil
+	case nil:
+		reply.DynamicFeesConfig = cfg
+		return nil
+	default:
+		return err
+	}
+}
+
+// GetGasPriceReply is the response from GetFeeRates
+type GetGasPriceReply struct {
+	NextGasPrice commonfee.GasPrice `json:"nextGasPrice"`
+	NextGasCap   commonfee.Gas      `json:"nextGasCap"`
+}
+
+// GetNextFeeRates returns the next fee rates that a transaction must pay to be accepted now
+func (s *Service) GetNextGasData(_ *http.Request, _ *struct{}, reply *GetGasPriceReply) error {
+	s.vm.ctx.Log.Debug("API called",
+		zap.String("service", "platform"),
+		zap.String("method", "getNextGasData"),
+	)
+
+	s.vm.ctx.Lock.Lock()
+	defer s.vm.ctx.Lock.Unlock()
+
+	preferredID := s.vm.chainManager.Preferred()
+	onAccept, ok := s.vm.chainManager.GetState(preferredID)
+	if !ok {
+		return fmt.Errorf("could not retrieve state for block %s", preferredID)
+	}
+
+	feeCalculator, err := state.PickFeeCalculator(&s.vm.Config, s.vm.parser.Codec(), onAccept, onAccept.GetTimestamp())
+	if err != nil {
+		return err
+	}
+	reply.NextGasPrice = feeCalculator.GetGasPrice()
+	reply.NextGasCap = feeCalculator.GetGasCap()
+	return nil
 }

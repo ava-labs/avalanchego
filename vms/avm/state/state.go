@@ -4,6 +4,7 @@
 package state
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -15,10 +16,12 @@ import (
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/avm/block"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
+	"github.com/ava-labs/avalanchego/vms/avm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+
+	commonfee "github.com/ava-labs/avalanchego/vms/components/fee"
 )
 
 const (
@@ -28,11 +31,12 @@ const (
 )
 
 var (
-	utxoPrefix      = []byte("utxo")
-	txPrefix        = []byte("tx")
-	blockIDPrefix   = []byte("blockID")
-	blockPrefix     = []byte("block")
-	singletonPrefix = []byte("singleton")
+	utxoPrefix       = []byte("utxo")
+	txPrefix         = []byte("tx")
+	blockIDPrefix    = []byte("blockID")
+	blockPrefix      = []byte("block")
+	singletonPrefix  = []byte("singleton")
+	CurrentGasCapKey = []byte("gas cap")
 
 	isInitializedKey = []byte{0x00}
 	timestampKey     = []byte{0x01}
@@ -49,6 +53,7 @@ type ReadOnlyChain interface {
 	GetBlock(blkID ids.ID) (block.Block, error)
 	GetLastAccepted() ids.ID
 	GetTimestamp() time.Time
+	GetCurrentGasCap() (commonfee.Gas, error)
 }
 
 type Chain interface {
@@ -60,6 +65,7 @@ type Chain interface {
 	AddBlock(block block.Block)
 	SetLastAccepted(blkID ids.ID)
 	SetTimestamp(t time.Time)
+	SetCurrentGasCap(commonfee.Gas)
 }
 
 // State persistently maintains a set of UTXOs, transaction, statuses, and
@@ -133,6 +139,7 @@ type state struct {
 	// [lastAccepted] is the most recently accepted block.
 	lastAccepted, persistedLastAccepted ids.ID
 	timestamp, persistedTimestamp       time.Time
+	currentGasCap                       *commonfee.Gas
 	singletonDB                         database.Database
 
 	trackChecksum bool
@@ -342,6 +349,31 @@ func (s *state) InitializeChainState(stopVertexID ids.ID, genesisTimestamp time.
 	s.persistedLastAccepted = lastAccepted
 	s.timestamp, err = database.GetTimestamp(s.singletonDB, timestampKey)
 	s.persistedTimestamp = s.timestamp
+
+	switch currentGasCapBytes, err := s.singletonDB.Get(CurrentGasCapKey); err {
+	case nil:
+		gas, err := database.ParseUInt64(currentGasCapBytes)
+		if err != nil {
+			return err
+		}
+		s.currentGasCap = new(commonfee.Gas)
+		*s.currentGasCap = commonfee.Gas(gas)
+
+	case database.ErrNotFound:
+		// fork introducing dynamic fees may not be active yet,
+		// hence we may have never stored fees windows. Set to nil
+		// TODO: remove once fork is active
+		feesCfg, err := fee.GetDynamicConfig(true /*isEActive*/)
+		if err != nil {
+			return fmt.Errorf("failed retrieving dynamic fees config: %w", err)
+		}
+		s.currentGasCap = new(commonfee.Gas)
+		*s.currentGasCap = feesCfg.MaxGasPerSecond
+
+	default:
+		return err
+	}
+
 	return err
 }
 
@@ -383,6 +415,20 @@ func (s *state) GetTimestamp() time.Time {
 	return s.timestamp
 }
 
+func (s *state) GetCurrentGasCap() (commonfee.Gas, error) {
+	if s.currentGasCap == nil {
+		return commonfee.ZeroGas, nil
+	}
+	return *s.currentGasCap, nil
+}
+
+func (s *state) SetCurrentGasCap(gasCap commonfee.Gas) {
+	if s.currentGasCap == nil {
+		s.currentGasCap = new(commonfee.Gas)
+	}
+	*s.currentGasCap = gasCap
+}
+
 func (s *state) SetTimestamp(t time.Time) {
 	s.timestamp = t
 }
@@ -408,7 +454,7 @@ func (s *state) CommitBatch() (database.Batch, error) {
 }
 
 func (s *state) Close() error {
-	return utils.Err(
+	return errors.Join(
 		s.utxoDB.Close(),
 		s.txDB.Close(),
 		s.blockIDDB.Close(),
@@ -419,7 +465,7 @@ func (s *state) Close() error {
 }
 
 func (s *state) write() error {
-	return utils.Err(
+	return errors.Join(
 		s.writeUTXOs(),
 		s.writeTxs(),
 		s.writeBlockIDs(),
@@ -498,6 +544,11 @@ func (s *state) writeMetadata() error {
 			return fmt.Errorf("failed to write last accepted: %w", err)
 		}
 		s.persistedLastAccepted = s.lastAccepted
+	}
+	if s.currentGasCap != nil {
+		if err := database.PutUInt64(s.singletonDB, CurrentGasCapKey, uint64(*s.currentGasCap)); err != nil {
+			return fmt.Errorf("failed to write current gas cap: %w", err)
+		}
 	}
 	return nil
 }

@@ -58,7 +58,7 @@ func TestTimeout(t *testing.T) {
 			TimeoutCoefficient: 1.25,
 		},
 		benchlist,
-		"",
+		prometheus.NewRegistry(),
 		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
@@ -70,7 +70,6 @@ func TestTimeout(t *testing.T) {
 	mc, err := message.NewCreator(
 		logging.NoLog{},
 		metrics,
-		"dummyNamespace",
 		constants.DefaultNetworkCompressionType,
 		10*time.Second,
 	)
@@ -86,7 +85,6 @@ func TestTimeout(t *testing.T) {
 		set.Set[ids.ID]{},
 		nil,
 		router.HealthConfig{},
-		"",
 		prometheus.NewRegistry(),
 	))
 
@@ -101,6 +99,7 @@ func TestTimeout(t *testing.T) {
 		tm,
 		p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
 		subnets.New(ctx.NodeID, subnets.Config{}),
+		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
 
@@ -133,6 +132,7 @@ func TestTimeout(t *testing.T) {
 		subnets.New(ctx.NodeID, subnets.Config{}),
 		commontracker.NewPeers(),
 		p2pTracker,
+		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
 
@@ -334,7 +334,7 @@ func TestReliableMessages(t *testing.T) {
 			TimeoutCoefficient: 1.25,
 		},
 		benchlist,
-		"",
+		prometheus.NewRegistry(),
 		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
@@ -347,7 +347,6 @@ func TestReliableMessages(t *testing.T) {
 	mc, err := message.NewCreator(
 		logging.NoLog{},
 		metrics,
-		"dummyNamespace",
 		constants.DefaultNetworkCompressionType,
 		10*time.Second,
 	)
@@ -363,7 +362,6 @@ func TestReliableMessages(t *testing.T) {
 		set.Set[ids.ID]{},
 		nil,
 		router.HealthConfig{},
-		"",
 		prometheus.NewRegistry(),
 	))
 
@@ -378,6 +376,7 @@ func TestReliableMessages(t *testing.T) {
 		tm,
 		p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
 		subnets.New(ctx.NodeID, subnets.Config{}),
+		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
 
@@ -410,6 +409,7 @@ func TestReliableMessages(t *testing.T) {
 		subnets.New(ctx.NodeID, subnets.Config{}),
 		commontracker.NewPeers(),
 		p2pTracker,
+		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
 
@@ -491,7 +491,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 			TimeoutCoefficient: 1.25,
 		},
 		benchlist,
-		"",
+		prometheus.NewRegistry(),
 		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
@@ -504,7 +504,6 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	mc, err := message.NewCreator(
 		logging.NoLog{},
 		metrics,
-		"dummyNamespace",
 		constants.DefaultNetworkCompressionType,
 		10*time.Second,
 	)
@@ -520,7 +519,6 @@ func TestReliableMessagesToMyself(t *testing.T) {
 		set.Set[ids.ID]{},
 		nil,
 		router.HealthConfig{},
-		"",
 		prometheus.NewRegistry(),
 	))
 
@@ -535,6 +533,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 		tm,
 		p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
 		subnets.New(ctx.NodeID, subnets.Config{}),
+		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
 
@@ -567,6 +566,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 		subnets.New(ctx.NodeID, subnets.Config{}),
 		commontracker.NewPeers(),
 		p2pTracker,
+		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
 
@@ -846,6 +846,7 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 				timeoutManager,
 				p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
 				subnets.New(ctx.NodeID, subnets.Config{}),
+				prometheus.NewRegistry(),
 			)
 			require.NoError(err)
 
@@ -1052,11 +1053,6 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 				router         = router.NewMockRouter(ctrl)
 			)
 
-			// Instantiate new registerers to avoid duplicate metrics
-			// registration
-			ctx.Registerer = prometheus.NewRegistry()
-			ctx.AvalancheRegisterer = prometheus.NewRegistry()
-
 			sender, err := New(
 				ctx,
 				msgCreator,
@@ -1065,6 +1061,7 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 				timeoutManager,
 				p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
 				subnets.New(ctx.NodeID, subnets.Config{}),
+				prometheus.NewRegistry(),
 			)
 			require.NoError(err)
 
@@ -1231,6 +1228,7 @@ func TestSender_Single_Request(t *testing.T) {
 				timeoutManager,
 				engineType,
 				subnets.New(ctx.NodeID, subnets.Config{}),
+				prometheus.NewRegistry(),
 			)
 			require.NoError(err)
 

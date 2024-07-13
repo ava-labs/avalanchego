@@ -10,6 +10,7 @@
 package message
 
 import (
+	netip "net/netip"
 	reflect "reflect"
 	time "time"
 
@@ -283,7 +284,7 @@ func (mr *MockOutboundMsgBuilderMockRecorder) GetStateSummaryFrontier(arg0, arg1
 }
 
 // Handshake mocks base method.
-func (m *MockOutboundMsgBuilder) Handshake(arg0 uint32, arg1 uint64, arg2 ips.IPPort, arg3 string, arg4, arg5, arg6 uint32, arg7 uint64, arg8, arg9 []byte, arg10 []ids.ID, arg11, arg12 []uint32, arg13, arg14 []byte) (OutboundMessage, error) {
+func (m *MockOutboundMsgBuilder) Handshake(arg0 uint32, arg1 uint64, arg2 netip.AddrPort, arg3 string, arg4, arg5, arg6 uint32, arg7 uint64, arg8, arg9 []byte, arg10 []ids.ID, arg11, arg12 []uint32, arg13, arg14 []byte) (OutboundMessage, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Handshake", arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13, arg14)
 	ret0, _ := ret[0].(OutboundMessage)

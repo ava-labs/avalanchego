@@ -4,6 +4,7 @@
 package peer
 
 import (
+	"net/netip"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -12,8 +13,8 @@ import (
 )
 
 type Info struct {
-	IP                    string                 `json:"ip"`
-	PublicIP              string                 `json:"publicIP,omitempty"`
+	IP                    netip.AddrPort         `json:"ip"`
+	PublicIP              netip.AddrPort         `json:"publicIP,omitempty"`
 	ID                    ids.NodeID             `json:"nodeID"`
 	Version               string                 `json:"version"`
 	LastSent              time.Time              `json:"lastSent"`

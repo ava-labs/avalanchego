@@ -32,12 +32,13 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
+	"github.com/ava-labs/avalanchego/vms/avm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	avajson "github.com/ava-labs/avalanchego/utils/json"
-	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
+	commonfee "github.com/ava-labs/avalanchego/vms/components/fee"
 	keystoreutils "github.com/ava-labs/avalanchego/vms/components/keystore"
 )
 
@@ -79,14 +80,11 @@ var (
 	keys  = secp256k1.TestKeys()[:3] // TODO: Remove [:3]
 	addrs []ids.ShortID              // addrs[i] corresponds to keys[i]
 
-	testFeesCfg = commonfees.DynamicFeesConfig{
-		FeeRate: commonfees.Dimensions{
-			5 * units.NanoAvax,
-			5 * units.NanoAvax,
-			5 * units.NanoAvax,
-			5 * units.NanoAvax,
-		},
-		BlockMaxComplexity: commonfees.Max,
+	testFeesCfg = commonfee.DynamicFeesConfig{
+		GasPrice:            commonfee.GasPrice(10),
+		FeeDimensionWeights: commonfee.Dimensions{1, 1, 1, 1},
+		MaxGasPerSecond:     commonfee.Gas(1_000_000),
+		LeakGasCoeff:        commonfee.Gas(10),
 	}
 )
 
@@ -115,10 +113,11 @@ type envConfig struct {
 }
 
 type environment struct {
-	genesisBytes  []byte
-	genesisTx     *txs.Tx
-	sharedMemory  *atomic.Memory
-	issuer        chan common.Message
+	genesisBytes []byte
+	genesisTx    *txs.Tx
+	sharedMemory *atomic.Memory
+	issuer       chan common.Message
+
 	vm            *VM
 	service       *Service
 	walletService *WalletService
@@ -256,9 +255,11 @@ func setup(tb testing.TB, c *envConfig) *environment {
 
 func staticConfig(tb testing.TB, f fork) config.Config {
 	c := config.Config{
-		TxFee:            testTxFee,
-		CreateAssetTxFee: testTxFee,
-		EUpgradeTime:     mockable.MaxTime,
+		StaticConfig: fee.StaticConfig{
+			TxFee:            testTxFee,
+			CreateAssetTxFee: testTxFee,
+		},
+		EUpgradeTime: mockable.MaxTime,
 	}
 
 	switch f {
@@ -370,8 +371,8 @@ func sampleAddrs(tb testing.TB, addressFormatter avax.AddressManager, addrs []id
 	sampler.Initialize(uint64(len(addrs)))
 
 	numAddrs := 1 + rand.Intn(len(addrs)) // #nosec G404
-	indices, err := sampler.Sample(numAddrs)
-	require.NoError(err)
+	indices, ok := sampler.Sample(numAddrs)
+	require.True(ok)
 	for _, index := range indices {
 		addr := addrs[index]
 		addrStr, err := addressFormatter.FormatLocalAddress(addr)

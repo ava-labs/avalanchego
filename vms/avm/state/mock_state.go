@@ -18,6 +18,7 @@ import (
 	block "github.com/ava-labs/avalanchego/vms/avm/block"
 	txs "github.com/ava-labs/avalanchego/vms/avm/txs"
 	avax "github.com/ava-labs/avalanchego/vms/components/avax"
+	fee "github.com/ava-labs/avalanchego/vms/components/fee"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -122,6 +123,21 @@ func (mr *MockChainMockRecorder) GetBlockIDAtHeight(arg0 any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBlockIDAtHeight", reflect.TypeOf((*MockChain)(nil).GetBlockIDAtHeight), arg0)
 }
 
+// GetCurrentGasCap mocks base method.
+func (m *MockChain) GetCurrentGasCap() (fee.Gas, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetCurrentGasCap")
+	ret0, _ := ret[0].(fee.Gas)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetCurrentGasCap indicates an expected call of GetCurrentGasCap.
+func (mr *MockChainMockRecorder) GetCurrentGasCap() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCurrentGasCap", reflect.TypeOf((*MockChain)(nil).GetCurrentGasCap))
+}
+
 // GetLastAccepted mocks base method.
 func (m *MockChain) GetLastAccepted() ids.ID {
 	m.ctrl.T.Helper()
@@ -178,6 +194,18 @@ func (m *MockChain) GetUTXO(arg0 ids.ID) (*avax.UTXO, error) {
 func (mr *MockChainMockRecorder) GetUTXO(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUTXO", reflect.TypeOf((*MockChain)(nil).GetUTXO), arg0)
+}
+
+// SetCurrentGasCap mocks base method.
+func (m *MockChain) SetCurrentGasCap(arg0 fee.Gas) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "SetCurrentGasCap", arg0)
+}
+
+// SetCurrentGasCap indicates an expected call of SetCurrentGasCap.
+func (mr *MockChainMockRecorder) SetCurrentGasCap(arg0 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetCurrentGasCap", reflect.TypeOf((*MockChain)(nil).SetCurrentGasCap), arg0)
 }
 
 // SetLastAccepted mocks base method.
@@ -375,6 +403,21 @@ func (mr *MockStateMockRecorder) GetBlockIDAtHeight(arg0 any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBlockIDAtHeight", reflect.TypeOf((*MockState)(nil).GetBlockIDAtHeight), arg0)
 }
 
+// GetCurrentGasCap mocks base method.
+func (m *MockState) GetCurrentGasCap() (fee.Gas, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetCurrentGasCap")
+	ret0, _ := ret[0].(fee.Gas)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetCurrentGasCap indicates an expected call of GetCurrentGasCap.
+func (mr *MockStateMockRecorder) GetCurrentGasCap() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCurrentGasCap", reflect.TypeOf((*MockState)(nil).GetCurrentGasCap))
+}
+
 // GetLastAccepted mocks base method.
 func (m *MockState) GetLastAccepted() ids.ID {
 	m.ctrl.T.Helper()
@@ -460,6 +503,18 @@ func (m *MockState) IsInitialized() (bool, error) {
 func (mr *MockStateMockRecorder) IsInitialized() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsInitialized", reflect.TypeOf((*MockState)(nil).IsInitialized))
+}
+
+// SetCurrentGasCap mocks base method.
+func (m *MockState) SetCurrentGasCap(arg0 fee.Gas) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "SetCurrentGasCap", arg0)
+}
+
+// SetCurrentGasCap indicates an expected call of SetCurrentGasCap.
+func (mr *MockStateMockRecorder) SetCurrentGasCap(arg0 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetCurrentGasCap", reflect.TypeOf((*MockState)(nil).SetCurrentGasCap), arg0)
 }
 
 // SetInitialized mocks base method.
@@ -628,6 +683,21 @@ func (mr *MockDiffMockRecorder) GetBlockIDAtHeight(arg0 any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBlockIDAtHeight", reflect.TypeOf((*MockDiff)(nil).GetBlockIDAtHeight), arg0)
 }
 
+// GetCurrentGasCap mocks base method.
+func (m *MockDiff) GetCurrentGasCap() (fee.Gas, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetCurrentGasCap")
+	ret0, _ := ret[0].(fee.Gas)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetCurrentGasCap indicates an expected call of GetCurrentGasCap.
+func (mr *MockDiffMockRecorder) GetCurrentGasCap() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCurrentGasCap", reflect.TypeOf((*MockDiff)(nil).GetCurrentGasCap))
+}
+
 // GetLastAccepted mocks base method.
 func (m *MockDiff) GetLastAccepted() ids.ID {
 	m.ctrl.T.Helper()
@@ -684,6 +754,18 @@ func (m *MockDiff) GetUTXO(arg0 ids.ID) (*avax.UTXO, error) {
 func (mr *MockDiffMockRecorder) GetUTXO(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUTXO", reflect.TypeOf((*MockDiff)(nil).GetUTXO), arg0)
+}
+
+// SetCurrentGasCap mocks base method.
+func (m *MockDiff) SetCurrentGasCap(arg0 fee.Gas) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "SetCurrentGasCap", arg0)
+}
+
+// SetCurrentGasCap indicates an expected call of SetCurrentGasCap.
+func (mr *MockDiffMockRecorder) SetCurrentGasCap(arg0 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetCurrentGasCap", reflect.TypeOf((*MockDiff)(nil).SetCurrentGasCap), arg0)
 }
 
 // SetLastAccepted mocks base method.

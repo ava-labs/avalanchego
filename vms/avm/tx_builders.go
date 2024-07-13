@@ -13,14 +13,13 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/state"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
-	"github.com/ava-labs/avalanchego/vms/avm/txs/fees"
+	"github.com/ava-labs/avalanchego/vms/avm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/chain/x/signer"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
-	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 	walletbuilder "github.com/ava-labs/avalanchego/wallet/chain/x/builder"
 )
 
@@ -44,10 +43,11 @@ func buildCreateAssetTx(
 	kc *secp256k1fx.Keychain,
 	changeAddr ids.ShortID,
 ) (*txs.Tx, ids.ShortID, error) {
-	var (
-		pBuilder, pSigner = builders(backend, kc)
-		feeCalc           = feeCalculator(backend)
-	)
+	pBuilder, pSigner := builders(backend, kc)
+	feeCalc, err := feeCalculator(backend)
+	if err != nil {
+		return nil, ids.ShortEmpty, fmt.Errorf("failed creating fee calculator: %w", err)
+	}
 
 	utx, err := pBuilder.NewCreateAssetTx(
 		name,
@@ -76,10 +76,11 @@ func buildBaseTx(
 	kc *secp256k1fx.Keychain,
 	changeAddr ids.ShortID,
 ) (*txs.Tx, ids.ShortID, error) {
-	var (
-		pBuilder, pSigner = builders(backend, kc)
-		feeCalc           = feeCalculator(backend)
-	)
+	pBuilder, pSigner := builders(backend, kc)
+	feeCalc, err := feeCalculator(backend)
+	if err != nil {
+		return nil, ids.ShortEmpty, fmt.Errorf("failed creating fee calculator: %w", err)
+	}
 
 	utx, err := pBuilder.NewBaseTx(
 		outs,
@@ -106,10 +107,11 @@ func mintNFT(
 	kc *secp256k1fx.Keychain,
 	changeAddr ids.ShortID,
 ) (*txs.Tx, error) {
-	var (
-		pBuilder, pSigner = builders(backend, kc)
-		feeCalc           = feeCalculator(backend)
-	)
+	pBuilder, pSigner := builders(backend, kc)
+	feeCalc, err := feeCalculator(backend)
+	if err != nil {
+		return nil, fmt.Errorf("failed creating fee calculator: %w", err)
+	}
 
 	utx, err := pBuilder.NewOperationTxMintNFT(
 		assetID,
@@ -131,10 +133,12 @@ func mintFTs(
 	kc *secp256k1fx.Keychain,
 	changeAddr ids.ShortID,
 ) (*txs.Tx, error) {
-	var (
-		pBuilder, pSigner = builders(backend, kc)
-		feeCalc           = feeCalculator(backend)
-	)
+	pBuilder, pSigner := builders(backend, kc)
+	feeCalc, err := feeCalculator(backend)
+	if err != nil {
+		return nil, fmt.Errorf("failed creating fee calculator: %w", err)
+	}
+
 	utx, err := pBuilder.NewOperationTxMintFT(
 		outputs,
 		feeCalc,
@@ -153,10 +157,11 @@ func buildOperation(
 	kc *secp256k1fx.Keychain,
 	changeAddr ids.ShortID,
 ) (*txs.Tx, error) {
-	var (
-		pBuilder, pSigner = builders(backend, kc)
-		feeCalc           = feeCalculator(backend)
-	)
+	pBuilder, pSigner := builders(backend, kc)
+	feeCalc, err := feeCalculator(backend)
+	if err != nil {
+		return nil, fmt.Errorf("failed creating fee calculator: %w", err)
+	}
 
 	utx, err := pBuilder.NewOperationTx(
 		ops,
@@ -176,10 +181,11 @@ func buildImportTx(
 	to ids.ShortID,
 	kc *secp256k1fx.Keychain,
 ) (*txs.Tx, error) {
-	var (
-		pBuilder, pSigner = builders(backend, kc)
-		feeCalc           = feeCalculator(backend)
-	)
+	pBuilder, pSigner := builders(backend, kc)
+	feeCalc, err := feeCalculator(backend)
+	if err != nil {
+		return nil, fmt.Errorf("failed creating fee calculator: %w", err)
+	}
 
 	outOwner := &secp256k1fx.OutputOwners{
 		Locktime:  0,
@@ -208,10 +214,11 @@ func buildExportTx(
 	kc *secp256k1fx.Keychain,
 	changeAddr ids.ShortID,
 ) (*txs.Tx, ids.ShortID, error) {
-	var (
-		pBuilder, pSigner = builders(backend, kc)
-		feeCalc           = feeCalculator(backend)
-	)
+	pBuilder, pSigner := builders(backend, kc)
+	feeCalc, err := feeCalculator(backend)
+	if err != nil {
+		return nil, ids.ShortEmpty, fmt.Errorf("failed creating fee calculator: %w", err)
+	}
 
 	outputs := []*avax.TransferableOutput{{
 		Asset: avax.Asset{ID: exportedAssetID},
@@ -254,23 +261,9 @@ func builders(backend txBuilderBackend, kc *secp256k1fx.Keychain) (walletbuilder
 	return builder, signer
 }
 
-func feeCalculator(backend txBuilderBackend) *fees.Calculator {
-	var (
-		chainTime = backend.State().GetTimestamp()
-		cfg       = backend.Config()
-		isEActive = cfg.IsEActivated(chainTime)
-	)
-
-	var feeCalculator *fees.Calculator
-	if !isEActive {
-		feeCalculator = fees.NewStaticCalculator(cfg)
-	} else {
-		feeCfg := config.GetDynamicFeesConfig(isEActive)
-		feeMan := commonfees.NewManager(feeCfg.FeeRate)
-		feeCalculator = fees.NewDynamicCalculator(backend.Codec(), feeMan, feeCfg.BlockMaxComplexity, nil)
-	}
-
-	return feeCalculator
+func feeCalculator(backend txBuilderBackend) (fee.Calculator, error) {
+	chainTime := backend.State().GetTimestamp()
+	return state.PickBuildingFeeCalculator(backend.Config(), backend.Codec(), backend.State(), chainTime)
 }
 
 func options(changeAddr ids.ShortID, memo []byte) []common.Option {

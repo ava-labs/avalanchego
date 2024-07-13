@@ -132,7 +132,7 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 		return err
 	}
 
-	nextBlkTime, _, err := executor.NextBlockTime(stateDiff, m.txExecutorBackend.Clk)
+	nextBlkTime, _, err := state.NextBlockTime(stateDiff, m.txExecutorBackend.Clk)
 	if err != nil {
 		return err
 	}

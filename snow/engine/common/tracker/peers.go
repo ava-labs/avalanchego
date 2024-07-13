@@ -5,13 +5,13 @@ package tracker
 
 import (
 	"context"
+	"errors"
 	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
@@ -113,23 +113,20 @@ type meteredPeers struct {
 	totalWeight      prometheus.Gauge
 }
 
-func NewMeteredPeers(namespace string, reg prometheus.Registerer) (Peers, error) {
+func NewMeteredPeers(reg prometheus.Registerer) (Peers, error) {
 	percentConnected := prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespace,
-		Name:      "percent_connected",
-		Help:      "Percent of connected stake",
+		Name: "percent_connected",
+		Help: "Percent of connected stake",
 	})
 	totalWeight := prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespace,
-		Name:      "total_weight",
-		Help:      "Total stake",
+		Name: "total_weight",
+		Help: "Total stake",
 	})
 	numValidators := prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespace,
-		Name:      "num_validators",
-		Help:      "Total number of validators",
+		Name: "num_validators",
+		Help: "Total number of validators",
 	})
-	err := utils.Err(
+	err := errors.Join(
 		reg.Register(percentConnected),
 		reg.Register(totalWeight),
 		reg.Register(numValidators),

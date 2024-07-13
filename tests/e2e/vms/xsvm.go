@@ -1,39 +1,54 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
+//go:build test
+
 package vms
 
 import (
 	"fmt"
-	"math"
 	"time"
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
+	"github.com/ava-labs/avalanchego/tests/fixture/subnet"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/vms/example/xsvm"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/api"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/cmd/issue/export"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/cmd/issue/importtx"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/cmd/issue/transfer"
-	"github.com/ava-labs/avalanchego/vms/example/xsvm/genesis"
 
 	ginkgo "github.com/onsi/ginkgo/v2"
 )
+
+const pollingInterval = 50 * time.Millisecond
 
 var (
 	subnetAName = "xsvm-a"
 	subnetBName = "xsvm-b"
 )
 
-func XSVMSubnets(nodes ...*tmpnet.Node) []*tmpnet.Subnet {
+func XSVMSubnetsOrPanic(nodes ...*tmpnet.Node) []*tmpnet.Subnet {
+	key, err := secp256k1.NewPrivateKey()
+	if err != nil {
+		panic(err)
+	}
+	subnetANodes := nodes
+	subnetBNodes := nodes
+	if len(nodes) > 1 {
+		// Validate tmpnet bootstrap of a disjoint validator set
+		midpoint := len(nodes) / 2
+		subnetANodes = nodes[:midpoint]
+		subnetBNodes = nodes[midpoint:]
+	}
 	return []*tmpnet.Subnet{
-		newXSVMSubnet(subnetAName, nodes...),
-		newXSVMSubnet(subnetBName, nodes...),
+		subnet.NewXSVMOrPanic(subnetAName, key, subnetANodes...),
+		subnet.NewXSVMOrPanic(subnetBName, key, subnetBNodes...),
 	}
 }
 
@@ -51,14 +66,21 @@ var _ = ginkgo.Describe("[XSVM]", func() {
 		sourceChain := sourceSubnet.Chains[0]
 		destinationChain := destinationSubnet.Chains[0]
 
-		apiNode := network.Nodes[0]
-		tests.Outf(" issuing transactions on %s (%s)\n", apiNode.NodeID, apiNode.URI)
+		sourceValidators := getNodesForIDs(network.Nodes, sourceSubnet.ValidatorIDs)
+		require.NotEmpty(sourceValidators)
+		sourceAPINode := sourceValidators[0]
+		tests.Outf(" issuing transactions for source subnet on %s (%s)\n", sourceAPINode.NodeID, sourceAPINode.URI)
+
+		destinationValidators := getNodesForIDs(network.Nodes, destinationSubnet.ValidatorIDs)
+		require.NotEmpty(destinationValidators)
+		destinationAPINode := destinationValidators[0]
+		tests.Outf(" issuing transactions for destination subnet on %s (%s)\n", destinationAPINode.NodeID, destinationAPINode.URI)
 
 		destinationKey, err := secp256k1.NewPrivateKey()
 		require.NoError(err)
 
 		ginkgo.By("checking that the funded key has sufficient funds for the export")
-		sourceClient := api.NewClient(apiNode.URI, sourceChain.ChainID.String())
+		sourceClient := api.NewClient(sourceAPINode.URI, sourceChain.ChainID.String())
 		initialSourcedBalance, err := sourceClient.Balance(
 			e2e.DefaultContext(),
 			sourceChain.PreFundedKey.Address(),
@@ -71,7 +93,7 @@ var _ = ginkgo.Describe("[XSVM]", func() {
 		exportTxStatus, err := export.Export(
 			e2e.DefaultContext(),
 			&export.Config{
-				URI:                apiNode.URI,
+				URI:                sourceAPINode.URI,
 				SourceChainID:      sourceChain.ChainID,
 				DestinationChainID: destinationChain.ChainID,
 				Amount:             units.Schmeckle,
@@ -83,12 +105,13 @@ var _ = ginkgo.Describe("[XSVM]", func() {
 		tests.Outf(" issued transaction with ID: %s\n", exportTxStatus.TxID)
 
 		ginkgo.By("checking that the export transaction has been accepted on all nodes")
-		for _, node := range network.Nodes[1:] {
-			require.NoError(api.WaitForAcceptance(
+		for _, node := range sourceValidators[1:] {
+			require.NoError(api.AwaitTxAccepted(
 				e2e.DefaultContext(),
 				api.NewClient(node.URI, sourceChain.ChainID.String()),
 				sourceChain.PreFundedKey.Address(),
 				exportTxStatus.Nonce,
+				pollingInterval,
 			))
 		}
 
@@ -99,7 +122,7 @@ var _ = ginkgo.Describe("[XSVM]", func() {
 		transferTxStatus, err := transfer.Transfer(
 			e2e.DefaultContext(),
 			&transfer.Config{
-				URI:        apiNode.URI,
+				URI:        destinationAPINode.URI,
 				ChainID:    destinationChain.ChainID,
 				AssetID:    destinationChain.ChainID,
 				Amount:     units.Schmeckle,
@@ -111,14 +134,14 @@ var _ = ginkgo.Describe("[XSVM]", func() {
 		tests.Outf(" issued transaction with ID: %s\n", transferTxStatus.TxID)
 
 		ginkgo.By(fmt.Sprintf("importing to blockchain %s on subnet %s", destinationChain.ChainID, destinationSubnet.SubnetID))
-		sourceURIs := make([]string, len(network.Nodes))
-		for i, node := range network.Nodes {
+		sourceURIs := make([]string, len(sourceValidators))
+		for i, node := range sourceValidators {
 			sourceURIs[i] = node.URI
 		}
 		importTxStatus, err := importtx.Import(
 			e2e.DefaultContext(),
 			&importtx.Config{
-				URI:                apiNode.URI,
+				URI:                destinationAPINode.URI,
 				SourceURIs:         sourceURIs,
 				SourceChainID:      sourceChain.ChainID.String(),
 				DestinationChainID: destinationChain.ChainID.String(),
@@ -135,45 +158,22 @@ var _ = ginkgo.Describe("[XSVM]", func() {
 		require.GreaterOrEqual(initialSourcedBalance-units.Schmeckle, sourceBalance)
 
 		ginkgo.By("checking that the balance of the destination key is non-zero")
-		destinationClient := api.NewClient(apiNode.URI, destinationChain.ChainID.String())
+		destinationClient := api.NewClient(destinationAPINode.URI, destinationChain.ChainID.String())
 		destinationBalance, err := destinationClient.Balance(e2e.DefaultContext(), destinationKey.Address(), sourceChain.ChainID)
 		require.NoError(err)
 		require.Equal(units.Schmeckle, destinationBalance)
 	})
 })
 
-func newXSVMSubnet(name string, nodes ...*tmpnet.Node) *tmpnet.Subnet {
-	if len(nodes) == 0 {
-		panic("a subnet must be validated by at least one node")
+// Retrieve the nodes corresponding to the provided IDs
+func getNodesForIDs(nodes []*tmpnet.Node, nodeIDs []ids.NodeID) []*tmpnet.Node {
+	desiredNodes := make([]*tmpnet.Node, 0, len(nodeIDs))
+	for _, node := range nodes {
+		for _, nodeID := range nodeIDs {
+			if node.NodeID == nodeID {
+				desiredNodes = append(desiredNodes, node)
+			}
+		}
 	}
-
-	key, err := secp256k1.NewPrivateKey()
-	if err != nil {
-		panic(err)
-	}
-
-	genesisBytes, err := genesis.Codec.Marshal(genesis.CodecVersion, &genesis.Genesis{
-		Timestamp: time.Now().Unix(),
-		Allocations: []genesis.Allocation{
-			{
-				Address: key.Address(),
-				Balance: math.MaxUint64,
-			},
-		},
-	})
-	if err != nil {
-		panic(err)
-	}
-
-	return &tmpnet.Subnet{
-		Name: name,
-		Chains: []*tmpnet.Chain{
-			{
-				VMID:         xsvm.ID,
-				Genesis:      genesisBytes,
-				PreFundedKey: key,
-			},
-		},
-		ValidatorIDs: tmpnet.NodesToIDs(nodes...),
-	}
+	return desiredNodes
 }

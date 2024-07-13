@@ -116,7 +116,7 @@ type Bootstrapper struct {
 }
 
 func New(config Config, onFinished func(ctx context.Context, lastReqID uint32) error) (*Bootstrapper, error) {
-	metrics, err := newMetrics("bs", config.Ctx.Registerer)
+	metrics, err := newMetrics(config.Ctx.Registerer)
 	return &Bootstrapper{
 		Config:                      config,
 		metrics:                     metrics,
@@ -150,6 +150,14 @@ func (b *Bootstrapper) Clear(context.Context) error {
 }
 
 func (b *Bootstrapper) Start(ctx context.Context, startReqID uint32) error {
+	b.Ctx.State.Set(snow.EngineState{
+		Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
+		State: snow.Bootstrapping,
+	})
+	if err := b.VM.SetState(ctx, snow.Bootstrapping); err != nil {
+		return fmt.Errorf("failed to notify VM that bootstrapping has started: %w", err)
+	}
+
 	lastAccepted, err := b.getLastAccepted(ctx)
 	if err != nil {
 		return err
@@ -160,14 +168,6 @@ func (b *Bootstrapper) Start(ctx context.Context, startReqID uint32) error {
 		zap.Stringer("lastAcceptedID", lastAccepted.ID()),
 		zap.Uint64("lastAcceptedHeight", lastAcceptedHeight),
 	)
-
-	b.Ctx.State.Set(snow.EngineState{
-		Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
-		State: snow.Bootstrapping,
-	})
-	if err := b.VM.SetState(ctx, snow.Bootstrapping); err != nil {
-		return fmt.Errorf("failed to notify VM that bootstrapping has started: %w", err)
-	}
 
 	// Set the starting height
 	b.startingHeight = lastAcceptedHeight

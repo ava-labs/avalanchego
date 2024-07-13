@@ -23,7 +23,6 @@ import (
 
 func newInboundMsgByteThrottler(
 	log logging.Logger,
-	namespace string,
 	registerer prometheus.Registerer,
 	vdrs validators.Manager,
 	config MsgByteThrottlerConfig,
@@ -42,7 +41,7 @@ func newInboundMsgByteThrottler(
 		waitingToAcquire:   linked.NewHashmap[uint64, *msgMetadata](),
 		nodeToWaitingMsgID: make(map[ids.NodeID]uint64),
 	}
-	return t, t.metrics.initialize(namespace, registerer)
+	return t, t.metrics.initialize(registerer)
 }
 
 // Information about a message waiting to be read.
@@ -306,34 +305,29 @@ type inboundMsgByteThrottlerMetrics struct {
 	awaitingRelease       prometheus.Gauge
 }
 
-func (m *inboundMsgByteThrottlerMetrics) initialize(namespace string, reg prometheus.Registerer) error {
+func (m *inboundMsgByteThrottlerMetrics) initialize(reg prometheus.Registerer) error {
 	errs := wrappers.Errs{}
 	m.acquireLatency = metric.NewAveragerWithErrs(
-		namespace,
 		"byte_throttler_inbound_acquire_latency",
 		"average time (in ns) to get space on the inbound message byte buffer",
 		reg,
 		&errs,
 	)
 	m.remainingAtLargeBytes = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespace,
-		Name:      "byte_throttler_inbound_remaining_at_large_bytes",
-		Help:      "Bytes remaining in the at-large byte buffer",
+		Name: "byte_throttler_inbound_remaining_at_large_bytes",
+		Help: "Bytes remaining in the at-large byte buffer",
 	})
 	m.remainingVdrBytes = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespace,
-		Name:      "byte_throttler_inbound_remaining_validator_bytes",
-		Help:      "Bytes remaining in the validator byte buffer",
+		Name: "byte_throttler_inbound_remaining_validator_bytes",
+		Help: "Bytes remaining in the validator byte buffer",
 	})
 	m.awaitingAcquire = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespace,
-		Name:      "byte_throttler_inbound_awaiting_acquire",
-		Help:      "Number of inbound messages waiting to acquire space on the inbound message byte buffer",
+		Name: "byte_throttler_inbound_awaiting_acquire",
+		Help: "Number of inbound messages waiting to acquire space on the inbound message byte buffer",
 	})
 	m.awaitingRelease = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespace,
-		Name:      "byte_throttler_inbound_awaiting_release",
-		Help:      "Number of messages currently being read/handled",
+		Name: "byte_throttler_inbound_awaiting_release",
+		Help: "Number of messages currently being read/handled",
 	})
 	errs.Add(
 		reg.Register(m.remainingAtLargeBytes),

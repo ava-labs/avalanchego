@@ -4,6 +4,7 @@
 package executor
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -44,6 +45,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/upgrade"
@@ -51,6 +53,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	pvalidators "github.com/ava-labs/avalanchego/vms/platformvm/validators"
+	walletsigner "github.com/ava-labs/avalanchego/wallet/chain/p/signer"
 	walletcommon "github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
 
@@ -129,7 +132,7 @@ type environment struct {
 	mockedState    *state.MockState
 	uptimes        uptime.Manager
 	utxosVerifier  utxo.Verifier
-	txBuilder      *txstest.Builder
+	factory        *txstest.WalletFactory
 	backend        *executor.Backend
 }
 
@@ -157,7 +160,7 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller, f fork) *environment 
 		res.state = defaultState(res.config, res.ctx, res.baseDB, rewardsCalc)
 		res.uptimes = uptime.NewManager(res.state, res.clk)
 		res.utxosVerifier = utxo.NewVerifier(res.ctx, res.clk, res.fx)
-		res.txBuilder = txstest.NewBuilder(
+		res.factory = txstest.NewWalletFactory(
 			res.ctx,
 			res.config,
 			res.state,
@@ -167,8 +170,7 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller, f fork) *environment 
 		res.mockedState = state.NewMockState(ctrl)
 		res.uptimes = uptime.NewManager(res.mockedState, res.clk)
 		res.utxosVerifier = utxo.NewVerifier(res.ctx, res.clk, res.fx)
-
-		res.txBuilder = txstest.NewBuilder(
+		res.factory = txstest.NewWalletFactory(
 			res.ctx,
 			res.config,
 			res.mockedState,
@@ -250,9 +252,8 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller, f fork) *environment 
 }
 
 func addSubnet(env *environment) {
-	// Create a subnet
-	var err error
-	testSubnet1, err = env.txBuilder.NewCreateSubnetTx(
+	builder, signer := env.factory.NewWallet(preFundedKeys[0])
+	utx, err := builder.NewCreateSubnetTx(
 		&secp256k1fx.OutputOwners{
 			Threshold: 2,
 			Addrs: []ids.ShortID{
@@ -261,7 +262,6 @@ func addSubnet(env *environment) {
 				preFundedKeys[2].PublicKey().Address(),
 			},
 		},
-		[]*secp256k1.PrivateKey{preFundedKeys[0]},
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
@@ -270,8 +270,11 @@ func addSubnet(env *environment) {
 	if err != nil {
 		panic(err)
 	}
+	testSubnet1, err = walletsigner.SignUnsigned(context.Background(), signer, utx)
+	if err != nil {
+		panic(err)
+	}
 
-	// store it
 	genesisID := env.state.GetLastAccepted()
 	stateDiff, err := state.NewDiff(genesisID, env.blkManager)
 	if err != nil {
@@ -330,14 +333,16 @@ func defaultConfig(t *testing.T, f fork) *config.Config {
 		Chains:                 chains.TestManager,
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		Validators:             validators.NewManager(),
-		TxFee:                  defaultTxFee,
-		CreateSubnetTxFee:      100 * defaultTxFee,
-		CreateBlockchainTxFee:  100 * defaultTxFee,
-		MinValidatorStake:      5 * units.MilliAvax,
-		MaxValidatorStake:      500 * units.MilliAvax,
-		MinDelegatorStake:      1 * units.MilliAvax,
-		MinStakeDuration:       defaultMinStakingDuration,
-		MaxStakeDuration:       defaultMaxStakingDuration,
+		StaticFeeConfig: fee.StaticConfig{
+			TxFee:                 defaultTxFee,
+			CreateSubnetTxFee:     100 * defaultTxFee,
+			CreateBlockchainTxFee: 100 * defaultTxFee,
+		},
+		MinValidatorStake: 5 * units.MilliAvax,
+		MaxValidatorStake: 500 * units.MilliAvax,
+		MinDelegatorStake: 1 * units.MilliAvax,
+		MinStakeDuration:  defaultMinStakingDuration,
+		MaxStakeDuration:  defaultMaxStakingDuration,
 		RewardConfig: reward.Config{
 			MaxConsumptionRate: .12 * reward.PercentDenominator,
 			MinConsumptionRate: .10 * reward.PercentDenominator,
@@ -492,7 +497,8 @@ func addPendingValidator(
 	rewardAddress ids.ShortID,
 	keys []*secp256k1.PrivateKey,
 ) (*txs.Tx, error) {
-	addPendingValidatorTx, err := env.txBuilder.NewAddValidatorTx(
+	builder, signer := env.factory.NewWallet(keys...)
+	utx, err := builder.NewAddValidatorTx(
 		&txs.Validator{
 			NodeID: nodeID,
 			Start:  uint64(startTime.Unix()),
@@ -504,8 +510,11 @@ func addPendingValidator(
 			Addrs:     []ids.ShortID{rewardAddress},
 		},
 		reward.PercentDenominator,
-		keys,
 	)
+	if err != nil {
+		return nil, err
+	}
+	addPendingValidatorTx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
 	if err != nil {
 		return nil, err
 	}
