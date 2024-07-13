@@ -4,7 +4,6 @@
 package avm
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -21,11 +20,6 @@ func TestVerifyFxUsage(t *testing.T) {
 
 	env := setup(t, &envConfig{fork: latest})
 	env.vm.ctx.Lock.Unlock()
-	defer func() {
-		env.vm.ctx.Lock.Lock()
-		require.NoError(env.vm.Shutdown(context.Background()))
-		env.vm.ctx.Lock.Unlock()
-	}()
 
 	var (
 		key = keys[0]

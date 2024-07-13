@@ -4,7 +4,6 @@
 package avm
 
 import (
-	"context"
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -31,10 +30,7 @@ func TestIndexTransaction_Ordered(t *testing.T) {
 	env := setup(t, &envConfig{
 		fork: eUpgrade,
 	})
-	defer func() {
-		require.NoError(env.vm.Shutdown(context.Background()))
-		env.vm.ctx.Lock.Unlock()
-	}()
+	defer env.vm.ctx.Lock.Unlock()
 
 	key := keys[0]
 	addr := key.PublicKey().Address()
@@ -75,10 +71,7 @@ func TestIndexTransaction_MultipleTransactions(t *testing.T) {
 	env := setup(t, &envConfig{
 		fork: eUpgrade,
 	})
-	defer func() {
-		require.NoError(env.vm.Shutdown(context.Background()))
-		env.vm.ctx.Lock.Unlock()
-	}()
+	defer env.vm.ctx.Lock.Unlock()
 
 	addressTxMap := map[ids.ShortID]*txs.Tx{}
 	txAssetID := avax.Asset{ID: env.genesisTx.ID()}
@@ -123,10 +116,7 @@ func TestIndexTransaction_MultipleAddresses(t *testing.T) {
 	env := setup(t, &envConfig{
 		fork: eUpgrade,
 	})
-	defer func() {
-		require.NoError(env.vm.Shutdown(context.Background()))
-		env.vm.ctx.Lock.Unlock()
-	}()
+	defer env.vm.ctx.Lock.Unlock()
 
 	addrs := make([]ids.ShortID, len(keys))
 	for i, key := range keys {
@@ -166,10 +156,7 @@ func TestIndexer_Read(t *testing.T) {
 	env := setup(t, &envConfig{
 		fork: eUpgrade,
 	})
-	defer func() {
-		require.NoError(env.vm.Shutdown(context.Background()))
-		env.vm.ctx.Lock.Unlock()
-	}()
+	defer env.vm.ctx.Lock.Unlock()
 
 	// generate test address and asset IDs
 	assetID := ids.GenerateTestID()

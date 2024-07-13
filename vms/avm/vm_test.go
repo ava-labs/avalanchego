@@ -118,11 +118,6 @@ func TestIssueTx(t *testing.T) {
 		fork: latest,
 	})
 	env.vm.ctx.Lock.Unlock()
-	defer func() {
-		env.vm.ctx.Lock.Lock()
-		require.NoError(env.vm.Shutdown(context.Background()))
-		env.vm.ctx.Lock.Unlock()
-	}()
 
 	tx := newTx(t, env.genesisBytes, env.vm.ctx.ChainID, env.vm.parser, "AVAX")
 	issueAndAccept(require, env.vm, env.issuer, tx)
@@ -136,11 +131,6 @@ func TestIssueNFT(t *testing.T) {
 		fork: latest,
 	})
 	env.vm.ctx.Lock.Unlock()
-	defer func() {
-		env.vm.ctx.Lock.Lock()
-		require.NoError(env.vm.Shutdown(context.Background()))
-		env.vm.ctx.Lock.Unlock()
-	}()
 
 	var (
 		key = keys[0]
@@ -224,11 +214,6 @@ func TestIssueProperty(t *testing.T) {
 		}},
 	})
 	env.vm.ctx.Lock.Unlock()
-	defer func() {
-		env.vm.ctx.Lock.Lock()
-		require.NoError(env.vm.Shutdown(context.Background()))
-		env.vm.ctx.Lock.Unlock()
-	}()
 
 	var (
 		key = keys[0]
@@ -320,11 +305,6 @@ func TestIssueTxWithFeeAsset(t *testing.T) {
 		isCustomFeeAsset: true,
 	})
 	env.vm.ctx.Lock.Unlock()
-	defer func() {
-		env.vm.ctx.Lock.Lock()
-		require.NoError(env.vm.Shutdown(context.Background()))
-		env.vm.ctx.Lock.Unlock()
-	}()
 
 	// send first asset
 	tx := newTx(t, env.genesisBytes, env.vm.ctx.ChainID, env.vm.parser, feeAssetName)
@@ -339,11 +319,6 @@ func TestIssueTxWithAnotherAsset(t *testing.T) {
 		isCustomFeeAsset: true,
 	})
 	env.vm.ctx.Lock.Unlock()
-	defer func() {
-		env.vm.ctx.Lock.Lock()
-		require.NoError(env.vm.Shutdown(context.Background()))
-		env.vm.ctx.Lock.Unlock()
-	}()
 
 	// send second asset
 	var (
@@ -393,10 +368,7 @@ func TestVMFormat(t *testing.T) {
 	env := setup(t, &envConfig{
 		fork: latest,
 	})
-	defer func() {
-		require.NoError(t, env.vm.Shutdown(context.Background()))
-		env.vm.ctx.Lock.Unlock()
-	}()
+	defer env.vm.ctx.Lock.Unlock()
 
 	tests := []struct {
 		in       ids.ShortID
@@ -424,10 +396,7 @@ func TestTxAcceptAfterParseTx(t *testing.T) {
 		fork:          latest,
 		notLinearized: true,
 	})
-	defer func() {
-		require.NoError(env.vm.Shutdown(context.Background()))
-		env.vm.ctx.Lock.Unlock()
-	}()
+	defer env.vm.ctx.Lock.Unlock()
 
 	var (
 		key = keys[0]
@@ -504,10 +473,7 @@ func TestIssueImportTx(t *testing.T) {
 	env := setup(t, &envConfig{
 		fork: latest,
 	})
-	defer func() {
-		require.NoError(env.vm.Shutdown(context.Background()))
-		env.vm.ctx.Lock.Unlock()
-	}()
+	defer env.vm.ctx.Lock.Unlock()
 
 	peerSharedMemory := env.sharedMemory.NewSharedMemory(constants.PlatformChainID)
 
@@ -590,10 +556,7 @@ func TestForceAcceptImportTx(t *testing.T) {
 		fork:          latest,
 		notLinearized: true,
 	})
-	defer func() {
-		require.NoError(env.vm.Shutdown(context.Background()))
-		env.vm.ctx.Lock.Unlock()
-	}()
+	defer env.vm.ctx.Lock.Unlock()
 
 	genesisTx := getCreateTxFromGenesisTest(t, env.genesisBytes, "AVAX")
 	avaxID := genesisTx.ID()
@@ -669,10 +632,7 @@ func TestIssueExportTx(t *testing.T) {
 	env := setup(t, &envConfig{
 		fork: latest,
 	})
-	defer func() {
-		require.NoError(env.vm.Shutdown(context.Background()))
-		env.vm.ctx.Lock.Unlock()
-	}()
+	defer env.vm.ctx.Lock.Unlock()
 
 	genesisTx := getCreateTxFromGenesisTest(t, env.genesisBytes, "AVAX")
 
@@ -736,10 +696,7 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 	env := setup(t, &envConfig{
 		fork: latest,
 	})
-	defer func() {
-		require.NoError(env.vm.Shutdown(context.Background()))
-		env.vm.ctx.Lock.Unlock()
-	}()
+	defer env.vm.ctx.Lock.Unlock()
 
 	genesisTx := getCreateTxFromGenesisTest(t, env.genesisBytes, "AVAX")
 
