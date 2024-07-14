@@ -5,9 +5,6 @@ inputs:
   run:
     description: "the bash command to run"
     required: true
-  url_encoded_repo:
-    # TODO(marun) Process github.repository into this url-encoded form
-    default: 'ava-labs%2Favalanchego'
   filter_by_owner:
     default: ''
   prometheus_id:
@@ -21,8 +18,10 @@ inputs:
   # The following inputs need never be provided by the caller. They
   # default to context values that the action's steps are unable to
   # acccess directly.
-  repository:
-    default: ${{ github.repository }}
+  repository_owner:
+    default: ${{ github.repository_owner }}
+  repository_name:
+    default: ${{ github.event.repository.name }}
   workflow:
     default: ${{ github.workflow }}
   run_id:
@@ -57,14 +56,14 @@ runs:
       shell: bash
       run: .github/actions/run-monitored-tmpnet-cmd/notify-metrics-availability.sh
       env:
-        GRAFANA_URL: https://grafana-experimental.avax-dev.network/d/kBQpRdWnk/avalanche-main-dashboard?orgId=1&refresh=10s&var-filter=is_ephemeral_node%7C%3D%7Cfalse&var-filter=gh_repo%7C%3D%7C${{ inputs.url_encoded_repo }}&var-filter=gh_run_id%7C%3D%7C${{ inputs.run_id }}&var-filter=gh_run_attempt%7C%3D%7C${{ inputs.run_attempt }}
+        GRAFANA_URL: https://grafana-experimental.avax-dev.network/d/kBQpRdWnk/avalanche-main-dashboard?orgId=1&refresh=10s&var-filter=is_ephemeral_node%7C%3D%7Cfalse&var-filter=gh_repo%7C%3D%7C${{ inputs.repository_owner }}%2F${{ inputs.repository_name }}&var-filter=gh_run_id%7C%3D%7C${{ inputs.run_id }}&var-filter=gh_run_attempt%7C%3D%7C${{ inputs.run_attempt }}
         GH_JOB_ID: ${{ inputs.job }}
         FILTER_BY_OWNER: ${{ inputs.filter_by_owner }}
     - name: Run command
       shell: bash
       run: ${{ inputs.run }}
       env:
-        GH_REPO: ${{ inputs.repository }}
+        GH_REPO: ${{ inputs.repository_owner }}/${{ inputs.repository_name }}
         GH_WORKFLOW: ${{ inputs.workflow }}
         GH_RUN_ID: ${{ inputs.run_id }}
         GH_RUN_NUMBER: ${{ inputs.run_number }}
