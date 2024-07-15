@@ -31,8 +31,8 @@ jobs:
           username: ${{ secrets.ANTITHESIS_USERNAME }}
           password: ${{ secrets.ANTITHESIS_PASSWORD }}
           github_token: ${{ secrets.ANTITHESIS_GH_PAT }}
-          config_image: antithesis-xsvm-config@${{ github.event.inputs.image_tag || 'latest' }}
-          images: antithesis-xsvm-workload@${{ github.event.inputs.image_tag || 'latest' }};antithesis-xsvm-node@${{ github.event.inputs.image_tag || 'latest' }}
+          config_image: antithesis-xsvm-config:${{ github.event.inputs.image_tag || 'latest' }}
+          images: antithesis-xsvm-workload:${{ github.event.inputs.image_tag || 'latest' }};antithesis-xsvm-node:${{ github.event.inputs.image_tag || 'latest' }}
           email_recipients: ${{ github.event.inputs.recipients || secrets.ANTITHESIS_RECIPIENTS }}
           additional_parameters: |-
             custom.duration=${{ github.event.inputs.duration || '0.5' }}
