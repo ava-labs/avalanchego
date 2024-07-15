@@ -570,7 +570,11 @@ func (e *StandardTxExecutor) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwn
 }
 
 func (e *StandardTxExecutor) BaseTx(tx *txs.BaseTx) error {
-	if !e.Backend.Config.UpgradeConfig.IsDurangoActivated(e.State.GetTimestamp()) {
+	var (
+		currentTimestamp = e.State.GetTimestamp()
+		upgrades         = e.Backend.Config.UpgradeConfig
+	)
+	if !upgrades.IsDurangoActivated(currentTimestamp) {
 		return ErrDurangoUpgradeNotActive
 	}
 
