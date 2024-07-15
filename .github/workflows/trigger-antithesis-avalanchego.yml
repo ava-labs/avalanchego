@@ -1,0 +1,38 @@
+name: Trigger Antithesis Avalanchego Setup
+
+on:
+  # TODO(marun) Add a schedule to execute regularly
+  workflow_dispatch:
+    inputs:
+      duration:
+        description: 'The duration to run the test for'
+        default: '0.5'
+        required: true
+        type: string
+      recipients:
+        description: 'Comma-seperated email addresses to send the test report to'
+        required: true
+        type: string
+      image_tag:
+        description: 'The image tag to target'
+        default: latest
+        required: true
+        type: string
+
+jobs:
+  antithesis_avalanchego:
+    name: Run Antithesis Avalanchego Test Setup
+    runs-on: ubuntu-latest
+    steps:
+      - uses: antithesishq/antithesis-trigger-action@v0.5
+        with:
+          notebook_name: avalanche
+          tenant: avalanche
+          username: ${{ secrets.ANTITHESIS_USERNAME }}
+          password: ${{ secrets.ANTITHESIS_PASSWORD }}
+          github_token: ${{ secrets.ANTITHESIS_GH_PAT }}
+          config_image: antithesis-avalanchego-config@${{ github.event.inputs.image_tag || 'latest' }}
+          images: antithesis-avalanchego-workload@${{ github.event.inputs.image_tag || 'latest' }};antithesis-avalanchego-node@${{ github.event.inputs.image_tag || 'latest' }}
+          email_recipients: ${{ github.event.inputs.recipients || secrets.ANTITHESIS_RECIPIENTS }}
+          additional_parameters: |-
+            custom.duration=${{ github.event.inputs.duration || '0.5' }}
