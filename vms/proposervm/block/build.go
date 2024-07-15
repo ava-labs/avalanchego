@@ -7,6 +7,7 @@ import (
 	"crypto"
 	"crypto/rand"
 	"encoding/binary"
+	"fmt"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -203,6 +204,16 @@ func Build(
 	}
 
 	block.bytes, err = marshalBlock(block)
+
+	// The following ensures that we would initialize the vrfSig member only when
+	// the provided signature is 96 bytes long. That supports both statelessUnsignedBlockV0 & statelessUnsignedBlock
+	// variations, as well as optional 32-byte hashes stored in the VRFSig.
+	if len(blockVrfSig) == bls.SignatureLen {
+		block.vrfSig, err = bls.SignatureFromBytes(blockVrfSig)
+		if err != nil {
+			return nil, fmt.Errorf("%w: %w", errFailedToParseVRFSignature, err)
+		}
+	}
 	return block, err
 }
 

@@ -15,7 +15,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 
@@ -185,7 +184,6 @@ func (p *postForkCommonComponents) buildChild(
 	parentTimestamp time.Time,
 	parentPChainHeight uint64,
 	parentBlockVRFSig []byte,
-	blsSignKey *bls.SecretKey,
 ) (Block, error) {
 	// Child's timestamp is the later of now and this block's timestamp
 	newTimestamp := p.vm.Time().Truncate(time.Second)
@@ -231,7 +229,7 @@ func (p *postForkCommonComponents) buildChild(
 	// do we have the VRFSig activated ? if so, figure out the child block vrf signature.
 	if p.vm.IsVRFSigActivated(newTimestamp) {
 		if shouldBuildSignedBlock {
-			childBlockVrfSig = block.NextBlockVRFSig(parentBlockVRFSig, blsSignKey, p.vm.ctx.ChainID, p.vm.ctx.NetworkID)
+			childBlockVrfSig = block.NextBlockVRFSig(parentBlockVRFSig, p.vm.Config.StakingBLSKey, p.vm.ctx.ChainID, p.vm.ctx.NetworkID)
 		} else {
 			// in this case, we can't sign with BLS key, since we're not going to include the Certificate, which is required
 			// for the signature validation. Instead, we'll just hash the parent block VRF signature.

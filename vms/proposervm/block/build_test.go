@@ -209,3 +209,13 @@ func TestNextBlockVRFSig(t *testing.T) {
 		require.Equal(testCase.expectedOut, NextBlockVRFSig(testCase.parentBlockVRFSig, testCase.blsSignKey, testCase.chainID, testCase.networkID))
 	}
 }
+
+func TestVerifySignature(t *testing.T) {
+	signKey, err := bls.NewSecretKey()
+	require.NoError(t, err)
+	var block statelessBlock[statelessUnsignedBlock]
+	block.StatelessBlock.VRFSig = NextBlockVRFSig(nil, signKey, [32]byte{0}, 8888)
+	block.vrfSig, err = bls.SignatureFromBytes(block.StatelessBlock.VRFSig)
+	require.NoError(t, err)
+	require.True(t, block.VerifySignature(bls.PublicFromSecretKey(signKey), nil, [32]byte{0}, 8888))
+}

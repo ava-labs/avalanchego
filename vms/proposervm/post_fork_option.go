@@ -123,7 +123,6 @@ func (b *postForkOption) buildChild(ctx context.Context) (Block, error) {
 		b.Timestamp(),
 		parentPChainHeight,
 		[]byte{}, // TODO : verify me.
-		b.vm.Config.StakingBLSKey,
 	)
 }
 

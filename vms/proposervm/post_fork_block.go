@@ -134,7 +134,9 @@ func (b *postForkBlock) verifyPostForkChild(ctx context.Context, child *postFork
 	parentTimestamp := b.Timestamp()
 	parentPChainHeight := b.PChainHeight()
 
-	if err := b.verifyVRFSig(ctx, child); err != nil {
+	// TODO: Both verifyVRFSig and Verify below calls GetValidatorSet; we might want to refactor that
+	// so we'll make that call only once.
+	if err := b.verifyVRFSig(ctx, child, parentPChainHeight); err != nil {
 		return err
 	}
 
@@ -146,7 +148,7 @@ func (b *postForkBlock) verifyPostForkChild(ctx context.Context, child *postFork
 	)
 }
 
-func (b *postForkBlock) verifyVRFSig(ctx context.Context, child *postForkBlock) error {
+func (b *postForkBlock) verifyVRFSig(ctx context.Context, child *postForkBlock, parentPChainHeight uint64) error {
 	if !b.vm.Config.IsVRFSigActivated(child.Timestamp()) {
 		// if the VRFSig has yet to be activated, verify that the VRF signature isn't there.
 		if len(child.SignedBlock.VRFSig()) != 0 {
@@ -160,7 +162,7 @@ func (b *postForkBlock) verifyVRFSig(ctx context.Context, child *postForkBlock) 
 	// if there is a known proposer. ( i.e. block was signed )
 	if childProposer := child.SignedBlock.Proposer(); childProposer != ids.EmptyNodeID {
 		// get the validators set.
-		validatorSet, err := b.vm.ctx.ValidatorState.GetValidatorSet(ctx, child.PChainHeight(), child.vm.ctx.SubnetID)
+		validatorSet, err := child.vm.ctx.ValidatorState.GetValidatorSet(ctx, parentPChainHeight, b.vm.ctx.SubnetID)
 		if err != nil {
 			return err
 		}
@@ -204,7 +206,6 @@ func (b *postForkBlock) buildChild(ctx context.Context) (Block, error) {
 		b.Timestamp(),
 		b.PChainHeight(),
 		b.SignedBlock.VRFSig(),
-		b.vm.Config.StakingBLSKey,
 	)
 }
 
