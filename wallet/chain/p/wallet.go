@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -308,10 +307,7 @@ func (w *wallet) IssueBaseTx(
 	outputs []*avax.TransferableOutput,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	feeCalc, err := w.feeCalculator(w.builder.Context(), options...)
-	if err != nil {
-		return nil, err
-	}
+	feeCalc := w.feeCalculator(w.builder.Context(), options...)
 
 	utx, err := w.builder.NewBaseTx(outputs, feeCalc, options...)
 	if err != nil {
@@ -327,10 +323,7 @@ func (w *wallet) IssueAddValidatorTx(
 	shares uint32,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	feeCalc, err := w.feeCalculator(w.builder.Context(), options...)
-	if err != nil {
-		return nil, err
-	}
+	feeCalc := w.feeCalculator(w.builder.Context(), options...)
 
 	utx, err := w.builder.NewAddValidatorTx(vdr, rewardsOwner, shares, feeCalc, options...)
 	if err != nil {
@@ -343,10 +336,7 @@ func (w *wallet) IssueAddSubnetValidatorTx(
 	vdr *txs.SubnetValidator,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	feeCalc, err := w.feeCalculator(w.builder.Context(), options...)
-	if err != nil {
-		return nil, err
-	}
+	feeCalc := w.feeCalculator(w.builder.Context(), options...)
 
 	utx, err := w.builder.NewAddSubnetValidatorTx(vdr, feeCalc, options...)
 	if err != nil {
@@ -361,10 +351,7 @@ func (w *wallet) IssueRemoveSubnetValidatorTx(
 	subnetID ids.ID,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	feeCalc, err := w.feeCalculator(w.builder.Context(), options...)
-	if err != nil {
-		return nil, err
-	}
+	feeCalc := w.feeCalculator(w.builder.Context(), options...)
 
 	utx, err := w.builder.NewRemoveSubnetValidatorTx(nodeID, subnetID, feeCalc, options...)
 	if err != nil {
@@ -379,10 +366,7 @@ func (w *wallet) IssueAddDelegatorTx(
 	rewardsOwner *secp256k1fx.OutputOwners,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	feeCalc, err := w.feeCalculator(w.builder.Context(), options...)
-	if err != nil {
-		return nil, err
-	}
+	feeCalc := w.feeCalculator(w.builder.Context(), options...)
 
 	utx, err := w.builder.NewAddDelegatorTx(vdr, rewardsOwner, feeCalc, options...)
 	if err != nil {
@@ -399,10 +383,7 @@ func (w *wallet) IssueCreateChainTx(
 	chainName string,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	feeCalc, err := w.feeCalculator(w.builder.Context(), options...)
-	if err != nil {
-		return nil, err
-	}
+	feeCalc := w.feeCalculator(w.builder.Context(), options...)
 
 	utx, err := w.builder.NewCreateChainTx(subnetID, genesis, vmID, fxIDs, chainName, feeCalc, options...)
 	if err != nil {
@@ -416,10 +397,7 @@ func (w *wallet) IssueCreateSubnetTx(
 	owner *secp256k1fx.OutputOwners,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	feeCalc, err := w.feeCalculator(w.builder.Context(), options...)
-	if err != nil {
-		return nil, err
-	}
+	feeCalc := w.feeCalculator(w.builder.Context(), options...)
 
 	utx, err := w.builder.NewCreateSubnetTx(owner, feeCalc, options...)
 	if err != nil {
@@ -433,10 +411,7 @@ func (w *wallet) IssueTransferSubnetOwnershipTx(
 	owner *secp256k1fx.OutputOwners,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	feeCalc, err := w.feeCalculator(w.builder.Context(), options...)
-	if err != nil {
-		return nil, err
-	}
+	feeCalc := w.feeCalculator(w.builder.Context(), options...)
 
 	utx, err := w.builder.NewTransferSubnetOwnershipTx(subnetID, owner, feeCalc, options...)
 	if err != nil {
@@ -450,10 +425,7 @@ func (w *wallet) IssueImportTx(
 	to *secp256k1fx.OutputOwners,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	feeCalc, err := w.feeCalculator(w.builder.Context(), options...)
-	if err != nil {
-		return nil, err
-	}
+	feeCalc := w.feeCalculator(w.builder.Context(), options...)
 
 	utx, err := w.builder.NewImportTx(sourceChainID, to, feeCalc, options...)
 	if err != nil {
@@ -468,10 +440,7 @@ func (w *wallet) IssueExportTx(
 	outputs []*avax.TransferableOutput,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	feeCalc, err := w.feeCalculator(w.builder.Context(), options...)
-	if err != nil {
-		return nil, err
-	}
+	feeCalc := w.feeCalculator(w.builder.Context(), options...)
 
 	utx, err := w.builder.NewExportTx(chainID, outputs, feeCalc, options...)
 	if err != nil {
@@ -498,10 +467,7 @@ func (w *wallet) IssueTransformSubnetTx(
 	uptimeRequirement uint32,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	feeCalc, err := w.feeCalculator(w.builder.Context(), options...)
-	if err != nil {
-		return nil, err
-	}
+	feeCalc := w.feeCalculator(w.builder.Context(), options...)
 
 	utx, err := w.builder.NewTransformSubnetTx(
 		subnetID,
@@ -537,10 +503,7 @@ func (w *wallet) IssueAddPermissionlessValidatorTx(
 	shares uint32,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	feeCalc, err := w.feeCalculator(w.builder.Context(), options...)
-	if err != nil {
-		return nil, err
-	}
+	feeCalc := w.feeCalculator(w.builder.Context(), options...)
 
 	utx, err := w.builder.NewAddPermissionlessValidatorTx(
 		vdr,
@@ -565,10 +528,7 @@ func (w *wallet) IssueAddPermissionlessDelegatorTx(
 	rewardsOwner *secp256k1fx.OutputOwners,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	feeCalc, err := w.feeCalculator(w.builder.Context(), options...)
-	if err != nil {
-		return nil, err
-	}
+	feeCalc := w.feeCalculator(w.builder.Context(), options...)
 
 	utx, err := w.builder.NewAddPermissionlessDelegatorTx(
 		vdr,
@@ -624,49 +584,52 @@ func (w *wallet) IssueTx(
 	return w.Backend.AcceptTx(ctx, tx)
 }
 
-func (w *wallet) feeCalculator(ctx *builder.Context, options ...common.Option) (fee.Calculator, error) {
-	if err := w.refreshFeesData(ctx, options...); err != nil {
-		return nil, err
-	}
+func (w *wallet) feeCalculator(ctx *builder.Context, options ...common.Option) fee.Calculator {
+	w.refreshFeesData(ctx, options...)
 
 	if !w.isEUpgradeActive {
-		return fee.NewStaticCalculator(w.staticFeesConfig, upgrade.Config{}, time.Time{}), nil
+		return fee.NewStaticCalculator(w.staticFeesConfig, upgrade.Config{}, time.Time{})
 	}
 
-	return fee.NewBuildingDynamicCalculator(commonfee.NewCalculator(w.feeCfg.FeeDimensionWeights, w.gasPrice, w.gasCap)), nil
+	return fee.NewBuildingDynamicCalculator(commonfee.NewCalculator(w.feeCfg.FeeDimensionWeights, w.gasPrice, w.gasCap))
 }
 
-func (w *wallet) refreshFeesData(ctx *builder.Context, options ...common.Option) error {
-	var (
-		ops    = common.NewOptions(options)
-		opsCtx = ops.Context()
-	)
+func (w *wallet) refreshFeesData(ctx *builder.Context, _ ...common.Option) {
+	// TODO: until we wire in dynamic fees verification, we should build txs as if all it's static fees
+	// (at least for e2e tests)
 
-	chainTime, err := w.client.GetTimestamp(opsCtx)
-	if err != nil {
-		return err
-	}
-	eUpgradeTime := version.GetEUpgradeTime(w.builder.Context().NetworkID)
-	isEUpgradeActive := !chainTime.Before(eUpgradeTime)
+	// var (
+	// 	ops    = common.NewOptions(options)
+	// 	opsCtx = ops.Context()
+	// )
 
-	// update static and dynamic fees configs if needed
-	switch {
-	case !isEUpgradeActive:
-		w.staticFeesConfig = staticFeesConfigFromContext(ctx)
-		w.isEUpgradeActive = isEUpgradeActive
-		return nil
-	case !w.isEUpgradeActive && isEUpgradeActive:
-		w.feeCfg, err = w.client.GetDynamicFeeConfig(opsCtx)
-		if err != nil {
-			return err
-		}
-		w.isEUpgradeActive = isEUpgradeActive
-	default:
-		// nothing to do
-	}
+	// chainTime, err := w.client.GetTimestamp(opsCtx)
+	// if err != nil {
+	// 	return err
+	// }
+	// eUpgradeTime := version.GetEUpgradeTime(w.builder.Context().NetworkID)
+	// isEUpgradeActive := !chainTime.Before(eUpgradeTime)
 
-	w.gasPrice, w.gasCap, err = w.client.GetNextGasData(opsCtx)
-	return err
+	// // update static and dynamic fees configs if needed
+	// switch {
+	// case !isEUpgradeActive:
+	// 	w.staticFeesConfig = staticFeesConfigFromContext(ctx)
+	// 	w.isEUpgradeActive = isEUpgradeActive
+	// 	return nil
+	// case !w.isEUpgradeActive && isEUpgradeActive:
+	// 	w.feeCfg, err = w.client.GetDynamicFeeConfig(opsCtx)
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// 	w.isEUpgradeActive = isEUpgradeActive
+	// default:
+	// 	// nothing to do
+	// }
+	// w.gasPrice, w.gasCap, err = w.client.GetNextGasData(opsCtx)
+	// return err
+
+	w.staticFeesConfig = staticFeesConfigFromContext(ctx)
+	w.isEUpgradeActive = false
 }
 
 func staticFeesConfigFromContext(ctx *builder.Context) fee.StaticConfig {
