@@ -190,7 +190,7 @@ func (v *verifier) ApricotStandardBlock(b *block.ApricotStandardBlock) error {
 	var (
 		staticFeeConfig = v.txExecutorBackend.Config.StaticFeeConfig
 		upgradeConfig   = v.txExecutorBackend.Config.UpgradeConfig
-		timestamp       = onAcceptState.GetTimestamp()
+		timestamp       = onAcceptState.GetTimestamp() // Equal to parent timestamp
 		feeCalculator   = fee.NewStaticCalculator(staticFeeConfig, upgradeConfig, timestamp)
 	)
 	return v.standardBlock(b, feeCalculator, onAcceptState)
