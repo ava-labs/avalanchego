@@ -280,8 +280,9 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 			onAbortState, err := state.NewDiff(lastAcceptedID, env)
 			require.NoError(err)
 
-			feeCalculator, err := state.PickFeeCalculator(env.config, onCommitState)
+			feeCalculator, err := state.PickFeeCalculator(env.config, onCommitState, onCommitState.GetTimestamp())
 			require.NoError(err)
+
 			executor := ProposalTxExecutor{
 				OnCommitState: onCommitState,
 				OnAbortState:  onAbortState,
@@ -330,7 +331,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		onAbortState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
 
-		feeCalculator, err := state.PickFeeCalculator(env.config, onCommitState)
+		feeCalculator, err := state.PickFeeCalculator(env.config, onCommitState, onCommitState.GetTimestamp())
 		require.NoError(err)
 		executor := ProposalTxExecutor{
 			OnCommitState: onCommitState,
@@ -372,7 +373,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		onAbortState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
 
-		feeCalculator, err := state.PickFeeCalculator(env.config, onCommitState)
+		feeCalculator, err := state.PickFeeCalculator(env.config, onCommitState, onCommitState.GetTimestamp())
 		require.NoError(err)
 		executor := ProposalTxExecutor{
 			OnCommitState: onCommitState,
@@ -437,7 +438,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		onAbortState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
 
-		feeCalculator, err := state.PickFeeCalculator(env.config, onCommitState)
+		feeCalculator, err := state.PickFeeCalculator(env.config, onCommitState, onCommitState.GetTimestamp())
 		require.NoError(err)
 		executor := ProposalTxExecutor{
 			OnCommitState: onCommitState,
@@ -494,7 +495,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		onAbortState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
 
-		feeCalculator, err := state.PickFeeCalculator(env.config, onCommitState)
+		feeCalculator, err := state.PickFeeCalculator(env.config, onCommitState, onCommitState.GetTimestamp())
 		require.NoError(err)
 		executor := ProposalTxExecutor{
 			OnCommitState: onCommitState,
@@ -534,7 +535,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		onAbortState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
 
-		feeCalculator, err := state.PickFeeCalculator(env.config, onCommitState)
+		feeCalculator, err := state.PickFeeCalculator(env.config, onCommitState, onCommitState.GetTimestamp())
 		require.NoError(err)
 		executor := ProposalTxExecutor{
 			OnCommitState: onCommitState,
@@ -574,7 +575,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		onAbortState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
 
-		feeCalculator, err := state.PickFeeCalculator(env.config, onCommitState)
+		feeCalculator, err := state.PickFeeCalculator(env.config, onCommitState, onCommitState.GetTimestamp())
 		require.NoError(err)
 		executor := ProposalTxExecutor{
 			OnCommitState: onCommitState,
@@ -616,7 +617,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		onAbortState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
 
-		feeCalculator, err := state.PickFeeCalculator(env.config, onCommitState)
+		feeCalculator, err := state.PickFeeCalculator(env.config, onCommitState, onCommitState.GetTimestamp())
 		require.NoError(err)
 		executor := ProposalTxExecutor{
 			OnCommitState: onCommitState,
@@ -693,7 +694,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		onAbortState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
 
-		feeCalculator, err := state.PickFeeCalculator(env.config, onCommitState)
+		feeCalculator, err := state.PickFeeCalculator(env.config, onCommitState, onCommitState.GetTimestamp())
 		require.NoError(err)
 		executor := ProposalTxExecutor{
 			OnCommitState: onCommitState,
@@ -743,7 +744,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		onAbortState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
 
-		feeCalculator, err := state.PickFeeCalculator(env.config, onCommitState)
+		feeCalculator, err := state.PickFeeCalculator(env.config, onCommitState, onCommitState.GetTimestamp())
 		require.NoError(err)
 		executor := ProposalTxExecutor{
 			OnCommitState: onCommitState,
@@ -788,7 +789,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		onAbortState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
 
-		feeCalculator, err := state.PickFeeCalculator(env.config, onCommitState)
+		feeCalculator, err := state.PickFeeCalculator(env.config, onCommitState, onCommitState.GetTimestamp())
 		require.NoError(err)
 		executor := ProposalTxExecutor{
 			OnCommitState: onCommitState,
@@ -842,7 +843,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		onAbortState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
 
-		feeCalculator, err := state.PickFeeCalculator(env.config, onCommitState)
+		feeCalculator, err := state.PickFeeCalculator(env.config, onCommitState, onCommitState.GetTimestamp())
 		require.NoError(err)
 		executor := ProposalTxExecutor{
 			OnCommitState: onCommitState,
@@ -894,8 +895,9 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 		onAbortState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
 
-		feeCalculator, err := state.PickFeeCalculator(env.config, onCommitState)
+		feeCalculator, err := state.PickFeeCalculator(env.config, onCommitState, onCommitState.GetTimestamp())
 		require.NoError(err)
+
 		executor := ProposalTxExecutor{
 			OnCommitState: onCommitState,
 			OnAbortState:  onAbortState,
@@ -938,8 +940,9 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 		onAbortState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
 
-		feeCalculator, err := state.PickFeeCalculator(env.config, onCommitState)
+		feeCalculator, err := state.PickFeeCalculator(env.config, onCommitState, onCommitState.GetTimestamp())
 		require.NoError(err)
+
 		executor := ProposalTxExecutor{
 			OnCommitState: onCommitState,
 			OnAbortState:  onAbortState,
@@ -996,8 +999,9 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 		onAbortState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
 
-		feeCalculator, err := state.PickFeeCalculator(env.config, onCommitState)
+		feeCalculator, err := state.PickFeeCalculator(env.config, onCommitState, onCommitState.GetTimestamp())
 		require.NoError(err)
+
 		executor := ProposalTxExecutor{
 			OnCommitState: onCommitState,
 			OnAbortState:  onAbortState,
@@ -1046,8 +1050,9 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 		onAbortState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
 
-		feeCalculator, err := state.PickFeeCalculator(env.config, onCommitState)
+		feeCalculator, err := state.PickFeeCalculator(env.config, onCommitState, onCommitState.GetTimestamp())
 		require.NoError(err)
+
 		executor := ProposalTxExecutor{
 			OnCommitState: onCommitState,
 			OnAbortState:  onAbortState,

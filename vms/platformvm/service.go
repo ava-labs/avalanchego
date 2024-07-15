@@ -1882,7 +1882,19 @@ func (s *Service) GetNextGasData(_ *http.Request, _ *struct{}, reply *GetGasPric
 		return fmt.Errorf("could not retrieve state for block %s", preferredID)
 	}
 
-	feeCalculator, err := state.PickFeeCalculator(&s.vm.Config, onAccept)
+	currentChainTime := onAccept.GetTimestamp()
+	nextTimestamp, _, err := state.NextBlockTime(onAccept, &s.vm.clock)
+	if err != nil {
+		return fmt.Errorf("could not calculate next staker change time: %w", err)
+	}
+
+	stateDiff, err := state.NewDiffOn(onAccept)
+	if err != nil {
+		return err
+	}
+	stateDiff.SetTimestamp(nextTimestamp)
+
+	feeCalculator, err := state.PickFeeCalculator(&s.vm.Config, stateDiff, currentChainTime)
 	if err != nil {
 		return err
 	}

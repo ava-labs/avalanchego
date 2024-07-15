@@ -34,15 +34,18 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
 	avajson "github.com/ava-labs/avalanchego/utils/json"
+	commonfee "github.com/ava-labs/avalanchego/vms/components/fee"
 	vmkeystore "github.com/ava-labs/avalanchego/vms/components/keystore"
 	pchainapi "github.com/ava-labs/avalanchego/vms/platformvm/api"
 	blockbuilder "github.com/ava-labs/avalanchego/vms/platformvm/block/builder"
@@ -74,6 +77,31 @@ var (
 		formatting.JSON, formatting.Hex,
 	}
 )
+
+func testReplayFeeCalculator(cfg *config.Config, parentBlkTime time.Time, state state.Chain) (fee.Calculator, error) {
+	var (
+		childBlkTime = state.GetTimestamp()
+		isEActive    = cfg.UpgradeConfig.IsEActivated(childBlkTime)
+	)
+
+	if !isEActive {
+		return fee.NewStaticCalculator(cfg.StaticFeeConfig, cfg.UpgradeConfig, childBlkTime), nil
+	}
+
+	feesCfg, err := fee.GetDynamicConfig(isEActive)
+	if err != nil {
+		return nil, fmt.Errorf("failed retrieving dynamic fees config: %w", err)
+	}
+	currentGasCap, err := state.GetCurrentGasCap()
+	if err != nil {
+		return nil, fmt.Errorf("failed retrieving current gas cap: %w", err)
+	}
+	gasCap, err := commonfee.GasCap(feesCfg, currentGasCap, parentBlkTime, childBlkTime)
+	if err != nil {
+		return nil, fmt.Errorf("failed updating gas cap: %w", err)
+	}
+	return fee.NewDynamicCalculator(commonfee.NewCalculator(feesCfg.FeeDimensionWeights, feesCfg.GasPrice, gasCap)), nil
+}
 
 func defaultService(t *testing.T) (*Service, *mutableSharedMemory, *txstest.WalletFactory) {
 	vm, factory, _, mutableSharedMemory := defaultVM(t, latestFork)
@@ -402,7 +430,7 @@ func TestGetBalance(t *testing.T) {
 		if idx == 0 {
 			// we use the first key to fund a subnet creation in [defaultGenesis].
 			// As such we need to account for the subnet creation fee
-			feeCalc, err := state.PickFeeCalculator(&service.vm.Config, service.vm.state)
+			feeCalc, err := testReplayFeeCalculator(&service.vm.Config, defaultGenesisTime, service.vm.state)
 			require.NoError(err)
 			fee, err := feeCalc.CalculateFee(&txs.Tx{Unsigned: testSubnet1.Unsigned, Creds: testSubnet1.Creds})
 			require.NoError(err)

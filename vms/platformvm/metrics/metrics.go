@@ -12,6 +12,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
+
+	commonfee "github.com/ava-labs/avalanchego/vms/components/fee"
 )
 
 var _ Metrics = (*metrics)(nil)
@@ -38,6 +40,8 @@ type Metrics interface {
 	SetTimeUntilUnstake(time.Duration)
 	// Mark when this node will unstake from a subnet.
 	SetTimeUntilSubnetUnstake(subnetID ids.ID, timeUntilUnstake time.Duration)
+	// Mark gas cumulated across txs of last accepted block
+	SetBlockGas(commonfee.Gas)
 }
 
 func New(registerer prometheus.Registerer) (Metrics, error) {
@@ -80,6 +84,10 @@ func New(registerer prometheus.Registerer) (Metrics, error) {
 			Name: "validator_sets_duration_sum",
 			Help: "Total amount of time generating validator sets in nanoseconds",
 		}),
+		blockGas: prometheus.NewGauge(prometheus.GaugeOpts{
+			Name: "block_gas",
+			Help: "Cumulated gas over last accepted block",
+		}),
 	}
 
 	errs := wrappers.Errs{Err: err}
@@ -96,6 +104,7 @@ func New(registerer prometheus.Registerer) (Metrics, error) {
 		registerer.Register(m.validatorSetsCached),
 		registerer.Register(m.validatorSetsHeightDiff),
 		registerer.Register(m.validatorSetsDuration),
+		registerer.Register(m.blockGas),
 	)
 
 	return m, errs.Err
@@ -115,6 +124,8 @@ type metrics struct {
 	validatorSetsCreated    prometheus.Counter
 	validatorSetsHeightDiff prometheus.Gauge
 	validatorSetsDuration   prometheus.Gauge
+
+	blockGas prometheus.Gauge
 }
 
 func (m *metrics) MarkAccepted(b block.Block) error {
@@ -151,4 +162,8 @@ func (m *metrics) SetTimeUntilUnstake(timeUntilUnstake time.Duration) {
 
 func (m *metrics) SetTimeUntilSubnetUnstake(subnetID ids.ID, timeUntilUnstake time.Duration) {
 	m.timeUntilSubnetUnstake.WithLabelValues(subnetID.String()).Set(float64(timeUntilUnstake))
+}
+
+func (m *metrics) SetBlockGas(g commonfee.Gas) {
+	m.blockGas.Set(float64(g))
 }

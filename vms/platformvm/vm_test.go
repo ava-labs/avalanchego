@@ -84,7 +84,7 @@ const (
 	durango
 	eUpgrade
 
-	latestFork = durango
+	latestFork fork = eUpgrade
 
 	defaultWeight uint64 = 10000
 )
@@ -368,7 +368,7 @@ func defaultVM(t *testing.T, f fork) (*VM, *txstest.WalletFactory, database.Data
 // Ensure genesis state is parsed from bytes and stored correctly
 func TestGenesis(t *testing.T) {
 	require := require.New(t)
-	vm, _, _, _ := defaultVM(t, latestFork)
+	vm, _, _, _ := defaultVM(t, durango)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
@@ -404,7 +404,7 @@ func TestGenesis(t *testing.T) {
 
 			// we use the first key to fund a subnet creation in [defaultGenesis].
 			// As such we need to account for the subnet creation fee
-			feeCalc, err := state.PickFeeCalculator(&vm.Config, vm.state)
+			feeCalc, err := testReplayFeeCalculator(&vm.Config, defaultGenesisTime, vm.state)
 			require.NoError(err)
 			fee, err := feeCalc.CalculateFee(&txs.Tx{Unsigned: testSubnet1.Unsigned, Creds: testSubnet1.Creds})
 			require.NoError(err)
@@ -2148,7 +2148,7 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 	validatorStartTime := latestForkTime.Add(txexecutor.SyncBound).Add(1 * time.Second)
 	validatorEndTime := validatorStartTime.Add(360 * 24 * time.Hour)
 
-	vm, factory, _, _ := defaultVM(t, latestFork)
+	vm, factory, _, _ := defaultVM(t, durango)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
@@ -2389,7 +2389,7 @@ func TestBaseTx(t *testing.T) {
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
-	sendAmt := uint64(100000)
+	sendAmt := uint64(100_000)
 	changeAddr := ids.ShortEmpty
 
 	builder, txSigner, feeCalc, err := factory.NewWallet(keys[0])
@@ -2453,7 +2453,7 @@ func TestBaseTx(t *testing.T) {
 	}
 	require.Equal(totalOutputAmt, key0OutputAmt+key1OutputAmt+changeAddrOutputAmt)
 
-	feeCalc, err = state.PickFeeCalculator(&vm.Config, vm.state)
+	feeCalc, err = state.PickFeeCalculator(&vm.Config, vm.state, vm.state.GetTimestamp())
 	require.NoError(err)
 
 	fee, err := feeCalc.CalculateFee(baseTx)
@@ -2478,7 +2478,7 @@ func TestBaseTx(t *testing.T) {
 
 func TestPruneMempool(t *testing.T) {
 	require := require.New(t)
-	vm, factory, _, _ := defaultVM(t, latestFork)
+	vm, factory, _, _ := defaultVM(t, durango)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 

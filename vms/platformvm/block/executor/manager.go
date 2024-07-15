@@ -132,6 +132,8 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 		return err
 	}
 
+	parentBlkTime := stateDiff.GetTimestamp()
+
 	nextBlkTime, _, err := state.NextBlockTime(stateDiff, m.txExecutorBackend.Clk)
 	if err != nil {
 		return err
@@ -142,7 +144,7 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 		return err
 	}
 
-	feeCalculator, err := state.PickFeeCalculator(m.txExecutorBackend.Config, stateDiff)
+	feeCalculator, err := state.PickFeeCalculator(m.txExecutorBackend.Config, stateDiff, parentBlkTime)
 	if err != nil {
 		return err
 	}

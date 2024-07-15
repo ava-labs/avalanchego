@@ -163,7 +163,7 @@ func TestNewImportTx(t *testing.T) {
 
 			stateDiff.SetTimestamp(tt.timestamp)
 
-			feeCalculator, err := state.PickFeeCalculator(env.config, stateDiff)
+			feeCalculator, err := state.PickFeeCalculator(env.config, stateDiff, stateDiff.GetTimestamp())
 			require.NoError(err)
 
 			verifier := StandardTxExecutor{

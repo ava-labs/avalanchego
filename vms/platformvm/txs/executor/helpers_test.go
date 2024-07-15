@@ -233,6 +233,8 @@ func addSubnet(t *testing.T, env *environment) {
 	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
+	_, _, feeCalc, err = env.factory.NewWallet(preFundedKeys[0])
+	require.NoError(err)
 	executor := StandardTxExecutor{
 		Backend:       &env.backend,
 		FeeCalculator: feeCalc,

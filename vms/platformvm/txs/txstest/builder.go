@@ -4,6 +4,8 @@
 package txstest
 
 import (
+	"fmt"
+
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
@@ -52,5 +54,17 @@ func (w *WalletFactory) NewWallet(keys ...*secp256k1.PrivateKey) (builder.Builde
 }
 
 func (w *WalletFactory) FeeCalculator() (fee.Calculator, error) {
-	return state.PickFeeCalculator(w.cfg, w.state)
+	parentBlkTime := w.state.GetTimestamp()
+	nextBlkTime, _, err := state.NextBlockTime(w.state, w.clk)
+	if err != nil {
+		return nil, fmt.Errorf("failed calculating next block time: %w", err)
+	}
+
+	diff, err := state.NewDiffOn(w.state)
+	if err != nil {
+		return nil, fmt.Errorf("failed building diff: %w", err)
+	}
+	diff.SetTimestamp(nextBlkTime)
+
+	return state.PickBuildingFeeCalculator(w.cfg, diff, parentBlkTime)
 }

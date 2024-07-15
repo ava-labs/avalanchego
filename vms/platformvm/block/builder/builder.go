@@ -331,7 +331,7 @@ func packBlockTxs(
 		return nil, err
 	}
 
-	feeCalculator, err := state.PickFeeCalculator(backend.Config, stateDiff)
+	feeCalculator, err := state.PickFeeCalculator(backend.Config, stateDiff, parentState.GetTimestamp())
 	if err != nil {
 		return nil, err
 	}
