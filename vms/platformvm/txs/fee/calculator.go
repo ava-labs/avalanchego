@@ -3,9 +3,23 @@
 
 package fee
 
-import "github.com/ava-labs/avalanchego/vms/platformvm/txs"
+import (
+	"github.com/ava-labs/avalanchego/vms/components/fee"
+	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+)
 
 // Calculator is the interfaces that any fee Calculator must implement
 type Calculator interface {
 	CalculateFee(tx *txs.Tx) (uint64, error)
+
+	GetFee() uint64
+	ResetFee(newFee uint64)
+	AddFeesFor(complexity fee.Dimensions) (uint64, error)
+	RemoveFeesFor(unitsToRm fee.Dimensions) (uint64, error)
+	GetGasPrice() fee.GasPrice
+	GetBlockGas() (fee.Gas, error)
+	GetGasCap() fee.Gas
+	setCredentials(creds []verify.Verifiable)
+	IsEActive() bool
 }

@@ -4,9 +4,12 @@
 package fee
 
 import (
+	"errors"
 	"time"
 
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/vms/components/fee"
+	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/upgrade"
 )
@@ -14,6 +17,8 @@ import (
 var (
 	_ Calculator  = (*staticCalculator)(nil)
 	_ txs.Visitor = (*staticCalculator)(nil)
+
+	errComplexityNotPriced = errors.New("complexity not priced")
 )
 
 func NewStaticCalculator(
@@ -43,6 +48,32 @@ func (c *staticCalculator) CalculateFee(tx *txs.Tx) (uint64, error) {
 	err := tx.Unsigned.Visit(c)
 	return c.fee, err
 }
+
+func (c *staticCalculator) GetFee() uint64 {
+	return c.fee
+}
+
+func (c *staticCalculator) ResetFee(newFee uint64) {
+	c.fee = newFee
+}
+
+func (*staticCalculator) AddFeesFor(fee.Dimensions) (uint64, error) {
+	return 0, errComplexityNotPriced
+}
+
+func (*staticCalculator) RemoveFeesFor(fee.Dimensions) (uint64, error) {
+	return 0, errComplexityNotPriced
+}
+
+func (*staticCalculator) GetGasPrice() fee.GasPrice { return fee.ZeroGasPrice }
+
+func (*staticCalculator) GetBlockGas() (fee.Gas, error) { return fee.ZeroGas, nil }
+
+func (*staticCalculator) GetGasCap() fee.Gas { return fee.ZeroGas }
+
+func (*staticCalculator) setCredentials([]verify.Verifiable) {}
+
+func (*staticCalculator) IsEActive() bool { return false }
 
 func (c *staticCalculator) AddValidatorTx(*txs.AddValidatorTx) error {
 	c.fee = c.staticCfg.AddPrimaryNetworkValidatorFee
