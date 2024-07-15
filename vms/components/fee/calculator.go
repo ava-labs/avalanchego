@@ -15,13 +15,13 @@ import (
 
 var errGasBoundBreached = errors.New("gas bound breached")
 
-// Calculator performs fee-related operations that are share move P-chain and X-chain
-// Calculator is supposed to be embedded with chain specific calculators.
+// Calculator performs fee-related operations that are shared among P-chain and X-chain
+// Calculator is supposed to be embedded within chain specific calculators.
 type Calculator struct {
 	// feeWeights help consolidating complexity into gas
 	feeWeights Dimensions
 
-	// gas cap enforced with adding gas via CumulateGas
+	// gas cap enforced with adding gas via AddFeesFor
 	gasCap Gas
 
 	// Avax denominated gas price, i.e. fee per unit of gas.
@@ -131,7 +131,7 @@ func (c *Calculator) AddFeesFor(complexity Dimensions) (uint64, error) {
 		return 0, fmt.Errorf("%w: %w", errGasBoundBreached, err)
 	}
 	if totalGas > c.gasCap {
-		return 0, fmt.Errorf("%w: %w", errGasBoundBreached, err)
+		return 0, fmt.Errorf("%w: total gas %d, gas cap %d", errGasBoundBreached, totalGas, c.gasCap)
 	}
 
 	return c.GetLatestTxFee()

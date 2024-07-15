@@ -1440,7 +1440,6 @@ func TestDurangoMemoField(t *testing.T) {
 				endTime := primaryValidator.EndTime
 				builder, signer, feeCalc, err := env.factory.NewWallet(testSubnet1ControlKeys[0], testSubnet1ControlKeys[1])
 				require.NoError(t, err)
-
 				utx, err := builder.NewAddSubnetValidatorTx(
 					&txs.SubnetValidator{
 						Validator: txs.Validator{
@@ -1471,7 +1470,6 @@ func TestDurangoMemoField(t *testing.T) {
 
 				builder, signer, feeCalc, err = env.factory.NewWallet(preFundedKeys...)
 				require.NoError(t, err)
-
 				utx2, err := builder.NewRemoveSubnetValidatorTx(
 					primaryValidator.NodeID,
 					testSubnet1.ID(),
@@ -1531,7 +1529,6 @@ func TestDurangoMemoField(t *testing.T) {
 
 				builder, txSigner, feeCalc, err := env.factory.NewWallet(preFundedKeys...)
 				require.NoError(t, err)
-
 				utx, err := builder.NewAddPermissionlessValidatorTx(
 					&txs.SubnetValidator{
 						Validator: txs.Validator{
