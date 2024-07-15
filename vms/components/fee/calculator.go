@@ -77,7 +77,7 @@ func (c *Calculator) AddFeesFor(complexity Dimensions) (uint64, error) {
 		return 0, fmt.Errorf("%w: %w", errGasBoundBreached, err)
 	}
 	if totalGas > c.gasCap {
-		return 0, fmt.Errorf("%w: %w", errGasBoundBreached, err)
+		return 0, fmt.Errorf("%w: total gas %d, gas cap %d", errGasBoundBreached, totalGas, c.gasCap)
 	}
 
 	return c.GetLatestTxFee()
