@@ -570,13 +570,7 @@ func (e *StandardTxExecutor) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwn
 }
 
 func (e *StandardTxExecutor) BaseTx(tx *txs.BaseTx) error {
-	var (
-		currentTimestamp = e.State.GetTimestamp()
-		upgrades         = e.Backend.Config.UpgradeConfig
-		IsDurangoActive  = upgrades.IsDurangoActivated(currentTimestamp)
-	)
-
-	if !IsDurangoActive {
+	if !e.Backend.Config.UpgradeConfig.IsDurangoActivated(e.State.GetTimestamp()) {
 		return ErrDurangoUpgradeNotActive
 	}
 
@@ -619,13 +613,12 @@ func (e *StandardTxExecutor) BaseTx(tx *txs.BaseTx) error {
 func (e *StandardTxExecutor) putStaker(stakerTx txs.Staker) error {
 	var (
 		chainTime = e.State.GetTimestamp()
-		upgrades  = e.Backend.Config.UpgradeConfig
 		txID      = e.Tx.ID()
 		staker    *state.Staker
 		err       error
 	)
 
-	if !upgrades.IsDurangoActivated(chainTime) {
+	if !e.Config.UpgradeConfig.IsDurangoActivated(chainTime) {
 		// Pre-Durango, stakers set a future [StartTime] and are added to the
 		// pending staker set. They are promoted to the current staker set once
 		// the chain time reaches [StartTime].

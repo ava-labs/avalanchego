@@ -759,13 +759,7 @@ func verifyTransferSubnetOwnershipTx(
 	sTx *txs.Tx,
 	tx *txs.TransferSubnetOwnershipTx,
 ) error {
-	var (
-		currentTimestamp = chainState.GetTimestamp()
-		upgrades         = backend.Config.UpgradeConfig
-		isDurangoActive  = upgrades.IsDurangoActivated(currentTimestamp)
-	)
-
-	if !isDurangoActive {
+	if !backend.Config.UpgradeConfig.IsDurangoActivated(chainState.GetTimestamp()) {
 		return ErrDurangoUpgradeNotActive
 	}
 
