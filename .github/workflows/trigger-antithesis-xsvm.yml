@@ -1,7 +1,8 @@
 name: Trigger Antithesis XSVM Setup
 
 on:
-  # TODO(marun) Add a schedule to execute regularly
+  schedule:
+    - cron: '0 10 * * *'
   workflow_dispatch:
     inputs:
       duration:
@@ -35,4 +36,4 @@ jobs:
           images: antithesis-xsvm-workload:${{ github.event.inputs.image_tag || 'latest' }};antithesis-xsvm-node:${{ github.event.inputs.image_tag || 'latest' }}
           email_recipients: ${{ github.event.inputs.recipients || secrets.ANTITHESIS_RECIPIENTS }}
           additional_parameters: |-
-            custom.duration=${{ github.event.inputs.duration || '0.5' }}
+            custom.duration=${{ github.event.inputs.duration || '11.25' }}
