@@ -30,7 +30,7 @@ jobs:
           sudo apt-get -y update
           sudo apt-get -y install gcc-aarch64-linux-gnu
       - name: Checkout osxcross
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           repository: tpoechtrager/osxcross
           path: osxcross
@@ -41,9 +41,9 @@ jobs:
           wget https://github.com/phracker/MacOSX-SDKs/releases/download/11.3/MacOSX11.3.sdk.tar.xz -O tarballs/MacOSX11.3.sdk.tar.xz
           echo cd4f08a75577145b8f05245a2975f7c81401d75e9535dcffbb879ee1deefcbf4 tarballs/MacOSX11.3.sdk.tar.xz | sha256sum -c -
           UNATTENDED=1 ./build.sh
-          echo $PWD/target/bin >> $GITHUB_PATH
+          echo "$PWD/target/bin" >> "$GITHUB_PATH"
       - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v2
+        uses: goreleaser/goreleaser-action@v3
         with:
           distribution: goreleaser
           version: latest
