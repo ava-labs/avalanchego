@@ -6,6 +6,9 @@ package fee
 import (
 	"errors"
 	"fmt"
+	"math"
+	"math/big"
+	"time"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
@@ -31,6 +34,10 @@ type Calculator struct {
 	// latestTxComplexity tracks complexity of latest tx being processed.
 	// latestTxComplexity is especially helpful while building a tx.
 	latestTxComplexity Dimensions
+
+	// currentExcessGas stores current excess gas, cumulated over time
+	// to be updated once a block is accepted with cumulatedGas
+	currentExcessGas Gas
 }
 
 func NewCalculator(feeWeights Dimensions, gasPrice GasPrice, gasCap Gas) *Calculator {
@@ -39,6 +46,45 @@ func NewCalculator(feeWeights Dimensions, gasPrice GasPrice, gasCap Gas) *Calcul
 		gasCap:     gasCap,
 		gasPrice:   gasPrice,
 	}
+}
+
+func NewUpdatedManager(
+	feesConfig DynamicFeesConfig,
+	gasCap, currentExcessGas Gas,
+	parentBlkTime, childBlkTime time.Time,
+) (*Calculator, error) {
+	res := &Calculator{
+		feeWeights:       feesConfig.FeeDimensionWeights,
+		gasCap:           gasCap,
+		currentExcessGas: currentExcessGas,
+	}
+
+	targetGas, err := TargetGas(feesConfig, parentBlkTime, childBlkTime)
+	if err != nil {
+		return nil, fmt.Errorf("failed calculating target gas: %w", err)
+	}
+
+	if currentExcessGas > targetGas {
+		currentExcessGas -= targetGas
+	} else {
+		currentExcessGas = ZeroGas
+	}
+
+	res.gasPrice = fakeExponential(feesConfig.MinGasPrice, currentExcessGas, feesConfig.UpdateDenominator)
+	return res, nil
+}
+
+func TargetGas(feesConfig DynamicFeesConfig, parentBlkTime, childBlkTime time.Time) (Gas, error) {
+	if parentBlkTime.Compare(childBlkTime) > 0 {
+		return ZeroGas, fmt.Errorf("unexpected block times, parentBlkTim %v, childBlkTime %v", parentBlkTime, childBlkTime)
+	}
+
+	elapsedTime := uint64(childBlkTime.Unix() - parentBlkTime.Unix())
+	targetGas, over := safemath.Mul64(uint64(feesConfig.GasTargetRate), elapsedTime)
+	if over != nil {
+		targetGas = math.MaxUint64
+	}
+	return Gas(targetGas), nil
 }
 
 func (c *Calculator) GetGasPrice() GasPrice {
@@ -55,6 +101,14 @@ func (c *Calculator) GetBlockGas() (Gas, error) {
 
 func (c *Calculator) GetGasCap() Gas {
 	return c.gasCap
+}
+
+func (c *Calculator) GetExcessGas() (Gas, error) {
+	g, err := safemath.Add64(uint64(c.currentExcessGas), uint64(c.cumulatedGas))
+	if err != nil {
+		return ZeroGas, err
+	}
+	return Gas(g), nil
 }
 
 // AddFeesFor updates latest tx complexity. It should be called once when tx is being verified
@@ -116,4 +170,28 @@ func (c *Calculator) GetLatestTxFee() (uint64, error) {
 		return 0, err
 	}
 	return safemath.Mul64(uint64(c.gasPrice), uint64(gas))
+}
+
+// fakeExponential approximates factor * e ** (numerator / denominator) using
+// Taylor expansion.
+func fakeExponential(f GasPrice, n, d Gas) GasPrice {
+	var (
+		factor      = new(big.Int).SetUint64(uint64(f))
+		numerator   = new(big.Int).SetUint64(uint64(n))
+		denominator = new(big.Int).SetUint64(uint64(d))
+		output      = new(big.Int)
+		accum       = new(big.Int).Mul(factor, denominator)
+	)
+	for i := 1; accum.Sign() > 0; i++ {
+		output.Add(output, accum)
+
+		accum.Mul(accum, numerator)
+		accum.Div(accum, denominator)
+		accum.Div(accum, big.NewInt(int64(i)))
+	}
+	output = output.Div(output, denominator)
+	if !output.IsUint64() {
+		return math.MaxUint64
+	}
+	return GasPrice(output.Uint64())
 }

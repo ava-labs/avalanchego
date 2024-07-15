@@ -11,14 +11,22 @@ import (
 
 var (
 	errZeroLeakGasCoeff     = errors.New("zero leak gas coefficient")
+	errZerUpdateDenominator = errors.New("update denominator cannot be zero")
 	errUnexpectedBlockTimes = errors.New("unexpected block times")
 )
 
 type DynamicFeesConfig struct {
-	// At this state this is the fixed gas price applied to each block
-	// In the next PRs, gas price will float and this will become the
-	// minimum gas price
-	GasPrice GasPrice `json:"gas-price"`
+	// MinGasPrice contains the minimal gas price
+	// enforced by the dynamic fees algo.
+	MinGasPrice GasPrice `json:"minimal-gas-price"`
+
+	// UpdateDenominator contains the
+	// exponential normalization coefficient.
+	UpdateDenominator Gas `json:"update-denominator"`
+
+	// GasTargetRate contains the preferred gas consumed by a block.
+	// The dynamic fee algo strives to converge to GasTargetRate per second.
+	GasTargetRate Gas `json:"block-target-complexity-rate"`
 
 	// weights to merge fees dimensions complexities into a single gas value
 	FeeDimensionWeights Dimensions `json:"fee-dimension-weights"`
@@ -29,6 +37,10 @@ type DynamicFeesConfig struct {
 }
 
 func (c *DynamicFeesConfig) Validate() error {
+	if c.UpdateDenominator == 0 {
+		return errZerUpdateDenominator
+	}
+
 	if c.LeakGasCoeff == 0 {
 		return errZeroLeakGasCoeff
 	}

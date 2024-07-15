@@ -94,13 +94,24 @@ func testReplayFeeCalculator(cfg *config.Config, parentBlkTime time.Time, state 
 	}
 	currentGasCap, err := state.GetCurrentGasCap()
 	if err != nil {
-		return nil, fmt.Errorf("failed retrieving current gas cap: %w", err)
+		return nil, fmt.Errorf("failed retrieving gas cap: %w", err)
 	}
+	excessComplexity, err := state.GetExcessGas()
+	if err != nil {
+		return nil, fmt.Errorf("failed retrieving excess complexity: %w", err)
+	}
+
 	gasCap, err := commonfee.GasCap(feesCfg, currentGasCap, parentBlkTime, childBlkTime)
 	if err != nil {
-		return nil, fmt.Errorf("failed updating gas cap: %w", err)
+		return nil, fmt.Errorf("failed retrieving gas cap: %w", err)
 	}
-	return fee.NewDynamicCalculator(commonfee.NewCalculator(feesCfg.FeeDimensionWeights, feesCfg.GasPrice, gasCap)), nil
+
+	feesMan, err := commonfee.NewUpdatedManager(feesCfg, gasCap, excessComplexity, parentBlkTime, childBlkTime)
+	if err != nil {
+		return nil, fmt.Errorf("failed updating fee manager: %w", err)
+	}
+
+	return fee.NewDynamicCalculator(feesMan), nil
 }
 
 func defaultService(t *testing.T) (*Service, *mutableSharedMemory, *txstest.WalletFactory) {
@@ -1175,4 +1186,48 @@ func TestServiceGetSubnets(t *testing.T) {
 			Threshold:   0,
 		},
 	}, response.Subnets)
+}
+
+func TestGetFeeRates(t *testing.T) {
+	require := require.New(t)
+	service, _, _ := defaultService(t)
+
+	service.vm.ctx.Lock.Lock()
+	now := service.vm.state.GetTimestamp().Add(time.Second)
+	service.vm.clock.Set(now)
+	feeCfg, err := fee.GetDynamicConfig(true /*isEActive*/)
+	require.NoError(err)
+	service.vm.ctx.Lock.Unlock()
+
+	//  initially minimal fees
+	reply0 := GetGasPriceReply{}
+	require.NoError(service.GetNextGasData(nil, nil, &reply0))
+	require.Equal(feeCfg.MinGasPrice, reply0.NextGasPrice)
+
+	// let gas go above target. Gas price will go up
+	service.vm.ctx.Lock.Lock()
+	chainTime := service.vm.state.GetTimestamp()
+	elapsedTime := 10 * time.Second
+	targetGas, err := commonfee.TargetGas(feeCfg, chainTime, chainTime.Add(elapsedTime))
+	require.NoError(err)
+
+	excessGas, err := service.vm.state.GetExcessGas()
+	require.NoError(err)
+	service.vm.state.SetExcessGas(excessGas + targetGas + commonfee.Gas(20_000))
+	service.vm.ctx.Lock.Unlock()
+
+	reply1 := GetGasPriceReply{}
+	require.NoError(service.GetNextGasData(nil, nil, &reply1))
+	highGasPrice := reply1.NextGasPrice
+	require.Greater(highGasPrice, feeCfg.MinGasPrice)
+
+	// let time tick. Fee rates will go down
+	service.vm.ctx.Lock.Lock()
+	now = now.Add(10 * time.Second)
+	service.vm.clock.Set(now)
+	service.vm.ctx.Lock.Unlock()
+
+	reply2 := GetGasPriceReply{}
+	require.NoError(service.GetNextGasData(nil, nil, &reply2))
+	require.Less(reply2.NextGasPrice, highGasPrice)
 }

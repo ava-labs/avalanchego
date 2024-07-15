@@ -521,7 +521,7 @@ func TestStandardBlockGas(t *testing.T) {
 				blk := env.blkManager.NewBlock(statelessBlk)
 				require.NoError(blk.Verify(context.Background()))
 
-				// check that metered complexity is non-zero post E upgrade and zero pre E upgrade
+				// check that gas cap is non-zero post E upgrade and zero pre E upgrade
 				blkState, found := env.blkManager.(*manager).blkIDToState[blk.ID()]
 				require.True(found)
 

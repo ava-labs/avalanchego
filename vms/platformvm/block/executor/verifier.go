@@ -255,6 +255,7 @@ func (v *verifier) ApricotAtomicBlock(b *block.ApricotAtomicBlock) error {
 		inputs:         atomicExecutor.Inputs,
 		timestamp:      atomicExecutor.OnAccept.GetTimestamp(),
 		blockGas:       commonfee.ZeroGas,
+		excessGas:      commonfee.ZeroGas,
 		atomicRequests: atomicExecutor.AtomicRequests,
 	}
 	return nil
@@ -423,6 +424,10 @@ func (v *verifier) proposalBlock(
 	if err != nil {
 		return err
 	}
+	excessGas, err := feeCalculator.GetExcessGas()
+	if err != nil {
+		return err
+	}
 
 	if feeCalculator.IsEActive() {
 		nextGasCap := commonfee.UpdateGasCap(currentGasCap, blkGas)
@@ -453,6 +458,7 @@ func (v *verifier) proposalBlock(
 		// always be the same as the Banff Proposal Block.
 		timestamp:      onAbortState.GetTimestamp(),
 		blockGas:       blkGas,
+		excessGas:      excessGas,
 		atomicRequests: atomicRequests,
 	}
 	return nil
@@ -482,6 +488,10 @@ func (v *verifier) standardBlock(
 	if err != nil {
 		return err
 	}
+	excessGas, err := feeCalculator.GetExcessGas()
+	if err != nil {
+		return err
+	}
 
 	if feeCalculator.IsEActive() {
 		nextGasCap := commonfee.UpdateGasCap(currentGasCap, blkGas)
@@ -496,6 +506,7 @@ func (v *verifier) standardBlock(
 
 		timestamp:      onAcceptState.GetTimestamp(),
 		blockGas:       blkGas,
+		excessGas:      excessGas,
 		inputs:         inputs,
 		atomicRequests: atomicRequests,
 	}
@@ -558,6 +569,14 @@ func (v *verifier) processStandardTxs(
 
 	if err := v.verifyUniqueInputs(parentID, inputs); err != nil {
 		return nil, nil, nil, err
+	}
+
+	if v.txExecutorBackend.Config.UpgradeConfig.IsEActivated(state.GetTimestamp()) {
+		excessGas, err := feeCalculator.GetExcessGas()
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		state.SetExcessGas(excessGas)
 	}
 
 	if numFuncs := len(funcs); numFuncs == 1 {

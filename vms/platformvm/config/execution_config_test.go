@@ -94,7 +94,8 @@ func TestExecutionConfigUnmarshal(t *testing.T) {
 			ChecksumsEnabled:             true,
 			MempoolPruneFrequency:        time.Minute,
 			DynamicFeesConfig: &commonfee.DynamicFeesConfig{
-				GasPrice:            commonfee.GasPrice(1234),
+				MinGasPrice:         commonfee.GasPrice(1234),
+				UpdateDenominator:   commonfee.Gas(567),
 				FeeDimensionWeights: commonfee.Dimensions{1, 2, 3, 4},
 				MaxGasPerSecond:     commonfee.Gas(12),
 				LeakGasCoeff:        commonfee.Gas(34),

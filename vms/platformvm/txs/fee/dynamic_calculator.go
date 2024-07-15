@@ -94,6 +94,8 @@ func (c *dynamicCalculator) GetGasPrice() fee.GasPrice { return c.fc.GetGasPrice
 
 func (c *dynamicCalculator) GetBlockGas() (fee.Gas, error) { return c.fc.GetBlockGas() }
 
+func (c *dynamicCalculator) GetExcessGas() (fee.Gas, error) { return c.fc.GetExcessGas() }
+
 func (c *dynamicCalculator) GetGasCap() fee.Gas { return c.fc.GetGasCap() }
 
 func (c *dynamicCalculator) setCredentials(creds []verify.Verifiable) {

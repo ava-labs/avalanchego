@@ -19,6 +19,7 @@ type Calculator interface {
 	RemoveFeesFor(unitsToRm fee.Dimensions) (uint64, error)
 	GetGasPrice() fee.GasPrice
 	GetBlockGas() (fee.Gas, error)
+	GetExcessGas() (fee.Gas, error)
 	GetGasCap() fee.Gas
 	setCredentials(creds []verify.Verifiable)
 	IsEActive() bool
