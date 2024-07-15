@@ -109,12 +109,12 @@ func (n *Network) writeGenesis() error {
 	return nil
 }
 
-func (n *Network) getChainConfigDir() string {
+func (n *Network) GetChainConfigDir() string {
 	return filepath.Join(n.Dir, "chains")
 }
 
 func (n *Network) readChainConfigs() error {
-	baseChainConfigDir := n.getChainConfigDir()
+	baseChainConfigDir := n.GetChainConfigDir()
 	entries, err := os.ReadDir(baseChainConfigDir)
 	if err != nil {
 		return fmt.Errorf("failed to read chain config dir: %w", err)
@@ -147,7 +147,7 @@ func (n *Network) readChainConfigs() error {
 }
 
 func (n *Network) writeChainConfigs() error {
-	baseChainConfigDir := n.getChainConfigDir()
+	baseChainConfigDir := n.GetChainConfigDir()
 
 	for chainAlias, chainConfig := range n.ChainConfigs {
 		// Create the directory
@@ -226,12 +226,12 @@ func (n *Network) writeEnvFile() error {
 	return nil
 }
 
-func (n *Network) getSubnetDir() string {
+func (n *Network) GetSubnetDir() string {
 	return filepath.Join(n.Dir, defaultSubnetDirName)
 }
 
 func (n *Network) readSubnets() error {
-	subnets, err := readSubnets(n.getSubnetDir())
+	subnets, err := readSubnets(n.GetSubnetDir())
 	if err != nil {
 		return err
 	}
