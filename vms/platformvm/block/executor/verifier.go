@@ -357,9 +357,6 @@ func (v *verifier) abortBlock(b block.Block) error {
 		statelessBlock: b,
 		onAcceptState:  onAbortState,
 		timestamp:      onAbortState.GetTimestamp(),
-
-		// blockComplexity not set. We'll assign same complexity
-		// as proposal blocks upon acceptance
 	}
 	return nil
 }
@@ -377,9 +374,6 @@ func (v *verifier) commitBlock(b block.Block) error {
 		statelessBlock: b,
 		onAcceptState:  onCommitState,
 		timestamp:      onCommitState.GetTimestamp(),
-
-		// blockComplexity not set. We'll assign same complexity
-		// as proposal blocks upon acceptance
 	}
 	return nil
 }
@@ -475,7 +469,6 @@ func (v *verifier) processStandardTxs(txs []*txs.Tx, feeCalculator fee.Calculato
 		funcs          = make([]func(), 0, len(txs))
 		atomicRequests = make(map[ids.ID]*atomic.Requests)
 	)
-
 	for _, tx := range txs {
 		txExecutor := executor.StandardTxExecutor{
 			Backend:       v.txExecutorBackend,

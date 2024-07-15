@@ -375,9 +375,9 @@ func TestGetBalance(t *testing.T) {
 	require := require.New(t)
 	service, _, _ := defaultService(t)
 
-	feeCalc, err := state.PickFeeCalculator(&service.vm.Config, service.vm.state)
+	feeCalculator, err := state.PickFeeCalculator(&service.vm.Config, service.vm.state)
 	require.NoError(err)
-	createSubnetFee, err := feeCalc.CalculateFee(&txs.Tx{Unsigned: &txs.CreateSubnetTx{}})
+	createSubnetFee, err := feeCalculator.CalculateFee(&txs.Tx{Unsigned: &txs.CreateSubnetTx{}})
 	require.NoError(err)
 
 	// Ensure GetStake is correct for each of the genesis validators
