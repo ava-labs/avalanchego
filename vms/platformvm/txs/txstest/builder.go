@@ -66,5 +66,5 @@ func (w *WalletFactory) FeeCalculator() (fee.Calculator, error) {
 	}
 	diff.SetTimestamp(nextBlkTime)
 
-	return state.PickFeeCalculator(w.cfg, diff, parentBlkTime)
+	return state.PickBuildingFeeCalculator(w.cfg, diff, parentBlkTime)
 }

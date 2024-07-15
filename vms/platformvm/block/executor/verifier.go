@@ -423,7 +423,11 @@ func (v *verifier) proposalBlock(
 		return err
 	}
 
-	blkGas := feeCalculator.GetBlockGas()
+	blkGas, err := feeCalculator.GetBlockGas()
+	if err != nil {
+		return err
+	}
+
 	if feeCalculator.IsEActive() {
 		nextGasCap := commonfee.UpdateGasCap(currentGasCap, blkGas)
 		onCommitState.SetCurrentGasCap(nextGasCap)
@@ -478,7 +482,11 @@ func (v *verifier) standardBlock(
 
 	blkID := b.ID()
 
-	blkGas := feeCalculator.GetBlockGas()
+	blkGas, err := feeCalculator.GetBlockGas()
+	if err != nil {
+		return err
+	}
+
 	if feeCalculator.IsEActive() {
 		nextGasCap := commonfee.UpdateGasCap(currentGasCap, blkGas)
 		onAcceptState.SetCurrentGasCap(nextGasCap)
@@ -498,7 +506,12 @@ func (v *verifier) standardBlock(
 	return nil
 }
 
-func (v *verifier) processStandardTxs(txs []*txs.Tx, feeCalculator fee.Calculator, state state.Diff, parentID ids.ID) (
+func (v *verifier) processStandardTxs(
+	txs []*txs.Tx,
+	feeCalculator fee.Calculator,
+	state state.Diff,
+	parentID ids.ID,
+) (
 	set.Set[ids.ID],
 	map[ids.ID]*atomic.Requests,
 	func(),

@@ -123,6 +123,9 @@ type Client interface {
 	GetBlock(ctx context.Context, blockID ids.ID, options ...rpc.Option) ([]byte, error)
 	// GetBlockByHeight returns the block at the given [height].
 	GetBlockByHeight(ctx context.Context, height uint64, options ...rpc.Option) ([]byte, error)
+
+	// GetDynamicFeeConfig returns DynamicFeesConfig
+	GetDynamicFeeConfig(ctx context.Context, options ...rpc.Option) (commonfee.DynamicFeesConfig, error)
 	// GetNextGasData returns the gas price that a transaction must pay to be accepted now
 	// and the gas cap, i.e. the maximum gas a transactions can consume
 	GetNextGasData(ctx context.Context, options ...rpc.Option) (commonfee.GasPrice, commonfee.Gas, error)
@@ -547,6 +550,12 @@ func AwaitTxAccepted(
 			return ctx.Err()
 		}
 	}
+}
+
+func (c *client) GetDynamicFeeConfig(ctx context.Context, options ...rpc.Option) (commonfee.DynamicFeesConfig, error) {
+	res := &DynamicFeesConfigReply{}
+	err := c.requester.SendRequest(ctx, "platform.getDynamicFeeConfig", struct{}{}, res, options...)
+	return res.DynamicFeesConfig, err
 }
 
 func (c *client) GetNextGasData(ctx context.Context, options ...rpc.Option) (commonfee.GasPrice, commonfee.Gas, error) {

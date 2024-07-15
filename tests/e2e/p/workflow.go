@@ -25,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
+	commonfee "github.com/ava-labs/avalanchego/vms/components/fee"
 	ginkgo "github.com/onsi/ginkgo/v2"
 )
 
@@ -57,6 +58,11 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 			require.NoError(err)
 			tests.Outf("{{green}} minimal validator stake: %d {{/}}\n", minValStake)
 			tests.Outf("{{green}} minimal delegator stake: %d {{/}}\n", minDelStake)
+
+			tests.Outf("{{blue}} fetching minimal stake amounts {{/}}\n")
+			feeCfg, err := pChainClient.GetDynamicFeeConfig(e2e.DefaultContext())
+			require.NoError(err)
+			tests.Outf("{{green}} fee config: %v {{/}}\n", feeCfg)
 
 			tests.Outf("{{blue}} fetching X-chain tx fee {{/}}\n")
 			infoClient := info.NewClient(nodeURI.URI)
@@ -160,7 +166,7 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 				require.NoError(err)
 
 				// retrieve fees paid for the tx
-				feeCalc := fee.NewDynamicCalculator(nextGasPrice, nextGasCap)
+				feeCalc := fee.NewDynamicCalculator(commonfee.NewCalculator(feeCfg.FeeDimensionWeights, nextGasPrice, nextGasCap))
 				pChainExportFee, err = feeCalc.CalculateFee(tx)
 				require.NoError(err)
 			})

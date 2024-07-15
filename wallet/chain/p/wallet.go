@@ -289,8 +289,9 @@ type wallet struct {
 	signer  walletsigner.Signer
 	client  platformvm.Client
 
-	isEForkActive    bool
+	isEUpgradeActive bool
 	staticFeesConfig fee.StaticConfig
+	feeCfg           commonfee.DynamicFeesConfig
 	gasPrice         commonfee.GasPrice
 	gasCap           commonfee.Gas
 }
@@ -316,6 +317,7 @@ func (w *wallet) IssueBaseTx(
 	if err != nil {
 		return nil, err
 	}
+
 	return w.IssueUnsignedTx(utx, options...)
 }
 
@@ -350,6 +352,7 @@ func (w *wallet) IssueAddSubnetValidatorTx(
 	if err != nil {
 		return nil, err
 	}
+
 	return w.IssueUnsignedTx(utx, options...)
 }
 
@@ -367,6 +370,7 @@ func (w *wallet) IssueRemoveSubnetValidatorTx(
 	if err != nil {
 		return nil, err
 	}
+
 	return w.IssueUnsignedTx(utx, options...)
 }
 
@@ -404,6 +408,7 @@ func (w *wallet) IssueCreateChainTx(
 	if err != nil {
 		return nil, err
 	}
+
 	return w.IssueUnsignedTx(utx, options...)
 }
 
@@ -454,6 +459,7 @@ func (w *wallet) IssueImportTx(
 	if err != nil {
 		return nil, err
 	}
+
 	return w.IssueUnsignedTx(utx, options...)
 }
 
@@ -471,6 +477,7 @@ func (w *wallet) IssueExportTx(
 	if err != nil {
 		return nil, err
 	}
+
 	return w.IssueUnsignedTx(utx, options...)
 }
 
@@ -517,6 +524,7 @@ func (w *wallet) IssueTransformSubnetTx(
 	if err != nil {
 		return nil, err
 	}
+
 	return w.IssueUnsignedTx(utx, options...)
 }
 
@@ -547,6 +555,7 @@ func (w *wallet) IssueAddPermissionlessValidatorTx(
 	if err != nil {
 		return nil, err
 	}
+
 	return w.IssueUnsignedTx(utx, options...)
 }
 
@@ -571,6 +580,7 @@ func (w *wallet) IssueAddPermissionlessDelegatorTx(
 	if err != nil {
 		return nil, err
 	}
+
 	return w.IssueUnsignedTx(utx, options...)
 }
 
@@ -619,11 +629,11 @@ func (w *wallet) feeCalculator(ctx *builder.Context, options ...common.Option) (
 		return nil, err
 	}
 
-	if !w.isEForkActive {
+	if !w.isEUpgradeActive {
 		return fee.NewStaticCalculator(w.staticFeesConfig, upgrade.Config{}, time.Time{}), nil
 	}
 
-	return fee.NewDynamicCalculator(w.gasPrice, w.gasCap), nil
+	return fee.NewBuildingDynamicCalculator(commonfee.NewCalculator(w.feeCfg.FeeDimensionWeights, w.gasPrice, w.gasCap)), nil
 }
 
 func (w *wallet) refreshFeesData(ctx *builder.Context, options ...common.Option) error {
@@ -637,13 +647,23 @@ func (w *wallet) refreshFeesData(ctx *builder.Context, options ...common.Option)
 		return err
 	}
 	eUpgradeTime := version.GetEUpgradeTime(w.builder.Context().NetworkID)
-	w.isEForkActive = !chainTime.Before(eUpgradeTime)
+	isEUpgradeActive := !chainTime.Before(eUpgradeTime)
 
-	if !w.isEForkActive {
+	// update static and dynamic fees configs if needed
+	switch {
+	case !isEUpgradeActive:
 		w.staticFeesConfig = staticFeesConfigFromContext(ctx)
+		w.isEUpgradeActive = isEUpgradeActive
 		return nil
+	case !w.isEUpgradeActive && isEUpgradeActive:
+		w.feeCfg, err = w.client.GetDynamicFeeConfig(opsCtx)
+		if err != nil {
+			return err
+		}
+		w.isEUpgradeActive = isEUpgradeActive
+	default:
+		// nothing to do
 	}
-
 	w.gasPrice, w.gasCap, err = w.client.GetNextGasData(opsCtx)
 	return err
 }
