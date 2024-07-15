@@ -168,9 +168,9 @@ func (v *verifier) ApricotProposalBlock(b *block.ApricotProposalBlock) error {
 	}
 
 	var (
-		staticFeesCfg = v.txExecutorBackend.Config.StaticFeeConfig
-		upgrades      = v.txExecutorBackend.Config.UpgradeConfig
-		feeCalculator = fee.NewStaticCalculator(staticFeesCfg, upgrades, onCommitState.GetTimestamp())
+		staticFeeConfig = v.txExecutorBackend.Config.StaticFeeConfig
+		upgradeConfig   = v.txExecutorBackend.Config.UpgradeConfig
+		feeCalculator   = fee.NewStaticCalculator(staticFeeConfig, upgradeConfig, onCommitState.GetTimestamp())
 	)
 	return v.proposalBlock(b, nil, onCommitState, onAbortState, feeCalculator, nil, nil, nil)
 }
@@ -187,9 +187,9 @@ func (v *verifier) ApricotStandardBlock(b *block.ApricotStandardBlock) error {
 	}
 
 	var (
-		staticFeesCfg = v.txExecutorBackend.Config.StaticFeeConfig
-		upgrades      = v.txExecutorBackend.Config.UpgradeConfig
-		feeCalculator = fee.NewStaticCalculator(staticFeesCfg, upgrades, onAcceptState.GetTimestamp())
+		staticFeeConfig = v.txExecutorBackend.Config.StaticFeeConfig
+		upgradeConfig   = v.txExecutorBackend.Config.UpgradeConfig
+		feeCalculator   = fee.NewStaticCalculator(staticFeeConfig, upgradeConfig, onAcceptState.GetTimestamp())
 	)
 	return v.standardBlock(b, feeCalculator, onAcceptState)
 }
