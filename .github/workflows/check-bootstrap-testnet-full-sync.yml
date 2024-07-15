@@ -11,7 +11,6 @@ jobs:
   check_bootstrap_testnet_full_sync:
     name: Check Bootstrap (testnet,full-sync)
     runs-on: avalanche-avalanchego
-    timeout-minutes: 4320 # 3 days
     steps:
     - name: Checkout Repository
       uses: actions/checkout@v4
