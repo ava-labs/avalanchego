@@ -176,9 +176,10 @@ func (v *verifier) ApricotProposalBlock(b *block.ApricotProposalBlock) error {
 	}
 
 	var (
-		staticFeesCfg = v.txExecutorBackend.Config.StaticFeeConfig
-		upgrades      = v.txExecutorBackend.Config.UpgradeConfig
-		feeCalculator = fee.NewStaticCalculator(staticFeesCfg, upgrades, onCommitState.GetTimestamp())
+		staticFeeConfig = v.txExecutorBackend.Config.StaticFeeConfig
+		upgradeConfig   = v.txExecutorBackend.Config.UpgradeConfig
+		timestamp       = onCommitState.GetTimestamp() // Equal to parent timestamp
+		feeCalculator   = fee.NewStaticCalculator(staticFeeConfig, upgradeConfig, timestamp)
 	)
 	return v.proposalBlock(b, nil, onCommitState, onAbortState, feeCalculator, nil, nil, nil)
 }
@@ -195,9 +196,10 @@ func (v *verifier) ApricotStandardBlock(b *block.ApricotStandardBlock) error {
 	}
 
 	var (
-		staticFeesCfg = v.txExecutorBackend.Config.StaticFeeConfig
-		upgrades      = v.txExecutorBackend.Config.UpgradeConfig
-		feeCalculator = fee.NewStaticCalculator(staticFeesCfg, upgrades, onAcceptState.GetTimestamp())
+		staticFeeConfig = v.txExecutorBackend.Config.StaticFeeConfig
+		upgradeConfig   = v.txExecutorBackend.Config.UpgradeConfig
+		timestamp       = onAcceptState.GetTimestamp() // Equal to parent timestamp
+		feeCalculator   = fee.NewStaticCalculator(staticFeeConfig, upgradeConfig, timestamp)
 	)
 	return v.standardBlock(b, feeCalculator, onAcceptState)
 }
@@ -366,9 +368,6 @@ func (v *verifier) abortBlock(b block.Block) error {
 		statelessBlock: b,
 		onAcceptState:  onAbortState,
 		timestamp:      onAbortState.GetTimestamp(),
-
-		// blockComplexity not set. We'll assign same complexity
-		// as proposal blocks upon acceptance
 	}
 	return nil
 }
@@ -386,9 +385,6 @@ func (v *verifier) commitBlock(b block.Block) error {
 		statelessBlock: b,
 		onAcceptState:  onCommitState,
 		timestamp:      onCommitState.GetTimestamp(),
-
-		// blockComplexity not set. We'll assign same complexity
-		// as proposal blocks upon acceptance
 	}
 	return nil
 }
@@ -523,7 +519,6 @@ func (v *verifier) processStandardTxs(
 		funcs          = make([]func(), 0, len(txs))
 		atomicRequests = make(map[ids.ID]*atomic.Requests)
 	)
-
 	for _, tx := range txs {
 		txExecutor := executor.StandardTxExecutor{
 			Backend:       v.txExecutorBackend,

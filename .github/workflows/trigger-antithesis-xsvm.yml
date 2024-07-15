@@ -1,4 +1,4 @@
-name: Trigger Antithesis Test Runs
+name: Trigger Antithesis XSVM Setup
 
 on:
   # TODO(marun) Add a schedule to execute regularly
@@ -10,8 +10,7 @@ on:
         required: true
         type: string
       recipients:
-        description: 'Email recipients to send the test report to'
-        default: ${{ secrets.ANTITHESIS_RECIPIENTS }}
+        description: 'Comma-seperated email addresses to send the test report to'
         required: true
         type: string
       image_tag:
@@ -21,22 +20,6 @@ on:
         type: string
 
 jobs:
-  antithesis_avalanchego:
-    name: Run Antithesis Avalanchego Test Setup
-    runs-on: ubuntu-latest
-    steps:
-      - uses: antithesishq/antithesis-trigger-action@v0.5
-        with:
-          notebook_name: avalanche
-          tenant: avalanche
-          username: ${{ secrets.ANTITHESIS_USERNAME }}
-          password: ${{ secrets.ANTITHESIS_PASSWORD }}
-          github_token: ${{ secrets.ANTITHESIS_GH_PAT }}
-          config_image: antithesis-avalanchego-config@${{ github.event.inputs.image_tag || 'latest' }}
-          images: antithesis-avalanchego-workload@${{ github.event.inputs.image_tag || 'latest' }};antithesis-avalanchego-node@${{ github.event.inputs.image_tag || 'latest' }}
-          email_recipients: ${{ github.event.inputs.recipients || secrets.ANTITHESIS_RECIPIENTS }}
-          additional_parameters: |-
-            custom.duration=${{ github.event.inputs.duration || '0.5' }}
   antithesis_xsvm:
     name: Run Antithesis XSVM Test Setup
     runs-on: ubuntu-latest
