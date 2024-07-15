@@ -69,9 +69,11 @@ func (e *StandardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 	}
 
 	// Verify the flowcheck
-	feeCalculator := fee.NewStaticCalculator(e.Backend.Config.StaticFeeConfig, e.Backend.Config.UpgradeConfig)
-	fee := feeCalculator.CalculateFee(tx, currentTimestamp)
-
+	feeCalculator := fee.NewStaticCalculator(e.Backend.Config.StaticFeeConfig, e.Backend.Config.UpgradeConfig, currentTimestamp)
+	fee, err := feeCalculator.CalculateFee(e.Tx)
+	if err != nil {
+		return err
+	}
 	if err := e.FlowChecker.VerifySpend(
 		tx,
 		e.State,
@@ -117,9 +119,11 @@ func (e *StandardTxExecutor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 	}
 
 	// Verify the flowcheck
-	feeCalculator := fee.NewStaticCalculator(e.Backend.Config.StaticFeeConfig, e.Backend.Config.UpgradeConfig)
-	fee := feeCalculator.CalculateFee(tx, currentTimestamp)
-
+	feeCalculator := fee.NewStaticCalculator(e.Backend.Config.StaticFeeConfig, e.Backend.Config.UpgradeConfig, currentTimestamp)
+	fee, err := feeCalculator.CalculateFee(e.Tx)
+	if err != nil {
+		return err
+	}
 	if err := e.FlowChecker.VerifySpend(
 		tx,
 		e.State,
@@ -200,9 +204,11 @@ func (e *StandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 		copy(ins[len(tx.Ins):], tx.ImportedInputs)
 
 		// Verify the flowcheck
-		feeCalculator := fee.NewStaticCalculator(e.Backend.Config.StaticFeeConfig, e.Backend.Config.UpgradeConfig)
-		fee := feeCalculator.CalculateFee(tx, currentTimestamp)
-
+		feeCalculator := fee.NewStaticCalculator(e.Backend.Config.StaticFeeConfig, e.Backend.Config.UpgradeConfig, currentTimestamp)
+		fee, err := feeCalculator.CalculateFee(e.Tx)
+		if err != nil {
+			return err
+		}
 		if err := e.FlowChecker.VerifySpendUTXOs(
 			tx,
 			utxos,
@@ -259,9 +265,11 @@ func (e *StandardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 	}
 
 	// Verify the flowcheck
-	feeCalculator := fee.NewStaticCalculator(e.Backend.Config.StaticFeeConfig, e.Backend.Config.UpgradeConfig)
-	fee := feeCalculator.CalculateFee(tx, currentTimestamp)
-
+	feeCalculator := fee.NewStaticCalculator(e.Backend.Config.StaticFeeConfig, e.Backend.Config.UpgradeConfig, currentTimestamp)
+	fee, err := feeCalculator.CalculateFee(e.Tx)
+	if err != nil {
+		return err
+	}
 	if err := e.FlowChecker.VerifySpend(
 		tx,
 		e.State,
@@ -448,9 +456,11 @@ func (e *StandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 	}
 
 	// Verify the flowcheck
-	feeCalculator := fee.NewStaticCalculator(e.Backend.Config.StaticFeeConfig, e.Backend.Config.UpgradeConfig)
-	fee := feeCalculator.CalculateFee(tx, currentTimestamp)
-
+	feeCalculator := fee.NewStaticCalculator(e.Backend.Config.StaticFeeConfig, e.Backend.Config.UpgradeConfig, currentTimestamp)
+	fee, err := feeCalculator.CalculateFee(e.Tx)
+	if err != nil {
+		return err
+	}
 	totalRewardAmount := tx.MaximumSupply - tx.InitialSupply
 	if err := e.Backend.FlowChecker.VerifySpend(
 		tx,
@@ -557,7 +567,11 @@ func (e *StandardTxExecutor) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwn
 }
 
 func (e *StandardTxExecutor) BaseTx(tx *txs.BaseTx) error {
-	if !e.Backend.Config.UpgradeConfig.IsDurangoActivated(e.State.GetTimestamp()) {
+	var (
+		currentTimestamp = e.State.GetTimestamp()
+		upgrades         = e.Backend.Config.UpgradeConfig
+	)
+	if !upgrades.IsDurangoActivated(currentTimestamp) {
 		return ErrDurangoUpgradeNotActive
 	}
 
@@ -571,10 +585,11 @@ func (e *StandardTxExecutor) BaseTx(tx *txs.BaseTx) error {
 	}
 
 	// Verify the flowcheck
-	currentTimestamp := e.State.GetTimestamp()
-	feeCalculator := fee.NewStaticCalculator(e.Backend.Config.StaticFeeConfig, e.Backend.Config.UpgradeConfig)
-	fee := feeCalculator.CalculateFee(tx, currentTimestamp)
-
+	feeCalculator := fee.NewStaticCalculator(e.Backend.Config.StaticFeeConfig, upgrades, currentTimestamp)
+	fee, err := feeCalculator.CalculateFee(e.Tx)
+	if err != nil {
+		return err
+	}
 	if err := e.FlowChecker.VerifySpend(
 		tx,
 		e.State,
