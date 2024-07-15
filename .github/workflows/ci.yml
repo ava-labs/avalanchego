@@ -51,8 +51,11 @@ jobs:
       - name: Run shellcheck
         shell: bash
         run: scripts/shellcheck.sh
+      - name: Run actionlint
+        shell: bash
+        run: scripts/actionlint.sh
   test:
-    name: Golang Unit Tests v${{ matrix.go }} (${{ matrix.os }})
+    name: Golang Unit Tests (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -80,7 +83,7 @@ jobs:
     - name: Set timeout on Windows # Windows UT run slower and need a longer timeout
       shell: bash
       if: matrix.os == 'windows-latest'
-      run: echo "TIMEOUT=1200s" >> $GITHUB_ENV
+      run: echo "TIMEOUT=1200s" >> "$GITHUB_ENV"
     - run: go mod download
       shell: bash
     - run: ./scripts/build.sh evm
@@ -92,7 +95,7 @@ jobs:
     - run: ./scripts/coverage.sh
       shell: bash
   avalanchego_e2e:
-    name: AvalancheGo E2E Tests v${{ matrix.go }} (${{ matrix.os }})
+    name: AvalancheGo E2E Tests (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
