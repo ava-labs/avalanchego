@@ -2866,7 +2866,7 @@ func TestEngineRegistersInvalidVoterDependencyRegression(t *testing.T) {
 	))
 	require.Len(pollRequestIDs, 1)
 
-	_, wasCached := engine.nonVerifiedCache.Get(rejectedChain[1].ID())
+	_, wasCached := engine.unverifiedBlockCache.Get(rejectedChain[1].ID())
 	require.True(wasCached)
 
 	// Issue acceptedChain[0] to consensus.
@@ -2948,155 +2948,72 @@ func TestEngineRegistersInvalidVoterDependencyRegression(t *testing.T) {
 
 func TestGetProcessingAncestor(t *testing.T) {
 	var (
-		ctx = snowtest.ConsensusContext(
-			snowtest.Context(t, snowtest.PChainID),
-		)
 		issuedBlock   = snowmantest.BuildChild(snowmantest.Genesis)
 		unissuedBlock = snowmantest.BuildChild(issuedBlock)
+
+		emptyNonVerifiedTree             = ancestor.NewTree()
+		nonVerifiedTreeWithUnissuedBlock = ancestor.NewTree()
+
+		emptyNonVerifiedCache             = &cache.Empty[ids.ID, snowman.Block]{}
+		nonVerifiedCacheWithUnissuedBlock = &cache.LRU[ids.ID, snowman.Block]{Size: 1}
+		nonVerifiedCacheWithDecidedBlock  = &cache.LRU[ids.ID, snowman.Block]{Size: 1}
 	)
-
-	metrics, err := newMetrics(prometheus.NewRegistry())
-	require.NoError(t, err)
-
-	c := &snowman.Topological{}
-	require.NoError(t, c.Initialize(
-		ctx,
-		snowball.DefaultParameters,
-		snowmantest.GenesisID,
-		0,
-		time.Now(),
-	))
-
-	require.NoError(t, c.Add(issuedBlock))
-
-	nonVerifiedAncestors := ancestor.NewTree()
-	nonVerifiedAncestors.Add(unissuedBlock.ID(), unissuedBlock.Parent())
+	nonVerifiedTreeWithUnissuedBlock.Add(unissuedBlock.ID(), unissuedBlock.Parent())
+	nonVerifiedCacheWithUnissuedBlock.Put(unissuedBlock.ID(), unissuedBlock)
+	nonVerifiedCacheWithDecidedBlock.Put(snowmantest.GenesisID, snowmantest.Genesis)
 
 	tests := []struct {
 		name             string
-		engine           *Transitive
+		nonVerifieds     ancestor.Tree
+		nonVerifiedCache cache.Cacher[ids.ID, snowman.Block]
 		initialVote      ids.ID
 		expectedAncestor ids.ID
 		expectedFound    bool
 	}{
 		{
-			name: "drop accepted blockID",
-			engine: &Transitive{
-				Config: Config{
-					Ctx: ctx,
-					VM: &block.TestVM{
-						TestVM: common.TestVM{
-							T: t,
-						},
-						GetBlockF: MakeGetBlockF(
-							[]*snowmantest.Block{snowmantest.Genesis},
-						),
-					},
-					Consensus: c,
-				},
-				metrics:          metrics,
-				nonVerifieds:     ancestor.NewTree(),
-				pending:          map[ids.ID]snowman.Block{},
-				nonVerifiedCache: &cache.Empty[ids.ID, snowman.Block]{},
-			},
+			name:             "drop accepted blockID",
+			nonVerifieds:     emptyNonVerifiedTree,
+			nonVerifiedCache: emptyNonVerifiedCache,
 			initialVote:      snowmantest.GenesisID,
 			expectedAncestor: ids.Empty,
 			expectedFound:    false,
 		},
 		{
-			name: "return processing blockID",
-			engine: &Transitive{
-				Config: Config{
-					Ctx: ctx,
-					VM: &block.TestVM{
-						TestVM: common.TestVM{
-							T: t,
-						},
-						GetBlockF: MakeGetBlockF(
-							[]*snowmantest.Block{snowmantest.Genesis},
-						),
-					},
-					Consensus: c,
-				},
-				metrics:          metrics,
-				nonVerifieds:     ancestor.NewTree(),
-				pending:          map[ids.ID]snowman.Block{},
-				nonVerifiedCache: &cache.Empty[ids.ID, snowman.Block]{},
-			},
+			name:             "drop cached and accepted blockID",
+			nonVerifieds:     emptyNonVerifiedTree,
+			nonVerifiedCache: nonVerifiedCacheWithDecidedBlock,
+			initialVote:      snowmantest.GenesisID,
+			expectedAncestor: ids.Empty,
+			expectedFound:    false,
+		},
+		{
+			name:             "return processing blockID",
+			nonVerifieds:     emptyNonVerifiedTree,
+			nonVerifiedCache: emptyNonVerifiedCache,
 			initialVote:      issuedBlock.ID(),
 			expectedAncestor: issuedBlock.ID(),
 			expectedFound:    true,
 		},
 		{
-			name: "drop unknown blockID",
-			engine: &Transitive{
-				Config: Config{
-					Ctx: ctx,
-					VM: &block.TestVM{
-						TestVM: common.TestVM{
-							T: t,
-						},
-						GetBlockF: MakeGetBlockF(
-							[]*snowmantest.Block{snowmantest.Genesis},
-						),
-					},
-					Consensus: c,
-				},
-				metrics:          metrics,
-				nonVerifieds:     ancestor.NewTree(),
-				pending:          map[ids.ID]snowman.Block{},
-				nonVerifiedCache: &cache.Empty[ids.ID, snowman.Block]{},
-			},
+			name:             "drop unknown blockID",
+			nonVerifieds:     emptyNonVerifiedTree,
+			nonVerifiedCache: emptyNonVerifiedCache,
 			initialVote:      ids.GenerateTestID(),
 			expectedAncestor: ids.Empty,
 			expectedFound:    false,
 		},
 		{
-			name: "apply vote through ancestor tree",
-			engine: &Transitive{
-				Config: Config{
-					Ctx: ctx,
-					VM: &block.TestVM{
-						TestVM: common.TestVM{
-							T: t,
-						},
-						GetBlockF: MakeGetBlockF(
-							[]*snowmantest.Block{snowmantest.Genesis},
-						),
-					},
-					Consensus: c,
-				},
-				metrics:          metrics,
-				nonVerifieds:     nonVerifiedAncestors,
-				pending:          map[ids.ID]snowman.Block{},
-				nonVerifiedCache: &cache.Empty[ids.ID, snowman.Block]{},
-			},
+			name:             "apply vote through ancestor tree",
+			nonVerifieds:     nonVerifiedTreeWithUnissuedBlock,
+			nonVerifiedCache: emptyNonVerifiedCache,
 			initialVote:      unissuedBlock.ID(),
 			expectedAncestor: issuedBlock.ID(),
 			expectedFound:    true,
 		},
 		{
-			name: "apply vote through pending set",
-			engine: &Transitive{
-				Config: Config{
-					Ctx: ctx,
-					VM: &block.TestVM{
-						TestVM: common.TestVM{
-							T: t,
-						},
-						GetBlockF: MakeGetBlockF(
-							[]*snowmantest.Block{snowmantest.Genesis},
-						),
-					},
-					Consensus: c,
-				},
-				metrics:      metrics,
-				nonVerifieds: ancestor.NewTree(),
-				pending: map[ids.ID]snowman.Block{
-					unissuedBlock.ID(): unissuedBlock,
-				},
-				nonVerifiedCache: &cache.Empty[ids.ID, snowman.Block]{},
-			},
+			name:             "apply vote through pending set",
+			nonVerifieds:     emptyNonVerifiedTree,
+			nonVerifiedCache: nonVerifiedCacheWithUnissuedBlock,
 			initialVote:      unissuedBlock.ID(),
 			expectedAncestor: issuedBlock.ID(),
 			expectedFound:    true,
@@ -3106,7 +3023,36 @@ func TestGetProcessingAncestor(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 
-			ancestor, found := test.engine.getProcessingAncestor(context.Background(), test.initialVote)
+			var (
+				ctx = snowtest.ConsensusContext(
+					snowtest.Context(t, snowtest.PChainID),
+				)
+				consensus = &snowman.Topological{}
+			)
+			require.NoError(consensus.Initialize(
+				ctx,
+				snowball.DefaultParameters,
+				snowmantest.GenesisID,
+				0,
+				time.Now(),
+			))
+
+			require.NoError(consensus.Add(issuedBlock))
+
+			metrics, err := newMetrics(prometheus.NewRegistry())
+			require.NoError(err)
+
+			engine := &Transitive{
+				Config: Config{
+					Ctx:       ctx,
+					Consensus: consensus,
+				},
+				metrics:                metrics,
+				unverifiedIDToAncestor: test.nonVerifieds,
+				unverifiedBlockCache:   test.nonVerifiedCache,
+			}
+
+			ancestor, found := engine.getProcessingAncestor(test.initialVote)
 			require.Equal(test.expectedAncestor, ancestor)
 			require.Equal(test.expectedFound, found)
 		})
