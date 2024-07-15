@@ -331,11 +331,15 @@ func packBlockTxs(
 		return nil, err
 	}
 
+	feeCalculator, err := state.PickFeeCalculator(backend.Config, stateDiff)
+	if err != nil {
+		return nil, err
+	}
+
 	var (
 		blockTxs []*txs.Tx
 		inputs   set.Set[ids.ID]
 	)
-
 	for {
 		tx, exists := mempool.Peek()
 		if !exists {
@@ -355,9 +359,10 @@ func packBlockTxs(
 		}
 
 		executor := &txexecutor.StandardTxExecutor{
-			Backend: backend,
-			State:   txDiff,
-			Tx:      tx,
+			Backend:       backend,
+			State:         txDiff,
+			FeeCalculator: feeCalculator,
+			Tx:            tx,
 		}
 
 		err = tx.Unsigned.Visit(executor)
