@@ -53,7 +53,9 @@ func TestNewExportTx(t *testing.T) {
 		t.Run(tt.description, func(t *testing.T) {
 			require := require.New(t)
 
-			builder, signer := env.factory.NewWallet(tt.sourceKeys...)
+			builder, signer, feeCalc, err := env.factory.NewWallet(tt.sourceKeys...)
+			require.NoError(err)
+
 			utx, err := builder.NewExportTx(
 				tt.destinationChainID,
 				[]*avax.TransferableOutput{{
@@ -67,6 +69,7 @@ func TestNewExportTx(t *testing.T) {
 						},
 					},
 				}},
+				feeCalc,
 			)
 			require.NoError(err)
 			tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
@@ -77,12 +80,9 @@ func TestNewExportTx(t *testing.T) {
 
 			stateDiff.SetTimestamp(tt.timestamp)
 
-			feeCalculator, err := state.PickFeeCalculator(env.config, stateDiff)
-			require.NoError(err)
-
 			verifier := StandardTxExecutor{
 				Backend:       &env.backend,
-				FeeCalculator: feeCalculator,
+				FeeCalculator: feeCalc,
 				State:         stateDiff,
 				Tx:            tx,
 			}

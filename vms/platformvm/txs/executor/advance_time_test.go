@@ -395,7 +395,9 @@ func TestAdvanceTimeTxUpdateStakers(t *testing.T) {
 			}
 
 			for _, staker := range test.subnetStakers {
-				builder, signer := env.factory.NewWallet(preFundedKeys[0], preFundedKeys[1])
+				builder, signer, feeCalc, err := env.factory.NewWallet(preFundedKeys[0], preFundedKeys[1])
+				require.NoError(err)
+
 				utx, err := builder.NewAddSubnetValidatorTx(
 					&txs.SubnetValidator{
 						Validator: txs.Validator{
@@ -406,6 +408,7 @@ func TestAdvanceTimeTxUpdateStakers(t *testing.T) {
 						},
 						Subnet: subnetID,
 					},
+					feeCalc,
 				)
 				require.NoError(err)
 				tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
@@ -499,7 +502,9 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 	subnetVdr1StartTime := defaultValidateStartTime
 	subnetVdr1EndTime := defaultValidateStartTime.Add(defaultMinStakingDuration)
 
-	builder, signer := env.factory.NewWallet(preFundedKeys[0], preFundedKeys[1])
+	builder, signer, feeCalc, err := env.factory.NewWallet(preFundedKeys[0], preFundedKeys[1])
+	require.NoError(err)
+
 	utx, err := builder.NewAddSubnetValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
@@ -510,6 +515,7 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 			},
 			Subnet: subnetID,
 		},
+		feeCalc,
 	)
 	require.NoError(err)
 	tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
@@ -543,6 +549,7 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 			},
 			Subnet: subnetID,
 		},
+		feeCalc,
 	)
 	require.NoError(err)
 	tx, err = walletsigner.SignUnsigned(context.Background(), signer, utx)
@@ -617,7 +624,8 @@ func TestTrackedSubnet(t *testing.T) {
 
 			subnetVdr1StartTime := defaultValidateStartTime.Add(1 * time.Minute)
 			subnetVdr1EndTime := defaultValidateStartTime.Add(10 * defaultMinStakingDuration).Add(1 * time.Minute)
-			builder, signer := env.factory.NewWallet(preFundedKeys[0], preFundedKeys[1])
+			builder, signer, feeCalc, err := env.factory.NewWallet(preFundedKeys[0], preFundedKeys[1])
+			require.NoError(err)
 			utx, err := builder.NewAddSubnetValidatorTx(
 				&txs.SubnetValidator{
 					Validator: txs.Validator{
@@ -628,6 +636,7 @@ func TestTrackedSubnet(t *testing.T) {
 					},
 					Subnet: subnetID,
 				},
+				feeCalc,
 			)
 			require.NoError(err)
 			tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
@@ -732,7 +741,9 @@ func TestAdvanceTimeTxDelegatorStakerWeight(t *testing.T) {
 	pendingDelegatorStartTime := pendingValidatorStartTime.Add(1 * time.Second)
 	pendingDelegatorEndTime := pendingDelegatorStartTime.Add(1 * time.Second)
 
-	builder, signer := env.factory.NewWallet(preFundedKeys[0], preFundedKeys[1], preFundedKeys[4])
+	builder, signer, feeCalc, err := env.factory.NewWallet(preFundedKeys[0], preFundedKeys[1], preFundedKeys[4])
+	require.NoError(err)
+
 	utx, err := builder.NewAddDelegatorTx(
 		&txs.Validator{
 			NodeID: nodeID,
@@ -744,6 +755,7 @@ func TestAdvanceTimeTxDelegatorStakerWeight(t *testing.T) {
 			Threshold: 1,
 			Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
 		},
+		feeCalc,
 	)
 	require.NoError(err)
 	addDelegatorTx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
@@ -837,7 +849,8 @@ func TestAdvanceTimeTxDelegatorStakers(t *testing.T) {
 	// Add delegator
 	pendingDelegatorStartTime := pendingValidatorStartTime.Add(1 * time.Second)
 	pendingDelegatorEndTime := pendingDelegatorStartTime.Add(defaultMinStakingDuration)
-	builder, signer := env.factory.NewWallet(preFundedKeys[0], preFundedKeys[1], preFundedKeys[4])
+	builder, signer, feeCalc, err := env.factory.NewWallet(preFundedKeys[0], preFundedKeys[1], preFundedKeys[4])
+	require.NoError(err)
 	utx, err := builder.NewAddDelegatorTx(
 		&txs.Validator{
 			NodeID: nodeID,
@@ -849,6 +862,7 @@ func TestAdvanceTimeTxDelegatorStakers(t *testing.T) {
 			Threshold: 1,
 			Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
 		},
+		feeCalc,
 	)
 	require.NoError(err)
 	addDelegatorTx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
@@ -960,7 +974,11 @@ func addPendingValidator(
 	nodeID ids.NodeID,
 	keys []*secp256k1.PrivateKey,
 ) (*txs.Tx, error) {
-	builder, signer := env.factory.NewWallet(keys...)
+	builder, signer, feeCalc, err := env.factory.NewWallet(keys...)
+	if err != nil {
+		return nil, err
+	}
+
 	utx, err := builder.NewAddValidatorTx(
 		&txs.Validator{
 			NodeID: nodeID,
@@ -973,6 +991,7 @@ func addPendingValidator(
 			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
 		},
 		reward.PercentDenominator,
+		feeCalc,
 	)
 	if err != nil {
 		return nil, err

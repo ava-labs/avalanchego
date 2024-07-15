@@ -163,6 +163,7 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller, f fork) *environment 
 		res.factory = txstest.NewWalletFactory(
 			res.ctx,
 			res.config,
+			res.clk,
 			res.state,
 		)
 	} else {
@@ -173,10 +174,12 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller, f fork) *environment 
 		res.factory = txstest.NewWalletFactory(
 			res.ctx,
 			res.config,
+			res.clk,
 			res.mockedState,
 		)
 
 		// setup expectations strictly needed for environment creation
+		res.mockedState.EXPECT().GetTimestamp().Return(time.Time{}).AnyTimes() // to initialize createSubnet/BlockchainTx fee
 		res.mockedState.EXPECT().GetLastAccepted().Return(genesisBlkID).Times(1)
 	}
 
@@ -252,7 +255,11 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller, f fork) *environment 
 }
 
 func addSubnet(env *environment) {
-	builder, signer := env.factory.NewWallet(preFundedKeys[0])
+	builder, signer, feeCalc, err := env.factory.NewWallet(preFundedKeys[0])
+	if err != nil {
+		panic(err)
+	}
+
 	utx, err := builder.NewCreateSubnetTx(
 		&secp256k1fx.OutputOwners{
 			Threshold: 2,
@@ -262,6 +269,7 @@ func addSubnet(env *environment) {
 				preFundedKeys[2].PublicKey().Address(),
 			},
 		},
+		feeCalc,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
@@ -505,7 +513,11 @@ func addPendingValidator(
 	rewardAddress ids.ShortID,
 	keys []*secp256k1.PrivateKey,
 ) (*txs.Tx, error) {
-	builder, signer := env.factory.NewWallet(keys...)
+	builder, signer, feeCalc, err := env.factory.NewWallet(keys...)
+	if err != nil {
+		return nil, err
+	}
+
 	utx, err := builder.NewAddValidatorTx(
 		&txs.Validator{
 			NodeID: nodeID,
@@ -518,6 +530,7 @@ func addPendingValidator(
 			Addrs:     []ids.ShortID{rewardAddress},
 		},
 		reward.PercentDenominator,
+		feeCalc,
 	)
 	if err != nil {
 		return nil, err
