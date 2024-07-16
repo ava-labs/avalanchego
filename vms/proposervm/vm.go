@@ -19,7 +19,6 @@ import (
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
@@ -531,16 +530,7 @@ func (vm *VM) parsePostForkBlock(ctx context.Context, b []byte) (PostForkBlock, 
 		return nil, err
 	}
 
-	// if the block already exists, then make sure the status is set correctly
 	blkID := statelessBlock.ID()
-	blk, err := vm.getPostForkBlock(ctx, blkID)
-	if err == nil {
-		return blk, nil
-	}
-	if err != database.ErrNotFound {
-		return nil, err
-	}
-
 	innerBlkBytes := statelessBlock.Block()
 	innerBlk, err := vm.parseInnerBlock(ctx, blkID, innerBlkBytes)
 	if err != nil {
@@ -548,25 +538,22 @@ func (vm *VM) parsePostForkBlock(ctx context.Context, b []byte) (PostForkBlock, 
 	}
 
 	if statelessSignedBlock, ok := statelessBlock.(statelessblock.SignedBlock); ok {
-		blk = &postForkBlock{
+		return &postForkBlock{
 			SignedBlock: statelessSignedBlock,
 			postForkCommonComponents: postForkCommonComponents{
 				vm:       vm,
 				innerBlk: innerBlk,
-				status:   choices.Processing,
 			},
-		}
-	} else {
-		blk = &postForkOption{
-			Block: statelessBlock,
-			postForkCommonComponents: postForkCommonComponents{
-				vm:       vm,
-				innerBlk: innerBlk,
-				status:   choices.Processing,
-			},
-		}
+		}, nil
 	}
-	return blk, nil
+
+	return &postForkOption{
+		Block: statelessBlock,
+		postForkCommonComponents: postForkCommonComponents{
+			vm:       vm,
+			innerBlk: innerBlk,
+		},
+	}, nil
 }
 
 func (vm *VM) parsePreForkBlock(ctx context.Context, b []byte) (*preForkBlock, error) {
@@ -590,7 +577,7 @@ func (vm *VM) getPostForkBlock(ctx context.Context, blkID ids.ID) (PostForkBlock
 		return block, nil
 	}
 
-	statelessBlock, status, err := vm.State.GetBlock(blkID)
+	statelessBlock, err := vm.State.GetBlock(blkID)
 	if err != nil {
 		return nil, err
 	}
@@ -607,7 +594,6 @@ func (vm *VM) getPostForkBlock(ctx context.Context, blkID ids.ID) (PostForkBlock
 			postForkCommonComponents: postForkCommonComponents{
 				vm:       vm,
 				innerBlk: innerBlk,
-				status:   status,
 			},
 		}, nil
 	}
@@ -616,7 +602,6 @@ func (vm *VM) getPostForkBlock(ctx context.Context, blkID ids.ID) (PostForkBlock
 		postForkCommonComponents: postForkCommonComponents{
 			vm:       vm,
 			innerBlk: innerBlk,
-			status:   status,
 		},
 	}, nil
 }
@@ -640,7 +625,7 @@ func (vm *VM) acceptPostForkBlock(blk PostForkBlock) error {
 	if err := vm.State.SetLastAccepted(blkID); err != nil {
 		return err
 	}
-	if err := vm.State.PutBlock(blk.getStatelessBlk(), choices.Accepted); err != nil {
+	if err := vm.State.PutBlock(blk.getStatelessBlk()); err != nil {
 		return err
 	}
 	if err := vm.updateHeightIndex(height, blkID); err != nil {

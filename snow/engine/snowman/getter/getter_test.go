@@ -80,20 +80,25 @@ func TestFilterAccepted(t *testing.T) {
 	acceptedBlk := snowmantest.BuildChild(snowmantest.Genesis)
 	require.NoError(acceptedBlk.Accept(context.Background()))
 
-	unknownBlkID := ids.GenerateTestID()
-
-	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
-		switch blkID {
-		case snowmantest.GenesisID:
-			return snowmantest.Genesis, nil
-		case acceptedBlk.ID():
-			return acceptedBlk, nil
-		case unknownBlkID:
-			return nil, errUnknownBlock
-		default:
-			require.FailNow(errUnknownBlock.Error())
-			return nil, errUnknownBlock
+	var (
+		allBlocks = []*snowmantest.Block{
+			snowmantest.Genesis,
+			acceptedBlk,
 		}
+		unknownBlkID = ids.GenerateTestID()
+	)
+
+	vm.LastAcceptedF = snowmantest.MakeLastAcceptedBlockF(allBlocks)
+	vm.GetBlockIDAtHeightF = snowmantest.MakeGetBlockIDAtHeightF(allBlocks)
+	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
+		for _, blk := range allBlocks {
+			if blk.ID() == blkID {
+				return blk, nil
+			}
+		}
+
+		require.Equal(unknownBlkID, blkID)
+		return nil, errUnknownBlock
 	}
 
 	var accepted []ids.ID

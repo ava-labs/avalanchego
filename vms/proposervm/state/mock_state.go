@@ -13,7 +13,6 @@ import (
 	reflect "reflect"
 
 	ids "github.com/ava-labs/avalanchego/ids"
-	choices "github.com/ava-labs/avalanchego/snow/choices"
 	block "github.com/ava-labs/avalanchego/vms/proposervm/block"
 	gomock "go.uber.org/mock/gomock"
 )
@@ -84,13 +83,12 @@ func (mr *MockStateMockRecorder) DeleteLastAccepted() *gomock.Call {
 }
 
 // GetBlock mocks base method.
-func (m *MockState) GetBlock(arg0 ids.ID) (block.Block, choices.Status, error) {
+func (m *MockState) GetBlock(arg0 ids.ID) (block.Block, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetBlock", arg0)
 	ret0, _ := ret[0].(block.Block)
-	ret1, _ := ret[1].(choices.Status)
-	ret2, _ := ret[2].(error)
-	return ret0, ret1, ret2
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // GetBlock indicates an expected call of GetBlock.
@@ -160,17 +158,17 @@ func (mr *MockStateMockRecorder) GetMinimumHeight() *gomock.Call {
 }
 
 // PutBlock mocks base method.
-func (m *MockState) PutBlock(arg0 block.Block, arg1 choices.Status) error {
+func (m *MockState) PutBlock(arg0 block.Block) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "PutBlock", arg0, arg1)
+	ret := m.ctrl.Call(m, "PutBlock", arg0)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // PutBlock indicates an expected call of PutBlock.
-func (mr *MockStateMockRecorder) PutBlock(arg0, arg1 any) *gomock.Call {
+func (mr *MockStateMockRecorder) PutBlock(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutBlock", reflect.TypeOf((*MockState)(nil).PutBlock), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutBlock", reflect.TypeOf((*MockState)(nil).PutBlock), arg0)
 }
 
 // SetBlockIDAtHeight mocks base method.

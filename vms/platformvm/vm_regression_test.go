@@ -22,7 +22,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
@@ -713,11 +712,6 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	err = importBlk.Verify(context.Background())
 	require.ErrorIs(err, database.ErrNotFound)
 
-	// Because we no longer ever reject a block in verification, the status
-	// should remain as processing.
-	importBlkStatus := importBlk.Status()
-	require.Equal(choices.Processing, importBlkStatus)
-
 	// Populate the shared memory UTXO.
 	m := atomic.NewMemory(prefixdb.New([]byte{5}, baseDB))
 
@@ -744,10 +738,6 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	// Because the shared memory UTXO has now been populated, the block should
 	// pass verification.
 	require.NoError(importBlk.Verify(context.Background()))
-
-	// The status shouldn't have been changed during a successful verification.
-	importBlkStatus = importBlk.Status()
-	require.Equal(choices.Processing, importBlkStatus)
 
 	// Move chain time ahead to bring the new validator from the pending
 	// validator set into the current validator set.
@@ -777,9 +767,6 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	}
 	for _, blk := range allBlocks {
 		require.NoError(blk.Accept(context.Background()))
-
-		status := blk.Status()
-		require.Equal(choices.Accepted, status)
 	}
 
 	// Force a reload of the state from the database.
@@ -961,11 +948,6 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	err = importBlk.Verify(context.Background())
 	require.ErrorIs(err, database.ErrNotFound)
 
-	// Because we no longer ever reject a block in verification, the status
-	// should remain as processing.
-	importBlkStatus := importBlk.Status()
-	require.Equal(choices.Processing, importBlkStatus)
-
 	// Populate the shared memory UTXO.
 	m := atomic.NewMemory(prefixdb.New([]byte{5}, baseDB))
 
@@ -992,10 +974,6 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	// Because the shared memory UTXO has now been populated, the block should
 	// pass verification.
 	require.NoError(importBlk.Verify(context.Background()))
-
-	// The status shouldn't have been changed during a successful verification.
-	importBlkStatus = importBlk.Status()
-	require.Equal(choices.Processing, importBlkStatus)
 
 	newValidatorStartTime1 := newValidatorStartTime0.Add(executor.SyncBound).Add(1 * time.Second)
 	newValidatorEndTime1 := newValidatorStartTime1.Add(defaultMaxStakingDuration)
@@ -1092,9 +1070,6 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	}
 	for _, blk := range allBlocks {
 		require.NoError(blk.Accept(context.Background()))
-
-		status := blk.Status()
-		require.Equal(choices.Accepted, status)
 	}
 
 	// Force a reload of the state from the database.
