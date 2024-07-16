@@ -17,7 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
@@ -43,18 +42,18 @@ var (
 
 	// last accepted blocks data before and after summary is accepted
 	preSummaryBlk = &snowmantest.Block{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.ID{'f', 'i', 'r', 's', 't', 'B', 'l', 'K'},
-			StatusV: choices.Accepted,
+		Decidable: snowtest.Decidable{
+			IDV:    ids.ID{'f', 'i', 'r', 's', 't', 'B', 'l', 'K'},
+			Status: snowtest.Accepted,
 		},
 		HeightV: preSummaryHeight,
 		ParentV: ids.ID{'p', 'a', 'r', 'e', 'n', 't', 'B', 'l', 'k'},
 	}
 
 	summaryBlk = &snowmantest.Block{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.ID{'s', 'u', 'm', 'm', 'a', 'r', 'y', 'B', 'l', 'K'},
-			StatusV: choices.Accepted,
+		Decidable: snowtest.Decidable{
+			IDV:    ids.ID{'s', 'u', 'm', 'm', 'a', 'r', 'y', 'B', 'l', 'K'},
+			Status: snowtest.Accepted,
 		},
 		HeightV: SummaryHeight,
 		ParentV: ids.ID{'p', 'a', 'r', 'e', 'n', 't', 'B', 'l', 'k'},

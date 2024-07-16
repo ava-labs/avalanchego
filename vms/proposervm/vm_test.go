@@ -21,7 +21,6 @@ import (
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -32,7 +31,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
-	"github.com/ava-labs/avalanchego/vms/proposervm/state"
 
 	statelessblock "github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
@@ -103,9 +101,9 @@ func initTestProposerVM(
 	) error {
 		return nil
 	}
-	coreVM.LastAcceptedF = func(context.Context) (ids.ID, error) {
-		return snowmantest.GenesisID, nil
-	}
+	coreVM.LastAcceptedF = snowmantest.MakeLastAcceptedBlockF(
+		[]*snowmantest.Block{snowmantest.Genesis},
+	)
 	coreVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case snowmantest.GenesisID:
@@ -501,7 +499,6 @@ func TestCoreBlockFailureCauseProposerBlockParseFailure(t *testing.T) {
 		postForkCommonComponents: postForkCommonComponents{
 			vm:       proVM,
 			innerBlk: innerBlk,
-			status:   choices.Processing,
 		},
 	}
 
@@ -551,7 +548,6 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 		postForkCommonComponents: postForkCommonComponents{
 			vm:       proVM,
 			innerBlk: innerBlk,
-			status:   choices.Processing,
 		},
 	}
 
@@ -575,7 +571,6 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 		postForkCommonComponents: postForkCommonComponents{
 			vm:       proVM,
 			innerBlk: innerBlk,
-			status:   choices.Processing,
 		},
 	}
 
@@ -646,7 +641,6 @@ func TestTwoProBlocksWithSameParentCanBothVerify(t *testing.T) {
 		postForkCommonComponents: postForkCommonComponents{
 			vm:       proVM,
 			innerBlk: netcoreBlk,
-			status:   choices.Processing,
 		},
 	}
 
@@ -800,9 +794,9 @@ func TestExpiredBuildBlock(t *testing.T) {
 	coreVM := &block.TestVM{}
 	coreVM.T = t
 
-	coreVM.LastAcceptedF = func(context.Context) (ids.ID, error) {
-		return snowmantest.GenesisID, nil
-	}
+	coreVM.LastAcceptedF = snowmantest.MakeLastAcceptedBlockF(
+		[]*snowmantest.Block{snowmantest.Genesis},
+	)
 	coreVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case snowmantest.GenesisID:
@@ -1083,60 +1077,61 @@ func TestInnerVMRollback(t *testing.T) {
 
 	valState := &validators.TestState{
 		T: t,
+		GetCurrentHeightF: func(context.Context) (uint64, error) {
+			return defaultPChainHeight, nil
+		},
+		GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+			nodeID := ids.BuildTestNodeID([]byte{1})
+			return map[ids.NodeID]*validators.GetValidatorOutput{
+				nodeID: {
+					NodeID: nodeID,
+					Weight: 100,
+				},
+			}, nil
+		},
 	}
-	valState.GetCurrentHeightF = func(context.Context) (uint64, error) {
-		return defaultPChainHeight, nil
-	}
-	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
-		nodeID := ids.BuildTestNodeID([]byte{1})
-		return map[ids.NodeID]*validators.GetValidatorOutput{
-			nodeID: {
-				NodeID: nodeID,
-				Weight: 100,
+
+	coreVM := &block.TestVM{
+		TestVM: common.TestVM{
+			T: t,
+			InitializeF: func(
+				context.Context,
+				*snow.Context,
+				database.Database,
+				[]byte,
+				[]byte,
+				[]byte,
+				chan<- common.Message,
+				[]*common.Fx,
+				common.AppSender,
+			) error {
+				return nil
 			},
-		}, nil
-	}
-
-	coreVM := &block.TestVM{}
-	coreVM.T = t
-
-	coreVM.LastAcceptedF = func(context.Context) (ids.ID, error) {
-		return snowmantest.GenesisID, nil
-	}
-	coreVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
-		switch blkID {
-		case snowmantest.GenesisID:
-			return snowmantest.Genesis, nil
-		default:
-			return nil, errUnknownBlock
-		}
-	}
-	coreVM.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
-		switch {
-		case bytes.Equal(b, snowmantest.GenesisBytes):
-			return snowmantest.Genesis, nil
-		default:
-			return nil, errUnknownBlock
-		}
+		},
+		ParseBlockF: func(_ context.Context, b []byte) (snowman.Block, error) {
+			switch {
+			case bytes.Equal(b, snowmantest.GenesisBytes):
+				return snowmantest.Genesis, nil
+			default:
+				return nil, errUnknownBlock
+			}
+		},
+		GetBlockF: func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
+			switch blkID {
+			case snowmantest.GenesisID:
+				return snowmantest.Genesis, nil
+			default:
+				return nil, errUnknownBlock
+			}
+		},
+		LastAcceptedF: snowmantest.MakeLastAcceptedBlockF(
+			[]*snowmantest.Block{snowmantest.Genesis},
+		),
 	}
 
 	ctx := snowtest.Context(t, snowtest.CChainID)
 	ctx.NodeID = ids.NodeIDFromCert(pTestCert)
 	ctx.ValidatorState = valState
-
-	coreVM.InitializeF = func(
-		context.Context,
-		*snow.Context,
-		database.Database,
-		[]byte,
-		[]byte,
-		[]byte,
-		chan<- common.Message,
-		[]*common.Fx,
-		common.AppSender,
-	) error {
-		return nil
-	}
 
 	db := memdb.New()
 
@@ -1202,23 +1197,24 @@ func TestInnerVMRollback(t *testing.T) {
 
 	proVM.Clock.Set(statelessBlock.Timestamp())
 
+	lastAcceptedID, err := proVM.LastAccepted(context.Background())
+	require.NoError(err)
+	require.Equal(snowmantest.GenesisID, lastAcceptedID)
+
 	parsedBlock, err := proVM.ParseBlock(context.Background(), statelessBlock.Bytes())
 	require.NoError(err)
-
-	require.Equal(choices.Processing, parsedBlock.Status())
 
 	require.NoError(parsedBlock.Verify(context.Background()))
 	require.NoError(proVM.SetPreference(context.Background(), parsedBlock.ID()))
 	require.NoError(parsedBlock.Accept(context.Background()))
 
-	fetchedBlock, err := proVM.GetBlock(context.Background(), parsedBlock.ID())
+	lastAcceptedID, err = proVM.LastAccepted(context.Background())
 	require.NoError(err)
-
-	require.Equal(choices.Accepted, fetchedBlock.Status())
+	require.Equal(parsedBlock.ID(), lastAcceptedID)
 
 	// Restart the node and have the inner VM rollback state.
 	require.NoError(proVM.Shutdown(context.Background()))
-	coreBlk.StatusV = choices.Processing
+	coreBlk.Status = snowtest.Undecided
 
 	proVM = New(
 		coreVM,
@@ -1249,15 +1245,9 @@ func TestInnerVMRollback(t *testing.T) {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
 
-	lastAcceptedID, err := proVM.LastAccepted(context.Background())
+	lastAcceptedID, err = proVM.LastAccepted(context.Background())
 	require.NoError(err)
-
 	require.Equal(snowmantest.GenesisID, lastAcceptedID)
-
-	parsedBlock, err = proVM.ParseBlock(context.Background(), statelessBlock.Bytes())
-	require.NoError(err)
-
-	require.Equal(choices.Processing, parsedBlock.Status())
 }
 
 func TestBuildBlockDuringWindow(t *testing.T) {
@@ -1390,7 +1380,6 @@ func TestTwoForks_OneIsAccepted(t *testing.T) {
 		postForkCommonComponents: postForkCommonComponents{
 			vm:       proVM,
 			innerBlk: yBlock,
-			status:   choices.Processing,
 		},
 	}
 
@@ -1414,14 +1403,14 @@ func TestTwoForks_OneIsAccepted(t *testing.T) {
 	require.Equal(yBlock.ID(), zBlock.Parent())
 	require.Equal(bBlock.ID(), cBlock.Parent())
 
-	require.NotEqual(choices.Rejected, yBlock.Status())
+	require.NotEqual(snowtest.Rejected, yBlock.Status)
 
 	// accept A
 	require.NoError(aBlock.Accept(context.Background()))
 
-	require.Equal(choices.Accepted, xBlock.Status())
-	require.Equal(choices.Rejected, yBlock.Status())
-	require.Equal(choices.Rejected, zBlock.Status())
+	require.Equal(snowtest.Accepted, xBlock.Status)
+	require.Equal(snowtest.Rejected, yBlock.Status)
+	require.Equal(snowtest.Rejected, zBlock.Status)
 }
 
 func TestTooFarAdvanced(t *testing.T) {
@@ -1460,7 +1449,6 @@ func TestTooFarAdvanced(t *testing.T) {
 		postForkCommonComponents: postForkCommonComponents{
 			vm:       proVM,
 			innerBlk: yBlock,
-			status:   choices.Processing,
 		},
 	}
 
@@ -1482,7 +1470,6 @@ func TestTooFarAdvanced(t *testing.T) {
 		postForkCommonComponents: postForkCommonComponents{
 			vm:       proVM,
 			innerBlk: yBlock,
-			status:   choices.Processing,
 		},
 	}
 
@@ -1493,14 +1480,14 @@ func TestTooFarAdvanced(t *testing.T) {
 // Ensure that Accepting a PostForkOption (B) causes both the other option and
 // the core block in the other option to be rejected.
 //
-//	   G
-//	   |
-//	  A(X)
-//	 /====\
-//	B(...) C(...)
+//	    G
+//	    |
+//	   A(X)
+//	  /    \
+//	B(Y)   C(Z)
 //
-// B(...) is B(X.opts[0])
-// B(...) is C(X.opts[1])
+// Y is X.opts[0]
+// Z is X.opts[1]
 func TestTwoOptions_OneIsAccepted(t *testing.T) {
 	require := require.New(t)
 
@@ -1516,7 +1503,7 @@ func TestTwoOptions_OneIsAccepted(t *testing.T) {
 	xTestBlock := snowmantest.BuildChild(snowmantest.Genesis)
 	xBlock := &TestOptionsBlock{
 		Block: *xTestBlock,
-		opts: [2]snowman.Block{
+		opts: [2]*snowmantest.Block{
 			snowmantest.BuildChild(xTestBlock),
 			snowmantest.BuildChild(xTestBlock),
 		},
@@ -1527,30 +1514,24 @@ func TestTwoOptions_OneIsAccepted(t *testing.T) {
 	}
 	aBlockIntf, err := proVM.BuildBlock(context.Background())
 	require.NoError(err)
-
 	require.IsType(&postForkBlock{}, aBlockIntf)
 	aBlock := aBlockIntf.(*postForkBlock)
 
 	opts, err := aBlock.Options(context.Background())
 	require.NoError(err)
 
-	require.NoError(aBlock.Verify(context.Background()))
 	bBlock := opts[0]
-	require.NoError(bBlock.Verify(context.Background()))
 	cBlock := opts[1]
+
+	require.NoError(aBlock.Verify(context.Background()))
+	require.NoError(bBlock.Verify(context.Background()))
 	require.NoError(cBlock.Verify(context.Background()))
 
 	require.NoError(aBlock.Accept(context.Background()))
-
 	require.NoError(bBlock.Accept(context.Background()))
 
 	// the other pre-fork option should be rejected
-	require.Equal(choices.Rejected, xBlock.opts[1].Status())
-
-	// the other post-fork option should also be rejected
-	require.NoError(cBlock.Reject(context.Background()))
-
-	require.Equal(choices.Rejected, cBlock.Status())
+	require.Equal(snowtest.Rejected, xBlock.opts[1].Status)
 }
 
 // Ensure that given the chance, built blocks will reference a lagged P-chain
@@ -1607,9 +1588,9 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 	) error {
 		return nil
 	}
-	coreVM.LastAcceptedF = func(context.Context) (ids.ID, error) {
-		return snowmantest.GenesisID, nil
-	}
+	coreVM.LastAcceptedF = snowmantest.MakeLastAcceptedBlockF(
+		[]*snowmantest.Block{snowmantest.Genesis},
+	)
 	coreVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case snowmantest.GenesisID:
@@ -1732,7 +1713,6 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 		postForkCommonComponents: postForkCommonComponents{
 			vm:       proVM,
 			innerBlk: yBlock,
-			status:   choices.Processing,
 		},
 	}
 
@@ -1780,9 +1760,9 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 	) error {
 		return nil
 	}
-	coreVM.LastAcceptedF = func(context.Context) (ids.ID, error) {
-		return snowmantest.GenesisID, nil
-	}
+	coreVM.LastAcceptedF = snowmantest.MakeLastAcceptedBlockF(
+		[]*snowmantest.Block{snowmantest.Genesis},
+	)
 	coreVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case snowmantest.GenesisID:
@@ -1879,7 +1859,7 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 	xTestBlock := snowmantest.BuildChild(snowmantest.Genesis)
 	xBlock := &TestOptionsBlock{
 		Block: *xTestBlock,
-		opts: [2]snowman.Block{
+		opts: [2]*snowmantest.Block{
 			snowmantest.BuildChild(xTestBlock),
 			snowmantest.BuildChild(xTestBlock),
 		},
@@ -1987,9 +1967,6 @@ func TestVMInnerBlkCache(t *testing.T) {
 		require.NoError(vm.Shutdown(context.Background()))
 	}()
 
-	state := state.NewMockState(ctrl) // mock state
-	vm.State = state
-
 	// Create a block near the tip (0).
 	blkNearTipInnerBytes := []byte{1}
 	blkNearTip, err := statelessblock.Build(
@@ -2008,9 +1985,6 @@ func TestVMInnerBlkCache(t *testing.T) {
 	)
 	require.NoError(err)
 
-	// Parse a block.
-	// Not in the VM's state so need to parse it.
-	state.EXPECT().GetBlock(blkNearTip.ID()).Return(blkNearTip, choices.Accepted, nil).Times(2)
 	// We will ask the inner VM to parse.
 	mockInnerBlkNearTip := snowmantest.NewMockBlock(ctrl)
 	mockInnerBlkNearTip.EXPECT().Height().Return(uint64(1)).Times(2)
@@ -2040,102 +2014,6 @@ func TestVMInnerBlkCache(t *testing.T) {
 
 	_, ok = vm.innerBlkCache.Get(blkNearTip.ID())
 	require.False(ok)
-}
-
-func TestVMInnerBlkCacheDeduplicationRegression(t *testing.T) {
-	require := require.New(t)
-	var (
-		activationTime = time.Unix(0, 0)
-		durangoTime    = activationTime
-	)
-	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
-	defer func() {
-		require.NoError(proVM.Shutdown(context.Background()))
-	}()
-
-	// create pre-fork block X and post-fork block A
-	xBlock := snowmantest.BuildChild(snowmantest.Genesis)
-
-	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
-		return xBlock, nil
-	}
-	aBlock, err := proVM.BuildBlock(context.Background())
-	require.NoError(err)
-	coreVM.BuildBlockF = nil
-
-	bStatelessBlock, err := statelessblock.BuildUnsigned(
-		snowmantest.GenesisID,
-		snowmantest.GenesisTimestamp,
-		defaultPChainHeight,
-		xBlock.Bytes(),
-		[]byte{}, // parentBlockSig
-	)
-	require.NoError(err)
-
-	xBlockCopy := *xBlock
-	coreVM.ParseBlockF = func(context.Context, []byte) (snowman.Block, error) {
-		return &xBlockCopy, nil
-	}
-
-	bBlockBytes := bStatelessBlock.Bytes()
-	bBlock, err := proVM.ParseBlock(context.Background(), bBlockBytes)
-	require.NoError(err)
-
-	require.NoError(aBlock.Verify(context.Background()))
-	require.NoError(bBlock.Verify(context.Background()))
-	require.NoError(aBlock.Accept(context.Background()))
-	require.NoError(bBlock.Reject(context.Background()))
-
-	require.Equal(
-		choices.Accepted,
-		aBlock.(*postForkBlock).innerBlk.Status(),
-	)
-
-	require.Equal(
-		choices.Accepted,
-		bBlock.(*postForkBlock).innerBlk.Status(),
-	)
-
-	cachedXBlock, ok := proVM.innerBlkCache.Get(bBlock.ID())
-	require.True(ok)
-	require.Equal(
-		choices.Accepted,
-		cachedXBlock.Status(),
-	)
-}
-
-func TestVMInnerBlkMarkedAcceptedRegression(t *testing.T) {
-	require := require.New(t)
-	var (
-		activationTime = time.Unix(0, 0)
-		durangoTime    = activationTime
-	)
-	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
-	defer func() {
-		require.NoError(proVM.Shutdown(context.Background()))
-	}()
-
-	// create an inner block and wrap it in an postForkBlock.
-	innerBlock := snowmantest.BuildChild(snowmantest.Genesis)
-
-	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
-		return innerBlock, nil
-	}
-	outerBlock, err := proVM.BuildBlock(context.Background())
-	require.NoError(err)
-	coreVM.BuildBlockF = nil
-
-	require.NoError(outerBlock.Verify(context.Background()))
-	require.NoError(outerBlock.Accept(context.Background()))
-
-	coreVM.GetBlockF = func(_ context.Context, id ids.ID) (snowman.Block, error) {
-		require.Equal(innerBlock.ID(), id)
-		return innerBlock, nil
-	}
-
-	wrappedInnerBlock, err := proVM.GetBlock(context.Background(), innerBlock.ID())
-	require.NoError(err)
-	require.Equal(choices.Rejected, wrappedInnerBlock.Status())
 }
 
 type blockWithVerifyContext struct {

@@ -64,7 +64,7 @@ type Manager interface {
 	// If the validator doesn't exist, returns false.
 	GetValidator(subnetID ids.ID, nodeID ids.NodeID) (*Validator, bool)
 
-	// GetValidatoIDs returns the validator IDs in the subnet.
+	// GetValidatorIDs returns the validator IDs in the subnet.
 	GetValidatorIDs(subnetID ids.ID) []ids.NodeID
 
 	// SubsetWeight returns the sum of the weights of the validators in the subnet.

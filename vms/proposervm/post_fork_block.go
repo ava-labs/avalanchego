@@ -7,7 +7,6 @@ import (
 	"context"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
@@ -45,7 +44,6 @@ func (b *postForkBlock) Accept(ctx context.Context) error {
 
 func (b *postForkBlock) acceptOuterBlk() error {
 	// Update in-memory references
-	b.status = choices.Accepted
 	b.vm.lastAcceptedTime = b.Timestamp()
 
 	return b.vm.acceptPostForkBlock(b)
@@ -60,15 +58,7 @@ func (b *postForkBlock) acceptInnerBlk(ctx context.Context) error {
 func (b *postForkBlock) Reject(context.Context) error {
 	// We do not reject the inner block here because it may be accepted later
 	delete(b.vm.verifiedBlocks, b.ID())
-	b.status = choices.Rejected
 	return nil
-}
-
-func (b *postForkBlock) Status() choices.Status {
-	if b.status == choices.Accepted && b.Height() > b.vm.lastAcceptedHeight {
-		return choices.Processing
-	}
-	return b.status
 }
 
 // Return this block's parent, or a *missing.Block if
@@ -118,7 +108,6 @@ func (b *postForkBlock) Options(ctx context.Context) ([2]snowman.Block, error) {
 			postForkCommonComponents: postForkCommonComponents{
 				vm:       b.vm,
 				innerBlk: innerOption,
-				status:   innerOption.Status(),
 			},
 		}
 	}
@@ -211,10 +200,6 @@ func (b *postForkBlock) buildChild(ctx context.Context) (Block, error) {
 
 func (b *postForkBlock) pChainHeight(context.Context) (uint64, error) {
 	return b.PChainHeight(), nil
-}
-
-func (b *postForkBlock) setStatus(status choices.Status) {
-	b.status = status
 }
 
 func (b *postForkBlock) getStatelessBlk() block.Block {
