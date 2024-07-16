@@ -1,11 +1,12 @@
 name: Trigger Antithesis Avalanchego Setup
 
 on:
-  # TODO(marun) Add a schedule to execute regularly
+  schedule:
+    - cron: '0 22 * * *' # Every day at 10PM UTC
   workflow_dispatch:
     inputs:
       duration:
-        description: 'The duration to run the test for'
+        description: 'The duration (in hours) to run the test for'
         default: '0.5'
         required: true
         type: string
@@ -35,4 +36,4 @@ jobs:
           images: antithesis-avalanchego-workload:${{ github.event.inputs.image_tag || 'latest' }};antithesis-avalanchego-node:${{ github.event.inputs.image_tag || 'latest' }}
           email_recipients: ${{ github.event.inputs.recipients || secrets.ANTITHESIS_RECIPIENTS }}
           additional_parameters: |-
-            custom.duration=${{ github.event.inputs.duration || '0.5' }}
+            custom.duration=${{ github.event.inputs.duration || '11.25' }} # Duration is in hours
