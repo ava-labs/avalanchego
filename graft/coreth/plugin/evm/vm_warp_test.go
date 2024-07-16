@@ -13,7 +13,6 @@ import (
 	_ "embed"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
@@ -83,8 +82,6 @@ func TestSendWarpMessage(t *testing.T) {
 	require.NoError(err)
 
 	require.NoError(blk.Verify(context.Background()))
-
-	require.Equal(choices.Processing, blk.Status())
 
 	// Verify that the constructed block contains the expected log with an unsigned warp message in the log data
 	ethBlock1 := blk.(*chain.BlockWrapper).Block.(*Block).ethBlock
@@ -356,7 +353,6 @@ func testWarpVMTransaction(t *testing.T, unsignedMessage *avalancheWarp.Unsigned
 	require.NoError(err)
 	require.True(shouldVerifyWithCtx)
 	require.NoError(warpBlockVerifyWithCtx.VerifyWithContext(context.Background(), blockCtx))
-	require.Equal(choices.Processing, warpBlock.Status())
 	require.NoError(vm.SetPreference(context.Background(), warpBlock.ID()))
 	require.NoError(warpBlock.Accept(context.Background()))
 	vm.blockChain.DrainAcceptorQueue()
@@ -510,14 +506,12 @@ func TestReceiveWarpMessage(t *testing.T) {
 	require.NoError(err)
 	require.True(shouldVerifyWithCtx)
 	require.NoError(block2VerifyWithCtx.VerifyWithContext(context.Background(), validProposerCtx))
-	require.Equal(choices.Processing, block2.Status())
 	require.NoError(vm.SetPreference(context.Background(), block2.ID()))
 
 	// Verify the block with another valid context with identical predicate results
 	require.NoError(block2VerifyWithCtx.VerifyWithContext(context.Background(), &block.Context{
 		PChainHeight: minimumValidPChainHeight + 1,
 	}))
-	require.Equal(choices.Processing, block2.Status())
 
 	// Verify the block in a different context causing the warp message to fail verification changing
 	// the expected header predicate results.

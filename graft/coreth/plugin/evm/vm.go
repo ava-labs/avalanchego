@@ -76,7 +76,6 @@ import (
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
@@ -593,7 +592,15 @@ func (vm *VM) Initialize(
 	for i, hexMsg := range vm.config.WarpOffChainMessages {
 		offchainWarpMessages[i] = []byte(hexMsg)
 	}
-	vm.warpBackend, err = warp.NewBackend(vm.ctx.NetworkID, vm.ctx.ChainID, vm.ctx.WarpSigner, vm, vm.warpDB, warpSignatureCacheSize, offchainWarpMessages)
+	vm.warpBackend, err = warp.NewBackend(
+		vm.ctx.NetworkID,
+		vm.ctx.ChainID,
+		vm.ctx.WarpSigner,
+		vm,
+		vm.warpDB,
+		warpSignatureCacheSize,
+		offchainWarpMessages,
+	)
 	if err != nil {
 		return err
 	}
@@ -772,14 +779,12 @@ func (vm *VM) initChainState(lastAcceptedBlock *types.Block) error {
 	if err != nil {
 		return fmt.Errorf("failed to create block wrapper for the last accepted block: %w", err)
 	}
-	block.status = choices.Accepted
 
 	config := &chain.Config{
 		DecidedCacheSize:      decidedCacheSize,
 		MissingCacheSize:      missingCacheSize,
 		UnverifiedCacheSize:   unverifiedCacheSize,
 		BytesToIDCacheSize:    bytesToIDCacheSize,
-		GetBlockIDAtHeight:    vm.GetBlockIDAtHeight,
 		GetBlock:              vm.getBlock,
 		UnmarshalBlock:        vm.parseBlock,
 		BuildBlock:            vm.buildBlock,
@@ -1378,6 +1383,27 @@ func (vm *VM) getBlock(_ context.Context, id ids.ID) (snowman.Block, error) {
 	return vm.newBlock(ethBlock)
 }
 
+// GetAcceptedBlock attempts to retrieve block [blkID] from the VM. This method
+// only returns accepted blocks.
+func (vm *VM) GetAcceptedBlock(ctx context.Context, blkID ids.ID) (snowman.Block, error) {
+	blk, err := vm.GetBlock(ctx, blkID)
+	if err != nil {
+		return nil, err
+	}
+
+	height := blk.Height()
+	acceptedBlkID, err := vm.GetBlockIDAtHeight(ctx, height)
+	if err != nil {
+		return nil, err
+	}
+
+	if acceptedBlkID != blkID {
+		// The provided block is not accepted.
+		return nil, database.ErrNotFound
+	}
+	return blk, nil
+}
+
 // SetPreference sets what the current tail of the chain is
 func (vm *VM) SetPreference(ctx context.Context, blkID ids.ID) error {
 	// Since each internal handler used by [vm.State] always returns a block
@@ -1508,7 +1534,9 @@ func (vm *VM) CreateStaticHandlers(context.Context) (map[string]http.Handler, er
 // accepted, then nil will be returned immediately.
 // If the ancestry of [ancestor] cannot be fetched, then [errRejectedParent] may be returned.
 func (vm *VM) conflicts(inputs set.Set[ids.ID], ancestor *Block) error {
-	for ancestor.Status() != choices.Accepted {
+	lastAcceptedBlock := vm.LastAcceptedBlock()
+	lastAcceptedHeight := lastAcceptedBlock.Height()
+	for ancestor.Height() > lastAcceptedHeight {
 		// If any of the atomic transactions in the ancestor conflict with [inputs]
 		// return an error.
 		for _, atomicTx := range ancestor.atomicTxs {
@@ -1528,10 +1556,6 @@ func (vm *VM) conflicts(inputs set.Set[ids.ID], ancestor *Block) error {
 		// been verified.
 		nextAncestorIntf, err := vm.GetBlockInternal(context.TODO(), nextAncestorID)
 		if err != nil {
-			return errRejectedParent
-		}
-
-		if blkStatus := nextAncestorIntf.Status(); blkStatus == choices.Unknown || blkStatus == choices.Rejected {
 			return errRejectedParent
 		}
 		nextAncestor, ok := nextAncestorIntf.(*Block)
@@ -1661,9 +1685,6 @@ func (vm *VM) verifyTxs(txs []*Tx, parentHash common.Hash, baseFee *big.Int, hei
 	// into the canonical chain because the parent will be missing.
 	ancestorInf, err := vm.GetBlockInternal(context.TODO(), ancestorID)
 	if err != nil {
-		return errRejectedParent
-	}
-	if blkStatus := ancestorInf.Status(); blkStatus == choices.Unknown || blkStatus == choices.Rejected {
 		return errRejectedParent
 	}
 	ancestor, ok := ancestorInf.(*Block)
