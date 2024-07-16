@@ -711,7 +711,7 @@ func (t *Transitive) issueFromByID(
 	blk, err := t.getBlock(ctx, blkID)
 	if err != nil {
 		t.sendRequest(ctx, nodeID, blkID, issuedMetric)
-		return nil
+		return nil //nolint:nilerr
 	}
 	return t.issueFrom(ctx, nodeID, blk, issuedMetric)
 }
@@ -738,7 +738,7 @@ func (t *Transitive) issueFrom(
 		blk, err = t.getBlock(ctx, blkID)
 		if err != nil {
 			t.sendRequest(ctx, nodeID, blkID, issuedMetric)
-			return nil
+			return nil //nolint:nilerr
 		}
 	}
 
