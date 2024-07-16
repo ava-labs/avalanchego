@@ -100,7 +100,7 @@ func (n *Node) Write() error {
 	}
 
 	if err := n.writeFlags(); err != nil {
-		return nil
+		return err
 	}
 	return n.writeConfig()
 }
