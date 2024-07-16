@@ -282,7 +282,7 @@ func (s *Subnet) HasChainConfig() bool {
 	return false
 }
 
-func waitForActiveValidators(
+func WaitForActiveValidators(
 	ctx context.Context,
 	w io.Writer,
 	pChainClient platformvm.Client,
