@@ -23,6 +23,13 @@ import (
 
 const bootstrapIndex = 0
 
+var (
+	errTargetPathEnvVarNotSet = errors.New("TARGET_PATH environment variable not set")
+	errImageTagEnvVarNotSet   = errors.New("IMAGE_TAG environment variable not set")
+	errAvalancheGoEvVarNotSet = errors.New("AVALANCHEGO_PATH environment variable not set")
+	errPluginDirEnvVarNotSet  = errors.New("AVALANCHEGO_PLUGIN_DIR environment variable not set")
+)
+
 // Creates docker-compose configuration for an antithesis test
 // setup. Configuration is via env vars to simplify usage by main entrypoints. If
 // the provided network includes a subnet, the initial DB state for the subnet
@@ -30,24 +37,24 @@ const bootstrapIndex = 0
 func GenerateComposeConfig(network *tmpnet.Network, baseImageName string) error {
 	targetPath := os.Getenv("TARGET_PATH")
 	if len(targetPath) == 0 {
-		return errors.New("TARGET_PATH environment variable not set")
+		return errTargetPathEnvVarNotSet
 	}
 
 	imageTag := os.Getenv("IMAGE_TAG")
 	if len(imageTag) == 0 {
-		return errors.New("IMAGE_TAG environment variable not set")
+		return errImageTagEnvVarNotSet
 	}
 
 	// Subnet testing requires creating an initial db state for the bootstrap node
 	if len(network.Subnets) > 0 {
 		avalancheGoPath := os.Getenv("AVALANCHEGO_PATH")
 		if len(avalancheGoPath) == 0 {
-			return errors.New("AVALANCHEGO_PATH environment variable not set")
+			return errAvalancheGoEvVarNotSet
 		}
 
 		pluginDir := os.Getenv("AVALANCHEGO_PLUGIN_DIR")
 		if len(pluginDir) == 0 {
-			return errors.New("AVALANCHEGO_PLUGIN_DIR environment variable not set")
+			return errPluginDirEnvVarNotSet
 		}
 
 		bootstrapVolumePath, err := getBootstrapVolumePath(targetPath)
