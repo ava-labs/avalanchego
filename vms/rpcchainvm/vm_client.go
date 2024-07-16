@@ -399,7 +399,8 @@ func (vm *VMClient) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
 // method will be called instead.
 func (vm *VMClient) buildBlockWithContext(ctx context.Context, blockCtx *block.Context) (snowman.Block, error) {
 	resp, err := vm.client.BuildBlock(ctx, &vmpb.BuildBlockRequest{
-		PChainHeight: &blockCtx.PChainHeight,
+		PChainHeight:   &blockCtx.PChainHeight,
+		RandomnessSeed: blockCtx.RandomnessSeed[:],
 	})
 	if err != nil {
 		return nil, err

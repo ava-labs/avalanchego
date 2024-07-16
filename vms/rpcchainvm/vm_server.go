@@ -31,6 +31,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators/gvalidators"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
@@ -387,9 +388,19 @@ func (vm *VMServer) BuildBlock(ctx context.Context, req *vmpb.BuildBlockRequest)
 	if vm.bVM == nil || req.PChainHeight == nil {
 		blk, err = vm.vm.BuildBlock(ctx)
 	} else {
-		blk, err = vm.bVM.BuildBlockWithContext(ctx, &block.Context{
+		blkContext := &block.Context{
 			PChainHeight: *req.PChainHeight,
-		})
+		}
+		switch len(req.RandomnessSeed) {
+		case 0:
+			blkContext.RandomnessSeed = [hashing.HashLen]byte{}
+		case hashing.HashLen:
+			blkContext.RandomnessSeed = [hashing.HashLen]byte(req.RandomnessSeed)
+		default:
+			// invalid input.
+			return nil, errors.New("build block request contained invalid randomness seed length")
+		}
+		blk, err = vm.bVM.BuildBlockWithContext(ctx, blkContext)
 	}
 	if err != nil {
 		return nil, err

@@ -158,6 +158,7 @@ message Handler {
 
 message BuildBlockRequest {
   optional uint64 p_chain_height = 1;
+  optional bytes randomness_seed = 2;
 }
 
 // Note: The status of a freshly built block is assumed to be Processing.
