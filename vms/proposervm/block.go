@@ -170,8 +170,8 @@ func (p *postForkCommonComponents) Verify(
 	return p.vm.verifyAndRecordInnerBlk(
 		ctx,
 		&smblock.Context{
-			PChainHeight: parentPChainHeight,
-			// todo : use block.CalculateVRFOut(child.VRFOut())
+			PChainHeight:   parentPChainHeight,
+			RandomnessSeed: block.CalculateVRFOut(child.VRFSig()),
 		},
 		child,
 	)
@@ -240,8 +240,8 @@ func (p *postForkCommonComponents) buildChild(
 	var innerBlock snowman.Block
 	if p.vm.blockBuilderVM != nil {
 		innerBlock, err = p.vm.blockBuilderVM.BuildBlockWithContext(ctx, &smblock.Context{
-			PChainHeight: parentPChainHeight,
-			// todo : add block.CalculateVRFOut(childBlockVrfSig)
+			PChainHeight:   parentPChainHeight,
+			RandomnessSeed: block.CalculateVRFOut(childBlockVrfSig),
 		})
 	} else {
 		innerBlock, err = p.vm.ChainVM.BuildBlock(ctx)

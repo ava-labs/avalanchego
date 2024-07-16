@@ -48,7 +48,7 @@ func BuildUnsigned(
 	return block, block.initialize(bytes)
 }
 
-func CalculateVRFOut(vrfSig []byte) []byte {
+func CalculateVRFOut(vrfSig []byte) [32]byte {
 	// build the hash of the following struct:
 	// +-------------------------+----------+------------+
 	// |  prefix :               | [8]byte  | "rng-derv" |
@@ -56,14 +56,13 @@ func CalculateVRFOut(vrfSig []byte) []byte {
 	// |  vrfSig :               | [96]byte |  96 bytes  |
 	// +-------------------------+----------+------------+
 	if len(vrfSig) != bls.SignatureLen {
-		return nil
+		return [32]byte{0}
 	}
 
 	buffer := make([]byte, len(vrfOutPrefix)+bls.SignatureLen)
 	copy(buffer, vrfOutPrefix)
 	copy(buffer[len(vrfOutPrefix):], vrfSig)
-	outHash := hashing.ComputeHash256Array(buffer)
-	return outHash[:]
+	return hashing.ComputeHash256Array(buffer)
 }
 
 func initializeID(bytes []byte, signature []byte) (ids.ID, error) {
