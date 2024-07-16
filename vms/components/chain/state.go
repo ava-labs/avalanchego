@@ -224,7 +224,7 @@ func (s *State) GetBlock(ctx context.Context, blkID ids.ID) (snowman.Block, erro
 
 	// Since this block is not in consensus, addBlockOutsideConsensus
 	// is called to add [blk] to the correct cache.
-	return s.addBlockOutsideConsensus(blk)
+	return s.addBlockOutsideConsensus(blk), nil
 }
 
 // getCachedBlock checks the caches for [blkID] by priority. Returning
@@ -290,7 +290,7 @@ func (s *State) ParseBlock(ctx context.Context, b []byte) (snowman.Block, error)
 
 	// Since this block is not in consensus, addBlockOutsideConsensus
 	// is called to add [blk] to the correct cache.
-	return s.addBlockOutsideConsensus(blk)
+	return s.addBlockOutsideConsensus(blk), nil
 }
 
 // BatchedParseBlock implements part of the block.BatchedChainVM interface. In
@@ -365,11 +365,7 @@ func (s *State) BatchedParseBlock(ctx context.Context, blksBytes [][]byte) ([]sn
 		}
 
 		s.missingBlocks.Evict(blkID)
-		wrappedBlk, err := s.addBlockOutsideConsensus(blk)
-		if err != nil {
-			return nil, err
-		}
-		blks[i] = wrappedBlk
+		blks[i] = s.addBlockOutsideConsensus(blk)
 	}
 	return blks, nil
 }
@@ -387,7 +383,7 @@ func (s *State) BuildBlockWithContext(ctx context.Context, blockCtx *block.Conte
 		return nil, err
 	}
 
-	return s.deduplicate(blk)
+	return s.deduplicate(blk), nil
 }
 
 // BuildBlock attempts to build a new internal Block, wraps it, and adds it
@@ -398,15 +394,15 @@ func (s *State) BuildBlock(ctx context.Context) (snowman.Block, error) {
 		return nil, err
 	}
 
-	return s.deduplicate(blk)
+	return s.deduplicate(blk), nil
 }
 
-func (s *State) deduplicate(blk snowman.Block) (snowman.Block, error) {
+func (s *State) deduplicate(blk snowman.Block) snowman.Block {
 	blkID := blk.ID()
 	// Defensive: buildBlock should not return a block that has already been verified.
 	// If it does, make sure to return the existing reference to the block.
 	if existingBlk, ok := s.getCachedBlock(blkID); ok {
-		return existingBlk, nil
+		return existingBlk
 	}
 	// Evict the produced block from missing blocks in case it was previously
 	// marked as missing.
@@ -421,7 +417,7 @@ func (s *State) deduplicate(blk snowman.Block) (snowman.Block, error) {
 // assumes [blk] is a known, non-wrapped block that is not currently
 // in consensus. [blk] could be either decided or a block that has not yet
 // been verified and added to consensus.
-func (s *State) addBlockOutsideConsensus(blk snowman.Block) (snowman.Block, error) {
+func (s *State) addBlockOutsideConsensus(blk snowman.Block) snowman.Block {
 	wrappedBlk := &BlockWrapper{
 		Block: blk,
 		state: s,
@@ -434,7 +430,7 @@ func (s *State) addBlockOutsideConsensus(blk snowman.Block) (snowman.Block, erro
 		s.unverifiedBlocks.Put(blkID, wrappedBlk)
 	}
 
-	return wrappedBlk, nil
+	return wrappedBlk
 }
 
 func (s *State) LastAccepted(context.Context) (ids.ID, error) {
