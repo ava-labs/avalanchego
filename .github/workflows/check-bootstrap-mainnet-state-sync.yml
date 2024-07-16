@@ -8,7 +8,7 @@ jobs:
   check_bootstrap_mainnet_state_sync:
     name: Check Bootstrap (mainnet,state-sync)
     runs-on: avalanche-avalanchego
-    timeout-minutes: 4320 # 3 days
+    timeout-minutes: 7200 # 5 days, maximum allowed for jobs running on a self-hosted runner
     steps:
     - name: Checkout Repository
       uses: actions/checkout@v4
