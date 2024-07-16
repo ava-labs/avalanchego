@@ -12,9 +12,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
-	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/vms/avm/block"
 	"github.com/ava-labs/avalanchego/vms/avm/state"
@@ -38,8 +36,7 @@ var (
 // Exported for testing in avm package.
 type Block struct {
 	block.Block
-	manager  *manager
-	rejected bool
+	manager *manager
 }
 
 func (b *Block) Verify(context.Context) error {
@@ -293,51 +290,5 @@ func (b *Block) Reject(context.Context) error {
 	// If we added transactions to the mempool, we should be willing to build a
 	// block.
 	b.manager.mempool.RequestBuildBlock()
-
-	b.rejected = true
 	return nil
-}
-
-func (b *Block) Status() choices.Status {
-	// If this block's reference was rejected, we should report it as rejected.
-	//
-	// We don't persist the rejection, but that's fine. The consensus engine
-	// will hold the same reference to the block until it no longer needs it.
-	// After the consensus engine has released the reference to the block that
-	// was verified, it may get a new reference that isn't marked as rejected.
-	// The consensus engine may then try to issue the block, but will discover
-	// that it was rejected due to a conflicting block having been accepted.
-	if b.rejected {
-		return choices.Rejected
-	}
-
-	blkID := b.ID()
-	// If this block is the last accepted block, we don't need to go to disk to
-	// check the status.
-	if b.manager.lastAccepted == blkID {
-		return choices.Accepted
-	}
-	// Check if the block is in memory. If so, it's processing.
-	if _, ok := b.manager.blkIDToState[blkID]; ok {
-		return choices.Processing
-	}
-	// Block isn't in memory. Check in the database.
-	_, err := b.manager.state.GetBlock(blkID)
-	switch err {
-	case nil:
-		return choices.Accepted
-
-	case database.ErrNotFound:
-		// choices.Unknown means we don't have the bytes of the block.
-		// In this case, we do, so we return choices.Processing.
-		return choices.Processing
-
-	default:
-		// TODO: correctly report this error to the consensus engine.
-		b.manager.backend.Ctx.Log.Error(
-			"dropping unhandled database error",
-			zap.Error(err),
-		)
-		return choices.Processing
-	}
 }

@@ -100,7 +100,7 @@ func (n *Node) Write() error {
 	}
 
 	if err := n.writeFlags(); err != nil {
-		return fmt.Errorf("failed to write flags: %w", err)
+		return err
 	}
 	return n.writeConfig()
 }

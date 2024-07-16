@@ -9,6 +9,8 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 )
 
 func NextBlockTime(state Chain, clk *mockable.Clock) (time.Time, bool, error) {
@@ -67,4 +69,13 @@ func GetNextStakerChangeTime(state Chain) (time.Time, error) {
 	default:
 		return time.Time{}, database.ErrNotFound
 	}
+}
+
+// PickFeeCalculator creates either a static or a dynamic fee calculator,
+// depending on the active upgrade.
+//
+// PickFeeCalculator does not modify [state].
+func PickFeeCalculator(cfg *config.Config, state Chain) (fee.Calculator, error) {
+	timestamp := state.GetTimestamp()
+	return fee.NewStaticCalculator(cfg.StaticFeeConfig, cfg.UpgradeConfig, timestamp), nil
 }

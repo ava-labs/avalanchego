@@ -25,7 +25,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/ids/galiasreader"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/appsender"
@@ -232,7 +231,6 @@ func (vm *VMClient) Initialize(
 		vm:       vm,
 		id:       id,
 		parentID: parentID,
-		status:   choices.Accepted,
 		bytes:    resp.Bytes,
 		height:   resp.Height,
 		time:     time,
@@ -335,7 +333,6 @@ func (vm *VMClient) SetState(ctx context.Context, state snow.State) error {
 		vm:       vm,
 		id:       id,
 		parentID: parentID,
-		status:   choices.Accepted,
 		bytes:    resp.Bytes,
 		height:   resp.Height,
 		time:     time,
@@ -433,11 +430,6 @@ func (vm *VMClient) parseBlock(ctx context.Context, bytes []byte) (snowman.Block
 		return nil, err
 	}
 
-	status := choices.Status(resp.Status)
-	if err := status.Valid(); err != nil {
-		return nil, err
-	}
-
 	time, err := grpcutils.TimestampAsTime(resp.Timestamp)
 	if err != nil {
 		return nil, err
@@ -446,7 +438,6 @@ func (vm *VMClient) parseBlock(ctx context.Context, bytes []byte) (snowman.Block
 		vm:                  vm,
 		id:                  id,
 		parentID:            parentID,
-		status:              status,
 		bytes:               bytes,
 		height:              resp.Height,
 		time:                time,
@@ -470,17 +461,11 @@ func (vm *VMClient) getBlock(ctx context.Context, blkID ids.ID) (snowman.Block, 
 		return nil, err
 	}
 
-	status := choices.Status(resp.Status)
-	if err := status.Valid(); err != nil {
-		return nil, err
-	}
-
 	time, err := grpcutils.TimestampAsTime(resp.Timestamp)
 	return &blockClient{
 		vm:                  vm,
 		id:                  blkID,
 		parentID:            parentID,
-		status:              status,
 		bytes:               resp.Bytes,
 		height:              resp.Height,
 		time:                time,
@@ -649,11 +634,6 @@ func (vm *VMClient) batchedParseBlock(ctx context.Context, blksBytes [][]byte) (
 			return nil, err
 		}
 
-		status := choices.Status(blkResp.Status)
-		if err := status.Valid(); err != nil {
-			return nil, err
-		}
-
 		time, err := grpcutils.TimestampAsTime(blkResp.Timestamp)
 		if err != nil {
 			return nil, err
@@ -663,7 +643,6 @@ func (vm *VMClient) batchedParseBlock(ctx context.Context, blksBytes [][]byte) (
 			vm:                  vm,
 			id:                  id,
 			parentID:            parentID,
-			status:              status,
 			bytes:               blksBytes[idx],
 			height:              blkResp.Height,
 			time:                time,
@@ -798,7 +777,6 @@ func (vm *VMClient) newBlockFromBuildBlock(resp *vmpb.BuildBlockResponse) (*bloc
 		vm:                  vm,
 		id:                  id,
 		parentID:            parentID,
-		status:              choices.Processing,
 		bytes:               resp.Bytes,
 		height:              resp.Height,
 		time:                time,
@@ -811,7 +789,6 @@ type blockClient struct {
 
 	id                  ids.ID
 	parentID            ids.ID
-	status              choices.Status
 	bytes               []byte
 	height              uint64
 	time                time.Time
@@ -823,7 +800,6 @@ func (b *blockClient) ID() ids.ID {
 }
 
 func (b *blockClient) Accept(ctx context.Context) error {
-	b.status = choices.Accepted
 	_, err := b.vm.client.BlockAccept(ctx, &vmpb.BlockAcceptRequest{
 		Id: b.id[:],
 	})
@@ -831,15 +807,10 @@ func (b *blockClient) Accept(ctx context.Context) error {
 }
 
 func (b *blockClient) Reject(ctx context.Context) error {
-	b.status = choices.Rejected
 	_, err := b.vm.client.BlockReject(ctx, &vmpb.BlockRejectRequest{
 		Id: b.id[:],
 	})
 	return err
-}
-
-func (b *blockClient) Status() choices.Status {
-	return b.status
 }
 
 func (b *blockClient) Parent() ids.ID {
