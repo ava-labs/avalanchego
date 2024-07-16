@@ -22,7 +22,6 @@ import (
 	"github.com/ava-labs/coreth/predicate"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
@@ -115,7 +114,6 @@ type Block struct {
 	id        ids.ID
 	ethBlock  *types.Block
 	vm        *VM
-	status    choices.Status
 	atomicTxs []*Tx
 }
 
@@ -146,7 +144,6 @@ func (b *Block) Accept(context.Context) error {
 	// practice to cleanup the batch we were modifying in the case of an error.
 	defer vm.db.Abort()
 
-	b.status = choices.Accepted
 	log.Debug(fmt.Sprintf("Accepting block %s (%s) at height %d", b.ID().Hex(), b.ID(), b.Height()))
 
 	// Call Accept for relevant precompile logs. Note we do this prior to
@@ -232,7 +229,6 @@ func (b *Block) handlePrecompileAccept(rules params.Rules, sharedMemoryWriter *s
 // Reject implements the snowman.Block interface
 // If [b] contains an atomic transaction, attempt to re-issue it
 func (b *Block) Reject(context.Context) error {
-	b.status = choices.Rejected
 	log.Debug(fmt.Sprintf("Rejecting block %s (%s) at height %d", b.ID().Hex(), b.ID(), b.Height()))
 	for _, tx := range b.atomicTxs {
 		b.vm.mempool.RemoveTx(tx)
@@ -249,15 +245,6 @@ func (b *Block) Reject(context.Context) error {
 		return err
 	}
 	return b.vm.blockChain.Reject(b.ethBlock)
-}
-
-// SetStatus implements the InternalBlock interface allowing ChainState
-// to set the status on an existing block
-func (b *Block) SetStatus(status choices.Status) { b.status = status }
-
-// Status implements the snowman.Block interface
-func (b *Block) Status() choices.Status {
-	return b.status
 }
 
 // Parent implements the snowman.Block interface
