@@ -137,7 +137,7 @@ func (b *postForkBlock) verifyPostForkChild(ctx context.Context, child *postFork
 }
 
 func (b *postForkBlock) verifyVRFSig(ctx context.Context, child *postForkBlock, parentPChainHeight uint64) error {
-	if !b.vm.Config.IsVRFSigActivated(child.Timestamp()) {
+	if !b.vm.Config.IsEActivated(child.Timestamp()) {
 		// if the VRFSig has yet to be activated, verify that the VRF signature isn't there.
 		if len(child.SignedBlock.VRFSig()) != 0 {
 			return errVRFSignaturePresents

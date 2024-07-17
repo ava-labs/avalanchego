@@ -224,7 +224,7 @@ func (p *postForkCommonComponents) buildChild(
 
 	var childBlockVrfSig []byte
 	// do we have the VRFSig activated ? if so, figure out the child block vrf signature.
-	if p.vm.IsVRFSigActivated(newTimestamp) {
+	if p.vm.IsEActivated(newTimestamp) {
 		if shouldBuildSignedBlock {
 			childBlockVrfSig = block.NextBlockVRFSig(parentBlockVRFSig, p.vm.Config.StakingBLSKey, p.vm.ctx.ChainID, p.vm.ctx.NetworkID)
 		} else {

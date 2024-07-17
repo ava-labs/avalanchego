@@ -794,16 +794,16 @@ func (m *manager) createAvalancheChain(
 	var vmWrappingProposerVM block.ChainVM = proposervm.New(
 		vmWrappedInsideProposerVM,
 		proposervm.Config{
-			ActivationTime:       m.ApricotPhase4Time,
-			DurangoTime:          version.GetDurangoTime(m.NetworkID),
-			MinimumPChainHeight:  m.ApricotPhase4MinPChainHeight,
-			MinBlkDelay:          minBlockDelay,
-			NumHistoricalBlocks:  numHistoricalBlocks,
-			StakingLeafSigner:    m.StakingTLSSigner,
-			StakingCertLeaf:      m.StakingTLSCert,
-			Registerer:           proposervmReg,
-			StakingBLSKey:        m.StakingBLSKey,
-			VRFSigActivationTime: version.GetEUpgradeTime(m.NetworkID),
+			ActivationTime:         m.ApricotPhase4Time,
+			DurangoTime:            version.GetDurangoTime(m.NetworkID),
+			MinimumPChainHeight:    m.ApricotPhase4MinPChainHeight,
+			MinBlkDelay:            minBlockDelay,
+			NumHistoricalBlocks:    numHistoricalBlocks,
+			StakingLeafSigner:      m.StakingTLSSigner,
+			StakingCertLeaf:        m.StakingTLSCert,
+			Registerer:             proposervmReg,
+			StakingBLSKey:          m.StakingBLSKey,
+			EUpgradeActivationTime: version.GetEUpgradeTime(m.NetworkID),
 		},
 	)
 
@@ -1193,16 +1193,16 @@ func (m *manager) createSnowmanChain(
 	vm = proposervm.New(
 		vm,
 		proposervm.Config{
-			ActivationTime:       m.ApricotPhase4Time,
-			DurangoTime:          version.GetDurangoTime(m.NetworkID),
-			MinimumPChainHeight:  m.ApricotPhase4MinPChainHeight,
-			MinBlkDelay:          minBlockDelay,
-			NumHistoricalBlocks:  numHistoricalBlocks,
-			StakingLeafSigner:    m.StakingTLSSigner,
-			StakingCertLeaf:      m.StakingTLSCert,
-			Registerer:           proposervmReg,
-			StakingBLSKey:        m.StakingBLSKey,
-			VRFSigActivationTime: version.GetEUpgradeTime(m.NetworkID),
+			ActivationTime:         m.ApricotPhase4Time,
+			DurangoTime:            version.GetDurangoTime(m.NetworkID),
+			MinimumPChainHeight:    m.ApricotPhase4MinPChainHeight,
+			MinBlkDelay:            minBlockDelay,
+			NumHistoricalBlocks:    numHistoricalBlocks,
+			StakingLeafSigner:      m.StakingTLSSigner,
+			StakingCertLeaf:        m.StakingTLSCert,
+			Registerer:             proposervmReg,
+			StakingBLSKey:          m.StakingBLSKey,
+			EUpgradeActivationTime: version.GetEUpgradeTime(m.NetworkID),
 		},
 	)
 

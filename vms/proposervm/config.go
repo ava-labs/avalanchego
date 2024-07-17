@@ -42,14 +42,14 @@ type Config struct {
 	// The BLS key associated with the node; used for signing chained signature in order to provide provable randomness.
 	StakingBLSKey *bls.SecretKey
 
-	// VRFSig activation time
-	VRFSigActivationTime time.Time
+	// e-upgrade activation time
+	EUpgradeActivationTime time.Time
 }
 
 func (c *Config) IsDurangoActivated(timestamp time.Time) bool {
 	return !timestamp.Before(c.DurangoTime)
 }
 
-func (c *Config) IsVRFSigActivated(timestamp time.Time) bool {
-	return !timestamp.Before(c.VRFSigActivationTime)
+func (c *Config) IsEActivated(timestamp time.Time) bool {
+	return !timestamp.Before(c.EUpgradeActivationTime)
 }
