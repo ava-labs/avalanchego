@@ -2456,12 +2456,14 @@ func TestGetPostDurangoSlotTimeWithNoValidators(t *testing.T) {
 		return map[ids.NodeID]*validators.GetValidatorOutput{}, nil
 	}
 
+	emptyParentBlockSig := []byte{}
 	coreBlk := snowmantest.BuildChild(snowmantest.Genesis)
 	statelessBlock, err := statelessblock.BuildUnsigned(
 		snowmantest.GenesisID,
 		proVM.Time(),
 		0,
 		coreBlk.Bytes(),
+		emptyParentBlockSig,
 	)
 	require.NoError(err)
 
