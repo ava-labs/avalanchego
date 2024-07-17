@@ -37,3 +37,4 @@ jobs:
           email_recipients: ${{ github.event.inputs.recipients || secrets.ANTITHESIS_RECIPIENTS }}
           additional_parameters: |-
             custom.duration=${{ github.event.inputs.duration || '11.25' }} # Duration is in hours
+            custom.workload=avalanchego
