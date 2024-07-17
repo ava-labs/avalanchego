@@ -102,6 +102,7 @@ const (
 	requestsNamespace        = constants.PlatformName + metric.NamespaceSeparator + "requests"
 	resourceTrackerNamespace = constants.PlatformName + metric.NamespaceSeparator + "resource_tracker"
 	responsesNamespace       = constants.PlatformName + metric.NamespaceSeparator + "responses"
+	rpcchainvmNamespace      = constants.PlatformName + metric.NamespaceSeparator + "rpcchainvm"
 	systemResourcesNamespace = constants.PlatformName + metric.NamespaceSeparator + "system_resources"
 )
 
@@ -400,6 +401,9 @@ type Node struct {
 	// Specifies how much disk usage each peer can cause before
 	// we rate-limit them.
 	diskTargeter tracker.Targeter
+
+	// Closed when a sufficient amount of bootstrap nodes are connected to
+	onSufficientlyConnected chan struct{}
 }
 
 /*
@@ -596,36 +600,19 @@ func (n *Node) initNetworking(reg prometheus.Registerer) error {
 		}
 	}
 
+	n.onSufficientlyConnected = make(chan struct{})
 	numBootstrappers := n.bootstrappers.Count(constants.PrimaryNetworkID)
 	requiredConns := (3*numBootstrappers + 3) / 4
 
 	if requiredConns > 0 {
-		onSufficientlyConnected := make(chan struct{})
 		consensusRouter = &beaconManager{
 			Router:                  consensusRouter,
 			beacons:                 n.bootstrappers,
 			requiredConns:           int64(requiredConns),
-			onSufficientlyConnected: onSufficientlyConnected,
+			onSufficientlyConnected: n.onSufficientlyConnected,
 		}
-
-		// Log a warning if we aren't able to connect to a sufficient portion of
-		// nodes.
-		go func() {
-			timer := time.NewTimer(n.Config.BootstrapBeaconConnectionTimeout)
-			defer timer.Stop()
-
-			select {
-			case <-timer.C:
-				if n.shuttingDown.Get() {
-					return
-				}
-				n.Log.Warn("failed to connect to bootstrap nodes",
-					zap.Stringer("bootstrappers", n.bootstrappers),
-					zap.Duration("duration", n.Config.BootstrapBeaconConnectionTimeout),
-				)
-			case <-onSufficientlyConnected:
-			}
-		}()
+	} else {
+		close(n.onSufficientlyConnected)
 	}
 
 	// add node configs to network config
@@ -714,6 +701,25 @@ func (n *Node) Dispatch() error {
 		// If node is already shutting down, this does nothing.
 		n.Shutdown(1)
 	})
+
+	// Log a warning if we aren't able to connect to a sufficient portion of
+	// nodes.
+	go func() {
+		timer := time.NewTimer(n.Config.BootstrapBeaconConnectionTimeout)
+		defer timer.Stop()
+
+		select {
+		case <-timer.C:
+			if n.shuttingDown.Get() {
+				return
+			}
+			n.Log.Warn("failed to connect to bootstrap nodes",
+				zap.Stringer("bootstrappers", n.bootstrappers),
+				zap.Duration("duration", n.Config.BootstrapBeaconConnectionTimeout),
+			)
+		case <-n.onSufficientlyConnected:
+		}
+	}()
 
 	// Add state sync nodes to the peer network
 	for i, peerIP := range n.Config.StateSyncIPs {
@@ -1212,7 +1218,7 @@ func (n *Node) initVMs() error {
 
 	// Register the VMs that Avalanche supports
 	eUpgradeTime := version.GetEUpgradeTime(n.Config.NetworkID)
-	err := utils.Err(
+	err := errors.Join(
 		n.VMManager.RegisterFactory(context.TODO(), constants.PlatformVMID, &platformvm.Factory{
 			Config: platformconfig.Config{
 				Chains:                    n.chainManager,
@@ -1257,6 +1263,11 @@ func (n *Node) initVMs() error {
 	// initialize vm runtime manager
 	n.runtimeManager = runtime.NewManager()
 
+	rpcchainvmMetricsGatherer := metrics.NewLabelGatherer(chains.ChainLabel)
+	if err := n.MetricsGatherer.Register(rpcchainvmNamespace, rpcchainvmMetricsGatherer); err != nil {
+		return err
+	}
+
 	// initialize the vm registry
 	n.VMRegistry = registry.NewVMRegistry(registry.VMRegistryConfig{
 		VMGetter: registry.NewVMGetter(registry.VMGetterConfig{
@@ -1265,6 +1276,7 @@ func (n *Node) initVMs() error {
 			PluginDirectory: n.Config.PluginDir,
 			CPUTracker:      n.resourceManager,
 			RuntimeTracker:  n.runtimeManager,
+			MetricsGatherer: rpcchainvmMetricsGatherer,
 		}),
 		VMManager: n.VMManager,
 	})

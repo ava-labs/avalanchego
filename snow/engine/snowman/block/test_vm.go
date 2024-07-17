@@ -1,6 +1,8 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
+//go:build test
+
 package block
 
 import (
@@ -100,7 +102,7 @@ func (vm *TestVM) LastAccepted(ctx context.Context) (ids.ID, error) {
 	if vm.CantLastAccepted && vm.T != nil {
 		require.FailNow(vm.T, errLastAccepted.Error())
 	}
-	return ids.ID{}, errLastAccepted
+	return ids.Empty, errLastAccepted
 }
 
 func (vm *TestVM) GetBlockIDAtHeight(ctx context.Context, height uint64) (ids.ID, error) {

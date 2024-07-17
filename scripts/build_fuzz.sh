@@ -28,7 +28,7 @@ do
         echo "Fuzzing $func in $file"
         parentDir=$(dirname "$file")
         # If any of the fuzz tests fail, return exit code 1
-        if ! go test "$parentDir" -run="$func" -fuzz="$func" -fuzztime="${fuzzTime}"s; then
+        if ! go test -tags test "$parentDir" -run="$func" -fuzz="$func" -fuzztime="${fuzzTime}"s; then
             failed=true
         fi
     done
