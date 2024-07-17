@@ -21,7 +21,6 @@ import (
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
@@ -371,9 +370,10 @@ func TestGenesis(t *testing.T) {
 	genesisBlockID, err := vm.LastAccepted(context.Background()) // lastAccepted should be ID of genesis block
 	require.NoError(err)
 
+	// Ensure the genesis block can be retrieved
 	genesisBlock, err := vm.manager.GetBlock(genesisBlockID)
 	require.NoError(err)
-	require.Equal(choices.Accepted, genesisBlock.Status())
+	require.NotNil(genesisBlock)
 
 	genesisState, _ := defaultGenesis(t, vm.ctx.AVAXAssetID)
 	// Ensure all the genesis UTXOs are there

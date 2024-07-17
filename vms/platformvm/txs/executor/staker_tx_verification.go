@@ -90,6 +90,7 @@ func verifySubnetValidatorPrimaryNetworkRequirements(
 // added to the staking set.
 func verifyAddValidatorTx(
 	backend *Backend,
+	feeCalculator fee.Calculator,
 	chainState state.Chain,
 	sTx *txs.Tx,
 	tx *txs.AddValidatorTx,
@@ -164,7 +165,6 @@ func verifyAddValidatorTx(
 	}
 
 	// Verify the flowcheck
-	feeCalculator := fee.NewStaticCalculator(backend.Config.StaticFeeConfig, backend.Config.UpgradeConfig, currentTimestamp)
 	fee, err := feeCalculator.CalculateFee(sTx)
 	if err != nil {
 		return nil, err
@@ -189,6 +189,7 @@ func verifyAddValidatorTx(
 // AddSubnetValidatorTx.
 func verifyAddSubnetValidatorTx(
 	backend *Backend,
+	feeCalculator fee.Calculator,
 	chainState state.Chain,
 	sTx *txs.Tx,
 	tx *txs.AddSubnetValidatorTx,
@@ -257,7 +258,6 @@ func verifyAddSubnetValidatorTx(
 	}
 
 	// Verify the flowcheck
-	feeCalculator := fee.NewStaticCalculator(backend.Config.StaticFeeConfig, backend.Config.UpgradeConfig, currentTimestamp)
 	fee, err := feeCalculator.CalculateFee(sTx)
 	if err != nil {
 		return err
@@ -288,6 +288,7 @@ func verifyAddSubnetValidatorTx(
 // * The flow checker passes.
 func verifyRemoveSubnetValidatorTx(
 	backend *Backend,
+	feeCalculator fee.Calculator,
 	chainState state.Chain,
 	sTx *txs.Tx,
 	tx *txs.RemoveSubnetValidatorTx,
@@ -337,7 +338,6 @@ func verifyRemoveSubnetValidatorTx(
 	}
 
 	// Verify the flowcheck
-	feeCalculator := fee.NewStaticCalculator(backend.Config.StaticFeeConfig, backend.Config.UpgradeConfig, currentTimestamp)
 	fee, err := feeCalculator.CalculateFee(sTx)
 	if err != nil {
 		return nil, false, err
@@ -363,6 +363,7 @@ func verifyRemoveSubnetValidatorTx(
 // added to the staking set.
 func verifyAddDelegatorTx(
 	backend *Backend,
+	feeCalculator fee.Calculator,
 	chainState state.Chain,
 	sTx *txs.Tx,
 	tx *txs.AddDelegatorTx,
@@ -457,7 +458,6 @@ func verifyAddDelegatorTx(
 	}
 
 	// Verify the flowcheck
-	feeCalculator := fee.NewStaticCalculator(backend.Config.StaticFeeConfig, backend.Config.UpgradeConfig, currentTimestamp)
 	fee, err := feeCalculator.CalculateFee(sTx)
 	if err != nil {
 		return nil, err
@@ -482,6 +482,7 @@ func verifyAddDelegatorTx(
 // AddPermissionlessValidatorTx.
 func verifyAddPermissionlessValidatorTx(
 	backend *Backend,
+	feeCalculator fee.Calculator,
 	chainState state.Chain,
 	sTx *txs.Tx,
 	tx *txs.AddPermissionlessValidatorTx,
@@ -579,7 +580,6 @@ func verifyAddPermissionlessValidatorTx(
 	copy(outs[len(tx.Outs):], tx.StakeOuts)
 
 	// Verify the flowcheck
-	feeCalculator := fee.NewStaticCalculator(backend.Config.StaticFeeConfig, backend.Config.UpgradeConfig, currentTimestamp)
 	fee, err := feeCalculator.CalculateFee(sTx)
 	if err != nil {
 		return err
@@ -604,6 +604,7 @@ func verifyAddPermissionlessValidatorTx(
 // AddPermissionlessDelegatorTx.
 func verifyAddPermissionlessDelegatorTx(
 	backend *Backend,
+	feeCalculator fee.Calculator,
 	chainState state.Chain,
 	sTx *txs.Tx,
 	tx *txs.AddPermissionlessDelegatorTx,
@@ -726,7 +727,6 @@ func verifyAddPermissionlessDelegatorTx(
 	}
 
 	// Verify the flowcheck
-	feeCalculator := fee.NewStaticCalculator(backend.Config.StaticFeeConfig, backend.Config.UpgradeConfig, currentTimestamp)
 	fee, err := feeCalculator.CalculateFee(sTx)
 	if err != nil {
 		return err
@@ -754,6 +754,7 @@ func verifyAddPermissionlessDelegatorTx(
 // * The flow checker passes.
 func verifyTransferSubnetOwnershipTx(
 	backend *Backend,
+	feeCalculator fee.Calculator,
 	chainState state.Chain,
 	sTx *txs.Tx,
 	tx *txs.TransferSubnetOwnershipTx,
@@ -786,7 +787,6 @@ func verifyTransferSubnetOwnershipTx(
 	}
 
 	// Verify the flowcheck
-	feeCalculator := fee.NewStaticCalculator(backend.Config.StaticFeeConfig, upgrades, currentTimestamp)
 	fee, err := feeCalculator.CalculateFee(sTx)
 	if err != nil {
 		return err

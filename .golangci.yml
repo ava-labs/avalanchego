@@ -68,6 +68,7 @@ linters:
     # - lll
     - misspell
     - nakedret
+    - nilerr
     - noctx
     - nolintlint
     - perfsprint

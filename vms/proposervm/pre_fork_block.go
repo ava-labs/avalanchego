@@ -11,9 +11,7 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
@@ -42,28 +40,6 @@ func (*preForkBlock) acceptOuterBlk() error {
 
 func (b *preForkBlock) acceptInnerBlk(ctx context.Context) error {
 	return b.Block.Accept(ctx)
-}
-
-func (b *preForkBlock) Status() choices.Status {
-	forkHeight, err := b.vm.GetForkHeight()
-	if err == database.ErrNotFound {
-		return b.Block.Status()
-	}
-	if err != nil {
-		// TODO: Once `Status()` can return an error, we should return the error
-		// here.
-		b.vm.ctx.Log.Error("unexpected error looking up fork height",
-			zap.Error(err),
-		)
-		return b.Block.Status()
-	}
-
-	// The fork has occurred earlier than this block, so preForkBlocks are all
-	// invalid.
-	if b.Height() >= forkHeight {
-		return choices.Rejected
-	}
-	return b.Block.Status()
 }
 
 func (b *preForkBlock) Verify(ctx context.Context) error {
@@ -246,7 +222,6 @@ func (b *preForkBlock) buildChild(ctx context.Context) (Block, error) {
 		postForkCommonComponents: postForkCommonComponents{
 			vm:       b.vm,
 			innerBlk: innerBlock,
-			status:   choices.Processing,
 		},
 	}
 
