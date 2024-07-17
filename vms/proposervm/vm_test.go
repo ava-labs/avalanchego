@@ -2389,7 +2389,7 @@ func TestHistoricalBlockDeletion(t *testing.T) {
 	requireNumHeights(newNumHistoricalBlocks)
 }
 
-func TestGetPostDurangoSlotTime(t *testing.T) {
+func TestGetPostDurangoSlotTimeWithNoValidators(t *testing.T) {
 	require := require.New(t)
 
 	var (
@@ -2402,15 +2402,16 @@ func TestGetPostDurangoSlotTime(t *testing.T) {
 	}()
 
 	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+		// If there are no validators, anyone should be able to propose a block.
 		return map[ids.NodeID]*validators.GetValidatorOutput{}, nil
 	}
 
-	coreBlk0 := snowmantest.BuildChild(snowmantest.Genesis)
-	statelessBlock0, err := statelessblock.BuildUnsigned(
+	coreBlk := snowmantest.BuildChild(snowmantest.Genesis)
+	statelessBlock, err := statelessblock.BuildUnsigned(
 		snowmantest.GenesisID,
 		proVM.Time(),
 		0,
-		coreBlk0.Bytes(),
+		coreBlk.Bytes(),
 	)
 	require.NoError(err)
 
@@ -2418,8 +2419,8 @@ func TestGetPostDurangoSlotTime(t *testing.T) {
 		switch blkID {
 		case snowmantest.GenesisID:
 			return snowmantest.Genesis, nil
-		case coreBlk0.ID():
-			return coreBlk0, nil
+		case coreBlk.ID():
+			return coreBlk, nil
 		default:
 			return nil, errUnknownBlock
 		}
@@ -2428,25 +2429,27 @@ func TestGetPostDurangoSlotTime(t *testing.T) {
 		switch {
 		case bytes.Equal(b, snowmantest.GenesisBytes):
 			return snowmantest.Genesis, nil
-		case bytes.Equal(b, coreBlk0.Bytes()):
-			return coreBlk0, nil
+		case bytes.Equal(b, coreBlk.Bytes()):
+			return coreBlk, nil
 		default:
 			return nil, errUnknownBlock
 		}
 	}
 
-	statefulBlock0, err := proVM.ParseBlock(context.Background(), statelessBlock0.Bytes())
+	statefulBlock, err := proVM.ParseBlock(context.Background(), statelessBlock.Bytes())
 	require.NoError(err)
 
-	require.NoError(statefulBlock0.Verify(context.Background()))
+	require.NoError(statefulBlock.Verify(context.Background()))
 
 	currentTime := proVM.Clock.Time().Truncate(time.Second)
-	_, err = proVM.getPostDurangoSlotTime(
+	parentTimestamp := statefulBlock.Timestamp()
+	slotTime, err := proVM.getPostDurangoSlotTime(
 		context.Background(),
-		statefulBlock0.Height()+1,
-		statelessBlock0.PChainHeight(),
-		proposer.TimeToSlot(statefulBlock0.Timestamp(), currentTime),
-		statefulBlock0.Timestamp(),
+		statefulBlock.Height()+1,
+		statelessBlock.PChainHeight(),
+		proposer.TimeToSlot(parentTimestamp, currentTime),
+		parentTimestamp,
 	)
 	require.NoError(err)
+	require.Equal(parentTimestamp.Add(proVM.MinBlkDelay), slotTime)
 }
