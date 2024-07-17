@@ -277,6 +277,7 @@ func TestBlockVerify_BlocksBuiltOnPreForkGenesis(t *testing.T) {
 	require.IsType(&preForkBlock{}, preForkChild)
 
 	require.NoError(preForkChild.Verify(context.Background()))
+	emptyParentBlockSig := []byte{}
 
 	// postFork block does NOT verify if parent is before fork activation time
 	postForkStatelessChild, err := statelessblock.Build(
@@ -288,7 +289,7 @@ func TestBlockVerify_BlocksBuiltOnPreForkGenesis(t *testing.T) {
 		proVM.ctx.ChainID,
 		proVM.StakingLeafSigner,
 		statelessblock.NextBlockVRFSig(
-			[]byte{}, // parentBlockSig
+			emptyParentBlockSig,
 			proVM.StakingBLSKey,
 			proVM.ctx.ChainID,
 			proVM.ctx.NetworkID),
@@ -610,6 +611,7 @@ func TestBlockVerify_ForkBlockIsOracleBlockButChildrenAreSigned(t *testing.T) {
 
 	require.NoError(firstBlock.Verify(context.Background()))
 
+	emptyParentBlockSig := []byte{}
 	slb, err := statelessblock.Build(
 		firstBlock.ID(), // refer unknown parent
 		firstBlock.Timestamp(),
@@ -619,7 +621,7 @@ func TestBlockVerify_ForkBlockIsOracleBlockButChildrenAreSigned(t *testing.T) {
 		proVM.ctx.ChainID,
 		proVM.StakingLeafSigner,
 		statelessblock.NextBlockVRFSig(
-			[]byte{}, // parentBlockSig
+			emptyParentBlockSig,
 			proVM.StakingBLSKey,
 			proVM.ctx.ChainID,
 			proVM.ctx.NetworkID),

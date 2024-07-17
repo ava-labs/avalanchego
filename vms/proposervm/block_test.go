@@ -92,13 +92,15 @@ func TestPostForkCommonComponents_buildChild(t *testing.T) {
 		vm:       vm,
 	}
 
+	emptyParentBlockSig := []byte{}
+
 	// Should call BuildBlockWithContext since proposervm is activated
 	gotChild, err := blk.buildChild(
 		context.Background(),
 		parentID,
 		parentTimestamp,
 		pChainHeight-1,
-		[]byte{}, // parentBlockSig
+		emptyParentBlockSig,
 	)
 	require.NoError(err)
 	require.Equal(builtBlk, gotChild.(*postForkBlock).innerBlk)
@@ -414,6 +416,8 @@ func TestPostDurangoBuildChildResetScheduler(t *testing.T) {
 		proposer.MaxLookAheadWindow + time.Minute,
 	}
 
+	emptyParentBlockSig := []byte{}
+
 	for _, delay := range delays {
 		windower.EXPECT().MinDelayForProposer(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 			Return(delay, nil).Times(1)
@@ -428,7 +432,7 @@ func TestPostDurangoBuildChildResetScheduler(t *testing.T) {
 			parentID,
 			parentTimestamp,
 			pChainHeight-1,
-			[]byte{}, // parentBlockSig
+			emptyParentBlockSig,
 		)
 		require.ErrorIs(err, errUnexpectedProposer)
 	}

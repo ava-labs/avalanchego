@@ -170,6 +170,7 @@ func TestStateSyncGetOngoingSyncStateSummary(t *testing.T) {
 		require.Equal(innerBlk.Bytes(), b)
 		return innerBlk, nil
 	}
+	emptyParentBlockSig := []byte{}
 
 	slb, err := statelessblock.Build(
 		vm.preferred,
@@ -180,7 +181,7 @@ func TestStateSyncGetOngoingSyncStateSummary(t *testing.T) {
 		vm.ctx.ChainID,
 		vm.StakingLeafSigner,
 		statelessblock.NextBlockVRFSig(
-			[]byte{}, // parentBlockSig
+			emptyParentBlockSig,
 			vm.StakingBLSKey,
 			vm.ctx.ChainID,
 			vm.ctx.NetworkID),
@@ -258,6 +259,7 @@ func TestStateSyncGetLastStateSummary(t *testing.T) {
 		require.Equal(innerBlk.Bytes(), b)
 		return innerBlk, nil
 	}
+	emptyParentBlockSig := []byte{}
 
 	slb, err := statelessblock.Build(
 		vm.preferred,
@@ -268,7 +270,7 @@ func TestStateSyncGetLastStateSummary(t *testing.T) {
 		vm.ctx.ChainID,
 		vm.StakingLeafSigner,
 		statelessblock.NextBlockVRFSig(
-			[]byte{}, // parentBlockSig
+			emptyParentBlockSig,
 			vm.StakingBLSKey,
 			vm.ctx.ChainID,
 			vm.ctx.NetworkID),
@@ -349,6 +351,7 @@ func TestStateSyncGetStateSummary(t *testing.T) {
 		require.Equal(innerBlk.Bytes(), b)
 		return innerBlk, nil
 	}
+	emptyParentBlockSig := []byte{}
 
 	slb, err := statelessblock.Build(
 		vm.preferred,
@@ -359,7 +362,7 @@ func TestStateSyncGetStateSummary(t *testing.T) {
 		vm.ctx.ChainID,
 		vm.StakingLeafSigner,
 		statelessblock.NextBlockVRFSig(
-			[]byte{}, // parentBlockSig
+			emptyParentBlockSig,
 			vm.StakingBLSKey,
 			vm.ctx.ChainID,
 			vm.ctx.NetworkID),
@@ -425,6 +428,7 @@ func TestParseStateSummary(t *testing.T) {
 		require.Equal(innerBlk.Bytes(), b)
 		return innerBlk, nil
 	}
+	emptyParentBlockSig := []byte{}
 
 	slb, err := statelessblock.Build(
 		vm.preferred,
@@ -435,7 +439,7 @@ func TestParseStateSummary(t *testing.T) {
 		vm.ctx.ChainID,
 		vm.StakingLeafSigner,
 		statelessblock.NextBlockVRFSig(
-			[]byte{}, // parentBlockSig
+			emptyParentBlockSig,
 			vm.StakingBLSKey,
 			vm.ctx.ChainID,
 			vm.ctx.NetworkID),
@@ -484,6 +488,7 @@ func TestStateSummaryAccept(t *testing.T) {
 		HeightV: innerSummary.Height(),
 	}
 
+	emptyParentBlockSig := []byte{}
 	slb, err := statelessblock.Build(
 		vm.preferred,
 		innerBlk.Timestamp(),
@@ -493,7 +498,7 @@ func TestStateSummaryAccept(t *testing.T) {
 		vm.ctx.ChainID,
 		vm.StakingLeafSigner,
 		statelessblock.NextBlockVRFSig(
-			[]byte{}, // parentBlockSig
+			emptyParentBlockSig,
 			vm.StakingBLSKey,
 			vm.ctx.ChainID,
 			vm.ctx.NetworkID),
@@ -567,7 +572,7 @@ func TestStateSummaryAcceptOlderBlock(t *testing.T) {
 		require.Equal(innerBlk.Bytes(), b)
 		return innerBlk, nil
 	}
-
+	emptyParentBlockSig := []byte{}
 	slb, err := statelessblock.Build(
 		vm.preferred,
 		innerBlk.Timestamp(),
@@ -577,7 +582,7 @@ func TestStateSummaryAcceptOlderBlock(t *testing.T) {
 		vm.ctx.ChainID,
 		vm.StakingLeafSigner,
 		statelessblock.NextBlockVRFSig(
-			[]byte{}, // parentBlockSig
+			emptyParentBlockSig,
 			vm.StakingBLSKey,
 			vm.ctx.ChainID,
 			vm.ctx.NetworkID),

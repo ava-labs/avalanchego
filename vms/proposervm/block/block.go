@@ -15,7 +15,6 @@ import (
 )
 
 var (
-	// compile time check to ensure statelessBlock implements SignedBlock
 	_ SignedBlock = (*statelessBlock[statelessUnsignedBlock])(nil)
 	_ SignedBlock = (*statelessBlock[statelessUnsignedBlockV0])(nil)
 
@@ -32,8 +31,7 @@ type Block interface {
 	Block() []byte
 	Bytes() []byte
 
-	// initialize & verify are used by the parser so that we could treat all the
-	// block types uniformally.
+	// initialize & verify are used by the parser so that all the block types can be treated uniformly
 	initialize(bytes []byte) error
 	verify(chainID ids.ID) error
 }

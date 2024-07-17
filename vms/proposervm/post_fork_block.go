@@ -12,7 +12,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
 
-// compile time check to ensure that postForkBlock implements PostForkBlock
 var _ PostForkBlock = (*postForkBlock)(nil)
 
 type postForkBlock struct {
