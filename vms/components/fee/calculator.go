@@ -3,117 +3,110 @@
 
 package fee
 
-import (
-	"errors"
-	"fmt"
+// var errGasBoundBreached = errors.New("gas bound breached")
 
-	"github.com/ava-labs/avalanchego/utils/math"
-)
+// // Calculator performs fee-related operations that are shared among P-chain and X-chain
+// // Calculator is supposed to be embedded within chain specific calculators.
+// type Calculator struct {
+// 	// feeWeights help consolidating complexity into gas
+// 	feeWeights Dimensions
 
-var errGasBoundBreached = errors.New("gas bound breached")
+// 	// gas cap enforced with adding gas via AddFeesFor
+// 	gasCap Gas
 
-// Calculator performs fee-related operations that are shared among P-chain and X-chain
-// Calculator is supposed to be embedded within chain specific calculators.
-type Calculator struct {
-	// feeWeights help consolidating complexity into gas
-	feeWeights Dimensions
+// 	// Avax denominated gas price, i.e. fee per unit of gas.
+// 	gasPrice GasPrice
 
-	// gas cap enforced with adding gas via AddFeesFor
-	gasCap Gas
+// 	// cumulatedGas helps aggregating the gas consumed in a single block
+// 	// so that we can verify it's not too big/build it properly.
+// 	cumulatedGas Gas
 
-	// Avax denominated gas price, i.e. fee per unit of gas.
-	gasPrice GasPrice
+// 	// latestTxComplexity tracks complexity of latest tx being processed.
+// 	// latestTxComplexity is especially helpful while building a tx.
+// 	latestTxComplexity Dimensions
+// }
 
-	// cumulatedGas helps aggregating the gas consumed in a single block
-	// so that we can verify it's not too big/build it properly.
-	cumulatedGas Gas
+// func NewCalculator(feeWeights Dimensions, gasPrice GasPrice, gasCap Gas) *Calculator {
+// 	return &Calculator{
+// 		feeWeights: feeWeights,
+// 		gasCap:     gasCap,
+// 		gasPrice:   gasPrice,
+// 	}
+// }
 
-	// latestTxComplexity tracks complexity of latest tx being processed.
-	// latestTxComplexity is especially helpful while building a tx.
-	latestTxComplexity Dimensions
-}
+// func (c *Calculator) GetGasPrice() GasPrice {
+// 	return c.gasPrice
+// }
 
-func NewCalculator(feeWeights Dimensions, gasPrice GasPrice, gasCap Gas) *Calculator {
-	return &Calculator{
-		feeWeights: feeWeights,
-		gasCap:     gasCap,
-		gasPrice:   gasPrice,
-	}
-}
+// func (c *Calculator) GetBlockGas() (Gas, error) {
+// 	txGas, err := c.latestTxComplexity.ToGas(c.feeWeights)
+// 	if err != nil {
+// 		return 0, err
+// 	}
+// 	return c.cumulatedGas + txGas, nil
+// }
 
-func (c *Calculator) GetGasPrice() GasPrice {
-	return c.gasPrice
-}
+// func (c *Calculator) GetGasCap() Gas {
+// 	return c.gasCap
+// }
 
-func (c *Calculator) GetBlockGas() (Gas, error) {
-	txGas, err := c.latestTxComplexity.ToGas(c.feeWeights)
-	if err != nil {
-		return 0, err
-	}
-	return c.cumulatedGas + txGas, nil
-}
+// // AddFeesFor updates latest tx complexity. It should be called once when tx is being verified
+// // and may be called multiple times when tx is being built (and tx components are added in time).
+// // AddFeesFor checks that gas cap is not breached. It also returns the updated tx fee for convenience.
+// func (c *Calculator) AddFeesFor(complexity Dimensions) (uint64, error) {
+// 	if complexity == (Dimensions{}) {
+// 		return c.GetLatestTxFee()
+// 	}
 
-func (c *Calculator) GetGasCap() Gas {
-	return c.gasCap
-}
+// 	// Ensure we can consume (don't want partial update of values)
+// 	uc, err := c.latestTxComplexity.Add(complexity)
+// 	if err != nil {
+// 		return 0, fmt.Errorf("%w: %w", errGasBoundBreached, err)
+// 	}
+// 	c.latestTxComplexity = uc
 
-// AddFeesFor updates latest tx complexity. It should be called once when tx is being verified
-// and may be called multiple times when tx is being built (and tx components are added in time).
-// AddFeesFor checks that gas cap is not breached. It also returns the updated tx fee for convenience.
-func (c *Calculator) AddFeesFor(complexity Dimensions) (uint64, error) {
-	if complexity == (Dimensions{}) {
-		return c.GetLatestTxFee()
-	}
+// 	totalGas, err := c.GetBlockGas()
+// 	if err != nil {
+// 		return 0, fmt.Errorf("%w: %w", errGasBoundBreached, err)
+// 	}
+// 	if totalGas > c.gasCap {
+// 		return 0, fmt.Errorf("%w: total gas %d, gas cap %d", errGasBoundBreached, totalGas, c.gasCap)
+// 	}
 
-	// Ensure we can consume (don't want partial update of values)
-	uc, err := c.latestTxComplexity.Add(complexity)
-	if err != nil {
-		return 0, fmt.Errorf("%w: %w", errGasBoundBreached, err)
-	}
-	c.latestTxComplexity = uc
+// 	return c.GetLatestTxFee()
+// }
 
-	totalGas, err := c.GetBlockGas()
-	if err != nil {
-		return 0, fmt.Errorf("%w: %w", errGasBoundBreached, err)
-	}
-	if totalGas > c.gasCap {
-		return 0, fmt.Errorf("%w: total gas %d, gas cap %d", errGasBoundBreached, totalGas, c.gasCap)
-	}
+// // Sometimes, e.g. while building a tx, we'd like freedom to speculatively add complexity
+// // and to remove it later on. [RemoveFeesFor] grants this freedom
+// func (c *Calculator) RemoveFeesFor(complexity Dimensions) (uint64, error) {
+// 	if complexity == (Dimensions{}) {
+// 		return c.GetLatestTxFee()
+// 	}
 
-	return c.GetLatestTxFee()
-}
+// 	rc, err := c.latestTxComplexity.Sub(complexity)
+// 	if err != nil {
+// 		return 0, fmt.Errorf("%w: current Gas %d, gas to revert %d", err, c.cumulatedGas, complexity)
+// 	}
+// 	c.latestTxComplexity = rc
+// 	return c.GetLatestTxFee()
+// }
 
-// Sometimes, e.g. while building a tx, we'd like freedom to speculatively add complexity
-// and to remove it later on. [RemoveFeesFor] grants this freedom
-func (c *Calculator) RemoveFeesFor(complexity Dimensions) (uint64, error) {
-	if complexity == (Dimensions{}) {
-		return c.GetLatestTxFee()
-	}
+// // DoneWithLatestTx should be invoked one a tx has been fully processed, before moving to the next one
+// func (c *Calculator) DoneWithLatestTx() error {
+// 	txGas, err := c.latestTxComplexity.ToGas(c.feeWeights)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	c.cumulatedGas += txGas
+// 	c.latestTxComplexity = Dimensions{}
+// 	return nil
+// }
 
-	rc, err := c.latestTxComplexity.Sub(complexity)
-	if err != nil {
-		return 0, fmt.Errorf("%w: current Gas %d, gas to revert %d", err, c.cumulatedGas, complexity)
-	}
-	c.latestTxComplexity = rc
-	return c.GetLatestTxFee()
-}
-
-// DoneWithLatestTx should be invoked one a tx has been fully processed, before moving to the next one
-func (c *Calculator) DoneWithLatestTx() error {
-	txGas, err := c.latestTxComplexity.ToGas(c.feeWeights)
-	if err != nil {
-		return err
-	}
-	c.cumulatedGas += txGas
-	c.latestTxComplexity = Dimensions{}
-	return nil
-}
-
-// CalculateFee must be a stateless method
-func (c *Calculator) GetLatestTxFee() (uint64, error) {
-	gas, err := c.latestTxComplexity.ToGas(c.feeWeights)
-	if err != nil {
-		return 0, err
-	}
-	return math.Mul64(uint64(c.gasPrice), uint64(gas))
-}
+// // CalculateFee must be a stateless method
+// func (c *Calculator) GetLatestTxFee() (uint64, error) {
+// 	gas, err := c.latestTxComplexity.ToGas(c.feeWeights)
+// 	if err != nil {
+// 		return 0, err
+// 	}
+// 	return math.Mul64(uint64(c.gasPrice), uint64(gas))
+// }
