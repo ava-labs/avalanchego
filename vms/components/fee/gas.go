@@ -38,11 +38,30 @@ func (g Gas) SubPerSecond(gasPerSecond Gas, seconds uint64) Gas {
 	return Gas(totalGas)
 }
 
-// MulExp returns g*e^(excess / gasConversionConstant)
+// MulExp returns an approximation of g*e^(excess / gasConversionConstant)
 func (g GasPrice) MulExp(
 	excess Gas,
-	gasConversionConstant Gas,
+	gasConversionConstant GasPrice,
 ) GasPrice {
-	// TODO: Implement this
-	return 0
+	var (
+		iteration      GasPrice = 1
+		output         GasPrice
+		numeratorAccum = g * gasConversionConstant
+	)
+	for numeratorAccum > 0 {
+		output += numeratorAccum
+		numeratorAccum = (numeratorAccum * GasPrice(excess)) / (gasConversionConstant * iteration)
+		iteration++
+	}
+	return output / gasConversionConstant
 }
+
+// def fake_exponential(factor: int, numerator: int, denominator: int) -> int:
+//     i = 1
+//     output = 0
+//     numerator_accum = factor * denominator
+//     while numerator_accum > 0:
+//         output += numerator_accum
+//         numerator_accum = (numerator_accum * numerator) // (denominator * i)
+//         i += 1
+//     return output // denominator

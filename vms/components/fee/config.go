@@ -15,6 +15,6 @@ type Config struct {
 	MaxGasCapacity Gas `json:"maxGasCapacity"`
 	// Minimum price in nAVAX per unit of gas.
 	MinGasPrice GasPrice `json:"minGasPrice"`
-	// Constant used to
-	GasConversionConstant Gas `json:"gasConversionConstant"`
+	// Constant used to convert excess gas to a gas price.
+	GasConversionConstant GasPrice `json:"gasConversionConstant"`
 }
