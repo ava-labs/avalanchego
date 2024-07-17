@@ -276,7 +276,7 @@ func (c *dynamicCalculator) meterTx(
 		if err != nil {
 			return complexity, fmt.Errorf("failed adding credential %d: %w", i, err)
 		}
-		complexity, err = fee.Add(complexity, credDimensions)
+		complexity, err = complexity.Add(credDimensions)
 		if err != nil {
 			return complexity, fmt.Errorf("failed adding credentials: %w", err)
 		}
@@ -290,7 +290,7 @@ func (c *dynamicCalculator) meterTx(
 			return complexity, fmt.Errorf("failed retrieving size of inputs: %w", err)
 		}
 		inputDimensions[fee.Bandwidth] = 0 // inputs bandwidth is already accounted for above, so we zero it
-		complexity, err = fee.Add(complexity, inputDimensions)
+		complexity, err = complexity.Add(inputDimensions)
 		if err != nil {
 			return complexity, fmt.Errorf("failed adding inputs: %w", err)
 		}
@@ -302,7 +302,7 @@ func (c *dynamicCalculator) meterTx(
 			return complexity, fmt.Errorf("failed retrieving size of outputs: %w", err)
 		}
 		outputDimensions[fee.Bandwidth] = 0 // outputs bandwidth is already accounted for above, so we zero it
-		complexity, err = fee.Add(complexity, outputDimensions)
+		complexity, err = complexity.Add(outputDimensions)
 		if err != nil {
 			return complexity, fmt.Errorf("failed adding outputs: %w", err)
 		}

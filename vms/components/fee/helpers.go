@@ -8,7 +8,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -17,50 +16,47 @@ import (
 func MeterInput(c codec.Manager, v uint16, in *avax.TransferableInput) (Dimensions, error) {
 	cost, err := in.In.Cost()
 	if err != nil {
-		return Empty, fmt.Errorf("failed retrieving cost of input %s: %w", in.ID, err)
+		return Dimensions{}, fmt.Errorf("failed retrieving cost of input %s: %w", in.ID, err)
 	}
 
 	inSize, err := c.Size(v, in)
 	if err != nil {
-		return Empty, fmt.Errorf("failed retrieving size of input %s: %w", in.ID, err)
+		return Dimensions{}, fmt.Errorf("failed retrieving size of input %s: %w", in.ID, err)
 	}
 	uInSize := uint64(inSize)
 
-	complexity := Empty
-	complexity[Bandwidth] += uInSize - codec.VersionSize
-	complexity[DBRead] += uInSize  // inputs are read
-	complexity[DBWrite] += uInSize // inputs are deleted
-	complexity[Compute] += cost
-	return complexity, nil
+	return Dimensions{
+		Bandwidth: uInSize - codec.VersionSize,
+		DBRead:    uInSize, // inputs are read
+		DBWrite:   uInSize, // inputs are deleted
+		Compute:   cost,
+	}, nil
 }
 
 func MeterOutput(c codec.Manager, v uint16, out *avax.TransferableOutput) (Dimensions, error) {
 	outSize, err := c.Size(v, out)
 	if err != nil {
-		return Empty, fmt.Errorf("failed retrieving size of output %s: %w", out.ID, err)
+		return Dimensions{}, fmt.Errorf("failed retrieving size of output %s: %w", out.ID, err)
 	}
 	uOutSize := uint64(outSize)
 
-	complexity := Empty
-	complexity[Bandwidth] += uOutSize - codec.VersionSize
-	complexity[DBWrite] += uOutSize
-	return complexity, nil
+	return Dimensions{
+		Bandwidth: uOutSize - codec.VersionSize,
+		DBWrite:   uOutSize,
+	}, nil
 }
 
 func MeterCredential(c codec.Manager, v uint16, keysCount int) (Dimensions, error) {
 	// Ensure that codec picks interface instead of the pointer to evaluate size.
-	creds := make([]verify.Verifiable, 0, 1)
-	creds = append(creds, &secp256k1fx.Credential{
+	var cred verify.Verifiable = &secp256k1fx.Credential{
 		Sigs: make([][secp256k1.SignatureLen]byte, keysCount),
-	})
-
-	credSize, err := c.Size(v, creds)
-	if err != nil {
-		return Empty, fmt.Errorf("failed retrieving size of credentials: %w", err)
 	}
-	credSize -= wrappers.IntLen // length of the slice, we want the single credential
+	credSize, err := c.Size(v, &cred)
+	if err != nil {
+		return Dimensions{}, fmt.Errorf("failed retrieving size of credentials: %w", err)
+	}
 
-	complexity := Empty
-	complexity[Bandwidth] += uint64(credSize) - codec.VersionSize
-	return complexity, nil
+	return Dimensions{
+		Bandwidth: uint64(credSize) - codec.VersionSize,
+	}, nil
 }

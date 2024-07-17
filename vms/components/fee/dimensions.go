@@ -3,68 +3,61 @@
 
 package fee
 
-import (
-	safemath "github.com/ava-labs/avalanchego/utils/math"
-)
+import "github.com/ava-labs/avalanchego/utils/math"
 
 const (
-	Bandwidth Dimension = 0
-	DBRead    Dimension = 1
-	DBWrite   Dimension = 2 // includes deletes
-	Compute   Dimension = 3
+	Bandwidth Dimension = iota
+	DBRead
+	DBWrite // includes deletes
+	Compute
 
-	FeeDimensions = 4
-)
-
-var (
-	ZeroGas      = Gas(0)
-	ZeroGasPrice = GasPrice(0)
-	Empty        = Dimensions{}
+	NumDimensions = iota
 )
 
 type (
-	GasPrice uint64
-	Gas      uint64
-
-	Dimension  int
-	Dimensions [FeeDimensions]uint64
+	Dimension  uint
+	Dimensions [NumDimensions]uint64
 )
 
-func Add(lhs, rhs Dimensions) (Dimensions, error) {
-	var res Dimensions
-	for i := 0; i < FeeDimensions; i++ {
-		v, err := safemath.Add64(lhs[i], rhs[i])
+func (d Dimensions) Add(o Dimensions) (Dimensions, error) {
+	var (
+		res Dimensions
+		err error
+	)
+	for i := range d {
+		res[i], err = math.Add64(d[i], o[i])
 		if err != nil {
 			return res, err
 		}
-		res[i] = v
 	}
 	return res, nil
 }
 
-func Remove(lhs, rhs Dimensions) (Dimensions, error) {
-	var res Dimensions
-	for i := 0; i < FeeDimensions; i++ {
-		v, err := safemath.Sub(lhs[i], rhs[i])
+func (d Dimensions) Sub(o Dimensions) (Dimensions, error) {
+	var (
+		res Dimensions
+		err error
+	)
+	for i := range d {
+		res[i], err = math.Sub(d[i], o[i])
 		if err != nil {
 			return res, err
 		}
-		res[i] = v
 	}
 	return res, nil
 }
 
-func ToGas(weights, dimensions Dimensions) (Gas, error) {
-	res := uint64(0)
-	for i := 0; i < FeeDimensions; i++ {
-		v, err := safemath.Mul64(weights[i], dimensions[i])
+func (d Dimensions) ToGas(weights Dimensions) (Gas, error) {
+	var res uint64
+	for i := range d {
+		v, err := math.Mul64(d[i], weights[i])
 		if err != nil {
-			return ZeroGas, err
+			return 0, err
 		}
-		res, err = safemath.Add64(res, v)
+		res, err = math.Add64(res, v)
 		if err != nil {
-			return ZeroGas, err
+			return 0, err
 		}
 	}
-	return Gas(res) / 10, nil
+	return Gas(res), nil
 }

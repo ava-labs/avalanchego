@@ -7,7 +7,7 @@ import (
 	"errors"
 	"fmt"
 
-	safemath "github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/math"
 )
 
 var errGasBoundBreached = errors.New("gas bound breached")
@@ -46,9 +46,9 @@ func (c *Calculator) GetGasPrice() GasPrice {
 }
 
 func (c *Calculator) GetBlockGas() (Gas, error) {
-	txGas, err := ToGas(c.feeWeights, c.latestTxComplexity)
+	txGas, err := c.latestTxComplexity.ToGas(c.feeWeights)
 	if err != nil {
-		return ZeroGas, err
+		return 0, err
 	}
 	return c.cumulatedGas + txGas, nil
 }
@@ -61,12 +61,12 @@ func (c *Calculator) GetGasCap() Gas {
 // and may be called multiple times when tx is being built (and tx components are added in time).
 // AddFeesFor checks that gas cap is not breached. It also returns the updated tx fee for convenience.
 func (c *Calculator) AddFeesFor(complexity Dimensions) (uint64, error) {
-	if complexity == Empty {
+	if complexity == (Dimensions{}) {
 		return c.GetLatestTxFee()
 	}
 
 	// Ensure we can consume (don't want partial update of values)
-	uc, err := Add(c.latestTxComplexity, complexity)
+	uc, err := c.latestTxComplexity.Add(complexity)
 	if err != nil {
 		return 0, fmt.Errorf("%w: %w", errGasBoundBreached, err)
 	}
@@ -86,11 +86,11 @@ func (c *Calculator) AddFeesFor(complexity Dimensions) (uint64, error) {
 // Sometimes, e.g. while building a tx, we'd like freedom to speculatively add complexity
 // and to remove it later on. [RemoveFeesFor] grants this freedom
 func (c *Calculator) RemoveFeesFor(complexity Dimensions) (uint64, error) {
-	if complexity == Empty {
+	if complexity == (Dimensions{}) {
 		return c.GetLatestTxFee()
 	}
 
-	rc, err := Remove(c.latestTxComplexity, complexity)
+	rc, err := c.latestTxComplexity.Sub(complexity)
 	if err != nil {
 		return 0, fmt.Errorf("%w: current Gas %d, gas to revert %d", err, c.cumulatedGas, complexity)
 	}
@@ -100,20 +100,20 @@ func (c *Calculator) RemoveFeesFor(complexity Dimensions) (uint64, error) {
 
 // DoneWithLatestTx should be invoked one a tx has been fully processed, before moving to the next one
 func (c *Calculator) DoneWithLatestTx() error {
-	txGas, err := ToGas(c.feeWeights, c.latestTxComplexity)
+	txGas, err := c.latestTxComplexity.ToGas(c.feeWeights)
 	if err != nil {
 		return err
 	}
 	c.cumulatedGas += txGas
-	c.latestTxComplexity = Empty
+	c.latestTxComplexity = Dimensions{}
 	return nil
 }
 
 // CalculateFee must be a stateless method
 func (c *Calculator) GetLatestTxFee() (uint64, error) {
-	gas, err := ToGas(c.feeWeights, c.latestTxComplexity)
+	gas, err := c.latestTxComplexity.ToGas(c.feeWeights)
 	if err != nil {
 		return 0, err
 	}
-	return safemath.Mul64(uint64(c.gasPrice), uint64(gas))
+	return math.Mul64(uint64(c.gasPrice), uint64(gas))
 }

@@ -10,15 +10,18 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/utils/units"
-
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 var (
-	testDynamicFeeCfg = DynamicFeesConfig{
-		GasPrice:            GasPrice(10 * units.NanoAvax),
-		FeeDimensionWeights: Dimensions{6, 10, 10, 1},
+	testDynamicConfig = DynamicConfig{
+		GasPrice: 10,
+		FeeDimensionWeights: Dimensions{
+			Bandwidth: 6,
+			DBRead:    10,
+			DBWrite:   10,
+			Compute:   1,
+		},
 	}
 	testGasCap = Gas(math.MaxUint64)
 )
@@ -27,7 +30,7 @@ func TestAddAndRemoveFees(t *testing.T) {
 	require := require.New(t)
 
 	var (
-		fc = NewCalculator(testDynamicFeeCfg.FeeDimensionWeights, testDynamicFeeCfg.GasPrice, testGasCap)
+		fc = NewCalculator(testDynamicConfig.FeeDimensionWeights, testDynamicConfig.GasPrice, testGasCap)
 
 		complexity      = Dimensions{1, 2, 3, 4}
 		extraComplexity = Dimensions{2, 3, 4, 5}
@@ -80,7 +83,7 @@ func TestGasCap(t *testing.T) {
 		// childBlkTime  = parentBlkTime.Add(time.Second)
 		// grandChildBlkTime = childBlkTime.Add(5 * time.Second)
 
-		cfg = DynamicFeesConfig{
+		cfg = DynamicConfig{
 			MaxGasPerSecond: Gas(1_000),
 			LeakGasCoeff:    Gas(5),
 		}
@@ -91,7 +94,7 @@ func TestGasCap(t *testing.T) {
 	// A block whose gas matches cap, will consume full available cap
 	blkGas := cfg.MaxGasPerSecond
 	currCap = UpdateGasCap(currCap, blkGas)
-	require.Equal(ZeroGas, currCap)
+	require.Zero(currCap)
 
 	// capacity grows linearly in time till MaxGas
 	for i := 1; i <= 5; i++ {
@@ -121,5 +124,5 @@ func TestGasCap(t *testing.T) {
 	// time can only grow forward with capacity
 	childBlkTime = parentBlkTime.Add(-1 * time.Second)
 	_, err = GasCap(cfg, currCap, parentBlkTime, childBlkTime)
-	require.ErrorIs(err, errUnexpectedBlockTimes)
+	require.ErrorIs(err, errChildTimeBeforeParent)
 }
