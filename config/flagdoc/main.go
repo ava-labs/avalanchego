@@ -22,15 +22,11 @@ func run(out io.Writer) error {
 	cmd := &cobra.Command{
 		Use: `AvalancheGo`, // shown as ## level header
 		Short: `This is shown under the title
-and
-can
-be
-multiline`,
+
+and can be multiline`,
 		Long: `This is shown under the "Synopsis" header
-and
-can
-be
-multiline`,
+
+and can be multiline`,
 	}
 	*cmd.Flags() = *config.BuildFlagSet()
 	return doc.GenMarkdown(cmd, out)

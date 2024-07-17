@@ -1,18 +1,14 @@
 ## AvalancheGo
 
 This is shown under the title
-and
-can
-be
-multiline
+
+and can be multiline
 
 ### Synopsis
 
 This is shown under the "Synopsis" header
-and
-can
-be
-multiline
+
+and can be multiline
 
 ### Options
 
