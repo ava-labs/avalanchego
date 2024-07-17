@@ -1404,20 +1404,43 @@ func TestStateSubnetOwner(t *testing.T) {
 func TestStateSubnetManager(t *testing.T) {
 	require := require.New(t)
 
-	state := newInitializedState(require)
+	initializedState := newInitializedState(require)
 
+	// Test in-memory lookups
 	subnetID := ids.GenerateTestID()
-
-	chainID, addr, err := state.GetSubnetManager(subnetID)
+	chainID, addr, err := initializedState.GetSubnetManager(subnetID)
 	require.ErrorIs(err, database.ErrNotFound)
 	require.Equal(ids.Empty, chainID)
 	require.Nil(addr)
 
 	expectedChainID := ids.GenerateTestID()
 	expectedAddr := []byte{'a', 'd', 'd', 'r'}
-	state.SetSubnetManager(subnetID, expectedChainID, expectedAddr)
+	initializedState.SetSubnetManager(subnetID, expectedChainID, expectedAddr)
 
-	chainID, addr, err = state.GetSubnetManager(subnetID)
+	chainID, addr, err = initializedState.GetSubnetManager(subnetID)
+	require.NoError(err)
+	require.Equal(expectedChainID, chainID)
+	require.Equal(expectedAddr, addr)
+
+	// Test cache lookups
+	subnetID = ids.GenerateTestID()
+	subnetManagerCache := initializedState.(*state).subnetManagerCache
+
+	chainID, addr, err = initializedState.GetSubnetManager(subnetID)
+	require.ErrorIs(err, database.ErrNotFound)
+	require.Equal(ids.Empty, chainID)
+	require.Nil(addr)
+
+	require.Zero(subnetManagerCache.Len())
+	expectedChainID = ids.GenerateTestID()
+	expectedAddr = []byte{'a', 'd', 'd', 'r', '2'}
+	subnetManagerCache.Put(subnetID, chainIDAndAddr{
+		ChainID: expectedChainID,
+		Addr:    expectedAddr,
+	})
+	require.Equal(1, subnetManagerCache.Len())
+
+	chainID, addr, err = initializedState.GetSubnetManager(subnetID)
 	require.NoError(err)
 	require.Equal(expectedChainID, chainID)
 	require.Equal(expectedAddr, addr)
