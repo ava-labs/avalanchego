@@ -145,7 +145,7 @@ func (r *responder) CrossChainAppRequest(ctx context.Context, chainID ids.ID, re
 			zap.Uint64("handlerID", r.handlerID),
 			zap.Binary("message", request),
 		)
-		return nil
+		return nil //nolint:nilerr
 	}
 
 	return r.sender.SendCrossChainAppResponse(ctx, chainID, requestID, appResponse)

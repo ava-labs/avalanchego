@@ -34,6 +34,6 @@ func (i *issuer) Execute(ctx context.Context, _ []ids.ID, abandoned []ids.ID) er
 	// well.
 	blkID := i.blk.ID()
 	delete(i.t.pending, blkID)
-	i.t.addToNonVerifieds(i.blk)
+	i.t.markAsUnverified(i.blk)
 	return i.t.blocked.Abandon(ctx, blkID)
 }
