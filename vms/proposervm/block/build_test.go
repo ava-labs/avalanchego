@@ -109,8 +109,6 @@ func TestBuildOption(t *testing.T) {
 }
 
 func TestCalculateVRFOut(t *testing.T) {
-	require := require.New(t)
-
 	testCases := []struct {
 		name        string
 		vrfSig      []byte
@@ -127,14 +125,13 @@ func TestCalculateVRFOut(t *testing.T) {
 	}
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
+			require := require.New(t)
 			require.Equal(testCase.expectedOut, CalculateVRFOut(testCase.vrfSig))
 		})
 	}
 }
 
 func TestCalculateBootstrappingBlockSig(t *testing.T) {
-	require := require.New(t)
-
 	testCases := []struct {
 		name        string
 		chainID     ids.ID
@@ -149,14 +146,13 @@ func TestCalculateBootstrappingBlockSig(t *testing.T) {
 	}
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
+			require := require.New(t)
 			require.Equal(testCase.expectedOut, calculateBootstrappingBlockSig(testCase.chainID, testCase.networkID))
 		})
 	}
 }
 
 func TestNextHashBlockSignature(t *testing.T) {
-	require := require.New(t)
-
 	testCases := []struct {
 		name        string
 		vrfSig      []byte
@@ -170,16 +166,15 @@ func TestNextHashBlockSignature(t *testing.T) {
 	}
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
+			require := require.New(t)
 			require.Equal(testCase.expectedOut, NextHashBlockSignature(testCase.vrfSig))
 		})
 	}
 }
 
 func TestNextBlockVRFSig(t *testing.T) {
-	require := require.New(t)
-
 	validTestKey, err := bls.SecretKeyFromBytes([]byte{82, 18, 255, 50, 56, 29, 176, 229, 124, 84, 244, 171, 82, 160, 181, 170, 123, 16, 24, 243, 159, 86, 48, 53, 180, 156, 62, 64, 253, 211, 156, 198})
-	require.NoError(err)
+	require.NoError(t, err)
 
 	networkID := uint32(4)
 	chainID := hashing.ComputeHash256Array([]byte{5})
@@ -217,6 +212,7 @@ func TestNextBlockVRFSig(t *testing.T) {
 	}
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
+			require := require.New(t)
 			require.Equal(testCase.expectedOut, NextBlockVRFSig(testCase.parentBlockVRFSig, testCase.blsSignKey, testCase.chainID, testCase.networkID))
 		})
 	}
