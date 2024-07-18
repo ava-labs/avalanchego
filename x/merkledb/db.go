@@ -123,6 +123,24 @@ type RangeProofer interface {
 		maxLength int,
 	) (*RangeProof, error)
 
+	// Returns nil iff all the following hold:
+	//   - [start] <= [end].
+	//   - [proof] is non-empty.
+	//   - All keys in [proof.KeyValues] and [proof.DeletedKeys] are in [start, end].
+	//     If [start] is nothing, all keys are considered > [start].
+	//     If [end] is nothing, all keys are considered < [end].
+	//   - [proof.KeyValues] and [proof.DeletedKeys] are sorted in order of increasing key.
+	//   - [proof.StartProof] and [proof.EndProof] are well-formed.
+	//   - When the changes in [proof.KeyChanes] are applied,
+	//     the root ID of the database is [expectedEndRootID].
+	VerifyRangeProof(
+		ctx context.Context,
+		proof *RangeProof,
+		start maybe.Maybe[[]byte],
+		end maybe.Maybe[[]byte],
+		expectedRootID ids.ID,
+	) error
+
 	// CommitRangeProof commits the key/value pairs within the [proof] to the db.
 	// [start] is the smallest possible key in the range this [proof] covers.
 	// [end] is the largest possible key in the range this [proof] covers.

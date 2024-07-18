@@ -50,6 +50,7 @@ type Client interface {
 	GetRangeProof(
 		ctx context.Context,
 		request *pb.SyncGetRangeProofRequest,
+		verificationDB DB,
 	) (*merkledb.RangeProof, error)
 
 	// GetChangeProof synchronously sends the given request
@@ -71,8 +72,6 @@ type client struct {
 	stateSyncNodeIdx uint32
 	log              logging.Logger
 	metrics          SyncMetrics
-	tokenSize        int
-	hasher           merkledb.Hasher
 }
 
 type ClientConfig struct {
@@ -98,8 +97,6 @@ func NewClient(config *ClientConfig) (Client, error) {
 		stateSyncNodes: config.StateSyncNodeIDs,
 		log:            config.Log,
 		metrics:        config.Metrics,
-		tokenSize:      merkledb.BranchFactorToTokenSize[config.BranchFactor],
-		hasher:         hasher,
 	}, nil
 }
 
@@ -170,13 +167,12 @@ func (c *client) GetChangeProof(
 			// so they sent a range proof instead.
 			err := verifyRangeProof(
 				ctx,
+				db,
 				&rangeProof,
 				int(req.KeyLimit),
 				startKey,
 				endKey,
 				req.EndRootHash,
-				c.tokenSize,
-				c.hasher,
 			)
 			if err != nil {
 				return nil, err
@@ -209,13 +205,12 @@ func (c *client) GetChangeProof(
 // than [keyLimit] keys.
 func verifyRangeProof(
 	ctx context.Context,
+	db merkledb.RangeProofer,
 	rangeProof *merkledb.RangeProof,
 	keyLimit int,
 	start maybe.Maybe[[]byte],
 	end maybe.Maybe[[]byte],
 	rootBytes []byte,
-	tokenSize int,
-	hasher merkledb.Hasher,
 ) error {
 	root, err := ids.ToID(rootBytes)
 	if err != nil {
@@ -230,14 +225,7 @@ func verifyRangeProof(
 		)
 	}
 
-	if err := rangeProof.Verify(
-		ctx,
-		start,
-		end,
-		root,
-		tokenSize,
-		hasher,
-	); err != nil {
+	if err := db.VerifyRangeProof(ctx, rangeProof, start, end, root); err != nil {
 		return fmt.Errorf("%w due to %w", errInvalidRangeProof, err)
 	}
 	return nil
@@ -249,6 +237,7 @@ func verifyRangeProof(
 func (c *client) GetRangeProof(
 	ctx context.Context,
 	req *pb.SyncGetRangeProofRequest,
+	db DB,
 ) (*merkledb.RangeProof, error) {
 	parseFn := func(ctx context.Context, responseBytes []byte) (*merkledb.RangeProof, error) {
 		if len(responseBytes) > int(req.BytesLimit) {
@@ -270,13 +259,12 @@ func (c *client) GetRangeProof(
 
 		if err := verifyRangeProof(
 			ctx,
+			db,
 			&rangeProof,
 			int(req.KeyLimit),
 			maybeBytesToMaybe(req.StartKey),
 			maybeBytesToMaybe(req.EndKey),
 			req.RootHash,
-			c.tokenSize,
-			c.hasher,
 		); err != nil {
 			return nil, err
 		}

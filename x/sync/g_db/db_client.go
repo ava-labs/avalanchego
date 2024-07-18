@@ -81,6 +81,36 @@ func (c *DBClient) GetChangeProof(
 	return &proof, nil
 }
 
+func (c *DBClient) VerifyRangeProof(
+	ctx context.Context,
+	proof *merkledb.RangeProof,
+	startKey maybe.Maybe[[]byte],
+	endKey maybe.Maybe[[]byte],
+	expectedRootID ids.ID,
+) error {
+	resp, err := c.client.VerifyRangeProof(ctx, &pb.VerifyRangeProofRequest{
+		Proof: proof.ToProto(),
+		StartKey: &pb.MaybeBytes{
+			Value:     startKey.Value(),
+			IsNothing: startKey.IsNothing(),
+		},
+		EndKey: &pb.MaybeBytes{
+			Value:     endKey.Value(),
+			IsNothing: endKey.IsNothing(),
+		},
+		ExpectedRootHash: expectedRootID[:],
+	})
+	if err != nil {
+		return err
+	}
+
+	// TODO there's probably a better way to do this.
+	if len(resp.Error) == 0 {
+		return nil
+	}
+	return errors.New(resp.Error)
+}
+
 func (c *DBClient) VerifyChangeProof(
 	ctx context.Context,
 	proof *merkledb.ChangeProof,

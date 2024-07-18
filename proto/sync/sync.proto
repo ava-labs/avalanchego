@@ -30,6 +30,7 @@ service DB {
   rpc CommitChangeProof(CommitChangeProofRequest) returns (google.protobuf.Empty);
 
   rpc GetRangeProof(GetRangeProofRequest) returns (GetRangeProofResponse);
+  rpc VerifyRangeProof(VerifyRangeProofRequest) returns (VerifyRangeProofResponse);
   rpc CommitRangeProof(CommitRangeProofRequest) returns (google.protobuf.Empty);
 }
 
@@ -116,6 +117,18 @@ message GetRangeProofRequest {
   MaybeBytes start_key = 2;
   MaybeBytes end_key = 3;
   uint32 key_limit = 4;
+}
+
+message VerifyRangeProofRequest {
+  RangeProof proof = 1;
+  MaybeBytes start_key = 2;
+  MaybeBytes end_key = 3;
+  bytes expected_root_hash = 4;
+}
+
+message VerifyRangeProofResponse {
+  // If empty, there was no error.
+  string error = 1;
 }
 
 message GetRangeProofResponse {
