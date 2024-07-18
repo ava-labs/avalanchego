@@ -43,7 +43,7 @@ func (s State) ConsumeGas(gas Gas) (State, error) {
 		return State{
 			Capacity: Gas(newCapacity),
 			Excess:   math.MaxUint64,
-		}, nil
+		}, nil //nolint:nilerr // excess is capped at math.MaxUint64
 	}
 
 	return State{
