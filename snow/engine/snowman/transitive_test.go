@@ -3174,20 +3174,20 @@ func TestTransitiveStart(t *testing.T) {
 			wantProcessingBlks []processingBlk, // Blocks that should be processing in consensus after starting
 		)
 	}{
-		//		 [G]
+		//       [G]
 		{
 			name: "no blocks in preferred chain",
 			setup: func(genesisBlk *snowmantest.Block) (snowman.Block, []snowman.Block, snowman.Block, ids.ID, []processingBlk) {
 				return genesisBlk, []snowman.Block{genesisBlk}, nil, genesisBlk.IDV, nil
 			},
 		},
-		//		  G
-		//		  |
-		//		  A
-		//		 / \
-		//	    B  *C*
-		//	    |
-		//	   [D]
+		//        G
+		//        |
+		//        A
+		//       / \
+		//      B  *C*
+		//      |
+		//     [D]
 		{
 			name: "preferred chain before last accepted",
 			setup: func(genesisBlk *snowmantest.Block) (snowman.Block, []snowman.Block, snowman.Block, ids.ID, []processingBlk) {
@@ -3199,13 +3199,13 @@ func TestTransitiveStart(t *testing.T) {
 				return blkD, []snowman.Block{genesisBlk, blkA, blkB, blkC, blkD}, blkC, blkD.IDV, nil
 			},
 		},
-		//		  G
-		//		  |
-		//		 *A*
-		//		  |
-		//		 [B]
-		//	     / \
-		//	   C    D
+		//        G
+		//        |
+		//       *A*
+		//        |
+		//       [B]
+		//       / \
+		//     C    D
 		{
 			name: "preferred chain before last accepted - oracle last accepted block",
 			setup: func(genesisBlk *snowmantest.Block) (snowman.Block, []snowman.Block, snowman.Block, ids.ID, []processingBlk) {
@@ -3224,13 +3224,13 @@ func TestTransitiveStart(t *testing.T) {
 					}
 			},
 		},
-		//		  G
-		//		  |
-		//		  A
-		//		 / \
-		//	    B  *C*
-		//	    |
-		//	   [D]
+		//        G
+		//        |
+		//        A
+		//       / \
+		//      B  *C*
+		//      |
+		//     [D]
 		{
 			name: "preferred chain before last accepted - option block preference",
 			setup: func(genesisBlk *snowmantest.Block) (snowman.Block, []snowman.Block, snowman.Block, ids.ID, []processingBlk) {
@@ -3241,9 +3241,9 @@ func TestTransitiveStart(t *testing.T) {
 				return blkD, []snowman.Block{genesisBlk, blkA, blkD}, blkC, blkD.IDV, nil
 			},
 		},
-		//		 [G]
-		//		  |
-		//		 *A*
+		//       [G]
+		//        |
+		//       *A*
 		{
 			name: "preferred chain after last accepted",
 			setup: func(genesisBlk *snowmantest.Block) (snowman.Block, []snowman.Block, snowman.Block, ids.ID, []processingBlk) {
@@ -3256,13 +3256,13 @@ func TestTransitiveStart(t *testing.T) {
 					[]processingBlk{{Block: blkA, preferred: true}}
 			},
 		},
-		//		 [G]
-		//		  |
-		//		 *A*
-		//		  |
-		//		 *B*
-		//		  |
-		//		 *C*
+		//       [G]
+		//        |
+		//       *A*
+		//        |
+		//       *B*
+		//        |
+		//       *C*
 		{
 			name: "preferred chain after last accepted - multiple blocks",
 			setup: func(genesisBlk *snowmantest.Block) (snowman.Block, []snowman.Block, snowman.Block, ids.ID, []processingBlk) {
@@ -3281,11 +3281,11 @@ func TestTransitiveStart(t *testing.T) {
 					}
 			},
 		},
-		//		 [G]
-		//		  |
-		//		 *A*
-		//		 / \
-		//	   *B*  C
+		//       [G]
+		//        |
+		//       *A*
+		//       / \
+		//     *B*  C
 		{
 			name: "preferred chain after last accepted - oracle block preference",
 			setup: func(genesisBlk *snowmantest.Block) (snowman.Block, []snowman.Block, snowman.Block, ids.ID, []processingBlk) {
@@ -3304,13 +3304,13 @@ func TestTransitiveStart(t *testing.T) {
 		},
 		// We should only store A -> B -> D because C is not the preferred
 		// option.
-		//		 [G]
-		//		  |
-		//		 *A*
-		//		 / \
-		//	   *B*  C
-		//	    |
-		//	   *D*
+		//       [G]
+		//        |
+		//       *A*
+		//       / \
+		//     *B*  C
+		//      |
+		//     *D*
 		{
 			name: "preferred chain - preferred tip branching out of oracle block preference",
 			setup: func(genesisBlk *snowmantest.Block) (snowman.Block, []snowman.Block, snowman.Block, ids.ID, []processingBlk) {
@@ -3331,13 +3331,13 @@ func TestTransitiveStart(t *testing.T) {
 		// We should only re-issue the preferred chain if it extends the last
 		// accepted block
 		// option.
-		//		 [G]
-		//		  |
-		//		 *A*
-		//		 / \
-		//	   *B* [C]
-		//	    |
-		//	   *D*
+		//       [G]
+		//        |
+		//       *A*
+		//       / \
+		//     *B* [C]
+		//      |
+		//     *D*
 		{
 			name: "preferred chain - preferred tip branching out of oracle block preference",
 			setup: func(genesisBlk *snowmantest.Block) (snowman.Block, []snowman.Block, snowman.Block, ids.ID, []processingBlk) {
@@ -3349,13 +3349,13 @@ func TestTransitiveStart(t *testing.T) {
 				return blkC, []snowman.Block{genesisBlk, blkA, blkB, blkC, blkD}, blkD, blkC.IDV, nil
 			},
 		},
-		//		 [G]
-		//		  |
-		//		 *A*
-		//		  |
-		//		  B <- fails verification
-		//		  |
-		//		  C
+		//       [G]
+		//        |
+		//       *A*
+		//        |
+		//        B <- fails verification
+		//        |
+		//        C
 		{
 			name: "preferred chain after last accepted - abort remaining preferred chain if block fails verification",
 			setup: func(genesisBlk *snowmantest.Block) (snowman.Block, []snowman.Block, snowman.Block, ids.ID, []processingBlk) {
@@ -3375,11 +3375,11 @@ func TestTransitiveStart(t *testing.T) {
 					}
 			},
 		},
-		//		 [G]
-		//		  |
-		//		  A <- rejected
-		//		  |
-		//		  B
+		//       [G]
+		//        |
+		//        A <- rejected
+		//        |
+		//        B
 		{
 			name: "preferred chain after last accepted - preference chain rejected",
 			setup: func(genesisBlk *snowmantest.Block) (snowman.Block, []snowman.Block, snowman.Block, ids.ID, []processingBlk) {
@@ -3389,13 +3389,13 @@ func TestTransitiveStart(t *testing.T) {
 				return genesisBlk, []snowman.Block{genesisBlk, blkA, blkB}, genesisBlk, genesisBlk.IDV, nil
 			},
 		},
-		//		 [G]
-		//		  |
-		//		 *A*
-		//		  |
-		//		  B <- rejected
-		//		  |
-		//		  C
+		//       [G]
+		//        |
+		//       *A*
+		//        |
+		//        B <- rejected
+		//        |
+		//        C
 		{
 			name: "preferred chain after last accepted - preference chain partially rejected",
 			setup: func(genesisBlk *snowmantest.Block) (snowman.Block, []snowman.Block, snowman.Block, ids.ID, []processingBlk) {
