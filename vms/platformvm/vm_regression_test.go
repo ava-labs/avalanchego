@@ -65,7 +65,8 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	changeAddr := keys[0].PublicKey().Address()
 
 	// create valid tx
-	builder, txSigner := factory.NewWallet(keys[0])
+	builder, txSigner, feeCalc, err := factory.NewWallet(keys[0])
+	require.NoError(err)
 	utx, err := builder.NewAddValidatorTx(
 		&txs.Validator{
 			NodeID: nodeID,
@@ -78,6 +79,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 			Addrs:     []ids.ShortID{changeAddr},
 		},
 		reward.PercentDenominator,
+		feeCalc,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{changeAddr},
@@ -110,7 +112,8 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	firstDelegatorEndTime := firstDelegatorStartTime.Add(vm.MinStakeDuration)
 
 	// create valid tx
-	builder, txSigner = factory.NewWallet(keys[0], keys[1])
+	builder, txSigner, feeCalc, err = factory.NewWallet(keys[0], keys[1])
+	require.NoError(err)
 	uDelTx1, err := builder.NewAddDelegatorTx(
 		&txs.Validator{
 			NodeID: nodeID,
@@ -122,6 +125,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 			Threshold: 1,
 			Addrs:     []ids.ShortID{changeAddr},
 		},
+		feeCalc,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{changeAddr},
@@ -156,7 +160,9 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	vm.clock.Set(secondDelegatorStartTime.Add(-10 * executor.SyncBound))
 
 	// create valid tx
-	builder, txSigner = factory.NewWallet(keys[0], keys[1], keys[3])
+	builder, txSigner, feeCalc, err = factory.NewWallet(keys[0], keys[1], keys[3])
+	require.NoError(err)
+
 	uDelTx2, err := builder.NewAddDelegatorTx(
 		&txs.Validator{
 			NodeID: nodeID,
@@ -168,6 +174,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 			Threshold: 1,
 			Addrs:     []ids.ShortID{changeAddr},
 		},
+		feeCalc,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{changeAddr},
@@ -192,7 +199,9 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	thirdDelegatorEndTime := thirdDelegatorStartTime.Add(vm.MinStakeDuration)
 
 	// create valid tx
-	builder, txSigner = factory.NewWallet(keys[0], keys[1], keys[4])
+	builder, txSigner, feeCalc, err = factory.NewWallet(keys[0], keys[1], keys[4])
+	require.NoError(err)
+
 	uDelTx3, err := builder.NewAddDelegatorTx(
 		&txs.Validator{
 			NodeID: nodeID,
@@ -204,6 +213,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 			Threshold: 1,
 			Addrs:     []ids.ShortID{changeAddr},
 		},
+		feeCalc,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{changeAddr},
@@ -273,7 +283,8 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			changeAddr := keys[0].PublicKey().Address()
 
 			// create valid tx
-			builder, txSigner := factory.NewWallet(keys[0], keys[1])
+			builder, txSigner, feeCalc, err := factory.NewWallet(keys[0], keys[1])
+			require.NoError(err)
 			utx, err := builder.NewAddValidatorTx(
 				&txs.Validator{
 					NodeID: nodeID,
@@ -286,6 +297,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 					Addrs:     []ids.ShortID{id},
 				},
 				reward.PercentDenominator,
+				feeCalc,
 				walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 					Threshold: 1,
 					Addrs:     []ids.ShortID{changeAddr},
@@ -319,6 +331,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 					Threshold: 1,
 					Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
 				},
+				feeCalc,
 				walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 					Threshold: 1,
 					Addrs:     []ids.ShortID{changeAddr},
@@ -352,6 +365,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 					Threshold: 1,
 					Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
 				},
+				feeCalc,
 				walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 					Threshold: 1,
 					Addrs:     []ids.ShortID{changeAddr},
@@ -385,6 +399,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 					Threshold: 1,
 					Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
 				},
+				feeCalc,
 				walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 					Threshold: 1,
 					Addrs:     []ids.ShortID{changeAddr},
@@ -418,6 +433,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 					Threshold: 1,
 					Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
 				},
+				feeCalc,
 				walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 					Threshold: 1,
 					Addrs:     []ids.ShortID{changeAddr},
@@ -502,15 +518,19 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 	factory := txstest.NewWalletFactory(
 		vm.ctx,
 		&vm.Config,
+		&vm.clock,
 		vm.state,
 	)
 
-	builder, txSigner := factory.NewWallet(key0)
+	builder, txSigner, feeCalc, err := factory.NewWallet(key0)
+	require.NoError(err)
+
 	utx0, err := builder.NewCreateSubnetTx(
 		&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{addr0},
 		},
+		feeCalc,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{addr0},
@@ -520,12 +540,15 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 	addSubnetTx0, err := walletsigner.SignUnsigned(context.Background(), txSigner, utx0)
 	require.NoError(err)
 
-	builder, txSigner = factory.NewWallet(key1)
+	builder, txSigner, feeCalc, err = factory.NewWallet(key1)
+	require.NoError(err)
+
 	utx1, err := builder.NewCreateSubnetTx(
 		&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{addr1},
 		},
+		feeCalc,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{addr1},
@@ -540,6 +563,7 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 			Threshold: 1,
 			Addrs:     []ids.ShortID{addr1},
 		},
+		feeCalc,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{addr0},
@@ -610,7 +634,8 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	newValidatorEndTime := newValidatorStartTime.Add(defaultMinStakingDuration)
 
 	// Create the tx to add a new validator
-	builder, txSigner := factory.NewWallet(keys[0])
+	builder, txSigner, feeCalc, err := factory.NewWallet(keys[0])
+	require.NoError(err)
 	utx, err := builder.NewAddValidatorTx(
 		&txs.Validator{
 			NodeID: nodeID,
@@ -623,6 +648,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
 		},
 		reward.PercentDenominator,
+		feeCalc,
 	)
 	require.NoError(err)
 	addValidatorTx, err := walletsigner.SignUnsigned(context.Background(), txSigner, utx)
@@ -812,7 +838,8 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	nodeID0 := ids.GenerateTestNodeID()
 
 	// Create the tx to add the first new validator
-	builder, txSigner := factory.NewWallet(keys[0])
+	builder, txSigner, feeCalc, err := factory.NewWallet(keys[0])
+	require.NoError(err)
 	utx, err := builder.NewAddValidatorTx(
 		&txs.Validator{
 			NodeID: nodeID0,
@@ -825,6 +852,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
 		},
 		reward.PercentDenominator,
+		feeCalc,
 	)
 	require.NoError(err)
 	addValidatorTx0, err := walletsigner.SignUnsigned(context.Background(), txSigner, utx)
@@ -981,7 +1009,9 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	nodeID1 := ids.GenerateTestNodeID()
 
 	// Create the tx to add the second new validator
-	builder, txSigner = factory.NewWallet(keys[1])
+	builder, txSigner, feeCalc, err = factory.NewWallet(keys[1])
+	require.NoError(err)
+
 	utx1, err := builder.NewAddValidatorTx(
 		&txs.Validator{
 			NodeID: nodeID1,
@@ -994,6 +1024,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
 		},
 		reward.PercentDenominator,
+		feeCalc,
 	)
 	require.NoError(err)
 	addValidatorTx1, err := walletsigner.SignUnsigned(context.Background(), txSigner, utx1)
@@ -1139,7 +1170,8 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 	extraNodeID := ids.GenerateTestNodeID()
 
 	// Create the tx to add the first new validator
-	builder, txSigner := factory.NewWallet(keys[0])
+	builder, txSigner, feeCalc, err := factory.NewWallet(keys[0])
+	require.NoError(err)
 	utx, err := builder.NewAddValidatorTx(
 		&txs.Validator{
 			NodeID: extraNodeID,
@@ -1152,6 +1184,7 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
 		},
 		reward.PercentDenominator,
+		feeCalc,
 	)
 	require.NoError(err)
 	addValidatorTx0, err := walletsigner.SignUnsigned(context.Background(), txSigner, utx)
@@ -1266,7 +1299,9 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 	changeAddr := keys[0].PublicKey().Address()
 
 	// create valid tx
-	builder, txSigner := factory.NewWallet(keys[0], keys[1])
+	builder, txSigner, feeCalc, err := factory.NewWallet(keys[0], keys[1])
+	require.NoError(err)
+
 	utx, err := builder.NewAddValidatorTx(
 		&txs.Validator{
 			NodeID: nodeID,
@@ -1279,6 +1314,7 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 			Addrs:     []ids.ShortID{id},
 		},
 		reward.PercentDenominator,
+		feeCalc,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{changeAddr},
@@ -1312,6 +1348,7 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 			Threshold: 1,
 			Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
 		},
+		feeCalc,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{changeAddr},
@@ -1345,6 +1382,7 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 			Threshold: 1,
 			Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
 		},
+		feeCalc,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{changeAddr},
@@ -1379,7 +1417,8 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionNotTracked(t
 	nodeID := ids.GenerateTestNodeID()
 	changeAddr := keys[0].PublicKey().Address()
 
-	builder, txSigner := factory.NewWallet(keys[0], keys[1])
+	builder, txSigner, feeCalc, err := factory.NewWallet(keys[0], keys[1])
+	require.NoError(err)
 	utx, err := builder.NewAddValidatorTx(
 		&txs.Validator{
 			NodeID: nodeID,
@@ -1392,6 +1431,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionNotTracked(t
 			Addrs:     []ids.ShortID{id},
 		},
 		reward.PercentDenominator,
+		feeCalc,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{changeAddr},
@@ -1417,6 +1457,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionNotTracked(t
 			Threshold: 1,
 			Addrs:     []ids.ShortID{changeAddr},
 		},
+		feeCalc,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{changeAddr},
@@ -1447,6 +1488,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionNotTracked(t
 			},
 			Subnet: createSubnetTx.ID(),
 		},
+		feeCalc,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{changeAddr},
@@ -1478,6 +1520,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionNotTracked(t
 	uRemoveSubnetValTx, err := builder.NewRemoveSubnetValidatorTx(
 		nodeID,
 		createSubnetTx.ID(),
+		feeCalc,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{changeAddr},
@@ -1528,7 +1571,8 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 	nodeID := ids.GenerateTestNodeID()
 	changeAddr := keys[0].PublicKey().Address()
 
-	builder, txSigner := factory.NewWallet(keys[0], keys[1])
+	builder, txSigner, feeCalc, err := factory.NewWallet(keys[0], keys[1])
+	require.NoError(err)
 	utx, err := builder.NewAddValidatorTx(
 		&txs.Validator{
 			NodeID: nodeID,
@@ -1541,6 +1585,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 			Addrs:     []ids.ShortID{id},
 		},
 		reward.PercentDenominator,
+		feeCalc,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{changeAddr},
@@ -1566,6 +1611,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 			Threshold: 1,
 			Addrs:     []ids.ShortID{changeAddr},
 		},
+		feeCalc,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{changeAddr},
@@ -1596,6 +1642,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 			},
 			Subnet: createSubnetTx.ID(),
 		},
+		feeCalc,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{changeAddr},
@@ -1619,6 +1666,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 	uRemoveSubnetValTx, err := builder.NewRemoveSubnetValidatorTx(
 		nodeID,
 		createSubnetTx.ID(),
+		feeCalc,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{changeAddr},
@@ -1679,7 +1727,9 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 	require.NoError(err)
 
 	// build primary network validator with BLS key
-	builder, txSigner := factory.NewWallet(keys...)
+	builder, txSigner, feeCalc, err := factory.NewWallet(keys...)
+	require.NoError(err)
+
 	uPrimaryTx, err := builder.NewAddPermissionlessValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
@@ -1701,6 +1751,7 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 			Addrs:     []ids.ShortID{addr},
 		},
 		reward.PercentDenominator,
+		feeCalc,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{addr},
@@ -1728,7 +1779,8 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 	require.NoError(err)
 
 	// insert the subnet validator
-	builder, txSigner = factory.NewWallet(keys[0], keys[1])
+	builder, txSigner, feeCalc, err = factory.NewWallet(keys[0], keys[1])
+	require.NoError(err)
 	uAddSubnetValTx, err := builder.NewAddSubnetValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
@@ -1739,6 +1791,7 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 			},
 			Subnet: subnetID,
 		},
+		feeCalc,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{addr},
@@ -1809,7 +1862,8 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 	require.NoError(err)
 	require.NotEqual(sk1, sk2)
 
-	builder, txSigner = factory.NewWallet(keys...)
+	builder, txSigner, feeCalc, err = factory.NewWallet(keys...)
+	require.NoError(err)
 	uPrimaryRestartTx, err := builder.NewAddPermissionlessValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
@@ -1831,6 +1885,7 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 			Addrs:     []ids.ShortID{addr},
 		},
 		reward.PercentDenominator,
+		feeCalc,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{addr},
@@ -1935,7 +1990,8 @@ func TestPrimaryNetworkValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	nodeID := ids.GenerateTestNodeID()
 	addr := keys[0].PublicKey().Address()
 
-	builder, txSigner := factory.NewWallet(keys[0])
+	builder, txSigner, feeCalc, err := factory.NewWallet(keys[0])
+	require.NoError(err)
 	uAddValTx1, err := builder.NewAddValidatorTx(
 		&txs.Validator{
 			NodeID: nodeID,
@@ -1948,6 +2004,7 @@ func TestPrimaryNetworkValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 			Addrs:     []ids.ShortID{addr},
 		},
 		reward.PercentDenominator,
+		feeCalc,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{addr},
@@ -2005,7 +2062,8 @@ func TestPrimaryNetworkValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	sk2, err := bls.NewSecretKey()
 	require.NoError(err)
 
-	builder, txSigner = factory.NewWallet(keys...)
+	builder, txSigner, feeCalc, err = factory.NewWallet(keys...)
+	require.NoError(err)
 	uPrimaryRestartTx, err := builder.NewAddPermissionlessValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
@@ -2027,6 +2085,7 @@ func TestPrimaryNetworkValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 			Addrs:     []ids.ShortID{addr},
 		},
 		reward.PercentDenominator,
+		feeCalc,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{addr},
@@ -2095,7 +2154,9 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	nodeID := ids.GenerateTestNodeID()
 	addr := keys[0].PublicKey().Address()
 
-	builder, txSigner := factory.NewWallet(keys[0])
+	builder, txSigner, feeCalc, err := factory.NewWallet(keys[0])
+	require.NoError(err)
+
 	uPrimaryTx1, err := builder.NewAddValidatorTx(
 		&txs.Validator{
 			NodeID: nodeID,
@@ -2108,6 +2169,7 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 			Addrs:     []ids.ShortID{addr},
 		},
 		reward.PercentDenominator,
+		feeCalc,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{addr},
@@ -2135,7 +2197,8 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	require.NoError(err)
 
 	// insert the subnet validator
-	builder, txSigner = factory.NewWallet(keys[0], keys[1])
+	builder, txSigner, feeCalc, err = factory.NewWallet(keys[0], keys[1])
+	require.NoError(err)
 	uAddSubnetValTx, err := builder.NewAddSubnetValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
@@ -2146,6 +2209,7 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 			},
 			Subnet: subnetID,
 		},
+		feeCalc,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{addr},
@@ -2215,7 +2279,9 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	sk2, err := bls.NewSecretKey()
 	require.NoError(err)
 
-	builder, txSigner = factory.NewWallet(keys...)
+	builder, txSigner, feeCalc, err = factory.NewWallet(keys...)
+	require.NoError(err)
+
 	uPrimaryRestartTx, err := builder.NewAddPermissionlessValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
@@ -2237,6 +2303,7 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 			Addrs:     []ids.ShortID{addr},
 		},
 		reward.PercentDenominator,
+		feeCalc,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{addr},
@@ -2312,7 +2379,8 @@ func TestSubnetValidatorSetAfterPrimaryNetworkValidatorRemoval(t *testing.T) {
 	nodeID := ids.GenerateTestNodeID()
 	addr := keys[0].PublicKey().Address()
 
-	builder, txSigner := factory.NewWallet(keys[0])
+	builder, txSigner, feeCalc, err := factory.NewWallet(keys[0])
+	require.NoError(err)
 	uPrimaryTx1, err := builder.NewAddValidatorTx(
 		&txs.Validator{
 			NodeID: nodeID,
@@ -2325,6 +2393,7 @@ func TestSubnetValidatorSetAfterPrimaryNetworkValidatorRemoval(t *testing.T) {
 			Addrs:     []ids.ShortID{addr},
 		},
 		reward.PercentDenominator,
+		feeCalc,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{addr},
@@ -2349,7 +2418,9 @@ func TestSubnetValidatorSetAfterPrimaryNetworkValidatorRemoval(t *testing.T) {
 	require.NoError(err)
 
 	// insert the subnet validator
-	builder, txSigner = factory.NewWallet(keys[0], keys[1])
+	builder, txSigner, feeCalc, err = factory.NewWallet(keys[0], keys[1])
+	require.NoError(err)
+
 	uAddSubnetValTx, err := builder.NewAddSubnetValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
@@ -2360,6 +2431,7 @@ func TestSubnetValidatorSetAfterPrimaryNetworkValidatorRemoval(t *testing.T) {
 			},
 			Subnet: subnetID,
 		},
+		feeCalc,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{addr},

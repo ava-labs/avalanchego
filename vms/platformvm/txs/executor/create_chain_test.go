@@ -33,13 +33,16 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
-	builder, signer := env.factory.NewWallet(preFundedKeys[0], preFundedKeys[1])
+	builder, signer, feeCalc, err := env.factory.NewWallet(preFundedKeys[0], preFundedKeys[1])
+	require.NoError(err)
+
 	utx, err := builder.NewCreateChainTx(
 		testSubnet1.ID(),
 		nil,
 		constants.AVMID,
 		nil,
 		"chain name",
+		feeCalc,
 	)
 	require.NoError(err)
 	tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
@@ -50,12 +53,10 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 
 	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
-	feeCalculator, err := state.PickFeeCalculator(env.config, stateDiff)
-	require.NoError(err)
 
 	executor := StandardTxExecutor{
 		Backend:       &env.backend,
-		FeeCalculator: feeCalculator,
+		FeeCalculator: feeCalc,
 		State:         stateDiff,
 		Tx:            tx,
 	}
@@ -70,13 +71,15 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
-	builder, signer := env.factory.NewWallet(testSubnet1ControlKeys[0], testSubnet1ControlKeys[1])
+	builder, signer, feeCalc, err := env.factory.NewWallet(testSubnet1ControlKeys[0], testSubnet1ControlKeys[1])
+	require.NoError(err)
 	utx, err := builder.NewCreateChainTx(
 		testSubnet1.ID(),
 		nil,
 		constants.AVMID,
 		nil,
 		"chain name",
+		feeCalc,
 	)
 	require.NoError(err)
 	tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
@@ -94,11 +97,9 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
-	feeCalculator, err := state.PickFeeCalculator(env.config, stateDiff)
-	require.NoError(err)
 	executor := StandardTxExecutor{
 		Backend:       &env.backend,
-		FeeCalculator: feeCalculator,
+		FeeCalculator: feeCalc,
 		State:         stateDiff,
 		Tx:            tx,
 	}
@@ -114,13 +115,15 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
-	builder, signer := env.factory.NewWallet(testSubnet1ControlKeys[0], testSubnet1ControlKeys[1])
+	builder, signer, feeCalc, err := env.factory.NewWallet(testSubnet1ControlKeys[0], testSubnet1ControlKeys[1])
+	require.NoError(err)
 	utx, err := builder.NewCreateChainTx(
 		testSubnet1.ID(),
 		nil,
 		constants.AVMID,
 		nil,
 		"chain name",
+		feeCalc,
 	)
 	require.NoError(err)
 	tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
@@ -153,13 +156,15 @@ func TestCreateChainTxValid(t *testing.T) {
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
-	builder, signer := env.factory.NewWallet(testSubnet1ControlKeys[0], testSubnet1ControlKeys[1])
+	builder, signer, feeCalc, err := env.factory.NewWallet(testSubnet1ControlKeys[0], testSubnet1ControlKeys[1])
+	require.NoError(err)
 	utx, err := builder.NewCreateChainTx(
 		testSubnet1.ID(),
 		nil,
 		constants.AVMID,
 		nil,
 		"chain name",
+		feeCalc,
 	)
 	require.NoError(err)
 	tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
@@ -226,14 +231,17 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 			cfg := *env.config
 
 			cfg.StaticFeeConfig.CreateBlockchainTxFee = test.fee
-			factory := txstest.NewWalletFactory(env.ctx, &cfg, env.state)
-			builder, signer := factory.NewWallet(preFundedKeys...)
+			factory := txstest.NewWalletFactory(env.ctx, &cfg, env.clk, env.state)
+			builder, signer, feeCalc, err := factory.NewWallet(preFundedKeys...)
+			require.NoError(err)
+
 			utx, err := builder.NewCreateChainTx(
 				testSubnet1.ID(),
 				nil,
 				ids.GenerateTestID(),
 				nil,
 				"",
+				feeCalc,
 			)
 			require.NoError(err)
 			tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)

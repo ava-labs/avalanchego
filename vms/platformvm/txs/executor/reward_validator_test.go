@@ -251,7 +251,8 @@ func TestRewardDelegatorTxExecuteOnCommitPreDelegateeDeferral(t *testing.T) {
 	vdrEndTime := uint64(defaultValidateStartTime.Add(2 * defaultMinStakingDuration).Unix())
 	vdrNodeID := ids.GenerateTestNodeID()
 
-	builder, signer := env.factory.NewWallet(preFundedKeys[0])
+	builder, signer, feeCalc, err := env.factory.NewWallet(preFundedKeys[0])
+	require.NoError(err)
 	uVdrTx, err := builder.NewAddValidatorTx(
 		&txs.Validator{
 			NodeID: vdrNodeID,
@@ -264,6 +265,7 @@ func TestRewardDelegatorTxExecuteOnCommitPreDelegateeDeferral(t *testing.T) {
 			Addrs:     []ids.ShortID{vdrRewardAddress},
 		},
 		reward.PercentDenominator/4,
+		feeCalc,
 	)
 	require.NoError(err)
 	vdrTx, err := walletsigner.SignUnsigned(context.Background(), signer, uVdrTx)
@@ -283,6 +285,7 @@ func TestRewardDelegatorTxExecuteOnCommitPreDelegateeDeferral(t *testing.T) {
 			Threshold: 1,
 			Addrs:     []ids.ShortID{delRewardAddress},
 		},
+		feeCalc,
 	)
 	require.NoError(err)
 	delTx, err := walletsigner.SignUnsigned(context.Background(), signer, uDelTx)
@@ -386,7 +389,8 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 	vdrEndTime := uint64(defaultValidateStartTime.Add(2 * defaultMinStakingDuration).Unix())
 	vdrNodeID := ids.GenerateTestNodeID()
 
-	builder, signer := env.factory.NewWallet(preFundedKeys[0])
+	builder, signer, feeCalc, err := env.factory.NewWallet(preFundedKeys[0])
+	require.NoError(err)
 	uVdrTx, err := builder.NewAddValidatorTx(
 		&txs.Validator{
 			NodeID: vdrNodeID,
@@ -399,6 +403,7 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 			Addrs:     []ids.ShortID{vdrRewardAddress},
 		},
 		reward.PercentDenominator/4,
+		feeCalc,
 	)
 	require.NoError(err)
 	vdrTx, err := walletsigner.SignUnsigned(context.Background(), signer, uVdrTx)
@@ -418,6 +423,7 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 			Threshold: 1,
 			Addrs:     []ids.ShortID{delRewardAddress},
 		},
+		feeCalc,
 	)
 	require.NoError(err)
 	delTx, err := walletsigner.SignUnsigned(context.Background(), signer, uDelTx)
@@ -617,7 +623,8 @@ func TestRewardDelegatorTxAndValidatorTxExecuteOnCommitPostDelegateeDeferral(t *
 	vdrEndTime := uint64(defaultValidateStartTime.Add(2 * defaultMinStakingDuration).Unix())
 	vdrNodeID := ids.GenerateTestNodeID()
 
-	builder, signer := env.factory.NewWallet(preFundedKeys[0])
+	builder, signer, feeCalc, err := env.factory.NewWallet(preFundedKeys[0])
+	require.NoError(err)
 	uVdrTx, err := builder.NewAddValidatorTx(
 		&txs.Validator{
 			NodeID: vdrNodeID,
@@ -630,6 +637,7 @@ func TestRewardDelegatorTxAndValidatorTxExecuteOnCommitPostDelegateeDeferral(t *
 			Addrs:     []ids.ShortID{vdrRewardAddress},
 		},
 		reward.PercentDenominator/4,
+		feeCalc,
 	)
 	require.NoError(err)
 	vdrTx, err := walletsigner.SignUnsigned(context.Background(), signer, uVdrTx)
@@ -649,6 +657,7 @@ func TestRewardDelegatorTxAndValidatorTxExecuteOnCommitPostDelegateeDeferral(t *
 			Threshold: 1,
 			Addrs:     []ids.ShortID{delRewardAddress},
 		},
+		feeCalc,
 	)
 	require.NoError(err)
 	delTx, err := walletsigner.SignUnsigned(context.Background(), signer, uDelTx)
@@ -794,7 +803,8 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	vdrEndTime := uint64(defaultValidateStartTime.Add(2 * defaultMinStakingDuration).Unix())
 	vdrNodeID := ids.GenerateTestNodeID()
 
-	builder, signer := env.factory.NewWallet(preFundedKeys[0])
+	builder, signer, feeCalc, err := env.factory.NewWallet(preFundedKeys[0])
+	require.NoError(err)
 	uVdrTx, err := builder.NewAddValidatorTx(
 		&txs.Validator{
 			NodeID: vdrNodeID,
@@ -807,6 +817,7 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 			Addrs:     []ids.ShortID{vdrRewardAddress},
 		},
 		reward.PercentDenominator/4,
+		feeCalc,
 	)
 	require.NoError(err)
 	vdrTx, err := walletsigner.SignUnsigned(context.Background(), signer, uVdrTx)
@@ -826,6 +837,7 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 			Threshold: 1,
 			Addrs:     []ids.ShortID{delRewardAddress},
 		},
+		feeCalc,
 	)
 	require.NoError(err)
 	delTx, err := walletsigner.SignUnsigned(context.Background(), signer, uDelTx)

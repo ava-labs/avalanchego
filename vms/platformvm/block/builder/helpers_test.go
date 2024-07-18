@@ -153,7 +153,7 @@ func newEnvironment(t *testing.T, f fork) *environment { //nolint:unparam
 
 	res.uptimes = uptime.NewManager(res.state, res.clk)
 	res.utxosVerifier = utxo.NewVerifier(res.ctx, res.clk, res.fx)
-	res.factory = txstest.NewWalletFactory(res.ctx, res.config, res.state)
+	res.factory = txstest.NewWalletFactory(res.ctx, res.config, res.clk, res.state)
 
 	genesisID := res.state.GetLastAccepted()
 	res.backend = txexecutor.Backend{
@@ -236,7 +236,9 @@ func newEnvironment(t *testing.T, f fork) *environment { //nolint:unparam
 func addSubnet(t *testing.T, env *environment) {
 	require := require.New(t)
 
-	builder, signer := env.factory.NewWallet(preFundedKeys[0])
+	builder, signer, feeCalc, err := env.factory.NewWallet(preFundedKeys[0])
+	require.NoError(err)
+
 	utx, err := builder.NewCreateSubnetTx(
 		&secp256k1fx.OutputOwners{
 			Threshold: 2,
@@ -246,6 +248,7 @@ func addSubnet(t *testing.T, env *environment) {
 				preFundedKeys[2].PublicKey().Address(),
 			},
 		},
+		feeCalc,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},

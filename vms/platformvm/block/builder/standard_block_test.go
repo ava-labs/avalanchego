@@ -63,13 +63,16 @@ func TestAtomicTxImports(t *testing.T) {
 		}}},
 	}))
 
-	builder, signer := env.factory.NewWallet(recipientKey)
+	builder, signer, feeCalc, err := env.factory.NewWallet(recipientKey)
+	require.NoError(err)
+
 	utx, err := builder.NewImportTx(
 		env.ctx.XChainID,
 		&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{recipientKey.PublicKey().Address()},
 		},
+		feeCalc,
 	)
 	require.NoError(err)
 	tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
