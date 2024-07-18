@@ -349,6 +349,7 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 			vm.state,
 			vm.ctx.SharedMemory,
 			vm.parser.Codec(),
+			&vm.clock,
 		),
 	}, "avm"); err != nil {
 		return nil, err

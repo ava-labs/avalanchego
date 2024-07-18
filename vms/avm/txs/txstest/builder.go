@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/state"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
@@ -29,12 +30,14 @@ type Builder struct {
 	chain state.State
 	cfg   *config.Config
 	codec codec.Manager
+	clk   *mockable.Clock
 }
 
 func New(
 	codec codec.Manager,
 	ctx *snow.Context,
 	cfg *config.Config,
+	clk *mockable.Clock,
 	feeAssetID ids.ID,
 	state state.State,
 ) *Builder {
@@ -46,6 +49,7 @@ func New(
 		chain: state,
 		cfg:   cfg,
 		codec: codec,
+		clk:   clk,
 	}
 }
 
@@ -275,6 +279,17 @@ func (b *Builder) builders(kc *secp256k1fx.Keychain) (builder.Builder, signer.Si
 }
 
 func (b *Builder) feeCalculator() (fee.Calculator, error) {
-	chainTime := b.chain.GetTimestamp()
-	return state.PickBuildingFeeCalculator(b.cfg, b.codec, b.chain, chainTime)
+	var (
+		chain         = b.chain
+		parentBlkTime = chain.GetTimestamp()
+		nextBlkTime   = state.NextBlockTime(parentBlkTime, b.clk)
+	)
+
+	diff, err := state.NewDiffOn(chain)
+	if err != nil {
+		return nil, fmt.Errorf("failed building diff: %w", err)
+	}
+	diff.SetTimestamp(nextBlkTime)
+
+	return state.PickBuildingFeeCalculator(b.cfg, b.codec, chain, parentBlkTime)
 }

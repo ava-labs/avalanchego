@@ -19,6 +19,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm/block"
 	"github.com/ava-labs/avalanchego/vms/avm/state"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/executor"
+
+	commonfee "github.com/ava-labs/avalanchego/vms/components/fee"
 )
 
 const SyncBound = 10 * time.Second
@@ -134,6 +136,7 @@ func (b *Block) Verify(context.Context) error {
 	if err != nil {
 		return err
 	}
+	currGasCap := feeCalc.GetGasCap()
 
 	for _, tx := range txs {
 		// Verify that the tx is valid according to the current state of the
@@ -202,6 +205,16 @@ func (b *Block) Verify(context.Context) error {
 
 	// Now that the block has been executed, we can add the block data to the
 	// state diff.
+	if feeCalc.IsEActive() {
+		blkGas, err := feeCalc.GetBlockGas()
+		if err != nil {
+			return err
+		}
+
+		nextGasCap := commonfee.UpdateGasCap(currGasCap, blkGas)
+		stateDiff.SetCurrentGasCap(nextGasCap)
+	}
+
 	stateDiff.SetLastAccepted(blkID)
 	stateDiff.AddBlock(b.Block)
 

@@ -62,7 +62,7 @@ func TestBaseTx(t *testing.T) {
 		utxosKey   = testKeys[1]
 		utxos      = makeTestUTXOs(utxosKey)
 		chainUTXOs = common.NewDeterministicChainUTXOs(require, map[ids.ID][]*avax.UTXO{
-			constants.PlatformChainID: utxos,
+			xChainID: utxos,
 		})
 		backend = NewBackend(testContext, chainUTXOs)
 
@@ -86,21 +86,27 @@ func TestBaseTx(t *testing.T) {
 	)
 
 	{ // Post E-Upgrade
-		commonCalc := commonfee.NewCalculator(testFeeWeights, testGasPrice, testBlockMaxGas)
-		feeCalc := fee.NewDynamicCalculator(commonCalc, builder.Parser.Codec())
+		buildCalc := commonfee.NewCalculator(testFeeWeights, testGasPrice, testBlockMaxGas)
+		feeCalc := fee.NewBuildingDynamicCalculator(buildCalc, builder.Parser.Codec())
 		utx, err := b.NewBaseTx(
 			outputsToMove,
 			feeCalc,
 		)
 		require.NoError(err)
+		buildGas, err := buildCalc.GetBlockGas()
+		require.NoError(err)
 
 		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
 
-		commonCalc = commonfee.NewCalculator(testFeeWeights, testGasPrice, testBlockMaxGas)
-		fc := fee.NewDynamicCalculator(commonCalc, builder.Parser.Codec())
+		verifyCalc := commonfee.NewCalculator(testFeeWeights, testGasPrice, testBlockMaxGas)
+		fc := fee.NewDynamicCalculator(verifyCalc, builder.Parser.Codec())
 		fee, err := fc.CalculateFee(tx)
 		require.NoError(err)
+		verifyGas, err := verifyCalc.GetBlockGas()
+		require.NoError(err)
+
+		require.Equal(buildGas, verifyGas)
 		require.Equal(3_060*units.MicroAvax, fee)
 
 		// check UTXOs selection and fee financing
@@ -215,9 +221,8 @@ func TestCreateAssetTx(t *testing.T) {
 
 	{
 		// Post E-Upgrade
-		commonCalc := commonfee.NewCalculator(testFeeWeights, testGasPrice, testBlockMaxGas)
-		feeCalc := fee.NewDynamicCalculator(commonCalc, builder.Parser.Codec())
-
+		buildCalc := commonfee.NewCalculator(testFeeWeights, testGasPrice, testBlockMaxGas)
+		feeCalc := fee.NewBuildingDynamicCalculator(buildCalc, builder.Parser.Codec())
 		utx, err := b.NewCreateAssetTx(
 			assetName,
 			symbol,
@@ -229,21 +234,27 @@ func TestCreateAssetTx(t *testing.T) {
 
 		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
+		buildGas, err := buildCalc.GetBlockGas()
+		require.NoError(err)
 
-		commonCalc = commonfee.NewCalculator(testFeeWeights, testGasPrice, testBlockMaxGas)
-		fc := fee.NewDynamicCalculator(commonCalc, builder.Parser.Codec())
+		verifyCalc := commonfee.NewCalculator(testFeeWeights, testGasPrice, testBlockMaxGas)
+		fc := fee.NewDynamicCalculator(verifyCalc, builder.Parser.Codec())
 		fee, err := fc.CalculateFee(tx)
 		require.NoError(err)
-		require.Equal(9898*units.MicroAvax, fee)
+		verifyGas, err := verifyCalc.GetBlockGas()
+		require.NoError(err)
+
+		require.Equal(verifyGas, buildGas)
+		require.Equal(1850*units.MicroAvax, fee)
 
 		// check UTXOs selection and fee financing
 		ins := utx.Ins
 		outs := utx.Outs
-		require.Len(ins, 2)
+		require.Len(ins, 1)
 		require.Len(outs, 1)
 
 		expectedConsumed := fee
-		consumed := ins[0].In.Amount() + ins[1].In.Amount() - outs[0].Out.Amount()
+		consumed := ins[0].In.Amount() - outs[0].Out.Amount()
 		require.Equal(expectedConsumed, consumed)
 	}
 
@@ -306,9 +317,8 @@ func TestMintNFTOperation(t *testing.T) {
 
 	{
 		// Post E-Upgrade
-		commonCalc := commonfee.NewCalculator(testFeeWeights, testGasPrice, testBlockMaxGas)
-		feeCalc := fee.NewDynamicCalculator(commonCalc, builder.Parser.Codec())
-
+		buildCalc := commonfee.NewCalculator(testFeeWeights, testGasPrice, testBlockMaxGas)
+		feeCalc := fee.NewBuildingDynamicCalculator(buildCalc, builder.Parser.Codec())
 		utx, err := b.NewOperationTxMintNFT(
 			nftAssetID,
 			payload,
@@ -319,21 +329,27 @@ func TestMintNFTOperation(t *testing.T) {
 
 		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
+		buildGas, err := buildCalc.GetBlockGas()
+		require.NoError(err)
 
-		commonCalc = commonfee.NewCalculator(testFeeWeights, testGasPrice, testBlockMaxGas)
-		fc := fee.NewDynamicCalculator(commonCalc, builder.Parser.Codec())
+		verifyCalc := commonfee.NewCalculator(testFeeWeights, testGasPrice, testBlockMaxGas)
+		fc := fee.NewDynamicCalculator(verifyCalc, builder.Parser.Codec())
 		fee, err := fc.CalculateFee(tx)
 		require.NoError(err)
-		require.Equal(9818*units.MicroAvax, fee)
+		verifyGas, err := verifyCalc.GetBlockGas()
+		require.NoError(err)
+
+		require.Equal(verifyGas, buildGas)
+		require.Equal(1770*units.MicroAvax, fee)
 
 		// check UTXOs selection and fee financing
 		ins := utx.Ins
 		outs := utx.Outs
-		require.Len(ins, 2)
+		require.Len(ins, 1)
 		require.Len(outs, 1)
 
 		expectedConsumed := fee
-		consumed := ins[0].In.Amount() + ins[1].In.Amount() - outs[0].Out.Amount()
+		consumed := ins[0].In.Amount() - outs[0].Out.Amount()
 		require.Equal(expectedConsumed, consumed)
 	}
 
@@ -402,9 +418,8 @@ func TestMintFTOperation(t *testing.T) {
 
 	{
 		// Post E-Upgrade
-		commonCalc := commonfee.NewCalculator(testFeeWeights, testGasPrice, testBlockMaxGas)
-		feeCalc := fee.NewDynamicCalculator(commonCalc, builder.Parser.Codec())
-
+		buildCalc := commonfee.NewCalculator(testFeeWeights, testGasPrice, testBlockMaxGas)
+		feeCalc := fee.NewBuildingDynamicCalculator(buildCalc, builder.Parser.Codec())
 		utx, err := b.NewOperationTxMintFT(
 			outputs,
 			feeCalc,
@@ -413,28 +428,33 @@ func TestMintFTOperation(t *testing.T) {
 
 		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
+		buildGas, err := buildCalc.GetBlockGas()
+		require.NoError(err)
 
-		commonCalc = commonfee.NewCalculator(testFeeWeights, testGasPrice, testBlockMaxGas)
-		fc := fee.NewDynamicCalculator(commonCalc, builder.Parser.Codec())
+		verifyCalc := commonfee.NewCalculator(testFeeWeights, testGasPrice, testBlockMaxGas)
+		fc := fee.NewDynamicCalculator(verifyCalc, builder.Parser.Codec())
 		fee, err := fc.CalculateFee(tx)
 		require.NoError(err)
-		require.Equal(9845*units.MicroAvax, fee)
+		verifyGas, err := verifyCalc.GetBlockGas()
+		require.NoError(err)
+
+		require.Equal(verifyGas, buildGas)
+		require.Equal(1800*units.MicroAvax, fee)
 
 		// check UTXOs selection and fee financing
 		ins := utx.Ins
 		outs := utx.Outs
-		require.Len(ins, 2)
+		require.Len(ins, 1)
 		require.Len(outs, 1)
 
 		expectedConsumed := fee
-		consumed := ins[0].In.Amount() + ins[1].In.Amount() - outs[0].Out.Amount()
+		consumed := ins[0].In.Amount() - outs[0].Out.Amount()
 		require.Equal(expectedConsumed, consumed)
 	}
 
 	{
 		// Pre E-Upgrade
 		feeCalc := fee.NewStaticCalculator(testStaticConfig)
-
 		utx, err := b.NewOperationTxMintFT(
 			outputs,
 			feeCalc,
@@ -489,9 +509,8 @@ func TestMintPropertyOperation(t *testing.T) {
 
 	{
 		// Post E-Upgrade
-		commonCalc := commonfee.NewCalculator(testFeeWeights, testGasPrice, testBlockMaxGas)
-		feeCalc := fee.NewDynamicCalculator(commonCalc, builder.Parser.Codec())
-
+		buildCalc := commonfee.NewCalculator(testFeeWeights, testGasPrice, testBlockMaxGas)
+		feeCalc := fee.NewBuildingDynamicCalculator(buildCalc, builder.Parser.Codec())
 		utx, err := b.NewOperationTxMintProperty(
 			propertyAssetID,
 			propertyOwner,
@@ -501,21 +520,27 @@ func TestMintPropertyOperation(t *testing.T) {
 
 		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
+		buildGas, err := buildCalc.GetBlockGas()
+		require.NoError(err)
 
-		commonCalc = commonfee.NewCalculator(testFeeWeights, testGasPrice, testBlockMaxGas)
-		fc := fee.NewDynamicCalculator(commonCalc, builder.Parser.Codec())
+		verifyCalc := commonfee.NewCalculator(testFeeWeights, testGasPrice, testBlockMaxGas)
+		fc := fee.NewDynamicCalculator(verifyCalc, builder.Parser.Codec())
 		fee, err := fc.CalculateFee(tx)
 		require.NoError(err)
-		require.Equal(9837*units.MicroAvax, fee)
+		verifyGas, err := verifyCalc.GetBlockGas()
+		require.NoError(err)
+
+		require.Equal(verifyGas, buildGas)
+		require.Equal(1790*units.MicroAvax, fee)
 
 		// check UTXOs selection and fee financing
 		ins := utx.Ins
 		outs := utx.Outs
-		require.Len(ins, 2)
+		require.Len(ins, 1)
 		require.Len(outs, 1)
 
 		expectedConsumed := fee
-		consumed := ins[0].In.Amount() + ins[1].In.Amount() - outs[0].Out.Amount()
+		consumed := ins[0].In.Amount() - outs[0].Out.Amount()
 		require.Equal(expectedConsumed, consumed)
 	}
 
@@ -572,9 +597,8 @@ func TestBurnPropertyOperation(t *testing.T) {
 
 	{
 		// Post E-Upgrade
-		commonCalc := commonfee.NewCalculator(testFeeWeights, testGasPrice, testBlockMaxGas)
-		feeCalc := fee.NewDynamicCalculator(commonCalc, builder.Parser.Codec())
-
+		buildCalc := commonfee.NewCalculator(testFeeWeights, testGasPrice, testBlockMaxGas)
+		feeCalc := fee.NewBuildingDynamicCalculator(buildCalc, builder.Parser.Codec())
 		utx, err := b.NewOperationTxBurnProperty(
 			propertyAssetID,
 			feeCalc,
@@ -583,21 +607,27 @@ func TestBurnPropertyOperation(t *testing.T) {
 
 		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
+		buildGas, err := buildCalc.GetBlockGas()
+		require.NoError(err)
 
-		commonCalc = commonfee.NewCalculator(testFeeWeights, testGasPrice, testBlockMaxGas)
-		fc := fee.NewDynamicCalculator(commonCalc, builder.Parser.Codec())
+		verifyCalc := commonfee.NewCalculator(testFeeWeights, testGasPrice, testBlockMaxGas)
+		fc := fee.NewDynamicCalculator(verifyCalc, builder.Parser.Codec())
 		fee, err := fc.CalculateFee(tx)
 		require.NoError(err)
-		require.Equal(9765*units.MicroAvax, fee)
+		verifyGas, err := verifyCalc.GetBlockGas()
+		require.NoError(err)
+
+		require.Equal(verifyGas, buildGas)
+		require.Equal(1720*units.MicroAvax, fee)
 
 		// check UTXOs selection and fee financing
 		ins := utx.Ins
 		outs := utx.Outs
-		require.Len(ins, 2)
+		require.Len(ins, 1)
 		require.Len(outs, 1)
 
 		expectedConsumed := fee
-		consumed := ins[0].In.Amount() + ins[1].In.Amount() - outs[0].Out.Amount()
+		consumed := ins[0].In.Amount() - outs[0].Out.Amount()
 		require.Equal(expectedConsumed, consumed)
 	}
 
@@ -665,9 +695,8 @@ func TestImportTx(t *testing.T) {
 	)
 
 	{ // Post E-Upgrade
-		commonCalc := commonfee.NewCalculator(testFeeWeights, testGasPrice, testBlockMaxGas)
-		feeCalc := fee.NewDynamicCalculator(commonCalc, builder.Parser.Codec())
-
+		buildCalc := commonfee.NewCalculator(testFeeWeights, testGasPrice, testBlockMaxGas)
+		feeCalc := fee.NewBuildingDynamicCalculator(buildCalc, builder.Parser.Codec())
 		utx, err := b.NewImportTx(
 			sourceChainID,
 			importTo,
@@ -677,23 +706,29 @@ func TestImportTx(t *testing.T) {
 
 		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
+		buildGas, err := buildCalc.GetBlockGas()
+		require.NoError(err)
 
-		commonCalc = commonfee.NewCalculator(testFeeWeights, testGasPrice, testBlockMaxGas)
-		fc := fee.NewDynamicCalculator(commonCalc, builder.Parser.Codec())
+		verifyCalc := commonfee.NewCalculator(testFeeWeights, testGasPrice, testBlockMaxGas)
+		fc := fee.NewDynamicCalculator(verifyCalc, builder.Parser.Codec())
 		fee, err := fc.CalculateFee(tx)
 		require.NoError(err)
-		require.Equal(14251*units.MicroAvax, fee)
+		verifyGas, err := verifyCalc.GetBlockGas()
+		require.NoError(err)
+
+		require.Equal(verifyGas, buildGas)
+		require.Equal(1590*units.MicroAvax, fee)
 
 		// check UTXOs selection and fee financing
 		ins := utx.Ins
 		outs := utx.Outs
 		importedIns := utx.ImportedIns
-		require.Len(ins, 2)
+		require.Zero(ins)
 		require.Len(importedIns, 1)
 		require.Len(outs, 1)
 
 		expectedConsumed := fee
-		consumed := importedIns[0].In.Amount() + ins[0].In.Amount() + ins[1].In.Amount() - outs[0].Out.Amount()
+		consumed := importedIns[0].In.Amount() - outs[0].Out.Amount()
 		require.Equal(expectedConsumed, consumed)
 	}
 
@@ -762,24 +797,29 @@ func TestExportTx(t *testing.T) {
 	)
 
 	{ // Post E-Upgrade
-		commonCalc := commonfee.NewCalculator(testFeeWeights, testGasPrice, testBlockMaxGas)
-		feeCalc := fee.NewDynamicCalculator(commonCalc, builder.Parser.Codec())
-
+		buildCalc := commonfee.NewCalculator(testFeeWeights, testGasPrice, testBlockMaxGas)
+		feeCalc := fee.NewBuildingDynamicCalculator(buildCalc, builder.Parser.Codec())
 		utx, err := b.NewExportTx(
 			subnetID,
 			exportedOutputs,
 			feeCalc,
 		)
 		require.NoError(err)
+		buildGas, err := buildCalc.GetBlockGas()
+		require.NoError(err)
 
 		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
 		require.NoError(err)
 
-		commonCalc = commonfee.NewCalculator(testFeeWeights, testGasPrice, testBlockMaxGas)
-		fc := fee.NewDynamicCalculator(commonCalc, builder.Parser.Codec())
+		verifyCalc := commonfee.NewCalculator(testFeeWeights, testGasPrice, testBlockMaxGas)
+		fc := fee.NewDynamicCalculator(verifyCalc, builder.Parser.Codec())
 		fee, err := fc.CalculateFee(tx)
 		require.NoError(err)
-		require.Equal(9966*units.MicroAvax, fee)
+		verifyGas, err := verifyCalc.GetBlockGas()
+		require.NoError(err)
+
+		require.Equal(verifyGas, buildGas)
+		require.Equal(3090*units.MicroAvax, fee)
 
 		// check UTXOs selection and fee financing
 		ins := utx.Ins

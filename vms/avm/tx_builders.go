@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/state"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
@@ -30,6 +31,7 @@ type txBuilderBackend interface {
 	State() state.State
 	Config() *config.Config
 	Codec() codec.Manager
+	Clock() *mockable.Clock
 
 	Context() *walletbuilder.Context
 	ResetAddresses(addrs set.Set[ids.ShortID])
@@ -262,8 +264,19 @@ func builders(backend txBuilderBackend, kc *secp256k1fx.Keychain) (walletbuilder
 }
 
 func feeCalculator(backend txBuilderBackend) (fee.Calculator, error) {
-	chainTime := backend.State().GetTimestamp()
-	return state.PickBuildingFeeCalculator(backend.Config(), backend.Codec(), backend.State(), chainTime)
+	var (
+		chain         = backend.State()
+		parentBlkTime = chain.GetTimestamp()
+		nextBlkTime   = state.NextBlockTime(parentBlkTime, backend.Clock())
+	)
+
+	diff, err := state.NewDiffOn(chain)
+	if err != nil {
+		return nil, fmt.Errorf("failed building diff: %w", err)
+	}
+	diff.SetTimestamp(nextBlkTime)
+
+	return state.PickBuildingFeeCalculator(backend.Config(), backend.Codec(), chain, parentBlkTime)
 }
 
 func options(changeAddr ids.ShortID, memo []byte) []common.Option {

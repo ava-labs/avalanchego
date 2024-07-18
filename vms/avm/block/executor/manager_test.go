@@ -13,6 +13,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/avm/block"
 	"github.com/ava-labs/avalanchego/vms/avm/state"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
@@ -166,6 +167,7 @@ func TestManagerVerifyTx(t *testing.T) {
 				return &manager{
 					backend:      defaultTestBackend(true, nil),
 					state:        state,
+					clk:          &mockable.Clock{},
 					lastAccepted: lastAcceptedID,
 				}
 			},
@@ -196,6 +198,7 @@ func TestManagerVerifyTx(t *testing.T) {
 				return &manager{
 					backend:      defaultTestBackend(true, nil),
 					state:        state,
+					clk:          &mockable.Clock{},
 					lastAccepted: lastAcceptedID,
 				}
 			},
@@ -226,6 +229,7 @@ func TestManagerVerifyTx(t *testing.T) {
 				return &manager{
 					backend:      defaultTestBackend(true, nil),
 					state:        state,
+					clk:          &mockable.Clock{},
 					lastAccepted: lastAcceptedID,
 				}
 			},

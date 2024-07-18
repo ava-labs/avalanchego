@@ -543,7 +543,7 @@ func TestServiceGetTxJSON_BaseTx(t *testing.T) {
 					"addresses": [
 						"X-testing1d6kkj0qh4wcmus3tk59npwt3rluc6en72ngurd"
 					],
-					"amount": 999990355,
+					"amount": 999997280,
 					"locktime": 0,
 					"threshold": 1
 				}
@@ -614,7 +614,7 @@ func TestServiceGetTxJSON_ExportTx(t *testing.T) {
 					"addresses": [
 						"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
 					],
-					"amount": 999990215,
+					"amount": 999997250,
 					"locktime": 0,
 					"threshold": 1
 				}
@@ -753,7 +753,7 @@ func TestServiceGetTxJSON_CreateAssetTx(t *testing.T) {
 					"addresses": [
 						"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
 					],
-					"amount": 999990715,
+					"amount": 999998150,
 					"locktime": 0,
 					"threshold": 1
 				}
@@ -924,7 +924,7 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 					"addresses": [
 						"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
 					],
-					"amount": 999983115,
+					"amount": 999996560,
 					"locktime": 0,
 					"threshold": 1
 				}
@@ -932,12 +932,12 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 		],
 		"inputs": [
 			{
-				"txID": "KGWg2g81xZHm3Enyd16GKh79tRgRK1hcFDsJe5eY9RZQAv5QG",
+				"txID": "2duEndKLApqnbfo1SZsHL87Se4QJAps96Xt7koYGhLS3aqk2GE",
 				"outputIndex": 0,
 				"assetID": "tvLKci3hNoCX4NijS6TfiT6XJJY3gGKd2git6SSVTG5J8Nfby",
 				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 				"input": {
-					"amount": 999991615,
+					"amount": 999998330,
 					"signatureIndices": [
 						0
 					]

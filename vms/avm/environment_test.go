@@ -224,6 +224,7 @@ func setup(tb testing.TB, c *envConfig) *environment {
 				vm.state,
 				vm.ctx.SharedMemory,
 				vm.parser.Codec(),
+				&vm.clock,
 			),
 		},
 		walletService: &WalletService{

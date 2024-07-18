@@ -236,7 +236,7 @@ func (b *builder) NewBaseTx(
 	}
 
 	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
-	toBurn := map[ids.ID]uint64{} // fee are calculated in financeTx
+	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
 	for _, out := range outputs {
 		assetID := out.AssetID()
 		amountToBurn, err := math.Add64(toBurn[assetID], out.Out.Amount())
@@ -301,7 +301,7 @@ func (b *builder) NewCreateAssetTx(
 	}
 
 	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
-	toBurn := map[ids.ID]uint64{} // fee are calculated in financeTx
+	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
 
 	// feesMan cumulates consumed units. Let's init it with utx filled so far
 	if _, err := feeCalc.CalculateFee(&txs.Tx{Unsigned: utx}); err != nil {
@@ -339,7 +339,7 @@ func (b *builder) NewOperationTx(
 	}
 
 	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
-	toBurn := map[ids.ID]uint64{} // fee are calculated in financeTx
+	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
 
 	// feesMan cumulates consumed units. Let's init it with utx filled so far
 	if _, err := feeCalc.CalculateFee(&txs.Tx{Unsigned: utx}); err != nil {
@@ -607,7 +607,7 @@ func (b *builder) NewExportTx(
 	}
 
 	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
-	toBurn := map[ids.ID]uint64{} // fee are calculated in financeTx
+	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
 	for _, out := range outputs {
 		assetID := out.AssetID()
 		amountToBurn, err := math.Add64(toBurn[assetID], out.Out.Amount())

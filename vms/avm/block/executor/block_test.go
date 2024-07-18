@@ -860,6 +860,7 @@ func TestBlockReject(t *testing.T) {
 						metrics:      metrics.NewMockMetrics(ctrl),
 						backend:      defaultTestBackend(true, nil),
 						state:        mockState,
+						clk:          &mockable.Clock{},
 						blkIDToState: map[ids.ID]*blockState{
 							blockID: {},
 						},
@@ -913,6 +914,7 @@ func TestBlockReject(t *testing.T) {
 						metrics:      metrics.NewMockMetrics(ctrl),
 						backend:      defaultTestBackend(true, nil),
 						state:        mockState,
+						clk:          &mockable.Clock{},
 						blkIDToState: map[ids.ID]*blockState{
 							blockID: {},
 						},

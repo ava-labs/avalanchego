@@ -416,9 +416,16 @@ func (s *state) GetTimestamp() time.Time {
 }
 
 func (s *state) GetCurrentGasCap() (commonfee.Gas, error) {
-	if s.currentGasCap == nil {
-		return commonfee.ZeroGas, nil
+	if s.currentGasCap != nil {
+		return *s.currentGasCap, nil
 	}
+
+	feesCfg, err := fee.GetDynamicConfig(true /*isEActive*/)
+	if err != nil {
+		return commonfee.ZeroGas, fmt.Errorf("failed retrieving dynamic fees config: %w", err)
+	}
+	s.currentGasCap = new(commonfee.Gas)
+	*s.currentGasCap = feesCfg.MaxGasPerSecond
 	return *s.currentGasCap, nil
 }
 
