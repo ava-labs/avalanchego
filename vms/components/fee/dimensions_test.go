@@ -16,29 +16,61 @@ func Test_Dimensions_Add(t *testing.T) {
 	tests := []struct {
 		name        string
 		lhs         Dimensions
-		rhs         Dimensions
+		rhs         []Dimensions
 		expected    Dimensions
 		expectedErr error
 	}{
 		{
-			name: "no error",
+			name: "no error single entry",
 			lhs: Dimensions{
 				Bandwidth: 1,
 				DBRead:    2,
 				DBWrite:   3,
 				Compute:   4,
 			},
-			rhs: Dimensions{
-				Bandwidth: 10,
-				DBRead:    20,
-				DBWrite:   30,
-				Compute:   40,
+			rhs: []Dimensions{
+				{
+					Bandwidth: 10,
+					DBRead:    20,
+					DBWrite:   30,
+					Compute:   40,
+				},
 			},
 			expected: Dimensions{
 				Bandwidth: 11,
 				DBRead:    22,
 				DBWrite:   33,
 				Compute:   44,
+			},
+			expectedErr: nil,
+		},
+		{
+			name: "no error multiple entries",
+			lhs: Dimensions{
+				Bandwidth: 1,
+				DBRead:    2,
+				DBWrite:   3,
+				Compute:   4,
+			},
+			rhs: []Dimensions{
+				{
+					Bandwidth: 10,
+					DBRead:    20,
+					DBWrite:   30,
+					Compute:   40,
+				},
+				{
+					Bandwidth: 100,
+					DBRead:    200,
+					DBWrite:   300,
+					Compute:   400,
+				},
+			},
+			expected: Dimensions{
+				Bandwidth: 111,
+				DBRead:    222,
+				DBWrite:   333,
+				Compute:   444,
 			},
 			expectedErr: nil,
 		},
@@ -50,17 +82,19 @@ func Test_Dimensions_Add(t *testing.T) {
 				DBWrite:   3,
 				Compute:   4,
 			},
-			rhs: Dimensions{
-				Bandwidth: 10,
-				DBRead:    20,
-				DBWrite:   30,
-				Compute:   40,
+			rhs: []Dimensions{
+				{
+					Bandwidth: 10,
+					DBRead:    20,
+					DBWrite:   30,
+					Compute:   40,
+				},
 			},
 			expected: Dimensions{
 				Bandwidth: 0,
-				DBRead:    0,
-				DBWrite:   0,
-				Compute:   0,
+				DBRead:    2,
+				DBWrite:   3,
+				Compute:   4,
 			},
 			expectedErr: safemath.ErrOverflow,
 		},
@@ -72,11 +106,13 @@ func Test_Dimensions_Add(t *testing.T) {
 				DBWrite:   3,
 				Compute:   math.MaxUint64,
 			},
-			rhs: Dimensions{
-				Bandwidth: 10,
-				DBRead:    20,
-				DBWrite:   30,
-				Compute:   40,
+			rhs: []Dimensions{
+				{
+					Bandwidth: 10,
+					DBRead:    20,
+					DBWrite:   30,
+					Compute:   40,
+				},
 			},
 			expected: Dimensions{
 				Bandwidth: 11,
@@ -91,7 +127,7 @@ func Test_Dimensions_Add(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 
-			actual, err := test.lhs.Add(test.rhs)
+			actual, err := test.lhs.Add(test.rhs...)
 			require.ErrorIs(err, test.expectedErr)
 			require.Equal(test.expected, actual)
 		})
@@ -102,29 +138,61 @@ func Test_Dimensions_Sub(t *testing.T) {
 	tests := []struct {
 		name        string
 		lhs         Dimensions
-		rhs         Dimensions
+		rhs         []Dimensions
 		expected    Dimensions
 		expectedErr error
 	}{
 		{
-			name: "no error",
+			name: "no error single entry",
 			lhs: Dimensions{
 				Bandwidth: 11,
 				DBRead:    22,
 				DBWrite:   33,
 				Compute:   44,
 			},
-			rhs: Dimensions{
-				Bandwidth: 1,
-				DBRead:    2,
-				DBWrite:   3,
-				Compute:   4,
+			rhs: []Dimensions{
+				{
+					Bandwidth: 1,
+					DBRead:    2,
+					DBWrite:   3,
+					Compute:   4,
+				},
 			},
 			expected: Dimensions{
 				Bandwidth: 10,
 				DBRead:    20,
 				DBWrite:   30,
 				Compute:   40,
+			},
+			expectedErr: nil,
+		},
+		{
+			name: "no error multiple entries",
+			lhs: Dimensions{
+				Bandwidth: 11,
+				DBRead:    22,
+				DBWrite:   33,
+				Compute:   44,
+			},
+			rhs: []Dimensions{
+				{
+					Bandwidth: 1,
+					DBRead:    2,
+					DBWrite:   3,
+					Compute:   4,
+				},
+				{
+					Bandwidth: 5,
+					DBRead:    5,
+					DBWrite:   5,
+					Compute:   5,
+				},
+			},
+			expected: Dimensions{
+				Bandwidth: 5,
+				DBRead:    15,
+				DBWrite:   25,
+				Compute:   35,
 			},
 			expectedErr: nil,
 		},
@@ -136,17 +204,19 @@ func Test_Dimensions_Sub(t *testing.T) {
 				DBWrite:   33,
 				Compute:   44,
 			},
-			rhs: Dimensions{
-				Bandwidth: math.MaxUint64,
-				DBRead:    2,
-				DBWrite:   3,
-				Compute:   4,
+			rhs: []Dimensions{
+				{
+					Bandwidth: math.MaxUint64,
+					DBRead:    2,
+					DBWrite:   3,
+					Compute:   4,
+				},
 			},
 			expected: Dimensions{
 				Bandwidth: 0,
-				DBRead:    0,
-				DBWrite:   0,
-				Compute:   0,
+				DBRead:    22,
+				DBWrite:   33,
+				Compute:   44,
 			},
 			expectedErr: safemath.ErrUnderflow,
 		},
@@ -158,11 +228,13 @@ func Test_Dimensions_Sub(t *testing.T) {
 				DBWrite:   33,
 				Compute:   44,
 			},
-			rhs: Dimensions{
-				Bandwidth: 1,
-				DBRead:    2,
-				DBWrite:   3,
-				Compute:   math.MaxUint64,
+			rhs: []Dimensions{
+				{
+					Bandwidth: 1,
+					DBRead:    2,
+					DBWrite:   3,
+					Compute:   math.MaxUint64,
+				},
 			},
 			expected: Dimensions{
 				Bandwidth: 10,
@@ -177,7 +249,7 @@ func Test_Dimensions_Sub(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 
-			actual, err := test.lhs.Sub(test.rhs)
+			actual, err := test.lhs.Sub(test.rhs...)
 			require.ErrorIs(err, test.expectedErr)
 			require.Equal(test.expected, actual)
 		})
