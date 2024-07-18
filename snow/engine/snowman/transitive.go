@@ -506,19 +506,20 @@ func (t *Transitive) Start(ctx context.Context, startReqID uint32) error {
 		return err
 	}
 
-	preferredBlk, err := t.getInitialPreference(ctx, lastAccepted)
+	persistedPreferredTip, err := t.getInitialPreference(ctx, lastAccepted)
 	if err != nil {
 		return fmt.Errorf("failed to get initial preference: %w", err)
 	}
 
+	// Iterate back towards the last accepted block
 	previousPreferenceChain := make([]snowman.Block, 0)
-	for preferredBlk.Height() > lastAccepted.Height() {
-		if preferredBlk.Status() != choices.Processing {
-			break
+	for blk := persistedPreferredTip; blk.Height() > lastAccepted.Height(); {
+		// Skip any blocks decided during bootstrapping
+		if blk.Status() == choices.Processing {
+			previousPreferenceChain = append(previousPreferenceChain, blk)
 		}
 
-		previousPreferenceChain = append(previousPreferenceChain, preferredBlk)
-		preferredBlk, err = t.VM.GetBlock(ctx, preferredBlk.Parent())
+		blk, err = t.VM.GetBlock(ctx, blk.Parent())
 		if err != nil {
 			return err
 		}
@@ -535,7 +536,9 @@ func (t *Transitive) Start(ctx context.Context, startReqID uint32) error {
 	// processing in consensus.
 	issuedMetric := t.metrics.issued.WithLabelValues(builtSource)
 	currentPreferredTip := lastAcceptedID
-	persistedPreferredTip := previousPreferenceChain[len(previousPreferenceChain)-1]
+
+	// Reverse the preferred chain so the blocks are now in chronological order
+	slices.Reverse(previousPreferenceChain)
 
 	if persistedPreferredTip.Height() <= lastAccepted.Height() {
 		// to maintain the invariant that oracle blocks are issued in the correct
@@ -561,12 +564,9 @@ func (t *Transitive) Start(ctx context.Context, startReqID uint32) error {
 				}
 			}
 		}
-	} else if len(previousPreferenceChain) > 0 && persistedPreferredTip.Parent() == lastAcceptedID {
+	} else if len(previousPreferenceChain) > 0 && previousPreferenceChain[0].Parent() == lastAcceptedID {
 		// Re-issue all blocks in the preferred chain into consensus if the
 		// preferred chain extends the last accepted block
-		//
-		// Reverse the preferred chain so the blocks are now in chronological order
-		slices.Reverse(previousPreferenceChain)
 
 		for _, blk := range previousPreferenceChain {
 			ok, err := t.addUnverifiedBlockToConsensus(
@@ -586,10 +586,10 @@ func (t *Transitive) Start(ctx context.Context, startReqID uint32) error {
 
 			currentPreferredTip = blk.ID()
 		}
-	}
 
-	if err := t.VM.SetPreference(ctx, currentPreferredTip); err != nil {
-		return err
+		if err := t.VM.SetPreference(ctx, currentPreferredTip); err != nil {
+			return err
+		}
 	}
 
 	t.Ctx.Log.Info("starting consensus",
