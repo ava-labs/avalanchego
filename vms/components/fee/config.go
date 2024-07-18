@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-// The fee package implements the fee logic specified in ACP-103:
+// The fee package implements dynamic gas pricing specified in ACP-103:
 // https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/103-dynamic-fees
 package fee
 
