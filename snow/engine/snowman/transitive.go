@@ -513,6 +513,10 @@ func (t *Transitive) Start(ctx context.Context, startReqID uint32) error {
 
 	previousPreferenceChain := make([]snowman.Block, 0)
 	for preferredBlk.Height() > lastAccepted.Height() {
+		if preferredBlk.Status() != choices.Processing {
+			break
+		}
+
 		previousPreferenceChain = append(previousPreferenceChain, preferredBlk)
 		preferredBlk, err = t.VM.GetBlock(ctx, preferredBlk.Parent())
 		if err != nil {

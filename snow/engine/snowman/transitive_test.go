@@ -3313,6 +3313,37 @@ func TestTransitiveStart(t *testing.T) {
 				return genesisBlk, []snowman.Block{genesisBlk, blkA, blkB, blkC}, blkC, blkA.IDV, []snowman.Block{blkA}
 			},
 		},
+		//		 [G]
+		//		  |
+		//		  A <- rejected
+		//		  |
+		//		  B
+		{
+			name: "preferred chain after last accepted - preference chain rejected",
+			setup: func(genesisBlk *snowmantest.Block) (snowman.Block, []snowman.Block, snowman.Block, ids.ID, []snowman.Block) {
+				blkA := BuildBlock(genesisBlk, choices.Rejected)
+				blkB := BuildBlock(blkA, choices.Rejected)
+
+				return genesisBlk, []snowman.Block{genesisBlk, blkA, blkB}, genesisBlk, genesisBlk.IDV, nil
+			},
+		},
+		//		 [G]
+		//		  |
+		//		 *A*
+		//		  |
+		//		  B <- rejected
+		//		  |
+		//		  C
+		{
+			name: "preferred chain after last accepted - preference chain partially rejected",
+			setup: func(genesisBlk *snowmantest.Block) (snowman.Block, []snowman.Block, snowman.Block, ids.ID, []snowman.Block) {
+				blkA := BuildBlock(genesisBlk, choices.Processing)
+				blkB := BuildBlock(blkA, choices.Rejected)
+				blkC := BuildBlock(blkB, choices.Rejected)
+
+				return genesisBlk, []snowman.Block{genesisBlk, blkA, blkB, blkC}, blkC, blkA.IDV, []snowman.Block{blkA}
+			},
+		},
 	}
 
 	for _, tt := range tests {
