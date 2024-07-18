@@ -13,7 +13,7 @@ import (
 
 var _ txs.Visitor = (*txInit)(nil)
 
-// Init initializes FxID where required
+// txInit initializes FxID where required
 type txInit struct {
 	tx            *txs.Tx
 	ctx           *snow.Context

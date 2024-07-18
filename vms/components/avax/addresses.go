@@ -131,7 +131,7 @@ func ParseServiceAddress(a AddressManager, addrStr string) (ids.ShortID, error) 
 	return addr, nil
 }
 
-// ParseServiceAddress get addresses IDs from addresses strings, being them either localized or not
+// ParseServiceAddresses get addresses IDs from addresses strings, being them either localized or not
 func ParseServiceAddresses(a AddressManager, addrStrs []string) (set.Set[ids.ShortID], error) {
 	addrs := set.NewSet[ids.ShortID](len(addrStrs))
 	for _, addrStr := range addrStrs {
