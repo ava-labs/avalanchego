@@ -959,13 +959,12 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest, token
 			require.NoError(err)
 			require.LessOrEqual(len(rangeProof.KeyValues), maxProofLen)
 
-			require.NoError(rangeProof.Verify(
+			require.NoError(db.VerifyRangeProof(
 				context.Background(),
+				rangeProof,
 				start,
 				end,
 				root,
-				tokenSize,
-				db.hasher,
 			))
 		case opGenerateChangeProof:
 			root, err := db.GetMerkleRoot(context.Background())

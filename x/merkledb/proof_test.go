@@ -153,24 +153,22 @@ func Test_RangeProof_Extra_Value(t *testing.T) {
 	require.NoError(err)
 	require.NotNil(proof)
 
-	require.NoError(proof.Verify(
+	require.NoError(db.VerifyRangeProof(
 		context.Background(),
+		proof,
 		maybe.Some([]byte{1}),
 		maybe.Some([]byte{5, 5}),
 		db.rootID,
-		db.tokenSize,
-		db.hasher,
 	))
 
 	proof.KeyValues = append(proof.KeyValues, KeyValue{Key: []byte{5}, Value: []byte{5}})
 
-	err = proof.Verify(
+	err = db.VerifyRangeProof(
 		context.Background(),
+		proof,
 		maybe.Some([]byte{1}),
 		maybe.Some([]byte{5, 5}),
 		db.rootID,
-		db.tokenSize,
-		db.hasher,
 	)
 	require.ErrorIs(err, ErrInvalidProof)
 }
@@ -241,7 +239,7 @@ func Test_RangeProof_Verify_Bad_Data(t *testing.T) {
 
 			tt.malform(proof)
 
-			err = proof.Verify(context.Background(), maybe.Some([]byte{2}), maybe.Some([]byte{3, 0}), db.getMerkleRoot(), db.tokenSize, db.hasher)
+			err = db.VerifyRangeProof(context.Background(), proof, maybe.Some([]byte{2}), maybe.Some([]byte{3, 0}), db.getMerkleRoot())
 			require.ErrorIs(err, tt.expectedErr)
 		})
 	}
@@ -483,9 +481,12 @@ func Test_RangeProof_Syntactic_Verify(t *testing.T) {
 		},
 	}
 
+	db, err := getBasicDB()
+	require.NoError(t, err)
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := tt.proof.Verify(context.Background(), tt.start, tt.end, ids.Empty, 4, DefaultHasher)
+			err := db.VerifyRangeProof(context.Background(), tt.proof, tt.start, tt.end, ids.Empty)
 			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}
@@ -519,13 +520,12 @@ func Test_RangeProof(t *testing.T) {
 	// only a single node here since others are duplicates in endproof
 	require.Equal([]byte{1}, proof.StartProof[0].Key.Bytes())
 
-	require.NoError(proof.Verify(
+	require.NoError(db.VerifyRangeProof(
 		context.Background(),
+		proof,
 		maybe.Some([]byte{1}),
 		maybe.Some([]byte{3, 5}),
 		db.rootID,
-		db.tokenSize,
-		db.hasher,
 	))
 }
 
@@ -574,13 +574,12 @@ func Test_RangeProof_NilStart(t *testing.T) {
 	require.Equal(ToKey([]byte("key2")), proof.EndProof[1].Key, db.tokenSize)
 	require.Equal(ToKey([]byte("key2")).Take(28), proof.EndProof[0].Key)
 
-	require.NoError(proof.Verify(
+	require.NoError(db.VerifyRangeProof(
 		context.Background(),
+		proof,
 		maybe.Nothing[[]byte](),
 		maybe.Some([]byte("key35")),
 		db.rootID,
-		db.tokenSize,
-		db.hasher,
 	))
 }
 
@@ -615,13 +614,12 @@ func Test_RangeProof_NilEnd(t *testing.T) {
 	require.Equal(db.root.Value().key, proof.EndProof[0].Key)
 	require.Equal([]byte{2}, proof.EndProof[1].Key.Bytes())
 
-	require.NoError(proof.Verify(
+	require.NoError(db.VerifyRangeProof(
 		context.Background(),
+		proof,
 		maybe.Some([]byte{1}),
 		maybe.Nothing[[]byte](),
 		db.rootID,
-		db.tokenSize,
-		db.hasher,
 	))
 }
 
@@ -659,13 +657,12 @@ func Test_RangeProof_EmptyValues(t *testing.T) {
 	require.Equal(ToKey([]byte("key1")).Take(28), proof.EndProof[0].Key, db.tokenSize) // root
 	require.Equal(ToKey([]byte("key2")), proof.EndProof[1].Key, db.tokenSize)
 
-	require.NoError(proof.Verify(
+	require.NoError(db.VerifyRangeProof(
 		context.Background(),
+		proof,
 		maybe.Some([]byte("key1")),
 		maybe.Some([]byte("key2")),
 		db.rootID,
-		db.tokenSize,
-		db.hasher,
 	))
 }
 
@@ -1751,13 +1748,12 @@ func FuzzRangeProofInvariants(f *testing.F) {
 		}
 		require.NoError(err)
 
-		require.NoError(rangeProof.Verify(
+		require.NoError(db.VerifyRangeProof(
 			context.Background(),
+			rangeProof,
 			start,
 			end,
 			rootID,
-			db.tokenSize,
-			db.hasher,
 		))
 
 		// Make sure the start proof doesn't contain any nodes
