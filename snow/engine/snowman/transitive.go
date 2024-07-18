@@ -711,8 +711,9 @@ func (t *Transitive) issueFromByID(
 ) error {
 	blk, err := t.getBlock(ctx, blkID)
 	if err != nil {
+		// If the block is not locally available, request it from the peer.
 		t.sendRequest(ctx, nodeID, blkID, issuedMetric)
-		return nil
+		return nil //nolint:nilerr
 	}
 	return t.issueFrom(ctx, nodeID, blk, issuedMetric)
 }
@@ -738,8 +739,9 @@ func (t *Transitive) issueFrom(
 		blkID = blk.Parent()
 		blk, err = t.getBlock(ctx, blkID)
 		if err != nil {
+			// If the block is not locally available, request it from the peer.
 			t.sendRequest(ctx, nodeID, blkID, issuedMetric)
-			return nil
+			return nil //nolint:nilerr
 		}
 	}
 

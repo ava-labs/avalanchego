@@ -15,10 +15,10 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
@@ -65,7 +65,7 @@ func TestOracle_PreForkBlkCanBuiltOnPreForkOption(t *testing.T) {
 	preferredTestBlk := snowmantest.BuildChild(coreTestBlk)
 	oracleCoreBlk := &TestOptionsBlock{
 		Block: *coreTestBlk,
-		opts: [2]snowman.Block{
+		opts: [2]*snowmantest.Block{
 			preferredTestBlk,
 			snowmantest.BuildChild(coreTestBlk),
 		},
@@ -139,7 +139,7 @@ func TestOracle_PostForkBlkCanBuiltOnPreForkOption(t *testing.T) {
 
 	oracleCoreBlk := &TestOptionsBlock{
 		Block: *coreTestBlk,
-		opts: [2]snowman.Block{
+		opts: [2]*snowmantest.Block{
 			preferredBlk,
 			unpreferredBlk,
 		},
@@ -294,7 +294,6 @@ func TestBlockVerify_BlocksBuiltOnPreForkGenesis(t *testing.T) {
 		postForkCommonComponents: postForkCommonComponents{
 			vm:       proVM,
 			innerBlk: coreBlk,
-			status:   choices.Processing,
 		},
 	}
 
@@ -439,12 +438,12 @@ func TestBlockAccept_PreFork_SetsLastAcceptedBlock(t *testing.T) {
 	// test
 	require.NoError(builtBlk.Accept(context.Background()))
 
-	coreVM.LastAcceptedF = func(context.Context) (ids.ID, error) {
-		if coreBlk.Status() == choices.Accepted {
-			return coreBlk.ID(), nil
-		}
-		return snowmantest.GenesisID, nil
-	}
+	coreVM.LastAcceptedF = snowmantest.MakeLastAcceptedBlockF(
+		[]*snowmantest.Block{
+			snowmantest.Genesis,
+			coreBlk,
+		},
+	)
 	acceptedID, err := proVM.LastAccepted(context.Background())
 	require.NoError(err)
 	require.Equal(builtBlk.ID(), acceptedID)
@@ -474,8 +473,7 @@ func TestBlockReject_PreForkBlock_InnerBlockIsRejected(t *testing.T) {
 	proBlk := sb.(*preForkBlock)
 
 	require.NoError(proBlk.Reject(context.Background()))
-	require.Equal(choices.Rejected, proBlk.Status())
-	require.Equal(choices.Rejected, proBlk.Block.Status())
+	require.Equal(snowtest.Rejected, coreBlk.Status)
 }
 
 func TestBlockVerify_ForkBlockIsOracleBlock(t *testing.T) {
@@ -497,7 +495,7 @@ func TestBlockVerify_ForkBlockIsOracleBlock(t *testing.T) {
 	coreTestBlk.TimestampV = postActivationTime
 	coreBlk := &TestOptionsBlock{
 		Block: *coreTestBlk,
-		opts: [2]snowman.Block{
+		opts: [2]*snowmantest.Block{
 			snowmantest.BuildChild(coreTestBlk),
 			snowmantest.BuildChild(coreTestBlk),
 		},
@@ -567,7 +565,7 @@ func TestBlockVerify_ForkBlockIsOracleBlockButChildrenAreSigned(t *testing.T) {
 	coreTestBlk.TimestampV = postActivationTime
 	coreBlk := &TestOptionsBlock{
 		Block: *coreTestBlk,
-		opts: [2]snowman.Block{
+		opts: [2]*snowmantest.Block{
 			snowmantest.BuildChild(coreTestBlk),
 			snowmantest.BuildChild(coreTestBlk),
 		},

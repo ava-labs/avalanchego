@@ -4,6 +4,7 @@
 package antithesis
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -22,9 +23,63 @@ import (
 
 const bootstrapIndex = 0
 
+var (
+	errTargetPathEnvVarNotSet = errors.New("TARGET_PATH environment variable not set")
+	errImageTagEnvVarNotSet   = errors.New("IMAGE_TAG environment variable not set")
+	errAvalancheGoEvVarNotSet = errors.New("AVALANCHEGO_PATH environment variable not set")
+	errPluginDirEnvVarNotSet  = errors.New("AVALANCHEGO_PLUGIN_DIR environment variable not set")
+)
+
+// Creates docker-compose configuration for an antithesis test
+// setup. Configuration is via env vars to simplify usage by main entrypoints. If
+// the provided network includes a subnet, the initial DB state for the subnet
+// will be created and written to the target path.
+func GenerateComposeConfig(network *tmpnet.Network, baseImageName string) error {
+	targetPath := os.Getenv("TARGET_PATH")
+	if len(targetPath) == 0 {
+		return errTargetPathEnvVarNotSet
+	}
+
+	imageTag := os.Getenv("IMAGE_TAG")
+	if len(imageTag) == 0 {
+		return errImageTagEnvVarNotSet
+	}
+
+	// Subnet testing requires creating an initial db state for the bootstrap node
+	if len(network.Subnets) > 0 {
+		avalancheGoPath := os.Getenv("AVALANCHEGO_PATH")
+		if len(avalancheGoPath) == 0 {
+			return errAvalancheGoEvVarNotSet
+		}
+
+		pluginDir := os.Getenv("AVALANCHEGO_PLUGIN_DIR")
+		if len(pluginDir) == 0 {
+			return errPluginDirEnvVarNotSet
+		}
+
+		bootstrapVolumePath, err := getBootstrapVolumePath(targetPath)
+		if err != nil {
+			return fmt.Errorf("failed to get bootstrap volume path: %w", err)
+		}
+
+		if err := initBootstrapDB(network, avalancheGoPath, pluginDir, bootstrapVolumePath); err != nil {
+			return fmt.Errorf("failed to initialize db volumes: %w", err)
+		}
+	}
+
+	nodeImageName := fmt.Sprintf("%s-node:%s", baseImageName, imageTag)
+	workloadImageName := fmt.Sprintf("%s-workload:%s", baseImageName, imageTag)
+
+	if err := initComposeConfig(network, nodeImageName, workloadImageName, targetPath); err != nil {
+		return fmt.Errorf("failed to generate compose config: %w", err)
+	}
+
+	return nil
+}
+
 // Initialize the given path with the docker-compose configuration (compose file and
 // volumes) needed for an Antithesis test setup.
-func GenerateComposeConfig(
+func initComposeConfig(
 	network *tmpnet.Network,
 	nodeImageName string,
 	workloadImageName string,

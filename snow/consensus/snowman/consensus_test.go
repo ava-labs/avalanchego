@@ -17,7 +17,6 @@ import (
 	"gonum.org/v1/gonum/mathext/prng"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
@@ -251,9 +250,9 @@ func AddOnUnknownParentTest(t *testing.T, factory Factory) {
 	))
 
 	block := &snowmantest.Block{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+		Decidable: snowtest.Decidable{
+			IDV:    ids.GenerateTestID(),
+			Status: snowtest.Undecided,
 		},
 		ParentV: ids.GenerateTestID(),
 		HeightV: snowmantest.GenesisHeight + 2,
@@ -289,7 +288,7 @@ func StatusOrProcessingPreviouslyAcceptedTest(t *testing.T, factory Factory) {
 		snowmantest.GenesisTimestamp,
 	))
 
-	require.Equal(choices.Accepted, snowmantest.Genesis.Status())
+	require.Equal(snowtest.Accepted, snowmantest.Genesis.Status)
 	require.False(sm.Processing(snowmantest.Genesis.ID()))
 	require.True(sm.IsPreferred(snowmantest.Genesis.ID()))
 
@@ -326,7 +325,7 @@ func StatusOrProcessingPreviouslyRejectedTest(t *testing.T, factory Factory) {
 	block := snowmantest.BuildChild(snowmantest.Genesis)
 	require.NoError(block.Reject(context.Background()))
 
-	require.Equal(choices.Rejected, block.Status())
+	require.Equal(snowtest.Rejected, block.Status)
 	require.False(sm.Processing(block.ID()))
 	require.False(sm.IsPreferred(block.ID()))
 
@@ -361,7 +360,7 @@ func StatusOrProcessingUnissuedTest(t *testing.T, factory Factory) {
 
 	block := snowmantest.BuildChild(snowmantest.Genesis)
 
-	require.Equal(choices.Processing, block.Status())
+	require.Equal(snowtest.Undecided, block.Status)
 	require.False(sm.Processing(block.ID()))
 	require.False(sm.IsPreferred(block.ID()))
 
@@ -397,7 +396,7 @@ func StatusOrProcessingIssuedTest(t *testing.T, factory Factory) {
 	block := snowmantest.BuildChild(snowmantest.Genesis)
 
 	require.NoError(sm.Add(block))
-	require.Equal(choices.Processing, block.Status())
+	require.Equal(snowtest.Undecided, block.Status)
 	require.True(sm.Processing(block.ID()))
 	require.True(sm.IsPreferred(block.ID()))
 
@@ -439,12 +438,12 @@ func RecordPollAcceptSingleBlockTest(t *testing.T, factory Factory) {
 	require.NoError(sm.RecordPoll(context.Background(), votes))
 	require.Equal(block.ID(), sm.Preference())
 	require.Equal(1, sm.NumProcessing())
-	require.Equal(choices.Processing, block.Status())
+	require.Equal(snowtest.Undecided, block.Status)
 
 	require.NoError(sm.RecordPoll(context.Background(), votes))
 	require.Equal(block.ID(), sm.Preference())
 	require.Zero(sm.NumProcessing())
-	require.Equal(choices.Accepted, block.Status())
+	require.Equal(snowtest.Accepted, block.Status)
 }
 
 func RecordPollAcceptAndRejectTest(t *testing.T, factory Factory) {
@@ -483,14 +482,14 @@ func RecordPollAcceptAndRejectTest(t *testing.T, factory Factory) {
 	require.NoError(sm.RecordPoll(context.Background(), votes))
 	require.Equal(firstBlock.ID(), sm.Preference())
 	require.Equal(2, sm.NumProcessing())
-	require.Equal(choices.Processing, firstBlock.Status())
-	require.Equal(choices.Processing, secondBlock.Status())
+	require.Equal(snowtest.Undecided, firstBlock.Status)
+	require.Equal(snowtest.Undecided, secondBlock.Status)
 
 	require.NoError(sm.RecordPoll(context.Background(), votes))
 	require.Equal(firstBlock.ID(), sm.Preference())
 	require.Zero(sm.NumProcessing())
-	require.Equal(choices.Accepted, firstBlock.Status())
-	require.Equal(choices.Rejected, secondBlock.Status())
+	require.Equal(snowtest.Accepted, firstBlock.Status)
+	require.Equal(snowtest.Rejected, secondBlock.Status)
 }
 
 func RecordPollSplitVoteNoChangeTest(t *testing.T, factory Factory) {
@@ -628,9 +627,9 @@ func RecordPollRejectTransitivelyTest(t *testing.T, factory Factory) {
 
 	require.Zero(sm.NumProcessing())
 	require.Equal(block0.ID(), sm.Preference())
-	require.Equal(choices.Accepted, block0.Status())
-	require.Equal(choices.Rejected, block1.Status())
-	require.Equal(choices.Rejected, block2.Status())
+	require.Equal(snowtest.Accepted, block0.Status)
+	require.Equal(snowtest.Rejected, block1.Status)
+	require.Equal(snowtest.Rejected, block2.Status)
 }
 
 func RecordPollTransitivelyResetConfidenceTest(t *testing.T, factory Factory) {
@@ -697,10 +696,10 @@ func RecordPollTransitivelyResetConfidenceTest(t *testing.T, factory Factory) {
 	require.NoError(sm.RecordPoll(context.Background(), votesFor3))
 	require.Zero(sm.NumProcessing())
 	require.Equal(block3.ID(), sm.Preference())
-	require.Equal(choices.Rejected, block0.Status())
-	require.Equal(choices.Accepted, block1.Status())
-	require.Equal(choices.Rejected, block2.Status())
-	require.Equal(choices.Accepted, block3.Status())
+	require.Equal(snowtest.Rejected, block0.Status)
+	require.Equal(snowtest.Accepted, block1.Status)
+	require.Equal(snowtest.Rejected, block2.Status)
+	require.Equal(snowtest.Accepted, block3.Status)
 }
 
 func RecordPollInvalidVoteTest(t *testing.T, factory Factory) {
@@ -803,11 +802,11 @@ func RecordPollTransitiveVotingTest(t *testing.T, factory Factory) {
 
 	require.Equal(4, sm.NumProcessing())
 	require.Equal(block2.ID(), sm.Preference())
-	require.Equal(choices.Accepted, block0.Status())
-	require.Equal(choices.Processing, block1.Status())
-	require.Equal(choices.Processing, block2.Status())
-	require.Equal(choices.Processing, block3.Status())
-	require.Equal(choices.Processing, block4.Status())
+	require.Equal(snowtest.Accepted, block0.Status)
+	require.Equal(snowtest.Undecided, block1.Status)
+	require.Equal(snowtest.Undecided, block2.Status)
+	require.Equal(snowtest.Undecided, block3.Status)
+	require.Equal(snowtest.Undecided, block4.Status)
 
 	dep2_2_2 := bag.Of(block2.ID(), block2.ID(), block2.ID())
 	require.NoError(sm.RecordPoll(context.Background(), dep2_2_2))
@@ -818,11 +817,11 @@ func RecordPollTransitiveVotingTest(t *testing.T, factory Factory) {
 
 	require.Zero(sm.NumProcessing())
 	require.Equal(block2.ID(), sm.Preference())
-	require.Equal(choices.Accepted, block0.Status())
-	require.Equal(choices.Accepted, block1.Status())
-	require.Equal(choices.Accepted, block2.Status())
-	require.Equal(choices.Rejected, block3.Status())
-	require.Equal(choices.Rejected, block4.Status())
+	require.Equal(snowtest.Accepted, block0.Status)
+	require.Equal(snowtest.Accepted, block1.Status)
+	require.Equal(snowtest.Accepted, block2.Status)
+	require.Equal(snowtest.Rejected, block3.Status)
+	require.Equal(snowtest.Rejected, block4.Status)
 }
 
 func RecordPollDivergedVotingWithNoConflictingBitTest(t *testing.T, factory Factory) {
@@ -850,25 +849,25 @@ func RecordPollDivergedVotingWithNoConflictingBitTest(t *testing.T, factory Fact
 	))
 
 	block0 := &snowmantest.Block{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.ID{0x06}, // 0110
-			StatusV: choices.Processing,
+		Decidable: snowtest.Decidable{
+			IDV:    ids.ID{0x06}, // 0110
+			Status: snowtest.Undecided,
 		},
 		ParentV: snowmantest.GenesisID,
 		HeightV: snowmantest.GenesisHeight + 1,
 	}
 	block1 := &snowmantest.Block{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.ID{0x08}, // 0001
-			StatusV: choices.Processing,
+		Decidable: snowtest.Decidable{
+			IDV:    ids.ID{0x08}, // 0001
+			Status: snowtest.Undecided,
 		},
 		ParentV: snowmantest.GenesisID,
 		HeightV: snowmantest.GenesisHeight + 1,
 	}
 	block2 := &snowmantest.Block{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.ID{0x01}, // 1000
-			StatusV: choices.Processing,
+		Decidable: snowtest.Decidable{
+			IDV:    ids.ID{0x01}, // 1000
+			Status: snowtest.Undecided,
 		},
 		ParentV: snowmantest.GenesisID,
 		HeightV: snowmantest.GenesisHeight + 1,
@@ -896,10 +895,10 @@ func RecordPollDivergedVotingWithNoConflictingBitTest(t *testing.T, factory Fact
 	require.NoError(sm.Add(block3))
 
 	require.Equal(block0.ID(), sm.Preference())
-	require.Equal(choices.Processing, block0.Status(), "should not be decided yet")
-	require.Equal(choices.Processing, block1.Status(), "should not be decided yet")
-	require.Equal(choices.Processing, block2.Status(), "should not be decided yet")
-	require.Equal(choices.Processing, block3.Status(), "should not be decided yet")
+	require.Equal(snowtest.Undecided, block0.Status, "should not be decided yet")
+	require.Equal(snowtest.Undecided, block1.Status, "should not be decided yet")
+	require.Equal(snowtest.Undecided, block2.Status, "should not be decided yet")
+	require.Equal(snowtest.Undecided, block3.Status, "should not be decided yet")
 
 	// Current graph structure:
 	//       G
@@ -921,10 +920,10 @@ func RecordPollDivergedVotingWithNoConflictingBitTest(t *testing.T, factory Fact
 	require.NoError(sm.RecordPoll(context.Background(), votes3))
 
 	require.Equal(4, sm.NumProcessing())
-	require.Equal(choices.Processing, block0.Status())
-	require.Equal(choices.Processing, block1.Status())
-	require.Equal(choices.Processing, block2.Status())
-	require.Equal(choices.Processing, block3.Status())
+	require.Equal(snowtest.Undecided, block0.Status)
+	require.Equal(snowtest.Undecided, block1.Status)
+	require.Equal(snowtest.Undecided, block2.Status)
+	require.Equal(snowtest.Undecided, block3.Status)
 }
 
 func RecordPollChangePreferredChainTest(t *testing.T, factory Factory) {
@@ -1462,7 +1461,7 @@ func RecordPollRegressionCalculateInDegreeIndegreeCalculation(t *testing.T, fact
 	votes.AddCount(blk2.ID(), 1)
 	votes.AddCount(blk3.ID(), 2)
 	require.NoError(sm.RecordPoll(context.Background(), votes))
-	require.Equal(choices.Accepted, blk1.Status())
-	require.Equal(choices.Accepted, blk2.Status())
-	require.Equal(choices.Accepted, blk3.Status())
+	require.Equal(snowtest.Accepted, blk1.Status)
+	require.Equal(snowtest.Accepted, blk2.Status)
+	require.Equal(snowtest.Accepted, blk3.Status)
 }

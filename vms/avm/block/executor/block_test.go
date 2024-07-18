@@ -13,10 +13,8 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
-	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -927,113 +925,8 @@ func TestBlockReject(t *testing.T) {
 
 			b := tt.blockFunc(ctrl)
 			require.NoError(b.Reject(context.Background()))
-			require.True(b.rejected)
 			_, ok := b.manager.blkIDToState[b.ID()]
 			require.False(ok)
-		})
-	}
-}
-
-func TestBlockStatus(t *testing.T) {
-	type test struct {
-		name      string
-		blockFunc func(ctrl *gomock.Controller) *Block
-		expected  choices.Status
-	}
-	tests := []test{
-		{
-			name: "block is rejected",
-			blockFunc: func(*gomock.Controller) *Block {
-				return &Block{
-					rejected: true,
-				}
-			},
-			expected: choices.Rejected,
-		},
-		{
-			name: "block is last accepted",
-			blockFunc: func(ctrl *gomock.Controller) *Block {
-				blockID := ids.GenerateTestID()
-				mockBlock := block.NewMockBlock(ctrl)
-				mockBlock.EXPECT().ID().Return(blockID).AnyTimes()
-				return &Block{
-					Block: mockBlock,
-					manager: &manager{
-						backend:      defaultTestBackend(false, nil),
-						lastAccepted: blockID,
-					},
-				}
-			},
-			expected: choices.Accepted,
-		},
-		{
-			name: "block is processing",
-			blockFunc: func(ctrl *gomock.Controller) *Block {
-				blockID := ids.GenerateTestID()
-				mockBlock := block.NewMockBlock(ctrl)
-				mockBlock.EXPECT().ID().Return(blockID).AnyTimes()
-				return &Block{
-					Block: mockBlock,
-					manager: &manager{
-						backend: defaultTestBackend(false, nil),
-						blkIDToState: map[ids.ID]*blockState{
-							blockID: {},
-						},
-					},
-				}
-			},
-			expected: choices.Processing,
-		},
-		{
-			name: "block is accepted but not last accepted",
-			blockFunc: func(ctrl *gomock.Controller) *Block {
-				blockID := ids.GenerateTestID()
-				mockBlock := block.NewMockBlock(ctrl)
-				mockBlock.EXPECT().ID().Return(blockID).AnyTimes()
-
-				mockState := state.NewMockState(ctrl)
-				mockState.EXPECT().GetBlock(blockID).Return(nil, nil)
-
-				return &Block{
-					Block: mockBlock,
-					manager: &manager{
-						backend:      defaultTestBackend(false, nil),
-						blkIDToState: map[ids.ID]*blockState{},
-						state:        mockState,
-					},
-				}
-			},
-			expected: choices.Accepted,
-		},
-		{
-			name: "block is unknown",
-			blockFunc: func(ctrl *gomock.Controller) *Block {
-				blockID := ids.GenerateTestID()
-				mockBlock := block.NewMockBlock(ctrl)
-				mockBlock.EXPECT().ID().Return(blockID).AnyTimes()
-
-				mockState := state.NewMockState(ctrl)
-				mockState.EXPECT().GetBlock(blockID).Return(nil, database.ErrNotFound)
-
-				return &Block{
-					Block: mockBlock,
-					manager: &manager{
-						backend:      defaultTestBackend(false, nil),
-						blkIDToState: map[ids.ID]*blockState{},
-						state:        mockState,
-					},
-				}
-			},
-			expected: choices.Processing,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			require := require.New(t)
-			ctrl := gomock.NewController(t)
-
-			b := tt.blockFunc(ctrl)
-			require.Equal(tt.expected, b.Status())
 		})
 	}
 }
