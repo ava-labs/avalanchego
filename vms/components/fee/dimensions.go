@@ -19,32 +19,30 @@ type (
 	Dimensions [NumDimensions]uint64
 )
 
-func (d Dimensions) Add(o Dimensions) (Dimensions, error) {
-	var (
-		res Dimensions
-		err error
-	)
-	for i := range d {
-		res[i], err = math.Add64(d[i], o[i])
-		if err != nil {
-			return res, err
+func (d Dimensions) Add(os ...Dimensions) (Dimensions, error) {
+	var err error
+	for _, o := range os {
+		for i := range o {
+			d[i], err = math.Add64(d[i], o[i])
+			if err != nil {
+				return d, err
+			}
 		}
 	}
-	return res, nil
+	return d, nil
 }
 
-func (d Dimensions) Sub(o Dimensions) (Dimensions, error) {
-	var (
-		res Dimensions
-		err error
-	)
-	for i := range d {
-		res[i], err = math.Sub(d[i], o[i])
-		if err != nil {
-			return res, err
+func (d Dimensions) Sub(os ...Dimensions) (Dimensions, error) {
+	var err error
+	for _, o := range os {
+		for i := range o {
+			d[i], err = math.Sub(d[i], o[i])
+			if err != nil {
+				return d, err
+			}
 		}
 	}
-	return res, nil
+	return d, nil
 }
 
 func (d Dimensions) ToGas(weights Dimensions) (Gas, error) {
