@@ -88,10 +88,6 @@ func NewClient(config *ClientConfig) (Client, error) {
 	if err := config.BranchFactor.Valid(); err != nil {
 		return nil, err
 	}
-	hasher := config.Hasher
-	if hasher == nil {
-		hasher = merkledb.DefaultHasher
-	}
 	return &client{
 		networkClient:  config.NetworkClient,
 		stateSyncNodes: config.StateSyncNodeIDs,
