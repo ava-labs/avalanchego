@@ -315,7 +315,7 @@ func (n *Network) Create(rootDir string) error {
 		// Ensure the node is configured for use with the network and
 		// knows where to write its configuration.
 		if err := n.EnsureNodeConfig(node); err != nil {
-			return nil
+			return err
 		}
 	}
 

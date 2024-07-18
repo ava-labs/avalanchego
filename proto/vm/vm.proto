@@ -88,13 +88,6 @@ enum State {
   STATE_NORMAL_OP = 3;
 }
 
-enum Status {
-  STATUS_UNSPECIFIED = 0;
-  STATUS_PROCESSING = 1;
-  STATUS_REJECTED = 2;
-  STATUS_ACCEPTED = 3;
-}
-
 enum Error {
   // ERROR_UNSPECIFIED is used to indicate that no error occurred.
   ERROR_UNSPECIFIED = 0;
@@ -177,7 +170,6 @@ message ParseBlockRequest {
 message ParseBlockResponse {
   bytes id = 1;
   bytes parent_id = 2;
-  Status status = 3;
   uint64 height = 4;
   google.protobuf.Timestamp timestamp = 5;
   bool verify_with_context = 6;
@@ -190,7 +182,6 @@ message GetBlockRequest {
 message GetBlockResponse {
   bytes parent_id = 1;
   bytes bytes = 2;
-  Status status = 3;
   uint64 height = 4;
   google.protobuf.Timestamp timestamp = 5;
   // used to propagate database.ErrNotFound through RPC
