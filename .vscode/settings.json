@@ -8,4 +8,7 @@
         ],
     },
     "go.testTags": "test",
+    "cSpell.words": [
+        "Stakeable"
+    ],
 }
