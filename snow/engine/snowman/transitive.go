@@ -533,13 +533,39 @@ func (t *Transitive) Start(ctx context.Context, startReqID uint32) error {
 	// Check if the initial preference is more recent than the last accepted
 	// block. This can occur if we shut down while a set of blocks was still
 	// processing in consensus.
-	preferredTip := lastAcceptedID
 	issuedMetric := t.metrics.issued.WithLabelValues(builtSource)
+	currentPreferredTip := lastAcceptedID
+	persistedPreferredTip := previousPreferenceChain[len(previousPreferenceChain)-1]
 
-	// Re-issue all blocks in the preferred chain into consensus if the
-	// preferred chain extends the last accepted block
-	if len(previousPreferenceChain) > 0 && previousPreferenceChain[len(previousPreferenceChain)-1].Parent() == lastAcceptedID {
-		// reverse the preferred chain so the blocks are now in chronological order
+	if persistedPreferredTip.Height() <= lastAccepted.Height() {
+		// to maintain the invariant that oracle blocks are issued in the correct
+		// preferences, we need to handle the case that we are bootstrapping into an oracle block
+		if oracleBlk, ok := lastAccepted.(snowman.OracleBlock); ok {
+			options, err := oracleBlk.Options(ctx)
+			switch {
+			case err == snowman.ErrNotOracle:
+				// if there aren't blocks we need to deliver on startup, we need to set
+				// the preference to the last accepted block
+				if err := t.VM.SetPreference(ctx, lastAcceptedID); err != nil {
+					return err
+				}
+			case err != nil:
+				return err
+			default:
+				issuedMetric := t.metrics.issued.WithLabelValues(builtSource)
+				for _, blk := range options {
+					// note that deliver will set the VM's preference
+					if err := t.deliver(ctx, t.Ctx.NodeID, blk, false, issuedMetric); err != nil {
+						return err
+					}
+				}
+			}
+		}
+	} else if len(previousPreferenceChain) > 0 && persistedPreferredTip.Parent() == lastAcceptedID {
+		// Re-issue all blocks in the preferred chain into consensus if the
+		// preferred chain extends the last accepted block
+		//
+		// Reverse the preferred chain so the blocks are now in chronological order
 		slices.Reverse(previousPreferenceChain)
 
 		for _, blk := range previousPreferenceChain {
@@ -558,18 +584,18 @@ func (t *Transitive) Start(ctx context.Context, startReqID uint32) error {
 				break
 			}
 
-			preferredTip = blk.ID()
+			currentPreferredTip = blk.ID()
 		}
 	}
 
-	if err := t.VM.SetPreference(ctx, preferredTip); err != nil {
+	if err := t.VM.SetPreference(ctx, currentPreferredTip); err != nil {
 		return err
 	}
 
 	t.Ctx.Log.Info("starting consensus",
 		zap.Stringer("lastAcceptedID", lastAcceptedID),
 		zap.Uint64("lastAcceptedHeight", lastAcceptedHeight),
-		zap.Stringer("preferredID", preferredTip),
+		zap.Stringer("preferredID", currentPreferredTip),
 	)
 	t.metrics.bootstrapFinished.Set(1)
 
