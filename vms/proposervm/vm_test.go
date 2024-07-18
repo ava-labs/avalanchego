@@ -2388,3 +2388,68 @@ func TestHistoricalBlockDeletion(t *testing.T) {
 	issueBlock()
 	requireNumHeights(newNumHistoricalBlocks)
 }
+
+func TestGetPostDurangoSlotTimeWithNoValidators(t *testing.T) {
+	require := require.New(t)
+
+	var (
+		activationTime = time.Unix(0, 0)
+		durangoTime    = activationTime
+	)
+	coreVM, valState, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+	defer func() {
+		require.NoError(proVM.Shutdown(context.Background()))
+	}()
+
+	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+		// If there are no validators, anyone should be able to propose a block.
+		return map[ids.NodeID]*validators.GetValidatorOutput{}, nil
+	}
+
+	coreBlk := snowmantest.BuildChild(snowmantest.Genesis)
+	statelessBlock, err := statelessblock.BuildUnsigned(
+		snowmantest.GenesisID,
+		proVM.Time(),
+		0,
+		coreBlk.Bytes(),
+	)
+	require.NoError(err)
+
+	coreVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
+		switch blkID {
+		case snowmantest.GenesisID:
+			return snowmantest.Genesis, nil
+		case coreBlk.ID():
+			return coreBlk, nil
+		default:
+			return nil, errUnknownBlock
+		}
+	}
+	coreVM.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
+		switch {
+		case bytes.Equal(b, snowmantest.GenesisBytes):
+			return snowmantest.Genesis, nil
+		case bytes.Equal(b, coreBlk.Bytes()):
+			return coreBlk, nil
+		default:
+			return nil, errUnknownBlock
+		}
+	}
+
+	statefulBlock, err := proVM.ParseBlock(context.Background(), statelessBlock.Bytes())
+	require.NoError(err)
+
+	require.NoError(statefulBlock.Verify(context.Background()))
+
+	currentTime := proVM.Clock.Time().Truncate(time.Second)
+	parentTimestamp := statefulBlock.Timestamp()
+	slotTime, err := proVM.getPostDurangoSlotTime(
+		context.Background(),
+		statefulBlock.Height()+1,
+		statelessBlock.PChainHeight(),
+		proposer.TimeToSlot(parentTimestamp, currentTime),
+		parentTimestamp,
+	)
+	require.NoError(err)
+	require.Equal(parentTimestamp.Add(proVM.MinBlkDelay), slotTime)
+}
