@@ -76,7 +76,7 @@ func (g GasPrice) MulExp(
 		output         uint256.Int
 		numeratorAccum uint256.Int
 
-		maxOutput uint256.Int // range is [0, MaxUint128]
+		maxOutput uint256.Int
 	)
 	numerator.SetUint64(uint64(excess))                     // range is [0, MaxUint64]
 	denominator.SetUint64(uint64(excessConversionConstant)) // range is [0, MaxUint64]
