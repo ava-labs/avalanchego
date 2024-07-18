@@ -3196,13 +3196,31 @@ func TestTransitiveStart(t *testing.T) {
 		},
 		//		  G
 		//		  |
+		//		 *A*
+		//		  |
+		//		 [B]
+		//	     / \
+		//	   C    D
+		{
+			name: "preferred chain before last accepted - oracle last accepted block",
+			setup: func(genesisBlk *snowmantest.Block) (snowman.Block, []snowman.Block, snowman.Block, ids.ID, []snowman.Block) {
+				blkA := BuildBlock(genesisBlk, choices.Accepted)
+				blkB := BuildOracleBlock(blkA, choices.Accepted, choices.Processing)
+				blkC := blkB.OptionsV[0]
+				blkD := blkB.OptionsV[1]
+
+				return blkB, []snowman.Block{genesisBlk, blkA, blkB, blkC, blkD}, blkA, blkC.ID(), []snowman.Block{blkC, blkD}
+			},
+		},
+		//		  G
+		//		  |
 		//		  A
 		//		 / \
 		//	    B  *C*
 		//	    |
 		//	   [D]
 		{
-			name: "preferred chain before last accepted - option block",
+			name: "preferred chain before last accepted - option block preference",
 			setup: func(genesisBlk *snowmantest.Block) (snowman.Block, []snowman.Block, snowman.Block, ids.ID, []snowman.Block) {
 				blkA := BuildOracleBlock(genesisBlk, choices.Accepted, choices.Processing)
 				blkC := blkA.OptionsV[1]
@@ -3245,7 +3263,7 @@ func TestTransitiveStart(t *testing.T) {
 		//		 / \
 		//	   *B*  C
 		{
-			name: "preferred chain after last accepted - oracle block",
+			name: "preferred chain after last accepted - oracle block preference",
 			setup: func(genesisBlk *snowmantest.Block) (snowman.Block, []snowman.Block, snowman.Block, ids.ID, []snowman.Block) {
 				blkA := BuildOracleBlock(genesisBlk, choices.Processing, choices.Processing)
 				blkB := blkA.OptionsV[0]
@@ -3263,7 +3281,7 @@ func TestTransitiveStart(t *testing.T) {
 		//	    |
 		//	   *D*
 		{
-			name: "preferred chain - preferred tip branching out of oracle block",
+			name: "preferred chain - preferred tip branching out of oracle block preference",
 			setup: func(genesisBlk *snowmantest.Block) (snowman.Block, []snowman.Block, snowman.Block, ids.ID, []snowman.Block) {
 				blkA := BuildOracleBlock(genesisBlk, choices.Processing, choices.Processing)
 				blkB := blkA.OptionsV[0]
@@ -3283,7 +3301,7 @@ func TestTransitiveStart(t *testing.T) {
 		//	    |
 		//	   *D*
 		{
-			name: "preferred chain - preferred tip branching out of oracle block",
+			name: "preferred chain - preferred tip branching out of oracle block preference",
 			setup: func(genesisBlk *snowmantest.Block) (snowman.Block, []snowman.Block, snowman.Block, ids.ID, []snowman.Block) {
 				blkA := BuildBlock(genesisBlk, choices.Accepted)
 				blkB := BuildBlock(blkA, choices.Processing)
