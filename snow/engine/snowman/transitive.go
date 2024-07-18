@@ -468,6 +468,29 @@ func (t *Transitive) Context() *snow.ConsensusContext {
 	return t.Ctx
 }
 
+func (t *Transitive) getInitialPreference(
+	ctx context.Context,
+	lastAcceptedBlk snowman.Block,
+) (snowman.Block, error) {
+	var (
+		blkID ids.ID
+		err   error
+	)
+
+	// Default to using the last accepted block if the VM does not define its
+	// own initial preferred block.
+	if t.getInitialPreferenceVM == nil {
+		blkID = lastAcceptedBlk.ID()
+	} else {
+		blkID, err = t.getInitialPreferenceVM.GetInitialPreference(ctx)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return t.VM.GetBlock(ctx, blkID)
+}
+
 func (t *Transitive) Start(ctx context.Context, startReqID uint32) error {
 	t.requestID = startReqID
 	lastAcceptedID, err := t.VM.LastAccepted(ctx)
@@ -483,40 +506,15 @@ func (t *Transitive) Start(ctx context.Context, startReqID uint32) error {
 		return err
 	}
 
-	var (
-		preferredID    ids.ID
-		preferredBlock snowman.Block
-	)
-
-	// Default to using the last accepted block if the VM does not define its
-	// own initial preferred block.
-	if t.getInitialPreferenceVM == nil {
-		preferredID = lastAcceptedID
-		preferredBlock = lastAccepted
-	} else {
-		preferredID, err = t.getInitialPreferenceVM.GetInitialPreference(ctx)
-		if err != nil {
-			return fmt.Errorf("failed to get initial preference: %w", err)
-		}
-
-		preferredBlock, err = t.VM.GetBlock(ctx, preferredID)
-		if err != nil {
-			return fmt.Errorf("failed to get initial preferred block: %w", err)
-		}
+	preferredBlk, err := t.getInitialPreference(ctx, lastAccepted)
+	if err != nil {
+		return fmt.Errorf("failed to get initial preference: %w", err)
 	}
 
-	// Check if the initial setup is more recent than the last accepted
-	// block. This can occur if we shut down while a set of blocks was still
-	// processing in consensus.
-	preferredTip := lastAcceptedID
-	if preferredBlock.Height() > lastAccepted.Height() {
-		preferredTip = preferredID
-	}
-
-	preferredChain := make([]snowman.Block, 0)
-	for preferredBlock.Height() > lastAccepted.Height() {
-		preferredChain = append(preferredChain, preferredBlock)
-		preferredBlock, err = t.VM.GetBlock(ctx, preferredBlock.Parent())
+	previousPreferenceChain := make([]snowman.Block, 0)
+	for preferredBlk.Height() > lastAccepted.Height() {
+		previousPreferenceChain = append(previousPreferenceChain, preferredBlk)
+		preferredBlk, err = t.VM.GetBlock(ctx, preferredBlk.Parent())
 		if err != nil {
 			return err
 		}
@@ -528,23 +526,35 @@ func (t *Transitive) Start(ctx context.Context, startReqID uint32) error {
 		return err
 	}
 
+	// Check if the initial preference is more recent than the last accepted
+	// block. This can occur if we shut down while a set of blocks was still
+	// processing in consensus.
+	preferredTip := lastAcceptedID
 	issuedMetric := t.metrics.issued.WithLabelValues(builtSource)
 
 	// Re-issue all blocks in the preferred chain into consensus if the
 	// preferred chain extends the last accepted block
-	if len(preferredChain) > 0 && preferredChain[len(preferredChain)-1].Parent() == lastAcceptedID {
+	if len(previousPreferenceChain) > 0 && previousPreferenceChain[len(previousPreferenceChain)-1].Parent() == lastAcceptedID {
 		// reverse the preferred chain so the blocks are now in chronological order
-		slices.Reverse(preferredChain)
+		slices.Reverse(previousPreferenceChain)
 
-		for _, preferredBlk := range preferredChain {
-			if _, err := t.addUnverifiedBlockToConsensus(
+		for _, blk := range previousPreferenceChain {
+			ok, err := t.addUnverifiedBlockToConsensus(
 				ctx,
 				t.Ctx.NodeID,
-				preferredBlk,
+				blk,
 				issuedMetric,
-			); err != nil {
+			)
+			if err != nil {
 				return err
 			}
+			if !ok {
+				t.Ctx.Log.Warn("failed to insert block into consensus",
+					zap.Stringer("blkID", blk.ID()))
+				break
+			}
+
+			preferredTip = blk.ID()
 		}
 	}
 

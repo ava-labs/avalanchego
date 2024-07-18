@@ -3290,7 +3290,27 @@ func TestTransitiveStart(t *testing.T) {
 				blkC := BuildBlock(blkA, choices.Accepted)
 				blkD := BuildBlock(blkB, choices.Processing)
 
-				return blkC, []snowman.Block{genesisBlk, blkA, blkB, blkC, blkD}, blkD, blkD.IDV, nil
+				return blkC, []snowman.Block{genesisBlk, blkA, blkB, blkC, blkD}, blkD, blkC.IDV, nil
+			},
+		},
+		//		 [G]
+		//		  |
+		//		 *A*
+		//		  |
+		//		  B <- fails verification
+		//		  |
+		//		  C
+		{
+			name: "preferred chain after last accepted - abort remaining preferred chain if block fails verification",
+			setup: func(genesisBlk *snowmantest.Block) (snowman.Block, []snowman.Block, snowman.Block, ids.ID, []snowman.Block) {
+				blkA := BuildBlock(genesisBlk, choices.Processing)
+
+				blkB := BuildBlock(blkA, choices.Processing)
+				blkB.VerifyV = errors.New("foo")
+
+				blkC := BuildBlock(blkB, choices.Processing)
+
+				return genesisBlk, []snowman.Block{genesisBlk, blkA, blkB, blkC}, blkC, blkA.IDV, []snowman.Block{blkA}
 			},
 		},
 	}
