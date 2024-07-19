@@ -164,12 +164,13 @@ var (
 	errUnsupportedTx     = errors.New("unsupported tx type")
 	errUnsupportedOutput = errors.New("unsupported output type")
 	errUnsupportedInput  = errors.New("unsupported input type")
+	errUnsupportedOwner  = errors.New("unsupported owner type")
 )
 
 func TxComplexity(tx txs.UnsignedTx) (fee.Dimensions, error) {
 	c := complexityCalculator{}
 	err := tx.Visit(&c)
-	return c.complexity, err
+	return c.output, err
 }
 
 func OutputComplexity(out *avax.TransferableOutput) (fee.Dimensions, error) {
@@ -192,9 +193,12 @@ func OutputComplexity(out *avax.TransferableOutput) (fee.Dimensions, error) {
 	}
 
 	numAddresses := uint64(len(secp256k1Out.Addrs))
-	// TODO: Overflow check
-	complexity[fee.Bandwidth] += numAddresses * ids.ShortIDLen // addresses
-	return complexity, nil
+	addressBandwidth, err := math.Mul(numAddresses, ids.ShortIDLen)
+	if err != nil {
+		return fee.Dimensions{}, err
+	}
+	complexity[fee.Bandwidth], err = math.Add(complexity[fee.Bandwidth], addressBandwidth)
+	return complexity, err
 }
 
 // InputComplexity returns the complexity an input adds to a transaction. It
@@ -219,15 +223,24 @@ func InputComplexity(in *avax.TransferableInput) (fee.Dimensions, error) {
 	}
 
 	numSignatures := uint64(len(secp256k1In.SigIndices))
-	complexity[fee.Bandwidth] += numSignatures * intrinsicSECP256k1FxSignatureBandwidth // TODO: Overflow check
-	return complexity, nil
+	signatureBandwidth, err := math.Mul(numSignatures, intrinsicSECP256k1FxSignatureBandwidth)
+	if err != nil {
+		return fee.Dimensions{}, err
+	}
+	complexity[fee.Bandwidth], err = math.Add(complexity[fee.Bandwidth], signatureBandwidth)
+	return complexity, err
 }
 
 // OwnerComplexity returns the complexity an owner adds to a transaction.
 // It does not include the typeID of the owner.
-func OwnerComplexity(_ fx.Owner) (fee.Dimensions, error) {
+func OwnerComplexity(ownerIntf fx.Owner) (fee.Dimensions, error) {
+	owner, ok := ownerIntf.(*secp256k1fx.OutputOwners)
+	if !ok {
+		return fee.Dimensions{}, errUnsupportedOwner
+	}
+
 	return fee.Dimensions{
-		fee.Bandwidth: 0, // TODO
+		fee.Bandwidth: intrinsicSECP256k1FxOutputOwnersBandwidth, // TODO
 		fee.DBRead:    0,
 		fee.DBWrite:   1,
 		fee.Compute:   0, // TODO
@@ -258,8 +271,7 @@ func SignerComplexity(_ signer.Signer) (fee.Dimensions, error) {
 }
 
 type complexityCalculator struct {
-	// outputs:
-	complexity fee.Dimensions
+	output fee.Dimensions
 }
 
 func (*complexityCalculator) AddDelegatorTx(*txs.AddDelegatorTx) error {
@@ -303,7 +315,7 @@ func (c *complexityCalculator) AddPermissionlessValidatorTx(tx *txs.AddPermissio
 	if err != nil {
 		return err
 	}
-	c.complexity, err = IntrinsicAddPermissionlessValidatorTxComplexities.Add(
+	c.output, err = IntrinsicAddPermissionlessValidatorTxComplexities.Add(
 		baseTxComplexity,
 		signerComplexity,
 		outputsComplexity,
@@ -326,7 +338,7 @@ func (c *complexityCalculator) AddPermissionlessDelegatorTx(tx *txs.AddPermissio
 	if err != nil {
 		return err
 	}
-	c.complexity, err = IntrinsicAddPermissionlessDelegatorTxComplexities.Add(
+	c.output, err = IntrinsicAddPermissionlessDelegatorTxComplexities.Add(
 		baseTxComplexity,
 		ownerComplexity,
 		outputsComplexity,
@@ -343,7 +355,7 @@ func (c *complexityCalculator) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx
 	if err != nil {
 		return err
 	}
-	c.complexity, err = IntrinsicAddSubnetValidatorTxComplexities.Add(
+	c.output, err = IntrinsicAddSubnetValidatorTxComplexities.Add(
 		baseTxComplexity,
 		authComplexity,
 	)
@@ -355,18 +367,30 @@ func (c *complexityCalculator) BaseTx(tx *txs.BaseTx) error {
 	if err != nil {
 		return err
 	}
-	c.complexity, err = IntrinsicBaseTxComplexities.Add(baseTxComplexity)
+	c.output, err = IntrinsicBaseTxComplexities.Add(baseTxComplexity)
 	return err
 }
 
 func (c *complexityCalculator) CreateChainTx(tx *txs.CreateChainTx) error {
+	bandwidth, err := math.Mul(uint64(len(tx.FxIDs)), ids.IDLen)
+	if err != nil {
+		return err
+	}
+	bandwidth, err = math.Add(bandwidth, uint64(len(tx.ChainName)))
+	if err != nil {
+		return err
+	}
+	bandwidth, err = math.Add(bandwidth, uint64(len(tx.GenesisData)))
+	if err != nil {
+		return err
+	}
 	dynamicComplexity := fee.Dimensions{
-		// TODO: Overflow check
-		fee.Bandwidth: uint64(len(tx.ChainName) + len(tx.FxIDs)*ids.IDLen + len(tx.GenesisData)),
+		fee.Bandwidth: bandwidth,
 		fee.DBRead:    0,
 		fee.DBWrite:   0,
 		fee.Compute:   0,
 	}
+
 	baseTxComplexity, err := baseTx(&tx.BaseTx)
 	if err != nil {
 		return err
@@ -375,7 +399,7 @@ func (c *complexityCalculator) CreateChainTx(tx *txs.CreateChainTx) error {
 	if err != nil {
 		return err
 	}
-	c.complexity, err = IntrinsicCreateChainTxComplexities.Add(
+	c.output, err = IntrinsicCreateChainTxComplexities.Add(
 		dynamicComplexity,
 		baseTxComplexity,
 		authComplexity,
@@ -392,7 +416,7 @@ func (c *complexityCalculator) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 	if err != nil {
 		return err
 	}
-	c.complexity, err = IntrinsicCreateSubnetTxComplexities.Add(
+	c.output, err = IntrinsicCreateSubnetTxComplexities.Add(
 		baseTxComplexity,
 		ownerComplexity,
 	)
@@ -408,7 +432,7 @@ func (c *complexityCalculator) ExportTx(tx *txs.ExportTx) error {
 	if err != nil {
 		return err
 	}
-	c.complexity, err = IntrinsicExportTxComplexities.Add(
+	c.output, err = IntrinsicExportTxComplexities.Add(
 		baseTxComplexity,
 		outputsComplexity,
 	)
@@ -424,7 +448,7 @@ func (c *complexityCalculator) ImportTx(tx *txs.ImportTx) error {
 	if err != nil {
 		return err
 	}
-	c.complexity, err = IntrinsicImportTxComplexities.Add(
+	c.output, err = IntrinsicImportTxComplexities.Add(
 		baseTxComplexity,
 		inputsComplexity,
 	)
@@ -440,7 +464,7 @@ func (c *complexityCalculator) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValid
 	if err != nil {
 		return err
 	}
-	c.complexity, err = IntrinsicRemoveSubnetValidatorTxComplexities.Add(
+	c.output, err = IntrinsicRemoveSubnetValidatorTxComplexities.Add(
 		baseTxComplexity,
 		authComplexity,
 	)
@@ -460,7 +484,7 @@ func (c *complexityCalculator) TransferSubnetOwnershipTx(tx *txs.TransferSubnetO
 	if err != nil {
 		return err
 	}
-	c.complexity, err = IntrinsicTransferSubnetOwnershipTxComplexities.Add(
+	c.output, err = IntrinsicTransferSubnetOwnershipTxComplexities.Add(
 		baseTxComplexity,
 		authComplexity,
 		ownerComplexity,
