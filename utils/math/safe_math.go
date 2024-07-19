@@ -45,7 +45,7 @@ func Sub[T constraints.Unsigned](a, b T) (T, error) {
 	return a - b, nil
 }
 
-// Mul64 returns:
+// Mul returns:
 // 1) a * b
 // 2) If there is overflow, an error
 func Mul[T constraints.Unsigned](a, b T) (T, error) {
