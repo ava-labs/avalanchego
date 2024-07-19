@@ -179,7 +179,7 @@ func (t *Transitive) Gossip(ctx context.Context) error {
 		return nil
 	}
 
-	nextHeightToAccept, err := math.Add64(lastAcceptedHeight, 1)
+	nextHeightToAccept, err := math.Add(lastAcceptedHeight, 1)
 	if err != nil {
 		t.Ctx.Log.Error("skipping block gossip",
 			zap.String("reason", "block height overflow"),
@@ -886,7 +886,7 @@ func (t *Transitive) sendQuery(
 	}
 
 	_, lastAcceptedHeight := t.Consensus.LastAccepted()
-	nextHeightToAccept, err := math.Add64(lastAcceptedHeight, 1)
+	nextHeightToAccept, err := math.Add(lastAcceptedHeight, 1)
 	if err != nil {
 		t.Ctx.Log.Error("dropped query for block",
 			zap.String("reason", "block height overflow"),
