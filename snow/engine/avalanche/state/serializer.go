@@ -86,7 +86,7 @@ func (s *Serializer) BuildStopVtx(
 			return nil, err
 		}
 		parentHeight := parent.v.vtx.Height()
-		childHeight, err := math.Add64(parentHeight, 1)
+		childHeight, err := math.Add(parentHeight, 1)
 		if err != nil {
 			return nil, err
 		}

@@ -133,7 +133,7 @@ func IncreaseBalance(db database.KeyValueReaderWriterDeleter, address ids.ShortI
 	if err != nil {
 		return err
 	}
-	balance, err = math.Add64(balance, amount)
+	balance, err = math.Add(balance, amount)
 	if err != nil {
 		return err
 	}
@@ -185,7 +185,7 @@ func IncreaseLoan(db database.KeyValueReaderWriterDeleter, chainID ids.ID, amoun
 	if err != nil {
 		return err
 	}
-	balance, err = math.Add64(balance, amount)
+	balance, err = math.Add(balance, amount)
 	if err != nil {
 		return err
 	}

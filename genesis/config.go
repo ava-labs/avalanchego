@@ -143,12 +143,12 @@ func (c Config) Unparse() (UnparsedConfig, error) {
 func (c *Config) InitialSupply() (uint64, error) {
 	initialSupply := uint64(0)
 	for _, allocation := range c.Allocations {
-		newInitialSupply, err := math.Add64(initialSupply, allocation.InitialAmount)
+		newInitialSupply, err := math.Add(initialSupply, allocation.InitialAmount)
 		if err != nil {
 			return 0, err
 		}
 		for _, unlock := range allocation.UnlockSchedule {
-			newInitialSupply, err = math.Add64(newInitialSupply, unlock.Amount)
+			newInitialSupply, err = math.Add(newInitialSupply, unlock.Amount)
 			if err != nil {
 				return 0, err
 			}
