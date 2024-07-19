@@ -17,6 +17,11 @@ type State struct {
 	Excess   Gas
 }
 
+// AdvanceTime adds maxGasPerSecond to capacity and subtracts targetGasPerSecond
+// from excess over the provided duration.
+//
+// Capacity is capped at maxGasCapacity.
+// Excess to be removed is capped at excess.
 func (s State) AdvanceTime(
 	maxGasCapacity Gas,
 	maxGasPerSecond Gas,
@@ -32,15 +37,19 @@ func (s State) AdvanceTime(
 	}
 }
 
+// ConsumeGas removes gas from capacity and adds gas to excess.
+//
+// If the capacity is insufficient, an error is returned.
+// If the excess would overflow, it is capped at MaxUint64.
 func (s State) ConsumeGas(gas Gas) (State, error) {
 	newCapacity, err := safemath.Sub(uint64(s.Capacity), uint64(gas))
 	if err != nil {
 		return State{}, ErrInsufficientCapacity
 	}
 
-	newExcess, err := safemath.Add64(uint64(s.Excess), uint64(gas))
+	newExcess, err := safemath.Add(uint64(s.Excess), uint64(gas))
 	if err != nil {
-		//nolint:nilerr // excess is capped at math.MaxUint64
+		//nolint:nilerr // excess is capped at MaxUint64
 		return State{
 			Capacity: Gas(newCapacity),
 			Excess:   math.MaxUint64,

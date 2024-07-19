@@ -18,20 +18,26 @@ type (
 	GasPrice uint64
 )
 
+// AddPerSecond returns g + gasPerSecond * seconds.
+//
+// If overflow would occur, MaxUint64 is returned.
 func (g Gas) AddPerSecond(gasPerSecond Gas, seconds uint64) Gas {
-	newGas, err := safemath.Mul64(uint64(gasPerSecond), seconds)
+	newGas, err := safemath.Mul(uint64(gasPerSecond), seconds)
 	if err != nil {
 		return math.MaxUint64
 	}
-	totalGas, err := safemath.Add64(uint64(g), newGas)
+	totalGas, err := safemath.Add(uint64(g), newGas)
 	if err != nil {
 		return math.MaxUint64
 	}
 	return Gas(totalGas)
 }
 
+// SubPerSecond returns g - gasPerSecond * seconds.
+//
+// If underflow would occur, 0 is returned.
 func (g Gas) SubPerSecond(gasPerSecond Gas, seconds uint64) Gas {
-	gasToRemove, err := safemath.Mul64(uint64(gasPerSecond), seconds)
+	gasToRemove, err := safemath.Mul(uint64(gasPerSecond), seconds)
 	if err != nil {
 		return 0
 	}
@@ -42,7 +48,7 @@ func (g Gas) SubPerSecond(gasPerSecond Gas, seconds uint64) Gas {
 	return Gas(totalGas)
 }
 
-// MulExp returns an approximation of g*e^(excess / excessConversionConstant)
+// MulExp returns an approximation of g * e^(excess / excessConversionConstant)
 //
 // This implements the EIP-4844 fake exponential formula:
 //
@@ -63,7 +69,7 @@ func (g Gas) SubPerSecond(gasPerSecond Gas, seconds uint64) Gas {
 //
 // This function does not perform any memory allocations.
 //
-//nolint:dupword // This comment is copied from the EIP-4844 specification
+//nolint:dupword // The python is copied from the EIP-4844 specification
 func (g GasPrice) MulExp(
 	excess Gas,
 	excessConversionConstant Gas,

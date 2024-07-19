@@ -67,7 +67,7 @@ func (s *weightedArray) Initialize(weights []uint64) error {
 
 	cumulativeWeight := uint64(0)
 	for i := 0; i < len(s.arr); i++ {
-		newWeight, err := math.Add64(
+		newWeight, err := math.Add(
 			cumulativeWeight,
 			s.arr[i].cumulativeWeight,
 		)
