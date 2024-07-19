@@ -170,7 +170,7 @@ func (b *builder) GetImportableBalance(
 			continue
 		}
 
-		newBalance, err := math.Add64(balance, amount)
+		newBalance, err := math.Add(balance, amount)
 		if err != nil {
 			return 0, err
 		}
@@ -218,7 +218,7 @@ func (b *builder) NewImportTx(
 			},
 		})
 
-		newImportedAmount, err := math.Add64(importedAmount, amount)
+		newImportedAmount, err := math.Add(importedAmount, amount)
 		if err != nil {
 			return nil, err
 		}
@@ -280,7 +280,7 @@ func (b *builder) NewExportTx(
 			Out:   output,
 		}
 
-		newExportedAmount, err := math.Add64(exportedAmount, output.Amt)
+		newExportedAmount, err := math.Add(exportedAmount, output.Amt)
 		if err != nil {
 			return nil, err
 		}
@@ -311,7 +311,7 @@ func (b *builder) NewExportTx(
 		return nil, err
 	}
 
-	amountToConsume, err := math.Add64(exportedAmount, initialFee)
+	amountToConsume, err := math.Add(exportedAmount, initialFee)
 	if err != nil {
 		return nil, err
 	}
@@ -360,7 +360,7 @@ func (b *builder) NewExportTx(
 		// Update the cost for the next iteration
 		cost = newCost
 
-		amountToConsume, err = math.Add64(amountToConsume, additionalFee)
+		amountToConsume, err = math.Add(amountToConsume, additionalFee)
 		if err != nil {
 			return nil, err
 		}

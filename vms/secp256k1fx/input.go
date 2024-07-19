@@ -28,7 +28,7 @@ type Input struct {
 
 func (in *Input) Cost() (uint64, error) {
 	numSigs := uint64(len(in.SigIndices))
-	return math.Mul64(numSigs, CostPerSignature)
+	return math.Mul(numSigs, CostPerSignature)
 }
 
 // Verify this input is syntactically valid

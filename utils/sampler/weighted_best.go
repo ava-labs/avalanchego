@@ -34,7 +34,7 @@ type weightedBest struct {
 func (s *weightedBest) Initialize(weights []uint64) error {
 	totalWeight := uint64(0)
 	for _, weight := range weights {
-		newWeight, err := safemath.Add64(totalWeight, weight)
+		newWeight, err := safemath.Add(totalWeight, weight)
 		if err != nil {
 			return err
 		}
