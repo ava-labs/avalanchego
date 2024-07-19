@@ -6,10 +6,10 @@ package fee
 import "github.com/ava-labs/avalanchego/utils/math"
 
 const (
-	Bandwidth Dimension = iota // bytes
-	DBRead                     // num reads
-	DBWrite                    // num writes (includes deletes)
-	Compute                    // time
+	Bandwidth Dimension = iota
+	DBRead
+	DBWrite // includes deletes
+	Compute
 
 	NumDimensions = iota
 )
