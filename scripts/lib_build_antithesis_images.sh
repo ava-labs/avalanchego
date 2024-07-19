@@ -96,7 +96,7 @@ function build_antithesis_images {
   ${docker_cmd} -t "${workload_image_name}" -f "${base_dockerfile}.workload" "${target_path}"
 }
 
-# Generate the docker-compose configuration for the antithesis config image.
+# Generate the docker compose configuration for the antithesis config image.
 function gen_antithesis_compose_config {
   local image_tag=$1
   local exe_path=$2
