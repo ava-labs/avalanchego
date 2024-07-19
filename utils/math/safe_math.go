@@ -22,9 +22,7 @@ var (
 
 // MaxUint returns the maximum value of an unsigned integer of type T.
 func MaxUint[T constraints.Unsigned]() T {
-	// Unsigned integers will underflow to their max value.
-	// Ref: https://go.dev/ref/spec#Arithmetic_operators
-	return T(0) - 1
+	return ^T(0)
 }
 
 // Add returns:

@@ -204,7 +204,7 @@ func GetMaxWeight(
 		if isAdded {
 			op = math.Add
 		} else {
-			op = math.Sub[uint64]
+			op = math.Sub
 		}
 		currentWeight, err = op(currentWeight, delegator.Weight)
 		if err != nil {
